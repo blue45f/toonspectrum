@@ -1617,6 +1617,7 @@ function materializeStudioBrushPackSelectionInternal(
   return {
     catalogId: descriptor.catalogId,
     catalogName: descriptor.catalogName,
+    operation: "paint",
     defaultWidth: descriptor.defaultWidth,
     defaultOpacity: descriptor.defaultOpacity,
     runtimeBrushId: descriptor.runtimeBrushId,

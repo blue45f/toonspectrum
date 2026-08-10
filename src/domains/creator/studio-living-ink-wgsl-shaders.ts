@@ -22,6 +22,8 @@
 
 import {
   STUDIO_LIVING_INK_FLUID_DEFAULTS,
+  STUDIO_LIVING_INK_GRANULATION_MULTIPLIER_BOUNDS,
+  STUDIO_LIVING_INK_MAXIMUM_OPTICAL_DENSITY,
   studioLivingInkCoarseVelocityGrid,
   studioLivingInkEvaporationMultiplier,
   studioLivingInkVelocityDamping,
@@ -34,7 +36,18 @@ import {
 
 import type { StudioLivingInkDisplayMode } from "./studio-living-ink-gpu-protocol";
 
-export const STUDIO_LIVING_INK_WGSL_SHADER_REVISION = "wgsl-field-v3-paper-resolve" as const;
+export const STUDIO_LIVING_INK_WGSL_SHADER_REVISION = "wgsl-field-v5-bounded-optical-density" as const;
+
+/**
+ * WebGPU display-resolve sediment response.
+ *
+ * The shared 2.15 optical-density response is the physical model's starting point. The WGSL path
+ * then crosses an rgba32float storage buffer, explicit RGBA8 quantisation and a straight-alpha
+ * page composite, which attenuates the measured high-frequency sediment contrast relative to the
+ * WebGL2 half-float framebuffer resolve. A 2.35 response restores the same visible deposition
+ * contrast after that transfer without changing the noise spectrum, density gate or verifier.
+ */
+export const STUDIO_LIVING_INK_WGSL_GRANULATION_RESPONSE_GAIN = 2.35 as const;
 
 /** Field uniform slot count (f32/u32 words). The GPU buffer is `4 × this` bytes. */
 export const STUDIO_LIVING_INK_WGSL_UNIFORM_WORDS = 40 as const;
@@ -740,13 +753,29 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   // Slowly varying paper fibres make capillary spread elongated but continuous. Sampling a fibre
   // axis plus its perpendicular avoids grid diamonds and exposes real paper-direction response.
   let fieldSize = vec2f(f32(u.width), f32(u.height));
-  let fibreCell = floor(uv * fieldSize / 28.0);
+  // The certified GLSL field is addressed in bottom-left uv while this storage grid is top-down.
+  // Evaluate the paper in the same physical page space, then reflect its direction back into the
+  // storage-grid basis. Without both halves of that transform the radial wash sees a different
+  // fibre tile and its capillary ellipse is biased even though all scalar coefficients match.
+  let paperUv = vec2f(uv.x, 1.0 - uv.y);
+  let fibreCell = floor(paperUv * fieldSize / 28.0);
   let fibreNoise = fract(sin(dot(fibreCell + vec2f(u.seed), vec2f(41.73, 97.11))) * 43758.5453);
   let fibreAngle = (fibreNoise - 0.5) * 1.4 + 0.34;
-  let fibre = vec2f(cos(fibreAngle), sin(fibreAngle));
+  let pageFibre = vec2f(cos(fibreAngle), sin(fibreAngle));
+  let fibre = vec2f(pageFibre.x, -pageFibre.y);
   let perpendicular = vec2f(-fibre.y, fibre.x);
-  let parallelReach = fibre * texel * (1.0 + u.capillaryCreep * (3.0 + 3.0 * u.fiberAmount));
-  let perpendicularReach = perpendicular * texel * (1.0 + u.capillaryCreep * 1.6);
+  let rawParallelReach = 1.0 + u.capillaryCreep * (3.0 + 3.0 * u.fiberAmount);
+  let rawPerpendicularReach = 1.0 + u.capillaryCreep * 1.6;
+  // Preserve the porous area reached by the GLSL stencil while bounding its second-moment
+  // eccentricity. A procedural fibre is a direction, not permission for a single random tile to
+  // turn a radial puddle into a long ellipse. The determinant-preserving pair moves reach from the
+  // dominant axis to its perpendicular without changing total capillary area or water mass.
+  let geometricReach = sqrt(rawParallelReach * rawPerpendicularReach);
+  let maximumFibreRatio = 1.0 + u.fiberAmount * 1.2;
+  let fibreRatio = min(rawParallelReach / rawPerpendicularReach, maximumFibreRatio);
+  let axisScale = sqrt(fibreRatio);
+  let parallelReach = fibre * texel * geometricReach * axisScale;
+  let perpendicularReach = perpendicular * texel * geometricReach / axisScale;
   let farParallelReach = parallelReach * 1.4;
   let farPerpendicularReach = perpendicularReach * 1.25;
   let parallelWeight = 0.5 + u.fiberAmount * 0.22;
@@ -1046,6 +1075,12 @@ fn clampUv(p: vec2f) -> vec2f {
   return clamp(p, vec2f(0.0), vec2f(1.0));
 }
 
+// GLSL evaluates paper and capillary directions in bottom-left page uv. WGSL storage rows are
+// top-down, so directed offsets (unlike symmetric scalar distances) must be reflected exactly once.
+fn pageVectorToField(v: vec2f) -> vec2f {
+  return vec2f(v.x, -v.y);
+}
+
 @compute @workgroup_size(8, 8)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
   if (gid.x >= u.displayWidth || gid.y >= u.displayHeight) { return; }
@@ -1075,13 +1110,15 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     // Reconstruct the capillary plume from the authoritative mobile field at display time. The
     // rotated eight-tap kernel follows the local paper direction, avoiding both square Gaussian
     // blur and the circular dab joints of a stamp renderer.
-    let fieldPixel = uv / fineTexel;
+    let fieldPixel = vec2f(uv.x / fineTexel.x, (1.0 - uv.y) / fineTexel.y);
     let plumeAngle = (smoothNoise(fieldPixel * 0.021 + vec2f(23.0, 71.0)) - 0.5) * 1.7;
-    let axis = vec2f(cos(plumeAngle), sin(plumeAngle));
-    let crossAxis = vec2f(-axis.y, axis.x);
+    let pageAxis = vec2f(cos(plumeAngle), sin(plumeAngle));
+    let pageCrossAxis = vec2f(-pageAxis.y, pageAxis.x);
+    let axis = pageVectorToField(pageAxis);
+    let crossAxis = pageVectorToField(pageCrossAxis);
     let plumeRadius = (4.0 + smoothstep(0.025, 0.7, wetness) * 27.0)
       * mix(0.8, 1.2, smoothNoise(fieldPixel * 0.057 + vec2f(3.0, 47.0)));
-    var plumeWarp = vec2f(
+    var pagePlumeWarp = vec2f(
       smoothNoise(fieldPixel * 0.039 + vec2f(79.0, 13.0)) - 0.5,
       smoothNoise(fieldPixel * 0.043 + vec2f(17.0, 101.0)) - 0.5,
     ) * fineTexel * plumeRadius * 0.42;
@@ -1091,14 +1128,12 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     // isolated dots, noisy scallops or frame-to-frame randomness.
     let lobeWaveA = sin(fieldPixel.x * 0.071 + fieldPixel.y * 0.019 + u.seed * 0.017);
     let lobeWaveB = sin(fieldPixel.x * 0.033 - fieldPixel.y * 0.027 + u.seed * 0.031 + 1.7);
-    // Negated against GLSL: the drift is the one *deliberate* direction in this kernel (a wash
-    // creeping down the page), and GLSL authors it in WebGL uv where +y points up. The surrounding
-    // noise terms are symmetric so their sign is immaterial, but this one is the picture.
-    let verticalDrift = -(0.14 + lobeWaveA * 0.17 + lobeWaveB * 0.09);
-    plumeWarp = plumeWarp + vec2f(
+    let verticalDrift = 0.14 + lobeWaveA * 0.17 + lobeWaveB * 0.09;
+    pagePlumeWarp = pagePlumeWarp + vec2f(
       fineTexel.x * plumeRadius * lobeWaveB * 0.08,
       fineTexel.y * plumeRadius * verticalDrift,
     );
+    let plumeWarp = pageVectorToField(pagePlumeWarp);
     let plumeUv = clampUv(uv + plumeWarp);
     let a = axis * fineTexel * plumeRadius;
     let b = crossAxis * fineTexel * plumeRadius * 0.96;
@@ -1121,12 +1156,12 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       + sampleMobile(clampUv(plumeUv + b))
       + sampleMobile(clampUv(plumeUv - b))
     );
-    let lobeOffsetA = fineTexel * plumeRadius
-      * vec2f(0.34 + lobeWaveB * 0.08, -0.18 + lobeWaveA * 0.1);
-    let lobeOffsetB = fineTexel * plumeRadius
-      * vec2f(-0.23 + lobeWaveA * 0.07, 0.31 + lobeWaveB * 0.08);
-    let lobeOffsetC = fineTexel * plumeRadius
-      * vec2f(0.08 + lobeWaveB * 0.05, 0.48 + lobeWaveA * 0.06);
+    let lobeOffsetA = pageVectorToField(fineTexel * plumeRadius
+      * vec2f(0.34 + lobeWaveB * 0.08, -0.18 + lobeWaveA * 0.1));
+    let lobeOffsetB = pageVectorToField(fineTexel * plumeRadius
+      * vec2f(-0.23 + lobeWaveA * 0.07, 0.31 + lobeWaveB * 0.08));
+    let lobeOffsetC = pageVectorToField(fineTexel * plumeRadius
+      * vec2f(0.08 + lobeWaveB * 0.05, 0.48 + lobeWaveA * 0.06));
     let lobePlume =
       sampleMobile(clampUv(plumeUv + lobeOffsetA)) * 0.42
       + sampleMobile(clampUv(plumeUv + lobeOffsetB)) * 0.34
@@ -1141,15 +1176,19 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     // Preserve the physical channel separation after broad plume reconstruction. Two bounded
     // channel-biased lobe probes keep the fringe spatial (rather than merely tinting the wash)
     // without producing a synthetic rainbow edge.
-    let chromaCurl = normalize(axis * 0.82 + crossAxis * 0.57)
-      * fineTexel * plumeRadius * (0.15 + u.chromaticSeparation * 0.5);
+    let chromaCurl = pageVectorToField(normalize(pageAxis * 0.82 + pageCrossAxis * 0.57)
+      * fineTexel * plumeRadius * (0.15 + u.chromaticSeparation * 0.5));
     let redLobe = sampleMobile(clampUv(plumeUv + lobeOffsetA + chromaCurl)).x;
     let blueLobe = sampleMobile(clampUv(plumeUv + lobeOffsetB - chromaCurl)).z;
     plume.x = plume.x + redLobe * u.chromaticSeparation * 1.05;
     plume.z = plume.z + blueLobe * u.chromaticSeparation * 1.05;
     let plumeGate = smoothstep(0.018, 0.58, wetness) * 0.9;
     mobileContribution = mix(mobileCenter, plume, plumeGate);
-    let saturatedCenterDilution = smoothstep(0.3, 1.1, wetness) * 0.64;
+    // A thicker, faster-creeping film carries more suspended pigment out of its saturated centre.
+    // Couple that dilution to the same capillary control as the wet tensor; leaving it at a fixed
+    // 0.64 retained a dark core after the area-preserving front had already moved the water out.
+    let centerDilutionGain = 0.64 + u.capillaryCreep * 0.05;
+    let saturatedCenterDilution = smoothstep(0.3, 1.1, wetness) * centerDilutionGain;
     mobileContribution = vec4f(
       mobileContribution.xyz * (1.0 - saturatedCenterDilution),
       mobileContribution.w,
@@ -1175,7 +1214,12 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let fixedLower = dot(fixedPigmentAt(uv - vec2f(0.0, fineTexel.y)).xyz, vec3f(0.333333));
   let fixedUpper = dot(fixedPigmentAt(uv + vec2f(0.0, fineTexel.y)).xyz, vec3f(0.333333));
   let fixedPigmentEdge = length(vec2f(fixedRight - fixedLeft, fixedUpper - fixedLower));
-  let pixel = uv * vec2f(f32(u.displayWidth), f32(u.displayHeight));
+  // Match the GLSL framebuffer's bottom-left paper coordinates while retaining top-down storage
+  // and presentation. This keeps the seeded fibre/grain realization identical after row flip.
+  let pixel = vec2f(
+    uv.x * f32(u.displayWidth),
+    (1.0 - uv.y) * f32(u.displayHeight),
+  );
   let fiber = layeredFiber(pixel * vec2f(0.035, 0.085));
   let tooth = smoothNoise(pixel * 0.31 + vec2f(7.3, 19.1));
   let grain = layeredFiber(pixel * 0.105 + vec2f(41.0, 13.0));
@@ -1194,8 +1238,13 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let granulationGate = smoothstep(0.005, 0.24, centerDensity)
     * (1.0 - smoothstep(0.38, 1.15, centerDensity) * 0.74);
   let sediment = (grain - 0.5) * 2.0 + (tooth - 0.5) * 0.7;
-  let granulationMultiplier = 1.0
-    + sediment * u.granulationAmount * 2.15 * granulationGate;
+  let granulationMultiplier = clamp(
+    1.0
+      + sediment * u.granulationAmount
+        * ${wgslFloat(STUDIO_LIVING_INK_WGSL_GRANULATION_RESPONSE_GAIN)} * granulationGate,
+    ${wgslFloat(STUDIO_LIVING_INK_GRANULATION_MULTIPLIER_BOUNDS.minimum)},
+    ${wgslFloat(STUDIO_LIVING_INK_GRANULATION_MULTIPLIER_BOUNDS.maximum)},
+  );
   fixedOpticalDensity = fixedOpticalDensity * granulationMultiplier;
   mobileOpticalDensity = mobileOpticalDensity * granulationMultiplier;
   let wetGradient = length(vec2f(
@@ -1212,7 +1261,11 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   mobileOpticalDensity = mobileOpticalDensity * (1.0
     + mobilePigmentEdge * u.edgeAmount * (0.65 + dryingFront * 4.2)
     + dryingFront * mobileCenterDensity * u.edgeAmount * (0.9 + wetGradient * 7.0));
-  let opticalDensity = fixedOpticalDensity + mobileOpticalDensity;
+  let opticalDensity = clamp(
+    fixedOpticalDensity + mobileOpticalDensity,
+    vec3f(0.0),
+    vec3f(${wgslFloat(STUDIO_LIVING_INK_MAXIMUM_OPTICAL_DENSITY)}),
+  );
   var color = paper * exp(-opticalDensity);
   let mobileWhiteCoverage = 1.0 - exp(-combined.w * ${wgslFloat(STUDIO_LIVING_INK_WHITE_GOUACHE_EXTINCTION)});
   let gouache = vec3f(0.986, 0.982, 0.968);

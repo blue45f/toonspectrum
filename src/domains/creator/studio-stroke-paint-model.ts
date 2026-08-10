@@ -1,5 +1,6 @@
 import { resolveStudioBrushRenderFamily } from "./studio-brush";
-import { resolveStudioBrushDynamicsPresetId } from "./studio-brush-dynamics";
+import { isStudioBrushEraserAliasId } from "./studio-brush-alias-profile";
+import { resolveStudioCapturedBrushDynamicsPresetId } from "./studio-brush-dynamics";
 import { isStudioInkPressureModel } from "./studio-ink-pressure-model";
 
 /**
@@ -9,11 +10,11 @@ import { isStudioInkPressureModel } from "./studio-ink-pressure-model";
  * dab-local opacity are multiplied into every dab before it is painted directly onto the
  * destination. Existing documents must keep that behavior.
  *
- * `layered-flow-v1` is opt-in for ordinary single-colour ink. Flow and dab-local opacity build
- * coverage on a transparent,
- * stroke-local surface; the element/stroke opacity is then applied exactly once when that surface
- * is composited onto the document. This matches painting applications where flow controls pigment
- * deposition while opacity controls the completed stroke as a whole.
+ * `layered-flow-v1` is opt-in for ordinary single-colour ink and the named low-density eraser.
+ * Flow and dab-local opacity build coverage on a transparent, stroke-local surface; the
+ * element/stroke opacity is then applied exactly once when that surface is composited onto the
+ * document. For paint this prevents overlap darkening; for the kneaded eraser it makes one gesture
+ * lift a bounded amount instead of compounding the same 38% alpha at every overlapping dab.
  *
  * `bounded-flow-v2` extends the same alpha contract to versioned dynamic brushes through sparse,
  * budgeted stroke-local RGBA tiles. It is a distinct persisted value so old dynamic strokes, which
@@ -118,7 +119,7 @@ export function isStudioBoundedFlowPaintModelCompatible(
   if (input.stampPipeline !== undefined && input.stampPipeline !== null) return false;
   if (input.watercolorPipeline !== undefined && input.watercolorPipeline !== null) return false;
   if (typeof input.brushDynamics !== "object" || input.brushDynamics === null) return false;
-  if (resolveStudioBrushDynamicsPresetId(input.brush) === null) return false;
+  if (resolveStudioCapturedBrushDynamicsPresetId(input) === null) return false;
   if (!hasCausalGeometry(input)) return false;
   return isStudioBoundedFlowSymmetryCompatible(input.symmetry);
 }
@@ -126,8 +127,9 @@ export function isStudioBoundedFlowPaintModelCompatible(
 /**
  * Cross-field guard for every persistence and renderer boundary.
  *
- * v1 remains intentionally limited to ordinary freehand pen/marker strokes. v2 admits only
- * snapshotted dynamic-brush presets and renderer-bounded symmetry. Erasers, closed fills,
+ * v1 remains intentionally limited to ordinary freehand pen/marker strokes plus named erasers
+ * whose catalogue contract explicitly owns low-density lifting. v2 admits only snapshotted
+ * dynamic-brush presets and renderer-bounded symmetry. Generic erasers, closed fills,
  * stamp/watercolor engines and unknown combinations retain the legacy per-dab compositor.
  */
 export function isStudioStrokePaintModelCompatible(
@@ -135,13 +137,16 @@ export function isStudioStrokePaintModelCompatible(
 ): input is StudioStrokePaintModelCompatibilityInput & { paintModel: StudioStrokePaintModel } {
   if (isStudioBoundedFlowPaintModelCompatible(input)) return true;
   if (input.paintModel !== STUDIO_STROKE_PAINT_MODEL_LAYERED_FLOW_V1) return false;
-  if ((input.kind ?? "freehand") !== "freehand" || (input.mode ?? "pen") !== "pen") return false;
+  const mode = input.mode ?? "pen";
+  const namedEraser = mode === "eraser" && isStudioBrushEraserAliasId(input.brush);
+  if ((input.kind ?? "freehand") !== "freehand" || (mode !== "pen" && !namedEraser)) return false;
   if (input.fill !== undefined && input.fill !== null) return false;
   if (input.brushDynamics !== undefined && input.brushDynamics !== null) return false;
   if (input.stampPipeline !== undefined && input.stampPipeline !== null) return false;
   if (input.watercolorPipeline !== undefined && input.watercolorPipeline !== null) return false;
   if (hasNonIdentitySymmetry(input.symmetry)) return false;
   if (!hasCausalGeometry(input)) return false;
+  if (namedEraser) return true;
   const family = resolveStudioBrushRenderFamily(input.brush ?? "pen");
   return family === "pen" || family === "marker";
 }

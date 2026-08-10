@@ -1,3 +1,5 @@
+import studioRevisionCompareWorkerBootstrapSource from "./studio-revision-compare.worker-bootstrap.ts?raw";
+import studioRevisionCompareWorkerRuntimeUrl from "./studio-revision-compare.worker.ts?worker&url";
 import {
   STUDIO_REVISION_CHANGE_DETAIL_LIMIT,
   STUDIO_REVISION_CHANGE_FIELD_LIMIT,
@@ -19,6 +21,10 @@ import {
 import { projectRevisionComparisonValue } from "@/lib/revision-comparison-projection";
 
 const STUDIO_REVISION_COMPARE_WORKER_VERSION = 1 as const;
+const STUDIO_REVISION_COMPARE_RUNTIME_MODULE_URL_TOKEN =
+  "__TOONSPECTRUM_REVISION_COMPARE_RUNTIME_MODULE_URL__";
+const STUDIO_REVISION_COMPARE_BOOTSTRAP_READY_TYPE =
+  "studio-revision-compare/bootstrap-ready";
 export const STUDIO_REVISION_COMPARE_DIRECT_MAX_ELEMENTS = 50_000;
 /** Shared clone/compute ceiling used even when a module Worker is available. */
 export const STUDIO_REVISION_COMPARE_MAX_ELEMENTS = 250_000;
@@ -53,6 +59,13 @@ export interface StudioRevisionCompareWorkerLike {
   terminate(): void;
 }
 
+interface StudioRevisionCompareNativeWorkerLike {
+  onmessage: ((event: MessageEvent<unknown>) => void) | null;
+  onerror: StudioRevisionCompareWorkerLike["onerror"];
+  postMessage(message: StudioRevisionCompareWorkerRequest): void;
+  terminate(): void;
+}
+
 export type StudioRevisionCompareWorkerFactory = () => StudioRevisionCompareWorkerLike | null;
 
 interface StudioRevisionCompareWorkerRequest {
@@ -77,12 +90,97 @@ export type StudioRevisionCompareWorkerResponse =
   | StudioRevisionCompareWorkerSuccess
   | StudioRevisionCompareWorkerFailure;
 
+function isStudioRevisionCompareBootstrapReady(value: unknown): boolean {
+  if (typeof value !== "object" || value === null) return false;
+  const message = value as Record<string, unknown>;
+  return message.type === STUDIO_REVISION_COMPARE_BOOTSTRAP_READY_TYPE && message.version === 1;
+}
+
+function createIdempotentBlobUrlRevoker(
+  bootstrapUrl: string,
+  revokeObjectURL: (url: string) => void
+): () => void {
+  let revoked = false;
+  return () => {
+    if (revoked) return;
+    revoked = true;
+    revokeObjectURL(bootstrapUrl);
+  };
+}
+
+class StudioRevisionCompareOwnedModuleWorker implements StudioRevisionCompareWorkerLike {
+  onmessage: StudioRevisionCompareWorkerLike["onmessage"] = null;
+  onerror: StudioRevisionCompareWorkerLike["onerror"] = null;
+  private terminated = false;
+
+  constructor(
+    private readonly worker: StudioRevisionCompareNativeWorkerLike,
+    private readonly revokeBootstrapUrl: () => void
+  ) {
+    worker.onmessage = (event) => {
+      if (isStudioRevisionCompareBootstrapReady(event.data)) {
+        this.revokeBootstrapUrl();
+        return;
+      }
+      this.onmessage?.(event as MessageEvent<StudioRevisionCompareWorkerResponse>);
+    };
+    worker.onerror = (event) => {
+      this.revokeBootstrapUrl();
+      this.onerror?.(event);
+    };
+  }
+
+  postMessage(message: StudioRevisionCompareWorkerRequest): void {
+    this.worker.postMessage(message);
+  }
+
+  terminate(): void {
+    this.revokeBootstrapUrl();
+    if (this.terminated) return;
+    this.terminated = true;
+    this.worker.onmessage = null;
+    this.worker.onerror = null;
+    this.worker.terminate();
+  }
+}
+
 export function createStudioRevisionCompareModuleWorker(): StudioRevisionCompareWorkerLike | null {
-  if (typeof Worker !== "function") return null;
-  return new Worker(new URL("./studio-revision-compare.worker.ts", import.meta.url), {
-    type: "module",
-    name: "toonspectrum-revision-compare",
-  }) as unknown as StudioRevisionCompareWorkerLike;
+  if (
+    typeof Worker !== "function" ||
+    typeof Blob !== "function" ||
+    typeof URL.createObjectURL !== "function" ||
+    typeof URL.revokeObjectURL !== "function"
+  ) {
+    return null;
+  }
+  const tokenParts = studioRevisionCompareWorkerBootstrapSource.split(
+    STUDIO_REVISION_COMPARE_RUNTIME_MODULE_URL_TOKEN
+  );
+  if (tokenParts.length !== 2) {
+    throw new Error("Revision comparison Worker bootstrap contract is invalid.");
+  }
+  const runtimeUrl = new URL(studioRevisionCompareWorkerRuntimeUrl, import.meta.url).href;
+  const bootstrapUrl = URL.createObjectURL(new Blob([
+    tokenParts[0],
+    runtimeUrl,
+    tokenParts[1],
+  ], { type: "text/javascript;charset=utf-8" }));
+  const revokeBootstrapUrl = createIdempotentBlobUrlRevoker(
+    bootstrapUrl,
+    URL.revokeObjectURL.bind(URL)
+  );
+  let worker: StudioRevisionCompareNativeWorkerLike | undefined;
+  try {
+    worker = new Worker(bootstrapUrl, {
+      type: "module",
+      name: "toonspectrum-revision-compare",
+    }) as unknown as StudioRevisionCompareNativeWorkerLike;
+    return new StudioRevisionCompareOwnedModuleWorker(worker, revokeBootstrapUrl);
+  } catch (error) {
+    revokeBootstrapUrl();
+    worker?.terminate();
+    throw error;
+  }
 }
 
 function createAbortError(): Error {

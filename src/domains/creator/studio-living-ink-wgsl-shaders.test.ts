@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   STUDIO_LIVING_INK_FLUID_DEFAULTS,
+  STUDIO_LIVING_INK_GRANULATION_MULTIPLIER_BOUNDS,
+  STUDIO_LIVING_INK_MAXIMUM_OPTICAL_DENSITY,
   studioLivingInkVelocityDamping,
 } from "./studio-living-ink-execution-protocol";
 import {
@@ -15,6 +17,7 @@ import {
   studioLivingInkVelocityDampingForStep,
   stepStudioLivingInkFluidReference,
   STUDIO_LIVING_INK_RELEASE_VELOCITY_DAMPING_RATE_PER_SECOND,
+  STUDIO_LIVING_INK_WGSL_GRANULATION_RESPONSE_GAIN,
   STUDIO_LIVING_INK_WGSL_COARSE_PASSES,
   STUDIO_LIVING_INK_WGSL_LEGACY_PASS_ORDER,
   STUDIO_LIVING_INK_WGSL_PASS_ORDER,
@@ -96,6 +99,36 @@ describe("studio-living-ink-wgsl-shaders", () => {
     expect(resolve).toContain("u.vignetteAmount");
   });
 
+  it("maps directional paper physics from GLSL page space into the top-down WGSL grid", () => {
+    const wet = studioLivingInkWgslSourceForPass("wet");
+    expect(wet).toContain("let paperUv = vec2f(uv.x, 1.0 - uv.y);");
+    expect(wet).toContain("let fibre = vec2f(pageFibre.x, -pageFibre.y);");
+
+    const resolve = studioLivingInkWgslSourceForPass("display");
+    expect(resolve).toContain("fn pageVectorToField(v: vec2f)");
+    expect(resolve).toContain("(1.0 - uv.y) / fineTexel.y");
+    expect(resolve).toContain("let axis = pageVectorToField(pageAxis);");
+    expect(resolve).toContain("let plumeWarp = pageVectorToField(pagePlumeWarp);");
+    expect(resolve).toContain("let lobeOffsetC = pageVectorToField(");
+    expect(resolve).toContain("(1.0 - uv.y) * f32(u.displayHeight)");
+    // A lone sign change on the mean drift is insufficient: every directed page-space vector has
+    // to cross the same basis transform, while symmetric +/- taps remain symmetric afterwards.
+    expect(resolve).not.toContain("let verticalDrift = -(");
+  });
+
+  it("compensates WebGPU resolve transfer without changing the sediment spectrum or gate", () => {
+    expect(STUDIO_LIVING_INK_WGSL_GRANULATION_RESPONSE_GAIN).toBe(2.35);
+    const resolve = studioLivingInkWgslSourceForPass("display");
+    expect(resolve).toContain("sediment * u.granulationAmount\n        * 2.35 * granulationGate");
+    expect(resolve).toContain("let sediment = (grain - 0.5) * 2.0 + (tooth - 0.5) * 0.7;");
+    expect(resolve).toContain("smoothstep(0.005, 0.24, centerDensity)");
+    expect(resolve).toContain(`let granulationMultiplier = clamp(`);
+    expect(resolve).toContain(`${STUDIO_LIVING_INK_GRANULATION_MULTIPLIER_BOUNDS.minimum}`);
+    expect(resolve).toContain(`${STUDIO_LIVING_INK_GRANULATION_MULTIPLIER_BOUNDS.maximum}.0`);
+    expect(resolve).toContain("let opticalDensity = clamp(");
+    expect(resolve).toContain(`vec3f(${STUDIO_LIVING_INK_MAXIMUM_OPTICAL_DENSITY}.0)`);
+  });
+
   it("branches display modes on the same ladder the GLSL resolve reads", () => {
     expect(studioLivingInkWgslDisplayModeCode("composite")).toBe(0);
     expect(studioLivingInkWgslDisplayModeCode("mobile-pigment")).toBe(1);
@@ -128,6 +161,23 @@ describe("studio-living-ink-wgsl-shaders", () => {
     expect(studioLivingInkWgslSourceForPass("merge-deposit")).toContain("+ max(deposit[i]");
     expect(studioLivingInkWgslSourceForPass("clear-masked"))
       .toContain("1.0 - clamp(selection[i].x, 0.0, 1.0)");
+  });
+
+  it("bounds fibre eccentricity while preserving the wet stencil's capillary area", () => {
+    const wet = studioLivingInkWgslSourceForPass("wet");
+    expect(wet).toContain("let geometricReach = sqrt(rawParallelReach * rawPerpendicularReach);");
+    expect(wet).toContain("let maximumFibreRatio = 1.0 + u.fiberAmount * 1.2;");
+    expect(wet).toContain("let axisScale = sqrt(fibreRatio);");
+    expect(wet).toContain("geometricReach * axisScale");
+    expect(wet).toContain("geometricReach / axisScale");
+  });
+
+  it("couples saturated-centre pigment dilution to bounded capillary outflow", () => {
+    const resolve = studioLivingInkWgslSourceForPass("display");
+    expect(resolve).toContain("let centerDilutionGain = 0.64 + u.capillaryCreep * 0.05;");
+    expect(resolve).toContain(
+      "let saturatedCenterDilution = smoothstep(0.3, 1.1, wetness) * centerDilutionGain;",
+    );
   });
 
   /*

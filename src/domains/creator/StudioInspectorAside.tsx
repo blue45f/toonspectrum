@@ -95,7 +95,6 @@ import { resolveStudioInspectorRasterToolPolicy } from "./studio-inspector-raste
 import {
   executeStudioInspectorArmedChange,
   executeStudioInspectorArmedToggle,
-  executeStudioInspectorDrawModeTransition,
   executeStudioInspectorRouteTransition,
   studioInspectorTransientOwners,
   type StudioInspectorTransientState,
@@ -263,6 +262,7 @@ import { buttonClass } from "@/components/ui/button-utils";
 import { cn } from "@/lib/utils";
 
 export interface StudioInspectorAsideHandlers {
+  activateCanvasTool: (tool: "select" | "draw", drawMode?: DrawMode) => void;
   activatePixelSelectionToolFromInspector: (
     kind: StudioInspectorPixelSelectionToolId,
   ) => void;
@@ -567,7 +567,6 @@ interface StudioInspectorAsideProps {
   setColor: import("react").Dispatch<import("react").SetStateAction<string>>;
   setCropAspect: import("react").Dispatch<import("react").SetStateAction<CropAspectId>>;
   setCropRect: import("react").Dispatch<import("react").SetStateAction<CropRect | null>>;
-  setDrawMode: import("react").Dispatch<import("react").SetStateAction<DrawMode>>;
   setDrawShape: import("react").Dispatch<import("react").SetStateAction<DrawShapeKind>>;
   setEyedropperActive: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setFilterClipboard: import("react").Dispatch<import("react").SetStateAction<Partial<ImageFilterFields> | null>>;
@@ -676,7 +675,7 @@ interface StudioInspectorAsideProps {
   setSymmetryCenterX: import("react").Dispatch<import("react").SetStateAction<number>>;
   setSymmetryCenterY: import("react").Dispatch<import("react").SetStateAction<number>>;
   setSymmetryRadialCount: import("react").Dispatch<import("react").SetStateAction<number>>;
-  setSymmetryType: import("react").Dispatch<import("react").SetStateAction<"none" | "vertical" | "horizontal" | "radial" | "kaleidoscope" | "silk">>;
+  setSymmetryType: (value: "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope" | "silk") => void;
   setTiltEnabled: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setTipAngle: import("react").Dispatch<import("react").SetStateAction<number>>;
   setTipRoundness: import("react").Dispatch<import("react").SetStateAction<number>>;
@@ -923,7 +922,6 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   setColor,
   setCropAspect,
   setCropRect,
-  setDrawMode,
   setDrawShape,
   setEyedropperActive,
   setFilterClipboard,
@@ -1094,6 +1092,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   stableHandlers,
 }: StudioInspectorAsideProps) {
   const {
+    activateCanvasTool,
     activatePixelSelectionToolFromInspector,
     addProceduralArtisticBrushRaster,
     replaceDrawWithHokusaiNaturalMedia,
@@ -3384,9 +3383,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                   aria-label="펜으로 그리기"
                   className="min-h-11 rounded-lg border border-accent/40 bg-accent-soft px-2.5 py-2 text-left text-[0.72rem] font-semibold text-fg transition-colors hover:border-accent/70"
                   onClick={() => {
-                    disarmAllPixelTools();
-                    setTool("draw");
-                    setDrawMode("pen");
+                    activateCanvasTool("draw", "pen");
                     setEyedropperActive(false);
                     announceDrawingShortcut("펜 · 캔버스에 바로 그려 보세요");
                   }}
@@ -3467,10 +3464,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
               <StudioInspectorDrawModeControls
                 drawMode={drawMode}
                 onDrawModeChange={(next) => {
-                  executeStudioInspectorDrawModeTransition(drawMode, next, {
-                    disarm: disarmAllPixelTools,
-                    setDrawMode,
-                  });
+                  activateCanvasTool("draw", next);
                 }}
                 onDrawShapeChange={setDrawShape}
                 onStrokeWidthChange={setStrokeWidth}
@@ -3646,9 +3640,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                       onToggleActive={() => {
                         const next = !quickShapeActive;
                         if (next) {
-                          disarmAllPixelTools();
-                          setTool("draw");
-                          setDrawMode("pen");
+                          activateCanvasTool("draw", "pen");
                           setEyedropperActive(false);
                           announceDrawingShortcut("스마트 도형 켜짐 · 그려서 손을 떼면 다듬어요");
                         } else {

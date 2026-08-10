@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  STUDIO_LIVING_INK_NEW_PHYSICAL_STROKES_ENABLED,
   studioLivingInkAdmitsBrush,
   studioLivingInkExplicitBrushKey,
   studioLivingInkSupportsExplicitBrush,
@@ -31,7 +32,8 @@ describe("studio Living Ink brush admission", () => {
     "ink-wash",
     "sumi",
     "sumi-e",
-  ])("requires an explicit physical-mode opt-in for exact built-in %s", (brushId) => {
+  ])("keeps retired page-wide materialization closed for exact built-in %s", (brushId) => {
+    expect(STUDIO_LIVING_INK_NEW_PHYSICAL_STROKES_ENABLED).toBe(false);
     expect(studioLivingInkExplicitBrushKey(brushId, brushId)).not.toBeNull();
     expect(studioLivingInkAdmitsBrush({
       brushId,
@@ -42,7 +44,7 @@ describe("studio Living Ink brush admission", () => {
       brushId,
       catalogId: brushId,
       physicalModeEnabled: true,
-    })).toBe(true);
+    })).toBe(false);
   });
 
   it.each([

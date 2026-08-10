@@ -154,12 +154,19 @@ export function mutateStudioProDrawPrefs(
 export function applyBrushPresetWithLocks(
   preset: { id: string; defaultWidth: number; defaultOpacity: number; defaultColor?: string },
   locks: Pick<StudioProDrawPrefs, "sizeLocked" | "opacityLocked">,
-  current: { strokeWidth: number; brushOpacity: number; color: string }
+  current: { strokeWidth: number; brushOpacity: number; color: string },
+  options: { operation?: "paint" | "erase" } = {},
 ): { brushId: string; strokeWidth: number; brushOpacity: number; color: string } {
   return {
     brushId: preset.id,
     strokeWidth: locks.sizeLocked ? current.strokeWidth : preset.defaultWidth,
-    brushOpacity: locks.opacityLocked ? current.brushOpacity : preset.defaultOpacity,
+    // A named eraser's opacity is its destructive strength, not merely a paint-style appearance
+    // preference. Preserving 38% while selecting the standard eraser would silently turn its
+    // promised full removal into a partial lift, so operation identity takes precedence here.
+    brushOpacity:
+      locks.opacityLocked && options.operation !== "erase"
+        ? current.brushOpacity
+        : preset.defaultOpacity,
     // Preset colors are catalogue-preview hints, not drawing-state mutations. Keeping the
     // active color avoids the especially confusing white-on-white stroke after Star Dust.
     color: current.color,

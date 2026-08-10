@@ -253,7 +253,13 @@ export type StudioBrushDynamicsBrushId = StudioBrushDynamicsPresetId
   | "oil-pastel"
   | "erodible-pencil"
   | "paint-tube"
-  | "tangent-normal-brush";
+  | "tangent-normal-brush"
+  | "watercolor"
+  | "ink-wash"
+  | "inkwash-pen"
+  | "inkwash-water-brush"
+  | "inkwash-bleed-wash"
+  | "inkwash-white-ink";
 
 /** Runtime/type guard shared by the editor, persistence and export paths. */
 export function isStudioBrushDynamicsPresetId(value: unknown): value is StudioBrushDynamicsPresetId {
@@ -288,6 +294,59 @@ export function resolveStudioBrushDynamicsPresetId(
     || brushId === "oil-pastel"
   ) return "dry-media";
   return null;
+}
+
+const STUDIO_CAPTURED_WET_DYNAMIC_PRESET_BY_BRUSH_ID: Readonly<
+  Record<string, StudioBrushDynamicsPresetId>
+> = Object.freeze({
+  watercolor: "airbrush",
+  "ink-wash": "airbrush",
+  "inkwash-pen": "ink-particle",
+  "inkwash-water-brush": "airbrush",
+  "inkwash-bleed-wash": "airbrush",
+  "inkwash-white-ink": "ink-particle",
+});
+
+/**
+ * Pointer-start resolver for newly authored wet presets.
+ *
+ * Bare brush ids deliberately remain legacy watercolor ids. Only a captured causal dynamics
+ * snapshot opts a new stroke into the bounded dynamic renderer, so old saved documents retain
+ * their historical watercolor pixels.
+ */
+export function resolveStudioBrushDynamicsSelectionPresetId(
+  brushId: unknown,
+  brushDynamics: unknown,
+): StudioBrushDynamicsPresetId | null {
+  const installed = resolveStudioBrushDynamicsPresetId(brushId);
+  if (installed) return installed;
+  if (
+    typeof brushId !== "string"
+    || typeof brushDynamics !== "object"
+    || brushDynamics === null
+  ) return null;
+  const depositPipeline = (brushDynamics as { depositPipeline?: unknown }).depositPipeline;
+  if (!isStudioDynamicBrushCausalDepositPipeline(depositPipeline)) return null;
+  return STUDIO_CAPTURED_WET_DYNAMIC_PRESET_BY_BRUSH_ID[brushId] ?? null;
+}
+
+/** Persisted/render resolver; unlike the selection helper this requires the versioned paint seam. */
+export function resolveStudioCapturedBrushDynamicsPresetId(input: Readonly<{
+  brush?: unknown;
+  brushDynamics?: unknown;
+  paintModel?: unknown;
+  watercolorPipeline?: unknown;
+}>): StudioBrushDynamicsPresetId | null {
+  const installed = resolveStudioBrushDynamicsPresetId(input.brush);
+  if (installed) return installed;
+  if (
+    input.paintModel !== "bounded-flow-v2"
+    || (input.watercolorPipeline !== undefined && input.watercolorPipeline !== null)
+  ) return null;
+  return resolveStudioBrushDynamicsSelectionPresetId(
+    input.brush,
+    input.brushDynamics,
+  );
 }
 
 export interface StudioBrushDynamicsPreset {
@@ -1291,6 +1350,181 @@ const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamic
         mappings: [{ source: "tilt-magnitude", from: 0.98, to: 0.85 }],
         jitter: null,
       },
+    },
+  },
+  watercolor: {
+    presetId: "airbrush",
+    overrides: {
+      seed: 401,
+      fallbackPressure: 0.55,
+      maxSpeed: 1.05,
+      taper: {
+        enabled: true,
+        startLength: 0.035,
+        endLength: 0.08,
+        minSizeRatio: 0.4,
+        minOpacityRatio: 0.52,
+        curve: 1,
+      },
+      tip: { shape: "soft", softness: 0.86 },
+      width: {
+        base: 28,
+        mappings: [{ source: "pressure", from: 0.76, to: 1.3 }],
+        jitter: { mode: "multiply", amount: 0.08 },
+      },
+      opacity: { base: 1, mappings: [{ source: "pressure", from: 0.55, to: 1 }] },
+      flow: {
+        base: 0.45,
+        mappings: [
+          { source: "pressure", from: 0.35, to: 1 },
+          { source: "speed", from: 1.06, to: 0.68 },
+        ],
+      },
+      grain: { space: "canvas-fixed", amount: 0.16, scale: 16, contrast: 0.34, seed: 401 },
+      dualBrush: {
+        enabled: true,
+        tip: { shape: "sponge", softness: 0.66 },
+        blendMode: "screen",
+        sizeRatio: 1.42,
+      },
+      spacingRatio: 0.09,
+      spacing: { mappings: [], jitter: null },
+      scatterRatio: 0.025,
+      scatter: { mappings: [], jitter: null },
+      angle: { base: 0, mappings: [{ source: "direction", mode: "add", from: 0, to: 360 }], jitter: null },
+      roundness: { base: 0.94, mappings: [], jitter: null },
+    },
+  },
+  "ink-wash": {
+    presetId: "airbrush",
+    overrides: {
+      seed: 402,
+      fallbackPressure: 0.55,
+      maxSpeed: 1.1,
+      taper: {
+        enabled: true,
+        startLength: 0.045,
+        endLength: 0.2,
+        minSizeRatio: 0.22,
+        minOpacityRatio: 0.52,
+        curve: 1.45,
+      },
+      tip: { shape: "bristle", softness: 0.12 },
+      width: {
+        base: 30,
+        mappings: [
+          { source: "pressure", from: 0.28, to: 1.65, curve: 1.2 },
+          { source: "speed", from: 1.04, to: 0.74 },
+        ],
+        jitter: { mode: "multiply", amount: 0.08 },
+      },
+      opacity: { base: 1, mappings: [{ source: "pressure", from: 0.48, to: 1 }] },
+      flow: {
+        base: 0.68,
+        mappings: [
+          { source: "pressure", from: 0.4, to: 1 },
+          { source: "speed", from: 1.04, to: 0.58 },
+        ],
+      },
+      grain: { space: "stroke-fixed", amount: 0.3, scale: 4.4, contrast: 0.58, seed: 402 },
+      dualBrush: {
+        enabled: true,
+        tip: { shape: "bristle", softness: 0.04 },
+        blendMode: "multiply",
+        sizeRatio: 0.8,
+      },
+      spacingRatio: 0.08,
+      spacing: { mappings: [], jitter: null },
+      scatterRatio: 0.02,
+      scatter: { mappings: [], jitter: null },
+      angle: { base: 0, mappings: [{ source: "direction", mode: "add", from: 0, to: 360 }], jitter: null },
+      roundness: { base: 0.7, mappings: [], jitter: null },
+    },
+  },
+  "inkwash-pen": {
+    presetId: "ink-particle",
+    overrides: {
+      seed: 403,
+      fallbackPressure: 0.55,
+      maxSpeed: 1.2,
+      taper: { enabled: true, startLength: 0.04, endLength: 0.22, minSizeRatio: 0.14, minOpacityRatio: 0.5, curve: 1.35 },
+      tip: { shape: "hard", softness: 0.08 },
+      width: { base: 8, mappings: [{ source: "pressure", from: 0.18, to: 1.5, curve: 1.2 }], jitter: null },
+      opacity: { base: 1, mappings: [{ source: "pressure", from: 0.45, to: 1 }] },
+      flow: { base: 0.78, mappings: [{ source: "pressure", from: 0.52, to: 1 }] },
+      grain: { amount: 0 },
+      dualBrush: { enabled: false },
+      spacingRatio: 0.075,
+      spacing: { mappings: [], jitter: null },
+      scatterRatio: 0,
+      scatter: { mappings: [], jitter: null },
+      angle: { base: 0, mappings: [{ source: "direction", mode: "add", from: 0, to: 360 }], jitter: null },
+      roundness: { base: 0.78, mappings: [], jitter: null },
+    },
+  },
+  "inkwash-water-brush": {
+    presetId: "airbrush",
+    overrides: {
+      seed: 404,
+      fallbackPressure: 0.55,
+      maxSpeed: 1,
+      taper: { enabled: true, startLength: 0.03, endLength: 0.09, minSizeRatio: 0.5, minOpacityRatio: 0.45, curve: 0.9 },
+      tip: { shape: "soft", softness: 0.92 },
+      width: { base: 32, mappings: [{ source: "pressure", from: 0.82, to: 1.24 }], jitter: null },
+      opacity: { base: 1, mappings: [{ source: "pressure", from: 0.4, to: 0.75 }] },
+      flow: { base: 0.33, mappings: [{ source: "pressure", from: 0.3, to: 0.68 }] },
+      grain: { space: "canvas-fixed", amount: 0.08, scale: 18, contrast: 0.2, seed: 404 },
+      dualBrush: { enabled: false },
+      spacingRatio: 0.1,
+      // A perfectly fixed station interval leaves a faint comb in this low-pigment wash. Seeded
+      // spacing variation preserves deterministic replay while de-correlating adjacent soft edges.
+      spacing: { mappings: [], jitter: { mode: "multiply", amount: 0.08 } },
+      scatterRatio: 0.015,
+      scatter: { mappings: [], jitter: null },
+      angle: { base: 0, mappings: [], jitter: null },
+      roundness: { base: 1, mappings: [], jitter: null },
+    },
+  },
+  "inkwash-bleed-wash": {
+    presetId: "airbrush",
+    overrides: {
+      seed: 405,
+      fallbackPressure: 0.55,
+      maxSpeed: 1.05,
+      taper: { enabled: true, startLength: 0.035, endLength: 0.1, minSizeRatio: 0.42, minOpacityRatio: 0.48, curve: 1 },
+      tip: { shape: "soft", softness: 0.9 },
+      width: { base: 36, mappings: [{ source: "pressure", from: 0.72, to: 1.38 }], jitter: { mode: "multiply", amount: 0.07 } },
+      opacity: { base: 1, mappings: [{ source: "pressure", from: 0.5, to: 1 }] },
+      flow: { base: 0.4, mappings: [{ source: "pressure", from: 0.32, to: 1 }, { source: "speed", from: 1.08, to: 0.64 }] },
+      grain: { space: "canvas-fixed", amount: 0.14, scale: 18, contrast: 0.3, seed: 405 },
+      dualBrush: { enabled: true, tip: { shape: "sponge", softness: 0.7 }, blendMode: "screen", sizeRatio: 1.5 },
+      spacingRatio: 0.085,
+      spacing: { mappings: [], jitter: null },
+      scatterRatio: 0.025,
+      scatter: { mappings: [], jitter: null },
+      angle: { base: 0, mappings: [{ source: "direction", mode: "add", from: 0, to: 360 }], jitter: null },
+      roundness: { base: 0.96, mappings: [], jitter: null },
+    },
+  },
+  "inkwash-white-ink": {
+    presetId: "ink-particle",
+    overrides: {
+      seed: 406,
+      fallbackPressure: 0.55,
+      maxSpeed: 1.1,
+      taper: { enabled: true, startLength: 0.04, endLength: 0.14, minSizeRatio: 0.32, minOpacityRatio: 0.58, curve: 1.1 },
+      tip: { shape: "sponge", softness: 0.18 },
+      width: { base: 16, mappings: [{ source: "pressure", from: 0.45, to: 1.3 }], jitter: null },
+      opacity: { base: 1, mappings: [{ source: "pressure", from: 0.68, to: 1 }] },
+      flow: { base: 0.82, mappings: [{ source: "pressure", from: 0.7, to: 1 }] },
+      grain: { amount: 0 },
+      dualBrush: { enabled: false },
+      spacingRatio: 0.08,
+      spacing: { mappings: [], jitter: null },
+      scatterRatio: 0,
+      scatter: { mappings: [], jitter: null },
+      angle: { base: 0, mappings: [{ source: "direction", mode: "add", from: 0, to: 360 }], jitter: null },
+      roundness: { base: 0.9, mappings: [], jitter: null },
     },
   },
   spray: {

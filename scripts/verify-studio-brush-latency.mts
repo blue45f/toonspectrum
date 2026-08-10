@@ -793,7 +793,20 @@ async function main(): Promise<void> {
   const catalogById = new Map(
     STUDIO_ALL_BRUSH_CATALOG_ITEMS.map((brush) => [brush.id, brush]),
   );
-  const representatives = STUDIO_BRUSH_LATENCY_IDS.map((id) => {
+  const requestedIds = (process.env.TOONSPECTRUM_BRUSH_LATENCY_IDS ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+  const requestedIdSet = new Set(requestedIds);
+  const representativeIds = requestedIds.length > 0
+    ? STUDIO_BRUSH_LATENCY_IDS.filter((id) => requestedIdSet.has(id))
+    : STUDIO_BRUSH_LATENCY_IDS;
+  invariant(
+    requestedIds.length === requestedIdSet.size
+      && representativeIds.length === requestedIdSet.size,
+    "TOONSPECTRUM_BRUSH_LATENCY_IDS contains an unknown or duplicate representative id",
+  );
+  const representatives = representativeIds.map((id) => {
     const brush = catalogById.get(id);
     invariant(brush, `${id}: latency representative is absent from shipped catalogue`);
     return { id, brush };

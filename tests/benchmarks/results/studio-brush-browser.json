@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "measuredAt": "2026-08-11T00:12:45+09:00",
+  "command": "pnpm run verify:studio-brushes",
+  "status": "pass",
+  "catalog": {
+    "total": 231,
+    "core": 71,
+    "pro": 160,
+    "paint": 229,
+    "erase": 2
+  },
+  "desktop": {
+    "selectedAndRendered": 231,
+    "undoPassed": 231,
+    "redoPassed": 231,
+    "errorCount": 0,
+    "erasers": {
+      "standard-eraser": {
+        "operation": "erase",
+        "liveRetainedLayerActive": true,
+        "residualEnergyRatio": 0
+      },
+      "kneaded-eraser": {
+        "operation": "erase",
+        "liveRetainedLayerActive": true,
+        "residualEnergyRatio": 0.6204371299198885
+      }
+    }
+  },
+  "longRouteCore": {
+    "passed": 71,
+    "total": 71,
+    "visibleSegmentsPerTool": 6,
+    "totalSegmentsPerTool": 6,
+    "representativePersistedPathDistancePx": 392.7396173371252,
+    "undoPassed": 71,
+    "continuousPolicyFailures": 0,
+    "qualityPolicyCounts": {
+      "strict-continuous": 51,
+      "soft-wet-continuous": 12,
+      "record-only-discrete": 8
+    },
+    "errorCount": 0
+  },
+  "smartShapes": {
+    "passed": 6,
+    "total": 6,
+    "representation": "brush-outline",
+    "errorCount": 0
+  },
+  "mobile": {
+    "paintSelections": 229,
+    "eraserSelections": 2,
+    "interactiveTargets": 474,
+    "minimumTargetWidthPx": 44,
+    "minimumTargetHeightPx": 44,
+    "undersizedTargets": 0,
+    "errorCount": 0
+  },
+  "pointerUpDurability": {
+    "navigationIssuedInMs": 0.21958399994764477,
+    "unloadGuardShown": true,
+    "markerReason": "pointerup",
+    "strokeCount": 1,
+    "payloadContainsEveryStroke": true,
+    "recoveryBannerShown": true,
+    "recoveredPixelsChanged": true,
+    "errorCount": 0
+  }
+}

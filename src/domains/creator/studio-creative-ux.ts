@@ -14,7 +14,11 @@
  * Pure data + presentation helpers; no document state.
  */
 
-import { BRUSH_PRESETS, type BrushPreset } from "./studio-brush";
+import {
+  BRUSH_PRESETS,
+  type BrushPreset,
+  type StudioToolOperation,
+} from "./studio-brush";
 import { resolveStudioBrushRuntimeContract } from "./studio-brush-runtime-contract";
 
 import type { StudioBrushPreviewStyle } from "./studio-brush-visual";
@@ -36,6 +40,7 @@ export const STUDIO_BEGINNER_BRUSH_IDS = [
   "ballpoint",
   "felt-tip",
   "school-pen",
+  "standard-eraser",
   "kneaded-eraser",
 ] as const;
 
@@ -101,6 +106,8 @@ export interface StudioBrushTrayItem {
   defaultWidth: number;
   defaultOpacity: number;
   defaultColor?: string;
+  /** Independent tool-family axis; media categories never imply paint versus erase. */
+  operation: StudioToolOperation;
   category: StudioBrushTrayItemCategory;
   mediaGroup: StudioBrushMediaGroup;
   /** 0–1 visual weight for stroke preview thickness. */
@@ -145,6 +152,7 @@ const MEDIA_GROUP: Record<string, StudioBrushMediaGroup> = {
   calligraphy: "line",
   "fountain-pen": "line",
   "parallel-pen": "line",
+  "standard-eraser": "texture",
   "kneaded-eraser": "texture",
   pencil: "line",
   "soft-pencil": "line",
@@ -197,6 +205,7 @@ const SHORT_NAMES: Record<string, string> = {
   calligraphy: "캘리",
   "fountain-pen": "만년필",
   "parallel-pen": "평행펜",
+  "standard-eraser": "지우개",
   "kneaded-eraser": "떡지우개",
   marker: "마커",
   "felt-tip": "펠트",
@@ -249,6 +258,7 @@ const HINTS: Record<string, string> = {
   calligraphy: "기울기 펜촉 — 캘리그래피",
   "fountain-pen": "사선 촉과 필압이 만드는 만년필 획",
   "parallel-pen": "넓고 평행한 촉 — 고딕 레터링·굵은 장식선",
+  "standard-eraser": "한 번에 완전히 지우는 100% 기본 지우개",
   "kneaded-eraser": "여러 번 문질러 농도를 서서히 걷어내는 저농도 지우개",
   marker: "굵고 반투명 — 스케치·채색",
   "felt-tip": "펠트 마커 — 일러스트 윤곽",
@@ -301,6 +311,7 @@ export function studioBrushTrayItem(preset: BrushPreset): StudioBrushTrayItem {
     defaultWidth: preset.defaultWidth,
     defaultOpacity: preset.defaultOpacity,
     defaultColor: preset.defaultColor,
+    operation: preset.operation,
     category: BEGINNER_SET.has(preset.id) ? "beginner" : "expressive",
     mediaGroup: MEDIA_GROUP[preset.id] ?? "line",
     previewWeight: previewWeightFor(preset),

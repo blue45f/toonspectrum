@@ -14,11 +14,16 @@ import {
 } from "./studio-brush-alias-profile";
 import {
   normalizeStudioBrushDynamicsSettings,
-  resolveStudioBrushDynamicsPresetId,
+  resolveStudioCapturedBrushDynamicsPresetId,
   studioBrushDynamicsSeedFromKey,
 } from "./studio-brush-dynamics";
 import {
+  composeStudioBrushDualTipAlphaMap,
+  planNormalizedStudioBrushTipComposition,
+} from "./studio-brush-tip-composition";
+import {
   buildStudioBrushTipAlphaMap,
+  sampleStudioBrushTipAlphaMap,
   studioBrushTipUsesSolidEllipse,
 } from "./studio-brush-tip-stamp";
 import {
@@ -53,6 +58,10 @@ import type {
   NormalizedStudioBrushDynamicsSettings,
 } from "./studio-brush-dynamics";
 import type {
+  NormalizedStudioBrushTipSettings,
+  StudioBrushTipAlphaMap,
+} from "./studio-brush-tip-stamp";
+import type {
   StudioCanonicalBrushAffineTransform,
   StudioCanonicalBrushColor,
   StudioCanonicalBrushComposite,
@@ -64,6 +73,7 @@ import type {
   StudioCanonicalBrushResponseCurve,
   StudioCanonicalBrushSourceSampleCandidate,
   StudioCanonicalBrushTip,
+  StudioCanonicalBrushTipCompositionV2,
 } from "./studio-canonical-brush-plan";
 import type { StudioCanonicalBrushSpecialistLoweringRequirement } from "./studio-canonical-brush-webgpu-lowering";
 import type { StudioLinearColorSpace } from "./studio-color-quality-engine";
@@ -74,6 +84,9 @@ export const STUDIO_CANONICAL_BRUSH_DRAW_ADAPTER_VERSION = 2 as const;
 
 const MAX_RUNTIME_SPEED = 64;
 const MAX_SOURCE_IDENTIFIER_CHARACTERS = 4_096;
+const MAX_CANONICAL_COMPOSED_TIP_DIMENSION = 2_048;
+const MAX_CANONICAL_COMPOSED_TIP_PIXELS =
+  MAX_CANONICAL_COMPOSED_TIP_DIMENSION * MAX_CANONICAL_COMPOSED_TIP_DIMENSION;
 const EPSILON = 1e-10;
 const IDENTITY_CURVE = Object.freeze({
   minimum: 1,
@@ -647,41 +660,20 @@ function staticProperty(
   return { ok: true, value: property.base };
 }
 
-function tipAndAsset(
-  settings: NormalizedStudioBrushDynamicsSettings,
-): BuildResult<{
+interface CanonicalTipBuild {
   readonly tip: StudioCanonicalBrushTip;
-  readonly requirements: readonly StudioCanonicalBrushDrawAdapterRequirement[];
   readonly assets: readonly StudioEngineWebGpuTexturedBrushAssetPayload[];
-}> {
-  if (settings.tipLayers.length > 0 || settings.dualBrush !== undefined) {
-    return reject(
-      "unsupported-dynamics",
-      "element.brushDynamics",
-      "Multi-tip and dual-brush composition require a future canonical recipe extension.",
-    );
-  }
-  if (studioBrushTipUsesSolidEllipse(settings.tip)) {
-    return {
-      ok: true,
-      value: {
-        tip: { kind: "analytic", shape: "round", edgeSoftness: 0 },
-        requirements: [],
-        assets: [],
-      },
-    };
-  }
-  const alphaMap = buildStudioBrushTipAlphaMap(settings.tip);
+}
+
+interface EffectiveTipCarrierBuild extends CanonicalTipBuild {
+  /** Symmetric diameter expansion relative to the primary dab's authored diameter. */
+  readonly diameterScale: number;
+}
+
+function textureTipAndAsset(alphaMap: StudioBrushTipAlphaMap): CanonicalTipBuild {
   const bytes = new Uint8Array(alphaMap.alphas.length);
   for (let index = 0; index < alphaMap.alphas.length; index += 1) {
-    const alpha = alphaMap.alphas[index];
-    if (!inRange(alpha, 0, 1)) {
-      return reject(
-        "unsupported-dynamics",
-        "element.brushDynamics.tip",
-        "The normalized tip produced an invalid alpha texel.",
-      );
-    }
+    const alpha = alphaMap.alphas[index]!;
     bytes[index] = Math.round(alpha * 255);
   }
   const contentHash = `sha256:${sha256HexPortable(bytes)}`;
@@ -699,18 +691,309 @@ function tipAndAsset(
     bytes,
   };
   return {
+    tip: {
+      kind: "texture",
+      assetId,
+      contentHash,
+      channel: "alpha",
+      width: alphaMap.size,
+      height: alphaMap.size,
+    },
+    assets: [asset],
+  };
+}
+
+function canonicalTip(
+  settings: NormalizedStudioBrushTipSettings,
+  forcedAlphaMap?: StudioBrushTipAlphaMap,
+): BuildResult<CanonicalTipBuild> {
+  if (!forcedAlphaMap && studioBrushTipUsesSolidEllipse(settings)) {
+    return {
+      ok: true,
+      value: {
+        tip: { kind: "analytic", shape: "round", edgeSoftness: 0 },
+        assets: [],
+      },
+    };
+  }
+  const alphaMap = forcedAlphaMap ?? buildStudioBrushTipAlphaMap(settings);
+  if (
+    !positiveSafeInteger(alphaMap.size)
+    || alphaMap.size > STUDIO_CANONICAL_BRUSH_PLAN_BUDGETS.maxTextureDimension
+    || alphaMap.alphas.length !== alphaMap.size * alphaMap.size
+    || Array.from(alphaMap.alphas).some((alpha) => !inRange(alpha, 0, 1))
+  ) {
+    return reject(
+      "unsupported-dynamics",
+      "element.brushDynamics.tip",
+      "The normalized tip produced an invalid or over-budget alpha texture.",
+    );
+  }
+  return { ok: true, value: textureTipAndAsset(alphaMap) };
+}
+
+function composedDabSymmetricExtent(
+  dab: Readonly<{
+    x: number;
+    y: number;
+    size: number;
+    angle: number;
+    roundness: number;
+  }>,
+): number {
+  const radiusX = dab.size / 2;
+  const radiusY = radiusX * dab.roundness;
+  const angle = dab.angle * Math.PI / 180;
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const halfWidth = Math.hypot(radiusX * cos, radiusY * sin);
+  const halfHeight = Math.hypot(radiusX * sin, radiusY * cos);
+  return Math.max(Math.abs(dab.x) + halfWidth, Math.abs(dab.y) + halfHeight);
+}
+
+function sampleComposedTipDab(
+  alphaMap: StudioBrushTipAlphaMap,
+  dab: Readonly<{
+    x: number;
+    y: number;
+    size: number;
+    angle: number;
+    roundness: number;
+    opacity: number;
+    flow: number;
+  }>,
+  x: number,
+  y: number,
+): number {
+  const radiusX = dab.size / 2;
+  const radiusY = radiusX * dab.roundness;
+  if (!(radiusX > 0) || !(radiusY > 0)) return 0;
+  const angle = dab.angle * Math.PI / 180;
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const deltaX = x - dab.x;
+  const deltaY = y - dab.y;
+  const localX = (cos * deltaX + sin * deltaY) / radiusX;
+  const localY = (-sin * deltaX + cos * deltaY) / radiusY;
+  if (localX < -1 || localX > 1 || localY < -1 || localY > 1) return 0;
+  return sampleStudioBrushTipAlphaMap(
+    alphaMap,
+    (localX * 0.5 + 0.5) * (alphaMap.size - 1),
+    (localY * 0.5 + 0.5) * (alphaMap.size - 1),
+  ) * dab.opacity * dab.flow;
+}
+
+/**
+ * Flattens the exact ordered multi-tip visual program into one bounded R8 carrier.
+ *
+ * The retained renderer paints primary, layer 0 and layer 1 in that order. Repeating the
+ * source-over operation with an R8 quantization boundary after every mark mirrors an RGBA8
+ * destination and deliberately keeps ordering observable in the carrier bytes. Geometry comes
+ * from the shared composition planner, so scale, offset, rotation, roundness and opacity cannot
+ * drift from Canvas/SVG semantics.
+ */
+function flattenEffectiveTipCarrier(
+  settings: NormalizedStudioBrushDynamicsSettings,
+): BuildResult<EffectiveTipCarrierBuild> {
+  const primaryAlphaMap = composeStudioBrushDualTipAlphaMap(
+    settings.tip,
+    settings.dualBrush,
+  );
+  const layerAlphaMaps = settings.tipLayers.map((layer) => (
+    buildStudioBrushTipAlphaMap(layer.tip)
+  ));
+  const composed = planNormalizedStudioBrushTipComposition(
+    {
+      x: 0,
+      y: 0,
+      size: 2,
+      angle: settings.angle.base,
+      roundness: settings.roundness.base,
+      opacity: 1,
+      flow: 1,
+    },
+    settings.tip,
+    settings.tipLayers,
+  );
+  const alphaMaps = [primaryAlphaMap, ...layerAlphaMaps];
+  if (composed.length < 1 || composed.length > alphaMaps.length) {
+    return reject(
+      "unsupported-dynamics",
+      "element.brushDynamics.tipLayers",
+      "The normalized multi-tip planner produced an inconsistent layer count.",
+    );
+  }
+  let diameterScale = 1;
+  let sourceDimension = primaryAlphaMap.size;
+  for (const composedTip of composed) {
+    const alphaMapIndex = composedTip.role === "primary" ? 0 : composedTip.layerIndex + 1;
+    const alphaMap = alphaMaps[alphaMapIndex];
+    if (!alphaMap) {
+      return reject(
+        "unsupported-dynamics",
+        "element.brushDynamics.tipLayers",
+        "A composed tip layer has no deterministic alpha-map source.",
+      );
+    }
+    diameterScale = Math.max(
+      diameterScale,
+      composedDabSymmetricExtent(composedTip.dab),
+    );
+    sourceDimension = Math.max(sourceDimension, alphaMap.size);
+  }
+  const outputDimension = Math.ceil(sourceDimension * diameterScale);
+  const outputPixels = outputDimension * outputDimension;
+  if (
+    !finite(diameterScale)
+    || diameterScale < 1
+    || !positiveSafeInteger(outputDimension)
+    || outputDimension > MAX_CANONICAL_COMPOSED_TIP_DIMENSION
+    || !positiveSafeInteger(outputPixels)
+    || outputPixels > MAX_CANONICAL_COMPOSED_TIP_PIXELS
+    || outputDimension > STUDIO_CANONICAL_BRUSH_PLAN_BUDGETS.maxTextureDimension
+  ) {
+    return reject(
+      "unsupported-dynamics",
+      "element.brushDynamics.tipLayers",
+      "The transformed multi-tip carrier exceeds the canonical R8 texture budget.",
+    );
+  }
+
+  const r8 = new Uint8Array(outputPixels);
+  const maximumPixel = outputDimension - 1;
+  for (let pixelY = 0; pixelY < outputDimension; pixelY += 1) {
+    const y = maximumPixel === 0
+      ? 0
+      : (pixelY / maximumPixel * 2 - 1) * diameterScale;
+    for (let pixelX = 0; pixelX < outputDimension; pixelX += 1) {
+      const x = maximumPixel === 0
+        ? 0
+        : (pixelX / maximumPixel * 2 - 1) * diameterScale;
+      const outputIndex = pixelY * outputDimension + pixelX;
+      let destination = 0;
+      for (const composedTip of composed) {
+        const alphaMapIndex = composedTip.role === "primary" ? 0 : composedTip.layerIndex + 1;
+        const source = Math.round(
+          Math.min(1, Math.max(0, sampleComposedTipDab(
+            alphaMaps[alphaMapIndex]!,
+            composedTip.dab,
+            x,
+            y,
+          ))) * 255,
+        );
+        destination = Math.min(
+          255,
+          Math.round(source + destination * (255 - source) / 255),
+        );
+      }
+      r8[outputIndex] = destination;
+    }
+  }
+  const alphas = new Float32Array(outputPixels);
+  for (let index = 0; index < outputPixels; index += 1) {
+    alphas[index] = r8[index]! / 255;
+  }
+  const carrier = canonicalTip(settings.tip, {
+    size: outputDimension,
+    alphas,
+    shape: settings.tip.shape,
+    softness: settings.tip.softness,
+    custom: true,
+    revision: `canonical-ordered-tip-layers-v1:${JSON.stringify({
+      primary: settings.tip,
+      layers: settings.tipLayers,
+      dualBrush: settings.dualBrush ?? null,
+      angle: settings.angle.base,
+      roundness: settings.roundness.base,
+      diameterScale,
+    })}`,
+  });
+  if (!carrier.ok) return carrier;
+  return {
     ok: true,
     value: {
-      tip: {
-        kind: "texture",
-        assetId,
-        contentHash,
-        channel: "alpha",
-        width: alphaMap.size,
-        height: alphaMap.size,
-      },
-      requirements: ["texture-tip"],
-      assets: [asset],
+      ...carrier.value,
+      diameterScale,
+    },
+  };
+}
+
+function tipAndAssets(
+  settings: NormalizedStudioBrushDynamicsSettings,
+  retainComposition: boolean,
+): BuildResult<{
+  readonly tip: StudioCanonicalBrushTip;
+  readonly tipComposition: StudioCanonicalBrushTipCompositionV2 | null;
+  readonly carrierDiameterScale: number;
+  readonly carrierOwnsFootprint: boolean;
+  readonly requirements: readonly StudioCanonicalBrushDrawAdapterRequirement[];
+  readonly assets: readonly StudioEngineWebGpuTexturedBrushAssetPayload[];
+}> {
+  const hasComposition = settings.tipLayers.length > 0 || settings.dualBrush !== undefined;
+  if (hasComposition && !retainComposition) {
+    const path = settings.tipLayers.length > 0
+      ? "element.brushDynamics.tipLayers"
+      : "element.brushDynamics.dualBrush";
+    return reject(
+      "unsupported-dynamics",
+      path,
+      "Multi-tip and dual-brush composition requires retained bounded-flow-v2 dynamics.",
+    );
+  }
+  const dualActive = settings.dualBrush?.enabled === true;
+  const carrierOwnsFootprint = dualActive
+    || settings.tipLayers.some((layer) => layer.opacity > 0);
+  let carrierDiameterScale = 1;
+  let effectivePrimary: BuildResult<CanonicalTipBuild>;
+  if (carrierOwnsFootprint) {
+    const flattened = flattenEffectiveTipCarrier(settings);
+    if (!flattened.ok) return flattened;
+    carrierDiameterScale = flattened.value.diameterScale;
+    effectivePrimary = { ok: true, value: flattened.value };
+  } else {
+    effectivePrimary = canonicalTip(settings.tip);
+    if (!effectivePrimary.ok) return effectivePrimary;
+  }
+
+  const assetById = new Map<string, StudioEngineWebGpuTexturedBrushAssetPayload>();
+  const retainAssets = (build: CanonicalTipBuild): void => {
+    for (const asset of build.assets) assetById.set(asset.assetId, asset);
+  };
+  retainAssets(effectivePrimary.value);
+  if (hasComposition) {
+    const primary = canonicalTip(settings.tip);
+    if (!primary.ok) return primary;
+    retainAssets(primary.value);
+    for (const layer of settings.tipLayers) {
+      const layerTip = canonicalTip(layer.tip);
+      if (!layerTip.ok) return layerTip;
+      retainAssets(layerTip.value);
+    }
+    if (settings.dualBrush) {
+      const dualTip = canonicalTip(settings.dualBrush.tip);
+      if (!dualTip.ok) return dualTip;
+      retainAssets(dualTip.value);
+    }
+  }
+  const assets = [...assetById.values()].sort((left, right) =>
+    left.assetId < right.assetId ? -1 : left.assetId > right.assetId ? 1 : 0
+  );
+  return {
+    ok: true,
+    value: {
+      tip: effectivePrimary.value.tip,
+      tipComposition: hasComposition
+        ? {
+            model: "normalized-multi-tip-v1",
+            primary: settings.tip,
+            layers: settings.tipLayers,
+            dualBrush: settings.dualBrush ?? null,
+          }
+        : null,
+      carrierDiameterScale,
+      carrierOwnsFootprint,
+      requirements: effectivePrimary.value.tip.kind === "texture" ? ["texture-tip"] : [],
+      assets,
     },
   };
 }
@@ -754,6 +1037,7 @@ function versionedRecipe(
   element: DrawEl,
   base: StudioCanonicalBrushRecipeV1Base,
   retainedDynamics: NormalizedStudioBrushDynamicsSettings | null,
+  tipComposition: StudioCanonicalBrushTipCompositionV2 | null = null,
 ): BuildResult<StudioCanonicalBrushRecipe> {
   if (element.paintModel === undefined) {
     if (retainedDynamics !== null) {
@@ -796,13 +1080,14 @@ function versionedRecipe(
         ...base,
         paint: paintContract(element.paintModel),
         retainedDynamics,
+        ...(tipComposition ? { tipComposition } : {}),
       },
     };
   }
   return reject(
     "unsupported-paint-model",
     "element.paintModel",
-    "Layered flow accepts ordinary ink only; bounded flow requires retained dynamic settings.",
+    "Layered flow accepts ordinary ink or a named low-density eraser; bounded flow requires retained dynamic settings.",
   );
 }
 
@@ -810,7 +1095,7 @@ function dynamicRecipe(
   request: StudioCanonicalBrushDrawAdapterRequest,
 ): BuildResult<RecipeBuild> {
   const { element } = request;
-  const presetId = resolveStudioBrushDynamicsPresetId(element.brush);
+  const presetId = resolveStudioCapturedBrushDynamicsPresetId(element);
   if (!presetId || !element.brushDynamics) {
     return reject(
       "unsupported-brush",
@@ -844,7 +1129,7 @@ function dynamicRecipe(
       ? "graphite"
       : "ink";
   if (element.paintModel === STUDIO_STROKE_PAINT_MODEL_BOUNDED_FLOW_V2) {
-    const tip = tipAndAsset(settings);
+    const tip = tipAndAssets(settings, true);
     if (!tip.ok) return tip;
     const color = linearColor(element.stroke, request.colorSpace);
     if (!color.ok) return color;
@@ -854,14 +1139,22 @@ function dynamicRecipe(
       ?? settings.spacing.base / settings.width.base;
     const scatterRatioValue = settings.scatterRatio
       ?? settings.scatter.base / settings.width.base;
+    const carrierSize = settings.width.base * tip.value.carrierDiameterScale;
+    const carrierSpacingRatio = spacingRatioValue / tip.value.carrierDiameterScale;
+    const carrierScatterRatio = scatterRatioValue / tip.value.carrierDiameterScale;
     if (
       !inRange(
-        spacingRatioValue,
+        carrierSize,
+        0.01,
+        STUDIO_CANONICAL_BRUSH_PLAN_BUDGETS.maxBrushSize,
+      )
+      || !inRange(
+        carrierSpacingRatio,
         0.001,
         STUDIO_CANONICAL_BRUSH_PLAN_BUDGETS.maxSpacingRatio,
       )
       || !inRange(
-        scatterRatioValue,
+        carrierScatterRatio,
         0,
         STUDIO_CANONICAL_BRUSH_PLAN_BUDGETS.maxScatterRatio,
       )
@@ -889,16 +1182,18 @@ function dynamicRecipe(
       engine: "dab-v1",
       material,
       tip: tip.value.tip,
-      size: settings.width.base,
+      size: carrierSize,
       flow: 1,
       hardness: 1,
-      spacingRatio: spacingRatioValue,
+      spacingRatio: carrierSpacingRatio,
       scatter: {
-        radiusRatio: scatterRatioValue,
+        radiusRatio: carrierScatterRatio,
         distribution: "uniform-disk",
       },
-      angleRadians: settings.angle.base * Math.PI / 180,
-      roundness: settings.roundness.base,
+      angleRadians: tip.value.carrierOwnsFootprint
+        ? 0
+        : settings.angle.base * Math.PI / 180,
+      roundness: tip.value.carrierOwnsFootprint ? 1 : settings.roundness.base,
       pressure: {
         size: IDENTITY_CURVE,
         opacity: IDENTITY_CURVE,
@@ -906,7 +1201,7 @@ function dynamicRecipe(
       },
       grain,
       wetMedia: null,
-    }, settings);
+    }, settings, tip.value.tipComposition);
     if (!recipe.ok) return recipe;
     const requirements: StudioCanonicalBrushDrawAdapterRequirement[] = [
       ...tip.value.requirements,
@@ -954,7 +1249,7 @@ function dynamicRecipe(
   if (!spacing.ok) return spacing;
   const scatter = scatterRatio(settings, size.value);
   if (!scatter.ok) return scatter;
-  const tip = tipAndAsset(settings);
+  const tip = tipAndAssets(settings, false);
   if (!tip.ok) return tip;
   const color = linearColor(element.stroke, request.colorSpace);
   if (!color.ok) return color;

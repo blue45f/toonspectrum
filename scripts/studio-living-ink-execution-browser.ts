@@ -1,3 +1,8 @@
+import {
+  canonicalStudioLivingInkDisplayRgba8,
+  canonicalStudioLivingInkDisplayRgba8BottomUp,
+  isStudioLivingInkExecutionReadbackProvenance,
+} from "../src/domains/creator/studio-living-ink-execution-protocol";
 import { DEFAULT_STUDIO_LIVING_INK_MATERIAL_CONTROLS } from "../src/domains/creator/studio-living-ink-gpu-protocol";
 import {
   createStudioLivingInkExecutionProvider,
@@ -8,6 +13,7 @@ import {
 import type {
   StudioLivingInkExecutionConfig,
   StudioLivingInkExecutionFrame,
+  StudioLivingInkExecutionReceipt,
   StudioLivingInkWorkerRequest,
 } from "../src/domains/creator/studio-living-ink-execution-protocol";
 import type {
@@ -25,6 +31,7 @@ declare global {
 
 const WIDTH = 256;
 const HEIGHT = 160;
+const PAGE_RGBA = Object.freeze([255, 255, 255, 255] as const);
 
 const config: StudioLivingInkExecutionConfig = {
   displayWidth: WIDTH,
@@ -82,14 +89,39 @@ function canvas(id: string): HTMLCanvasElement {
   return value;
 }
 
-function drawFrame(frame: StudioLivingInkExecutionFrame, id: string): ImageData {
+interface DrawnLivingInkFrame {
+  /** Straight-alpha RGBA carried by the runtime's ImageBitmap. */
+  readonly raw: ImageData;
+  /** What the artist sees after that wash surface is composited over the white document. */
+  readonly composited: ImageData;
+}
+
+function drawFrameWithRaw(frame: StudioLivingInkExecutionFrame, id: string): DrawnLivingInkFrame {
   const target = canvas(id);
-  const context = target.getContext("2d", { alpha: false, willReadFrequently: true });
+  const rawCanvas = document.createElement("canvas");
+  rawCanvas.width = target.width;
+  rawCanvas.height = target.height;
+  const rawContext = rawCanvas.getContext("2d", { alpha: true, willReadFrequently: true });
+  if (!rawContext) throw new Error(`No raw 2D context for ${id}.`);
+  rawContext.clearRect(0, 0, rawCanvas.width, rawCanvas.height);
+  rawContext.drawImage(frame.image, 0, 0, rawCanvas.width, rawCanvas.height);
+  const raw = rawContext.getImageData(0, 0, rawCanvas.width, rawCanvas.height);
+
+  const context = target.getContext("2d", { alpha: true, willReadFrequently: true });
   if (!context) throw new Error(`No 2D context for ${id}.`);
-  context.clearRect(0, 0, target.width, target.height);
+  // Exercise the browser's exact ImageBitmap source-over path used by Studio. Reading the bitmap
+  // into ImageData and re-compositing its straight channels in JavaScript would introduce another
+  // premultiply/un-premultiply round trip and can make a low-alpha wash spuriously pale.
+  context.fillStyle = `rgb(${PAGE_RGBA[0]} ${PAGE_RGBA[1]} ${PAGE_RGBA[2]})`;
+  context.fillRect(0, 0, target.width, target.height);
   context.drawImage(frame.image, 0, 0, target.width, target.height);
+  const composited = context.getImageData(0, 0, target.width, target.height);
   frame.image.close();
-  return context.getImageData(0, 0, target.width, target.height);
+  return Object.freeze({ raw, composited });
+}
+
+function drawFrame(frame: StudioLivingInkExecutionFrame, id: string): ImageData {
+  return drawFrameWithRaw(frame, id).composited;
 }
 
 function darkness(image: ImageData, bounds = { x: 0, y: 0, width: WIDTH, height: HEIGHT }): number {
@@ -283,6 +315,30 @@ function highFrequencyResidual(
     }
   }
   return sum / Math.max(1, count);
+}
+
+function highFrequencyStandardDeviation(
+  image: ImageData,
+  bounds: Readonly<{ x: number; y: number; width: number; height: number }>,
+): number {
+  const residuals: number[] = [];
+  for (let y = bounds.y + 1; y < bounds.y + bounds.height - 1; y += 1) {
+    for (let x = bounds.x + 1; x < bounds.x + bounds.width - 1; x += 1) {
+      const value = darkness(image, { x, y, width: 1, height: 1 });
+      const neighborhood = (
+        darkness(image, { x: x - 1, y, width: 1, height: 1 })
+        + darkness(image, { x: x + 1, y, width: 1, height: 1 })
+        + darkness(image, { x, y: y - 1, width: 1, height: 1 })
+        + darkness(image, { x, y: y + 1, width: 1, height: 1 })
+      ) / 4;
+      residuals.push(value - neighborhood);
+    }
+  }
+  const mean = residuals.reduce((sum, value) => sum + value, 0) / Math.max(1, residuals.length);
+  return Math.sqrt(
+    residuals.reduce((sum, value) => sum + (value - mean) ** 2, 0)
+      / Math.max(1, residuals.length),
+  );
 }
 
 function pixelDarkness(image: ImageData, x: number, y: number): number {
@@ -577,15 +633,16 @@ function bytesToHex(bytes: Uint8Array): string {
   return result;
 }
 
-async function bottomUpHash(image: ImageData): Promise<`sha256:${string}`> {
-  const normalized = new Uint8Array(image.data.length);
-  const stride = image.width * 4;
-  for (let row = 0; row < image.height; row += 1) {
-    normalized.set(
-      image.data.subarray(row * stride, row * stride + stride),
-      (image.height - 1 - row) * stride,
-    );
+async function receiptOrientedHash(
+  image: ImageData,
+  receipt: StudioLivingInkExecutionReceipt,
+): Promise<`sha256:${string}`> {
+  if (!isStudioLivingInkExecutionReadbackProvenance(receipt)) {
+    throw new Error("Living Ink receipt has contradictory backend/readback provenance.");
   }
+  const normalized = receipt.displayReadbackOrientation === "webgl-bottom-left-row-major"
+    ? canonicalStudioLivingInkDisplayRgba8BottomUp(image.data, image.width, image.height)
+    : canonicalStudioLivingInkDisplayRgba8(image.data);
   const digest = await crypto.subtle.digest("SHA-256", normalized);
   return `sha256:${bytesToHex(new Uint8Array(digest))}`;
 }
@@ -624,8 +681,13 @@ async function main(): Promise<void> {
     const lineFrame = await bloomProvider.apply(darkInk(1, lineMarks()));
     const lineReceiptHash = lineFrame.receipt.displaySha256;
     const lineReceiptBackend = lineFrame.receipt.backend;
-    const lineImage = drawFrame(lineFrame, "line");
-    const normalizedDisplayHash = await bottomUpHash(lineImage);
+    const lineReceiptReadback = Object.freeze({
+      orientation: lineFrame.receipt.displayReadbackOrientation,
+      format: lineFrame.receipt.readbackFormat,
+    });
+    const drawnLine = drawFrameWithRaw(lineFrame, "line");
+    const lineImage = drawnLine.composited;
+    const normalizedDisplayHash = await receiptOrientedHash(drawnLine.raw, lineFrame.receipt);
     const waterFrame = await bloomProvider.apply({
       kind: "water",
       version: 1,
@@ -797,8 +859,17 @@ async function main(): Promise<void> {
 
     const deterministicA = await deterministicHash();
     const deterministicB = await deterministicHash();
-    const nearBlackBelowFloor = await deterministicHash([0.001, 0.008, 0.014, 1]);
-    const nearBlackAtFloor = await deterministicHash([0.015, 0.015, 0.015, 1]);
+    // Stroke colours enter as linear channels and are encoded to display reflectance before the
+    // 0.015 floor. Use the linear inverse of that floor; comparing against 0.015 linear tested
+    // different, above-floor colours after the colour-space correction and could never be exact.
+    const linearReflectanceFloor = 0.015 / 12.92;
+    const nearBlackBelowFloor = await deterministicHash([0, 0.0005, 0.001, 1]);
+    const nearBlackAtFloor = await deterministicHash([
+      linearReflectanceFloor,
+      linearReflectanceFloor,
+      linearReflectanceFloor,
+      1,
+    ]);
 
     const crashWorkers: CrashableLivingInkWorker[] = [];
     const crashProvider = new StudioLivingInkExecutionProvider(config, {
@@ -898,7 +969,13 @@ async function main(): Promise<void> {
     const lineRegion = { x: 18, y: 58, width: 220, height: 46 };
     const bloomRegion = { x: 82, y: 56, width: 92, height: 52 };
     const lineStats = regionStats(lineImage, lineRegion);
-    const paperStats = regionStats(clearImage, lineRegion);
+    // The canonical Living Ink surface is transparent outside a wash. Paper fibre therefore lives
+    // inside the wash instead of repainting the untouched page. Keep the original oracle floor,
+    // but measure the physical signal where it now exists rather than asking a clean white page to
+    // contain texture. The bloom region is a broad, low-frequency wash and avoids treating the
+    // narrow dark ink core itself as "paper texture".
+    const pageStats = regionStats(clearImage, lineRegion);
+    const paperTextureStandardDeviation = highFrequencyStandardDeviation(bloomImage, bloomRegion);
     const bloomStats = regionStats(bloomImage, bloomRegion);
     const centerRegion = { x: 112, y: 64, width: 32, height: 32 };
     const isolatedBloomShape = radialBloomShape(
@@ -978,6 +1055,7 @@ async function main(): Promise<void> {
         webgpu: capabilities.webgpu,
         halfFloatFields: capabilities.halfFloatRenderable,
         rgba8Readback: true,
+        readbackProvenance: lineReceiptReadback,
       },
       line: {
         receiptHash: lineReceiptHash,
@@ -992,8 +1070,8 @@ async function main(): Promise<void> {
         bounds: bloomDifferenceBounds,
       },
       visualQuality: {
-        sumiLocalContrast: lineStats.mean - paperStats.mean,
-        sumiPeakDensityOverPaper: lineStats.maximum - paperStats.mean,
+        sumiLocalContrast: lineStats.mean - pageStats.mean,
+        sumiPeakDensityOverPaper: lineStats.maximum - pageStats.mean,
         pigmentRegionStandardDeviation: lineStats.standardDeviation,
         fiberGranulationResidual: highFrequencyResidual(bloomImage, bloomRegion),
         bloomEdgeConcentration: bloomStats.maximum - bloomStats.mean,
@@ -1019,7 +1097,7 @@ async function main(): Promise<void> {
           bloomImage,
           bloomRegion,
         ),
-        paperLuminanceStandardDeviation: paperStats.standardDeviation,
+        paperLuminanceStandardDeviation: paperTextureStandardDeviation,
         wetSheenAndBloomDifference: meanAbsoluteDifference(lineImage, bloomImage, bloomRegion),
         whiteCoverageLightening: lightening(darkBase.image, whiteLayer.image, centerRegion),
         whiteCenterLuminance: 255 - darkness(whiteLayer.image, centerRegion),

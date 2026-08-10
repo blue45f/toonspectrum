@@ -186,6 +186,7 @@ describe("studio brush applied baseline contract", () => {
       catalogId: "essentials:rough-pencil",
       catalogName: "거친 연필",
       runtimeBrushId: "dry-media",
+      operation: "paint" as const,
       defaultWidth: 4,
       defaultOpacity: 0.84,
       brushDynamics: studioBrushDynamicsPresetSettings("dry-media"),

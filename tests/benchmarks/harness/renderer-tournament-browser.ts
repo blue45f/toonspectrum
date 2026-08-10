@@ -47,12 +47,17 @@ import {
 } from "../../../packages/studio-engine-registry/src/tournament";
 
 import {
+  RENDERER_TOURNAMENT_BROWSER_BOOTSTRAP_ORDER,
+  RENDERER_TOURNAMENT_BROWSER_BOOTSTRAP_RECEIPT_GLOBAL,
+  RENDERER_TOURNAMENT_BROWSER_CSP_VIOLATIONS_GLOBAL,
   RENDERER_TOURNAMENT_BROWSER_PROVIDER_IDS,
   RENDERER_TOURNAMENT_BROWSER_RESULT_GLOBAL,
   RENDERER_TOURNAMENT_BROWSER_SCENE_IDS,
   RENDERER_TOURNAMENT_BROWSER_WARM_SAMPLES,
   RENDERER_TOURNAMENT_BROWSER_WARMUPS,
   buildRendererTournamentScene,
+  type RendererTournamentBrowserBootstrapReceipt,
+  type RendererTournamentBrowserCspCaptureControlResult,
   type RendererTournamentBrowserMeasurementResult,
   type RendererTournamentBrowserProfileResult,
   type RendererTournamentBrowserProviderId,
@@ -62,7 +67,7 @@ import {
 import type { Browser, BrowserContext, Page, Response } from "playwright";
 import type { PreviewServer } from "vite";
 
-export const RENDERER_TOURNAMENT_BROWSER_REPORT_SCHEMA_VERSION = 2 as const;
+export const RENDERER_TOURNAMENT_BROWSER_REPORT_SCHEMA_VERSION = 3 as const;
 export const RENDERER_TOURNAMENT_BROWSER_COLD_SAMPLES = 7;
 
 const RESULT_TIMEOUT_MS = 8 * 60 * 1_000;
@@ -78,7 +83,7 @@ const TRACKED_RESULT = join(
 const PAGE_ALIAS = "virtual:renderer-tournament-browser-page";
 const REFERENCE_PROVIDER_ID: RendererTournamentBrowserProviderId = "vello-cpu";
 const FAULT_CONTROL_SCENE_ID: RendererTournamentBrowserSceneId = "dense-strokes";
-const WEBGPU_ARGS = Object.freeze([
+export const RENDERER_TOURNAMENT_BROWSER_CHROMIUM_ARGS = Object.freeze([
   "--no-sandbox",
   "--enable-unsafe-webgpu",
   "--enable-features=WebGPU",
@@ -86,7 +91,7 @@ const WEBGPU_ARGS = Object.freeze([
   "--disable-software-rasterizer",
   "--enable-precise-memory-info",
 ]);
-const CONTENT_SECURITY_POLICY = [
+export const RENDERER_TOURNAMENT_BROWSER_CONTENT_SECURITY_POLICY = [
   "default-src 'none'",
   "script-src 'self' 'wasm-unsafe-eval'",
   "connect-src 'self'",
@@ -98,6 +103,11 @@ const CONTENT_SECURITY_POLICY = [
   "base-uri 'none'",
   "frame-ancestors 'none'",
 ].join("; ");
+const CLEAN_CSP_DISPOSITION = "no securitypolicyviolation event observed";
+const QUARANTINED_CSP_DISPOSITION =
+  "retained as an explicit release quarantine; renderer timing and visual evidence remain usable, but this run does not claim CSP-clean execution";
+const FORBIDDEN_BROWSER_JIT_FLAG =
+  /(?:^|[=,\s"'])--?(?:jitless|disable-jit|no-opt|no-turbofan)(?:$|[=,\s"'])/iu;
 
 type JsonRecord = Record<string, unknown>;
 
@@ -116,6 +126,8 @@ export interface RendererTournamentBrowserDiagnostics {
   readonly browserVersion: string;
   readonly hostPlatform: string;
   readonly launchArgs: readonly string[];
+  /** Full argv reported by Chromium through CDP, including Playwright defaults. */
+  readonly actualBrowserCommandLine: readonly string[];
   readonly consoleErrors: readonly string[];
   readonly consoleWarnings: readonly string[];
   readonly pageErrors: readonly string[];
@@ -131,6 +143,44 @@ export interface RendererTournamentBrowserDiagnostics {
     crossOriginEmbedderPolicy: string;
     crossOriginResourcePolicy: string;
   }>;
+}
+
+export interface RendererTournamentBrowserManifestReceipt {
+  readonly manifestPath: ".vite/manifest.json";
+  readonly htmlEntryKey: "index.html";
+  readonly htmlScriptSource: "/bootstrap.ts";
+  readonly bootstrapEntryName: "index";
+  readonly bootstrapEntrySource: "index.html";
+  readonly bootstrapEntryFile: string;
+  readonly bootstrapEntryIsEntry: true;
+  readonly bootstrapStaticImports: readonly string[];
+  readonly bootstrapDynamicImports: readonly ["entry.ts"];
+  readonly pageEntryKey: "entry.ts";
+  readonly pageEntryName: "entry";
+  readonly pageEntrySource: "entry.ts";
+  readonly pageEntryFile: string;
+  readonly pageEntryIsDynamicEntry: true;
+  readonly pageStaticImports: readonly string[];
+  readonly pageDynamicImports: readonly string[];
+  readonly bootstrapSourceSha256: string;
+  /** Manifest-addressed production bundle captured as canonical base64 for portable verification. */
+  readonly bootstrapBundleFile: string;
+  readonly bootstrapBundleEncoding: "base64";
+  readonly bootstrapBundleBytesBase64: string;
+  readonly bootstrapBundleByteLength: number;
+  readonly bootstrapBundleSha256: string;
+}
+
+export interface RendererTournamentBrowserCspCaptureControl {
+  readonly freshContext: true;
+  readonly sameStrictCsp: true;
+  readonly attempted: true;
+  readonly blocked: true;
+  readonly errorName: "EvalError";
+  readonly violationCount: number;
+  readonly observedPatterns: readonly string[];
+  readonly responseContentSecurityPolicy: string;
+  readonly bootstrapReceipt: RendererTournamentBrowserBootstrapReceipt;
 }
 
 export interface RendererTournamentProviderMeasurement {
@@ -208,11 +258,14 @@ export interface RendererTournamentBrowserArtifact {
   readonly schemaVersion: typeof RENDERER_TOURNAMENT_BROWSER_REPORT_SCHEMA_VERSION;
   readonly generatedAt: string;
   readonly status: "pass" | "fail" | "unsupported" | "quarantined";
-  /** Quality/performance/evidence integrity passed independently of release policy. */
+  /** Quality/performance/evidence integrity passed independently of bounded CSP policy. */
   readonly technicalPass: boolean;
-  /** Technical evidence passed and every release gate, including CSP, is clean. */
+  /**
+   * The bounded renderer-tournament evidence and its strict-CSP execution gate passed.
+   * This is not product-wide promotion and does not claim external CSP non-inferiority.
+   */
   readonly releasePass: boolean;
-  /** Backward-compatible release verdict. This must always equal releasePass. */
+  /** Backward-compatible bounded tournament verdict. Always equals releasePass. */
   readonly pass: boolean;
   readonly benchmark: Readonly<{
     execution: "vite-production-build-chromium-metal-webgpu";
@@ -273,6 +326,9 @@ export interface RendererTournamentBrowserArtifact {
       likelySource: string | null;
       unsafeEvalAddedForBenchmark: false;
       jitDisabledForBenchmark: false;
+      zodJitlessPrebootstrap: true;
+      bootstrapReceipt: RendererTournamentBrowserBootstrapReceipt;
+      captureControl: RendererTournamentBrowserCspCaptureControl;
     }>;
     packageVersions: Readonly<Record<string, string>>;
     claims: Readonly<{
@@ -287,6 +343,7 @@ export interface RendererTournamentBrowserArtifact {
     mode: "vite-production-build";
     assets: readonly string[];
     scratchDirectory: string;
+    manifestReceipt: RendererTournamentBrowserManifestReceipt | null;
   }>;
   readonly validationIssues: readonly string[];
 }
@@ -411,6 +468,108 @@ function walkFiles(directory: string, prefix = ""): string[] {
     });
 }
 
+export function createRendererTournamentCspBootstrapSource(): string {
+  return [
+    "// Install complete CSP observation before any application dependency can evaluate.",
+    `const cspViolationsGlobal = ${JSON.stringify(RENDERER_TOURNAMENT_BROWSER_CSP_VIOLATIONS_GLOBAL)};`,
+    `const bootstrapReceiptGlobal = ${JSON.stringify(RENDERER_TOURNAMENT_BROWSER_BOOTSTRAP_RECEIPT_GLOBAL)};`,
+    "const cspViolations = [];",
+    "const bootstrapOrder = [];",
+    "globalThis[cspViolationsGlobal] = cspViolations;",
+    "const bootstrapReceipt = { schemaVersion: 1, order: bootstrapOrder };",
+    "globalThis[bootstrapReceiptGlobal] = bootstrapReceipt;",
+    "document.addEventListener(\"securitypolicyviolation\", (event) => {",
+    "  cspViolations.push(`${event.effectiveDirective}: ${event.blockedURI || \"inline\"}`);",
+    "});",
+    'bootstrapOrder.push("csp-listener-installed");',
+    "// Preserve any existing Zod global configuration and disable only Zod parser codegen.",
+    "const existingZodConfig = globalThis.__zod_globalConfig;",
+    "const zodConfig = existingZodConfig && typeof existingZodConfig === \"object\"",
+    "  ? existingZodConfig",
+    "  : {};",
+    "if (zodConfig !== existingZodConfig) globalThis.__zod_globalConfig = zodConfig;",
+    "zodConfig.jitless = true;",
+    'bootstrapOrder.push("zod-jitless-configured");',
+    'bootstrapOrder.push("entry-import-started");',
+    'void import("./entry.ts");',
+    "",
+  ].join("\n");
+}
+
+function manifestStringArray(value: unknown, label: string): string[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || !value.every((item) => typeof item === "string")) {
+    throw new Error(`${label} must be a string array in the Vite manifest`);
+  }
+  return [...value] as string[];
+}
+
+function createManifestReceipt(
+  distributionDirectory: string,
+  bootstrapSource: string,
+): RendererTournamentBrowserManifestReceipt {
+  const manifestPath = join(distributionDirectory, ".vite/manifest.json");
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as JsonRecord;
+  const bootstrapEntry = record(manifest["index.html"]);
+  const pageEntry = record(manifest["entry.ts"]);
+  const bootstrapEntryName = bootstrapEntry?.name;
+  const bootstrapEntrySource = bootstrapEntry?.src;
+  const bootstrapEntryFile = bootstrapEntry?.file;
+  const pageEntryName = pageEntry?.name;
+  const pageEntrySource = pageEntry?.src;
+  const pageEntryFile = pageEntry?.file;
+  const bootstrapStaticImports = manifestStringArray(
+    bootstrapEntry?.imports,
+    "bootstrap static imports",
+  );
+  const bootstrapDynamicImports = manifestStringArray(
+    bootstrapEntry?.dynamicImports,
+    "bootstrap dynamic imports",
+  );
+  const pageStaticImports = manifestStringArray(pageEntry?.imports, "page static imports");
+  const pageDynamicImports = manifestStringArray(pageEntry?.dynamicImports, "page dynamic imports");
+  if (
+    bootstrapEntry?.isEntry !== true ||
+    bootstrapEntryName !== "index" ||
+    bootstrapEntrySource !== "index.html" ||
+    typeof bootstrapEntryFile !== "string" ||
+    bootstrapStaticImports.length !== 0 ||
+    JSON.stringify(bootstrapDynamicImports) !== JSON.stringify(["entry.ts"]) ||
+    pageEntry?.isDynamicEntry !== true ||
+    pageEntryName !== "entry" ||
+    pageEntrySource !== "entry.ts" ||
+    typeof pageEntryFile !== "string"
+  ) {
+    throw new Error("Vite manifest does not preserve bootstrap-before-dynamic-page boundary");
+  }
+  const bootstrapBundle = readFileSync(join(distributionDirectory, bootstrapEntryFile));
+  const bootstrapBundleBytesBase64 = bootstrapBundle.toString("base64");
+  return {
+    manifestPath: ".vite/manifest.json",
+    htmlEntryKey: "index.html",
+    htmlScriptSource: "/bootstrap.ts",
+    bootstrapEntryName: "index",
+    bootstrapEntrySource: "index.html",
+    bootstrapEntryFile,
+    bootstrapEntryIsEntry: true,
+    bootstrapStaticImports,
+    bootstrapDynamicImports: ["entry.ts"],
+    pageEntryKey: "entry.ts",
+    pageEntryName: "entry",
+    pageEntrySource: "entry.ts",
+    pageEntryFile,
+    pageEntryIsDynamicEntry: true,
+    pageStaticImports,
+    pageDynamicImports,
+    bootstrapSourceSha256: createHash("sha256").update(bootstrapSource).digest("hex"),
+    bootstrapBundleFile: bootstrapEntryFile,
+    bootstrapBundleEncoding: "base64",
+    bootstrapBundleBytesBase64,
+    bootstrapBundleByteLength: bootstrapBundle.byteLength,
+    bootstrapBundleSha256: createHash("sha256").update(bootstrapBundle).digest("hex"),
+  };
+}
+
 function createHtml(): string {
   return [
     "<!doctype html>",
@@ -422,7 +581,7 @@ function createHtml(): string {
     "</head>",
     "<body>",
     '<main><h1>Renderer Tournament browser benchmark</h1></main>',
-    '<script type="module" src="/entry.ts"></script>',
+    '<script type="module" src="/bootstrap.ts"></script>',
     "</body>",
     "</html>",
   ].join("");
@@ -432,7 +591,8 @@ function emptyDiagnostics(): RendererTournamentBrowserDiagnostics {
   return {
     browserVersion: "unavailable",
     hostPlatform: process.platform,
-    launchArgs: WEBGPU_ARGS,
+    launchArgs: RENDERER_TOURNAMENT_BROWSER_CHROMIUM_ARGS,
+    actualBrowserCommandLine: [],
     consoleErrors: [],
     consoleWarnings: [],
     pageErrors: [],
@@ -455,6 +615,7 @@ interface MutableDiagnostics {
   browserVersion: string;
   hostPlatform: string;
   launchArgs: readonly string[];
+  actualBrowserCommandLine: string[];
   consoleErrors: string[];
   consoleWarnings: string[];
   pageErrors: string[];
@@ -465,6 +626,39 @@ interface MutableDiagnostics {
   requestCount: number;
   responseCount: number;
   responseHeaders: RendererTournamentBrowserDiagnostics["responseHeaders"];
+}
+
+function createMutableDiagnostics(actualBrowserCommandLine: readonly string[] = []): MutableDiagnostics {
+  return {
+    ...emptyDiagnostics(),
+    actualBrowserCommandLine: [...actualBrowserCommandLine],
+    consoleErrors: [],
+    consoleWarnings: [],
+    pageErrors: [],
+    requestFailures: [],
+    errorResponses: [],
+    serverErrors: [],
+    cspViolations: [],
+  };
+}
+
+async function chromiumCommandLine(browser: Browser): Promise<string[]> {
+  const session = await browser.newBrowserCDPSession();
+  try {
+    const response = await session.send("Browser.getBrowserCommandLine") as {
+      arguments?: unknown;
+    };
+    if (
+      !Array.isArray(response.arguments) ||
+      response.arguments.length === 0 ||
+      !response.arguments.every((argument) => typeof argument === "string")
+    ) {
+      throw new Error("CDP Browser.getBrowserCommandLine returned no complete argv receipt");
+    }
+    return [...response.arguments] as string[];
+  } finally {
+    await session.detach();
+  }
 }
 
 function observePage(page: Page, diagnostics: MutableDiagnostics): void {
@@ -522,9 +716,11 @@ async function waitForPageResult(page: Page): Promise<unknown> {
 
 function appendCspViolations(value: unknown, diagnostics: MutableDiagnostics): void {
   const violations = record(value)?.cspViolations;
-  if (!Array.isArray(violations)) return;
+  if (!Array.isArray(violations) || !violations.every((item) => typeof item === "string")) {
+    throw new Error("page CSP violations must be a complete string array");
+  }
   for (const violation of violations) {
-    if (typeof violation === "string") diagnostics.cspViolations.push(violation);
+    diagnostics.cspViolations.push(violation as string);
   }
 }
 
@@ -555,9 +751,32 @@ async function runIsolatedPage(
   }
 }
 
+function bootstrapReceiptIsValid(value: unknown): value is RendererTournamentBrowserBootstrapReceipt {
+  const receipt = record(value);
+  return Boolean(
+    receipt &&
+    receipt.schemaVersion === 1 &&
+    Array.isArray(receipt.order) &&
+    receipt.order.every((item) => typeof item === "string") &&
+    JSON.stringify(receipt.order) === JSON.stringify(RENDERER_TOURNAMENT_BROWSER_BOOTSTRAP_ORDER) &&
+    receipt.listenerInstalledBeforeZodConfig === true &&
+    receipt.listenerInstalledBeforeEntryImport === true &&
+    receipt.zodJitlessConfiguredBeforeEntryImport === true &&
+    receipt.pageModuleEvaluated === true &&
+    receipt.zodGlobalConfigObservedByPage === true &&
+    receipt.zodCoreGlobalConfigJitless === true &&
+    receipt.zodAllowsEvalValue === false
+  );
+}
+
 function parseProfile(value: unknown): RendererTournamentBrowserProfileResult {
   const item = record(value);
-  if (item?.schemaVersion !== 1 || item.mode !== "profile" || item.status !== "ok") {
+  if (
+    item?.schemaVersion !== 1 ||
+    item.mode !== "profile" ||
+    item.status !== "ok" ||
+    !bootstrapReceiptIsValid(item.bootstrapReceipt)
+  ) {
     throw new Error(`profile page failed: ${JSON.stringify(value)}`);
   }
   return value as RendererTournamentBrowserProfileResult;
@@ -568,11 +787,33 @@ function parseMeasurement(value: unknown): RendererTournamentBrowserMeasurementR
   if (
     item?.schemaVersion !== 1 ||
     !["cold", "warm", "fault-control"].includes(String(item.mode)) ||
-    item.status !== "ok"
+    item.status !== "ok" ||
+    !bootstrapReceiptIsValid(item.bootstrapReceipt)
   ) {
     throw new Error(`measurement page failed: ${JSON.stringify(value)}`);
   }
   return value as RendererTournamentBrowserMeasurementResult;
+}
+
+function parseCspCaptureControl(value: unknown): RendererTournamentBrowserCspCaptureControlResult {
+  const item = record(value);
+  const violations = item?.cspViolations;
+  if (
+    item?.schemaVersion !== 1 ||
+    item.mode !== "csp-control" ||
+    item.status !== "ok" ||
+    item.attempted !== true ||
+    item.blocked !== true ||
+    item.errorName !== "EvalError" ||
+    !Array.isArray(violations) ||
+    violations.length === 0 ||
+    !violations.every((violation) => typeof violation === "string") ||
+    !violations.some((violation) => /^(?:script-src|script-src-elem): eval$/u.test(violation)) ||
+    !bootstrapReceiptIsValid(item.bootstrapReceipt)
+  ) {
+    throw new Error(`strict-CSP capture control failed: ${JSON.stringify(value)}`);
+  }
+  return value as RendererTournamentBrowserCspCaptureControlResult;
 }
 
 function recordCostSamples(
@@ -715,6 +956,7 @@ function writeJson(path: string, value: unknown): void {
 function readonlyDiagnostics(value: MutableDiagnostics): RendererTournamentBrowserDiagnostics {
   return {
     ...value,
+    actualBrowserCommandLine: [...value.actualBrowserCommandLine],
     consoleErrors: [...value.consoleErrors],
     consoleWarnings: [...value.consoleWarnings],
     pageErrors: [...value.pageErrors],
@@ -740,6 +982,88 @@ function providerIdsExact(providers: unknown): boolean {
   );
 }
 
+function exactStringArray(value: unknown, expected: readonly string[]): boolean {
+  return Array.isArray(value) &&
+    value.every((item) => typeof item === "string") &&
+    JSON.stringify(value) === JSON.stringify(expected);
+}
+
+function cspDirectiveTokens(csp: string, directiveName: string): readonly string[] | null {
+  const matches = csp
+    .split(";")
+    .map((directive) => directive.trim().split(/\s+/u).filter(Boolean))
+    .filter((tokens) => tokens[0] === directiveName);
+  return matches.length === 1 ? matches[0]!.slice(1) : null;
+}
+
+function actualBrowserCommandLineIsSafe(value: unknown): value is readonly string[] {
+  return Array.isArray(value) &&
+    value.length > 0 &&
+    value.every((argument) =>
+      typeof argument === "string" && !FORBIDDEN_BROWSER_JIT_FLAG.test(argument));
+}
+
+function canonicalBase64Bytes(value: unknown): Uint8Array | null {
+  if (
+    typeof value !== "string" ||
+    value.length === 0 ||
+    !/^(?:[A-Za-z\d+/]{4})*(?:[A-Za-z\d+/]{2}==|[A-Za-z\d+/]{3}=)?$/u.test(value)
+  ) {
+    return null;
+  }
+  const decoded = Buffer.from(value, "base64");
+  return decoded.toString("base64") === value ? new Uint8Array(decoded) : null;
+}
+
+function isBuiltJavaScriptAssetPath(value: unknown): value is string {
+  return typeof value === "string" && /^assets\/[A-Za-z\d._-]+\.js$/u.test(value);
+}
+
+function manifestReceiptIsValid(value: unknown, assets: unknown): boolean {
+  const receipt = record(value);
+  if (
+    !receipt ||
+    !Array.isArray(assets) ||
+    !assets.every((asset) => typeof asset === "string")
+  ) return false;
+  const bootstrapEntryFile = receipt.bootstrapEntryFile;
+  const pageEntryFile = receipt.pageEntryFile;
+  const bootstrapBundleBytes = canonicalBase64Bytes(receipt.bootstrapBundleBytesBase64);
+  return receipt.manifestPath === ".vite/manifest.json" &&
+    receipt.htmlEntryKey === "index.html" &&
+    receipt.htmlScriptSource === "/bootstrap.ts" &&
+    receipt.bootstrapEntryName === "index" &&
+    receipt.bootstrapEntrySource === receipt.htmlEntryKey &&
+    receipt.bootstrapEntryIsEntry === true &&
+    isBuiltJavaScriptAssetPath(bootstrapEntryFile) &&
+    assets.includes(bootstrapEntryFile) &&
+    assets.filter((asset) => asset === bootstrapEntryFile).length === 1 &&
+    assets.includes(`${bootstrapEntryFile}.map`) &&
+    exactStringArray(receipt.bootstrapStaticImports, []) &&
+    exactStringArray(receipt.bootstrapDynamicImports, ["entry.ts"]) &&
+    receipt.pageEntryKey === "entry.ts" &&
+    receipt.pageEntryName === "entry" &&
+    receipt.pageEntrySource === receipt.pageEntryKey &&
+    receipt.pageEntryIsDynamicEntry === true &&
+    isBuiltJavaScriptAssetPath(pageEntryFile) &&
+    pageEntryFile !== bootstrapEntryFile &&
+    assets.includes(pageEntryFile) &&
+    assets.filter((asset) => asset === pageEntryFile).length === 1 &&
+    Array.isArray(receipt.pageStaticImports) &&
+    receipt.pageStaticImports.every((item) => typeof item === "string") &&
+    Array.isArray(receipt.pageDynamicImports) &&
+    receipt.pageDynamicImports.every((item) => typeof item === "string") &&
+    receipt.bootstrapSourceSha256 === createHash("sha256")
+      .update(createRendererTournamentCspBootstrapSource())
+      .digest("hex") &&
+    receipt.bootstrapBundleFile === bootstrapEntryFile &&
+    receipt.bootstrapBundleEncoding === "base64" &&
+    bootstrapBundleBytes !== null &&
+    Number.isSafeInteger(receipt.bootstrapBundleByteLength) &&
+    receipt.bootstrapBundleByteLength === bootstrapBundleBytes.byteLength &&
+    receipt.bootstrapBundleSha256 === digestHex(bootstrapBundleBytes);
+}
+
 export function validateRendererTournamentBrowserArtifact(
   artifact: unknown,
 ): readonly string[] {
@@ -761,6 +1085,7 @@ export function validateRendererTournamentBrowserArtifact(
     record(benchmark.referencePolicy)?.providerId !== REFERENCE_PROVIDER_ID ||
     record(benchmark.claims)?.boundedCorpusOnly !== true ||
     record(benchmark.claims)?.productWidePromotion !== false ||
+    record(benchmark.claims)?.cspNonInferiority !== "not-measured" ||
     record(benchmark.claims)?.nodeTimingsMixedIntoBrowserProfile !== false
   ) {
     issues.push("execution/reference/bounded-claim receipt is incomplete");
@@ -774,6 +1099,7 @@ export function validateRendererTournamentBrowserArtifact(
     profile?.profileVersion !== 1 ||
     profile.runtime !== "browser-main" ||
     profile.workload !== "preview" ||
+    !bootstrapReceiptIsValid(profileResult.bootstrapReceipt) ||
     typeof profile.deviceHash !== "string" ||
     typeof profile.engineHash !== "string" ||
     typeof benchmark.devicePartitionKey !== "string" ||
@@ -1090,44 +1416,91 @@ export function validateRendererTournamentBrowserArtifact(
     diagnostics.errorResponses.length > 0 ||
     !Array.isArray(diagnostics.serverErrors) ||
     diagnostics.serverErrors.length > 0 ||
-    !Array.isArray(diagnostics.cspViolations)
+    !Array.isArray(diagnostics.cspViolations) ||
+    !diagnostics.cspViolations.every((value) => typeof value === "string")
   ) {
     issues.push("Chromium console/page/request/5xx diagnostics contain errors or CSP diagnostics are absent");
   }
+  if (
+    !exactStringArray(
+      diagnostics?.launchArgs,
+      RENDERER_TOURNAMENT_BROWSER_CHROMIUM_ARGS,
+    ) ||
+    !actualBrowserCommandLineIsSafe(diagnostics?.actualBrowserCommandLine) ||
+    !RENDERER_TOURNAMENT_BROWSER_CHROMIUM_ARGS.every((argument) =>
+      (diagnostics?.actualBrowserCommandLine as unknown[] | undefined)?.includes(argument) === true)
+  ) {
+    issues.push("Chromium argv is absent, inconsistent, or disables the browser JIT");
+  }
   const csp = record(benchmark.csp);
-  const cspViolations = Array.isArray(diagnostics?.cspViolations)
-    ? diagnostics.cspViolations.filter((value): value is string => typeof value === "string")
+  const cspViolationArrayIsValid = Array.isArray(diagnostics?.cspViolations) &&
+    diagnostics.cspViolations.every((value) => typeof value === "string");
+  const cspViolations = cspViolationArrayIsValid
+    ? [...(diagnostics!.cspViolations as string[])]
     : [];
   const observedCspPatterns = [...new Set(cspViolations)].sort();
   const recordedCspPatterns = Array.isArray(csp?.observedPatterns)
     ? csp.observedPatterns
     : [];
+  const cspIsClean = cspViolations.length === 0;
+  const captureControl = record(csp?.captureControl);
+  const capturePatterns = Array.isArray(captureControl?.observedPatterns)
+    ? captureControl.observedPatterns
+    : [];
   if (
     !csp ||
+    !cspViolationArrayIsValid ||
     csp.cleanClaimed !== (cspViolations.length === 0) ||
     csp.violationCount !== cspViolations.length ||
     csp.unsafeEvalAddedForBenchmark !== false ||
     csp.jitDisabledForBenchmark !== false ||
-    typeof csp.disposition !== "string" ||
-    csp.disposition.length === 0 ||
+    csp.zodJitlessPrebootstrap !== true ||
+    !bootstrapReceiptIsValid(csp.bootstrapReceipt) ||
+    JSON.stringify(csp.bootstrapReceipt) !== JSON.stringify(profileResult?.bootstrapReceipt) ||
     JSON.stringify(recordedCspPatterns) !== JSON.stringify(observedCspPatterns) ||
-    (cspViolations.length === 0
-      ? csp.status !== "clean"
-      : csp.status !== "quarantined")
+    (cspIsClean
+      ? csp.status !== "clean" ||
+        csp.disposition !== CLEAN_CSP_DISPOSITION ||
+        csp.likelySource !== null
+      : csp.status !== "quarantined" ||
+        csp.disposition !== QUARANTINED_CSP_DISPOSITION ||
+        typeof csp.likelySource !== "string" ||
+        csp.likelySource.length === 0) ||
+    !captureControl ||
+    captureControl.freshContext !== true ||
+    captureControl.sameStrictCsp !== true ||
+    captureControl.attempted !== true ||
+    captureControl.blocked !== true ||
+    captureControl.errorName !== "EvalError" ||
+    typeof captureControl.violationCount !== "number" ||
+    captureControl.violationCount < 1 ||
+    !capturePatterns.every((pattern) => typeof pattern === "string") ||
+    !capturePatterns.some((pattern) =>
+      /^(?:script-src|script-src-elem): eval$/u.test(String(pattern))) ||
+    captureControl.responseContentSecurityPolicy !==
+      RENDERER_TOURNAMENT_BROWSER_CONTENT_SECURITY_POLICY ||
+    !bootstrapReceiptIsValid(captureControl.bootstrapReceipt)
   ) {
     issues.push("CSP violations are missing, suppressed, or represented as clean");
   }
   const headers = record(diagnostics?.responseHeaders);
   const assets = production?.assets;
+  const scriptTokens = typeof headers?.contentSecurityPolicy === "string"
+    ? cspDirectiveTokens(headers.contentSecurityPolicy, "script-src")
+    : null;
   if (
     production?.mode !== "vite-production-build" ||
     !Array.isArray(assets) ||
     !assets.some((asset) => typeof asset === "string" && asset.endsWith(".js")) ||
     !assets.some((asset) => typeof asset === "string" && asset.endsWith(".wasm")) ||
     typeof headers?.contentSecurityPolicy !== "string" ||
-    !headers.contentSecurityPolicy.includes("wasm-unsafe-eval") ||
+    headers.contentSecurityPolicy !== RENDERER_TOURNAMENT_BROWSER_CONTENT_SECURITY_POLICY ||
+    !exactStringArray(scriptTokens, ["'self'", "'wasm-unsafe-eval'"]) ||
+    scriptTokens?.includes("'unsafe-eval'") === true ||
     headers.crossOriginOpenerPolicy !== "same-origin" ||
-    headers.crossOriginEmbedderPolicy !== "require-corp"
+    headers.crossOriginEmbedderPolicy !== "require-corp" ||
+    headers.crossOriginResourcePolicy !== "same-origin" ||
+    !manifestReceiptIsValid(production.manifestReceipt, assets)
   ) {
     issues.push("Vite production build, WASM assets, CSP, or isolation headers are incomplete");
   }
@@ -1166,7 +1539,12 @@ export async function runRendererTournamentBrowserBenchmark(
   mkdirSync(distributionPath, { recursive: true });
   const sourceDirectory = realpathSync(sourcePath);
   const distributionDirectory = realpathSync(distributionPath);
+  const bootstrapSource = createRendererTournamentCspBootstrapSource();
   writeFileSync(join(sourceDirectory, "index.html"), createHtml());
+  writeFileSync(
+    join(sourceDirectory, "bootstrap.ts"),
+    bootstrapSource,
+  );
   writeFileSync(join(sourceDirectory, "entry.ts"), `import ${JSON.stringify(PAGE_ALIAS)};\n`);
   await build({
     root: sourceDirectory,
@@ -1186,19 +1564,11 @@ export async function runRendererTournamentBrowserBenchmark(
     },
   });
   const assets = walkFiles(distributionDirectory);
+  const manifestReceipt = createManifestReceipt(distributionDirectory, bootstrapSource);
   const port = await findFreePort();
   let previewServer: PreviewServer | null = null;
   let browser: Browser | null = null;
-  const mutableDiagnostics: MutableDiagnostics = {
-    ...emptyDiagnostics(),
-    consoleErrors: [],
-    consoleWarnings: [],
-    pageErrors: [],
-    requestFailures: [],
-    errorResponses: [],
-    serverErrors: [],
-    cspViolations: [],
-  };
+  const mutableDiagnostics = createMutableDiagnostics();
   try {
     previewServer = await preview({
       root: sourceDirectory,
@@ -1212,7 +1582,7 @@ export async function runRendererTournamentBrowserBenchmark(
         strictPort: true,
         headers: {
           "Cache-Control": "no-store",
-          "Content-Security-Policy": CONTENT_SECURITY_POLICY,
+          "Content-Security-Policy": RENDERER_TOURNAMENT_BROWSER_CONTENT_SECURITY_POLICY,
           "Cross-Origin-Opener-Policy": "same-origin",
           "Cross-Origin-Embedder-Policy": "require-corp",
           "Cross-Origin-Resource-Policy": "same-origin",
@@ -1220,9 +1590,39 @@ export async function runRendererTournamentBrowserBenchmark(
         },
       },
     });
-    browser = await chromium.launch({ headless: true, args: [...WEBGPU_ARGS] });
+    browser = await chromium.launch({
+      headless: true,
+      args: [...RENDERER_TOURNAMENT_BROWSER_CHROMIUM_ARGS],
+    });
     mutableDiagnostics.browserVersion = browser.version();
+    const actualBrowserCommandLine = await chromiumCommandLine(browser);
+    mutableDiagnostics.actualBrowserCommandLine = actualBrowserCommandLine;
     const baseUrl = `http://127.0.0.1:${port}/`;
+    const controlDiagnostics = createMutableDiagnostics(actualBrowserCommandLine);
+    const cspControlResult = parseCspCaptureControl(await runIsolatedPage(
+      browser,
+      baseUrl,
+      { mode: "csp-control" },
+      controlDiagnostics,
+    ));
+    if (
+      controlDiagnostics.responseHeaders.contentSecurityPolicy !==
+      RENDERER_TOURNAMENT_BROWSER_CONTENT_SECURITY_POLICY
+    ) {
+      throw new Error("strict-CSP positive control did not receive the benchmark CSP");
+    }
+    const cspCaptureControl: RendererTournamentBrowserCspCaptureControl = {
+      freshContext: true,
+      sameStrictCsp: true,
+      attempted: true,
+      blocked: true,
+      errorName: "EvalError",
+      violationCount: cspControlResult.cspViolations.length,
+      observedPatterns: [...new Set(cspControlResult.cspViolations)].sort(),
+      responseContentSecurityPolicy:
+        controlDiagnostics.responseHeaders.contentSecurityPolicy,
+      bootstrapReceipt: cspControlResult.bootstrapReceipt,
+    };
     const profile = parseProfile(await runIsolatedPage(
       browser,
       baseUrl,
@@ -1611,15 +2011,16 @@ export async function runRendererTournamentBrowserBenchmark(
         violationCount: mutableDiagnostics.cspViolations.length,
         observedPatterns: [...new Set(mutableDiagnostics.cspViolations)].sort(),
         disposition: mutableDiagnostics.cspViolations.length === 0
-          ? "no securitypolicyviolation event observed"
-          : "retained as an explicit release quarantine; renderer timing and visual evidence remain usable, but this run does not claim CSP-clean execution",
-        likelySource: mutableDiagnostics.cspViolations.every(
-          (violation) => violation === "script-src: eval",
-        )
-          ? "inference from source audit: Zod allowsEval caught Function probe under strict CSP"
-          : null,
+          ? CLEAN_CSP_DISPOSITION
+          : QUARANTINED_CSP_DISPOSITION,
+        likelySource: mutableDiagnostics.cspViolations.length === 0
+          ? null
+          : "unresolved strict-CSP violation; no provider receives release promotion",
         unsafeEvalAddedForBenchmark: false,
         jitDisabledForBenchmark: false,
+        zodJitlessPrebootstrap: true,
+        bootstrapReceipt: profile.bootstrapReceipt,
+        captureControl: cspCaptureControl,
       },
       packageVersions: {
         playwright: packageVersion(join(ROOT, "node_modules/playwright/package.json")),
@@ -1650,6 +2051,7 @@ export async function runRendererTournamentBrowserBenchmark(
         mode: "vite-production-build",
         assets,
         scratchDirectory: scratch,
+        manifestReceipt,
       },
       validationIssues: [],
     };
@@ -1754,6 +2156,7 @@ async function main(): Promise<void> {
         assets: [],
         scratchDirectory:
           process.env.TOONSPECTRUM_RENDERER_TOURNAMENT_VERIFY_DIR ?? "unavailable",
+        manifestReceipt: null,
       },
       validationIssues: [
         `benchmark orchestrator failed: ${error instanceof Error ? error.message : String(error)}`,

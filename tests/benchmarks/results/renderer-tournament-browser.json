@@ -1,10 +1,10 @@
 {
-  "schemaVersion": 2,
-  "generatedAt": "2026-08-10T07:11:46.644Z",
-  "status": "quarantined",
+  "schemaVersion": 3,
+  "generatedAt": "2026-08-10T10:58:25.539Z",
+  "status": "pass",
   "technicalPass": true,
-  "releasePass": false,
-  "pass": false,
+  "releasePass": true,
+  "pass": true,
   "benchmark": {
     "execution": "vite-production-build-chromium-metal-webgpu",
     "referencePolicy": {
@@ -17,7 +17,7 @@
       "schemaVersion": 1,
       "mode": "profile",
       "status": "ok",
-      "measuredAt": "2026-08-10T07:11:13.222Z",
+      "measuredAt": "2026-08-10T10:57:50.966Z",
       "profile": {
         "profileVersion": 1,
         "deviceHash": "edec385e184878a679a02dae39141fe6d3aa93de7e4d9d785ff8a4ab7b3a0076",
@@ -232,9 +232,23 @@
       },
       "crossOriginIsolated": true,
       "secureContext": true,
-      "cspViolations": [
-        "script-src: eval"
-      ]
+      "bootstrapReceipt": {
+        "schemaVersion": 1,
+        "order": [
+          "csp-listener-installed",
+          "zod-jitless-configured",
+          "entry-import-started",
+          "page-module-evaluated"
+        ],
+        "listenerInstalledBeforeZodConfig": true,
+        "listenerInstalledBeforeEntryImport": true,
+        "zodJitlessConfiguredBeforeEntryImport": true,
+        "pageModuleEvaluated": true,
+        "zodGlobalConfigObservedByPage": true,
+        "zodCoreGlobalConfigJitless": true,
+        "zodAllowsEvalValue": false
+      },
+      "cspViolations": []
     },
     "devicePartitionKey": "v=1|device=edec385e184878a679a02dae39141fe6d3aa93de7e4d9d785ff8a4ab7b3a0076|engine=587f8e5f438bd9d51ff16a017d1c617ec4a6f567e5f01946ae796251bb2fdc5a|gpu=true|runtime=browser-main|workload=preview|browser=Chromium|browserVersion=140.0.7339.186|os=macOS|arch=arm|cpu=12|memoryGiB=8|gpuBackend=webgpu|gpuVendor=apple|gpuArchitecture=metal-3|maxTexture2D=8192|dpr=1|colorSpace=srgb|power=?",
     "sampling": {
@@ -294,73 +308,73 @@
               "percentileMethod": "median-and-nearest-rank-ceil",
               "sampleCount": 7,
               "samplesMs": [
-                82.07499998807907,
-                72.50999999046326,
-                74.86500000953674,
-                72.76499998569489,
-                75.60500001907349,
-                73.51499998569489,
-                72.03000003099442
+                83.05999994277954,
+                75.3950001001358,
+                72.90000009536743,
+                73.45500004291534,
+                73.74500000476837,
+                73.23500001430511,
+                73.14499998092651
               ],
-              "p50Ms": 73.51499998569489,
-              "p95Ms": 82.07499998807907,
-              "p99Ms": 82.07499998807907,
-              "minMs": 72.03000003099442,
-              "maxMs": 82.07499998807907
+              "p50Ms": 73.45500004291534,
+              "p95Ms": 83.05999994277954,
+              "p99Ms": 83.05999994277954,
+              "minMs": 72.90000009536743,
+              "maxMs": 83.05999994277954
             },
             "warm": {
               "percentileMethod": "median-and-nearest-rank-ceil",
               "sampleCount": 31,
               "samplesMs": [
-                3.259999990463257,
-                2.7800000309944153,
-                2.9950000047683716,
-                2.9850000143051147,
-                3.074999988079071,
-                3.115000009536743,
-                2.525000035762787,
-                2.959999978542328,
-                3.0800000429153442,
-                3.134999990463257,
+                5.060000061988831,
+                3.1200000047683716,
+                3.0600000619888306,
+                3.0649999380111694,
                 3.1050000190734863,
-                2.615000009536743,
-                2.9850000143051147,
-                2.990000009536743,
-                2.9200000166893005,
-                2.9699999690055847,
-                2.990000009536743,
-                2.990000009536743,
-                2.9700000286102295,
-                2.949999988079071,
-                2.939999997615814,
-                2.949999988079071,
-                2.8949999809265137,
-                2.9200000166893005,
-                2.9300000071525574,
-                2.649999976158142,
-                3.0350000262260437,
-                2.8899999856948853,
-                2.935000002384186,
-                2.8600000143051147,
-                2.884999990463257
+                2.5950000286102295,
+                3.059999942779541,
+                3.0100001096725464,
+                3.2399998903274536,
+                3.2649999856948853,
+                3.215000033378601,
+                3.0299999713897705,
+                3.0950000286102295,
+                2.9600000381469727,
+                3.034999966621399,
+                3.0799999237060547,
+                3.125,
+                2.740000009536743,
+                3.2450000047683716,
+                3.040000081062317,
+                3.0049999952316284,
+                3.1399999856948853,
+                3.0800000429153442,
+                3.0449999570846558,
+                2.65500009059906,
+                2.9299999475479126,
+                2.9450000524520874,
+                3.049999952316284,
+                3.0800000429153442,
+                2.9800000190734863,
+                2.9299999475479126
               ],
-              "p50Ms": 2.959999978542328,
-              "p95Ms": 3.134999990463257,
-              "p99Ms": 3.259999990463257,
-              "minMs": 2.525000035762787,
-              "maxMs": 3.259999990463257
+              "p50Ms": 3.059999942779541,
+              "p95Ms": 3.2649999856948853,
+              "p99Ms": 5.060000061988831,
+              "minMs": 2.5950000286102295,
+              "maxMs": 5.060000061988831
             },
             "costEvidence": {
               "warmMs": {
-                "p50": 2.959999978542328,
-                "p95": 3.134999990463257,
-                "p99": 3.259999990463257,
+                "p50": 3.059999942779541,
+                "p95": 3.2649999856948853,
+                "p99": 5.060000061988831,
                 "samples": 31
               },
               "coldMs": {
-                "p50": 73.51499998569489,
-                "p95": 82.07499998807907,
-                "p99": 82.07499998807907,
+                "p50": 73.45500004291534,
+                "p95": 83.05999994277954,
+                "p99": 83.05999994277954,
                 "samples": 7
               },
               "cpuPreparationMs": null,
@@ -418,8 +432,8 @@
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 4125465,
-                      "totalJsHeapBytes": 7664281,
+                      "usedJsHeapBytes": 5952072,
+                      "totalJsHeapBytes": 9204996,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -427,20 +441,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 8344843,
-                      "totalJsHeapBytes": 12230687,
+                      "usedJsHeapBytes": 9239360,
+                      "totalJsHeapBytes": 13066772,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 4140416
+                    "maxObservedUsedJsHeapBytes": 5467955
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 4132597,
-                      "totalJsHeapBytes": 7664281,
+                      "usedJsHeapBytes": 6079892,
+                      "totalJsHeapBytes": 9204996,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -448,20 +462,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 8350523,
-                      "totalJsHeapBytes": 12492831,
+                      "usedJsHeapBytes": 9227240,
+                      "totalJsHeapBytes": 13066772,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 4147548
+                    "maxObservedUsedJsHeapBytes": 5460451
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 4119477,
-                      "totalJsHeapBytes": 7926425,
+                      "usedJsHeapBytes": 6089532,
+                      "totalJsHeapBytes": 9204996,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -469,20 +483,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 8317527,
-                      "totalJsHeapBytes": 12492831,
+                      "usedJsHeapBytes": 9221872,
+                      "totalJsHeapBytes": 12804628,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 4134428
+                    "maxObservedUsedJsHeapBytes": 5440595
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 4143289,
-                      "totalJsHeapBytes": 7926425,
+                      "usedJsHeapBytes": 5988332,
+                      "totalJsHeapBytes": 9204996,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -490,20 +504,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 8336007,
-                      "totalJsHeapBytes": 12230687,
+                      "usedJsHeapBytes": 9212760,
+                      "totalJsHeapBytes": 12804628,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 4158240
+                    "maxObservedUsedJsHeapBytes": 5420579
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 4136449,
-                      "totalJsHeapBytes": 7926425,
+                      "usedJsHeapBytes": 6076800,
+                      "totalJsHeapBytes": 9204996,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -511,20 +525,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 8328083,
-                      "totalJsHeapBytes": 12492831,
+                      "usedJsHeapBytes": 9229980,
+                      "totalJsHeapBytes": 12804628,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 4151400
+                    "maxObservedUsedJsHeapBytes": 5451975
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 4118177,
-                      "totalJsHeapBytes": 7664281,
+                      "usedJsHeapBytes": 5914364,
+                      "totalJsHeapBytes": 8942852,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -532,20 +546,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 8335103,
-                      "totalJsHeapBytes": 12230687,
+                      "usedJsHeapBytes": 9242204,
+                      "totalJsHeapBytes": 12804628,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 4133128
+                    "maxObservedUsedJsHeapBytes": 5465059
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 4118801,
-                      "totalJsHeapBytes": 7926425,
+                      "usedJsHeapBytes": 6134743,
+                      "totalJsHeapBytes": 9467191,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -553,21 +567,21 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 8321531,
-                      "totalJsHeapBytes": 12492831,
+                      "usedJsHeapBytes": 9235068,
+                      "totalJsHeapBytes": 13066772,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 4133752
+                    "maxObservedUsedJsHeapBytes": 5464818
                   }
                 ],
                 "warmRun": {
                   "before": {
                     "performanceMemoryExposed": true,
-                    "usedJsHeapBytes": 4103421,
-                    "totalJsHeapBytes": 8188569,
+                    "usedJsHeapBytes": 5937352,
+                    "totalJsHeapBytes": 9204996,
                     "jsHeapLimitBytes": 4294705152,
                     "userAgentSpecificMemoryExposed": true,
                     "userAgentSpecificMemoryBytes": null,
@@ -575,14 +589,14 @@
                   },
                   "after": {
                     "performanceMemoryExposed": true,
-                    "usedJsHeapBytes": 11959787,
-                    "totalJsHeapBytes": 15704095,
+                    "usedJsHeapBytes": 12855464,
+                    "totalJsHeapBytes": 16540180,
                     "jsHeapLimitBytes": 4294705152,
                     "userAgentSpecificMemoryExposed": true,
                     "userAgentSpecificMemoryBytes": null,
                     "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                   },
-                  "maxObservedUsedJsHeapBytes": 11959619
+                  "maxObservedUsedJsHeapBytes": 12855296
                 }
               }
             },
@@ -611,73 +625,73 @@
               "percentileMethod": "median-and-nearest-rank-ceil",
               "sampleCount": 7,
               "samplesMs": [
-                26.975000023841858,
-                26.485000014305115,
-                26.475000023841858,
-                26.39000004529953,
-                26.524999976158142,
-                26.725000023841858,
-                26.625
+                23.919999957084656,
+                23.264999985694885,
+                23.24500000476837,
+                23.37999999523163,
+                22.90499997138977,
+                23.134999990463257,
+                22.43499994277954
               ],
-              "p50Ms": 26.524999976158142,
-              "p95Ms": 26.975000023841858,
-              "p99Ms": 26.975000023841858,
-              "minMs": 26.39000004529953,
-              "maxMs": 26.975000023841858
+              "p50Ms": 23.24500000476837,
+              "p95Ms": 23.919999957084656,
+              "p99Ms": 23.919999957084656,
+              "minMs": 22.43499994277954,
+              "maxMs": 23.919999957084656
             },
             "warm": {
               "percentileMethod": "median-and-nearest-rank-ceil",
               "sampleCount": 31,
               "samplesMs": [
-                1.340000033378601,
-                1.2200000286102295,
-                1.2249999642372131,
+                1.3650000095367432,
+                1.3550000190734863,
+                1.2300000190734863,
                 1.1299999952316284,
-                1.100000023841858,
-                1.0350000262260437,
-                1.0600000023841858,
+                1.0550000667572021,
+                1.0749999284744263,
+                1.149999976158142,
+                1.0749999284744263,
+                1.0700000524520874,
+                1.0399999618530273,
+                0.9850000143051147,
+                0.9950000047683716,
+                1.0149999856948853,
+                0.9950000047683716,
+                1.090000033378601,
                 1.024999976158142,
+                1.0350000858306885,
+                0.9849998950958252,
+                0.9950000047683716,
+                1.0150001049041748,
+                0.9749999046325684,
+                1.0150001049041748,
+                0.9950000047683716,
+                1.0299999713897705,
                 1.0049999952316284,
                 0.9900000095367432,
-                0.9549999833106995,
                 0.9800000190734863,
-                0.9900000095367432,
-                1,
-                1.0399999618530273,
-                0.940000057220459,
-                0.98499995470047,
-                0.98499995470047,
-                1,
-                1.0250000357627869,
-                0.9599999785423279,
-                0.9850000143051147,
-                0.9850000143051147,
-                0.9300000071525574,
-                0.9599999785423279,
-                0.9350000023841858,
-                0.9399999976158142,
-                0.9749999642372131,
-                0.9650000333786011,
-                0.9350000023841858,
-                0.9399999976158142
+                1.0299999713897705,
+                0.9750000238418579,
+                0.9950000047683716,
+                0.9700000286102295
               ],
-              "p50Ms": 0.9850000143051147,
-              "p95Ms": 1.2249999642372131,
-              "p99Ms": 1.340000033378601,
-              "minMs": 0.9300000071525574,
-              "maxMs": 1.340000033378601
+              "p50Ms": 1.0150001049041748,
+              "p95Ms": 1.3550000190734863,
+              "p99Ms": 1.3650000095367432,
+              "minMs": 0.9700000286102295,
+              "maxMs": 1.3650000095367432
             },
             "costEvidence": {
               "warmMs": {
-                "p50": 0.9850000143051147,
-                "p95": 1.2249999642372131,
-                "p99": 1.340000033378601,
+                "p50": 1.0150001049041748,
+                "p95": 1.3550000190734863,
+                "p99": 1.3650000095367432,
                 "samples": 31
               },
               "coldMs": {
-                "p50": 26.524999976158142,
-                "p95": 26.975000023841858,
-                "p99": 26.975000023841858,
+                "p50": 23.24500000476837,
+                "p95": 23.919999957084656,
+                "p99": 23.919999957084656,
                 "samples": 7
               },
               "cpuPreparationMs": null,
@@ -735,8 +749,8 @@
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 4160165,
-                      "totalJsHeapBytes": 7664265,
+                      "usedJsHeapBytes": 5630023,
+                      "totalJsHeapBytes": 9467175,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -744,20 +758,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 7284511,
-                      "totalJsHeapBytes": 10980699,
+                      "usedJsHeapBytes": 7900083,
+                      "totalJsHeapBytes": 12078979,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 4175116
+                    "maxObservedUsedJsHeapBytes": 5443646
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 4154741,
-                      "totalJsHeapBytes": 7664265,
+                      "usedJsHeapBytes": 5922943,
+                      "totalJsHeapBytes": 9205031,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -765,20 +779,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 7056658,
-                      "totalJsHeapBytes": 11242894,
+                      "usedJsHeapBytes": 7898643,
+                      "totalJsHeapBytes": 11816835,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 4169692
+                    "maxObservedUsedJsHeapBytes": 5442854
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 4126617,
-                      "totalJsHeapBytes": 7664265,
+                      "usedJsHeapBytes": 5426720,
+                      "totalJsHeapBytes": 9204980,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -786,20 +800,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 6973551,
-                      "totalJsHeapBytes": 11242843,
+                      "usedJsHeapBytes": 7908223,
+                      "totalJsHeapBytes": 11816835,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 4141568
+                    "maxObservedUsedJsHeapBytes": 5440743
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 4127261,
-                      "totalJsHeapBytes": 7664265,
+                      "usedJsHeapBytes": 6020655,
+                      "totalJsHeapBytes": 9205031,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -807,20 +821,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 7007707,
-                      "totalJsHeapBytes": 11242843,
+                      "usedJsHeapBytes": 7898283,
+                      "totalJsHeapBytes": 11816835,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 4142212
+                    "maxObservedUsedJsHeapBytes": 5444014
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 4125361,
-                      "totalJsHeapBytes": 7664265,
+                      "usedJsHeapBytes": 6100312,
+                      "totalJsHeapBytes": 9729268,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -828,20 +842,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 6998651,
-                      "totalJsHeapBytes": 11242843,
+                      "usedJsHeapBytes": 7889775,
+                      "totalJsHeapBytes": 12341123,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 4140312
+                    "maxObservedUsedJsHeapBytes": 5434911
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 4149905,
-                      "totalJsHeapBytes": 7664265,
+                      "usedJsHeapBytes": 6079532,
+                      "totalJsHeapBytes": 9467124,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -849,20 +863,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 7302818,
-                      "totalJsHeapBytes": 10980750,
+                      "usedJsHeapBytes": 7906851,
+                      "totalJsHeapBytes": 12078979,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 4164856
+                    "maxObservedUsedJsHeapBytes": 5430487
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 4121317,
-                      "totalJsHeapBytes": 7664265,
+                      "usedJsHeapBytes": 6027068,
+                      "totalJsHeapBytes": 9204980,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -870,21 +884,21 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 7007123,
-                      "totalJsHeapBytes": 10980699,
+                      "usedJsHeapBytes": 7944283,
+                      "totalJsHeapBytes": 12078979,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 4136268
+                    "maxObservedUsedJsHeapBytes": 5445239
                   }
                 ],
                 "warmRun": {
                   "before": {
                     "performanceMemoryExposed": true,
-                    "usedJsHeapBytes": 4145933,
-                    "totalJsHeapBytes": 7664265,
+                    "usedJsHeapBytes": 6132484,
+                    "totalJsHeapBytes": 9467124,
                     "jsHeapLimitBytes": 4294705152,
                     "userAgentSpecificMemoryExposed": true,
                     "userAgentSpecificMemoryBytes": null,
@@ -892,14 +906,14 @@
                   },
                   "after": {
                     "performanceMemoryExposed": true,
-                    "usedJsHeapBytes": 10088403,
-                    "totalJsHeapBytes": 13405531,
+                    "usedJsHeapBytes": 10966323,
+                    "totalJsHeapBytes": 14503811,
                     "jsHeapLimitBytes": 4294705152,
                     "userAgentSpecificMemoryExposed": true,
                     "userAgentSpecificMemoryBytes": null,
                     "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                   },
-                  "maxObservedUsedJsHeapBytes": 10088235
+                  "maxObservedUsedJsHeapBytes": 10966155
                 }
               }
             },
@@ -928,73 +942,73 @@
               "percentileMethod": "median-and-nearest-rank-ceil",
               "sampleCount": 7,
               "samplesMs": [
-                35.985000014305115,
-                36.0450000166893,
-                35.435000002384186,
-                35.435000002384186,
-                35.86500000953674,
-                36.685000002384186,
-                35.99000000953674
+                34.47500002384186,
+                32.7849999666214,
+                33.829999923706055,
+                32.81500005722046,
+                33.169999957084656,
+                32.59499990940094,
+                32.60000002384186
               ],
-              "p50Ms": 35.985000014305115,
-              "p95Ms": 36.685000002384186,
-              "p99Ms": 36.685000002384186,
-              "minMs": 35.435000002384186,
-              "maxMs": 36.685000002384186
+              "p50Ms": 32.81500005722046,
+              "p95Ms": 34.47500002384186,
+              "p99Ms": 34.47500002384186,
+              "minMs": 32.59499990940094,
+              "maxMs": 34.47500002384186
             },
             "warm": {
               "percentileMethod": "median-and-nearest-rank-ceil",
               "sampleCount": 31,
               "samplesMs": [
-                0.2149999737739563,
-                0.14500004053115845,
-                0.13999998569488525,
+                0.16499996185302734,
+                0.12999999523162842,
+                0.13499999046325684,
                 0.1499999761581421,
                 0.12999999523162842,
-                0.1600000262260437,
-                0.13999998569488525,
-                0.12000000476837158,
-                0.15000003576278687,
-                0.13999998569488525,
-                0.11500000953674316,
-                0.11000001430511475,
-                0.11000001430511475,
-                0.11500000953674316,
-                0.10500001907348633,
+                0.1499999761581421,
+                0.1549999713897705,
                 0.125,
-                0.10999995470046997,
+                0.16499996185302734,
+                0.125,
+                0.12999999523162842,
+                0.1099998950958252,
+                0.10500001907348633,
                 0.11000001430511475,
                 0.11500000953674316,
-                0.10500001907348633,
-                0.11500000953674316,
-                0.13499999046325684,
-                0.08499997854232788,
-                0.09500002861022949,
-                0.09499996900558472,
-                0.09500002861022949,
+                0.125,
+                0.11000001430511475,
                 0.10000002384185791,
-                0.09499996900558472,
+                0.11000001430511475,
                 0.10500001907348633,
-                0.09499996900558472,
-                0.09500002861022949
+                0.10500001907348633,
+                0.13999998569488525,
+                0.0849999189376831,
+                0.08999991416931152,
+                0.09000003337860107,
+                0.08500003814697266,
+                0.09500002861022949,
+                0.0849999189376831,
+                0.09500002861022949,
+                0.09000003337860107,
+                0.10000002384185791
               ],
-              "p50Ms": 0.11500000953674316,
-              "p95Ms": 0.1600000262260437,
-              "p99Ms": 0.2149999737739563,
-              "minMs": 0.08499997854232788,
-              "maxMs": 0.2149999737739563
+              "p50Ms": 0.11000001430511475,
+              "p95Ms": 0.16499996185302734,
+              "p99Ms": 0.16499996185302734,
+              "minMs": 0.0849999189376831,
+              "maxMs": 0.16499996185302734
             },
             "costEvidence": {
               "warmMs": {
-                "p50": 0.11500000953674316,
-                "p95": 0.1600000262260437,
-                "p99": 0.2149999737739563,
+                "p50": 0.11000001430511475,
+                "p95": 0.16499996185302734,
+                "p99": 0.16499996185302734,
                 "samples": 31
               },
               "coldMs": {
-                "p50": 35.985000014305115,
-                "p95": 36.685000002384186,
-                "p99": 36.685000002384186,
+                "p50": 32.81500005722046,
+                "p95": 34.47500002384186,
+                "p99": 34.47500002384186,
                 "samples": 7
               },
               "cpuPreparationMs": null,
@@ -1052,8 +1066,8 @@
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 4154703,
-                      "totalJsHeapBytes": 7664275,
+                      "usedJsHeapBytes": 6073122,
+                      "totalJsHeapBytes": 9204990,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -1061,20 +1075,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 139099434,
-                      "totalJsHeapBytes": 145419958,
+                      "usedJsHeapBytes": 139646480,
+                      "totalJsHeapBytes": 145731876,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 4169654
+                    "maxObservedUsedJsHeapBytes": 5455061
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 4137815,
-                      "totalJsHeapBytes": 7664275,
+                      "usedJsHeapBytes": 6107222,
+                      "totalJsHeapBytes": 9467134,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -1082,20 +1096,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 139118134,
-                      "totalJsHeapBytes": 145157814,
+                      "usedJsHeapBytes": 139648628,
+                      "totalJsHeapBytes": 145731876,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 4152766
+                    "maxObservedUsedJsHeapBytes": 5441597
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 4110455,
-                      "totalJsHeapBytes": 7664275,
+                      "usedJsHeapBytes": 6048429,
+                      "totalJsHeapBytes": 9205041,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -1103,20 +1117,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 139100086,
-                      "totalJsHeapBytes": 145419958,
+                      "usedJsHeapBytes": 139648744,
+                      "totalJsHeapBytes": 145731876,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 4125406
+                    "maxObservedUsedJsHeapBytes": 5468412
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 4152423,
-                      "totalJsHeapBytes": 7664275,
+                      "usedJsHeapBytes": 5431597,
+                      "totalJsHeapBytes": 9467185,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -1124,20 +1138,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 139099834,
-                      "totalJsHeapBytes": 144895670,
+                      "usedJsHeapBytes": 139638216,
+                      "totalJsHeapBytes": 145469732,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 4167374
+                    "maxObservedUsedJsHeapBytes": 5445620
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 4133975,
-                      "totalJsHeapBytes": 7664275,
+                      "usedJsHeapBytes": 6037701,
+                      "totalJsHeapBytes": 9205041,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -1145,20 +1159,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 139099758,
-                      "totalJsHeapBytes": 144633526,
+                      "usedJsHeapBytes": 139646828,
+                      "totalJsHeapBytes": 145994020,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 4148926
+                    "maxObservedUsedJsHeapBytes": 5454900
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 4167079,
-                      "totalJsHeapBytes": 7926419,
+                      "usedJsHeapBytes": 6039478,
+                      "totalJsHeapBytes": 9204990,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -1166,20 +1180,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 139120278,
-                      "totalJsHeapBytes": 145157814,
+                      "usedJsHeapBytes": 139648172,
+                      "totalJsHeapBytes": 145731876,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 4182030
+                    "maxObservedUsedJsHeapBytes": 5456717
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 4128231,
-                      "totalJsHeapBytes": 7926419,
+                      "usedJsHeapBytes": 5848149,
+                      "totalJsHeapBytes": 9205041,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -1187,21 +1201,21 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 139099950,
-                      "totalJsHeapBytes": 145419958,
+                      "usedJsHeapBytes": 139650180,
+                      "totalJsHeapBytes": 145731876,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 4143182
+                    "maxObservedUsedJsHeapBytes": 5438892
                   }
                 ],
                 "warmRun": {
                   "before": {
                     "performanceMemoryExposed": true,
-                    "usedJsHeapBytes": 4123967,
-                    "totalJsHeapBytes": 7664275,
+                    "usedJsHeapBytes": 6115578,
+                    "totalJsHeapBytes": 9204990,
                     "jsHeapLimitBytes": 4294705152,
                     "userAgentSpecificMemoryExposed": true,
                     "userAgentSpecificMemoryBytes": null,
@@ -1209,14 +1223,14 @@
                   },
                   "after": {
                     "performanceMemoryExposed": true,
-                    "usedJsHeapBytes": 141670866,
-                    "totalJsHeapBytes": 147320502,
+                    "usedJsHeapBytes": 142209704,
+                    "totalJsHeapBytes": 147894564,
                     "jsHeapLimitBytes": 4294705152,
                     "userAgentSpecificMemoryExposed": true,
                     "userAgentSpecificMemoryBytes": null,
                     "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                   },
-                  "maxObservedUsedJsHeapBytes": 141670698
+                  "maxObservedUsedJsHeapBytes": 142209536
                 }
               }
             },
@@ -1283,7 +1297,7 @@
               "raceTimings": [],
               "gateFailures": [],
               "challengerId": "skia-canvaskit",
-              "expectedGainPct": 88.32487229780682
+              "expectedGainPct": 89.16256128707496
             }
           },
           "penUp": {
@@ -1328,7 +1342,7 @@
               "raceTimings": [],
               "gateFailures": [],
               "challengerId": "skia-canvaskit",
-              "expectedGainPct": 88.32487229780682
+              "expectedGainPct": 89.16256128707496
             }
           },
           "finalCachedWinner": "skia-canvaskit"
@@ -1348,7 +1362,7 @@
         },
         "promotion": {
           "providerId": "skia-canvaskit",
-          "measuredGainVsReferencePct": 88.32487229780682,
+          "measuredGainVsReferencePct": 89.16256128707496,
           "boundedCorpusOnly": true,
           "soakPassed": false,
           "outcome": {
@@ -1408,73 +1422,73 @@
               "percentileMethod": "median-and-nearest-rank-ceil",
               "sampleCount": 7,
               "samplesMs": [
-                79.20999997854233,
-                79.05500000715256,
-                79.53500002622604,
-                96.81000000238419,
-                73.57499998807907,
-                74.09499996900558,
-                74.02000004053116
+                73.47499990463257,
+                73.14999997615814,
+                72.41499996185303,
+                72.95999991893768,
+                73.76999998092651,
+                73.79999995231628,
+                74.47500002384186
               ],
-              "p50Ms": 79.05500000715256,
-              "p95Ms": 96.81000000238419,
-              "p99Ms": 96.81000000238419,
-              "minMs": 73.57499998807907,
-              "maxMs": 96.81000000238419
+              "p50Ms": 73.47499990463257,
+              "p95Ms": 74.47500002384186,
+              "p99Ms": 74.47500002384186,
+              "minMs": 72.41499996185303,
+              "maxMs": 74.47500002384186
             },
             "warm": {
               "percentileMethod": "median-and-nearest-rank-ceil",
               "sampleCount": 31,
               "samplesMs": [
-                3.450000047683716,
-                3.240000009536743,
-                3.115000009536743,
-                3.1700000166893005,
-                3.064999997615814,
-                2.915000021457672,
-                3.060000002384186,
-                3.3449999690055847,
-                3.2800000309944153,
+                3.5449999570846558,
+                2.799999952316284,
+                3.100000023841858,
+                3.2450000047683716,
+                3.1649999618530273,
+                2.9700000286102295,
+                3.1549999713897705,
+                4.6549999713897705,
+                3.3799999952316284,
+                5.409999966621399,
+                3.0450000762939453,
+                4.324999928474426,
+                3.1299999952316284,
+                3.0450000762939453,
+                3.0299999713897705,
+                3.0850000381469727,
+                4.434999942779541,
+                3.215000033378601,
+                4.360000014305115,
+                3.0199999809265137,
+                2.7050000429153442,
+                4.190000057220459,
+                3.100000023841858,
+                4.004999995231628,
+                3,
+                4.304999947547913,
+                2.7350000143051147,
+                3.0800000429153442,
                 3.1050000190734863,
-                3.0300000309944153,
-                3.0699999928474426,
-                3.074999988079071,
-                2.965000033378601,
-                4.349999964237213,
-                3.01500004529953,
-                3.0799999833106995,
-                2.715000033378601,
-                2.9300000071525574,
-                3.0399999618530273,
-                3.0399999618530273,
-                2.8050000071525574,
-                3.0149999856948853,
-                2.949999988079071,
-                3.0149999856948853,
-                4.25,
-                2.8350000381469727,
-                2.9649999737739563,
-                3.0300000309944153,
-                2.8399999737739563,
-                2.9850000143051147
+                3.034999966621399,
+                2.7350000143051147
               ],
-              "p50Ms": 3.0399999618530273,
-              "p95Ms": 4.25,
-              "p99Ms": 4.349999964237213,
-              "minMs": 2.715000033378601,
-              "maxMs": 4.349999964237213
+              "p50Ms": 3.1050000190734863,
+              "p95Ms": 4.6549999713897705,
+              "p99Ms": 5.409999966621399,
+              "minMs": 2.7050000429153442,
+              "maxMs": 5.409999966621399
             },
             "costEvidence": {
               "warmMs": {
-                "p50": 3.0399999618530273,
-                "p95": 4.25,
-                "p99": 4.349999964237213,
+                "p50": 3.1050000190734863,
+                "p95": 4.6549999713897705,
+                "p99": 5.409999966621399,
                 "samples": 31
               },
               "coldMs": {
-                "p50": 79.05500000715256,
-                "p95": 96.81000000238419,
-                "p99": 96.81000000238419,
+                "p50": 73.47499990463257,
+                "p95": 74.47500002384186,
+                "p99": 74.47500002384186,
                 "samples": 7
               },
               "cpuPreparationMs": null,
@@ -1532,8 +1546,8 @@
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 4194555,
-                      "totalJsHeapBytes": 8336047,
+                      "usedJsHeapBytes": 5527162,
+                      "totalJsHeapBytes": 9205018,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -1541,20 +1555,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 9043844,
-                      "totalJsHeapBytes": 12836952,
+                      "usedJsHeapBytes": 9671501,
+                      "totalJsHeapBytes": 13148749,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 4209506
+                    "maxObservedUsedJsHeapBytes": 5541185
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 4220375,
-                      "totalJsHeapBytes": 8073903,
+                      "usedJsHeapBytes": 5532534,
+                      "totalJsHeapBytes": 9467162,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -1562,20 +1576,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 9061648,
-                      "totalJsHeapBytes": 12312664,
+                      "usedJsHeapBytes": 9681777,
+                      "totalJsHeapBytes": 13410893,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 4235326
+                    "maxObservedUsedJsHeapBytes": 5546557
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 4231291,
-                      "totalJsHeapBytes": 7664303,
+                      "usedJsHeapBytes": 5505206,
+                      "totalJsHeapBytes": 9205018,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -1583,20 +1597,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 9089520,
-                      "totalJsHeapBytes": 12574808,
+                      "usedJsHeapBytes": 9655805,
+                      "totalJsHeapBytes": 13148749,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 4246242
+                    "maxObservedUsedJsHeapBytes": 5519229
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 4210239,
-                      "totalJsHeapBytes": 8073903,
+                      "usedJsHeapBytes": 5533790,
+                      "totalJsHeapBytes": 9205018,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -1604,20 +1618,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 9062948,
-                      "totalJsHeapBytes": 12312664,
+                      "usedJsHeapBytes": 9653469,
+                      "totalJsHeapBytes": 13410893,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 4225190
+                    "maxObservedUsedJsHeapBytes": 5547813
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 4239103,
-                      "totalJsHeapBytes": 8073903,
+                      "usedJsHeapBytes": 5523114,
+                      "totalJsHeapBytes": 9467162,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -1625,20 +1639,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 9062604,
-                      "totalJsHeapBytes": 12312664,
+                      "usedJsHeapBytes": 9673509,
+                      "totalJsHeapBytes": 13673037,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 4254054
+                    "maxObservedUsedJsHeapBytes": 5537137
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 4246603,
-                      "totalJsHeapBytes": 7811759,
+                      "usedJsHeapBytes": 5540597,
+                      "totalJsHeapBytes": 9205069,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -1646,20 +1660,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 9070004,
-                      "totalJsHeapBytes": 12312664,
+                      "usedJsHeapBytes": 9660193,
+                      "totalJsHeapBytes": 13148749,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 4261554
+                    "maxObservedUsedJsHeapBytes": 5554620
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 4199199,
-                      "totalJsHeapBytes": 8073903,
+                      "usedJsHeapBytes": 5527858,
+                      "totalJsHeapBytes": 9205018,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -1667,21 +1681,21 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 9025276,
-                      "totalJsHeapBytes": 12574808,
+                      "usedJsHeapBytes": 9657937,
+                      "totalJsHeapBytes": 13410893,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 4214150
+                    "maxObservedUsedJsHeapBytes": 5541881
                   }
                 ],
                 "warmRun": {
                   "before": {
                     "performanceMemoryExposed": true,
-                    "usedJsHeapBytes": 4203103,
-                    "totalJsHeapBytes": 7811759,
+                    "usedJsHeapBytes": 5535174,
+                    "totalJsHeapBytes": 9729306,
                     "jsHeapLimitBytes": 4294705152,
                     "userAgentSpecificMemoryExposed": true,
                     "userAgentSpecificMemoryBytes": null,
@@ -1689,14 +1703,14 @@
                   },
                   "after": {
                     "performanceMemoryExposed": true,
-                    "usedJsHeapBytes": 11657688,
-                    "totalJsHeapBytes": 17260632,
+                    "usedJsHeapBytes": 12553889,
+                    "totalJsHeapBytes": 18244173,
                     "jsHeapLimitBytes": 4294705152,
                     "userAgentSpecificMemoryExposed": true,
                     "userAgentSpecificMemoryBytes": null,
                     "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                   },
-                  "maxObservedUsedJsHeapBytes": 13650924
+                  "maxObservedUsedJsHeapBytes": 14076753
                 }
               }
             },
@@ -1725,73 +1739,73 @@
               "percentileMethod": "median-and-nearest-rank-ceil",
               "sampleCount": 7,
               "samplesMs": [
-                81.00499999523163,
-                81.36500000953674,
-                80.83499997854233,
-                81.4099999666214,
-                78.46999996900558,
-                81.1350000500679,
-                80.875
+                78.90000009536743,
+                78.875,
+                77.53999996185303,
+                79.07499992847443,
+                77.49499988555908,
+                76.47500002384186,
+                77.48000001907349
               ],
-              "p50Ms": 81.00499999523163,
-              "p95Ms": 81.4099999666214,
-              "p99Ms": 81.4099999666214,
-              "minMs": 78.46999996900558,
-              "maxMs": 81.4099999666214
+              "p50Ms": 77.53999996185303,
+              "p95Ms": 79.07499992847443,
+              "p99Ms": 79.07499992847443,
+              "minMs": 76.47500002384186,
+              "maxMs": 79.07499992847443
             },
             "warm": {
               "percentileMethod": "median-and-nearest-rank-ceil",
               "sampleCount": 31,
               "samplesMs": [
-                31.535000026226044,
-                31.644999980926514,
-                31.74500000476837,
-                31.944999992847443,
-                31.7600000500679,
-                31.555000007152557,
-                31.5799999833107,
-                31.5,
-                31.305000007152557,
-                31.439999997615814,
-                31.4549999833107,
+                32.02499997615814,
+                31.925000071525574,
+                31.829999923706055,
+                31.789999961853027,
+                32.144999980926514,
+                31.925000071525574,
+                31.789999961853027,
+                32.11500000953674,
+                32.264999985694885,
+                31.949999928474426,
+                31.674999952316284,
+                31.649999976158142,
+                31.625,
+                31.68999993801117,
+                31.670000076293945,
+                31.68999993801117,
+                31.639999985694885,
+                31.805000066757202,
+                31.830000042915344,
                 31.62999999523163,
-                31.735000014305115,
-                31.680000007152557,
-                31.839999973773956,
-                31.64500004053116,
-                31.589999973773956,
-                31.605000019073486,
-                31.4650000333786,
-                31.3299999833107,
+                31.87000000476837,
+                31.799999952316284,
+                31.514999985694885,
+                31.649999976158142,
+                31.725000023841858,
                 31.615000009536743,
-                31.560000002384186,
-                31.735000014305115,
+                31.674999952316284,
+                31.695000052452087,
+                31.90499997138977,
                 31.889999985694885,
-                31.560000002384186,
-                31.560000002384186,
-                31.439999997615814,
-                31.6599999666214,
-                31.775000035762787,
-                31.73499995470047,
-                31.7849999666214
+                31.889999985694885
               ],
-              "p50Ms": 31.615000009536743,
-              "p95Ms": 31.889999985694885,
-              "p99Ms": 31.944999992847443,
-              "minMs": 31.305000007152557,
-              "maxMs": 31.944999992847443
+              "p50Ms": 31.789999961853027,
+              "p95Ms": 32.144999980926514,
+              "p99Ms": 32.264999985694885,
+              "minMs": 31.514999985694885,
+              "maxMs": 32.264999985694885
             },
             "costEvidence": {
               "warmMs": {
-                "p50": 31.615000009536743,
-                "p95": 31.889999985694885,
-                "p99": 31.944999992847443,
+                "p50": 31.789999961853027,
+                "p95": 32.144999980926514,
+                "p99": 32.264999985694885,
                 "samples": 31
               },
               "coldMs": {
-                "p50": 81.00499999523163,
-                "p95": 81.4099999666214,
-                "p99": 81.4099999666214,
+                "p50": 77.53999996185303,
+                "p95": 79.07499992847443,
+                "p99": 79.07499992847443,
                 "samples": 7
               },
               "cpuPreparationMs": null,
@@ -1849,8 +1863,8 @@
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 4263367,
-                      "totalJsHeapBytes": 7811743,
+                      "usedJsHeapBytes": 5545229,
+                      "totalJsHeapBytes": 9205053,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -1858,20 +1872,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 7829373,
-                      "totalJsHeapBytes": 11586929,
+                      "usedJsHeapBytes": 8441893,
+                      "totalJsHeapBytes": 12160921,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 4278318
+                    "maxObservedUsedJsHeapBytes": 5559252
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 4242615,
-                      "totalJsHeapBytes": 8073887,
+                      "usedJsHeapBytes": 5511114,
+                      "totalJsHeapBytes": 9205002,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -1879,20 +1893,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 7845257,
-                      "totalJsHeapBytes": 11849073,
+                      "usedJsHeapBytes": 8457933,
+                      "totalJsHeapBytes": 12160921,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 4257566
+                    "maxObservedUsedJsHeapBytes": 5525137
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 4193079,
-                      "totalJsHeapBytes": 7926431,
+                      "usedJsHeapBytes": 5527966,
+                      "totalJsHeapBytes": 9205002,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -1900,20 +1914,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 7822189,
-                      "totalJsHeapBytes": 11586929,
+                      "usedJsHeapBytes": 8463969,
+                      "totalJsHeapBytes": 12160921,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 4208030
+                    "maxObservedUsedJsHeapBytes": 5541989
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 4206615,
-                      "totalJsHeapBytes": 7811743,
+                      "usedJsHeapBytes": 5499502,
+                      "totalJsHeapBytes": 9205002,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -1921,20 +1935,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 7815681,
-                      "totalJsHeapBytes": 11586929,
+                      "usedJsHeapBytes": 8457893,
+                      "totalJsHeapBytes": 12160921,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 4221566
+                    "maxObservedUsedJsHeapBytes": 5513525
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 4205183,
-                      "totalJsHeapBytes": 7926431,
+                      "usedJsHeapBytes": 5534226,
+                      "totalJsHeapBytes": 9205002,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -1942,20 +1956,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 7832773,
-                      "totalJsHeapBytes": 11849073,
+                      "usedJsHeapBytes": 8480753,
+                      "totalJsHeapBytes": 12160921,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 4220134
+                    "maxObservedUsedJsHeapBytes": 5548249
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 4204995,
-                      "totalJsHeapBytes": 8073887,
+                      "usedJsHeapBytes": 5513142,
+                      "totalJsHeapBytes": 9205002,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -1963,20 +1977,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 7829044,
-                      "totalJsHeapBytes": 11849124,
+                      "usedJsHeapBytes": 8463753,
+                      "totalJsHeapBytes": 12160921,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 4219946
+                    "maxObservedUsedJsHeapBytes": 5527165
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 4228907,
-                      "totalJsHeapBytes": 8073887,
+                      "usedJsHeapBytes": 5561061,
+                      "totalJsHeapBytes": 9205053,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -1984,21 +1998,21 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 7770913,
-                      "totalJsHeapBytes": 11586929,
+                      "usedJsHeapBytes": 8493653,
+                      "totalJsHeapBytes": 12160921,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 4243858
+                    "maxObservedUsedJsHeapBytes": 5575084
                   }
                 ],
                 "warmRun": {
                   "before": {
                     "performanceMemoryExposed": true,
-                    "usedJsHeapBytes": 4214127,
-                    "totalJsHeapBytes": 7811743,
+                    "usedJsHeapBytes": 5529846,
+                    "totalJsHeapBytes": 9205002,
                     "jsHeapLimitBytes": 4294705152,
                     "userAgentSpecificMemoryExposed": true,
                     "userAgentSpecificMemoryBytes": null,
@@ -2006,14 +2020,14 @@
                   },
                   "after": {
                     "performanceMemoryExposed": true,
-                    "usedJsHeapBytes": 15048957,
-                    "totalJsHeapBytes": 18287985,
+                    "usedJsHeapBytes": 15689373,
+                    "totalJsHeapBytes": 19386265,
                     "jsHeapLimitBytes": 4294705152,
                     "userAgentSpecificMemoryExposed": true,
                     "userAgentSpecificMemoryBytes": null,
                     "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                   },
-                  "maxObservedUsedJsHeapBytes": 15048789
+                  "maxObservedUsedJsHeapBytes": 15689205
                 }
               }
             },
@@ -2042,73 +2056,73 @@
               "percentileMethod": "median-and-nearest-rank-ceil",
               "sampleCount": 7,
               "samplesMs": [
-                45.169999957084656,
-                45.66499996185303,
-                45.814999997615814,
-                46.12999999523163,
-                46.7399999499321,
-                45.02499997615814,
-                44.55000001192093
+                43.56499993801117,
+                43.27499997615814,
+                43.24000000953674,
+                46.27999997138977,
+                44.269999980926514,
+                43.49500000476837,
+                43.49500000476837
               ],
-              "p50Ms": 45.66499996185303,
-              "p95Ms": 46.7399999499321,
-              "p99Ms": 46.7399999499321,
-              "minMs": 44.55000001192093,
-              "maxMs": 46.7399999499321
+              "p50Ms": 43.49500000476837,
+              "p95Ms": 46.27999997138977,
+              "p99Ms": 46.27999997138977,
+              "minMs": 43.24000000953674,
+              "maxMs": 46.27999997138977
             },
             "warm": {
               "percentileMethod": "median-and-nearest-rank-ceil",
               "sampleCount": 31,
               "samplesMs": [
+                3.8300000429153442,
+                3.924999952316284,
+                3.899999976158142,
+                3.940000057220459,
+                3.8300000429153442,
+                3.944999933242798,
+                3.8200000524520874,
+                3.8299999237060547,
                 3.75,
-                4,
-                3.8700000047683716,
-                3.8600000143051147,
+                3.7949999570846558,
+                3.759999990463257,
+                3.7350000143051147,
+                3.8550000190734863,
+                3.7350000143051147,
+                3.840000033378601,
                 3.75,
-                3.8450000286102295,
-                3.824999988079071,
-                3.8399999737739563,
-                3.6550000309944153,
-                3.6700000166893005,
-                3.884999990463257,
-                3.665000021457672,
-                3.649999976158142,
+                3.8049999475479126,
                 3.7200000286102295,
-                3.814999997615814,
-                3.784999966621399,
+                3.8300000429153442,
+                3.9149999618530273,
+                3.840000033378601,
+                3.8399999141693115,
+                3.734999895095825,
+                3.790000081062317,
                 3.7549999952316284,
-                3.6700000166893005,
-                3.6799999475479126,
-                3.8600000143051147,
-                3.650000035762787,
-                3.685000002384186,
-                3.6700000166893005,
-                3.709999978542328,
-                3.7149999737739563,
-                3.814999997615814,
-                3.6399999856948853,
-                3.709999978542328,
-                3.8950000405311584,
-                3.634999990463257,
-                3.6449999809265137
+                3.850000023841858,
+                3.7049999237060547,
+                3.8100000619888306,
+                3.7350000143051147,
+                3.7649999856948853,
+                3.7050000429153442
               ],
-              "p50Ms": 3.7200000286102295,
-              "p95Ms": 3.8950000405311584,
-              "p99Ms": 4,
-              "minMs": 3.634999990463257,
-              "maxMs": 4
+              "p50Ms": 3.8100000619888306,
+              "p95Ms": 3.940000057220459,
+              "p99Ms": 3.944999933242798,
+              "minMs": 3.7049999237060547,
+              "maxMs": 3.944999933242798
             },
             "costEvidence": {
               "warmMs": {
-                "p50": 3.7200000286102295,
-                "p95": 3.8950000405311584,
-                "p99": 4,
+                "p50": 3.8100000619888306,
+                "p95": 3.940000057220459,
+                "p99": 3.944999933242798,
                 "samples": 31
               },
               "coldMs": {
-                "p50": 45.66499996185303,
-                "p95": 46.7399999499321,
-                "p99": 46.7399999499321,
+                "p50": 43.49500000476837,
+                "p95": 46.27999997138977,
+                "p99": 46.27999997138977,
                 "samples": 7
               },
               "cpuPreparationMs": null,
@@ -2166,8 +2180,8 @@
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 4219177,
-                      "totalJsHeapBytes": 8073897,
+                      "usedJsHeapBytes": 5579263,
+                      "totalJsHeapBytes": 9205063,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -2175,20 +2189,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 139269829,
-                      "totalJsHeapBytes": 144977601,
+                      "usedJsHeapBytes": 139798043,
+                      "totalJsHeapBytes": 145813807,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 4234128
+                    "maxObservedUsedJsHeapBytes": 5593286
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 4235221,
-                      "totalJsHeapBytes": 8073897,
+                      "usedJsHeapBytes": 5525304,
+                      "totalJsHeapBytes": 9205012,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -2196,20 +2210,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 139269793,
-                      "totalJsHeapBytes": 144715457,
+                      "usedJsHeapBytes": 139799435,
+                      "totalJsHeapBytes": 146075951,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 4250172
+                    "maxObservedUsedJsHeapBytes": 5539327
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 4226957,
-                      "totalJsHeapBytes": 8073897,
+                      "usedJsHeapBytes": 5512704,
+                      "totalJsHeapBytes": 9205012,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -2217,20 +2231,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 139269537,
-                      "totalJsHeapBytes": 144977601,
+                      "usedJsHeapBytes": 139798715,
+                      "totalJsHeapBytes": 145813807,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 4241908
+                    "maxObservedUsedJsHeapBytes": 5526727
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 4215113,
-                      "totalJsHeapBytes": 8073897,
+                      "usedJsHeapBytes": 5522696,
+                      "totalJsHeapBytes": 9729300,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -2238,20 +2252,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 139252009,
-                      "totalJsHeapBytes": 145239745,
+                      "usedJsHeapBytes": 139799047,
+                      "totalJsHeapBytes": 145027375,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 4230064
+                    "maxObservedUsedJsHeapBytes": 5536719
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 4194909,
-                      "totalJsHeapBytes": 7664297,
+                      "usedJsHeapBytes": 5519988,
+                      "totalJsHeapBytes": 9205012,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -2259,20 +2273,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 139268809,
-                      "totalJsHeapBytes": 144453313,
+                      "usedJsHeapBytes": 139800271,
+                      "totalJsHeapBytes": 145813807,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 4209860
+                    "maxObservedUsedJsHeapBytes": 5534011
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 4212217,
-                      "totalJsHeapBytes": 7811753,
+                      "usedJsHeapBytes": 5520248,
+                      "totalJsHeapBytes": 9205012,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -2280,20 +2294,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 139251905,
-                      "totalJsHeapBytes": 144715457,
+                      "usedJsHeapBytes": 139798047,
+                      "totalJsHeapBytes": 145813807,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 4227168
+                    "maxObservedUsedJsHeapBytes": 5534271
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 4215277,
-                      "totalJsHeapBytes": 8336041,
+                      "usedJsHeapBytes": 5514424,
+                      "totalJsHeapBytes": 9205012,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -2301,21 +2315,21 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 139269629,
-                      "totalJsHeapBytes": 144715457,
+                      "usedJsHeapBytes": 139799003,
+                      "totalJsHeapBytes": 145813807,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 4230228
+                    "maxObservedUsedJsHeapBytes": 5528447
                   }
                 ],
                 "warmRun": {
                   "before": {
                     "performanceMemoryExposed": true,
-                    "usedJsHeapBytes": 4194101,
-                    "totalJsHeapBytes": 7811753,
+                    "usedJsHeapBytes": 5544016,
+                    "totalJsHeapBytes": 9205012,
                     "jsHeapLimitBytes": 4294705152,
                     "userAgentSpecificMemoryExposed": true,
                     "userAgentSpecificMemoryBytes": null,
@@ -2323,14 +2337,14 @@
                   },
                   "after": {
                     "performanceMemoryExposed": true,
-                    "usedJsHeapBytes": 145110605,
-                    "totalJsHeapBytes": 149843649,
+                    "usedJsHeapBytes": 145648151,
+                    "totalJsHeapBytes": 150941999,
                     "jsHeapLimitBytes": 4294705152,
                     "userAgentSpecificMemoryExposed": true,
                     "userAgentSpecificMemoryBytes": null,
                     "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                   },
-                  "maxObservedUsedJsHeapBytes": 145110437
+                  "maxObservedUsedJsHeapBytes": 145647983
                 }
               }
             },
@@ -2397,7 +2411,7 @@
               "raceTimings": [],
               "gateFailures": [],
               "challengerId": "vello-gpu-browser",
-              "expectedGainPct": 90.38431136822393
+              "expectedGainPct": 90.23277753130108
             }
           },
           "penUp": {
@@ -2442,7 +2456,7 @@
               "raceTimings": [],
               "gateFailures": [],
               "challengerId": "vello-gpu-browser",
-              "expectedGainPct": 90.38431136822393
+              "expectedGainPct": 90.23277753130108
             }
           },
           "finalCachedWinner": "vello-gpu-browser"
@@ -2462,7 +2476,7 @@
         },
         "promotion": {
           "providerId": "vello-gpu-browser",
-          "measuredGainVsReferencePct": 90.38431136822393,
+          "measuredGainVsReferencePct": 90.23277753130108,
           "boundedCorpusOnly": true,
           "soakPassed": false,
           "outcome": {
@@ -2522,73 +2536,73 @@
               "percentileMethod": "median-and-nearest-rank-ceil",
               "sampleCount": 7,
               "samplesMs": [
-                99.64499998092651,
-                98.7049999833107,
-                100.34500002861023,
-                104.98499995470047,
-                98.05499994754791,
-                98.10500001907349,
-                97.67999994754791
+                98.7849999666214,
+                96.46000003814697,
+                98,
+                98.74000000953674,
+                101.52499997615814,
+                106.37000000476837,
+                103.8950001001358
               ],
-              "p50Ms": 98.7049999833107,
-              "p95Ms": 104.98499995470047,
-              "p99Ms": 104.98499995470047,
-              "minMs": 97.67999994754791,
-              "maxMs": 104.98499995470047
+              "p50Ms": 98.7849999666214,
+              "p95Ms": 106.37000000476837,
+              "p99Ms": 106.37000000476837,
+              "minMs": 96.46000003814697,
+              "maxMs": 106.37000000476837
             },
             "warm": {
               "percentileMethod": "median-and-nearest-rank-ceil",
               "sampleCount": 31,
               "samplesMs": [
-                20.410000026226044,
-                19.8400000333786,
-                20.240000009536743,
-                19.785000026226044,
-                21.009999990463257,
-                20.740000009536743,
-                25.060000002384186,
-                20.1700000166893,
-                19.730000019073486,
-                19.819999992847443,
-                20.12999999523163,
-                19.740000009536743,
-                20.1700000166893,
-                20.339999973773956,
-                20.5900000333786,
-                20.509999990463257,
-                20.430000007152557,
-                19.5450000166893,
-                19.605000019073486,
-                18.82499998807907,
-                19.115000009536743,
-                19.0900000333786,
-                18.82499998807907,
-                20.344999969005585,
-                21.709999978542328,
-                18.02999997138977,
-                18.07499998807907,
-                17.644999980926514,
-                18.040000021457672,
-                18.155000030994415,
-                17.92500001192093
+                20.84500002861023,
+                20.72000002861023,
+                20.519999980926514,
+                20.330000042915344,
+                20.644999980926514,
+                20.320000052452087,
+                25.639999985694885,
+                22.25499999523163,
+                20.549999952316284,
+                22.835000038146973,
+                25.84500002861023,
+                21.429999947547913,
+                20.674999952316284,
+                22.480000019073486,
+                19.94000005722046,
+                22.329999923706055,
+                21.769999980926514,
+                22.610000014305115,
+                22.954999923706055,
+                22.90499997138977,
+                22.644999980926514,
+                22.225000023841858,
+                22.43500006198883,
+                19.610000014305115,
+                20.769999980926514,
+                19.97000002861023,
+                19.960000038146973,
+                20.990000009536743,
+                19.99500000476837,
+                21.269999980926514,
+                19.94000005722046
               ],
-              "p50Ms": 19.819999992847443,
-              "p95Ms": 21.709999978542328,
-              "p99Ms": 25.060000002384186,
-              "minMs": 17.644999980926514,
-              "maxMs": 25.060000002384186
+              "p50Ms": 20.990000009536743,
+              "p95Ms": 25.639999985694885,
+              "p99Ms": 25.84500002861023,
+              "minMs": 19.610000014305115,
+              "maxMs": 25.84500002861023
             },
             "costEvidence": {
               "warmMs": {
-                "p50": 19.819999992847443,
-                "p95": 21.709999978542328,
-                "p99": 25.060000002384186,
+                "p50": 20.990000009536743,
+                "p95": 25.639999985694885,
+                "p99": 25.84500002861023,
                 "samples": 31
               },
               "coldMs": {
-                "p50": 98.7049999833107,
-                "p95": 104.98499995470047,
-                "p99": 104.98499995470047,
+                "p50": 98.7849999666214,
+                "p95": 106.37000000476837,
+                "p99": 106.37000000476837,
                 "samples": 7
               },
               "cpuPreparationMs": null,
@@ -2646,8 +2660,8 @@
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 5387285,
-                      "totalJsHeapBytes": 14889629,
+                      "usedJsHeapBytes": 7070776,
+                      "totalJsHeapBytes": 16282888,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -2655,20 +2669,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 13636782,
-                      "totalJsHeapBytes": 25862214,
+                      "usedJsHeapBytes": 14335595,
+                      "totalJsHeapBytes": 26960443,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 5407652
+                    "maxObservedUsedJsHeapBytes": 7090215
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 5446657,
-                      "totalJsHeapBytes": 14889629,
+                      "usedJsHeapBytes": 7075592,
+                      "totalJsHeapBytes": 16282888,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -2676,20 +2690,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 13766270,
-                      "totalJsHeapBytes": 25862214,
+                      "usedJsHeapBytes": 14358475,
+                      "totalJsHeapBytes": 26960443,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 5467024
+                    "maxObservedUsedJsHeapBytes": 7095031
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 5474377,
-                      "totalJsHeapBytes": 15151773,
+                      "usedJsHeapBytes": 7033775,
+                      "totalJsHeapBytes": 16282939,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -2697,20 +2711,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 13710430,
-                      "totalJsHeapBytes": 25862214,
+                      "usedJsHeapBytes": 14360379,
+                      "totalJsHeapBytes": 26698299,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 5494744
+                    "maxObservedUsedJsHeapBytes": 7053214
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 5353493,
-                      "totalJsHeapBytes": 15151773,
+                      "usedJsHeapBytes": 7086400,
+                      "totalJsHeapBytes": 16282888,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -2718,20 +2732,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 13669038,
-                      "totalJsHeapBytes": 25600070,
+                      "usedJsHeapBytes": 14390723,
+                      "totalJsHeapBytes": 26960443,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 5373860
+                    "maxObservedUsedJsHeapBytes": 7105839
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 5536481,
-                      "totalJsHeapBytes": 15151773,
+                      "usedJsHeapBytes": 6973151,
+                      "totalJsHeapBytes": 16020795,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -2739,20 +2753,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 13733670,
-                      "totalJsHeapBytes": 25862214,
+                      "usedJsHeapBytes": 14341075,
+                      "totalJsHeapBytes": 26436155,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 5556848
+                    "maxObservedUsedJsHeapBytes": 6992590
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 5360605,
-                      "totalJsHeapBytes": 14889629,
+                      "usedJsHeapBytes": 7017004,
+                      "totalJsHeapBytes": 16020744,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -2760,20 +2774,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 13635354,
-                      "totalJsHeapBytes": 25600070,
+                      "usedJsHeapBytes": 14336207,
+                      "totalJsHeapBytes": 26698299,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 5380972
+                    "maxObservedUsedJsHeapBytes": 7036443
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 5323677,
-                      "totalJsHeapBytes": 15151773,
+                      "usedJsHeapBytes": 7121747,
+                      "totalJsHeapBytes": 16282939,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -2781,21 +2795,21 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 13627914,
-                      "totalJsHeapBytes": 25600070,
+                      "usedJsHeapBytes": 14359715,
+                      "totalJsHeapBytes": 26960443,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 5344044
+                    "maxObservedUsedJsHeapBytes": 7141186
                   }
                 ],
                 "warmRun": {
                   "before": {
                     "performanceMemoryExposed": true,
-                    "usedJsHeapBytes": 5411917,
-                    "totalJsHeapBytes": 14889629,
+                    "usedJsHeapBytes": 7095283,
+                    "totalJsHeapBytes": 16282939,
                     "jsHeapLimitBytes": 4294705152,
                     "userAgentSpecificMemoryExposed": true,
                     "userAgentSpecificMemoryBytes": null,
@@ -2803,14 +2817,14 @@
                   },
                   "after": {
                     "performanceMemoryExposed": true,
-                    "usedJsHeapBytes": 16563923,
-                    "totalJsHeapBytes": 52765827,
+                    "usedJsHeapBytes": 17108808,
+                    "totalJsHeapBytes": 54388512,
                     "jsHeapLimitBytes": 4294705152,
                     "userAgentSpecificMemoryExposed": true,
                     "userAgentSpecificMemoryBytes": null,
                     "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                   },
-                  "maxObservedUsedJsHeapBytes": 26426339
+                  "maxObservedUsedJsHeapBytes": 26910236
                 }
               }
             },
@@ -2839,73 +2853,73 @@
               "percentileMethod": "median-and-nearest-rank-ceil",
               "sampleCount": 7,
               "samplesMs": [
-                482.4800000190735,
-                475.6550000309944,
-                465.2300000190735,
-                465.30500000715256,
-                459.09500002861023,
-                476.0649999976158,
-                465.94499999284744
+                474.7649999856949,
+                469.06500005722046,
+                468.0500000715256,
+                478.13499999046326,
+                474.54499995708466,
+                476.64999997615814,
+                484.50999999046326
               ],
-              "p50Ms": 465.94499999284744,
-              "p95Ms": 482.4800000190735,
-              "p99Ms": 482.4800000190735,
-              "minMs": 459.09500002861023,
-              "maxMs": 482.4800000190735
+              "p50Ms": 474.7649999856949,
+              "p95Ms": 484.50999999046326,
+              "p99Ms": 484.50999999046326,
+              "minMs": 468.0500000715256,
+              "maxMs": 484.50999999046326
             },
             "warm": {
               "percentileMethod": "median-and-nearest-rank-ceil",
               "sampleCount": 31,
               "samplesMs": [
-                412.11500000953674,
-                409.30500000715256,
-                411.78500002622604,
-                410.8799999952316,
-                409.98499995470047,
-                410.44499999284744,
-                409.35499995946884,
-                411.5,
-                411.4350000023842,
-                411.8349999785423,
-                411.0849999785423,
-                406.8799999952316,
-                409.96499997377396,
-                410.9549999833107,
-                411.1550000309944,
-                414.4399999976158,
-                411.2350000143051,
-                411.19499999284744,
-                410.81999999284744,
-                410.1799999475479,
-                410.67500001192093,
-                410.75,
-                411.05500000715256,
-                410.25,
-                410.6199999451637,
-                410.3799999952316,
-                409.11500000953674,
-                410.53500002622604,
-                418.69999998807907,
-                446.3100000023842,
-                419.7099999785423
+                414.3899999856949,
+                413.00999999046326,
+                413.02999997138977,
+                413.2099999189377,
+                414.1750000715256,
+                413.2549999952316,
+                415.81500005722046,
+                418.7300000190735,
+                419.4850000143051,
+                414.6400001049042,
+                413.3600000143051,
+                414.085000038147,
+                412.88499999046326,
+                414.61500000953674,
+                412.77499997615814,
+                415.9950000047684,
+                413.9800000190735,
+                412.95500004291534,
+                419.24000000953674,
+                436.70500004291534,
+                422.83000004291534,
+                412.42000007629395,
+                413.88499999046326,
+                412.59500002861023,
+                413.3550000190735,
+                412.89999997615814,
+                413.77499997615814,
+                413.90499997138977,
+                412.9650000333786,
+                412.5,
+                415.1949999332428
               ],
-              "p50Ms": 410.8799999952316,
-              "p95Ms": 419.7099999785423,
-              "p99Ms": 446.3100000023842,
-              "minMs": 406.8799999952316,
-              "maxMs": 446.3100000023842
+              "p50Ms": 413.88499999046326,
+              "p95Ms": 422.83000004291534,
+              "p99Ms": 436.70500004291534,
+              "minMs": 412.42000007629395,
+              "maxMs": 436.70500004291534
             },
             "costEvidence": {
               "warmMs": {
-                "p50": 410.8799999952316,
-                "p95": 419.7099999785423,
-                "p99": 446.3100000023842,
+                "p50": 413.88499999046326,
+                "p95": 422.83000004291534,
+                "p99": 436.70500004291534,
                 "samples": 31
               },
               "coldMs": {
-                "p50": 465.94499999284744,
-                "p95": 482.4800000190735,
-                "p99": 482.4800000190735,
+                "p50": 474.7649999856949,
+                "p95": 484.50999999046326,
+                "p99": 484.50999999046326,
                 "samples": 7
               },
               "cpuPreparationMs": null,
@@ -2963,8 +2977,8 @@
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 5372021,
-                      "totalJsHeapBytes": 15676045,
+                      "usedJsHeapBytes": 6922464,
+                      "totalJsHeapBytes": 16020728,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -2972,20 +2986,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 20499599,
-                      "totalJsHeapBytes": 26299743,
+                      "usedJsHeapBytes": 21427739,
+                      "totalJsHeapBytes": 27496327,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 5392388
+                    "maxObservedUsedJsHeapBytes": 6941903
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 8905277,
-                      "totalJsHeapBytes": 15151757,
+                      "usedJsHeapBytes": 6976512,
+                      "totalJsHeapBytes": 16020728,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -2993,20 +3007,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 20342190,
-                      "totalJsHeapBytes": 26398098,
+                      "usedJsHeapBytes": 21503595,
+                      "totalJsHeapBytes": 27496327,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 8925644
+                    "maxObservedUsedJsHeapBytes": 6995951
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 5370241,
-                      "totalJsHeapBytes": 15151757,
+                      "usedJsHeapBytes": 7044824,
+                      "totalJsHeapBytes": 16282872,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -3014,20 +3028,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 20504427,
-                      "totalJsHeapBytes": 26561887,
+                      "usedJsHeapBytes": 21587079,
+                      "totalJsHeapBytes": 27758471,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 5390608
+                    "maxObservedUsedJsHeapBytes": 7064263
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 5410693,
-                      "totalJsHeapBytes": 14889613,
+                      "usedJsHeapBytes": 7027379,
+                      "totalJsHeapBytes": 16282923,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -3035,20 +3049,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 20540867,
-                      "totalJsHeapBytes": 26398047,
+                      "usedJsHeapBytes": 21490667,
+                      "totalJsHeapBytes": 27496327,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 5431060
+                    "maxObservedUsedJsHeapBytes": 7046818
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 5348433,
-                      "totalJsHeapBytes": 15413901,
+                      "usedJsHeapBytes": 7108272,
+                      "totalJsHeapBytes": 16020728,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -3056,20 +3070,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 20470995,
-                      "totalJsHeapBytes": 26316127,
+                      "usedJsHeapBytes": 21626203,
+                      "totalJsHeapBytes": 27758471,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 5368800
+                    "maxObservedUsedJsHeapBytes": 7127711
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 5292305,
-                      "totalJsHeapBytes": 15413901,
+                      "usedJsHeapBytes": 6951504,
+                      "totalJsHeapBytes": 16282872,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -3077,20 +3091,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 20433687,
-                      "totalJsHeapBytes": 26561887,
+                      "usedJsHeapBytes": 21388723,
+                      "totalJsHeapBytes": 27496327,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 5312672
+                    "maxObservedUsedJsHeapBytes": 6970943
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 5437137,
-                      "totalJsHeapBytes": 15676045,
+                      "usedJsHeapBytes": 6989016,
+                      "totalJsHeapBytes": 16807160,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -3098,21 +3112,21 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 20571618,
-                      "totalJsHeapBytes": 26398098,
+                      "usedJsHeapBytes": 21505951,
+                      "totalJsHeapBytes": 27496327,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 5457504
+                    "maxObservedUsedJsHeapBytes": 7008455
                   }
                 ],
                 "warmRun": {
                   "before": {
                     "performanceMemoryExposed": true,
-                    "usedJsHeapBytes": 5461061,
-                    "totalJsHeapBytes": 15151757,
+                    "usedJsHeapBytes": 7023624,
+                    "totalJsHeapBytes": 16020728,
                     "jsHeapLimitBytes": 4294705152,
                     "userAgentSpecificMemoryExposed": true,
                     "userAgentSpecificMemoryBytes": null,
@@ -3120,14 +3134,14 @@
                   },
                   "after": {
                     "performanceMemoryExposed": true,
-                    "usedJsHeapBytes": 18054369,
-                    "totalJsHeapBytes": 53595189,
+                    "usedJsHeapBytes": 18744997,
+                    "totalJsHeapBytes": 54431493,
                     "jsHeapLimitBytes": 4294705152,
                     "userAgentSpecificMemoryExposed": true,
                     "userAgentSpecificMemoryBytes": null,
                     "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                   },
-                  "maxObservedUsedJsHeapBytes": 41709559
+                  "maxObservedUsedJsHeapBytes": 42621083
                 }
               }
             },
@@ -3156,73 +3170,73 @@
               "percentileMethod": "median-and-nearest-rank-ceil",
               "sampleCount": 7,
               "samplesMs": [
-                79.61000001430511,
-                77.72500002384186,
-                76.16500002145767,
-                75.1149999499321,
-                74.23000001907349,
-                76.15500003099442,
-                77.49500000476837
+                74.5,
+                74.7299998998642,
+                73.92500007152557,
+                75.18500006198883,
+                78.52999997138977,
+                82.0550000667572,
+                84.4449999332428
               ],
-              "p50Ms": 76.16500002145767,
-              "p95Ms": 79.61000001430511,
-              "p99Ms": 79.61000001430511,
-              "minMs": 74.23000001907349,
-              "maxMs": 79.61000001430511
+              "p50Ms": 75.18500006198883,
+              "p95Ms": 84.4449999332428,
+              "p99Ms": 84.4449999332428,
+              "minMs": 73.92500007152557,
+              "maxMs": 84.4449999332428
             },
             "warm": {
               "percentileMethod": "median-and-nearest-rank-ceil",
               "sampleCount": 31,
               "samplesMs": [
-                32.8400000333786,
-                32.84999996423721,
-                32.049999952316284,
-                31.674999952316284,
-                31.23499995470047,
-                31.05000001192093,
-                30.80000001192093,
-                31.00499999523163,
-                30.064999997615814,
-                30.289999961853027,
-                31.22999995946884,
-                30.74500000476837,
-                30.224999964237213,
-                30.50499999523163,
-                30.344999969005585,
-                30.9099999666214,
-                30.77000004053116,
-                30.80000001192093,
-                30.5799999833107,
-                30.80000001192093,
-                30.830000042915344,
-                31.25,
-                31.055000007152557,
-                31.14500004053116,
-                30.985000014305115,
-                30.694999992847443,
-                30.5100000500679,
-                31.4549999833107,
-                31.214999973773956,
-                31.77999997138977,
-                30.694999992847443
+                33.49500000476837,
+                31.74500000476837,
+                32.00999999046326,
+                31.704999923706055,
+                31.360000014305115,
+                31.18500006198883,
+                31.5,
+                30.644999980926514,
+                30.920000076293945,
+                30.700000047683716,
+                30.93499994277954,
+                30.790000081062317,
+                30.87999999523163,
+                30.669999957084656,
+                30.764999985694885,
+                30.664999961853027,
+                31.009999990463257,
+                30.649999976158142,
+                31.075000047683716,
+                30.96499991416931,
+                31.024999976158142,
+                30.789999961853027,
+                30.955000042915344,
+                30.700000047683716,
+                30.769999980926514,
+                30.740000009536743,
+                30.895000100135803,
+                30.919999957084656,
+                30.87000000476837,
+                30.66000008583069,
+                30.705000042915344
               ],
-              "p50Ms": 30.9099999666214,
-              "p95Ms": 32.8400000333786,
-              "p99Ms": 32.84999996423721,
-              "minMs": 30.064999997615814,
-              "maxMs": 32.84999996423721
+              "p50Ms": 30.895000100135803,
+              "p95Ms": 32.00999999046326,
+              "p99Ms": 33.49500000476837,
+              "minMs": 30.644999980926514,
+              "maxMs": 33.49500000476837
             },
             "costEvidence": {
               "warmMs": {
-                "p50": 30.9099999666214,
-                "p95": 32.8400000333786,
-                "p99": 32.84999996423721,
+                "p50": 30.895000100135803,
+                "p95": 32.00999999046326,
+                "p99": 33.49500000476837,
                 "samples": 31
               },
               "coldMs": {
-                "p50": 76.16500002145767,
-                "p95": 79.61000001430511,
-                "p99": 79.61000001430511,
+                "p50": 75.18500006198883,
+                "p95": 84.4449999332428,
+                "p99": 84.4449999332428,
                 "samples": 7
               },
               "cpuPreparationMs": null,
@@ -3280,8 +3294,8 @@
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 5370927,
-                      "totalJsHeapBytes": 15151767,
+                      "usedJsHeapBytes": 7006958,
+                      "totalJsHeapBytes": 16020738,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -3289,20 +3303,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 141638848,
-                      "totalJsHeapBytes": 151973560,
+                      "usedJsHeapBytes": 142163802,
+                      "totalJsHeapBytes": 152285478,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 5391294
+                    "maxObservedUsedJsHeapBytes": 7026397
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 5410327,
-                      "totalJsHeapBytes": 14627479,
+                      "usedJsHeapBytes": 6972938,
+                      "totalJsHeapBytes": 16282882,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -3310,20 +3324,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 141636448,
-                      "totalJsHeapBytes": 151449272,
+                      "usedJsHeapBytes": 142198390,
+                      "totalJsHeapBytes": 152809766,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 5430694
+                    "maxObservedUsedJsHeapBytes": 6992377
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 5466343,
-                      "totalJsHeapBytes": 15413911,
+                      "usedJsHeapBytes": 7086494,
+                      "totalJsHeapBytes": 16282882,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -3331,20 +3345,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 141661972,
-                      "totalJsHeapBytes": 151711416,
+                      "usedJsHeapBytes": 142149646,
+                      "totalJsHeapBytes": 152285478,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 5486710
+                    "maxObservedUsedJsHeapBytes": 7105933
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 5361159,
-                      "totalJsHeapBytes": 15413911,
+                      "usedJsHeapBytes": 7069310,
+                      "totalJsHeapBytes": 16282882,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -3352,20 +3366,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 141633516,
-                      "totalJsHeapBytes": 151711416,
+                      "usedJsHeapBytes": 142233578,
+                      "totalJsHeapBytes": 152285478,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 5381526
+                    "maxObservedUsedJsHeapBytes": 7088749
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 5386891,
-                      "totalJsHeapBytes": 15413911,
+                      "usedJsHeapBytes": 7069822,
+                      "totalJsHeapBytes": 16545026,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -3373,20 +3387,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 141615700,
-                      "totalJsHeapBytes": 151973560,
+                      "usedJsHeapBytes": 142199074,
+                      "totalJsHeapBytes": 152285478,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 5407258
+                    "maxObservedUsedJsHeapBytes": 7089261
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 5408955,
-                      "totalJsHeapBytes": 15413911,
+                      "usedJsHeapBytes": 7650253,
+                      "totalJsHeapBytes": 16282933,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -3394,20 +3408,20 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 141641412,
-                      "totalJsHeapBytes": 152235704,
+                      "usedJsHeapBytes": 142165026,
+                      "totalJsHeapBytes": 152809766,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 5429322
+                    "maxObservedUsedJsHeapBytes": 7051116
                   },
                   {
                     "before": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 5441687,
-                      "totalJsHeapBytes": 15151767,
+                      "usedJsHeapBytes": 7064549,
+                      "totalJsHeapBytes": 16545077,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
@@ -3415,21 +3429,21 @@
                     },
                     "after": {
                       "performanceMemoryExposed": true,
-                      "usedJsHeapBytes": 141644736,
-                      "totalJsHeapBytes": 151449272,
+                      "usedJsHeapBytes": 142197346,
+                      "totalJsHeapBytes": 151761190,
                       "jsHeapLimitBytes": 4294705152,
                       "userAgentSpecificMemoryExposed": true,
                       "userAgentSpecificMemoryBytes": null,
                       "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                     },
-                    "maxObservedUsedJsHeapBytes": 5462054
+                    "maxObservedUsedJsHeapBytes": 7083988
                   }
                 ],
                 "warmRun": {
                   "before": {
                     "performanceMemoryExposed": true,
-                    "usedJsHeapBytes": 5351979,
-                    "totalJsHeapBytes": 15413911,
+                    "usedJsHeapBytes": 7069025,
+                    "totalJsHeapBytes": 16282933,
                     "jsHeapLimitBytes": 4294705152,
                     "userAgentSpecificMemoryExposed": true,
                     "userAgentSpecificMemoryBytes": null,
@@ -3437,14 +3451,14 @@
                   },
                   "after": {
                     "performanceMemoryExposed": true,
-                    "usedJsHeapBytes": 147957896,
-                    "totalJsHeapBytes": 161541816,
+                    "usedJsHeapBytes": 143958230,
+                    "totalJsHeapBytes": 162050342,
                     "jsHeapLimitBytes": 4294705152,
                     "userAgentSpecificMemoryExposed": true,
                     "userAgentSpecificMemoryBytes": null,
                     "userAgentSpecificMemoryError": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
                   },
-                  "maxObservedUsedJsHeapBytes": 149204788
+                  "maxObservedUsedJsHeapBytes": 150102518
                 }
               }
             },
@@ -3511,7 +3525,7 @@
               "raceTimings": [],
               "gateFailures": [],
               "challengerId": "vello-gpu-browser",
-              "expectedGainPct": 95.17620716679384
+              "expectedGainPct": 94.92854295033152
             }
           },
           "penUp": {
@@ -3556,7 +3570,7 @@
               "raceTimings": [],
               "gateFailures": [],
               "challengerId": "vello-gpu-browser",
-              "expectedGainPct": 95.17620716679384
+              "expectedGainPct": 94.92854295033152
             }
           },
           "finalCachedWinner": "vello-gpu-browser"
@@ -3576,7 +3590,7 @@
         },
         "promotion": {
           "providerId": "vello-gpu-browser",
-          "measuredGainVsReferencePct": 95.17620716679384,
+          "measuredGainVsReferencePct": 94.92854295033152,
           "boundedCorpusOnly": true,
           "soakPassed": false,
           "outcome": {
@@ -3599,49 +3613,49 @@
         "percentileMethod": "median-and-nearest-rank-ceil",
         "sampleCount": 31,
         "samplesMs": [
-          21.605000019073486,
-          20.174999952316284,
-          19.799999952316284,
-          19.780000030994415,
-          25.5450000166893,
-          21.230000019073486,
-          21.32499998807907,
-          20.49500000476837,
-          20.660000026226044,
-          19.530000030994415,
-          19.759999990463257,
+          22.119999885559082,
+          20.875,
+          21.72000002861023,
+          22.024999976158142,
+          28.519999980926514,
+          25.24500000476837,
+          21.634999990463257,
+          22.360000014305115,
+          22.985000014305115,
+          19.22000002861023,
+          20.5,
+          21.15000009536743,
+          20.77999997138977,
+          20.769999980926514,
+          20.165000081062317,
+          20.4650000333786,
+          20.730000019073486,
+          20.264999985694885,
+          20.669999957084656,
+          22.864999890327454,
+          24.294999957084656,
+          18.9099999666214,
+          21.420000076293945,
+          20.085000038146973,
+          21.889999985694885,
           20.1599999666214,
-          20.814999997615814,
-          20.674999952316284,
-          20.76500004529953,
-          20.985000014305115,
-          19.615000009536743,
-          19.23499995470047,
-          19.8400000333786,
-          19.834999978542328,
-          20.05000001192093,
-          19.830000042915344,
-          20.67500001192093,
-          20.555000007152557,
-          20.509999990463257,
-          20.644999980926514,
-          19.319999992847443,
-          19.57499998807907,
-          19.524999976158142,
-          19.24500000476837,
-          19.444999992847443
+          22.460000038146973,
+          23.830000042915344,
+          22.75,
+          19.519999980926514,
+          21.360000014305115
         ],
-        "p50Ms": 20.1599999666214,
-        "p95Ms": 21.605000019073486,
-        "p99Ms": 25.5450000166893,
-        "minMs": 19.23499995470047,
-        "maxMs": 25.5450000166893
+        "p50Ms": 21.360000014305115,
+        "p95Ms": 25.24500000476837,
+        "p99Ms": 28.519999980926514,
+        "minMs": 18.9099999666214,
+        "maxMs": 28.519999980926514
       },
       "gate": {
         "pass": false,
         "mismatchPct": 8.77956814236111
       },
-      "referenceWarmP50Ms": 410.8799999952316,
+      "referenceWarmP50Ms": 413.88499999046326,
       "fasterThanReference": true,
       "selectedWinnerId": "vello-cpu",
       "exclusionReason": "visual-equivalence-gate-failed",
@@ -3677,132 +3691,90 @@
           "percentileMethod": "median-and-nearest-rank-ceil",
           "sampleCount": 31,
           "samplesMs": [
-            1.340000033378601,
-            1.2200000286102295,
-            1.2249999642372131,
+            1.3650000095367432,
+            1.3550000190734863,
+            1.2300000190734863,
             1.1299999952316284,
-            1.100000023841858,
-            1.0350000262260437,
-            1.0600000023841858,
+            1.0550000667572021,
+            1.0749999284744263,
+            1.149999976158142,
+            1.0749999284744263,
+            1.0700000524520874,
+            1.0399999618530273,
+            0.9850000143051147,
+            0.9950000047683716,
+            1.0149999856948853,
+            0.9950000047683716,
+            1.090000033378601,
             1.024999976158142,
+            1.0350000858306885,
+            0.9849998950958252,
+            0.9950000047683716,
+            1.0150001049041748,
+            0.9749999046325684,
+            1.0150001049041748,
+            0.9950000047683716,
+            1.0299999713897705,
             1.0049999952316284,
             0.9900000095367432,
-            0.9549999833106995,
             0.9800000190734863,
-            0.9900000095367432,
-            1,
-            1.0399999618530273,
-            0.940000057220459,
-            0.98499995470047,
-            0.98499995470047,
-            1,
-            1.0250000357627869,
-            0.9599999785423279,
-            0.9850000143051147,
-            0.9850000143051147,
-            0.9300000071525574,
-            0.9599999785423279,
-            0.9350000023841858,
-            0.9399999976158142,
-            0.9749999642372131,
-            0.9650000333786011,
-            0.9350000023841858,
-            0.9399999976158142
-          ],
-          "p50Ms": 0.9850000143051147,
-          "p95Ms": 1.2249999642372131,
-          "p99Ms": 1.340000033378601,
-          "minMs": 0.9300000071525574,
-          "maxMs": 1.340000033378601
-        },
-        {
-          "percentileMethod": "median-and-nearest-rank-ceil",
-          "sampleCount": 31,
-          "samplesMs": [
-            1.3450000286102295,
-            1.2350000143051147,
-            1.2350000143051147,
-            1.1850000023841858,
-            1.0699999928474426,
             1.0299999713897705,
-            1.0649999976158142,
-            1.0200000405311584,
-            1,
-            1.0450000166893005,
-            0.9649999737739563,
-            0.9700000286102295,
-            0.9699999690055847,
-            0.9650000333786011,
-            1.0399999618530273,
-            0.9799999594688416,
-            1.0099999904632568,
-            0.9850000143051147,
-            0.9650000333786011,
-            0.9900000095367432,
-            0.9599999785423279,
-            1.0149999856948853,
-            1.059999942779541,
-            0.9649999737739563,
             0.9750000238418579,
-            0.949999988079071,
-            0.9449999928474426,
-            0.9600000381469727,
-            0.949999988079071,
-            0.9300000071525574,
-            0.9449999928474426
+            0.9950000047683716,
+            0.9700000286102295
           ],
-          "p50Ms": 0.9850000143051147,
-          "p95Ms": 1.2350000143051147,
-          "p99Ms": 1.3450000286102295,
-          "minMs": 0.9300000071525574,
-          "maxMs": 1.3450000286102295
+          "p50Ms": 1.0150001049041748,
+          "p95Ms": 1.3550000190734863,
+          "p99Ms": 1.3650000095367432,
+          "minMs": 0.9700000286102295,
+          "maxMs": 1.3650000095367432
         },
         {
           "percentileMethod": "median-and-nearest-rank-ceil",
           "sampleCount": 31,
           "samplesMs": [
             1.3200000524520874,
-            1.2799999713897705,
-            1.2200000286102295,
-            1.1150000095367432,
-            1.0799999833106995,
-            1.0499999523162842,
-            1.215000033378601,
-            1.0849999785423279,
-            0.9850000143051147,
-            0.9900000095367432,
-            0.9449999928474426,
-            0.9550000429153442,
-            0.9800000190734863,
-            0.98499995470047,
-            1.0550000071525574,
-            0.9750000238418579,
+            1.2699999809265137,
+            1.2699999809265137,
+            1.1449999809265137,
+            1.0749999284744263,
             1.0099999904632568,
-            0.9750000238418579,
-            0.9850000143051147,
-            1.0199999809265137,
-            0.9950000047683716,
-            0.9900000095367432,
-            0.9900000095367432,
-            0.9900000095367432,
-            0.9950000047683716,
-            0.9599999785423279,
-            0.9800000190734863,
-            1.0300000309944153,
+            1.2050000429153442,
+            1.0600000619888306,
+            1.0149999856948853,
+            1.0299999713897705,
+            0.9450000524520874,
             0.934999942779541,
-            0.9199999570846558,
-            0.925000011920929
+            0.9500000476837158,
+            0.9399999380111694,
+            0.9550000429153442,
+            0.9750000238418579,
+            0.9900000095367432,
+            1.0099999904632568,
+            0.9450000524520874,
+            0.9799998998641968,
+            0.9350000619888306,
+            0.9650000333786011,
+            0.9399999380111694,
+            0.9350000619888306,
+            0.9499999284744263,
+            0.9650000333786011,
+            0.9700000286102295,
+            0.9800000190734863,
+            0.9499999284744263,
+            0.9350000619888306,
+            0.9249999523162842
           ],
-          "p50Ms": 0.9900000095367432,
-          "p95Ms": 1.2799999713897705,
+          "p50Ms": 0.9700000286102295,
+          "p95Ms": 1.2699999809265137,
           "p99Ms": 1.3200000524520874,
-          "minMs": 0.9199999570846558,
+          "minMs": 0.9249999523162842,
           "maxMs": 1.3200000524520874
         }
       ],
-      "incumbentRunIndex": 2,
-      "challengerRunIndex": 0,
-      "measuredGainPct": 0.5050500185316258,
+      "incumbentRunIndex": 0,
+      "challengerRunIndex": 1,
+      "measuredGainPct": 4.433504595370827,
       "thresholdPct": 12,
       "tournament": {
         "winnerId": "vello-cpu-repeat-incumbent",
@@ -3846,7 +3818,7 @@
           "raceTimings": [],
           "gateFailures": [],
           "challengerId": "vello-cpu-repeat-challenger",
-          "expectedGainPct": 0.5050500185316258
+          "expectedGainPct": 4.433504595370827
         }
       },
       "outcome": "held-below-12-percent"
@@ -3868,16 +3840,59 @@
       }
     ],
     "csp": {
-      "status": "quarantined",
-      "cleanClaimed": false,
-      "violationCount": 76,
-      "observedPatterns": [
-        "script-src: eval"
-      ],
-      "disposition": "retained as an explicit release quarantine; renderer timing and visual evidence remain usable, but this run does not claim CSP-clean execution",
-      "likelySource": "inference from source audit: Zod allowsEval caught Function probe under strict CSP",
+      "status": "clean",
+      "cleanClaimed": true,
+      "violationCount": 0,
+      "observedPatterns": [],
+      "disposition": "no securitypolicyviolation event observed",
+      "likelySource": null,
       "unsafeEvalAddedForBenchmark": false,
-      "jitDisabledForBenchmark": false
+      "jitDisabledForBenchmark": false,
+      "zodJitlessPrebootstrap": true,
+      "bootstrapReceipt": {
+        "schemaVersion": 1,
+        "order": [
+          "csp-listener-installed",
+          "zod-jitless-configured",
+          "entry-import-started",
+          "page-module-evaluated"
+        ],
+        "listenerInstalledBeforeZodConfig": true,
+        "listenerInstalledBeforeEntryImport": true,
+        "zodJitlessConfiguredBeforeEntryImport": true,
+        "pageModuleEvaluated": true,
+        "zodGlobalConfigObservedByPage": true,
+        "zodCoreGlobalConfigJitless": true,
+        "zodAllowsEvalValue": false
+      },
+      "captureControl": {
+        "freshContext": true,
+        "sameStrictCsp": true,
+        "attempted": true,
+        "blocked": true,
+        "errorName": "EvalError",
+        "violationCount": 1,
+        "observedPatterns": [
+          "script-src: eval"
+        ],
+        "responseContentSecurityPolicy": "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'; worker-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+        "bootstrapReceipt": {
+          "schemaVersion": 1,
+          "order": [
+            "csp-listener-installed",
+            "zod-jitless-configured",
+            "entry-import-started",
+            "page-module-evaluated"
+          ],
+          "listenerInstalledBeforeZodConfig": true,
+          "listenerInstalledBeforeEntryImport": true,
+          "zodJitlessConfiguredBeforeEntryImport": true,
+          "pageModuleEvaluated": true,
+          "zodGlobalConfigObservedByPage": true,
+          "zodCoreGlobalConfigJitless": true,
+          "zodAllowsEvalValue": false
+        }
+      }
     },
     "packageVersions": {
       "playwright": "1.55.1",
@@ -3905,92 +3920,66 @@
       "--disable-software-rasterizer",
       "--enable-precise-memory-info"
     ],
+    "actualBrowserCommandLine": [
+      "/Users/hjunkim/Library/Caches/ms-playwright/chromium_headless_shell-1193/chrome-mac/headless_shell",
+      "--disable-field-trial-config",
+      "--disable-background-networking",
+      "--disable-background-timer-throttling",
+      "--disable-backgrounding-occluded-windows",
+      "--disable-back-forward-cache",
+      "--disable-breakpad",
+      "--disable-client-side-phishing-detection",
+      "--disable-component-extensions-with-background-pages",
+      "--disable-component-update",
+      "--no-default-browser-check",
+      "--disable-default-apps",
+      "--disable-dev-shm-usage",
+      "--disable-extensions",
+      "--disable-features=AcceptCHFrame,AvoidUnnecessaryBeforeUnloadCheckSync,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,Translate,AutoDeElevate",
+      "--allow-pre-commit-input",
+      "--disable-hang-monitor",
+      "--disable-ipc-flooding-protection",
+      "--disable-popup-blocking",
+      "--disable-prompt-on-repost",
+      "--disable-renderer-backgrounding",
+      "--force-color-profile=srgb",
+      "--metrics-recording-only",
+      "--no-first-run",
+      "--password-store=basic",
+      "--use-mock-keychain",
+      "--no-service-autorun",
+      "--export-tagged-pdf",
+      "--disable-search-engine-choice-screen",
+      "--unsafely-disable-devtools-self-xss-warnings",
+      "--edge-skip-compat-layer-relaunch",
+      "--enable-automation",
+      "--enable-unsafe-swiftshader",
+      "--headless",
+      "--hide-scrollbars",
+      "--mute-audio",
+      "--blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4",
+      "--no-sandbox",
+      "--no-sandbox",
+      "--enable-unsafe-webgpu",
+      "--enable-features=WebGPU",
+      "--use-angle=metal",
+      "--disable-software-rasterizer",
+      "--enable-precise-memory-info",
+      "--user-data-dir=/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/playwright_chromiumdev_profile-pDzYTc",
+      "--remote-debugging-pipe",
+      "--no-startup-window",
+      "--use-mock-keychain",
+      "--allow-pre-commit-input"
+    ],
     "consoleErrors": [],
     "consoleWarnings": [],
     "pageErrors": [],
     "requestFailures": [],
     "errorResponses": [],
     "serverErrors": [],
-    "cspViolations": [
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval",
-      "script-src: eval"
-    ],
-    "requestCount": 511,
-    "responseCount": 511,
+    "cspViolations": [],
+    "requestCount": 805,
+    "responseCount": 805,
     "responseHeaders": {
       "contentSecurityPolicy": "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'; worker-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
       "crossOriginOpenerPolicy": "same-origin",
@@ -4002,28 +3991,72 @@
     "mode": "vite-production-build",
     "assets": [
       ".vite/manifest.json",
-      "assets/canvaskit-4SwT2wwE.js",
-      "assets/canvaskit-4SwT2wwE.js.map",
+      "assets/canvaskit-B4Eep5U3.js",
+      "assets/canvaskit-B4Eep5U3.js.map",
       "assets/canvaskit-CHcJ-ZL1.js",
       "assets/canvaskit-CHcJ-ZL1.js.map",
       "assets/canvaskit-DB1zH3nD.wasm",
-      "assets/index-CmNi_gnD.js",
-      "assets/index-CmNi_gnD.js.map",
-      "assets/src-Bj2s-19d.js",
-      "assets/src-Bj2s-19d.js.map",
-      "assets/src-CsDzaOlb.js",
-      "assets/src-CsDzaOlb.js.map",
-      "assets/src-jakKmES4.js",
-      "assets/src-jakKmES4.js.map",
+      "assets/chunk-QTnfLwEv.js",
+      "assets/core-CvQjQp2D.js",
+      "assets/core-CvQjQp2D.js.map",
+      "assets/entry-CehfD5Xh.js",
+      "assets/entry-CehfD5Xh.js.map",
+      "assets/index-BDQ10yC3.js",
+      "assets/index-BDQ10yC3.js.map",
+      "assets/src-0JUf6cwh.js",
+      "assets/src-0JUf6cwh.js.map",
+      "assets/src-B1HXED4A.js",
+      "assets/src-B1HXED4A.js.map",
+      "assets/src-BjgIP-hn.js",
+      "assets/src-BjgIP-hn.js.map",
       "assets/studio_engine_vello-BVfywkO2.js",
       "assets/studio_engine_vello-BVfywkO2.js.map",
-      "assets/studio_engine_vello-C4YKH7mR.js",
-      "assets/studio_engine_vello-C4YKH7mR.js.map",
+      "assets/studio_engine_vello-DefwjhnU.js",
+      "assets/studio_engine_vello-DefwjhnU.js.map",
       "assets/studio_engine_vello_bg-CJYNQLw0.wasm",
       "assets/studio_engine_vello_bg-Cs0YJulo.wasm",
+      "assets/tournament-SqpSWdou.js",
+      "assets/tournament-SqpSWdou.js.map",
       "index.html"
     ],
-    "scratchDirectory": "/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/toonspectrum-renderer-tournament-JypvIf"
+    "scratchDirectory": "/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/toonspectrum-renderer-tournament-ur6sty",
+    "manifestReceipt": {
+      "manifestPath": ".vite/manifest.json",
+      "htmlEntryKey": "index.html",
+      "htmlScriptSource": "/bootstrap.ts",
+      "bootstrapEntryName": "index",
+      "bootstrapEntrySource": "index.html",
+      "bootstrapEntryFile": "assets/index-BDQ10yC3.js",
+      "bootstrapEntryIsEntry": true,
+      "bootstrapStaticImports": [],
+      "bootstrapDynamicImports": [
+        "entry.ts"
+      ],
+      "pageEntryKey": "entry.ts",
+      "pageEntryName": "entry",
+      "pageEntrySource": "entry.ts",
+      "pageEntryFile": "assets/entry-CehfD5Xh.js",
+      "pageEntryIsDynamicEntry": true,
+      "pageStaticImports": [
+        "_chunk-QTnfLwEv.js",
+        "index.html",
+        "_tournament-SqpSWdou.js"
+      ],
+      "pageDynamicImports": [
+        "_core-CvQjQp2D.js",
+        "../../../../../../../../Users/hjunkim/WebstormProjects/toonspectrum/packages/studio-engine-vello/src/index.ts",
+        "_studio_engine_vello-DefwjhnU.js",
+        "../../../../../../../../Users/hjunkim/WebstormProjects/toonspectrum/node_modules/.pnpm/canvaskit-wasm@0.41.1/node_modules/canvaskit-wasm/bin/canvaskit.js",
+        "../../../../../../../../Users/hjunkim/WebstormProjects/toonspectrum/node_modules/.pnpm/canvaskit-wasm@0.41.1/node_modules/canvaskit-wasm/bin/canvaskit.wasm?url",
+        "../../../../../../../../Users/hjunkim/WebstormProjects/toonspectrum/packages/studio-engine-skia/src/index.ts"
+      ],
+      "bootstrapSourceSha256": "971383d454720cb64224676fe5d6a0547d3fcd41fb14772e45e42025a4be1a0c",
+      "bootstrapBundleFile": "assets/index-BDQ10yC3.js",
+      "bootstrapBundleEncoding": "base64",
+      "bootstrapBundleBytesBase64": "Y29uc3QgX192aXRlX19tYXBEZXBzPShpLG09X192aXRlX19tYXBEZXBzLGQ9KG0uZnx8KG0uZj1bImFzc2V0cy9lbnRyeS1DZWhmRDVYaC5qcyIsImFzc2V0cy9jaHVuay1RVG5mTHdFdi5qcyIsImFzc2V0cy90b3VybmFtZW50LVNxcFNXZG91LmpzIiwiYXNzZXRzL2NvcmUtQ3ZRalFwMkQuanMiXSkpKT0+aS5tYXAoaT0+ZFtpXSk7CihmdW5jdGlvbigpe2xldCBlPWRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoYGxpbmtgKS5yZWxMaXN0O2lmKGUmJmUuc3VwcG9ydHMmJmUuc3VwcG9ydHMoYG1vZHVsZXByZWxvYWRgKSlyZXR1cm47Zm9yKGxldCBlIG9mIGRvY3VtZW50LnF1ZXJ5U2VsZWN0b3JBbGwoYGxpbmtbcmVsPSJtb2R1bGVwcmVsb2FkIl1gKSluKGUpO25ldyBNdXRhdGlvbk9ic2VydmVyKGU9Pntmb3IobGV0IHQgb2YgZSlpZih0LnR5cGU9PT1gY2hpbGRMaXN0YClmb3IobGV0IGUgb2YgdC5hZGRlZE5vZGVzKWUudGFnTmFtZT09PWBMSU5LYCYmZS5yZWw9PT1gbW9kdWxlcHJlbG9hZGAmJm4oZSl9KS5vYnNlcnZlKGRvY3VtZW50LHtjaGlsZExpc3Q6ITAsc3VidHJlZTohMH0pO2Z1bmN0aW9uIHQoZSl7bGV0IHQ9e307cmV0dXJuIGUuaW50ZWdyaXR5JiYodC5pbnRlZ3JpdHk9ZS5pbnRlZ3JpdHkpLGUucmVmZXJyZXJQb2xpY3kmJih0LnJlZmVycmVyUG9saWN5PWUucmVmZXJyZXJQb2xpY3kpLGUuY3Jvc3NPcmlnaW49PT1gdXNlLWNyZWRlbnRpYWxzYD90LmNyZWRlbnRpYWxzPWBpbmNsdWRlYDplLmNyb3NzT3JpZ2luPT09YGFub255bW91c2A/dC5jcmVkZW50aWFscz1gb21pdGA6dC5jcmVkZW50aWFscz1gc2FtZS1vcmlnaW5gLHR9ZnVuY3Rpb24gbihlKXtpZihlLmVwKXJldHVybjtlLmVwPSEwO2xldCBuPXQoZSk7ZmV0Y2goZS5ocmVmLG4pfX0pKCk7dmFyIGU9YG1vZHVsZXByZWxvYWRgLHQ9ZnVuY3Rpb24oZSl7cmV0dXJuYC9gK2V9LG49e30scj1mdW5jdGlvbihyLGksYSl7bGV0IG89UHJvbWlzZS5yZXNvbHZlKCk7aWYoaSYmaS5sZW5ndGg+MCl7bGV0IHI9ZG9jdW1lbnQuZ2V0RWxlbWVudHNCeVRhZ05hbWUoYGxpbmtgKSxzPWRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoYG1ldGFbcHJvcGVydHk9Y3NwLW5vbmNlXWApLGM9cz8ubm9uY2V8fHM/LmdldEF0dHJpYnV0ZShgbm9uY2VgKTtmdW5jdGlvbiBsKGUpe3JldHVybiBQcm9taXNlLmFsbChlLm1hcChlPT5Qcm9taXNlLnJlc29sdmUoZSkudGhlbihlPT4oe3N0YXR1czpgZnVsZmlsbGVkYCx2YWx1ZTplfSksZT0+KHtzdGF0dXM6YHJlamVjdGVkYCxyZWFzb246ZX0pKSkpfW89bChpLm1hcChpPT57aWYoaT10KGksYSksaSBpbiBuKXJldHVybjtuW2ldPSEwO2xldCBvPWkuZW5kc1dpdGgoYC5jc3NgKSxzPW8/YFtyZWw9InN0eWxlc2hlZXQiXWA6YGA7aWYoYSlmb3IobGV0IGU9ci5sZW5ndGgtMTtlPj0wO2UtLSl7bGV0IHQ9cltlXTtpZih0LmhyZWY9PT1pJiYoIW98fHQucmVsPT09YHN0eWxlc2hlZXRgKSlyZXR1cm59ZWxzZSBpZihkb2N1bWVudC5xdWVyeVNlbGVjdG9yKGBsaW5rW2hyZWY9IiR7aX0iXSR7c31gKSlyZXR1cm47bGV0IGw9ZG9jdW1lbnQuY3JlYXRlRWxlbWVudChgbGlua2ApO2lmKGwucmVsPW8/YHN0eWxlc2hlZXRgOmUsb3x8KGwuYXM9YHNjcmlwdGApLGwuY3Jvc3NPcmlnaW49YGAsbC5ocmVmPWksYyYmbC5zZXRBdHRyaWJ1dGUoYG5vbmNlYCxjKSxkb2N1bWVudC5oZWFkLmFwcGVuZENoaWxkKGwpLG8pcmV0dXJuIG5ldyBQcm9taXNlKChlLHQpPT57bC5hZGRFdmVudExpc3RlbmVyKGBsb2FkYCxlKSxsLmFkZEV2ZW50TGlzdGVuZXIoYGVycm9yYCwoKT0+dChFcnJvcihgVW5hYmxlIHRvIHByZWxvYWQgQ1NTIGZvciAke2l9YCkpKX0pfSkpfWZ1bmN0aW9uIHMoZSl7bGV0IHQ9bmV3IEV2ZW50KGB2aXRlOnByZWxvYWRFcnJvcmAse2NhbmNlbGFibGU6ITB9KTtpZih0LnBheWxvYWQ9ZSx3aW5kb3cuZGlzcGF0Y2hFdmVudCh0KSwhdC5kZWZhdWx0UHJldmVudGVkKXRocm93IGV9cmV0dXJuIG8udGhlbihlPT57Zm9yKGxldCB0IG9mIGV8fFtdKXQuc3RhdHVzPT09YHJlamVjdGVkYCYmcyh0LnJlYXNvbik7cmV0dXJuIHIoKS5jYXRjaChzKX0pfSxpPWBfX1RPT05TUEVDVFJVTV9SRU5ERVJFUl9UT1VSTkFNRU5UX0NTUF9WSU9MQVRJT05TX19gLGE9YF9fVE9PTlNQRUNUUlVNX1JFTkRFUkVSX1RPVVJOQU1FTlRfQk9PVFNUUkFQX1JFQ0VJUFRfX2Asbz1bXSxzPVtdO2dsb2JhbFRoaXNbaV09byxnbG9iYWxUaGlzW2FdPXtzY2hlbWFWZXJzaW9uOjEsb3JkZXI6c30sZG9jdW1lbnQuYWRkRXZlbnRMaXN0ZW5lcihgc2VjdXJpdHlwb2xpY3l2aW9sYXRpb25gLGU9PntvLnB1c2goYCR7ZS5lZmZlY3RpdmVEaXJlY3RpdmV9OiAke2UuYmxvY2tlZFVSSXx8YGlubGluZWB9YCl9KSxzLnB1c2goYGNzcC1saXN0ZW5lci1pbnN0YWxsZWRgKTt2YXIgYz1nbG9iYWxUaGlzLl9fem9kX2dsb2JhbENvbmZpZyxsPWMmJnR5cGVvZiBjPT1gb2JqZWN0YD9jOnt9O2whPT1jJiYoZ2xvYmFsVGhpcy5fX3pvZF9nbG9iYWxDb25maWc9bCksbC5qaXRsZXNzPSEwLHMucHVzaChgem9kLWppdGxlc3MtY29uZmlndXJlZGApLHMucHVzaChgZW50cnktaW1wb3J0LXN0YXJ0ZWRgKSxyKCgpPT5pbXBvcnQoYC4vZW50cnktQ2VoZkQ1WGguanNgKSxfX3ZpdGVfX21hcERlcHMoWzAsMSwyLDNdKSk7ZXhwb3J0e3IgYXMgdH07Ci8vIyBzb3VyY2VNYXBwaW5nVVJMPWluZGV4LUJEUTEweUMzLmpzLm1hcA==",
+      "bootstrapBundleByteLength": 2704,
+      "bootstrapBundleSha256": "461930ec9c8d97b874847d11711748cd1bc8c33a8f170c388ac39c34b1a756eb"
+    }
   },
   "validationIssues": []
 }

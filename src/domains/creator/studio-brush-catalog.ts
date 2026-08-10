@@ -8,6 +8,7 @@
 import {
   STUDIO_BRUSH_CATALOG_COUNTS,
   STUDIO_CORE_BRUSH_CATALOG_ITEMS,
+  listStudioCoreBrushCatalogItems,
   studioBrushCatalogKindLabel,
   type StudioBrushCatalogItem,
 } from "./studio-brush-catalog-core";
@@ -20,9 +21,12 @@ import {
 } from "./studio-creative-ux";
 import { filterStudioBrushLibraryItems } from "./studio-draw-ux";
 
+import type { StudioToolOperation } from "./studio-brush";
+
 export {
   STUDIO_BRUSH_CATALOG_COUNTS,
   STUDIO_CORE_BRUSH_CATALOG_ITEMS,
+  listStudioCoreBrushCatalogItems,
   studioBrushCatalogKindLabel,
 };
 export type { StudioBrushCatalogItem };
@@ -37,6 +41,7 @@ export const STUDIO_PRO_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
         hint: descriptor.hint,
         defaultWidth: descriptor.defaultWidth,
         defaultOpacity: descriptor.defaultOpacity,
+        operation: "paint" as const,
         category: "expressive" as const,
         mediaGroup: descriptor.mediaGroup,
         previewWeight: descriptor.previewWeight,
@@ -51,6 +56,12 @@ export const STUDIO_ALL_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
   ...STUDIO_PRO_BRUSH_CATALOG_ITEMS,
 ];
 
+export const STUDIO_PAINT_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
+  Object.freeze(STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter((item) => item.operation === "paint"));
+
+export const STUDIO_ERASER_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
+  Object.freeze(STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter((item) => item.operation === "erase"));
+
 const STUDIO_BRUSH_CATALOG_BY_ID: ReadonlyMap<string, StudioBrushCatalogItem> =
   new Map(STUDIO_ALL_BRUSH_CATALOG_ITEMS.map((item) => [item.id, item]));
 
@@ -63,20 +74,27 @@ export function studioBrushCatalogItemById(
 }
 
 export function filterStudioBrushCatalogItems(options: {
+  operation?: StudioToolOperation;
   category?: StudioBrushTrayCategory | "favorites" | "recent";
   query?: string;
   favoriteIds?: readonly string[];
   recentIds?: readonly string[];
 } = {}): StudioBrushCatalogItem[] {
-  const query = (options.query ?? "").trim();
+  const { operation, ...libraryOptions } = options;
+  const query = (libraryOptions.query ?? "").trim();
   // Search is deliberately catalogue-wide. Artists should not have to guess which category owns a
   // named brush before they can find it; the category tabs resume as soon as the query is cleared.
-  const category = query ? "all" : options.category;
+  // `operation`, however, is a tool-family boundary and remains active during global search.
+  const category = query ? "all" : libraryOptions.category;
   return filterStudioBrushLibraryItems({
-    ...options,
+    ...libraryOptions,
     category,
     query,
-    catalogItems: STUDIO_ALL_BRUSH_CATALOG_ITEMS,
+    catalogItems: operation === undefined
+      ? STUDIO_ALL_BRUSH_CATALOG_ITEMS
+      : operation === "paint"
+        ? STUDIO_PAINT_BRUSH_CATALOG_ITEMS
+        : STUDIO_ERASER_BRUSH_CATALOG_ITEMS,
   }) as StudioBrushCatalogItem[];
 }
 
@@ -88,7 +106,7 @@ export function listStudioQuickBrushCatalogItems(options: {
 } = {}): StudioQuickBrushTrayItem[] {
   return listStudioQuickBrushTrayItems({
     ...options,
-    // Missing injection must never silently collapse the shelf from 230 to the 70 core brushes.
+    // Missing injection must never silently collapse the shelf from 231 to the 71 core tools.
     catalogItems: options.catalogItems ?? STUDIO_ALL_BRUSH_CATALOG_ITEMS,
   });
 }

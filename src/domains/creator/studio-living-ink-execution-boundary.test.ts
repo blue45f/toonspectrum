@@ -231,7 +231,10 @@ describe("Living Ink actual execution boundary", () => {
     expect(runtime).toContain('determinism: "same-runtime-replay"');
     expect(runtime).toContain("crossDeviceBitExact: false");
     expect(runtime).toContain('displayReadbackOrientation: "webgl-bottom-left-row-major"');
-    expect(browserGate).toContain("bottomUpHash");
+    expect(webGpuRuntime).toContain('displayReadbackOrientation: "top-left-row-major"');
+    expect(webGpuRuntime).toContain('readbackFormat: "rgba32float-storage-buffer-to-rgba8"');
+    expect(provider).toContain("isStudioLivingInkExecutionReadbackProvenance(receipt)");
+    expect(browserGate).toContain("receiptOrientedHash");
     expect(browserGate).toContain("normalizedDisplayHashMatchesReceipt");
   });
 });

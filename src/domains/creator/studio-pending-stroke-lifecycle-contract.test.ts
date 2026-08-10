@@ -122,6 +122,20 @@ describe("pending stroke lifecycle source contract", () => {
     expect(persistence).toContain("reportStudioAutosaveFailure(cause)");
   });
 
+  it("포인터업 task 안에서 이탈 가드를 무장하고 다음 navigation task 전에 내구 저장을 시작한다", () => {
+    const queue = sourceBetween(
+      "function queueDeferredStrokeCommit(finished: DrawEl)",
+      "const scheduleMarqueeRect =",
+    );
+
+    expect(queue).toContain("setUnloadGuardArmed(true)");
+    expect(queue).toContain("globalThis.queueMicrotask(() => {");
+    expect(queue).toContain('persistPendingStrokeEmergencyAutosaveRef.current("pointerup")');
+    expect(queue.indexOf("setUnloadGuardArmed(true)")).toBeLessThan(
+      queue.indexOf("globalThis.queueMicrotask(() => {")
+    );
+  });
+
   it("복구 탐지 전 primary를 보존하고 교차 페이지 입력은 성공한 flush 뒤에만 허용한다", () => {
     const pageSelection = sourceBetween(
       "function setCurrentPageId(next:",

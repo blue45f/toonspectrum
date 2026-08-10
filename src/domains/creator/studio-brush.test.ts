@@ -22,6 +22,8 @@ import {
   resolveBrushReleasePressureSample,
   resolveStudioFreehandRenderPath,
   resolveStudioBrushRenderFamily,
+  resolveStudioBrushPresetDrawMode,
+  resolveStudioBrushPresetOperation,
   sanitizeCalligraphyTipSettings,
   screentoneDotRadius,
   screentoneDotsForStroke,
@@ -47,6 +49,8 @@ describe("BRUSH_PRESETS", () => {
       "calligraphy",
       "marker",
       "felt-tip",
+      "standard-eraser",
+      "kneaded-eraser",
       "marker-bold",
       "highlighter",
       "neon",
@@ -102,7 +106,27 @@ describe("BRUSH_PRESETS", () => {
       expect(preset.defaultWidth).toBeGreaterThan(0);
       expect(preset.defaultOpacity).toBeGreaterThan(0);
       expect(preset.defaultOpacity).toBeLessThanOrEqual(1);
+      expect(["paint", "erase"]).toContain(preset.operation);
     }
+  });
+
+  it("models standard and kneaded erasers as explicit erase presets", () => {
+    expect(BRUSH_PRESETS.find((preset) => preset.id === "standard-eraser")).toMatchObject({
+      name: "일반 지우개",
+      defaultWidth: 20,
+      defaultOpacity: 1,
+      operation: "erase",
+    });
+    expect(BRUSH_PRESETS.find((preset) => preset.id === "kneaded-eraser")).toMatchObject({
+      defaultOpacity: 0.38,
+      operation: "erase",
+    });
+    expect(resolveStudioBrushPresetOperation("standard-eraser")).toBe("erase");
+    expect(resolveStudioBrushPresetOperation("kneaded-eraser")).toBe("erase");
+    expect(resolveStudioBrushPresetOperation("pen")).toBe("paint");
+    expect(resolveStudioBrushPresetOperation("legacy-unknown")).toBe("paint");
+    expect(resolveStudioBrushPresetDrawMode("standard-eraser")).toBe("eraser");
+    expect(resolveStudioBrushPresetDrawMode("pen")).toBe("pen");
   });
 
   it("maps commercial aliases onto stable render families", () => {

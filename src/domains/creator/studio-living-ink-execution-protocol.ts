@@ -9,7 +9,22 @@ import type {
 
 export const STUDIO_LIVING_INK_EXECUTION_PROTOCOL_VERSION = 1 as const;
 export const STUDIO_LIVING_INK_EXECUTION_ENGINE_VERSION =
-  "1.2.0-webgpu-pure-wgsl-field-or-webgl2-capsule" as const;
+  "1.3.0-bounded-density-truthful-readback" as const;
+
+/**
+ * Physical envelope for paper-granulation modulation of pigment extinction.
+ *
+ * Granulation redistributes optical density; it cannot create negative pigment or unbounded
+ * extinction. One sixteenth keeps valleys absorptive instead of punching white holes, while eight
+ * times the base density retains four visible stops of sediment concentration. The final
+ * Beer-Lambert density is capped separately because values above 32 are indistinguishable from
+ * black after RGBA8 quantisation.
+ */
+export const STUDIO_LIVING_INK_GRANULATION_MULTIPLIER_BOUNDS = Object.freeze({
+  minimum: 1 / 16,
+  maximum: 8,
+} as const);
+export const STUDIO_LIVING_INK_MAXIMUM_OPTICAL_DENSITY = 32 as const;
 
 /**
  * Numeric contract of the wet-media fluid, shared by the WGSL kernels (through uniforms), the GLSL
@@ -307,15 +322,21 @@ export interface StudioLivingInkExecutionCapabilities {
   }>;
 }
 
-export interface StudioLivingInkExecutionReceipt {
+interface StudioLivingInkExecutionReceiptBase {
   readonly kind: "studio-living-ink-execution-receipt";
   readonly version: typeof STUDIO_LIVING_INK_EXECUTION_PROTOCOL_VERSION;
   readonly engineVersion: typeof STUDIO_LIVING_INK_EXECUTION_ENGINE_VERSION;
   readonly requestId: number;
   readonly revision: number;
   readonly operationKind: StudioLivingInkOperation["kind"] | "restore";
-  readonly backend: StudioLivingInkExecutionBackend;
   readonly displaySha256: `sha256:${string}`;
+  /**
+   * The hash uses premultiplied colour bytes because those are the RGBA8 values an ImageBitmap
+   * preserves exactly across a browser canvas transfer. Straight RGB under partial alpha is
+   * quantized during that transfer and therefore cannot be a stable screen/receipt authority.
+   * Absent means the original straight-RGBA v1 contract on an older persisted receipt.
+   */
+  readonly displayHashEncoding?: "premultiplied-rgba8-v2";
   readonly operationSha256: `sha256:${string}`;
   readonly dirtyBounds: StudioLivingInkBounds;
   readonly dirtyTileCount: number;
@@ -331,11 +352,108 @@ export interface StudioLivingInkExecutionReceipt {
   readonly cpuOperationHashCrossDeviceDeterministic: true;
   readonly canonicalFrameAuthority: "first-rendered-rgba8-frame";
   readonly replayValidation: "bounded-visual-parity";
-  readonly displayReadbackOrientation: "webgl-bottom-left-row-major";
   readonly gpuError: 0;
-  readonly readbackFormat: "rgba8-staging-fbo";
   readonly imageOwnership: "caller-must-close";
   readonly contextRecovery: "worker-rebuild-journal-replay";
+}
+
+export type StudioLivingInkExecutionReadbackProvenance =
+  | Readonly<{
+      readonly backend: "webgl2-offscreen-half-float";
+      readonly displayReadbackOrientation: "webgl-bottom-left-row-major";
+      readonly readbackFormat: "rgba8-staging-fbo";
+    }>
+  | Readonly<{
+      readonly backend: "webgpu-offscreen-half-float";
+      readonly displayReadbackOrientation: "top-left-row-major";
+      readonly readbackFormat: "rgba32float-storage-buffer-to-rgba8";
+    }>;
+
+/**
+ * A receipt is backend-discriminated: a WebGPU storage-buffer map may never masquerade as a
+ * WebGL2 FBO readback. The existing WebGL2 v1 readback-provenance pair remains valid byte-for-byte.
+ * Historical WebGPU receipts carrying that WebGL2 pair are intentionally rejected rather than
+ * silently coerced; their pixels may still be displayed, but they are not trustworthy provenance
+ * evidence.
+ */
+export type StudioLivingInkExecutionReceipt =
+  StudioLivingInkExecutionReceiptBase & StudioLivingInkExecutionReadbackProvenance;
+
+export function isStudioLivingInkExecutionReadbackProvenance(
+  value: unknown,
+): value is StudioLivingInkExecutionReadbackProvenance {
+  if (value === null || typeof value !== "object") return false;
+  const candidate = value as Readonly<Record<string, unknown>>;
+  if (candidate.backend === "webgl2-offscreen-half-float") {
+    return candidate.displayReadbackOrientation === "webgl-bottom-left-row-major"
+      && candidate.readbackFormat === "rgba8-staging-fbo";
+  }
+  if (candidate.backend === "webgpu-offscreen-half-float") {
+    return candidate.displayReadbackOrientation === "top-left-row-major"
+      && candidate.readbackFormat === "rgba32float-storage-buffer-to-rgba8";
+  }
+  return false;
+}
+
+/**
+ * Canonical browser-preserved RGBA8 representation used by Living Ink display receipts.
+ *
+ * Alpha remains straight; only RGB is premultiplied with integer RGBA8 rounding. A subsequent
+ * canvas un-premultiply may choose a neighbouring straight code value, but multiplying that result
+ * by alpha recovers these bytes exactly. Transparent placeholder RGB is consequently normalized to
+ * zero instead of making otherwise identical clear frames hash differently across GPU backends.
+ */
+export function canonicalStudioLivingInkDisplayRgba8(
+  straightRgba: Uint8Array | Uint8ClampedArray,
+): Uint8Array {
+  if (straightRgba.byteLength % 4 !== 0) {
+    throw new RangeError("Living Ink display RGBA8 length must be divisible by four.");
+  }
+  const canonical = new Uint8Array(straightRgba.byteLength);
+  for (let index = 0; index < straightRgba.byteLength; index += 4) {
+    const alpha = straightRgba[index + 3] ?? 0;
+    canonical[index] = Math.round(((straightRgba[index] ?? 0) * alpha) / 255);
+    canonical[index + 1] = Math.round(((straightRgba[index + 1] ?? 0) * alpha) / 255);
+    canonical[index + 2] = Math.round(((straightRgba[index + 2] ?? 0) * alpha) / 255);
+    canonical[index + 3] = alpha;
+  }
+  return canonical;
+}
+
+/** Canonicalizes and flips a top-down frame in one allocation for the receipt's bottom-up order. */
+export function canonicalStudioLivingInkDisplayRgba8BottomUp(
+  straightRgba: Uint8Array | Uint8ClampedArray,
+  width: number,
+  height: number,
+): Uint8Array {
+  if (
+    !Number.isSafeInteger(width)
+    || !Number.isSafeInteger(height)
+    || width <= 0
+    || height <= 0
+    || straightRgba.byteLength !== width * height * 4
+  ) {
+    throw new RangeError("Living Ink display dimensions do not match its RGBA8 payload.");
+  }
+  const canonical = new Uint8Array(straightRgba.byteLength);
+  const stride = width * 4;
+  for (let sourceRow = 0; sourceRow < height; sourceRow += 1) {
+    const destinationRow = height - 1 - sourceRow;
+    for (let column = 0; column < width; column += 1) {
+      const source = sourceRow * stride + column * 4;
+      const destination = destinationRow * stride + column * 4;
+      const alpha = straightRgba[source + 3] ?? 0;
+      canonical[destination] = Math.round(((straightRgba[source] ?? 0) * alpha) / 255);
+      canonical[destination + 1] = Math.round(
+        ((straightRgba[source + 1] ?? 0) * alpha) / 255,
+      );
+      canonical[destination + 2] = Math.round(
+        ((straightRgba[source + 2] ?? 0) * alpha) / 255,
+      );
+      canonical[destination + 3] = alpha;
+    }
+  }
+  return canonical;
 }
 
 export interface StudioLivingInkExecutionFrame {

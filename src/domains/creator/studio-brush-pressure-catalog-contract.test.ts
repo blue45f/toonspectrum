@@ -361,7 +361,7 @@ function allPressureProbes(): PressureProbe[] {
   return [...core, ...procedural];
 }
 
-describe("230-brush hardware-pressure catalogue planner proxy", () => {
+describe("complete-catalogue hardware-pressure planner proxy", () => {
   beforeAll(async () => {
     perfectFreehandStroker = await loadStudioPerfectFreehandStroker();
   });
@@ -377,7 +377,7 @@ describe("230-brush hardware-pressure catalogue planner proxy", () => {
     ))).toBe(true);
   });
 
-  it("reports planner-level pressure deltas for the 227 non-fixed catalogue identities", () => {
+  it("reports planner-level pressure deltas for every non-fixed catalogue identity", () => {
     const responsiveIds = allPressureProbes()
       .filter(({ low, high }) => changed(low, high))
       .map(({ id }) => id);

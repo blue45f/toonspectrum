@@ -1,10 +1,10 @@
 /**
  * 탭 종료 경고 — "닫기 전에 물어보기"가 없던 마지막 조용한 실패를 막는다.
  *
- * 감사 항목: 스튜디오는 `pagehide` 에서 복구 사이드카를 동기 기록하지만, **탭을 닫기 전에
- * 사용자에게 묻는 표면이 0건**이었다. 복구 스냅샷이 있다는 것과 사용자가 그 사실을 안다는
- * 것은 다르다. 다음 방문에 복구 배너로 되찾을 수 있더라도, 지금 닫으면 **서버 원고는 뒤처진
- * 상태로 남는다** — 다른 기기에서 열면 방금 그린 것이 없다.
+ * 감사 항목: 스튜디오는 OPFS/SQLite 복구 스냅샷을 비동기로 기록하므로, 그 영수증이 오기 전
+ * 탭을 닫으면 복구본과 서버 원고가 모두 뒤처질 수 있다. 복구 스냅샷 요청을 보냈다는 것과
+ * 내구 저장이 끝났다는 것은 다르다. 이 짧은 구간을 사용자에게 알리지 않는 것이 마지막
+ * 조용한 실패였다.
  *
  * 배선 규율:
  *  - **미저장일 때만** 경고한다. 항상 띄우면 사용자가 학습해서 무시하고, 그러면 정말 위험한
@@ -35,6 +35,8 @@ export function studioPendingStrokeFingerprint(
 }
 
 export interface StudioUnsavedWorkSignals {
+  /** 최신 펜·지우개 설정이 아직 SQLite 영수증을 받지 못했는지 여부. */
+  readonly toolOperationMemoryDirty?: boolean;
   /** 하이드레이션 완료 여부. 아직이면 사용자가 잃을 편집 자체가 없다. */
   readonly hydrated: boolean;
   /** 현재 편집 세대. */
@@ -48,6 +50,7 @@ export interface StudioUnsavedWorkSignals {
 }
 
 export function hasUnsavedStudioWork(signals: StudioUnsavedWorkSignals): boolean {
+  if (signals.toolOperationMemoryDirty === true) return true;
   if (!signals.hydrated) return false;
   if (signals.editGeneration > signals.durableGeneration) return true;
   return (

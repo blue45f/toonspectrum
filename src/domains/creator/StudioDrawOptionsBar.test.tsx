@@ -419,10 +419,56 @@ describe("StudioDrawOptionsBar", () => {
     expect(html).toContain(`>${label}<`);
   });
 
+  it("keeps a named low-density eraser visible while generic eraser mode has no brush identity", () => {
+    const named = renderToStaticMarkup(
+      <StudioDrawOptionsBar
+        drawMode="eraser"
+        brushId="kneaded-eraser"
+        activeCatalogBrushId="kneaded-eraser"
+        activeCatalogBrushName="떡지우개(저농도)"
+        brushCatalogItems={STUDIO_ALL_BRUSH_CATALOG_ITEMS}
+        strokeWidth={26}
+        brushOpacity={0.38}
+        stabilizer={0}
+        color="#112233"
+        quickShapeActive={false}
+        onSelectBrush={vi.fn()}
+        onStrokeWidthChange={vi.fn()}
+        onOpacityChange={vi.fn()}
+        onStabilizerChange={vi.fn()}
+        onColorChange={vi.fn()}
+        onToggleQuickShape={vi.fn()}
+      />
+    );
+    expect(named).toContain("그리기 옵션 · 현재 떡지우개(저농도)");
+    expect(named).toContain("현재 도구 떡지우개(저농도), 26px, 지우기 강도 38%");
+    expect(named).toContain('data-studio-active-tool-summary="eraser"');
+
+    const generic = renderToStaticMarkup(
+      <StudioDrawOptionsBar
+        drawMode="eraser"
+        brushId="pen"
+        strokeWidth={26}
+        brushOpacity={0.38}
+        stabilizer={0}
+        color="#112233"
+        quickShapeActive={false}
+        onSelectBrush={vi.fn()}
+        onStrokeWidthChange={vi.fn()}
+        onOpacityChange={vi.fn()}
+        onStabilizerChange={vi.fn()}
+        onColorChange={vi.fn()}
+        onToggleQuickShape={vi.fn()}
+      />
+    );
+    expect(generic).toContain("그리기 옵션 · 현재 지우개");
+    expect(generic).not.toContain('data-studio-brush-active-pill="true"');
+  });
+
   it.each([
     ["pen", "브러시 크기", "브러시 불투명도", true],
     ["pixel", null, "픽셀 불투명도", false],
-    ["eraser", "지우개 크기", "지우개 불투명도", true],
+    ["eraser", "지우개 크기", "지우기 강도", true],
     ["shape", "도형 선 굵기", "도형 불투명도", false],
   ] as const)(
     "keeps %s properties contextual and hides irrelevant advanced brush settings",

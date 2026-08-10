@@ -35,7 +35,7 @@ async function main() {
 
     await page.screenshot({ path: join(screenshotsDir, "01-stage-initial.png") });
 
-    // 2. Test Brush Palette Search (230 Presets)
+    // 2. Test the complete Brush Palette search surface.
     console.log("Section 2: Testing Brush Library Search & Category Filtering...");
     const brushPill = page.locator('[data-studio-brush-active-pill="true"]').first();
     if (await brushPill.isVisible()) {

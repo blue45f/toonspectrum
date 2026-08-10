@@ -18,6 +18,14 @@ const toolBeltSource = readFileSync(
   new URL("./StudioToolBeltContent.tsx", import.meta.url),
   "utf8",
 );
+const inspectorSource = readFileSync(
+  new URL("./StudioInspectorAside.tsx", import.meta.url),
+  "utf8",
+);
+const canvasViewportSource = readFileSync(
+  new URL("./StudioCanvasViewport.tsx", import.meta.url),
+  "utf8",
+);
 const companionToolExecutorSource = readFileSync(
   new URL("./studio-companion-tool-command-executor.ts", import.meta.url),
   "utf8",
@@ -231,7 +239,7 @@ describe("StudioPage tool transition boundary", () => {
       [
         "function applyStudioBrushCatalogSelection(",
         "function applyBuiltInBrushPreset(",
-        'selection.drawMode ?? "pen"',
+        'selection.operation === "erase" ? "eraser" : "pen"',
       ],
       [
         "function applyBrushSlot(",
@@ -251,6 +259,58 @@ describe("StudioPage tool transition boundary", () => {
       expect(branch).not.toContain('setTool("draw");');
       expect(branch).not.toContain('setDrawMode("pen");');
     }
+    expect(studioPageSource).toContain(
+      'selection.operation === "erase" ? "eraser" : "pen",',
+    );
+  });
+
+  it("preserves independent paint and erase snapshots across explicit mode switches", () => {
+    const transitionStart = studioPageSource.indexOf(
+      "function activatePrimaryCanvasTool(",
+    );
+    const transitionEnd = studioPageSource.indexOf(
+      "activatePrimaryCanvasToolRef.current = activatePrimaryCanvasTool;",
+      transitionStart,
+    );
+    const transition = studioPageSource.slice(transitionStart, transitionEnd);
+
+    expect(transitionStart).toBeGreaterThanOrEqual(0);
+    expect(transitionEnd).toBeGreaterThan(transitionStart);
+    expect(transition).toContain("rememberedOperationForDrawMode(drawModeRef.current)");
+    expect(transition).toContain("rememberStudioToolOperationSnapshot(");
+    expect(transition).toContain("applyToolOperationSnapshot(toolOperationMemoryRef.current[targetOperation]);");
+    expect(transition).toContain("selectionWillReplaceToolSnapshot = false");
+    expect(transition).not.toContain("resetNamedEraserBrushIdentity");
+    expect(studioPageSource).not.toContain("function resetNamedEraserBrushIdentity()");
+    expect(studioPageSource).toContain("function prepareStudioSymmetryForBrush(");
+    expect(studioPageSource).toContain(
+      "prepareStudioSymmetryForBrush(applied.brushId);",
+    );
+    expect(studioPageSource).toContain(
+      "prepareStudioSymmetryForBrush(saved.brushId);",
+    );
+    expect(studioPageSource).toContain(
+      "prepareStudioSymmetryForBrush(slot.brushId);",
+    );
+    expect(studioPageSource).toContain("function changeStudioSymmetryType(");
+    expect(studioPageSource).toContain(
+      "떡지우개는 저농도 합성을 위해 대칭을 함께 사용할 수 없어요.",
+    );
+  });
+
+  it("keeps every literal pen activation on the identity-resetting transition boundary", () => {
+    expect(studioPageSource).not.toContain('setDrawMode("pen");');
+    expect(inspectorSource).not.toContain('setDrawMode("pen");');
+    expect(canvasViewportSource).not.toContain('setDrawMode("pen");');
+    expect(inspectorSource).toContain('activateCanvasTool("draw", "pen");');
+    expect(canvasViewportSource).toContain('activateCanvasTool("draw", "pen");');
+
+    const inspectorModeTabs = inspectorSource.slice(
+      inspectorSource.indexOf("onDrawModeChange={(next) =>"),
+      inspectorSource.indexOf("onDrawShapeChange={setDrawShape}"),
+    );
+    expect(inspectorModeTabs).toContain('activateCanvasTool("draw", next);');
+    expect(inspectorModeTabs).not.toContain("setDrawMode,");
   });
 
   it("delegates brush baseline ownership while preserving fresh one-step undo validation", () => {

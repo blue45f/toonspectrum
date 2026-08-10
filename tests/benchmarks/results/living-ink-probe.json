@@ -34,21 +34,34 @@
           "settle": 22
         }
       },
+      "executionContract": {
+        "worker": true,
+        "offscreenCanvas": true,
+        "gpuApi": true,
+        "webgl2": true,
+        "webgpu": false,
+        "halfFloatFields": true,
+        "rgba8Readback": true,
+        "readbackProvenance": {
+          "orientation": "webgl-bottom-left-row-major",
+          "format": "rgba8-staging-fbo"
+        }
+      },
       "launchArguments": [
         "--no-sandbox",
         "--disable-features=WebGPU"
       ],
       "lineBounds": {
         "x": 20,
-        "y": 71,
-        "width": 214,
-        "height": 19
+        "y": 70,
+        "width": 215,
+        "height": 20
       },
       "bloomBounds": {
-        "x": 20,
-        "y": 53,
-        "width": 215,
-        "height": 53
+        "x": 16,
+        "y": 40,
+        "width": 223,
+        "height": 79
       },
       "fixedInvariant": true,
       "cancelRollback": true,
@@ -60,78 +73,78 @@
         "ackImageBitmapCount": 0,
         "explicitPresentationFrames": 1,
         "presentEveryOperationFrames": 81,
-        "baselineHash": "sha256:75300d3159d087584cab320f94901ed58f0ec7f00f3f4109577f00db4a7a9d67",
-        "deferredHash": "sha256:75300d3159d087584cab320f94901ed58f0ec7f00f3f4109577f00db4a7a9d67",
+        "baselineHash": "sha256:76085430de7f776b93b392de3dbfc9638abf3d5eb36c2af84df387a4730d31c3",
+        "deferredHash": "sha256:76085430de7f776b93b392de3dbfc9638abf3d5eb36c2af84df387a4730d31c3",
         "endpointExact": true,
         "finalRevision": 81
       },
       "visualQuality": {
-        "sumiLocalContrast": 25.32691040842871,
-        "sumiPeakDensityOverPaper": 237.02022397892057,
-        "pigmentRegionStandardDeviation": 62.227079153478456,
-        "fiberGranulationResidual": 2.9963703703703697,
-        "bloomEdgeConcentration": 164.1041666666672,
-        "lineWashHeightExpansion": 34,
+        "sumiLocalContrast": 25.58066534914356,
+        "sumiPeakDensityOverPaper": 248,
+        "pigmentRegionStandardDeviation": 62.78833406030823,
+        "fiberGranulationResidual": 3.201000000000008,
+        "bloomEdgeConcentration": 162.09852285395817,
+        "lineWashHeightExpansion": 59,
         "isolatedBloomRadialShape": {
-          "meanRadius": 27,
-          "coefficientOfVariation": 0.16343459623300896,
-          "maximumAdjacentJumpRatio": 0.14814814814814814,
-          "normalizedHighFrequencyEdgeCurvature": 0.03806584362139917,
+          "meanRadius": 36.583333333333336,
+          "coefficientOfVariation": 0.12256310753817407,
+          "maximumAdjacentJumpRatio": 0.08200455580865604,
+          "normalizedHighFrequencyEdgeCurvature": 0.030372057706909643,
           "angularCoverage": 1,
           "dominantLobeCount": 2
         },
         "isolatedBloomAsymmetry": {
-          "leftRightMirrorResidual": 0.4981960502046912,
-          "topBottomMirrorResidual": 0.6701244482687199,
-          "centroidOffsetX": -2.9774508397661776,
-          "centroidOffsetY": 6.768294909242869
+          "leftRightMirrorResidual": 0.47381955773065243,
+          "topBottomMirrorResidual": 0.5454888983659337,
+          "centroidOffsetX": -2.3609968926822518,
+          "centroidOffsetY": 3.226122590534203
         },
         "isolatedBloomBounds": {
-          "x": 95,
-          "y": 58,
-          "width": 62,
-          "height": 48
+          "x": 81,
+          "y": 45,
+          "width": 91,
+          "height": 69
         },
-        "isolatedBloomGranulationResidual": 1.8030612244897948,
-        "isolatedBloomRimMinusCenterDarkness": -12.582954668397718,
-        "isolatedBloomAspectRatio": 1.2916666666666667,
-        "centralWashBandToMaximumRatio": 0.6921423739397474,
-        "minimumWashBandToMaximumRatio": 0.6871363896549981,
+        "isolatedBloomGranulationResidual": 1.5045918367346944,
+        "isolatedBloomRimMinusCenterDarkness": -11.278724440116843,
+        "isolatedBloomAspectRatio": 1.318840579710145,
+        "centralWashBandToMaximumRatio": 0.7255095180645271,
+        "minimumWashBandToMaximumRatio": 0.6904487811167527,
         "washBandDarkness": [
-          49.67962962962937,
-          40.75524691358026,
-          41.05216049382725,
-          44.770987654321,
-          59.3117283950613
+          56.9975308641976,
+          46.27839506172841,
+          48.628395061728526,
+          52.47067901234587,
+          67.02654320987625
         ],
         "continuousCapsule": {
-          "normalizedHighFrequencyResidual": 0.010945051753821912,
-          "maximumAdjacentJumpRatio": 0.14138438880706924,
-          "startEndToInteriorRatio": 0.9729677246482573,
-          "minimumToMedianRatio": 0.817378497790869
+          "normalizedHighFrequencyResidual": 0.012863455241251431,
+          "maximumAdjacentJumpRatio": 0.18487394957983194,
+          "startEndToInteriorRatio": 1.004525875708001,
+          "minimumToMedianRatio": 0.7100840336134454
         },
-        "selfIntersectionLuminanceRatio": 0.9818971759594497,
-        "redBlueCentroidSeparationPixels": 0.5037208032434582,
-        "paperLuminanceStandardDeviation": 4.180586429234691,
-        "wetSheenAndBloomDifference": 57.127508361204015,
-        "whiteCoverageLightening": 230.84082031250054,
-        "whiteCenterLuminance": 243.2701822916666,
-        "whiteCenterLuminanceDeltaFromPaper": 2.1038411458333997,
-        "darkOverWhiteDensityGain": 113.63053385416633
+        "selfIntersectionLuminanceRatio": 0.9373906960475691,
+        "redBlueCentroidSeparationPixels": 0.5453049616756863,
+        "paperLuminanceStandardDeviation": 4.274347972641074,
+        "wetSheenAndBloomDifference": 63.07998885172798,
+        "whiteCoverageLightening": 238.04752604166694,
+        "whiteCenterLuminance": 252.84993489583334,
+        "whiteCenterLuminanceDeltaFromPaper": 2.150065104166657,
+        "darkOverWhiteDensityGain": 118.5999348958335
       },
       "persistedJournalReload": {
         "serialization": "json-operation-journal-fresh-worker-runtime",
         "operationCount": 6,
-        "whiteHashBeforeReload": "sha256:c554c216734052c9dcd249ba1509aefd021d89efc53cb1738b09452a32ec3305",
-        "whiteHashAfterReload": "sha256:c554c216734052c9dcd249ba1509aefd021d89efc53cb1738b09452a32ec3305",
+        "whiteHashBeforeReload": "sha256:c2a2fe7ad4f41feaa20c287f61a9aed992c5ecaa7ae65af675b1e3634fe86aac",
+        "whiteHashAfterReload": "sha256:c2a2fe7ad4f41feaa20c287f61a9aed992c5ecaa7ae65af675b1e3634fe86aac",
         "whiteExact": true,
-        "darkOverWhiteHashBeforeReload": "sha256:f2eca5c440326ebaf70632614c86bea1d642c2de30d897c66991ba826ab0eebf",
-        "darkOverWhiteHashAfterReload": "sha256:f2eca5c440326ebaf70632614c86bea1d642c2de30d897c66991ba826ab0eebf",
+        "darkOverWhiteHashBeforeReload": "sha256:4550edb34819c76ab8fb74e9a5cfe8e7a238b789a23eece1e94b5a114285e138",
+        "darkOverWhiteHashAfterReload": "sha256:4550edb34819c76ab8fb74e9a5cfe8e7a238b789a23eece1e94b5a114285e138",
         "darkOverWhiteExact": true
       },
       "nearBlackReflectanceParity": {
-        "belowFloorHash": "sha256:714f5fe4765106cc9232542e7de2538bc21a78bab4ee14609d812bff7444f478",
-        "atFloorHash": "sha256:714f5fe4765106cc9232542e7de2538bc21a78bab4ee14609d812bff7444f478",
+        "belowFloorHash": "sha256:17d2e26feb664f419270b17ecd1beade39c8a7c425ede8414bfa2603fdd5da3c",
+        "atFloorHash": "sha256:17d2e26feb664f419270b17ecd1beade39c8a7c425ede8414bfa2603fdd5da3c",
         "exact": true
       },
       "workerCrashRecovery": {
@@ -139,7 +152,7 @@
         "workerInstances": 2,
         "recoveredBackend": "webgl2-offscreen-half-float",
         "reinitialized": true,
-        "postCrashFrameHash": "sha256:662332e83f50d708ef92d7872ed5ade470338c2266add33afb55c89ae73b8153"
+        "postCrashFrameHash": "sha256:909c2f3f8d3a28f689577378dc85aca7e9986495737248f6985584d29bdb0efc"
       },
       "failures": []
     },
@@ -166,6 +179,19 @@
           "settle": 22
         }
       },
+      "executionContract": {
+        "worker": true,
+        "offscreenCanvas": true,
+        "gpuApi": true,
+        "webgl2": false,
+        "webgpu": true,
+        "halfFloatFields": true,
+        "rgba8Readback": true,
+        "readbackProvenance": {
+          "orientation": "top-left-row-major",
+          "format": "rgba32float-storage-buffer-to-rgba8"
+        }
+      },
       "launchArguments": [
         "--no-sandbox",
         "--enable-unsafe-webgpu",
@@ -175,14 +201,14 @@
       "lineBounds": {
         "x": 20,
         "y": 70,
-        "width": 214,
+        "width": 215,
         "height": 20
       },
       "bloomBounds": {
-        "x": 20,
-        "y": 55,
-        "width": 215,
-        "height": 53
+        "x": 14,
+        "y": 41,
+        "width": 227,
+        "height": 75
       },
       "fixedInvariant": true,
       "cancelRollback": true,
@@ -194,78 +220,78 @@
         "ackImageBitmapCount": 0,
         "explicitPresentationFrames": 1,
         "presentEveryOperationFrames": 81,
-        "baselineHash": "sha256:4911efe88503000b1025fe9174a613aac15efea061dd208a134f6bc2fc8c41b9",
-        "deferredHash": "sha256:4911efe88503000b1025fe9174a613aac15efea061dd208a134f6bc2fc8c41b9",
+        "baselineHash": "sha256:16d8cac6bf023bd64bebc8939c1387f5775c51f140515c8862007a352e0febe4",
+        "deferredHash": "sha256:16d8cac6bf023bd64bebc8939c1387f5775c51f140515c8862007a352e0febe4",
         "endpointExact": true,
         "finalRevision": 81
       },
       "visualQuality": {
-        "sumiLocalContrast": 26.339789196307077,
-        "sumiPeakDensityOverPaper": 238.09041501976353,
-        "pigmentRegionStandardDeviation": 64.76160354604556,
-        "fiberGranulationResidual": 2.7012962962962987,
-        "bloomEdgeConcentration": 136.72192028985592,
-        "lineWashHeightExpansion": 33,
+        "sumiLocalContrast": 26.651976284584975,
+        "sumiPeakDensityOverPaper": 249.33333333333334,
+        "pigmentRegionStandardDeviation": 64.46707908482931,
+        "fiberGranulationResidual": 2.663037037037039,
+        "bloomEdgeConcentration": 141.6003344481614,
+        "lineWashHeightExpansion": 55,
         "isolatedBloomRadialShape": {
-          "meanRadius": 28.444444444444443,
-          "coefficientOfVariation": 0.12808986275054376,
-          "maximumAdjacentJumpRatio": 0.10546875,
-          "normalizedHighFrequencyEdgeCurvature": 0.0341796875,
+          "meanRadius": 38.486111111111114,
+          "coefficientOfVariation": 0.09166010728603696,
+          "maximumAdjacentJumpRatio": 0.12991699747383614,
+          "normalizedHighFrequencyEdgeCurvature": 0.028870443883074703,
           "angularCoverage": 1,
           "dominantLobeCount": 3
         },
         "isolatedBloomAsymmetry": {
-          "leftRightMirrorResidual": 0.5472384057696283,
-          "topBottomMirrorResidual": 0.5092121075884259,
-          "centroidOffsetX": -1.6212000864189093,
-          "centroidOffsetY": 3.12426924738881
+          "leftRightMirrorResidual": 0.4293884302917205,
+          "topBottomMirrorResidual": 0.5035462463708053,
+          "centroidOffsetX": -1.7818155459437008,
+          "centroidOffsetY": 3.425958727285675
         },
         "isolatedBloomBounds": {
-          "x": 98,
-          "y": 57,
-          "width": 63,
-          "height": 52
+          "x": 85,
+          "y": 43,
+          "width": 93,
+          "height": 70
         },
-        "isolatedBloomGranulationResidual": 1.777534013605436,
-        "isolatedBloomRimMinusCenterDarkness": -14.310234772260067,
-        "isolatedBloomAspectRatio": 1.2115384615384615,
-        "centralWashBandToMaximumRatio": 0.9373905553131368,
-        "minimumWashBandToMaximumRatio": 0.7892654951008512,
+        "isolatedBloomGranulationResidual": 1.5174489795918396,
+        "isolatedBloomRimMinusCenterDarkness": -14.797116736990112,
+        "isolatedBloomAspectRatio": 1.3285714285714285,
+        "centralWashBandToMaximumRatio": 0.9099247438971814,
+        "minimumWashBandToMaximumRatio": 0.9099247438971814,
         "washBandDarkness": [
-          44.06820987654338,
-          42.9854938271605,
-          51.05277777777762,
-          49.592901234567925,
-          54.46265432098723
+          55.85864197530887,
+          53.317901234567955,
+          50.82716049382727,
+          52.98518518518525,
+          55.7641975308644
         ],
         "continuousCapsule": {
-          "normalizedHighFrequencyResidual": 0.010431338028169018,
-          "maximumAdjacentJumpRatio": 0.11918604651162784,
-          "startEndToInteriorRatio": 1.008433797879071,
-          "minimumToMedianRatio": 0.8154069767441862
+          "normalizedHighFrequencyResidual": 0.00853077368319506,
+          "maximumAdjacentJumpRatio": 0.13287671232876705,
+          "startEndToInteriorRatio": 0.9815135152354996,
+          "minimumToMedianRatio": 0.7780821917808218
         },
-        "selfIntersectionLuminanceRatio": 0.9839343091752946,
-        "redBlueCentroidSeparationPixels": 0.5484737636408031,
-        "paperLuminanceStandardDeviation": 4.683953527163046,
-        "wetSheenAndBloomDifference": 57.29090022296544,
-        "whiteCoverageLightening": 229.89322916666706,
-        "whiteCenterLuminance": 241.28873697916654,
-        "whiteCenterLuminanceDeltaFromPaper": 2.090494791666714,
-        "darkOverWhiteDensityGain": 112.72656249999955
+        "selfIntersectionLuminanceRatio": 0.9794209975584234,
+        "redBlueCentroidSeparationPixels": 0.29110547027651695,
+        "paperLuminanceStandardDeviation": 3.628381985114564,
+        "wetSheenAndBloomDifference": 62.062778706800444,
+        "whiteCoverageLightening": 238.92415364583337,
+        "whiteCenterLuminance": 252.48990885416666,
+        "whiteCenterLuminanceDeltaFromPaper": 2.510091145833343,
+        "darkOverWhiteDensityGain": 119.21712239583346
       },
       "persistedJournalReload": {
         "serialization": "json-operation-journal-fresh-worker-runtime",
         "operationCount": 6,
-        "whiteHashBeforeReload": "sha256:661e3c00c9a0ef2aa89074637d7d18a17b66ae8f9468c534da8031ac479d2b1c",
-        "whiteHashAfterReload": "sha256:661e3c00c9a0ef2aa89074637d7d18a17b66ae8f9468c534da8031ac479d2b1c",
+        "whiteHashBeforeReload": "sha256:81ec6ae730f275ebc534dccffa3ec288eea1ada419c60767c30ccef5189aebf7",
+        "whiteHashAfterReload": "sha256:81ec6ae730f275ebc534dccffa3ec288eea1ada419c60767c30ccef5189aebf7",
         "whiteExact": true,
-        "darkOverWhiteHashBeforeReload": "sha256:6e581fe0d7994e2350d5f0a807d46d791de52e51fe6e8723cebba9fa7989f282",
-        "darkOverWhiteHashAfterReload": "sha256:6e581fe0d7994e2350d5f0a807d46d791de52e51fe6e8723cebba9fa7989f282",
+        "darkOverWhiteHashBeforeReload": "sha256:5e9f1b08a4aff2af75d75f30c8707e9496c1d7b226bcb67bd8212c12c6bdc7f3",
+        "darkOverWhiteHashAfterReload": "sha256:5e9f1b08a4aff2af75d75f30c8707e9496c1d7b226bcb67bd8212c12c6bdc7f3",
         "darkOverWhiteExact": true
       },
       "nearBlackReflectanceParity": {
-        "belowFloorHash": "sha256:a46e712cfe48d4d69d3f5bac83f77babfbc9ba69c025e837f6d99dec4328af14",
-        "atFloorHash": "sha256:a46e712cfe48d4d69d3f5bac83f77babfbc9ba69c025e837f6d99dec4328af14",
+        "belowFloorHash": "sha256:534f93b3ab5f216429bd686e6e7f6635464a20e3567822c08a61e7d607e31b2a",
+        "atFloorHash": "sha256:534f93b3ab5f216429bd686e6e7f6635464a20e3567822c08a61e7d607e31b2a",
         "exact": true
       },
       "workerCrashRecovery": {
@@ -273,7 +299,7 @@
         "workerInstances": 2,
         "recoveredBackend": "webgpu-offscreen-half-float",
         "reinitialized": true,
-        "postCrashFrameHash": "sha256:1b56eb948e922ed15d3c9767cc15cd339a1b00f95ad5b627dc5451432e3c06d0"
+        "postCrashFrameHash": "sha256:8f4aabc5cfb1e9c2b4f6742db95b567bd17e8ec596080ee28f56d6785f1037b5"
       },
       "failures": []
     }

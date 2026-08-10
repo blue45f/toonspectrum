@@ -9,9 +9,12 @@ import {
 } from "./studio-brush";
 import {
   filterStudioBrushCatalogItems,
+  listStudioCoreBrushCatalogItems,
   listStudioQuickBrushCatalogItems,
   STUDIO_ALL_BRUSH_CATALOG_ITEMS,
   STUDIO_BRUSH_CATALOG_COUNTS,
+  STUDIO_ERASER_BRUSH_CATALOG_ITEMS,
+  STUDIO_PAINT_BRUSH_CATALOG_ITEMS,
   studioBrushCatalogItemById,
   studioBrushCatalogKindLabel,
 } from "./studio-brush-catalog";
@@ -73,18 +76,18 @@ describe(`${CORE_BRUSH_CATALOG_COUNT}-preset brush catalog contract`, () => {
     expect(STUDIO_BRUSH_RUNTIME_CONTRACT.map((contract) => contract.id)).toEqual(presetIds);
   });
 
-  it("keeps all 230 identities behind one searchable quick/full catalogue source", () => {
-    expect(STUDIO_BRUSH_CATALOG_COUNTS).toEqual({ core: 70, pro: 160, total: 230 });
-    expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(230);
+  it("keeps all 231 identities behind one searchable quick/full catalogue source", () => {
+    expect(STUDIO_BRUSH_CATALOG_COUNTS).toEqual({ core: 71, pro: 160, total: 231 });
+    expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(231);
     expect(new Set(STUDIO_ALL_BRUSH_CATALOG_ITEMS.map((item) => item.id))).toHaveProperty(
       "size",
-      230
+      231
     );
 
     for (const item of STUDIO_ALL_BRUSH_CATALOG_ITEMS) {
       expect(studioBrushCatalogItemById(item.id), `${item.id}: lookup drift`).toBe(item);
       expect(studioBrushCatalogKindLabel(item), `${item.id}: missing kind label`).toMatch(
-        /^(선화|마커|채색|효과|질감)$/u
+        /^(선화|마커|채색|효과|질감|지우개)$/u
       );
       expect(
         filterStudioBrushCatalogItems({
@@ -95,6 +98,9 @@ describe(`${CORE_BRUSH_CATALOG_COUNT}-preset brush catalog contract`, () => {
         `${item.id}: hidden behind category during search`
       ).toBe(true);
     }
+    expect(studioBrushCatalogKindLabel(
+      STUDIO_ERASER_BRUSH_CATALOG_ITEMS[0]!,
+    )).toBe("지우개");
 
     const quick = listStudioQuickBrushCatalogItems({
       favoriteIds: ["heart-stamp"],
@@ -106,6 +112,35 @@ describe(`${CORE_BRUSH_CATALOG_COUNT}-preset brush catalog contract`, () => {
       ["hair-fiber", "recent"],
       ["pen", "recent"],
     ]);
+  });
+
+  it("keeps paint and eraser catalogues disjoint on the operation axis", () => {
+    expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS.every(
+      (item) => item.operation === "paint" || item.operation === "erase"
+    )).toBe(true);
+    expect(STUDIO_PAINT_BRUSH_CATALOG_ITEMS).toHaveLength(229);
+    expect(STUDIO_ERASER_BRUSH_CATALOG_ITEMS.map((item) => item.id)).toEqual([
+      "standard-eraser",
+      "kneaded-eraser",
+    ]);
+    expect(listStudioCoreBrushCatalogItems("erase").map((item) => item.id)).toEqual([
+      "standard-eraser",
+      "kneaded-eraser",
+    ]);
+    expect(filterStudioBrushCatalogItems({ operation: "erase" }).map((item) => item.id)).toEqual([
+      "standard-eraser",
+      "kneaded-eraser",
+    ]);
+    expect(filterStudioBrushCatalogItems({ operation: "paint" }).some(
+      (item) => item.id === "standard-eraser" || item.id === "kneaded-eraser"
+    )).toBe(false);
+    expect(filterStudioBrushCatalogItems({
+      operation: "paint",
+      query: "eraser",
+    })).toEqual([]);
+    expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter((item) => item.source === "pro").every(
+      (item) => item.operation === "paint"
+    )).toBe(true);
   });
 
   it("gives every preset an explicit renderer, engine route, preview, and exact-id search result", () => {
@@ -248,7 +283,9 @@ describe(`${CORE_BRUSH_CATALOG_COUNT}-preset brush catalog contract`, () => {
     const canonicalBySvg = new Map<string, string>();
     const svgById = new Map<string, string>();
 
-    for (const preset of BRUSH_PRESETS) {
+    // Erase identities share renderer carriers but differ by compositing operation, so a forced
+    // paint-mode SVG cannot audit their canonical relation. Operation parity is covered above.
+    for (const preset of BRUSH_PRESETS.filter(({ operation }) => operation === "paint")) {
       const runtime = resolveStudioBrushRuntimeContract(preset.id)!;
       const { svg } = exportPageToSvg({
         width: 96,

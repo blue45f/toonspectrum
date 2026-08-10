@@ -12,6 +12,7 @@
  */
 
 import {
+  canonicalStudioLivingInkDisplayRgba8,
   STUDIO_LIVING_INK_EXECUTION_ENGINE_VERSION,
   STUDIO_LIVING_INK_EXECUTION_LIMITS,
   STUDIO_LIVING_INK_EXECUTION_PROTOCOL_VERSION,
@@ -100,48 +101,17 @@ function sha256(value: Uint8Array | string): `sha256:${string}` {
 }
 
 /**
- * Re-orders display rows bottom-first, which is the orientation every Living Ink receipt declares
- * (`displayReadbackOrientation: "webgl-bottom-left-row-major"`). The WGSL field is top-down — a
- * splat lands at the same row index the pointer reports — so the presented surface is the natural
- * order and the *hash* is the flipped one, exactly inverting the WebGL2 runtime where `readPixels`
- * hands back bottom-up rows and presentation flips them. Both runtimes therefore hash the same
- * canonical byte order for the same picture.
- */
-function bottomUpRowMajor(pixels: Uint8Array, width: number, height: number): Uint8Array {
-  const stride = width * 4;
-  const normalized = new Uint8Array(pixels.length);
-  for (let row = 0; row < height; row += 1) {
-    normalized.set(
-      pixels.subarray(row * stride, row * stride + stride),
-      (height - 1 - row) * stride,
-    );
-  }
-  return normalized;
-}
-
-/**
- * True when a readback carries no presentable surface at all: every pixel fully transparent, or
- * every colour byte zero.
+ * True when a readback carries no presentable surface at all.
  *
- * This is the contract that was missing. A Living Ink display resolve is `exp(-opticalDensity)`,
- * so an *empty* field resolves to white paper and a saturated one only approaches black
- * asymptotically — a whole canvas of exact `rgb(0,0,0)` is not a picture this engine can compute,
- * it is the signature of a display buffer that was never written. Treating it as a real frame is
- * what let a blank WebGPU canvas ship: the receipt hashed the same zeros the screen showed, so
- * every hash-based check agreed with itself and nothing looked wrong.
+ * A valid empty Living Ink surface is transparent white: its alpha says that the page-sized wash
+ * layer must not repaint the document, while its colour distinguishes that deliberate clear
+ * resolve from an unwritten zeroed storage buffer. Opaque quantized black is valid pigment and must
+ * be admitted; only the exact all-channel-zero initialization marker is considered unwritten.
  */
 export function studioLivingInkPresentedPixelsAreBlank(
   pixels: Uint8Array | Uint8ClampedArray,
 ): boolean {
-  let maximumAlpha = 0;
-  let maximumColour = 0;
-  for (let index = 0; index < pixels.length; index += 4) {
-    const alpha = pixels[index + 3] ?? 0;
-    if (alpha > maximumAlpha) maximumAlpha = alpha;
-    const colour = Math.max(pixels[index] ?? 0, pixels[index + 1] ?? 0, pixels[index + 2] ?? 0);
-    if (colour > maximumColour) maximumColour = colour;
-    if (maximumAlpha > 0 && maximumColour > 0) return false;
-  }
+  for (const value of pixels) if (value !== 0) return false;
   return true;
 }
 
@@ -1208,15 +1178,16 @@ export class StudioLivingInkWebGpuPureRuntime {
     return Object.freeze({ image: this.present(pixels), receipt });
   }
 
-  /** Canonical receipt hash: the presented pixels, in the orientation the receipt declares. */
+  /** Canonical receipt hash: WebGPU storage and ImageData are both top-left row-major. */
   private displayHash(pixels: Uint8Array): `sha256:${string}` {
-    return sha256(bottomUpRowMajor(pixels, this.config.displayWidth, this.config.displayHeight));
+    return sha256(canonicalStudioLivingInkDisplayRgba8(pixels));
   }
 
   /**
-   * Turns the resolved pixels into the frame the caller shows. The bitmap is built from the very
-   * array the receipt hashes, so "what was verified" and "what reaches the screen" cannot drift
-   * apart — the drift is precisely what shipped a blank WebGPU canvas past a matching receipt.
+   * Turns the resolved pixels into the frame the caller shows. The bitmap is built from the same
+   * array whose browser-preserved premultiplied bytes the receipt hashes, so "what was verified"
+   * and "what reaches the screen" cannot drift apart. Straight RGB itself is not hash-stable under
+   * partial alpha because every canvas transfer quantizes through premultiplication.
    *
    * Fails closed on a blank readback rather than presenting it. The runtime has no second pixel
    * source to fall back to; the recoverable fallback lives one level up, in
@@ -1251,7 +1222,7 @@ export class StudioLivingInkWebGpuPureRuntime {
     ]);
   }
 
-  /** Resolved display pixels in natural top-down ImageData order (see `bottomUpRowMajor`). */
+  /** Resolved display pixels in natural top-left ImageData/storage-buffer row order. */
   private async readDisplayRgba8(): Promise<Uint8Array> {
     // Map requires MAP_READ-only buffer; copy display → staging
     const bytes = this.displayCellCount() * 16;
@@ -1299,6 +1270,7 @@ export class StudioLivingInkWebGpuPureRuntime {
       operationKind: input.operationKind,
       backend: "webgpu-offscreen-half-float",
       displaySha256: input.displaySha256,
+      displayHashEncoding: "premultiplied-rgba8-v2",
       operationSha256: input.operationSha256,
       dirtyBounds: input.dirtyBounds,
       dirtyTileCount: input.dirtyTileCount,
@@ -1314,9 +1286,9 @@ export class StudioLivingInkWebGpuPureRuntime {
       cpuOperationHashCrossDeviceDeterministic: true,
       canonicalFrameAuthority: "first-rendered-rgba8-frame",
       replayValidation: "bounded-visual-parity",
-      displayReadbackOrientation: "webgl-bottom-left-row-major",
+      displayReadbackOrientation: "top-left-row-major",
       gpuError: 0,
-      readbackFormat: "rgba8-staging-fbo",
+      readbackFormat: "rgba32float-storage-buffer-to-rgba8",
       imageOwnership: "caller-must-close",
       contextRecovery: "worker-rebuild-journal-replay",
     });

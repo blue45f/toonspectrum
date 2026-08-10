@@ -1,4 +1,5 @@
 import {
+  isStudioBrushEraserAliasId,
   isStudioBrushAliasId,
   mapStudioBrushAliasPressure,
   studioBrushAliasEffectiveDiameter,
@@ -301,7 +302,7 @@ export function sameStudioGpuLiveSourceJournalIdentity(
 
 function effectiveDiameter(identity: StudioGpuLiveSourceJournalIdentity): number {
   const selectedDiameter = Math.max(1, identity.selectedDiameter);
-  return identity.mode === "eraser"
+  return identity.mode === "eraser" && !isStudioBrushEraserAliasId(identity.brushAlias)
     ? selectedDiameter
     : studioBrushAliasEffectiveDiameter(identity.brushAlias, selectedDiameter);
 }
@@ -516,7 +517,10 @@ function advanceStudioGpuLiveSourceJournalUnchecked(
       state.identity.pressureModel
     );
     const renderPressure = mapStudioBrushAliasPressure(
-      state.identity.mode === "eraser" ? null : state.identity.brushAlias,
+      state.identity.mode === "eraser"
+        && !isStudioBrushEraserAliasId(state.identity.brushAlias)
+        ? null
+        : state.identity.brushAlias,
       sourcePressure,
       studioInkFallbackPressure(state.identity.pressureModel)
     );

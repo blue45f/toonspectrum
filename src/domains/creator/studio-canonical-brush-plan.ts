@@ -11,6 +11,16 @@ import {
   normalizeStudioBrushDynamicsSettings,
   type NormalizedStudioBrushDynamicsSettings,
 } from "./studio-brush-dynamics";
+import {
+  normalizeStudioBrushDualBrushSettings,
+  normalizeStudioBrushTipLayers,
+  type NormalizedStudioBrushDualBrushSettings,
+  type NormalizedStudioBrushTipLayerSettings,
+} from "./studio-brush-tip-composition";
+import {
+  normalizeStudioBrushTipSettings,
+  type NormalizedStudioBrushTipSettings,
+} from "./studio-brush-tip-stamp";
 import { canonicalStudioCommandJson } from "./studio-command-journal";
 
 export const STUDIO_CANONICAL_BRUSH_PLAN_VERSION = 1 as const;
@@ -204,6 +214,22 @@ export interface StudioCanonicalBrushPaintContractV2 {
 }
 
 /**
+ * Exact, renderer-neutral tip-composition program for paint-aware recipes.
+ *
+ * `tip` on the recipe remains the effective primary carrier (and is therefore directly usable by
+ * a single-tip texture lowerer). This contract keeps the non-destructive source composition that
+ * produced it: the primary tip, ordered transformed layers and optional dual-tip modulation. The
+ * same values also live in `retainedDynamics`; validation requires byte-identical agreement so a
+ * consumer can never choose between two conflicting visual authorities.
+ */
+export interface StudioCanonicalBrushTipCompositionV2 {
+  readonly model: "normalized-multi-tip-v1";
+  readonly primary: NormalizedStudioBrushTipSettings;
+  readonly layers: readonly NormalizedStudioBrushTipLayerSettings[];
+  readonly dualBrush: NormalizedStudioBrushDualBrushSettings | null;
+}
+
+/**
  * Paint-aware recipe. `retainedDynamics` is the complete normalized per-stroke program, including
  * causal deposit version, taper, pressure/speed/tilt/twist mappings, seeded jitter, grain and tip
  * settings. Summary fields in the base recipe aid classification only; a v2 consumer must execute
@@ -213,6 +239,8 @@ export interface StudioCanonicalBrushRecipeV2 extends StudioCanonicalBrushRecipe
   readonly version: typeof STUDIO_CANONICAL_BRUSH_RECIPE_PAINT_VERSION;
   readonly paint: StudioCanonicalBrushPaintContractV2;
   readonly retainedDynamics: NormalizedStudioBrushDynamicsSettings | null;
+  /** Absent on historical v2 recipes and on recipes with a single unmodulated primary tip. */
+  readonly tipComposition?: StudioCanonicalBrushTipCompositionV2;
 }
 
 export type StudioCanonicalBrushRecipe =
@@ -710,6 +738,57 @@ function validateRetainedDynamics(
   }
 }
 
+function validateTipCompositionV2(
+  input: unknown,
+  path: string,
+): ValidationResult<StudioCanonicalBrushTipCompositionV2> {
+  try {
+    const canonical = canonicalStudioCommandJson(
+      input,
+      STUDIO_CANONICAL_BRUSH_PLAN_BUDGETS.maxRetainedDynamicsBytes,
+    );
+    const detached = JSON.parse(canonical) as unknown;
+    const record = inspectRecord(
+      detached,
+      ["model", "primary", "layers", "dualBrush"],
+      path,
+    );
+    if (!record.ok) return record;
+    if (record.value.model !== "normalized-multi-tip-v1") {
+      return fail("invalid-field", `${path}.model`);
+    }
+    const primary = normalizeStudioBrushTipSettings(record.value.primary);
+    const layers = normalizeStudioBrushTipLayers(record.value.layers, primary);
+    const dualBrush = record.value.dualBrush === null
+      ? null
+      : normalizeStudioBrushDualBrushSettings(record.value.dualBrush, primary);
+    const normalized: StudioCanonicalBrushTipCompositionV2 = {
+      model: "normalized-multi-tip-v1",
+      primary,
+      layers,
+      dualBrush,
+    };
+    const normalizedCanonical = canonicalStudioCommandJson(
+      normalized,
+      STUDIO_CANONICAL_BRUSH_PLAN_BUDGETS.maxRetainedDynamicsBytes,
+    );
+    if (normalizedCanonical !== canonical) return fail("invalid-field", path);
+    if (layers.length === 0 && dualBrush === null) return fail("invalid-field", path);
+    return { ok: true, value: normalized };
+  } catch (error) {
+    return fail(
+      (
+        typeof error === "object"
+        && error !== null
+        && Object.getOwnPropertyDescriptor(error, "code")?.value === "PAYLOAD_TOO_LARGE"
+      )
+        ? "budget-exceeded"
+        : "not-plain-data",
+      path,
+    );
+  }
+}
+
 function validateRecipe(
   input: unknown,
   path: string,
@@ -721,6 +800,12 @@ function validateRecipe(
     && version.value !== STUDIO_CANONICAL_BRUSH_RECIPE_PAINT_VERSION
   ) return fail("unsupported-version", `${path}.version`);
   const versionTwo = version.value === STUDIO_CANONICAL_BRUSH_RECIPE_PAINT_VERSION;
+  const tipCompositionDescriptor = Object.getOwnPropertyDescriptor(input, "tipComposition");
+  if (
+    tipCompositionDescriptor
+    && (!tipCompositionDescriptor.enumerable || !("value" in tipCompositionDescriptor))
+  ) return fail("not-plain-data", `${path}.tipComposition`);
+  const hasTipComposition = tipCompositionDescriptor !== undefined;
   const record = inspectRecord(
     input,
     [
@@ -739,7 +824,11 @@ function validateRecipe(
       "pressure",
       "grain",
       "wetMedia",
-      ...(versionTwo ? ["paint", "retainedDynamics"] : []),
+      ...(versionTwo ? [
+        "paint",
+        "retainedDynamics",
+        ...(hasTipComposition ? ["tipComposition"] : []),
+      ] : []),
     ],
     path,
   );
@@ -831,6 +920,10 @@ function validateRecipe(
     `${path}.retainedDynamics`,
   );
   if (!retainedDynamics.ok) return retainedDynamics;
+  const tipComposition = hasTipComposition
+    ? validateTipCompositionV2(record.value.tipComposition, `${path}.tipComposition`)
+    : null;
+  if (tipComposition && !tipComposition.ok) return tipComposition;
   if (
     (paint.value.model === "bounded-flow-v2") !== (retainedDynamics.value !== null)
     || (
@@ -839,7 +932,22 @@ function validateRecipe(
     )
     || record.value.engine !== "dab-v1"
     || record.value.material === "pigment"
-    || record.value.material === "eraser"
+    || (
+      record.value.material === "eraser"
+      && paint.value.model !== "layered-flow-v1"
+    )
+    || (
+      tipComposition !== null
+      && (
+        retainedDynamics.value === null
+        || canonicalStudioCommandJson({
+          model: "normalized-multi-tip-v1",
+          primary: retainedDynamics.value.tip,
+          layers: retainedDynamics.value.tipLayers,
+          dualBrush: retainedDynamics.value.dualBrush ?? null,
+        }) !== canonicalStudioCommandJson(tipComposition.value)
+      )
+    )
   ) return fail("invalid-field", path);
   return {
     ok: true,
@@ -848,6 +956,7 @@ function validateRecipe(
       ...base,
       paint: paint.value,
       retainedDynamics: retainedDynamics.value,
+      ...(tipComposition ? { tipComposition: tipComposition.value } : {}),
     },
   };
 }

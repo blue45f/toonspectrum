@@ -78,6 +78,17 @@ type RawBenchmark = Readonly<{
   cancellationControl: Readonly<Record<string, unknown>>;
   uploadRollbackControl: Readonly<Record<string, unknown>>;
   bundledVrmFixture: Readonly<Record<string, unknown>>;
+  bootstrapReceipt: Readonly<{
+    schemaVersion: number;
+    order: readonly string[];
+    positiveControlViolations: readonly string[];
+    runtimeViolations: readonly string[];
+    positiveControlThrew: boolean;
+    positiveControlObserved: boolean;
+    configIdentityObserved: boolean;
+    globalConfigJitlessObserved: boolean;
+    zodAllowsEvalFalse: boolean;
+  }>;
   cspViolations: readonly string[];
 }>;
 
@@ -126,9 +137,15 @@ describe("VRM surface brush real Chromium promotion evidence", () => {
     expect(orchestrator).toContain('"--use-angle=metal"');
     expect(orchestrator).toContain('"--disable-software-rasterizer"');
     expect(orchestrator).toContain('"--enable-precise-memory-info"');
-    expect(orchestrator).toContain("__zod_globalConfig: { jitless: true }");
+    expect(orchestrator).toContain("document.addEventListener('securitypolicyviolation'");
+    expect(orchestrator).toContain("const zodConfig = root.__zod_globalConfig ??= {};");
+    expect(orchestrator).toContain("zodConfig.jitless = true;");
+    expect(orchestrator).toContain("await import(\"./entry.ts\")");
+    expect(orchestrator.indexOf("listener-installed"))
+      .toBeLessThan(orchestrator.indexOf("await import(\"./entry.ts\")"));
+    expect(orchestrator).toContain("Browser.getBrowserCommandLine");
     expect(orchestrator).toContain("script-src 'self'");
-    expect(orchestrator).not.toContain("'unsafe-eval'");
+    expect(orchestrator).not.toContain("script-src 'self' 'unsafe-eval'");
     expect(VRM_SURFACE_BRUSH_BROWSER_WARMUPS).toBe(3);
     expect(VRM_SURFACE_BRUSH_BROWSER_SAMPLES).toBe(31);
     expect(VRM_SURFACE_BRUSH_BROWSER_CASES).toEqual([
@@ -244,6 +261,26 @@ describe("VRM surface brush real Chromium promotion evidence", () => {
       pass: true,
     });
     expect(benchmark.cspViolations).toEqual([]);
+    expect(benchmark.bootstrapReceipt).toMatchObject({
+      schemaVersion: 1,
+      positiveControlThrew: true,
+      positiveControlObserved: true,
+      configIdentityObserved: true,
+      globalConfigJitlessObserved: true,
+      zodAllowsEvalFalse: true,
+      runtimeViolations: [],
+    });
+    expect(benchmark.bootstrapReceipt.positiveControlViolations.length).toBeGreaterThan(0);
+    expect(benchmark.bootstrapReceipt.order).toEqual([
+      "listener-installed",
+      "zod-jitless-configured",
+      "positive-control-started",
+      "positive-control-blocked",
+      "positive-control-observed",
+      "entry-import-started",
+      "page-module-evaluated",
+      "entry-import-complete",
+    ]);
     expect(artifact.diagnostics.requestFailures).toEqual([]);
     expect(artifact.diagnostics.successfulAssetResponseAborts).toHaveLength(2);
   });
@@ -261,6 +298,7 @@ describe("VRM surface brush real Chromium promotion evidence", () => {
     const full = mutableRecord(timings.fullRaycastProjectionCommit);
     (full.samplesMs as unknown[]).pop();
     mutableRecord(root.seamControl).noInterpolatedBridge = false;
+    mutableRecord(root.bootstrapReceipt).zodAllowsEvalFalse = false;
     const memory = mutableRecord(cases[0]!.memory);
     const gpuReason = memory.browserGpuMemoryReason;
     memory.browserGpuMemoryReason = "";
@@ -274,7 +312,34 @@ describe("VRM surface brush real Chromium promotion evidence", () => {
     expect(issues).toContain("controlled-256-8: exact unreduced scene/sample workload is not proven");
     expect(issues).toContain("controlled-256-8: fullRaycastProjectionCommit lacks 31 recomputable warm samples");
     expect(issues).toContain("two-island seam control did not split the UV run without a bridge");
+    expect(issues).toContain("strict-CSP bootstrap did not prove pre-import Zod jitless initialization");
     expect(issues).toContain("controlled-256-8: memory is estimated, omitted without reason, or malformed");
     expect(gpuReason).toEqual(expect.any(String));
+  });
+
+  it.each([
+    "--jitless",
+    "--disable-jit",
+    "--no-jit",
+    "--disable-javascript-jit",
+    "--no-opt",
+    "--no-turbofan",
+    "--js-flags=--jitless",
+    "--js-flags=--no-turbofan,--foo",
+    '--js-flags="--no-opt --foo"',
+    "--JS-FLAGS=--DISABLE-JIT",
+  ])("rejects Chromium JIT-disable argument %s", (argument) => {
+    const artifact = readArtifact();
+    const diagnostics = structuredClone(artifact.diagnostics) as {
+      launchArgs: string[];
+    } & VrmSurfaceBrushBrowserArtifact["diagnostics"];
+    diagnostics.launchArgs.push(argument);
+
+    const issues = validateVrmSurfaceBrushBrowserEvidence(
+      artifact.benchmark,
+      diagnostics,
+      artifact.productionBuild.assets,
+    );
+    expect(issues).toContain("Chromium was launched with a JavaScript JIT-disabling flag");
   });
 });

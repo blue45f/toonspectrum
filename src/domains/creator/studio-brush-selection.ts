@@ -1,4 +1,8 @@
-import { BRUSH_PRESETS, type BrushPreset } from "./studio-brush";
+import {
+  BRUSH_PRESETS,
+  type BrushPreset,
+  type StudioToolOperation,
+} from "./studio-brush";
 import {
   normalizeStudioBrushDynamicsSettings,
   studioBrushDynamicsSettingsForBrushId,
@@ -17,7 +21,9 @@ export interface StudioBrushCatalogSelection {
   catalogId: string;
   catalogName: string;
   runtimeBrushId: string;
-  /** Omitted legacy/pro selections paint; named eraser presets opt in explicitly. */
+  /** Authoritative artist operation. Renderer identity must never imply paint versus erase. */
+  operation: StudioToolOperation;
+  /** Compatibility projection for draw-tool consumers that have not migrated to `operation`. */
   drawMode?: "pen" | "eraser";
   defaultWidth: number;
   defaultOpacity: number;
@@ -63,7 +69,8 @@ export function studioCoreBrushCatalogSelection(
     catalogId: preset.id,
     catalogName: preset.name,
     runtimeBrushId: preset.id,
-    ...(preset.drawMode ? { drawMode: preset.drawMode } : {}),
+    operation: preset.operation,
+    ...(preset.operation === "erase" ? { drawMode: "eraser" as const } : {}),
     defaultWidth: preset.defaultWidth,
     defaultOpacity: preset.defaultOpacity,
     ...(preset.defaultColor ? { defaultColor: preset.defaultColor } : {}),
@@ -72,7 +79,7 @@ export function studioCoreBrushCatalogSelection(
 }
 
 /**
- * One fail-closed selector for the complete 230-brush catalogue.
+ * One fail-closed selector for the complete 231-tool catalogue.
  *
  * Core presets resolve synchronously from the canonical table. Procedural profiles keep their
  * physics chunk lazy, but both the desktop catalogue and mobile sheet receive the same durable
@@ -105,10 +112,11 @@ export function isStudioBrushCatalogSelection(
     && candidate.catalogName.length > 0
     && typeof candidate.runtimeBrushId === "string"
     && candidate.runtimeBrushId.length > 0
+    && (candidate.operation === "paint" || candidate.operation === "erase")
     && (
-      candidate.drawMode === undefined
-      || candidate.drawMode === "pen"
-      || candidate.drawMode === "eraser"
+      candidate.operation === "erase"
+        ? candidate.drawMode === "eraser"
+        : candidate.drawMode === undefined || candidate.drawMode === "pen"
     )
     && typeof candidate.defaultWidth === "number"
     && Number.isFinite(candidate.defaultWidth)

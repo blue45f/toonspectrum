@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 
+import { canonicalStudioLivingInkDisplayRgba8 } from "./studio-living-ink-execution-protocol";
 import {
   StudioLivingInkWebGpuPureRuntime,
   studioLivingInkPresentedPixelsAreBlank,
@@ -72,8 +73,10 @@ function restoreGlobals(): void {
   originals.clear();
 }
 
-/** Installs the fake environment. `displayCell` fills every resolved display cell. */
-function installFakeWebGpu(displayCell: readonly [number, number, number, number]): void {
+type DisplayCell = readonly [number, number, number, number];
+
+/** Installs the fake environment. A callback can make row order observable in receipt tests. */
+function installFakeWebGpu(displaySource: DisplayCell | ((cell: number) => DisplayCell)): void {
   const cells = CONFIG.fieldWidth * CONFIG.fieldHeight;
 
   class FakeImageData {
@@ -109,6 +112,9 @@ function installFakeWebGpu(displayCell: readonly [number, number, number, number
 
   const mappedDisplay = new Float32Array(cells * 4);
   for (let cell = 0; cell < cells; cell += 1) {
+    const displayCell = typeof displaySource === "function"
+      ? displaySource(cell)
+      : displaySource;
     mappedDisplay.set(displayCell, cell * 4);
   }
 
@@ -195,21 +201,32 @@ describe("studio-living-ink-webgpu-pure-runtime", () => {
   });
 
   describe("blank-frame detection", () => {
-    it("calls an untouched display buffer blank in both shapes it can take", () => {
+    it("rejects only the exact unwritten RGBA storage marker", () => {
       const cells = 64;
-      // A transferred bitmap from a surface nothing drew to: fully transparent.
+      // A storage buffer that the display pass never wrote remains zero-initialized.
       expect(studioLivingInkPresentedPixelsAreBlank(new Uint8Array(cells * 4))).toBe(true);
-      // A readback of a display buffer that was never written, once RGBA8 forces alpha opaque.
-      // This is the byte pattern that actually shipped: the receipt hashed these same zeros.
+
+      // Quantized black pigment is a valid completed frame: alpha is the write evidence that the
+      // old RGB-only sentinel discarded.
       const opaqueBlack = new Uint8Array(cells * 4);
       for (let index = 3; index < opaqueBlack.length; index += 4) opaqueBlack[index] = 255;
-      expect(studioLivingInkPresentedPixelsAreBlank(opaqueBlack)).toBe(true);
+      expect(studioLivingInkPresentedPixelsAreBlank(opaqueBlack)).toBe(false);
     });
 
     it("calls any real surface non-blank, including a single lit pixel", () => {
       const cells = 64;
       const paper = new Uint8Array(cells * 4).fill(255);
       expect(studioLivingInkPresentedPixelsAreBlank(paper)).toBe(false);
+
+      // The canonical wash layer deliberately resolves an untouched page as transparent white.
+      // It is empty content, but it is a real display result and must survive clear/undo/export.
+      const transparentPage = new Uint8Array(cells * 4);
+      for (let index = 0; index < transparentPage.length; index += 4) {
+        transparentPage[index] = 255;
+        transparentPage[index + 1] = 255;
+        transparentPage[index + 2] = 255;
+      }
+      expect(studioLivingInkPresentedPixelsAreBlank(transparentPage)).toBe(false);
 
       const oneLitPixel = new Uint8Array(cells * 4);
       for (let index = 3; index < oneLitPixel.length; index += 4) oneLitPixel[index] = 255;
@@ -235,23 +252,30 @@ describe("studio-living-ink-webgpu-pure-runtime", () => {
     });
 
     it("hashes the frame it presented, so the receipt cannot certify a different surface", async () => {
-      installFakeWebGpu([0.2, 0.4, 0.6, 1]);
+      installFakeWebGpu((cell) => [(cell + 1) / 16, 0.4, 0.6, 1]);
       const runtime = await StudioLivingInkWebGpuPureRuntime.tryCreate(CONFIG);
       const frame = await applyStroke(runtime!);
       const presented = frame.image as unknown as PresentedBitmap;
 
-      // The receipt declares webgl-bottom-left-row-major, so it must hash the presented pixels
-      // with their rows reversed — not some other buffer that merely happens to be nearby.
-      const stride = CONFIG.displayWidth * 4;
-      const bottomUp = new Uint8Array(presented.bytes.length);
-      for (let row = 0; row < CONFIG.displayHeight; row += 1) {
-        bottomUp.set(
-          presented.bytes.subarray(row * stride, row * stride + stride),
-          (CONFIG.displayHeight - 1 - row) * stride,
-        );
+      const topDown = canonicalStudioLivingInkDisplayRgba8(presented.bytes);
+      expect(frame.receipt.displaySha256).toBe(`sha256:${sha256HexPortable(topDown)}`);
+      expect(frame.receipt.displayReadbackOrientation).toBe("top-left-row-major");
+      expect(frame.receipt.readbackFormat).toBe("rgba32float-storage-buffer-to-rgba8");
+      expect(frame.receipt.backend).toBe("webgpu-offscreen-half-float");
+      runtime!.dispose();
+    });
+
+    it("presents a fully opaque quantized-black resolve", async () => {
+      installFakeWebGpu([0, 0, 0, 1]);
+      const runtime = await StudioLivingInkWebGpuPureRuntime.tryCreate(CONFIG);
+      expect(runtime).not.toBeNull();
+      const frame = await applyStroke(runtime!);
+      const presented = frame.image as unknown as PresentedBitmap;
+      expect(studioLivingInkPresentedPixelsAreBlank(presented.bytes)).toBe(false);
+      for (let index = 0; index < presented.bytes.length; index += 4) {
+        expect(Array.from(presented.bytes.slice(index, index + 4))).toEqual([0, 0, 0, 255]);
       }
-      expect(frame.receipt.displaySha256).toBe(`sha256:${sha256HexPortable(bottomUp)}`);
-      expect(frame.receipt.displayReadbackOrientation).toBe("webgl-bottom-left-row-major");
+      frame.image.close();
       runtime!.dispose();
     });
 

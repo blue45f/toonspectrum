@@ -78,15 +78,17 @@ function operation(sequence: number): StudioLivingInkOperation {
   return { kind: "advance", version: 1, sequence, fixedTicks: 1 };
 }
 
-function receipt(requestId: number): StudioLivingInkExecutionReceipt {
-  return {
+function receipt(
+  requestId: number,
+  backend: StudioLivingInkExecutionReceipt["backend"] = "webgl2-offscreen-half-float",
+): StudioLivingInkExecutionReceipt {
+  const base = {
     kind: "studio-living-ink-execution-receipt",
     version: STUDIO_LIVING_INK_EXECUTION_PROTOCOL_VERSION,
     engineVersion: STUDIO_LIVING_INK_EXECUTION_ENGINE_VERSION,
     requestId,
     revision: 1,
     operationKind: "advance",
-    backend: "webgl2-offscreen-half-float",
     displaySha256: `sha256:${"1".repeat(64)}`,
     operationSha256: `sha256:${"2".repeat(64)}`,
     dirtyBounds: { x: 0, y: 0, width: 64, height: 64 },
@@ -103,12 +105,23 @@ function receipt(requestId: number): StudioLivingInkExecutionReceipt {
     cpuOperationHashCrossDeviceDeterministic: true,
     canonicalFrameAuthority: "first-rendered-rgba8-frame",
     replayValidation: "bounded-visual-parity",
-    displayReadbackOrientation: "webgl-bottom-left-row-major",
     gpuError: 0,
-    readbackFormat: "rgba8-staging-fbo",
     imageOwnership: "caller-must-close",
     contextRecovery: "worker-rebuild-journal-replay",
-  };
+  } as const;
+  return backend === "webgpu-offscreen-half-float"
+    ? {
+        ...base,
+        backend,
+        displayReadbackOrientation: "top-left-row-major",
+        readbackFormat: "rgba32float-storage-buffer-to-rgba8",
+      }
+    : {
+        ...base,
+        backend,
+        displayReadbackOrientation: "webgl-bottom-left-row-major",
+        readbackFormat: "rgba8-staging-fbo",
+      };
 }
 
 function applied(requestId: number, revision = 1): StudioLivingInkExecutionApplied {
@@ -237,6 +250,34 @@ describe("StudioLivingInkExecutionProvider", () => {
     expect(firstWorker.terminated).toBe(true);
     await expect(provider.apply(operation(2))).rejects.toThrow("not initialized");
     await initialize(provider, secondWorker);
+    await provider.dispose();
+  });
+
+  it("rejects historical WebGPU receipts that falsely claim a WebGL2 FBO readback", async () => {
+    const worker = new FakeWorker();
+    const provider = new StudioLivingInkExecutionProvider(config, { workerFactory: () => worker });
+    await initialize(provider, worker);
+    const pending = provider.apply(operation(1));
+    await Promise.resolve();
+    const request = worker.messages.at(-1)!;
+    const invalidBitmap = bitmap();
+    const validWebGpuReceipt = receipt(request.requestId, "webgpu-offscreen-half-float");
+    worker.respond({
+      type: "living-ink/frame",
+      version: 1,
+      requestId: request.requestId,
+      frame: {
+        image: invalidBitmap,
+        receipt: {
+          ...validWebGpuReceipt,
+          displayReadbackOrientation: "webgl-bottom-left-row-major",
+          readbackFormat: "rgba8-staging-fbo",
+        } as unknown as StudioLivingInkExecutionReceipt,
+      },
+    });
+    await expect(pending).rejects.toThrow("invalid frame contract");
+    expect(invalidBitmap.closed).toBe(true);
+    expect(worker.terminated).toBe(true);
     await provider.dispose();
   });
 

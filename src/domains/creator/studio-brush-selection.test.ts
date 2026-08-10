@@ -6,8 +6,11 @@ import {
   STUDIO_BRUSH_CATALOG_COUNTS,
 } from "./studio-brush-catalog";
 import {
+  STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
   planNormalizedStudioDynamicBrushDabs,
+  resolveStudioBrushDynamicsSelectionPresetId,
   resolveStudioBrushDynamicsPresetId,
+  serializeStudioBrushDynamicsSettingsCanonical,
   studioBrushDynamicsSettingsForBrushId,
 } from "./studio-brush-dynamics";
 import {
@@ -17,18 +20,54 @@ import {
 } from "./studio-brush-selection";
 
 describe("studio brush catalogue selection", () => {
+  it("authors core wet media as distinct bounded dynamics without reclassifying legacy ids", () => {
+    const expectedEngine = new Map<string, "airbrush" | "ink-particle">([
+      ["watercolor", "airbrush"],
+      ["ink-wash", "airbrush"],
+      ["inkwash-pen", "ink-particle"],
+      ["inkwash-water-brush", "airbrush"],
+      ["inkwash-bleed-wash", "airbrush"],
+      ["inkwash-white-ink", "ink-particle"],
+    ]);
+    const signatures = new Set<string>();
+
+    for (const [brushId, engine] of expectedEngine) {
+      const preset = BRUSH_PRESETS.find((candidate) => candidate.id === brushId);
+      expect(preset, `${brushId}: missing core preset`).toBeDefined();
+      if (!preset) continue;
+      const selection = studioCoreBrushCatalogSelection(preset);
+
+      // A bare historical id must remain on the causal-watercolor compatibility renderer.
+      expect(resolveStudioBrushDynamicsPresetId(brushId), `${brushId}: legacy id drift`)
+        .toBeNull();
+      expect(selection.brushDynamics, `${brushId}: authored snapshot missing`).not.toBeNull();
+      expect(selection.brushDynamics?.depositPipeline, `${brushId}: causal pipeline`)
+        .toBe(STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3);
+      expect(selection.brushDynamics?.opacity.base, `${brushId}: outer opacity duplicated`).toBe(1);
+      expect(
+        resolveStudioBrushDynamicsSelectionPresetId(brushId, selection.brushDynamics),
+        `${brushId}: renderer engine`,
+      ).toBe(engine);
+      signatures.add(serializeStudioBrushDynamicsSettingsCanonical(selection.brushDynamics));
+    }
+
+    expect(signatures.size).toBe(expectedEngine.size);
+  });
+
   it("keeps catalogue and runtime identity explicit for core brushes", () => {
     const selection = studioCoreBrushCatalogSelection({
       id: "chalk",
       name: "초크",
       defaultWidth: 16,
       defaultOpacity: 0.8,
+      operation: "paint",
     });
 
     expect(selection).toMatchObject({
       catalogId: "chalk",
       catalogName: "초크",
       runtimeBrushId: "chalk",
+      operation: "paint",
     });
     expect(selection.brushDynamics?.tip.shape).toBe("sponge");
     expect(selection.brushDynamics?.opacity.base).toBe(1);
@@ -123,9 +162,9 @@ describe("studio brush catalogue selection", () => {
     }
   });
 
-  it("materializes all 230 catalogue ids through one fail-closed selection source", async () => {
+  it("materializes all 231 catalogue ids through one fail-closed selection source", async () => {
     expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(STUDIO_ALL_BRUSH_CATALOG_ITEMS.length);
-    expect(STUDIO_BRUSH_CATALOG_COUNTS).toEqual({ core: 70, pro: 160, total: 230 });
+    expect(STUDIO_BRUSH_CATALOG_COUNTS).toEqual({ core: 71, pro: 160, total: 231 });
 
     for (const item of STUDIO_ALL_BRUSH_CATALOG_ITEMS) {
       const selection = await materializeStudioBrushCatalogSelection(item.id);
@@ -135,6 +174,7 @@ describe("studio brush catalogue selection", () => {
         catalogName: item.name,
         defaultWidth: item.defaultWidth,
         defaultOpacity: item.defaultOpacity,
+        operation: item.operation,
       });
       expect(isStudioBrushCatalogSelection(selection), `${item.id}: invalid payload`).toBe(true);
       if (item.source === "core") {
@@ -152,13 +192,40 @@ describe("studio brush catalogue selection", () => {
     expect(await materializeStudioBrushCatalogSelection(null)).toBeNull();
   });
 
+  it("keeps both eraser selections explicit while preserving drawMode compatibility", async () => {
+    await expect(materializeStudioBrushCatalogSelection("standard-eraser")).resolves.toMatchObject({
+      catalogId: "standard-eraser",
+      runtimeBrushId: "standard-eraser",
+      operation: "erase",
+      drawMode: "eraser",
+      defaultWidth: 20,
+      defaultOpacity: 1,
+    });
+    await expect(materializeStudioBrushCatalogSelection("kneaded-eraser")).resolves.toMatchObject({
+      catalogId: "kneaded-eraser",
+      runtimeBrushId: "kneaded-eraser",
+      operation: "erase",
+      drawMode: "eraser",
+      defaultOpacity: 0.38,
+    });
+  });
+
   it("rejects incomplete or non-finite catalogue payloads", () => {
     expect(isStudioBrushCatalogSelection(null)).toBe(false);
     expect(isStudioBrushCatalogSelection({ catalogId: "pack-1" })).toBe(false);
     expect(isStudioBrushCatalogSelection({
+      catalogId: "legacy-pack",
+      catalogName: "레거시 브러시",
+      runtimeBrushId: "dry-media",
+      defaultWidth: 10,
+      defaultOpacity: 1,
+      brushDynamics: null,
+    })).toBe(false);
+    expect(isStudioBrushCatalogSelection({
       catalogId: "pack-1",
       catalogName: "프로 브러시",
       runtimeBrushId: "dry-media",
+      operation: "paint",
       defaultWidth: Number.NaN,
       defaultOpacity: 1,
       brushDynamics: null,

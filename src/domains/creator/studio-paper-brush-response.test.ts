@@ -54,8 +54,8 @@ describe("paper response policy", () => {
     // 목탄 가루 > 파스텔 > 흑연 ≳ 수채 > 회화 붓 > 유성 > 에어브러시 > 잉크.
     expect(strength("charcoal")).toBeGreaterThan(strength("pastel"));
     expect(strength("pastel")).toBeGreaterThan(strength("pencil"));
-    expect(strength("pencil")).toBeGreaterThan(strength("watercolor"));
-    expect(strength("watercolor")).toBeGreaterThan(strength("brush"));
+    expect(strength("pencil")).toBeGreaterThan(strength("wet-wash-broad"));
+    expect(strength("wet-wash-broad")).toBeGreaterThan(strength("brush"));
     expect(strength("brush")).toBeGreaterThan(strength("oil"));
     expect(strength("oil")).toBeGreaterThan(strength("calligraphy"));
     expect(strength("calligraphy")).toBeGreaterThan(strength("airbrush"));
@@ -79,6 +79,14 @@ describe("paper response policy", () => {
 
   it("follows the render-family map so pack/alias ids inherit their medium", () => {
     for (const [brushId, family] of Object.entries(STUDIO_BRUSH_RENDER_FAMILY)) {
+      if ([
+        "watercolor",
+        "ink-wash",
+        "inkwash-pen",
+        "inkwash-water-brush",
+        "inkwash-bleed-wash",
+        "inkwash-white-ink",
+      ].includes(brushId)) continue;
       expect(resolveStudioPaperBrushResponse(brushId), brushId).toBe(
         STUDIO_PAPER_BRUSH_RESPONSE[family],
       );
@@ -89,6 +97,24 @@ describe("paper response policy", () => {
     );
     expect(resolveStudioPaperBrushResponse("wet-wash-broad")).toBe(
       STUDIO_PAPER_BRUSH_RESPONSE.watercolor,
+    );
+  });
+
+  it("keeps new core wet snapshots authoritative without changing persisted pack paper", () => {
+    for (const brushId of [
+      "watercolor",
+      "ink-wash",
+      "inkwash-pen",
+      "inkwash-water-brush",
+      "inkwash-bleed-wash",
+      "inkwash-white-ink",
+    ]) {
+      expect(resolveStudioPaperBrushResponse(brushId), brushId).toBe(
+        STUDIO_PAPER_GRANULATION_IDENTITY,
+      );
+    }
+    expect(resolveStudioPaperBrushResponse("dry-media")).toBe(
+      STUDIO_PAPER_BRUSH_RESPONSE["dry-media"],
     );
   });
 });

@@ -70,7 +70,16 @@ describe("Studio canvas cursor integration boundary", () => {
     expect(studioCanvasViewportSource).toContain('brushCursorStyle !== "none"');
     expect(studioCanvasViewportSource).toContain("<StudioBrushCursor");
     expect(studioCanvasViewportSource).toContain(
-      "brushId={drawMode === \"eraser\" ? \"eraser\" : brush}",
+      "brushId={drawMode === \"eraser\" && !eraserPresetActive ? \"eraser\" : brush}",
+    );
+    expect(studioCanvasViewportSource).toContain(
+      'drawMode === "pen" || lowDensityEraserActive',
+    );
+    expect(studioCanvasViewportSource).toContain(
+      'resolveStudioBrushPresetOperation(brush) === "erase"',
+    );
+    expect(studioCanvasViewportSource).toContain(
+      '!isStudioBrushEraserAliasId(liveEl.brush)',
     );
     expect(snapshot).toBeGreaterThanOrEqual(0);
     expect(consume).toBeGreaterThanOrEqual(0);

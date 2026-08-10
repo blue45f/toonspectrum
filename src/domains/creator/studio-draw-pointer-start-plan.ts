@@ -10,14 +10,14 @@
 import {
   normalizeCalligraphyStylusInput,
   resolveBrushPressureSample,
+  resolveStudioBrushPresetOperation,
   resolveStudioBrushRenderFamily,
   strokeSampleDistanceForBrushFamily,
   strokeSampleDistanceForScale,
   type NormalizedCalligraphyStylusInput,
 } from "./studio-brush";
-import {
-  resolveStudioBrushDynamicsPresetId,
-} from "./studio-brush-dynamics";
+import { isStudioBrushEraserAliasId } from "./studio-brush-alias-profile";
+import { resolveStudioBrushDynamicsSelectionPresetId } from "./studio-brush-dynamics";
 import {
   resolveStudioStampBrushKind,
   type StudioStampBrushTuning,
@@ -129,13 +129,18 @@ export function planStudioDrawPointerStart(
     symmetry,
   } = input;
   const brushFamily = resolveStudioBrushRenderFamily(brush);
+  const namedEraser =
+    drawMode === "eraser" && resolveStudioBrushPresetOperation(brush) === "erase";
+  const lowDensityEraser = namedEraser && isStudioBrushEraserAliasId(brush);
   const stampKind = drawMode === "pen" ? resolveStudioStampBrushKind(brush) : null;
-  const causalWatercolor = drawMode === "pen" && brushFamily === "watercolor";
   // Eraser/pixel input contracts do not carry the currently selected pen's whole-stroke dynamics.
   // Letting that unrelated brush id affect eligibility sent the eraser through the slower legacy
   // stabilizer whenever an artist happened to switch from a dynamics brush.
   const hasBrushDynamics = drawMode === "pen"
-    && resolveStudioBrushDynamicsPresetId(brush) !== null;
+    && resolveStudioBrushDynamicsSelectionPresetId(brush, input.brushDynamics) !== null;
+  const causalWatercolor = drawMode === "pen"
+    && brushFamily === "watercolor"
+    && !hasBrushDynamics;
   const causalInputPlan = resolveStudioCausalInkInputPlan({
     stabilizerMode: input.stabilizerMode,
     stabilizerStrength: input.stabilizer,
@@ -166,9 +171,11 @@ export function planStudioDrawPointerStart(
       : STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1
     : undefined;
   const layeredFlowPaintEligible =
-    drawMode === "pen"
-    && brushOpacity < 1
-    && (brushFamily === "pen" || brushFamily === "marker")
+    brushOpacity < 1
+    && (
+      lowDensityEraser
+      || (drawMode === "pen" && (brushFamily === "pen" || brushFamily === "marker"))
+    )
     && !hasBrushDynamics
     && stampKind === null
     && symmetry.type === "none";
@@ -176,9 +183,8 @@ export function planStudioDrawPointerStart(
     drawMode === "pen"
     && hasBrushDynamics
     && stampKind === null
-    && !causalWatercolor
     && isStudioBoundedFlowSymmetryCompatible(symmetry);
-  const hybridPressure = drawMode === "pen" && brush !== "pen"
+  const hybridPressure = (drawMode === "pen" || lowDensityEraser) && brush !== "pen"
     ? resolveStudioHybridPressureSample(brush, {
         pointerType: pointer.pointerType,
         rawPressure: pointer.pressure,
@@ -226,7 +232,7 @@ export function planStudioDrawPointerStart(
   const startInkChannels = captureInkSensorChannels
     ? captureStudioPointerStartInkChannels(pointer, stylus)
     : {};
-  const brushCatalogIdentity = drawMode === "pen"
+  const brushCatalogIdentity = drawMode === "pen" || namedEraser
     ? normalizeStudioBrushCatalogIdentityMetadata(input)
     : {};
   // Resolved causal pressure is already persisted, including the mouse velocity fallback.
@@ -241,9 +247,11 @@ export function planStudioDrawPointerStart(
     opacity: brushOpacity,
     brush: drawMode === "pen"
       ? (brush === STUDIO_PIXEL_PENCIL_RENDER_MODE ? "pen" : brush)
-      : drawMode === "pixel"
-        ? STUDIO_PIXEL_PENCIL_RENDER_MODE
-        : undefined,
+      : namedEraser
+        ? brush
+        : drawMode === "pixel"
+          ? STUDIO_PIXEL_PENCIL_RENDER_MODE
+          : undefined,
     ...pressureContract,
     ...brushCatalogIdentity,
     ...(outlineStroke ? { outlineStroke } : {}),

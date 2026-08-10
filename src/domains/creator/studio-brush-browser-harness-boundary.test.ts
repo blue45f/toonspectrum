@@ -48,7 +48,12 @@ describe("Studio brush browser harness catalogue boundary", () => {
       "const PRODUCT_BRUSH_CATALOG_COUNT = STUDIO_ALL_BRUSH_CATALOG_ITEMS.length;",
     );
     expect(harness).toContain("assertProductBrushCatalogContract()");
-    expect(harness).toContain("assertUiBrushCatalogMatchesProductCatalog(firstCatalog)");
+    expect(harness).toContain(
+      "assertUiBrushCatalogMatchesProductCatalog(\n      firstCatalog,\n      STUDIO_PAINT_BRUSH_CATALOG_ITEMS,\n      \"paint\",\n    )",
+    );
+    expect(harness).toContain(
+      "assertUiEraserQuickPickerMatchesProductCatalog(eraserCatalog)",
+    );
     expect(harness).toContain(
       'firstCatalog.locator(\'[data-studio-brush-library-close="true"]\')',
     );
@@ -82,10 +87,10 @@ describe("Studio brush browser harness catalogue boundary", () => {
       'preset.source === "core" || expectedSelection.brushDynamics',
     );
     expect(harness).toContain(
-      "draw?.brushCatalogId === catalogId",
+      "draw?.brushCatalogId === expected.catalogId",
     );
     expect(harness).toContain(
-      "draw.brush === runtimeBrushId",
+      "draw.brush === expected.runtimeBrushId",
     );
     expect(harness).toContain(
       "serializeStudioBrushDynamicsSettingsCanonical(persistedProStroke.brushDynamics)",
@@ -126,9 +131,17 @@ describe("Studio brush browser harness catalogue boundary", () => {
     expect(harness).toContain("data-studio-active-draw-mode");
     expect(harness).toContain("prepareVisibleEraserBaseline");
     expect(harness).toContain("pointer-down gesture lost eraser operation authority");
-    expect(harness).toContain("destination-out remains release-visible by design");
+    expect(harness).toContain("eraser gesture had no live retained-layer preview");
+    expect(harness).toContain("live low-density gesture retained");
+    expect(harness).toContain("live retained-layer eraser");
+    expect(harness).not.toContain("release-visible destination-out over retained paint");
     expect(harness).toContain("waitForPersistedSelectedOperation(");
-    expect(harness).toContain('persistedErase.stroke.brush === null');
+    expect(harness).toContain(
+      "persistedErase.stroke.brush === expectedSelection.runtimeBrushId",
+    );
+    expect(harness).toContain('data-studio-active-tool-summary="eraser"');
+    expect(harness).toContain("measureEraserLiftRatio(");
+    expect(harness).toContain("expected a bounded partial lift");
     expect(harness).toContain("paint+erase cleanup left");
     expect(harness).toContain("long paint+erase cleanup left");
     expect(harness).toContain("TOONSPECTRUM_BRUSH_VERIFY_IDS");
@@ -137,13 +150,13 @@ describe("Studio brush browser harness catalogue boundary", () => {
 
   it("isolates every sparse long route and offers an exhaustive long-only catalogue audit", () => {
     expect(harness).toContain(
-      "const desktop = shapesOnly || longOnly ? null : await runDesktopBrushMatrix(browser, studioUrl);",
+      "const desktop = runDesktop ? await runDesktopBrushMatrix(browser, studioUrl) : null;",
     );
     expect(harness).toContain(
-      "const longBrushes = shapesOnly ? null : await runLongBrushMatrix(browser, studioUrl);",
+      "const longBrushes = runLong ? await runLongBrushMatrix(browser, studioUrl) : null;",
     );
     expect(harness).toContain(
-      "const smartShapes = drawingOnly || longOnly",
+      "const smartShapes = runShapes ? await runSmartShapeMatrix(browser, studioUrl) : null;",
     );
     expect(harness).toContain("const y = safeTop + (safeBottom - safeTop) / 2;");
     expect(harness).toContain("const ALL_BRUSH_LONG_MATRIX =");

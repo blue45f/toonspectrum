@@ -304,10 +304,27 @@ describe("studio draft preview destination-aware composition", () => {
     ]);
   });
 
-  it("plans a synchronous boundary for retained DOM ink and for a third blend transition", () => {
+  it("plans a synchronous boundary for erasing pending ink, retained DOM ink, and a third blend transition", () => {
     const pen = drawEl({ id: "pen", brush: "pen", mode: "pen" });
     const wash = drawEl({ id: "wash", brush: "highlighter", mode: "pen" });
     const oil = drawEl({ id: "oil", brush: "oil", mode: "pen" });
+    const eraser = drawEl({ id: "eraser", brush: "kneaded-eraser", mode: "eraser" });
+
+    expect(planStudioDraftPreviewBackdropBoundary({
+      incoming: eraser,
+      pending: [pen],
+      hasRetainedDomBackdrop: false,
+    })).toEqual({ action: "flush", reason: "eraser-backdrop" });
+    expect(planStudioDraftPreviewBackdropBoundary({
+      incoming: eraser,
+      pending: [pen],
+      hasRetainedDomBackdrop: true,
+    })).toEqual({ action: "flush", reason: "eraser-backdrop" });
+    expect(planStudioDraftPreviewBackdropBoundary({
+      incoming: eraser,
+      pending: [],
+      hasRetainedDomBackdrop: false,
+    })).toEqual({ action: "continue", reason: "within-layer-bound" });
 
     expect(planStudioDraftPreviewBackdropBoundary({
       incoming: wash,
@@ -939,7 +956,7 @@ describe("live freehand Canvas2D fixtures", () => {
     expect(context.operations.filter((operation) => operation === "fillStyle:#fedcba")).toHaveLength(2);
   });
 
-  it("routes sample-spaced pen and eraser drafts through causal dabs", () => {
+  it("routes ink and low-density eraser unions once while generic erasers keep legacy buildup", () => {
     const pen = new RecordingContext();
     drawLiveFreehandDraftToContext(asKonvaContext(pen), drawEl({
       points: [0, 0, 8, 0],
@@ -965,5 +982,21 @@ describe("live freehand Canvas2D fixtures", () => {
     expect(eraser.operations).not.toContain("fillStyle:#123456");
     expect(eraser.operations).toContain("fillStyle:#16100c");
     expect(eraser.operations.at(-1)).toBe("restore");
+
+    const kneaded = new RecordingContext();
+    drawLiveFreehandDraftToContext(asKonvaContext(kneaded), drawEl({
+      mode: "eraser",
+      brush: "kneaded-eraser",
+      opacity: 0.38,
+      points: [0, 0, 8, 0],
+      pressures: [0.5, 1],
+      sampleSpacing: 1,
+      paintModel: "layered-flow-v1",
+    }));
+    expect(kneaded.operations).toContain("alpha:0.38");
+    expect(kneaded.operations).toContain("composite:destination-out");
+    expect(kneaded.operations.filter((operation) => operation === "fill")).toHaveLength(1);
+    expect(kneaded.operations.filter((operation) => operation.startsWith("arc:")).length)
+      .toBeGreaterThan(1);
   });
 });

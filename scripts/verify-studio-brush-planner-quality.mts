@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { BRUSH_PRESETS } from "../src/domains/creator/studio-brush";
+import { STUDIO_BRUSH_CATALOG_COUNTS } from "../src/domains/creator/studio-brush-catalog-core";
 import { STUDIO_BRUSH_PACK_DESCRIPTORS } from "../src/domains/creator/studio-brush-pack-index";
 import { materializeAllStudioBrushPackSelections } from "../src/domains/creator/studio-brush-pack-runtime";
 import {
@@ -76,7 +77,7 @@ function main(): void {
     runtimeMs: performance.now() - started,
     outputRoot: OUTPUT_ROOT,
     policy: {
-      shippedPresetCount: 226,
+      shippedPresetCount: STUDIO_BRUSH_CATALOG_COUNTS.total,
       firstTapPeakChannelDeltaFloor: 4.5,
       continuousFirstTapPeakChannelDeltaFloor: 12,
       continuousCurveGapRatioMaximum: 1,
@@ -105,8 +106,8 @@ function main(): void {
     competitiveQuality,
     ...audit,
     ok:
-      candidates.length === 226
-      && audit.results.length === 226
+      candidates.length === STUDIO_BRUSH_CATALOG_COUNTS.total
+      && audit.results.length === STUDIO_BRUSH_CATALOG_COUNTS.total
       && audit.ok
       && audit.warningCount === 0
       && audit.exactFingerprintGroups.length === 0
@@ -153,7 +154,7 @@ function main(): void {
   }
   log(`report ${REPORT_PATH}`);
   invariant(report.ok, "Studio brush planner quality gate failed; inspect its JSON report");
-  log("ALL 226 SHIPPED BRUSH PLANNER QUALITY GATES OK");
+  log(`ALL ${STUDIO_BRUSH_CATALOG_COUNTS.total} SHIPPED BRUSH PLANNER QUALITY GATES OK`);
 }
 
 try {

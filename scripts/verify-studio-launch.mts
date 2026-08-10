@@ -103,6 +103,7 @@ interface RunResult {
     pageDelta: number;
   };
   workspaceMenu: WorkspaceMenuGateContractResult;
+  sqliteStorageFailureCount: number;
   errCount: number;
   shot: string;
 }
@@ -352,12 +353,18 @@ async function verifyWorkspaceMenuGate(
     .waitFor({ state: "hidden", timeout: 3000 })
     .then(() => waitForLocatorFocus(page, heavyTrigger))
     .catch(() => false);
+  // A fulfilled preload can make the intermediate busy frame shorter than a
+  // Playwright polling turn. When it is observable, keep the strict focus and
+  // collapsed-dialog contract; otherwise the activated/final states below are
+  // the authority rather than treating fast loading as a product failure.
+  const loadingStateValid = !loadingObserved || (
+    loadingFocusRetained
+    && loadingExpandedFalse
+    && loadingDialogCount === 0
+  );
   const ok =
     initialReady &&
-    loadingObserved &&
-    loadingFocusRetained &&
-    loadingExpandedFalse &&
-    loadingDialogCount === 0 &&
+    loadingStateValid &&
     activatedReady &&
     focusMovedInside &&
     dialogClosed &&
@@ -525,18 +532,29 @@ async function runOne(browser: Browser, run: number, url: string): Promise<RunRe
   const hasKonvaSurface = (await page.locator(".konvajs-content, canvas").count().catch(() => 0)) > 0;
 
   const dimOk = logicalW === "720" && hasKonvaSurface;
-  log(`run${run}: hasKonvaSurface=${hasKonvaSurface} dimOk=${dimOk} (target 720) consoleErrors=${consoleErrors.length}`);
+  const sqliteStorageFailureCount = await page.getByText(
+    /브러시 퀵 슬롯을 불러오지 못했어요|studio local sqlite unavailable/u,
+  ).count();
+  log(
+    `run${run}: hasKonvaSurface=${hasKonvaSurface} dimOk=${dimOk} (target 720) ` +
+    `sqliteStorageFailures=${sqliteStorageFailureCount} consoleErrors=${consoleErrors.length}`,
+  );
 
   await page.screenshot({ path: shot, fullPage: true });
 
   await ctx.close();
 
   // Strict gate: driven action performed (click logged) + konva surface + target logical noted
-  const ok = pageDelta >= 2 && dimOk && workspaceMenu.ok && consoleErrors.length === 0;
+  const ok = pageDelta >= 2
+    && dimOk
+    && workspaceMenu.ok
+    && sqliteStorageFailureCount === 0
+    && consoleErrors.length === 0;
   if (!ok) {
     log(
       `run${run} FAIL (delta=${pageDelta}, dimOk=${dimOk}, ` +
-      `workspaceMenu=${workspaceMenu.ok}, errs=${consoleErrors.length})`,
+      `workspaceMenu=${workspaceMenu.ok}, sqliteStorageFailures=${sqliteStorageFailureCount}, ` +
+      `errs=${consoleErrors.length})`,
     );
     if (consoleErrors.length > 0) {
       // 실패 시 원인을 출력해야 실제 Studio 회귀와 무해한 네트워크 경고를 구별할 수 있다.
@@ -553,6 +571,7 @@ async function runOne(browser: Browser, run: number, url: string): Promise<RunRe
     ok,
     stageInfo: { logicalW, hasKonvaSurface, pageDelta },
     workspaceMenu,
+    sqliteStorageFailureCount,
     errCount: consoleErrors.length,
     shot,
   };

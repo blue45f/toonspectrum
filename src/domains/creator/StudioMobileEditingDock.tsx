@@ -38,6 +38,7 @@ import {
   type ReactNode,
 } from "react";
 
+import { resolveStudioBrushPresetOperation } from "./studio-brush";
 import {
   StudioContextActionButton,
   StudioDockButton,
@@ -65,6 +66,10 @@ import {
   STUDIO_ERASE_TO_INTERSECTION_TIP,
 } from "./studio-vector-erase-to-intersection-apply";
 import { StudioColorBlindPreviewToggle } from "./StudioColorBlindPreviewToggle";
+import {
+  StudioEraserQuickPicker,
+  type StudioEraserQuickPickerId,
+} from "./StudioEraserQuickPicker";
 import { StudioLineCorrectionControls } from "./StudioLineCorrectionControls";
 import {
   StudioLivingInkControls,
@@ -652,6 +657,10 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
   const penModeActive = tool === "draw" && drawMode === "pen";
   const pixelModeActive = tool === "draw" && drawMode === "pixel";
   const shapeModeActive = tool === "draw" && drawMode === "shape";
+  const eraserPresetActive =
+    drawMode === "eraser" && resolveStudioBrushPresetOperation(brush) === "erase";
+  const activeEraserQuickId: StudioEraserQuickPickerId =
+    brush === "kneaded-eraser" ? "kneaded-eraser" : "standard-eraser";
   const undoDisabled = hi === 0 || collaborationDocumentLocked;
   const redoDisabled = hi >= history.length - 1 || collaborationDocumentLocked;
   const undoUnavailableTitle = collaborationDocumentLocked
@@ -950,7 +959,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
               <div className="flex min-h-12 items-center justify-between">
                 <p className="text-sm font-semibold text-fg">
                   {drawMode === "eraser"
-                    ? "지우개"
+                    ? eraserPresetActive ? activeCatalogBrushName : "지우개"
                     : drawMode === "shape"
                       ? "도형"
                       : drawMode === "pixel"
@@ -1011,10 +1020,10 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                   />
                 </div>
               </div> : null}
-              {drawMode !== "eraser" && (
+              {(drawMode !== "eraser" || eraserPresetActive) && (
                 <div>
                   <span className="mb-1 flex items-center justify-between text-[0.7rem] font-medium text-fg-3">
-                    <span>투명도</span>
+                    <span>{drawMode === "eraser" ? "지우기 강도" : "투명도"}</span>
                     <span className="tabular-nums text-fg-2">{Math.round(brushOpacity * 100)}%</span>
                   </span>
                   <div className="grid grid-cols-[minmax(0,1fr)_4.5rem] items-center gap-2">
@@ -1026,9 +1035,11 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                       value={Math.round(brushOpacity * 100)}
                       onChange={(e) => setBrushOpacity(Number(e.target.value) / 100)}
                       className="h-11 w-full accent-accent"
-                      aria-label="브러시 투명도 슬라이더"
+                      aria-label={drawMode === "eraser" ? "지우기 강도 슬라이더" : "브러시 투명도 슬라이더"}
                     />
-                    <label className="sr-only" htmlFor="mobile-brush-opacity">브러시 투명도 숫자</label>
+                    <label className="sr-only" htmlFor="mobile-brush-opacity">
+                      {drawMode === "eraser" ? "지우기 강도 숫자" : "브러시 투명도 숫자"}
+                    </label>
                     <input
                       id="mobile-brush-opacity"
                       type="number"
@@ -1109,7 +1120,9 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                     key={m.v}
                     type="button"
                     onClick={() => {
-                      if (!active) activateCanvasTool("draw", m.v);
+                      if (!active) {
+                        activateCanvasTool("draw", m.v);
+                      }
                     }}
                     aria-pressed={active}
                     aria-label={m.label}
@@ -1184,6 +1197,27 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                   </span>
                 </button>
               </div>
+            ) : null}
+
+            {drawMode === "eraser" && mobileSheet === "draw" ? (
+              <section
+                aria-label="지우개 종류"
+                className="mb-2.5 rounded-2xl border border-line/70 bg-card/45 p-2"
+              >
+                <div className="mb-2 flex items-center justify-between gap-2 px-1">
+                  <div>
+                    <p className="text-xs font-extrabold text-fg">지우개 종류</p>
+                    <p className="mt-0.5 text-[0.66rem] text-fg-3">
+                      한 번에 지울 양과 남는 결과를 보고 선택하세요.
+                    </p>
+                  </div>
+                </div>
+                <StudioEraserQuickPicker
+                  selectedId={activeEraserQuickId}
+                  onSelect={(id) => brushCatalogHandlers.selectBrushId(id)}
+                  ariaLabel="모바일 지우개 종류 빠른 선택"
+                />
+              </section>
             ) : null}
 
             {/* 펜 프리셋 — 데스크톱과 같은 현재/빠른 선반/전체 카탈로그 구조 */}
@@ -1554,6 +1588,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
               <StudioDockButton
                 icon={Eraser}
                 label={label.eraser}
+                data-studio-mobile-tool="eraser"
                 hintDescription="현재 레이어의 획을 지웁니다. 브러시 크기와 불투명도 설정을 그대로 활용합니다."
                 hintShortcut="E"
                 active={tool === "draw" && drawMode === "eraser"}

@@ -79,7 +79,7 @@ describe("studio shortcut advertisement contract", () => {
     expect(reachable).toContain("toggle-opacity-lock");
     expect(reachable).toContain("cycle-stabilizer");
     expect(reachable).toContain("select-pen");
-    expect(reachable).toContain("toggle-eraser");
+    expect(reachable).toContain("select-eraser");
   });
 
   it("binds the size lock to Shift+Alt+S only, so the saved-view chord stays intact", () => {

@@ -43,6 +43,7 @@ describe("Studio brush executable runtime validation", () => {
       name: "계약 없는 브러시",
       defaultWidth: 12,
       defaultOpacity: 1,
+      operation: "paint",
     };
     const audit = auditStudioBrushRuntimeCatalog(
       [...BRUSH_PRESETS, catalogOnly],
@@ -73,6 +74,22 @@ describe("Studio brush executable runtime validation", () => {
       .toContainEqual(expect.objectContaining({ code: "unsupported-engine-variant" }));
     expect(auditStudioBrushRuntimeCatalog([BRUSH_PRESETS[0]], [incompatibleTuple]).issues)
       .toContainEqual(expect.objectContaining({ code: "incompatible-engine-combination" }));
+  });
+
+  it("rejects a runtime contract whose operation disagrees with its catalogue preset", () => {
+    const standardEraser = BRUSH_PRESETS.find((preset) => preset.id === "standard-eraser")!;
+    const contract = STUDIO_BRUSH_RUNTIME_CONTRACT.find(
+      (candidate) => candidate.id === standardEraser.id
+    )!;
+    const audit = auditStudioBrushRuntimeCatalog(
+      [standardEraser],
+      [{ ...contract, operation: "paint", canonicalId: standardEraser.id, distinctness: "unique" }]
+    );
+
+    expect(audit.issues).toContainEqual(expect.objectContaining({
+      brushId: "standard-eraser",
+      code: "operation-mismatch",
+    }));
   });
 
   it("reports exact capabilities for custom presets built on stamp and dynamic engines", () => {
@@ -157,6 +174,7 @@ describe("Studio brush executable runtime validation", () => {
       name: "무반응 브러시",
       defaultWidth: 10,
       defaultOpacity: 1,
+      operation: "paint",
     };
     BRUSH_PRESETS.push(leakedPreset);
     try {

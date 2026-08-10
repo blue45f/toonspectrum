@@ -63,7 +63,7 @@ export interface StudioCanonicalVNextQualityShadowCapability {
   readonly supportedBackends: readonly StudioCanonicalVNextQualityShadowBackend[];
   /**
    * Exact catalogue identities only. A family wildcard is intentionally unsupported so installing
-   * a runtime cannot silently migrate the complete 230-brush shelf.
+   * a runtime cannot silently migrate the complete product brush shelf.
    */
   readonly optedInCatalogIds: readonly string[];
 }

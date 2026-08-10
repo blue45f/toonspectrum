@@ -6,8 +6,8 @@
  * contract with real browser-owned OPFS and Web Locks:
  *
  *   checkpoint -> page reload -> durable read
- *   newer browser fallback -> migration into OPFS -> durable read
- *   durable clear tombstone -> stale fallback suppression -> durable read
+ *   newer SQLite fallback -> migration into OPFS -> durable read
+ *   durable clear tombstone -> SQLite mirror + stale browser-slot suppression -> durable read
  *
  * Run:
  *   pnpm exec tsx scripts/verify-studio-autosave-opfs-session.mts
@@ -55,7 +55,8 @@ const RECOVERY_ROOT_NAME = "recovery-journals";
 const RESULT_TIMEOUT_MS = 120_000;
 const CSP = [
   "default-src 'none'",
-  "script-src 'self'",
+  "script-src 'self' 'wasm-unsafe-eval'",
+  "worker-src 'self'",
   "connect-src 'self'",
   "img-src 'none'",
   "style-src 'none'",
@@ -228,7 +229,8 @@ export function validateStudioAutosaveOpfsBrowserResult(
     receipt?.authority !== "opfs-journal"
     || positiveInteger(receipt?.sequence) === null
     || positiveInteger(receipt?.revision) === null
-    || checkpoint?.browserFallbackMirrored !== true
+    || checkpoint?.sqliteMirrorState !== "snapshot"
+    || elementId(checkpoint?.sqliteMirror) !== "checkpoint-stroke"
     || checkpoint?.pageReloadObserved !== true
     || checkpoint?.navigationType !== "reload"
     || afterReload?.state !== "snapshot"
@@ -241,12 +243,12 @@ export function validateStudioAutosaveOpfsBrowserResult(
   const reconciliation = record(migration?.reconciliation);
   const migratedRead = record(migration?.afterFreshSessionRead);
   if (
-    migration?.fallbackKeyKind !== "lifecycle-sidecar"
+    migration?.fallbackKind !== "sqlite-fallback"
     || reconciliation?.authority !== "opfs-journal"
     || reconciliation?.migratedToOpfs !== true
-    || elementId(reconciliation?.candidate) !== "newer-browser-fallback-stroke"
+    || elementId(reconciliation?.candidate) !== "newer-sqlite-fallback-stroke"
     || migratedRead?.state !== "snapshot"
-    || elementId(migratedRead) !== "newer-browser-fallback-stroke"
+    || elementId(migratedRead) !== "newer-sqlite-fallback-stroke"
     || migratedRead?.savedAt !== migration?.savedAt
     || (
       positiveInteger(migratedRead?.revision) ?? 0
@@ -254,7 +256,7 @@ export function validateStudioAutosaveOpfsBrowserResult(
       positiveInteger(afterReload?.revision) ?? Number.MAX_SAFE_INTEGER
     )
   ) {
-    issues.push("newer browser fallback was not promoted into native OPFS");
+    issues.push("newer SQLite fallback was not promoted into native OPFS");
   }
 
   const clearReceipt = record(clear?.receipt);
@@ -271,6 +273,7 @@ export function validateStudioAutosaveOpfsBrowserResult(
     || clearReconciliation?.migratedToOpfs !== false
     || clear?.stalePrimaryRemoved !== true
     || clear?.staleSidecarRemoved !== true
+    || nested(clear, "sqliteAfterClear", "state") !== "cleared"
     || finalRead?.state !== "cleared"
     || finalRead?.savedAt !== clear?.savedAt
   ) {
@@ -279,6 +282,7 @@ export function validateStudioAutosaveOpfsBrowserResult(
 
   if (
     cleanup?.opfsDocumentRemoved !== true
+    || cleanup?.sqliteRowRemoved !== true
     || cleanup?.localStorageCleared !== true
     || cleanup?.sessionStorageCleared !== true
   ) {
@@ -300,12 +304,14 @@ export function validateStudioAutosaveOpfsBrowserResult(
   if (
     !diagnostics.contentSecurityPolicy.includes("script-src 'self'")
     || !diagnostics.contentSecurityPolicy.includes("connect-src 'self'")
+    || !diagnostics.contentSecurityPolicy.includes("worker-src 'self'")
   ) {
     issues.push("the production preview did not serve the isolated verifier CSP");
   }
   if (
     productionAssets.length === 0
     || !productionAssets.some(path => /^assets\/.+\.js$/u.test(path))
+    || !productionAssets.some(path => /^assets\/.+\.wasm$/u.test(path))
     || diagnostics.requests.some(request => (
       request.url.includes("/src/")
       || /\.(?:[cm]?ts|tsx)(?:[?#]|$)/u.test(request.url)
@@ -338,6 +344,14 @@ export function createStudioAutosaveOpfsBrowserHarnessSource(
     repositoryRoot,
     "src/domains/creator/studio-autosave.ts",
   );
+  const sqliteStoreImport = browserHarnessImport(
+    repositoryRoot,
+    "src/domains/creator/studio-autosave-sqlite-store.ts",
+  );
+  const sqliteRuntimeImport = browserHarnessImport(
+    repositoryRoot,
+    "src/domains/creator/studio-local-database-runtime.ts",
+  );
   return `
 globalThis.__zod_globalConfig ??= {};
 globalThis.__zod_globalConfig.jitless = true;
@@ -351,6 +365,14 @@ const {
   serializeStudioAutosave,
   studioLifecycleAutosaveSidecarKey,
 } = await import(${autosaveImport});
+const {
+  STUDIO_AUTOSAVE_SQLITE_NAMESPACE,
+  acquireStudioAutosaveSqliteStore,
+} = await import(${sqliteStoreImport});
+const {
+  acquireStudioLocalDatabase,
+  closeStudioLocalDatabaseRuntime,
+} = await import(${sqliteRuntimeImport});
 
 const RESULT_GLOBAL = ${JSON.stringify(RESULT_GLOBAL)};
 const ROOT_NAME = ${JSON.stringify(ROOT_NAME)};
@@ -535,7 +557,7 @@ async function run() {
   const checkpointPayload = payload(checkpointSavedAt, "checkpoint-stroke");
   const migrationPayload = payload(
     migrationSavedAt,
-    "newer-browser-fallback-stroke",
+    "newer-sqlite-fallback-stroke",
   );
   const telemetry = {
     getDirectoryCalls: 0,
@@ -550,21 +572,24 @@ async function run() {
     try {
       await cleanupBrowserSlots(sidecarKey);
       await removeUniqueDocument(journalDocumentId).catch(() => false);
+      const sqlite = await acquireStudioAutosaveSqliteStore();
       session = await createStudioAutosaveOpfsSession(documentKey, scope);
       if (!session) throw new Error("native OPFS session selection returned null");
       const receipt = await persistStudioAutosaveWithOpfsPrimary({
         session,
+        sqlite,
         storage: window.localStorage,
         key: documentKey,
         payload: checkpointPayload,
       });
       await session.flush();
+      const sqliteMirror = await sqlite.read(documentKey);
       const filesAfterCheckpoint = await uniqueDocumentFiles(journalDocumentId);
       const phase = {
         receipt,
         savedAt: checkpointSavedAt,
-        browserFallbackMirrored:
-          window.localStorage.getItem(documentKey) !== null,
+        sqliteMirrorState: sqliteMirror?.state ?? null,
+        sqliteMirror,
         filesAfterCheckpoint,
         telemetry,
       };
@@ -578,6 +603,7 @@ async function run() {
       });
     } finally {
       await session?.dispose();
+      await closeStudioLocalDatabaseRuntime();
     }
     return;
   }
@@ -587,12 +613,15 @@ async function run() {
   let migrationReadSession = null;
   let clearReadSession = null;
   let finalReadSession = null;
+  let sqlite = null;
   let cleanup = {
     opfsDocumentRemoved: false,
+    sqliteRowRemoved: false,
     localStorageCleared: false,
     sessionStorageCleared: false,
   };
   try {
+    sqlite = await acquireStudioAutosaveSqliteStore();
     reloadSession = await createStudioAutosaveOpfsSession(documentKey, scope);
     if (!reloadSession) throw new Error("reload native OPFS session selection returned null");
     const afterReload = await reloadSession.readLatest();
@@ -603,12 +632,10 @@ async function run() {
       throw new Error("checkpoint did not survive the real page reload");
     }
 
-    window.localStorage.setItem(
-      sidecarKey,
-      serializeStudioAutosave(migrationPayload),
-    );
+    await sqlite.write(documentKey, migrationPayload);
     const reconciliation = await reconcileStudioAutosaveWithOpfsPrimary({
       session: reloadSession,
+      sqlite,
       storage: window.localStorage,
       key: documentKey,
     });
@@ -627,9 +654,9 @@ async function run() {
     if (
       afterFreshSessionRead?.state !== "snapshot"
       || firstElementId(afterFreshSessionRead)
-        !== "newer-browser-fallback-stroke"
+        !== "newer-sqlite-fallback-stroke"
     ) {
-      throw new Error("newer browser fallback did not persist into OPFS");
+      throw new Error("newer SQLite fallback did not persist into OPFS");
     }
     const clearReceipt = await migrationReadSession.clear(clearSavedAt);
     await migrationReadSession.flush();
@@ -651,6 +678,7 @@ async function run() {
     const afterClearFreshSessionRead = await clearReadSession.readLatest();
     const clearReconciliation = await reconcileStudioAutosaveWithOpfsPrimary({
       session: clearReadSession,
+      sqlite,
       storage: window.localStorage,
       key: documentKey,
     });
@@ -658,6 +686,7 @@ async function run() {
       window.localStorage.getItem(documentKey) === null;
     const staleSidecarRemoved =
       window.localStorage.getItem(sidecarKey) === null;
+    const sqliteAfterClear = await sqlite.read(documentKey);
     await clearReadSession.dispose();
     clearReadSession = null;
 
@@ -687,12 +716,17 @@ async function run() {
       filesAfterCleanup: [],
     };
     const opfsDocumentRemoved = await removeUniqueDocument(journalDocumentId);
+    const database = await acquireStudioLocalDatabase();
+    await database.kvDelete(STUDIO_AUTOSAVE_SQLITE_NAMESPACE, documentKey);
+    const sqliteRowRemoved =
+      await database.kvGet(STUDIO_AUTOSAVE_SQLITE_NAMESPACE, documentKey) === null;
     await cleanupBrowserSlots(sidecarKey);
     window.sessionStorage.removeItem(phaseKey);
     combinedTelemetry.filesAfterCleanup =
       await uniqueDocumentFiles(journalDocumentId);
     cleanup = {
       opfsDocumentRemoved,
+      sqliteRowRemoved,
       localStorageCleared:
         window.localStorage.getItem(documentKey) === null
         && window.localStorage.getItem(sidecarKey) === null,
@@ -713,15 +747,16 @@ async function run() {
       checkpoint: {
         receipt: phaseOne.receipt,
         savedAt: phaseOne.savedAt,
-        browserFallbackMirrored: phaseOne.browserFallbackMirrored,
+        sqliteMirrorState: phaseOne.sqliteMirrorState,
+        sqliteMirror: phaseOne.sqliteMirror,
         afterReload,
         pageReloadObserved: navigation?.type === "reload",
         navigationType: navigation?.type ?? null,
       },
       migration: {
         savedAt: migrationSavedAt,
-        fallbackKeyKind: reconciliation.candidate?.key === sidecarKey
-          ? "lifecycle-sidecar"
+        fallbackKind: reconciliation.candidate?.key === documentKey
+          ? "sqlite-fallback"
           : "unexpected",
         reconciliation,
         afterFreshSessionRead,
@@ -733,6 +768,7 @@ async function run() {
         reconciliation: clearReconciliation,
         stalePrimaryRemoved,
         staleSidecarRemoved,
+        sqliteAfterClear,
         finalFreshSessionRead,
       },
       cleanup,
@@ -745,6 +781,7 @@ async function run() {
       clearReadSession?.dispose(),
       finalReadSession?.dispose(),
     ].filter(Boolean));
+    await closeStudioLocalDatabaseRuntime();
   }
 }
 
@@ -759,6 +796,9 @@ run().catch(async error => {
         studioLifecycleAutosaveSidecarKey(documentKey),
       );
       window.sessionStorage.removeItem(phaseKey);
+      const database = await acquireStudioLocalDatabase().catch(() => null);
+      await database?.kvDelete(STUDIO_AUTOSAVE_SQLITE_NAMESPACE, documentKey);
+      await closeStudioLocalDatabaseRuntime();
     }
   } finally {
     publish({
@@ -1089,7 +1129,8 @@ export async function runStudioAutosaveOpfsBrowserVerifier(): Promise<void> {
         nativeNavigatorStorageGetDirectory: true,
         nativeOriginWideWebLocks: true,
         checkpointSurvivesPageReload: true,
-        newerBrowserFallbackMigratesToOpfs: true,
+        sqliteMirrorSurvivesPageReload: true,
+        newerSqliteFallbackMigratesToOpfs: true,
         durableClearTombstoneWins: true,
         uniqueDocumentCleanup: true,
         zeroConsoleErrors: true,

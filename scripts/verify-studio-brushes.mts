@@ -18,17 +18,26 @@
  *
  * Run after `pnpm build`:
  *   pnpm verify:studio-brushes
- * Exhaustive 226-brush long-route audit without repeating the short matrix:
+ * Exhaustive full-catalogue long-route audit without repeating the short matrix:
  *   TOONSPECTRUM_ALL_BRUSH_LONG_MATRIX=1 TOONSPECTRUM_BRUSH_LONG_ONLY=1 \
  *     pnpm verify:studio-brushes
  * Focused paint → eraser → paint browser regression (desktop short + core long routes):
  *   TOONSPECTRUM_BRUSH_VERIFY_IDS=perfect-marker,kneaded-eraser,marker \
  *     TOONSPECTRUM_DRAWING_ONLY=1 pnpm verify:studio-brushes
+ * Resume one independent product gate after a failure without replaying completed matrices:
+ *   TOONSPECTRUM_BRUSH_VERIFY_STAGE=mobile pnpm verify:studio-brushes
  * Screenshots/logs:
  *   TOONSPECTRUM_BRUSH_VERIFY_DIR=/tmp/my-run pnpm verify:studio-brushes
  */
 import { spawn, type ChildProcess } from "node:child_process";
-import { appendFileSync, mkdirSync, readdirSync, unlinkSync, writeFileSync } from "node:fs";
+import {
+  appendFileSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
@@ -39,15 +48,20 @@ import {
   chromium,
   type Browser,
   type BrowserContext,
+  type Dialog,
   type Locator,
   type Page,
 } from "playwright";
 
 import { STUDIO_APP_SETTINGS_STORAGE_KEY } from "../src/domains/creator/studio-app-settings";
+import { studioAutosaveKey } from "../src/domains/creator/studio-autosave";
 import { BRUSH_PRESETS } from "../src/domains/creator/studio-brush";
+import { isStudioBrushEraserAliasId } from "../src/domains/creator/studio-brush-alias-profile";
 import { studioBrushPresetUsesIntentionalDiscreteCarrier } from "../src/domains/creator/studio-brush-carrier-quality";
 import {
   STUDIO_ALL_BRUSH_CATALOG_ITEMS,
+  STUDIO_ERASER_BRUSH_CATALOG_ITEMS,
+  STUDIO_PAINT_BRUSH_CATALOG_ITEMS,
   type StudioBrushCatalogItem,
 } from "../src/domains/creator/studio-brush-catalog";
 import { serializeStudioBrushDynamicsSettingsCanonical } from "../src/domains/creator/studio-brush-dynamics";
@@ -80,6 +94,7 @@ const LOG_PATH = join(SCRATCH, "studio-brush-verify.log");
 const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
 const MOBILE_HINT_KEY = "toonspectrum-studio-mobile-hint-dismissed";
 const AUTOSAVE_PREFIX = "toonspectrum-studio-autosave";
+const AUTOSAVE_KEY = studioAutosaveKey({});
 const CLEAN_SESSION_KEY = "toonspectrum-brush-verifier-cleaned";
 const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
   "/api/auth/session",
@@ -116,7 +131,7 @@ const LONG_BRUSH_MATRIX_MODE =
   REQUESTED_BRUSH_VERIFY_IDS.length > 0
     ? `focused-${LONG_BRUSH_CATALOG_COUNT}`
     : ALL_BRUSH_LONG_MATRIX
-      ? "all-226"
+      ? `all-${LONG_BRUSH_CATALOG_COUNT}`
       : "core-only";
 
 type VerifierBrushOperation = "paint" | "erase";
@@ -133,6 +148,7 @@ interface BrushStrokeEvidence {
   selected: boolean;
   visualChanged: boolean;
   eraseLiveOperationActive: boolean | null;
+  eraseResidualRatio: number | null;
   undoEnabled: boolean;
   undoRestoredPixels: boolean;
   redoRestoredStroke: boolean;
@@ -204,6 +220,11 @@ interface PixelCoverage extends PixelDiff {
   bounds: { left: number; top: number; right: number; bottom: number } | null;
 }
 
+interface EraserLiftRatio {
+  affectedPixels: number;
+  residualEnergyRatio: number;
+}
+
 interface DesktopBrushResult {
   ok: boolean;
   catalogSessionCount: number;
@@ -254,6 +275,7 @@ interface SmartShapeResult {
 interface MobileTouchResult {
   ok: boolean;
   selectionCount: number;
+  eraserSelectionCount: number;
   interactiveTargetCount: number;
   minimumWidth: number;
   minimumHeight: number;
@@ -276,6 +298,7 @@ interface EmergencyAutosaveRecord {
 interface DeferredDurabilityResult {
   ok: boolean;
   navigationIssuedInMs: number;
+  unloadGuardShown: boolean;
   markerReason: string;
   strokeCount: number;
   payloadContainsEveryStroke: boolean;
@@ -620,6 +643,19 @@ async function activateDesktopPen(page: Page): Promise<void> {
   if (await propertiesTab.getAttribute("aria-selected") !== "true") await propertiesTab.click();
 }
 
+async function activateDesktopEraser(page: Page): Promise<void> {
+  await page.keyboard.press("e");
+  const toolbar = page.locator('[data-studio-draw-options="true"]');
+  await toolbar.waitFor({ state: "visible", timeout: 8_000 });
+  await page.waitForFunction(() =>
+    document.querySelector('[data-studio-draw-options="true"]')
+      ?.getAttribute("data-studio-active-draw-mode") === "eraser"
+  );
+  await toolbar.locator('[data-studio-brush-active-pill="true"]').waitFor({
+    state: "visible",
+  });
+}
+
 async function ensureDesktopBrushCatalogTrigger(page: Page): Promise<Locator> {
   const toolbar = page.locator('[data-studio-draw-options="true"]');
   await toolbar.waitFor({ state: "visible", timeout: 8_000 });
@@ -696,11 +732,15 @@ async function expandFullBrushCatalog(catalog: Locator): Promise<void> {
   );
 }
 
-async function assertUiBrushCatalogMatchesProductCatalog(catalog: Locator): Promise<void> {
+async function assertUiBrushCatalogMatchesProductCatalog(
+  catalog: Locator,
+  expectedCatalogItems: readonly StudioBrushCatalogItem[],
+  operationLabel: "paint" | "erase",
+): Promise<void> {
   await catalog.getByRole("tab", { name: "전체", exact: true }).click();
-  await catalog.getByRole("searchbox", { name: "브러시 검색" }).fill("");
+  await catalog.getByRole("searchbox").fill("");
   await expandFullBrushCatalog(catalog);
-  const expectedSelections = STUDIO_ALL_BRUSH_CATALOG_ITEMS.map((item) => ({
+  const expectedSelections = expectedCatalogItems.map((item) => ({
     label: `${item.name} 선택`,
     source: item.source,
   }));
@@ -714,8 +754,8 @@ async function assertUiBrushCatalogMatchesProductCatalog(catalog: Locator): Prom
   const actualLabels = actualSelections.map((selection) => selection.label);
 
   invariant(
-    actualSelections.length === PRODUCT_BRUSH_CATALOG_COUNT,
-    `desktop catalogue exposes ${actualSelections.length}/${PRODUCT_BRUSH_CATALOG_COUNT} product choices`,
+    actualSelections.length === expectedCatalogItems.length,
+    `desktop ${operationLabel} catalogue exposes ${actualSelections.length}/${expectedCatalogItems.length} product choices`,
   );
   invariant(
     new Set(actualLabels).size === actualLabels.length,
@@ -723,7 +763,23 @@ async function assertUiBrushCatalogMatchesProductCatalog(catalog: Locator): Prom
   );
   invariant(
     JSON.stringify(actualSelections) === JSON.stringify(expectedSelections),
-    "desktop catalogue selection order/source does not exactly match the product catalogue",
+    `desktop ${operationLabel} catalogue selection order/source does not exactly match its product partition`,
+  );
+}
+
+async function assertUiEraserQuickPickerMatchesProductCatalog(
+  catalog: Locator,
+): Promise<void> {
+  await catalog.getByRole("tab", { name: "전체", exact: true }).click();
+  await catalog.getByRole("searchbox").fill("");
+  const actualIds = await catalog
+    .locator("[data-studio-eraser-quick-option]")
+    .evaluateAll((buttons) => buttons.map((button) =>
+      button.getAttribute("data-studio-eraser-quick-option") ?? ""));
+  const expectedIds = STUDIO_ERASER_BRUSH_CATALOG_ITEMS.map((item) => item.id);
+  invariant(
+    JSON.stringify(actualIds) === JSON.stringify(expectedIds),
+    `desktop erase quick picker exposes ${actualIds.join(",") || "no choices"}; expected ${expectedIds.join(",")}`,
   );
 }
 
@@ -737,9 +793,18 @@ async function selectDesktopBrush(
   invariant(expectedSelection, `${preset.id}: catalogue selection did not materialize`);
   const operation = verifierBrushOperation(expectedSelection);
   const expectedDrawMode = operation === "erase" ? "eraser" : "pen";
+  if (operation === "erase") {
+    await activateDesktopEraser(page);
+  } else {
+    await page.keyboard.press("b");
+    await page.waitForFunction(() =>
+      document.querySelector('[data-studio-draw-options="true"]')
+        ?.getAttribute("data-studio-active-draw-mode") === "pen"
+    );
+  }
   const catalog = await openDesktopCatalog(page);
   await catalog.getByRole("tab", { name: "전체", exact: true }).click();
-  await catalog.getByRole("searchbox", { name: "브러시 검색" }).fill(preset.name);
+  await catalog.getByRole("searchbox").fill(preset.name);
   const option = catalog.getByRole("button", { name: `${preset.name} 선택`, exact: true });
   await option.waitFor({ state: "visible" });
   await option.scrollIntoViewIfNeeded();
@@ -752,18 +817,19 @@ async function selectDesktopBrush(
     { drawMode: expectedDrawMode },
     { timeout: 15000 },
   );
-  if (operation === "paint") {
-    await page.waitForFunction(
-      ({ expectedName }) => document
-        .querySelector('[data-studio-brush-active-pill="true"]')
-        ?.getAttribute("aria-label")
-        ?.includes(expectedName) === true,
-      { expectedName: preset.name },
-    );
-  } else {
+  await page.waitForFunction(
+    ({ expectedName }) => document
+      .querySelector('[data-studio-brush-active-pill="true"]')
+      ?.getAttribute("aria-label")
+      ?.includes(expectedName) === true,
+    { expectedName: preset.name },
+  );
+  if (operation === "erase") {
     invariant(
-      await page.locator('[data-studio-brush-active-pill="true"]').count() === 0,
-      `${preset.id}: eraser selection retained the pen-only active brush pill`,
+      await page.locator(
+        '[data-studio-brush-active-pill="true"][data-studio-active-tool-summary="eraser"]',
+      ).count() === 1,
+      `${preset.id}: named eraser selection did not expose its active brush identity`,
     );
   }
 }
@@ -891,6 +957,82 @@ async function compareScreenshotPixels(
     firstBase64: first.toString("base64"),
     secondBase64: second.toString("base64"),
     tolerance: channelTolerance,
+  });
+}
+
+async function measureEraserLiftRatio(
+  page: Page,
+  empty: Buffer,
+  painted: Buffer,
+  erased: Buffer,
+): Promise<EraserLiftRatio> {
+  return page.evaluate(async ({ emptyBase64, paintedBase64, erasedBase64 }) => {
+    const [emptyResponse, paintedResponse, erasedResponse] = await Promise.all([
+      fetch(`data:image/png;base64,${emptyBase64}`),
+      fetch(`data:image/png;base64,${paintedBase64}`),
+      fetch(`data:image/png;base64,${erasedBase64}`),
+    ]);
+    const [emptyBitmap, paintedBitmap, erasedBitmap] = await Promise.all([
+      createImageBitmap(await emptyResponse.blob()),
+      createImageBitmap(await paintedResponse.blob()),
+      createImageBitmap(await erasedResponse.blob()),
+    ]);
+    const emptyCanvas = new OffscreenCanvas(emptyBitmap.width, emptyBitmap.height);
+    const paintedCanvas = new OffscreenCanvas(paintedBitmap.width, paintedBitmap.height);
+    const erasedCanvas = new OffscreenCanvas(erasedBitmap.width, erasedBitmap.height);
+    const emptyContext = emptyCanvas.getContext("2d", { willReadFrequently: true });
+    const paintedContext = paintedCanvas.getContext("2d", { willReadFrequently: true });
+    const erasedContext = erasedCanvas.getContext("2d", { willReadFrequently: true });
+    if (!emptyContext || !paintedContext || !erasedContext) {
+      throw new Error("could not decode eraser evidence pixels");
+    }
+    emptyContext.drawImage(emptyBitmap, 0, 0);
+    paintedContext.drawImage(paintedBitmap, 0, 0);
+    erasedContext.drawImage(erasedBitmap, 0, 0);
+    const emptyPixels = emptyContext.getImageData(0, 0, emptyCanvas.width, emptyCanvas.height);
+    const paintedPixels = paintedContext.getImageData(0, 0, paintedCanvas.width, paintedCanvas.height);
+    const erasedPixels = erasedContext.getImageData(0, 0, erasedCanvas.width, erasedCanvas.height);
+    emptyBitmap.close();
+    paintedBitmap.close();
+    erasedBitmap.close();
+    if (
+      emptyCanvas.width !== paintedCanvas.width
+      || emptyCanvas.height !== paintedCanvas.height
+      || emptyCanvas.width !== erasedCanvas.width
+      || emptyCanvas.height !== erasedCanvas.height
+    ) return { affectedPixels: 0, residualEnergyRatio: 0 };
+
+    let affectedPixels = 0;
+    let baselineEnergy = 0;
+    let residualEnergy = 0;
+    for (let offset = 0; offset < emptyPixels.data.length; offset += 4) {
+      let paintedFromEmpty = 0;
+      let erasedFromPainted = 0;
+      let erasedFromEmpty = 0;
+      for (let channel = 0; channel < 3; channel += 1) {
+        paintedFromEmpty += Math.abs(
+          paintedPixels.data[offset + channel]! - emptyPixels.data[offset + channel]!,
+        );
+        erasedFromPainted += Math.abs(
+          erasedPixels.data[offset + channel]! - paintedPixels.data[offset + channel]!,
+        );
+        erasedFromEmpty += Math.abs(
+          erasedPixels.data[offset + channel]! - emptyPixels.data[offset + channel]!,
+        );
+      }
+      if (paintedFromEmpty < 24 || erasedFromPainted < 6) continue;
+      affectedPixels += 1;
+      baselineEnergy += paintedFromEmpty;
+      residualEnergy += erasedFromEmpty;
+    }
+    return {
+      affectedPixels,
+      residualEnergyRatio: baselineEnergy > 0 ? residualEnergy / baselineEnergy : 0,
+    };
+  }, {
+    emptyBase64: empty.toString("base64"),
+    paintedBase64: painted.toString("base64"),
+    erasedBase64: erased.toString("base64"),
   });
 }
 
@@ -1090,11 +1232,6 @@ async function prepareVisibleEraserBaseline(
 async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promise<DesktopBrushResult> {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
   const page = await context.newPage();
-  if (DEBUG_BRUSH_VERIFIER) {
-    page.on("console", (entry) => {
-      log(`console(${entry.type()}):${entry.text()}`);
-    });
-  }
   const errors = collectBrowserErrors(page, "desktop-brushes", studioUrl);
   const screenshot = join(SCRATCH, `studio-brush-desktop-${BRUSH_MATRIX_CATALOG_COUNT}.png`);
   const catalogScreenshot = join(SCRATCH, "studio-brush-desktop-catalog.png");
@@ -1127,10 +1264,21 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
     const catalogDialogCount = await page
       .locator('[role="dialog"][data-studio-brush-catalog="built-in"]')
       .count();
-    await assertUiBrushCatalogMatchesProductCatalog(firstCatalog);
+    await assertUiBrushCatalogMatchesProductCatalog(
+      firstCatalog,
+      STUDIO_PAINT_BRUSH_CATALOG_ITEMS,
+      "paint",
+    );
     await page.screenshot({ path: catalogScreenshot, animations: "disabled" });
     await firstCatalog.locator('[data-studio-brush-library-close="true"]').click();
     await firstCatalog.waitFor({ state: "detached" });
+
+    await activateDesktopEraser(page);
+    const eraserCatalog = await openDesktopCatalog(page);
+    await assertUiEraserQuickPickerMatchesProductCatalog(eraserCatalog);
+    await eraserCatalog.locator('[data-studio-brush-library-close="true"]').click();
+    await eraserCatalog.waitFor({ state: "detached" });
+    await activateDesktopPen(page);
 
     const stage = page.locator(".konvajs-content").first();
     await stage.waitFor({ state: "visible" });
@@ -1147,6 +1295,8 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
         `${preset.id}: pro catalogue selection has no runtime dynamics`,
       );
       const operation = verifierBrushOperation(expectedSelection);
+      const lowDensityEraser = operation === "erase"
+        && isStudioBrushEraserAliasId(expectedSelection.runtimeBrushId);
       await selectDesktopBrush(page, preset, expectedSelection);
       await page.mouse.move(4, 4);
       const point = strokePoint(stageBox, viewport, index);
@@ -1302,7 +1452,7 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
           eraseLiveOperationActive,
           `${preset.id}: pointer-down gesture lost eraser operation authority`,
         );
-        if (!hasMeaningfulPixelChange(liveDiff) && DEBUG_BRUSH_VERIFIER) {
+        if (!hasMeaningfulPixelChange(liveDiff)) {
           writeFileSync(
             join(SCRATCH, `studio-brush-diagnostic-${preset.id}-erase-baseline.png`),
             before,
@@ -1311,10 +1461,35 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
             join(SCRATCH, `studio-brush-diagnostic-${preset.id}-erase-live.png`),
             live,
           );
-          log(
-            `${preset.id}: destination-out remains release-visible by design; `
-              + `pointer-down diff ${JSON.stringify(liveDiff)}`,
+        }
+        invariant(
+          hasMeaningfulPixelChange(liveDiff),
+          `${preset.id}: eraser gesture had no live retained-layer preview; `
+            + `pointer-down diff ${JSON.stringify(liveDiff)}`,
+        );
+        const liveEraseLift = emptyBefore
+          ? await measureEraserLiftRatio(page, emptyBefore, before, live)
+          : null;
+        if (liveEraseLift) {
+          invariant(
+            liveEraseLift.affectedPixels >= 4,
+            `${preset.id}: live eraser had no measurable baseline overlap`,
           );
+          if (lowDensityEraser) {
+            invariant(
+              liveEraseLift.residualEnergyRatio >= 0.25
+                && liveEraseLift.residualEnergyRatio <= 0.85,
+              `${preset.id}: live low-density gesture retained `
+                + `${(liveEraseLift.residualEnergyRatio * 100).toFixed(1)}% of baseline energy; `
+                + "expected one bounded retained-layer lift",
+            );
+          } else {
+            invariant(
+              liveEraseLift.residualEnergyRatio <= 0.1,
+              `${preset.id}: live full-strength gesture retained `
+                + `${(liveEraseLift.residualEnergyRatio * 100).toFixed(1)}% of baseline energy`,
+            );
+          }
         }
       }
       await page.mouse.up();
@@ -1352,6 +1527,30 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
           ? `${preset.id}: erased baseline reappeared before commit`
           : `${preset.id}: released stroke disappeared before becoming durable`,
       );
+      const eraseLift = operation === "erase" && emptyBefore
+        ? await measureEraserLiftRatio(page, emptyBefore, before, after)
+        : null;
+      if (eraseLift) {
+        invariant(
+          eraseLift.affectedPixels >= 4,
+          `${preset.id}: eraser had no measurable baseline overlap`,
+        );
+        if (lowDensityEraser) {
+          invariant(
+            eraseLift.residualEnergyRatio >= 0.25
+              && eraseLift.residualEnergyRatio <= 0.85,
+            `${preset.id}: one low-density gesture retained `
+              + `${(eraseLift.residualEnergyRatio * 100).toFixed(1)}% of baseline energy; `
+              + "expected a bounded partial lift",
+          );
+        } else {
+          invariant(
+            eraseLift.residualEnergyRatio <= 0.1,
+            `${preset.id}: one full-strength gesture retained `
+              + `${(eraseLift.residualEnergyRatio * 100).toFixed(1)}% of baseline energy`,
+          );
+        }
+      }
       // Extended catalogue ids intentionally materialize onto three stable renderer ids. A pill
       // can therefore show the requested pro-brush name while a stale dynamics snapshot still
       // paints visible pixels through the same renderer. Verify the durable identity + exact
@@ -1371,7 +1570,9 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
         : null;
       const persistedOperationMatched = operation === "erase"
         ? persistedErase?.stroke.mode === "eraser"
-          && persistedErase.stroke.brush === null
+          && persistedErase.stroke.brush === expectedSelection.runtimeBrushId
+          && persistedErase.stroke.brushCatalogId === expectedSelection.catalogId
+          && persistedErase.stroke.brushCatalogName === expectedSelection.catalogName
           && persistedErase.draws[0]?.mode === "pen"
         : true;
       invariant(
@@ -1425,12 +1626,15 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
         selected: true,
         visualChanged,
         eraseLiveOperationActive,
+        eraseResidualRatio: eraseLift?.residualEnergyRatio ?? null,
         undoEnabled: true,
         undoRestoredPixels,
         redoRestoredStroke,
         persistedOperationMatched,
-        persistedCatalogId: persistedProStroke?.brushCatalogId ?? null,
-        persistedRuntimeBrushId: persistedProStroke?.brush ?? null,
+        persistedCatalogId:
+          persistedProStroke?.brushCatalogId ?? persistedErase?.stroke.brushCatalogId ?? null,
+        persistedRuntimeBrushId:
+          persistedProStroke?.brush ?? persistedErase?.stroke.brush ?? null,
         persistedDynamicsMatched,
       });
       // Keep every catalogue entry isolated. Broad texture/pro brushes must not cover the next
@@ -1473,6 +1677,18 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
       entry.selected
       && entry.visualChanged
       && (entry.operation === "paint" || entry.eraseLiveOperationActive === true)
+      && (
+        entry.operation === "paint"
+        || (
+          entry.eraseResidualRatio !== null
+          && (
+            isStudioBrushEraserAliasId(entry.persistedRuntimeBrushId)
+              ? entry.eraseResidualRatio >= 0.25
+                && entry.eraseResidualRatio <= 0.85
+              : entry.eraseResidualRatio <= 0.1
+          )
+        )
+      )
       && entry.undoEnabled
       && entry.undoRestoredPixels
       && entry.redoRestoredStroke
@@ -1520,114 +1736,134 @@ interface PersistedDrawElement {
   points: number[];
 }
 
+interface PersistedStudioDocument {
+  savedAt?: string;
+  currentPageId?: string;
+  pagesList?: Array<{ id?: string; elements?: unknown[] }>;
+}
+
+let builtAutosaveSqliteModulePath: string | null = null;
+
+function resolveBuiltAutosaveSqliteModulePath(): string {
+  if (builtAutosaveSqliteModulePath) return builtAutosaveSqliteModulePath;
+  const manifestPath = resolve(process.cwd(), "dist/.vite/manifest.json");
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as Record<
+    string,
+    { file?: unknown }
+  >;
+  const entry = manifest["src/domains/creator/studio-autosave-sqlite-store.ts"];
+  invariant(
+    entry && typeof entry.file === "string" && entry.file.length > 0,
+    "production manifest is missing the Studio autosave SQLite module",
+  );
+  builtAutosaveSqliteModulePath = `/${entry.file}`;
+  return builtAutosaveSqliteModulePath;
+}
+
+async function persistedStudioDocument(page: Page): Promise<PersistedStudioDocument | null> {
+  const moduleUrl = new URL(resolveBuiltAutosaveSqliteModulePath(), page.url()).href;
+  return page.evaluate(async ({ autosaveKey, sqliteModuleUrl }) => {
+    const sqliteModule = await import(/* @vite-ignore */ sqliteModuleUrl) as {
+      acquireStudioAutosaveSqliteStore?: () => Promise<{
+        read(key: string): Promise<{
+          state: "snapshot" | "cleared";
+          payload?: PersistedStudioDocument;
+        } | null>;
+      }>;
+    };
+    if (typeof sqliteModule.acquireStudioAutosaveSqliteStore !== "function") {
+      throw new Error("built Studio autosave SQLite module has no acquisition export");
+    }
+    const stored = await (await sqliteModule.acquireStudioAutosaveSqliteStore()).read(autosaveKey);
+    return stored?.state === "snapshot" && stored.payload ? stored.payload : null;
+  }, { autosaveKey: AUTOSAVE_KEY, sqliteModuleUrl: moduleUrl });
+}
+
+function drawElementsFromPersistedDocument(
+  document: PersistedStudioDocument | null,
+): PersistedDrawElement[] {
+  if (!document?.pagesList) return [];
+  const pageRecord = document.pagesList.find((candidate) => candidate.id === document.currentPageId)
+    ?? document.pagesList[0];
+  return (pageRecord?.elements ?? []).flatMap((element) => {
+    if (!element || typeof element !== "object" || Array.isArray(element)) return [];
+    const record = element as Record<string, unknown>;
+    if (record.type !== "draw") return [];
+    const shapeParams = record.shapeParams;
+    const polygonSides = shapeParams && typeof shapeParams === "object" && !Array.isArray(shapeParams)
+      && typeof (shapeParams as Record<string, unknown>).polygonSides === "number"
+      ? (shapeParams as Record<string, number>).polygonSides
+      : null;
+    return [{
+      brush: typeof record.brush === "string" ? record.brush : null,
+      brushCatalogId: typeof record.brushCatalogId === "string"
+        ? record.brushCatalogId
+        : null,
+      brushCatalogName: typeof record.brushCatalogName === "string"
+        ? record.brushCatalogName
+        : null,
+      brushDynamics: record.brushDynamics,
+      groupId: typeof record.groupId === "string" ? record.groupId : null,
+      hidden: record.hidden === true,
+      hasLivingInkReceipt: record.livingInkReceipt != null,
+      kind: typeof record.kind === "string" ? record.kind : "freehand",
+      mode: record.mode === "eraser" ? "eraser" as const : "pen" as const,
+      polygonSides,
+      points: Array.isArray(record.points)
+        ? record.points.filter((value): value is number =>
+            typeof value === "number" && Number.isFinite(value)
+          )
+        : [],
+    }];
+  });
+}
+
+async function waitForPersistedDrawElements(
+  page: Page,
+  predicate: (draws: PersistedDrawElement[]) => boolean,
+  label: string,
+  timeoutMilliseconds = 8_000,
+): Promise<PersistedDrawElement[]> {
+  const deadline = performance.now() + timeoutMilliseconds;
+  let latest: PersistedDrawElement[] = [];
+  let lastFailure: unknown = null;
+  while (performance.now() < deadline) {
+    try {
+      latest = drawElementsFromPersistedDocument(await persistedStudioDocument(page));
+      if (predicate(latest)) return latest;
+      lastFailure = null;
+    } catch (cause: unknown) {
+      lastFailure = cause;
+    }
+    await page.waitForTimeout(100);
+  }
+  const suffix = lastFailure instanceof Error
+    ? `; last SQLite read failed: ${lastFailure.message}`
+    : `; last durable draw count: ${latest.length}`;
+  throw new Error(`${label} timed out after ${timeoutMilliseconds}ms${suffix}`);
+}
+
 async function persistedDrawElements(page: Page): Promise<PersistedDrawElement[]> {
-  return page.evaluate((prefix) => {
-    interface PersistedStudioDocument {
-      savedAt?: string;
-      currentPageId?: string;
-      pagesList?: Array<{ id?: string; elements?: unknown[] }>;
-    }
-    let newest: PersistedStudioDocument | null = null;
-    for (let index = 0; index < window.localStorage.length; index += 1) {
-      const key = window.localStorage.key(index);
-      if (!key?.startsWith(prefix) || key.endsWith(":lifecycle")) continue;
-      const raw = window.localStorage.getItem(key);
-      if (!raw) continue;
-      try {
-        const value = JSON.parse(raw) as PersistedStudioDocument;
-        if (!value?.pagesList) continue;
-        if (!newest || String(value.savedAt ?? "") >= String(newest.savedAt ?? "")) newest = value;
-      } catch {
-        // Ignore unrelated/corrupt local data; the wait below remains strict.
-      }
-    }
-    if (!newest?.pagesList) return [];
-    const pageRecord = newest.pagesList.find((candidate) => candidate.id === newest?.currentPageId)
-      ?? newest.pagesList[0];
-    return (pageRecord?.elements ?? []).flatMap((element) => {
-      if (!element || typeof element !== "object" || Array.isArray(element)) return [];
-      const record = element as Record<string, unknown>;
-      if (record.type !== "draw") return [];
-      const shapeParams = record.shapeParams;
-      const polygonSides = shapeParams && typeof shapeParams === "object" && !Array.isArray(shapeParams)
-        && typeof (shapeParams as Record<string, unknown>).polygonSides === "number"
-        ? (shapeParams as Record<string, number>).polygonSides
-        : null;
-      return [{
-        brush: typeof record.brush === "string" ? record.brush : null,
-        brushCatalogId: typeof record.brushCatalogId === "string"
-          ? record.brushCatalogId
-          : null,
-        brushCatalogName: typeof record.brushCatalogName === "string"
-          ? record.brushCatalogName
-          : null,
-        brushDynamics: record.brushDynamics,
-        groupId: typeof record.groupId === "string" ? record.groupId : null,
-        hidden: record.hidden === true,
-        hasLivingInkReceipt: record.livingInkReceipt != null,
-        kind: typeof record.kind === "string" ? record.kind : "freehand",
-        mode: record.mode === "eraser" ? "eraser" as const : "pen" as const,
-        polygonSides,
-        points: Array.isArray(record.points)
-          ? record.points.filter((value): value is number => typeof value === "number" && Number.isFinite(value))
-          : [],
-      }];
-    });
-  }, AUTOSAVE_PREFIX);
+  return drawElementsFromPersistedDocument(await persistedStudioDocument(page));
 }
 
 async function waitForPersistedSingleCatalogStroke(
   page: Page,
   expected: StudioBrushCatalogSelection,
 ): Promise<PersistedDrawElement> {
-  await page.waitForFunction(({ prefix, catalogId, catalogName, runtimeBrushId }) => {
-    let newest: { savedAt?: string; pagesList?: Array<{ elements?: unknown[] }> } | null = null;
-    for (let index = 0; index < window.localStorage.length; index += 1) {
-      const key = window.localStorage.key(index);
-      if (!key?.startsWith(prefix) || key.endsWith(":lifecycle")) continue;
-      const raw = window.localStorage.getItem(key);
-      if (!raw) continue;
-      try {
-        const value = JSON.parse(raw) as {
-          savedAt?: string;
-          pagesList?: Array<{ elements?: unknown[] }>;
-        };
-        if (
-          value.pagesList
-          && (!newest || String(value.savedAt ?? "") >= String(newest.savedAt ?? ""))
-        ) {
-          newest = value;
-        }
-      } catch {
-        // Keep waiting for the normal debounced autosave.
-      }
-    }
-    const draws = (newest?.pagesList ?? [])
-      .flatMap((candidate) => candidate.elements ?? [])
-      .filter((element): element is Record<string, unknown> =>
-        Boolean(element)
-        && typeof element === "object"
-        && (element as { type?: unknown }).type === "draw"
-      );
+  const [saved] = await waitForPersistedDrawElements(page, (draws) => {
     const draw = draws[0];
     return draws.length === 1
-      && draw?.brushCatalogId === catalogId
-      && draw.brushCatalogName === catalogName
-      && draw.brush === runtimeBrushId
-      && draw.hidden !== true
-      && draw.groupId == null
-      && draw.livingInkReceipt == null
-      && Array.isArray(draw.points)
+      && draw?.brushCatalogId === expected.catalogId
+      && draw.brushCatalogName === expected.catalogName
+      && draw.brush === expected.runtimeBrushId
+      && !draw.hidden
+      && draw.groupId === null
+      && !draw.hasLivingInkReceipt
       && draw.points.length >= 4
       && Boolean(draw.brushDynamics)
       && typeof draw.brushDynamics === "object";
-  }, {
-    prefix: AUTOSAVE_PREFIX,
-    catalogId: expected.catalogId,
-    catalogName: expected.catalogName,
-    runtimeBrushId: expected.runtimeBrushId,
-  }, { timeout: 5_000 });
-  const [saved] = await persistedDrawElements(page);
+  }, `${expected.catalogId}: SQLite autosave did not expose the isolated pro stroke`);
   invariant(saved, `${expected.catalogId}: autosave did not expose the isolated pro stroke`);
   invariant(
     saved.brushCatalogId === expected.catalogId,
@@ -1717,23 +1953,11 @@ function persistedSmartShapeRepresentation(
 }
 
 async function waitForPersistedDrawCount(page: Page, expectedCount: number): Promise<void> {
-  await page.waitForFunction(({ prefix, count }) => {
-    for (let index = 0; index < window.localStorage.length; index += 1) {
-      const key = window.localStorage.key(index);
-      if (!key?.startsWith(prefix) || key.endsWith(":lifecycle")) continue;
-      const raw = window.localStorage.getItem(key);
-      if (!raw) continue;
-      try {
-        const value = JSON.parse(raw) as { pagesList?: Array<{ elements?: unknown[] }> };
-        const draws = (value.pagesList ?? []).flatMap((candidate) => candidate.elements ?? [])
-          .filter((element) => element && typeof element === "object" && (element as { type?: unknown }).type === "draw");
-        if (draws.length >= count) return true;
-      } catch {
-        // Keep waiting for the normal 1.5 s autosave.
-      }
-    }
-    return false;
-  }, { prefix: AUTOSAVE_PREFIX, count: expectedCount }, { timeout: 5_000 });
+  await waitForPersistedDrawElements(
+    page,
+    (draws) => draws.length >= expectedCount,
+    `SQLite autosave did not reach ${expectedCount} draws`,
+  );
 }
 
 async function waitForPersistedSelectedOperation(
@@ -1747,91 +1971,32 @@ async function waitForPersistedSelectedOperation(
   stroke: PersistedDrawElement;
   draws: PersistedDrawElement[];
 }> {
-  await page.waitForFunction(({
-    prefix,
-    catalogId,
-    catalogName,
-    runtimeBrushId,
-    expectedOperation,
-    drawCount,
-    requireCatalog,
-  }) => {
-    let newest: {
-      savedAt?: string;
-      currentPageId?: string;
-      pagesList?: Array<{ id?: string; elements?: unknown[] }>;
-    } | null = null;
-    for (let index = 0; index < window.localStorage.length; index += 1) {
-      const key = window.localStorage.key(index);
-      if (!key?.startsWith(prefix) || key.endsWith(":lifecycle")) continue;
-      const raw = window.localStorage.getItem(key);
-      if (!raw) continue;
-      try {
-        const value = JSON.parse(raw) as {
-          savedAt?: string;
-          currentPageId?: string;
-          pagesList?: Array<{ id?: string; elements?: unknown[] }>;
-        };
-        if (
-          value?.pagesList
-          && (!newest || String(value.savedAt ?? "") >= String(newest.savedAt ?? ""))
-        ) {
-          newest = value;
-        }
-      } catch {
-        // Keep waiting for the normal debounced autosave.
-      }
-    }
-    if (!newest?.pagesList) return false;
-    const pageRecord = newest.pagesList.find(
-      (candidate) => candidate.id === newest?.currentPageId,
-    ) ?? newest.pagesList[0];
-    const draws = (pageRecord?.elements ?? [])
-      .filter((element): element is Record<string, unknown> =>
-        Boolean(element)
-        && typeof element === "object"
-        && (element as { type?: unknown }).type === "draw"
-      );
-    if (draws.length !== drawCount) return false;
-    if (draws.some((draw) => (
-      draw.hidden === true
-      || draw.groupId != null
-      || draw.livingInkReceipt != null
+  const draws = await waitForPersistedDrawElements(page, (candidates) => {
+    if (candidates.length !== expectedDrawCount) return false;
+    if (candidates.some((draw) => (
+      draw.hidden || draw.groupId !== null || draw.hasLivingInkReceipt
     ))) return false;
-    if ((pageRecord?.elements ?? []).some((element) => (
-      Boolean(element)
-      && typeof element === "object"
-      && (element as Record<string, unknown>).livingInkReceipt != null
-    ))) return false;
-    const draw = draws.at(-1);
-    if (!draw || !Array.isArray(draw.points) || draw.points.length < 4) return false;
-    if (expectedOperation === "erase") {
+    const draw = candidates.at(-1);
+    if (!draw || draw.points.length < 4) return false;
+    if (operation === "erase") {
       return draw.mode === "eraser"
-        && draw.brush == null
-        && draw.brushCatalogId == null
-        && draw.brushCatalogName == null;
+        && draw.brush === expected.runtimeBrushId
+        && draw.brushCatalogId === expected.catalogId
+        && draw.brushCatalogName === expected.catalogName;
     }
     return draw.mode !== "eraser"
-      && draw.brush === runtimeBrushId
+      && draw.brush === expected.runtimeBrushId
       && (
-        !requireCatalog
+        !requireCatalogIdentity
         || (
-          draw.brushCatalogId === catalogId
-          && draw.brushCatalogName === catalogName
+          draw.brushCatalogId === expected.catalogId
+          && draw.brushCatalogName === expected.catalogName
           && Boolean(draw.brushDynamics)
           && typeof draw.brushDynamics === "object"
         )
       );
-  }, {
-    prefix: AUTOSAVE_PREFIX,
-    catalogId: expected.catalogId,
-    catalogName: expected.catalogName,
-    runtimeBrushId: expected.runtimeBrushId,
-    expectedOperation: operation,
-    drawCount: expectedDrawCount,
-    requireCatalog: requireCatalogIdentity,
-  }, { timeout: timeoutMilliseconds });
-  const draws = await persistedDrawElements(page);
+  }, `${expected.catalogId}: SQLite autosave did not expose the selected ${operation} operation`,
+  timeoutMilliseconds);
   invariant(
     draws.length === expectedDrawCount,
     `${expected.catalogId}: autosave exposed ${draws.length}/${expectedDrawCount} draw operations`,
@@ -1840,7 +2005,7 @@ async function waitForPersistedSelectedOperation(
   invariant(stroke, `${expected.catalogId}: autosave did not expose the selected operation`);
   invariant(
     operation === "erase"
-      ? stroke.mode === "eraser" && stroke.brush === null
+      ? stroke.mode === "eraser" && stroke.brush === expected.runtimeBrushId
       : stroke.mode === "pen" && stroke.brush === expected.runtimeBrushId,
     `${expected.catalogId}: autosave persisted the wrong ${operation} operation`,
   );
@@ -2065,6 +2230,11 @@ function writeLongBrushQualityReport(input: Readonly<{
 async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<LongBrushResult> {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
   const page = await context.newPage();
+  if (DEBUG_BRUSH_VERIFIER) {
+    page.on("console", (entry) => {
+      log(`console(${entry.type()}):${entry.text()}`);
+    });
+  }
   const errors = collectBrowserErrors(page, "long-brushes", studioUrl);
   const qualityRunDirectory = join(
     resolve(SCRATCH),
@@ -2254,17 +2424,9 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
         previewStyle: preset.previewStyle,
         intentionalDiscrete,
       });
-      // A destination-out draft cannot punch through retained paint from a separate transparent
-      // preview layer. Studio therefore keeps operation authority live while its first visible
-      // pixels are the synchronous release frame. Record the pointer-down frame honestly, but do
-      // not apply paint-specific live-energy ratios to it; release/settled route coverage,
-      // persistence and history remain strict below.
-      const qualityPolicy = operation === "erase"
-        ? {
-            kind: "record-only-discrete" as const,
-            reason: "release-visible destination-out over retained paint",
-          }
-        : classifiedQualityPolicy;
+      // Erasers replay their exact full compound path on the retained main layer, so the same
+      // continuous live/release/settled quality policy now applies to destination-out strokes.
+      const qualityPolicy = classifiedQualityPolicy;
       const sampleCount = Math.max(33, Math.ceil(endX - startX) + 1);
       const localRoutePoints = Array.from({ length: sampleCount }, (_, sampleIndex) => {
         const amount = sampleIndex / Math.max(1, sampleCount - 1);
@@ -2402,7 +2564,7 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
       );
       invariant(
         operation === "erase"
-          ? saved.mode === "eraser" && saved.brush === null
+          ? saved.mode === "eraser" && saved.brush === expectedSelection.runtimeBrushId
           : saved.mode === "pen" && saved.brush === expectedSelection.runtimeBrushId,
         operation === "erase"
           ? `${preset.id}: isolated long eraser did not persist as destination-out geometry`
@@ -2411,7 +2573,7 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
       );
       invariant(
         operation === "erase"
-          ? saved.brushCatalogId === null
+          ? saved.brushCatalogId === expectedSelection.catalogId
           : preset.source === "core" || saved.brushCatalogId === preset.id,
         `${preset.id}: isolated long stroke persisted with catalogue id `
           + `${saved.brushCatalogId ?? "missing"}`,
@@ -2480,7 +2642,7 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
           + `${coverage.visibleSegments}/6 route segments visible`
           + `${
             operation === "erase"
-              ? " (release-visible eraser)"
+              ? " (live retained-layer eraser)"
               : quality.policy.kind === "record-only-discrete"
                 ? " (discrete)"
                 : ""
@@ -2514,8 +2676,8 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
         && (
           entry.operation === "erase"
             ? entry.persistedMode === "eraser"
-              && entry.persistedBrushId === null
-              && entry.persistedCatalogId === null
+              && entry.persistedBrushId === entry.expectedRuntimeBrushId
+              && entry.persistedCatalogId === entry.id
             : entry.persistedMode === "pen"
               && entry.persistedBrushId === entry.expectedRuntimeBrushId
         )
@@ -2858,16 +3020,13 @@ async function runMobileTouchAudit(browser: Browser, studioUrl: string): Promise
   });
   const page = await context.newPage();
   const errors = collectBrowserErrors(page, "mobile-catalogue", studioUrl);
-  const screenshot = join(SCRATCH, "studio-brush-mobile-catalog.png");
+  const screenshot = join(SCRATCH, "studio-brush-mobile-operations.png");
 
   try {
     await prepareStudioPage(page, studioUrl);
-    const dock = page.locator('nav[aria-label="스튜디오 모바일 도구막대"]');
+    const dock = page.locator('nav[data-studio-mobile-editing-dock="true"]');
     await dock.waitFor({ state: "visible", timeout: 10_000 });
-    await dock.getByRole("button", {
-      name: "브러시 설정 (굵기·색·프리셋)",
-      exact: true,
-    }).click();
+    await dock.locator('button[aria-controls="studio-mobile-draw-settings"]').click();
     const drawSheet = page.locator('[data-studio-sheet-id="draw"][data-studio-mobile-sheet="draw"]');
     await drawSheet.waitFor({ state: "visible" });
     await drawSheet.locator('[data-studio-open-brush-library="true"]').click();
@@ -2877,10 +3036,10 @@ async function runMobileTouchAudit(browser: Browser, studioUrl: string): Promise
     await catalog.getByRole("tab", { name: "전체", exact: true }).click();
     await expandFullBrushCatalog(catalog);
     const selectionCount = await catalog.locator('button[aria-label$=" 선택"]').count();
-    const expectedCatalogCount = STUDIO_ALL_BRUSH_CATALOG_ITEMS.length;
+    const expectedCatalogCount = STUDIO_PAINT_BRUSH_CATALOG_ITEMS.length;
     invariant(
       selectionCount === expectedCatalogCount,
-      `mobile catalogue exposes ${selectionCount}/${expectedCatalogCount} brush choices`,
+      `mobile paint catalogue exposes ${selectionCount}/${expectedCatalogCount} brush choices`,
     );
 
     const targets = await catalog.locator("button, input").evaluateAll((elements) => elements
@@ -2912,6 +3071,35 @@ async function runMobileTouchAudit(browser: Browser, studioUrl: string): Promise
         .map((target) => `${target.label}=${target.width}x${target.height}`)
         .join(", ")}`,
     );
+
+    await catalog.locator('[data-studio-brush-library-close="true"]').click();
+    await catalog.waitFor({ state: "detached" });
+    const eraserButton = dock.locator('[data-studio-mobile-tool="eraser"]');
+    await eraserButton.click();
+    await dock.locator('[data-studio-mobile-tool="eraser"][aria-pressed="true"]')
+      .waitFor({ state: "visible" });
+    await dock.locator('button[aria-controls="studio-mobile-draw-settings"]').click();
+    await drawSheet.waitFor({ state: "visible" });
+    const eraserQuickPicker = drawSheet.locator('[data-studio-eraser-quick-picker="true"]');
+    await eraserQuickPicker.waitFor({ state: "visible" });
+    const actualEraserIds = await eraserQuickPicker
+      .locator("[data-studio-eraser-quick-option]")
+      .evaluateAll((buttons) => buttons.map((button) =>
+        button.getAttribute("data-studio-eraser-quick-option") ?? ""));
+    const expectedEraserIds = STUDIO_ERASER_BRUSH_CATALOG_ITEMS.map((item) => item.id);
+    invariant(
+      JSON.stringify(actualEraserIds) === JSON.stringify(expectedEraserIds),
+      `mobile eraser quick picker exposes ${actualEraserIds.join(",") || "no choices"}; expected ${expectedEraserIds.join(",")}`,
+    );
+    for (const eraserId of expectedEraserIds) {
+      const option = eraserQuickPicker.locator(
+        `[data-studio-eraser-quick-option="${eraserId}"]`,
+      );
+      await option.click();
+      await eraserQuickPicker
+        .locator(`[data-studio-eraser-quick-option="${eraserId}"][aria-pressed="true"]`)
+        .waitFor({ state: "visible" });
+    }
     await page.screenshot({ path: screenshot, animations: "disabled" });
     reportBrowserErrors(errors);
     invariant(errors.messages.length === 0, "mobile browser emitted console/page errors");
@@ -2919,6 +3107,7 @@ async function runMobileTouchAudit(browser: Browser, studioUrl: string): Promise
     return {
       ok: true,
       selectionCount,
+      eraserSelectionCount: actualEraserIds.length,
       interactiveTargetCount: targets.length,
       minimumWidth,
       minimumHeight,
@@ -2932,23 +3121,38 @@ async function runMobileTouchAudit(browser: Browser, studioUrl: string): Promise
 }
 
 async function readEmergencyAutosave(page: Page): Promise<EmergencyAutosaveRecord | null> {
-  return page.evaluate((prefix) => {
-    for (let index = 0; index < window.localStorage.length; index += 1) {
-      const key = window.localStorage.key(index);
-      if (!key?.startsWith(prefix)) continue;
-      const raw = window.localStorage.getItem(key);
-      if (!raw) continue;
-      try {
-        const payload = JSON.parse(raw) as Omit<EmergencyAutosaveRecord, "key">;
-        if (payload.pendingStrokeDurability?.kind === "pending-strokes") {
-          return { ...payload, key };
-        }
-      } catch {
-        // Continue looking for the scoped v2 payload.
-      }
+  const payload = await persistedStudioDocument(page) as Omit<
+    EmergencyAutosaveRecord,
+    "key"
+  > | null;
+  return payload?.pendingStrokeDurability?.kind === "pending-strokes"
+    ? { ...payload, key: AUTOSAVE_KEY }
+    : null;
+}
+
+async function waitForEmergencyAutosave(
+  page: Page,
+  timeoutMilliseconds = 8_000,
+): Promise<EmergencyAutosaveRecord | null> {
+  const deadline = performance.now() + timeoutMilliseconds;
+  let lastFailure: unknown = null;
+  while (performance.now() < deadline) {
+    try {
+      const emergency = await readEmergencyAutosave(page);
+      if (emergency) return emergency;
+      lastFailure = null;
+    } catch (cause: unknown) {
+      lastFailure = cause;
     }
-    return null;
-  }, AUTOSAVE_PREFIX);
+    await page.waitForTimeout(100);
+  }
+  if (lastFailure instanceof Error) {
+    throw new Error(
+      `pagehide SQLite autosave read failed: ${lastFailure.message}`,
+      { cause: lastFailure },
+    );
+  }
+  return null;
 }
 
 async function runDeferredDurabilityAudit(
@@ -2979,16 +3183,40 @@ async function runDeferredDurabilityAudit(
     await page.mouse.move(endX, start.y + 46, { steps: 14 });
     await page.mouse.up();
     const releasedAt = performance.now();
+    let unloadGuardShown = false;
+    let dialogFailure: Error | null = null;
+    let dialogSettlement: Promise<void> | null = null;
+    const handleDialog = (dialog: Dialog): void => {
+      dialogSettlement = (async () => {
+        if (dialog.type() !== "beforeunload") {
+          dialogFailure = new Error(`unexpected durability dialog: ${dialog.type()}`);
+          await dialog.dismiss();
+          return;
+        }
+        unloadGuardShown = true;
+        // Model a creator reading and accepting the browser warning. The SQLite Dedicated Worker
+        // remains alive during the prompt, giving the already-issued pointerup write a bounded
+        // opportunity to return a durable receipt before pagehide tears down the document.
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        await dialog.accept();
+      })().catch((cause: unknown) => {
+        dialogFailure = cause instanceof Error ? cause : new Error(String(cause));
+      });
+    };
+    page.on("dialog", handleDialog);
     const navigation = page.goto(origin, { waitUntil: "domcontentloaded", timeout: 20_000 });
     const navigationIssuedInMs = performance.now() - releasedAt;
     await navigation;
+    if (dialogSettlement) await dialogSettlement;
+    page.off("dialog", handleDialog);
+    if (dialogFailure) throw dialogFailure;
     invariant(
       navigationIssuedInMs < 50,
       `navigation was not immediate after pointerup (${navigationIssuedInMs.toFixed(2)}ms)`,
     );
 
-    const emergency = await readEmergencyAutosave(page);
-    invariant(emergency, "pagehide did not create an emergency autosave for the deferred stroke");
+    const emergency = await waitForEmergencyAutosave(page);
+    invariant(emergency, "pointerup did not create a durable autosave for the deferred stroke");
     const marker = emergency.pendingStrokeDurability;
     const strokeIds = Array.isArray(marker?.strokeIds)
       ? marker.strokeIds.filter((id): id is string => typeof id === "string")
@@ -2996,8 +3224,8 @@ async function runDeferredDurabilityAudit(
     const markerReason = typeof marker?.reason === "string" ? marker.reason : "missing";
     invariant(strokeIds.length > 0, "emergency autosave contains no deferred stroke ids");
     invariant(
-      markerReason === "pagehide" || markerReason === "unmount" || markerReason === "visibility-hidden",
-      `unexpected emergency autosave reason: ${markerReason}`,
+      markerReason === "pointerup",
+      `immediate navigation replaced or missed the pointerup durability receipt: ${markerReason}`,
     );
     const payloadIds = new Set(
       (emergency.pagesList ?? []).flatMap((savedPage) =>
@@ -3035,6 +3263,7 @@ async function runDeferredDurabilityAudit(
     return {
       ok: true,
       navigationIssuedInMs,
+      unloadGuardShown,
       markerReason,
       strokeCount: strokeIds.length,
       payloadContainsEveryStroke,
@@ -3120,12 +3349,35 @@ async function main(): Promise<void> {
   const drawingOnly = process.env.TOONSPECTRUM_DRAWING_ONLY === "1";
   const shapesOnly = process.env.TOONSPECTRUM_SHAPES_ONLY === "1";
   const longOnly = process.env.TOONSPECTRUM_BRUSH_LONG_ONLY === "1";
+  const requestedStage = process.env.TOONSPECTRUM_BRUSH_VERIFY_STAGE?.trim() ?? "";
+  const supportedStages = ["desktop", "long", "shapes", "mobile", "durability"] as const;
+  invariant(
+    requestedStage === "" || supportedStages.some((stage) => stage === requestedStage),
+    `unsupported TOONSPECTRUM_BRUSH_VERIFY_STAGE: ${requestedStage}`,
+  );
+  invariant(
+    requestedStage === "" || (!drawingOnly && !shapesOnly && !longOnly),
+    "TOONSPECTRUM_BRUSH_VERIFY_STAGE cannot be combined with legacy only-stage flags",
+  );
+  const runDesktop = requestedStage
+    ? requestedStage === "desktop"
+    : !shapesOnly && !longOnly;
+  const runLong = requestedStage ? requestedStage === "long" : !shapesOnly;
+  const runShapes = requestedStage
+    ? requestedStage === "shapes"
+    : !drawingOnly && !longOnly;
+  const runMobile = requestedStage
+    ? requestedStage === "mobile"
+    : !drawingOnly && !shapesOnly && !longOnly;
+  const runDurability = requestedStage
+    ? requestedStage === "durability"
+    : !drawingOnly && !shapesOnly && !longOnly;
   invariant(
     !(shapesOnly && longOnly),
     "TOONSPECTRUM_SHAPES_ONLY and TOONSPECTRUM_BRUSH_LONG_ONLY cannot be combined",
   );
   invariant(
-    shapesOnly || LONG_BRUSH_CATALOG_COUNT > 0,
+    !runLong || LONG_BRUSH_CATALOG_COUNT > 0,
     "the requested brush subset contains no brush admitted by the selected long-matrix mode",
   );
   if (REQUESTED_BRUSH_VERIFY_IDS.length > 0) {
@@ -3161,31 +3413,27 @@ async function main(): Promise<void> {
   try {
     await waitForServer(origin);
     browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
-    const desktop = shapesOnly || longOnly ? null : await runDesktopBrushMatrix(browser, studioUrl);
+    const desktop = runDesktop ? await runDesktopBrushMatrix(browser, studioUrl) : null;
     if (desktop) {
       invariant(
         desktop.ok,
         `desktop ${BRUSH_MATRIX_CATALOG_COUNT}-brush matrix failed`,
       );
     }
-    const longBrushes = shapesOnly ? null : await runLongBrushMatrix(browser, studioUrl);
+    const longBrushes = runLong ? await runLongBrushMatrix(browser, studioUrl) : null;
     if (longBrushes) {
       invariant(
         longBrushes.ok,
         `long ${LONG_BRUSH_CATALOG_COUNT}-brush matrix failed`,
       );
     }
-    const smartShapes = drawingOnly || longOnly
-      ? null
-      : await runSmartShapeMatrix(browser, studioUrl);
+    const smartShapes = runShapes ? await runSmartShapeMatrix(browser, studioUrl) : null;
     if (smartShapes) invariant(smartShapes.ok, "Smart Shape matrix failed");
-    const mobile = drawingOnly || shapesOnly || longOnly
-      ? null
-      : await runMobileTouchAudit(browser, studioUrl);
+    const mobile = runMobile ? await runMobileTouchAudit(browser, studioUrl) : null;
     if (mobile) invariant(mobile.ok, "mobile catalogue touch audit failed");
-    const durability = drawingOnly || shapesOnly || longOnly
-      ? null
-      : await runDeferredDurabilityAudit(browser, origin, studioUrl);
+    const durability = runDurability
+      ? await runDeferredDurabilityAudit(browser, origin, studioUrl)
+      : null;
     if (durability) invariant(durability.ok, "deferred stroke durability audit failed");
 
     await browser.close();

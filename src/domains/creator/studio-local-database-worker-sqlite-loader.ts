@@ -33,6 +33,7 @@ export async function loadStudioLocalDatabaseWorkerSqlite(
       vfs: Object.freeze({
         opfs: true,
         "opfs-vfs": true,
+        "opfs-wl": true,
       }),
     }),
     wasmfsOpfsDir: false,

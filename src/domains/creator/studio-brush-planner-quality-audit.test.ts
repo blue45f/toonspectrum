@@ -26,7 +26,7 @@ const SHIPPED_CANDIDATES = shippedCandidates();
 const SHIPPED_REPORT = auditStudioBrushPlannerQualityCatalogue(SHIPPED_CANDIDATES);
 
 describe("studio brush planner quality audit", () => {
-  it("deterministically audits all 230 shipped presets without planner failures", () => {
+  it("deterministically audits every shipped preset without planner failures", () => {
     const replay = auditStudioBrushPlannerQualityCatalogue(SHIPPED_CANDIDATES);
 
     expect(SHIPPED_CANDIDATES).toHaveLength(SHIPPED_CANDIDATES.length);

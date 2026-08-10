@@ -430,6 +430,18 @@ describe("studio brush dynamics settings safety", () => {
     });
   });
 
+  it("de-correlates the low-pigment water-brush edge with deterministic spacing variation", () => {
+    const settings = studioBrushDynamicsSettingsForBrushId("inkwash-water-brush");
+    expect(settings?.spacing.jitter).toEqual({ mode: "multiply", amount: 0.08 });
+    const spacings = Array.from({ length: 16 }, (_, stampIndex) =>
+      resolveStudioBrushDynamics({ pressure: 0.55, stampIndex }, settings!).spacing
+    );
+    expect(new Set(spacings).size).toBeGreaterThan(8);
+    expect(Array.from({ length: 16 }, (_, stampIndex) =>
+      resolveStudioBrushDynamics({ pressure: 0.55, stampIndex }, settings!).spacing
+    )).toEqual(spacings);
+  });
+
   it("keeps airbrush aliases visible on mouse taps without making long strokes opaque", () => {
     const settings = studioBrushDynamicsPresetSettings("airbrush");
     const tap = planStudioDynamicBrush({
