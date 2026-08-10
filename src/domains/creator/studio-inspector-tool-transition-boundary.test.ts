@@ -20,11 +20,12 @@ describe("StudioInspectorAside transient tool boundary", () => {
     );
   });
 
-  it("routes draw-mode changes through the same disarm-before-change contract", () => {
+  it("routes draw-mode changes through the Page-owned disarm-before-change contract", () => {
     expect(inspectorSource).toContain(
-      "executeStudioInspectorDrawModeTransition(drawMode, next",
+      'activateCanvasTool("draw", next);',
     );
     expect(inspectorSource).not.toContain("onDrawModeChange={setDrawMode}");
+    expect(inspectorSource).not.toContain("executeStudioInspectorDrawModeTransition(");
   });
 
   it("keeps cross-state side effects out of React functional updaters", () => {

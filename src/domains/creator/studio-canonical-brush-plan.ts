@@ -839,7 +839,10 @@ function validateRecipe(
     )
     || record.value.engine !== "dab-v1"
     || record.value.material === "pigment"
-    || record.value.material === "eraser"
+    || (
+      record.value.material === "eraser"
+      && paint.value.model !== "layered-flow-v1"
+    )
   ) return fail("invalid-field", path);
   return {
     ok: true,

@@ -89,6 +89,7 @@ describe("procedural brush pack runtime", () => {
         catalogName: descriptor.catalogName,
         defaultWidth: descriptor.defaultWidth,
         defaultOpacity: descriptor.defaultOpacity,
+        operation: "paint",
         runtimeBrushId: descriptor.runtimeBrushId,
         mediaGroup: descriptor.mediaGroup,
         previewStyle: descriptor.previewStyle,

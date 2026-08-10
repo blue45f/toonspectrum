@@ -404,6 +404,32 @@ describe("Studio DrawEl canonical brush adapter", () => {
       },
       retainedDynamics: null,
     });
+
+    const kneaded = ready(adaptStudioDrawElementToCanonicalBrushPlan(request({
+      id: "layered-kneaded-eraser",
+      type: "draw",
+      kind: "freehand",
+      mode: "eraser",
+      points: [0, 0, 12, 3],
+      pressures: [0.3, 0.9],
+      stroke: "#000000",
+      strokeWidth: 26,
+      opacity: 0.38,
+      brush: "kneaded-eraser",
+      pressureModel: "linear-full-v1",
+      sampleSpacing: 0,
+      paintModel: "layered-flow-v1",
+    })));
+    expect(kneaded.requirements).toEqual(["stroke-local-compositor"]);
+    expect(kneaded.plan).toMatchObject({
+      composite: { porterDuff: "destination-out", opacity: 0.38 },
+      recipe: {
+        version: 2,
+        brushId: "eraser:kneaded-eraser",
+        material: "eraser",
+        paint: { model: "layered-flow-v1", surface: "stroke-local-rgba" },
+      },
+    });
   });
 
   it("fails closed for unversioned non-pressure dynamics, dual tips and incomplete channels", () => {

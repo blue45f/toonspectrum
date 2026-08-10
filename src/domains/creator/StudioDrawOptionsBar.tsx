@@ -34,6 +34,7 @@ import {
   STUDIO_BRUSH_SIZE_CHIPS,
   nearestStudioBrushOpacityChip,
   nearestStudioBrushSizeChip,
+  resolveStudioBrushPresetOperation,
 } from "./studio-brush";
 import { studioBrushTrayItem } from "./studio-creative-ux";
 import {
@@ -285,6 +286,8 @@ export function StudioDrawOptionsBar({
     ?? (brushMeta ? studioBrushTrayItem(brushMeta) : null);
   const catalogBrushName =
     activeCatalogBrushName ?? catalogBrushItem?.name ?? brushMeta?.name ?? catalogBrushId;
+  const eraserPresetActive =
+    drawMode === "eraser" && resolveStudioBrushPresetOperation(brushId) === "erase";
   const isFavorite = favoriteBrushIds.includes(catalogBrushId);
   const tipColor = drawMode === "eraser" ? "oklch(0.55 0.02 70)" : color;
   const pixelMode = drawMode === "pixel";
@@ -299,7 +302,7 @@ export function StudioDrawOptionsBar({
     drawMode === "pixel"
       ? "픽셀 불투명도"
       : drawMode === "eraser"
-        ? "지우개 불투명도"
+        ? "지우기 강도"
         : drawMode === "shape"
           ? "도형 불투명도"
           : "브러시 불투명도";
@@ -438,7 +441,7 @@ export function StudioDrawOptionsBar({
       <div
         role="toolbar"
         aria-label={`그리기 옵션 · 현재 ${
-          drawMode === "pen"
+          drawMode === "pen" || eraserPresetActive
             ? catalogBrushName
             : drawMode === "pixel"
               ? "픽셀 펜"
@@ -553,7 +556,7 @@ export function StudioDrawOptionsBar({
         ) : null}
 
         {/* Active brush pill + library (PicsArt-class) */}
-        {drawMode === "pen" ? (
+        {drawMode === "pen" || eraserPresetActive ? (
           <div className="flex shrink-0 items-center gap-0.5">
             <StudioToolHintTarget
               className="min-w-0"
@@ -569,9 +572,13 @@ export function StudioDrawOptionsBar({
                 onClick={(event) => toggleBrushCatalog(event.currentTarget)}
                 aria-expanded={brushCatalogOpen}
                 aria-haspopup="dialog"
-                aria-label={`현재 도구 ${catalogBrushName}, ${strokeWidth}px, 불투명도 ${Math.round(brushOpacity * 100)}%, 브러시 선택 열기`}
+                aria-label={`현재 도구 ${catalogBrushName}, ${strokeWidth}px, ${
+                  eraserPresetActive ? "지우기 강도" : "불투명도"
+                } ${Math.round(brushOpacity * 100)}%, ${
+                  eraserPresetActive ? "지우개" : "브러시"
+                } 선택 열기`}
                 data-studio-brush-active-pill="true"
-                data-studio-active-tool-summary="pen"
+                data-studio-active-tool-summary={eraserPresetActive ? "eraser" : "pen"}
                 data-studio-core-draw-control="brush"
                 className={cn(
                   "flex h-10 max-w-[12rem] items-center gap-1.5 rounded-xl border px-2",

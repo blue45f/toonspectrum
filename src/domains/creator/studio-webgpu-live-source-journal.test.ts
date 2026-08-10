@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  isStudioBrushEraserAliasId,
   mapStudioBrushAliasPressure,
   studioBrushAliasEffectiveDiameter,
 } from "./studio-brush-alias-profile";
@@ -128,14 +129,16 @@ function expectedPlan(
     sealEndpoint,
   });
   const selectedDiameter = Math.max(1, sourceIdentity.selectedDiameter);
-  const size = sourceIdentity.mode === "eraser"
+  const namedEraser = sourceIdentity.mode === "eraser"
+    && isStudioBrushEraserAliasId(sourceIdentity.brushAlias);
+  const size = sourceIdentity.mode === "eraser" && !namedEraser
     ? selectedDiameter
     : studioBrushAliasEffectiveDiameter(sourceIdentity.brushAlias, selectedDiameter);
   return planStudioGpuLiveStroke({
     id: sourceIdentity.strokeId,
     points: samples.flatMap(({ x, y }) => [x, y]),
     pressures: samples.map(({ pressure }) => mapStudioBrushAliasPressure(
-      sourceIdentity.mode === "eraser" ? null : sourceIdentity.brushAlias,
+      sourceIdentity.mode === "eraser" && !namedEraser ? null : sourceIdentity.brushAlias,
       pressure,
       studioInkFallbackPressure(sourceIdentity.pressureModel)
     )),
@@ -277,6 +280,30 @@ describe("studio WebGPU live source journal", () => {
     );
     expect(advanced.suffixes[0]?.pressures[0]).toBe(0.8);
     expect(advanced.suffixes[0]?.pressures.at(-1)).toBe(1);
+  });
+
+  it("keeps the named kneaded eraser diameter and pressure response in the live journal", () => {
+    const sourceIdentity = identity({
+      brushAlias: "kneaded-eraser",
+      mode: "eraser",
+      selectedDiameter: 26,
+      opacity: 0.38,
+      composite: "erase",
+      sampleSpacing: 0,
+    });
+    const advanced = advanceStudioGpuLiveSourceJournal(stateFor(sourceIdentity), {
+      identity: sourceIdentity,
+      points: [0, 0, 5, 0],
+      pressures: [0.2, 1],
+      sealEndpoint: true,
+    });
+
+    expect(advanced.status).toBe("advanced");
+    expect(advanced.state.effectiveDiameter).toBeCloseTo(30.16);
+    expect(advanced.suffixes[0]?.pressures).toEqual([
+      mapStudioBrushAliasPressure("kneaded-eraser", 0.2, 1),
+      mapStudioBrushAliasPressure("kneaded-eraser", 1, 1),
+    ]);
   });
 
   it.each([

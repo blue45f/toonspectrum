@@ -265,6 +265,7 @@ export const STUDIO_BRUSH_ICON_BY_ID: Readonly<Record<string, StudioBrushIconId>
   "brush-pen": "brush",
   "perfect-ink": "pen-line",
   "perfect-marker": "highlighter",
+  "standard-eraser": "eraser",
   "kneaded-eraser": "eraser",
   pencil: "pencil",
   "erodible-pencil": "pencil",

@@ -10,7 +10,7 @@ import {
 
 export type StudioDrawingShortcut =
   | { type: "select-pen" }
-  | { type: "toggle-eraser" }
+  | { type: "select-eraser" }
   | { type: "adjust-width"; delta: number }
   | { type: "adjust-opacity"; delta: number }
   /** Recent brush slot recall (0–5). */
@@ -148,7 +148,7 @@ function resolveFromRegistry(
       return { type: "select-pen" };
     }
     if (matchRegistryAction(shortcuts, "tool-eraser", event)) {
-      return { type: "toggle-eraser" };
+      return { type: "select-eraser" };
     }
     if (matchRegistryAction(shortcuts, "swap-colors", event)) {
       return { type: "swap-colors" };
@@ -231,7 +231,7 @@ export function resolveStudioDrawingShortcut(
     return { type: "select-pen" };
   }
   if (allowEraser && code === "KeyE" && !event.altKey && !event.repeat) {
-    return { type: "toggle-eraser" };
+    return { type: "select-eraser" };
   }
 
   // Digit1–6 → recent brush slots (no modifiers). Shift+Digit assigns is handled by caller.

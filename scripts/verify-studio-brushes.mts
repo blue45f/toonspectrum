@@ -18,7 +18,7 @@
  *
  * Run after `pnpm build`:
  *   pnpm verify:studio-brushes
- * Exhaustive 226-brush long-route audit without repeating the short matrix:
+ * Exhaustive full-catalogue long-route audit without repeating the short matrix:
  *   TOONSPECTRUM_ALL_BRUSH_LONG_MATRIX=1 TOONSPECTRUM_BRUSH_LONG_ONLY=1 \
  *     pnpm verify:studio-brushes
  * Focused paint → eraser → paint browser regression (desktop short + core long routes):
@@ -45,9 +45,12 @@ import {
 
 import { STUDIO_APP_SETTINGS_STORAGE_KEY } from "../src/domains/creator/studio-app-settings";
 import { BRUSH_PRESETS } from "../src/domains/creator/studio-brush";
+import { isStudioBrushEraserAliasId } from "../src/domains/creator/studio-brush-alias-profile";
 import { studioBrushPresetUsesIntentionalDiscreteCarrier } from "../src/domains/creator/studio-brush-carrier-quality";
 import {
   STUDIO_ALL_BRUSH_CATALOG_ITEMS,
+  STUDIO_ERASER_BRUSH_CATALOG_ITEMS,
+  STUDIO_PAINT_BRUSH_CATALOG_ITEMS,
   type StudioBrushCatalogItem,
 } from "../src/domains/creator/studio-brush-catalog";
 import { serializeStudioBrushDynamicsSettingsCanonical } from "../src/domains/creator/studio-brush-dynamics";
@@ -116,7 +119,7 @@ const LONG_BRUSH_MATRIX_MODE =
   REQUESTED_BRUSH_VERIFY_IDS.length > 0
     ? `focused-${LONG_BRUSH_CATALOG_COUNT}`
     : ALL_BRUSH_LONG_MATRIX
-      ? "all-226"
+      ? `all-${LONG_BRUSH_CATALOG_COUNT}`
       : "core-only";
 
 type VerifierBrushOperation = "paint" | "erase";
@@ -133,6 +136,7 @@ interface BrushStrokeEvidence {
   selected: boolean;
   visualChanged: boolean;
   eraseLiveOperationActive: boolean | null;
+  eraseResidualRatio: number | null;
   undoEnabled: boolean;
   undoRestoredPixels: boolean;
   redoRestoredStroke: boolean;
@@ -204,6 +208,11 @@ interface PixelCoverage extends PixelDiff {
   bounds: { left: number; top: number; right: number; bottom: number } | null;
 }
 
+interface EraserLiftRatio {
+  affectedPixels: number;
+  residualEnergyRatio: number;
+}
+
 interface DesktopBrushResult {
   ok: boolean;
   catalogSessionCount: number;
@@ -254,6 +263,7 @@ interface SmartShapeResult {
 interface MobileTouchResult {
   ok: boolean;
   selectionCount: number;
+  eraserSelectionCount: number;
   interactiveTargetCount: number;
   minimumWidth: number;
   minimumHeight: number;
@@ -620,6 +630,19 @@ async function activateDesktopPen(page: Page): Promise<void> {
   if (await propertiesTab.getAttribute("aria-selected") !== "true") await propertiesTab.click();
 }
 
+async function activateDesktopEraser(page: Page): Promise<void> {
+  await page.keyboard.press("e");
+  const toolbar = page.locator('[data-studio-draw-options="true"]');
+  await toolbar.waitFor({ state: "visible", timeout: 8_000 });
+  await page.waitForFunction(() =>
+    document.querySelector('[data-studio-draw-options="true"]')
+      ?.getAttribute("data-studio-active-draw-mode") === "eraser"
+  );
+  await toolbar.locator('[data-studio-brush-active-pill="true"]').waitFor({
+    state: "visible",
+  });
+}
+
 async function ensureDesktopBrushCatalogTrigger(page: Page): Promise<Locator> {
   const toolbar = page.locator('[data-studio-draw-options="true"]');
   await toolbar.waitFor({ state: "visible", timeout: 8_000 });
@@ -696,11 +719,15 @@ async function expandFullBrushCatalog(catalog: Locator): Promise<void> {
   );
 }
 
-async function assertUiBrushCatalogMatchesProductCatalog(catalog: Locator): Promise<void> {
+async function assertUiBrushCatalogMatchesProductCatalog(
+  catalog: Locator,
+  expectedCatalogItems: readonly StudioBrushCatalogItem[],
+  operationLabel: "paint" | "erase",
+): Promise<void> {
   await catalog.getByRole("tab", { name: "전체", exact: true }).click();
-  await catalog.getByRole("searchbox", { name: "브러시 검색" }).fill("");
+  await catalog.getByRole("searchbox").fill("");
   await expandFullBrushCatalog(catalog);
-  const expectedSelections = STUDIO_ALL_BRUSH_CATALOG_ITEMS.map((item) => ({
+  const expectedSelections = expectedCatalogItems.map((item) => ({
     label: `${item.name} 선택`,
     source: item.source,
   }));
@@ -714,8 +741,8 @@ async function assertUiBrushCatalogMatchesProductCatalog(catalog: Locator): Prom
   const actualLabels = actualSelections.map((selection) => selection.label);
 
   invariant(
-    actualSelections.length === PRODUCT_BRUSH_CATALOG_COUNT,
-    `desktop catalogue exposes ${actualSelections.length}/${PRODUCT_BRUSH_CATALOG_COUNT} product choices`,
+    actualSelections.length === expectedCatalogItems.length,
+    `desktop ${operationLabel} catalogue exposes ${actualSelections.length}/${expectedCatalogItems.length} product choices`,
   );
   invariant(
     new Set(actualLabels).size === actualLabels.length,
@@ -723,7 +750,23 @@ async function assertUiBrushCatalogMatchesProductCatalog(catalog: Locator): Prom
   );
   invariant(
     JSON.stringify(actualSelections) === JSON.stringify(expectedSelections),
-    "desktop catalogue selection order/source does not exactly match the product catalogue",
+    `desktop ${operationLabel} catalogue selection order/source does not exactly match its product partition`,
+  );
+}
+
+async function assertUiEraserQuickPickerMatchesProductCatalog(
+  catalog: Locator,
+): Promise<void> {
+  await catalog.getByRole("tab", { name: "전체", exact: true }).click();
+  await catalog.getByRole("searchbox").fill("");
+  const actualIds = await catalog
+    .locator("[data-studio-eraser-quick-option]")
+    .evaluateAll((buttons) => buttons.map((button) =>
+      button.getAttribute("data-studio-eraser-quick-option") ?? ""));
+  const expectedIds = STUDIO_ERASER_BRUSH_CATALOG_ITEMS.map((item) => item.id);
+  invariant(
+    JSON.stringify(actualIds) === JSON.stringify(expectedIds),
+    `desktop erase quick picker exposes ${actualIds.join(",") || "no choices"}; expected ${expectedIds.join(",")}`,
   );
 }
 
@@ -737,9 +780,18 @@ async function selectDesktopBrush(
   invariant(expectedSelection, `${preset.id}: catalogue selection did not materialize`);
   const operation = verifierBrushOperation(expectedSelection);
   const expectedDrawMode = operation === "erase" ? "eraser" : "pen";
+  if (operation === "erase") {
+    await activateDesktopEraser(page);
+  } else {
+    await page.keyboard.press("b");
+    await page.waitForFunction(() =>
+      document.querySelector('[data-studio-draw-options="true"]')
+        ?.getAttribute("data-studio-active-draw-mode") === "pen"
+    );
+  }
   const catalog = await openDesktopCatalog(page);
   await catalog.getByRole("tab", { name: "전체", exact: true }).click();
-  await catalog.getByRole("searchbox", { name: "브러시 검색" }).fill(preset.name);
+  await catalog.getByRole("searchbox").fill(preset.name);
   const option = catalog.getByRole("button", { name: `${preset.name} 선택`, exact: true });
   await option.waitFor({ state: "visible" });
   await option.scrollIntoViewIfNeeded();
@@ -752,18 +804,19 @@ async function selectDesktopBrush(
     { drawMode: expectedDrawMode },
     { timeout: 15000 },
   );
-  if (operation === "paint") {
-    await page.waitForFunction(
-      ({ expectedName }) => document
-        .querySelector('[data-studio-brush-active-pill="true"]')
-        ?.getAttribute("aria-label")
-        ?.includes(expectedName) === true,
-      { expectedName: preset.name },
-    );
-  } else {
+  await page.waitForFunction(
+    ({ expectedName }) => document
+      .querySelector('[data-studio-brush-active-pill="true"]')
+      ?.getAttribute("aria-label")
+      ?.includes(expectedName) === true,
+    { expectedName: preset.name },
+  );
+  if (operation === "erase") {
     invariant(
-      await page.locator('[data-studio-brush-active-pill="true"]').count() === 0,
-      `${preset.id}: eraser selection retained the pen-only active brush pill`,
+      await page.locator(
+        '[data-studio-brush-active-pill="true"][data-studio-active-tool-summary="eraser"]',
+      ).count() === 1,
+      `${preset.id}: named eraser selection did not expose its active brush identity`,
     );
   }
 }
@@ -891,6 +944,82 @@ async function compareScreenshotPixels(
     firstBase64: first.toString("base64"),
     secondBase64: second.toString("base64"),
     tolerance: channelTolerance,
+  });
+}
+
+async function measureEraserLiftRatio(
+  page: Page,
+  empty: Buffer,
+  painted: Buffer,
+  erased: Buffer,
+): Promise<EraserLiftRatio> {
+  return page.evaluate(async ({ emptyBase64, paintedBase64, erasedBase64 }) => {
+    const [emptyResponse, paintedResponse, erasedResponse] = await Promise.all([
+      fetch(`data:image/png;base64,${emptyBase64}`),
+      fetch(`data:image/png;base64,${paintedBase64}`),
+      fetch(`data:image/png;base64,${erasedBase64}`),
+    ]);
+    const [emptyBitmap, paintedBitmap, erasedBitmap] = await Promise.all([
+      createImageBitmap(await emptyResponse.blob()),
+      createImageBitmap(await paintedResponse.blob()),
+      createImageBitmap(await erasedResponse.blob()),
+    ]);
+    const emptyCanvas = new OffscreenCanvas(emptyBitmap.width, emptyBitmap.height);
+    const paintedCanvas = new OffscreenCanvas(paintedBitmap.width, paintedBitmap.height);
+    const erasedCanvas = new OffscreenCanvas(erasedBitmap.width, erasedBitmap.height);
+    const emptyContext = emptyCanvas.getContext("2d", { willReadFrequently: true });
+    const paintedContext = paintedCanvas.getContext("2d", { willReadFrequently: true });
+    const erasedContext = erasedCanvas.getContext("2d", { willReadFrequently: true });
+    if (!emptyContext || !paintedContext || !erasedContext) {
+      throw new Error("could not decode eraser evidence pixels");
+    }
+    emptyContext.drawImage(emptyBitmap, 0, 0);
+    paintedContext.drawImage(paintedBitmap, 0, 0);
+    erasedContext.drawImage(erasedBitmap, 0, 0);
+    const emptyPixels = emptyContext.getImageData(0, 0, emptyCanvas.width, emptyCanvas.height);
+    const paintedPixels = paintedContext.getImageData(0, 0, paintedCanvas.width, paintedCanvas.height);
+    const erasedPixels = erasedContext.getImageData(0, 0, erasedCanvas.width, erasedCanvas.height);
+    emptyBitmap.close();
+    paintedBitmap.close();
+    erasedBitmap.close();
+    if (
+      emptyCanvas.width !== paintedCanvas.width
+      || emptyCanvas.height !== paintedCanvas.height
+      || emptyCanvas.width !== erasedCanvas.width
+      || emptyCanvas.height !== erasedCanvas.height
+    ) return { affectedPixels: 0, residualEnergyRatio: 0 };
+
+    let affectedPixels = 0;
+    let baselineEnergy = 0;
+    let residualEnergy = 0;
+    for (let offset = 0; offset < emptyPixels.data.length; offset += 4) {
+      let paintedFromEmpty = 0;
+      let erasedFromPainted = 0;
+      let erasedFromEmpty = 0;
+      for (let channel = 0; channel < 3; channel += 1) {
+        paintedFromEmpty += Math.abs(
+          paintedPixels.data[offset + channel]! - emptyPixels.data[offset + channel]!,
+        );
+        erasedFromPainted += Math.abs(
+          erasedPixels.data[offset + channel]! - paintedPixels.data[offset + channel]!,
+        );
+        erasedFromEmpty += Math.abs(
+          erasedPixels.data[offset + channel]! - emptyPixels.data[offset + channel]!,
+        );
+      }
+      if (paintedFromEmpty < 24 || erasedFromPainted < 6) continue;
+      affectedPixels += 1;
+      baselineEnergy += paintedFromEmpty;
+      residualEnergy += erasedFromEmpty;
+    }
+    return {
+      affectedPixels,
+      residualEnergyRatio: baselineEnergy > 0 ? residualEnergy / baselineEnergy : 0,
+    };
+  }, {
+    emptyBase64: empty.toString("base64"),
+    paintedBase64: painted.toString("base64"),
+    erasedBase64: erased.toString("base64"),
   });
 }
 
@@ -1127,10 +1256,21 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
     const catalogDialogCount = await page
       .locator('[role="dialog"][data-studio-brush-catalog="built-in"]')
       .count();
-    await assertUiBrushCatalogMatchesProductCatalog(firstCatalog);
+    await assertUiBrushCatalogMatchesProductCatalog(
+      firstCatalog,
+      STUDIO_PAINT_BRUSH_CATALOG_ITEMS,
+      "paint",
+    );
     await page.screenshot({ path: catalogScreenshot, animations: "disabled" });
     await firstCatalog.locator('[data-studio-brush-library-close="true"]').click();
     await firstCatalog.waitFor({ state: "detached" });
+
+    await activateDesktopEraser(page);
+    const eraserCatalog = await openDesktopCatalog(page);
+    await assertUiEraserQuickPickerMatchesProductCatalog(eraserCatalog);
+    await eraserCatalog.locator('[data-studio-brush-library-close="true"]').click();
+    await eraserCatalog.waitFor({ state: "detached" });
+    await activateDesktopPen(page);
 
     const stage = page.locator(".konvajs-content").first();
     await stage.waitFor({ state: "visible" });
@@ -1147,6 +1287,8 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
         `${preset.id}: pro catalogue selection has no runtime dynamics`,
       );
       const operation = verifierBrushOperation(expectedSelection);
+      const lowDensityEraser = operation === "erase"
+        && isStudioBrushEraserAliasId(expectedSelection.runtimeBrushId);
       await selectDesktopBrush(page, preset, expectedSelection);
       await page.mouse.move(4, 4);
       const point = strokePoint(stageBox, viewport, index);
@@ -1302,7 +1444,7 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
           eraseLiveOperationActive,
           `${preset.id}: pointer-down gesture lost eraser operation authority`,
         );
-        if (!hasMeaningfulPixelChange(liveDiff) && DEBUG_BRUSH_VERIFIER) {
+        if (!hasMeaningfulPixelChange(liveDiff)) {
           writeFileSync(
             join(SCRATCH, `studio-brush-diagnostic-${preset.id}-erase-baseline.png`),
             before,
@@ -1311,10 +1453,35 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
             join(SCRATCH, `studio-brush-diagnostic-${preset.id}-erase-live.png`),
             live,
           );
-          log(
-            `${preset.id}: destination-out remains release-visible by design; `
-              + `pointer-down diff ${JSON.stringify(liveDiff)}`,
+        }
+        invariant(
+          hasMeaningfulPixelChange(liveDiff),
+          `${preset.id}: eraser gesture had no live retained-layer preview; `
+            + `pointer-down diff ${JSON.stringify(liveDiff)}`,
+        );
+        const liveEraseLift = emptyBefore
+          ? await measureEraserLiftRatio(page, emptyBefore, before, live)
+          : null;
+        if (liveEraseLift) {
+          invariant(
+            liveEraseLift.affectedPixels >= 4,
+            `${preset.id}: live eraser had no measurable baseline overlap`,
           );
+          if (lowDensityEraser) {
+            invariant(
+              liveEraseLift.residualEnergyRatio >= 0.25
+                && liveEraseLift.residualEnergyRatio <= 0.85,
+              `${preset.id}: live low-density gesture retained `
+                + `${(liveEraseLift.residualEnergyRatio * 100).toFixed(1)}% of baseline energy; `
+                + "expected one bounded retained-layer lift",
+            );
+          } else {
+            invariant(
+              liveEraseLift.residualEnergyRatio <= 0.1,
+              `${preset.id}: live full-strength gesture retained `
+                + `${(liveEraseLift.residualEnergyRatio * 100).toFixed(1)}% of baseline energy`,
+            );
+          }
         }
       }
       await page.mouse.up();
@@ -1352,6 +1519,30 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
           ? `${preset.id}: erased baseline reappeared before commit`
           : `${preset.id}: released stroke disappeared before becoming durable`,
       );
+      const eraseLift = operation === "erase" && emptyBefore
+        ? await measureEraserLiftRatio(page, emptyBefore, before, after)
+        : null;
+      if (eraseLift) {
+        invariant(
+          eraseLift.affectedPixels >= 4,
+          `${preset.id}: eraser had no measurable baseline overlap`,
+        );
+        if (lowDensityEraser) {
+          invariant(
+            eraseLift.residualEnergyRatio >= 0.25
+              && eraseLift.residualEnergyRatio <= 0.85,
+            `${preset.id}: one low-density gesture retained `
+              + `${(eraseLift.residualEnergyRatio * 100).toFixed(1)}% of baseline energy; `
+              + "expected a bounded partial lift",
+          );
+        } else {
+          invariant(
+            eraseLift.residualEnergyRatio <= 0.1,
+            `${preset.id}: one full-strength gesture retained `
+              + `${(eraseLift.residualEnergyRatio * 100).toFixed(1)}% of baseline energy`,
+          );
+        }
+      }
       // Extended catalogue ids intentionally materialize onto three stable renderer ids. A pill
       // can therefore show the requested pro-brush name while a stale dynamics snapshot still
       // paints visible pixels through the same renderer. Verify the durable identity + exact
@@ -1371,7 +1562,9 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
         : null;
       const persistedOperationMatched = operation === "erase"
         ? persistedErase?.stroke.mode === "eraser"
-          && persistedErase.stroke.brush === null
+          && persistedErase.stroke.brush === expectedSelection.runtimeBrushId
+          && persistedErase.stroke.brushCatalogId === expectedSelection.catalogId
+          && persistedErase.stroke.brushCatalogName === expectedSelection.catalogName
           && persistedErase.draws[0]?.mode === "pen"
         : true;
       invariant(
@@ -1425,12 +1618,15 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
         selected: true,
         visualChanged,
         eraseLiveOperationActive,
+        eraseResidualRatio: eraseLift?.residualEnergyRatio ?? null,
         undoEnabled: true,
         undoRestoredPixels,
         redoRestoredStroke,
         persistedOperationMatched,
-        persistedCatalogId: persistedProStroke?.brushCatalogId ?? null,
-        persistedRuntimeBrushId: persistedProStroke?.brush ?? null,
+        persistedCatalogId:
+          persistedProStroke?.brushCatalogId ?? persistedErase?.stroke.brushCatalogId ?? null,
+        persistedRuntimeBrushId:
+          persistedProStroke?.brush ?? persistedErase?.stroke.brush ?? null,
         persistedDynamicsMatched,
       });
       // Keep every catalogue entry isolated. Broad texture/pro brushes must not cover the next
@@ -1473,6 +1669,18 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
       entry.selected
       && entry.visualChanged
       && (entry.operation === "paint" || entry.eraseLiveOperationActive === true)
+      && (
+        entry.operation === "paint"
+        || (
+          entry.eraseResidualRatio !== null
+          && (
+            isStudioBrushEraserAliasId(entry.persistedRuntimeBrushId)
+              ? entry.eraseResidualRatio >= 0.25
+                && entry.eraseResidualRatio <= 0.85
+              : entry.eraseResidualRatio <= 0.1
+          )
+        )
+      )
       && entry.undoEnabled
       && entry.undoRestoredPixels
       && entry.redoRestoredStroke
@@ -1807,9 +2015,9 @@ async function waitForPersistedSelectedOperation(
     if (!draw || !Array.isArray(draw.points) || draw.points.length < 4) return false;
     if (expectedOperation === "erase") {
       return draw.mode === "eraser"
-        && draw.brush == null
-        && draw.brushCatalogId == null
-        && draw.brushCatalogName == null;
+        && draw.brush === runtimeBrushId
+        && draw.brushCatalogId === catalogId
+        && draw.brushCatalogName === catalogName;
     }
     return draw.mode !== "eraser"
       && draw.brush === runtimeBrushId
@@ -1840,7 +2048,7 @@ async function waitForPersistedSelectedOperation(
   invariant(stroke, `${expected.catalogId}: autosave did not expose the selected operation`);
   invariant(
     operation === "erase"
-      ? stroke.mode === "eraser" && stroke.brush === null
+      ? stroke.mode === "eraser" && stroke.brush === expected.runtimeBrushId
       : stroke.mode === "pen" && stroke.brush === expected.runtimeBrushId,
     `${expected.catalogId}: autosave persisted the wrong ${operation} operation`,
   );
@@ -2254,17 +2462,9 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
         previewStyle: preset.previewStyle,
         intentionalDiscrete,
       });
-      // A destination-out draft cannot punch through retained paint from a separate transparent
-      // preview layer. Studio therefore keeps operation authority live while its first visible
-      // pixels are the synchronous release frame. Record the pointer-down frame honestly, but do
-      // not apply paint-specific live-energy ratios to it; release/settled route coverage,
-      // persistence and history remain strict below.
-      const qualityPolicy = operation === "erase"
-        ? {
-            kind: "record-only-discrete" as const,
-            reason: "release-visible destination-out over retained paint",
-          }
-        : classifiedQualityPolicy;
+      // Erasers replay their exact full compound path on the retained main layer, so the same
+      // continuous live/release/settled quality policy now applies to destination-out strokes.
+      const qualityPolicy = classifiedQualityPolicy;
       const sampleCount = Math.max(33, Math.ceil(endX - startX) + 1);
       const localRoutePoints = Array.from({ length: sampleCount }, (_, sampleIndex) => {
         const amount = sampleIndex / Math.max(1, sampleCount - 1);
@@ -2402,7 +2602,7 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
       );
       invariant(
         operation === "erase"
-          ? saved.mode === "eraser" && saved.brush === null
+          ? saved.mode === "eraser" && saved.brush === expectedSelection.runtimeBrushId
           : saved.mode === "pen" && saved.brush === expectedSelection.runtimeBrushId,
         operation === "erase"
           ? `${preset.id}: isolated long eraser did not persist as destination-out geometry`
@@ -2411,7 +2611,7 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
       );
       invariant(
         operation === "erase"
-          ? saved.brushCatalogId === null
+          ? saved.brushCatalogId === expectedSelection.catalogId
           : preset.source === "core" || saved.brushCatalogId === preset.id,
         `${preset.id}: isolated long stroke persisted with catalogue id `
           + `${saved.brushCatalogId ?? "missing"}`,
@@ -2480,7 +2680,7 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
           + `${coverage.visibleSegments}/6 route segments visible`
           + `${
             operation === "erase"
-              ? " (release-visible eraser)"
+              ? " (live retained-layer eraser)"
               : quality.policy.kind === "record-only-discrete"
                 ? " (discrete)"
                 : ""
@@ -2514,8 +2714,8 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
         && (
           entry.operation === "erase"
             ? entry.persistedMode === "eraser"
-              && entry.persistedBrushId === null
-              && entry.persistedCatalogId === null
+              && entry.persistedBrushId === entry.expectedRuntimeBrushId
+              && entry.persistedCatalogId === entry.id
             : entry.persistedMode === "pen"
               && entry.persistedBrushId === entry.expectedRuntimeBrushId
         )
@@ -2858,7 +3058,7 @@ async function runMobileTouchAudit(browser: Browser, studioUrl: string): Promise
   });
   const page = await context.newPage();
   const errors = collectBrowserErrors(page, "mobile-catalogue", studioUrl);
-  const screenshot = join(SCRATCH, "studio-brush-mobile-catalog.png");
+  const screenshot = join(SCRATCH, "studio-brush-mobile-operations.png");
 
   try {
     await prepareStudioPage(page, studioUrl);
@@ -2877,10 +3077,10 @@ async function runMobileTouchAudit(browser: Browser, studioUrl: string): Promise
     await catalog.getByRole("tab", { name: "전체", exact: true }).click();
     await expandFullBrushCatalog(catalog);
     const selectionCount = await catalog.locator('button[aria-label$=" 선택"]').count();
-    const expectedCatalogCount = STUDIO_ALL_BRUSH_CATALOG_ITEMS.length;
+    const expectedCatalogCount = STUDIO_PAINT_BRUSH_CATALOG_ITEMS.length;
     invariant(
       selectionCount === expectedCatalogCount,
-      `mobile catalogue exposes ${selectionCount}/${expectedCatalogCount} brush choices`,
+      `mobile paint catalogue exposes ${selectionCount}/${expectedCatalogCount} brush choices`,
     );
 
     const targets = await catalog.locator("button, input").evaluateAll((elements) => elements
@@ -2912,6 +3112,35 @@ async function runMobileTouchAudit(browser: Browser, studioUrl: string): Promise
         .map((target) => `${target.label}=${target.width}x${target.height}`)
         .join(", ")}`,
     );
+
+    await catalog.locator('[data-studio-brush-library-close="true"]').click();
+    await catalog.waitFor({ state: "detached" });
+    const eraserButton = dock.locator('[data-studio-mobile-tool="eraser"]');
+    await eraserButton.click();
+    await dock.locator('[data-studio-mobile-tool="eraser"][aria-pressed="true"]')
+      .waitFor({ state: "visible" });
+    await dock.locator('button[aria-controls="studio-mobile-draw-settings"]').click();
+    await drawSheet.waitFor({ state: "visible" });
+    const eraserQuickPicker = drawSheet.locator('[data-studio-eraser-quick-picker="true"]');
+    await eraserQuickPicker.waitFor({ state: "visible" });
+    const actualEraserIds = await eraserQuickPicker
+      .locator("[data-studio-eraser-quick-option]")
+      .evaluateAll((buttons) => buttons.map((button) =>
+        button.getAttribute("data-studio-eraser-quick-option") ?? ""));
+    const expectedEraserIds = STUDIO_ERASER_BRUSH_CATALOG_ITEMS.map((item) => item.id);
+    invariant(
+      JSON.stringify(actualEraserIds) === JSON.stringify(expectedEraserIds),
+      `mobile eraser quick picker exposes ${actualEraserIds.join(",") || "no choices"}; expected ${expectedEraserIds.join(",")}`,
+    );
+    for (const eraserId of expectedEraserIds) {
+      const option = eraserQuickPicker.locator(
+        `[data-studio-eraser-quick-option="${eraserId}"]`,
+      );
+      await option.click();
+      await eraserQuickPicker
+        .locator(`[data-studio-eraser-quick-option="${eraserId}"][aria-pressed="true"]`)
+        .waitFor({ state: "visible" });
+    }
     await page.screenshot({ path: screenshot, animations: "disabled" });
     reportBrowserErrors(errors);
     invariant(errors.messages.length === 0, "mobile browser emitted console/page errors");
@@ -2919,6 +3148,7 @@ async function runMobileTouchAudit(browser: Browser, studioUrl: string): Promise
     return {
       ok: true,
       selectionCount,
+      eraserSelectionCount: actualEraserIds.length,
       interactiveTargetCount: targets.length,
       minimumWidth,
       minimumHeight,

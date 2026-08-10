@@ -171,6 +171,12 @@ describe("Studio canvas viewport module boundary", () => {
       "setCurrentPageId={studioCanvasViewportHandlers.setCurrentPageId}",
     );
     expect(page.source).toContain(
+      "activateCanvasTool: activatePrimaryCanvasTool,",
+    );
+    expect(viewport.source).toContain(
+      'activateCanvasTool: (tool: "select" | "draw", drawMode?: DrawMode) => void;',
+    );
+    expect(page.source).not.toContain(
       "setDrawMode={studioCanvasViewportHandlers.setDrawMode}",
     );
     expect(page.source).toContain(

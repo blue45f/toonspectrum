@@ -35,18 +35,24 @@ function shippedCandidates(): StudioCompetitiveBrushQualityCandidate[] {
 
 describe("Studio competitive brush quality benchmark", () => {
   let report: StudioCompetitiveBrushQualityReport;
+  const shipped = shippedCandidates();
 
   beforeAll(() => {
-    report = benchmarkStudioCompetitiveBrushQuality(shippedCandidates());
+    report = benchmarkStudioCompetitiveBrushQuality(shipped);
   }, 30_000);
 
-  it("indexes all 230 shipped presets while measuring deterministic representative groups in CI", () => {
+  it("indexes the complete shipped catalogue while measuring deterministic representative groups in CI", () => {
     expect(report.schemaVersion).toBe(STUDIO_COMPETITIVE_BRUSH_QUALITY_SCHEMA_VERSION);
     expect(report.tier).toBe("ci");
-    expect(report.catalogue).toHaveLength(230);
-    expect(new Set(report.catalogue.map(({ catalogId }) => catalogId))).toHaveLength(230);
-    expect(report.catalogue.filter(({ source }) => source === "core")).toHaveLength(70);
-    expect(report.catalogue.filter(({ source }) => source === "pro")).toHaveLength(160);
+    expect(report.catalogue).toHaveLength(shipped.length);
+    expect(new Set(report.catalogue.map(({ catalogId }) => catalogId))).toHaveLength(shipped.length);
+    expect(report.catalogue.filter(({ source }) => source === "core")).toHaveLength(
+      BRUSH_PRESETS.length,
+    );
+    expect(report.catalogue.filter(({ source }) => source === "pro")).toHaveLength(
+      STUDIO_BRUSH_PACK_DESCRIPTORS.length,
+    );
+    expect(report.policy.expectedPresetCount).toBe(shipped.length);
     expect(report.summary.representativeCount).toBeGreaterThan(20);
     expect(report.summary.measuredCount).toBe(report.summary.representativeCount);
 

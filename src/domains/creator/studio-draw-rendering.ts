@@ -60,7 +60,11 @@ export type StudioDraftPreviewCompositeRunPlan =
 
 export interface StudioDraftPreviewBackdropBoundaryPlan {
   readonly action: "continue" | "flush";
-  readonly reason: "within-layer-bound" | "retained-dom-backdrop" | "third-blend-run";
+  readonly reason:
+    | "eraser-backdrop"
+    | "within-layer-bound"
+    | "retained-dom-backdrop"
+    | "third-blend-run";
 }
 
 export interface StudioDraftPreviewBackdropBoundaryExecution {
@@ -133,6 +137,12 @@ export function planStudioDraftPreviewBackdropBoundary(input: {
   readonly pending: readonly DrawEl[];
   readonly hasRetainedDomBackdrop: boolean;
 }): StudioDraftPreviewBackdropBoundaryPlan {
+  // A destination-out preview must share the retained main canvas with every pixel it can erase.
+  // Commit the bounded 200 ms preview FIFO first, otherwise the live gesture cannot affect those
+  // newer sibling canvases and they disappear only at pointer-up when the document catches up.
+  if (input.incoming.mode === "eraser" && input.pending.length > 0) {
+    return { action: "flush", reason: "eraser-backdrop" };
+  }
   const incomingMode = resolveStudioDraftPreviewCompositeMode(input.incoming);
   if (incomingMode === "backdrop-multiply" && input.hasRetainedDomBackdrop) {
     return { action: "flush", reason: "retained-dom-backdrop" };

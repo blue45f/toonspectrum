@@ -448,12 +448,18 @@ export function advanceStudioVelocityPressure(
     // still allowing sustained slow/fast motion to reach its calibrated target.
     // The target itself uses instantaneous velocity: smoothing velocity and then pressure would
     // make recovery lag behind the pointer for two independent filters.
-    pressure = lowPassVelocity(
-      previous.filteredPressure,
-      curvedSimulatedPressure,
-      timing.elapsedMs,
-      config.velocitySmoothingMs * 1.9
-    );
+    // A duplicate position carries no new geometric evidence. Letting elapsed time alone pull
+    // pressure toward the zero-velocity target makes a stationary mouse contact change diameter
+    // between its first and second event. Hold the last canonical pressure until the pointer
+    // actually moves; the next non-zero segment still receives the full causal velocity response.
+    pressure = distancePx === 0
+      ? previous.filteredPressure
+      : lowPassVelocity(
+          previous.filteredPressure,
+          curvedSimulatedPressure,
+          timing.elapsedMs,
+          config.velocitySmoothingMs * 1.9
+        );
   } else {
     source = "nominal";
     pressure = config.nominalPressure;

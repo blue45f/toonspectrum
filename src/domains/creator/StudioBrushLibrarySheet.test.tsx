@@ -25,19 +25,23 @@ import {
 import type { StudioBrushTrayItem } from "./studio-creative-ux";
 
 const catalog = new Map(listStudioBrushTrayItems("all").map((item) => [item.id, item]));
-const coreCatalogCount = STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter(
-  (item) => item.source === "core"
-).length;
 const proceduralCatalogCount = STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter(
   (item) => item.source === "pro"
 ).length;
 const beginnerCatalogItems = filterStudioBrushCatalogItems({
+  operation: "paint",
   category: "beginner",
   query: "",
   favoriteIds: [],
   recentIds: [],
 });
 const beginnerCatalogCount = beginnerCatalogItems.length;
+const paintCatalogCount = STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter(
+  (item) => item.operation === "paint",
+).length;
+const paintCoreCatalogCount = STUDIO_CORE_BRUSH_CATALOG_ITEMS.filter(
+  (item) => item.operation === "paint",
+).length;
 const sheetSource = readFileSync(
   resolve(process.cwd(), "src/domains/creator/StudioBrushLibrarySheet.tsx"),
   "utf8"
@@ -143,11 +147,46 @@ describe("StudioBrushLibrarySheet", () => {
     expect(html).toContain('data-studio-brush-surface-role="full-catalog-management"');
     expect(html).toContain("브러시 전체 라이브러리");
     expect(html).toContain(
-      `앱 제공 ${STUDIO_BRUSH_CATALOG_COUNTS.total}종 · 코어 ${coreCatalogCount} + 프로시저럴 ${proceduralCatalogCount}`
+      `브러시 ${paintCatalogCount}종 · 코어 ${paintCoreCatalogCount} + 프로시저럴 ${proceduralCatalogCount}`
     );
     expect(html).toContain('aria-label="브러시 전체 라이브러리 닫기"');
     expect(html).toContain('data-studio-brush-library-close="true"');
     expect(html).not.toContain('data-studio-brush-surface-role="quick-subtools"');
+  });
+
+  it("separates erasers into the shared picker and selects a stable eraser preset", async () => {
+    const onSelect = vi.fn();
+    const onClose = vi.fn();
+    render(
+      <StudioBrushLibrarySheet
+        open
+        operation="erase"
+        activeBrushId="kneaded-eraser"
+        onClose={onClose}
+        onSelect={onSelect}
+      />
+    );
+
+    expect(screen.getByRole("dialog", { name: "지우개 선택" })).toBeTruthy();
+    expect(screen.getByRole("group", { name: "지우개 종류 선택" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /일반 지우개, 100% 지움/u })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: /떡지우개, 38% 지움/u })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+    expect(screen.queryByRole("button", { name: "펜(매끈) 선택" })).toBeNull();
+    expect(screen.queryByRole("group", { name: "브러시 표시 방식" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /일반 지우개, 100% 지움/u }));
+    await waitFor(() => expect(onSelect).toHaveBeenCalledOnce());
+    expect(onSelect.mock.calls[0]?.[0]).toMatchObject({
+      operation: "erase",
+      runtimeBrushId: "standard-eraser",
+      catalogId: "standard-eraser",
+      defaultWidth: 20,
+      defaultOpacity: 1,
+    });
+    expect(onClose).toHaveBeenCalledWith("selection");
   });
 
   it(`publishes one unique ${STUDIO_ALL_BRUSH_CATALOG_ITEMS.length}-brush catalog while keeping the procedural runtime lazy`, () => {
@@ -305,7 +344,7 @@ describe("StudioBrushLibrarySheet", () => {
     const result = screen.getByRole("button", { name: "하트 도장 선택" });
     expect(result.tabIndex).toBe(0);
     expect(screen.getByRole("status").textContent).toBe("1/1개의 브러시가 표시됩니다.");
-    expect(screen.getByText(`분류와 관계없이 전체 ${STUDIO_BRUSH_CATALOG_COUNTS.total}종에서 검색 중`)).toBeTruthy();
+    expect(screen.getByText(`분류와 관계없이 전체 ${paintCatalogCount}종에서 검색 중`)).toBeTruthy();
   });
 
   it("keeps a long brush name inside the 320px text-row flex boundary", () => {
@@ -365,7 +404,7 @@ describe("StudioBrushLibrarySheet", () => {
       target: { value: "heart-stamp" },
     });
 
-    expect(screen.getByText(`분류와 관계없이 전체 ${STUDIO_BRUSH_CATALOG_COUNTS.total}종에서 검색 중`)).toBeTruthy();
+    expect(screen.getByText(`분류와 관계없이 전체 ${paintCatalogCount}종에서 검색 중`)).toBeTruthy();
     expect(screen.getByRole("status").textContent).toBe("1/1개의 브러시가 표시됩니다.");
     expect(screen.getByRole("button", { name: "하트 도장 선택" })).toBeTruthy();
   });

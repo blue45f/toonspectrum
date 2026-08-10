@@ -32,6 +32,7 @@ interface MockDockButtonProps {
   readonly "aria-label"?: string;
   readonly "aria-pressed"?: boolean;
   readonly "data-studio-mobile-comment-trigger"?: string;
+  readonly "data-studio-mobile-tool"?: string;
   readonly className?: string;
   readonly disabled?: boolean;
   readonly hintDescription?: string;
@@ -63,6 +64,7 @@ vi.mock("./studio-chrome-ui", () => ({
     "aria-expanded": ariaExpanded,
     "aria-label": ariaLabel,
     "aria-pressed": ariaPressed,
+    "data-studio-mobile-tool": mobileTool,
     label,
     disabled,
     hintDescription,
@@ -83,6 +85,7 @@ vi.mock("./studio-chrome-ui", () => ({
       data-hint-preview={hintPreview}
       data-hint-preview-variant={hintPreviewVariant}
       data-hint-unavailable-reason={hintUnavailableReason}
+      data-studio-mobile-tool={mobileTool}
       disabled={disabled}
       onClick={onClick}
       onFocus={onFocus}
@@ -1584,6 +1587,34 @@ describe("StudioMobileEditingDock", () => {
     expect(opacity.compareDocumentPosition(modeSwitch) & follows).toBe(follows);
   });
 
+  it("shows the named kneaded eraser identity and low-density opacity on mobile", () => {
+    const stableHandlers = createHandlers();
+    render(
+      <StudioMobileEditingDock
+        {...createProps({
+          isMobile: true,
+          mobileSheet: "draw",
+          drawMode: "eraser",
+          brush: "kneaded-eraser",
+          activeCatalogBrushId: "kneaded-eraser",
+          activeCatalogBrushName: "떡지우개(저농도)",
+          brushOpacity: 0.38,
+          strokeWidth: 26,
+          stableHandlers,
+        })}
+      />,
+    );
+
+    const sheet = screen.getByRole("dialog", { name: "브러시 설정" });
+    expect(within(sheet).getByText("떡지우개(저농도) 설정")).toBeTruthy();
+    expect(
+      within(sheet).getByLabelText<HTMLInputElement>("지우기 강도 슬라이더").value,
+    ).toBe("38");
+
+    fireEvent.click(within(sheet).getByRole("button", { name: "지우개" }));
+    expect(stableHandlers.activateCanvasTool).not.toHaveBeenCalled();
+  });
+
   it("renders the drawing tool row in the active locale instead of hardcoded Korean", () => {
     useI18n.getState().setLang("en");
     render(<StudioMobileEditingDock {...createProps({ isMobile: true })} />);
@@ -1593,6 +1624,10 @@ describe("StudioMobileEditingDock", () => {
     for (const name of ["Select", "Pen", "Pixel", "Eraser", "Fill", "Shape"]) {
       expect(within(toolbar).getByRole("button", { name })).toBeTruthy();
     }
+    expect(
+      within(toolbar).getByRole("button", { name: "Eraser" })
+        .getAttribute("data-studio-mobile-tool"),
+    ).toBe("eraser");
     expect(within(toolbar).getByRole("button", { name: "Undo" })).toBeTruthy();
     expect(within(toolbar).getByRole("button", { name: "Redo" })).toBeTruthy();
     expect(

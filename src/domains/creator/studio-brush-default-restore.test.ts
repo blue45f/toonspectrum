@@ -122,6 +122,7 @@ describe("studio brush default restore contract", () => {
       catalogId: "pro-pencil",
       catalogName: "프로 연필",
       runtimeBrushId: "dry-media",
+      operation: "paint",
       defaultWidth: 3.25,
       defaultOpacity: 0.82,
       brushDynamics: dynamics,

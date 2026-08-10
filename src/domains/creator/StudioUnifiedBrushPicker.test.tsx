@@ -94,6 +94,7 @@ describe("StudioUnifiedBrushPicker", () => {
           hint: "간격이 있는 하트 도장",
           defaultWidth: 26,
           defaultOpacity: 0.94,
+          operation: "paint",
           category: "expressive",
           mediaGroup: "fx",
           previewWeight: 0.8,

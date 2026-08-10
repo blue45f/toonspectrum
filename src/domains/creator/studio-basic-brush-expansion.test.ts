@@ -100,6 +100,7 @@ function kneadedEraserElement(brush = "kneaded-eraser"): DrawEl {
     stroke: "#222222",
     strokeWidth: 26,
     opacity: 0.38,
+    paintModel: "layered-flow-v1",
     sampleSpacing: 1,
   };
 }
@@ -235,6 +236,7 @@ describe("commercial basic brush expansion", () => {
     expect(studioBrushIconId("gel-pen")).toBe("pen-line");
     expect(studioBrushIconId("school-pen")).toBe("pen-tool");
     expect(studioBrushIconId("fountain-pen")).toBe("feather");
+    expect(studioBrushIconId("standard-eraser")).toBe("eraser");
     expect(studioBrushIconId("kneaded-eraser")).toBe("eraser");
   });
 
@@ -268,6 +270,7 @@ describe("commercial basic brush expansion", () => {
 
     expect(contract.composite).toBe("destination-out");
     expect(contract.opacity).toBe(0.38);
+    expect(contract.paintModel).toBe("layered-flow-v1");
     expect(contract.strokeWidth).toBeCloseTo(30.16);
     expect(contract.pressures).not.toEqual(genericContract.pressures);
     expect(contract.strokeWidth).toBeGreaterThan(genericContract.strokeWidth);

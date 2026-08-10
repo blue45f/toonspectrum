@@ -60,12 +60,14 @@ describe("studio brush catalogue selection", () => {
       name: "초크",
       defaultWidth: 16,
       defaultOpacity: 0.8,
+      operation: "paint",
     });
 
     expect(selection).toMatchObject({
       catalogId: "chalk",
       catalogName: "초크",
       runtimeBrushId: "chalk",
+      operation: "paint",
     });
     expect(selection.brushDynamics?.tip.shape).toBe("sponge");
     expect(selection.brushDynamics?.opacity.base).toBe(1);
@@ -160,9 +162,9 @@ describe("studio brush catalogue selection", () => {
     }
   });
 
-  it("materializes all 230 catalogue ids through one fail-closed selection source", async () => {
+  it("materializes all 231 catalogue ids through one fail-closed selection source", async () => {
     expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(STUDIO_ALL_BRUSH_CATALOG_ITEMS.length);
-    expect(STUDIO_BRUSH_CATALOG_COUNTS).toEqual({ core: 70, pro: 160, total: 230 });
+    expect(STUDIO_BRUSH_CATALOG_COUNTS).toEqual({ core: 71, pro: 160, total: 231 });
 
     for (const item of STUDIO_ALL_BRUSH_CATALOG_ITEMS) {
       const selection = await materializeStudioBrushCatalogSelection(item.id);
@@ -172,6 +174,7 @@ describe("studio brush catalogue selection", () => {
         catalogName: item.name,
         defaultWidth: item.defaultWidth,
         defaultOpacity: item.defaultOpacity,
+        operation: item.operation,
       });
       expect(isStudioBrushCatalogSelection(selection), `${item.id}: invalid payload`).toBe(true);
       if (item.source === "core") {
@@ -189,13 +192,40 @@ describe("studio brush catalogue selection", () => {
     expect(await materializeStudioBrushCatalogSelection(null)).toBeNull();
   });
 
+  it("keeps both eraser selections explicit while preserving drawMode compatibility", async () => {
+    await expect(materializeStudioBrushCatalogSelection("standard-eraser")).resolves.toMatchObject({
+      catalogId: "standard-eraser",
+      runtimeBrushId: "standard-eraser",
+      operation: "erase",
+      drawMode: "eraser",
+      defaultWidth: 20,
+      defaultOpacity: 1,
+    });
+    await expect(materializeStudioBrushCatalogSelection("kneaded-eraser")).resolves.toMatchObject({
+      catalogId: "kneaded-eraser",
+      runtimeBrushId: "kneaded-eraser",
+      operation: "erase",
+      drawMode: "eraser",
+      defaultOpacity: 0.38,
+    });
+  });
+
   it("rejects incomplete or non-finite catalogue payloads", () => {
     expect(isStudioBrushCatalogSelection(null)).toBe(false);
     expect(isStudioBrushCatalogSelection({ catalogId: "pack-1" })).toBe(false);
     expect(isStudioBrushCatalogSelection({
+      catalogId: "legacy-pack",
+      catalogName: "레거시 브러시",
+      runtimeBrushId: "dry-media",
+      defaultWidth: 10,
+      defaultOpacity: 1,
+      brushDynamics: null,
+    })).toBe(false);
+    expect(isStudioBrushCatalogSelection({
       catalogId: "pack-1",
       catalogName: "프로 브러시",
       runtimeBrushId: "dry-media",
+      operation: "paint",
       defaultWidth: Number.NaN,
       defaultOpacity: 1,
       brushDynamics: null,

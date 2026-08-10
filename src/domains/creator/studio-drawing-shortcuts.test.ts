@@ -11,12 +11,12 @@ import {
 describe("resolveStudioDrawingShortcut", () => {
   it("B는 펜, E는 펜·지우개 토글로 해석한다", () => {
     expect(resolveStudioDrawingShortcut({ code: "KeyB", key: "b" })).toEqual({ type: "select-pen" });
-    expect(resolveStudioDrawingShortcut({ code: "KeyE", key: "e" })).toEqual({ type: "toggle-eraser" });
+    expect(resolveStudioDrawingShortcut({ code: "KeyE", key: "e" })).toEqual({ type: "select-eraser" });
   });
 
   it("가상 키보드·브라우저 자동화가 축약 code를 보내도 key 의미로 보완한다", () => {
     expect(resolveStudioDrawingShortcut({ code: "b", key: "b" })).toEqual({ type: "select-pen" });
-    expect(resolveStudioDrawingShortcut({ code: "E", key: "E" })).toEqual({ type: "toggle-eraser" });
+    expect(resolveStudioDrawingShortcut({ code: "E", key: "E" })).toEqual({ type: "select-eraser" });
     expect(resolveStudioDrawingShortcut({ code: "]", key: "]" })).toEqual({
       type: "adjust-width",
       delta: 1,
@@ -181,7 +181,7 @@ describe("resolveStudioDrawingShortcut", () => {
     // Partial map: only remapped pen is owned; eraser hard-code still works.
     expect(
       resolveStudioDrawingShortcut({ code: "KeyE", key: "e" }, { shortcuts: { "tool-pen": "K" } })
-    ).toEqual({ type: "toggle-eraser" });
+    ).toEqual({ type: "select-eraser" });
   });
 });
 

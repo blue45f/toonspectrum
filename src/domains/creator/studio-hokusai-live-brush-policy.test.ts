@@ -137,7 +137,7 @@ describe("Studio Hokusai auto-route catalogue quality policy", () => {
     ]);
   });
 
-  it("audits all 230 identities and never promotes a procedural carrier as charcoal", () => {
+  it("audits all 231 identities and never promotes a procedural carrier as charcoal", () => {
     const professional = materializeAllStudioBrushPackSelections();
     const identities = [
       ...BRUSH_PRESETS.map((preset) => ({
@@ -151,9 +151,9 @@ describe("Studio Hokusai auto-route catalogue quality policy", () => {
         runtimeBrushId: selection.runtimeBrushId,
       })),
     ];
-    expect(identities).toHaveLength(230);
+    expect(identities).toHaveLength(231);
     expect(STUDIO_BRUSH_PACK_DESCRIPTORS).toHaveLength(professional.length);
-    expect(new Set(identities.map(({ catalogId }) => catalogId))).toHaveLength(230);
+    expect(new Set(identities.map(({ catalogId }) => catalogId))).toHaveLength(231);
 
     const admitted = identities.filter(({ catalogId, runtimeBrushId }) => (
       resolveStudioHokusaiLiveAutoRouteDecision(runtimeBrushId, catalogId).status

@@ -7,18 +7,32 @@
 
 import { STUDIO_PIXEL_PENCIL_RENDER_MODE } from "./studio-pixel-pencil";
 
+/** Artist-facing operation. Render families may be shared, but paint and erase never are. */
+export type StudioToolOperation = "paint" | "erase";
+
 // 브러시 프리셋 데이터(드로잉 툴바/우측 패널 공용).
 export interface BrushPreset {
   id: string;
   name: string;
   defaultWidth: number;
   defaultOpacity: number;
+  /** Durable tool operation; renderer family alone must never imply paint versus erase. */
+  operation: StudioToolOperation;
   /** Catalogue preview suggestion only; switching tools preserves the artist's active color. */
   defaultColor?: string;
   /** Locale-independent discovery terms that remain separate from the displayed product name. */
   searchAliases?: readonly string[];
-  /** A stable preset may select the existing non-destructive eraser tool instead of paint. */
-  drawMode?: "pen" | "eraser";
+}
+
+type BrushPresetDefinition = Omit<BrushPreset, "operation"> & {
+  /** Paint remains the authoring default for concise legacy preset declarations. */
+  operation?: StudioToolOperation;
+};
+
+function defineBrushPresets(
+  presets: readonly BrushPresetDefinition[]
+): BrushPreset[] {
+  return presets.map((preset) => ({ operation: "paint", ...preset }));
 }
 
 /**
@@ -71,6 +85,7 @@ export const STUDIO_BRUSH_RENDER_FAMILY: Readonly<Record<string, StudioBrushRend
   "fountain-pen": "calligraphy",
   "parallel-pen": "calligraphy",
   "brush-pen": "calligraphy",
+  "standard-eraser": "pen",
   "kneaded-eraser": "pen",
   // perfect-freehand(tldraw) 아웃라인 폴리곤 렌더 — studio-perfect-freehand.ts 어댑터가 그린다.
   "perfect-ink": "perfect",
@@ -149,7 +164,7 @@ export function resolveStudioBrushRenderFamily(brushId: unknown): StudioBrushRen
  * Commercial brush kit — Canva/Express beginner names + Picsart expressive media + webtoon line tools.
  * Keep legacy ids first so saved documents remain stable.
  */
-export const BRUSH_PRESETS: BrushPreset[] = [
+export const BRUSH_PRESETS: BrushPreset[] = defineBrushPresets([
   // —— Line tools (AutoDraw-adjacent clean ink, CSP-style line art) ——
   { id: "pen", name: "펜(매끈)", defaultWidth: 6, defaultOpacity: 1.0 },
   { id: "fineliner", name: "파인라이너", defaultWidth: 2.2, defaultOpacity: 1.0 },
@@ -214,13 +229,21 @@ export const BRUSH_PRESETS: BrushPreset[] = [
   { id: "perfect-ink", name: "캘리 잉크펜(퍼펙트)", defaultWidth: 9, defaultOpacity: 1.0 },
   { id: "perfect-marker", name: "마커 펜(퍼펙트)", defaultWidth: 14, defaultOpacity: 1.0 },
   {
+    id: "standard-eraser",
+    name: "일반 지우개",
+    defaultWidth: 20,
+    defaultOpacity: 1,
+    operation: "erase",
+    searchAliases: ["기본 지우개", "완전 지우개", "standard eraser", "hard eraser"],
+  },
+  {
     id: "kneaded-eraser",
     name: "떡지우개(저농도)",
     defaultWidth: 26,
     defaultOpacity: 0.38,
+    operation: "erase",
     defaultColor: "#b7ada0",
     searchAliases: ["말랑 지우개", "찰흙 지우개", "kneaded eraser", "putty eraser"],
-    drawMode: "eraser",
   },
   // —— Markers (Canva Draw / Express / Picsart / CSP) ——
   { id: "marker", name: "마커(굵고 반투명)", defaultWidth: 16, defaultOpacity: 0.6 },
@@ -323,17 +346,24 @@ export const BRUSH_PRESETS: BrushPreset[] = [
   },
   { id: "screentone", name: "스크린톤(도트)", defaultWidth: 22, defaultOpacity: 1.0 },
   { id: "crosshatch", name: "크로스 해치(사선)", defaultWidth: 20, defaultOpacity: 0.9 },
-];
+]);
+
+export function resolveStudioBrushPresetOperation(
+  brushId: unknown
+): StudioToolOperation {
+  if (typeof brushId !== "string") return "paint";
+  return BRUSH_PRESETS.find((preset) => preset.id === brushId)?.operation ?? "paint";
+}
 
 /**
  * Rehydrates the tool operation from a persistence-safe core id. Legacy and unknown ids keep the
- * historical paint behavior; only a preset that explicitly owns eraser semantics may switch it.
+ * historical pen behavior. `drawMode` remains a compatibility projection for callers that have
+ * not migrated to `StudioToolOperation`; catalogue state itself owns `operation` directly.
  */
 export function resolveStudioBrushPresetDrawMode(
   brushId: unknown
 ): "pen" | "eraser" {
-  if (typeof brushId !== "string") return "pen";
-  return BRUSH_PRESETS.find((preset) => preset.id === brushId)?.drawMode ?? "pen";
+  return resolveStudioBrushPresetOperation(brushId) === "erase" ? "eraser" : "pen";
 }
 
 /** Canva/PicsArt-style quick size chips (screen px brush width). */

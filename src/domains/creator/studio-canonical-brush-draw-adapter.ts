@@ -802,7 +802,7 @@ function versionedRecipe(
   return reject(
     "unsupported-paint-model",
     "element.paintModel",
-    "Layered flow accepts ordinary ink only; bounded flow requires retained dynamic settings.",
+    "Layered flow accepts ordinary ink or a named low-density eraser; bounded flow requires retained dynamic settings.",
   );
 }
 

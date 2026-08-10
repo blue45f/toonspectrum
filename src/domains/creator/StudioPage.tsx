@@ -193,11 +193,14 @@ import {
   pressureCurvePresetId,
   pressureCurveValueForPreset,
   resolveStudioBrushPresetDrawMode,
+  resolveStudioBrushPresetOperation,
   strokeSampleDistanceForScale,
   type BrushPreset,
+  type StudioToolOperation,
 } from "./studio-brush";
 import {
   isStudioBrushAliasId,
+  isStudioBrushEraserAliasId,
 } from "./studio-brush-alias-profile";
 import {
   resolveStudioHokusaiProductLiveAdmission,
@@ -211,7 +214,6 @@ import {
   type StudioBrushDynamicsPresetId,
 } from "./studio-brush-dynamics";
 import {
-  DEFAULT_STUDIO_BRUSH_SNAPSHOT,
   type DeletedBrushRecord,
   type StudioBrushStampTuning,
   type StudioBrushSnapshot,
@@ -1395,6 +1397,12 @@ import {
   type StudioTeamCommentRefreshSession,
 } from "./studio-team-comment-refresh-session";
 import { suppressNextStudioToolHintFocus } from "./studio-tool-hint-focus-suppression";
+import {
+  mergeHydratedStudioToolOperationMemory,
+  normalizeStudioToolOperationMemory,
+  rememberStudioToolOperationSnapshot,
+  type StudioToolOperationMemory,
+} from "./studio-tool-operation-memory";
 import {
   bootStudioTournamentPersistence,
   peekBootedStudioTournamentRuntime,
@@ -7643,12 +7651,49 @@ function StudioCuttoonEditor() {
     }, 1_400);
     drawingShortcutNoticeTimerRef.current = timer;
   }
+  const announceDrawingShortcutRef = useRef(announceDrawingShortcut);
+  announceDrawingShortcutRef.current = announceDrawingShortcut;
   useEffect(() => () => {
     if (drawingShortcutNoticeTimerRef.current) {
       globalThis.clearTimeout(drawingShortcutNoticeTimerRef.current);
     }
   }, []);
-  const [color, setColor] = useState("#7c5cfc");
+  const [initialToolOperationMemory] = useState<StudioToolOperationMemory>(() =>
+    normalizeStudioToolOperationMemory(null)
+  );
+  const toolOperationMemoryRef = useRef(initialToolOperationMemory);
+  const toolOperationMemoryTouchedRef = useRef(false);
+  const toolOperationMemoryErrorAnnouncedRef = useRef<string | null>(null);
+  const toolOperationMemoryPersistenceRef = useRef<{
+    hydrate(): Promise<StudioToolOperationMemory>;
+    save(memory: StudioToolOperationMemory): Promise<boolean>;
+    getSnapshot(): {
+      readonly lastError: {
+        readonly code: "corrupt" | "unavailable";
+        readonly message: string;
+      } | null;
+    };
+  } | null>(null);
+  const toolOperationMemoryPersistenceLoadRef = useRef<Promise<NonNullable<
+    typeof toolOperationMemoryPersistenceRef.current
+  >> | null>(null);
+  const pendingToolOperationMemorySavesRef = useRef<StudioToolOperationMemory[]>([]);
+  const queueToolOperationMemorySaveRef = useRef<
+    (memory: StudioToolOperationMemory) => void
+  >(() => undefined);
+  queueToolOperationMemorySaveRef.current = (memory) => {
+    const persistence = toolOperationMemoryPersistenceRef.current;
+    if (persistence) {
+      void persistence.save(memory);
+      return;
+    }
+    pendingToolOperationMemorySavesRef.current.push(memory);
+  };
+  const currentBrushSnapshotRef = useRef<StudioBrushSnapshot | null>(null);
+  const applyToolOperationSnapshotRef = useRef<
+    (snapshot: StudioBrushSnapshot) => void
+  >(() => undefined);
+  const [color, setColor] = useState(initialToolOperationMemory.paint.color);
   const [pixelArtMode, setPixelArtMode] = useState<StudioPixelArtModeState>(() => createStudioPixelArtMode());
   const [silkGenerativeSpec, setSilkGenerativeSpec] = useState<StudioSilkGenerativeSpec>(
     () => DEFAULT_STUDIO_SILK_GENERATIVE_SPEC,
@@ -7865,7 +7910,9 @@ function StudioCuttoonEditor() {
         console.error("Failed to store studio recent color:", err);
       });
   };
-  const [strokeWidth, setStrokeWidthState] = useState(6);
+  const [strokeWidth, setStrokeWidthState] = useState(
+    initialToolOperationMemory.paint.strokeWidth,
+  );
   const [drawMode, setDrawModeState] = useState<DrawMode>("pen");
   // Pixel pencil is intentionally fixed to one device-independent document pixel, but that
   // temporary constraint must never overwrite the artist's last raster/vector brush size.
@@ -7899,17 +7946,26 @@ function StudioCuttoonEditor() {
     setDrawModeState(plan.drawMode);
     setStrokeWidthState(plan.strokeWidth);
   };
-  const [brushOpacity, setBrushOpacity] = useState(1);
-  const [brush, setBrush] = useState<string>("pen");
+  const [brushOpacity, setBrushOpacity] = useState(
+    initialToolOperationMemory.paint.brushOpacity,
+  );
+  const [brush, setBrush] = useState<string>(initialToolOperationMemory.paint.brushId);
   const [activeCatalogBrush, setActiveCatalogBrush] = useState(() => ({
-    id: "pen",
-    name: BRUSH_PRESETS.find((preset) => preset.id === "pen")?.name ?? "펜",
-    sourcePresetId: undefined as string | undefined,
-    sourcePresetName: undefined as string | undefined,
+    id: initialToolOperationMemory.paint.sourcePresetId
+      ?? initialToolOperationMemory.paint.brushId,
+    name: initialToolOperationMemory.paint.sourcePresetName
+      ?? BRUSH_PRESETS.find(
+        (preset) => preset.id === initialToolOperationMemory.paint.brushId,
+      )?.name
+      ?? "펜",
+    sourcePresetId: initialToolOperationMemory.paint.sourcePresetId,
+    sourcePresetName: initialToolOperationMemory.paint.sourcePresetName,
   }));
   // 스탬프 브러시(잉크붓/정밀에어/그레인연필/물맛붓) 튜닝. 브러시 선택 경로에서 기본값을
   // 명시적으로 적용해, 저장 브러시를 불러온 직후 effect가 사용자 값을 덮어쓰지 않게 한다.
-  const [stampTuning, setStampTuning] = useState<StudioBrushStampTuning | null>(null);
+  const [stampTuning, setStampTuning] = useState<StudioBrushStampTuning | null>(
+    initialToolOperationMemory.paint.stampTuning,
+  );
   const brushSlotsOwnerScope = studioAuthUserId ?? "guest";
   const [brushSlotsDeviceProfile] = useState(studioBrushQuickSlotsDeviceProfile);
   const brushSlotsScope = {
@@ -8156,32 +8212,40 @@ function StudioCuttoonEditor() {
     });
   };
   const [stabilizer, setStabilizer] = useState<number>(
-    DEFAULT_STUDIO_BRUSH_SNAPSHOT.stabilizer
+    initialToolOperationMemory.paint.stabilizer
   );
   const [stabilizerMode, setStabilizerMode] = useState<StudioStabilizerMode>(
-    DEFAULT_STUDIO_BRUSH_SNAPSHOT.stabilizerMode
+    initialToolOperationMemory.paint.stabilizerMode
   );
   const [postCorrection, setPostCorrection] = useState<number>(
-    DEFAULT_STUDIO_BRUSH_SNAPSHOT.postCorrection
+    initialToolOperationMemory.paint.postCorrection
   );
   const [preserveCorners, setPreserveCorners] = useState<boolean>(
-    DEFAULT_STUDIO_BRUSH_SNAPSHOT.preserveCorners
+    initialToolOperationMemory.paint.preserveCorners
   );
   const [pressureCurve, setPressureCurve] = useState<number>(
-    () => loadStudioAppSettings(studioAppSettingsStorage()).other.pressureCurve
+    initialToolOperationMemory.paint.pressureCurve
   );
   const [pressureMinSize, setPressureMinSize] = useState<number>(
-    DEFAULT_STUDIO_BRUSH_SNAPSHOT.pressureMinSize
+    initialToolOperationMemory.paint.pressureMinSize
   );
   const [useVelocityPressure, setUseVelocityPressure] = useState<boolean>(
-    DEFAULT_STUDIO_BRUSH_SNAPSHOT.useVelocityPressure
+    initialToolOperationMemory.paint.useVelocityPressure
   );
-  const [velocitySensitivity, setVelocitySensitivity] = useState<number>(0.65);
-  const [tiltEnabled, setTiltEnabled] = useState<boolean>(true);
-  const [tipAngle, setTipAngle] = useState<number>(-30);
-  const [tipRoundness, setTipRoundness] = useState<number>(0.24);
+  const [velocitySensitivity, setVelocitySensitivity] = useState<number>(
+    initialToolOperationMemory.paint.velocitySensitivity,
+  );
+  const [tiltEnabled, setTiltEnabled] = useState<boolean>(
+    initialToolOperationMemory.paint.tiltEnabled,
+  );
+  const [tipAngle, setTipAngle] = useState<number>(
+    initialToolOperationMemory.paint.tipAngle,
+  );
+  const [tipRoundness, setTipRoundness] = useState<number>(
+    initialToolOperationMemory.paint.tipRoundness,
+  );
   const [brushDynamics, setBrushDynamics] = useState<NormalizedStudioBrushDynamicsSettings>(() =>
-    normalizeStudioBrushDynamicsSettings(DEFAULT_STUDIO_BRUSH_SNAPSHOT.brushDynamics)
+    normalizeStudioBrushDynamicsSettings(initialToolOperationMemory.paint.brushDynamics)
   );
   // 데스크톱 관리 패널과 모바일 퀵 선반은 같은 SQLite/OPFS authority를 소비한다. 배열은
   // 화면 projection일 뿐이며 모든 mutation은 아래 product repository를 먼저 commit한다.
@@ -8304,6 +8368,23 @@ function StudioCuttoonEditor() {
     brushDynamics,
     stampTuning,
   };
+  currentBrushSnapshotRef.current = currentBrushSnapshot;
+  const activeToolOperation: StudioToolOperation | null = drawMode === "pen"
+    ? "paint"
+    : drawMode === "eraser"
+      ? "erase"
+      : null;
+  if (activeToolOperation) {
+    toolOperationMemoryRef.current = {
+      ...toolOperationMemoryRef.current,
+      [activeToolOperation]: currentBrushSnapshot,
+    };
+  }
+  useEffect(() => () => {
+    queueToolOperationMemorySaveRef.current(
+      toolOperationMemoryRef.current,
+    );
+  }, []);
   // CLIP STUDIO처럼 속성을 수정해도 선택한 사용자 브러시의 정체성은 유지한다.
   // 비동기 기준선 선택·검사·복원 경쟁은 전용 컨트롤러가 소유하고, 이 편집기는 실제
   // 브러시 상태에 트랜잭션을 적용하는 어댑터만 남긴다.
@@ -8319,12 +8400,118 @@ function StudioCuttoonEditor() {
   });
   const activeSavedBrushId = brushBaselineController.activeSavedBrushId;
 
+  function applyToolOperationSnapshot(snapshot: StudioBrushSnapshot) {
+    const catalogId = snapshot.sourcePresetId ?? snapshot.brushId;
+    const catalogName = snapshot.sourcePresetName
+      ?? BRUSH_PRESETS.find((preset) => preset.id === snapshot.brushId)?.name
+      ?? snapshot.brushId;
+    brushBaselineController.selectCatalog(catalogId);
+    setBrush(snapshot.brushId);
+    setActiveCatalogBrush({
+      id: catalogId,
+      name: catalogName,
+      sourcePresetId: snapshot.sourcePresetId,
+      sourcePresetName: snapshot.sourcePresetName,
+    });
+    setStrokeWidth(snapshot.strokeWidth);
+    setBrushOpacity(snapshot.brushOpacity);
+    setColor(snapshot.color);
+    setStabilizer(snapshot.stabilizer);
+    setStabilizerMode(snapshot.stabilizerMode);
+    setPostCorrection(snapshot.postCorrection);
+    setPreserveCorners(snapshot.preserveCorners);
+    setPressureCurve(snapshot.pressureCurve);
+    setPressureMinSize(snapshot.pressureMinSize);
+    setUseVelocityPressure(snapshot.useVelocityPressure);
+    setVelocitySensitivity(snapshot.velocitySensitivity);
+    setTiltEnabled(snapshot.tiltEnabled);
+    setTipAngle(snapshot.tipAngle);
+    setTipRoundness(snapshot.tipRoundness);
+    setBrushDynamics(normalizeStudioBrushDynamicsSettings(snapshot.brushDynamics));
+    setStampTuning(snapshot.stampTuning);
+  }
+  applyToolOperationSnapshotRef.current = applyToolOperationSnapshot;
+  const announceToolOperationMemoryPersistenceError = useEffectEvent(
+    (code: "corrupt" | "unavailable") => {
+      announceDrawingShortcut(
+        code === "corrupt"
+          ? "저장된 펜·지우개 설정 일부가 손상되어 안전한 기본값으로 복구했어요."
+          : "펜·지우개 설정을 로컬 SQLite에 연결하지 못했어요. 현재 세션에서는 메모리 상태를 사용합니다.",
+      );
+    },
+  );
+  useEffect(() => {
+    let active = true;
+    toolOperationMemoryPersistenceLoadRef.current ??= import(
+      "./studio-tool-operation-memory-sqlite"
+    ).then(({ getProductStudioToolOperationMemoryController }) => {
+      const persistence = getProductStudioToolOperationMemoryController();
+      toolOperationMemoryPersistenceRef.current = persistence;
+      const queuedSaves = pendingToolOperationMemorySavesRef.current.splice(0);
+      for (const memory of queuedSaves) {
+        void persistence.save(memory);
+      }
+      return persistence;
+    });
+    void toolOperationMemoryPersistenceLoadRef.current
+      .then((persistence) => persistence.hydrate().then((hydratedMemory) => ({
+        hydratedMemory,
+        persistence,
+      })))
+      .then(({ hydratedMemory, persistence }) => {
+        if (!active) return;
+        const activeOperation = rememberedOperationForDrawMode(drawModeRef.current);
+        const hydrationMerge = mergeHydratedStudioToolOperationMemory({
+          hydratedMemory,
+          initialMemory: initialToolOperationMemory,
+          activeOperation,
+          activeSnapshot: currentBrushSnapshotRef.current,
+          operationTransitionTouched: toolOperationMemoryTouchedRef.current,
+        });
+        toolOperationMemoryRef.current = hydrationMerge.memory;
+        const persistenceError = persistence.getSnapshot().lastError;
+        if (persistenceError) {
+          const errorKey = `${persistenceError.code}:${persistenceError.message}`;
+          if (toolOperationMemoryErrorAnnouncedRef.current !== errorKey) {
+            toolOperationMemoryErrorAnnouncedRef.current = errorKey;
+            announceToolOperationMemoryPersistenceError(persistenceError.code);
+          }
+        }
+        if (hydrationMerge.activeSnapshotDiverged) {
+          queueToolOperationMemorySaveRef.current(hydrationMerge.memory);
+        }
+        if (
+          hydrationMerge.shouldApplyHydratedActiveSnapshot
+          && activeOperation !== null
+        ) {
+          applyToolOperationSnapshotRef.current(
+            hydrationMerge.memory[activeOperation],
+          );
+        }
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        const errorKey = `unavailable:${
+          error instanceof Error ? error.message : String(error)
+        }`;
+        if (toolOperationMemoryErrorAnnouncedRef.current !== errorKey) {
+          toolOperationMemoryErrorAnnouncedRef.current = errorKey;
+          announceToolOperationMemoryPersistenceError("unavailable");
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [initialToolOperationMemory]);
+
   function applySavedBrush(saved: StudioSavedBrush) {
     brushBaselineController.select({ kind: "saved", brush: saved });
     activatePrimaryCanvasTool(
       "draw",
       resolveStudioBrushPresetDrawMode(saved.brushId),
+      true,
     );
+    prepareStudioSymmetryForBrush(saved.brushId);
     setBrush(saved.brushId);
     setActiveCatalogBrush({
       id: saved.sourcePresetId ?? saved.brushId,
@@ -8375,14 +8562,21 @@ function StudioCuttoonEditor() {
       id: selection.runtimeBrushId,
       defaultWidth: selection.defaultWidth,
       defaultOpacity: selection.defaultOpacity,
-      ...(selection.defaultColor ? { defaultColor: selection.defaultColor } : {}),
+      ...(selection.operation === "paint" && selection.defaultColor
+        ? { defaultColor: selection.defaultColor }
+        : {}),
     }, proDrawPrefs, {
       strokeWidth,
       brushOpacity,
       color,
     });
     brushBaselineController.select({ kind: "catalog", selection });
-    activatePrimaryCanvasTool("draw", selection.drawMode ?? "pen");
+    activatePrimaryCanvasTool(
+      "draw",
+      selection.operation === "erase" ? "eraser" : "pen",
+      true,
+    );
+    prepareStudioSymmetryForBrush(applied.brushId);
     setBrush(applied.brushId);
     const extendedSource = selection.catalogId !== selection.runtimeBrushId;
     setActiveCatalogBrush({
@@ -8669,13 +8863,18 @@ function StudioCuttoonEditor() {
     // silently switching away from Selection/Hand. Its catalogue is therefore valid whenever the
     // visible draw sheet owns the launcher; selecting an entry activates Draw atomically below.
     // Desktop still requires the Draw workspace because its launcher belongs to that inspector.
-    const wrongSurface = drawMode !== "pen" || (
+    const brushCatalogModeAvailable = drawMode === "pen"
+      || (
+        drawMode === "eraser"
+        && resolveStudioBrushPresetOperation(brush) === "erase"
+      );
+    const wrongSurface = !brushCatalogModeAvailable || (
       brushCatalogSession.placement === "mobile-sheet"
         ? !isMobile || mobileSheet !== "draw"
         : isMobile || tool !== "draw"
     );
     if (wrongSurface) setBrushCatalogSession(null);
-  }, [brushCatalogSession, drawMode, isMobile, mobileSheet, tool]);
+  }, [brush, brushCatalogSession, drawMode, isMobile, mobileSheet, tool]);
 
   function applyBrushSlot(slot: StudioBrushSlot) {
     brushBaselineController.selectCatalog(slot.sourcePresetId ?? slot.brushId);
@@ -8706,7 +8905,9 @@ function StudioCuttoonEditor() {
     activatePrimaryCanvasTool(
       "draw",
       resolveStudioBrushPresetDrawMode(slot.brushId),
+      true,
     );
+    prepareStudioSymmetryForBrush(slot.brushId);
   }
 
   function applyDynamicsPreset(
@@ -8723,6 +8924,24 @@ function StudioCuttoonEditor() {
   const [symmetryCenterX, setSymmetryCenterX] = useState<number>(() => CANVAS_W / 2);
   const [symmetryCenterY, setSymmetryCenterY] = useState<number>(540);
   const [symmetryRadialCount, setSymmetryRadialCount] = useState<number>(6);
+  function prepareStudioSymmetryForBrush(brushId: unknown) {
+    if (!isStudioBrushEraserAliasId(brushId) || symmetryType === "none") return;
+    setSymmetryType("none");
+    announceDrawingShortcut("떡지우개의 저농도 지우기를 유지하려고 대칭을 껐어요.");
+  }
+  function changeStudioSymmetryType(
+    next: "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope" | "silk",
+  ) {
+    if (
+      next !== "none"
+      && drawMode === "eraser"
+      && isStudioBrushEraserAliasId(brush)
+    ) {
+      announceDrawingShortcut("떡지우개는 저농도 합성을 위해 대칭을 함께 사용할 수 없어요.");
+      return;
+    }
+    setSymmetryType(next);
+  }
   useEffect(() => {
     if (symmetryType === "silk" && symmetryRadialCount < 6) setSymmetryRadialCount(8);
   }, [symmetryType, symmetryRadialCount]);
@@ -16396,11 +16615,13 @@ function StudioCuttoonEditor() {
         return;
       case "brush": {
         let applied = false;
+        let presetApplied = false;
         if (control.patch.id !== undefined) {
           const preset = BRUSH_PRESETS.find((candidate) => candidate.id === control.patch.id);
           if (preset) {
             applyBuiltInBrushPreset(preset);
             applied = true;
+            presetApplied = true;
           }
         }
         if (control.patch.size !== undefined) {
@@ -16415,9 +16636,12 @@ function StudioCuttoonEditor() {
           setColor(control.patch.color.toLowerCase());
           applied = true;
         }
-        if (applied) {
-          setTool("draw");
-          setDrawMode("pen");
+        if (applied && !presetApplied) {
+          activatePrimaryCanvasTool(
+            "draw",
+            resolveStudioBrushPresetDrawMode(brush),
+            true,
+          );
         }
         return;
       }
@@ -25392,13 +25616,12 @@ const puppetWarpArmed =
           drawingShortcutStateRef.current.drawMode = "pen";
           activatePrimaryCanvasTool("draw", "pen");
           announceDrawingShortcut("펜");
-        } else if (drawingShortcut.type === "toggle-eraser") {
+        } else if (drawingShortcut.type === "select-eraser") {
           const currentDrawing = drawingShortcutStateRef.current;
-          const nextMode = currentDrawing.tool === "draw" && currentDrawing.drawMode === "eraser" ? "pen" : "eraser";
           currentDrawing.tool = "draw";
-          currentDrawing.drawMode = nextMode;
-          activatePrimaryCanvasTool("draw", nextMode);
-          announceDrawingShortcut(nextMode === "eraser" ? "지우개" : "펜");
+          currentDrawing.drawMode = "eraser";
+          activatePrimaryCanvasTool("draw", "eraser");
+          announceDrawingShortcut("지우개");
         } else if (drawingShortcut.type === "swap-colors") {
           setColor(secondaryColor);
           setSecondaryColor(color);
@@ -27393,8 +27616,7 @@ const puppetWarpArmed =
     }
     commit([...elements, el]);
     setSelectedId(null);
-    setTool("draw");
-    setDrawMode("pen");
+    activatePrimaryCanvasTool("draw", "pen");
   }
   // 개인 보관함(studio-emeres-library) 항목을 캔버스에 삽입 — addEmeresTemplate과 배치 로직은
   // 동일하되, svgToDataUrl 변환이 없고(item.src가 이미 dataURL) emeresSourceId에 custom: 접두사를 붙인다.
@@ -27439,8 +27661,7 @@ const puppetWarpArmed =
     }
     commit([...elements, el]);
     setSelectedId(null);
-    setTool("draw");
-    setDrawMode("pen");
+    activatePrimaryCanvasTool("draw", "pen");
   }
   // 우클릭한 요소를 이메레스 개인 보관함에 저장 — captureAnimFrame의 stage.toDataURL + 회전 가드
   // 패턴을 재사용하되, 프레임에 합성하지 않고 독립 StudioEmeresLibraryItem으로 저장한다.
@@ -30309,12 +30530,43 @@ const puppetWarpArmed =
       drawingPointerTransportRef
     ).getSession() !== null;
   }
+  function rememberedOperationForDrawMode(mode: DrawMode): StudioToolOperation | null {
+    if (mode === "pen") return "paint";
+    if (mode === "eraser") return "erase";
+    return null;
+  }
   function activatePrimaryCanvasTool(
     nextTool: "select" | "draw",
-    nextDrawMode?: DrawMode
+    nextDrawMode?: DrawMode,
+    selectionWillReplaceToolSnapshot = false,
   ) {
+    const currentOperation = rememberedOperationForDrawMode(drawModeRef.current);
+    const targetMode = nextTool === "draw"
+      ? nextDrawMode ?? drawModeRef.current
+      : null;
+    const targetOperation = targetMode === null
+      ? null
+      : rememberedOperationForDrawMode(targetMode);
+    if (currentOperation && currentOperation !== targetOperation) {
+      toolOperationMemoryTouchedRef.current = true;
+      toolOperationMemoryRef.current = rememberStudioToolOperationSnapshot(
+        toolOperationMemoryRef.current,
+        currentOperation,
+        currentBrushSnapshot,
+      );
+      queueToolOperationMemorySaveRef.current(
+        toolOperationMemoryRef.current,
+      );
+    }
+    if (
+      targetOperation
+      && targetOperation !== currentOperation
+      && !selectionWillReplaceToolSnapshot
+    ) {
+      applyToolOperationSnapshot(toolOperationMemoryRef.current[targetOperation]);
+    }
     const next = nextTool === "draw"
-      ? { tool: "draw" as const, drawMode: nextDrawMode ?? drawModeRef.current }
+      ? { tool: "draw" as const, drawMode: targetMode ?? drawModeRef.current }
       : { tool: "select" as const };
     return executeStudioPrimaryCanvasToolTransition(
       {
@@ -31083,7 +31335,12 @@ const puppetWarpArmed =
       }
       studioStrokeSurfaceRouteRef.current = strokeSurfaceRoute;
       const direct =
-        strokeSurfaceRoute.kind === "living-ink"
+        (
+          strokeSurfaceRoute.kind === "konva"
+          && next.mode === "eraser"
+          && isDirectLiveDraftEl(next)
+        )
+        || strokeSurfaceRoute.kind === "living-ink"
         || hokusaiPinned
         || pixelDirect
         || liveInkOverlayStarted
@@ -38130,7 +38387,7 @@ function clearSelectionForEdit() {
             { primary: "properties", image: "retouch" },
             isMobile ? "props" : null,
           );
-          announceDrawingShortcut(
+          announceDrawingShortcutRef.current(
             resumePlan.retouchTool === "smudge"
               ? `${scopeLabel}에서 혼합(스머지)을 시작해요`
               : resumePlan.retouchTool === "dodge-burn"
@@ -40334,6 +40591,7 @@ function clearSelectionForEdit() {
     : null;
 
   const studioInspectorAsideHandlers = useStudioStableHandlers<StudioInspectorAsideHandlers>({
+    activateCanvasTool: activatePrimaryCanvasTool,
     activatePixelSelectionToolFromInspector,
     addProceduralArtisticBrushRaster: (
       src,
@@ -41204,7 +41462,7 @@ function clearSelectionForEdit() {
     setStabilizerMode,
     setStampTuning,
     setStrokeWidth,
-    setSymmetryType,
+    setSymmetryType: changeStudioSymmetryType,
     applyLivingInkFix: applyStudioLivingInkFix,
     applyLivingInkClear: applyStudioLivingInkClear,
     patchLivingInkMaterial: patchStudioLivingInkMaterial,
@@ -41458,6 +41716,7 @@ function clearSelectionForEdit() {
   );
 
   const studioCanvasViewportHandlers = useStudioStableHandlers<StudioCanvasViewportHandlers>({
+  activateCanvasTool: activatePrimaryCanvasTool,
   addPage,
   closeViewToolWithFocus,
   beginCanvasSelectionResize,
@@ -41558,7 +41817,6 @@ function clearSelectionForEdit() {
     stopStudioCommentPlacementSession,
     setMaster,
     setCurrentPageId,
-    setDrawMode,
     setRightPanelOpen: setRightPanelOpenWithOverride,
     setStudioUiDensity,
     setActualPixelView,
@@ -41875,7 +42133,7 @@ function clearSelectionForEdit() {
           silkSpec={silkGenerativeSpec}
           onSilkSpecChange={(spec) => {
             setSilkGenerativeSpec(spec);
-            setSymmetryType("silk");
+            changeStudioSymmetryType("silk");
             setSymmetryRadialCount(spec.arms);
           }}
           onAddStickyNote={insertStudioStickyNote}
@@ -42365,6 +42623,7 @@ function clearSelectionForEdit() {
             placement={brushCatalogSession.placement}
             triggerElement={brushCatalogSession.trigger}
             activeBrushId={activeCatalogBrush.id}
+            operation={drawMode === "eraser" ? "erase" : "paint"}
             favoriteIds={proDrawPrefs.favoriteBrushIds}
             recentIds={proDrawPrefs.recentBrushIds}
             mobileKeyboardInset={mobileKeyboardInset}
@@ -42965,7 +43224,6 @@ function clearSelectionForEdit() {
           setCurrentPageId={studioCanvasViewportHandlers.setCurrentPageId}
           setDialogueBatchOpen={setDialogueBatchOpen}
           setDialogueTranslateOpen={setDialogueTranslateOpen}
-          setDrawMode={studioCanvasViewportHandlers.setDrawMode}
           setError={setError}
           setEyedropperActive={setEyedropperActive}
           setFollowingStudioSessionId={setFollowingStudioSessionId}
@@ -43420,7 +43678,6 @@ function clearSelectionForEdit() {
           setColor={setColor}
           setCropAspect={setCropAspect}
           setCropRect={setCropRect}
-          setDrawMode={setDrawMode}
           setDrawShape={setDrawShape}
           setEyedropperActive={setEyedropperActive}
           setFilterClipboard={setFilterClipboard}
@@ -43520,7 +43777,7 @@ function clearSelectionForEdit() {
           setSymmetryCenterX={setSymmetryCenterX}
           setSymmetryCenterY={setSymmetryCenterY}
           setSymmetryRadialCount={setSymmetryRadialCount}
-          setSymmetryType={setSymmetryType}
+          setSymmetryType={changeStudioSymmetryType}
           setTiltEnabled={setTiltEnabled}
           setTipAngle={setTipAngle}
           setTipRoundness={setTipRoundness}

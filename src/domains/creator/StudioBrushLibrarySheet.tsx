@@ -26,7 +26,8 @@ import { createPortal } from "react-dom";
 
 import {
   filterStudioBrushCatalogItems,
-  STUDIO_BRUSH_CATALOG_COUNTS,
+  STUDIO_ERASER_BRUSH_CATALOG_ITEMS,
+  STUDIO_PAINT_BRUSH_CATALOG_ITEMS,
   studioBrushCatalogItemById,
   studioBrushCatalogKindLabel,
 } from "./studio-brush-catalog";
@@ -48,7 +49,12 @@ import { STUDIO_BRUSH_LIBRARY_TABS } from "./studio-draw-ux";
 import { planGlowBrushPasses, planNeonBrushPasses } from "./studio-fx-brush";
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 import { StudioBrushPresetIcon } from "./StudioBrushPresetIcon";
+import {
+  StudioEraserQuickPicker,
+  type StudioEraserQuickPickerId,
+} from "./StudioEraserQuickPicker";
 
+import type { StudioToolOperation } from "./studio-brush";
 import type { StudioBrushCatalogItem } from "./studio-brush-catalog";
 import type { StudioBrushCatalogSelection } from "./studio-brush-selection";
 import type { StudioBrushTrayItem } from "./studio-creative-ux";
@@ -58,6 +64,8 @@ import { cn } from "@/lib/utils";
 export interface StudioBrushLibrarySheetProps {
   open: boolean;
   activeBrushId: string;
+  /** The active authoring family. Legacy callers default to the paint catalogue. */
+  operation?: StudioToolOperation;
   /**
    * Forces the short-surface layout when the visual viewport is occluded by a software keyboard.
    * A height media query covers genuinely short viewports without requiring a resize render.
@@ -85,6 +93,8 @@ export interface StudioBrushCatalogPortalProps {
   placement: StudioBrushCatalogPlacement;
   triggerElement: HTMLElement | null;
   activeBrushId: string;
+  /** Defaults to paint for compatibility with embedded legacy callers. */
+  operation?: StudioToolOperation;
   favoriteIds?: readonly string[];
   recentIds?: readonly string[];
   mobileKeyboardInset?: number;
@@ -128,6 +138,9 @@ const STUDIO_BRUSH_GRID_FALLBACK_COLUMNS = {
 const STUDIO_BRUSH_PROGRESSIVE_INITIAL_COUNT = 48;
 const STUDIO_BRUSH_PROGRESSIVE_BATCH_COUNT = 48;
 const STUDIO_BRUSH_PROGRESSIVE_ROOT_MARGIN = "240px 0px";
+const STUDIO_ERASER_LIBRARY_TABS = STUDIO_BRUSH_LIBRARY_TABS.filter(
+  (tab) => tab.id === "favorites" || tab.id === "recent" || tab.id === "all",
+);
 
 function countCssGridTracks(template: string): number | null {
   const normalizedTemplate = template.trim();
@@ -368,7 +381,7 @@ function StudioProceduralBrushPreviewDetail({
 function studioBrushCatalogPreviewKind(
   item: StudioBrushTrayItem
 ): StudioBrushCatalogPreviewKind {
-  if (item.id === "kneaded-eraser") return "eraser";
+  if (item.operation === "erase") return "eraser";
   if (
     item.id === "highlighter"
     || item.id === "chisel-highlighter"
@@ -727,6 +740,7 @@ export function LargeBrushPreview({
 export function StudioBrushLibrarySheet({
   open,
   activeBrushId,
+  operation = "paint",
   compact = false,
   triggerElement = null,
   favoriteIds = [],
@@ -751,7 +765,9 @@ export function StudioBrushLibrarySheet({
   const mountedRef = useRef(true);
   const selectionRequestEpochRef = useRef(0);
   const [query, setQuery] = useState("");
-  const [tab, setTab] = useState<(typeof STUDIO_BRUSH_LIBRARY_TABS)[number]["id"]>("beginner");
+  const [tab, setTab] = useState<(typeof STUDIO_BRUSH_LIBRARY_TABS)[number]["id"]>(
+    operation === "erase" ? "all" : "beginner",
+  );
   const [viewMode, setViewMode] = useState<StudioBrushCatalogViewMode>("stroke");
   const [visibleLimit, setVisibleLimit] = useState(
     STUDIO_BRUSH_PROGRESSIVE_INITIAL_COUNT
@@ -760,6 +776,17 @@ export function StudioBrushLibrarySheet({
   const [pendingSelectionId, setPendingSelectionId] = useState<string | null>(null);
   const [selectionError, setSelectionError] = useState<string | null>(null);
   const panelId = `${tabsId}-panel`;
+  const catalogTabs = operation === "erase"
+    ? STUDIO_ERASER_LIBRARY_TABS
+    : STUDIO_BRUSH_LIBRARY_TABS;
+  const operationCatalogItems = operation === "erase"
+    ? STUDIO_ERASER_BRUSH_CATALOG_ITEMS
+    : STUDIO_PAINT_BRUSH_CATALOG_ITEMS;
+  const operationCoreCount = operationCatalogItems.filter(
+    (item) => item.source === "core",
+  ).length;
+  const operationProCount = operationCatalogItems.length - operationCoreCount;
+  const operationLabel = operation === "erase" ? "지우개" : "브러시";
 
   useEffect(() => {
     mountedRef.current = true;
@@ -779,6 +806,13 @@ export function StudioBrushLibrarySheet({
     const t = globalThis.setTimeout(() => searchRef.current?.focus(), 30);
     return () => globalThis.clearTimeout(t);
   }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (!catalogTabs.some((catalogTab) => catalogTab.id === tab)) {
+      setTab(operation === "erase" ? "all" : "beginner");
+    }
+  }, [catalogTabs, open, operation, tab]);
 
   useEffect(() => {
     if (!open) return;
@@ -812,12 +846,14 @@ export function StudioBrushLibrarySheet({
 
   const normalizedQuery = query.trim();
   const items = filterStudioBrushCatalogItems({
+    operation,
     category: tab,
     query: normalizedQuery,
     favoriteIds,
     recentIds,
   });
   const progressiveFilterKey = [
+    operation,
     tab,
     normalizedQuery,
     tab === "favorites" ? favoriteIds.join("\u001f") : "",
@@ -840,6 +876,10 @@ export function StudioBrushLibrarySheet({
       ? activeBrushId
       : visibleItems[0]?.id ?? null;
   const activeCatalogItem = studioBrushCatalogItemById(activeBrushId);
+  const activeEraserId: StudioEraserQuickPickerId =
+    activeBrushId === "kneaded-eraser" ? "kneaded-eraser" : "standard-eraser";
+  const showEraserQuickPicker =
+    operation === "erase" && tab === "all" && normalizedQuery.length === 0;
 
   useLayoutEffect(() => {
     if (progressiveFilterKeyRef.current === progressiveFilterKey) return;
@@ -950,7 +990,7 @@ export function StudioBrushLibrarySheet({
     event: ReactKeyboardEvent<HTMLButtonElement>,
     currentIndex: number
   ): void {
-    const lastIndex = STUDIO_BRUSH_LIBRARY_TABS.length - 1;
+    const lastIndex = catalogTabs.length - 1;
     let nextIndex: number;
     if (event.key === "ArrowRight" || event.key === "ArrowDown") {
       nextIndex = currentIndex === lastIndex ? 0 : currentIndex + 1;
@@ -963,7 +1003,7 @@ export function StudioBrushLibrarySheet({
     } else {
       return;
     }
-    const nextTab = STUDIO_BRUSH_LIBRARY_TABS[nextIndex];
+    const nextTab = catalogTabs[nextIndex];
     if (!nextTab) return;
     event.preventDefault();
     chooseTab(nextTab.id);
@@ -1041,7 +1081,7 @@ export function StudioBrushLibrarySheet({
       >
         <div className="min-w-0">
           <p id={titleId} className="text-sm font-bold text-fg">
-            브러시 전체 라이브러리
+            {operation === "erase" ? "지우개 선택" : "브러시 전체 라이브러리"}
           </p>
           <p
             id={`${titleId}-description`}
@@ -1051,9 +1091,9 @@ export function StudioBrushLibrarySheet({
               "[@media(max-height:32rem)]:hidden"
             )}
           >
-            앱 제공 {STUDIO_BRUSH_CATALOG_COUNTS.total}종 · 코어{" "}
-            {STUDIO_BRUSH_CATALOG_COUNTS.core} + 프로시저럴{" "}
-            {STUDIO_BRUSH_CATALOG_COUNTS.pro} · {visibleItems.length}/{items.length}개 표시
+            {operation === "erase"
+              ? `지우개 ${operationCatalogItems.length}종 · ${visibleItems.length}/${items.length}개 표시`
+              : `브러시 ${operationCatalogItems.length}종 · 코어 ${operationCoreCount} + 프로시저럴 ${operationProCount} · ${visibleItems.length}/${items.length}개 표시`}
           </p>
         </div>
         <button
@@ -1063,7 +1103,9 @@ export function StudioBrushLibrarySheet({
             setPendingSelectionId(null);
             onClose("explicit");
           }}
-          aria-label="브러시 전체 라이브러리 닫기"
+          aria-label={operation === "erase"
+            ? "지우개 선택 닫기"
+            : "브러시 전체 라이브러리 닫기"}
           data-studio-brush-library-close="true"
           className={cn(
             "grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-raised hover:text-fg",
@@ -1093,9 +1135,11 @@ export function StudioBrushLibrarySheet({
               setVisibleLimit(STUDIO_BRUSH_PROGRESSIVE_INITIAL_COUNT);
               setFocusedBrushId(null);
             }}
-            placeholder={`전체 ${STUDIO_BRUSH_CATALOG_COUNTS.total}종 검색 (네온, 수채, G펜…)`}
+            placeholder={operation === "erase"
+              ? `지우개 ${operationCatalogItems.length}종 검색`
+              : `전체 ${operationCatalogItems.length}종 검색 (네온, 수채, G펜…)`}
             className="min-h-11 w-full rounded-xl border border-line bg-card py-1.5 pl-9 pr-3 text-xs outline-none placeholder:text-fg-3 focus:border-accent focus:ring-1 focus:ring-accent/40"
-            aria-label="전체 브러시 검색"
+            aria-label={`전체 ${operationLabel} 검색`}
             aria-controls={panelId}
             aria-describedby={`${titleId}-search-scope`}
             data-studio-brush-search-scope="all"
@@ -1110,10 +1154,12 @@ export function StudioBrushLibrarySheet({
           )}
         >
           {normalizedQuery
-            ? `분류와 관계없이 전체 ${STUDIO_BRUSH_CATALOG_COUNTS.total}종에서 검색 중`
-            : "분류를 고르거나 이름·용도·종류로 전체 검색"}
+            ? `분류와 관계없이 전체 ${operationCatalogItems.length}종에서 검색 중`
+            : operation === "erase"
+              ? "지우는 강도와 결과를 비교해 선택하세요."
+              : "분류를 고르거나 이름·용도·종류로 전체 검색"}
         </p>
-        <div
+        {operation === "paint" ? <div
           className={cn(
             "mt-1.5 flex min-w-0 items-center justify-between gap-2 px-1",
             compact && "mt-0 shrink-0 gap-0 px-0",
@@ -1171,7 +1217,7 @@ export function StudioBrushLibrarySheet({
               );
             })}
           </div>
-        </div>
+        </div> : null}
       </div>
 
       <div
@@ -1183,9 +1229,9 @@ export function StudioBrushLibrarySheet({
           "[@media(max-height:32rem)]:px-1 [@media(max-height:32rem)]:py-0"
         )}
         role="tablist"
-        aria-label="브러시 분류"
+        aria-label={`${operationLabel} 분류`}
       >
-        {STUDIO_BRUSH_LIBRARY_TABS.map((chip, chipIndex) => {
+        {catalogTabs.map((chip, chipIndex) => {
           const active = tab === chip.id;
           return (
             <button
@@ -1236,15 +1282,24 @@ export function StudioBrushLibrarySheet({
           </div>
         ) : null}
         <p role="status" aria-live="polite" className="sr-only">
-          {visibleItems.length}/{items.length}개의 브러시가 표시됩니다.
+          {visibleItems.length}/{items.length}개의 {operationLabel}가 표시됩니다.
         </p>
-        {items.length === 0 ? (
+        {showEraserQuickPicker ? (
+          <StudioEraserQuickPicker
+            selectedId={activeEraserId}
+            ariaLabel="지우개 종류 선택"
+            onSelect={(eraserId) => {
+              const item = studioBrushCatalogItemById(eraserId);
+              if (item?.operation === "erase") void selectCatalogItem(item);
+            }}
+          />
+        ) : items.length === 0 ? (
           <div className="flex h-28 flex-col items-center justify-center rounded-xl border border-dashed border-line text-center">
             <p className="text-xs text-fg-3">
               {tab === "favorites"
-                ? "즐겨찾기한 브러시가 없어요. ☆로 추가해 보세요."
+                ? `즐겨찾기한 ${operationLabel}가 없어요. ☆로 추가해 보세요.`
                 : tab === "recent"
-                  ? "최근 사용한 브러시가 아직 없어요."
+                  ? `최근 사용한 ${operationLabel}가 아직 없어요.`
                   : "검색 결과가 없습니다."}
             </p>
           </div>
@@ -1437,7 +1492,7 @@ export function StudioBrushLibrarySheet({
               <button
                 type="button"
                 aria-controls={panelId}
-                aria-label={`다음 브러시 ${nextBatchItemCount}개 불러오기, ${remainingItemCount}개 남음`}
+                aria-label={`다음 ${operationLabel} ${nextBatchItemCount}개 불러오기, ${remainingItemCount}개 남음`}
                 data-studio-brush-progressive-fallback="true"
                 onClick={() => {
                   if (progressiveLoadPendingRef.current) return;
@@ -1454,7 +1509,7 @@ export function StudioBrushLibrarySheet({
                   STUDIO_FOCUS_RING,
                 )}
               >
-                다음 브러시 {nextBatchItemCount}개 불러오기
+                다음 {operationLabel} {nextBatchItemCount}개 불러오기
               </button>
             </div>
           ) : null}
@@ -1478,7 +1533,7 @@ export function StudioBrushLibrarySheet({
           aria-label={
             activeCatalogItem
               ? `${activeCatalogItem.name} 기본값 다시 적용`
-              : "현재 브러시 기본값을 찾을 수 없음"
+              : `현재 ${operationLabel} 기본값을 찾을 수 없음`
           }
           className={cn(
             "flex min-h-11 w-full items-center gap-2 rounded-xl border border-line bg-card px-3 text-left text-fg-2 hover:border-accent/40 hover:bg-raised hover:text-fg disabled:cursor-not-allowed disabled:opacity-50",
@@ -1489,7 +1544,7 @@ export function StudioBrushLibrarySheet({
           <RotateCcw size={14} className="shrink-0" aria-hidden />
           <span className="min-w-0">
             <span className="block truncate text-[0.68rem] font-bold">
-              현재 브러시 기본값 다시 적용
+              현재 {operationLabel} 기본값 다시 적용
             </span>
             <span
               className={cn(
@@ -1499,8 +1554,10 @@ export function StudioBrushLibrarySheet({
               )}
             >
               {activeCatalogItem
-                ? `${activeCatalogItem.name}의 굵기·불투명도·촉 반응`
-                : "사용자 저장 브러시는 내 브러시에서 다시 적용"}
+                ? operation === "erase"
+                  ? `${activeCatalogItem.name}의 굵기·지우기 강도·촉 반응`
+                  : `${activeCatalogItem.name}의 굵기·불투명도·촉 반응`
+                : `사용자 저장 ${operationLabel}는 내 브러시에서 다시 적용`}
             </span>
           </span>
         </button>
@@ -1519,6 +1576,7 @@ export function StudioBrushCatalogPortal({
   placement,
   triggerElement,
   activeBrushId,
+  operation = "paint",
   favoriteIds = [],
   recentIds = [],
   mobileKeyboardInset = 0,
@@ -1594,6 +1652,7 @@ export function StudioBrushCatalogPortal({
     <StudioBrushLibrarySheet
       open
       activeBrushId={activeBrushId}
+      operation={operation}
       compact={placement === "mobile-sheet" && safeMobileKeyboardInset >= 80}
       triggerElement={triggerElement}
       favoriteIds={favoriteIds}

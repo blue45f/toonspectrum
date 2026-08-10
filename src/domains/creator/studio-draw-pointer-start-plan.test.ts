@@ -4,6 +4,10 @@ import { BRUSH_PRESETS } from "./studio-brush";
 import { materializeStudioBrushPackSelection } from "./studio-brush-pack-runtime";
 import { studioCoreBrushCatalogSelection } from "./studio-brush-selection";
 import {
+  advanceStudioBrushVelocityPressure,
+  initializeStudioBrushVelocityPressure,
+} from "./studio-brush-velocity-pressure";
+import {
   planStudioDrawPointerStart,
   type StudioDrawPointerStartInput,
 } from "./studio-draw-pointer-start-plan";
@@ -11,6 +15,7 @@ import {
   STUDIO_BRUSH_CATALOG_ID_MAX_LENGTH,
   STUDIO_BRUSH_CATALOG_NAME_MAX_LENGTH,
 } from "./studio-element-model";
+import { quantizeFixedRateStrokeSample } from "./studio-fixed-rate-stroke-filter";
 import {
   STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
   STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
@@ -228,6 +233,122 @@ describe("planStudioDrawPointerStart", () => {
       quantizeImmediately: true,
     });
     expect(plan.capturePointerDynamics).toBe(false);
+  });
+
+  it("preserves the standard eraser identity without enabling low-density paint", () => {
+    const plan = planStudioDrawPointerStart(input({
+      brush: "standard-eraser",
+      brushCatalogId: "standard-eraser",
+      brushCatalogName: "일반 지우개",
+      brushOpacity: 1,
+      drawMode: "eraser",
+      strokeWidth: 20,
+    }));
+
+    expect(plan.element).toMatchObject({
+      mode: "eraser",
+      brush: "standard-eraser",
+      brushCatalogId: "standard-eraser",
+      brushCatalogName: "일반 지우개",
+      opacity: 1,
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
+      strokeWidth: 20,
+    });
+    expect(plan.pressure).toBe(1);
+    expect(plan.element.paintModel).toBeUndefined();
+  });
+
+  it("preserves the named kneaded eraser and applies its low density once per stroke", () => {
+    const plan = planStudioDrawPointerStart(input({
+      brush: "kneaded-eraser",
+      brushCatalogId: "kneaded-eraser",
+      brushCatalogName: "떡지우개(저농도)",
+      brushOpacity: 0.38,
+      drawMode: "eraser",
+      strokeWidth: 26,
+    }));
+
+    expect(plan.element).toMatchObject({
+      mode: "eraser",
+      brush: "kneaded-eraser",
+      brushCatalogId: "kneaded-eraser",
+      brushCatalogName: "떡지우개(저농도)",
+      opacity: 0.38,
+      paintModel: STUDIO_STROKE_PAINT_MODEL_LAYERED_FLOW_V1,
+      strokeWidth: 26,
+    });
+    expect(plan.pressure).toBeCloseTo(0.55, 2);
+    expect(plan.element.pressures?.[0]).toBeCloseTo(plan.pressure, 6);
+
+    const generic = planStudioDrawPointerStart(input({
+      brush: "marker-bold",
+      brushCatalogId: "marker-bold",
+      brushCatalogName: "볼드 마커",
+      brushOpacity: 0.38,
+      drawMode: "eraser",
+      strokeWidth: 26,
+    }));
+    expect(generic.element.brush).toBeUndefined();
+    expect(generic.element.brushCatalogId).toBeUndefined();
+    expect(generic.element.paintModel).toBeUndefined();
+  });
+
+  it("keeps a stationary kneaded-eraser mouse sample continuous with its first point", () => {
+    const pointer = {
+      clientX: 0,
+      clientY: 0,
+      pointerType: "mouse",
+      pressure: 0.5,
+      timeStamp: 0,
+    } as const;
+    const pressureSettings = {
+      pressureCurve: 1,
+      pressureMinSize: 0,
+      useVelocityPressure: true,
+      velocitySensitivity: 0.65,
+    } as const;
+    const plan = planStudioDrawPointerStart(input({
+      position: { x: 0, y: 0 },
+      pointer,
+      brush: "kneaded-eraser",
+      brushOpacity: 0.38,
+      drawMode: "eraser",
+      pressureMinSize: pressureSettings.pressureMinSize,
+      positionScale: 1,
+      strokeWidth: 26,
+      velocitySensitivity: pressureSettings.velocitySensitivity,
+    }));
+    const initialState = initializeStudioBrushVelocityPressure(
+      "eraser",
+      pointer,
+      plan.element,
+      pressureSettings,
+    );
+    const followup = advanceStudioBrushVelocityPressure(
+      initialState,
+      {
+        x: pointer.clientX,
+        y: pointer.clientY,
+        timeMs: 10,
+        pointerType: pointer.pointerType,
+        pressure: pointer.pressure,
+      },
+      {
+        ...pressureSettings,
+        brushId: plan.element.brush,
+        fallbackPressure: plan.element.pressures?.[0],
+      },
+    );
+    const quantizedFollowup = quantizeFixedRateStrokeSample({
+      x: 0,
+      y: 0,
+      positionScale: 1,
+      pressure: followup.pressure,
+      timeStamp: 10,
+    });
+
+    expect(followup.sample.distancePx).toBe(0);
+    expect(quantizedFollowup.pressure).toBe(plan.element.pressures?.[0]);
   });
 
   it("persists symmetry while keeping mirrored translucent ink out of layered-flow paint", () => {

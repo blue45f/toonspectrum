@@ -14,6 +14,8 @@ import {
   type StudioQuickBrushTrayItem,
 } from "./studio-creative-ux";
 
+import type { StudioToolOperation } from "./studio-brush";
+
 export interface StudioBrushCatalogItem extends StudioBrushTrayItem {
   source: "core" | "pro";
 }
@@ -24,6 +26,14 @@ export const STUDIO_CORE_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] 
       Object.freeze({ ...item, source: "core" as const })
     )
   );
+
+export function listStudioCoreBrushCatalogItems(
+  operation?: StudioToolOperation
+): readonly StudioBrushCatalogItem[] {
+  return operation === undefined
+    ? STUDIO_CORE_BRUSH_CATALOG_ITEMS
+    : STUDIO_CORE_BRUSH_CATALOG_ITEMS.filter((item) => item.operation === operation);
+}
 
 export const STUDIO_BRUSH_CATALOG_COUNTS = Object.freeze({
   core: STUDIO_CORE_BRUSH_CATALOG_ITEMS.length,
@@ -52,8 +62,9 @@ export function studioCoreBrushCatalogItemById(
 }
 
 export function studioBrushCatalogKindLabel(
-  item: Pick<StudioBrushTrayItem, "mediaGroup">
+  item: Pick<StudioBrushTrayItem, "mediaGroup" | "operation">
 ): string {
+  if (item.operation === "erase") return "지우개";
   return STUDIO_BRUSH_MEDIA_LABELS[item.mediaGroup];
 }
 

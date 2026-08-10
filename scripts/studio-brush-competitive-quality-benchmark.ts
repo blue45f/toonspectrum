@@ -6,6 +6,9 @@ import {
   studioBrushAliasEffectiveDiameter,
 } from "../src/domains/creator/studio-brush-alias-profile";
 import {
+  STUDIO_BRUSH_CATALOG_COUNTS,
+} from "../src/domains/creator/studio-brush-catalog-core";
+import {
   auditStudioBrushContinuity,
   type StudioBrushContinuityAuditResult,
   type StudioBrushContinuityRenderStrategy,
@@ -59,7 +62,7 @@ const LONG_STROKE_DURATION_MS = (STUDIO_COMPETITIVE_BRUSH_LONG_SAMPLE_FLOOR - 1)
   / 240 * 1_000;
 const LONG_STROKE_WIDTH = 3_200;
 const LONG_STROKE_HEIGHT = 720;
-const DEFAULT_EXPECTED_PRESET_COUNT = 230;
+const DEFAULT_EXPECTED_PRESET_COUNT = STUDIO_BRUSH_CATALOG_COUNTS.total;
 const QUALITY_SEED = 0x71ac_4e2d;
 const VISIBLE_JOINT_GAP_RATIO = 0.8;
 const STRICT_CARRIER_GAP_RATIO = 1;

@@ -102,7 +102,7 @@ describe("studio stroke paint model", () => {
       .toBe(false);
   });
 
-  it("allows the model only for ordinary freehand pen and marker strokes", () => {
+  it("allows ordinary ink and named low-density erasers without admitting generic erasers", () => {
     const base = {
       paintModel: STUDIO_STROKE_PAINT_MODEL_LAYERED_FLOW_V1,
       kind: "freehand",
@@ -113,6 +113,16 @@ describe("studio stroke paint model", () => {
     expect(isStudioStrokePaintModelCompatible(base)).toBe(true);
     expect(isStudioStrokePaintModelCompatible({ ...base, brush: "fineliner" })).toBe(true);
     expect(isStudioStrokePaintModelCompatible({ ...base, mode: "eraser" })).toBe(false);
+    expect(isStudioStrokePaintModelCompatible({
+      ...base,
+      mode: "eraser",
+      brush: "kneaded-eraser",
+    })).toBe(true);
+    expect(isStudioStrokePaintModelCompatible({
+      ...base,
+      mode: "eraser",
+      brush: undefined,
+    })).toBe(false);
     expect(isStudioStrokePaintModelCompatible({ ...base, fill: "#fff" })).toBe(false);
     expect(isStudioStrokePaintModelCompatible({ ...base, brush: "watercolor" })).toBe(false);
     expect(isStudioStrokePaintModelCompatible({ ...base, brushDynamics: {} })).toBe(false);

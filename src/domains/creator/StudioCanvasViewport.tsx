@@ -10,8 +10,15 @@ import { moveKeyframe, removeKeyframe, removeTrack, resolveTimelineComposite, re
 import { resetStudioAppSettings, studioAppSettingsStorage, type StudioAppSettings, type StudioAppSettingsTab } from "./studio-app-settings";
 import { CANVAS_W } from "./studio-assets";
 import { studioBackgroundGradientColorStops } from "./studio-background-gradient-color-stops";
-import { BRUSH_PRESETS, type BrushPreset } from "./studio-brush";
-import { studioBrushAliasEffectiveDiameter } from "./studio-brush-alias-profile";
+import {
+  BRUSH_PRESETS,
+  resolveStudioBrushPresetOperation,
+  type BrushPreset,
+} from "./studio-brush";
+import {
+  isStudioBrushEraserAliasId,
+  studioBrushAliasEffectiveDiameter,
+} from "./studio-brush-alias-profile";
 import { BUBBLE_MERGE_MIN_COUNT, bubbleMergeUnavailableReason } from "./studio-bubble-merge";
 import { isStudioBrushCursorMode, studioCanvasCursorClassName, studioCanvasViewportCursorClassName } from "./studio-canvas-cursor";
 import {
@@ -400,6 +407,7 @@ function StudioViewInputModeControls({
 }
 
 export interface StudioCanvasViewportHandlers {
+  activateCanvasTool: (tool: "select" | "draw", drawMode?: DrawMode) => void;
   addPage: () => void;
   closeViewToolWithFocus: (options?: { preferCanvas?: boolean }) => void;
   beginCanvasSelectionResize: (
@@ -528,7 +536,6 @@ export interface StudioCanvasViewportHandlers {
   stopStudioCommentPlacementSession: () => void;
   setMaster: (next: Parameters<import("react").Dispatch<import("react").SetStateAction<DocumentMaster<El>>>>[0]) => void;
   setCurrentPageId: (value: import("react").SetStateAction<string>) => boolean;
-  setDrawMode: import("react").Dispatch<import("react").SetStateAction<DrawMode>>;
   setRightPanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setStudioUiDensity: (mode: StudioUiDensityMode) => void;
   snapBoundFunc: (pos: { x: number; y: number; }) => { x: number; y: number; };
@@ -743,7 +750,6 @@ export interface StudioCanvasViewportProps {
   setCurrentPageId: (value: import("react").SetStateAction<string>) => boolean;
   setDialogueBatchOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setDialogueTranslateOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setDrawMode: import("react").Dispatch<import("react").SetStateAction<DrawMode>>;
   setError: import("react").Dispatch<import("react").SetStateAction<string | null>>;
   setEyedropperActive: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setFollowingStudioSessionId: import("react").Dispatch<import("react").SetStateAction<string | null>>;
@@ -1041,7 +1047,6 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
   setCurrentPageId,
   setDialogueBatchOpen,
   setDialogueTranslateOpen,
-  setDrawMode,
   setError,
   setEyedropperActive,
   setFollowingStudioSessionId,
@@ -1162,6 +1167,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
 
 }: StudioCanvasViewportProps) {
   const {
+    activateCanvasTool,
     addPage,
     beginCanvasSelectionResize,
     cancelCanvasSelectionResize,
@@ -2053,6 +2059,10 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
     setSelectedId(narrowed.selectedId);
     setMarqueeIds(narrowed.marqueeIds);
   };
+  const eraserPresetActive =
+    drawMode === "eraser" && resolveStudioBrushPresetOperation(brush) === "erase";
+  const lowDensityEraserActive =
+    drawMode === "eraser" && isStudioBrushEraserAliasId(brush);
   return (
         <div
           className={cn(
@@ -2186,7 +2196,16 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 title={studioDrawHudToolLabel(
                   tool === "draw"
                     ? drawMode === "eraser"
-                      ? { mode: "eraser", widthPx: strokeWidth }
+                      ? {
+                          mode: "eraser",
+                          widthPx: strokeWidth,
+                          ...(eraserPresetActive
+                            ? {
+                                brushName: activeCatalogBrushName,
+                                opacity01: brushOpacity,
+                              }
+                            : {}),
+                        }
                       : drawMode === "shape"
                         ? { mode: "shape", shapeLabel: studioShapeKindLabel(drawShape) }
                         : drawMode === "pixel"
@@ -2225,7 +2244,9 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                       ? studioShapeKindLabel(drawShape)
                       : drawMode === "pixel"
                         ? "1px"
-                        : `${strokeWidth}px`}
+                        : eraserPresetActive
+                          ? `${activeCatalogBrushName} · ${strokeWidth}px · ${Math.round(brushOpacity * 100)}%`
+                          : `${strokeWidth}px`}
                   </span>
                 ) : null}
               </StudioHudPill>
@@ -2541,7 +2562,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
             }
             data-studio-brush-cursor-brush={
               tool === "draw" && isStudioBrushCursorMode(drawMode)
-                ? drawMode === "eraser" ? "eraser" : brush
+                ? drawMode === "eraser" && !eraserPresetActive ? "eraser" : brush
                 : undefined
             }
             data-studio-comment-placement-active={commentPinArmed ? "true" : undefined}
@@ -2999,6 +3020,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                   // (layer-scoped transform/crop starts with a reliable single-layer select).
                   const hitStrokeWidth = Math.max(
                     liveEl.mode === "eraser"
+                      && !isStudioBrushEraserAliasId(liveEl.brush)
                       ? liveEl.strokeWidth
                       : studioBrushAliasEffectiveDiameter(
                           liveEl.brush,
@@ -3644,9 +3666,9 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                       ? strokeGuideRef
                       : undefined
                   }
-                  brushId={drawMode === "eraser" ? "eraser" : brush}
+                  brushId={drawMode === "eraser" && !eraserPresetActive ? "eraser" : brush}
                   diameter={
-                    drawMode === "pen"
+                    drawMode === "pen" || lowDensityEraserActive
                       ? studioBrushAliasEffectiveDiameter(brush, strokeWidth)
                       : strokeWidth
                   }
@@ -4197,15 +4219,13 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
               onSmartShape={() => {
                 dismissQuickStart();
                 setQuickShapeActive(true);
-                setTool("draw");
-                setDrawMode("pen");
+                activateCanvasTool("draw", "pen");
                 setEyedropperActive(false);
               }}
               onStartDraw={() => {
                 dismissQuickStart();
-                setTool("draw");
-                setDrawMode("pen");
                 applyBuiltInBrushPreset(BRUSH_PRESETS.find((p) => p.id === "pen") ?? BRUSH_PRESETS[0]);
+                setEyedropperActive(false);
               }}
               onBrushKit={(trigger) => {
                 dismissQuickStart();

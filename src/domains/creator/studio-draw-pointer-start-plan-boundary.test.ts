@@ -67,7 +67,9 @@ describe("studio draw pointer-start planning ownership boundary", () => {
     // 의도적 변경(2026-07-29): 비-G펜 계열별 하이브리드 필압의 첫 접촉 정책을 같은 순수
     // capture planner에 고정한다. 라이브 append와 저장 replay가 동일한 명목 필압에서 시작한다.
     // 의도적 변경(2026-08-09): calligraphy authoring tip을 시작 스냅샷에 보존한다(310 → 315).
-    expect(planner.source.split("\n").length).toBeLessThanOrEqual(315);
+    // 의도적 변경(2026-08-10): 이름 있는 지우개의 operation·catalog identity를 보존한다
+    // (315 → 318). 브라우저·렌더러 소유권은 여전히 이 순수 플래너 밖에 있다.
+    expect(planner.source.split("\n").length).toBeLessThanOrEqual(318);
   });
 
   it("leaves gesture priority, leases, transport, CRDT publication, and live surfaces in the Page", () => {

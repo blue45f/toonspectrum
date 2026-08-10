@@ -11,7 +11,12 @@
  * resolvers used by Canvas and SVG.
  */
 
-import { BRUSH_PRESETS, type BrushPreset, type StudioBrushRenderFamily } from "./studio-brush";
+import {
+  BRUSH_PRESETS,
+  type BrushPreset,
+  type StudioBrushRenderFamily,
+  type StudioToolOperation,
+} from "./studio-brush";
 
 import type { StudioBrushPreviewStyle } from "./studio-brush-visual";
 
@@ -103,7 +108,7 @@ export interface StudioBrushRuntimeContract {
   dynamics: StudioBrushRuntimeDynamics;
   distinctness: StudioBrushRuntimeDistinctness;
   /** Omitted means ordinary paint; erase is admitted only through an explicit selectable preset. */
-  operation?: "paint" | "erase";
+  operation?: StudioToolOperation;
 }
 
 export const STUDIO_BRUSH_RUNTIME_CONTRACT = [
@@ -127,6 +132,7 @@ export const STUDIO_BRUSH_RUNTIME_CONTRACT = [
   { id: "brush-pen", family: "calligraphy", engine: "calligraphy-segments", engineVariant: "tilt-chisel", canonicalId: "calligraphy", preview: "calligraphy", tip: "chisel", texture: "none", dynamics: "tilt-pressure", distinctness: "profile-variant" },
   { id: "perfect-ink", family: "perfect", engine: "perfect-outline", engineVariant: "ink-taper", canonicalId: "perfect-ink", preview: "calligraphy", tip: "pressure-round", texture: "none", dynamics: "outline-pressure", distinctness: "unique" },
   { id: "perfect-marker", family: "perfect", engine: "perfect-outline", engineVariant: "marker-flat", canonicalId: "perfect-marker", preview: "solid", tip: "round", texture: "none", dynamics: "outline-pressure", distinctness: "unique" },
+  { id: "standard-eraser", family: "pen", engine: "causal-ink", engineVariant: "standard-erase", canonicalId: "standard-eraser", preview: "solid", tip: "round", texture: "none", dynamics: "causal-pressure", distinctness: "unique", operation: "erase" },
   { id: "kneaded-eraser", family: "pen", engine: "causal-ink", engineVariant: "round", canonicalId: "kneaded-eraser", preview: "solid", tip: "round", texture: "none", dynamics: "causal-pressure", distinctness: "unique", operation: "erase" },
   { id: "marker", family: "marker", engine: "causal-ink", engineVariant: "round", canonicalId: "pen", preview: "solid", tip: "round", texture: "none", dynamics: "causal-pressure", distinctness: "profile-variant" },
   { id: "felt-tip", family: "marker", engine: "causal-ink", engineVariant: "round", canonicalId: "pen", preview: "solid", tip: "round", texture: "none", dynamics: "causal-pressure", distinctness: "profile-variant" },
@@ -202,6 +208,7 @@ const STUDIO_BRUSH_ENGINE_CAPABILITIES: Readonly<
 > = {
   "causal-ink": {
     round: { families: ["pen", "marker"], previews: ["solid"], tip: "round", texture: "none", dynamics: "causal-pressure" },
+    "standard-erase": { families: ["pen"], previews: ["solid"], tip: "round", texture: "none", dynamics: "causal-pressure" },
   },
   "stamp-dabs": {
     ink: { families: ["stamp"], previews: ["solid"], tip: "stamp-ink", texture: "none", dynamics: "stamp-pressure-flow" },
@@ -300,6 +307,7 @@ export type StudioBrushRuntimeAuditIssueCode =
   | "duplicate-contract-id"
   | "missing-runtime-contract"
   | "orphan-runtime-contract"
+  | "operation-mismatch"
   | "invalid-preset-defaults"
   | "unsupported-engine-variant"
   | "incompatible-engine-combination"
@@ -393,6 +401,16 @@ export function auditStudioBrushRuntimeCatalog(
   for (const presetId of presetIds) {
     if (!contractIds.has(presetId)) {
       issues.push(auditIssue("missing-runtime-contract", presetId, "catalogue preset has no renderer contract"));
+    }
+  }
+  for (const preset of presets) {
+    const contract = contractById.get(preset.id);
+    if (contract && (contract.operation ?? "paint") !== preset.operation) {
+      issues.push(auditIssue(
+        "operation-mismatch",
+        preset.id,
+        `catalogue operation ${preset.operation} does not match runtime operation ${contract.operation ?? "paint"}`
+      ));
     }
   }
   for (const contractId of contractIds) {

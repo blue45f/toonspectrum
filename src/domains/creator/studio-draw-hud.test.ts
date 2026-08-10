@@ -24,6 +24,12 @@ describe("studio draw HUD labels", () => {
       "픽셀 펜 · 1px · HARD · RAW"
     );
     expect(studioDrawHudToolLabel({ mode: "eraser", widthPx: 12 })).toBe("지우개 12px");
+    expect(studioDrawHudToolLabel({
+      mode: "eraser",
+      brushName: "떡지우개(저농도)",
+      widthPx: 26,
+      opacity01: 0.38,
+    })).toBe("떡지우개(저농도) · 26px · 38%");
     expect(studioDrawHudToolLabel({ mode: "shape", shapeLabel: "타원" })).toBe("도형 · 타원");
     expect(studioDrawHudToolLabel({ mode: "select", selectionLabel: null })).toBe("선택");
     expect(studioDrawHudToolLabel({ mode: "select", selectionLabel: "말풍선" })).toBe(

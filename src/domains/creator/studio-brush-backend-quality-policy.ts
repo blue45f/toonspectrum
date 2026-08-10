@@ -984,6 +984,7 @@ const CORE_ROUTE_PROFILE_BY_ID = Object.freeze({
   "brush-pen": "continuous-specialist",
   "perfect-ink": "continuous-outline",
   "perfect-marker": "continuous-outline",
+  "standard-eraser": "continuous-analytic",
   "kneaded-eraser": "continuous-analytic",
   marker: "continuous-analytic",
   "felt-tip": "continuous-analytic",

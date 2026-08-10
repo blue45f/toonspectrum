@@ -24,6 +24,9 @@ describe("Studio native live-surface quality integration", () => {
     const directStart = start.indexOf("const direct =");
     const directEnd = start.indexOf(";", directStart);
     const directAuthority = start.slice(directStart, directEnd);
+    expect(directAuthority).toContain('strokeSurfaceRoute.kind === "konva"');
+    expect(directAuthority).toContain('next.mode === "eraser"');
+    expect(directAuthority).toContain("isDirectLiveDraftEl(next)");
     expect(directAuthority).toContain('strokeSurfaceRoute.kind === "living-ink"');
     expect(directAuthority).toContain("|| hokusaiPinned");
     expect(directAuthority).toContain("|| pixelDirect");
@@ -35,6 +38,25 @@ describe("Studio native live-surface quality integration", () => {
     expect(start).not.toContain(
       "const direct = pixelDirect || overlayCandidate || gpuPin",
     );
+  });
+
+  it("keeps the exact Konva eraser draft on the main retained layer", () => {
+    const page = source("./StudioPage.tsx");
+    const viewport = source("./StudioCanvasViewport.tsx");
+    const flushStart = page.indexOf("const flushDirectLiveDraft =");
+    const flushEnd = page.indexOf("const flushDirectLiveDraftNow =", flushStart);
+    const flush = page.slice(flushStart, flushEnd);
+    const eraserSceneStart = viewport.indexOf("{/* 지우개 초안만 메인 레이어에 남는다:");
+    const eraserSceneEnd = viewport.indexOf("{/* 그룹 및 다중 선택은", eraserSceneStart);
+    const eraserScene = viewport.slice(eraserSceneStart, eraserSceneEnd);
+
+    expect(flush).toContain(
+      '(next.mode === "eraser" ? mainLayerRef.current : liveDraftLayerRef.current)?.batchDraw();',
+    );
+    expect(eraserScene).toContain(
+      'if (!el || el.mode !== "eraser" || !liveDraftDirectRef.current) return;',
+    );
+    expect(eraserScene).toContain("drawLiveFreehandDraftToContext(context, el);");
   });
 
   it("does not admit prediction or block the exact dynamic fallback from a mere candidate", () => {

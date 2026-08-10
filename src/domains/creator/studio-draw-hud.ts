@@ -6,7 +6,7 @@
 export type StudioDrawHudTool =
   | { mode: "pen"; brushName: string; widthPx: number; opacity01: number }
   | { mode: "pixel" }
-  | { mode: "eraser"; widthPx: number }
+  | { mode: "eraser"; widthPx: number; brushName?: string; opacity01?: number }
   | { mode: "shape"; shapeLabel: string }
   | { mode: "select"; selectionLabel: string | null }
   | { mode: "other"; label: string };
@@ -18,6 +18,9 @@ export function studioDrawHudToolLabel(tool: StudioDrawHudTool): string {
     case "pixel":
       return "픽셀 펜 · 1px · HARD · RAW";
     case "eraser":
+      if (tool.brushName && tool.opacity01 !== undefined) {
+        return `${tool.brushName} · ${Math.round(tool.widthPx)}px · ${Math.round(tool.opacity01 * 100)}%`;
+      }
       return `지우개 ${Math.round(tool.widthPx)}px`;
     case "shape":
       return `도형 · ${tool.shapeLabel}`;
