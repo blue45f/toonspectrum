@@ -17,6 +17,18 @@ const STUDIO_LIVING_INK_EXPLICIT_BRUSH_IDS = new Set([
   "sumi-e",
 ]);
 
+/**
+ * Page-wide physical strokes are retired from the ordinary brush toolbar.
+ *
+ * Their document model hides each source DrawEl and folds every stroke into one full-page PNG.
+ * That makes a normal brush gesture pay a full-field settle/readback/encode cost, changes the
+ * apparent paper inside the wash, and makes independent strokes behave like one forced group.
+ * Existing canonical ImageEls remain renderable as read-only raster layers. Runtime journal replay
+ * and physical edit controls stay off as well, so opening a legacy page cannot recreate the same
+ * background worker/readback cost merely because a receipt is present.
+ */
+export const STUDIO_LIVING_INK_NEW_PHYSICAL_STROKES_ENABLED = false;
+
 function normalizedId(value: string | null | undefined): string | null {
   if (typeof value !== "string") return null;
   const normalized = value.trim().toLowerCase();
@@ -51,6 +63,7 @@ export function studioLivingInkAdmitsBrush(input: Readonly<{
   catalogId: string | null | undefined;
   physicalModeEnabled: boolean;
 }>): boolean {
-  return input.physicalModeEnabled
+  return STUDIO_LIVING_INK_NEW_PHYSICAL_STROKES_ENABLED
+    && input.physicalModeEnabled
     && studioLivingInkSupportsExplicitBrush(input.brushId, input.catalogId);
 }

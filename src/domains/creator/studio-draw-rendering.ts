@@ -10,7 +10,10 @@ import {
   mapStudioBrushAliasPressureSamples,
   studioBrushAliasEffectiveDiameter,
 } from "./studio-brush-alias-profile";
-import { resolveStudioBrushDynamicsPresetId } from "./studio-brush-dynamics";
+import {
+  resolveStudioBrushDynamicsPresetId,
+  resolveStudioCapturedBrushDynamicsPresetId,
+} from "./studio-brush-dynamics";
 import {
   resolveStudioStampBrushKind,
 } from "./studio-brush-stamp-engine";
@@ -195,7 +198,7 @@ export function resolveStudioDraftPreviewActiveLane(
   if (!active || active.mode === "eraser") return null;
   if (
     active.mode === "pen"
-    && resolveStudioBrushDynamicsPresetId(active.brush) !== null
+    && resolveStudioCapturedBrushDynamicsPresetId(active) !== null
   ) return "dynamic";
 
   const brushFamily = resolveStudioBrushRenderFamily(active.brush);

@@ -71,9 +71,27 @@ export const STUDIO_PAPER_BRUSH_RESPONSE: Readonly<
   pixel: STUDIO_PAPER_GRANULATION_IDENTITY,
 });
 
+// Newly authored core wet strokes already carry their own grain snapshot. These exact ids only
+// reach the dynamic call sites through bounded-flow-v2, so historical causal-watercolor strokes
+// keep their old renderer and pixels while new strokes avoid stacking a second paper response.
+const STUDIO_AUTHORED_WET_DYNAMIC_PAPER_RESPONSE_IDS = new Set([
+  "watercolor",
+  "ink-wash",
+  "inkwash-pen",
+  "inkwash-water-brush",
+  "inkwash-bleed-wash",
+  "inkwash-white-ink",
+]);
+
 /** 브러시 id → 종이 반응. 미지의 id는 `resolveStudioBrushRenderFamily`가 pen(=항등)으로 보낸다. */
 export function resolveStudioPaperBrushResponse(
-  brushId: unknown
+  brushId: unknown,
 ): StudioPaperGranulationSettings {
+  if (
+    typeof brushId === "string"
+    && STUDIO_AUTHORED_WET_DYNAMIC_PAPER_RESPONSE_IDS.has(brushId.trim().toLowerCase())
+  ) {
+    return STUDIO_PAPER_GRANULATION_IDENTITY;
+  }
   return STUDIO_PAPER_BRUSH_RESPONSE[resolveStudioBrushRenderFamily(brushId)];
 }

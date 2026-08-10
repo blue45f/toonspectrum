@@ -9,6 +9,7 @@ import {
 } from "./studio-brush-default-restore";
 import {
   normalizeStudioBrushDynamicsSettings,
+  studioBrushDynamicsSettingsForBrushId,
   studioBrushDynamicsPresetSettings,
 } from "./studio-brush-dynamics";
 import {
@@ -119,6 +120,22 @@ describe("StudioBrushStudio", () => {
       "ink-particle",
       studioBrushDynamicsPresetSettings("ink-particle"),
     );
+  });
+
+  it("edits newly authored wet dynamics without replacing the selected brush", async () => {
+    const settings = studioBrushDynamicsSettingsForBrushId("ink-wash");
+    if (!settings) throw new Error("missing ink-wash dynamics");
+    render(
+      <StudioBrushStudio
+        {...props({ brushId: "ink-wash", settings })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /브러시 스튜디오/ }));
+    fireEvent.click(await screen.findByRole("tab", { name: /반응/ }));
+
+    expect(screen.queryByRole("button", { name: "호환 브러시 선택하기" })).toBeNull();
+    expect(screen.getByText(/사용자 지정 · 6개 연결/)).toBeTruthy();
   });
 
   it("confirms one atomic transaction, preserves identity/color, and offers one-step undo", async () => {

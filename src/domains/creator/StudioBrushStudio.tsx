@@ -40,7 +40,7 @@ import {
   STUDIO_BRUSH_DYNAMICS_PRESETS,
   normalizeStudioBrushDynamicsSettings,
   planStudioDynamicBrush,
-  resolveStudioBrushDynamicsPresetId,
+  resolveStudioBrushDynamicsSelectionPresetId,
   studioBrushDynamicsPresetSettings,
   type NormalizedStudioBrushDynamicsSettings,
   type StudioBrushDynamicsPresetId,
@@ -806,7 +806,7 @@ export function StudioBrushStudio({
   const descriptionId = useId();
   const tabIdBase = useId();
   const tabPanelId = useId();
-  const dynamicsPresetId = resolveStudioBrushDynamicsPresetId(brushId);
+  const dynamicsPresetId = resolveStudioBrushDynamicsSelectionPresetId(brushId, settings);
   const dynamicsActive = dynamicsPresetId !== null;
   const matchedPreset = dynamicsActive ? studioBrushDynamicsPresetMatch(settings) : null;
   const mappingCount = studioBrushDynamicsActiveMappingCount(settings);

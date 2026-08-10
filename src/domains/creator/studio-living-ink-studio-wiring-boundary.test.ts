@@ -6,7 +6,7 @@ const studioPageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.ur
 
 describe("Living Ink Studio wiring boundary", () => {
   it("revokes a loading coordinator when explicit physical mode is turned off", () => {
-    const start = studioPageSource.indexOf("if (!receipt && !livingInkPhysicalModeEnabled)");
+    const start = studioPageSource.indexOf("if (!livingInkPhysicalModeEnabled)");
     const end = studioPageSource.indexOf("const freshPlan =", start);
     expect(start).toBeGreaterThan(-1);
     expect(end).toBeGreaterThan(start);
@@ -15,6 +15,8 @@ describe("Living Ink Studio wiring boundary", () => {
     expect(disabledBranch).toContain("livingInkAuthorityVerificationAbortRef.current?.abort();");
     expect(disabledBranch).toContain("void livingInkCoordinatorRef.current.dispose();");
     expect(disabledBranch).toContain('setLivingInkState("unavailable")');
+    expect(disabledBranch).not.toContain("verifyStudioLivingInkCanonicalImageAuthority");
+    expect(disabledBranch).not.toContain("livingInkCoordinatorRef.current.activate");
   });
 
   it("uses the same effective scope for pointer admission, actions, and displayed controls", () => {

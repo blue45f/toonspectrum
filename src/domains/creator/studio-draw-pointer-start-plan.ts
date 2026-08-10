@@ -16,7 +16,7 @@ import {
   type NormalizedCalligraphyStylusInput,
 } from "./studio-brush";
 import {
-  resolveStudioBrushDynamicsPresetId,
+  resolveStudioBrushDynamicsSelectionPresetId,
 } from "./studio-brush-dynamics";
 import {
   resolveStudioStampBrushKind,
@@ -130,12 +130,14 @@ export function planStudioDrawPointerStart(
   } = input;
   const brushFamily = resolveStudioBrushRenderFamily(brush);
   const stampKind = drawMode === "pen" ? resolveStudioStampBrushKind(brush) : null;
-  const causalWatercolor = drawMode === "pen" && brushFamily === "watercolor";
   // Eraser/pixel input contracts do not carry the currently selected pen's whole-stroke dynamics.
   // Letting that unrelated brush id affect eligibility sent the eraser through the slower legacy
   // stabilizer whenever an artist happened to switch from a dynamics brush.
   const hasBrushDynamics = drawMode === "pen"
-    && resolveStudioBrushDynamicsPresetId(brush) !== null;
+    && resolveStudioBrushDynamicsSelectionPresetId(brush, input.brushDynamics) !== null;
+  const causalWatercolor = drawMode === "pen"
+    && brushFamily === "watercolor"
+    && !hasBrushDynamics;
   const causalInputPlan = resolveStudioCausalInkInputPlan({
     stabilizerMode: input.stabilizerMode,
     stabilizerStrength: input.stabilizer,
@@ -176,7 +178,6 @@ export function planStudioDrawPointerStart(
     drawMode === "pen"
     && hasBrushDynamics
     && stampKind === null
-    && !causalWatercolor
     && isStudioBoundedFlowSymmetryCompatible(symmetry);
   const hybridPressure = drawMode === "pen" && brush !== "pen"
     ? resolveStudioHybridPressureSample(brush, {

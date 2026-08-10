@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  resolveStudioCapturedBrushDynamicsPresetId,
+  studioBrushDynamicsSettingsForBrushId,
+} from "./studio-brush-dynamics";
+import {
   STUDIO_STROKE_PAINT_MODEL_BOUNDED_FLOW_V2,
   STUDIO_STROKE_PAINT_MODEL_LAYERED_FLOW_V1,
   isStudioBoundedFlowPaintModelCompatible,
@@ -15,6 +19,43 @@ import {
 } from "./studio-stroke-paint-model";
 
 describe("studio stroke paint model", () => {
+  it("requires a versioned wet snapshot and keeps saved watercolor walkers on legacy pixels", () => {
+    const brushDynamics = studioBrushDynamicsSettingsForBrushId("ink-wash");
+    expect(brushDynamics).not.toBeNull();
+    const captured = {
+      paintModel: STUDIO_STROKE_PAINT_MODEL_BOUNDED_FLOW_V2,
+      kind: "freehand",
+      mode: "pen",
+      brush: "ink-wash",
+      sampleSpacing: 0.5,
+      brushDynamics,
+    };
+
+    expect(resolveStudioCapturedBrushDynamicsPresetId(captured)).toBe("airbrush");
+    expect(isStudioBoundedFlowPaintModelCompatible(captured)).toBe(true);
+    expect(resolveStudioCapturedBrushDynamicsPresetId({
+      ...captured,
+      paintModel: undefined,
+    })).toBeNull();
+    expect(isStudioBoundedFlowPaintModelCompatible({
+      ...captured,
+      brushDynamics: undefined,
+    })).toBe(false);
+
+    const legacy = {
+      ...captured,
+      paintModel: undefined,
+      brushDynamics: undefined,
+      watercolorPipeline: "causal-walker-v2",
+    };
+    expect(resolveStudioCapturedBrushDynamicsPresetId(legacy)).toBeNull();
+    expect(isStudioBoundedFlowPaintModelCompatible(legacy)).toBe(false);
+    expect(resolveStudioCapturedBrushDynamicsPresetId({
+      ...captured,
+      watercolorPipeline: "causal-walker-v2",
+    })).toBeNull();
+  });
+
   it("accepts only the two exact persisted paint contracts", () => {
     expect(isStudioStrokePaintModel(STUDIO_STROKE_PAINT_MODEL_LAYERED_FLOW_V1)).toBe(true);
     expect(isStudioStrokePaintModel(STUDIO_STROKE_PAINT_MODEL_BOUNDED_FLOW_V2)).toBe(true);
