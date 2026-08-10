@@ -646,6 +646,19 @@ describe("StudioMenubarContent", () => {
     expect(insertShortcuts?.className).toContain("shrink-0");
   });
 
+  it("keeps the workspace trigger lane out of the history cluster while the menubar scrolls", () => {
+    const { container } = render(<StudioMenubarContent {...createProps()} />);
+
+    const workspace = screen.getByRole("button", { name: "작업공간" });
+    const documentLane = workspace.parentElement;
+    const primaryLane = container.querySelector('[data-studio-menubar-primary="true"]');
+
+    expect(primaryLane?.className).toContain("overflow-x-auto");
+    expect(documentLane?.className).toContain("min-w-max");
+    expect(documentLane?.className).toContain("shrink-0");
+    expect(documentLane?.className).not.toMatch(/(?:^|\s)shrink(?:\s|$)/u);
+  });
+
   it("preloads the asset surface before delegating the desktop insert shortcut", () => {
     const setMenu = vi.fn();
     render(<StudioMenubarContent {...createProps({ setMenu })} />);

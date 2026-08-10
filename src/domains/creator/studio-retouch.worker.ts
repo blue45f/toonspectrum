@@ -14,7 +14,6 @@ interface StudioRetouchWorkerScope {
 }
 
 const workerScope = globalThis as unknown as StudioRetouchWorkerScope;
-let consumed = false;
 
 workerScope.postMessage({
   type: "studio-retouch/ready",
@@ -34,13 +33,11 @@ function serializeWorkerError(error: unknown): StudioRetouchWorkerFailureMessage
 workerScope.onmessage = (event) => {
   const message = event.data;
   if (
-    consumed
-    || !message
+    !message
     || typeof message !== "object"
     || message.type !== "studio-retouch/run"
     || message.version !== STUDIO_RETOUCH_WORKER_PROTOCOL_VERSION
   ) return;
-  consumed = true;
 
   try {
     const result = applyStudioRetouchWorkerRequest(message.request);

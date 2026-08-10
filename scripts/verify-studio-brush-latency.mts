@@ -15,6 +15,7 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
+import { pathToFileURL } from "node:url";
 
 import { chromium, type Browser, type Page } from "playwright";
 
@@ -53,6 +54,11 @@ const MOBILE_HINT_KEY = "toonspectrum-studio-mobile-hint-dismissed";
 const AUTOSAVE_PREFIX = "toonspectrum-studio-autosave";
 const INPUT_TIMEOUT_MS = 360;
 const SETTLE_OBSERVATION_MS = 360;
+const OPTIONAL_LOOPBACK_PREVIEW_PATHS = new Set([
+  "/api/auth/session",
+  "/api/studio-ai/status",
+  "/api/kmas/merge-on-access",
+]);
 
 interface ScreenPoint {
   readonly x: number;
@@ -112,20 +118,51 @@ function cleanScratch(): void {
   }
 }
 
-function expectedPreviewFailure(message: string): boolean {
-  return message.includes("/socket.io/")
-    || message.includes("/api/studio-ai/status")
-    || message.includes("/api/kmas/merge-on-access");
+export function expectedStudioBrushLatencyPreviewFailure(
+  message: string,
+  studioUrl: string,
+): boolean {
+  let previewUrl: URL;
+  try {
+    previewUrl = new URL(studioUrl);
+  } catch {
+    return false;
+  }
+  if (
+    previewUrl.protocol !== "http:"
+    || previewUrl.hostname !== "127.0.0.1"
+    || previewUrl.port.length === 0
+  ) return false;
+  const candidates = message.match(/(?:https?|wss?):\/\/[^\s]+/gu) ?? [];
+  return candidates.some((candidate) => {
+    try {
+      const url = new URL(candidate.replace(/['"\]})>,.;]+$/u, ""));
+      const sameLoopback = url.hostname === previewUrl.hostname && url.port === previewUrl.port;
+      if (!sameLoopback || url.hash !== "") return false;
+      if (url.protocol === "ws:" || url.protocol === "wss:") {
+        return url.protocol === "ws:"
+          && url.pathname === "/socket.io/"
+          && url.search === "?EIO=4&transport=websocket";
+      }
+      return url.origin === previewUrl.origin
+        && url.search === ""
+        && OPTIONAL_LOOPBACK_PREVIEW_PATHS.has(url.pathname);
+    } catch {
+      return false;
+    }
+  });
 }
 
-function collectBrowserErrors(page: Page, label: string): BrowserErrors {
+function collectBrowserErrors(page: Page, label: string, studioUrl: string): BrowserErrors {
   const errors: BrowserErrors = { console: [], page: [], responses: [] };
   page.on("console", (entry) => {
     if (entry.type() !== "error") return;
     const message = entry.location().url
       ? `${entry.text()} @ ${entry.location().url}`
       : entry.text();
-    if (!expectedPreviewFailure(message)) errors.console.push(`${label}: ${message}`);
+    if (!expectedStudioBrushLatencyPreviewFailure(message, studioUrl)) {
+      errors.console.push(`${label}: ${message}`);
+    }
   });
   page.on("pageerror", (error) => {
     errors.page.push(`${label}: ${error instanceof Error ? error.stack ?? error.message : String(error)}`);
@@ -133,7 +170,9 @@ function collectBrowserErrors(page: Page, label: string): BrowserErrors {
   page.on("response", (response) => {
     if (response.status() < 500) return;
     const message = `${response.status()} ${response.url()}`;
-    if (!expectedPreviewFailure(message)) errors.responses.push(`${label}: ${message}`);
+    if (!expectedStudioBrushLatencyPreviewFailure(message, studioUrl)) {
+      errors.responses.push(`${label}: ${message}`);
+    }
   });
   return errors;
 }
@@ -575,7 +614,7 @@ async function runBrushLatency(
     deviceScaleFactor: 1,
   });
   const page = await context.newPage();
-  const browserErrors = collectBrowserErrors(page, id);
+  const browserErrors = collectBrowserErrors(page, id, studioUrl);
   const livePath = join(SCRATCH, `studio-brush-latency-${id}-live.png`);
   const settledPath = join(SCRATCH, `studio-brush-latency-${id}-settled.png`);
 
@@ -835,10 +874,12 @@ async function main(): Promise<void> {
   }
 }
 
-void main().then(
-  () => process.exit(0),
-  (error: unknown) => {
-    log(`FATAL: ${error instanceof Error ? error.stack ?? error.message : String(error)}`);
-    process.exit(1);
-  },
-);
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  void main().then(
+    () => process.exit(0),
+    (error: unknown) => {
+      log(`FATAL: ${error instanceof Error ? error.stack ?? error.message : String(error)}`);
+      process.exit(1);
+    },
+  );
+}

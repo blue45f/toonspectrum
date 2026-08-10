@@ -78,6 +78,7 @@ const DRAW_MODEL: StudioOptionsBarsDrawModel = {
   symmetryType: "radial",
   livingInk: {
     supported: true,
+    physicalModeEnabled: true,
     state: "ready",
     mode: "ink",
     scope: "all",
@@ -117,6 +118,7 @@ function createHandlers(): StudioOptionsBarsHandlers {
     setBrushOpacity: vi.fn(),
     setColor: vi.fn(),
     setLivingInkMode: vi.fn(),
+    setLivingInkPhysicalModeEnabled: vi.fn(),
     setLivingInkScope: vi.fn(),
     setDrawMode: vi.fn(),
     setDrawShape: vi.fn(),

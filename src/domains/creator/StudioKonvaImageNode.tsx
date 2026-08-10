@@ -509,7 +509,8 @@ export function StudioKonvaImageNode({
   );
   // Cache eviction drops global ownership, but a mounted node must not swap an equivalent source
   // identity mid-frame: doing so invalidates exact Worker/GPU-filter results and briefly exposes
-  // raw pixels. The lease is released only after a canonical decoded/flip-ready source exists.
+  // raw pixels. This short handoff lease is released as soon as the canonical decoded/flip-ready
+  // source can replace it; it must not outlive the global cache lease for the component mount.
   const [mountedRasterEditSurface, setMountedRasterEditSurface] = useState<{
     readonly src: string;
     readonly surface: HTMLCanvasElement;
@@ -531,8 +532,8 @@ export function StudioKonvaImageNode({
         ? mountedRasterEditSurface.surface
         : null
     );
-  // The exact just-encoded canvas can render immediately while the canonical PNG decodes. A
-  // different src never reuses it, so undo/remote edits fail closed.
+  // The exact just-encoded canvas can render immediately while the canonical PNG continues
+  // decoding above. A different src never reuses it, so undo/remote edits fail closed.
   const decodedImg = loadedImage?.src === el.src ? loadedImage.image : undefined;
   const img: StudioRasterDisplaySource | undefined = rasterEditSurface ?? decodedImg;
   const flipped = !!el.flipped;
@@ -567,13 +568,22 @@ export function StudioKonvaImageNode({
       });
     };
     if (!requiresBakedFlip) {
-      // Animated GIFs remain live and static non-flipped sources participate in the first Konva
-      // draw directly. Keeping a state copy here would add an avoidable blank commit.
+      // 반전은 캔버스에 한 프레임을 구워야만 가능한데, 그러면 애니메이션이 멈춘다 — 재생 보존이
+      // 우선이므로 이 경로를 건너뛰고 항상 라이브 img를 그대로 쓴다(알려진 한계: 애니메이션 GIF는
+      // 좌우/상하 반전이 적용되지 않는다). 정적 비반전 이미지도 render-time에 그대로 전달해
+      // 캐시 표면이 effect 한 번을 기다리지 않고 첫 Konva draw에 참여하게 한다.
       setDisplayImage(undefined);
       return;
     }
+    if (
+      displayImage?.src === el.src
+      && displayImage.loadedImage === img
+      && displayImage.flipped === flipped
+      && displayImage.flippedY === flippedY
+      && displayImage.isAnimatedGif === isAnimatedGif
+    ) return;
     commitDisplayImage(createStudioRasterFlippedDisplaySource(img, flipped, flippedY));
-  }, [img, el.src, flipped, flippedY, isAnimatedGif, requiresBakedFlip]);
+  }, [displayImage, img, el.src, flipped, flippedY, isAnimatedGif, requiresBakedFlip]);
 
   const hasFilters = hasActiveImageFilters(el);
   const filterCacheKey = imageFilterCacheKey(el);
@@ -827,13 +837,16 @@ export function StudioKonvaImageNode({
     ) return;
 
     const leasedSurface = mountedRasterEditSurface.surface;
-    // Prepare the canonical replacement before releasing the short cache lease. Flips are baked
-    // first, so there is no frame in which a correctly flipped cached surface falls back to raw
-    // canonical pixels.
+    // The canonical Image is decoded before the short mounted lease is released. Flipped images
+    // prepare their replacement canvas first, then all source identities move in one React batch;
+    // there is never a render where the node has neither the cached source nor a flip-ready source.
     const previousSource = displayImg;
     const canonicalDisplaySource = requiresBakedFlip
       ? createStudioRasterFlippedDisplaySource(decodedImg, flipped, flippedY)
       : decodedImg;
+    // Canvas allocation/context recovery can fail under memory pressure. In that case the decoded
+    // image is not flip-ready, so keep the fail-closed handoff lease instead of replacing a
+    // correctly flipped visible source with raw canonical pixels.
     if (requiresBakedFlip && canonicalDisplaySource === decodedImg) return;
 
     if (previousSource) {
@@ -847,6 +860,9 @@ export function StudioKonvaImageNode({
       }
       const resultCache = workerResultCacheRef.current;
       if (resultCache?.source === previousSource) {
+        // Both sources represent the same immutable PNG authority. Rebinding preserves exact
+        // filtered canvases across the handoff instead of exposing raw pixels or scheduling a full
+        // filter pass solely because Canvas/Image object identity changed.
         workerResultCacheRef.current = { ...resultCache, source: canonicalDisplaySource };
       }
       setWorkerFilteredCanvas((current) => (
@@ -962,10 +978,15 @@ export function StudioKonvaImageNode({
     let dispatchSettled = false;
     // Drag detection: how long since the previous parameter change reached this effect.
     const requestAt = studioImageFilterClockMs();
-    const sincePreviousRequest = requestAt - filterRequestAtRef.current;
+    const previousRequestAt = filterRequestAtRef.current;
+    const sincePreviousRequest = previousRequestAt === null
+      ? Number.POSITIVE_INFINITY
+      : requestAt - previousRequestAt;
     filterRequestAtRef.current = requestAt;
     const draggingParameters =
-      proxyPreviewEligible && sincePreviousRequest <= IMAGE_FILTER_DRAG_WINDOW_MS;
+      proxyPreviewEligible
+      && previousRequestAt !== null
+      && sincePreviousRequest <= IMAGE_FILTER_DRAG_WINDOW_MS;
     setWorkerRequiredFailureKey((current) => current === requestKey ? current : undefined);
     setWorkerFallbackKey((current) => current === requestKey ? undefined : current);
     // A regular image can retain several recent filter results. If the same source becomes a
@@ -1530,18 +1551,23 @@ export function StudioKonvaImageNode({
   ]);
 
   // Worker/GPU-backed filters replace the raw decoded/cached source at the actual Konva image
-  // prop. The retained GPU canvas is valid for drag presentation, but only the exact settled CPU
-  // canvas may close a canonical raster presentation fence.
+  // prop. Keep the receipt tied to that concrete visible source: a proxy or retained GPU canvas is
+  // valid for responsive drag presentation, but only the exact settled CPU canvas may close a
+  // canonical raster presentation fence.
   const imageSource: CanvasImageSource | undefined = displayImg
     ? (showComputedCanvas ? visibleComputedCanvas! : displayImg)
     : undefined;
   const rasterPresentationSource = !imageSource
     ? undefined
     : workerPipelineActive
-      // Proxy and retained WebGPU canvases are intentionally transient. `readbackFinal()` commits
-      // the exact result into currentWorkerFilteredCanvas, and only that surface can acknowledge.
+      // A proxy canvas is intentionally approximate and a retained canvas may belong to a prior
+      // parameter revision. `readbackFinal()` commits the exact result into
+      // currentWorkerFilteredCanvas, and only that full-resolution Worker result closes the fence.
       ? (currentWorkerFilteredCanvas === imageSource ? imageSource : undefined)
       : hasFilters
+        // Konva's synchronous filter path is exact only after node.cache() completed for this
+        // concrete source and filter request. A module-ready flag alone can race the passive cache
+        // effect and acknowledge an old/unfiltered layer draw.
         ? (
             konvaFilterPresentationReady?.requestKey === workerRequestKey
             && konvaFilterPresentationReady.source === imageSource
@@ -1556,6 +1582,8 @@ export function StudioKonvaImageNode({
       elementId: el.id,
       src: el.src,
     });
+    // The verifier installs a fresh probe for each cold/warm operation, so its numeric epoch may
+    // restart at 1. Dedupe by the expectation object owned by that probe, not by epoch alone.
     if (!expected || rasterImagePresentationReceiptRef.current === expected) return;
     const node = imageRef.current;
     const layer = node?.getLayer();
@@ -1563,6 +1591,9 @@ export function StudioKonvaImageNode({
 
     let active = true;
     const acknowledgeAfterDraw = () => {
+      // React-Konva has applied this render's image prop before layout effects. A layer draw alone
+      // is insufficient: an unrelated image may finish later and draw the same layer, so retain
+      // the concrete CanvasImageSource identity in the receipt fence as well as element/src.
       if (
         !active
         || imageRef.current !== node
@@ -1579,8 +1610,9 @@ export function StudioKonvaImageNode({
       }
     };
     layer.on("draw.studioRasterPresentation", acknowledgeAfterDraw);
-    // `draw` fires after drawScene completes. This coalesces with React-Konva's pending draw and
-    // cannot be satisfied by decode, React commit, a different image, or a transient GPU preview.
+    // Coalesce with React-Konva's pending draw instead of forcing another synchronous full Stage
+    // pass. `draw` fires only after drawScene completes, so the receipt is an actual presentation
+    // fence; decode, React commit, another image, or a transient GPU preview cannot satisfy it.
     layer.batchDraw();
     return () => {
       active = false;

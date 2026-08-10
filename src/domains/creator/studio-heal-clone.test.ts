@@ -9,6 +9,7 @@ import {
   HEAL_CLONE_RADIUS_DEFAULT,
   HEAL_CLONE_RADIUS_RANGE,
   applyHealCloneDabs,
+  applyHealCloneDabsFromSeparateRegions,
   computeHealCloneSourceOffset,
   healCloneSourcePoint,
   healLocalMeanRadius,
@@ -22,8 +23,10 @@ import {
   type HealCloneCanvasFactory,
   type HealCloneCtx2DLike,
 } from "./studio-heal-clone-browser";
+import { planStudioRasterRetouchRegion } from "./studio-raster-retouch-region";
 
 import type { StudioImageDataLike } from "./studio-filters";
+import type { StudioHealCloneWorkerLike } from "./studio-heal-clone-worker-client";
 import type { MaskCanvasLike, MaskImageSource } from "./studio-selection-tools";
 
 // ---------------------------------------------------------------------------
@@ -371,12 +374,206 @@ describe("applyHealCloneDabs", () => {
   });
 });
 
+describe("applyHealCloneDabsFromSeparateRegions", () => {
+  it.each(["clone", "heal"] as const)(
+    "%s는 실제 ROI planner의 halo로 소수 반경·멀티 dab·네 모서리 경계를 모두 보존한다",
+    (mode) => {
+      const original = paintedImage(47, 31, (x, y) => [
+        (x * 31 + y * 7) % 256,
+        (x * 5 + y * 29) % 256,
+        (x * 11 + y * 13) % 256,
+        (x * 3 + y * 5) % 11 === 0 ? 80 : 255,
+      ]);
+      const cases: ReadonlyArray<{ radius: number; dabs: readonly HealCloneDab[] }> = [
+        {
+          radius: 0.5,
+          dabs: [{ srcX: 46.2, srcY: 0.3, destX: 0.2, destY: 30.1 }],
+        },
+        {
+          radius: 2.75,
+          dabs: [
+            { srcX: 39.4, srcY: 4.2, destX: 4.1, destY: 23.8 },
+            { srcX: 41.6, srcY: 6.1, destX: 6.3, destY: 25.2 },
+            { srcX: 43.2, srcY: 7.4, destX: 8.2, destY: 26.1 },
+          ],
+        },
+        {
+          radius: 5,
+          dabs: [{ srcX: 0, srcY: 30, destX: 46, destY: 0 }],
+        },
+      ];
+
+      for (const fixture of cases) {
+        const expected = cloneImage(original);
+        applyHealCloneDabs(original, expected, fixture.dabs, fixture.radius, 0.37, 0.63, mode);
+        const sourceRegion = planStudioRasterRetouchRegion(
+          fixture.dabs.map((dab) => ({ x: dab.srcX, y: dab.srcY })),
+          fixture.radius,
+          original.width,
+          original.height,
+        );
+        const destinationRegion = planStudioRasterRetouchRegion(
+          fixture.dabs.map((dab) => ({ x: dab.destX, y: dab.destY })),
+          fixture.radius,
+          original.width,
+          original.height,
+        );
+        expect(sourceRegion).not.toBeNull();
+        expect(destinationRegion).not.toBeNull();
+        const sourcePatch = cropFakeImage(
+          original,
+          sourceRegion!.x,
+          sourceRegion!.y,
+          sourceRegion!.width,
+          sourceRegion!.height,
+        );
+        const destinationPatch = cropFakeImage(
+          original,
+          destinationRegion!.x,
+          destinationRegion!.y,
+          destinationRegion!.width,
+          destinationRegion!.height,
+        );
+        applyHealCloneDabsFromSeparateRegions(
+          sourcePatch,
+          destinationPatch,
+          fixture.dabs.map((dab) => ({
+            srcX: dab.srcX - sourceRegion!.x,
+            srcY: dab.srcY - sourceRegion!.y,
+            destX: dab.destX - destinationRegion!.x,
+            destY: dab.destY - destinationRegion!.y,
+          })),
+          fixture.radius,
+          0.37,
+          0.63,
+          mode,
+        );
+        const actual = cloneImage(original);
+        pasteFakeImage(actual, destinationPatch, destinationRegion!.x, destinationRegion!.y);
+        expect(actual.data).toEqual(expected.data);
+      }
+    },
+  );
+
+  it.each(["clone", "heal"] as const)(
+    "%s는 멀리 떨어지고 크기가 다른 source/destination ROI에서도 full-frame과 byte-identical하다",
+    (mode) => {
+      const original = paintedImage(64, 48, (x, y) => [
+        (x * 13 + y * 3) % 256,
+        (x * 7 + y * 17) % 256,
+        (x * 19 + y * 5) % 256,
+        (x + y) % 9 === 0 ? 96 : 255,
+      ]);
+      const dabs: HealCloneDab[] = [
+        { srcX: 55.25, srcY: 9.75, destX: 5.5, destY: 39.5 },
+        { srcX: 57, srcY: 11, destX: 7.25, destY: 40.5 },
+      ];
+      const radius = 3.25;
+      const expected = cloneImage(original);
+      applyHealCloneDabs(original, expected, dabs, radius, 0.55, 0.72, mode);
+
+      const sourceRegion = { x: 49, y: 3, width: 15, height: 15 };
+      const destinationRegion = { x: 0, y: 33, width: 16, height: 15 };
+      const sourcePatch = cropFakeImage(
+        original,
+        sourceRegion.x,
+        sourceRegion.y,
+        sourceRegion.width,
+        sourceRegion.height,
+      );
+      const destinationPatch = cropFakeImage(
+        original,
+        destinationRegion.x,
+        destinationRegion.y,
+        destinationRegion.width,
+        destinationRegion.height,
+      );
+      const localDabs = dabs.map((dab) => ({
+        srcX: dab.srcX - sourceRegion.x,
+        srcY: dab.srcY - sourceRegion.y,
+        destX: dab.destX - destinationRegion.x,
+        destY: dab.destY - destinationRegion.y,
+      }));
+
+      applyHealCloneDabsFromSeparateRegions(
+        sourcePatch,
+        destinationPatch,
+        localDabs,
+        radius,
+        0.55,
+        0.72,
+        mode,
+      );
+      const actual = cloneImage(original);
+      pasteFakeImage(actual, destinationPatch, destinationRegion.x, destinationRegion.y);
+
+      expect(sourcePatch.width).not.toBe(destinationPatch.width);
+      expect(actual.data).toEqual(expected.data);
+    },
+  );
+
+  it.each(["clone", "heal"] as const)(
+    "%s는 source 오른쪽·destination 왼쪽이 이미지 경계에 잘려도 full-frame 경계를 보존한다",
+    (mode) => {
+      const original = paintedImage(32, 24, (x, y) => [x * 7, y * 9, (x + y) * 3, 255]);
+      const dabs: HealCloneDab[] = [{ srcX: 31, srcY: 8, destX: 0, destY: 16 }];
+      const expected = cloneImage(original);
+      applyHealCloneDabs(original, expected, dabs, 4, 0.4, 0.85, mode);
+
+      const sourcePatch = cropFakeImage(original, 25, 2, 7, 13);
+      const destinationPatch = cropFakeImage(original, 0, 10, 7, 14);
+      applyHealCloneDabsFromSeparateRegions(
+        sourcePatch,
+        destinationPatch,
+        [{ srcX: 6, srcY: 6, destX: 0, destY: 6 }],
+        4,
+        0.4,
+        0.85,
+        mode,
+      );
+      const actual = cloneImage(original);
+      pasteFakeImage(actual, destinationPatch, 0, 10);
+
+      expect(actual.data).toEqual(expected.data);
+    },
+  );
+});
+
 // ---------------------------------------------------------------------------
 // (C) bakeHealCloneStrokeToCanvas — DOM 없는 가짜 팩토리
 // ---------------------------------------------------------------------------
 
 type FakeHealCanvas = MaskCanvasLike & MaskImageSource & { id: number };
 type FakeSource = MaskImageSource & { testImage: StudioImageDataLike };
+
+function cropFakeImage(
+  image: StudioImageDataLike,
+  sx: number,
+  sy: number,
+  sw: number,
+  sh: number,
+): StudioImageDataLike {
+  const data = new Uint8ClampedArray(sw * sh * 4);
+  for (let y = 0; y < sh; y += 1) {
+    const sourceStart = ((sy + y) * image.width + sx) * 4;
+    const targetStart = y * sw * 4;
+    data.set(image.data.subarray(sourceStart, sourceStart + sw * 4), targetStart);
+  }
+  return { data, width: sw, height: sh };
+}
+
+function pasteFakeImage(
+  target: StudioImageDataLike,
+  image: StudioImageDataLike,
+  dx: number,
+  dy: number,
+): void {
+  for (let y = 0; y < image.height; y += 1) {
+    const sourceStart = y * image.width * 4;
+    const targetStart = ((dy + y) * target.width + dx) * 4;
+    target.data.set(image.data.subarray(sourceStart, sourceStart + image.width * 4), targetStart);
+  }
+}
 
 /** 생성 순서대로 id 를 붙이고 drawImage/getImageData/putImageData 를 인메모리 버퍼로 흉내내는 가짜 팩토리. */
 function fakeHealCloneFactory(
@@ -385,6 +582,7 @@ function fakeHealCloneFactory(
   failAt = Infinity
 ): HealCloneCanvasFactory {
   let count = 0;
+  const nativeImageData = new WeakSet<StudioImageDataLike>();
   return (width, height) => {
     count += 1;
     if (count >= failAt) return null;
@@ -407,19 +605,31 @@ function fakeHealCloneFactory(
       stroke: () => {},
       fillRect: () => {},
       clearRect: () => {},
+      createImageData: (sw, sh) => {
+        log.push(`c${id}:createImageData:${sw}x${sh}`);
+        const imageData = {
+          data: new Uint8ClampedArray(sw * sh * 4),
+          width: sw,
+          height: sh,
+        };
+        nativeImageData.add(imageData);
+        return imageData;
+      },
       drawImage: (image) => {
         log.push(`c${id}:drawImage`);
         const testImage = (image as FakeSource).testImage;
         buffers.set(id, { data: testImage.data.slice() as Uint8ClampedArray, width, height });
       },
-      getImageData: (_sx, _sy, sw, sh) => {
-        log.push(`c${id}:getImageData`);
-        const buf = buffers.get(id)!;
-        return { data: buf.data.slice() as Uint8ClampedArray, width: sw, height: sh };
+      getImageData: (sx, sy, sw, sh) => {
+        log.push(`c${id}:getImageData:${sx},${sy},${sw}x${sh}`);
+        return cropFakeImage(buffers.get(id)!, sx, sy, sw, sh);
       },
-      putImageData: (imageData) => {
-        log.push(`c${id}:putImageData`);
-        buffers.set(id, { data: imageData.data.slice() as Uint8ClampedArray, width, height });
+      putImageData: (imageData, dx, dy) => {
+        if (!nativeImageData.has(imageData)) {
+          throw new TypeError("putImageData requires a context-created ImageData wrapper");
+        }
+        log.push(`c${id}:putImageData:${dx},${dy},${imageData.width}x${imageData.height}`);
+        pasteFakeImage(buffers.get(id)!, imageData, dx, dy);
       },
     };
     return { canvas, ctx };
@@ -439,46 +649,119 @@ describe("bakeHealCloneStrokeToCanvas", () => {
     expect(log).toEqual([]);
   });
 
-  it("frozen/work 캔버스를 순서대로 만들고, work 만 putImageData 로 갱신해 반환한다", async () => {
+  it("멀리 떨어진 source/destination ROI를 분리해 bridge 없이 읽고 destination만 되붙인다", async () => {
     const log: string[] = [];
     const buffers = new Map<number, StudioImageDataLike>();
     const factory = fakeHealCloneFactory(log, buffers);
-    const testImage = paintedImage(10, 10, (x) => (x < 5 ? [0, 0, 0, 255] : [255, 255, 255, 255]));
+    const testImage = paintedImage(100, 80, (x, y) => [x * 2, y * 3, (x + y) % 256, 255]);
     const source: FakeSource = { testImage };
-    const dabs: HealCloneDab[] = [{ srcX: 8, srcY: 5, destX: 2, destY: 5 }]; // 흰색을 왼쪽 검정 영역에 복제.
+    const dabs: HealCloneDab[] = [{ srcX: 80, srcY: 20, destX: 20, destY: 60 }];
 
-    const out = await bakeHealCloneStrokeToCanvas(source, 10, 10, dabs, brush, "clone", factory);
+    const out = await bakeHealCloneStrokeToCanvas(source, 100, 80, dabs, brush, "clone", factory);
 
     expect(out).not.toBeNull();
-    expect((out as FakeHealCanvas).id).toBe(2); // work 캔버스(두 번째 생성)가 반환된다.
+    expect((out as FakeHealCanvas).id).toBe(1);
     expect(log).toEqual([
       "c1:drawImage",
-      "c2:drawImage",
-      "c1:getImageData",
-      "c2:getImageData",
-      "c2:putImageData",
+      "c1:getImageData:75,15,11x11",
+      "c1:getImageData:15,55,11x11",
+      "c1:createImageData:11x11",
+      "c1:putImageData:15,55,11x11",
     ]);
-
-    // 결과 버퍼(work=id 2)는 도장이 반영돼야 하고, frozen(id 1)은 원본 그대로 남아야 한다.
-    const workBuf = buffers.get(2)!;
-    const frozenBuf = buffers.get(1)!;
-    expect(pixelAt(workBuf, 2, 5)).toEqual([255, 255, 255, 255]);
-    expect(pixelAt(frozenBuf, 2, 5)).toEqual([0, 0, 0, 255]); // frozen 은 절대 변형되지 않는다.
 
     // 직접 applyHealCloneDabs 를 호출한 결과와 정확히 일치해야 한다(오케스트레이션이 알고리즘을 바꾸지 않음).
     const expectedDst = cloneImage(testImage);
     applyHealCloneDabs(testImage, expectedDst, dabs, brush.radiusPx, brush.hardness, brush.opacity, "clone");
-    expect(workBuf.data).toEqual(expectedDst.data);
+    expect(buffers.get(1)!.data).toEqual(expectedDst.data);
+
+    // destination ROI 밖은 원본 전체 캔버스에서 byte-identical 하게 보존된다.
+    expect(pixelAt(buffers.get(1)!, 0, 0)).toEqual(pixelAt(testImage, 0, 0));
+    expect(pixelAt(buffers.get(1)!, 99, 79)).toEqual(pixelAt(testImage, 99, 79));
   });
 
-  it("두 번째 캔버스(work) 생성이 실패하면 null(첫 캔버스는 그냥 버려진다)", async () => {
+  it("Worker 픽셀 바이트는 source-destination 거리와 무관하고 두 footprint 면적 합에만 비례한다", async () => {
+    const measure = async (sourceX: number) => {
+      const log: string[] = [];
+      const buffers = new Map<number, StudioImageDataLike>();
+      const testImage = paintedImage(3_000, 40, (x, y) => [x % 256, y * 5, (x + y) % 256, 255]);
+      await bakeHealCloneStrokeToCanvas(
+        { testImage },
+        3_000,
+        40,
+        [{ srcX: sourceX, srcY: 12, destX: 100, destY: 28 }],
+        brush,
+        "clone",
+        fakeHealCloneFactory(log, buffers),
+        { workerFactory: null },
+      );
+      const reads = log
+        .filter((entry) => entry.includes("getImageData"))
+        .map((entry) => {
+          const match = entry.match(/,(\d+)x(\d+)$/u);
+          if (!match) throw new Error(`unexpected getImageData log: ${entry}`);
+          return Number(match[1]) * Number(match[2]) * 4;
+        });
+      return { reads, log };
+    };
+
+    const near = await measure(120);
+    const far = await measure(2_800);
+
+    expect(near.reads).toEqual([11 * 11 * 4, 11 * 11 * 4]);
+    expect(far.reads).toEqual(near.reads);
+    expect(far.reads.reduce((sum, bytes) => sum + bytes, 0)).toBe(968);
+    expect(far.log.some((entry) => entry.includes("2691x"))).toBe(false);
+  });
+
+  it("한 캔버스만 써도 source snapshot은 고정돼 앞선 dab 결과를 다음 source로 읽지 않는다", async () => {
     const log: string[] = [];
     const buffers = new Map<number, StudioImageDataLike>();
-    const factory = fakeHealCloneFactory(log, buffers, 2); // 2번째 생성부터 실패.
+    const testImage = paintedImage(40, 20, (x) =>
+      x >= 30 ? [255, 255, 255, 255] : [0, 0, 0, 255]
+    );
+    const dabs: HealCloneDab[] = [
+      { srcX: 35, srcY: 10, destX: 10, destY: 10 },
+      { srcX: 10, srcY: 10, destX: 20, destY: 10 },
+    ];
+    const out = await bakeHealCloneStrokeToCanvas(
+      { testImage },
+      40,
+      20,
+      dabs,
+      { radiusPx: 1, hardness: 1, opacity: 1 },
+      "clone",
+      fakeHealCloneFactory(log, buffers),
+    );
+
+    expect(out).not.toBeNull();
+    expect(pixelAt(buffers.get(1)!, 10, 10)).toEqual([255, 255, 255, 255]);
+    expect(pixelAt(buffers.get(1)!, 20, 10)).toEqual([0, 0, 0, 255]);
+    expect(log.filter((entry) => entry === "c1:drawImage")).toHaveLength(1);
+  });
+
+  it("유일한 결과 캔버스 생성이 실패하면 명시적으로 거부", async () => {
+    const log: string[] = [];
+    const buffers = new Map<number, StudioImageDataLike>();
+    const factory = fakeHealCloneFactory(log, buffers, 1);
     const source: FakeSource = { testImage: solidImage(10, 10, 1, 1, 1) };
     const dabs: HealCloneDab[] = [{ srcX: 5, srcY: 5, destX: 5, destY: 5 }];
-    const out = await bakeHealCloneStrokeToCanvas(source, 10, 10, dabs, brush, "clone", factory);
-    expect(out).toBeNull();
+    await expect(
+      bakeHealCloneStrokeToCanvas(source, 10, 10, dabs, brush, "clone", factory),
+    ).rejects.toThrow("복구 브러시 결과 캔버스를 만들지 못했습니다.");
+    expect(log).toEqual([]);
+  });
+
+  it("source와 destination footprint가 모두 이미지 밖이면 정상 no-op", async () => {
+    const log: string[] = [];
+    const buffers = new Map<number, StudioImageDataLike>();
+    const factory = fakeHealCloneFactory(log, buffers);
+    const source: FakeSource = { testImage: solidImage(10, 10, 1, 1, 1) };
+    const dabs: HealCloneDab[] = [{ srcX: -100, srcY: -100, destX: -80, destY: -80 }];
+
+    await expect(
+      bakeHealCloneStrokeToCanvas(source, 10, 10, dabs, brush, "clone", factory),
+    ).resolves.toBeNull();
+    expect(log).toEqual([]);
   });
 
   it("width/height 가 비정상이면 캔버스를 만들지 않고 null", async () => {
@@ -507,5 +790,58 @@ describe("bakeHealCloneStrokeToCanvas", () => {
     const expectedDst = cloneImage(testImage);
     applyHealCloneDabs(testImage, expectedDst, dabs, healBrush.radiusPx, healBrush.hardness, healBrush.opacity, "heal");
     expect(buffers.get((out as FakeHealCanvas).id)!.data).toEqual(expectedDst.data);
+  });
+
+  it("이미 취소된 signal이면 캔버스 할당 전 AbortError", async () => {
+    const log: string[] = [];
+    const buffers = new Map<number, StudioImageDataLike>();
+    const controller = new AbortController();
+    controller.abort();
+    const source: FakeSource = { testImage: solidImage(10, 10, 1, 1, 1) };
+    const dabs: HealCloneDab[] = [{ srcX: 5, srcY: 5, destX: 5, destY: 5 }];
+
+    await expect(bakeHealCloneStrokeToCanvas(
+      source,
+      10,
+      10,
+      dabs,
+      brush,
+      "clone",
+      fakeHealCloneFactory(log, buffers),
+      { signal: controller.signal },
+    )).rejects.toMatchObject({ name: "AbortError" });
+    expect(log).toEqual([]);
+  });
+
+  it("실행 중 취소를 같은 signal로 Worker까지 전달하고 결과를 put하지 않는다", async () => {
+    const log: string[] = [];
+    const buffers = new Map<number, StudioImageDataLike>();
+    const controller = new AbortController();
+    let terminated = 0;
+    const worker: StudioHealCloneWorkerLike = {
+      onmessage: null,
+      onerror: null,
+      postMessage: () => {},
+      terminate: () => {
+        terminated += 1;
+      },
+    };
+    const source: FakeSource = { testImage: solidImage(20, 20, 1, 2, 3) };
+    const dabs: HealCloneDab[] = [{ srcX: 8, srcY: 8, destX: 12, destY: 12 }];
+    const pending = bakeHealCloneStrokeToCanvas(
+      source,
+      20,
+      20,
+      dabs,
+      brush,
+      "clone",
+      fakeHealCloneFactory(log, buffers),
+      { signal: controller.signal, workerFactory: () => worker },
+    );
+
+    controller.abort();
+    await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+    expect(terminated).toBe(1);
+    expect(log.some((entry) => entry.includes("putImageData"))).toBe(false);
   });
 });

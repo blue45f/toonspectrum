@@ -419,14 +419,28 @@ function fakeLiquifyFactory(
         const testImage = (image as FakeSource).testImage;
         buffers.set(id, { data: testImage.data.slice() as Uint8ClampedArray, width, height });
       },
-      getImageData: (_sx, _sy, sw, sh) => {
+      getImageData: (sx, sy, sw, sh) => {
         log.push(`c${id}:getImageData`);
         const buf = buffers.get(id)!;
-        return { data: buf.data.slice() as Uint8ClampedArray, width: sw, height: sh };
+        const data = new Uint8ClampedArray(sw * sh * 4);
+        for (let y = 0; y < sh; y += 1) {
+          for (let x = 0; x < sw; x += 1) {
+            const sourceOffset = ((sy + y) * width + sx + x) * 4;
+            data.set(buf.data.subarray(sourceOffset, sourceOffset + 4), (y * sw + x) * 4);
+          }
+        }
+        return { data, width: sw, height: sh };
       },
-      putImageData: (imageData) => {
+      putImageData: (imageData, dx, dy) => {
         log.push(`c${id}:putImageData`);
-        buffers.set(id, { data: imageData.data.slice() as Uint8ClampedArray, width, height });
+        const buf = buffers.get(id)!;
+        for (let y = 0; y < imageData.height; y += 1) {
+          for (let x = 0; x < imageData.width; x += 1) {
+            const sourceOffset = (y * imageData.width + x) * 4;
+            const targetOffset = ((dy + y) * width + dx + x) * 4;
+            buf.data.set(imageData.data.subarray(sourceOffset, sourceOffset + 4), targetOffset);
+          }
+        }
       },
     };
     return { canvas, ctx };
@@ -449,7 +463,7 @@ describe("bakeLiquifyStrokeToCanvas", () => {
     expect(log).toEqual([]);
   });
 
-  it("frozen/work 캔버스를 순서대로 만들고, work만 putImageData로 갱신해 반환한다", async () => {
+  it("full-size 결과 캔버스 하나만 만들고 ROI만 읽고 써서 반환한다", async () => {
     const log: string[] = [];
     const buffers = new Map<number, StudioImageDataLike>();
     const factory = fakeLiquifyFactory(log, buffers);
@@ -459,19 +473,14 @@ describe("bakeLiquifyStrokeToCanvas", () => {
     const out = await bakeLiquifyStrokeToCanvas(source, 20, 20, points, 8, 1, factory);
 
     expect(out).not.toBeNull();
-    expect((out as FakeCanvas).id).toBe(2); // work 캔버스(두 번째 생성)가 반환된다.
+    expect((out as FakeCanvas).id).toBe(1);
     expect(log).toEqual([
       "c1:drawImage",
-      "c2:drawImage",
       "c1:getImageData",
-      "c2:getImageData",
-      "c2:putImageData",
+      "c1:putImageData",
     ]);
 
-    const workBuf = buffers.get(2)!;
-    const frozenBuf = buffers.get(1)!;
-    // frozen(원본)은 절대 변형되지 않는다.
-    expect(frozenBuf.data).toEqual(testImage.data);
+    const workBuf = buffers.get(1)!;
 
     // 오케스트레이션이 알고리즘을 바꾸지 않는다 — 직접 계산한 결과와 정확히 일치해야 한다.
     const field = buildLiquifyDisplacementField(points, 8, 1, 20, 20)!;
@@ -513,14 +522,14 @@ describe("bakeLiquifyStrokeToCanvas", () => {
       const expectedField = buildLiquifyDisplacementField(expectedPoints, 4, 0.75, 20, 30)!;
       const expectedDst = cloneImage(testImage);
       applyLiquifyDisplacement(testImage, expectedDst, expectedField);
-      expect(buffers.get(2)!.data).toEqual(expectedDst.data);
+      expect(buffers.get(1)!.data).toEqual(expectedDst.data);
     }
   );
 
-  it("두 번째 캔버스(work) 생성이 실패하면 null", async () => {
+  it("결과 캔버스 생성이 실패하면 null", async () => {
     const log: string[] = [];
     const buffers = new Map<number, StudioImageDataLike>();
-    const factory = fakeLiquifyFactory(log, buffers, 2); // 2번째 생성부터 실패.
+    const factory = fakeLiquifyFactory(log, buffers, 1);
     const source: FakeSource = { testImage: solidImage(20, 20, 1, 1, 1) };
     const out = await bakeLiquifyStrokeToCanvas(source, 20, 20, points, 8, 1, factory);
     expect(out).toBeNull();

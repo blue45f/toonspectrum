@@ -2,7 +2,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { dodgeBurnStroke } from "./studio-dodge-burn";
 import {
+  clearStudioRasterEditSurfaces,
+  getStudioRasterEditSurfaceSnapshot,
+} from "./studio-raster-edit-surface-cache";
+import {
   encodeStudioRetouchCanvasPng,
+  loadStudioRetouchSourceImage,
   runStudioDodgeBurnRetouch,
   runStudioWetMixRetouch,
 } from "./studio-retouch-browser";
@@ -30,6 +35,7 @@ function opaquePixels(width: number, height: number): Uint8ClampedArray {
 }
 
 afterEach(() => {
+  clearStudioRasterEditSurfaces();
   vi.unstubAllGlobals();
 });
 
@@ -99,13 +105,15 @@ describe("Studio retouch browser orchestration", () => {
       expect(type).toBe("image/png");
       queueMicrotask(() => callback(new Blob([new Uint8Array([1, 2, 3])], { type })));
     });
-    const canvas = { toBlob, toDataURL } as unknown as HTMLCanvasElement;
+    const canvas = { height: 2, toBlob, toDataURL, width: 3 } as unknown as HTMLCanvasElement;
 
     await expect(encodeStudioRetouchCanvasPng(canvas)).resolves.toBe(
       "data:image/png;base64,AQID",
     );
     expect(toBlob).toHaveBeenCalledOnce();
     expect(toDataURL).not.toHaveBeenCalled();
+    expect(getStudioRasterEditSurfaceSnapshot("data:image/png;base64,AQID")).toBe(canvas);
+    await expect(loadStudioRetouchSourceImage("data:image/png;base64,AQID")).resolves.toBe(canvas);
   });
 
   it("aborts a pending asynchronous encode and retains a legacy-only fallback", async () => {

@@ -18,6 +18,7 @@ import {
   appendFileSync,
   existsSync,
   mkdirSync,
+  readFileSync,
   readdirSync,
   unlinkSync,
   writeFileSync,
@@ -27,6 +28,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
+import { decodePng } from "image-js";
 import {
   chromium,
   type Browser,
@@ -34,7 +36,7 @@ import {
   type Page,
 } from "playwright";
 
-export const STUDIO_LIVING_INK_INTEGRATION_REPORT_SCHEMA_VERSION = 4 as const;
+export const STUDIO_LIVING_INK_INTEGRATION_REPORT_SCHEMA_VERSION = 7 as const;
 
 const FIXED_PIGMENT_INVARIANT_GATE =
   "scripts/verify-studio-living-ink-execution.mjs#fixedInvariant.exact-and-maximumRgbDifference-zero" as const;
@@ -54,6 +56,8 @@ const APP_SETTINGS_KEY = "toonspectrum-studio-app-settings";
 const HASH_PATTERN = /^sha256:[a-f0-9]{64}$/u;
 const ROUTE_PATTERN = /^studio-stroke-surface-route-v1:\d+:\d+:[^:]+:living-ink$/u;
 const MINIMUM_AUTHORITATIVE_SAMPLES = 65;
+const MAX_PHYSICAL_FIRST_PIXEL_MS = 1_500;
+const MAX_PHYSICAL_CANONICAL_HANDOFF_MS = 5_000;
 const BRUSH = Object.freeze({ id: "watercolor", name: "수채 번짐" });
 const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
   "/api/auth/session",
@@ -97,10 +101,13 @@ interface PointerContactEvidence {
   readonly up: readonly [number, number] | null;
   readonly coalescedCalls: number;
   readonly coalescedSamples: number;
+  readonly downAtMs: number;
+  readonly upAtMs: number | null;
 }
 
 interface ProductPresentationEvidence {
   readonly sequence: number;
+  readonly atMs: number;
   readonly routeKey: string | null;
   readonly displaySha256: string | null;
   readonly revision: number | null;
@@ -108,6 +115,7 @@ interface ProductPresentationEvidence {
 
 interface ProductCanonicalHandoffEvidence {
   readonly sequence: number;
+  readonly atMs: number;
   readonly pngSha256: string | null;
 }
 
@@ -117,6 +125,11 @@ interface ControlStateEvidence {
   readonly waterDisabled: boolean;
   readonly fixDisabled: boolean;
   readonly clearDisabled: boolean;
+}
+
+interface ControlPresenceEvidence {
+  readonly sequence: number;
+  readonly present: boolean;
 }
 
 interface OverlaySurfaceEvidence {
@@ -143,6 +156,7 @@ interface BrowserMonitorSnapshot {
   readonly presentations: ProductPresentationEvidence[];
   readonly canonicalHandoffs: ProductCanonicalHandoffEvidence[];
   readonly controlStates: ControlStateEvidence[];
+  readonly controlPresenceStates: ControlPresenceEvidence[];
   readonly overlayDraws: number;
   readonly statusMessages: readonly string[];
   readonly overlaySurfaces: readonly OverlaySurfaceEvidence[];
@@ -201,14 +215,25 @@ export interface StudioLivingInkPositiveEvidence {
   readonly canonicalReceiptCount: number;
   readonly storedCanonicalPngHashMatched: boolean;
   readonly workerFinalHashMatched: boolean;
+  readonly physicalFirstPixelLatencyMs: number;
+  readonly physicalCanonicalHandoffLatencyMs: number;
+  readonly untouchedPaperPatchChangedPixels: number;
+  readonly untouchedPaperPatchMaxChannelDelta: number;
+  readonly canonicalUntouchedAlphaSampleCount: number;
+  readonly canonicalUntouchedNonTransparentPixels: number;
+  readonly canonicalUntouchedMaxAlpha: number;
+  readonly canonicalHandoffSelectedLayerCount: number;
+  readonly canonicalHandoffViewportMaxDelta: number;
   readonly undoLayerCount: number;
   readonly undoStoredElementCount: number;
   readonly redoLayerCount: number;
   readonly reloadLayerCount: number;
   readonly redoReceiptPreserved: boolean;
   readonly reloadReceiptPreserved: boolean;
-  readonly replayObservedLoading: boolean;
-  readonly replayControlsDisabledWhileLoading: boolean;
+  readonly replayAcceptedFrameObserved: boolean;
+  readonly replayPreAcceptanceControlStateCount: number;
+  readonly replayControlsAbsentBeforeAcceptedFrame: boolean;
+  readonly replayControlsFailClosedBeforeAcceptedFrame: boolean;
   readonly physicsReadyAfterAcceptedHash: boolean;
   readonly waterModeSelectableAfterReplay: boolean;
   readonly fixEnabledAfterReplay: boolean;
@@ -228,6 +253,7 @@ export interface StudioLivingInkPositiveEvidence {
   readonly fixedWaterRedoRestoredReceipt: boolean;
   readonly fixedWaterReloadReceiptPreserved: boolean;
   readonly screenshotLive: string;
+  readonly screenshotBlank: string;
   readonly screenshotCommitted: string;
   readonly screenshotReloaded: string;
   readonly screenshotFixed: string;
@@ -308,6 +334,100 @@ function pngDataUrlSha256(src: string | null): `sha256:${string}` | null {
   const bytes = Buffer.from(encoded, "base64");
   if (bytes.byteLength === 0) return null;
   return `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+}
+
+function inspectCanonicalUntouchedAlpha(src: string | null): Readonly<{
+  sampleCount: number;
+  nonTransparentPixels: number;
+  maxAlpha: number;
+}> {
+  const encoded = src?.match(/^data:image\/png;base64,([A-Za-z0-9+/]+={0,2})$/u)?.[1];
+  invariant(encoded, "stored canonical image is not a PNG data URL");
+  const bytes = Buffer.from(encoded, "base64");
+  const image = decodePng(new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength));
+  const data = image.getRawImage().data;
+  const patchSize = Math.max(
+    1,
+    Math.min(32, Math.floor(image.width / 8), Math.floor(image.height / 8)),
+  );
+  const origins = [
+    [0, 0],
+    [image.width - patchSize, 0],
+    [0, image.height - patchSize],
+    [image.width - patchSize, image.height - patchSize],
+  ] as const;
+  let sampleCount = 0;
+  let nonTransparentPixels = 0;
+  let maxAlpha = 0;
+  for (const [originX, originY] of origins) {
+    for (let y = originY; y < originY + patchSize; y += 1) {
+      for (let x = originX; x < originX + patchSize; x += 1) {
+        sampleCount += 1;
+        const alpha = image.channels === 4
+          ? Number(data[(y * image.width + x) * image.channels + 3])
+          : 255;
+        if (alpha !== 0) nonTransparentPixels += 1;
+        maxAlpha = Math.max(maxAlpha, alpha);
+      }
+    }
+  }
+  return Object.freeze({ sampleCount, nonTransparentPixels, maxAlpha });
+}
+
+function compareScreenshotRgbPatch(
+  beforePath: string,
+  afterPath: string,
+  patch: Readonly<{ x: number; y: number; width: number; height: number }>,
+): Readonly<{ changedPixels: number; maxChannelDelta: number }> {
+  const decode = (path: string) => {
+    const buffer = readFileSync(path);
+    const image = decodePng(new Uint8Array(
+      buffer.buffer,
+      buffer.byteOffset,
+      buffer.byteLength,
+    ));
+    return {
+      width: image.width,
+      height: image.height,
+      channels: image.channels,
+      data: image.getRawImage().data,
+    };
+  };
+  const before = decode(beforePath);
+  const after = decode(afterPath);
+  invariant(
+    before.width === after.width
+    && before.height === after.height
+    && before.channels >= 3
+    && after.channels >= 3,
+    "Living Ink paper-patch screenshots have incompatible RGB geometry",
+  );
+  invariant(
+    patch.x >= 0
+    && patch.y >= 0
+    && patch.x + patch.width <= before.width
+    && patch.y + patch.height <= before.height,
+    "Living Ink paper-patch sample falls outside the production screenshot",
+  );
+  let changedPixels = 0;
+  let maxChannelDelta = 0;
+  for (let y = patch.y; y < patch.y + patch.height; y += 1) {
+    for (let x = patch.x; x < patch.x + patch.width; x += 1) {
+      const beforeOffset = (y * before.width + x) * before.channels;
+      const afterOffset = (y * after.width + x) * after.channels;
+      let changed = false;
+      for (let channel = 0; channel < 3; channel += 1) {
+        const delta = Math.abs(
+          Number(before.data[beforeOffset + channel])
+          - Number(after.data[afterOffset + channel]),
+        );
+        if (delta > 0) changed = true;
+        maxChannelDelta = Math.max(maxChannelDelta, delta);
+      }
+      if (changed) changedPixels += 1;
+    }
+  }
+  return Object.freeze({ changedPixels, maxChannelDelta });
 }
 
 function exactLivingInkReceipt(receipt: unknown): LivingInkReceiptIdentity | null {
@@ -405,12 +525,14 @@ export function validateStudioLivingInkIntegrationResult(candidate: unknown): st
     if (
       !record(presentation)
       || !integer(presentation.sequence, 1)
+      || !finite(presentation.atMs)
       || presentation.routeKey !== positive.strictRouteKey
       || !string(presentation.displaySha256)
       || !HASH_PATTERN.test(presentation.displaySha256)
       || !integer(presentation.revision, 1)
       || !record(handoff)
       || !integer(handoff.sequence, 1)
+      || !finite(handoff.atMs)
       || !string(handoff.pngSha256)
       || !HASH_PATTERN.test(handoff.pngSha256)
       || !integer(positive.overlayDrawCount, 1)
@@ -430,6 +552,32 @@ export function validateStudioLivingInkIntegrationResult(candidate: unknown): st
       issues.push("pointerup did not create one hidden native source plus one canonical PNG");
     }
     if (
+      positive.untouchedPaperPatchChangedPixels !== 0
+      || positive.untouchedPaperPatchMaxChannelDelta !== 0
+      || !integer(positive.canonicalUntouchedAlphaSampleCount, 1)
+      || positive.canonicalUntouchedNonTransparentPixels !== 0
+      || positive.canonicalUntouchedMaxAlpha !== 0
+    ) {
+      issues.push("canonical handoff changed untouched paper or emitted opaque off-stroke pixels");
+    }
+    if (
+      positive.canonicalHandoffSelectedLayerCount !== 0
+      || !finite(positive.canonicalHandoffViewportMaxDelta)
+      || positive.canonicalHandoffViewportMaxDelta > 0.5
+    ) {
+      issues.push("canonical handoff selected the page image or shifted canvas viewport geometry");
+    }
+    if (
+      !finite(positive.physicalFirstPixelLatencyMs)
+      || positive.physicalFirstPixelLatencyMs < 0
+      || positive.physicalFirstPixelLatencyMs > MAX_PHYSICAL_FIRST_PIXEL_MS
+      || !finite(positive.physicalCanonicalHandoffLatencyMs)
+      || positive.physicalCanonicalHandoffLatencyMs < 0
+      || positive.physicalCanonicalHandoffLatencyMs > MAX_PHYSICAL_CANONICAL_HANDOFF_MS
+    ) {
+      issues.push("explicit physical mode exceeded first-pixel or canonical-handoff latency limits");
+    }
+    if (
       positive.undoLayerCount !== 0
       || positive.undoStoredElementCount !== 0
       || positive.redoLayerCount !== 2
@@ -440,8 +588,14 @@ export function validateStudioLivingInkIntegrationResult(candidate: unknown): st
       issues.push("Living Ink did not remain one atomic history/save-reload transaction");
     }
     if (
-      positive.replayObservedLoading !== true
-      || positive.replayControlsDisabledWhileLoading !== true
+      positive.replayAcceptedFrameObserved !== true
+      || positive.replayControlsFailClosedBeforeAcceptedFrame !== true
+      || !integer(positive.replayPreAcceptanceControlStateCount)
+      || (
+        integer(positive.replayPreAcceptanceControlStateCount)
+        && positive.replayPreAcceptanceControlStateCount < 1
+        && positive.replayControlsAbsentBeforeAcceptedFrame !== true
+      )
       || positive.physicsReadyAfterAcceptedHash !== true
       || positive.waterModeSelectableAfterReplay !== true
     ) {
@@ -531,7 +685,6 @@ export function expectedStudioLivingInkVerifierDiagnostic(
   message: string,
   studioUrl: string,
 ): boolean {
-  if (OPTIONAL_STATIC_PREVIEW_API_PATHS.some((path) => message.includes(path))) return true;
   let previewUrl: URL;
   try {
     previewUrl = new URL(studioUrl);
@@ -543,6 +696,18 @@ export function expectedStudioLivingInkVerifierDiagnostic(
     || previewUrl.hostname !== "127.0.0.1"
     || previewUrl.port.length === 0
   ) return false;
+  const httpCandidates = message.match(/https?:\/\/[^\s]+/gu) ?? [];
+  if (httpCandidates.some((candidate) => {
+    try {
+      const url = new URL(candidate.replace(/['"\]})>,.;:]+$/u, ""));
+      return url.origin === previewUrl.origin
+        && url.search === ""
+        && url.hash === ""
+        && OPTIONAL_STATIC_PREVIEW_API_PATHS.some((path) => path === url.pathname);
+    } catch {
+      return false;
+    }
+  })) return true;
   // Chromium's software/headless GL backend warns when the verifier intentionally performs the
   // receipt-authoritative RGBA8 readback. The WebGPU capability probe also reports its expected
   // no-adapter fallback in headless CI. Suppress only these exact loopback-preview diagnostics;
@@ -573,6 +738,9 @@ function collectBrowserDiagnostics(
     if (entry.type() !== "error" && entry.type() !== "warning") return;
     const location = entry.location().url;
     const message = location ? `${entry.text()} @ ${location}` : entry.text();
+    if (message.includes("[LEASE_BUSY]")) {
+      log(`${label} durable-writer collision: ${message}`);
+    }
     if (expectedStudioLivingInkVerifierDiagnostic(message, studioUrl)) return;
     (entry.type() === "error" ? diagnostics.consoleErrors : diagnostics.consoleWarnings)
       .push(`${label}: ${message}`);
@@ -626,6 +794,8 @@ async function installStudioMonitor(
       up: readonly [number, number] | null;
       coalescedCalls: number;
       coalescedSamples: number;
+      downAtMs: number;
+      upAtMs: number | null;
     };
     type MutableMonitor = {
       initSteps: string[];
@@ -640,6 +810,7 @@ async function installStudioMonitor(
       presentations: Array<Record<string, unknown>>;
       canonicalHandoffs: Array<Record<string, unknown>>;
       controlStates: Array<Record<string, unknown>>;
+      controlPresenceStates: Array<Record<string, unknown>>;
       overlayDraws: number;
       statusMessages: string[];
       overlaySurfaces: Array<Record<string, unknown>>;
@@ -660,6 +831,7 @@ async function installStudioMonitor(
       presentations: [],
       canonicalHandoffs: [],
       controlStates: [],
+      controlPresenceStates: [],
       overlayDraws: 0,
       statusMessages: [],
       overlaySurfaces: [],
@@ -806,6 +978,8 @@ async function installStudioMonitor(
         up: null,
         coalescedCalls: 0,
         coalescedSamples: 0,
+        downAtMs: performance.now(),
+        upAtMs: null,
       };
       monitor.pointerContacts.push(activeContact);
     }, true);
@@ -816,6 +990,7 @@ async function installStudioMonitor(
     const endContact = (event: Event): void => {
       if (!(event instanceof PointerEvent) || activeContact?.pointerId !== event.pointerId) return;
       activeContact.up = [event.clientX, event.clientY];
+      activeContact.upAtMs = performance.now();
       activeContact = null;
     };
     globalThis.addEventListener("pointerup", endContact, true);
@@ -873,6 +1048,7 @@ async function installStudioMonitor(
         ) {
           monitor.presentations.push({
             sequence: nextSequence(),
+            atMs: performance.now(),
             routeKey,
             displaySha256,
             revision: Number.isSafeInteger(revision) ? revision : null,
@@ -885,6 +1061,7 @@ async function installStudioMonitor(
         if (!last || last.pngSha256 !== pngSha256) {
           monitor.canonicalHandoffs.push({
             sequence: nextSequence(),
+            atMs: performance.now(),
             pngSha256,
           });
         }
@@ -892,9 +1069,16 @@ async function installStudioMonitor(
       const controls = document.querySelector<HTMLElement>(
         '[data-studio-living-ink-controls="true"]',
       );
+      const lastPresence = monitor.controlPresenceStates.at(-1);
+      if (!lastPresence || lastPresence.present !== Boolean(controls)) {
+        monitor.controlPresenceStates.push({
+          sequence: nextSequence(),
+          present: Boolean(controls),
+        });
+      }
       if (controls) {
         const state = controls.dataset.studioLivingInkState ?? "";
-        const water = controls.querySelector<HTMLButtonElement>('[aria-label="Living Ink 물"]');
+        const water = controls.querySelector<HTMLButtonElement>('[aria-label="수채 번짐 물"]');
         const fix = controls.querySelector<HTMLButtonElement>('[data-studio-living-ink-fix="true"]');
         const clear = controls.querySelector<HTMLButtonElement>('[data-studio-living-ink-clear="true"]');
         const next = {
@@ -1097,7 +1281,7 @@ async function activatePenAndWatercolor(
   const mobileDockVisible = await mobileDock.isVisible({ timeout: 250 }).catch(() => false);
   const pickerSurface = mobileDockVisible
     ? await (async () => {
-        const pen = mobileDock.getByRole("button", { name: "펜", exact: true });
+        const pen = mobileDock.getByRole("button", { name: /^(?:펜|Pen)$/u });
         if (await pen.getAttribute("aria-pressed") !== "true") await pen.click();
         const drawSheet = page.locator(`#${MOBILE_DRAW_SETTINGS_ID}`);
         if (await drawSheet.getAttribute("data-studio-mobile-sheet") !== "draw") {
@@ -1134,6 +1318,13 @@ async function activatePenAndWatercolor(
   ), BRUSH.name);
   const controls = page.locator('[data-studio-living-ink-controls="true"]');
   await controls.waitFor({ state: "visible", timeout: 12_000 });
+  const physicalMode = controls.getByRole("button", {
+    name: "수채 번짐 물리 모드",
+    exact: true,
+  });
+  if (await physicalMode.getAttribute("aria-pressed") !== "true") {
+    await physicalMode.click();
+  }
   try {
     await page.waitForFunction((state) => (
       document.querySelector('[data-studio-living-ink-controls="true"]')
@@ -1295,6 +1486,98 @@ async function restoreAutosave(page: Page): Promise<number> {
   return restoreSequenceWatermark;
 }
 
+async function reloadStudioAfterDurableWriterRelease(
+  page: Page,
+  studioUrl: string,
+): Promise<void> {
+  log("unmounting Studio before fresh-document recovery proof");
+  // A hard reload can terminate the document before React's async OPFS cleanup finishes, leaving
+  // the old 30-second fencing record behind even though its browser context no longer edits. Move
+  // through a shipped SPA route first so Studio unmounts while the document is still alive, and
+  // prove both durable writers released their exact lease files before starting a fresh document.
+  await page.evaluate(() => {
+    // Stay inside the isolated Studio route family. Leaving for a public route intentionally
+    // reloads the document to drop COOP/COEP, which would kill async writer cleanup mid-release.
+    globalThis.history.pushState(
+      {},
+      "",
+      "/studio/tools-companion?studio-living-ink-verifier-release=1",
+    );
+    globalThis.dispatchEvent(new PopStateEvent("popstate"));
+  });
+  await page.locator('[data-studio-editor="true"]').waitFor({
+    state: "detached",
+    timeout: 12_000,
+  });
+  const inspectDurableWriters = () => page.evaluate(async () => {
+    type DirectoryWithEntries = FileSystemDirectoryHandle & {
+      entries(): AsyncIterableIterator<[string, FileSystemHandle]>;
+    };
+    if (typeof navigator.storage?.getDirectory !== "function") {
+      return { writerPaths: ["OPFS-unavailable"], recoveryLockCount: 0 };
+    }
+    type QueryableLockManager = LockManager & {
+      query?: () => Promise<{
+        held: Array<{ name?: string }>;
+        pending: Array<{ name?: string }>;
+      }>;
+    };
+    const lockManager = navigator.locks as QueryableLockManager | undefined;
+    const lockSnapshot = await lockManager?.query?.();
+    const recoveryLockCount = [
+      ...(lockSnapshot?.held ?? []),
+      ...(lockSnapshot?.pending ?? []),
+    ].filter(
+      ({ name }) => name?.startsWith("toonspectrum-opfs-recovery:") === true,
+    ).length;
+    const opfsRoot = await navigator.storage.getDirectory();
+    const writerPaths: string[] = [];
+    const pending: Array<{ directory: FileSystemDirectoryHandle; prefix: string }> = [{
+      directory: opfsRoot,
+      prefix: "",
+    }];
+    while (pending.length > 0) {
+      const current = pending.pop();
+      if (!current) break;
+      for await (const [name, handle] of (current.directory as DirectoryWithEntries).entries()) {
+        const path = current.prefix ? `${current.prefix}/${name}` : name;
+        if (handle.kind === "file" && name === "writer-lease.bin") {
+          writerPaths.push(path);
+        }
+        if (handle.kind === "directory") {
+          pending.push({ directory: handle as FileSystemDirectoryHandle, prefix: path });
+        }
+      }
+    }
+    return { writerPaths: writerPaths.sort(), recoveryLockCount };
+  });
+  let leaseFreeSince: number | null = null;
+  let latestWriterState = await inspectDurableWriters();
+  const releaseDeadline = Date.now() + 12_000;
+  while (Date.now() < releaseDeadline) {
+    latestWriterState = await inspectDurableWriters();
+    if (
+      latestWriterState.writerPaths.length === 0
+      && latestWriterState.recoveryLockCount === 0
+    ) {
+      leaseFreeSince ??= Date.now();
+      if (Date.now() - leaseFreeSince >= 1_500) break;
+    } else {
+      leaseFreeSince = null;
+    }
+    await new Promise((resolveWait) => setTimeout(resolveWait, 100));
+  }
+  invariant(
+    leaseFreeSince !== null
+      && Date.now() - leaseFreeSince >= 1_500
+      && latestWriterState.writerPaths.length === 0
+      && latestWriterState.recoveryLockCount === 0,
+    `Studio durable writers did not release stably: ${JSON.stringify(latestWriterState)}`,
+  );
+  log("Studio durable writers stayed released for 1.5s; opening a fresh document");
+  await page.goto(studioUrl, { waitUntil: "domcontentloaded", timeout: 25_000 });
+}
+
 function mutateAutosave(
   raw: string,
   corruption: StudioLivingInkFailClosedEvidence["corruption"],
@@ -1350,6 +1633,7 @@ async function runPositive(
   const page = await context.newPage();
   const diagnostics = collectBrowserDiagnostics(page, "positive", studioUrl);
   const screenshotLive = join(SCRATCH, "positive-01-live.png");
+  const screenshotBlank = join(SCRATCH, "positive-00-blank.png");
   const screenshotCommitted = join(SCRATCH, "positive-02-committed.png");
   const screenshotReloaded = join(SCRATCH, "positive-03-reloaded.png");
   const screenshotFixed = join(SCRATCH, "positive-04-fixed.png");
@@ -1361,9 +1645,29 @@ async function runPositive(
     await page.locator('[data-studio-living-ink-overlay="true"]').waitFor({ state: "attached" });
     await openLayerNavigator(page);
     const blankNativePageElementCount = await waitForLayerCount(page, 0);
+    const stageBox = await page.locator(".konvajs-content").first().boundingBox();
+    invariant(stageBox, "Studio canvas bounds are unavailable for the untouched-paper proof");
+    const untouchedPaperPatch = Object.freeze({
+      x: Math.floor(stageBox.x + 80),
+      y: Math.floor(stageBox.y + 48),
+      width: 160,
+      height: 120,
+    });
+    await page.screenshot({ path: screenshotBlank, animations: "disabled" });
     const route = await authoritativePointerRoute(page);
     await drawAuthoritativeRoute(page, route, screenshotLive);
     await waitForLayerCount(page, 2);
+    const committedStageBox = await page.locator(".konvajs-content").first().boundingBox();
+    invariant(committedStageBox, "Studio canvas bounds disappeared after canonical handoff");
+    const canonicalHandoffViewportMaxDelta = Math.max(
+      Math.abs(stageBox.x - committedStageBox.x),
+      Math.abs(stageBox.y - committedStageBox.y),
+      Math.abs(stageBox.width - committedStageBox.width),
+      Math.abs(stageBox.height - committedStageBox.height),
+    );
+    const canonicalHandoffSelectedLayerCount = await page.locator(
+      '[data-studio-layer-row="true"][aria-selected="true"]',
+    ).count();
     await page.waitForFunction(() => {
       const monitor = (globalThis as typeof globalThis & {
         __studioLivingInkIntegrationMonitor?: BrowserMonitorSnapshot;
@@ -1381,7 +1685,13 @@ async function runPositive(
     const receipt = committedPair.receipt;
     const storedCanonicalPngSha256 = pngDataUrlSha256(committedPair.image.src);
     invariant(storedCanonicalPngSha256, "stored canonical PNG data URL could not be hashed");
+    const canonicalUntouchedAlpha = inspectCanonicalUntouchedAlpha(committedPair.image.src);
     await page.screenshot({ path: screenshotCommitted, animations: "disabled" });
+    const untouchedPaperPatchDiff = compareScreenshotRgbPatch(
+      screenshotBlank,
+      screenshotCommitted,
+      untouchedPaperPatch,
+    );
     const preHistoryMonitor = await readMonitor(page);
     invariant(preHistoryMonitor.workerErrors.length === 0, `Living Ink Worker errors: ${preHistoryMonitor.workerErrors.join(", ")}`);
 
@@ -1406,7 +1716,7 @@ async function runPositive(
     const redonePair = canonicalPair(redone);
     invariant(redonePair, "redone Living Ink pair is missing");
 
-    await page.reload({ waitUntil: "domcontentloaded", timeout: 25_000 });
+    await reloadStudioAfterDurableWriterRelease(page, studioUrl);
     const restoreSequenceWatermark = await restoreAutosave(page);
     await openLayerNavigator(page);
     const reloadLayerCount = await waitForLayerCount(page, 2);
@@ -1418,38 +1728,53 @@ async function runPositive(
     await activatePenAndWatercolor(page);
     const controls = page.locator('[data-studio-living-ink-controls="true"]');
     await controls.waitFor({ state: "visible", timeout: 12_000 });
-    await page.waitForFunction((expected) => {
-      const monitor = (globalThis as typeof globalThis & {
-        __studioLivingInkIntegrationMonitor?: BrowserMonitorSnapshot;
-      }).__studioLivingInkIntegrationMonitor;
-      if (!monitor) return false;
-      const loading = monitor.controlStates.find((state) => (
-        state.sequence > expected.watermark
-        && state.state === "loading"
-        && state.waterDisabled
-        && state.fixDisabled
-        && state.clearDisabled
-      ));
-      if (!loading) return false;
-      const acceptedFrame = monitor.frames.find((frame) => (
-        frame.sequence > loading.sequence
-        && frame.displaySha256 === expected.displaySha256
-        && frame.operationSha256 === expected.operationSha256
-      ));
-      if (!acceptedFrame) return false;
-      return monitor.controlStates.some((state) => (
-        state.sequence > acceptedFrame.sequence
-        && state.state === "ready"
-        && !state.waterDisabled
-        && !state.fixDisabled
-        && !state.clearDisabled
-      ));
-    }, {
-      watermark: restoreSequenceWatermark,
-      displaySha256: receipt.displaySha256,
-      operationSha256: receipt.operationSha256,
-    }, { timeout: 18_000 });
-    const waterButton = controls.getByRole("button", { name: "Living Ink 물", exact: true });
+    try {
+      await page.waitForFunction((expected) => {
+        const monitor = (globalThis as typeof globalThis & {
+          __studioLivingInkIntegrationMonitor?: BrowserMonitorSnapshot;
+        }).__studioLivingInkIntegrationMonitor;
+        if (!monitor) return false;
+        const acceptedFrame = monitor.frames.find((frame) => (
+          frame.sequence > expected.watermark
+          && frame.displaySha256 === expected.displaySha256
+          && frame.operationSha256 === expected.operationSha256
+        ));
+        if (!acceptedFrame) return false;
+        return monitor.controlStates.some((state) => (
+          state.sequence > acceptedFrame.sequence
+          && state.state === "ready"
+          && !state.waterDisabled
+          && !state.fixDisabled
+          && !state.clearDisabled
+        ));
+      }, {
+        watermark: restoreSequenceWatermark,
+        displaySha256: receipt.displaySha256,
+        operationSha256: receipt.operationSha256,
+      }, { timeout: 18_000 });
+    } catch (cause) {
+      const failedMonitor = await readMonitor(page);
+      writeFileSync(
+        join(SCRATCH, "positive-03-replay-failed-monitor.json"),
+        `${JSON.stringify(failedMonitor, null, 2)}\n`,
+      );
+      await page.screenshot({
+        path: join(SCRATCH, "positive-03-replay-failed.png"),
+        animations: "disabled",
+      });
+      throw new Error(
+        `accepted replay frame did not unlock physical controls: ${JSON.stringify({
+          watermark: restoreSequenceWatermark,
+          displaySha256: receipt.displaySha256,
+          operationSha256: receipt.operationSha256,
+          frames: failedMonitor.frames,
+          controlStates: failedMonitor.controlStates,
+          workerErrors: failedMonitor.workerErrors,
+        })}`,
+        { cause },
+      );
+    }
+    const waterButton = controls.getByRole("button", { name: "수채 번짐 물", exact: true });
     const fixButton = controls.locator('[data-studio-living-ink-fix="true"]');
     const clearButton = controls.locator('[data-studio-living-ink-clear="true"]');
     invariant(!(await waterButton.isDisabled()), "water stayed disabled after accepted replay");
@@ -1459,17 +1784,25 @@ async function runPositive(
     await page.screenshot({ path: screenshotReloaded, animations: "disabled" });
 
     const reloadMonitor = await readMonitor(page);
-    const replayLoading = reloadMonitor.controlStates.filter((state) => (
-      state.sequence > restoreSequenceWatermark && state.state === "loading"
-    ));
-    const firstReplayLoading = replayLoading[0] ?? null;
-    const replayAcceptedFrame = firstReplayLoading
-      ? reloadMonitor.frames.find((frame) => (
-          frame.sequence > firstReplayLoading.sequence
-          && frame.displaySha256 === receipt.displaySha256
-          && frame.operationSha256 === receipt.operationSha256
+    const replayAcceptedFrame = reloadMonitor.frames.find((frame) => (
+      frame.sequence > restoreSequenceWatermark
+      && frame.displaySha256 === receipt.displaySha256
+      && frame.operationSha256 === receipt.operationSha256
+    )) ?? null;
+    const replayPreAcceptanceControls = replayAcceptedFrame
+      ? reloadMonitor.controlStates.filter((state) => (
+          state.sequence > restoreSequenceWatermark
+          && state.sequence < replayAcceptedFrame.sequence
+        ))
+      : [];
+    const replayPresenceBeforeAccepted = replayAcceptedFrame
+      ? reloadMonitor.controlPresenceStates.findLast((state) => (
+          state.sequence < replayAcceptedFrame.sequence
         )) ?? null
       : null;
+    const replayControlsAbsentBeforeAcceptedFrame = Boolean(
+      replayPresenceBeforeAccepted && !replayPresenceBeforeAccepted.present,
+    );
     const replayReady = replayAcceptedFrame
       ? reloadMonitor.controlStates.filter((state) => (
           state.sequence > replayAcceptedFrame.sequence && state.state === "ready"
@@ -1486,6 +1819,17 @@ async function runPositive(
     const handoff = preHistoryMonitor.canonicalHandoffs.findLast((candidate) => (
       candidate.pngSha256 === receipt.canonicalPngSha256
     )) ?? null;
+    const firstPresentation = preHistoryMonitor.presentations.find((candidate) => (
+      candidate.routeKey === receipt.routeKey
+    )) ?? null;
+    const physicalFirstPixelLatencyMs = contact && firstPresentation
+      ? Math.max(0, firstPresentation.atMs - contact.downAtMs)
+      : -1;
+    const physicalCanonicalHandoffLatencyMs = contact?.upAtMs !== null
+      && contact?.upAtMs !== undefined
+      && handoff
+      ? Math.max(0, handoff.atMs - contact.upAtMs)
+      : -1;
     const presentation = preHistoryMonitor.presentations.findLast((candidate) => (
       candidate.routeKey === receipt.routeKey
       && candidate.displaySha256 === receipt.displaySha256
@@ -1548,7 +1892,6 @@ async function runPositive(
     const waterModeSelectableAfterReplay = await waterButton.getAttribute("aria-pressed") === "true";
     const fixedWaterRoute = await authoritativePointerRoute(page);
     await drawAuthoritativeRoute(page, fixedWaterRoute, screenshotFixedAfterWater);
-    await waitForLayerCount(page, 3);
     const fixedAfterWater = await waitForStoredDocument(
       page,
       (snapshot) => {
@@ -1567,6 +1910,11 @@ async function runPositive(
       18_000,
       committed.key,
     );
+    // Selecting the brush restores the property inspector by design. Re-open Layers only after
+    // autosave proves the canonical action finished, then verify the same three stored elements
+    // are represented in the navigator instead of mistaking a hidden tab for an empty document.
+    await openLayerNavigator(page);
+    await waitForLayerCount(page, 3);
     const fixedAfterWaterPair = canonicalPair(fixedAfterWater);
     invariant(fixedAfterWaterPair, "Water after Fix removed the canonical Living Ink pair");
     const fixedAfterWaterPngSha256 = pngDataUrlSha256(fixedAfterWaterPair.image.src);
@@ -1592,7 +1940,7 @@ async function runPositive(
       committed.key,
     );
 
-    await page.reload({ waitUntil: "domcontentloaded", timeout: 25_000 });
+    await reloadStudioAfterDurableWriterRelease(page, studioUrl);
     await restoreAutosave(page);
     await openLayerNavigator(page);
     await waitForLayerCount(page, 3);
@@ -1631,16 +1979,35 @@ async function runPositive(
         workerFinalHashMatched: Boolean(workerFinal && presentation && handoff)
           && presentation?.displaySha256 === receipt.displaySha256
           && handoff?.pngSha256 === receipt.canonicalPngSha256,
+        physicalFirstPixelLatencyMs,
+        physicalCanonicalHandoffLatencyMs,
+        untouchedPaperPatchChangedPixels: untouchedPaperPatchDiff.changedPixels,
+        untouchedPaperPatchMaxChannelDelta: untouchedPaperPatchDiff.maxChannelDelta,
+        canonicalUntouchedAlphaSampleCount: canonicalUntouchedAlpha.sampleCount,
+        canonicalUntouchedNonTransparentPixels: canonicalUntouchedAlpha.nonTransparentPixels,
+        canonicalUntouchedMaxAlpha: canonicalUntouchedAlpha.maxAlpha,
+        canonicalHandoffSelectedLayerCount,
+        canonicalHandoffViewportMaxDelta,
         undoLayerCount,
         undoStoredElementCount: undone.elements.length,
         redoLayerCount,
         reloadLayerCount,
         redoReceiptPreserved: JSON.stringify(redonePair.receipt) === JSON.stringify(receipt),
         reloadReceiptPreserved: JSON.stringify(reloadedPair.receipt) === JSON.stringify(receipt),
-        replayObservedLoading: replayLoading.length > 0,
-        replayControlsDisabledWhileLoading: replayLoading.length > 0 && replayLoading.every(({ waterDisabled, fixDisabled, clearDisabled }) => (
-          waterDisabled && fixDisabled && clearDisabled
-        )),
+        replayAcceptedFrameObserved: Boolean(replayAcceptedFrame),
+        replayPreAcceptanceControlStateCount: replayPreAcceptanceControls.length,
+        replayControlsAbsentBeforeAcceptedFrame,
+        replayControlsFailClosedBeforeAcceptedFrame:
+          Boolean(replayAcceptedFrame)
+          && replayPreAcceptanceControls.every(
+            ({ waterDisabled, fixDisabled, clearDisabled }) => (
+              waterDisabled && fixDisabled && clearDisabled
+            ),
+          )
+          && (
+            replayControlsAbsentBeforeAcceptedFrame
+            || replayPreAcceptanceControls.length > 0
+          ),
         physicsReadyAfterAcceptedHash: Boolean(replayAcceptedFrame) && replayReady.some(({ waterDisabled, fixDisabled, clearDisabled }) => (
           !waterDisabled && !fixDisabled && !clearDisabled
         )),
@@ -1665,6 +2032,7 @@ async function runPositive(
         fixedWaterReloadReceiptPreserved:
           JSON.stringify(fixedWaterReloadedPair.receipt) === JSON.stringify(fixedAfterWaterPair.receipt),
         screenshotLive,
+        screenshotBlank,
         screenshotCommitted,
         screenshotReloaded,
         screenshotFixed,
@@ -1717,7 +2085,7 @@ async function runFailClosed(
         ?.getAttribute("data-studio-living-ink-state") === "failed"
     ), undefined, { timeout: 18_000 });
     const state = await controls.getAttribute("data-studio-living-ink-state") ?? "";
-    const waterButton = controls.getByRole("button", { name: "Living Ink 물", exact: true });
+    const waterButton = controls.getByRole("button", { name: "수채 번짐 물", exact: true });
     const fixButton = controls.locator('[data-studio-living-ink-fix="true"]');
     const clearButton = controls.locator('[data-studio-living-ink-clear="true"]');
     const stored = await readStoredDocument(page, seed.key);
@@ -1764,7 +2132,13 @@ async function runMobile(
     const controls = page.locator('[data-studio-living-ink-controls="true"]');
     await controls.scrollIntoViewIfNeeded();
     const metrics = await controls.evaluate((root) => {
-      const labels = ["Living Ink 잉크", "Living Ink 물", "Living Ink 정착", "Living Ink 지우기"];
+      const labels = [
+        "수채 번짐 물리 모드",
+        "수채 번짐 안료",
+        "수채 번짐 물",
+        "수채 번짐 정착",
+        "수채 번짐 지우기",
+      ];
       const viewport = { width: globalThis.innerWidth, height: globalThis.innerHeight };
       const nodes = labels.flatMap((label) => {
         const node = root.querySelector<HTMLElement>(`[aria-label="${label}"]`);

@@ -29,7 +29,7 @@ describe("StudioPage view integration contract", () => {
 
   it("fails GPU raster surfaces closed while a quarter-turn view is active", () => {
     expect(source).toMatch(
-      /const webGpuViewportSurface = canvasRotation === 0[\s\S]*?planStudioWebGpuViewportSurface/u
+      /const webGpuViewportSurface = useMemo\(\s*\(\) => canvasRotation === 0[\s\S]*?\? planStudioWebGpuViewportSurface/u
     );
   });
 

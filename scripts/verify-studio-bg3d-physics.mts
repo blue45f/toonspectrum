@@ -32,7 +32,9 @@ const LOG_PATH = join(ARTIFACT_DIR, "verify.log");
 const QUICK_START_KEY = "toonspectrum-studio-quick-start-dismissed";
 const MOBILE_HINT_KEY = "toonspectrum-studio-mobile-hint-dismissed";
 const UI_DENSITY_KEY = "toonspectrum-studio-ui-density:v1";
+const LANGUAGE_KEY = "toonspectrum-lang";
 const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
+  "/api/auth/session",
   "/api/kmas/merge-on-access",
   "/api/studio-ai/status",
 ] as const;
@@ -75,13 +77,29 @@ function log(message: string): void {
 }
 
 function isExpectedStaticPreviewError(message: string, studioUrl: string): boolean {
-  if (OPTIONAL_STATIC_PREVIEW_API_PATHS.some((path) => message.includes(path))) return true;
-
   let previewUrl: URL;
   try {
     previewUrl = new URL(studioUrl);
   } catch {
     return false;
+  }
+
+  const locationSeparator = " @ ";
+  const locationIndex = message.lastIndexOf(locationSeparator);
+  if (message.startsWith("Failed to load resource:") && locationIndex >= 0) {
+    try {
+      const resourceUrl = new URL(message.slice(locationIndex + locationSeparator.length));
+      if (
+        resourceUrl.origin === previewUrl.origin
+        && resourceUrl.search === ""
+        && resourceUrl.hash === ""
+        && OPTIONAL_STATIC_PREVIEW_API_PATHS.some((path) => path === resourceUrl.pathname)
+      ) {
+        return true;
+      }
+    } catch {
+      // Continue to the exact Socket.IO diagnostic below.
+    }
   }
   if (
     previewUrl.protocol !== "http:" ||
@@ -189,6 +207,10 @@ async function configureStudioPage(page: Page): Promise<void> {
         configuration.uiDensityKey,
         JSON.stringify({ mode: "full" }),
       );
+      window.localStorage.setItem(
+        configuration.languageKey,
+        JSON.stringify({ state: { lang: "ko" }, version: 0 }),
+      );
     } catch {
       // Storage may be blocked, but the UI assertions below will still fail clearly.
     }
@@ -196,6 +218,7 @@ async function configureStudioPage(page: Page): Promise<void> {
     quickStartKey: QUICK_START_KEY,
     mobileHintKey: MOBILE_HINT_KEY,
     uiDensityKey: UI_DENSITY_KEY,
+    languageKey: LANGUAGE_KEY,
   });
 }
 
@@ -225,10 +248,10 @@ async function waitForElementAnimations(locator: Locator): Promise<void> {
 async function openDesktopBackground3d(page: Page): Promise<Locator> {
   const mainMenu = page.locator('[data-studio-main-menu="true"]');
   await mainMenu.waitFor({ state: "visible", timeout: 20_000 });
-  await mainMenu.getByRole("button", { name: "삽입", exact: true }).click();
-  const insertMenu = page.locator('[role="menu"][aria-label="삽입"]');
-  await insertMenu.waitFor({ state: "visible", timeout: 5_000 });
-  await insertMenu.getByRole("menuitem", { name: "3D 배경", exact: true }).click();
+  await mainMenu.getByRole("menuitem", { name: "3D", exact: true }).click();
+  const threeDMenu = page.locator('[role="menu"][aria-label="3D"]');
+  await threeDMenu.waitFor({ state: "visible", timeout: 5_000 });
+  await threeDMenu.getByRole("menuitem", { name: "3D 배경", exact: true }).click();
   return waitForBackground3dDialog(page);
 }
 
@@ -268,7 +291,9 @@ async function openMobileBackground3d(page: Page): Promise<Locator> {
   await addToolButton.click();
   const starter = page.locator('[data-studio-creative-starter="true"]');
   await starter.waitFor({ state: "visible", timeout: 5_000 });
-  const backgroundCard = starter.locator('[data-studio-starter-card="background-3d"]');
+  const moreTools = starter.locator('[data-studio-quickstart-more="true"]');
+  await moreTools.locator("summary").click();
+  const backgroundCard = starter.locator('[data-studio-quick-tool="background-3d"]');
   await backgroundCard.waitFor({ state: "visible", timeout: 5_000 });
   assertCondition(
     (await backgroundCard.innerText()).includes("3D 배경"),

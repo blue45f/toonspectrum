@@ -2267,8 +2267,8 @@ function StudioVrmMannequinMaterial({
     if (!enabled) {
       applyVrmCustomColors(vrm, customColors);
       applyVrmMaterialFx(vrm, materialFx);
-      // The poser uses frameloop="demand". Imperative material restoration has no React host
-      // update from which Fiber could infer that a fresh color frame is required.
+      // The static poser uses frameloop="demand". Restoring materials mutates Three objects
+      // imperatively, so React has no host prop change from which to schedule the color frame.
       invalidate();
       return;
     }
@@ -2294,11 +2294,14 @@ function StudioVrmMannequinMaterial({
         material.needsUpdate = true;
       }
     });
+    // Schedule the first clay frame even while the poser is otherwise static.
     invalidate();
     return () => {
       restore();
       applyVrmCustomColors(vrm, customColors);
       applyVrmMaterialFx(vrm, materialFx);
+      // Without this frame the Canvas keeps presenting the last gray framebuffer until the
+      // camera or another animation happens to invalidate it.
       invalidate();
     };
   }, [customColors, enabled, invalidate, materialFx, vrm]);

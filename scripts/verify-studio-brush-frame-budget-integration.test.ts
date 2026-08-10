@@ -28,4 +28,13 @@ describe("Studio brush latency and continuous frame-budget gate integration", ()
       'kind: "toonspectrum-studio-brush-latency-browser-v2"',
     );
   });
+
+  it("ignores optional preview failures only through the exact loopback policy", () => {
+    expect(verifierSource).toContain(
+      "expectedStudioBrushLatencyPreviewFailure(message, studioUrl)",
+    );
+    expect(verifierSource).toContain('previewUrl.hostname !== "127.0.0.1"');
+    expect(verifierSource).toContain("url.origin === previewUrl.origin");
+    expect(verifierSource).not.toContain('message.includes("/api/auth/session")');
+  });
 });

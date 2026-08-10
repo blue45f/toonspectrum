@@ -704,7 +704,9 @@ export class StudioLivingInkStudioCoordinator {
     this.#committedReceipt = null;
     this.#workingJournal = [];
     this.#capacityDiagnostic = null;
-    // Detach stale work synchronously. No late disposal continuation may reset a newer activation.
+    // Detach stale work synchronously. A rapid off/on cycle may start a new activation while the
+    // previous provider is still terminating; no late disposal continuation may reset that new
+    // activation's queue.
     this.#queue = Promise.resolve();
     this.#setState("unavailable");
     void queue.catch(() => undefined);

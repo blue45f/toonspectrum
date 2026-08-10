@@ -297,9 +297,13 @@ export default defineConfig(({ mode }) => ({
             || id.endsWith("/src/domains/creator/studio-inspector-focus.ts")
             || id.endsWith("/src/domains/creator/studio-liquify-contract.ts")
             || id.endsWith("/src/domains/creator/studio-mobile-sheet-snap.ts")
+            || id.endsWith("/src/domains/creator/studio-similar-style.ts")
+            || id.endsWith("/src/domains/creator/studio-story-beats.ts")
           ) {
-            // These lightweight contracts are shared by several Studio lazy entries. Keeping
-            // them together avoids small HTTP requests on every editor launch. The procedural
+            // These lightweight contracts are shared by several Studio lazy entries. Similar-style
+            // and story-beat helpers are also synchronously needed by StudioPage, so leaving their
+            // 273/313-byte bodies as separate shared chunks costs two launch requests without
+            // preserving any lazy bytes. Keeping them together avoids those micro-requests. The procedural
             // descriptor index is deliberately excluded so its 160 labels/previews stay behind
             // the full-library and saved-pro-brush dynamic boundaries.
             return "studio-core-micro-contracts";

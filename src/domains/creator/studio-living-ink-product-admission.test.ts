@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   studioLivingInkCanReuseAcceptedAuthority,
+  studioLivingInkEffectiveScope,
   studioLivingInkFailureDisposition,
   studioLivingInkProductAdmissionBlocked,
 } from "./studio-living-ink-product-admission";
@@ -71,5 +72,12 @@ describe("Living Ink product admission", () => {
   it("preserves the document for failed water, while ink retains its vector fallback", () => {
     expect(studioLivingInkFailureDisposition("water")).toBe("preserve-document-noop");
     expect(studioLivingInkFailureDisposition("ink")).toBe("save-vector-fallback");
+  });
+
+  it("uses one effective scope after the canonical image selection is released", () => {
+    expect(studioLivingInkEffectiveScope("selection", true)).toBe("selection");
+    expect(studioLivingInkEffectiveScope("selection", false)).toBe("all");
+    expect(studioLivingInkEffectiveScope("all", true)).toBe("all");
+    expect(studioLivingInkEffectiveScope("all", false)).toBe("all");
   });
 });

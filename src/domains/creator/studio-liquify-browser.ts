@@ -1,15 +1,22 @@
 /** Canvas-factory orchestration for the pure Liquify engine. */
 import {
-  buildLiquifyDisplacementField,
-  type LiquifyDisplacementField,
-  type LiquifyPixelPoint,
+  LIQUIFY_MAX_DISPLACEMENT_RADIUS_RATIO,
+  normalizeStudioLiquifyMode,
   type StudioLiquifyBrushDynamics,
   type StudioLiquifyMode,
-} from "./studio-liquify";
+} from "./studio-liquify-contract";
 import { runStudioLiquifyWorker } from "./studio-liquify-worker-client";
 import { flipNormalizedPoint } from "./studio-magic-wand";
 
 import type { StudioImageDataLike } from "./studio-filters";
+import type {
+  LiquifyDisplacementField,
+  LiquifyPixelPoint,
+} from "./studio-liquify";
+import type {
+  StudioLiquifyWorkerRunRequest,
+  StudioLiquifyWorkerStrokePlan,
+} from "./studio-liquify-worker-protocol";
 import type { MaskCanvasLike, MaskCtx2DLike, MaskImageSource } from "./studio-selection-tools";
 
 /**
@@ -28,6 +35,141 @@ export type LiquifyCanvasFactory = (
   width: number,
   height: number
 ) => { canvas: MaskCanvasLike & MaskImageSource; ctx: LiquifyCtx2DLike } | null;
+
+export type LiquifyRasterRegion = {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+};
+
+function clampRegionCoordinate(value: number, maximum: number): number {
+  if (!Number.isFinite(value)) return value < 0 ? 0 : maximum;
+  return Math.max(0, Math.min(maximum, value));
+}
+
+function regionWithSamplingHalo(
+  outputStartX: number,
+  outputStartY: number,
+  outputEndX: number,
+  outputEndY: number,
+  haloX: number,
+  haloY: number,
+  width: number,
+  height: number,
+): LiquifyRasterRegion {
+  const maxX = width - 1;
+  const maxY = height - 1;
+  const startX = clampRegionCoordinate(outputStartX, maxX);
+  const startY = clampRegionCoordinate(outputStartY, maxY);
+  const endX = clampRegionCoordinate(outputEndX, maxX);
+  const endY = clampRegionCoordinate(outputEndY, maxY);
+  const x = clampRegionCoordinate(startX - haloX, maxX);
+  const y = clampRegionCoordinate(startY - haloY, maxY);
+  const inclusiveEndX = clampRegionCoordinate(endX + haloX, maxX);
+  const inclusiveEndY = clampRegionCoordinate(endY + haloY, maxY);
+  return {
+    x,
+    y,
+    width: inclusiveEndX - x + 1,
+    height: inclusiveEndY - y + 1,
+  };
+}
+
+/**
+ * Stroke field의 가능한 출력 영역과 backward bilinear sampling halo를 함께 잡는다. 실제 field
+ * 생성은 계속 Worker가 담당한다. Stabilize/resample은 입력 점의 축별 최솟값/최댓값 바깥으로
+ * 나가지 않고 pressure dynamics는 base radius를 키우지 않으므로 이 계획은 모든 mode에 보수적이다.
+ */
+export function planLiquifyStrokeRasterRegion(
+  points: readonly LiquifyPixelPoint[],
+  radiusPx: number,
+  width: number,
+  height: number,
+): LiquifyRasterRegion {
+  const full = { x: 0, y: 0, width, height };
+  if (points.length === 0 || !Number.isFinite(radiusPx) || radiusPx <= 0) return full;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const point of points) {
+    if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) return full;
+    minX = Math.min(minX, point.x);
+    minY = Math.min(minY, point.y);
+    maxX = Math.max(maxX, point.x);
+    maxY = Math.max(maxY, point.y);
+  }
+  const maximumDisplacement = Math.max(
+    1,
+    radiusPx * LIQUIFY_MAX_DISPLACEMENT_RADIUS_RATIO,
+  );
+  // +1은 bilinear sample의 floor 좌표 오른쪽/아래 이웃까지 포함한다.
+  const halo = Math.ceil(maximumDisplacement) + 1;
+  return regionWithSamplingHalo(
+    Math.floor(minX - radiusPx),
+    Math.floor(minY - radiusPx),
+    Math.ceil(maxX + radiusPx),
+    Math.ceil(maxY + radiusPx),
+    halo,
+    halo,
+    width,
+    height,
+  );
+}
+
+/** Retained reconstruct/smooth field도 field footprint와 실제 최대 변위만큼만 읽는다. */
+export function planLiquifyFieldRasterRegion(
+  field: LiquifyDisplacementField,
+  width: number,
+  height: number,
+): LiquifyRasterRegion {
+  const full = { x: 0, y: 0, width, height };
+  const cells = field.width * field.height;
+  if (
+    !Number.isSafeInteger(field.originX)
+    || !Number.isSafeInteger(field.originY)
+    || !Number.isSafeInteger(field.width)
+    || !Number.isSafeInteger(field.height)
+    || field.width <= 0
+    || field.height <= 0
+    || !Number.isSafeInteger(cells)
+    || field.dx.length < cells
+    || field.dy.length < cells
+  ) {
+    return full;
+  }
+  const rawEndX = field.originX + field.width - 1;
+  const rawEndY = field.originY + field.height - 1;
+  if (!Number.isSafeInteger(rawEndX) || !Number.isSafeInteger(rawEndY)) return full;
+  if (rawEndX < 0 || rawEndY < 0 || field.originX >= width || field.originY >= height) {
+    // 유효 field지만 canvas와 만나지 않으면 기존 applied=true/no-change 계약을 1px로 재현한다.
+    return { x: 0, y: 0, width: 1, height: 1 };
+  }
+  let maximumX = 0;
+  let maximumY = 0;
+  for (let index = 0; index < cells; index += 1) {
+    const dx = field.dx[index]!;
+    const dy = field.dy[index]!;
+    if (!Number.isFinite(dx) || !Number.isFinite(dy)) continue;
+    maximumX = Math.max(maximumX, Math.abs(dx));
+    maximumY = Math.max(maximumY, Math.abs(dy));
+  }
+  return regionWithSamplingHalo(
+    field.originX,
+    field.originY,
+    rawEndX,
+    rawEndY,
+    Math.ceil(maximumX) + 1,
+    Math.ceil(maximumY) + 1,
+    width,
+    height,
+  );
+}
+
+export function liquifyRasterRegionWorkerBytes(region: LiquifyRasterRegion): number {
+  return region.width * region.height * 4 * 2;
+}
 
 /**
  * Structured-cloning an ImageData-like payload through a Worker preserves its typed pixel buffer,
@@ -73,31 +215,55 @@ export async function bakeLiquifyFieldToCanvas(
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return null;
   const w = Math.max(1, Math.round(width));
   const h = Math.max(1, Math.round(height));
+  return bakeLiquifyRequestToCanvas(source, w, h, { field }, createCanvas, options.signal);
+}
 
-  // frozen — 변위 계산의 유일한 색 소스, 다시는 건드리지 않는다(원본을 한 번 그린 뒤 고정).
-  const frozen = createCanvas(w, h);
-  if (!frozen) return null;
-  frozen.ctx.drawImage(source, 0, 0);
+async function bakeLiquifyRequestToCanvas(
+  source: MaskImageSource,
+  width: number,
+  height: number,
+  operation: { readonly field: LiquifyDisplacementField } | { readonly stroke: StudioLiquifyWorkerStrokePlan },
+  createCanvas: LiquifyCanvasFactory,
+  signal: AbortSignal | undefined,
+): Promise<(MaskCanvasLike & MaskImageSource) | null> {
+  throwIfLiquifyAborted(signal);
+  const region = "field" in operation
+    ? planLiquifyFieldRasterRegion(operation.field, width, height)
+    : planLiquifyStrokeRasterRegion(operation.stroke.points, operation.stroke.radiusPx, width, height);
 
-  // work — 원본을 한 번 그린 뒤 변위 필드가 실제로 반영되는 결과 버퍼.
-  const work = createCanvas(w, h);
+  // 결과 canvas는 기존 문서/PNG 계약 때문에 full-size지만, pixel snapshot과 Worker 왕복은
+  // sampling halo를 포함한 ROI 하나뿐이다. work는 원본이 이미 그려져 있어 ROI 밖도 자동 보존된다.
+  const work = createCanvas(width, height);
   if (!work) return null;
   work.ctx.drawImage(source, 0, 0);
 
-  const frozenData = frozen.ctx.getImageData(0, 0, w, h);
-  const workData = work.ctx.getImageData(0, 0, w, h);
-  // 필드 밖 픽셀은 applyLiquifyDisplacement가 의도적으로 건드리지 않는다. 따라서 dst는 반드시
-  // src와 바이트 단위로 같아야 한다. 두 번째 drawImage/getImageData 결과에만 의존하면 일부
-  // 브라우저의 디코드/context 복구 타이밍에서 투명 초기 버퍼가 남아 단일 dab 뒤 화면 전체가
-  // 사라질 수 있으므로, frozen 스냅샷을 명시적으로 복제해 불변식을 강제한다.
-  workData.data.set(frozenData.data);
+  const frozenData = work.ctx.getImageData(region.x, region.y, region.width, region.height);
+  const workData: StudioImageDataLike = {
+    data: new Uint8ClampedArray(frozenData.data),
+    width: frozenData.width,
+    height: frozenData.height,
+  };
 
-  const { dst } = await runStudioLiquifyWorker(
-    { src: frozenData, dst: workData, field },
-    { signal: options.signal }
+  const request: StudioLiquifyWorkerRunRequest = "field" in operation
+    ? {
+        src: frozenData,
+        dst: workData,
+        region: { originX: region.x, originY: region.y, canvasWidth: width, canvasHeight: height },
+        field: operation.field,
+      }
+    : {
+        src: frozenData,
+        dst: workData,
+        region: { originX: region.x, originY: region.y, canvasWidth: width, canvasHeight: height },
+        stroke: operation.stroke,
+      };
+  const { applied, dst } = await runStudioLiquifyWorker(
+    request,
+    { signal }
   );
+  if (!applied) return null;
 
-  work.ctx.putImageData(restoreCanvasImageData(dst), 0, 0);
+  work.ctx.putImageData(restoreCanvasImageData(dst), region.x, region.y);
   return work.canvas;
 }
 
@@ -109,8 +275,9 @@ export async function bakeLiquifyFieldToCanvas(
  * points는 화면에 표시된 상태의 디바이스 px 좌표다. opts.flipX/flipY가 켜져 있으면 정규화한 뒤
  * flipNormalizedPoint로 원본(비반전) 좌표계에 되돌리고, 다시 자연 px로 스케일해 순수 코어에 넘긴다.
  *
- * 변위 적용(applyLiquifyDisplacement)은 대형 이미지에서 무거운 bilinear 리샘플링 루프라
- * Worker로 옮긴다(Worker를 못 만드는 환경에선 클라이언트 내부에서 동일 엔진으로 동기 폴백).
+ * 변위 필드 생성(buildLiquifyDisplacementField)과 적용(applyLiquifyDisplacement)은 대형 이미지에서
+ * 모두 무거우므로 points+settings만 넘겨 Worker 안에서 연속 실행한다(Worker를 못 만드는 환경에선
+ * 클라이언트 내부에서 동일 엔진으로 동기 폴백).
  */
 export async function bakeLiquifyStrokeToCanvas(
   source: MaskImageSource,
@@ -132,6 +299,20 @@ export async function bakeLiquifyStrokeToCanvas(
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return null;
   const w = Math.max(1, Math.round(width));
   const h = Math.max(1, Math.round(height));
+  throwIfLiquifyAborted(opts?.signal);
+
+  const mode = normalizeStudioLiquifyMode(opts?.mode);
+  const minimumPointCount = mode === "push" ? 2 : 1;
+  // buildLiquifyDisplacementField의 값싼 no-op 가드만 미리 수행한다. 실제 dab/field 계획은 Worker가 한다.
+  if (
+    points.length < minimumPointCount
+    || !Number.isFinite(radiusPx)
+    || radiusPx <= 0
+    || !Number.isFinite(strength)
+    || strength <= 0
+  ) {
+    return null;
+  }
 
   const flipX = opts?.flipX ?? false;
   const flipY = opts?.flipY ?? false;
@@ -147,16 +328,20 @@ export async function bakeLiquifyStrokeToCanvas(
         })
       : points;
 
-  const field = buildLiquifyDisplacementField(sourcePoints, radiusPx, strength, w, h, {
-    mode: opts?.mode,
-    hardness: opts?.hardness,
-    minimumRadiusRatio: opts?.minimumRadiusRatio,
-    pressureAffectsRadius: opts?.pressureAffectsRadius,
-    pressureAffectsStrength: opts?.pressureAffectsStrength,
-    stabilizer: opts?.stabilizer,
-    spacingRatio: opts?.spacingRatio,
-    signal: opts?.signal,
-  });
-  if (!field) return null;
-  return bakeLiquifyFieldToCanvas(source, w, h, field, createCanvas, { signal: opts?.signal });
+  return bakeLiquifyRequestToCanvas(source, w, h, {
+    stroke: {
+      points: sourcePoints,
+      radiusPx,
+      strength,
+      options: {
+        mode,
+        hardness: opts?.hardness,
+        minimumRadiusRatio: opts?.minimumRadiusRatio,
+        pressureAffectsRadius: opts?.pressureAffectsRadius,
+        pressureAffectsStrength: opts?.pressureAffectsStrength,
+        stabilizer: opts?.stabilizer,
+        spacingRatio: opts?.spacingRatio,
+      },
+    },
+  }, createCanvas, opts?.signal);
 }

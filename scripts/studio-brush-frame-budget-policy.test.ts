@@ -35,13 +35,16 @@ function healthy(
 }
 
 describe("Studio continuous brush frame-budget policy", () => {
-  it("covers the seven representative media that users feel directly", () => {
+  it("covers the representative media, including wet-ink regression brushes", () => {
     expect(STUDIO_BRUSH_FRAME_BUDGET_IDS).toEqual([
       "pen",
       "g-pen-flex",
       "pencil-4b-rough",
       "airbrush-grand-soft",
       "watercolor-wet-wash",
+      "ink-wash",
+      "inkwash-bleed-wash",
+      "sumi-wash-fray",
       "oil",
       "highlighter",
     ]);

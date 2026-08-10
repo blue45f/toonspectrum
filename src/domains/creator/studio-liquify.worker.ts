@@ -1,4 +1,4 @@
-import { applyLiquifyDisplacement } from "./studio-liquify";
+import { applyLiquifyDisplacement, buildLiquifyDisplacementField } from "./studio-liquify";
 import {
   STUDIO_LIQUIFY_WORKER_PROTOCOL_VERSION,
   assertStudioLiquifyRequest,
@@ -28,6 +28,8 @@ function serializeWorkerError(error: unknown): StudioLiquifyWorkerFailureMessage
   return { name: "Error", message: "리퀴파이 Worker 실행에 실패했습니다." };
 }
 
+// 기본 client가 capacity 1로 직렬화하므로 이 런타임은 ready를 한 번만 보낸 뒤 순차 run 요청을
+// 계속 받는다. 요청별 상태는 아래 handler 지역 변수에만 두어 stroke 간 픽셀/field가 섞이지 않는다.
 workerScope.onmessage = (event) => {
   const message = event.data;
   if (
@@ -41,11 +43,24 @@ workerScope.onmessage = (event) => {
 
   try {
     assertStudioLiquifyRequest(message.request);
-    const { src, dst, field } = message.request;
-    applyLiquifyDisplacement(src, dst, field);
+    const { src, dst } = message.request;
+    const field = "stroke" in message.request
+      ? buildLiquifyDisplacementField(
+          message.request.stroke.points,
+          message.request.stroke.radiusPx,
+          message.request.stroke.strength,
+          message.request.region?.canvasWidth ?? src.width,
+          message.request.region?.canvasHeight ?? src.height,
+          message.request.stroke.options,
+        )
+      : message.request.field;
+    if (field) applyLiquifyDisplacement(src, dst, field, {
+      ...(message.request.region === undefined ? {} : { region: message.request.region }),
+    });
     const response: StudioLiquifyWorkerSuccessMessage = {
       type: "studio-liquify/success",
       version: STUDIO_LIQUIFY_WORKER_PROTOCOL_VERSION,
+      applied: field !== null,
       dst,
     };
     workerScope.postMessage(response, studioLiquifySuccessTransfers(response));

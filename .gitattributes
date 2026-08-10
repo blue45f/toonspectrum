@@ -1,2 +1,6 @@
 # Unified diff context lines intentionally carry a single prefix space.
 patches/*.patch whitespace=-blank-at-eol,-blank-at-eof
+
+# Reviewed upstream license copies are hash-pinned verbatim; preserve their whitespace.
+crates/studio-engine-vello/pkg*/THIRD_PARTY_LICENSES.txt whitespace=-blank-at-eol,-blank-at-eof
+packages/studio-brush-platform/src/ink-*/LICENSE-* whitespace=-blank-at-eol,-blank-at-eof

@@ -249,6 +249,9 @@ describe("Studio Konva image node boundary", () => {
     expect(source).toContain("const imageFilterBuildCache = new Map<string, ImageFilterBuild>();");
     expect(source).toContain("mod.registerStudioKonvaFilters(KonvaRuntime);");
     expect(source).toContain("controller.abort();");
+    expect(source).toContain(
+      "const filterRequestAtRef = useRef(Number.NEGATIVE_INFINITY);"
+    );
     expect(source).toContain("globalThis.cancelAnimationFrame(raf)");
     expect(source).toContain("if (el.frames && el.frames.length > 1) return;");
     expect(source).toContain("if (!liveStrokeRef?.current && now - lastDrawAt >= FRAME_INTERVAL_MS)");
@@ -261,6 +264,12 @@ describe("Studio Konva image node boundary", () => {
     expect(source).toContain(
       "commitDisplayImage(createStudioRasterFlippedDisplaySource(img, flipped, flippedY));"
     );
+    expect(source).toContain("?? currentGpuFilteredCanvas");
+    expect(source).toContain(
+      "? (showComputedCanvas ? visibleComputedCanvas! : displayImg)"
+    );
+    expect(source).toContain('layer.on("draw.studioRasterPresentation", acknowledgeAfterDraw);');
+    expect(source).toContain("node.image() !== rasterPresentationSource");
     expect(source).toContain(
       "node.cache(cachePad > 0 ? { offset: cachePad } : { pixelRatio: filterDensity });"
     );

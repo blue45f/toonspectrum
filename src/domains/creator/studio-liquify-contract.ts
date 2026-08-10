@@ -22,6 +22,13 @@ export const LIQUIFY_STABILIZER_DEFAULT = 0;
 export const LIQUIFY_SPACING_RANGE = { min: 10, max: 75, step: 5 } as const;
 export const LIQUIFY_SPACING_DEFAULT = 35;
 
+/** Worker 프로토콜과 순수 엔진이 함께 사용하는 직렬화/할당 안전 상한. */
+export const LIQUIFY_MAX_INPUT_POINTS = 20_000;
+/** dx+dy Float32Array 합계 128MiB. */
+export const LIQUIFY_MAX_FIELD_CELLS = 16_777_216;
+/** 한 stroke가 누적할 수 있는 최대 변위는 brush 반경의 이 배수로 제한된다. */
+export const LIQUIFY_MAX_DISPLACEMENT_RADIUS_RATIO = 2;
+
 /** Percent-based UI values are normalized to 0..1 once at the pixel-engine boundary. */
 export interface StudioLiquifyBrushDynamics {
   readonly hardness?: number;

@@ -963,6 +963,7 @@ export class StudioLivingInkWebGl2Runtime {
   private disposed = false;
   private passCount = 0;
   private fixSelectionEnabled = false;
+  /** Avoid allocating and uploading a full 1024² mask for the overwhelmingly common no-selection stroke. */
   private selectionTextureHasFullCoverage = true;
   /** Active brush footprint in field-cell space; radiusCells <= 0 disables scrubbing boost. */
   private brushFootprint: Readonly<{ x: number; y: number; radiusCells: number }> = Object.freeze({
