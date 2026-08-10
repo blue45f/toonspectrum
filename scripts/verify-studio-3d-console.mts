@@ -747,6 +747,22 @@ async function configureStudio(page: Page): Promise<void> {
   });
 }
 
+async function dismissHydratedQuickStart(page: Page): Promise<void> {
+  const quickStart = page.locator('[data-studio-creative-starter="true"]');
+  // First-use UI preferences now resolve from the asynchronous SQLite/OPFS authority. The
+  // retired localStorage seed above is only a compatibility hint, so a cold profile can mount
+  // the modal coach after the editor itself is already attached. Exercise the shipped dismiss
+  // control before opening unrelated 3D menus; otherwise its focus-restoration transaction can
+  // race the menu click and make a healthy menu look unavailable.
+  const mounted = await quickStart
+    .waitFor({ state: "visible", timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!mounted) return;
+  await quickStart.locator('[data-studio-quickstart-dismiss="true"]').click();
+  await quickStart.waitFor({ state: "detached", timeout: 3_000 });
+}
+
 async function openThreeDMenu(page: Page): Promise<Locator> {
   const mainMenu = page.locator('[data-studio-main-menu="true"]');
   await mainMenu.waitFor({ state: "visible", timeout: 20_000 });
@@ -938,6 +954,7 @@ async function run(page: Page, studioUrl: string): Promise<void> {
       { cause },
     );
   }
+  await dismissHydratedQuickStart(page);
   await page.waitForTimeout(500);
   assertCondition(
     babylonSpecialistRequests.length === 0,

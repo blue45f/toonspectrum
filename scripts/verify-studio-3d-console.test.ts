@@ -184,6 +184,33 @@ describe("3D character production-preview color boundary", () => {
     expect(toggleOff).toBeGreaterThan(mannequin);
     expect(restored).toBeGreaterThan(toggleOff);
   });
+
+  it("dismisses the SQLite-hydrated first-use coach before opening 3D menus", () => {
+    const dismissQuickStart = sourceBetween(
+      "async function dismissHydratedQuickStart(page: Page): Promise<void>",
+      "async function openThreeDMenu(page: Page): Promise<Locator>",
+    );
+    const productionPreview = sourceBetween(
+      "async function run(page: Page, studioUrl: string): Promise<void>",
+      "async function runBabylonStableIdOrientationParityProof(",
+    );
+    const dismissIndex = productionPreview.indexOf(
+      "await dismissHydratedQuickStart(page);",
+    );
+    const openMenuIndex = productionPreview.indexOf(
+      "const characterMenu = await openThreeDMenu(page);",
+    );
+
+    expect(dismissQuickStart).toContain(
+      "data-studio-creative-starter=\"true\"",
+    );
+    expect(dismissQuickStart).toContain(
+      "data-studio-quickstart-dismiss=\"true\"",
+    );
+    expect(dismissQuickStart).toContain('state: "detached"');
+    expect(dismissIndex).toBeGreaterThanOrEqual(0);
+    expect(openMenuIndex).toBeGreaterThan(dismissIndex);
+  });
 });
 
 describe("3D WebGPU conformance browser boundary", () => {
