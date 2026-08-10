@@ -4,6 +4,9 @@ export const STUDIO_BRUSH_FRAME_BUDGET_IDS = [
   "pencil-4b-rough",
   "airbrush-grand-soft",
   "watercolor-wet-wash",
+  "ink-wash",
+  "inkwash-bleed-wash",
+  "sumi-wash-fray",
   "oil",
   "highlighter",
 ] as const;

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   serializeStudioAutosave,
@@ -58,6 +58,7 @@ class FakeAutosaveJournal implements StudioAutosaveOpfsJournalPort {
   renewCount = 0;
   releaseCount = 0;
   now = 1_000;
+  appendGate: Promise<void> | null = null;
 
   async scan(): Promise<StudioOpfsRecoveryScan> {
     return Object.freeze({
@@ -120,6 +121,7 @@ class FakeAutosaveJournal implements StudioAutosaveOpfsJournalPort {
       readonly compactThroughSequence: number;
     },
   ): Promise<StudioOpfsRecoveryEntry> {
+    await this.appendGate;
     const sequence = (this.entries.at(-1)?.sequence ?? 0) + 1;
     this.entries = this.entries.filter(
       (entry) =>
@@ -231,6 +233,28 @@ describe("StudioAutosaveOpfsSession", () => {
     journal.now = 100_000;
     await target.write(payload("2026-07-30T01:02:00.000Z", "third"));
     expect(journal.acquireCount).toBe(2);
+  });
+
+  it("closes admission before waiting for an in-flight checkpoint during disposal", async () => {
+    const journal = new FakeAutosaveJournal();
+    let releaseAppend!: () => void;
+    journal.appendGate = new Promise<void>((resolve) => {
+      releaseAppend = resolve;
+    });
+    const target = session(journal);
+    const inFlight = target.write(payload("2026-07-30T01:00:00.000Z", "first"));
+    await vi.waitFor(() => expect(journal.acquireCount).toBe(1));
+
+    const disposal = target.dispose();
+    await expect(
+      target.write(payload("2026-07-30T01:01:00.000Z", "stale")),
+    ).rejects.toThrow("OPFS 자동저장 세션이 이미 종료되었습니다.");
+    releaseAppend();
+    await inFlight;
+    await disposal;
+
+    expect(journal.entries).toHaveLength(1);
+    expect(journal.releaseCount).toBe(1);
   });
 });
 

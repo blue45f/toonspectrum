@@ -1,4 +1,4 @@
-import { Droplets, Eraser, LockKeyhole, Paintbrush, Waves } from "lucide-react";
+import { Droplets, Eraser, LockKeyhole, Paintbrush, Power, Waves } from "lucide-react";
 
 import { STUDIO_WASH_INK_PRODUCT_LABEL_KO } from "./studio-brush-behavior-ui";
 import { DEFAULT_STUDIO_LIVING_INK_MATERIAL_CONTROLS } from "./studio-living-ink-gpu-protocol";
@@ -18,6 +18,8 @@ const WASH = STUDIO_WASH_INK_PRODUCT_LABEL_KO;
 
 export interface StudioLivingInkControlsProps {
   readonly supported: boolean;
+  readonly physicalModeEnabled: boolean;
+  readonly onPhysicalModeEnabledChange: (enabled: boolean) => void;
   readonly state: StudioLivingInkStudioState;
   readonly mode: StudioLivingInkStrokeMode;
   readonly onModeChange: (mode: StudioLivingInkStrokeMode) => void;
@@ -50,6 +52,8 @@ function stateLabel(state: StudioLivingInkStudioState): string {
 
 export function StudioLivingInkControls({
   supported,
+  physicalModeEnabled,
+  onPhysicalModeEnabledChange,
   state,
   mode,
   onModeChange,
@@ -68,17 +72,47 @@ export function StudioLivingInkControls({
 }: StudioLivingInkControlsProps) {
   if (!supported) return null;
   const ready = state === "ready" && !busy;
+  const physicalBrushReady = ready && physicalModeEnabled;
   const selectionScopeDisabled = !selectionAvailable;
   return (
     <div
       data-studio-living-ink-controls="true"
       data-studio-living-ink-state={state}
+      data-studio-living-ink-physical-mode={physicalModeEnabled ? "enabled" : "disabled"}
       data-studio-brush-behavior="wash"
       className="flex shrink-0 items-center gap-1 rounded-xl border border-line/70 bg-card/70 px-1 py-0.5"
     >
       <span className="hidden select-none px-1 text-[0.55rem] font-bold tracking-tight text-fg-3 sm:inline">
         {WASH}
       </span>
+      <StudioToolHintTarget
+        hint={studioToolHintFromLabel(
+          `${WASH} 물리 모드`,
+          physicalModeEnabled
+            ? "전체 물·안료 시뮬레이션을 사용합니다. 끄면 각 획이 다른 브러시처럼 독립된 빠른 레이어로 저장됩니다."
+            : "기본값은 빠른 독립 획입니다. 물·안료가 이전 획과 계속 섞이는 전용 표면이 필요할 때만 물리 모드를 켜세요.",
+          undefined,
+          "ink",
+        )}
+      >
+        <button
+          type="button"
+          data-studio-living-ink-physical-toggle="true"
+          disabled={busy}
+          aria-pressed={physicalModeEnabled}
+          aria-label={`${WASH} 물리 모드`}
+          onClick={() => onPhysicalModeEnabledChange(!physicalModeEnabled)}
+          className={cn(
+            buttonClass,
+            physicalModeEnabled
+              ? "border-accent/60 bg-accent-soft text-accent"
+              : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg",
+            busy && "cursor-not-allowed opacity-45",
+          )}
+        >
+          <Power size={14} aria-hidden />
+        </button>
+      </StudioToolHintTarget>
       <div
         role="group"
         aria-label={`${WASH} 도구`}
@@ -101,7 +135,7 @@ export function StudioLivingInkControls({
           >
             <button
               type="button"
-              disabled={!ready}
+              disabled={!physicalBrushReady}
               aria-pressed={mode === id}
               aria-label={`${WASH} ${label}`}
               onClick={() => onModeChange(id)}
@@ -110,7 +144,7 @@ export function StudioLivingInkControls({
                 mode === id
                   ? "border-accent/60 bg-accent-soft text-accent"
                   : "border-transparent text-fg-3 hover:bg-raised hover:text-fg",
-                !ready && "cursor-not-allowed opacity-45",
+                !physicalBrushReady && "cursor-not-allowed opacity-45",
               )}
             >
               <Icon size={15} aria-hidden />

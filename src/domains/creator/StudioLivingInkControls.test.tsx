@@ -11,6 +11,8 @@ afterEach(cleanup);
 function renderControls(overrides: Partial<Parameters<typeof StudioLivingInkControls>[0]> = {}) {
   const props: Parameters<typeof StudioLivingInkControls>[0] = {
     supported: true,
+    physicalModeEnabled: true,
+    onPhysicalModeEnabledChange: vi.fn(),
     state: "ready",
     mode: "ink",
     onModeChange: vi.fn(),
@@ -31,6 +33,16 @@ function renderControls(overrides: Partial<Parameters<typeof StudioLivingInkCont
 }
 
 describe("StudioLivingInkControls", () => {
+  it("defaults to independent strokes and requires a direct physical-mode opt-in", () => {
+    const { props } = renderControls({ physicalModeEnabled: false });
+    const toggle = screen.getByRole("button", { name: "수채 번짐 물리 모드" });
+    expect(toggle.getAttribute("aria-pressed")).toBe("false");
+    expect(screen.getByRole("button", { name: "수채 번짐 안료" }).hasAttribute("disabled"))
+      .toBe(true);
+    fireEvent.click(toggle);
+    expect(props.onPhysicalModeEnabledChange).toHaveBeenCalledWith(true);
+  });
+
   it("keeps Fix and persisted material controls truthfully disabled", () => {
     renderControls();
     expect(screen.getByRole("button", { name: "수채 번짐 정착" }).hasAttribute("disabled")).toBe(true);

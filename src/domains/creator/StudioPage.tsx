@@ -804,6 +804,11 @@ import {
   studioLiveWetInkOverlaySupportsElement,
 } from "./studio-live-wet-ink-overlay";
 import {
+  studioLivingInkAdmitsBrush,
+  studioLivingInkExplicitBrushKey,
+  studioLivingInkSupportsExplicitBrush,
+} from "./studio-living-ink-brush-admission";
+import {
   createStudioLivingInkCanonicalTransaction,
   studioLivingInkReceiptReplayToken,
   verifyStudioLivingInkCanonicalImageAuthority,
@@ -825,6 +830,7 @@ import {
 } from "./studio-living-ink-overlay";
 import {
   studioLivingInkCanReuseAcceptedAuthority,
+  studioLivingInkEffectiveScope,
   studioLivingInkFailureDisposition,
   studioLivingInkProductAdmissionBlocked,
   type StudioLivingInkAcceptedAuthority,
@@ -1888,34 +1894,19 @@ type StudioLivingInkCanonicalHandoff = Readonly<{
   strokeId: string | null;
 }>;
 
-const STUDIO_LIVING_INK_BRUSH_IDS = new Set([
-  "watercolor",
-  "ink-wash",
-  "sumi",
-  "sumi-e",
-  "watercolor-flat-wash",
-  "watercolor-wet-wash",
-  "watercolor-edge-stain",
-  "watercolor-dry-granule",
-  "watercolor-backrun-ring",
-]);
-
-function studioLivingInkSupportsBrush(
-  brushId: string | null | undefined,
-  catalogId: string | null | undefined,
+function studioLivingInkSupportsElement(
+  element: DrawEl,
+  physicalModeEnabled: boolean,
 ): boolean {
-  return [brushId, catalogId]
-    .filter((value): value is string => typeof value === "string")
-    .map((value) => value.toLowerCase())
-    .some((id) => STUDIO_LIVING_INK_BRUSH_IDS.has(id) || /(?:watercolor|ink-wash|sumi)/u.test(id));
-}
-
-function studioLivingInkSupportsElement(element: DrawEl): boolean {
   return element.mode === "pen"
     && (element.kind ?? "freehand") === "freehand"
     && !element.fill
     && (element.symmetry?.type ?? "none") === "none"
-    && studioLivingInkSupportsBrush(element.brush, element.brushCatalogId);
+    && studioLivingInkAdmitsBrush({
+      brushId: element.brush,
+      catalogId: element.brushCatalogId,
+      physicalModeEnabled,
+    });
 }
 
 function studioLivingInkLinearColor(value: string): readonly [number, number, number, number] | null {
@@ -11356,6 +11347,13 @@ function StudioCuttoonEditor() {
   const [livingInkState, setLivingInkState] = useState<StudioLivingInkStudioState>("unavailable");
   const [livingInkStateMessage, setLivingInkStateMessage] = useState<string | undefined>();
   const [livingInkMode, setLivingInkMode] = useState<StudioLivingInkStrokeMode>("ink");
+  const [livingInkPhysicalBrushKey, setLivingInkPhysicalBrushKey] = useState<string | null>(null);
+  const currentLivingInkExplicitBrushKey = studioLivingInkExplicitBrushKey(
+    brush,
+    activeCatalogBrush.id,
+  );
+  const livingInkPhysicalModeEnabled = currentLivingInkExplicitBrushKey !== null
+    && livingInkPhysicalBrushKey === currentLivingInkExplicitBrushKey;
   const [livingInkScope, setLivingInkScope] = useState<"all" | "selection">("all");
   const [livingInkMaterial, setLivingInkMaterial] = useState<StudioLivingInkMaterialControls>(
     () => ({ ...DEFAULT_STUDIO_LIVING_INK_MATERIAL_CONTROLS }),
@@ -11653,7 +11651,7 @@ function StudioCuttoonEditor() {
         hasActiveStroke: Boolean(livingInkStrokeRef.current),
         hasCanonicalHandoff: Boolean(livingInkCanonicalHandoffRef.current),
       })
-      || !studioLivingInkSupportsElement(element)
+      || !studioLivingInkSupportsElement(element, livingInkPhysicalModeEnabled)
       || quickShapeActive
       || postCorrection > 0
       || masterEditMode
@@ -11663,10 +11661,14 @@ function StudioCuttoonEditor() {
     ) return false;
     if (pendingStrokeCommitsRef.current && !flushPendingStrokeCommitsRef.current()) return false;
     const fieldScale = config.fieldWidth / CANVAS_W;
-    const selection = livingInkScope === "selection"
+    const scope = studioLivingInkEffectiveScope(
+      livingInkScope,
+      livingInkSelectionAvailable(),
+    );
+    const selection = scope === "selection"
       ? livingInkSelectionSnapshot(config)
       : null;
-    if (livingInkScope === "selection" && !selection) return false;
+    if (scope === "selection" && !selection) return false;
     // Dual-wield routing: pen draws ink, a finger after the pen has been seen draws water, and
     // the barrel button swaps momentarily — all without touching the toolbar.
     livingInkInputRoutingRef.current = withPencilSeen(
@@ -11768,6 +11770,21 @@ function StudioCuttoonEditor() {
       && element.livingInkReceipt?.pageId === activePage.id
     );
     const receipt = canonicalImage?.livingInkReceipt;
+    if (!receipt && !livingInkPhysicalModeEnabled) {
+      livingInkAuthorityVerificationEpochRef.current += 1;
+      livingInkAuthorityVerificationAbortRef.current?.abort();
+      livingInkAuthorityVerificationAbortRef.current = null;
+      livingInkAcceptedAuthorityRef.current = null;
+      livingInkRejectedAuthorityRef.current = null;
+      livingInkConfigRef.current = null;
+      // Turning the explicit mode off also revokes an activation that may still be creating its
+      // Worker/provider. Coordinator epochs make a late activation dispose itself instead of
+      // publishing `ready` over this unavailable state.
+      void livingInkCoordinatorRef.current.dispose();
+      setLivingInkState("unavailable");
+      setLivingInkStateMessage("물리 번짐을 직접 켜면 전용 표면을 준비합니다.");
+      return;
+    }
     const freshPlan = planStudioLivingInkProductExecutionConfig({
       documentWidth: CANVAS_W,
       documentHeight: canvasH,
@@ -11905,6 +11922,7 @@ function StudioCuttoonEditor() {
     canvasH,
     livingInkCanonicalSrc,
     livingInkMaterial,
+    livingInkPhysicalModeEnabled,
     livingInkReplayToken,
   ]);
 
@@ -30022,7 +30040,7 @@ const puppetWarpArmed =
         pointerId: Math.max(0, pointerSample.pointerId),
         strokeEpoch: studioStrokeSurfaceEpochRef.current++,
         livingInk: {
-          eligible: studioLivingInkSupportsElement(next),
+          eligible: studioLivingInkSupportsElement(next, livingInkPhysicalModeEnabled),
           providerState: livingInkState,
           capabilitiesAccepted: livingInkState === "ready",
           admitted: livingInkAdmitted,
@@ -30059,7 +30077,7 @@ const puppetWarpArmed =
             pointerId: Math.max(0, pointerSample.pointerId),
             strokeEpoch: Math.max(0, studioStrokeSurfaceEpochRef.current - 1),
             livingInk: {
-              eligible: studioLivingInkSupportsElement(next),
+              eligible: studioLivingInkSupportsElement(next, livingInkPhysicalModeEnabled),
               providerState: livingInkState,
               capabilitiesAccepted: livingInkState === "ready",
               admitted: false,
@@ -33829,7 +33847,11 @@ const puppetWarpArmed =
         livingInkAcceptedAuthorityRef.current = committedAuthority;
       }
       if (currentPageIdRef.current === state.pageId) {
-        setSelectedId(transaction.transaction.selectionId);
+        // Selecting the full-page canonical image opens image chrome, shifts the viewport, and
+        // makes the pointer-up handoff look like a geometry jump. Keep the drawing context stable;
+        // the artist can explicitly select the materialized layer afterward.
+        setSelectedId(null);
+        setLivingInkScope("all");
       }
       announceDrawingShortcut("수채 번짐 · 입력·놓을 때 물리 계산, 손을 떼면 2초 고정 settle");
       // The exact live pixels stay visible until StudioKonvaImageNode synchronously draws the same
@@ -39865,8 +39887,12 @@ function clearSelectionForEdit() {
         hasCanonicalHandoff: Boolean(livingInkCanonicalHandoffRef.current),
       })
     ) return;
+    const scope = studioLivingInkEffectiveScope(
+      livingInkScope,
+      livingInkSelectionAvailable(),
+    );
     const livingInkClearRequest =
-      kind === "clear" && livingInkScope === "all" ? studioClearLivingInkRequest() : null;
+      kind === "clear" && scope === "all" ? studioClearLivingInkRequest() : null;
     if (livingInkClearRequest && !(await confirmStudioDestructiveAction(livingInkClearRequest))) {
       return;
     }
@@ -39883,10 +39909,10 @@ function clearSelectionForEdit() {
     const surface = livingInkOverlaySurfaceRef.current;
     const config = livingInkConfigRef.current;
     if (!surface || !config) return;
-    const selection = livingInkScope === "selection"
+    const selection = scope === "selection"
       ? livingInkSelectionSnapshot(config)
       : null;
-    if (livingInkScope === "selection" && !selection) {
+    if (scope === "selection" && !selection) {
       setError("현재 수채 번짐 레이어에 사용할 수 있는 픽셀 선택이 없습니다.");
       return;
     }
@@ -39898,7 +39924,7 @@ function clearSelectionForEdit() {
       work = await livingInkCoordinatorRef.current.applyAction({
         routeKey,
         kind,
-        scope: livingInkScope,
+        scope,
         selection,
       });
       const presentation = await surface.renderer.presentCanonical(
@@ -39983,7 +40009,7 @@ function clearSelectionForEdit() {
       }
       setSelectedId(transaction.transaction.selectionId);
       announceDrawingShortcut(
-        `수채 번짐 · ${livingInkScope === "selection" ? "선택 영역" : "전체"} ${kind === "fix" ? "정착" : "지우기"}`,
+        `수채 번짐 · ${scope === "selection" ? "선택 영역" : "전체"} ${kind === "fix" ? "정착" : "지우기"}`,
       );
     } catch (cause) {
       if (work && !transactionCommitted) {
@@ -40081,6 +40107,11 @@ function clearSelectionForEdit() {
     },
     setDrawShape,
     setLivingInkMode,
+    setLivingInkPhysicalModeEnabled: (enabled) => {
+      setLivingInkPhysicalBrushKey(
+        enabled ? currentLivingInkExplicitBrushKey : null,
+      );
+    },
     setLivingInkScope,
     setPostCorrection,
     setPressureCurvePreset: (id) => setPressureCurve(pressureCurveValueForPreset(id)),
@@ -40137,7 +40168,14 @@ function clearSelectionForEdit() {
     element.type === "image" && element.livingInkReceipt?.pageId === activePage.id
   );
   const livingInkSelectionReady = livingInkSelectionAvailable();
-  const livingInkBrushSupported = studioLivingInkSupportsBrush(brush, activeCatalogBrush.id);
+  const livingInkEffectiveScope = studioLivingInkEffectiveScope(
+    livingInkScope,
+    livingInkSelectionReady,
+  );
+  const livingInkBrushSupported = studioLivingInkSupportsExplicitBrush(
+    brush,
+    activeCatalogBrush.id,
+  );
   const studioOptionsBarsDrawModel = useMemo<StudioOptionsBarsDrawModel>(
     () => ({
       visible: tool === "draw" && !canvasOnlyMode,
@@ -40183,9 +40221,10 @@ function clearSelectionForEdit() {
       favoriteBrushIds: proDrawPrefs.favoriteBrushIds,
       livingInk: {
         supported: livingInkBrushSupported,
+        physicalModeEnabled: livingInkPhysicalModeEnabled,
         state: livingInkState,
         mode: livingInkMode,
-        scope: livingInkSelectionReady ? livingInkScope : "all",
+        scope: livingInkEffectiveScope,
         selectionAvailable: livingInkSelectionReady,
         busy: livingInkBusy,
         fixAvailable: livingInkPersistedLayer && livingInkState === "ready",
@@ -40236,8 +40275,9 @@ function clearSelectionForEdit() {
       livingInkBusy,
       livingInkMaterial,
       livingInkMode,
+      livingInkPhysicalModeEnabled,
       livingInkPersistedLayer,
-      livingInkScope,
+      livingInkEffectiveScope,
       livingInkSelectionReady,
       livingInkState,
       livingInkStateMessage,
@@ -42513,6 +42553,8 @@ function clearSelectionForEdit() {
           isMobile={isMobile}
           livingInk={{
             ...studioOptionsBarsDrawModel.livingInk,
+            onPhysicalModeEnabledChange:
+              studioOptionsBarsHandlers.setLivingInkPhysicalModeEnabled,
             onModeChange: studioOptionsBarsHandlers.setLivingInkMode,
             onScopeChange: studioOptionsBarsHandlers.setLivingInkScope,
             onFix: studioOptionsBarsHandlers.applyLivingInkFix,

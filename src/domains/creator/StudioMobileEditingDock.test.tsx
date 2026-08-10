@@ -218,6 +218,8 @@ function createProps(
     isMobile: false,
     livingInk: {
       supported: false,
+      physicalModeEnabled: false,
+      onPhysicalModeEnabledChange: vi.fn(),
       state: "ready",
       mode: "ink",
       onModeChange: vi.fn(),
@@ -705,6 +707,7 @@ describe("StudioMobileEditingDock", () => {
           livingInk: {
             ...createProps().livingInk,
             supported: true,
+            physicalModeEnabled: true,
             fixAvailable: true,
             onModeChange,
             onFix,

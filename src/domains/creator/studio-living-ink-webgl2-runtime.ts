@@ -962,6 +962,8 @@ export class StudioLivingInkWebGl2Runtime {
   private disposed = false;
   private passCount = 0;
   private fixSelectionEnabled = false;
+  /** Avoid allocating and uploading a full 1024² mask for the overwhelmingly common no-selection stroke. */
+  private selectionTextureHasFullCoverage = true;
   /** Active brush footprint in field-cell space; radiusCells <= 0 disables scrubbing boost. */
   private brushFootprint: Readonly<{ x: number; y: number; radiusCells: number }> = Object.freeze({
     x: 0,
@@ -1176,6 +1178,7 @@ export class StudioLivingInkWebGl2Runtime {
     this.clearSurface(this.resources.divergence);
     this.clearSurface(this.resources.curl);
     this.clearSurface(this.resources.selection, 1);
+    this.selectionTextureHasFullCoverage = true;
     this.dirtyBounds = null;
     this.lastInkMark = null;
   }
@@ -1184,6 +1187,7 @@ export class StudioLivingInkWebGl2Runtime {
     const gl = this.gl;
     const width = this.config.fieldWidth;
     const height = this.config.fieldHeight;
+    if (!selection && this.selectionTextureHasFullCoverage) return false;
     const pixels = new Uint8Array(width * height);
     if (!selection) {
       pixels.fill(255);
@@ -1203,6 +1207,7 @@ export class StudioLivingInkWebGl2Runtime {
     gl.bindTexture(gl.TEXTURE_2D, this.resources.selection.texture);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, width, height, gl.RED, gl.UNSIGNED_BYTE, pixels);
+    this.selectionTextureHasFullCoverage = selection === null;
     return selection !== null;
   }
 

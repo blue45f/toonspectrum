@@ -196,6 +196,8 @@ function omitRepeatedAnchor<Operation extends StudioLivingInkDepositOperation | 
 export class StudioLivingInkStudioCoordinator {
   readonly #options: StudioLivingInkStudioCoordinatorOptions;
   #provider: StudioLivingInkCoordinatorProvider | null = null;
+  /** Provider owned while persisted operations are replaying but before authority is accepted. */
+  #activatingProvider: StudioLivingInkCoordinatorProvider | null = null;
   #config: StudioLivingInkExecutionConfig | null = null;
   #pageId: string | null = null;
   #state: StudioLivingInkStudioState = "unavailable";
@@ -242,6 +244,7 @@ export class StudioLivingInkStudioCoordinator {
   }>): Promise<boolean> {
     const epoch = ++this.#epoch;
     const previous = this.#provider;
+    const previousActivating = this.#activatingProvider;
     const previousQueue = this.#queue;
     if (this.#active) {
       this.#active.failed ??= new DOMException(
@@ -250,6 +253,7 @@ export class StudioLivingInkStudioCoordinator {
       );
     }
     this.#provider = null;
+    this.#activatingProvider = null;
     this.#active = null;
     this.#pendingActionRouteKey = null;
     this.#interactivePresentationGeneration += 1;
@@ -262,7 +266,11 @@ export class StudioLivingInkStudioCoordinator {
     // page switch indefinitely. The detached queue keeps its own rejection handler and closes any
     // late fake/test frame through the stale-owner guard in #enqueueOperation.
     void previousQueue.catch(() => undefined);
-    await previous?.dispose().catch(() => undefined);
+    await Promise.all(
+      [...new Set([previous, previousActivating].filter(
+        (provider): provider is StudioLivingInkCoordinatorProvider => provider !== null,
+      ))].map((provider) => provider.dispose().catch(() => undefined)),
+    );
     if (epoch !== this.#epoch) return false;
     this.#queue = Promise.resolve();
     const normalized = normalizeJournal(input.journal ?? []);
@@ -281,6 +289,7 @@ export class StudioLivingInkStudioCoordinator {
         await provider.dispose();
         return false;
       }
+      this.#activatingProvider = provider;
       for (let index = 0; index < normalized.length; index += 1) {
         const operation = normalized[index]!;
         const applied = await provider.apply(operation, {
@@ -293,6 +302,7 @@ export class StudioLivingInkStudioCoordinator {
           simulationTicks: operation.kind === "advance" ? operation.fixedTicks : undefined,
           present: false,
         });
+        if (epoch !== this.#epoch || this.#activatingProvider !== provider) return false;
         const ack = requireSimulationAck(applied);
         if (ack.operationKind !== operation.kind || ack.revision !== index + 1) {
           throw new Error("Living Ink replay acknowledgement did not match the journal sequence.");
@@ -300,6 +310,10 @@ export class StudioLivingInkStudioCoordinator {
       }
       if (input.expectedFinalReceipt) {
         const replayFrame = await provider.render("composite");
+        if (epoch !== this.#epoch || this.#activatingProvider !== provider) {
+          replayFrame.image.close();
+          return false;
+        }
         const accepted = replayFrame.receipt.engineVersion === input.expectedFinalReceipt.engineVersion
           && replayFrame.receipt.displaySha256 === input.expectedFinalReceipt.displaySha256
           && replayFrame.receipt.operationSha256 === input.expectedFinalReceipt.operationSha256
@@ -311,10 +325,8 @@ export class StudioLivingInkStudioCoordinator {
           );
         }
       }
-      if (epoch !== this.#epoch) {
-        await provider.dispose();
-        return false;
-      }
+      if (epoch !== this.#epoch || this.#activatingProvider !== provider) return false;
+      this.#activatingProvider = null;
       this.#provider = provider;
       candidate = null;
       this.#committedJournal = normalized;
@@ -325,7 +337,10 @@ export class StudioLivingInkStudioCoordinator {
       this.#setState("ready");
       return true;
     } catch (cause) {
-      await candidate?.dispose().catch(() => undefined);
+      if (candidate && this.#activatingProvider === candidate) {
+        this.#activatingProvider = null;
+        await candidate.dispose().catch(() => undefined);
+      }
       if (epoch === this.#epoch) {
         this.#provider = null;
         this.#committedJournal = [];
@@ -681,12 +696,18 @@ export class StudioLivingInkStudioCoordinator {
     this.#active = null;
     this.#pendingActionRouteKey = null;
     const provider = this.#provider;
+    const activatingProvider = this.#activatingProvider;
     const queue = this.#queue;
     this.#provider = null;
-    this.#setState("failed", message);
-    await provider?.dispose().catch(() => undefined);
-    void queue.catch(() => undefined);
+    this.#activatingProvider = null;
     this.#queue = Promise.resolve();
+    this.#setState("failed", message);
+    void queue.catch(() => undefined);
+    await Promise.all(
+      [...new Set([provider, activatingProvider].filter(
+        (candidate): candidate is StudioLivingInkCoordinatorProvider => candidate !== null,
+      ))].map((candidate) => candidate.dispose().catch(() => undefined)),
+    );
   }
 
   async dispose(): Promise<void> {
@@ -697,17 +718,26 @@ export class StudioLivingInkStudioCoordinator {
     this.#active = null;
     this.#pendingActionRouteKey = null;
     const provider = this.#provider;
+    const activatingProvider = this.#activatingProvider;
     const queue = this.#queue;
     this.#provider = null;
+    this.#activatingProvider = null;
     this.#pageId = null;
     this.#config = null;
     this.#committedJournal = [];
     this.#committedReceipt = null;
     this.#workingJournal = [];
     this.#capacityDiagnostic = null;
-    this.#setState("unavailable");
-    await provider?.dispose().catch(() => undefined);
-    void queue.catch(() => undefined);
+    // Detach stale work synchronously. A rapid off/on cycle may start a new activation while the
+    // previous provider is still terminating; no late disposal continuation may reset that new
+    // activation's queue.
     this.#queue = Promise.resolve();
+    this.#setState("unavailable");
+    void queue.catch(() => undefined);
+    await Promise.all(
+      [...new Set([provider, activatingProvider].filter(
+        (candidate): candidate is StudioLivingInkCoordinatorProvider => candidate !== null,
+      ))].map((candidate) => candidate.dispose().catch(() => undefined)),
+    );
   }
 }

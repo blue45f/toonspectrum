@@ -69,6 +69,8 @@ describe("Living Ink actual execution boundary", () => {
     expect(runtime.match(/this\.syncDoubleDirty\(/g)?.length).toBeGreaterThanOrEqual(6);
     expect(runtime).toContain("this.advanceDirtyHalo();");
     expect(runtime).toContain("height - 1 - (selection.bounds.y + row)");
+    expect(runtime).toContain("if (!selection && this.selectionTextureHasFullCoverage) return false;");
+    expect(runtime).toContain("this.selectionTextureHasFullCoverage = selection === null;");
     expect(runtime).toContain("accepted = clamp(settle * coverage");
     expect(runtime).toContain("strokeDeposit");
     expect(runtime).toContain("MERGE_DEPOSIT_FRAGMENT");
