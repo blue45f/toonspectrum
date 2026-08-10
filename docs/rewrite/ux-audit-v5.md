@@ -212,7 +212,7 @@
 
 리졸브 시점은 **프로파일을 적용하는 순간 하나뿐**이다(`StudioPage.tsx` `applyStudioWorkspaceLayout`). 매 입력마다 다시 판정하면 작가가 키보드에 손을 뻗었다는 이유로 도크가 재배치되고, 마운트 시점에 리졸브하면 자동저장이 장치 해석본을 작가가 authoring한 레이아웃으로 되써버린다. 저장 권위는 계속 authored 쪽에 있고 화면만 적응한다.
 
-§15.2 12축 중 **Vector Design·Animation·Pose & 3D 3종은 여전히 부재**다. 프로파일이 지정할 수 있는 축(인스펙터 섹션·도크·팔레트·퀵액션)에 배치할 표면 자체가 없다 — 벡터 인스펙터 섹션이 없고, 타임라인과 3D/VRM은 워크스페이스가 이름 붙일 수 없는 독립 화면이다.
+**재측정(최종 소스)** — `vector-design`·`animation`·`pose-3d`를 추가해 V5 카탈로그 12축을 모두 서로 다른 실제 기본 작업공간에 매핑했다. 전체 built-in은 15개이며, 카탈로그 부재 목록은 빈 배열이다. 세 전문 작업공간은 도크 배치만 바꾸지 않는다. `StudioPage.applyStudioWorkspaceLaunchSurface`가 Vector Design에서 도형 도구와 레이어/변형 인스펙터를, Animation에서 타임라인과 어니언 스킨을, Pose & 3D에서 실제 데생 인형 포저를 연다. 메뉴 전환·저장본 재적용·활성 작업공간 삭제 후 폴백·초기 hydration 모두 workspace ID를 이 경계까지 전달한다. `studio-workspace-specialist-launch-boundary.test.ts`가 이 제품 배선을 고정한다.
 
 `StudioCompanionWorkspacePresets.tsx:26,34,42,50`의 4개(`draw`·`navigate`·`review`·`reference`)는 멀티 디스플레이 보조창 전용이라 §15.2 프로파일이 아니다.
 

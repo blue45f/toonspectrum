@@ -200,6 +200,25 @@ describe("StudioAppSettingsPanel", () => {
     );
   });
 
+  it("SQLite/OPFS hydration이 끝나기 전에는 저장 완료로 표시하지 않는다", () => {
+    const body = { nodeName: "BODY" };
+    vi.stubGlobal("document", { body });
+    const html = renderToStaticMarkup(
+      <StudioAppSettingsPanel
+        open
+        settings={defaultStudioAppSettings()}
+        persistenceState="loading"
+        onClose={() => undefined}
+        onChange={() => undefined}
+        onResetAll={() => undefined}
+      />
+    );
+
+    expect(html).toContain('data-studio-app-settings-persistence="loading"');
+    expect(html).toContain("SQLite/OPFS에서 설정을 확인하는 중입니다.");
+    expect(html).not.toContain("변경 내용은 이 기기에 자동 저장됩니다.");
+  });
+
   it("가로형 터치 화면에서도 툴바 설정의 모든 핵심 조작을 44px 이상으로 유지한다", () => {
     const defaults = defaultStudioAppSettings();
     const settings: StudioAppSettings = {

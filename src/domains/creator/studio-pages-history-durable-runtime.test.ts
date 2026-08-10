@@ -1,6 +1,7 @@
 import { IDBFactory } from "fake-indexeddb";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { SqliteUnavailableError } from "./studio-local-database";
 import {
   createStudioPagesHistoryCommandJournal,
   type StudioHistoryJournalNavigationTarget,
@@ -8,6 +9,7 @@ import {
 import {
   createDefaultStudioPagesHistoryDurableRuntime,
   createStudioPagesHistoryIndexedDbRecoveryVault,
+  StudioPagesHistoryDurabilityUnavailableError,
   StudioPagesHistoryDurableRuntime,
 } from "./studio-pages-history-durable-runtime";
 
@@ -137,13 +139,20 @@ afterEach(() => {
 });
 
 describe("Studio pages history durable runtime", () => {
-  it("keeps the default client runtime available through the IndexedDB fallback without OPFS", async () => {
+  it("uses explicit memory-only state without opening IndexedDB when SQLite and OPFS are unavailable", async () => {
+    const indexedDB = new IDBFactory();
+    const indexedDbOpen = vi.spyOn(indexedDB, "open");
+    const onError = vi.fn();
+    const onDurabilityStatus = vi.fn();
     const runtime = await createDefaultStudioPagesHistoryDurableRuntime(
       {
         initialTarget: target(0),
+        openDatabase: () => Promise.reject(new SqliteUnavailableError("OPFS SAH pool unavailable")),
+        onError,
+        onDurabilityStatus,
       },
       {
-        indexedDB: new IDBFactory(),
+        indexedDB,
         navigator: { storage: {} },
         crypto: {
           randomUUID: () => "11111111-1111-4111-8111-111111111111",
@@ -156,7 +165,58 @@ describe("Studio pages history durable runtime", () => {
     expect(runtime.replayPlan()).toMatchObject({
       recordCount: 1,
     });
-    runtime.dispose();
+    expect(runtime.persistenceKind).toBe("memory-only");
+    expect(runtime.durabilityStatus()).toMatchObject({
+      state: "memory-only",
+      durable: false,
+      retryable: true,
+      cause: expect.any(StudioPagesHistoryDurabilityUnavailableError),
+    });
+    expect(onError).toHaveBeenCalledOnce();
+    expect(onError.mock.calls[0]?.[0]).toBeInstanceOf(
+      StudioPagesHistoryDurabilityUnavailableError,
+    );
+    expect(onDurabilityStatus).toHaveBeenLastCalledWith(
+      expect.objectContaining({ state: "memory-only", durable: false }),
+    );
+    expect(indexedDbOpen).not.toHaveBeenCalled();
+    await runtime.close();
+  });
+
+  it("uses IndexedDB only when a caller passes the explicit legacy recovery vault", async () => {
+    const indexedDB = new IDBFactory();
+    const indexedDbOpen = vi.spyOn(indexedDB, "open");
+    const vault = createStudioPagesHistoryIndexedDbRecoveryVault({
+      identity: {
+        documentId: "history-legacy-opt-in",
+        documentVersion: 1,
+        engineVersion: "studio-pages-history-command-journal-1",
+      },
+      indexedDB,
+      randomToken: () => "legacy-opt-in-token",
+    });
+    const runtime = await createDefaultStudioPagesHistoryDurableRuntime(
+      {
+        initialTarget: target(0),
+        preferSqlite: false,
+        legacyRecoveryVault: vault,
+      },
+      {
+        navigator: { storage: {} },
+        crypto: {
+          randomUUID: () => "22222222-2222-4222-8222-222222222222",
+        },
+      },
+    );
+
+    runtime.recordTransition(transition(0, 1));
+    await runtime.flush();
+    expect(runtime.durabilityStatus()).toMatchObject({
+      state: "durable",
+      persistenceKind: "legacy-indexeddb",
+    });
+    expect(indexedDbOpen).toHaveBeenCalled();
+    await runtime.close();
   });
 
   it("keeps history synchronous while serializing one command stream to one backend", async () => {
@@ -209,6 +269,7 @@ describe("Studio pages history durable runtime", () => {
     const onError = vi.fn();
     const recovery = new FakeRecovery();
     const commandJournal = createStudioPagesHistoryCommandJournal();
+    const onDurabilityStatus = vi.fn();
     const runtime = new StudioPagesHistoryDurableRuntime({
       commandJournal,
       recovery,
@@ -216,6 +277,8 @@ describe("Studio pages history durable runtime", () => {
       pageId: "page-history",
       eventTarget: null,
       onError,
+      onDurabilityStatus,
+      persistenceKind: "native-opfs",
     });
 
     runtime.rebase(target(1));
@@ -229,6 +292,19 @@ describe("Studio pages history durable runtime", () => {
 
     expect(onError).toHaveBeenCalledOnce();
     expect(onError).toHaveBeenCalledWith(failure);
+    expect(onDurabilityStatus).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ state: "durable", persistenceKind: "native-opfs" }),
+    );
+    expect(onDurabilityStatus).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ state: "memory-only", cause: failure }),
+    );
+    expect(runtime.durabilityStatus()).toMatchObject({
+      state: "memory-only",
+      retryable: true,
+      cause: failure,
+    });
     expect(recovery.commands).toHaveLength(1);
     expect(commandJournal.replayPlan().recordCount).toBeGreaterThan(1);
   });

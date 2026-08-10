@@ -120,6 +120,24 @@ afterEach(() => {
 });
 
 describe("Studio tools companion multi-window integration", () => {
+  it("propagates transient presentation-safe state between two companion windows", async () => {
+    const storageRead = vi.spyOn(Storage.prototype, "getItem");
+    const storageWrite = vi.spyOn(Storage.prototype, "setItem");
+    const workspaceView = renderCompanion("workspace");
+    const navigatorView = renderCompanion("navigator");
+    const workspace = within(workspaceView.container);
+    const navigator = within(navigatorView.container);
+
+    fireEvent.click(workspace.getByRole("button", { name: "발표 안전 켜기" }));
+
+    await waitFor(() => {
+      expect(workspace.getByRole("button", { name: "발표 안전 끄기" })).toBeTruthy();
+      expect(navigator.getByRole("button", { name: "발표 안전 끄기" })).toBeTruthy();
+    });
+    expect(storageRead).not.toHaveBeenCalled();
+    expect(storageWrite).not.toHaveBeenCalled();
+  });
+
   it("keeps workspace, Navigator, and Review concurrently bound through one primary runtime", async () => {
     const onCommand = vi.fn();
     const onControl = vi.fn();

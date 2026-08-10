@@ -1,0 +1,214 @@
+{
+  "schema": "toonspectrum-v12-runtime-fault-matrix",
+  "version": 1,
+  "authority": "docs/architecture/ToonStudio_Vello차세대엔진_공격적활용_CSP초월_인플레이스최종아키텍처_V12_2026-08-08.md §17",
+  "runner": "vitest-node with production state machines, sqlite-wasm memory VFS, and deterministic injected boundaries",
+  "measured": {
+    "deviceLoss": {
+      "fabricCycles": 100,
+      "fabricNotifications": 100,
+      "isolatedThrowingListenerCalls": 100,
+      "detachedListenerCalls": 50,
+      "uniqueDeviceEpochs": 100,
+      "recoveryCycles": 100,
+      "recoveryDiscards": 100,
+      "tournamentKills": 100,
+      "tournamentRevives": 100,
+      "permanentDemotions": 0,
+      "stagedCommands": 100,
+      "replayedCommands": 100,
+      "duplicateReplays": 0,
+      "lostCommands": 0,
+      "staleLossSignalsAccepted": 0,
+      "pendingTimers": 0,
+      "activeLeasesAfterLoss": 0,
+      "pendingLossPromises": 0
+    },
+    "workerTermination": {
+      "cycles": 1000,
+      "failedClosed": 1000,
+      "terminateCalls": 1000,
+      "acceptedPrefixesPreserved": 1000,
+      "staleMessagesAttempted": 1000,
+      "staleMessagesApplied": 0,
+      "duplicateAcceptedCommits": 0,
+      "pendingListeners": 0,
+      "pendingTimers": 0,
+      "openPointerRings": 0,
+      "pendingReadyPromises": 0
+    },
+    "queueCompletionInversion": {
+      "flights": 64,
+      "queueWrites": 64,
+      "reverseCompletions": 64,
+      "uploadedCurrentGeneration": 1,
+      "rejectedStaleGenerations": 63,
+      "staleResultsApplied": 0,
+      "completionOrderViolations": 0,
+      "pendingFlightPromises": 0
+    },
+    "journalRecovery": {
+      "crashReopens": 64,
+      "acceptedEdits": 64,
+      "recoveredEdits": 64,
+      "lostAcceptedEdits": 0,
+      "duplicateJournalSequences": 0,
+      "recoveryIssues": 0,
+      "snapshotCheckpoints": 8,
+      "listenerNotifications": 64,
+      "digestMatches": 1
+    },
+    "storageFaults": {
+      "rejectedWrites": 1,
+      "rejectedWriteStateAdvances": 0,
+      "successfulSameSequenceRetries": 2,
+      "tornWrites": 1,
+      "crcCorruptionsDetected": 1,
+      "corruptSnapshotsRejected": 1,
+      "duplicateJournalSequences": 0,
+      "quotaRejections": 1,
+      "filesWrittenAfterQuotaReject": 0,
+      "atomicWriteRejections": 1,
+      "filesWrittenAfterWriteReject": 0,
+      "corruptBlobsDetected": 1,
+      "corruptBlobBytesApplied": 0
+    },
+    "collaboration": {
+      "offlineEdits": 1,
+      "durableOutboxRowsBeforeReconnect": 1,
+      "publicationsWhileOffline": 0,
+      "publicationAttempts": 2,
+      "retryMetadataRows": 1,
+      "stableUpdateIdsAcrossRetry": 1,
+      "stablePayloadsAcrossRetry": 1,
+      "authoritativeServerApplies": 1,
+      "durableOutboxRowsAfterAck": 0,
+      "convergedStateVectors": 1,
+      "lostAcceptedEdits": 0,
+      "duplicateServerCommits": 0,
+      "pendingTimersAfterClose": 0,
+      "pendingIntervalsAfterClose": 0,
+      "transportListenersAfterClose": 0
+    }
+  },
+  "simulated": [
+    {
+      "id": "gpu-device-loss",
+      "fault": "100 GPUDevice.lost resolutions plus 100 device-epoch recovery cycles",
+      "productionSubjects": [
+        "studio-gpu-fabric",
+        "studio-device-loss-recovery"
+      ],
+      "automation": "deterministic injected GPU/device promises and clock",
+      "proves": "epoch invalidation, listener isolation/detach, fallback tournament kill/revive, CPU staging replay, stale-generation rejection, and cleanup",
+      "doesNotClaim": "a physical adapter/driver reset or browser WebGPU implementation result"
+    },
+    {
+      "id": "provider-worker-termination",
+      "fault": "1000 abrupt Engine Worker error events after an accepted document command",
+      "productionSubjects": [
+        "studio-engine-worker-client",
+        "studio-shared-pointer-ring-buffer"
+      ],
+      "automation": "deterministic worker event boundary",
+      "proves": "fail-closed termination, accepted-prefix preservation, stale callback rejection, listener/timer/SAB-ring cleanup, and exactly-once terminate",
+      "doesNotClaim": "an operating-system kill of a browser DedicatedWorker process"
+    },
+    {
+      "id": "queue-submit-completion-inversion",
+      "fault": "64 queued WebGPU upload completion promises resolved in exact reverse order",
+      "productionSubjects": [
+        "studio-vrm-texture-paint-gpu-upload"
+      ],
+      "automation": "deterministic GPUQueue completion seam",
+      "proves": "only the current generation can publish and all 63 stale completions are rejected",
+      "doesNotClaim": "physical GPUQueue.submit reordering by a real driver"
+    },
+    {
+      "id": "tab-crash-journal-recovery",
+      "fault": "64 ungraceful CommandBus drops and reopens",
+      "productionSubjects": [
+        "CommandBus",
+        "SqliteJournalStore",
+        "sqlite-wasm"
+      ],
+      "automation": "new runtime instance over one real SQLite memory-VFS database",
+      "proves": "digest, sequence, snapshots, and every accepted edit survive without duplicate journal commits",
+      "doesNotClaim": "browser process kill plus OPFS fsync/power-loss durability"
+    },
+    {
+      "id": "storage-quota-write-rejection",
+      "fault": "quota reservation failure, atomic filesystem write rejection, and SQLite journal append rejection",
+      "productionSubjects": [
+        "studio-opfs-asset-store",
+        "studio-opfs-filesystem",
+        "SqliteJournalStore"
+      ],
+      "automation": "production estimator/filesystem/store injection seams",
+      "proves": "no partial file, no in-memory journal advance, and same-sequence retry",
+      "doesNotClaim": "exhaustion of a browser origin's physical OPFS quota"
+    },
+    {
+      "id": "corrupt-blob-crc",
+      "fault": "same-length CAS blob mutation, torn journal CRC, and corrupt snapshot slot",
+      "productionSubjects": [
+        "studio-opfs-asset-store",
+        "FaultInjectingJournalStore",
+        "SqliteJournalStore"
+      ],
+      "automation": "byte mutation and production CRC fault wrapper",
+      "proves": "hash verification rejects corrupt bytes, recovery truncates the torn tail, and the sibling snapshot wins",
+      "doesNotClaim": "naturally occurring disk bit rot on a physical volume"
+    },
+    {
+      "id": "network-offline-retry-outbox",
+      "fault": "offline edit, reconnect, one transient publish failure, and retry ACK",
+      "productionSubjects": [
+        "StudioLiveRoom",
+        "StudioCrdtRoomBinding",
+        "SqliteStudioCrdtOutbox",
+        "sqlite-wasm"
+      ],
+      "automation": "controlled server-transport boundary with real Room/Binding/SQLite outbox",
+      "proves": "offline durability, retry metadata, stable update identity/payload, authoritative convergence, exactly-once server apply, and cleanup",
+      "doesNotClaim": "a real Socket.IO/PostgreSQL/server network partition"
+    }
+  ],
+  "externalRequired": [
+    {
+      "id": "physical-webgpu-device-loss-100",
+      "status": "required-not-run",
+      "gate": "100 browser GPUDevice losses/reacquisitions on the release browser/device/driver matrix with visual parity and zero unreplayed commands"
+    },
+    {
+      "id": "dedicated-worker-process-kill-1000",
+      "status": "required-not-run",
+      "gate": "1000 real provider DedicatedWorker terminations under browser memory/listener instrumentation"
+    },
+    {
+      "id": "physical-gpu-submit-order-and-device-loss",
+      "status": "required-not-run",
+      "gate": "real GPUQueue.submit/onSubmittedWorkDone/device-loss races plus provider-destroys-texture-first, wrong-device texture, wrong usage, and wrong format validation"
+    },
+    {
+      "id": "browser-tab-process-crash-opfs",
+      "status": "required-not-run",
+      "gate": "kill/relaunch the browser tab/process over OPFS SQLite and verify journal digest after OS-level persistence boundaries"
+    },
+    {
+      "id": "physical-opfs-quota-and-bitrot",
+      "status": "required-not-run",
+      "gate": "exhaust a real browser origin quota and mutate/recover physical OPFS blobs without accepting corrupt content"
+    },
+    {
+      "id": "real-network-collaboration-partition",
+      "status": "required-not-run",
+      "gate": "Socket.IO/API/PostgreSQL disconnect, retry, duplicate ACK, server restart, and multi-client outbox convergence"
+    }
+  ],
+  "verdict": {
+    "automatedStateMachineGate": "pass",
+    "externalHardwareBrowserGate": "required-not-run",
+    "releaseGate": "not-satisfied-by-this-artifact-alone"
+  }
+}

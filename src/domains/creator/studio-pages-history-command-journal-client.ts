@@ -2,6 +2,10 @@ import type {
   StudioHistoryJournalNavigationTarget,
   StudioHistoryJournalTransitionInput,
 } from "./studio-pages-history-command-journal";
+import type {
+  StudioPagesHistoryDurabilityStatus,
+  StudioPagesHistoryPersistenceKind,
+} from "./studio-pages-history-durable-runtime";
 
 export type {
   StudioHistoryJournalNavigationTarget,
@@ -28,18 +32,43 @@ interface StudioPagesHistoryCommandJournalRuntime {
   rebase(target: StudioHistoryJournalNavigationTarget): void;
   reset(): void;
   dispose?(): void;
+  close?(): Promise<void>;
+  durabilityStatus?(): StudioPagesHistoryDurabilityStatus;
 }
+
+export interface StudioPagesHistoryCommandJournalDurabilityStatus {
+  readonly state: "initializing" | "retrying" | "durable" | "memory-only";
+  readonly durable: boolean;
+  readonly persistenceKind: StudioPagesHistoryPersistenceKind | null;
+  readonly retryable: boolean;
+  readonly cause: unknown;
+}
+
+export const STUDIO_PAGES_HISTORY_INITIAL_DURABILITY_STATUS:
+StudioPagesHistoryCommandJournalDurabilityStatus = Object.freeze({
+  state: "initializing",
+  durable: false,
+  persistenceKind: null,
+  retryable: false,
+  cause: null,
+});
 
 export interface StudioPagesHistoryCommandJournalClientOptions {
   readonly loadRuntime?: (
     initialTarget: StudioHistoryJournalNavigationTarget | null
   ) => Promise<StudioPagesHistoryCommandJournalRuntime>;
   readonly onError?: (cause: unknown) => void;
+  readonly onDurabilityStatus?: (
+    status: StudioPagesHistoryCommandJournalDurabilityStatus
+  ) => void;
 }
 
 async function loadDefaultRuntime(
   initialTarget: StudioHistoryJournalNavigationTarget | null,
-  onError?: (cause: unknown) => void
+  onError?: (cause: unknown) => void,
+  onDurabilityStatus?: (
+    status: StudioPagesHistoryCommandJournalDurabilityStatus
+  ) => void
 ): Promise<StudioPagesHistoryCommandJournalRuntime> {
   const { createDefaultStudioPagesHistoryDurableRuntime } = await import(
     "./studio-pages-history-durable-runtime"
@@ -47,6 +76,7 @@ async function loadDefaultRuntime(
   return createDefaultStudioPagesHistoryDurableRuntime({
     initialTarget,
     onError,
+    onDurabilityStatus,
   });
 }
 
@@ -74,18 +104,50 @@ export class StudioPagesHistoryCommandJournalClient {
     initialTarget: StudioHistoryJournalNavigationTarget | null
   ) => Promise<StudioPagesHistoryCommandJournalRuntime>;
   private readonly onError: ((cause: unknown) => void) | undefined;
+  private readonly onDurabilityStatus:
+    | ((status: StudioPagesHistoryCommandJournalDurabilityStatus) => void)
+    | undefined;
   private runtime: StudioPagesHistoryCommandJournalRuntime | null = null;
   private loadPromise: Promise<boolean> | null = null;
   private pending: StudioHistoryJournalClientAction[] = [];
   private latestTarget: StudioHistoryJournalNavigationTarget | null = null;
   private lastReadinessError: unknown = null;
+  private durability: StudioPagesHistoryCommandJournalDurabilityStatus =
+    STUDIO_PAGES_HISTORY_INITIAL_DURABILITY_STATUS;
+  private readonly durabilityListeners = new Set<
+    (status: StudioPagesHistoryCommandJournalDurabilityStatus) => void
+  >();
   private disposed = false;
 
   constructor(options: StudioPagesHistoryCommandJournalClientOptions = {}) {
-    this.loadRuntime = options.loadRuntime ?? (
-      (initialTarget) => loadDefaultRuntime(initialTarget, options.onError)
-    );
     this.onError = options.onError;
+    this.onDurabilityStatus = options.onDurabilityStatus;
+    this.loadRuntime = options.loadRuntime ?? (
+      (initialTarget) => loadDefaultRuntime(
+        initialTarget,
+        options.onError,
+        (status) => this.publishDurabilityStatus(status),
+      )
+    );
+    this.publishDurabilityStatus(STUDIO_PAGES_HISTORY_INITIAL_DURABILITY_STATUS);
+  }
+
+  private publishDurabilityStatus(
+    status: StudioPagesHistoryCommandJournalDurabilityStatus
+  ): void {
+    this.durability = Object.freeze({ ...status });
+    try {
+      this.onDurabilityStatus?.(this.durability);
+    } catch {
+      // A status observer cannot escape into the accepted edit path.
+    }
+    for (const listener of [...this.durabilityListeners]) {
+      try {
+        listener(this.durability);
+      } catch {
+        // One UI observer cannot hide status from another observer.
+      }
+    }
   }
 
   private apply(
@@ -166,6 +228,8 @@ export class StudioPagesHistoryCommandJournalClient {
           return false;
         }
         this.runtime = runtime;
+        const runtimeDurability = runtime.durabilityStatus?.();
+        if (runtimeDurability) this.publishDurabilityStatus(runtimeDurability);
         const pending = this.pending;
         this.pending = [];
         for (const action of pending) {
@@ -189,6 +253,13 @@ export class StudioPagesHistoryCommandJournalClient {
         if (this.disposed) return false;
         this.runtime = null;
         this.lastReadinessError = cause;
+        this.publishDurabilityStatus({
+          state: "memory-only",
+          durable: false,
+          persistenceKind: "memory-only",
+          retryable: true,
+          cause,
+        });
         this.retainLatestCheckpoint();
         return false;
       })
@@ -282,6 +353,51 @@ export class StudioPagesHistoryCommandJournalClient {
     this.pending = [];
     this.latestTarget = null;
     this.lastReadinessError = null;
+    this.durabilityListeners.clear();
+  }
+
+  durabilityStatus(): StudioPagesHistoryCommandJournalDurabilityStatus {
+    return this.durability;
+  }
+
+  observeDurabilityStatus(
+    listener: (status: StudioPagesHistoryCommandJournalDurabilityStatus) => void
+  ): () => void {
+    if (this.disposed) return () => undefined;
+    this.durabilityListeners.add(listener);
+    try {
+      listener(this.durability);
+    } catch {
+      // The subscription remains live even if its initial render callback fails.
+    }
+    return () => {
+      this.durabilityListeners.delete(listener);
+    };
+  }
+
+  /**
+   * Reopens the durable authority and checkpoints the latest accepted snapshot into it.
+   * Editing stays available while this promise runs; a failed retry remains explicitly
+   * memory-only and can be attempted again.
+   */
+  async retryDurability(): Promise<boolean> {
+    if (this.disposed) return false;
+    if (this.durability.durable) return true;
+    this.publishDurabilityStatus({
+      state: "retrying",
+      durable: false,
+      persistenceKind: null,
+      retryable: false,
+      cause: this.durability.cause,
+    });
+    const previous = this.runtime;
+    this.runtime = null;
+    if (previous?.close) await previous.close().catch(() => undefined);
+    else previous?.dispose?.();
+    this.retainLatestCheckpoint();
+    this.lastReadinessError = null;
+    const ready = await this.ensureRuntime();
+    return ready && this.durability.durable;
   }
 
   /** Await only in diagnostics/tests; Studio editing never blocks on journal loading. */

@@ -2,12 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   STUDIO_DRAFT_COLLABORATION_POLICY,
-  STUDIO_DRAFT_COLLABORATION_STORAGE_KEY,
   consumeStudioDraftCollaborationProvisionAttempt,
+  createStudioDraftCollaborationIdentityRepository,
   createStudioDraftCollaborationPromotionRequest,
   createStudioDraftCollaborationProvisionRequest,
   loadOrCreateStudioDraftCollaborationIdentity,
   type StudioDraftCollaborationIdentity,
+  type StudioDraftCollaborationIdentityRepository,
   type StudioDraftCollaborationTemporaryRoom,
 } from "./studio-draft-collaboration";
 
@@ -19,19 +20,27 @@ const UUIDS = {
   room: "44444444-4444-4444-8444-444444444444",
 } as const;
 
-function memoryStorage() {
-  const entries = new Map<string, string>();
+function memoryStore() {
+  const values = new Map<string, string>();
   return {
-    getItem(key: string) {
-      return entries.get(key) ?? null;
+    values,
+    async get(key: string) {
+      return values.get(key) ?? null;
     },
-    setItem(key: string, value: string) {
-      entries.set(key, value);
+    async set(key: string, value: string) {
+      values.set(key, value);
     },
-    value(key = STUDIO_DRAFT_COLLABORATION_STORAGE_KEY) {
-      return entries.get(key) ?? null;
+    async delete(key: string) {
+      values.delete(key);
     },
   };
+}
+
+function identityRepositoryFactory(
+  store: ReturnType<typeof memoryStore>,
+): () => Promise<StudioDraftCollaborationIdentityRepository> {
+  const repository = createStudioDraftCollaborationIdentityRepository(store);
+  return async () => repository;
 }
 
 function identity(
@@ -70,131 +79,107 @@ function room(
   };
 }
 
-describe("local Studio draft collaboration identity", () => {
-  it("keeps one stable persisted identity for the same document and owner", () => {
-    const storage = memoryStorage();
-    const first = loadOrCreateStudioDraftCollaborationIdentity(storage, {
+describe("local Studio draft collaboration SQLite identity", () => {
+  it("keeps one stable persisted identity for the same document and owner", async () => {
+    const store = memoryStore();
+    const acquireRepository = identityRepositoryFactory(store);
+    const first = await loadOrCreateStudioDraftCollaborationIdentity({
       documentScopeKey: "autosave:new-work",
       ownerScopeKey: "account-a",
       now: NOW,
       createUuid: () => UUIDS.draftA,
-    });
-    const second = loadOrCreateStudioDraftCollaborationIdentity(storage, {
+    }, acquireRepository);
+    const second = await loadOrCreateStudioDraftCollaborationIdentity({
       documentScopeKey: "autosave:new-work",
       ownerScopeKey: "account-a",
       now: NOW + 60_000,
       createUuid: () => {
         throw new Error("stable identity must not rotate");
       },
-    });
+    }, acquireRepository);
 
     expect(second.draftDocumentId).toBe(first.draftDocumentId);
     expect(second.createdAt).toBe(first.createdAt);
     expect(second.lastOpenedAt).toBe(new Date(NOW + 60_000).toISOString());
     expect(second.persistence).toBe("persistent");
-    expect(JSON.parse(storage.value() ?? "{}")).toMatchObject({
-      version: 1,
-      identities: [{ draftDocumentId: first.draftDocumentId }],
-    });
+    expect(store.values.size).toBe(1);
+    expect([...store.values.values()][0]).toContain(first.draftDocumentId);
   });
 
-  it("isolates identities by both document and owner scope", () => {
-    const storage = memoryStorage();
-    const first = loadOrCreateStudioDraftCollaborationIdentity(storage, {
+  it("isolates identities by owner-scoped SQLite rows", async () => {
+    const store = memoryStore();
+    const acquireRepository = identityRepositoryFactory(store);
+    const first = await loadOrCreateStudioDraftCollaborationIdentity({
       documentScopeKey: "autosave:new-work",
       ownerScopeKey: "account-a",
       now: NOW,
       createUuid: () => UUIDS.draftA,
-    });
-    const second = loadOrCreateStudioDraftCollaborationIdentity(storage, {
+    }, acquireRepository);
+    const second = await loadOrCreateStudioDraftCollaborationIdentity({
       documentScopeKey: "autosave:new-work",
       ownerScopeKey: "account-b",
       now: NOW,
       createUuid: () => UUIDS.draftB,
-    });
+    }, acquireRepository);
 
     expect(second.draftDocumentId).not.toBe(first.draftDocumentId);
-    expect(JSON.parse(storage.value() ?? "{}").identities).toHaveLength(2);
+    expect(store.values.size).toBe(2);
   });
 
-  it("rotates an expired identity and drops corrupt or oversized persisted input", () => {
-    const storage = memoryStorage();
-    storage.setItem(
-      STUDIO_DRAFT_COLLABORATION_STORAGE_KEY,
-      JSON.stringify({
-        version: 1,
-        identities: [
-          {
-            draftDocumentId: `draft_${UUIDS.draftA}`,
-            documentScopeKey: "autosave:new-work",
-            ownerScopeKey: "account-a",
-            createdAt: new Date(NOW - 10_000).toISOString(),
-            lastOpenedAt: new Date(NOW - 5_000).toISOString(),
-            expiresAt: new Date(NOW).toISOString(),
-          },
-        ],
-      })
-    );
-    const rotated = loadOrCreateStudioDraftCollaborationIdentity(storage, {
+  it("rotates an expired SQLite identity", async () => {
+    const store = memoryStore();
+    const acquireRepository = identityRepositoryFactory(store);
+    await loadOrCreateStudioDraftCollaborationIdentity({
       documentScopeKey: "autosave:new-work",
       ownerScopeKey: "account-a",
       now: NOW,
+      createUuid: () => UUIDS.draftA,
+    }, acquireRepository);
+    const rotated = await loadOrCreateStudioDraftCollaborationIdentity({
+      documentScopeKey: "autosave:new-work",
+      ownerScopeKey: "account-a",
+      now: NOW + STUDIO_DRAFT_COLLABORATION_POLICY.localIdentityIdleTtlMs,
       createUuid: () => UUIDS.draftB,
-    });
-    expect(rotated.draftDocumentId).toBe(`draft_${UUIDS.draftB}`);
+    }, acquireRepository);
 
-    storage.setItem(
-      STUDIO_DRAFT_COLLABORATION_STORAGE_KEY,
-      "x".repeat(STUDIO_DRAFT_COLLABORATION_POLICY.maxStorageBytes + 1)
-    );
-    const recovered = loadOrCreateStudioDraftCollaborationIdentity(storage, {
-      documentScopeKey: "autosave:recovered",
-      ownerScopeKey: "account-a",
-      now: NOW,
-      createUuid: () => UUIDS.draftA,
-    });
-    expect(recovered.draftDocumentId).toBe(`draft_${UUIDS.draftA}`);
+    expect(rotated.draftDocumentId).toBe(`draft_${UUIDS.draftB}`);
   });
 
-  it("returns an explicit memory-only identity when storage is blocked", () => {
-    const blockedStorage = {
-      getItem() {
-        throw new DOMException("blocked", "SecurityError");
-      },
-      setItem() {
-        throw new DOMException("blocked", "SecurityError");
-      },
-    };
-    const result = loadOrCreateStudioDraftCollaborationIdentity(blockedStorage, {
+  it("returns an explicit memory-only identity when SQLite/OPFS is blocked", async () => {
+    const result = await loadOrCreateStudioDraftCollaborationIdentity({
       documentScopeKey: "autosave:new-work",
       ownerScopeKey: "account-a",
       now: NOW,
       createUuid: () => UUIDS.draftA,
+    }, async () => {
+      throw new DOMException("blocked", "SecurityError");
     });
 
     expect(result.persistence).toBe("memory-only");
     expect(result.draftDocumentId).toBe(`draft_${UUIDS.draftA}`);
   });
 
-  it("rejects whitespace-rewritten scope keys and invalid UUID generators", () => {
-    expect(() =>
-      loadOrCreateStudioDraftCollaborationIdentity(null, {
-        documentScopeKey: " autosave:new-work",
-        ownerScopeKey: "account-a",
-        now: NOW,
-        createUuid: () => UUIDS.draftA,
-      })
-    ).toThrow("문서 또는 소유자 범위");
-    expect(() =>
-      loadOrCreateStudioDraftCollaborationIdentity(null, {
-        documentScopeKey: "autosave:new-work",
-        ownerScopeKey: "account-a",
-        now: NOW,
-        createUuid: () => "predictable",
-      })
-    ).toThrow("올바른 UUID");
+  it("rejects whitespace-rewritten scope keys and invalid UUID generators", async () => {
+    await expect(loadOrCreateStudioDraftCollaborationIdentity({
+      documentScopeKey: " autosave:new-work",
+      ownerScopeKey: "account-a",
+      now: NOW,
+      createUuid: () => UUIDS.draftA,
+    }, async () => {
+      throw new Error("must not open SQLite");
+    })).rejects.toThrow("문서 또는 소유자 범위");
+
+    await expect(loadOrCreateStudioDraftCollaborationIdentity({
+      documentScopeKey: "autosave:new-work",
+      ownerScopeKey: "account-a",
+      now: NOW,
+      createUuid: () => "predictable",
+    }, async () => {
+      throw new Error("blocked");
+    })).rejects.toThrow("올바른 UUID");
   });
 });
+
 
 describe("lazy draft collaboration provision and promotion contract", () => {
   it("builds an idempotent provision request only on explicit share or invite intent", () => {

@@ -13,7 +13,10 @@ import {
 import { nativeHSL } from "../../../../src/domains/creator/studio-konva-native-filters";
 import { buildChannelLevelsLuts } from "../../../../src/domains/creator/studio-levels";
 import { EffectCompileError } from "../effect-compiler";
-import { registerFilterProviders } from "../filter-providers";
+import {
+  registerFilterProviderTestFixtures,
+  registerFilterProviders,
+} from "../filter-providers";
 import { EngineCapabilityRegistry } from "../registry";
 import {
   UnsupportedWgslOpError,
@@ -76,8 +79,9 @@ function node(
 }
 
 function filterRegistry(): EngineCapabilityRegistry {
-  const registry = new EngineCapabilityRegistry();
+  const registry = EngineCapabilityRegistry.forTestFixtures();
   registerFilterProviders(registry);
+  registerFilterProviderTestFixtures(registry);
   return registry;
 }
 
@@ -169,6 +173,55 @@ describe("composeWgslVariant — 결정성과 variantKey 구조 계약", () => {
     expect(() => composeWgslVariant([{ op: "levels", lut: shortLut }])).toThrow(
       /channel "r" LUT must have exactly 256 entries/,
     );
+  });
+
+  it("emits the complete V12 shader manifest with a calculable memory budget", () => {
+    const variant = composeWgslVariant(FULL_CHAIN);
+    expect(variant.manifest).toMatchObject({
+      inputFormats: ["rgba8-packed-u32-storage"],
+      outputFormats: ["rgba8-packed-u32-storage"],
+      bindGroups: {
+        group: 0,
+        bindings: WGSL_VARIANT_BINDINGS,
+        lutBindingPresent: true,
+      },
+      workgroupSize: {
+        x: WGSL_VARIANT_WORKGROUP_SIZE,
+        y: 1,
+        z: 1,
+        dispatchRowThreads: WGSL_VARIANT_DISPATCH_ROW_THREADS,
+      },
+      storageWrites: {
+        targets: ["dst"],
+        policy: "single-bounded-write-per-invocation",
+        guard: "global-index < pixel-count",
+      },
+      bounds: { input: "full-frame", output: "full-frame", haloPx: 0 },
+      determinism: {
+        class: "deterministic",
+        timeIndependent: true,
+        stageBoundaryQuantization: "round-half-even-rgba8",
+      },
+      timeDependency: "none",
+      variants: {
+        preview: variant.variantKey,
+        final: variant.variantKey,
+        pixelEquivalent: true,
+      },
+      licenseProvenance: {
+        spdx: "LicenseRef-ToonSpectrum-Proprietary",
+        source: "ToonStudio deterministic WGSL variant composer",
+        generatedFrom: "EffectGraphIR color-operation subsequence",
+      },
+    });
+    expect(variant.manifest.memoryEstimate).toEqual({
+      fixedBytes:
+        variant.uniformByteLength +
+        variant.lutEntryCount * Uint32Array.BYTES_PER_ELEMENT,
+      bytesPerPixel: 8,
+      formula: "uniform + lut + src-rgba8 + dst-rgba8",
+    });
+    expect(Object.isFrozen(variant.manifest)).toBe(true);
   });
 });
 
@@ -372,7 +425,7 @@ describe("enumerateVariantsForGraph — effect-compiler 접속", () => {
   });
 
   it("프로바이더 그룹 경계는 run 을 끊지 않는다(copy 전이 제거 근거)", () => {
-    const registry = new EngineCapabilityRegistry();
+    const registry = EngineCapabilityRegistry.forTestFixtures();
     const base = {
       kind: "filter" as const,
       version: "test",
@@ -388,13 +441,13 @@ describe("enumerateVariantsForGraph — effect-compiler 접속", () => {
       fallbackProviderId: null,
       knownIssues: [],
     };
-    registry.register({
+    registry.registerTestFixture({
       ...base,
       id: "levels-only",
       displayName: "levels only",
       capabilities: ["filter.op.levels", "filter.phase.final"],
     });
-    registry.register({
+    registry.registerTestFixture({
       ...base,
       id: "hsl-only",
       displayName: "hsl only",

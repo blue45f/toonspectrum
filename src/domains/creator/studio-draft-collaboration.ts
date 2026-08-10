@@ -3,9 +3,13 @@
  * only that browser-local identity and the future lazy-provision/promotion wire contract. It does
  * not pretend that a durable collaboration room exists before the server confirms one.
  */
+import { acquireStudioLocalDatabase } from "./studio-local-database-runtime";
+import { studioWorkspaceOwnerScope } from "./studio-workspaces";
 
-export const STUDIO_DRAFT_COLLABORATION_STORAGE_KEY =
-  "toonspectrum-studio-draft-collaboration:v1";
+import type { StudioAsyncKeyValueStore } from "./studio-local-database";
+
+export const STUDIO_DRAFT_COLLABORATION_SQLITE_NAMESPACE =
+  "studio-draft-collaboration-v12" as const;
 
 const DAY_MS = 24 * 60 * 60 * 1_000;
 const MAX_SCOPE_LENGTH = 200;
@@ -117,8 +121,6 @@ export interface StudioDraftCollaborationProvisionGateResult {
   readonly next: StudioDraftCollaborationProvisionGate;
 }
 
-type DraftCollaborationStorage = Pick<Storage, "getItem" | "setItem">;
-
 interface PersistedDraftCollaborationIdentity {
   readonly draftDocumentId: string;
   readonly documentScopeKey: string;
@@ -138,6 +140,14 @@ export interface LoadOrCreateStudioDraftCollaborationInput {
   readonly ownerScopeKey: string;
   readonly now?: number;
   readonly createUuid?: () => string;
+}
+
+export interface StudioDraftCollaborationIdentityRepository {
+  readonly authority: "sqlite-opfs";
+  loadOrCreate(
+    input: LoadOrCreateStudioDraftCollaborationInput,
+  ): Promise<StudioDraftCollaborationIdentity>;
+  flush(): Promise<void>;
 }
 
 function exactBoundedScope(value: unknown): string | null {
@@ -249,37 +259,45 @@ function parsePersistedIdentity(
   };
 }
 
-function readEnvelope(
-  storage: DraftCollaborationStorage | null | undefined,
-  now: number
+function parseIdentityEnvelope(
+  raw: string | null,
+  now: number,
 ): PersistedDraftCollaborationIdentity[] {
-  if (!storage) return [];
-  try {
-    const raw = storage.getItem(STUDIO_DRAFT_COLLABORATION_STORAGE_KEY);
-    if (!raw || utf8ByteLength(raw) > STUDIO_DRAFT_COLLABORATION_POLICY.maxStorageBytes) return [];
-    const parsed = JSON.parse(raw) as unknown;
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return [];
-    const envelope = parsed as Partial<PersistedDraftCollaborationEnvelope>;
-    if (envelope.version !== 1 || !Array.isArray(envelope.identities)) return [];
-    const uniqueIds = new Set<string>();
-    return envelope.identities
-      .slice(0, STUDIO_DRAFT_COLLABORATION_POLICY.maxPersistedIdentities * 2)
-      .map((identity) => parsePersistedIdentity(identity, now))
-      .filter((identity): identity is PersistedDraftCollaborationIdentity => {
-        if (!identity || uniqueIds.has(identity.draftDocumentId)) return false;
-        uniqueIds.add(identity.draftDocumentId);
-        return true;
-      });
-  } catch {
-    return [];
+  if (raw === null) return [];
+  if (!raw || utf8ByteLength(raw) > STUDIO_DRAFT_COLLABORATION_POLICY.maxStorageBytes) {
+    throw new Error("초안 협업 SQLite 데이터가 비어 있거나 허용 크기를 초과했습니다.");
   }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw) as unknown;
+  } catch (cause) {
+    throw new Error("초안 협업 SQLite JSON이 손상되었습니다.", { cause });
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("초안 협업 SQLite envelope 형식이 올바르지 않습니다.");
+  }
+  const envelope = parsed as Partial<PersistedDraftCollaborationEnvelope>;
+  if (envelope.version !== 1 || !Array.isArray(envelope.identities)) {
+    throw new Error("초안 협업 SQLite envelope 버전이 올바르지 않습니다.");
+  }
+  const uniqueIds = new Set<string>();
+  const identities = envelope.identities
+    .slice(0, STUDIO_DRAFT_COLLABORATION_POLICY.maxPersistedIdentities * 2)
+    .map((identity) => parsePersistedIdentity(identity, now))
+    .filter((identity): identity is PersistedDraftCollaborationIdentity => {
+      if (!identity || uniqueIds.has(identity.draftDocumentId)) return false;
+      uniqueIds.add(identity.draftDocumentId);
+      return true;
+    });
+  if (envelope.identities.length > 0 && identities.length === 0) {
+    throw new Error("초안 협업 SQLite identity가 모두 손상되었습니다.");
+  }
+  return identities;
 }
 
-function persistEnvelope(
-  storage: DraftCollaborationStorage | null | undefined,
-  identities: readonly PersistedDraftCollaborationIdentity[]
-): boolean {
-  if (!storage) return false;
+function encodeIdentityEnvelope(
+  identities: readonly PersistedDraftCollaborationIdentity[],
+): string {
   const bounded = identities
     .slice()
     .sort((left, right) => Date.parse(right.lastOpenedAt) - Date.parse(left.lastOpenedAt))
@@ -287,16 +305,11 @@ function persistEnvelope(
   while (bounded.length > 0) {
     const envelope = JSON.stringify({ version: 1, identities: bounded });
     if (utf8ByteLength(envelope) <= STUDIO_DRAFT_COLLABORATION_POLICY.maxStorageBytes) {
-      try {
-        storage.setItem(STUDIO_DRAFT_COLLABORATION_STORAGE_KEY, envelope);
-        return true;
-      } catch {
-        return false;
-      }
+      return envelope;
     }
     bounded.pop();
   }
-  return false;
+  throw new Error("초안 협업 SQLite envelope를 허용 크기로 줄일 수 없습니다.");
 }
 
 function publicIdentity(
@@ -306,14 +319,13 @@ function publicIdentity(
   return { version: 1, ...identity, persistence };
 }
 
-/**
- * Resolves one stable identity per (document, owner) pair. Merely opening Studio writes only a
- * tiny local record; no collaboration API or database resource is touched.
- */
-export function loadOrCreateStudioDraftCollaborationIdentity(
-  storage: DraftCollaborationStorage | null | undefined,
-  input: LoadOrCreateStudioDraftCollaborationInput
-): StudioDraftCollaborationIdentity {
+function nextDraftCollaborationIdentity(
+  identities: readonly PersistedDraftCollaborationIdentity[],
+  input: LoadOrCreateStudioDraftCollaborationInput,
+): {
+  readonly identity: PersistedDraftCollaborationIdentity;
+  readonly identities: readonly PersistedDraftCollaborationIdentity[];
+} {
   const documentScopeKey = exactBoundedScope(input.documentScopeKey);
   const ownerScopeKey = exactBoundedScope(input.ownerScopeKey);
   if (!documentScopeKey || !ownerScopeKey) {
@@ -322,7 +334,6 @@ export function loadOrCreateStudioDraftCollaborationIdentity(
   const now = input.now ?? Date.now();
   const openedAt = iso(now);
   const expiresAt = iso(now + STUDIO_DRAFT_COLLABORATION_POLICY.localIdentityIdleTtlMs);
-  const identities = readEnvelope(storage, now);
   const matchingIndex = identities.findIndex(
     (identity) =>
       identity.documentScopeKey === documentScopeKey && identity.ownerScopeKey === ownerScopeKey
@@ -339,8 +350,106 @@ export function loadOrCreateStudioDraftCollaborationIdentity(
         expiresAt,
       };
   const remaining = identities.filter((_, index) => index !== matchingIndex);
-  const persisted = persistEnvelope(storage, [next, ...remaining]);
-  return publicIdentity(next, persisted ? "persistent" : "memory-only");
+  return Object.freeze({
+    identity: next,
+    identities: Object.freeze([next, ...remaining]),
+  });
+}
+
+class DraftCollaborationIdentityWriteError extends Error {
+  readonly identity: PersistedDraftCollaborationIdentity;
+
+  constructor(identity: PersistedDraftCollaborationIdentity, cause: unknown) {
+    super("초안 협업 SQLite 쓰기를 확인하지 못했습니다.", { cause });
+    this.name = "DraftCollaborationIdentityWriteError";
+    this.identity = identity;
+  }
+}
+
+/** One owner-scoped row per account; all writes share one serialized SQLite queue. */
+export function createStudioDraftCollaborationIdentityRepository(
+  store: StudioAsyncKeyValueStore,
+): StudioDraftCollaborationIdentityRepository {
+  let writeTail: Promise<void> = Promise.resolve();
+
+  return Object.freeze({
+    authority: "sqlite-opfs" as const,
+    loadOrCreate(input: LoadOrCreateStudioDraftCollaborationInput) {
+      const ownerScopeKey = exactBoundedScope(input.ownerScopeKey);
+      if (!ownerScopeKey) {
+        return Promise.reject(new Error("초안 협업 소유자 범위가 올바르지 않습니다."));
+      }
+      const sqliteOwnerKey = studioWorkspaceOwnerScope(ownerScopeKey);
+      const operation = writeTail
+        .catch(() => undefined)
+        .then(async () => {
+          const now = input.now ?? Date.now();
+          const current = parseIdentityEnvelope(await store.get(sqliteOwnerKey), now);
+          if (current.some((identity) => identity.ownerScopeKey !== ownerScopeKey)) {
+            throw new Error("초안 협업 SQLite owner 행이 다른 계정 identity를 포함합니다.");
+          }
+          const next = nextDraftCollaborationIdentity(current, input);
+          const encoded = encodeIdentityEnvelope(next.identities);
+          try {
+            await store.set(sqliteOwnerKey, encoded);
+            if (await store.get(sqliteOwnerKey) !== encoded) {
+              throw new Error("SQLite verification mismatch");
+            }
+          } catch (cause) {
+            throw new DraftCollaborationIdentityWriteError(next.identity, cause);
+          }
+          return publicIdentity(next.identity, "persistent");
+        });
+      writeTail = operation.then(() => undefined, () => undefined);
+      return operation;
+    },
+    flush() {
+      return writeTail;
+    },
+  });
+}
+
+let sharedIdentityRepository: Promise<StudioDraftCollaborationIdentityRepository> | null = null;
+
+export function acquireProductStudioDraftCollaborationIdentityRepository(): Promise<StudioDraftCollaborationIdentityRepository> {
+  sharedIdentityRepository ??= acquireStudioLocalDatabase().then((database) =>
+    createStudioDraftCollaborationIdentityRepository(
+      database.asAsyncKeyValueStore(STUDIO_DRAFT_COLLABORATION_SQLITE_NAMESPACE),
+    ));
+  sharedIdentityRepository.catch(() => {
+    sharedIdentityRepository = null;
+  });
+  return sharedIdentityRepository;
+}
+
+export function resetStudioDraftCollaborationIdentityRepositoryForTests(): void {
+  sharedIdentityRepository = null;
+}
+
+/**
+ * Resolves one stable identity per (document, owner) pair from SQLite/OPFS. The pre-cutover
+ * localStorage envelope is deliberately never probed or imported. If SQLite is unavailable, the
+ * returned identity is explicitly marked memory-only so the host can warn before sharing.
+ */
+export async function loadOrCreateStudioDraftCollaborationIdentity(
+  input: LoadOrCreateStudioDraftCollaborationInput,
+  acquireRepository: () => Promise<StudioDraftCollaborationIdentityRepository> =
+    acquireProductStudioDraftCollaborationIdentityRepository,
+): Promise<StudioDraftCollaborationIdentity> {
+  // Validate before opening SQLite so malformed scopes never become a memory-only pseudo-success.
+  if (!exactBoundedScope(input.documentScopeKey) || !exactBoundedScope(input.ownerScopeKey)) {
+    throw new Error("초안 협업 문서 또는 소유자 범위가 올바르지 않습니다.");
+  }
+  iso(input.now ?? Date.now());
+  try {
+    return await (await acquireRepository()).loadOrCreate(input);
+  } catch (cause) {
+    if (cause instanceof DraftCollaborationIdentityWriteError) {
+      return publicIdentity(cause.identity, "memory-only");
+    }
+    const fallback = nextDraftCollaborationIdentity([], input);
+    return publicIdentity(fallback.identity, "memory-only");
+  }
 }
 
 function assertCurrentOwnedIdentity(

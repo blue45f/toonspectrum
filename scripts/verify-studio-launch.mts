@@ -3,7 +3,7 @@
  * Committed, reproducible harness for Verification plan step 2.
  * - Spawns `vite preview`
  * - Two successive desktop headless runs plus one mobile drawing run via Playwright API
- * - addInitScript to dismiss quick-start overlay
+ * - Dismisses the first-run quick-start overlay after SQLite preference hydration
  * - Asserts Konva/canvas surface present with target webtoon dims
  * - Verifies the workspace manager stays intent-gated and preserves dialog focus
  * - Performs a driven interaction using shipped UI (click "예시로 시작" or "추가")
@@ -35,6 +35,21 @@ const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
   "/api/kmas/merge-on-access",
   "/api/studio-ai/status",
 ] as const;
+
+async function dismissHydratedQuickStart(page: Page): Promise<void> {
+  const quickStart = page.locator('[data-studio-creative-starter="true"]');
+  // UI preferences now hydrate from the asynchronous SQLite/OPFS authority. Pre-seeding the
+  // retired localStorage compatibility key is therefore insufficient: on a cold profile the
+  // coach can mount after the canvas and dock are already actionable. Wait for that authoritative
+  // decision, then exercise the shipped dismiss control before continuing with unrelated tools.
+  const mounted = await quickStart
+    .waitFor({ state: "visible", timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!mounted) return;
+  await quickStart.locator('[data-studio-quickstart-dismiss="true"]').click();
+  await quickStart.waitFor({ state: "detached", timeout: 3_000 });
+}
 
 export function isExpectedStaticPreviewApiError(
   message: string,
@@ -615,6 +630,7 @@ async function runMobileDrawing(browser: Browser, url: string): Promise<MobileRu
     .locator('[data-studio-editor="true"][data-studio-mobile-immersive="true"]')
     .waitFor({ state: "attached", timeout: 3000 });
   const workspaceMenu = await verifyMobileWorkspaceMenuGateDormant(page, "mobile");
+  await dismissHydratedQuickStart(page);
 
   await page.getByRole("button", { name: "브러시 설정 (굵기·색·프리셋)" }).click();
   const sheet = page.getByRole("dialog", { name: "브러시 설정" });
@@ -1186,6 +1202,7 @@ async function runMobileDockLayout(
     page,
     `mobile-dock-${width}`,
   );
+  await dismissHydratedQuickStart(page);
   const primary = dock.locator('[data-studio-mobile-dock-scroll="primary"]');
   const secondary = dock.locator('[data-studio-mobile-dock-scroll="secondary"]');
   const secondaryToolbar = dock.getByRole("toolbar", { name: "작업 공간", exact: true });

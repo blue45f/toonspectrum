@@ -141,10 +141,16 @@
   낮춘다. pressure/tilt dynamics, UV island/seam 분리, miss/fallback, transaction rollback,
   NaN/overflow/admission을 검증했다. Three.js `Intersection` 호환 입력과 실제 `three-mesh-bvh` ray
   hit를 기존 `StudioVrmTexturePaintRuntime`의 단일 texture owner에 연결하는 concrete adapter도
-  구현했다. 실제 R3F UI event loop를 통과했다는 주장은 하지 않는다.
+  구현했다. 후속 제품 배선에서 비테스트 `/studio` caller인 `StudioVrmPoser`가 실제 R3F
+  pointer down/move/up과 `faceIndex`, pressure/tilt, analytic camera scale을 최대 2,048 samples·
+  50,000 projected operations의 bounded transaction으로 모아 이 경계를 호출한다. pointercancel,
+  leave, lost capture, window blur, second pointer, tool/enable change, device loss, unmount는 실행 전
+  discard 또는 실행 중 atomic rollback으로 닫는다.
   texture matrix/wrap, triangle/UV-island, texel density, pressure 원정밀도와 seam run을 보존하고,
   성공한 operation 전체를 sparse COW undo 뒤 한 번의 atlas upload로 원자 커밋한다. 취소·upload
-  실패·cross-texture hit는 픽셀과 history를 남기지 않고 fail-closed한다.
+  실패·cross-texture hit는 픽셀과 history를 남기지 않고 fail-closed한다. deterministic undo/replay,
+  제품 caller, lifecycle 취소, hot-path readback 0과 명시적 unsupported(stamp/image/smudge/wet)는
+  7파일 127/127 집중 테스트로 고정했다.
 - MYB v3, ABR v1/v2, SUT/SUTG, Krita bundle, SVG를 bounded FormatGateway에서 검증·변환한다.
   ABR v6+와 손실 가능한 기능은 “지원 완료”로 표시하지 않고 explicit unsupported로 반환한다.
 
@@ -162,6 +168,15 @@
   상태, palette/Brand Kit/saved clips, 이름 있는 프로젝트 체크포인트, BG3D shot recovery를
   SQLite/OPFS에 저장한다. 영구 거절 CRDT frontier와 재전송 잠금 marker도 같은 권위에 저장해
   제품 factory가 IndexedDB/localStorage를 열지 않는다.
+- owner-scoped 작업공간은 `studio-workspaces-v12` SQLite snapshot과 revision/writer/mutation
+  순서로 저장하고, BroadcastChannel에는 상태가 아닌 revision invalidation만 보낸다. 늦은 hydration과
+  외부 탭 변경은 dirty-revision fence 및 base/local/external 3-way merge를 거쳐야 하며, 검증 쓰기가
+  실패하면 `memory-only`로 명시 강등한다. Quick Access(`studio-quick-access-v12`)와 저장 전 초안
+  협업 identity(`studio-draft-collaboration-v12`)도 같은 owner-scoped SQLite 원칙을 사용한다.
+- 앱 설정, advanced fill, effect/asset favorite, recent color, AI provider, UI boolean, background/
+  effect/element/page preview, Pro Draw, 보조창 layout, Reference Panel, watermark, VRM recent pose/
+  character를 전용 SQLite namespace로 옮겼다. 민감한 webcam consent와 presentation-safe 상태는
+  의도적으로 탭 수명 `sessionStorage`/메모리에만 둔다.
 - AI 이미지 참조 메타데이터는 `StudioProjectFile`·project snapshot·autosave·save payload의 동일
   문서 권위에 포함하며, 원본 이미지 바이트는 asset/CAS 참조로 분리한다. Creator Pack palette는
   제품 SQLite repository가 소유한다. 브러시 quick slot도 `studio-brush-quick-slots-v12` SQLite
@@ -244,6 +259,12 @@
 - 무조건 자체 구현 금지 규칙을 동일 corpus·품질·성능·라이선스 증거 기반 승인 규칙으로 교체했다.
 - V12 파괴 확인 문구는 `REPLACE_CURRENT_TOONSTUDIO_IN_PLACE_V12`로 교체했고 compile flag,
   `RESET_EXISTING_STUDIO_DATA=YES`, 확인 문구가 모두 없으면 삭제를 거부한다.
+- 삭제된 과거 linked worktree의 retained Git index 6,113개와 old HEAD
+  `3a2a4aa…`를 현재 main의 대응 커밋 `a5fb614d…`와 patch-id로 대조해 tracked/staged 유실 0을
+  확인했다. old-tree-only source-like 파일 `crates/vendor/wgpu-toon/Cargo.toml.orig`은 Git object
+  원문 그대로 복구했으며 SHA-256
+  `88e09c…`가 기존 manifest와 일치한다. 남은 old-only 항목은 의도적으로 제거된 generated
+  artifact였고, `.git/worktrees` 메타데이터는 정리하지 않았다.
 
 ## Build/Test/Benchmark commands
 
@@ -308,19 +329,19 @@ SOAK_MINUTES=480 pnpm run soak:studio-engine
 | Vello WebGPU 128² | 7장면 p50 2.9~3.0ms, 6장면 fuzzy mismatch 0%, curve 0.036621%(gate 0.6%) |
 | Vello-native SVG | 제품은 CPU RGBA asset preview이며 interactive GPU Scene Fragment가 아니다. vello_svg 0.10.0 native CPU↔resvg SSIM 0.995936/0.995692/0.997639; 별도 browser GPU 하니스 p50 3.0ms, p95 3.1~3.4ms, GPU↔CPU fuzzy 최대 0.030518% |
 | Vello 대형 장면 package/harness | 5k@512² GPU p50 73.7ms vs vello_cpu 2,471.7ms; 15k GPU 205.0ms vs CPU 7,410.3ms |
-| renderer tournament 실제 브라우저 | schema v3, Chromium 140/Apple Metal WebGPU, 동일 SceneIR·cold 7/warm 31: flat-simple CanvasKit warm p50 0.110ms·fuzzy 0%; curves/clips/gradients Vello GPU p50 3.105ms·0%; dense 768-stroke Vello GPU p50 20.990ms·0%(CanvasKit 0.006104%). pen-down 전환 금지와 12% hysteresis hold, 시각 실패 fault-control quarantine은 유지한다. 실제 release realm은 CSP event/console/page/request 오류 0이며 `technicalPass=true`, `releasePass=true`, `pass=true`, `status=pass`다. 정책은 `script-src 'self' 'wasm-unsafe-eval'`이며 JavaScript용 `'unsafe-eval'`은 없다. CDP 실제 argv 49개에는 JIT-disable flag가 없고, 별도 fresh context의 같은 CSP eval 양성 대조군은 `EvalError`와 `script-src: eval` 1건을 관측했다. Zod core runtime receipt와 Vite manifest/digest receipt도 통과했다. CSP 완화와 Chromium `--jitless`는 사용하지 않았다. shadow soak 부재로 `boundedCorpusOnly=true`, `productWidePromotion=false`, 외부 `cspNonInferiority=not-measured`를 유지한다 |
+| renderer tournament 실제 브라우저 | schema v4, Chromium 140/Apple Metal WebGPU, 동일 SceneIR·cold 7/warm 31: flat-simple CanvasKit warm p50 0.110ms·fuzzy 0%; curves/clips/gradients Vello GPU p50 3.105ms·0%; dense 768-stroke Vello GPU p50 20.990ms·0%(CanvasKit 0.006104%). pen-down 전환 금지와 12% hysteresis hold, 시각 실패 fault-control quarantine은 유지한다. 실제 하니스 realm은 CSP event/console/page/request 오류 0이며 `technicalPass=true`, `boundedHarnessPass=true`, `pass=true`, `status=pass`다. `pass`는 bounded-harness 하위 호환 별칭이며 제품 릴리스 승격 판정이 아니다. 정책은 `script-src 'self' 'wasm-unsafe-eval'`이며 JavaScript용 `'unsafe-eval'`은 없다. CDP 실제 argv 49개에는 JIT-disable flag가 없고, 별도 fresh context의 같은 CSP eval 양성 대조군은 `EvalError`와 `script-src: eval` 1건을 관측했다. Zod core runtime receipt와 Vite manifest/digest receipt도 통과했다. CSP 완화와 Chromium `--jitless`는 사용하지 않았다. shadow soak 부재로 `boundedCorpusOnly=true`, `productWidePromotion=false`, 외부 `cspNonInferiority=not-measured`를 유지한다 |
 | 정확 대형 문서 | package/harness에서 100k/1M path 생성·직렬화·재생 exact count; 1M 중심 viewport 3,904 path GPU p50/p95/p99 18.110/20.485/20.485ms, 256-path CPU reference fuzzy 0.032%. exact corpus의 비테스트 `/studio` caller는 확인되지 않았고 1M monolithic all-visible는 격리 |
 | 100-layer tiled WebGPU | 8,192² 및 2,048×30,720, 100 layers/200 RGBA tiles/209,715,200B; pan/zoom p50/p95/p99 16.645/18.505/21.120ms 및 16.685/18.435/27.595ms; hot-path readback 0, max linear delta 0.00036147(gate 0.002) |
 | Google Ink 증분 mesh | update p50/p95/p99 0.069750/0.085750/0.108125ms; single-shot 대비 payload -85.90%; final mesh byte-identical |
 | 필터 품질 | downscale: libvips Lanczos3 27.26dB/SSIM 0.9887; Gaussian: CanvasKit 47.94dB/0.9874 |
 | retained WebGPU filter presentation 512² | Chromium 140/Metal, 6-op chain, warmup 5 + 40 frames: interactive `mapAsync` 0, settle 1; submit/present p50/p95/p99 1.10/3.90/4.30ms, next-rAF visible 16.70/17.90/18.50ms, final readback 3.90ms; GPUCanvas↔canonical RGB/alpha 최대 오차 0, changed channel 0 |
-| WGSL/WESL | 35/35 browser compile + Naga valid; 5→1 pipeline(-80%), GPU pass p50 0.142→0.037ms, 픽셀 오차 0 |
+| WGSL/WESL | 도전자 검증: 35/35 browser compile + Naga valid; 5→1 pipeline(-80%), GPU pass p50 0.142→0.037ms, 픽셀 오차 0. 다만 벽시계 jank stddev 0.093→0.104ms로 악화되고 p99/p50은 1.077 동률이어서 결합 승격 게이트는 `passed=false`; 제품 기본은 정적 WGSL/자체 생성기를 유지한다. |
 | WGSL pipeline cache | schema v2, Chromium 140/Metal production build, 각 접근 61 samples: uncached operation p50/p95/p99 3.115/3.315/3.545ms vs cached value update 0.075/0.120/0.180ms, 각각 41.533×/27.625×/19.694×; pipeline creation 61→1, long task 0, estimated resident entry 22,040B. dependency-free bootstrap이 CSP listener→Zod jitless→dynamic import 순서를 고정하고 Zod `allowsEval.value=false`를 확인했다. CDP 실제 argv 48개에 JIT-disable flag가 없으며, 별도 fresh context의 같은 CSP eval 양성 대조군은 `EvalError`와 `script-src: eval` 1건을 관측했다. release realm의 console/page/network/CSP 오류는 0이다 |
 | Living Ink WebGL2/WebGPU 실제 브라우저 | Chromium 140 Dedicated Worker + OffscreenCanvas에서 양 backend `status=ok`, failures 0, WebGPU visual parity `reached`. WebGL2/WebGPU isolated granulation **1.50459/1.51745**(gate 1.5), aspect **1.31884/1.32857**(gate 1–1.35), continuous max jump **0.18487/0.13288**(gate 0.22), min/median **0.71008/0.77808**(gate 0.55). WebGL2/WebGPU operation 81, ACK readback/ImageBitmap 0/0, explicit presentation 1, deferred endpoint hash-exact. WebGL2 receipt=`rgba8-staging-fbo`+bottom-left, WebGPU receipt=`rgba32float-storage-buffer-to-rgba8`+top-left이며 두 조합 모두 표시 bitmap hash와 일치한다. journal reload·crash recovery·near-black parity도 exact다 |
 | GPU 필터 전체 kernel/chain | 실제 browser 19/19 통과. morphology/convolution/spatial/LUT chain은 최대 채널 오차 0, Gaussian/HSL/full-chain은 최대 1/255, alpha 오차 0, page error 0 |
 | 제품 브러시·도형 browser matrix | `tests/benchmarks/results/studio-brush-browser.json`. 최종 통합 production browser 실측: core 71 + pro 160 = **231/231** 선택·paint/erase·undo·redo 통과. `standard-eraser`는 완전 삭제(residual 0), `kneaded-eraser`는 저농도 부분 삭제(residual 0.620437)를 실제 retained-layer erase로 수행했다. core 장거리 필획 **71/71**은 각 6/6 segment와 약 392.7px persistence·Undo, continuous-policy failure 0을 기록했다. Smart Shape 6/6 통과. 모바일은 paint 229개 + eraser 2개를 분리 노출했고 **474 interactive targets**, 최소 44×44px, undersized 0, browser error 0이었다. |
 | pointer-up 내구성 | 브라우저 내비게이션 발행 **0.220ms**, beforeunload guard 표시, marker reason `pointerup`, stroke 1/1 payload 포함, recovery banner와 복구 픽셀 변화 확인, error 0 |
-| 전체 push 검증 | 최종 통합 트리에서 `pnpm run verify:push` exit 0. architecture/lint/root+API typecheck, Vitest **2,310 files·27,501 tests pass**(23 files·68 tests explicit skip), Cloudflare realtime 9 tests + typecheck + Wrangler dry-run, production build/CSP, workspace builds, bundle ratchet **0 regression**, license inventory 580 pnpm·Vello CPU/GPU 85/144 crates·opaque WASM 3개·license text 415개가 통과했다. 보안 감사에는 high/critical 0, low 3·moderate 3이 남고 React Router advisory 예외는 만료 기한이 있는 정책으로 검증됐다. |
+| 전체 push 검증 | 최종 통합 트리에서 `pnpm run verify:push`를 실행했다. architecture/lint/root+API typecheck, Vitest **2,333 files·27,809 tests pass**(22 files·68 tests explicit skip), Cloudflare realtime 9 tests + typecheck + Wrangler dry-run, production build/CSP, workspace builds, bundle ratchet **0 regression**, license inventory 580 pnpm·Vello CPU/GPU 85/144 crates·opaque WASM 3개·license text 415개가 통과했다. 보안 감사에는 high/critical 0, low 3·moderate 3이 남고 React Router advisory 예외는 만료 기한이 있는 정책으로 검증됐다. |
 | CJK text cache package/harness | 실제 Parley/Skrifa 100,000 serviced glyph; steady hit 100%, 전체 hit 90%, 472.601×; 6 sample shape/pixel byte-exact |
 | SQLite Translation Memory | 512 entries/296,700B; save p50/p95/p99 7.965/13.860/16.255ms, load 8.715/9.915/10.075ms |
 | SQLite Production Bible | save p50/p95/p99 2.450/2.885/3.685ms, load 0.240/0.385/1.465ms; forced Worker terminate reopen 9.215ms |
@@ -338,7 +359,7 @@ SOAK_MINUTES=480 pnpm run soak:studio-engine
 | SQLite BG3D LT 프리셋 | 최대 32개 canonical 28,447B; 100회 save p50/p95/p99 8.715/9.520/10.655ms, load 4.140/4.990/5.270ms; Worker 강제 종료 뒤 SHA·32개 의미 동일 |
 | CRDT recovery SQLite/OPFS | Chromium 140 Dedicated Worker, 31 frontier/4,127 updates/95 rows/1,883,363B; save p50/p95/p99 75.495/131.265/134.820ms, 전체 load 126.670/134.105/179.470ms; close/reopen·30회 load·1,853,078B bundle digest 동일, 257-update commit 직후 Worker terminate 후 손실 0, 손상 행 fail-closed. 동일 SAH-pool의 두 번째 Worker는 `NoModificationAllowedError`로 거절됐고 예상 경합 console error 7건/예상 밖 error 0건이므로 판정은 `quarantined-single-owner`다 |
 | `/studio` production browser QA | 최종 통합 트리의 production build/Chromium에서 desktop 2회와 mobile 320/360/390px launch 통과. SQLite storage failure 0, desktop 720px Konva surface·page add persistence, 모바일 19개 dock target·pages/props/brushes focus trap/drag/keyboard dismissal·document overflow 0. 별도 menu/mobile-top(320/360/390/430 immersive+windowed)/icon verifier도 모두 exit 0, unlabeled·undersized·console error 0 |
-| final bundle budget | 최종 통합 production build 기준 route raw/gzip **4,644.6/1,489.0KiB**, StudioPage **1,955.1/577.1KiB**, app shell 이후 **4,061.8/1,305.6KiB**, request **191**, route chunk **200**; ratchet 기준 27개 유지·2개 개선·regression 0. reference 초과 12건은 관측치이며 release veto는 ratchet이 담당한다 |
+| final bundle budget | 최종 통합 production build 기준 route raw/gzip **4,661.6/1,492.7KiB**, StudioPage **1,938.8/572.2KiB**, app shell 이후 **4,078.9/1,309.3KiB**, app-shell request **191**, route chunk **200**; 27개 ratchet regression 0. SQLite preference/워터마크 런타임과 페이지 목록·도구 레일은 기능 손실 없이 지연 경계로 분리했다. reference 초과 12건은 관측치이며 release veto는 ratchet이 담당한다 |
 | 외부 복구 패키지 | 1,055,639B ZIP export p50/p95/p99 4.545/4.970/5.034ms; import 27.922/34.303/40.996ms |
 | third-party provenance inventory | Vello CPU/GPU 외부 crate 85/144, Vello license document digest 88, opaque WASM inventory 3개·upstream component 5개, hash-pinned JS/WASM 엔진 파일 총 10개 |
 | 8h soak | 480분, 727,739 cycles, 29,109,560 commands, 1,455,478 renders, error 0; RSS 225.1→344.8MiB |
@@ -412,10 +433,24 @@ provider 귀속 native CPU/GPU·texture/buffer peak는 production adapter와 Web
   `src/domains/creator/studio-three-mesh-bvh-provider.test.ts`,
   `src/domains/creator/studio-vrm-surface-brush-provider.ts`,
   `src/domains/creator/studio-vrm-surface-brush-provider.test.ts`,
+  `src/domains/creator/studio-vrm-surface-paint-tool.ts`,
+  `src/domains/creator/studio-vrm-surface-paint-tool.test.ts`,
+  `src/domains/creator/studio-vrm-surface-paint-product-boundary.test.ts`,
+  `src/domains/creator/StudioVrmPoser.tsx`,
   `tests/benchmarks/results/vrm-surface-brush-browser.json`,
   `tests/benchmarks/harness/vrm-surface-brush-browser-page.ts`,
   `tests/benchmarks/harness/vrm-surface-brush-browser.ts`,
   `tests/visual/vrm-surface-brush-browser-contract.test.ts`
+- owner-scoped UI SQLite:
+  `src/domains/creator/studio-workspace-sqlite-runtime.ts`,
+  `src/domains/creator/studio-workspace-sqlite-runtime.test.ts`,
+  `src/domains/creator/studio-quick-access-integration.ts`,
+  `src/domains/creator/studio-draft-collaboration.ts`,
+  `src/domains/creator/studio-ui-preferences-sqlite.ts`,
+  `src/domains/creator/studio-pro-draw-preferences-sqlite.ts`,
+  `src/domains/creator/studio-companion-window-preferences-sqlite.ts`,
+  `src/domains/creator/studio-reference-panel-preferences-sqlite.ts`,
+  `src/domains/creator/studio-watermark-preferences-sqlite.ts`
 - SVG/Vello: `tests/benchmarks/results/vello-svg-native-browser.json`,
   `tests/visual/svg-vello-native.test.ts`
 - tiled/million-scale: `tests/benchmarks/results/tiledoc-webgpu-browser.json`,
@@ -467,8 +502,10 @@ provider 귀속 native CPU/GPU·texture/buffer peak는 production adapter와 Web
   표현이라고 주장하지 않으며, 각자의 digest가 재실행 31회 동안 각각 byte-stable임을 검증했다.
   pressure `0.123456789`/`0.987654321`은 operation까지 strict-equal이며, UV chart 변경은 두 run과 한
   seam으로 분리돼 chart 사이 보간 dab을 만들지 않는다. 실제 bundled `sample.vrm`도 두 실행의 atlas
-  bytes가 동일했다. 이는 adapter→제품 texture runtime 경로의 결정성 증거이며 Studio UI 도구 배선이나
-  사람의 VRM 질감·손맛 블라인드 품질 판정으로 확대하지 않는다.
+  bytes가 동일했다. 실제 `StudioVrmPoser`의 R3F pointer workflow도 같은 controller를 호출하고
+  한 gesture를 canonical atlas commit 1회로 닫으며, pressure/tilt와 deterministic undo/replay,
+  pointer-leave/upload-failure rollback을 제품 테스트로 검증했다. 이는 자동 제품 배선·트랜잭션
+  정확성 증거이며 사람의 VRM 질감·손맛 블라인드 품질 판정으로 확대하지 않는다.
 - CJK cache는 fresh/cached shape와 렌더 픽셀이 표본 6개에서 byte-exact이고 tofu outline은 0이다.
 - 복구한 `/System/Library/Fonts/Supplemental/Arial Unicode.ttf`(23,278,008B,
   SHA-256 `876af2cd4854644e7f3e7feb2f688997fdb3343c6df6693611209c9dfb47ccec`)와
@@ -522,12 +559,12 @@ provider 귀속 native CPU/GPU·texture/buffer peak는 production adapter와 Web
   no-readback/vector-shadow/canonical-once 계약은 통과했다. 다만 Studio watercolor live shadow→settled
   material의 centroid/centerline drift와 energy ratio를 직접 계량하는 제품 raw artifact는 별도이며,
   현재 GPU material verifier를 그 수치로 대체하지 않는다.
-- **3D surface brush 잔여 범위**: 실제 Three.js/VRM raycast/BVH provider와 texture owner의 round-tip
-  no-mixing 경로는 연결됐다. stamp/image tip, smudge/wet neighborhood backend, face index 또는 texel-density
-  근거가 없는 custom picker는 격리돼 있으며, 실제 VRM 모델 corpus의 사람 시각 품질은 아직 통과로
-  표시하지 않는다. 현재 source audit에서 surface-brush adapter API의 비테스트 caller는 발견되지 않았고,
-  production Chromium artifact도 adapter를 직접 호출하는 전용 하니스다. 따라서 기존 Studio UI/R3F
-  pointer workflow에 사용자 도구로 배선됐다고 표시하지 않는다.
+- **3D surface brush 잔여 범위**: 실제 Three.js/VRM raycast/BVH provider, texture owner, 비테스트
+  `StudioVrmPoser` R3F pointer workflow의 round-tip/no-mixing 경로까지 연결됐다. stamp/image tip,
+  smudge/wet neighborhood backend는 명시적 unsupported이며, face index 또는 texel-density 근거가 없는
+  hit는 seam-safe로 가장하지 않고 기존 compatibility round path로 보낸다. 권리 확보된 다중 VRM 모델
+  corpus의 사람 시각 품질·손맛 blind gate, 실 resident GPU memory, 장시간 texture churn과 실기기
+  pressure/tilt 전달은 아직 통과로 표시하지 않는다.
 - **renderer tournament 승격 범위**: Chromium/Apple Metal의 3개 fingerprint bucket에서 Vello GPU,
   vello_cpu, CanvasKit 실제 cost·visual raw JSON은 통과했다. 그러나 장치·장면 범위가 제한되고 shadow
   soak가 없어 product-wide promotion은 하지 않는다. 분리 GPU pass와 provider 귀속 native CPU/GPU

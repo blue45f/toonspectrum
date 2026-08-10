@@ -42,16 +42,6 @@ const createSeriesPage = readFileSync(
 
 const creatorDir = fileURLToPath(new URL(".", import.meta.url));
 
-/**
- * 네이티브 confirm 이 남아도 되는 **유일한** 파일.
- *
- * `studio-destructive-action-preview.ts` 는 승인 표면이 하나도 마운트되지 않은 환경
- * (SSR·테스트·호스트가 없는 라우트)에서 쓰는 fail-closed fallback 의 소유자다. 그 fallback
- * 자체를 없애면 승인 표면이 없을 때 파괴가 **조용히 통과**하거나 **조용히 무시**된다.
- * 다른 파일이 이 목록에 추가되려면 같은 수준의 근거가 있어야 한다.
- */
-const NATIVE_CONFIRM_EXCEPTIONS = new Set(["studio-destructive-action-preview.ts"]);
-
 function creatorSourceFiles(): readonly string[] {
   return readdirSync(creatorDir).filter(
     (name) =>
@@ -129,10 +119,10 @@ describe("Studio reliability product boundary", () => {
 
   it("has no native confirm left anywhere in the creator domain", () => {
     const offenders: string[] = [];
+    const nativeConfirmCall = /(?:globalThis|window)\s*\.\s*confirm\s*(?:\?\.)?\s*\(/u;
     for (const name of creatorSourceFiles()) {
-      if (NATIVE_CONFIRM_EXCEPTIONS.has(name)) continue;
       const source = readFileSync(`${creatorDir}${name}`, "utf8");
-      if (source.includes("globalThis.confirm(") || source.includes("window.confirm(")) {
+      if (nativeConfirmCall.test(source)) {
         offenders.push(name);
       }
     }
@@ -143,12 +133,12 @@ describe("Studio reliability product boundary", () => {
     ).toEqual([]);
   });
 
-  it("keeps the declared native-confirm exception to the fail-closed fallback only", () => {
-    // 예외 파일은 fallback 을 실제로 갖고 있어야 하고, 그 fallback 은 승인 표면이 없을 때
-    // false 를 돌려주는 fail-closed 여야 한다.
+  it("keeps the missing-presenter path fail-closed without a native dialog exception", () => {
     expect(destructivePreview).toContain("function defaultPresenter(");
     expect(destructivePreview).toContain("fail-closed");
-    expect(NATIVE_CONFIRM_EXCEPTIONS.size).toBe(1);
+    expect(destructivePreview).not.toMatch(
+      /(?:globalThis|window)\s*\.\s*confirm\s*(?:\?\.)?\s*\(/u,
+    );
   });
 
   it("routes the approval surface through the on-canvas dialog instead of the browser dialog", () => {

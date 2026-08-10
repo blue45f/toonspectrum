@@ -42,7 +42,10 @@ describe("workspace device overrides reach the studio", () => {
     // resolution ever reached the workspace snapshot instead, a pen-display session would rewrite
     // the profile the artist authored on a desktop.
     const source = studioPageSource();
-    expect(source).toContain("updateStudioWorkspaceLiveLayout(sourceState, nextLayout)");
+    expect(source).toContain(
+      "updateStudioWorkspaceLiveLayout(workspacePersistence.state, nextLayout)",
+    );
+    expect(source).toContain("persistStudioWorkspaceStateFromEffect(");
     expect(source).not.toContain("resolveStudioWorkspaceDeviceLayout(nextLayout");
   });
 

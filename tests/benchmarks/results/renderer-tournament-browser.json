@@ -1,9 +1,9 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "generatedAt": "2026-08-10T10:58:25.539Z",
   "status": "pass",
   "technicalPass": true,
-  "releasePass": true,
+  "boundedHarnessPass": true,
   "pass": true,
   "benchmark": {
     "execution": "vite-production-build-chromium-metal-webgpu",

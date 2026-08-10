@@ -141,7 +141,7 @@ function jsxAttributes(node: ts.JsxSelfClosingElement): Map<string, string | nul
   }));
 }
 
-const IMAGE_NODE_PROPS = [
+const IMAGE_NODE_CALL_PROPS = [
   "el",
   "draggable",
   "innerRef",
@@ -152,6 +152,14 @@ const IMAGE_NODE_PROPS = [
   "onInteractionBegin",
   "onInteractionEnd",
   "liveStrokeRef",
+  "onHokusaiCanonicalImageReady",
+  "onLivingInkCanonicalImageReady",
+  "rasterPresentationEligible",
+] as const;
+
+const IMAGE_NODE_CONTRACT_PROPS = [
+  ...IMAGE_NODE_CALL_PROPS.slice(0, 10),
+  "onAnimatedImageFilterStatus",
   "onHokusaiCanonicalImageReady",
   "onLivingInkCanonicalImageReady",
   "rasterPresentationEligible",
@@ -190,7 +198,7 @@ describe("Studio Konva image node boundary", () => {
     expect(page.source).not.toMatch(/\bUrlImage\b/u);
   });
 
-  it("preserves the exact thirteen-prop effective image call contract", () => {
+  it("preserves the effective image call contract and its optional status observer", () => {
     const viewport = moduleShape("./StudioCanvasViewport.tsx");
     const imageNode = moduleShape("./StudioKonvaImageNode.tsx");
     const contract = propertyNames(
@@ -198,8 +206,8 @@ describe("Studio Konva image node boundary", () => {
     );
     const attributes = jsxAttributes(findImageNodeJsx(viewport));
 
-    expect(contract).toEqual(IMAGE_NODE_PROPS);
-    expect([...attributes.keys()]).toEqual(IMAGE_NODE_PROPS);
+    expect(contract).toEqual(IMAGE_NODE_CONTRACT_PROPS);
+    expect([...attributes.keys()]).toEqual(IMAGE_NODE_CALL_PROPS);
     expect(attributes.get("el")).toBe("{effectiveEl}");
     expect(attributes.get("draggable")).toBe("{draggable}");
     expect(attributes.get("innerRef")).toBe("{setRef}");
@@ -252,9 +260,9 @@ describe("Studio Konva image node boundary", () => {
     expect(source).toContain(
       "const filterRequestAtRef = useRef(Number.NEGATIVE_INFINITY);"
     );
-    expect(source).toContain("globalThis.cancelAnimationFrame(raf)");
+    expect(source).toContain("cancelFrame: (id) => globalThis.cancelAnimationFrame(id)");
     expect(source).toContain("if (el.frames && el.frames.length > 1) return;");
-    expect(source).toContain("if (!liveStrokeRef?.current && now - lastDrawAt >= FRAME_INTERVAL_MS)");
+    expect(source).toContain("isPenDown: () => !!liveStrokeRef?.current");
     expect(source).toContain("function createStudioRasterFlippedDisplaySource(");
     expect(source).toContain(
       'context.translate(scaleX === -1 ? width : 0, scaleY === -1 ? height : 0);'

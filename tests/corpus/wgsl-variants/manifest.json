@@ -15,7 +15,64 @@
       ],
       "usesLut": true,
       "lutEntryCount": 768,
-      "uniformByteLength": 16
+      "uniformByteLength": 16,
+      "shaderManifest": {
+        "inputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "outputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "bindGroups": {
+          "group": 0,
+          "bindings": {
+            "src": 0,
+            "dst": 1,
+            "params": 2,
+            "lut": 3
+          },
+          "lutBindingPresent": true
+        },
+        "workgroupSize": {
+          "x": 64,
+          "y": 1,
+          "z": 1,
+          "dispatchRowThreads": 16384
+        },
+        "storageWrites": {
+          "targets": [
+            "dst"
+          ],
+          "policy": "single-bounded-write-per-invocation",
+          "guard": "global-index < pixel-count"
+        },
+        "bounds": {
+          "input": "full-frame",
+          "output": "full-frame",
+          "haloPx": 0
+        },
+        "determinism": {
+          "class": "deterministic",
+          "timeIndependent": true,
+          "stageBoundaryQuantization": "round-half-even-rgba8"
+        },
+        "memoryEstimate": {
+          "fixedBytes": 3088,
+          "bytesPerPixel": 8,
+          "formula": "uniform + lut + src-rgba8 + dst-rgba8"
+        },
+        "timeDependency": "none",
+        "variants": {
+          "preview": "wgslfx-v1-bc-6315e001",
+          "final": "wgslfx-v1-bc-6315e001",
+          "pixelEquivalent": true
+        },
+        "licenseProvenance": {
+          "spdx": "LicenseRef-ToonSpectrum-Proprietary",
+          "source": "ToonStudio deterministic WGSL variant composer",
+          "generatedFrom": "EffectGraphIR color-operation subsequence"
+        }
+      }
     },
     {
       "variantKey": "wgslfx-v1-hsl-29b08829",
@@ -26,7 +83,64 @@
       ],
       "usesLut": false,
       "lutEntryCount": 0,
-      "uniformByteLength": 64
+      "uniformByteLength": 64,
+      "shaderManifest": {
+        "inputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "outputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "bindGroups": {
+          "group": 0,
+          "bindings": {
+            "src": 0,
+            "dst": 1,
+            "params": 2,
+            "lut": 3
+          },
+          "lutBindingPresent": false
+        },
+        "workgroupSize": {
+          "x": 64,
+          "y": 1,
+          "z": 1,
+          "dispatchRowThreads": 16384
+        },
+        "storageWrites": {
+          "targets": [
+            "dst"
+          ],
+          "policy": "single-bounded-write-per-invocation",
+          "guard": "global-index < pixel-count"
+        },
+        "bounds": {
+          "input": "full-frame",
+          "output": "full-frame",
+          "haloPx": 0
+        },
+        "determinism": {
+          "class": "deterministic",
+          "timeIndependent": true,
+          "stageBoundaryQuantization": "round-half-even-rgba8"
+        },
+        "memoryEstimate": {
+          "fixedBytes": 64,
+          "bytesPerPixel": 8,
+          "formula": "uniform + lut + src-rgba8 + dst-rgba8"
+        },
+        "timeDependency": "none",
+        "variants": {
+          "preview": "wgslfx-v1-hsl-29b08829",
+          "final": "wgslfx-v1-hsl-29b08829",
+          "pixelEquivalent": true
+        },
+        "licenseProvenance": {
+          "spdx": "LicenseRef-ToonSpectrum-Proprietary",
+          "source": "ToonStudio deterministic WGSL variant composer",
+          "generatedFrom": "EffectGraphIR color-operation subsequence"
+        }
+      }
     },
     {
       "variantKey": "wgslfx-v1-lv-113694b0",
@@ -37,7 +151,64 @@
       ],
       "usesLut": true,
       "lutEntryCount": 768,
-      "uniformByteLength": 16
+      "uniformByteLength": 16,
+      "shaderManifest": {
+        "inputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "outputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "bindGroups": {
+          "group": 0,
+          "bindings": {
+            "src": 0,
+            "dst": 1,
+            "params": 2,
+            "lut": 3
+          },
+          "lutBindingPresent": true
+        },
+        "workgroupSize": {
+          "x": 64,
+          "y": 1,
+          "z": 1,
+          "dispatchRowThreads": 16384
+        },
+        "storageWrites": {
+          "targets": [
+            "dst"
+          ],
+          "policy": "single-bounded-write-per-invocation",
+          "guard": "global-index < pixel-count"
+        },
+        "bounds": {
+          "input": "full-frame",
+          "output": "full-frame",
+          "haloPx": 0
+        },
+        "determinism": {
+          "class": "deterministic",
+          "timeIndependent": true,
+          "stageBoundaryQuantization": "round-half-even-rgba8"
+        },
+        "memoryEstimate": {
+          "fixedBytes": 3088,
+          "bytesPerPixel": 8,
+          "formula": "uniform + lut + src-rgba8 + dst-rgba8"
+        },
+        "timeDependency": "none",
+        "variants": {
+          "preview": "wgslfx-v1-lv-113694b0",
+          "final": "wgslfx-v1-lv-113694b0",
+          "pixelEquivalent": true
+        },
+        "licenseProvenance": {
+          "spdx": "LicenseRef-ToonSpectrum-Proprietary",
+          "source": "ToonStudio deterministic WGSL variant composer",
+          "generatedFrom": "EffectGraphIR color-operation subsequence"
+        }
+      }
     },
     {
       "variantKey": "wgslfx-v1-cv-4bfd893b",
@@ -48,7 +219,64 @@
       ],
       "usesLut": true,
       "lutEntryCount": 768,
-      "uniformByteLength": 16
+      "uniformByteLength": 16,
+      "shaderManifest": {
+        "inputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "outputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "bindGroups": {
+          "group": 0,
+          "bindings": {
+            "src": 0,
+            "dst": 1,
+            "params": 2,
+            "lut": 3
+          },
+          "lutBindingPresent": true
+        },
+        "workgroupSize": {
+          "x": 64,
+          "y": 1,
+          "z": 1,
+          "dispatchRowThreads": 16384
+        },
+        "storageWrites": {
+          "targets": [
+            "dst"
+          ],
+          "policy": "single-bounded-write-per-invocation",
+          "guard": "global-index < pixel-count"
+        },
+        "bounds": {
+          "input": "full-frame",
+          "output": "full-frame",
+          "haloPx": 0
+        },
+        "determinism": {
+          "class": "deterministic",
+          "timeIndependent": true,
+          "stageBoundaryQuantization": "round-half-even-rgba8"
+        },
+        "memoryEstimate": {
+          "fixedBytes": 3088,
+          "bytesPerPixel": 8,
+          "formula": "uniform + lut + src-rgba8 + dst-rgba8"
+        },
+        "timeDependency": "none",
+        "variants": {
+          "preview": "wgslfx-v1-cv-4bfd893b",
+          "final": "wgslfx-v1-cv-4bfd893b",
+          "pixelEquivalent": true
+        },
+        "licenseProvenance": {
+          "spdx": "LicenseRef-ToonSpectrum-Proprietary",
+          "source": "ToonStudio deterministic WGSL variant composer",
+          "generatedFrom": "EffectGraphIR color-operation subsequence"
+        }
+      }
     },
     {
       "variantKey": "wgslfx-v1-cb-ca410de5",
@@ -59,7 +287,64 @@
       ],
       "usesLut": false,
       "lutEntryCount": 0,
-      "uniformByteLength": 64
+      "uniformByteLength": 64,
+      "shaderManifest": {
+        "inputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "outputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "bindGroups": {
+          "group": 0,
+          "bindings": {
+            "src": 0,
+            "dst": 1,
+            "params": 2,
+            "lut": 3
+          },
+          "lutBindingPresent": false
+        },
+        "workgroupSize": {
+          "x": 64,
+          "y": 1,
+          "z": 1,
+          "dispatchRowThreads": 16384
+        },
+        "storageWrites": {
+          "targets": [
+            "dst"
+          ],
+          "policy": "single-bounded-write-per-invocation",
+          "guard": "global-index < pixel-count"
+        },
+        "bounds": {
+          "input": "full-frame",
+          "output": "full-frame",
+          "haloPx": 0
+        },
+        "determinism": {
+          "class": "deterministic",
+          "timeIndependent": true,
+          "stageBoundaryQuantization": "round-half-even-rgba8"
+        },
+        "memoryEstimate": {
+          "fixedBytes": 64,
+          "bytesPerPixel": 8,
+          "formula": "uniform + lut + src-rgba8 + dst-rgba8"
+        },
+        "timeDependency": "none",
+        "variants": {
+          "preview": "wgslfx-v1-cb-ca410de5",
+          "final": "wgslfx-v1-cb-ca410de5",
+          "pixelEquivalent": true
+        },
+        "licenseProvenance": {
+          "spdx": "LicenseRef-ToonSpectrum-Proprietary",
+          "source": "ToonStudio deterministic WGSL variant composer",
+          "generatedFrom": "EffectGraphIR color-operation subsequence"
+        }
+      }
     },
     {
       "variantKey": "wgslfx-v1-bc.bc-c17dca0c",
@@ -71,7 +356,64 @@
       ],
       "usesLut": true,
       "lutEntryCount": 1536,
-      "uniformByteLength": 16
+      "uniformByteLength": 16,
+      "shaderManifest": {
+        "inputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "outputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "bindGroups": {
+          "group": 0,
+          "bindings": {
+            "src": 0,
+            "dst": 1,
+            "params": 2,
+            "lut": 3
+          },
+          "lutBindingPresent": true
+        },
+        "workgroupSize": {
+          "x": 64,
+          "y": 1,
+          "z": 1,
+          "dispatchRowThreads": 16384
+        },
+        "storageWrites": {
+          "targets": [
+            "dst"
+          ],
+          "policy": "single-bounded-write-per-invocation",
+          "guard": "global-index < pixel-count"
+        },
+        "bounds": {
+          "input": "full-frame",
+          "output": "full-frame",
+          "haloPx": 0
+        },
+        "determinism": {
+          "class": "deterministic",
+          "timeIndependent": true,
+          "stageBoundaryQuantization": "round-half-even-rgba8"
+        },
+        "memoryEstimate": {
+          "fixedBytes": 6160,
+          "bytesPerPixel": 8,
+          "formula": "uniform + lut + src-rgba8 + dst-rgba8"
+        },
+        "timeDependency": "none",
+        "variants": {
+          "preview": "wgslfx-v1-bc.bc-c17dca0c",
+          "final": "wgslfx-v1-bc.bc-c17dca0c",
+          "pixelEquivalent": true
+        },
+        "licenseProvenance": {
+          "spdx": "LicenseRef-ToonSpectrum-Proprietary",
+          "source": "ToonStudio deterministic WGSL variant composer",
+          "generatedFrom": "EffectGraphIR color-operation subsequence"
+        }
+      }
     },
     {
       "variantKey": "wgslfx-v1-bc.hsl-2792e142",
@@ -83,7 +425,64 @@
       ],
       "usesLut": true,
       "lutEntryCount": 768,
-      "uniformByteLength": 64
+      "uniformByteLength": 64,
+      "shaderManifest": {
+        "inputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "outputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "bindGroups": {
+          "group": 0,
+          "bindings": {
+            "src": 0,
+            "dst": 1,
+            "params": 2,
+            "lut": 3
+          },
+          "lutBindingPresent": true
+        },
+        "workgroupSize": {
+          "x": 64,
+          "y": 1,
+          "z": 1,
+          "dispatchRowThreads": 16384
+        },
+        "storageWrites": {
+          "targets": [
+            "dst"
+          ],
+          "policy": "single-bounded-write-per-invocation",
+          "guard": "global-index < pixel-count"
+        },
+        "bounds": {
+          "input": "full-frame",
+          "output": "full-frame",
+          "haloPx": 0
+        },
+        "determinism": {
+          "class": "deterministic",
+          "timeIndependent": true,
+          "stageBoundaryQuantization": "round-half-even-rgba8"
+        },
+        "memoryEstimate": {
+          "fixedBytes": 3136,
+          "bytesPerPixel": 8,
+          "formula": "uniform + lut + src-rgba8 + dst-rgba8"
+        },
+        "timeDependency": "none",
+        "variants": {
+          "preview": "wgslfx-v1-bc.hsl-2792e142",
+          "final": "wgslfx-v1-bc.hsl-2792e142",
+          "pixelEquivalent": true
+        },
+        "licenseProvenance": {
+          "spdx": "LicenseRef-ToonSpectrum-Proprietary",
+          "source": "ToonStudio deterministic WGSL variant composer",
+          "generatedFrom": "EffectGraphIR color-operation subsequence"
+        }
+      }
     },
     {
       "variantKey": "wgslfx-v1-bc.lv-dc0a2521",
@@ -95,7 +494,64 @@
       ],
       "usesLut": true,
       "lutEntryCount": 1536,
-      "uniformByteLength": 16
+      "uniformByteLength": 16,
+      "shaderManifest": {
+        "inputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "outputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "bindGroups": {
+          "group": 0,
+          "bindings": {
+            "src": 0,
+            "dst": 1,
+            "params": 2,
+            "lut": 3
+          },
+          "lutBindingPresent": true
+        },
+        "workgroupSize": {
+          "x": 64,
+          "y": 1,
+          "z": 1,
+          "dispatchRowThreads": 16384
+        },
+        "storageWrites": {
+          "targets": [
+            "dst"
+          ],
+          "policy": "single-bounded-write-per-invocation",
+          "guard": "global-index < pixel-count"
+        },
+        "bounds": {
+          "input": "full-frame",
+          "output": "full-frame",
+          "haloPx": 0
+        },
+        "determinism": {
+          "class": "deterministic",
+          "timeIndependent": true,
+          "stageBoundaryQuantization": "round-half-even-rgba8"
+        },
+        "memoryEstimate": {
+          "fixedBytes": 6160,
+          "bytesPerPixel": 8,
+          "formula": "uniform + lut + src-rgba8 + dst-rgba8"
+        },
+        "timeDependency": "none",
+        "variants": {
+          "preview": "wgslfx-v1-bc.lv-dc0a2521",
+          "final": "wgslfx-v1-bc.lv-dc0a2521",
+          "pixelEquivalent": true
+        },
+        "licenseProvenance": {
+          "spdx": "LicenseRef-ToonSpectrum-Proprietary",
+          "source": "ToonStudio deterministic WGSL variant composer",
+          "generatedFrom": "EffectGraphIR color-operation subsequence"
+        }
+      }
     },
     {
       "variantKey": "wgslfx-v1-bc.cv-631bd6d2",
@@ -107,7 +563,64 @@
       ],
       "usesLut": true,
       "lutEntryCount": 1536,
-      "uniformByteLength": 16
+      "uniformByteLength": 16,
+      "shaderManifest": {
+        "inputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "outputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "bindGroups": {
+          "group": 0,
+          "bindings": {
+            "src": 0,
+            "dst": 1,
+            "params": 2,
+            "lut": 3
+          },
+          "lutBindingPresent": true
+        },
+        "workgroupSize": {
+          "x": 64,
+          "y": 1,
+          "z": 1,
+          "dispatchRowThreads": 16384
+        },
+        "storageWrites": {
+          "targets": [
+            "dst"
+          ],
+          "policy": "single-bounded-write-per-invocation",
+          "guard": "global-index < pixel-count"
+        },
+        "bounds": {
+          "input": "full-frame",
+          "output": "full-frame",
+          "haloPx": 0
+        },
+        "determinism": {
+          "class": "deterministic",
+          "timeIndependent": true,
+          "stageBoundaryQuantization": "round-half-even-rgba8"
+        },
+        "memoryEstimate": {
+          "fixedBytes": 6160,
+          "bytesPerPixel": 8,
+          "formula": "uniform + lut + src-rgba8 + dst-rgba8"
+        },
+        "timeDependency": "none",
+        "variants": {
+          "preview": "wgslfx-v1-bc.cv-631bd6d2",
+          "final": "wgslfx-v1-bc.cv-631bd6d2",
+          "pixelEquivalent": true
+        },
+        "licenseProvenance": {
+          "spdx": "LicenseRef-ToonSpectrum-Proprietary",
+          "source": "ToonStudio deterministic WGSL variant composer",
+          "generatedFrom": "EffectGraphIR color-operation subsequence"
+        }
+      }
     },
     {
       "variantKey": "wgslfx-v1-bc.cb-6fbcb18c",
@@ -119,7 +632,64 @@
       ],
       "usesLut": true,
       "lutEntryCount": 768,
-      "uniformByteLength": 64
+      "uniformByteLength": 64,
+      "shaderManifest": {
+        "inputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "outputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "bindGroups": {
+          "group": 0,
+          "bindings": {
+            "src": 0,
+            "dst": 1,
+            "params": 2,
+            "lut": 3
+          },
+          "lutBindingPresent": true
+        },
+        "workgroupSize": {
+          "x": 64,
+          "y": 1,
+          "z": 1,
+          "dispatchRowThreads": 16384
+        },
+        "storageWrites": {
+          "targets": [
+            "dst"
+          ],
+          "policy": "single-bounded-write-per-invocation",
+          "guard": "global-index < pixel-count"
+        },
+        "bounds": {
+          "input": "full-frame",
+          "output": "full-frame",
+          "haloPx": 0
+        },
+        "determinism": {
+          "class": "deterministic",
+          "timeIndependent": true,
+          "stageBoundaryQuantization": "round-half-even-rgba8"
+        },
+        "memoryEstimate": {
+          "fixedBytes": 3136,
+          "bytesPerPixel": 8,
+          "formula": "uniform + lut + src-rgba8 + dst-rgba8"
+        },
+        "timeDependency": "none",
+        "variants": {
+          "preview": "wgslfx-v1-bc.cb-6fbcb18c",
+          "final": "wgslfx-v1-bc.cb-6fbcb18c",
+          "pixelEquivalent": true
+        },
+        "licenseProvenance": {
+          "spdx": "LicenseRef-ToonSpectrum-Proprietary",
+          "source": "ToonStudio deterministic WGSL variant composer",
+          "generatedFrom": "EffectGraphIR color-operation subsequence"
+        }
+      }
     },
     {
       "variantKey": "wgslfx-v1-hsl.bc-4ebf4514",
@@ -131,7 +701,64 @@
       ],
       "usesLut": true,
       "lutEntryCount": 768,
-      "uniformByteLength": 64
+      "uniformByteLength": 64,
+      "shaderManifest": {
+        "inputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "outputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "bindGroups": {
+          "group": 0,
+          "bindings": {
+            "src": 0,
+            "dst": 1,
+            "params": 2,
+            "lut": 3
+          },
+          "lutBindingPresent": true
+        },
+        "workgroupSize": {
+          "x": 64,
+          "y": 1,
+          "z": 1,
+          "dispatchRowThreads": 16384
+        },
+        "storageWrites": {
+          "targets": [
+            "dst"
+          ],
+          "policy": "single-bounded-write-per-invocation",
+          "guard": "global-index < pixel-count"
+        },
+        "bounds": {
+          "input": "full-frame",
+          "output": "full-frame",
+          "haloPx": 0
+        },
+        "determinism": {
+          "class": "deterministic",
+          "timeIndependent": true,
+          "stageBoundaryQuantization": "round-half-even-rgba8"
+        },
+        "memoryEstimate": {
+          "fixedBytes": 3136,
+          "bytesPerPixel": 8,
+          "formula": "uniform + lut + src-rgba8 + dst-rgba8"
+        },
+        "timeDependency": "none",
+        "variants": {
+          "preview": "wgslfx-v1-hsl.bc-4ebf4514",
+          "final": "wgslfx-v1-hsl.bc-4ebf4514",
+          "pixelEquivalent": true
+        },
+        "licenseProvenance": {
+          "spdx": "LicenseRef-ToonSpectrum-Proprietary",
+          "source": "ToonStudio deterministic WGSL variant composer",
+          "generatedFrom": "EffectGraphIR color-operation subsequence"
+        }
+      }
     },
     {
       "variantKey": "wgslfx-v1-hsl.hsl-5e3a556a",
@@ -143,7 +770,64 @@
       ],
       "usesLut": false,
       "lutEntryCount": 0,
-      "uniformByteLength": 112
+      "uniformByteLength": 112,
+      "shaderManifest": {
+        "inputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "outputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "bindGroups": {
+          "group": 0,
+          "bindings": {
+            "src": 0,
+            "dst": 1,
+            "params": 2,
+            "lut": 3
+          },
+          "lutBindingPresent": false
+        },
+        "workgroupSize": {
+          "x": 64,
+          "y": 1,
+          "z": 1,
+          "dispatchRowThreads": 16384
+        },
+        "storageWrites": {
+          "targets": [
+            "dst"
+          ],
+          "policy": "single-bounded-write-per-invocation",
+          "guard": "global-index < pixel-count"
+        },
+        "bounds": {
+          "input": "full-frame",
+          "output": "full-frame",
+          "haloPx": 0
+        },
+        "determinism": {
+          "class": "deterministic",
+          "timeIndependent": true,
+          "stageBoundaryQuantization": "round-half-even-rgba8"
+        },
+        "memoryEstimate": {
+          "fixedBytes": 112,
+          "bytesPerPixel": 8,
+          "formula": "uniform + lut + src-rgba8 + dst-rgba8"
+        },
+        "timeDependency": "none",
+        "variants": {
+          "preview": "wgslfx-v1-hsl.hsl-5e3a556a",
+          "final": "wgslfx-v1-hsl.hsl-5e3a556a",
+          "pixelEquivalent": true
+        },
+        "licenseProvenance": {
+          "spdx": "LicenseRef-ToonSpectrum-Proprietary",
+          "source": "ToonStudio deterministic WGSL variant composer",
+          "generatedFrom": "EffectGraphIR color-operation subsequence"
+        }
+      }
     },
     {
       "variantKey": "wgslfx-v1-hsl.lv-f3b8b789",
@@ -155,7 +839,64 @@
       ],
       "usesLut": true,
       "lutEntryCount": 768,
-      "uniformByteLength": 64
+      "uniformByteLength": 64,
+      "shaderManifest": {
+        "inputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "outputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "bindGroups": {
+          "group": 0,
+          "bindings": {
+            "src": 0,
+            "dst": 1,
+            "params": 2,
+            "lut": 3
+          },
+          "lutBindingPresent": true
+        },
+        "workgroupSize": {
+          "x": 64,
+          "y": 1,
+          "z": 1,
+          "dispatchRowThreads": 16384
+        },
+        "storageWrites": {
+          "targets": [
+            "dst"
+          ],
+          "policy": "single-bounded-write-per-invocation",
+          "guard": "global-index < pixel-count"
+        },
+        "bounds": {
+          "input": "full-frame",
+          "output": "full-frame",
+          "haloPx": 0
+        },
+        "determinism": {
+          "class": "deterministic",
+          "timeIndependent": true,
+          "stageBoundaryQuantization": "round-half-even-rgba8"
+        },
+        "memoryEstimate": {
+          "fixedBytes": 3136,
+          "bytesPerPixel": 8,
+          "formula": "uniform + lut + src-rgba8 + dst-rgba8"
+        },
+        "timeDependency": "none",
+        "variants": {
+          "preview": "wgslfx-v1-hsl.lv-f3b8b789",
+          "final": "wgslfx-v1-hsl.lv-f3b8b789",
+          "pixelEquivalent": true
+        },
+        "licenseProvenance": {
+          "spdx": "LicenseRef-ToonSpectrum-Proprietary",
+          "source": "ToonStudio deterministic WGSL variant composer",
+          "generatedFrom": "EffectGraphIR color-operation subsequence"
+        }
+      }
     },
     {
       "variantKey": "wgslfx-v1-hsl.cv-1c5ae7fa",
@@ -167,7 +908,64 @@
       ],
       "usesLut": true,
       "lutEntryCount": 768,
-      "uniformByteLength": 64
+      "uniformByteLength": 64,
+      "shaderManifest": {
+        "inputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "outputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "bindGroups": {
+          "group": 0,
+          "bindings": {
+            "src": 0,
+            "dst": 1,
+            "params": 2,
+            "lut": 3
+          },
+          "lutBindingPresent": true
+        },
+        "workgroupSize": {
+          "x": 64,
+          "y": 1,
+          "z": 1,
+          "dispatchRowThreads": 16384
+        },
+        "storageWrites": {
+          "targets": [
+            "dst"
+          ],
+          "policy": "single-bounded-write-per-invocation",
+          "guard": "global-index < pixel-count"
+        },
+        "bounds": {
+          "input": "full-frame",
+          "output": "full-frame",
+          "haloPx": 0
+        },
+        "determinism": {
+          "class": "deterministic",
+          "timeIndependent": true,
+          "stageBoundaryQuantization": "round-half-even-rgba8"
+        },
+        "memoryEstimate": {
+          "fixedBytes": 3136,
+          "bytesPerPixel": 8,
+          "formula": "uniform + lut + src-rgba8 + dst-rgba8"
+        },
+        "timeDependency": "none",
+        "variants": {
+          "preview": "wgslfx-v1-hsl.cv-1c5ae7fa",
+          "final": "wgslfx-v1-hsl.cv-1c5ae7fa",
+          "pixelEquivalent": true
+        },
+        "licenseProvenance": {
+          "spdx": "LicenseRef-ToonSpectrum-Proprietary",
+          "source": "ToonStudio deterministic WGSL variant composer",
+          "generatedFrom": "EffectGraphIR color-operation subsequence"
+        }
+      }
     },
     {
       "variantKey": "wgslfx-v1-hsl.cb-3506a594",
@@ -179,7 +977,64 @@
       ],
       "usesLut": false,
       "lutEntryCount": 0,
-      "uniformByteLength": 112
+      "uniformByteLength": 112,
+      "shaderManifest": {
+        "inputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "outputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "bindGroups": {
+          "group": 0,
+          "bindings": {
+            "src": 0,
+            "dst": 1,
+            "params": 2,
+            "lut": 3
+          },
+          "lutBindingPresent": false
+        },
+        "workgroupSize": {
+          "x": 64,
+          "y": 1,
+          "z": 1,
+          "dispatchRowThreads": 16384
+        },
+        "storageWrites": {
+          "targets": [
+            "dst"
+          ],
+          "policy": "single-bounded-write-per-invocation",
+          "guard": "global-index < pixel-count"
+        },
+        "bounds": {
+          "input": "full-frame",
+          "output": "full-frame",
+          "haloPx": 0
+        },
+        "determinism": {
+          "class": "deterministic",
+          "timeIndependent": true,
+          "stageBoundaryQuantization": "round-half-even-rgba8"
+        },
+        "memoryEstimate": {
+          "fixedBytes": 112,
+          "bytesPerPixel": 8,
+          "formula": "uniform + lut + src-rgba8 + dst-rgba8"
+        },
+        "timeDependency": "none",
+        "variants": {
+          "preview": "wgslfx-v1-hsl.cb-3506a594",
+          "final": "wgslfx-v1-hsl.cb-3506a594",
+          "pixelEquivalent": true
+        },
+        "licenseProvenance": {
+          "spdx": "LicenseRef-ToonSpectrum-Proprietary",
+          "source": "ToonStudio deterministic WGSL variant composer",
+          "generatedFrom": "EffectGraphIR color-operation subsequence"
+        }
+      }
     },
     {
       "variantKey": "wgslfx-v1-lv.bc-fa0ece83",
@@ -191,7 +1046,64 @@
       ],
       "usesLut": true,
       "lutEntryCount": 1536,
-      "uniformByteLength": 16
+      "uniformByteLength": 16,
+      "shaderManifest": {
+        "inputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "outputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "bindGroups": {
+          "group": 0,
+          "bindings": {
+            "src": 0,
+            "dst": 1,
+            "params": 2,
+            "lut": 3
+          },
+          "lutBindingPresent": true
+        },
+        "workgroupSize": {
+          "x": 64,
+          "y": 1,
+          "z": 1,
+          "dispatchRowThreads": 16384
+        },
+        "storageWrites": {
+          "targets": [
+            "dst"
+          ],
+          "policy": "single-bounded-write-per-invocation",
+          "guard": "global-index < pixel-count"
+        },
+        "bounds": {
+          "input": "full-frame",
+          "output": "full-frame",
+          "haloPx": 0
+        },
+        "determinism": {
+          "class": "deterministic",
+          "timeIndependent": true,
+          "stageBoundaryQuantization": "round-half-even-rgba8"
+        },
+        "memoryEstimate": {
+          "fixedBytes": 6160,
+          "bytesPerPixel": 8,
+          "formula": "uniform + lut + src-rgba8 + dst-rgba8"
+        },
+        "timeDependency": "none",
+        "variants": {
+          "preview": "wgslfx-v1-lv.bc-fa0ece83",
+          "final": "wgslfx-v1-lv.bc-fa0ece83",
+          "pixelEquivalent": true
+        },
+        "licenseProvenance": {
+          "spdx": "LicenseRef-ToonSpectrum-Proprietary",
+          "source": "ToonStudio deterministic WGSL variant composer",
+          "generatedFrom": "EffectGraphIR color-operation subsequence"
+        }
+      }
     },
     {
       "variantKey": "wgslfx-v1-lv.hsl-38027cff",
@@ -203,7 +1115,64 @@
       ],
       "usesLut": true,
       "lutEntryCount": 768,
-      "uniformByteLength": 64
+      "uniformByteLength": 64,
+      "shaderManifest": {
+        "inputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "outputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "bindGroups": {
+          "group": 0,
+          "bindings": {
+            "src": 0,
+            "dst": 1,
+            "params": 2,
+            "lut": 3
+          },
+          "lutBindingPresent": true
+        },
+        "workgroupSize": {
+          "x": 64,
+          "y": 1,
+          "z": 1,
+          "dispatchRowThreads": 16384
+        },
+        "storageWrites": {
+          "targets": [
+            "dst"
+          ],
+          "policy": "single-bounded-write-per-invocation",
+          "guard": "global-index < pixel-count"
+        },
+        "bounds": {
+          "input": "full-frame",
+          "output": "full-frame",
+          "haloPx": 0
+        },
+        "determinism": {
+          "class": "deterministic",
+          "timeIndependent": true,
+          "stageBoundaryQuantization": "round-half-even-rgba8"
+        },
+        "memoryEstimate": {
+          "fixedBytes": 3136,
+          "bytesPerPixel": 8,
+          "formula": "uniform + lut + src-rgba8 + dst-rgba8"
+        },
+        "timeDependency": "none",
+        "variants": {
+          "preview": "wgslfx-v1-lv.hsl-38027cff",
+          "final": "wgslfx-v1-lv.hsl-38027cff",
+          "pixelEquivalent": true
+        },
+        "licenseProvenance": {
+          "spdx": "LicenseRef-ToonSpectrum-Proprietary",
+          "source": "ToonStudio deterministic WGSL variant composer",
+          "generatedFrom": "EffectGraphIR color-operation subsequence"
+        }
+      }
     },
     {
       "variantKey": "wgslfx-v1-lv.lv-499da56e",
@@ -215,7 +1184,64 @@
       ],
       "usesLut": true,
       "lutEntryCount": 1536,
-      "uniformByteLength": 16
+      "uniformByteLength": 16,
+      "shaderManifest": {
+        "inputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "outputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "bindGroups": {
+          "group": 0,
+          "bindings": {
+            "src": 0,
+            "dst": 1,
+            "params": 2,
+            "lut": 3
+          },
+          "lutBindingPresent": true
+        },
+        "workgroupSize": {
+          "x": 64,
+          "y": 1,
+          "z": 1,
+          "dispatchRowThreads": 16384
+        },
+        "storageWrites": {
+          "targets": [
+            "dst"
+          ],
+          "policy": "single-bounded-write-per-invocation",
+          "guard": "global-index < pixel-count"
+        },
+        "bounds": {
+          "input": "full-frame",
+          "output": "full-frame",
+          "haloPx": 0
+        },
+        "determinism": {
+          "class": "deterministic",
+          "timeIndependent": true,
+          "stageBoundaryQuantization": "round-half-even-rgba8"
+        },
+        "memoryEstimate": {
+          "fixedBytes": 6160,
+          "bytesPerPixel": 8,
+          "formula": "uniform + lut + src-rgba8 + dst-rgba8"
+        },
+        "timeDependency": "none",
+        "variants": {
+          "preview": "wgslfx-v1-lv.lv-499da56e",
+          "final": "wgslfx-v1-lv.lv-499da56e",
+          "pixelEquivalent": true
+        },
+        "licenseProvenance": {
+          "spdx": "LicenseRef-ToonSpectrum-Proprietary",
+          "source": "ToonStudio deterministic WGSL variant composer",
+          "generatedFrom": "EffectGraphIR color-operation subsequence"
+        }
+      }
     },
     {
       "variantKey": "wgslfx-v1-lv.cv-06425de9",
@@ -227,7 +1253,64 @@
       ],
       "usesLut": true,
       "lutEntryCount": 1536,
-      "uniformByteLength": 16
+      "uniformByteLength": 16,
+      "shaderManifest": {
+        "inputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "outputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "bindGroups": {
+          "group": 0,
+          "bindings": {
+            "src": 0,
+            "dst": 1,
+            "params": 2,
+            "lut": 3
+          },
+          "lutBindingPresent": true
+        },
+        "workgroupSize": {
+          "x": 64,
+          "y": 1,
+          "z": 1,
+          "dispatchRowThreads": 16384
+        },
+        "storageWrites": {
+          "targets": [
+            "dst"
+          ],
+          "policy": "single-bounded-write-per-invocation",
+          "guard": "global-index < pixel-count"
+        },
+        "bounds": {
+          "input": "full-frame",
+          "output": "full-frame",
+          "haloPx": 0
+        },
+        "determinism": {
+          "class": "deterministic",
+          "timeIndependent": true,
+          "stageBoundaryQuantization": "round-half-even-rgba8"
+        },
+        "memoryEstimate": {
+          "fixedBytes": 6160,
+          "bytesPerPixel": 8,
+          "formula": "uniform + lut + src-rgba8 + dst-rgba8"
+        },
+        "timeDependency": "none",
+        "variants": {
+          "preview": "wgslfx-v1-lv.cv-06425de9",
+          "final": "wgslfx-v1-lv.cv-06425de9",
+          "pixelEquivalent": true
+        },
+        "licenseProvenance": {
+          "spdx": "LicenseRef-ToonSpectrum-Proprietary",
+          "source": "ToonStudio deterministic WGSL variant composer",
+          "generatedFrom": "EffectGraphIR color-operation subsequence"
+        }
+      }
     },
     {
       "variantKey": "wgslfx-v1-lv.cb-d86a87f3",
@@ -239,7 +1322,64 @@
       ],
       "usesLut": true,
       "lutEntryCount": 768,
-      "uniformByteLength": 64
+      "uniformByteLength": 64,
+      "shaderManifest": {
+        "inputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "outputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "bindGroups": {
+          "group": 0,
+          "bindings": {
+            "src": 0,
+            "dst": 1,
+            "params": 2,
+            "lut": 3
+          },
+          "lutBindingPresent": true
+        },
+        "workgroupSize": {
+          "x": 64,
+          "y": 1,
+          "z": 1,
+          "dispatchRowThreads": 16384
+        },
+        "storageWrites": {
+          "targets": [
+            "dst"
+          ],
+          "policy": "single-bounded-write-per-invocation",
+          "guard": "global-index < pixel-count"
+        },
+        "bounds": {
+          "input": "full-frame",
+          "output": "full-frame",
+          "haloPx": 0
+        },
+        "determinism": {
+          "class": "deterministic",
+          "timeIndependent": true,
+          "stageBoundaryQuantization": "round-half-even-rgba8"
+        },
+        "memoryEstimate": {
+          "fixedBytes": 3136,
+          "bytesPerPixel": 8,
+          "formula": "uniform + lut + src-rgba8 + dst-rgba8"
+        },
+        "timeDependency": "none",
+        "variants": {
+          "preview": "wgslfx-v1-lv.cb-d86a87f3",
+          "final": "wgslfx-v1-lv.cb-d86a87f3",
+          "pixelEquivalent": true
+        },
+        "licenseProvenance": {
+          "spdx": "LicenseRef-ToonSpectrum-Proprietary",
+          "source": "ToonStudio deterministic WGSL variant composer",
+          "generatedFrom": "EffectGraphIR color-operation subsequence"
+        }
+      }
     },
     {
       "variantKey": "wgslfx-v1-cv.bc-a367d19e",
@@ -251,7 +1391,64 @@
       ],
       "usesLut": true,
       "lutEntryCount": 1536,
-      "uniformByteLength": 16
+      "uniformByteLength": 16,
+      "shaderManifest": {
+        "inputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "outputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "bindGroups": {
+          "group": 0,
+          "bindings": {
+            "src": 0,
+            "dst": 1,
+            "params": 2,
+            "lut": 3
+          },
+          "lutBindingPresent": true
+        },
+        "workgroupSize": {
+          "x": 64,
+          "y": 1,
+          "z": 1,
+          "dispatchRowThreads": 16384
+        },
+        "storageWrites": {
+          "targets": [
+            "dst"
+          ],
+          "policy": "single-bounded-write-per-invocation",
+          "guard": "global-index < pixel-count"
+        },
+        "bounds": {
+          "input": "full-frame",
+          "output": "full-frame",
+          "haloPx": 0
+        },
+        "determinism": {
+          "class": "deterministic",
+          "timeIndependent": true,
+          "stageBoundaryQuantization": "round-half-even-rgba8"
+        },
+        "memoryEstimate": {
+          "fixedBytes": 6160,
+          "bytesPerPixel": 8,
+          "formula": "uniform + lut + src-rgba8 + dst-rgba8"
+        },
+        "timeDependency": "none",
+        "variants": {
+          "preview": "wgslfx-v1-cv.bc-a367d19e",
+          "final": "wgslfx-v1-cv.bc-a367d19e",
+          "pixelEquivalent": true
+        },
+        "licenseProvenance": {
+          "spdx": "LicenseRef-ToonSpectrum-Proprietary",
+          "source": "ToonStudio deterministic WGSL variant composer",
+          "generatedFrom": "EffectGraphIR color-operation subsequence"
+        }
+      }
     },
     {
       "variantKey": "wgslfx-v1-cv.hsl-ee1e5a88",
@@ -263,7 +1460,64 @@
       ],
       "usesLut": true,
       "lutEntryCount": 768,
-      "uniformByteLength": 64
+      "uniformByteLength": 64,
+      "shaderManifest": {
+        "inputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "outputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "bindGroups": {
+          "group": 0,
+          "bindings": {
+            "src": 0,
+            "dst": 1,
+            "params": 2,
+            "lut": 3
+          },
+          "lutBindingPresent": true
+        },
+        "workgroupSize": {
+          "x": 64,
+          "y": 1,
+          "z": 1,
+          "dispatchRowThreads": 16384
+        },
+        "storageWrites": {
+          "targets": [
+            "dst"
+          ],
+          "policy": "single-bounded-write-per-invocation",
+          "guard": "global-index < pixel-count"
+        },
+        "bounds": {
+          "input": "full-frame",
+          "output": "full-frame",
+          "haloPx": 0
+        },
+        "determinism": {
+          "class": "deterministic",
+          "timeIndependent": true,
+          "stageBoundaryQuantization": "round-half-even-rgba8"
+        },
+        "memoryEstimate": {
+          "fixedBytes": 3136,
+          "bytesPerPixel": 8,
+          "formula": "uniform + lut + src-rgba8 + dst-rgba8"
+        },
+        "timeDependency": "none",
+        "variants": {
+          "preview": "wgslfx-v1-cv.hsl-ee1e5a88",
+          "final": "wgslfx-v1-cv.hsl-ee1e5a88",
+          "pixelEquivalent": true
+        },
+        "licenseProvenance": {
+          "spdx": "LicenseRef-ToonSpectrum-Proprietary",
+          "source": "ToonStudio deterministic WGSL variant composer",
+          "generatedFrom": "EffectGraphIR color-operation subsequence"
+        }
+      }
     },
     {
       "variantKey": "wgslfx-v1-cv.lv-71341c87",
@@ -275,7 +1529,64 @@
       ],
       "usesLut": true,
       "lutEntryCount": 1536,
-      "uniformByteLength": 16
+      "uniformByteLength": 16,
+      "shaderManifest": {
+        "inputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "outputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "bindGroups": {
+          "group": 0,
+          "bindings": {
+            "src": 0,
+            "dst": 1,
+            "params": 2,
+            "lut": 3
+          },
+          "lutBindingPresent": true
+        },
+        "workgroupSize": {
+          "x": 64,
+          "y": 1,
+          "z": 1,
+          "dispatchRowThreads": 16384
+        },
+        "storageWrites": {
+          "targets": [
+            "dst"
+          ],
+          "policy": "single-bounded-write-per-invocation",
+          "guard": "global-index < pixel-count"
+        },
+        "bounds": {
+          "input": "full-frame",
+          "output": "full-frame",
+          "haloPx": 0
+        },
+        "determinism": {
+          "class": "deterministic",
+          "timeIndependent": true,
+          "stageBoundaryQuantization": "round-half-even-rgba8"
+        },
+        "memoryEstimate": {
+          "fixedBytes": 6160,
+          "bytesPerPixel": 8,
+          "formula": "uniform + lut + src-rgba8 + dst-rgba8"
+        },
+        "timeDependency": "none",
+        "variants": {
+          "preview": "wgslfx-v1-cv.lv-71341c87",
+          "final": "wgslfx-v1-cv.lv-71341c87",
+          "pixelEquivalent": true
+        },
+        "licenseProvenance": {
+          "spdx": "LicenseRef-ToonSpectrum-Proprietary",
+          "source": "ToonStudio deterministic WGSL variant composer",
+          "generatedFrom": "EffectGraphIR color-operation subsequence"
+        }
+      }
     },
     {
       "variantKey": "wgslfx-v1-cv.cv-a6d7b7c0",
@@ -287,7 +1598,64 @@
       ],
       "usesLut": true,
       "lutEntryCount": 1536,
-      "uniformByteLength": 16
+      "uniformByteLength": 16,
+      "shaderManifest": {
+        "inputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "outputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "bindGroups": {
+          "group": 0,
+          "bindings": {
+            "src": 0,
+            "dst": 1,
+            "params": 2,
+            "lut": 3
+          },
+          "lutBindingPresent": true
+        },
+        "workgroupSize": {
+          "x": 64,
+          "y": 1,
+          "z": 1,
+          "dispatchRowThreads": 16384
+        },
+        "storageWrites": {
+          "targets": [
+            "dst"
+          ],
+          "policy": "single-bounded-write-per-invocation",
+          "guard": "global-index < pixel-count"
+        },
+        "bounds": {
+          "input": "full-frame",
+          "output": "full-frame",
+          "haloPx": 0
+        },
+        "determinism": {
+          "class": "deterministic",
+          "timeIndependent": true,
+          "stageBoundaryQuantization": "round-half-even-rgba8"
+        },
+        "memoryEstimate": {
+          "fixedBytes": 6160,
+          "bytesPerPixel": 8,
+          "formula": "uniform + lut + src-rgba8 + dst-rgba8"
+        },
+        "timeDependency": "none",
+        "variants": {
+          "preview": "wgslfx-v1-cv.cv-a6d7b7c0",
+          "final": "wgslfx-v1-cv.cv-a6d7b7c0",
+          "pixelEquivalent": true
+        },
+        "licenseProvenance": {
+          "spdx": "LicenseRef-ToonSpectrum-Proprietary",
+          "source": "ToonStudio deterministic WGSL variant composer",
+          "generatedFrom": "EffectGraphIR color-operation subsequence"
+        }
+      }
     },
     {
       "variantKey": "wgslfx-v1-cv.cb-42ab460a",
@@ -299,7 +1667,64 @@
       ],
       "usesLut": true,
       "lutEntryCount": 768,
-      "uniformByteLength": 64
+      "uniformByteLength": 64,
+      "shaderManifest": {
+        "inputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "outputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "bindGroups": {
+          "group": 0,
+          "bindings": {
+            "src": 0,
+            "dst": 1,
+            "params": 2,
+            "lut": 3
+          },
+          "lutBindingPresent": true
+        },
+        "workgroupSize": {
+          "x": 64,
+          "y": 1,
+          "z": 1,
+          "dispatchRowThreads": 16384
+        },
+        "storageWrites": {
+          "targets": [
+            "dst"
+          ],
+          "policy": "single-bounded-write-per-invocation",
+          "guard": "global-index < pixel-count"
+        },
+        "bounds": {
+          "input": "full-frame",
+          "output": "full-frame",
+          "haloPx": 0
+        },
+        "determinism": {
+          "class": "deterministic",
+          "timeIndependent": true,
+          "stageBoundaryQuantization": "round-half-even-rgba8"
+        },
+        "memoryEstimate": {
+          "fixedBytes": 3136,
+          "bytesPerPixel": 8,
+          "formula": "uniform + lut + src-rgba8 + dst-rgba8"
+        },
+        "timeDependency": "none",
+        "variants": {
+          "preview": "wgslfx-v1-cv.cb-42ab460a",
+          "final": "wgslfx-v1-cv.cb-42ab460a",
+          "pixelEquivalent": true
+        },
+        "licenseProvenance": {
+          "spdx": "LicenseRef-ToonSpectrum-Proprietary",
+          "source": "ToonStudio deterministic WGSL variant composer",
+          "generatedFrom": "EffectGraphIR color-operation subsequence"
+        }
+      }
     },
     {
       "variantKey": "wgslfx-v1-cb.bc-c3cdfcf8",
@@ -311,7 +1736,64 @@
       ],
       "usesLut": true,
       "lutEntryCount": 768,
-      "uniformByteLength": 64
+      "uniformByteLength": 64,
+      "shaderManifest": {
+        "inputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "outputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "bindGroups": {
+          "group": 0,
+          "bindings": {
+            "src": 0,
+            "dst": 1,
+            "params": 2,
+            "lut": 3
+          },
+          "lutBindingPresent": true
+        },
+        "workgroupSize": {
+          "x": 64,
+          "y": 1,
+          "z": 1,
+          "dispatchRowThreads": 16384
+        },
+        "storageWrites": {
+          "targets": [
+            "dst"
+          ],
+          "policy": "single-bounded-write-per-invocation",
+          "guard": "global-index < pixel-count"
+        },
+        "bounds": {
+          "input": "full-frame",
+          "output": "full-frame",
+          "haloPx": 0
+        },
+        "determinism": {
+          "class": "deterministic",
+          "timeIndependent": true,
+          "stageBoundaryQuantization": "round-half-even-rgba8"
+        },
+        "memoryEstimate": {
+          "fixedBytes": 3136,
+          "bytesPerPixel": 8,
+          "formula": "uniform + lut + src-rgba8 + dst-rgba8"
+        },
+        "timeDependency": "none",
+        "variants": {
+          "preview": "wgslfx-v1-cb.bc-c3cdfcf8",
+          "final": "wgslfx-v1-cb.bc-c3cdfcf8",
+          "pixelEquivalent": true
+        },
+        "licenseProvenance": {
+          "spdx": "LicenseRef-ToonSpectrum-Proprietary",
+          "source": "ToonStudio deterministic WGSL variant composer",
+          "generatedFrom": "EffectGraphIR color-operation subsequence"
+        }
+      }
     },
     {
       "variantKey": "wgslfx-v1-cb.hsl-4e7129c6",
@@ -323,7 +1805,64 @@
       ],
       "usesLut": false,
       "lutEntryCount": 0,
-      "uniformByteLength": 112
+      "uniformByteLength": 112,
+      "shaderManifest": {
+        "inputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "outputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "bindGroups": {
+          "group": 0,
+          "bindings": {
+            "src": 0,
+            "dst": 1,
+            "params": 2,
+            "lut": 3
+          },
+          "lutBindingPresent": false
+        },
+        "workgroupSize": {
+          "x": 64,
+          "y": 1,
+          "z": 1,
+          "dispatchRowThreads": 16384
+        },
+        "storageWrites": {
+          "targets": [
+            "dst"
+          ],
+          "policy": "single-bounded-write-per-invocation",
+          "guard": "global-index < pixel-count"
+        },
+        "bounds": {
+          "input": "full-frame",
+          "output": "full-frame",
+          "haloPx": 0
+        },
+        "determinism": {
+          "class": "deterministic",
+          "timeIndependent": true,
+          "stageBoundaryQuantization": "round-half-even-rgba8"
+        },
+        "memoryEstimate": {
+          "fixedBytes": 112,
+          "bytesPerPixel": 8,
+          "formula": "uniform + lut + src-rgba8 + dst-rgba8"
+        },
+        "timeDependency": "none",
+        "variants": {
+          "preview": "wgslfx-v1-cb.hsl-4e7129c6",
+          "final": "wgslfx-v1-cb.hsl-4e7129c6",
+          "pixelEquivalent": true
+        },
+        "licenseProvenance": {
+          "spdx": "LicenseRef-ToonSpectrum-Proprietary",
+          "source": "ToonStudio deterministic WGSL variant composer",
+          "generatedFrom": "EffectGraphIR color-operation subsequence"
+        }
+      }
     },
     {
       "variantKey": "wgslfx-v1-cb.lv-6803a58d",
@@ -335,7 +1874,64 @@
       ],
       "usesLut": true,
       "lutEntryCount": 768,
-      "uniformByteLength": 64
+      "uniformByteLength": 64,
+      "shaderManifest": {
+        "inputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "outputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "bindGroups": {
+          "group": 0,
+          "bindings": {
+            "src": 0,
+            "dst": 1,
+            "params": 2,
+            "lut": 3
+          },
+          "lutBindingPresent": true
+        },
+        "workgroupSize": {
+          "x": 64,
+          "y": 1,
+          "z": 1,
+          "dispatchRowThreads": 16384
+        },
+        "storageWrites": {
+          "targets": [
+            "dst"
+          ],
+          "policy": "single-bounded-write-per-invocation",
+          "guard": "global-index < pixel-count"
+        },
+        "bounds": {
+          "input": "full-frame",
+          "output": "full-frame",
+          "haloPx": 0
+        },
+        "determinism": {
+          "class": "deterministic",
+          "timeIndependent": true,
+          "stageBoundaryQuantization": "round-half-even-rgba8"
+        },
+        "memoryEstimate": {
+          "fixedBytes": 3136,
+          "bytesPerPixel": 8,
+          "formula": "uniform + lut + src-rgba8 + dst-rgba8"
+        },
+        "timeDependency": "none",
+        "variants": {
+          "preview": "wgslfx-v1-cb.lv-6803a58d",
+          "final": "wgslfx-v1-cb.lv-6803a58d",
+          "pixelEquivalent": true
+        },
+        "licenseProvenance": {
+          "spdx": "LicenseRef-ToonSpectrum-Proprietary",
+          "source": "ToonStudio deterministic WGSL variant composer",
+          "generatedFrom": "EffectGraphIR color-operation subsequence"
+        }
+      }
     },
     {
       "variantKey": "wgslfx-v1-cb.cv-e1f8d26e",
@@ -347,7 +1943,64 @@
       ],
       "usesLut": true,
       "lutEntryCount": 768,
-      "uniformByteLength": 64
+      "uniformByteLength": 64,
+      "shaderManifest": {
+        "inputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "outputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "bindGroups": {
+          "group": 0,
+          "bindings": {
+            "src": 0,
+            "dst": 1,
+            "params": 2,
+            "lut": 3
+          },
+          "lutBindingPresent": true
+        },
+        "workgroupSize": {
+          "x": 64,
+          "y": 1,
+          "z": 1,
+          "dispatchRowThreads": 16384
+        },
+        "storageWrites": {
+          "targets": [
+            "dst"
+          ],
+          "policy": "single-bounded-write-per-invocation",
+          "guard": "global-index < pixel-count"
+        },
+        "bounds": {
+          "input": "full-frame",
+          "output": "full-frame",
+          "haloPx": 0
+        },
+        "determinism": {
+          "class": "deterministic",
+          "timeIndependent": true,
+          "stageBoundaryQuantization": "round-half-even-rgba8"
+        },
+        "memoryEstimate": {
+          "fixedBytes": 3136,
+          "bytesPerPixel": 8,
+          "formula": "uniform + lut + src-rgba8 + dst-rgba8"
+        },
+        "timeDependency": "none",
+        "variants": {
+          "preview": "wgslfx-v1-cb.cv-e1f8d26e",
+          "final": "wgslfx-v1-cb.cv-e1f8d26e",
+          "pixelEquivalent": true
+        },
+        "licenseProvenance": {
+          "spdx": "LicenseRef-ToonSpectrum-Proprietary",
+          "source": "ToonStudio deterministic WGSL variant composer",
+          "generatedFrom": "EffectGraphIR color-operation subsequence"
+        }
+      }
     },
     {
       "variantKey": "wgslfx-v1-cb.cb-797a6d18",
@@ -359,7 +2012,64 @@
       ],
       "usesLut": false,
       "lutEntryCount": 0,
-      "uniformByteLength": 112
+      "uniformByteLength": 112,
+      "shaderManifest": {
+        "inputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "outputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "bindGroups": {
+          "group": 0,
+          "bindings": {
+            "src": 0,
+            "dst": 1,
+            "params": 2,
+            "lut": 3
+          },
+          "lutBindingPresent": false
+        },
+        "workgroupSize": {
+          "x": 64,
+          "y": 1,
+          "z": 1,
+          "dispatchRowThreads": 16384
+        },
+        "storageWrites": {
+          "targets": [
+            "dst"
+          ],
+          "policy": "single-bounded-write-per-invocation",
+          "guard": "global-index < pixel-count"
+        },
+        "bounds": {
+          "input": "full-frame",
+          "output": "full-frame",
+          "haloPx": 0
+        },
+        "determinism": {
+          "class": "deterministic",
+          "timeIndependent": true,
+          "stageBoundaryQuantization": "round-half-even-rgba8"
+        },
+        "memoryEstimate": {
+          "fixedBytes": 112,
+          "bytesPerPixel": 8,
+          "formula": "uniform + lut + src-rgba8 + dst-rgba8"
+        },
+        "timeDependency": "none",
+        "variants": {
+          "preview": "wgslfx-v1-cb.cb-797a6d18",
+          "final": "wgslfx-v1-cb.cb-797a6d18",
+          "pixelEquivalent": true
+        },
+        "licenseProvenance": {
+          "spdx": "LicenseRef-ToonSpectrum-Proprietary",
+          "source": "ToonStudio deterministic WGSL variant composer",
+          "generatedFrom": "EffectGraphIR color-operation subsequence"
+        }
+      }
     },
     {
       "variantKey": "wgslfx-v1-bc.hsl.lv.cv.cb-41190ba0",
@@ -374,7 +2084,64 @@
       ],
       "usesLut": true,
       "lutEntryCount": 2304,
-      "uniformByteLength": 112
+      "uniformByteLength": 112,
+      "shaderManifest": {
+        "inputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "outputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "bindGroups": {
+          "group": 0,
+          "bindings": {
+            "src": 0,
+            "dst": 1,
+            "params": 2,
+            "lut": 3
+          },
+          "lutBindingPresent": true
+        },
+        "workgroupSize": {
+          "x": 64,
+          "y": 1,
+          "z": 1,
+          "dispatchRowThreads": 16384
+        },
+        "storageWrites": {
+          "targets": [
+            "dst"
+          ],
+          "policy": "single-bounded-write-per-invocation",
+          "guard": "global-index < pixel-count"
+        },
+        "bounds": {
+          "input": "full-frame",
+          "output": "full-frame",
+          "haloPx": 0
+        },
+        "determinism": {
+          "class": "deterministic",
+          "timeIndependent": true,
+          "stageBoundaryQuantization": "round-half-even-rgba8"
+        },
+        "memoryEstimate": {
+          "fixedBytes": 9328,
+          "bytesPerPixel": 8,
+          "formula": "uniform + lut + src-rgba8 + dst-rgba8"
+        },
+        "timeDependency": "none",
+        "variants": {
+          "preview": "wgslfx-v1-bc.hsl.lv.cv.cb-41190ba0",
+          "final": "wgslfx-v1-bc.hsl.lv.cv.cb-41190ba0",
+          "pixelEquivalent": true
+        },
+        "licenseProvenance": {
+          "spdx": "LicenseRef-ToonSpectrum-Proprietary",
+          "source": "ToonStudio deterministic WGSL variant composer",
+          "generatedFrom": "EffectGraphIR color-operation subsequence"
+        }
+      }
     },
     {
       "variantKey": "wgslfx-v1-bc-d269a5e7",
@@ -385,7 +2152,64 @@
       ],
       "usesLut": true,
       "lutEntryCount": 768,
-      "uniformByteLength": 16
+      "uniformByteLength": 16,
+      "shaderManifest": {
+        "inputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "outputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "bindGroups": {
+          "group": 0,
+          "bindings": {
+            "src": 0,
+            "dst": 1,
+            "params": 2,
+            "lut": 3
+          },
+          "lutBindingPresent": true
+        },
+        "workgroupSize": {
+          "x": 64,
+          "y": 1,
+          "z": 1,
+          "dispatchRowThreads": 16384
+        },
+        "storageWrites": {
+          "targets": [
+            "dst"
+          ],
+          "policy": "single-bounded-write-per-invocation",
+          "guard": "global-index < pixel-count"
+        },
+        "bounds": {
+          "input": "full-frame",
+          "output": "full-frame",
+          "haloPx": 0
+        },
+        "determinism": {
+          "class": "deterministic",
+          "timeIndependent": true,
+          "stageBoundaryQuantization": "round-half-even-rgba8"
+        },
+        "memoryEstimate": {
+          "fixedBytes": 3088,
+          "bytesPerPixel": 8,
+          "formula": "uniform + lut + src-rgba8 + dst-rgba8"
+        },
+        "timeDependency": "none",
+        "variants": {
+          "preview": "wgslfx-v1-bc-d269a5e7",
+          "final": "wgslfx-v1-bc-d269a5e7",
+          "pixelEquivalent": true
+        },
+        "licenseProvenance": {
+          "spdx": "LicenseRef-ToonSpectrum-Proprietary",
+          "source": "ToonStudio deterministic WGSL variant composer",
+          "generatedFrom": "EffectGraphIR color-operation subsequence"
+        }
+      }
     },
     {
       "variantKey": "wgslfx-v1-bc-6c89a728",
@@ -396,7 +2220,64 @@
       ],
       "usesLut": true,
       "lutEntryCount": 768,
-      "uniformByteLength": 16
+      "uniformByteLength": 16,
+      "shaderManifest": {
+        "inputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "outputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "bindGroups": {
+          "group": 0,
+          "bindings": {
+            "src": 0,
+            "dst": 1,
+            "params": 2,
+            "lut": 3
+          },
+          "lutBindingPresent": true
+        },
+        "workgroupSize": {
+          "x": 64,
+          "y": 1,
+          "z": 1,
+          "dispatchRowThreads": 16384
+        },
+        "storageWrites": {
+          "targets": [
+            "dst"
+          ],
+          "policy": "single-bounded-write-per-invocation",
+          "guard": "global-index < pixel-count"
+        },
+        "bounds": {
+          "input": "full-frame",
+          "output": "full-frame",
+          "haloPx": 0
+        },
+        "determinism": {
+          "class": "deterministic",
+          "timeIndependent": true,
+          "stageBoundaryQuantization": "round-half-even-rgba8"
+        },
+        "memoryEstimate": {
+          "fixedBytes": 3088,
+          "bytesPerPixel": 8,
+          "formula": "uniform + lut + src-rgba8 + dst-rgba8"
+        },
+        "timeDependency": "none",
+        "variants": {
+          "preview": "wgslfx-v1-bc-6c89a728",
+          "final": "wgslfx-v1-bc-6c89a728",
+          "pixelEquivalent": true
+        },
+        "licenseProvenance": {
+          "spdx": "LicenseRef-ToonSpectrum-Proprietary",
+          "source": "ToonStudio deterministic WGSL variant composer",
+          "generatedFrom": "EffectGraphIR color-operation subsequence"
+        }
+      }
     },
     {
       "variantKey": "wgslfx-v1-hsl-0b7a44eb",
@@ -407,7 +2288,64 @@
       ],
       "usesLut": false,
       "lutEntryCount": 0,
-      "uniformByteLength": 64
+      "uniformByteLength": 64,
+      "shaderManifest": {
+        "inputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "outputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "bindGroups": {
+          "group": 0,
+          "bindings": {
+            "src": 0,
+            "dst": 1,
+            "params": 2,
+            "lut": 3
+          },
+          "lutBindingPresent": false
+        },
+        "workgroupSize": {
+          "x": 64,
+          "y": 1,
+          "z": 1,
+          "dispatchRowThreads": 16384
+        },
+        "storageWrites": {
+          "targets": [
+            "dst"
+          ],
+          "policy": "single-bounded-write-per-invocation",
+          "guard": "global-index < pixel-count"
+        },
+        "bounds": {
+          "input": "full-frame",
+          "output": "full-frame",
+          "haloPx": 0
+        },
+        "determinism": {
+          "class": "deterministic",
+          "timeIndependent": true,
+          "stageBoundaryQuantization": "round-half-even-rgba8"
+        },
+        "memoryEstimate": {
+          "fixedBytes": 64,
+          "bytesPerPixel": 8,
+          "formula": "uniform + lut + src-rgba8 + dst-rgba8"
+        },
+        "timeDependency": "none",
+        "variants": {
+          "preview": "wgslfx-v1-hsl-0b7a44eb",
+          "final": "wgslfx-v1-hsl-0b7a44eb",
+          "pixelEquivalent": true
+        },
+        "licenseProvenance": {
+          "spdx": "LicenseRef-ToonSpectrum-Proprietary",
+          "source": "ToonStudio deterministic WGSL variant composer",
+          "generatedFrom": "EffectGraphIR color-operation subsequence"
+        }
+      }
     },
     {
       "variantKey": "wgslfx-v1-cb-5fdef04d",
@@ -418,7 +2356,64 @@
       ],
       "usesLut": false,
       "lutEntryCount": 0,
-      "uniformByteLength": 64
+      "uniformByteLength": 64,
+      "shaderManifest": {
+        "inputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "outputFormats": [
+          "rgba8-packed-u32-storage"
+        ],
+        "bindGroups": {
+          "group": 0,
+          "bindings": {
+            "src": 0,
+            "dst": 1,
+            "params": 2,
+            "lut": 3
+          },
+          "lutBindingPresent": false
+        },
+        "workgroupSize": {
+          "x": 64,
+          "y": 1,
+          "z": 1,
+          "dispatchRowThreads": 16384
+        },
+        "storageWrites": {
+          "targets": [
+            "dst"
+          ],
+          "policy": "single-bounded-write-per-invocation",
+          "guard": "global-index < pixel-count"
+        },
+        "bounds": {
+          "input": "full-frame",
+          "output": "full-frame",
+          "haloPx": 0
+        },
+        "determinism": {
+          "class": "deterministic",
+          "timeIndependent": true,
+          "stageBoundaryQuantization": "round-half-even-rgba8"
+        },
+        "memoryEstimate": {
+          "fixedBytes": 64,
+          "bytesPerPixel": 8,
+          "formula": "uniform + lut + src-rgba8 + dst-rgba8"
+        },
+        "timeDependency": "none",
+        "variants": {
+          "preview": "wgslfx-v1-cb-5fdef04d",
+          "final": "wgslfx-v1-cb-5fdef04d",
+          "pixelEquivalent": true
+        },
+        "licenseProvenance": {
+          "spdx": "LicenseRef-ToonSpectrum-Proprietary",
+          "source": "ToonStudio deterministic WGSL variant composer",
+          "generatedFrom": "EffectGraphIR color-operation subsequence"
+        }
+      }
     }
   ]
 }

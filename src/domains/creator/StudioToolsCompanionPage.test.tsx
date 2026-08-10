@@ -16,10 +16,8 @@ import {
   buildStudioCompanionReferenceState,
   buildStudioCompanionReviewState,
   isStudioCompanionSessionId,
-  isStudioCompanionPresentationSafeState,
   studioCompanionChannelName,
   type StudioCompanionMessage,
-  type StudioCompanionPresentationSafeState,
 } from "./studio-tools-companion";
 import { StudioToolsCompanionPage } from "./StudioToolsCompanionPage";
 
@@ -78,15 +76,6 @@ function restoreObjectUrlStatics() {
   else Reflect.deleteProperty(URL, "revokeObjectURL");
 }
 
-function persistedPresentationSafeState(key: string): StudioCompanionPresentationSafeState {
-  const raw = window.localStorage.getItem(key);
-  const value = raw ? JSON.parse(raw) as unknown : null;
-  if (!isStudioCompanionPresentationSafeState(value)) {
-    throw new Error("persisted presentation-safe state missing");
-  }
-  return value;
-}
-
 function referenceWebpBlob(width: number, height: number): Blob {
   const bytes = new Uint8Array(30);
   const view = new DataView(bytes.buffer);
@@ -127,6 +116,14 @@ function companionInstanceId(channel: FakeBroadcastChannel): string {
     .find((message) => message.type === "hello" && message.role === "companion");
   if (!hello || hello.role !== "companion") throw new Error("companion hello missing");
   return hello.companionInstanceId;
+}
+
+function latestProtocolChannel(targetSessionId: string): FakeBroadcastChannel {
+  const channel = FakeBroadcastChannel.instances.findLast(
+    (candidate) => candidate.name === studioCompanionChannelName(targetSessionId),
+  );
+  if (!channel) throw new Error(`companion channel missing for ${targetSessionId}`);
+  return channel;
 }
 
 function projectedReview(input: {
@@ -504,13 +501,10 @@ describe("StudioToolsCompanionPage", () => {
   });
 
   it("immediately rediscovers a disconnected primary when presentation-safe is disabled without sending stale demand", () => {
-    window.localStorage.setItem(
-      `toonspectrum.studio.companion.presentation-safe.${sessionId}`,
-      "1"
-    );
     renderCompanion();
     const channel = FakeBroadcastChannel.instances[0]!;
     const companionInstance = companionInstanceId(channel);
+    fireEvent.click(screen.getByRole("button", { name: "발표 안전 켜기" }));
     channel.postMessage.mockClear();
 
     fireEvent.click(screen.getByRole("button", { name: "발표 안전 끄기" }));
@@ -530,13 +524,10 @@ describe("StudioToolsCompanionPage", () => {
   });
 
   it("immediately pings a known reconnecting primary without sending demand before generation is verified", () => {
-    window.localStorage.setItem(
-      `toonspectrum.studio.companion.presentation-safe.${sessionId}`,
-      "1"
-    );
     renderCompanion();
     const channel = FakeBroadcastChannel.instances[0]!;
     const companionInstance = companionInstanceId(channel);
+    fireEvent.click(screen.getByRole("button", { name: "발표 안전 켜기" }));
     act(() => {
       channel.emit({
         v: 1,
@@ -565,14 +556,11 @@ describe("StudioToolsCompanionPage", () => {
   });
 
   it("does not duplicate discovery or heartbeat when a connected Navigator resumes demand", () => {
-    window.localStorage.setItem(
-      `toonspectrum.studio.companion.presentation-safe.${sessionId}`,
-      "1"
-    );
     renderCompanion(`/studio/tools-companion?session=${sessionId}&view=navigator`);
     const channel = FakeBroadcastChannel.instances[0]!;
     const companionInstance = companionInstanceId(channel);
     connectPrimary({ channel, companionInstance });
+    fireEvent.click(screen.getByRole("button", { name: "발표 안전 켜기" }));
     channel.postMessage.mockClear();
 
     fireEvent.click(screen.getByRole("button", { name: "발표 안전 끄기" }));
@@ -1000,8 +988,11 @@ describe("StudioToolsCompanionPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "세션 전환" }));
 
     expect(first.close).toHaveBeenCalledOnce();
-    expect(FakeBroadcastChannel.instances).toHaveLength(2);
-    const second = FakeBroadcastChannel.instances[1]!;
+    expect(FakeBroadcastChannel.instances.filter((channel) => (
+      channel.name === studioCompanionChannelName(sessionId)
+      || channel.name === studioCompanionChannelName(sessionIdB)
+    ))).toHaveLength(2);
+    const second = latestProtocolChannel(sessionIdB);
     expect(second.name).toBe(studioCompanionChannelName(sessionIdB));
     expect(screen.getByText(/연결 대기/u)).toBeTruthy();
     expect(screen.queryByText(/이전 문서/u)).toBeNull();
@@ -1259,9 +1250,7 @@ describe("StudioToolsCompanionPage", () => {
     expect(screen.getByRole("alert").textContent).toContain("팝업이 차단됐습니다");
   });
 
-  it("initializes and synchronizes presentation-safe state without exposing the document title", () => {
-    const key = `toonspectrum.studio.companion.presentation-safe.${sessionId}`;
-    window.localStorage.setItem(key, "1");
+  it("initializes presentation-safe as transient and synchronizes it without exposing the document title", () => {
     const view = renderCompanion();
     const channel = FakeBroadcastChannel.instances[0]!;
     const companionInstance = companionInstanceId(channel);
@@ -1280,34 +1269,27 @@ describe("StudioToolsCompanionPage", () => {
       });
     });
 
+    expect(view.container.textContent).toContain("공개 전 비밀 작품");
+    act(() => channel.emit(buildStudioCompanionPresentationSafe({
+      companionInstanceId: companionPeerB,
+      targetCompanionInstanceId: companionInstance,
+      state: {
+        enabled: true,
+        clock: 1,
+        writerInstanceId: companionPeerB,
+        mutationId: "presentation-peer-b-0001",
+      },
+    })));
     expect(view.container.textContent).not.toContain("공개 전 비밀 작품");
     expect(screen.getByRole("button", { name: "발표 안전 끄기" }).getAttribute("aria-pressed")).toBe("true");
-    expect(persistedPresentationSafeState(key)).toEqual(expect.objectContaining({
-      enabled: true,
-      clock: 1,
-    }));
 
     fireEvent.click(screen.getByRole("button", { name: "발표 안전 끄기" }));
-    expect(persistedPresentationSafeState(key)).toEqual(expect.objectContaining({
-      enabled: false,
-      clock: 2,
-    }));
     expect(view.container.textContent).toContain("공개 전 비밀 작품");
-
-    window.localStorage.setItem(key, "1");
-    act(() => {
-      window.dispatchEvent(new StorageEvent("storage", { key, newValue: "1" }));
-    });
-    expect(view.container.textContent).not.toContain("공개 전 비밀 작품");
   });
 
-  it("keeps presentation-safe usable when hardened storage throws on read and write", () => {
-    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
-      throw new DOMException("blocked", "SecurityError");
-    });
-    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
-      throw new DOMException("blocked", "SecurityError");
-    });
+  it("never touches localStorage while keeping presentation-safe usable", () => {
+    const getItem = vi.spyOn(Storage.prototype, "getItem");
+    const setItem = vi.spyOn(Storage.prototype, "setItem");
     const view = renderCompanion();
     const channel = FakeBroadcastChannel.instances[0]!;
     const companionInstance = companionInstanceId(channel);
@@ -1331,9 +1313,11 @@ describe("StudioToolsCompanionPage", () => {
 
     expect(screen.getByRole("button", { name: "발표 안전 끄기" }).getAttribute("aria-pressed")).toBe("true");
     expect(view.container.textContent).not.toContain("저장소 차단 비밀 작품");
+    expect(getItem).not.toHaveBeenCalled();
+    expect(setItem).not.toHaveBeenCalled();
   });
 
-  it("converges presentation-safe state through companion peers when storage is blocked", async () => {
+  it("converges presentation-safe state through companion peers without browser storage", async () => {
     const { createObjectURL, revokeObjectURL } = installObjectUrlSpies();
     vi.stubGlobal("Image", class {
       onload: (() => void) | null = null;
@@ -1346,12 +1330,6 @@ describe("StudioToolsCompanionPage", () => {
       set src(_value: string) {
         queueMicrotask(() => this.onload?.());
       }
-    });
-    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
-      throw new DOMException("blocked", "SecurityError");
-    });
-    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
-      throw new DOMException("blocked", "SecurityError");
     });
     renderCompanion(`/studio/tools-companion?session=${sessionId}&view=reference`);
     const channel = FakeBroadcastChannel.instances[0]!;
@@ -1484,12 +1462,14 @@ describe("StudioToolsCompanionPage", () => {
     expect(screen.queryByLabelText("최근 선택 색상 #AABBCC")).toBeNull();
   });
 
-  it("persists an accepted peer presentation-safe state without rebroadcasting its storage echo", () => {
-    const key = `toonspectrum.studio.companion.presentation-safe.${sessionId}`;
-    vi.spyOn(Storage.prototype, "setItem");
+  it("accepts a peer presentation-safe state without durable writes or an echo broadcast", () => {
+    const storageWrite = vi.spyOn(Storage.prototype, "setItem");
     renderCompanion();
     const channel = FakeBroadcastChannel.instances[0]!;
     const ownInstanceId = companionInstanceId(channel);
+    const safeMessageCount = channel.postMessage.mock.calls.filter(([message]) => (
+      (message as StudioCompanionMessage).type === "companion-presentation-safe"
+    )).length;
     act(() => channel.emit(buildStudioCompanionPresentationSafe({
       companionInstanceId: companionPeerB,
       targetCompanionInstanceId: ownInstanceId,
@@ -1500,82 +1480,42 @@ describe("StudioToolsCompanionPage", () => {
         mutationId: "presentation-peer-b-0001",
       },
     })));
-    expect(persistedPresentationSafeState(key)).toEqual(expect.objectContaining({
-      enabled: true,
-      clock: 1,
-      writerInstanceId: companionPeerB,
-      mutationId: "presentation-peer-b-0001",
-    }));
-    const safeMessageCount = channel.postMessage.mock.calls.filter(([message]) => (
-      (message as StudioCompanionMessage).type === "companion-presentation-safe"
-    )).length;
-
-    act(() => window.dispatchEvent(new StorageEvent("storage", {
-      key,
-      newValue: window.localStorage.getItem(key),
-    })));
+    expect(screen.getByRole("button", { name: "발표 안전 끄기" })).toBeTruthy();
+    expect(storageWrite).not.toHaveBeenCalled();
     expect(channel.postMessage.mock.calls.filter(([message]) => (
       (message as StudioCompanionMessage).type === "companion-presentation-safe"
     ))).toHaveLength(safeMessageCount);
   });
 
-  it.each([
-    {
-      durableEnabled: false,
-      replayEnabled: true,
-      expectedButton: "발표 안전 켜기",
-      label: "stored false",
-    },
-    {
-      durableEnabled: true,
-      replayEnabled: false,
-      expectedButton: "발표 안전 끄기",
-      label: "stored safe",
-    },
-  ])("keeps $label authoritative over a targeted higher-clock peer replay", ({
-    durableEnabled,
-    replayEnabled,
-    expectedButton,
-  }) => {
-    const key = `toonspectrum.studio.companion.presentation-safe.${sessionId}`;
-    window.localStorage.setItem(key, JSON.stringify({
-      enabled: durableEnabled,
-      clock: 7,
-      writerInstanceId: companionPeerB,
-      mutationId: "presentation-peer-b-0007",
-    }));
+  it("rejects a stale presentation-safe revision under deterministic LWW ordering", () => {
     renderCompanion();
     const channel = FakeBroadcastChannel.instances[0]!;
     const ownInstanceId = companionInstanceId(channel);
 
     act(() => channel.emit(buildStudioCompanionPresentationSafe({
+      companionInstanceId: companionPeerB,
+      targetCompanionInstanceId: ownInstanceId,
+      state: {
+        enabled: true,
+        clock: 7,
+        writerInstanceId: companionPeerB,
+        mutationId: "presentation-peer-b-0007",
+      },
+    })));
+    expect(screen.getByRole("button", { name: "발표 안전 끄기" })).toBeTruthy();
+
+    act(() => channel.emit(buildStudioCompanionPresentationSafe({
       companionInstanceId: companionPeerC,
       targetCompanionInstanceId: ownInstanceId,
       state: {
-        enabled: replayEnabled,
-        clock: 99,
+        enabled: false,
+        clock: 6,
         writerInstanceId: companionPeerC,
-        mutationId: "presentation-peer-c-0099",
+        mutationId: "presentation-peer-c-0006",
       },
     })));
 
-    expect(screen.getByRole("button", { name: expectedButton })).toBeTruthy();
-    expect(persistedPresentationSafeState(key)).toEqual({
-      enabled: durableEnabled,
-      clock: 100,
-      writerInstanceId: ownInstanceId,
-      mutationId: expect.any(String),
-    });
-    expect(channel.postMessage).toHaveBeenCalledWith(expect.objectContaining({
-      type: "companion-presentation-safe",
-      companionInstanceId: ownInstanceId,
-      targetCompanionInstanceId: null,
-      state: expect.objectContaining({
-        enabled: durableEnabled,
-        clock: 100,
-        writerInstanceId: ownInstanceId,
-      }),
-    }));
+    expect(screen.getByRole("button", { name: "발표 안전 끄기" })).toBeTruthy();
   });
 
   it("closes its channel when the detached window unmounts", () => {
@@ -1845,7 +1785,7 @@ describe("StudioToolsCompanionPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "세션 전환" }));
     expect(revokeObjectURL).toHaveBeenCalledTimes(2);
 
-    const second = FakeBroadcastChannel.instances[1]!;
+    const second = latestProtocolChannel(sessionIdB);
     const secondCompanion = companionInstanceId(second);
     connectPrimary({ channel: second, companionInstance: secondCompanion });
     await emitDecodedNavigatorFrame(

@@ -526,6 +526,26 @@ export function studioDeleteWorkRequest(
 }
 
 /**
+ * ㉙ 앱 설정 전체 초기화 — 그림 문서는 유지되지만, 기기별 단축키·입력·도구막대·격자
+ * 개인화는 즉시 기본값으로 덮어써지고 문서 히스토리로 되돌릴 수 없다.
+ */
+export function studioResetApplicationSettingsRequest(): StudioDestructiveActionRequest {
+  return {
+    id: "studio.settings.reset-all",
+    title: "앱 설정 전체 초기화",
+    losses: [
+      {
+        label: "이 기기의 Studio 개인 설정",
+        note: "단축키·마우스·터치·도구막대·격자 설정이 기본값으로 돌아가요",
+      },
+    ],
+    gains: ["ToonStudio 기본 설정"],
+    reversibility: "irreversible",
+    confirmLabel: "전체 설정 초기화",
+  };
+}
+
+/**
  * 커밋 결과를 원장에 남기고 그대로 돌려준다.
  *
  * 감사가 찾아낸 조용한 실패: 파괴 승인 뒤의 `commit(...)` 다섯 곳이 반환값을 버려서,

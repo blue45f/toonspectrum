@@ -1,13 +1,12 @@
 /**
  * StudioGpuFabric — 단일 GPUDevice 소유권 브로커 (V12 §6 GpuInteropBroker의 TS측 실구현).
  *
- * V12 §6.1은 "가능하면 Rust/wgpu가 browser GPUDevice를 생성·소유"를 이상형으로 두지만,
- * 현행 핀(vello 0.9 → wgpu 29.0.4)에서는 외부 GPUDevice 주입/노출 API가 전무하다
- * (wgpu `src/lib.rs`의 `mod backend`는 private, `backend::webgpu::WebDevice.inner`는
- * pub(crate), `Device::from_custom`은 디바이스 채택이 아니라 백엔드 전체 재구현 —
- * ADR-0011 레인 원장과 tests/benchmarks/results/gpu-fabric-probe.json에 실측 기록).
- * 따라서 이 모듈이 JS측 단일 디바이스 소유자가 되고, vello GPU(pkg-gpu)는 자기
- * 내부 디바이스를 유지한 채 §6.3 폴백 사다리의 L0(저빈도 readback 교환)으로 연결된다.
+ * V12 §6.1의 단일 디바이스 목표는 현행 vello 0.9/wgpu 29 상류 API만으로는 막혔지만,
+ * `crates/vendor/wgpu-toon`의 최소 WebGPU handle-adoption 패치와 pkg-gpu의
+ * `adoptGpuDevice`/raw `GPUTexture` 표면으로 해소했다. StudioVelloHub는 이 fabric의
+ * GPUDevice를 참조 동일성까지 확인해 채택하고, same-device 텍스처를 L4 zero-copy로
+ * 넘긴다. 미지원·검증 실패 island만 §6.3의 낮은 교환 레벨로 강등한다. 근거는
+ * ADR-0011과 `tests/benchmarks/results/toon-vello-fork.json`에 고정돼 있다.
  *
  * 소유권·공유 계약:
  *  - 물리 GPUDevice는 이 fabric 하나가 소유한다. 소비자는 lease(참조 카운트)를 받아
@@ -18,8 +17,8 @@
  *    `acquireStudioGpuFilterRuntime({ gpu })`을 통해 fabric 디바이스 위에 필터 런타임을
  *    올린다(acquireStudioGpuFilterRuntimeOnFabric). 런타임에는 destroy()가 lease 해제로
  *    치환된 파사드 디바이스를 건네므로, 런타임의 dispose 규율(디바이스 destroy)이
- *    공유 디바이스를 파괴하지 않는다. 기존 기본 싱글턴 경로(무옵션 acquire)는 무접촉 —
- *    호출부 컷오버(studio-gpu-filter-apply의 acquire 1줄)는 다음 슬라이스 몫이다.
+ *    공유 디바이스를 파괴하지 않는다. `studio-gpu-filter-apply`의 기본 제품 경로도 이
+ *    fabric을 사용하며, 명시적 GPU override를 받은 하니스/embed만 독립 런타임을 소유한다.
  *  - device loss: 리스너 허브(onStudioGpuDeviceLost)가 epoch 단위로 1회 통지한다.
  *    명시적 dispose 는 loss 통지를 발생시키지 않는다(계획된 종료 ≠ 손실).
  *  - 기능 프로브(maxTextureDimension2D·timestamp-query 등)는 디바이스 생성 시 1회

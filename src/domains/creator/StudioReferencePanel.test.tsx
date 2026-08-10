@@ -11,9 +11,14 @@ import {
   type StudioReferenceBoardItem,
 } from "./studio-reference-board";
 import { REFERENCE_PANEL_STORAGE_KEY, serializeReferencePanelSettings } from "./studio-reference-panel";
+import {
+  STUDIO_REFERENCE_PANEL_SETTINGS_KEY,
+  createStudioReferencePanelPreferencesRepository,
+} from "./studio-reference-panel-preferences-sqlite";
 import { StudioReferencePanel } from "./StudioReferencePanel";
 
 import type { StudioAsset } from "./studio-asset-library";
+import type { StudioAsyncKeyValueStore } from "./studio-local-database";
 import type { StudioReferenceImageRaster } from "./studio-reference-color-sampler";
 
 const assetLibraryMock = vi.hoisted(() => ({
@@ -29,6 +34,9 @@ const colorSamplerMock = vi.hoisted(() => ({
 }));
 const remoteReferenceMock = vi.hoisted(() => ({
   importStudioRemoteReferenceImage: vi.fn(),
+}));
+const referencePreferencesMock = vi.hoisted(() => ({
+  acquireProduct: vi.fn(),
 }));
 
 vi.mock("./studio-asset-library", async (importOriginal) => {
@@ -56,6 +64,14 @@ vi.mock("./studio-reference-color-sampler", async (importOriginal) => {
 vi.mock("./studio-remote-reference-image-client", () => ({
   importStudioRemoteReferenceImage: remoteReferenceMock.importStudioRemoteReferenceImage,
 }));
+
+vi.mock("./studio-reference-panel-preferences-sqlite", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./studio-reference-panel-preferences-sqlite")>();
+  return {
+    ...actual,
+    acquireProductStudioReferencePanelPreferencesRepository: referencePreferencesMock.acquireProduct,
+  };
+});
 
 const HASH_A = `sha256:${"a".repeat(64)}` as const;
 const HASH_B = `sha256:${"b".repeat(64)}` as const;
@@ -122,6 +138,27 @@ function deferred<T>(): {
   return { promise, resolve, reject };
 }
 
+function createReferencePreferencesHarness(
+  initialRaw: string | null = null,
+  overrides: Partial<StudioAsyncKeyValueStore> = {},
+) {
+  const values = new Map<string, string>();
+  if (initialRaw !== null) values.set(STUDIO_REFERENCE_PANEL_SETTINGS_KEY, initialRaw);
+  const store: StudioAsyncKeyValueStore = {
+    get: async (key) => values.get(key) ?? null,
+    set: async (key, value) => { values.set(key, value); },
+    delete: async (key) => { values.delete(key); },
+    ...overrides,
+  };
+  const repository = createStudioReferencePanelPreferencesRepository(store);
+  return {
+    values,
+    store,
+    repository,
+    acquire: vi.fn(async () => repository),
+  };
+}
+
 function makeItem(
   id: string,
   sha256 = HASH_A,
@@ -178,7 +215,8 @@ function ControlledReferencePanel({
 }
 
 beforeEach(() => {
-  window.localStorage.clear();
+  const preferences = createReferencePreferencesHarness();
+  referencePreferencesMock.acquireProduct.mockResolvedValue(preferences.repository);
   assetLibraryMock.listAssets.mockResolvedValue([ASSET_A, ASSET_B]);
   assetLibraryMock.ensureStudioAssetContentHash.mockImplementation(async (asset: StudioAsset) => asset);
   let importedAssetIndex = 0;
@@ -214,6 +252,178 @@ afterEach(() => {
 });
 
 describe("StudioReferencePanel controlled reference board", () => {
+  it("hydrates its layout from SQLite and persists keyboard layout changes", async () => {
+    const preferences = createReferencePreferencesHarness(serializeReferencePanelSettings({
+      x: 144,
+      y: 120,
+      width: 420,
+      height: 340,
+      assetId: null,
+      flipped: false,
+    }));
+    const { container } = render(
+      <StudioReferencePanel
+        open
+        onClose={vi.fn()}
+        document={createStudioReferenceBoardDocument()}
+        onChange={vi.fn()}
+        acquirePreferences={preferences.acquire}
+      />
+    );
+
+    const panel = await screen.findByRole("region", { name: "포즈 참고 보드" });
+    await waitFor(() => {
+      expect(panel.style.left).toBe("144px");
+      expect(panel.style.width).toBe("420px");
+      expect(panel.getAttribute("data-studio-reference-preferences-authority")).toBe("sqlite-opfs");
+    });
+
+    fireEvent.keyDown(screen.getByRole("button", { name: /패널 크기 조절/u }), {
+      key: "ArrowRight",
+    });
+    await waitFor(() => {
+      const saved = preferences.values.get(STUDIO_REFERENCE_PANEL_SETTINGS_KEY);
+      expect(saved).toContain('"width":436');
+    }, { timeout: 1_000 });
+    expect(container.textContent).not.toContain("현재 세션 메모리");
+  });
+
+  it("keeps a user resize made before hydration and saves that newer layout", async () => {
+    const load = deferred<string | null>();
+    const preferences = createReferencePreferencesHarness(null, {
+      get: vi.fn(async () => load.promise),
+    });
+    render(
+      <StudioReferencePanel
+        open
+        onClose={vi.fn()}
+        document={createStudioReferenceBoardDocument()}
+        onChange={vi.fn()}
+        acquirePreferences={preferences.acquire}
+      />
+    );
+
+    const panel = screen.getByRole("region", { name: "포즈 참고 보드" });
+    fireEvent.keyDown(screen.getByRole("button", { name: /패널 크기 조절/u }), {
+      key: "ArrowLeft",
+    });
+    expect(panel.style.width).toBe("284px");
+
+    await act(async () => {
+      load.resolve(serializeReferencePanelSettings({
+        x: 200,
+        y: 120,
+        width: 500,
+        height: 400,
+        assetId: null,
+        flipped: false,
+      }));
+      await load.promise;
+    });
+    await waitFor(() => {
+      expect(panel.getAttribute("data-studio-reference-preferences-authority")).toBe("sqlite-opfs");
+      expect(panel.style.width).toBe("284px");
+    });
+    await waitFor(() => {
+      expect(preferences.values.get(STUDIO_REFERENCE_PANEL_SETTINGS_KEY)).toContain('"width":284');
+    }, { timeout: 1_000 });
+  });
+
+  it("stays usable but visibly reports memory-only authority after a SQLite write failure", async () => {
+    const preferences = createReferencePreferencesHarness(null, {
+      set: vi.fn(async () => { throw new Error("SQLITE_FULL"); }),
+    });
+    render(
+      <StudioReferencePanel
+        open
+        onClose={vi.fn()}
+        document={createStudioReferenceBoardDocument()}
+        onChange={vi.fn()}
+        acquirePreferences={preferences.acquire}
+      />
+    );
+    const panel = screen.getByRole("region", { name: "포즈 참고 보드" });
+    await waitFor(() => {
+      expect(panel.getAttribute("data-studio-reference-preferences-authority")).toBe("sqlite-opfs");
+    });
+
+    fireEvent.keyDown(screen.getByRole("button", { name: /패널 크기 조절/u }), {
+      key: "ArrowLeft",
+    });
+    expect(panel.style.width).toBe("284px");
+    expect((await screen.findByRole("status")).textContent).toContain("현재 세션 메모리");
+    expect(panel.getAttribute("data-studio-reference-preferences-authority")).toBe("memory-only");
+
+    fireEvent.keyDown(screen.getByRole("button", { name: /패널 크기 조절/u }), {
+      key: "ArrowLeft",
+    });
+    expect(panel.style.width).toBe("268px");
+  });
+
+  it("flushes the newest dirty layout when unmounted before the debounce expires", async () => {
+    const preferences = createReferencePreferencesHarness();
+    const view = render(
+      <StudioReferencePanel
+        open
+        onClose={vi.fn()}
+        document={createStudioReferenceBoardDocument()}
+        onChange={vi.fn()}
+        acquirePreferences={preferences.acquire}
+      />
+    );
+    const panel = screen.getByRole("region", { name: "포즈 참고 보드" });
+    await waitFor(() => {
+      expect(panel.getAttribute("data-studio-reference-preferences-authority")).toBe("sqlite-opfs");
+    });
+    fireEvent.keyDown(screen.getByRole("button", { name: /패널 크기 조절/u }), {
+      key: "ArrowLeft",
+    });
+    view.unmount();
+
+    await waitFor(() => {
+      expect(preferences.values.get(STUDIO_REFERENCE_PANEL_SETTINGS_KEY)).toContain('"width":284');
+    });
+    await expect(preferences.repository.flush()).resolves.toBeUndefined();
+  });
+
+  it("never probes or rewrites the discarded localStorage panel setting", async () => {
+    window.localStorage.setItem(
+      REFERENCE_PANEL_STORAGE_KEY,
+      serializeReferencePanelSettings({
+        x: 400,
+        y: 100,
+        width: 500,
+        height: 400,
+        assetId: ASSET_A.id,
+        flipped: true,
+      }),
+    );
+    const getItem = vi.spyOn(Storage.prototype, "getItem");
+    const setItem = vi.spyOn(Storage.prototype, "setItem");
+    try {
+      const onCommit = vi.fn();
+      const panel = render(
+        <ControlledReferencePanel
+          initialDocument={createStudioReferenceBoardDocument()}
+          onCommit={onCommit}
+        />
+      );
+      await waitFor(() => {
+        expect(screen.getByRole("region", { name: "포즈 참고 보드" })
+          .getAttribute("data-studio-reference-preferences-authority")).toBe("sqlite-opfs");
+      });
+      await new Promise((resolve) => window.setTimeout(resolve, 220));
+      expect(getItem).not.toHaveBeenCalled();
+      expect(setItem).not.toHaveBeenCalled();
+      expect(onCommit).not.toHaveBeenCalled();
+      panel.unmount();
+    } finally {
+      getItem.mockRestore();
+      setItem.mockRestore();
+      window.localStorage.clear();
+    }
+  });
+
   it("adds the same asset as multiple independent items without putting data URLs in the document", async () => {
     const onCommit = vi.fn();
     render(
@@ -779,18 +989,16 @@ describe("StudioReferencePanel controlled reference board", () => {
     expect(onCommit).not.toHaveBeenCalled();
   });
 
-  it("migrates a legacy pinned workspace image once, including its flip state", async () => {
-    window.localStorage.setItem(
-      REFERENCE_PANEL_STORAGE_KEY,
-      serializeReferencePanelSettings({
-        x: 400,
-        y: 100,
-        width: 300,
-        height: 260,
-        assetId: ASSET_A.id,
-        flipped: true,
-      })
-    );
+  it("promotes a SQLite-loaded pinned workspace image once, including its flip state", async () => {
+    const preferences = createReferencePreferencesHarness(serializeReferencePanelSettings({
+      x: 400,
+      y: 100,
+      width: 300,
+      height: 260,
+      assetId: ASSET_A.id,
+      flipped: true,
+    }));
+    referencePreferencesMock.acquireProduct.mockResolvedValue(preferences.repository);
     const onCommit = vi.fn();
     render(
       <ControlledReferencePanel
@@ -806,23 +1014,21 @@ describe("StudioReferencePanel controlled reference board", () => {
     expect(migrated.items[0]?.view.flipX).toBe(true);
 
     await new Promise((resolve) => window.setTimeout(resolve, 220));
-    const stored = window.localStorage.getItem(REFERENCE_PANEL_STORAGE_KEY);
+    const stored = preferences.values.get(STUDIO_REFERENCE_PANEL_SETTINGS_KEY);
     expect(stored).not.toContain(ASSET_A.id);
     expect(onCommit).toHaveBeenCalledTimes(1);
   });
 
-  it("does not migrate a legacy pinned hash into a replacement document", async () => {
-    window.localStorage.setItem(
-      REFERENCE_PANEL_STORAGE_KEY,
-      serializeReferencePanelSettings({
-        x: 400,
-        y: 100,
-        width: 300,
-        height: 260,
-        assetId: ASSET_A.id,
-        flipped: false,
-      })
-    );
+  it("does not promote a SQLite-loaded pinned hash into a replacement document", async () => {
+    const preferences = createReferencePreferencesHarness(serializeReferencePanelSettings({
+      x: 400,
+      y: 100,
+      width: 300,
+      height: 260,
+      assetId: ASSET_A.id,
+      flipped: false,
+    }));
+    referencePreferencesMock.acquireProduct.mockResolvedValue(preferences.repository);
     const pendingHash = deferred<StudioAsset>();
     assetLibraryMock.ensureStudioAssetContentHash.mockReturnValueOnce(pendingHash.promise);
     const firstOnChange = vi.fn();

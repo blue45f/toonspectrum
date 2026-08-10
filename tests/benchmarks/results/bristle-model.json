@@ -1,7 +1,7 @@
 {
   "harness": "tests/visual/bristle-quality.test.ts",
   "model": "packages/studio-brush-platform/src/bristle-model.ts",
-  "generatedAt": "2026-08-10T15:38:31.820Z",
+  "generatedAt": "2026-08-10T19:17:30.337Z",
   "host": {
     "platform": "darwin",
     "arch": "arm64",
@@ -274,43 +274,43 @@
       "rows": [
         {
           "bristleCount": 8,
-          "simOnlyP50Ms": 0.04337,
-          "withFootprintsP50Ms": 0.06754,
-          "simOnlyPerSampleUs": 0.1807,
-          "frameBudgetPct": 0.26,
-          "samplesPerFrameBudget": 92219
+          "simOnlyP50Ms": 0.04358,
+          "withFootprintsP50Ms": 0.067,
+          "simOnlyPerSampleUs": 0.1816,
+          "frameBudgetPct": 0.262,
+          "samplesPerFrameBudget": 91776
         },
         {
           "bristleCount": 16,
-          "simOnlyP50Ms": 0.09775,
-          "withFootprintsP50Ms": 0.16671,
-          "simOnlyPerSampleUs": 0.4073,
-          "frameBudgetPct": 0.587,
-          "samplesPerFrameBudget": 40920
+          "simOnlyP50Ms": 0.08654,
+          "withFootprintsP50Ms": 0.16442,
+          "simOnlyPerSampleUs": 0.3606,
+          "frameBudgetPct": 0.519,
+          "samplesPerFrameBudget": 46220
         },
         {
           "bristleCount": 32,
-          "simOnlyP50Ms": 0.13954,
-          "withFootprintsP50Ms": 0.20988,
-          "simOnlyPerSampleUs": 0.5814,
-          "frameBudgetPct": 0.837,
-          "samplesPerFrameBudget": 28665
+          "simOnlyP50Ms": 0.13217,
+          "withFootprintsP50Ms": 0.20488,
+          "simOnlyPerSampleUs": 0.5507,
+          "frameBudgetPct": 0.793,
+          "samplesPerFrameBudget": 30264
         },
         {
           "bristleCount": 64,
-          "simOnlyP50Ms": 0.23467,
-          "withFootprintsP50Ms": 0.36742,
-          "simOnlyPerSampleUs": 0.9778,
-          "frameBudgetPct": 1.408,
-          "samplesPerFrameBudget": 17045
+          "simOnlyP50Ms": 0.22725,
+          "withFootprintsP50Ms": 0.3595,
+          "simOnlyPerSampleUs": 0.9469,
+          "frameBudgetPct": 1.364,
+          "samplesPerFrameBudget": 17601
         },
         {
           "bristleCount": 128,
-          "simOnlyP50Ms": 0.42562,
-          "withFootprintsP50Ms": 0.75183,
-          "simOnlyPerSampleUs": 1.7734,
-          "frameBudgetPct": 2.554,
-          "samplesPerFrameBudget": 9397
+          "simOnlyP50Ms": 0.42879,
+          "withFootprintsP50Ms": 0.79692,
+          "simOnlyPerSampleUs": 1.7866,
+          "frameBudgetPct": 2.573,
+          "samplesPerFrameBudget": 9328
         }
       ]
     },

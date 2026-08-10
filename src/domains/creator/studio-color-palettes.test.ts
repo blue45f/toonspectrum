@@ -188,7 +188,7 @@ describe("readRecentColors / storeRecentColors", () => {
 
   it("filters out non-hex entries from stored arrays", () => {
     const raw = JSON.stringify(["#aabbcc", "red", 7, null, "#fff", "#zzzzzz"]);
-    expect(readRecentColors({ getItem: () => raw })).toEqual(["#aabbcc", "#fff"]);
+    expect(readRecentColors({ getItem: () => raw })).toEqual(["#aabbcc", "#ffffff"]);
   });
 
   it("returns [] when getItem throws", () => {

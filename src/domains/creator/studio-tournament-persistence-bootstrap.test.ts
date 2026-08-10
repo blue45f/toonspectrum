@@ -39,6 +39,7 @@ describe("Studio tournament persistence bootstrap", () => {
             order.push("hydrate");
             return true;
           },
+          persistenceStatus: () => ({ mode: "sqlite-opfs", durable: true, reason: null }),
         } as never;
       },
       warn: vi.fn(),
@@ -50,7 +51,10 @@ describe("Studio tournament persistence bootstrap", () => {
 
   it("does not construct a runtime while the dynamic persistence module is loading", async () => {
     const moduleLoad = deferred<StudioTournamentPersistenceModule>();
-    const getRuntime = vi.fn(() => ({ hydrate: vi.fn(async () => true) }) as never);
+    const getRuntime = vi.fn(() => ({
+      hydrate: vi.fn(async () => true),
+      persistenceStatus: () => ({ mode: "sqlite-opfs", durable: true, reason: null }),
+    }) as never);
     const bootstrap = createStudioTournamentPersistenceBootstrap({
       loadPersistence: () => moduleLoad.promise,
       getRuntime,
@@ -71,7 +75,10 @@ describe("Studio tournament persistence bootstrap", () => {
     }));
     const bootstrap = createStudioTournamentPersistenceBootstrap({
       loadPersistence,
-      getRuntime: () => ({ hydrate } as never),
+      getRuntime: () => ({
+        hydrate,
+        persistenceStatus: () => ({ mode: "sqlite-opfs", durable: true, reason: null }),
+      }) as never,
       warn: vi.fn(),
     });
 
@@ -91,7 +98,10 @@ describe("Studio tournament persistence bootstrap", () => {
       .mockResolvedValueOnce({ installStudioTournamentSqlitePersistence: vi.fn() });
     const bootstrap = createStudioTournamentPersistenceBootstrap({
       loadPersistence,
-      getRuntime: () => ({ hydrate: vi.fn(async () => false) } as never),
+      getRuntime: () => ({
+        hydrate: vi.fn(async () => false),
+        persistenceStatus: () => ({ mode: "sqlite-opfs", durable: true, reason: null }),
+      }) as never,
       warn,
     });
 
@@ -100,6 +110,30 @@ describe("Studio tournament persistence bootstrap", () => {
     await expect(bootstrap.boot()).resolves.toBe(true);
     expect(loadPersistence).toHaveBeenCalledTimes(2);
     expect(warn).toHaveBeenCalledOnce();
+  });
+
+  it("returns false and reports explicit memory-only status when SQLite cannot open", async () => {
+    const warn = vi.fn();
+    const bootstrap = createStudioTournamentPersistenceBootstrap({
+      loadPersistence: async () => ({
+        installStudioTournamentSqlitePersistence: vi.fn(),
+      }),
+      getRuntime: () => ({
+        hydrate: vi.fn(async () => false),
+        persistenceStatus: () => ({
+          mode: "memory-only",
+          durable: false,
+          reason: "database open failed: OPFS unavailable",
+        }),
+      }) as never,
+      warn,
+    });
+
+    await expect(bootstrap.boot()).resolves.toBe(false);
+    expect(warn).toHaveBeenCalledWith(
+      "studio tournament is running memory-only; SQLite/OPFS persistence is unavailable",
+      expect.objectContaining({ mode: "memory-only", durable: false }),
+    );
   });
 
   it("keeps SQLite persistence outside the StudioPage static graph", () => {

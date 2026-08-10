@@ -50,12 +50,16 @@ export type {
  */
 
 export const STUDIO_WORKSPACE_STATE_VERSION = 4 as const;
+/**
+ * Compatibility-envelope version for explicitly injected test/rollback adapters.
+ * Product code never selects this browser-KV seam; SQLite/OPFS owns V12 workspaces.
+ */
 export const STUDIO_WORKSPACE_PAYLOAD_VERSION = 4 as const;
 export const STUDIO_WORKSPACE_MAX_CUSTOM = 24;
 export const STUDIO_WORKSPACE_NAME_MAX_LENGTH = 48;
 export const STUDIO_WORKSPACE_RAW_MAX_BYTES = 64 * 1024;
+/** @deprecated Explicit compatibility seam only; not a product authority. */
 export const STUDIO_WORKSPACE_STORAGE_KEY = "toonspectrum:studio:workspaces-v12";
-
 export const STUDIO_WORKSPACE_LEFT_PANEL_WIDTH = Object.freeze({
   minimum: 128,
   default: 160,
@@ -92,6 +96,9 @@ export const STUDIO_EXPANDED_WORKSPACE_IDS = [
   "pen-display",
   "mobile-draw",
   "photo-edit",
+  "vector-design",
+  "animation",
+  "pose-3d",
 ] as const;
 
 export const STUDIO_DEFAULT_WORKSPACE_IDS = [
@@ -133,6 +140,30 @@ export type StudioMobileControlSide = (typeof STUDIO_MOBILE_CONTROL_SIDES)[numbe
 export type StudioWorkspaceDeviceKind = (typeof STUDIO_WORKSPACE_DEVICE_KINDS)[number];
 export type StudioWorkspaceId = StudioDefaultWorkspaceId | string;
 export type StudioWorkspaceMoveDirection = "up" | "down";
+export type StudioWorkspaceLaunchSurface =
+  | "vector-design"
+  | "animation"
+  | "pose-3d";
+
+const STUDIO_WORKSPACE_LAUNCH_SURFACES = Object.freeze({
+  "vector-design": "vector-design",
+  animation: "animation",
+  "pose-3d": "pose-3d",
+} as const satisfies Partial<Record<StudioDefaultWorkspaceId, StudioWorkspaceLaunchSurface>>);
+
+/**
+ * Returns the concrete production surface a built-in workspace must open after its dock layout is
+ * applied. Most workspaces need no one-shot surface; custom ids deliberately return null.
+ */
+export function studioWorkspaceLaunchSurface(
+  workspaceId: StudioWorkspaceId,
+): StudioWorkspaceLaunchSurface | null {
+  return Object.prototype.hasOwnProperty.call(STUDIO_WORKSPACE_LAUNCH_SURFACES, workspaceId)
+    ? STUDIO_WORKSPACE_LAUNCH_SURFACES[
+        workspaceId as keyof typeof STUDIO_WORKSPACE_LAUNCH_SURFACES
+      ]
+    : null;
+}
 
 export interface StudioWorkspaceDesktopLayout {
   readonly leftPanelOpen: boolean;
@@ -202,6 +233,10 @@ export interface StudioWorkspaceState {
   readonly applyQuickActionsOnSwitch: boolean;
 }
 
+/**
+ * @deprecated Explicitly injected compatibility codec used by tests and emergency rollback only.
+ * The product runtime never obtains ambient localStorage through this interface.
+ */
 export interface StudioWorkspaceStorage {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
@@ -255,8 +290,8 @@ export interface StudioWorkspaceLoadResult {
   readonly failure: StudioWorkspacePersistenceFailure | null;
 }
 
+/** @deprecated Compatibility adapter guard; product writes use StudioWorkspacePersistenceRuntime. */
 export interface StudioWorkspaceSaveOptions {
-  /** Scope returned by loadStudioWorkspacePersistence; prevents auth-transition cross-writes. */
   readonly sourceOwnerScope?: string;
 }
 
@@ -647,17 +682,61 @@ export const STUDIO_DEFAULT_WORKSPACES: readonly StudioDefaultWorkspace[] = Obje
       READING_DEVICE_OVERRIDES,
     ),
   }),
+  Object.freeze({
+    id: "vector-design",
+    name: "벡터 디자인",
+    description:
+      "도형·선택·변형과 레이어 구조를 전면에 두고 편집 가능한 벡터 오브젝트를 설계합니다.",
+    layout: createBuiltinLayout(
+      { primary: "layers", image: "transform", document: "canvas" },
+      { leftPanelOpen: true, rightPanelOpen: true, rightPanelWidth: 344 },
+      ["undo", "redo", "select", "duplicate", "bring-front", "properties"],
+      READING_DEVICE_OVERRIDES,
+    ),
+  }),
+  Object.freeze({
+    id: "animation",
+    name: "애니메이션",
+    description:
+      "레이어 타임라인·키프레임·어니언 스킨을 열어 셀과 카메라 움직임을 한 화면에서 다룹니다.",
+    layout: createBuiltinLayout(
+      { primary: "layers", image: "transform", document: "navigator" },
+      {
+        leftPanelOpen: true,
+        rightPanelOpen: true,
+        leftPanelWidth: 216,
+        rightPanelWidth: 344,
+      },
+      ["undo", "redo", "select", "duplicate", "properties", "fit-width"],
+      READING_DEVICE_OVERRIDES,
+    ),
+  }),
+  Object.freeze({
+    id: "pose-3d",
+    name: "포즈 & 3D",
+    description:
+      "3D 데생 인형 포저를 열고 변형·레이어 인스펙터를 함께 배치해 구도와 자세를 설계합니다.",
+    layout: createBuiltinLayout(
+      { primary: "properties", image: "transform", document: "canvas" },
+      { leftPanelOpen: false, rightPanelOpen: true, rightPanelWidth: 360 },
+      ["undo", "redo", "select", "properties", "fit-width", "duplicate"],
+      READING_DEVICE_OVERRIDES,
+    ),
+  }),
 ]);
 
 /**
- * Where each requested workspace profile landed, including the ones that could not be built.
- *
- * A profile is only shipped when every panel it arranges exists. `workspaceId: null` records a
- * requirement whose feature has no workspace-addressable surface in this build — the panels exist
- * as Studio UI, but `StudioWorkspaceLayout` cannot name them, so a profile claiming to open them
- * would resolve to an ordinary properties pane and lie to the artist.
+ * Where each requested workspace profile landed. `workspaceId: null` remains part of the audit
+ * schema so a future unavailable profile cannot be silently omitted; this build ships all twelve.
+ * Specialist profiles also have an explicit one-shot product-surface launch contract above.
  */
-export const STUDIO_WORKSPACE_CATALOGUE_COVERAGE = Object.freeze([
+export interface StudioWorkspaceCatalogueCoverageEntry {
+  readonly requirement: string;
+  readonly workspaceId: StudioDefaultWorkspaceId | null;
+  readonly absence: string | null;
+}
+
+export const STUDIO_WORKSPACE_CATALOGUE_COVERAGE: readonly StudioWorkspaceCatalogueCoverageEntry[] = Object.freeze([
   Object.freeze({ requirement: "Quick Sketch", workspaceId: "quick-sketch", absence: null }),
   Object.freeze({ requirement: "CSP Migration", workspaceId: "csp-migration", absence: null }),
   Object.freeze({ requirement: "Pen Display", workspaceId: "pen-display", absence: null }),
@@ -667,30 +746,12 @@ export const STUDIO_WORKSPACE_CATALOGUE_COVERAGE = Object.freeze([
   Object.freeze({ requirement: "Photo Edit", workspaceId: "photo-edit", absence: null }),
   Object.freeze({ requirement: "Collaboration Review", workspaceId: "review", absence: null }),
   Object.freeze({ requirement: "Presentation/Publish", workspaceId: "publish", absence: null }),
-  Object.freeze({
-    requirement: "Vector Design",
-    workspaceId: null,
-    absence:
-      "벡터 편집 패널이 워크스페이스 축에 없습니다. 인스펙터 primary/image/document 어디에도 벡터 섹션이 없고,"
-      + " 퀵 액션 16종에도 벡터 명령이 없어 배치할 대상 자체가 존재하지 않습니다.",
-  }),
-  Object.freeze({
-    requirement: "Animation",
-    workspaceId: null,
-    absence:
-      "애니메이션 타임라인은 별도 다이얼로그/패널로만 열리고 워크스페이스 레이아웃이 지정할 수 있는 도크가"
-      + " 아닙니다. 프로파일이 열어 줄 수 있는 것이 없어 부재로 기록합니다.",
-  }),
-  Object.freeze({
-    requirement: "Pose & 3D",
-    workspaceId: null,
-    absence:
-      "3D 배경·VRM 포저는 워크스페이스 인스펙터 섹션이 아니라 독립 화면으로 동작합니다. 도크 폭이나 인스펙터"
-      + " 탭으로는 그 화면을 불러올 수 없어 부재로 기록합니다.",
-  }),
+  Object.freeze({ requirement: "Vector Design", workspaceId: "vector-design", absence: null }),
+  Object.freeze({ requirement: "Animation", workspaceId: "animation", absence: null }),
+  Object.freeze({ requirement: "Pose & 3D", workspaceId: "pose-3d", absence: null }),
 ]);
 
-/** The requested profiles this build cannot honestly ship, kept machine-readable for the audit. */
+/** Requested profiles this build cannot honestly ship, kept machine-readable for future drift. */
 export const STUDIO_WORKSPACE_ABSENT_CATALOGUE_REQUIREMENTS = Object.freeze(
   STUDIO_WORKSPACE_CATALOGUE_COVERAGE
     .filter((entry) => entry.workspaceId === null)
@@ -1136,8 +1197,8 @@ function serializeWorkspaceEnvelope(
 }
 
 /**
- * Saves the normalized UI allowlist and verifies the exact write before reporting persistence.
- * Editing remains available when storage is blocked; callers receive a truthful session-only result.
+ * @deprecated Explicit injected compatibility write. Product code uses SQLite/OPFS and never
+ * obtains ambient localStorage here. Kept only for bounded rollback/tests.
  */
 export function saveStudioWorkspaceState(
   storage: StudioWorkspaceStorage | null | undefined,
@@ -1280,9 +1341,8 @@ function persistMigratedWorkspace(
 }
 
 /**
- * Loads the V12 owner-scoped workspace. Pre-V12 keys are ignored by default because
- * the in-place cutover discards internal Studio data. Explicit migration remains a
- * developer/test tool; schema upgrades already written under the V12 key stay valid.
+ * @deprecated Explicit injected compatibility read. Pre-V12 discovery is disabled unless a
+ * caller opts into the test/rollback import path; product boot never calls this function.
  */
 export function loadStudioWorkspacePersistence(
   storage: StudioWorkspaceLoadStorage | null | undefined,
@@ -1409,6 +1469,39 @@ export function loadStudioWorkspaceState(
   userId: string | null | undefined
 ): StudioWorkspaceState {
   return loadStudioWorkspacePersistence(storage, userId).state;
+}
+
+const OWNER_SCOPE_PATTERN = /^(?:guest|owner-[0-9a-f]{16})$/u;
+
+/** Returns a fresh immutable default tagged for one owner-scoped persistence session. */
+export function createStudioWorkspaceDefaultState(
+  userId: string | null | undefined,
+): StudioWorkspaceState {
+  return createDefaultState(studioWorkspaceOwnerScope(userId));
+}
+
+/**
+ * Canonicalizes an untrusted value and binds every derived state to one opaque owner scope.
+ * SQLite repositories use this boundary after validating their envelope. It performs no legacy
+ * browser-KV discovery or migration.
+ */
+export function normalizeStudioWorkspaceStateForOwner(
+  raw: unknown,
+  ownerScope: string,
+): StudioWorkspaceState {
+  if (!OWNER_SCOPE_PATTERN.test(ownerScope)) {
+    throw new TypeError("Studio workspace owner scope is invalid.");
+  }
+  const normalized = normalizeStudioWorkspaceState(raw);
+  STATE_OWNER_SCOPES.set(normalized, ownerScope);
+  return normalized;
+}
+
+/** Owner provenance is intentionally process-local and never serialized outside its envelope. */
+export function studioWorkspaceStateOwnerScope(
+  state: StudioWorkspaceState,
+): string | null {
+  return STATE_OWNER_SCOPES.get(state) ?? null;
 }
 
 export function resolveStudioWorkspace(

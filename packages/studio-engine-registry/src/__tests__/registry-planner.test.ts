@@ -45,9 +45,11 @@ describe("license hard gate (V11 §3.1)", () => {
   });
 
   it("registry refuses providers that fail the gate before scoring", () => {
-    const registry = new EngineCapabilityRegistry();
+    const registry = EngineCapabilityRegistry.forTestFixtures();
     expect(() =>
-      registry.register(descriptor({ id: "gpl-thing", license: "GPL-3.0-only" })),
+      registry.registerTestFixture(
+        descriptor({ id: "gpl-thing", license: "GPL-3.0-only" }),
+      ),
     ).toThrow(ProviderRegistrationError);
     expect(registry.list()).toHaveLength(0);
   });
@@ -88,15 +90,15 @@ describe("score weights (V11 §3.2)", () => {
 
 describe("EngineCapabilityRegistry", () => {
   it("queries by kind + capabilities and resolves fallback chains", () => {
-    const registry = new EngineCapabilityRegistry();
-    registry.register(
+    const registry = EngineCapabilityRegistry.forTestFixtures();
+    registry.registerTestFixture(
       descriptor({
         id: "canvaskit",
         capabilities: ["render.vector.fill", "render.text.paragraph"],
         fallbackProviderId: null,
       }),
     );
-    registry.register(
+    registry.registerTestFixture(
       descriptor({
         id: "vello-cpu",
         capabilities: ["render.vector.fill", "export.deterministic"],
@@ -110,9 +112,9 @@ describe("EngineCapabilityRegistry", () => {
   });
 
   it("rejects duplicate registration", () => {
-    const registry = new EngineCapabilityRegistry();
-    registry.register(descriptor({ id: "dup" }));
-    expect(() => registry.register(descriptor({ id: "dup" }))).toThrow(
+    const registry = EngineCapabilityRegistry.forTestFixtures();
+    registry.registerTestFixture(descriptor({ id: "dup" }));
+    expect(() => registry.registerTestFixture(descriptor({ id: "dup" }))).toThrow(
       ProviderRegistrationError,
     );
   });
@@ -120,8 +122,8 @@ describe("EngineCapabilityRegistry", () => {
 
 describe("HybridExecutionPlanner", () => {
   function registryWithRenderers(): EngineCapabilityRegistry {
-    const registry = new EngineCapabilityRegistry();
-    registry.register(
+    const registry = EngineCapabilityRegistry.forTestFixtures();
+    registry.registerTestFixture(
       descriptor({
         id: "canvaskit",
         capabilities: [
@@ -132,7 +134,7 @@ describe("HybridExecutionPlanner", () => {
         ],
       }),
     );
-    registry.register(
+    registry.registerTestFixture(
       descriptor({
         id: "vello-cpu",
         capabilities: ["render.vector.fill", "render.vector.stroke", "export.deterministic"],

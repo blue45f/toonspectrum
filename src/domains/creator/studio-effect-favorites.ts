@@ -1,6 +1,9 @@
 /**
- * Effect / look / filter favorites + recent list (mirrors studio-asset-favorites patterns).
- * Pure, storage-injected; no DOM.
+ * Effect / look / filter favorite and recent-list state. Pure, storage-injected; no DOM.
+ *
+ * The synchronous Storage helpers are an explicit legacy/import-test seam.
+ * Product Studio uses `studio-ui-preferences-sqlite.ts` (SQLite over OPFS) and
+ * never chooses localStorage from this module automatically.
  */
 
 export const STUDIO_EFFECT_FAVORITE_STATE_VERSION = 1 as const;

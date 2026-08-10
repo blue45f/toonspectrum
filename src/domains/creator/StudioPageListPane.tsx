@@ -5,6 +5,7 @@ import {
   Copy,
   Eraser,
   FlipHorizontal2,
+  GripVertical,
   LayoutTemplate,
   Maximize2,
   Minimize2,
@@ -13,7 +14,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { Suspense, lazy, memo, useState } from "react";
+import { Suspense, lazy, memo, useEffect, useId, useRef, useState } from "react";
 
 import { StudioEdgeRailButton } from "./studio-chrome-ui";
 import { confirmStudioDestructiveAction } from "./studio-destructive-action-preview";
@@ -33,12 +34,15 @@ import {
   pageDisplayName,
 } from "./studio-page-meta";
 import { shotTagBadgeText, shotTagBadgeTitle } from "./studio-panel-shot-tags";
-import { StudioPanelResizeHandle } from "./StudioPanelResizeHandle";
 
 import type { El } from "./studio-element-model";
 import type { DocumentMaster } from "./studio-master-page";
 import type { StudioPageDnd } from "./studio-page-dnd";
 import type { PageState } from "./studio-page-state";
+import type {
+  StudioPagePreviewSize,
+  StudioUiPreferencesRepository,
+} from "./studio-ui-preferences-sqlite";
 import type { StudioMobileSheet } from "./StudioMobileEditingDock";
 import type { Resizable } from "@/components/use-resizable";
 import type { Dispatch, RefObject, SetStateAction } from "react";
@@ -51,14 +55,13 @@ const LazyStudioMobileSheetHandle = lazy(() =>
   }))
 );
 
-type StudioPagePreviewSize = "compact" | "comfortable" | "large";
+const PAGE_PREVIEW_SIZE_VALUES = ["compact", "comfortable", "large"] as const satisfies readonly StudioPagePreviewSize[];
 
-const PAGE_PREVIEW_SIZE_STORAGE_KEY = "toonspectrum:studio:page-preview-size:v1";
-const PAGE_PREVIEW_SIZE_VALUES: readonly StudioPagePreviewSize[] = [
-  "compact",
-  "comfortable",
-  "large",
-];
+async function acquireProductStudioUiPreferencesRepository(): Promise<StudioUiPreferencesRepository> {
+  const module = await import("./studio-ui-preferences-sqlite");
+  return module.acquireProductStudioUiPreferencesRepository();
+}
+
 const PAGE_PREVIEW_SIZE_CLASS: Record<StudioPagePreviewSize, string> = {
   compact: "h-14",
   comfortable: "h-24",
@@ -70,24 +73,47 @@ const PAGE_PREVIEW_SIZE_LABEL: Record<StudioPagePreviewSize, string> = {
   large: "크게",
 };
 
-function readPagePreviewSize(): StudioPagePreviewSize {
-  if (typeof window === "undefined") return "comfortable";
-  try {
-    const stored = window.localStorage.getItem(PAGE_PREVIEW_SIZE_STORAGE_KEY);
-    return PAGE_PREVIEW_SIZE_VALUES.includes(stored as StudioPagePreviewSize)
-      ? (stored as StudioPagePreviewSize)
-      : "comfortable";
-  } catch {
-    return "comfortable";
-  }
-}
-
-function persistPagePreviewSize(value: StudioPagePreviewSize): void {
-  try {
-    window.localStorage.setItem(PAGE_PREVIEW_SIZE_STORAGE_KEY, value);
-  } catch {
-    // 사생활 보호 모드나 저장소 차단 환경에서도 현재 세션의 조절은 그대로 유지한다.
-  }
+function StudioPageListResizeHandle({ leftResize }: { readonly leftResize: Resizable }) {
+  const helpId = useId();
+  const { handleProps, dragging } = leftResize;
+  const label = "페이지 목록 너비 조절";
+  return (
+    <>
+      <div
+        {...handleProps}
+        aria-label={label}
+        aria-describedby={helpId}
+        title={`${label} · 현재 ${handleProps["aria-valuenow"]}px · 드래그 / 더블클릭·더블탭·Enter(기본) / ←→`}
+        data-studio-panel-resizer="true"
+        data-dragging={dragging ? "true" : "false"}
+        className={cn(
+          "group relative hidden w-3 shrink-0 touch-none cursor-col-resize select-none items-center justify-center self-stretch border-x border-line/35 bg-panel/35 transition-[background-color,border-color] motion-reduce:transition-none lg:flex",
+          "before:absolute before:inset-y-0 before:left-1/2 before:w-6 before:-translate-x-1/2 before:content-['']",
+          "focus-visible:z-10 focus-visible:border-accent/60 focus-visible:bg-accent/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent",
+          "active:border-accent/50 active:bg-accent/15",
+          dragging
+            ? "border-accent/60 bg-accent/20"
+            : "hover:border-accent/35 hover:bg-accent/10",
+        )}
+      >
+        <span
+          aria-hidden
+          className={cn(
+            "grid h-12 w-2.5 place-items-center rounded-full border shadow-sm transition-[color,background-color,border-color,transform] motion-reduce:transition-none",
+            dragging
+              ? "scale-105 border-accent bg-accent text-on-accent"
+              : "border-line bg-raised text-fg-3 group-hover:border-accent/50 group-hover:bg-accent-soft group-hover:text-accent group-focus-visible:border-accent group-focus-visible:bg-accent-soft group-focus-visible:text-accent",
+          )}
+        >
+          <GripVertical size={10} strokeWidth={2.25} />
+        </span>
+      </div>
+      <span id={helpId} className="sr-only">
+        좌우 방향키로 조금씩 조절하고 Home과 End로 최소·최대 너비를 선택할 수 있습니다.
+        Enter를 누르거나 더블클릭·더블탭하면 기본 너비로 돌아갑니다.
+      </span>
+    </>
+  );
 }
 
 export interface StudioPageListPaneHandlers {
@@ -133,6 +159,8 @@ export interface StudioPageListPaneProps {
   setMobileSheet: Dispatch<SetStateAction<StudioMobileSheet>>;
   visibleLeftPanelOpen: boolean;
   stableHandlers: StudioPageListPaneHandlers;
+  /** Test seam; product defaults to the shared SQLite/OPFS preference authority. */
+  acquireUiPreferences?: () => Promise<StudioUiPreferencesRepository>;
 }
 
 export const StudioPageListPane = memo(function StudioPageListPane({
@@ -159,6 +187,7 @@ export const StudioPageListPane = memo(function StudioPageListPane({
   setMobileSheet,
   visibleLeftPanelOpen,
   stableHandlers,
+  acquireUiPreferences = acquireProductStudioUiPreferencesRepository,
 }: StudioPageListPaneProps) {
   const {
     addPage,
@@ -179,9 +208,56 @@ export const StudioPageListPane = memo(function StudioPageListPane({
     movePageUp,
   } = stableHandlers;
   const [mobileSnap, setMobileSnap] = useState<StudioMobileSheetSnap>("medium");
-  const [pagePreviewSize, setPagePreviewSize] = useState<StudioPagePreviewSize>(
-    readPagePreviewSize
-  );
+  const [pagePreviewSize, setPagePreviewSize] = useState<StudioPagePreviewSize>("comfortable");
+  const [preferenceAuthority, setPreferenceAuthority] = useState<
+    "loading" | "sqlite-opfs" | "memory-only"
+  >("loading");
+  const preferenceRepositoryRef = useRef<StudioUiPreferencesRepository | null>(null);
+  const preferenceDirtyRef = useRef(false);
+  const preferenceMountedRef = useRef(true);
+
+  useEffect(() => {
+    preferenceMountedRef.current = true;
+    return () => {
+      preferenceMountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    void acquireUiPreferences()
+      .then(async (repository) => {
+        preferenceRepositoryRef.current = repository;
+        const persisted = await repository.loadPagePreviewSize();
+        if (!active) return;
+        setPreferenceAuthority("sqlite-opfs");
+        if (!preferenceDirtyRef.current) setPagePreviewSize(persisted);
+      })
+      .catch(() => {
+        if (active) setPreferenceAuthority("memory-only");
+      });
+    return () => {
+      active = false;
+    };
+  }, [acquireUiPreferences]);
+
+  const selectPagePreviewSize = (next: StudioPagePreviewSize): void => {
+    preferenceDirtyRef.current = true;
+    setPagePreviewSize(next);
+    const save = preferenceRepositoryRef.current
+      ? preferenceRepositoryRef.current.savePagePreviewSize(next)
+      : acquireUiPreferences().then((repository) => {
+          preferenceRepositoryRef.current = repository;
+          return repository.savePagePreviewSize(next);
+        });
+    void save
+      .then(() => {
+        if (preferenceMountedRef.current) setPreferenceAuthority("sqlite-opfs");
+      })
+      .catch(() => {
+        if (preferenceMountedRef.current) setPreferenceAuthority("memory-only");
+      });
+  };
   // CSP EX 스타일 다중 페이지 선택 — currentPageId 와 별도로 벌크 이동/삭제 대상 id 목록.
   const [selectedPageIds, setSelectedPageIds] = useState<string[]>([]);
   const pageIdSet = new Set(pages.map((page) => page.id));
@@ -206,6 +282,7 @@ export const StudioPageListPane = memo(function StudioPageListPane({
           role={isMobile && mobileSheet === "pages" ? "dialog" : undefined}
           aria-modal={isMobile && mobileSheet === "pages" ? true : undefined}
           data-studio-sheet-id="pages"
+          data-studio-ui-preferences-authority={preferenceAuthority}
           data-studio-mobile-sheet={isMobile && mobileSheet === "pages" ? "true" : undefined}
           data-studio-sheet-snap={isMobile ? mobileSnap : undefined}
           data-popup-kind={isMobile && mobileSheet === "pages" ? "sheet" : undefined}
@@ -331,8 +408,7 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                   onChange={(event) => {
                     const next = PAGE_PREVIEW_SIZE_VALUES[Number(event.currentTarget.value)];
                     if (!next) return;
-                    setPagePreviewSize(next);
-                    persistPagePreviewSize(next);
+                    selectPagePreviewSize(next);
                   }}
                   aria-label="페이지 미리보기 크기 조절"
                   aria-valuetext={PAGE_PREVIEW_SIZE_LABEL[pagePreviewSize]}
@@ -341,6 +417,11 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                 <Maximize2 size={12} className="shrink-0 text-fg-3" aria-hidden />
               </div>
             </div>
+            {preferenceAuthority === "memory-only" ? (
+              <p role="status" className="mt-1 rounded-md border border-warning/40 bg-warning/10 px-2 py-1 text-[0.62rem] text-fg-2">
+                미리보기 크기는 저장소를 다시 연결하기 전까지 이번 탭에서만 유지됩니다.
+              </p>
+            ) : null}
             {multiSelectActive ? (
               <div
                 role="toolbar"
@@ -692,7 +773,7 @@ export const StudioPageListPane = memo(function StudioPageListPane({
 
         {/* 페이지 목록 ↔ 캔버스 너비 스플리터(데스크톱) */}
         {visibleLeftPanelOpen && (
-          <StudioPanelResizeHandle handleProps={leftResize.handleProps} dragging={leftResize.dragging} label="페이지 목록 너비 조절" />
+          <StudioPageListResizeHandle leftResize={leftResize} />
         )}
     </>
   );

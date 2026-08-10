@@ -122,6 +122,7 @@ interface CorpusManifest {
     usesLut: boolean;
     lutEntryCount: number;
     uniformByteLength: number;
+    shaderManifest: ComposedWgslVariant["manifest"];
   }>;
 }
 
@@ -145,6 +146,7 @@ function buildManifest(corpus: readonly ComposedWgslVariant[]): CorpusManifest {
       usesLut: variant.usesLut,
       lutEntryCount: variant.lutEntryCount,
       uniformByteLength: variant.uniformByteLength,
+      shaderManifest: variant.manifest,
     })),
   };
 }

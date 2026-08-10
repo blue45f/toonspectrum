@@ -78,6 +78,7 @@ import type { WatermarkSettings } from "./studio-watermark";
 import type { StudioWillV1PageExportResult } from "./studio-will-v1-export-bridge";
 import type {
   StudioWorkspaceDeviceKind,
+  StudioWorkspaceId,
   StudioWorkspaceLayout,
   StudioWorkspaceLoadResult,
   StudioWorkspaceSaveResult,
@@ -425,10 +426,13 @@ function StudioMenubarOverflowMenu({
  * `useStudioStableHandlers` 계약상 핸들러 백은 평면(함수만)이어야 해서 여기에 펼쳐 둔다.
  */
 export interface StudioMenubarContentHandlers extends StudioProjectReviewActionHandlers {
-  applyStudioWorkspaceLayout: (layout: StudioWorkspaceLayout) => void;
+  applyStudioWorkspaceLayout: (
+    layout: StudioWorkspaceLayout,
+    workspaceId?: StudioWorkspaceId,
+  ) => void;
   cancelInterchangeImport: () => void;
   changeMobileImmersiveMode: (enabled: boolean) => void;
-  ensureWatermarkLoaded: () => WatermarkSettings;
+  ensureWatermarkLoaded: () => Promise<WatermarkSettings>;
   exportCurrentPageToPsd: () => Promise<PsdExportResult>;
   exportCurrentPageToRasterInterchange: (
     format: StudioRasterInterchangeFormat
@@ -1037,9 +1041,9 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
             <StudioToolHintTarget hint={MENUBAR_HINTS.exportOptions} preferredSide="bottom">
               <button
                 type="button"
-                onClick={() => {
+                onClick={async () => {
                   preloadStudioExportMenuPanel();
-                  ensureWatermarkLoaded();
+                  await ensureWatermarkLoaded();
                   setProjectActionsOpen(false);
                   setExportMenuOpen((open) => !open);
                 }}

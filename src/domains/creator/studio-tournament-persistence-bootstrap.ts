@@ -29,9 +29,9 @@ export interface StudioTournamentPersistenceBootstrap {
 /**
  * Creates an idempotent async bootstrap. Installation always precedes shared
  * runtime construction, so the runtime captures the SQLite/OPFS adapter rather
- * than the lightweight fallback. A failed module load may be retried later;
- * hydration failure itself is already contained by the runtime and does not
- * invalidate the installed adapter.
+ * than becoming memory-only. A failed module load may be retried later. A
+ * database-open failure returns false and emits the runtime's explicit
+ * non-durable status; it is never reported as a successful boot.
  */
 export function createStudioTournamentPersistenceBootstrap(
   dependencies: StudioTournamentPersistenceBootstrapDependencies,
@@ -48,6 +48,14 @@ export function createStudioTournamentPersistenceBootstrap(
           persistenceModule.installStudioTournamentSqlitePersistence();
           const runtime = dependencies.getRuntime();
           await runtime.hydrate();
+          const status = runtime.persistenceStatus();
+          if (!status.durable) {
+            dependencies.warn(
+              "studio tournament is running memory-only; SQLite/OPFS persistence is unavailable",
+              status,
+            );
+            return false;
+          }
           return true;
         })
         .catch((cause: unknown) => {

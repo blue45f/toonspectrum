@@ -119,7 +119,10 @@ export interface StudioWorkspaceMenuProps {
   /** Persists catalog, active selection, and device preferences. */
   onStateChange: (state: StudioWorkspaceState) => StudioWorkspacePersistenceSnapshot;
   /** Applies a switched or reloaded layout to the actual Studio controls. */
-  onApplyLayout: (layout: StudioWorkspaceLayout) => void;
+  onApplyLayout: (
+    layout: StudioWorkspaceLayout,
+    workspaceId?: StudioWorkspaceId,
+  ) => void;
 }
 
 export type StudioWorkspacePersistenceSnapshot = Pick<
@@ -145,6 +148,9 @@ const DEFAULT_WORKSPACE_ICONS: Record<StudioDefaultWorkspaceId, LucideIcon> = {
   "pen-display": Tablet,
   "mobile-draw": Smartphone,
   "photo-edit": SunMedium,
+  "vector-design": PenTool,
+  animation: LayoutPanelTop,
+  "pose-3d": Scan,
 };
 
 const DEVICE_KIND_LABELS: Record<StudioWorkspaceDeviceKind, string> = {
@@ -723,7 +729,7 @@ export function StudioWorkspaceMenu({
     const next = switchStudioWorkspace(baseState, id);
     rememberRecentWorkspace(id);
     commitState(next);
-    onApplyLayout(next.liveLayout);
+    onApplyLayout(next.liveLayout, next.activeWorkspaceId);
     closeMenu();
   }
 
@@ -830,7 +836,7 @@ export function StudioWorkspaceMenu({
     try {
       const next = reloadStudioWorkspace(syncedState);
       const result = commitState(next);
-      onApplyLayout(next.liveLayout);
+      onApplyLayout(next.liveLayout, next.activeWorkspaceId);
       announceCommitted(
         `“${activeWorkspace?.name ?? "현재 작업공간"}”의 저장된 배치를 다시 적용했어요.`,
         result
@@ -1051,7 +1057,7 @@ export function StudioWorkspaceMenu({
       const workspace = resolveStudioWorkspace(syncedState, id);
       const next = deleteStudioWorkspace(syncedState, id);
       const result = commitState(next);
-      if (deletingActive) onApplyLayout(next.liveLayout);
+      if (deletingActive) onApplyLayout(next.liveLayout, next.activeWorkspaceId);
       setActionsWorkspaceId(null);
       setConfirmDeleteId(null);
       setRenameWorkspaceId(null);
@@ -1094,7 +1100,7 @@ export function StudioWorkspaceMenu({
         layout
       );
       const result = commitState(next);
-      onApplyLayout(next.liveLayout);
+      onApplyLayout(next.liveLayout, next.activeWorkspaceId);
       announceCommitted(message, result);
       setError(null);
     } catch (actionError) {

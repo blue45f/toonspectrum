@@ -24,10 +24,12 @@ import {
   studioDeleteWriterRoomItemRequest,
   studioExportSplitChoiceRequest,
   studioRemoveEmeresUnderlaysRequest,
+  studioResetApplicationSettingsRequest,
   studioRestoreCheckpointRequest,
 } from "./studio-destructive-command-catalog";
 
 afterEach(() => {
+  setStudioDestructiveConfirmPresenter(null);
   resetStudioDestructiveActionLedger();
 });
 
@@ -66,6 +68,18 @@ describe("destructive action preview", () => {
     expect(preview).not.toContain(STUDIO_DESTRUCTIVE_UNDO_HINT);
   });
 
+  it("treats resetting application preferences as an irreversible, previewed loss", () => {
+    const preview = formatStudioDestructivePreview(
+      studioResetApplicationSettingsRequest(),
+    );
+
+    expect(preview).toContain("앱 설정 전체 초기화");
+    expect(preview).toContain("이 기기의 Studio 개인 설정");
+    expect(preview).toContain("단축키·마우스·터치·도구막대·격자 설정");
+    expect(preview).toContain(STUDIO_DESTRUCTIVE_IRREVERSIBLE_HINT);
+    expect(preview).not.toContain(STUDIO_DESTRUCTIVE_UNDO_HINT);
+  });
+
   it("states the undo scope limit when undo only covers part of the document", () => {
     const preview = formatStudioDestructivePreview(
       studioRestoreCheckpointRequest({ checkpointName: "초안", currentPageCount: 3 }),
@@ -83,15 +97,18 @@ describe("destructive action preview", () => {
     ).toBe("현재 페이지 3개 · 현재 제목·설명·마스터·캐릭터 설정");
   });
 
-  it("refuses to destroy when no confirmation surface exists", async () => {
+  it("refuses to destroy without a custom confirmation surface and never calls native confirm", async () => {
     const original = Reflect.get(globalThis, "confirm");
-    Reflect.deleteProperty(globalThis, "confirm");
+    const nativeConfirm = vi.fn(() => true);
+    Reflect.set(globalThis, "confirm", nativeConfirm);
     try {
       await expect(
         confirmStudioDestructiveAction(studioRemoveEmeresUnderlaysRequest(1)),
       ).resolves.toBe(false);
+      expect(nativeConfirm).not.toHaveBeenCalled();
     } finally {
-      if (original !== undefined) Reflect.set(globalThis, "confirm", original);
+      if (original === undefined) Reflect.deleteProperty(globalThis, "confirm");
+      else Reflect.set(globalThis, "confirm", original);
     }
   });
 

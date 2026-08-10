@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -8,6 +8,7 @@ import {
   setStudioDestructiveConfirmPresenter,
   type StudioDestructiveActionRequest,
 } from "./studio-destructive-action-preview";
+import { createStudioUiPreferencesRepository } from "./studio-ui-preferences-sqlite";
 import {
   StudioPageListPane,
   type StudioPageListPaneHandlers,
@@ -41,6 +42,16 @@ vi.mock("./studio-page-lazy-ui", () => ({
     <div data-testid={`page-thumbnail-${page.id}`} data-class-name={className}>{page.id}</div>
   ),
 }));
+
+function createUiPreferencesHarness() {
+  const values = new Map<string, string>();
+  const repository = createStudioUiPreferencesRepository({
+    get: async (key) => values.get(key) ?? null,
+    set: async (key, value) => { values.set(key, value); },
+    delete: async (key) => { values.delete(key); },
+  });
+  return { values, acquire: async () => repository };
+}
 
 const PAGES: PageState[] = [
   {
@@ -144,6 +155,7 @@ function createProps(
     setMobileSheet: vi.fn(),
     visibleLeftPanelOpen: true,
     stableHandlers: createHandlers(),
+    acquireUiPreferences: createUiPreferencesHarness().acquire,
     ...overrides,
   };
 }
@@ -281,9 +293,16 @@ describe("StudioPageListPane", () => {
     });
   });
 
-  it("adjusts and persists page preview density for long EX-style projects", () => {
-    const props = createProps();
+  it("adjusts and persists page preview density in SQLite for long EX-style projects", async () => {
+    const preferences = createUiPreferencesHarness();
+    const props = createProps({ acquireUiPreferences: preferences.acquire });
     const view = render(<StudioPageListPane {...props} />);
+    await waitFor(() => {
+      expect(
+        document.querySelector("[data-studio-sheet-id='pages']")
+          ?.getAttribute("data-studio-ui-preferences-authority"),
+      ).toBe("sqlite-opfs");
+    });
     const size = screen.getByRole<HTMLInputElement>("slider", {
       name: "페이지 미리보기 크기 조절",
     });
@@ -299,15 +318,34 @@ describe("StudioPageListPane", () => {
     expect(screen.getByTestId("page-thumbnail-page-1").getAttribute("data-class-name")).toBe(
       "h-14",
     );
-    expect(window.localStorage.getItem("toonspectrum:studio:page-preview-size:v1")).toBe(
-      "compact",
-    );
+    await waitFor(() => expect(preferences.values.get("page-preview-size")).toBe("compact"));
 
     view.unmount();
     render(<StudioPageListPane {...props} />);
+    await waitFor(() => {
+      expect(
+        screen.getByRole<HTMLInputElement>("slider", { name: "페이지 미리보기 크기 조절" }).value,
+      ).toBe("0");
+    });
+  });
+
+  it("keeps preview changes in-session but discloses a non-durable preference authority", async () => {
+    const props = createProps({
+      acquireUiPreferences: async () => { throw new Error("OPFS unavailable"); },
+    });
+    render(<StudioPageListPane {...props} />);
+    expect((await screen.findByRole("status")).textContent).toContain("이번 탭에서만 유지");
     expect(
-      screen.getByRole<HTMLInputElement>("slider", { name: "페이지 미리보기 크기 조절" }).value,
-    ).toBe("0");
+      document.querySelector("[data-studio-sheet-id='pages']")
+        ?.getAttribute("data-studio-ui-preferences-authority"),
+    ).toBe("memory-only");
+    fireEvent.change(screen.getByRole("slider", { name: "페이지 미리보기 크기 조절" }), {
+      target: { value: "2" },
+    });
+    expect(
+      screen.getByRole("slider", { name: "페이지 미리보기 크기 조절" })
+        .getAttribute("aria-valuetext"),
+    ).toBe("크게");
   });
 
   it("keeps the mobile sheet inert while closed and restores modal semantics when opened", async () => {

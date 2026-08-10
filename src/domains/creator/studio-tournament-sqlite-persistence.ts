@@ -6,20 +6,19 @@ import { acquireStudioLocalDatabase } from "./studio-local-database-runtime";
 import {
   STUDIO_TOURNAMENT_WINNER_SCHEMA_VERSION,
   STUDIO_TOURNAMENT_WINNER_STORAGE_KEY,
-  createLocalStorageTournamentPersistence,
   installDefaultTournamentPersistence,
   parsePersistedTournamentState,
   type PersistedTournamentStateV1,
+  type StudioTournamentPersistenceStatus,
   type StudioTournamentRenderSampleEvent,
   type TournamentPersistencePort,
 } from "./studio-renderer-tournament-runtime";
 
 /**
  * SQLite(OPFS) 어댑터를 토너먼트 영속 포트에 접합하는 글루.
- * 우선순위: SQLite(OPFS) → localStorage 폴백 → 무영속(null).
- * SQLite 개방은 첫 load/save 시점에 lazy 하게 1회 시도하며, 실패 시 그 포트
- * 인스턴스는 localStorage 어댑터로 영구 강등된다(요청마다 재시도로 인한
- * 반복 실패 비용 방지 — 다음 세션에서 다시 시도된다).
+ * SQLite 개방은 첫 load/save/sample 시점에 lazy 하게 1회 시도한다. 실패 시
+ * 포트는 명시적인 memory-only/non-durable 상태가 되며 localStorage나
+ * IndexedDB로 자동 강등하지 않는다. 다음 세션의 새 포트만 다시 시도한다.
  *
  * V12 E25: 영속 매체가 kv JSON blob 에서 tournament_winners 구조화 테이블로
  * 승격됐다. load 는 raw 후보 행을 기존 검증기(parsePersistedTournamentState)에
@@ -35,8 +34,18 @@ const TOURNAMENT_KV_NAMESPACE = "tournament";
 export interface SqliteTournamentPersistenceOptions {
   /** 테스트 시임 — 기본은 openStudioLocalDatabase (OPFS). */
   openDatabase?: () => Promise<StudioLocalDatabase>;
-  /** SQLite 불가 시 폴백 포트. 기본은 localStorage 어댑터, null이면 무영속. */
-  fallback?: TournamentPersistencePort | null;
+}
+
+export class StudioTournamentPersistenceUnavailableError extends Error {
+  constructor(readonly status: StudioTournamentPersistenceStatus) {
+    super(status.reason ?? "Studio tournament SQLite persistence is unavailable");
+    this.name = "StudioTournamentPersistenceUnavailableError";
+  }
+}
+
+function errorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.length > 0) return error.message;
+  return String(error);
 }
 
 async function loadLegacyKvState(
@@ -59,56 +68,88 @@ async function loadLegacyKvState(
 export function createSqliteTournamentPersistence(
   options: SqliteTournamentPersistenceOptions = {},
 ): TournamentPersistencePort {
-  const openDatabase =
-    options.openDatabase ?? acquireStudioLocalDatabase;
-  const fallback =
-    options.fallback !== undefined
-      ? options.fallback
-      : createLocalStorageTournamentPersistence();
-  let database: Promise<StudioLocalDatabase | null> | null = null;
+  const openDatabase = options.openDatabase ?? acquireStudioLocalDatabase;
+  let database: Promise<StudioLocalDatabase> | null = null;
+  let sampleSink: ReturnType<typeof createCostSampleSink> | null = null;
+  let persistenceStatus: StudioTournamentPersistenceStatus = {
+    mode: "initializing-sqlite",
+    durable: false,
+    reason: "SQLite/OPFS tournament database has not opened yet",
+  };
 
-  function resolveDatabase(): Promise<StudioLocalDatabase | null> {
+  function degrade(error: unknown, phase: string): StudioTournamentPersistenceUnavailableError {
+    const unavailable = error instanceof SqliteUnavailableError;
+    persistenceStatus = {
+      mode: "memory-only",
+      durable: false,
+      reason: `${phase}: ${unavailable ? "SQLite/OPFS unavailable" : "SQLite operation failed"}: ${errorMessage(error)}`,
+    };
+    return new StudioTournamentPersistenceUnavailableError({ ...persistenceStatus });
+  }
+
+  function resolveDatabase(): Promise<StudioLocalDatabase> {
+    if (persistenceStatus.mode === "memory-only") {
+      return Promise.reject(
+        new StudioTournamentPersistenceUnavailableError({ ...persistenceStatus }),
+      );
+    }
     database ??= openDatabase().then(
-      (opened) => opened,
-      (error: unknown) => {
-        if (!(error instanceof SqliteUnavailableError)) {
-          // 개방 실패 원인이 무엇이든 영속화는 폴백으로 계속한다. 원인은
-          // 삼키지 않고 조용히 강등된 사실을 콘솔로 남긴다(런타임 계약상
-          // 영속 실패는 비치명).
-          console.warn("studio tournament sqlite persistence degraded", error);
-        }
-        return null;
+      (opened) => {
+        persistenceStatus = { mode: "sqlite-opfs", durable: true, reason: null };
+        sampleSink = createCostSampleSink(opened, {
+          onFailure: (error) => {
+            degrade(error, "cost sample write failed");
+          },
+        });
+        return opened;
       },
+      (error: unknown) => Promise.reject(degrade(error, "database open failed")),
     );
     return database;
   }
 
   return {
+    status: () => ({ ...persistenceStatus }),
     async load(): Promise<PersistedTournamentStateV1 | null> {
-      const db = await resolveDatabase();
-      if (!db) return fallback ? fallback.load() : null;
-      const candidates = await db.listTournamentWinnerCandidates();
-      if (candidates.length === 0) {
-        // 구조화 행이 전혀 없을 때만 구버전 kv blob 을 읽는다 — 마이그레이션
-        // 경로. save 가 구조화 테이블을 채우고 blob 을 지우면 다시는 안 탄다.
-        return loadLegacyKvState(db);
+      try {
+        const db = await resolveDatabase();
+        const candidates = await db.listTournamentWinnerCandidates();
+        if (candidates.length === 0) {
+          // 구조화 행이 전혀 없을 때만 구버전 SQLite kv blob 을 읽는다.
+          return loadLegacyKvState(db);
+        }
+        return parsePersistedTournamentState({
+          version: STUDIO_TOURNAMENT_WINNER_SCHEMA_VERSION,
+          entries: candidates,
+        });
+      } catch (error) {
+        if (error instanceof StudioTournamentPersistenceUnavailableError) throw error;
+        throw degrade(error, "winner load failed");
       }
-      return parsePersistedTournamentState({
-        version: STUDIO_TOURNAMENT_WINNER_SCHEMA_VERSION,
-        entries: candidates,
-      });
     },
     async save(state: PersistedTournamentStateV1): Promise<void> {
-      const db = await resolveDatabase();
-      if (!db) {
-        if (fallback) await fallback.save(state);
-        return;
+      try {
+        const db = await resolveDatabase();
+        await db.replaceTournamentWinners(state.entries);
+        // 구조화 저장이 성공한 뒤에만 구버전 SQLite kv blob 을 지운다.
+        await db.kvDelete(TOURNAMENT_KV_NAMESPACE, STUDIO_TOURNAMENT_WINNER_STORAGE_KEY);
+      } catch (error) {
+        if (error instanceof StudioTournamentPersistenceUnavailableError) throw error;
+        // A rejected state (for example a NOT NULL/finite constraint) does not
+        // make the already-open SQLite authority non-durable. Preserve the
+        // previous atomic rows and surface the exact write error to the caller.
+        throw error;
       }
-      await db.replaceTournamentWinners(state.entries);
-      // 구조화 저장이 성공한 뒤에만 구버전 blob 을 지운다. 교체와 삭제 사이
-      // 크래시가 나면 다음 load 는 여전히 구조화 행(권위 소스)을 보고, 다음
-      // save 가 blob 삭제를 재시도한다.
-      await db.kvDelete(TOURNAMENT_KV_NAMESPACE, STUDIO_TOURNAMENT_WINNER_STORAGE_KEY);
+    },
+    async recordSample(sample: StudioTournamentRenderSampleEvent): Promise<void> {
+      const db = await resolveDatabase();
+      const sink = sampleSink ?? createCostSampleSink(db, {
+        onFailure: (error) => {
+          degrade(error, "cost sample write failed");
+        },
+      });
+      sampleSink = sink;
+      await sink(sample);
     },
   };
 }
@@ -121,12 +162,14 @@ export function createSqliteTournamentPersistence(
  */
 export function createCostSampleSink(
   database: StudioLocalDatabase,
+  options: { onFailure?: (error: unknown) => void } = {},
 ): (sample: StudioTournamentRenderSampleEvent) => Promise<void> {
   let warned = false;
   return async (sample) => {
     try {
       await database.recordCostSample(sample.providerId, sample.bucket, "warm", sample.ms);
     } catch (error) {
+      options.onFailure?.(error);
       if (!warned) {
         warned = true;
         console.warn("studio tournament cost sample sink degraded", error);

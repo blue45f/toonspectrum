@@ -43,6 +43,7 @@ interface NodeHttpModule {
 }
 
 interface NodeFsPromisesModule {
+  readFile(path: URL, encoding: "utf8"): Promise<string>;
   writeFile(path: URL, data: string): Promise<void>;
 }
 
@@ -99,6 +100,57 @@ const IMAGE_SIZE = 512;
 const PIXEL_COUNT = IMAGE_SIZE * IMAGE_SIZE;
 const TOTAL_FRAMES = 60;
 const WARMUP_FRAMES = 10;
+
+interface PipelinePromotionGateInput {
+  pipelineCountReduced: boolean;
+  pipelineCreateTimeReduced: boolean;
+  wallClockJankReduced: boolean;
+  gpuExecutionReduced: boolean | null;
+}
+
+function passesPipelinePromotionGate(input: PipelinePromotionGateInput): boolean {
+  return (
+    input.pipelineCountReduced &&
+    input.pipelineCreateTimeReduced &&
+    input.wallClockJankReduced &&
+    input.gpuExecutionReduced === true
+  );
+}
+
+describe("committed WGSL/WESL pipeline promotion evidence", () => {
+  it("cannot pass unless pipeline count, creation, GPU execution, and wall-clock jank all improve", async () => {
+    const { readFile } = (await dynamicImport(
+      "node:fs/promises",
+    )) as NodeFsPromisesModule;
+    const artifact = JSON.parse(await readFile(RESULTS_URL, "utf8")) as {
+      gate: {
+        pipelineCountReduced: boolean;
+        pipelineCreateTimeReduced: boolean;
+        wallClockFrame: {
+          jankReduced: boolean;
+          jankStddevReduced: boolean;
+          jankP99OverP50Reduced: boolean;
+        };
+        gpuExecution: { reduced: boolean | null };
+        passed: boolean;
+      };
+    };
+    const { gate } = artifact;
+
+    expect(gate.wallClockFrame.jankReduced).toBe(
+      gate.wallClockFrame.jankStddevReduced ||
+        gate.wallClockFrame.jankP99OverP50Reduced,
+    );
+    expect(gate.passed).toBe(
+      passesPipelinePromotionGate({
+        pipelineCountReduced: gate.pipelineCountReduced,
+        pipelineCreateTimeReduced: gate.pipelineCreateTimeReduced,
+        wallClockJankReduced: gate.wallClockFrame.jankReduced,
+        gpuExecutionReduced: gate.gpuExecution.reduced,
+      }),
+    );
+  });
+});
 
 // ---------------------------------------------------------------------------
 // 5연산 체인 — 밝기→대비→HSL→레벨→커브. 밝기/대비는 정적 커널 경로에서 별개
@@ -768,6 +820,9 @@ describeProbe("wgsl variant pipeline count / jank real-browser probe", () => {
             : "parity-at-sync-floor";
       const gpuExecutionReduced =
         gpuStaticSum !== null && gpuFused !== null ? gpuFused.p50 < gpuStaticSum.p50 : null;
+      const wallClockJankReduced =
+        frameB.stddev < frameA.stddev ||
+        frameB.jankP99OverP50 < frameA.jankP99OverP50;
 
       const gate = {
         criterion:
@@ -780,6 +835,7 @@ describeProbe("wgsl variant pipeline count / jank real-browser probe", () => {
           frameP50Reduced: frameB.p50 < frameA.p50,
           jankStddevReduced: frameB.stddev < frameA.stddev,
           jankP99OverP50Reduced: frameB.jankP99OverP50 < frameA.jankP99OverP50,
+          jankReduced: wallClockJankReduced,
           verdict: wallClockVerdict,
           note: "512² 체인의 GPU 실행(수백µs)이 submit→onSubmittedWorkDone 왕복(~2.5ms)에 가려져 두 방식 모두 같은 측정 플로어에 앉는다 — 벽시계 프레임/jank 차이는 타이머 해상도(100µs) 이내",
         },
@@ -789,12 +845,12 @@ describeProbe("wgsl variant pipeline count / jank real-browser probe", () => {
         },
         passed: false,
       };
-      gate.passed =
-        gate.pipelineCountReduced &&
-        wallClockVerdict !== "regressed" &&
-        (gate.pipelineCreateTimeReduced ||
-          wallClockVerdict === "reduced" ||
-          gpuExecutionReduced === true);
+      gate.passed = passesPipelinePromotionGate({
+        pipelineCountReduced: gate.pipelineCountReduced,
+        pipelineCreateTimeReduced: gate.pipelineCreateTimeReduced,
+        wallClockJankReduced,
+        gpuExecutionReduced,
+      });
 
       const report = {
         harness:

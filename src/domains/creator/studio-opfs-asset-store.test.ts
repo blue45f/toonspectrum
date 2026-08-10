@@ -11,14 +11,15 @@ import {
   type StudioOpfsStorageEstimator,
 } from "./studio-opfs-asset-store";
 import {
-  createStudioOpfsLocalStorageFileSystem,
+  createStudioOpfsLegacyLocalStorageFileSystem,
   createStudioOpfsMemoryFileSystem,
   formatStudioOpfsBytes,
   isValidStudioOpfsPath,
   selectStudioOpfsFileSystem,
   StudioOpfsError,
-  STUDIO_OPFS_FALLBACK_MAX_TOTAL_BYTES,
-  type StudioOpfsLocalStorageLike,
+  STUDIO_OPFS_LEGACY_LOCAL_STORAGE_MAX_TOTAL_BYTES,
+  type StudioOpfsDirectoryHandleLike,
+  type StudioOpfsLegacyLocalStorageLike,
 } from "./studio-opfs-filesystem";
 
 // ── 도우미 ──────────────────────────────────────────────────────────────
@@ -40,7 +41,7 @@ function jsonBytes(seed: number, count = 400): Uint8Array {
   );
 }
 
-function createFakeLocalStorage(): StudioOpfsLocalStorageLike & { map: Map<string, string> } {
+function createFakeLocalStorage(): StudioOpfsLegacyLocalStorageLike & { map: Map<string, string> } {
   const map = new Map<string, string>();
   return {
     map,
@@ -48,6 +49,20 @@ function createFakeLocalStorage(): StudioOpfsLocalStorageLike & { map: Map<strin
     setItem: (key, value) => void map.set(key, value),
     removeItem: (key) => void map.delete(key),
   };
+}
+
+function createEmptyOpfsDirectory(): StudioOpfsDirectoryHandleLike {
+  const directory: StudioOpfsDirectoryHandleLike = {
+    async getDirectoryHandle() {
+      return directory;
+    },
+    async getFileHandle() {
+      throw Object.assign(new Error("missing"), { name: "NotFoundError" });
+    },
+    async removeEntry() {},
+    async *keys() {},
+  };
+  return directory;
 }
 
 function fixedEstimator(usage: number, quota: number): StudioOpfsStorageEstimator {
@@ -471,34 +486,66 @@ describe("studio-opfs-asset-store · 동시 쓰기 안전성", () => {
   });
 });
 
-// ── 폴백 ────────────────────────────────────────────────────────────────
+// ── 제품 선택과 명시적 legacy 어댑터 ───────────────────────────────────
 
-describe("studio-opfs-asset-store · OPFS 부재 폴백", () => {
-  it("OPFS가 없으면 localStorage 어댑터를 고르고 이유를 밝힌다", async () => {
+describe("studio-opfs-asset-store · OPFS 제품 선택", () => {
+  it("OPFS가 없으면 localStorage를 읽지 않고 명시적 memory-only를 고른다", async () => {
     const storage = createFakeLocalStorage();
-    const selection = await selectStudioOpfsFileSystem({ localStorage: storage });
-    expect(selection.kind).toBe("local-storage");
-    expect(selection.reason).toMatch(/지원하지 않아/u);
+    let localStorageAccesses = 0;
+    const scope = {
+      navigator: undefined,
+      get localStorage() {
+        localStorageAccesses += 1;
+        return storage;
+      },
+    };
+    const selection = await selectStudioOpfsFileSystem(scope);
+    expect(selection.kind).toBe("memory");
+    expect(selection.durability).toBe("memory-only");
+    expect(selection.reason).toMatch(/새로고침하면 사라집니다/u);
+    expect(localStorageAccesses).toBe(0);
+    expect(storage.map.size).toBe(0);
   });
 
-  it("getDirectory가 있어도 호출이 던지면 폴백한다(시크릿 모드)", async () => {
-    const storage = createFakeLocalStorage();
+  it("getDirectory가 있어도 호출이 던지면 원인을 담은 memory-only가 된다", async () => {
+    const denied = new Error("denied");
     const selection = await selectStudioOpfsFileSystem({
-      navigator: { storage: { getDirectory: async () => { throw new Error("denied"); } } },
-      localStorage: storage,
+      navigator: { storage: { getDirectory: async () => { throw denied; } } },
     });
-    expect(selection.kind).toBe("local-storage");
+    expect(selection.kind).toBe("memory");
+    expect(selection.durability).toBe("memory-only");
+    expect(selection.cause).toBeInstanceOf(StudioOpfsError);
+    expect((selection.cause as StudioOpfsError).cause).toBe(denied);
   });
 
-  it("localStorage조차 없으면 세션 한정 메모리 저장소로 내려간다", async () => {
+  it("OPFS API 자체가 없으면 세션 한정 메모리 저장소와 명시적 원인을 반환한다", async () => {
     const selection = await selectStudioOpfsFileSystem({});
     expect(selection.kind).toBe("memory");
-    expect(selection.reason).toMatch(/창을 닫으면 사라져요/u);
+    expect(selection.durability).toBe("memory-only");
+    expect(selection.cause).toMatchObject({ code: "NOT_SUPPORTED" });
   });
 
-  it("폴백에서도 저장/읽기/삭제와 중복 제거가 똑같이 동작한다", async () => {
+  it("실제 디렉터리 probe가 성공해야 durable OPFS로 승격한다", async () => {
+    const directory = createEmptyOpfsDirectory();
+    const selection = await selectStudioOpfsFileSystem({
+      navigator: {
+        storage: {
+          getDirectory: async () => directory,
+        },
+      },
+    });
+    expect(selection).toMatchObject({
+      kind: "opfs",
+      durability: "durable",
+      cause: null,
+    });
+  });
+});
+
+describe("studio-opfs-asset-store · 명시적 legacy localStorage import/test 어댑터", () => {
+  it("명시적으로 만들면 저장/읽기/삭제와 중복 제거가 동작한다", async () => {
     const storage = createFakeLocalStorage();
-    const fs = createStudioOpfsLocalStorageFileSystem(storage);
+    const fs = createStudioOpfsLegacyLocalStorageFileSystem(storage);
     const store = createStudioOpfsAssetStore({ fs });
 
     const payload = jsonBytes(51, 800);
@@ -512,9 +559,9 @@ describe("studio-opfs-asset-store · OPFS 부재 폴백", () => {
     expect(await store.get(first.ref.hash)).toBeNull();
   });
 
-  it("폴백은 옛 천장을 지키고, 넘으면 조용히 자르지 않고 숫자를 밝혀 거절한다", async () => {
+  it("legacy 상한을 넘으면 조용히 자르지 않고 숫자를 밝혀 거절한다", async () => {
     const storage = createFakeLocalStorage();
-    const fs = createStudioOpfsLocalStorageFileSystem(storage, { maxTotalBytes: 20_000 });
+    const fs = createStudioOpfsLegacyLocalStorageFileSystem(storage, { maxTotalBytes: 20_000 });
     const store = createStudioOpfsAssetStore({ fs });
 
     await store.put(new Uint8Array(15_000).fill(7), { mime: "font/woff2" });
@@ -525,13 +572,13 @@ describe("studio-opfs-asset-store · OPFS 부재 폴백", () => {
     expect((await store.list()).length).toBe(1);
   });
 
-  it("폴백 기본 상한은 나머지 localStorage 예산을 침범하지 않는 크기다", () => {
-    expect(STUDIO_OPFS_FALLBACK_MAX_TOTAL_BYTES).toBeLessThanOrEqual(2_000_000);
+  it("legacy 기본 상한은 나머지 localStorage 예산을 침범하지 않는 크기다", () => {
+    expect(STUDIO_OPFS_LEGACY_LOCAL_STORAGE_MAX_TOTAL_BYTES).toBeLessThanOrEqual(2_000_000);
   });
 
-  it("폴백 어댑터의 write는 실패해도 이전 내용을 남긴다(원자성)", async () => {
+  it("legacy 어댑터의 write는 실패해도 이전 내용을 남긴다(원자성)", async () => {
     const storage = createFakeLocalStorage();
-    const fs = createStudioOpfsLocalStorageFileSystem(storage, { maxTotalBytes: 10_000 });
+    const fs = createStudioOpfsLegacyLocalStorageFileSystem(storage, { maxTotalBytes: 10_000 });
     await fs.write("blobs/aa.bin", new Uint8Array(5_000).fill(1));
     await expect(fs.write("blobs/aa.bin", new Uint8Array(20_000).fill(2))).rejects.toThrow(StudioOpfsError);
     expect((await fs.read("blobs/aa.bin"))?.byteLength).toBe(5_000);

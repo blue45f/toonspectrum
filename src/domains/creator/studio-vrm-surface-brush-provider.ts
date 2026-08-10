@@ -70,6 +70,13 @@ export interface PrepareStudioVrmSurfaceProjectionProviderInput {
    * derive that scale without inventing geometry (notably a single-point tap).
    */
   readonly texelDensityBySample?: readonly (number | null | undefined)[];
+  /**
+   * Camera ray differential measured by the R3F caller at each hit depth. The
+   * adapter combines this scene-units/CSS-pixel scale with the runtime-owned
+   * triangle texel density, avoiding texture inspection or GPU readback for a
+   * one-sample tap.
+   */
+  readonly worldUnitsPerCssPixelBySample?: readonly (number | null | undefined)[];
   readonly signal?: AbortSignal;
 }
 
@@ -227,6 +234,7 @@ function resolveDensities(
   stroke: StrokeIR,
   session: StudioVrmTexturePaintSurfaceSession,
   explicit: readonly (number | null | undefined)[] | undefined,
+  worldUnitsPerCssPixel: readonly (number | null | undefined)[] | undefined,
   lane: "primary" | "fallback",
 ): readonly (number | null)[] {
   const pairDensities: Array<number | null> = Array.from(
@@ -259,13 +267,31 @@ function resolveDensities(
       }
       return supplied;
     }
+    const suppliedWorldScale = worldUnitsPerCssPixel?.[sampleIndex];
+    if (suppliedWorldScale !== undefined && suppliedWorldScale !== null) {
+      if (!Number.isFinite(suppliedWorldScale) || suppliedWorldScale <= 0) {
+        throw bridgeFailure(
+          "texel-density-unavailable",
+          `${lane} sample[${sampleIndex}] supplied an invalid world/CSS-pixel scale ${String(suppliedWorldScale)}`,
+          sampleIndex,
+        );
+      }
+      if (
+        projection.texelsPerWorldUnit !== undefined
+        && Number.isFinite(projection.texelsPerWorldUnit)
+        && projection.texelsPerWorldUnit > 0
+      ) {
+        const density = suppliedWorldScale * projection.texelsPerWorldUnit;
+        if (Number.isFinite(density) && density > DENSITY_EPSILON) return density;
+      }
+    }
     const adjacent = [pairDensities[sampleIndex - 1], pairDensities[sampleIndex]]
       .filter((value): value is number => value !== null && value !== undefined);
     if (adjacent.length === 0) {
       throw bridgeFailure(
         "texel-density-unavailable",
         `${lane} sample[${sampleIndex}] has no measured screen→texel derivative; `
-          + "provide texelDensityBySample from a camera ray differential",
+          + "provide texelDensityBySample or a camera worldUnitsPerCssPixelBySample differential",
         sampleIndex,
       );
     }
@@ -473,6 +499,13 @@ export async function prepareStudioVrmSurfaceProjectionProvider(
   if (input.texelDensityBySample) {
     assertHitArrayLength("texelDensityBySample", input.texelDensityBySample, sampleCount);
   }
+  if (input.worldUnitsPerCssPixelBySample) {
+    assertHitArrayLength(
+      "worldUnitsPerCssPixelBySample",
+      input.worldUnitsPerCssPixelBySample,
+      sampleCount,
+    );
+  }
   const anchor = [...input.rayHits, ...(input.fallbackRayHits ?? [])]
     .find((hit): hit is StudioVrmTexturePaintRayHit => hit !== null);
   if (!anchor) {
@@ -508,6 +541,7 @@ export async function prepareStudioVrmSurfaceProjectionProvider(
       input.stroke,
       session,
       input.texelDensityBySample,
+      input.worldUnitsPerCssPixelBySample,
       "primary",
     );
     const primary = toProviderProjections(primaryRaw, primaryDensity);
@@ -534,6 +568,7 @@ export async function prepareStudioVrmSurfaceProjectionProvider(
         input.stroke,
         session,
         input.texelDensityBySample,
+        input.worldUnitsPerCssPixelBySample,
         "fallback",
       );
       fallbackProvider = new StudioVrmSurfaceProjectionProvider(

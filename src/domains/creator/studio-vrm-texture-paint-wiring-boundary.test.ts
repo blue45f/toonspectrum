@@ -254,7 +254,7 @@ describe("Studio VRM texture-paint wiring boundary", () => {
       "const finishTexturePaint =",
     );
     expect(pointerHandlers.match(/texturePaintMutationBlockedRef\.current/gu))
-      .toHaveLength(2);
+      .toHaveLength(3);
   });
 
   it("recreates paint runtime only when canonical initial surface-paint identity changes", () => {

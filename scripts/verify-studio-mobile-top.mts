@@ -211,6 +211,20 @@ async function installStudioGuestSessionBoundary(page: Page): Promise<void> {
   });
 }
 
+async function dismissHydratedQuickStart(page: Page): Promise<void> {
+  const quickStart = page.locator('[data-studio-creative-starter="true"]');
+  // The first-use flag is SQLite/OPFS-owned. It can resolve after the mobile shell is already
+  // visible, so the retired localStorage seed above is only a compatibility hint. Close the real
+  // product coach after hydration before measuring unrelated top-chrome hit targets.
+  const mounted = await quickStart
+    .waitFor({ state: "visible", timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!mounted) return;
+  await quickStart.locator('[data-studio-quickstart-dismiss="true"]').click();
+  await quickStart.waitFor({ state: "detached", timeout: 3_000 });
+}
+
 /**
  * Everything above the canvas in one DOM pass. Runs inside the page so rect
  * math sees real computed layout (Tailwind pointer-coarse variants included).
@@ -700,6 +714,7 @@ async function runMode(
     .waitFor({ state: "attached", timeout: 5000 });
   // Let the lazy menubar content + belt suspense settle before measuring.
   await page.locator('[data-studio-menubar-actions="true"]').waitFor({ state: "attached", timeout: 8000 });
+  await dismissHydratedQuickStart(page);
   await page.waitForTimeout(400);
 
   const metrics = await measureTopChrome(page, mode);

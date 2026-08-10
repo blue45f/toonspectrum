@@ -1,4 +1,5 @@
 import {
+  declareTrustedBootstrapProvider,
   EngineCapabilityRegistry,
   HybridExecutionPlanner,
   providerDescriptorSchema,
@@ -43,24 +44,30 @@ function buildShadowRegistry(): EngineCapabilityRegistry {
   const registry = new EngineCapabilityRegistry();
   STUDIO_STROKE_SURFACE_ROUTE_PRIORITY.forEach((kind, index) => {
     const next = STUDIO_STROKE_SURFACE_ROUTE_PRIORITY[index + 1] ?? null;
-    registry.register(
-      providerDescriptorSchema.parse({
-        id: `stroke-route-${kind}`,
-        kind: "raster-brush",
-        displayName: `Studio stroke surface lane: ${kind}`,
-        version: "route-v1",
-        license: "internal",
-        attribution: "",
-        maturity: "production-baseline",
-        runtime: "js",
-        capabilities: [`stroke.route.${kind}`, "stroke.route.any"],
-        limitations: [],
-        previewQuality: "production",
-        finalQuality: "production",
-        determinism: "tolerance",
-        memoryEstimateMb: 0,
-        fallbackProviderId: next === null ? null : `stroke-route-${next}`,
-        knownIssues: [],
+    const descriptor = providerDescriptorSchema.parse({
+      id: `stroke-route-${kind}`,
+      kind: "raster-brush",
+      displayName: `Studio stroke surface lane: ${kind}`,
+      version: "route-v1",
+      license: "internal",
+      attribution: "",
+      maturity: "production-baseline",
+      runtime: "js",
+      capabilities: [`stroke.route.${kind}`, "stroke.route.any"],
+      limitations: [],
+      previewQuality: "production",
+      finalQuality: "production",
+      determinism: "tolerance",
+      memoryEstimateMb: 0,
+      fallbackProviderId: next === null ? null : `stroke-route-${next}`,
+      knownIssues: [],
+    });
+    registry.registerTrustedBootstrap(
+      declareTrustedBootstrapProvider(descriptor, {
+        classification: "checked-in-first-party",
+        source: "src/domains/creator/studio-surface-plan-shadow.ts",
+        owner: "studio-brush-platform",
+        justification: `checked-in Studio stroke surface route: ${kind}`,
       }),
     );
   });

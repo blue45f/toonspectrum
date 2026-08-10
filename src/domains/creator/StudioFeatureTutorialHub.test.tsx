@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { STUDIO_FEATURE_TUTORIALS } from "./studio-feature-tutorials";
 import { StudioFeatureTutorialHub } from "./StudioFeatureTutorialHub";
+
+import type { StudioTutorialProgressRepository } from "./studio-tutorial-progress-sqlite";
 
 import { useI18n } from "@/lib/i18n";
 
@@ -27,6 +29,81 @@ afterEach(() => {
 });
 
 describe("StudioFeatureTutorialHub", () => {
+  it("hydrates and saves tutorial progress through the SQLite/OPFS authority", async () => {
+    const save = vi.fn(async () => undefined);
+    const repository: StudioTutorialProgressRepository = {
+      authority: "sqlite-opfs",
+      load: async () => ({ completed: ["pen"], lastId: "pen" }),
+      save,
+    };
+    render(
+      <StudioFeatureTutorialHub
+        open
+        onClose={vi.fn()}
+        acquireProgressRepository={async () => repository}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog").getAttribute("data-studio-tutorial-progress-authority"))
+        .toBe("sqlite-opfs");
+      expect(screen.getByRole("progressbar").getAttribute("aria-valuenow")).toBe("1");
+    });
+
+    const nextTutorial = STUDIO_FEATURE_TUTORIALS[1]!;
+    fireEvent.click(screen.getByRole("button", { name: nextTutorial.title }));
+    await waitFor(() => {
+      expect(save).toHaveBeenLastCalledWith({ completed: ["pen"], lastId: nextTutorial.id });
+    });
+  });
+
+  it("does not let late hydration overwrite progress chosen in the open dialog", async () => {
+    let resolveLoad!: (value: { completed: string[]; lastId: string }) => void;
+    const load = new Promise<{ completed: string[]; lastId: string }>((resolve) => {
+      resolveLoad = resolve;
+    });
+    const repository: StudioTutorialProgressRepository = {
+      authority: "sqlite-opfs",
+      load: () => load,
+      save: async () => undefined,
+    };
+    render(
+      <StudioFeatureTutorialHub
+        open
+        initialTutorialId="pen"
+        onClose={vi.fn()}
+        acquireProgressRepository={async () => repository}
+      />,
+    );
+    const selected = STUDIO_FEATURE_TUTORIALS[1]!;
+    fireEvent.click(screen.getByRole("button", { name: selected.title }));
+    resolveLoad({ completed: ["fill"], lastId: "fill" });
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog").getAttribute("data-studio-tutorial-progress-authority"))
+        .toBe("sqlite-opfs");
+    });
+    expect(screen.getByRole("button", { name: selected.title }).getAttribute("aria-current"))
+      .toBe("true");
+  });
+
+  it("keeps tutorials usable and visibly marks progress as memory-only when SQLite is unavailable", async () => {
+    render(
+      <StudioFeatureTutorialHub
+        open
+        onClose={vi.fn()}
+        acquireProgressRepository={async () => { throw new Error("OPFS unavailable"); }}
+      />,
+    );
+    const warning = await screen.findByText(/튜토리얼 진행도는 .*이번 탭에서만 유지/u);
+    expect(warning.getAttribute("data-studio-tutorial-persistence-status")).toBe("memory-only");
+    expect(screen.getByRole("dialog").getAttribute("data-studio-tutorial-progress-authority"))
+      .toBe("memory-only");
+    fireEvent.click(screen.getByRole("button", { name: STUDIO_FEATURE_TUTORIALS[1]!.title }));
+    expect(screen.getByRole("button", { name: STUDIO_FEATURE_TUTORIALS[1]!.title })
+      .getAttribute("aria-current")).toBe("true");
+  });
+
   it("closed 이면 렌더하지 않는다", () => {
     const { container } = render(<StudioFeatureTutorialHub open={false} onClose={vi.fn()} />);
     expect(container.innerHTML).toBe("");

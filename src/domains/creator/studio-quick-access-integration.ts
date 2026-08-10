@@ -1,3 +1,4 @@
+import { acquireStudioLocalDatabase } from "./studio-local-database-runtime";
 import {
   encodeStudioQuickAccessState,
   normalizeStudioQuickAccessState,
@@ -5,6 +6,7 @@ import {
   type StudioQuickAccessState,
 } from "./studio-quick-access";
 
+import type { StudioAsyncKeyValueStore } from "./studio-local-database";
 import type { StudioQuickActionId } from "./studio-quick-actions";
 
 export const STUDIO_QUICK_ACCESS_COMMAND_IDS = [
@@ -47,11 +49,6 @@ export type StudioQuickAccessExecutionIntent =
     kind: "pixel-transform";
   }>;
 
-export interface StudioQuickAccessStorage {
-  getItem(key: string): string | null;
-  setItem(key: string, value: string): void;
-}
-
 export type StudioQuickAccessSaveStatus =
   | "persisted"
   | "storage-unavailable"
@@ -59,7 +56,22 @@ export type StudioQuickAccessSaveStatus =
   | "write-failed"
   | "verification-failed";
 
-const STORAGE_PREFIX = "toonspectrum-studio-quick-access:v1";
+export type StudioQuickAccessAuthority = "sqlite-opfs" | "memory-only";
+
+export interface StudioQuickAccessLoadResult {
+  readonly state: StudioQuickAccessState;
+  readonly authority: StudioQuickAccessAuthority;
+  readonly failure: "storage-unavailable" | "read-failed" | "invalid-payload" | null;
+}
+
+export interface StudioQuickAccessRepository {
+  readonly authority: "sqlite-opfs";
+  load(ownerScope: string): Promise<StudioQuickAccessState | null>;
+  save(ownerScope: string, state: StudioQuickAccessState): Promise<void>;
+  flush(): Promise<void>;
+}
+
+export const STUDIO_QUICK_ACCESS_SQLITE_NAMESPACE = "studio-quick-access-v12" as const;
 const VALID_OWNER_SCOPE = /^(?:guest|owner-[0-9a-f]{16})$/u;
 
 const COMMAND_CATALOG: readonly Omit<
@@ -229,10 +241,8 @@ const EXECUTION_INTENTS: Readonly<
   "dodge-burn": Object.freeze({ kind: "quick-action", action: "dodge-burn" }),
 });
 
-function storageKey(ownerScope: string): string | null {
-  return VALID_OWNER_SCOPE.test(ownerScope)
-    ? `${STORAGE_PREFIX}:${ownerScope}`
-    : null;
+function validOwnerScope(ownerScope: string): boolean {
+  return VALID_OWNER_SCOPE.test(ownerScope);
 }
 
 /**
@@ -266,42 +276,119 @@ export function resolveStudioQuickAccessExecutionIntent(
   return EXECUTION_INTENTS[commandId as StudioQuickAccessCommandId] ?? null;
 }
 
-export function loadStudioQuickAccessState(
-  storage: Pick<StudioQuickAccessStorage, "getItem"> | null | undefined,
-  ownerScope: string,
-): StudioQuickAccessState {
-  const key = storageKey(ownerScope);
-  if (!storage || !key) return normalizeStudioQuickAccessState(null);
-  try {
-    return normalizeStudioQuickAccessState(storage.getItem(key));
-  } catch {
-    return normalizeStudioQuickAccessState(null);
+function parseStoredState(raw: string): StudioQuickAccessState {
+  const normalized = normalizeStudioQuickAccessState(raw);
+  if (encodeStudioQuickAccessState(normalized) !== raw) {
+    throw new Error("Studio Quick Access SQLite payload is not canonical.");
   }
+  return normalized;
 }
 
 /**
- * Saves and verifies the bounded allowlisted payload locally. No project content,
- * command handler, account identifier, provider setting, or network request is involved.
+ * SQLite/OPFS repository for the bounded Quick Access model. The owner scope is already opaque,
+ * and writes are serialized so an older async gesture cannot overtake a newer one.
  */
-export function saveStudioQuickAccessState(
-  storage: StudioQuickAccessStorage | null | undefined,
+export function createStudioQuickAccessRepository(
+  store: StudioAsyncKeyValueStore,
+): StudioQuickAccessRepository {
+  let writeTail: Promise<void> = Promise.resolve();
+
+  const load = async (ownerScope: string): Promise<StudioQuickAccessState | null> => {
+    if (!validOwnerScope(ownerScope)) throw new TypeError("Invalid Quick Access owner scope.");
+    const raw = await store.get(ownerScope);
+    return raw === null ? null : parseStoredState(raw);
+  };
+
+  return Object.freeze({
+    authority: "sqlite-opfs" as const,
+    load,
+    save(ownerScope: string, state: StudioQuickAccessState) {
+      if (!validOwnerScope(ownerScope)) {
+        return Promise.reject(new TypeError("Invalid Quick Access owner scope."));
+      }
+      const encoded = encodeStudioQuickAccessState(state);
+      const operation = writeTail
+        .catch(() => undefined)
+        .then(async () => {
+          await store.set(ownerScope, encoded);
+          if (await store.get(ownerScope) !== encoded) {
+            throw new Error("Studio Quick Access SQLite write could not be verified.");
+          }
+        });
+      writeTail = operation.then(() => undefined, () => undefined);
+      return operation;
+    },
+    flush() {
+      return writeTail;
+    },
+  });
+}
+
+let sharedRepository: Promise<StudioQuickAccessRepository> | null = null;
+
+export function acquireProductStudioQuickAccessRepository(): Promise<StudioQuickAccessRepository> {
+  sharedRepository ??= acquireStudioLocalDatabase().then((database) =>
+    createStudioQuickAccessRepository(
+      database.asAsyncKeyValueStore(STUDIO_QUICK_ACCESS_SQLITE_NAMESPACE),
+    ));
+  sharedRepository.catch(() => {
+    sharedRepository = null;
+  });
+  return sharedRepository;
+}
+
+export function resetStudioQuickAccessRepositoryForTests(): void {
+  sharedRepository = null;
+}
+
+/** Product load never probes or imports the pre-cutover localStorage key. */
+export async function loadStudioQuickAccessState(
   ownerScope: string,
-  state: StudioQuickAccessState,
-): StudioQuickAccessSaveStatus {
-  if (!storage) return "storage-unavailable";
-  const key = storageKey(ownerScope);
-  if (!key) return "invalid-owner";
-  const encoded = encodeStudioQuickAccessState(state);
-  try {
-    storage.setItem(key, encoded);
-  } catch {
-    return "write-failed";
+  acquireRepository: () => Promise<StudioQuickAccessRepository> =
+    acquireProductStudioQuickAccessRepository,
+): Promise<StudioQuickAccessLoadResult> {
+  if (!validOwnerScope(ownerScope)) {
+    return Object.freeze({
+      state: normalizeStudioQuickAccessState(null),
+      authority: "memory-only" as const,
+      failure: "read-failed" as const,
+    });
   }
   try {
-    return storage.getItem(key) === encoded
-      ? "persisted"
-      : "verification-failed";
+    const repository = await acquireRepository();
+    return Object.freeze({
+      state: await repository.load(ownerScope) ?? normalizeStudioQuickAccessState(null),
+      authority: "sqlite-opfs" as const,
+      failure: null,
+    });
+  } catch (cause) {
+    return Object.freeze({
+      state: normalizeStudioQuickAccessState(null),
+      authority: "memory-only" as const,
+      failure: cause instanceof SyntaxError ? "invalid-payload" as const : "read-failed" as const,
+    });
+  }
+}
+
+export async function saveStudioQuickAccessState(
+  ownerScope: string,
+  state: StudioQuickAccessState,
+  acquireRepository: () => Promise<StudioQuickAccessRepository> =
+    acquireProductStudioQuickAccessRepository,
+): Promise<StudioQuickAccessSaveStatus> {
+  if (!validOwnerScope(ownerScope)) return "invalid-owner";
+  let repository: StudioQuickAccessRepository;
+  try {
+    repository = await acquireRepository();
   } catch {
-    return "verification-failed";
+    return "storage-unavailable";
+  }
+  try {
+    await repository.save(ownerScope, state);
+    return "persisted";
+  } catch (cause) {
+    return cause instanceof Error && cause.message.includes("verified")
+      ? "verification-failed"
+      : "write-failed";
   }
 }

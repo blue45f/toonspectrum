@@ -1,7 +1,7 @@
 /**
  * 파괴적 명령의 preview · 트랜잭션 · undo 고지 — V5 §15 "Undo 신뢰" 배선.
  *
- * 감사(ux-audit-v5 §2.12): 파괴적 명령의 안전장치가 네이티브 `globalThis.confirm()`
+ * 감사(ux-audit-v5 §2.12): 파괴적 명령의 안전장치가 네이티브 browser confirm
  * 10곳뿐이고 preview 도 transaction 도 없다. 게다가 그 중 다섯 곳은 커밋 반환값을
  * 버려서, 문서 잠금·저장 중 거절이 **아무 표시 없이** 사라진다.
  *
@@ -14,11 +14,12 @@
  *  3. **undo 고지** — 되돌릴 수 있는 명령은 실행 직후 원장에 undo 핸들과 함께 기록되고,
  *     상태 레일이 "실행 취소" 버튼으로 노출한다.
  *
- * 되돌릴 수 없는 명령(예: 저장소에서 복구 지점 삭제)은 confirm 을 유지하되 무엇이
- * 영구히 사라지는지 preview 에 명시한다 — `reversibility: "irreversible"`.
+ * 되돌릴 수 없는 명령(예: 저장소에서 복구 지점 삭제)도 동일한 커스텀 승인 표면을
+ * 유지하며 무엇이 영구히 사라지는지 preview 에 명시한다 — `reversibility: "irreversible"`.
  *
- * 순수 모듈: React·DOM·타이머 없음. presenter 는 주입 가능한 seam 이고, 기본 구현만
- * `globalThis.confirm` 을 쓴다.
+ * 순수 모듈: React·DOM·타이머 없음. presenter 는 주입 가능한 seam 이고, 승인 표면이
+ * 없으면 파괴를 거절한다. 네이티브 browser confirm 은 구조화 preview·포커스·감사 원장을
+ * 보장하지 못하므로 fallback 으로도 사용하지 않는다.
  */
 
 /**
@@ -151,7 +152,7 @@ export function summarizeStudioDestructiveLosses(
 
 /**
  * 승인 표면. 온캔버스 다이얼로그는 사용자의 응답을 동기적으로 돌려줄 수 없으므로
- * `Promise<boolean>` 을 허용한다. 동기 presenter(테스트·네이티브 fallback)도 그대로 쓴다.
+ * `Promise<boolean>` 을 허용한다. 동기 presenter(테스트)도 그대로 쓴다.
  */
 export type StudioDestructiveConfirmPresenter = (
   request: StudioDestructiveActionRequest,
@@ -162,9 +163,7 @@ let presenter: StudioDestructiveConfirmPresenter | null = null;
 
 /**
  * preview 표면 교체 지점. 온캔버스 다이얼로그(`StudioDestructiveConfirmHost`)가 마운트되면
- * 여기에 꽂히고, 그 표면이 없는 곳(테스트·SSR·호스트 미마운트 라우트)에서는 기본 presenter 가
- * **preview 텍스트를 담은** 네이티브 confirm 을 띄운다. 이 모듈이 그 fallback 의 유일한
- * 소유자다 — 다른 곳에 네이티브 confirm 이 다시 생기면 계약 테스트가 막는다.
+ * 여기에 꽂힌다. 표면이 없는 테스트·SSR·미마운트 라우트에서는 fail-closed 한다.
  */
 export function setStudioDestructiveConfirmPresenter(
   next: StudioDestructiveConfirmPresenter | null,
@@ -172,14 +171,10 @@ export function setStudioDestructiveConfirmPresenter(
   presenter = next;
 }
 
-function defaultPresenter(preview: string): boolean {
-  const confirmFn = (globalThis as { confirm?: (message?: string) => boolean }).confirm;
-  if (typeof confirmFn !== "function") {
-    // 승인 표면이 없으면 파괴를 진행하지 않는다(fail-closed). 조용히 실행하는 쪽이
-    // 조용한 실패다.
-    return false;
-  }
-  return confirmFn(preview) === true;
+function defaultPresenter(): boolean {
+  // 승인 표면이 없으면 파괴를 진행하지 않는다(fail-closed). 브라우저 confirm 으로
+  // 강등하면 구조화 preview·포커스 복귀·테스트 가능한 결과 계약을 잃는다.
+  return false;
 }
 
 /**
@@ -191,7 +186,7 @@ async function askForApproval(
 ): Promise<boolean> {
   const preview = formatStudioDestructivePreview(request);
   try {
-    const answer = await (presenter ?? ((_request, text) => defaultPresenter(text)))(
+    const answer = await (presenter ?? (() => defaultPresenter()))(
       request,
       preview,
     );

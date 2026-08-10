@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 interface ModuleShape {
   readonly allImports: readonly string[];
+  readonly dynamicImports: readonly string[];
   readonly exportedDeclarations: ReadonlySet<string>;
   readonly source: string;
   readonly topLevelDeclarations: ReadonlySet<string>;
@@ -22,6 +23,7 @@ function moduleShape(relativePath: string): ModuleShape {
     relativePath.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
   );
   const allImports: string[] = [];
+  const dynamicImports: string[] = [];
   const exportedDeclarations = new Set<string>();
   const topLevelDeclarations = new Set<string>();
   const valueImports: string[] = [];
@@ -57,8 +59,23 @@ function moduleShape(relativePath: string): ModuleShape {
     }
   }
 
+  function visit(node: ts.Node): void {
+    if (
+      ts.isCallExpression(node)
+      && node.expression.kind === ts.SyntaxKind.ImportKeyword
+      && node.arguments.length === 1
+      && ts.isStringLiteral(node.arguments[0])
+    ) {
+      dynamicImports.push(node.arguments[0].text);
+    }
+    ts.forEachChild(node, visit);
+  }
+
+  visit(file);
+
   return {
     allImports,
+    dynamicImports,
     exportedDeclarations,
     source,
     topLevelDeclarations,
@@ -67,11 +84,12 @@ function moduleShape(relativePath: string): ModuleShape {
 }
 
 describe("Studio left tool rail module boundary", () => {
-  it("keeps StudioPage as the one-way static owner", () => {
+  it("keeps StudioPage as the one-way lazy orchestration owner", () => {
     const page = moduleShape("./StudioPage.tsx");
     const rail = moduleShape("./StudioLeftToolRail.tsx");
 
-    expect(page.valueImports.filter((specifier) => specifier === "./StudioLeftToolRail")).toEqual([
+    expect(page.valueImports).not.toContain("./StudioLeftToolRail");
+    expect(page.dynamicImports.filter((specifier) => specifier === "./StudioLeftToolRail")).toEqual([
       "./StudioLeftToolRail",
     ]);
     expect(rail.allImports).not.toContain("./StudioPage");

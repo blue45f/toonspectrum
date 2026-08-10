@@ -35,6 +35,18 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const WORKSPACE_ROOT = resolve(HERE, "../../..");
 const CREATOR_ROOT = resolve(WORKSPACE_ROOT, "src/domains/creator");
 const PACKAGE_ROOT = resolve(WORKSPACE_ROOT, "packages");
+const PAGES_HISTORY_DURABLE_RUNTIME_SOURCE = readFileSync(
+  resolve(CREATOR_ROOT, "studio-pages-history-durable-runtime.ts"),
+  "utf8",
+);
+const COMPANION_PAGE_SOURCE = readFileSync(
+  resolve(CREATOR_ROOT, "StudioToolsCompanionPage.tsx"),
+  "utf8",
+);
+const COMPANION_LAYOUT_HOOK_SOURCE = readFileSync(
+  resolve(CREATOR_ROOT, "use-studio-companion-window-layout.ts"),
+  "utf8",
+);
 
 const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".mts", ".cts"]);
 const EXCLUDED_DIRECTORY_NAMES = new Set([
@@ -354,6 +366,10 @@ const LEGACY_IDB =
   "Explicit pre-V12 IndexedDB import/test or observable emergency rollback seam; SQLite/OPFS remains the product-default authority.";
 const LEGACY_IDB_PROOF =
   "The legacy database name and exact operation count are pinned here; adding an open/write/delete or changing the key requires review.";
+const HISTORY_LEGACY_IDB =
+  "Explicit pages-history emergency adapter only; the product factory cannot construct or infer this IndexedDB authority.";
+const HISTORY_LEGACY_IDB_PROOF =
+  "The default factory accepts only a caller-created legacyRecoveryVault and otherwise selects SQLite, native OPFS, or observable memory-only state.";
 
 const ALLOWANCES: readonly BrowserKvAllowance[] = Object.freeze([
   // Deletion-only cleanup of browser compatibility remnants.
@@ -366,24 +382,15 @@ const ALLOWANCES: readonly BrowserKvAllowance[] = Object.freeze([
   allow("src/domains/creator/studio-data-destruction.ts", "local-storage-cleanup", "key", 2, CLEANUP_ONLY, CLEANUP_PROOF),
   allow("src/domains/creator/studio-server-revision-restore-controller.ts", "local-storage-cleanup", "autosaveKey", 1, CLEANUP_ONLY, CLEANUP_PROOF),
 
-  // UI-only, consent, and tutorial keys. Sensitive clipboard state uses sessionStorage and
+  // Legacy injected UI helpers. Product UI settings use SQLite/OPFS, while sensitive clipboard
+  // state uses sessionStorage and
   // therefore does not need (and must not gain) a durable-browser-storage allowance.
-  allow("src/domains/creator/StudioPage.tsx", "local-storage-write", '"toonspectrum-studio-ai-notice-ack"', 1, UI_ONLY, UI_PROOF),
-  allow("src/domains/creator/StudioPage.tsx", "local-storage-write", '"toonspectrum-studio-quick-start-dismissed"', 1, UI_ONLY, UI_PROOF),
-  allow("src/domains/creator/StudioPage.tsx", "local-storage-write", '"toonspectrum-studio-mobile-hint-dismissed"', 1, UI_ONLY, UI_PROOF),
-  allow("src/domains/creator/StudioPage.tsx", "local-storage-write", '"toonspectrum-studio-comment-pins-hidden"', 1, UI_ONLY, UI_PROOF),
-  allow("src/domains/creator/StudioPage.tsx", "local-storage-write", '"toonspectrum-studio-watermark"', 1, UI_ONLY, UI_PROOF),
-  allow("src/domains/creator/StudioPage.tsx", "local-storage-write", '"toonspectrum-studio-server-ai-provider"', 1, UI_ONLY, UI_PROOF),
-  allow("src/domains/creator/StudioPageListPane.tsx", "local-storage-write", '"toonspectrum:studio:page-preview-size:v1"', 1, UI_ONLY, UI_PROOF),
-  allow("src/domains/creator/StudioReferencePanel.tsx", "local-storage-write", "REFERENCE_PANEL_STORAGE_KEY", 2, UI_ONLY, UI_PROOF),
-  allow("src/domains/creator/StudioToolsCompanionPage.tsx", "local-storage-write", "presentationSafeStorageKey(sessionId)", 1, UI_ONLY, UI_PROOF),
-  allow("src/domains/creator/StudioVrmPoser.tsx", "local-storage-write", '"studio_webcam_consent"', 1, UI_ONLY, UI_PROOF),
-  allow("src/domains/creator/studio-feature-tutorials.ts", "local-storage-write", '"toonspectrum.studio.tutorialProgress.v1"', 1, UI_ONLY, UI_PROOF),
+  allow("src/domains/creator/studio-feature-tutorials.ts", "local-storage-write", '"toonspectrum.studio.tutorialProgress.v1"', 1, INJECTED_COMPATIBILITY, INJECTED_PROOF),
   allow("src/domains/creator/studio-asset-favorites.ts", "durable-storage-write", "studioAssetFavoriteStorageKey(userId)", 1, UI_ONLY, UI_PROOF),
   allow("src/domains/creator/studio-brush-slots.ts", "durable-storage-write", '"toonspectrum-studio-brush-slots:v2"', 1, UI_ONLY, UI_PROOF),
   allow("src/domains/creator/studio-effect-favorites.ts", "durable-storage-write", '"toonspectrum-studio-effect-favorites:v1"', 1, UI_ONLY, UI_PROOF),
   allow("src/domains/creator/studio-vrm-poser-ux.ts", "durable-storage-write", "key", 1, UI_ONLY, UI_PROOF),
-  allow("src/domains/creator/studio-workspaces.ts", "durable-storage-write", "studioWorkspaceStorageKey(userId)", 1, UI_ONLY, UI_PROOF),
+  allow("src/domains/creator/studio-workspaces.ts", "durable-storage-write", "studioWorkspaceStorageKey(userId)", 1, INJECTED_COMPATIBILITY, INJECTED_PROOF),
 
   // Injected localStorage-compatible codecs retained outside product authority selection.
   allow("src/domains/creator/studio-animatic-timeline.ts", "durable-storage-write", "studioAnimaticStorageKey(document.workScope)", 1, INJECTED_COMPATIBILITY, INJECTED_PROOF),
@@ -401,7 +408,6 @@ const ALLOWANCES: readonly BrowserKvAllowance[] = Object.freeze([
   allow("src/domains/creator/studio-creator-pack-runtime.ts", "durable-storage-write", '"toonspectrum.studio-creator-filter-presets.v1"', 1, INJECTED_COMPATIBILITY, INJECTED_PROOF),
   allow("src/domains/creator/studio-creator-pack-runtime.ts", "durable-storage-write", "key", 1, INJECTED_COMPATIBILITY, INJECTED_PROOF),
   allow("src/domains/creator/studio-custom-fonts.ts", "durable-storage-write", '"toonspectrum-studio-custom-fonts"', 1, INJECTED_COMPATIBILITY, INJECTED_PROOF),
-  allow("src/domains/creator/studio-draft-collaboration.ts", "durable-storage-write", '"toonspectrum-studio-draft-collaboration:v1"', 1, INJECTED_COMPATIBILITY, INJECTED_PROOF),
   allow("src/domains/creator/studio-emeres-library.ts", "durable-storage-write", '"toonspectrum-studio-emeres-library"', 1, INJECTED_COMPATIBILITY, INJECTED_PROOF),
   allow("src/domains/creator/studio-filter-library-sqlite-repository.ts", "durable-storage-write", "storageKey", 1, INJECTED_COMPATIBILITY, INJECTED_PROOF),
   allow("src/domains/creator/studio-marketplace-packages.ts", "durable-storage-write", '"toonspectrum.studio-marketplace-library.v1"', 1, INJECTED_COMPATIBILITY, INJECTED_PROOF),
@@ -431,8 +437,8 @@ const ALLOWANCES: readonly BrowserKvAllowance[] = Object.freeze([
   allow("src/domains/creator/studio-crdt-outbox.ts", "indexeddb-open", '"toonspectrum-studio-crdt-outbox"', 1, LEGACY_IDB, LEGACY_IDB_PROOF),
   allow("src/domains/creator/studio-crdt-outbox.ts", "indexeddb-write", "put", 1, LEGACY_IDB, LEGACY_IDB_PROOF),
   allow("src/domains/creator/studio-crdt-outbox.ts", "indexeddb-cleanup", "delete", 1, CLEANUP_ONLY, CLEANUP_PROOF),
-  allow("src/domains/creator/studio-pages-history-durable-runtime.ts", "indexeddb-open", '"toonspectrum-studio-crdt-recovery-vault"', 1, LEGACY_IDB, LEGACY_IDB_PROOF),
-  allow("src/domains/creator/studio-pages-history-durable-runtime.ts", "indexeddb-write", "put", 4, LEGACY_IDB, LEGACY_IDB_PROOF),
+  allow("src/domains/creator/studio-pages-history-durable-runtime.ts", "indexeddb-open", '"toonspectrum-studio-crdt-recovery-vault"', 1, HISTORY_LEGACY_IDB, HISTORY_LEGACY_IDB_PROOF),
+  allow("src/domains/creator/studio-pages-history-durable-runtime.ts", "indexeddb-write", "put", 4, HISTORY_LEGACY_IDB, HISTORY_LEGACY_IDB_PROOF),
   allow("src/domains/creator/studio-production-bible.ts", "indexeddb-open", '"toonspectrum-studio-production-bible"', 1, LEGACY_IDB, LEGACY_IDB_PROOF),
   allow("src/domains/creator/studio-production-bible.ts", "indexeddb-write", "put", 1, LEGACY_IDB, LEGACY_IDB_PROOF),
   allow("src/domains/creator/studio-production-bible.ts", "local-storage-write", "normalizeStudioProductionBibleStorageKey(key)", 2, LEGACY_IDB, LEGACY_IDB_PROOF),
@@ -488,6 +494,31 @@ function unauthorizedFindings(
 }
 
 describe("Studio browser-KV authority boundary", () => {
+  it("keeps companion layout and presentation-safe product paths free of localStorage authority", () => {
+    for (const source of [COMPANION_PAGE_SOURCE, COMPANION_LAYOUT_HOOK_SOURCE]) {
+      expect(source).not.toContain("localStorage");
+      expect(source).not.toMatch(/\b(?:getItem|setItem|removeItem)\s*\(/u);
+    }
+    expect(COMPANION_LAYOUT_HOOK_SOURCE).toContain(
+      "createStudioCompanionWindowPreferencesRuntime",
+    );
+    expect(COMPANION_PAGE_SOURCE).toContain("buildStudioCompanionPresentationSafe");
+  });
+
+  it("keeps pages-history IndexedDB behind an explicit legacy vault seam", () => {
+    const factoryStart = PAGES_HISTORY_DURABLE_RUNTIME_SOURCE.indexOf(
+      "export async function createDefaultStudioPagesHistoryDurableRuntime(",
+    );
+    expect(factoryStart).toBeGreaterThanOrEqual(0);
+    const defaultFactory = PAGES_HISTORY_DURABLE_RUNTIME_SOURCE.slice(factoryStart);
+
+    expect(defaultFactory).not.toContain("createStudioPagesHistoryIndexedDbRecoveryVault(");
+    expect(defaultFactory).not.toContain("scope.indexedDB");
+    expect(defaultFactory).toContain("existingRecoveryVault: options.legacyRecoveryVault ?? null");
+    expect(defaultFactory).toContain("createStudioPagesHistoryMemoryRecovery(identity)");
+    expect(defaultFactory).toContain('persistenceKind = "memory-only"');
+  });
+
   it("rejects direct, aliased, key-obscured, native-IDB, and wrapper-IDB durable writes", () => {
     const fixtures = [
       `localStorage.setItem("toonspectrum-studio-autosave", payload);`,

@@ -274,7 +274,7 @@ export function StudioAiToolPopoverBody({
                         const prompt = aiCharacterPrompt.trim();
                         if (prompt) {
                           setAiRecentPrompts(
-                            pushStudioAiRecentPrompt(globalThis.localStorage, "character", prompt)
+                            pushStudioAiRecentPrompt(globalThis.sessionStorage, "character", prompt)
                           );
                         }
                         onGenerateAiCharacter();
@@ -291,7 +291,7 @@ export function StudioAiToolPopoverBody({
                       onInsertAsNote={insertAiCompositionNote}
                       onOperationStart={(prompt) => {
                         setAiRecentPrompts(
-                          pushStudioAiRecentPrompt(globalThis.localStorage, "composition", prompt)
+                          pushStudioAiRecentPrompt(globalThis.sessionStorage, "composition", prompt)
                         );
                         const provider = pendingTextAiProviderContext();
                         return beginTrackedStudioAiOperation("composition", {
@@ -328,7 +328,7 @@ export function StudioAiToolPopoverBody({
                         const prompt = aiDialogueSuggestSituation.trim();
                         if (prompt) {
                           setAiRecentPrompts(
-                            pushStudioAiRecentPrompt(globalThis.localStorage, "dialogue", prompt)
+                            pushStudioAiRecentPrompt(globalThis.sessionStorage, "dialogue", prompt)
                           );
                         }
                         void executeSuggestDialogueLines();
@@ -353,7 +353,7 @@ export function StudioAiToolPopoverBody({
                         const prompt = aiPaletteSuggestMood.trim();
                         if (prompt) {
                           setAiRecentPrompts(
-                            pushStudioAiRecentPrompt(globalThis.localStorage, "palette", prompt)
+                            pushStudioAiRecentPrompt(globalThis.sessionStorage, "palette", prompt)
                           );
                         }
                         void executeSuggestColorPalette();

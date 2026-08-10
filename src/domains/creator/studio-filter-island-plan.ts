@@ -1,4 +1,5 @@
 import {
+  declareTrustedBootstrapProvider,
   EngineCapabilityRegistry,
   HybridExecutionPlanner,
   providerDescriptorSchema,
@@ -92,25 +93,31 @@ function buildFilterRegistry(): EngineCapabilityRegistry {
     },
   ];
   for (const entry of lanes) {
-    registry.register(
-      providerDescriptorSchema.parse({
-        id: `${LANE_PROVIDER_PREFIX}${entry.lane}`,
-        kind: "filter",
-        displayName: entry.displayName,
-        version: "studio-filter-island-v1",
-        license: "internal",
-        attribution: "",
-        maturity: "production-baseline",
-        runtime: entry.runtime,
-        capabilities: [`filter.lane.${entry.lane}`, "filter.phase.final"],
-        limitations: entry.limitations,
-        previewQuality: "production",
-        finalQuality: "production",
-        determinism: "tolerance",
-        memoryEstimateMb: entry.runtime === "webgpu" ? 24 : 8,
-        fallbackProviderId:
-          entry.fallback === null ? null : `${LANE_PROVIDER_PREFIX}${entry.fallback}`,
-        knownIssues: [],
+    const descriptor = providerDescriptorSchema.parse({
+      id: `${LANE_PROVIDER_PREFIX}${entry.lane}`,
+      kind: "filter",
+      displayName: entry.displayName,
+      version: "studio-filter-island-v1",
+      license: "internal",
+      attribution: "",
+      maturity: "production-baseline",
+      runtime: entry.runtime,
+      capabilities: [`filter.lane.${entry.lane}`, "filter.phase.final"],
+      limitations: entry.limitations,
+      previewQuality: "production",
+      finalQuality: "production",
+      determinism: "tolerance",
+      memoryEstimateMb: entry.runtime === "webgpu" ? 24 : 8,
+      fallbackProviderId:
+        entry.fallback === null ? null : `${LANE_PROVIDER_PREFIX}${entry.fallback}`,
+      knownIssues: [],
+    });
+    registry.registerTrustedBootstrap(
+      declareTrustedBootstrapProvider(descriptor, {
+        classification: "checked-in-first-party",
+        source: "src/domains/creator/studio-filter-island-plan.ts",
+        owner: "studio-imaging",
+        justification: `checked-in Studio filter island lane: ${entry.lane}`,
       }),
     );
   }
@@ -183,20 +190,25 @@ function scheduleTournamentBootstrap(): void {
   bootstrap.schedule(() => {
     void bootstrap
       .loadPersistence()
-      .then((module) => {
+      .then(async (module) => {
         // Must be installed before the shared runtime is first created —
         // getStudioTournamentRuntime() below resolves the adapter once.
         module.installStudioTournamentSqlitePersistence();
+        const runtime = getStudioTournamentRuntime();
+        await runtime.hydrate();
+        const status = runtime.persistenceStatus();
+        if (!status.durable) {
+          console.warn(
+            "studio filter tournament is memory-only; SQLite/OPFS persistence is unavailable",
+            status,
+          );
+        }
       })
       .catch((error: unknown) => {
-        // Losing persistence costs telemetry, never correctness: an
-        // unhydrated tournament simply leaves the planner ladder alone.
+        // Do not construct a fallback-backed runtime after a failed module
+        // load. The planner ladder remains unchanged and the failure is
+        // observable for Studio reliability status/telemetry.
         console.warn("studio tournament persistence bootstrap skipped", error);
-      })
-      .then(() => getStudioTournamentRuntime().hydrate())
-      .catch(() => {
-        // hydrate() already swallows its own failures; this guards teardown
-        // races (e.g. a test environment torn down before the idle task ran).
       });
   });
 }

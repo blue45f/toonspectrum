@@ -20,7 +20,7 @@ import type { StudioVrmTexturePaintBlendMode } from "./studio-vrm-texture-paint-
 import { cn } from "@/lib/utils";
 
 export interface StudioVrmTexturePaintPanelSettings {
-  readonly tool: "brush" | "fill";
+  readonly tool: "surface-brush" | "brush" | "fill";
   readonly brushKind: StudioStampBrushKind;
   readonly color: string;
   /** Texture-space diameter in texels. */
@@ -142,6 +142,8 @@ export function StudioVrmTexturePaintPanel({
   onRetryRestore,
 }: StudioVrmTexturePaintPanelProps) {
   const editingDisabled = disabled || strokeActive;
+  const brushTool = settings.tool !== "fill";
+  const surfaceBrushTool = settings.tool === "surface-brush";
   const hasActiveTexture = activeTargetId !== null;
   const [resetConfirmationTarget, setResetConfirmationTarget] = useState<string | null>(null);
   const resetArmed =
@@ -263,7 +265,22 @@ export function StudioVrmTexturePaintPanel({
 
       <fieldset disabled={editingDisabled} className="space-y-2 disabled:opacity-60">
         <legend className="mb-2 text-xs font-bold text-fg">표면 도구</legend>
-        <div className="grid grid-cols-2 gap-1.5" role="group" aria-label="표면 페인트 도구">
+        <div className="grid grid-cols-3 gap-1.5" role="group" aria-label="표면 페인트 도구">
+          <button
+            type="button"
+            aria-pressed={surfaceBrushTool}
+            title="실제 R3F ray hit를 UV chart별로 나눠 한 번의 atlas transaction으로 저장합니다."
+            className={cn(
+              "inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border px-1 text-[0.64rem] font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
+              surfaceBrushTool
+                ? "border-accent/60 bg-accent-soft text-accent"
+                : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg",
+            )}
+            onClick={() => onSettingsChange({ tool: "surface-brush" })}
+          >
+            <Paintbrush size={14} aria-hidden />
+            V12 UV
+          </button>
           <button
             type="button"
             aria-pressed={settings.tool === "brush"}
@@ -275,8 +292,8 @@ export function StudioVrmTexturePaintPanel({
             )}
             onClick={() => onSettingsChange({ tool: "brush" })}
           >
-            <Paintbrush size={15} aria-hidden />
-            브러시
+            <Paintbrush size={14} aria-hidden />
+            호환
           </button>
           <button
             type="button"
@@ -290,16 +307,30 @@ export function StudioVrmTexturePaintPanel({
             )}
             onClick={() => onSettingsChange({ tool: "fill" })}
           >
-            <PaintBucket size={15} aria-hidden />
+            <PaintBucket size={14} aria-hidden />
             ColorDrop
           </button>
         </div>
         <p className="text-[0.64rem] leading-relaxed text-fg-3">
           {settings.tool === "fill"
             ? "표면을 한 번 눌러 채웁니다. 계산은 기기 안에서 처리되며 텍스처 경계를 넘어 번지지 않습니다."
-            : "표면을 끌어 칠합니다. 캔버스에 포커스한 뒤 F로 도구를 빠르게 전환할 수 있습니다."}
+            : surfaceBrushTool
+              ? "R3F 포인터 획을 BrushProgramIR·StrokeIR로 보존하고 UV chart 경계에서 run을 나눈 뒤 한 번만 저장합니다."
+              : "기존 라운드 팁 경로로 표면을 끌어 칠합니다. V12 UV 경로를 사용할 수 없을 때의 호환 폴백입니다."}
         </p>
       </fieldset>
+
+      {surfaceBrushTool ? (
+        <div
+          className="rounded-lg border border-line bg-card/60 px-3 py-2.5 text-[0.64rem] leading-relaxed text-fg-3"
+          role="note"
+          data-testid="vrm-surface-brush-capability"
+        >
+          <span className="block font-bold text-fg-2">지원 범위: round 촉 · 혼색 없음</span>
+          stamp/image 촉과 smudge/wet 혼색은 검증된 sampler·texture-neighborhood backend가 없어
+          명시적으로 지원하지 않습니다. 이 의미를 호환 브러시로 조용히 바꾸지 않습니다.
+        </div>
+      ) : null}
 
       {settings.tool === "brush" ? (
         <fieldset disabled={editingDisabled} className="space-y-3 disabled:opacity-60">
@@ -399,7 +430,7 @@ export function StudioVrmTexturePaintPanel({
           </div>
         </div>
 
-        {settings.tool === "brush" ? (
+        {brushTool ? (
           <>
             <label htmlFor="vrm-surface-paint-size" className="grid grid-cols-[3rem_minmax(0,1fr)_3.5rem] items-center gap-2 text-xs">
               <span className="font-semibold text-fg-2">크기</span>

@@ -7,7 +7,7 @@ import { ClipMaskGroup } from "./ClipMaskGroup";
 import { studioAdjustmentStackToFilterFields } from "./studio-adjustment-stack";
 import { type StudioAdvancedRuler, type StudioAdvancedRulerDocument } from "./studio-advanced-ruler-document";
 import { moveKeyframe, removeKeyframe, removeTrack, resolveTimelineComposite, resolveTimelineTransforms, type AnimationTimelineDoc } from "./studio-anim-tracks";
-import { resetStudioAppSettings, studioAppSettingsStorage, type StudioAppSettings, type StudioAppSettingsTab } from "./studio-app-settings";
+import { defaultStudioAppSettings, type StudioAppSettings, type StudioAppSettingsTab } from "./studio-app-settings";
 import { CANVAS_W } from "./studio-assets";
 import { studioBackgroundGradientColorStops } from "./studio-background-gradient-color-stops";
 import {
@@ -592,7 +592,7 @@ export interface StudioCanvasViewportProps {
   appSettings: StudioAppSettings;
   appSettingsInitialTab: StudioAppSettingsTab;
   appSettingsOpen: boolean;
-  appSettingsPersistenceState: "saved" | "session-only";
+  appSettingsPersistenceState: "loading" | "saved" | "session-only";
   authorizedWorkAssetScopeId: string | null;
   autosaveRestoreBlockedReason: "legacy-unversioned" | "work-mismatch" | "revision-mismatch" | null;
   bg: string;
@@ -4349,8 +4349,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 onChange={commitAppSettings}
                 onRetryPersistence={retryAppSettingsPersistence}
                 onResetAll={() => {
-                  const next = resetStudioAppSettings(studioAppSettingsStorage());
-                  commitAppSettings(next);
+                  commitAppSettings(defaultStudioAppSettings());
                 }}
               />
             </Suspense>

@@ -154,13 +154,13 @@ describe("renderer tournament real Chromium evidence contract", () => {
     expect(RENDERER_TOURNAMENT_BROWSER_WARM_SAMPLES).toBe(31);
   });
 
-  it("accepts technically valid, strict-CSP-clean release evidence", () => {
+  it("accepts technically valid, strict-CSP-clean bounded harness evidence", () => {
     const artifact = readArtifact();
     expect(artifact.schemaVersion).toBe(RENDERER_TOURNAMENT_BROWSER_REPORT_SCHEMA_VERSION);
     expect(artifact.generatedAt).toMatch(/^20\d\d-/u);
     expect(artifact.status).toBe("pass");
     expect(artifact.technicalPass).toBe(true);
-    expect(artifact.releasePass).toBe(true);
+    expect(artifact.boundedHarnessPass).toBe(true);
     expect(artifact.pass).toBe(true);
     expect(artifact.validationIssues).toEqual([]);
     expect(validateRendererTournamentBrowserArtifact(artifact)).toEqual([]);
@@ -465,7 +465,7 @@ describe("renderer tournament real Chromium evidence contract", () => {
     expect(artifact).toMatchObject({
       status: "pass",
       technicalPass: true,
-      releasePass: true,
+      boundedHarnessPass: true,
       pass: true,
     });
     expect(benchmark.claims).toMatchObject({
@@ -544,11 +544,11 @@ describe("renderer tournament real Chromium evidence contract", () => {
 
     const falseQuarantineIssues = mutatedIssues((root) => {
       root.status = "quarantined";
-      root.releasePass = false;
+      root.boundedHarnessPass = false;
       root.pass = false;
     });
     expect(falseQuarantineIssues).toContain(
-      "top-level technical/release verdict is inconsistent with evidence and CSP",
+      "top-level technical/bounded-harness verdict is inconsistent with evidence and CSP",
     );
   });
 
@@ -686,7 +686,7 @@ describe("renderer tournament real Chromium evidence contract", () => {
     expect(manifestFileMismatchIssues).toContain(expectedIssue);
   });
 
-  it("rejects schema and bounded-scope overclaims without changing clean releasePass", () => {
+  it("rejects schema and bounded-scope overclaims without changing the clean harness verdict", () => {
     const oldSchemaIssues = mutatedIssues((root) => {
       root.schemaVersion = 2;
     });
@@ -721,7 +721,7 @@ describe("renderer tournament real Chromium evidence contract", () => {
     }
 
     const artifact = readArtifact();
-    expect(artifact.releasePass).toBe(true);
+    expect(artifact.boundedHarnessPass).toBe(true);
     expect(artifact.benchmark?.claims).toMatchObject({
       boundedCorpusOnly: true,
       productWidePromotion: false,

@@ -19,10 +19,6 @@ const workspaceSource = readFileSync(
   new URL("./studio-workspaces.ts", import.meta.url),
   "utf8",
 );
-const workspaceMergeSource = readFileSync(
-  new URL("./studio-workspace-three-way-merge.ts", import.meta.url),
-  "utf8",
-);
 const viteSource = readFileSync(
   new URL("../../../vite.config.ts", import.meta.url),
   "utf8",
@@ -106,7 +102,7 @@ describe("Studio drawing palette workspace integration boundary", () => {
     expect(liveLayout).toContain("drawingPaletteLayout,");
   });
 
-  it("persists only settled palette sizes and restores them across every workspace boundary", () => {
+  it("persists settled palette sizes through the SQLite workspace runtime", () => {
     const paletteState = sourceBetween(
       pageSource,
       "const [drawingPaletteDragging, setDrawingPaletteDragging]",
@@ -122,37 +118,29 @@ describe("Studio drawing palette workspace integration boundary", () => {
     const applyLayout = sourceBetween(
       pageSource,
       "function applyStudioWorkspaceLayout",
-      "function persistStudioWorkspaceState",
+      "function updateWorkspacePersistenceSnapshot",
       "workspace apply",
     );
     const ownerSync = sourceBetween(
       pageSource,
-      "// 로그인/로그아웃으로 owner가 바뀌면",
-      "// 패널·팔레트 드래그 또는 작업공간 편집과 겹친 외부 저장본은",
-      "workspace owner sync",
+      "// owner가 바뀔 때마다 별도의 SQLite/OPFS runtime을 열고",
+      "// 드래그나 작업공간 메뉴 편집과 겹친 외부 revision은",
+      "workspace owner hydration",
     );
     const pendingReplay = sourceBetween(
       pageSource,
-      "// 패널·팔레트 드래그 또는 작업공간 편집과 겹친 외부 저장본은",
+      "// 드래그나 작업공간 메뉴 편집과 겹친 외부 revision은",
       "// 활성 프리셋 스냅샷은 그대로 두고",
       "pending external workspace replay",
     );
     const autosave = sourceBetween(
       pageSource,
       "// 활성 프리셋 스냅샷은 그대로 두고",
-      "// 다른 탭에서 같은 계정의 작업공간을 저장하면",
+      "// 재사용 클립 보관함",
       "workspace autosave",
     );
-    const externalSync = sourceBetween(
-      pageSource,
-      "// 다른 탭에서 같은 계정의 작업공간을 저장하면",
-      "// 재사용 클립 보관함",
-      "workspace external sync",
-    );
 
-    expect(paletteState).toContain(
-      "const drawingPaletteDraggingRef = useRef(false)",
-    );
+    expect(paletteState).toContain("const drawingPaletteDraggingRef = useRef(false)");
     expect(paletteState).toContain(
       "const [drawingPaletteCancelEpoch, setDrawingPaletteCancelEpoch] = useState(0)",
     );
@@ -161,177 +149,90 @@ describe("Studio drawing palette workspace integration boundary", () => {
     );
     expect(pageSource).toContain("interface PendingStudioWorkspaceSync");
     expect(pageSource).toContain("readonly ownerScope: string;");
-    expect(pageSource).toContain("readonly storageKey: string;");
-    expect(pageSource).toContain("readonly latestEventRaw: string | null;");
+    expect(pageSource).toContain("readonly authorityRevision: number;");
     expect(pageSource).toContain("readonly sequence: number;");
     expect(pageSource).toContain("readonly baseState: StudioWorkspaceState;");
-    expect(dragController).toContain(
-      "drawingPaletteDraggingRef.current = next",
-    );
+    expect(pageSource).not.toContain("readonly latestEventRaw: string | null;");
+    expect(pageSource).not.toContain("readonly storageKey: string;");
+
+    expect(dragController).toContain("drawingPaletteDraggingRef.current = next");
     expect(dragController).toContain("setDrawingPaletteDragging(next)");
-    expect(dragController).toContain(
-      "if (!drawingPaletteDraggingRef.current) return",
-    );
-    expect(dragController).toContain(
-      "drawingPaletteDraggingRef.current = false",
-    );
-    expect(dragController).toContain("setDrawingPaletteDragging(false)");
-    expect(dragController).toContain(
-      "setDrawingPaletteCancelEpoch((current) => current + 1)",
-    );
-    // `presented` is the workspace layout resolved for the current input surface. The drag has to
-    // be cancelled before it lands either way: a palette that is mid-drag while its layout is
-    // replaced would keep dragging against coordinates that no longer exist.
+    expect(dragController).toContain("setDrawingPaletteCancelEpoch((current) => current + 1)");
     expect(applyLayout.indexOf("cancelDrawingPaletteDrag()")).toBeLessThan(
       applyLayout.indexOf("setDrawingPaletteLayout(presented.drawingPalettes)"),
     );
-    expect(applyLayout).toContain(
-      "setDrawingPaletteLayout(presented.drawingPalettes)",
-    );
-    expect(ownerSync.indexOf("replacePendingExternalWorkspaceSync(null)")).toBeLessThan(
-      ownerSync.indexOf("loadStudioWorkspacePersistence("),
-    );
-    expect(ownerSync).toContain(
-      "계정이 바뀌어 이전 탭에서 보류한 작업공간 변경을 반영하지 않았어요.",
-    );
-    expect(ownerSync).toContain(
-      'nextPersistence.state.liveLayout,\n      "owner-scope-change",\n      false',
-    );
-    expect(pendingReplay).toContain(
-      "drawingPaletteDragging ||\n      !pendingExternalWorkspaceSync",
-    );
-    expect(pendingReplay).toContain(
-      "replacePendingExternalWorkspaceSync(null)",
-    );
-    expect(pendingReplay).toContain(
-      "pendingSync.ownerScope !== ownerScope",
-    );
-    expect(pendingReplay).toContain(
-      "pendingSync.storageKey !== storageKey",
-    );
-    expect(pendingReplay).toContain(
-      "currentPersistence.ownerScope !== ownerScope",
-    );
-    expect(pendingReplay.indexOf("pendingSync.ownerScope !== ownerScope")).toBeLessThan(
-      pendingReplay.indexOf("loadStudioWorkspacePersistence(storage"),
-    );
-    expect(pendingReplay).toContain("leftResize.dragging ||");
-    expect(pendingReplay).toContain("rightResize.dragging ||");
+
+    expect(ownerSync).toContain("createStudioWorkspacePersistenceRuntime({");
+    expect(ownerSync).toContain('import("./studio-workspace-sqlite-runtime")');
+    expect(ownerSync).toContain("runtime.subscribeInvalidation((invalidation)");
+    expect(ownerSync).toContain("await runtime.hydrate({");
+    expect(ownerSync).toContain("getDirtyRevision: () => workspaceDirtyRevisionRef.current");
+    expect(ownerSync).toContain("authorityRevision: Math.max(");
+    expect(ownerSync).not.toContain("localStorage");
+    expect(ownerSync).not.toContain('window.addEventListener("storage"');
+
+    expect(pendingReplay).toContain("leftResize.dragging");
+    expect(pendingReplay).toContain("rightResize.dragging");
+    expect(pendingReplay).toContain("drawingPaletteDragging");
     expect(pendingReplay).toContain(
       "'[data-testid=\"studio-workspace-dialog\"]:not([hidden])'",
     );
+    expect(pendingReplay).toContain("void runtime.reconcile({");
+    expect(pendingReplay).toContain("baseState: pendingSync.baseState");
     expect(pendingReplay).toContain(
-      "const loaded = loadStudioWorkspacePersistence(storage, studioAuthUserId)",
+      "getDirtyRevision: () => workspaceDirtyRevisionRef.current",
     );
-    expect(pendingReplay).toContain(
-      'void import("./studio-workspace-three-way-merge")',
-    );
-    expect(pendingReplay).toContain(
-      "reconcileStudioWorkspacePendingSync({",
-    );
-    expect(pendingReplay).toContain(
-      "expectedRaw: latestPending.latestEventRaw",
-    );
-    expect(pendingReplay).toContain(
-      'reconciliation.kind === "retry-latest-raw"',
-    );
-    expect(pendingReplay).toContain(
-      "latestPersistence.state,\n          liveWorkspaceLayoutRef.current",
-    );
-    expect(pendingReplay).toContain(
-      "const { conflictPaths, result } = reconciliation",
-    );
-    expect(pendingReplay).toContain(
-      "겹친 ${conflictPaths.length}개 설정은 현재 탭을 유지했습니다.",
-    );
-    expect(
-      pendingReplay.match(/deferWhileWorkspaceMenuOpen\(\)/g),
-    ).toHaveLength(2);
-    expect(
-      pendingReplay.lastIndexOf("if (deferWhileWorkspaceMenuOpen()) return"),
-    ).toBeLessThan(
-      pendingReplay.indexOf("reconcileStudioWorkspacePendingSync({"),
-    );
-    expect(pendingReplay).toContain(
-      "applyStudioWorkspaceLayoutFromEffect(\n          result.state.liveLayout,\n          \"external-sync\",\n          false",
-    );
+    expect(pendingReplay).toContain("result.conflictPaths.length > 0");
+    expect(pendingReplay).toContain('"external-sync"');
+    expect(pendingReplay).not.toContain("loadStudioWorkspacePersistence");
+    expect(pendingReplay).not.toContain("saveStudioWorkspaceState");
+
     expect(autosave).toContain(
       "if (leftResize.dragging || rightResize.dragging || drawingPaletteDragging) return",
     );
-    expect(autosave).toContain(
-      "if (pendingExternalWorkspaceSync) return",
-    );
+    expect(autosave).toContain("if (pendingExternalWorkspaceSync) return");
     expect(autosave).toContain("drawingPalettes: drawingPaletteLayout");
-    expect(autosave).toContain("drawingPaletteDragging,");
-    expect(autosave).toContain("drawingPaletteLayout,");
-    expect(autosave).toContain("pendingExternalWorkspaceSync,");
-    expect(externalSync).toContain(
-      "replacePendingExternalWorkspaceSync({",
-    );
-    expect(externalSync).toContain("ownerScope,");
-    expect(externalSync).toContain("storageKey,");
-    expect(externalSync).toContain("latestEventRaw: event.newValue,");
-    expect(externalSync).toContain("sequence,");
-    expect(externalSync).toContain("workspaceSyncBaseStateRef.current");
-    expect(
-      externalSync.indexOf("replacePendingExternalWorkspaceSync({"),
-    ).toBeLessThan(
-      externalSync.indexOf("if (drawingPaletteDraggingRef.current) {"),
-    );
-    expect(externalSync).toContain(
-      "팔레트 크기 조절 중이라 다른 탭의 작업공간 변경을 보류했어요.",
-    );
-    expect(externalSync).not.toContain(
-      "loadStudioWorkspacePersistence(storage",
-    );
+    expect(autosave).toContain("persistStudioWorkspaceStateFromEffect(");
+    expect(autosave).not.toContain("localStorage");
   });
 
-  it("keeps menu state session-atomic and writes only a three-way merged pending state", () => {
+  it("keeps menu edits session-atomic until verified SQLite persistence completes", () => {
     const persist = sourceBetween(
       pageSource,
       "function persistStudioWorkspaceState",
-      "// 로그인/로그아웃으로 owner가 바뀌면",
+      "// owner가 바뀔 때마다 별도의 SQLite/OPFS runtime을 열고",
       "direct workspace persistence",
     );
     const pendingReplay = sourceBetween(
       pageSource,
-      "// 패널·팔레트 드래그 또는 작업공간 편집과 겹친 외부 저장본은",
+      "// 드래그나 작업공간 메뉴 편집과 겹친 외부 revision은",
       "// 활성 프리셋 스냅샷은 그대로 두고",
       "pending external workspace replay",
     );
-    const autosave = sourceBetween(
-      pageSource,
-      "// 활성 프리셋 스냅샷은 그대로 두고",
-      "// 다른 탭에서 같은 계정의 작업공간을 저장하면",
-      "workspace autosave",
+
+    expect(persist).toContain(
+      "const guardRevision = workspaceDirtyRevisionRef.current + 1",
     );
-    expect(autosave.indexOf("if (pendingExternalWorkspaceSync) return")).toBeLessThan(
-      autosave.indexOf("saveStudioWorkspaceState("),
+    expect(persist).toContain(
+      "const blockedByExternalMerge = pendingExternalWorkspaceSyncRef.current !== null",
     );
-    expect(persist.indexOf("if (pendingExternalWorkspaceSyncRef.current) {")).toBeLessThan(
-      persist.indexOf("saveStudioWorkspaceState("),
+    expect(persist).toContain("status: \"session-only\"");
+    expect(persist).toContain("updateWorkspacePersistenceSnapshot(optimistic)");
+    expect(persist.indexOf("blockedByExternalMerge")).toBeLessThan(
+      persist.indexOf("void runtime.save("),
     );
-    const blockedDirectSave = sourceBetween(
-      persist,
-      "if (pendingExternalWorkspaceSyncRef.current) {",
-      "const result = saveStudioWorkspaceState(",
-      "pending direct workspace save",
+    expect(persist).toContain(
+      "result.guardRevision !== workspaceDirtyRevisionRef.current",
     );
-    expect(blockedDirectSave).toContain("state: sessionState");
-    expect(blockedDirectSave).toContain("setWorkspacePersistence((current)");
-    expect(blockedDirectSave).toContain('"session-only"');
-    expect(blockedDirectSave).toContain('"verification-failed"');
-    expect(blockedDirectSave).toContain("return Object.freeze({");
-    expect(
-      workspaceMergeSource.indexOf("const merged = mergeStudioWorkspaceStates("),
-    ).toBeLessThan(
-      workspaceMergeSource.indexOf(
-        "const result = saveStudioWorkspaceState(storage, userId, merged.state",
-      ),
-    );
-    expect(pendingReplay).not.toContain("saveStudioWorkspaceState(");
+    expect(persist).not.toContain("localStorage");
+    expect(persist).not.toContain("saveStudioWorkspaceState");
+
+    expect(pendingReplay).toContain("void runtime.reconcile({");
+    expect(pendingReplay).toContain("workspaceSyncBaseStateRef.current = result.state");
     expect(pendingReplay).toContain("state: result.state");
+    expect(pendingReplay).not.toContain("reconcileStudioWorkspacePendingSync");
   });
+
 
   it("keeps cancellation and lazy palette ownership controlled from Page through Aside", () => {
     const pageHandlers = sourceBetween(

@@ -20,9 +20,8 @@ import {
 import {
   createStudioEffectId,
   isStudioEffectFavorite,
-  loadStudioEffectFavoriteState,
   rememberStudioEffectRecent,
-  saveStudioEffectFavoriteState,
+  normalizeStudioEffectFavoriteState,
   toggleStudioEffectFavorite,
   type StudioEffectFavoriteState,
 } from "./studio-effect-favorites";
@@ -64,6 +63,10 @@ import {
   STUDIO_FOCUS_RING,
   studioSegmentChipClass,
 } from "./studio-panel-ui";
+import {
+  acquireProductStudioUiPreferencesRepository,
+  type StudioUiPreferencesRepository,
+} from "./studio-ui-preferences-sqlite";
 import { StudioCurvePanel } from "./StudioCurvePanel";
 import { useStudioHistogramSource } from "./useStudioHistogramSource";
 import { useStudioModalSheet } from "./useStudioModalSheet";
@@ -99,14 +102,6 @@ const STUDIO_FILTER_GALLERY_VIEWS: readonly {
     label: studioFilterGroupLabel(group),
   })),
 ];
-
-function browserEffectFavoriteStorage(): Storage | null {
-  try {
-    return typeof window !== "undefined" ? window.localStorage : null;
-  } catch {
-    return null;
-  }
-}
 
 function studioFilterEffectId(kind: StudioFilterKind) {
   return createStudioEffectId("filter", kind);
@@ -164,6 +159,8 @@ interface StudioFilterDialogProps {
   onClose: () => void;
   /** Tests may inject a repository; product defaults to the shared OPFS SQLite runtime. */
   acquireFilterLibrary?: () => Promise<ProductFilterLibraryRepository>;
+  /** Test seam; product defaults to the shared SQLite/OPFS UI-preference authority. */
+  acquireUiPreferences?: () => Promise<StudioUiPreferencesRepository>;
 }
 
 interface NumberControlProps {
@@ -435,6 +432,7 @@ export function StudioFilterDialog({
   onApply,
   onClose,
   acquireFilterLibrary = acquireProductFilterLibraryRepository,
+  acquireUiPreferences = acquireProductStudioUiPreferencesRepository,
 }: StudioFilterDialogProps): ReactElement {
   const dialogRef = useRef<HTMLElement>(null);
   // 히스토그램 원본 — src 키 LRU 캐시(디코드는 다이얼로그 세션당 최대 1회).
@@ -455,10 +453,17 @@ export function StudioFilterDialog({
   const [galleryView, setGalleryView] = useState<StudioFilterGalleryView>("all");
   const [effectFavoriteState, setEffectFavoriteState] = useState(() =>
     rememberStudioEffectRecent(
-      loadStudioEffectFavoriteState(browserEffectFavoriteStorage()),
+      normalizeStudioEffectFavoriteState(),
       studioFilterEffectId(kind),
     ),
   );
+  const effectFavoriteStateRef = useRef(effectFavoriteState);
+  const effectPreferenceDirtyRef = useRef(false);
+  const effectPreferenceRepositoryRef = useRef<StudioUiPreferencesRepository | null>(null);
+  const effectPreferenceMountedRef = useRef(true);
+  const [effectPreferenceAuthority, setEffectPreferenceAuthority] = useState<
+    "loading" | "sqlite-opfs" | "memory-only"
+  >("loading");
   const [installedCreatorPresets, setInstalledCreatorPresets] = useState<
     readonly StudioFilterLibraryPreset[]
   >([]);
@@ -484,6 +489,37 @@ export function StudioFilterDialog({
   const reportPreview = useEffectEvent(onPreview);
   // 미리보기가 켜져 있을 때 스크림에서 제외할 캔버스 영역(뷰포트 좌표). 측정 불가면 null → 통짜 스크림.
   const [previewCutout, setPreviewCutout] = useState<StudioFilterPreviewCutout | null>(null);
+
+  useEffect(() => {
+    effectPreferenceMountedRef.current = true;
+    return () => {
+      effectPreferenceMountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    void acquireUiPreferences()
+      .then(async (repository) => {
+        effectPreferenceRepositoryRef.current = repository;
+        const loaded = await repository.loadEffectFavorites();
+        const hydrated = effectPreferenceDirtyRef.current
+          ? effectFavoriteStateRef.current
+          : rememberStudioEffectRecent(loaded, studioFilterEffectId(kind));
+        if (!effectPreferenceDirtyRef.current && active) {
+          effectFavoriteStateRef.current = hydrated;
+          setEffectFavoriteState(hydrated);
+        }
+        await repository.saveEffectFavorites(hydrated);
+        if (active) setEffectPreferenceAuthority("sqlite-opfs");
+      })
+      .catch(() => {
+        if (active) setEffectPreferenceAuthority("memory-only");
+      });
+    return () => {
+      active = false;
+    };
+  }, [acquireUiPreferences, kind]);
 
   useEffect(() => {
     let active = true;
@@ -648,12 +684,27 @@ export function StudioFilterDialog({
 
   useEffect(() => () => reportPreview(null), []);
 
-  useEffect(() => {
-    saveStudioEffectFavoriteState(
-      browserEffectFavoriteStorage(),
-      effectFavoriteState,
-    );
-  }, [effectFavoriteState]);
+  const updateEffectFavoriteState = (
+    update: (current: StudioEffectFavoriteState) => StudioEffectFavoriteState,
+  ): void => {
+    const next = update(effectFavoriteStateRef.current);
+    effectFavoriteStateRef.current = next;
+    effectPreferenceDirtyRef.current = true;
+    setEffectFavoriteState(next);
+    const save = effectPreferenceRepositoryRef.current
+      ? effectPreferenceRepositoryRef.current.saveEffectFavorites(next)
+      : acquireUiPreferences().then((repository) => {
+          effectPreferenceRepositoryRef.current = repository;
+          return repository.saveEffectFavorites(next);
+        });
+    void save
+      .then(() => {
+        if (effectPreferenceMountedRef.current) setEffectPreferenceAuthority("sqlite-opfs");
+      })
+      .catch(() => {
+        if (effectPreferenceMountedRef.current) setEffectPreferenceAuthority("memory-only");
+      });
+  };
 
   const title = STUDIO_FILTER_LABELS[activeKind];
   const resetDraft = () => {
@@ -664,13 +715,13 @@ export function StudioFilterDialog({
     if (applying) return;
     setActiveKind(nextKind);
     setDraft(createStudioFilterDraft(nextKind, image));
-    setEffectFavoriteState((current) =>
+    updateEffectFavoriteState((current) =>
       rememberStudioEffectRecent(current, studioFilterEffectId(nextKind)),
     );
     setGalleryOpen(false);
   };
   const toggleGalleryFavorite = (nextKind: StudioFilterKind) => {
-    setEffectFavoriteState((current) =>
+    updateEffectFavoriteState((current) =>
       toggleStudioEffectFavorite(current, studioFilterEffectId(nextKind)),
     );
   };
@@ -730,6 +781,7 @@ export function StudioFilterDialog({
         aria-describedby={describedBy}
         aria-busy={applying || undefined}
         data-studio-shortcut-boundary="true"
+        data-studio-ui-preferences-authority={effectPreferenceAuthority}
         tabIndex={-1}
         className="relative flex max-h-[min(86dvh,42rem)] w-[min(34rem,calc(100vw-1rem))] flex-col overflow-hidden rounded-2xl border border-line-strong bg-panel text-fg shadow-2xl"
       >
@@ -763,6 +815,11 @@ export function StudioFilterDialog({
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 [scrollbar-width:thin]">
           <div className="space-y-4">
+            {effectPreferenceAuthority === "memory-only" ? (
+              <p role="status" className="rounded-lg border border-warning/40 bg-warning/10 px-2.5 py-1.5 text-[0.65rem] text-fg-2">
+                즐겨찾기와 최근 필터는 저장소를 다시 연결하기 전까지 이번 탭에서만 유지됩니다.
+              </p>
+            ) : null}
             <section
               aria-label="필터 갤러리"
               className="min-w-0 overflow-hidden rounded-xl border border-line bg-card/45"

@@ -1,4 +1,5 @@
 import { providerDescriptorSchema } from "./descriptor";
+import { declareTrustedBootstrapProvider } from "./registry";
 
 import type { ProviderDescriptor } from "./descriptor";
 import type { EngineCapabilityRegistry } from "./registry";
@@ -102,8 +103,33 @@ export const wasmVipsPipelineDescriptor: ProviderDescriptor =
     knownIssues: ["measured: resize 2048->512 p50 16.4ms, gaussblur s4 2048^2 p50 46.7ms"],
   });
 
+const canvasKitImageFilterBootstrap = declareTrustedBootstrapProvider(
+  canvasKitImageFilterDescriptor,
+  {
+    classification: "checked-in-production-baseline",
+    source: "packages/studio-engine-registry/src/filter-providers.ts",
+    owner: "studio-rendering",
+    justification: "checked-in CanvasKit filter baseline with pinned benchmark evidence",
+  },
+);
+const openCvImageWorkerBootstrap = declareTrustedBootstrapProvider(
+  openCvImageWorkerDescriptor,
+  {
+    classification: "checked-in-production-baseline",
+    source: "packages/studio-engine-registry/src/filter-providers.ts",
+    owner: "studio-imaging",
+    justification: "checked-in OpenCV analysis worker baseline with pinned benchmark evidence",
+  },
+);
+
 export function registerFilterProviders(registry: EngineCapabilityRegistry): void {
-  registry.register(canvasKitImageFilterDescriptor);
-  registry.register(openCvImageWorkerDescriptor);
-  registry.register(wasmVipsPipelineDescriptor);
+  registry.registerTrustedBootstrap(canvasKitImageFilterBootstrap);
+  registry.registerTrustedBootstrap(openCvImageWorkerBootstrap);
+}
+
+/** Candidate-only lane for bounded compiler tests; never callable on a governed registry. */
+export function registerFilterProviderTestFixtures(
+  registry: EngineCapabilityRegistry,
+): void {
+  registry.registerTestFixture(wasmVipsPipelineDescriptor);
 }

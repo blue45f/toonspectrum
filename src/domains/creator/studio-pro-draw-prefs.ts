@@ -5,7 +5,8 @@
  * - Recent built-in brush ids (Ibis / Procreate Recent)
  * - Favorite built-in brush ids (Ibis / CSP material pin lite)
  *
- * Pure + localStorage injectable; no React.
+ * Pure preference transforms plus an injected pre-V12 storage codec; no React.
+ * Product code uses studio-pro-draw-preferences-sqlite.ts and never opens this legacy key.
  */
 
 import { BRUSH_PRESETS } from "./studio-brush";
@@ -212,12 +213,4 @@ export function cycleStudioStabilizerStrength(current: number): number {
   if (idx === -1) return steps[0];
   if (steps[idx] === safe) return steps[(idx + 1) % steps.length]!;
   return steps[idx]!;
-}
-
-export function studioProDrawStorage(): StudioProDrawPrefsStorage | null {
-  try {
-    return typeof globalThis.localStorage === "undefined" ? null : globalThis.localStorage;
-  } catch {
-    return null;
-  }
 }

@@ -1,4 +1,7 @@
-import { providerDescriptorSchema } from "@toonspectrum/studio-engine-registry";
+import {
+  declareTrustedBootstrapProvider,
+  providerDescriptorSchema,
+} from "@toonspectrum/studio-engine-registry";
 
 import type {
   EngineCapabilityRegistry,
@@ -68,9 +71,28 @@ export const hokusaiProviderDescriptor: ProviderDescriptor =
     knownIssues: [],
   });
 
+const perfectFreehandBootstrap = declareTrustedBootstrapProvider(
+  perfectFreehandProviderDescriptor,
+  {
+    classification: "checked-in-production-baseline",
+    source: "packages/studio-brush-platform/src/providers.ts",
+    owner: "studio-brush-platform",
+    justification: "checked-in pressure-outline baseline used by the vector brush fallback",
+  },
+);
+const hokusaiBootstrap = declareTrustedBootstrapProvider(
+  hokusaiProviderDescriptor,
+  {
+    classification: "checked-in-production-baseline",
+    source: "packages/studio-brush-platform/src/providers.ts",
+    owner: "studio-brush-platform",
+    justification: "checked-in natural-media wasm baseline with fidelity goldens",
+  },
+);
+
 export function registerBrushPlatformProviders(
   registry: EngineCapabilityRegistry,
 ): void {
-  registry.register(perfectFreehandProviderDescriptor);
-  registry.register(hokusaiProviderDescriptor);
+  registry.registerTrustedBootstrap(perfectFreehandBootstrap);
+  registry.registerTrustedBootstrap(hokusaiBootstrap);
 }
