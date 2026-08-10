@@ -80,7 +80,7 @@ export const BABYLON_STABLE_ID_PARITY_WIDTHS = [63, 65] as const;
 export const BABYLON_STABLE_ID_PARITY_HEIGHT = 64;
 export const BABYLON_ALIGNED_RASTER_SMOKE_SIZE = 64;
 const BABYLON_STABLE_ID_ENGINE_INIT_TIMEOUT_MS = 60_000;
-export const STUDIO_3D_WEBGPU_MAX_BROWSER_ATTEMPTS = 2;
+export const STUDIO_3D_WEBGPU_MAX_BROWSER_ATTEMPTS = 3;
 export const STUDIO_3D_WEBGPU_PROOF_SHARDS = Object.freeze([
   "babylon-artifact-parity",
   "magic-layer-alignment",
@@ -2868,7 +2868,7 @@ async function main(): Promise<void> {
     // WebGPU adapter as well as ANGLE's WebGL adapter: --use-angle alone does not select the
     // WebGPU device, so a GPU-less runner can otherwise lose its default Dawn device mid-proof.
     // No normal Chromium process exists until every proof shard has closed. Each shard gets at
-    // most one fresh-process retry only for classified device/context lifetime failures; semantic
+    // most two fresh-process retries only for classified device/context lifetime failures; semantic
     // and parity failures remain immediate hard failures and completed shards are never replayed.
     await runStudio3dWebGpuProofShardsWithFreshBrowserRetry(
       async (shard) => {
@@ -2878,7 +2878,8 @@ async function main(): Promise<void> {
       ({ attempt, reason, shard }) => {
         console.warn(
           `[verify-studio-3d-console] transient WebGPU ${reason} in ${shard}; ` +
-            `closed attempt ${String(attempt)} and starting one fresh browser retry`,
+            `closed attempt ${String(attempt)} and starting fresh browser attempt ` +
+            `${String(attempt + 1)}/${String(STUDIO_3D_WEBGPU_MAX_BROWSER_ATTEMPTS)}`,
         );
       },
     );

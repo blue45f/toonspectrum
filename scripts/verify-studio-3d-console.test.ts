@@ -296,7 +296,7 @@ describe("3D WebGPU conformance browser boundary", () => {
     expect(classifyStudio3dWebGpuRetryableFailure(error)).toBeNull();
   });
 
-  it("restarts exactly one fresh attempt after a classified loss", async () => {
+  it("restarts a fresh attempt after a classified loss", async () => {
     const attempts: number[] = [];
     const retryReasons: string[] = [];
 
@@ -314,7 +314,7 @@ describe("3D WebGPU conformance browser boundary", () => {
       },
     );
 
-    expect(STUDIO_3D_WEBGPU_MAX_BROWSER_ATTEMPTS).toBe(2);
+    expect(STUDIO_3D_WEBGPU_MAX_BROWSER_ATTEMPTS).toBe(3);
     expect(attempts).toEqual([1, 2]);
     expect(retryReasons).toEqual(["context-or-device-lost"]);
   });
@@ -332,7 +332,55 @@ describe("3D WebGPU conformance browser boundary", () => {
     expect(attempts).toEqual([1]);
   });
 
-  it("hard-fails the second classified loss without a third attempt", async () => {
+  it("allows two fresh attempts for consecutive classified losses", async () => {
+    const attempts: number[] = [];
+    const retries: number[] = [];
+
+    await runStudio3dWebGpuConformanceWithFreshBrowserRetry(
+      async (attempt) => {
+        attempts.push(attempt);
+        if (attempt < STUDIO_3D_WEBGPU_MAX_BROWSER_ATTEMPTS) {
+          throw Object.assign(new Error("WebGPU context was lost."), {
+            code: "context-lost",
+          });
+        }
+      },
+      ({ attempt }) => {
+        retries.push(attempt);
+      },
+    );
+
+    expect(attempts).toEqual([1, 2, 3]);
+    expect(retries).toEqual([1, 2]);
+  });
+
+  it("does not hide a semantic failure after a classified retry", async () => {
+    const semanticFailure = new Error("WebGPU/WebGL2 normal spatial parity failed");
+    const attempts: number[] = [];
+    const retries: number[] = [];
+
+    await expect(
+      runStudio3dWebGpuConformanceWithFreshBrowserRetry(
+        async (attempt) => {
+          attempts.push(attempt);
+          if (attempt === 1) {
+            throw Object.assign(new Error("WebGPU context was lost."), {
+              code: "context-lost",
+            });
+          }
+          throw semanticFailure;
+        },
+        ({ attempt }) => {
+          retries.push(attempt);
+        },
+      ),
+    ).rejects.toBe(semanticFailure);
+
+    expect(attempts).toEqual([1, 2]);
+    expect(retries).toEqual([1]);
+  });
+
+  it("hard-fails the third classified loss without a fourth attempt", async () => {
     const failure = Object.assign(new Error("WebGPU context was lost."), {
       code: "context-lost",
     });
@@ -350,8 +398,8 @@ describe("3D WebGPU conformance browser boundary", () => {
         },
       ),
     ).rejects.toBe(failure);
-    expect(attempts).toEqual([1, 2]);
-    expect(retries).toEqual([1]);
+    expect(attempts).toEqual([1, 2, 3]);
+    expect(retries).toEqual([1, 2]);
   });
 
   it("isolates heavyweight proofs in ordered fresh-browser shards", async () => {
