@@ -38,6 +38,10 @@ Studio treats `paint` and `erase` as first-class tool operations.
   the active operation filters what the artist sees.
 - Eraser previews demonstrate their result on existing ink. Eraser opacity is labelled as erase
   strength in artist-facing UI.
+- A named eraser's declared strength is semantic operation state, so selecting an eraser applies
+  its own strength even when the paint-opacity preference is locked. The lock still preserves
+  opacity while switching between paint presets; it cannot silently turn the full-strength
+  `standard-eraser` into a partial lift.
 - Persisted draw elements remain mode-authoritative for backwards compatibility. A missing brush
   identity on a legacy eraser normalizes to `standard-eraser` only at the authoring/catalogue
   boundary; document replay never guesses operation from a display name.
@@ -84,12 +88,26 @@ soft, textured, and pixel erasers without turning each one into a mode exception
 ## Consequences
 
 - Switching tools no longer changes the other tool's preset, width, strength, color, or dynamics.
+- Paint opacity locking and eraser strength are deliberately separate contracts. Size locking may
+  span both operations, while erase selection always restores the selected eraser's declared
+  destructive strength.
 - Writes are serialized through the tool-operation memory controller. Edits made while SQLite is
   hydrating win only for their own operation slot, so a fast paint edit cannot erase the stored
   eraser snapshot (and vice versa).
-- Tool transitions that occur before the persistence chunk resolves are queued in order and
-  replayed into the controller before hydration settles. Closing Studio also queues the latest
-  normalized snapshot, so chunk loading never becomes a window for silently dropped state.
+- Active property edits are proactively persisted through a 250 ms latest-value coalescer. At most
+  one write and one trailing latest snapshot exist, so slider drags never create an unbounded
+  promise queue and the pointer/render hot path never awaits storage.
+- Changes made before the persistence chunk resolves occupy one replaceable latest-snapshot slot.
+  Successful loading clears that slot before scheduling it; failed loading keeps only that latest
+  value and permits one guarded retry on an explicit online signal. Closing Studio schedules the
+  latest normalized snapshot and requests a non-blocking flush.
+- A write failure leaves the controller `dirty` and `degraded`, is announced once per failure
+  episode, participates in Studio's existing unsaved-work unload guard, and remains retryable. A
+  successful retry clears both the error episode and dirty signal; there is no localStorage,
+  IndexedDB, or durable memory fallback.
+- Closing the SQLite Dedicated Worker is an atomic admission barrier. Concurrent callers share one
+  close promise, new RPCs are rejected, prior pending RPCs are settled explicitly, and the Worker
+  terminates exactly once after the close handshake.
 - Catalogue filters, recent items, favorites, and quick slots must resolve operation from canonical
   metadata rather than relying on category names.
 - Existing anonymous eraser strokes remain valid and pixel-identical.

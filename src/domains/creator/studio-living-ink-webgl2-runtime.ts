@@ -1,7 +1,10 @@
 import {
+  canonicalStudioLivingInkDisplayRgba8,
   STUDIO_LIVING_INK_EXECUTION_ENGINE_VERSION,
   STUDIO_LIVING_INK_EXECUTION_LIMITS,
   STUDIO_LIVING_INK_EXECUTION_PROTOCOL_VERSION,
+  STUDIO_LIVING_INK_GRANULATION_MULTIPLIER_BOUNDS,
+  STUDIO_LIVING_INK_MAXIMUM_OPTICAL_DENSITY,
   type StudioLivingInkExecutionApplyOptions,
   type StudioLivingInkExecutionApplied,
   type StudioLivingInkExecutionApplyResult,
@@ -85,6 +88,71 @@ type Programs = Readonly<{
   exchange: Program;
   display: Program;
 }>;
+
+export const STUDIO_LIVING_INK_WEBGL2_DISPLAY_GRANULATION_SEDIMENT_GAIN = 2.35;
+export const STUDIO_LIVING_INK_WEBGL2_DILUTE_SEDIMENT_RESPONSE = Object.freeze({
+  additionalGain: 4.6,
+  fullStrengthDensity: 0.035,
+  fadeOutDensity: 0.2,
+} as const);
+
+/** CPU-readable form of the GLSL dilute-wash response, used to pin its physical density envelope. */
+export function studioLivingInkWebGlDiluteSedimentBoost(centerDensity: number): number {
+  if (!Number.isFinite(centerDensity)) {
+    throw new RangeError("Living Ink sediment density must be finite.");
+  }
+  const response = STUDIO_LIVING_INK_WEBGL2_DILUTE_SEDIMENT_RESPONSE;
+  const normalized = clamp(
+    (centerDensity - response.fullStrengthDensity)
+      / (response.fadeOutDensity - response.fullStrengthDensity),
+    0,
+    1,
+  );
+  const faded = normalized * normalized * (3 - 2 * normalized);
+  return 1 + (1 - faded) * response.additionalGain;
+}
+
+export interface StudioLivingInkWebGlGranulationSample {
+  readonly grain: number;
+  readonly tooth: number;
+  readonly granulationAmount: number;
+  readonly centerDensity: number;
+}
+
+function smoothstepNumber(edge0: number, edge1: number, value: number): number {
+  const normalized = clamp((value - edge0) / (edge1 - edge0), 0, 1);
+  return normalized * normalized * (3 - 2 * normalized);
+}
+
+/** CPU oracle for the exact bounded multiplier embedded in the display shader. */
+export function studioLivingInkWebGlGranulationMultiplier(
+  sample: StudioLivingInkWebGlGranulationSample,
+): number {
+  for (const [name, value, minimum] of [
+    ["grain", sample.grain, 0],
+    ["tooth", sample.tooth, 0],
+    ["granulationAmount", sample.granulationAmount, 0],
+    ["centerDensity", sample.centerDensity, 0],
+  ] as const) {
+    const maximum = name === "centerDensity" ? Number.POSITIVE_INFINITY : 1;
+    if (!Number.isFinite(value) || value < minimum || value > maximum) {
+      throw new RangeError(`Living Ink ${name} is outside its physical range.`);
+    }
+  }
+  const granulationGate = smoothstepNumber(0.005, 0.24, sample.centerDensity)
+    * (1 - smoothstepNumber(0.38, 1.15, sample.centerDensity) * 0.74);
+  const sediment = (sample.grain - 0.5) * 2 + (sample.tooth - 0.5) * 0.7;
+  const rawMultiplier = 1
+    + sediment * sample.granulationAmount
+      * STUDIO_LIVING_INK_WEBGL2_DISPLAY_GRANULATION_SEDIMENT_GAIN
+      * granulationGate
+      * studioLivingInkWebGlDiluteSedimentBoost(sample.centerDensity);
+  return clamp(
+    rawMultiplier,
+    STUDIO_LIVING_INK_GRANULATION_MULTIPLIER_BOUNDS.minimum,
+    STUDIO_LIVING_INK_GRANULATION_MULTIPLIER_BOUNDS.maximum,
+  );
+}
 
 const FULLSCREEN_VERTEX = `#version 300 es
 precision highp float;
@@ -661,9 +729,26 @@ void main(){
   vec3 mobileOpticalDensity = mobileContribution.rgb * densityStrength;
   float granulationGate = smoothstep(0.005, 0.24, centerDensity)
     * (1.0 - smoothstep(0.38, 1.15, centerDensity) * 0.74);
+  // Dilute radial washes expose pigment/fibre separation that concentrated ink optically masks.
+  // Boost sediment while pigment is sparse, then return exactly to the shared baseline before a
+  // dark continuous stroke reaches its centre density so paper tooth cannot cut periodic gaps.
+  float diluteSedimentBoost = 1.0 + (
+    1.0 - smoothstep(
+      ${STUDIO_LIVING_INK_WEBGL2_DILUTE_SEDIMENT_RESPONSE.fullStrengthDensity.toFixed(3)},
+      ${STUDIO_LIVING_INK_WEBGL2_DILUTE_SEDIMENT_RESPONSE.fadeOutDensity.toFixed(3)},
+      centerDensity
+    )
+  ) * ${STUDIO_LIVING_INK_WEBGL2_DILUTE_SEDIMENT_RESPONSE.additionalGain.toFixed(2)};
   float sediment = (grain - 0.5) * 2.0 + (tooth - 0.5) * 0.7;
-  float granulationMultiplier = 1.0
-    + sediment * granulationAmount * 2.15 * granulationGate;
+  float granulationMultiplier = clamp(
+    1.0
+      + sediment * granulationAmount
+        * ${STUDIO_LIVING_INK_WEBGL2_DISPLAY_GRANULATION_SEDIMENT_GAIN.toFixed(2)}
+        * granulationGate
+        * diluteSedimentBoost,
+    ${STUDIO_LIVING_INK_GRANULATION_MULTIPLIER_BOUNDS.minimum.toFixed(4)},
+    ${STUDIO_LIVING_INK_GRANULATION_MULTIPLIER_BOUNDS.maximum.toFixed(1)}
+  );
   fixedOpticalDensity *= granulationMultiplier;
   mobileOpticalDensity *= granulationMultiplier;
   float wetGradient = length(vec2(
@@ -678,7 +763,11 @@ void main(){
   mobileOpticalDensity *= 1.0
     + mobilePigmentEdge * edgeAmount * (0.65 + dryingFront * 4.2)
     + dryingFront * mobileCenterDensity * edgeAmount * (0.9 + wetGradient * 7.0);
-  vec3 opticalDensity = fixedOpticalDensity + mobileOpticalDensity;
+  vec3 opticalDensity = clamp(
+    fixedOpticalDensity + mobileOpticalDensity,
+    vec3(0.0),
+    vec3(${STUDIO_LIVING_INK_MAXIMUM_OPTICAL_DENSITY.toFixed(1)})
+  );
   vec3 color = paper * exp(-opticalDensity);
   float mobileWhiteCoverage = 1.0 - exp(-combined.a * ${STUDIO_LIVING_INK_WHITE_GOUACHE_EXTINCTION});
   vec3 gouache = vec3(0.986, 0.982, 0.968);
@@ -741,6 +830,103 @@ function stableJson(value: unknown): string {
 function sha256(value: Uint8Array | string): `sha256:${string}` {
   const bytes = typeof value === "string" ? new TextEncoder().encode(value) : value;
   return `sha256:${sha256HexPortable(bytes)}`;
+}
+
+export type StudioLivingInkWebGlPresentationEnvironment = Readonly<{
+  createImageBitmap: (
+    source: ImageData,
+    options: ImageBitmapOptions,
+  ) => Promise<ImageBitmap>;
+  stillOwnsFrame: () => boolean;
+}>;
+
+const WEB_GL_READBACK_BITMAP_OPTIONS = Object.freeze({
+  colorSpaceConversion: "none",
+  imageOrientation: "none",
+  premultiplyAlpha: "none",
+}) satisfies ImageBitmapOptions;
+
+/**
+ * Converts WebGL's bottom-left row-major readback to ImageData's top-left row-major order.
+ *
+ * A fresh array is intentional: the receipt continues to hash the untouched WebGL byte order,
+ * while the bitmap receives the same RGBA8 values with only their row addresses changed.
+ */
+export function studioLivingInkWebGlReadbackToTopDownRgba8(
+  pixels: Uint8Array,
+  width: number,
+  height: number,
+): Uint8ClampedArray<ArrayBuffer> {
+  const expectedByteLength = width * height * 4;
+  if (
+    !Number.isSafeInteger(width)
+    || width <= 0
+    || !Number.isSafeInteger(height)
+    || height <= 0
+    || !Number.isSafeInteger(expectedByteLength)
+    || pixels.byteLength !== expectedByteLength
+  ) throw new Error("Living Ink RGBA8 display readback dimensions are malformed.");
+
+  const stride = width * 4;
+  const topDown = new Uint8ClampedArray(expectedByteLength);
+  for (let sourceRow = 0; sourceRow < height; sourceRow += 1) {
+    const targetRow = height - 1 - sourceRow;
+    topDown.set(
+      pixels.subarray(sourceRow * stride, sourceRow * stride + stride),
+      targetRow * stride,
+    );
+  }
+  return topDown;
+}
+
+async function createBrowserImageBitmap(
+  source: ImageData,
+  options: ImageBitmapOptions,
+): Promise<ImageBitmap> {
+  if (typeof globalThis.createImageBitmap !== "function") {
+    throw new Error("Living Ink requires createImageBitmap for RGBA8 presentation.");
+  }
+  return await globalThis.createImageBitmap(source, options);
+}
+
+function closeImageBitmapQuietly(bitmap: ImageBitmap): void {
+  try {
+    bitmap.close();
+  } catch {
+    // Ownership is already revoked. A browser close failure must not publish a stale GPU frame.
+  }
+}
+
+/**
+ * Builds the caller-owned bitmap from the exact RGBA8 staging readback used by the receipt.
+ * Browser bitmap storage may internally premultiply alpha, but no alternate framebuffer, colour
+ * conversion or implicit orientation transform is allowed into this authority boundary.
+ */
+export async function createStudioLivingInkWebGlReadbackBitmap(
+  pixels: Uint8Array,
+  width: number,
+  height: number,
+  environment: Partial<StudioLivingInkWebGlPresentationEnvironment> = {},
+): Promise<ImageBitmap> {
+  const topDown = studioLivingInkWebGlReadbackToTopDownRgba8(pixels, width, height);
+  const imageData = new ImageData(topDown, width, height);
+  const bitmap = await (environment.createImageBitmap ?? createBrowserImageBitmap)(
+    imageData,
+    WEB_GL_READBACK_BITMAP_OPTIONS,
+  );
+
+  let stillOwnsFrame: boolean;
+  try {
+    stillOwnsFrame = environment.stillOwnsFrame?.() ?? true;
+  } catch (error) {
+    closeImageBitmapQuietly(bitmap);
+    throw error;
+  }
+  if (!stillOwnsFrame) {
+    closeImageBitmapQuietly(bitmap);
+    throw new Error("Living Ink RGBA8 presentation was invalidated before publication.");
+  }
+  return bitmap;
 }
 
 export function validateStudioLivingInkExecutionConfig(
@@ -986,13 +1172,13 @@ export class StudioLivingInkWebGl2Runtime {
     this.canvas = new OffscreenCanvas(config.displayWidth, config.displayHeight);
     const gl = this.canvas.getContext("webgl2", {
       // The resolve writes wash coverage in alpha so an untouched page stays transparent; the
-      // transferred ImageBitmap has to carry it, and it is authored straight, not premultiplied.
+      // RGBA8 readback-derived ImageBitmap carries it straight, without a second framebuffer.
       alpha: true,
       premultipliedAlpha: false,
       antialias: false,
       depth: false,
       desynchronized: true,
-      preserveDrawingBuffer: true,
+      preserveDrawingBuffer: false,
       stencil: false,
     });
     if (!gl) throw new Error("Living Ink requires OffscreenCanvas WebGL2.");
@@ -1781,10 +1967,6 @@ export class StudioLivingInkWebGl2Runtime {
               : 0,
     );
     this.draw(this.resources.display);
-    this.bind(this.programs.copy);
-    gl.uniform1i(this.programs.copy.uniforms.sourceTexture, textureUnit(gl, this.resources.display, 0));
-    gl.uniform1f(this.programs.copy.uniforms.multiplier, 1);
-    this.draw(null);
   }
 
   private displayPixels(): Uint8Array {
@@ -1801,6 +1983,21 @@ export class StudioLivingInkWebGl2Runtime {
       pixels,
     );
     return pixels;
+  }
+
+  private async presentDisplayPixels(pixels: Uint8Array): Promise<ImageBitmap> {
+    return await createStudioLivingInkWebGlReadbackBitmap(
+      pixels,
+      this.config.displayWidth,
+      this.config.displayHeight,
+      {
+        stillOwnsFrame: () => (
+          !this.disposed
+          && !this.contextLost
+          && !this.gl.isContextLost()
+        ),
+      },
+    );
   }
 
   private operationBounds(operation: StudioLivingInkOperation): StudioLivingInkBounds {
@@ -1945,7 +2142,8 @@ export class StudioLivingInkWebGl2Runtime {
       revision: this.revision,
       operationKind: operation.kind,
       backend: "webgl2-offscreen-half-float",
-      displaySha256: sha256(pixels),
+      displaySha256: sha256(canonicalStudioLivingInkDisplayRgba8(pixels)),
+      displayHashEncoding: "premultiplied-rgba8-v2",
       operationSha256,
       dirtyBounds,
       dirtyTileCount,
@@ -1967,7 +2165,8 @@ export class StudioLivingInkWebGl2Runtime {
       imageOwnership: "caller-must-close",
       contextRecovery: "worker-rebuild-journal-replay",
     });
-    return Object.freeze({ image: this.canvas.transferToImageBitmap(), receipt });
+    const image = await this.presentDisplayPixels(pixels);
+    return Object.freeze({ image, receipt });
   }
 
   async renderFrame(
@@ -1987,7 +2186,8 @@ export class StudioLivingInkWebGl2Runtime {
       revision: this.revision,
       operationKind: "restore",
       backend: "webgl2-offscreen-half-float",
-      displaySha256: sha256(pixels),
+      displaySha256: sha256(canonicalStudioLivingInkDisplayRgba8(pixels)),
+      displayHashEncoding: "premultiplied-rgba8-v2",
       operationSha256: sha256(`render:${displayMode}:${this.revision}`),
       dirtyBounds: this.simulationBounds(),
       dirtyTileCount: 0,
@@ -2009,7 +2209,8 @@ export class StudioLivingInkWebGl2Runtime {
       imageOwnership: "caller-must-close",
       contextRecovery: "worker-rebuild-journal-replay",
     });
-    return Object.freeze({ image: this.canvas.transferToImageBitmap(), receipt });
+    const image = await this.presentDisplayPixels(pixels);
+    return Object.freeze({ image, receipt });
   }
 
   dispose(): void {

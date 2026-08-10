@@ -26,6 +26,15 @@ describe("studio unsaved work signal", () => {
     ).toBe(false);
   });
 
+  it("reports a dirty tool-operation SQLite snapshot even before document hydration", () => {
+    expect(
+      hasUnsavedStudioWork(signals({
+        hydrated: false,
+        toolOperationMemoryDirty: true,
+      })),
+    ).toBe(true);
+  });
+
   it("stays quiet when the durable authority already caught up", () => {
     expect(hasUnsavedStudioWork(signals())).toBe(false);
   });

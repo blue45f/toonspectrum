@@ -1476,7 +1476,9 @@ const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamic
       grain: { space: "canvas-fixed", amount: 0.08, scale: 18, contrast: 0.2, seed: 404 },
       dualBrush: { enabled: false },
       spacingRatio: 0.1,
-      spacing: { mappings: [], jitter: null },
+      // A perfectly fixed station interval leaves a faint comb in this low-pigment wash. Seeded
+      // spacing variation preserves deterministic replay while de-correlating adjacent soft edges.
+      spacing: { mappings: [], jitter: { mode: "multiply", amount: 0.08 } },
       scatterRatio: 0.015,
       scatter: { mappings: [], jitter: null },
       angle: { base: 0, mappings: [], jitter: null },

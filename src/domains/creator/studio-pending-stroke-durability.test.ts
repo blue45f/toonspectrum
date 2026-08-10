@@ -67,7 +67,7 @@ describe("pending stroke durability", () => {
     const result = createStudioLifecycleEmergencyAutosave({
       payload: basePayload([{ id: "page-1", elements: [{ id: "stable-edit" }] }]),
       pending: { pageId: "page-1", strokes: [{ id: "pending-stroke" }] },
-      reason: "pagehide",
+      reason: "pointerup",
       savedAt: "2026-07-18T01:02:04.000Z",
       documentScope: { kind: "local" },
     });
@@ -80,7 +80,7 @@ describe("pending stroke durability", () => {
     ]);
     expect(result.payload.lifecycleDurability).toMatchObject({
       kind: "lifecycle-snapshot",
-      reason: "pagehide",
+      reason: "pointerup",
       pendingStrokePageId: "page-1",
       pendingStrokeIds: ["pending-stroke"],
     });

@@ -310,6 +310,22 @@ describe("Studio advanced WebGPU live-ink integration", () => {
     );
   });
 
+  it("schedules a post-commit handoff pass after installing the ref-only queue", () => {
+    const page = source("./StudioPage.tsx");
+    const queueStart = page.indexOf("function queueCommittedStrokeSurfaceHandoff(");
+    const queueEnd = page.indexOf("function queueDeferredStrokeCommit(", queueStart);
+    const queueSource = page.slice(queueStart, queueEnd);
+    const install = queueSource.indexOf(
+      "committedInkSurfaceHandoffsRef.current = [...pending, queued]",
+    );
+    const retry = queueSource.indexOf("scheduleCommittedInkSurfaceHandoffRetry()", install);
+
+    expect(queueStart).toBeGreaterThan(-1);
+    expect(queueEnd).toBeGreaterThan(queueStart);
+    expect(install).toBeGreaterThan(-1);
+    expect(retry).toBeGreaterThan(install);
+  });
+
   it("requires the full active journal identity before rebaselining a settled prefix", () => {
     const page = source("./StudioPage.tsx");
     const matchStart = page.indexOf("function activeGpuLiveSourceJournalMatchesPlan(");

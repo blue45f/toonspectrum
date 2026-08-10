@@ -327,9 +327,10 @@ describe("studio tool operation memory SQLite controller", () => {
   });
 
   it("surfaces corrupt rows while retaining independent deterministic defaults", async () => {
+    const save = vi.fn(() => Promise.resolve());
     const controller = createStudioToolOperationMemoryController({
       load: () => Promise.resolve("{"),
-      save: () => Promise.resolve(),
+      save,
     });
 
     await expect(controller.hydrate()).resolves.toMatchObject({
@@ -338,8 +339,38 @@ describe("studio tool operation memory SQLite controller", () => {
     });
     expect(controller.getSnapshot()).toMatchObject({
       phase: "degraded",
+      dirty: true,
       lastError: { code: "corrupt" },
     });
+    await expect(controller.retry()).resolves.toBe(true);
+    expect(save).toHaveBeenCalledOnce();
+    expect(controller.getSnapshot()).toMatchObject({
+      phase: "ready",
+      dirty: false,
+      lastError: null,
+    });
+  });
+
+  it("retries a failed Worker-backed database acquisition instead of caching rejection", async () => {
+    let acquisitions = 0;
+    const store = {
+      get: () => Promise.resolve(null),
+      set: () => Promise.resolve(),
+      delete: () => Promise.resolve(),
+    };
+    const persistence = createStudioToolOperationMemorySqlitePersistence({
+      acquireDatabase: async () => {
+        acquisitions += 1;
+        if (acquisitions === 1) throw new Error("Worker chunk unavailable");
+        return {
+          asAsyncKeyValueStore: () => store,
+        } as unknown as StudioLocalDatabase;
+      },
+    });
+
+    await expect(persistence.load()).rejects.toThrow(/Worker chunk unavailable/);
+    await expect(persistence.load()).resolves.toBeNull();
+    expect(acquisitions).toBe(2);
   });
 
   it("merges a pre-hydration paint edit without erasing the persisted erase slot", async () => {
@@ -410,6 +441,128 @@ describe("studio tool operation memory SQLite controller", () => {
     expect(parseStudioToolOperationMemory(saved[1]).memory.paint.strokeWidth).toBe(33);
   });
 
+  it("proactively coalesces active snapshot changes into one latest SQLite write", async () => {
+    vi.useFakeTimers();
+    try {
+      const saved: string[] = [];
+      const controller = createStudioToolOperationMemoryController({
+        load: () => Promise.resolve(null),
+        save: async (serialized) => {
+          saved.push(serialized);
+        },
+      }, { coalesceMs: 25 });
+      await controller.hydrate();
+      const first = rememberStudioToolOperationSnapshot(
+        controller.getSnapshot().memory,
+        "paint",
+        paint(12),
+      );
+      const second = rememberStudioToolOperationSnapshot(first, "paint", paint(24));
+      const latest = rememberStudioToolOperationSnapshot(second, "paint", paint(48));
+
+      controller.scheduleSave(first);
+      controller.scheduleSave(second);
+      controller.scheduleSave(latest);
+      expect(controller.getSnapshot()).toMatchObject({ dirty: true, writeInFlight: false });
+      await vi.advanceTimersByTimeAsync(24);
+      expect(saved).toHaveLength(0);
+      await vi.advanceTimersByTimeAsync(1);
+
+      expect(saved).toHaveLength(1);
+      expect(parseStudioToolOperationMemory(saved[0]!).memory.paint.strokeWidth).toBe(48);
+      expect(controller.getSnapshot()).toMatchObject({
+        phase: "ready",
+        dirty: false,
+        writeInFlight: false,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("bounds edits during an in-flight write to one trailing latest write", async () => {
+    vi.useFakeTimers();
+    try {
+      const firstWrite = deferred<void>();
+      const saved: string[] = [];
+      const controller = createStudioToolOperationMemoryController({
+        load: () => Promise.resolve(null),
+        save: (serialized) => {
+          saved.push(serialized);
+          return saved.length === 1 ? firstWrite.promise : Promise.resolve();
+        },
+      }, { coalesceMs: 10 });
+      await controller.hydrate();
+      const first = rememberStudioToolOperationSnapshot(
+        controller.getSnapshot().memory,
+        "erase",
+        kneadedEraser(20),
+      );
+      const second = rememberStudioToolOperationSnapshot(first, "erase", kneadedEraser(30));
+      const latest = rememberStudioToolOperationSnapshot(second, "erase", kneadedEraser(40));
+
+      controller.scheduleSave(first);
+      await vi.advanceTimersByTimeAsync(10);
+      expect(saved).toHaveLength(1);
+      controller.scheduleSave(second);
+      controller.scheduleSave(latest);
+      await vi.advanceTimersByTimeAsync(10);
+      expect(saved).toHaveLength(1);
+
+      firstWrite.resolve();
+      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(10);
+      await controller.flush();
+      expect(saved).toHaveLength(2);
+      expect(parseStudioToolOperationMemory(saved[1]!).memory.erase.strokeWidth).toBe(40);
+      expect(controller.getSnapshot().dirty).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps a failed later save dirty and degraded until an explicit retry succeeds", async () => {
+    vi.useFakeTimers();
+    try {
+      let rejectSave = true;
+      const save = vi.fn(async () => {
+        if (rejectSave) throw new Error("OPFS quota temporarily unavailable");
+      });
+      const controller = createStudioToolOperationMemoryController({
+        load: () => Promise.resolve(null),
+        save,
+      }, { coalesceMs: 5 });
+      const snapshots: ReturnType<typeof controller.getSnapshot>[] = [];
+      controller.subscribe(() => snapshots.push(controller.getSnapshot()));
+      await controller.hydrate();
+      controller.scheduleSave(rememberStudioToolOperationSnapshot(
+        controller.getSnapshot().memory,
+        "paint",
+        paint(19),
+      ));
+      await vi.advanceTimersByTimeAsync(5);
+
+      expect(controller.getSnapshot()).toMatchObject({
+        phase: "degraded",
+        dirty: true,
+        writeInFlight: false,
+        lastError: { code: "unavailable" },
+      });
+      expect(snapshots.some(({ lastError }) => lastError !== null)).toBe(true);
+
+      rejectSave = false;
+      await expect(controller.retry()).resolves.toBe(true);
+      expect(save).toHaveBeenCalledTimes(2);
+      expect(controller.getSnapshot()).toMatchObject({
+        phase: "ready",
+        dirty: false,
+        lastError: null,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("notifies subscribers for hydration, memory updates, and persistence outcomes", async () => {
     const controller = createStudioToolOperationMemoryController({
       load: () => Promise.resolve(null),
@@ -469,13 +622,13 @@ describe("studio tool operation memory SQLite controller", () => {
     expect(runtimeSource).toContain("acquireStudioLocalDatabase");
   });
 
-  it("pins the Studio hydration race merge and visible one-time SQLite warning", () => {
+  it("pins dynamic loading, bounded pre-load coalescing, race merge, and later warnings", () => {
     const pageSource = readFileSync(
       new URL("./StudioPage.tsx", import.meta.url),
       "utf8",
     );
     const hydrationStart = pageSource.indexOf(
-      "toolOperationMemoryPersistenceLoadRef.current ??= import(",
+      'const loading = import("./studio-tool-operation-memory-sqlite")',
     );
     const hydrationEnd = pageSource.indexOf(
       "function applySavedBrush",
@@ -488,31 +641,38 @@ describe("studio tool operation memory SQLite controller", () => {
       /import\s+[^;]*from\s+["']\.\/studio-tool-operation-memory-sqlite["']/,
     );
     expect(hydration).toContain('"./studio-tool-operation-memory-sqlite"');
-    expect(hydration).toContain(
-      "pendingToolOperationMemorySavesRef.current.splice(0)",
-    );
-    expect(hydration).toContain("for (const memory of queuedSaves)");
-    expect(hydration).toContain("void persistence.save(memory)");
+    expect(pageSource).toContain("pendingToolOperationMemorySaveRef.current = memory");
+    expect(pageSource).not.toContain("pendingToolOperationMemorySavesRef");
+    expect(pageSource).not.toContain(".push(memory)");
+    expect(hydration).toContain("const pendingMemory = pendingToolOperationMemorySaveRef.current");
+    expect(hydration).toContain("pendingToolOperationMemorySaveRef.current = null");
+    expect(hydration).toContain("persistence.scheduleSave(pendingMemory)");
+    expect(hydration).toContain("persistence.subscribe(() => observePersistence(persistence))");
+    expect(pageSource).toContain("persistence.scheduleSave(memory)");
+    expect(pageSource).toContain("areStudioToolOperationSnapshotsEqual(");
     expect(hydration).toContain("mergeHydratedStudioToolOperationMemory({");
     expect(hydration).toContain("activeSnapshot: currentBrushSnapshotRef.current");
     expect(hydration).toContain("initialMemory: initialToolOperationMemory");
-    expect(hydration).toContain(
-      "persistence.getSnapshot().lastError",
+    expect(pageSource).toContain(
+      "const persistenceSnapshot = persistence.getSnapshot()",
     );
-    expect(hydration).toContain(
-      "toolOperationMemoryErrorAnnouncedRef.current !== errorKey",
-    );
+    expect(pageSource).toContain("const persistenceError = persistenceSnapshot.lastError");
+    expect(pageSource).toContain("toolOperationMemoryErrorAnnouncedRef.current === errorKey");
     expect(pageSource).toContain(
       "const announceToolOperationMemoryPersistenceError = useEffectEvent(",
     );
     expect(pageSource).toContain("announceDrawingShortcut(");
-    expect(pageSource).toContain("현재 세션에서는 메모리 상태를 사용합니다.");
-    expect(hydration).toContain(
+    expect(pageSource).toContain("변경 사항을 유지하고 다시 시도할게요.");
+    expect(pageSource).toContain(
       "announceToolOperationMemoryPersistenceError(persistenceError.code)",
     );
     expect(hydration).toContain("hydrationMerge.activeSnapshotDiverged");
     expect(hydration).toContain(
       "queueToolOperationMemorySaveRef.current(hydrationMerge.memory)",
+    );
+    expect(hydration).toContain('globalThis.addEventListener("online", retryWhenOnline)');
+    expect(pageSource).toContain(
+      "toolOperationMemoryDirty: toolOperationMemoryPersistenceDirty",
     );
   });
 });

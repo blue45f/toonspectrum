@@ -1,3 +1,5 @@
+import * as zodCore from "zod/v4/core";
+
 import {
   WgslPipelineKilledError,
   createWgslPipelineCache,
@@ -18,9 +20,20 @@ import type {
 } from "../../../packages/studio-engine-registry/src/wgsl-variants";
 
 const RESULT_GLOBAL = "__TOONSPECTRUM_WGSL_PIPELINE_CACHE_RESULT__";
+const CSP_VIOLATIONS_GLOBAL =
+  "__TOONSPECTRUM_WGSL_PIPELINE_CACHE_CSP_VIOLATIONS__";
+const BOOTSTRAP_RECEIPT_GLOBAL =
+  "__TOONSPECTRUM_WGSL_PIPELINE_CACHE_BOOTSTRAP_RECEIPT__";
+const BOOTSTRAP_ORDER = [
+  "csp-listener-installed",
+  "zod-jitless-configured",
+  "entry-import-started",
+  "page-module-evaluated",
+] as const;
 const SAMPLES = 61;
 const WARMUP_PIPELINES = 5;
 const FRAME_GAP_THRESHOLD_MS = 20;
+const CSP_CONTROL_MODE = "csp-control";
 
 interface TimedEntry {
   readonly startTime: number;
@@ -84,10 +97,153 @@ interface PhaseMeasurement {
   };
 }
 
+interface MutableBootstrapReceipt {
+  readonly schemaVersion: 1;
+  readonly order: string[];
+}
+
+interface WgslPipelineCacheBootstrapReceipt {
+  readonly schemaVersion: 1;
+  readonly order: readonly string[];
+  readonly listenerInstalledBeforeZodConfig: boolean;
+  readonly listenerInstalledBeforeEntryImport: boolean;
+  readonly zodJitlessConfiguredBeforeEntryImport: boolean;
+  readonly pageModuleEvaluated: boolean;
+  readonly zodGlobalConfigObservedByPage: boolean;
+  readonly zodCoreGlobalConfigJitless: boolean;
+  readonly zodAllowsEvalValue: boolean;
+}
+
 declare global {
   interface Window {
     __TOONSPECTRUM_WGSL_PIPELINE_CACHE_RESULT__?: unknown;
+    __TOONSPECTRUM_WGSL_PIPELINE_CACHE_CSP_VIOLATIONS__?: unknown;
+    __TOONSPECTRUM_WGSL_PIPELINE_CACHE_BOOTSTRAP_RECEIPT__?: unknown;
   }
+
+  // Zod v4 reads this realm-global configuration during module evaluation.
+  // The dependency-free bootstrap creates or mutates it before importing us.
+  var __zod_globalConfig: Record<string, unknown> | undefined;
+}
+
+function indexBefore(
+  order: readonly string[],
+  left: string,
+  right: string,
+): boolean {
+  const leftIndex = order.indexOf(left);
+  const rightIndex = order.indexOf(right);
+  return leftIndex >= 0 && rightIndex >= 0 && leftIndex < rightIndex;
+}
+
+function consumeBootstrapState(): Readonly<{
+  cspViolations: string[];
+  receipt: MutableBootstrapReceipt;
+}> {
+  const globals = globalThis as typeof globalThis & Record<string, unknown>;
+  const violations = globals[CSP_VIOLATIONS_GLOBAL];
+  const receipt = globals[BOOTSTRAP_RECEIPT_GLOBAL];
+  if (
+    !Array.isArray(violations) ||
+    !violations.every((value) => typeof value === "string")
+  ) {
+    throw new Error("WGSL pipeline-cache CSP violation channel is missing or invalid");
+  }
+  if (
+    typeof receipt !== "object" ||
+    receipt === null ||
+    Array.isArray(receipt) ||
+    (receipt as MutableBootstrapReceipt).schemaVersion !== 1 ||
+    !Array.isArray((receipt as MutableBootstrapReceipt).order) ||
+    !(receipt as MutableBootstrapReceipt).order.every(
+      (value) => typeof value === "string",
+    )
+  ) {
+    throw new Error("WGSL pipeline-cache bootstrap receipt is missing or invalid");
+  }
+  const mutableReceipt = receipt as MutableBootstrapReceipt;
+  mutableReceipt.order.push("page-module-evaluated");
+  return { cspViolations: violations, receipt: mutableReceipt };
+}
+
+function observeBootstrapReceipt(
+  receipt: MutableBootstrapReceipt,
+): WgslPipelineCacheBootstrapReceipt {
+  const order = [...receipt.order];
+  if (JSON.stringify(order) !== JSON.stringify(BOOTSTRAP_ORDER)) {
+    throw new Error("WGSL pipeline-cache bootstrap order is incomplete or reordered");
+  }
+  const globals = globalThis as typeof globalThis & {
+    __zod_globalConfig?: Readonly<Record<string, unknown>>;
+  };
+  return {
+    schemaVersion: 1,
+    order,
+    listenerInstalledBeforeZodConfig: indexBefore(
+      order,
+      "csp-listener-installed",
+      "zod-jitless-configured",
+    ),
+    listenerInstalledBeforeEntryImport: indexBefore(
+      order,
+      "csp-listener-installed",
+      "entry-import-started",
+    ),
+    zodJitlessConfiguredBeforeEntryImport: indexBefore(
+      order,
+      "zod-jitless-configured",
+      "entry-import-started",
+    ),
+    pageModuleEvaluated: order.includes("page-module-evaluated"),
+    zodGlobalConfigObservedByPage: globals.__zod_globalConfig?.jitless === true,
+    zodCoreGlobalConfigJitless: zodCore.globalConfig.jitless === true,
+    zodAllowsEvalValue: zodCore.util.allowsEval.value,
+  };
+}
+
+const bootstrapState = consumeBootstrapState();
+const bootstrapReceipt = observeBootstrapReceipt(bootstrapState.receipt);
+const cspViolations = bootstrapState.cspViolations;
+
+async function waitForCspViolation(startCount: number): Promise<void> {
+  const deadline = performance.now() + 2_000;
+  while (cspViolations.length <= startCount && performance.now() < deadline) {
+    await new Promise<void>((resolve) => setTimeout(resolve, 10));
+  }
+}
+
+async function runCspPositiveControl(): Promise<unknown> {
+  const startCount = cspViolations.length;
+  let blocked = false;
+  let errorName: string | null = null;
+  try {
+    // Deliberate positive control: exact script-src 'self' must reject eval.
+    const evaluate = new Function("return 1");
+    evaluate();
+  } catch (error) {
+    blocked = error instanceof EvalError;
+    errorName = error instanceof Error ? error.name : null;
+  }
+  await waitForCspViolation(startCount);
+  const observed = cspViolations.slice(startCount);
+  const pass =
+    blocked &&
+    errorName === "EvalError" &&
+    observed.includes("script-src: eval");
+  return {
+    schemaVersion: 2,
+    mode: CSP_CONTROL_MODE,
+    status: pass ? "ok" : "error",
+    pass,
+    attempted: true,
+    blocked,
+    errorName,
+    cspViolations: observed,
+    bootstrapReceipt,
+    error: pass
+      ? null
+      : "strict-CSP positive control did not block eval and emit script-src: eval",
+  };
 }
 
 function round(value: number): number {
@@ -227,19 +383,23 @@ async function run(): Promise<unknown> {
   const gpu = (navigator as unknown as { readonly gpu?: BrowserGpu }).gpu;
   if (!gpu) {
     return {
-      schemaVersion: 1,
+      schemaVersion: 2,
       status: "unsupported",
       pass: false,
       reason: "navigator.gpu is unavailable",
+      bootstrapReceipt,
+      cspViolations: [...cspViolations],
     };
   }
   const adapter = await gpu.requestAdapter({ powerPreference: "high-performance" });
   if (!adapter) {
     return {
-      schemaVersion: 1,
+      schemaVersion: 2,
       status: "unsupported",
       pass: false,
       reason: "no WebGPU adapter",
+      bootstrapReceipt,
+      cspViolations: [...cspViolations],
     };
   }
   const device = await adapter.requestDevice();
@@ -386,11 +546,13 @@ async function run(): Promise<unknown> {
     };
     const pass = Object.values(gates).every(Boolean);
     return {
-      schemaVersion: 1,
+      schemaVersion: 2,
       status: pass ? "ok" : "failed",
       pass,
       execution: "vite-production-build-chromium-metal-webgpu",
       measuredAt: new Date().toISOString(),
+      bootstrapReceipt,
+      cspViolations: [...cspViolations],
       adapter: {
         vendor: adapterInfo.vendor,
         architecture: adapterInfo.architecture,
@@ -464,15 +626,21 @@ async function run(): Promise<unknown> {
   }
 }
 
-void run()
+const pageMode = new URL(globalThis.location.href).searchParams.get("mode");
+const pageExecution =
+  pageMode === CSP_CONTROL_MODE ? runCspPositiveControl() : run();
+
+void pageExecution
   .then((result) => {
     window[RESULT_GLOBAL] = result;
   })
   .catch((error: unknown) => {
     window[RESULT_GLOBAL] = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       status: "error",
       pass: false,
+      bootstrapReceipt,
+      cspViolations: [...cspViolations],
       error:
         error instanceof Error
           ? { name: error.name, message: error.message, stack: error.stack ?? null }

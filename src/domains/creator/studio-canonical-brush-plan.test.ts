@@ -292,6 +292,100 @@ describe("studio canonical brush plan", () => {
     });
   });
 
+  it("accepts exact v2 multi-tip semantics and rejects a composition that diverges from dynamics", () => {
+    const dynamics = normalizeStudioBrushDynamicsSettings({
+      seed: 401,
+      tip: { shape: "soft", softness: 0.86 },
+      tipLayers: [{
+        tip: { shape: "grain", softness: 0.4 },
+        scale: 1.2,
+        opacity: 0.6,
+        offsetX: 0.25,
+        offsetY: -0.4,
+        angle: 15,
+        roundness: 0.8,
+      }],
+      dualBrush: {
+        enabled: true,
+        tip: { shape: "sponge", softness: 0.66 },
+        blendMode: "screen",
+        sizeRatio: 1.42,
+      },
+    });
+    const input = candidate("watercolor");
+    const composition = {
+      model: "normalized-multi-tip-v1",
+      primary: dynamics.tip,
+      layers: dynamics.tipLayers,
+      dualBrush: dynamics.dualBrush ?? null,
+    };
+    Object.assign(input.recipe, {
+      version: 2,
+      paint: {
+        model: "bounded-flow-v2",
+        depositionAlpha: "flow-times-dab-opacity",
+        accumulation: "source-over-stroke-local-rgba",
+        finalCompositeOpacity: "plan-composite-opacity-once",
+        surface: "bounded-sparse-rgba-tiles",
+      },
+      retainedDynamics: dynamics,
+      tipComposition: composition,
+    });
+
+    const parsed = parseStudioCanonicalBrushPlan(structuredClone(input), STATE);
+    expect(parsed).toMatchObject({
+      ok: true,
+      value: {
+        plan: {
+          recipe: {
+            version: 2,
+            tipComposition: {
+              model: "normalized-multi-tip-v1",
+              layers: [{ scale: 1.2, opacity: 0.6 }],
+              dualBrush: { enabled: true, blendMode: "screen", sizeRatio: 1.42 },
+            },
+          },
+        },
+      },
+    });
+
+    const conflicting = structuredClone(input);
+    const conflictingComposition = (conflicting.recipe as Record<string, unknown>)
+      .tipComposition as {
+        dualBrush: Record<string, unknown> | null;
+        layers: Array<Record<string, unknown>>;
+      };
+    conflictingComposition.dualBrush = {
+      ...conflictingComposition.dualBrush,
+      sizeRatio: 0.75,
+    };
+    expect(parseStudioCanonicalBrushPlan(conflicting, STATE)).toEqual({
+      ok: false,
+      reason: "invalid-field",
+      path: "$.recipe",
+    });
+
+    const nonFinite = structuredClone(input);
+    const nonFiniteRecipe = nonFinite.recipe as Record<string, unknown>;
+    const nonFiniteComposition = structuredClone(nonFiniteRecipe.tipComposition) as {
+      layers: Array<Record<string, unknown>>;
+    };
+    nonFiniteRecipe.tipComposition = nonFiniteComposition;
+    nonFiniteComposition.layers[0]!.scale = Number.POSITIVE_INFINITY;
+    expect(parseStudioCanonicalBrushPlan(nonFinite, STATE)).toMatchObject({
+      ok: false,
+      path: "$.recipe.tipComposition",
+    });
+
+    const legacy = candidate("legacy-watercolor");
+    (legacy.recipe as Record<string, unknown>).tipComposition = composition;
+    expect(parseStudioCanonicalBrushPlan(legacy, STATE)).toEqual({
+      ok: false,
+      reason: "unknown-field",
+      path: "$.recipe.tipComposition",
+    });
+  });
+
   it("rejects predicted input instead of filtering it into durable history", () => {
     const input = candidate();
     input.source.samples[1]!.role = "predicted";

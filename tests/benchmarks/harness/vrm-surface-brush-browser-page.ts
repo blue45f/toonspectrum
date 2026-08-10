@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { globalConfig, util as zodCoreUtil } from "zod/v4/core";
 
 import {
   executeSurfaceBrushStroke,
@@ -113,7 +114,47 @@ interface BvhHitLane {
 declare global {
   interface Window {
     __TOONSPECTRUM_VRM_SURFACE_BRUSH_BROWSER_RESULT__?: unknown;
+    __TOONSPECTRUM_VRM_SURFACE_BRUSH_BOOTSTRAP_RECEIPT__?: BootstrapReceiptState;
   }
+}
+
+interface BootstrapReceiptState {
+  readonly schemaVersion: number;
+  readonly order: string[];
+  readonly positiveControlViolations: string[];
+  readonly runtimeViolations: string[];
+  readonly positiveControlThrew: boolean;
+  readonly configRef: object | null;
+}
+
+interface BootstrapReceiptEvidence {
+  readonly schemaVersion: 1;
+  readonly order: readonly string[];
+  readonly positiveControlViolations: readonly string[];
+  readonly runtimeViolations: readonly string[];
+  readonly positiveControlThrew: boolean;
+  readonly positiveControlObserved: boolean;
+  readonly configIdentityObserved: boolean;
+  readonly globalConfigJitlessObserved: boolean;
+  readonly zodAllowsEvalFalse: boolean;
+}
+
+const bootstrapState = window.__TOONSPECTRUM_VRM_SURFACE_BRUSH_BOOTSTRAP_RECEIPT__;
+bootstrapState?.order.push("page-module-evaluated");
+
+function captureBootstrapReceipt(): BootstrapReceiptEvidence {
+  const state = window.__TOONSPECTRUM_VRM_SURFACE_BRUSH_BOOTSTRAP_RECEIPT__;
+  return {
+    schemaVersion: 1,
+    order: [...(state?.order ?? [])],
+    positiveControlViolations: [...(state?.positiveControlViolations ?? [])],
+    runtimeViolations: [...(state?.runtimeViolations ?? [])],
+    positiveControlThrew: state?.positiveControlThrew === true,
+    positiveControlObserved: (state?.positiveControlViolations.length ?? 0) > 0,
+    configIdentityObserved: state?.configRef === globalConfig,
+    globalConfigJitlessObserved: globalConfig.jitless === true,
+    zodAllowsEvalFalse: zodCoreUtil.allowsEval.value === false,
+  };
 }
 
 const PROGRAM: BrushProgramIR = Object.freeze({
@@ -139,11 +180,6 @@ const PROGRAM: BrushProgramIR = Object.freeze({
   mixing: { kind: "none", strength: 0 },
   output: { target: "raster-tiles", bake: "editable-proxy" },
   providerPreference: ["three-vrm-texture-paint"],
-});
-
-const cspViolations: string[] = [];
-document.addEventListener("securitypolicyviolation", (event) => {
-  cspViolations.push(`${event.effectiveDirective}: ${event.blockedURI || "inline"}`);
 });
 
 function round(value: number, digits = 6): number {
@@ -1098,15 +1134,23 @@ async function run(): Promise<void> {
   const cancellationControl = await runCancellationControl();
   const uploadRollbackControl = await runUploadRollbackControl();
   const bundledVrmFixture = await runBundledVrmFixture();
+  await new Promise((resolve) => setTimeout(resolve, 25));
+  const bootstrapReceipt = captureBootstrapReceipt();
+  const cspViolations = bootstrapReceipt.runtimeViolations;
   const pass = controlledCases.every((candidate) =>
     Object.values(candidate.gates as Record<string, unknown>).every((value) => value === true))
     && seamControl.pass === true
     && cancellationControl.pass === true
     && uploadRollbackControl.pass === true
     && bundledVrmFixture.pass === true
+    && bootstrapReceipt.positiveControlThrew
+    && bootstrapReceipt.positiveControlObserved
+    && bootstrapReceipt.configIdentityObserved
+    && bootstrapReceipt.globalConfigJitlessObserved
+    && bootstrapReceipt.zodAllowsEvalFalse
     && cspViolations.length === 0;
   window.__TOONSPECTRUM_VRM_SURFACE_BRUSH_BROWSER_RESULT__ = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     status: pass ? "ok" : "failed",
     pass,
     measuredAt: new Date().toISOString(),
@@ -1137,13 +1181,14 @@ async function run(): Promise<void> {
     cancellationControl,
     uploadRollbackControl,
     bundledVrmFixture,
+    bootstrapReceipt,
     cspViolations,
   };
 }
 
 run().catch((error) => {
   window.__TOONSPECTRUM_VRM_SURFACE_BRUSH_BROWSER_RESULT__ = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     status: "error",
     pass: false,
     measuredAt: new Date().toISOString(),
@@ -1152,6 +1197,8 @@ run().catch((error) => {
       message: errorMessage(error),
       stack: error instanceof Error ? error.stack ?? null : null,
     },
-    cspViolations,
+    bootstrapReceipt: captureBootstrapReceipt(),
+    cspViolations:
+      window.__TOONSPECTRUM_VRM_SURFACE_BRUSH_BOOTSTRAP_RECEIPT__?.runtimeViolations ?? [],
   };
 });

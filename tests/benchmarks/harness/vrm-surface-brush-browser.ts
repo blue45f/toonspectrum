@@ -25,9 +25,11 @@ import { build, preview } from "vite";
 import type { Browser, Page, Request } from "playwright";
 import type { PreviewServer } from "vite";
 
-export const VRM_SURFACE_BRUSH_BROWSER_REPORT_SCHEMA_VERSION = 1 as const;
+export const VRM_SURFACE_BRUSH_BROWSER_REPORT_SCHEMA_VERSION = 2 as const;
 export const VRM_SURFACE_BRUSH_BROWSER_RESULT_GLOBAL =
   "__TOONSPECTRUM_VRM_SURFACE_BRUSH_BROWSER_RESULT__";
+export const VRM_SURFACE_BRUSH_BROWSER_BOOTSTRAP_RECEIPT_GLOBAL =
+  "__TOONSPECTRUM_VRM_SURFACE_BRUSH_BOOTSTRAP_RECEIPT__";
 export const VRM_SURFACE_BRUSH_BROWSER_WARMUPS = 3;
 export const VRM_SURFACE_BRUSH_BROWSER_SAMPLES = 31;
 export const VRM_SURFACE_BRUSH_BROWSER_CASES = Object.freeze([
@@ -72,6 +74,7 @@ type JsonRecord = Record<string, unknown>;
 
 export interface VrmSurfaceBrushBrowserDiagnostics {
   readonly browserVersion: string;
+  /** Actual Chromium argv returned by Browser.getBrowserCommandLine. */
   readonly launchArgs: readonly string[];
   readonly consoleErrors: readonly string[];
   readonly consoleWarnings: readonly string[];
@@ -112,6 +115,74 @@ function nested(value: unknown, ...keys: readonly string[]): unknown {
   let current = value;
   for (const key of keys) current = record(current)?.[key];
   return current;
+}
+
+const EXPECTED_BOOTSTRAP_ORDER = Object.freeze([
+  "listener-installed",
+  "zod-jitless-configured",
+  "positive-control-started",
+  "positive-control-blocked",
+  "positive-control-observed",
+  "entry-import-started",
+  "page-module-evaluated",
+  "entry-import-complete",
+] as const);
+
+function stringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string");
+}
+
+function strictCspIsExact(policy: string): boolean {
+  if (policy.trim() !== CONTENT_SECURITY_POLICY) return false;
+  const scriptDirective = policy
+    .split(";")
+    .map((directive) => directive.trim().split(/\s+/u))
+    .find(([name]) => name === "script-src");
+  if (!scriptDirective) return false;
+  const tokens = new Set(scriptDirective.slice(1));
+  return !tokens.has("'unsafe-eval'") && !tokens.has("'unsafe-inline'");
+}
+
+function disablesJavascriptJit(argument: string): boolean {
+  const normalized = argument.toLowerCase().replace(/["']/gu, " ").trim();
+  const forbidden =
+    /(?:^|[\s,])--?(?:jitless|disable-jit|no-jit|disable-javascript-jit|no-opt|no-turbofan)(?:$|[\s,=])/u;
+  if (forbidden.test(normalized)) return true;
+  const jsFlagsPrefix = "--js-flags=";
+  if (!normalized.startsWith(jsFlagsPrefix)) return false;
+  return forbidden.test(normalized.slice(jsFlagsPrefix.length));
+}
+
+function bootstrapReceiptIssues(benchmark: unknown): string[] {
+  const issues: string[] = [];
+  const receipt = record(nested(benchmark, "bootstrapReceipt"));
+  const order = receipt?.order;
+  const positiveControlViolations = receipt?.positiveControlViolations;
+  const runtimeViolations = receipt?.runtimeViolations;
+  if (
+    receipt?.schemaVersion !== 1
+    || !stringArray(order)
+    || order.length !== EXPECTED_BOOTSTRAP_ORDER.length
+    || order.some((step, index) => step !== EXPECTED_BOOTSTRAP_ORDER[index])
+    || receipt.configIdentityObserved !== true
+    || receipt.globalConfigJitlessObserved !== true
+    || receipt.zodAllowsEvalFalse !== true
+  ) {
+    issues.push("strict-CSP bootstrap did not prove pre-import Zod jitless initialization");
+  }
+  if (
+    receipt?.positiveControlThrew !== true
+    || receipt.positiveControlObserved !== true
+    || !stringArray(positiveControlViolations)
+    || positiveControlViolations.length === 0
+    || !positiveControlViolations.every((violation) => violation.startsWith("script-src:"))
+  ) {
+    issues.push("strict-CSP positive eval control was not blocked and observed");
+  }
+  if (!stringArray(runtimeViolations) || runtimeViolations.length !== 0) {
+    issues.push("strict-CSP runtime captured unexpected policy violations");
+  }
+  return issues;
 }
 
 function finite(value: unknown): number | null {
@@ -279,6 +350,7 @@ export function validateVrmSurfaceBrushBrowserEvidence(
   ) {
     issues.push("browser did not produce passing real VRM surface-brush evidence");
   }
+  issues.push(...bootstrapReceiptIssues(benchmark));
   const productPath = nested(benchmark, "workload", "productPath");
   if (
     !Array.isArray(productPath)
@@ -337,7 +409,8 @@ export function validateVrmSurfaceBrushBrowserEvidence(
     || diagnostics.pageErrors.length > 0
     || diagnostics.requestFailures.length > 0
     || diagnostics.errorResponses.length > 0
-    || (nested(benchmark, "cspViolations") as unknown[] | undefined)?.length !== 0
+    || !stringArray(nested(benchmark, "cspViolations"))
+    || (nested(benchmark, "cspViolations") as string[]).length !== 0
   ) {
     issues.push("browser diagnostics contain runtime, network, or CSP failures");
   }
@@ -352,13 +425,16 @@ export function validateVrmSurfaceBrushBrowserEvidence(
   if (
     !diagnostics.launchArgs.includes("--enable-precise-memory-info")
     || !diagnostics.launchArgs.includes("--use-angle=metal")
-    || !diagnostics.responseHeaders.contentSecurityPolicy.includes("default-src 'none'")
+    || !strictCspIsExact(diagnostics.responseHeaders.contentSecurityPolicy)
     || diagnostics.responseHeaders.crossOriginOpenerPolicy !== "same-origin"
     || diagnostics.responseHeaders.crossOriginEmbedderPolicy !== "require-corp"
     || !productionAssets.some((asset) => asset.endsWith(".js"))
     || !productionAssets.includes("vrm/sample.vrm")
   ) {
     issues.push("production build, bundled VRM, CSP, isolation, or Chromium launch receipt is incomplete");
+  }
+  if (diagnostics.launchArgs.some(disablesJavascriptJit)) {
+    issues.push("Chromium was launched with a JavaScript JIT-disabling flag");
   }
   return issues;
 }
@@ -544,10 +620,46 @@ export async function runVrmSurfaceBrushBrowserBenchmark(
   writeFileSync(
     join(sourceDirectory, "bootstrap.ts"),
     [
-      "// Zod 4 documents this global pre-bootstrap for strict CSP runtimes.",
-      "// It must run before the production module graph is evaluated.",
-      "Object.assign(globalThis, { __zod_globalConfig: { jitless: true } });",
-      'void import("./entry.ts");',
+      "// This dependency-free bootstrap must execute before the production graph.",
+      "const root = globalThis;",
+      `const receiptKey = ${JSON.stringify(VRM_SURFACE_BRUSH_BROWSER_BOOTSTRAP_RECEIPT_GLOBAL)};`,
+      "const receipt = {",
+      "  schemaVersion: 1,",
+      "  order: [],",
+      "  positiveControlViolations: [],",
+      "  runtimeViolations: [],",
+      "  positiveControlThrew: false,",
+      "  captureChannel: 'runtime',",
+      "  configRef: null,",
+      "};",
+      "root[receiptKey] = receipt;",
+      "document.addEventListener('securitypolicyviolation', (event) => {",
+      "  const target = receipt.captureChannel === 'positive-control'",
+      "    ? receipt.positiveControlViolations",
+      "    : receipt.runtimeViolations;",
+      "  target.push(`${event.effectiveDirective}: ${event.blockedURI || 'inline'}`);",
+      "});",
+      "receipt.order.push('listener-installed');",
+      "const zodConfig = root.__zod_globalConfig ??= {};",
+      "zodConfig.jitless = true;",
+      "receipt.configRef = zodConfig;",
+      "receipt.order.push('zod-jitless-configured');",
+      "receipt.captureChannel = 'positive-control';",
+      "receipt.order.push('positive-control-started');",
+      "try {",
+      "  new Function('return 1')();",
+      "} catch {",
+      "  receipt.positiveControlThrew = true;",
+      "  receipt.order.push('positive-control-blocked');",
+      "}",
+      "await new Promise((resolve) => setTimeout(resolve, 25));",
+      "if (receipt.positiveControlViolations.length > 0) {",
+      "  receipt.order.push('positive-control-observed');",
+      "}",
+      "receipt.captureChannel = 'runtime';",
+      "receipt.order.push('entry-import-started');",
+      'await import("./entry.ts");',
+      "receipt.order.push('entry-import-complete');",
       "",
     ].join("\n"),
   );
@@ -603,8 +715,17 @@ export async function runVrmSurfaceBrushBrowserBenchmark(
       },
     });
     browser = await chromium.launch({ headless: true, args: [...CHROMIUM_ARGS] });
+    const browserSession = await browser.newBrowserCDPSession();
+    const commandLine = await browserSession.send("Browser.getBrowserCommandLine") as {
+      arguments?: unknown;
+    };
+    await browserSession.detach();
+    const actualLaunchArgs = stringArray(commandLine.arguments)
+      ? commandLine.arguments
+      : [];
     const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
     diagnostics = observePage(page, browser.version());
+    (diagnostics as { launchArgs: readonly string[] }).launchArgs = actualLaunchArgs;
     const response = await page.goto(`http://127.0.0.1:${port}/`, {
       waitUntil: "load",
       timeout: 30_000,
@@ -667,7 +788,7 @@ async function main(): Promise<void> {
       status: "fail",
       pass: false,
       benchmark: {
-        schemaVersion: 1,
+        schemaVersion: VRM_SURFACE_BRUSH_BROWSER_REPORT_SCHEMA_VERSION,
         status: "error",
         pass: false,
         error: error instanceof Error

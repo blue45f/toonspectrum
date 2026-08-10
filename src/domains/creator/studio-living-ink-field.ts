@@ -83,11 +83,10 @@ export function studioLivingInkPigmentOpticalDensity(linearChannel: number): num
  *    `studioLivingInkPigmentCoatFactor` divides each batch by the path length it actually covered,
  *    measured against the Gaussian capsule's own reach, so one pass over a pixel is one coat no
  *    matter how the samples were grouped or how fast the hand moved.
- * 2. The measured end-to-end gain of the shipped resolve — capillary plume reconstruction, sediment
- *    granulation and drying-front edge concentration multiplied together — is far above one, so a
- *    nominal coat arrived at ~60× unit depth and every hue collapsed onto its surviving channel.
- *    `resolveGain` divides it back out. It is a measurement, not a taste knob: browser-measured peak
- *    exposure of a default 수채 번짐 stroke before this change was 61.6 coats.
+ * 2. The end-to-end field-to-surface transfer is not unity: capsule maximum-union, pressure/speed
+ *    load, capillary reconstruction and transparent surface coverage all change the visible coat.
+ *    `resolveGain` is the measured normalization divisor for that complete path, not a taste knob.
+ *    It is allowed below one when the physical field carries less than one visible coat.
  */
 export const STUDIO_LIVING_INK_PIGMENT_COAT = Object.freeze({
   /** Gaussian falloff the deposit splat uses for pigment capsules. */
@@ -99,18 +98,14 @@ export const STUDIO_LIVING_INK_PIGMENT_COAT = Object.freeze({
   /**
    * Measured resolve gain that one coat has to be divided by.
    *
-   * Browser-measured peak exposure of a default 수채 번짐 stroke was 61.6 coats before this change;
-   * the resolve's own plume, granulation and drying-front terms account for ~46x of it and the rest
-   * was sample-rate stacking. Dividing here rather than inside the resolve keeps the wet edge alive:
-   * the drying-front term is density-proportional, so it stays a visible fraction of a coat instead
-   * of collapsing to unity the way a flat post-resolve ceiling would make it.
-   *
-   * Calibrated in a real browser against a shipped production preview: at 3.6 the darkest pixel of
-   * a default stroke measured 2.3 coats, so 6 puts the wet-edge rim at ~1.4 coats and the body of
-   * the wash near half a coat. The rim is meant to sit above one coat — that is the edge darkening —
-   * it just has to stay close enough to it that 주황 and 주홍 remain different colours there.
+   * The earlier value 6 was measured before the resolve became a transparent wash surface and
+   * before linear palette colours were re-encoded to display reflectance. Keeping it after those
+   * changes diluted the reviewed browser stroke to 16.77 mean code values of bloom difference and
+   * erased edge/granulation gates. The current 0.5 divisor is measured on the complete shipped path:
+   * WebGL2/WebGPU retain distinct near-black and chromatic channels while the strict InkWash oracle
+   * again sees >63 code values of bloom difference, visible sediment and bounded edge deposition.
    */
-  resolveGain: 6,
+  resolveGain: 0.5,
 } as const);
 
 /**

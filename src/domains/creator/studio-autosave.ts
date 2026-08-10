@@ -28,10 +28,11 @@ export interface StudioAutosaveStorage {
 }
 
 /**
- * Why an autosave was written synchronously instead of by the normal debounced autosave loop.
+ * Why an autosave bypassed the normal debounced loop and entered durable storage immediately.
  * The marker is private recovery metadata; it is never projected into a creator document.
  */
 export type StudioPendingStrokeDurabilityReason =
+  | "pointerup"
   | "route-change"
   | "pagehide"
   | "visibility-hidden"
@@ -94,13 +95,14 @@ export type StudioAutosavePayload = {
   /** Shared-work optimistic-concurrency source. Both fields are required for safe shared restore. */
   sourceWorkId?: string;
   sourceRevision?: number;
-  /** Synchronous recovery receipt for strokes that had not reached React state before navigation. */
+  /** Immediate recovery receipt for strokes that had not reached React state before navigation. */
   pendingStrokeDurability?: StudioPendingStrokeDurabilityMarker;
-  /** Synchronous route/page lifecycle receipt, including stable edits inside the debounce window. */
+  /** Immediate route/page lifecycle receipt, including stable edits inside the debounce window. */
   lifecycleDurability?: StudioLifecycleDurabilityMarker;
 };
 
 const STUDIO_PENDING_STROKE_DURABILITY_REASONS = new Set<StudioPendingStrokeDurabilityReason>([
+  "pointerup",
   "route-change",
   "pagehide",
   "visibility-hidden",

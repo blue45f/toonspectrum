@@ -1,4 +1,6 @@
 import {
+  isStudioLivingInkExecutionReadbackProvenance,
+  STUDIO_LIVING_INK_EXECUTION_ENGINE_VERSION,
   STUDIO_LIVING_INK_EXECUTION_PROTOCOL_VERSION,
   type StudioLivingInkExecutionApplyOptions,
   type StudioLivingInkExecutionApplied,
@@ -79,12 +81,16 @@ function validFrameResponse(
     && typeof (image as { close?: unknown }).close === "function"
     && receipt?.kind === "studio-living-ink-execution-receipt"
     && receipt.version === STUDIO_LIVING_INK_EXECUTION_PROTOCOL_VERSION
+    && receipt.engineVersion === STUDIO_LIVING_INK_EXECUTION_ENGINE_VERSION
     && receipt.requestId === response.requestId
     && /^sha256:[0-9a-f]{64}$/.test(receipt.displaySha256)
+    && (
+      receipt.displayHashEncoding === undefined
+      || receipt.displayHashEncoding === "premultiplied-rgba8-v2"
+    )
     && /^sha256:[0-9a-f]{64}$/.test(receipt.operationSha256)
     && receipt.imageOwnership === "caller-must-close"
-    && receipt.readbackFormat === "rgba8-staging-fbo"
-    && receipt.displayReadbackOrientation === "webgl-bottom-left-row-major";
+    && isStudioLivingInkExecutionReadbackProvenance(receipt);
 }
 
 function validAppliedResponse(

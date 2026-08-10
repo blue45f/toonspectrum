@@ -165,6 +165,15 @@ describe("Engine vNext Brush Library lifecycle parity", () => {
         result.receipt.phases.reopen.canonicalPlanHash,
         result.receipt.phases.export.canonicalPlanHash,
       ]).size).toBeGreaterThan(1);
+      if (catalogId === "watercolor") {
+        expect(current.brushDynamics?.dualBrush).toMatchObject({
+          enabled: true,
+          blendMode: "screen",
+          sizeRatio: 1.42,
+        });
+        expect(result.receipt.recipeDigest).toMatch(/^sha256:[0-9a-f]{64}$/);
+        expect(result.receipt.visualContractDigest).toMatch(/^sha256:[0-9a-f]{64}$/);
+      }
     },
   );
 

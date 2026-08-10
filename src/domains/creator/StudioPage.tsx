@@ -1398,6 +1398,7 @@ import {
 } from "./studio-team-comment-refresh-session";
 import { suppressNextStudioToolHintFocus } from "./studio-tool-hint-focus-suppression";
 import {
+  areStudioToolOperationSnapshotsEqual,
   mergeHydratedStudioToolOperationMemory,
   normalizeStudioToolOperationMemory,
   rememberStudioToolOperationSnapshot,
@@ -7662,12 +7663,20 @@ function StudioCuttoonEditor() {
     normalizeStudioToolOperationMemory(null)
   );
   const toolOperationMemoryRef = useRef(initialToolOperationMemory);
+  const lastQueuedToolOperationMemoryRef = useRef(initialToolOperationMemory);
   const toolOperationMemoryTouchedRef = useRef(false);
   const toolOperationMemoryErrorAnnouncedRef = useRef<string | null>(null);
+  const [toolOperationMemoryPersistenceDirty, setToolOperationMemoryPersistenceDirty] =
+    useState(false);
   const toolOperationMemoryPersistenceRef = useRef<{
     hydrate(): Promise<StudioToolOperationMemory>;
+    scheduleSave(memory: StudioToolOperationMemory): void;
     save(memory: StudioToolOperationMemory): Promise<boolean>;
+    retry(): Promise<boolean>;
+    flush(): Promise<boolean>;
+    subscribe(listener: () => void): () => void;
     getSnapshot(): {
+      readonly dirty: boolean;
       readonly lastError: {
         readonly code: "corrupt" | "unavailable";
         readonly message: string;
@@ -7677,17 +7686,19 @@ function StudioCuttoonEditor() {
   const toolOperationMemoryPersistenceLoadRef = useRef<Promise<NonNullable<
     typeof toolOperationMemoryPersistenceRef.current
   >> | null>(null);
-  const pendingToolOperationMemorySavesRef = useRef<StudioToolOperationMemory[]>([]);
+  const pendingToolOperationMemorySaveRef = useRef<StudioToolOperationMemory | null>(null);
+  const retryToolOperationMemoryPersistenceRef = useRef<() => void>(() => undefined);
   const queueToolOperationMemorySaveRef = useRef<
     (memory: StudioToolOperationMemory) => void
   >(() => undefined);
   queueToolOperationMemorySaveRef.current = (memory) => {
     const persistence = toolOperationMemoryPersistenceRef.current;
     if (persistence) {
-      void persistence.save(memory);
+      persistence.scheduleSave(memory);
       return;
     }
-    pendingToolOperationMemorySavesRef.current.push(memory);
+    pendingToolOperationMemorySaveRef.current = memory;
+    setToolOperationMemoryPersistenceDirty(true);
   };
   const currentBrushSnapshotRef = useRef<StudioBrushSnapshot | null>(null);
   const applyToolOperationSnapshotRef = useRef<
@@ -8374,16 +8385,29 @@ function StudioCuttoonEditor() {
     : drawMode === "eraser"
       ? "erase"
       : null;
+  const currentBrushSnapshotPersistenceSignal = JSON.stringify(currentBrushSnapshot);
   if (activeToolOperation) {
     toolOperationMemoryRef.current = {
       ...toolOperationMemoryRef.current,
       [activeToolOperation]: currentBrushSnapshot,
     };
   }
+  useEffect(() => {
+    if (!activeToolOperation) return;
+    const memory = toolOperationMemoryRef.current;
+    if (areStudioToolOperationSnapshotsEqual(
+      activeToolOperation,
+      lastQueuedToolOperationMemoryRef.current[activeToolOperation],
+      memory[activeToolOperation],
+    )) return;
+    lastQueuedToolOperationMemoryRef.current = memory;
+    queueToolOperationMemorySaveRef.current(memory);
+  }, [activeToolOperation, currentBrushSnapshotPersistenceSignal]);
   useEffect(() => () => {
     queueToolOperationMemorySaveRef.current(
       toolOperationMemoryRef.current,
     );
+    void toolOperationMemoryPersistenceRef.current?.flush();
   }, []);
   // CLIP STUDIO처럼 속성을 수정해도 선택한 사용자 브러시의 정체성은 유지한다.
   // 비동기 기준선 선택·검사·복원 경쟁은 전용 컨트롤러가 소유하고, 이 편집기는 실제
@@ -8436,24 +8460,52 @@ function StudioCuttoonEditor() {
       announceDrawingShortcut(
         code === "corrupt"
           ? "저장된 펜·지우개 설정 일부가 손상되어 안전한 기본값으로 복구했어요."
-          : "펜·지우개 설정을 로컬 SQLite에 연결하지 못했어요. 현재 세션에서는 메모리 상태를 사용합니다.",
+          : "펜·지우개 설정을 로컬 SQLite에 저장하지 못했어요. 변경 사항을 유지하고 다시 시도할게요.",
       );
     },
   );
   useEffect(() => {
     let active = true;
-    toolOperationMemoryPersistenceLoadRef.current ??= import(
-      "./studio-tool-operation-memory-sqlite"
-    ).then(({ getProductStudioToolOperationMemoryController }) => {
-      const persistence = getProductStudioToolOperationMemoryController();
-      toolOperationMemoryPersistenceRef.current = persistence;
-      const queuedSaves = pendingToolOperationMemorySavesRef.current.splice(0);
-      for (const memory of queuedSaves) {
-        void persistence.save(memory);
+    let unsubscribe: () => void = () => undefined;
+    const observePersistence = (
+      persistence: NonNullable<typeof toolOperationMemoryPersistenceRef.current>,
+    ) => {
+      if (!active) return;
+      const persistenceSnapshot = persistence.getSnapshot();
+      setToolOperationMemoryPersistenceDirty(
+        persistenceSnapshot.dirty || pendingToolOperationMemorySaveRef.current !== null,
+      );
+      const persistenceError = persistenceSnapshot.lastError;
+      if (!persistenceError) {
+        toolOperationMemoryErrorAnnouncedRef.current = null;
+        return;
       }
-      return persistence;
-    });
-    void toolOperationMemoryPersistenceLoadRef.current
+      const errorKey = `${persistenceError.code}:${persistenceError.message}`;
+      if (toolOperationMemoryErrorAnnouncedRef.current === errorKey) return;
+      toolOperationMemoryErrorAnnouncedRef.current = errorKey;
+      announceToolOperationMemoryPersistenceError(persistenceError.code);
+    };
+    const startPersistence = () => {
+      if (
+        toolOperationMemoryPersistenceRef.current
+        || toolOperationMemoryPersistenceLoadRef.current
+      ) return;
+      const loading = import("./studio-tool-operation-memory-sqlite")
+        .then(({ getProductStudioToolOperationMemoryController }) => {
+          const persistence = getProductStudioToolOperationMemoryController();
+          toolOperationMemoryPersistenceRef.current = persistence;
+          if (active) {
+            unsubscribe();
+            unsubscribe = persistence.subscribe(() => observePersistence(persistence));
+          }
+          const pendingMemory = pendingToolOperationMemorySaveRef.current;
+          if (pendingMemory) persistence.scheduleSave(pendingMemory);
+          pendingToolOperationMemorySaveRef.current = null;
+          observePersistence(persistence);
+          return persistence;
+        });
+      toolOperationMemoryPersistenceLoadRef.current = loading;
+      void loading
       .then((persistence) => persistence.hydrate().then((hydratedMemory) => ({
         hydratedMemory,
         persistence,
@@ -8469,14 +8521,8 @@ function StudioCuttoonEditor() {
           operationTransitionTouched: toolOperationMemoryTouchedRef.current,
         });
         toolOperationMemoryRef.current = hydrationMerge.memory;
-        const persistenceError = persistence.getSnapshot().lastError;
-        if (persistenceError) {
-          const errorKey = `${persistenceError.code}:${persistenceError.message}`;
-          if (toolOperationMemoryErrorAnnouncedRef.current !== errorKey) {
-            toolOperationMemoryErrorAnnouncedRef.current = errorKey;
-            announceToolOperationMemoryPersistenceError(persistenceError.code);
-          }
-        }
+        lastQueuedToolOperationMemoryRef.current = hydrationMerge.memory;
+        observePersistence(persistence);
         if (hydrationMerge.activeSnapshotDiverged) {
           queueToolOperationMemorySaveRef.current(hydrationMerge.memory);
         }
@@ -8490,7 +8536,13 @@ function StudioCuttoonEditor() {
         }
       })
       .catch((error: unknown) => {
+        if (toolOperationMemoryPersistenceLoadRef.current === loading) {
+          toolOperationMemoryPersistenceLoadRef.current = null;
+        }
         if (!active) return;
+        setToolOperationMemoryPersistenceDirty(
+          pendingToolOperationMemorySaveRef.current !== null,
+        );
         const errorKey = `unavailable:${
           error instanceof Error ? error.message : String(error)
         }`;
@@ -8499,8 +8551,20 @@ function StudioCuttoonEditor() {
           announceToolOperationMemoryPersistenceError("unavailable");
         }
       });
+    };
+    retryToolOperationMemoryPersistenceRef.current = () => {
+      const persistence = toolOperationMemoryPersistenceRef.current;
+      if (persistence) void persistence.retry();
+      else startPersistence();
+    };
+    const retryWhenOnline = () => retryToolOperationMemoryPersistenceRef.current();
+    globalThis.addEventListener("online", retryWhenOnline);
+    startPersistence();
     return () => {
       active = false;
+      unsubscribe();
+      retryToolOperationMemoryPersistenceRef.current = () => undefined;
+      globalThis.removeEventListener("online", retryWhenOnline);
     };
   }, [initialToolOperationMemory]);
 
@@ -8569,7 +8633,7 @@ function StudioCuttoonEditor() {
       strokeWidth,
       brushOpacity,
       color,
-    });
+    }, { operation: selection.operation });
     brushBaselineController.select({ kind: "catalog", selection });
     activatePrimaryCanvasTool(
       "draw",
@@ -15147,17 +15211,19 @@ function StudioCuttoonEditor() {
       pendingGpuStrokesRef.current.length - reserved.gpu
     );
     if (overlaySettledCount + draftSettledCount + gpuSettledCount === 0) return;
-    committedInkSurfaceHandoffsRef.current = [
-      ...pending,
-      createStudioCommittedInkSurfaceHandoff({
-        pageId,
-        strokeIds: [...new Set(strokeIds)],
-        overlaySettledCount,
-        draftSettledCount,
-        gpuSettledCount,
-        queuedRevision: studioRevisionProjectGenerationRef.current,
-      }),
-    ];
+    const queued = createStudioCommittedInkSurfaceHandoff({
+      pageId,
+      strokeIds: [...new Set(strokeIds)],
+      overlaySettledCount,
+      draftSettledCount,
+      gpuSettledCount,
+      queuedRevision: studioRevisionProjectGenerationRef.current,
+    });
+    committedInkSurfaceHandoffsRef.current = [...pending, queued];
+    // This ref-only append can happen after React's last layout effect in the automatic commit
+    // batch. Always schedule one post-commit pass; the processor remains idempotent and waits
+    // fail-visible until the canonical scene projection has caught up.
+    scheduleCommittedInkSurfaceHandoffRetry();
   }
   function queueDeferredStrokeCommit(finished: DrawEl) {
     const existing = pendingStrokeCommitsRef.current;
@@ -15175,6 +15241,16 @@ function StudioCuttoonEditor() {
     batch.timer = globalThis.setTimeout(() => {
       flushPendingStrokeCommitsRef.current();
     }, DEFERRED_STROKE_COMMIT_IDLE_MS);
+    // This stroke is authoritative on the live surface but intentionally remains outside React
+    // history for 200ms. Arm the close guard in the same discrete input event, then begin the
+    // durable SQLite/OPFS snapshot at the microtask checkpoint before a browser navigation task
+    // can tear down this document and its Dedicated Worker.
+    setUnloadGuardArmed(true);
+    globalThis.queueMicrotask(() => {
+      const pending = pendingStrokeCommitsRef.current;
+      if (!pending || !pending.strokes.some((stroke) => stroke.id === finished.id)) return;
+      persistPendingStrokeEmergencyAutosaveRef.current("pointerup");
+    });
   }
   const scheduleMarqueeRect = (next: { x: number; y: number; w: number; h: number } | null) => {
     pendingMarqueeRectRef.current = next;
@@ -15262,9 +15338,8 @@ function StudioCuttoonEditor() {
   }, []);
   // 탭 종료 경고 — 미저장 편집이 남아 있을 때만 묻는다.
   //
-  // `pagehide` 는 복구 사이드카를 남길 뿐 사용자에게 아무것도 알리지 않는다. 방금 그린 획이
-  // 아직 내구 저장소(그리고 서버 원고)에 닿지 않았는데 탭이 닫히면, 다른 기기에서 열었을 때
-  // 그 획은 없다. 그것이 마지막 남은 조용한 실패였다.
+  // 포인터업은 SQLite/OPFS 복구 스냅샷을 즉시 시작하지만, 완료 전에 탭이 닫히면 다른
+  // 기기에서 방금 그린 획을 열 수 없다. 그 짧은 구간에만 브라우저의 이탈 확인을 사용한다.
   //
   // 리스너는 **미저장 편집이 처음 생긴 뒤에만** 붙인다. 열어만 보고 나가는 문서에서
   // beforeunload 를 등록해 bfcache 를 잃지 않기 위해서다. 한 번 붙은 뒤에도 판정은 매번
@@ -15274,6 +15349,7 @@ function StudioCuttoonEditor() {
   }>({
     hasUnsavedStudioWorkNow: () =>
       hasUnsavedStudioWork({
+        toolOperationMemoryDirty: toolOperationMemoryPersistenceDirty,
         hydrated: workHydrated,
         editGeneration: studioRevisionProjectGenerationRef.current,
         durableGeneration: studioLifecycleDurableGenerationRef.current,
@@ -15289,8 +15365,15 @@ function StudioCuttoonEditor() {
     if (unloadGuardArmed) return;
     if (!studioUnsavedWorkRef.hasUnsavedStudioWorkNow()) return;
     setUnloadGuardArmed(true);
-  }, [pages, master, studioUnsavedWorkRef, unloadGuardArmed, workHydrated]);
-  useEffect(() => {
+  }, [
+    pages,
+    master,
+    studioUnsavedWorkRef,
+    toolOperationMemoryPersistenceDirty,
+    unloadGuardArmed,
+    workHydrated,
+  ]);
+  useLayoutEffect(() => {
     if (!unloadGuardArmed) return;
     return installStudioUnloadGuard({
       target: globalThis,
@@ -30554,6 +30637,7 @@ const puppetWarpArmed =
         currentOperation,
         currentBrushSnapshot,
       );
+      lastQueuedToolOperationMemoryRef.current = toolOperationMemoryRef.current;
       queueToolOperationMemorySaveRef.current(
         toolOperationMemoryRef.current,
       );

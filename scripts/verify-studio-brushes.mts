@@ -24,11 +24,20 @@
  * Focused paint → eraser → paint browser regression (desktop short + core long routes):
  *   TOONSPECTRUM_BRUSH_VERIFY_IDS=perfect-marker,kneaded-eraser,marker \
  *     TOONSPECTRUM_DRAWING_ONLY=1 pnpm verify:studio-brushes
+ * Resume one independent product gate after a failure without replaying completed matrices:
+ *   TOONSPECTRUM_BRUSH_VERIFY_STAGE=mobile pnpm verify:studio-brushes
  * Screenshots/logs:
  *   TOONSPECTRUM_BRUSH_VERIFY_DIR=/tmp/my-run pnpm verify:studio-brushes
  */
 import { spawn, type ChildProcess } from "node:child_process";
-import { appendFileSync, mkdirSync, readdirSync, unlinkSync, writeFileSync } from "node:fs";
+import {
+  appendFileSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
@@ -39,11 +48,13 @@ import {
   chromium,
   type Browser,
   type BrowserContext,
+  type Dialog,
   type Locator,
   type Page,
 } from "playwright";
 
 import { STUDIO_APP_SETTINGS_STORAGE_KEY } from "../src/domains/creator/studio-app-settings";
+import { studioAutosaveKey } from "../src/domains/creator/studio-autosave";
 import { BRUSH_PRESETS } from "../src/domains/creator/studio-brush";
 import { isStudioBrushEraserAliasId } from "../src/domains/creator/studio-brush-alias-profile";
 import { studioBrushPresetUsesIntentionalDiscreteCarrier } from "../src/domains/creator/studio-brush-carrier-quality";
@@ -83,6 +94,7 @@ const LOG_PATH = join(SCRATCH, "studio-brush-verify.log");
 const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
 const MOBILE_HINT_KEY = "toonspectrum-studio-mobile-hint-dismissed";
 const AUTOSAVE_PREFIX = "toonspectrum-studio-autosave";
+const AUTOSAVE_KEY = studioAutosaveKey({});
 const CLEAN_SESSION_KEY = "toonspectrum-brush-verifier-cleaned";
 const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
   "/api/auth/session",
@@ -286,6 +298,7 @@ interface EmergencyAutosaveRecord {
 interface DeferredDurabilityResult {
   ok: boolean;
   navigationIssuedInMs: number;
+  unloadGuardShown: boolean;
   markerReason: string;
   strokeCount: number;
   payloadContainsEveryStroke: boolean;
@@ -1219,11 +1232,6 @@ async function prepareVisibleEraserBaseline(
 async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promise<DesktopBrushResult> {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
   const page = await context.newPage();
-  if (DEBUG_BRUSH_VERIFIER) {
-    page.on("console", (entry) => {
-      log(`console(${entry.type()}):${entry.text()}`);
-    });
-  }
   const errors = collectBrowserErrors(page, "desktop-brushes", studioUrl);
   const screenshot = join(SCRATCH, `studio-brush-desktop-${BRUSH_MATRIX_CATALOG_COUNT}.png`);
   const catalogScreenshot = join(SCRATCH, "studio-brush-desktop-catalog.png");
@@ -1728,114 +1736,134 @@ interface PersistedDrawElement {
   points: number[];
 }
 
+interface PersistedStudioDocument {
+  savedAt?: string;
+  currentPageId?: string;
+  pagesList?: Array<{ id?: string; elements?: unknown[] }>;
+}
+
+let builtAutosaveSqliteModulePath: string | null = null;
+
+function resolveBuiltAutosaveSqliteModulePath(): string {
+  if (builtAutosaveSqliteModulePath) return builtAutosaveSqliteModulePath;
+  const manifestPath = resolve(process.cwd(), "dist/.vite/manifest.json");
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as Record<
+    string,
+    { file?: unknown }
+  >;
+  const entry = manifest["src/domains/creator/studio-autosave-sqlite-store.ts"];
+  invariant(
+    entry && typeof entry.file === "string" && entry.file.length > 0,
+    "production manifest is missing the Studio autosave SQLite module",
+  );
+  builtAutosaveSqliteModulePath = `/${entry.file}`;
+  return builtAutosaveSqliteModulePath;
+}
+
+async function persistedStudioDocument(page: Page): Promise<PersistedStudioDocument | null> {
+  const moduleUrl = new URL(resolveBuiltAutosaveSqliteModulePath(), page.url()).href;
+  return page.evaluate(async ({ autosaveKey, sqliteModuleUrl }) => {
+    const sqliteModule = await import(/* @vite-ignore */ sqliteModuleUrl) as {
+      acquireStudioAutosaveSqliteStore?: () => Promise<{
+        read(key: string): Promise<{
+          state: "snapshot" | "cleared";
+          payload?: PersistedStudioDocument;
+        } | null>;
+      }>;
+    };
+    if (typeof sqliteModule.acquireStudioAutosaveSqliteStore !== "function") {
+      throw new Error("built Studio autosave SQLite module has no acquisition export");
+    }
+    const stored = await (await sqliteModule.acquireStudioAutosaveSqliteStore()).read(autosaveKey);
+    return stored?.state === "snapshot" && stored.payload ? stored.payload : null;
+  }, { autosaveKey: AUTOSAVE_KEY, sqliteModuleUrl: moduleUrl });
+}
+
+function drawElementsFromPersistedDocument(
+  document: PersistedStudioDocument | null,
+): PersistedDrawElement[] {
+  if (!document?.pagesList) return [];
+  const pageRecord = document.pagesList.find((candidate) => candidate.id === document.currentPageId)
+    ?? document.pagesList[0];
+  return (pageRecord?.elements ?? []).flatMap((element) => {
+    if (!element || typeof element !== "object" || Array.isArray(element)) return [];
+    const record = element as Record<string, unknown>;
+    if (record.type !== "draw") return [];
+    const shapeParams = record.shapeParams;
+    const polygonSides = shapeParams && typeof shapeParams === "object" && !Array.isArray(shapeParams)
+      && typeof (shapeParams as Record<string, unknown>).polygonSides === "number"
+      ? (shapeParams as Record<string, number>).polygonSides
+      : null;
+    return [{
+      brush: typeof record.brush === "string" ? record.brush : null,
+      brushCatalogId: typeof record.brushCatalogId === "string"
+        ? record.brushCatalogId
+        : null,
+      brushCatalogName: typeof record.brushCatalogName === "string"
+        ? record.brushCatalogName
+        : null,
+      brushDynamics: record.brushDynamics,
+      groupId: typeof record.groupId === "string" ? record.groupId : null,
+      hidden: record.hidden === true,
+      hasLivingInkReceipt: record.livingInkReceipt != null,
+      kind: typeof record.kind === "string" ? record.kind : "freehand",
+      mode: record.mode === "eraser" ? "eraser" as const : "pen" as const,
+      polygonSides,
+      points: Array.isArray(record.points)
+        ? record.points.filter((value): value is number =>
+            typeof value === "number" && Number.isFinite(value)
+          )
+        : [],
+    }];
+  });
+}
+
+async function waitForPersistedDrawElements(
+  page: Page,
+  predicate: (draws: PersistedDrawElement[]) => boolean,
+  label: string,
+  timeoutMilliseconds = 8_000,
+): Promise<PersistedDrawElement[]> {
+  const deadline = performance.now() + timeoutMilliseconds;
+  let latest: PersistedDrawElement[] = [];
+  let lastFailure: unknown = null;
+  while (performance.now() < deadline) {
+    try {
+      latest = drawElementsFromPersistedDocument(await persistedStudioDocument(page));
+      if (predicate(latest)) return latest;
+      lastFailure = null;
+    } catch (cause: unknown) {
+      lastFailure = cause;
+    }
+    await page.waitForTimeout(100);
+  }
+  const suffix = lastFailure instanceof Error
+    ? `; last SQLite read failed: ${lastFailure.message}`
+    : `; last durable draw count: ${latest.length}`;
+  throw new Error(`${label} timed out after ${timeoutMilliseconds}ms${suffix}`);
+}
+
 async function persistedDrawElements(page: Page): Promise<PersistedDrawElement[]> {
-  return page.evaluate((prefix) => {
-    interface PersistedStudioDocument {
-      savedAt?: string;
-      currentPageId?: string;
-      pagesList?: Array<{ id?: string; elements?: unknown[] }>;
-    }
-    let newest: PersistedStudioDocument | null = null;
-    for (let index = 0; index < window.localStorage.length; index += 1) {
-      const key = window.localStorage.key(index);
-      if (!key?.startsWith(prefix) || key.endsWith(":lifecycle")) continue;
-      const raw = window.localStorage.getItem(key);
-      if (!raw) continue;
-      try {
-        const value = JSON.parse(raw) as PersistedStudioDocument;
-        if (!value?.pagesList) continue;
-        if (!newest || String(value.savedAt ?? "") >= String(newest.savedAt ?? "")) newest = value;
-      } catch {
-        // Ignore unrelated/corrupt local data; the wait below remains strict.
-      }
-    }
-    if (!newest?.pagesList) return [];
-    const pageRecord = newest.pagesList.find((candidate) => candidate.id === newest?.currentPageId)
-      ?? newest.pagesList[0];
-    return (pageRecord?.elements ?? []).flatMap((element) => {
-      if (!element || typeof element !== "object" || Array.isArray(element)) return [];
-      const record = element as Record<string, unknown>;
-      if (record.type !== "draw") return [];
-      const shapeParams = record.shapeParams;
-      const polygonSides = shapeParams && typeof shapeParams === "object" && !Array.isArray(shapeParams)
-        && typeof (shapeParams as Record<string, unknown>).polygonSides === "number"
-        ? (shapeParams as Record<string, number>).polygonSides
-        : null;
-      return [{
-        brush: typeof record.brush === "string" ? record.brush : null,
-        brushCatalogId: typeof record.brushCatalogId === "string"
-          ? record.brushCatalogId
-          : null,
-        brushCatalogName: typeof record.brushCatalogName === "string"
-          ? record.brushCatalogName
-          : null,
-        brushDynamics: record.brushDynamics,
-        groupId: typeof record.groupId === "string" ? record.groupId : null,
-        hidden: record.hidden === true,
-        hasLivingInkReceipt: record.livingInkReceipt != null,
-        kind: typeof record.kind === "string" ? record.kind : "freehand",
-        mode: record.mode === "eraser" ? "eraser" as const : "pen" as const,
-        polygonSides,
-        points: Array.isArray(record.points)
-          ? record.points.filter((value): value is number => typeof value === "number" && Number.isFinite(value))
-          : [],
-      }];
-    });
-  }, AUTOSAVE_PREFIX);
+  return drawElementsFromPersistedDocument(await persistedStudioDocument(page));
 }
 
 async function waitForPersistedSingleCatalogStroke(
   page: Page,
   expected: StudioBrushCatalogSelection,
 ): Promise<PersistedDrawElement> {
-  await page.waitForFunction(({ prefix, catalogId, catalogName, runtimeBrushId }) => {
-    let newest: { savedAt?: string; pagesList?: Array<{ elements?: unknown[] }> } | null = null;
-    for (let index = 0; index < window.localStorage.length; index += 1) {
-      const key = window.localStorage.key(index);
-      if (!key?.startsWith(prefix) || key.endsWith(":lifecycle")) continue;
-      const raw = window.localStorage.getItem(key);
-      if (!raw) continue;
-      try {
-        const value = JSON.parse(raw) as {
-          savedAt?: string;
-          pagesList?: Array<{ elements?: unknown[] }>;
-        };
-        if (
-          value.pagesList
-          && (!newest || String(value.savedAt ?? "") >= String(newest.savedAt ?? ""))
-        ) {
-          newest = value;
-        }
-      } catch {
-        // Keep waiting for the normal debounced autosave.
-      }
-    }
-    const draws = (newest?.pagesList ?? [])
-      .flatMap((candidate) => candidate.elements ?? [])
-      .filter((element): element is Record<string, unknown> =>
-        Boolean(element)
-        && typeof element === "object"
-        && (element as { type?: unknown }).type === "draw"
-      );
+  const [saved] = await waitForPersistedDrawElements(page, (draws) => {
     const draw = draws[0];
     return draws.length === 1
-      && draw?.brushCatalogId === catalogId
-      && draw.brushCatalogName === catalogName
-      && draw.brush === runtimeBrushId
-      && draw.hidden !== true
-      && draw.groupId == null
-      && draw.livingInkReceipt == null
-      && Array.isArray(draw.points)
+      && draw?.brushCatalogId === expected.catalogId
+      && draw.brushCatalogName === expected.catalogName
+      && draw.brush === expected.runtimeBrushId
+      && !draw.hidden
+      && draw.groupId === null
+      && !draw.hasLivingInkReceipt
       && draw.points.length >= 4
       && Boolean(draw.brushDynamics)
       && typeof draw.brushDynamics === "object";
-  }, {
-    prefix: AUTOSAVE_PREFIX,
-    catalogId: expected.catalogId,
-    catalogName: expected.catalogName,
-    runtimeBrushId: expected.runtimeBrushId,
-  }, { timeout: 5_000 });
-  const [saved] = await persistedDrawElements(page);
+  }, `${expected.catalogId}: SQLite autosave did not expose the isolated pro stroke`);
   invariant(saved, `${expected.catalogId}: autosave did not expose the isolated pro stroke`);
   invariant(
     saved.brushCatalogId === expected.catalogId,
@@ -1925,23 +1953,11 @@ function persistedSmartShapeRepresentation(
 }
 
 async function waitForPersistedDrawCount(page: Page, expectedCount: number): Promise<void> {
-  await page.waitForFunction(({ prefix, count }) => {
-    for (let index = 0; index < window.localStorage.length; index += 1) {
-      const key = window.localStorage.key(index);
-      if (!key?.startsWith(prefix) || key.endsWith(":lifecycle")) continue;
-      const raw = window.localStorage.getItem(key);
-      if (!raw) continue;
-      try {
-        const value = JSON.parse(raw) as { pagesList?: Array<{ elements?: unknown[] }> };
-        const draws = (value.pagesList ?? []).flatMap((candidate) => candidate.elements ?? [])
-          .filter((element) => element && typeof element === "object" && (element as { type?: unknown }).type === "draw");
-        if (draws.length >= count) return true;
-      } catch {
-        // Keep waiting for the normal 1.5 s autosave.
-      }
-    }
-    return false;
-  }, { prefix: AUTOSAVE_PREFIX, count: expectedCount }, { timeout: 5_000 });
+  await waitForPersistedDrawElements(
+    page,
+    (draws) => draws.length >= expectedCount,
+    `SQLite autosave did not reach ${expectedCount} draws`,
+  );
 }
 
 async function waitForPersistedSelectedOperation(
@@ -1955,91 +1971,32 @@ async function waitForPersistedSelectedOperation(
   stroke: PersistedDrawElement;
   draws: PersistedDrawElement[];
 }> {
-  await page.waitForFunction(({
-    prefix,
-    catalogId,
-    catalogName,
-    runtimeBrushId,
-    expectedOperation,
-    drawCount,
-    requireCatalog,
-  }) => {
-    let newest: {
-      savedAt?: string;
-      currentPageId?: string;
-      pagesList?: Array<{ id?: string; elements?: unknown[] }>;
-    } | null = null;
-    for (let index = 0; index < window.localStorage.length; index += 1) {
-      const key = window.localStorage.key(index);
-      if (!key?.startsWith(prefix) || key.endsWith(":lifecycle")) continue;
-      const raw = window.localStorage.getItem(key);
-      if (!raw) continue;
-      try {
-        const value = JSON.parse(raw) as {
-          savedAt?: string;
-          currentPageId?: string;
-          pagesList?: Array<{ id?: string; elements?: unknown[] }>;
-        };
-        if (
-          value?.pagesList
-          && (!newest || String(value.savedAt ?? "") >= String(newest.savedAt ?? ""))
-        ) {
-          newest = value;
-        }
-      } catch {
-        // Keep waiting for the normal debounced autosave.
-      }
-    }
-    if (!newest?.pagesList) return false;
-    const pageRecord = newest.pagesList.find(
-      (candidate) => candidate.id === newest?.currentPageId,
-    ) ?? newest.pagesList[0];
-    const draws = (pageRecord?.elements ?? [])
-      .filter((element): element is Record<string, unknown> =>
-        Boolean(element)
-        && typeof element === "object"
-        && (element as { type?: unknown }).type === "draw"
-      );
-    if (draws.length !== drawCount) return false;
-    if (draws.some((draw) => (
-      draw.hidden === true
-      || draw.groupId != null
-      || draw.livingInkReceipt != null
+  const draws = await waitForPersistedDrawElements(page, (candidates) => {
+    if (candidates.length !== expectedDrawCount) return false;
+    if (candidates.some((draw) => (
+      draw.hidden || draw.groupId !== null || draw.hasLivingInkReceipt
     ))) return false;
-    if ((pageRecord?.elements ?? []).some((element) => (
-      Boolean(element)
-      && typeof element === "object"
-      && (element as Record<string, unknown>).livingInkReceipt != null
-    ))) return false;
-    const draw = draws.at(-1);
-    if (!draw || !Array.isArray(draw.points) || draw.points.length < 4) return false;
-    if (expectedOperation === "erase") {
+    const draw = candidates.at(-1);
+    if (!draw || draw.points.length < 4) return false;
+    if (operation === "erase") {
       return draw.mode === "eraser"
-        && draw.brush === runtimeBrushId
-        && draw.brushCatalogId === catalogId
-        && draw.brushCatalogName === catalogName;
+        && draw.brush === expected.runtimeBrushId
+        && draw.brushCatalogId === expected.catalogId
+        && draw.brushCatalogName === expected.catalogName;
     }
     return draw.mode !== "eraser"
-      && draw.brush === runtimeBrushId
+      && draw.brush === expected.runtimeBrushId
       && (
-        !requireCatalog
+        !requireCatalogIdentity
         || (
-          draw.brushCatalogId === catalogId
-          && draw.brushCatalogName === catalogName
+          draw.brushCatalogId === expected.catalogId
+          && draw.brushCatalogName === expected.catalogName
           && Boolean(draw.brushDynamics)
           && typeof draw.brushDynamics === "object"
         )
       );
-  }, {
-    prefix: AUTOSAVE_PREFIX,
-    catalogId: expected.catalogId,
-    catalogName: expected.catalogName,
-    runtimeBrushId: expected.runtimeBrushId,
-    expectedOperation: operation,
-    drawCount: expectedDrawCount,
-    requireCatalog: requireCatalogIdentity,
-  }, { timeout: timeoutMilliseconds });
-  const draws = await persistedDrawElements(page);
+  }, `${expected.catalogId}: SQLite autosave did not expose the selected ${operation} operation`,
+  timeoutMilliseconds);
   invariant(
     draws.length === expectedDrawCount,
     `${expected.catalogId}: autosave exposed ${draws.length}/${expectedDrawCount} draw operations`,
@@ -2273,6 +2230,11 @@ function writeLongBrushQualityReport(input: Readonly<{
 async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<LongBrushResult> {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
   const page = await context.newPage();
+  if (DEBUG_BRUSH_VERIFIER) {
+    page.on("console", (entry) => {
+      log(`console(${entry.type()}):${entry.text()}`);
+    });
+  }
   const errors = collectBrowserErrors(page, "long-brushes", studioUrl);
   const qualityRunDirectory = join(
     resolve(SCRATCH),
@@ -3062,12 +3024,9 @@ async function runMobileTouchAudit(browser: Browser, studioUrl: string): Promise
 
   try {
     await prepareStudioPage(page, studioUrl);
-    const dock = page.locator('nav[aria-label="스튜디오 모바일 도구막대"]');
+    const dock = page.locator('nav[data-studio-mobile-editing-dock="true"]');
     await dock.waitFor({ state: "visible", timeout: 10_000 });
-    await dock.getByRole("button", {
-      name: "브러시 설정 (굵기·색·프리셋)",
-      exact: true,
-    }).click();
+    await dock.locator('button[aria-controls="studio-mobile-draw-settings"]').click();
     const drawSheet = page.locator('[data-studio-sheet-id="draw"][data-studio-mobile-sheet="draw"]');
     await drawSheet.waitFor({ state: "visible" });
     await drawSheet.locator('[data-studio-open-brush-library="true"]').click();
@@ -3162,23 +3121,38 @@ async function runMobileTouchAudit(browser: Browser, studioUrl: string): Promise
 }
 
 async function readEmergencyAutosave(page: Page): Promise<EmergencyAutosaveRecord | null> {
-  return page.evaluate((prefix) => {
-    for (let index = 0; index < window.localStorage.length; index += 1) {
-      const key = window.localStorage.key(index);
-      if (!key?.startsWith(prefix)) continue;
-      const raw = window.localStorage.getItem(key);
-      if (!raw) continue;
-      try {
-        const payload = JSON.parse(raw) as Omit<EmergencyAutosaveRecord, "key">;
-        if (payload.pendingStrokeDurability?.kind === "pending-strokes") {
-          return { ...payload, key };
-        }
-      } catch {
-        // Continue looking for the scoped v2 payload.
-      }
+  const payload = await persistedStudioDocument(page) as Omit<
+    EmergencyAutosaveRecord,
+    "key"
+  > | null;
+  return payload?.pendingStrokeDurability?.kind === "pending-strokes"
+    ? { ...payload, key: AUTOSAVE_KEY }
+    : null;
+}
+
+async function waitForEmergencyAutosave(
+  page: Page,
+  timeoutMilliseconds = 8_000,
+): Promise<EmergencyAutosaveRecord | null> {
+  const deadline = performance.now() + timeoutMilliseconds;
+  let lastFailure: unknown = null;
+  while (performance.now() < deadline) {
+    try {
+      const emergency = await readEmergencyAutosave(page);
+      if (emergency) return emergency;
+      lastFailure = null;
+    } catch (cause: unknown) {
+      lastFailure = cause;
     }
-    return null;
-  }, AUTOSAVE_PREFIX);
+    await page.waitForTimeout(100);
+  }
+  if (lastFailure instanceof Error) {
+    throw new Error(
+      `pagehide SQLite autosave read failed: ${lastFailure.message}`,
+      { cause: lastFailure },
+    );
+  }
+  return null;
 }
 
 async function runDeferredDurabilityAudit(
@@ -3209,16 +3183,40 @@ async function runDeferredDurabilityAudit(
     await page.mouse.move(endX, start.y + 46, { steps: 14 });
     await page.mouse.up();
     const releasedAt = performance.now();
+    let unloadGuardShown = false;
+    let dialogFailure: Error | null = null;
+    let dialogSettlement: Promise<void> | null = null;
+    const handleDialog = (dialog: Dialog): void => {
+      dialogSettlement = (async () => {
+        if (dialog.type() !== "beforeunload") {
+          dialogFailure = new Error(`unexpected durability dialog: ${dialog.type()}`);
+          await dialog.dismiss();
+          return;
+        }
+        unloadGuardShown = true;
+        // Model a creator reading and accepting the browser warning. The SQLite Dedicated Worker
+        // remains alive during the prompt, giving the already-issued pointerup write a bounded
+        // opportunity to return a durable receipt before pagehide tears down the document.
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        await dialog.accept();
+      })().catch((cause: unknown) => {
+        dialogFailure = cause instanceof Error ? cause : new Error(String(cause));
+      });
+    };
+    page.on("dialog", handleDialog);
     const navigation = page.goto(origin, { waitUntil: "domcontentloaded", timeout: 20_000 });
     const navigationIssuedInMs = performance.now() - releasedAt;
     await navigation;
+    if (dialogSettlement) await dialogSettlement;
+    page.off("dialog", handleDialog);
+    if (dialogFailure) throw dialogFailure;
     invariant(
       navigationIssuedInMs < 50,
       `navigation was not immediate after pointerup (${navigationIssuedInMs.toFixed(2)}ms)`,
     );
 
-    const emergency = await readEmergencyAutosave(page);
-    invariant(emergency, "pagehide did not create an emergency autosave for the deferred stroke");
+    const emergency = await waitForEmergencyAutosave(page);
+    invariant(emergency, "pointerup did not create a durable autosave for the deferred stroke");
     const marker = emergency.pendingStrokeDurability;
     const strokeIds = Array.isArray(marker?.strokeIds)
       ? marker.strokeIds.filter((id): id is string => typeof id === "string")
@@ -3226,8 +3224,8 @@ async function runDeferredDurabilityAudit(
     const markerReason = typeof marker?.reason === "string" ? marker.reason : "missing";
     invariant(strokeIds.length > 0, "emergency autosave contains no deferred stroke ids");
     invariant(
-      markerReason === "pagehide" || markerReason === "unmount" || markerReason === "visibility-hidden",
-      `unexpected emergency autosave reason: ${markerReason}`,
+      markerReason === "pointerup",
+      `immediate navigation replaced or missed the pointerup durability receipt: ${markerReason}`,
     );
     const payloadIds = new Set(
       (emergency.pagesList ?? []).flatMap((savedPage) =>
@@ -3265,6 +3263,7 @@ async function runDeferredDurabilityAudit(
     return {
       ok: true,
       navigationIssuedInMs,
+      unloadGuardShown,
       markerReason,
       strokeCount: strokeIds.length,
       payloadContainsEveryStroke,
@@ -3350,12 +3349,35 @@ async function main(): Promise<void> {
   const drawingOnly = process.env.TOONSPECTRUM_DRAWING_ONLY === "1";
   const shapesOnly = process.env.TOONSPECTRUM_SHAPES_ONLY === "1";
   const longOnly = process.env.TOONSPECTRUM_BRUSH_LONG_ONLY === "1";
+  const requestedStage = process.env.TOONSPECTRUM_BRUSH_VERIFY_STAGE?.trim() ?? "";
+  const supportedStages = ["desktop", "long", "shapes", "mobile", "durability"] as const;
+  invariant(
+    requestedStage === "" || supportedStages.some((stage) => stage === requestedStage),
+    `unsupported TOONSPECTRUM_BRUSH_VERIFY_STAGE: ${requestedStage}`,
+  );
+  invariant(
+    requestedStage === "" || (!drawingOnly && !shapesOnly && !longOnly),
+    "TOONSPECTRUM_BRUSH_VERIFY_STAGE cannot be combined with legacy only-stage flags",
+  );
+  const runDesktop = requestedStage
+    ? requestedStage === "desktop"
+    : !shapesOnly && !longOnly;
+  const runLong = requestedStage ? requestedStage === "long" : !shapesOnly;
+  const runShapes = requestedStage
+    ? requestedStage === "shapes"
+    : !drawingOnly && !longOnly;
+  const runMobile = requestedStage
+    ? requestedStage === "mobile"
+    : !drawingOnly && !shapesOnly && !longOnly;
+  const runDurability = requestedStage
+    ? requestedStage === "durability"
+    : !drawingOnly && !shapesOnly && !longOnly;
   invariant(
     !(shapesOnly && longOnly),
     "TOONSPECTRUM_SHAPES_ONLY and TOONSPECTRUM_BRUSH_LONG_ONLY cannot be combined",
   );
   invariant(
-    shapesOnly || LONG_BRUSH_CATALOG_COUNT > 0,
+    !runLong || LONG_BRUSH_CATALOG_COUNT > 0,
     "the requested brush subset contains no brush admitted by the selected long-matrix mode",
   );
   if (REQUESTED_BRUSH_VERIFY_IDS.length > 0) {
@@ -3391,31 +3413,27 @@ async function main(): Promise<void> {
   try {
     await waitForServer(origin);
     browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
-    const desktop = shapesOnly || longOnly ? null : await runDesktopBrushMatrix(browser, studioUrl);
+    const desktop = runDesktop ? await runDesktopBrushMatrix(browser, studioUrl) : null;
     if (desktop) {
       invariant(
         desktop.ok,
         `desktop ${BRUSH_MATRIX_CATALOG_COUNT}-brush matrix failed`,
       );
     }
-    const longBrushes = shapesOnly ? null : await runLongBrushMatrix(browser, studioUrl);
+    const longBrushes = runLong ? await runLongBrushMatrix(browser, studioUrl) : null;
     if (longBrushes) {
       invariant(
         longBrushes.ok,
         `long ${LONG_BRUSH_CATALOG_COUNT}-brush matrix failed`,
       );
     }
-    const smartShapes = drawingOnly || longOnly
-      ? null
-      : await runSmartShapeMatrix(browser, studioUrl);
+    const smartShapes = runShapes ? await runSmartShapeMatrix(browser, studioUrl) : null;
     if (smartShapes) invariant(smartShapes.ok, "Smart Shape matrix failed");
-    const mobile = drawingOnly || shapesOnly || longOnly
-      ? null
-      : await runMobileTouchAudit(browser, studioUrl);
+    const mobile = runMobile ? await runMobileTouchAudit(browser, studioUrl) : null;
     if (mobile) invariant(mobile.ok, "mobile catalogue touch audit failed");
-    const durability = drawingOnly || shapesOnly || longOnly
-      ? null
-      : await runDeferredDurabilityAudit(browser, origin, studioUrl);
+    const durability = runDurability
+      ? await runDeferredDurabilityAudit(browser, origin, studioUrl)
+      : null;
     if (durability) invariant(durability.ok, "deferred stroke durability audit failed");
 
     await browser.close();

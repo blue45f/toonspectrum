@@ -24,9 +24,19 @@ import { build, preview } from "vite";
 import type { Browser, Page } from "playwright";
 import type { PreviewServer } from "vite";
 
-export const WGSL_PIPELINE_CACHE_REPORT_SCHEMA_VERSION = 1 as const;
+export const WGSL_PIPELINE_CACHE_REPORT_SCHEMA_VERSION = 2 as const;
 export const WGSL_PIPELINE_CACHE_RESULT_GLOBAL =
   "__TOONSPECTRUM_WGSL_PIPELINE_CACHE_RESULT__";
+export const WGSL_PIPELINE_CACHE_CSP_VIOLATIONS_GLOBAL =
+  "__TOONSPECTRUM_WGSL_PIPELINE_CACHE_CSP_VIOLATIONS__";
+export const WGSL_PIPELINE_CACHE_BOOTSTRAP_RECEIPT_GLOBAL =
+  "__TOONSPECTRUM_WGSL_PIPELINE_CACHE_BOOTSTRAP_RECEIPT__";
+export const WGSL_PIPELINE_CACHE_BOOTSTRAP_ORDER = [
+  "csp-listener-installed",
+  "zod-jitless-configured",
+  "entry-import-started",
+  "page-module-evaluated",
+] as const;
 export const WGSL_PIPELINE_CACHE_BENCHMARK_SAMPLES = 61;
 
 const RESULT_TIMEOUT_MS = 5 * 60 * 1_000;
@@ -40,14 +50,16 @@ const TRACKED_RESULT = join(
   "tests/benchmarks/results/wgsl-pipeline-cache.json",
 );
 const PAGE_ALIAS = "virtual:wgsl-pipeline-cache-browser-page";
-const WEBGPU_ARGS = Object.freeze([
+const FORBIDDEN_BROWSER_JIT_FLAG =
+  /(?:^|[\s,;=:"'])(?:--?)?(?:jitless|disable-jit|no-jit|no-opt|no-turbofan)(?=$|[\s,;=:"'])/iu;
+export const WGSL_PIPELINE_CACHE_WEBGPU_ARGS = Object.freeze([
   "--no-sandbox",
   "--enable-unsafe-webgpu",
   "--enable-features=WebGPU",
   "--use-angle=metal",
   "--disable-software-rasterizer",
 ]);
-const CONTENT_SECURITY_POLICY = [
+export const WGSL_PIPELINE_CACHE_CONTENT_SECURITY_POLICY = [
   "default-src 'none'",
   "script-src 'self'",
   "connect-src 'self'",
@@ -65,11 +77,13 @@ type JsonRecord = Record<string, unknown>;
 export interface WgslPipelineCacheBrowserDiagnostics {
   readonly browserVersion: string;
   readonly launchArgs: readonly string[];
+  readonly actualBrowserCommandLine: readonly string[];
   readonly consoleErrors: readonly string[];
   readonly consoleWarnings: readonly string[];
   readonly pageErrors: readonly string[];
   readonly requestFailures: readonly string[];
   readonly errorResponses: readonly string[];
+  readonly cspViolations: readonly string[];
   readonly responseHeaders: Readonly<{
     contentSecurityPolicy: string;
     crossOriginOpenerPolicy: string;
@@ -77,13 +91,38 @@ export interface WgslPipelineCacheBrowserDiagnostics {
   }>;
 }
 
+export interface WgslPipelineCacheCspPositiveControl {
+  readonly freshContext: true;
+  readonly sameStrictCsp: true;
+  readonly attempted: true;
+  readonly blocked: true;
+  readonly errorName: "EvalError";
+  readonly violationCount: number;
+  readonly observedPatterns: readonly string[];
+  readonly responseContentSecurityPolicy: string;
+  readonly bootstrapReceipt: WgslPipelineCacheBootstrapReceipt;
+}
+
+export interface WgslPipelineCacheBootstrapReceipt {
+  readonly schemaVersion: 1;
+  readonly order: readonly string[];
+  readonly listenerInstalledBeforeZodConfig: boolean;
+  readonly listenerInstalledBeforeEntryImport: boolean;
+  readonly zodJitlessConfiguredBeforeEntryImport: boolean;
+  readonly pageModuleEvaluated: boolean;
+  readonly zodGlobalConfigObservedByPage: boolean;
+  readonly zodCoreGlobalConfigJitless: boolean;
+  readonly zodAllowsEvalValue: boolean;
+}
+
 export interface WgslPipelineCacheBrowserArtifact {
   readonly schemaVersion: typeof WGSL_PIPELINE_CACHE_REPORT_SCHEMA_VERSION;
   readonly generatedAt: string;
-  readonly status: "pass" | "fail" | "unsupported";
+  readonly status: "pass" | "fail" | "quarantined" | "unsupported";
   readonly pass: boolean;
   readonly benchmark: unknown;
   readonly diagnostics: WgslPipelineCacheBrowserDiagnostics;
+  readonly cspPositiveControl: WgslPipelineCacheCspPositiveControl | null;
   readonly productionBuild: Readonly<{
     mode: "vite-production-build";
     assets: readonly string[];
@@ -111,6 +150,63 @@ function finite(value: unknown): number | null {
 function close(actual: unknown, expected: number): boolean {
   const numeric = finite(actual);
   return numeric !== null && Math.abs(numeric - expected) <= 0.000002;
+}
+
+function exactStringArray(
+  value: unknown,
+  expected?: readonly string[],
+): value is readonly string[] {
+  return (
+    Array.isArray(value) &&
+    value.every((item) => typeof item === "string") &&
+    (expected === undefined || JSON.stringify(value) === JSON.stringify(expected))
+  );
+}
+
+export function actualBrowserCommandLineIsJitSafe(value: unknown): boolean {
+  return (
+    exactStringArray(value) &&
+    value.length > 0 &&
+    value.every((argument) => !FORBIDDEN_BROWSER_JIT_FLAG.test(argument))
+  );
+}
+
+function bootstrapReceiptIsValid(
+  value: unknown,
+): value is WgslPipelineCacheBootstrapReceipt {
+  const receipt = record(value);
+  return Boolean(
+    receipt &&
+      receipt.schemaVersion === 1 &&
+      exactStringArray(receipt.order, WGSL_PIPELINE_CACHE_BOOTSTRAP_ORDER) &&
+      receipt.listenerInstalledBeforeZodConfig === true &&
+      receipt.listenerInstalledBeforeEntryImport === true &&
+      receipt.zodJitlessConfiguredBeforeEntryImport === true &&
+      receipt.pageModuleEvaluated === true &&
+      receipt.zodGlobalConfigObservedByPage === true &&
+      receipt.zodCoreGlobalConfigJitless === true &&
+      receipt.zodAllowsEvalValue === false
+  );
+}
+
+function cspPositiveControlIsValid(value: unknown): boolean {
+  const control = record(value);
+  const observedPatterns = control?.observedPatterns;
+  return Boolean(
+    control &&
+      control.freshContext === true &&
+      control.sameStrictCsp === true &&
+      control.attempted === true &&
+      control.blocked === true &&
+      control.errorName === "EvalError" &&
+      exactStringArray(observedPatterns) &&
+      observedPatterns.length > 0 &&
+      control.violationCount === observedPatterns.length &&
+      observedPatterns.includes("script-src: eval") &&
+      control.responseContentSecurityPolicy ===
+        WGSL_PIPELINE_CACHE_CONTENT_SECURITY_POLICY &&
+      bootstrapReceiptIsValid(control.bootstrapReceipt)
+  );
 }
 
 function distributionValid(value: unknown): boolean {
@@ -171,8 +267,10 @@ export function validateWgslPipelineCacheEvidence(
   benchmark: unknown,
   diagnostics: WgslPipelineCacheBrowserDiagnostics,
   productionAssets: readonly string[],
+  cspPositiveControl: unknown = undefined,
 ): readonly string[] {
   const issues: string[] = [];
+  const diagnosticsRecord = record(diagnostics);
   if (
     nested(benchmark, "schemaVersion") !==
       WGSL_PIPELINE_CACHE_REPORT_SCHEMA_VERSION ||
@@ -182,6 +280,9 @@ export function validateWgslPipelineCacheEvidence(
       "vite-production-build-chromium-metal-webgpu"
   ) {
     issues.push("browser did not produce passing production WebGPU evidence");
+  }
+  if (!bootstrapReceiptIsValid(nested(benchmark, "bootstrapReceipt"))) {
+    issues.push("bootstrap order or Zod strict-CSP runtime receipt is invalid");
   }
   if (
     nested(benchmark, "workload", "generator") !== "composeWgslVariant" ||
@@ -239,22 +340,65 @@ export function validateWgslPipelineCacheEvidence(
   if (!gates || Object.values(gates).some((gate) => gate !== true)) {
     issues.push("one or more production pipeline-cache gates failed");
   }
-  if (
-    diagnostics.consoleErrors.length > 0 ||
-    diagnostics.pageErrors.length > 0 ||
-    diagnostics.requestFailures.length > 0 ||
-    diagnostics.errorResponses.length > 0
+  const diagnosticArrays = [
+    diagnosticsRecord?.consoleErrors,
+    diagnosticsRecord?.consoleWarnings,
+    diagnosticsRecord?.pageErrors,
+    diagnosticsRecord?.requestFailures,
+    diagnosticsRecord?.errorResponses,
+    diagnosticsRecord?.cspViolations,
+  ];
+  if (!diagnosticArrays.every((value) => exactStringArray(value))) {
+    issues.push("browser diagnostics must be complete string arrays");
+  } else if (
+    diagnosticArrays.slice(0, 5).some((value) => value.length > 0)
   ) {
     issues.push("browser diagnostics contain runtime or network failures");
   }
+  const benchmarkViolations = nested(benchmark, "cspViolations");
+  const diagnosticViolations = diagnosticsRecord?.cspViolations;
   if (
-    !diagnostics.launchArgs.includes("--use-angle=metal") ||
-    !diagnostics.launchArgs.includes("--disable-software-rasterizer") ||
-    !diagnostics.responseHeaders.contentSecurityPolicy.includes("default-src 'none'") ||
+    !exactStringArray(benchmarkViolations) ||
+    !exactStringArray(diagnosticViolations) ||
+    JSON.stringify(benchmarkViolations) !== JSON.stringify(diagnosticViolations)
+  ) {
+    issues.push("CSP violations are missing, non-string, or suppressed");
+  } else if (diagnosticViolations.length > 0) {
+    issues.push("strict-CSP violations quarantine this browser evidence");
+  }
+  const responseHeaders = record(diagnosticsRecord?.responseHeaders);
+  if (
+    typeof diagnosticsRecord?.browserVersion !== "string" ||
+    diagnosticsRecord.browserVersion.length === 0 ||
+    !exactStringArray(
+      diagnosticsRecord.launchArgs,
+      WGSL_PIPELINE_CACHE_WEBGPU_ARGS,
+    ) ||
+    responseHeaders?.contentSecurityPolicy !==
+      WGSL_PIPELINE_CACHE_CONTENT_SECURITY_POLICY ||
+    responseHeaders.crossOriginOpenerPolicy !== "same-origin" ||
+    responseHeaders.crossOriginEmbedderPolicy !== "require-corp" ||
+    !exactStringArray(productionAssets) ||
     productionAssets.length === 0 ||
     !productionAssets.some((asset) => asset.endsWith(".js"))
   ) {
-    issues.push("production build, CSP, or hardware WebGPU launch receipt is incomplete");
+    issues.push("production build, exact CSP, or hardware WebGPU receipt is incomplete");
+  }
+  if (
+    !actualBrowserCommandLineIsJitSafe(
+      diagnosticsRecord?.actualBrowserCommandLine,
+    ) ||
+    !WGSL_PIPELINE_CACHE_WEBGPU_ARGS.every(
+      (argument) =>
+        (diagnosticsRecord?.actualBrowserCommandLine as
+          | readonly unknown[]
+          | undefined)?.includes(argument) === true,
+    )
+  ) {
+    issues.push("actual Chromium argv is missing or disables the browser JIT");
+  }
+  if (!cspPositiveControlIsValid(cspPositiveControl)) {
+    issues.push("fresh-context strict-CSP positive control is missing or invalid");
   }
   return issues;
 }
@@ -266,33 +410,49 @@ export function validateWgslPipelineCacheArtifact(
   const issues: string[] = [];
   if (
     item?.schemaVersion !== WGSL_PIPELINE_CACHE_REPORT_SCHEMA_VERSION ||
-    item.status !== "pass" ||
-    item.pass !== true ||
-    typeof item.generatedAt !== "string"
+    typeof item.generatedAt !== "string" ||
+    !record(item.benchmark)
   ) {
-    issues.push("top-level WGSL pipeline cache artifact schema/status is invalid");
+    issues.push("top-level WGSL pipeline cache artifact schema/evidence is invalid");
   }
-  const diagnostics = item?.diagnostics as
-    | WgslPipelineCacheBrowserDiagnostics
-    | undefined;
+  const diagnostics = record(item?.diagnostics);
   const production = record(item?.productionBuild);
   if (
     !diagnostics ||
-    !Array.isArray(diagnostics.consoleErrors) ||
-    !Array.isArray(production?.assets)
+    production?.mode !== "vite-production-build" ||
+    !exactStringArray(production.assets)
   ) {
     issues.push("top-level diagnostics or production build receipt is absent");
     return issues;
   }
   const recomputed = validateWgslPipelineCacheEvidence(
     item?.benchmark,
-    diagnostics,
-    production.assets as string[],
+    diagnostics as unknown as WgslPipelineCacheBrowserDiagnostics,
+    production.assets,
+    item?.cspPositiveControl,
   );
   issues.push(...recomputed);
+  const diagnosticViolations = diagnostics.cspViolations;
+  const expectedStatus: WgslPipelineCacheBrowserArtifact["status"] =
+    nested(item?.benchmark, "status") === "unsupported"
+      ? "unsupported"
+      : exactStringArray(diagnosticViolations) && diagnosticViolations.length > 0
+        ? "quarantined"
+        : recomputed.length === 0
+          ? "pass"
+          : "fail";
+  if (
+    item?.status !== expectedStatus ||
+    item.pass !== (expectedStatus === "pass")
+  ) {
+    issues.push("top-level WGSL pipeline cache artifact verdict is invalid");
+  }
   const recordedIssues = item?.validationIssues;
-  if (!Array.isArray(recordedIssues) || recordedIssues.length !== 0) {
-    issues.push("artifact records unresolved validation issues");
+  if (
+    !exactStringArray(recordedIssues) ||
+    JSON.stringify(recordedIssues) !== JSON.stringify(recomputed)
+  ) {
+    issues.push("artifact validation issues do not match recomputed evidence");
   }
   return issues;
 }
@@ -326,6 +486,36 @@ function walkFiles(directory: string, prefix = ""): string[] {
     });
 }
 
+export function createWgslPipelineCacheCspBootstrapSource(): string {
+  return [
+    "// Observe strict-CSP before any dependency-bearing module can evaluate.",
+    `const cspViolationsGlobal = ${JSON.stringify(WGSL_PIPELINE_CACHE_CSP_VIOLATIONS_GLOBAL)};`,
+    `const bootstrapReceiptGlobal = ${JSON.stringify(WGSL_PIPELINE_CACHE_BOOTSTRAP_RECEIPT_GLOBAL)};`,
+    "const cspViolations = [];",
+    "const bootstrapOrder = [];",
+    "globalThis[cspViolationsGlobal] = cspViolations;",
+    "const bootstrapReceipt = { schemaVersion: 1, order: bootstrapOrder };",
+    "globalThis[bootstrapReceiptGlobal] = bootstrapReceipt;",
+    'document.addEventListener("securitypolicyviolation", (event) => {',
+    '  const directive = typeof event.effectiveDirective === "string" ? event.effectiveDirective : "unknown";',
+    '  const blocked = typeof event.blockedURI === "string" && event.blockedURI.length > 0 ? event.blockedURI : "inline";',
+    "  cspViolations.push(`${directive}: ${blocked}`);",
+    "});",
+    'bootstrapOrder.push("csp-listener-installed");',
+    "// Preserve the realm object and all existing properties; disable only Zod parser codegen.",
+    "const existingZodConfig = globalThis.__zod_globalConfig;",
+    'const zodConfig = existingZodConfig && typeof existingZodConfig === "object"',
+    "  ? existingZodConfig",
+    "  : {};",
+    "if (zodConfig !== existingZodConfig) globalThis.__zod_globalConfig = zodConfig;",
+    "zodConfig.jitless = true;",
+    'bootstrapOrder.push("zod-jitless-configured");',
+    'bootstrapOrder.push("entry-import-started");',
+    'await import("./entry.ts");',
+    "",
+  ].join("\n");
+}
+
 function createHtml(): string {
   return [
     "<!doctype html>",
@@ -336,7 +526,7 @@ function createHtml(): string {
     "<title>WGSL pipeline cache benchmark</title>",
     "</head>",
     "<body>",
-    '<script type="module" src="/entry.ts"></script>',
+    '<script type="module" src="/bootstrap.ts"></script>',
     "</body>",
     "</html>",
   ].join("");
@@ -345,12 +535,14 @@ function createHtml(): string {
 function emptyDiagnostics(): WgslPipelineCacheBrowserDiagnostics {
   return {
     browserVersion: "unavailable",
-    launchArgs: WEBGPU_ARGS,
+    launchArgs: WGSL_PIPELINE_CACHE_WEBGPU_ARGS,
+    actualBrowserCommandLine: [],
     consoleErrors: [],
     consoleWarnings: [],
     pageErrors: [],
     requestFailures: [],
     errorResponses: [],
+    cspViolations: [],
     responseHeaders: {
       contentSecurityPolicy: "",
       crossOriginOpenerPolicy: "",
@@ -362,24 +554,29 @@ function emptyDiagnostics(): WgslPipelineCacheBrowserDiagnostics {
 function observePage(
   page: Page,
   browserVersion: string,
+  actualBrowserCommandLine: readonly string[],
 ): WgslPipelineCacheBrowserDiagnostics {
   const diagnostics: {
     browserVersion: string;
     launchArgs: readonly string[];
+    actualBrowserCommandLine: readonly string[];
     consoleErrors: string[];
     consoleWarnings: string[];
     pageErrors: string[];
     requestFailures: string[];
     errorResponses: string[];
+    cspViolations: string[];
     responseHeaders: WgslPipelineCacheBrowserDiagnostics["responseHeaders"];
   } = {
     ...emptyDiagnostics(),
     browserVersion,
+    actualBrowserCommandLine,
     consoleErrors: [],
     consoleWarnings: [],
     pageErrors: [],
     requestFailures: [],
     errorResponses: [],
+    cspViolations: [],
   };
   page.on("console", (message) => {
     if (message.type() === "error") diagnostics.consoleErrors.push(message.text());
@@ -411,6 +608,71 @@ async function waitForBenchmark(page: Page): Promise<unknown> {
   );
 }
 
+async function chromiumCommandLine(browser: Browser): Promise<readonly string[]> {
+  const session = await browser.newBrowserCDPSession();
+  try {
+    const response = (await session.send("Browser.getBrowserCommandLine")) as {
+      readonly arguments?: unknown;
+    };
+    if (!exactStringArray(response.arguments) || response.arguments.length === 0) {
+      throw new Error("CDP Browser.getBrowserCommandLine returned no argv");
+    }
+    return [...response.arguments];
+  } finally {
+    await session.detach().catch(() => undefined);
+  }
+}
+
+async function runCspPositiveControl(
+  browser: Browser,
+  baseUrl: string,
+): Promise<WgslPipelineCacheCspPositiveControl> {
+  const context = await browser.newContext({ viewport: { width: 800, height: 600 } });
+  try {
+    const page = await context.newPage();
+    const response = await page.goto(`${baseUrl}?mode=csp-control`, {
+      waitUntil: "load",
+      timeout: 30_000,
+    });
+    const result = record(await waitForBenchmark(page));
+    const violations = result?.cspViolations;
+    const responseContentSecurityPolicy =
+      (await response?.headerValue("content-security-policy")) ?? "";
+    if (
+      result?.schemaVersion !== WGSL_PIPELINE_CACHE_REPORT_SCHEMA_VERSION ||
+      result.mode !== "csp-control" ||
+      result.status !== "ok" ||
+      result.pass !== true ||
+      result.attempted !== true ||
+      result.blocked !== true ||
+      result.errorName !== "EvalError" ||
+      !exactStringArray(violations) ||
+      !violations.includes("script-src: eval") ||
+      responseContentSecurityPolicy !==
+        WGSL_PIPELINE_CACHE_CONTENT_SECURITY_POLICY ||
+      !bootstrapReceiptIsValid(result.bootstrapReceipt)
+    ) {
+      throw new Error(
+        `strict-CSP positive control failed: ${JSON.stringify(result)}`,
+      );
+    }
+    return {
+      freshContext: true,
+      sameStrictCsp: true,
+      attempted: true,
+      blocked: true,
+      errorName: "EvalError",
+      violationCount: violations.length,
+      observedPatterns: [...violations],
+      responseContentSecurityPolicy,
+      bootstrapReceipt:
+        result.bootstrapReceipt as unknown as WgslPipelineCacheBootstrapReceipt,
+    };
+  } finally {
+    await context.close().catch(() => undefined);
+  }
+}
+
 function writeJson(path: string, value: unknown): void {
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
@@ -429,6 +691,10 @@ export async function runWgslPipelineCacheBrowserBenchmark(
   const sourceDirectory = realpathSync(sourcePath);
   const distributionDirectory = realpathSync(distributionPath);
   writeFileSync(join(sourceDirectory, "index.html"), createHtml());
+  writeFileSync(
+    join(sourceDirectory, "bootstrap.ts"),
+    createWgslPipelineCacheCspBootstrapSource(),
+  );
   writeFileSync(
     join(sourceDirectory, "entry.ts"),
     `import ${JSON.stringify(PAGE_ALIAS)};\n`,
@@ -456,6 +722,7 @@ export async function runWgslPipelineCacheBrowserBenchmark(
   let browser: Browser | null = null;
   let diagnostics: WgslPipelineCacheBrowserDiagnostics;
   let benchmark: unknown;
+  let cspPositiveControl: WgslPipelineCacheCspPositiveControl;
   try {
     previewServer = await preview({
       root: sourceDirectory,
@@ -469,17 +736,26 @@ export async function runWgslPipelineCacheBrowserBenchmark(
         strictPort: true,
         headers: {
           "Cache-Control": "no-store",
-          "Content-Security-Policy": CONTENT_SECURITY_POLICY,
+          "Content-Security-Policy": WGSL_PIPELINE_CACHE_CONTENT_SECURITY_POLICY,
           "Cross-Origin-Opener-Policy": "same-origin",
           "Cross-Origin-Embedder-Policy": "require-corp",
           "Cross-Origin-Resource-Policy": "same-origin",
         },
       },
     });
-    browser = await chromium.launch({ headless: true, args: [...WEBGPU_ARGS] });
+    browser = await chromium.launch({
+      headless: true,
+      args: [...WGSL_PIPELINE_CACHE_WEBGPU_ARGS],
+    });
+    const actualBrowserCommandLine = await chromiumCommandLine(browser);
+    const baseUrl = `http://127.0.0.1:${port}/`;
     const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
-    diagnostics = observePage(page, browser.version());
-    const response = await page.goto(`http://127.0.0.1:${port}/`, {
+    diagnostics = observePage(
+      page,
+      browser.version(),
+      actualBrowserCommandLine,
+    );
+    const response = await page.goto(baseUrl, {
       waitUntil: "load",
       timeout: 30_000,
     });
@@ -493,6 +769,16 @@ export async function runWgslPipelineCacheBrowserBenchmark(
         (await response?.headerValue("cross-origin-embedder-policy")) ?? "",
     };
     benchmark = await waitForBenchmark(page);
+    const pageCspViolations = nested(benchmark, "cspViolations");
+    if (
+      Array.isArray(pageCspViolations) &&
+      pageCspViolations.every((value) => typeof value === "string")
+    ) {
+      (diagnostics as { cspViolations: string[] }).cspViolations.push(
+        ...(pageCspViolations as string[]),
+      );
+    }
+    cspPositiveControl = await runCspPositiveControl(browser, baseUrl);
   } finally {
     await browser?.close().catch(() => undefined);
     await previewServer?.close().catch(() => undefined);
@@ -501,11 +787,14 @@ export async function runWgslPipelineCacheBrowserBenchmark(
     benchmark,
     diagnostics,
     assets,
+    cspPositiveControl,
   );
   const benchmarkStatus = nested(benchmark, "status");
   const status: WgslPipelineCacheBrowserArtifact["status"] =
     benchmarkStatus === "unsupported"
       ? "unsupported"
+      : diagnostics.cspViolations.length > 0
+        ? "quarantined"
       : validationIssues.length === 0
         ? "pass"
         : "fail";
@@ -516,6 +805,7 @@ export async function runWgslPipelineCacheBrowserBenchmark(
     pass: status === "pass",
     benchmark,
     diagnostics,
+    cspPositiveControl,
     productionBuild: {
       mode: "vite-production-build",
       assets,
@@ -566,7 +856,7 @@ async function main(): Promise<void> {
       status: "fail",
       pass: false,
       benchmark: {
-        schemaVersion: 1,
+        schemaVersion: WGSL_PIPELINE_CACHE_REPORT_SCHEMA_VERSION,
         status: "error",
         pass: false,
         error:
@@ -575,6 +865,7 @@ async function main(): Promise<void> {
             : { name: "NonError", message: String(error) },
       },
       diagnostics: emptyDiagnostics(),
+      cspPositiveControl: null,
       productionBuild: {
         mode: "vite-production-build",
         assets: [],

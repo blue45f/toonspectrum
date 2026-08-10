@@ -13,6 +13,16 @@ import {
 
 export const RENDERER_TOURNAMENT_BROWSER_RESULT_GLOBAL =
   "__TOONSPECTRUM_RENDERER_TOURNAMENT_BROWSER_RESULT__";
+export const RENDERER_TOURNAMENT_BROWSER_CSP_VIOLATIONS_GLOBAL =
+  "__TOONSPECTRUM_RENDERER_TOURNAMENT_CSP_VIOLATIONS__";
+export const RENDERER_TOURNAMENT_BROWSER_BOOTSTRAP_RECEIPT_GLOBAL =
+  "__TOONSPECTRUM_RENDERER_TOURNAMENT_BOOTSTRAP_RECEIPT__";
+export const RENDERER_TOURNAMENT_BROWSER_BOOTSTRAP_ORDER = [
+  "csp-listener-installed",
+  "zod-jitless-configured",
+  "entry-import-started",
+  "page-module-evaluated",
+] as const;
 export const RENDERER_TOURNAMENT_BROWSER_SCENE_IDS = [
   "flat-simple",
   "curves-clips-gradients",
@@ -30,6 +40,18 @@ export type RendererTournamentBrowserSceneId =
   (typeof RENDERER_TOURNAMENT_BROWSER_SCENE_IDS)[number];
 export type RendererTournamentBrowserProviderId =
   (typeof RENDERER_TOURNAMENT_BROWSER_PROVIDER_IDS)[number];
+
+export interface RendererTournamentBrowserBootstrapReceipt {
+  readonly schemaVersion: 1;
+  readonly order: readonly string[];
+  readonly listenerInstalledBeforeZodConfig: boolean;
+  readonly listenerInstalledBeforeEntryImport: boolean;
+  readonly zodJitlessConfiguredBeforeEntryImport: boolean;
+  readonly pageModuleEvaluated: boolean;
+  readonly zodGlobalConfigObservedByPage: boolean;
+  readonly zodCoreGlobalConfigJitless: boolean;
+  readonly zodAllowsEvalValue: boolean;
+}
 
 interface BrowserMemorySignals {
   readonly performanceMemoryExposed: boolean;
@@ -74,6 +96,7 @@ export interface RendererTournamentBrowserProfileResult {
   readonly fingerprints: Readonly<Record<RendererTournamentBrowserSceneId, SceneFingerprint>>;
   readonly crossOriginIsolated: boolean;
   readonly secureContext: boolean;
+  readonly bootstrapReceipt: RendererTournamentBrowserBootstrapReceipt;
   readonly cspViolations: readonly string[];
 }
 
@@ -100,6 +123,7 @@ export interface RendererTournamentBrowserMeasurementResult {
   }>;
   readonly wasmObservationSource: string | null;
   readonly unavailableMemoryReasons: Readonly<Record<string, string>>;
+  readonly bootstrapReceipt: RendererTournamentBrowserBootstrapReceipt;
   readonly cspViolations: readonly string[];
   readonly corruption?: Readonly<{
     kind: "central-checkerboard-xor";
@@ -109,9 +133,23 @@ export interface RendererTournamentBrowserMeasurementResult {
   readonly error: string | null;
 }
 
+export interface RendererTournamentBrowserCspCaptureControlResult {
+  readonly schemaVersion: 1;
+  readonly mode: "csp-control";
+  readonly status: "ok" | "error";
+  readonly measuredAt: string;
+  readonly attempted: true;
+  readonly blocked: boolean;
+  readonly errorName: string | null;
+  readonly cspViolations: readonly string[];
+  readonly bootstrapReceipt: RendererTournamentBrowserBootstrapReceipt;
+  readonly error: string | null;
+}
+
 type PageResult =
   | RendererTournamentBrowserProfileResult
   | RendererTournamentBrowserMeasurementResult
+  | RendererTournamentBrowserCspCaptureControlResult
   | Readonly<{
       schemaVersion: 1;
       mode: "error";
@@ -146,15 +184,46 @@ interface CanvasKitWithHeap {
   readonly HEAPU8?: Uint8Array;
 }
 
-const cspViolations: string[] = [];
-
-if (typeof document !== "undefined") {
-  document.addEventListener("securitypolicyviolation", (event) => {
-    cspViolations.push(
-      `${event.effectiveDirective}: ${event.blockedURI || "inline"}`,
-    );
-  });
+interface MutableBootstrapReceipt {
+  schemaVersion: 1;
+  order: string[];
 }
+
+interface RendererTournamentBrowserGlobals {
+  __zod_globalConfig?: Readonly<Record<string, unknown>>;
+  [RENDERER_TOURNAMENT_BROWSER_CSP_VIOLATIONS_GLOBAL]?: unknown;
+  [RENDERER_TOURNAMENT_BROWSER_BOOTSTRAP_RECEIPT_GLOBAL]?: unknown;
+}
+
+function browserBootstrapState(): Readonly<{
+  cspViolations: string[];
+  receipt: MutableBootstrapReceipt | null;
+}> {
+  if (typeof window === "undefined") {
+    return { cspViolations: [], receipt: null };
+  }
+  const globals = globalThis as typeof globalThis & RendererTournamentBrowserGlobals;
+  const violations = globals[RENDERER_TOURNAMENT_BROWSER_CSP_VIOLATIONS_GLOBAL];
+  const receipt = globals[RENDERER_TOURNAMENT_BROWSER_BOOTSTRAP_RECEIPT_GLOBAL];
+  if (!Array.isArray(violations) || !violations.every((value) => typeof value === "string")) {
+    throw new Error("renderer tournament CSP bootstrap shared array is missing or invalid");
+  }
+  if (
+    typeof receipt !== "object" ||
+    receipt === null ||
+    Array.isArray(receipt) ||
+    (receipt as MutableBootstrapReceipt).schemaVersion !== 1 ||
+    !Array.isArray((receipt as MutableBootstrapReceipt).order)
+  ) {
+    throw new Error("renderer tournament bootstrap receipt is missing or invalid");
+  }
+  const mutableReceipt = receipt as MutableBootstrapReceipt;
+  mutableReceipt.order.push("page-module-evaluated");
+  return { cspViolations: violations as string[], receipt: mutableReceipt };
+}
+
+const bootstrapState = browserBootstrapState();
+const cspViolations = bootstrapState.cspViolations;
 
 function finiteOrNull(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -162,6 +231,87 @@ function finiteOrNull(value: unknown): number | null {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function indexBefore(order: readonly string[], left: string, right: string): boolean {
+  const leftIndex = order.indexOf(left);
+  const rightIndex = order.indexOf(right);
+  return leftIndex >= 0 && rightIndex >= 0 && leftIndex < rightIndex;
+}
+
+async function observeBootstrapReceipt(): Promise<RendererTournamentBrowserBootstrapReceipt> {
+  if (!bootstrapState.receipt) {
+    throw new Error("renderer tournament page evaluated without browser bootstrap receipt");
+  }
+  const globals = globalThis as typeof globalThis & RendererTournamentBrowserGlobals;
+  const zodCore = await import("zod/v4/core");
+  const order = [...bootstrapState.receipt.order];
+  return {
+    schemaVersion: 1,
+    order,
+    listenerInstalledBeforeZodConfig: indexBefore(
+      order,
+      "csp-listener-installed",
+      "zod-jitless-configured",
+    ),
+    listenerInstalledBeforeEntryImport: indexBefore(
+      order,
+      "csp-listener-installed",
+      "entry-import-started",
+    ),
+    zodJitlessConfiguredBeforeEntryImport: indexBefore(
+      order,
+      "zod-jitless-configured",
+      "entry-import-started",
+    ),
+    pageModuleEvaluated: order.includes("page-module-evaluated"),
+    zodGlobalConfigObservedByPage: globals.__zod_globalConfig?.jitless === true,
+    zodCoreGlobalConfigJitless: zodCore.globalConfig.jitless === true,
+    zodAllowsEvalValue: zodCore.util.allowsEval.value,
+  };
+}
+
+async function waitForCspViolation(startCount: number): Promise<void> {
+  const deadline = performance.now() + 2_000;
+  while (cspViolations.length <= startCount && performance.now() < deadline) {
+    await new Promise<void>((resolve) => setTimeout(resolve, 10));
+  }
+}
+
+async function runCspCaptureControl(): Promise<RendererTournamentBrowserCspCaptureControlResult> {
+  const bootstrapReceipt = await observeBootstrapReceipt();
+  const startCount = cspViolations.length;
+  let blocked = false;
+  let errorName: string | null = null;
+  try {
+    // Deliberate positive control: strict script-src must block this while wasm-unsafe-eval stays.
+    const evaluate = new Function("return 1");
+    evaluate();
+  } catch (error) {
+    blocked = true;
+    errorName = error instanceof Error ? error.name : null;
+  }
+  await waitForCspViolation(startCount);
+  const observed = cspViolations.slice(startCount);
+  const observedEvalViolation = observed.some((violation) =>
+    /^(?:script-src|script-src-elem): eval$/u.test(violation));
+  const status = blocked && errorName === "EvalError" && observedEvalViolation
+    ? "ok"
+    : "error";
+  return {
+    schemaVersion: 1,
+    mode: "csp-control",
+    status,
+    measuredAt: new Date().toISOString(),
+    attempted: true,
+    blocked,
+    errorName,
+    cspViolations: observed,
+    bootstrapReceipt,
+    error: status === "ok"
+      ? null
+      : "strict-CSP positive control did not block eval and emit script-src violation",
+  };
 }
 
 function createLcg(seed: number): () => number {
@@ -563,6 +713,7 @@ async function runMeasurement(
   providerId: RendererTournamentBrowserProviderId,
   sceneId: RendererTournamentBrowserSceneId,
 ): Promise<RendererTournamentBrowserMeasurementResult> {
+  const bootstrapReceipt = await observeBootstrapReceipt();
   const scene = buildRendererTournamentScene(sceneId);
   const fingerprint = computeSceneFingerprint(scene);
   const before = await observeMemory();
@@ -630,6 +781,7 @@ async function runMeasurement(
       memorySignals: { before, after, maxObservedUsedJsHeapBytes },
       wasmObservationSource: runtime.wasmObservationSource,
       unavailableMemoryReasons: unavailableMemoryReasons(runtime),
+      bootstrapReceipt,
       cspViolations: [...cspViolations],
       ...(corruption ? { corruption } : {}),
       error: null,
@@ -655,6 +807,7 @@ async function runMeasurement(
       memorySignals: { before, after, maxObservedUsedJsHeapBytes },
       wasmObservationSource: runtime?.wasmObservationSource ?? null,
       unavailableMemoryReasons: runtime ? unavailableMemoryReasons(runtime) : {},
+      bootstrapReceipt,
       cspViolations: [...cspViolations],
       error: errorMessage(error),
     };
@@ -741,6 +894,7 @@ async function providerAvailability(): Promise<RendererTournamentBrowserProvider
 }
 
 async function runProfile(): Promise<RendererTournamentBrowserProfileResult> {
+  const bootstrapReceipt = await observeBootstrapReceipt();
   const nav = navigator as NavigatorWithOptionalSignals;
   const userAgentData = await highEntropyUserAgentData();
   let adapterReceipt: Record<string, unknown> | null = null;
@@ -868,6 +1022,7 @@ async function runProfile(): Promise<RendererTournamentBrowserProfileResult> {
     fingerprints,
     crossOriginIsolated: globalThis.crossOriginIsolated,
     secureContext: globalThis.isSecureContext,
+    bootstrapReceipt,
     cspViolations: [...cspViolations],
   };
 }
@@ -898,6 +1053,8 @@ async function main(): Promise<void> {
   let result: PageResult;
   if (mode === "profile") {
     result = await runProfile();
+  } else if (mode === "csp-control") {
+    result = await runCspCaptureControl();
   } else if (mode === "cold" || mode === "warm" || mode === "fault-control") {
     result = await runMeasurement(
       mode,

@@ -43,6 +43,35 @@ describe("studio pro draw prefs", () => {
     ).toBe("#7c3aed");
   });
 
+  it("keeps named eraser strength exact even when paint opacity is locked", () => {
+    const current = { strokeWidth: 12, brushOpacity: 0.38, color: "#111111" };
+
+    expect(
+      applyBrushPresetWithLocks(
+        { id: "standard-eraser", defaultWidth: 20, defaultOpacity: 1 },
+        { sizeLocked: true, opacityLocked: true },
+        current,
+        { operation: "erase" },
+      ),
+    ).toMatchObject({
+      brushId: "standard-eraser",
+      strokeWidth: 12,
+      brushOpacity: 1,
+    });
+    expect(
+      applyBrushPresetWithLocks(
+        { id: "kneaded-eraser", defaultWidth: 26, defaultOpacity: 0.38 },
+        { sizeLocked: true, opacityLocked: true },
+        { ...current, brushOpacity: 1 },
+        { operation: "erase" },
+      ),
+    ).toMatchObject({
+      brushId: "kneaded-eraser",
+      strokeWidth: 12,
+      brushOpacity: 0.38,
+    });
+  });
+
   it("remembers recent and favorite built-in brushes", () => {
     let prefs = normalizeStudioProDrawPrefs(null);
     prefs = rememberRecentBrushId(prefs, "pen");

@@ -87,10 +87,10 @@ describe("Studio brush browser harness catalogue boundary", () => {
       'preset.source === "core" || expectedSelection.brushDynamics',
     );
     expect(harness).toContain(
-      "draw?.brushCatalogId === catalogId",
+      "draw?.brushCatalogId === expected.catalogId",
     );
     expect(harness).toContain(
-      "draw.brush === runtimeBrushId",
+      "draw.brush === expected.runtimeBrushId",
     );
     expect(harness).toContain(
       "serializeStudioBrushDynamicsSettingsCanonical(persistedProStroke.brushDynamics)",
@@ -150,13 +150,13 @@ describe("Studio brush browser harness catalogue boundary", () => {
 
   it("isolates every sparse long route and offers an exhaustive long-only catalogue audit", () => {
     expect(harness).toContain(
-      "const desktop = shapesOnly || longOnly ? null : await runDesktopBrushMatrix(browser, studioUrl);",
+      "const desktop = runDesktop ? await runDesktopBrushMatrix(browser, studioUrl) : null;",
     );
     expect(harness).toContain(
-      "const longBrushes = shapesOnly ? null : await runLongBrushMatrix(browser, studioUrl);",
+      "const longBrushes = runLong ? await runLongBrushMatrix(browser, studioUrl) : null;",
     );
     expect(harness).toContain(
-      "const smartShapes = drawingOnly || longOnly",
+      "const smartShapes = runShapes ? await runSmartShapeMatrix(browser, studioUrl) : null;",
     );
     expect(harness).toContain("const y = safeTop + (safeBottom - safeTop) / 2;");
     expect(harness).toContain("const ALL_BRUSH_LONG_MATRIX =");

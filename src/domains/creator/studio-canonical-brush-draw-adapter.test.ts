@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import { normalizeStudioBrushDynamicsSettings } from "./studio-brush-dynamics";
+import { encodeStudioBrushTipAlphaMapBase64 } from "./studio-brush-tip-stamp";
 import { adaptStudioDrawElementToCanonicalBrushPlan } from "./studio-canonical-brush-draw-adapter";
+import { hashStudioCanonicalBrushPlan } from "./studio-canonical-brush-plan";
+import { sampleStudioEngineTexturedBrushTipCpu } from "./studio-engine-webgpu-textured-brush-plan";
 import { sha256HexPortable } from "./studio-sha256";
 
+import type { NormalizedStudioBrushDynamicsSettings } from "./studio-brush-dynamics";
 import type {
   StudioCanonicalBrushDrawAdapterReady,
   StudioCanonicalBrushDrawAdapterRequest,
@@ -47,6 +51,39 @@ function ready(
     throw new Error(`${result.reason} at ${result.path}: ${result.detail}`);
   }
   return result;
+}
+
+function effectiveTipAsset(result: StudioCanonicalBrushDrawAdapterReady) {
+  const tip = result.plan.recipe.tip;
+  if (tip.kind !== "texture") throw new Error("Expected a flattened canonical texture tip.");
+  const asset = result.assets.find((candidate) => candidate.assetId === tip.assetId);
+  if (!asset) throw new Error("Missing effective canonical tip asset.");
+  return asset;
+}
+
+function constantAlphaTip(byte: number) {
+  const bytes = new Uint8Array(8 * 8);
+  bytes.fill(byte);
+  return {
+    shape: "round" as const,
+    softness: 0,
+    alphaMapSize: 8,
+    alphaMapBase64: encodeStudioBrushTipAlphaMapBase64(bytes),
+  };
+}
+
+function boundedCompositionElement(
+  id: string,
+  dynamics: NormalizedStudioBrushDynamicsSettings,
+): DrawEl {
+  return dynamicElement({
+    id,
+    brush: "watercolor",
+    paintModel: "bounded-flow-v2",
+    sampleSpacing: 0,
+    pressureModel: "linear-residual-path-v3",
+    brushDynamics: dynamics,
+  });
 }
 
 function dynamicElement(overrides: Partial<DrawEl> = {}): DrawEl {
@@ -432,6 +469,195 @@ describe("Studio DrawEl canonical brush adapter", () => {
     });
   });
 
+  it("preserves watercolor dualBrush and ordered tipLayers in the canonical v2 visual contract", () => {
+    const dynamics = normalizeStudioBrushDynamicsSettings({
+      ...dynamicElement().brushDynamics,
+      depositPipeline: "causal-deposit-v3-segmented",
+      tip: { shape: "soft", softness: 0.86, alphaMapSize: 16 },
+      tipLayers: [
+        {
+          tip: { shape: "bristle", softness: 0.3, alphaMapSize: 16 },
+          scale: 1.25,
+          opacity: 0.42,
+          offsetX: -0.35,
+          offsetY: 0.2,
+          angle: 18,
+          roundness: 0.7,
+        },
+        {
+          tip: { shape: "grain", softness: 0.5, alphaMapSize: 16 },
+          scale: 0.65,
+          opacity: 0.78,
+          offsetX: 0.4,
+          offsetY: -0.15,
+          angle: -27,
+          roundness: 1.2,
+        },
+      ],
+      dualBrush: {
+        enabled: true,
+        tip: { shape: "sponge", softness: 0.66, alphaMapSize: 16 },
+        blendMode: "screen",
+        sizeRatio: 1.42,
+      },
+    });
+    const element = boundedCompositionElement("watercolor-canonical-composition", dynamics);
+    const first = ready(adaptStudioDrawElementToCanonicalBrushPlan(request(element)));
+    const replay = ready(adaptStudioDrawElementToCanonicalBrushPlan(
+      request(structuredClone(element)),
+    ));
+
+    expect(first.plan.recipe).toMatchObject({
+      version: 2,
+      tip: { kind: "texture" },
+      tipComposition: {
+        model: "normalized-multi-tip-v1",
+        primary: dynamics.tip,
+        layers: [
+          { scale: 1.25, opacity: 0.42, offsetX: -0.35, angle: 18 },
+          { scale: 0.65, opacity: 0.78, offsetX: 0.4, angle: -27 },
+        ],
+        dualBrush: {
+          enabled: true,
+          blendMode: "screen",
+          sizeRatio: 1.42,
+        },
+      },
+      retainedDynamics: {
+        tipLayers: dynamics.tipLayers,
+        dualBrush: dynamics.dualBrush,
+      },
+    });
+    expect(first.requirements).toEqual([
+      "texture-tip",
+      "grain",
+      "retained-dynamics",
+      "stroke-local-compositor",
+    ]);
+    expect(first.assets.length).toBeGreaterThanOrEqual(4);
+    expect(first.assets.map((asset) => asset.assetId)).toEqual(
+      [...first.assets.map((asset) => asset.assetId)].sort(),
+    );
+    expect(new Set(first.assets.map((asset) => asset.assetId)).size).toBe(first.assets.length);
+    const effective = effectiveTipAsset(first);
+    expect(effective.contentHash).toBe(
+      "sha256:2ac6bcc8d78189852aa5fb3c309c2a89694727d6a311c109be3326cb77f09ca6",
+    );
+    expect(effective.width).toBeGreaterThan(16);
+    expect(first.plan.recipe).toMatchObject({
+      size: expect.any(Number),
+      angleRadians: 0,
+      roundness: 1,
+    });
+    expect(first.plan.recipe.size).toBeGreaterThan(dynamics.width.base);
+    expect(replay.assets).toEqual(first.assets);
+    expect(hashStudioCanonicalBrushPlan(replay.plan)).toBe(
+      hashStudioCanonicalBrushPlan(first.plan),
+    );
+  });
+
+  it("flattens ordered layers through R8 source-over and pins their single-tip bytes", () => {
+    const primary = constantAlphaTip(1);
+    const faint = constantAlphaTip(1);
+    const wash = constantAlphaTip(64);
+    const layer = (tip: ReturnType<typeof constantAlphaTip>) => ({
+      tip,
+      scale: 1,
+      opacity: 1,
+      offsetX: 0,
+      offsetY: 0,
+      angle: 0,
+      roundness: 1,
+    });
+    const settings = (tipLayers: readonly ReturnType<typeof layer>[]) => (
+      normalizeStudioBrushDynamicsSettings({
+        ...dynamicElement().brushDynamics,
+        depositPipeline: "causal-deposit-v3-segmented",
+        tip: primary,
+        tipLayers,
+        grain: { amount: 0 },
+        angle: { base: 0, mappings: [], jitter: null },
+        roundness: { base: 1, mappings: [], jitter: null },
+      })
+    );
+    const forward = ready(adaptStudioDrawElementToCanonicalBrushPlan(request(
+      boundedCompositionElement("ordered-layer-r8", settings([layer(faint), layer(wash)])),
+    )));
+    const reversed = ready(adaptStudioDrawElementToCanonicalBrushPlan(request(
+      boundedCompositionElement("ordered-layer-r8", settings([layer(wash), layer(faint)])),
+    )));
+    const primaryOnly = ready(adaptStudioDrawElementToCanonicalBrushPlan(request(
+      boundedCompositionElement("ordered-layer-r8", settings([])),
+    )));
+    const forwardAsset = effectiveTipAsset(forward);
+    const reversedAsset = effectiveTipAsset(reversed);
+    const primaryAsset = effectiveTipAsset(primaryOnly);
+
+    expect([...new Set(forwardAsset.bytes)]).toEqual([65]);
+    expect([...new Set(reversedAsset.bytes)]).toEqual([66]);
+    expect(forwardAsset.contentHash).toBe(
+      "sha256:d53eda7a637c99cc7fb566d96e9fa109bf15c478410a3f5eb4d4c4e26cd081f6",
+    );
+    expect(reversedAsset.contentHash).toBe(
+      "sha256:c422e7070cb1cb455b5de9afee0d975e303d0239c72030cd7414ab5c382d3ae8",
+    );
+    expect(forwardAsset.bytes).not.toEqual(reversedAsset.bytes);
+    expect(sampleStudioEngineTexturedBrushTipCpu(
+      forwardAsset,
+      0.5,
+      0.5,
+      0,
+    )).toBeGreaterThan(sampleStudioEngineTexturedBrushTipCpu(
+      primaryAsset,
+      0.5,
+      0.5,
+      0,
+    ));
+    expect(forward.plan.recipe.tip).toMatchObject({
+      kind: "texture",
+      assetId: forwardAsset.assetId,
+      contentHash: forwardAsset.contentHash,
+    });
+  });
+
+  it("binds every layer transform and opacity into effective carrier pixels", () => {
+    const baseLayer = {
+      tip: { shape: "bristle" as const, softness: 0.2, alphaMapSize: 24 },
+      scale: 1.1,
+      opacity: 0.55,
+      offsetX: 0.2,
+      offsetY: -0.15,
+      angle: 13,
+      roundness: 0.72,
+    };
+    const effectiveHash = (patch: Partial<typeof baseLayer>): string => {
+      const dynamics = normalizeStudioBrushDynamicsSettings({
+        ...dynamicElement().brushDynamics,
+        depositPipeline: "causal-deposit-v3-segmented",
+        tip: { shape: "soft", softness: 0.65, alphaMapSize: 24 },
+        tipLayers: [{ ...baseLayer, ...patch }],
+        grain: { amount: 0 },
+        angle: { base: 0, mappings: [], jitter: null },
+        roundness: { base: 1, mappings: [], jitter: null },
+      });
+      return effectiveTipAsset(ready(adaptStudioDrawElementToCanonicalBrushPlan(request(
+        boundedCompositionElement("layer-transform-pixels", dynamics),
+      )))).contentHash;
+    };
+    const baseline = effectiveHash({});
+    const variants = [
+      effectiveHash({ scale: 1.45 }),
+      effectiveHash({ opacity: 0.31 }),
+      effectiveHash({ offsetX: -0.45 }),
+      effectiveHash({ offsetY: 0.5 }),
+      effectiveHash({ angle: -41 }),
+      effectiveHash({ roundness: 0.38 }),
+    ];
+
+    expect(new Set(variants).size).toBe(variants.length);
+    expect(variants).not.toContain(baseline);
+  });
+
   it("fails closed for unversioned non-pressure dynamics, dual tips and incomplete channels", () => {
     const cases: Array<{
       readonly element: DrawEl;
@@ -472,7 +698,7 @@ describe("Studio DrawEl canonical brush adapter", () => {
           }),
         }),
         reason: "unsupported-dynamics",
-        path: "element.brushDynamics",
+        path: "element.brushDynamics.dualBrush",
       },
       {
         element: dynamicElement({ tiltXs: [0, 1] }),

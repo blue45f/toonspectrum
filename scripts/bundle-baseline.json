@@ -1,6 +1,6 @@
 {
   "schema": "toonspectrum.bundle-baseline/1",
-  "recordedAt": "2026-08-10T05:20:05.030Z",
+  "recordedAt": "2026-08-10T15:31:53.435Z",
   "note": "Last accepted measurement of scripts/check-studio-bundle.mjs. Regressions beyond the tolerance fail the build; see docs/perf/bundle-gate.md. Regenerate with UPDATE_BUNDLE_BASELINE=1 node scripts/check-studio-bundle.mjs.",
   "policy": {
     "byteTolerance": 0.02,
@@ -18,11 +18,11 @@
     "Studio route after app shell chunks": 188,
     "app entry raw": 596623,
     "app entry gzip": 187745,
-    "BG3D editor activation raw": 2851692,
-    "BG3D editor activation gzip": 847201,
+    "BG3D editor activation raw": 2814199,
+    "BG3D editor activation gzip": 835303,
     "BG3D editor activation chunks": 42,
-    "BG3D shot-batch runtime after editor raw": 157723,
-    "BG3D shot-batch runtime after editor gzip": 43355,
+    "BG3D shot-batch runtime after editor raw": 113533,
+    "BG3D shot-batch runtime after editor gzip": 33902,
     "BG3D shot-batch runtime after editor chunks": 4,
     "BG3D pass-PNG Worker raw": 2651,
     "BG3D pass-PNG Worker gzip": 1156,

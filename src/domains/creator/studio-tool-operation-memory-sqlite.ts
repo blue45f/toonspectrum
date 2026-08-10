@@ -19,6 +19,7 @@ export const STUDIO_TOOL_OPERATION_MEMORY_SQLITE_NAMESPACE =
 export const STUDIO_TOOL_OPERATION_MEMORY_SQLITE_KEY = "profile-v1";
 export const STUDIO_TOOL_OPERATION_MEMORY_SCHEMA =
   "toonspectrum.studio.tool-operation-memory";
+export const STUDIO_TOOL_OPERATION_MEMORY_COALESCE_MS = 250;
 const PERSISTED_STUDIO_TOOL_OPERATION_MEMORY_VERSION = 1 as const;
 
 const PERSISTED_DEFAULT_STANDARD_ERASER_SNAPSHOT: StudioBrushSnapshot = {
@@ -164,8 +165,14 @@ export function createStudioToolOperationMemorySqlitePersistence(
   let store: Promise<StudioAsyncKeyValueStore> | null = null;
 
   function resolveStore(): Promise<StudioAsyncKeyValueStore> {
-    store ??= acquireDatabase().then((database) =>
-      database.asAsyncKeyValueStore(STUDIO_TOOL_OPERATION_MEMORY_SQLITE_NAMESPACE));
+    if (store === null) {
+      const acquisition = acquireDatabase().then((database) =>
+        database.asAsyncKeyValueStore(STUDIO_TOOL_OPERATION_MEMORY_SQLITE_NAMESPACE));
+      store = acquisition;
+      void acquisition.catch(() => {
+        if (store === acquisition) store = null;
+      });
+    }
     return store;
   }
 
@@ -193,14 +200,26 @@ export interface StudioToolOperationMemoryControllerSnapshot {
   readonly phase: StudioToolOperationMemoryPersistencePhase;
   readonly repairedCorruption: boolean;
   readonly lastError: StudioToolOperationMemoryPersistenceError | null;
+  /** True until the latest normalized snapshot has a successful SQLite receipt. */
+  readonly dirty: boolean;
+  readonly writeInFlight: boolean;
 }
 
 export interface StudioToolOperationMemoryController {
   getSnapshot(): StudioToolOperationMemoryControllerSnapshot;
   subscribe(listener: () => void): () => void;
   hydrate(): Promise<StudioToolOperationMemory>;
+  /** Synchronous, bounded latest-value scheduling for active property changes. */
+  scheduleSave(memory: StudioToolOperationMemory): void;
+  /** Explicit immediate persistence. Concurrent calls share one bounded flush. */
   save(memory: StudioToolOperationMemory): Promise<boolean>;
+  /** Retries the current dirty snapshot without creating another queue entry. */
+  retry(): Promise<boolean>;
   flush(): Promise<boolean>;
+}
+
+export interface StudioToolOperationMemoryControllerOptions {
+  readonly coalesceMs?: number;
 }
 
 function unavailablePersistenceError(
@@ -226,7 +245,13 @@ function snapshotChanged(
 
 export function createStudioToolOperationMemoryController(
   persistence: StudioToolOperationMemoryPersistencePort,
+  options: StudioToolOperationMemoryControllerOptions = {},
 ): StudioToolOperationMemoryController {
+  const coalesceMs = options.coalesceMs
+    ?? STUDIO_TOOL_OPERATION_MEMORY_COALESCE_MS;
+  if (!Number.isFinite(coalesceMs) || coalesceMs < 0) {
+    throw new RangeError(`coalesceMs must be finite and non-negative, got ${coalesceMs}`);
+  }
   const listeners = new Set<() => void>();
   const dirtyBeforeHydration = new Set<StudioToolOperation>();
   let snapshot: StudioToolOperationMemoryControllerSnapshot = {
@@ -234,10 +259,16 @@ export function createStudioToolOperationMemoryController(
     phase: "idle",
     repairedCorruption: false,
     lastError: null,
+    dirty: false,
+    writeInFlight: false,
   };
   let hydration: Promise<StudioToolOperationMemory> | null = null;
-  let mutationTail: Promise<boolean> = Promise.resolve(true);
+  let coalesceTimer: ReturnType<typeof setTimeout> | null = null;
+  let persistPromise: Promise<boolean> | null = null;
+  let flushPromise: Promise<boolean> | null = null;
   let lastPersistSucceeded = true;
+  let memoryRevision = 0;
+  let durableRevision = 0;
 
   function publish(
     next: StudioToolOperationMemoryControllerSnapshot,
@@ -284,49 +315,96 @@ export function createStudioToolOperationMemoryController(
             ? snapshot.memory.erase
             : persisted.erase,
         });
+        let dirty = snapshot.dirty;
+        if (repairedCorruption || parseError?.code === "corrupt") {
+          memoryRevision += 1;
+          dirty = true;
+        } else if (!dirty) {
+          durableRevision = memoryRevision;
+        }
+        lastPersistSucceeded = parseError === null;
         publish({
           memory,
           phase: parseError === null ? "ready" : "degraded",
           repairedCorruption:
             repairedCorruption || parseError?.code === "corrupt",
           lastError: parseError,
+          dirty,
+          writeInFlight: false,
         });
         return memory;
       } catch (error) {
         const lastError = unavailablePersistenceError("읽기", error);
+        lastPersistSucceeded = false;
         publish({
           ...snapshot,
           phase: "degraded",
           lastError,
         });
+        hydration = null;
         return snapshot.memory;
       }
     })();
     return hydration;
   }
 
-  function save(memory: StudioToolOperationMemory): Promise<boolean> {
+  function markDirty(memory: StudioToolOperationMemory): void {
     const normalized = normalizePersistenceMemory(memory);
+    const paintChanged = snapshotChanged(snapshot.memory.paint, normalized.paint);
+    const eraseChanged = snapshotChanged(snapshot.memory.erase, normalized.erase);
     if (snapshot.phase === "idle" || snapshot.phase === "hydrating") {
-      if (snapshotChanged(snapshot.memory.paint, normalized.paint)) {
+      if (paintChanged) {
         dirtyBeforeHydration.add("paint");
       }
-      if (snapshotChanged(snapshot.memory.erase, normalized.erase)) {
+      if (eraseChanged) {
         dirtyBeforeHydration.add("erase");
       }
     }
-    publish({ ...snapshot, memory: normalized });
-    const run = async (): Promise<boolean> => {
+    if (paintChanged || eraseChanged) memoryRevision += 1;
+    publish({
+      ...snapshot,
+      memory: normalized,
+      dirty: snapshot.dirty || paintChanged || eraseChanged,
+    });
+  }
+
+  function clearCoalesceTimer(): void {
+    if (coalesceTimer === null) return;
+    globalThis.clearTimeout(coalesceTimer);
+    coalesceTimer = null;
+  }
+
+  function armCoalescedWrite(): void {
+    if (!snapshot.dirty || coalesceTimer !== null) return;
+    coalesceTimer = globalThis.setTimeout(() => {
+      coalesceTimer = null;
+      void persistLatest();
+    }, coalesceMs);
+  }
+
+  function persistLatest(): Promise<boolean> {
+    if (persistPromise !== null) return persistPromise;
+    persistPromise = (async (): Promise<boolean> => {
       await hydrate();
+      if (!snapshot.dirty) return true;
+      const targetRevision = memoryRevision;
+      const targetMemory = snapshot.memory;
+      publish({ ...snapshot, writeInFlight: true });
       try {
-        await persistence.save(serializeStudioToolOperationMemory(snapshot.memory));
+        await persistence.save(serializeStudioToolOperationMemory(targetMemory));
+        durableRevision = Math.max(durableRevision, targetRevision);
         lastPersistSucceeded = true;
+        const dirty = memoryRevision > durableRevision;
         publish({
           ...snapshot,
           phase: "ready",
           repairedCorruption: false,
           lastError: null,
+          dirty,
+          writeInFlight: false,
         });
+        if (dirty) armCoalescedWrite();
+        else clearCoalesceTimer();
         return true;
       } catch (error) {
         lastPersistSucceeded = false;
@@ -334,13 +412,37 @@ export function createStudioToolOperationMemoryController(
           ...snapshot,
           phase: "degraded",
           lastError: unavailablePersistenceError("저장", error),
+          dirty: true,
+          writeInFlight: false,
         });
         return false;
       }
-    };
-    const result = mutationTail.then(run, run);
-    mutationTail = result;
-    return result;
+    })().finally(() => {
+      persistPromise = null;
+    });
+    return persistPromise;
+  }
+
+  function flush(): Promise<boolean> {
+    if (flushPromise !== null) return flushPromise;
+    clearCoalesceTimer();
+    flushPromise = (async (): Promise<boolean> => {
+      while (snapshot.dirty) {
+        const success = await persistLatest();
+        if (!success) return false;
+      }
+      return lastPersistSucceeded;
+    })().finally(() => {
+      flushPromise = null;
+    });
+    return flushPromise;
+  }
+
+  async function retry(): Promise<boolean> {
+    if (snapshot.phase === "degraded" && hydration === null) {
+      await hydrate();
+    }
+    return snapshot.dirty ? flush() : lastPersistSucceeded;
   }
 
   return {
@@ -350,11 +452,16 @@ export function createStudioToolOperationMemoryController(
       return () => listeners.delete(listener);
     },
     hydrate,
-    save,
-    async flush() {
-      await mutationTail;
-      return lastPersistSucceeded;
+    scheduleSave(memory) {
+      markDirty(memory);
+      armCoalescedWrite();
     },
+    save(memory) {
+      markDirty(memory);
+      return flush();
+    },
+    retry,
+    flush,
   };
 }
 

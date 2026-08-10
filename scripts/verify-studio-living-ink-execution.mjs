@@ -167,8 +167,22 @@ function validate(result, diagnostics, lane) {
     || !contract.halfFloatFields
     || !contract.rgba8Readback
   ) failures.push("execution capability contract is incomplete");
+  const readback = contract.readbackProvenance ?? {};
+  const expectedReadback = lane.id === "webgpu"
+    ? {
+        orientation: "top-left-row-major",
+        format: "rgba32float-storage-buffer-to-rgba8",
+      }
+    : {
+        orientation: "webgl-bottom-left-row-major",
+        format: "rgba8-staging-fbo",
+      };
+  if (
+    readback.orientation !== expectedReadback.orientation
+    || readback.format !== expectedReadback.format
+  ) failures.push("backend receipt reported contradictory readback provenance");
   if (!result.line?.normalizedDisplayHashMatchesReceipt) {
-    failures.push("bottom-up RGBA8 readback did not normalize to the displayed ImageBitmap");
+    failures.push("receipt-oriented RGBA8 readback did not normalize to the displayed ImageBitmap");
   }
   const deferred = result.deferredPresentation ?? {};
   if (
@@ -383,6 +397,7 @@ function laneSummary(lane, result) {
     reason: lane.reason,
     backend: result?.backend ?? null,
     capabilities: result?.capabilities ?? null,
+    executionContract: result?.executionContract ?? null,
     launchArguments: lane.diagnostics?.launchArguments ?? null,
     lineBounds: result?.line?.bounds ?? null,
     bloomBounds: result?.bloom?.bounds ?? null,

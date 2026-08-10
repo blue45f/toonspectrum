@@ -225,7 +225,7 @@ export function appendStudioPagesHistorySnapshot<Page>(
 }
 
 /**
- * Creates a full synchronous lifecycle recovery. A pending batch is projected when present, while
+ * Creates a full lifecycle recovery payload. A pending batch is projected when present, while
  * an already-stable edit still receives a receipt and succeeds with `no-pending`. Missing or
  * ambiguous target pages fail closed because inventing a destination would silently corrupt work.
  */
@@ -292,7 +292,7 @@ export function createStudioLifecycleEmergencyAutosave<
 }
 
 /**
- * Builds a synchronous emergency autosave from the latest stable snapshot plus deferred strokes.
+ * Builds a deterministic emergency autosave from the latest stable snapshot plus deferred strokes.
  * Callers supply the timestamp so this helper stays deterministic and safe to use from pagehide
  * or unmount cleanup. Shared documents never have their source revision silently rebased.
  */

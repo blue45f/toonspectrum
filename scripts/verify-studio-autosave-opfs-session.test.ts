@@ -40,7 +40,7 @@ function diagnostics(
   return {
     browserVersion: "Chromium test",
     contentSecurityPolicy:
-      "default-src 'none'; script-src 'self'; connect-src 'self'",
+      "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; connect-src 'self'",
     consoleErrors: [],
     consoleWarnings: [],
     pageErrors: [],
@@ -104,20 +104,21 @@ function successfulResult() {
         sequence: 1,
         revision: 1,
       },
-      browserFallbackMirrored: true,
+      sqliteMirrorState: "snapshot",
+      sqliteMirror: payload(checkpointSavedAt, "checkpoint-stroke"),
       afterReload: payload(checkpointSavedAt, "checkpoint-stroke"),
       pageReloadObserved: true,
       navigationType: "reload",
     },
     migration: {
       savedAt: migrationSavedAt,
-      fallbackKeyKind: "lifecycle-sidecar",
+      fallbackKind: "sqlite-fallback",
       reconciliation: {
         candidate: {
-          key: `${DOCUMENT_KEY}:lifecycle`,
+          key: DOCUMENT_KEY,
           payload: payload(
             migrationSavedAt,
-            "newer-browser-fallback-stroke",
+            "newer-sqlite-fallback-stroke",
           ).payload,
         },
         authority: "opfs-journal",
@@ -125,7 +126,7 @@ function successfulResult() {
       },
       afterFreshSessionRead: payload(
         migrationSavedAt,
-        "newer-browser-fallback-stroke",
+        "newer-sqlite-fallback-stroke",
       ),
     },
     clear: {
@@ -149,6 +150,10 @@ function successfulResult() {
       },
       stalePrimaryRemoved: true,
       staleSidecarRemoved: true,
+      sqliteAfterClear: {
+        state: "cleared",
+        savedAt: clearSavedAt,
+      },
       finalFreshSessionRead: {
         state: "cleared",
         savedAt: clearSavedAt,
@@ -158,6 +163,7 @@ function successfulResult() {
     },
     cleanup: {
       opfsDocumentRemoved: true,
+      sqliteRowRemoved: true,
       localStorageCleared: true,
       sessionStorageCleared: true,
     },
@@ -171,7 +177,12 @@ describe("Studio autosave native OPFS production-preview verifier", () => {
       validateStudioAutosaveOpfsBrowserResult(
         successfulResult(),
         diagnostics(),
-        ["index.html", "assets/index-abcd.js", "assets/index-abcd.js.map"],
+        [
+          "index.html",
+          "assets/index-abcd.js",
+          "assets/index-abcd.js.map",
+          "assets/sqlite3-abcd.wasm",
+        ],
       ),
     ).toEqual([]);
   });
@@ -185,7 +196,7 @@ describe("Studio autosave native OPFS production-preview verifier", () => {
     const issues = validateStudioAutosaveOpfsBrowserResult(
       result,
       diagnostics(),
-      ["index.html", "assets/index-abcd.js"],
+      ["index.html", "assets/index-abcd.js", "assets/sqlite3-abcd.wasm"],
     );
     expect(issues).toContain(
       "real navigator.storage.getDirectory and origin-wide Web Locks were not observed",
@@ -213,13 +224,13 @@ describe("Studio autosave native OPFS production-preview verifier", () => {
     const issues = validateStudioAutosaveOpfsBrowserResult(
       result,
       diagnostics(),
-      ["index.html", "assets/index-abcd.js"],
+      ["index.html", "assets/index-abcd.js", "assets/sqlite3-abcd.wasm"],
     );
     expect(issues).toContain(
       "checkpoint save -> real page reload -> durable read did not round-trip",
     );
     expect(issues).toContain(
-      "newer browser fallback was not promoted into native OPFS",
+      "newer SQLite fallback was not promoted into native OPFS",
     );
     expect(issues).toContain(
       "durable clear tombstone did not suppress and remove stale browser recovery",
@@ -244,7 +255,7 @@ describe("Studio autosave native OPFS production-preview verifier", () => {
           url: "http://127.0.0.1:4173/src/browser-harness.ts",
         }],
       }),
-      ["index.html", "assets/index-abcd.js"],
+      ["index.html", "assets/index-abcd.js", "assets/sqlite3-abcd.wasm"],
     );
     expect(issues).toContain(
       "Chromium observed console, page, request, 5xx, or CSP failures",
@@ -261,6 +272,8 @@ describe("Studio autosave native OPFS production-preview verifier", () => {
     expect(source).toContain("createStudioAutosaveOpfsSession");
     expect(source).toContain("persistStudioAutosaveWithOpfsPrimary");
     expect(source).toContain("reconcileStudioAutosaveWithOpfsPrimary");
+    expect(source).toContain("acquireStudioAutosaveSqliteStore");
+    expect(source).toContain("acquireStudioLocalDatabase");
     expect(source).toContain("navigator.storage.getDirectory()");
     expect(source).toContain("navigator.locks.request(");
     expect(source).toContain("window.sessionStorage");

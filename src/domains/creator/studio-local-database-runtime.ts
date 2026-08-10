@@ -1,9 +1,6 @@
-import { openStudioLocalDatabase } from "./studio-local-database";
+import { openStudioLocalDatabaseWorker } from "./studio-local-database-worker-client";
 
-import type {
-  StudioLocalDatabase,
-  StudioSqliteApiHandle,
-} from "./studio-local-database";
+import type { StudioLocalDatabase } from "./studio-local-database";
 
 /**
  * One app-lifetime SQLite handle shared by history, renderer tournament, and subsequent local
@@ -11,31 +8,9 @@ import type {
  * chunks can race and defeats SQLite's role as the single local authority.
  */
 let sharedDatabase: Promise<StudioLocalDatabase> | null = null;
-let sharedSqliteApi: Promise<StudioSqliteApiHandle> | null = null;
-
-/**
- * OPFS SAH-pool VFS owns SyncAccessHandles beyond one DB handle's close(). Reinitializing
- * sqlite-wasm before a same-session reopen creates a second VFS over those files and Chromium
- * rejects it with NoModificationAllowedError. Keep the initialized API/VFS registry for the app
- * lifetime; only the logical DB handle is cycled by closeStudioLocalDatabaseRuntime().
- */
-function acquireStudioSqliteApi(): Promise<StudioSqliteApiHandle> {
-  if (sharedSqliteApi) return sharedSqliteApi;
-  const opening = import("@sqlite.org/sqlite-wasm").then(async (module) =>
-    await module.default() as unknown as StudioSqliteApiHandle);
-  sharedSqliteApi = opening;
-  void opening.catch(() => {
-    if (sharedSqliteApi === opening) sharedSqliteApi = null;
-  });
-  return opening;
-}
 
 export function acquireStudioLocalDatabase(
-  openDatabase: () => Promise<StudioLocalDatabase> = () =>
-    openStudioLocalDatabase({
-      vfs: "opfs",
-      loadSqlite: acquireStudioSqliteApi,
-    }),
+  openDatabase: () => Promise<StudioLocalDatabase> = openStudioLocalDatabaseWorker,
 ): Promise<StudioLocalDatabase> {
   sharedDatabase ??= Promise.resolve().then(openDatabase);
   return sharedDatabase;
