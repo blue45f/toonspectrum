@@ -2756,16 +2756,19 @@ function VrmActor({
 
   useEffect(() => {
     applyVrmCustomColors(vrm, customColors);
-    // applyVrmCustomColors already repairs when idle; re-run after paint races settle.
+    invalidate();
+    // Re-run the repair after paint/material races settle on the next frame.
     const raf = requestAnimationFrame(() => {
       repairVrmTexturedNearBlackLitFactors(vrm);
+      invalidate();
     });
     return () => cancelAnimationFrame(raf);
-  }, [customColors, vrm]);
+  }, [customColors, invalidate, vrm]);
 
   useEffect(() => {
     applyVrmMaterialFx(vrm, materialFx);
-  }, [materialFx, vrm]);
+    invalidate();
+  }, [materialFx, invalidate, vrm]);
 
   // 팔/다리 본 시간축 스무딩(프레임 간 상태 유지). 웹캠 토글마다 리셋해 stale 보간 방지.
   const boneSmootherRef = useRef<VrmBoneSmoother>(new VrmBoneSmoother());

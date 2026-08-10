@@ -852,4 +852,30 @@ describe("VRM material fx (MToon shade/outline/rim/emissive)", () => {
     applyVrmCustomColors(vrm, {});
     expect(`#${tops.color.getHexString()}`).toBe("#ffffff");
   });
+
+  it("repairs an unrelated near-black slot while preserving an active custom color", () => {
+    const { vrm } = createMinimalVrm();
+    const tops = new THREE.MeshStandardMaterial({
+      name: "Tops_01_CLOTH",
+      color: new THREE.Color("#ffffff"),
+      map: new THREE.Texture(),
+    });
+    const bottoms = new THREE.MeshStandardMaterial({
+      name: "Bottoms_01_CLOTH",
+      color: new THREE.Color("#000000"),
+      map: new THREE.Texture(),
+    });
+    const mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(0.1, 0.1, 0.1),
+      [tops, bottoms],
+    );
+    mesh.name = "Body";
+    vrm.scene.add(mesh);
+
+    applyVrmCustomColors(vrm, { tops: "#ff3366" });
+
+    expect(`#${tops.color.getHexString()}`).toBe("#ff3366");
+    expect(tops.userData.__vrmCustomColorApplied).toBe(true);
+    expect(`#${bottoms.color.getHexString()}`).toBe("#ffffff");
+  });
 });

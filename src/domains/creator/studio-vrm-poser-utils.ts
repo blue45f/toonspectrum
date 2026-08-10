@@ -1409,7 +1409,6 @@ export function repairVrmTexturedNearBlackLitFactors(vrm: VRM): number {
  * - After idle pass, repair any textured near-black lit factors left by races.
  */
 export function applyVrmCustomColors(vrm: VRM, customColors: Record<string, string>) {
-  let anyActiveCustom = false;
   vrm.scene.traverse((obj) => {
     if (!(obj as Partial<THREE.Mesh>).isMesh) return;
     const mesh = obj as THREE.Mesh;
@@ -1431,7 +1430,6 @@ export function applyVrmCustomColors(vrm: VRM, customColors: Record<string, stri
       const part = classifyVrmCustomColorPartForMaterial(mesh.name, colored.name);
       const customHex = part ? customColors[part] : undefined;
       const hasCustom = isActiveCustomColorHex(customHex);
-      if (hasCustom) anyActiveCustom = true;
       let original = colored.userData.__vrmCustomColorOriginal as THREE.Color | undefined;
 
       if (original && (isVrmMannequinPaintColor(original) || isVrmNearBlackLitColor(original))) {
@@ -1464,10 +1462,10 @@ export function applyVrmCustomColors(vrm: VRM, customColors: Record<string, stri
     });
   });
 
-  // Idle / post-restore pass: heal textured clothes that collapsed to pure black lit×map.
-  if (!anyActiveCustom) {
-    repairVrmTexturedNearBlackLitFactors(vrm);
-  }
+  // Heal textured clothes that collapsed to pure black lit×map.
+  // Skip only materials that are actively custom-repainted or costume-repainted; leave
+  // other slots visible for near-black map lighting artifacts.
+  repairVrmTexturedNearBlackLitFactors(vrm);
 }
 
 // ── 재질 효과(MToon 셰이딩/외곽선/림라이트) ─────────────────────────────
