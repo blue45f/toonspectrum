@@ -11,6 +11,21 @@ export interface StudioLivingInkAcceptedAuthority {
   readonly canonicalSrc: string;
 }
 
+export type StudioLivingInkScope = "all" | "selection";
+
+/**
+ * Selection scope is only authoritative while the selected canonical image and its pixel mask are
+ * both still available. Callers must use this same effective scope for the UI, pointer admission,
+ * and Fix/Clear actions so a stale `selection` preference cannot silently route one path
+ * differently from another.
+ */
+export function studioLivingInkEffectiveScope(
+  requestedScope: StudioLivingInkScope,
+  selectionAvailable: boolean,
+): StudioLivingInkScope {
+  return requestedScope === "selection" && selectionAvailable ? "selection" : "all";
+}
+
 export function studioLivingInkCanReuseAcceptedAuthority(input: Readonly<{
   accepted: StudioLivingInkAcceptedAuthority | null;
   pageId: string;

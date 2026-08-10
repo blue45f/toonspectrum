@@ -449,6 +449,58 @@ describe("StudioLivingInkStudioCoordinator", () => {
     await Promise.resolve();
   });
 
+  it("invalidates and disposes a provider that finishes loading after physical mode is disabled", async () => {
+    let resolveProvider!: (provider: FakeProvider) => void;
+    const provider = new FakeProvider();
+    const coordinator = new StudioLivingInkStudioCoordinator({
+      providerFactory: () => new Promise<StudioLivingInkCoordinatorProvider>((resolve) => {
+        resolveProvider = resolve;
+      }),
+    });
+
+    const activation = coordinator.activate({ pageId: "page-1", config });
+    await Promise.resolve();
+    expect(coordinator.state).toBe("loading");
+
+    await expect(coordinator.dispose()).resolves.toBeUndefined();
+    expect(coordinator.state).toBe("unavailable");
+    expect(coordinator.pageId).toBeNull();
+
+    resolveProvider(provider);
+    await expect(activation).resolves.toBe(false);
+    expect(provider.disposed).toHaveBeenCalledTimes(1);
+    expect(coordinator.state).toBe("unavailable");
+    expect(coordinator.pageId).toBeNull();
+  });
+
+  it("disposes the loading provider immediately when physical replay is disabled mid-operation", async () => {
+    let releaseReplay!: () => void;
+    const provider = new FakeProvider();
+    provider.pendingApply = new Promise<void>((resolve) => { releaseReplay = resolve; });
+    const coordinator = new StudioLivingInkStudioCoordinator({
+      providerFactory: async () => provider,
+    });
+    const journal: StudioLivingInkOperation[] = [{
+      kind: "advance",
+      version: 1,
+      sequence: 1,
+      fixedTicks: 1,
+    }];
+
+    const activation = coordinator.activate({ pageId: "page-1", config, journal });
+    while (provider.operations.length === 0) await Promise.resolve();
+    expect(coordinator.state).toBe("loading");
+
+    await expect(coordinator.dispose()).resolves.toBeUndefined();
+    expect(provider.disposed).toHaveBeenCalledTimes(1);
+    expect(coordinator.state).toBe("unavailable");
+
+    releaseReplay();
+    await expect(activation).resolves.toBe(false);
+    expect(provider.disposed).toHaveBeenCalledTimes(1);
+    expect(coordinator.state).toBe("unavailable");
+  });
+
   it("cancels and rebuilds committed authority without waiting for a hung apply", async () => {
     let releaseApply!: () => void;
     const oldProvider = new FakeProvider();

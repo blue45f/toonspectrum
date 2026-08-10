@@ -452,10 +452,13 @@ export class StudioAutosaveOpfsSession {
 
   async dispose(): Promise<void> {
     if (this.#disposed) return;
+    // Close admission synchronously. Effect cleanup and page/route transitions can overlap a
+    // pending checkpoint; leaving the flag open until its tail settles lets a stale closure append
+    // behind the tail that disposal is waiting for and strand the renewed writer lease.
+    this.#disposed = true;
     await this.#tail;
     const writer = this.#writer;
     this.#writer = null;
-    this.#disposed = true;
     if (!writer) return;
     try {
       await this.#journal.releaseWriter(writer);

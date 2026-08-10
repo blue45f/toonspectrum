@@ -157,7 +157,14 @@ export class StudioPagesHistoryCommandJournalClient {
       // this fail-open promise boundary rather than letting it escape from recordTransition().
       .then(() => this.disposed ? null : this.loadRuntime(this.latestTarget))
       .then((runtime) => {
-        if (this.disposed || !runtime) return false;
+        if (!runtime) return false;
+        if (this.disposed) {
+          // Dynamic import/runtime construction cannot be cancelled. A runtime may therefore
+          // acquire its durable writer after the owning StrictMode generation or route has already
+          // unmounted. Dispose that late authority immediately instead of leaking its 30s lease.
+          runtime.dispose?.();
+          return false;
+        }
         this.runtime = runtime;
         const pending = this.pending;
         this.pending = [];
@@ -266,8 +273,8 @@ export class StudioPagesHistoryCommandJournalClient {
 
   /**
    * Release queued page graphs and ignore a runtime that resolves after the owning Studio unmounts.
-   * Dynamic import itself cannot be aborted, but disposed clients never replay its pending work.
-   */
+  * Dynamic import itself cannot be aborted, but disposed clients never replay its pending work.
+  */
   dispose(): void {
     this.disposed = true;
     this.runtime?.dispose?.();

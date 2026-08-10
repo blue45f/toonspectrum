@@ -586,6 +586,11 @@ async function prepareStudioPage(page: Page, studioUrl: string): Promise<void> {
   await installCleanStudioState(page);
   await page.goto(studioUrl, { waitUntil: "domcontentloaded", timeout: 20_000 });
   await page.locator('[data-studio-editor="true"]').waitFor({ state: "visible", timeout: 12_000 });
+  // Hide transient evidence chrome before any gesture. Moving the pointer or waiting after
+  // pointerup would skip the exact live-to-retained boundary this verifier must measure.
+  await page.addStyleTag({
+    content: '[data-studio-brush-hud="true"] { display: none !important; }',
+  });
   await dismissTransientChrome(page);
   const shellState = await page.evaluate(() => ({
     bodyTextLength: document.body.innerText.trim().length,
@@ -1313,9 +1318,8 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
         }
       }
       await page.mouse.up();
-      await page.mouse.move(4, 4);
-
       const immediate = await page.screenshot({ animations: "disabled", clip: usedClip });
+      await page.mouse.move(4, 4);
       const immediateDiff = await compareScreenshotPixels(page, before, immediate);
       if (DEBUG_BRUSH_VERIFIER && preset.id === "perfect-ink") {
         log(`DEBUG ${preset.id}: immediateDiff ${JSON.stringify(immediateDiff)} at point ${JSON.stringify(point)}`);
@@ -1507,6 +1511,9 @@ interface PersistedDrawElement {
   brushCatalogId: string | null;
   brushCatalogName: string | null;
   brushDynamics: unknown;
+  groupId: string | null;
+  hidden: boolean;
+  hasLivingInkReceipt: boolean;
   kind: string | null;
   mode: "pen" | "eraser";
   polygonSides: number | null;
@@ -1555,6 +1562,9 @@ async function persistedDrawElements(page: Page): Promise<PersistedDrawElement[]
           ? record.brushCatalogName
           : null,
         brushDynamics: record.brushDynamics,
+        groupId: typeof record.groupId === "string" ? record.groupId : null,
+        hidden: record.hidden === true,
+        hasLivingInkReceipt: record.livingInkReceipt != null,
         kind: typeof record.kind === "string" ? record.kind : "freehand",
         mode: record.mode === "eraser" ? "eraser" as const : "pen" as const,
         polygonSides,
@@ -1604,6 +1614,9 @@ async function waitForPersistedSingleCatalogStroke(
       && draw?.brushCatalogId === catalogId
       && draw.brushCatalogName === catalogName
       && draw.brush === runtimeBrushId
+      && draw.hidden !== true
+      && draw.groupId == null
+      && draw.livingInkReceipt == null
       && Array.isArray(draw.points)
       && draw.points.length >= 4
       && Boolean(draw.brushDynamics)
@@ -1627,6 +1640,12 @@ async function waitForPersistedSingleCatalogStroke(
   invariant(
     saved.brush === expected.runtimeBrushId,
     `${expected.catalogId}: persisted runtime brush is ${saved.brush ?? "missing"}, expected ${expected.runtimeBrushId}`,
+  );
+  invariant(!saved.hidden, `${expected.catalogId}: ordinary stroke was hidden after pointerup`);
+  invariant(saved.groupId === null, `${expected.catalogId}: ordinary stroke was grouped after pointerup`);
+  invariant(
+    !saved.hasLivingInkReceipt,
+    `${expected.catalogId}: ordinary stroke unexpectedly entered the Living Ink document route`,
   );
   return saved;
 }
@@ -1773,6 +1792,16 @@ async function waitForPersistedSelectedOperation(
         && (element as { type?: unknown }).type === "draw"
       );
     if (draws.length !== drawCount) return false;
+    if (draws.some((draw) => (
+      draw.hidden === true
+      || draw.groupId != null
+      || draw.livingInkReceipt != null
+    ))) return false;
+    if ((pageRecord?.elements ?? []).some((element) => (
+      Boolean(element)
+      && typeof element === "object"
+      && (element as Record<string, unknown>).livingInkReceipt != null
+    ))) return false;
     const draw = draws.at(-1);
     if (!draw || !Array.isArray(draw.points) || draw.points.length < 4) return false;
     if (expectedOperation === "erase") {
@@ -1813,6 +1842,18 @@ async function waitForPersistedSelectedOperation(
       ? stroke.mode === "eraser" && stroke.brush === null
       : stroke.mode === "pen" && stroke.brush === expected.runtimeBrushId,
     `${expected.catalogId}: autosave persisted the wrong ${operation} operation`,
+  );
+  invariant(
+    draws.every((draw) => !draw.hidden),
+    `${expected.catalogId}: an ordinary operation was hidden after pointerup`,
+  );
+  invariant(
+    draws.every((draw) => draw.groupId === null),
+    `${expected.catalogId}: an ordinary operation gained a group id`,
+  );
+  invariant(
+    draws.every((draw) => !draw.hasLivingInkReceipt),
+    `${expected.catalogId}: an ordinary operation entered the Living Ink document route`,
   );
   return { stroke, draws };
 }
@@ -1972,8 +2013,9 @@ function writeLongBrushQualityReport(input: Readonly<{
       identicalCropWithinBrush: true,
       uiContamination:
         "The crop is confined to the exposed central canvas, both route endpoints must pass "
-        + "elementFromPoint(.konvajs-content), and the baseline is stability-polled after hover "
-        + "is moved to (4,4). Fixed editor chrome therefore never contributes to the ROI.",
+        + "elementFromPoint(.konvajs-content), and the brush HUD is hidden by verifier-only CSS "
+        + "before the gesture. The immediate release frame is captured before any pointer move "
+        + "or wait, so fixed and transient editor chrome never contributes to the ROI.",
       cursorIsolation:
         "The isolated browser context persists brushCursorStyle='none' in an init script before "
         + "Studio initializes. All transition metrics therefore compare the complete ink ROI; "

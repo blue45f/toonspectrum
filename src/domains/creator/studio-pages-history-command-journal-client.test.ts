@@ -29,6 +29,7 @@ function deferredRuntime() {
 }
 
 class FakeRuntime {
+  disposeCount = 0;
   readonly actions: Array<
     | { kind: "transition"; input: StudioHistoryJournalTransitionInput }
     | { kind: "undo" | "redo" | "rebase"; target: StudioHistoryJournalNavigationTarget }
@@ -53,6 +54,10 @@ class FakeRuntime {
 
   reset() {
     this.actions.push({ kind: "reset" });
+  }
+
+  dispose() {
+    this.disposeCount += 1;
   }
 }
 
@@ -293,6 +298,7 @@ describe("Studio pages history command journal lazy client", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(runtime.actions).toEqual([]);
+    expect(runtime.disposeCount).toBe(1);
     await expect(client.ready()).rejects.toThrow(
       "Studio history journal client has been disposed."
     );
