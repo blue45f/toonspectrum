@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "artifactId": "libmypaint",
+  "components": [
+    {
+      "name": "libmypaint",
+      "version": "1.6.1",
+      "commit": "2768251dacce3939136c839aeca413f4aa4241d0",
+      "license": "ISC",
+      "upstream": "https://github.com/mypaint/libmypaint",
+      "copiedLicense": "COPYING",
+      "licenseSha256": "1246cef097bd4b57ad0fb1127cf131af7aeb06e0c00a6aff5dd5b7603303b149"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "mypaint-wasm.mjs",
+      "sha256": "c9328dfdf5e793783ace902f446816bf4c5f579a61db0eddfc59043654cc7f2e"
+    },
+    {
+      "path": "mypaint-wasm.wasm",
+      "sha256": "811e5d89fd740dcb18f75ed5b631a405e05d84b3efb9a2f577f25f99301f757b"
+    }
+  ]
+}

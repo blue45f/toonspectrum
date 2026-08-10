@@ -193,6 +193,25 @@ async function waitForServer(url: string, timeoutMs = 20000): Promise<void> {
 }
 
 /**
+ * The production-preview gate intentionally does not start Nest. Provide the same explicit guest
+ * session boundary used by the Hybrid DCC verifier so auth transport noise cannot be confused
+ * with a Studio chrome regression; every unhandled console/page error remains a hard failure.
+ */
+async function installStudioGuestSessionBoundary(page: Page): Promise<void> {
+  await page.route("**/api/auth/session", async (route) => {
+    if (route.request().method() !== "GET") {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json; charset=utf-8",
+      body: JSON.stringify({ authenticated: false, user: null }),
+    });
+  });
+}
+
+/**
  * Everything above the canvas in one DOM pass. Runs inside the page so rect
  * math sees real computed layout (Tailwind pointer-coarse variants included).
  */
@@ -644,6 +663,7 @@ async function runMode(
     if (!isExpectedStaticPreviewError(text, url)) consoleErrors.push(text);
   });
   page.on("pageerror", (error) => consoleErrors.push(String(error)));
+  await installStudioGuestSessionBoundary(page);
 
   // tsx(esbuild) keepNames rewrites nested functions with a `__name` helper that
   // does not exist inside the page; give the evaluated snippets a no-op shim.
@@ -654,6 +674,13 @@ async function runMode(
     try {
       window.localStorage.setItem(quickStartKey, "1");
       window.localStorage.setItem(mobileHintKey, "1");
+      // This verifier addresses Korean product labels throughout. Pin the app locale so a
+      // headless Chromium host whose navigator.language is en-US does not translate the same
+      // accessible navigation landmark to "Studio mobile toolbar" before we query it.
+      window.localStorage.setItem(
+        "toonspectrum-lang",
+        JSON.stringify({ state: { lang: "ko" }, version: 0 }),
+      );
       window.sessionStorage.setItem(immersiveKey, immersiveValue);
     } catch {}
   }, {

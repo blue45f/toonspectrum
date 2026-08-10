@@ -81,6 +81,32 @@ describe("Studio BG3D asset-library ownership boundary", () => {
     expect(panelSource).toContain('aria-label="3D 모델 및 연결 파일 선택"');
   });
 
+  it("delays SQLite/OPFS model, template, and LT preset authorities until their product surfaces activate", () => {
+    const editorSource = moduleSource("./StudioBackground3D.tsx");
+    const editorImports = moduleImports("./StudioBackground3D.tsx");
+    const modelLoaderImports = moduleImports("./studio-bg3d-model-library-loader.ts");
+    const templateLoaderImports = moduleImports("./studio-bg3d-template-library-loader.ts");
+    const presetLoaderImports = moduleImports("./studio-bg3d-lt-preset-repository-loader.ts");
+
+    expect(editorImports.valueImports).toContain("./studio-bg3d-model-library-loader");
+    expect(editorImports.valueImports).toContain("./studio-bg3d-template-library-loader");
+    expect(editorImports.valueImports).toContain("./studio-bg3d-lt-preset-repository-loader");
+    expect(editorImports.valueImports).not.toContain("./bg3d-model-library");
+    expect(editorImports.valueImports).not.toContain("./bg3d-template-library");
+    expect(editorImports.valueImports).not.toContain(
+      "./studio-mannequin-bg3d-preset-sqlite-repository",
+    );
+    expect(modelLoaderImports.dynamicImports).toEqual(["./bg3d-model-library"]);
+    expect(templateLoaderImports.dynamicImports).toEqual(["./bg3d-template-library"]);
+    expect(presetLoaderImports.dynamicImports).toEqual([
+      "./studio-mannequin-bg3d-preset-sqlite-repository",
+    ]);
+    expect(editorSource).toContain("if (!open || !modelsPanelActivated) return;");
+    expect(editorSource).toContain("if (!open || !ltPresetPanelActivated) return;");
+    expect(editorSource).toContain('if (tab === "models") setModelsPanelActivated(true)');
+    expect(editorSource).toContain('if (tab === "lt") setLtPresetPanelActivated(true)');
+  });
+
   it("preserves the single analyzable lazy editor boundary", () => {
     const loaderImports = moduleImports("./studio-background-3d-loader.ts");
 

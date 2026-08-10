@@ -1,0 +1,641 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-08T20:31:13.622Z",
+  "status": "pass",
+  "pass": true,
+  "benchmark": {
+    "status": "ok",
+    "pass": true,
+    "schemaVersion": 1,
+    "execution": "vite-production-build-chromium-dedicated-worker-opfs-sahpool",
+    "authority": {
+      "kind": "sqlite-opfs-sahpool",
+      "requestedVfs": "opfs",
+      "productOpenExpression": "openStudioLocalDatabase({ vfs: \"opfs\", loadSqlite })",
+      "productionPersistence": "createStudioAnimaticSqlitePersistence",
+      "namespace": "studio-animatic-v12",
+      "sqlitePackage": "@sqlite.org/sqlite-wasm 3.53.0-build1",
+      "opfsDirectory": "toonspectrum-studio-sqlite",
+      "logicalDatabaseFilename": "studio-local-v12.db",
+      "expectedOpenFilename": "/studio-local-v12.db",
+      "openedOpfsDatabaseFilenames": [
+        "/studio-local-v12.db",
+        "/studio-local-v12.db"
+      ],
+      "installedOpfsDirectories": [
+        "toonspectrum-studio-sqlite",
+        "toonspectrum-studio-sqlite"
+      ],
+      "opfsDatabaseOpenCount": 2,
+      "nonV12DatabaseOpenCount": 0,
+      "oldDatabaseFilenameOpenCount": 0,
+      "memoryDatabaseOpenCount": 0,
+      "memoryDatabaseOpenFilenames": [],
+      "memoryVfsUsed": false,
+      "localStorageApiPresent": false,
+      "localStorageFallbackUsed": false,
+      "closeCompletedBeforeReopen": true
+    },
+    "policy": {
+      "legacyDataMigration": false,
+      "discardExistingStudioData": true,
+      "oldLocalStorageRead": false
+    },
+    "support": {
+      "wasm": true,
+      "opfs": true
+    },
+    "capabilities": {
+      "dedicatedWorker": true,
+      "secureContext": true,
+      "crossOriginIsolated": true,
+      "navigatorStorageGetDirectory": true,
+      "syncAccessHandle": true,
+      "cryptoSubtle": true,
+      "localStorageApiPresent": false
+    },
+    "browser": {
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.186 Safari/537.36",
+      "language": "en-US",
+      "hardwareConcurrency": 12,
+      "deviceMemoryGiB": 8
+    },
+    "config": {
+      "workScope": "v12-opfs-animatic-maximum-document",
+      "corruptionScope": "v12-opfs-animatic-corruption-probe",
+      "segmentCount": 180,
+      "segmentCap": 180,
+      "cameraKeyframesPerSegment": 16,
+      "cameraKeyframeCount": 2880,
+      "cueCount": 1139,
+      "cueAbsoluteCap": 5760,
+      "maximumPracticalCueSearch": "binary-search-next-cue-fails-export-or-text-gate",
+      "nextCueRejected": true,
+      "nextCueError": "애니매틱 JSON은 800KB 이하여야 합니다.",
+      "maximumSourceExportBytes": 799973,
+      "finalEditExportBytes": 799973,
+      "exportByteCap": 800000,
+      "saveSampleCount": 120,
+      "loadSampleCount": 120,
+      "uniqueSequentialEditCount": 120
+    },
+    "opening": {
+      "sqliteWasmInitMs": 44.08,
+      "coldOpenMs": 32.165,
+      "reopenMs": 0.81
+    },
+    "saves": {
+      "successfulCount": 120,
+      "distribution": {
+        "sampleCount": 120,
+        "percentileMethod": "nearest-rank-ceil",
+        "samplesMs": [
+          22.465,
+          22.1,
+          22.38,
+          21.035,
+          23.4,
+          22.86,
+          23.305,
+          20.445,
+          21.85,
+          22.7,
+          22.745,
+          24.18,
+          20.5,
+          21.63,
+          23.175,
+          22.415,
+          24.05,
+          22.05,
+          22.88,
+          24.52,
+          24.33,
+          22.925,
+          22.73,
+          22.73,
+          22.41,
+          23.355,
+          22.225,
+          23.11,
+          23.375,
+          23.59,
+          22.93,
+          23.275,
+          22.22,
+          23.18,
+          22.31,
+          22.58,
+          25.1,
+          22.57,
+          22.34,
+          21.98,
+          23.355,
+          22.33,
+          22.515,
+          23.305,
+          23.12,
+          23.36,
+          23.065,
+          22.745,
+          22.585,
+          21.79,
+          25.345,
+          20.99,
+          21.84,
+          22.585,
+          22.495,
+          22.375,
+          22.74,
+          22.51,
+          22.655,
+          22.72,
+          20.29,
+          24.305,
+          22.76,
+          22.7,
+          25.17,
+          22.885,
+          22.42,
+          21.945,
+          22.235,
+          21.18,
+          23,
+          21.97,
+          22.99,
+          22.775,
+          22.635,
+          22.9,
+          22.715,
+          22.25,
+          24.625,
+          21.8,
+          20.84,
+          21.875,
+          23.02,
+          22.99,
+          23.005,
+          22.23,
+          21.905,
+          21.855,
+          21.945,
+          22.415,
+          22.015,
+          23.84,
+          24.075,
+          22.905,
+          23.265,
+          24.475,
+          23.65,
+          23.35,
+          25.305,
+          26.56,
+          22.68,
+          23.39,
+          23.12,
+          22.33,
+          22.575,
+          22.485,
+          24.38,
+          21.605,
+          19.7,
+          22.83,
+          21.53,
+          22.71,
+          22.745,
+          22.42,
+          22.095,
+          22.93,
+          22.52,
+          21.67,
+          22.53,
+          19.11
+        ],
+        "minMs": 19.11,
+        "p50Ms": 22.7,
+        "p95Ms": 24.52,
+        "p99Ms": 25.345,
+        "maxMs": 26.56,
+        "meanMs": 22.7067
+      }
+    },
+    "loads": {
+      "successfulCount": 120,
+      "mismatchCount": 0,
+      "distribution": {
+        "sampleCount": 120,
+        "percentileMethod": "nearest-rank-ceil",
+        "samplesMs": [
+          5.11,
+          4.885,
+          4.955,
+          4.83,
+          4.99,
+          4.7,
+          4.715,
+          4.725,
+          4.85,
+          4.87,
+          5.045,
+          6.095,
+          4.905,
+          4.895,
+          4.845,
+          4.865,
+          4.98,
+          4.86,
+          4.745,
+          4.695,
+          4.67,
+          4.85,
+          4.715,
+          4.635,
+          4.79,
+          4.785,
+          4.735,
+          4.85,
+          4.89,
+          4.9,
+          4.725,
+          4.745,
+          4.975,
+          4.78,
+          4.83,
+          5.005,
+          4.885,
+          4.925,
+          4.825,
+          4.975,
+          6.81,
+          4.775,
+          4.895,
+          4.575,
+          4.77,
+          4.805,
+          5,
+          4.92,
+          4.805,
+          4.58,
+          4.575,
+          4.635,
+          4.67,
+          4.745,
+          4.705,
+          4.58,
+          4.945,
+          4.87,
+          4.695,
+          4.725,
+          4.655,
+          4.6,
+          4.64,
+          4.7,
+          4.835,
+          4.7,
+          4.73,
+          4.735,
+          6.205,
+          4.88,
+          4.62,
+          4.825,
+          4.855,
+          4.715,
+          4.85,
+          4.67,
+          4.685,
+          4.755,
+          4.8,
+          4.62,
+          4.675,
+          4.76,
+          4.815,
+          4.75,
+          4.705,
+          4.82,
+          4.645,
+          5.05,
+          4.7,
+          5.07,
+          4.795,
+          4.945,
+          4.825,
+          4.92,
+          4.845,
+          4.85,
+          6.705,
+          4.84,
+          4.93,
+          4.825,
+          5.53,
+          4.815,
+          4.895,
+          5.135,
+          4.91,
+          4.81,
+          4.775,
+          4.825,
+          4.67,
+          4.635,
+          4.7,
+          4.895,
+          4.805,
+          5.955,
+          4.605,
+          4.605,
+          4.6,
+          4.645,
+          4.725,
+          4.78
+        ],
+        "minMs": 4.575,
+        "p50Ms": 4.805,
+        "p95Ms": 5.135,
+        "p99Ms": 6.705,
+        "maxMs": 6.81,
+        "meanMs": 4.8666
+      }
+    },
+    "semanticIntegrity": {
+      "productValidationPath": "createStudioAnimaticSqlitePersistence -> export/importStudioAnimaticDocument",
+      "initialLoadStatus": "empty",
+      "sourceImportValidated": true,
+      "canonicalBytes": 799973,
+      "canonicalDigestSha256": "5464eedd43b849831d77cf5e9a3fbd299bd98c05046a0e093f91c40eab66bd16",
+      "persistedBeforeCloseBytes": 799973,
+      "persistedBeforeCloseDigestSha256": "5464eedd43b849831d77cf5e9a3fbd299bd98c05046a0e093f91c40eab66bd16",
+      "persistedBeforeCloseExact": true,
+      "reopenedBytes": 799973,
+      "reopenedDigestSha256": "5464eedd43b849831d77cf5e9a3fbd299bd98c05046a0e093f91c40eab66bd16",
+      "reopenedCanonicalBytesExact": true,
+      "normalizedDocumentExact": true
+    },
+    "corruption": {
+      "separateScope": "v12-opfs-animatic-corruption-probe",
+      "separateStorageKey": "toonspectrum-studio-animatic:v12:198brgx:0ukkp9h",
+      "status": "invalid",
+      "documentIsNull": true,
+      "error": "애니매틱 JSON을 해석하지 못했습니다.",
+      "failClosed": true,
+      "mainDocumentIntact": true
+    },
+    "opfs": {
+      "before": {
+        "exists": false,
+        "error": {
+          "name": "NotFoundError",
+          "message": "A requested file or directory could not be found at the time an operation was processed.",
+          "stack": null
+        },
+        "entries": [],
+        "fileCount": 0,
+        "totalFileBytes": 0
+      },
+      "afterSave": {
+        "exists": true,
+        "entries": [
+          {
+            "path": ".opaque",
+            "kind": "directory",
+            "sizeBytes": null
+          },
+          {
+            "path": ".opaque/36eqazot61n",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/jzuogs1ahyq",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/m2fleb643wf",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/nplclufsp3k",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/tasi2qi68h",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/wleogfw09e",
+            "kind": "file",
+            "sizeBytes": 1773568
+          }
+        ],
+        "fileCount": 6,
+        "totalFileBytes": 1794048
+      },
+      "final": {
+        "exists": true,
+        "entries": [
+          {
+            "path": ".opaque",
+            "kind": "directory",
+            "sizeBytes": null
+          },
+          {
+            "path": ".opaque/36eqazot61n",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/jzuogs1ahyq",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/m2fleb643wf",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/nplclufsp3k",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/tasi2qi68h",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/wleogfw09e",
+            "kind": "file",
+            "sizeBytes": 1773568
+          }
+        ],
+        "fileCount": 6,
+        "totalFileBytes": 1794048
+      }
+    },
+    "storage": {
+      "before": {
+        "usageBytes": 0,
+        "quotaBytes": 2032293000,
+        "usageDetails": {}
+      },
+      "afterSave": {
+        "usageBytes": 1795410,
+        "quotaBytes": 2032293000,
+        "usageDetails": {
+          "fileSystem": 1795410
+        }
+      },
+      "final": {
+        "usageBytes": 1795410,
+        "quotaBytes": 2032293000,
+        "usageDetails": {
+          "fileSystem": 1795410
+        }
+      }
+    },
+    "memory": {
+      "before": {
+        "performanceMemory": null,
+        "userAgentSpecific": null,
+        "userAgentSpecificError": null,
+        "unavailableIsNull": true
+      },
+      "afterSave": {
+        "performanceMemory": null,
+        "userAgentSpecific": null,
+        "userAgentSpecificError": null,
+        "unavailableIsNull": true
+      },
+      "final": {
+        "performanceMemory": null,
+        "userAgentSpecific": null,
+        "userAgentSpecificError": null,
+        "unavailableIsNull": true
+      }
+    },
+    "securityPolicyViolations": [],
+    "pageMemory": {
+      "before": {
+        "performanceMemory": {
+          "usedJSHeapSizeBytes": 670288,
+          "totalJSHeapSizeBytes": 1575916,
+          "jsHeapSizeLimitBytes": 4294705152
+        },
+        "userAgentSpecific": null,
+        "userAgentSpecificError": {
+          "name": "SecurityError",
+          "message": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available.",
+          "stack": "SecurityError: Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available.\n    at n (http://127.0.0.1:58256/assets/index-BCP9JUhv.js:1:1023)\n    at i (http://127.0.0.1:58256/assets/index-BCP9JUhv.js:1:1562)\n    at http://127.0.0.1:58256/assets/index-BCP9JUhv.js:1:2483"
+        },
+        "unavailableIsNull": false
+      },
+      "after": {
+        "performanceMemory": {
+          "usedJSHeapSizeBytes": 1275519,
+          "totalJSHeapSizeBytes": 1871231,
+          "jsHeapSizeLimitBytes": 4294705152
+        },
+        "userAgentSpecific": null,
+        "userAgentSpecificError": {
+          "name": "SecurityError",
+          "message": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available.",
+          "stack": "SecurityError: Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available.\n    at n (http://127.0.0.1:58256/assets/index-BCP9JUhv.js:1:1023)\n    at Worker.<anonymous> (http://127.0.0.1:58256/assets/index-BCP9JUhv.js:1:2012)"
+        },
+        "unavailableIsNull": false
+      }
+    },
+    "pageSecurityPolicyViolations": []
+  },
+  "diagnostics": {
+    "browserVersion": "140.0.7339.186",
+    "consoleErrors": [],
+    "consoleWarnings": [],
+    "pageErrors": [],
+    "requestFailures": [],
+    "errorResponses": [],
+    "requests": [
+      {
+        "method": "GET",
+        "resourceType": "document",
+        "url": "http://127.0.0.1:58256/"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:58256/assets/index-BCP9JUhv.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:58256/assets/animatic-sqlite-opfs-browser-client-DJDVlacA.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:58256/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:58256/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:58256/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      }
+    ],
+    "responses": [
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:58256/"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:58256/assets/index-BCP9JUhv.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:58256/assets/animatic-sqlite-opfs-browser-client-DJDVlacA.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:58256/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:58256/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:58256/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      }
+    ],
+    "responseHeaders": {
+      "contentSecurityPolicy": "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'; worker-src 'self'; style-src 'none'; img-src 'none'; font-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+      "crossOriginOpenerPolicy": "same-origin",
+      "crossOriginEmbedderPolicy": "require-corp",
+      "crossOriginResourcePolicy": "same-origin"
+    }
+  },
+  "productionBuild": {
+    "mode": "vite-production-build",
+    "assets": [
+      ".vite/manifest.json",
+      "assets/animatic-sqlite-opfs-browser-client-DJDVlacA.js",
+      "assets/animatic-sqlite-opfs-browser-client-DJDVlacA.js.map",
+      "assets/index-BCP9JUhv.js",
+      "assets/index-BCP9JUhv.js.map",
+      "assets/sqlite3-BVKGSWc-.wasm",
+      "assets/sqlite3-opfs-async-proxy-D_xnb1D8.js",
+      "assets/sqlite3-worker1-N5XM9NUp.js",
+      "assets/sqlite3-worker1-N5XM9NUp.js.map",
+      "index.html"
+    ],
+    "scratchDirectory": "/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/toonspectrum-animatic-sqlite-opfs-La3CIA"
+  },
+  "validationIssues": []
+}

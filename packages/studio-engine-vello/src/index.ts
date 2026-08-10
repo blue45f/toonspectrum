@@ -1,14 +1,19 @@
 export {
   velloCpuProviderDescriptor,
   velloGpuBrowserProviderDescriptor,
+  velloSvgNativeProviderDescriptor,
 } from "./descriptor";
 export {
+  adoptGpuDevice,
   compareGpuVsCpu,
   fuzzyMismatchPct,
+  gpuDeviceHandle,
   hasWebGpu,
+  isGpuDeviceAdopted,
   loadVelloGpuBrowser,
   probeWebGpu,
   renderSceneToPixelsGpu,
+  renderSceneToTextureGpu,
   type GpuCpuComparison,
   type VelloGpuInitInput,
   type WebGpuAdapterInfo,
@@ -37,6 +42,7 @@ export type { ShapedText, ShapedGlyph, ShapeTextOptions } from "./text";
 export {
   shapeTextVerticalToGlyphPaths,
   verticalColumnSchema,
+  verticalFeatureEvidenceSchema,
   verticalMetricsSourceSchema,
   verticalShapedGlyphSchema,
   verticalShapedTextSchema,
@@ -44,6 +50,7 @@ export {
 export type {
   ShapeTextVerticalOptions,
   VerticalColumn,
+  VerticalFeatureEvidence,
   VerticalMetricsSource,
   VerticalShapedGlyph,
   VerticalShapedText,
@@ -55,6 +62,14 @@ export {
   fnv1a32,
   shapeTextCached,
 } from "./text-cache";
+export {
+  SvgNativeRenderError,
+  auditSvgNative,
+  loadVelloSvgNative,
+  renderSvgToPixelsVelloCpu,
+  renderSvgToPixelsVelloGpu,
+} from "./svg-vello";
+export type { SvgNativeAudit, SvgNativeErrorCode } from "./svg-vello";
 export type {
   TextShapeCache,
   TextShapeCacheMetrics,

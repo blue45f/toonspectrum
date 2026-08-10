@@ -40,6 +40,31 @@ export const STUDIO_LIVING_INK_WGSL_SHADER_REVISION = "wgsl-field-v3-paper-resol
 export const STUDIO_LIVING_INK_WGSL_UNIFORM_WORDS = 40 as const;
 
 /**
+ * Release is not Fix. It needs a much shorter momentum tail, however: the production fast-stroke
+ * probe measured 32.31 px of post-release drift with the Fix-only 7/s extra rate. Treating that as
+ * `v0 / 7` gives an initial residual velocity near 226 px/s. An additional 60/s release rate keeps
+ * the conservative discrete integral (move first, then damp at 60 Hz for 120 ticks) below 6 px,
+ * leaving margin under the 7 px preferred gate without changing any pigment/drying semantics.
+ */
+export const STUDIO_LIVING_INK_RELEASE_VELOCITY_DAMPING_RATE_PER_SECOND = 60 as const;
+
+/** Shared WebGL2/WebGPU/reference velocity retention selector for one fixed simulation tick. */
+export function studioLivingInkVelocityDampingForStep(
+  flow: number,
+  dt: number,
+  fixing: boolean,
+  velocitySettling: boolean,
+): number {
+  // Fix retains its reviewed 7/s path exactly, even if a malformed caller supplies both flags.
+  if (fixing) return studioLivingInkVelocityDamping(flow, dt, true);
+  const interactiveRetention = studioLivingInkVelocityDamping(flow, dt, false);
+  return velocitySettling
+    ? interactiveRetention
+      * Math.exp(-dt * STUDIO_LIVING_INK_RELEASE_VELOCITY_DAMPING_RATE_PER_SECOND)
+    : interactiveRetention;
+}
+
+/**
  * Display-resolve mode code, shared with the GLSL runtime's `displayMode` uniform. The numbers are
  * the contract between the two backends — the WGSL resolve reproduces the same branch ladder
  * (`> 3.5` flow, `> 2.5` water, `0.5 … 1.5` mobile-only, `> 1.5` fixed-only) that
@@ -91,6 +116,12 @@ export interface StudioLivingInkFieldUniformInput {
   readonly vorticity: number;
   readonly capillaryCreep: number;
   readonly fixing: boolean;
+  /**
+   * Pen-up settle may stop residual momentum without invoking any fixation chemistry. This flag
+   * affects only velocity retention (slot 12); evaporation and mobile-to-fixed transfer continue
+   * to follow `fixing` exclusively.
+   */
+  readonly velocitySettling: boolean;
   readonly dryingEdgeDeposition: number;
   /**
    * Per-channel pigment diffusion blend for this step, from `studioLivingInkPigmentDiffusionRates`
@@ -124,7 +155,12 @@ export function writeStudioLivingInkFieldUniforms(
   data[9] = input.fixTransfer;
   words[10] = input.coarseWidth;
   words[11] = input.coarseHeight;
-  data[12] = studioLivingInkVelocityDamping(input.flow, input.dt, input.fixing);
+  data[12] = studioLivingInkVelocityDampingForStep(
+    input.flow,
+    input.dt,
+    input.fixing,
+    input.velocitySettling,
+  );
   data[13] = studioLivingInkVorticityStrength(input.vorticity);
   data[14] = STUDIO_LIVING_INK_FLUID_DEFAULTS.velocityWetGate.minimum;
   data[15] = STUDIO_LIVING_INK_FLUID_DEFAULTS.velocityWetGate.maximum;
@@ -1395,6 +1431,8 @@ export interface StudioLivingInkFluidReferenceStepParams {
   readonly capillaryCreep: number;
   readonly pressureIterations: number;
   readonly fixing?: boolean;
+  /** Stops residual momentum at release without enabling fixation evaporation semantics. */
+  readonly velocitySettling?: boolean;
   /**
    * Lab switches. Production always runs every pass; these exist so a quality gate can isolate one
    * mechanism and measure what it is actually worth (confinement vs. none, chromatographic
@@ -1867,11 +1905,17 @@ export function stepStudioLivingInkFluidReference(
   params: StudioLivingInkFluidReferenceStepParams,
 ): Readonly<{ divergenceBefore: number; divergenceAfter: number }> {
   const fixing = params.fixing === true;
+  const velocitySettling = params.velocitySettling === true;
   const chroma = studioLivingInkReferenceChroma(params.chromaticSeparation);
   advectVelocityReference(
     field,
     params.dt,
-    studioLivingInkVelocityDamping(params.flow, params.dt, fixing),
+    studioLivingInkVelocityDampingForStep(
+      params.flow,
+      params.dt,
+      fixing,
+      velocitySettling,
+    ),
   );
   if (params.confinement !== false) {
     confineVorticityReference(

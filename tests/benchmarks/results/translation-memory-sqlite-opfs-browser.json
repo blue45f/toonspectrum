@@ -1,0 +1,385 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-08T20:34:53.358Z",
+  "status": "pass",
+  "pass": true,
+  "benchmark": {
+    "status": "ok",
+    "pass": true,
+    "schemaVersion": 1,
+    "execution": "vite-production-build-chromium-dedicated-worker-opfs-sahpool",
+    "authority": {
+      "kind": "sqlite-opfs-sahpool",
+      "requestedVfs": "opfs",
+      "productPersistence": "createStudioTranslationMemorySqlitePersistence",
+      "namespace": "studio-translation-memory-v12",
+      "key": "library-v1",
+      "opfsDirectory": "toonspectrum-studio-sqlite",
+      "logicalDatabaseFilename": "studio-local-v12.db",
+      "expectedOpenFilename": "/studio-local-v12.db",
+      "openedOpfsDatabaseFilenames": [
+        "/studio-local-v12.db",
+        "/studio-local-v12.db"
+      ],
+      "installedOpfsDirectories": [
+        "toonspectrum-studio-sqlite",
+        "toonspectrum-studio-sqlite"
+      ],
+      "opfsDatabaseOpenCount": 2,
+      "nonV12DatabaseOpenCount": 0,
+      "memoryDatabaseOpenCount": 0,
+      "memoryDatabaseOpenFilenames": [],
+      "memoryVfsUsed": false,
+      "localStorageApiPresent": false,
+      "localStorageFallbackUsed": false,
+      "closeCompletedBeforeReopen": true
+    },
+    "policy": {
+      "legacyDataMigration": false,
+      "discardExistingStudioData": true,
+      "oldLocalStorageRead": false,
+      "legacyKeyProbeEmpty": true,
+      "legacyNamespaceProbeEmpty": true
+    },
+    "support": {
+      "wasm": true,
+      "opfs": true
+    },
+    "capabilities": {
+      "dedicatedWorker": true,
+      "secureContext": true,
+      "crossOriginIsolated": true,
+      "navigatorStorageGetDirectory": true,
+      "syncAccessHandle": true,
+      "cryptoSubtle": true,
+      "localStorageApiPresent": false
+    },
+    "browser": {
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.186 Safari/537.36",
+      "language": "en-US",
+      "hardwareConcurrency": 12,
+      "deviceMemoryGiB": 8
+    },
+    "config": {
+      "entryCount": 512,
+      "saveSampleCount": 30,
+      "loadSampleCount": 50,
+      "canonicalBytes": 296700
+    },
+    "opening": {
+      "sqliteWasmInitMs": 35.865,
+      "coldOpenMs": 33.63,
+      "reopenMs": 0.535
+    },
+    "saves": {
+      "successfulCount": 30,
+      "distribution": {
+        "sampleCount": 30,
+        "percentileMethod": "nearest-rank-ceil",
+        "samplesMs": [
+          16.255,
+          13.86,
+          8.445,
+          8.99,
+          7.91,
+          7.695,
+          7.965,
+          8.135,
+          8.03,
+          7.635,
+          12.435,
+          7.085,
+          7.33,
+          7.785,
+          8.375,
+          8.37,
+          10.74,
+          8.68,
+          8.285,
+          9.755,
+          7.57,
+          7.905,
+          7.695,
+          8.205,
+          7.875,
+          8.115,
+          7.635,
+          7.91,
+          7.605,
+          7.66
+        ],
+        "minMs": 7.085,
+        "p50Ms": 7.965,
+        "p95Ms": 13.86,
+        "p99Ms": 16.255,
+        "maxMs": 16.255,
+        "meanMs": 8.7312
+      }
+    },
+    "loads": {
+      "successfulCount": 50,
+      "mismatchCount": 0,
+      "distribution": {
+        "sampleCount": 50,
+        "percentileMethod": "nearest-rank-ceil",
+        "samplesMs": [
+          9.225,
+          8.98,
+          9.82,
+          8.995,
+          8.715,
+          9.195,
+          8.385,
+          8.88,
+          8.375,
+          9.215,
+          8.92,
+          8.855,
+          8.385,
+          8.75,
+          8.45,
+          8.53,
+          8.28,
+          8.445,
+          8.87,
+          8.645,
+          9.915,
+          8.81,
+          8.655,
+          8.515,
+          8.795,
+          8.43,
+          9.965,
+          8.565,
+          8.7,
+          8.665,
+          8.63,
+          8.885,
+          8.25,
+          10.075,
+          8.62,
+          8.65,
+          9.16,
+          9.13,
+          8.335,
+          8.895,
+          8.975,
+          8.825,
+          9.26,
+          8.52,
+          8.905,
+          8.455,
+          8.345,
+          8.51,
+          8.85,
+          8.425
+        ],
+        "minMs": 8.25,
+        "p50Ms": 8.715,
+        "p95Ms": 9.915,
+        "p99Ms": 10.075,
+        "maxMs": 10.075,
+        "meanMs": 8.8126
+      }
+    },
+    "integrity": {
+      "expectedEntryCount": 512,
+      "reopenedEntryCount": 512,
+      "noEntryLoss": true,
+      "canonicalJsonExact": true,
+      "rawBeforeCloseExact": true,
+      "rawAfterReopenExact": true,
+      "expectedSha256": "fa4e5b25cb75891546ac366a7440a5581840cbd51cb6ff89781369da9ff18e66",
+      "rawBeforeCloseSha256": "fa4e5b25cb75891546ac366a7440a5581840cbd51cb6ff89781369da9ff18e66",
+      "reopenedSha256": "fa4e5b25cb75891546ac366a7440a5581840cbd51cb6ff89781369da9ff18e66"
+    },
+    "search": {
+      "exactFound": true,
+      "exactReusable": true,
+      "exactTranslation": "It is so good to see you again, Minsu! edit-29",
+      "expectedTranslation": "It is so good to see you again, Minsu! edit-29",
+      "fuzzyFound": true,
+      "fuzzyScore": 1,
+      "fuzzyAutoApply": false,
+      "localeIsolationExactCount": 0,
+      "localeIsolationFuzzyCount": 0
+    },
+    "opfs": {
+      "afterSave": {
+        "exists": true,
+        "entries": [
+          {
+            "path": ".opaque",
+            "kind": "directory",
+            "sizeBytes": null
+          },
+          {
+            "path": ".opaque/bhxh9gma7xw",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/bi7vxdtu2fo",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/pjzzzzpxgym",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/wl5y5du0grr",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/wnk70vujq29",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/ytd5hqmg5c",
+            "kind": "file",
+            "sizeBytes": 774144
+          }
+        ],
+        "fileCount": 6,
+        "totalFileBytes": 794624
+      },
+      "final": {
+        "exists": true,
+        "entries": [
+          {
+            "path": ".opaque",
+            "kind": "directory",
+            "sizeBytes": null
+          },
+          {
+            "path": ".opaque/bhxh9gma7xw",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/bi7vxdtu2fo",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/pjzzzzpxgym",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/wl5y5du0grr",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/wnk70vujq29",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/ytd5hqmg5c",
+            "kind": "file",
+            "sizeBytes": 774144
+          }
+        ],
+        "fileCount": 6,
+        "totalFileBytes": 794624
+      }
+    },
+    "securityPolicyViolations": [],
+    "pageSecurityPolicyViolations": []
+  },
+  "diagnostics": {
+    "browserVersion": "140.0.7339.186",
+    "consoleErrors": [],
+    "consoleWarnings": [],
+    "pageErrors": [],
+    "requestFailures": [],
+    "errorResponses": [],
+    "requests": [
+      {
+        "method": "GET",
+        "resourceType": "document",
+        "url": "http://127.0.0.1:58627/"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:58627/assets/index-CYOTH1J-.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:58627/assets/translation-memory-sqlite-opfs-browser-client-CiBKr01y.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:58627/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:58627/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:58627/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      }
+    ],
+    "responses": [
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:58627/"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:58627/assets/index-CYOTH1J-.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:58627/assets/translation-memory-sqlite-opfs-browser-client-CiBKr01y.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:58627/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:58627/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:58627/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      }
+    ],
+    "responseHeaders": {
+      "contentSecurityPolicy": "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'; worker-src 'self'; style-src 'none'; img-src 'none'; font-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+      "crossOriginOpenerPolicy": "same-origin",
+      "crossOriginEmbedderPolicy": "require-corp",
+      "crossOriginResourcePolicy": "same-origin"
+    }
+  },
+  "productionBuild": {
+    "mode": "vite-production-build",
+    "assets": [
+      ".vite/manifest.json",
+      "assets/index-CYOTH1J-.js",
+      "assets/index-CYOTH1J-.js.map",
+      "assets/sqlite3-BVKGSWc-.wasm",
+      "assets/sqlite3-opfs-async-proxy-D_xnb1D8.js",
+      "assets/sqlite3-worker1-N5XM9NUp.js",
+      "assets/sqlite3-worker1-N5XM9NUp.js.map",
+      "assets/translation-memory-sqlite-opfs-browser-client-CiBKr01y.js",
+      "assets/translation-memory-sqlite-opfs-browser-client-CiBKr01y.js.map",
+      "index.html"
+    ],
+    "scratchDirectory": "/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/toonspectrum-translation-memory-opfs-kpoq8u"
+  },
+  "validationIssues": []
+}

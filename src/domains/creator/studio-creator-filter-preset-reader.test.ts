@@ -4,7 +4,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   STUDIO_CREATOR_FILTER_PRESET_LIBRARY_KEY,
-  STUDIO_CREATOR_FILTER_PRESET_LIBRARY_MAX,
   listStudioCreatorFilterPresets,
   type StudioCreatorInstalledFilterPreset,
   type StudioCreatorPackStorage,
@@ -51,8 +50,9 @@ function storageWith(value: unknown): Pick<StudioCreatorPackStorage, "getItem"> 
 }
 
 describe("Studio Creator filter preset reader boundary", () => {
-  it("keeps the filter dialog independent from the full Creator Pack runtime", () => {
-    expect(dialogSource).toContain('from "./studio-creator-filter-preset-reader"');
+  it("keeps the legacy reader out of the V12 product filter dialog", () => {
+    expect(dialogSource).not.toContain('from "./studio-creator-filter-preset-reader"');
+    expect(dialogSource).toContain('from "./studio-filter-library-sqlite-repository"');
     expect(dialogSource).not.toContain('from "./studio-creator-pack-runtime"');
     expect(readerSource).not.toContain('from "./studio-creator-pack-runtime"');
     expect(readerSource).not.toContain('from "./studio-creator-pack-catalog"');
@@ -88,20 +88,15 @@ describe("Studio Creator filter preset reader boundary", () => {
     ]);
   });
 
-  it("caps valid entries and fails closed for malformed, oversized, or inaccessible storage", () => {
+  it("does not impose a preset-count cap and fails closed for malformed or inaccessible storage", () => {
     const many = Array.from(
-      { length: STUDIO_CREATOR_FILTER_PRESET_LIBRARY_MAX + 8 },
+      { length: 128 },
       (_, index) => validPreset(index),
     );
-    expect(listStudioCreatorFilterPresets(storageWith(many))).toHaveLength(
-      STUDIO_CREATOR_FILTER_PRESET_LIBRARY_MAX,
-    );
+    expect(listStudioCreatorFilterPresets(storageWith(many))).toHaveLength(128);
     expect(listStudioCreatorFilterPresets(storageWith({ presets: many }))).toEqual([]);
     expect(listStudioCreatorFilterPresets({
       getItem: () => "{broken",
-    })).toEqual([]);
-    expect(listStudioCreatorFilterPresets({
-      getItem: () => " ".repeat(64 * 1_024 + 1),
     })).toEqual([]);
     expect(listStudioCreatorFilterPresets({
       getItem: () => {

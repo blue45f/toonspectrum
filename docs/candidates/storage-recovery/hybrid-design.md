@@ -1,134 +1,160 @@
-# ToonStudio V11 — storage-recovery 하이브리드 설계 (Hybrid Design)
+# ToonStudio V12 — storage-recovery 하이브리드 설계
 
-- 담당 서브시스템: **storage-recovery** (E24·E25)
-- 전제: 1차 구현 = `project-model-v11`의 **append-only CommandJournal + two-slot snapshot + CRC32 복구** (메모리/파일/OPFS 저널스토어 3종). 본 설계는 이 소유 계층을 중심에 두고 SQLite WASM(인덱스), CAS+클라우드(백업), Yjs/Loro(협업)를 장점별로 조합한다.
+## 1. 결정
 
-## 1. 단계별 파이프라인 (입력 → 처리 → 렌더 → 출력)
-
-저장 서브시스템에서 각 단계는 다음으로 해석한다.
+V12는 로컬 저장을 다음 두 책임으로 나눈다.
 
 ```text
-[입력]  편집 이벤트
-  CommandRegistry가 발행한 Command (stroke commit, layer op, effect op, ...)
-  + 협업 세션이면 원격 CRDT op 스트림
-        │
-        ▼
-[처리]  내구성 계층 (storage island 소유)
-  1. Command → CommandJournal append (append-only, 레코드별 CRC32)
-  2. 주기·임계 도달 시 snapshot 생성 → two-slot 교대 기록
-  3. 타일·에셋 blob → CAS 청크 (BLAKE3 주소) → OPFS blob store
-  4. 메타데이터·에셋 인덱스·검색어 → SQLite WASM upsert
-  5. 협업 모드: 의미 객체 diff → Yjs/Loro doc 반영 (픽셀·타일 제외)
-        │
-        ▼
-[렌더]  복구·하이드레이션 (읽기 경로)
-  1. superblock/슬롯 검증 → 유효 snapshot 선택 (two-slot 중 CRC 통과분)
-  2. snapshot 이후 저널 리플레이 → CRC 실패 지점에서 절단
-  3. 복원된 IR → HybridExecutionPlanner → 엔진 캐시(SkPath, vello::Scene 등) 재생성
-     (V11 §2.1: 엔진 객체는 저장 원본이 아니라 재생성 가능한 cache)
-  4. 협업 모드: CRDT 상태 벡터 교환 → 누락 op 수신 → 병합
-        │
-        ▼
-[출력]  외부화
-  1. 클라우드 백업: journal segment + snapshot + CAS 청크 업로드 (내용 주소 기반 증분)
-  2. 복구 패키지 export: 단일 파일 아카이브 (superblock + snapshot + tail journal + 참조 CAS 청크)
-  3. 협업 서버: CRDT update 릴레이·영속화
+의미·복구 계약
+  stable ToonStudio IR / CommandBus
+  append journal + CRC32 + two-slot snapshot
+                 │
+                 ▼
+물리·질의 권위
+  @sqlite.org/sqlite-wasm 3.53.0-build1
+  OPFS SAH-pool /toonspectrum-studio-sqlite/studio-local-v12.db
 ```
 
-## 2. Preview / Final 분리
+SQLite는 단순 파생 인덱스가 아니라 V12 로컬 제품 데이터의 물리 권위다. 그러나 SQLite 행에
+renderer/engine 객체를 저장하지 않는다. 복구 가능한 stable IR, canonical JSON, provider ID와
+실측 비용만 저장한다. 저널 의미와 손상 복구 판정은 ToonStudio가 소유하고, B-tree·transaction·
+constraint·keyset query는 SQLite가 소유한다.
 
-V11 §1.2의 Preview/Final 분리를 저장 계층에 그대로 적용한다. **프레임 예산을 쓰는 경로와 내구성을 보장하는 경로를 분리**하는 것이 핵심이다.
-
-| 구분 | Preview 내구성 (편집 중) | Final 내구성 (커밋 지점) |
-| --- | --- | --- |
-| 대상 | 진행 중 스트로크·드래그의 임시 상태 | 완료된 Command, 스냅샷, export |
-| 스토어 | 메모리 저널스토어 (링 버퍼) | OPFS 저널스토어 + flush |
-| 보장 | 탭 생존 시 undo 연속성 | 크래시·탭 종료 후 복구 가능 |
-| hot path 규칙 | append는 비동기 큐 적재만. 렌더 루프에서 OPFS I/O 0회 (V11 §9.1 hot path 원칙의 저장판) | flush는 storage worker에서만. `createSyncAccessHandle` 동기 쓰기 후 flush |
-| 스냅샷 | 없음 (저널만) | two-slot 교대 + CRC32, 완료 후 이전 세대 저널 세그먼트 compaction |
-| 백업 | 없음 | 클라우드 증분 업로드 (idle·주기 트리거) |
-
-스트로크 커밋 시점에 Preview 저널의 확정 구간이 Final 저널로 승격된다. 이 경계는 핫패스 탈React 계약(커밋 지연 파이프라인)과 동일한 리듬을 탄다 — 프레임당 갱신은 메모리, 커밋 시 내구성.
-
-## 3. Island 소유권
-
-V11 §1.1 "한 Surface 또는 큰 Island에 주 소유자 하나" 원칙을 저장에 적용한다.
+## 2. 단일 런타임 소유권
 
 ```text
-Storage Island = dedicated Worker 1개 (문서당)
-├─ 소유: OPFS sync access handle (저널·스냅샷·CAS 파일 전부)
-├─ 소유: SQLite WASM 연결 (opfs-sahpool 채택 시 배타 접근이 강제되므로 정확히 일치)
-├─ 소유: CRC 검증·compaction·백업 업로더 스케줄
-└─ 외부 계약: 메시지 채널 (append batch / snapshot request / hydrate / query)
-
-Main thread
-├─ 소유 금지: OPFS 핸들 직접 접근 금지
-└─ CommandRegistry → append batch 전송만
-
-CRDT doc (협업 모드)
-├─ 소유: 의미 객체 트리 (레이어·벡터·텍스트·댓글·컷·키프레임)
-├─ 소유 금지: raster tile·대형 asset (CAS 참조 해시만 보유)
-└─ 영속화: CRDT update도 CommandJournal의 한 레코드 타입으로 Storage Island에 위임
+acquireStudioLocalDatabase()
+  └─ app lifetime Promise<StudioLocalDatabase> 1개
+      ├─ history journal / A·B snapshots
+      ├─ autosave / checkpoint / workspace metadata
+      ├─ renderer tournament winners / cost samples
+      ├─ brush_library_records
+      ├─ filter_library_records
+      └─ validated KV documents
+          ├─ animatic
+          ├─ translation memory
+          ├─ production bible
+          └─ creator-pack install receipts
 ```
 
-**단일 작성자(single-writer) 규칙**: 한 문서의 Final 저널 작성자는 항상 정확히 하나의 Storage Island다. 다중 탭이 같은 문서를 열면 Web Locks로 writer를 선출하고, 나머지 탭은 read-only + CRDT 경유로만 편집을 전파한다. 이 규칙 덕분에 opfs-sahpool VFS의 배타 접근 제약이 제약이 아니라 설계와 일치하게 된다.
+lazy feature chunk마다 SAH-pool을 다시 설치하거나 별도 DB를 열지 않는다. 제품은 app-lifetime
+공유 handle을 사용하고 테스트/명시적 종료에서만 `closeStudioLocalDatabaseRuntime()`을 호출한다.
+브라우저 하니스는 Dedicated Worker에서 같은 제품 open/repository 코드를 실행해 close/reopen을
+증명한다.
 
-## 4. 폴백 체인
+다중 탭 writer 정책은 Web Locks 또는 lease epoch로 한 writer를 선출한다. history recovery는
+document identity와 30초 lease, writer epoch, process queue를 사용한다. 명시적 협업 프로토콜이
+없는 서로 다른 탭의 변경을 임의 last-write-wins로 “병합 완료” 표시하지 않는다.
 
-CapabilityRegistry가 부팅 시 프로브해 아래 체인에서 가장 높은 단계를 선택한다. 각 강등은 사용자에게 내구성 수준 변화를 고지한다.
+## 3. 쓰기와 복구 흐름
 
-### 4.1 물리 저장 체인
+### 3.1 명령 저널
 
 ```text
-1. OPFS + dedicated worker sync access handle   ← 기본 (Final 내구성 전체 제공)
-2. OPFS 비동기 핸들 (createWritable)            ← sync handle 실패 시. flush 빈도 하향
-3. IndexedDB 저널스토어                          ← OPFS 불가 브라우저. 세그먼트 단위 blob 기록
-4. 메모리 저널스토어 + 강제 클라우드 백업 권고    ← 최후. "이 세션은 로컬 복구 불가" 명시 경고
+accepted command
+  → canonical journal payload + seq + CRC32
+  → BEGIN IMMEDIATE
+  → 같은 project_id에서 seq 이상의 torn tail 제거
+  → journal_entries upsert/append
+  → COMMIT
 ```
 
-### 4.2 메타데이터·검색 체인
+스냅샷은 slot 0/1을 교대한다. 복구는 newest valid snapshot과 그 이후의 연속 CRC-valid tail만
+노출하며 첫 손상/공백 이후 항목을 조용히 건너뛰지 않는다. slot B가 손상되면 A로 되돌아가고,
+두 슬롯과 tail의 issue를 구조화해 반환한다.
+
+### 3.2 제품 문서
+
+애니매틱·번역 메모리·Production Bible은 저장 전 기존 domain exporter/schema를 재사용한다.
+
+1. 크기·항목 수·문자 길이·버전 검증
+2. canonical JSON 생성
+3. namespace+key 단일 `kvSet` upsert
+4. load 시 같은 importer/strict schema로 재검증
+5. 일부 행만 살릴 수 없는 손상은 전체 `invalid`로 fail-closed
+
+각 어댑터는 save queue와 generation fencing을 둔다. 먼저 시작한 느린 쓰기가 나중 편집을
+덮지 않으며, unmount 뒤 늦은 hydration이 React 상태를 되돌리지 않는다.
+
+### 3.3 대형 카탈로그
+
+브러시와 필터는 JSON envelope 전체를 읽지 않는다.
+
+- 브러시 UI 초기 256행, 필터 UI 초기 128행
+- stable composite order + cursor 기반 keyset pagination
+- 검색·category/engine·pinned/favorite 조건을 SQL에 pushdown
+- 정확 `totalCount`와 명시적 “더 불러오기”
+- mutation 뒤 사용자가 의도적으로 불러온 깊이까지만 bounded refresh
+- import/creator pack은 `putMany()` transaction으로 cap 없이 기록
+
+Creator Pack 설치는 현재 resource 행과 receipt가 두 단계다. 중간 종료 후 partial row 또는 receipt
+불일치를 발견하면 설치 완료로 간주하지 않고 `repair-required`로 차단한다. 단일 원자 transaction으로
+과장하지 않으며, 향후 receipt와 resource write를 한 DB transaction으로 합치는 것이 교체 조건이다.
+
+## 4. Preview와 durable commit
+
+pointer move·GPU composite·selection overlay에는 SQLite/OPFS I/O가 없다. 진행 중 stroke는 입력/
+renderer 메모리에 있고, command commit·autosave debounce·명시 저장 경계에서만 durable queue에
+들어간다. `createSyncAccessHandle`과 SQL statement는 storage worker/runtime 소유이며 interactive
+render hot path의 GPU→CPU readback과도 무관하다.
 
 ```text
-1. SQLite WASM (opfs-sahpool VFS)               ← 기본. COOP/COEP 불요, 단일 writer와 정합
-2. SQLite WASM (opfs VFS)                        ← COOP/COEP 배포 프로필에서 비교 채택 가능
-3. SQLite WASM (메모리 DB) + 저널에서 재구축      ← OPFS 불가 시. 인덱스는 세션 휘발
-4. 인덱스 비활성 (선형 스캔)                      ← 검색·최근 목록 기능 축소 모드
+pen move / frame             committed command / document save
+--------------------------   ----------------------------------
+memory + GPU only            async serialized storage queue
+no SQL                       validation + transaction
+no OPFS flush                success/failure surfaced to UI
 ```
 
-메타데이터 체인이 어느 단계로 떨어져도 **정합성의 원천은 항상 CommandJournal**이다. SQLite 인덱스는 저널에서 언제든 전량 재구축 가능한 파생 데이터로 취급한다(손상 시 drop & rebuild).
+## 5. 실패 정책
 
-### 4.3 협업 체인
-
-```text
-1. CRDT(Yjs 또는 Loro, 벤치 후 단일 선택) + 서버 릴레이   ← 실시간 협업
-2. CRDT 로컬 + 오프라인 큐                                  ← 네트워크 단절. 재접속 시 병합
-3. 저널 단독 (협업 비활성)                                  ← CRDT 로드 실패. 단독 편집은 무손상 유지
-```
-
-### 4.4 백업 체인
-
-```text
-1. 클라우드 증분 백업 (CAS 주소 기반 dedup 업로드)
-2. 수동 복구 패키지 export (단일 파일 다운로드)
-3. 백업 없음 경고 배너 (OPFS는 백업이 아님을 상시 고지)
-```
-
-## 5. 복구 시나리오별 동작 계약
-
-V11 §10.5의 fault injection 항목(tab/GPU/Worker/quota/network/collab)을 저장 관점 계약으로 고정한다.
-
-| 장애 | 계약 |
+| 실패 | 동작 |
 | --- | --- |
-| 탭 크래시·강제 종료 | 재시작 시 two-slot 스냅샷 중 CRC 통과 슬롯 + 저널 tail 리플레이. 손실 허용 범위 = 마지막 flush 이후 구간만 |
-| 저널 torn write | 레코드 CRC32 실패 지점에서 절단. 절단 이전까지 전부 복원 |
-| 스냅샷 torn write | 손상 슬롯 폐기, 이전 슬롯 + 더 긴 저널 리플레이로 복원 |
-| quota 초과 | append 실패를 상위로 전파, 편집 차단 대신 백업·정리 유도. 부분 기록 잔여물은 다음 부팅 CRC가 제거 |
-| Worker 크래시 | Storage Island 재기동 → 핸들 재획득 → 미확정 큐 재전송 (Command에 멱등 seq 부여) |
-| 네트워크 단절 (협업) | CRDT 오프라인 큐. 로컬 저널은 영향 없음 |
-| 클라우드 장애 | 백업만 지연. 로컬 내구성 계약 불변 |
+| WebAssembly/OPFS/SAH-pool 부재 | `SqliteUnavailableError`; 조용한 memory/localStorage 강등 금지 |
+| SQLite open/migration 실패 | 제품 데이터 미로드, 오류 표면화, 명시 retry 가능 |
+| journal row CRC/torn JSON | 첫 불연속에서 tail 절단, issue 보고 |
+| snapshot 한 슬롯 손상 | 다른 슬롯 + 연속 tail로 복구 |
+| 두 슬롯 모두 손상 | 빈 정상 문서로 가장하지 않고 recovery issue/실패 |
+| document canonical/schema 불일치 | `invalid`; 자동 덮어쓰기 차단, 검증된 명시 import만 복구 가능 |
+| save 실패 | 메모리 편집 유지 가능, UI는 “메모리 임시·저장되지 않음” 표시 |
+| quota 초과 | 실패 전파, 정리/export 안내; localStorage에 복제하지 않음 |
+| Worker/device/tab 종료 | 이미 COMMIT된 행만 재개방, 진행 중 요청은 미완료로 취급 |
+| creator-pack row/receipt 불일치 | `repair-required`; 성공 배지 금지 |
 
-## 6. 자체 구현 경계 (V11 §3.3 적용)
+SQLite unavailable compatibility adapter가 남아 있는 모듈은 **V12 전용 키**만 사용할 수 있고,
+제품 기본 성공 경로가 아니다. 기존 Studio v1 키를 자동 탐색하지 않는다.
 
-- **유지하는 자체 구현**: 저널·two-slot·CRC 복구(이미 존재), CAS 청크·복구 패키지 포맷, 백업 스케줄러. 근거: 비파괴 의미 보존과 복구 계약이 제품 경쟁 우위 영역이고, 이를 통째로 제공하는 검증 엔진이 없다.
-- **재사용하는 검증 엔진**: SQLite WASM(질의·인덱스를 자체 B-tree로 재발명하지 않는다), Yjs/Loro(CRDT 수렴 알고리즘을 자체 구현하지 않는다), BLAKE3/CRC32 crate(해시 자체 구현 금지).
-- **경쟁 벤치 대상**: CRC32 → BLAKE3 저널 체크섬 승격 여부, Yjs vs Loro, 공식 SQLite WASM vs wa-sqlite. 전부 `tests/benchmarks` 하니스 실측으로만 결정한다.
+## 6. 데이터 폐기와 외부 포맷
+
+V12 DB 파일명 자체를 `studio-local-v12.db`로 바꿔 이전 `/studio-local.db`를 재개방하지 않는다.
+기존 autosave/checkpoint/workspace/animatic/tournament/brush/filter/TM/Bible 키도 제품 boot에서 읽지
+않는다. 최종 파괴 작업은 다음 세 조건을 모두 요구한다.
+
+1. compile-time destructive flag
+2. `RESET_EXISTING_STUDIO_DATA=YES`
+3. confirmation phrase `REPLACE_CURRENT_TOONSTUDIO_IN_PLACE_V12`
+
+반면 사용자가 선택한 SUT/SUTG/KPP/MYB/Krita bundle/ABR/JSON은 FormatGateway 입력이다. 이는
+폐기 대상 내부 데이터의 자동 migration이 아니라 명시적 외부 asset import이며, 원본·rights·
+unsupported를 보존한다.
+
+## 7. 백업과 협업 경계
+
+OPFS는 같은 origin의 로컬 내구성일 뿐 백업이 아니다. 브라우저 데이터 삭제·기기 분실을 막지
+못한다. cloud backup/CAS는 별도 권한·암호화·보존 정책과 함께 구현해야 하며 현재 로컬 저장
+완료를 클라우드 동기화로 표현하지 않는다.
+
+Yjs/Loro 협업도 별도 Provider다. CRDT에는 layer/text/comic/animation 같은 의미 객체와 asset
+hash만 넣고 raster tile 대형 blob은 넣지 않는다. CRDT가 선택되더라도 SQLite 저널과 백업의
+역할을 대체하지 않는다.
+
+## 8. 교체 조건
+
+- 공식 SQLite WASM을 wa-sqlite/다른 엔진으로 교체: 같은 실제 Chromium OPFS 하니스에서
+  canonical/복구 품질 동률, p95 우위, 번들·메모리·라이선스 게이트 통과 시만 허용.
+- localStorage 제품 기본 복귀: 허용하지 않는다. SQLite보다 정확성과 내구성이 우수하다는 같은
+  테스트 증거가 없는 한 후보가 아니다.
+- KV 문서의 구조화 테이블 승격: 검색/부분 갱신이 실제 병목이고 schema migration 비용보다
+  p95·메모리 우위가 입증될 때.
+- creator pack two-stage commit: resource+receipt를 한 SQLite transaction으로 합친 뒤
+  fault injection에서 partial install 0을 증명하면 `repair-required` 경계를 단순화한다.

@@ -293,7 +293,7 @@ export function StudioHokusaiNaturalMediaInspectorSection({
         </span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-xs font-bold text-fg">
-            Hokusai 자연매체
+            Hokusai 자연매체 · 실험적
           </span>
           <span className="block truncate text-[0.6rem] text-fg-3">
             선택 선화 → 연필 · 목탄 · 오일 · 붓 · 마커
@@ -339,6 +339,9 @@ export function StudioHokusaiNaturalMediaInspectorSection({
             </p>
             <p className="mt-0.5 text-[0.6rem] leading-relaxed text-fg-3">
               변환 성공 시 원본 벡터는 숨김 보존하고 같은 위치에 투명 래스터를 만듭니다. 실행 취소로 즉시 되돌릴 수 있습니다.
+            </p>
+            <p className="mt-1 text-[0.6rem] leading-relaxed text-warn">
+              품질·처리량 승격 게이트를 아직 통과하지 않은 실험적 명시 변환입니다. 기본 연필·목탄·오일 브러시에는 자동 적용되지 않습니다.
             </p>
             {!selectedDraw && onRequestSelectStroke ? (
               <button

@@ -16,7 +16,7 @@
 | vello_common | 0.2.0 | Apache-2.0 OR MIT | https://crates.io/crates/vello_common | Sparse Strips 공통 하부 — vello_cpu가 소비하는 경로·페인트·타일 공통층(Hybrid 장면 허브 후보의 공통 기반) |
 | kurbo | 0.13.1 | Apache-2.0 OR MIT | https://crates.io/crates/kurbo · https://github.com/linebender/kurbo | ToonStudio 공통 2D 기하 언어 (Bezier·stroke outline·trim·guides) |
 | peniko | 0.6.1 | Apache-2.0 OR MIT | https://crates.io/crates/peniko · https://github.com/linebender/peniko | Paint·Gradient·Image·Blend 공통 표현 |
-| color (Linebender Color) | 0.3.3 | Apache-2.0 OR MIT | https://crates.io/crates/color · https://github.com/linebender/color | 광색역·CSS Color 4·ACES/ProPhoto 색 변환 |
+| color (Linebender Color) | 0.3.3 | Apache-2.0 OR MIT | https://crates.io/crates/color · https://github.com/linebender/color | Vello/Peniko 장면 색 타입 의존. 현재 `/studio` 광색역·CSS 색 변환의 제품 오너는 Color.js/Culori 및 자체 고비트 경로이며 이 crate가 그 역할을 대체한다고 주장하지 않는다 |
 | parley | 0.11.0 | Apache-2.0 OR MIT | https://crates.io/crates/parley · https://github.com/linebender/parley | 다국어 문단·말풍선·줄바꿈·편집 레이아웃 (Vello glyph layout source) |
 | fontique | 0.11.0 | Apache-2.0 OR MIT | https://crates.io/crates/fontique (parley 저장소) | 폰트 탐색·fallback (Parley 하위 기반) |
 | harfrust | 0.10.0 | MIT | https://crates.io/crates/harfrust | 텍스트 shaping (Parley 하위 기반) |
@@ -37,6 +37,13 @@
 (manifest 표기 순서만 `Apache-2.0 OR MIT`로 다른 경우 있음 — 동일 듀얼 라이선스).
 매트릭스 11행(Fontique + HarfRust + Skrifa + ICU4X)의 `각 프로젝트 고지`는 본 표의 실측값으로 구체화된다:
 fontique `Apache-2.0 OR MIT` / harfrust `MIT` / skrifa `MIT OR Apache-2.0` / icu_* `Unicode-3.0`.
+
+제품 호출 범위 주의(2026-08-10 source audit): 위 `V12 역할`은 후보/패키지 역할이며 곧바로 `/studio`
+제품 오너를 뜻하지 않는다. Kurbo editable proxy, Parley/Skrifa/Fontique/Harfrust, Glifo 역할 cache와
+Velato는 현재 package/provider/benchmark 경계이고 확인된 비테스트 기본 제품 caller가 없다.
+Linebender Color는 Vello/Peniko 장면 내부 의존이며 실제 CSS·광색역 제품 색관리 오너는
+Color.js/Culori 및 기존 고비트 경로다. `vello_svg`의 제품 표면도 CPU RGBA asset preview이고
+interactive GPU Scene Fragment가 아니다.
 
 ## 2. 이미 실측된 증거
 
@@ -62,7 +69,7 @@ fontique `Apache-2.0 OR MIT` / harfrust `MIT` / skrifa `MIT OR Apache-2.0` / icu
   Chromium 140.0.7339.186(playwright headless shell, `--enable-unsafe-webgpu --enable-features=WebGPU
   --use-angle=metal`)에서 wgpu `BrowserWebGpu` 어댑터 획득·렌더·readback 성공. 7개 장면 중 6개 퍼지
   불일치 **0.0000%**, `03-curves` 0.0366% — 네이티브 Metal 레인(§2 첫 항목)과 동수치, 게이트 0.6%.
-  GPU p50 2.6~2.8ms / 128²(readback + wasm-bindgen JSON 경계 포함, 프로브 전용 증거 수집).
+  최신 재실측 GPU p50 2.9~3.0ms / 128²(readback + wasm-bindgen JSON 경계 포함, 프로브 전용 증거 수집).
   재실행 커맨드:
   `VELLO_GPU_BROWSER_PROBE=1 pnpm exec vitest run packages/studio-engine-vello/src/__tests__/gpu-browser-probe.test.ts`
   (repo를 로컬 HTTP로 서빙하고 Playwright Chromium → 시스템 Chrome headless → headed 순서로
@@ -239,6 +246,8 @@ upstream-compatible 트랙 단일 소스로 유지된다.
     `VELLO_LOTTIE_BROWSER_PROBE=1`): Chromium 140.0.7339.186 headless, wgpu `BrowserWebGpu`
     어댑터에서 2픽스처×3프레임 전부 결정성 통과, 프레임 상호 상이 + 클리핑 재현,
     p50 3.1~3.3ms / 128²(JSON 파싱+velato 하강+렌더+readback+JS 경계 포함).
+  이 결과는 provider/하니스 증거이며 기존 `/studio` animation player의 기본 비테스트 caller로
+  Velato가 승격됐다는 뜻이 아니다.
 - **산출물 갱신**: `pkg-gpu/`는 이제
   `wasm-pack build --target web --release --out-dir pkg-gpu -- --features lottie`로 빌드한다
   (lottie ⊃ gpu — SceneIR GPU 레인 동일 포함, 재빌드 후 §2 실브라우저 패리티 프로브 재실행으로

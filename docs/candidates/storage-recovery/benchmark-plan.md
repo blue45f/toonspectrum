@@ -1,117 +1,104 @@
-# ToonStudio V11 — storage-recovery 벤치마크 계획 (Benchmark Plan)
+# ToonStudio V12 — storage-recovery 벤치마크 계획과 실측
 
-- 담당 서브시스템: **storage-recovery** (E24·E25)
-- 하니스 위치: `/tests/benchmarks` (V11 §12 모노레포 구조), fault 시험은 `/tests/fault-injection`
-- 원칙: 모든 수치는 이 하니스에서만 생산한다. 문서에 미리 적어 둔 수치는 존재하지 않으며, 아래의 게이트 수치는 **잠정 목표**로 표기하고 실측 후 확정한다.
+## 1. 원칙
 
-## 1. 코퍼스 구성
+- 제품과 같은 repository/open 함수를 Vite production build에서 실행한다.
+- OPFS 측정은 `vfs:"opfs"`, exact `studio-local-v12.db`, Dedicated Worker를 증명한다.
+- memory VFS 수치는 SQL 로직 회귀 기준일 뿐 브라우저 내구성 수치로 승격하지 않는다.
+- p50/p95/p99는 raw sample과 percentile method를 JSON에 함께 저장한다.
+- 브라우저가 메모리를 노출하지 않으면 추정하지 않고 `null`을 기록한다.
+- canonical byte/digest, 누락·중복·정렬, 손상 fail-closed가 성능보다 먼저 통과해야 한다.
 
-E25 게이트 열(golden image, p50/p95/p99, peak memory, 4h/24h soak, provider fallback)과 V11 §9.3 성능 게이트를 저장 관점으로 구체화한 코퍼스다.
+## 2. 완료된 하니스
 
-### 1.1 문서 코퍼스 (V11 §9.3 대표 문서와 정렬)
+| 하니스 | 실제 입력 | 품질·내구성 게이트 | p50/p95/p99 | 결과 |
+| --- | --- | --- | --- | --- |
+| `brush-library-opfs-browser` | 브러시 10,000개, 16,924,275B source payload, batch 200, page 257 | close/reopen, 39 page full scan, 10k unique, missing/duplicate/order mismatch 0, memory/localStorage fallback 0 | insert batch **44.580/53.580/55.985ms**; page **21.170/43.375/44.020ms**; ID **0.280/0.410/0.495ms** | 통과 |
+| `filter-library-opfs-browser` | 필터 10,000개, 3,761,900B source payload, batch 250, page 257 | exact V12 filename 2회 open, non-V12/memory open 0, 39 page full scan 무손실 | insert batch **50.305/80.810/90.215ms**; page **4.825/26.000/30.690ms** | 통과 |
+| `animatic-sqlite-opfs-browser` | 180 segment, 2,880 camera keyframe, 1,139 cue, canonical 799,973B, save/load 각 120회 | product exporter/importer, 120 sequential edit final-state, close/reopen byte/digest equality, 별도 corrupt row `invalid`, legacy read 0 | save **22.700/24.520/25.345ms**; load **4.805/5.135/6.705ms**; cold open 32.165ms, reopen 0.810ms | 통과 |
+| `translation-memory-sqlite-opfs-browser` | 승인 TM 512개, canonical 296,700B, save 30회/load 50회 | 제품 factory, close/reopen SHA equality, exact/fuzzy 검색 의미·언어쌍 격리, legacy key/namespace read 0, memory/localStorage fallback 0 | save **7.965/13.860/16.255ms**; load **8.715/9.915/10.075ms**; cold open 33.630ms, reopen 0.535ms | 통과 |
+| `production-bible-sqlite-opfs-browser` | strict canonical 1,010B, save/load 각 60회, owner/work 3 scope | 제품 factory, close/reopen, `worker.terminate()` 뒤 새 Worker 복구, owner/work 격리, corrupt/non-canonical fail-closed, legacy key read 0 | save **2.450/2.885/3.685ms**; load **0.240/0.385/1.465ms**; normal reopen 0.445ms, forced-worker reopen 9.215ms | 통과 |
+| `recovery-package-cas` | seq 33, snapshot 32, attachment 8개·1,048,576B, package 1,055,639B | deterministic ZIP, CRC/SHA/IR 인증, 새 sqlite-wasm DB seq/project digest 일치, CAS attachment 8/8 | export **4.545/4.970/5.034ms**; import 인증 **27.922/34.303/40.996ms**; restore **0.298/0.419/0.419ms** | 통과 — 외부 파일, cloud 아님 |
+| SQLite journal fault suite | 실제 sqlite-wasm memory DB 위 CommandBus, journal, A/B snapshot | 5 command reopen seq/digest 동일, torn row/CRC 절단, B 손상 시 A fallback, 이어쓰기 중복 seq 0 | 성능 분포 미측정 | 기능 게이트 통과 |
+| autosave/history SQLite suite | 제품 autosave store와 pages-history recovery port | writer lease, seq frontier, CRC, checkpoint, generation fencing, recovery issue 표면화 | 성능 분포 미측정 | 기능 게이트 통과 |
 
-| 코퍼스 ID | 구성 | 목적 |
+Raw data:
+
+- `tests/benchmarks/results/brush-library-opfs-browser.json`
+- `tests/benchmarks/results/filter-library-opfs-browser.json`
+- `tests/benchmarks/results/animatic-sqlite-opfs-browser.json`
+- `tests/benchmarks/results/translation-memory-sqlite-opfs-browser.json`
+- `tests/benchmarks/results/production-bible-sqlite-opfs-browser.json`
+- `tests/benchmarks/results/recovery-package-cas.json`
+
+계약:
+
+- `tests/visual/brush-library-opfs-browser-contract.test.ts`
+- `tests/visual/filter-library-opfs-browser-contract.test.ts`
+- `tests/visual/translation-memory-sqlite-opfs-browser-contract.test.ts`
+- `tests/visual/production-bible-sqlite-opfs-browser-contract.test.ts`
+- `tests/visual/recovery-package-cas-contract.test.ts`
+- `src/domains/creator/studio-pages-history-sqlite-recovery.test.ts`
+- `src/domains/creator/studio-autosave-sqlite-store.test.ts`
+- `src/domains/creator/studio-v12-data-discard-policy.test.ts`
+
+## 3. 제품 문서별 게이트
+
+번역 메모리와 Production Bible은 Node memory VFS 기능 테스트에 이어 실제 Chromium Dedicated
+Worker·OPFS close/reopen을 통과했다. 아래 판정은 위 raw artifact의 브라우저 수치이며 memory VFS
+p50을 OPFS 수치로 대체하지 않는다.
+
+| 문서 | 코퍼스 | 필수 판정 |
 | --- | --- | --- |
-| DOC-S | 웹툰 1컷, 레이어 8, 2048px | 최소 오버헤드 기준선 |
-| DOC-M | 페이지 1장, 레이어 100, 4K | 일반 제작 문서 |
-| DOC-L | 8K 캔버스, 레이어 100 | 대형 문서 상한 |
-| DOC-STRIP | 30,000px 웹툰 스트립 | 스크롤 만화 실전 상한 |
-| DOC-ANIM | 컷 24 + 키프레임 밀집 AnimationGraph | 저널에 고빈도 소형 명령이 몰리는 형태 |
+| Translation Memory | 승인 항목 512개·296,700B, exact/fuzzy·잘못된 언어쌍 probe | canonical round-trip, legacy localStorage/namespace read 0, save queue 순서, close/reopen, 검색 결과 동일 — **통과** |
+| Production Bible | character/location/prop/rule/promise strict canonical, owner/work 3 scope | strict schema와 canonical bytes, owner/work isolation, legacy IDB/localStorage read 0, close/reopen·강제 Worker 종료 복구 — **통과** |
+| Creator Pack receipts | brush/filter pack install/uninstall, 같은 package version 충돌, 중간 종료 | rows+receipt 일치, partial install은 `repair-required`, downgrade/오염 차단 |
+| Tournament | 여러 fingerprint/deviceHash와 warm/cold cost sample | winner/cache 구조화 복원, kill list 즉시 퇴출, 손상 행만 drop, hot path 저장 실패 비전파 |
 
-### 1.2 저널·스냅샷 코퍼스
+## 4. fault-injection 매트릭스
 
-| 코퍼스 ID | 구성 | 목적 |
+| 장애 | 주입 | 통과 기준 |
 | --- | --- | --- |
-| JRN-1K | Command 1,000건 (스트로크 위주) | 짧은 세션 |
-| JRN-100K | Command 100,000건 (스트로크·레이어·필터 혼합) | 하루 작업 세션 |
-| JRN-1M | Command 1,000,000건 + 스냅샷 다세대 | compaction·리플레이 상한, soak 입력 |
-| SNAP-ROT | 스냅샷 교대 기록 1,000회 반복 | two-slot 교대·CRC 경로 마모 시험 |
+| SQLite migration 중단 | migration statement 실패 | 해당 version 전체 rollback, 이전 version/data 보존, 다음 open 재시도 가능 |
+| torn journal payload | payload/CRC/seq 하나 변조 | 첫 손상에서 tail 절단, 이전 frontier digest 동일 |
+| snapshot B 손상 | slot 1 payload/CRC 변조 | slot A + tail로 복구, ignored slot 보고 |
+| writer crash | transaction 중 Worker terminate | 이전 또는 새 완성 commit만 관측, 부분 JSON/row 없음 |
+| quota | VFS write/kvSet가 quota error 반환 | UI에 저장 실패, memory 편집과 durable 상태 구분, localStorage 복제 0 |
+| OPFS/SAH 미지원 | API 제거/VFS install reject | `SqliteUnavailableError`, 자동 memory DB open 0 |
+| 다중 탭 writer | 두 writer가 같은 document lease 요청 | 단일 writer epoch, loser read-only/retry, 무언 병합 0 |
+| corrupt canonical document | JSON/unknown field/oversize/duplicate | 전체 `invalid`, 일반 save로 자동 덮어쓰기 금지 |
+| creator pack 중단 | rows 이후 receipt 전 throw | `repair-required`, 설치 완료 표시 0 |
+| destructive cutover 오입력 | flag/env/phrase 중 하나 누락 | 삭제 0 |
 
-각 저널 코퍼스는 **결정적 시드로 재생성 가능한 스크립트**로 정의한다(레코드 바이너리를 커밋하지 않고 생성기를 커밋).
+## 5. 장치 매트릭스
 
-### 1.3 협업 코퍼스 (E24)
+현재 실제 OPFS 결과는 Chromium 140/macOS 한 장치다. 다음을 별도 raw artifact로 추가한다.
 
-| 코퍼스 ID | 구성 | 목적 |
-| --- | --- | --- |
-| CO-2 | 2 클라이언트, 레이어 트리 동시 이동 + 텍스트 동시 편집 | 기본 수렴 |
-| CO-8 | 8 클라이언트, 컷·말풍선·키프레임 혼합 편집 | 팀 작업 규모 |
-| CO-32 | 32 클라이언트, 인위적 지연·순서 뒤섞기 주입 | 스트레스·수렴 상한 |
-| CO-OFF | 오프라인 24h 분기 후 재병합 | 오프라인 큐·히스토리 크기 |
+1. Chromium stable Windows와 Linux
+2. Safari의 OPFS/worker capability 및 명시적 unavailable UX
+3. Firefox 지원 상태와 capability 결과
+4. 낮은 quota/저장 공간, private browsing, site-data eviction
+5. 두 탭/두 worker 경쟁
+6. 8시간 저장·검색·checkpoint 반복 후 file growth와 recovery time
 
-동일 코퍼스를 **Yjs와 Loro(필요 시 Automerge)에 동일 op 시퀀스로 주입**한다 — V11 §1.2 결합 유형 8 "교차 검증"의 저장판.
+브라우저가 SAH-pool을 지원하지 않는 환경을 억지로 “통과”시키지 않는다. 기능 축소 모드와
+내구성 부재를 사용자에게 표시하고 release support matrix에 기록한다.
 
-### 1.4 장애 주입 코퍼스 (`/tests/fault-injection`)
+## 6. 승격·회귀 기준
 
-- 저널 append 도중 프로세스 킬 (레코드 경계·경계 중간 각각)
-- 스냅샷 기록 도중 킬 (슬롯 A/B 각각, superblock 갱신 전/후)
-- OPFS quota 고갈, 핸들 강제 해제, Worker 크래시
-- 임의 바이트 플립 (저널·스냅샷·CAS 청크) — CRC 검출률 측정
-- 다중 탭 동시 오픈 → writer 선출 경합
-- 클라우드 업로드 중단·재개 (부분 업로드 정합성)
+성능 gate는 품질 gate 뒤에 적용한다.
 
-## 2. 측정 지표
+1. canonical/IR 의미 손실 0, engine object 저장 0
+2. 누락·중복·정렬 mismatch 0
+3. close/reopen digest equality
+4. corruption/torn write fail-closed
+5. interactive render hot path SQL/OPFS I/O 0
+6. UI가 bounded page만 보유
+7. p95가 이전 승인 결과의 25% 이상 퇴행하면 원인·장치 부하를 조사
+8. peak memory/API unavailable은 null로 유지; 추정값으로 gate를 통과시키지 않음
 
-| 지표 | 정의 | 비고 |
-| --- | --- | --- |
-| append p50/p95/p99 | Command 1건이 append 큐 적재 → Final flush 완료까지. 큐 적재 지연(핫패스 영향)과 flush 지연을 분리 계측 | 스토어 3종(메모리/파일/OPFS)별 |
-| snapshot write p50/p95/p99 | 스냅샷 직렬화 시작 → 슬롯 flush 완료 | 문서 코퍼스별 |
-| recovery time (RTO) p50/p95/p99 | 프로세스 재시작 → IR 복원 완료 → 첫 렌더 가능 시점 | JRN-100K·JRN-1M 기준 |
-| replay throughput | 저널 리플레이 명령/초 | compaction 정책 입력값 |
-| peak memory | 각 시나리오의 storage worker 최대 상주 메모리 (WASM heap 포함) | 하니스 계측만 사용 |
-| journal/snapshot 크기 | 세션당 증가량, compaction 후 크기, CAS dedup 절감률 | 클라우드 비용 추정 입력 |
-| CRDT 지표 | update 크기/op, 병합 시간, 문서 크기 성장(히스토리 포함), 수렴까지 왕복 수 | Yjs·Loro 동일 코퍼스 비교 |
-| SQLite 지표 | 인덱스 upsert 지연, 검색 질의 p50/p95, 저널로부터 전량 재구축 시간 | 공식 빌드 vs wa-sqlite |
-| 픽셀 diff 임계 | 복구·백업 복원 후 렌더 결과 vs 크래시 직전 golden 렌더의 diff. **손실 허용 구간(마지막 flush 이후) 이전 상태에 대해 diff = 0 (완전 일치)** | 저장 계층은 유손실 근사를 허용하지 않는다. 렌더러 비결정성 격리를 위해 Vello CPU/resvg 기준 렌더(E04·E15)로 비교 |
+## 7. CSP와 외부 검증
 
-## 3. 통과 게이트
-
-수치 게이트는 전부 **잠정**이며 1차 실측 분포 확인 후 확정치로 승격한다. 정합성 게이트는 잠정이 아니라 절대 조건이다.
-
-### 3.1 정합성 게이트 (절대 조건, release blocker — V11 §10.5)
-
-- 장애 주입 전 시나리오에서 **flush 완료 구간 데이터 손실 0건**.
-- torn write·바이트 플립 **검출률 100%** (미검출 손상으로 열리는 경우 0건).
-- two-slot 복구 성공률 100% (두 슬롯 동시 손상은 저널 재구축 경로로 커버).
-- 복구 후 픽셀 diff = 0 (위 2절 정의).
-- CRDT: 모든 협업 코퍼스에서 전 클라이언트 최종 상태 바이트 동일(수렴 실패 0건).
-- 다중 탭: Final 저널 writer가 동시에 2개가 되는 경우 0건.
-
-### 3.2 성능 게이트 (잠정 목표)
-
-- 핫패스 비차단: append 큐 적재가 입력→프리뷰 예산(V11 §9.3: p50 4ms / p95 8ms) 안에서 **렌더 프레임을 차단하는 시간 0** — 저장은 프레임 예산을 소비하지 않는다.
-- RTO: JRN-100K 복구 p95가 "앱 콜드 스타트와 동급" 수준일 것 — 구체 수치는 실측 후 설정.
-- soak: 4h/24h 연속 편집에서 storage worker peak memory 상승이 유계(bounded)일 것, compaction이 저널 크기를 유계로 유지할 것.
-- 폴백 강등(OPFS→IndexedDB 등) 시 편집 연속성 유지 — 진행 중 스트로크 소실 0건.
-
-### 3.3 선택 게이트 (후보 간 비교 판정)
-
-- Yjs vs Loro: 동일 코퍼스에서 수렴 정확성 동률일 때 update 크기·병합 시간·문서 성장·번들 비용·유지보수 위험으로 종합 판정. **한 문서에 하나의 CRDT만 채택** (E24).
-- 공식 SQLite WASM vs wa-sqlite: 동률이면 공식 빌드 채택 (유지보수 위험 최소화).
-- CRC32 vs BLAKE3 저널 체크섬: 검출력 요건과 처리량 실측을 비교해 승격 여부 결정. 승격해도 기존 CRC32 저널을 읽는 하위 호환은 유지.
-
-## 4. CSP 비열위 비교 방법
-
-CSP(Clip Studio Paint)와 저장·복구 체감을 직접 비교한다. 엔진 데모가 아니라 제작 흐름 기준(V11 §0.3)이다.
-
-### 4.1 비교 시나리오
-
-| 시나리오 | CSP 데스크톱 | ToonStudio 웹 | 판정 |
-| --- | --- | --- | --- |
-| 강제 종료 후 복구 | CSP 복구 다이얼로그의 복원 결과 | two-slot + 저널 리플레이 복원 결과 | 손실 구간(마지막 보존 시점 이후 작업량)과 복구 소요 시간을 동일 작업 스크립트로 비교 |
-| 자동 저장 중 편집 방해 | CSP 자동 저장 시 입력 끊김 체감 | Final flush·스냅샷 중 입력 지연 계측 | 저장 중 프레임 드랍·입력 지연이 CSP 동급 이하 |
-| 대형 문서 저장/열기 | DOC-L·DOC-STRIP 상당 .clip 저장·열기 시간 | 동일 문서 snapshot 기록·복원(RTO) 시간 | 동일 장치에서 스톱워치+하니스 병행 계측 |
-| 파일 손상 내성 | 저장 파일 바이트 플립 후 열기 시도 | 동일 손상 주입 후 복구 경로 | "조용한 손상 통과" 0건이 목표 — 검출·복구·명시 실패 중 하나여야 함 |
-| 버전 이력·되돌리기 | CSP 수동 백업/이력 기능 범위 | 저널 기반 시점 복원 + 클라우드 백업 세대 | 기능 범위 비교 (여기서는 비열위가 아니라 우위 후보 영역) |
-| 협업 | CSP는 실시간 공동 편집 없음 | CRDT 협업 | 비교 불성립 — ToonStudio 차별화 영역으로 별도 보고 |
-
-### 4.2 방법 규율
-
-- 동일 장치·동일 작업 스크립트(자동화 입력 재생)로 양쪽을 구동한다.
-- CSP 측은 외부 계측(화면 녹화 타임스탬프·스톱워치)만 가능하므로, ToonStudio 측도 동일 외부 계측을 병행해 비교 공정성을 확보하고 내부 하니스 수치는 참고 열로 분리한다.
-- "비열위" 판정은 시나리오별 p95 기준으로 하며, 열위 항목은 V11 §3.3 자체 구현/구조 개선 후보로 자동 등록한다.
-
-## 5. 산출물
-
-- `tests/benchmarks/storage-recovery/` 결과 JSON (지표 전부) + 실행 환경 기록 (브라우저·OS·장치·commit).
-- ProviderBenchmarkRegistry 등록 레코드: 저널스토어 3종, SQLite VFS별, CRDT 후보별.
-- 본 문서의 잠정 게이트를 확정치로 치환하는 후속 PR — 실측 근거 링크 필수.
+저장 엔진의 완성은 CSP 브러시 감각 비열위를 대신하지 않는다. SUT/SUTG/Krita bundle을 SQL에
+무손실 저장했다는 사실과 CSP/Krita가 동일 획을 만든다는 주장은 별도다. 실제 target-app roundtrip,
+permissioned asset corpus, 물리 태블릿 blind lab이 없으면 포맷/품질 게이트는 미통과로 남긴다.

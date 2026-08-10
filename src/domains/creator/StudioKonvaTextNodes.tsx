@@ -7,6 +7,7 @@ import {
 } from "./studio-bubble-text-runtime";
 import {
   planDialogueRubyOverlayPlacements,
+  planDialogueVerticalRubyOverlayPlacements,
   readDialogueRubySpans,
 } from "./studio-dialogue-ruby-layout";
 import {
@@ -132,8 +133,7 @@ export function StudioKonvaTextNode({
   }
 
   if (el.vertical) {
-    // Vertical text keeps base-only paint: stacked ruby overlays are horizontal-only in this MVP
-    // (column/run geometry does not yet host furigana beside upright glyphs).
+    // Vertical base and ruby share one transform group so selection/edit/resize semantics stay atomic.
     return (
       <StudioKonvaVerticalTextNode
         el={el}
@@ -165,11 +165,9 @@ export function StudioKonvaTextNode({
       : {};
   const shadowEnabled = !!el.shadowColor && (el.shadowOpacity ?? 0) > 0;
 
-  // Duck-typed rubySpans — dialogue elements may carry range annotations without a full rich-text model.
-  // Horizontal only: base stays one KText; each reading is a smaller overlay Text centered on its segment.
-  const rubySpans = readDialogueRubySpans(
-    (el as Extract<El, { type: "text" }> & { rubySpans?: unknown }).rubySpans,
-  );
+  // rubySpans is a stable element-model field; base stays one KText and each horizontal reading is
+  // a smaller overlay Text centered on its annotated segment.
+  const rubySpans = readDialogueRubySpans(el.rubySpans);
   const rubyOverlays = rubySpans
     ? planDialogueRubyOverlayPlacements(text, rubySpans, {
         fontSize: el.fontSize,
@@ -303,18 +301,27 @@ function StudioKonvaVerticalTextNode({
 }) {
   const fontFamily = el.font ?? "Pretendard, sans-serif";
   const fontStyle = el.fontStyle ?? "bold";
+  const lineHeight = el.lineHeight ?? 1.4;
+  const letterSpacing = el.letterSpacing ?? 0;
   const layout = verticalTextLayout({
     text: el.text,
     fontSize: el.fontSize,
     // 세로쓰기 기본 행간은 1.4 — 가로쓰기 기본값 1은 열이 서로 맞닿아 읽을 수 없다(말풍선의
     // 세로쓰기 기본값 `el.vertical ? 1.4 : …`와 같은 값을 쓴다).
-    lineHeight: el.lineHeight ?? 1.4,
-    letterSpacing: el.letterSpacing ?? 0,
+    lineHeight,
+    letterSpacing,
     fontFamily,
     fontStyle,
     maxColumnLength: el.width,
     blockAlign: verticalBlockAlign(el.align),
   });
+  const rubySpans = readDialogueRubySpans(el.rubySpans);
+  const verticalRuby = planDialogueVerticalRubyOverlayPlacements(
+    el.text,
+    rubySpans,
+    layout,
+    { fontSize: el.fontSize, lineHeight, letterSpacing },
+  );
   const gradientSpec =
     el.fillType === "gradient"
       ? (el.gradient ?? legacyTextGradientToSpec(el.gradientColorStart, el.gradientColorEnd, el.gradientDirection))
@@ -341,7 +348,10 @@ function StudioKonvaVerticalTextNode({
     >
       {layout.columns.flatMap((column) =>
         column.items.map((item, itemIndex) => {
-          const { boxWidth, lineHeight } = verticalTextItemGeometry(item, el.fontSize);
+          const { boxWidth, lineHeight: itemLineHeight, scaleX } = verticalTextItemGeometry(
+            item,
+            el.fontSize,
+          );
           return (
             <KText
               key={`${column.index}-${itemIndex}`}
@@ -349,6 +359,7 @@ function StudioKonvaVerticalTextNode({
               x={item.x}
               y={item.y}
               rotation={item.rotation}
+              scaleX={scaleX}
               {...(item.rotation === 0
                 ? // 열 폭(1em) 상자에 글자를 가운데로. wrap="none" — 이 상자는 이미 열 코어가
                   // 정한 조판 결과라 Konva가 다시 줄바꿈하면 안 된다(폭이 1em보다 넓은 이모지 등).
@@ -357,8 +368,8 @@ function StudioKonvaVerticalTextNode({
               fontSize={el.fontSize}
               fontFamily={fontFamily}
               fontStyle={fontStyle}
-              lineHeight={lineHeight}
-              letterSpacing={item.rotation === 90 ? (el.letterSpacing ?? 0) : 0}
+              lineHeight={itemLineHeight}
+              letterSpacing={item.rotation === 90 ? letterSpacing : 0}
               fill={gradientSpec ? undefined : el.fill}
               {...(gradientSpec
                 ? konvaGradientProps(gradientSpec, {
@@ -383,6 +394,26 @@ function StudioKonvaVerticalTextNode({
           );
         }),
       )}
+      {verticalRuby.placements.map((placement) => (
+        <KText
+          key={`vertical-ruby-${placement.spanIndex}-${placement.fragmentIndex}`}
+          name="studio-vertical-ruby"
+          text={[...placement.ruby].join("\n")}
+          x={placement.x}
+          y={placement.y}
+          width={placement.width}
+          height={placement.height}
+          align="center"
+          wrap="none"
+          rotation={0}
+          fontSize={placement.rubyFontSize}
+          fontFamily={fontFamily}
+          fontStyle={fontStyle}
+          lineHeight={placement.rubyGlyphAdvance / placement.rubyFontSize}
+          fill={el.fill}
+          listening={false}
+        />
+      ))}
     </KGroup>
   );
 }

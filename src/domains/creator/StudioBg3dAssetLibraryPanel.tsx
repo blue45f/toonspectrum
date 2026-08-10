@@ -129,7 +129,7 @@ export function StudioBg3dAssetLibraryPanel({
       return;
     }
     if (
-      entry.source !== "indexed-db" ||
+      entry.source === "sample" ||
       entry.status !== "verified" ||
       !entry.canUse ||
       !entry.contentHash ||
@@ -473,7 +473,7 @@ export function StudioBg3dAssetLibraryPanel({
         {visibleEntries.map((entry) => {
           const isDeleting = deletingModelId === entry.id;
           const isExporting = exportingModelId === entry.id;
-          const canDownloadCanonicalGlb = entry.source === "indexed-db"
+          const canDownloadCanonicalGlb = entry.source !== "sample"
             && entry.status === "verified"
             && entry.canUse
             && entry.contentHash !== null
@@ -521,7 +521,7 @@ export function StudioBg3dAssetLibraryPanel({
                 </span>
               </button>
 
-              {entry.source === "indexed-db" ? (
+              {entry.source !== "sample" ? (
                 <div className="grid grid-cols-2 gap-1.5 border-t border-line/80 bg-panel/45 p-1.5">
                   <button
                     type="button"

@@ -130,6 +130,14 @@ import {
 } from "./studio-causal-watercolor-brush";
 import { calculateStudioCrc32 } from "./studio-crc32";
 import {
+  planDialogueRubyOverlayPlacements,
+  planDialogueVerticalRubyOverlayPlacements,
+  readDialogueRubySpans,
+  type StudioRubyOverlayPlacement,
+  type StudioRubySpanInput,
+  type StudioVerticalRubyLayoutPlan,
+} from "./studio-dialogue-ruby-layout";
+import {
   resolveStudioDynamicBrushMaterialIdentity,
   type StudioDynamicBrushMaterialIdentity,
 } from "./studio-dry-media-dynamic-bridge";
@@ -332,6 +340,8 @@ export interface SvgTextElLike extends SvgElMeta, SkewFields {
   gradientDirection?: "vertical" | "horizontal";
   gradient?: StudioGradientSpec;
   textPath?: TextPathConfig;
+  /** Dialogue annotation extension carried by the runtime scene even though the base El is structural. */
+  rubySpans?: readonly StudioRubySpanInput[];
 }
 
 export interface SvgBubbleElLike extends SvgElMeta {
@@ -369,6 +379,8 @@ export interface SvgBubbleElLike extends SvgElMeta {
   /** shout/angry Star 안쪽 반경 비율(0..1). 미설정 시 variant 기본값. */
   starAmplitude?: number;
   customShapePoints?: number[];
+  /** Dialogue annotation extension carried by the runtime scene even though the base El is structural. */
+  rubySpans?: readonly StudioRubySpanInput[];
 }
 
 export interface SvgFrameElLike extends SvgElMeta {
@@ -676,21 +688,6 @@ function getSymmetricPoints(points: number[], symmetry: SvgDrawElLike["symmetry"
     }
     return transformed;
   });
-}
-
-/** StudioPage formatVerticalText 포트 — 세로쓰기(열 우→좌, 빈 칸은 전각 공백). */
-function formatVerticalText(text: string): string {
-  const lines = text.split("\n");
-  const maxLen = Math.max(...lines.map((l) => l.length));
-  const resultLines: string[] = [];
-  for (let charIdx = 0; charIdx < maxLen; charIdx++) {
-    const rowChars: string[] = [];
-    for (let lineIdx = lines.length - 1; lineIdx >= 0; lineIdx--) {
-      rowChars.push(lines[lineIdx]?.[charIdx] ?? "　");
-    }
-    resultLines.push(rowChars.join("  "));
-  }
-  return resultLines.join("\n");
 }
 
 /**
@@ -1437,7 +1434,7 @@ function verticalTextBlockMarkup(opts: VerticalTextBlockOptions): string {
   const parts: string[] = [];
   for (const column of opts.layout.columns) {
     for (const item of column.items) {
-      const { boxWidth, lineHeight } = verticalTextItemGeometry(item, opts.fontSize);
+      const { boxWidth, lineHeight, scaleX } = verticalTextItemGeometry(item, opts.fontSize);
       const rotated = item.rotation === 90;
       const block = textBlockMarkup({
         text: item.text,
@@ -1455,11 +1452,80 @@ function verticalTextBlockMarkup(opts: VerticalTextBlockOptions): string {
         strokeWidth: opts.strokeWidth,
         filter: opts.filter,
       });
-      const transform = `translate(${fmt(item.x)} ${fmt(item.y)})${rotated ? " rotate(90)" : ""}`;
+      const transform =
+        `translate(${fmt(item.x)} ${fmt(item.y)})`
+        + `${rotated ? " rotate(90)" : ""}`
+        + `${scaleX !== 1 ? ` scale(${fmt(scaleX)} 1)` : ""}`;
       parts.push(`<g transform="${transform}">${block}</g>`);
     }
   }
   return parts.join("");
+}
+
+function horizontalRubyBlockMarkup(
+  placements: readonly StudioRubyOverlayPlacement[],
+  options: {
+    readonly offsetX: number;
+    readonly offsetY: number;
+    readonly fontFamily: string;
+    readonly fontStyle: "normal" | "bold" | "italic" | "bold italic";
+    readonly fill: string;
+  },
+): string {
+  return placements
+    .map((placement) => textBlockMarkup({
+      text: placement.ruby,
+      x: options.offsetX + placement.x,
+      y: options.offsetY + placement.y,
+      boxWidth: Math.max(placement.baseWidth, 1),
+      fontSize: placement.rubyFontSize,
+      lineHeight: 1,
+      letterSpacing: 0,
+      align: "center",
+      fontFamily: options.fontFamily,
+      fontStyle: options.fontStyle,
+      fill: options.fill,
+    }))
+    .join("");
+}
+
+function verticalRubyBlockMarkup(
+  plan: StudioVerticalRubyLayoutPlan,
+  options: {
+    readonly fontFamily: string;
+    readonly fontStyle: "normal" | "bold" | "italic" | "bold italic";
+    readonly fill: string;
+  },
+): string {
+  return plan.placements
+    .map((placement) => textBlockMarkup({
+      text: [...placement.ruby].join("\n"),
+      x: placement.x,
+      y: placement.y,
+      boxWidth: placement.width,
+      boxHeight: placement.height,
+      fontSize: placement.rubyFontSize,
+      lineHeight: placement.rubyGlyphAdvance / placement.rubyFontSize,
+      letterSpacing: 0,
+      align: "center",
+      fontFamily: options.fontFamily,
+      fontStyle: options.fontStyle,
+      fill: options.fill,
+    }))
+    .join("");
+}
+
+function reportVerticalRubyPlan(
+  ctx: ExportCtx,
+  el: { readonly id: string; readonly type: string },
+  plan: StudioVerticalRubyLayoutPlan,
+): void {
+  for (const warning of plan.warnings) {
+    addSkip(ctx, el, "approximated", `세로 루비 경고(${warning.code}): ${warning.message}`);
+  }
+  for (const unsupported of plan.unsupported) {
+    addSkip(ctx, el, "skipped", `세로 루비 미지원(${unsupported.code}): ${unsupported.message}`);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -2988,6 +3054,7 @@ function serializeFreehand(
 
 function serializeText(ctx: ExportCtx, el: SvgTextElLike): string {
   const fontFamily = el.font ?? "Pretendard, sans-serif";
+  const fontStyle = el.fontStyle ?? "bold";
   ctx.fonts.add(fontFamily);
   const transform = nodeTransform(el.x, el.y, el.rotation, el);
   const opacity = el.opacity ?? 1;
@@ -3004,6 +3071,7 @@ function serializeText(ctx: ExportCtx, el: SvgTextElLike): string {
 
   const textPath = normalizeTextPath(el.textPath);
   const usesPath = el.textPath && !isFlatTextPath(textPath);
+  const rubySpans = readDialogueRubySpans(el.rubySpans);
 
   // 채우기 — 그라데이션이면 로컬(0,0 원점) bbox 로 defs 생성(그룹 translate 안이라 로컬 좌표).
   const gradientSpec =
@@ -3012,6 +3080,9 @@ function serializeText(ctx: ExportCtx, el: SvgTextElLike): string {
       : null;
 
   if (usesPath) {
+    if (rubySpans) {
+      addSkip(ctx, el, "skipped", "곡선 텍스트의 루비 주석은 SVG 경로 조판에서 아직 재현할 수 없어요.");
+    }
     const pathData = buildTextPathData(textPath, el.width, el.fontSize);
     const pathId = nextId(ctx, "stp");
     ctx.defs.push(`<path id="${pathId}" d="${escapeXml(pathData)}" fill="none"/>`);
@@ -3056,7 +3127,13 @@ function serializeText(ctx: ExportCtx, el: SvgTextElLike): string {
       },
       SVG_VERTICAL_MEASURER
     );
-    if (verticalLayout.columns.some((column) => column.items.some((item) => item.rotation === 90))) {
+    if (
+      verticalLayout.columns.some((column) =>
+        column.items.some(
+          (item) => item.rotation === 90 || item.form === "tate-chu-yoko",
+        ),
+      )
+    ) {
       addSkip(
         ctx,
         el,
@@ -3069,7 +3146,7 @@ function serializeText(ctx: ExportCtx, el: SvgTextElLike): string {
       fontSize: el.fontSize,
       letterSpacing: verticalLetterSpacing,
       fontFamily,
-      fontStyle: el.fontStyle ?? "bold",
+      fontStyle,
       fill: (item) =>
         gradientSpec
           ? gradientDef(
@@ -3089,7 +3166,23 @@ function serializeText(ctx: ExportCtx, el: SvgTextElLike): string {
       strokeWidth: el.strokeWidth,
       filter,
     });
-    return `<g${transform ? att("transform", transform) : ""}${opacity !== 1 ? att("opacity", opacity) : ""}>${verticalBlock}</g>`;
+    const verticalRuby = planDialogueVerticalRubyOverlayPlacements(
+      el.text,
+      rubySpans,
+      verticalLayout,
+      {
+        fontSize: el.fontSize,
+        lineHeight: el.lineHeight ?? 1.4,
+        letterSpacing: verticalLetterSpacing,
+      },
+    );
+    reportVerticalRubyPlan(ctx, el, verticalRuby);
+    const rubyBlock = verticalRubyBlockMarkup(verticalRuby, {
+      fontFamily,
+      fontStyle,
+      fill: el.fill,
+    });
+    return `<g${transform ? att("transform", transform) : ""}${opacity !== 1 ? att("opacity", opacity) : ""}>${verticalBlock}${rubyBlock}</g>`;
   }
 
   const content = el.text;
@@ -3117,13 +3210,33 @@ function serializeText(ctx: ExportCtx, el: SvgTextElLike): string {
     letterSpacing,
     align: el.align ?? "left",
     fontFamily,
-    fontStyle: el.fontStyle ?? "bold",
+    fontStyle,
     fill,
     stroke: el.stroke,
     strokeWidth: el.strokeWidth,
     filter,
   });
-  return `<g${transform ? att("transform", transform) : ""}${opacity !== 1 ? att("opacity", opacity) : ""}>${block}</g>`;
+  const horizontalRuby = rubySpans
+    ? planDialogueRubyOverlayPlacements(content, rubySpans, {
+        fontSize: el.fontSize,
+        letterSpacing,
+        textWidth: el.width,
+        align: el.align ?? "left",
+      })
+    : [];
+  if (horizontalRuby.length > 0) {
+    addSkip(ctx, el, "approximated", "가로 루비 위치는 SVG에서 글꼴 advance 근사로 배치돼요.");
+  } else if (rubySpans) {
+    addSkip(ctx, el, "skipped", "유효한 가로 루비 범위를 찾지 못해 루비 주석을 그리지 않았어요.");
+  }
+  const rubyBlock = horizontalRubyBlockMarkup(horizontalRuby, {
+    offsetX: 0,
+    offsetY: 0,
+    fontFamily,
+    fontStyle,
+    fill: el.fill,
+  });
+  return `<g${transform ? att("transform", transform) : ""}${opacity !== 1 ? att("opacity", opacity) : ""}>${block}${rubyBlock}</g>`;
 }
 
 function serializeSticker(ctx: ExportCtx, el: SvgStickerElLike): string {
@@ -3306,13 +3419,64 @@ function serializeBubble(ctx: ExportCtx, el: SvgBubbleElLike): string {
   const bVPadBot = Math.max(10, Math.round(bFs * 0.64));
   const lineHeight = el.lineHeight ?? (el.vertical ? 1.4 : theme === "soft" ? 1.35 : theme === "vivid" ? 1.2 : 1.25);
   const letterSpacing = theme === "vivid" ? 0 : 0.3;
-  const content = el.vertical ? formatVerticalText(el.text) : el.text;
+  const content = el.text;
   const boxWidth = Math.max(8, el.width - bHPad * 2);
   const boxHeight = Math.max(8, el.height - (bVPadTop + bVPadBot));
-  if (content.split("\n").some((line) => estimateLineWidth(line, bFs, letterSpacing) > boxWidth * 1.02)) {
-    addSkip(ctx, el, "approximated", "말풍선 자동 줄바꿈은 SVG에 없어 수동 줄바꿈(엔터)만 반영돼요.");
-  }
-  if (content.trim().length > 0) {
+  const bubbleFontStyle = el.fontStyle ?? "bold";
+  const rubySpans = readDialogueRubySpans(el.rubySpans);
+  if (el.vertical && content.trim().length > 0) {
+    const verticalLayout = layoutVerticalText(
+      {
+        text: content,
+        fontSize: bFs,
+        lineHeight,
+        letterSpacing,
+        fontFamily,
+        fontStyle: bubbleFontStyle,
+        maxColumnLength: boxHeight,
+        blockAlign: verticalBlockAlign(el.align),
+      },
+      SVG_VERTICAL_MEASURER,
+    );
+    if (
+      verticalLayout.columns.some((column) =>
+        column.items.some((item) => item.rotation === 90 || item.form === "tate-chu-yoko"),
+      )
+    ) {
+      addSkip(
+        ctx,
+        el,
+        "approximated",
+        "말풍선 세로쓰기 속 라틴/숫자 폭은 글꼴 실측 없이 근사해 열 나눔이 화면과 조금 다를 수 있어요.",
+      );
+    }
+    const verticalRuby = planDialogueVerticalRubyOverlayPlacements(
+      content,
+      rubySpans,
+      verticalLayout,
+      { fontSize: bFs, lineHeight, letterSpacing },
+    );
+    reportVerticalRubyPlan(ctx, el, verticalRuby);
+    const baseMarkup = verticalTextBlockMarkup({
+      layout: verticalLayout,
+      fontSize: bFs,
+      letterSpacing,
+      fontFamily,
+      fontStyle: bubbleFontStyle,
+      fill: () => el.textFill,
+    });
+    const rubyMarkup = verticalRubyBlockMarkup(verticalRuby, {
+      fontFamily,
+      fontStyle: bubbleFontStyle,
+      fill: el.textFill,
+    });
+    const verticalX = bHPad + Math.max(0, (boxWidth - verticalLayout.width) / 2);
+    const verticalY = bVPadTop + Math.max(0, (boxHeight - verticalLayout.height) / 2);
+    body.push(`<g transform="translate(${fmt(verticalX)} ${fmt(verticalY)})">${baseMarkup}${rubyMarkup}</g>`);
+  } else if (content.trim().length > 0) {
+    if (content.split("\n").some((line) => estimateLineWidth(line, bFs, letterSpacing) > boxWidth * 1.02)) {
+      addSkip(ctx, el, "approximated", "말풍선 자동 줄바꿈은 SVG에 없어 수동 줄바꿈(엔터)만 반영돼요.");
+    }
     body.push(
       textBlockMarkup({
         text: content,
@@ -3325,10 +3489,30 @@ function serializeBubble(ctx: ExportCtx, el: SvgBubbleElLike): string {
         letterSpacing,
         align: el.align ?? "center",
         fontFamily,
-        fontStyle: el.fontStyle ?? "bold",
+        fontStyle: bubbleFontStyle,
         fill: el.textFill,
       })
     );
+    const horizontalRuby = rubySpans
+      ? planDialogueRubyOverlayPlacements(content, rubySpans, {
+          fontSize: bFs,
+          letterSpacing,
+          textWidth: boxWidth,
+          align: el.align ?? "center",
+        })
+      : [];
+    if (horizontalRuby.length > 0) {
+      addSkip(ctx, el, "approximated", "말풍선 가로 루비 위치는 SVG에서 글꼴 advance 근사로 배치돼요.");
+    } else if (rubySpans) {
+      addSkip(ctx, el, "skipped", "유효한 말풍선 가로 루비 범위를 찾지 못해 루비 주석을 그리지 않았어요.");
+    }
+    body.push(horizontalRubyBlockMarkup(horizontalRuby, {
+      offsetX: bHPad,
+      offsetY: bVPadTop,
+      fontFamily,
+      fontStyle: bubbleFontStyle,
+      fill: el.textFill,
+    }));
   }
 
   const transform = nodeTransform(el.x, el.y, el.rotation);

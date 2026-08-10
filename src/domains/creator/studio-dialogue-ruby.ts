@@ -12,14 +12,9 @@ import {
 } from "./studio-dialogue-batch";
 import { isEffectivelyLocked } from "./studio-layers";
 
-export type DialogueRubySpan = {
-  /** UTF-16 code unit start offset into element.text (textarea/selection compatible). */
-  readonly start: number;
-  /** Exclusive end offset. */
-  readonly end: number;
-  /** Reading (furigana / 루비). */
-  readonly ruby: string;
-};
+import type { StudioDialogueRubySpan } from "./studio-element-model";
+
+export type DialogueRubySpan = StudioDialogueRubySpan;
 
 export type DialogueRangeFormatPatch = {
   readonly fontSize?: number;

@@ -1,0 +1,175 @@
+{
+  "schema": "toon-text-cache-cjk-benchmark-v1",
+  "generatedAtUtc": "2026-08-08T21:25:00.379Z",
+  "runtime": {
+    "node": "v24.16.0",
+    "platform": "darwin 25.6.0",
+    "cpu": "Apple M2 Max",
+    "execution": "real committed Parley/Skrifa Vello WASM in Node; no mock"
+  },
+  "font": {
+    "path": "/System/Library/Fonts/Supplemental/AppleGothic.ttf",
+    "sha256": "def69dc2b5e12746049a5dcb189f95341ec460589f47587938567313af3020b1",
+    "bytes": 15255648,
+    "redistribution": "not committed; OS-provided benchmark input"
+  },
+  "workload": {
+    "uniqueEntries": 100,
+    "scenePasses": 10,
+    "glyphsPerEntry": 100,
+    "requestedGlyphs": 100000,
+    "coldShapedGlyphs": 10000,
+    "servedGlyphs": 100000,
+    "outlineVerbs": 1225482,
+    "script": "Hangul syllables U+AC00..U+D7A3",
+    "options": {
+      "fontSizePx": 20,
+      "maxWidthPx": 1200
+    },
+    "sampleIndices": [
+      0,
+      13,
+      31,
+      50,
+      73,
+      99
+    ]
+  },
+  "coldShape": {
+    "latencyMs": {
+      "p50": 24.585583,
+      "p95": 29.237542,
+      "p99": 125.409042,
+      "max": 125.409042,
+      "total": 2603.117163
+    },
+    "glyphsPerMs": 3.842
+  },
+  "cacheHit": {
+    "latencyMs": {
+      "p50": 0.004792,
+      "p95": 0.011583,
+      "p99": 0.020834,
+      "max": 0.057333,
+      "total": 5.50806
+    },
+    "sameObjectHits": 900,
+    "hitRatio": 1,
+    "overallRequestHitRatio": 0.9,
+    "speedupByTotal": 472.601
+  },
+  "cache": {
+    "afterCold": {
+      "hits": 0,
+      "misses": 100,
+      "evictions": 0,
+      "entries": 100,
+      "approxBytes": 118299072
+    },
+    "final": {
+      "hits": 900,
+      "misses": 100,
+      "evictions": 0,
+      "entries": 100,
+      "approxBytes": 118299072
+    },
+    "maxEntries": 124,
+    "maxBytes": 268435456
+  },
+  "memory": {
+    "before": {
+      "rss": 238665728,
+      "heapTotal": 62701568,
+      "heapUsed": 30871784,
+      "external": 73655805,
+      "arrayBuffers": 31593063
+    },
+    "afterCold": {
+      "rss": 508936192,
+      "heapTotal": 315473920,
+      "heapUsed": 230724440,
+      "external": 77063717,
+      "arrayBuffers": 31593063
+    },
+    "afterHits": {
+      "rss": 509018112,
+      "heapTotal": 315473920,
+      "heapUsed": 235422688,
+      "external": 77063717,
+      "arrayBuffers": 31593063
+    },
+    "observedRssDeltaBytes": 270352384,
+    "observedHeapUsedDeltaBytes": 204550904,
+    "note": "process-level observation; font/WASM/runtime/cache are not separately attributable"
+  },
+  "visualSamples": [
+    {
+      "index": 0,
+      "glyphs": 100,
+      "cachedShapeSha256": "e038063dc5f12c7a8e35687dd37cd45fa41c9f80132f8a20aa9830b93af7788c",
+      "freshShapeSha256": "e038063dc5f12c7a8e35687dd37cd45fa41c9f80132f8a20aa9830b93af7788c",
+      "cachedPixelSha256": "390c344f8acbf77fddd15a8819cd2cd68ab6f12a59d0207026a227a32ae86630",
+      "freshPixelSha256": "390c344f8acbf77fddd15a8819cd2cd68ab6f12a59d0207026a227a32ae86630",
+      "shapeByteExact": true,
+      "pixelByteExact": true
+    },
+    {
+      "index": 13,
+      "glyphs": 100,
+      "cachedShapeSha256": "dd59e6f2d0bffd6be172cecee3fec9c4672213c7bd4ae032c58c979e26d70873",
+      "freshShapeSha256": "dd59e6f2d0bffd6be172cecee3fec9c4672213c7bd4ae032c58c979e26d70873",
+      "cachedPixelSha256": "c07c85061d498a56e7718893b3008c7f53aeb72bfd43a5a24df429c5790c84ad",
+      "freshPixelSha256": "c07c85061d498a56e7718893b3008c7f53aeb72bfd43a5a24df429c5790c84ad",
+      "shapeByteExact": true,
+      "pixelByteExact": true
+    },
+    {
+      "index": 31,
+      "glyphs": 100,
+      "cachedShapeSha256": "1808c0562776d973d150be693e3018c79c77331dc1dd3cb6eda2883b06b8ce00",
+      "freshShapeSha256": "1808c0562776d973d150be693e3018c79c77331dc1dd3cb6eda2883b06b8ce00",
+      "cachedPixelSha256": "4fee1b89e09204100f2241b2d66ef1b43d4a62bf3137e6305497aab8c68f8294",
+      "freshPixelSha256": "4fee1b89e09204100f2241b2d66ef1b43d4a62bf3137e6305497aab8c68f8294",
+      "shapeByteExact": true,
+      "pixelByteExact": true
+    },
+    {
+      "index": 50,
+      "glyphs": 100,
+      "cachedShapeSha256": "95adcba612643161e6ee814cdc5f0ce212089b439dc58968521f5d4750e2993e",
+      "freshShapeSha256": "95adcba612643161e6ee814cdc5f0ce212089b439dc58968521f5d4750e2993e",
+      "cachedPixelSha256": "53b280c74b804f91f0aed2471453ce3c0f7cbb6093a021e55cc640560a52fa23",
+      "freshPixelSha256": "53b280c74b804f91f0aed2471453ce3c0f7cbb6093a021e55cc640560a52fa23",
+      "shapeByteExact": true,
+      "pixelByteExact": true
+    },
+    {
+      "index": 73,
+      "glyphs": 100,
+      "cachedShapeSha256": "a471594a443552287b4de3185cf1058517bebf52a1bcf43e142b10ad543f2771",
+      "freshShapeSha256": "a471594a443552287b4de3185cf1058517bebf52a1bcf43e142b10ad543f2771",
+      "cachedPixelSha256": "3e0053ccf6e04e35688f0f982f0f84d000bc3b01591a6c35eef467f201b1caea",
+      "freshPixelSha256": "3e0053ccf6e04e35688f0f982f0f84d000bc3b01591a6c35eef467f201b1caea",
+      "shapeByteExact": true,
+      "pixelByteExact": true
+    },
+    {
+      "index": 99,
+      "glyphs": 100,
+      "cachedShapeSha256": "7b4ee05f55e5db5db2f2f3bda092a3bd61bc21d1233001054f869bb8800b892e",
+      "freshShapeSha256": "7b4ee05f55e5db5db2f2f3bda092a3bd61bc21d1233001054f869bb8800b892e",
+      "cachedPixelSha256": "5a5a4a9cc1cf9176a1d0e4b4033d855ef1e454ac526f52541da2f483ebe44329",
+      "freshPixelSha256": "5a5a4a9cc1cf9176a1d0e4b4033d855ef1e454ac526f52541da2f483ebe44329",
+      "shapeByteExact": true,
+      "pixelByteExact": true
+    }
+  ],
+  "gates": {
+    "exactRequestedGlyphCount": true,
+    "noTofuOutlines": true,
+    "fullSteadyStateHit": true,
+    "noEvictionAtDeclaredBudget": true,
+    "cacheWithinDeclaredBudget": true,
+    "sampledShapeAndPixelByteExact": true
+  }
+}

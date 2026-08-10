@@ -1,9 +1,31 @@
-# ToonStudio V11 벤치마크 계획 (Benchmark Plan)
+# ToonStudio V11→V12 벤치마크 계획 및 실행 원장 (Benchmark Plan)
 
-- 기준일: 2026-08-07
-- 실행 위치: `/tests/benchmarks` (하니스·raw data), `/tests/corpus` (입력 corpus), `/apps/benchmark-lab-v11` (장치 실측·시각화)
+- 기준일: 2026-08-09
+- 실행 위치: `/tests/benchmarks/harness` (하니스), `/tests/benchmarks/results` (raw data), `/tests/corpus` (입력 corpus), 기존 `/studio` 브라우저 검증 스크립트(제품 실측)
 - 결과 저장: `ProviderBenchmarkRegistry` — HybridExecutionPlanner의 라우팅 근거 데이터
-- 현재 상태: **전 후보 미실측.** capability-survey.md의 p50/p95/p99·Peak Memory 컬럼은 이 계획으로만 채운다.
+- 현재 상태: **자동화 범위 실행됨.** Vello CPU/GPU, CanvasKit 교차 diff, Google Ink, 1000px libmypaint/Hokusai, OpenCV, libvips, WESL/Naga, Velato, GPU fabric, color, 실제 Chromium OPFS SQLite, 정확 100k/1M path, 8K·100-layer/30,720px exact WebGPU product surface, 8h soak는 raw artifact가 있다. 자동화할 수 없는 CSP 실기기 blind와 물리 P3/HDR·다중 OS 장치 매트릭스는 외부 release gate로 남는다. 1M 단일 all-visible overview는 retained/sharded GPU ingestion 도입 전까지 격리하며, 24h soak는 ADR 0011에 따라 선택 야간 재검증이다.
+
+## 0. 실행 상태와 증거 우선순위
+
+1. `tests/benchmarks/results/*.json` 및 corpus golden이 단일 수치 진실이다.
+2. `capability-survey.md` §2.0은 raw artifact의 판정을 색인하며 숫자를 임의 보간하지 않는다.
+3. 브라우저 GPU 측정은 adapter·Chromium·플래그·해상도·readback 포함 여부를 함께 기록한다.
+4. `passed: false`, `*Reduced: false`, `unsupported`, `skipped`를 문서 요약에서 성공으로 바꾸지 않는다.
+5. CSP 비교는 최신 안정 CSP, 같은 PC/GPU/태블릿/해상도/색공간과 사람 blind session이 없으면 자동화 하니스 결과와 분리해 `외부 미검증`으로 남긴다.
+
+### 완료된 자동화 묶음
+
+| 묶음 | raw evidence | 상태 |
+| --- | --- | --- |
+| Cross-renderer quality | `cross-renderer-diff.json`, `vello-gpu-browser.json`, SVG visual corpus | 통과 범위 고정 |
+| Brush feel/pressure | `tests/visual/pressure-fidelity.test.ts`, `libmypaint-fullsize.json`, `libmypaint-parity.json`, `ink-mesh-incremental.json`, raster goldens | 1000px 품질·압력·처리량 실측; libmypaint 유지 판정. Google Ink 증분 final mesh byte parity와 pressure/tilt/orientation 전달 통과; 물리 태블릿 blind는 잔여 |
+| Filter quality/performance | `quality-lab.json`, `filter-candidates.json`, `filter-lanes.json`, `vips-export-cutover.json` | provider별 우승 역할 고정; 4K 60fps 미통과 |
+| Shader platform | `wgsl-variants-browser.json`, `wgsl-variants-pipeline.json`, WGSL corpus + Naga test | compile/정합성 통과; wall-clock jank 미통과 |
+| Reliability | `soak.json`, device-loss/worker-crash/quota/network fault tests, SQLite recovery tests | 8h 통과; 물리 탭 종료를 포함한 통합 fault matrix는 잔여 |
+| Browser OPFS SQLite | `brush-library-opfs-browser.json`, `filter-library-opfs-browser.json`, `animatic-sqlite-opfs-browser.json`, `translation-memory-sqlite-opfs-browser.json`, `production-bible-sqlite-opfs-browser.json` | Dedicated Worker SAH-pool의 exact `studio-local-v12.db`: 브러시·필터 각 10,000개, 최대 799,973B 애니매틱, TM 512개, strict Bible을 저장·close/reopen·무손실 검증. Bible은 강제 Worker 종료 후 재개방까지 통과; memory/localStorage fallback 0 |
+| Large scene | `large-scene.json`, `scene-sharding.json`, `large-scene-million.json` | 정확 100k 전체 Vello GPU overview와 정확 1M 생성·전체 JSON 왕복·37-view bounded interaction 통과. 1M 단일 all-visible JSON frame만 명시 격리 |
+| Sparse large document | `tiledoc-scale.json`, `tiledoc-webgpu-browser.json` | 8192²·100 layer와 2048×30,720·100 layer를 exact 200 tile/200MiB로 Chromium Metal WebGPU 제품 surface에 표시. pan p95≤18.505ms, edit/reorder p95≤35.495ms, hot readback 0, device-loss 복구·rgba16float 품질 통과 |
+| CSP blind protocol | `tests/benchmarks/harness/csp-blind-lab.ts` + 16 contract tests | deterministic A/B·sealed key·완전성·Wilson 비열위 판정 구현; 사람/동일 태블릿 결과는 `insufficient-data` |
 
 ## 1. 코퍼스 구성
 
@@ -72,7 +94,7 @@ diff 실패는 "provider 탈락"이 아니라 CapabilityRegistry의 불안정 �
 | readback | 일반 편집 GPU→CPU readback 0회 |
 | 대형 브러시·필터 | 1,000px 브러시와 4K 필터 interaction을 CSP와 동일 장치에서 비교해 동률 이상 |
 | 대형 문서 | 8K·100 layer 문서와 30,000px 웹툰 스트립 편집 유지 |
-| 장시간 안정성 | 4h/24h soak(마스터 프롬프트 Phase 7은 8h/24h — 긴 쪽을 채택해 8h/24h로 운용), context-loss·worker-crash 복구 성공 |
+| 장시간 안정성 | 8h soak 통과(ADR 0011로 필수 게이트 종결), context-loss·worker-crash 복구 성공. 24h는 선택 야간 재검증 |
 | 폴백 | provider fallback 발동 시 데이터 손실 0, IR 재컴파일로 시각 동등성 유지 |
 | 기록 의무 | Provider별 p50/p95/p99·peak memory·cache hit rate를 ProviderBenchmarkRegistry에 기록 |
 

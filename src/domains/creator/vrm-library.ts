@@ -1,3 +1,12 @@
+import {
+  getProductStudioVrmAssetSqliteOpfsRepository,
+  StudioVrmAssetRepositoryError,
+  type StudioVrmAssetSqliteOpfsRepository,
+  type StudioVrmModelAsset,
+  type StudioVrmModelAssetMetadata,
+  type StudioVrmThumbnailAsset,
+} from "./studio-vrm-asset-sqlite-opfs-repository";
+
 const DB_NAME = "toonspectrum-studio-vrm-library";
 const DB_VERSION = 1;
 const MODEL_STORE = "models";
@@ -47,7 +56,7 @@ export type VrmStoredModelWithContentIdentity = VrmStoredModelRecord & {
 export type VrmLibraryEntry = {
   id: string;
   name: string;
-  source: "sample" | "indexed-db";
+  source: "memory" | "sample" | "sqlite-opfs";
   thumbnail: string | null;
   createdAt: number;
   updatedAt: number;
@@ -55,6 +64,13 @@ export type VrmLibraryEntry = {
   byteSize?: number;
   mimeType?: string;
 };
+
+export interface VrmLibraryStorageOptions {
+  /** Product default. Tests may inject one repository backed by memory SQLite + fake OPFS. */
+  readonly repository?: StudioVrmAssetSqliteOpfsRepository;
+  /** Explicit pre-V12 test/embed seam. Product code never supplies or probes this value. */
+  readonly legacyIndexedDb?: IDBFactory | null;
+}
 
 export type SampleVrm = {
   id: string;
@@ -388,21 +404,32 @@ export function hashVrmBlob(blob: Blob): Promise<VrmContentHash> {
   return runSerializedBlobWork(async () => sha256Bytes(await readVrmBlobBytes(blob)));
 }
 
+async function inspectVrmBlobWithBytes(blob: Blob): Promise<{
+  contentHash: VrmContentHash;
+  byteSize: number;
+  mimeType: string;
+  bytes: Uint8Array;
+}> {
+  return runSerializedBlobWork(async () => {
+    const buffer = await readVrmBlobBytes(blob);
+    validateVrmGlbBytes(buffer);
+    return {
+      contentHash: await sha256Bytes(buffer),
+      byteSize: buffer.byteLength,
+      // 입력의 Content-Type은 신뢰 경계가 아니다. 구조 검증을 통과한 뒤 안전한 정규 MIME을 부여한다.
+      mimeType: "model/gltf-binary",
+      bytes: new Uint8Array(buffer),
+    };
+  });
+}
+
 async function inspectVrmBlob(blob: Blob): Promise<{
   contentHash: VrmContentHash;
   byteSize: number;
   mimeType: string;
 }> {
-  return runSerializedBlobWork(async () => {
-    const bytes = await readVrmBlobBytes(blob);
-    validateVrmGlbBytes(bytes);
-    return {
-      contentHash: await sha256Bytes(bytes),
-      byteSize: bytes.byteLength,
-      // 입력의 Content-Type은 신뢰 경계가 아니다. 구조 검증을 통과한 뒤 안전한 정규 MIME을 부여한다.
-      mimeType: "model/gltf-binary",
-    };
-  });
+  const { bytes: _bytes, ...identity } = await inspectVrmBlobWithBytes(blob);
+  return identity;
 }
 
 /** 레거시 DB v1 행을 검증하고 안정적인 콘텐츠 식별 정보로 보강한다. */
@@ -441,16 +468,44 @@ function createModelId() {
 }
 
 function normalizeVrmName(fileName: string) {
-  const normalized = fileName.trim().replace(/\.vrm$/i, "").trim().slice(0, 120).trim();
+  const normalized = fileName
+    .normalize("NFKC")
+    .trim()
+    .replace(/\.vrm$/i, "")
+    .trim()
+    .replace(/\s+/gu, " ");
+  if (normalized.length > 120) {
+    throw new RangeError("VRM 캐릭터 이름은 120자 이하여야 합니다.");
+  }
+  if (Array.from(normalized).some((character) => {
+    const code = character.codePointAt(0) ?? 0;
+    return code <= 0x1f || code === 0x7f;
+  })) {
+    throw new TypeError("VRM 캐릭터 이름에 제어 문자를 사용할 수 없습니다.");
+  }
   return normalized || "VRM 캐릭터";
-}
-
-function hasIndexedDb() {
-  return typeof indexedDB !== "undefined";
 }
 
 function createIndexedDbError() {
   return new Error("이 브라우저에서는 VRM 라이브러리 저장소를 사용할 수 없습니다.");
+}
+
+function usesLegacyIndexedDb(options: VrmLibraryStorageOptions): boolean {
+  return Object.prototype.hasOwnProperty.call(options, "legacyIndexedDb");
+}
+
+function legacyIndexedDb(options: VrmLibraryStorageOptions): IDBFactory {
+  if (!usesLegacyIndexedDb(options) || options.legacyIndexedDb === null) {
+    throw createIndexedDbError();
+  }
+  if (options.legacyIndexedDb) return options.legacyIndexedDb;
+  throw createIndexedDbError();
+}
+
+function productRepository(
+  options: VrmLibraryStorageOptions,
+): StudioVrmAssetSqliteOpfsRepository {
+  return options.repository ?? getProductStudioVrmAssetSqliteOpfsRepository();
 }
 
 function requestResult<T>(request: IDBRequest<T>) {
@@ -468,13 +523,9 @@ function transactionDone(transaction: IDBTransaction) {
   });
 }
 
-function openLibraryDatabase() {
-  if (!hasIndexedDb()) {
-    return Promise.reject(createIndexedDbError());
-  }
-
+function openLibraryDatabase(factory: IDBFactory) {
   return new Promise<IDBDatabase>((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    const request = factory.open(DB_NAME, DB_VERSION);
 
     request.onupgradeneeded = () => {
       const db = request.result;
@@ -491,8 +542,11 @@ function openLibraryDatabase() {
   });
 }
 
-async function withDatabase<T>(callback: (db: IDBDatabase) => Promise<T>) {
-  const db = await openLibraryDatabase();
+async function withDatabase<T>(
+  factory: IDBFactory,
+  callback: (db: IDBDatabase) => Promise<T>,
+) {
+  const db = await openLibraryDatabase(factory);
   try {
     return await callback(db);
   } finally {
@@ -524,7 +578,7 @@ export function withDefaultVrmEntry(storedModels: VrmStoredModelRecord[], sample
       return {
         id: model.id,
         name: model.name,
-        source: "indexed-db",
+        source: "sqlite-opfs",
         thumbnail: model.thumbnail ?? null,
         createdAt: model.createdAt,
         updatedAt: model.updatedAt,
@@ -542,7 +596,9 @@ export function withDefaultVrmEntry(storedModels: VrmStoredModelRecord[], sample
 }
 
 export function getDeletableModelIds(entries: VrmLibraryEntry[]) {
-  return entries.filter((entry) => entry.source === "indexed-db").map((entry) => entry.id);
+  return entries
+    .filter((entry) => entry.source === "memory" || entry.source === "sqlite-opfs")
+    .map((entry) => entry.id);
 }
 
 function isStoredVrmModelRecord(value: unknown): value is VrmStoredModelRecord {
@@ -627,8 +683,10 @@ async function persistVrmIdentityBackfills(
   await Promise.all([reconcile(), done]);
 }
 
-export async function listStoredVrmModels(): Promise<VrmStoredModelRecord[]> {
-  return withDatabase(async (db) => {
+async function listLegacyStoredVrmModels(
+  factory: IDBFactory,
+): Promise<VrmStoredModelRecord[]> {
+  return withDatabase(factory, async (db) => {
     const transaction = db.transaction(MODEL_STORE, "readonly");
     const done = transactionDone(transaction);
     const store = transaction.objectStore(MODEL_STORE);
@@ -677,8 +735,11 @@ export async function listStoredVrmModels(): Promise<VrmStoredModelRecord[]> {
   });
 }
 
-export async function getStoredVrmModel(id: string) {
-  return withDatabase(async (db) => {
+async function getLegacyStoredVrmModel(
+  id: string,
+  factory: IDBFactory,
+): Promise<VrmStoredModelRecord | null> {
+  return withDatabase(factory, async (db) => {
     const transaction = db.transaction(MODEL_STORE, "readonly");
     const done = transactionDone(transaction);
     const store = transaction.objectStore(MODEL_STORE);
@@ -688,15 +749,11 @@ export async function getStoredVrmModel(id: string) {
   });
 }
 
-export async function getStoredVrmModelByHash(hash: string): Promise<VrmStoredModelRecord | null> {
-  const canonicalHash = canonicalizeVrmContentHash(hash);
-  if (!canonicalHash) return null;
-  const records = await listStoredVrmModels();
-  return records.find((record) => canonicalizeVrmContentHash(record.contentHash) === canonicalHash) ?? null;
-}
-
-export async function getCachedVrmThumbnail(id: string) {
-  return withDatabase(async (db) => {
+async function getLegacyCachedVrmThumbnail(
+  id: string,
+  factory: IDBFactory,
+): Promise<string | null> {
+  return withDatabase(factory, async (db) => {
     const transaction = db.transaction(THUMBNAIL_STORE, "readonly");
     const done = transactionDone(transaction);
     const store = transaction.objectStore(THUMBNAIL_STORE);
@@ -706,12 +763,186 @@ export async function getCachedVrmThumbnail(id: string) {
   });
 }
 
-export async function listVrmLibraryEntries() {
-  const [storedModels, cachedSampleThumbnails] = await Promise.all([
-    listStoredVrmModels(),
-    Promise.all(SAMPLE_VRM_ENTRIES.map(async (entry) => [entry.id, await getCachedVrmThumbnail(entry.id)] as const)),
+function thumbnailToDataUrl(thumbnail: StudioVrmThumbnailAsset): string {
+  let binary = "";
+  const chunkSize = 32_768;
+  for (let offset = 0; offset < thumbnail.bytes.byteLength; offset += chunkSize) {
+    const chunk = thumbnail.bytes.subarray(
+      offset,
+      Math.min(offset + chunkSize, thumbnail.bytes.byteLength),
+    );
+    binary += String.fromCharCode(...chunk);
+  }
+  if (typeof globalThis.btoa !== "function") {
+    throw new StudioVrmAssetRepositoryError(
+      "unavailable",
+      "이 환경에서는 VRM thumbnail base64를 만들 수 없습니다.",
+    );
+  }
+  return `data:${thumbnail.mimeType};base64,${globalThis.btoa(binary)}`;
+}
+
+function dataUrlToThumbnail(value: string): StudioVrmThumbnailAsset {
+  const match = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/]+={0,2})$/u.exec(value);
+  if (!match || typeof globalThis.atob !== "function") {
+    throw new TypeError("VRM thumbnail은 canonical PNG/JPEG/WebP data URL이어야 합니다.");
+  }
+  let decoded: string;
+  try {
+    decoded = globalThis.atob(match[2]);
+  } catch (cause) {
+    throw new TypeError("VRM thumbnail base64가 손상되었습니다.", { cause });
+  }
+  const bytes = Uint8Array.from(decoded, (character) => character.charCodeAt(0));
+  if (bytes.byteLength < 1 || bytes.byteLength > 2 * 1024 * 1024) {
+    throw new RangeError("VRM thumbnail은 2 MiB 이하여야 합니다.");
+  }
+  return {
+    bytes,
+    mimeType: match[1] as StudioVrmThumbnailAsset["mimeType"],
+  };
+}
+
+function recordFromAsset(asset: StudioVrmModelAsset): VrmStoredModelWithContentIdentity {
+  return {
+    id: asset.id,
+    name: asset.name,
+    blob: new Blob([Uint8Array.from(asset.bytes).buffer], { type: asset.mimeType }),
+    thumbnail: asset.thumbnail ? thumbnailToDataUrl(asset.thumbnail) : null,
+    createdAt: asset.createdAt,
+    updatedAt: asset.updatedAt,
+    contentHash: asset.contentHash,
+    byteSize: asset.byteSize,
+    mimeType: asset.mimeType,
+    validationVersion: asset.validationVersion,
+  };
+}
+
+function libraryEntryFromMetadata(
+  metadata: StudioVrmModelAssetMetadata,
+  thumbnail: string | null,
+): VrmLibraryEntry {
+  return {
+    id: metadata.id,
+    name: metadata.name,
+    source: "sqlite-opfs",
+    thumbnail,
+    createdAt: metadata.createdAt,
+    updatedAt: metadata.updatedAt,
+    contentHash: metadata.contentHash,
+    byteSize: metadata.byteSize,
+    mimeType: metadata.mimeType,
+  };
+}
+
+export function memoryVrmLibraryEntry(
+  record: VrmStoredModelWithContentIdentity,
+): VrmLibraryEntry {
+  return {
+    id: record.id,
+    name: record.name,
+    source: "memory",
+    thumbnail: record.thumbnail,
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+    contentHash: record.contentHash,
+    byteSize: record.byteSize,
+    mimeType: record.mimeType,
+  };
+}
+
+export async function listStoredVrmModels(
+  options: VrmLibraryStorageOptions = {},
+): Promise<VrmStoredModelRecord[]> {
+  if (usesLegacyIndexedDb(options)) {
+    return listLegacyStoredVrmModels(legacyIndexedDb(options));
+  }
+  const repository = productRepository(options);
+  const metadata = await repository.listModelMetadata();
+  const records: VrmStoredModelRecord[] = [];
+  // This compatibility API materializes bytes; product catalog listing uses metadata below.
+  for (const entry of metadata) {
+    const model = await repository.getModel(entry.id);
+    if (model) records.push(recordFromAsset(model));
+  }
+  return records;
+}
+
+export async function getStoredVrmModel(
+  id: string,
+  options: VrmLibraryStorageOptions = {},
+): Promise<VrmStoredModelRecord | null> {
+  if (usesLegacyIndexedDb(options)) {
+    return getLegacyStoredVrmModel(id, legacyIndexedDb(options));
+  }
+  const asset = await productRepository(options).getModel(id);
+  return asset ? recordFromAsset(asset) : null;
+}
+
+export async function getStoredVrmModelByHash(
+  value: string,
+  options: VrmLibraryStorageOptions = {},
+): Promise<VrmStoredModelRecord | null> {
+  const contentHash = canonicalizeVrmContentHash(value);
+  if (!contentHash) return null;
+  if (usesLegacyIndexedDb(options)) {
+    const records = await listLegacyStoredVrmModels(legacyIndexedDb(options));
+    return records.find(
+      (record) => canonicalizeVrmContentHash(record.contentHash) === contentHash,
+    ) ?? null;
+  }
+  const asset = await productRepository(options).getModelByHash(contentHash);
+  return asset ? recordFromAsset(asset) : null;
+}
+
+export async function getCachedVrmThumbnail(
+  id: string,
+  options: VrmLibraryStorageOptions = {},
+): Promise<string | null> {
+  if (usesLegacyIndexedDb(options)) {
+    return getLegacyCachedVrmThumbnail(id, legacyIndexedDb(options));
+  }
+  const thumbnail = await productRepository(options).getThumbnail(id);
+  return thumbnail ? thumbnailToDataUrl(thumbnail) : null;
+}
+
+export async function listVrmLibraryEntries(
+  options: VrmLibraryStorageOptions = {},
+): Promise<VrmLibraryEntry[]> {
+  if (usesLegacyIndexedDb(options)) {
+    const factory = legacyIndexedDb(options);
+    const [storedModels, cachedSampleThumbnails] = await Promise.all([
+      listLegacyStoredVrmModels(factory),
+      Promise.all(SAMPLE_VRM_ENTRIES.map(async (entry) => [
+        entry.id,
+        await getLegacyCachedVrmThumbnail(entry.id, factory),
+      ] as const)),
+    ]);
+    return withDefaultVrmEntry(storedModels, Object.fromEntries(cachedSampleThumbnails));
+  }
+  const repository = productRepository(options);
+  const [metadata, sampleThumbnails] = await Promise.all([
+    repository.listModelMetadata(),
+    Promise.all(SAMPLE_VRM_ENTRIES.map(async (entry) => [
+      entry.id,
+      await repository.getThumbnail(entry.id),
+    ] as const)),
   ]);
-  return withDefaultVrmEntry(storedModels, Object.fromEntries(cachedSampleThumbnails));
+  const uploaded: VrmLibraryEntry[] = [];
+  for (const entry of metadata) {
+    const thumbnail = entry.hasThumbnail
+      ? await repository.getThumbnail(entry.id)
+      : null;
+    uploaded.push(libraryEntryFromMetadata(
+      entry,
+      thumbnail ? thumbnailToDataUrl(thumbnail) : null,
+    ));
+  }
+  const samples = SAMPLE_VRM_ENTRIES.map((entry) => {
+    const thumbnail = sampleThumbnails.find(([id]) => id === entry.id)?.[1] ?? null;
+    return { ...entry, thumbnail: thumbnail ? thumbnailToDataUrl(thumbnail) : null };
+  });
+  return [...samples, ...uploaded];
 }
 
 let saveWorkTail: Promise<void> = Promise.resolve();
@@ -729,7 +960,7 @@ export async function saveVerifiedVrmBlob(input: {
   name: string;
   blob: Blob;
   expectedHash?: string;
-}): Promise<VrmStoredModelRecord> {
+}, options: VrmLibraryStorageOptions = {}): Promise<VrmStoredModelRecord> {
   return runSerializedSave(async () => {
     const expectedHash = input.expectedHash === undefined
       ? null
@@ -738,15 +969,43 @@ export async function saveVerifiedVrmBlob(input: {
       throw new TypeError("예상 VRM 해시는 sha256: 뒤에 64자리 16진수여야 합니다.");
     }
 
-    // 검증·해시가 모두 끝나기 전에는 IndexedDB를 열거나 변경하지 않는다.
-    const identity = await inspectVrmBlob(input.blob);
+    // 검증·해시가 모두 끝나기 전에는 어떤 durable authority도 열거나 변경하지 않는다.
+    const inspected = await inspectVrmBlobWithBytes(input.blob);
+    const { bytes, ...identity } = inspected;
     if (expectedHash && identity.contentHash !== expectedHash) {
       throw new TypeError("VRM 파일의 SHA-256 해시가 프로젝트에 기록된 값과 일치하지 않습니다.");
     }
 
-    // DB v1 레거시 행도 먼저 순차 보정해 같은 콘텐츠의 중복 저장을 막는다.
-    await listStoredVrmModels();
-    return withDatabase(async (db) => {
+    if (!usesLegacyIndexedDb(options)) {
+      const timestamp = Date.now();
+      const result = await productRepository(options).saveModel({
+        id: createModelId(),
+        name: normalizeVrmName(input.name),
+        bytes,
+        expectedHash: identity.contentHash,
+        validationVersion: VRM_VALIDATION_VERSION,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      });
+      return {
+        id: result.metadata.id,
+        name: result.metadata.name,
+        // The caller-supplied immutable Blob has the same fully verified SHA-256 bytes.
+        blob: input.blob,
+        thumbnail: null,
+        createdAt: result.metadata.createdAt,
+        updatedAt: result.metadata.updatedAt,
+        contentHash: result.metadata.contentHash,
+        byteSize: result.metadata.byteSize,
+        mimeType: result.metadata.mimeType,
+        validationVersion: result.metadata.validationVersion,
+      };
+    }
+
+    const factory = legacyIndexedDb(options);
+    // Explicit legacy tests may still exercise v1 identity backfill; product never enters here.
+    await listLegacyStoredVrmModels(factory);
+    return withDatabase(factory, async (db) => {
       const transaction = db.transaction(MODEL_STORE, "readwrite");
       const done = transactionDone(transaction);
       const store = transaction.objectStore(MODEL_STORE);
@@ -778,12 +1037,27 @@ export async function saveVerifiedVrmBlob(input: {
   });
 }
 
-export function saveUploadedVrm(file: File) {
-  return saveVerifiedVrmBlob({ name: file.name, blob: file });
+export function saveUploadedVrm(
+  file: File,
+  options: VrmLibraryStorageOptions = {},
+) {
+  return saveVerifiedVrmBlob({ name: file.name, blob: file }, options);
 }
 
-export async function saveVrmThumbnail(id: string, thumbnail: string) {
-  return withDatabase(async (db) => {
+export async function saveVrmThumbnail(
+  id: string,
+  thumbnail: string,
+  options: VrmLibraryStorageOptions = {},
+): Promise<void> {
+  if (!usesLegacyIndexedDb(options)) {
+    await productRepository(options).saveThumbnail(
+      id,
+      dataUrlToThumbnail(thumbnail),
+      Date.now(),
+    );
+    return;
+  }
+  return withDatabase(legacyIndexedDb(options), async (db) => {
     const transaction = db.transaction([MODEL_STORE, THUMBNAIL_STORE], "readwrite");
     const done = transactionDone(transaction);
     const modelStore = transaction.objectStore(MODEL_STORE);
@@ -799,10 +1073,17 @@ export async function saveVrmThumbnail(id: string, thumbnail: string) {
   });
 }
 
-export async function deleteStoredVrmModel(id: string) {
+export async function deleteStoredVrmModel(
+  id: string,
+  options: VrmLibraryStorageOptions = {},
+): Promise<void> {
   if (isSampleVrmId(id)) return;
 
-  return withDatabase(async (db) => {
+  if (!usesLegacyIndexedDb(options)) {
+    await productRepository(options).deleteModel(id);
+    return;
+  }
+  return withDatabase(legacyIndexedDb(options), async (db) => {
     const transaction = db.transaction([MODEL_STORE, THUMBNAIL_STORE], "readwrite");
     const done = transactionDone(transaction);
     transaction.objectStore(MODEL_STORE).delete(id);

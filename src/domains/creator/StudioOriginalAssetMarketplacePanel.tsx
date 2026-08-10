@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import {
   useId,
+  useEffect,
   useRef,
   useState,
   type DragEvent,
@@ -27,14 +28,16 @@ import {
 
 import { writeStudioAssetDragPayload } from "./studio-insert-drag-writer";
 import {
+  getProductStudioMarketplaceLibrarySqliteRepository,
+  type StudioMarketplaceLibrarySqliteRepository,
+} from "./studio-marketplace-library-sqlite-repository";
+import {
   STUDIO_MARKETPLACE_REDISTRIBUTION_NOTICE,
   cloneStudioMarketplacePackageToLibrary,
   createStudioMarketplaceShareManifest,
   filterStudioMarketplacePackages,
-  loadStudioMarketplaceLibrary,
   removeStudioMarketplacePackageFromLibrary,
   resolveStudioMarketplaceImport,
-  saveStudioMarketplaceLibrary,
   type StudioMarketplaceAccessModel,
   type StudioMarketplaceLibraryState,
 } from "./studio-marketplace-packages";
@@ -92,16 +95,8 @@ export interface StudioOriginalAssetMarketplacePanelProps {
   readonly onUseAsset: (asset: StudioAsset) => boolean;
   /** Useful for a dedicated asset-market route; compact toolbar embedding stays lazy by default. */
   readonly initialOpen?: boolean;
-}
-
-function currentStorage(): Storage | null {
-  try {
-    return typeof globalThis.localStorage === "undefined"
-      ? null
-      : globalThis.localStorage;
-  } catch {
-    return null;
-  }
+  /** Test/embed seam. Product code leaves this undefined and uses shared V12 SQLite/OPFS. */
+  readonly libraryRepository?: StudioMarketplaceLibrarySqliteRepository;
 }
 
 function dragOriginalAsset(
@@ -377,9 +372,14 @@ function AssetPreviewDialog({
 export function StudioOriginalAssetMarketplacePanel({
   onUseAsset,
   initialOpen = false,
+  libraryRepository,
 }: StudioOriginalAssetMarketplacePanelProps): ReactElement {
   const marketplaceRootRef = useRef<HTMLElement>(null);
   const previewDialogRef = useRef<HTMLElement>(null);
+  const operationGenerationRef = useRef(0);
+  const [repository] = useState(
+    () => libraryRepository ?? getProductStudioMarketplaceLibrarySqliteRepository(),
+  );
   const placementHelpId = useId();
   const statusId = useId();
   const [query, setQuery] = useState("");
@@ -392,10 +392,32 @@ export function StudioOriginalAssetMarketplacePanel({
   const [libraryView, setLibraryView] = useState<LibraryView>("catalog");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [previewAsset, setPreviewAsset] = useState<StudioOriginalFreeAsset | null>(null);
-  const [library, setLibrary] = useState<StudioMarketplaceLibraryState>(
-    () => loadStudioMarketplaceLibrary(currentStorage())
-  );
+  const [library, setLibrary] = useState<StudioMarketplaceLibraryState>({
+    version: 1,
+    packages: [],
+  });
   const [status, setStatus] = useState<MarketplaceStatus | null>(null);
+
+  useEffect(() => {
+    const generation = ++operationGenerationRef.current;
+    void repository.list().then((persisted) => {
+      if (operationGenerationRef.current !== generation) return;
+      setLibrary(persisted);
+    }).catch((error: unknown) => {
+      if (operationGenerationRef.current !== generation) return;
+      setStatus({
+        message: `SQLite 라이브러리를 열지 못했습니다. 설치 상태를 저장 가능한 것으로 표시하지 않습니다: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        error: true,
+      });
+    });
+    return () => {
+      if (operationGenerationRef.current === generation) {
+        operationGenerationRef.current += 1;
+      }
+    };
+  }, [repository]);
 
   useStudioModalSheet({
     activeKey: previewAsset ? `original-asset-preview:${previewAsset.id}` : null,
@@ -446,16 +468,22 @@ export function StudioOriginalAssetMarketplacePanel({
     const removedPackageIds = library.packages
       .filter((entry) => !nextIds.has(entry.packageId))
       .map((entry) => entry.packageId);
-    const storage = currentStorage();
-    const persisted = saveStudioMarketplaceLibrary(storage, nextState, {
-      removedPackageIds,
-    });
-    setLibrary(persisted ? loadStudioMarketplaceLibrary(storage) : nextState);
-    setStatus({
-      message: persisted
-        ? message
-        : "라이브러리는 현재 화면에 반영했지만 브라우저 로컬 저장소에는 기록하지 못했습니다.",
-      error: !persisted,
+    const previous = library;
+    const generation = ++operationGenerationRef.current;
+    setLibrary(nextState);
+    void repository.save(nextState, { removedPackageIds }).then((persisted) => {
+      if (operationGenerationRef.current !== generation) return;
+      setLibrary(persisted);
+      setStatus({ message, error: false });
+    }).catch((error: unknown) => {
+      if (operationGenerationRef.current !== generation) return;
+      setLibrary(previous);
+      setStatus({
+        message: `SQLite/OPFS에 기록하지 못해 설치 상태를 되돌렸습니다: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        error: true,
+      });
     });
   };
 

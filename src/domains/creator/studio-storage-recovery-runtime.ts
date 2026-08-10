@@ -187,7 +187,7 @@ export async function ensureStudioStorageRecoveryRuntime(): Promise<StudioOpfsRe
         channel: "storage",
         level: "degraded",
         title: "내구 복구 저장소를 열지 못했습니다",
-        detail: `${causeMessage(cause)} — 브라우저 임시 저장으로만 보호됩니다.`,
+        detail: `${causeMessage(cause)} — 현재 작업은 이 탭 메모리에만 남아 있습니다.`,
         at: now(),
       });
       return null;
@@ -210,14 +210,13 @@ export function resetStudioStorageRecoveryRuntime(): void {
 /**
  * 저장이 성공했다 — 남아 있던 실패 신호를 내린다.
  *
- * **내구 저장소로 성공했을 때만** 신호를 내린다. 브라우저 임시 저장으로 강등된 채 성공한
- * 것은 "해결됨"이 아니다. 성공 자체가 직전에 띄운 강등 고지를 지워버리면 그 강등은 다시
- * 무음이 된다 — Wave E 가 없애려는 실패 모양 그대로다.
+ * **내구 저장소로 성공했을 때만** 신호를 내린다. V12 제품 경로는 브라우저 KV 저장을
+ * 성공으로 호출할 수 없으며, OPFS/SQLite receipt만 이 진입점에 전달한다.
  */
 export function noteStudioSaveSucceeded(
-  authority: "opfs-journal" | "browser-storage-fallback" = "opfs-journal",
+  authority: "opfs-journal" | "sqlite-fallback" = "opfs-journal",
 ): void {
-  if (authority !== "opfs-journal") return;
+  void authority;
   clearStudioReliabilityChannel("save");
 }
 
@@ -245,15 +244,15 @@ export function reportStudioAutosaveFailure(cause: unknown): Promise<void> {
 }
 
 /**
- * OPFS 저장 권위가 브라우저 저장소로 강등됐을 때. 문서는 그대로 저장되지만 내구성이
- * 낮아졌으므로 그 사실이 사용자에게 도달해야 한다(기존에는 `catch {}` 로 삼켜졌다).
+ * OPFS와 SQLite 저장 권위를 모두 사용할 수 없을 때. 현재 탭의 메모리 작업은 유지되지만
+ * 내구 저장 성공은 아니므로 그 사실이 사용자에게 도달해야 한다.
  */
 export function reportStudioSaveAuthorityDegraded(cause: unknown): void {
   reportStudioReliabilitySignal({
     channel: "save",
     level: "degraded",
-    title: "내구 저장소 대신 브라우저 임시 저장으로 보관했습니다",
-    detail: `${causeMessage(cause)} — 브라우저 데이터를 지우면 함께 사라질 수 있어요.`,
+    title: "내구 임시저장 경로를 사용할 수 없습니다",
+    detail: `${causeMessage(cause)} — 현재 작업은 이 탭 메모리에만 남아 있어요. 파일로 내보내 두는 것이 안전합니다.`,
     at: now(),
   });
 }

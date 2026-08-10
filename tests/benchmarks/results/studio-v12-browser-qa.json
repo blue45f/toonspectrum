@@ -1,0 +1,371 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-10T06:16:15Z",
+  "status": "pass",
+  "pass": true,
+  "build": {
+    "gitSha": "0c30c023c5395a23d4c5ae3543f2d07cac74ec5c",
+    "currentDetachedHead": "0c30c023c5395a23d4c5ae3543f2d07cac74ec5c",
+    "detachedHead": true,
+    "workingTreeDirty": true,
+    "distSource": "existing-production-dist",
+    "distBuiltAtUtc": "2026-08-10T06:02:42Z",
+    "distIndexSha256": "35df9ccf0a380b90e2755b8a45edfe36e022976c4b59da044567aa84196e9045"
+  },
+  "browser": {
+    "name": "Chromium",
+    "version": "140.0.7339.186",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.186 Safari/537.36",
+    "headless": true
+  },
+  "route": {
+    "requestedPath": "/studio",
+    "expectedPath": "/studio",
+    "parallelRouteObserved": false,
+    "observedParallelRoutes": []
+  },
+  "viewports": [
+    {
+      "id": "desktop-1440x900",
+      "width": 1440,
+      "height": 900,
+      "finalUrl": "http://127.0.0.1:55863/studio",
+      "routePathname": "/studio",
+      "page": {
+        "clientWidth": 1440,
+        "clientHeight": 900,
+        "scrollWidth": 1440,
+        "scrollHeight": 900,
+        "horizontalOverflowPx": 0
+      },
+      "canvas": {
+        "selector": "[data-studio-canvas-viewport=\"true\"]",
+        "visible": true,
+        "width": 924,
+        "height": 786.328125,
+        "left": 224,
+        "top": 113.671875,
+        "childCanvasCount": 15,
+        "childCanvasWidth": 924,
+        "childCanvasHeight": 1386
+      },
+      "surfaces": {
+        "topChrome": {
+          "selector": "[data-studio-app-menubar=\"true\"]",
+          "visible": true,
+          "width": 1440,
+          "height": 44,
+          "left": 0,
+          "top": 0
+        },
+        "editing": {
+          "selector": "[data-studio-tool-rail=\"true\"]",
+          "visible": true,
+          "width": 52,
+          "height": 812,
+          "left": 172,
+          "top": 88
+        },
+        "loadingOrErrorOverlaysChecked": [
+          "vite-error-overlay",
+          "[data-studio-error-overlay=\"true\"]",
+          "[data-studio-loading-overlay=\"true\"]",
+          "[data-testid=\"studio-loading-overlay\"]",
+          "[role=\"alert\"][data-studio-error=\"true\"]"
+        ],
+        "loadingOrErrorOverlaysVisible": []
+      },
+      "interaction": {
+        "name": "desktop File menu open/close",
+        "selector": "[data-studio-main-menu=\"true\"] >> role=menuitem[name=\"파일\"]",
+        "action": "click, then Escape",
+        "opened": true,
+        "closed": true,
+        "passed": true,
+        "outcome": "File menu became visible and closed on Escape"
+      },
+      "errors": {
+        "console": [],
+        "page": [],
+        "requestFailed": [],
+        "responses5xx": [],
+        "csp": [],
+        "unhandledRejections": []
+      },
+      "network": {
+        "responseStatusCounts": {
+          "200": 303
+        },
+        "guestHarnessRoutes": [
+          "GET **/api/auth/session",
+          "**/api/kmas/merge-on-access",
+          "**/api/studio-ai/status"
+        ]
+      },
+      "unavailableMetrics": {
+        "gpuAdapter": null,
+        "gpuBackend": null,
+        "gpuMemoryBytes": null,
+        "jsHeapUsedBytes": null,
+        "wasmMemoryBytes": null
+      },
+      "screenshot": "/tmp/toonspectrum-studio-v12-browser-qa.Wiwcjm/manual/desktop-1440x900.png"
+    },
+    {
+      "id": "mobile-390x844",
+      "width": 390,
+      "height": 844,
+      "finalUrl": "http://127.0.0.1:55863/studio",
+      "routePathname": "/studio",
+      "page": {
+        "clientWidth": 390,
+        "clientHeight": 844,
+        "scrollWidth": 390,
+        "scrollHeight": 844,
+        "horizontalOverflowPx": 0
+      },
+      "canvas": {
+        "selector": "[data-studio-canvas-viewport=\"true\"]",
+        "visible": true,
+        "width": 390,
+        "height": 714.328125,
+        "left": 0,
+        "top": 129.671875,
+        "childCanvasCount": 15,
+        "childCanvasWidth": 390,
+        "childCanvasHeight": 585
+      },
+      "surfaces": {
+        "topChrome": {
+          "selector": "[data-studio-app-menubar=\"true\"]",
+          "visible": true,
+          "width": 271.390625,
+          "height": 54,
+          "left": 6,
+          "top": 6
+        },
+        "editing": {
+          "selector": "[data-studio-mobile-editing-dock=\"true\"]",
+          "visible": true,
+          "width": 390,
+          "height": 56.59375,
+          "left": 0,
+          "top": 787.40625
+        },
+        "loadingOrErrorOverlaysChecked": [
+          "vite-error-overlay",
+          "[data-studio-error-overlay=\"true\"]",
+          "[data-studio-loading-overlay=\"true\"]",
+          "[data-testid=\"studio-loading-overlay\"]",
+          "[role=\"alert\"][data-studio-error=\"true\"]"
+        ],
+        "loadingOrErrorOverlaysVisible": []
+      },
+      "interaction": {
+        "name": "mobile workspace dock open/close",
+        "selector": "[data-studio-mobile-workspace-toggle=\"true\"]",
+        "action": "click, then click again",
+        "opened": true,
+        "closed": true,
+        "passed": true,
+        "outcome": "expanded dock became visible and returned to collapsed state"
+      },
+      "errors": {
+        "console": [],
+        "page": [],
+        "requestFailed": [],
+        "responses5xx": [],
+        "csp": [],
+        "unhandledRejections": []
+      },
+      "network": {
+        "responseStatusCounts": {
+          "200": 307
+        },
+        "guestHarnessRoutes": [
+          "GET **/api/auth/session",
+          "**/api/kmas/merge-on-access",
+          "**/api/studio-ai/status"
+        ]
+      },
+      "unavailableMetrics": {
+        "gpuAdapter": null,
+        "gpuBackend": null,
+        "gpuMemoryBytes": null,
+        "jsHeapUsedBytes": null,
+        "wasmMemoryBytes": null
+      },
+      "screenshot": "/tmp/toonspectrum-studio-v12-browser-qa.Wiwcjm/manual/mobile-390x844.png"
+    },
+    {
+      "id": "narrow-mobile-320x568",
+      "width": 320,
+      "height": 568,
+      "finalUrl": "http://127.0.0.1:55863/studio",
+      "routePathname": "/studio",
+      "page": {
+        "clientWidth": 320,
+        "clientHeight": 568,
+        "scrollWidth": 320,
+        "scrollHeight": 568,
+        "horizontalOverflowPx": 0
+      },
+      "canvas": {
+        "selector": "[data-studio-canvas-viewport=\"true\"]",
+        "visible": true,
+        "width": 320,
+        "height": 438.328125,
+        "left": 0,
+        "top": 129.671875,
+        "childCanvasCount": 15,
+        "childCanvasWidth": 320,
+        "childCanvasHeight": 480
+      },
+      "surfaces": {
+        "topChrome": {
+          "selector": "[data-studio-app-menubar=\"true\"]",
+          "visible": true,
+          "width": 271.390625,
+          "height": 54,
+          "left": 6,
+          "top": 6
+        },
+        "editing": {
+          "selector": "[data-studio-mobile-editing-dock=\"true\"]",
+          "visible": true,
+          "width": 320,
+          "height": 56.59375,
+          "left": 0,
+          "top": 511.40625
+        },
+        "loadingOrErrorOverlaysChecked": [
+          "vite-error-overlay",
+          "[data-studio-error-overlay=\"true\"]",
+          "[data-studio-loading-overlay=\"true\"]",
+          "[data-testid=\"studio-loading-overlay\"]",
+          "[role=\"alert\"][data-studio-error=\"true\"]"
+        ],
+        "loadingOrErrorOverlaysVisible": []
+      },
+      "interaction": {
+        "name": "mobile workspace dock open/close",
+        "selector": "[data-studio-mobile-workspace-toggle=\"true\"]",
+        "action": "click, then click again",
+        "opened": true,
+        "closed": true,
+        "passed": true,
+        "outcome": "expanded dock became visible and returned to collapsed state"
+      },
+      "errors": {
+        "console": [],
+        "page": [],
+        "requestFailed": [],
+        "responses5xx": [],
+        "csp": [],
+        "unhandledRejections": []
+      },
+      "network": {
+        "responseStatusCounts": {
+          "200": 307
+        },
+        "guestHarnessRoutes": [
+          "GET **/api/auth/session",
+          "**/api/kmas/merge-on-access",
+          "**/api/studio-ai/status"
+        ]
+      },
+      "unavailableMetrics": {
+        "gpuAdapter": null,
+        "gpuBackend": null,
+        "gpuMemoryBytes": null,
+        "jsHeapUsedBytes": null,
+        "wasmMemoryBytes": null
+      },
+      "screenshot": "/tmp/toonspectrum-studio-v12-browser-qa.Wiwcjm/manual/narrow-mobile-320x568.png"
+    }
+  ],
+  "commands": [
+    {
+      "name": "verify:studio-launch",
+      "command": "pnpm run verify:studio-launch",
+      "exitCode": 0,
+      "passed": true,
+      "durationMs": 241000,
+      "durationSource": "coordinator wall clock rounded to nearest second",
+      "artifactDir": "/tmp/toonspectrum-studio-v12-browser-qa.Wiwcjm/launch",
+      "outcome": "desktop runs 2/2, mobile drawing, 320/360/390 docks and pages/props/brushes sheets passed; consoleErrors=0"
+    },
+    {
+      "name": "verify:studio-menus",
+      "command": "pnpm run verify:studio-menus",
+      "exitCode": 0,
+      "passed": true,
+      "durationMs": 17347,
+      "durationSource": "command runner wall clock",
+      "artifactDir": "/tmp/toonspectrum-studio-v12-browser-qa.Wiwcjm/menus",
+      "outcome": "main menu, rail, five menu-driven popovers, draw options and export options passed"
+    },
+    {
+      "name": "verify:studio-mobile-top",
+      "command": "pnpm run verify:studio-mobile-top",
+      "exitCode": 0,
+      "passed": true,
+      "durationMs": 24116,
+      "durationSource": "command runner wall clock",
+      "artifactDir": "/tmp/toonspectrum-studio-v12-browser-qa.Wiwcjm/mobile-top",
+      "outcome": "320/360/390/430 immersive and windowed runs passed; overflow, overlap, clipping and errors all zero"
+    },
+    {
+      "name": "verify:studio-icons",
+      "command": "pnpm run verify:studio-icons",
+      "exitCode": 0,
+      "passed": true,
+      "durationMs": 7517,
+      "durationSource": "command runner wall clock",
+      "artifactDir": "/tmp/toonspectrum-studio-v12-browser-qa.Wiwcjm/icons",
+      "outcome": "menubar, tool rail, draw options and main menu icon contracts passed"
+    }
+  ],
+  "visualInspection": {
+    "performed": true,
+    "screenshotsReviewed": [
+      "/tmp/toonspectrum-studio-v12-browser-qa.Wiwcjm/manual/desktop-1440x900.png",
+      "/tmp/toonspectrum-studio-v12-browser-qa.Wiwcjm/manual/mobile-390x844.png",
+      "/tmp/toonspectrum-studio-v12-browser-qa.Wiwcjm/manual/narrow-mobile-320x568.png"
+    ],
+    "findings": [
+      "Desktop canvas, page rail, tool rail, menubar, inspector and bottom canvas controls are visible without clipping.",
+      "390px top actions and bottom editing dock remain reachable; the canvas host remains visible.",
+      "320px top actions and bottom editing dock remain reachable; horizontally scrollable tool lanes do not create document overflow.",
+      "The visible mobile one-hand drawing card is a dismissible onboarding hint, not a loading or error overlay."
+    ],
+    "blockers": []
+  },
+  "harness": {
+    "productionServer": "vite preview over the existing dist",
+    "authenticatedCollaborationStarted": false,
+    "guestSessionBoundary": true,
+    "guestHarnessRoutes": [
+      "GET **/api/auth/session",
+      "**/api/kmas/merge-on-access",
+      "**/api/studio-ai/status"
+    ],
+    "note": "The guest-session routes exist only inside the Playwright context; production auth code and build assets were not modified."
+  },
+  "safety": {
+    "prohibitedActionsTriggered": [],
+    "avoided": [
+      "V12 destructive reset",
+      "publish",
+      "marketplace purchase",
+      "file deletion",
+      "camera or microphone",
+      "external messages"
+    ]
+  },
+  "unavailable": {
+    "authenticatedTwoUserCollaboration": "not requested and no disposable authenticated API/database was started",
+    "gpuAndMemoryAxes": "not exposed by this production UI QA pass; every viewport records explicit null instead of fabricated zero"
+  },
+  "temporaryEvidenceRoot": "/tmp/toonspectrum-studio-v12-browser-qa.Wiwcjm"
+}

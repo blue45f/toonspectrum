@@ -1,20 +1,43 @@
 import { readFileSync } from "node:fs";
 
+import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
-const source = [
+const sourceFiles = [
   "./StudioBackground3D.tsx",
   "./StudioBg3dShapesPanel.tsx",
   "./StudioBg3dViewPanel.tsx",
   "./StudioBg3dLtPanel.tsx",
-].map((fileName) => readFileSync(new URL(fileName, import.meta.url), "utf8")).join("\n");
+].map((fileName) => {
+  const fileUrl = new URL(fileName, import.meta.url);
+  const text = readFileSync(fileUrl, "utf8");
+  return {
+    file: ts.createSourceFile(
+      fileUrl.pathname,
+      text,
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.TSX,
+    ),
+    text,
+  };
+});
+const source = sourceFiles.map(({ text }) => text).join("\n");
 
-function functionSlice(name: string, nextName: string): string {
-  const start = source.indexOf(`function ${name}(`);
-  const end = source.indexOf(`function ${nextName}(`, start);
-  expect(start).toBeGreaterThanOrEqual(0);
-  expect(end).toBeGreaterThan(start);
-  return source.slice(start, end);
+function functionSource(name: string): string {
+  for (const { file } of sourceFiles) {
+    let match: ts.FunctionDeclaration | null = null;
+    function visit(node: ts.Node): void {
+      if (ts.isFunctionDeclaration(node) && node.name?.text === name) {
+        match = node;
+        return;
+      }
+      ts.forEachChild(node, visit);
+    }
+    visit(file);
+    if (match) return (match as ts.FunctionDeclaration).getText(file);
+  }
+  throw new Error(`Missing function ${name}`);
 }
 
 function expectInOrder(haystack: string, needles: readonly string[]): void {
@@ -28,14 +51,8 @@ function expectInOrder(haystack: string, needles: readonly string[]): void {
 
 describe("Studio BG3D imported-model thumbnail integration boundary", () => {
   it("keeps capture and isolated Three thumbnail runtimes behind the post-import lazy boundary", () => {
-    const loader = functionSlice(
-      "loadStudioBg3dModelThumbnailRuntime",
-      "getBrowserLtPresetStorage",
-    );
-    const capture = functionSlice(
-      "startModelThumbnailCaptureBatch",
-      "invalidateModalAssetSession",
-    );
+    const loader = functionSource("loadStudioBg3dModelThumbnailRuntime");
+    const capture = functionSource("startModelThumbnailCaptureBatch");
 
     expect(source).toContain(
       'import type { StudioBg3dModelThumbnailCaptureController } from "./studio-bg3d-model-thumbnail-capture";',
@@ -56,7 +73,7 @@ describe("Studio BG3D imported-model thumbnail integration boundary", () => {
   });
 
   it("loads the model conversion runtime only after a user selects files and fences the await", () => {
-    const upload = functionSlice("handleUploadModelFiles", "handleDeleteModelFromLibrary");
+    const upload = functionSource("handleUploadModelFiles");
 
     expect(source).toContain(
       'import type { StudioBg3dImportProgress } from "./studio-bg3d-model-import";',
@@ -74,7 +91,7 @@ describe("Studio BG3D imported-model thumbnail integration boundary", () => {
   });
 
   it("commits import and scene placement before starting best-effort thumbnail work", () => {
-    const upload = functionSlice("handleUploadModelFiles", "handleDeleteModelFromLibrary");
+    const upload = functionSource("handleUploadModelFiles");
 
     expectInOrder(upload, [
       "await importVerifiedBg3dModelsAtomically",
@@ -93,10 +110,7 @@ describe("Studio BG3D imported-model thumbnail integration boundary", () => {
   });
 
   it("passes only the cache-owned root into an isolated handle and always disposes it", () => {
-    const capture = functionSlice(
-      "startModelThumbnailCaptureBatch",
-      "invalidateModalAssetSession",
-    );
+    const capture = functionSource("startModelThumbnailCaptureBatch");
 
     expect(capture).toContain("const cachedEntry = modelRootCacheRef.current.get(record.id)");
     expect(capture).toContain("cachedRoot: cachedEntry.root");
@@ -111,10 +125,7 @@ describe("Studio BG3D imported-model thumbnail integration boundary", () => {
   });
 
   it("serializes models through one controller and leaves a placeholder when the GPU lease is busy", () => {
-    const capture = functionSlice(
-      "startModelThumbnailCaptureBatch",
-      "invalidateModalAssetSession",
-    );
+    const capture = functionSource("startModelThumbnailCaptureBatch");
 
     expectInOrder(capture, [
       "for (const record of records)",
@@ -132,11 +143,8 @@ describe("Studio BG3D imported-model thumbnail integration boundary", () => {
   });
 
   it("uses an owner-checked synchronous lease without weakening the existing close guard", () => {
-    const acquire = functionSlice(
-      "acquireModelThumbnailGpuLease",
-      "startModelThumbnailCaptureBatch",
-    );
-    const close = functionSlice("requestUserClose", "handleSaveToLibrary");
+    const acquire = functionSource("acquireModelThumbnailGpuLease");
+    const close = functionSource("requestUserClose");
 
     expectInOrder(acquire, [
       "if (captureInFlightRef.current) return null",
@@ -151,12 +159,8 @@ describe("Studio BG3D imported-model thumbnail integration boundary", () => {
   });
 
   it("invalidates thumbnail generations on new import, delete, modal close, and unmount", () => {
-    const upload = functionSlice("handleUploadModelFiles", "handleDeleteModelFromLibrary");
-    const removeStart = source.indexOf("async function handleDeleteModelFromLibrary(");
-    const removeEnd = source.indexOf("const handlePanelTabChange", removeStart);
-    expect(removeStart).toBeGreaterThanOrEqual(0);
-    expect(removeEnd).toBeGreaterThan(removeStart);
-    const remove = source.slice(removeStart, removeEnd);
+    const upload = functionSource("handleUploadModelFiles");
+    const remove = functionSource("handleDeleteModelFromLibrary");
 
     expectInOrder(upload, [
       "invalidateModelThumbnailCaptures()",

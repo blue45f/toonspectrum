@@ -28,6 +28,7 @@ import {
   studioVrmTexturePaintOpRects,
   unionStudioVrmTextureRect,
   type StudioVrmTexturePaintApplyOptions,
+  type StudioVrmTexturePaintOp,
 } from "./studio-vrm-texture-paint-ops";
 import {
   type StudioVrmTextureStrokePlanOptions,
@@ -54,6 +55,7 @@ import {
   type StudioVrmTextureRect,
   type StudioVrmUvPoint,
   type StudioVrmTextureWrapMode,
+  resolveStudioVrmTexelPoint,
 } from "./studio-vrm-texture-uv";
 
 import type {
@@ -123,6 +125,8 @@ export type StudioVrmTexturePaintRuntimeErrorCode =
   | "source-unreadable"
   | "stale-completion"
   | "stroke-sample-budget"
+  | "surface-operation-invalid"
+  | "surface-session-invalid"
   | "target-invalid"
   | "target-mismatch"
   | "target-rgba-budget"
@@ -154,6 +158,55 @@ export interface StudioVrmTexturePaintRayHit {
   /** Raycaster가 제공하는 geometry triangle index. */
   readonly faceIndex?: number | null;
   readonly point?: THREE.Vector3 | Readonly<{ x: number; y: number; z: number }>;
+}
+
+/**
+ * Opaque lease for one externally planned surface-brush transaction.
+ *
+ * The runtime validates object identity, not only these diagnostic fields, so
+ * callers cannot forge a lease and mutate an unrelated texture target.
+ */
+export interface StudioVrmTexturePaintSurfaceSession {
+  readonly id: string;
+  readonly targetId: string;
+  readonly width: number;
+  readonly height: number;
+  readonly wrapU: StudioVrmTextureWrapMode;
+  readonly wrapV: StudioVrmTextureWrapMode;
+}
+
+/** Ray/BVH evidence normalized by the runtime that owns the texture target. */
+export interface StudioVrmTexturePaintSurfaceProjection {
+  readonly u: number;
+  readonly v: number;
+  readonly uvWasWrapped: boolean;
+  readonly sourcePressure?: number;
+  readonly triangleId?: string;
+  readonly islandId: string;
+  readonly world?: Readonly<{ readonly x: number; readonly y: number; readonly z: number }>;
+  readonly texelsPerWorldUnit?: number;
+}
+
+export interface StudioVrmTexturePaintSurfacePrepareInput {
+  readonly hit: StudioVrmTexturePaintRayHit;
+  readonly pressure?: number;
+  readonly signal?: AbortSignal;
+}
+
+export interface StudioVrmTexturePaintPreparedSurface {
+  readonly session: StudioVrmTexturePaintSurfaceSession;
+  readonly projection: StudioVrmTexturePaintSurfaceProjection;
+}
+
+export interface StudioVrmTexturePaintSurfaceCommitInput {
+  readonly operations: readonly StudioVrmTexturePaintOp[];
+  readonly signal?: AbortSignal;
+}
+
+export interface StudioVrmTexturePaintSurfaceCommitReceipt {
+  readonly appliedOperations: number;
+  readonly changedTexels: number;
+  readonly revision: number;
 }
 
 export interface StudioVrmTexturePaintStrokeBegin {
@@ -314,7 +367,14 @@ export interface StudioVrmTexturePaintHistorySnapshot {
 
 export interface StudioVrmTexturePaintRuntimeSnapshot {
   readonly status: StudioVrmTexturePaintRuntimeStatus;
-  readonly activeOperation: "fill" | "sample" | "stroke" | "stroke-read" | null;
+  readonly activeOperation:
+    | "fill"
+    | "sample"
+    | "stroke"
+    | "stroke-read"
+    | "surface-brush"
+    | "surface-read"
+    | null;
   readonly activePointerId: number | null;
   readonly activeTargetId: string | null;
   readonly activeTarget: Readonly<Pick<
@@ -422,6 +482,16 @@ interface ActiveStroke {
   changedTexels: number;
 }
 
+interface SurfacePaintSessionState {
+  readonly id: string;
+  readonly originMaterial: BaseColorMaterial;
+  readonly sourceTexture: THREE.Texture;
+  readonly paintWrap: StudioVrmTexturePaintApplyOptions;
+  readonly controller: AbortController | null;
+  target: PaintTarget | null;
+  token: StudioVrmTexturePaintSurfaceSession | null;
+}
+
 interface PendingColorSample {
   readonly controller: AbortController;
 }
@@ -511,6 +581,8 @@ const ERROR_MESSAGES: Readonly<Record<StudioVrmTexturePaintRuntimeErrorCode, str
     "source-unreadable": "텍스처를 읽을 수 없습니다. CORS 설정을 확인하세요.",
     "stale-completion": "이전 텍스처 준비 결과를 무시했습니다.",
     "stroke-sample-budget": "한 획의 입력 지점 한도를 초과했습니다.",
+    "surface-operation-invalid": "표면 브러시 텍스처 연산이 올바르지 않습니다.",
+    "surface-session-invalid": "표면 브러시 세션이 만료되었거나 다른 대상에 속합니다.",
     "target-invalid": "페인팅 대상을 더 이상 사용할 수 없습니다.",
     "target-mismatch": "한 획으로 서로 다른 텍스처를 칠할 수 없습니다.",
     "target-rgba-budget": "이 텍스처는 안전한 페인팅 상주 메모리 한도를 초과합니다.",
@@ -543,6 +615,17 @@ function failure<T>(
   code: StudioVrmTexturePaintRuntimeErrorCode,
 ): StudioVrmTexturePaintRuntimeResult<T> {
   return Object.freeze({ ok: false as const, error: frozenError(code) });
+}
+
+/**
+ * Canonical chart identity used at the package provider boundary. Type tags
+ * prevent a numeric provider id (`1`) from colliding with a textual id
+ * (`"1"`); non-finite and empty identities are rejected.
+ */
+export function canonicalizeStudioVrmSurfaceIslandId(value: unknown): string | null {
+  if (typeof value === "string") return value.length > 0 ? `string:${value}` : null;
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  return `number:${Object.is(value, -0) ? "-0" : String(value)}`;
 }
 
 function boundedInteger(value: unknown, fallback: number, minimum: number): number {
@@ -1025,6 +1108,29 @@ function isValidStrokeStyle(style: StudioVrmTextureStrokeStyle): boolean {
   return style.blend === "erase" || parseStudioVrmTextureColor(style.color) !== null;
 }
 
+function isValidSurfacePaintOperation(operation: StudioVrmTexturePaintOp): boolean {
+  if (
+    !Number.isFinite(operation.x)
+    || !Number.isFinite(operation.y)
+    || !Number.isFinite(operation.radius)
+    || operation.radius <= 0
+    || !Number.isFinite(operation.hardness)
+    || operation.hardness < 0
+    || operation.hardness > 1
+    || !Number.isFinite(operation.opacity)
+    || operation.opacity < 0
+    || operation.opacity > 1
+    || parseStudioVrmTextureColor(operation.color) === null
+  ) {
+    return false;
+  }
+  return operation.blend === "normal"
+    || operation.blend === "multiply"
+    || operation.blend === "screen"
+    || operation.blend === "overlay"
+    || operation.blend === "erase";
+}
+
 function markMaterialChanged(material: THREE.Material): void {
   try {
     material.needsUpdate = true;
@@ -1363,6 +1469,8 @@ export class StudioVrmTexturePaintRuntime {
   private filling: PendingFill | null = null;
   private pending: PendingStroke | null = null;
   private active: ActiveStroke | null = null;
+  private surfaceSession: SurfacePaintSessionState | null = null;
+  private surfaceSessionSequence = 0;
   private lastError: StudioVrmTexturePaintRuntimeError | null = null;
   private lastGuidance: StudioVrmTexturePaintRuntimeGuidance | null = null;
   private disposed = false;
@@ -1411,7 +1519,7 @@ export class StudioVrmTexturePaintRuntime {
   exportPaintedTargets():
     StudioVrmTexturePaintRuntimeResult<readonly StudioVrmTexturePaintExportTarget[]> {
     if (this.disposed) return this.fail("disposed");
-    if (this.sampling || this.filling || this.pending || this.active) {
+    if (this.sampling || this.filling || this.pending || this.active || this.surfaceSession) {
       return this.fail("pointer-active");
     }
     const exported: StudioVrmTexturePaintExportTarget[] = [];
@@ -1451,7 +1559,7 @@ export class StudioVrmTexturePaintRuntime {
     StudioVrmTexturePaintRuntimeResult<StudioVrmTexturePaintRuntimeSnapshot>
   > {
     if (this.disposed) return this.fail("disposed");
-    if (this.sampling || this.filling || this.pending || this.active) {
+    if (this.sampling || this.filling || this.pending || this.active || this.surfaceSession) {
       return this.fail("pointer-active");
     }
     if (!isCanonicalBindingDescriptor(input.binding)) return this.fail("binding-missing");
@@ -1556,7 +1664,7 @@ export class StudioVrmTexturePaintRuntime {
     input: StudioVrmTexturePaintColorSampleInput,
   ): Promise<StudioVrmTexturePaintRuntimeResult<StudioVrmTexturePaintColorSample>> {
     if (this.disposed) return this.fail("disposed");
-    if (this.sampling || this.filling || this.pending || this.active) {
+    if (this.sampling || this.filling || this.pending || this.active || this.surfaceSession) {
       return this.fail("pointer-active");
     }
     if (input.signal?.aborted) return this.fail("source-read-aborted");
@@ -1622,7 +1730,7 @@ export class StudioVrmTexturePaintRuntime {
     input: StudioVrmTexturePaintFillInput,
   ): Promise<StudioVrmTexturePaintRuntimeResult<boolean>> {
     if (this.disposed) return this.fail("disposed");
-    if (this.sampling || this.filling || this.pending || this.active) {
+    if (this.sampling || this.filling || this.pending || this.active || this.surfaceSession) {
       return this.fail("pointer-active");
     }
     if (input.signal?.aborted) return this.fail("source-read-aborted");
@@ -1824,13 +1932,297 @@ export class StudioVrmTexturePaintRuntime {
     }
   }
 
+  /**
+   * Prepare the runtime-owned atlas for a package-level surface brush.
+   * Ray/triangle classification still runs through the same `resolveHit`
+   * path as pointer painting; this seam only leases the resulting target.
+   */
+  async prepareSurfaceBrushSession(
+    input: StudioVrmTexturePaintSurfacePrepareInput,
+  ): Promise<
+    StudioVrmTexturePaintRuntimeResult<StudioVrmTexturePaintPreparedSurface>
+  > {
+    if (this.disposed) return this.fail("disposed");
+    if (this.sampling || this.filling || this.pending || this.active || this.surfaceSession) {
+      return this.fail("pointer-active");
+    }
+    if (input.signal?.aborted) return this.fail("source-read-aborted");
+    if (
+      input.pressure !== undefined
+      && (!Number.isFinite(input.pressure) || input.pressure < 0 || input.pressure > 1)
+    ) {
+      return this.fail("invalid-style");
+    }
+
+    this.lastGuidance = null;
+    const initialHit = this.resolveHit(input.hit, input.pressure);
+    if (!initialHit.ok) return this.fail(initialHit.error.code);
+    const resolved = initialHit.value;
+    this.surfaceSessionSequence = Math.min(
+      Number.MAX_SAFE_INTEGER,
+      this.surfaceSessionSequence + 1,
+    );
+    const controller = resolved.target ? null : new AbortController();
+    const state: SurfacePaintSessionState = {
+      id: `surface-${this.surfaceSessionSequence}`,
+      originMaterial: resolved.material,
+      sourceTexture: resolved.sourceTexture,
+      paintWrap: resolved.paintWrap,
+      controller,
+      target: resolved.target,
+      token: null,
+    };
+    this.surfaceSession = state;
+    const abortFromCaller = () => controller?.abort();
+    input.signal?.addEventListener("abort", abortFromCaller, { once: true });
+    this.publish();
+
+    const failSession = <T>(
+      code: StudioVrmTexturePaintRuntimeErrorCode,
+    ): StudioVrmTexturePaintRuntimeResult<T> => {
+      if (this.surfaceSession === state) this.surfaceSession = null;
+      return this.fail(code);
+    };
+
+    try {
+      if (!state.target) {
+        if (!controller) return failSession("source-unreadable");
+        const readable = await this.readSourceTexture(state.sourceTexture, controller);
+        if (this.surfaceSession !== state || this.disposed) {
+          return failure(this.disposed ? "disposed" : "stale-completion");
+        }
+        if (!readable.ok) return failSession(readable.error.code);
+        try {
+          if (state.originMaterial.map !== state.sourceTexture) {
+            return failSession("source-changed");
+          }
+        } catch {
+          return failSession("source-changed");
+        }
+        const target = this.createTarget(state.sourceTexture, readable.value);
+        if (!target.ok) return failSession(target.error.code);
+        state.target = target.value;
+      } else {
+        const rebound = this.bindUnownedSourceMaterials(state.target);
+        if (!rebound.ok) return failSession(rebound.error.code);
+      }
+      if (
+        input.signal?.aborted
+        || controller?.signal.aborted
+        || this.surfaceSession !== state
+        || this.disposed
+        || !state.target
+      ) {
+        return failSession(this.disposed ? "disposed" : "source-read-aborted");
+      }
+
+      // Re-resolve after target creation so cached geometry density can use
+      // the exact runtime-owned atlas dimensions.
+      const currentHit = this.resolveHit(input.hit, input.pressure);
+      if (
+        !currentHit.ok
+        || currentHit.value.sourceTexture !== state.sourceTexture
+        || currentHit.value.target !== state.target
+      ) {
+        return failSession(currentHit.ok ? "target-mismatch" : currentHit.error.code);
+      }
+      const projection = this.surfaceProjectionFromResolved(currentHit.value, input.hit);
+      if (!projection.ok) return failSession(projection.error.code);
+      const token = Object.freeze({
+        id: state.id,
+        targetId: state.target.id,
+        width: state.target.size.width,
+        height: state.target.size.height,
+        wrapU: currentHit.value.wrapU,
+        wrapV: currentHit.value.wrapV,
+      });
+      state.token = token;
+      this.selectedTarget = state.target;
+      this.lastError = null;
+      this.lastGuidance = null;
+      this.publish();
+      return success(Object.freeze({ session: token, projection: projection.value }));
+    } finally {
+      input.signal?.removeEventListener("abort", abortFromCaller);
+    }
+  }
+
+  /** Resolve another Three.js ray hit against an existing runtime-owned lease. */
+  resolveSurfaceBrushHit(
+    session: StudioVrmTexturePaintSurfaceSession,
+    hit: StudioVrmTexturePaintRayHit,
+    pressure?: number,
+  ): StudioVrmTexturePaintRuntimeResult<StudioVrmTexturePaintSurfaceProjection> {
+    if (this.disposed) return this.fail("disposed");
+    const state = this.surfaceSession;
+    if (!state?.token || state.token !== session || !state.target) {
+      return this.fail("surface-session-invalid");
+    }
+    if (
+      pressure !== undefined
+      && (!Number.isFinite(pressure) || pressure < 0 || pressure > 1)
+    ) {
+      return this.fail("invalid-style");
+    }
+    const resolved = this.resolveHit(hit, pressure);
+    if (!resolved.ok) return this.fail(resolved.error.code);
+    if (
+      resolved.value.sourceTexture !== state.sourceTexture
+      || resolved.value.target !== state.target
+    ) {
+      return this.fail("target-mismatch");
+    }
+    const projection = this.surfaceProjectionFromResolved(resolved.value, hit);
+    return projection.ok ? projection : this.fail(projection.error.code);
+  }
+
+  /**
+   * Apply an exact package-generated operation list atomically to the primary
+   * Canvas/ImageData owner. The only GPU action is the existing dirty upload;
+   * no interactive GPU-to-CPU readback is introduced.
+   */
+  commitSurfaceBrushSession(
+    session: StudioVrmTexturePaintSurfaceSession,
+    input: StudioVrmTexturePaintSurfaceCommitInput,
+  ): StudioVrmTexturePaintRuntimeResult<StudioVrmTexturePaintSurfaceCommitReceipt> {
+    if (this.disposed) return this.fail("disposed");
+    const state = this.surfaceSession;
+    if (!state?.token || state.token !== session || !state.target) {
+      return this.fail("surface-session-invalid");
+    }
+    const target = state.target;
+    if (
+      input.signal?.aborted
+      || !Array.isArray(input.operations)
+      || input.operations.length === 0
+      || input.operations.length > 200_000
+      || input.operations.some((operation) => !isValidSurfacePaintOperation(operation))
+    ) {
+      this.surfaceSession = null;
+      return this.fail(input.signal?.aborted ? "source-read-aborted" : "surface-operation-invalid");
+    }
+
+    const checkpoint = this.captureHistoryCheckpoint();
+    const recorder = createStudioVrmTextureUndoRecorder(
+      target.imageData.data,
+      target.size,
+      this.options.undoTileSize,
+      this.options.maxHistoryBytes,
+      (requiredPeakBytes) => this.admitHistoryPeak(requiredPeakBytes),
+    );
+    if (!recorder) {
+      this.surfaceSession = null;
+      return this.fail("invalid-dimensions");
+    }
+
+    const rollbackBeforeFinish = (
+      code: StudioVrmTexturePaintRuntimeErrorCode,
+    ): StudioVrmTexturePaintRuntimeResult<StudioVrmTexturePaintSurfaceCommitReceipt> => {
+      const restored = recorder.cancel();
+      this.restoreHistoryCheckpoint(checkpoint);
+      this.surfaceSession = null;
+      if (restored > 0 && !this.syncTarget(target)) {
+        this.invalidateTarget(target);
+        return this.fail("target-invalid");
+      }
+      return this.fail(code);
+    };
+
+    let changedTexels = 0;
+    let dirtyRect = EMPTY_STUDIO_VRM_TEXTURE_RECT;
+    for (const operation of input.operations) {
+      if (input.signal?.aborted) return rollbackBeforeFinish("source-read-aborted");
+      const rects = studioVrmTexturePaintOpRects(operation, target.size, state.paintWrap);
+      if (!recorder.recordAll(rects)) return rollbackBeforeFinish("history-budget");
+      for (const rect of rects) dirtyRect = unionStudioVrmTextureRect(dirtyRect, rect);
+      changedTexels += applyStudioVrmTexturePaintOp(
+        target.imageData.data,
+        target.size,
+        operation,
+        { ...state.paintWrap, originalPixels: target.originalPixels },
+      );
+    }
+    if (changedTexels === 0) return rollbackBeforeFinish("surface-operation-invalid");
+
+    const entry = recorder.finish();
+    if (recorder.budgetExceeded || !entry) {
+      const restored = recorder.cancel();
+      this.restoreHistoryCheckpoint(checkpoint);
+      this.surfaceSession = null;
+      if (restored === 0) {
+        this.invalidateTarget(target);
+        return this.fail("target-invalid");
+      }
+      return this.fail("history-budget");
+    }
+    const bytes = studioVrmTextureUndoEntryBytes(entry);
+    if (!this.admitHistoryPeak(bytes)) {
+      const restored = applyStudioVrmTextureUndoEntry(
+        target.imageData.data,
+        target.size,
+        entry,
+        "undo",
+      );
+      this.restoreHistoryCheckpoint(checkpoint);
+      this.surfaceSession = null;
+      if (!restored) {
+        this.invalidateTarget(target);
+        return this.fail("target-invalid");
+      }
+      return this.fail("history-budget");
+    }
+    if (!this.syncTarget(target, dirtyRect)) {
+      const restored = applyStudioVrmTextureUndoEntry(
+        target.imageData.data,
+        target.size,
+        entry,
+        "undo",
+      );
+      this.restoreHistoryCheckpoint(checkpoint);
+      this.surfaceSession = null;
+      if (!restored || !this.syncTarget(target)) {
+        this.invalidateTarget(target);
+        return this.fail("target-invalid");
+      }
+      return this.fail("canvas-unavailable");
+    }
+
+    this.clearFutureHistory();
+    this.historyPast.push({ kind: "stroke", target, entry, bytes });
+    this.historyBytes += bytes;
+    this.evictHistory();
+    this.selectedTarget = target;
+    this.surfaceSession = null;
+    this.lastError = null;
+    this.lastGuidance = null;
+    this.publish();
+    return success(Object.freeze({
+      appliedOperations: input.operations.length,
+      changedTexels,
+      revision: this.contentRevision,
+    }));
+  }
+
+  cancelSurfaceBrushSession(
+    session: StudioVrmTexturePaintSurfaceSession,
+  ): StudioVrmTexturePaintRuntimeResult<boolean> {
+    if (this.disposed) return this.fail("disposed");
+    const state = this.surfaceSession;
+    if (!state) return success(false);
+    if (!state.token || state.token !== session) return this.fail("surface-session-invalid");
+    state.controller?.abort();
+    this.surfaceSession = null;
+    this.publish();
+    return success(true);
+  }
+
   async beginStroke(
     input: StudioVrmTexturePaintStrokeBegin,
   ): Promise<StudioVrmTexturePaintRuntimeResult<StudioVrmTexturePaintRuntimeSnapshot>> {
     if (this.disposed) return this.fail("disposed");
     if (!this.isPointerId(input.pointerId)) return this.fail("invalid-pointer");
     if (!isValidStrokeStyle(input.style)) return this.fail("invalid-style");
-    if (this.sampling || this.filling || this.pending || this.active) {
+    if (this.sampling || this.filling || this.pending || this.active || this.surfaceSession) {
       return this.fail("pointer-active");
     }
 
@@ -1951,6 +2343,7 @@ export class StudioVrmTexturePaintRuntime {
   ): StudioVrmTexturePaintRuntimeResult<boolean> {
     if (this.disposed) return this.fail("disposed");
     if (!this.isPointerId(input.pointerId)) return this.fail("invalid-pointer");
+    if (this.surfaceSession) return this.fail("pointer-active");
 
     if (this.pending) {
       if (this.pending.pointerId !== input.pointerId) return this.fail("pointer-mismatch");
@@ -1983,6 +2376,7 @@ export class StudioVrmTexturePaintRuntime {
   commitStroke(pointerId: number): StudioVrmTexturePaintRuntimeResult<boolean> {
     if (this.disposed) return this.fail("disposed");
     if (!this.isPointerId(pointerId)) return this.fail("invalid-pointer");
+    if (this.surfaceSession) return this.fail("pointer-active");
     if (this.pending) {
       if (this.pending.pointerId !== pointerId) return this.fail("pointer-mismatch");
       if (this.pending.terminal) return success(false);
@@ -1997,6 +2391,7 @@ export class StudioVrmTexturePaintRuntime {
   cancelStroke(pointerId: number): StudioVrmTexturePaintRuntimeResult<boolean> {
     if (this.disposed) return this.fail("disposed");
     if (!this.isPointerId(pointerId)) return this.fail("invalid-pointer");
+    if (this.surfaceSession) return this.fail("pointer-active");
     if (this.pending) {
       if (this.pending.pointerId !== pointerId) return this.fail("pointer-mismatch");
       this.pending.readController?.abort();
@@ -2019,7 +2414,7 @@ export class StudioVrmTexturePaintRuntime {
 
   undo(): StudioVrmTexturePaintRuntimeResult<boolean> {
     if (this.disposed) return this.fail("disposed");
-    if (this.sampling || this.filling || this.pending || this.active) {
+    if (this.sampling || this.filling || this.pending || this.active || this.surfaceSession) {
       return this.fail("pointer-active");
     }
     const record = this.historyPast.at(-1);
@@ -2048,7 +2443,7 @@ export class StudioVrmTexturePaintRuntime {
 
   redo(): StudioVrmTexturePaintRuntimeResult<boolean> {
     if (this.disposed) return this.fail("disposed");
-    if (this.sampling || this.filling || this.pending || this.active) {
+    if (this.sampling || this.filling || this.pending || this.active || this.surfaceSession) {
       return this.fail("pointer-active");
     }
     const record = this.historyFuture.at(-1);
@@ -2077,7 +2472,7 @@ export class StudioVrmTexturePaintRuntime {
 
   resetActiveTarget(): StudioVrmTexturePaintRuntimeResult<boolean> {
     if (this.disposed) return this.fail("disposed");
-    if (this.sampling || this.filling || this.pending || this.active) {
+    if (this.sampling || this.filling || this.pending || this.active || this.surfaceSession) {
       return this.fail("pointer-active");
     }
     const target = this.selectedTarget;
@@ -2099,10 +2494,12 @@ export class StudioVrmTexturePaintRuntime {
     this.geometryPrewarmController.abort();
     this.sampling?.controller.abort();
     this.filling?.controller.abort();
+    this.surfaceSession?.controller?.abort();
     for (const controller of this.inFlightReadControllers) controller.abort();
     this.sampling = null;
     this.filling = null;
     this.pending = null;
+    this.surfaceSession = null;
     if (this.active) {
       this.active.recorder.cancel();
       this.active = null;
@@ -2500,6 +2897,47 @@ export class StudioVrmTexturePaintRuntime {
     });
   }
 
+  private surfaceProjectionFromResolved(
+    resolved: ResolvedPaintHit,
+    hit: StudioVrmTexturePaintRayHit,
+  ): StudioVrmTexturePaintRuntimeResult<StudioVrmTexturePaintSurfaceProjection> {
+    const target = resolved.target;
+    if (!target) return failure("target-invalid");
+    const point = resolveStudioVrmTexelPoint(resolved.sample.uv, target.size, {
+      wrapU: resolved.wrapU,
+      wrapV: resolved.wrapV,
+      flipV: false,
+    });
+    if (!point) return failure("uv-missing");
+    const u = point.x / target.size.width;
+    const v = point.y / target.size.height;
+    if (!Number.isFinite(u) || !Number.isFinite(v)) return failure("uv-missing");
+    const faceIndex = isUsableFaceIndex(hit.faceIndex) ? hit.faceIndex : undefined;
+    const object = hit.object as THREE.Mesh;
+    const triangleId = faceIndex === undefined
+      ? undefined
+      : `${object.uuid}:${object.geometry.uuid}:face:${faceIndex}`;
+    const islandId = canonicalizeStudioVrmSurfaceIslandId(
+      resolved.sample.islandId,
+    ) ?? `runtime:${object.uuid}:${resolved.material.uuid}`;
+    return success(Object.freeze({
+      u,
+      v,
+      uvWasWrapped:
+        Math.abs(u - resolved.sample.uv.u) > Number.EPSILON
+        || Math.abs(v - resolved.sample.uv.v) > Number.EPSILON,
+      ...(resolved.sample.pressure === undefined
+        ? {}
+        : { sourcePressure: resolved.sample.pressure }),
+      ...(triangleId === undefined ? {} : { triangleId }),
+      islandId,
+      ...(resolved.sample.world ? { world: Object.freeze({ ...resolved.sample.world }) } : {}),
+      ...(resolved.sample.texelsPerWorldUnit === undefined
+        ? {}
+        : { texelsPerWorldUnit: resolved.sample.texelsPerWorldUnit }),
+    }));
+  }
+
   private async readSourceTexture(
     texture: THREE.Texture,
     controller: AbortController,
@@ -2853,6 +3291,10 @@ export class StudioVrmTexturePaintRuntime {
       this.pending.readController?.abort();
       this.pending = null;
     }
+    if (this.surfaceSession?.target === target) {
+      this.surfaceSession.controller?.abort();
+      this.surfaceSession = null;
+    }
     this.removeTargetHistory(target);
     for (const binding of target.bindings.values()) {
       try {
@@ -2952,9 +3394,9 @@ export class StudioVrmTexturePaintRuntime {
     }));
     const status: StudioVrmTexturePaintRuntimeStatus = this.disposed
       ? "disposed"
-      : this.sampling || this.filling || this.pending
+      : this.sampling || this.filling || this.pending || (this.surfaceSession && !this.surfaceSession.token)
         ? "loading"
-        : this.active
+        : this.active || this.surfaceSession
           ? "painting"
           : this.selectedTarget && !this.selectedTarget.valid
             ? "invalid"
@@ -2980,6 +3422,10 @@ export class StudioVrmTexturePaintRuntime {
           ? "stroke-read"
           : this.active
             ? "stroke"
+            : this.surfaceSession
+              ? this.surfaceSession.token
+                ? "surface-brush"
+                : "surface-read"
             : null;
     return Object.freeze({
       status,

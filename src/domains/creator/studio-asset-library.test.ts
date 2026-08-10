@@ -3,10 +3,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   canonicalizeStudioAssetContentHash,
   createAssetRecord,
+  createLegacyIndexedDbStudioAssetLibrary,
   ensureStudioAssetContentHash,
   findStudioAssetCandidatesByContentIdentities,
   findStudioAssetCandidatesByContentIdentity,
   hashStudioAssetDataUrl,
+  installStudioAssetLibraryPortForTest,
   listAssets,
   normalizeAssetName,
   STUDIO_ASSET_CONTENT_IDENTITY_MAX_CANDIDATES_PER_HASH,
@@ -327,10 +329,14 @@ function installFakeIndexedDb(
     },
   } as IDBFactory;
   vi.stubGlobal("indexedDB", factory);
+  installStudioAssetLibraryPortForTest(
+    createLegacyIndexedDbStudioAssetLibrary({ indexedDB: factory }),
+  );
   return state;
 }
 
 afterEach(() => {
+  installStudioAssetLibraryPortForTest(null);
   vi.unstubAllGlobals();
 });
 

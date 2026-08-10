@@ -22,6 +22,7 @@ import {
   STUDIO_LIVING_INK_WHITE_GOUACHE_EXTINCTION,
   STUDIO_LIVING_INK_WHITE_GOUACHE_LOAD_GAIN,
 } from "./studio-living-ink-field";
+import { studioLivingInkVelocityDampingForStep } from "./studio-living-ink-wgsl-shaders";
 import { sha256HexPortable } from "./studio-sha256";
 
 import type {
@@ -962,6 +963,7 @@ export class StudioLivingInkWebGl2Runtime {
   private disposed = false;
   private passCount = 0;
   private fixSelectionEnabled = false;
+  private selectionTextureHasFullCoverage = true;
   /** Active brush footprint in field-cell space; radiusCells <= 0 disables scrubbing boost. */
   private brushFootprint: Readonly<{ x: number; y: number; radiusCells: number }> = Object.freeze({
     x: 0,
@@ -1176,6 +1178,7 @@ export class StudioLivingInkWebGl2Runtime {
     this.clearSurface(this.resources.divergence);
     this.clearSurface(this.resources.curl);
     this.clearSurface(this.resources.selection, 1);
+    this.selectionTextureHasFullCoverage = true;
     this.dirtyBounds = null;
     this.lastInkMark = null;
   }
@@ -1184,6 +1187,9 @@ export class StudioLivingInkWebGl2Runtime {
     const gl = this.gl;
     const width = this.config.fieldWidth;
     const height = this.config.fieldHeight;
+    // Full coverage is the steady-state path for ordinary strokes. Avoid allocating and uploading
+    // the same width×height 255 mask for every operation; selected edits still invalidate this bit.
+    if (!selection && this.selectionTextureHasFullCoverage) return false;
     const pixels = new Uint8Array(width * height);
     if (!selection) {
       pixels.fill(255);
@@ -1203,6 +1209,7 @@ export class StudioLivingInkWebGl2Runtime {
     gl.bindTexture(gl.TEXTURE_2D, this.resources.selection.texture);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, width, height, gl.RED, gl.UNSIGNED_BYTE, pixels);
+    this.selectionTextureHasFullCoverage = selection === null;
     return selection !== null;
   }
 
@@ -1586,7 +1593,12 @@ export class StudioLivingInkWebGl2Runtime {
     this.syncDoubleDirty(this.resources.mobile, bounds);
   }
 
-  private step(dt: number, fixing: boolean, pressureIterations: number): void {
+  private step(
+    dt: number,
+    fixing: boolean,
+    pressureIterations: number,
+    velocitySettling = false,
+  ): void {
     const gl = this.gl;
     this.advanceDirtyHalo();
     const bounds = this.simulationBounds();
@@ -1597,7 +1609,12 @@ export class StudioLivingInkWebGl2Runtime {
     gl.uniform1f(this.programs.velocity.uniforms.dt, dt);
     gl.uniform1f(
       this.programs.velocity.uniforms.damping,
-      Math.exp(-dt * (3 - material.flow * 2.35)) * (fixing ? Math.exp(-dt * 7) : 1),
+      studioLivingInkVelocityDampingForStep(
+        material.flow,
+        dt,
+        fixing,
+        velocitySettling,
+      ),
     );
     this.drawDirty(this.resources.velocity.write, bounds);
     this.resources.velocity.swap();
@@ -1873,6 +1890,7 @@ export class StudioLivingInkWebGl2Runtime {
     if (!integer(ticks, 0, STUDIO_LIVING_INK_EXECUTION_LIMITS.maximumAdvanceTicks)) {
       throw new Error("Living Ink simulation tick budget exceeded.");
     }
+    const velocitySettling = operation.kind === "advance" && quality === "settle";
     // Settle/advance ticks after pen-up must not keep a ghost scrub tip from the last mark.
     this.clearBrushFootprint();
     for (let tick = 0; tick < ticks; tick += 1) {
@@ -1881,6 +1899,7 @@ export class StudioLivingInkWebGl2Runtime {
         STUDIO_LIVING_INK_EXECUTION_LIMITS.fixedTimeStepSeconds,
         operation.kind === "fix",
         pressureIterations,
+        velocitySettling,
       );
       this.assertNoGlError("fixed-step-simulation");
       if ((tick + 1) % 6 === 0) await yieldControl();

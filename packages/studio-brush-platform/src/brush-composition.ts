@@ -2,7 +2,9 @@ import {
   brushProgramIRSchema,
   colorIRSchema,
   dynamicMappingIRSchema,
+  evaluateDynamicMapping,
   pathIRSchema,
+  strokeIRSchema,
   tipGraphIRSchema,
 } from "@toonspectrum/studio-project-model";
 import { z } from "zod";
@@ -29,6 +31,8 @@ import type { LibMypaintRaw } from "./libmypaint/index";
 import type { HokusaiModuleLike, RasterStrokeSample } from "./raster-compile";
 import type { StabilizerBackend } from "./stabilizer-provider";
 import type {
+  BrushProgramIR,
+  DynamicInputIR,
   ModeledSampleIR,
   PathIR,
   SceneIR,
@@ -56,6 +60,9 @@ import type {
  * - composite stage: deterministic straight-alpha blending of the layer
  *   frames in declared order (src-over | multiply, per-layer opacity) onto
  *   the shared preview background.
+ * - 3D surface stage: `executeSurfaceBrushStroke` projects the stable
+ *   BrushProgramIR + StrokeIR through an injected hit provider, splits UV
+ *   seams, and emits deterministic texture operations plus reference pixels.
  *
  * Contracts (zero silent loss, 품질·손맛 우선 정책):
  * - Deterministic: identical program + stroke input + engines produce
@@ -66,9 +73,9 @@ import type {
  *   stage — never a silent fallback.
  * - Stage reports are merged into `warnings` with stage prefixes
  *   (`layer[<id>].engine[<name>] …`) in deterministic order.
- * - §12.2 rows whose Studio Max providers are not all shipped either record
- *   the exact substitution in `laneNote` or live in
- *   {@link UNAVAILABLE_COMPOSITION_ROWS} with the missing provider named.
+ * - Unavailable hardware/app backends are isolated behind provider contracts;
+ *   the CPU reference paths remain executable and never claim a neutral frame
+ *   as successful output.
  *
  * Contract: import this file by direct path (like ./stabilizer-provider it
  * is intentionally NOT re-exported from the package barrel; barrel
@@ -344,25 +351,108 @@ export interface CompositionEngines {
    */
   text?: CompositionTextEngine;
   /**
-   * §12.2 "3D 표면 브러시" seam. NOT satisfied by anything in `packages/`:
-   * the shipped hit/UV + texture-paint implementation lives in the app layer
-   * (`src/domains/creator/studio-vrm-texture-uv.ts` +
-   * `studio-vrm-texture-paint-ops.ts`), which packages must not import.
-   * Declared here so a host that owns both sides can inject it without a
-   * schema change; see {@link UNAVAILABLE_COMPOSITION_ROWS}.
+   * §12.2 "3D 표면 브러시" hit/UV provider. It is consumed by
+   * {@link executeSurfaceBrushStroke}; the 2D composition executor deliberately
+   * remains byte-compatible and does not infer a surface transaction from a
+   * 2D-only CompositionProgramIR.
    */
   surface?: SurfaceProjectionProvider;
 }
 
 /**
- * §12.2 "3D 표면 브러시" injection boundary — 실측 결과 기반 인터페이스.
+ * Stable world-space point carried by a surface hit. The core only compares
+ * distances; it does not depend on Three.js or another scene runtime.
+ */
+export interface SurfaceWorldPoint {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+}
+
+/** Context supplied to every projection call in original StrokeIR order. */
+export interface SurfaceProjectionContext {
+  readonly sampleIndex: number;
+  readonly strokeId: string;
+  readonly brushProgramId: string;
+  readonly signal?: AbortSignal;
+}
+
+/** A successful screen/sample → mesh → UV projection. */
+export interface SurfaceProjectionHit {
+  /** Texture-space UV. Values outside [0, 1] are rejected, never clamped. */
+  readonly u: number;
+  readonly v: number;
+  /** Texels covered by one scene-space pixel at this hit; must be positive. */
+  readonly texelDensity: number;
+  /** Stable picking identifiers used in evidence and diagnostics. */
+  readonly triangleId?: string | number;
+  readonly islandId?: string | number;
+  /** Optional world point enables density-aware seam detection. */
+  readonly world?: SurfaceWorldPoint;
+  /** World-unit → texel scale from the hit triangle, when available. */
+  readonly texelsPerWorldUnit?: number;
+  /** Provider-known chart boundary before this hit. */
+  readonly seamBefore?: boolean;
+}
+
+export interface SurfaceTextureSize {
+  readonly width: number;
+  readonly height: number;
+}
+
+/** One deterministic texture-space dab, in application order. */
+export interface SurfaceTextureDabOperation {
+  readonly kind: "dab";
+  readonly sequence: number;
+  /** Source StrokeIR sample at the right side of this interpolation interval. */
+  readonly sampleIndex: number;
+  /** 0..1 position from the preceding projected sample to sampleIndex. */
+  readonly interpolation: number;
+  /** UV-continuous run. Misses and seams start a new run. */
+  readonly run: number;
+  readonly projection: "primary" | "fallback";
+  readonly u: number;
+  readonly v: number;
+  readonly x: number;
+  readonly y: number;
+  /** The calibrated/modelled pressure is retained without quantization. */
+  readonly pressure: number;
+  readonly radiusTexels: number;
+  readonly opacity: number;
+  readonly hardness: number;
+  readonly color: StrokeIR["color"];
+  readonly triangleId?: string | number;
+  readonly islandId?: string | number;
+}
+
+/** Transaction optionally committed by the injected texture owner. */
+export interface SurfaceTextureTransaction {
+  readonly version: 1;
+  readonly strokeId: string;
+  readonly brushProgramId: string;
+  readonly width: number;
+  readonly height: number;
+  readonly operations: readonly SurfaceTextureDabOperation[];
+}
+
+export interface SurfaceTextureCommitReceipt {
+  /** Must exactly match the transaction operation count. */
+  readonly appliedOperations: number;
+  /** Provider-side changed texels, when the backend can report it. */
+  readonly changedTexels?: number;
+  readonly revision?: string | number;
+}
+
+/**
+ * §12.2 "3D 표면 브러시" injection boundary — evidence-backed interface.
  *
  * The provider projects a screen-space stroke sample onto a mesh and answers
- * with the UV texel it hit, which is what the 2D dab engine then paints into
- * the texture atlas (no UV flip: the shipped app-layer implementation resolves
- * texels in the same y-down space the raster engines already use).
+ * with UV/chart identity. This package deterministically lowers those hits to
+ * pressure-bearing texture operations and a CPU RGBA8 reference image. A host
+ * may additionally commit the exact operation transaction to its GPU/Canvas
+ * texture owner through `commitTextureOperations`.
  *
- * Shipped implementation (surveyed 2026-08-08, read-only):
+ * App implementation surveyed 2026-08-08:
  * - `src/domains/creator/studio-vrm-texture-uv.ts` —
  *   `computeStudioVrmBarycentric`, `resolveStudioVrmTriangleUv`,
  *   `resolveStudioVrmTextureHit`, `resolveStudioVrmTexelPoint`;
@@ -370,25 +460,82 @@ export interface CompositionEngines {
  *   `applyStudioVrmTexturePaintOp` (2D brush engine reused on the atlas);
  * - `src/domains/creator/studio-vrm-texture-stroke.ts` — stroke walking.
  *
- * They cannot be wired from this package: `packages/*` may not depend on
- * `src/`, and publishing a package-facing adapter would require editing the
- * app layer. Interface only, by design — no approximation is substituted.
+ * The dependency direction remains package-safe: the app adapts its hit data
+ * to this structural contract. The deterministic reference rasterizer below
+ * is real output, not a neutral placeholder; unavailable GPU upload/raycast
+ * backends are isolated behind this provider instead of quarantining the
+ * complete feature.
  */
 export interface SurfaceProjectionProvider {
+  /** Stable diagnostics identifier. */
+  readonly id?: string;
   /**
    * Project one screen-space sample onto the bound mesh.
-   * Returns `null` when the ray misses (the executor must then decide, never
-   * this boundary — a miss is data, not a fallback).
+   * Returns `null` for a ray miss. The executor applies the explicit miss
+   * policy; provider exceptions are failures, not misses.
    */
-  projectSample(sample: ModeledSampleIR): {
-    /** Texture-space UV in [0, 1]². */
-    u: number;
-    v: number;
-    /** Texel footprint of one screen px — drives the dab radius in UV space. */
-    texelDensity: number;
-  } | null;
+  projectSample(
+    sample: ModeledSampleIR,
+    context: SurfaceProjectionContext,
+  ): SurfaceProjectionHit | null;
   /** Atlas size the projected texels address. */
-  textureSize(): { width: number; height: number };
+  textureSize(): SurfaceTextureSize;
+  /** Optional product texture commit. A mismatched receipt fails loudly. */
+  commitTextureOperations?(
+    transaction: SurfaceTextureTransaction,
+  ): SurfaceTextureCommitReceipt;
+  /** Called once when execution aborts or rolls back after provider entry. */
+  cancelStroke?(context: {
+    readonly strokeId: string;
+    readonly reason: "aborted" | "projection-failed" | "commit-failed";
+  }): void;
+}
+
+export type SurfaceBrushMissPolicy = "break" | "reject" | "fallback";
+export type SurfaceBrushProviderFailurePolicy = "reject" | "fallback";
+
+export interface ExecuteSurfaceBrushOptions {
+  readonly signal?: AbortSignal;
+  /** Default `break`: keep valid hits, split the UV run, and warn. */
+  readonly missPolicy?: SurfaceBrushMissPolicy;
+  /** Provider exceptions reject by default; fallback is explicitly opt-in. */
+  readonly providerFailurePolicy?: SurfaceBrushProviderFailurePolicy;
+  readonly fallbackProvider?: SurfaceProjectionProvider;
+  /** Absolute UV-atlas jump gate. Default max(64, minDimension * 0.25). */
+  readonly seamBreakTexels?: number;
+  /** Actual/expected texel motion gate when density is known. Default 4. */
+  readonly seamStretchRatio?: number;
+  /** Deterministic operation budget. Default 200,000. */
+  readonly maxOperations?: number;
+  /** Optional existing straight-alpha RGBA8 texture; copied before painting. */
+  readonly initialPixels?: Uint8Array;
+  /** Default true: invoke commitTextureOperations when the provider owns it. */
+  readonly commit?: boolean;
+}
+
+export interface SurfaceBrushExecutionReceipt {
+  readonly providerId: string;
+  readonly fallbackProviderId?: string;
+  readonly inputSamples: number;
+  readonly projectedSamples: number;
+  readonly fallbackSamples: number;
+  readonly missedSamples: number;
+  readonly runs: number;
+  readonly seamBreaks: number;
+  readonly operations: number;
+  readonly changedTexels: number;
+  readonly committed: boolean;
+  readonly commitReceipt?: SurfaceTextureCommitReceipt;
+}
+
+export interface SurfaceBrushExecutionResult {
+  readonly width: number;
+  readonly height: number;
+  /** Straight-alpha RGBA8 reference texture after applying all operations. */
+  readonly pixels: Uint8Array;
+  readonly operations: readonly SurfaceTextureDabOperation[];
+  readonly warnings: readonly string[];
+  readonly receipt: SurfaceBrushExecutionReceipt;
 }
 
 export interface ExecuteCompositionOptions {
@@ -442,6 +589,781 @@ export class CompositionExecutionError extends Error {
     super(`${stage}: ${message}`);
     this.name = "CompositionExecutionError";
   }
+}
+
+/** Explicit cancellation result; a partial UV transaction is never returned. */
+export class SurfaceBrushCancelledError extends Error {
+  constructor(
+    readonly strokeId: string,
+    readonly processedSamples: number,
+    readonly abortReason: unknown,
+  ) {
+    super(
+      `surface[${strokeId}]: cancelled after ${processedSamples} projected sample(s)`,
+    );
+    this.name = "SurfaceBrushCancelledError";
+  }
+}
+
+const SURFACE_TEXTURE_MAX_DIMENSION = 4096;
+const SURFACE_TEXTURE_MAX_TEXELS =
+  SURFACE_TEXTURE_MAX_DIMENSION * SURFACE_TEXTURE_MAX_DIMENSION;
+const SURFACE_DEFAULT_MAX_OPERATIONS = 200_000;
+
+interface ResolvedSurfaceHit {
+  readonly sample: ModeledSampleIR;
+  readonly sampleIndex: number;
+  readonly projection: "primary" | "fallback";
+  readonly hit: SurfaceProjectionHit;
+  readonly x: number;
+  readonly y: number;
+  readonly radiusTexels: number;
+  readonly opacity: number;
+}
+
+function surfaceErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function surfaceProviderId(provider: SurfaceProjectionProvider): string {
+  const id = provider.id?.trim();
+  return id && id.length > 0 ? id : "surface-provider";
+}
+
+function cancelSurfaceProviders(
+  providers: readonly SurfaceProjectionProvider[],
+  strokeId: string,
+  reason: "aborted" | "projection-failed" | "commit-failed",
+): void {
+  const visited = new Set<SurfaceProjectionProvider>();
+  for (const provider of providers) {
+    if (visited.has(provider)) continue;
+    visited.add(provider);
+    try {
+      provider.cancelStroke?.({ strokeId, reason });
+    } catch {
+      // Cancellation is best-effort cleanup. Its exception must never hide the
+      // projection/commit failure that caused rollback.
+    }
+  }
+}
+
+function assertSurfaceNotAborted(
+  signal: AbortSignal | undefined,
+  strokeId: string,
+  processedSamples: number,
+  providers: readonly SurfaceProjectionProvider[],
+): void {
+  if (signal?.aborted !== true) return;
+  cancelSurfaceProviders(providers, strokeId, "aborted");
+  throw new SurfaceBrushCancelledError(strokeId, processedSamples, signal.reason);
+}
+
+function readSurfaceTextureSize(
+  provider: SurfaceProjectionProvider,
+  role: "primary" | "fallback",
+): SurfaceTextureSize {
+  let value: SurfaceTextureSize;
+  try {
+    value = provider.textureSize();
+  } catch (error) {
+    throw new CompositionExecutionError(
+      `surface.provider[${surfaceProviderId(provider)}].textureSize`,
+      surfaceErrorMessage(error),
+    );
+  }
+  if (
+    !Number.isSafeInteger(value.width) ||
+    !Number.isSafeInteger(value.height) ||
+    value.width <= 0 ||
+    value.height <= 0 ||
+    value.width > SURFACE_TEXTURE_MAX_DIMENSION ||
+    value.height > SURFACE_TEXTURE_MAX_DIMENSION ||
+    value.width * value.height > SURFACE_TEXTURE_MAX_TEXELS
+  ) {
+    throw new CompositionExecutionError(
+      `surface.provider[${surfaceProviderId(provider)}].textureSize`,
+      `${role} texture must be positive safe integers within ${SURFACE_TEXTURE_MAX_DIMENSION}²; ` +
+        `received ${String(value.width)}×${String(value.height)}`,
+    );
+  }
+  return { width: value.width, height: value.height };
+}
+
+function assertStableSurfaceId(
+  value: string | number | undefined,
+  label: string,
+  stage: string,
+): void {
+  if (value === undefined) return;
+  if (
+    (typeof value === "string" && value.length > 0) ||
+    (typeof value === "number" && Number.isFinite(value))
+  ) {
+    return;
+  }
+  throw new CompositionExecutionError(stage, `${label} must be a non-empty string or finite number`);
+}
+
+function assertSurfaceHit(
+  hit: SurfaceProjectionHit,
+  provider: SurfaceProjectionProvider,
+  sampleIndex: number,
+): void {
+  const stage = `surface.provider[${surfaceProviderId(provider)}].sample[${sampleIndex}]`;
+  if (
+    !Number.isFinite(hit.u) ||
+    !Number.isFinite(hit.v) ||
+    hit.u < 0 ||
+    hit.u > 1 ||
+    hit.v < 0 ||
+    hit.v > 1
+  ) {
+    throw new CompositionExecutionError(
+      stage,
+      `UV must be finite and inside [0, 1]²; received (${String(hit.u)}, ${String(hit.v)})`,
+    );
+  }
+  if (!Number.isFinite(hit.texelDensity) || hit.texelDensity <= 0) {
+    throw new CompositionExecutionError(
+      stage,
+      `texelDensity must be finite and positive; received ${String(hit.texelDensity)}`,
+    );
+  }
+  assertStableSurfaceId(hit.triangleId, "triangleId", stage);
+  assertStableSurfaceId(hit.islandId, "islandId", stage);
+  if (
+    hit.world &&
+    (!Number.isFinite(hit.world.x) ||
+      !Number.isFinite(hit.world.y) ||
+      !Number.isFinite(hit.world.z))
+  ) {
+    throw new CompositionExecutionError(stage, "world position must contain finite x/y/z");
+  }
+  if (
+    hit.texelsPerWorldUnit !== undefined &&
+    (!Number.isFinite(hit.texelsPerWorldUnit) || hit.texelsPerWorldUnit <= 0)
+  ) {
+    throw new CompositionExecutionError(
+      stage,
+      "texelsPerWorldUnit must be finite and positive when supplied",
+    );
+  }
+}
+
+function surfaceRandom(seed: number, sampleIndex: number): number {
+  let value = (seed ^ Math.imul(sampleIndex + 1, 0x9e3779b1)) >>> 0;
+  value ^= value >>> 16;
+  value = Math.imul(value, 0x7feb352d) >>> 0;
+  value ^= value >>> 15;
+  value = Math.imul(value, 0x846ca68b) >>> 0;
+  value ^= value >>> 16;
+  return value / 0x1_0000_0000;
+}
+
+function surfaceDynamicInputValue(
+  input: DynamicInputIR,
+  sample: ModeledSampleIR,
+  sampleIndex: number,
+  seed: number,
+): number {
+  switch (input) {
+    case "pressure":
+      return sample.pressure;
+    case "velocity":
+      return sample.velocity / (1 + sample.velocity);
+    case "tiltAltitude":
+      return 1 - sample.altitudeDeg / 90;
+    case "tiltAzimuth":
+      return sample.azimuthDeg / 360;
+    case "random":
+      return surfaceRandom(seed, sampleIndex);
+    case "constant":
+      return 1;
+    case "twist":
+      throw new CompositionExecutionError(
+        `surface.dynamics.sample[${sampleIndex}]`,
+        "BrushProgramIR requests twist, but ModeledSampleIR does not carry twist; refusing silent substitution",
+      );
+  }
+}
+
+function surfaceMappingProduct(
+  mappings: BrushProgramIR["sizeDynamics"] | BrushProgramIR["flowDynamics"],
+  sample: ModeledSampleIR,
+  sampleIndex: number,
+  seed: number,
+  label: "size" | "flow",
+): number {
+  let product = 1;
+  for (const [mappingIndex, mapping] of mappings.entries()) {
+    const inputValue = surfaceDynamicInputValue(mapping.input, sample, sampleIndex, seed);
+    const value = evaluateDynamicMapping(mapping, inputValue);
+    if (!Number.isFinite(value) || value < 0) {
+      throw new CompositionExecutionError(
+        `surface.dynamics.${label}[${mappingIndex}].sample[${sampleIndex}]`,
+        `mapping produced ${String(value)}; a surface multiplier must be finite and non-negative`,
+      );
+    }
+    product *= value;
+    if (!Number.isFinite(product)) {
+      throw new CompositionExecutionError(
+        `surface.dynamics.${label}[${mappingIndex}].sample[${sampleIndex}]`,
+        "mapping product overflowed",
+      );
+    }
+  }
+  return product;
+}
+
+function surfacePressureSize(program: BrushProgramIR, pressure: number): number {
+  const thinning = program.geometry.thinning;
+  return thinning >= 0
+    ? 1 - thinning + thinning * pressure
+    : 1 + -thinning * (1 - pressure);
+}
+
+function resolveSurfaceHitDynamics(
+  program: BrushProgramIR,
+  stroke: StrokeIR,
+  sample: ModeledSampleIR,
+  sampleIndex: number,
+  hit: SurfaceProjectionHit,
+): { radiusTexels: number; opacity: number } {
+  const sizeScale =
+    surfacePressureSize(program, sample.pressure) *
+    surfaceMappingProduct(
+      program.sizeDynamics,
+      sample,
+      sampleIndex,
+      stroke.seed,
+      "size",
+    );
+  const radiusTexels = (stroke.baseSizePx * hit.texelDensity * sizeScale) / 2;
+  const maximumRadius = SURFACE_TEXTURE_MAX_DIMENSION * 4;
+  if (
+    !Number.isFinite(radiusTexels) ||
+    radiusTexels <= 0 ||
+    radiusTexels > maximumRadius
+  ) {
+    throw new CompositionExecutionError(
+      `surface.dynamics.size.sample[${sampleIndex}]`,
+      `radius must be finite in (0, ${maximumRadius}]; received ${String(radiusTexels)}`,
+    );
+  }
+  const flowScale = surfaceMappingProduct(
+    program.flowDynamics,
+    sample,
+    sampleIndex,
+    stroke.seed,
+    "flow",
+  );
+  const opacity = Math.min(1, stroke.color.a * sample.pressure * flowScale);
+  if (!Number.isFinite(opacity) || opacity < 0) {
+    throw new CompositionExecutionError(
+      `surface.dynamics.flow.sample[${sampleIndex}]`,
+      `opacity must be finite and non-negative; received ${String(opacity)}`,
+    );
+  }
+  return { radiusTexels, opacity };
+}
+
+function surfaceIslandKey(hit: SurfaceProjectionHit): string | null {
+  return hit.islandId === undefined ? null : `${typeof hit.islandId}:${String(hit.islandId)}`;
+}
+
+function surfaceSeamReason(
+  previous: ResolvedSurfaceHit,
+  current: ResolvedSurfaceHit,
+  seamBreakTexels: number,
+  seamStretchRatio: number,
+): string | null {
+  if (current.hit.seamBefore === true) return "provider marked seamBefore";
+  const previousIsland = surfaceIslandKey(previous.hit);
+  const currentIsland = surfaceIslandKey(current.hit);
+  if (
+    previousIsland !== null &&
+    currentIsland !== null &&
+    previousIsland !== currentIsland
+  ) {
+    return `UV island changed ${String(previous.hit.islandId)} → ${String(current.hit.islandId)}`;
+  }
+  const actual = Math.hypot(current.x - previous.x, current.y - previous.y);
+  const brushGuard = Math.max(previous.radiusTexels, current.radiusTexels) * 2;
+  let threshold: number;
+  if (
+    previous.hit.world &&
+    current.hit.world &&
+    previous.hit.texelsPerWorldUnit !== undefined &&
+    current.hit.texelsPerWorldUnit !== undefined
+  ) {
+    const worldStep = Math.hypot(
+      current.hit.world.x - previous.hit.world.x,
+      current.hit.world.y - previous.hit.world.y,
+      current.hit.world.z - previous.hit.world.z,
+    );
+    const expected =
+      worldStep *
+      ((previous.hit.texelsPerWorldUnit + current.hit.texelsPerWorldUnit) / 2);
+    // With mesh-space evidence the absolute atlas threshold is intentionally
+    // omitted: a small seam on a dense face chart must still be detected.
+    threshold = Math.max(brushGuard, expected * seamStretchRatio);
+  } else {
+    const sceneStep = Math.hypot(
+      current.sample.x - previous.sample.x,
+      current.sample.y - previous.sample.y,
+    );
+    const expected =
+      sceneStep * ((previous.hit.texelDensity + current.hit.texelDensity) / 2);
+    threshold = Math.max(
+      seamBreakTexels,
+      brushGuard,
+      expected * seamStretchRatio,
+    );
+  }
+  return actual > threshold
+    ? `UV jump ${actual.toFixed(3)}px exceeded seam threshold ${threshold.toFixed(3)}px`
+    : null;
+}
+
+function surfaceLerp(from: number, to: number, t: number): number {
+  return from + (to - from) * t;
+}
+
+function appendSurfaceSegment(
+  operations: SurfaceTextureDabOperation[],
+  previous: ResolvedSurfaceHit | null,
+  current: ResolvedSurfaceHit,
+  run: number,
+  program: BrushProgramIR,
+  stroke: StrokeIR,
+  maxOperations: number,
+): void {
+  const distance = previous
+    ? Math.hypot(current.x - previous.x, current.y - previous.y)
+    : 0;
+  const averageDiameter = previous
+    ? previous.radiusTexels + current.radiusTexels
+    : current.radiusTexels * 2;
+  const spacing = Math.max(0.5, averageDiameter * (program.tip.spacingPct / 100));
+  const steps = previous ? Math.max(1, Math.ceil(distance / spacing)) : 1;
+  if (operations.length + steps > maxOperations) {
+    throw new CompositionExecutionError(
+      "surface.operations",
+      `operation budget ${maxOperations} exceeded while lowering sample[${current.sampleIndex}]`,
+    );
+  }
+  for (let step = 1; step <= steps; step += 1) {
+    const t = previous ? step / steps : 1;
+    const source = previous ?? current;
+    const chooseCurrentIdentity = !previous || t >= 0.5;
+    const identity = chooseCurrentIdentity ? current.hit : source.hit;
+    operations.push({
+      kind: "dab",
+      sequence: operations.length,
+      sampleIndex: current.sampleIndex,
+      interpolation: t,
+      run,
+      projection:
+        current.projection === "fallback" || source.projection === "fallback"
+          ? "fallback"
+          : "primary",
+      u: surfaceLerp(source.hit.u, current.hit.u, t),
+      v: surfaceLerp(source.hit.v, current.hit.v, t),
+      x: surfaceLerp(source.x, current.x, t),
+      y: surfaceLerp(source.y, current.y, t),
+      pressure: surfaceLerp(source.sample.pressure, current.sample.pressure, t),
+      radiusTexels: surfaceLerp(source.radiusTexels, current.radiusTexels, t),
+      opacity: surfaceLerp(source.opacity, current.opacity, t),
+      hardness: program.tip.hardness,
+      color: { ...stroke.color },
+      ...(identity.triangleId === undefined
+        ? {}
+        : { triangleId: identity.triangleId }),
+      ...(identity.islandId === undefined ? {} : { islandId: identity.islandId }),
+    });
+  }
+}
+
+function rasterizeSurfaceOperations(
+  width: number,
+  height: number,
+  initialPixels: Uint8Array | undefined,
+  operations: readonly SurfaceTextureDabOperation[],
+): { pixels: Uint8Array; changedTexels: number } {
+  const byteLength = width * height * 4;
+  if (initialPixels && initialPixels.length !== byteLength) {
+    throw new CompositionExecutionError(
+      "surface.initialPixels",
+      `buffer is ${initialPixels.length} bytes; texture requires ${byteLength}`,
+    );
+  }
+  const before = initialPixels ? new Uint8Array(initialPixels) : new Uint8Array(byteLength);
+  const pixels = new Uint8Array(before);
+  for (const operation of operations) {
+    if (operation.opacity <= 0) continue;
+    const radius = operation.radiusTexels;
+    const minX = Math.max(0, Math.floor(operation.x - radius - 0.5));
+    const maxX = Math.min(width - 1, Math.ceil(operation.x + radius + 0.5));
+    const minY = Math.max(0, Math.floor(operation.y - radius - 0.5));
+    const maxY = Math.min(height - 1, Math.ceil(operation.y + radius + 0.5));
+    const hardRadius = radius * operation.hardness;
+    for (let y = minY; y <= maxY; y += 1) {
+      for (let x = minX; x <= maxX; x += 1) {
+        const distance = Math.hypot(x + 0.5 - operation.x, y + 0.5 - operation.y);
+        const edgeCoverage = Math.min(1, Math.max(0, radius + 0.5 - distance));
+        if (edgeCoverage === 0) continue;
+        const softness =
+          distance <= hardRadius || hardRadius >= radius
+            ? 1
+            : Math.min(1, Math.max(0, (radius - distance) / (radius - hardRadius)));
+        const sourceAlpha = Math.min(1, operation.opacity * edgeCoverage * softness);
+        if (sourceAlpha === 0) continue;
+        const at = (y * width + x) * 4;
+        const destinationAlpha = (pixels[at + 3] ?? 0) / 255;
+        const outputAlpha = sourceAlpha + destinationAlpha * (1 - sourceAlpha);
+        for (let channel = 0; channel < 3; channel += 1) {
+          const source =
+            channel === 0
+              ? operation.color.r
+              : channel === 1
+                ? operation.color.g
+                : operation.color.b;
+          const destination = (pixels[at + channel] ?? 0) / 255;
+          const output =
+            outputAlpha === 0
+              ? 0
+              : (source * sourceAlpha +
+                  destination * destinationAlpha * (1 - sourceAlpha)) /
+                outputAlpha;
+          pixels[at + channel] = Math.round(output * 255);
+        }
+        pixels[at + 3] = Math.round(outputAlpha * 255);
+      }
+    }
+  }
+  let changedTexels = 0;
+  for (let at = 0; at < width * height; at += 1) {
+    const offset = at * 4;
+    if (
+      pixels[offset] !== before[offset] ||
+      pixels[offset + 1] !== before[offset + 1] ||
+      pixels[offset + 2] !== before[offset + 2] ||
+      pixels[offset + 3] !== before[offset + 3]
+    ) {
+      changedTexels += 1;
+    }
+  }
+  return { pixels, changedTexels };
+}
+
+function projectSurfaceSample(
+  provider: SurfaceProjectionProvider,
+  sample: ModeledSampleIR,
+  context: SurfaceProjectionContext,
+): SurfaceProjectionHit | null {
+  try {
+    return provider.projectSample(sample, context);
+  } catch (error) {
+    throw new CompositionExecutionError(
+      `surface.provider[${surfaceProviderId(provider)}].sample[${context.sampleIndex}]`,
+      surfaceErrorMessage(error),
+    );
+  }
+}
+
+/**
+ * Execute one real 3D surface-brush transaction.
+ *
+ * The original StrokeIR and BrushProgramIR remain the durable source of truth.
+ * Projection is sequential in sample order, UV seams split interpolation runs,
+ * and the returned operation list is suitable for a retained GPU texture owner.
+ * The CPU reference pixels make the path independently testable and provide a
+ * deterministic fallback/export surface without GPU→CPU readback.
+ */
+export function executeSurfaceBrushStroke(
+  brushProgram: BrushProgramIR,
+  strokeInput: StrokeIR,
+  provider: SurfaceProjectionProvider,
+  options: ExecuteSurfaceBrushOptions = {},
+): SurfaceBrushExecutionResult {
+  let program: BrushProgramIR;
+  let stroke: StrokeIR;
+  try {
+    program = brushProgramIRSchema.parse(brushProgram);
+    stroke = strokeIRSchema.parse(strokeInput);
+  } catch (error) {
+    throw new CompositionExecutionError("surface.input", surfaceErrorMessage(error));
+  }
+  if (stroke.samples.length === 0) {
+    throw new CompositionExecutionError("surface.input", "StrokeIR contains zero samples");
+  }
+  if (program.tip.kind !== "round") {
+    throw new CompositionExecutionError(
+      "surface.brush.tip",
+      `${program.tip.kind} tips need a provider-specific stamp sampler; the deterministic CPU backend supports round tips only`,
+    );
+  }
+  if (program.mixing.kind !== "none") {
+    throw new CompositionExecutionError(
+      "surface.brush.mixing",
+      `${program.mixing.kind} mixing needs a texture-neighborhood backend; refusing a flat-color substitution`,
+    );
+  }
+
+  const missPolicy = options.missPolicy ?? "break";
+  const failurePolicy = options.providerFailurePolicy ?? "reject";
+  const fallbackProvider = options.fallbackProvider;
+  if (
+    (missPolicy === "fallback" || failurePolicy === "fallback") &&
+    fallbackProvider === undefined
+  ) {
+    throw new CompositionExecutionError(
+      "surface.fallback",
+      "fallback policy requires options.fallbackProvider",
+    );
+  }
+  const providers = fallbackProvider ? [provider, fallbackProvider] : [provider];
+  assertSurfaceNotAborted(options.signal, stroke.id, 0, providers);
+  const size = readSurfaceTextureSize(provider, "primary");
+  if (fallbackProvider) {
+    const fallbackSize = readSurfaceTextureSize(fallbackProvider, "fallback");
+    if (fallbackSize.width !== size.width || fallbackSize.height !== size.height) {
+      throw new CompositionExecutionError(
+        "surface.fallback.textureSize",
+        `fallback ${fallbackSize.width}×${fallbackSize.height} does not address primary ${size.width}×${size.height}`,
+      );
+    }
+  }
+  const seamBreakTexels = options.seamBreakTexels ?? Math.max(64, Math.min(size.width, size.height) * 0.25);
+  const seamStretchRatio = options.seamStretchRatio ?? 4;
+  const maxOperations = options.maxOperations ?? SURFACE_DEFAULT_MAX_OPERATIONS;
+  if (!Number.isFinite(seamBreakTexels) || seamBreakTexels <= 0) {
+    throw new CompositionExecutionError("surface.options", "seamBreakTexels must be positive and finite");
+  }
+  if (!Number.isFinite(seamStretchRatio) || seamStretchRatio <= 0) {
+    throw new CompositionExecutionError("surface.options", "seamStretchRatio must be positive and finite");
+  }
+  if (!Number.isSafeInteger(maxOperations) || maxOperations <= 0) {
+    throw new CompositionExecutionError("surface.options", "maxOperations must be a positive safe integer");
+  }
+
+  const warnings: string[] = [];
+  if (stroke.brushPresetId !== program.id) {
+    warnings.push(
+      `surface.input: StrokeIR brushPresetId ${stroke.brushPresetId} differs from BrushProgramIR id ${program.id}`,
+    );
+  }
+  if (program.output.target !== "raster-tiles") {
+    warnings.push(
+      "surface.output: vector-path policy lowered to UV texture dabs; the original StrokeIR remains the editable proxy",
+    );
+  }
+  if (program.geometry.kind !== "perfect-freehand") {
+    warnings.push(
+      `surface.geometry: ${program.geometry.kind} centerline samples are projected directly; mesh tessellation remains provider-side`,
+    );
+  }
+
+  const operations: SurfaceTextureDabOperation[] = [];
+  let previous: ResolvedSurfaceHit | null = null;
+  let pendingBreak = false;
+  let run = -1;
+  let projectedSamples = 0;
+  let fallbackSamples = 0;
+  let missedSamples = 0;
+  let seamBreaks = 0;
+
+  for (const [sampleIndex, sample] of stroke.samples.entries()) {
+    assertSurfaceNotAborted(options.signal, stroke.id, sampleIndex, providers);
+    const context: SurfaceProjectionContext = {
+      sampleIndex,
+      strokeId: stroke.id,
+      brushProgramId: program.id,
+      ...(options.signal ? { signal: options.signal } : {}),
+    };
+    let hit: SurfaceProjectionHit | null;
+    let projection: ResolvedSurfaceHit["projection"] = "primary";
+    try {
+      hit = projectSurfaceSample(provider, sample, context);
+    } catch (error) {
+      if (failurePolicy !== "fallback" || !fallbackProvider) {
+        cancelSurfaceProviders(providers, stroke.id, "projection-failed");
+        throw error;
+      }
+      warnings.push(
+        `surface.provider[${surfaceProviderId(provider)}].sample[${sampleIndex}] failed; ` +
+          `fallback[${surfaceProviderId(fallbackProvider)}] used: ${surfaceErrorMessage(error)}`,
+      );
+      try {
+        hit = projectSurfaceSample(fallbackProvider, sample, context);
+      } catch (fallbackError) {
+        cancelSurfaceProviders(providers, stroke.id, "projection-failed");
+        throw fallbackError;
+      }
+      projection = "fallback";
+    }
+    if (hit === null && missPolicy === "fallback" && fallbackProvider) {
+      try {
+        hit = projectSurfaceSample(fallbackProvider, sample, context);
+      } catch (error) {
+        cancelSurfaceProviders(providers, stroke.id, "projection-failed");
+        throw error;
+      }
+      projection = "fallback";
+      if (hit !== null) {
+        warnings.push(
+          `surface.provider[${surfaceProviderId(provider)}].sample[${sampleIndex}] missed; ` +
+            `fallback[${surfaceProviderId(fallbackProvider)}] supplied the UV hit`,
+        );
+      }
+    }
+    if (hit === null) {
+      missedSamples += 1;
+      if (missPolicy === "reject") {
+        cancelSurfaceProviders(providers, stroke.id, "projection-failed");
+        throw new CompositionExecutionError(
+          `surface.provider[${surfaceProviderId(provider)}].sample[${sampleIndex}]`,
+          "ray missed and missPolicy is reject",
+        );
+      }
+      warnings.push(
+        `surface.sample[${sampleIndex}]: ray miss; no texture operation emitted and the UV run was split`,
+      );
+      pendingBreak = true;
+      previous = null;
+      continue;
+    }
+    const hitProvider = projection === "fallback" ? (fallbackProvider as SurfaceProjectionProvider) : provider;
+    assertSurfaceHit(hit, hitProvider, sampleIndex);
+    const dynamics = resolveSurfaceHitDynamics(program, stroke, sample, sampleIndex, hit);
+    const resolved: ResolvedSurfaceHit = {
+      sample,
+      sampleIndex,
+      projection,
+      hit,
+      x: hit.u * size.width,
+      y: hit.v * size.height,
+      ...dynamics,
+    };
+    projectedSamples += 1;
+    if (projection === "fallback") fallbackSamples += 1;
+    if (previous === null) {
+      run += 1;
+      pendingBreak = false;
+      appendSurfaceSegment(operations, null, resolved, run, program, stroke, maxOperations);
+    } else {
+      const seamReason = surfaceSeamReason(
+        previous,
+        resolved,
+        seamBreakTexels,
+        seamStretchRatio,
+      );
+      if (pendingBreak || seamReason !== null) {
+        run += 1;
+        if (seamReason !== null) {
+          seamBreaks += 1;
+          warnings.push(
+            `surface.sample[${sampleIndex}]: UV seam split run ${run - 1} → ${run}: ${seamReason}`,
+          );
+        }
+        appendSurfaceSegment(operations, null, resolved, run, program, stroke, maxOperations);
+      } else {
+        appendSurfaceSegment(
+          operations,
+          previous,
+          resolved,
+          run,
+          program,
+          stroke,
+          maxOperations,
+        );
+      }
+      pendingBreak = false;
+    }
+    previous = resolved;
+    assertSurfaceNotAborted(options.signal, stroke.id, sampleIndex + 1, providers);
+  }
+
+  if (projectedSamples === 0 || operations.length === 0) {
+    cancelSurfaceProviders(providers, stroke.id, "projection-failed");
+    throw new CompositionExecutionError(
+      "surface.operations",
+      `projection produced ${projectedSamples} hit(s) / ${operations.length} operation(s); refusing a neutral surface result`,
+    );
+  }
+  const rasterized = rasterizeSurfaceOperations(
+    size.width,
+    size.height,
+    options.initialPixels,
+    operations,
+  );
+  if (rasterized.changedTexels === 0) {
+    cancelSurfaceProviders(providers, stroke.id, "projection-failed");
+    throw new CompositionExecutionError(
+      "surface.raster",
+      "operations changed zero texels; refusing to report a no-op surface stroke",
+    );
+  }
+
+  assertSurfaceNotAborted(options.signal, stroke.id, stroke.samples.length, providers);
+  let commitReceipt: SurfaceTextureCommitReceipt | undefined;
+  if (options.commit !== false && provider.commitTextureOperations) {
+    const transaction: SurfaceTextureTransaction = {
+      version: 1,
+      strokeId: stroke.id,
+      brushProgramId: program.id,
+      width: size.width,
+      height: size.height,
+      operations,
+    };
+    try {
+      commitReceipt = provider.commitTextureOperations(transaction);
+    } catch (error) {
+      cancelSurfaceProviders(providers, stroke.id, "commit-failed");
+      throw new CompositionExecutionError(
+        `surface.provider[${surfaceProviderId(provider)}].commit`,
+        surfaceErrorMessage(error),
+      );
+    }
+    if (
+      !Number.isSafeInteger(commitReceipt.appliedOperations) ||
+      commitReceipt.appliedOperations !== operations.length ||
+      (commitReceipt.changedTexels !== undefined &&
+        (!Number.isSafeInteger(commitReceipt.changedTexels) ||
+          commitReceipt.changedTexels < 0))
+    ) {
+      cancelSurfaceProviders(providers, stroke.id, "commit-failed");
+      throw new CompositionExecutionError(
+        `surface.provider[${surfaceProviderId(provider)}].commit`,
+        `invalid receipt: applied ${String(commitReceipt.appliedOperations)} of ${operations.length} operations`,
+      );
+    }
+  }
+
+  return {
+    width: size.width,
+    height: size.height,
+    pixels: rasterized.pixels,
+    operations,
+    warnings,
+    receipt: {
+      providerId: surfaceProviderId(provider),
+      ...(fallbackProvider
+        ? { fallbackProviderId: surfaceProviderId(fallbackProvider) }
+        : {}),
+      inputSamples: stroke.samples.length,
+      projectedSamples,
+      fallbackSamples,
+      missedSamples,
+      runs: run + 1,
+      seamBreaks,
+      operations: operations.length,
+      changedTexels: rasterized.changedTexels,
+      committed: commitReceipt !== undefined,
+      ...(commitReceipt ? { commitReceipt } : {}),
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -1169,15 +2091,6 @@ export function executeCompositionProgram(
   }> = [];
   const layerReports: CompositionLayerReport[] = [];
   const warnings: string[] = [];
-  if (engines.surface !== undefined) {
-    // The seam exists, the consumer does not (see
-    // UNAVAILABLE_COMPOSITION_ROWS). Injecting it must not look like it
-    // worked — report the no-op instead of swallowing it.
-    warnings.push(
-      "engines.surface: no geometry stage consumes the 3D surface provider yet " +
-        "(§12.2 '3D 표면 브러시' stays unavailable) — the injection is a no-op",
-    );
-  }
   for (const layer of normalized.layers) {
     const rendered = runLayer(layer, stabilized, engines, context);
     layerFrames.push({ frame: rendered.frame, composite: layer.composite });
@@ -1757,24 +2670,34 @@ export interface UnavailableCompositionRow {
   missing: string;
 }
 
+/** Executable §12.2 surface lane; only its host-specific picker is injected. */
+export const SURFACE_COMPOSITION_CAPABILITY = Object.freeze({
+  name: "3D 표면 브러시",
+  entryPoint: "executeSurfaceBrushStroke",
+  referenceBackend: "deterministic-cpu-rgba8",
+  projectionBackend: "injected-surface-hit-provider",
+});
+
 /**
- * §12.2 rows that cannot be composed yet because a required provider is not
- * reachable from this package — recorded explicitly instead of approximated.
- * Rows 9–12 (장식·패턴 / 파티클 / 리본·헤어·로프 / 텍스트 브러시) moved out of
- * this list when their providers shipped in ./composition-providers.
+ * Legacy 2D CompositionProgramIR preset coverage ledger. The 3D row remains
+ * here only because it is not a 2D `COMPOSITION_PRESETS` entry and its concrete
+ * Three.js raycaster cannot live in packages/*. The feature itself is shipped
+ * through {@link executeSurfaceBrushStroke}; this entry quarantines the
+ * unavailable app-owned backend, not the complete surface-brush lane.
+ *
+ * @deprecated Use {@link SURFACE_COMPOSITION_CAPABILITY} for feature status.
  */
 export const UNAVAILABLE_COMPOSITION_ROWS: readonly UnavailableCompositionRow[] = [
   {
     name: "3D 표면 브러시",
     missing:
-      "Three.js hit/UV projection + texture paint provider reachable from packages/. " +
-      "The provider EXISTS but on the app side of the layering boundary: " +
+      "Only the concrete Three.js hit/UV adapter is unavailable inside packages/. " +
+      "executeSurfaceBrushStroke now provides deterministic UV operations and real " +
+      "RGBA8 output through SurfaceProjectionProvider; the app-owned adapter remains at " +
       "src/domains/creator/studio-vrm-texture-uv.ts (computeStudioVrmBarycentric, " +
       "resolveStudioVrmTriangleUv, resolveStudioVrmTextureHit) and " +
       "studio-vrm-texture-paint-ops.ts (applyStudioVrmTexturePaintOp, the 2D dab " +
-      "engine reused on the UV atlas). packages/* must not import src/*, so the " +
-      "composition executor only declares the injection seam " +
-      "(SurfaceProjectionProvider, CompositionEngines.surface); wiring it needs a " +
-      "package-facing adapter published from the app layer.",
+      "engine reused on the UV atlas). packages/* must not import src/*; hosts adapt " +
+      "that picker to the stable package-facing provider contract.",
   },
 ];

@@ -1,6 +1,7 @@
 import {
   createStudioCommandEnvelope,
   createStudioCommandJournal,
+  restoreStudioCommandJournal,
   type StudioCommandJournal,
   type StudioCommandJsonValue,
   type StudioCommandReplayPlan,
@@ -43,6 +44,8 @@ export interface StudioHistoryJournalTransitionInput {
 export interface StudioPagesHistoryCommandJournalOptions {
   readonly maxRecords?: number;
   readonly compactAt?: number;
+  /** CRC/checksum-verified durable frontier produced by serialize(). */
+  readonly serialized?: string;
 }
 
 export interface StudioHistoryJournalNavigationTarget {
@@ -231,7 +234,20 @@ export class StudioPagesHistoryCommandJournal {
     }
     this.maxRecords = maxRecords;
     this.compactAt = compactAt;
-    this.journalValue = this.createJournal();
+    this.journalValue = options.serialized === undefined
+      ? this.createJournal()
+      : restoreStudioCommandJournal<StudioCommandJsonValue>(options.serialized);
+    if (options.serialized !== undefined) {
+      if (
+        this.journalValue.extensions.integration !== "studio-pages-history"
+        || this.journalValue.extensions.version !== 1
+      ) {
+        throw new Error("Restored Studio history journal belongs to another integration.");
+      }
+      if (this.journalValue.limits.maxRecords !== this.maxRecords) {
+        throw new Error("Restored Studio history journal limits do not match this runtime.");
+      }
+    }
   }
 
   private createJournal(): StudioCommandJournal<StudioCommandJsonValue> {
@@ -454,10 +470,47 @@ export class StudioPagesHistoryCommandJournal {
     this.flushPendingCoalescedTransition();
     return this.journalValue.serialize();
   }
+
+  /**
+   * Confirms that a restored integrity frontier describes the content snapshot already loaded by
+   * the product autosave authority. A mismatch is rebased instead of applying undo receipts to a
+   * different document generation.
+   */
+  matchesTarget(target: StudioHistoryJournalNavigationTarget): boolean {
+    const expected = summarizeStudioHistorySnapshot(target.pages, target.historyIndex);
+    const plan = this.replayPlan();
+    let current: StudioHistoryJournalSnapshotSummary | null = null;
+    const checkpoint = plan.checkpoint?.state;
+    if (checkpoint && typeof checkpoint === "object" && !Array.isArray(checkpoint)) {
+      current = checkpoint as unknown as StudioHistoryJournalSnapshotSummary;
+    }
+    for (const batch of plan.batches) {
+      for (const operation of batch.operations) {
+        if (operation.kind !== "studio.history.transition") continue;
+        const payload = operation.payload;
+        if (!payload || typeof payload !== "object" || Array.isArray(payload)) continue;
+        const snapshot = (payload as Record<string, unknown>).snapshot;
+        if (snapshot && typeof snapshot === "object" && !Array.isArray(snapshot)) {
+          current = snapshot as unknown as StudioHistoryJournalSnapshotSummary;
+        }
+      }
+    }
+    return current !== null
+      && current.historyIndex === expected.historyIndex
+      && current.pageCount === expected.pageCount
+      && current.elementCount === expected.elementCount
+      && current.contentDigest === expected.contentDigest;
+  }
 }
 
 export function createStudioPagesHistoryCommandJournal(
   options: StudioPagesHistoryCommandJournalOptions = {}
 ): StudioPagesHistoryCommandJournal {
   return new StudioPagesHistoryCommandJournal(options);
+}
+
+export function restoreStudioPagesHistoryCommandJournal(
+  serialized: string,
+): StudioPagesHistoryCommandJournal {
+  return new StudioPagesHistoryCommandJournal({ serialized });
 }

@@ -16,6 +16,7 @@ import {
   type StudioPoseMaterial,
 } from "./studio-pose-material";
 import {
+  EMPTY_STUDIO_POSE_MATERIAL_LIBRARY,
   STUDIO_POSE_MATERIAL_LIBRARY_KIND,
   STUDIO_POSE_MATERIAL_LIBRARY_STORAGE_KEY,
   STUDIO_POSE_MATERIAL_LIBRARY_VERSION,
@@ -23,11 +24,13 @@ import {
 } from "./studio-pose-material-library";
 import { StudioVrmPoseMaterialPanel } from "./StudioVrmPoseMaterialPanel";
 
+
 import type { StudioPoseScope } from "./studio-humanoid-bones";
 import type {
   StudioVrmPoseMaterialApplyResult,
   StudioVrmPoseMaterialCaptureOptions,
 } from "./studio-vrm-pose-material-adapter";
+import type { StudioVrmPoseMaterialSqliteRepository } from "./studio-vrm-pose-material-sqlite-repository";
 
 class MemoryStorage implements StudioPoseMaterialStorage {
   readonly values = new Map<string, string>();
@@ -386,5 +389,79 @@ describe("StudioVrmPoseMaterialPanel", () => {
     expect((save as HTMLButtonElement).disabled).toBe(true);
     expect(save.className).toContain("min-h-11");
     expect(screen.getByText(/실시간 추적·애니메이션·캡처·관절 드래그/)).toBeTruthy();
+  });
+
+  it("hydrates from the async product repository and keeps a failed durable save explicitly in memory", async () => {
+    const repository: StudioVrmPoseMaterialSqliteRepository = {
+      authority: "sqlite",
+      load: vi.fn(async () => EMPTY_STUDIO_POSE_MATERIAL_LIBRARY),
+      save: vi.fn(async () => {
+        throw new Error("quota denied");
+      }),
+    };
+    render(
+      <StudioVrmPoseMaterialPanel
+        disabled={false}
+        activeMaterialId={null}
+        lockedBoneCount={0}
+        repository={repository}
+        onCapture={materialFromCapture}
+        onApply={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => expect((screen.getByLabelText("포즈 소재 이름") as HTMLInputElement).disabled)
+      .toBe(false));
+    fireEvent.change(screen.getByLabelText("포즈 소재 이름"), {
+      target: { value: "메모리 복구 소재" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "현재 자세를 범용 소재로 저장" }));
+
+    await waitFor(() => expect(screen.getByText("메모리 복구 소재")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/현재 탭 메모리 임시 · 새로고침 시 사라짐/))
+      .toBeTruthy());
+    expect(repository.save).toHaveBeenCalledOnce();
+    expect(screen.getByRole("status").getAttribute("data-studio-vrm-pose-material-authority"))
+      .toBe("memory");
+  });
+
+  it("serializes rapid product saves and prevents a late first write from winning", async () => {
+    let releaseFirst!: () => void;
+    const firstGate = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    let calls = 0;
+    const repository: StudioVrmPoseMaterialSqliteRepository = {
+      authority: "sqlite",
+      load: vi.fn(async () => EMPTY_STUDIO_POSE_MATERIAL_LIBRARY),
+      save: vi.fn(async (payload) => {
+        if (++calls === 1) await firstGate;
+        return payload;
+      }),
+    };
+    render(
+      <StudioVrmPoseMaterialPanel
+        disabled={false}
+        activeMaterialId={null}
+        lockedBoneCount={0}
+        repository={repository}
+        onCapture={materialFromCapture}
+        onApply={vi.fn()}
+      />,
+    );
+    await waitFor(() => expect((screen.getByLabelText("포즈 소재 이름") as HTMLInputElement).disabled)
+      .toBe(false));
+
+    fireEvent.change(screen.getByLabelText("포즈 소재 이름"), { target: { value: "첫 소재" } });
+    fireEvent.click(screen.getByRole("button", { name: "현재 자세를 범용 소재로 저장" }));
+    fireEvent.change(screen.getByLabelText("포즈 소재 이름"), { target: { value: "마지막 소재" } });
+    fireEvent.click(screen.getByRole("button", { name: "현재 자세를 범용 소재로 저장" }));
+
+    await waitFor(() => expect(repository.save).toHaveBeenCalledTimes(1));
+    releaseFirst();
+    await waitFor(() => expect(repository.save).toHaveBeenCalledTimes(2));
+    const finalPayload = vi.mocked(repository.save).mock.calls[1]?.[0];
+    expect(new Set(finalPayload?.materials.map((entry) => entry.name)))
+      .toEqual(new Set(["첫 소재", "마지막 소재"]));
   });
 });

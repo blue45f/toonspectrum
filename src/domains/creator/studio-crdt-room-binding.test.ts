@@ -8,6 +8,7 @@ import { createStudioCrdtServerAckError } from "./studio-crdt-operation-error";
 import {
   StudioCrdtOutboxCorruptionError,
   type StudioCrdtOutbox,
+  type StudioCrdtOutboxRetryMetadata,
 } from "./studio-crdt-outbox";
 import {
   STUDIO_CRDT_PROTOCOL_VERSION,
@@ -191,6 +192,24 @@ class DurableMemoryOutbox extends MemoryOutbox {
       state: "durable" as const,
       message: "테스트 브라우저 복구 저장소가 정상입니다.",
     };
+  }
+}
+
+class RetryMetadataMemoryOutbox extends DurableMemoryOutbox {
+  readonly retries: Array<{
+    scope: string;
+    workId: string;
+    updateId: string;
+    metadata: StudioCrdtOutboxRetryMetadata;
+  }> = [];
+
+  async recordRetry(
+    scope: string,
+    workId: string,
+    updateId: string,
+    metadata: StudioCrdtOutboxRetryMetadata,
+  ): Promise<void> {
+    this.retries.push({ scope, workId, updateId, metadata });
   }
 }
 
@@ -985,6 +1004,47 @@ describe("StudioCrdtRoomBinding", () => {
       lastAckServerSequence: null,
     });
     expect(outbox.requests.size).toBe(1);
+
+    binding.close();
+    client.destroy();
+    server.destroy();
+  });
+
+  it("persists bounded retry metadata before scheduling a retryable publication", async () => {
+    vi.useFakeTimers();
+    const server = new StudioCrdtDocument();
+    const client = new StudioCrdtDocument();
+    const fake = new FakeRoom(server);
+    fake.failuresRemaining = 1;
+    const outbox = new RetryMetadataMemoryOutbox();
+    const binding = new StudioCrdtRoomBinding({
+      document: client,
+      room: room(fake),
+      outbox,
+      recoveryVault: new MemoryRecoveryVault(),
+      outboxScope: "user-retry-metadata",
+    });
+    await binding.start();
+
+    add(client, "retry-metadata-stroke", 53);
+    await vi.advanceTimersByTimeAsync(40);
+    await vi.runAllTicks();
+
+    expect(outbox.retries).toHaveLength(1);
+    expect(outbox.retries[0]).toMatchObject({
+      scope: "user-retry-metadata",
+      workId: fake.workId,
+      updateId: fake.publications[0]?.updateId,
+      metadata: {
+        attemptCount: 1,
+        errorCode: "transport_error",
+        errorMessage: "temporary disconnect",
+      },
+    });
+    expect(
+      outbox.retries[0]!.metadata.nextRetryAt -
+        outbox.retries[0]!.metadata.attemptedAt,
+    ).toBe(300);
 
     binding.close();
     client.destroy();

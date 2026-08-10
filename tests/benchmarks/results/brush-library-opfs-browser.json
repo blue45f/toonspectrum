@@ -1,0 +1,1523 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-08T20:07:56.027Z",
+  "status": "pass",
+  "pass": true,
+  "benchmark": {
+    "status": "ok",
+    "pass": true,
+    "schemaVersion": 1,
+    "execution": "vite-production-build-chromium-opfs-sahpool",
+    "authority": {
+      "kind": "sqlite-opfs-sahpool",
+      "requestedVfs": "opfs",
+      "sqlitePackage": "@sqlite.org/sqlite-wasm 3.53.0-build1",
+      "opfsDirectory": "toonspectrum-studio-sqlite",
+      "logicalDatabaseFilename": "studio-local-v12.db",
+      "memoryVfsUsed": false,
+      "localStorageFallbackUsed": false,
+      "closeCompletedBeforeReopen": true
+    },
+    "support": {
+      "wasm": true,
+      "opfs": true
+    },
+    "capabilities": {
+      "secureContext": true,
+      "crossOriginIsolated": true,
+      "navigatorStorageGetDirectory": true,
+      "syncAccessHandle": true,
+      "cryptoSubtle": true
+    },
+    "browser": {
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.186 Safari/537.36",
+      "language": "en-US",
+      "hardwareConcurrency": 12,
+      "deviceMemoryGiB": 8
+    },
+    "config": {
+      "brushCount": 10000,
+      "insertBatchSize": 200,
+      "insertBatchCount": 50,
+      "pageSize": 257,
+      "lookupSampleCount": 200,
+      "filterSampleCountPerCase": 60,
+      "sourcePayloadBytes": 16924275
+    },
+    "insertion": {
+      "initialCount": 0,
+      "insertedCount": 10000,
+      "skippedDuplicateCount": 0,
+      "totalMs": 2105.805,
+      "throughputBrushesPerSecond": 4748.78,
+      "batchSamples": [
+        {
+          "index": 0,
+          "count": 200,
+          "ms": 18.29
+        },
+        {
+          "index": 1,
+          "count": 200,
+          "ms": 17.56
+        },
+        {
+          "index": 2,
+          "count": 200,
+          "ms": 20.845
+        },
+        {
+          "index": 3,
+          "count": 200,
+          "ms": 22.2
+        },
+        {
+          "index": 4,
+          "count": 200,
+          "ms": 24.52
+        },
+        {
+          "index": 5,
+          "count": 200,
+          "ms": 29.27
+        },
+        {
+          "index": 6,
+          "count": 200,
+          "ms": 31.935
+        },
+        {
+          "index": 7,
+          "count": 200,
+          "ms": 37.03
+        },
+        {
+          "index": 8,
+          "count": 200,
+          "ms": 39.855
+        },
+        {
+          "index": 9,
+          "count": 200,
+          "ms": 55.985
+        },
+        {
+          "index": 10,
+          "count": 200,
+          "ms": 54.86
+        },
+        {
+          "index": 11,
+          "count": 200,
+          "ms": 42.465
+        },
+        {
+          "index": 12,
+          "count": 200,
+          "ms": 35.435
+        },
+        {
+          "index": 13,
+          "count": 200,
+          "ms": 32.975
+        },
+        {
+          "index": 14,
+          "count": 200,
+          "ms": 33.135
+        },
+        {
+          "index": 15,
+          "count": 200,
+          "ms": 33.045
+        },
+        {
+          "index": 16,
+          "count": 200,
+          "ms": 39.39
+        },
+        {
+          "index": 17,
+          "count": 200,
+          "ms": 48.825
+        },
+        {
+          "index": 18,
+          "count": 200,
+          "ms": 47.53
+        },
+        {
+          "index": 19,
+          "count": 200,
+          "ms": 47.03
+        },
+        {
+          "index": 20,
+          "count": 200,
+          "ms": 42.2
+        },
+        {
+          "index": 21,
+          "count": 200,
+          "ms": 44.48
+        },
+        {
+          "index": 22,
+          "count": 200,
+          "ms": 40.67
+        },
+        {
+          "index": 23,
+          "count": 200,
+          "ms": 43.68
+        },
+        {
+          "index": 24,
+          "count": 200,
+          "ms": 44.58
+        },
+        {
+          "index": 25,
+          "count": 200,
+          "ms": 43.66
+        },
+        {
+          "index": 26,
+          "count": 200,
+          "ms": 45.095
+        },
+        {
+          "index": 27,
+          "count": 200,
+          "ms": 42.195
+        },
+        {
+          "index": 28,
+          "count": 200,
+          "ms": 44.065
+        },
+        {
+          "index": 29,
+          "count": 200,
+          "ms": 42.07
+        },
+        {
+          "index": 30,
+          "count": 200,
+          "ms": 45.41
+        },
+        {
+          "index": 31,
+          "count": 200,
+          "ms": 44.82
+        },
+        {
+          "index": 32,
+          "count": 200,
+          "ms": 48.19
+        },
+        {
+          "index": 33,
+          "count": 200,
+          "ms": 53.17
+        },
+        {
+          "index": 34,
+          "count": 200,
+          "ms": 51.71
+        },
+        {
+          "index": 35,
+          "count": 200,
+          "ms": 49.715
+        },
+        {
+          "index": 36,
+          "count": 200,
+          "ms": 46.595
+        },
+        {
+          "index": 37,
+          "count": 200,
+          "ms": 49.79
+        },
+        {
+          "index": 38,
+          "count": 200,
+          "ms": 52.65
+        },
+        {
+          "index": 39,
+          "count": 200,
+          "ms": 48.635
+        },
+        {
+          "index": 40,
+          "count": 200,
+          "ms": 53.58
+        },
+        {
+          "index": 41,
+          "count": 200,
+          "ms": 49.2
+        },
+        {
+          "index": 42,
+          "count": 200,
+          "ms": 49.675
+        },
+        {
+          "index": 43,
+          "count": 200,
+          "ms": 47.36
+        },
+        {
+          "index": 44,
+          "count": 200,
+          "ms": 46.935
+        },
+        {
+          "index": 45,
+          "count": 200,
+          "ms": 46.965
+        },
+        {
+          "index": 46,
+          "count": 200,
+          "ms": 48.72
+        },
+        {
+          "index": 47,
+          "count": 200,
+          "ms": 49.045
+        },
+        {
+          "index": 48,
+          "count": 200,
+          "ms": 45.985
+        },
+        {
+          "index": 49,
+          "count": 200,
+          "ms": 32.365
+        }
+      ],
+      "distribution": {
+        "sampleCount": 50,
+        "percentileMethod": "nearest-rank-ceil",
+        "samplesMs": [
+          18.29,
+          17.56,
+          20.845,
+          22.2,
+          24.52,
+          29.27,
+          31.935,
+          37.03,
+          39.855,
+          55.985,
+          54.86,
+          42.465,
+          35.435,
+          32.975,
+          33.135,
+          33.045,
+          39.39,
+          48.825,
+          47.53,
+          47.03,
+          42.2,
+          44.48,
+          40.67,
+          43.68,
+          44.58,
+          43.66,
+          45.095,
+          42.195,
+          44.065,
+          42.07,
+          45.41,
+          44.82,
+          48.19,
+          53.17,
+          51.71,
+          49.715,
+          46.595,
+          49.79,
+          52.65,
+          48.635,
+          53.58,
+          49.2,
+          49.675,
+          47.36,
+          46.935,
+          46.965,
+          48.72,
+          49.045,
+          45.985,
+          32.365
+        ],
+        "minMs": 17.56,
+        "p50Ms": 44.58,
+        "p95Ms": 53.58,
+        "p99Ms": 55.985,
+        "maxMs": 55.985,
+        "meanMs": 42.1078
+      }
+    },
+    "durability": {
+      "closedOnce": true,
+      "reopenMs": 0.8,
+      "reopenProbeId": "opfs-brush-09999",
+      "reopenProbeName": "pen OPFS 작가 브러시 09999"
+    },
+    "keysetFullScan": {
+      "pageCount": 39,
+      "observedCount": 10000,
+      "uniqueCount": 10000,
+      "expectedTotalCount": 10000,
+      "firstPageTotalCount": 10000,
+      "duplicateCount": 0,
+      "missingCount": 0,
+      "unexpectedCount": 0,
+      "missingIds": [],
+      "unexpectedIds": [],
+      "orderMismatchCount": 0,
+      "expectedOrderDigestSha256": "49f4c5536d5ca420677d5bfa96069f926bc3975f66ce9476c1086490c198e621",
+      "observedOrderDigestSha256": "49f4c5536d5ca420677d5bfa96069f926bc3975f66ce9476c1086490c198e621",
+      "pageReceipts": [
+        {
+          "index": 0,
+          "itemCount": 257,
+          "firstId": "opfs-brush-09996",
+          "lastId": "opfs-brush-04233",
+          "nextCursorDigestSha256": "da94065bf3d9da9a1f990eed84457a9f7a33e88976a9e105bb703957029e5e1e",
+          "totalCount": 10000,
+          "ms": 44.02
+        },
+        {
+          "index": 1,
+          "itemCount": 257,
+          "firstId": "opfs-brush-06341",
+          "lastId": "opfs-brush-01445",
+          "nextCursorDigestSha256": "18c084db30c901dfdb1e0c3caf069c3a1e4b20074fdfb885790195af3d0d459f",
+          "totalCount": 10000,
+          "ms": 41.1
+        },
+        {
+          "index": 2,
+          "itemCount": 257,
+          "firstId": "opfs-brush-01411",
+          "lastId": "opfs-brush-09420",
+          "nextCursorDigestSha256": "c810675fa8b7b81960c135b2013a385b25b8982f471edc70b3809985559690ec",
+          "totalCount": 10000,
+          "ms": 33.13
+        },
+        {
+          "index": 3,
+          "itemCount": 257,
+          "firstId": "opfs-brush-09417",
+          "lastId": "opfs-brush-08601",
+          "nextCursorDigestSha256": "ad64de27d33f906837a0be71c13533279961753457ce8c62e2f6199f0c2dcaf6",
+          "totalCount": 10000,
+          "ms": 43.375
+        },
+        {
+          "index": 4,
+          "itemCount": 257,
+          "firstId": "opfs-brush-08598",
+          "lastId": "opfs-brush-07782",
+          "nextCursorDigestSha256": "ef20fd8944fd30514f35f0aaeaac0a45f4e600dddca3cc7f16ad9440e97f8e9d",
+          "totalCount": 10000,
+          "ms": 31.605
+        },
+        {
+          "index": 5,
+          "itemCount": 257,
+          "firstId": "opfs-brush-07779",
+          "lastId": "opfs-brush-06963",
+          "nextCursorDigestSha256": "a555b77c6942e79ed5028a2af4dfd7c35d8984dfd15fec21239007e1442ff661",
+          "totalCount": 10000,
+          "ms": 34.105
+        },
+        {
+          "index": 6,
+          "itemCount": 257,
+          "firstId": "opfs-brush-06960",
+          "lastId": "opfs-brush-09803",
+          "nextCursorDigestSha256": "ecbc024faa469a2bd9e6ca16d66fcc406fe93824ea5e2d2269d28850ada4bc75",
+          "totalCount": 10000,
+          "ms": 23.405
+        },
+        {
+          "index": 7,
+          "itemCount": 257,
+          "firstId": "opfs-brush-09802",
+          "lastId": "opfs-brush-09496",
+          "nextCursorDigestSha256": "ba1fbfa63cf2f478f0bf8b6d847a40635047142dd37f04ac3de8810e9eaf3d69",
+          "totalCount": 10000,
+          "ms": 26.125
+        },
+        {
+          "index": 8,
+          "itemCount": 257,
+          "firstId": "opfs-brush-06330",
+          "lastId": "opfs-brush-06126",
+          "nextCursorDigestSha256": "7cb0a22fd9aa7de54cd0d490a357746649430336467eb84a7ab182b6832ca3d9",
+          "totalCount": 10000,
+          "ms": 28.105
+        },
+        {
+          "index": 9,
+          "itemCount": 257,
+          "firstId": "opfs-brush-09188",
+          "lastId": "opfs-brush-08882",
+          "nextCursorDigestSha256": "b4b6d8e01018b6ca99d7fe157b50662c3b781b912fc3ed46ab0d1480f0d86aa0",
+          "totalCount": 10000,
+          "ms": 20.93
+        },
+        {
+          "index": 10,
+          "itemCount": 257,
+          "firstId": "opfs-brush-08881",
+          "lastId": "opfs-brush-08575",
+          "nextCursorDigestSha256": "4d0c84fd571a7fbe2b08018ced944007f68eabe5e7efe7086e68eb38315be195",
+          "totalCount": 10000,
+          "ms": 20.345
+        },
+        {
+          "index": 11,
+          "itemCount": 257,
+          "firstId": "opfs-brush-08573",
+          "lastId": "opfs-brush-08267",
+          "nextCursorDigestSha256": "a7c448fe39b2500447be2ed1d673b539c4e017e8fe71e3ff05d1c3b7a07e5292",
+          "totalCount": 10000,
+          "ms": 20.33
+        },
+        {
+          "index": 12,
+          "itemCount": 257,
+          "firstId": "opfs-brush-05511",
+          "lastId": "opfs-brush-05307",
+          "nextCursorDigestSha256": "3f196e24d51a92ad1bdc7ef8c576374257c5b4f1f69ed9e396e18c8ad300eaeb",
+          "totalCount": 10000,
+          "ms": 20.26
+        },
+        {
+          "index": 13,
+          "itemCount": 257,
+          "firstId": "opfs-brush-07960",
+          "lastId": "opfs-brush-07654",
+          "nextCursorDigestSha256": "62c617c180aea61f9c2722cfa145d67b1a3f9b189e8724df05bc51dcc197691e",
+          "totalCount": 10000,
+          "ms": 20.325
+        },
+        {
+          "index": 14,
+          "itemCount": 257,
+          "firstId": "opfs-brush-07652",
+          "lastId": "opfs-brush-07346",
+          "nextCursorDigestSha256": "ca14060600199fb00d5ad8c12bd4141ab32ea9eda6834633baf22f42ddd5b8d6",
+          "totalCount": 10000,
+          "ms": 23.885
+        },
+        {
+          "index": 15,
+          "itemCount": 257,
+          "firstId": "opfs-brush-07345",
+          "lastId": "opfs-brush-07039",
+          "nextCursorDigestSha256": "ace7f96b6c4f5a661b1eb44732c33f9a1d72bd070bbb9cb29dccd5e995518970",
+          "totalCount": 10000,
+          "ms": 21.505
+        },
+        {
+          "index": 16,
+          "itemCount": 257,
+          "firstId": "opfs-brush-07037",
+          "lastId": "opfs-brush-06731",
+          "nextCursorDigestSha256": "67d4bec186600c3963a4fd9a7f6c2489781922c15bf1520110f500ea6862aff5",
+          "totalCount": 10000,
+          "ms": 20.1
+        },
+        {
+          "index": 17,
+          "itemCount": 257,
+          "firstId": "opfs-brush-06730",
+          "lastId": "opfs-brush-06424",
+          "nextCursorDigestSha256": "84880975b66020a3d28a0d6362fd357f5e4ebe858eebb23526ee643ff4dd0cf5",
+          "totalCount": 10000,
+          "ms": 19.905
+        },
+        {
+          "index": 18,
+          "itemCount": 257,
+          "firstId": "opfs-brush-06422",
+          "lastId": "opfs-brush-06116",
+          "nextCursorDigestSha256": "7e1c1b9c170b21235d7acf57b003753ebc983a0138812d00305d4eb71a751e84",
+          "totalCount": 10000,
+          "ms": 20.745
+        },
+        {
+          "index": 19,
+          "itemCount": 257,
+          "firstId": "opfs-brush-04077",
+          "lastId": "opfs-brush-03873",
+          "nextCursorDigestSha256": "b30832bbc96a6cbb94182d9162002e796f76ca406445080ac3202f8df03d998c",
+          "totalCount": 10000,
+          "ms": 31.125
+        },
+        {
+          "index": 20,
+          "itemCount": 257,
+          "firstId": "opfs-brush-05809",
+          "lastId": "opfs-brush-05503",
+          "nextCursorDigestSha256": "d38dac1eb22a085c75fc9b6792be5f02ce0dcafc3db72c62803b3f469fc1c1c5",
+          "totalCount": 10000,
+          "ms": 21.215
+        },
+        {
+          "index": 21,
+          "itemCount": 257,
+          "firstId": "opfs-brush-05501",
+          "lastId": "opfs-brush-05195",
+          "nextCursorDigestSha256": "aa6926669033b0151212d83cc2c1f3c5270b3835349b7babbef1b0dda5f060f3",
+          "totalCount": 10000,
+          "ms": 20.56
+        },
+        {
+          "index": 22,
+          "itemCount": 257,
+          "firstId": "opfs-brush-05194",
+          "lastId": "opfs-brush-04888",
+          "nextCursorDigestSha256": "935518fa59bd1f809d4c8e1b55164cc7055e8973d805db1f961a0134c8ac62cd",
+          "totalCount": 10000,
+          "ms": 20
+        },
+        {
+          "index": 23,
+          "itemCount": 257,
+          "firstId": "opfs-brush-03258",
+          "lastId": "opfs-brush-03054",
+          "nextCursorDigestSha256": "6971a180124641fab08e0adace3fcd3f6fb2fd219db762f3f72f6f2b3f6239b8",
+          "totalCount": 10000,
+          "ms": 20.25
+        },
+        {
+          "index": 24,
+          "itemCount": 257,
+          "firstId": "opfs-brush-04580",
+          "lastId": "opfs-brush-04274",
+          "nextCursorDigestSha256": "56759d9d77c18219176cc286ca1b8f9296fd46f78c979a51fcc1e7bc175ed4ec",
+          "totalCount": 10000,
+          "ms": 19.86
+        },
+        {
+          "index": 25,
+          "itemCount": 257,
+          "firstId": "opfs-brush-04273",
+          "lastId": "opfs-brush-03967",
+          "nextCursorDigestSha256": "ce291a85e229449f0947aa6e60efb265a503d545f7ecc2d0b6a106b2ec2f003b",
+          "totalCount": 10000,
+          "ms": 19.835
+        },
+        {
+          "index": 26,
+          "itemCount": 257,
+          "firstId": "opfs-brush-03965",
+          "lastId": "opfs-brush-03659",
+          "nextCursorDigestSha256": "91a2a0a0815f19db725bc6fa96061dce87e87e38a832a4fa3cc24105e7d50623",
+          "totalCount": 10000,
+          "ms": 21.185
+        },
+        {
+          "index": 27,
+          "itemCount": 257,
+          "firstId": "opfs-brush-02439",
+          "lastId": "opfs-brush-02235",
+          "nextCursorDigestSha256": "b79e4344b2351780b438153de5aedbad191670cf51a568da1d32eadb8767765d",
+          "totalCount": 10000,
+          "ms": 20.825
+        },
+        {
+          "index": 28,
+          "itemCount": 257,
+          "firstId": "opfs-brush-03352",
+          "lastId": "opfs-brush-03046",
+          "nextCursorDigestSha256": "f7c0cca9fd67fab5bca174b4e2b668b89f19860de2347dd34c8daef820ab567e",
+          "totalCount": 10000,
+          "ms": 21.45
+        },
+        {
+          "index": 29,
+          "itemCount": 257,
+          "firstId": "opfs-brush-03044",
+          "lastId": "opfs-brush-02738",
+          "nextCursorDigestSha256": "1ffc8ea942b1353e14218d0874c08622c7bdbe2ef392c3551ab0c51fd1e34cbf",
+          "totalCount": 10000,
+          "ms": 29.135
+        },
+        {
+          "index": 30,
+          "itemCount": 257,
+          "firstId": "opfs-brush-01824",
+          "lastId": "opfs-brush-01620",
+          "nextCursorDigestSha256": "b572c5b596b5b2edeba2ef4ab4edb8c290ace1f8ceedd25b7362674cf1890ca8",
+          "totalCount": 10000,
+          "ms": 21.155
+        },
+        {
+          "index": 31,
+          "itemCount": 257,
+          "firstId": "opfs-brush-02429",
+          "lastId": "opfs-brush-02123",
+          "nextCursorDigestSha256": "b66ff7bd9a04d5051b46a54dc8e79c40822a19b9e9eb8d187f9cafd679dfa6b1",
+          "totalCount": 10000,
+          "ms": 20.43
+        },
+        {
+          "index": 32,
+          "itemCount": 257,
+          "firstId": "opfs-brush-02122",
+          "lastId": "opfs-brush-01816",
+          "nextCursorDigestSha256": "c4e2ca12df805ecbfefc3f9699b4432b09a9922bbb87a38b6df0216e8b26efae",
+          "totalCount": 10000,
+          "ms": 21.17
+        },
+        {
+          "index": 33,
+          "itemCount": 257,
+          "firstId": "opfs-brush-01814",
+          "lastId": "opfs-brush-01508",
+          "nextCursorDigestSha256": "35aab0fd00150501fe7e160b63fdbb50ac28f950e3dad241f7f7d52c755ef543",
+          "totalCount": 10000,
+          "ms": 23.095
+        },
+        {
+          "index": 34,
+          "itemCount": 257,
+          "firstId": "opfs-brush-01005",
+          "lastId": "opfs-brush-00801",
+          "nextCursorDigestSha256": "6674ccc6abbcebda95db643402ed05b9f297ada495d585cbb2c9502af850959c",
+          "totalCount": 10000,
+          "ms": 20.915
+        },
+        {
+          "index": 35,
+          "itemCount": 257,
+          "firstId": "opfs-brush-01201",
+          "lastId": "opfs-brush-00895",
+          "nextCursorDigestSha256": "72fcfcc92a985cf11dda8821abacf649db3cbcdcd50aee6f792f63703657e561",
+          "totalCount": 10000,
+          "ms": 20.985
+        },
+        {
+          "index": 36,
+          "itemCount": 257,
+          "firstId": "opfs-brush-00893",
+          "lastId": "opfs-brush-00587",
+          "nextCursorDigestSha256": "1a81acb913f8b03a57e6e984ddab86d0f64c768c1a9bb9e760bbd2a1c098d8db",
+          "totalCount": 10000,
+          "ms": 19.79
+        },
+        {
+          "index": 37,
+          "itemCount": 257,
+          "firstId": "opfs-brush-00586",
+          "lastId": "opfs-brush-00280",
+          "nextCursorDigestSha256": "f96a3e86712e2d3f41ffe8bf56caff7f1cc37ccfb5c8094550762f89e23d59ed",
+          "totalCount": 10000,
+          "ms": 22.105
+        },
+        {
+          "index": 38,
+          "itemCount": 234,
+          "firstId": "opfs-brush-00186",
+          "lastId": "opfs-brush-00001",
+          "nextCursorDigestSha256": null,
+          "totalCount": 10000,
+          "ms": 30.03
+        }
+      ],
+      "distribution": {
+        "sampleCount": 39,
+        "percentileMethod": "nearest-rank-ceil",
+        "samplesMs": [
+          44.02,
+          41.1,
+          33.13,
+          43.375,
+          31.605,
+          34.105,
+          23.405,
+          26.125,
+          28.105,
+          20.93,
+          20.345,
+          20.33,
+          20.26,
+          20.325,
+          23.885,
+          21.505,
+          20.1,
+          19.905,
+          20.745,
+          31.125,
+          21.215,
+          20.56,
+          20,
+          20.25,
+          19.86,
+          19.835,
+          21.185,
+          20.825,
+          21.45,
+          29.135,
+          21.155,
+          20.43,
+          21.17,
+          23.095,
+          20.915,
+          20.985,
+          19.79,
+          22.105,
+          30.03
+        ],
+        "minMs": 19.79,
+        "p50Ms": 21.17,
+        "p95Ms": 43.375,
+        "p99Ms": 44.02,
+        "maxMs": 44.02,
+        "meanMs": 24.5747
+      }
+    },
+    "structuredIntegrity": {
+      "productPayloadIndexValidationPath": "createSqliteBrushLibraryRepository.query -> sqlRecordToStudioBrush",
+      "validatedCanonicalRowCount": 10000,
+      "canonicalNormalizationMismatchCount": 0,
+      "lookupMismatchCount": 0,
+      "allChecksPassed": true
+    },
+    "idLookup": {
+      "mismatchCount": 0,
+      "distribution": {
+        "sampleCount": 200,
+        "percentileMethod": "nearest-rank-ceil",
+        "samplesMs": [
+          0.66,
+          0.35,
+          0.335,
+          0.34,
+          0.45,
+          0.4,
+          0.34,
+          0.39,
+          0.38,
+          0.315,
+          0.3,
+          0.28,
+          0.29,
+          0.305,
+          0.305,
+          0.29,
+          0.285,
+          0.28,
+          0.275,
+          0.31,
+          0.3,
+          0.295,
+          0.285,
+          0.3,
+          0.29,
+          0.3,
+          0.305,
+          0.3,
+          0.28,
+          0.285,
+          0.445,
+          0.32,
+          0.325,
+          0.425,
+          0.55,
+          0.315,
+          0.285,
+          0.25,
+          0.24,
+          0.215,
+          0.215,
+          0.2,
+          0.205,
+          0.215,
+          0.215,
+          0.205,
+          0.215,
+          0.205,
+          0.205,
+          0.21,
+          0.195,
+          0.205,
+          0.215,
+          0.205,
+          0.22,
+          0.25,
+          0.21,
+          0.205,
+          0.2,
+          0.2,
+          0.205,
+          0.21,
+          0.24,
+          0.21,
+          0.28,
+          0.225,
+          0.205,
+          0.205,
+          0.21,
+          0.21,
+          0.19,
+          0.235,
+          0.245,
+          0.235,
+          0.225,
+          0.24,
+          0.215,
+          0.205,
+          0.21,
+          0.31,
+          0.3,
+          0.285,
+          0.3,
+          0.295,
+          0.285,
+          0.275,
+          0.295,
+          0.285,
+          0.285,
+          0.305,
+          0.29,
+          0.28,
+          0.295,
+          0.295,
+          0.28,
+          0.31,
+          0.35,
+          0.335,
+          0.39,
+          0.32,
+          0.285,
+          0.31,
+          0.395,
+          0.31,
+          0.215,
+          0.215,
+          0.205,
+          0.2,
+          0.21,
+          0.2,
+          0.21,
+          0.2,
+          0.225,
+          0.2,
+          0.235,
+          0.21,
+          0.205,
+          0.23,
+          0.22,
+          0.21,
+          0.21,
+          0.21,
+          0.22,
+          0.22,
+          0.235,
+          0.205,
+          0.2,
+          0.21,
+          0.22,
+          0.21,
+          0.305,
+          0.285,
+          0.36,
+          0.24,
+          0.195,
+          0.32,
+          0.345,
+          0.3,
+          0.26,
+          0.245,
+          0.22,
+          0.2,
+          0.3,
+          0.3,
+          0.31,
+          0.305,
+          0.28,
+          0.275,
+          0.295,
+          0.26,
+          0.265,
+          0.3,
+          0.295,
+          0.27,
+          0.285,
+          0.27,
+          0.28,
+          0.28,
+          0.275,
+          0.27,
+          0.335,
+          0.315,
+          0.34,
+          0.305,
+          0.295,
+          0.335,
+          0.305,
+          0.325,
+          0.295,
+          0.285,
+          0.29,
+          0.275,
+          0.27,
+          0.275,
+          0.27,
+          0.295,
+          0.29,
+          0.275,
+          0.275,
+          0.27,
+          0.33,
+          0.405,
+          0.41,
+          0.4,
+          0.385,
+          0.415,
+          0.45,
+          0.33,
+          0.475,
+          0.435,
+          0.495,
+          0.35,
+          0.335,
+          0.33,
+          0.315,
+          0.3,
+          0.28,
+          0.285,
+          0.28,
+          0.29
+        ],
+        "minMs": 0.19,
+        "p50Ms": 0.28,
+        "p95Ms": 0.41,
+        "p99Ms": 0.495,
+        "maxMs": 0.66,
+        "meanMs": 0.2819
+      }
+    },
+    "filters": [
+      {
+        "id": "category-watercolor",
+        "request": {
+          "category": "watercolor",
+          "limit": 64
+        },
+        "expectedCount": 2000,
+        "observedTotalCount": 2000,
+        "mismatchCount": 0,
+        "firstPageDigestSha256": "d99dda4411c71c2d6d12bc6c8da4db18bad3aebbef689bef0432c84a371b3c32",
+        "distribution": {
+          "sampleCount": 60,
+          "percentileMethod": "nearest-rank-ceil",
+          "samplesMs": [
+            8.29,
+            3.885,
+            4.13,
+            3.7,
+            3.76,
+            3.6,
+            3.875,
+            4.05,
+            4.11,
+            3.665,
+            3.81,
+            4.21,
+            4.645,
+            5.295,
+            4.055,
+            3.87,
+            3.98,
+            3.69,
+            4.06,
+            3.59,
+            3.785,
+            3.63,
+            3.6,
+            3.65,
+            3.775,
+            3.935,
+            3.515,
+            3.66,
+            3.65,
+            3.935,
+            3.715,
+            3.76,
+            3.735,
+            4.19,
+            3.86,
+            3.9,
+            3.71,
+            3.655,
+            3.695,
+            3.605,
+            3.885,
+            3.59,
+            4.28,
+            3.655,
+            3.585,
+            4.35,
+            3.985,
+            3.85,
+            3.655,
+            4.08,
+            4.77,
+            4.835,
+            4.11,
+            5.255,
+            4.69,
+            4,
+            3.905,
+            4.355,
+            4.345,
+            3.99
+          ],
+          "minMs": 3.515,
+          "p50Ms": 3.875,
+          "p95Ms": 4.835,
+          "p99Ms": 8.29,
+          "maxMs": 8.29,
+          "meanMs": 4.04
+        }
+      },
+      {
+        "id": "pinned-only",
+        "request": {
+          "pinned": true,
+          "limit": 64
+        },
+        "expectedCount": 589,
+        "observedTotalCount": 589,
+        "mismatchCount": 0,
+        "firstPageDigestSha256": "d24f5f1b0b79544ef51764531ad355bafad6604341ac59f8166e9f151e0035ec",
+        "distribution": {
+          "sampleCount": 60,
+          "percentileMethod": "nearest-rank-ceil",
+          "samplesMs": [
+            9.515,
+            3.915,
+            4.04,
+            3.625,
+            4.3,
+            3.805,
+            3.775,
+            3.595,
+            4.275,
+            3.96,
+            3.525,
+            3.705,
+            3.605,
+            3.96,
+            3.75,
+            3.59,
+            3.615,
+            3.535,
+            3.8,
+            3.755,
+            3.98,
+            3.495,
+            3.91,
+            4.01,
+            4.07,
+            3.835,
+            4.03,
+            3.99,
+            3.725,
+            3.7,
+            3.75,
+            3.99,
+            3.625,
+            3.56,
+            3.7,
+            3.84,
+            3.9,
+            3.945,
+            4.03,
+            3.98,
+            4.21,
+            4.62,
+            8.265,
+            4.36,
+            4.5,
+            4,
+            4.175,
+            3.835,
+            4.135,
+            3.865,
+            3.575,
+            3.81,
+            4.065,
+            3.685,
+            3.61,
+            3.84,
+            3.95,
+            4.275,
+            3.79,
+            3.945
+          ],
+          "minMs": 3.495,
+          "p50Ms": 3.865,
+          "p95Ms": 4.5,
+          "p99Ms": 9.515,
+          "maxMs": 9.515,
+          "meanMs": 4.0537
+        }
+      },
+      {
+        "id": "nfkc-search-category-pinned",
+        "request": {
+          "search": "ＷＡＴＥＲＣＯＬＯＲ",
+          "category": "watercolor",
+          "pinned": true,
+          "limit": 64
+        },
+        "expectedCount": 118,
+        "observedTotalCount": 118,
+        "mismatchCount": 0,
+        "firstPageDigestSha256": "d99dda4411c71c2d6d12bc6c8da4db18bad3aebbef689bef0432c84a371b3c32",
+        "distribution": {
+          "sampleCount": 60,
+          "percentileMethod": "nearest-rank-ceil",
+          "samplesMs": [
+            4.315,
+            3.87,
+            4.315,
+            4.095,
+            3.755,
+            3.88,
+            3.975,
+            3.895,
+            4.15,
+            3.84,
+            3.835,
+            3.96,
+            4.33,
+            3.945,
+            3.985,
+            3.66,
+            3.65,
+            3.655,
+            3.675,
+            4.11,
+            4.365,
+            3.73,
+            3.74,
+            3.76,
+            3.74,
+            4.77,
+            4.025,
+            3.865,
+            3.64,
+            3.955,
+            4.475,
+            3.955,
+            3.74,
+            4.11,
+            4.175,
+            4.075,
+            4.055,
+            3.88,
+            3.97,
+            3.875,
+            3.905,
+            4.225,
+            4.165,
+            3.81,
+            3.935,
+            3.95,
+            3.715,
+            4.235,
+            3.805,
+            4.035,
+            3.935,
+            3.97,
+            4.03,
+            3.615,
+            4.56,
+            3.795,
+            3.775,
+            3.71,
+            4.715,
+            3.845
+          ],
+          "minMs": 3.615,
+          "p50Ms": 3.935,
+          "p95Ms": 4.475,
+          "p99Ms": 4.77,
+          "maxMs": 4.77,
+          "meanMs": 3.9754
+        }
+      }
+    ],
+    "opfs": {
+      "before": {
+        "exists": false,
+        "error": {
+          "name": "NotFoundError",
+          "message": "A requested file or directory could not be found at the time an operation was processed.",
+          "stack": null
+        },
+        "entries": [],
+        "fileCount": 0,
+        "totalFileBytes": 0
+      },
+      "afterInsert": {
+        "exists": true,
+        "entries": [
+          {
+            "path": ".opaque",
+            "kind": "directory",
+            "sizeBytes": null
+          },
+          {
+            "path": ".opaque/akxczqgfve9",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/bu5b9ly5gxh",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/ca22c6c2dvs",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/f4le9f0qyo",
+            "kind": "file",
+            "sizeBytes": 22163456
+          },
+          {
+            "path": ".opaque/s7qrsr019kk",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/ukc2v1y52h8",
+            "kind": "file",
+            "sizeBytes": 4096
+          }
+        ],
+        "fileCount": 6,
+        "totalFileBytes": 22183936
+      },
+      "final": {
+        "exists": true,
+        "entries": [
+          {
+            "path": ".opaque",
+            "kind": "directory",
+            "sizeBytes": null
+          },
+          {
+            "path": ".opaque/akxczqgfve9",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/bu5b9ly5gxh",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/ca22c6c2dvs",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/f4le9f0qyo",
+            "kind": "file",
+            "sizeBytes": 22163456
+          },
+          {
+            "path": ".opaque/s7qrsr019kk",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/ukc2v1y52h8",
+            "kind": "file",
+            "sizeBytes": 4096
+          }
+        ],
+        "fileCount": 6,
+        "totalFileBytes": 22183936
+      }
+    },
+    "storage": {
+      "before": {
+        "usageBytes": 0,
+        "quotaBytes": 1841838539,
+        "usageDetails": {}
+      },
+      "afterInsert": {
+        "usageBytes": 22185300,
+        "quotaBytes": 1841838539,
+        "usageDetails": {
+          "fileSystem": 22185300
+        }
+      },
+      "final": {
+        "usageBytes": 22185300,
+        "quotaBytes": 1841838539,
+        "usageDetails": {
+          "fileSystem": 22185300
+        }
+      }
+    },
+    "memory": {
+      "before": {
+        "performanceMemory": null,
+        "userAgentSpecific": null,
+        "userAgentSpecificError": null
+      },
+      "afterInsert": {
+        "performanceMemory": null,
+        "userAgentSpecific": null,
+        "userAgentSpecificError": null
+      },
+      "final": {
+        "performanceMemory": null,
+        "userAgentSpecific": null,
+        "userAgentSpecificError": null
+      }
+    },
+    "securityPolicyViolations": [],
+    "pageMemory": {
+      "before": {
+        "performanceMemory": {
+          "usedJSHeapSizeBytes": 670065,
+          "totalJSHeapSizeBytes": 1575869,
+          "jsHeapSizeLimitBytes": 4294705152
+        },
+        "userAgentSpecific": null,
+        "userAgentSpecificError": {
+          "name": "SecurityError",
+          "message": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available.",
+          "stack": "SecurityError: Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available.\n    at n (http://127.0.0.1:55648/assets/index-CsDuJtCS.js:1:1021)\n    at i (http://127.0.0.1:55648/assets/index-CsDuJtCS.js:1:1514)\n    at http://127.0.0.1:55648/assets/index-CsDuJtCS.js:1:2436"
+        }
+      },
+      "after": {
+        "performanceMemory": {
+          "usedJSHeapSizeBytes": 1295620,
+          "totalJSHeapSizeBytes": 1871176,
+          "jsHeapSizeLimitBytes": 4294705152
+        },
+        "userAgentSpecific": null,
+        "userAgentSpecificError": {
+          "name": "SecurityError",
+          "message": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available.",
+          "stack": "SecurityError: Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available.\n    at n (http://127.0.0.1:55648/assets/index-CsDuJtCS.js:1:1021)\n    at Worker.<anonymous> (http://127.0.0.1:55648/assets/index-CsDuJtCS.js:1:1960)"
+        }
+      }
+    },
+    "pageSecurityPolicyViolations": []
+  },
+  "diagnostics": {
+    "browserVersion": "140.0.7339.186",
+    "consoleErrors": [],
+    "consoleWarnings": [],
+    "pageErrors": [],
+    "requestFailures": [],
+    "errorResponses": [],
+    "requests": [
+      {
+        "method": "GET",
+        "resourceType": "document",
+        "url": "http://127.0.0.1:55648/"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:55648/assets/index-CsDuJtCS.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:55648/assets/brush-library-opfs-browser-client-CQlFwXlv.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:55648/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:55648/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:55648/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      }
+    ],
+    "responses": [
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:55648/"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:55648/assets/index-CsDuJtCS.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:55648/assets/brush-library-opfs-browser-client-CQlFwXlv.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:55648/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:55648/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:55648/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      }
+    ],
+    "responseHeaders": {
+      "contentSecurityPolicy": "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'; worker-src 'self'; style-src 'none'; img-src 'none'; font-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+      "crossOriginOpenerPolicy": "same-origin",
+      "crossOriginEmbedderPolicy": "require-corp",
+      "crossOriginResourcePolicy": "same-origin"
+    }
+  },
+  "productionBuild": {
+    "mode": "vite-production-build",
+    "assets": [
+      ".vite/manifest.json",
+      "assets/brush-library-opfs-browser-client-CQlFwXlv.js",
+      "assets/brush-library-opfs-browser-client-CQlFwXlv.js.map",
+      "assets/index-CsDuJtCS.js",
+      "assets/index-CsDuJtCS.js.map",
+      "assets/sqlite3-BVKGSWc-.wasm",
+      "assets/sqlite3-opfs-async-proxy-D_xnb1D8.js",
+      "assets/sqlite3-worker1-N5XM9NUp.js",
+      "assets/sqlite3-worker1-N5XM9NUp.js.map",
+      "index.html"
+    ],
+    "scratchDirectory": "/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/toonspectrum-brush-library-opfs-ewjLwd"
+  },
+  "validationIssues": []
+}

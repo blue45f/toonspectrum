@@ -7,6 +7,7 @@ import {
 } from "./studio-brush-dynamics";
 import {
   BRUSH_EXPORT_KIND,
+  BRUSH_LIBRARY_CAPACITY,
   BRUSH_LIBRARY_KEY,
   BRUSH_LIBRARY_STORAGE_VERSION,
   BRUSH_OPACITY_RANGE,
@@ -639,26 +640,35 @@ describe("saveBrush", () => {
     expect(next[0].createdAt).toBe(2);
   });
 
-  it(`최대 ${MAX_BRUSHES}개에서 새 항목을 거부하고 기존 항목을 자동 삭제하지 않는다`, () => {
+  it("4,096개를 넘는 라이브러리도 자동 삭제나 개수 거부 없이 저장한다", () => {
     const s = fakeStorage();
-    let result: StudioSavedBrush[] = [];
-    for (let i = 0; i < MAX_BRUSHES; i++) result = saveBrush(s, brush(`b${i}`, i));
-    const overflow = saveBrushWithResult(s, brush("overflow", 999));
-    expect(overflow.status).toBe("full");
-    expect(overflow.brushes.map((item) => item.id)).not.toContain("overflow");
-    expect(result).toHaveLength(MAX_BRUSHES);
-    expect(result.map((item) => item.id)).toContain("b0");
-    expect(listBrushes(s)).toHaveLength(MAX_BRUSHES);
+    const imported = Array.from({ length: 4_096 }, (_, index) => brush(`b${index}`, index));
+    const batch = saveBrushBatchWithResult(s, imported);
+    const next = saveBrushWithResult(s, brush("b4096", 4_096));
+
+    expect(BRUSH_LIBRARY_CAPACITY).toBe("unbounded");
+    expect(MAX_BRUSHES).toBe(Number.POSITIVE_INFINITY);
+    expect(batch).toMatchObject({ status: "saved", savedCount: 4_096, skippedCount: 0 });
+    expect(next.status).toBe("saved");
+    expect(next.brushes).toHaveLength(4_097);
+    expect(next.brushes[0]?.id).toBe("b4096");
+    expect(next.brushes[1]?.id).toBe("b0");
+    expect(next.brushes.at(-1)?.id).toBe("b4095");
+    expect(listBrushes(s)).toHaveLength(4_097);
   });
 
-  it(`최대 ${MAX_BRUSHES}개여도 같은 id 갱신은 허용한다`, () => {
+  it("수천 개가 저장돼도 같은 id 갱신은 한 항목으로 결정적으로 교체한다", () => {
     const s = fakeStorage();
-    for (let i = 0; i < MAX_BRUSHES; i++) saveBrush(s, brush(`b${i}`, i));
+    saveBrushBatchWithResult(
+      s,
+      Array.from({ length: 3_000 }, (_, index) => brush(`b${index}`, index))
+    );
     const updated = { ...brush("b0", 999), name: "갱신됨" };
     const result = saveBrushWithResult(s, updated);
     expect(result.status).toBe("saved");
-    expect(result.brushes).toHaveLength(MAX_BRUSHES);
+    expect(result.brushes).toHaveLength(3_000);
     expect(result.brushes[0]).toMatchObject({ id: "b0", name: "갱신됨" });
+    expect(result.brushes.filter((candidate) => candidate.id === "b0")).toHaveLength(1);
   });
 
   it("저장소 쓰기가 실패하면 성공으로 가장하지 않고 원본 목록을 유지한다", () => {
@@ -862,23 +872,37 @@ describe("빠른 선반·복제·삭제 취소", () => {
     expect(result.brushes.map((item) => item.id)).toEqual(["b", "a", result.brush?.id]);
   });
 
-  it("라이브러리 상한에서 복제를 거부하고 모든 원본을 유지한다", () => {
+  it("수천 개 라이브러리에서도 원본 다음 위치에 복제한다", () => {
     const s = fakeStorage();
-    for (let index = 0; index < MAX_BRUSHES; index++) saveBrush(s, brush(`b${index}`));
+    saveBrushBatchWithResult(
+      s,
+      Array.from({ length: 3_000 }, (_, index) => brush(`b${index}`, index))
+    );
     const result = duplicateBrush(s, "b0");
-    expect(result.status).toBe("full");
-    expect(result.brushes).toHaveLength(MAX_BRUSHES);
+    expect(result.status).toBe("duplicated");
+    expect(result.brushes).toHaveLength(3_001);
+    expect(result.brushes[0]?.id).toBe("b0");
+    expect(result.brushes[1]?.id).toBe(result.brush?.id);
   });
 
-  it("브러시 팩을 한 번에 저장하고 남은 용량까지만 명시적으로 부분 수용한다", () => {
+  it("브러시 팩은 개수와 무관하게 전부 저장하고 중복 id만 첫 항목으로 축약한다", () => {
     const s = fakeStorage();
-    for (let index = 0; index < MAX_BRUSHES - 1; index++) saveBrush(s, brush(`base-${index}`));
-    const result = saveBrushBatchWithResult(s, [brush("pack-a"), brush("pack-b")]);
+    saveBrushBatchWithResult(
+      s,
+      Array.from({ length: 3_000 }, (_, index) => brush(`base-${index}`, index))
+    );
+    const result = saveBrushBatchWithResult(s, [
+      { ...brush("pack-a"), name: "첫 항목" },
+      { ...brush("pack-a"), name: "중복 항목" },
+      brush("pack-b"),
+    ]);
     expect(result.status).toBe("partial");
-    expect(result.savedCount).toBe(1);
+    expect(result.savedCount).toBe(2);
     expect(result.skippedCount).toBe(1);
-    expect(result.brushes).toHaveLength(MAX_BRUSHES);
+    expect(result.brushes).toHaveLength(3_002);
     expect(result.brushes[0]?.id).toBe("pack-a");
+    expect(result.brushes[0]?.name).toBe("첫 항목");
+    expect(result.brushes[1]?.id).toBe("pack-b");
   });
 
   it("브러시 팩 저장 실패는 영속 원본을 보존하고 부분 성공을 노출하지 않는다", () => {

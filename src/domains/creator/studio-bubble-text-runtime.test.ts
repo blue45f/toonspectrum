@@ -92,6 +92,7 @@ describe("verticalBlockAlign / verticalTextItemGeometry", () => {
     expect(verticalTextItemGeometry(spaced.columns[0]!.items[0]!, 20)).toEqual({
       boxWidth: 20,
       lineHeight: 1.3, // (20 + 6) / 20
+      scaleX: 1,
     });
   });
 
@@ -102,7 +103,27 @@ describe("verticalBlockAlign / verticalTextItemGeometry", () => {
       lineHeight: 1.4,
       fontFamily: "Pretendard, sans-serif",
     });
-    expect(verticalTextItemGeometry(layout.columns[0]!.items[0]!, 20)).toEqual({ boxWidth: 20, lineHeight: 1 });
+    expect(verticalTextItemGeometry(layout.columns[0]!.items[0]!, 20)).toEqual({
+      boxWidth: 20,
+      lineHeight: 1,
+      scaleX: 1,
+    });
+  });
+
+  it("returns an inverse-width box for one-cell tate-chu-yoko scaling", () => {
+    const layout = verticalTextLayout({
+      text: "2026",
+      fontSize: 20,
+      lineHeight: 1.4,
+      fontFamily: "Pretendard, sans-serif",
+    });
+    const item = layout.columns[0]!.items[0]!;
+    expect(item.form).toBe("tate-chu-yoko");
+    const geometry = verticalTextItemGeometry(item, 20);
+    expect(geometry.scaleX).toBeGreaterThan(0);
+    expect(geometry.scaleX).toBeLessThanOrEqual(1);
+    expect(geometry.boxWidth * geometry.scaleX).toBeCloseTo(20, 8);
+    expect(geometry.lineHeight).toBe(1);
   });
 });
 

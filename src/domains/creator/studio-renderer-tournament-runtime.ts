@@ -44,7 +44,7 @@ import {
 /* ------------------------------------------------------------------ */
 
 export const STUDIO_TOURNAMENT_WINNER_STORAGE_KEY =
-  "toonspectrum-studio-tournament-winners-v1";
+  "toonspectrum-studio-v12-tournament-winners-v1";
 export const STUDIO_TOURNAMENT_WINNER_SCHEMA_VERSION = 1;
 
 export interface PersistedWinnerEntry extends WinnerCacheEntry {
@@ -149,8 +149,9 @@ export function resolveDefaultTournamentStorage(): TournamentWinnerStorage | nul
 }
 
 /**
- * Fallback adapter: the synchronous localStorage API wrapped behind the async
- * port. Unreadable/unparsable payloads load as null (ignored, never thrown);
+ * V12-only fallback adapter: the synchronous localStorage API wrapped behind
+ * the async port. The key does not overlap pre-V12 tournament state.
+ * Unreadable/unparsable payloads load as null (ignored, never thrown);
  * saving without usable storage or over quota rejects, which the runtime
  * reports as `persist() === false`.
  */

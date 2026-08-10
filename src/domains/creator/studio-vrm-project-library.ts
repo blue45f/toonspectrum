@@ -27,9 +27,10 @@ import {
 /**
  * Portable VRM archive bridge.
  *
- * Scene documents own only a stable content hash and public model metadata. Device-local IndexedDB
- * ids remain behind this boundary and are never written into project.json. Export and import both
- * re-read and validate the complete GLB/VRM payload instead of trusting cached row metadata.
+ * Scene documents own only a stable content hash and public model metadata. Device-local
+ * SQLite/OPFS storage ids remain behind this boundary and are never written into project.json.
+ * Export and import both re-read and validate the complete GLB/VRM payload instead of trusting
+ * cached manifest metadata.
  */
 
 export type StudioVrmProjectLibraryDiagnosticCode =

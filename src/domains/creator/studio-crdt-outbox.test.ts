@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
-  IndexedDbStudioCrdtOutbox,
+  LegacyIndexedDbStudioCrdtOutbox,
   SerializedStudioCrdtOutbox,
   StudioCrdtOutboxCorruptionError,
   StudioCrdtOutboxTimeoutError,
@@ -30,7 +30,7 @@ afterEach(() => {
 
 describe("Studio CRDT durable outbox", () => {
   it("retains a same-page emergency copy when IndexedDB is unavailable", async () => {
-    const outbox = new SerializedStudioCrdtOutbox(new IndexedDbStudioCrdtOutbox());
+    const outbox = new SerializedStudioCrdtOutbox(new LegacyIndexedDbStudioCrdtOutbox());
     const scope = "memory-user-a";
     const workId = "memory-work-a";
     const pending = request(workId, "11111111-1111-4111-8111-111111111111");
@@ -334,7 +334,7 @@ describe("Studio CRDT durable outbox", () => {
         return undefined;
       },
     };
-    const direct = new IndexedDbStudioCrdtOutbox(persistence);
+    const direct = new LegacyIndexedDbStudioCrdtOutbox(persistence);
     const serialized = new SerializedStudioCrdtOutbox(direct);
 
     await expect(serialized.list(scope, workId)).rejects.toBeInstanceOf(
@@ -367,8 +367,8 @@ describe("Studio CRDT durable outbox", () => {
       "replacement-instance-work-a",
       "99999999-9999-4999-8999-999999999999"
     );
-    const previous = new IndexedDbStudioCrdtOutbox();
-    const replacement = new IndexedDbStudioCrdtOutbox();
+    const previous = new LegacyIndexedDbStudioCrdtOutbox();
+    const replacement = new LegacyIndexedDbStudioCrdtOutbox();
 
     previous.putEmergency(scope, pending);
     replacement.removeEmergency(scope, pending.workId, pending.updateId);
@@ -420,7 +420,7 @@ describe("Studio CRDT durable outbox", () => {
   });
 
   it("preserves more than the former row and emergency caps without silent eviction", async () => {
-    const delegate = new IndexedDbStudioCrdtOutbox();
+    const delegate = new LegacyIndexedDbStudioCrdtOutbox();
     const scope = "uncapped-user-a";
     const workId = "uncapped-work-a";
     const count = 8_193;
@@ -432,7 +432,7 @@ describe("Studio CRDT durable outbox", () => {
       );
     }
 
-    const replacement = new IndexedDbStudioCrdtOutbox();
+    const replacement = new LegacyIndexedDbStudioCrdtOutbox();
     expect(replacement.listEmergency(scope, workId)).toHaveLength(count);
     await Promise.all(
       Array.from({ length: count }, (_, index) =>
@@ -496,8 +496,8 @@ describe("Studio CRDT durable outbox", () => {
         for (const key of keys) rows.delete(key);
       },
     };
-    const previousDelegate = new IndexedDbStudioCrdtOutbox(persistence);
-    const replacementDelegate = new IndexedDbStudioCrdtOutbox(persistence);
+    const previousDelegate = new LegacyIndexedDbStudioCrdtOutbox(persistence);
+    const replacementDelegate = new LegacyIndexedDbStudioCrdtOutbox(persistence);
     const previous = new SerializedStudioCrdtOutbox(previousDelegate, { timeoutMs: 100 });
     const replacement = new SerializedStudioCrdtOutbox(replacementDelegate, { timeoutMs: 100 });
 

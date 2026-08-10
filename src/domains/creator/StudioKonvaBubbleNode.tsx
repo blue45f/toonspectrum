@@ -53,6 +53,7 @@ import {
 } from "./studio-bubble-text-runtime";
 import {
   planDialogueRubyOverlayPlacements,
+  planDialogueVerticalRubyOverlayPlacements,
   readDialogueRubySpans,
 } from "./studio-dialogue-ruby-layout";
 import { konvaGradientProps } from "./studio-gradient-engine";
@@ -409,14 +410,8 @@ export function StudioKonvaBubbleNode({
         ).blockHeight;
   const textPaintHeight = Math.max(textBoxHeight, Math.ceil(horizontalBlockHeight));
   const textPaintY = bVPadTop - (textPaintHeight - textBoxHeight) / 2;
-  // Vertical bubbles keep base-only paint (column core). Stacked ruby is horizontal-only
-  // in this MVP — column layout does not host furigana beside upright glyphs yet.
-  const rubySpans = !el.vertical
-    ? readDialogueRubySpans(
-        (el as Extract<El, { type: "bubble" }> & { rubySpans?: unknown }).rubySpans,
-      )
-    : undefined;
-  const rubyOverlays = rubySpans
+  const rubySpans = readDialogueRubySpans(el.rubySpans);
+  const rubyOverlays = rubySpans && !verticalLayout
     ? planDialogueRubyOverlayPlacements(el.text, rubySpans, {
         fontSize: bFs,
         letterSpacing: bubbleLetterSpacingPx,
@@ -424,6 +419,13 @@ export function StudioKonvaBubbleNode({
         align: bubbleAlign,
       })
     : [];
+  const verticalRuby = verticalLayout
+    ? planDialogueVerticalRubyOverlayPlacements(el.text, rubySpans, verticalLayout, {
+        fontSize: bFs,
+        lineHeight: bubbleLineHeight,
+        letterSpacing: bubbleLetterSpacingPx,
+      })
+    : null;
 
   return (
     <Group
@@ -639,7 +641,10 @@ export function StudioKonvaBubbleNode({
         >
           {verticalLayout.columns.flatMap((column) =>
             column.items.map((item, itemIndex) => {
-              const { boxWidth, lineHeight } = verticalTextItemGeometry(item, bFs);
+              const { boxWidth, lineHeight: itemLineHeight, scaleX } = verticalTextItemGeometry(
+                item,
+                bFs,
+              );
               return (
                 <KText
                   key={`bubble-vcol-${column.index}-${itemIndex}`}
@@ -647,6 +652,7 @@ export function StudioKonvaBubbleNode({
                   x={item.x}
                   y={item.y}
                   rotation={item.rotation}
+                  scaleX={scaleX}
                   {...(item.rotation === 0
                     ? { width: boxWidth, align: "center" as const, wrap: "none" as const }
                     : {})}
@@ -654,12 +660,32 @@ export function StudioKonvaBubbleNode({
                   fontFamily={bubbleFontFamily}
                   fontStyle={bubbleFontStyle}
                   fill={el.textFill}
-                  lineHeight={lineHeight}
+                  lineHeight={itemLineHeight}
                   letterSpacing={item.rotation === 90 ? bubbleLetterSpacingPx : 0}
                 />
               );
             }),
           )}
+          {verticalRuby?.placements.map((placement) => (
+            <KText
+              key={`bubble-vertical-ruby-${placement.spanIndex}-${placement.fragmentIndex}`}
+              name="studio-vertical-ruby"
+              text={[...placement.ruby].join("\n")}
+              x={placement.x}
+              y={placement.y}
+              width={placement.width}
+              height={placement.height}
+              align="center"
+              wrap="none"
+              rotation={0}
+              fontSize={placement.rubyFontSize}
+              fontFamily={bubbleFontFamily}
+              fontStyle={bubbleFontStyle}
+              fill={el.textFill}
+              lineHeight={placement.rubyGlyphAdvance / placement.rubyFontSize}
+              listening={false}
+            />
+          ))}
         </Group>
       ) : (
         <KText

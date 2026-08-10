@@ -18,7 +18,7 @@
 | Skia / CanvasKit (Paragraph 포함) | BSD-3-Clause | 저작권 고지·라이선스 사본 동봉(바이너리 배포 시 NOTICE), 상표 보증 문구 금지 | **직접 WASM 번들** (렌더 코어와 동일 번들 — 텍스트용 추가 배포물 없음. Paragraph 포함 빌드 플래그로 자체 빌드·commit 고정) | 불필요 |
 | Parley | MIT OR Apache-2.0 | 고지 동봉. Apache-2.0 선택 시 특허 조항 자동 적용(방어에 유리) | Rust→WASM **별도 모듈, Worker 상주·lazy load** (Phase 1은 벤치 하니스에만 포함, 프로덕션 번들 제외) | 불필요 |
 | Fontique | MIT OR Apache-2.0 | 고지 동봉 | Parley 스택 모듈 동봉 | 불필요 |
-| HarfRust | MIT 계열 (HarfBuzz permissive 라이선스 승계 — 배포 전 저장소 LICENSE 원문 재확인을 license scan 게이트에 포함) | 고지 동봉 | Parley 스택 모듈 동봉 | 불필요 |
+| HarfRust 0.10.0 | MIT (crate manifest/LICENSE 핀 확인) | 저작권·MIT 고지 동봉 | Parley의 간접 사용과 직접 TTB 세로 셰이핑을 동일 WASM 모듈에 통합 | 불필요 |
 | Skrifa (fontations) | MIT OR Apache-2.0 | 고지 동봉 | Parley 스택 모듈 동봉 | 불필요 |
 | ICU4X | Unicode License (Unicode-3.0, permissive) | 고지·데이터 파일 라이선스 동봉 | **독립 소형 WASM/데이터 팩** — KinsokuEngine 기반으로 Phase 1부터 프로덕션 포함 가능. datagen으로 필요 로케일(ko/ja/zh + 대상 시장)만 슬라이스해 번들 최소화 | 불필요 |
 | Glifo | permissive (매트릭스 E08 기준 — 배포 전 저장소 LICENSE 재확인 필수, 실험적 프로젝트라 라이선스 변동 감시 대상) | 고지 동봉 | Parley 스택 모듈 동봉 (GlyphCacheAdapter 뒤 격리, 프로덕션 기본 비활성) | 불필요 |
@@ -84,8 +84,28 @@ glifo-cache:
 ## 5. 운영 체크리스트
 
 - [ ] CI license scan: 전 crate/모듈 SPDX 식별자 수집 → 허용 목록(BSD/MIT/Apache-2.0/ISC/Unicode/OFL[폰트]) 외 검출 시 빌드 실패
-- [ ] HarfRust·Glifo LICENSE 원문 확인 결과를 이 문서에 반영(§1 표의 "재확인" 단서 해소) — Phase 0 종료 조건
+- [ ] Glifo LICENSE 원문 확인 결과를 이 문서에 반영. HarfRust 0.10.0 MIT 확인은 완료
 - [ ] NOTICE/attribution 자동 생성 파이프라인 (cargo-about + JS 의존성 라이선스 수집 통합)
 - [ ] ICU4X 데이터 팩 슬라이스 목록과 해시를 릴리스 노트에 기록
 - [ ] 폰트 Rights BOM 스키마를 AssetPackageIR/FormatInteropIR과 공유 (아키텍처 §2 IR 계층)
 - [ ] 버전 업그레이드 시 라이선스 변경 diff 검사 (특히 실험적 프로젝트 Glifo)
+
+## 6. V12 세로쓰기 품질 하니스의 시스템 글꼴 처리
+
+`tests/benchmarks/results/text-vertical-quality.json`은 두 로컬 시스템 글꼴을 **입력으로만** 썼고
+글꼴 파일은 저장소에 복사하지 않았다.
+
+| 용도 | 로컬 경로 | SHA-256 / bytes | 배포 판정 |
+| --- | --- | --- | --- |
+| Parley/Skrifa WASM CJK shaping | `/System/Library/Fonts/Supplemental/AppleGothic.ttf` | `def69dc2b5e12746049a5dcb189f95341ec460589f47587938567313af3020b1` / 15,255,648B | Apple 시스템 글꼴의 재배포 권리를 주장하지 않음. 하니스가 로컬에서 읽고 PathIR/측정값만 커밋 |
+| Chromium 제품 reference | `/System/Library/Fonts/Supplemental/Arial Unicode.ttf` | `876af2cd4854644e7f3e7feb2f688997fdb3343c6df6693611209c9dfb47ccec` / 23,278,008B | Microsoft/Apple 시스템 글꼴의 재배포 권리를 주장하지 않음. 하니스 Vite 서버가 실행 중 메모리 응답으로만 제공; 글꼴 파일 미커밋 |
+
+AppleGothic은 Skrifa에서는 정상 파싱되지만 Chromium의 network `FontFace` OTS 경로에서 거부되어,
+제품 reference에는 같은 Mac의 CJK-capable Arial Unicode를 사용했다. 이 차이를 숨기지 않고 raw
+artifact에 두 path/hash를 별도 기록한다. 커밋되는 PNG는 측정 증거이며 폰트 바이너리나 재사용
+가능한 글리프 atlas가 아니다. 배포 앱의 번들 기본 글꼴 정책은 §4의 OFL 폰트 원칙을 그대로
+따르며, 이 로컬 벤치 입력을 제품 번들 후보로 승격하지 않는다.
+
+다른 OS/버전에서 재실행할 때는 `TOON_CJK_FONT`·`TOON_BROWSER_CJK_FONT`로 로컬 설치 글꼴을
+주입하고 path/SHA/size를 새 artifact에 기록해야 한다. 해시가 달라진 결과를 기존 reference와
+동일 환경 결과로 간주하면 안 된다.

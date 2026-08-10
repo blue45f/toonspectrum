@@ -78,3 +78,79 @@
 - `tests/benchmarks/stroke-brush/` 실행 결과 JSON(ProviderBenchmarkRegistry 입력 포맷).
 - capability-survey.md의 p50/p95/p99·Peak Memory 열 갱신 PR.
 - Google Ink PoC 판정 보고서(승격/보류/기각 + 근거 시각 자료 — V11 §3.3 요건).
+
+## 8. V12 surface-brush 브리지 자동 게이트 (2026-08-10)
+
+하니스: `src/domains/creator/studio-vrm-surface-brush-provider.test.ts`.
+
+| 게이트 | 자동 증거 |
+| --- | --- |
+| 실제 hit adapter | 설치된 Three Raycaster 교차점과 `three-mesh-bvh` 0.9.13 `raycastFirst`의 face/world 결과를 대조한 뒤 같은 intersection으로 제품 stroke 커밋 |
+| 비 no-op | runtime export atlas의 alpha tex셀 수가 0보다 크고 commit receipt의 changedTexels가 0보다 큼 |
+| 압력 정밀도 | 0.123456789/0.987654321 입력이 operation pressure에 strict-equal로 유지됨 |
+| UV seam | 서로 끊긴 두 chart에서 island/triangle ID가 달라지고 run 2개, seam break 1개, 중간 bridge operation 0 |
+| 결정성 | 같은 runtime target에서 undo 후 같은 hit/stroke 재실행 시 operation·reference RGBA·제품 atlas RGBA byte-equal |
+| 취소/rollback | AbortSignal은 history/pixel 0 상태로 lease 종료. dirty upload 1회 주입 실패는 COW delta 복구 후 export diff 0 |
+| 명시 거부 | faceIndex 없음, 단일 tap 밀도 근거 없음, NaN UV, Infinity/overflow density, cross-target hit, stamp tip을 각각 오류 코드/메시지로 고정 |
+| surface owner/readback | surface session 중 기존 pointer stroke=`pointer-active`; 커밋은 CPU ImageData→dirty CanvasTexture upload만 수행하고 GPU readback API 호출 없음 |
+
+Vitest wall-clock은 제품 지연 p50/p95/p99가 아니므로 성능 수치로 전용하지 않는다. 브라우저 실기기
+raycast→first-pixel과 대형 VRM atlas 메모리는 별도 benchmark artifact가 생길 때만 이 문서에 기록한다.
+
+## 9. V12 VRM surface-brush 실브라우저 측정 (2026-08-10)
+
+원시 증거는 `tests/benchmarks/results/vrm-surface-brush-browser.json`, 실행기는
+`tests/benchmarks/harness/vrm-surface-brush-browser.ts`다. production Vite build를 Chromium
+140.0.7339.186에서 실행했으며, ANGLE Metal renderer는 Apple M2 Max로 식별됐다. 각 workload는
+warmup 3회를 버리고 31회를 기록했고, 아래 백분위는 보관된 원시 배열에 nearest-rank-ceil을 다시
+적용해 재현할 수 있다. 축소 scene·축소 sample·mock projection provider는 사용하지 않았다.
+
+측정 경계는 `three-mesh-bvh raycastFirst` → BVH face/local point에서 UV 복원 →
+`StudioVrmSurfaceProjectionProvider` → `executeSurfaceBrushStroke` →
+`StudioVrmTexturePaintRuntime` atlas commit 전체다. atlas export·SHA-256·undo는 시간 경계 밖에서
+검증했다.
+
+| Atlas / scene / stroke | 전체 p50/p95/p99 | BVH p50/p95/p99 | projection+atlas commit p50/p95/p99 | 입력 sample당 전체 p50/p95/p99 | 최종 atlas 변경 tex셀 | commit receipt 변경 tex셀 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 256² / 128 triangles / 8 samples | 1.585 / 2.940 / 3.350ms | 0.155 / 0.220 / 0.245ms | 1.440 / 2.720 / 3.105ms | 0.198125 / 0.367500 / 0.418750ms | 389 (31/31 동일) | 769 (31/31 동일) |
+| 512² / 2,048 triangles / 32 samples | 4.280 / 5.400 / 5.695ms | 0.360 / 0.500 / 0.550ms | 3.935 / 4.900 / 5.235ms | 0.133750 / 0.168750 / 0.177969ms | 1,791 (31/31 동일) | 4,438 (31/31 동일) |
+| 1,024² / 8,192 triangles / 128 samples | 13.205 / 14.785 / 15.650ms | 1.505 / 1.630 / 1.725ms | 11.755 / 13.440 / 13.925ms | 0.103164 / 0.115508 / 0.122266ms | 7,288 (31/31 동일) | 19,889 (31/31 동일) |
+
+### 9.1 품질·복구 게이트
+
+- reference RGBA와 제품 atlas RGBA는 각 workload의 31회 모두 workload별 단일 SHA-256으로
+  byte-equal이었다. reference 변경 tex셀도 각각 389/1,791/7,288로 고정됐다.
+- BVH hit에서 복원한 UV의 최대 오차는 세 workload 모두 0이었다. 원본 pressure는 interpolation=1
+  경로에서 양자화 없이 strict-equal로 유지됐다.
+- 두 UV island 실제 BVH hit는 run 2개·seam break 1개를 만들었고, island 사이 보간 operation은 0,
+  최종 변경 tex셀은 3이었다.
+- 취소는 `SurfaceBrushCancelledError`, active operation 없음, undo history 0, 변경 tex셀 0으로
+  종료됐다. dirty Canvas upload 실패 주입도 `runtime-commit-failed`, history 0, 변경 tex셀 0으로
+  rollback됐다.
+- 제품 `public/vrm/sample.vrm`을 `loadStudioVrmAsset`으로 실제 로드했다. 선택된 `Body_1`
+  SkinnedMesh는 5,307 vertices/8,864 triangles, source atlas 2,048²였다. 동일 stroke 2회 commit은
+  14.690/14.870ms, 변경 tex셀 1/1, atlas SHA-256 byte-equal이었다.
+- strict CSP(`script-src 'self'`) 위반, console/page error, HTTP error, 일반 request failure는 모두 0이다.
+  fixture HEAD/GET의 HTTP 200 이후 Chromium body 종료 `ERR_ABORTED` 2건은 일반 실패에서 숨기지 않고
+  별도 진단 배열에 기록했다. hot path GPU readback은 0이다.
+
+### 9.2 메모리 관측 경계
+
+| Workload | JS heap before | JS heap after | 관측 peak used JS heap | runtime admission model |
+| --- | --- | --- | --- | --- |
+| 256² / 8 samples | 11,367,138B | 36,239,609B | 38,494,679B | 1,165,896B |
+| 512² / 32 samples | 27,905,297B | 27,423,960B | 86,454,911B | 4,386,672B |
+| 1,024² / 128 samples | 61,199,412B | 64,035,486B | 124,626,388B | 17,206,128B |
+
+JS heap은 Chromium의 `performance.memory`가 노출한 관측값이다. 이 Chromium에서는
+`performance.measureUserAgentSpecificMemory`가 사용할 수 없어 값은 `null`과 실패 사유로 기록했다.
+WebGL2/Three.js는 resident GPU allocation counter를 제공하지 않으므로 GPU memory도 `null`과 사유로
+기록했으며 추정치를 관측값으로 승격하지 않았다. 마지막 열은 제품 admission model일 뿐 브라우저
+GPU/heap 관측값이 아니다.
+
+### 9.3 판정
+
+round tip·no-mixing VRM surface-brush 제품 경로는 본 실브라우저 workload에서 **활성 검증됨**으로
+승격한다. 이 판정은 stamp/image tip, smudge/wet neighborhood backend, 외부 태블릿 pen-to-pixel,
+CSP 대비 작화가 블라인드 손맛 평가까지 완료했다는 뜻이 아니다. 그 항목들은 기존 별도 게이트를
+유지한다.

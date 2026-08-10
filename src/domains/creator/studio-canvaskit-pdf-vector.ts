@@ -37,6 +37,7 @@ import {
   evaluatePdfFontEmbedding,
   fontDescriptorFlags,
   glyphWidthToPdf,
+  textNeedsEmbeddedFont,
 } from "./studio-canvaskit-pdf-font";
 
 import type { StudioPdfFontDocumentIntent, StudioPdfFontResource } from "./studio-canvaskit-pdf-font";
@@ -100,6 +101,14 @@ export type StudioPdfOp =
       y: number;
       color: StudioPdfColor;
       charSpacing?: number;
+      /**
+       * Upright Studio-coordinate linear transform `[a,b,c,d]`. The writer composes the PDF text
+       * baseline flip automatically, so callers can express rotation and tate-chu-yoko scale
+       * without converting to PDF's bottom-left coordinate system.
+       */
+      matrix?: readonly [number, number, number, number];
+      /** Unicode extraction/accessibility replacement. Defaults to `text`. */
+      actualText?: string;
       /** 0=채움, 1=선, 2=채움+선, 3=보이지 않음(OCR 레이어). */
       renderMode?: 0 | 1 | 2 | 3;
       alpha?: number;
@@ -420,6 +429,46 @@ function winAnsiHex(text: string): string {
   return `<${hex}>`;
 }
 
+function unicodeCodePointHex(codePoint: number): string {
+  if (codePoint <= 0xffff) return codePoint.toString(16).toUpperCase().padStart(4, "0");
+  const shifted = codePoint - 0x10000;
+  const high = 0xd800 + (shifted >> 10);
+  const low = 0xdc00 + (shifted & 0x3ff);
+  return `${high.toString(16).toUpperCase().padStart(4, "0")}${low.toString(16).toUpperCase().padStart(4, "0")}`;
+}
+
+/** CID glyph id -> Unicode scalar map for copy/search and downstream text extraction. */
+function buildToUnicodeCMap(font: Extract<StudioPdfFontResource, { kind: "truetype-cid" }>): Uint8Array {
+  const used = new Set(font.usedGlyphIds);
+  const byGlyph = new Map<number, number>();
+  for (const [codePoint, glyphId] of [...font.metrics.cmap.entries()].sort((left, right) => left[0] - right[0])) {
+    if (!used.has(glyphId) || byGlyph.has(glyphId)) continue;
+    byGlyph.set(glyphId, codePoint);
+  }
+  const mappings = [...byGlyph.entries()].sort((left, right) => left[0] - right[0]);
+  const lines = [
+    "/CIDInit /ProcSet findresource begin",
+    "12 dict begin",
+    "begincmap",
+    "/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def",
+    `/CMapName ${pdfName(`TS-${font.resourceName}-Unicode`)} def`,
+    "/CMapType 2 def",
+    "1 begincodespacerange",
+    "<0000> <FFFF>",
+    "endcodespacerange",
+  ];
+  for (let offset = 0; offset < mappings.length; offset += 100) {
+    const chunk = mappings.slice(offset, offset + 100);
+    lines.push(`${chunk.length} beginbfchar`);
+    for (const [glyphId, codePoint] of chunk) {
+      lines.push(`<${glyphId.toString(16).toUpperCase().padStart(4, "0")}> <${unicodeCodePointHex(codePoint)}>`);
+    }
+    lines.push("endbfchar");
+  }
+  lines.push("endcmap", "CMapName currentdict /CMap defineresource pop", "end", "end");
+  return encoder.encode(lines.join("\n"));
+}
+
 function buildContentStream(
   page: StudioPdfPage,
   fonts: ReadonlyMap<string, StudioPdfFontResource>,
@@ -491,7 +540,23 @@ function buildContentStream(
       case "text": {
         const resource = fonts.get(item.font);
         if (!resource) throw new Error(`PDF에 없는 글꼴(${item.font})을 텍스트가 참조하고 있어요.`);
+        if (resource.kind === "standard-14" && textNeedsEmbeddedFont(item.text)) {
+          throw new Error(
+            `PDF 표준 글꼴(${resource.baseFont})로 유니코드 텍스트를 표시할 수 없어요. CID TrueType 글꼴을 임베드해 주세요.`,
+          );
+        }
+        if (resource.kind === "truetype-cid") {
+          const missing = [...new Set([...item.text].filter(
+            (char) => !resource.metrics.cmap.has(char.codePointAt(0) ?? 0),
+          ))];
+          if (missing.length > 0) {
+            throw new Error(
+              `PDF 글꼴(${resource.baseFont})에 필요한 글리프가 없어요: ${missing.join(" ")}`,
+            );
+          }
+        }
         const gsName = gs.use(clamp01(item.alpha), 1);
+        lines.push(`/Span << /ActualText ${pdfHexText(item.actualText ?? item.text)} >> BDC`);
         lines.push("BT");
         if (gsName) lines.push(`${pdfName(gsName)} gs`);
         lines.push(fillColorOperator(item.color));
@@ -499,14 +564,18 @@ function buildContentStream(
         if (item.charSpacing) lines.push(`${pdfNumber(item.charSpacing)} Tc`);
         if (item.renderMode !== undefined && item.renderMode !== 0) lines.push(`${item.renderMode} Tr`);
         // 뒤집힌 CTM 안에서 글자를 바로 세우려면 텍스트 행렬의 d 를 -1 로 둔다.
-        const d = originTopLeft ? -1 : 1;
-        lines.push(`1 0 0 ${d} ${pdfNumber(item.x)} ${pdfNumber(item.y)} Tm`);
+        const [a, b, c, d] = item.matrix ?? [1, 0, 0, 1];
+        const textMatrix = originTopLeft ? [a, b, -c, -d] : [a, b, c, d];
+        lines.push(
+          `${textMatrix.map(pdfNumber).join(" ")} ${pdfNumber(item.x)} ${pdfNumber(item.y)} Tm`,
+        );
         const encoded =
           resource.kind === "truetype-cid"
             ? `<${encodeIdentityHText(resource.metrics, item.text)}>`
             : winAnsiHex(item.text);
         lines.push(`${encoded} Tj`);
         lines.push("ET");
+        lines.push("EMC");
         break;
       }
       default:
@@ -771,6 +840,7 @@ export function buildVectorPdf(document: StudioPdfDocument): Uint8Array {
     const descendantNum = writer.allocate();
     const descriptorNum = writer.allocate();
     const fileNum = writer.allocate();
+    const toUnicodeNum = writer.allocate();
     const scale = 1000 / font.metrics.unitsPerEm;
     const bbox = font.metrics.bbox.map((v) => Math.round(v * scale));
     const missingWidth = glyphWidthToPdf(font.metrics, 0);
@@ -778,7 +848,7 @@ export function buildVectorPdf(document: StudioPdfDocument): Uint8Array {
       writer.object(
         fontNum,
         `<< /Type /Font /Subtype /Type0 /BaseFont ${pdfName(font.baseFont)} /Encoding /Identity-H ` +
-          `/DescendantFonts [${descendantNum} 0 R] >>`,
+          `/DescendantFonts [${descendantNum} 0 R] /ToUnicode ${toUnicodeNum} 0 R >>`,
       );
       writer.object(
         descendantNum,
@@ -797,6 +867,7 @@ export function buildVectorPdf(document: StudioPdfDocument): Uint8Array {
           `/FontFile2 ${fileNum} 0 R >>`,
       );
       writer.stream(fileNum, `/Length1 ${font.fontBytes.length}`, font.fontBytes);
+      writer.stream(toUnicodeNum, "", buildToUnicodeCMap(font));
     });
   }
 

@@ -36,3 +36,32 @@
 2. perfect-freehand outline 자기교차 케이스의 Kurbo/PathOps 정리 비용 — corpus의 hairpin·급회전 트레이스로 측정.
 3. `getPredictedEvents` 장치·브라우저별 제공 품질 편차 — 장치 프로필 수집과 병행.
 4. Lyon 탑재 여부 — Vello 자체 래스터화로 충분한지 Phase 1 cross-renderer 비교 후 결정.
+
+## 4. V12 3D surface projection 후보 판정 (2026-08-10)
+
+| Candidate | Unique Strength | Missing Features / Risk | Final Role |
+| --- | --- | --- | --- |
+| Three Raycaster/R3F intersection + 기존 VRM texture runtime | 제품 hit가 이미 object·UV·faceIndex·world point를 제공하고 runtime geometry index가 island/triangle 밀도를 계산한다. 기존 Canvas/ImageData·undo·CanvasTexture 소유권과 바로 결합 | 단일 tap의 screen→world 미분은 hit 한 개만으로 알 수 없음. faceIndex 없는 custom picker는 seam 증명 불가 | **선정 제품 경로.** `adaptThreeRaycastIntersection` → opaque runtime session → `SurfaceProjectionProvider` |
+| `three-mesh-bvh` 0.9.13 hit lane | 대형 메시 first-hit를 빠르게 제공하며 설치된 실제 adapter가 faceIndex/world를 반환 | 독립 BVH artifact에는 UV가 없으므로 제품 Three intersection의 UV 또는 같은 geometry의 검증된 UV 조회가 필요 | **ray hit 가속/검증 lane.** 실제 테스트에서 Three intersection의 face/world와 동등성 확인 |
+| 직접 GPU render-target 페인트 | 큰 atlas에서 compute/fragment 처리량 잠재력 | 현재 제품 undo 원자성·CPU export authority와 별도 owner가 생기며, 검증을 위해 hot readback을 유발할 위험 | backend 후보 격리. 동일 op/undo/quality gate를 통과하기 전 primary owner 아님 |
+| 새 custom mesh/UV projector | API를 자유롭게 설계 가능 | 이미 있는 face/UV/BVH/geometry-index를 중복 구현하고 seam·skinning·texture matrix 의미가 갈라짐 | 기각. 제품 geometry를 재발명하지 않음 |
+
+현재 round/no-mixing lane은 활성 검증됨. stamp/image tip 및 smudge/wet neighborhood backend만 선택적으로
+격리하며, surface brush 전체를 no-op 또는 quarantine으로 되돌리지 않는다.
+
+## 5. VRM surface-brush 실측 후보 갱신 (2026-08-10)
+
+아래 행만 실브라우저에서 측정됐다. stroke-brush의 다른 후보에 적힌 `미실측`을 이 결과로 대체하지
+않는다. 원시 31-sample 배열·환경·검증기는
+`tests/benchmarks/results/vrm-surface-brush-browser.json`과
+`tests/visual/vrm-surface-brush-browser-contract.test.ts`에 고정했다.
+
+| Candidate | Unique Strength | Missing Features | Visual Quality | p50/p95/p99 | Peak Memory | Worker/Bundle Cost | Determinism | License | Interop Cost | Maintenance Risk | Final Role |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Three.js + three-mesh-bvh 0.9.13 → StudioVrmSurfaceProjectionProvider → executeSurfaceBrushStroke → StudioVrmTexturePaintRuntime | 제품 VRM geometry/material locator·실제 BVH face/local/world hit·CPU authoritative atlas·undo를 한 소유권 경계로 연결. 별도 projector나 mock 없음 | 현재 승격 범위는 round tip/no-mixing. stamp/image tip과 smudge/wet neighborhood는 별도 backend 필요. 단일 hit만으로 screen→world 미분을 복원하지 않음 | 세 workload 모두 BVH→UV 최대 오차 0, pressure strict-equal. reference/atlas SHA-256 각 31/31 byte-equal. 최종 atlas 변경 tex셀 389/1,791/7,288. 2-island seam은 2 runs·1 break·bridge 0 | 전체 경로: 256²·8 samples 1.585/2.940/3.350ms; 512²·32 samples 4.280/5.400/5.695ms; 1,024²·128 samples 13.205/14.785/15.650ms. BVH만은 각각 0.155/0.220/0.245, 0.360/0.500/0.550, 1.505/1.630/1.725ms | Chromium observed used-JS peak 38,494,679 / 86,454,911 / 124,626,388B. UA-specific memory·GPU resident bytes는 API 미노출로 `null+reason`; 추정치를 관측값으로 표시하지 않음 | production build 전체 그래프를 사용해 이 후보만의 독립 bundle delta는 분리하지 않음. texture geometry/fill worker와 runtime dirty Canvas upload 경계를 그대로 사용 | 높음 — reference RGBA와 제품 atlas 모두 workload별 31회 단일 digest. `sample.vrm` 실제 2회 commit도 byte-equal | Three.js MIT, three-mesh-bvh MIT, ToonStudio adapter/runtime internal | 중간 — BVH face/local point에서 동일 geometry UV를 복원해 provider에 전달하고 CPU atlas→CanvasTexture dirty upload. hot GPU readback 0 | 중간 — skinned/deformed geometry 갱신 정책과 미지원 tip/mixing backend가 후속 유지보수 축 | **round/no-mixing VRM surface-brush 활성 검증됨.** 실제 `sample.vrm` 5,307 vertices/8,864 triangles commit 14.690/14.870ms, 취소·dirty upload rollback 모두 변경 tex셀/history 0 |
+
+승격 근거는 Chromium 140.0.7339.186, Apple M2 Max ANGLE Metal, production Vite build, warmup 3회
+제외 후 workload당 31회다. strict CSP 위반·console/page error·HTTP error·일반 request failure는 0이며,
+hot path GPU readback도 0이다. 제품 `sample.vrm` 요청의 HTTP 200 이후 Chromium body 종료 2건은 별도
+진단값으로 보존했다. CSP 대비 외부 장치 블라인드 손맛 게이트는 이 브라우저 내부 성능 증거로
+대체하지 않는다.

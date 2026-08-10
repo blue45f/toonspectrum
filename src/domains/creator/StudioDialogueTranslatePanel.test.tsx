@@ -4,10 +4,20 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  openStudioLocalDatabase,
+  type StudioLocalDatabase,
+} from "./studio-local-database";
+import {
   createStudioTranslationMemoryEntry,
-  saveStudioTranslationMemory,
 } from "./studio-translation-memory";
+import { createStudioTranslationMemorySqlitePersistence } from "./studio-translation-memory-sqlite-persistence";
 import { StudioDialogueTranslatePanel } from "./StudioDialogueTranslatePanel";
+
+const databaseRuntime = vi.hoisted(() => ({ acquire: vi.fn() }));
+
+vi.mock("./studio-local-database-runtime", () => ({
+  acquireStudioLocalDatabase: databaseRuntime.acquire,
+}));
 
 const pages = [
   {
@@ -56,13 +66,19 @@ function renderPanel(
   return { onDraftChange };
 }
 
-beforeEach(() => {
+let database: StudioLocalDatabase;
+
+beforeEach(async () => {
   localStorage.clear();
+  database = await openStudioLocalDatabase({ vfs: "memory" });
+  databaseRuntime.acquire.mockResolvedValue(database);
 });
 
-afterEach(() => {
+afterEach(async () => {
   cleanup();
   vi.restoreAllMocks();
+  databaseRuntime.acquire.mockReset();
+  await database.close();
 });
 
 describe("StudioDialogueTranslatePanel translation-memory bridge", () => {
@@ -91,9 +107,10 @@ describe("StudioDialogueTranslatePanel translation-memory bridge", () => {
       now: 1,
     });
     if (!created.ok) throw new Error(created.error);
-    expect(saveStudioTranslationMemory(localStorage, [created.entry]).ok).toBe(
-      true
-    );
+    const persistence = createStudioTranslationMemorySqlitePersistence({
+      acquireDatabase: async () => database,
+    });
+    await expect(persistence.save([created.entry])).resolves.toEqual({ ok: true });
     const { onDraftChange } = renderPanel();
 
     fireEvent.click(screen.getByRole("button", { name: "메모리" }));

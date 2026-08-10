@@ -29,7 +29,18 @@
  *   **pressure** LUT divided by 6, so the px radius is `exp(tap * 6)`.
  */
 
+import {
+  importCspToolFile,
+  CspToolFileError,
+  type CspSutSqliteReader,
+  type CspToolFileImportResult,
+} from "../../../packages/studio-format-gateway/src/csp-sut";
 import { parseKppPreset, KppParseError } from "../../../packages/studio-format-gateway/src/kpp";
+import {
+  importKritaBundle,
+  KritaBundleError,
+  type KritaBundleImportResult,
+} from "../../../packages/studio-format-gateway/src/krita-bundle";
 import { importMybBrush, MybParseError } from "../../../packages/studio-format-gateway/src/myb";
 
 import { STABILIZER_MAX } from "./studio-brush";
@@ -41,13 +52,23 @@ import {
 } from "./studio-brush-dynamics";
 import {
   DEFAULT_STUDIO_BRUSH_SNAPSHOT,
+  createBrush,
   importBrushFromJson,
   type StudioBrushSnapshot,
+  type StudioSavedBrush,
 } from "./studio-brush-library";
-import { STUDIO_BRUSH_PROGRAM_MAX_BYTES } from "./studio-brush-pack-format";
+import {
+  STUDIO_BRUSH_PROGRAM_MAX_BYTES,
+  STUDIO_EXTERNAL_BRUSH_PACK_MAX_BYTES,
+} from "./studio-brush-pack-format";
 
 
+import type {
+  BrushLibraryBatchWriteSummary,
+  BrushLibraryRepositoryPort,
+} from "./studio-brush-library-repository";
 import type { StudioBrushPackFormat } from "./studio-brush-pack-format";
+import type { FormatIssue } from "../../../packages/studio-format-gateway/src/format-common";
 import type {
   BrushProgramIR,
   DynamicMappingIR,
@@ -56,6 +77,7 @@ import type {
 export {
   STUDIO_BRUSH_PACK_ACCEPT,
   STUDIO_BRUSH_PROGRAM_MAX_BYTES,
+  STUDIO_EXTERNAL_BRUSH_PACK_MAX_BYTES,
   studioBrushPackFormatOf,
   type StudioBrushPackFormat,
 } from "./studio-brush-pack-format";
@@ -74,7 +96,7 @@ const MIN_OPACITY = 0.05;
 export class StudioBrushProgramImportError extends Error {
   constructor(
     message: string,
-    readonly format: "myb" | "kpp",
+    readonly format: "myb" | "kpp" | "sut" | "sutg" | "bundle",
     options?: ErrorOptions,
   ) {
     super(message, options);
@@ -85,6 +107,25 @@ export class StudioBrushProgramImportError extends Error {
 export interface StudioBrushPackCandidate {
   readonly name: string;
   readonly snapshot: StudioBrushSnapshot;
+  /** Stable source path for multi-resource bundles. */
+  readonly sourcePath?: string;
+  readonly tags?: readonly string[];
+}
+
+export interface StudioBrushPackRights {
+  readonly authors: readonly string[];
+  readonly licenses: readonly string[];
+  readonly websites: readonly string[];
+  readonly emails: readonly string[];
+  readonly tags: readonly string[];
+}
+
+export interface StudioBrushPackPreservation {
+  readonly status: "drawable" | "structured-partial" | "preserve-only";
+  readonly sourceFormat: string;
+  readonly originalBytesUnmodified: true;
+  /** FormatGateway holds the original bytes in its sourcePayload for this result. */
+  readonly sourcePayloadAvailable: boolean;
 }
 
 export interface StudioBrushPackImportResult {
@@ -97,6 +138,26 @@ export interface StudioBrushPackImportResult {
   readonly unmapped: readonly string[];
   /** Approximations and parser notes worth reading before drawing. */
   readonly warnings: readonly string[];
+  /** Structured unsupported ledger; never collapsed into a false success. */
+  readonly unsupported?: readonly FormatIssue[];
+  readonly rights?: StudioBrushPackRights;
+  readonly preservation?: StudioBrushPackPreservation;
+}
+
+export interface StudioBrushPackCommitResult {
+  readonly result: StudioBrushPackImportResult;
+  readonly materialized: readonly StudioSavedBrush[];
+  readonly saved: BrushLibraryBatchWriteSummary;
+}
+
+export class StudioBrushPackPreserveOnlyError extends Error {
+  constructor(readonly result: StudioBrushPackImportResult) {
+    const firstReason = result.unsupported?.[0];
+    super(
+      `원본 바이트는 변경하지 않고 보존 판정했지만 실제로 그릴 수 있는 브러시가 0개라 SQLite 카탈로그에는 저장하지 않았어요.${firstReason ? ` ${firstReason.message}` : ""}`,
+    );
+    this.name = "StudioBrushPackPreserveOnlyError";
+  }
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -383,6 +444,141 @@ function presetDisplayName(rawName: string, fileName: string): string {
   return stem || "가져온 브러시";
 }
 
+function issueText(issue: FormatIssue): string {
+  return `${issue.path ? `${issue.path}: ` : ""}${issue.message} [${issue.code}]`;
+}
+
+function uniqueStrings(values: readonly string[]): string[] {
+  return [...new Set(values.filter((value) => value.trim().length > 0))];
+}
+
+function cspRights(result: CspToolFileImportResult): StudioBrushPackRights {
+  return {
+    authors: result.rights.authors,
+    licenses: result.rights.licenses,
+    websites: result.rights.websites,
+    emails: result.rights.emails,
+    tags: [],
+  };
+}
+
+function kritaRights(result: KritaBundleImportResult): StudioBrushPackRights {
+  return {
+    authors: uniqueStrings([
+      result.rights.author ?? "",
+      result.rights.creator ?? "",
+      result.rights.initialCreator ?? "",
+    ]),
+    licenses: uniqueStrings([result.rights.license ?? ""]),
+    websites: uniqueStrings([result.rights.website ?? ""]),
+    emails: uniqueStrings([result.rights.email ?? ""]),
+    tags: result.rights.tags,
+  };
+}
+
+/** Verified clean-room SUT/SUTG subset → drawable Studio snapshots. */
+export async function importStudioCspToolBytes(
+  bytes: Uint8Array,
+  fileName: string,
+  kind: "sut" | "sutg",
+  sqliteReader?: CspSutSqliteReader,
+  signal?: AbortSignal,
+): Promise<StudioBrushPackImportResult> {
+  let parsed: CspToolFileImportResult;
+  try {
+    parsed = await importCspToolFile(bytes, { kind, sqliteReader, signal });
+  } catch (cause) {
+    if (cause instanceof CspToolFileError) {
+      throw new StudioBrushProgramImportError(
+        `Clip Studio ${kind.toUpperCase()} 파일을 읽지 못했어요. ${cause.message}`,
+        kind,
+        { cause },
+      );
+    }
+    throw cause;
+  }
+  const mapped = parsed.programs.map((program) => ({
+    program,
+    mapped: studioBrushSnapshotFromProgram(program),
+  }));
+  return {
+    format: kind,
+    brushes: mapped.map(({ program, mapped: lowered }) => ({
+      name: presetDisplayName(program.name, fileName),
+      snapshot: {
+        ...lowered.snapshot,
+        sourcePresetName: presetDisplayName(program.name, fileName),
+      },
+    })),
+    unmapped: mapped.flatMap(({ program, mapped: lowered }) =>
+      lowered.unmapped.map((field) => `${program.name}:${field}`)),
+    warnings: [
+      ...parsed.warnings.map(issueText),
+      ...mapped.flatMap(({ program, mapped: lowered }) =>
+        lowered.warnings.map((message) => `${program.name}: ${message}`)),
+    ],
+    unsupported: parsed.unsupported,
+    rights: cspRights(parsed),
+    preservation: {
+      status: parsed.supportLevel,
+      sourceFormat: parsed.sourcePayload.format,
+      originalBytesUnmodified: true,
+      sourcePayloadAvailable: parsed.sourcePayload.base64.length > 0,
+    },
+  };
+}
+
+/** Krita `.bundle` KPP/MYB resources → one candidate per verified program. */
+export async function importStudioKritaBundleBytes(
+  bytes: Uint8Array,
+  options: Parameters<typeof importKritaBundle>[1] = {},
+): Promise<StudioBrushPackImportResult> {
+  let parsed: KritaBundleImportResult;
+  try {
+    parsed = await importKritaBundle(bytes, options);
+  } catch (cause) {
+    if (cause instanceof KritaBundleError) {
+      throw new StudioBrushProgramImportError(
+        `Krita 브러시 번들(.bundle)을 읽지 못했어요. ${cause.message}`,
+        "bundle",
+        { cause },
+      );
+    }
+    throw cause;
+  }
+  const mapped = parsed.brushes.map((brush) => ({
+    brush,
+    mapped: studioBrushSnapshotFromProgram(brush.program),
+  }));
+  return {
+    format: "bundle",
+    brushes: mapped.map(({ brush, mapped: lowered }) => ({
+      name: presetDisplayName(brush.program.name, brush.path),
+      snapshot: {
+        ...lowered.snapshot,
+        sourcePresetName: presetDisplayName(brush.program.name, brush.path),
+      },
+      sourcePath: brush.path,
+      tags: brush.tags,
+    })),
+    unmapped: mapped.flatMap(({ brush, mapped: lowered }) =>
+      lowered.unmapped.map((field) => `${brush.path}:${field}`)),
+    warnings: [
+      ...parsed.warnings.map(issueText),
+      ...mapped.flatMap(({ brush, mapped: lowered }) =>
+        lowered.warnings.map((message) => `${brush.path}: ${message}`)),
+    ],
+    unsupported: parsed.unsupported,
+    rights: kritaRights(parsed),
+    preservation: {
+      status: parsed.brushes.length > 0 ? "structured-partial" : "preserve-only",
+      sourceFormat: parsed.sourcePayload.format,
+      originalBytesUnmodified: true,
+      sourcePayloadAvailable: parsed.sourcePayload.base64.length > 0,
+    },
+  };
+}
+
 /** libmypaint `.myb` v3 → one drawable brush. */
 export function importStudioMybBytes(
   bytes: Uint8Array,
@@ -480,22 +676,117 @@ export function importStudioBrushJsonText(
   };
 }
 
-/**
- * Reads a `.myb`/`.kpp` file. ABR and JSON keep their existing lanes because
- * both already have worker/validator plumbing this must not duplicate.
- */
+export interface StudioBrushProgramFileOptions {
+  readonly signal?: AbortSignal;
+  readonly cspSqliteReader?: CspSutSqliteReader;
+  readonly kritaBundleOptions?: Parameters<typeof importKritaBundle>[1];
+}
+
+/** Reads every engine-neutral program lane; ABR/JSON retain their dedicated owners. */
 export async function importStudioBrushProgramFile(
   file: File,
-  format: "myb" | "kpp",
+  format: "myb" | "kpp" | "sut" | "sutg" | "bundle",
+  options: StudioBrushProgramFileOptions = {},
 ): Promise<StudioBrushPackImportResult> {
-  if (file.size > STUDIO_BRUSH_PROGRAM_MAX_BYTES) {
+  const maximumBytes = format === "sut" || format === "sutg" || format === "bundle"
+    ? STUDIO_EXTERNAL_BRUSH_PACK_MAX_BYTES
+    : STUDIO_BRUSH_PROGRAM_MAX_BYTES;
+  if (file.size > maximumBytes) {
     throw new StudioBrushProgramImportError(
-      "브러시 파일이 너무 커요. 8MB 이하 파일만 가져올 수 있어요.",
+      `브러시 파일이 너무 커요. ${Math.round(maximumBytes / 1_000_000)}MB 이하 파일만 가져올 수 있어요.`,
       format,
     );
   }
+  if (options.signal?.aborted) {
+    throw new StudioBrushProgramImportError("브러시 가져오기가 취소되었습니다.", format);
+  }
   const bytes = new Uint8Array(await file.arrayBuffer());
-  return format === "myb"
-    ? importStudioMybBytes(bytes, file.name)
-    : importStudioKppBytes(bytes, file.name);
+  if (options.signal?.aborted) {
+    throw new StudioBrushProgramImportError("브러시 가져오기가 취소되었습니다.", format);
+  }
+  if (format === "myb") return importStudioMybBytes(bytes, file.name);
+  if (format === "kpp") return importStudioKppBytes(bytes, file.name);
+  if (format === "bundle") {
+    return importStudioKritaBundleBytes(bytes, {
+      ...options.kritaBundleOptions,
+      signal: options.signal,
+    });
+  }
+  const sqliteReader = options.cspSqliteReader
+    ?? (await import("./studio-csp-sut-sqlite-reader-client"))
+      .createBrowserCspSutSqliteReader();
+  return importStudioCspToolBytes(bytes, file.name, format, sqliteReader, options.signal);
+}
+
+export function studioBrushPackFormatLabel(format: StudioBrushPackFormat): string {
+  switch (format) {
+    case "myb": return "libmypaint";
+    case "kpp": return "Krita";
+    case "bundle": return "Krita 번들";
+    case "sut": return "Clip Studio SUT";
+    case "sutg": return "Clip Studio SUTG";
+    case "abr": return "Photoshop ABR";
+    case "json": return "Studio JSON";
+  }
+}
+
+function displayList(label: string, values: readonly string[]): string | null {
+  if (values.length === 0) return null;
+  const shown = values.slice(0, 4);
+  const remainder = values.length - shown.length;
+  return `${label}: ${shown.join(", ")}${remainder > 0 ? ` 외 ${remainder}개` : ""}.`;
+}
+
+/** Compact but explicit UI ledger for approximations, unsupported fields and rights. */
+export function studioBrushPackImportNotes(result: StudioBrushPackImportResult): string[] {
+  const notes = [...result.warnings];
+  const unmapped = displayList("옮기지 못한 전용 설정", result.unmapped);
+  if (unmapped) notes.push(unmapped);
+  const unsupported = result.unsupported ?? [];
+  const unsupportedSummary = displayList(
+    `미지원 항목 ${unsupported.length}개`,
+    unsupported.map(issueText),
+  );
+  if (unsupportedSummary) notes.push(unsupportedSummary);
+  const rights = result.rights;
+  if (rights) {
+    const parts = [
+      displayList("제작자", rights.authors),
+      displayList("라이선스", rights.licenses),
+      displayList("웹사이트", rights.websites),
+      displayList("연락처", rights.emails),
+      displayList("태그", rights.tags),
+    ].filter((value): value is string => value !== null);
+    if (parts.length > 0) notes.push(`권리 정보 — ${parts.join(" ")}`);
+  }
+  if (result.preservation?.originalBytesUnmodified) {
+    notes.push("원본 파일 바이트는 수정하지 않았어요.");
+  }
+  return uniqueStrings(notes);
+}
+
+/**
+ * Sole commit boundary for MYB/KPP/SUT/SUTG/Krita bundle programs. It refuses
+ * preserve-only results and writes every materialized brush in one SQLite
+ * repository batch.
+ */
+export async function commitStudioBrushPackImport(
+  result: StudioBrushPackImportResult,
+  repository: BrushLibraryRepositoryPort,
+): Promise<StudioBrushPackCommitResult> {
+  if (result.brushes.length === 0) throw new StudioBrushPackPreserveOnlyError(result);
+  const materialized = result.brushes.map((candidate) =>
+    createBrush(candidate.name, candidate.snapshot));
+  const saved = await repository.putMany(materialized);
+  return { result, materialized, saved };
+}
+
+export async function importAndCommitStudioBrushProgramFile(
+  file: File,
+  format: "myb" | "kpp" | "sut" | "sutg" | "bundle",
+  repository: BrushLibraryRepositoryPort,
+  options: StudioBrushProgramFileOptions = {},
+): Promise<StudioBrushPackCommitResult> {
+  const result = await importStudioBrushProgramFile(file, format, options);
+  return commitStudioBrushPackImport(result, repository);
 }

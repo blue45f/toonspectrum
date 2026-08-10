@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-08T19:23:10.514Z",
+  "renderer": "studio-hokusai-wasm / hokusai 0.3.0",
+  "canvas": {
+    "width": 192,
+    "height": 96
+  },
+  "sut": {
+    "supportLevel": "structured-partial",
+    "pressures": [0.2, 0.4, 0.6, 0.8, 1],
+    "frames": [
+      {
+        "alphaMass": 1660,
+        "inkedPixels": 314,
+        "sha256": "4103103e389bc2770a97396be94eadf744e4e1270c002ccd322aa256817bf1b7"
+      },
+      {
+        "alphaMass": 25146,
+        "inkedPixels": 640,
+        "sha256": "6013fb5970835e7a241da5373a5fecd6b88b99acb094e1d4e91d3d85390efc88"
+      },
+      {
+        "alphaMass": 86158,
+        "inkedPixels": 1280,
+        "sha256": "1c5b871bc52e970109739700689d89c105115b0ca3bb84b11b9a8702bdbf3e79"
+      },
+      {
+        "alphaMass": 224580,
+        "inkedPixels": 1618,
+        "sha256": "50513965b759d0ccdd2f35951143b18252c77bd30f3ef58d5f83f885e672dfb4"
+      },
+      {
+        "alphaMass": 560796,
+        "inkedPixels": 2284,
+        "sha256": "dfc27f46a7120e249d1f760b826625880f72eddf7980af7bda0a0f99ea046cfb"
+      }
+    ],
+    "pressureAlphaMassPearson": 0.905894,
+    "highLowAlphaMassRatio": 337.828916,
+    "deterministicReplay": true,
+    "unmapped": [
+      "flowDynamics[1].input=constant",
+      "sizeDynamics[0].input=constant"
+    ]
+  },
+  "kritaBundleKpp": {
+    "path": "paintoppresets/pressure.kpp",
+    "frame": {
+      "alphaMass": 169219,
+      "inkedPixels": 1700,
+      "sha256": "921f2b7f9b04567ae06a906430b7e707030052e6d88cddcadf23b9b71abbdf3d"
+    },
+    "deterministicReplay": true
+  }
+}

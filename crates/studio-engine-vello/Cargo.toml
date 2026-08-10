@@ -16,10 +16,23 @@ vello = { version = "0.9", optional = true }
 # V12 Velato lane — Lottie(bodymovin) -> vello Scene lowering; velato 0.11.0
 # depends on vello ^0.9 (crates.io index 실측), unified with our 0.9.0 pin.
 velato = { version = "0.11", optional = true }
+# V12 native SVG lane. vello_svg 0.10.0 is the first release that pins
+# vello 0.9.0, so it unifies with this crate's GPU stack. Raster image codecs
+# stay disabled: the bounded lane rejects image/pattern/filter/mask/text before
+# lowering instead of accepting vello_svg's red-box/bbox approximations.
+vello_svg = { version = "=0.10.0", optional = true, default-features = false }
+# Raw XML capability audit before usvg normalizes or drops unsupported syntax.
+# usvg 0.46 already uses this exact parser line, so it adds no second XML stack.
+roxmltree = { version = "=0.21.1", optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 wasm-bindgen = "0.2"
 parley = { version = "0.11", default-features = false, features = ["std", "system"] }
+# Parley 0.11 intentionally exposes horizontal paragraph layout only. The
+# vertical single-style lane therefore calls the same pinned HarfRust shaper
+# directly with Direction::TopToBottom so GSUB vert/vrt2 are real substitutions,
+# not feature-presence claims or Unicode presentation-form rewrites.
+harfrust = { version = "0.10", default-features = false, features = ["std"] }
 skrifa = "0.43"
 
 [features]
@@ -35,6 +48,9 @@ fabric = ["gpu", "dep:wgpu"]
 # Velato Lottie lane (ADR-0011): rides on the gpu render path, so it is a
 # strict superset feature — `pkg-gpu` is built with `--features lottie`.
 lottie = ["gpu", "dep:velato"]
+# SVG parsing/lowering is usable by the vello_cpu reference without WebGPU;
+# the browser pkg-gpu combines this with `gpu`/`lottie` at build time.
+svg = ["dep:vello_svg", "dep:roxmltree"]
 
 # V12 lane 2 (ADR-0011): browser WebGPU async entry needs the JS futures
 # bridge; both stay optional so the default CPU wasm artifact is unchanged.

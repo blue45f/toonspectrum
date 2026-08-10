@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { disposeStudioGpuFabric } from "./studio-gpu-fabric";
 import {
   applyGpuFilterChain,
   isStudioGpuFilterChainEligible,
   planStudioGpuFilterChain,
+  presentGpuFilterChain,
 } from "./studio-gpu-filter-apply";
 import {
   STUDIO_GPU_FILTER_KERNELS,
@@ -15,6 +17,7 @@ import { disposeStudioGpuFilterRuntime } from "./studio-gpu-filter-runtime";
 import { buildImageFilters, registerStudioKonvaFilters, type KonvaLike } from "./studio-konva-filters";
 
 import type { StudioGpuFilterKernelId } from "./studio-gpu-filter-kernels";
+import type { StudioGpuFilterPresentationSurface } from "./studio-gpu-filter-presentation";
 import type { ImageFilterFields } from "./studio-konva-filter-fields";
 
 const registry: KonvaLike = { Filters: {} };
@@ -78,7 +81,9 @@ function imageData(width = 4, height = 3) {
 }
 
 afterEach(() => {
+  disposeStudioGpuFabric();
   disposeStudioGpuFilterRuntime();
+  vi.unstubAllGlobals();
 });
 
 describe("studio-gpu-filter-apply: 체인 계획", () => {
@@ -302,10 +307,18 @@ describe("studio-gpu-filter-apply: 체인 계획", () => {
 
 interface FakeGpuHarness {
   readonly gpu: GPU;
+  readonly device: GPUDevice;
   readonly requestAdapter: ReturnType<typeof vi.fn>;
+  readonly requestDevice: ReturnType<typeof vi.fn>;
   readonly dispatchCalls: [number, number][];
   readonly createBuffer: ReturnType<typeof vi.fn>;
+  readonly createShaderModule: ReturnType<typeof vi.fn>;
+  readonly createComputePipeline: ReturnType<typeof vi.fn>;
+  readonly destroyDevice: ReturnType<typeof vi.fn>;
+  readonly pushErrorScope: ReturnType<typeof vi.fn>;
+  readonly popErrorScope: ReturnType<typeof vi.fn>;
   popErrorScopeResults: (object | null)[];
+  resolveDeviceLoss(): void;
 }
 
 function createFakeGpu(overrides?: {
@@ -325,6 +338,11 @@ function createFakeGpu(overrides?: {
   const lost = new Promise<GPUDeviceLostInfo>((resolve) => {
     resolveLost = resolve;
   });
+  const resolveDeviceLoss = () => {
+    if (!resolveLost) return;
+    resolveLost({ reason: "unknown", message: "test loss" } as GPUDeviceLostInfo);
+    resolveLost = null;
+  };
   const createBuffer = vi.fn((descriptor: { size: number }) => {
     if (overrides?.createBufferThrows) throw new Error("out of memory");
     return {
@@ -335,9 +353,20 @@ function createFakeGpu(overrides?: {
       unmap: vi.fn(),
     };
   });
+  const createShaderModule = vi.fn(() => ({}));
+  const createComputePipeline = vi.fn(() => ({ getBindGroupLayout: vi.fn(() => ({})) }));
+  const destroyDevice = vi.fn();
+  const pushErrorScope = vi.fn();
+  const popErrorScope = vi.fn(async () => {
+    if (overrides?.loseOnPopErrorScope) {
+      resolveDeviceLoss();
+      await Promise.resolve();
+    }
+    return harness.popErrorScopeResults.shift() ?? null;
+  });
   const device = {
-    createShaderModule: vi.fn(() => ({})),
-    createComputePipeline: vi.fn(() => ({ getBindGroupLayout: vi.fn(() => ({})) })),
+    createShaderModule,
+    createComputePipeline,
     createBindGroup: vi.fn(() => ({})),
     createBuffer,
     createCommandEncoder: vi.fn(() => ({
@@ -353,7 +382,7 @@ function createFakeGpu(overrides?: {
       finish: vi.fn(() => ({})),
     })),
     queue: { writeBuffer: vi.fn(), submit: vi.fn() },
-    destroy: vi.fn(),
+    destroy: destroyDevice,
     lost,
     limits: {
       maxStorageBufferBindingSize: 128 * 1024 * 1024,
@@ -363,22 +392,24 @@ function createFakeGpu(overrides?: {
       maxComputeWorkgroupSizeX: 256,
       ...overrides?.limits,
     },
-    pushErrorScope: vi.fn(),
-    popErrorScope: vi.fn(async () => {
-      if (overrides?.loseOnPopErrorScope && resolveLost) {
-        resolveLost({ reason: "unknown", message: "test loss" } as GPUDeviceLostInfo);
-        resolveLost = null;
-        await Promise.resolve();
-      }
-      return harness.popErrorScopeResults.shift() ?? null;
-    }),
+    pushErrorScope,
+    popErrorScope,
   };
-  const requestAdapter = vi.fn(async () => ({ requestDevice: async () => device }));
+  const requestDevice = vi.fn(async () => device);
+  const requestAdapter = vi.fn(async () => ({ requestDevice }));
   return {
     gpu: { requestAdapter } as unknown as GPU,
+    device: device as unknown as GPUDevice,
     requestAdapter,
+    requestDevice,
     dispatchCalls,
     createBuffer,
+    createShaderModule,
+    createComputePipeline,
+    destroyDevice,
+    pushErrorScope,
+    popErrorScope,
+    resolveDeviceLoss,
     get popErrorScopeResults() {
       return harness.popErrorScopeResults;
     },
@@ -387,6 +418,90 @@ function createFakeGpu(overrides?: {
     },
   };
 }
+
+async function flushDeviceLoss(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
+describe("studio-gpu-filter-apply: StudioGpuFabric cutover", () => {
+  it("기본 호출 두 번은 어댑터·디바이스·런타임을 공유하고 적용별 cleanup이 디바이스를 파기하지 않는다", async () => {
+    const harness = createFakeGpu();
+    vi.stubGlobal("navigator", { gpu: harness.gpu });
+
+    const first = await applyGpuFilterChain(imageData(), { brightness: 0.2 });
+    const second = await applyGpuFilterChain(imageData(), { brightness: 0.3 });
+
+    expect(first).not.toBeNull();
+    expect(second).not.toBeNull();
+    expect(harness.requestAdapter).toHaveBeenCalledTimes(1);
+    expect(harness.requestDevice).toHaveBeenCalledTimes(1);
+    expect(harness.createShaderModule).toHaveBeenCalledTimes(1);
+    expect(harness.createComputePipeline).toHaveBeenCalledTimes(1);
+    expect(harness.pushErrorScope).toHaveBeenCalledTimes(4);
+    expect(harness.popErrorScope).toHaveBeenCalledTimes(4);
+    expect(harness.destroyDevice).not.toHaveBeenCalled();
+  });
+
+  it("명시적 options.gpu는 fabric을 우회해 호출마다 독립 런타임을 소유·폐기한다", async () => {
+    const production = createFakeGpu();
+    const override = createFakeGpu();
+    vi.stubGlobal("navigator", { gpu: production.gpu });
+
+    expect(await applyGpuFilterChain(
+      imageData(),
+      { brightness: 0.2 },
+      { gpu: override.gpu },
+    )).not.toBeNull();
+    expect(await applyGpuFilterChain(
+      imageData(),
+      { brightness: 0.3 },
+      { gpu: override.gpu },
+    )).not.toBeNull();
+
+    expect(production.requestAdapter).not.toHaveBeenCalled();
+    expect(override.requestAdapter).toHaveBeenCalledTimes(2);
+    expect(override.requestDevice).toHaveBeenCalledTimes(2);
+    expect(override.createShaderModule).toHaveBeenCalledTimes(2);
+    expect(override.destroyDevice).toHaveBeenCalledTimes(2);
+  });
+
+  it("fabric 명시적 dispose 뒤 기본 호출은 새 어댑터·디바이스·런타임을 획득한다", async () => {
+    const first = createFakeGpu();
+    vi.stubGlobal("navigator", { gpu: first.gpu });
+    expect(await applyGpuFilterChain(imageData(), { brightness: 0.2 })).not.toBeNull();
+
+    disposeStudioGpuFabric();
+    expect(first.destroyDevice).toHaveBeenCalledTimes(1);
+
+    const replacement = createFakeGpu();
+    vi.stubGlobal("navigator", { gpu: replacement.gpu });
+    expect(await applyGpuFilterChain(imageData(), { brightness: 0.2 })).not.toBeNull();
+    expect(replacement.requestAdapter).toHaveBeenCalledTimes(1);
+    expect(replacement.requestDevice).toHaveBeenCalledTimes(1);
+    expect(replacement.createShaderModule).toHaveBeenCalledTimes(1);
+    expect(replacement.destroyDevice).not.toHaveBeenCalled();
+  });
+
+  it("fabric device loss 뒤 기본 호출은 새 디바이스로 복구하고 stale 런타임을 재사용하지 않는다", async () => {
+    const first = createFakeGpu();
+    vi.stubGlobal("navigator", { gpu: first.gpu });
+    expect(await applyGpuFilterChain(imageData(), { brightness: 0.2 })).not.toBeNull();
+
+    first.resolveDeviceLoss();
+    await flushDeviceLoss();
+
+    const replacement = createFakeGpu();
+    vi.stubGlobal("navigator", { gpu: replacement.gpu });
+    expect(await applyGpuFilterChain(imageData(), { brightness: 0.2 })).not.toBeNull();
+    expect(first.requestAdapter).toHaveBeenCalledTimes(1);
+    expect(replacement.requestAdapter).toHaveBeenCalledTimes(1);
+    expect(replacement.requestDevice).toHaveBeenCalledTimes(1);
+    expect(replacement.createShaderModule).toHaveBeenCalledTimes(1);
+    expect(replacement.destroyDevice).not.toHaveBeenCalled();
+  });
+});
 
 describe("studio-gpu-filter-apply: 폴백 경로", () => {
   it("node 환경(WebGPU 없음)에서는 유효한 체인도 null → 호출부 CPU 폴백", async () => {
@@ -681,5 +796,111 @@ describe("studio-gpu-filter-apply: 폴백 경로", () => {
       expect(x).toBe(256);
       expect(y).toBe(1);
     }
+  });
+});
+
+describe("studio-gpu-filter-apply: retained interactive presentation", () => {
+  function presentationSurface() {
+    const canvas = { height: 3, width: 4 } as unknown as HTMLCanvasElement;
+    const present = vi.fn<StudioGpuFilterPresentationSurface["present"]>(async () => ({
+      status: "presented",
+      revision: 1,
+    }));
+    const dispose = vi.fn();
+    return {
+      canvas,
+      dispose,
+      present,
+      revision: 0,
+    } satisfies StudioGpuFilterPresentationSurface;
+  }
+
+  it("hands GPUCanvasContext the native fabric device instead of the lifecycle facade", async () => {
+    const harness = createFakeGpu();
+    const surface = presentationSurface();
+    vi.stubGlobal("navigator", { gpu: harness.gpu });
+
+    const frame = await presentGpuFilterChain(
+      imageData(),
+      { brightness: 0.2 },
+      { surface },
+    );
+
+    expect(frame).not.toBeNull();
+    expect(surface.present).toHaveBeenCalledWith(expect.objectContaining({
+      device: harness.device,
+    }));
+    expect(harness.requestAdapter).toHaveBeenCalledTimes(1);
+    expect(harness.requestDevice).toHaveBeenCalledTimes(1);
+    expect(harness.destroyDevice).not.toHaveBeenCalled();
+    frame!.dispose();
+  });
+
+  it("publishes the GPU canvas without mapping a staging buffer, then reads once after settle", async () => {
+    const harness = createFakeGpu();
+    const surface = presentationSurface();
+    const frame = await presentGpuFilterChain(
+      imageData(),
+      { brightness: 0.2 },
+      { gpu: harness.gpu, sourceRevision: "slider-7", surface },
+    );
+
+    expect(frame).not.toBeNull();
+    expect(frame!.canvas).toBe(surface.canvas);
+    expect(frame!.sourceRevision).toBe("slider-7");
+    expect(surface.present).toHaveBeenCalledTimes(1);
+    const buffersBeforeSettle = harness.createBuffer.mock.results
+      .map((result) => result.value as { mapAsync: ReturnType<typeof vi.fn> });
+    expect(buffersBeforeSettle.every((buffer) => buffer.mapAsync.mock.calls.length === 0)).toBe(true);
+    expect(harness.destroyDevice).not.toHaveBeenCalled();
+
+    const canonical = await frame!.readbackFinal();
+    expect(canonical).not.toBeNull();
+    expect(canonical).toMatchObject({ width: 4, height: 3 });
+    const buffersAfterSettle = harness.createBuffer.mock.results
+      .map((result) => result.value as { mapAsync: ReturnType<typeof vi.fn> });
+    expect(buffersAfterSettle.reduce(
+      (count, buffer) => count + buffer.mapAsync.mock.calls.length,
+      0,
+    )).toBe(1);
+    expect(harness.destroyDevice).toHaveBeenCalledTimes(1);
+    expect(await frame!.readbackFinal()).toBe(canonical);
+  });
+
+  it("drops a superseded preview without any final readback and reports presentation failure", async () => {
+    const harness = createFakeGpu();
+    const surface = presentationSurface();
+    const frame = await presentGpuFilterChain(
+      imageData(),
+      { brightness: 0.4 },
+      { gpu: harness.gpu, surface },
+    );
+    expect(frame).not.toBeNull();
+    frame!.dispose();
+    frame!.dispose();
+
+    const mapped = harness.createBuffer.mock.results
+      .map((result) => result.value as { mapAsync: ReturnType<typeof vi.fn> })
+      .reduce((count, buffer) => count + buffer.mapAsync.mock.calls.length, 0);
+    expect(mapped).toBe(0);
+    expect(await frame!.readbackFinal()).toBeNull();
+    expect(harness.destroyDevice).toHaveBeenCalledTimes(1);
+
+    const failedHarness = createFakeGpu();
+    const failedSurface = presentationSurface();
+    failedSurface.present.mockResolvedValueOnce({
+      status: "unavailable",
+      reason: "context lost",
+    });
+    const onFailure = vi.fn();
+    await expect(presentGpuFilterChain(
+      imageData(),
+      { brightness: 0.6 },
+      { gpu: failedHarness.gpu, onFailure, surface: failedSurface },
+    )).resolves.toBeNull();
+    expect(onFailure).toHaveBeenCalledWith({
+      phase: "presentation",
+      message: "context lost",
+    });
   });
 });

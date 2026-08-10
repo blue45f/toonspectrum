@@ -176,6 +176,127 @@ describe("vertical text lane (wasm)", () => {
     expect(second).toEqual(first);
   });
 
+  it("keeps the additive vertical-feature schema compatible with legacy JSON", () => {
+    const current = shapeTextVerticalToGlyphPaths("Ink", fontBytes, {
+      fontSizePx: 24,
+      maxHeightPx: 200,
+    });
+    const legacy = structuredClone(current) as Record<string, unknown>;
+    delete legacy.verticalFeatures;
+    const glyphs = legacy.glyphs as Record<string, unknown>[];
+    for (const glyph of glyphs) {
+      delete glyph.verticalAlternate;
+      delete glyph.verticalFallback;
+    }
+    const parsed = verticalShapedTextSchema.parse(legacy);
+    expect(parsed.verticalFeatures).toEqual({
+      requested: ["vert", "vrt2"],
+      fontHasVert: false,
+      fontHasVrt2: false,
+      application: "absent-in-font",
+      appliedGlyphs: 0,
+      geometricFallbackGlyphs: 0,
+      strategy: "not-applicable",
+    });
+    expect(parsed.glyphs.every((glyph) => !glyph.verticalAlternate && glyph.verticalFallback === null)).toBe(true);
+  });
+
+  it("exposes geometric punctuation fallback instead of presentation-form substitution", () => {
+    const shaped = shapeTextVerticalToGlyphPaths("「あ」", fontBytes, {
+      fontSizePx: 24,
+      maxHeightPx: 4000,
+    });
+    expect(shaped.glyphs).toHaveLength(3);
+    expect(shaped.glyphs[0]).toMatchObject({ verticalAlternate: false, verticalFallback: "rotate" });
+    expect(shaped.glyphs[2]).toMatchObject({ verticalAlternate: false, verticalFallback: "rotate" });
+    expect(shaped.warnings.some((warning) => warning.includes("vertical form U+FE"))).toBe(false);
+  });
+
+  it("applies installed Arial Unicode vert/vrt2 through real HarfRust TTB shaping", async () => {
+    if (process.platform !== "darwin") return;
+    let systemFont: Uint8Array;
+    try {
+      systemFont = new Uint8Array(
+        await readFile("/System/Library/Fonts/Supplemental/Arial Unicode.ttf"),
+      );
+    } catch {
+      return;
+    }
+    const shaped = shapeTextVerticalToGlyphPaths("「」、。！？", systemFont, {
+      fontSizePx: 32,
+      maxHeightPx: 4000,
+    });
+    expect(shaped.verticalFeatures.fontHasVert || shaped.verticalFeatures.fontHasVrt2).toBe(true);
+    expect(shaped.verticalFeatures.application).toBe("applied");
+    expect(shaped.verticalFeatures.appliedGlyphs).toBeGreaterThan(0);
+    expect(
+      shaped.verticalFeatures.appliedGlyphs
+        + shaped.verticalFeatures.geometricFallbackGlyphs,
+    ).toBe(6);
+    expect(
+      shaped.glyphs.every(
+        (glyph) => glyph.verticalAlternate || glyph.verticalFallback !== null,
+      ),
+    ).toBe(true);
+  });
+
+  it("keeps adjacent Japanese closing/opening brackets in independent TTB cells", async () => {
+    if (process.platform !== "darwin") return;
+    let systemFont: Uint8Array;
+    try {
+      systemFont = new Uint8Array(
+        await readFile("/System/Library/Fonts/Supplemental/Arial Unicode.ttf"),
+      );
+    } catch {
+      return;
+    }
+    const shaped = shapeTextVerticalToGlyphPaths("」「", systemFont, {
+      fontSizePx: 32,
+      maxHeightPx: 4000,
+    });
+    expect(shaped.glyphs).toHaveLength(2);
+    expect(shaped.height).toBeCloseTo(64, 3);
+    expect(shaped.glyphs[1]?.y).toBeGreaterThan(shaped.glyphs[0]?.y ?? 0);
+    expect(shaped.glyphs.every((glyph) => glyph.verticalAlternate)).toBe(true);
+    expect(
+      shaped.glyphs.every(
+        (glyph) => !glyph.rotated && glyph.verticalFallback === null,
+      ),
+    ).toBe(true);
+  });
+
+  it("fits one-to-four digits horizontally into one tate-chu-yoko cell", () => {
+    const shaped = shapeTextVerticalToGlyphPaths("2026", fontBytes, {
+      fontSizePx: 24,
+      maxHeightPx: 4000,
+    });
+    expect(shaped.height).toBeCloseTo(24, 3);
+    expect(shaped.glyphs).toHaveLength(4);
+    expect(shaped.glyphs.every((glyph) => !glyph.rotated)).toBe(true);
+    expect(shaped.glyphs.every((glyph) => glyph.tateChuYoko)).toBe(true);
+    expect(
+      shaped.warnings.some((warning) => warning.includes("tate-chu-yoko")),
+    ).toBe(false);
+    for (const glyph of shaped.glyphs) {
+      const bounds = pathBounds(glyph.path);
+      if (!Number.isFinite(bounds.minX)) continue;
+      expect(bounds.minX).toBeGreaterThanOrEqual(-0.001);
+      expect(bounds.maxX).toBeLessThanOrEqual(24.001);
+      expect(bounds.minY).toBeGreaterThanOrEqual(-0.001);
+      expect(bounds.maxY).toBeLessThanOrEqual(24.001);
+    }
+  });
+
+  it("keeps five-digit runs in the explicit rotated fallback lane", () => {
+    const shaped = shapeTextVerticalToGlyphPaths("12345", fontBytes, {
+      fontSizePx: 24,
+      maxHeightPx: 4000,
+    });
+    expect(shaped.glyphs).toHaveLength(5);
+    expect(shaped.glyphs.every((glyph) => glyph.rotated)).toBe(true);
+    expect(shaped.glyphs.every((glyph) => !glyph.tateChuYoko)).toBe(true);
+  });
+
   it("declares the vertical text capability on the vello-cpu descriptor", () => {
     expect(velloCpuProviderDescriptor.capabilities).toContain(
       "render.text.vertical",

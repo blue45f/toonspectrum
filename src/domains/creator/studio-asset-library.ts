@@ -1,5 +1,6 @@
-// 회원 커스텀 에셋 라이브러리 — 업로드한 이미지를 브라우저(IndexedDB)에 저장해 재사용.
-// (멤버 간 공유 서버 동기화는 추후 백엔드 작업; 현재는 기기-로컬 개인 라이브러리.)
+// 회원 커스텀 에셋 라이브러리의 공개 모델과 제품 포트.
+// V12 제품 기본 권위는 SQLite manifest + OPFS SHA-256 CAS이며, 아래 IndexedDB 구현은
+// 사용자가 명시적으로 선택하는 legacy import/test seam에서만 열린다.
 
 import { STUDIO_ASSET_DATA_URL_MAX_CHARS } from "./studio-upload-image-safety";
 
@@ -20,6 +21,27 @@ const SHA256_CONTENT_HASH_PATTERN = /^sha256:([0-9a-f]{64})$/i;
 
 export type StudioAssetContentHash = `sha256:${string}`;
 
+export interface StudioAssetRightsMetadata {
+  readonly sourceKind: "local-upload" | "ai-generated" | "3d-generated" | "imported" | "unknown";
+  readonly sourceId: string | null;
+  readonly licenseId: string;
+  readonly licenseLabel: string;
+  readonly licenseUrl: string | null;
+  readonly attributionRequired: boolean | null;
+  readonly attributionText: string;
+  readonly rightsConfirmed: boolean;
+}
+
+export interface StudioAssetSaveInput {
+  name: string;
+  dataUrl: string;
+  width: number;
+  height: number;
+  kind?: string;
+  contentHash?: string;
+  rights?: StudioAssetRightsMetadata;
+}
+
 export interface StudioAsset {
   id: string;
   name: string;
@@ -37,6 +59,8 @@ export interface StudioAsset {
    * 표시해야 하므로 그리드 썸네일에 'AI' 배지를 노출한다. 업로드 등 일반 에셋은 생략(undefined).
    */
   kind?: string;
+  /** V12 local manifest에 저장되는 엔진 독립 권리 메타데이터. */
+  rights?: StudioAssetRightsMetadata;
 }
 
 export type StudioAssetWithContentHash = StudioAsset & {
@@ -54,6 +78,17 @@ export type StudioAssetContentIdentityCandidateMap = ReadonlyMap<
   readonly StudioAsset[]
 >;
 
+export interface StudioAssetLibraryPort {
+  save(input: StudioAssetSaveInput): Promise<StudioAssetWithContentHash>;
+  list(): Promise<StudioAsset[]>;
+  findByContentIdentities(
+    lookups: readonly StudioAssetContentIdentityLookup[],
+    signal?: AbortSignal,
+  ): Promise<StudioAssetContentIdentityCandidateMap>;
+  delete(id: string): Promise<void>;
+  rename(id: string, newName: string): Promise<void>;
+}
+
 function createAssetId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
   return `asset-${Date.now()}-${Math.random().toString(36).slice(2)}`; // NOSONAR S2245 비암호화 용도(시각효과/ID 생성)
@@ -66,14 +101,7 @@ export function normalizeAssetName(fileName: string): string {
 }
 
 export function createAssetRecord(
-  input: {
-    name: string;
-    dataUrl: string;
-    width: number;
-    height: number;
-    kind?: string;
-    contentHash?: string;
-  },
+  input: StudioAssetSaveInput,
   id = createAssetId(),
   now = Date.now()
 ): StudioAsset {
@@ -87,6 +115,7 @@ export function createAssetRecord(
     height: Math.max(1, Math.round(input.height)),
     createdAt: now,
     ...(input.kind ? { kind: input.kind } : {}),
+    ...(input.rights ? { rights: input.rights } : {}),
   };
 }
 
@@ -166,7 +195,12 @@ function decodeBase64Payload(payload: string): Uint8Array<ArrayBuffer> {
   return bytes;
 }
 
-function decodeStudioAssetDataUrl(dataUrl: string): Uint8Array<ArrayBuffer> {
+export interface DecodedStudioAssetDataUrl {
+  readonly bytes: Uint8Array<ArrayBuffer>;
+  readonly mimeType: string;
+}
+
+export function decodeStudioAssetDataUrl(dataUrl: string): DecodedStudioAssetDataUrl {
   if (typeof dataUrl !== "string" || !/^data:/i.test(dataUrl)) {
     throw new TypeError("에셋 콘텐츠는 데이터 URL이어야 합니다.");
   }
@@ -180,11 +214,18 @@ function decodeStudioAssetDataUrl(dataUrl: string): Uint8Array<ArrayBuffer> {
 
   const metadata = dataUrl.slice(5, separatorIndex);
   const payload = dataUrl.slice(separatorIndex + 1);
+  const declaredMime = metadata.split(";", 1)[0]?.trim().toLowerCase() || "application/octet-stream";
+  if (!/^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+$/u.test(declaredMime)) {
+    throw new TypeError("에셋 MIME 형식이 올바르지 않습니다.");
+  }
   const isBase64 = metadata
     .split(";")
     .slice(1)
     .some((token) => token.trim().toLowerCase() === "base64");
-  return isBase64 ? decodeBase64Payload(payload) : decodePercentEncodedPayload(payload);
+  return {
+    bytes: isBase64 ? decodeBase64Payload(payload) : decodePercentEncodedPayload(payload),
+    mimeType: declaredMime,
+  };
 }
 
 /** 데이터 URL 문자열이 아니라 디코딩된 원본 바이트를 SHA-256으로 식별한다. */
@@ -193,22 +234,33 @@ export async function hashStudioAssetDataUrl(dataUrl: string): Promise<StudioAss
   if (!subtle) {
     throw new Error("이 브라우저에서는 에셋 콘텐츠 해시를 계산할 수 없습니다.");
   }
-  const digest = await subtle.digest("SHA-256", decodeStudioAssetDataUrl(dataUrl));
+  const digest = await subtle.digest("SHA-256", decodeStudioAssetDataUrl(dataUrl).bytes);
   const hex = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
   return `sha256:${hex}`;
+}
+
+function hasCanonicalStudioAssetContentHash(
+  asset: StudioAsset,
+): asset is StudioAssetWithContentHash {
+  return typeof asset.contentHash === "string"
+    && canonicalizeStudioAssetContentHash(asset.contentHash) === asset.contentHash;
 }
 
 /** 레거시 에셋에 콘텐츠 해시를 부여하되 원본 객체를 변경하거나 이미지 바이트를 별도 저장하지 않는다. */
 export async function ensureStudioAssetContentHash(
   asset: StudioAsset
 ): Promise<StudioAssetWithContentHash> {
+  if (hasCanonicalStudioAssetContentHash(asset)) return asset;
   const canonicalHash = canonicalizeStudioAssetContentHash(asset.contentHash);
-  if (canonicalHash === asset.contentHash) {
-    return asset as StudioAssetWithContentHash;
+  if (canonicalHash !== null) {
+    return {
+      ...asset,
+      contentHash: canonicalHash,
+    };
   }
   return {
     ...asset,
-    contentHash: canonicalHash ?? (await hashStudioAssetDataUrl(asset.dataUrl)),
+    contentHash: await hashStudioAssetDataUrl(asset.dataUrl),
   };
 }
 
@@ -226,6 +278,7 @@ function isStudioAssetRecord(value: unknown): value is StudioAsset {
     typeof record.createdAt === "number" &&
     Number.isFinite(record.createdAt) &&
     (record.kind === undefined || typeof record.kind === "string") &&
+    (record.rights === undefined || (typeof record.rights === "object" && record.rights !== null)) &&
     (record.contentHash === undefined || typeof record.contentHash === "string")
   );
 }
@@ -325,10 +378,6 @@ async function persistAssetHashBackfills(
   await Promise.all([reconcileCurrentRows(), done]);
 }
 
-function hasIndexedDb() {
-  return typeof indexedDB !== "undefined";
-}
-
 function dbError() {
   return new Error("이 브라우저에서는 에셋 라이브러리 저장소를 사용할 수 없습니다.");
 }
@@ -348,10 +397,10 @@ function transactionDone(transaction: IDBTransaction) {
   });
 }
 
-function openDatabase() {
-  if (!hasIndexedDb()) return Promise.reject(dbError());
+function openLegacyDatabase(indexedDb: IDBFactory | null) {
+  if (!indexedDb) return Promise.reject(dbError());
   return new Promise<IDBDatabase>((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, STUDIO_ASSET_LIBRARY_DB_VERSION);
+    const request = indexedDb.open(DB_NAME, STUDIO_ASSET_LIBRARY_DB_VERSION);
     let settled = false;
     const fail = (error: Error) => {
       if (settled) return;
@@ -392,8 +441,11 @@ function openDatabase() {
   });
 }
 
-async function withDatabase<T>(callback: (db: IDBDatabase) => Promise<T>) {
-  const db = await openDatabase();
+async function withLegacyDatabase<T>(
+  indexedDb: IDBFactory | null,
+  callback: (db: IDBDatabase) => Promise<T>,
+) {
+  const db = await openLegacyDatabase(indexedDb);
   try {
     return await callback(db);
   } finally {
@@ -401,16 +453,12 @@ async function withDatabase<T>(callback: (db: IDBDatabase) => Promise<T>) {
   }
 }
 
-export async function saveAsset(input: {
-  name: string;
-  dataUrl: string;
-  width: number;
-  height: number;
-  kind?: string;
-  contentHash?: string;
-}): Promise<StudioAssetWithContentHash> {
+async function legacySaveAsset(
+  indexedDb: IDBFactory | null,
+  input: StudioAssetSaveInput,
+): Promise<StudioAssetWithContentHash> {
   const record = await ensureStudioAssetContentHash(createAssetRecord(input));
-  await withDatabase(async (db) => {
+  await withLegacyDatabase(indexedDb, async (db) => {
     const tx = db.transaction(STORE, "readwrite");
     const done = transactionDone(tx);
     tx.objectStore(STORE).put(record);
@@ -419,8 +467,8 @@ export async function saveAsset(input: {
   return record;
 }
 
-export async function listAssets(): Promise<StudioAsset[]> {
-  return withDatabase(async (db) => {
+async function legacyListAssets(indexedDb: IDBFactory | null): Promise<StudioAsset[]> {
+  return withLegacyDatabase(indexedDb, async (db) => {
     const tx = db.transaction(STORE, "readonly");
     const done = transactionDone(tx);
     const storedRecords = await requestResult<unknown[]>(tx.objectStore(STORE).getAll());
@@ -468,7 +516,8 @@ export async function listAssets(): Promise<StudioAsset[]> {
  * 해시 후보는 id fallback보다 먼저 반환하되 호출자가 실제 바이트 SHA-256을 다시 검증한다.
  * 해시가 없는 v1 레거시 행은 정확한 id 힌트가 있을 때만 안전하게 반환한다.
  */
-export async function findStudioAssetCandidatesByContentIdentities(
+async function legacyFindStudioAssetCandidatesByContentIdentities(
+  indexedDb: IDBFactory | null,
   lookups: readonly StudioAssetContentIdentityLookup[],
   signal?: AbortSignal
 ): Promise<StudioAssetContentIdentityCandidateMap> {
@@ -488,7 +537,7 @@ export async function findStudioAssetCandidatesByContentIdentities(
   }
   if (assetIdsByHash.size === 0) return new Map();
 
-  return withDatabase(async (db) => {
+  return withLegacyDatabase(indexedDb, async (db) => {
     const exactIds = [...new Set([...assetIdsByHash.values()].flat())];
     const exactAssets = new Map<string, StudioAsset>();
     if (exactIds.length > 0) {
@@ -571,20 +620,8 @@ export async function findStudioAssetCandidatesByContentIdentities(
   });
 }
 
-export async function findStudioAssetCandidatesByContentIdentity(
-  lookup: StudioAssetContentIdentityLookup
-): Promise<StudioAsset[]> {
-  const contentHash = canonicalizeStudioAssetContentHash(lookup.contentHash);
-  if (!contentHash || lookup.signal?.aborted) return [];
-  const candidates = await findStudioAssetCandidatesByContentIdentities(
-    [lookup],
-    lookup.signal
-  );
-  return [...(candidates.get(contentHash) ?? [])];
-}
-
-export async function deleteAsset(id: string): Promise<void> {
-  await withDatabase(async (db) => {
+async function legacyDeleteAsset(indexedDb: IDBFactory | null, id: string): Promise<void> {
+  await withLegacyDatabase(indexedDb, async (db) => {
     const tx = db.transaction(STORE, "readwrite");
     const done = transactionDone(tx);
     tx.objectStore(STORE).delete(id);
@@ -592,8 +629,12 @@ export async function deleteAsset(id: string): Promise<void> {
   });
 }
 
-export async function renameAsset(id: string, newName: string): Promise<void> {
-  await withDatabase(async (db) => {
+async function legacyRenameAsset(
+  indexedDb: IDBFactory | null,
+  id: string,
+  newName: string,
+): Promise<void> {
+  await withLegacyDatabase(indexedDb, async (db) => {
     const tx = db.transaction(STORE, "readwrite");
     const store = tx.objectStore(STORE);
     const asset = await requestResult<StudioAsset>(store.get(id));
@@ -602,4 +643,79 @@ export async function renameAsset(id: string, newName: string): Promise<void> {
     store.put(asset);
     await transactionDone(tx);
   });
+}
+
+export interface LegacyIndexedDbStudioAssetLibraryOptions {
+  /** Explicit legacy seam. Omitting this never probes ambient IndexedDB. */
+  readonly indexedDB: IDBFactory | null;
+}
+
+/**
+ * Pre-V12 IndexedDB reader/writer retained only for an explicit user-directed import or tests.
+ * Product boot and the exported no-argument functions below never instantiate this adapter.
+ */
+export function createLegacyIndexedDbStudioAssetLibrary(
+  options: LegacyIndexedDbStudioAssetLibraryOptions,
+): StudioAssetLibraryPort {
+  const indexedDb = options.indexedDB;
+  return {
+    save: (input) => legacySaveAsset(indexedDb, input),
+    list: () => legacyListAssets(indexedDb),
+    findByContentIdentities: (lookups, signal) =>
+      legacyFindStudioAssetCandidatesByContentIdentities(indexedDb, lookups, signal),
+    delete: (id) => legacyDeleteAsset(indexedDb, id),
+    rename: (id, newName) => legacyRenameAsset(indexedDb, id, newName),
+  };
+}
+
+let productPortOverride: StudioAssetLibraryPort | null = null;
+
+/** Test-only dependency seam; passing null restores the SQLite/OPFS product default. */
+export function installStudioAssetLibraryPortForTest(
+  port: StudioAssetLibraryPort | null,
+): void {
+  productPortOverride = port;
+}
+
+async function productPort(): Promise<StudioAssetLibraryPort> {
+  if (productPortOverride) return productPortOverride;
+  const module = await import("./studio-asset-library-sqlite-opfs-repository");
+  return module.getProductStudioAssetLibraryRepository();
+}
+
+export async function saveAsset(
+  input: StudioAssetSaveInput,
+): Promise<StudioAssetWithContentHash> {
+  return (await productPort()).save(input);
+}
+
+export async function listAssets(): Promise<StudioAsset[]> {
+  return (await productPort()).list();
+}
+
+export async function findStudioAssetCandidatesByContentIdentities(
+  lookups: readonly StudioAssetContentIdentityLookup[],
+  signal?: AbortSignal,
+): Promise<StudioAssetContentIdentityCandidateMap> {
+  return (await productPort()).findByContentIdentities(lookups, signal);
+}
+
+export async function findStudioAssetCandidatesByContentIdentity(
+  lookup: StudioAssetContentIdentityLookup,
+): Promise<StudioAsset[]> {
+  const contentHash = canonicalizeStudioAssetContentHash(lookup.contentHash);
+  if (!contentHash || lookup.signal?.aborted) return [];
+  const candidates = await findStudioAssetCandidatesByContentIdentities(
+    [lookup],
+    lookup.signal,
+  );
+  return [...(candidates.get(contentHash) ?? [])];
+}
+
+export async function deleteAsset(id: string): Promise<void> {
+  return (await productPort()).delete(id);
+}
+
+export async function renameAsset(id: string, newName: string): Promise<void> {
+  return (await productPort()).rename(id, newName);
 }

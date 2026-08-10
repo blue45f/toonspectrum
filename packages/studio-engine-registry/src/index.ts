@@ -7,4 +7,6 @@ export * from "./effect-compiler";
 export * from "./benchmark-registry";
 export * from "./tournament";
 export * from "./wgsl-variants";
+export * from "./wgsl-pipeline-cache";
 export * from "./wesl-compile";
+export * from "./external-filter-bridge";

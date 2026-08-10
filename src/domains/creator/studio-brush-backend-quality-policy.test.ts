@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import { BRUSH_PRESETS } from "./studio-brush";
@@ -7,10 +9,13 @@ import {
   STUDIO_BRUSH_BACKEND_QUALITY_POLICY_VERSION,
   STUDIO_BRUSH_BACKEND_ROUTE_CANDIDATES,
   STUDIO_CORE_BRUSH_BACKEND_ROUTE_PROFILES,
+  STUDIO_HOKUSAI_FULLSIZE_PROMOTION_GATE,
   STUDIO_HOKUSAI_MYB_PROVIDER_POLICY,
   STUDIO_HOKUSAI_MYB_PROVIDER_POLICY_VERSION,
+  STUDIO_HOKUSAI_PRODUCT_PROMOTED_PRESETS,
   classifyStudioBrushBackendQuality,
   resolveStudioBrushBackendQualityRoute,
+  resolveStudioHokusaiProductLiveAdmission,
   type StudioBrushBackendAvailability,
   type StudioBrushBackendId,
   type StudioBrushBackendQualityFamily,
@@ -140,18 +145,18 @@ describe("studio brush backend integration audit", () => {
     expect(auditById.get("hokusai-myb-worker")).toMatchObject({
       implementation:
         "installed studio-hokusai-wasm with exact Hokusai 0.3.0 crates and a packed dirty-frame Dedicated Worker",
-      connection: "active-product",
+      connection: "conditional-product",
       phases: ["live", "commit", "settled"],
       asynchronous: true,
-      defaultAvailability: "loading",
+      defaultAvailability: "unavailable",
       brushPixelAuthority: true,
     });
     expect(auditById.get("hokusai-myb-worker")?.evidence)
-      .toContain("automatically route the 19 verified");
+      .toContain("explicit experimental conversion");
     expect(auditById.get("hokusai-myb-worker")?.evidence)
-      .toContain("canonical PNG commit ownership");
+      .toContain("failed quality parity and the 1.2x throughput gate");
     expect(auditById.get("hokusai-myb-worker")?.evidence)
-      .toContain("atomic failure fallback");
+      .toContain("benchmark reference, not a product fallback");
   });
 });
 
@@ -327,10 +332,10 @@ describe("studio brush material backend policy", () => {
 
 describe("Hokusai .myb provider admission", () => {
   it("pins the profile-routed packed dirty-frame adapter and forbids the stock opaque-white surface", () => {
-    expect(STUDIO_BRUSH_BACKEND_QUALITY_POLICY_VERSION).toBe(7);
-    expect(STUDIO_HOKUSAI_MYB_PROVIDER_POLICY_VERSION).toBe(6);
+    expect(STUDIO_BRUSH_BACKEND_QUALITY_POLICY_VERSION).toBe(8);
+    expect(STUDIO_HOKUSAI_MYB_PROVIDER_POLICY_VERSION).toBe(7);
     expect(STUDIO_HOKUSAI_MYB_PROVIDER_POLICY).toMatchObject({
-      policyVersion: 6,
+      policyVersion: 7,
       backendId: "hokusai-myb-worker",
       crate: "hokusai-wasm",
       exactVersion: "0.3.0",
@@ -349,13 +354,17 @@ describe("Hokusai .myb provider admission", () => {
         stockOpaqueWhiteFlatteningAllowed: false,
       },
       rollout: {
-        defaultMode: "automatic-natural-media-live-provider-active-19-presets",
+        defaultMode: "experimental-explicit-selected-stroke-only",
+        productStatus: "experimental-quality-gate-blocked",
+        liveAutomaticRoutingEnabled: false,
         settledRequiresExplicitOptIn: true,
         fullLiveCoreInstalled: true,
         runtimeMustBeReady: true,
-        defaultBrushRoutesChanged: true,
-        verifiedAutomaticRouteCount: 19,
-        prewarmAtBrushSelection: true,
+        defaultBrushRoutesChanged: false,
+        verifiedAutomaticRouteCount: 0,
+        promotedPresetEvidenceCount: 0,
+        prewarmAtBrushSelection: false,
+        prewarmAtExplicitAdmission: true,
         admissionPinnedAtStrokeStart: true,
         midStrokeProviderSwitchAllowed: false,
         inFlightTransferableFrameLimit: 1,
@@ -365,6 +374,9 @@ describe("Hokusai .myb provider admission", () => {
         licenseGatePassed: true,
         reproducibleReleaseGatePassed: true,
         realBrowserRuntimeGatePassed: true,
+        fullsizeQualityParityPassed: false,
+        fullsizeThroughputGatePassed: false,
+        benchmarkReferenceIsProductFallback: false,
       },
       determinism: {
         persistSeed: true,
@@ -380,6 +392,63 @@ describe("Hokusai .myb provider admission", () => {
     expect(Object.isFrozen(STUDIO_HOKUSAI_MYB_PROVIDER_POLICY)).toBe(true);
     expect(Object.isFrozen(STUDIO_HOKUSAI_MYB_PROVIDER_POLICY.surface))
       .toBe(true);
+  });
+
+  it("pins the failed full-size verdict and blocks identity-only product promotion", () => {
+    const raw = JSON.parse(readFileSync(
+      new URL("../../../tests/benchmarks/results/libmypaint-fullsize.json", import.meta.url),
+      "utf8",
+    )) as {
+      gate: {
+        allQualityParityPass: boolean;
+        hokusaiThroughputAdvantageMin: number;
+        hokusaiPasses20pctGate: boolean;
+        verdict: string;
+      };
+    };
+
+    expect(STUDIO_HOKUSAI_FULLSIZE_PROMOTION_GATE).toMatchObject({
+      artifact: "tests/benchmarks/results/libmypaint-fullsize.json",
+      requiredThroughputRatio: 1.2,
+      observedMinimumThroughputRatio: raw.gate.hokusaiThroughputAdvantageMin,
+      allQualityParityPass: raw.gate.allQualityParityPass,
+      hokusaiPasses20pctGate: raw.gate.hokusaiPasses20pctGate,
+      verdict: raw.gate.verdict,
+      libmypaintRole: "benchmark-reference-only-not-product-fallback",
+    });
+    expect(STUDIO_HOKUSAI_PRODUCT_PROMOTED_PRESETS).toEqual([]);
+
+    expect(resolveStudioHokusaiProductLiveAdmission({
+      brushId: "pencil",
+      catalogId: "pencil",
+    })).toEqual({
+      status: "blocked",
+      reason: "fullsize-quality-gate-failed",
+      retainBackend: "existing-exact-product-route",
+      userVisibleStatus: "experimental-quality-gate-blocked",
+      noProductLibmypaintFallback: true,
+    });
+  });
+
+  it("admits Hokusai only when the caller carries an explicit experimental choice", () => {
+    expect(resolveStudioHokusaiProductLiveAdmission({
+      brushId: "charcoal",
+      catalogId: "charcoal",
+      explicitExperimentalOptIn: true,
+    })).toEqual({
+      status: "admitted",
+      mode: "experimental-explicit-opt-in",
+      presetId: "charcoal",
+      userVisibleStatus: "experimental",
+    });
+    expect(resolveStudioHokusaiProductLiveAdmission({
+      brushId: "gpen",
+      explicitExperimentalOptIn: true,
+    })).toMatchObject({
+      status: "blocked",
+      reason: "identity-not-supported",
+      noProductLibmypaintFallback: true,
+    });
   });
 
   it("fails closed for the retired adapter v1 opt-in metadata", () => {

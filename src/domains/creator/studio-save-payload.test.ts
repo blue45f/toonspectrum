@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { createEmptyStudioAiImageReferenceDocument } from
+  "./studio-ai-image-reference-roles";
 import { createEmptyStudioAiProvenanceDocument } from "./studio-ai-provenance";
 import { createEmptyStudioCharacterBible } from "./studio-character-bible";
 import { createEmptyStudioCommentsDocument } from "./studio-comments";
@@ -48,6 +50,7 @@ function saveInput(
       characterBible: createEmptyStudioCharacterBible(),
       writerRoom: createEmptyStudioWriterRoomDocument(),
       aiProvenance: createEmptyStudioAiProvenanceDocument(),
+      aiImageReferences: createEmptyStudioAiImageReferenceDocument(),
       comments: createEmptyStudioCommentsDocument(),
       releaseSchedule: createEmptyStudioReleaseSchedule(),
       publicationAnalytics: createEmptyStudioPublicationAnalyticsDocument(),
@@ -117,6 +120,7 @@ describe("buildStudioSavePayload", () => {
         characterBible: input.document.characterBible,
         writerRoom: input.document.writerRoom,
         aiProvenance: input.document.aiProvenance,
+        aiImageReferences: input.document.aiImageReferences,
         comments: input.document.comments,
         releaseSchedule: input.document.releaseSchedule,
         publicationAnalytics: input.document.publicationAnalytics,

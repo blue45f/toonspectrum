@@ -139,6 +139,9 @@ describe("Studio Hokusai natural-media inspector", () => {
     );
 
     openSection(container);
+    expect(screen.getByText("Hokusai 자연매체 · 실험적")).not.toBeNull();
+    expect(screen.getByText(/기본 연필·목탄·오일 브러시에는 자동 적용되지 않습니다/u))
+      .not.toBeNull();
     expect(screen.getByText(/원본 벡터는 숨김 보존/u)).not.toBeNull();
     for (const label of ["연필", "목탄", "오일", "캘리그래피", "마커"]) {
       expect(screen.getByRole("radio", {

@@ -104,3 +104,31 @@ benchmark-plan.md §5의 게이트를 통과해야 GoogleInkProvider를 기본 �
 5. Worker 격리 하에서 crash 시 PerfectFreehandProvider로 무손실 자동 폴백이 동작한다.
 
 실패 시 Google Ink는 후보 풀에 남고(재도전 가능), 1차 구성이 그대로 주력을 유지한다 — V11 §3.3 "자체 구현은 최후 수단이 아니라 비교를 통과한 하나의 후보 Provider"의 역방향 적용이다.
+
+## 6. V12 3D surface-brush 제품 브리지 (2026-08-10)
+
+`executeSurfaceBrushStroke`의 제품 Provider는 별도 메시/UV를 만들지 않는다. 제품이 이미 가진
+Three/R3F Raycaster 또는 `three-mesh-bvh` hit를 다음 경로로 그대로 내린다.
+
+```text
+Three Intersection / BVH hit (object, uv/uv1, faceIndex, world point)
+  → StudioVrmTexturePaintRuntime.resolveHit
+      (texture matrix/wrap + geometry-index island + triangle texel density)
+  → opaque surface session (one target, one primary owner)
+  → SurfaceProjectionProvider (sample-order lookup; pressure byte/float 그대로)
+  → executeSurfaceBrushStroke (seam-separated deterministic dab operations)
+  → StudioVrmTexturePaintRuntime.commitSurfaceBrushSession
+      (COW undo recorder → ImageData apply → one dirty CanvasTexture upload)
+```
+
+- atlas의 원본·편집 RGBA·CanvasTexture·undo는 기존 texture-paint runtime만 소유한다. Provider는
+  픽셀 포인터를 받지 않으며 interactive GPU→CPU readback은 0회다.
+- screen px→texel 밀도는 인접한 실제 world hit와 triangle `texelsPerWorldUnit` 또는 같은 UV
+  island의 실제 UV delta로만 계산한다. 한 점 탭처럼 미분 근거가 없으면 호출자가 camera ray
+  differential 실측을 넣어야 하며, 없으면 `texel-density-unavailable`로 명시 거부한다.
+- 서로 다른 island, face/triangle ID, sampler wrap은 보존된다. `faceIndex`가 없으면 seam 소유권을
+  증명할 수 없으므로 전체 기능을 격리하지 않고 그 입력만 `triangle-index-missing`으로 거부한다.
+- package lowering/commit/Canvas upload 중 실패하거나 signal이 취소되면 runtime lease를 닫고 COW
+  delta를 원상 복구한다. 다른 target의 hit를 한 획에 섞는 것도 `target-mismatch`로 거부한다.
+- `stamp`/`image` tip과 `smudge`/`wet`은 texture-neighborhood/stamp sampler가 아직 없어 해당 backend만
+  격리한다. round/no-mixing surface brush는 제품 경로로 활성화되어 있다.

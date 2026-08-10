@@ -258,7 +258,7 @@ describe("VRM library helpers", () => {
       {
         id: "upload-1",
         name: "Action Hero",
-        source: "indexed-db",
+        source: "sqlite-opfs",
         thumbnail: null,
         createdAt: 1,
         updatedAt: 1,

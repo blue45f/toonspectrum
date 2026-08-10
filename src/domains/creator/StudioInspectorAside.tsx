@@ -206,6 +206,7 @@ import { normalizeTextPath, type TextPathConfig } from "./studio-text-path";
 import { type StudioViewRotation } from "./studio-view-controls";
 import { StudioBgRemoveButton } from "./StudioBgRemoveButton";
 import { StudioCommandSearchHost } from "./StudioCommandSearchHost";
+import { StudioCustomFontsPanel } from "./StudioCustomFontsPanel";
 import { StudioFigmaDesignPanel } from "./StudioFigmaDesignPanel";
 import {
   StudioHokusaiNaturalMediaInspectorMount,
@@ -1561,6 +1562,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
             대신하고, 인스펙터가 접은 Advanced 컨트롤의 대체 도달 경로이기도
             하다(F1).
           */}
+          {/* 명령 검색 결과를 실제 도움말 목적지에 연결해 클릭·Enter no-op을 막는다. */}
           <StudioCommandSearchHost
             hideTrigger={isMobile}
             onNavigateInspector={(route) => {
@@ -1575,19 +1577,12 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                 toggleStudioDrawingPalette(drawingPaletteLayout, paletteId),
               );
             }}
-            /*
-              명령 행의 실제 소비자. 이게 없던 동안 명령 결과(코퍼스의 대부분)는
-              클릭·Enter 둘 다 조용한 no-op 이었다. 도움말 센터의 명령 패널은
-              카탈로그가 실제로 들고 있는 이름·단축키·타사 별칭·관련 항목을
-              그리므로, 실행 배선이 오기 전까지 "이게 무엇이고 어디 있는가"에
-              답하는 가장 정직한 목적지다.
-            */
-            onOpenHelp={(_helpNodeId, commandId) => {
+            onOpenHelp={(_helpNodeId, commandId) =>
               openStudioHelpCenter({
                 section: "current-tool",
                 toolCommandId: commandId,
-              });
-            }}
+              })
+            }
           />
           <StudioInspectorNavigator
             layout={inspectorLayout}
@@ -1894,11 +1889,11 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                   />
                 </label>
               )}
-              
+
               {selected.type === "text" && (
                 <StudioInspectorSection sectionId="element.text-fill" loadingLabel="글자 채우기 스타일을 여는 중...">
                 <div className="space-y-2.5">
-                  
+
                   <div className="flex gap-1.5 bg-card rounded-lg p-0.5 border border-line">
                     {[
                       { label: "단색 채우기", v: "solid" },
@@ -1928,7 +1923,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                         allowClear={false}
                         title="그라데이션 편집"
                       />
-                      
+
                     </div>
                   )}
                 </div>
@@ -2045,6 +2040,12 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                         </button>
                       ))}
                     </div>
+                  </div>
+                  <div className="mt-3 border-t border-line/30 pt-3">
+                    <StudioCustomFontsPanel
+                      canApplyFont
+                      onApplyFont={(font) => patchEl(selected.id, { font } as Partial<El>)}
+                    />
                   </div>
                   <div className="mt-2 flex items-center justify-between gap-2 text-sm text-fg-2">
                     글자 크기
@@ -2430,7 +2431,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                       ))}
                     </div>
                   </div>
-                  
+
                   <label className="flex items-center justify-between gap-2 text-sm text-fg-2 cursor-pointer">
                     세로 쓰기 (세로 연출)
                     <input
@@ -3734,7 +3735,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                 {drawMode !== "pixel" ? (
                   <StudioInspectorSection sectionId="tool.symmetry" loadingLabel="대칭 자를 여는 중...">
                   <div className="space-y-2">
-                  
+
                   <div className="grid grid-cols-5 gap-1">
                     {([
                       { id: "none", label: "없음" },

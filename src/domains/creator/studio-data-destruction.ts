@@ -32,6 +32,18 @@ export const STUDIO_OPFS_ROOTS: readonly string[] = Object.freeze([
   "toonstudio-v11",
   // studio-local-database.ts STUDIO_SQLITE_OPFS_DIRECTORY (opfs-sahpool VFS root)
   "toonspectrum-studio-sqlite",
+  // studio-opfs-filesystem.ts default + asset/BG3D shot SHA-256 CAS
+  "toonspectrum-studio-assets",
+  // studio-opfs-sync-access-store.ts large-document binary authority
+  "toonspectrum-studio-large-documents",
+  // studio-pages-history-durable-runtime.ts history recovery snapshots
+  "toonspectrum-studio-history-recovery",
+  // studio-vrm-asset-sqlite-opfs-repository.ts model/texture SHA-256 CAS
+  "toonspectrum-studio-vrm-assets-v12",
+  // studio-bg3d-libraries-sqlite-opfs-authority.ts model/thumbnail SHA-256 CAS
+  "toonspectrum-studio-bg3d-libraries-v12",
+  // studio-storage-recovery-runtime.ts quota/save-failure recovery journal
+  "studio-recovery",
 ]);
 
 export const STUDIO_INDEXED_DB_DATABASES: readonly string[] = Object.freeze([
@@ -43,14 +55,36 @@ export const STUDIO_INDEXED_DB_DATABASES: readonly string[] = Object.freeze([
   "toonspectrum-studio-bg3d-template-library",
   "toonspectrum-studio-asset-library",
   "toonspectrum-studio-scene-snapshot-library",
+  "toonspectrum-studio-production-bible",
+  "toonspectrum-studio-bg3d-asset-metadata",
+  "toonspectrum-studio-bg3d-shot-batch-recovery",
+  "toonspectrum-studio-vrm-texture-paint-library",
 ]);
 
 export const STUDIO_LOCAL_STORAGE_PREFIXES: readonly string[] = Object.freeze([
-  // studio-workspaces.ts / studio-autosave.ts / VRM poser 등 Studio 창작 상태.
+  // V12 fallback, Studio preferences, libraries, and legacy creative state.
+  // This deliberately excludes account/auth/billing keys, which do not use this prefix.
+  "toonspectrum-studio-",
+  // studio-workspaces.ts / studio-autosave.ts / VRM poser 등 이전 Studio 창작 상태.
   "toonspectrum:studio:",
   "toonspectrum-studio-autosave",
   "studio:",
   "studio_",
+]);
+
+/**
+ * Studio creative keys that deliberately use a dotted namespace and therefore
+ * do not match the hyphen/colon prefixes above. Keep these exact: a broad
+ * `toonspectrum.studio` prefix could erase account/platform data that is outside
+ * the destructive cutover boundary.
+ */
+export const STUDIO_LOCAL_STORAGE_EXACT_KEYS: readonly string[] = Object.freeze([
+  "toonspectrum.studio-marketplace-library.v1",
+  "toonspectrum.studio-creator-filter-presets.v1",
+  "toonspectrum.studio-filter-library.v12.fallback",
+  "toonspectrum.studio.bg3d.lt-presets.v1",
+  "toonspectrum.studio.bg3d.lt-presets.corrupt.v1",
+  "toonspectrum.studio.tutorialProgress.v1",
 ]);
 
 export interface StudioDataDestructionFlags {
@@ -90,7 +124,8 @@ export function authorizeStudioDataDestruction(
 export type StudioDataDestructionTarget =
   | { kind: "opfs-root"; name: string }
   | { kind: "indexed-db"; name: string }
-  | { kind: "local-storage-prefix"; prefix: string };
+  | { kind: "local-storage-prefix"; prefix: string }
+  | { kind: "local-storage-key"; key: string };
 
 export function planStudioDataDestruction(): StudioDataDestructionTarget[] {
   return [
@@ -103,6 +138,10 @@ export function planStudioDataDestruction(): StudioDataDestructionTarget[] {
       kind: "local-storage-prefix" as const,
       prefix,
     })),
+    ...STUDIO_LOCAL_STORAGE_EXACT_KEYS.map((key) => ({
+      kind: "local-storage-key" as const,
+      key,
+    })),
   ];
 }
 
@@ -111,6 +150,7 @@ export interface StudioDataDestructionAdapter {
   removeOpfsRoot(name: string): Promise<void>;
   deleteIndexedDb(name: string): Promise<void>;
   removeLocalStorageByPrefix(prefix: string): Promise<number>;
+  removeLocalStorageKey(key: string): Promise<number>;
 }
 
 export class StudioDataDestructionRefusedError extends Error {
@@ -149,6 +189,9 @@ export async function executeStudioDataDestruction(
           target.prefix,
         );
         break;
+      case "local-storage-key":
+        localStorageKeysRemoved += await adapter.removeLocalStorageKey(target.key);
+        break;
     }
     destroyed.push(target);
   }
@@ -185,6 +228,13 @@ export function browserStudioDataDestructionAdapter(): StudioDataDestructionAdap
       }
       for (const key of doomed) localStorage.removeItem(key);
       return Promise.resolve(doomed.length);
+    },
+    removeLocalStorageKey(key) {
+      if (typeof localStorage === "undefined" || localStorage.getItem(key) === null) {
+        return Promise.resolve(0);
+      }
+      localStorage.removeItem(key);
+      return Promise.resolve(1);
     },
   };
 }

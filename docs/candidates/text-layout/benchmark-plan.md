@@ -86,14 +86,40 @@ Provider 승격·유지 판정은 아래 게이트로 한다. 게이트는 아�
 - [ ] 실패 시: Parley 스택은 하니스 상주 후보로 유지, 다음 릴리스 주기에 재평가 (탈락이 아니라 "지속적 경쟁" — 아키텍처 §0.2)
 
 ### G4 — Glifo 게이트
-- [ ] `glyph.raster` cache hit rate와 atlas footprint가 내장 단순 atlas 대비 우위
-- [ ] 캐시 on/off 픽셀 동일 (캐시가 화질을 바꾸면 즉시 탈락)
+- [x] 반복 CJK 100,000글리프 장면에서 steady-state hit 100%, 256MiB 예산 내 eviction 0
+- [x] 캐시 on/off 구조 SHA와 Vello CPU 픽셀 byte-exact(6개 표본)
+- [x] all-unique 100,000 outline 상주 실패를 별도 raw artifact로 보존하고 제품 경로에서 기각
 - [ ] 우위 없으면 GlyphCacheAdapter 기본 구현 유지 (매트릭스 E08 격리 지침)
 
+실측 하니스는 `tests/benchmarks/harness/text-cache-cjk.ts`, 통과 artifact는
+`tests/benchmarks/results/text-cache-cjk.json`, 메모리 기각 artifact는
+`tests/benchmarks/results/text-cache-cjk-all-unique-rejected.json`, 빠른 회귀 계약은
+`tests/visual/text-cache-cjk-contract.test.ts`다. OS 제공 font 경로는 재현 환경별
+`TOON_CJK_FONT`로 주입하고 artifact에 path·SHA-256·byte size를 반드시 기록한다.
+
 ### G5 — 세로쓰기 게이트 (VerticalTextLayoutIR)
-- [ ] ja-vertical 코퍼스의 회전·縦中横 배치가 조판 명세(JLREQ 기반 자체 명세) 일치
-- [ ] 세로쓰기 금칙(행두·행말) 위반 0건
+- [x] bounded ko/ja 코퍼스의 직립·회전·약물·1–4자리 縦中横·5자리 폴백·명시/자동 열 넘김에서 glyph drop 0, 우→좌 열, 결정적 기하
+- [x] 유효 bounded 코퍼스의 세로쓰기 금칙(행두·행말) 위반 0건. 인접 `」「`는 독립 셀로 분리되고 HarfRust TTB 대체 glyph를 적용
+- [x] vertical ruby의 UTF-16/서로게이트·종중횡조 base cell·열 경계 분할에서 reading drop 0, 오른쪽 배치·수직 중심·결정성 통과
+- [x] HarfRust-TTB/Skrifa vertical PathIR을 Vello/CanvasKit에 교차 렌더: symmetric 3×3 δ48 mismatch 0.002403% ≤ 0.6%, bounds 동일
 - [ ] CSP 비열위 비교(§4) 세로쓰기 항목 통과
+
+G5 자동 증거는 `tests/benchmarks/harness/text-vertical-quality.ts`가 생성한
+`tests/benchmarks/results/text-vertical-quality.json`과 세 PNG
+`tests/corpus/text/golden/vertical-quality-*.png`다. `tests/visual/text-vertical-quality-contract.test.ts`는
+raw 240/240/160표본에서 percentile을 재계산하고, PNG SHA·크기, WASM 매니페스트, Konva/SVG/Rust
+소스 배선을 고정한다. OS 글꼴은 파일 자체를 커밋하지 않고 path/SHA-256/byte size만 기록한다.
+
+실측(Apple M2 Max, Headless Chromium 140.0.7339.186, Node 24.16.0):
+
+| 경로 | warmup / raw n | p50 / p95 / p99 | 품질 결과 |
+| --- | --- | --- | --- |
+| 제품 vertical layout, 8사례 배치 | 40 / 240 (각 20회 내부 평균) | 0.045 / 0.055 / 0.065ms | glyph drop 0, 금칙 위반 0, RTL·TCY·결정성 통과 |
+| 제품 vertical ruby, 3사례 배치 | 40 / 240 (각 20회 내부 평균) | 0.015 / 0.020 / 0.030ms | reading drop 0, cross-column 4조각, right+center 통과 |
+| HarfRust-TTB/Skrifa WASM vertical, 6사례 배치 | 30 / 160 | 7.085291 / 8.191167 / 16.737333ms | 실제 vert/vrt2 gid 적용·TCY 1–4셀·5자리 회전·결정성·경고 allowlist 통과 |
+
+메모리는 프로세스 RSS/heap 전후만 관측했다(RSS +193,232,896B, heap +37,099,184B). 개별
+Provider peak CPU/GPU는 관측할 수 없어 `null`이며, 추정값으로 채우지 않는다.
 
 ## 4. CSP 비열위 비교 방법
 

@@ -11,7 +11,14 @@
  */
 
 /** Formats reachable from the brush import entry points. */
-export type StudioBrushPackFormat = "abr" | "myb" | "kpp" | "json";
+export type StudioBrushPackFormat =
+  | "abr"
+  | "myb"
+  | "kpp"
+  | "sut"
+  | "sutg"
+  | "bundle"
+  | "json";
 
 /**
  * `accept` for every brush import input. `.kpp` files are PNGs, so `image/png`
@@ -19,10 +26,13 @@ export type StudioBrushPackFormat = "abr" | "myb" | "kpp" | "json";
  * extension and would otherwise grey the file out.
  */
 export const STUDIO_BRUSH_PACK_ACCEPT =
-  ".json,.abr,.myb,.kpp,application/json,application/octet-stream,application/x-photoshop,image/png";
+  ".json,.abr,.myb,.kpp,.sut,.sutg,.bundle,application/json,application/octet-stream,application/x-photoshop,image/png,application/zip,application/x-krita-resourcebundle";
 
 /** `.myb`/`.kpp` are single presets; the ABR lane keeps its own 32MB budget. */
 export const STUDIO_BRUSH_PROGRAM_MAX_BYTES = 8 * 1024 * 1024;
+
+/** Bounded external containers; mirrors the hard FormatGateway ceiling. */
+export const STUDIO_EXTERNAL_BRUSH_PACK_MAX_BYTES = 128_000_000;
 
 /** Extension first, then the MIME types a picker may report instead. */
 export function studioBrushPackFormatOf(
@@ -32,6 +42,11 @@ export function studioBrushPackFormatOf(
   if (/\.abr$/iu.test(fileName) || mimeType === "application/x-photoshop") return "abr";
   if (/\.myb$/iu.test(fileName)) return "myb";
   if (/\.kpp$/iu.test(fileName)) return "kpp";
+  if (/\.sut$/iu.test(fileName)) return "sut";
+  if (/\.sutg$/iu.test(fileName)) return "sutg";
+  if (/\.bundle$/iu.test(fileName) || mimeType === "application/x-krita-resourcebundle") {
+    return "bundle";
+  }
   if (/\.json$/iu.test(fileName) || mimeType === "application/json") return "json";
   return null;
 }

@@ -230,7 +230,7 @@ describe("복구 가이드", () => {
     expect(scan.autosaves).toHaveLength(1);
     expect(scan.autosaves[0]?.savedAt).toBe("2026-08-08T01:02:03.000Z");
     expect(scan.autosaves[0]?.pageCount).toBe(1);
-    expect(scan.checkpointKeys[0]).toContain("toonspectrum-studio-checkpoints:v1");
+    expect(scan.checkpointKeys[0]).toContain("toonspectrum-studio-checkpoints:v12");
   });
 
   it("저장소를 못 읽는 것과 0건을 구분한다", () => {

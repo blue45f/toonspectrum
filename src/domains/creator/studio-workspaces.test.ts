@@ -635,6 +635,34 @@ describe("Studio workspace owner-scoped persistence", () => {
     });
   });
 
+  it("starts V12 clean and ignores every pre-V12 workspace key by default", () => {
+    const legacyKey = "toonspectrum-studio-workspaces:v1:guest";
+    const storage = memoryStorage({
+      [legacyKey]: JSON.stringify({
+        ...DEFAULT_STUDIO_WORKSPACE_STATE,
+        version: 1,
+        mobileControlSide: "left",
+      }),
+      [STUDIO_INSPECTOR_LAYOUT_STORAGE_KEY]: JSON.stringify({ primary: "layers" }),
+      "toonspectrum:studio:workspaces:guest": JSON.stringify({
+        kind: "toonspectrum.studio-workspaces",
+        payloadVersion: STUDIO_WORKSPACE_PAYLOAD_VERSION,
+        ownerScope: "guest",
+        state: DEFAULT_STUDIO_WORKSPACE_STATE,
+      }),
+    });
+
+    expect(loadStudioWorkspacePersistence(storage, null)).toMatchObject({
+      state: DEFAULT_STUDIO_WORKSPACE_STATE,
+      source: "default",
+      status: "session-only",
+      failure: null,
+    });
+    expect(storage.values.has(legacyKey)).toBe(true);
+    expect(storage.values.has(STUDIO_INSPECTOR_LAYOUT_STORAGE_KEY)).toBe(true);
+    expect(studioWorkspaceStorageKey(null)).toContain("workspaces-v12");
+  });
+
   it("migrates a prior owner-scoped v1 key and deletes it only after verified v3 write", () => {
     const userId = "legacy-owner@example.com";
     const currentKey = studioWorkspaceStorageKey(userId);
@@ -664,7 +692,9 @@ describe("Studio workspace owner-scoped persistence", () => {
       },
     };
 
-    const loaded = loadStudioWorkspacePersistence(storage, userId);
+    const loaded = loadStudioWorkspacePersistence(storage, userId, {
+      legacyDataPolicy: "import-explicit",
+    });
     const persistedEnvelope = JSON.parse(values.get(currentKey) ?? "null") as {
       payloadVersion?: unknown;
     };
@@ -694,7 +724,9 @@ describe("Studio workspace owner-scoped persistence", () => {
       }),
     });
 
-    const loaded = loadStudioWorkspacePersistence(storage, null);
+    const loaded = loadStudioWorkspacePersistence(storage, null, {
+      legacyDataPolicy: "import-explicit",
+    });
 
     expect(loaded).toMatchObject({
       source: "legacy-v1",
@@ -719,7 +751,9 @@ describe("Studio workspace owner-scoped persistence", () => {
       },
     };
 
-    expect(loadStudioWorkspacePersistence(storage, null)).toMatchObject({
+    expect(loadStudioWorkspacePersistence(storage, null, {
+      legacyDataPolicy: "import-explicit",
+    })).toMatchObject({
       source: "legacy-v1",
       status: "session-only",
       failure: "verification-failed",
@@ -750,7 +784,9 @@ describe("Studio workspace owner-scoped persistence", () => {
       [STUDIO_LEGACY_RIGHT_PANEL_WIDTH_STORAGE_KEY]: "9999",
     };
     const guestStorage = memoryStorage(initial);
-    const guest = loadStudioWorkspacePersistence(guestStorage, null);
+    const guest = loadStudioWorkspacePersistence(guestStorage, null, {
+      legacyDataPolicy: "import-explicit",
+    });
 
     expect(guest).toMatchObject({
       source: "legacy-preferences",

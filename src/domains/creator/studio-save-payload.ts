@@ -21,6 +21,7 @@ type StudioSaveProjectDocumentFields = Pick<
   | "characterBible"
   | "writerRoom"
   | "aiProvenance"
+  | "aiImageReferences"
   | "comments"
   | "releaseSchedule"
   | "publicationAnalytics"
@@ -95,6 +96,7 @@ export function buildStudioSavePayload(
       characterBible: document.characterBible,
       writerRoom: document.writerRoom,
       aiProvenance: document.aiProvenance,
+      aiImageReferences: document.aiImageReferences,
       comments: document.comments,
       releaseSchedule: document.releaseSchedule,
       publicationAnalytics: document.publicationAnalytics,

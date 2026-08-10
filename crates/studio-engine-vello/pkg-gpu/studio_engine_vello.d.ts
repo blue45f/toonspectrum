@@ -17,6 +17,12 @@ export function adapter_version(): string;
 export function adopt_gpu_device(device: any): void;
 
 /**
+ * Audits an SVG without rendering it. This is exposed for product capability
+ * gates and tests so unsupported semantics are visible before any GPU work.
+ */
+export function audit_svg_native_json(svg: string): string;
+
+/**
  * True once [`adopt_gpu_device`] installed an external device.
  */
 export function fabric_device_adopted(): boolean;
@@ -76,6 +82,20 @@ export function render_scene_gpu_texture_json(scene_json: string): Promise<any>;
 export function render_scene_json(scene_json: string): Uint8Array;
 
 /**
+ * Renders the strict Vello-native SVG subset through vello_cpu. It ships in
+ * pkg-gpu as the deterministic fallback/reference for the same usvg tree;
+ * the default CPU pkg remains byte-untouched.
+ */
+export function render_svg_cpu_json(svg: string, width: number, height: number): Uint8Array;
+
+/**
+ * Renders the strict SVG subset through vello_svg 0.10 -> vello 0.9 on the
+ * browser WebGPU device. Readback exists only for quality evidence/export;
+ * callers must keep the interactive hot path on-GPU.
+ */
+export function render_svg_gpu_json(svg: string, width: number, height: number): Promise<Uint8Array>;
+
+/**
  * Shapes text with the given font bytes into positioned glyph PathIR JSON
  * (Parley/harfrust/ICU4X lane, matrix E07).
  */
@@ -93,6 +113,7 @@ export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly adapter_version: () => [number, number];
     readonly adopt_gpu_device: (a: any) => [number, number];
+    readonly audit_svg_native_json: (a: number, b: number) => [number, number, number, number];
     readonly fabric_device_adopted: () => number;
     readonly fabric_device_handle: () => any;
     readonly fit_polyline_json: (a: number, b: number, c: number, d: number) => [number, number, number, number];
@@ -101,6 +122,8 @@ export interface InitOutput {
     readonly render_scene_gpu_json: (a: number, b: number) => any;
     readonly render_scene_gpu_texture_json: (a: number, b: number) => any;
     readonly render_scene_json: (a: number, b: number) => [number, number, number, number];
+    readonly render_svg_cpu_json: (a: number, b: number, c: number, d: number) => [number, number, number];
+    readonly render_svg_gpu_json: (a: number, b: number, c: number, d: number) => any;
     readonly shape_text_json: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
     readonly shape_text_vertical_json: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
     readonly wasm_bindgen_b055bf54e8b77daf___convert__closures_____invoke___wasm_bindgen_b055bf54e8b77daf___JsValue__core_9b3796e30d99ddb7___result__Result_____wasm_bindgen_b055bf54e8b77daf___JsError___true_: (a: number, b: number, c: any) => [number, number];

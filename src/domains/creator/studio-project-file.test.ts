@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { hydrateStudioAiImageReferenceDocument } from
+  "./studio-ai-image-reference-roles";
 import {
   appendStudioAiOperation,
   createEmptyStudioAiProvenanceDocument,
@@ -31,6 +33,16 @@ import {
 
 const page = { id: "p1", elements: [], bg: "#ffffff", bgGrad: null, canvasH: 1080 };
 const PRIVATE_PROMPT = "원작자의 비공개 결말 프롬프트";
+const AI_IMAGE_REFERENCES = hydrateStudioAiImageReferenceDocument({
+  version: 1,
+  references: [{
+    id: "character-ref-1",
+    role: "character",
+    asset: { assetId: "asset-character-1", sha256: `sha256:${"a".repeat(64)}` },
+    label: "주인공 정면",
+    guidance: "얼굴 비율만 유지",
+  }],
+});
 
 function schemaV1Scene(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   const current = createDefaultStudioBg3dSceneDocument();
@@ -652,5 +664,17 @@ describe("studio project file", () => {
 
     expect(image.src).toBe(src);
     expect(image).not.toHaveProperty("bg3dScene");
+  });
+
+  it("preserves metadata-only AI image roles in canonical project JSON", () => {
+    const parsed = parseStudioProjectFile({
+      version: 2,
+      pagesList: [page],
+      aiImageReferences: AI_IMAGE_REFERENCES,
+    });
+    expect(parsed.aiImageReferences).toEqual(AI_IMAGE_REFERENCES);
+    expect(JSON.parse(serializeStudioProjectFile(parsed)).aiImageReferences)
+      .toEqual(AI_IMAGE_REFERENCES);
+    expect(JSON.stringify(parsed.aiImageReferences)).not.toContain("data:");
   });
 });

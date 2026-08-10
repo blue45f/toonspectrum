@@ -507,6 +507,10 @@ export function parseStudioMannequinPose(raw: unknown): StudioMannequinPose | nu
 
 // ── 세션 상태(체형 + 포즈) 영속 계약 ─────────────────────────────────────────
 
+/**
+ * Explicit pre-V12 localStorage import/test seam. Product boot must not probe this key; users may
+ * move an old value only through an explicit import flow.
+ */
 export const STUDIO_MANNEQUIN_STATE_STORAGE_KEY = "toonspectrum-studio-mannequin-state:v1";
 export const STUDIO_MANNEQUIN_STATE_DOC_KIND = "studio-mannequin-state" as const;
 export const STUDIO_MANNEQUIN_STATE_DOC_VERSION = 1 as const;

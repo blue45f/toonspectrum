@@ -1,0 +1,17 @@
+ToonSpectrum opaque WASM third-party NOTICE
+
+Artifact lane: libmypaint
+
+The binary files below are independently emitted Emscripten artifacts. This
+NOTICE, the copied upstream license files, THIRD_PARTY_INVENTORY.json, and
+THIRD_PARTY_NOTICES.sha256 form the fail-closed provenance boundary. The
+upstream source distributions used here contain no separate NOTICE file.
+
+| Component | Version | Commit | License | Upstream | Copied license |
+| --- | --- | --- | --- | --- | --- |
+| libmypaint | 1.6.1 | 2768251dacce3939136c839aeca413f4aa4241d0 | ISC | https://github.com/mypaint/libmypaint | COPYING |
+
+| Shipped artifact | SHA-256 |
+| --- | --- |
+| mypaint-wasm.mjs | c9328dfdf5e793783ace902f446816bf4c5f579a61db0eddfc59043654cc7f2e |
+| mypaint-wasm.wasm | 811e5d89fd740dcb18f75ed5b631a405e05d84b3efb9a2f577f25f99301f757b |

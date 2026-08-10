@@ -34,6 +34,33 @@ export function adopt_gpu_device(device) {
 }
 
 /**
+ * Audits an SVG without rendering it. This is exposed for product capability
+ * gates and tests so unsupported semantics are visible before any GPU work.
+ * @param {string} svg
+ * @returns {string}
+ */
+export function audit_svg_native_json(svg) {
+    let deferred3_0;
+    let deferred3_1;
+    try {
+        const ptr0 = passStringToWasm0(svg, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.audit_svg_native_json(ptr0, len0);
+        var ptr2 = ret[0];
+        var len2 = ret[1];
+        if (ret[3]) {
+            ptr2 = 0; len2 = 0;
+            throw takeFromExternrefTable0(ret[2]);
+        }
+        deferred3_0 = ptr2;
+        deferred3_1 = len2;
+        return getStringFromWasm0(ptr2, len2);
+    } finally {
+        wasm.__wbindgen_free(deferred3_0, deferred3_1, 1);
+    }
+}
+
+/**
  * True once [`adopt_gpu_device`] installed an external device.
  * @returns {boolean}
  */
@@ -161,6 +188,41 @@ export function render_scene_json(scene_json) {
     var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
     wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
     return v2;
+}
+
+/**
+ * Renders the strict Vello-native SVG subset through vello_cpu. It ships in
+ * pkg-gpu as the deterministic fallback/reference for the same usvg tree;
+ * the default CPU pkg remains byte-untouched.
+ * @param {string} svg
+ * @param {number} width
+ * @param {number} height
+ * @returns {Uint8Array}
+ */
+export function render_svg_cpu_json(svg, width, height) {
+    const ptr0 = passStringToWasm0(svg, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ret = wasm.render_svg_cpu_json(ptr0, len0, width, height);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return takeFromExternrefTable0(ret[0]);
+}
+
+/**
+ * Renders the strict SVG subset through vello_svg 0.10 -> vello 0.9 on the
+ * browser WebGPU device. Readback exists only for quality evidence/export;
+ * callers must keep the interactive hot path on-GPU.
+ * @param {string} svg
+ * @param {number} width
+ * @param {number} height
+ * @returns {Promise<Uint8Array>}
+ */
+export function render_svg_gpu_json(svg, width, height) {
+    const ptr0 = passStringToWasm0(svg, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ret = wasm.render_svg_gpu_json(ptr0, len0, width, height);
+    return ret;
 }
 
 /**
@@ -782,12 +844,12 @@ function __wbg_get_imports() {
             arg0.writeTexture(arg1, getArrayU8FromWasm0(arg2, arg3), arg4, arg5);
         }, arguments); },
         __wbindgen_cast_0000000000000001: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 610, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 892, ret: Unit, inner_ret: Some(Unit) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen_b055bf54e8b77daf___convert__closures_____invoke___wasm_bindgen_b055bf54e8b77daf___JsValue______true_);
             return ret;
         },
         __wbindgen_cast_0000000000000002: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 644, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 927, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen_b055bf54e8b77daf___convert__closures_____invoke___wasm_bindgen_b055bf54e8b77daf___JsValue__core_9b3796e30d99ddb7___result__Result_____wasm_bindgen_b055bf54e8b77daf___JsError___true_);
             return ret;
         },

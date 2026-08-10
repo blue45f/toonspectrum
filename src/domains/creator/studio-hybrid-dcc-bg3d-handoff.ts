@@ -8,7 +8,7 @@
 
 import {
   createStudioBg3dModelAttachment,
-  importVerifiedBg3dModelsAtomically,
+  importVerifiedBg3dModelsAtomicallyV12 as importVerifiedBg3dModelsAtomically,
 } from "./bg3d-model-library";
 import { fitStudioBg3dCameraToBounds } from "./studio-bg3d-camera-framing";
 import { computeStudioBg3dAutoFitScale } from "./studio-bg3d-model-scale-contract";

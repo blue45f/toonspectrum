@@ -8,8 +8,8 @@
 //! from PoC to the production lane (CanvasKit Paragraph stays the baseline).
 
 use parley::{
-    Alignment, AlignmentOptions, FontContext, Layout, LayoutContext,
-    PositionedLayoutItem, StyleProperty,
+    Alignment, AlignmentOptions, FontContext, Layout, LayoutContext, PositionedLayoutItem,
+    StyleProperty,
 };
 use skrifa::instance::{LocationRef, NormalizedCoord, Size};
 use skrifa::outline::{DrawSettings, OutlinePen};
@@ -103,7 +103,13 @@ pub fn shape_text(
         .register_fonts(font_bytes.to_vec().into(), None);
     let family_name = families
         .first()
-        .map(|(id, _)| font_cx.collection.family_name(*id).unwrap_or_default().to_string())
+        .map(|(id, _)| {
+            font_cx
+                .collection
+                .family_name(*id)
+                .unwrap_or_default()
+                .to_string()
+        })
         .ok_or_else(|| {
             RenderError::InvalidScene("font bytes contained no registrable font".into())
         })?;
@@ -147,11 +153,9 @@ pub fn shape_text(
                         Size::new(run.font_size()),
                         LocationRef::new(&coords),
                     );
-                    outline
-                        .draw(settings, &mut pen)
-                        .map_err(|error| {
-                            RenderError::InvalidScene(format!("glyph draw: {error}"))
-                        })?;
+                    outline.draw(settings, &mut pen).map_err(|error| {
+                        RenderError::InvalidScene(format!("glyph draw: {error}"))
+                    })?;
                 }
                 glyphs.push(ShapedGlyph {
                     glyph_id: glyph.id,
@@ -170,6 +174,36 @@ pub fn shape_text(
         line_count,
         glyphs,
     })
+}
+
+/// Extracts one explicitly selected glyph outline through Skrifa. The direct
+/// HarfRust vertical shaper uses this after TTB GSUB has selected a `vert` or
+/// `vrt2` alternate glyph id. Keeping outline extraction here guarantees that
+/// horizontal Parley and vertical HarfRust output share exactly one PathIR pen
+/// and y-axis conversion.
+pub(crate) fn outline_glyph(
+    font_bytes: &[u8],
+    glyph_id: u32,
+    font_size: f32,
+    offset_x: f32,
+    offset_y: f32,
+) -> Result<Vec<serde_json::Value>, RenderError> {
+    let font_ref = FontRef::from_index(font_bytes, 0)
+        .map_err(|error| RenderError::InvalidScene(format!("font parse: {error}")))?;
+    let mut pen = PathIrPen {
+        verbs: Vec::new(),
+        offset_x: f64::from(offset_x),
+        offset_y: f64::from(offset_y),
+    };
+    if let Some(outline) = font_ref.outline_glyphs().get(GlyphId::new(glyph_id)) {
+        outline
+            .draw(
+                DrawSettings::unhinted(Size::new(font_size), LocationRef::default()),
+                &mut pen,
+            )
+            .map_err(|error| RenderError::InvalidScene(format!("glyph draw: {error}")))?;
+    }
+    Ok(pen.verbs)
 }
 
 pub fn shaped_text_to_json(shaped: &ShapedText) -> String {

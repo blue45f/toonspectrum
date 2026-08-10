@@ -1,0 +1,18 @@
+ToonSpectrum opaque WASM third-party NOTICE
+
+Artifact lane: google-ink-mesh
+
+The binary files below are independently emitted Emscripten artifacts. This
+NOTICE, the copied upstream license files, THIRD_PARTY_INVENTORY.json, and
+THIRD_PARTY_NOTICES.sha256 form the fail-closed provenance boundary. The
+upstream source distributions used here contain no separate NOTICE file.
+
+| Component | Version | Commit | License | Upstream | Copied license |
+| --- | --- | --- | --- | --- | --- |
+| google/ink | 1.1.0 | 1d0daba661f3035f42f3649b8e6a0061b47aa759 | Apache-2.0 | https://github.com/google/ink | LICENSE-GOOGLE-INK |
+| abseil-cpp | 20260526.0 | 5650e9cf76d3be4318d5fa3af38ee483ddfd5e4a | Apache-2.0 | https://github.com/abseil/abseil-cpp | LICENSE-ABSEIL |
+
+| Shipped artifact | SHA-256 |
+| --- | --- |
+| ink_mesh.mjs | e81d758845ef37cca23fa47330fc23c109fc813ffcbe332f813b4bd15ad29493 |
+| ink_mesh.wasm | baee81840296eab12301803261d47200560d78c955a97a6679cbe67527ebbc3d |

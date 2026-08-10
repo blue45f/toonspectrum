@@ -321,6 +321,89 @@ function isLibraryEntry(value: unknown): value is StudioMarketplaceLibraryEntry 
   );
 }
 
+function hasExactKeys(value: object, expected: readonly string[]): boolean {
+  const actual = Object.keys(value).sort();
+  const sortedExpected = [...expected].sort();
+  return actual.length === sortedExpected.length
+    && actual.every((key, index) => key === sortedExpected[index]);
+}
+
+function canonicalMarketplaceLibraryState(value: unknown): StudioMarketplaceLibraryState {
+  if (
+    !value
+    || typeof value !== "object"
+    || Array.isArray(value)
+    || !hasExactKeys(value, ["version", "packages"])
+  ) {
+    throw new Error("마켓 라이브러리 envelope가 올바르지 않습니다.");
+  }
+  const envelope = value as { readonly version?: unknown; readonly packages?: unknown };
+  if (
+    envelope.version !== STUDIO_MARKETPLACE_LIBRARY_VERSION
+    || !Array.isArray(envelope.packages)
+  ) {
+    throw new Error("마켓 라이브러리 버전 또는 packages가 올바르지 않습니다.");
+  }
+  if (envelope.packages.length > STUDIO_MARKETPLACE_MAX_LIBRARY_PACKAGES) {
+    throw new Error(
+      `마켓 라이브러리는 ${STUDIO_MARKETPLACE_MAX_LIBRARY_PACKAGES}개를 초과할 수 없습니다.`,
+    );
+  }
+
+  const seen = new Set<string>();
+  const packages = envelope.packages.map((entry) => {
+    if (
+      !isLibraryEntry(entry)
+      || !hasExactKeys(entry, [
+        "packageId",
+        "version",
+        "packageFingerprint",
+        "addedAt",
+      ])
+    ) {
+      throw new Error("마켓 라이브러리 항목이 올바르지 않습니다.");
+    }
+    if (seen.has(entry.packageId)) {
+      throw new Error(`마켓 라이브러리에 중복 packageId가 있습니다: ${entry.packageId}`);
+    }
+    seen.add(entry.packageId);
+    return {
+      packageId: entry.packageId,
+      version: entry.version,
+      packageFingerprint: entry.packageFingerprint,
+      addedAt: entry.addedAt,
+    } satisfies StudioMarketplaceLibraryEntry;
+  });
+  return {
+    version: STUDIO_MARKETPLACE_LIBRARY_VERSION,
+    packages,
+  };
+}
+
+/** Strict, byte-canonical parser used by the V12 SQLite product authority. */
+export function parseCanonicalStudioMarketplaceLibrary(
+  raw: string,
+): StudioMarketplaceLibraryState {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    throw new Error("마켓 라이브러리 JSON이 손상되었습니다.", { cause: error });
+  }
+  const state = canonicalMarketplaceLibraryState(parsed);
+  if (JSON.stringify(state) !== raw) {
+    throw new Error("마켓 라이브러리가 canonical JSON 형식이 아닙니다.");
+  }
+  return state;
+}
+
+/** Serializes only fully validated state; invalid input is never truncated or normalized. */
+export function serializeCanonicalStudioMarketplaceLibrary(
+  state: StudioMarketplaceLibraryState,
+): string {
+  return JSON.stringify(canonicalMarketplaceLibraryState(state));
+}
+
 export function loadStudioMarketplaceLibrary(
   storage: Pick<Storage, "getItem"> | null | undefined
 ): StudioMarketplaceLibraryState {

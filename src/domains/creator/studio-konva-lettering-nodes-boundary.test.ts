@@ -211,7 +211,7 @@ describe("Studio Konva lettering node boundary", () => {
     expect(nodes.valueImports).toEqual([
       "react-konva/lib/ReactKonvaCore",
       "./studio-bubble-text-runtime",
-      // Horizontal ruby overlay paint (planDialogueRubyOverlayPlacements) — vertical stays base-only.
+      // Shared horizontal + vertical-rl ruby overlay planners.
       "./studio-dialogue-ruby-layout",
       "./studio-gradient-engine",
       "./studio-node-props",
@@ -285,7 +285,7 @@ describe("Studio Konva lettering node boundary", () => {
       "./studio-bubble-path",
       "./studio-bubble-text-fit",
       "./studio-bubble-text-runtime",
-      // Horizontal ruby overlay paint — vertical bubbles stay base-only (formatVerticalText).
+      // Shared horizontal + vertical-rl ruby overlay planners.
       "./studio-dialogue-ruby-layout",
       "./studio-gradient-engine",
       "./studio-node-props",
@@ -326,29 +326,35 @@ describe("Studio Konva lettering node boundary", () => {
     expect(nodes.source).toContain("onCommitTransform(el.id, el.fontSize, event, { minFontSize: 16 })");
   });
 
-  it("paints horizontal ruby overlays via studio-dialogue-ruby-layout in text + bubble nodes", () => {
+  it("paints horizontal and vertical-rl ruby overlays in both product lettering mounts", () => {
     const nodes = moduleShape("./StudioKonvaTextNodes.tsx");
     const bubbleNode = moduleShape("./StudioKonvaBubbleNode.tsx");
     const layout = moduleShape("./studio-dialogue-ruby-layout.ts");
 
     // Layout planner is a pure export used by both paint sites (not reimplemented in nodes).
     expect(layout.exportedDeclarations.has("planDialogueRubyOverlayPlacements")).toBe(true);
+    expect(layout.exportedDeclarations.has("planDialogueVerticalRubyOverlayPlacements")).toBe(true);
     expect(layout.exportedDeclarations.has("planDialogueRubyRuns")).toBe(true);
 
     expect(nodes.valueImports).toContain("./studio-dialogue-ruby-layout");
     expect(nodes.source).toContain("readDialogueRubySpans(");
     expect(nodes.source).toContain("planDialogueRubyOverlayPlacements(");
+    expect(nodes.source).toContain("planDialogueVerticalRubyOverlayPlacements(");
+    expect(nodes.source).toContain('name="studio-vertical-ruby"');
     expect(nodes.source).toMatch(/rubyOverlays\.length\s*>\s*0/u);
 
     expect(bubbleNode.valueImports).toContain("./studio-dialogue-ruby-layout");
     expect(bubbleNode.source).toContain("readDialogueRubySpans(");
     expect(bubbleNode.source).toContain("planDialogueRubyOverlayPlacements(");
-    // Vertical bubbles stay base-only; stacked furigana is horizontal MVP only.
-    expect(bubbleNode.source).toContain("!el.vertical");
-    expect(bubbleNode.source).toMatch(
+    expect(bubbleNode.source).toContain("planDialogueVerticalRubyOverlayPlacements(");
+    expect(bubbleNode.source).toContain('name="studio-vertical-ruby"');
+    expect(bubbleNode.source).not.toMatch(
       /const rubySpans = !el\.vertical\s*\?\s*readDialogueRubySpans\(/u,
     );
     expect(bubbleNode.source).not.toContain("planDialogueRubyRuns(");
     expect(nodes.source).not.toContain("planDialogueRubyRuns(");
+    // Ruby overlays never capture pointer hits; the parent group owns selection/edit transforms.
+    expect(nodes.source).toMatch(/name="studio-vertical-ruby"[\s\S]*?listening=\{false\}/u);
+    expect(bubbleNode.source).toMatch(/name="studio-vertical-ruby"[\s\S]*?listening=\{false\}/u);
   });
 });

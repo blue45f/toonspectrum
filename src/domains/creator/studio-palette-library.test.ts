@@ -258,13 +258,14 @@ describe("createPalette", () => {
     expect(() => createPalette("색상", [])).toThrow();
   });
 
-  it(`최대 ${MAX_COLORS_PER_PALETTE}개로 자른다`, () => {
+  it(`최대 ${MAX_COLORS_PER_PALETTE}개를 넘으면 조용히 자르지 않고 거부한다`, () => {
     const colors = Array.from({ length: MAX_COLORS_PER_PALETTE + 10 }, (_, i) => {
       const hex = i.toString(16).padStart(6, "0");
       return `#${hex}`;
     });
-    const p = createPalette("큰 팔레트", colors);
-    expect(p.colors).toHaveLength(MAX_COLORS_PER_PALETTE);
+    expect(() => createPalette("큰 팔레트", colors)).toThrow(
+      `팔레트 하나에는 최대 ${MAX_COLORS_PER_PALETTE}색만 저장할 수 있습니다.`,
+    );
   });
 });
 

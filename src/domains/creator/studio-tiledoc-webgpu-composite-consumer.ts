@@ -8,6 +8,9 @@
  * lives here; device loss or any rejected frame is recovered by invalidating the bridge planner.
  */
 
+import { acquireStudioGpuDevice } from "./studio-gpu-fabric";
+
+import type { StudioGpuDeviceLease } from "./studio-gpu-fabric";
 import type {
   StudioTileDocWebGpuConsumer,
   StudioTileDocWebGpuConsumerResult,
@@ -27,13 +30,19 @@ export const STUDIO_TILEDOC_WEBGPU_DEFAULT_MAX_RETAINED_BYTES = 512 * 1_024 * 1_
 export const STUDIO_TILEDOC_WEBGPU_DEFAULT_MAX_FRAME_UPLOAD_BYTES = 128 * 1_024 * 1_024;
 export const STUDIO_TILEDOC_WEBGPU_DEFAULT_MAX_UPLOAD_POOL_ENTRIES = 16;
 export const STUDIO_TILEDOC_WEBGPU_DEFAULT_MAX_UPLOAD_POOL_BYTES = 64 * 1_024 * 1_024;
+export const STUDIO_TILEDOC_WEBGPU_DEFAULT_MAX_SOURCE_CACHE_ENTRIES = 512;
+export const STUDIO_TILEDOC_WEBGPU_DEFAULT_MAX_SOURCE_CACHE_BYTES = 512 * 1_024 * 1_024;
 export const STUDIO_TILEDOC_WEBGPU_DEFAULT_MAX_STACK_ENTRIES = 16_384;
 
+const GPU_TEXTURE_COPY_SRC = 0x01;
 const GPU_TEXTURE_COPY_DST = 0x02;
 const GPU_TEXTURE_BINDING = 0x04;
 const GPU_TEXTURE_RENDER_ATTACHMENT = 0x10;
+const GPU_BUFFER_MAP_READ = 0x01;
+const GPU_BUFFER_COPY_DST = 0x08;
 const GPU_BUFFER_VERTEX = 0x20;
 const GPU_BUFFER_UNIFORM = 0x40;
+const GPU_MAP_MODE_READ = 0x01;
 const PRESENTATION_VERTEX_FLOATS = 4;
 const COMPOSITE_PARAMETER_BYTES = 16;
 const MIN_DYNAMIC_UNIFORM_ALIGNMENT = 256;
@@ -246,12 +255,17 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4f {
 
 export interface StudioTileDocWebGpuCompositeConsumerOptions {
   readonly canvas: HTMLCanvasElement;
+  /** Explicit GPU override is an isolated test/diagnostic lane. Product callers use the fabric. */
   readonly gpu?: GPU | null;
+  /** Test seam for the shared-device broker. Omit in product code. */
+  readonly acquireDevice?: typeof acquireStudioGpuDevice;
   readonly maxRetainedEntries?: number;
   readonly maxRetainedBytes?: number;
   readonly maxFrameUploadBytes?: number;
   readonly maxUploadPoolEntries?: number;
   readonly maxUploadPoolBytes?: number;
+  readonly maxSourceCacheEntries?: number;
+  readonly maxSourceCacheBytes?: number;
   readonly maxStackEntries?: number;
   readonly onDeviceLost?: (info: GPUDeviceLostInfo) => void;
 }
@@ -264,6 +278,37 @@ export interface StudioTileDocWebGpuCompositeConsumerStats {
   readonly retainedBytes: number;
   readonly uploadPoolEntries: number;
   readonly uploadPoolBytes: number;
+  readonly activeUploadBytes: number;
+  readonly sourceCacheEntries: number;
+  readonly sourceCacheBytes: number;
+  readonly sourceCacheHits: number;
+  readonly sourceCacheMisses: number;
+  readonly sourceCacheEvictions: number;
+  readonly retainedCacheHits: number;
+  readonly retainedCacheMisses: number;
+  readonly retainedCacheEvictions: number;
+  readonly compositeCacheReuses: number;
+  readonly sourceUploadCount: number;
+  readonly sourcePayloadBytesUploaded: number;
+  readonly physicalBytesUploaded: number;
+  readonly presentedFrames: number;
+  readonly presentationDraws: number;
+  readonly hotPathReadbackCount: 0;
+  readonly validationReadbackCount: number;
+  readonly validationReadbackBytes: number;
+  readonly trackedGpuBytes: number;
+  readonly peakTrackedGpuBytes: number;
+  readonly deviceOwnership: "none" | "isolated-override" | "studio-gpu-fabric";
+  readonly deviceEpoch: number;
+}
+
+export interface StudioTileDocWebGpuValidationReadback {
+  readonly tileId: string;
+  readonly width: number;
+  readonly height: number;
+  readonly format: typeof STUDIO_TILEDOC_WEBGPU_COMPOSITE_TEXTURE_FORMAT;
+  readonly bytesPerRow: number;
+  readonly bytes: Uint8Array;
 }
 
 export type StudioTileDocWebGpuCompositePlanFailureReason =
@@ -308,14 +353,19 @@ interface NormalizedOptions {
   readonly maxFrameUploadBytes: number;
   readonly maxUploadPoolEntries: number;
   readonly maxUploadPoolBytes: number;
+  readonly maxSourceCacheEntries: number;
+  readonly maxSourceCacheBytes: number;
   readonly maxStackEntries: number;
 }
 
 interface RetainedTile {
   readonly id: string;
   readonly textures: readonly [GPUTexture, GPUTexture];
+  readonly width: number;
+  readonly height: number;
   readonly byteLength: number;
   finalTextureIndex: 0 | 1;
+  contentKey: string | null;
   lastUsed: number;
 }
 
@@ -324,6 +374,12 @@ interface UploadPoolTexture {
   readonly width: number;
   readonly height: number;
   readonly byteLength: number;
+}
+
+interface SourceCacheTexture extends UploadPoolTexture {
+  readonly key: string;
+  readonly bufferIdentity: string;
+  lastUsed: number;
 }
 
 interface GpuState {
@@ -335,6 +391,8 @@ interface GpuState {
   readonly presentationPipeline: GPURenderPipeline;
   readonly compositeBindGroupLayout: GPUBindGroupLayout;
   readonly presentationBindGroupLayout: GPUBindGroupLayout;
+  readonly ownership: "isolated-override" | "studio-gpu-fabric";
+  readonly lease: StudioGpuDeviceLease | null;
 }
 
 interface DocumentContract {
@@ -347,6 +405,7 @@ interface ActiveUpload {
   readonly key: string;
   readonly source: StudioTileDocWebGpuSourceSnapshot;
   readonly pooled: UploadPoolTexture;
+  readonly retained: boolean;
 }
 
 function safePositiveInteger(value: number | undefined, fallback: number): number {
@@ -420,6 +479,22 @@ function sameRect(
 
 function sourceKey(source: StudioTileDocWebGpuSourceSnapshot): string {
   return `${source.bufferId}:${source.contentRevision}`;
+}
+
+function sourceBufferIdentity(source: StudioTileDocWebGpuSourceSnapshot): string {
+  return String(source.bufferId);
+}
+
+function compositeContentKey(tile: StudioTileDocWebGpuFrame["dirtyTiles"][number]): string {
+  return tile.action === "clear"
+    ? "clear"
+    : tile.stack.map((source) => [
+        source.layerId,
+        source.bufferId,
+        source.contentRevision,
+        source.opacity,
+        source.blendMode,
+      ].join("\u001f")).join("\u001e");
 }
 
 function blendModeCode(mode: string): number | null {
@@ -768,10 +843,12 @@ export class StudioTileDocWebGpuCompositeConsumer implements StudioTileDocWebGpu
 
   private readonly canvas: HTMLCanvasElement;
   private readonly gpuOverride: GPU | null | undefined;
+  private readonly acquireDevice: typeof acquireStudioGpuDevice;
   private readonly options: NormalizedOptions;
   private readonly onDeviceLost: ((info: GPUDeviceLostInfo) => void) | undefined;
   private readonly retainedTiles = new Map<string, RetainedTile>();
   private readonly uploadPool: UploadPoolTexture[] = [];
+  private readonly sourceCache = new Map<string, SourceCacheTexture>();
 
   private state: GpuState | null = null;
   private initialization: Promise<GpuState | null> | null = null;
@@ -779,14 +856,32 @@ export class StudioTileDocWebGpuCompositeConsumer implements StudioTileDocWebGpu
   private uploadScratch: Uint8Array | null = null;
   private retainedBytes = 0;
   private uploadPoolBytes = 0;
+  private activeUploadBytes = 0;
+  private sourceCacheBytes = 0;
   private sequence = 0;
   private generation = 0;
   private active = false;
   private disposed = false;
+  private sourceCacheHits = 0;
+  private sourceCacheMisses = 0;
+  private sourceCacheEvictions = 0;
+  private retainedCacheHits = 0;
+  private retainedCacheMisses = 0;
+  private retainedCacheEvictions = 0;
+  private compositeCacheReuses = 0;
+  private sourceUploadCount = 0;
+  private sourcePayloadBytesUploaded = 0;
+  private physicalBytesUploaded = 0;
+  private presentedFrames = 0;
+  private presentationDraws = 0;
+  private validationReadbackCount = 0;
+  private validationReadbackBytes = 0;
+  private peakTrackedGpuBytes = 0;
 
   public constructor(options: StudioTileDocWebGpuCompositeConsumerOptions) {
     this.canvas = options.canvas;
     this.gpuOverride = options.gpu;
+    this.acquireDevice = options.acquireDevice ?? acquireStudioGpuDevice;
     this.onDeviceLost = options.onDeviceLost;
     this.options = Object.freeze({
       maxRetainedEntries: safePositiveInteger(
@@ -809,6 +904,14 @@ export class StudioTileDocWebGpuCompositeConsumer implements StudioTileDocWebGpu
         options.maxUploadPoolBytes,
         STUDIO_TILEDOC_WEBGPU_DEFAULT_MAX_UPLOAD_POOL_BYTES
       ),
+      maxSourceCacheEntries: safePositiveInteger(
+        options.maxSourceCacheEntries,
+        STUDIO_TILEDOC_WEBGPU_DEFAULT_MAX_SOURCE_CACHE_ENTRIES
+      ),
+      maxSourceCacheBytes: safePositiveInteger(
+        options.maxSourceCacheBytes,
+        STUDIO_TILEDOC_WEBGPU_DEFAULT_MAX_SOURCE_CACHE_BYTES
+      ),
       maxStackEntries: safePositiveInteger(
         options.maxStackEntries,
         STUDIO_TILEDOC_WEBGPU_DEFAULT_MAX_STACK_ENTRIES
@@ -817,20 +920,100 @@ export class StudioTileDocWebGpuCompositeConsumer implements StudioTileDocWebGpu
   }
 
   public stats(): StudioTileDocWebGpuCompositeConsumerStats {
+    const state = this.state;
     return Object.freeze({
       active: this.active,
       disposed: this.disposed,
-      deviceGeneration: this.state?.generation ?? this.generation,
+      deviceGeneration: state?.generation ?? this.generation,
       retainedEntries: this.retainedTiles.size,
       retainedBytes: this.retainedBytes,
       uploadPoolEntries: this.uploadPool.length,
       uploadPoolBytes: this.uploadPoolBytes,
+      activeUploadBytes: this.activeUploadBytes,
+      sourceCacheEntries: this.sourceCache.size,
+      sourceCacheBytes: this.sourceCacheBytes,
+      sourceCacheHits: this.sourceCacheHits,
+      sourceCacheMisses: this.sourceCacheMisses,
+      sourceCacheEvictions: this.sourceCacheEvictions,
+      retainedCacheHits: this.retainedCacheHits,
+      retainedCacheMisses: this.retainedCacheMisses,
+      retainedCacheEvictions: this.retainedCacheEvictions,
+      compositeCacheReuses: this.compositeCacheReuses,
+      sourceUploadCount: this.sourceUploadCount,
+      sourcePayloadBytesUploaded: this.sourcePayloadBytesUploaded,
+      physicalBytesUploaded: this.physicalBytesUploaded,
+      presentedFrames: this.presentedFrames,
+      presentationDraws: this.presentationDraws,
+      hotPathReadbackCount: 0,
+      validationReadbackCount: this.validationReadbackCount,
+      validationReadbackBytes: this.validationReadbackBytes,
+      trackedGpuBytes: this.trackedGpuBytes(),
+      peakTrackedGpuBytes: this.peakTrackedGpuBytes,
+      deviceOwnership: state?.ownership ?? "none",
+      deviceEpoch: state?.lease?.epoch ?? 0,
     });
+  }
+
+  /**
+   * Explicit quality-lab seam. It is intentionally absent from `present()` and therefore cannot
+   * enter pan/zoom/edit/reorder timing. Callers must wait for an idle completed frame.
+   */
+  public async readbackRetainedTileForValidation(
+    tileId: string
+  ): Promise<StudioTileDocWebGpuValidationReadback | null> {
+    if (this.disposed || this.active || tileId.length === 0) return null;
+    const state = this.state;
+    const retained = this.retainedTiles.get(tileId);
+    if (!state || !retained || typeof state.device.queue.onSubmittedWorkDone !== "function") {
+      return null;
+    }
+    const bytesPerRow = alignTo(
+      retained.width * STUDIO_TILEDOC_WEBGPU_COMPOSITE_BYTES_PER_PIXEL,
+      STUDIO_TILEDOC_WEBGPU_UPLOAD_ROW_ALIGNMENT
+    );
+    const byteLength = bytesPerRow * retained.height;
+    let buffer: GPUBuffer | null = null;
+    try {
+      buffer = state.device.createBuffer({
+        label: `Studio tiledoc validation readback ${tileId}`,
+        size: byteLength,
+        usage: GPU_BUFFER_MAP_READ | GPU_BUFFER_COPY_DST,
+      });
+      const encoder = state.device.createCommandEncoder({
+        label: `Studio tiledoc validation readback ${tileId}`,
+      });
+      encoder.copyTextureToBuffer(
+        { texture: retained.textures[retained.finalTextureIndex] },
+        { buffer, offset: 0, bytesPerRow, rowsPerImage: retained.height },
+        { width: retained.width, height: retained.height, depthOrArrayLayers: 1 }
+      );
+      state.device.queue.submit([encoder.finish()]);
+      await state.device.queue.onSubmittedWorkDone();
+      if (this.state !== state || this.disposed) return null;
+      await buffer.mapAsync(GPU_MAP_MODE_READ);
+      const bytes = new Uint8Array(buffer.getMappedRange()).slice();
+      buffer.unmap();
+      this.validationReadbackCount += 1;
+      this.validationReadbackBytes += bytes.byteLength;
+      return Object.freeze({
+        tileId,
+        width: retained.width,
+        height: retained.height,
+        format: STUDIO_TILEDOC_WEBGPU_COMPOSITE_TEXTURE_FORMAT,
+        bytesPerRow,
+        bytes,
+      });
+    } catch {
+      return null;
+    } finally {
+      safeDestroyBuffer(buffer);
+    }
   }
 
   /** Clears retained tile textures but keeps the healthy device and pipelines. */
   public invalidate(): void {
     this.releaseRetainedTiles();
+    this.releaseSourceCache();
     this.contract = null;
   }
 
@@ -839,12 +1022,13 @@ export class StudioTileDocWebGpuCompositeConsumer implements StudioTileDocWebGpu
     this.disposed = true;
     this.releaseRetainedTiles();
     this.releaseUploadPool();
+    this.releaseSourceCache();
     this.uploadScratch = null;
     const state = this.state;
     this.state = null;
     this.initialization = null;
     safeUnconfigure(state?.context ?? null);
-    safeDestroyDevice(state?.device ?? null);
+    this.releaseDeviceState(state);
   }
 
   public async present(
@@ -887,12 +1071,6 @@ export class StudioTileDocWebGpuCompositeConsumer implements StudioTileDocWebGpu
     }
   }
 
-  private gpu(): GPU | null {
-    if (this.gpuOverride !== undefined) return this.gpuOverride;
-    if (typeof navigator === "undefined") return null;
-    return navigator.gpu ?? null;
-  }
-
   private acceptDocumentContract(frame: StudioTileDocWebGpuFrame): boolean {
     const next = {
       documentWidth: frame.documentWidth,
@@ -911,9 +1089,7 @@ export class StudioTileDocWebGpuCompositeConsumer implements StudioTileDocWebGpu
   private async ensureState(): Promise<GpuState | null> {
     if (this.state) return this.state;
     if (this.initialization) return this.initialization;
-    const gpu = this.gpu();
-    if (!gpu) return null;
-    this.initialization = this.initialize(gpu);
+    this.initialization = this.initialize();
     try {
       return await this.initialization;
     } finally {
@@ -921,29 +1097,58 @@ export class StudioTileDocWebGpuCompositeConsumer implements StudioTileDocWebGpu
     }
   }
 
-  private async initialize(gpu: GPU): Promise<GpuState | null> {
+  private preferredCanvasFormat(): GPUTextureFormat {
+    const gpu = this.gpuOverride ?? (
+      typeof navigator === "undefined" ? null : navigator.gpu ?? null
+    );
+    try {
+      return gpu?.getPreferredCanvasFormat() ?? "bgra8unorm";
+    } catch {
+      return "bgra8unorm";
+    }
+  }
+
+  private async initialize(): Promise<GpuState | null> {
     let device: GPUDevice | null = null;
+    let lease: StudioGpuDeviceLease | null = null;
+    let ownership: GpuState["ownership"] = "isolated-override";
     let context: GPUCanvasContext | null = null;
     try {
-      const adapter = await gpu.requestAdapter({ powerPreference: "high-performance" });
-      if (!adapter || this.disposed) return null;
-      device = await adapter.requestDevice();
+      let generation: number;
+      if (this.gpuOverride === undefined) {
+        lease = await this.acquireDevice();
+        if (!lease || lease.lost || this.disposed) {
+          lease?.release();
+          return null;
+        }
+        ownership = "studio-gpu-fabric";
+        device = lease.device;
+        generation = lease.epoch;
+      } else {
+        const gpu = this.gpuOverride;
+        if (!gpu) return null;
+        const adapter = await gpu.requestAdapter({ powerPreference: "high-performance" });
+        if (!adapter || this.disposed) return null;
+        device = await adapter.requestDevice();
+        if (this.generation >= Number.MAX_SAFE_INTEGER) {
+          safeDestroyDevice(device);
+          return null;
+        }
+        generation = this.generation + 1;
+      }
       if (this.disposed) {
-        safeDestroyDevice(device);
+        if (lease) lease.release();
+        else safeDestroyDevice(device);
         return null;
       }
       const candidate = this.canvas.getContext("webgpu");
       context = candidate && "configure" in candidate ? candidate as GPUCanvasContext : null;
       if (!context) {
-        safeDestroyDevice(device);
+        if (lease) lease.release();
+        else safeDestroyDevice(device);
         return null;
       }
-      if (this.generation >= Number.MAX_SAFE_INTEGER) {
-        safeDestroyDevice(device);
-        return null;
-      }
-      const generation = this.generation + 1;
-      const canvasFormat = gpu.getPreferredCanvasFormat();
+      const canvasFormat = this.preferredCanvasFormat();
       const compositeBindGroupLayout = device.createBindGroupLayout({
         label: "Studio tiledoc composite bindings",
         entries: [
@@ -1038,6 +1243,8 @@ export class StudioTileDocWebGpuCompositeConsumer implements StudioTileDocWebGpu
         presentationPipeline,
         compositeBindGroupLayout,
         presentationBindGroupLayout,
+        ownership,
+        lease,
       };
       this.generation = generation;
       this.state = state;
@@ -1045,7 +1252,8 @@ export class StudioTileDocWebGpuCompositeConsumer implements StudioTileDocWebGpu
       return state;
     } catch {
       safeUnconfigure(context);
-      safeDestroyDevice(device);
+      if (lease) lease.release();
+      else safeDestroyDevice(device);
       return null;
     }
   }
@@ -1065,8 +1273,10 @@ export class StudioTileDocWebGpuCompositeConsumer implements StudioTileDocWebGpu
     this.state = null;
     this.releaseRetainedTiles();
     this.releaseUploadPool();
+    this.releaseSourceCache();
     this.uploadScratch = null;
     safeUnconfigure(state.context);
+    state.lease?.release();
     this.onDeviceLost?.(info);
   }
 
@@ -1076,6 +1286,10 @@ export class StudioTileDocWebGpuCompositeConsumer implements StudioTileDocWebGpu
     signal: AbortSignal
   ): Promise<StudioTileDocWebGpuConsumerResult> {
     const frame = plan.frame;
+    for (const tileId of frame.visibleTileIds) {
+      if (this.retainedTiles.has(tileId)) this.retainedCacheHits += 1;
+      else this.retainedCacheMisses += 1;
+    }
     const protectedIds = new Set([
       ...frame.visibleTileIds,
       ...frame.dirtyTiles
@@ -1100,7 +1314,35 @@ export class StudioTileDocWebGpuCompositeConsumer implements StudioTileDocWebGpu
     }
     if (signal.aborted) return { status: "rejected", reason: "aborted" };
 
-    const uploads = this.acquireAndUploadSources(plan, state);
+    const tilesToComposite = frame.dirtyTiles.filter((tile) => {
+      if (tile.action !== "composite") return false;
+      const retained = this.retainedTiles.get(tile.id);
+      if (retained?.contentKey === compositeContentKey(tile)) {
+        this.compositeCacheReuses += 1;
+        return false;
+      }
+      return true;
+    });
+    const executionFrame: StudioTileDocWebGpuFrame = Object.freeze({
+      ...frame,
+      dirtyTiles: Object.freeze(tilesToComposite),
+      dirtyTileIds: Object.freeze(tilesToComposite.map((tile) => tile.id)),
+    });
+    const uniqueSources = new Map<string, StudioTileDocWebGpuSourceSnapshot>();
+    let stackEntryCount = 0;
+    for (const tile of tilesToComposite) {
+      stackEntryCount += tile.stack.length;
+      for (const source of tile.stack) uniqueSources.set(sourceKey(source), source);
+    }
+    const executionPlan: StudioTileDocWebGpuCompositePlan = Object.freeze({
+      ...plan,
+      frame: executionFrame,
+      uploadBytes: [...uniqueSources.values()]
+        .reduce((total, source) => total + source.byteLength, 0),
+      stackEntryCount,
+    });
+
+    const uploads = this.acquireAndUploadSources(executionPlan, state);
     if (!uploads) return { status: "rejected", reason: "upload-texture-failed" };
     const uniformAlignment = Math.max(
       MIN_DYNAMIC_UNIFORM_ALIGNMENT,
@@ -1110,7 +1352,7 @@ export class StudioTileDocWebGpuCompositeConsumer implements StudioTileDocWebGpu
     let vertexBuffer: GPUBuffer | null = null;
     try {
       uniformBuffer = this.createCompositeParameterBuffer(
-        plan,
+        executionPlan,
         state.device,
         uniformAlignment
       );
@@ -1121,7 +1363,7 @@ export class StudioTileDocWebGpuCompositeConsumer implements StudioTileDocWebGpu
       this.releaseActiveUploads(uploads, state);
       return { status: "rejected", reason: "buffer-allocation-failed" };
     }
-    if ((plan.stackEntryCount > 0 && !uniformBuffer) || (
+    if ((executionPlan.stackEntryCount > 0 && !uniformBuffer) || (
       plan.presentationVertices.byteLength > 0 && !vertexBuffer
     )) {
       safeDestroyBuffer(uniformBuffer);
@@ -1141,7 +1383,7 @@ export class StudioTileDocWebGpuCompositeConsumer implements StudioTileDocWebGpu
         label: `Studio tiledoc frame ${frame.requestSequence}`,
       });
       this.encodeDirtyComposites(
-        plan,
+        executionPlan,
         state,
         uploads,
         uniformBuffer,
@@ -1165,6 +1407,12 @@ export class StudioTileDocWebGpuCompositeConsumer implements StudioTileDocWebGpu
           reason: signal.aborted ? "aborted" : this.disposed ? "disposed" : "device-lost",
         };
       }
+      for (const tile of tilesToComposite) {
+        const retained = this.retainedTiles.get(tile.id);
+        if (retained) retained.contentKey = compositeContentKey(tile);
+      }
+      this.presentedFrames += 1;
+      this.presentationDraws += plan.presentationDraws.length;
       return this.receipt(frame, state.generation);
     } catch {
       return abortReason(signal);
@@ -1206,13 +1454,14 @@ export class StudioTileDocWebGpuCompositeConsumer implements StudioTileDocWebGpu
     ) {
       const candidate = candidates.shift();
       if (!candidate) return null;
+      this.retainedCacheEvictions += 1;
       this.releaseRetainedTile(candidate.id);
     }
     const descriptor: GPUTextureDescriptor = {
       label: `Studio tiledoc retained ${tileId}`,
       size: { width: tileSize, height: tileSize, depthOrArrayLayers: 1 },
       format: STUDIO_TILEDOC_WEBGPU_COMPOSITE_TEXTURE_FORMAT,
-      usage: GPU_TEXTURE_BINDING | GPU_TEXTURE_RENDER_ATTACHMENT,
+      usage: GPU_TEXTURE_COPY_SRC | GPU_TEXTURE_BINDING | GPU_TEXTURE_RENDER_ATTACHMENT,
     };
     let first: GPUTexture | null = null;
     let second: GPUTexture | null = null;
@@ -1225,12 +1474,16 @@ export class StudioTileDocWebGpuCompositeConsumer implements StudioTileDocWebGpu
       const created: RetainedTile = {
         id: tileId,
         textures: [first, second],
+        width: tileSize,
+        height: tileSize,
         byteLength: textureBytes,
         finalTextureIndex: 0,
+        contentKey: null,
         lastUsed: ++this.sequence,
       };
       this.retainedTiles.set(tileId, created);
       this.retainedBytes += textureBytes;
+      this.updatePeakTrackedGpuBytes();
       return created;
     } catch {
       if (first) safeDestroyTexture(first);
@@ -1258,38 +1511,76 @@ export class StudioTileDocWebGpuCompositeConsumer implements StudioTileDocWebGpu
     state: GpuState
   ): Map<string, ActiveUpload> | null {
     const uploads = new Map<string, ActiveUpload>();
+    const protectedKeys = new Set(
+      plan.frame.dirtyTiles.flatMap((tile) => tile.stack.map(sourceKey))
+    );
     try {
       for (const tile of plan.frame.dirtyTiles) {
         for (const source of tile.stack) {
           const key = sourceKey(source);
           if (uploads.has(key)) continue;
+          const cached = this.sourceCache.get(key);
+          if (cached) {
+            cached.lastUsed = ++this.sequence;
+            this.sourceCacheHits += 1;
+            uploads.set(key, { key, source, pooled: cached, retained: true });
+            continue;
+          }
+          this.sourceCacheMisses += 1;
+          const retain = this.reserveSourceCache(source, protectedKeys);
           const pooled = this.acquireUploadTexture(
             state,
             source.pixelWidth,
             source.pixelHeight
           );
-          const packed = packStudioTileDocWebGpuUpload(source, this.uploadScratch ?? undefined);
-          if (!this.uploadScratch || this.uploadScratch.byteLength < packed.bytes.byteLength) {
-            this.uploadScratch = new Uint8Array(packed.bytes.byteLength);
-            this.uploadScratch.set(packed.bytes);
-          }
-          const uploadBytes = this.uploadScratch.subarray(0, packed.bytes.byteLength);
-          if (packed.bytes.buffer !== uploadBytes.buffer) uploadBytes.set(packed.bytes);
-          state.device.queue.writeTexture(
-            { texture: pooled.texture },
-            uploadBytes,
-            {
-              offset: 0,
-              bytesPerRow: packed.bytesPerRow,
-              rowsPerImage: packed.rowsPerImage,
-            },
-            {
-              width: source.pixelWidth,
-              height: source.pixelHeight,
-              depthOrArrayLayers: 1,
+          try {
+            const packed = packStudioTileDocWebGpuUpload(
+              source,
+              this.uploadScratch ?? undefined
+            );
+            if (!this.uploadScratch || this.uploadScratch.byteLength < packed.bytes.byteLength) {
+              this.uploadScratch = new Uint8Array(packed.bytes.byteLength);
+              this.uploadScratch.set(packed.bytes);
             }
-          );
-          uploads.set(key, { key, source, pooled });
+            const uploadBytes = this.uploadScratch.subarray(0, packed.bytes.byteLength);
+            if (packed.bytes.buffer !== uploadBytes.buffer) uploadBytes.set(packed.bytes);
+            state.device.queue.writeTexture(
+              { texture: pooled.texture },
+              uploadBytes,
+              {
+                offset: 0,
+                bytesPerRow: packed.bytesPerRow,
+                rowsPerImage: packed.rowsPerImage,
+              },
+              {
+                width: source.pixelWidth,
+                height: source.pixelHeight,
+                depthOrArrayLayers: 1,
+              }
+            );
+            this.sourceUploadCount += 1;
+            this.sourcePayloadBytesUploaded += source.byteLength;
+            this.physicalBytesUploaded += uploadBytes.byteLength;
+          } catch (cause) {
+            this.activeUploadBytes -= pooled.byteLength;
+            safeDestroyTexture(pooled.texture);
+            throw cause;
+          }
+          if (retain) {
+            const entry: SourceCacheTexture = {
+              ...pooled,
+              key,
+              bufferIdentity: sourceBufferIdentity(source),
+              lastUsed: ++this.sequence,
+            };
+            this.activeUploadBytes -= pooled.byteLength;
+            this.sourceCache.set(key, entry);
+            this.sourceCacheBytes += pooled.byteLength;
+            uploads.set(key, { key, source, pooled: entry, retained: true });
+          } else {
+            uploads.set(key, { key, source, pooled, retained: false });
+          }
+          this.updatePeakTrackedGpuBytes();
         }
       }
       return uploads;
@@ -1297,6 +1588,40 @@ export class StudioTileDocWebGpuCompositeConsumer implements StudioTileDocWebGpu
       this.releaseActiveUploads(uploads, state);
       return null;
     }
+  }
+
+  private reserveSourceCache(
+    source: StudioTileDocWebGpuSourceSnapshot,
+    protectedKeys: ReadonlySet<string>
+  ): boolean {
+    const byteLength = source.pixelWidth
+      * source.pixelHeight
+      * STUDIO_TILEDOC_WEBGPU_SOURCE_BYTES_PER_PIXEL;
+    if (
+      byteLength <= 0
+      || byteLength > this.options.maxSourceCacheBytes
+      || this.options.maxSourceCacheEntries <= 0
+    ) {
+      return false;
+    }
+    const identity = sourceBufferIdentity(source);
+    for (const entry of [...this.sourceCache.values()]) {
+      if (entry.bufferIdentity === identity && !protectedKeys.has(entry.key)) {
+        this.releaseSourceCacheEntry(entry.key, true);
+      }
+    }
+    const candidates = [...this.sourceCache.values()]
+      .filter((entry) => !protectedKeys.has(entry.key))
+      .sort((left, right) => left.lastUsed - right.lastUsed);
+    while (
+      this.sourceCache.size + 1 > this.options.maxSourceCacheEntries
+      || this.sourceCacheBytes + byteLength > this.options.maxSourceCacheBytes
+    ) {
+      const candidate = candidates.shift();
+      if (!candidate) return false;
+      this.releaseSourceCacheEntry(candidate.key, true);
+    }
+    return true;
   }
 
   private acquireUploadTexture(
@@ -1310,10 +1635,11 @@ export class StudioTileDocWebGpuCompositeConsumer implements StudioTileDocWebGpu
     if (index >= 0) {
       const [entry] = this.uploadPool.splice(index, 1);
       this.uploadPoolBytes -= entry!.byteLength;
+      this.activeUploadBytes += entry!.byteLength;
       return entry!;
     }
     const byteLength = width * height * STUDIO_TILEDOC_WEBGPU_SOURCE_BYTES_PER_PIXEL;
-    return {
+    const created = {
       texture: state.device.createTexture({
         label: "Studio tiledoc source upload",
         size: { width, height, depthOrArrayLayers: 1 },
@@ -1324,13 +1650,18 @@ export class StudioTileDocWebGpuCompositeConsumer implements StudioTileDocWebGpu
       height,
       byteLength,
     };
+    this.activeUploadBytes += byteLength;
+    this.updatePeakTrackedGpuBytes();
+    return created;
   }
 
   private releaseActiveUploads(
     uploads: ReadonlyMap<string, ActiveUpload>,
     state: GpuState
   ): void {
-    for (const { pooled } of uploads.values()) {
+    for (const { pooled, retained } of uploads.values()) {
+      if (retained) continue;
+      this.activeUploadBytes -= pooled.byteLength;
       if (
         this.state === state
         && !this.disposed
@@ -1349,6 +1680,39 @@ export class StudioTileDocWebGpuCompositeConsumer implements StudioTileDocWebGpu
     for (const entry of this.uploadPool) safeDestroyTexture(entry.texture);
     this.uploadPool.length = 0;
     this.uploadPoolBytes = 0;
+  }
+
+  private releaseSourceCacheEntry(key: string, eviction: boolean): void {
+    const entry = this.sourceCache.get(key);
+    if (!entry) return;
+    this.sourceCache.delete(key);
+    this.sourceCacheBytes -= entry.byteLength;
+    if (eviction) this.sourceCacheEvictions += 1;
+    safeDestroyTexture(entry.texture);
+  }
+
+  private releaseSourceCache(): void {
+    for (const key of [...this.sourceCache.keys()]) {
+      this.releaseSourceCacheEntry(key, false);
+    }
+    this.sourceCacheBytes = 0;
+  }
+
+  private trackedGpuBytes(): number {
+    return this.retainedBytes
+      + this.sourceCacheBytes
+      + this.uploadPoolBytes
+      + this.activeUploadBytes;
+  }
+
+  private updatePeakTrackedGpuBytes(): void {
+    this.peakTrackedGpuBytes = Math.max(this.peakTrackedGpuBytes, this.trackedGpuBytes());
+  }
+
+  private releaseDeviceState(state: GpuState | null): void {
+    if (!state) return;
+    if (state.lease) state.lease.release();
+    else safeDestroyDevice(state.device);
   }
 
   private createCompositeParameterBuffer(

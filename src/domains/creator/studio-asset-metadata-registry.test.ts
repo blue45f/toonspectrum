@@ -246,6 +246,8 @@ describe("StudioAssetMetadataRegistry", () => {
       "render.vector.fill",
       "render.gpu.webgpu",
       "render.lottie.frame",
+      "render.svg.vello-native",
+      "format.svg.strict-audit",
       "brush.natural-media.myb",
       "stroke.geometry.pressure-outline",
       "filter.op.gaussian-blur",

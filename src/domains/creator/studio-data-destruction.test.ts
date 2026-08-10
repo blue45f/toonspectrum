@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   STUDIO_DATA_RESET_CONFIRMATION_PHRASE,
   STUDIO_INDEXED_DB_DATABASES,
+  STUDIO_LOCAL_STORAGE_EXACT_KEYS,
   STUDIO_LOCAL_STORAGE_PREFIXES,
   STUDIO_OPFS_ROOTS,
   StudioDataDestructionRefusedError,
@@ -40,6 +41,10 @@ function recordingAdapter(): StudioDataDestructionAdapter & { calls: string[] } 
     removeLocalStorageByPrefix: (prefix) => {
       calls.push(`ls:${prefix}`);
       return Promise.resolve(2);
+    },
+    removeLocalStorageKey: (key) => {
+      calls.push(`ls-key:${key}`);
+      return Promise.resolve(1);
     },
   };
 }
@@ -95,8 +100,11 @@ describe("executeStudioDataDestruction", () => {
       expect(adapter.calls).toContain(`idb:${db}`);
     }
     expect(report.localStorageKeysRemoved).toBe(
-      2 * STUDIO_LOCAL_STORAGE_PREFIXES.length,
+      2 * STUDIO_LOCAL_STORAGE_PREFIXES.length + STUDIO_LOCAL_STORAGE_EXACT_KEYS.length,
     );
+    for (const key of STUDIO_LOCAL_STORAGE_EXACT_KEYS) {
+      expect(adapter.calls).toContain(`ls-key:${key}`);
+    }
   });
 });
 
@@ -121,6 +129,32 @@ describe("inventory stays in sync with the owning modules (drift contract)", () 
       'STUDIO_SQLITE_OPFS_DIRECTORY = "toonspectrum-studio-sqlite"',
     );
     expect(STUDIO_OPFS_ROOTS).toContain("toonspectrum-studio-sqlite");
+    expect(read("./studio-opfs-filesystem.ts")).toContain(
+      'rootName = "toonspectrum-studio-assets"',
+    );
+    expect(read("./studio-opfs-sync-access-store.ts")).toContain(
+      '"toonspectrum-studio-large-documents"',
+    );
+    expect(read("./studio-pages-history-durable-runtime.ts")).toContain(
+      'rootName: "toonspectrum-studio-history-recovery"',
+    );
+    expect(read("./studio-vrm-asset-sqlite-opfs-repository.ts")).toContain(
+      'STUDIO_VRM_ASSET_OPFS_ROOT = "toonspectrum-studio-vrm-assets-v12"',
+    );
+    expect(read("./studio-bg3d-libraries-sqlite-opfs-authority.ts")).toContain(
+      '"toonspectrum-studio-bg3d-libraries-v12"',
+    );
+    expect(read("./studio-storage-recovery-runtime.ts")).toContain(
+      'rootName: "studio-recovery"',
+    );
+    expect(STUDIO_OPFS_ROOTS).toEqual(expect.arrayContaining([
+      "toonspectrum-studio-assets",
+      "toonspectrum-studio-large-documents",
+      "toonspectrum-studio-history-recovery",
+      "toonspectrum-studio-vrm-assets-v12",
+      "toonspectrum-studio-bg3d-libraries-v12",
+      "studio-recovery",
+    ]));
   });
 
   it("IndexedDB names match the library modules", () => {
@@ -128,7 +162,12 @@ describe("inventory stays in sync with the owning modules (drift contract)", () 
     expect(read("./studio-crdt-outbox.ts")).toContain("toonspectrum-studio-crdt-outbox");
     expect(read("./studio-checkpoints.ts")).toContain("toonspectrum-studio-checkpoints");
     expect(read("./studio-crdt-recovery-vault.ts")).toContain(
-      '"toonspectrum-studio-crdt-recovery-vault"',
+      "createStudioCrdtRecoverySqlitePersistence",
+    );
+    // The old IndexedDB authority is no longer opened by product code, but its
+    // exact name remains in the destructive cutover inventory.
+    expect(STUDIO_INDEXED_DB_DATABASES).toContain(
+      "toonspectrum-studio-crdt-recovery-vault",
     );
     expect(read("./bg3d-model-library.ts")).toContain(
       '"toonspectrum-studio-bg3d-model-library"',
@@ -142,5 +181,45 @@ describe("inventory stays in sync with the owning modules (drift contract)", () 
     expect(read("./bg3d-template-library.ts")).toContain(
       '"toonspectrum-studio-bg3d-template-library"',
     );
+    expect(read("./studio-production-bible.ts")).toContain(
+      '"toonspectrum-studio-production-bible"',
+    );
+    expect(read("./studio-bg3d-asset-metadata-store.ts")).toContain(
+      '"toonspectrum-studio-bg3d-asset-metadata"',
+    );
+    expect(read("./studio-bg3d-shot-batch-recovery-store.ts")).toContain(
+      '"toonspectrum-studio-bg3d-shot-batch-recovery"',
+    );
+    expect(read("./studio-vrm-texture-paint-library.ts")).toContain(
+      '"toonspectrum-studio-vrm-texture-paint-library"',
+    );
+    expect(STUDIO_INDEXED_DB_DATABASES).toEqual(
+      expect.arrayContaining([
+        "toonspectrum-studio-production-bible",
+        "toonspectrum-studio-bg3d-asset-metadata",
+        "toonspectrum-studio-bg3d-shot-batch-recovery",
+        "toonspectrum-studio-vrm-texture-paint-library",
+      ]),
+    );
+  });
+
+  it("covers the V12 localStorage fallback without reopening legacy data", () => {
+    const brushRepository = read("./studio-brush-library-sqlite-repository.ts");
+    const fallbackKey = "toonspectrum-studio-v12-brush-library-fallback";
+    expect(brushRepository).toContain(`"${fallbackKey}"`);
+    expect(STUDIO_LOCAL_STORAGE_PREFIXES.some((prefix) => fallbackKey.startsWith(prefix)))
+      .toBe(true);
+    expect(brushRepository).toContain('legacyDataPolicy?: "discard" | "import-explicit"');
+  });
+
+  it("covers dotted Studio creative keys without using a broad platform prefix", () => {
+    expect(STUDIO_LOCAL_STORAGE_PREFIXES).not.toContain("toonspectrum.studio");
+    expect(STUDIO_LOCAL_STORAGE_EXACT_KEYS).toEqual(expect.arrayContaining([
+      "toonspectrum.studio-marketplace-library.v1",
+      "toonspectrum.studio-creator-filter-presets.v1",
+      "toonspectrum.studio-filter-library.v12.fallback",
+      "toonspectrum.studio.bg3d.lt-presets.v1",
+      "toonspectrum.studio.bg3d.lt-presets.corrupt.v1",
+    ]));
   });
 });

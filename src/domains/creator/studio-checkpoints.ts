@@ -1,14 +1,20 @@
 import { z } from "zod";
 
 import { normalizeStudioAiProvenanceDocument } from "./studio-ai-provenance";
+import { acquireStudioLocalDatabase } from "./studio-local-database-runtime";
+
+import type { StudioLocalDatabase } from "./studio-local-database";
 
 export const STUDIO_CHECKPOINT_LIMIT = 10;
-const STUDIO_CHECKPOINT_PREFIX = "toonspectrum-studio-checkpoints:v1";
+const STUDIO_CHECKPOINT_PREFIX = "toonspectrum-studio-checkpoints:v12";
 const STUDIO_CHECKPOINT_DATABASE_NAME = "toonspectrum-studio-checkpoints";
 const STUDIO_CHECKPOINT_DATABASE_VERSION = 1;
 const STUDIO_CHECKPOINT_DATABASE_STORE = "documents";
-const STUDIO_CHECKPOINT_DURABLE_FALLBACK_SUFFIX = ":durable-fallback:v1";
+const STUDIO_CHECKPOINT_DURABLE_FALLBACK_SUFFIX = ":durable-fallback:v12";
+export const STUDIO_CHECKPOINT_SQLITE_NAMESPACE = "studio-named-checkpoints-v12";
+const STUDIO_CHECKPOINT_SQLITE_INDEX_KEY = "__checkpoint-keys-v1";
 let checkpointStorageSequence = 0;
+const checkpointSqliteQueues = new Map<string, Promise<void>>();
 
 export interface StudioCheckpointStorage {
   getItem(key: string): string | null;
@@ -26,6 +32,16 @@ const StudioCheckpointSchema = z.object({
 const StudioCheckpointFileSchema = z.object({
   version: z.literal(1),
   checkpoints: z.array(z.unknown()).max(100),
+});
+
+const StudioCheckpointSqliteFileSchema = z.object({
+  version: z.literal(1),
+  checkpoints: z.array(StudioCheckpointSchema).max(STUDIO_CHECKPOINT_LIMIT),
+});
+
+const StudioCheckpointSqliteIndexSchema = z.object({
+  version: z.literal(1),
+  keys: z.array(z.string().min(1).max(4_096)).max(10_000),
 });
 
 const StudioCheckpointIndexedDbFileSchema = StudioCheckpointFileSchema.extend({
@@ -114,6 +130,122 @@ function mergeCheckpointLists(...lists: readonly StudioCheckpoint[][]): StudioCh
     })
   );
   return normalizeCheckpointList({ version: 1, checkpoints });
+}
+
+function parseSqliteCheckpointList(raw: string | null): StudioCheckpoint[] {
+  if (raw === null) return [];
+  let candidate: unknown;
+  try {
+    candidate = JSON.parse(raw);
+  } catch {
+    throw new Error("SQLite 복구 지점 문서가 손상되어 안전하게 열 수 없습니다.");
+  }
+  const parsed = StudioCheckpointSqliteFileSchema.safeParse(candidate);
+  if (!parsed.success || parsed.data.checkpoints.some(
+    (checkpoint) => !Number.isFinite(Date.parse(checkpoint.createdAt))
+  )) {
+    throw new Error("SQLite 복구 지점 문서가 손상되어 안전하게 열 수 없습니다.");
+  }
+  return normalizeCheckpointList(parsed.data);
+}
+
+function serializeSqliteCheckpointList(checkpoints: readonly StudioCheckpoint[]): string {
+  const file = StudioCheckpointSqliteFileSchema.parse({
+    version: 1,
+    checkpoints: checkpoints.slice(0, STUDIO_CHECKPOINT_LIMIT),
+  });
+  if (!isJsonCheckpointValue(file)) throw createDurableStorageError();
+  try {
+    return JSON.stringify(file);
+  } catch {
+    throw createDurableStorageError();
+  }
+}
+
+async function withCheckpointSqliteQueue<T>(key: string, operation: () => Promise<T>): Promise<T> {
+  const previous = checkpointSqliteQueues.get(key) ?? Promise.resolve();
+  let release!: () => void;
+  const current = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const tail = previous.catch(() => undefined).then(() => current);
+  checkpointSqliteQueues.set(key, tail);
+  await previous.catch(() => undefined);
+  try {
+    return await operation();
+  } finally {
+    release();
+    if (checkpointSqliteQueues.get(key) === tail) checkpointSqliteQueues.delete(key);
+  }
+}
+
+function parseSqliteCheckpointKeys(raw: string | null): string[] {
+  if (raw === null) return [];
+  let candidate: unknown;
+  try {
+    candidate = JSON.parse(raw);
+  } catch {
+    throw new Error("SQLite 복구 지점 색인이 손상되어 안전하게 열 수 없습니다.");
+  }
+  const parsed = StudioCheckpointSqliteIndexSchema.safeParse(candidate);
+  if (!parsed.success || new Set(parsed.data.keys).size !== parsed.data.keys.length) {
+    throw new Error("SQLite 복구 지점 색인이 손상되어 안전하게 열 수 없습니다.");
+  }
+  return [...parsed.data.keys].sort((left, right) => left.localeCompare(right));
+}
+
+async function updateSqliteCheckpointIndex(
+  database: StudioLocalDatabase,
+  key: string,
+  present: boolean
+): Promise<void> {
+  await withCheckpointSqliteQueue(`index:${STUDIO_CHECKPOINT_SQLITE_INDEX_KEY}`, async () => {
+    const current = parseSqliteCheckpointKeys(
+      await database.kvGet(
+        STUDIO_CHECKPOINT_SQLITE_NAMESPACE,
+        STUDIO_CHECKPOINT_SQLITE_INDEX_KEY
+      )
+    );
+    const next = present
+      ? [...new Set([...current, key])].sort((left, right) => left.localeCompare(right))
+      : current.filter((candidate) => candidate !== key);
+    if (next.length === 0) {
+      await database.kvDelete(
+        STUDIO_CHECKPOINT_SQLITE_NAMESPACE,
+        STUDIO_CHECKPOINT_SQLITE_INDEX_KEY
+      );
+      return;
+    }
+    await database.kvSet(
+      STUDIO_CHECKPOINT_SQLITE_NAMESPACE,
+      STUDIO_CHECKPOINT_SQLITE_INDEX_KEY,
+      JSON.stringify(StudioCheckpointSqliteIndexSchema.parse({ version: 1, keys: next }))
+    );
+  });
+}
+
+async function mutateSqliteCheckpointList(
+  key: string,
+  mutate: (checkpoints: StudioCheckpoint[]) => StudioCheckpoint[]
+): Promise<StudioCheckpoint[]> {
+  return withCheckpointSqliteQueue(key, async () => {
+    const database = await acquireStudioLocalDatabase();
+    const current = parseSqliteCheckpointList(
+      await database.kvGet(STUDIO_CHECKPOINT_SQLITE_NAMESPACE, key)
+    );
+    const next = normalizeCheckpointList({ version: 1, checkpoints: mutate(current) });
+    if (next.length === 0) {
+      await database.kvDelete(STUDIO_CHECKPOINT_SQLITE_NAMESPACE, key);
+    } else {
+      await database.kvSet(
+        STUDIO_CHECKPOINT_SQLITE_NAMESPACE,
+        key,
+        serializeSqliteCheckpointList(next)
+      );
+    }
+    await updateSqliteCheckpointIndex(database, key, next.length > 0);
+    return next;
+  });
 }
 
 function createCheckpointRecord(input: StudioCheckpointInput): StudioCheckpoint {
@@ -447,13 +579,20 @@ function fallbackCheckpointList(
 }
 
 /**
- * Reads IndexedDB-first checkpoints and imports the legacy localStorage container once.
- * If IndexedDB is unavailable, the safe JSON fallback remains readable.
+ * Product calls pass `undefined` and read the shared V12 SQLite/OPFS authority. Supplying a storage
+ * adapter explicitly enters the legacy IndexedDB/localStorage compatibility seam; product boot
+ * never discovers or imports that seam automatically.
  */
 export async function listDurableStudioCheckpoints(
-  storage: StudioCheckpointStorage,
+  storage: StudioCheckpointStorage | undefined,
   key: string
 ): Promise<StudioCheckpoint[]> {
+  if (storage === undefined) {
+    const database = await acquireStudioLocalDatabase();
+    return parseSqliteCheckpointList(
+      await database.kvGet(STUDIO_CHECKPOINT_SQLITE_NAMESPACE, key)
+    );
+  }
   try {
     return await mutateIndexedDbCheckpointList(storage, key, (checkpoints) => checkpoints, false);
   } catch {
@@ -461,16 +600,37 @@ export async function listDurableStudioCheckpoints(
   }
 }
 
+/** Lazy recovery-center inventory for V12 SQLite checkpoints; it never scans legacy web storage. */
+export async function listDurableStudioCheckpointKeys(): Promise<string[]> {
+  const database = await acquireStudioLocalDatabase();
+  return parseSqliteCheckpointKeys(
+    await database.kvGet(
+      STUDIO_CHECKPOINT_SQLITE_NAMESPACE,
+      STUDIO_CHECKPOINT_SQLITE_INDEX_KEY
+    )
+  );
+}
+
+export async function countDurableStudioCheckpoints(): Promise<number> {
+  const keys = await listDurableStudioCheckpointKeys();
+  const lists = await Promise.all(keys.map((key) => listDurableStudioCheckpoints(undefined, key)));
+  return lists.reduce((sum, checkpoints) => sum + checkpoints.length, 0);
+}
+
 /**
- * Persists the complete checkpoint using IndexedDB structured clone (Blob-capable) before resolving.
- * localStorage is used only as a JSON-safe fallback; if both stores fail, the promise rejects.
+ * Product calls persist the complete JSON-safe project snapshot in SQLite before resolving. The
+ * explicit legacy storage seam retains its old IndexedDB structured-clone behavior for tests and
+ * opt-in recovery tools only.
  */
 export async function createDurableStudioCheckpoint(
-  storage: StudioCheckpointStorage,
+  storage: StudioCheckpointStorage | undefined,
   key: string,
   input: StudioCheckpointInput
 ): Promise<StudioCheckpoint[]> {
   const checkpoint = createCheckpointRecord(input);
+  if (storage === undefined) {
+    return mutateSqliteCheckpointList(key, (checkpoints) => [checkpoint, ...checkpoints]);
+  }
   try {
     return await mutateIndexedDbCheckpointList(storage, key, (checkpoints) => [
       checkpoint,
@@ -484,7 +644,7 @@ export async function createDurableStudioCheckpoint(
 }
 
 export async function renameDurableStudioCheckpoint(
-  storage: StudioCheckpointStorage,
+  storage: StudioCheckpointStorage | undefined,
   key: string,
   id: string,
   name: string
@@ -495,6 +655,7 @@ export async function renameDurableStudioCheckpoint(
     checkpoints.map((checkpoint) =>
       checkpoint.id === id ? { ...checkpoint, name: normalizedName } : checkpoint
     );
+  if (storage === undefined) return mutateSqliteCheckpointList(key, rename);
   try {
     return await mutateIndexedDbCheckpointList(storage, key, rename);
   } catch {
@@ -507,12 +668,13 @@ export async function renameDurableStudioCheckpoint(
 }
 
 export async function deleteDurableStudioCheckpoint(
-  storage: StudioCheckpointStorage,
+  storage: StudioCheckpointStorage | undefined,
   key: string,
   id: string
 ): Promise<StudioCheckpoint[]> {
   const remove = (checkpoints: StudioCheckpoint[]) =>
     checkpoints.filter((checkpoint) => checkpoint.id !== id);
+  if (storage === undefined) return mutateSqliteCheckpointList(key, remove);
   try {
     return await mutateIndexedDbCheckpointList(storage, key, remove);
   } catch {

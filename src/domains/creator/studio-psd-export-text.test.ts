@@ -3,6 +3,7 @@
 import { readPsd } from "ag-psd";
 import { describe, expect, it, vi } from "vitest";
 
+import { parseDialogueRubyExportXmp } from "./studio-dialogue-ruby-export";
 import {
   exportPagePsd,
   planPsdEditableTextDescriptor,
@@ -130,6 +131,7 @@ describe("PSD editable text one-way export", () => {
 
     expect(result.layerCount).toBe(2);
     expect(result.skipped).toEqual([]);
+    expect(result.rubyReceipts).toEqual([]);
     expect(result.lossManifest?.decisions).toEqual(expect.arrayContaining([
       expect.objectContaining({ feature: "text", disposition: "preserved", count: 1 }),
     ]));
@@ -211,6 +213,112 @@ describe("PSD editable text one-way export", () => {
         count: elements.length,
       }),
     ]));
+  });
+
+  it("preserves horizontal ruby appearance as pixels and exact source ranges in deterministic XMP", async () => {
+    const rubySpans = [{ start: 0, end: 2, ruby: "안녕" }];
+    const text = textEl("ruby-horizontal", {
+      name: "Horizontal Ruby",
+      text: "漢字",
+      rubySpans,
+    });
+    const { stage, toCanvasById } = fakeStage([{
+      id: text.id,
+      documentRect: { x: 20, y: 30, width: 220, height: 48 },
+      canvas: pixelCanvas(220, 48, [14, 27, 40, 255]),
+    }]);
+    const result = await exportPagePsd(stage, [text], 720, 1_080, 1, { includeBackground: false });
+    const parsed = await parseResult(result);
+    const layer = parsed.children?.[0];
+    const manifest = parseDialogueRubyExportXmp(parsed.imageResources?.xmpMetadata ?? "");
+
+    expect(layer?.text).toBeUndefined();
+    expect(layer).toMatchObject({ left: 20, top: 30, right: 240, bottom: 78 });
+    expect(toCanvasById.get(text.id)).toHaveBeenCalledOnce();
+    expect(result.blob.size).toBeGreaterThan(220 * 48);
+    expect(result.rubyReceipts).toEqual([
+      expect.objectContaining({
+        elementId: text.id,
+        writingMode: "horizontal-tb",
+        appearance: "visible-raster-layer",
+        editability: "source-metadata-only",
+        metadata: "document-xmp-v1",
+        placementCount: 1,
+        unsupported: [],
+      }),
+    ]);
+    expect(manifest?.records).toEqual([
+      expect.objectContaining({
+        elementId: text.id,
+        text: "漢字",
+        rubySpans,
+        disposition: "visible-raster-metadata-psd",
+      }),
+    ]);
+    expect(result.skipped).toEqual([
+      expect.stringContaining("화면 그대로 보이는 래스터 레이어"),
+    ]);
+  });
+
+  it("retains vertical-rl ruby and detects a tate-chu-yoko base beside the annotation", async () => {
+    const text = textEl("ruby-vertical", {
+      name: "Vertical Ruby",
+      text: "縦2026横",
+      vertical: true,
+      width: 120,
+      rubySpans: [{ start: 1, end: 5, ruby: "にせん" }],
+    });
+    const { stage } = fakeStage([{
+      id: text.id,
+      documentRect: { x: 20, y: 30, width: 120, height: 160 },
+    }]);
+    const first = await exportPagePsd(stage, [text], 720, 1_080, 1, { includeBackground: false });
+    const second = await exportPagePsd(stage, [text], 720, 1_080, 1, { includeBackground: false });
+    const parsed = await parseResult(first);
+    const manifest = parseDialogueRubyExportXmp(parsed.imageResources?.xmpMetadata ?? "");
+
+    expect(first.rubyReceipts).toEqual(second.rubyReceipts);
+    expect(first.rubyReceipts[0]).toMatchObject({
+      writingMode: "vertical-rl",
+      tateChuYokoBaseCount: 1,
+      placementCount: 3,
+      unsupported: [],
+    });
+    expect(manifest?.records[0]).toMatchObject({
+      text: "縦2026横",
+      writingMode: "vertical-rl",
+      rubySpans: [{ start: 1, end: 5, ruby: "にせん" }],
+    });
+    expect(parsed.children?.[0]?.text).toBeUndefined();
+  });
+
+  it("keeps malformed ruby offsets in XMP and emits explicit unsupported receipts", async () => {
+    const rubySpans = [
+      { start: 0, end: 1, ruby: "a" },
+      { start: 0, end: 4, ruby: "overlap" },
+      { start: 1, end: 2, ruby: "split" },
+      { start: -1, end: 9, ruby: "range" },
+    ];
+    const text = textEl("ruby-malformed", {
+      name: "Malformed Ruby",
+      text: "A😀B",
+      rubySpans,
+    });
+    const { stage } = fakeStage([{
+      id: text.id,
+      documentRect: { x: 20, y: 30, width: 220, height: 48 },
+    }]);
+    const result = await exportPagePsd(stage, [text], 720, 1_080, 1, { includeBackground: false });
+    const parsed = await parseResult(result);
+    const manifest = parseDialogueRubyExportXmp(parsed.imageResources?.xmpMetadata ?? "");
+
+    expect(result.rubyReceipts[0]?.unsupported.map((issue) => issue.code)).toEqual(expect.arrayContaining([
+      "overlapping-span",
+      "split-surrogate-pair",
+      "out-of-range",
+    ]));
+    expect(manifest?.records[0]?.rubySpans).toEqual(rubySpans);
+    expect(result.skipped[0]).toContain("범위 문제");
   });
 
   it("keeps the bounded eligibility matrix explicit for inactive effects, size, color, and panel clipping", () => {

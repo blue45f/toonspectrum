@@ -3,17 +3,17 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { createRef } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { STUDIO_CREATOR_PACK_CATALOG } from "./studio-creator-pack-catalog";
-import {
-  installStudioCreatorPack,
-  type StudioCreatorPackStorage,
-} from "./studio-creator-pack-runtime";
 import { STUDIO_FILTER_DIALOG_CATALOG } from "./studio-filter-catalog";
+import {
+  STUDIO_FILTER_LIBRARY_DATA_POLICY,
+  type ProductFilterLibraryRepository,
+  type StudioFilterLibraryPreset,
+} from "./studio-filter-library-sqlite-repository";
 import { StudioFilterDialog } from "./StudioFilterDialog";
 
 const filterDialogCatalogCount = STUDIO_FILTER_DIALOG_CATALOG.length;
@@ -300,40 +300,197 @@ describe("StudioFilterDialog", () => {
     expect(filterDialogSource).toMatch(/label="대비"[\s\S]*?min=\{-80\}[\s\S]*?max=\{80\}/u);
   });
 
-  it("surfaces an installed Creator Pack preset in the matching live filter dialog", () => {
-    const values = new Map<string, string>();
-    const target: StudioCreatorPackStorage = {
-      getItem: (key) => values.get(key) ?? null,
-      setItem: (key, value) => {
-        values.set(key, value);
-      },
-      removeItem: (key) => {
-        values.delete(key);
+  it("surfaces a matching preset from the SQLite product repository", async () => {
+    const sqlPreset: StudioFilterLibraryPreset = {
+      id: "creator-pack:filter-pack:vignette-1",
+      packageId: "filter-pack",
+      entryId: "vignette-1",
+      name: "대사 집중 비네트",
+      engine: "vignette",
+      values: { darkness: 35, size: 45, roundness: 100, feather: 60 },
+      installedAt: 1_000,
+      updatedAt: 1_000,
+      category: "creator-pack",
+      favorite: false,
+      sortOrder: 0,
+      packageVersion: "12.0.0",
+      packageFingerprint: "fixture",
+    };
+    const product: ProductFilterLibraryRepository = {
+      authority: "sqlite",
+      legacyDataPolicy: STUDIO_FILTER_LIBRARY_DATA_POLICY,
+      repository: {
+        query: vi.fn().mockResolvedValue({
+          items: [sqlPreset],
+          nextCursor: null,
+          hasMore: false,
+          totalCount: 1,
+        }),
+        getById: vi.fn(),
+        put: vi.fn(),
+        putMany: vi.fn(),
+        delete: vi.fn(),
+        deleteMany: vi.fn(),
+        setFavorite: vi.fn(),
       },
     };
-    const filterPack = STUDIO_CREATOR_PACK_CATALOG.find(
-      (pack) => pack.metadata.kind === "filter",
-    )!;
-    expect(installStudioCreatorPack(filterPack, target, 1_000).status).toBe("installed");
-    vi.stubGlobal("localStorage", target);
-    try {
-      const html = renderToStaticMarkup(
-        <StudioFilterDialog
-          activeKey="filter:vignette"
-          kind="vignette"
-          image={{}}
-          rootRef={createRef<HTMLElement>()}
-          onPreview={vi.fn()}
-          onApply={vi.fn()}
-          onClose={vi.fn()}
-        />,
-      );
-      expect(html).toContain("설치한 Creator Pack 프리셋");
-      expect(html).toContain("대사 집중 비네트");
-      expect(html).not.toContain("야간 듀오톤");
-    } finally {
-      vi.unstubAllGlobals();
-    }
+    render(
+      <StudioFilterDialog
+        activeKey="filter:vignette"
+        kind="vignette"
+        image={{}}
+        rootRef={createRef<HTMLElement>()}
+        acquireFilterLibrary={() => Promise.resolve(product)}
+        onPreview={vi.fn()}
+        onApply={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+    await waitFor(() => expect(screen.getByText("대사 집중 비네트")).toBeTruthy());
+    expect(screen.getByText("1개 · 무제한 · 로컬 SQL")).toBeTruthy();
+    expect(product.repository.query).toHaveBeenCalledWith({
+      cursor: null,
+      engine: "vignette",
+      limit: 128,
+    });
+  });
+
+  it("labels the SQLite-unavailable memory session as non-persistent and never unlimited", async () => {
+    const sessionPreset: StudioFilterLibraryPreset = {
+      id: "creator-pack:session:vignette-1",
+      packageId: "session",
+      entryId: "vignette-1",
+      name: "세션 비네트",
+      engine: "vignette",
+      values: { darkness: 30, size: 50, roundness: 90, feather: 55 },
+      installedAt: 2_000,
+      updatedAt: 2_000,
+      category: "creator-pack",
+      favorite: false,
+      sortOrder: 0,
+      packageVersion: "12.0.0",
+      packageFingerprint: "session-only",
+    };
+    const product: ProductFilterLibraryRepository = {
+      authority: "memory-session",
+      legacyDataPolicy: STUDIO_FILTER_LIBRARY_DATA_POLICY,
+      repository: {
+        query: vi.fn().mockResolvedValue({
+          items: [sessionPreset],
+          nextCursor: null,
+          hasMore: false,
+          totalCount: 1,
+        }),
+        getById: vi.fn(),
+        put: vi.fn(),
+        putMany: vi.fn(),
+        delete: vi.fn(),
+        deleteMany: vi.fn(),
+        setFavorite: vi.fn(),
+      },
+    };
+    const { container } = render(
+      <StudioFilterDialog
+        activeKey="filter:vignette-session"
+        kind="vignette"
+        image={{}}
+        rootRef={createRef<HTMLElement>()}
+        acquireFilterLibrary={() => Promise.resolve(product)}
+        onPreview={vi.fn()}
+        onApply={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText(
+      "1개 · 비영속 메모리 세션 · 브라우저 종료 시 사라짐",
+    )).toBeTruthy());
+    expect(container.querySelector("[data-studio-filter-library-authority]")
+      ?.getAttribute("data-studio-filter-library-authority")).toBe("memory-session");
+    expect(screen.getByText("현재 세션 Creator Pack 필터 프리셋")).toBeTruthy();
+    expect(screen.getByText(/현재 세션에만 유지됩니다/u)).toBeTruthy();
+    expect(container.textContent).not.toContain("무제한");
+    expect(container.textContent).not.toContain("호환 저장소");
+  });
+
+  it("keyset-pages installed SQL presets instead of rendering the whole catalog", async () => {
+    const first: StudioFilterLibraryPreset = {
+      id: "creator-pack:filter-pack:vignette-1",
+      packageId: "filter-pack",
+      entryId: "vignette-1",
+      name: "첫 프리셋",
+      engine: "vignette",
+      values: { darkness: 35, size: 45, roundness: 100, feather: 60 },
+      installedAt: 1_000,
+      updatedAt: 1_000,
+      category: "creator-pack",
+      favorite: false,
+      sortOrder: 0,
+      packageVersion: "12.0.0",
+      packageFingerprint: "fixture",
+    };
+    const second = {
+      ...first,
+      id: "creator-pack:filter-pack:vignette-2",
+      entryId: "vignette-2",
+      name: "둘째 프리셋",
+      sortOrder: 1,
+    };
+    const cursor = {
+      favorite: false,
+      sortOrder: 0,
+      updatedAt: 1_000,
+      id: first.id,
+    };
+    const query = vi.fn()
+      .mockResolvedValueOnce({
+        items: [first],
+        nextCursor: cursor,
+        hasMore: true,
+        totalCount: 2,
+      })
+      .mockResolvedValueOnce({
+        items: [second],
+        nextCursor: null,
+        hasMore: false,
+        totalCount: 2,
+      });
+    const product: ProductFilterLibraryRepository = {
+      authority: "sqlite",
+      legacyDataPolicy: STUDIO_FILTER_LIBRARY_DATA_POLICY,
+      repository: {
+        query,
+        getById: vi.fn(),
+        put: vi.fn(),
+        putMany: vi.fn(),
+        delete: vi.fn(),
+        deleteMany: vi.fn(),
+        setFavorite: vi.fn(),
+      },
+    };
+    render(
+      <StudioFilterDialog
+        activeKey="filter:vignette-paged"
+        kind="vignette"
+        image={{}}
+        rootRef={createRef<HTMLElement>()}
+        acquireFilterLibrary={() => Promise.resolve(product)}
+        onPreview={vi.fn()}
+        onApply={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    const loadMore = await screen.findByRole("button", { name: "더 불러오기 (1/2)" });
+    expect(screen.queryByText("둘째 프리셋")).toBeNull();
+    fireEvent.click(loadMore);
+    await waitFor(() => expect(screen.getByText("둘째 프리셋")).toBeTruthy());
+    expect(query).toHaveBeenNthCalledWith(2, {
+      cursor,
+      engine: "vignette",
+      limit: 128,
+    });
+    expect(screen.queryByRole("button", { name: /더 불러오기/u })).toBeNull();
   });
 
   it("renders schema-driven sliders for filter-pack kinds (vignette)", () => {

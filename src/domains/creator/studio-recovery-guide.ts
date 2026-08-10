@@ -16,8 +16,8 @@ import { parseStudioAutosave, studioAutosaveHasContent } from "./studio-autosave
 import type { StudioReliabilityStatusSnapshot } from "./studio-reliability-status-store";
 
 /** `studio-autosave.ts` / `studio-checkpoints.ts` 가 쓰는 키 접두사(실측치). */
-export const STUDIO_AUTOSAVE_KEY_PREFIX = "toonspectrum-studio-autosave:v2";
-export const STUDIO_CHECKPOINT_KEY_PREFIX = "toonspectrum-studio-checkpoints:v1";
+export const STUDIO_AUTOSAVE_KEY_PREFIX = "toonspectrum-studio-autosave:v12";
+export const STUDIO_CHECKPOINT_KEY_PREFIX = "toonspectrum-studio-checkpoints:v12";
 
 export interface StudioRecoveryStorageLike {
   readonly length: number;

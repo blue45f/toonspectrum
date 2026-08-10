@@ -51,6 +51,16 @@ import {
   type CostumeState,
   type CostumeSlot,
 } from "./studio-vrm-costume";
+import {
+  createStudioVrmCreativeSqliteRepository,
+  parseStudioVrmCustomPoseImport,
+  serializeStudioVrmCustomPoseLibrary,
+  serializeStudioVrmFullStateLibrary,
+  STUDIO_VRM_CUSTOM_POSE_MAX_LABEL_LENGTH,
+  STUDIO_VRM_FULL_STATE_MAX_NAME_LENGTH,
+  type StudioVrmCreativeSqliteRepository,
+  type StudioVrmCustomPose,
+} from "./studio-vrm-creative-sqlite-repository";
 import { createStudioVrmExpressionApplyPlan } from "./studio-vrm-expression-apply";
 import {
   solveStudioVrmFullBodyIk,
@@ -126,7 +136,6 @@ import {
   scrubVrmMannequinColorCaches,
   ZERO_ROTATION,
   computeLightingUniforms,
-  deserializeFullVrmState,
   serializeFullVrmState,
   applyFullState,
   stripFingerBones,
@@ -253,12 +262,13 @@ import {
 } from "./studio-vrm-texture-paint-runtime";
 import {
   applyCalibration,
-  CALIBRATION_STORAGE_KEY,
   CalibrationSampler,
-  deserializeCalibration,
-  serializeCalibration,
   type TrackingCalibration,
 } from "./studio-vrm-tracking-calibration";
+import {
+  createStudioVrmTrackingCalibrationSqliteRepository,
+  type StudioVrmTrackingCalibrationRepository,
+} from "./studio-vrm-tracking-calibration-sqlite-repository";
 import { AdaptiveQualityController } from "./studio-vrm-tracking-quality";
 import {
   solveStudioVrmUserIk,
@@ -336,9 +346,12 @@ import {
 } from "./StudioVrmTexturePaintPanel";
 import {
   canonicalizeVrmContentHash,
+  createUploadedVrmRecord,
   deleteStoredVrmModel,
+  ensureStoredVrmContentIdentity,
   getStoredVrmModel,
   listVrmLibraryEntries,
+  memoryVrmLibraryEntry,
   SAMPLE_VRM_ID,
   SAMPLE_VRM_ENTRIES,
   isBundledVrmRightsBlocked,
@@ -346,6 +359,7 @@ import {
   saveUploadedVrm,
   saveVrmThumbnail,
   type VrmLibraryEntry,
+  type VrmStoredModelWithContentIdentity,
 } from "./vrm-library";
 
 import type { StudioVrmPoserInsertResult } from "./studio-3d-insert-contract";
@@ -372,11 +386,21 @@ type StudioVrmPoserProps = {
   onInsert: (result: StudioVrmPoserInsertResult) => boolean | void | Promise<boolean | void>;
   initialDataUrl?: string;
   initialScene?: StudioVrmSceneDocument;
+  /** Async test seam. Product defaults to the shared studio-local-v12.db authority. */
+  creativeRepository?: StudioVrmCreativeSqliteRepository;
+  /** Async test seam. Product defaults to a dedicated namespace in studio-local-v12.db. */
+  trackingCalibrationRepository?: StudioVrmTrackingCalibrationRepository;
 };
 
 type LoadStatus = "empty" | "loading" | "ready" | "error";
 type LibraryStatus = "loading" | "ready" | "error";
 type TexturePaintPersistenceStatus = "idle" | "restoring" | "ready" | "error";
+type VrmCreativePersistenceStatus =
+  | "hydrating"
+  | "sqlite"
+  | "saving"
+  | "memory"
+  | "read-error";
 type CaptureState = {
   gl: THREE.WebGLRenderer | null;
   scene: THREE.Scene | null;
@@ -390,14 +414,7 @@ function studioVrmTexturePaintSceneIdentity(
   return JSON.stringify(scene.surfacePaint);
 }
 
-type CustomPose = {
-  id: string;
-  label: string;
-  yOffset: number;
-  bones: PoseBoneMap;
-  poseTranslations?: StudioVrmPoseTranslations;
-  expressionWeights?: Record<string, number>;
-};
+type CustomPose = StudioVrmCustomPose;
 
 type ExpressionAction = {
   id: string;
@@ -2215,6 +2232,7 @@ function StudioVrmMannequinMaterial({
   materialFx: VrmMaterialFx;
 }) {
   const snapshotsRef = useRef<MannequinMaterialSnapshot[]>([]);
+  const invalidate = useThree((state) => state.invalidate);
 
   const enforce = () => {
     for (const { material } of snapshotsRef.current) {
@@ -2249,6 +2267,9 @@ function StudioVrmMannequinMaterial({
     if (!enabled) {
       applyVrmCustomColors(vrm, customColors);
       applyVrmMaterialFx(vrm, materialFx);
+      // The poser uses frameloop="demand". Imperative material restoration has no React host
+      // update from which Fiber could infer that a fresh color frame is required.
+      invalidate();
       return;
     }
     const seen = new Set<THREE.Material>();
@@ -2273,12 +2294,14 @@ function StudioVrmMannequinMaterial({
         material.needsUpdate = true;
       }
     });
+    invalidate();
     return () => {
       restore();
       applyVrmCustomColors(vrm, customColors);
       applyVrmMaterialFx(vrm, materialFx);
+      invalidate();
     };
-  }, [customColors, enabled, materialFx, vrm]);
+  }, [customColors, enabled, invalidate, materialFx, vrm]);
 
   useFrame(() => {
     if (enabled) enforce();
@@ -3400,10 +3423,28 @@ function normalizeCatalogNextOffset(currentOffset: number, page: SharedAssetCata
   return page.nextOffset;
 }
 
-export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initialScene }: StudioVrmPoserProps) {
+export function StudioVrmPoser({
+  open,
+  onClose,
+  onInsert,
+  initialDataUrl,
+  initialScene,
+  creativeRepository: creativeRepositoryOverride,
+  trackingCalibrationRepository: trackingCalibrationRepositoryOverride,
+}: StudioVrmPoserProps) {
   const dialogTitleId = useId();
   const dialogDescriptionId = useId();
   const viewportInstructionsId = useId();
+  useEffect(() => {
+    // Clipboard payloads can contain full pose/expression state. Do not retain or
+    // migrate the former persistent browser copies across sessions.
+    try {
+      localStorage.removeItem("studio_pose_clipboard");
+      localStorage.removeItem("studio_vrm_full_clip");
+    } catch {
+      // Storage denial does not affect the in-memory/session clipboard.
+    }
+  }, []);
   const texturePaintSceneIdentity = studioVrmTexturePaintSceneIdentity(initialScene);
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -3492,6 +3533,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   const [isCapturing, setIsCapturing] = useState(false);
   const [isThumbnailCapturing, setIsThumbnailCapturing] = useState(false);
   const [libraryEntries, setLibraryEntries] = useState<VrmLibraryEntry[]>(SAMPLE_VRM_ENTRIES);
+  const memoryVrmModelsRef = useRef(new Map<string, VrmStoredModelWithContentIdentity>());
   const [libraryStatus, setLibraryStatus] = useState<LibraryStatus>("loading");
   const [libraryError, setLibraryError] = useState("");
   const [activeModelId, setActiveModelId] = useState(SAMPLE_VRM_ID);
@@ -3529,6 +3571,26 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   const [propAttachments, setPropAttachments] = useState<Record<string, PropAttachmentConfig>>({});
   const [selectedPropId, setSelectedPropId] = useState<string | null>(null);
   const [savedPoses, setSavedPoses] = useState<CustomPose[]>([]);
+  const [creativeRepository] = useState<StudioVrmCreativeSqliteRepository>(() =>
+    creativeRepositoryOverride ?? createStudioVrmCreativeSqliteRepository()
+  );
+  const [trackingCalibrationRepository] = useState<StudioVrmTrackingCalibrationRepository>(() =>
+    trackingCalibrationRepositoryOverride
+      ?? createStudioVrmTrackingCalibrationSqliteRepository()
+  );
+  const [vrmCreativePersistenceStatus, setVrmCreativePersistenceStatus] =
+    useState<VrmCreativePersistenceStatus>("hydrating");
+  const [vrmCreativePersistenceMessage, setVrmCreativePersistenceMessage] = useState(
+    "SQLite/OPFS 포즈 라이브러리를 불러오는 중입니다.",
+  );
+  const vrmCreativeMountedRef = useRef(false);
+  const vrmCreativeMutationGenerationRef = useRef(0);
+  const vrmCreativeMutationTailRef = useRef<Promise<void>>(Promise.resolve());
+  const vrmCreativeDirtyAuthoritiesRef = useRef(new Set<"poses" | "full-states">());
+  const savedPosesRef = useRef<CustomPose[]>(savedPoses);
+  const savedFullStatesRef = useRef<Record<string, FullVrmState>>(savedFullStates);
+  savedPosesRef.current = savedPoses;
+  savedFullStatesRef.current = savedFullStates;
   const [preserveExpression, setPreserveExpression] = useState(true);
   // 본 부착 소품(studio-vrm-props) — 복수 부착 인스턴스.
   const [vrmPropItems, setVrmPropItems] = useState<PropInstance[]>([]);
@@ -3580,6 +3642,10 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   const [calibrationCountdown, setCalibrationCountdown] = useState(0);
   const [calibrationProgress, setCalibrationProgress] = useState(0);
   const [calibrated, setCalibrated] = useState(false);
+  const [calibrationPersistenceStatus, setCalibrationPersistenceStatus] = useState<
+    "loading" | "sqlite" | "saving" | "memory" | "read-error"
+  >("loading");
+  const [calibrationPersistenceMessage, setCalibrationPersistenceMessage] = useState("");
   // 얼굴 미검출 장기화(~5초) 힌트 배지.
   const [faceLostLong, setFaceLostLong] = useState(false);
 
@@ -3594,6 +3660,8 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   const qualityRef = useRef<AdaptiveQualityController | null>(null);
   const calibrationRef = useRef<TrackingCalibration | null>(null);
   const calibrationSamplerRef = useRef<CalibrationSampler | null>(null);
+  const calibrationPersistenceMountedRef = useRef(false);
+  const calibrationPersistenceGenerationRef = useRef(0);
   const faceLostFramesRef = useRef(0);
   const faceLostLongRef = useRef(false);
   const lastChannelsRef = useRef<TrackingChannels | null>(null);
@@ -3712,7 +3780,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
       initialScene.model.source === "bundled"
         ? activeTexturePaintRestoreEntry?.source === "sample"
           && activeTexturePaintRestoreEntry.id === initialScene.model.id
-        : activeTexturePaintRestoreEntry?.source === "indexed-db"
+        : activeTexturePaintRestoreEntry?.source === "sqlite-opfs"
           && canonicalizeVrmContentHash(activeTexturePaintRestoreEntry.contentHash)
             === initialScene.model.hash
     ),
@@ -5541,38 +5609,72 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   }, [open, initialDataUrl, initialScene, resetFullStateHistory]);
 
   useEffect(() => {
-    const stored = localStorage.getItem("studio_custom_poses");
-    if (stored) {
-      try {
-        setSavedPoses(JSON.parse(stored));
-      } catch (e) {
-        console.error("Failed to load custom poses", e);
-      }
-    }
-    const fullStored = localStorage.getItem("studio_vrm_full_states");
-    if (fullStored) {
-      try {
-        const parsed: unknown = JSON.parse(fullStored);
-        const restored: Record<string, FullVrmState> = {};
-        if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
-          for (const [name, candidate] of Object.entries(parsed).slice(0, 100)) {
-            if (!name || name.length > 24) continue;
-            const full = deserializeFullVrmState(candidate);
-            if (full) restored[name] = full;
-          }
-        }
-        setSavedFullStates(restored);
-      } catch (e) {
-        console.error("Failed to load full vrm states", e);
-      }
-    }
-    // 저장된 트래킹 캘리브레이션 복원(손상/버전 불일치면 null → 미적용).
-    const storedCalibration = deserializeCalibration(localStorage.getItem(CALIBRATION_STORAGE_KEY));
-    if (storedCalibration) {
+    vrmCreativeMountedRef.current = true;
+    const hydrationGeneration = vrmCreativeMutationGenerationRef.current;
+    void Promise.all([
+      creativeRepository.loadCustomPoses(),
+      creativeRepository.loadFullStates(),
+    ]).then(([poses, fullStates]) => {
+      if (
+        !vrmCreativeMountedRef.current
+        || vrmCreativeMutationGenerationRef.current !== hydrationGeneration
+      ) return;
+      savedPosesRef.current = poses;
+      savedFullStatesRef.current = fullStates;
+      vrmCreativeDirtyAuthoritiesRef.current.clear();
+      setSavedPoses(poses);
+      setSavedFullStates(fullStates);
+      setVrmCreativePersistenceStatus("sqlite");
+      setVrmCreativePersistenceMessage("");
+    }).catch((caughtError: unknown) => {
+      if (
+        !vrmCreativeMountedRef.current
+        || vrmCreativeMutationGenerationRef.current !== hydrationGeneration
+      ) return;
+      setVrmCreativePersistenceStatus("read-error");
+      setVrmCreativePersistenceMessage(
+        `SQLite/OPFS 포즈 데이터를 검증해 불러오지 못했습니다. 기존 원문 보호를 위해 저장을 막았습니다: ${
+          caughtError instanceof Error ? caughtError.message : String(caughtError)
+        }`,
+      );
+    });
+
+    return () => {
+      vrmCreativeMountedRef.current = false;
+      vrmCreativeMutationGenerationRef.current += 1;
+    };
+  }, [creativeRepository]);
+
+  useEffect(() => {
+    calibrationPersistenceMountedRef.current = true;
+    const generation = ++calibrationPersistenceGenerationRef.current;
+    setCalibrationPersistenceStatus("loading");
+    setCalibrationPersistenceMessage("");
+    void trackingCalibrationRepository.load().then((storedCalibration) => {
+      if (
+        !calibrationPersistenceMountedRef.current
+        || calibrationPersistenceGenerationRef.current !== generation
+      ) return;
       calibrationRef.current = storedCalibration;
-      setCalibrated(true);
-    }
-  }, []);
+      setCalibrated(storedCalibration !== null);
+      setCalibrationPersistenceStatus("sqlite");
+    }).catch((caughtError: unknown) => {
+      if (
+        !calibrationPersistenceMountedRef.current
+        || calibrationPersistenceGenerationRef.current !== generation
+      ) return;
+      setCalibrationPersistenceStatus("read-error");
+      setCalibrationPersistenceMessage(
+        `SQLite/OPFS 캘리브레이션을 검증해 불러오지 못했습니다: ${
+          caughtError instanceof Error ? caughtError.message : String(caughtError)
+        }`,
+      );
+    });
+    return () => {
+      calibrationPersistenceMountedRef.current = false;
+      calibrationPersistenceGenerationRef.current += 1;
+    };
+  }, [trackingCalibrationRepository]);
 
   // Check camera permission state on mount or when webcam status changes
   useEffect(() => {
@@ -5830,11 +5932,27 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                   const cal = sampler.build();
                   if (cal) {
                     calibrationRef.current = cal;
-                    try {
-                      localStorage.setItem(CALIBRATION_STORAGE_KEY, serializeCalibration(cal));
-                    } catch (storageErr) {
-                      console.warn("캘리브레이션 저장 실패(이번 세션에서만 유지):", storageErr);
-                    }
+                    const generation = ++calibrationPersistenceGenerationRef.current;
+                    setCalibrationPersistenceStatus("saving");
+                    setCalibrationPersistenceMessage("");
+                    void trackingCalibrationRepository.save(cal).then(() => {
+                      if (
+                        !calibrationPersistenceMountedRef.current
+                        || calibrationPersistenceGenerationRef.current !== generation
+                      ) return;
+                      setCalibrationPersistenceStatus("sqlite");
+                    }).catch((caughtError: unknown) => {
+                      if (
+                        !calibrationPersistenceMountedRef.current
+                        || calibrationPersistenceGenerationRef.current !== generation
+                      ) return;
+                      setCalibrationPersistenceStatus("memory");
+                      setCalibrationPersistenceMessage(
+                        `캘리브레이션은 현재 탭에만 적용됩니다. SQLite/OPFS 저장 실패: ${
+                          caughtError instanceof Error ? caughtError.message : String(caughtError)
+                        }`,
+                      );
+                    });
                     channelSmootherRef.current.reset();
                   }
                   setCalibrated(!!cal);
@@ -5922,7 +6040,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
         streamRef.current = null;
       }
     };
-  }, [webcamActive]);
+  }, [trackingCalibrationRepository, webcamActive]);
 
   useEffect(() => {
     return () => {
@@ -5942,12 +6060,28 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
 
   const handleClearCalibration = () => {
     calibrationRef.current = null;
-    try {
-      localStorage.removeItem(CALIBRATION_STORAGE_KEY);
-    } catch (storageErr) {
-      console.warn("캘리브레이션 삭제 실패:", storageErr);
-    }
     setCalibrated(false);
+    const generation = ++calibrationPersistenceGenerationRef.current;
+    setCalibrationPersistenceStatus("saving");
+    setCalibrationPersistenceMessage("");
+    void trackingCalibrationRepository.clear().then(() => {
+      if (
+        !calibrationPersistenceMountedRef.current
+        || calibrationPersistenceGenerationRef.current !== generation
+      ) return;
+      setCalibrationPersistenceStatus("sqlite");
+    }).catch((caughtError: unknown) => {
+      if (
+        !calibrationPersistenceMountedRef.current
+        || calibrationPersistenceGenerationRef.current !== generation
+      ) return;
+      setCalibrationPersistenceStatus("read-error");
+      setCalibrationPersistenceMessage(
+        `SQLite/OPFS 캘리브레이션 삭제에 실패했습니다. 새로고침하면 이전 값이 복원될 수 있습니다: ${
+          caughtError instanceof Error ? caughtError.message : String(caughtError)
+        }`,
+      );
+    });
   };
 
   const handleCapturePose = () => {
@@ -5975,20 +6109,90 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     setWebcamActive(false);
   };
 
+  const vrmCreativeReadOnly = vrmCreativePersistenceStatus === "hydrating"
+    || vrmCreativePersistenceStatus === "read-error";
+
+  function replaceSavedPoses(next: CustomPose[]): void {
+    savedPosesRef.current = next;
+    setSavedPoses(next);
+  }
+
+  function replaceSavedFullStates(next: Record<string, FullVrmState>): void {
+    savedFullStatesRef.current = next;
+    setSavedFullStates(next);
+  }
+
+  function enqueueVrmCreativePersistence(
+    authority: "poses" | "full-states",
+    operation: () => Promise<unknown>,
+    successMessage: string,
+  ): void {
+    const generation = vrmCreativeMutationGenerationRef.current + 1;
+    vrmCreativeMutationGenerationRef.current = generation;
+    setVrmCreativePersistenceStatus("saving");
+    setVrmCreativePersistenceMessage("SQLite/OPFS에 저장하는 중입니다.");
+    const persisted = vrmCreativeMutationTailRef.current
+      .catch(() => undefined)
+      .then(operation);
+    vrmCreativeMutationTailRef.current = persisted.then(() => undefined, () => undefined);
+    void persisted.then(() => {
+      vrmCreativeDirtyAuthoritiesRef.current.delete(authority);
+      if (!vrmCreativeMountedRef.current || vrmCreativeMutationGenerationRef.current !== generation) {
+        return;
+      }
+      if (vrmCreativeDirtyAuthoritiesRef.current.size > 0) {
+        setVrmCreativePersistenceStatus("memory");
+        setVrmCreativePersistenceMessage(
+          "일부 VRM 창작 데이터는 현재 탭 메모리 임시 상태입니다. 새로고침하면 사라질 수 있습니다.",
+        );
+        return;
+      }
+      setVrmCreativePersistenceStatus("sqlite");
+      setVrmCreativePersistenceMessage(successMessage);
+    }).catch((caughtError: unknown) => {
+      vrmCreativeDirtyAuthoritiesRef.current.add(authority);
+      if (!vrmCreativeMountedRef.current || vrmCreativeMutationGenerationRef.current !== generation) {
+        return;
+      }
+      setVrmCreativePersistenceStatus("memory");
+      setVrmCreativePersistenceMessage(
+        `SQLite/OPFS 저장에 실패해 변경을 현재 탭 메모리에만 유지합니다. 현재 탭 메모리 임시 · 새로고침 시 사라짐: ${
+          caughtError instanceof Error ? caughtError.message : String(caughtError)
+        }`,
+      );
+    });
+  }
+
   function handleSavePose() {
+    if (vrmCreativeReadOnly) return;
     const label = globalThis.prompt("포즈 이름을 입력해 주세요:", `마이 포즈 ${savedPoses.length + 1}`);
     if (!label) return;
+    const canonicalLabel = label.normalize("NFKC").trim().replace(/\s+/gu, " ");
+    if (!canonicalLabel || canonicalLabel.length > STUDIO_VRM_CUSTOM_POSE_MAX_LABEL_LENGTH) {
+      alert(`포즈 이름은 ${STUDIO_VRM_CUSTOM_POSE_MAX_LABEL_LENGTH}자 이하여야 합니다.`);
+      return;
+    }
     const newPose: CustomPose = {
       id: `custom-${Date.now()}`,
-      label,
+      label: canonicalLabel,
       yOffset: customYOffset,
       bones: mergeStudioVrmFingerRotationsIntoBones(customBones, fingerEdits),
       poseTranslations: cloneStudioVrmPoseTranslations(poseTranslations),
       expressionWeights: { ...expressionWeights }
     };
-    const next = [...savedPoses, newPose];
-    setSavedPoses(next);
-    localStorage.setItem("studio_custom_poses", JSON.stringify(next));
+    const next = [...savedPosesRef.current, newPose];
+    try {
+      serializeStudioVrmCustomPoseLibrary(next);
+    } catch (caughtError) {
+      alert(caughtError instanceof Error ? caughtError.message : "포즈 저장 한도를 초과했습니다.");
+      return;
+    }
+    replaceSavedPoses(next);
+    enqueueVrmCreativePersistence(
+      "poses",
+      () => creativeRepository.saveCustomPoses(next),
+      `“${canonicalLabel}” 포즈를 SQLite/OPFS에 저장했습니다.`,
+    );
   }
 
   function handleDeletePose(id: string, e: MouseEvent<HTMLButtonElement>) {
@@ -5998,9 +6202,13 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
       if (
         !(await confirmStudioDestructiveAction(studioDeleteCustomPoseRequest(poseLabel)))
       ) return;
-      const next = savedPoses.filter((p) => p.id !== id);
-      setSavedPoses(next);
-      localStorage.setItem("studio_custom_poses", JSON.stringify(next));
+      const next = savedPosesRef.current.filter((p) => p.id !== id);
+      replaceSavedPoses(next);
+      enqueueVrmCreativePersistence(
+        "poses",
+        () => creativeRepository.saveCustomPoses(next),
+        "커스텀 포즈 삭제를 SQLite/OPFS에 저장했습니다.",
+      );
       if (activePoseId === id) {
         setActivePoseId("default");
       }
@@ -6055,7 +6263,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
           alert("현재 자세와 표정이 클립보드에 복사되었습니다.\n다른 캐릭터나 다른 컷의 캐릭터에 붙여넣기(Paste)할 수 있습니다.");
         })
         .catch(() => {
-          localStorage.setItem("studio_pose_clipboard", jsonStr);
+          sessionStorage.setItem("studio_pose_clipboard", jsonStr);
           alert("현재 자세와 표정이 로컬 저장소에 임시 복사되었습니다.");
         });
     } catch (_e) {
@@ -6069,7 +6277,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
       try {
         jsonStr = await navigator.clipboard.readText();
       } catch (_clipErr) {
-        jsonStr = localStorage.getItem("studio_pose_clipboard") || "";
+        jsonStr = sessionStorage.getItem("studio_pose_clipboard") || "";
       }
 
       if (!jsonStr) {
@@ -6118,12 +6326,12 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     try {
       const full = captureFullState();
       const json = JSON.stringify(full);
-      navigator.clipboard.writeText(json).then(() => alert("전체 포저 상태 복사됨")).catch(() => { localStorage.setItem("studio_vrm_full_clip", json); alert("로컬에 전체 상태 저장"); });
+      navigator.clipboard.writeText(json).then(() => alert("전체 포저 상태 복사됨")).catch(() => { sessionStorage.setItem("studio_vrm_full_clip", json); alert("현재 탭에 전체 상태 저장"); });
     } catch { alert("전체 상태 복사 실패"); }
   }
   async function handlePasteFullState() {
     try {
-      let json = ""; try { json = await navigator.clipboard.readText(); } catch { json = localStorage.getItem("studio_vrm_full_clip") || ""; }
+      let json = ""; try { json = await navigator.clipboard.readText(); } catch { json = sessionStorage.getItem("studio_vrm_full_clip") || ""; }
       if (!json) return alert("전체 상태 데이터 없음");
       const s = JSON.parse(json) as FullVrmStateInput;
       loadHandlers.handlePasteFullStateFromParsed(s);
@@ -6131,12 +6339,44 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     } catch { alert("붙여넣기 실패"); }
   }
   function handleSaveFullLocal() {
-    const name = (fullStateName || `full-${Date.now()}`).slice(0,24);
+    if (vrmCreativeReadOnly) return;
+    const name = (fullStateName || `full-${Date.now()}`)
+      .normalize("NFKC")
+      .trim()
+      .replace(/\s+/gu, " ");
+    if (!name) return;
+    if (name.length > STUDIO_VRM_FULL_STATE_MAX_NAME_LENGTH) {
+      alert(`전체 상태 이름은 ${STUDIO_VRM_FULL_STATE_MAX_NAME_LENGTH}자 이하여야 합니다.`);
+      return;
+    }
     const full = captureFullState();
-    const next = { ...savedFullStates, [name]: full };
-    setSavedFullStates(next);
-    localStorage.setItem("studio_vrm_full_states", JSON.stringify(next));
-    setFullStateName(""); alert(`저장: ${name}`);
+    const next = { ...savedFullStatesRef.current, [name]: full };
+    try {
+      serializeStudioVrmFullStateLibrary(next);
+    } catch (caughtError) {
+      alert(caughtError instanceof Error ? caughtError.message : "전체 상태 저장 한도를 초과했습니다.");
+      return;
+    }
+    replaceSavedFullStates(next);
+    enqueueVrmCreativePersistence(
+      "full-states",
+      () => creativeRepository.saveFullStates(next),
+      `“${name}” 전체 상태를 SQLite/OPFS에 저장했습니다.`,
+    );
+    setFullStateName("");
+  }
+
+  function handleDeleteFullLocal(name: string): void {
+    if (vrmCreativeReadOnly) return;
+    const next = { ...savedFullStatesRef.current };
+    if (!Object.prototype.hasOwnProperty.call(next, name)) return;
+    delete next[name];
+    replaceSavedFullStates(next);
+    enqueueVrmCreativePersistence(
+      "full-states",
+      () => creativeRepository.saveFullStates(next),
+      `“${name}” 전체 상태 삭제를 SQLite/OPFS에 저장했습니다.`,
+    );
   }
   function commitFullStateRestore(
     s: FullVrmState,
@@ -6277,6 +6517,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   }
 
   function handleImportPoses() {
+    if (vrmCreativeReadOnly) return;
     const input = document.createElement("input");
     input.type = "file";
     input.accept = ".json";
@@ -6288,38 +6529,41 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
       reader.onload = (e) => {
         try {
           const contents = e.target?.result as string;
-          const parsed = JSON.parse(contents);
-          if (!Array.isArray(parsed)) {
-            alert("올바른 포즈 파일 형식이 아닙니다 (배열 형태여야 함).");
-            return;
-          }
-          
-          const validPoses = parsed.filter((p) => p && typeof p === "object" && p.label && p.bones);
-          if (validPoses.length === 0) {
+          const importNonce = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`; // NOSONAR S2245 non-security identifier
+          const imported = parseStudioVrmCustomPoseImport(
+            contents,
+            (index) => `custom-${importNonce}-${index.toString(36)}`,
+          );
+          if (imported.length === 0) {
             alert("가져올 수 있는 유효한 포즈 데이터가 없습니다.");
             return;
           }
-          
+
           // 승인이 비동기라 아래 저장은 바깥 try/catch 밖에서 일어난다. 실패를 삼키면
           // "가져왔다고 했는데 다음 실행에 없는" 조용한 실패가 되므로 여기서 다시 잡는다.
           void (async () => {
             if (
               !(await confirmStudioDestructiveAction(
-                studioImportPosesRequest(validPoses.length)
+                studioImportPosesRequest(imported.length)
               ))
             ) return;
-            const sanitized = validPoses.map((p) => ({
-              ...p,
-              id: `custom-${Date.now()}-${Math.random().toString(36).substring(2, 7)}` // NOSONAR S2245 비암호화 용도(시각효과/ID 생성)
-            }));
-            const next = [...savedPoses, ...sanitized];
-            setSavedPoses(next);
-            localStorage.setItem("studio_custom_poses", JSON.stringify(next));
-          })().catch(() => {
-            alert("가져온 포즈를 이 기기에 저장하지 못했습니다. 저장 공간을 확인해 주세요.");
+            const next = [...savedPosesRef.current, ...imported];
+            serializeStudioVrmCustomPoseLibrary(next);
+            replaceSavedPoses(next);
+            enqueueVrmCreativePersistence(
+              "poses",
+              () => creativeRepository.saveCustomPoses(next),
+              `커스텀 포즈 ${imported.length}개를 SQLite/OPFS에 저장했습니다.`,
+            );
+          })().catch((caughtError: unknown) => {
+            alert(caughtError instanceof Error
+              ? caughtError.message
+              : "가져온 포즈를 검증하거나 저장하지 못했습니다.");
           });
-        } catch (_err) {
-          alert("파일 읽기 또는 파싱에 실패했습니다.");
+        } catch (caughtError) {
+          alert(caughtError instanceof Error
+            ? caughtError.message
+            : "파일 읽기 또는 파싱에 실패했습니다.");
         }
       };
       reader.readAsText(file);
@@ -6705,6 +6949,17 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
           if (!thumbnail) return;
 
           setLibraryEntries((entries) => entries.map((entry) => (entry.id === activeLibraryEntry.id ? { ...entry, thumbnail } : entry)));
+          if (activeLibraryEntry.source === "memory") {
+            const memoryModel = memoryVrmModelsRef.current.get(activeLibraryEntry.id);
+            if (memoryModel) {
+              memoryVrmModelsRef.current.set(activeLibraryEntry.id, {
+                ...memoryModel,
+                thumbnail,
+                updatedAt: Date.now(),
+              });
+            }
+            return;
+          }
           saveVrmThumbnail(activeLibraryEntry.id, thumbnail).catch((caughtError: unknown) => {
             setLibraryError(getErrorMessage(caughtError, "썸네일을 저장하지 못했습니다."));
           });
@@ -6948,7 +7203,9 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
 
     void (async () => {
       try {
-        const storedModel = await getStoredVrmModel(entry.id);
+        const storedModel = entry.source === "memory"
+          ? memoryVrmModelsRef.current.get(entry.id) ?? null
+          : await getStoredVrmModel(entry.id);
         if (requestId !== loadRequestRef.current) return;
         if (!storedModel) {
           throw new Error("저장된 VRM 파일을 찾지 못했습니다.");
@@ -6980,10 +7237,36 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     setLibraryError("");
 
     try {
-      const savedModels = await Promise.all(files.map((file) => saveUploadedVrm(file)));
-      const nextEntries = await listVrmLibraryEntries();
+      const savedModels: VrmStoredModelWithContentIdentity[] = [];
+      let memoryOnly = false;
+      for (const file of files) {
+        const validated = await ensureStoredVrmContentIdentity(createUploadedVrmRecord(file));
+        try {
+          const saved = await saveUploadedVrm(file);
+          savedModels.push(saved as VrmStoredModelWithContentIdentity);
+        } catch {
+          memoryOnly = true;
+          memoryVrmModelsRef.current.set(validated.id, validated);
+          savedModels.push(validated);
+        }
+      }
+      const durableEntries = await listVrmLibraryEntries().catch(() => SAMPLE_VRM_ENTRIES);
+      const memoryEntries = [...memoryVrmModelsRef.current.values()]
+        .sort((left, right) => right.updatedAt - left.updatedAt)
+        .map(memoryVrmLibraryEntry);
+      const nextEntries = [
+        ...durableEntries,
+        ...memoryEntries.filter((memoryEntry) => (
+          !durableEntries.some((entry) => entry.contentHash === memoryEntry.contentHash)
+        )),
+      ];
       setLibraryEntries(nextEntries);
-      setLibraryStatus("ready");
+      setLibraryStatus(memoryOnly ? "error" : "ready");
+      if (memoryOnly) {
+        setLibraryError(
+          "SQLite/OPFS 저장에 실패해 선택한 VRM을 현재 탭 메모리에만 유지합니다. 새로고침하면 사라지며 프로젝트 삽입은 durable 저장 전까지 차단됩니다.",
+        );
+      }
 
       const firstUploadedEntry = nextEntries.find((entry) => entry.id === savedModels[0]?.id);
       if (firstUploadedEntry) {
@@ -7002,14 +7285,19 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   }
 
   async function handleDeleteEntry(entry: VrmLibraryEntry) {
-    if (entry.source !== "indexed-db") return;
+    if (entry.source === "sample") return;
 
     setDeletingModelId(entry.id);
     setLibraryError("");
 
     try {
-      await deleteStoredVrmModel(entry.id);
-      const nextEntries = await listVrmLibraryEntries();
+      if (entry.source === "memory") memoryVrmModelsRef.current.delete(entry.id);
+      else await deleteStoredVrmModel(entry.id);
+      const durableEntries = await listVrmLibraryEntries().catch(() => SAMPLE_VRM_ENTRIES);
+      const nextEntries = [
+        ...durableEntries,
+        ...[...memoryVrmModelsRef.current.values()].map(memoryVrmLibraryEntry),
+      ];
       setLibraryEntries(nextEntries);
       setLibraryStatus("ready");
       if (activeModelId === entry.id) {
@@ -7999,6 +8287,14 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
 
   function handleInsert() {
     if (isCapturing || isSharingPose || isThumbnailCapturing) return;
+    const insertLibraryEntry = libraryEntries.find((entry) => entry.id === activeModelId);
+    if (insertLibraryEntry?.source === "memory") {
+      setError(
+        "현재 VRM은 SQLite/OPFS 저장 실패로 이 탭 메모리에만 있습니다. 새로고침 후 손실되지 않도록 저장소를 복구하고 다시 업로드한 뒤 프로젝트에 추가해 주세요.",
+      );
+      setStatus("ready");
+      return;
+    }
     const activeTexturePaintPointerId =
       texturePaintSnapshotRef.current?.activePointerId;
     if (typeof activeTexturePaintPointerId === "number") {
@@ -8150,7 +8446,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
           releaseCaptureHelpers = null;
         };
         try {
-          // PNG 인코딩·해시·IndexedDB 저장은 여러 프레임이 걸릴 수 있다. 먼저 표면 텍스처를
+          // PNG 인코딩·해시·SQLite/OPFS 저장은 여러 프레임이 걸릴 수 있다. 먼저 표면 텍스처를
           // 영속화한 뒤 전체 캡처 전제를 다시 검사하고 pose bake→scene→RGBA 캡처를 같은
           // 동기 구간에서 수행해 메타데이터와 실제 픽셀이 서로 다른 시점을 기록하지 않는다.
           const surfacePaint: StudioVrmSurfacePaintSettings = currentTexturePaintRuntime
@@ -9071,7 +9367,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                     </button>
                     <button
                       type="button"
-                      disabled={!vrm}
+                      disabled={!vrm || vrmCreativeReadOnly}
                       onClick={handleSavePose}
                       className="inline-flex items-center gap-1 rounded-lg border border-accent/30 bg-accent-soft/40 px-2 py-1 text-[0.68rem] font-bold text-accent hover:bg-accent-soft disabled:opacity-45"
                     >
@@ -9420,6 +9716,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                       <button
                         type="button"
                         onClick={handleImportPoses}
+                        disabled={vrmCreativeReadOnly}
                         className="inline-flex items-center rounded border border-line bg-card px-1.5 py-0.5 text-[0.68rem] font-bold text-fg-2 hover:bg-raised hover:text-fg"
                         title="JSON 포즈 파일 가져오기"
                       >
@@ -9427,6 +9724,23 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                       </button>
                     </div>
                   </div>
+
+                  {vrmCreativePersistenceMessage ? (
+                    <p
+                      className={cx(
+                        "rounded-lg border px-2.5 py-2 text-[0.65rem] leading-relaxed",
+                        vrmCreativePersistenceStatus === "memory"
+                          || vrmCreativePersistenceStatus === "read-error"
+                          ? "border-warn/35 bg-warn/10 text-warn"
+                          : "border-line/55 bg-card/35 text-fg-3",
+                      )}
+                      role="status"
+                      aria-live="polite"
+                      data-studio-vrm-creative-authority={vrmCreativePersistenceStatus}
+                    >
+                      {vrmCreativePersistenceMessage}
+                    </p>
+                  ) : null}
                   
                   {savedPoses.length === 0 ? (
                     <p className="text-center py-4 text-[0.68rem] text-fg-3/60 italic bg-card/20 rounded-xl border border-dashed border-line/55">
@@ -9456,6 +9770,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                           <button
                             type="button"
                             onClick={(e) => handleDeletePose(pose.id, e)}
+                            disabled={vrmCreativeReadOnly}
                             className="absolute right-2 top-2 grid size-5 place-items-center rounded-md text-fg-3 hover:bg-raised hover:text-bad"
                             aria-label="포즈 삭제"
                             title="삭제"
@@ -9849,6 +10164,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                       type="button"
                       role="switch"
                       aria-checked={mannequinMode}
+                      aria-label="중립 데생 인형 보기"
                       disabled={!vrm}
                       className={cx(
                         "min-h-9 shrink-0 rounded-lg border px-2.5 text-[0.68rem] font-bold disabled:opacity-45",
@@ -10469,15 +10785,29 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                   <div className="space-y-2 border-t border-line/45 pt-3">
                     <p className="text-[0.65rem] font-bold uppercase tracking-wider text-fg-3">전체 상태 저장 · 불러오기</p>
                     <p className="text-[0.68rem] leading-relaxed text-fg-3">포즈 · 비율 · 손가락 · 의상 · 조명 · 소품을 한 번에 저장하고 불러옵니다.</p>
+                    {vrmCreativePersistenceStatus === "memory" ? (
+                      <p className="text-[0.65rem] leading-relaxed text-warn">
+                        현재 탭 메모리 임시 · 새로고침 시 저장되지 않은 전체 상태가 사라집니다.
+                      </p>
+                    ) : null}
                     <div className="flex gap-1.5">
                       <input
                         value={fullStateName}
                         onChange={(event) => setFullStateName(event.target.value)}
                         placeholder="상태 이름"
                         aria-label="저장할 3D 캐릭터 상태 이름"
+                        maxLength={STUDIO_VRM_FULL_STATE_MAX_NAME_LENGTH}
+                        disabled={vrmCreativeReadOnly}
                         className="min-w-0 flex-1 rounded-lg border border-line bg-card px-2 py-1 text-xs text-fg placeholder:text-fg-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                       />
-                      <button type="button" onClick={handleSaveFullLocal} className="shrink-0 rounded-lg border border-accent/30 bg-accent-soft/40 px-3 py-1 text-[0.68rem] font-bold text-accent transition-colors hover:bg-accent-soft">저장</button>
+                      <button
+                        type="button"
+                        onClick={handleSaveFullLocal}
+                        disabled={vrmCreativeReadOnly}
+                        className="shrink-0 rounded-lg border border-accent/30 bg-accent-soft/40 px-3 py-1 text-[0.68rem] font-bold text-accent transition-colors hover:bg-accent-soft disabled:opacity-45"
+                      >
+                        저장
+                      </button>
                     </div>
                     <div className="flex gap-1.5">
                       <button type="button" onClick={handleCopyFullState} className="flex-1 rounded-lg border border-line bg-card px-2 py-1 text-[0.68rem] font-medium text-fg-2 transition-colors hover:bg-raised hover:text-fg">복사</button>
@@ -10485,8 +10815,25 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                     </div>
                     {Object.keys(savedFullStates).length > 0 && (
                       <div className="flex flex-wrap gap-1.5 pt-0.5">
-                        {Object.keys(savedFullStates).map(n => (
-                          <button key={n} type="button" onClick={() => handleLoadFullLocal(n)} className="rounded-lg border border-line bg-card px-2 py-0.5 text-[0.66rem] font-medium text-fg-2 transition-colors hover:bg-raised hover:text-fg">{n}</button>
+                        {Object.keys(savedFullStates).map((name) => (
+                          <span key={name} className="inline-flex items-center rounded-lg border border-line bg-card">
+                            <button
+                              type="button"
+                              onClick={() => handleLoadFullLocal(name)}
+                              className="px-2 py-0.5 text-[0.66rem] font-medium text-fg-2 transition-colors hover:bg-raised hover:text-fg"
+                            >
+                              {name}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={vrmCreativeReadOnly}
+                              onClick={() => handleDeleteFullLocal(name)}
+                              className="grid size-7 place-items-center border-l border-line text-fg-3 hover:text-bad disabled:opacity-45"
+                              aria-label={`${name} 전체 포저 상태 삭제`}
+                            >
+                              <Trash2 size={11} aria-hidden />
+                            </button>
+                          </span>
                         ))}
                       </div>
                     )}
@@ -11128,7 +11475,15 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                             </div>
                             <div className="space-y-1.5 border-t border-line/60 pt-2.5 text-[0.68rem] text-fg-2">
                               <div className="flex items-center justify-between">
-                                <span>정면 캘리브레이션{calibrated && !calibrating ? " · 적용됨" : ""}</span>
+                                <span>
+                                  정면 캘리브레이션
+                                  {calibrated && !calibrating ? " · 적용됨" : ""}
+                                  {calibrationPersistenceStatus === "sqlite" && calibrated
+                                    ? " · SQLite 저장됨"
+                                    : ""}
+                                  {calibrationPersistenceStatus === "saving" ? " · 저장 중" : ""}
+                                  {calibrationPersistenceStatus === "memory" ? " · 현재 탭만" : ""}
+                                </span>
                                 {calibrated && !calibrating && (
                                   <button
                                     type="button"
@@ -11158,6 +11513,14 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                               <p className="text-[0.64rem] leading-relaxed text-fg-3">
                                 정면·무표정 기준으로 머리 각도와 시선, 눈 크기를 보정합니다. 비스듬히 앉아도 정면 응시가 유지됩니다.
                               </p>
+                              {calibrationPersistenceMessage && (
+                                <p
+                                  className="rounded border border-amber-500/25 bg-amber-500/10 px-2 py-1.5 text-[0.64rem] leading-relaxed text-amber-700 dark:text-amber-300"
+                                  role="status"
+                                >
+                                  {calibrationPersistenceMessage}
+                                </p>
+                              )}
                             </div>
                           </div>
                         )}

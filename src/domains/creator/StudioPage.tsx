@@ -24,6 +24,7 @@ import {
   studioActiveStrokeRecoveryFingerprint,
   type StudioActiveStrokePointerType,
 } from "./studio-active-stroke-lifecycle";
+import { resolveStudioActiveToolCommandId } from "./studio-active-tool-command";
 import { resolveStudioAdvancedFillEntry } from "./studio-advanced-fill-entry";
 import {
   loadStudioAdvancedFillSettings,
@@ -51,6 +52,7 @@ import {
 import {
   loadStudioAiRecentPrompts,
   pushStudioAiRecentPrompt,
+  STUDIO_AI_RECENT_PROMPTS_KEY,
   type StudioAiAssistToolId,
   type StudioAiRecentPromptsState,
 } from "./studio-ai-assist-ux";
@@ -85,12 +87,9 @@ import {
 import { resolveStudioAiImageReferences } from "./studio-ai-image-reference-resolution";
 import {
   createEmptyStudioAiImageReferenceDocument,
+  hydrateStudioAiImageReferenceDocument,
   type StudioAiImageReferenceDocument,
 } from "./studio-ai-image-reference-roles";
-import {
-  loadStudioAiImageReferenceDocument,
-  saveStudioAiImageReferenceDocument,
-} from "./studio-ai-image-reference-storage";
 import {
   createEmptyStudioAiProvenanceDocument,
   normalizeStudioAiProvenanceDocument,
@@ -167,7 +166,6 @@ import {
   studioAutosaveKey,
   studioLifecycleAutosaveSidecarKey,
   studioSharedAutosaveCompatibility,
-  writeStudioLifecycleAutosave,
   type StudioAutosavePayload,
   type StudioPendingStrokeDurabilityReason,
 } from "./studio-autosave";
@@ -202,6 +200,10 @@ import {
   isStudioBrushAliasId,
 } from "./studio-brush-alias-profile";
 import {
+  resolveStudioHokusaiProductLiveAdmission,
+  type StudioHokusaiProductLivePresetId,
+} from "./studio-brush-backend-quality-policy";
+import {
   normalizeStudioBrushDynamicsSettings,
   resolveStudioBrushDynamicsPresetId,
   studioBrushDynamicsSettingsForBrushId,
@@ -209,14 +211,7 @@ import {
   type StudioBrushDynamicsPresetId,
 } from "./studio-brush-dynamics";
 import {
-  browserBrushLibraryStorage,
-  BRUSH_LIBRARY_KEY,
-  createBrush,
   DEFAULT_STUDIO_BRUSH_SNAPSHOT,
-  listBrushes,
-  markBrushUsedWithResult,
-  restoreDeletedBrush,
-  saveBrushBatchWithResult,
   type DeletedBrushRecord,
   type StudioBrushStampTuning,
   type StudioBrushSnapshot,
@@ -243,9 +238,9 @@ import {
 } from "./studio-brush-selection";
 import {
   assignStudioBrushSlot,
-  loadStudioBrushSlotsState,
+  emptyStudioBrushSlots,
   rememberStudioBrushSlot,
-  saveStudioBrushSlotsState,
+  STUDIO_BRUSH_SLOT_COUNT,
   studioBrushSlotAt,
   type StudioBrushSlot,
   type StudioBrushSlotsState,
@@ -326,12 +321,13 @@ import {
   listDurableStudioCheckpoints,
   studioCheckpointKey,
   type StudioCheckpoint,
-} from "./studio-checkpoints";
+} from "./studio-checkpoint-loader";
 import {
   StudioAppMenubar,
   StudioEdgeRailButton,
   StudioToolBelt,
 } from "./studio-chrome-ui";
+import { deleteSavedClipInMemory, upsertSavedClipInMemory } from "./studio-clips";
 import { shouldOwnStudioCoalescedBatchDraft } from "./studio-coalesced-batch-mutation";
 import {
   COLOR_RANGE_FUZZINESS_DEFAULT,
@@ -411,7 +407,6 @@ import {
   type CropDragSession,
   type CropRect,
 } from "./studio-crop";
-import { resolveStudioActiveToolCommandId } from "./studio-current-tool-help";
 import {
   NODE_SMOOTH_DEFAULT_STRENGTH,
   NODE_SMOOTH_DRAG_RANGE_PX,
@@ -634,7 +629,6 @@ import {
   type StudioHokusaiLiveSampleLike,
 } from "./studio-hokusai-live-brush-protocol";
 import {
-  resolveStudioHokusaiLivePreset,
   type StudioHokusaiLiveRouteResult,
 } from "./studio-hokusai-live-brush-router";
 import {
@@ -656,6 +650,11 @@ import {
   createCanvasImageElement,
   type CanvasImagePlacement,
 } from "./studio-image-placement";
+import {
+  loadStudioInkMeshLivePreviewModule,
+  type StudioInkMeshLivePreviewModule,
+  type StudioInkMeshLivePreviewRuntime,
+} from "./studio-ink-mesh-live-preview-loader";
 import {
   studioInkFallbackPressure,
 } from "./studio-ink-pressure-model";
@@ -821,6 +820,7 @@ import {
 } from "./studio-living-ink-input-routing";
 import {
   StudioLivingInkOverlayRenderer,
+  studioLivingInkCoverageIntersectsStroke,
   type StudioLivingInkOverlayPresentationReceipt,
 } from "./studio-living-ink-overlay";
 import {
@@ -840,6 +840,7 @@ import {
   type StudioLivingInkStrokeMode,
   type StudioLivingInkStudioState,
 } from "./studio-living-ink-studio-coordinator";
+import { studioLivingInkVectorShadowElement } from "./studio-living-ink-vector-shadow";
 import { localizeStudioText } from "./studio-localize-text";
 import {
   createStudioMacroSession,
@@ -994,7 +995,7 @@ import {
   createStudioPagesHistoryCommandJournalClient,
   type StudioHistoryJournalTransitionInput,
 } from "./studio-pages-history-command-journal-client";
-import { createPalette, savePalette } from "./studio-palette-library";
+import { createPalette } from "./studio-palette-library";
 import { withShotTag } from "./studio-panel-shot-tags";
 import {
   beginPanelSplitDrag,
@@ -1198,7 +1199,6 @@ import {
 } from "./studio-release-schedule-loader";
 import { studioSafeModeQuality } from "./studio-reliability-status-store";
 import { publishStudioRenderBackend } from "./studio-render-backend-beacon";
-import { getStudioTournamentRuntime } from "./studio-renderer-tournament-runtime";
 import {
   appendStudioPendingRasterRetouchGesturePoint,
   beginStudioPendingRasterRetouchGesture,
@@ -1386,7 +1386,10 @@ import {
   type StudioTeamCommentRefreshSession,
 } from "./studio-team-comment-refresh-session";
 import { suppressNextStudioToolHintFocus } from "./studio-tool-hint-focus-suppression";
-import { installStudioTournamentSqlitePersistence } from "./studio-tournament-sqlite-persistence";
+import {
+  bootStudioTournamentPersistence,
+  peekBootedStudioTournamentRuntime,
+} from "./studio-tournament-persistence-bootstrap";
 import {
   loadStudioUiDensityState,
   saveStudioUiDensityState,
@@ -1592,7 +1595,10 @@ import type {
 } from "./studio-3d-insert-contract";
 import type { AdvancedFillMaskLike } from "./studio-advanced-fill";
 import type { StudioAdvancedFillPreview } from "./studio-advanced-fill-preview";
-import type { StudioAsset } from "./studio-asset-library";
+import type {
+  StudioAsset,
+  StudioAssetWithContentHash,
+} from "./studio-asset-library";
 import type {
   StudioAutoActionExecutionProgress,
   StudioAutoActionPlan,
@@ -1781,6 +1787,9 @@ type StudioAutosaveOpfsSession = NonNullable<
   Awaited<ReturnType<typeof import("./studio-autosave-opfs-session").createStudioAutosaveOpfsSession>>
 >;
 
+type StudioAutosaveSqlitePort =
+  import("./studio-autosave-sqlite-store").StudioAutosaveSqlitePort;
+
 type StudioHybridDccWorkspacePersistence = ReturnType<
   typeof import("./studio-hybrid-dcc-workspace-persistence")
     .createStudioHybridDccWorkspacePersistenceFromFileSystem
@@ -1930,16 +1939,15 @@ function studioLivingInkLinearColor(value: string): readonly [number, number, nu
   return Object.freeze([linear(match[1]!), linear(match[2]!), linear(match[3]!), 1]);
 }
 
-const STUDIO_HOKUSAI_AUTOMATIC_PRESETS = new Set(["pencil", "charcoal", "oil"]);
-
-function studioHokusaiAutomaticPreset(
+function studioHokusaiProductLivePreset(
   brushId: string,
   catalogId: string | null | undefined,
-): "pencil" | "charcoal" | "oil" | null {
-  const preset = resolveStudioHokusaiLivePreset(brushId, catalogId);
-  return preset && STUDIO_HOKUSAI_AUTOMATIC_PRESETS.has(preset)
-    ? preset as "pencil" | "charcoal" | "oil"
-    : null;
+): StudioHokusaiProductLivePresetId | null {
+  // Brush identity is not an opt-in. The committed full-size comparison failed both the visual
+  // parity and 1.2x throughput promotion gates, so the normal shelf never starts Hokusai live.
+  // The selected-stroke inspector remains the explicit, user-visible experimental surface.
+  const admission = resolveStudioHokusaiProductLiveAdmission({ brushId, catalogId });
+  return admission.status === "admitted" ? admission.presetId : null;
 }
 
 function studioHokusaiColor(value: string): `#${string}` | null {
@@ -2681,6 +2689,38 @@ function studioWorkspaceStorage(): Storage | null {
   }
 }
 
+function studioBrushQuickSlotsDeviceProfile(): string {
+  const browserNavigator = globalThis.navigator;
+  const userAgent = browserNavigator?.userAgent ?? "";
+  const browserFamily = /(?:Edg|EdgiOS)\//u.test(userAgent)
+    ? "edge"
+    : /(?:Firefox|FxiOS)\//u.test(userAgent)
+      ? "firefox"
+      : /(?:Chrome|CriOS|Chromium)\//u.test(userAgent)
+        ? "chromium"
+        : /Safari\//u.test(userAgent)
+          ? "safari"
+          : "browser";
+  const navigatorWithUserAgentData = browserNavigator as Navigator & {
+    readonly userAgentData?: { readonly platform?: string };
+  };
+  const rawPlatform = navigatorWithUserAgentData?.userAgentData?.platform
+    ?? browserNavigator?.platform
+    ?? "unknown";
+  const platform = Array.from(
+    rawPlatform.trim().toLowerCase().replace(/[^\p{L}\p{N}._-]+/gu, "-"),
+  ).slice(0, 80).join("") || "unknown";
+  const maxTouchPoints = Number.isSafeInteger(browserNavigator?.maxTouchPoints)
+    ? Math.min(64, Math.max(0, browserNavigator.maxTouchPoints))
+    : 0;
+  const hardwareConcurrency = Number.isSafeInteger(browserNavigator?.hardwareConcurrency)
+    ? Math.min(256, Math.max(0, browserNavigator.hardwareConcurrency))
+    : 0;
+  return `browser-v1:${browserFamily}:${platform}:touch-${maxTouchPoints}:cores-${
+    hardwareConcurrency
+  }`;
+}
+
 function studioAdvancedFillStorage(): Storage | null {
   try {
     return typeof window === "undefined" ? null : window.localStorage;
@@ -2753,8 +2793,30 @@ type StudioToolsCompanionPrimaryRuntime = StudioCompanionPrimaryRuntime & {
 };
 
 type StudioPixelEditBrushRuntime = typeof import("./studio-pixel-edit-brush-runtime");
+type StudioBrushLibrarySqliteRepositoryModule = typeof import(
+  "./studio-brush-library-sqlite-repository"
+);
+type StudioBrushQuickSlotsSqliteRepositoryModule = typeof import(
+  "./studio-brush-slots-sqlite-repository"
+);
+type ProductStudioBrushQuickSlotsRepository = ReturnType<
+  StudioBrushQuickSlotsSqliteRepositoryModule["getProductStudioBrushQuickSlotsSqliteRepository"]
+>;
+type StudioBrushQuickSlotsSnapshot = Awaited<
+  ReturnType<ProductStudioBrushQuickSlotsRepository["load"]>
+>;
+type ProductBrushLibraryRepository =
+  StudioBrushLibrarySqliteRepositoryModule["openProductBrushLibraryRepository"] extends (
+    ...args: never[]
+  ) => Promise<infer Repository>
+    ? Repository
+    : never;
 
 let studioPixelEditBrushRuntimePromise: Promise<StudioPixelEditBrushRuntime> | null = null;
+let studioBrushLibrarySqliteRepositoryPromise:
+  Promise<StudioBrushLibrarySqliteRepositoryModule> | null = null;
+let studioBrushQuickSlotsSqliteRepositoryPromise:
+  Promise<StudioBrushQuickSlotsSqliteRepositoryModule> | null = null;
 
 function loadStudioPixelEditBrushRuntime(): Promise<StudioPixelEditBrushRuntime> {
   return studioPixelEditBrushRuntimePromise ??= import("./studio-pixel-edit-brush-runtime").catch(
@@ -2763,6 +2825,33 @@ function loadStudioPixelEditBrushRuntime(): Promise<StudioPixelEditBrushRuntime>
       throw error;
     }
   );
+}
+
+function loadStudioBrushLibrarySqliteRepository(): Promise<StudioBrushLibrarySqliteRepositoryModule> {
+  return studioBrushLibrarySqliteRepositoryPromise ??= import(
+    "./studio-brush-library-sqlite-repository"
+  ).catch((error: unknown) => {
+    studioBrushLibrarySqliteRepositoryPromise = null;
+    throw error;
+  });
+}
+
+function loadStudioBrushQuickSlotsSqliteRepository():
+Promise<StudioBrushQuickSlotsSqliteRepositoryModule> {
+  return studioBrushQuickSlotsSqliteRepositoryPromise ??= import(
+    "./studio-brush-slots-sqlite-repository"
+  ).catch((error: unknown) => {
+    studioBrushQuickSlotsSqliteRepositoryPromise = null;
+    throw error;
+  });
+}
+
+async function readAllProductBrushes(
+  product: ProductBrushLibraryRepository,
+): Promise<StudioSavedBrush[]> {
+  const { readAllBrushesFromRepository } =
+    await loadStudioBrushLibrarySqliteRepository();
+  return readAllBrushesFromRepository(product.repository);
 }
 
 type StudioToolsCompanionReviewProjectionInput = Parameters<
@@ -3052,6 +3141,12 @@ function StudioCuttoonEditor() {
     studioWorkAssetAdmissionCoordinator,
     studioWorkAssetHydrator,
   ]);
+  useEffect(() => {
+    // Persistence is a boot concern, never a pen-down dependency. The dynamic
+    // boundary keeps SQLite/OPFS out of the static Studio route while the
+    // synchronous stroke ladder remains pristine until hydration completes.
+    void bootStudioTournamentPersistence();
+  }, []);
   const studioLiveHeldResourcesRef = useRef<string[]>([]);
   const studioLiveMutationGenerationRef = useRef(0);
   const studioLivePendingMutationRef = useRef<{
@@ -3465,6 +3560,26 @@ function StudioCuttoonEditor() {
   const checkpointKey = studioCheckpointKey({ userId: studioAuthUserId, workId, remixId });
   const autosaveOpfsSessionRef =
     useRef<Promise<StudioAutosaveOpfsSession | null> | null>(null);
+  const autosaveSqliteStoreRef =
+    useRef<Promise<StudioAutosaveSqlitePort | null> | null>(null);
+  useEffect(() => {
+    const storePromise = import("./studio-autosave-sqlite-store")
+      .then(({ acquireStudioAutosaveSqliteStore }) =>
+        acquireStudioAutosaveSqliteStore()
+      )
+      .catch((cause: unknown) => {
+        if (import.meta.env.DEV) {
+          console.warn("Studio SQLite autosave authority is unavailable.", cause);
+        }
+        return null;
+      });
+    autosaveSqliteStoreRef.current = storePromise;
+    return () => {
+      if (autosaveSqliteStoreRef.current === storePromise) {
+        autosaveSqliteStoreRef.current = null;
+      }
+    };
+  }, []);
   useEffect(() => {
     const sessionPromise = import("./studio-autosave-opfs-session")
       .then(({ createStudioAutosaveOpfsSession }) =>
@@ -3485,25 +3600,9 @@ function StudioCuttoonEditor() {
     };
   }, [autosaveKey]);
   const [scenarioImageReferenceDocument, setScenarioImageReferenceDocument] =
-    useState<StudioAiImageReferenceDocument>(() =>
-      workId
-        ? loadStudioAiImageReferenceDocument(studioWorkspaceStorage(), {
-            workId,
-            userScope: studioAuthUserId,
-          })
-        : createEmptyStudioAiImageReferenceDocument()
+    useState<StudioAiImageReferenceDocument>(
+      createEmptyStudioAiImageReferenceDocument,
     );
-  useEffect(() => {
-    if (!workId) return;
-    const persistenceTimer = window.setTimeout(() => {
-      saveStudioAiImageReferenceDocument(
-        studioWorkspaceStorage(),
-        { workId, userScope: studioAuthUserId },
-        scenarioImageReferenceDocument
-      );
-    }, 160);
-    return () => window.clearTimeout(persistenceTimer);
-  }, [scenarioImageReferenceDocument, studioAuthUserId, workId]);
   const loggedIn = Boolean(studioAuthUserId);
   const liveRoomQueryParam = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("room") : null;
   const [draftCollaboration, setDraftCollaboration] =
@@ -5666,7 +5765,7 @@ function StudioCuttoonEditor() {
   useEffect(() => {
     if (!checkpointPanelOpen) return;
     let checkpointLoadActive = true;
-    void listDurableStudioCheckpoints(globalThis.localStorage, checkpointKey)
+    void listDurableStudioCheckpoints(undefined, checkpointKey)
       .then((storedCheckpoints) => {
         if (checkpointLoadActive) setCheckpoints(storedCheckpoints);
       })
@@ -6800,6 +6899,19 @@ function StudioCuttoonEditor() {
   }, [currentWorkspaceOwnerScope, studioAuthUserId]);
   // 재사용 클립 보관함 — 선택 요소(그룹)를 저장해 다른 컷·회차에서 다시 꺼내 쓴다.
   const [clips, setClips] = useState<StudioClip[]>([]);
+  const [, setClipStorageState] = useState<
+    "idle" | "loading" | "sqlite" | "memory" | "unavailable"
+  >("idle");
+  const clipsRef = useRef<StudioClip[]>([]);
+  const clipMemoryModeRef = useRef(false);
+  const clipHydrationGenerationRef = useRef(0);
+  const clipMutationGenerationRef = useRef(0);
+  const clipMutationTailRef = useRef<Promise<void>>(Promise.resolve());
+
+  function replaceSavedClips(next: StudioClip[]): void {
+    clipsRef.current = next;
+    setClips(next);
+  }
 
   useEffect(() => {
     if (pageGradeActive) setPageGradePanelOpen(true);
@@ -6849,6 +6961,9 @@ function StudioCuttoonEditor() {
   // 임시저장 복구 여부 상태
   const [hasAutosave, setHasAutosave] = useState(false);
   const [autosaveChecked, setAutosaveChecked] = useState(false);
+  const autosaveRecoveryCandidateRef = useRef<
+    import("./studio-autosave-opfs-session").StudioAutosaveRecoveryCandidate | null
+  >(null);
   const [autosaveRestoreBlockedReason, setAutosaveRestoreBlockedReason] = useState<
     "legacy-unversioned" | "work-mismatch" | "revision-mismatch" | null
   >(null);
@@ -7587,23 +7702,43 @@ function StudioCuttoonEditor() {
         console.error("Failed to load studio recent colors:", err);
       });
   };
-  // 저장된 클립 복원 — 클립 메뉴를 열 때만 모듈/localStorage를 읽어 초기 스튜디오 로드를 가볍게 유지한다.
+  // 저장된 클립 복원 — 클립 메뉴를 열 때만 V12 SQLite repository를 로드해 초기 진입을 가볍게
+  // 유지한다. 이전 브라우저 키는 LEGACY_DATA_MIGRATION=FALSE에 따라 자동으로 읽지 않는다.
   useEffect(() => {
     if (menu !== "clip") return;
     if (clipsLoadRef.current) return;
 
-    let alive = true;
-    clipsLoadRef.current = import("./studio-clips")
-      .then(({ listClips }) => {
-        if (!alive) return;
-        setClips(listClips(globalThis.localStorage));
+    const generation = ++clipHydrationGenerationRef.current;
+    setClipStorageState("loading");
+    clipsRepositoryRef.current ??= import("./studio-saved-clip-sqlite-repository")
+      .then(({ getProductStudioSavedClipSqliteRepository }) =>
+        getProductStudioSavedClipSqliteRepository());
+    clipsLoadRef.current = clipsRepositoryRef.current
+      .then((repository) => repository.list())
+      .then((loaded) => {
+        if (
+          !editorMountedRef.current
+          || generation !== clipHydrationGenerationRef.current
+          || clipMemoryModeRef.current
+        ) {
+          return;
+        }
+        replaceSavedClips(loaded);
+        setClipStorageState("sqlite");
       })
       .catch((err) => {
-        console.error("Failed to load studio clips:", err);
+        if (!editorMountedRef.current || generation !== clipHydrationGenerationRef.current) return;
+        setClipStorageState("unavailable");
+        setError(`SQLite/OPFS 클립 보관함을 열지 못했습니다. 기존 저장 키는 자동으로 읽지 않으며 현재 목록은 저장되지 않았습니다: ${
+          err instanceof Error ? err.message : String(err)
+        }`);
         clipsLoadRef.current = null;
       });
     return () => {
-      alive = false;
+      if (clipHydrationGenerationRef.current === generation) {
+        clipHydrationGenerationRef.current += 1;
+      }
+      clipsLoadRef.current = null;
     };
   }, [menu]);
   // 전체화면 상태 동기화 — ESC 등으로 빠져나가도 토글 상태가 맞도록 이벤트로 추적.
@@ -7736,11 +7871,216 @@ function StudioCuttoonEditor() {
   // 스탬프 브러시(잉크붓/정밀에어/그레인연필/물맛붓) 튜닝. 브러시 선택 경로에서 기본값을
   // 명시적으로 적용해, 저장 브러시를 불러온 직후 effect가 사용자 값을 덮어쓰지 않게 한다.
   const [stampTuning, setStampTuning] = useState<StudioBrushStampTuning | null>(null);
-  const [brushSlotsState, setBrushSlotsState] = useState<StudioBrushSlotsState>(() =>
-    loadStudioBrushSlotsState(
-      typeof globalThis.localStorage === "undefined" ? null : globalThis.localStorage
-    )
-  );
+  const brushSlotsOwnerScope = studioAuthUserId ?? "guest";
+  const [brushSlotsDeviceProfile] = useState(studioBrushQuickSlotsDeviceProfile);
+  const brushSlotsScope = {
+    ownerScope: brushSlotsOwnerScope,
+    deviceProfile: brushSlotsDeviceProfile,
+  };
+  const brushSlotsScopeKey = JSON.stringify([
+    brushSlotsScope.ownerScope,
+    brushSlotsScope.deviceProfile,
+  ]);
+  const brushSlotsScopeRef = useRef({ key: brushSlotsScopeKey, scope: brushSlotsScope });
+  brushSlotsScopeRef.current = { key: brushSlotsScopeKey, scope: brushSlotsScope };
+  const [brushSlotsProjection, setBrushSlotsProjection] = useState(() => ({
+    scopeKey: brushSlotsScopeKey,
+    state: emptyStudioBrushSlots(),
+  }));
+  const brushSlotsState = brushSlotsProjection.scopeKey === brushSlotsScopeKey
+    ? brushSlotsProjection.state
+    : emptyStudioBrushSlots();
+  const brushSlotsProjectionRef = useRef(brushSlotsProjection);
+  brushSlotsProjectionRef.current = brushSlotsProjection;
+  const brushSlotsDurableSnapshotRef = useRef<{
+    scopeKey: string;
+    snapshot: StudioBrushQuickSlotsSnapshot;
+  } | null>(null);
+  const brushSlotsHydrationGenerationRef = useRef(0);
+  const brushSlotsMutationGenerationRef = useRef(0);
+  const brushSlotsMutationTailRef = useRef<Promise<void>>(Promise.resolve());
+  const brushSlotsDirtyGenerationsByScopeRef = useRef(new Map<string, number[]>());
+
+  useEffect(() => {
+    let active = true;
+    const generation = brushSlotsHydrationGenerationRef.current + 1;
+    brushSlotsHydrationGenerationRef.current = generation;
+    const mutationGeneration = brushSlotsMutationGenerationRef.current;
+    const request = brushSlotsScopeRef.current;
+    if (brushSlotsProjectionRef.current.scopeKey !== request.key) {
+      const emptyProjection = { scopeKey: request.key, state: emptyStudioBrushSlots() };
+      brushSlotsProjectionRef.current = emptyProjection;
+      setBrushSlotsProjection(emptyProjection);
+    }
+    if (brushSlotsDurableSnapshotRef.current?.scopeKey !== request.key) {
+      brushSlotsDurableSnapshotRef.current = null;
+    }
+
+    void loadStudioBrushQuickSlotsSqliteRepository()
+      .then(({ getProductStudioBrushQuickSlotsSqliteRepository }) =>
+        getProductStudioBrushQuickSlotsSqliteRepository().load(request.scope))
+      .then((snapshot) => {
+        if (
+          !active
+          || !editorMountedRef.current
+          || brushSlotsHydrationGenerationRef.current !== generation
+          || brushSlotsMutationGenerationRef.current !== mutationGeneration
+          || brushSlotsScopeRef.current.key !== request.key
+        ) {
+          return;
+        }
+        brushSlotsDurableSnapshotRef.current = { scopeKey: request.key, snapshot };
+        const projection = { scopeKey: request.key, state: { slots: snapshot.slots } };
+        brushSlotsProjectionRef.current = projection;
+        setBrushSlotsProjection(projection);
+      })
+      .catch((cause) => {
+        if (
+          !active
+          || !editorMountedRef.current
+          || brushSlotsHydrationGenerationRef.current !== generation
+          || brushSlotsMutationGenerationRef.current !== mutationGeneration
+          || brushSlotsScopeRef.current.key !== request.key
+        ) {
+          return;
+        }
+        setError(
+          cause instanceof Error
+            ? `브러시 퀵 슬롯을 불러오지 못했어요: ${cause.message}`
+            : "브러시 퀵 슬롯을 불러오지 못했어요. SQLite 저장소를 확인해주세요.",
+        );
+      });
+    return () => {
+      active = false;
+    };
+  }, [brushSlotsScopeKey]);
+
+  function commitStudioBrushSlotsMutation(
+    update: (state: StudioBrushSlotsState) => StudioBrushSlotsState,
+    options: {
+      readonly successMessage?: string;
+      readonly failureMessage: string;
+    },
+  ): void {
+    const request = brushSlotsScopeRef.current;
+    const currentProjection = brushSlotsProjectionRef.current;
+    const currentState = currentProjection.scopeKey === request.key
+      ? currentProjection.state
+      : emptyStudioBrushSlots();
+    const desiredState = update(currentState);
+    const generation = brushSlotsMutationGenerationRef.current + 1;
+    brushSlotsMutationGenerationRef.current = generation;
+    const dirtyGenerations = brushSlotsDirtyGenerationsByScopeRef.current.get(request.key)
+      ?? Array.from({ length: STUDIO_BRUSH_SLOT_COUNT }, () => 0);
+    brushSlotsDirtyGenerationsByScopeRef.current.set(request.key, dirtyGenerations);
+    for (let index = 0; index < STUDIO_BRUSH_SLOT_COUNT; index += 1) {
+      if (
+        JSON.stringify(currentState.slots[index] ?? null)
+        !== JSON.stringify(desiredState.slots[index] ?? null)
+      ) {
+        dirtyGenerations[index] = generation;
+      }
+    }
+    const optimisticProjection = { scopeKey: request.key, state: desiredState };
+    brushSlotsProjectionRef.current = optimisticProjection;
+    setBrushSlotsProjection(optimisticProjection);
+
+    const persist = async (): Promise<void> => {
+      const activeDirtySlots = dirtyGenerations.flatMap((marker, slotIndex) =>
+        marker > 0 && marker <= generation ? [{ marker, slotIndex }] : []);
+      if (activeDirtySlots.length === 0) {
+        if (
+          editorMountedRef.current
+          && brushSlotsScopeRef.current.key === request.key
+          && brushSlotsMutationGenerationRef.current === generation
+          && options.successMessage
+        ) {
+          announceDrawingShortcut(options.successMessage);
+        }
+        return;
+      }
+      const repositoryModule = await loadStudioBrushQuickSlotsSqliteRepository();
+      const repository = repositoryModule.getProductStudioBrushQuickSlotsSqliteRepository();
+      const durable = brushSlotsDurableSnapshotRef.current?.scopeKey === request.key
+        ? brushSlotsDurableSnapshotRef.current.snapshot
+        : await repository.load(request.scope);
+      const applyDirtySlots = (
+        base: StudioBrushQuickSlotsSnapshot,
+        entries: readonly { marker: number; slotIndex: number }[],
+      ): StudioBrushSlotsState => {
+        const slots = [...base.slots];
+        for (const { slotIndex } of entries) {
+          slots[slotIndex] = desiredState.slots[slotIndex] ?? null;
+        }
+        return { slots };
+      };
+
+      let saved: StudioBrushQuickSlotsSnapshot;
+      let conflictResolved = false;
+      try {
+        saved = await repository.save(
+          request.scope,
+          applyDirtySlots(durable, activeDirtySlots),
+          durable.revision,
+        );
+      } catch (cause) {
+        if (
+          !cause
+          || typeof cause !== "object"
+          || !("code" in cause)
+          || cause.code !== "conflict"
+        ) {
+          throw cause;
+        }
+        const latest = await repository.load(request.scope);
+        const retryDirtySlots = activeDirtySlots.filter(
+          ({ marker, slotIndex }) => dirtyGenerations[slotIndex] === marker,
+        );
+        if (retryDirtySlots.length === 0) return;
+        saved = await repository.save(
+          request.scope,
+          applyDirtySlots(latest, retryDirtySlots),
+          latest.revision,
+        );
+        conflictResolved = true;
+      }
+
+      for (const { marker, slotIndex } of activeDirtySlots) {
+        if (dirtyGenerations[slotIndex] === marker) dirtyGenerations[slotIndex] = 0;
+      }
+      if (dirtyGenerations.every((marker) => marker === 0)) {
+        brushSlotsDirtyGenerationsByScopeRef.current.delete(request.key);
+      }
+      if (brushSlotsScopeRef.current.key !== request.key) return;
+      brushSlotsDurableSnapshotRef.current = { scopeKey: request.key, snapshot: saved };
+      if (!editorMountedRef.current) return;
+      if (conflictResolved) {
+        announceDrawingShortcut("다른 탭의 브러시 슬롯 변경을 다시 불러와 안전하게 병합했어요.");
+      }
+      if (brushSlotsMutationGenerationRef.current === generation) {
+        const projection = { scopeKey: request.key, state: { slots: saved.slots } };
+        brushSlotsProjectionRef.current = projection;
+        setBrushSlotsProjection(projection);
+        if (!conflictResolved && options.successMessage) {
+          announceDrawingShortcut(options.successMessage);
+        }
+      }
+    };
+    const operation = brushSlotsMutationTailRef.current.then(persist, persist);
+    brushSlotsMutationTailRef.current = operation.then(
+      () => undefined,
+      () => undefined,
+    );
+    void operation.catch((cause) => {
+      if (!editorMountedRef.current || brushSlotsScopeRef.current.key !== request.key) return;
+      const message = cause && typeof cause === "object" && "code" in cause
+        && cause.code === "conflict"
+        ? "다른 탭에서 브러시 슬롯이 다시 변경되어 현재 슬롯은 안전하게 유지했지만 저장하지 못했어요. 다시 시도해주세요."
+        : `${options.failureMessage} 현재 슬롯은 이 화면에만 유지되며 저장 완료로 처리하지 않았어요.`;
+      setError(message);
+      announceDrawingShortcut(message);
+    });
+  }
   /** Procreate size/opacity lock + Ibis recent/favorites for built-in brushes. */
   const {
     proDrawPrefs,
@@ -7804,11 +8144,38 @@ function StudioCuttoonEditor() {
   const [brushDynamics, setBrushDynamics] = useState<NormalizedStudioBrushDynamicsSettings>(() =>
     normalizeStudioBrushDynamicsSettings(DEFAULT_STUDIO_BRUSH_SNAPSHOT.brushDynamics)
   );
-  // 데스크톱 관리 패널과 모바일 퀵 선반이 같은 배열을 소비한다. 같은 탭의 localStorage 변경은
-  // storage 이벤트를 발생시키지 않으므로 StudioPage가 단일 source of truth를 소유한다.
-  const [savedBrushes, setSavedBrushes] = useState<StudioSavedBrush[]>(() =>
-    listBrushes(browserBrushLibraryStorage())
-  );
+  // 데스크톱 관리 패널과 모바일 퀵 선반은 같은 SQLite/OPFS authority를 소비한다. 배열은
+  // 화면 projection일 뿐이며 모든 mutation은 아래 product repository를 먼저 commit한다.
+  const [savedBrushes, setSavedBrushes] = useState<StudioSavedBrush[]>([]);
+  const brushProjectionGenerationRef = useRef(0);
+  const commitSavedBrushProjection = useCallback((
+    update: SetStateAction<StudioSavedBrush[]>,
+  ) => {
+    brushProjectionGenerationRef.current += 1;
+    setSavedBrushes(update);
+  }, []);
+  const brushRepositoryPromiseRef = useRef<Promise<ProductBrushLibraryRepository> | null>(null);
+  const productBrushRepository = useCallback(() => {
+    const repository = brushRepositoryPromiseRef.current
+      ?? loadStudioBrushLibrarySqliteRepository().then(
+        ({ openProductBrushLibraryRepository }) =>
+          openProductBrushLibraryRepository(),
+      );
+    brushRepositoryPromiseRef.current = repository;
+    return repository;
+  }, []);
+  const refreshSavedBrushesFromRepository = useCallback(async (
+    product?: ProductBrushLibraryRepository,
+  ) => {
+    const generation = brushProjectionGenerationRef.current + 1;
+    brushProjectionGenerationRef.current = generation;
+    const authority = product ?? await productBrushRepository();
+    const next = await readAllProductBrushes(authority);
+    if (brushProjectionGenerationRef.current === generation) {
+      setSavedBrushes(next);
+    }
+    return next;
+  }, [productBrushRepository]);
   // 그리기 ▸ 브러시 가져오기 전용 입력. 라이브러리 패널의 컨트롤과 같은 매퍼를 쓰되,
   // 메뉴에서 곧바로 파일 선택기를 열 수 있도록 StudioPage가 입력을 소유한다.
   const brushPackImportInputRef = useRef<HTMLInputElement>(null);
@@ -7818,13 +8185,25 @@ function StudioCuttoonEditor() {
   const brushUndoToastRef = useRef<HTMLDivElement>(null);
   const brushUndoButtonRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    const handleBrushStorage = (event: StorageEvent) => {
-      if (event.key !== null && event.key !== BRUSH_LIBRARY_KEY) return;
-      setSavedBrushes(listBrushes(browserBrushLibraryStorage()));
+    let active = true;
+    const generation = brushProjectionGenerationRef.current + 1;
+    brushProjectionGenerationRef.current = generation;
+    void productBrushRepository()
+      .then(async (product) => {
+        const next = await readAllProductBrushes(product);
+        if (active && brushProjectionGenerationRef.current === generation) {
+          setSavedBrushes(next);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setError("브러시 라이브러리를 열지 못했어요. 저장소 권한과 여유 공간을 확인해주세요.");
+        }
+      });
+    return () => {
+      active = false;
     };
-    globalThis.addEventListener("storage", handleBrushStorage);
-    return () => globalThis.removeEventListener("storage", handleBrushStorage);
-  }, []);
+  }, [productBrushRepository]);
   useEffect(() => {
     const active = pendingBrushDeletes.filter((pending) => pending.id !== pausedBrushDeleteId);
     if (active.length === 0) return;
@@ -7848,24 +8227,17 @@ function StudioCuttoonEditor() {
     globalThis.requestAnimationFrame?.(() => brushUndoButtonRef.current?.focus({ preventScroll: true }));
   }
 
-  function undoBrushDelete(pending: PendingBrushDelete) {
-    const result = restoreDeletedBrush(browserBrushLibraryStorage(), pending.deleted);
-    if (result.status === "full") {
-      announceDrawingShortcut("브러시가 40개라 삭제를 복구하지 못했어요.");
-      return;
+  async function undoBrushDelete(pending: PendingBrushDelete) {
+    try {
+      const product = await productBrushRepository();
+      await product.repository.restore(pending.deleted);
+      await refreshSavedBrushesFromRepository(product);
+      setPendingBrushDeletes((current) => current.filter((candidate) => candidate.id !== pending.id));
+      setPausedBrushDeleteId((current) => current === pending.id ? null : current);
+      announceDrawingShortcut(`“${pending.deleted.brush.name}” 브러시를 복구했어요.`);
+    } catch {
+      announceDrawingShortcut("브러시 삭제를 복구하지 못했어요. 저장소 권한과 여유 공간을 확인해주세요.");
     }
-    if (result.status === "library-unreadable") {
-      announceDrawingShortcut("저장된 브러시 데이터를 읽지 못해 삭제 복구를 중단했어요.");
-      return;
-    }
-    if (result.status === "storage-error") {
-      announceDrawingShortcut("브라우저 저장소 오류로 삭제를 복구하지 못했어요.");
-      return;
-    }
-    setSavedBrushes(result.brushes);
-    setPendingBrushDeletes((current) => current.filter((candidate) => candidate.id !== pending.id));
-    setPausedBrushDeleteId((current) => current === pending.id ? null : current);
-    announceDrawingShortcut(`“${pending.deleted.brush.name}” 브러시를 복구했어요.`);
   }
 
   const currentBrushSnapshot: StudioBrushSnapshot = {
@@ -7939,18 +8311,22 @@ function StudioCuttoonEditor() {
     setTipAngle(saved.tipAngle);
     setTipRoundness(saved.tipRoundness);
     setBrushDynamics(normalizeStudioBrushDynamicsSettings(saved.brushDynamics));
-    const used = markBrushUsedWithResult(browserBrushLibraryStorage(), saved.id);
-    if (used.status === "updated") {
-      setSavedBrushes(used.brushes);
-    } else if (used.status === "missing") {
-      setSavedBrushes(used.brushes);
-      brushBaselineController.invalidate();
-      announceDrawingShortcut("브러시는 적용했지만 다른 탭에서 삭제되어 저장 목록을 새로 맞췄어요.");
-    } else if (used.status === "library-unreadable") {
-      announceDrawingShortcut("브러시는 적용했지만 저장 데이터를 읽지 못해 최근 사용 기록은 남기지 못했어요.");
-    } else if (used.status === "storage-error") {
-      announceDrawingShortcut("브러시는 적용했지만 브라우저 저장소 오류로 최근 사용 기록은 남기지 못했어요.");
-    }
+    const usedAt = Date.now();
+    void productBrushRepository()
+      .then(async (product) => {
+        const stored = await product.repository.getById(saved.id);
+        if (!stored) {
+          await refreshSavedBrushesFromRepository(product);
+          brushBaselineController.invalidate();
+          announceDrawingShortcut("브러시는 적용했지만 다른 탭에서 삭제되어 저장 목록을 새로 맞췄어요.");
+          return;
+        }
+        await product.repository.put({ ...stored, lastUsedAt: usedAt });
+        await refreshSavedBrushesFromRepository(product);
+      })
+      .catch(() => {
+        announceDrawingShortcut("브러시는 적용했지만 SQLite 사용 기록을 남기지 못했어요.");
+      });
   }
 
   function applyStudioBrushCatalogSelection(selection: StudioBrushCatalogSelection) {
@@ -7988,8 +8364,8 @@ function StudioCuttoonEditor() {
     commitProDrawPrefsMutation(
       (latest) => rememberRecentBrushId(latest, selection.catalogId)
     );
-    setBrushSlotsState((prev) => {
-      const next = rememberStudioBrushSlot(prev, {
+    commitStudioBrushSlotsMutation(
+      (prev) => rememberStudioBrushSlot(prev, {
         brushId: applied.brushId,
         ...(extendedSource
           ? {
@@ -8002,15 +8378,11 @@ function StudioCuttoonEditor() {
           : {}),
         strokeWidth: applied.strokeWidth,
         brushOpacity: applied.brushOpacity,
-      });
-      queueMicrotask(() => {
-        saveStudioBrushSlotsState(
-          typeof globalThis.localStorage === "undefined" ? null : globalThis.localStorage,
-          next
-        );
-      });
-      return next;
-    });
+      }),
+      {
+        failureMessage: "최근 브러시 슬롯을 SQLite에 저장하지 못했어요.",
+      },
+    );
   }
 
   function applyBuiltInBrushPreset(preset: BrushPreset) {
@@ -8165,7 +8537,7 @@ function StudioCuttoonEditor() {
     if (!file) return;
     const format = studioBrushPackFormatOf(file.name, file.type);
     if (format === null) {
-      setError("브러시 파일 형식을 알아보지 못했어요. .abr · .myb · .kpp · .json 파일을 선택해 주세요.");
+      setError("브러시 파일 형식을 알아보지 못했어요. .abr · .myb · .kpp · .sut · .sutg · .bundle · .json 파일을 선택해 주세요.");
       return;
     }
     if (format === "abr" || format === "json") {
@@ -8181,31 +8553,50 @@ function StudioCuttoonEditor() {
     }
     setBrushPackImporting(true);
     try {
-      const { importStudioBrushProgramFile } = await import("./studio-brush-pack-import");
-      const result = await importStudioBrushProgramFile(file, format);
-      const candidate = result.brushes[0];
-      if (!candidate) {
-        setError("이 파일에서 가져올 수 있는 브러시를 찾지 못했어요.");
+      const importer = await import("./studio-brush-pack-import");
+      const product = await productBrushRepository();
+      // Keep each external format as an explicit product route. This prevents a
+      // future MYB/KPP-only parser signature from silently accepting a CSP or
+      // bundle container through an over-broad union.
+      let committed: Awaited<ReturnType<
+        typeof importer.importAndCommitStudioBrushProgramFile
+      >>;
+      switch (format) {
+        case "myb":
+          committed = await importer.importAndCommitStudioBrushProgramFile(
+            file, "myb", product.repository,
+          );
+          break;
+        case "kpp":
+          committed = await importer.importAndCommitStudioBrushProgramFile(
+            file, "kpp", product.repository,
+          );
+          break;
+        case "sut":
+          committed = await importer.importAndCommitStudioBrushProgramFile(
+            file, "sut", product.repository,
+          );
+          break;
+        case "sutg":
+          committed = await importer.importAndCommitStudioBrushProgramFile(
+            file, "sutg", product.repository,
+          );
+          break;
+        case "bundle":
+          committed = await importer.importAndCommitStudioBrushProgramFile(
+            file, "bundle", product.repository,
+          );
+          break;
+      }
+      if (committed.saved.savedCount === 0) {
+        setError("브러시 파일에 새로 저장할 항목이 없어요.");
         return;
       }
-      const created = createBrush(candidate.name, candidate.snapshot);
-      const saved = saveBrushBatchWithResult(browserBrushLibraryStorage(), [created]);
-      if (saved.status === "storage-error" || saved.status === "library-unreadable") {
-        setError("브러시를 이 브라우저에 저장하지 못했어요. 저장소 권한이나 여유 공간을 확인해주세요.");
-        return;
-      }
-      if (saved.status === "full" || saved.savedCount === 0) {
-        setError("브러시 라이브러리가 가득 찼어요. 기존 브러시를 정리한 뒤 다시 시도해 주세요.");
-        return;
-      }
-      setSavedBrushes(saved.brushes);
-      const label = format === "myb" ? "libmypaint" : "Krita";
-      const notes = [...result.warnings];
-      if (result.unmapped.length > 0) {
-        notes.push(`이 포맷 전용 설정 ${result.unmapped.length}개는 옮기지 못했어요.`);
-      }
+      await refreshSavedBrushesFromRepository(product);
+      const label = importer.studioBrushPackFormatLabel(format);
+      const notes = importer.studioBrushPackImportNotes(committed.result);
       announceDrawingShortcut(
-        `${label} 브러시 "${created.name}"을(를) 내 브러시에 추가했어요.${notes.length > 0 ? ` ${notes.join(" ")}` : ""}`,
+        `${label} 브러시 ${committed.saved.savedCount}개를 SQLite 내 브러시에 추가했어요.${notes.length > 0 ? ` ${notes.join(" ")}` : ""}`,
       );
       openBrushLibraryFromMenu();
     } catch (caught) {
@@ -8397,6 +8788,18 @@ function StudioCuttoonEditor() {
   const [assets, setAssets] = useState<StudioAsset[]>([]);
   const [assetsLoading, setAssetsLoading] = useState(false);
   const [assetsLoaded, setAssetsLoaded] = useState(false);
+  const [, setAssetStorageState] = useState<
+    "idle" | "loading" | "sqlite-opfs" | "memory" | "unavailable"
+  >("idle");
+  const assetsRef = useRef<StudioAsset[]>([]);
+  const assetMemoryModeRef = useRef(false);
+  const assetHydrationGenerationRef = useRef(0);
+  const assetMutationGenerationRef = useRef(0);
+  const assetMutationTailRef = useRef<Promise<void>>(Promise.resolve());
+  function replaceStudioAssets(next: StudioAsset[]): void {
+    assetsRef.current = next;
+    setAssets(next);
+  }
   const scenarioImageReferenceAssets = useMemo(
     () => assets.filter(isStudioAiReferenceCompatibleAsset),
     [assets]
@@ -9115,6 +9518,9 @@ function StudioCuttoonEditor() {
   const sceneTemplatesLoadRef = useRef<Promise<void> | null>(null);
   const sfxLoadRef = useRef<Promise<void> | null>(null);
   const clipsLoadRef = useRef<Promise<void> | null>(null);
+  const clipsRepositoryRef = useRef<Promise<
+    import("./studio-saved-clip-sqlite-repository").StudioSavedClipSqliteRepository
+  > | null>(null);
 
   useEffect(() => {
     if (!workHydrated || !workId || !studioAuthUserId || !sharedDocument) return;
@@ -10013,6 +10419,7 @@ function StudioCuttoonEditor() {
         releaseSchedule,
         publicationAnalytics,
         referenceBoard,
+        aiImageReferences: scenarioImageReferenceDocument,
         currentPageId,
         webtoonTheme,
         panelGutter,
@@ -10073,8 +10480,12 @@ function StudioCuttoonEditor() {
       }
       if (!hasMeaningfulAutosaveContent) {
         const sessionPromise = autosaveOpfsSessionRef.current;
+        const sqlitePromise = autosaveSqliteStoreRef.current;
         void (async () => {
-          const session = await (sessionPromise ?? Promise.resolve(null));
+          const [session, sqlite] = await Promise.all([
+            sessionPromise ?? Promise.resolve(null),
+            sqlitePromise ?? Promise.resolve(null),
+          ]);
           if (
             studioRevisionProjectGenerationRef.current !== scheduledGeneration
             || (
@@ -10082,7 +10493,22 @@ function StudioCuttoonEditor() {
               && autosaveOpfsSessionRef.current !== sessionPromise
             )
           ) return;
-          await session?.clear();
+          const savedAt = new Date().toISOString();
+          const attempted: Promise<unknown>[] = [];
+          if (session) attempted.push(session.clear(savedAt));
+          if (sqlite) attempted.push(sqlite.clear(autosaveKey, savedAt));
+          const results = await Promise.allSettled(attempted);
+          if (
+            results.length === 0
+            || results.every((result) => result.status === "rejected")
+          ) {
+            throw new AggregateError(
+              results.map((result) =>
+                result.status === "rejected" ? result.reason : null
+              ),
+              "Studio durable autosave tombstones failed",
+            );
+          }
           // 새 편집이 clear 도중 시작됐다면 그 편집의 기존 브라우저 복구 슬롯은 보존한다.
           // 뒤따르는 최신 세대 저장이 직렬 OPFS journal을 다시 채운다.
           if (studioRevisionProjectGenerationRef.current !== scheduledGeneration) return;
@@ -10102,6 +10528,8 @@ function StudioCuttoonEditor() {
         })().catch((cause: unknown) => {
           // Durable snapshot을 지우지 못했는데 local fallback만 지우면 다음 재진입에서 오래된
           // OPFS 내용이 복원된다. 두 권위를 그대로 보존하고 다음 편집/clear에서 재시도한다.
+          reportStudioSaveAuthorityDegraded(cause);
+          void reportStudioAutosaveFailure(cause);
           if (import.meta.env.DEV) {
             console.warn("Studio empty autosave tombstone could not be written.", cause);
           }
@@ -10118,11 +10546,16 @@ function StudioCuttoonEditor() {
           : {}),
       };
       const sessionPromise = autosaveOpfsSessionRef.current;
+      const sqlitePromise = autosaveSqliteStoreRef.current;
       void import("./studio-autosave-opfs-session")
         .then(async ({ persistStudioAutosaveWithOpfsPrimary }) => {
-          const session = await (sessionPromise ?? Promise.resolve(null));
+          const [session, sqlite] = await Promise.all([
+            sessionPromise ?? Promise.resolve(null),
+            sqlitePromise ?? Promise.resolve(null),
+          ]);
           const receipt = await persistStudioAutosaveWithOpfsPrimary({
             session,
+            sqlite,
             storage: globalThis.localStorage,
             key: autosaveKey,
             payload,
@@ -10141,30 +10574,8 @@ function StudioCuttoonEditor() {
           noteStudioSaveSucceeded(receipt.authority);
         })
         .catch((cause: unknown) => {
-          // Module/session initialization is intentionally outside the hot edit path. If it
-          // cannot start, preserve the established synchronous recovery slot.
-          try {
-            globalThis.localStorage.setItem(
-              autosaveKey,
-              serializeStudioAutosave(payload)
-            );
-            globalThis.localStorage.removeItem(
-              studioLifecycleAutosaveSidecarKey(autosaveKey)
-            );
-            if (
-              sessionPromise === null
-              || autosaveOpfsSessionRef.current === sessionPromise
-            ) {
-              studioLifecycleDurableGenerationRef.current = Math.max(
-                studioLifecycleDurableGenerationRef.current,
-                scheduledGeneration
-              );
-              studioLifecycleDurablePendingFingerprintRef.current =
-                scheduledPendingFingerprint;
-            }
-          } catch {
-            // The diagnostic below reports both an unavailable OPFS authority and fallback.
-          }
+          // Keep the current in-memory generation dirty. Only an OPFS/SQLite receipt may advance
+          // the durable generation; browser KV is compatibility/discard-only in the V12 product.
           // 무음 금지: 상태 레일에 도달시키고, 쿼터 압박이면 복구 저널 공간 회수까지 잇는다.
           void reportStudioAutosaveFailure(cause);
           console.error("Auto-save failed:", cause);
@@ -10260,6 +10671,7 @@ function StudioCuttoonEditor() {
   // (요소·게시 정보가 전부 빈 백업은 복구 가치가 없고, 과거 버전이 남긴 빈 페이로드도 거른다.)
   useEffect(() => {
     if (!workHydrated) return;
+    autosaveRecoveryCandidateRef.current = null;
     if (collaborationDocumentLocked) {
       setHasAutosave(false);
       setAutosaveRestoreBlockedReason(null);
@@ -10269,34 +10681,60 @@ function StudioCuttoonEditor() {
     setAutosaveChecked(false);
     let cancelled = false;
     const sessionPromise = autosaveOpfsSessionRef.current;
+    const sqlitePromise = autosaveSqliteStoreRef.current;
     const cancelIdle = scheduleIdle(() => {
       void (async () => {
-        let saved = readStudioAutosave(
-          globalThis.localStorage,
-          autosaveKey,
-          !workId && !remixId
-        );
+        let saved:
+          | import("./studio-autosave-opfs-session").StudioAutosaveRecoveryCandidate
+          | null;
         try {
           const [
             { reconcileStudioAutosaveWithOpfsPrimary },
             session,
+            sqlite,
           ] = await Promise.all([
             import("./studio-autosave-opfs-session"),
             sessionPromise ?? Promise.resolve(null),
+            sqlitePromise ?? Promise.resolve(null),
           ]);
           const reconciliation = await reconcileStudioAutosaveWithOpfsPrimary({
             session,
+            sqlite,
             storage: globalThis.localStorage,
             key: autosaveKey,
-            allowLegacy: !workId && !remixId,
+            allowLegacy: false,
           });
           saved = reconciliation.candidate;
         } catch (cause) {
+          let compatibility: ReturnType<typeof readStudioAutosave> = null;
+          try {
+            compatibility = readStudioAutosave(
+              globalThis.localStorage,
+              autosaveKey,
+              false,
+            );
+          } catch {
+            // localStorage is compatibility-only; denial must not fabricate a recovery candidate.
+          }
+          saved = compatibility
+            ? Object.freeze({
+                key: compatibility.key,
+                authority: "browser-storage-compatibility" as const,
+                savedAt: compatibility.payload.savedAt,
+                sequence: null,
+                revision: null,
+                payload: compatibility.payload,
+              })
+            : null;
+          reportStudioSaveAuthorityDegraded(cause);
           if (import.meta.env.DEV) {
             console.warn("Studio OPFS autosave reconciliation fell back.", cause);
           }
         }
         if (cancelled) return;
+        autosaveRecoveryCandidateRef.current = saved;
+        const compatibilityOnly =
+          saved?.authority === "browser-storage-compatibility";
         const compatibility =
           saved && workId && sharedDocument
             ? studioSharedAutosaveCompatibility(saved.payload, {
@@ -10305,8 +10743,19 @@ function StudioCuttoonEditor() {
               })
             : null;
         setAutosaveRestoreBlockedReason(
-          compatibility && !compatibility.compatible ? compatibility.reason : null
+          compatibilityOnly
+            ? "legacy-unversioned"
+            : compatibility && !compatibility.compatible
+              ? compatibility.reason
+              : null
         );
+        if (compatibilityOnly) {
+          reportStudioSaveAuthorityDegraded(
+            new Error(
+              "OPFS와 SQLite 자동저장 원본을 읽지 못해 localStorage 호환 백업만 찾았습니다. JSON 백업만 허용합니다."
+            )
+          );
+        }
         setHasAutosave(Boolean(saved));
         setAutosaveChecked(true);
       })();
@@ -10355,8 +10804,19 @@ function StudioCuttoonEditor() {
     if (!prepareStudioDocumentReplacement("임시저장본을 복구", { flushPending: true })) return;
     const mutationTicket = captureStudioMutationTicket();
     try {
-      const saved = readStudioAutosave(localStorage, autosaveKey, !workId && !remixId);
-      if (saved) {
+      const saved = autosaveRecoveryCandidateRef.current;
+      if (!saved) {
+        setError("복구할 내구 임시저장 데이터를 찾지 못했어요.");
+        return;
+      }
+      if (saved.authority === "browser-storage-compatibility") {
+        setAutosaveRestoreBlockedReason("legacy-unversioned");
+        setError(
+          "내구 저장소에서 확인되지 않은 호환 백업은 자동 복구하지 않아요. JSON 백업으로 내려받아 보관해 주세요."
+        );
+        return;
+      }
+      {
         if (workId && sharedDocument) {
           const compatibility = studioSharedAutosaveCompatibility(saved.payload, {
             workId,
@@ -10456,6 +10916,7 @@ function StudioCuttoonEditor() {
         setReferenceBoard(normalizeStudioReferenceBoardDocument(parsed.referenceBoard));
         // 문서 마스터 복구 — 백업에 없으면 빈 마스터(하위호환).
         setMaster(normalizeDocumentMaster(parsed.master) as DocumentMaster<El>);
+        autosaveRecoveryCandidateRef.current = null;
         setAutosaveRestoreBlockedReason(null);
         setHasAutosave(false);
       }
@@ -10466,12 +10927,33 @@ function StudioCuttoonEditor() {
 
   function clearAutosaveDurableAuthority() {
     const sessionPromise = autosaveOpfsSessionRef.current;
-    if (!sessionPromise) return;
-    void sessionPromise
-      .then((session) => session?.clear())
+    const sqlitePromise = autosaveSqliteStoreRef.current;
+    if (!sessionPromise && !sqlitePromise) return;
+    const savedAt = new Date().toISOString();
+    void Promise.all([
+      sessionPromise ?? Promise.resolve(null),
+      sqlitePromise ?? Promise.resolve(null),
+    ])
+      .then(async ([session, sqlite]) => {
+        const attempted: Promise<unknown>[] = [];
+        if (session) attempted.push(session.clear(savedAt));
+        if (sqlite) attempted.push(sqlite.clear(autosaveKey, savedAt));
+        const results = await Promise.allSettled(attempted);
+        if (
+          results.length > 0
+          && results.every((result) => result.status === "rejected")
+        ) {
+          throw new AggregateError(
+            results.map((result) =>
+              result.status === "rejected" ? result.reason : null
+            ),
+            "Studio durable autosave tombstones failed",
+          );
+        }
+      })
       .catch((cause: unknown) => {
         if (import.meta.env.DEV) {
-          console.warn("Studio OPFS autosave tombstone could not be written.", cause);
+          console.warn("Studio durable autosave tombstone could not be written.", cause);
         }
       });
   }
@@ -10482,16 +10964,17 @@ function StudioCuttoonEditor() {
       localStorage.removeItem(autosaveKey);
       localStorage.removeItem(studioLifecycleAutosaveSidecarKey(autosaveKey));
       if (!workId && !remixId) localStorage.removeItem(LEGACY_STUDIO_AUTOSAVE_KEY);
-      setHasAutosave(false);
-      setAutosaveRestoreBlockedReason(null);
     } catch {
       // 무시
     }
+    autosaveRecoveryCandidateRef.current = null;
+    setHasAutosave(false);
+    setAutosaveRestoreBlockedReason(null);
   }
 
   function downloadAutosaveBackup() {
     try {
-      const saved = readStudioAutosave(localStorage, autosaveKey, !workId && !remixId);
+      const saved = autosaveRecoveryCandidateRef.current;
       if (!saved) {
         setError("내려받을 임시저장 데이터를 찾지 못했어요.");
         return;
@@ -11078,7 +11561,7 @@ function StudioCuttoonEditor() {
     if (pageId !== currentPageIdRef.current) return;
     const retained = element ?? drawingRef.current;
     if (retained) {
-      liveDraftVisualRef.current = retained;
+      liveDraftVisualRef.current = studioLivingInkVectorShadowElement(retained);
       liveDraftPendingRef.current = retained;
       liveDraftDirectRef.current = true;
     }
@@ -11215,7 +11698,7 @@ function StudioCuttoonEditor() {
       || canvasFlipH
       || canvasRotation !== 0
       || !color
-      || !studioHokusaiAutomaticPreset(element.brush ?? "pen", element.brushCatalogId)
+      || !studioHokusaiProductLivePreset(element.brush ?? "pen", element.brushCatalogId)
     ) return false;
     // Hokusai finishes asynchronously. Start it only from a clean history boundary so its one
     // canonical transaction cannot overtake an older 200ms deferred stroke batch.
@@ -11340,7 +11823,7 @@ function StudioCuttoonEditor() {
   }
 
   useEffect(() => {
-    if (!studioHokusaiAutomaticPreset(brush, activeCatalogBrush.id)) return;
+    if (!studioHokusaiProductLivePreset(brush, activeCatalogBrush.id)) return;
     void hokusaiLiveProviderRef.current.prewarm().catch(() => undefined);
   }, [activeCatalogBrush.id, brush]);
 
@@ -11403,38 +11886,6 @@ function StudioCuttoonEditor() {
       setLivingInkStateMessage(message);
     },
     onCapacityDiagnostic: (message) => setError(message),
-    onInteractiveFrame: (frame, routeKey) => {
-      const state = livingInkStrokeRef.current;
-      const surface = livingInkOverlaySurfaceRef.current;
-      if (
-        !state
-        || state.failed
-        || state.route.routeKey !== routeKey
-        || !surface
-        || state.surfaceKey !== surface.binding.surfaceKey
-      ) {
-        frame.image.close();
-        return;
-      }
-      const claim = claimStudioStrokeSurfaceLifecycle(state.route, {
-        phase: "append",
-        routeKey,
-        strokeId: state.strokeId,
-        kind: "living-ink",
-      });
-      if (claim.status !== "owned") {
-        frame.image.close();
-        failStudioLivingInkStroke(state, "라이브 표면 소유권 영수증이 일치하지 않습니다.");
-        return;
-      }
-      const accepted = surface.renderer.offer(
-        frame,
-        routeKey,
-        surface.binding.projection,
-        (receipt) => onStudioLivingInkOverlayPresented(state, receipt),
-      );
-      if (!accepted) failStudioLivingInkStroke(state, "물리 프레임을 캔버스에 표시하지 못했습니다.");
-    },
   });
 
   function onStudioLivingInkOverlayPresented(
@@ -11458,7 +11909,9 @@ function StudioCuttoonEditor() {
     if (!state.overlayPresented) {
       state.overlayPresented = true;
       livingInkOverlayVisibleRef.current = true;
-      liveDraftLayerRef.current?.drawScene();
+      // The first accepted material frame is the presentation receipt that may retire the exact
+      // vector shadow used while a fast contact outruns the Worker.
+      clearStudioLivingInkVectorShadow(state);
     }
   }
 
@@ -11473,6 +11926,22 @@ function StudioCuttoonEditor() {
       liveDraftVisualRef.current = retained;
       liveDraftPendingRef.current = retained;
       liveDraftDirectRef.current = true;
+    }
+    liveDraftLayerRef.current?.drawScene();
+  }
+
+  function clearStudioLivingInkVectorShadow(
+    state: Pick<StudioLivingInkPinnedStroke, "strokeId">,
+  ): void {
+    if (liveDraftVisualRef.current?.id === state.strokeId) {
+      liveDraftVisualRef.current = null;
+      liveDraftPendingRef.current = null;
+      liveDraftDirectRef.current = false;
+    }
+    if (draftPreviewStoreRef.current.getSnapshot().active?.id === state.strokeId) {
+      draftPreviewStoreRef.current.setActive(null);
+      draftPreviewNormalLayerRef.current?.drawScene();
+      draftPreviewDynamicLayerRef.current?.drawScene();
     }
     liveDraftLayerRef.current?.drawScene();
   }
@@ -11540,6 +12009,8 @@ function StudioCuttoonEditor() {
     livingInkOverlaySurfaceRef.current?.renderer.clear();
     livingInkOverlayVisibleRef.current = false;
     if (!handoff || handoff.kind === "stroke") {
+      const finishingState = livingInkStrokeRef.current;
+      if (finishingState) clearStudioLivingInkVectorShadow(finishingState);
       livingInkStrokeRef.current = null;
       livingInkFinalizingRef.current = false;
       studioStrokeSurfaceRouteRef.current = null;
@@ -12958,6 +13429,35 @@ function StudioCuttoonEditor() {
   liveInkOverlayRendererRef.current ??= new StudioLiveInkOverlayRenderer();
   const liveInkPredictionRendererRef = useRef<StudioLiveInkPredictionRenderer>(null as never);
   liveInkPredictionRendererRef.current ??= new StudioLiveInkPredictionRenderer();
+  // Google Ink owns only the replaceable predicted mesh tail. The existing live-ink/Konva
+  // surfaces remain the single authoritative paint owner and the fail-visible fallback.
+  const inkMeshLivePreviewModuleRef = useRef<StudioInkMeshLivePreviewModule | null>(null);
+  const inkMeshLivePreviewRuntimeRef = useRef<StudioInkMeshLivePreviewRuntime | null>(null);
+  const [inkMeshLivePreviewRuntime, setInkMeshLivePreviewRuntime] =
+    useState<StudioInkMeshLivePreviewRuntime | null>(null);
+  useEffect(() => {
+    let mounted = true;
+    void loadStudioInkMeshLivePreviewModule()
+      .then((module) => {
+        if (!mounted) return;
+        const runtime = new module.StudioInkMeshLivePreviewRuntime();
+        inkMeshLivePreviewModuleRef.current = module;
+        inkMeshLivePreviewRuntimeRef.current = runtime;
+        setInkMeshLivePreviewRuntime(runtime);
+      })
+      .catch((cause: unknown) => {
+        if (import.meta.env.DEV) {
+          console.warn("Studio Ink Mesh preview is unavailable; Canvas ink remains active.", cause);
+        }
+      });
+    return () => {
+      mounted = false;
+      const runtime = inkMeshLivePreviewRuntimeRef.current;
+      inkMeshLivePreviewRuntimeRef.current = null;
+      inkMeshLivePreviewModuleRef.current = null;
+      runtime?.dispose();
+    };
+  }, []);
   // The Canvas append path mutates one pressure array for the duration of a stroke. Cache the
   // alias-mapped prefix and extend only its new suffix, otherwise remapping the full history on
   // every pointer frame would reintroduce O(N²) work for long fineliner/marker strokes.
@@ -13774,6 +14274,23 @@ function StudioCuttoonEditor() {
   const flushDirectLiveDraft = () => {
     const next = liveDraftPendingRef.current;
     if (!next) return;
+    const livingInkStroke = livingInkStrokeRef.current;
+    if (
+      livingInkStroke
+      && !livingInkStroke.failed
+      && livingInkStroke.strokeId === next.id
+    ) {
+      // Living Ink deliberately batches authoritative samples before asking the physical field
+      // for work. A fast browser move can therefore reach pointer-up with fewer than one material
+      // chunk. Keep the exact retained ink vector current until an accepted material-presentation
+      // receipt takes ownership; otherwise that legal sparse route appears as only its initial tap.
+      // Water has no pigment fallback and must remain visually owned by the physical surface.
+      if (!livingInkStroke.overlayPresented && livingInkStroke.mode === "ink") {
+        liveDraftVisualRef.current = studioLivingInkVectorShadowElement(next);
+        liveDraftLayerRef.current?.drawScene();
+      }
+      return;
+    }
     const hokusaiStroke = hokusaiLiveStrokeRef.current;
     if (
       hokusaiStroke
@@ -13873,13 +14390,26 @@ function StudioCuttoonEditor() {
    */
   const flushDirectLiveDraftNow = (next: DrawEl | null) => {
     if (!next) return;
+    const livingInkStroke = livingInkStrokeRef.current;
+    const directLivingInk = liveDraftDirectRef.current
+      && Boolean(
+        livingInkStroke
+        && !livingInkStroke.failed
+        && livingInkStroke.strokeId === next.id,
+      );
     const directInk = liveDraftDirectRef.current && isDirectLiveDraftEl(next);
     const directStamp = liveStampDraftDirectRef.current && isDirectLiveStampDraftEl(next);
     const directDynamic = liveDynamicBrushDraftDirectRef.current
       && studioLiveDynamicBrushOverlaySupportsElement(next);
     const directWetInk = liveWetInkDraftDirectRef.current
       && studioLiveWetInkOverlaySupportsElement(next);
-    if (!directInk && !directStamp && !directDynamic && !directWetInk) return;
+    if (
+      !directLivingInk
+      && !directInk
+      && !directStamp
+      && !directDynamic
+      && !directWetInk
+    ) return;
     liveDraftPendingRef.current = next;
     if (liveDraftRafRef.current !== null) {
       globalThis.cancelAnimationFrame(liveDraftRafRef.current);
@@ -13905,6 +14435,7 @@ function StudioCuttoonEditor() {
     gpuLiveAcceptedRequestIdRef.current = null;
     gpuFinalReceiptFallbackStrokeRef.current = null;
     gpuFinalReceiptRequestIdRef.current = null;
+    inkMeshLivePreviewRuntimeRef.current?.cancel();
     endPredictedInkTail();
     // 대기 중 커밋 배치를 먼저 동기화한다 — 아래의 즉시 클리어가 그 잉크까지 지우기 때문.
     flushPendingStrokeCommitsRef.current();
@@ -13930,6 +14461,25 @@ function StudioCuttoonEditor() {
     mainLayerRef.current?.batchDraw();
   };
   const scheduleDraft = (next: DrawEl | null) => {
+    const livingInkStroke = livingInkStrokeRef.current;
+    if (
+      next
+      && livingInkStroke
+      && !livingInkStroke.failed
+      && livingInkStroke.strokeId === next.id
+    ) {
+      // Predicted browser samples may also visit scheduleDraft. They stay inside the pinned Living
+      // Ink route instead of falling through isDirectLiveDraftEl and tearing down the specialist
+      // epoch merely because this brush is not a generic Canvas2D ink preset.
+      liveDraftPendingRef.current = next;
+      if (liveDraftRafRef.current === null) {
+        liveDraftRafRef.current = globalThis.requestAnimationFrame(() => {
+          liveDraftRafRef.current = null;
+          flushDirectLiveDraft();
+        });
+      }
+      return;
+    }
     const hokusaiStroke = hokusaiLiveStrokeRef.current;
     if (
       next
@@ -14062,7 +14612,11 @@ function StudioCuttoonEditor() {
     if (requiresFinalGpuFallback && !promotedFinalGpuFallback) {
       // The exact vector remains visible until the committed main-layer draw receipt. Hiding the
       // unreceipted GPU pin below prevents a stale pre-correction/prefix frame from covering it.
-      draftPreviewStoreRef.current.settle(finalGpuFallbackStroke);
+      // `settle` mounts a different Konva layer; flush that React commit before hiding the only
+      // preceding surface so the transfer has a real presentation receipt, not merely store state.
+      flushSync(() => {
+        draftPreviewStoreRef.current.settle(finalGpuFallbackStroke);
+      });
     }
     const wasStampDirect = liveStampDraftDirectRef.current;
     const wasDynamicBrushDirect = liveDynamicBrushDraftDirectRef.current;
@@ -14119,11 +14673,12 @@ function StudioCuttoonEditor() {
       const renderer = liveDynamicBrushOverlayRendererRef.current;
       if (preserveInk && finalDynamicBrushStroke) {
         const seal = renderer.end(finalDynamicBrushStroke);
-        // The exact retained vector becomes visible synchronously before the transient coverage
-        // surface relinquishes authority. The existing draft FIFO then holds it until the main
-        // layer's committed-draw receipt releases that prefix.
-        draftPreviewStoreRef.current.settle(finalDynamicBrushStroke);
-        draftPreviewDynamicLayerRef.current?.drawScene();
+        // `settle` replaces the active dynamic layer with a settled-run layer. Commit that mount
+        // synchronously; its layout draw is the receipt that allows the transient canvas to go.
+        // The existing draft FIFO then holds it until the main-layer committed-draw receipt.
+        flushSync(() => {
+          draftPreviewStoreRef.current.settle(finalDynamicBrushStroke);
+        });
         if (seal.status === "settled") renderer.releaseSettledPrefix(1);
         else renderer.resetActive();
       } else {
@@ -14137,11 +14692,12 @@ function StudioCuttoonEditor() {
           pageEpoch: currentPageId,
           hidden: finalWetInkStroke.hidden === true,
         });
-        // Exact committed-runtime pixels are replaced synchronously, then the same DrawEl becomes
-        // the retained FIFO authority before the transient surface is released. Both mutations
-        // happen in one task, so there is no blank frame or doubled translucent wash.
-        draftPreviewStoreRef.current.settle(finalWetInkStroke);
-        draftPreviewNormalLayerRef.current?.drawScene();
+        // `settle` replaces the active normal layer with a settled-run layer. A direct draw on the
+        // old normal-layer ref is not a receipt for that new layer, so synchronously commit the
+        // store publication and its layout draw before releasing the exact wet-ink canvas.
+        flushSync(() => {
+          draftPreviewStoreRef.current.settle(finalWetInkStroke);
+        });
         if (seal.status === "settled") renderer.releaseSettledPrefix(1);
         else renderer.resetActive();
       } else {
@@ -18505,23 +19061,198 @@ const puppetWarpArmed =
 
   // 커스텀 에셋 라이브러리 목록 불러오기 및 관리
   const loadAssetsList = async () => {
+    const generation = ++assetHydrationGenerationRef.current;
+    if (assetMemoryModeRef.current) {
+      setAssetsLoaded(true);
+      setAssetsLoading(false);
+      setAssetStorageState("memory");
+      return;
+    }
     setAssetsLoading(true);
+    setAssetStorageState("loading");
     try {
       const { listAssets } = await import("./studio-asset-library");
       const list = await listAssets();
-      setAssets(list);
+      if (!editorMountedRef.current || generation !== assetHydrationGenerationRef.current) return;
+      replaceStudioAssets(list);
+      setAssetStorageState("sqlite-opfs");
     } catch (err) {
       console.error("Failed to load custom assets:", err);
-      setAssets([]);
+      if (!editorMountedRef.current || generation !== assetHydrationGenerationRef.current) return;
+      const repositoryModule = await import(
+        "./studio-asset-library-sqlite-opfs-repository"
+      ).catch(() => null);
+      if (!editorMountedRef.current || generation !== assetHydrationGenerationRef.current) return;
+      const failClosed = repositoryModule
+        && err instanceof repositoryModule.StudioAssetLibraryRepositoryError
+        && err.code === "corrupt";
+      if (failClosed) {
+        setAssetStorageState("unavailable");
+        setError(`${err.message} 손상된 manifest나 누락된 blob을 일부만 불러오지 않았습니다.`);
+      } else {
+        assetMemoryModeRef.current = true;
+        setAssetStorageState("memory");
+        setError(`SQLite/OPFS 에셋 보관함을 열지 못해 현재 탭 메모리만 사용합니다. 새로고침하면 변경이 사라집니다: ${
+          err instanceof Error ? err.message : String(err)
+        }`);
+      }
     } finally {
-      setAssetsLoaded(true);
-      setAssetsLoading(false);
+      if (editorMountedRef.current && generation === assetHydrationGenerationRef.current) {
+        setAssetsLoaded(true);
+        setAssetsLoading(false);
+      }
     }
   };
 
+  async function createValidatedMemoryAsset(
+    input: import("./studio-asset-library").StudioAssetSaveInput,
+  ): Promise<StudioAssetWithContentHash> {
+    const assetLibrary = await import("./studio-asset-library");
+    const actualHash = await assetLibrary.hashStudioAssetDataUrl(input.dataUrl);
+    const expectedHash = assetLibrary.canonicalizeStudioAssetContentHash(input.contentHash);
+    if (input.contentHash !== undefined && expectedHash !== actualHash) {
+      throw new Error("제공된 contentHash가 실제 에셋 바이트 SHA-256과 일치하지 않습니다.");
+    }
+    return {
+      ...assetLibrary.createAssetRecord({ ...input, contentHash: actualHash }),
+      contentHash: actualHash,
+    };
+  }
+
+  async function canKeepAssetMutationInMemory(cause: unknown): Promise<boolean> {
+    const repositoryModule = await import(
+      "./studio-asset-library-sqlite-opfs-repository"
+    ).catch(() => null);
+    return repositoryModule === null
+      || repositoryModule.isStudioAssetLibraryMemoryFallbackError(cause);
+  }
+
+  function enqueueAssetMutation<T>(work: () => Promise<T>): Promise<T> {
+    const result = assetMutationTailRef.current.then(work, work);
+    assetMutationTailRef.current = result.then(() => undefined, () => undefined);
+    return result;
+  }
+
+  function saveStudioAssetMutation(
+    input: import("./studio-asset-library").StudioAssetSaveInput,
+  ): Promise<StudioAssetWithContentHash> {
+    return enqueueAssetMutation(async () => {
+      const generation = ++assetMutationGenerationRef.current;
+      assetHydrationGenerationRef.current += 1;
+      if (assetMemoryModeRef.current) {
+        const saved = await createValidatedMemoryAsset(input);
+        if (editorMountedRef.current && generation === assetMutationGenerationRef.current) {
+          replaceStudioAssets([
+            saved,
+            ...assetsRef.current.filter(({ id }) => id !== saved.id),
+          ]);
+          setAssetsLoaded(true);
+          setAssetsLoading(false);
+          setAssetStorageState("memory");
+        }
+        return saved;
+      }
+      try {
+        const { saveAsset } = await import("./studio-asset-library");
+        const saved = await saveAsset(input);
+        if (editorMountedRef.current && generation === assetMutationGenerationRef.current) {
+          assetHydrationGenerationRef.current += 1;
+          replaceStudioAssets([
+            saved,
+            ...assetsRef.current.filter(({ id }) => id !== saved.id),
+          ]);
+          setAssetsLoaded(true);
+          setAssetsLoading(false);
+          setAssetStorageState("sqlite-opfs");
+        }
+        return saved;
+      } catch (cause) {
+        if (!await canKeepAssetMutationInMemory(cause)) throw cause;
+        const saved = await createValidatedMemoryAsset(input);
+        assetMemoryModeRef.current = true;
+        if (editorMountedRef.current && generation === assetMutationGenerationRef.current) {
+          assetHydrationGenerationRef.current += 1;
+          replaceStudioAssets([
+            saved,
+            ...assetsRef.current.filter(({ id }) => id !== saved.id),
+          ]);
+          setAssetsLoaded(true);
+          setAssetsLoading(false);
+          setAssetStorageState("memory");
+          setError(`SQLite/OPFS 저장에 실패해 에셋을 현재 탭 메모리에만 유지합니다. 새로고침하면 사라집니다: ${
+            cause instanceof Error ? cause.message : String(cause)
+          }`);
+        }
+        return saved;
+      }
+    });
+  }
+
+  function deleteStudioAssetMutation(id: string): Promise<void> {
+    return enqueueAssetMutation(async () => {
+      const generation = ++assetMutationGenerationRef.current;
+      assetHydrationGenerationRef.current += 1;
+      if (!assetMemoryModeRef.current) {
+        try {
+          const { deleteAsset } = await import("./studio-asset-library");
+          await deleteAsset(id);
+          if (editorMountedRef.current && generation === assetMutationGenerationRef.current) {
+            setAssetStorageState("sqlite-opfs");
+          }
+        } catch (cause) {
+          if (!await canKeepAssetMutationInMemory(cause)) throw cause;
+          if (!editorMountedRef.current || generation !== assetMutationGenerationRef.current) return;
+          assetMemoryModeRef.current = true;
+          setAssetStorageState("memory");
+          setError(`SQLite/OPFS 삭제에 실패해 현재 탭 목록에서만 에셋을 숨깁니다. 새로고침하면 다시 나타날 수 있습니다: ${
+            cause instanceof Error ? cause.message : String(cause)
+          }`);
+        }
+      }
+      if (editorMountedRef.current && generation === assetMutationGenerationRef.current) {
+        replaceStudioAssets(assetsRef.current.filter((asset) => asset.id !== id));
+        setAssetsLoaded(true);
+        setAssetsLoading(false);
+      }
+    });
+  }
+
+  function renameStudioAssetMutation(id: string, name: string): Promise<void> {
+    return enqueueAssetMutation(async () => {
+      const generation = ++assetMutationGenerationRef.current;
+      assetHydrationGenerationRef.current += 1;
+      const assetLibrary = await import("./studio-asset-library");
+      const normalizedName = assetLibrary.normalizeAssetName(name);
+      if (!assetMemoryModeRef.current) {
+        try {
+          await assetLibrary.renameAsset(id, normalizedName);
+          if (editorMountedRef.current && generation === assetMutationGenerationRef.current) {
+            setAssetStorageState("sqlite-opfs");
+          }
+        } catch (cause) {
+          if (!await canKeepAssetMutationInMemory(cause)) throw cause;
+          if (!editorMountedRef.current || generation !== assetMutationGenerationRef.current) return;
+          assetMemoryModeRef.current = true;
+          setAssetStorageState("memory");
+          setError(`SQLite/OPFS 이름 변경에 실패해 현재 탭 메모리에서만 반영합니다. 새로고침하면 사라집니다: ${
+            cause instanceof Error ? cause.message : String(cause)
+          }`);
+        }
+      }
+      if (editorMountedRef.current && generation === assetMutationGenerationRef.current) {
+        replaceStudioAssets(assetsRef.current.map((asset) =>
+          asset.id === id ? { ...asset, name: normalizedName } : asset));
+        setAssetsLoaded(true);
+        setAssetsLoading(false);
+      }
+    });
+  }
+
+  const loadAssetsListFromEffect = useEffectEvent(loadAssetsList);
+
   useEffect(() => {
     if (menu === "asset") {
-      loadAssetsList();
+      void loadAssetsListFromEffect();
     }
   }, [menu]);
 
@@ -18530,9 +19261,7 @@ const puppetWarpArmed =
     if (!file) return;
     try {
       const { src, width, height } = await loadStudioCanvasImageFile(file);
-      const { saveAsset } = await import("./studio-asset-library");
-      await saveAsset({ name: file.name, dataUrl: src, width, height });
-      await loadAssetsList();
+      await saveStudioAssetMutation({ name: file.name, dataUrl: src, width, height });
     } catch (err) {
       setError(err instanceof Error ? err.message : "에셋 업로드 실패");
     } finally {
@@ -18542,10 +19271,8 @@ const puppetWarpArmed =
 
   async function onDeleteAsset(id: string) {
     try {
-      const { deleteAsset } = await import("./studio-asset-library");
-      await deleteAsset(id);
+      await deleteStudioAssetMutation(id);
       removeAssetFavorite(createStudioAssetFavoriteId("local", id));
-      await loadAssetsList();
     } catch (err) {
       setError(err instanceof Error ? err.message : "에셋 삭제 실패");
     }
@@ -18904,8 +19631,16 @@ const puppetWarpArmed =
   /** Tabbed AI assist hub — which tool card is open. */
   const [aiAssistTool, setAiAssistTool] = useState<StudioAiAssistToolId>("background");
   const [aiRecentPrompts, setAiRecentPrompts] = useState<StudioAiRecentPromptsState>(() =>
-    loadStudioAiRecentPrompts(globalThis.localStorage)
+    loadStudioAiRecentPrompts(globalThis.sessionStorage)
   );
+  useEffect(() => {
+    // Prompt text is session-private. Do not migrate the former persistent key.
+    try {
+      globalThis.localStorage.removeItem(STUDIO_AI_RECENT_PROMPTS_KEY);
+    } catch {
+      // Storage denial must not block AI Assist.
+    }
+  }, []);
   /** Composition panel draft (lifted so hub presets can fill it). */
   const [aiCompositionDraft, setAiCompositionDraft] = useState("");
   const [aiColorizePrompt, setAiColorizePrompt] = useState("파스텔톤 웹툰 셀 채색, 부드러운 그림자와 하이라이트");
@@ -18929,16 +19664,14 @@ const puppetWarpArmed =
     null
   );
   // 색상 팔레트 추천 — 결과가 색상 데이터(hex+용도 설명)라 대사/나레이션 제안과 동일한 이유로 AI 최초
-  // 사용 고지(runWithAiNotice) 대상이 아니다. "저장"은 새 상태를 만들지 않고 기존
-  // studio-palette-library.createPalette/savePalette를 그대로 재사용한다(아래
-  // saveSuggestedPaletteToLibrary 참고) — StudioPaletteLibraryPanel은 menu==="palette"일 때만
-  // 마운트되는 자기완결형 컴포넌트라, 다음에 그 탭을 열면 localStorage에서 새로 저장된 팔레트를 자동으로
-  // 읽어온다(별도 동기화 불필요).
+  // 사용 고지(runWithAiNotice) 대상이 아니다. "저장"은 아래 saveSuggestedPaletteToLibrary에서
+  // 패널과 동일한 V12 SQLite repository로 들어가며, 다음에 스타일 탭을 열 때 그 권위를 읽는다.
   const [aiPaletteSuggestMood, setAiPaletteSuggestMood] = useState("");
   const [aiPaletteSuggestBusy, setAiPaletteSuggestBusy] = useState(false);
   const [aiPaletteSuggestError, setAiPaletteSuggestError] = useState<string | null>(null);
   const [aiPaletteSuggestion, setAiPaletteSuggestion] = useState<PaletteSuggestion | null>(null);
   const [aiPaletteSuggestSavedMsg, setAiPaletteSuggestSavedMsg] = useState<string | null>(null);
+  const aiPaletteSaveGenerationRef = useRef(0);
   // 시나리오 자동 생성(투닝/투툰/WeToon 벤치마크, docs/studio-competitor-features.md §4 로드맵) — 별도
   // 전체화면 모달(StudioScenarioAutoLayoutPanel)로 열린다. aiAssist 팝오버의 다른 AI 기능들과 달리
   // 여러 장면을 순차 생성해 시간이 걸리고 미리보기 그리드가 필요해 320px 팝오버에 넣지 않는다.
@@ -18974,7 +19707,7 @@ const puppetWarpArmed =
   }
   useEffect(() => () => scenarioAbortControllerRef.current?.abort(), []);
   useEffect(() => {
-    if (scenarioOpen) void loadAssetsList();
+    if (scenarioOpen) void loadAssetsListFromEffect();
   }, [scenarioOpen]);
   // 생성형 AI 최초 사용 고지의 "확인 후 실행할 동작" — acknowledgeAiNotice가 확인 시 이 ref를
   // 실행한다. 기존엔 onGenerateAsset()만 하드코딩돼 있었는데, AI 배경 생성/자동 채색도 같은 고지를
@@ -19000,10 +19733,8 @@ const puppetWarpArmed =
   async function handleRenameAsset(id: string) {
     if (!renamingAssetName.trim()) return;
     try {
-      const { renameAsset } = await import("./studio-asset-library");
-      await renameAsset(id, renamingAssetName);
+      await renameStudioAssetMutation(id, renamingAssetName);
       setRenamingAssetId(null);
-      await loadAssetsList();
     } catch (err) {
       setError(err instanceof Error ? err.message : "에셋 이름 변경 실패");
     }
@@ -19030,10 +19761,7 @@ const puppetWarpArmed =
     setError(null);
     let operationId: string | null = null;
     try {
-      const [{ generateAsset }, { saveAsset }] = await Promise.all([
-        import("@/src/infrastructure/creator-client"),
-        import("./studio-asset-library"),
-      ]);
+      const { generateAsset } = await import("@/src/infrastructure/creator-client");
       if (!canApplyStudioMutation(mutationTicket)) return;
       operationId = beginTrackedStudioAiOperation("asset-image", {
         kind: "image",
@@ -19060,7 +19788,7 @@ const puppetWarpArmed =
         target: { pageId: activePage.id },
       });
       operationId = null;
-      const saved = await saveAsset({
+      const saved = await saveStudioAssetMutation({
         // 결과물이 생성형 AI 산출물임을 라이브러리에서도 식별할 수 있게 kind 로 표시(라벨/배지용).
         name: generated.name,
         dataUrl: generated.dataUrl,
@@ -19068,8 +19796,6 @@ const puppetWarpArmed =
         height: generated.height,
         kind: "ai",
       });
-      if (!canApplyStudioMutation(mutationTicket)) return;
-      await loadAssetsList();
       if (!canApplyStudioMutation(mutationTicket)) return;
       const generatedProvenance = finalizeStudioAiGeneratedAssetProvenance(requestProvenance, {
         model: generated.model,
@@ -24608,8 +25334,8 @@ const puppetWarpArmed =
       ) {
         e.preventDefault();
         const index = Number(e.key) - 1;
-        setBrushSlotsState((prev) => {
-          const next = assignStudioBrushSlot(prev, index, {
+        commitStudioBrushSlotsMutation(
+          (prev) => assignStudioBrushSlot(prev, index, {
             brushId: brush,
             ...(activeCatalogBrush.sourcePresetId
               ? {
@@ -24620,14 +25346,12 @@ const puppetWarpArmed =
             brushDynamics,
             strokeWidth,
             brushOpacity,
-          });
-          saveStudioBrushSlotsState(
-            typeof globalThis.localStorage === "undefined" ? null : globalThis.localStorage,
-            next
-          );
-          return next;
-        });
-        announceDrawingShortcut(`슬롯 ${index + 1}에 저장`);
+          }),
+          {
+            successMessage: `슬롯 ${index + 1}에 저장`,
+            failureMessage: `슬롯 ${index + 1}을 SQLite에 저장하지 못했어요.`,
+          },
+        );
       } else if (
         !mod &&
         !e.altKey &&
@@ -25477,7 +26201,7 @@ const puppetWarpArmed =
   function onGenerateAiBackground() {
     const prompt = aiBgPrompt.trim();
     if (!prompt || aiBgBusy || !isStudioAiConfigured(aiSettings)) return;
-    setAiRecentPrompts(pushStudioAiRecentPrompt(globalThis.localStorage, "background", prompt));
+    setAiRecentPrompts(pushStudioAiRecentPrompt(globalThis.sessionStorage, "background", prompt));
     runWithAiNotice(() => void executeAiBackgroundGenerate(prompt, aiBgSize));
   }
 
@@ -26311,23 +27035,32 @@ const puppetWarpArmed =
     }
     setAiPaletteSuggestBusy(false);
   }
-  // 제안받은 팔레트를 기존 팔레트 라이브러리에 저장 — 새 타입/저장 경로를 만들지 않고
-  // studio-palette-library.createPalette(이름 폴백·중복 제거)+savePalette(localStorage upsert)를
-  // 그대로 재사용한다(StudioPaletteLibraryPanel의 handleCreateFromPaste와 동일한 호출 관례).
-  function saveSuggestedPaletteToLibrary(suggestion: PaletteSuggestion) {
+  // 제안받은 팔레트도 패널과 동일한 V12 SQLite authority에 저장한다. 이전 브라우저 키는 읽지
+  // 않으며, 내구성 쓰기가 실패하면 제안은 현재 패널 메모리에만 남고 저장 성공으로 표시하지 않는다.
+  async function saveSuggestedPaletteToLibrary(suggestion: PaletteSuggestion): Promise<void> {
+    const generation = ++aiPaletteSaveGenerationRef.current;
     try {
       const palette = createPalette(
         suggestion.name,
         suggestion.colors.map((c) => c.hex)
       );
-      savePalette(globalThis.localStorage, palette);
+      const { getProductStudioPaletteSqliteRepository } = await import(
+        "./studio-palette-sqlite-repository"
+      );
+      await getProductStudioPaletteSqliteRepository().save(palette);
+      if (!editorMountedRef.current || generation !== aiPaletteSaveGenerationRef.current) return;
       setAiPaletteSuggestError(null);
       setAiPaletteSuggestSavedMsg(
         `"${palette.name}" 팔레트로 저장했어요 (${palette.colors.length}색). "스타일" 탭에서 확인하세요.`
       );
     } catch (e) {
+      if (!editorMountedRef.current || generation !== aiPaletteSaveGenerationRef.current) return;
       setAiPaletteSuggestSavedMsg(null);
-      setAiPaletteSuggestError(e instanceof Error ? e.message : "팔레트를 저장하지 못했어요.");
+      setAiPaletteSuggestError(
+        `SQLite/OPFS 팔레트 저장에 실패했습니다. 제안은 현재 탭 메모리에만 남고 라이브러리에는 저장되지 않았습니다: ${
+          e instanceof Error ? e.message : String(e)
+        }`
+      );
     }
   }
 
@@ -26609,12 +27342,16 @@ const puppetWarpArmed =
     setContextMenu((prev) => ({ ...prev, visible: false }));
     if (!name) return;
     try {
-      const { createEmeresLibraryItem, saveEmeresLibraryItem } = await import("./studio-emeres-library");
+      const [{ createEmeresLibraryItem }, { getProductStudioEmeresSqliteRepository }] =
+        await Promise.all([
+          import("./studio-emeres-library"),
+          import("./studio-emeres-sqlite-repository"),
+        ]);
       const created = createEmeresLibraryItem(name, { src, width: Math.round(bounds.w), height: Math.round(bounds.h) });
-      saveEmeresLibraryItem(globalThis.localStorage, created);
+      await getProductStudioEmeresSqliteRepository().save(created);
     } catch (err) {
       console.error("Failed to save emeres library item:", err);
-      setError("이메레스로 저장하지 못했습니다.");
+      setError("SQLite/OPFS 이메레스 보관함에 저장하지 못했습니다.");
     }
   }
   const emeresUnderlayCount = elements.filter((e) => e.emeresSourceId != null).length;
@@ -26830,6 +27567,77 @@ const puppetWarpArmed =
     if (next === pages || commitPages(next as PageState[])) setActiveDialogueLocale(locale);
   }
 
+  function commitSavedClipMutation(
+    persisted: (
+      repository: import("./studio-saved-clip-sqlite-repository").StudioSavedClipSqliteRepository,
+    ) => Promise<StudioClip[]>,
+    memoryUpdate: (current: readonly StudioClip[]) => StudioClip[],
+  ): Promise<"durable" | "memory" | "rejected"> {
+    const run = async (): Promise<"durable" | "memory" | "rejected"> => {
+      const generation = ++clipMutationGenerationRef.current;
+      clipHydrationGenerationRef.current += 1;
+      if (clipMemoryModeRef.current) {
+        try {
+          replaceSavedClips(memoryUpdate(clipsRef.current));
+          setClipStorageState("memory");
+          return "memory";
+        } catch (cause) {
+          if (editorMountedRef.current) {
+            setError(cause instanceof Error ? cause.message : "클립 변경을 적용하지 못했습니다.");
+          }
+          return "rejected";
+        }
+      }
+
+      try {
+        const repositoryModule = await import("./studio-saved-clip-sqlite-repository");
+        clipsRepositoryRef.current ??= Promise.resolve(
+          repositoryModule.getProductStudioSavedClipSqliteRepository(),
+        );
+        const next = await persisted(await clipsRepositoryRef.current);
+        if (!editorMountedRef.current || generation !== clipMutationGenerationRef.current) {
+          return "rejected";
+        }
+        // Fence a clip-menu hydration that may have started while this queued write was in flight.
+        clipHydrationGenerationRef.current += 1;
+        replaceSavedClips(next);
+        setClipStorageState("sqlite");
+        return "durable";
+      } catch (cause) {
+        if (!editorMountedRef.current || generation !== clipMutationGenerationRef.current) {
+          return "rejected";
+        }
+        const repositoryModule = await import("./studio-saved-clip-sqlite-repository").catch(() => null);
+        if (
+          repositoryModule
+          && cause instanceof repositoryModule.StudioSavedClipSqliteRepositoryError
+          && cause.code !== "unavailable"
+        ) {
+          setError(`${cause.message} 기존 클립은 삭제되지 않았고 새 데이터도 잘라내지 않았습니다.`);
+          return "rejected";
+        }
+        try {
+          replaceSavedClips(memoryUpdate(clipsRef.current));
+        } catch (validationError) {
+          setError(validationError instanceof Error
+            ? validationError.message
+            : "클립 변경을 적용하지 못했습니다.");
+          return "rejected";
+        }
+        clipMemoryModeRef.current = true;
+        setClipStorageState("memory");
+        setError(`SQLite/OPFS 저장에 실패해 클립 변경을 현재 탭 메모리에만 유지합니다. 새로고침하면 사라집니다: ${
+          cause instanceof Error ? cause.message : String(cause)
+        }`);
+        return "memory";
+      }
+    };
+
+    const result = clipMutationTailRef.current.then(run, run);
+    clipMutationTailRef.current = result.then(() => undefined, () => undefined);
+    return result;
+  }
+
   // 요소 평행이동(draw는 points, 그 외는 x/y) — 클립 정규화·삽입용.
   function shiftEl(el: El, dx: number, dy: number): El {
     return el.type === "draw"
@@ -26849,14 +27657,12 @@ const puppetWarpArmed =
       members.length > 1 ? "내 장면 클립" : selected.type === "bubble" ? "말풍선 클립" : "내 클립";
     const name = globalThis.prompt("클립 이름을 정해주세요", fallbackName)?.trim();
     if (!name) return;
-    try {
-      const { saveClip } = await import("./studio-clips");
-      setClips(saveClip(globalThis.localStorage, { id: uid(), name, createdAt: Date.now(), els }));
-    } catch (err) {
-      console.error("Failed to save studio clip:", err);
-      setError("클립을 저장하지 못했습니다.");
-    }
-    setMenu("clip");
+    const clip: StudioClip = { id: uid(), name, createdAt: Date.now(), els };
+    await commitSavedClipMutation(
+      (repository) => repository.save(clip),
+      (current) => upsertSavedClipInMemory(current, clip),
+    );
+    if (editorMountedRef.current) setMenu("clip");
   }
   // 클립을 캔버스에 삽입 — 새 id·새 그룹으로 화면 중앙 부근에 배치.
   function insertClip(clip: StudioClip) {
@@ -26896,13 +27702,10 @@ const puppetWarpArmed =
     setTool("select");
   }
   async function deleteClip(id: string) {
-    try {
-      const { removeClip } = await import("./studio-clips");
-      setClips(removeClip(globalThis.localStorage, id));
-    } catch (err) {
-      console.error("Failed to delete studio clip:", err);
-      setError("클립을 삭제하지 못했습니다.");
-    }
+    await commitSavedClipMutation(
+      (repository) => repository.delete(id),
+      (current) => deleteSavedClipInMemory(current, id),
+    );
   }
   function regenerateTemplate(tpl: TemplateSpec, gutter: number, currentEls: El[] = elements) {
     let nextFrames: FrameSpec[] = [];
@@ -29291,6 +30094,7 @@ const puppetWarpArmed =
     const discardedId = drawingRef.current?.id;
     discardStudioLivingInkStroke(discardedId);
     discardStudioHokusaiLiveStroke(discardedId);
+    inkMeshLivePreviewRuntimeRef.current?.cancel();
     if (discardedId) cancelLiveStrokeBackendAudit(discardedId);
     drawingCrdtPublisherRef.current.cancel(discardedId);
     if (discardedId) {
@@ -29418,6 +30222,7 @@ const puppetWarpArmed =
     const discardedId = drawingRef.current?.id;
     discardStudioLivingInkStroke(discardedId);
     discardStudioHokusaiLiveStroke(discardedId);
+    inkMeshLivePreviewRuntimeRef.current?.cancel();
     cancelAllLiveStrokeBackendAudits();
     drawingCrdtPublisherRef.current.cancel(discardedId);
     if (discardedId) {
@@ -29868,22 +30673,24 @@ const puppetWarpArmed =
       // any side-effecting begin call, which lanes may attempt admission. Pristine tournament
       // state (no winner, nothing killed) admits every lane, so the gated ladder below evaluates
       // byte-identically to the pre-tournament contract; a killed lane never begins, and a cached
-      // winner owns the head by denying the lanes ranked above it. Default persistence mirrors
-      // the filter island (SQLite/OPFS first, localStorage fallback) and must be installed before
-      // the lazy shared runtime hydrates on first use; this stroke reads only in-memory state.
-      installStudioTournamentSqlitePersistence();
-      const strokeRouteTournamentRuntime = getStudioTournamentRuntime();
-      const strokeRouteTournamentGate = resolveStudioStrokeRoutePointerDownGate({
-        lanes: STUDIO_STROKE_ROUTE_TOURNAMENT_LANES,
-        traits: {
-          pointCount: Math.floor(next.points.length / 2),
-          // An absent brush id normalizes to the "unknown" family bucket.
-          brushFamily: next.brush ?? "",
-          canvasScale: zoomRef.current,
-        },
-        state: strokeRouteTournamentRuntime,
-      });
-      if (strokeRouteTournamentGate.selection.killIgnoredReason) {
+      // winner owns the head by denying the lanes ranked above it. SQLite/OPFS
+      // installs asynchronously after mount; before it is ready `peek` returns
+      // null and every lane remains admitted in its original order. No stroke
+      // constructs a fallback-backed runtime or waits for persistence I/O.
+      const strokeRouteTournamentRuntime = peekBootedStudioTournamentRuntime();
+      const strokeRouteTournamentGate = strokeRouteTournamentRuntime
+        ? resolveStudioStrokeRoutePointerDownGate({
+            lanes: STUDIO_STROKE_ROUTE_TOURNAMENT_LANES,
+            traits: {
+              pointCount: Math.floor(next.points.length / 2),
+              // An absent brush id normalizes to the "unknown" family bucket.
+              brushFamily: next.brush ?? "",
+              canvasScale: zoomRef.current,
+            },
+            state: strokeRouteTournamentRuntime,
+          })
+        : null;
+      if (strokeRouteTournamentGate?.selection.killIgnoredReason) {
         console.warn(
           "Studio stroke-route tournament kill list was ignored to keep a fallback chain.",
           strokeRouteTournamentGate.selection.killIgnoredReason,
@@ -29892,16 +30699,16 @@ const puppetWarpArmed =
       // Admissions are side-effecting. Attempt them strictly in product priority order and stop
       // invoking lower providers after the first accepted owner; resolving all probes first would
       // start multiple translucent surfaces and create a cancellation race.
-      const livingInkAdmitted = strokeRouteTournamentGate.admits("living-ink")
+      const livingInkAdmitted = (strokeRouteTournamentGate?.admits("living-ink") ?? true)
         && pendingGpuAuthorityPromoted
         && beginStudioLivingInkStroke(next, pointerSample);
-      const hokusaiPinned = strokeRouteTournamentGate.admits("hokusai")
+      const hokusaiPinned = (strokeRouteTournamentGate?.admits("hokusai") ?? true)
         && pendingGpuAuthorityPromoted
         && !livingInkAdmitted
         && beginStudioHokusaiLiveStroke(next);
       const stampKind = resolveStudioStampBrushKind(next.brush);
       const stampDirect = Boolean(
-        strokeRouteTournamentGate.admits("stamp")
+        (strokeRouteTournamentGate?.admits("stamp") ?? true)
         && !livingInkAdmitted
         && !hokusaiPinned
         && stampKind
@@ -29925,7 +30732,7 @@ const puppetWarpArmed =
       // 도착하지 않으면(조용히 실패하는 GPU 환경) 같은 스트로크 안에서 Konva 로 인계된다.
       // (미드스트로크 스크린샷 검증 완료 — drawImage 기반 픽셀 판정은 WebGPU 캔버스에서
       // 위음성을 내므로 합성 스크린샷/영수증으로만 판정한다.)
-      const gpuStartEligible = strokeRouteTournamentGate.admits("gpu")
+      const gpuStartEligible = (strokeRouteTournamentGate?.admits("gpu") ?? true)
         && pendingGpuAuthorityPromoted
         && !livingInkAdmitted
         && !hokusaiPinned
@@ -29971,7 +30778,7 @@ const puppetWarpArmed =
       liveInkOverlayClearGenRef.current += 1;
       let liveInkOverlayStarted = false;
       if (
-        strokeRouteTournamentGate.admits("live-ink")
+        (strokeRouteTournamentGate?.admits("live-ink") ?? true)
         && overlayCandidate
         && !livingInkAdmitted
         && !hokusaiPinned
@@ -29994,7 +30801,7 @@ const puppetWarpArmed =
         // 다른 렌더러를 쓰는 새 획도 이전 커밋의 draw 영수증 대기 잉크를 지우면 안 된다.
         liveInkOverlayRendererRef.current.resetActive();
       }
-      const wetInkOverlayStarted = strokeRouteTournamentGate.admits("wet-fallback")
+      const wetInkOverlayStarted = (strokeRouteTournamentGate?.admits("wet-fallback") ?? true)
         && !pixelDirect
         && !livingInkAdmitted
         && !hokusaiPinned
@@ -30007,7 +30814,7 @@ const puppetWarpArmed =
           pageEpoch: currentPageId,
           hidden: next.hidden === true,
         }).status === "started";
-      const dynamicBrushDirect = strokeRouteTournamentGate.admits("dynamic")
+      const dynamicBrushDirect = (strokeRouteTournamentGate?.admits("dynamic") ?? true)
         && !pixelDirect
         && !livingInkAdmitted
         && !hokusaiPinned
@@ -30130,6 +30937,17 @@ const puppetWarpArmed =
         causalPostCorrectionEligible,
         nativePredictionEligible: predictionTailEligible,
       });
+      if (predictionTailEligible && !causalPostCorrectionEligible) {
+        // This is a bounded preview admission only: failure leaves the already-started Canvas2D
+        // live-ink + Perfect Freehand path untouched. The async host prewarms WASM/fabric before
+        // pointerdown, so begin itself never waits inside the contact task.
+        inkMeshLivePreviewRuntimeRef.current?.begin(
+          next,
+          liveBrushPressureSamplesFor(next),
+        );
+      } else {
+        inkMeshLivePreviewRuntimeRef.current?.cancel();
+      }
       // A pin grants only a write route, never visibility. The exact retained Konva vector stays
       // visible until coordinator token + imperative receipt both authorize the GPU frame.
       applyLiveStrokeBackendPresentationEffects();
@@ -32962,6 +33780,34 @@ const puppetWarpArmed =
             } else {
               scheduleDraft(predictedPreview);
             }
+            const inkMeshModule = inkMeshLivePreviewModuleRef.current;
+            const inkMeshRuntime = inkMeshLivePreviewRuntimeRef.current;
+            if (inkMeshModule && inkMeshRuntime) {
+              try {
+                const meshPreview = suffixDraft
+                  ? inkMeshModule.expandStudioInkMeshPredictedSuffix(
+                      authoritativeDrawing,
+                      predictedPreview,
+                      predictionStartSampleIndex,
+                    )
+                  : predictedPreview;
+                const meshReceipt = inkMeshRuntime.previewPredicted(
+                  meshPreview,
+                  authoritativePointCount,
+                  studioLiveBrushPressureSamples(meshPreview),
+                );
+                if (inkMeshModule.isStudioInkMeshRenderedReceipt(meshReceipt)) {
+                  // Canvas prediction remains the fail-visible CPU path, but exactly one transient
+                  // tail is visible in this frame. Its state stays intact so device loss can resume
+                  // on the next browser delivery without touching DrawEl/history.
+                  liveInkPredictionRendererRef.current.clear();
+                }
+              } catch {
+                // A malformed compact preview is non-authoritative. Drop only the mesh island and
+                // leave the already-rendered Canvas2D prediction + Perfect Freehand path untouched.
+                inkMeshRuntime.cancel();
+              }
+            }
           }
         } finally {
           drawingPredictionBatchMutationRef.current = false;
@@ -32998,6 +33844,13 @@ const puppetWarpArmed =
   function publishAuthoritativeFreehandSuffix(startSample: number): DrawEl | null {
     const authoritativeDrawing = drawingRef.current;
     if (!authoritativeDrawing) return null;
+    // The same coalesced suffix that becomes DrawEl/CRDT authority advances Google Ink's retained
+    // InProgressStroke. Any previously displayed estimate is replaced by this exact prefix before
+    // the normal live surface flushes; no predicted sample enters this call.
+    inkMeshLivePreviewRuntimeRef.current?.synchronizeAuthoritative(
+      authoritativeDrawing,
+      liveBrushPressureSamplesFor(authoritativeDrawing),
+    );
     appendStudioLivingInkAuthoritativeSuffix(authoritativeDrawing, startSample);
     appendStudioHokusaiAuthoritativeSuffix(authoritativeDrawing, startSample);
     if (liveDraftDirectRef.current || liveStampDraftDirectRef.current) {
@@ -33620,8 +34473,9 @@ const puppetWarpArmed =
       // The pointerup finally-block has already cleared the direct DrawEl refs. Install an exact
       // settled copy before removing the material overlay so async Worker failure never flashes a
       // blank frame while the React history commit reaches the main layer.
-      draftPreviewStoreRef.current.settle(finished);
-      draftPreviewNormalLayerRef.current?.drawScene();
+      flushSync(() => {
+        draftPreviewStoreRef.current.settle(finished);
+      });
     }
     const committed = commit(fallbackElements, undefined, state.pageId);
     hokusaiLiveOverlaySurfaceRef.current?.renderer.clear();
@@ -33689,8 +34543,12 @@ const puppetWarpArmed =
     );
     const currentPage = currentPageIdRef.current === state.pageId;
     if (currentPage) {
-      draftPreviewStoreRef.current.settle(finished);
-      draftPreviewNormalLayerRef.current?.drawScene();
+      // A failed/blank physical frame must transfer to the newly mounted settled-run layer before
+      // the Worker canvas is cleared. Merely mutating the external store is not a paint receipt.
+      flushSync(() => {
+        draftPreviewStoreRef.current.settle(finished);
+      });
+      clearStudioLivingInkVectorShadow(state);
     }
     const committed = commit(fallbackElements, undefined, state.pageId);
     livingInkOverlaySurfaceRef.current?.renderer.clear();
@@ -33750,6 +34608,19 @@ const puppetWarpArmed =
         surface.binding.projection,
         (receipt) => onStudioLivingInkOverlayPresented(state, receipt),
       );
+      if (!studioLivingInkCoverageIntersectsStroke({
+        coverage: presentation.alphaCoverage,
+        outputWidth: presentation.width,
+        outputHeight: presentation.height,
+        documentWidth: CANVAS_W,
+        documentHeight: canvasH,
+        points: finished.points,
+        diameter: studioLiveBrushEffectiveDiameter(finished),
+      })) {
+        throw new Error(
+          "Living Ink canonical PNG가 원본 획의 위치에 표시 가능한 안료를 만들지 못해 원본 벡터를 유지합니다.",
+        );
+      }
       const result: StudioLivingInkCanonicalResult = Object.freeze({
         src: presentation.src,
         pngSha256: presentation.pngSha256,
@@ -33829,7 +34700,12 @@ const puppetWarpArmed =
         livingInkAcceptedAuthorityRef.current = committedAuthority;
       }
       if (currentPageIdRef.current === state.pageId) {
-        setSelectedId(transaction.transaction.selectionId);
+        // Automatic materialization is still part of the drawing gesture. Selecting the new
+        // page-sized image would mount image-editing chrome and move the canvas host between the
+        // live/released frame and the canonical handoff. The pixels and document coordinates are
+        // already identical; keep the drawing context stable and let the artist explicitly select
+        // the materialized layer afterward (same contract as Hokusai below).
+        setSelectedId(null);
       }
       announceDrawingShortcut("수채 번짐 · 입력·놓을 때 물리 계산, 손을 떼면 2초 고정 settle");
       // The exact live pixels stay visible until StudioKonvaImageNode synchronously draws the same
@@ -34106,6 +34982,17 @@ const puppetWarpArmed =
         pointerEvent,
         options.consumeReleaseSample !== false,
       );
+      if (authoritativeLiveStroke) {
+        // Seal the upstream InProgressStroke from hardware-backed DrawEl samples only. The mesh
+        // canvas is cleared immediately afterwards; normal release planning still owns document
+        // commit, anti-flicker handoff, and every settled pixel.
+        inkMeshLivePreviewRuntimeRef.current?.finish(
+          authoritativeLiveStroke,
+          liveBrushPressureSamplesFor(authoritativeLiveStroke),
+        );
+      } else {
+        inkMeshLivePreviewRuntimeRef.current?.cancel();
+      }
       if (drawingRef.current && isCompleteStudioDrawOp(drawingRef.current)) {
         const completedDrawing = drawingRef.current;
         completedLiveStrokeBackendAudit = true;
@@ -34365,6 +35252,21 @@ const puppetWarpArmed =
         completedLiveStrokeBackendAudit && deferInkCleanup
       );
       clearDraftPreview({ preserveInkForDeferredCommit: deferInkCleanup });
+      const finishingLivingInk = livingInkStrokeRef.current;
+      if (
+        deferInkCleanup
+        && finishingLivingInk?.finishing
+        && finishingLivingInk.finalDrawing
+        && !finishingLivingInk.overlayPresented
+      ) {
+        // A short contact can finish before the Worker presents even its first material frame.
+        // Restore the exact vector in the same pointer-up task and retire it only on a real frame
+        // or canonical-image receipt; otherwise the async finish window contains a blank canvas.
+        showStudioLivingInkVectorShadow(
+          finishingLivingInk.finalDrawing,
+          finishingLivingInk.pageId,
+        );
+      }
       const finishingHokusai = hokusaiLiveStrokeRef.current;
       if (
         deferInkCleanup
@@ -35801,6 +36703,7 @@ const puppetWarpArmed =
           characterBible,
           writerRoom,
           aiProvenance,
+          aiImageReferences: scenarioImageReferenceDocument,
           comments: studioComments,
           releaseSchedule,
           publicationAnalytics,
@@ -35935,11 +36838,6 @@ const puppetWarpArmed =
         return;
       }
 
-      saveStudioAiImageReferenceDocument(
-        studioWorkspaceStorage(),
-        { workId: savedWorkId, userScope: saveAuthScopeKey },
-        scenarioImageReferenceDocument
-      );
       clearAutosaveDurableAuthority();
       try {
         localStorage.removeItem(autosaveKey);
@@ -38147,7 +39045,7 @@ function clearSelectionForEdit() {
 
   // The empty-dependency page lifecycle listeners below call through this ref, so every render
   // supplies the latest document/scope snapshot without reinstalling global handlers. This is a
-  // synchronous, private recovery write only; normal editing still uses the debounced autosave.
+  // best-effort durable recovery request; normal editing still uses the debounced autosave.
   persistPendingStrokeEmergencyAutosaveRef.current = (reason) => {
     const pendingBatch = pendingStrokeCommitsRef.current;
     const activeRecovery = readActiveStrokeLifecycleRecovery();
@@ -38223,33 +39121,45 @@ function clearSelectionForEdit() {
             : { kind: "local" },
       });
       if (emergency.ok) {
-        writeStudioLifecycleAutosave(
-          globalThis.localStorage,
-          autosaveKey,
-          emergency.payload,
-          {
-            // Startup recovery discovery is intentionally idle-scheduled. Until it completes,
-            // treat any contentful primary as unresolved so a fast edit + pagehide cannot replace
-            // the artist's older recovery before the banner has even had a chance to appear.
-            preservePrimary:
-              !autosaveChecked || hasAutosave || autosaveRestoreBlockedReason !== null,
-          }
-        );
+        const emergencyGeneration = studioRevisionProjectGenerationRef.current;
+        const durableWrites: Promise<"opfs-journal" | "sqlite-fallback">[] = [];
         const sessionPromise = autosaveOpfsSessionRef.current;
         if (sessionPromise) {
-          void sessionPromise
-            .then((session) => session?.write(emergency.payload))
-            .catch((cause: unknown) => {
-              // pagehide cannot await OPFS. The synchronous lifecycle sidecar remains the
-              // authoritative fallback and is reconciled into OPFS on the next Studio launch.
-              if (import.meta.env.DEV && reason !== "pagehide") {
-                console.warn("Studio lifecycle autosave stayed in the fallback slot.", cause);
-              }
-            });
+          durableWrites.push(sessionPromise.then(async (session) => {
+            if (!session) throw new Error("OPFS autosave authority is unavailable");
+            const receipt = await session.write(emergency.payload);
+            return receipt.authority;
+          }));
         }
-        studioLifecycleDurableGenerationRef.current =
-          studioRevisionProjectGenerationRef.current;
-        studioLifecycleDurablePendingFingerprintRef.current = pendingFingerprint;
+        const sqlitePromise = autosaveSqliteStoreRef.current;
+        if (sqlitePromise) {
+          durableWrites.push(sqlitePromise.then(async (sqlite) => {
+            if (!sqlite) throw new Error("SQLite autosave authority is unavailable");
+            await sqlite.write(autosaveKey, emergency.payload);
+            return "sqlite-fallback" as const;
+          }));
+        }
+        const durabilityAttempt = durableWrites.length > 0
+          ? Promise.any(durableWrites)
+          : Promise.reject(
+              new Error("OPFS journal and SQLite autosave authorities are unavailable")
+            );
+        void durabilityAttempt
+          .then((authority) => {
+            studioLifecycleDurableGenerationRef.current = Math.max(
+              studioLifecycleDurableGenerationRef.current,
+              emergencyGeneration
+            );
+            studioLifecycleDurablePendingFingerprintRef.current = pendingFingerprint;
+            noteStudioSaveSucceeded(authority);
+          })
+          .catch((cause: unknown) => {
+            // The exact payload remains in the current tab's memory. Do not advance either durable
+            // frontier until an OPFS/SQLite receipt exists, and make the loss of durability visible.
+            reportStudioSaveAuthorityDegraded(cause);
+            void reportStudioAutosaveFailure(cause);
+            console.error("Pending stroke emergency autosave failed:", cause);
+          });
       }
     } catch (cause) {
       // pagehide/unmount must stay non-blocking. Keep a diagnostic for development without
@@ -38340,6 +39250,9 @@ function clearSelectionForEdit() {
     setReleaseSchedule(normalizeReleaseSchedule(projectData.releaseSchedule));
     setPublicationAnalytics(publicationAnalyticsDocument);
     setReferenceBoard(normalizeStudioReferenceBoardDocument(projectData.referenceBoard));
+    setScenarioImageReferenceDocument(
+      hydrateStudioAiImageReferenceDocument(projectData.aiImageReferences),
+    );
     return true;
   }
 
@@ -38364,7 +39277,7 @@ function clearSelectionForEdit() {
     if (!ensureSharedDocumentAvailableForExport()) return false;
     try {
       setCheckpoints(
-        await createDurableStudioCheckpoint(globalThis.localStorage, checkpointKey, {
+        await createDurableStudioCheckpoint(undefined, checkpointKey, {
           name,
           payload: currentStudioProjectSnapshot(),
         })
@@ -38406,7 +39319,7 @@ function clearSelectionForEdit() {
     if (!(await confirmStudioDestructiveAction(deleteRequest))) return;
     try {
       setCheckpoints(
-        await deleteDurableStudioCheckpoint(globalThis.localStorage, checkpointKey, checkpoint.id)
+        await deleteDurableStudioCheckpoint(undefined, checkpointKey, checkpoint.id)
       );
       settleStudioDestructiveCommit(deleteRequest, true);
       setCheckpointError(null);
@@ -39629,9 +40542,8 @@ function clearSelectionForEdit() {
       const mutationTicket = bg3dMutationTicketRef.current;
       if (!mutationTicket || !canApplyStudioMutation(mutationTicket)) return false;
       try {
-        const assetLibrary = await import("./studio-asset-library");
         if (!canApplyStudioMutation(mutationTicket)) return false;
-        const saved = await assetLibrary.saveAsset({
+        const saved = await saveStudioAssetMutation({
           name: capture.shotId ? "3D 저장 컷 · AI 구도 참조" : "3D 현재 샷 · AI 구도 참조",
           dataUrl: capture.dataUrl,
           width: capture.width,
@@ -39639,7 +40551,7 @@ function clearSelectionForEdit() {
           kind: "bg3d-ai-method",
         });
         if (!canApplyStudioMutation(mutationTicket)) {
-          await assetLibrary.deleteAsset(saved.id).catch(() => undefined);
+          await deleteStudioAssetMutation(saved.id).catch(() => undefined);
           return false;
         }
         const application = applyStudioBg3dAiMethodReference(
@@ -39648,16 +40560,12 @@ function clearSelectionForEdit() {
           capture,
         );
         if (!application.ok) {
-          await assetLibrary.deleteAsset(saved.id).catch(() => undefined);
+          await deleteStudioAssetMutation(saved.id).catch(() => undefined);
           setError(
             "구도·카메라 참조가 가득 찼어요. AI 이미지 참조 팩의 Method 항목 하나를 제거한 뒤 다시 시도해 주세요.",
           );
           return false;
         }
-        setAssets((current) => [
-          saved,
-          ...current.filter(({ id }) => id !== saved.id),
-        ]);
         setAssetsLoaded(true);
         setScenarioImageReferenceDocument(application.document);
         setScenarioError(null);
@@ -40015,8 +40923,8 @@ function clearSelectionForEdit() {
 
   const studioOptionsBarsHandlers = useStudioStableHandlers<StudioOptionsBarsHandlers>({
     assignBrushSlot: (index) => {
-      setBrushSlotsState((prev) => {
-        const next = assignStudioBrushSlot(prev, index, {
+      commitStudioBrushSlotsMutation(
+        (prev) => assignStudioBrushSlot(prev, index, {
           brushId: brush,
           ...(activeCatalogBrush.sourcePresetId
             ? {
@@ -40027,14 +40935,12 @@ function clearSelectionForEdit() {
           brushDynamics,
           strokeWidth,
           brushOpacity,
-        });
-        saveStudioBrushSlotsState(
-          typeof globalThis.localStorage === "undefined" ? null : globalThis.localStorage,
-          next
-        );
-        return next;
-      });
-      announceDrawingShortcut(`슬롯 ${index + 1}에 저장`);
+        }),
+        {
+          successMessage: `슬롯 ${index + 1}에 저장`,
+          failureMessage: `슬롯 ${index + 1}을 SQLite에 저장하지 못했어요.`,
+        },
+      );
     },
     cycleStabilizer: () => {
       setStabilizer((prev) => {
@@ -40565,7 +41471,7 @@ function clearSelectionForEdit() {
         className="hidden"
         disabled={brushPackImporting}
         onChange={(event) => void handleBrushPackImportFromMenu(event)}
-        aria-label="브러시 가져오기 (ABR · MYB · KPP · JSON)"
+        aria-label="브러시 가져오기 (ABR · MYB · KPP · SUT · SUTG · Krita 번들 · JSON)"
       />
       <input
         ref={psdImportInputRef}
@@ -40943,7 +41849,7 @@ function clearSelectionForEdit() {
         <button
           ref={brushUndoButtonRef}
           type="button"
-          onClick={() => undoBrushDelete(pendingBrushDelete)}
+          onClick={() => void undoBrushDelete(pendingBrushDelete)}
           className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl bg-warn/15 px-3 font-bold text-warn hover:bg-warn/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           <Undo2 size={14} aria-hidden /> 삭제 취소
@@ -41646,6 +42552,7 @@ function clearSelectionForEdit() {
           <StudioCanvasViewport
           liveDynamicBrushOverlayRenderer={liveDynamicBrushOverlayRenderer}
           liveWetInkOverlayRenderer={liveWetInkOverlayRenderer}
+          inkMeshLivePreviewRuntime={inkMeshLivePreviewRuntime}
           liveInkPredictionRenderer={liveInkPredictionRenderer}
           liveStampOverlayRenderer={liveStampOverlayRenderer}
           bubbleShapeActiveHandleIndex={bubbleShapeActiveHandleIndex}
@@ -42363,7 +43270,7 @@ function clearSelectionForEdit() {
           setPuppetWarpPins={setPuppetWarpPins}
           setQuickShapeActive={setQuickShapeActive}
           setRightPanelOpen={setRightPanelOpenWithOverride}
-          setSavedBrushes={setSavedBrushes}
+          setSavedBrushes={commitSavedBrushProjection}
           setShapeFill={setShapeFill}
           setSharedDocumentNotice={setSharedDocumentNotice}
           setShowGrid={setShowGrid}
@@ -42547,7 +43454,7 @@ function clearSelectionForEdit() {
           pressureMinSize={pressureMinSize}
           setPressureMinSize={setPressureMinSize}
           setQuickStartOpen={setQuickStartOpen}
-          setSavedBrushes={setSavedBrushes}
+          setSavedBrushes={commitSavedBrushProjection}
           setSelectedId={setSelectedId}
           setShapeFill={setShapeFill}
           setStampTuning={setStampTuning}

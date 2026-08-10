@@ -3,6 +3,11 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const runtime = readFileSync(new URL("./studio-living-ink-webgl2-runtime.ts", import.meta.url), "utf8");
+const webGpuRuntime = readFileSync(
+  new URL("./studio-living-ink-webgpu-pure-runtime.ts", import.meta.url),
+  "utf8",
+);
+const wgsl = readFileSync(new URL("./studio-living-ink-wgsl-shaders.ts", import.meta.url), "utf8");
 const worker = readFileSync(new URL("./studio-living-ink.worker.ts", import.meta.url), "utf8");
 const provider = readFileSync(new URL("./studio-living-ink-provider.ts", import.meta.url), "utf8");
 const validation = readFileSync(
@@ -97,6 +102,33 @@ describe("Living Ink actual execution boundary", () => {
     expect(browserGate).toContain("maximumRgbDifference(fixedBefore.image, fixedAfter.image)");
     expect(verifier).toContain("fixed pigment changed under water scrub/advance");
     expect(verifier).toContain("result.fixedInvariant?.maximumRgbDifference !== 0");
+  });
+
+  it("damps release-settle velocity without activating fixation chemistry in either backend", () => {
+    for (const source of [runtime, webGpuRuntime]) {
+      expect(source).toContain(
+        'const velocitySettling = operation.kind === "advance" && quality === "settle";',
+      );
+    }
+    expect(runtime).toMatch(
+      /operation\.kind === "fix",\s+pressureIterations,\s+velocitySettling,/,
+    );
+    expect(webGpuRuntime).toContain(
+      'this.step(operation.kind === "fix", pressureIterations, velocitySettling)',
+    );
+    expect(runtime).toContain(
+      "studioLivingInkVelocityDampingForStep(\n        material.flow,\n        dt,\n        fixing,\n        velocitySettling,",
+    );
+    expect(runtime).toContain("if (fixing) {");
+    expect(runtime).toContain("Math.exp(-dt / (fixing ? 0.25 : dryWindow))");
+    expect(webGpuRuntime).toContain("fixTransfer: fixing ? 1 - Math.exp(-dt * 5) : 0");
+    expect(webGpuRuntime).toContain("if (fixing) {");
+    expect(wgsl).toContain("STUDIO_LIVING_INK_RELEASE_VELOCITY_DAMPING_RATE_PER_SECOND = 60");
+    expect(wgsl).toContain("studioLivingInkVelocityDampingForStep(");
+    expect(wgsl).toContain("if (fixing) return studioLivingInkVelocityDamping(flow, dt, true)");
+    expect(wgsl).toContain(
+      "studioLivingInkEvaporationMultiplier(input.dryRate, input.dt, input.fixing)",
+    );
   });
 
   it("gates organic wash quality and continuous-stroke artifacts against actual pixels", () => {

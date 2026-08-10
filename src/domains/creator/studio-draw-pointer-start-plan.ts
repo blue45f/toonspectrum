@@ -247,8 +247,7 @@ export function planStudioDrawPointerStart(
     ...pressureContract,
     ...brushCatalogIdentity,
     ...(outlineStroke ? { outlineStroke } : {}),
-    // The inspector tip belongs to the `calligraphy` brush; every other family member is sold
-    // with its own nib and must persist that instead of silently inheriting a 45° default.
+    // Each calligraphy-family brush persists its own nib instead of inheriting the inspector's 45° tip.
     brushTip: drawMode === "pen"
       ? resolveStudioCalligraphyAuthoringTip(brush, brushTip)
       : undefined,

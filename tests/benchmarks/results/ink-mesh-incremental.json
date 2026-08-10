@@ -1,0 +1,108 @@
+{
+  "schema": "toon-ink-mesh-incremental-benchmark-v1",
+  "generatedAtUtc": "2026-08-08T21:00:12.428Z",
+  "runtime": {
+    "node": "v24.16.0",
+    "platform": "darwin 25.6.0",
+    "cpu": "Apple M2 Max",
+    "execution": "real committed Emscripten WASM in Node; no mock"
+  },
+  "upstream": {
+    "repository": "https://github.com/google/ink",
+    "commit": "1d0daba661f3035f42f3649b8e6a0061b47aa759",
+    "license": "Apache-2.0"
+  },
+  "workload": {
+    "points": 240,
+    "chunkSize": 8,
+    "updatesPerStroke": 31,
+    "warmupStrokes": 5,
+    "measuredStrokes": 40,
+    "channels": [
+      "x",
+      "y",
+      "tMs",
+      "pressure",
+      "tiltRad",
+      "orientationRad"
+    ]
+  },
+  "candidates": {
+    "upstreamInProgressStroke": {
+      "backend": "upstream-in-progress",
+      "updateLatencyMs": {
+        "p50": 0.06975,
+        "p95": 0.08575,
+        "p99": 0.108125,
+        "max": 0.236041
+      },
+      "strokeLatencyMs": {
+        "p50": 2.181334,
+        "p95": 2.401958,
+        "p99": 2.493042,
+        "max": 2.493042
+      },
+      "metricsPerStroke": {
+        "backend": "upstream-in-progress",
+        "updateCount": 31,
+        "inputCount": 240,
+        "inputPayloadBytes": 11520,
+        "wasmToJsPayloadBytes": 11336,
+        "deltaPayloadBytes": 11336,
+        "fullSnapshotEquivalentBytes": 85216,
+        "maxDeltaPayloadBytes": 564,
+        "peakTrackedVectorBytes": 9588,
+        "peakWasmHeapBytes": 16973824,
+        "gpuReadbackCount": 0
+      },
+      "finalMesh": {
+        "vertexCount": 173,
+        "triangleCount": 171,
+        "sha256": "546e27bb72f7420d38c94ab0230793e22cf108bdd4b21c134079fb3b9cdde6cc"
+      },
+      "deltaSha256": "ba8f554cab35609eb979b7bb50eb0b7a314052e9aa1899a20754173df5b201ee",
+      "exactFinalParityRuns": 40
+    },
+    "retainedSingleShotFallback": {
+      "backend": "single-shot-fallback",
+      "updateLatencyMs": {
+        "p50": 0.590625,
+        "p95": 1.110459,
+        "p99": 1.194333,
+        "max": 1.267083
+      },
+      "strokeLatencyMs": {
+        "p50": 18.344667,
+        "p95": 18.728375,
+        "p99": 18.884375,
+        "max": 18.884375
+      },
+      "metricsPerStroke": {
+        "backend": "single-shot-fallback",
+        "updateCount": 31,
+        "inputCount": 240,
+        "inputPayloadBytes": 11520,
+        "wasmToJsPayloadBytes": 80396,
+        "deltaPayloadBytes": 11336,
+        "fullSnapshotEquivalentBytes": 85216,
+        "maxDeltaPayloadBytes": 564,
+        "peakTrackedVectorBytes": 16340,
+        "peakWasmHeapBytes": 16973824,
+        "gpuReadbackCount": 0
+      },
+      "finalMesh": {
+        "vertexCount": 173,
+        "triangleCount": 171,
+        "sha256": "546e27bb72f7420d38c94ab0230793e22cf108bdd4b21c134079fb3b9cdde6cc"
+      },
+      "deltaSha256": "ba8f554cab35609eb979b7bb50eb0b7a314052e9aa1899a20754173df5b201ee",
+      "exactFinalParityRuns": 40
+    }
+  },
+  "evidence": {
+    "finalMeshByteExactAcrossAllMeasuredRuns": true,
+    "upstreamWasmToJsPayloadReductionVsFullSnapshots": 0.8669733383402178,
+    "upstreamWasmToJsPayloadReductionVsFallback": 0.8589979600975173,
+    "gpuReadbackCount": 0
+  }
+}

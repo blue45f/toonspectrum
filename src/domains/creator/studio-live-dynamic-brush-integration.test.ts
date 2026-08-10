@@ -44,12 +44,13 @@ describe("Studio live dynamic brush integration boundary", () => {
     const settle = clear.indexOf(
       "draftPreviewStoreRef.current.settle(finalDynamicBrushStroke)",
     );
-    const drawReceipt = clear.indexOf("draftPreviewDynamicLayerRef.current?.drawScene()");
+    const flushReceipt = clear.lastIndexOf("flushSync(() => {", settle);
     const release = clear.indexOf("renderer.releaseSettledPrefix(1)");
     expect(seal).toBeGreaterThan(0);
+    expect(flushReceipt).toBeGreaterThan(seal);
     expect(settle).toBeGreaterThan(seal);
-    expect(drawReceipt).toBeGreaterThan(settle);
-    expect(release).toBeGreaterThan(drawReceipt);
+    expect(settle).toBeGreaterThan(flushReceipt);
+    expect(release).toBeGreaterThan(settle);
   });
 
   it("mounts both active and settled native-density canvases through Viewport", () => {

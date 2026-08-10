@@ -1,10 +1,15 @@
 /**
  * Browser-local content-addressed store for verified VRM surface-paint PNG artifacts.
  *
- * Only a canonical artifact receipt and an immutable PNG Blob cross the IndexedDB boundary.
+ * Only a canonical artifact receipt and immutable PNG bytes cross the SQLite/OPFS boundary.
  * Canvas pixels, RGBA buffers, object URLs, and data URLs are deliberately unsupported.
  */
 
+import {
+  getProductStudioVrmAssetSqliteOpfsRepository,
+  StudioVrmAssetRepositoryError,
+  type StudioVrmAssetSqliteOpfsRepository,
+} from "./studio-vrm-asset-sqlite-opfs-repository";
 import {
   STUDIO_VRM_TEXTURE_PAINT_ARTIFACT_LIMITS,
   STUDIO_VRM_TEXTURE_PAINT_ARTIFACT_MIME,
@@ -21,7 +26,7 @@ export const STUDIO_VRM_TEXTURE_PAINT_LIBRARY_DATABASE_NAME =
 export const STUDIO_VRM_TEXTURE_PAINT_LIBRARY_DATABASE_VERSION = 1;
 export const STUDIO_VRM_TEXTURE_PAINT_LIBRARY_STORE_NAME = "png-artifacts";
 
-/** Scene-v5 artifact/bundle ceilings. IndexedDB itself is not a single-project bundle. */
+/** Scene-v5 artifact/bundle ceilings. Durable storage itself is not a single-project bundle. */
 export const STUDIO_VRM_TEXTURE_PAINT_LIBRARY_LIMITS = Object.freeze({
   ...STUDIO_VRM_TEXTURE_PAINT_ARTIFACT_LIMITS,
 });
@@ -39,8 +44,10 @@ export interface StudioVrmTexturePaintLibraryLimits {
 
 export interface StudioVrmTexturePaintLibraryOptions {
   readonly signal?: AbortSignal;
-  /** Dependency injection for tests and non-window runtimes. null explicitly disables storage. */
+  /** Explicit pre-V12 test/embed seam. Product code never supplies or probes this value. */
   readonly indexedDb?: IDBFactory | null;
+  /** Product default; tests can inject an actual SQLite memory DB + fake OPFS repository. */
+  readonly repository?: StudioVrmAssetSqliteOpfsRepository;
   /** Callers may lower, but never raise, the scene-v5 browser persistence limits. */
   readonly limits?: Partial<StudioVrmTexturePaintLibraryLimits>;
 }
@@ -70,7 +77,8 @@ const ERROR_MESSAGES: Readonly<
   LIMIT_INVALID: "VRM 표면 페인팅 로컬 저장 안전 한도가 올바르지 않습니다.",
   STORAGE_CORRUPT:
     "로컬에 저장된 VRM 표면 페인팅 PNG 또는 무결성 receipt가 손상되었습니다.",
-  STORAGE_UNAVAILABLE: "이 환경에서는 VRM 표면 페인팅 로컬 저장소를 사용할 수 없습니다.",
+  STORAGE_UNAVAILABLE:
+    "VRM 표면 페인팅 SQLite/OPFS 저장소를 사용할 수 없습니다. 현재 편집은 이 탭 메모리에만 남으며 새로고침하면 사라집니다.",
   TRANSACTION_FAILED: "VRM 표면 페인팅 로컬 저장 트랜잭션을 완료하지 못했습니다.",
 });
 
@@ -220,16 +228,40 @@ function artifactLimits(
 }
 
 function resolveIndexedDb(options: StudioVrmTexturePaintLibraryOptions): IDBFactory {
-  if (options.indexedDb !== undefined) {
-    if (options.indexedDb === null) throw libraryError("STORAGE_UNAVAILABLE");
-    return options.indexedDb;
+  if (!usesLegacyIndexedDb(options) || !options.indexedDb) {
+    throw libraryError("STORAGE_UNAVAILABLE");
   }
-  try {
-    if (typeof globalThis.indexedDB !== "undefined") return globalThis.indexedDB;
-  } catch {
-    // Browser privacy settings can make IndexedDB property access throw.
+  return options.indexedDb;
+}
+
+function usesLegacyIndexedDb(options: StudioVrmTexturePaintLibraryOptions): boolean {
+  return Object.prototype.hasOwnProperty.call(options, "indexedDb");
+}
+
+function repository(
+  options: StudioVrmTexturePaintLibraryOptions,
+): StudioVrmAssetSqliteOpfsRepository {
+  return options.repository ?? getProductStudioVrmAssetSqliteOpfsRepository();
+}
+
+function repositoryError(
+  cause: unknown,
+  signal: AbortSignal | undefined,
+): StudioVrmTexturePaintLibraryError {
+  if (signal?.aborted || (cause instanceof Error && cause.name === "AbortError")) {
+    return libraryError("ABORTED", signal?.reason ?? cause);
   }
-  throw libraryError("STORAGE_UNAVAILABLE");
+  if (cause instanceof StudioVrmAssetRepositoryError) {
+    if (cause.code === "missing") return libraryError("ARTIFACT_MISSING", cause);
+    if (cause.code === "corrupt" || cause.code === "invalid") {
+      return libraryError("STORAGE_CORRUPT", cause);
+    }
+    if (cause.code === "limit") return libraryError("ARTIFACT_INVALID", cause);
+    if (cause.code === "unavailable" || cause.code === "closed") {
+      return libraryError("STORAGE_UNAVAILABLE", cause);
+    }
+  }
+  return libraryError("TRANSACTION_FAILED", cause);
 }
 
 function openDatabase(
@@ -505,10 +537,10 @@ async function verifiedStoredArtifact(
 }
 
 /**
- * Verifies the artifact before opening IndexedDB, then atomically overwrites an existing hash
- * with the verified Blob. The overwrite repairs any same-key byte tampering while retaining one
- * content-addressed record. Aggregate project budgets are enforced by the manifest/bundle export
- * boundary, not across unrelated projects sharing this browser cache.
+ * Verifies the artifact before opening the selected durable authority, then atomically overwrites
+ * an existing hash with verified PNG bytes. The overwrite repairs any same-key byte tampering
+ * while retaining one content-addressed record. Aggregate project budgets are enforced by the
+ * manifest/bundle export boundary, not across unrelated projects sharing this browser cache.
  */
 export async function saveStudioVrmTexturePaintLibraryArtifact(
   value: StudioVrmTexturePaintArtifact,
@@ -517,6 +549,27 @@ export async function saveStudioVrmTexturePaintLibraryArtifact(
   const limits = resolveLimits(options.limits);
   const artifact = await verifiedInputArtifact(value, limits, options.signal);
   throwIfAborted(options.signal);
+  if (!usesLegacyIndexedDb(options)) {
+    try {
+      const buffer = await artifact.archiveEntry.data.arrayBuffer();
+      throwIfAborted(options.signal);
+      const result = await repository(options).saveTexture({
+        receipt: artifact.metadata,
+        bytes: new Uint8Array(buffer),
+        limits: {
+          maxArtifacts: limits.maxArtifacts,
+          maxArtifactBytes: limits.maxArtifactBytes,
+          maxAggregateBytes: limits.maxAggregateBytes,
+        },
+      }, options.signal);
+      return Object.freeze({
+        receipt: result.receipt,
+        deduplicated: result.deduplicated,
+      });
+    } catch (cause) {
+      throw repositoryError(cause, options.signal);
+    }
+  }
   return withObjectStore("readwrite", options, async (store) => {
     const existingValue = await requestResult<unknown>(
       store.get(artifact.metadata.contentHash),
@@ -539,7 +592,7 @@ export async function saveStudioVrmTexturePaintLibraryArtifact(
 
 /**
  * Resolves one strict content hash and revalidates PNG structure, receipt, dimensions, byte count,
- * and SHA-256 after the IndexedDB transaction has completed.
+ * and SHA-256 after the durable read has completed.
  */
 export async function getStudioVrmTexturePaintLibraryArtifact(
   contentHashValue: StudioVrmTexturePaintArtifactHash | string,
@@ -547,6 +600,22 @@ export async function getStudioVrmTexturePaintLibraryArtifact(
 ): Promise<StudioVrmTexturePaintArtifact> {
   const contentHash = strictContentHash(contentHashValue);
   const limits = resolveLimits(options.limits);
+  if (!usesLegacyIndexedDb(options)) {
+    try {
+      const stored = await repository(options).getTexture(contentHash, options.signal);
+      if (!stored) throw libraryError("ARTIFACT_MISSING");
+      return await verifiedStoredArtifact({
+        contentHash,
+        receipt: stored.receipt,
+        png: new Blob([Uint8Array.from(stored.bytes).buffer], {
+          type: STUDIO_VRM_TEXTURE_PAINT_ARTIFACT_MIME,
+        }),
+      }, contentHash, limits, options.signal);
+    } catch (cause) {
+      if (cause instanceof StudioVrmTexturePaintLibraryError) throw cause;
+      throw repositoryError(cause, options.signal);
+    }
+  }
   const stored = await withObjectStore("readonly", options, async (store) => {
     const value = await requestResult<unknown>(
       store.get(contentHash),

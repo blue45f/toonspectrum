@@ -23,10 +23,21 @@ import {
   STUDIO_BG3D_SHOT_BATCH_RECOVERY_DOWNLOAD_TTL_MS,
   STUDIO_BG3D_SHOT_BATCH_RECOVERY_LEASE_MS,
   STUDIO_BG3D_SHOT_BATCH_RECOVERY_MAX_JOBS,
+  STUDIO_BG3D_SHOT_BATCH_RECOVERY_CAS_OWNER_PREFIX,
+  STUDIO_BG3D_SHOT_BATCH_RECOVERY_SQLITE_CATALOG_KEY,
+  STUDIO_BG3D_SHOT_BATCH_RECOVERY_SQLITE_NAMESPACE,
   StudioBg3dShotBatchRecoveryError,
   createStudioBg3dShotBatchRecoveryStore,
   type StudioBg3dShotBatchRecoveryAuthorizationReceipt,
+  type StudioBg3dShotBatchRecoveryRunExclusive,
 } from "./studio-bg3d-shot-batch-recovery-store";
+import {
+  openStudioLocalDatabase,
+  type StudioLocalDatabase,
+  type StudioSqliteApiHandle,
+} from "./studio-local-database";
+import { createStudioOpfsAssetStore } from "./studio-opfs-asset-store";
+import { createStudioOpfsMemoryFileSystem } from "./studio-opfs-filesystem";
 
 let fixtureSequence = 0;
 
@@ -1049,5 +1060,337 @@ describe("Studio BG3D durable shot-batch recovery", () => {
     expect(resumed.images).toHaveLength(0);
     expect(resumed.queue.items[0]?.status).toBe("pending");
     await resumedStore.release(resumed);
+  });
+});
+
+let sqliteApiPromise: Promise<StudioSqliteApiHandle> | null = null;
+
+function loadRealSqliteApi(): Promise<StudioSqliteApiHandle> {
+  sqliteApiPromise ??= import("@sqlite.org/sqlite-wasm").then(async (module) =>
+    (await module.default()) as unknown as StudioSqliteApiHandle);
+  return sqliteApiPromise;
+}
+
+async function openNamedSqlite(filename: string): Promise<StudioLocalDatabase> {
+  return openStudioLocalDatabase({
+    vfs: "memory",
+    memoryFilename: filename,
+    loadSqlite: loadRealSqliteApi,
+  });
+}
+
+function createTestRunExclusive(): StudioBg3dShotBatchRecoveryRunExclusive {
+  let tail: Promise<unknown> = Promise.resolve();
+  return <T>(task: () => Promise<T>): Promise<T> => {
+    const result = tail.then(task, task);
+    tail = result.catch(() => undefined);
+    return result;
+  };
+}
+
+function bindDatabaseWithKvFault(
+  database: StudioLocalDatabase,
+  shouldFail: () => boolean,
+): StudioLocalDatabase {
+  return new Proxy(database, {
+    get(target, property, receiver) {
+      if (property === "kvSet") {
+        return async (...args: Parameters<StudioLocalDatabase["kvSet"]>) => {
+          if (shouldFail()) throw new Error("forced sqlite commit fault");
+          return target.kvSet(...args);
+        };
+      }
+      const value = Reflect.get(target, property, receiver) as unknown;
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+}
+
+describe("Studio BG3D V12 SQLite/OPFS recovery authority", () => {
+  it("persists a verified binary shot across a real sqlite-wasm close and reopen", async () => {
+    const filename = `bg3d-shot-reopen-${crypto.randomUUID()}.sqlite3`;
+    const fileSystem = createStudioOpfsMemoryFileSystem();
+    const runExclusive = createTestRunExclusive();
+    const { plan, sourceRevision } = await fixture("durable");
+    const firstDatabase = await openNamedSqlite(filename);
+    const firstAssets = createStudioOpfsAssetStore({ fs: fileSystem });
+    const firstStore = createStudioBg3dShotBatchRecoveryStore({
+      acquireDatabase: async () => firstDatabase,
+      acquireAssetStore: async () => firstAssets,
+      runExclusive,
+      ownerId: "sqlite-reopen-a",
+      heartbeat: false,
+      storageManager: null,
+    });
+    const first = await firstStore.acquire(plan, sourceRevision);
+    const token = await firstStore.startShot(first, plan.shots[0]!.shotId);
+    await firstStore.completeShot(first, token, artifacts(plan));
+    const expectedBytes = first.totalArtifactBytes;
+    await firstStore.release(first);
+    const raw = await firstDatabase.kvGet(
+      STUDIO_BG3D_SHOT_BATCH_RECOVERY_SQLITE_NAMESPACE,
+      STUDIO_BG3D_SHOT_BATCH_RECOVERY_SQLITE_CATALOG_KEY,
+    );
+    expect(raw).toContain("sha256:");
+    expect(raw).not.toContain("data:image");
+    expect(raw).not.toContain("iVBOR");
+    expect(await firstAssets.ownerRefs(
+      `${STUDIO_BG3D_SHOT_BATCH_RECOVERY_CAS_OWNER_PREFIX}${plan.resumeKey}`,
+    )).toHaveLength(1);
+    await firstDatabase.close();
+
+    const reopenedDatabase = await openNamedSqlite(filename);
+    const reopenedAssets = createStudioOpfsAssetStore({ fs: fileSystem });
+    const reopenedStore = createStudioBg3dShotBatchRecoveryStore({
+      acquireDatabase: async () => reopenedDatabase,
+      acquireAssetStore: async () => reopenedAssets,
+      runExclusive,
+      ownerId: "sqlite-reopen-b",
+      heartbeat: false,
+      storageManager: null,
+    });
+    const restored = await reopenedStore.acquire(plan, sourceRevision);
+    expect(restored.mode).toBe("durable");
+    expect(restored.queue.items[0]?.status).toBe("succeeded");
+    expect(restored.images).toHaveLength(1);
+    expect(restored.images[0]?.png.size).toBe(expectedBytes);
+    expect(restored.totalArtifactBytes).toBe(expectedBytes);
+    await reopenedStore.release(restored);
+    await reopenedDatabase.close();
+  });
+
+  it("does not auto-read a completed legacy IndexedDB job on product boot", async () => {
+    const legacyDatabase = new IDBFactory();
+    const { plan, sourceRevision } = await fixture("durable");
+    const legacyStore = createStudioBg3dShotBatchRecoveryStore({
+      indexedDB: legacyDatabase,
+      ownerId: "legacy-seed",
+      heartbeat: false,
+      storageManager: null,
+    });
+    const legacy = await legacyStore.acquire(plan, sourceRevision);
+    const legacyToken = await legacyStore.startShot(legacy, plan.shots[0]!.shotId);
+    await legacyStore.completeShot(legacy, legacyToken, artifacts(plan));
+    await legacyStore.release(legacy);
+
+    const sqlite = await openNamedSqlite(`bg3d-no-legacy-${crypto.randomUUID()}.sqlite3`);
+    const assets = createStudioOpfsAssetStore({ fs: createStudioOpfsMemoryFileSystem() });
+    const product = createStudioBg3dShotBatchRecoveryStore({
+      acquireDatabase: async () => sqlite,
+      acquireAssetStore: async () => assets,
+      runExclusive: createTestRunExclusive(),
+      ownerId: "sqlite-product",
+      heartbeat: false,
+      storageManager: null,
+    });
+    const fresh = await product.acquire(plan, sourceRevision);
+    expect(fresh.mode).toBe("durable");
+    expect(fresh.images).toHaveLength(0);
+    expect(fresh.queue.items[0]?.status).toBe("pending");
+    expect(await sqlite.kvGet(
+      STUDIO_BG3D_SHOT_BATCH_RECOVERY_SQLITE_NAMESPACE,
+      STUDIO_BG3D_SHOT_BATCH_RECOVERY_SQLITE_CATALOG_KEY,
+    )).not.toBeNull();
+    await product.release(fresh);
+    await sqlite.close();
+  });
+
+  it("fails closed on a torn canonical SQLite catalog", async () => {
+    const database = await openNamedSqlite(`bg3d-torn-${crypto.randomUUID()}.sqlite3`);
+    const assets = createStudioOpfsAssetStore({ fs: createStudioOpfsMemoryFileSystem() });
+    const runExclusive = createTestRunExclusive();
+    const { plan, sourceRevision } = await fixture("durable");
+    const writer = createStudioBg3dShotBatchRecoveryStore({
+      acquireDatabase: async () => database,
+      acquireAssetStore: async () => assets,
+      runExclusive,
+      ownerId: "torn-writer",
+      heartbeat: false,
+      storageManager: null,
+    });
+    const session = await writer.acquire(plan, sourceRevision);
+    await writer.release(session);
+    const raw = await database.kvGet(
+      STUDIO_BG3D_SHOT_BATCH_RECOVERY_SQLITE_NAMESPACE,
+      STUDIO_BG3D_SHOT_BATCH_RECOVERY_SQLITE_CATALOG_KEY,
+    );
+    if (!raw) throw new Error("sqlite catalog fixture missing");
+    await database.kvSet(
+      STUDIO_BG3D_SHOT_BATCH_RECOVERY_SQLITE_NAMESPACE,
+      STUDIO_BG3D_SHOT_BATCH_RECOVERY_SQLITE_CATALOG_KEY,
+      raw.slice(0, -1),
+    );
+    const reader = createStudioBg3dShotBatchRecoveryStore({
+      acquireDatabase: async () => database,
+      acquireAssetStore: async () => assets,
+      runExclusive,
+      ownerId: "torn-reader",
+      heartbeat: false,
+      storageManager: null,
+    });
+    await expect(reader.acquire(plan, sourceRevision)).rejects.toMatchObject({ code: "corrupt" });
+    await database.close();
+  });
+
+  it("fails closed when an OPFS CAS artifact is modified after commit", async () => {
+    const database = await openNamedSqlite(`bg3d-cas-corrupt-${crypto.randomUUID()}.sqlite3`);
+    const fileSystem = createStudioOpfsMemoryFileSystem();
+    const assets = createStudioOpfsAssetStore({ fs: fileSystem });
+    const runExclusive = createTestRunExclusive();
+    const { plan, sourceRevision } = await fixture("durable");
+    const writer = createStudioBg3dShotBatchRecoveryStore({
+      acquireDatabase: async () => database,
+      acquireAssetStore: async () => assets,
+      runExclusive,
+      ownerId: "cas-writer",
+      heartbeat: false,
+      storageManager: null,
+    });
+    const session = await writer.acquire(plan, sourceRevision);
+    const token = await writer.startShot(session, plan.shots[0]!.shotId);
+    await writer.completeShot(session, token, artifacts(plan));
+    await writer.release(session);
+    const refs = await assets.ownerRefs(
+      `${STUDIO_BG3D_SHOT_BATCH_RECOVERY_CAS_OWNER_PREFIX}${plan.resumeKey}`,
+    );
+    const entry = refs[0] ? await assets.stat(refs[0]) : null;
+    if (!entry) throw new Error("CAS fixture unavailable");
+    const stored = fileSystem.snapshot().get(entry.path);
+    if (!stored) throw new Error("CAS bytes unavailable");
+    const corrupt = Uint8Array.from(stored);
+    corrupt[Math.floor(corrupt.byteLength / 2)] ^= 0xff;
+    await fileSystem.write(entry.path, corrupt);
+
+    const reader = createStudioBg3dShotBatchRecoveryStore({
+      acquireDatabase: async () => database,
+      acquireAssetStore: async () => createStudioOpfsAssetStore({ fs: fileSystem }),
+      runExclusive,
+      ownerId: "cas-reader",
+      heartbeat: false,
+      storageManager: null,
+    });
+    await expect(reader.acquire(plan, sourceRevision)).rejects.toMatchObject({ code: "corrupt" });
+    await database.close();
+  });
+
+  it("serializes contenders and rejects a stale owner after lease takeover", async () => {
+    const database = await openNamedSqlite(`bg3d-fence-${crypto.randomUUID()}.sqlite3`);
+    const assets = createStudioOpfsAssetStore({ fs: createStudioOpfsMemoryFileSystem() });
+    const runExclusive = createTestRunExclusive();
+    const { plan, sourceRevision } = await fixture("durable");
+    let now = 100_000;
+    const firstStore = createStudioBg3dShotBatchRecoveryStore({
+      acquireDatabase: async () => database,
+      acquireAssetStore: async () => assets,
+      runExclusive,
+      ownerId: "sqlite-fence-a",
+      now: () => now,
+      heartbeat: false,
+      storageManager: null,
+    });
+    const secondStore = createStudioBg3dShotBatchRecoveryStore({
+      acquireDatabase: async () => database,
+      acquireAssetStore: async () => assets,
+      runExclusive,
+      ownerId: "sqlite-fence-b",
+      now: () => now,
+      heartbeat: false,
+      storageManager: null,
+    });
+    const stale = await firstStore.acquire(plan, sourceRevision);
+    await expect(secondStore.acquire(plan, sourceRevision)).rejects.toMatchObject({ code: "busy" });
+    now += STUDIO_BG3D_SHOT_BATCH_RECOVERY_LEASE_MS + 1;
+    const current = await secondStore.acquire(plan, sourceRevision);
+    expect(current.fence).toBeGreaterThan(stale.fence);
+    await expect(firstStore.startShot(stale, plan.shots[0]!.shotId)).rejects.toMatchObject({
+      code: "lease-lost",
+    });
+    await secondStore.release(current);
+    await database.close();
+  });
+
+  it("keeps the last committed checkpoint when the next SQLite commit faults", async () => {
+    const database = await openNamedSqlite(`bg3d-fault-${crypto.randomUUID()}.sqlite3`);
+    let failCommit = false;
+    const faultyDatabase = bindDatabaseWithKvFault(database, () => failCommit);
+    const fileSystem = createStudioOpfsMemoryFileSystem();
+    const assets = createStudioOpfsAssetStore({ fs: fileSystem });
+    const runExclusive = createTestRunExclusive();
+    const { plan, sourceRevision } = await fixture("durable");
+    let now = 200_000;
+    const writer = createStudioBg3dShotBatchRecoveryStore({
+      acquireDatabase: async () => faultyDatabase,
+      acquireAssetStore: async () => assets,
+      runExclusive,
+      ownerId: "fault-writer",
+      now: () => now,
+      heartbeat: false,
+      storageManager: null,
+    });
+    const session = await writer.acquire(plan, sourceRevision);
+    const token = await writer.startShot(session, plan.shots[0]!.shotId);
+    failCommit = true;
+    await expect(writer.completeShot(session, token, artifacts(plan))).rejects.toMatchObject({
+      code: "storage-unavailable",
+    });
+    failCommit = false;
+    now += STUDIO_BG3D_SHOT_BATCH_RECOVERY_LEASE_MS + 1;
+    const restartedAssets = createStudioOpfsAssetStore({ fs: fileSystem });
+    const reader = createStudioBg3dShotBatchRecoveryStore({
+      acquireDatabase: async () => database,
+      acquireAssetStore: async () => restartedAssets,
+      runExclusive,
+      ownerId: "fault-reader",
+      now: () => now,
+      heartbeat: false,
+      storageManager: null,
+    });
+    const recovered = await reader.acquire(plan, sourceRevision);
+    expect(recovered.images).toHaveLength(0);
+    expect(recovered.queue.items[0]?.status).toBe("pending");
+    expect(await restartedAssets.ownerRefs(
+      `${STUDIO_BG3D_SHOT_BATCH_RECOVERY_CAS_OWNER_PREFIX}${plan.resumeKey}`,
+    )).toEqual([]);
+    await reader.release(recovered);
+    await database.close();
+  });
+
+  it("keeps canonical Job ordering and acknowledgement/delete semantics", async () => {
+    const database = await openNamedSqlite(`bg3d-order-${crypto.randomUUID()}.sqlite3`);
+    const assets = createStudioOpfsAssetStore({ fs: createStudioOpfsMemoryFileSystem() });
+    const runExclusive = createTestRunExclusive();
+    const firstFixture = await fixture("durable");
+    const secondFixture = await fixture("durable");
+    const store = createStudioBg3dShotBatchRecoveryStore({
+      acquireDatabase: async () => database,
+      acquireAssetStore: async () => assets,
+      runExclusive,
+      ownerId: "order-writer",
+      heartbeat: false,
+      storageManager: null,
+    });
+    const second = await store.acquire(secondFixture.plan, secondFixture.sourceRevision);
+    await store.release(second);
+    const first = await store.acquire(firstFixture.plan, firstFixture.sourceRevision);
+    const token = await store.startShot(first, firstFixture.plan.shots[0]!.shotId);
+    await store.completeShot(first, token, artifacts(firstFixture.plan));
+    await store.markDownloadRequested(first);
+    await store.discard(first);
+
+    const raw = await database.kvGet(
+      STUDIO_BG3D_SHOT_BATCH_RECOVERY_SQLITE_NAMESPACE,
+      STUDIO_BG3D_SHOT_BATCH_RECOVERY_SQLITE_CATALOG_KEY,
+    );
+    if (!raw) throw new Error("canonical catalog unavailable");
+    const parsed = JSON.parse(raw) as { entries: Array<{ job: { recoveryKey: string } }> };
+    const keys = parsed.entries.map(({ job }) => job.recoveryKey);
+    expect(keys).toEqual([...keys].sort());
+    expect(JSON.stringify(parsed)).toBe(raw);
+
+    const deleted = await store.acquire(firstFixture.plan, firstFixture.sourceRevision);
+    expect(deleted.images).toHaveLength(0);
+    expect(deleted.queue.items[0]?.status).toBe("pending");
+    await store.release(deleted);
+    await database.close();
   });
 });

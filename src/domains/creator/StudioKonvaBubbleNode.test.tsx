@@ -300,7 +300,7 @@ describe("StudioKonvaBubbleNode text and interaction", () => {
     expect(texts[1]!.y).toBeCloseTo(verticalPadding.top - 9 * 0.9);
   });
 
-  it("skips ruby overlays for vertical bubbles (base-only column paint)", () => {
+  it("mounts upright ruby overlays beside vertical bubble columns", () => {
     const source = "漢字";
     render(
       <StudioKonvaBubbleNode
@@ -316,9 +316,34 @@ describe("StudioKonvaBubbleNode text and interaction", () => {
       />,
     );
 
-    // 열 코어는 연속 직립 글자를 한 노드로 병합한다 — 루비 오버레이 노드는 하나도 없어야 한다.
-    expect(konvaCapture.texts).toHaveLength(1);
+    expect(konvaCapture.texts).toHaveLength(2);
     expect(konvaCapture.texts[0]).toMatchObject({ text: "漢\n字", fontSize: 24 });
+    expect(konvaCapture.texts[1]).toMatchObject({
+      name: "studio-vertical-ruby",
+      text: "か\nん\nじ",
+      listening: false,
+      rotation: 0,
+      wrap: "none",
+    });
+    expect(Number(konvaCapture.texts[1]!.x)).toBeGreaterThan(
+      Number(konvaCapture.texts[0]!.x) + 24,
+    );
+    // The overlay remains inside the same nested vertical group as the base text.
+    expect(konvaCapture.groups).toHaveLength(2);
+  });
+
+  it("preserves tate-chu-yoko horizontal scaling in vertical bubbles", () => {
+    render(
+      <StudioKonvaBubbleNode
+        {...commonProps()}
+        el={bubbleElement({ fontSize: 24, text: "第12話", vertical: true })}
+      />,
+    );
+    const digits = konvaCapture.texts.find((node) => node.text === "12");
+    expect(digits).toBeDefined();
+    expect(digits).toMatchObject({ rotation: 0, lineHeight: 1, letterSpacing: 0 });
+    expect(Number(digits!.scaleX)).toBeGreaterThan(0);
+    expect(Number(digits!.scaleX)).toBeLessThanOrEqual(1);
   });
 
   // D4 회귀 계약(2026-08 브라우저 감사): 레거시 formatVerticalText 전치 근사는 열 길이를 상자

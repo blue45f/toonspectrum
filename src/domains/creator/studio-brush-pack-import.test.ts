@@ -100,13 +100,17 @@ describe("brush pack format sniffing", () => {
     expect(studioBrushPackFormatOf("Studio.abr")).toBe("abr");
     expect(studioBrushPackFormatOf("wash-soft.myb")).toBe("myb");
     expect(studioBrushPackFormatOf("ink.KPP")).toBe("kpp");
+    expect(studioBrushPackFormatOf("ink.sut")).toBe("sut");
+    expect(studioBrushPackFormatOf("group.sutg")).toBe("sutg");
+    expect(studioBrushPackFormatOf("paint.bundle")).toBe("bundle");
     expect(studioBrushPackFormatOf("saved.json")).toBe("json");
-    expect(studioBrushPackFormatOf("brush.sut")).toBeNull();
     expect(studioBrushPackFormatOf("nameless", "application/x-photoshop")).toBe("abr");
+    expect(studioBrushPackFormatOf("nameless", "application/x-krita-resourcebundle"))
+      .toBe("bundle");
   });
 
   it("advertises .myb and .kpp on the accept list, so the picker can offer them", () => {
-    for (const extension of [".json", ".abr", ".myb", ".kpp"]) {
+    for (const extension of [".json", ".abr", ".myb", ".kpp", ".sut", ".sutg", ".bundle"]) {
       expect(STUDIO_BRUSH_PACK_ACCEPT).toContain(extension);
     }
   });

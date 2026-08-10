@@ -76,12 +76,12 @@ afterAll(async () => {
 });
 
 describe("migration runner", () => {
-  it("brings a fresh database to user_version 2 with the full schema", () => {
+  it("brings a fresh database to user_version 6 with the full schema", () => {
     const handle = memoryHandle();
     try {
       const version = runStudioLocalDatabaseMigrations(handle);
-      expect(version).toBe(2);
-      expect(selectValue(handle, "PRAGMA user_version")).toBe(2);
+      expect(version).toBe(6);
+      expect(selectValue(handle, "PRAGMA user_version")).toBe(6);
       const names = tableNames(handle);
       expect(names).toContain("kv");
       expect(names).toContain("tournament_winners");
@@ -89,6 +89,20 @@ describe("migration runner", () => {
       expect(names).toContain("cost_samples_provider_bucket");
       expect(names).toContain("journal_entries");
       expect(names).toContain("snapshots");
+      expect(names).toContain("brush_library_records");
+      expect(names).toContain("brush_library_keyset_order");
+      expect(names).toContain("brush_library_category_keyset");
+      expect(names).toContain("filter_library_records");
+      expect(names).toContain("filter_library_keyset_order");
+      expect(names).toContain("filter_library_engine_keyset");
+      expect(names).toContain("filter_library_category_keyset");
+      expect(names).toContain("filter_library_package_entry");
+      expect(names).toContain("crdt_outbox_v12_entries");
+      expect(names).toContain("crdt_outbox_v12_order");
+      expect(names).toContain("crdt_outbox_v12_acknowledgements");
+      expect(names).toContain("crdt_outbox_v12_ack_time");
+      expect(names).toContain("crdt_recovery_v12_rows");
+      expect(names).toContain("crdt_recovery_v12_scope_order");
     } finally {
       handle.close();
     }
@@ -98,14 +112,14 @@ describe("migration runner", () => {
     const handle = memoryHandle();
     try {
       runStudioLocalDatabaseMigrations(handle);
-      expect(runStudioLocalDatabaseMigrations(handle)).toBe(2);
-      expect(selectValue(handle, "PRAGMA user_version")).toBe(2);
+      expect(runStudioLocalDatabaseMigrations(handle)).toBe(6);
+      expect(selectValue(handle, "PRAGMA user_version")).toBe(6);
     } finally {
       handle.close();
     }
   });
 
-  it("advances an existing v1 database to v2 on reopen, preserving v1 data", () => {
+  it("advances an existing v1 database to v6 on reopen, preserving v1 data", () => {
     const handle = memoryHandle();
     try {
       // 구버전 세션: v1 마이그레이션까지만 적용된 DB 를 흉내낸다.
@@ -116,15 +130,159 @@ describe("migration runner", () => {
       );
       expect(tableNames(handle)).not.toContain("journal_entries");
 
-      // 재개방(전체 체인) — v2 로 자동 전진하고 v1 데이터는 그대로 남는다.
-      expect(runStudioLocalDatabaseMigrations(handle)).toBe(2);
-      expect(selectValue(handle, "PRAGMA user_version")).toBe(2);
+      // 재개방(전체 체인) — 최신 버전으로 자동 전진하고 v1 데이터는 그대로 남는다.
+      expect(runStudioLocalDatabaseMigrations(handle)).toBe(6);
+      expect(selectValue(handle, "PRAGMA user_version")).toBe(6);
       const names = tableNames(handle);
       expect(names).toContain("journal_entries");
       expect(names).toContain("snapshots");
+      expect(names).toContain("brush_library_records");
+      expect(names).toContain("filter_library_records");
+      expect(names).toContain("crdt_outbox_v12_entries");
       expect(
         selectValue(handle, "SELECT value FROM kv WHERE namespace = 'ns' AND key = 'k'"),
       ).toBe("v");
+    } finally {
+      handle.close();
+    }
+  });
+
+  it("advances the current v2 database to v6 without disturbing journal data", () => {
+    const handle = memoryHandle();
+    try {
+      const throughV2 = STUDIO_LOCAL_DATABASE_MIGRATIONS.filter(
+        (migration) => migration.toVersion <= 2,
+      );
+      expect(runStudioLocalDatabaseMigrations(handle, throughV2)).toBe(2);
+      handle.exec(
+        "INSERT INTO journal_entries (project_id, seq, payload, crc32) VALUES ('p', 7, 'keep', 9)",
+      );
+      expect(tableNames(handle)).not.toContain("brush_library_records");
+
+      expect(runStudioLocalDatabaseMigrations(handle)).toBe(6);
+      expect(selectValue(handle, "PRAGMA user_version")).toBe(6);
+      expect(tableNames(handle)).toContain("brush_library_records");
+      expect(tableNames(handle)).toContain("filter_library_records");
+      expect(tableNames(handle)).toContain("crdt_outbox_v12_entries");
+      expect(
+        selectValue(
+          handle,
+          "SELECT payload FROM journal_entries WHERE project_id = 'p' AND seq = 7",
+        ),
+      ).toBe("keep");
+    } finally {
+      handle.close();
+    }
+  });
+
+  it("advances an existing v3 database to v6 without disturbing brush rows", () => {
+    const handle = memoryHandle();
+    try {
+      const throughV3 = STUDIO_LOCAL_DATABASE_MIGRATIONS.filter(
+        (migration) => migration.toVersion <= 3,
+      );
+      expect(runStudioLocalDatabaseMigrations(handle, throughV3)).toBe(3);
+      handle.exec(`INSERT INTO brush_library_records
+        (id, name, brush_id, category, search_text, payload, pinned, activity_at,
+          created_at, updated_at, last_used_at)
+        VALUES ('keep-brush', 'Keep', 'pen', 'pen', 'keep', '{}', 0, 2, 1, 2, NULL)`);
+      expect(tableNames(handle)).not.toContain("filter_library_records");
+
+      expect(runStudioLocalDatabaseMigrations(handle)).toBe(6);
+      expect(selectValue(handle, "PRAGMA user_version")).toBe(6);
+      expect(tableNames(handle)).toContain("filter_library_records");
+      expect(tableNames(handle)).toContain("crdt_outbox_v12_entries");
+      expect(
+        selectValue(handle, "SELECT name FROM brush_library_records WHERE id = 'keep-brush'"),
+      ).toBe("Keep");
+    } finally {
+      handle.close();
+    }
+  });
+
+  it("advances an existing v4 database to v6 without disturbing filter rows", () => {
+    const handle = memoryHandle();
+    try {
+      const throughV4 = STUDIO_LOCAL_DATABASE_MIGRATIONS.filter(
+        (migration) => migration.toVersion <= 4,
+      );
+      expect(runStudioLocalDatabaseMigrations(handle, throughV4)).toBe(4);
+      handle.exec(`INSERT INTO filter_library_records
+        (id, name, package_id, entry_id, engine, category, search_text, payload,
+          favorite, sort_order, created_at, updated_at)
+        VALUES ('keep-filter', 'Keep', 'pkg', 'entry', 'skia', 'color',
+          'keep', '{}', 0, 1, 1, 2)`);
+      expect(tableNames(handle)).not.toContain("crdt_outbox_v12_entries");
+
+      expect(runStudioLocalDatabaseMigrations(handle)).toBe(6);
+      expect(selectValue(handle, "PRAGMA user_version")).toBe(6);
+      expect(tableNames(handle)).toContain("crdt_outbox_v12_entries");
+      expect(
+        selectValue(
+          handle,
+          "SELECT name FROM filter_library_records WHERE id = 'keep-filter'",
+        ),
+      ).toBe("Keep");
+    } finally {
+      handle.close();
+    }
+  });
+
+  it("rolls a failed v5 outbox migration back to the intact v4 schema", () => {
+    const handle = memoryHandle();
+    try {
+      const throughV4 = STUDIO_LOCAL_DATABASE_MIGRATIONS.filter(
+        (migration) => migration.toVersion <= 4,
+      );
+      expect(runStudioLocalDatabaseMigrations(handle, throughV4)).toBe(4);
+      expect(() =>
+        runStudioLocalDatabaseMigrations(handle, [
+          ...throughV4,
+          {
+            toVersion: 5,
+            statements: [
+              STUDIO_LOCAL_DATABASE_MIGRATIONS[4].statements[0],
+              "THIS V5 OUTBOX MIGRATION MUST ROLLBACK",
+            ],
+          },
+        ]),
+      ).toThrow();
+      expect(selectValue(handle, "PRAGMA user_version")).toBe(4);
+      expect(tableNames(handle)).not.toContain("crdt_outbox_v12_entries");
+      expect(tableNames(handle)).toContain("filter_library_records");
+    } finally {
+      handle.close();
+    }
+  });
+
+  it("rolls a failed v6 recovery migration back to the intact v5 outbox schema", () => {
+    const handle = memoryHandle();
+    try {
+      const throughV5 = STUDIO_LOCAL_DATABASE_MIGRATIONS.filter(
+        (migration) => migration.toVersion <= 5,
+      );
+      expect(runStudioLocalDatabaseMigrations(handle, throughV5)).toBe(5);
+      handle.exec(`INSERT INTO crdt_outbox_v12_entries
+        (scope, work_id, update_id, client_sequence, request_payload, payload_bytes,
+          created_at, updated_at)
+        VALUES ('keep', 'work', 'update', 1, '{}', 2, 1, 1)`);
+      expect(() =>
+        runStudioLocalDatabaseMigrations(handle, [
+          ...throughV5,
+          {
+            toVersion: 6,
+            statements: [
+              STUDIO_LOCAL_DATABASE_MIGRATIONS[5].statements[0],
+              "THIS V6 RECOVERY MIGRATION MUST ROLLBACK",
+            ],
+          },
+        ]),
+      ).toThrow();
+      expect(selectValue(handle, "PRAGMA user_version")).toBe(5);
+      expect(tableNames(handle)).not.toContain("crdt_recovery_v12_rows");
+      expect(
+        selectValue(handle, "SELECT COUNT(*) FROM crdt_outbox_v12_entries"),
+      ).toBe(1);
     } finally {
       handle.close();
     }
@@ -166,8 +324,10 @@ describe("migration runner", () => {
     }
   });
 
-  it("ships exactly the sequential v1..v2 migration set", () => {
-    expect(STUDIO_LOCAL_DATABASE_MIGRATIONS.map((m) => m.toVersion)).toEqual([1, 2]);
+  it("ships exactly the sequential v1..v6 migration set", () => {
+    expect(STUDIO_LOCAL_DATABASE_MIGRATIONS.map((m) => m.toVersion)).toEqual([
+      1, 2, 3, 4, 5, 6,
+    ]);
     const v1Ddl = STUDIO_LOCAL_DATABASE_MIGRATIONS[0].statements.join("\n");
     expect(v1Ddl).toContain("PRIMARY KEY (namespace, key)");
     expect(v1Ddl).toContain("PRIMARY KEY (bucket, device_hash)");
@@ -176,6 +336,31 @@ describe("migration runner", () => {
     expect(v2Ddl).toContain("PRIMARY KEY (project_id, seq)");
     expect(v2Ddl).toContain("CHECK (slot IN (0, 1))");
     expect(v2Ddl).toContain("PRIMARY KEY (project_id, slot)");
+    const v3Ddl = STUDIO_LOCAL_DATABASE_MIGRATIONS[2].statements.join("\n");
+    expect(v3Ddl).toContain("CREATE TABLE IF NOT EXISTS brush_library_records");
+    expect(v3Ddl).toContain("CHECK (pinned IN (0, 1))");
+    expect(v3Ddl).toContain("pinned DESC, activity_at DESC, created_at DESC, id ASC");
+    expect(v3Ddl).not.toMatch(/LIMIT\s+\d+/i);
+    const v4Ddl = STUDIO_LOCAL_DATABASE_MIGRATIONS[3].statements.join("\n");
+    expect(v4Ddl).toContain("CREATE TABLE IF NOT EXISTS filter_library_records");
+    expect(v4Ddl).toContain("CHECK (favorite IN (0, 1))");
+    expect(v4Ddl).toContain("favorite DESC, sort_order ASC, updated_at DESC, id ASC");
+    expect(v4Ddl).not.toMatch(/LIMIT\s+\d+/i);
+    const v5Ddl = STUDIO_LOCAL_DATABASE_MIGRATIONS[4].statements.join("\n");
+    expect(v5Ddl).toContain("CREATE TABLE IF NOT EXISTS crdt_outbox_v12_entries");
+    expect(v5Ddl).toContain("PRIMARY KEY (scope, work_id, update_id)");
+    expect(v5Ddl).toContain("attempt_count INTEGER NOT NULL DEFAULT 0");
+    expect(v5Ddl).toContain("client_sequence ASC, created_at ASC, update_id ASC");
+    expect(v5Ddl).toContain(
+      "CREATE TABLE IF NOT EXISTS crdt_outbox_v12_acknowledgements",
+    );
+    expect(v5Ddl.match(/\) STRICT/g)).toHaveLength(2);
+    const v6Ddl = STUDIO_LOCAL_DATABASE_MIGRATIONS[5].statements.join("\n");
+    expect(v6Ddl).toContain("CREATE TABLE IF NOT EXISTS crdt_recovery_v12_rows");
+    expect(v6Ddl).toContain("PRIMARY KEY (scope, work_id, row_key)");
+    expect(v6Ddl).toContain("payload_bytes INTEGER NOT NULL CHECK (payload_bytes > 0)");
+    expect(v6Ddl).toContain("CREATE INDEX IF NOT EXISTS crdt_recovery_v12_scope_order");
+    expect(v6Ddl.match(/\) STRICT/g)).toHaveLength(1);
   });
 });
 
@@ -517,6 +702,6 @@ describe("probeSqliteSupport", () => {
 describe("opfs naming contract", () => {
   it("pins the destruction-inventory directory and database filename", () => {
     expect(STUDIO_SQLITE_OPFS_DIRECTORY).toBe("toonspectrum-studio-sqlite");
-    expect(STUDIO_SQLITE_DATABASE_FILENAME).toBe("studio-local.db");
+    expect(STUDIO_SQLITE_DATABASE_FILENAME).toBe("studio-local-v12.db");
   });
 });

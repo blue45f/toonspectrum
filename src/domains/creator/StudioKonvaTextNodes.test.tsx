@@ -377,10 +377,11 @@ describe("StudioKonvaTextNode", () => {
     });
   });
 
-  it("skips ruby overlays for vertical text (base-only columns)", () => {
+  it("mounts upright ruby overlays beside vertical text without stealing interactions", () => {
+    const props = commonProps();
     render(
       <StudioKonvaTextNode
-        {...commonProps()}
+        {...props}
         el={textElement({
           fontSize: 20,
           text: "漢字",
@@ -392,9 +393,36 @@ describe("StudioKonvaTextNode", () => {
       />,
     );
 
-    // Vertical path paints column runs only — no smaller furigana overlay Text.
-    expect(konvaCapture.texts.every((node) => node.fontSize === 20)).toBe(true);
-    expect(konvaCapture.texts.some((node) => node.text === "かんじ")).toBe(false);
+    expect(konvaCapture.texts).toHaveLength(2);
+    expect(konvaCapture.texts[0]).toMatchObject({ text: "漢\n字", fontSize: 20 });
+    expect(konvaCapture.texts[1]).toMatchObject({
+      name: "studio-vertical-ruby",
+      text: "か\nん\nじ",
+      fontSize: 9,
+      listening: false,
+      rotation: 0,
+      wrap: "none",
+    });
+    expect(Number(konvaCapture.texts[1]!.x)).toBeGreaterThan(
+      Number(konvaCapture.texts[0]!.x) + 20,
+    );
+    const group = latest(konvaCapture.groups, "vertical ruby group");
+    expect(group.ref).toBe(props.innerRef);
+    expect(group).toMatchObject({ studioElementId: "text-1", x: 10, y: 20 });
+  });
+
+  it("renders tate-chu-yoko with the core horizontal scale in the vertical mount", () => {
+    render(
+      <StudioKonvaTextNode
+        {...commonProps()}
+        el={textElement({ fontSize: 20, text: "第12話", vertical: true })}
+      />,
+    );
+    const digits = konvaCapture.texts.find((node) => node.text === "12");
+    expect(digits).toBeDefined();
+    expect(digits).toMatchObject({ rotation: 0, lineHeight: 1, letterSpacing: 0 });
+    expect(Number(digits!.scaleX)).toBeGreaterThan(0);
+    expect(Number(digits!.scaleX)).toBeLessThanOrEqual(1);
   });
 });
 

@@ -310,6 +310,54 @@ pub async fn render_lottie_gpu_json(
     Ok(js_sys::Uint8Array::from(pixels.as_slice()))
 }
 
+/// Audits an SVG without rendering it. This is exposed for product capability
+/// gates and tests so unsupported semantics are visible before any GPU work.
+#[cfg(feature = "svg")]
+#[wasm_bindgen]
+pub fn audit_svg_native_json(svg: String) -> Result<String, JsError> {
+    let audit =
+        crate::svg::audit_svg_source(&svg).map_err(|error| JsError::new(&error.to_json()))?;
+    Ok(serde_json::json!({
+        "elementCount": audit.element_count,
+        "maxDepth": audit.max_depth,
+        "localReferenceCount": audit.local_reference_count,
+    })
+    .to_string())
+}
+
+/// Renders the strict Vello-native SVG subset through vello_cpu. It ships in
+/// pkg-gpu as the deterministic fallback/reference for the same usvg tree;
+/// the default CPU pkg remains byte-untouched.
+#[cfg(feature = "svg")]
+#[wasm_bindgen]
+pub fn render_svg_cpu_json(
+    svg: String,
+    width: u32,
+    height: u32,
+) -> Result<js_sys::Uint8Array, JsError> {
+    let pixels = crate::svg::render_svg_cpu(&svg, width, height)
+        .map_err(|error| JsError::new(&error.to_json()))?;
+    Ok(js_sys::Uint8Array::from(pixels.as_slice()))
+}
+
+/// Renders the strict SVG subset through vello_svg 0.10 -> vello 0.9 on the
+/// browser WebGPU device. Readback exists only for quality evidence/export;
+/// callers must keep the interactive hot path on-GPU.
+#[cfg(feature = "svg")]
+#[wasm_bindgen]
+pub async fn render_svg_gpu_json(
+    svg: String,
+    width: u32,
+    height: u32,
+) -> Result<js_sys::Uint8Array, JsError> {
+    let scene = crate::svg::svg_to_vello_scene(&svg, width, height)
+        .map_err(|error| JsError::new(&error.to_json()))?;
+    let pixels = render_encoded_scene_gpu(&scene, width, height, Color::new([0.0, 0.0, 0.0, 0.0]))
+        .await
+        .map_err(|error| JsError::new(&error))?;
+    Ok(js_sys::Uint8Array::from(pixels.as_slice()))
+}
+
 /// Probes WebGPU adapter availability. Resolves with a JSON string:
 /// `{"supported":true,"adapter":{...},"engine":"..."}` or
 /// `{"supported":false,"reason":"..."}`. Never rejects — probing is the one

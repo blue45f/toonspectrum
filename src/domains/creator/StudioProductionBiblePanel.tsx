@@ -291,22 +291,36 @@ function persistenceCopy(
 ): { label: string; tone: string } {
   if (!persistence) {
     return {
-      label: "로컬 전용 · 서버 동기화 없음",
+      label: "SQLite/OPFS 상태 확인 중 · 서버 동기화 없음",
       tone: "border-warn/35 bg-warn/10 text-warn",
     };
   }
-  if (!persistence.persisted || persistence.backend === "memory") {
+  if (persistence.backend === "unavailable") {
+    return {
+      label: "SQLite/OPFS 사용 불가 · 저장되지 않음",
+      tone: "border-bad/35 bg-bad/10 text-bad",
+    };
+  }
+  if (persistence.backend === "memory") {
     return {
       label: "메모리 임시 · 새로고침 전까지",
       tone: "border-bad/35 bg-bad/10 text-bad",
     };
   }
+  if (persistence.backend === "sqlite") {
+    return {
+      label: persistence.persisted
+        ? "이 기기 SQLite/OPFS 저장 · 서버 동기화 없음"
+        : "SQLite/OPFS 준비 · 첫 변경 시 저장",
+      tone: "border-good/35 bg-good/10 text-good",
+    };
+  }
   return {
     label:
-      persistence.backend === "indexeddb"
-        ? "이 기기 IndexedDB 저장 · 서버 동기화 없음"
-        : "이 기기 localStorage 저장 · 서버 동기화 없음",
-    tone: "border-good/35 bg-good/10 text-good",
+      persistence.backend === "legacy-indexeddb"
+        ? "명시적으로 가져온 레거시 IndexedDB · V12 제품 저장 아님"
+        : "명시적으로 가져온 레거시 localStorage · V12 제품 저장 아님",
+    tone: "border-warn/35 bg-warn/10 text-warn",
   };
 }
 

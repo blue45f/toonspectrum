@@ -107,7 +107,7 @@ describe("pending stroke lifecycle source contract", () => {
     expect(journalSetup).toContain("pagesHistoryCommandJournalRef.current = null");
   });
 
-  it("route/page lifecycle은 안정 상태와 대기 획을 모두 동기 복구 슬롯에 기록한다", () => {
+  it("route/page lifecycle은 안정 상태와 대기 획을 내구 저장소에만 요청한다", () => {
     const persistence = sourceBetween(
       "persistPendingStrokeEmergencyAutosaveRef.current = (reason) =>",
       "function applyStudioProjectSnapshotWithPreparedDocuments"
@@ -116,10 +116,10 @@ describe("pending stroke lifecycle source contract", () => {
     expect(persistence).toContain("hasDirtyStableState");
     expect(persistence).toContain("hasDirtyPendingState");
     expect(persistence).toContain("createStudioLifecycleEmergencyAutosave");
-    expect(persistence).toContain("writeStudioLifecycleAutosave");
-    expect(persistence).toContain(
-      "!autosaveChecked || hasAutosave || autosaveRestoreBlockedReason !== null"
-    );
+    expect(persistence).not.toContain("writeStudioLifecycleAutosave");
+    expect(persistence).not.toContain("localStorage.setItem");
+    expect(persistence).toContain("Promise.any(durableWrites)");
+    expect(persistence).toContain("reportStudioAutosaveFailure(cause)");
   });
 
   it("복구 탐지 전 primary를 보존하고 교차 페이지 입력은 성공한 flush 뒤에만 허용한다", () => {

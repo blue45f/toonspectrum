@@ -1,19 +1,51 @@
-# ToonStudio V11 엔진 후보 역량 조사 (Capability Survey)
+# ToonStudio V11→V12 엔진 후보 역량 조사 (Capability Survey)
 
-- 기준일: 2026-08-07
-- 대상 하위 시스템: V11 엔진 포트폴리오 전체 (Phase 0 후보 검증 기반)
+- 기준일: 2026-08-09
+- 대상 하위 시스템: 기존 `/studio`에 인플레이스 통합된 V11→V12 엔진 포트폴리오
 - 권위 소스:
   - `docs/architecture/ToonStudio_검증엔진우선_하이브리드최적조합_선택적자체구현_최종아키텍처_V11_2026-08-07.md`
   - `docs/architecture/ToonStudio_V11_하이브리드엔진_장점조합_배치매트릭스.csv` (E01~E28)
+  - `docs/architecture/ToonStudio_Vello차세대엔진_공격적활용_CSP초월_인플레이스최종아키텍처_V12_2026-08-08.md`
 
 ## 1. 조사 원칙
 
 - **Verified-first**: 검증된 엔진·라이브러리를 먼저 평가하고 장점별로 분해한다. 자체 구현은 금지 대상이 아니라 "비교를 통과한 하나의 후보 Provider"다(아키텍처 §3.3).
-- **성능 수치는 전부 미실측이다.** 이 문서의 p50/p95/p99와 Peak Memory 컬럼은 절대 수치를 기재하지 않는다. 모든 후보는 `/tests/benchmarks` 하니스와 `/apps/benchmark-lab-v11`에서 동일 corpus·동일 장치로 측정한 뒤에만 수치를 채운다.
+- **실측값과 미실측값을 분리한다.** 아래 V11 원조사 표의 `미실측` 셀은 당시 상태를 보존한 역사적 baseline이며, 현재 승격 판정은 바로 다음의 V12 실측 원장과 커밋된 raw JSON을 우선한다. raw 결과가 없는 후보만 미실측이다. 실행 위치는 별도 앱이 아니라 기존 저장소의 `tests/benchmarks/harness`다.
 - **정성 사실은 근거와 함께 기재한다.** 예: Vello 공식 저장소가 알파 상태를 명시한다(매트릭스 E02 위험 항목), Google Ink는 공식 웹 SDK가 아니다(매트릭스 E09), G'MIC은 공식 GUI 기준 640개 이상의 필터를 제공한다(매트릭스 E18).
 - 라이선스·안전성 하드 게이트(상용 배포, copyleft 격리, sandbox, 데이터 손실 가능성)를 통과한 후보만 품질 점수 대상이 된다(아키텍처 §3.1).
 
 ## 2. 후보 역량 매트릭스
+
+### 2.0 V12 실측 우선 원장
+
+이 표는 아래의 V11 정성 표보다 우선한다. 숫자를 집계 문서에 다시 복사해 단일 진실을
+둘로 만들지 않도록, 각 행은 커밋된 raw artifact와 판정만 고정한다. `부분 통과`는 구현은
+있지만 V12의 최종 workload 또는 제품 컷오버 게이트가 남았다는 뜻이다.
+
+| Candidate / lane | 커밋된 실측 | 품질 판정 | 성능·안정성 판정 | 현재 역할 |
+| --- | --- | --- | --- | --- |
+| Vello Classic browser GPU | `tests/benchmarks/results/vello-gpu-browser.json`, `large-scene.json`, `large-scene-million.json`, `studio-vello-hub*` tests | 128² 7장면 중 6장면 fuzzy 0%, curve 0.0366%; 100k/1M 품질 subset fuzzy 0.0225%/0.0320%(모두 0.6% gate 통과); bounded selection SceneIR island는 CPU shadow δ48 gate 적용 | 소형 p50 2.6~2.8ms; 정확 100k 전체 overview GPU p50/p95 383.165/386.250ms; 1M 문서 3,904-path visible viewport GPU p50/p95 18.110/20.485ms | `/studio` 선택 overlay의 검증된 GPU Hub; same-device fabric·CPU fallback. 1M all-visible은 retained/sharded ingestion 전까지 격리 |
+| Vello CPU | `cross-renderer-diff.json`, `large-scene.json` | CanvasKit 교차 diff gate 통과, bit-stable reference | 30k path@1024² p50 약 31.88s — interactive 대형 장면에는 부적합 | 결정적 reference/fallback |
+| CanvasKit/Ganesh | `cross-renderer-diff.json`, `quality-lab.json`, `filter-lanes.json` | 교차 렌더 기준선; Gaussian reference 47.94dB | 4K full-chain 제품 apply는 p50 34.3ms/p95 39.3ms로 60fps gate 실패 | 생산 기준선 + reference; texture-resident preview 최적화 필요 |
+| Google Ink | `ink-modeler-poc.json`, `ink-mesh-attempt.json`, `ink-mesh-incremental.json` | jitter 87.4% 감소, corner error 5.70px; 증분 final mesh가 단발 기준과 40/40 byte-identical, pressure/tilt/orientation 보존 | 증분 update p50/p95/p99 **0.069750/0.085750/0.108125ms** vs 단발 remesh 0.590625/1.110459/1.194333ms; payload -85.90%, heap peak 16,973,824B | upstream InProgressStroke 증분 후보 + 단발 품질 fallback; GPU subrange 제품 배선·동일 태블릿 blind gate는 잔여 |
+| libmypaint ↔ Hokusai | `libmypaint-fullsize.json`, `libmypaint-parity.json`, `tests/visual/pressure-fidelity.test.ts` | 실제 1000px에서 ink-crisp 동률, wash-soft profile 0.920452·coverage ratio 2.867748로 Hokusai 품질 gate 실패 | Hokusai/libmypaint 처리량 0.318134×(wash), 0.096991×(ink); 양쪽 결정성·압력·메모리 gate 통과 | libmypaint quality/production reference, Hokusai deterministic challenger/fallback |
+| OpenCV.js | `filter-candidates.json` | 분석 provider로만 사용해 비파괴 의미 보존 | Canny 512 p50 1.372/p95 2.033ms, dilation p50 0.476ms | worker 분석 lane |
+| libvips/wasm-vips | `quality-lab.json`, `vips-export-cutover.json` | Lanczos3 downscale 우승; 16K export SSIM 0.9639→0.991 | 30,000px 편집/장기 peak memory는 미실측 | final/export provider |
+| WESL/WGSL/Naga | `wgsl-variants-browser.json`, `wgsl-variants-pipeline.json`, 35-file WGSL corpus | 35/35 browser compile + Naga validation, 대표 chain 채널 오차 0 | pipeline 5→1, create 15.0→2.5ms, GPU 0.142→0.037ms; wall-clock jank 감소 boolean은 실패 | 활성 shader platform, jank 게이트 부분 통과 |
+| Velato | `velato-lottie-browser.json` | 2 fixture×3 frame 결정성·clipping 통과 | p50 3.1~3.3ms, p95 3.3~5.1ms@128² | Vello-native Lottie lane; 실세계 corpus 확장 필요 |
+| SVG gateway + vello_svg native | `svg-import` visual tests, `vello-svg-native-browser.json`, `svg-vello-native` tests | 편집 import의 Vello CPU↔CanvasKit coverage 차이 0.272~1.304%. strict native curves/gradients/clip은 resvg SSIM 0.995692~0.997639, fuzzy≤0.036621%; GPU↔CPU≤0.030518% | native browser GPU p50≈3.0ms@128²; pkg-gpu +1,117,145B(+24.143%) | 편집 가능 SVG는 SceneIR, strict interactive island는 lazy vello_svg 0.10, final/reference는 resvg. unsupported는 렌더 전 명시 거부 |
+| Toon GPU fabric/fork | `toon-vello-fork.json`, `gpu-fabric-probe.json` | same-device handoff에서 픽셀 계약 유지 | L4가 L0 readback/upload 대비 약 1.89~2.43×; 제품 filter chain은 공유 fabric 사용 | 제품 GPU interop 기본 경로 |
+| Color pipeline | `color-lab.json` | 729색: F32 max ΔE00 0.0267, RGBA8888 max 0.509 | 물리 P3/HDR 장치는 외부 lab 미실측 | 검증된 수치 기준선 |
+| SQLite(OPFS) | `studio-local-database`·journal/autosave tests와 브러시·필터·애니매틱·TM·Bible OPFS raw artifacts | CRC tail 절단, A/B snapshot, writer fencing, 재개 frontier, autosave 손상 fail-closed; exact `studio-local-v12.db` close/reopen 후 브러시·필터 각 10,000행, 애니매틱 799,973B, TM 512개, strict Bible canonical SHA 보존. Bible은 강제 Worker 종료 후 새 Worker 복구 | Chromium 140: brush/filter p95 53.580/80.810ms, animatic save/load p95 24.520/5.135ms, TM 13.860/9.915ms, Bible 2.885/0.385ms. Worker/WASM peak는 API 미노출로 null | 제품 history/tournament/autosave/brush/filter/animatic/TM/Bible/creator-pack의 공유 V12 권위. legacy localStorage/IDB 자동 읽기 0; unavailable은 명시적 메모리 상태로 표면화 |
+| 무제한 브러시 저장소 | `brush-library-sqlite.json`, `brush-library-opfs-browser.json`, `studio-brush-library-sqlite-repository` tests | 실제 OPFS 10,000개·39 keyset page에서 누락/중복/정렬 불일치 0, NFKC 검색·분류·고정 필터, payload/index 오염 fail-closed | batch-200 p50/p95/p99 **44.580/53.580/55.985ms**; page-257 **21.170/43.375/44.020ms**; ID **0.280/0.410/0.495ms** | 제품 SQLite 구조화 repository와 256행 bounded UI. `LEGACY_DATA_MIGRATION=FALSE`; 레거시 가져오기는 명시적 개발/테스트 도구로만 격리 |
+| Sparse 8K/초장축 문서 WebGPU | `tiledoc-scale.json`, `tiledoc-webgpu-browser.json` | 8192²·100 layer 및 2048×30,720·100 layer, exact 200 tile/209,715,200B, rgba16float max delta 0.00036147, device-loss 복구, hot readback 0 | Chromium Metal product surface: pan p95 18.505/18.435ms, edit 34.600/35.135ms, reorder 35.495/34.975ms; tracked GPU peak 218/371MiB | one-primary-surface 제품 경로 통과. D3D12/Vulkan/통합 GPU/P3-HDR 실기기 매트릭스는 외부 관측 |
+| 정확 100k/1M 벡터 장면 | `large-scene-million.json`, `large-scene-million-contract.test.ts` | 100k/1M 비공선 cubic 전량 생성·직렬화·파싱·재해시 일치; 100k 전체 및 1M bounded viewport 반복 fuzzy 0%; count reduction/proxy 오표기 없음 | 1M interaction 준비 p50/p95/p99 8.207/38.963/47.875ms, culling p95 2.777ms, max visible 17,162; Node sampled peak RSS 387.58MB | exact-count bounded product interaction 통과; monolithic 1M all-visible JSON만 명시 격리 |
+| 8h soak | `tests/benchmarks/results/soak.json` | 오류·데이터 손실 0 | 727,739 cycles / 29,109,560 commands / 1,455,478 renders; RSS 225.1→344.8MB | 8h 통과로 게이트 종결(ADR 0011); 24h는 선택 야간 재검증 |
+
+`p50/p95/p99` 또는 peak memory가 위 raw artifact에 없는 경우 숫자를 추정하지 않는다.
+특히 CSP 동일 장치·동일 태블릿 blind 비교와 물리 P3/HDR·다중 OS 장치 매트릭스는
+현재도 완료로 표시할 수 없다. 대형 문서 브라우저 WebGPU 제품 표시는 통과했다. 100k/1M exact-count 게이트도 통과했지만, 제품의 공간 샤딩을
+우회하는 1M 단일 all-visible JSON frame은 retained/sharded ingestion 전까지 별도 격리한다.
 
 > 아래 표에서 `미실측`은 "미실측 — tests/benchmarks 하니스로 측정"의 축약이 아니라 전체 문구를 그대로 적는다. Visual Quality는 실측 전 정성 평가이며, cross-renderer diff와 golden image로 확정한다.
 
@@ -43,7 +75,7 @@
 | Rapier + Jolt + Manifold | Rapier 강체/충돌, Jolt 고급 물리 후보, Manifold 견고한 mesh boolean | 동일 기능 엔진 동시 상주 금지 — 기능별 단일 선택(매트릭스 E22) | 해당 없음(시뮬레이션/기하) — bake 결과로 검증 | 미실측 — tests/benchmarks 하니스로 측정 | 미실측 — tests/benchmarks 하니스로 측정 | 중간(정성) — 기능별 lazy-load | 시드 고정 + command/bake 동기화로 결정성 확보(협업 계약) | permissive 프로젝트 조합 | 중간 | 중간 | 기능별 선택(물리·mesh boolean) |
 | WebCodecs + Mediabunny + FFmpeg | 브라우저 하드웨어 codec → JS container → 범용 bridge의 단계적 조합 | codec capability·라이선스를 파일별 탐지 필요(매트릭스 E23). WebCodecs 미지원 codec 존재 | 해당 없음(미디어 IO) — 인코딩 품질은 기준 diff | 미실측 — tests/benchmarks 하니스로 측정 | 미실측 — tests/benchmarks 하니스로 측정 | WebCodecs 낮음 / FFmpeg bridge 높음(정성) | 인코더별 상이 — 검증 필요 | mixed(FFmpeg는 빌드 구성에 따라 LGPL/GPL) | 중간 | 중간 | 생산 미디어 계층 |
 | Yjs 또는 Loro | 의미 객체·텍스트·트리의 local-first 협업, undo/presence/version | 대형 raster tile은 CRDT에 부적합 — CAS 분리 필수. 한 문서에 CRDT 혼용 금지(매트릭스 E24) | 해당 없음(협업 계층) | 미실측 — tests/benchmarks 하니스로 측정 | 미실측 — tests/benchmarks 하니스로 측정 | 낮음(정성) | 수렴 보장(CRDT 특성), 시뮬레이션은 command+seed+bake만 동기화 | permissive | 낮음 | 낮음 | 생산 협업 계층 |
-| OPFS + SQLite WASM | 대형 파일·타일의 브라우저 로컬 저장 + metadata/index/journal 구조화 | OPFS는 백업이 아님 — 외부 복구 패키지·cloud sync 필요(매트릭스 E25) | 해당 없음(저장 계층) — CRC/무결성 검증으로 판정 | 미실측 — tests/benchmarks 하니스로 측정 | 미실측 — tests/benchmarks 하니스로 측정 | 낮음(정성) — SQLite WASM 단일 모듈 | 높음 — append journal + CRC 계약(ADR 0007) | standards / SQLite public domain | 낮음 | 낮음 | 생산 저장 계층 |
+| OPFS + SQLite WASM | 대형 파일·타일의 브라우저 로컬 저장 + metadata/index/journal 구조화 | OPFS는 백업이 아님. 외부 recovery ZIP은 구현됐지만 cloud sync·암호화·key recovery는 별도 | 해당 없음(저장 계층) — CRC/무결성 검증으로 판정 | 실제 Chromium catalog/doc 수치는 SQLite 행 참조. recovery ZIP 1.056MB export/import/restore p95 **4.970/34.303/0.419ms** | recovery Node peak delta만 측정; browser OPFS/WASM peak는 null | SQLite WASM 단일 모듈 + recovery ZIP 증분 dependency 0 | append journal+CRC, recovery SHA-256/seq/project digest 동일 | standards / SQLite public domain | 낮음 | 낮음. cloud provider 정책은 격리 | 생산 저장 계층 + 명시적 외부 recovery file |
 | React Aria + Radix + XState | 접근 가능한 DOM 입력·메뉴/팝오버 primitives·명시적 tool state machine | 캔버스 hot path의 샘플·입자를 React state에 넣지 않는다는 계약 필요(매트릭스 E26) | 해당 없음(UI 계층) | 미실측 — tests/benchmarks 하니스로 측정 | 미실측 — tests/benchmarks 하니스로 측정 | 낮음~중간(정성) | 해당 없음 | permissive | 낮음 — CommandRegistry 단일 공유 | 낮음 | 생산 웹 UI |
 | Xilem + Masonry | 선언형 reactive view diff + retained widget tree·event/update/layout/paint pass | 공식 프로젝트가 experimental — 웹 UI 전면 교체에 사용 금지(매트릭스 E27) | 미검증 | 미실측 — tests/benchmarks 하니스로 측정 | 미실측 — tests/benchmarks 하니스로 측정 | 해당 없음(현 웹 범위 외) | 미검증 | permissive | 높음 — 현 스택과 별도 shell | 높음 — experimental | 연구·네이티브 후보 |
 | wgpu / WebGPU + ToonGpuExtensions | 검증 엔진 결과를 같은 frame graph에 연결, sparse tile·진단·ToonWet 등 제품 특화 공백 충전 | 자체 엔진 전체를 새로 만들지 않음 — 부족한 pass만 작은 custom module(매트릭스 E28) | 목표 높음 — 승격 조건은 reference corpus에서 기존 엔진 대비 우위 입증 | 미실측 — tests/benchmarks 하니스로 측정 | 미실측 — tests/benchmarks 하니스로 측정 | 낮음(정성) — 얇은 확장만 유지 | 모듈별 결정성 계약 필수(승인 PR에 deterministic reference 요구) | internal + wgpu permissive | 최저 — frame graph 내부 | 내부 소유 — 팀 역량에 종속 | 필수 얇은 확장(승격 가능 custom 후보) |
@@ -63,5 +95,6 @@
 
 ## 4. 측정 공백 요약
 
-- 모든 후보의 p50/p95/p99·Peak Memory·cache hit rate는 **미실측**이다. Phase 0에서 EngineCapabilityRegistry + benchmark harness를 먼저 구축하고, Phase 1 이후 동일 SceneIR/StrokeIR/FilterIR corpus로 채운다.
-- Visual Quality의 정성 평가는 golden image·cross-renderer diff·CSP blind test(Phase 7)로만 확정한다. 근거 없는 "지원 완료" 표시는 마스터 프롬프트 절대 규칙 9에 의해 금지된다.
+- §2.0의 raw artifact가 있는 레인은 이미 p50/p95·품질·메모리 중 측정 가능한 축을 채웠다. p99, GPU peak memory, cache hit rate가 artifact에 없는 레인은 해당 셀만 미실측으로 남기며 기존 숫자로 추정하지 않는다.
+- 자동화로 닫을 수 없는 공백은 CSP 최신 안정판·동일 펜 장치의 블라인드 평가와 물리 P3/HDR 출력이다. 정확 100k/1M path의 생성·전량 JSON 왕복·bounded pan/zoom·브라우저 Vello GPU 품질은 `large-scene-million.json`으로 닫았다. 대형 문서 브라우저 GPU presentation은 자동화 가능한 잔여이며, 1M 단일 all-visible overview는 monolithic JSON 대신 retained/sharded GPU ingestion이 생길 때 재개한다. 8K·100-layer/30,720px sparse storage·compositor core는 `tiledoc-scale.json`으로 실측했지만 이를 end-to-end 완료로 과장하지 않는다. 24h soak는 ADR 0011의 제품 오너 결정에 따라 필수 게이트가 아니라 선택 야간 재검증이다.
+- Visual Quality는 golden image·cross-renderer diff로 자동 회귀를 막고, 손맛·태스크 비열위의 최종 외부 판정은 CSP blind test로 분리한다. 근거 없는 "지원 완료" 표시는 마스터 프롬프트 절대 규칙 9에 의해 금지된다.

@@ -25,6 +25,7 @@ import { canvasKitProviderDescriptor } from "../../../packages/studio-engine-ski
 import {
   velloCpuProviderDescriptor,
   velloGpuBrowserProviderDescriptor,
+  velloSvgNativeProviderDescriptor,
 } from "../../../packages/studio-engine-vello/src/descriptor";
 
 import type { StudioAsyncKeyValueStore } from "./studio-local-database";
@@ -65,6 +66,7 @@ export const STUDIO_KNOWN_ENGINE_DESCRIPTORS: readonly ProviderDescriptor[] = [
   canvasKitProviderDescriptor,
   velloCpuProviderDescriptor,
   velloGpuBrowserProviderDescriptor,
+  velloSvgNativeProviderDescriptor,
   perfectFreehandProviderDescriptor,
   hokusaiProviderDescriptor,
   canvasKitImageFilterDescriptor,

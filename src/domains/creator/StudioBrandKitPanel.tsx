@@ -1,25 +1,28 @@
 // 브랜드 킷 패널 — "스타일" 툴바 그룹 팝오버 안에 서브탭 콘텐츠로 얹히는 컴포넌트.
 // 팔레트(참조)·제목/본문 글꼴·로고를 하나의 이름 붙은 킷으로 저장·이름변경·삭제하고,
 // 스와치/글꼴/로고를 각각 개별적으로 적용한다. StudioPaletteLibraryPanel과 동일한
-// "라이브러리 매니저" 컨벤션 — 자체 useState로 목록을 소유하고 localStorage를 직접
-// 읽고/쓴다(캔버스 도구 패널처럼 모든 값을 prop으로 받는 얇은 패널과는 다른 컨벤션).
+// "라이브러리 매니저" 컨벤션 — 자체 useState로 목록을 소유하고 V12 SQLite repository를
+// 통해 읽고/쓴다(캔버스 도구 패널처럼 모든 값을 prop으로 받는 얇은 패널과는 다른 컨벤션).
 // 팝오버 위치·z-index·max-height는 호출부(StudioPage.tsx의 스타일 그룹 wrapper)가 담당한다 —
 // 이 컴포넌트는 자체 fixed/absolute wrapper를 갖지 않는다(2026-07-05 툴바 그룹화로 이관).
 import { ImagePlus, Pencil, Plus, X } from "lucide-react";
-import { useEffect, useState, type ChangeEvent, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
 
 import {
   BRAND_KIT_FONTS,
   createBrandKit,
   DEFAULT_BRAND_KIT_FONT,
-  deleteBrandKit,
-  listBrandKits,
-  renameBrandKit,
+  deleteBrandKitInMemory,
+  renameBrandKitInMemory,
   resolveBrandKitPalette,
-  saveBrandKit,
+  upsertBrandKitInMemory,
   type BrandKit,
   type BrandKitLogo,
 } from "./studio-brand-kit";
+import {
+  getProductStudioBrandKitSqliteRepository,
+  StudioBrandKitSqliteRepositoryError,
+} from "./studio-brand-kit-sqlite-repository";
 import {
   buildGoogleFontCss2Url,
   filterStudioGoogleFonts,
@@ -31,12 +34,13 @@ import {
   type StudioGoogleFontCategory,
 } from "./studio-google-fonts";
 import { downscaleImageFile } from "./studio-image-utils";
-import { listPalettes, type StudioNamedPalette } from "./studio-palette-library";
+import { type StudioNamedPalette } from "./studio-palette-library";
+import { getProductStudioPaletteSqliteRepository } from "./studio-palette-sqlite-repository";
 
 import { cx } from "@/lib/cx";
 
 const MAX_LOGO_UPLOAD_BYTES = 8 * 1024 * 1024; // 8MB — 다운스케일 전 원본 파일에 대한 저비용 가드(메인스레드 디코딩 지연 방지).
-const LOGO_MAX_DIM = 320; // downscaleImageFile 최대 픽셀 변 — 로고는 작은 코너 장식이라 320px면 충분하고 localStorage 예산도 지킨다.
+const LOGO_MAX_DIM = 320; // downscaleImageFile 최대 픽셀 변 — 로고는 작은 코너 장식이며 canonical SQLite payload 예산 안에 둔다.
 const LOGO_QUALITY = 0.92;
 const SWATCH_PREVIEW_COUNT = 8;
 
@@ -189,17 +193,47 @@ export interface StudioBrandKitPanelProps {
   /** 킷의 로고를 문서 마스터 로고 슬롯에 적용(추가 또는 같은 자리 교체) — 실제
    *  ImageEl 구성 + setMaster(withMasterElements(...)) 수행은 호출측 책임. */
   onApplyLogo: (kit: BrandKit) => void;
+  /** Test/embed seams. Product code leaves these undefined. */
+  repository?: StudioBrandKitLibraryRepository;
+  paletteRepository?: StudioBrandKitPaletteRepository;
 }
 
-export function StudioBrandKitPanel({ onPickColor, canApplyFont, onApplyFont, onApplyLogo }: StudioBrandKitPanelProps) {
-  // lazy 초기화 — 이 패널 자체가 menu === "brandKit"일 때만 마운트되므로 마운트 시점이 곧
-  // "필요할 때"라 useEffect/구독 없이 동기 로드로 충분하다(StudioPaletteLibraryPanel과 동일 논리).
-  const [kits, setKits] = useState<BrandKit[]>(() => listBrandKits(globalThis.localStorage));
-  // 생성 폼의 팔레트 <select>와 각 킷 카드의 스와치 해석용 읽기 전용 스냅샷 — 패널이 열려
-  // 있는 동안 팔레트 라이브러리를 직접 편집할 방법이 이 패널엔 없으므로 재조회가 불필요하다.
-  const [palettes] = useState<StudioNamedPalette[]>(() => listPalettes(globalThis.localStorage));
+export interface StudioBrandKitLibraryRepository {
+  readonly authority?: "sqlite" | "injected";
+  list(): Promise<BrandKit[]>;
+  save(kit: BrandKit): Promise<BrandKit[]>;
+  rename(id: string, name: string): Promise<BrandKit[]>;
+  delete(id: string): Promise<BrandKit[]>;
+  subscribe?(listener: () => void): () => void;
+}
+
+export interface StudioBrandKitPaletteRepository {
+  readonly authority?: "sqlite" | "injected";
+  list(): Promise<StudioNamedPalette[]>;
+  subscribe?(listener: () => void): () => void;
+}
+
+const PRODUCT_REPOSITORY: StudioBrandKitLibraryRepository =
+  getProductStudioBrandKitSqliteRepository();
+const PRODUCT_PALETTE_REPOSITORY: StudioBrandKitPaletteRepository =
+  getProductStudioPaletteSqliteRepository();
+
+export function StudioBrandKitPanel({
+  onPickColor,
+  canApplyFont,
+  onApplyFont,
+  onApplyLogo,
+  repository = PRODUCT_REPOSITORY,
+  paletteRepository = PRODUCT_PALETTE_REPOSITORY,
+}: StudioBrandKitPanelProps) {
+  const [kits, setKits] = useState<BrandKit[]>([]);
+  const [palettes, setPalettes] = useState<StudioNamedPalette[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [doneMsg, setDoneMsg] = useState<string | null>(null);
+  const [mutationBusy, setMutationBusy] = useState(false);
+  const [storageState, setStorageState] = useState<
+    "loading" | "sqlite" | "injected" | "memory" | "unavailable"
+  >("loading");
   const [creatorOpen, setCreatorOpen] = useState(false);
   const [draftName, setDraftName] = useState("");
   const [draftPaletteId, setDraftPaletteId] = useState("");
@@ -209,6 +243,88 @@ export function StudioBrandKitPanel({ onPickColor, canApplyFont, onApplyFont, on
   const [draftLogoBusy, setDraftLogoBusy] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renamingName, setRenamingName] = useState("");
+  const mountedRef = useRef(true);
+  const memoryModeRef = useRef(false);
+  const mutationBusyRef = useRef(false);
+  const loadGenerationRef = useRef(0);
+  const paletteLoadGenerationRef = useRef(0);
+  const mutationGenerationRef = useRef(0);
+  const kitsRef = useRef<BrandKit[]>([]);
+
+  function replaceKits(next: BrandKit[]): void {
+    kitsRef.current = next;
+    setKits(next);
+  }
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    memoryModeRef.current = false;
+
+    const hydrate = async () => {
+      const generation = ++loadGenerationRef.current;
+      setStorageState("loading");
+      try {
+        const loaded = await repository.list();
+        if (
+          !active
+          || !mountedRef.current
+          || generation !== loadGenerationRef.current
+          || memoryModeRef.current
+        ) {
+          return;
+        }
+        replaceKits(loaded);
+        setError(null);
+        setStorageState(repository.authority === "sqlite" ? "sqlite" : "injected");
+      } catch (cause) {
+        if (!active || !mountedRef.current || generation !== loadGenerationRef.current) return;
+        setStorageState("unavailable");
+        setError(`SQLite/OPFS 브랜드 킷을 열지 못했습니다: ${
+          cause instanceof Error ? cause.message : String(cause)
+        }. 기존 브라우저 키는 자동으로 읽지 않습니다.`);
+      }
+    };
+
+    void hydrate();
+    const unsubscribe = repository.subscribe?.(() => void hydrate());
+    return () => {
+      active = false;
+      loadGenerationRef.current += 1;
+      unsubscribe?.();
+    };
+  }, [repository]);
+
+  useEffect(() => {
+    let active = true;
+    const hydratePalettes = async () => {
+      const generation = ++paletteLoadGenerationRef.current;
+      try {
+        const loaded = await paletteRepository.list();
+        if (!active || !mountedRef.current || generation !== paletteLoadGenerationRef.current) return;
+        setPalettes(loaded);
+      } catch (cause) {
+        if (!active || !mountedRef.current || generation !== paletteLoadGenerationRef.current) return;
+        setPalettes([]);
+        setError(`연결할 SQLite 팔레트를 불러오지 못했습니다: ${
+          cause instanceof Error ? cause.message : String(cause)
+        }`);
+      }
+    };
+    void hydratePalettes();
+    const unsubscribe = paletteRepository.subscribe?.(() => void hydratePalettes());
+    return () => {
+      active = false;
+      paletteLoadGenerationRef.current += 1;
+      unsubscribe?.();
+    };
+  }, [paletteRepository]);
 
   // 저장된 킷 중 headingFont/bodyFont가 Google Font를 가리키면 패널이 열리자마자 미리 로드해
   // 둔다 — 그래야 "제목/본문 글꼴 적용" 버튼 자체의 미리보기 라벨(style={{fontFamily}})이
@@ -222,19 +338,91 @@ export function StudioBrandKitPanel({ onPickColor, canApplyFont, onApplyFont, on
     }
   }, [kits]);
 
-  function handleDelete(id: string) {
-    setKits(deleteBrandKit(globalThis.localStorage, id));
+  async function commitMutation(
+    persisted: () => Promise<BrandKit[]>,
+    memoryUpdate: (current: readonly BrandKit[]) => BrandKit[],
+  ): Promise<"durable" | "memory" | "rejected"> {
+    if (mutationBusyRef.current) return "rejected";
+    mutationBusyRef.current = true;
+    const generation = ++mutationGenerationRef.current;
+    loadGenerationRef.current += 1;
+    setMutationBusy(true);
+    setError(null);
+    setDoneMsg(null);
+
+    if (storageState === "memory") {
+      try {
+        replaceKits(memoryUpdate(kitsRef.current));
+        return "memory";
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "브랜드 킷 변경을 적용하지 못했습니다.");
+        return "rejected";
+      } finally {
+        mutationBusyRef.current = false;
+        setMutationBusy(false);
+      }
+    }
+
+    try {
+      const next = await persisted();
+      if (!mountedRef.current || generation !== mutationGenerationRef.current) return "rejected";
+      // A save can synchronously notify subscribers and start list() before the save promise
+      // resolves. Fence that read so its late result cannot overwrite this mutation result.
+      loadGenerationRef.current += 1;
+      replaceKits(next);
+      setStorageState(repository.authority === "sqlite" ? "sqlite" : "injected");
+      return "durable";
+    } catch (cause) {
+      if (!mountedRef.current || generation !== mutationGenerationRef.current) return "rejected";
+      if (cause instanceof StudioBrandKitSqliteRepositoryError && cause.code !== "unavailable") {
+        setError(`${cause.message} 항목을 줄이거나 데이터를 고친 뒤 다시 시도해 주세요.`);
+        return "rejected";
+      }
+      try {
+        replaceKits(memoryUpdate(kitsRef.current));
+      } catch (validationError) {
+        setError(validationError instanceof Error
+          ? validationError.message
+          : "브랜드 킷 변경을 적용하지 못했습니다.");
+        return "rejected";
+      }
+      memoryModeRef.current = true;
+      setStorageState("memory");
+      setError(`SQLite/OPFS 저장에 실패해 변경을 현재 탭 메모리에만 유지합니다. 새로고침하면 사라집니다: ${
+        cause instanceof Error ? cause.message : String(cause)
+      }`);
+      return "memory";
+    } finally {
+      if (mountedRef.current && generation === mutationGenerationRef.current) {
+        mutationBusyRef.current = false;
+        setMutationBusy(false);
+      }
+    }
+  }
+
+  function handleDelete(id: string): void {
+    if (mutationBusyRef.current) return;
+    void commitMutation(
+      () => repository.delete(id),
+      (current) => deleteBrandKitInMemory(current, id),
+    );
   }
 
   function startRename(k: BrandKit) {
+    if (mutationBusyRef.current) return;
     setRenamingId(k.id);
     setRenamingName(k.name);
   }
 
   function commitRename() {
-    if (!renamingId) return;
-    setKits(renameBrandKit(globalThis.localStorage, renamingId, renamingName));
+    if (!renamingId || mutationBusyRef.current) return;
+    const id = renamingId;
+    const name = renamingName;
     setRenamingId(null);
+    void commitMutation(
+      () => repository.rename(id, name),
+      (current) => renameBrandKitInMemory(current, id, name),
+    );
   }
 
   function handleRenameKeyDown(e: KeyboardEvent<HTMLInputElement>) {
@@ -258,11 +446,11 @@ export function StudioBrandKitPanel({ onPickColor, canApplyFont, onApplyFont, on
     } catch (err) {
       setError(err instanceof Error ? err.message : "로고 이미지를 불러오지 못했어요.");
     } finally {
-      setDraftLogoBusy(false);
+      if (mountedRef.current) setDraftLogoBusy(false);
     }
   }
 
-  function handleCreate() {
+  function handleCreate(): void {
     // createBrandKit은 절대 던지지 않으므로(§ 설계 의도) try/catch가 필요 없다 — createPalette류의
     // "직접 입력" 흐름과 달리 호출 자체는 항상 성공한다. 단, 버튼은 draftLogoBusy(로고
     // downscaleImageFile 진행 중)일 때는 비활성화된다 — 아니면 업로드 완료 전에 제출해
@@ -274,15 +462,21 @@ export function StudioBrandKitPanel({ onPickColor, canApplyFont, onApplyFont, on
       bodyFont: draftBodyFont,
       logo: draftLogo,
     });
-    setKits(saveBrandKit(globalThis.localStorage, kit));
-    setError(null);
-    setDoneMsg(`"${kit.name}" 브랜드 킷을 만들었어요.`);
-    setDraftName("");
-    setDraftPaletteId("");
-    setDraftHeadingFont(DEFAULT_BRAND_KIT_FONT);
-    setDraftBodyFont(DEFAULT_BRAND_KIT_FONT);
-    setDraftLogo(null);
-    setCreatorOpen(false);
+    void commitMutation(
+      () => repository.save(kit),
+      (current) => upsertBrandKitInMemory(current, kit),
+    ).then((outcome) => {
+      if (!mountedRef.current || outcome === "rejected") return;
+      setDoneMsg(outcome === "durable"
+        ? `"${kit.name}" 브랜드 킷을 만들었어요.`
+        : `"${kit.name}" 브랜드 킷은 현재 탭 메모리에만 있습니다. 새로고침하면 사라집니다.`);
+      setDraftName("");
+      setDraftPaletteId("");
+      setDraftHeadingFont(DEFAULT_BRAND_KIT_FONT);
+      setDraftBodyFont(DEFAULT_BRAND_KIT_FONT);
+      setDraftLogo(null);
+      setCreatorOpen(false);
+    });
   }
 
   function handleApplyLogo(k: BrandKit) {
@@ -292,8 +486,23 @@ export function StudioBrandKitPanel({ onPickColor, canApplyFont, onApplyFont, on
   }
 
   return (
-    <>
+    <div
+      data-studio-brand-kit-authority={storageState}
+      aria-busy={mutationBusy || storageState === "loading"}
+    >
       <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">내 브랜드 킷 — 팔레트·글꼴·로고 묶음</p>
+
+      <p className="mb-1.5 text-[0.6rem] font-semibold text-fg-3" aria-live="polite">
+        {storageState === "loading"
+          ? "SQLite/OPFS 브랜드 킷 확인 중"
+          : storageState === "sqlite"
+            ? "이 기기 SQLite/OPFS 저장"
+            : storageState === "memory"
+              ? "현재 탭 메모리 임시 · 새로고침 시 사라짐"
+              : storageState === "unavailable"
+                ? "SQLite/OPFS 사용 불가 · 저장되지 않음"
+                : "주입 저장소"}
+      </p>
 
       {error && (
         <p className="mb-1.5 text-[0.66rem] text-bad" role="alert">
@@ -421,7 +630,7 @@ export function StudioBrandKitPanel({ onPickColor, canApplyFont, onApplyFont, on
                   accept="image/*"
                   className="hidden"
                   onChange={handleLogoFile}
-                  disabled={draftLogoBusy}
+                  disabled={draftLogoBusy || mutationBusy || storageState === "loading"}
                 />
               </label>
             )}
@@ -430,7 +639,7 @@ export function StudioBrandKitPanel({ onPickColor, canApplyFont, onApplyFont, on
           <button
             type="button"
             onClick={handleCreate}
-            disabled={draftLogoBusy}
+            disabled={draftLogoBusy || mutationBusy || storageState === "loading"}
             title={draftLogoBusy ? "로고를 불러오는 중이에요. 잠시만 기다려주세요." : undefined}
             className="rounded-lg bg-accent py-1.5 text-[0.66rem] font-semibold text-on-accent transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
@@ -568,11 +777,11 @@ export function StudioBrandKitPanel({ onPickColor, canApplyFont, onApplyFont, on
       )}
 
       <div className="mt-2 space-y-0.5 border-t border-line/60 pt-1.5 text-[0.6rem] leading-snug text-fg-3">
-        <p>브랜드 킷은 이 브라우저에만 저장돼요(다른 기기·계정과 공유되지 않아요).</p>
+        <p>브랜드 킷은 이 기기의 SQLite/OPFS에 저장돼요(다른 기기·계정과 공유되지 않아요).</p>
         <p>로고 적용은 문서 마스터에 저장되고, 실행취소(⌘Z)가 지원되지 않아요.</p>
         <p>팔레트가 삭제되면 이 킷의 팔레트 연결도 함께 끊겨요(로고·글꼴은 영향 없어요).</p>
         <p>Google Fonts는 처음 고를 때만 구글 서버에서 내려받아요(API 키·별도 비용 없음, 완전 오프라인은 아니에요).</p>
       </div>
-    </>
+    </div>
   );
 }

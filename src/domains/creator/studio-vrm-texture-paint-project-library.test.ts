@@ -875,7 +875,7 @@ describe("studio VRM texture-paint project library bridge", () => {
     });
   });
 
-  it("presents deterministic ready and missing-library states for JSON imports", async () => {
+  it("presents deterministic ready and fail-closed unavailable states for JSON imports", async () => {
     await expect(
       auditStudioVrmTexturePaintJsonImport(project([])),
     ).resolves.toEqual({ notice: null, alertSuffix: "" });
@@ -892,13 +892,9 @@ describe("studio VRM texture-paint project library bridge", () => {
       expect(presentation).toEqual({
         notice: {
           tone: "warn",
-          text: expect.stringMatching(
-            /VRM 표면 페인팅 PNG 1개가 이 기기에 없습니다.*\.toonproject\.zip/u,
-          ),
+          text: expect.stringMatching(/로컬 저장소를 확인할 수 없습니다.*\.toonproject\.zip/u),
         },
-        alertSuffix: expect.stringMatching(
-          /VRM 표면 페인팅 원본 1개가 없어.*archive 복구/u,
-        ),
+        alertSuffix: expect.stringMatching(/로컬 저장소를 확인할 수 없어.*archive/u),
       });
     } finally {
       vi.unstubAllGlobals();

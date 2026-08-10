@@ -371,9 +371,21 @@ describe("Studio VRM texture-paint production integration boundary", () => {
       "onEyedropperToggle={() =>",
     );
     expect(runtimeSource).toContain("async sampleBaseColor(");
-    expect(runtimeSource).toContain(
-      "if (this.sampling || this.filling || this.pending || this.active) {",
+    const sampleGuard = sourceBetween(
+      runtimeSource,
+      "async sampleBaseColor(",
+      "if (input.signal?.aborted)",
     );
+    for (const mutuallyExclusiveOperation of [
+      "this.sampling",
+      "this.filling",
+      "this.pending",
+      "this.active",
+      "this.surfaceSession",
+    ]) {
+      expect(sampleGuard).toContain(mutuallyExclusiveOperation);
+    }
+    expect(sampleGuard).toContain('return this.fail("pointer-active");');
   });
 
   it("arms ColorDrop as a pending tap while preserving brush pointerdown latency", () => {

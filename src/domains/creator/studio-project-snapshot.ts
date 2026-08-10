@@ -1,3 +1,8 @@
+import {
+  createEmptyStudioAiImageReferenceDocument,
+  hydrateStudioAiImageReferenceDocument,
+  type StudioAiImageReferenceDocument,
+} from "./studio-ai-image-reference-roles";
 import { studioDrawingAssistHasContent } from "./studio-drawing-assist-document";
 import {
   serializeDocumentMaster,
@@ -102,6 +107,7 @@ export type StudioProjectSnapshot = {
   releaseSchedule: StudioReleaseSchedule;
   publicationAnalytics: StudioPublicationAnalyticsDocument;
   referenceBoard: StudioReferenceBoardDocument;
+  aiImageReferences: StudioAiImageReferenceDocument;
   currentPageId: string;
   webtoonTheme: StudioProjectFile["webtoonTheme"];
   panelGutter: number;
@@ -126,6 +132,7 @@ export interface BuildStudioProjectFileSnapshotInput {
   releaseSchedule: StudioReleaseSchedule;
   publicationAnalytics: StudioPublicationAnalyticsDocument;
   referenceBoard: StudioReferenceBoardDocument;
+  aiImageReferences?: StudioAiImageReferenceDocument;
   currentPageId: string;
   webtoonTheme: StudioProjectFile["webtoonTheme"];
   panelGutter: number;
@@ -159,6 +166,9 @@ export function buildStudioProjectFileSnapshot(
     releaseSchedule: input.releaseSchedule,
     publicationAnalytics: input.publicationAnalytics,
     referenceBoard: input.referenceBoard,
+    aiImageReferences: input.aiImageReferences === undefined
+      ? createEmptyStudioAiImageReferenceDocument()
+      : hydrateStudioAiImageReferenceDocument(input.aiImageReferences),
     currentPageId: input.currentPageId,
     webtoonTheme: input.webtoonTheme,
     panelGutter: input.panelGutter,
@@ -191,6 +201,7 @@ export function studioProjectSnapshotHasMeaningfulContent(
     snapshot.releaseSchedule.items.length > 0 ||
     snapshot.publicationAnalytics.records.length > 0 ||
     studioReferenceBoardHasContent(snapshot.referenceBoard) ||
+    snapshot.aiImageReferences.references.length > 0 ||
     snapshot.publishPack.profile !== "generic" ||
     snapshot.publishPack.aiUsage !== "none" ||
     snapshot.publishPack.disclosure.trim() !== "" ||

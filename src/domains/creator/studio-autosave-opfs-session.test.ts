@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   serializeStudioAutosave,
@@ -7,6 +7,7 @@ import {
   type StudioAutosaveStorage,
 } from "./studio-autosave";
 import {
+  StudioAutosaveDurabilityError,
   StudioAutosaveOpfsSession,
   persistStudioAutosaveWithOpfsPrimary,
   reconcileStudioAutosaveWithOpfsPrimary,
@@ -17,6 +18,11 @@ import {
   type StudioOpfsRecoveryScan,
   type StudioOpfsRecoveryWriterLease,
 } from "./studio-opfs-recovery-journal";
+
+import type {
+  StudioAutosaveSqlitePort,
+  StudioAutosaveSqliteReadResult,
+} from "./studio-autosave-sqlite-store";
 
 const DOCUMENT_ID = "autosave-test-document";
 const ENGINE_VERSION = "studio-autosave-v2";
@@ -50,6 +56,32 @@ function memoryStorage(
   };
 }
 
+function memorySqliteStore(): StudioAutosaveSqlitePort & {
+  readonly values: Map<string, StudioAutosaveSqliteReadResult>;
+  failWrites: boolean;
+} {
+  const values = new Map<string, StudioAutosaveSqliteReadResult>();
+  return {
+    values,
+    failWrites: false,
+    async read(key) {
+      return values.get(key) ?? null;
+    },
+    async write(key, next) {
+      if (this.failWrites) throw new Error("sqlite write failed");
+      values.set(key, Object.freeze({
+        state: "snapshot",
+        savedAt: next.savedAt,
+        payload: next,
+      }));
+    },
+    async clear(key, savedAt = new Date().toISOString()) {
+      if (this.failWrites) throw new Error("sqlite clear failed");
+      values.set(key, Object.freeze({ state: "cleared", savedAt }));
+    },
+  };
+}
+
 class FakeAutosaveJournal implements StudioAutosaveOpfsJournalPort {
   readonly payloads = new Map<string, Uint8Array>();
   entries: StudioOpfsRecoveryEntry[] = [];
@@ -58,6 +90,7 @@ class FakeAutosaveJournal implements StudioAutosaveOpfsJournalPort {
   renewCount = 0;
   releaseCount = 0;
   now = 1_000;
+  appendGate: Promise<void> | null = null;
 
   async scan(): Promise<StudioOpfsRecoveryScan> {
     return Object.freeze({
@@ -120,6 +153,7 @@ class FakeAutosaveJournal implements StudioAutosaveOpfsJournalPort {
       readonly compactThroughSequence: number;
     },
   ): Promise<StudioOpfsRecoveryEntry> {
+    await this.appendGate;
     const sequence = (this.entries.at(-1)?.sequence ?? 0) + 1;
     this.entries = this.entries.filter(
       (entry) =>
@@ -160,7 +194,7 @@ class FakeAutosaveJournal implements StudioAutosaveOpfsJournalPort {
 
 function session(
   journal: FakeAutosaveJournal,
-  key = "toonspectrum-studio-autosave:v2:guest:new",
+  key = "toonspectrum-studio-autosave:v12:guest:new",
 ): StudioAutosaveOpfsSession {
   return new StudioAutosaveOpfsSession({
     autosaveKey: key,
@@ -232,10 +266,32 @@ describe("StudioAutosaveOpfsSession", () => {
     await target.write(payload("2026-07-30T01:02:00.000Z", "third"));
     expect(journal.acquireCount).toBe(2);
   });
+
+  it("closes admission before waiting for an in-flight checkpoint during disposal", async () => {
+    const journal = new FakeAutosaveJournal();
+    let releaseAppend!: () => void;
+    journal.appendGate = new Promise<void>((resolve) => {
+      releaseAppend = resolve;
+    });
+    const target = session(journal);
+    const inFlight = target.write(payload("2026-07-30T01:00:00.000Z", "first"));
+    await vi.waitFor(() => expect(journal.acquireCount).toBe(1));
+
+    const disposal = target.dispose();
+    await expect(
+      target.write(payload("2026-07-30T01:01:00.000Z", "stale")),
+    ).rejects.toThrow("OPFS 자동저장 세션이 이미 종료되었습니다.");
+    releaseAppend();
+    await inFlight;
+    await disposal;
+
+    expect(journal.entries).toHaveLength(1);
+    expect(journal.releaseCount).toBe(1);
+  });
 });
 
 describe("Studio autosave OPFS authority reconciliation", () => {
-  it("commits OPFS first and keeps browser storage as the restore cache", async () => {
+  it("commits OPFS without writing browser storage and discards stale compatibility data", async () => {
     const key = "autosave-primary";
     const storage = memoryStorage({
       [studioLifecycleAutosaveSidecarKey(key)]: serializeStudioAutosave(
@@ -245,6 +301,7 @@ describe("Studio autosave OPFS authority reconciliation", () => {
     const journal = new FakeAutosaveJournal();
     const target = session(journal, key);
     const next = payload("2026-07-30T03:00:00.000Z", "durable");
+    const setItem = vi.spyOn(storage, "setItem");
 
     const receipt = await persistStudioAutosaveWithOpfsPrimary({
       session: target,
@@ -254,30 +311,130 @@ describe("Studio autosave OPFS authority reconciliation", () => {
     });
 
     expect(receipt.authority).toBe("opfs-journal");
-    expect(storage.getItem(key)).toBe(serializeStudioAutosave(next));
+    expect(setItem).not.toHaveBeenCalled();
+    expect(storage.getItem(key)).toBeNull();
     expect(storage.getItem(studioLifecycleAutosaveSidecarKey(key))).toBeNull();
   });
 
-  it("falls back to browser storage when a durable session is unavailable", async () => {
+  it("does not touch writable browser KV after a durable snapshot commits", async () => {
+    const key = "autosave-browser-quota";
+    const target = session(new FakeAutosaveJournal(), key);
+    const setItem = vi.fn(() => {
+      throw new DOMException("quota", "QuotaExceededError");
+    });
+    const blockedStorage: StudioAutosaveStorage = {
+      getItem: () => {
+        throw new DOMException("blocked", "SecurityError");
+      },
+      setItem,
+      removeItem: () => {
+        throw new DOMException("blocked", "SecurityError");
+      },
+    };
+
+    await expect(persistStudioAutosaveWithOpfsPrimary({
+      session: target,
+      storage: blockedStorage,
+      key,
+      payload: payload("2026-07-30T03:10:00.000Z", "durable-despite-quota"),
+    })).resolves.toMatchObject({ authority: "opfs-journal" });
+    await expect(reconcileStudioAutosaveWithOpfsPrimary({
+      session: target,
+      storage: blockedStorage,
+      key,
+    })).resolves.toMatchObject({
+      authority: "opfs-journal",
+      durability: "durable",
+      candidate: {
+        authority: "opfs-journal",
+        sequence: 1,
+        revision: 1,
+        payload: { pagesList: [{ elements: [{ id: "durable-despite-quota" }] }] },
+      },
+    });
+    expect(setItem).not.toHaveBeenCalled();
+  });
+
+  it("never returns browser storage as durable success when all durable authorities are unavailable", async () => {
     const key = "autosave-fallback";
     const storage = memoryStorage();
     const next = payload("2026-07-30T03:00:00.000Z");
+    const setItem = vi.spyOn(storage, "setItem");
+    const causes: unknown[] = [];
+    const failure = await persistStudioAutosaveWithOpfsPrimary({
+      session: null,
+      storage,
+      key,
+      payload: next,
+      onDurableAuthorityDegraded: (cause) => causes.push(cause),
+    }).then(
+      () => null,
+      (cause: unknown) => cause,
+    );
+
+    expect(failure).toBeInstanceOf(StudioAutosaveDurabilityError);
+    expect(failure).toHaveProperty("message", expect.stringContaining("메모리에 남아"));
+    expect(setItem).not.toHaveBeenCalled();
+    expect(storage.getItem(key)).toBeNull();
+    expect(causes).toHaveLength(1);
+  });
+
+  it("uses SQLite without reporting or writing a synchronous browser slot", async () => {
+    const key = "autosave-sqlite-fallback";
+    const storage = memoryStorage();
+    const sqlite = memorySqliteStore();
+    const next = payload("2026-07-30T03:30:00.000Z", "sqlite");
+    const setItem = vi.spyOn(storage, "setItem");
+
     const receipt = await persistStudioAutosaveWithOpfsPrimary({
       session: null,
+      sqlite,
       storage,
       key,
       payload: next,
     });
 
-    expect(receipt).toMatchObject({
-      authority: "browser-storage-fallback",
-      sequence: null,
-      revision: null,
+    expect(receipt.authority).toBe("sqlite-fallback");
+    expect(sqlite.values.get(key)).toMatchObject({
+      state: "snapshot",
+      payload: { pagesList: [{ elements: [{ id: "sqlite" }] }] },
     });
-    expect(storage.getItem(key)).toBe(serializeStudioAutosave(next));
+    expect(setItem).not.toHaveBeenCalled();
+    expect(storage.getItem(key)).toBeNull();
   });
 
-  it("selects a newer OPFS snapshot and migrates a newer lifecycle fallback back to OPFS", async () => {
+  it("only reports durable degradation after OPFS and SQLite both fail", async () => {
+    const key = "autosave-all-durable-fail";
+    const storage = memoryStorage();
+    const setItem = vi.spyOn(storage, "setItem");
+    const sqlite = memorySqliteStore();
+    sqlite.failWrites = true;
+    const causes: unknown[] = [];
+    const journal = new FakeAutosaveJournal();
+    journal.appendCheckpoint = async () => {
+      throw new Error("opfs write failed");
+    };
+
+    const failure = await persistStudioAutosaveWithOpfsPrimary({
+      session: session(journal, key),
+      sqlite,
+      storage,
+      key,
+      payload: payload("2026-07-30T03:40:00.000Z"),
+      onDurableAuthorityDegraded: (cause) => causes.push(cause),
+    }).then(
+      () => null,
+      (cause: unknown) => cause,
+    );
+
+    expect(failure).toBeInstanceOf(StudioAutosaveDurabilityError);
+    expect(setItem).not.toHaveBeenCalled();
+    expect(storage.getItem(key)).toBeNull();
+    expect(causes).toHaveLength(1);
+    expect(causes[0]).toBeInstanceOf(AggregateError);
+  });
+
+  it("selects the exact OPFS snapshot without promoting a newer browser compatibility input", async () => {
     const key = "autosave-reconcile";
     const journal = new FakeAutosaveJournal();
     const target = session(journal, key);
@@ -285,6 +442,7 @@ describe("Studio autosave OPFS authority reconciliation", () => {
     const storage = memoryStorage({
       [key]: serializeStudioAutosave(payload("2026-07-30T02:00:00.000Z", "local-old")),
     });
+    const setItem = vi.spyOn(storage, "setItem");
 
     const durableWins = await reconcileStudioAutosaveWithOpfsPrimary({
       session: target,
@@ -293,27 +451,49 @@ describe("Studio autosave OPFS authority reconciliation", () => {
     });
     expect(durableWins).toMatchObject({
       authority: "opfs-journal",
+      durability: "durable",
       migratedToOpfs: false,
-      candidate: { payload: { pagesList: [{ elements: [{ id: "opfs" }] }] } },
+      candidate: {
+        authority: "opfs-journal",
+        sequence: 1,
+        revision: 1,
+        payload: { pagesList: [{ elements: [{ id: "opfs" }] }] },
+      },
     });
+    expect(setItem).not.toHaveBeenCalled();
 
     storage.setItem(
       studioLifecycleAutosaveSidecarKey(key),
       serializeStudioAutosave(payload("2026-07-30T04:00:00.000Z", "lifecycle-new")),
     );
-    const localWins = await reconcileStudioAutosaveWithOpfsPrimary({
+    setItem.mockClear();
+    const durableStillWins = await reconcileStudioAutosaveWithOpfsPrimary({
       session: target,
       storage,
       key,
     });
-    expect(localWins).toMatchObject({
+    expect(durableStillWins).toMatchObject({
       authority: "opfs-journal",
-      migratedToOpfs: true,
-      candidate: { payload: { pagesList: [{ elements: [{ id: "lifecycle-new" }] }] } },
+      durability: "durable",
+      migratedToOpfs: false,
+      candidate: {
+        authority: "opfs-journal",
+        sequence: 1,
+        revision: 1,
+        payload: { pagesList: [{ elements: [{ id: "opfs" }] }] },
+      },
+      compatibilityCandidate: {
+        authority: "browser-storage-compatibility",
+        key: studioLifecycleAutosaveSidecarKey(key),
+        payload: { pagesList: [{ elements: [{ id: "lifecycle-new" }] }] },
+      },
     });
+    expect(setItem).not.toHaveBeenCalled();
     expect(await target.readLatest()).toMatchObject({
       state: "snapshot",
-      payload: { pagesList: [{ elements: [{ id: "lifecycle-new" }] }] },
+      sequence: 1,
+      revision: 1,
+      payload: { pagesList: [{ elements: [{ id: "opfs" }] }] },
     });
   });
 
@@ -338,9 +518,150 @@ describe("Studio autosave OPFS authority reconciliation", () => {
 
     expect(result).toEqual({
       candidate: null,
+      compatibilityCandidate: null,
       authority: "opfs-journal",
+      durability: "none",
       migratedToOpfs: false,
     });
     expect(storage.values.size).toBe(0);
+  });
+
+  it("selects the SQLite snapshot without promoting a newer browser compatibility input", async () => {
+    const key = "autosave-sqlite-reconcile";
+    const sqlite = memorySqliteStore();
+    await sqlite.write(key, payload("2026-07-30T04:00:00.000Z", "sqlite"));
+    const storage = memoryStorage({
+      [key]: serializeStudioAutosave(payload("2026-07-30T03:00:00.000Z", "old")),
+    });
+    const setItem = vi.spyOn(storage, "setItem");
+
+    const sqliteWins = await reconcileStudioAutosaveWithOpfsPrimary({
+      session: null,
+      sqlite,
+      storage,
+      key,
+    });
+    expect(sqliteWins).toMatchObject({
+      authority: "sqlite-fallback",
+      durability: "durable",
+      candidate: {
+        authority: "sqlite-fallback",
+        sequence: null,
+        revision: null,
+        payload: { pagesList: [{ elements: [{ id: "sqlite" }] }] },
+      },
+    });
+    expect(setItem).not.toHaveBeenCalled();
+
+    storage.setItem(
+      studioLifecycleAutosaveSidecarKey(key),
+      serializeStudioAutosave(payload("2026-07-30T05:00:00.000Z", "sidecar")),
+    );
+    setItem.mockClear();
+    const sqliteStillWins = await reconcileStudioAutosaveWithOpfsPrimary({
+      session: null,
+      sqlite,
+      storage,
+      key,
+    });
+    expect(sqliteStillWins).toMatchObject({
+      authority: "sqlite-fallback",
+      durability: "durable",
+      candidate: {
+        authority: "sqlite-fallback",
+        payload: { pagesList: [{ elements: [{ id: "sqlite" }] }] },
+      },
+      compatibilityCandidate: {
+        authority: "browser-storage-compatibility",
+        key: studioLifecycleAutosaveSidecarKey(key),
+        payload: { pagesList: [{ elements: [{ id: "sidecar" }] }] },
+      },
+    });
+    expect(setItem).not.toHaveBeenCalled();
+    expect(sqlite.values.get(key)).toMatchObject({
+      state: "snapshot",
+      payload: { pagesList: [{ elements: [{ id: "sqlite" }] }] },
+    });
+  });
+
+  it("honors a newer SQLite tombstone over stale browser recovery", async () => {
+    const key = "autosave-sqlite-clear";
+    const sqlite = memorySqliteStore();
+    await sqlite.clear(key, "2026-07-30T06:00:00.000Z");
+    const storage = memoryStorage({
+      [key]: serializeStudioAutosave(payload("2026-07-30T05:00:00.000Z")),
+    });
+
+    const result = await reconcileStudioAutosaveWithOpfsPrimary({
+      session: null,
+      sqlite,
+      storage,
+      key,
+    });
+
+    expect(result).toEqual({
+      candidate: null,
+      compatibilityCandidate: null,
+      authority: "sqlite-fallback",
+      durability: "none",
+      migratedToOpfs: false,
+    });
+    expect(storage.values.size).toBe(0);
+  });
+
+  it("exposes a browser-only recovery as backup-only compatibility, never durable state", async () => {
+    const key = "autosave-compatibility-only";
+    const storage = memoryStorage({
+      [key]: serializeStudioAutosave(
+        payload("2026-07-30T07:00:00.000Z", "compatibility-only"),
+      ),
+    });
+    const setItem = vi.spyOn(storage, "setItem");
+
+    const result = await reconcileStudioAutosaveWithOpfsPrimary({
+      session: null,
+      sqlite: null,
+      storage,
+      key,
+      allowLegacy: false,
+    });
+
+    expect(result).toMatchObject({
+      authority: "browser-storage-compatibility",
+      durability: "compatibility-only",
+      migratedToOpfs: false,
+      candidate: {
+        authority: "browser-storage-compatibility",
+        sequence: null,
+        revision: null,
+        payload: { pagesList: [{ elements: [{ id: "compatibility-only" }] }] },
+      },
+    });
+    expect(setItem).not.toHaveBeenCalled();
+  });
+
+  it("never attempts a compatibility write when no durable authority exists", async () => {
+    const setItem = vi.fn(() => {
+      throw new DOMException("quota", "QuotaExceededError");
+    });
+    const blockedStorage: StudioAutosaveStorage = {
+      getItem: () => null,
+      setItem,
+      removeItem: () => undefined,
+    };
+
+    const failure = await persistStudioAutosaveWithOpfsPrimary({
+      session: null,
+      sqlite: null,
+      storage: blockedStorage,
+      key: "autosave-no-authority",
+      payload: payload("2026-07-30T08:00:00.000Z", "unsaved"),
+    }).then(
+      () => null,
+      (cause: unknown) => cause,
+    );
+
+    expect(failure).toBeInstanceOf(StudioAutosaveDurabilityError);
+    expect(setItem).not.toHaveBeenCalled();
   });
 });

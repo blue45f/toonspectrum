@@ -1,13 +1,13 @@
 /**
  * StudioCustomFontsPanel — 사용자가 소유한 글꼴 파일을 가져와 보관·적용하는 패널.
- * StudioBrushLibraryPanel과 같은 controlled consumer다: 목록은 StudioPage가 소유하고
- * (영속화도 거기서), 이 패널은 파일 검증·등록·표시만 맡아 새 배열을 콜백으로 올려보낸다.
+ * Props로 목록을 주입하면 기존 controlled import/test seam으로 동작한다. Props가 없으면
+ * 제품 SQLite canonical manifest + OPFS SHA-256 CAS를 직접 hydrate하고 저장한다.
  *
  * 브라우저 seam(document.fonts·FontFace)은 prop으로 주입 가능하다 — jsdom에는 FontFace가
  * 없으므로 테스트가 가짜 폰트 집합을 넣어 등록 성공/실패 경로를 그대로 검증한다.
  */
 import { Type, Upload, X } from "lucide-react";
-import { useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 
 import {
   addCustomFont,
@@ -20,6 +20,7 @@ import {
   MAX_CUSTOM_FONT_TOTAL_BYTES,
   MAX_CUSTOM_FONTS,
   registerStudioCustomFont,
+  registerStudioCustomFonts,
   removeCustomFont,
   totalCustomFontBytes,
   type StudioCustomFont,
@@ -27,6 +28,8 @@ import {
   type StudioFontSetLike,
 } from "./studio-custom-fonts";
 import { STUDIO_EASE, STUDIO_FOCUS_RING, StudioEmptyState, StudioSectionHeader } from "./studio-panel-ui";
+
+import type { StudioCustomFontRepository } from "./studio-custom-font-sqlite-opfs-repository";
 
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -54,10 +57,9 @@ function tText(
 }
 
 export interface StudioCustomFontsPanelProps {
-  /** 보관 중인 사용자 글꼴 — StudioPage가 소유하는 단일 목록. */
-  readonly fonts: readonly StudioCustomFont[];
-  /** 추가·삭제 결과. 영속화(saveCustomFonts)는 소유자가 한다. */
-  readonly onFontsChange: (fonts: StudioCustomFont[]) => void;
+  /** 둘을 함께 주입할 때만 explicit controlled legacy/test seam으로 동작한다. */
+  readonly fonts?: readonly StudioCustomFont[];
+  readonly onFontsChange?: (fonts: StudioCustomFont[]) => void;
   /** 선택한 요소에 글꼴 적용 — 값은 customFontCssValue()가 만든 CSS font-family 문자열
    *  (StudioBrandKitPanel.onApplyFont와 완전히 동일한 규약). */
   readonly onApplyFont?: (cssValue: string) => void;
@@ -66,6 +68,27 @@ export interface StudioCustomFontsPanelProps {
   /** 테스트 주입 seam. 생략하면 document.fonts / window.FontFace. */
   readonly fontSet?: StudioFontSetLike | null;
   readonly createFontFace?: StudioFontFaceFactory | null;
+  /** 실 SQLite/OPFS 테스트와 제품 경계 주입점. 생략하면 lazy product repository를 연다. */
+  readonly repository?: StudioCustomFontRepository;
+  readonly loadRepository?: () => Promise<StudioCustomFontRepository>;
+}
+
+type StudioCustomFontStorageState =
+  | "loading"
+  | "sqlite-opfs"
+  | "memory-only"
+  | "unavailable"
+  | "controlled";
+
+async function loadProductRepository(): Promise<StudioCustomFontRepository> {
+  const module = await import("./studio-custom-font-sqlite-opfs-repository");
+  return module.getProductStudioCustomFontRepository();
+}
+
+function storageErrorCode(error: unknown): string | null {
+  return typeof error === "object" && error !== null && "code" in error
+    ? String((error as { readonly code?: unknown }).code ?? "")
+    : null;
 }
 
 export function StudioCustomFontsPanel({
@@ -75,14 +98,88 @@ export function StudioCustomFontsPanel({
   canApplyFont = false,
   fontSet,
   createFontFace,
+  repository,
+  loadRepository,
 }: StudioCustomFontsPanelProps) {
+  const controlled = fonts !== undefined && onFontsChange !== undefined;
+  const [productFonts, setProductFonts] = useState<StudioCustomFont[]>([]);
+  const [storageState, setStorageState] = useState<StudioCustomFontStorageState>(
+    controlled ? "controlled" : "loading",
+  );
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
+  const mountedRef = useRef(false);
+  const repositoryRef = useRef<StudioCustomFontRepository | null>(repository ?? null);
+  const hydrationGenerationRef = useRef(0);
+  const mutationGenerationRef = useRef(0);
+  const mutationTailRef = useRef<Promise<void>>(Promise.resolve());
   const t = useT();
 
-  const usedBytes = totalCustomFontBytes(fonts);
+  const activeFonts: readonly StudioCustomFont[] = controlled ? (fonts ?? []) : productFonts;
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      hydrationGenerationRef.current += 1;
+      mutationGenerationRef.current += 1;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (controlled) {
+      setStorageState("controlled");
+      return;
+    }
+    const generation = ++hydrationGenerationRef.current;
+    setStorageState("loading");
+    setError(null);
+    const resolveRepository = repository
+      ? Promise.resolve(repository)
+      : (loadRepository ?? loadProductRepository)();
+    void resolveRepository.then(async (resolved) => {
+      const loaded = await resolved.list();
+      const registrations = await registerStudioCustomFonts(
+        loaded,
+        fontSet === undefined ? browserFontSet() : fontSet,
+        createFontFace === undefined ? undefined : createFontFace,
+      );
+      if (!mountedRef.current || generation !== hydrationGenerationRef.current) return;
+      repositoryRef.current = resolved;
+      setProductFonts(loaded);
+      setStorageState("sqlite-opfs");
+      const failures = registrations.filter((result) => result.status === "failed");
+      if (failures.length > 0) {
+        setNotice(
+          `${loaded.length}개 글꼴의 OPFS 무결성은 확인했지만 ${failures.length}개는 `
+          + "이 브라우저 FontFace에 등록하지 못했어요.",
+        );
+      }
+    }).catch((cause: unknown) => {
+      if (!mountedRef.current || generation !== hydrationGenerationRef.current) return;
+      repositoryRef.current = null;
+      const code = storageErrorCode(cause);
+      if (code === "unavailable" || code === "quota-exceeded") {
+        setStorageState("memory-only");
+        setNotice("SQLite/OPFS를 열지 못해 현재 탭 메모리만 사용합니다. 새로고침하면 사라져요.");
+        return;
+      }
+      setStorageState("unavailable");
+      setError(
+        "사용자 글꼴 manifest 또는 OPFS blob의 무결성을 확인하지 못해 일부 항목을 표시하지 않았습니다.",
+      );
+    });
+  }, [controlled, createFontFace, fontSet, loadRepository, repository]);
+
+  function enqueueMutation<T>(task: () => Promise<T>): Promise<T> {
+    const run = mutationTailRef.current.then(task, task);
+    mutationTailRef.current = run.then(() => undefined, () => undefined);
+    return run;
+  }
+
+  const usedBytes = totalCustomFontBytes(activeFonts);
   const usedPercent = Math.min(100, Math.round((usedBytes / MAX_CUSTOM_FONT_TOTAL_BYTES) * 100));
 
   async function handleImportFile(event: ChangeEvent<HTMLInputElement>) {
@@ -112,36 +209,118 @@ export function StudioCustomFontsPanel({
         return;
       }
       const bytes = new Uint8Array(await file.arrayBuffer());
-      const result = addCustomFont(fonts, { fileName: file.name, bytes });
-      if (result.status === "rejected") {
-        setError(result.message);
-        return;
-      }
-      const registered = await registerStudioCustomFont(
-        result.font,
+      const register = (font: StudioCustomFont) => registerStudioCustomFont(
+        font,
         fontSet === undefined ? browserFontSet() : fontSet,
         createFontFace === undefined ? undefined : createFontFace,
       );
-      if (registered.status === "failed") {
-        setError(registered.message);
-        return; // 등록 실패한 글꼴은 보관함에 남기지 않는다(못 쓰는 항목이 예산만 먹는다).
+      let storedFont: StudioCustomFont;
+      let nextFonts: StudioCustomFont[];
+      let registrationStatus: "ok" | "unsupported" = "ok";
+
+      if (controlled) {
+        const result = addCustomFont(activeFonts, { fileName: file.name, bytes });
+        if (result.status === "rejected") {
+          setError(result.message);
+          return;
+        }
+        const registered = await register(result.font);
+        if (registered.status === "failed") {
+          setError(registered.message);
+          return;
+        }
+        registrationStatus = registered.status;
+        storedFont = result.font;
+        nextFonts = result.fonts;
+        onFontsChange?.(nextFonts);
+      } else if (storageState === "unavailable" || storageState === "loading") {
+        setError(
+          storageState === "loading"
+            ? "사용자 글꼴 SQLite/OPFS 보관함을 확인하는 중이에요. 잠시 뒤 다시 시도해주세요."
+            : "사용자 글꼴 저장소 무결성을 확인할 수 없어 가져오기를 중단했습니다.",
+        );
+        return;
+      } else if (storageState === "memory-only" || !repositoryRef.current) {
+        const result = addCustomFont(activeFonts, { fileName: file.name, bytes });
+        if (result.status === "rejected") {
+          setError(result.message);
+          return;
+        }
+        const registered = await register(result.font);
+        if (registered.status === "failed") {
+          setError(registered.message);
+          return;
+        }
+        registrationStatus = registered.status;
+        storedFont = result.font;
+        nextFonts = result.fonts;
+        if (mountedRef.current) setProductFonts(nextFonts);
+      } else {
+        const generation = ++mutationGenerationRef.current;
+        const durableRepository = repositoryRef.current;
+        try {
+          const saved = await enqueueMutation(() => durableRepository.save({
+            fileName: file.name,
+            bytes,
+          }));
+          const registered = await register(saved);
+          if (registered.status === "failed") {
+            await enqueueMutation(() => durableRepository.delete(saved.id)).catch(() => undefined);
+            setError(registered.message);
+            return;
+          }
+          registrationStatus = registered.status;
+          if (!mountedRef.current || generation !== mutationGenerationRef.current) return;
+          storedFont = saved;
+          nextFonts = [...activeFonts.filter((font) => font.id !== saved.id), saved];
+          setProductFonts(nextFonts);
+        } catch (cause) {
+          if (!mountedRef.current || generation !== mutationGenerationRef.current) return;
+          const code = storageErrorCode(cause);
+          if (code === "unavailable" || code === "quota-exceeded") {
+            const fallback = addCustomFont(activeFonts, { fileName: file.name, bytes });
+            if (fallback.status === "rejected") {
+              setError(fallback.message);
+              return;
+            }
+            const registered = await register(fallback.font);
+            if (registered.status === "failed") {
+              setError(registered.message);
+              return;
+            }
+            storedFont = fallback.font;
+            nextFonts = fallback.fonts;
+            setProductFonts(nextFonts);
+            setStorageState("memory-only");
+            setNotice(
+              `“${fallback.font.family}” 글꼴은 현재 탭 메모리에만 담았어요. 새로고침하면 사라져요.`,
+            );
+            return;
+          }
+          setStorageState("unavailable");
+          setError(
+            "사용자 글꼴 manifest 또는 OPFS blob이 손상되어 가져오기를 중단했습니다. 일부 데이터로 덮어쓰지 않았습니다.",
+          );
+          return;
+        }
       }
-      onFontsChange(result.fonts);
       setNotice(
-        registered.status === "unsupported"
+        storageState === "memory-only"
+          ? `“${storedFont.family}” 글꼴은 현재 탭 메모리에만 담았어요. 새로고침하면 사라져요.`
+          : registrationStatus === "unsupported"
           ? tText(
             t,
-            `“${result.font.family}” 글꼴을 담았어요. 이 브라우저는 미리보기를 지원하지 않아요.`,
+            `“${storedFont.family}” 글꼴을 담았어요. 이 브라우저는 미리보기를 지원하지 않아요.`,
             "studio.customFonts.noticeUnsupported",
-            { fontName: result.font.family },
+            { fontName: storedFont.family },
           )
           : tText(
             t,
-            `“${result.font.family}” 글꼴을 담았어요. (${formatCustomFontBytes(result.font.byteLength)})`,
+            `“${storedFont.family}” 글꼴을 담았어요. (${formatCustomFontBytes(storedFont.byteLength)})`,
             "studio.customFonts.noticeUploaded",
             {
-              fontName: result.font.family,
-              size: formatCustomFontBytes(result.font.byteLength),
+              fontName: storedFont.family,
+              size: formatCustomFontBytes(storedFont.byteLength),
             },
           ),
       );
@@ -161,11 +340,48 @@ export function StudioCustomFontsPanel({
     if (busyRef.current) return;
     setError(null);
     setNotice(null);
-    onFontsChange(removeCustomFont(fonts, font.id));
+    if (controlled) {
+      onFontsChange?.(removeCustomFont(activeFonts, font.id));
+      return;
+    }
+    if (storageState === "memory-only") {
+      setProductFonts((current) => removeCustomFont(current, font.id));
+      setNotice("현재 탭 메모리에서만 지웠어요. 이 상태는 새로고침 후 유지되지 않습니다.");
+      return;
+    }
+    const durableRepository = repositoryRef.current;
+    if (!durableRepository || storageState !== "sqlite-opfs") {
+      setError("사용자 글꼴 SQLite/OPFS 저장소를 사용할 수 없어 삭제하지 않았습니다.");
+      return;
+    }
+    const generation = ++mutationGenerationRef.current;
+    busyRef.current = true;
+    setBusy(true);
+    void enqueueMutation(() => durableRepository.delete(font.id)).then(() => {
+      if (!mountedRef.current || generation !== mutationGenerationRef.current) return;
+      setProductFonts((current) => removeCustomFont(current, font.id));
+      setNotice(`“${font.family}” 글꼴을 SQLite/OPFS 보관함에서 삭제했어요.`);
+    }).catch((cause: unknown) => {
+      if (!mountedRef.current || generation !== mutationGenerationRef.current) return;
+      if (storageErrorCode(cause) !== "corrupt") {
+        setError("사용자 글꼴을 기기 보관함에서 삭제하지 못해 목록을 유지했습니다.");
+      } else {
+        setStorageState("unavailable");
+        setError("사용자 글꼴 저장소 무결성 오류로 삭제를 중단했습니다.");
+      }
+    }).finally(() => {
+      if (!mountedRef.current || generation !== mutationGenerationRef.current) return;
+      busyRef.current = false;
+      setBusy(false);
+    });
   }
 
   return (
-    <section aria-label={t("studio.customFonts.title")} aria-busy={busy}>
+    <section
+      aria-label={t("studio.customFonts.title")}
+      aria-busy={busy || storageState === "loading"}
+      data-studio-custom-font-authority={storageState}
+    >
       <StudioSectionHeader
         title={t("studio.customFonts.title")}
         description={tText(
@@ -176,12 +392,25 @@ export function StudioCustomFontsPanel({
         )}
       />
 
+      <p className="mb-2 text-[0.6rem] font-semibold text-fg-3" aria-live="polite">
+        {storageState === "loading"
+          ? "SQLite/OPFS 사용자 글꼴 확인 중"
+          : storageState === "sqlite-opfs"
+            ? "이 기기 SQLite manifest · OPFS SHA-256 원본 저장"
+            : storageState === "memory-only"
+              ? "현재 탭 메모리 임시 · 새로고침 시 사라짐"
+              : storageState === "unavailable"
+                ? "저장소 무결성 확인 실패 · 가져오기 중단"
+                : "주입된 controlled 보관함"}
+      </p>
+
       <label
         className={cn(
           "flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-line bg-card px-2 text-[0.72rem] font-semibold text-fg-2",
           STUDIO_EASE,
           "hover:bg-raised focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent",
-          busy && "pointer-events-none cursor-wait opacity-55",
+          (busy || storageState === "loading" || storageState === "unavailable")
+            && "pointer-events-none cursor-wait opacity-55",
         )}
       >
         <Upload size={14} aria-hidden />
@@ -191,7 +420,7 @@ export function StudioCustomFontsPanel({
           accept={CUSTOM_FONT_ACCEPT}
           aria-label={t("studio.customFonts.importAria")}
           className="sr-only"
-          disabled={busy}
+          disabled={busy || storageState === "loading" || storageState === "unavailable"}
           onChange={(event) => void handleImportFile(event)}
         />
       </label>
@@ -212,9 +441,9 @@ export function StudioCustomFontsPanel({
           <span className="tabular-nums">
             {tText(
               t,
-              `${fonts.length}/${MAX_CUSTOM_FONTS}개`,
+              `${activeFonts.length}/${MAX_CUSTOM_FONTS}개`,
               "studio.customFonts.storageCount",
-              { count: fonts.length, max: MAX_CUSTOM_FONTS },
+              { count: activeFonts.length, max: MAX_CUSTOM_FONTS },
             )}
           </span>
         </div>
@@ -253,7 +482,7 @@ export function StudioCustomFontsPanel({
         </p>
       )}
 
-      {fonts.length === 0 ? (
+      {activeFonts.length === 0 ? (
         <div className="mt-2">
           <StudioEmptyState
             icon={<Type size={18} aria-hidden />}
@@ -271,12 +500,12 @@ export function StudioCustomFontsPanel({
           className="mt-2 max-h-72 space-y-1.5 overflow-y-auto pr-1"
           aria-label={tText(
             t,
-            `담은 글꼴 ${fonts.length}개`,
+            `담은 글꼴 ${activeFonts.length}개`,
             "studio.customFonts.listAria",
-            { count: fonts.length },
+            { count: activeFonts.length },
           )}
         >
-          {fonts.map((font) => (
+          {activeFonts.map((font) => (
             <li key={font.id} className="rounded-lg border border-line bg-card px-2 py-1.5">
               <div className="flex items-center gap-0.5">
                 <span className="min-w-0 flex-1">

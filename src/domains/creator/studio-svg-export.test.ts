@@ -2957,6 +2957,26 @@ describe("텍스트 직렬화", () => {
     expect(svg).toContain('xml:space="preserve"');
   });
 
+  it("가로 루비 — 독음을 원문 위의 작은 SVG 텍스트로 보존하고 advance 근사를 고지한다", () => {
+    const { svg, skipped } = exportPageToSvg(
+      page([
+        textEl({
+          text: "漢字",
+          align: "left",
+          rubySpans: [{ start: 0, end: 2, ruby: "かんじ" }],
+        }),
+      ]),
+    );
+
+    expect(svg).toContain('font-size="9"');
+    expect(svg).toContain(">かんじ</tspan>");
+    expect(
+      skipped.some(
+        (entry) => entry.mode === "approximated" && entry.label.includes("가로 루비"),
+      ),
+    ).toBe(true);
+  });
+
   it("XML 특수문자를 철저히 이스케이프한다", () => {
     const { svg } = exportPageToSvg(page([textEl({ text: `<b>&"quote"&'q'</b>`, align: "left" })]));
     expect(svg).toContain("&lt;b&gt;&amp;&quot;quote&quot;&amp;&apos;q&apos;&lt;/b&gt;");
@@ -3008,6 +3028,20 @@ describe("텍스트 직렬화", () => {
     expect(svg).toContain(">。</tspan>");
   });
 
+  it("세로쓰기 — 독립된 네 자리 숫자는 한 셀 안에 縦中横으로 가로 배치한다", () => {
+    const { svg, skipped } = exportPageToSvg(
+      page([textEl({ text: "가2026나", vertical: true, align: "left", lineHeight: 1.4 })]),
+    );
+    expect(svg).toMatch(/<g transform="translate\(4 21\) scale\(0\.\d+ 1\)">/u);
+    expect(svg).toContain(">2026</tspan>");
+    expect(svg).not.toContain('translate(4 21) rotate(90)');
+    expect(
+      skipped.some(
+        (entry) => entry.id === "t1" && entry.mode === "approximated" && entry.label.includes("세로쓰기"),
+      ),
+    ).toBe(true);
+  });
+
   it("세로쓰기 — 라틴 폭 근사를 정직하게 고지하고, 한글만이면 고지하지 않는다", () => {
     const mixed = exportPageToSvg(page([textEl({ text: "가OK나", vertical: true })]));
     expect(
@@ -3028,6 +3062,48 @@ describe("텍스트 직렬화", () => {
     expect(svg).toContain('<g transform="translate(32 0)">');
     expect(svg).toContain('<g transform="translate(4 0)">');
     expect(svg.match(/<g transform="translate\(\d+(?:\.\d+)? 0\)">/gu)).toHaveLength(2);
+  });
+
+  it("세로쓰기 루비 — 실제 열 레이아웃 오른쪽에 독음 글리프를 세로로 보존한다", () => {
+    const { svg, skipped } = exportPageToSvg(
+      page([
+        textEl({
+          text: "漢字",
+          vertical: true,
+          align: "left",
+          width: 80,
+          lineHeight: 1.4,
+          letterSpacing: 0,
+          rubySpans: [{ start: 0, end: 2, ruby: "かんじ" }],
+        }),
+      ]),
+    );
+
+    expect(svg).toContain('font-size="9"');
+    expect(svg).toContain(">か</tspan>");
+    expect(svg).toContain(">ん</tspan>");
+    expect(svg).toContain(">じ</tspan>");
+    expect(skipped.some((entry) => entry.label.includes("세로 루비"))).toBe(false);
+  });
+
+  it("세로쓰기 루비 — surrogate pair를 가르는 범위는 조용히 버리지 않고 skipped로 보고한다", () => {
+    const { svg, skipped } = exportPageToSvg(
+      page([
+        textEl({
+          text: "😀字",
+          vertical: true,
+          width: 80,
+          rubySpans: [{ start: 1, end: 2, ruby: "え" }],
+        }),
+      ]),
+    );
+
+    expect(svg).not.toContain(">え</tspan>");
+    expect(
+      skipped.some(
+        (entry) => entry.mode === "skipped" && entry.label.includes("split-surrogate-pair"),
+      ),
+    ).toBe(true);
   });
 
   it("자동 줄바꿈이 필요한 긴 문장은 근사로 정직하게 고지한다", () => {
@@ -3065,6 +3141,46 @@ describe("말풍선 직렬화", () => {
     expect(svg).toContain(`<path d="${expected}" fill="#ffffff" stroke="#1f1a16" stroke-width="2.5"`);
     expect(svg).toContain('<tspan x="100" y="67.14">야!</tspan>');
     expect(svg).toContain('letter-spacing="0.3"');
+  });
+
+  it("가로 말풍선 루비 — 독음을 text box 위에 보존하고 근사 receipt를 반환한다", () => {
+    const { svg, skipped } = exportPageToSvg(
+      page([
+        bubbleEl({
+          text: "漢字",
+          rubySpans: [{ start: 0, end: 2, ruby: "かんじ" }],
+        }),
+      ]),
+    );
+
+    expect(svg).toContain('font-size="10.8"');
+    expect(svg).toContain(">かんじ</tspan>");
+    expect(
+      skipped.some(
+        (entry) => entry.mode === "approximated" && entry.label.includes("말풍선 가로 루비"),
+      ),
+    ).toBe(true);
+  });
+
+  it("세로 말풍선 루비 — 캔버스와 같은 열 코어와 오른쪽 독음 오버레이를 내보낸다", () => {
+    const { svg, skipped } = exportPageToSvg(
+      page([
+        bubbleEl({
+          text: "漢字",
+          vertical: true,
+          height: 180,
+          rubySpans: [{ start: 0, end: 2, ruby: "かんじ" }],
+        }),
+      ]),
+    );
+
+    expect(svg).toContain('font-size="10.8"');
+    expect(svg).toContain(">漢</tspan>");
+    expect(svg).toContain(">字</tspan>");
+    expect(svg).toContain(">か</tspan>");
+    expect(svg).toContain(">ん</tspan>");
+    expect(svg).toContain(">じ</tspan>");
+    expect(skipped.some((entry) => entry.label.includes("세로 루비"))).toBe(false);
   });
 
   it("speech — 편집한 꼬리 밑동과 곡률이 SVG path에 보존된다", () => {

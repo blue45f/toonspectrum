@@ -156,7 +156,8 @@ describe("Studio options-bars module boundary", () => {
 
     for (const contract of [
       "assignStudioBrushSlot(prev, index",
-      "saveStudioBrushSlotsState(",
+      "commitStudioBrushSlotsMutation(",
+      "failureMessage: `슬롯 ${index + 1}을 SQLite에 저장하지 못했어요.`,",
       "studioBrushSlotAt(brushSlotsState, index)",
       "void loadStudioBrushStudio();",
       "setMobileSheet(",

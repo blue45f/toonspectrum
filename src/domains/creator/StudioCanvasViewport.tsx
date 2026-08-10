@@ -1,5 +1,5 @@
 import { BookOpen, CircleHelp, Clapperboard, Eraser, FlipHorizontal2, Grid3X3, ImagePlus, Keyboard, Lock, Maximize2, MessageSquare, Minimize2, Minus, Mouse, MousePointer2, PaintBucket, Pencil, PenTool, Plus, Shapes, Sparkles, Square, Unlock, Wind } from "lucide-react";
-import { Fragment, Profiler, Suspense, memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type SetStateAction } from "react";
+import { Fragment, Profiler, Suspense, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type SetStateAction } from "react";
 import { createPortal } from "react-dom";
 import { Stage, Layer, Rect, Group, Circle as KCircle, Transformer, Shape, Text } from "react-konva/lib/ReactKonvaCore";
 
@@ -38,6 +38,7 @@ import { type HealCloneMode } from "./studio-heal-clone";
 import { computeHistoryBrushAvailability } from "./studio-history-brush";
 import { type StudioHokusaiLiveOverlayProjection } from "./studio-hokusai-live-brush-overlay";
 import { uid } from "./studio-id";
+import { type StudioInkMeshLivePreviewRuntime } from "./studio-ink-mesh-live-preview-loader";
 import { imageFilterCacheKey } from "./studio-konva-filter-fields";
 import { shouldApplyLayerMask, type LayerMaskPaintMode } from "./studio-layer-mask";
 import { isEffectivelyHidden, isEffectivelyLocked, type LayerGroup } from "./studio-layers";
@@ -70,6 +71,11 @@ import {
 import { normalizeShapeParams } from "./studio-stroke-shapes";
 import { studioUiDensityDescription, studioUiDensityLabel, type StudioUiDensityMode } from "./studio-ui-density";
 import { materializeStudioAdvancedFillVectorTarget } from "./studio-vector-fill-reference";
+import { resolveStudioVelloHubProductCapability } from "./studio-vello-hub";
+import {
+  StudioVelloHubSurface,
+  type StudioVelloHubAuthority,
+} from "./studio-vello-hub-surface";
 import { STUDIO_VIEW_ACTION_HINTS } from "./studio-view-action-hints";
 import { planStudioCanvasStageLayout, stepStudioViewZoom, toggleStudioCanvasWheelMode, type StudioViewRotation } from "./studio-view-controls";
 import { StudioViewToolsHud } from "./studio-view-tools-hud-loader";
@@ -81,6 +87,7 @@ import { colorBlindFilterStyle, StudioColorBlindFilterDefs, type CvdMode } from 
 import { StudioDraftPreviewLayers } from "./StudioDraftPreviewLayers";
 import { StudioDrawNode } from "./StudioDrawNode";
 import { StudioGroupUniformResizeProxy } from "./StudioGroupUniformResizeProxy";
+import { StudioInkMeshLivePreviewHost } from "./StudioInkMeshLivePreviewHost";
 import { StudioKonvaBubbleNode } from "./StudioKonvaBubbleNode";
 import { StudioKonvaImageNode } from "./StudioKonvaImageNode";
 import { StudioFocusLinesNode, StudioFramePanel, StudioSpeedLinesNode, StudioWorkAssetPlaceholderNode } from "./StudioKonvaPrimitiveNodes";
@@ -496,6 +503,7 @@ export interface StudioLivingInkOverlaySurfaceBinding {
 export interface StudioCanvasViewportProps {
   liveDynamicBrushOverlayRenderer: StudioLiveDynamicBrushOverlayRenderer;
   liveWetInkOverlayRenderer: import("./studio-live-wet-ink-overlay").StudioLiveWetInkOverlayRenderer;
+  inkMeshLivePreviewRuntime: StudioInkMeshLivePreviewRuntime | null;
   liveInkPredictionRenderer: StudioLiveInkPredictionRenderer;
   liveStampOverlayRenderer: StudioLiveStampOverlayRenderer;
   bubbleShapeActiveHandleIndex: number | null;
@@ -801,6 +809,7 @@ export interface StudioCanvasViewportProps {
 export const StudioCanvasViewport = memo(function StudioCanvasViewport({
   liveDynamicBrushOverlayRenderer,
   liveWetInkOverlayRenderer,
+  inkMeshLivePreviewRuntime,
   liveInkPredictionRenderer,
   liveStampOverlayRenderer,
   bubbleShapeActiveHandleIndex,
@@ -1212,6 +1221,14 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
     canonicalDryMediaCanvasAuthority,
     setCanonicalDryMediaCanvasAuthority,
   ] = useState<StudioCanonicalVNextDryMediaCanvasAuthority | null>(null);
+  const velloHubCapability = resolveStudioVelloHubProductCapability();
+  const [velloHubAuthority, setVelloHubAuthority] =
+    useState<StudioVelloHubAuthority>(() => ({
+      status: velloHubCapability.enabled ? "idle" : "disabled",
+      backendId: null,
+      decision: null,
+      reason: velloHubCapability.reason,
+    }));
   const [pixiMountParent, setPixiMountParent] = useState<HTMLDivElement | null>(null);
   const hokusaiLiveCanvasRef = useRef<HTMLCanvasElement>(null);
   const livingInkCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -1557,6 +1574,16 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
       stageViewClip?.left,
       stageViewClip?.top,
     ],
+  );
+  // Stable identity prevents the async Vello/Pixi selection island from rerendering when an
+  // unrelated inspector or status control commits while the selected document ids are unchanged.
+  const acceleratedSceneSelectedIds = useMemo(
+    () => marqueeIds.length > 0 ? marqueeIds : selectedId ? [selectedId] : [],
+    [marqueeIds, selectedId],
+  );
+  const readVelloHubPenDown = useCallback(
+    () => drawingRef.current !== null,
+    [drawingRef],
   );
   const stageClipRuntimeRef = useRef<StudioStageViewportClipRuntime | null>(null);
   // React 는 정착된 스크롤 스냅샷으로 Stage 를 커밋하므로, 커밋 직후 살아 있는 스크롤 값으로
@@ -2460,6 +2487,8 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 : undefined
             }
             data-studio-comment-placement-active={commentPinArmed ? "true" : undefined}
+            data-studio-vello-hub-authority={velloHubAuthority.status}
+            data-studio-vello-hub-backend={velloHubAuthority.backendId ?? undefined}
             className={cn(
               "relative rounded-sm shadow-[0_0_0_1px_oklch(0.3_0.012_64/0.55),0_18px_50px_oklch(0.08_0.01_70/0.45)]",
               canvasCursorClassName,
@@ -2847,6 +2876,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                         liveStrokeRef={drawingRef}
                         onHokusaiCanonicalImageReady={onHokusaiCanonicalImageReady}
                         onLivingInkCanonicalImageReady={onLivingInkCanonicalImageReady}
+                        rasterPresentationEligible={!isNonInteractiveRender}
                       />
                     </Fragment>
                   );
@@ -3932,28 +3962,47 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 flipX={canvasFlipH}
               />
             ) : null}
+            {transientPenInkSurfaceEnabled && webGpuViewportSurface && inkMeshLivePreviewRuntime ? (
+              <StudioInkMeshLivePreviewHost
+                runtime={inkMeshLivePreviewRuntime}
+                left={webGpuViewportSurface.surface.left}
+                top={webGpuViewportSurface.surface.top}
+                width={webGpuViewportSurface.surface.width}
+                height={webGpuViewportSurface.surface.height}
+                documentScale={effScale}
+                documentWidth={CANVAS_W}
+                flipX={canvasFlipH}
+              />
+            ) : null}
           </Suspense>
-          <StudioPixiSceneOverlayHost
-            enabled
+          <StudioVelloHubSurface
+            enabled={velloHubCapability.enabled}
             mountParent={pixiMountParent}
-            // 이 오버레이는 줌 호스트에 마운트돼 문서 CSS 공간에 그린다 — Stage 가 클립돼도
-            // 좌표계는 문서 박스 그대로여야 한다.
             width={stageViewLayout.hostWidth}
             height={stageViewLayout.hostHeight}
-            // 오버레이 도형은 문서 단위로 만들어지므로 배치 변환을 함께 넘긴다. Stage 와 같은
-            // 값을 쓰되 뷰포트 클립은 되돌린다 — 클립되는 것은 Stage 하나뿐이고 이 캔버스는
-            // 문서 박스 전체를 덮기 때문이다.
             documentTransform={pixiSceneDocumentTransform}
             documentWidth={CANVAS_W}
             documentHeight={canvasH}
             elements={elements}
-            selectedIds={
-              marqueeIds.length > 0
-                ? marqueeIds
-                : selectedId
-                  ? [selectedId]
-                  : []
+            selectedIds={acceleratedSceneSelectedIds}
+            isPenDown={readVelloHubPenDown}
+            onAuthorityChange={setVelloHubAuthority}
+          />
+          <StudioPixiSceneOverlayHost
+            enabled={
+              !velloHubCapability.enabled
+              || velloHubAuthority.status === "fallback"
             }
+            mountParent={pixiMountParent}
+            // Vello Hub와 같은 renderer-neutral selection seam. Vello가 admission/render에
+            // 실패한 경우에만 Pixi가 명시적으로 이 island의 단독 소유권을 되찾는다.
+            width={stageViewLayout.hostWidth}
+            height={stageViewLayout.hostHeight}
+            documentTransform={pixiSceneDocumentTransform}
+            documentWidth={CANVAS_W}
+            documentHeight={canvasH}
+            elements={elements}
+            selectedIds={acceleratedSceneSelectedIds}
           />
           {webGpuViewportSurface ? (
             <canvas

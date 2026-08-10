@@ -22,6 +22,7 @@ import {
   STUDIO_PRODUCTION_BIBLE_VERSION,
   StudioProductionBibleLocalRepository,
   StudioProductionBibleSchema,
+  studioProductionBibleLegacyStorageKey,
   studioProductionBibleStorageKey,
   type StudioProductionBible,
   type StudioProductionBibleEntryKind,
@@ -354,6 +355,9 @@ describe("studio production bible search, merge, and diagnostics", () => {
 describe("studio production bible local-only persistence", () => {
   it("isolates keys by owner and work/remix context", () => {
     const key = studioProductionBibleStorageKey({ userId: "u1", workId: "w1" });
+    expect(key).toContain(":v12:");
+    expect(studioProductionBibleLegacyStorageKey({ userId: "u1", workId: "w1" }))
+      .toContain(":v1:");
     expect(key).not.toBe(
       studioProductionBibleStorageKey({ userId: "u2", workId: "w1" })
     );
@@ -365,10 +369,11 @@ describe("studio production bible local-only persistence", () => {
     );
   });
 
-  it("persists to IndexedDB and restores a canonical local-only document", async () => {
+  it("uses an injected IndexedDB adapter only behind explicit legacy import policy", async () => {
     const factory = new IDBFactory();
     const storage = memoryStorage();
     const repository = new StudioProductionBibleLocalRepository({
+      legacyDataPolicy: "import-explicit",
       indexedDB: factory,
       localStorage: storage,
     });
@@ -376,25 +381,26 @@ describe("studio production bible local-only persistence", () => {
     const saved = await repository.save("project-1", bible);
     expect(saved).toMatchObject({
       bible,
-      backend: "indexeddb",
+      backend: "legacy-indexeddb",
       persisted: true,
       localOnly: true,
     });
     expect(storage.values.has("project-1")).toBe(true);
 
     const restored = await new StudioProductionBibleLocalRepository({
+      legacyDataPolicy: "import-explicit",
       indexedDB: factory,
       localStorage: null,
     }).load("project-1");
     expect(restored).toMatchObject({
       bible,
-      backend: "indexeddb",
+      backend: "legacy-indexeddb",
       persisted: true,
       localOnly: true,
     });
   });
 
-  it("falls back from a failed IDB boundary to localStorage without losing the accepted edit", async () => {
+  it("uses an injected localStorage adapter only in explicit legacy tooling", async () => {
     const storage = memoryStorage();
     const failingFactory = {
       open: () => {
@@ -402,6 +408,7 @@ describe("studio production bible local-only persistence", () => {
       },
     } as unknown as IDBFactory;
     const repository = new StudioProductionBibleLocalRepository({
+      legacyDataPolicy: "import-explicit",
       indexedDB: failingFactory,
       localStorage: storage,
     });
@@ -409,7 +416,7 @@ describe("studio production bible local-only persistence", () => {
     const saved = await repository.save("project-2", bible);
     expect(saved).toMatchObject({
       bible,
-      backend: "local-storage",
+      backend: "legacy-local-storage",
       persisted: true,
       localOnly: true,
     });
@@ -419,6 +426,7 @@ describe("studio production bible local-only persistence", () => {
 
   it("reports memory-only durability honestly when every browser store fails", async () => {
     const repository = new StudioProductionBibleLocalRepository({
+      legacyDataPolicy: "import-explicit",
       indexedDB: null,
       localStorage: {
         getItem: () => {
@@ -439,5 +447,38 @@ describe("studio production bible local-only persistence", () => {
     });
     expect(saved.warning).toMatch(/새로고침 전/);
     expect((await repository.load("project-3")).bible).toEqual(bible);
+  });
+
+  it("ignores injected and global legacy stores under the default discard policy", async () => {
+    const storage = memoryStorage();
+    const bible = productionFixture();
+    storage.setItem("discarded-project", serializeStudioProductionBible(bible));
+    const repository = new StudioProductionBibleLocalRepository({
+      indexedDB: new IDBFactory(),
+      localStorage: storage,
+    });
+
+    const loaded = await repository.load("discarded-project");
+    expect(loaded.backend).toBe("memory");
+    expect(loaded.persisted).toBe(false);
+    expect(loaded.bible).toEqual(createEmptyStudioProductionBible());
+  });
+
+  it("fails closed instead of converting a corrupt explicit legacy payload to an empty success", async () => {
+    const storage = memoryStorage();
+    storage.setItem("corrupt-legacy", "{broken");
+    const repository = new StudioProductionBibleLocalRepository({
+      legacyDataPolicy: "import-explicit",
+      indexedDB: null,
+      localStorage: storage,
+    });
+
+    const loaded = await repository.load("corrupt-legacy");
+    expect(loaded).toMatchObject({
+      bible: createEmptyStudioProductionBible(),
+      backend: "memory",
+      persisted: false,
+      warning: expect.stringContaining("가져오지 않았습니다"),
+    });
   });
 });

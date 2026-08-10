@@ -9,7 +9,7 @@ import {
   studioRasterTileIntersectsDocumentRect,
   type StudioRasterVisibleDocumentRect,
 } from "./studio-raster-visible-rect";
-import { StudioRasterCrdtCanvas } from "./StudioRasterCrdtCanvas";
+import { StudioTiledDocWebGpuSurface } from "./StudioTiledDocWebGpuSurface";
 
 import type { StudioCrdtDocument } from "./studio-crdt-document";
 import type { StudioRasterReplayRuntimeResult } from "./studio-crdt-raster-replay-runtime";
@@ -353,9 +353,9 @@ export function StudioRasterCrdtSurface({
     callbacksRef.current.onHandoffCandidateChange?.(null);
   }, []);
 
-  if (!frame || !viewport || hidden) return null;
+  if (!frame || !viewport || !visibleDocumentRect || hidden) return null;
   return (
-    <StudioRasterCrdtCanvas
+    <StudioTiledDocWebGpuSurface
       className={className}
       generation={frame.generation}
       surface={frame.result.surface}
@@ -364,6 +364,7 @@ export function StudioRasterCrdtSurface({
         ...viewport.transform,
         surfaceBounds: viewport.surface,
       }}
+      documentViewport={visibleDocumentRect}
       signal={frame.signal}
       presentationAuthorized={presentationAuthorized}
       onFrameReady={(generation) => {

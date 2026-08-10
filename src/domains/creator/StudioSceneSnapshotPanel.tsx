@@ -8,21 +8,18 @@ import {
   Trash2,
   Users,
 } from "lucide-react";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import {
   cloneStudioSceneSnapshot,
   createStudioSceneSnapshot,
-  deleteStudioSceneSnapshot,
-  duplicateStudioSceneSnapshot,
   filterStudioSceneSnapshots,
-  listStudioSceneSnapshots,
   normalizeStudioSceneSnapshotTags,
-  saveStudioSceneSnapshot,
   STUDIO_SCENE_SNAPSHOT_MAX_ENTRIES,
   STUDIO_SCENE_SNAPSHOT_TOTAL_MAX_BYTES,
   StudioSceneSnapshotLibraryError,
 } from "./studio-scene-snapshot-library";
+import { getProductStudioSceneSnapshotSqliteRepository } from "./studio-scene-snapshot-sqlite-repository";
 
 import type { PageState } from "./studio-page-state";
 import type {
@@ -35,6 +32,7 @@ export interface StudioSceneSnapshotRepository {
   save: (snapshot: StudioSceneSnapshot) => Promise<StudioSceneSnapshot[]>;
   duplicate: (id: string) => Promise<StudioSceneSnapshot[]>;
   delete: (id: string) => Promise<StudioSceneSnapshot[]>;
+  readonly authority?: "sqlite" | "injected";
 }
 
 export interface StudioSceneSnapshotPanelProps {
@@ -45,12 +43,8 @@ export interface StudioSceneSnapshotPanelProps {
   repository?: StudioSceneSnapshotRepository;
 }
 
-const DEFAULT_REPOSITORY: StudioSceneSnapshotRepository = {
-  list: listStudioSceneSnapshots,
-  save: saveStudioSceneSnapshot,
-  duplicate: duplicateStudioSceneSnapshot,
-  delete: deleteStudioSceneSnapshot,
-};
+const DEFAULT_REPOSITORY: StudioSceneSnapshotRepository =
+  getProductStudioSceneSnapshotSqliteRepository();
 
 function formatBytes(bytes: number): string {
   if (bytes < 1_024) return `${bytes}B`;
@@ -87,7 +81,7 @@ function errorMessage(error: unknown): string {
         return "다른 탭이 로컬 라이브러리 갱신을 막고 있습니다. 다른 Studio 탭을 닫아 주세요.";
       case "storage-unavailable":
       case "clone-unavailable":
-        return "이 브라우저에서는 개인 장면 라이브러리를 사용할 수 없습니다.";
+        return "SQLite/OPFS 개인 장면 라이브러리를 사용할 수 없습니다. 저장되지 않았습니다.";
       case "not-found":
         return "선택한 장면 스냅샷을 찾지 못했습니다.";
       default:
@@ -116,25 +110,42 @@ export function StudioSceneSnapshotPanel({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [storageState, setStorageState] = useState<
+    "loading" | "sqlite" | "injected" | "unavailable"
+  >("loading");
+  const loadGenerationRef = useRef(0);
+  const operationGenerationRef = useRef(0);
+  const mountedRef = useRef(true);
 
   useEffect(() => {
-    let active = true;
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const generation = ++loadGenerationRef.current;
     setLoading(true);
+    setStorageState("loading");
     void repository
       .list()
       .then((entries) => {
-        if (!active) return;
+        if (!mountedRef.current || generation !== loadGenerationRef.current) return;
         setSnapshots(entries);
         setError(null);
+        setStorageState(repository.authority === "sqlite" ? "sqlite" : "injected");
       })
       .catch((cause: unknown) => {
-        if (active) setError(errorMessage(cause));
+        if (!mountedRef.current || generation !== loadGenerationRef.current) return;
+        setError(errorMessage(cause));
+        setStorageState("unavailable");
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (mountedRef.current && generation === loadGenerationRef.current) setLoading(false);
       });
     return () => {
-      active = false;
+      if (loadGenerationRef.current === generation) loadGenerationRef.current += 1;
     };
   }, [repository]);
 
@@ -143,6 +154,7 @@ export function StudioSceneSnapshotPanel({
 
   async function captureCurrentPage(): Promise<void> {
     if (busyId) return;
+    const generation = ++operationGenerationRef.current;
     setBusyId("capture");
     setError(null);
     try {
@@ -154,40 +166,59 @@ export function StudioSceneSnapshotPanel({
         ...(sourceWorkId !== undefined ? { sourceWorkId } : {}),
       });
       const entries = await repository.save(snapshot);
+      if (!mountedRef.current || generation !== operationGenerationRef.current) return;
       setSnapshots(entries);
       setName(`${sourcePage.name?.trim() || "새 장면"} 스냅샷`);
       setTagsText("");
+      setStorageState(repository.authority === "sqlite" ? "sqlite" : "injected");
     } catch (cause) {
-      setError(errorMessage(cause));
+      if (mountedRef.current && generation === operationGenerationRef.current) {
+        setError(errorMessage(cause));
+        setStorageState("unavailable");
+      }
     } finally {
-      setBusyId(null);
+      if (mountedRef.current && generation === operationGenerationRef.current) setBusyId(null);
     }
   }
 
   async function duplicateSnapshot(id: string): Promise<void> {
     if (busyId) return;
+    const generation = ++operationGenerationRef.current;
     setBusyId(id);
     setError(null);
     try {
-      setSnapshots(await repository.duplicate(id));
+      const entries = await repository.duplicate(id);
+      if (!mountedRef.current || generation !== operationGenerationRef.current) return;
+      setSnapshots(entries);
+      setStorageState(repository.authority === "sqlite" ? "sqlite" : "injected");
     } catch (cause) {
-      setError(errorMessage(cause));
+      if (mountedRef.current && generation === operationGenerationRef.current) {
+        setError(errorMessage(cause));
+        setStorageState("unavailable");
+      }
     } finally {
-      setBusyId(null);
+      if (mountedRef.current && generation === operationGenerationRef.current) setBusyId(null);
     }
   }
 
   async function deleteSnapshot(id: string): Promise<void> {
     if (busyId) return;
+    const generation = ++operationGenerationRef.current;
     setBusyId(id);
     setError(null);
     try {
-      setSnapshots(await repository.delete(id));
+      const entries = await repository.delete(id);
+      if (!mountedRef.current || generation !== operationGenerationRef.current) return;
+      setSnapshots(entries);
       setPendingDeleteId(null);
+      setStorageState(repository.authority === "sqlite" ? "sqlite" : "injected");
     } catch (cause) {
-      setError(errorMessage(cause));
+      if (mountedRef.current && generation === operationGenerationRef.current) {
+        setError(errorMessage(cause));
+        setStorageState("unavailable");
+      }
     } finally {
-      setBusyId(null);
+      if (mountedRef.current && generation === operationGenerationRef.current) setBusyId(null);
     }
   }
 
@@ -218,6 +249,18 @@ export function StudioSceneSnapshotPanel({
               </h2>
               <span className="rounded-full border border-line bg-card px-2 py-0.5 text-[0.68rem] font-semibold text-fg-2">
                 개인 · 이 기기 전용
+              </span>
+              <span
+                className="rounded-full border border-line bg-card px-2 py-0.5 text-[0.68rem] font-semibold text-fg-3"
+                data-studio-scene-snapshot-authority={storageState}
+              >
+                {storageState === "loading"
+                  ? "SQLite/OPFS 확인 중"
+                  : storageState === "sqlite"
+                    ? "SQLite/OPFS 저장"
+                    : storageState === "unavailable"
+                      ? "저장소 사용 불가"
+                      : "주입 저장소"}
               </span>
             </div>
             <p className="mt-1 text-xs leading-relaxed text-fg-3">

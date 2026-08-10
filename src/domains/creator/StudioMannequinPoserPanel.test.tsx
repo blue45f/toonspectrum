@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { STUDIO_MANNEQUIN_DEFAULT_BODY_PARAMS } from "./studio-mannequin-model";
 import { STUDIO_MANNEQUIN_POSE_PRESETS } from "./studio-mannequin-poses";
@@ -42,6 +42,10 @@ const webcamRuntimeMocks = vi.hoisted(() => ({
   dispose: vi.fn(),
   init: vi.fn(),
 }));
+const persistenceRuntimeMocks = vi.hoisted(() => ({
+  load: vi.fn<() => Promise<unknown>>(async () => null),
+  save: vi.fn(async (state: unknown) => state),
+}));
 
 vi.mock("./studio-mannequin-scene", () => ({
   createStudioMannequinScene: (options: unknown) => createScene(options),
@@ -56,10 +60,23 @@ vi.mock("./studio-mannequin-webcam-tracking", async (importOriginal) => {
   };
 });
 
+vi.mock("./studio-mannequin-bg3d-preset-sqlite-repository", () => ({
+  getProductStudioMannequinStateSqliteRepository: () => ({
+    authority: "sqlite",
+    load: persistenceRuntimeMocks.load,
+    save: persistenceRuntimeMocks.save,
+  }),
+}));
+
 const { StudioMannequinPoserPanel } = await import("./StudioMannequinPoserPanel");
 
 const originalMediaDevicesDescriptor = Object.getOwnPropertyDescriptor(navigator, "mediaDevices");
 const originalSecureContextDescriptor = Object.getOwnPropertyDescriptor(window, "isSecureContext");
+
+beforeEach(() => {
+  persistenceRuntimeMocks.load.mockReset().mockResolvedValue(null);
+  persistenceRuntimeMocks.save.mockReset().mockImplementation(async (state: unknown) => state);
+});
 
 afterEach(() => {
   cleanup();
@@ -386,15 +403,54 @@ describe("StudioMannequinPoserPanel", () => {
     expect(sceneHandle.dispose).toHaveBeenCalledTimes(1);
   });
 
-  it("닫기 버튼은 마지막 체형/포즈를 localStorage 버전드 문서로 저장한다", () => {
+  it("닫기 버튼은 마지막 체형/포즈를 SQLite에 저장한 뒤 닫는다", async () => {
     const onClose = vi.fn();
     renderPanel({ onClose });
     fireEvent.click(screen.getByRole("button", { name: "3D 데생 인형 닫기" }));
-    expect(onClose).toHaveBeenCalledTimes(1);
-    const stored = localStorage.getItem("toonspectrum-studio-mannequin-state:v1");
-    expect(stored).toBeTruthy();
-    const parsed = JSON.parse(stored!) as { kind?: string; params?: { heightCm?: number } };
-    expect(parsed.kind).toBe("studio-mannequin-state");
-    expect(parsed.params?.heightCm).toBe(STUDIO_MANNEQUIN_DEFAULT_BODY_PARAMS.heightCm);
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(persistenceRuntimeMocks.save).toHaveBeenCalledWith({
+      params: STUDIO_MANNEQUIN_DEFAULT_BODY_PARAMS,
+      pose: { joints: {}, pelvisOffset: [0, 0, 0] },
+    });
+    expect(localStorage.getItem("toonspectrum-studio-mannequin-state:v1")).toBeNull();
+  });
+
+  it("SQLite 저장 실패 시 닫지 않고 memory-only 경고와 JSON 탈출구를 유지한다", async () => {
+    persistenceRuntimeMocks.save.mockRejectedValueOnce(new Error("quota exhausted"));
+    const onClose = vi.fn();
+    renderPanel({ onClose });
+
+    fireEvent.click(screen.getByRole("button", { name: "3D 데생 인형 닫기" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert").textContent).toContain("현재 탭 메모리 임시");
+    });
+    expect(screen.getByRole("button", { name: /내보내기/ })).toBeTruthy();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("늦은 SQLite hydration이 사용자가 먼저 바꾼 체형을 덮어쓰지 않는다", async () => {
+    let resolveLoad!: (state: {
+      params: typeof STUDIO_MANNEQUIN_DEFAULT_BODY_PARAMS;
+      pose: {
+        joints: Record<string, never>;
+        pelvisOffset: readonly [number, number, number];
+      };
+    }) => void;
+    persistenceRuntimeMocks.load.mockReturnValueOnce(new Promise((resolve) => {
+      resolveLoad = resolve;
+    }));
+    renderPanel();
+    fireEvent.click(screen.getByRole("button", { name: /^체형/ }));
+    const heightSlider = screen.getByLabelText(/신장/);
+    fireEvent.change(heightSlider, { target: { value: "190" } });
+    await waitFor(() => expect((heightSlider as HTMLInputElement).value).toBe("190"));
+
+    resolveLoad({
+      params: { ...STUDIO_MANNEQUIN_DEFAULT_BODY_PARAMS, heightCm: 150 },
+      pose: { joints: {}, pelvisOffset: [0, 0, 0] },
+    });
+    await waitFor(() => expect(persistenceRuntimeMocks.load).toHaveBeenCalledTimes(1));
+    expect((heightSlider as HTMLInputElement).value).toBe("190");
   });
 });

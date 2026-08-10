@@ -210,6 +210,40 @@ describe("StudioSceneSnapshotPanel", () => {
     expect(screen.queryAllByRole("dialog")).toHaveLength(0);
   });
 
+  it("fences a stale asynchronous hydration after the repository changes", async () => {
+    let resolveFirst!: (entries: StudioSceneSnapshot[]) => void;
+    const first = repositoryFixture();
+    vi.mocked(first.list).mockImplementation(() => new Promise((resolve) => {
+      resolveFirst = resolve;
+    }));
+    const fresh = snapshotFixture({ id: "scene-fresh", name: "새 SQLite 권위" });
+    const second = repositoryFixture([fresh]);
+    const view = render(
+      <StudioSceneSnapshotPanel
+        sourcePage={pageFixture()}
+        theme="soft"
+        onApply={vi.fn()}
+        repository={first}
+      />
+    );
+
+    view.rerender(
+      <StudioSceneSnapshotPanel
+        sourcePage={pageFixture()}
+        theme="soft"
+        onApply={vi.fn()}
+        repository={second}
+      />
+    );
+    expect(await screen.findByText("새 SQLite 권위")).toBeTruthy();
+    resolveFirst([snapshotFixture({ id: "scene-stale", name: "오래된 IndexedDB 권위" })]);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(screen.queryByText("오래된 IndexedDB 권위")).toBeNull();
+    expect(screen.getByText("새 SQLite 권위")).toBeTruthy();
+  });
+
   it("turns storage failures into actionable local-only guidance", async () => {
     const repository = repositoryFixture();
     vi.mocked(repository.list).mockRejectedValue(
@@ -228,7 +262,12 @@ describe("StudioSceneSnapshotPanel", () => {
     );
 
     expect(
-      await screen.findByText("이 브라우저에서는 개인 장면 라이브러리를 사용할 수 없습니다.")
+      await screen.findByText(
+        "SQLite/OPFS 개인 장면 라이브러리를 사용할 수 없습니다. 저장되지 않았습니다."
+      )
+    ).toBeTruthy();
+    expect(
+      document.querySelector("[data-studio-scene-snapshot-authority='unavailable']")
     ).toBeTruthy();
   });
 });

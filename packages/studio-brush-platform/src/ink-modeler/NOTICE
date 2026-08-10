@@ -1,0 +1,18 @@
+ToonSpectrum opaque WASM third-party NOTICE
+
+Artifact lane: google-ink-stroke-modeler
+
+The binary files below are independently emitted Emscripten artifacts. This
+NOTICE, the copied upstream license files, THIRD_PARTY_INVENTORY.json, and
+THIRD_PARTY_NOTICES.sha256 form the fail-closed provenance boundary. The
+upstream source distributions used here contain no separate NOTICE file.
+
+| Component | Version | Commit | License | Upstream | Copied license |
+| --- | --- | --- | --- | --- | --- |
+| google/ink-stroke-modeler | 0.1.0 | f2388813b0b25bc3e33d143d369a8367ab2e30c8 | Apache-2.0 | https://github.com/google/ink-stroke-modeler | LICENSE-GOOGLE-INK-STROKE-MODELER |
+| abseil-cpp | 20250512.0 | bc257a88f7c1939f24e0379f14a3589e926c950c | Apache-2.0 | https://github.com/abseil/abseil-cpp | LICENSE-ABSEIL |
+
+| Shipped artifact | SHA-256 |
+| --- | --- |
+| ink_stroke_modeler.mjs | 556ae443e4f95886461798c0d60595ffe755dc70eab6ac06fdc5b85df429873b |
+| ink_stroke_modeler.wasm | 0b65a64a69ab75638d946a46bc346ea181370d7f003a82582a7629a312864da9 |

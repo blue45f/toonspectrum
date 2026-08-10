@@ -6,6 +6,7 @@
  * verified SHA-256 identity used to resolve the local model library at apply time.
  */
 
+import { getStudioBg3dLibrariesAuthority } from "./studio-bg3d-libraries-sqlite-opfs-authority";
 import {
   STUDIO_BG3D_SCENE_DOCUMENT_MAX_BYTES,
   parseStudioBg3dSceneDocument,
@@ -13,6 +14,8 @@ import {
   type StudioBg3dSceneDocument,
   type StudioBg3dSceneNode,
 } from "./studio-bg3d-scene-document";
+
+import type { StudioBg3dLibrariesAuthority } from "./studio-bg3d-libraries-sqlite-opfs-authority";
 
 export const BG3D_TEMPLATE_LIBRARY_DATABASE_NAME =
   "toonspectrum-studio-bg3d-template-library";
@@ -285,7 +288,7 @@ function transactionFailure(transaction: IDBTransaction, fallback: string): Bg3d
 }
 
 /** Reads only validated current-format rows and waits for the readonly transaction to complete. */
-export async function listBg3dTemplates(): Promise<Bg3dTemplateLibraryEntry[]> {
+export async function legacyListBg3dTemplates(): Promise<Bg3dTemplateLibraryEntry[]> {
   const database = await getDb();
   return new Promise((resolve, reject) => {
     let settled = false;
@@ -336,7 +339,7 @@ export async function listBg3dTemplates(): Promise<Bg3dTemplateLibraryEntry[]> {
  * Atomically stores one canonical row and returns the list from that same readwrite transaction.
  * The promise never resolves on `put.onsuccess`; transaction completion is the durability point.
  */
-export async function saveBg3dTemplate(
+export async function legacySaveBg3dTemplate(
   draft: Bg3dTemplateLibraryDraft,
 ): Promise<Bg3dTemplateLibraryEntry[]> {
   const record = recordFromDraft(draft);
@@ -444,7 +447,9 @@ export async function saveBg3dTemplate(
 }
 
 /** Deletes one id and returns the post-delete list only after the transaction commits. */
-export async function deleteBg3dTemplate(id: string): Promise<Bg3dTemplateLibraryEntry[]> {
+export async function legacyDeleteBg3dTemplate(
+  id: string,
+): Promise<Bg3dTemplateLibraryEntry[]> {
   if (!isSafeId(id)) throw libraryError("invalid-id", "Invalid BG3D template id.");
   const database = await getDb();
   return new Promise((resolve, reject) => {
@@ -490,6 +495,221 @@ export async function deleteBg3dTemplate(id: string): Promise<Bg3dTemplateLibrar
     }
   });
 }
+
+// ── V12 shared SQLite product authority ──────────────────────────────────
+
+export const BG3D_TEMPLATE_LIBRARY_V12_MANIFEST_KIND =
+  "toonspectrum-studio-bg3d-template-library-v12";
+export const BG3D_TEMPLATE_LIBRARY_V12_MANIFEST_VERSION = 1 as const;
+export const BG3D_TEMPLATE_LIBRARY_V12_MAX_TOTAL_BYTES = 48 * 1024 * 1024;
+export const BG3D_TEMPLATE_LIBRARY_V12_MAX_MANIFEST_BYTES = 50 * 1024 * 1024;
+
+const TEMPLATE_V12_MANIFEST_KEYS = [
+  "kind",
+  "version",
+  "revision",
+  "updatedAt",
+  "records",
+] as const;
+
+interface Bg3dTemplateLibraryV12Manifest {
+  readonly kind: typeof BG3D_TEMPLATE_LIBRARY_V12_MANIFEST_KIND;
+  readonly version: typeof BG3D_TEMPLATE_LIBRARY_V12_MANIFEST_VERSION;
+  readonly revision: number;
+  readonly updatedAt: number;
+  readonly records: readonly StoredBg3dTemplateRecord[];
+}
+
+export interface Bg3dTemplateLibraryV12Options {
+  readonly authority?: StudioBg3dLibrariesAuthority;
+}
+
+function exactV12TemplateManifest(raw: unknown): Record<string, unknown> | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const prototype = Object.getPrototypeOf(raw);
+  if (prototype !== Object.prototype && prototype !== null) return null;
+  const keys = Object.keys(raw);
+  if (
+    keys.length !== TEMPLATE_V12_MANIFEST_KEYS.length ||
+    keys.some((key) => !TEMPLATE_V12_MANIFEST_KEYS.includes(
+      key as (typeof TEMPLATE_V12_MANIFEST_KEYS)[number],
+    ))
+  ) return null;
+  return raw as Record<string, unknown>;
+}
+
+function canonicalV12TemplateManifest(
+  manifest: Bg3dTemplateLibraryV12Manifest,
+): Bg3dTemplateLibraryV12Manifest {
+  return {
+    kind: BG3D_TEMPLATE_LIBRARY_V12_MANIFEST_KIND,
+    version: BG3D_TEMPLATE_LIBRARY_V12_MANIFEST_VERSION,
+    revision: manifest.revision,
+    updatedAt: manifest.updatedAt,
+    records: [...manifest.records].sort((left, right) => left.id.localeCompare(right.id)),
+  };
+}
+
+function emptyV12TemplateManifest(): Bg3dTemplateLibraryV12Manifest {
+  return canonicalV12TemplateManifest({
+    kind: BG3D_TEMPLATE_LIBRARY_V12_MANIFEST_KIND,
+    version: BG3D_TEMPLATE_LIBRARY_V12_MANIFEST_VERSION,
+    revision: 0,
+    updatedAt: 0,
+    records: [],
+  });
+}
+
+function parseV12TemplateManifest(raw: string | null): Bg3dTemplateLibraryV12Manifest {
+  if (raw === null) return emptyV12TemplateManifest();
+  if (UTF8_ENCODER.encode(raw).byteLength > BG3D_TEMPLATE_LIBRARY_V12_MAX_MANIFEST_BYTES) {
+    throw libraryError("transaction-failed", "The BG3D SQLite template manifest is oversized.");
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (cause) {
+    throw libraryError("transaction-failed", "The BG3D SQLite template manifest is torn.", cause);
+  }
+  const value = exactV12TemplateManifest(parsed);
+  if (
+    !value ||
+    value.kind !== BG3D_TEMPLATE_LIBRARY_V12_MANIFEST_KIND ||
+    value.version !== BG3D_TEMPLATE_LIBRARY_V12_MANIFEST_VERSION ||
+    !Number.isSafeInteger(value.revision) ||
+    (value.revision as number) < 0 ||
+    !isSafeCreatedAt(value.updatedAt) ||
+    !Array.isArray(value.records) ||
+    value.records.length > BG3D_TEMPLATE_LIBRARY_MAX_ENTRIES
+  ) throw libraryError("transaction-failed", "The BG3D SQLite template manifest is invalid.");
+
+  const records: StoredBg3dTemplateRecord[] = [];
+  let totalBytes = 0;
+  for (const candidate of value.records) {
+    const entry = entryFromStoredRecord(candidate);
+    if (!entry) {
+      throw libraryError("transaction-failed", "The BG3D SQLite template row is invalid.");
+    }
+    const record = recordFromDraft({
+      id: entry.id,
+      name: entry.name,
+      createdAt: entry.createdAt,
+      document: entry.document,
+    });
+    if (!record || JSON.stringify(record) !== JSON.stringify(candidate)) {
+      throw libraryError("transaction-failed", "The BG3D SQLite template row is noncanonical.");
+    }
+    totalBytes += UTF8_ENCODER.encode(record.sceneJson).byteLength;
+    records.push(record);
+  }
+  if (
+    totalBytes > BG3D_TEMPLATE_LIBRARY_V12_MAX_TOTAL_BYTES ||
+    new Set(records.map(({ id }) => id)).size !== records.length
+  ) throw libraryError("transaction-failed", "The BG3D SQLite template ledger is invalid.");
+  const manifest = canonicalV12TemplateManifest({
+    kind: BG3D_TEMPLATE_LIBRARY_V12_MANIFEST_KIND,
+    version: BG3D_TEMPLATE_LIBRARY_V12_MANIFEST_VERSION,
+    revision: value.revision as number,
+    updatedAt: value.updatedAt as number,
+    records,
+  });
+  if (JSON.stringify(manifest) !== raw) {
+    throw libraryError("transaction-failed", "The BG3D SQLite template manifest is noncanonical.");
+  }
+  return manifest;
+}
+
+function serializeV12TemplateManifest(manifest: Bg3dTemplateLibraryV12Manifest): string {
+  const raw = JSON.stringify(canonicalV12TemplateManifest(manifest));
+  if (UTF8_ENCODER.encode(raw).byteLength > BG3D_TEMPLATE_LIBRARY_V12_MAX_MANIFEST_BYTES) {
+    throw libraryError("max-entries", "The BG3D template manifest byte limit was reached.");
+  }
+  return raw;
+}
+
+function entriesFromV12TemplateManifest(
+  manifest: Bg3dTemplateLibraryV12Manifest,
+): Bg3dTemplateLibraryEntry[] {
+  return entriesFromStoredRecords(manifest.records);
+}
+
+function v12TemplateAuthority(
+  options: Bg3dTemplateLibraryV12Options,
+): StudioBg3dLibrariesAuthority {
+  return options.authority ?? getStudioBg3dLibrariesAuthority();
+}
+
+export async function listBg3dTemplatesV12(
+  options: Bg3dTemplateLibraryV12Options = {},
+): Promise<Bg3dTemplateLibraryEntry[]> {
+  const manifest = parseV12TemplateManifest(
+    await v12TemplateAuthority(options).readManifest("templates"),
+  );
+  return entriesFromV12TemplateManifest(manifest);
+}
+
+export async function saveBg3dTemplateV12(
+  draft: Bg3dTemplateLibraryDraft,
+  options: Bg3dTemplateLibraryV12Options = {},
+): Promise<Bg3dTemplateLibraryEntry[]> {
+  const record = recordFromDraft(draft);
+  if (!record) {
+    throw libraryError("invalid-entry", "The BG3D template is not canonical or bounded.");
+  }
+  return v12TemplateAuthority(options).mutate("templates", () => [], async (context) => {
+    const current = parseV12TemplateManifest(context.currentRaw);
+    const byId = new Map(current.records.map((candidate) => [candidate.id, candidate]));
+    if (!byId.has(record.id) && byId.size >= BG3D_TEMPLATE_LIBRARY_MAX_ENTRIES) {
+      throw libraryError("max-entries", "The BG3D template library is full.");
+    }
+    byId.set(record.id, record);
+    const records = [...byId.values()];
+    const totalBytes = records.reduce(
+      (sum, candidate) => sum + UTF8_ENCODER.encode(candidate.sceneJson).byteLength,
+      0,
+    );
+    if (totalBytes > BG3D_TEMPLATE_LIBRARY_V12_MAX_TOTAL_BYTES) {
+      throw libraryError("max-entries", "The BG3D template library byte limit was reached.");
+    }
+    const next = canonicalV12TemplateManifest({
+      ...current,
+      revision: current.revision + 1,
+      updatedAt: context.now,
+      records,
+    });
+    return {
+      nextRaw: serializeV12TemplateManifest(next),
+      nextRefs: [],
+      result: entriesFromV12TemplateManifest(next),
+    };
+  });
+}
+
+export async function deleteBg3dTemplateV12(
+  id: string,
+  options: Bg3dTemplateLibraryV12Options = {},
+): Promise<Bg3dTemplateLibraryEntry[]> {
+  if (!isSafeId(id)) throw libraryError("invalid-id", "Invalid BG3D template id.");
+  return v12TemplateAuthority(options).mutate("templates", () => [], async (context) => {
+    const current = parseV12TemplateManifest(context.currentRaw);
+    const next = canonicalV12TemplateManifest({
+      ...current,
+      revision: current.revision + 1,
+      updatedAt: context.now,
+      records: current.records.filter((candidate) => candidate.id !== id),
+    });
+    return {
+      nextRaw: serializeV12TemplateManifest(next),
+      nextRefs: [],
+      result: entriesFromV12TemplateManifest(next),
+    };
+  });
+}
+
+/** Product defaults are the V12 SQLite authority; IndexedDB remains explicit legacy test/import. */
+export const listBg3dTemplates = listBg3dTemplatesV12;
+export const saveBg3dTemplate = saveBg3dTemplateV12;
+export const deleteBg3dTemplate = deleteBg3dTemplateV12;
 
 /**
  * Reissues every template node id before insertion and remaps hierarchy parents exactly. Template

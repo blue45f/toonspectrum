@@ -623,7 +623,7 @@ describe("executor wiring for the row-9..12 providers", () => {
     expect(other.pixels).not.toEqual(first.pixels);
   });
 
-  it("reports an injected 3D surface provider as the no-op it currently is", () => {
+  it("keeps 2D composition byte-compatible when the dedicated surface provider is registered", () => {
     const program = providerProgram({ kind: "particle-splat" });
     const quiet = executeCompositionProgram(
       program,
@@ -644,8 +644,9 @@ describe("executor wiring for the row-9..12 providers", () => {
       },
       { width: WIDTH, height: HEIGHT },
     );
-    expect(injected.warnings[0]).toMatch(/engines\.surface.*no-op/s);
-    // A no-op must also be pixel-neutral — no hidden half-implementation.
+    // Surface execution now lives in executeSurfaceBrushStroke. Merely sharing
+    // the provider registry with a 2D program must not perturb its contract.
+    expect(injected.warnings).toEqual(quiet.warnings);
     expect(injected.pixels).toEqual(quiet.pixels);
   });
 

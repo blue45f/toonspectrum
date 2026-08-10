@@ -3,16 +3,21 @@ import {
   parseStudioCrdtUpdateRequest,
   type StudioCrdtUpdateRequest,
 } from "./studio-crdt-protocol";
+import {
+  requireStudioCrdtRecoveryDatabase,
+  type StudioCrdtRecoveryDatabase,
+  type StudioCrdtRecoverySqlCandidate,
+  type StudioCrdtRecoverySqlRowKind,
+  type StudioLocalDatabase,
+} from "./studio-local-database";
+import { acquireStudioLocalDatabase } from "./studio-local-database-runtime";
 
-const DATABASE_NAME = "toonspectrum-studio-crdt-recovery-vault";
-const DATABASE_VERSION = 1;
-const STORE_NAME = "rejected-frontiers";
-const SCOPE_WORK_INDEX = "scope-work";
 const LEGACY_MAX_FRONTIER_UPDATES = 4_096;
 const RECOVERY_CHUNK_MAX_UPDATES = 128;
 const RECOVERY_CHUNK_MAX_JSON_CHARS = 2 * 1024 * 1024;
-const REJECTION_MARKER_STORAGE_PREFIX =
-  "toonspectrum:studio-crdt:permanent-rejection:v1:";
+export const STUDIO_CRDT_RECOVERY_MAX_ROWS_PER_WORK = 100_000;
+export const STUDIO_CRDT_RECOVERY_MAX_BYTES_PER_WORK = 512 * 1024 * 1024;
+export const STUDIO_CRDT_RECOVERY_MAX_ROW_BYTES = 3 * 1024 * 1024;
 
 export const STUDIO_CRDT_RECOVERY_BUNDLE_VERSION = 1 as const;
 
@@ -64,10 +69,26 @@ export interface PreserveStudioCrdtRejectionMarkerInput {
   recoveryUpdateCount: number;
 }
 
-export interface StudioCrdtRejectionMarkerFallback {
-  /** Returns true only when the marker also survived beyond the current page lifetime. */
-  preserve(marker: StudioCrdtPermanentRejectionMarker): boolean;
+export interface StudioCrdtRejectionMarkerEphemeralLatch {
+  /** Same-page lock only. This method never claims browser-durable success. */
+  preserve(marker: StudioCrdtPermanentRejectionMarker): void;
   list(scope: string, workId: string): unknown[];
+}
+
+export class StudioCrdtRecoveryDurabilityError extends Error {
+  readonly durability = "degraded" as const;
+
+  constructor(operation: string, cause: unknown) {
+    super(`CRDT 복구 영속성이 저하되었습니다 (${operation}).`, { cause });
+    this.name = "StudioCrdtRecoveryDurabilityError";
+  }
+}
+
+export class StudioCrdtRecoveryCorruptionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "StudioCrdtRecoveryCorruptionError";
+  }
 }
 
 export interface StudioCrdtRecoveryVault {
@@ -127,7 +148,7 @@ type StoredStudioCrdtRecoveryRow =
 
 export interface StudioCrdtRecoveryVaultPersistence {
   list(scope: string, workId: string): Promise<unknown[]>;
-  get(key: string): Promise<unknown | null>;
+  get(scope: string, workId: string, key: string): Promise<unknown | null>;
   put(entry: StoredStudioCrdtRecoveryRow): Promise<void>;
 }
 
@@ -165,16 +186,6 @@ function recoveryChunkKey(
 
 function rejectionMarkerKey(scope: string, workId: string, rejectedUpdateId: string): string {
   return JSON.stringify(["permanent-rejection", scope, workId, rejectedUpdateId]);
-}
-
-function rejectionMarkerStorageKey(
-  scope: string,
-  workId: string,
-  rejectedUpdateId: string
-): string {
-  return `${REJECTION_MARKER_STORAGE_PREFIX}${encodeURIComponent(
-    rejectionMarkerKey(scope, workId, rejectedUpdateId)
-  )}`;
 }
 
 function isStoredEntry(value: unknown): value is StoredStudioCrdtRecoveryVaultEntry {
@@ -325,69 +336,21 @@ const samePageRejectionMarkers = new Map<
   StoredStudioCrdtPermanentRejectionMarker
 >();
 
-class BrowserStudioCrdtRejectionMarkerFallback
-implements StudioCrdtRejectionMarkerFallback {
-  preserve(marker: StudioCrdtPermanentRejectionMarker): boolean {
+class SamePageStudioCrdtRejectionMarkerLatch
+implements StudioCrdtRejectionMarkerEphemeralLatch {
+  preserve(marker: StudioCrdtPermanentRejectionMarker): void {
     const stored: StoredStudioCrdtPermanentRejectionMarker = {
       ...marker,
       kind: "permanent-rejection",
       key: rejectionMarkerKey(marker.scope, marker.workId, marker.rejectedUpdateId),
     };
     samePageRejectionMarkers.set(stored.key, stored);
-    try {
-      if (!globalThis.localStorage) return false;
-      globalThis.localStorage.setItem(
-        rejectionMarkerStorageKey(marker.scope, marker.workId, marker.rejectedUpdateId),
-        JSON.stringify(stored)
-      );
-      return true;
-    } catch {
-      // The module-level copy still locks replacement bindings in this page. The caller receives
-      // false so it can surface that reload durability is at risk when IndexedDB also fails.
-      return false;
-    }
   }
 
   list(scope: string, workId: string): unknown[] {
-    const markers = new Map<string, unknown>();
-    for (const [key, marker] of samePageRejectionMarkers) {
-      if (marker.scope === scope && marker.workId === workId) markers.set(key, marker);
-    }
-    try {
-      const storage = globalThis.localStorage;
-      if (!storage) return [...markers.values()];
-      for (let index = 0; index < storage.length; index += 1) {
-        const storageKey = storage.key(index);
-        if (!storageKey?.startsWith(REJECTION_MARKER_STORAGE_PREFIX)) continue;
-        let logicalKey: unknown;
-        try {
-          logicalKey = JSON.parse(decodeURIComponent(
-            storageKey.slice(REJECTION_MARKER_STORAGE_PREFIX.length)
-          ));
-        } catch {
-          continue;
-        }
-        if (!(
-          Array.isArray(logicalKey) &&
-          logicalKey[0] === "permanent-rejection" &&
-          logicalKey[1] === scope &&
-          logicalKey[2] === workId
-        )) continue;
-        const serialized = storage.getItem(storageKey);
-        let candidate: unknown = null;
-        try {
-          candidate = serialized === null ? null : JSON.parse(serialized);
-        } catch {
-          candidate = null;
-        }
-        // Retain an invalid scoped value so listRejectionMarkers fails closed instead of silently
-        // forgetting a guard whose localStorage value was damaged.
-        markers.set(JSON.stringify(logicalKey), candidate);
-      }
-    } catch {
-      // Access can be denied in hardened browsing modes. Same-page markers still apply.
-    }
-    return [...markers.values()];
+    return [...samePageRejectionMarkers.values()].filter(
+      (marker) => marker.scope === scope && marker.workId === workId
+    );
   }
 }
 
@@ -412,80 +375,108 @@ function publicEntry(entry: StoredStudioCrdtRecoveryVaultEntry): StudioCrdtRecov
   };
 }
 
-function requestResult<T>(request: IDBRequest<T>): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error ?? new Error("CRDT 복구 저장소 요청이 실패했습니다."));
-  });
+function recoverySqlRowKind(row: StoredStudioCrdtRecoveryRow): StudioCrdtRecoverySqlRowKind {
+  if (isStoredEntry(row)) return "legacy-frontier";
+  return row.kind;
 }
 
-function transactionDone(transaction: IDBTransaction): Promise<void> {
-  return new Promise<void>((resolve, reject) => {
-    transaction.oncomplete = () => resolve();
-    transaction.onabort = () => reject(
-      transaction.error ?? new Error("CRDT 복구 저장소 작업이 취소되었습니다.")
+function parseRecoverySqlCandidate(
+  candidate: StudioCrdtRecoverySqlCandidate,
+  scope: string,
+  workId: string,
+): StoredStudioCrdtRecoveryRow {
+  if (
+    candidate.scope !== scope ||
+    candidate.workId !== workId ||
+    !safeString(candidate.rowKey, 8_192) ||
+    !safeString(candidate.payload, STUDIO_CRDT_RECOVERY_MAX_ROW_BYTES) ||
+    !Number.isSafeInteger(candidate.payloadBytes) ||
+    (candidate.payloadBytes as number) <= 0 ||
+    !Number.isSafeInteger(candidate.updatedAt) ||
+    (candidate.updatedAt as number) < 0 ||
+    new TextEncoder().encode(candidate.payload as string).byteLength !== candidate.payloadBytes
+  ) {
+    throw new StudioCrdtRecoveryCorruptionError(
+      "CRDT SQLite 복구 행의 구조 또는 byte count가 손상되었습니다.",
     );
-    transaction.onerror = () => reject(
-      transaction.error ?? new Error("CRDT 복구 저장소 작업이 실패했습니다.")
-    );
-  });
-}
-
-let databasePromise: Promise<IDBDatabase> | null = null;
-
-function openDatabase(): Promise<IDBDatabase> {
-  if (databasePromise) return databasePromise;
-  if (!globalThis.indexedDB) {
-    return Promise.reject(new Error("이 브라우저에서 영구 CRDT 복구 저장소를 사용할 수 없습니다."));
   }
-  databasePromise = new Promise<IDBDatabase>((resolve, reject) => {
-    const request = globalThis.indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
-    request.onupgradeneeded = () => {
-      const database = request.result;
-      const store = database.objectStoreNames.contains(STORE_NAME)
-        ? request.transaction?.objectStore(STORE_NAME)
-        : database.createObjectStore(STORE_NAME, { keyPath: "key" });
-      if (store && !store.indexNames.contains(SCOPE_WORK_INDEX)) {
-        store.createIndex(SCOPE_WORK_INDEX, ["scope", "workId"], { unique: false });
-      }
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(
-      request.error ?? new Error("CRDT 복구 저장소를 열지 못했습니다.")
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(candidate.payload as string);
+  } catch {
+    throw new StudioCrdtRecoveryCorruptionError(
+      "CRDT SQLite 복구 행의 JSON이 손상되었습니다.",
     );
-    request.onblocked = () => reject(
-      new Error("다른 탭이 CRDT 복구 저장소 갱신을 차단했습니다.")
+  }
+  if (
+    !isKnownStoredRow(parsed) ||
+    parsed.scope !== scope ||
+    parsed.workId !== workId ||
+    parsed.key !== candidate.rowKey ||
+    recoverySqlRowKind(parsed) !== candidate.rowKind
+  ) {
+    throw new StudioCrdtRecoveryCorruptionError(
+      "CRDT SQLite 복구 행의 identity 또는 payload가 손상되었습니다.",
     );
-  }).catch((error) => {
-    databasePromise = null;
-    throw error;
-  });
-  return databasePromise;
+  }
+  return parsed;
 }
 
-function indexedDbPersistence(): StudioCrdtRecoveryVaultPersistence {
+async function acquireRecoveryDatabase(
+  acquireDatabase: () => Promise<StudioLocalDatabase>,
+  operation: string,
+): Promise<StudioCrdtRecoveryDatabase> {
+  try {
+    return requireStudioCrdtRecoveryDatabase(await acquireDatabase());
+  } catch (error) {
+    throw new StudioCrdtRecoveryDurabilityError(operation, error);
+  }
+}
+
+export function createStudioCrdtRecoverySqlitePersistence(
+  acquireDatabase: () => Promise<StudioLocalDatabase> = acquireStudioLocalDatabase
+): StudioCrdtRecoveryVaultPersistence {
   return {
     async list(scope, workId) {
-      const database = await openDatabase();
-      const transaction = database.transaction(STORE_NAME, "readonly");
-      const store = transaction.objectStore(STORE_NAME);
-      const index = store.index(SCOPE_WORK_INDEX);
-      const rows = await requestResult(index.getAll(IDBKeyRange.only([scope, workId])));
-      await transactionDone(transaction);
-      return rows;
+      const database = await acquireRecoveryDatabase(acquireDatabase, "scoped list");
+      let candidates: StudioCrdtRecoverySqlCandidate[];
+      try {
+        candidates = await database.listCrdtRecoveryCandidates(scope, workId);
+      } catch (error) {
+        throw new StudioCrdtRecoveryDurabilityError("scoped list", error);
+      }
+      return candidates.map((candidate) => parseRecoverySqlCandidate(candidate, scope, workId));
     },
-    async get(key) {
-      const database = await openDatabase();
-      const transaction = database.transaction(STORE_NAME, "readonly");
-      const value = await requestResult(transaction.objectStore(STORE_NAME).get(key));
-      await transactionDone(transaction);
-      return value ?? null;
+    async get(scope, workId, key) {
+      const database = await acquireRecoveryDatabase(acquireDatabase, "row read");
+      let candidate: StudioCrdtRecoverySqlCandidate | null;
+      try {
+        candidate = await database.getCrdtRecoveryCandidate(scope, workId, key);
+      } catch (error) {
+        throw new StudioCrdtRecoveryDurabilityError("row read", error);
+      }
+      return candidate === null ? null : parseRecoverySqlCandidate(candidate, scope, workId);
     },
     async put(entry) {
-      const database = await openDatabase();
-      const transaction = database.transaction(STORE_NAME, "readwrite", { durability: "strict" });
-      transaction.objectStore(STORE_NAME).put(entry);
-      await transactionDone(transaction);
+      const payload = JSON.stringify(entry);
+      const payloadBytes = new TextEncoder().encode(payload).byteLength;
+      const database = await acquireRecoveryDatabase(acquireDatabase, "row commit");
+      try {
+        await database.putCrdtRecoveryRecord({
+          scope: entry.scope,
+          workId: entry.workId,
+          rowKey: entry.key,
+          rowKind: recoverySqlRowKind(entry),
+          payload,
+          payloadBytes,
+        }, {
+          maxRows: STUDIO_CRDT_RECOVERY_MAX_ROWS_PER_WORK,
+          maxBytes: STUDIO_CRDT_RECOVERY_MAX_BYTES_PER_WORK,
+          maxRowBytes: STUDIO_CRDT_RECOVERY_MAX_ROW_BYTES,
+        });
+      } catch (error) {
+        throw new StudioCrdtRecoveryDurabilityError("row commit", error);
+      }
     },
   };
 }
@@ -501,13 +492,14 @@ function randomVaultId(): string {
  * Durable, non-retrying storage for optimistic Yjs frontiers rejected by the authoritative server.
  * Entries remain separate from the resend outbox so opening the work cannot silently replay them.
  */
-export class IndexedDbStudioCrdtRecoveryVault implements StudioCrdtRecoveryVault {
+export class PersistentStudioCrdtRecoveryVault implements StudioCrdtRecoveryVault {
   constructor(
-    private readonly persistence: StudioCrdtRecoveryVaultPersistence = indexedDbPersistence(),
+    private readonly persistence: StudioCrdtRecoveryVaultPersistence =
+      createStudioCrdtRecoverySqlitePersistence(),
     private readonly now: () => number = Date.now,
     private readonly randomId: () => string = randomVaultId,
-    private readonly markerFallback: StudioCrdtRejectionMarkerFallback =
-      new BrowserStudioCrdtRejectionMarkerFallback()
+    private readonly markerLatch: StudioCrdtRejectionMarkerEphemeralLatch =
+      new SamePageStudioCrdtRejectionMarkerLatch()
   ) {}
 
   async preserveRejectionMarker(
@@ -534,17 +526,15 @@ export class IndexedDbStudioCrdtRecoveryVault implements StudioCrdtRecoveryVault
       recoveryUpdateCount: input.recoveryUpdateCount,
       createdAt: this.now(),
     };
-    const fallbackDurable = this.markerFallback.preserve(marker);
+    // Lock this page before the asynchronous durable write. The latch is never returned as
+    // durable success: a failed SQLite commit still rejects and drives degraded product status.
+    this.markerLatch.preserve(marker);
     const stored: StoredStudioCrdtPermanentRejectionMarker = {
       ...marker,
       kind: "permanent-rejection",
       key: rejectionMarkerKey(scope, workId, input.rejectedUpdateId),
     };
-    try {
-      await this.persistence.put(stored);
-    } catch (error) {
-      if (!fallbackDurable) throw error;
-    }
+    await this.persistence.put(stored);
     return { ...marker };
   }
 
@@ -554,7 +544,7 @@ export class IndexedDbStudioCrdtRecoveryVault implements StudioCrdtRecoveryVault
   ): Promise<StudioCrdtPermanentRejectionMarker[]> {
     const rows = [
       ...(await this.persistence.list(scope, workId)),
-      ...this.markerFallback.list(scope, workId),
+      ...this.markerLatch.list(scope, workId),
     ];
     if (rows.some((row) => !isKnownStoredRow(row))) {
       throw new Error("CRDT 복구 저장소의 영구 거절 표식이 손상되었습니다.");
@@ -691,7 +681,7 @@ export class IndexedDbStudioCrdtRecoveryVault implements StudioCrdtRecoveryVault
 
   async markExported(scope: string, workId: string, vaultId: string): Promise<void> {
     const key = vaultKey(scope, workId, vaultId);
-    const value = await this.persistence.get(key);
+    const value = await this.persistence.get(scope, workId, key);
     if (
       !(isStoredEntry(value) || isStoredManifest(value)) ||
       value.scope !== scope ||
@@ -709,7 +699,7 @@ export class IndexedDbStudioCrdtRecoveryVault implements StudioCrdtRecoveryVault
 }
 
 export function createStudioCrdtRecoveryVault(): StudioCrdtRecoveryVault {
-  return new IndexedDbStudioCrdtRecoveryVault();
+  return new PersistentStudioCrdtRecoveryVault();
 }
 
 export function createStudioCrdtRecoveryBundle(

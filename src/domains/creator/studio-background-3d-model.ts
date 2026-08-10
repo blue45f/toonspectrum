@@ -31,7 +31,7 @@ import type {
 
 export interface BgCustomModelInstance {
   id: string;
-  /** bg3d-model-library.ts IndexedDB 레코드 id — 모델 바이너리 자체는 절대 씬 상태/직렬화에 포함되지 않는다. */
+  /** BG3D 로컬 SQLite/OPFS private id — 모델 바이너리 자체는 절대 씬 상태/직렬화에 포함되지 않는다. */
   modelId: string;
   position: [number, number, number];
   rotation: [number, number, number]; // Euler XYZ, 라디안 — BgPrimitive와 동일 계약

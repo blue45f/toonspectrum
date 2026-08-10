@@ -36,8 +36,8 @@ TextIR (아키텍처 §2: PathIR/ShapeIR/TextIR 계층의 일부)
 ├─ 후보 경로(벤치 전용 → 승격 시 활성): Parley 스택
 │   Fontique 폰트 해석 → HarfRust 셰이핑 → Parley 줄 배치(BreakPlan 직접 주입) → 글리프 런
 └─ 세로쓰기 경로(제품 확장): VerticalTextLayoutIR
-    글리프 단위 세로 배치·약물 회전·縦中横 → 셰이핑은 HarfRust(vert/vrt2 feature) 또는
-    CanvasKit 글리프 API 재사용, 줄(=세로 행) 나눔은 동일 BreakPlan 사용
+    글리프 단위 세로 배치·Unicode 약물 역할 분리·縦中横 → Skrifa로 vert/vrt2 존재를 검사하고
+    Parley TTB가 없는 현재 버전은 명시적 기하 폴백, 줄(=세로 행) 나눔은 동일 BreakPlan 사용
         │
         ▼
 [처리 3 — 줄 조정]  (제품 계층)
@@ -101,7 +101,8 @@ KinsokuEngine (제품 소유, Rust crate, 엔진 중립)
 
 VerticalTextLayoutIR (제품 소유)
 ├─ 세로 행 배치(우→좌 행 진행), 글리프 회전 규칙(약물·라틴 회전, 縦中横)
-├─ 셰이핑 재사용: HarfRust vert/vrt2/vpal feature 경로 우선, CanvasKit 글리프 API 폴백
+├─ 셰이핑 재사용: HarfRust 0.10 TTB + vert/vrt2 → Skrifa glyph outline
+│   └─ 폰트가 alternate를 제공하지 않는 문자만 역할별 기하 폴백(수동 코드포인트 치환 금지)
 └─ 렌더 재사용: 배치가 끝난 글리프를 positioned-glyph 목록으로 CanvasKit/Vello에 전달
 ```
 
@@ -118,8 +119,9 @@ Parley 스택 (승격 후 주력)
         (CommandJournal/RecoveryIR로 TextIR은 항상 보존되므로 데이터 손실 없음)
 
 [세로쓰기 폴백]
-VerticalTextLayoutIR + HarfRust vert feature
-  → VerticalTextLayoutIR + CanvasKit 글리프 API (회전 배치 폴백)
+VerticalTextLayoutIR + 검증된 직접 HarfRust TTB vert/vrt2
+  → VerticalTextLayoutIR + 역할별 회전/offset/center 기하 폴백 + 명시 경고
+    → VerticalTextLayoutIR + CanvasKit 글리프 API (동일 기하 배치)
     → 가로쓰기 강제 전환 + 사용자 고지 (기능 저하 모드, 문서 저장은 세로쓰기 의도 유지)
 
 [금칙 폴백]
@@ -149,3 +151,43 @@ GlyphCacheAdapter[Glifo]
 | Phase 2~3 | ICU4X + KinsokuEngine 1차(가로쓰기 금칙), cross-engine diff 상설화 |
 | Phase 4 (Comic) | 말풍선 독서 순서·컷 연결과 통합, 세로쓰기 VerticalTextLayoutIR 1차, Parley 스택 승격 평가 게이트 실행 |
 | Phase 7 | CSP blind test에 조판 품질 항목 포함, 장시간 soak에 IME·대량 텍스트 편집 시나리오 포함 |
+
+## 7. V12 세로쓰기 하이브리드의 실제 배치와 증거
+
+V12에서 세로쓰기 island는 다음처럼 분업한다. 이 결정은
+`tests/benchmarks/results/text-vertical-quality.json`의 실측으로 한정하며, 가로 문단 전체의
+CanvasKit/Parley 경쟁 결론을 바꾸지 않는다.
+
+```text
+TextIR + ruby UTF-16 spans
+  → 제품 VerticalTextLayout
+      · Canvas measureText 기반 회전 런 폭
+      · 직립 CJK / Unicode opening·closing·small·stop 역할별 독립 약물 / 1–4자리 종중횡조
+      · maxColumnLength + 최대 32셀 최근접 유효 break 금칙, 불가 시 명시 overflow
+  → 제품 vertical ruby planner
+      · 실제 base-cell 좌표 사용
+      · 오른쪽 배치 + 수직 중심 + 열 경계 결정적 분할
+  → Konva 편집 캔버스 / SVG 공통 기하
+
+동일 텍스트 검증 island
+  → Parley(가로 문단) + 직접 HarfRust TTB(세로 셀) + Skrifa + font vmtx
+  → GSUB vert/vrt2 존재 검사 + Direction::TopToBottom 실제 glyph 선택
+  → 폰트가 대체를 주지 않은 글리프만 기하 폴백/경고(JSON에 적용·폴백 수 기록)
+  → vertical PathIR (종중횡조 transform 포함)
+  → Vello CPU와 CanvasKit에 shadow render
+  → symmetric 3×3 δ48 visual equivalence gate
+```
+
+제품 경로의 8사례 배치는 p50/p95/p99 0.045/0.055/0.065ms, 루비 3사례 배치는
+0.015/0.020/0.030ms였다. HarfRust-TTB/Skrifa WASM 6사례 배치는
+7.085291/8.191167/16.737333ms였다. 동일 PathIR의 Vello/CanvasKit 불일치는 0.002403%, 두
+엔진의 ink bounds는 동일했다. 수치는 raw series로 보존되며 계약 테스트가 percentile을 다시
+계산한다.
+
+`vertical ruby`는 아직 PathIR이 아니라 Konva 텍스트 오버레이다. 따라서 제품 reference PNG의
+루비 픽셀을 Vello/CanvasKit cross-render 결과로 표현하지 않는다. 교차 엔진 수치는 Rust vertical
+PathIR만, 루비는 제품 기하와 Chromium Canvas 결정성만 증명한다. 인접 `」「`·중첩 약물의
+독립 분절과 bounded 금칙은 완료했다. OpenType `vert`/`vrt2`는 직접 HarfRust TTB로 실제
+적용하며 Arial Unicode `「」`의 대체 glyph ID가 HarfBuzz 기준과 일치한다. ruby 광학 메트릭과
+CSP 동일 장치 블라인드는 잔여 게이트이고, 폰트가 제공하지 않는 `、。！？`의 기하 폴백은
+OpenType 지원으로 과장하지 않는다.

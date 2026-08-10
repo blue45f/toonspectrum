@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { hydrateStudioAiImageReferenceDocument } from
+  "./studio-ai-image-reference-roles";
 import {
   normalizeStudioAiProvenanceDocument,
   type StudioAiProvenanceDocument,
@@ -61,6 +63,13 @@ const CommonProjectSchema = z.object({
   publicationAnalytics: z.unknown().optional(),
   /** Project-owned pose/reference board. Binary bytes live in the asset archive, never here. */
   referenceBoard: z.unknown().optional(),
+  /** Metadata-only AI role references. Binary bytes stay in the content-addressed asset store. */
+  aiImageReferences: z
+    .unknown()
+    .optional()
+    .transform((value) =>
+      value === undefined ? undefined : hydrateStudioAiImageReferenceDocument(value)
+    ),
   /** Private operation history; hydration always strips raw prompt fields by default. */
   aiProvenance: OptionalAiProvenanceSchema,
   // 목적지 정책은 자주 바뀌므로 프로젝트 파서는 느슨하게 보존하고, UI에서 별도 정규화한다.
@@ -198,6 +207,7 @@ export function parseStudioProjectFile(value: unknown): StudioProjectFile {
     master: legacy.data.master,
     writerRoom: legacy.data.writerRoom,
     aiProvenance: legacy.data.aiProvenance,
+    aiImageReferences: undefined,
     currentPageId: legacy.data.pages[0].id,
     webtoonTheme: "classic",
     panelGutter: 24,

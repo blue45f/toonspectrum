@@ -55,7 +55,7 @@
 | 한중일 텍스트 | TextIR | ICU4X/HarfRust/Skrifa/Parley layout | Glifo/Vello render | CanvasKit Paragraph validation |
 | 3D 포즈·배경 | Scene3DIR | Three.js/three-vrm + Rapier contact + BVH raycast | Three.js island → depth/normal/ID pass | Vello/CanvasKit 2D composite |
 | 애니메이션·오디오 | AnimationGraph | WebCodecs preview 디코드/인코드 | 타임라인 preview 합성 | Mediabunny container → FFmpeg final bridge |
-| 협업·복구 | 사용자 커맨드 | Yjs/Loro semantic ops + command+seed+bake | presence/cursor는 Vello overlay | OPFS journal/CAS + cloud backup |
+| 협업·복구 | 사용자 커맨드 | Yjs/Loro semantic ops + command+seed+bake | presence/cursor는 Vello overlay | SQLite/OPFS journal/CAS + deterministic 외부 recovery ZIP; cloud는 opt-in 격리 |
 
 ## 3. Preview / Final 분리
 
@@ -128,7 +128,8 @@ G'MIC/GEGL 격리 provider → libvips → CanvasKit final (품질 프로필 하
 WebCodecs → FFmpeg bridge (미지원 codec·batch)
 
 [저장]
-OPFS 주 저널 → two-slot snapshot 복구 → cloud backup(후속) 재수화
+SQLite/OPFS 주 저널 → two-slot snapshot 복구 → SHA-256 CAS recovery ZIP 내보내기/재수화
+→ opt-in 암호화 cloud backup(후속 격리)
 
 [GPU 전체 장애]
 모든 GPU island → CPU 기준선(Vello CPU·CanvasKit SW·resvg·tiny-skia)로 강등,

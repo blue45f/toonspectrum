@@ -451,18 +451,10 @@ function RecoveryPanel() {
       typeof window === "undefined" ? null : (window.localStorage ?? null);
     const result = scanStudioRecoveryStorage(storage);
     setScan(result);
-    if (!storage || result.checkpointKeys.length === 0) {
-      setCheckpointCount(0);
-      return;
-    }
     let cancelled = false;
     void import("./studio-checkpoints")
       .then(async (module) => {
-        let total = 0;
-        for (const key of result.checkpointKeys) {
-          const list = await module.listDurableStudioCheckpoints(storage, key);
-          total += list.length;
-        }
+        const total = await module.countDurableStudioCheckpoints();
         if (!cancelled) setCheckpointCount(total);
       })
       .catch(() => {

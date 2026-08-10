@@ -28,7 +28,7 @@ import {
 } from "./studio-hokusai-natural-media-worker-protocol";
 import { STUDIO_PIXEL_PENCIL_RENDER_MODE } from "./studio-pixel-pencil";
 
-export const STUDIO_BRUSH_BACKEND_QUALITY_POLICY_VERSION = 7 as const;
+export const STUDIO_BRUSH_BACKEND_QUALITY_POLICY_VERSION = 8 as const;
 
 export type StudioBrushBackendQualityFamily =
   | "continuous-ink"
@@ -99,7 +99,123 @@ export interface StudioBrushBackendIntegrationAudit {
   readonly evidence: string;
 }
 
-export const STUDIO_HOKUSAI_MYB_PROVIDER_POLICY_VERSION = 6 as const;
+export const STUDIO_HOKUSAI_MYB_PROVIDER_POLICY_VERSION = 7 as const;
+
+/**
+ * Product-promotion verdict copied from the committed 1000px full-size comparison artifact.
+ *
+ * This is deliberately a fail-closed policy input rather than a claim that libmypaint is wired
+ * into the product. libmypaint remains a benchmark reference only. Hokusai may not replace an
+ * existing product route automatically until a new committed artifact proves both visual parity
+ * and the required 1.2x throughput for the exact preset being promoted.
+ */
+export const STUDIO_HOKUSAI_FULLSIZE_PROMOTION_GATE = Object.freeze({
+  artifact: "tests/benchmarks/results/libmypaint-fullsize.json" as const,
+  workload: "1000px-full-size-natural-media-corpus" as const,
+  requiredThroughputRatio: 1.2 as const,
+  observedMinimumThroughputRatio: 0.096991 as const,
+  allQualityParityPass: false as const,
+  hokusaiPasses20pctGate: false as const,
+  verdict: "retain-libmypaint-reference" as const,
+  libmypaintRole: "benchmark-reference-only-not-product-fallback" as const,
+});
+
+export type StudioHokusaiProductLivePresetId = Exclude<
+  ReturnType<typeof resolveStudioHokusaiLivePreset>,
+  null
+>;
+
+export interface StudioHokusaiPresetPromotionEvidence {
+  readonly identity: string;
+  readonly presetId: StudioHokusaiProductLivePresetId;
+  readonly artifact: string;
+  readonly allQualityParityPass: true;
+  readonly hokusaiPasses20pctGate: true;
+  readonly approvedForAutomaticProductRoute: true;
+}
+
+/**
+ * Only evidence committed here can promote an exact preset into the automatic product route.
+ * The current full-size corpus failed, so the list must remain empty.
+ */
+export const STUDIO_HOKUSAI_PRODUCT_PROMOTED_PRESETS:
+readonly StudioHokusaiPresetPromotionEvidence[] = Object.freeze([]);
+
+export interface StudioHokusaiProductLiveAdmissionInput {
+  readonly brushId: string;
+  readonly catalogId?: string | null;
+  /** User-facing experimental choice for this invocation; never inferred from brush identity. */
+  readonly explicitExperimentalOptIn?: boolean;
+}
+
+export type StudioHokusaiProductLiveAdmission =
+  | Readonly<{
+      status: "admitted";
+      mode: "experimental-explicit-opt-in" | "preset-quality-promoted";
+      presetId: StudioHokusaiProductLivePresetId;
+      userVisibleStatus: "experimental" | "quality-promoted";
+    }>
+  | Readonly<{
+      status: "blocked";
+      reason: "identity-not-supported" | "fullsize-quality-gate-failed";
+      retainBackend: "existing-exact-product-route";
+      userVisibleStatus: "experimental-quality-gate-blocked";
+      noProductLibmypaintFallback: true;
+    }>;
+
+/**
+ * Product admission boundary for Hokusai live rendering.
+ *
+ * Mapping an identity to a Hokusai preset is not promotion evidence. The caller must either carry
+ * an explicit, user-visible experimental opt-in for this invocation or the exact identity must
+ * have a committed per-preset promotion receipt above. A blocked decision keeps the existing
+ * product renderer; it never pretends that the benchmark-only libmypaint reference is available.
+ */
+export function resolveStudioHokusaiProductLiveAdmission(
+  input: StudioHokusaiProductLiveAdmissionInput,
+): StudioHokusaiProductLiveAdmission {
+  const presetId = resolveStudioHokusaiLivePreset(input.brushId, input.catalogId);
+  if (presetId === null) {
+    return Object.freeze({
+      status: "blocked",
+      reason: "identity-not-supported",
+      retainBackend: "existing-exact-product-route",
+      userVisibleStatus: "experimental-quality-gate-blocked",
+      noProductLibmypaintFallback: true,
+    });
+  }
+
+  const identity = input.catalogId?.trim() || input.brushId.trim();
+  const promotion = STUDIO_HOKUSAI_PRODUCT_PROMOTED_PRESETS.find((entry) =>
+    entry.identity === identity
+    && entry.presetId === presetId
+    && entry.allQualityParityPass
+    && entry.hokusaiPasses20pctGate
+    && entry.approvedForAutomaticProductRoute);
+  if (promotion) {
+    return Object.freeze({
+      status: "admitted",
+      mode: "preset-quality-promoted",
+      presetId,
+      userVisibleStatus: "quality-promoted",
+    });
+  }
+  if (input.explicitExperimentalOptIn === true) {
+    return Object.freeze({
+      status: "admitted",
+      mode: "experimental-explicit-opt-in",
+      presetId,
+      userVisibleStatus: "experimental",
+    });
+  }
+  return Object.freeze({
+    status: "blocked",
+    reason: "fullsize-quality-gate-failed",
+    retainBackend: "existing-exact-product-route",
+    userVisibleStatus: "experimental-quality-gate-blocked",
+    noProductLibmypaintFallback: true,
+  });
+}
 
 /**
  * Admission policy for the installed Hokusai/libmypaint natural-media provider.
@@ -108,9 +224,10 @@ export const STUDIO_HOKUSAI_MYB_PROVIDER_POLICY_VERSION = 6 as const;
  * facade is intentionally not admissible for Studio. The installed local wrapper pins the three
  * Hokusai crates exactly, reads the dirty rectangle as packed transparent RGBA8 inside a Dedicated
  * Worker and returns packed dirty live frames plus a verified crop-sized canonical PNG and parity
- * receipt. Pencil, charcoal, oil, calligraphy and marker identities may opt into this automatic
- * live route only after prewarm and the complete admission receipt. The explicit selected-stroke
- * settled transform remains available as a conversion fallback.
+ * receipt. The committed full-size comparison does not pass visual parity or the 1.2x throughput
+ * gate, so brush identity alone can never activate the live route. The explicit selected-stroke
+ * transform remains available as a user-visible experimental conversion; future automatic use
+ * requires a committed per-preset promotion receipt.
  */
 export const STUDIO_HOKUSAI_MYB_PROVIDER_POLICY = Object.freeze({
   policyVersion: STUDIO_HOKUSAI_MYB_PROVIDER_POLICY_VERSION,
@@ -137,13 +254,17 @@ export const STUDIO_HOKUSAI_MYB_PROVIDER_POLICY = Object.freeze({
     stockOpaqueWhiteFlatteningAllowed: false as const,
   }),
   rollout: Object.freeze({
-    defaultMode: "automatic-natural-media-live-provider-active-19-presets" as const,
+    defaultMode: "experimental-explicit-selected-stroke-only" as const,
+    productStatus: "experimental-quality-gate-blocked" as const,
+    liveAutomaticRoutingEnabled: false as const,
     settledRequiresExplicitOptIn: true as const,
     fullLiveCoreInstalled: true as const,
     runtimeMustBeReady: true as const,
-    defaultBrushRoutesChanged: true as const,
-    verifiedAutomaticRouteCount: 19 as const,
-    prewarmAtBrushSelection: true as const,
+    defaultBrushRoutesChanged: false as const,
+    verifiedAutomaticRouteCount: 0 as const,
+    promotedPresetEvidenceCount: 0 as const,
+    prewarmAtBrushSelection: false as const,
+    prewarmAtExplicitAdmission: true as const,
     admissionPinnedAtStrokeStart: true as const,
     midStrokeProviderSwitchAllowed: false as const,
     inFlightTransferableFrameLimit: 1 as const,
@@ -153,6 +274,9 @@ export const STUDIO_HOKUSAI_MYB_PROVIDER_POLICY = Object.freeze({
     licenseGatePassed: true as const,
     reproducibleReleaseGatePassed: true as const,
     realBrowserRuntimeGatePassed: true as const,
+    fullsizeQualityParityPassed: false as const,
+    fullsizeThroughputGatePassed: false as const,
+    benchmarkReferenceIsProductFallback: false as const,
   }),
   determinism: Object.freeze({
     persistSeed: true as const,
@@ -427,16 +551,16 @@ readonly StudioBrushBackendIntegrationAudit[] = Object.freeze([
     id: "hokusai-myb-worker",
     implementation:
       "installed studio-hokusai-wasm with exact Hokusai 0.3.0 crates and a packed dirty-frame Dedicated Worker",
-    connection: "active-product",
+    connection: "conditional-product",
     phases: ["live", "commit", "settled"],
     asynchronous: true,
-    defaultAvailability: "loading",
+    defaultAvailability: "unavailable",
     brushPixelAuthority: true,
     evidence:
-      "StudioPage and StudioCanvasViewport automatically route the 19 verified pencil, charcoal "
-      + "and oil identities through the prewarmed packed-dirty provider. StudioKonvaImageNode "
-      + "holds canonical PNG commit ownership until its hash-keyed drawScene receipt; the prior "
-      + "runtime-stroke-boundary path remains the atomic failure fallback.",
+      "The selected-stroke inspector exposes Hokusai as an explicit experimental conversion. "
+      + "Automatic pencil, charcoal and oil routing is blocked because the committed full-size "
+      + "corpus failed quality parity and the 1.2x throughput gate. The existing exact product "
+      + "route remains authoritative; libmypaint is a benchmark reference, not a product fallback.",
   },
   {
     id: "vnext-provider-router",

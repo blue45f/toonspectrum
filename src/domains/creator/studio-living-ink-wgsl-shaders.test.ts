@@ -1,13 +1,20 @@
 import { describe, expect, it } from "vitest";
 
-import { STUDIO_LIVING_INK_FLUID_DEFAULTS } from "./studio-living-ink-execution-protocol";
 import {
+  STUDIO_LIVING_INK_FLUID_DEFAULTS,
+  studioLivingInkVelocityDamping,
+} from "./studio-living-ink-execution-protocol";
+import {
+  createStudioLivingInkFluidReference,
   listStudioLivingInkWgslDeclaredIdentifiers,
   listStudioLivingInkWgslPassSources,
   studioLivingInkWgslDisplayModeCode,
   studioLivingInkWgslPassGrid,
   studioLivingInkWgslPassIsCoarse,
   studioLivingInkWgslSourceForPass,
+  studioLivingInkVelocityDampingForStep,
+  stepStudioLivingInkFluidReference,
+  STUDIO_LIVING_INK_RELEASE_VELOCITY_DAMPING_RATE_PER_SECOND,
   STUDIO_LIVING_INK_WGSL_COARSE_PASSES,
   STUDIO_LIVING_INK_WGSL_LEGACY_PASS_ORDER,
   STUDIO_LIVING_INK_WGSL_PASS_ORDER,
@@ -257,6 +264,7 @@ fn probe(point: vec2f) -> f32 {
       vorticity: 0.2,
       capillaryCreep: 0.3,
       fixing: false,
+      velocitySettling: false,
       dryingEdgeDeposition: 0.4,
       pigmentDiffusion: [0.11, 0.02, 0.09, 0.12],
       fixSelectionEnabled: false,
@@ -293,6 +301,7 @@ fn probe(point: vec2f) -> f32 {
       vorticity: 0.2,
       capillaryCreep: 0.3,
       fixing: true,
+      velocitySettling: false,
       dryingEdgeDeposition: 0.4,
       pigmentDiffusion: [0.11, 0.02, 0.09, 0.12],
       fixSelectionEnabled: false,
@@ -300,6 +309,88 @@ fn probe(point: vec2f) -> f32 {
     });
     expect(fixing[12]).toBeLessThan(uniforms[12]!);
     expect(fixing[18]).toBeLessThan(uniforms[18]!);
+
+    const settling = writeStudioLivingInkFieldUniforms({
+      width: 512,
+      height: 256,
+      coarseWidth: 128,
+      coarseHeight: 64,
+      dt: 1 / 60,
+      bleed: 0.5,
+      dryRate: 0.25,
+      chroma: [1.4, 1.1, 0.6],
+      chromaticSeparation: 0.5,
+      beerDensity: 0.8,
+      fixTransfer: 0,
+      flow: 0.7,
+      vorticity: 0.2,
+      capillaryCreep: 0.3,
+      fixing: false,
+      velocitySettling: true,
+      dryingEdgeDeposition: 0.4,
+      pigmentDiffusion: [0.11, 0.02, 0.09, 0.12],
+      fixSelectionEnabled: false,
+      display,
+    });
+    // Release settle uses a stronger release-only momentum brake. It must retain ordinary advance
+    // evaporation and carry no mobile-to-fixed transfer request.
+    expect(settling[12]).toBeLessThan(fixing[12]!);
+    expect(settling[18]).toBeCloseTo(uniforms[18]!, 7);
+    expect(settling[9]).toBe(0);
+  });
+
+  it("bounds the measured release momentum tail below the preferred seven-pixel gate", () => {
+    const dt = 1 / 60;
+    const ticks = 120;
+    const flow = 0.7;
+    const observedFixDriftPx = 32.31;
+    const reviewedFixExtraRate = 7;
+    const estimatedInitialVelocityPxPerSecond = observedFixDriftPx * reviewedFixExtraRate;
+    const interactive = studioLivingInkVelocityDampingForStep(flow, dt, false, false);
+    const fixing = studioLivingInkVelocityDampingForStep(flow, dt, true, false);
+    const release = studioLivingInkVelocityDampingForStep(flow, dt, false, true);
+
+    // Interactive and Fix are byte-for-byte the pre-release formulas; release is a third mode.
+    expect(interactive).toBe(studioLivingInkVelocityDamping(flow, dt, false));
+    expect(fixing).toBe(studioLivingInkVelocityDamping(flow, dt, true));
+    expect(release).toBeLessThan(fixing);
+    expect(STUDIO_LIVING_INK_RELEASE_VELOCITY_DAMPING_RATE_PER_SECOND).toBe(60);
+
+    // Run the shared CPU fluid reference at the production 60 Hz/120-tick cadence. Integrating the
+    // velocity before each reference tick deliberately measures the conservative pre-damp motion
+    // convention, while the GPU kernels upload the same release retention into slot 12.
+    const productionFieldHeight = 1_024;
+    const field = createStudioLivingInkFluidReference({ width: 16, height: 16 });
+    field.wet.fill(1);
+    for (let index = 1; index < field.velocity.length; index += 2) {
+      field.velocity[index] = estimatedInitialVelocityPxPerSecond / productionFieldHeight;
+    }
+    let measuredReferenceDisplacementPx = 0;
+    for (let tick = 0; tick < ticks; tick += 1) {
+      let meanVelocityY = 0;
+      for (let index = 1; index < field.velocity.length; index += 2) {
+        meanVelocityY += field.velocity[index] ?? 0;
+      }
+      meanVelocityY /= field.velocity.length / 2;
+      measuredReferenceDisplacementPx += meanVelocityY * dt * productionFieldHeight;
+      stepStudioLivingInkFluidReference(field, {
+        dt,
+        flow,
+        bleed: 0.5,
+        dryRate: 0.25,
+        chromaticSeparation: 0.5,
+        vorticity: 0.2,
+        capillaryCreep: 0.3,
+        pressureIterations: 0,
+        fixing: false,
+        velocitySettling: true,
+        confinement: false,
+        transport: false,
+      });
+    }
+    expect(measuredReferenceDisplacementPx).toBeCloseTo(5.8868, 3);
+    expect(measuredReferenceDisplacementPx).toBeLessThanOrEqual(7);
+    expect(measuredReferenceDisplacementPx).toBeLessThanOrEqual(28 * 0.25);
   });
 
   /*

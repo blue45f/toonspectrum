@@ -24,11 +24,6 @@ export {
   waitForStudioBg3dBatchDocumentVisible,
 } from "./studio-bg3d-shot-batch-queue";
 export {
-  STUDIO_BG3D_SHOT_BATCH_RECOVERY_AUTHORIZATION_RECEIPT_MAX_TTL_MS,
-  StudioBg3dShotBatchRecoveryError,
-  createStudioBg3dShotBatchRecoveryStore,
-} from "./studio-bg3d-shot-batch-recovery-store";
-export {
   buildStudioBg3dShotBatchArchiveInWorker,
   isStudioBg3dShotBatchWorkerUnavailableError,
 } from "./studio-bg3d-shot-batch-worker-client";

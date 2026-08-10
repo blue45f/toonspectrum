@@ -2,13 +2,10 @@ import {
   STUDIO_BG3D_PROCEDURAL_STARTER_PACK_ID,
 } from "./studio-bg3d-procedural-starter-pack";
 import {
-  browserBrushLibraryStorage,
-  listBrushes,
   sanitizeBrushSnapshot,
   type StudioSavedBrush,
 } from "./studio-brush-library";
 import {
-  listStudioCreatorFilterPresets,
   type StudioCreatorInstalledFilterPreset,
   type StudioCreatorPackStorage,
 } from "./studio-creator-pack-runtime";
@@ -22,10 +19,7 @@ import {
   findStudioOriginalFreeAsset,
   type StudioOriginalFreeAsset,
 } from "./studio-original-free-asset-packs";
-import {
-  listPalettes,
-  type StudioNamedPalette,
-} from "./studio-palette-library";
+import { type StudioNamedPalette } from "./studio-palette-library";
 import {
   SCENE_TEMPLATES,
 } from "./studio-scene-templates";
@@ -412,10 +406,11 @@ export function listStudioCommunityShareCandidates(input: {
   readonly filters?: readonly StudioCreatorInstalledFilterPreset[];
   readonly palettes?: readonly StudioNamedPalette[];
 } = {}): StudioCommunityShareCandidate[] {
-  const brushes = input.brushes ?? listBrushes(browserBrushLibraryStorage());
-  const storage = browserStudioCreatorStorage();
-  const filters = input.filters ?? listStudioCreatorFilterPresets(storage);
-  const palettes = input.palettes ?? listPalettes(storage);
+  // Product callers hydrate all three arrays from the SQLite repositories. Omitted inputs are
+  // intentionally empty; this pure projection must never discover pre-V12 localStorage data.
+  const brushes = input.brushes ?? [];
+  const filters = input.filters ?? [];
+  const palettes = input.palettes ?? [];
   return [
     ...brushes.map((brush) => ({
       id: brush.id,

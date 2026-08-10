@@ -26,11 +26,35 @@ function sourceSection(
 }
 
 describe("Studio Hokusai live UI authority wiring", () => {
+  it("keeps Hokusai live behind the failed full-size promotion gate", () => {
+    const admission = sourceSection(
+      PAGE_SOURCE,
+      "function studioHokusaiProductLivePreset(",
+      "function studioHokusaiColor(",
+    );
+    expect(admission).toContain("resolveStudioHokusaiProductLiveAdmission({ brushId, catalogId })");
+    expect(admission).not.toContain("explicitExperimentalOptIn: true");
+    expect(PAGE_SOURCE).not.toContain("STUDIO_HOKUSAI_AUTOMATIC_PRESETS");
+    expect(PAGE_SOURCE).not.toContain("studioHokusaiAutomaticPreset(");
+
+    const begin = sourceSection(
+      PAGE_SOURCE,
+      "function beginStudioHokusaiLiveStroke(",
+      "const [livingInkState, setLivingInkState]",
+    );
+    expect(begin).toContain(
+      "!studioHokusaiProductLivePreset(element.brush ?? \"pen\", element.brushCatalogId)",
+    );
+    expect(begin).toContain(
+      "if (!studioHokusaiProductLivePreset(brush, activeCatalogBrush.id)) return;",
+    );
+  });
+
   it("releases the live overlay only after the exact decoded canonical PNG is drawn", () => {
     const imageReceipt = sourceSection(
       IMAGE_NODE_SOURCE,
       "const hokusaiPngHash = el.hokusaiLiveReceipt?.canonical.pngHash;",
-      "if (!displayImg) return null;",
+      "const livingInkPngHash = el.livingInkReceipt?.canonicalPngSha256;",
     );
     expect(imageReceipt.indexOf("layer.drawScene();")).toBeGreaterThan(0);
     expect(imageReceipt.indexOf("onHokusaiCanonicalImageReady(el.id, hokusaiPngHash);"))
@@ -165,7 +189,7 @@ describe("Studio Hokusai live UI authority wiring", () => {
     expect(specialistRelease).toContain("session.finish()");
   });
 
-  it("keeps automatic canonical materialization in drawing chrome", () => {
+  it("keeps explicitly admitted canonical materialization in drawing chrome", () => {
     const finish = sourceSection(
       PAGE_SOURCE,
       "async function finishStudioHokusaiLiveStroke(",

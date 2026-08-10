@@ -1,8 +1,8 @@
 import {
   SqliteUnavailableError,
-  openStudioLocalDatabase,
   type StudioLocalDatabase,
 } from "./studio-local-database";
+import { acquireStudioLocalDatabase } from "./studio-local-database-runtime";
 import {
   STUDIO_TOURNAMENT_WINNER_SCHEMA_VERSION,
   STUDIO_TOURNAMENT_WINNER_STORAGE_KEY,
@@ -60,7 +60,7 @@ export function createSqliteTournamentPersistence(
   options: SqliteTournamentPersistenceOptions = {},
 ): TournamentPersistencePort {
   const openDatabase =
-    options.openDatabase ?? (() => openStudioLocalDatabase({ vfs: "opfs" }));
+    options.openDatabase ?? acquireStudioLocalDatabase;
   const fallback =
     options.fallback !== undefined
       ? options.fallback

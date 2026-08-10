@@ -1,0 +1,1678 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-10T06:03:21.428Z",
+  "status": "pass",
+  "pass": true,
+  "benchmark": {
+    "status": "ok",
+    "pass": true,
+    "schemaVersion": 1,
+    "execution": "vite-production-build-chromium-dedicated-workers",
+    "authority": {
+      "kind": "shared-sqlite-opfs-crdt-recovery-v6",
+      "requestedVfs": "opfs",
+      "sqlitePackage": "@sqlite.org/sqlite-wasm 3.53.0-build1",
+      "sqliteOpfsDirectory": "toonspectrum-studio-sqlite",
+      "sqliteFilename": "studio-local-v12.db",
+      "schemaVersion": 6,
+      "table": "crdt_recovery_v12_rows",
+      "installedOpfsDirectories": [
+        "toonspectrum-studio-sqlite"
+      ],
+      "openedOpfsDatabaseFilenames": [
+        "/studio-local-v12.db"
+      ],
+      "openedMemoryDatabaseFilenames": [],
+      "sqliteWasmInitMs": 40.57,
+      "openMs": 33.57
+    },
+    "gracefulRestart": {
+      "pass": true,
+      "seed": {
+        "status": "ok",
+        "pass": true,
+        "schemaVersion": 1,
+        "execution": "vite-production-build-chromium-dedicated-worker-opfs-sahpool",
+        "authority": {
+          "kind": "shared-sqlite-opfs-crdt-recovery-v6",
+          "requestedVfs": "opfs",
+          "sqlitePackage": "@sqlite.org/sqlite-wasm 3.53.0-build1",
+          "sqliteOpfsDirectory": "toonspectrum-studio-sqlite",
+          "sqliteFilename": "studio-local-v12.db",
+          "schemaVersion": 6,
+          "table": "crdt_recovery_v12_rows",
+          "installedOpfsDirectories": [
+            "toonspectrum-studio-sqlite"
+          ],
+          "openedOpfsDatabaseFilenames": [
+            "/studio-local-v12.db"
+          ],
+          "openedMemoryDatabaseFilenames": [],
+          "sqliteWasmInitMs": 40.57,
+          "openMs": 33.57
+        },
+        "support": {
+          "wasm": true,
+          "opfs": true
+        },
+        "capabilities": {
+          "dedicatedWorker": true,
+          "secureContext": true,
+          "crossOriginIsolated": true,
+          "navigatorStorageGetDirectory": true,
+          "syncAccessHandle": true,
+          "cryptoSubtle": true
+        },
+        "expected": {
+          "frontierCount": 31,
+          "updateCount": 4127,
+          "digest": "sha256:5c5db83b6b043e1afa8445e810719f3c45a9dc09c77100363fb4a8280f0be530",
+          "rowCount": 95
+        },
+        "exact": {
+          "frontierCount": 31,
+          "updateCount": 4127,
+          "markerCount": 1,
+          "digest": "sha256:5c5db83b6b043e1afa8445e810719f3c45a9dc09c77100363fb4a8280f0be530",
+          "match": true
+        },
+        "metrics": {
+          "markerMs": 3.64,
+          "primaryFrontierMs": 18,
+          "save": {
+            "sampleCount": 30,
+            "percentileMethod": "nearest-rank-ceil",
+            "samplesMs": [
+              22.935,
+              27.255,
+              30.885,
+              35.48,
+              40.74,
+              44.085,
+              44.065,
+              47.68,
+              52.555,
+              55.13,
+              59.305,
+              64.59,
+              69.07,
+              72.585,
+              75.495,
+              79.855,
+              83.315,
+              89.71,
+              91.96,
+              94.405,
+              98.31,
+              105.665,
+              113.41,
+              111.93,
+              119.75,
+              123.815,
+              125.61,
+              126.525,
+              131.265,
+              134.82
+            ],
+            "minMs": 22.935,
+            "p50Ms": 75.495,
+            "p95Ms": 131.265,
+            "p99Ms": 134.82,
+            "maxMs": 134.82,
+            "meanMs": 79.0733
+          }
+        },
+        "rows": {
+          "rowCount": 95,
+          "payloadBytes": 1883270,
+          "kindCounts": {
+            "frontier-chunk": 63,
+            "frontier-manifest": 31,
+            "permanent-rejection": 1
+          },
+          "rowKeysUnique": true
+        },
+        "opfs": {
+          "entries": [
+            {
+              "path": "toonspectrum-studio-sqlite",
+              "kind": "directory",
+              "bytes": null
+            },
+            {
+              "path": "toonspectrum-studio-sqlite/.opaque",
+              "kind": "directory",
+              "bytes": null
+            },
+            {
+              "path": "toonspectrum-studio-sqlite/.opaque/238uu9dwxieh",
+              "kind": "file",
+              "bytes": 4096
+            },
+            {
+              "path": "toonspectrum-studio-sqlite/.opaque/25j0i7gl4at",
+              "kind": "file",
+              "bytes": 2240512
+            },
+            {
+              "path": "toonspectrum-studio-sqlite/.opaque/4dlp23lthc",
+              "kind": "file",
+              "bytes": 4096
+            },
+            {
+              "path": "toonspectrum-studio-sqlite/.opaque/6umcf5jwyvs",
+              "kind": "file",
+              "bytes": 4096
+            },
+            {
+              "path": "toonspectrum-studio-sqlite/.opaque/hzcd3989dc5",
+              "kind": "file",
+              "bytes": 4096
+            },
+            {
+              "path": "toonspectrum-studio-sqlite/.opaque/wi1pa8cnn7m",
+              "kind": "file",
+              "bytes": 4096
+            }
+          ],
+          "fileCount": 6,
+          "totalFileBytes": 2260992,
+          "sqliteTableIndexWalBytes": null,
+          "sqliteTableIndexWalBytesReason": "SAH-pool storage files do not expose portable table/index/WAL attribution"
+        },
+        "storage": {
+          "before": {
+            "usageBytes": 0,
+            "quotaBytes": 1737098859,
+            "availableBytes": 1737098859,
+            "usageDetails": {}
+          },
+          "after": {
+            "usageBytes": 2262358,
+            "quotaBytes": 1737098859,
+            "availableBytes": 1734836501,
+            "usageDetails": {
+              "fileSystem": 2262358
+            }
+          }
+        },
+        "memory": {
+          "before": {
+            "performanceMemory": null,
+            "userAgentSpecific": null
+          },
+          "after": {
+            "performanceMemory": null,
+            "userAgentSpecific": null
+          }
+        },
+        "gracefulCloseCompleted": true,
+        "fallback": {
+          "indexedDbAccessCount": 0,
+          "localStorageAccessCount": 0,
+          "memoryDatabaseOpenCount": 0,
+          "durableMemoryFallbackSuccessCount": 0,
+          "indexedDbProbeInstalled": true,
+          "localStorageProbeInstalled": true,
+          "openedMemoryDatabaseFilenames": []
+        }
+      },
+      "reopen": {
+        "status": "ok",
+        "pass": true,
+        "schemaVersion": 1,
+        "authority": {
+          "kind": "shared-sqlite-opfs-crdt-recovery-v6",
+          "requestedVfs": "opfs",
+          "sqlitePackage": "@sqlite.org/sqlite-wasm 3.53.0-build1",
+          "sqliteOpfsDirectory": "toonspectrum-studio-sqlite",
+          "sqliteFilename": "studio-local-v12.db",
+          "schemaVersion": 6,
+          "table": "crdt_recovery_v12_rows",
+          "installedOpfsDirectories": [
+            "toonspectrum-studio-sqlite"
+          ],
+          "openedOpfsDatabaseFilenames": [
+            "/studio-local-v12.db"
+          ],
+          "openedMemoryDatabaseFilenames": [],
+          "sqliteWasmInitMs": 45.855,
+          "openMs": 9.52
+        },
+        "exact": {
+          "frontierCount": 31,
+          "updateCount": 4127,
+          "markerCount": 1,
+          "digest": "sha256:5c5db83b6b043e1afa8445e810719f3c45a9dc09c77100363fb4a8280f0be530",
+          "expectedDigest": "sha256:5c5db83b6b043e1afa8445e810719f3c45a9dc09c77100363fb4a8280f0be530",
+          "bundleDigest": "sha256:5c5db83b6b043e1afa8445e810719f3c45a9dc09c77100363fb4a8280f0be530",
+          "match": true,
+          "exportedCount": 31,
+          "loadMismatchCount": 0
+        },
+        "metrics": {
+          "load": {
+            "sampleCount": 30,
+            "percentileMethod": "nearest-rank-ceil",
+            "samplesMs": [
+              179.47,
+              127.36,
+              129.305,
+              126.485,
+              134.105,
+              127.32,
+              132.7,
+              126.67,
+              127.8,
+              125.7,
+              126.215,
+              125.82,
+              128.245,
+              124.97,
+              126.725,
+              125.805,
+              127.105,
+              125.77,
+              126.47,
+              125.36,
+              126.89,
+              124.915,
+              126.67,
+              125.335,
+              127.45,
+              125.195,
+              127.4,
+              126.165,
+              127.18,
+              125.345
+            ],
+            "minMs": 124.915,
+            "p50Ms": 126.67,
+            "p95Ms": 134.105,
+            "p99Ms": 179.47,
+            "maxMs": 179.47,
+            "meanMs": 128.7315
+          },
+          "bundleBuild": {
+            "sampleCount": 30,
+            "percentileMethod": "nearest-rank-ceil",
+            "samplesMs": [
+              2.445,
+              0.685,
+              0.645,
+              0.63,
+              0.635,
+              0.675,
+              0.655,
+              0.625,
+              0.635,
+              1.775,
+              0.625,
+              0.655,
+              0.64,
+              0.655,
+              0.635,
+              0.645,
+              0.69,
+              0.675,
+              1.755,
+              0.735,
+              0.73,
+              0.695,
+              0.755,
+              0.63,
+              0.665,
+              0.635,
+              0.645,
+              0.63,
+              1.705,
+              0.76
+            ],
+            "minMs": 0.625,
+            "p50Ms": 0.655,
+            "p95Ms": 1.775,
+            "p99Ms": 2.445,
+            "maxMs": 2.445,
+            "meanMs": 0.8322
+          },
+          "export": {
+            "sampleCount": 31,
+            "percentileMethod": "nearest-rank-ceil",
+            "samplesMs": [
+              6.185,
+              2.795,
+              2.77,
+              2.575,
+              2.56,
+              2.605,
+              2.825,
+              2.59,
+              2.54,
+              2.595,
+              2.42,
+              2.37,
+              2.395,
+              2.345,
+              2.37,
+              2.475,
+              2.445,
+              2.34,
+              2.425,
+              2.475,
+              2.565,
+              2.56,
+              2.465,
+              2.495,
+              2.395,
+              2.39,
+              2.38,
+              2.495,
+              2.605,
+              2.455,
+              2.635
+            ],
+            "minMs": 2.34,
+            "p50Ms": 2.495,
+            "p95Ms": 2.825,
+            "p99Ms": 6.185,
+            "maxMs": 6.185,
+            "meanMs": 2.6303
+          },
+          "bundleBytes": 1853078
+        },
+        "rows": {
+          "rowCount": 95,
+          "payloadBytes": 1883363,
+          "kindCounts": {
+            "frontier-chunk": 63,
+            "frontier-manifest": 31,
+            "permanent-rejection": 1
+          },
+          "rowKeysUnique": true
+        },
+        "gracefulCloseCompleted": true,
+        "fallback": {
+          "indexedDbAccessCount": 0,
+          "localStorageAccessCount": 0,
+          "memoryDatabaseOpenCount": 0,
+          "durableMemoryFallbackSuccessCount": 0,
+          "indexedDbProbeInstalled": true,
+          "localStorageProbeInstalled": true,
+          "openedMemoryDatabaseFilenames": []
+        }
+      }
+    },
+    "forcedTermination": {
+      "pass": true,
+      "workerTerminateCalled": true,
+      "databaseCloseCalledBeforeTerminate": false,
+      "terminateToRecoveryStartDelayMs": 250,
+      "terminationResultAtMonotonicMs": 8113.44,
+      "seed": {
+        "status": "ready-for-terminate",
+        "pass": true,
+        "schemaVersion": 1,
+        "expectedDigest": "sha256:29b92b8bf1a13099d7cb4799751d3e9cc78ca9797012013b002e08b7342070ab",
+        "updateCount": 257,
+        "commitMs": 36.415,
+        "rows": {
+          "rowCount": 5,
+          "payloadBytes": 119390,
+          "kindCounts": {
+            "frontier-chunk": 3,
+            "frontier-manifest": 1,
+            "permanent-rejection": 1
+          },
+          "rowKeysUnique": true
+        },
+        "databaseIntentionallyLeftOpen": true,
+        "fallback": {
+          "indexedDbAccessCount": 0,
+          "localStorageAccessCount": 0,
+          "memoryDatabaseOpenCount": 0,
+          "durableMemoryFallbackSuccessCount": 0,
+          "indexedDbProbeInstalled": true,
+          "localStorageProbeInstalled": true,
+          "openedMemoryDatabaseFilenames": []
+        }
+      },
+      "verify": {
+        "status": "ok",
+        "pass": true,
+        "schemaVersion": 1,
+        "reopenLoadExportMs": 25.74,
+        "exact": {
+          "frontierCount": 1,
+          "updateCount": 257,
+          "markerCount": 1,
+          "digest": "sha256:29b92b8bf1a13099d7cb4799751d3e9cc78ca9797012013b002e08b7342070ab",
+          "expectedDigest": "sha256:29b92b8bf1a13099d7cb4799751d3e9cc78ca9797012013b002e08b7342070ab",
+          "match": true
+        },
+        "rows": {
+          "rowCount": 5,
+          "payloadBytes": 119390,
+          "kindCounts": {
+            "frontier-chunk": 3,
+            "frontier-manifest": 1,
+            "permanent-rejection": 1
+          },
+          "rowKeysUnique": true
+        },
+        "gracefulCloseCompletedAfterVerification": true,
+        "fallback": {
+          "indexedDbAccessCount": 0,
+          "localStorageAccessCount": 0,
+          "memoryDatabaseOpenCount": 0,
+          "durableMemoryFallbackSuccessCount": 0,
+          "indexedDbProbeInstalled": true,
+          "localStorageProbeInstalled": true,
+          "openedMemoryDatabaseFilenames": []
+        }
+      }
+    },
+    "corruption": {
+      "attempted": true,
+      "safeTestSeam": true,
+      "pass": true,
+      "seed": {
+        "status": "corruption-injected",
+        "pass": true,
+        "schemaVersion": 1,
+        "changedRows": 1,
+        "safeSeam": "same sqlite-wasm OPFS SAH-pool raw handle after product DB close",
+        "corruption": "canonical JSON replaced with {} and matching payload_bytes=2",
+        "fallback": {
+          "indexedDbAccessCount": 0,
+          "localStorageAccessCount": 0,
+          "memoryDatabaseOpenCount": 0,
+          "durableMemoryFallbackSuccessCount": 0,
+          "indexedDbProbeInstalled": true,
+          "localStorageProbeInstalled": true,
+          "openedMemoryDatabaseFilenames": []
+        }
+      },
+      "verify": {
+        "status": "ok",
+        "pass": true,
+        "schemaVersion": 1,
+        "failClosed": true,
+        "returnedPartialFrontierCount": 0,
+        "error": {
+          "name": "StudioCrdtRecoveryCorruptionError",
+          "message": "CRDT SQLite 복구 행의 identity 또는 payload가 손상되었습니다.",
+          "stack": "StudioCrdtRecoveryCorruptionError: CRDT SQLite 복구 행의 identity 또는 payload가 손상되었습니다.\n    at T (http://127.0.0.1:54941/assets/studio-crdt-recovery-vault-CZjAeiI1.js:1:4278)\n    at http://127.0.0.1:54941/assets/studio-crdt-recovery-vault-CZjAeiI1.js:1:4589\n    at Array.map (<anonymous>)\n    at Object.list (http://127.0.0.1:54941/assets/studio-crdt-recovery-vault-CZjAeiI1.js:1:4582)\n    at async k.list (http://127.0.0.1:54941/assets/studio-crdt-recovery-vault-CZjAeiI1.js:1:7347)\n    at async G (http://127.0.0.1:54941/assets/crdt-recovery-sqlite-opfs-browser-worker-DHyLDQg7.js:8:342)",
+          "cause": null
+        },
+        "fallback": {
+          "indexedDbAccessCount": 0,
+          "localStorageAccessCount": 0,
+          "memoryDatabaseOpenCount": 0,
+          "durableMemoryFallbackSuccessCount": 0,
+          "indexedDbProbeInstalled": true,
+          "localStorageProbeInstalled": true,
+          "openedMemoryDatabaseFilenames": []
+        }
+      }
+    },
+    "contention": {
+      "attempted": true,
+      "bounded": true,
+      "ownerHoldMs": 1000,
+      "claim": "quarantined-single-owner",
+      "concurrentOwnershipSupported": false,
+      "gatePass": true,
+      "owner": {
+        "status": "ok",
+        "pass": true,
+        "schemaVersion": 1,
+        "workId": "crdt-recovery-opfs-v6-contention-owner",
+        "digest": "sha256:5e3bf50eb74900a03cb6df8e276b860c129ee691af4ad257ef83b4fd9df4cb09",
+        "holdMs": 1000,
+        "gracefulCloseCompleted": true,
+        "fallback": {
+          "indexedDbAccessCount": 0,
+          "localStorageAccessCount": 0,
+          "memoryDatabaseOpenCount": 0,
+          "durableMemoryFallbackSuccessCount": 0,
+          "indexedDbProbeInstalled": true,
+          "localStorageProbeInstalled": true,
+          "openedMemoryDatabaseFilenames": []
+        }
+      },
+      "contender": {
+        "status": "quarantined-single-owner",
+        "pass": false,
+        "schemaVersion": 1,
+        "workId": "crdt-recovery-opfs-v6-contention-contender",
+        "elapsedMs": 36.305,
+        "knownSingleOwnerRejection": true,
+        "error": {
+          "name": "SqliteUnavailableError",
+          "message": "studio local sqlite unavailable: opfs-sahpool vfs install or database open failed: Failed to execute 'createSyncAccessHandle' on 'FileSystemFileHandle': Access Handles cannot be created if there is another open Access Handle or Writable stream associated with the same file.",
+          "stack": "SqliteUnavailableError: studio local sqlite unavailable: opfs-sahpool vfs install or database open failed: Failed to execute 'createSyncAccessHandle' on 'FileSystemFileHandle': Access Handles cannot be created if there is another open Access Handle or Writable stream associated with the same file.\n    at Z (http://127.0.0.1:54941/assets/studio-local-database-DFumYwv_.js:262:1142)\n    at async Module.$ (http://127.0.0.1:54941/assets/studio-local-database-DFumYwv_.js:262:1385)\n    at async M (http://127.0.0.1:54941/assets/crdt-recovery-sqlite-opfs-browser-worker-DHyLDQg7.js:1:6437)\n    at async X (http://127.0.0.1:54941/assets/crdt-recovery-sqlite-opfs-browser-worker-DHyLDQg7.js:8:1441)",
+          "cause": {
+            "name": "NoModificationAllowedError",
+            "message": "Failed to execute 'createSyncAccessHandle' on 'FileSystemFileHandle': Access Handles cannot be created if there is another open Access Handle or Writable stream associated with the same file."
+          }
+        },
+        "fallback": {
+          "indexedDbAccessCount": 0,
+          "localStorageAccessCount": 0,
+          "memoryDatabaseOpenCount": 0,
+          "durableMemoryFallbackSuccessCount": 0,
+          "indexedDbProbeInstalled": true,
+          "localStorageProbeInstalled": true,
+          "openedMemoryDatabaseFilenames": []
+        }
+      },
+      "finalVerification": {
+        "status": "ok",
+        "pass": true,
+        "schemaVersion": 1,
+        "owner": {
+          "exact": true,
+          "digest": "sha256:5e3bf50eb74900a03cb6df8e276b860c129ee691af4ad257ef83b4fd9df4cb09",
+          "expectedDigest": "sha256:5e3bf50eb74900a03cb6df8e276b860c129ee691af4ad257ef83b4fd9df4cb09",
+          "rows": {
+            "rowCount": 4,
+            "payloadBytes": 60677,
+            "kindCounts": {
+              "frontier-chunk": 2,
+              "frontier-manifest": 1,
+              "permanent-rejection": 1
+            },
+            "rowKeysUnique": true
+          }
+        },
+        "contender": {
+          "expectedCommitted": false,
+          "exact": true,
+          "digest": null,
+          "expectedDigest": null,
+          "rows": {
+            "rowCount": 0,
+            "payloadBytes": 0,
+            "kindCounts": {},
+            "rowKeysUnique": true
+          }
+        },
+        "fallback": {
+          "indexedDbAccessCount": 0,
+          "localStorageAccessCount": 0,
+          "memoryDatabaseOpenCount": 0,
+          "durableMemoryFallbackSuccessCount": 0,
+          "indexedDbProbeInstalled": true,
+          "localStorageProbeInstalled": true,
+          "openedMemoryDatabaseFilenames": []
+        }
+      },
+      "quarantinedReason": "Chromium OPFS SAH-pool rejected a concurrent second Worker owner; no support claim is made"
+    },
+    "metrics": {
+      "save": {
+        "sampleCount": 30,
+        "percentileMethod": "nearest-rank-ceil",
+        "samplesMs": [
+          22.935,
+          27.255,
+          30.885,
+          35.48,
+          40.74,
+          44.085,
+          44.065,
+          47.68,
+          52.555,
+          55.13,
+          59.305,
+          64.59,
+          69.07,
+          72.585,
+          75.495,
+          79.855,
+          83.315,
+          89.71,
+          91.96,
+          94.405,
+          98.31,
+          105.665,
+          113.41,
+          111.93,
+          119.75,
+          123.815,
+          125.61,
+          126.525,
+          131.265,
+          134.82
+        ],
+        "minMs": 22.935,
+        "p50Ms": 75.495,
+        "p95Ms": 131.265,
+        "p99Ms": 134.82,
+        "maxMs": 134.82,
+        "meanMs": 79.0733
+      },
+      "load": {
+        "sampleCount": 30,
+        "percentileMethod": "nearest-rank-ceil",
+        "samplesMs": [
+          179.47,
+          127.36,
+          129.305,
+          126.485,
+          134.105,
+          127.32,
+          132.7,
+          126.67,
+          127.8,
+          125.7,
+          126.215,
+          125.82,
+          128.245,
+          124.97,
+          126.725,
+          125.805,
+          127.105,
+          125.77,
+          126.47,
+          125.36,
+          126.89,
+          124.915,
+          126.67,
+          125.335,
+          127.45,
+          125.195,
+          127.4,
+          126.165,
+          127.18,
+          125.345
+        ],
+        "minMs": 124.915,
+        "p50Ms": 126.67,
+        "p95Ms": 134.105,
+        "p99Ms": 179.47,
+        "maxMs": 179.47,
+        "meanMs": 128.7315
+      },
+      "export": {
+        "sampleCount": 31,
+        "percentileMethod": "nearest-rank-ceil",
+        "samplesMs": [
+          6.185,
+          2.795,
+          2.77,
+          2.575,
+          2.56,
+          2.605,
+          2.825,
+          2.59,
+          2.54,
+          2.595,
+          2.42,
+          2.37,
+          2.395,
+          2.345,
+          2.37,
+          2.475,
+          2.445,
+          2.34,
+          2.425,
+          2.475,
+          2.565,
+          2.56,
+          2.465,
+          2.495,
+          2.395,
+          2.39,
+          2.38,
+          2.495,
+          2.605,
+          2.455,
+          2.635
+        ],
+        "minMs": 2.34,
+        "p50Ms": 2.495,
+        "p95Ms": 2.825,
+        "p99Ms": 6.185,
+        "maxMs": 6.185,
+        "meanMs": 2.6303
+      },
+      "bundleBuild": {
+        "sampleCount": 30,
+        "percentileMethod": "nearest-rank-ceil",
+        "samplesMs": [
+          2.445,
+          0.685,
+          0.645,
+          0.63,
+          0.635,
+          0.675,
+          0.655,
+          0.625,
+          0.635,
+          1.775,
+          0.625,
+          0.655,
+          0.64,
+          0.655,
+          0.635,
+          0.645,
+          0.69,
+          0.675,
+          1.755,
+          0.735,
+          0.73,
+          0.695,
+          0.755,
+          0.63,
+          0.665,
+          0.635,
+          0.645,
+          0.63,
+          1.705,
+          0.76
+        ],
+        "minMs": 0.625,
+        "p50Ms": 0.655,
+        "p95Ms": 1.775,
+        "p99Ms": 2.445,
+        "maxMs": 2.445,
+        "meanMs": 0.8322
+      },
+      "payloadBytes": 1883363,
+      "rowCount": 95,
+      "workerPeakMemoryBytes": null,
+      "workerPeakMemoryReason": "Chromium exposes snapshots only; no Worker peak-memory observer is available"
+    },
+    "fallback": {
+      "workerCount": 9,
+      "workerIndexedDbAccessCount": 0,
+      "workerLocalStorageAccessCount": 0,
+      "pageIndexedDbAccessCount": 0,
+      "pageLocalStorageAccessCount": 0,
+      "memoryDatabaseOpenCount": 0,
+      "durableMemoryFallbackSuccessCount": 0,
+      "totalFallbackCount": 0,
+      "workerProbesInstalledInEveryWorker": true,
+      "pageProbes": {
+        "indexedDbProbeInstalled": true,
+        "localStorageProbeInstalled": true
+      }
+    },
+    "pageMemory": {
+      "before": {
+        "performanceMemory": {
+          "usedJSHeapSizeBytes": 689740,
+          "totalJSHeapSizeBytes": 1582160,
+          "jsHeapSizeLimitBytes": 4294705152
+        },
+        "userAgentSpecific": null
+      },
+      "after": {
+        "performanceMemory": {
+          "usedJSHeapSizeBytes": 1351050,
+          "totalJSHeapSizeBytes": 2402314,
+          "jsHeapSizeLimitBytes": 4294705152
+        },
+        "userAgentSpecific": null
+      }
+    },
+    "pageSecurityPolicyViolations": [],
+    "claims": {
+      "browserOpfsDurability": true,
+      "multiWorkerConcurrentOwnership": null,
+      "osCrashPowerLoss": null,
+      "quotaExhaustion": null,
+      "externalCspParity": false
+    },
+    "quarantinedLimitations": [
+      "Concurrent dual-Worker SAH-pool ownership is quarantined on this Chromium build.",
+      "Full Chromium process crash, OS crash, power loss, and hardware fsync semantics are unmeasured.",
+      "Quota exhaustion and full SAH-pool injection remain unmeasured to avoid destabilizing the shared origin.",
+      "Multi-tab authenticated Yjs convergence and server receipt deduplication are separate gates.",
+      "External CSP blind quality parity is not claimed by this storage benchmark."
+    ],
+    "remainingFaultGates": [
+      "full-browser-process-crash",
+      "os-crash-and-power-loss",
+      "opfs-quota-exhaustion",
+      "sah-pool-capacity-exhaustion",
+      "long-duration-multi-tab-contention",
+      "cross-platform-filesystem-matrix"
+    ]
+  },
+  "diagnostics": {
+    "browserVersion": "140.0.7339.186",
+    "consoleErrors": [
+      "opfs-sahpool: NoModificationAllowedError: Failed to execute 'createSyncAccessHandle' on 'FileSystemFileHandle': Access Handles cannot be created if there is another open Access Handle or Writable stream associated with the same file.",
+      "opfs-sahpool: NoModificationAllowedError: Failed to execute 'createSyncAccessHandle' on 'FileSystemFileHandle': Access Handles cannot be created if there is another open Access Handle or Writable stream associated with the same file.",
+      "opfs-sahpool: NoModificationAllowedError: Failed to execute 'createSyncAccessHandle' on 'FileSystemFileHandle': Access Handles cannot be created if there is another open Access Handle or Writable stream associated with the same file.",
+      "opfs-sahpool: NoModificationAllowedError: Failed to execute 'createSyncAccessHandle' on 'FileSystemFileHandle': Access Handles cannot be created if there is another open Access Handle or Writable stream associated with the same file.",
+      "opfs-sahpool: NoModificationAllowedError: Failed to execute 'createSyncAccessHandle' on 'FileSystemFileHandle': Access Handles cannot be created if there is another open Access Handle or Writable stream associated with the same file.",
+      "opfs-sahpool: NoModificationAllowedError: Failed to execute 'createSyncAccessHandle' on 'FileSystemFileHandle': Access Handles cannot be created if there is another open Access Handle or Writable stream associated with the same file.",
+      "opfs-sahpool removeVfs() failed with no recovery strategy: NoModificationAllowedError: Failed to execute 'removeEntry' on 'FileSystemDirectoryHandle': An attempt was made to modify an object where modifications are not allowed."
+    ],
+    "expectedQuarantinedConsoleErrors": [
+      "opfs-sahpool: NoModificationAllowedError: Failed to execute 'createSyncAccessHandle' on 'FileSystemFileHandle': Access Handles cannot be created if there is another open Access Handle or Writable stream associated with the same file.",
+      "opfs-sahpool: NoModificationAllowedError: Failed to execute 'createSyncAccessHandle' on 'FileSystemFileHandle': Access Handles cannot be created if there is another open Access Handle or Writable stream associated with the same file.",
+      "opfs-sahpool: NoModificationAllowedError: Failed to execute 'createSyncAccessHandle' on 'FileSystemFileHandle': Access Handles cannot be created if there is another open Access Handle or Writable stream associated with the same file.",
+      "opfs-sahpool: NoModificationAllowedError: Failed to execute 'createSyncAccessHandle' on 'FileSystemFileHandle': Access Handles cannot be created if there is another open Access Handle or Writable stream associated with the same file.",
+      "opfs-sahpool: NoModificationAllowedError: Failed to execute 'createSyncAccessHandle' on 'FileSystemFileHandle': Access Handles cannot be created if there is another open Access Handle or Writable stream associated with the same file.",
+      "opfs-sahpool: NoModificationAllowedError: Failed to execute 'createSyncAccessHandle' on 'FileSystemFileHandle': Access Handles cannot be created if there is another open Access Handle or Writable stream associated with the same file.",
+      "opfs-sahpool removeVfs() failed with no recovery strategy: NoModificationAllowedError: Failed to execute 'removeEntry' on 'FileSystemDirectoryHandle': An attempt was made to modify an object where modifications are not allowed."
+    ],
+    "unexpectedConsoleErrors": [],
+    "consoleWarnings": [],
+    "pageErrors": [],
+    "requestFailures": [],
+    "errorResponses": [],
+    "requests": [
+      {
+        "method": "GET",
+        "resourceType": "document",
+        "url": "http://127.0.0.1:54941/"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/index-BsrpBWFv.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/crdt-recovery-sqlite-opfs-browser-worker-DHyLDQg7.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/studio-local-database-DFumYwv_.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/studio-local-database-runtime-CXWKDb8o.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/studio-crdt-recovery-vault-CZjAeiI1.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/studio-crdt-protocol-CCItfG2m.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/dist-DyYvbTuS.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:54941/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/crdt-recovery-sqlite-opfs-browser-worker-DHyLDQg7.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/studio-local-database-DFumYwv_.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/studio-local-database-runtime-CXWKDb8o.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/studio-crdt-recovery-vault-CZjAeiI1.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/studio-crdt-protocol-CCItfG2m.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/dist-DyYvbTuS.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:54941/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/crdt-recovery-sqlite-opfs-browser-worker-DHyLDQg7.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/studio-local-database-DFumYwv_.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/studio-local-database-runtime-CXWKDb8o.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/studio-crdt-recovery-vault-CZjAeiI1.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/studio-crdt-protocol-CCItfG2m.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/dist-DyYvbTuS.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:54941/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/crdt-recovery-sqlite-opfs-browser-worker-DHyLDQg7.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/studio-local-database-DFumYwv_.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/studio-local-database-runtime-CXWKDb8o.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/studio-crdt-recovery-vault-CZjAeiI1.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/studio-crdt-protocol-CCItfG2m.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/dist-DyYvbTuS.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:54941/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/crdt-recovery-sqlite-opfs-browser-worker-DHyLDQg7.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/studio-local-database-DFumYwv_.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/studio-local-database-runtime-CXWKDb8o.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/studio-crdt-recovery-vault-CZjAeiI1.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/studio-crdt-protocol-CCItfG2m.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/dist-DyYvbTuS.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:54941/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/crdt-recovery-sqlite-opfs-browser-worker-DHyLDQg7.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/studio-local-database-DFumYwv_.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/studio-local-database-runtime-CXWKDb8o.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/studio-crdt-recovery-vault-CZjAeiI1.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/studio-crdt-protocol-CCItfG2m.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/dist-DyYvbTuS.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:54941/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/crdt-recovery-sqlite-opfs-browser-worker-DHyLDQg7.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/crdt-recovery-sqlite-opfs-browser-worker-DHyLDQg7.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/studio-local-database-DFumYwv_.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/studio-local-database-runtime-CXWKDb8o.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/studio-crdt-recovery-vault-CZjAeiI1.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/studio-crdt-protocol-CCItfG2m.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/dist-DyYvbTuS.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:54941/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/studio-local-database-DFumYwv_.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/studio-local-database-runtime-CXWKDb8o.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/studio-crdt-recovery-vault-CZjAeiI1.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/studio-crdt-protocol-CCItfG2m.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/dist-DyYvbTuS.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:54941/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/crdt-recovery-sqlite-opfs-browser-worker-DHyLDQg7.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/studio-local-database-DFumYwv_.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/studio-local-database-runtime-CXWKDb8o.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/studio-crdt-recovery-vault-CZjAeiI1.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/studio-crdt-protocol-CCItfG2m.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/dist-DyYvbTuS.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:54941/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:54941/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      }
+    ],
+    "responses": [
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/index-BsrpBWFv.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/crdt-recovery-sqlite-opfs-browser-worker-DHyLDQg7.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/studio-local-database-runtime-CXWKDb8o.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/studio-local-database-DFumYwv_.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/studio-crdt-recovery-vault-CZjAeiI1.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/studio-crdt-protocol-CCItfG2m.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/dist-DyYvbTuS.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/crdt-recovery-sqlite-opfs-browser-worker-DHyLDQg7.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/studio-local-database-runtime-CXWKDb8o.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/studio-crdt-recovery-vault-CZjAeiI1.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/studio-crdt-protocol-CCItfG2m.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/studio-local-database-DFumYwv_.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/dist-DyYvbTuS.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/crdt-recovery-sqlite-opfs-browser-worker-DHyLDQg7.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/studio-local-database-runtime-CXWKDb8o.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/studio-crdt-protocol-CCItfG2m.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/studio-crdt-recovery-vault-CZjAeiI1.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/studio-local-database-DFumYwv_.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/dist-DyYvbTuS.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/crdt-recovery-sqlite-opfs-browser-worker-DHyLDQg7.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/studio-local-database-runtime-CXWKDb8o.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/studio-crdt-protocol-CCItfG2m.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/studio-crdt-recovery-vault-CZjAeiI1.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/studio-local-database-DFumYwv_.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/dist-DyYvbTuS.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/crdt-recovery-sqlite-opfs-browser-worker-DHyLDQg7.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/studio-local-database-runtime-CXWKDb8o.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/studio-crdt-protocol-CCItfG2m.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/studio-crdt-recovery-vault-CZjAeiI1.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/studio-local-database-DFumYwv_.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/dist-DyYvbTuS.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/crdt-recovery-sqlite-opfs-browser-worker-DHyLDQg7.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/studio-local-database-runtime-CXWKDb8o.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/studio-crdt-protocol-CCItfG2m.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/studio-crdt-recovery-vault-CZjAeiI1.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/studio-local-database-DFumYwv_.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/dist-DyYvbTuS.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/crdt-recovery-sqlite-opfs-browser-worker-DHyLDQg7.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/crdt-recovery-sqlite-opfs-browser-worker-DHyLDQg7.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/studio-local-database-runtime-CXWKDb8o.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/studio-crdt-protocol-CCItfG2m.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/studio-crdt-recovery-vault-CZjAeiI1.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/studio-local-database-DFumYwv_.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/dist-DyYvbTuS.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/studio-local-database-runtime-CXWKDb8o.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/studio-crdt-protocol-CCItfG2m.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/studio-crdt-recovery-vault-CZjAeiI1.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/studio-local-database-DFumYwv_.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/dist-DyYvbTuS.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/crdt-recovery-sqlite-opfs-browser-worker-DHyLDQg7.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/studio-local-database-runtime-CXWKDb8o.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/studio-crdt-protocol-CCItfG2m.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/studio-crdt-recovery-vault-CZjAeiI1.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/studio-local-database-DFumYwv_.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/dist-DyYvbTuS.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:54941/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      }
+    ],
+    "responseHeaders": {
+      "contentSecurityPolicy": "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'; worker-src 'self'; style-src 'none'; img-src 'none'; font-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+      "crossOriginOpenerPolicy": "same-origin",
+      "crossOriginEmbedderPolicy": "require-corp",
+      "crossOriginResourcePolicy": "same-origin"
+    }
+  },
+  "productionBuild": {
+    "mode": "vite-production-build",
+    "assets": [
+      ".vite/manifest.json",
+      "assets/crdt-recovery-sqlite-opfs-browser-worker-DHyLDQg7.js",
+      "assets/crdt-recovery-sqlite-opfs-browser-worker-DHyLDQg7.js.map",
+      "assets/dist-DyYvbTuS.js",
+      "assets/dist-DyYvbTuS.js.map",
+      "assets/index-BsrpBWFv.js",
+      "assets/index-BsrpBWFv.js.map",
+      "assets/sqlite3-BVKGSWc-.wasm",
+      "assets/sqlite3-opfs-async-proxy-D_xnb1D8.js",
+      "assets/sqlite3-worker1-C2ugQ0WY.js",
+      "assets/sqlite3-worker1-C2ugQ0WY.js.map",
+      "assets/studio-crdt-protocol-CCItfG2m.js",
+      "assets/studio-crdt-protocol-CCItfG2m.js.map",
+      "assets/studio-crdt-recovery-vault-CZjAeiI1.js",
+      "assets/studio-crdt-recovery-vault-CZjAeiI1.js.map",
+      "assets/studio-local-database-DFumYwv_.js",
+      "assets/studio-local-database-DFumYwv_.js.map",
+      "assets/studio-local-database-runtime-CXWKDb8o.js",
+      "assets/studio-local-database-runtime-CXWKDb8o.js.map",
+      "index.html"
+    ],
+    "assetBytes": {
+      ".vite/manifest.json": 131,
+      "assets/crdt-recovery-sqlite-opfs-browser-worker-DHyLDQg7.js": 16587,
+      "assets/crdt-recovery-sqlite-opfs-browser-worker-DHyLDQg7.js.map": 54627,
+      "assets/dist-DyYvbTuS.js": 212780,
+      "assets/dist-DyYvbTuS.js.map": 891250,
+      "assets/index-BsrpBWFv.js": 8991,
+      "assets/index-BsrpBWFv.js.map": 24201,
+      "assets/sqlite3-BVKGSWc-.wasm": 864752,
+      "assets/sqlite3-opfs-async-proxy-D_xnb1D8.js": 32289,
+      "assets/sqlite3-worker1-C2ugQ0WY.js": 210894,
+      "assets/sqlite3-worker1-C2ugQ0WY.js.map": 882199,
+      "assets/studio-crdt-protocol-CCItfG2m.js": 8142,
+      "assets/studio-crdt-protocol-CCItfG2m.js.map": 37158,
+      "assets/studio-crdt-recovery-vault-CZjAeiI1.js": 11314,
+      "assets/studio-crdt-recovery-vault-CZjAeiI1.js.map": 40013,
+      "assets/studio-local-database-DFumYwv_.js": 31021,
+      "assets/studio-local-database-DFumYwv_.js.map": 92413,
+      "assets/studio-local-database-runtime-CXWKDb8o.js": 539,
+      "assets/studio-local-database-runtime-CXWKDb8o.js.map": 2757,
+      "index.html": 263
+    },
+    "totalBytes": 3422321,
+    "scratchDirectory": "/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/toonspectrum-crdt-recovery-sqlite-opfs-dSiasz",
+    "buildMs": 385.2879
+  },
+  "validationIssues": []
+}

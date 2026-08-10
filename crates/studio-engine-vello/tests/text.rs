@@ -70,7 +70,10 @@ fn glyph_paths_render_through_vello_cpu() {
         .chunks_exact(4)
         .filter(|px| px[0] < 200 && px[3] == 255)
         .count();
-    assert!(inked > 150, "expected visible glyph coverage, got {inked} dark pixels");
+    assert!(
+        inked > 150,
+        "expected visible glyph coverage, got {inked} dark pixels"
+    );
 }
 
 #[test]
@@ -172,7 +175,9 @@ fn vertical_newline_forces_column_break() {
     assert_eq!(second.len(), 2);
     // Column 0 (the first written column) is the rightmost.
     assert!(shaped.columns[0].x > shaped.columns[1].x);
-    assert!(first.iter().all(|g| g.x > second.iter().map(|s| s.x).fold(f32::MIN, f32::max)));
+    assert!(first
+        .iter()
+        .all(|g| g.x > second.iter().map(|s| s.x).fold(f32::MIN, f32::max)));
 }
 
 #[test]
@@ -189,15 +194,12 @@ fn vertical_upright_cells_advance_by_1em_fallback_with_warning() {
     assert_eq!(shaped.column_count, 1);
     assert!((shaped.height - 2.0 * font_size).abs() < 1e-3);
     assert!(shaped.glyphs.iter().all(|glyph| !glyph.rotated));
-    // Each cell's glyphs are offset by exactly one cell advance.
+    // Per-font vertical alternates/fallback centering may change each glyph's
+    // local origin, but source order must still progress downward and the
+    // authoritative column height remains exactly two 1em cells.
     let cell0_y = shaped.glyphs.first().map(|glyph| glyph.y).unwrap();
     let cell1_y = shaped.glyphs.last().map(|glyph| glyph.y).unwrap();
-    assert!(
-        (cell1_y - cell0_y - font_size).abs() < 1e-3,
-        "upright cell advance must be 1em: {} vs {}",
-        cell1_y - cell0_y,
-        font_size
-    );
+    assert!(cell1_y > cell0_y);
 }
 
 #[test]
@@ -243,31 +245,148 @@ fn vertical_hangul_without_cjk_font_warns_instead_of_silent_loss() {
 }
 
 #[test]
-fn vertical_punctuation_without_vertical_form_glyph_warns_and_keeps_original() {
-    // Roboto carries neither U+FE41/FE42 vertical corner brackets nor the
-    // originals — the mapping must degrade loudly, never silently.
+fn vertical_punctuation_uses_opentype_or_explicit_geometric_fallback() {
+    // The lane must never hand-map to U+FE presentation-form code points.
+    // Depending on available Fontique fallback fonts, HarfRust either applies
+    // the actual GSUB alternate or the module records a geometric fallback.
     let shaped = shape_text_vertical("「あ」", &roboto(), 24.0, 4000.0).unwrap();
     assert!(!shaped.glyphs.is_empty());
-    assert!(shaped
+    assert!(!shaped
         .warnings
         .iter()
-        .any(|warning| warning.contains("U+FE41") && warning.contains("keeping the original")));
+        .any(|warning| warning.contains("vertical form U+FE")));
+    let first = shaped.glyphs.first().unwrap();
+    let last = shaped.glyphs.last().unwrap();
+    assert!(first.vertical_alternate || first.vertical_fallback.is_some());
+    assert!(last.vertical_alternate || last.vertical_fallback.is_some());
+    assert_eq!(
+        shaped.vertical_features.applied_glyphs
+            + shaped.vertical_features.geometric_fallback_glyphs,
+        shaped
+            .glyphs
+            .iter()
+            .filter(|glyph| glyph.vertical_alternate || glyph.vertical_fallback.is_some())
+            .count()
+    );
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn arial_unicode_applies_real_top_to_bottom_gsub_and_keeps_fallback_explicit() {
+    let path = "/System/Library/Fonts/Supplemental/Arial Unicode.ttf";
+    let Ok(font) = std::fs::read(path) else {
+        return;
+    };
+    let shaped = shape_text_vertical("「」、。！？", &font, 32.0, 4000.0).unwrap();
+    let font_ref = skrifa::FontRef::from_index(&font, 0).unwrap();
+    use skrifa::raw::TableProvider as _;
+    let raw_feature_tags: Vec<String> = font_ref
+        .gsub()
+        .ok()
+        .and_then(|gsub| gsub.feature_list().ok())
+        .map(|features| {
+            features
+                .feature_records()
+                .iter()
+                .map(|record| record.feature_tag().to_string())
+                .collect()
+        })
+        .unwrap_or_default();
+    assert_eq!(shaped.glyphs.len(), 6);
+    let evidence: Vec<_> = shaped
+        .glyphs
+        .iter()
+        .map(|glyph| {
+            (
+                glyph.glyph_id,
+                glyph.vertical_alternate,
+                glyph.vertical_fallback,
+            )
+        })
+        .collect();
+    assert!(
+        shaped.vertical_features.font_has_vert || shaped.vertical_features.font_has_vrt2,
+        "Arial Unicode must advertise a vertical GSUB feature: tags={raw_feature_tags:?}, \
+         glyphs={evidence:?}"
+    );
+    assert!(
+        shaped.vertical_features.applied_glyphs > 0,
+        "expected HarfRust TTB vert/vrt2 substitutions, glyphs={evidence:?}, warnings={:?}",
+        shaped.warnings
+    );
     assert!(shaped
+        .glyphs
+        .iter()
+        .all(|glyph| glyph.vertical_alternate || glyph.vertical_fallback.is_some()));
+    assert_eq!(
+        shaped.vertical_features.applied_glyphs
+            + shaped.vertical_features.geometric_fallback_glyphs,
+        6
+    );
+    assert!(!shaped
         .warnings
         .iter()
-        .any(|warning| warning.contains("U+FE42")));
+        .any(|warning| warning.contains("U+FE")));
+    let json = shaped_text_vertical_to_json(&shaped);
+    assert!(json.contains(r#""requested":["vert","vrt2"]"#));
+    assert!(json.contains(r#""application":"applied""#));
+    assert!(
+        json.contains(r#""strategy":"mixed""#)
+            || json.contains(r#""strategy":"opentype-vert-vrt2""#)
+    );
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn adjacent_japanese_closing_opening_brackets_keep_two_ttb_cells() {
+    let path = "/System/Library/Fonts/Supplemental/Arial Unicode.ttf";
+    let Ok(font) = std::fs::read(path) else {
+        return;
+    };
+    let shaped = shape_text_vertical("」「", &font, 32.0, 4000.0).unwrap();
+    assert_eq!(shaped.glyphs.len(), 2);
+    assert!((shaped.height - 64.0).abs() < 1e-3);
+    assert!(shaped.glyphs[1].y > shaped.glyphs[0].y);
+    assert!(shaped.glyphs.iter().all(|glyph| glyph.vertical_alternate));
+    assert!(shaped
+        .glyphs
+        .iter()
+        .all(|glyph| glyph.vertical_fallback.is_none() && !glyph.rotated));
 }
 
 #[test]
-fn vertical_short_digit_runs_flag_tate_chu_yoko_as_v2() {
+fn vertical_short_digit_runs_compose_tate_chu_yoko_in_one_cell() {
     let shaped = shape_text_vertical("2026", &roboto(), 24.0, 4000.0).unwrap();
-    assert!(shaped
+    assert!(!shaped
         .warnings
         .iter()
-        .any(|warning| warning.contains("tate-chu-yoko") && warning.contains("2026")));
-    // The digits still rotate and render as a normal Latin run (no drop).
+        .any(|warning| warning.contains("tate-chu-yoko")));
     assert_eq!(shaped.glyphs.len(), 4);
+    assert!(shaped.glyphs.iter().all(|glyph| !glyph.rotated));
+    assert!(shaped.glyphs.iter().all(|glyph| glyph.tate_chu_yoko));
+    assert!((shaped.height - 24.0).abs() < 1e-3);
+    for glyph in &shaped.glyphs {
+        for verb in &glyph.verbs {
+            for (x_key, y_key) in [("x", "y"), ("cx", "cy"), ("c1x", "c1y"), ("c2x", "c2y")] {
+                let (Some(x), Some(y)) = (
+                    verb.get(x_key).and_then(|value| value.as_f64()),
+                    verb.get(y_key).and_then(|value| value.as_f64()),
+                ) else {
+                    continue;
+                };
+                assert!((-1e-3..=24.0 + 1e-3).contains(&x));
+                assert!((-1e-3..=24.0 + 1e-3).contains(&y));
+            }
+        }
+    }
+}
+
+#[test]
+fn vertical_five_digit_run_stays_rotated_not_tate_chu_yoko() {
+    let shaped = shape_text_vertical("12345", &roboto(), 24.0, 4000.0).unwrap();
+    assert_eq!(shaped.glyphs.len(), 5);
     assert!(shaped.glyphs.iter().all(|glyph| glyph.rotated));
+    assert!(shaped.glyphs.iter().all(|glyph| !glyph.tate_chu_yoko));
 }
 
 #[test]
@@ -297,5 +416,8 @@ fn vertical_glyph_paths_render_through_vello_cpu() {
         .chunks_exact(4)
         .filter(|px| px[0] < 200 && px[3] == 255)
         .count();
-    assert!(inked > 150, "expected visible vertical glyph coverage, got {inked} dark pixels");
+    assert!(
+        inked > 150,
+        "expected visible vertical glyph coverage, got {inked} dark pixels"
+    );
 }

@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "measuredAt": "2026-08-10T05:41:00.303Z",
+  "lane": "retained-webgpu-filter-presentation",
+  "environment": {
+    "browser": "Chromium 140.0.7339.186",
+    "backend": "metal",
+    "headless": true,
+    "adapterInfoExposed": false
+  },
+  "workload": {
+    "width": 512,
+    "height": 512,
+    "warmupFrames": 5,
+    "measuredFrames": 40,
+    "filterChain": [
+      "brightness",
+      "contrast",
+      "hsl",
+      "levels",
+      "curve",
+      "color-balance"
+    ]
+  },
+  "retainedSurface": {
+    "stableCanvasIdentity": true,
+    "mapAsyncInstrumentation": true,
+    "mapCallsBeforeSettle": 0,
+    "mapCallsAfterSettle": 1,
+    "settleMapCalls": 1
+  },
+  "submitLatencyMs": {
+    "p50": 1.100000023841858,
+    "p95": 3.900000035762787,
+    "p99": 4.300000011920929
+  },
+  "visibleFrameLatencyMs": {
+    "p50": 16.69999998807907,
+    "p95": 17.899999976158142,
+    "p99": 18.5
+  },
+  "finalCanonicalReadbackMs": 3.900000035762787,
+  "presentationVsCanonical": {
+    "maxChannelDelta": 0,
+    "maxAlphaDelta": 0,
+    "changedChannels": 0,
+    "meanAbsoluteDelta": 0
+  },
+  "gates": {
+    "interactiveGpuToCpuReadbacks": 0,
+    "finalCanonicalReadbacks": 1,
+    "onePrimarySurfaceOwner": true,
+    "presentationMaxChannelDelta": 0,
+    "passed": true
+  },
+  "notes": [
+    "Submit latency covers compute planning, command submission, validation scopes, and direct GPUCanvas presentation without staging-buffer mapping.",
+    "Visible-frame latency includes the next requestAnimationFrame boundary.",
+    "The displayed GPUCanvas was sampled only after the simulated drag settled for benchmark quality validation; product interactive code does not call getImageData."
+  ]
+}

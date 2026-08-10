@@ -1,0 +1,159 @@
+ToonSpectrum studio-engine-vello third-party NOTICE
+
+Artifact: pkg-gpu
+Target: wasm32-unknown-unknown
+Cargo features: fabric,lottie,svg
+Locked external crates: 144
+
+This NOTICE accompanies the checked-in JavaScript/WASM artifact. Exact license
+texts are in THIRD_PARTY_LICENSES.txt and the machine-checked provenance is in
+../THIRD_PARTY_INVENTORY.json. No upstream NOTICE file was omitted: crate root
+LICENSE, COPYING, and NOTICE files discovered in the reviewed source graph are
+copied into the bundle and hash-locked.
+
+| Package | SPDX/license expression | Upstream |
+| --- | --- | --- |
+| adler2@2.0.1 | 0BSD OR MIT OR Apache-2.0 | https://github.com/oyvindln/adler2 |
+| arrayref@0.3.9 | BSD-2-Clause | https://github.com/droundy/arrayref |
+| arrayvec@0.7.8 | MIT OR Apache-2.0 | https://github.com/bluss/arrayvec |
+| base64@0.22.1 | MIT OR Apache-2.0 | https://github.com/marshallpierce/rust-base64 |
+| bitflags@2.13.1 | MIT OR Apache-2.0 | https://github.com/bitflags/bitflags |
+| bumpalo@3.20.3 | MIT OR Apache-2.0 | https://github.com/fitzgen/bumpalo |
+| bytemuck@1.25.2 | Zlib OR Apache-2.0 OR MIT | https://github.com/Lokathor/bytemuck |
+| bytemuck_derive@1.12.0 | Zlib OR Apache-2.0 OR MIT | https://github.com/Lokathor/bytemuck |
+| cfg-if@1.0.4 | MIT OR Apache-2.0 | https://github.com/rust-lang/cfg-if |
+| color@0.3.3 | Apache-2.0 OR MIT | https://github.com/linebender/color |
+| core_maths@0.1.1 | MIT | https://github.com/robertbastian/core_maths |
+| crc32fast@1.5.0 | MIT OR Apache-2.0 | https://github.com/srijs/rust-crc32fast |
+| data-url@0.3.2 | MIT OR Apache-2.0 | https://github.com/servo/rust-url |
+| displaydoc@0.2.7 | MIT OR Apache-2.0 | https://github.com/yaahc/displaydoc |
+| document-features@0.2.12 | MIT OR Apache-2.0 | https://github.com/slint-ui/document-features |
+| euclid@0.22.14 | MIT OR Apache-2.0 | https://github.com/servo/euclid |
+| fdeflate@0.3.7 | MIT OR Apache-2.0 | https://github.com/image-rs/fdeflate |
+| fearless_simd@0.4.1 | Apache-2.0 OR MIT | https://github.com/linebender/fearless_simd |
+| flate2@1.1.9 | MIT OR Apache-2.0 | https://github.com/rust-lang/flate2-rs |
+| float-cmp@0.9.0 | MIT | https://github.com/mikedilger/float-cmp |
+| foldhash@0.2.0 | Zlib | https://github.com/orlp/foldhash |
+| font-types@0.11.3 | MIT OR Apache-2.0 | https://github.com/googlefonts/fontations |
+| font-types@0.12.2 | MIT OR Apache-2.0 | https://github.com/googlefonts/fontations |
+| fontdb@0.23.0 | MIT | https://github.com/RazrFalcon/fontdb |
+| fontique@0.11.0 | Apache-2.0 OR MIT | https://github.com/linebender/parley |
+| futures-core@0.3.33 | MIT OR Apache-2.0 | https://github.com/rust-lang/futures-rs |
+| futures-intrusive@0.5.0 | MIT OR Apache-2.0 | https://github.com/Matthias247/futures-intrusive |
+| futures-task@0.3.33 | MIT OR Apache-2.0 | https://github.com/rust-lang/futures-rs |
+| futures-util@0.3.33 | MIT OR Apache-2.0 | https://github.com/rust-lang/futures-rs |
+| glifo@0.3.0 | Apache-2.0 OR MIT | https://github.com/linebender/vello |
+| guillotiere@0.7.0 | MIT/Apache-2.0 | https://github.com/nical/guillotiere |
+| harfrust@0.10.0 | MIT | https://github.com/harfbuzz/harfrust |
+| hashbrown@0.16.1 | MIT OR Apache-2.0 | https://github.com/rust-lang/hashbrown |
+| hashbrown@0.17.1 | MIT OR Apache-2.0 | https://github.com/rust-lang/hashbrown |
+| icu_collections@2.2.0 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
+| icu_locale@2.2.0 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
+| icu_locale_core@2.2.0 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
+| icu_locale_data@2.2.0 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
+| icu_normalizer@2.2.0 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
+| icu_normalizer_data@2.2.0 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
+| icu_properties@2.2.0 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
+| icu_properties_data@2.2.0 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
+| icu_provider@2.2.0 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
+| icu_segmenter@2.2.0 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
+| icu_segmenter_data@2.2.0 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
+| imagesize@0.14.0 | MIT | https://github.com/Roughsketch/imagesize |
+| itoa@1.0.18 | MIT OR Apache-2.0 | https://github.com/dtolnay/itoa |
+| js-sys@0.3.103 | MIT OR Apache-2.0 | https://github.com/wasm-bindgen/wasm-bindgen/tree/master/crates/js-sys |
+| kurbo@0.13.1 | Apache-2.0 OR MIT | https://github.com/linebender/kurbo |
+| libm@0.2.16 | MIT | https://github.com/rust-lang/compiler-builtins |
+| linebender_resource_handle@0.1.1 | Apache-2.0 OR MIT | https://github.com/linebender/raw_resource_handle |
+| litemap@0.8.2 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
+| litrs@1.0.0 | MIT OR Apache-2.0 | https://github.com/LukasKalbertodt/litrs |
+| lock_api@0.4.14 | MIT OR Apache-2.0 | https://github.com/Amanieu/parking_lot |
+| log@0.4.33 | MIT OR Apache-2.0 | https://github.com/rust-lang/log |
+| memchr@2.8.3 | Unlicense OR MIT | https://github.com/BurntSushi/memchr |
+| memmap2@0.9.11 | MIT OR Apache-2.0 | https://github.com/RazrFalcon/memmap2-rs |
+| miniz_oxide@0.8.9 | MIT OR Zlib OR Apache-2.0 | https://github.com/Frommi/miniz_oxide/tree/master/miniz_oxide |
+| num-traits@0.2.19 | MIT OR Apache-2.0 | https://github.com/rust-num/num-traits |
+| once_cell@1.21.4 | MIT OR Apache-2.0 | https://github.com/matklad/once_cell |
+| parking_lot@0.12.5 | MIT OR Apache-2.0 | https://github.com/Amanieu/parking_lot |
+| parking_lot_core@0.9.12 | MIT OR Apache-2.0 | https://github.com/Amanieu/parking_lot |
+| parlance@0.1.0 | Apache-2.0 OR MIT | https://github.com/linebender/parley |
+| parley@0.11.0 | Apache-2.0 OR MIT | https://github.com/linebender/parley |
+| parley_data@0.11.0 | Apache-2.0 OR MIT | https://github.com/linebender/parley |
+| peniko@0.6.1 | Apache-2.0 OR MIT | https://github.com/linebender/peniko |
+| pico-args@0.5.0 | MIT | https://github.com/RazrFalcon/pico-args |
+| pin-project-lite@0.2.17 | Apache-2.0 OR MIT | https://github.com/taiki-e/pin-project-lite |
+| png@0.18.1 | MIT OR Apache-2.0 | https://github.com/image-rs/image-png |
+| polycool@0.4.0 | MIT OR Apache-2.0 | https://github.com/linebender/kurbo |
+| potential_utf@0.1.5 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
+| proc-macro2@1.0.107 | MIT OR Apache-2.0 | https://github.com/dtolnay/proc-macro2 |
+| profiling@1.0.18 | MIT OR Apache-2.0 | https://github.com/aclysma/profiling |
+| quote@1.0.47 | MIT OR Apache-2.0 | https://github.com/dtolnay/quote |
+| raw-window-handle@0.6.2 | MIT OR Apache-2.0 OR Zlib | https://github.com/rust-windowing/raw-window-handle |
+| read-fonts@0.39.2 | MIT OR Apache-2.0 | https://github.com/googlefonts/fontations |
+| read-fonts@0.40.2 | MIT OR Apache-2.0 | https://github.com/googlefonts/fontations |
+| read-fonts@0.41.0 | MIT OR Apache-2.0 | https://github.com/googlefonts/fontations |
+| roxmltree@0.21.1 | MIT OR Apache-2.0 | https://github.com/RazrFalcon/roxmltree |
+| rustybuzz@0.20.1 | MIT | https://github.com/harfbuzz/rustybuzz |
+| scopeguard@1.2.0 | MIT OR Apache-2.0 | https://github.com/bluss/scopeguard |
+| serde@1.0.229 | MIT OR Apache-2.0 | https://github.com/serde-rs/serde |
+| serde_core@1.0.229 | MIT OR Apache-2.0 | https://github.com/serde-rs/serde |
+| serde_derive@1.0.229 | MIT OR Apache-2.0 | https://github.com/serde-rs/serde |
+| serde_json@1.0.151 | MIT OR Apache-2.0 | https://github.com/serde-rs/json |
+| serde_repr@0.1.21 | MIT OR Apache-2.0 | https://github.com/dtolnay/serde-repr |
+| simd-adler32@0.3.10 | MIT | https://github.com/mcountryman/simd-adler32 |
+| simplecss@0.2.2 | Apache-2.0 OR MIT | https://github.com/linebender/simplecss |
+| siphasher@1.0.3 | MIT/Apache-2.0 | https://github.com/jedisct1/rust-siphash |
+| skrifa@0.42.1 | MIT OR Apache-2.0 | https://github.com/googlefonts/fontations |
+| skrifa@0.43.2 | MIT OR Apache-2.0 | https://github.com/googlefonts/fontations |
+| skrifa@0.44.0 | MIT OR Apache-2.0 | https://github.com/googlefonts/fontations |
+| slab@0.4.12 | MIT | https://github.com/tokio-rs/slab |
+| slotmap@1.1.1 | Zlib | https://github.com/orlp/slotmap |
+| smallvec@1.15.2 | MIT OR Apache-2.0 | https://github.com/servo/rust-smallvec |
+| stable_deref_trait@1.2.1 | MIT OR Apache-2.0 | https://github.com/storyyeller/stable_deref_trait |
+| static_assertions@1.1.0 | MIT OR Apache-2.0 | https://github.com/nvzqz/static-assertions-rs |
+| strict-num@0.1.1 | MIT | https://github.com/RazrFalcon/strict-num |
+| svg_fmt@0.4.5 | MIT/Apache-2.0 | https://github.com/nical/rust_debug |
+| svgtypes@0.16.1 | Apache-2.0 OR MIT | https://github.com/linebender/svgtypes |
+| syn@2.0.119 | MIT OR Apache-2.0 | https://github.com/dtolnay/syn |
+| syn@3.0.3 | MIT OR Apache-2.0 | https://github.com/dtolnay/syn |
+| synstructure@0.13.2 | MIT | https://github.com/mystor/synstructure |
+| thiserror-impl@2.0.19 | MIT OR Apache-2.0 | https://github.com/dtolnay/thiserror |
+| thiserror@2.0.19 | MIT OR Apache-2.0 | https://github.com/dtolnay/thiserror |
+| tiny-skia-path@0.11.4 | BSD-3-Clause | https://github.com/RazrFalcon/tiny-skia/tree/master/path |
+| tinystr@0.8.3 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
+| tinyvec@1.12.0 | Zlib OR Apache-2.0 OR MIT | https://github.com/Lokathor/tinyvec |
+| tinyvec_macros@0.1.1 | MIT OR Apache-2.0 OR Zlib | https://github.com/Soveu/tinyvec_macros |
+| ttf-parser@0.25.1 | MIT OR Apache-2.0 | https://github.com/harfbuzz/ttf-parser |
+| unicode-bidi-mirroring@0.4.0 | MIT/Apache-2.0 | https://github.com/RazrFalcon/unicode-bidi-mirroring |
+| unicode-bidi@0.3.18 | MIT OR Apache-2.0 | https://github.com/servo/unicode-bidi |
+| unicode-ccc@0.4.0 | MIT/Apache-2.0 | https://github.com/RazrFalcon/unicode-ccc |
+| unicode-ident@1.0.24 | (MIT OR Apache-2.0) AND Unicode-3.0 | https://github.com/dtolnay/unicode-ident |
+| unicode-properties@0.1.4 | MIT/Apache-2.0 | https://github.com/unicode-rs/unicode-properties |
+| unicode-script@0.5.8 | MIT OR Apache-2.0 | https://github.com/unicode-rs/unicode-script |
+| unicode-vo@0.1.0 | MIT/Apache-2.0 | https://github.com/RazrFalcon/unicode-vo |
+| usvg@0.46.0 | Apache-2.0 OR MIT | https://github.com/linebender/resvg |
+| utf8_iter@1.0.4 | Apache-2.0 OR MIT | https://github.com/hsivonen/utf8_iter |
+| velato@0.11.0 | Apache-2.0 OR MIT | https://github.com/linebender/velato |
+| vello@0.9.0 | Apache-2.0 OR MIT | https://github.com/linebender/vello |
+| vello_common@0.2.0 | Apache-2.0 OR MIT | https://github.com/linebender/vello |
+| vello_cpu@0.2.0 | Apache-2.0 OR MIT | https://github.com/linebender/vello |
+| vello_encoding@0.9.0 | Apache-2.0 OR MIT | https://github.com/linebender/vello |
+| vello_shaders@0.9.0 | Apache-2.0 OR MIT | https://github.com/linebender/vello |
+| vello_svg@0.10.0 | Apache-2.0 OR MIT | https://github.com/linebender/vello_svg |
+| wasm-bindgen-futures@0.4.76 | MIT OR Apache-2.0 | https://github.com/wasm-bindgen/wasm-bindgen/tree/master/crates/futures |
+| wasm-bindgen-macro-support@0.2.126 | MIT OR Apache-2.0 | https://github.com/wasm-bindgen/wasm-bindgen/tree/master/crates/macro-support |
+| wasm-bindgen-macro@0.2.126 | MIT OR Apache-2.0 | https://github.com/wasm-bindgen/wasm-bindgen/tree/master/crates/macro |
+| wasm-bindgen-shared@0.2.126 | MIT OR Apache-2.0 | https://github.com/wasm-bindgen/wasm-bindgen/tree/master/crates/shared |
+| wasm-bindgen@0.2.126 | MIT OR Apache-2.0 | https://github.com/wasm-bindgen/wasm-bindgen |
+| web-sys@0.3.103 | MIT OR Apache-2.0 | https://github.com/wasm-bindgen/wasm-bindgen/tree/master/crates/web-sys |
+| wgpu-types@29.0.4 | MIT OR Apache-2.0 | https://github.com/gfx-rs/wgpu |
+| wgpu@29.0.4 | MIT OR Apache-2.0 | https://github.com/gfx-rs/wgpu |
+| writeable@0.6.3 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
+| xmlwriter@0.1.0 | MIT | https://github.com/RazrFalcon/xmlwriter |
+| yoke-derive@0.8.2 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
+| yoke@0.8.3 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
+| zerofrom-derive@0.1.7 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
+| zerofrom@0.1.8 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
+| zerotrie@0.2.4 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
+| zerovec-derive@0.11.3 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
+| zerovec@0.11.6 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
+| zmij@1.0.23 | MIT | https://github.com/dtolnay/zmij |

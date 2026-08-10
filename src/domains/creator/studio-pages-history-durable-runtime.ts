@@ -2,6 +2,11 @@ import {
   calculateStudioCrc32,
 } from "./studio-crc32";
 import {
+  SqliteUnavailableError,
+  type StudioLocalDatabase,
+} from "./studio-local-database";
+import { acquireStudioLocalDatabase } from "./studio-local-database-runtime";
+import {
   selectStudioOpfsFileSystem,
   type StudioOpfsFileSystemSelection,
   type StudioOpfsStorageManagerLike,
@@ -27,10 +32,12 @@ import {
 } from "./studio-opfs-recovery-runtime";
 import {
   createStudioPagesHistoryCommandJournal,
+  restoreStudioPagesHistoryCommandJournal,
   type StudioHistoryJournalNavigationTarget,
   type StudioHistoryJournalNavigationResult,
   type StudioHistoryJournalTransitionInput,
 } from "./studio-pages-history-command-journal";
+import { createStudioPagesHistorySqliteRecovery } from "./studio-pages-history-sqlite-recovery";
 
 const RECOVERY_DATABASE_NAME = "toonspectrum-studio-crdt-recovery-vault";
 const RECOVERY_DATABASE_VERSION = 1;
@@ -44,8 +51,9 @@ const HISTORY_RECOVERY_MAX_BYTES = 64 * 1024 * 1024;
 const HISTORY_RECOVERY_CHECKPOINT_INTERVAL = 48;
 const HISTORY_RECOVERY_COALESCED_IDLE_MS = 350;
 const TEXT_ENCODER = new TextEncoder();
+const TEXT_DECODER = new TextDecoder("utf-8", { fatal: true });
 
-interface StudioPagesHistoryRecoveryPort {
+export interface StudioPagesHistoryRecoveryPort {
   scanLatest(options?: StudioOpfsRecoveryMutationOptions): Promise<StudioOpfsRecoveryScan>;
   acquireWriter(input: {
     readonly ownerId: string;
@@ -61,6 +69,8 @@ interface StudioPagesHistoryRecoveryPort {
   ): Promise<StudioOpfsRecoveryEntry>;
   flush(options?: StudioOpfsRecoveryMutationOptions): Promise<void>;
   abort(reason?: unknown): Promise<void>;
+  /** Optional durable payload access used to restore the verified command frontier. */
+  readLatestPayload?(): Promise<Uint8Array | null>;
 }
 
 interface StudioPagesHistoryCommandJournalPort {
@@ -124,11 +134,18 @@ interface StudioPagesHistoryDurableRuntimeOptions {
     removeEventListener(type: "pagehide", listener: () => void): void;
   } | null;
   readonly onError?: (cause: unknown) => void;
+  readonly persistenceKind?: StudioPagesHistoryPersistenceKind;
 }
+
+export type StudioPagesHistoryPersistenceKind = "sqlite-opfs" | "legacy-opfs-or-indexeddb";
 
 export interface CreateDefaultStudioPagesHistoryDurableRuntimeOptions {
   readonly initialTarget: StudioHistoryJournalNavigationTarget | null;
   readonly onError?: (cause: unknown) => void;
+  /** Test/embedding seam; production opens the OPFS SAH-pool SQLite database. */
+  readonly openDatabase?: () => Promise<StudioLocalDatabase>;
+  /** Explicit emergency rollback only. SQLite is the product default. */
+  readonly preferSqlite?: boolean;
 }
 
 interface BrowserRecoveryScope {
@@ -684,12 +701,14 @@ export class StudioPagesHistoryDurableRuntime
   readonly #recovery: StudioPagesHistoryRecoveryPort;
   readonly #pageId: string;
   readonly #onError: ((cause: unknown) => void) | undefined;
+  readonly persistenceKind: StudioPagesHistoryPersistenceKind;
   #lastSequence: number;
   #revision: number;
   #writesSinceCheckpoint = 0;
   #tail: Promise<void> = Promise.resolve();
   #durabilityFailed = false;
   #disposed = false;
+  #closePromise: Promise<void> | null = null;
   #removePageHide: (() => void) | null = null;
   #coalescedTimer: ReturnType<typeof setTimeout> | null = null;
   #coalescedPending = false;
@@ -699,6 +718,7 @@ export class StudioPagesHistoryDurableRuntime
     this.#recovery = options.recovery;
     this.#pageId = options.pageId;
     this.#onError = options.onError;
+    this.persistenceKind = options.persistenceKind ?? "legacy-opfs-or-indexeddb";
     this.#lastSequence = options.initialScan.lastSequence;
     this.#revision = options.initialScan.entries.at(-1)?.revision ?? 0;
     const target = options.eventTarget;
@@ -830,12 +850,20 @@ export class StudioPagesHistoryDurableRuntime
   }
 
   dispose(): void {
-    if (this.#disposed) return;
+    void this.close();
+  }
+
+  close(): Promise<void> {
+    if (this.#closePromise) return this.#closePromise;
     this.#flushCoalescedWrite();
     this.#disposed = true;
     this.#removePageHide?.();
     this.#removePageHide = null;
-    void this.#tail.finally(() => this.#recovery.abort("history-runtime-disposed"));
+    this.#closePromise = this.#tail.then(
+      () => this.#recovery.abort("history-runtime-disposed"),
+      () => this.#recovery.abort("history-runtime-disposed"),
+    );
+    return this.#closePromise;
   }
 }
 
@@ -844,47 +872,89 @@ export async function createDefaultStudioPagesHistoryDurableRuntime(
   scope: BrowserRecoveryScope = globalThis as unknown as BrowserRecoveryScope,
 ): Promise<StudioPagesHistoryDurableRuntime> {
   const identity = recoveryIdentity(options.initialTarget);
-  let selection: StudioOpfsFileSystemSelection | null = null;
-  const vault = createStudioPagesHistoryIndexedDbRecoveryVault({
-    identity,
-    indexedDB: scope.indexedDB ?? null,
-  });
-  const recovery: StudioOpfsRecoveryRuntime =
-    await createStudioOpfsRecoveryRuntime({
-      probeCapabilities: async () => {
-        selection = await selectStudioOpfsFileSystem(scope, {
-          rootName: "toonspectrum-studio-history-recovery",
-        });
-        return {
-          fileSystemKind: selection.kind,
-          originLockAvailable: typeof scope.navigator?.locks?.request === "function",
-        };
-      },
-      createOpfsJournal: () => {
-        if (!selection || selection.kind !== "opfs") {
-          throw new Error("선택되지 않은 OPFS history recovery journal입니다.");
-        }
-        return createStudioOpfsRecoveryJournal({
-          identity,
-          adapter: createStudioOpfsRecoveryJournalAdapter({
-            fileSystem: selection.fs,
-            lockManager: scope.navigator?.locks ?? null,
-            quotaEstimator: scope.navigator?.storage?.estimate
-              ? {
-                  estimate: () => scope.navigator!.storage!.estimate!(),
-                }
-              : null,
-          }),
-        });
-      },
-      existingRecoveryVault: vault,
+  const reportInitializationError = (cause: unknown): void => {
+    try {
+      options.onError?.(cause);
+    } catch {
+      // Diagnostics cannot turn an available persistence fallback into a startup failure.
+    }
+  };
+  let recovery: StudioPagesHistoryRecoveryPort | null = null;
+  let persistenceKind: StudioPagesHistoryPersistenceKind = "legacy-opfs-or-indexeddb";
+  if (options.preferSqlite !== false) {
+    try {
+      const database = await (options.openDatabase?.()
+        ?? acquireStudioLocalDatabase());
+      recovery = createStudioPagesHistorySqliteRecovery({
+        database,
+        identity,
+        closeDatabaseOnAbort: false,
+        lockManager: scope.navigator?.locks ?? null,
+      });
+      persistenceKind = "sqlite-opfs";
+    } catch (cause) {
+      // OPFS/SQLite capability absence is an explicit, observable legacy fallback. Unexpected
+      // initialization failures are also reported to the existing diagnostics channel.
+      if (!(cause instanceof SqliteUnavailableError)) reportInitializationError(cause);
+    }
+  }
+  if (recovery === null) {
+    let selection: StudioOpfsFileSystemSelection | null = null;
+    const vault = createStudioPagesHistoryIndexedDbRecoveryVault({
+      identity,
+      indexedDB: scope.indexedDB ?? null,
     });
+    const legacyRecovery: StudioOpfsRecoveryRuntime =
+      await createStudioOpfsRecoveryRuntime({
+        probeCapabilities: async () => {
+          selection = await selectStudioOpfsFileSystem(scope, {
+            rootName: "toonspectrum-studio-history-recovery",
+          });
+          return {
+            fileSystemKind: selection.kind,
+            originLockAvailable: typeof scope.navigator?.locks?.request === "function",
+          };
+        },
+        createOpfsJournal: () => {
+          if (!selection || selection.kind !== "opfs") {
+            throw new Error("선택되지 않은 OPFS history recovery journal입니다.");
+          }
+          return createStudioOpfsRecoveryJournal({
+            identity,
+            adapter: createStudioOpfsRecoveryJournalAdapter({
+              fileSystem: selection.fs,
+              lockManager: scope.navigator?.locks ?? null,
+              quotaEstimator: scope.navigator?.storage?.estimate
+                ? {
+                    estimate: () => scope.navigator!.storage!.estimate!(),
+                  }
+                : null,
+            }),
+          });
+        },
+        existingRecoveryVault: vault,
+      });
+    recovery = legacyRecovery;
+  }
   const initialScan = await recovery.scanLatest();
   const ownerId = typeof scope.crypto?.randomUUID === "function"
     ? `history-${scope.crypto.randomUUID()}`
     : `history-${historyHash(`${Date.now()}:${identity.documentId}`)}`;
   await recovery.acquireWriter({ ownerId });
-  const commandJournal = createStudioPagesHistoryCommandJournal();
+  let commandJournal = createStudioPagesHistoryCommandJournal();
+  const latestPayload = await recovery.readLatestPayload?.();
+  if (latestPayload && options.initialTarget) {
+    try {
+      const restored = restoreStudioPagesHistoryCommandJournal(TEXT_DECODER.decode(latestPayload));
+      if (restored.matchesTarget(options.initialTarget)) commandJournal = restored;
+      else commandJournal.rebase(options.initialTarget);
+    } catch (cause) {
+      reportInitializationError(cause);
+      commandJournal.rebase(options.initialTarget);
+    }
+  } else if (options.initialTarget) {
+    commandJournal.rebase(options.initialTarget);
+  }
   return new StudioPagesHistoryDurableRuntime({
     commandJournal,
     recovery,
@@ -896,5 +966,6 @@ export async function createDefaultStudioPagesHistoryDurableRuntime(
         ? scope as typeof globalThis
         : null,
     onError: options.onError,
+    persistenceKind,
   });
 }

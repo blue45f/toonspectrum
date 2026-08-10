@@ -438,6 +438,7 @@ export class StudioLivingInkWebGpuPureRuntime {
   private writeUniforms(extra?: {
     fixTransfer?: number;
     fixing?: boolean;
+    velocitySettling?: boolean;
     displayMode?: StudioLivingInkDisplayMode;
   }): void {
     const chroma = studioLivingInkChromaBleedMultipliers(
@@ -459,6 +460,7 @@ export class StudioLivingInkWebGpuPureRuntime {
       vorticity: this.config.material.vorticity,
       capillaryCreep: this.config.material.capillaryCreep,
       fixing: extra?.fixing ?? false,
+      velocitySettling: extra?.velocitySettling ?? false,
       dryingEdgeDeposition: this.config.material.dryingEdgeDeposition,
       // mobility = 1 is the worst-case wet cell; the kernel still gates by local mobility. The
       // scrub-tip variant is deliberately absent: both runtimes clear the brush footprint before
@@ -883,11 +885,19 @@ export class StudioLivingInkWebGpuPureRuntime {
    * One fixed tick of the Stable Fluids loop, in the order the fluid requires:
    * advect → confine vorticity → project (divergence, Jacobi, gradient) → water → pigment.
    */
-  private step(fixing: boolean, pressureIterations: number): void {
+  private step(
+    fixing: boolean,
+    pressureIterations: number,
+    velocitySettling = false,
+  ): void {
     // Settle rate, from the certified runtime: `1 - exp(-dt * 5)` per fixation tick — an
     // exponential approach over the fix window, not a flat fraction.
     const dt = STUDIO_LIVING_INK_EXECUTION_LIMITS.fixedTimeStepSeconds;
-    this.writeUniforms({ fixTransfer: fixing ? 1 - Math.exp(-dt * 5) : 0, fixing });
+    this.writeUniforms({
+      fixTransfer: fixing ? 1 - Math.exp(-dt * 5) : 0,
+      fixing,
+      velocitySettling,
+    });
     const uniforms = { binding: 0, resource: { buffer: this.uniforms } } as const;
 
     this.dispatch("advect-velocity", [
@@ -1029,9 +1039,10 @@ export class StudioLivingInkWebGpuPureRuntime {
           / STUDIO_LIVING_INK_EXECUTION_LIMITS.fixedTimeStepSeconds,
       );
     }
+    const velocitySettling = operation.kind === "advance" && quality === "settle";
     for (let tick = 0; tick < ticks; tick += 1) {
       if (isCancelled()) throw new DOMException("Living Ink request cancelled.", "AbortError");
-      this.step(operation.kind === "fix", pressureIterations);
+      this.step(operation.kind === "fix", pressureIterations, velocitySettling);
       if ((tick + 1) % 6 === 0) await yieldControl();
     }
 

@@ -1,9 +1,12 @@
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
+  copyFileSync,
   existsSync,
   mkdtempSync,
   readFileSync,
   rmSync,
+  writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -12,10 +15,15 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import {
+  OPAQUE_WASM_POLICIES,
   isRecoverablePnpmLicenseInventoryError,
   parsePnpmLicenseInventory,
   readFilesystemLicenseInventory,
   readResolvedLicenseInventory,
+  validateLockedNoticeFiles,
+  validateOpaqueWasmThirdPartyInventory,
+  validateShippedEngineNotices,
+  validateVelloThirdPartyInventory,
 } from "../generate-third-party-notices.mjs";
 
 const REPOSITORY_ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
@@ -24,6 +32,15 @@ const SCRIPT_PATH = join(
   "scripts",
   "generate-third-party-notices.mjs",
 );
+const VELLO_DIRECTORY = join(
+  REPOSITORY_ROOT,
+  "crates",
+  "studio-engine-vello",
+);
+
+function sha256(value) {
+  return createHash("sha256").update(value).digest("hex");
+}
 
 describe("generated third-party notice inventory", () => {
   it("only treats pnpm's missing cached package index as recoverable", () => {
@@ -163,6 +180,175 @@ describe("generated third-party notice inventory", () => {
     ).toBe(true);
   });
 
+  it("validates both Vello feature inventories and every opaque WASM provenance boundary", () => {
+    const result = validateShippedEngineNotices();
+
+    expect(result.vello.cpuPackageCount).toBe(85);
+    expect(result.vello.gpuPackageCount).toBe(144);
+    expect(result.opaque).toHaveLength(3);
+    expect(
+      result.vello.inventory.artifacts.find(({ id }) => id === "pkg-gpu"),
+    ).toMatchObject({
+      features: ["fabric", "lottie", "svg"],
+    });
+    expect(
+      result.vello.inventory.packages.map(({ name, version }) =>
+        `${name}@${version}`,
+      ),
+    ).toEqual(
+      expect.arrayContaining([
+        "vello@0.9.0",
+        "velato@0.11.0",
+        "vello_svg@0.10.0",
+        "usvg@0.46.0",
+        "parley@0.11.0",
+        "harfrust@0.10.0",
+        "skrifa@0.42.1",
+        "skrifa@0.43.2",
+        "skrifa@0.44.0",
+      ]),
+    );
+    expect(
+      result.opaque.flatMap(({ inventory }) =>
+        inventory.components.map(({ name }) => name),
+      ),
+    ).toEqual([
+      "google/ink",
+      "abseil-cpp",
+      "google/ink-stroke-modeler",
+      "abseil-cpp",
+      "libmypaint",
+    ]);
+  });
+
+  it("fails when a Vello feature inventory omits a shipped Cargo package", () => {
+    const inventory = JSON.parse(
+      readFileSync(
+        join(VELLO_DIRECTORY, "THIRD_PARTY_INVENTORY.json"),
+        "utf8",
+      ),
+    );
+    inventory.packages = inventory.packages.filter(
+      ({ name, version }) => `${name}@${version}` !== "vello@0.9.0",
+    );
+
+    expect(() =>
+      validateVelloThirdPartyInventory({
+        directory: VELLO_DIRECTORY,
+        inventory,
+        validateFiles: false,
+      }),
+    ).toThrow("pkg-gpu references an unreviewed package: vello@0.9.0");
+  });
+
+  it("fails when an opaque WASM inventory omits a component or artifact", () => {
+    const policy = OPAQUE_WASM_POLICIES[0];
+    const inventory = JSON.parse(
+      readFileSync(
+        join(policy.directory, "THIRD_PARTY_INVENTORY.json"),
+        "utf8",
+      ),
+    );
+    const missingComponent = structuredClone(inventory);
+    missingComponent.components.pop();
+    expect(() =>
+      validateOpaqueWasmThirdPartyInventory(policy, {
+        inventory: missingComponent,
+        validateFiles: false,
+      }),
+    ).toThrow("opaque WASM inventory is malformed");
+
+    const missingArtifact = structuredClone(inventory);
+    missingArtifact.artifacts.pop();
+    expect(() =>
+      validateOpaqueWasmThirdPartyInventory(policy, {
+        inventory: missingArtifact,
+        validateFiles: false,
+      }),
+    ).toThrow("artifact file set changed");
+  });
+
+  it("fails when a hash-pinned opaque WASM artifact file is omitted", () => {
+    const policy = OPAQUE_WASM_POLICIES[0];
+    const directory = mkdtempSync(
+      join(tmpdir(), "toonspectrum-opaque-engine-artifact-test-"),
+    );
+    try {
+      for (const path of [
+        ...policy.requiredNoticeFiles,
+        "THIRD_PARTY_NOTICES.sha256",
+        policy.artifactFiles[0],
+      ]) {
+        copyFileSync(join(policy.directory, path), join(directory, path));
+      }
+      const inventory = JSON.parse(
+        readFileSync(
+          join(policy.directory, "THIRD_PARTY_INVENTORY.json"),
+          "utf8",
+        ),
+      );
+
+      expect(() =>
+        validateOpaqueWasmThirdPartyInventory(policy, {
+          directory,
+          inventory,
+        }),
+      ).toThrow(
+        `artifact provenance no longer matches ${policy.artifactFiles[1]}`,
+      );
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("fails when a hash-locked shipped license copy is omitted or changed", () => {
+    const directory = mkdtempSync(
+      join(tmpdir(), "toonspectrum-engine-notice-lock-test-"),
+    );
+    const requiredFiles = ["LICENSE", "NOTICE", "THIRD_PARTY_INVENTORY.json"];
+    try {
+      for (const path of requiredFiles) {
+        writeFileSync(join(directory, path), `${path}\n`, "utf8");
+      }
+      writeFileSync(
+        join(directory, "THIRD_PARTY_NOTICES.sha256"),
+        `${requiredFiles
+          .sort()
+          .map(
+            (path) =>
+              `${sha256(readFileSync(join(directory, path)))}  ${path}`,
+          )
+          .join("\n")}\n`,
+        "utf8",
+      );
+      expect(validateLockedNoticeFiles(directory, requiredFiles).size).toBe(3);
+
+      rmSync(join(directory, "THIRD_PARTY_INVENTORY.json"));
+      expect(() =>
+        validateLockedNoticeFiles(directory, requiredFiles),
+      ).toThrow(
+        "Required shipped third-party notice file is missing: THIRD_PARTY_INVENTORY.json",
+      );
+      writeFileSync(
+        join(directory, "THIRD_PARTY_INVENTORY.json"),
+        "THIRD_PARTY_INVENTORY.json\n",
+        "utf8",
+      );
+
+      rmSync(join(directory, "LICENSE"));
+      expect(() =>
+        validateLockedNoticeFiles(directory, requiredFiles),
+      ).toThrow("Required shipped third-party notice file is missing: LICENSE");
+
+      writeFileSync(join(directory, "LICENSE"), "changed\n", "utf8");
+      expect(() =>
+        validateLockedNoticeFiles(directory, requiredFiles),
+      ).toThrow("Shipped third-party notice hash mismatch for LICENSE");
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it("passes the full legal audit without pnpm's package index", () => {
     const output = execFileSync(
       process.execPath,
@@ -179,11 +365,11 @@ describe("generated third-party notice inventory", () => {
     );
 
     expect(output).toMatch(
-      /^License audit passed \(\d+ entries, \d+ license texts, \d+ packages without a root license file\)\.\n$/u,
+      /^License audit passed \(\d+ pnpm entries, 85\/144 Vello CPU\/GPU crates, 3 opaque WASM inventories, \d+ license texts, \d+ npm packages without a root license file\)\.\n$/u,
     );
   });
 
-  it("writes the complete pinned Hokusai Rust/WASM inventory and notices", () => {
+  it("writes complete pnpm, Hokusai, Vello, and opaque WASM notices", () => {
     const directory = mkdtempSync(
       join(tmpdir(), "toonspectrum-third-party-notice-test-"),
     );
@@ -226,6 +412,15 @@ describe("generated third-party notice inventory", () => {
       expect(notice).toContain(
         "6cc2f3fa1611d32ad7563f7092aa1bf58741124302630cef7d21561ecd7b7284",
       );
+      expect(notice).toContain("## Pinned Vello CPU/GPU Rust/WASM inventories");
+      expect(notice).toContain("| `vello` | 0.9.0 | Apache-2.0 OR MIT | pkg-gpu |");
+      expect(notice).toContain("| `velato` | 0.11.0 | Apache-2.0 OR MIT | pkg-gpu |");
+      expect(notice).toContain("| `vello_svg` | 0.10.0 | Apache-2.0 OR MIT | pkg-gpu |");
+      expect(notice).toContain("| `harfrust` | 0.10.0 | MIT | pkg, pkg-gpu |");
+      expect(notice).toContain("## Locked opaque WASM engine provenance");
+      expect(notice).toContain("`google/ink-stroke-modeler`");
+      expect(notice).toContain("`abseil-cpp`");
+      expect(notice).toContain("`libmypaint`");
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }

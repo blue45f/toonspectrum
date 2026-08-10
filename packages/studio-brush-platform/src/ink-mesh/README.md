@@ -2,8 +2,10 @@
 
 Committed reproducible build of the google/ink stroke **mesh generation** lane
 (BrushTip geometry -> InProgressStroke incremental mesh), used by
-`../ink-mesh.ts`. This is V12 codex §11.2 step 1 — "geometry/brush/stroke
-modules only, no Android mesh-rendering utilities" — and the sibling of the
+`../ink-mesh.ts`. The retained single-shot ABI and the V12 next-stage
+`InProgressStroke` retain-and-replace delta ABI are built from the same bridge.
+This remains the geometry/brush/stroke subset only (no Android rendering
+utilities), and is the sibling of the
 `../ink-modeler/` artifact (stroke input modeling). Same release contract:
 generated artifacts are pinned by `INTEGRITY.sha256`, never hand-edited (the
 two-line `@generated` + `eslint-disable` banner on the `.mjs` is part of the
@@ -59,8 +61,8 @@ em++ -O3 -std=c++20 -I. -I$HOME/toolchains/abseil-cpp bridge/imk_bridge.cc \
   -o bridge/out/ink_mesh.mjs \
   -sMODULARIZE=1 -sEXPORT_ES6=1 -sEXPORT_NAME=createInkMeshModule \
   -sENVIRONMENT=web,worker,node -sALLOW_MEMORY_GROWTH=1 -sFILESYSTEM=0 -sASSERTIONS=0 \
-  -sEXPORTED_FUNCTIONS=_imk_create,_imk_destroy,_imk_point_stride,_imk_generate,_imk_vertex_count,_imk_triangle_count,_imk_positions_ptr,_imk_tex_coords_ptr,_imk_indices_ptr,_malloc,_free \
-  -sEXPORTED_RUNTIME_METHODS=HEAPF64,HEAPF32,HEAPU32
+  -sEXPORTED_FUNCTIONS=_imk_create,_imk_destroy,_imk_point_stride,_imk_max_points_per_append,_imk_max_stroke_points,_imk_begin,_imk_append,_imk_finish,_imk_cancel,_imk_generate,_imk_vertex_count,_imk_triangle_count,_imk_positions_ptr,_imk_tex_coords_ptr,_imk_indices_ptr,_imk_delta_kind,_imk_delta_base_revision,_imk_delta_revision,_imk_delta_retained_vertex_count,_imk_delta_retained_triangle_count,_imk_delta_vertex_count,_imk_delta_triangle_count,_imk_delta_positions_ptr,_imk_delta_tex_coords_ptr,_imk_delta_indices_ptr,_imk_input_count,_imk_tracked_vector_bytes,_malloc,_free \
+  -sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAPF64,HEAPF32,HEAPU32
 ```
 
 Then re-apply the two-line banner to the generated `.mjs`, copy
@@ -75,14 +77,38 @@ shasum -a 256 README.md ink_mesh.mjs ink_mesh.wasm imk_bridge.cc > INTEGRITY.sha
 - `.mjs` is an emscripten MODULARIZE + ES6 factory (`createInkMeshModule`),
   web + worker + node; the wasm is located via `import.meta.url` (override with
   `locateFile`).
-- Exported C surface (see `imk_bridge.cc`): `imk_create` / `imk_destroy` /
-  `imk_point_stride` / `imk_generate(points, count, brush params…)` /
-  `imk_vertex_count` / `imk_triangle_count` / `imk_positions_ptr` (f32 x,y) /
-  `imk_tex_coords_ptr` (f32 surface-UV u,v) / `imk_indices_ptr` (u32 × 3).
-- Input points are **pre-modeled** (stride 4 doubles: x, y, tSeconds,
-  pressure) and are fed through `BrushFamily::PassthroughModel` — the modeled
+- Compatibility surface: `imk_generate` and the full-mesh count/pointer
+  getters are retained unchanged at the TypeScript API.
+- Incremental surface: `imk_begin` starts/restarts one retained upstream
+  `InProgressStroke`; `imk_append` enqueues only new real inputs;
+  `imk_finish` seals the stroke; `imk_cancel` clears it. Delta getters expose
+  protocol revision, operation, retained counts, and replacement tails.
+  Maximums are 65,536 points per live append and 1,000,000 per stroke.
+- Input points are **pre-modeled** (stride 6 doubles: x, y, tSeconds,
+  pressure, tiltRadians, orientationRadians) and are fed through
+  `BrushFamily::PassthroughModel` — the modeled
   output of the `../ink-modeler/` lane connects here without a second
-  smoothing pass. `noise_seed` is fixed to 0: deterministic replay contract.
-- Quarantine status + measured numbers live in
-  `docs/adr/0011-v12-frontier-quarantine-ledger.md` lane 3 and
-  `tests/benchmarks/results/ink-mesh-attempt.json`.
+  smoothing pass. Optional-channel presence must stay consistent within a
+  stroke. `noise_seed` is fixed to 0.
+- TypeScript protocol `toon-ink-mesh-delta-v1` uses
+  `baseRevision/revision + retainedVertexCount/retainedTriangleCount + tails`.
+  `append` never truncates, `update` replaces a changed tail, and `noop`
+  advances the revision without geometry bytes. Applying it requires no GPU
+  readback.
+
+## Focused verification
+
+```shell
+pnpm exec vitest run \
+  packages/studio-brush-platform/src/__tests__/ink-mesh.test.ts \
+  packages/studio-brush-platform/src/__tests__/ink-mesh-incremental.test.ts \
+  tests/visual/ink-mesh-vello-smoke.test.ts
+pnpm exec tsx tests/benchmarks/harness/ink-mesh-incremental.ts
+shasum -a 256 -c packages/studio-brush-platform/src/ink-mesh/INTEGRITY.sha256
+```
+
+Candidate comparison and measured evidence live under
+`docs/candidates/ink-mesh-incremental/` and in
+`tests/benchmarks/results/ink-mesh-incremental.json`. Product promotion still
+depends on the physical-stylus/CSP blind quality gate; the single-shot path is
+the mandatory fallback.

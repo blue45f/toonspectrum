@@ -6,7 +6,7 @@ import {
   type StudioCrdtUpdateRequest,
 } from "./studio-crdt-protocol";
 import {
-  IndexedDbStudioCrdtRecoveryVault,
+  PersistentStudioCrdtRecoveryVault,
   createStudioCrdtRecoveryBundle,
   selectStudioCrdtRecoveryEntriesForDownload,
   studioCrdtRecoveryBundleFileName,
@@ -24,7 +24,7 @@ class MemoryPersistence implements StudioCrdtRecoveryVaultPersistence {
     });
   }
 
-  async get(key: string): Promise<unknown | null> {
+  async get(_scope: string, _workId: string, key: string): Promise<unknown | null> {
     return this.rows.get(key) ?? null;
   }
 
@@ -46,7 +46,7 @@ function request(updateId: string, workId = "work-a"): StudioCrdtUpdateRequest {
 describe("Studio CRDT recovery vault", () => {
   it("durably separates a rejected frontier and deduplicates the rejected update id", async () => {
     const persistence = new MemoryPersistence();
-    const vault = new IndexedDbStudioCrdtRecoveryVault(
+    const vault = new PersistentStudioCrdtRecoveryVault(
       persistence,
       () => 1_000,
       () => "vault-a"
@@ -77,7 +77,7 @@ describe("Studio CRDT recovery vault", () => {
 
   it("keeps exported frontiers in the vault as a non-retrying recovery source", async () => {
     let now = 2_000;
-    const vault = new IndexedDbStudioCrdtRecoveryVault(
+    const vault = new PersistentStudioCrdtRecoveryVault(
       new MemoryPersistence(),
       () => now,
       () => "vault-b"
@@ -104,7 +104,7 @@ describe("Studio CRDT recovery vault", () => {
   });
 
   it("keeps an already exported recovery archive downloadable", async () => {
-    const vault = new IndexedDbStudioCrdtRecoveryVault(
+    const vault = new PersistentStudioCrdtRecoveryVault(
       new MemoryPersistence(),
       () => 3_250,
       () => "vault-redownload"
@@ -174,7 +174,7 @@ describe("Studio CRDT recovery vault", () => {
       status: "pending-export",
       updates: [],
     });
-    const vault = new IndexedDbStudioCrdtRecoveryVault(persistence);
+    const vault = new PersistentStudioCrdtRecoveryVault(persistence);
 
     await expect(vault.list("user-corrupt", "work-corrupt")).rejects.toThrow(
       "손상된 frontier"
@@ -183,7 +183,7 @@ describe("Studio CRDT recovery vault", () => {
 
   it("preserves a frontier larger than 4096 updates as bounded chunks behind a manifest", async () => {
     const persistence = new MemoryPersistence();
-    const vault = new IndexedDbStudioCrdtRecoveryVault(
+    const vault = new PersistentStudioCrdtRecoveryVault(
       persistence,
       () => 3_500,
       () => "vault-large"
@@ -223,7 +223,7 @@ describe("Studio CRDT recovery vault", () => {
       }
     }
     const persistence = new MarkerOnlyPersistence();
-    const vault = new IndexedDbStudioCrdtRecoveryVault(
+    const vault = new PersistentStudioCrdtRecoveryVault(
       persistence,
       () => 3_750,
       () => "vault-marker-only"
@@ -256,7 +256,7 @@ describe("Studio CRDT recovery vault", () => {
   });
 
   it("builds a portable bundle without leaking the authenticated outbox scope", async () => {
-    const vault = new IndexedDbStudioCrdtRecoveryVault(
+    const vault = new PersistentStudioCrdtRecoveryVault(
       new MemoryPersistence(),
       () => 4_000,
       () => "vault-c"

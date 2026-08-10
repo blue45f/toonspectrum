@@ -59,6 +59,7 @@ describe("StudioCommunityMarketplacePanel", () => {
     expect(source).toContain("createStudioOriginalFreeAssetRecord");
     expect(source).toContain("deleteArmed");
     expect(source).toContain("삭제 확인");
+    expect(source).toContain('|| projection.pack.metadata.kind === "palette"');
   });
 
   it("권리·AI·라이선스 확인 없이 게시할 수 없고 가짜 성공을 표시하지 않는다", () => {

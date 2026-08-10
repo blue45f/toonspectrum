@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -86,6 +86,62 @@ afterEach(() => {
 });
 
 describe("StudioAnimaticTimelinePanel local commercial workflow", () => {
+  it("uses the async SQLite authority by default instead of reading localStorage", async () => {
+    const persistence = {
+      load: vi.fn(async () => ({ document: null, status: "empty" as const })),
+      save: vi.fn(async (_document: StudioAnimaticDocument) => ({ ok: true })),
+    };
+    const { container } = render(
+      <StudioAnimaticTimelinePanel
+        workScope="episode-sqlite"
+        pages={PAGES}
+        persistence={persistence}
+      />
+    );
+
+    await waitFor(() => expect(persistence.load).toHaveBeenCalledWith("episode-sqlite"));
+    expect(
+      container.querySelector('[data-studio-animatic-authority="sqlite"]')
+    ).toBeTruthy();
+    expect(screen.getByText("로컬 SQL 무음 미리보기")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "애니매틱 반복 재생" }));
+    await waitFor(() => expect(persistence.save).toHaveBeenCalledOnce());
+    expect(persistence.save.mock.calls[0]?.[0]).toMatchObject({
+      workScope: "episode-sqlite",
+      loop: true,
+    });
+  });
+
+  it("serializes rapid SQLite writes so an older completion cannot overwrite a newer edit", async () => {
+    const releases: Array<() => void> = [];
+    const persistence = {
+      load: vi.fn(async () => ({ document: null, status: "empty" as const })),
+      save: vi.fn((_document: StudioAnimaticDocument) => new Promise<{ ok: true }>((resolve) => {
+        releases.push(() => resolve({ ok: true }));
+      })),
+    };
+    render(
+      <StudioAnimaticTimelinePanel
+        workScope="episode-write-order"
+        pages={PAGES}
+        persistence={persistence}
+      />
+    );
+    await waitFor(() => expect(persistence.load).toHaveBeenCalledOnce());
+
+    fireEvent.click(screen.getByRole("button", { name: "애니매틱 반복 재생" }));
+    fireEvent.change(screen.getByLabelText("미리보기 FPS"), { target: { value: "24" } });
+
+    await waitFor(() => expect(persistence.save).toHaveBeenCalledTimes(1));
+    expect(persistence.save.mock.calls[0]?.[0]).toMatchObject({ loop: true, fps: 12 });
+    releases.shift()?.();
+    await waitFor(() => expect(persistence.save).toHaveBeenCalledTimes(2));
+    expect(persistence.save.mock.calls[1]?.[0]).toMatchObject({ loop: true, fps: 24 });
+    releases.shift()?.();
+    await waitFor(() => expect(screen.getByText("미리보기 FPS를 변경했습니다.")).toBeTruthy());
+  });
+
   it("exposes a zero-server silent workflow and a mobile horizontal timeline", () => {
     const { container } = render(
       <StudioAnimaticTimelinePanel

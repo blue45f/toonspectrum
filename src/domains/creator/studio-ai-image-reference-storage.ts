@@ -5,6 +5,13 @@ import {
   type StudioAiImageReferenceDocument,
 } from "./studio-ai-image-reference-roles";
 
+/**
+ * Legacy/test-only Web Storage adapter. V12 product authority is the canonical
+ * `aiImageReferences` field in StudioProjectFile/StudioProjectSnapshot and its
+ * OPFS/SQLite autosave journal. Product boot must not call this module or
+ * automatically import these keys (`LEGACY_DATA_MIGRATION=FALSE`).
+ */
+
 export const STUDIO_AI_IMAGE_REFERENCE_STORAGE_VERSION = 1 as const;
 export const STUDIO_AI_IMAGE_REFERENCE_STORAGE_PREFIX =
   `toonspectrum-studio-ai-image-references:v${STUDIO_AI_IMAGE_REFERENCE_STORAGE_VERSION}`;
@@ -104,8 +111,8 @@ function resolveStorageKey(
 }
 
 /**
- * Reads metadata-only references. Missing, blocked, corrupt, oversized, or future-version data
- * fails closed to the canonical empty document and never interrupts Studio startup.
+ * Explicit legacy-import/test seam. Missing, blocked, corrupt, oversized, or future-version data
+ * fails closed to the canonical empty document. Product startup does not call this function.
  */
 export function loadStudioAiImageReferenceDocument(
   storage: Pick<StudioAiImageReferenceStorage, "getItem"> | null | undefined,
@@ -124,7 +131,7 @@ export function loadStudioAiImageReferenceDocument(
 }
 
 /**
- * Persists only the canonical reference-role document. Canonical serialization strips binary
+ * Legacy/test seam that persists only the canonical reference-role document. Canonical serialization strips binary
  * data, data URLs, provider payloads, and unknown fields; quota/private-mode failures are ignored
  * while the normalized in-memory document is returned to the caller.
  */

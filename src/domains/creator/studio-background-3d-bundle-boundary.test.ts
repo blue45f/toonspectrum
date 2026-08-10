@@ -154,7 +154,10 @@ describe("Studio background 3D bundle boundary", () => {
     expect(imports.valueImports).not.toContain("./studio-bg3d-shot-artifact-pipeline");
     expect(imports.dynamicImports).not.toContain("./studio-bg3d-shot-batch-runtime");
     expect(imports.valueImports).toContain("./studio-bg3d-shot-batch-runtime-loader");
-    expect(loaderImports.dynamicImports).toEqual(["./studio-bg3d-shot-batch-runtime"]);
+    expect(loaderImports.dynamicImports).toEqual([
+      "./studio-bg3d-shot-batch-runtime",
+      "./studio-bg3d-shot-batch-recovery-store",
+    ]);
     expect(imports.valueImports).not.toContain("./studio-bg3d-shot-batch-recovery-store");
     expect(imports.valueImports).not.toContain("./studio-bg3d-shot-batch-worker-client");
     expect(imports.valueImports).not.toContain("./studio-bg3d-shot-contact-sheet-worker-client");
@@ -164,6 +167,7 @@ describe("Studio background 3D bundle boundary", () => {
     expect(imports.valueImports).toContain("./studio-bg3d-shot-batch-limits");
     expect(imports.valueImports).toContain("./studio-bg3d-shot-batch-pass-catalog");
     expect(runtimeSource).toContain('from "./studio-bg3d-shot-artifact-pipeline"');
+    expect(runtimeSource).not.toContain('from "./studio-bg3d-shot-batch-recovery-store"');
   });
 
   it("keeps the metadata contract independent of rendering runtimes", () => {

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import {
+  createEmptyStudioAiImageReferenceDocument,
+  hydrateStudioAiImageReferenceDocument,
+} from "./studio-ai-image-reference-roles";
 import { createEmptyStudioAiProvenanceDocument } from "./studio-ai-provenance";
 import {
   createEmptyStudioCharacterBible,
@@ -71,6 +75,7 @@ function baseInput(): BuildStudioProjectFileSnapshotInput {
     characterBible: createEmptyStudioCharacterBible(),
     writerRoom: createEmptyStudioWriterRoomDocument(),
     aiProvenance: createEmptyStudioAiProvenanceDocument(),
+    aiImageReferences: createEmptyStudioAiImageReferenceDocument(),
     comments: createEmptyStudioCommentsDocument(),
     releaseSchedule: createEmptyStudioReleaseSchedule(),
     publicationAnalytics: createEmptyStudioPublicationAnalyticsDocument(),
@@ -229,6 +234,7 @@ describe("buildStudioProjectFileSnapshot", () => {
       characterBible: input.characterBible,
       writerRoom: input.writerRoom,
       aiProvenance: input.aiProvenance,
+      aiImageReferences: input.aiImageReferences,
       comments: input.comments,
       releaseSchedule: input.releaseSchedule,
       publicationAnalytics: input.publicationAnalytics,
@@ -262,6 +268,7 @@ describe("buildStudioProjectFileSnapshot", () => {
       "characterBible",
       "writerRoom",
       "aiProvenance",
+      "aiImageReferences",
       "comments",
       "releaseSchedule",
       "publicationAnalytics",
@@ -312,6 +319,17 @@ describe("studioProjectSnapshotHasMeaningfulContent", () => {
       }],
       ["writer room", (input) => { input.writerRoom.stages.premise.text = "두 사람의 재회"; }],
       ["AI provenance", (input) => { input.aiProvenance.operations.push({} as never); }],
+      ["AI image references", (input) => {
+        input.aiImageReferences = hydrateStudioAiImageReferenceDocument({
+          version: 1,
+          references: [{
+            id: "method-ref-1",
+            role: "method",
+            asset: { assetId: "asset-method-1" },
+            guidance: "카메라 구도만 참고",
+          }],
+        });
+      }],
       ["comments", (input) => { input.comments.threads.push({} as never); }],
       ["release schedule", (input) => { input.releaseSchedule.items.push({} as never); }],
       ["publication analytics", (input) => { input.publicationAnalytics.records.push({} as never); }],

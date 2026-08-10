@@ -14,8 +14,24 @@ interface FakeContainerOptions {
   readonly isRenderGroup?: boolean;
 }
 
+class FakePoint {
+  x: number;
+  y: number;
+  readonly set = vi.fn((x: number, y: number) => {
+    this.x = x;
+    this.y = y;
+  });
+
+  constructor(x = 0, y = 0) {
+    this.x = x;
+    this.y = y;
+  }
+}
+
 class FakeContainer {
   readonly children: FakeContainer[] = [];
+  readonly position = new FakePoint();
+  readonly scale = new FakePoint(1, 1);
   label = "";
   isRenderGroup = false;
   sortableChildren = false;
@@ -23,6 +39,7 @@ class FakeContainer {
   zIndex = 0;
   visible = true;
   alpha = 1;
+  rotation = 0;
   destroyed = false;
 
   constructor(options: FakeContainerOptions = {}) {
@@ -263,6 +280,9 @@ describe("Studio Pixi scene provider", () => {
       sortableChildren: true,
       eventMode: "passive",
     });
+    expect(root.position.set).toHaveBeenCalledWith(0, 0);
+    expect(root.scale.set).toHaveBeenCalledWith(1, 1);
+    expect(root.rotation).toBe(0);
     expect(provider.receipt).toMatchObject({
       activeRenderer: "webgpu",
       fallback: null,
@@ -272,13 +292,34 @@ describe("Studio Pixi scene provider", () => {
       },
     });
 
-    provider.resize({ width: 900, height: 1_600, dpr: 2.5 });
+    provider.resize({
+      width: 900,
+      height: 1_600,
+      dpr: 2.5,
+      documentTransform: {
+        scaleX: -1.5,
+        scaleY: 1.5,
+        offsetX: 320,
+        offsetY: 48,
+        rotation: 90,
+      },
+    });
     expect(application.renderer.resize).toHaveBeenCalledWith(900, 1_600, 2.5);
     expect(provider.viewport).toEqual({
       width: 900,
       height: 1_600,
       dpr: 2.5,
+      documentTransform: {
+        scaleX: -1.5,
+        scaleY: 1.5,
+        offsetX: 320,
+        offsetY: 48,
+        rotation: 90,
+      },
     });
+    expect(root.position).toEqual(expect.objectContaining({ x: 320, y: 48 }));
+    expect(root.scale).toEqual(expect.objectContaining({ x: -1.5, y: 1.5 }));
+    expect(root.rotation).toBeCloseTo(Math.PI / 2);
     expect(provider.canvas.style.width).toBe("900px");
     expect(provider.canvas.style.height).toBe("1600px");
 

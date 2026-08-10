@@ -1,7 +1,11 @@
 /**
  * Recent brush slots (1–6).
  * Stores the canonical engine id plus the exact source preset and dynamics for quick recall.
- * Pure model + localStorage helpers.
+ * Pure model plus legacy browser-storage helpers.
+ *
+ * V12 product durability is owned by studio-brush-slots-sqlite-repository.ts. The storage
+ * helpers below remain an explicit legacy/test seam only; the SQLite repository never reads or
+ * automatically imports either key (LEGACY_DATA_MIGRATION=false).
  */
 
 import { BRUSH_PRESETS } from "./studio-brush";
@@ -20,6 +24,7 @@ import {
 export const STUDIO_BRUSH_SLOT_COUNT = 6;
 export const STUDIO_BRUSH_SLOTS_LEGACY_STORAGE_KEY = "toonspectrum-studio-brush-slots:v1";
 export const STUDIO_BRUSH_SLOTS_STORAGE_KEY = "toonspectrum-studio-brush-slots:v2";
+export const STUDIO_BRUSH_SLOTS_LEGACY_AUTO_MIGRATION = false as const;
 
 export interface StudioBrushSlot extends StudioBrushSourcePresetMetadata {
   /** 실제 렌더러는 언제나 설치된 BRUSH_PRESETS id만 사용한다. */

@@ -78,8 +78,6 @@ export interface StudioLivingInkCoordinatorProvider {
 
 export interface StudioLivingInkStudioCoordinatorOptions {
   readonly onStateChange?: (state: StudioLivingInkStudioState, message?: string) => void;
-  /** Takes ownership of the ImageBitmap and must close it. */
-  readonly onInteractiveFrame?: (frame: StudioLivingInkExecutionFrame, routeKey: string) => void;
   readonly onCapacityDiagnostic?: (message: string) => void;
   /** Test seam. Production always uses the isolated Worker/WebGL2 provider factory. */
   readonly providerFactory?: (
@@ -196,6 +194,8 @@ function omitRepeatedAnchor<Operation extends StudioLivingInkDepositOperation | 
 export class StudioLivingInkStudioCoordinator {
   readonly #options: StudioLivingInkStudioCoordinatorOptions;
   #provider: StudioLivingInkCoordinatorProvider | null = null;
+  /** Provider owned while persisted operations replay, before physical authority is accepted. */
+  #activatingProvider: StudioLivingInkCoordinatorProvider | null = null;
   #config: StudioLivingInkExecutionConfig | null = null;
   #pageId: string | null = null;
   #state: StudioLivingInkStudioState = "unavailable";
@@ -207,7 +207,6 @@ export class StudioLivingInkStudioCoordinator {
   #active: ActiveStroke | null = null;
   #pendingActionRouteKey: string | null = null;
   #capacityDiagnostic: string | null = null;
-  #interactivePresentationGeneration = 0;
 
   constructor(options: StudioLivingInkStudioCoordinatorOptions = {}) {
     this.#options = options;
@@ -242,6 +241,7 @@ export class StudioLivingInkStudioCoordinator {
   }>): Promise<boolean> {
     const epoch = ++this.#epoch;
     const previous = this.#provider;
+    const previousActivating = this.#activatingProvider;
     const previousQueue = this.#queue;
     if (this.#active) {
       this.#active.failed ??= new DOMException(
@@ -250,9 +250,9 @@ export class StudioLivingInkStudioCoordinator {
       );
     }
     this.#provider = null;
+    this.#activatingProvider = null;
     this.#active = null;
     this.#pendingActionRouteKey = null;
-    this.#interactivePresentationGeneration += 1;
     this.#pageId = input.pageId;
     this.#config = structuredClone(input.config);
     this.#capacityDiagnostic = null;
@@ -262,7 +262,11 @@ export class StudioLivingInkStudioCoordinator {
     // page switch indefinitely. The detached queue keeps its own rejection handler and closes any
     // late fake/test frame through the stale-owner guard in #enqueueOperation.
     void previousQueue.catch(() => undefined);
-    await previous?.dispose().catch(() => undefined);
+    await Promise.all(
+      [...new Set([previous, previousActivating].filter(
+        (provider): provider is StudioLivingInkCoordinatorProvider => provider !== null,
+      ))].map((provider) => provider.dispose().catch(() => undefined)),
+    );
     if (epoch !== this.#epoch) return false;
     this.#queue = Promise.resolve();
     const normalized = normalizeJournal(input.journal ?? []);
@@ -281,6 +285,7 @@ export class StudioLivingInkStudioCoordinator {
         await provider.dispose();
         return false;
       }
+      this.#activatingProvider = provider;
       for (let index = 0; index < normalized.length; index += 1) {
         const operation = normalized[index]!;
         const applied = await provider.apply(operation, {
@@ -293,6 +298,7 @@ export class StudioLivingInkStudioCoordinator {
           simulationTicks: operation.kind === "advance" ? operation.fixedTicks : undefined,
           present: false,
         });
+        if (epoch !== this.#epoch || this.#activatingProvider !== provider) return false;
         const ack = requireSimulationAck(applied);
         if (ack.operationKind !== operation.kind || ack.revision !== index + 1) {
           throw new Error("Living Ink replay acknowledgement did not match the journal sequence.");
@@ -300,6 +306,10 @@ export class StudioLivingInkStudioCoordinator {
       }
       if (input.expectedFinalReceipt) {
         const replayFrame = await provider.render("composite");
+        if (epoch !== this.#epoch || this.#activatingProvider !== provider) {
+          replayFrame.image.close();
+          return false;
+        }
         const accepted = replayFrame.receipt.engineVersion === input.expectedFinalReceipt.engineVersion
           && replayFrame.receipt.displaySha256 === input.expectedFinalReceipt.displaySha256
           && replayFrame.receipt.operationSha256 === input.expectedFinalReceipt.operationSha256
@@ -311,10 +321,8 @@ export class StudioLivingInkStudioCoordinator {
           );
         }
       }
-      if (epoch !== this.#epoch) {
-        await provider.dispose();
-        return false;
-      }
+      if (epoch !== this.#epoch || this.#activatingProvider !== provider) return false;
+      this.#activatingProvider = null;
       this.#provider = provider;
       candidate = null;
       this.#committedJournal = normalized;
@@ -325,7 +333,10 @@ export class StudioLivingInkStudioCoordinator {
       this.#setState("ready");
       return true;
     } catch (cause) {
-      await candidate?.dispose().catch(() => undefined);
+      if (candidate && this.#activatingProvider === candidate) {
+        this.#activatingProvider = null;
+        await candidate.dispose().catch(() => undefined);
+      }
       if (epoch === this.#epoch) {
         this.#provider = null;
         this.#committedJournal = [];
@@ -464,9 +475,6 @@ export class StudioLivingInkStudioCoordinator {
     operation: StudioLivingInkOperation,
     quality: "interactive" | "settle",
   ): void {
-    // A settle/finalization operation also invalidates an older queued interactive readback. The
-    // canonical render after settle supersedes that frame and must be the next visible authority.
-    const presentationGeneration = ++this.#interactivePresentationGeneration;
     this.#queue = this.#queue.then(async () => {
       try {
         if (owner.failed) return;
@@ -486,28 +494,9 @@ export class StudioLivingInkStudioCoordinator {
         if (this.#active !== owner || owner.failed || !owner.routeKey) {
           return;
         }
-        // Multiple canonical 8-sample chunks commonly enter the queue in one coalesced pointer
-        // event. Read back only the newest interactive state; finishStroke renders its own settled
-        // canonical frame after the non-interactive advance operation.
-        if (
-          quality !== "interactive"
-          || presentationGeneration !== this.#interactivePresentationGeneration
-        ) return;
-        const frame = await provider.render("composite");
-        if (this.#active !== owner || owner.failed || !owner.routeKey) {
-          frame.image.close();
-          return;
-        }
-        if (!this.#options.onInteractiveFrame) {
-          frame.image.close();
-          return;
-        }
-        try {
-          this.#options.onInteractiveFrame(frame, owner.routeKey);
-        } catch (cause) {
-          frame.image.close();
-          throw cause;
-        }
+        // Pointer-contact presentation is owned by the retained vector shadow. The GPU field is
+        // still updated in-order here, but it never crosses GPU→CPU while the pen is down. A single
+        // canonical readback occurs after the deterministic release settle in finishStroke().
       } catch (cause) {
         owner.failed = cause instanceof Error ? cause : new Error("Living Ink operation이 실패했습니다.");
       }
@@ -681,12 +670,20 @@ export class StudioLivingInkStudioCoordinator {
     this.#active = null;
     this.#pendingActionRouteKey = null;
     const provider = this.#provider;
+    const activatingProvider = this.#activatingProvider;
     const queue = this.#queue;
     this.#provider = null;
-    this.#setState("failed", message);
-    await provider?.dispose().catch(() => undefined);
-    void queue.catch(() => undefined);
+    this.#activatingProvider = null;
+    // Detach stale work before disposal completes. A rapid physical-mode re-enable must not be
+    // overwritten by a late continuation from the provider being revoked here.
     this.#queue = Promise.resolve();
+    this.#setState("failed", message);
+    void queue.catch(() => undefined);
+    await Promise.all(
+      [...new Set([provider, activatingProvider].filter(
+        (candidate): candidate is StudioLivingInkCoordinatorProvider => candidate !== null,
+      ))].map((candidate) => candidate.dispose().catch(() => undefined)),
+    );
   }
 
   async dispose(): Promise<void> {
@@ -697,17 +694,24 @@ export class StudioLivingInkStudioCoordinator {
     this.#active = null;
     this.#pendingActionRouteKey = null;
     const provider = this.#provider;
+    const activatingProvider = this.#activatingProvider;
     const queue = this.#queue;
     this.#provider = null;
+    this.#activatingProvider = null;
     this.#pageId = null;
     this.#config = null;
     this.#committedJournal = [];
     this.#committedReceipt = null;
     this.#workingJournal = [];
     this.#capacityDiagnostic = null;
-    this.#setState("unavailable");
-    await provider?.dispose().catch(() => undefined);
-    void queue.catch(() => undefined);
+    // Detach stale work synchronously. No late disposal continuation may reset a newer activation.
     this.#queue = Promise.resolve();
+    this.#setState("unavailable");
+    void queue.catch(() => undefined);
+    await Promise.all(
+      [...new Set([provider, activatingProvider].filter(
+        (candidate): candidate is StudioLivingInkCoordinatorProvider => candidate !== null,
+      ))].map((candidate) => candidate.dispose().catch(() => undefined)),
+    );
   }
 }

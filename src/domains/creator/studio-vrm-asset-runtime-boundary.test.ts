@@ -129,7 +129,8 @@ describe("Studio VRM asset runtime ownership boundary", () => {
 
     expectInOrder(libraryLoad, [
       "const requestId = beginModelLoad(entry.id);",
-      "const storedModel = await getStoredVrmModel(entry.id);",
+      'const storedModel = entry.source === "memory"',
+      ": await getStoredVrmModel(entry.id);",
       "if (requestId !== loadRequestRef.current) return;",
       "const objectUrl = URL.createObjectURL(storedModel.blob);",
       "const loadedVrm = await loadVrmAsset(objectUrl);",

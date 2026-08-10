@@ -43,6 +43,14 @@ import {
   type Psd,
 } from "ag-psd";
 
+import {
+  buildDialogueRubyExportXmp,
+  createDialogueRubyMetadataRecord,
+  planDialogueRubyPdfOps,
+  type DialogueRubyExportIssue,
+  type DialogueRubyExportWarning,
+  type DialogueRubyExportMetadataRecord,
+} from "./studio-dialogue-ruby-export";
 import { readStudioExportResolutionDpi } from "./studio-raster-resolution-metadata";
 
 import type {
@@ -203,6 +211,21 @@ export interface PsdExportResult {
   layerCount: number;
   /** 기능별 보존/래스터화/제외를 기계적으로 읽을 수 있는 왕복 손실 명세. */
   lossManifest?: PsdInterchangeLossManifest;
+  /** Native PSD ruby is unavailable: visible raster + lossless XMP source preservation receipt. */
+  rubyReceipts: readonly PsdRubyExportReceipt[];
+}
+
+export interface PsdRubyExportReceipt {
+  readonly elementId: string;
+  readonly layerName: string;
+  readonly writingMode: "horizontal-tb" | "vertical-rl";
+  readonly appearance: "visible-raster-layer";
+  readonly editability: "source-metadata-only";
+  readonly metadata: "document-xmp-v1" | "unavailable";
+  readonly placementCount: number;
+  readonly tateChuYokoBaseCount: number;
+  readonly warnings: readonly DialogueRubyExportWarning[];
+  readonly unsupported: readonly DialogueRubyExportIssue[];
 }
 
 /** 콜러가 Blob 생성·다운로드에 쓸 MIME 타입. */
@@ -515,6 +538,99 @@ function hasActiveTextShadow(el: PsdTextElLike): boolean {
 
 function hasRichTextRuns(el: PsdTextElLike): boolean {
   return Array.isArray(el.rubySpans) ? el.rubySpans.length > 0 : el.rubySpans != null;
+}
+
+function planPsdRubyReceipt(
+  el: PsdTextElLike,
+  layerName: string,
+): { receipt: PsdRubyExportReceipt; metadata: DialogueRubyExportMetadataRecord | null } | null {
+  if (!hasRichTextRuns(el)) return null;
+  const plan = planDialogueRubyPdfOps({
+    elementId: el.id,
+    layerName,
+    text: el.text,
+    rubySpans: el.rubySpans,
+    vertical: el.vertical,
+    width: el.width,
+    fontSize: el.fontSize,
+    lineHeight: el.lineHeight,
+    letterSpacing: el.letterSpacing,
+    fontFamily: el.font,
+    fontStyle: el.fontStyle,
+    align: el.align,
+  }, {
+    // No PDF is built here. The shared lowering is used only to reuse the exact product planners
+    // and produce a placement/issue receipt for the PSD raster+metadata path.
+    fontResourceName: "PSD-RUBY-RECEIPT",
+    color: { space: "gray", gray: 0 },
+    pxToPt: 1,
+  });
+  let metadata: DialogueRubyExportMetadataRecord | null = null;
+  const warnings: DialogueRubyExportWarning[] = [
+    ...plan.warnings.filter((warning) => warning.code !== "pdf-vertical-glyph-overlays"),
+    {
+      code: "psd-ruby-raster-fallback",
+      message: "ag-psd has no native editable ruby structure; appearance stays in the raster layer and source spans stay in XMP.",
+      spanIndex: null,
+    },
+  ];
+  const unsupported = [...plan.unsupported];
+  try {
+    metadata = createDialogueRubyMetadataRecord({
+      elementId: el.id,
+      layerName,
+      text: el.text,
+      rubySpans: el.rubySpans,
+      vertical: el.vertical,
+      width: el.width,
+      fontSize: el.fontSize,
+      lineHeight: el.lineHeight,
+      letterSpacing: el.letterSpacing,
+      fontFamily: el.font,
+      fontStyle: el.fontStyle,
+      align: el.align,
+    }, "visible-raster-metadata-psd");
+  } catch (error) {
+    const issue: DialogueRubyExportIssue = {
+      code: "metadata-not-json-compatible",
+      message: error instanceof Error ? error.message : String(error),
+      spanIndex: null,
+    };
+    if (!unsupported.some((entry) => entry.code === issue.code && entry.message === issue.message)) {
+      unsupported.push(issue);
+    }
+  }
+  if (metadata) {
+    try {
+      // Validate JSON compatibility per record now so one malformed extension value cannot prevent
+      // every other annotation from being serialized at the document boundary.
+      buildDialogueRubyExportXmp([metadata]);
+    } catch (error) {
+      unsupported.push({
+        code: "metadata-not-json-compatible",
+        message: error instanceof Error ? error.message : String(error),
+        spanIndex: null,
+      });
+      metadata = null;
+    }
+  }
+  return {
+    receipt: Object.freeze({
+      elementId: el.id,
+      layerName,
+      writingMode: el.vertical ? "vertical-rl" : "horizontal-tb",
+      appearance: "visible-raster-layer",
+      editability: "source-metadata-only",
+      metadata: metadata ? "document-xmp-v1" : "unavailable",
+      placementCount: plan.rubyOps.length,
+      tateChuYokoBaseCount: plan.baseOps.filter(
+        (op) => op.op === "text" && op.matrix?.[0] !== undefined && op.matrix[0] > 0 && op.matrix[0] < 1,
+      ).length,
+      warnings: Object.freeze(warnings.map((warning) => Object.freeze(warning))),
+      unsupported: Object.freeze(unsupported.map((issue) => Object.freeze(issue))),
+    }),
+    metadata,
+  };
 }
 
 /**
@@ -971,6 +1087,18 @@ export async function exportPagePsd(
   const psdWidth = Math.max(1, Math.round(canvasW * scale));
   const psdHeight = Math.max(1, Math.round(canvasH * scale));
   const skipped: string[] = [];
+  const rubyReceipts: PsdRubyExportReceipt[] = [];
+  const rubyMetadata: DialogueRubyExportMetadataRecord[] = [];
+
+  const rubyByElementId = new Map<string, PsdRubyExportReceipt>();
+  elements.forEach((element, index) => {
+    if (element.type !== "text") return;
+    const planned = planPsdRubyReceipt(element, elementLabel(element, index));
+    if (!planned) return;
+    rubyReceipts.push(planned.receipt);
+    rubyByElementId.set(element.id, planned.receipt);
+    if (planned.metadata) rubyMetadata.push(planned.metadata);
+  });
 
   if (elements.length === 0) {
     skipped.push("페이지에 요소가 없어 빈 캔버스로 저장했어요.");
@@ -982,6 +1110,7 @@ export async function exportPagePsd(
       skipped,
       layerCount: 0,
       lossManifest: withPsdExportLossDecisions(preflight.lossManifest, elements, [], 0, 0),
+      rubyReceipts,
     };
   }
 
@@ -1077,9 +1206,22 @@ export async function exportPagePsd(
         editableTextCount += 1;
       } else if (editable.fallbackReasons.length > 0) {
         rasterTextCount += 1;
-        skipped.push(
-          `${label}: ${editable.fallbackReasons.join(", ")} 때문에 편집 가능한 PSD 텍스트로 보존할 수 없어 화면 그대로 래스터화했어요.`,
-        );
+        const rubyReceipt = rubyByElementId.get(el.id);
+        if (rubyReceipt) {
+          const issueSummary = rubyReceipt.unsupported.length > 0
+            ? ` 범위 문제 ${rubyReceipt.unsupported.map((issue) => issue.code).join(", ")}도 원문 그대로 보존했어요.`
+            : "";
+          const metadataSummary = rubyReceipt.metadata === "document-xmp-v1"
+            ? "원문·UTF-16 범위는 문서 XMP metadata에 보존했어요."
+            : "원문 metadata는 JSON 호환 오류로 기록하지 못했어요.";
+          skipped.push(
+            `${label}: PSD에 편집 가능한 루비 구조가 없어 화면 그대로 보이는 래스터 레이어를 유지하고 ${metadataSummary}${issueSummary}`,
+          );
+        } else {
+          skipped.push(
+            `${label}: ${editable.fallbackReasons.join(", ")} 때문에 편집 가능한 PSD 텍스트로 보존할 수 없어 화면 그대로 래스터화했어요.`,
+          );
+        }
       }
     }
 
@@ -1105,11 +1247,16 @@ export async function exportPagePsd(
     children.push(makeBackgroundLayer(psdWidth, psdHeight, opts.background));
   }
 
+  const published = publishedPsdResolutionInfo();
+  const xmpMetadata = rubyMetadata.length > 0 ? buildDialogueRubyExportXmp(rubyMetadata) : undefined;
+  const imageResources = published.imageResources || xmpMetadata
+    ? { ...(published.imageResources ?? {}), ...(xmpMetadata ? { xmpMetadata } : {}) }
+    : undefined;
   const psd: Psd = {
     width: psdWidth,
     height: psdHeight,
     children,
-    ...publishedPsdResolutionInfo(),
+    ...(imageResources ? { imageResources } : {}),
   };
 
   // 합성 썸네일(파일탐색기 미리보기용, 순수 장식)은 만들지 않는다 — 실측 결과 요소 2개짜리 거의
@@ -1138,5 +1285,6 @@ export async function exportPagePsd(
       editableTextCount,
       rasterTextCount,
     ),
+    rubyReceipts,
   };
 }

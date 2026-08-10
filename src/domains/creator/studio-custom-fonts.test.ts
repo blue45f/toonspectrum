@@ -25,6 +25,7 @@ import {
   totalCustomFontBytes,
   type CustomFontStorage,
   type StudioCustomFont,
+  type StudioFontFaceBinarySource,
   type StudioFontFaceLike,
   type StudioFontSetLike,
 } from "./studio-custom-fonts";
@@ -187,7 +188,7 @@ describe("addCustomFont", () => {
       fileName: "Sans.ttf",
       byteLength: TTF.byteLength,
     });
-    expect(result.fonts[0]?.dataUrl.startsWith("data:font/ttf;base64,")).toBe(true);
+    expect(result.fonts[0]?.dataUrl?.startsWith("data:font/ttf;base64,")).toBe(true);
   });
 
   it.each([
@@ -198,7 +199,7 @@ describe("addCustomFont", () => {
     ["woff2", "wOF2", "font/woff2"],
   ] as const)("labels a %s payload with its own MIME", (_label, signature, mime) => {
     const result = added([], "Face.bin", fontBytes(signature));
-    expect(result.font.dataUrl.startsWith(`data:${mime};base64,`)).toBe(true);
+    expect(result.font.dataUrl?.startsWith(`data:${mime};base64,`)).toBe(true);
   });
 
   it("rejects a non-font payload with an honest Korean message", () => {
@@ -218,7 +219,13 @@ describe("addCustomFont", () => {
   });
 
   it("rejects a file over the per-file cap and names both numbers", () => {
-    const huge = fontBytes([0x00, 0x01, 0x00, 0x00], MAX_CUSTOM_FONT_FILE_BYTES + 1);
+    const huge = {
+      0: 0x00,
+      1: 0x01,
+      2: 0x00,
+      3: 0x00,
+      byteLength: MAX_CUSTOM_FONT_FILE_BYTES + 1,
+    } as unknown as Uint8Array;
     const result = addCustomFont([], { fileName: "huge.ttf", bytes: huge });
     expect(result.status).toBe("rejected");
     if (result.status !== "rejected") throw new Error("unreachable");
@@ -227,26 +234,30 @@ describe("addCustomFont", () => {
   });
 
   it("rejects a file that would exceed the total budget and names both numbers", () => {
-    const big = fontBytes([0x00, 0x01, 0x00, 0x00], MAX_CUSTOM_FONT_FILE_BYTES);
-    let fonts: StudioCustomFont[] = [];
-    fonts = added(fonts, "a.ttf", big).fonts;
-    expect(totalCustomFontBytes(fonts)).toBe(MAX_CUSTOM_FONT_FILE_BYTES);
-    expect(remainingCustomFontBytes(fonts)).toBe(MAX_CUSTOM_FONT_TOTAL_BYTES - MAX_CUSTOM_FONT_FILE_BYTES);
+    const seed = added([], "a.ttf").font;
+    const fonts: StudioCustomFont[] = [{ ...seed, byteLength: MAX_CUSTOM_FONT_TOTAL_BYTES }];
+    expect(totalCustomFontBytes(fonts)).toBe(MAX_CUSTOM_FONT_TOTAL_BYTES);
+    expect(remainingCustomFontBytes(fonts)).toBe(0);
 
-    const result = addCustomFont(fonts, { fileName: "b.ttf", bytes: big });
+    const result = addCustomFont(fonts, { fileName: "b.ttf", bytes: TTF });
     expect(result.status).toBe("rejected");
     if (result.status !== "rejected") throw new Error("unreachable");
     expect(result.message).toContain(formatCustomFontBytes(MAX_CUSTOM_FONT_TOTAL_BYTES));
-    expect(result.message).toContain(formatCustomFontBytes(big.byteLength));
+    expect(result.message).toContain(formatCustomFontBytes(TTF.byteLength));
     expect(result.fonts).toHaveLength(1);
   });
 
   it("accepts a file that exactly fills the remaining budget", () => {
-    const half = fontBytes([0x00, 0x01, 0x00, 0x00], MAX_CUSTOM_FONT_TOTAL_BYTES / 2);
-    let fonts = added([], "a.ttf", half).fonts;
-    fonts = added(fonts, "b.ttf", half).fonts;
-    expect(totalCustomFontBytes(fonts)).toBe(MAX_CUSTOM_FONT_TOTAL_BYTES);
-    expect(remainingCustomFontBytes(fonts)).toBe(0);
+    const seed = added([], "a.ttf").font;
+    const fonts: StudioCustomFont[] = [{
+      ...seed,
+      byteLength: MAX_CUSTOM_FONT_TOTAL_BYTES - TTF.byteLength,
+    }];
+    const result = addCustomFont(fonts, { fileName: "b.ttf", bytes: TTF });
+    expect(result.status).toBe("added");
+    if (result.status !== "added") throw new Error(result.message);
+    expect(totalCustomFontBytes(result.fonts)).toBe(MAX_CUSTOM_FONT_TOTAL_BYTES);
+    expect(remainingCustomFontBytes(result.fonts)).toBe(0);
   });
 
   it("rejects past the count cap", () => {
@@ -356,17 +367,15 @@ describe("serializeCustomFonts / parseCustomFonts", () => {
     expect(parseCustomFonts(raw)[0]?.byteLength).toBe(TTF.byteLength);
   });
 
-  it("drops a record whose payload alone exceeds the per-file cap", () => {
-    // 상한보다 큰 바이트 수가 나오는 최소 길이의 유효 base64(패딩 없음).
-    const payload = "A".repeat(Math.ceil((MAX_CUSTOM_FONT_FILE_BYTES + 3) / 3) * 4);
-    const overCap = {
-      id: "over-cap",
-      family: "Over",
-      fileName: "over.ttf",
-      byteLength: 10, // 작다고 거짓말해도 payload 실측이 이긴다
-      dataUrl: `data:font/ttf;base64,${payload}`,
+  it("refuses to push verified OPFS bytes back through the legacy data-url serializer", () => {
+    const productFont: StudioCustomFont = {
+      id: "opfs-font",
+      family: "OPFS Font",
+      fileName: "opfs.ttf",
+      byteLength: TTF.byteLength,
+      verifiedBytes: TTF,
     };
-    expect(parseCustomFonts(JSON.stringify({ version: 1, fonts: [overCap] }))).toEqual([]);
+    expect(() => serializeCustomFonts([productFont])).toThrow(/legacy data-url store/u);
   });
 
   it("caps the parsed record count", () => {
@@ -417,7 +426,10 @@ describe("listCustomFonts / saveCustomFonts", () => {
 
 // ── FontFace 등록 ───────────────────────────────────────────────────────
 
-type FakeFontFaceFactory = (family: string, source: string) => StudioFontFaceLike & { source: string };
+type FakeFontFaceFactory = (
+  family: string,
+  source: StudioFontFaceBinarySource,
+) => StudioFontFaceLike & { source: StudioFontFaceBinarySource };
 
 function fakeFontSet() {
   const faces: StudioFontFaceLike[] = [];
@@ -453,7 +465,7 @@ describe("registerStudioCustomFont", () => {
     const result = await registerStudioCustomFont(font, set, factory);
 
     expect(result).toEqual({ status: "ok", family: "Sans" });
-    expect(factory).toHaveBeenCalledWith("Sans", customFontFaceSource(font));
+    expect(factory).toHaveBeenCalledWith("Sans", customFontFaceSource({ dataUrl: font.dataUrl! }));
     expect(registered.map((face) => face.family)).toEqual(["Sans"]);
   });
 

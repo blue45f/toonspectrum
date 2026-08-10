@@ -138,8 +138,9 @@ describe("studio storage recovery runtime — no silent save failure", () => {
 
     const snapshot = getStudioReliabilityStatusSnapshot();
     expect(snapshot.save?.level).toBe("degraded");
-    expect(snapshot.save?.title).toContain("브라우저 임시 저장");
+    expect(snapshot.save?.title).toContain("내구 임시저장 경로");
     expect(snapshot.save?.detail).toContain("origin lock unavailable");
+    expect(snapshot.save?.detail).toContain("탭 메모리");
   });
 
   it("clears the save channel once a durable save succeeds again", async () => {
@@ -151,14 +152,13 @@ describe("studio storage recovery runtime — no silent save failure", () => {
     expect(getStudioReliabilityStatusSnapshot().save).toBeNull();
   });
 
-  it("does not let a fallback save erase the demotion notice it just raised", () => {
+  it("treats OPFS-backed SQLite as durable", () => {
     install(null);
-    reportStudioSaveAuthorityDegraded(new Error("origin lock unavailable"));
+    reportStudioSaveAuthorityDegraded(new Error("OPFS journal unavailable"));
 
-    // 폴백 저장은 성공하지만 내구성은 여전히 낮다 — 고지가 살아 있어야 한다.
-    noteStudioSaveSucceeded("browser-storage-fallback");
+    noteStudioSaveSucceeded("sqlite-fallback");
 
-    expect(getStudioReliabilityStatusSnapshot().save?.level).toBe("degraded");
+    expect(getStudioReliabilityStatusSnapshot().save).toBeNull();
   });
 
   it("installs a pagehide flush so a closing tab still lands its recovery record", async () => {

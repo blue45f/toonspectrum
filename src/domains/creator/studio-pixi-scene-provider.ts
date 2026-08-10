@@ -150,9 +150,9 @@ function compareOverlayEntries(
 }
 
 /**
- * Selection chrome must keep a constant on-screen thickness, exactly like Konva's
- * `strokeScaleEnabled: false`. The root carries the document scale, so the authored stroke width
- * is divided by it before drawing.
+ * Selection chrome must keep a constant on-screen thickness like the primary stage's non-scaling
+ * stroke contract. The root carries the document scale, so authored width is divided before draw;
+ * this mirrors the authoritative canvas while preserving Pixi's independent overlay ownership.
  */
 function chromeStrokeScale(transform: StudioSceneDocumentTransform): number {
   const magnitude = Math.max(Math.abs(transform.scaleX), Math.abs(transform.scaleY));

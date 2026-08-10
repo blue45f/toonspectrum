@@ -3,6 +3,7 @@
 export const memory: WebAssembly.Memory;
 export const adapter_version: () => [number, number];
 export const adopt_gpu_device: (a: any) => [number, number];
+export const audit_svg_native_json: (a: number, b: number) => [number, number, number, number];
 export const fabric_device_adopted: () => number;
 export const fabric_device_handle: () => any;
 export const fit_polyline_json: (a: number, b: number, c: number, d: number) => [number, number, number, number];
@@ -11,6 +12,8 @@ export const render_lottie_gpu_json: (a: number, b: number, c: number, d: number
 export const render_scene_gpu_json: (a: number, b: number) => any;
 export const render_scene_gpu_texture_json: (a: number, b: number) => any;
 export const render_scene_json: (a: number, b: number) => [number, number, number, number];
+export const render_svg_cpu_json: (a: number, b: number, c: number, d: number) => [number, number, number];
+export const render_svg_gpu_json: (a: number, b: number, c: number, d: number) => any;
 export const shape_text_json: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
 export const shape_text_vertical_json: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
 export const wasm_bindgen_b055bf54e8b77daf___convert__closures_____invoke___wasm_bindgen_b055bf54e8b77daf___JsValue__core_9b3796e30d99ddb7___result__Result_____wasm_bindgen_b055bf54e8b77daf___JsError___true_: (a: number, b: number, c: any) => [number, number];

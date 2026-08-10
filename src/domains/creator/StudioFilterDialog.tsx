@@ -18,10 +18,6 @@ import {
 } from "react";
 
 import {
-  browserStudioCreatorPackStorage,
-  listStudioCreatorFilterPresets,
-} from "./studio-creator-filter-preset-reader";
-import {
   createStudioEffectId,
   isStudioEffectFavorite,
   loadStudioEffectFavoriteState,
@@ -39,6 +35,14 @@ import {
   type StudioFilterCatalogGroup,
   type StudioFilterDialogCatalogEntry,
 } from "./studio-filter-catalog";
+import {
+  acquireProductFilterLibraryRepository,
+  subscribeStudioFilterLibraryChanges,
+  type ProductFilterLibraryAuthority,
+  type ProductFilterLibraryRepository,
+  type StudioFilterLibraryPage,
+  type StudioFilterLibraryPreset,
+} from "./studio-filter-library-sqlite-repository";
 import {
   STUDIO_FILTER_LABELS,
   cloneStudioFilterDraft,
@@ -72,6 +76,8 @@ import { buttonClass } from "@/components/ui/button-utils";
 import { cn } from "@/lib/utils";
 
 type FilterPatch = Partial<ImageFilterFields>;
+
+const STUDIO_FILTER_LIBRARY_DIALOG_PAGE_SIZE = 128;
 
 export type StudioFilterApplicationScope = "whole" | StudioSelectionFilterMaskScope;
 
@@ -156,6 +162,8 @@ interface StudioFilterDialogProps {
     scope: StudioFilterApplicationScope,
   ) => void;
   onClose: () => void;
+  /** Tests may inject a repository; product defaults to the shared OPFS SQLite runtime. */
+  acquireFilterLibrary?: () => Promise<ProductFilterLibraryRepository>;
 }
 
 interface NumberControlProps {
@@ -426,6 +434,7 @@ export function StudioFilterDialog({
   onPreview,
   onApply,
   onClose,
+  acquireFilterLibrary = acquireProductFilterLibraryRepository,
 }: StudioFilterDialogProps): ReactElement {
   const dialogRef = useRef<HTMLElement>(null);
   // 히스토그램 원본 — src 키 LRU 캐시(디코드는 다이얼로그 세션당 최대 1회).
@@ -450,9 +459,20 @@ export function StudioFilterDialog({
       studioFilterEffectId(kind),
     ),
   );
-  const [installedCreatorPresets] = useState(() =>
-    listStudioCreatorFilterPresets(browserStudioCreatorPackStorage()),
-  );
+  const [installedCreatorPresets, setInstalledCreatorPresets] = useState<
+    readonly StudioFilterLibraryPreset[]
+  >([]);
+  const [filterLibraryCursor, setFilterLibraryCursor] = useState<
+    StudioFilterLibraryPage["nextCursor"]
+  >(null);
+  const [filterLibraryHasMore, setFilterLibraryHasMore] = useState(false);
+  const [filterLibraryTotalCount, setFilterLibraryTotalCount] = useState(0);
+  const [filterLibraryPageLoading, setFilterLibraryPageLoading] = useState(false);
+  const filterLibraryProductRef = useRef<ProductFilterLibraryRepository | null>(null);
+  const filterLibraryQueryGenerationRef = useRef(0);
+  const [filterLibraryAuthority, setFilterLibraryAuthority] = useState<
+    ProductFilterLibraryAuthority | "loading" | "error"
+  >("loading");
   const installedPackPresets = isStudioFilterPackKind(activeKind)
     ? installedCreatorPresets.filter((preset) => preset.engine === activeKind)
     : [];
@@ -464,6 +484,88 @@ export function StudioFilterDialog({
   const reportPreview = useEffectEvent(onPreview);
   // 미리보기가 켜져 있을 때 스크림에서 제외할 캔버스 영역(뷰포트 좌표). 측정 불가면 null → 통짜 스크림.
   const [previewCutout, setPreviewCutout] = useState<StudioFilterPreviewCutout | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const generation = filterLibraryQueryGenerationRef.current + 1;
+    filterLibraryQueryGenerationRef.current = generation;
+    async function loadInstalledPresets(): Promise<void> {
+      if (!isStudioFilterPackKind(activeKind)) {
+        setInstalledCreatorPresets([]);
+        setFilterLibraryCursor(null);
+        setFilterLibraryHasMore(false);
+        setFilterLibraryTotalCount(0);
+        return;
+      }
+      setFilterLibraryAuthority("loading");
+      try {
+        const product = await acquireFilterLibrary();
+        const page = await product.repository.query({
+          cursor: null,
+          engine: activeKind,
+          limit: STUDIO_FILTER_LIBRARY_DIALOG_PAGE_SIZE,
+        });
+        if (!active || filterLibraryQueryGenerationRef.current !== generation) return;
+        filterLibraryProductRef.current = product;
+        setInstalledCreatorPresets(page.items);
+        setFilterLibraryCursor(page.nextCursor);
+        setFilterLibraryHasMore(page.hasMore);
+        setFilterLibraryTotalCount(page.totalCount);
+        setFilterLibraryAuthority(product.authority);
+      } catch {
+        if (!active || filterLibraryQueryGenerationRef.current !== generation) return;
+        setInstalledCreatorPresets([]);
+        setFilterLibraryCursor(null);
+        setFilterLibraryHasMore(false);
+        setFilterLibraryTotalCount(0);
+        setFilterLibraryAuthority("error");
+      }
+    }
+    void loadInstalledPresets();
+    const unsubscribe = subscribeStudioFilterLibraryChanges(() => {
+      void loadInstalledPresets();
+    });
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [acquireFilterLibrary, activeKind]);
+
+  async function loadMoreInstalledFilterPresets(): Promise<void> {
+    if (
+      filterLibraryPageLoading
+      || !filterLibraryHasMore
+      || filterLibraryCursor === null
+      || !isStudioFilterPackKind(activeKind)
+    ) return;
+    const product = filterLibraryProductRef.current;
+    if (!product) return;
+    const generation = filterLibraryQueryGenerationRef.current;
+    setFilterLibraryPageLoading(true);
+    try {
+      const page = await product.repository.query({
+        cursor: filterLibraryCursor,
+        engine: activeKind,
+        limit: STUDIO_FILTER_LIBRARY_DIALOG_PAGE_SIZE,
+      });
+      if (filterLibraryQueryGenerationRef.current !== generation) return;
+      setInstalledCreatorPresets((current) => {
+        const ids = new Set(current.map((preset) => preset.id));
+        return [...current, ...page.items.filter((preset) => !ids.has(preset.id))];
+      });
+      setFilterLibraryCursor(page.nextCursor);
+      setFilterLibraryHasMore(page.hasMore);
+      setFilterLibraryTotalCount(page.totalCount);
+    } catch {
+      if (filterLibraryQueryGenerationRef.current === generation) {
+        setFilterLibraryAuthority("error");
+      }
+    } finally {
+      if (filterLibraryQueryGenerationRef.current === generation) {
+        setFilterLibraryPageLoading(false);
+      }
+    }
+  }
 
   useStudioModalSheet({
     activeKey,
@@ -841,16 +943,38 @@ export function StudioFilterDialog({
 
             {isStudioFilterPackDraft(draft) ? (
               <>
+                <p
+                  role={filterLibraryAuthority === "error" ? "alert" : "status"}
+                  data-studio-filter-library-authority={filterLibraryAuthority}
+                  className={cn(
+                    "rounded-lg border px-3 py-2 text-[0.64rem] font-semibold",
+                    filterLibraryAuthority === "error"
+                      ? "border-bad/30 bg-bad/10 text-bad"
+                      : "border-line bg-card/70 text-fg-3",
+                  )}
+                >
+                  {filterLibraryAuthority === "sqlite"
+                    ? `${filterLibraryTotalCount}개 · 무제한 · 로컬 SQL`
+                    : filterLibraryAuthority === "memory-session"
+                      ? `${filterLibraryTotalCount}개 · 비영속 메모리 세션 · 브라우저 종료 시 사라짐`
+                      : filterLibraryAuthority === "error"
+                        ? "필터 카탈로그 SQL을 읽지 못했습니다. 기존 데이터로 조용히 강등하지 않았습니다."
+                        : "로컬 SQL 필터 카탈로그 연결 중…"}
+                </p>
                 {installedPackPresets.length > 0 ? (
                   <section
                     aria-label="설치한 Creator Pack 필터 프리셋"
                     className="rounded-lg border border-accent/25 bg-accent-soft/35 p-2.5"
                   >
                     <p className="text-[0.68rem] font-bold text-fg">
-                      설치한 Creator Pack 프리셋
+                      {filterLibraryAuthority === "memory-session"
+                        ? "현재 세션 Creator Pack 필터 프리셋"
+                        : "설치한 Creator Pack 필터 프리셋"}
                     </p>
                     <p className="mt-0.5 text-[0.62rem] leading-relaxed text-fg-3">
-                      선택하면 현재 다이얼로그 값과 비파괴 미리보기에 즉시 반영됩니다.
+                      {filterLibraryAuthority === "memory-session"
+                        ? "현재 세션에만 유지됩니다. 선택하면 비파괴 미리보기에 즉시 반영됩니다."
+                        : "선택하면 현재 다이얼로그 값과 비파괴 미리보기에 즉시 반영됩니다."}
                     </p>
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {installedPackPresets.map((preset) => (
@@ -871,6 +995,22 @@ export function StudioFilterDialog({
                         </button>
                       ))}
                     </div>
+                    {filterLibraryHasMore ? (
+                      <button
+                        type="button"
+                        disabled={filterLibraryPageLoading}
+                        onClick={() => void loadMoreInstalledFilterPresets()}
+                        className={cn(
+                          "mt-2 min-h-11 rounded-lg border border-line bg-card px-3 text-[0.68rem] font-semibold text-fg-2 hover:border-accent/45 hover:bg-raised disabled:cursor-wait disabled:opacity-60",
+                          STUDIO_EASE,
+                          STUDIO_FOCUS_RING,
+                        )}
+                      >
+                        {filterLibraryPageLoading
+                          ? "프리셋 불러오는 중…"
+                          : `더 불러오기 (${installedCreatorPresets.length}/${filterLibraryTotalCount})`}
+                      </button>
+                    ) : null}
                   </section>
                 ) : null}
                 {isStudioFilterUnionWaveKind(draft.kind) ? (

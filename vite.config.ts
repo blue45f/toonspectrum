@@ -290,14 +290,27 @@ export default defineConfig(({ mode }) => ({
             id.endsWith("/lib/studio-raster-asset-admission.ts")
             || id.endsWith("/src/domains/creator/studio-background-gradient-color-stops.ts")
             || id.endsWith("/src/domains/creator/studio-characters.ts")
+            || id.endsWith("/src/domains/creator/studio-brush-pack-format.ts")
             || id.endsWith("/src/domains/creator/studio-brush-pack-id.ts")
             || id.endsWith("/src/domains/creator/studio-brush-selection.ts")
+            || id.endsWith("/src/domains/creator/studio-help-center-channel.ts")
+            || id.endsWith("/src/domains/creator/studio-inspector-focus.ts")
+            || id.endsWith("/src/domains/creator/studio-liquify-contract.ts")
+            || id.endsWith("/src/domains/creator/studio-mobile-sheet-snap.ts")
           ) {
             // These lightweight contracts are shared by several Studio lazy entries. Keeping
             // them together avoids small HTTP requests on every editor launch. The procedural
             // descriptor index is deliberately excluded so its 160 labels/previews stay behind
             // the full-library and saved-pro-brush dynamic boundaries.
             return "studio-core-micro-contracts";
+          }
+          if (
+            id.endsWith("/src/domains/creator/studio-paper-brush-response.ts")
+            || id.endsWith("/src/domains/creator/studio-paper-texture.ts")
+          ) {
+            // Paper texture is an unconditional dependency of the eager brush-response model.
+            // Keep the tiny texture helper in the same request instead of paying a second chunk.
+            return "studio-paper-brush-response";
           }
           if (
             id.includes("/node_modules/react/") ||

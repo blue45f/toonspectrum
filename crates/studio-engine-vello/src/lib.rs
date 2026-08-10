@@ -13,6 +13,8 @@ pub mod gpu_web;
 pub mod lottie;
 pub mod render;
 pub mod scene;
+#[cfg(feature = "svg")]
+pub mod svg;
 pub mod text;
 pub mod text_vertical;
 

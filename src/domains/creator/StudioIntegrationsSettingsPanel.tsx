@@ -22,9 +22,10 @@
 //     스톡 사진 검색 패널은 menu가 단일 값이라 동시에 열리지 않으므로, 마운트 시점 재로드만으로
 //     충분하다).
 import { CheckCircle2, Eye, EyeOff, ExternalLink, Images } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
+  discardLegacyStudioStockImageAccessKey,
   isStudioStockImageConfigured,
   loadStudioStockImageAccessKey,
   saveStudioStockImageAccessKey,
@@ -43,21 +44,38 @@ export interface StudioIntegrationsSettingsPanelProps {
   onAiSettingsChange: (next: StudioAiSettings) => void;
 }
 
+function browserStorage(kind: "localStorage" | "sessionStorage"): Storage | null {
+  try {
+    const scope = globalThis as typeof globalThis & Partial<
+      Pick<Window, "localStorage" | "sessionStorage">
+    >;
+    return scope[kind] ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export function StudioIntegrationsSettingsPanel({ aiSettings, onAiSettingsChange }: StudioIntegrationsSettingsPanelProps) {
-  const [accessKey, setAccessKey] = useState(() => loadStudioStockImageAccessKey(globalThis.localStorage));
+  const [accessKey, setAccessKey] = useState(() =>
+    loadStudioStockImageAccessKey(browserStorage("sessionStorage")),
+  );
   const [showAccessKey, setShowAccessKey] = useState(false);
   const stockImageConfigured = isStudioStockImageConfigured(accessKey);
 
+  useEffect(() => {
+    discardLegacyStudioStockImageAccessKey(browserStorage("localStorage"));
+  }, []);
+
   function updateAccessKey(next: string) {
     setAccessKey(next);
-    saveStudioStockImageAccessKey(globalThis.localStorage, next);
+    saveStudioStockImageAccessKey(browserStorage("sessionStorage"), next);
   }
 
   return (
     <div className="flex flex-col gap-2">
       <p className="text-[0.63rem] leading-relaxed text-fg-3">
-        API 키가 필요한 기능을 한 곳에서 관리해요. AI 키는 현재 탭 세션에만, Unsplash 키는 이
-        브라우저에 저장되며 어느 키도 이 앱 서버로 전송하지 않아요.
+        API 키가 필요한 기능을 한 곳에서 관리해요. AI 키와 Unsplash 키는 현재 탭 세션에만
+        저장되며 어느 키도 이 앱 서버로 전송하지 않아요.
       </p>
 
       <StudioAiSettingsPanel settings={aiSettings} onChange={onAiSettingsChange} />
@@ -69,7 +87,7 @@ export function StudioIntegrationsSettingsPanel({ aiSettings, onAiSettingsChange
         </div>
         <p className="rounded-md border border-line bg-card/70 px-2 py-1.5 text-[0.63rem] leading-relaxed text-fg-3">
           무료 Unsplash 계정으로 Access Key를 발급받아 입력하면 스톡 사진을 검색해 캔버스에 바로 삽입할 수
-          있어요. 키는 <span className="font-semibold text-fg-2">이 브라우저에만</span> 저장되고, 이 앱
+          있어요. 키는 <span className="font-semibold text-fg-2">현재 탭 세션에만</span> 저장되고, 이 앱
           서버로는 전송되지 않아요 — 검색은 브라우저가 Unsplash로 직접 요청해요.{" "}
           <a
             href={STUDIO_STOCK_IMAGE_DEVELOPER_SIGNUP_URL}

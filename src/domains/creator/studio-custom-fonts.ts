@@ -4,27 +4,15 @@
  * <link>로 주입"하는 쪽이라면, 이 모듈은 "사용자가 가진 바이너리를 FontFace로 등록"하는 쪽이다
  * (교체가 아니라 나란히 놓이는 두 번째 공급원 — 두 목록은 서로를 알지 못한다).
  *
- * 저장소(localStorage 호환 인터페이스)를 주입받아 순수하게 동작한다
- * (studio-palette-library.ts·studio-brush-library.ts와 완전히 동일한 패턴:
- *  키 네이밍, 버전 envelope, 방어적 파싱, MAX_* 상한, 배열을 새로 만들어 반환).
+ * 제품 경로는 studio-custom-font-sqlite-opfs-repository.ts의 SQLite canonical manifest와
+ * OPFS SHA-256 CAS를 사용한다. 아래 localStorage 호환 함수는 자동 호출되지 않는 명시적
+ * legacy import/test seam으로만 유지한다.
  *
  * ── 용량 예산(왜 이 숫자인가) ────────────────────────────────────────────
- * 글꼴 바이너리는 이 앱이 localStorage에 넣는 payload 중 압도적으로 크다. data URL은 base64라
- * 원본 바이트의 약 4/3배 문자를 먹고(+ JSON 이스케이프), 브라우저 origin 쿼터는 대체로 5 MB
- * 안팎이다. 브러시 라이브러리(최대 120종·PNG 팁)·팔레트·클립·환경설정이 같은 쿼터를 나눠
- * 쓰므로, 글꼴이 쓸 수 있는 몫을 다음과 같이 잡았다.
- *
- *   - 파일 1개: 2,000,000 B(2 MB). 서브셋/단일 굵기 WOFF2 한글 글꼴(보통 0.3~1.2 MB)과
- *     라틴 글꼴 전부가 들어온다. StudioBrushLibraryPanel의 가져오기 상한(2 MB)과 같은 눈금이다.
- *     전체 굵기가 든 원본 한글 TTF(4~8 MB)는 서브셋/WOFF2 변환을 요구한다 — 조용히 잘라
- *     저장하는 대신 숫자를 밝히고 거절한다.
- *   - 보관함 합계: 3,000,000 B(3 MB) ≈ base64 4.1 MB 문자. 나머지 스튜디오 키에 약 1 MB를
- *     남긴다. 이 예산을 지켜도 브라우저가 쓰기를 거부할 수 있으므로(시크릿 모드·쿼터 편차)
- *     saveCustomFonts()는 실패를 false로 정직하게 돌려준다.
- *   - 개수: 24개. 레터링 작업에 실제로 필요한 서체 수의 상한이자 파싱 비용의 경계.
- *
- * 더 큰 보관함이 필요해지면 저장 seam(CustomFontStorage)만 IndexedDB 어댑터로 갈아끼우면
- * 되도록, 이 모듈은 localStorage를 직접 참조하지 않는다(browserCustomFontStorage() 제외).
+ * CJK TTC·다축 variable font는 수십 MiB가 될 수 있다. 제품 상한은 파일 128 MiB,
+ * 라이브러리 2 GiB, 512개다. 이는 작은 localStorage 쿼터에서 유래한 제한이 아니라 한 번의
+ * File.arrayBuffer/FontFace 메모리 폭주와 manifest 탐색 비용을 막는 안전 경계다. 실제 디스크
+ * 여유는 OPFS quota estimator가 별도로 검사한다.
  */
 
 import { firstFontFamilyName } from "./studio-google-fonts";
@@ -39,10 +27,12 @@ export interface StudioCustomFont {
   family: string;
   /** 사용자가 고른 원본 파일명(표시·재가져오기 안내용). */
   fileName: string;
-  /** dataUrl이 담고 있는 실제 글꼴 바이트 수(예산 계산의 단일 기준). */
+  /** 실제 글꼴 바이트 수(예산 계산의 단일 기준). */
   byteLength: number;
-  /** `data:font/woff2;base64,...` — FontFace source와 영속화가 공유하는 유일한 사본. */
-  dataUrl: string;
+  /** explicit legacy seam에서만 사용하는 인라인 사본. 제품 SQLite에는 절대 저장하지 않는다. */
+  dataUrl?: string;
+  /** OPFS CAS에서 SHA-256 검증을 마친 제품 hydration 바이트. */
+  verifiedBytes?: Uint8Array;
 }
 
 /** category가 없는 사용자 글꼴의 CSS 폴백. studioGoogleFontCssValue의 sans/display와 같은 값. */
@@ -51,11 +41,9 @@ const CUSTOM_FONT_FALLBACK = "sans-serif";
 export const DEFAULT_CUSTOM_FONT_FAMILY = "사용자 글꼴";
 export const MAX_CUSTOM_FONT_FAMILY_LENGTH = 64;
 
-// § 용량 예산 참고. 사용자에게 보여줄 숫자라 10진 MB 눈금을 쓴다(StudioPublishPackagePanel의
-// formatBytes와 같은 관례 — "2 MB"가 2,097,152가 아니라 2,000,000이다).
-export const MAX_CUSTOM_FONT_FILE_BYTES = 2_000_000;
-export const MAX_CUSTOM_FONT_TOTAL_BYTES = 3_000_000;
-export const MAX_CUSTOM_FONTS = 24;
+export const MAX_CUSTOM_FONT_FILE_BYTES = 128 * 1024 * 1024;
+export const MAX_CUSTOM_FONT_TOTAL_BYTES = 2 * 1024 * 1024 * 1024;
+export const MAX_CUSTOM_FONTS = 512;
 
 const FORMAT_MIME: Record<StudioCustomFontFormat, string> = {
   ttf: "font/ttf",
@@ -64,6 +52,10 @@ const FORMAT_MIME: Record<StudioCustomFontFormat, string> = {
   woff: "font/woff",
   woff2: "font/woff2",
 };
+
+export function studioCustomFontMime(format: StudioCustomFontFormat): string {
+  return FORMAT_MIME[format];
+}
 
 /** 파일 선택 대화상자에 넘길 accept 문자열. 확장자와 MIME을 함께 준다(OS별로 한쪽만 맞는다). */
 export const CUSTOM_FONT_ACCEPT =
@@ -133,7 +125,7 @@ function isForbiddenFamilyChar(ch: string): boolean {
   return FAMILY_FORBIDDEN_PUNCTUATION.includes(ch);
 }
 
-function sanitizeFamily(raw: string): string {
+export function normalizeStudioCustomFontFamily(raw: string): string {
   let stripped = "";
   for (const ch of String(raw ?? "")) stripped += isForbiddenFamilyChar(ch) ? " " : ch;
   const cleaned = stripped.replace(/\s+/gu, " ").replace(/^[.\s]+|[.\s]+$/gu, "").trim();
@@ -159,7 +151,7 @@ function uniqueFamily(base: string, taken: ReadonlySet<string>): string {
  */
 export function deriveCustomFontFamily(fileName: string, taken: Iterable<string> = []): string {
   const withoutPath = String(fileName ?? "").split(/[\\/]/u).pop() ?? "";
-  const base = sanitizeFamily(withoutPath.replace(FONT_EXTENSION_RE, ""));
+  const base = normalizeStudioCustomFontFamily(withoutPath.replace(FONT_EXTENSION_RE, ""));
   return uniqueFamily(base || DEFAULT_CUSTOM_FONT_FAMILY, new Set(taken));
 }
 
@@ -171,7 +163,7 @@ export function customFontCssValue(font: Pick<StudioCustomFont, "family">): stri
 }
 
 /** FontFace 생성자에 넘길 CSS src 서술자. base64 문자 집합엔 따옴표가 없어 안전하게 감싼다. */
-export function customFontFaceSource(font: Pick<StudioCustomFont, "dataUrl">): string {
+export function customFontFaceSource(font: { readonly dataUrl: string }): string {
   return `url("${font.dataUrl}")`;
 }
 
@@ -300,7 +292,7 @@ export function renameCustomFont(
 ): StudioCustomFont[] {
   const target = fonts.find((font) => font.id === id);
   if (!target) return [...fonts];
-  const cleaned = sanitizeFamily(String(family ?? ""));
+  const cleaned = normalizeStudioCustomFontFamily(String(family ?? ""));
   if (!cleaned) return [...fonts];
   const taken = new Set(fonts.filter((font) => font.id !== id).map((font) => font.family));
   const next = uniqueFamily(cleaned, taken);
@@ -333,7 +325,7 @@ function normalizeStoredFont(value: unknown): StudioCustomFont | null {
   // 계산을 통과하지 못하게 하는 유일한 방어선이다.
   const byteLength = base64ByteLength(match[1] ?? "");
   if (byteLength === null || byteLength <= 0 || byteLength > MAX_CUSTOM_FONT_FILE_BYTES) return null;
-  const family = sanitizeFamily(typeof record.family === "string" ? record.family : "");
+  const family = normalizeStudioCustomFontFamily(typeof record.family === "string" ? record.family : "");
   if (!family) return null;
   return {
     id,
@@ -346,7 +338,21 @@ function normalizeStoredFont(value: unknown): StudioCustomFont | null {
 
 /** 버전 envelope로 직렬화. brush 라이브러리와 같은 shape. */
 export function serializeCustomFonts(fonts: readonly StudioCustomFont[]): string {
-  return JSON.stringify({ version: CUSTOM_FONT_LIBRARY_STORAGE_VERSION, fonts });
+  return JSON.stringify({
+    version: CUSTOM_FONT_LIBRARY_STORAGE_VERSION,
+    fonts: fonts.map((font) => {
+      if (!font.dataUrl) {
+        throw new Error("verified OPFS font bytes cannot be serialized into the legacy data-url store");
+      }
+      return {
+        id: font.id,
+        family: font.family,
+        fileName: font.fileName,
+        byteLength: font.byteLength,
+        dataUrl: font.dataUrl,
+      };
+    }),
+  });
 }
 
 /**
@@ -439,7 +445,12 @@ export interface StudioFontSetLike {
   add(font: StudioFontFaceLike): unknown;
 }
 
-export type StudioFontFaceFactory = (family: string, source: string) => StudioFontFaceLike;
+export type StudioFontFaceBinarySource = string | ArrayBuffer;
+
+export type StudioFontFaceFactory = (
+  family: string,
+  source: StudioFontFaceBinarySource,
+) => StudioFontFaceLike;
 
 export type StudioCustomFontRegisterResult =
   | { status: "ok"; family: string }
@@ -448,7 +459,9 @@ export type StudioCustomFontRegisterResult =
 
 /** 브라우저 기본 seam. FontFace가 없는 환경(구형·jsdom)에서는 null. */
 export function browserFontFaceFactory(): StudioFontFaceFactory | null {
-  const ctor = (globalThis as { FontFace?: new (family: string, source: string) => StudioFontFaceLike })
+  const ctor = (globalThis as {
+    FontFace?: new (family: string, source: StudioFontFaceBinarySource) => StudioFontFaceLike;
+  })
     .FontFace;
   if (typeof ctor !== "function") return null;
   return (family, source) => new ctor(family, source);
@@ -475,7 +488,15 @@ export async function registerStudioCustomFont(
 ): Promise<StudioCustomFontRegisterResult> {
   if (!fontSet || !createFontFace) return { status: "unsupported", family: font.family };
   try {
-    const face = createFontFace(font.family, customFontFaceSource(font));
+    let source: StudioFontFaceBinarySource;
+    if (font.verifiedBytes) {
+      source = Uint8Array.from(font.verifiedBytes).buffer;
+    } else if (font.dataUrl) {
+      source = customFontFaceSource({ dataUrl: font.dataUrl });
+    } else {
+      throw new Error("검증된 글꼴 바이트가 없습니다.");
+    }
+    const face = createFontFace(font.family, source);
     await face.load();
     fontSet.add(face);
     return { status: "ok", family: font.family };

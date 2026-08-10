@@ -2,20 +2,16 @@ import { useEffect, useRef, useState } from "react";
 
 import {
   createEmptyStudioProductionBible,
-  StudioProductionBibleLocalRepository,
   studioProductionBibleStorageKey,
   type StudioProductionBible,
   type StudioProductionBiblePersistenceResult,
+  type StudioProductionBibleRepository,
 } from "./studio-production-bible";
+import { createStudioProductionBibleSqlitePersistence } from "./studio-production-bible-sqlite-persistence";
 import {
   StudioProductionBiblePanel,
   type StudioProductionBibleLinkOption,
 } from "./StudioProductionBiblePanel";
-
-type ProductionBibleRepository = Pick<
-  StudioProductionBibleLocalRepository,
-  "load" | "save"
->;
 
 export interface StudioProductionBibleWorkspaceProps {
   readonly open: boolean;
@@ -25,20 +21,22 @@ export interface StudioProductionBibleWorkspaceProps {
   readonly remixId?: string | null;
   readonly characterOptions?: readonly StudioProductionBibleLinkOption[];
   readonly assetOptions?: readonly StudioProductionBibleLinkOption[];
-  /** Test/custom-storage seam. The default remains IndexedDB with localStorage recovery. */
-  readonly repository?: ProductionBibleRepository;
+  /** Test/custom-storage seam. Product default is shared V12 SQLite/OPFS only. */
+  readonly repository?: StudioProductionBibleRepository;
 }
 
 const INITIAL_PERSISTENCE: StudioProductionBiblePersistenceResult = {
   bible: createEmptyStudioProductionBible(),
-  backend: "memory",
+  backend: "unavailable",
   persisted: false,
   localOnly: true,
+  warning: "SQLite/OPFS 저장 권위를 확인하고 있습니다.",
 };
 
 /**
  * Lazy host that keeps the production-bible core out of Studio's initial route chunk.
  * The document remains deliberately local-only until a server schema is explicitly introduced.
+ * Shared V12 SQLite/OPFS is the sole product authority; legacy browser stores are never consulted.
  */
 export function StudioProductionBibleWorkspace({
   open,
@@ -51,7 +49,7 @@ export function StudioProductionBibleWorkspace({
   repository,
 }: StudioProductionBibleWorkspaceProps) {
   const [defaultRepository] = useState(
-    () => new StudioProductionBibleLocalRepository()
+    () => createStudioProductionBibleSqlitePersistence()
   );
   const activeRepository = repository ?? defaultRepository;
   const storageKey = studioProductionBibleStorageKey({
@@ -70,23 +68,54 @@ export function StudioProductionBibleWorkspace({
     if (!open) return;
     let active = true;
     const loadEpoch = ++saveEpochRef.current;
-    void activeRepository.load(storageKey).then((result) => {
-      if (!active || loadEpoch !== saveEpochRef.current) return;
-      setBible(result.bible);
-      setPersistence(result);
-    });
+    setBible(INITIAL_PERSISTENCE.bible);
+    setPersistence(INITIAL_PERSISTENCE);
+    void activeRepository.load(storageKey).then(
+      (result) => {
+        if (!active || loadEpoch !== saveEpochRef.current) return;
+        setBible(result.bible);
+        setPersistence(result);
+      },
+      (error: unknown) => {
+        if (!active || loadEpoch !== saveEpochRef.current) return;
+        setPersistence({
+          bible: createEmptyStudioProductionBible(),
+          backend: "unavailable",
+          persisted: false,
+          localOnly: true,
+          warning: `SQLite/OPFS 바이블 읽기에 실패했습니다: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        });
+      }
+    );
     return () => {
       active = false;
+      saveEpochRef.current += 1;
     };
   }, [activeRepository, open, storageKey]);
 
   function changeBible(next: StudioProductionBible): void {
     setBible(next);
     const saveEpoch = ++saveEpochRef.current;
-    void activeRepository.save(storageKey, next).then((result) => {
-      if (saveEpoch !== saveEpochRef.current) return;
-      setPersistence(result);
-    });
+    void activeRepository.save(storageKey, next).then(
+      (result) => {
+        if (saveEpoch !== saveEpochRef.current) return;
+        setPersistence(result);
+      },
+      (error: unknown) => {
+        if (saveEpoch !== saveEpochRef.current) return;
+        setPersistence({
+          bible: next,
+          backend: "memory",
+          persisted: false,
+          localOnly: true,
+          warning: `SQLite/OPFS 저장에 실패해 변경을 세션 메모리에만 유지합니다: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        });
+      }
+    );
   }
 
   return (

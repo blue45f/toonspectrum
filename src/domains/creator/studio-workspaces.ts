@@ -54,7 +54,7 @@ export const STUDIO_WORKSPACE_PAYLOAD_VERSION = 4 as const;
 export const STUDIO_WORKSPACE_MAX_CUSTOM = 24;
 export const STUDIO_WORKSPACE_NAME_MAX_LENGTH = 48;
 export const STUDIO_WORKSPACE_RAW_MAX_BYTES = 64 * 1024;
-export const STUDIO_WORKSPACE_STORAGE_KEY = "toonspectrum:studio:workspaces";
+export const STUDIO_WORKSPACE_STORAGE_KEY = "toonspectrum:studio:workspaces-v12";
 
 export const STUDIO_WORKSPACE_LEFT_PANEL_WIDTH = Object.freeze({
   minimum: 128,
@@ -1279,10 +1279,15 @@ function persistMigratedWorkspace(
   );
 }
 
-/** Loads, owner-validates, and opportunistically migrates stable/prior/legacy preference payloads. */
+/**
+ * Loads the V12 owner-scoped workspace. Pre-V12 keys are ignored by default because
+ * the in-place cutover discards internal Studio data. Explicit migration remains a
+ * developer/test tool; schema upgrades already written under the V12 key stay valid.
+ */
 export function loadStudioWorkspacePersistence(
   storage: StudioWorkspaceLoadStorage | null | undefined,
-  userId: string | null | undefined
+  userId: string | null | undefined,
+  options: { readonly legacyDataPolicy?: "discard" | "import-explicit" } = {},
 ): StudioWorkspaceLoadResult {
   const ownerScope = studioWorkspaceOwnerScope(userId);
   const fallback = createDefaultState(ownerScope);
@@ -1324,6 +1329,16 @@ export function loadStudioWorkspacePersistence(
         write.failure
       );
     }
+  }
+
+  if (options.legacyDataPolicy !== "import-explicit") {
+    return loadResult(
+      fallback,
+      ownerScope,
+      "default",
+      "session-only",
+      invalidPayloadFound ? "invalid-payload" : null,
+    );
   }
 
   const legacyKey = legacyV1StorageKey(userId);

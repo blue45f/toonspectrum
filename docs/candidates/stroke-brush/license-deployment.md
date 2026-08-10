@@ -25,6 +25,13 @@
 - Google Ink의 전용 Worker 격리는 **안정성·메모리 회수 사유**(V11 §9.1 lazy load + Worker 종료 회수)이지 라이선스 요구가 아니다. 문서·코드 주석에 사유를 혼동해 적지 않는다.
 - 인접 경계 주의: 자연매체 쪽 libmypaint는 ISC(permissive)라 copyleft 아님 — stroke-brush가 natural-media Provider와 조합될 때도 새로운 copyleft 표면은 생기지 않는다. 단, MyPaint **브러시 프리셋(.myb) 자산**은 코드와 별개의 라이선스이므로 Rights BOM으로 개별 추적한다(V11 §11 asset 조항).
 
+## V12 surface-brush 브리지 고지 (2026-08-10)
+
+신규 dependency·WASM·Worker는 추가하지 않는다. 제품 브리지는 리포에 이미 핀된 Three.js와
+`three-mesh-bvh` 0.9.13(MIT), 내부 VRM texture-paint runtime 및 내부 BrushProgramIR lowering만
+재사용한다. 메시·텍스처·VRM 사용자 자산의 Rights BOM과 texture export 고지는 기존 3D asset
+정책을 그대로 따른다.
+
 ## 3. 배포 체크리스트
 
 1. **THIRD-PARTY NOTICES**: perfect-freehand(MIT), Google Ink(Apache-2.0 + NOTICE), Kurbo/Lyon/wgpu(dual), CanvasKit(BSD) 항목을 빌드 시 자동 생성 목록에 포함하고 license scan CI(매트릭스 검증 게이트 공통 항목)로 검증한다.

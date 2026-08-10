@@ -1,9 +1,9 @@
 /**
  * Browser-durable, shot-atomic recovery for Studio 3D batch renders.
  *
- * IndexedDB transactions are the authority. BroadcastChannel/Web Locks may be added as latency
- * optimizations later, but correctness comes from a fencing lease plus state-revision CAS in the
- * same transaction that commits a shot's artifact bundle and global byte ledger.
+ * Product authority is one canonical catalog row in the shared V12 SQLite/OPFS database, fenced
+ * by Web Locks; PNG/PSD bytes live in the SHA-256 OPFS CAS. The former IndexedDB implementation is
+ * opened only through the explicit `indexedDB` legacy/test seam and is never read on product boot.
  */
 
 import {
@@ -34,11 +34,25 @@ import {
   type StudioBg3dShotBatchFailureCode,
   type StudioBg3dShotBatchQueue,
 } from "./studio-bg3d-shot-batch-queue";
+import { acquireStudioLocalDatabase } from "./studio-local-database-runtime";
+import { createStudioOpfsAssetStore } from "./studio-opfs-asset-store";
+import { createStudioOpfsNativeFileSystem } from "./studio-opfs-filesystem";
 import { compareStudioValidationStrings } from "./studio-validation-string-order";
+
+import type { StudioLocalDatabase } from "./studio-local-database";
+import type { StudioOpfsAssetStore } from "./studio-opfs-asset-store";
+import type { StudioOpfsStorageManagerLike } from "./studio-opfs-filesystem";
 
 export const STUDIO_BG3D_SHOT_BATCH_RECOVERY_DATABASE_NAME =
   "toonspectrum-studio-bg3d-shot-batch-recovery";
 export const STUDIO_BG3D_SHOT_BATCH_RECOVERY_DATABASE_VERSION = 1;
+export const STUDIO_BG3D_SHOT_BATCH_RECOVERY_SQLITE_NAMESPACE =
+  "studio-bg3d-shot-batch-recovery-v12";
+export const STUDIO_BG3D_SHOT_BATCH_RECOVERY_SQLITE_CATALOG_KEY = "catalog-v1";
+export const STUDIO_BG3D_SHOT_BATCH_RECOVERY_SQLITE_LOCK_NAME =
+  "toonspectrum:studio:bg3d-shot-batch-recovery:v12";
+export const STUDIO_BG3D_SHOT_BATCH_RECOVERY_CAS_OWNER_PREFIX =
+  "studio-bg3d-shot-batch-recovery-v12:";
 export const STUDIO_BG3D_SHOT_BATCH_RECOVERY_JOB_TTL_MS = 7 * 24 * 60 * 60 * 1_000;
 export const STUDIO_BG3D_SHOT_BATCH_RECOVERY_DOWNLOAD_TTL_MS = 24 * 60 * 60 * 1_000;
 export const STUDIO_BG3D_SHOT_BATCH_RECOVERY_LEASE_MS = 30_000;
@@ -226,12 +240,52 @@ interface MemoryRecord {
 }
 
 export interface StudioBg3dShotBatchRecoveryStoreOptions {
+  /**
+   * Explicit legacy/test seam. Merely having a global IndexedDB no longer selects it; product
+   * boot uses the shared V12 SQLite/OPFS authority unless this property is explicitly supplied.
+   */
   readonly indexedDB?: IDBFactory | null;
+  readonly acquireDatabase?: () => Promise<StudioLocalDatabase>;
+  readonly acquireAssetStore?: () => Promise<StudioOpfsAssetStore>;
+  /** Cross-tab read/modify/write fence. Product default is navigator.locks exclusive mode. */
+  readonly runExclusive?: StudioBg3dShotBatchRecoveryRunExclusive | null;
   readonly now?: () => number;
   readonly ownerId?: string;
   /** Tests can disable timers while still exercising all lease/CAS transitions explicitly. */
   readonly heartbeat?: boolean;
   readonly storageManager?: Pick<StorageManager, "estimate" | "persist"> | null;
+}
+
+export type StudioBg3dShotBatchRecoveryRunExclusive = <T>(
+  task: () => Promise<T>,
+) => Promise<T>;
+
+/** Public recovery contract shared by the V12 SQLite authority and explicit legacy seam. */
+export interface StudioBg3dShotBatchRecoveryStore {
+  acquire(
+    plan: StudioBg3dShotBatchPlan,
+    sourceRevision: string,
+    options?: StudioBg3dShotBatchRecoveryAcquireOptions,
+  ): Promise<StudioBg3dShotBatchRecoverySession>;
+  startShot(
+    session: StudioBg3dShotBatchRecoverySession,
+    shotId: string,
+  ): Promise<StudioBg3dShotBatchRunToken>;
+  completeShot(
+    session: StudioBg3dShotBatchRecoverySession,
+    token: StudioBg3dShotBatchRunToken,
+    artifacts: StudioBg3dShotBatchShotArtifacts,
+    options?: StudioBg3dShotBatchRecoveryCommitOptions,
+  ): Promise<void>;
+  failShot(
+    session: StudioBg3dShotBatchRecoverySession,
+    token: StudioBg3dShotBatchRunToken,
+    failureCode: StudioBg3dShotBatchFailureCode,
+  ): Promise<void>;
+  resetInterrupted(session: StudioBg3dShotBatchRecoverySession): Promise<void>;
+  markDownloadRequested(session: StudioBg3dShotBatchRecoverySession): Promise<void>;
+  release(session: StudioBg3dShotBatchRecoverySession): Promise<void>;
+  discard(session: StudioBg3dShotBatchRecoverySession): Promise<void>;
 }
 
 const memoryRecords = new Map<string, MemoryRecord>();
@@ -911,6 +965,638 @@ async function verifyArtifactRecords(
   return records;
 }
 
+interface SqliteRecoveryBlobRef {
+  readonly hash: `sha256:${string}`;
+  readonly byteSize: number;
+  readonly mime: string;
+}
+
+interface SqliteRecoveryImage extends Omit<StudioBg3dShotBatchImage, "png"> {
+  readonly pngRef: SqliteRecoveryBlobRef;
+}
+
+interface SqliteRecoveryLayeredPsd extends Omit<StudioBg3dShotBatchLayeredPsd, "psd"> {
+  readonly psdRef: SqliteRecoveryBlobRef;
+}
+
+interface SqliteRecoveryArtifacts {
+  readonly images: readonly SqliteRecoveryImage[];
+  readonly skippedArtifacts: readonly StudioBg3dShotBatchSkippedArtifact[];
+  readonly layeredPsds: readonly SqliteRecoveryLayeredPsd[];
+  readonly psdFallbacks: readonly StudioBg3dShotBatchPsdFallback[];
+  readonly blobs: StudioBg3dVerifiedShotBatchShotArtifacts["blobs"];
+  readonly totalBytes: number;
+  readonly artifactCount: number;
+}
+
+interface SqliteRecoveryArtifactRecord extends Omit<ArtifactRecord, "artifacts"> {
+  readonly artifacts: SqliteRecoveryArtifacts;
+}
+
+interface SqliteRecoveryCatalogEntry {
+  readonly job: JobRecord;
+  readonly lease: LeaseRecord | null;
+  readonly artifacts: readonly SqliteRecoveryArtifactRecord[];
+}
+
+interface SqliteRecoveryCatalog {
+  readonly kind: "toonspectrum-bg3d-shot-batch-recovery-catalog";
+  readonly version: 1;
+  readonly revision: number;
+  readonly updatedAt: number;
+  readonly entries: readonly SqliteRecoveryCatalogEntry[];
+}
+
+const SQLITE_CATALOG_KIND = "toonspectrum-bg3d-shot-batch-recovery-catalog";
+const SQLITE_CATALOG_VERSION = 1;
+const SQLITE_HASH_PATTERN = /^sha256:([0-9a-f]{64})$/u;
+const SQLITE_CAS_ROOT = "toonspectrum-studio-assets";
+
+function isSafeNonNegativeInteger(value: unknown): value is number {
+  return Number.isSafeInteger(value) && (value as number) >= 0;
+}
+
+function isSqliteBlobRef(value: unknown): value is SqliteRecoveryBlobRef {
+  if (!exactKeys(value, ["hash", "byteSize", "mime"])) return false;
+  const ref = value as SqliteRecoveryBlobRef;
+  return SQLITE_HASH_PATTERN.test(ref.hash) && Number.isSafeInteger(ref.byteSize) &&
+    ref.byteSize > 0 && ref.byteSize <= STUDIO_BG3D_SHOT_BATCH_MAX_TOTAL_BYTES &&
+    typeof ref.mime === "string" && ref.mime.length >= 1 && ref.mime.length <= 160;
+}
+
+function isVerifiedBlobReceipt(value: unknown): value is SqliteRecoveryArtifacts["blobs"][number] {
+  if (!exactKeys(value, ["kind", "key", "sha256", "byteSize"])) return false;
+  const blob = value as SqliteRecoveryArtifacts["blobs"][number];
+  return (blob.kind === "png" || blob.kind === "psd") &&
+    typeof blob.key === "string" && blob.key.length >= 1 && blob.key.length <= 512 &&
+    /^[0-9a-f]{64}$/u.test(blob.sha256) && Number.isSafeInteger(blob.byteSize) &&
+    blob.byteSize > 0 && blob.byteSize <= STUDIO_BG3D_SHOT_BATCH_MAX_TOTAL_BYTES;
+}
+
+function isSqliteRecoveryImage(value: unknown): value is SqliteRecoveryImage {
+  if (!exactKeys(value, [
+    "shotId", "shotName", "width", "height", "pass", "requestedHeight", "wasReduced",
+    "pngRef",
+  ])) return false;
+  const image = value as SqliteRecoveryImage;
+  return typeof image.shotId === "string" && typeof image.shotName === "string" &&
+    typeof image.pass === "string" && Number.isSafeInteger(image.width) && image.width > 0 &&
+    Number.isSafeInteger(image.height) && image.height > 0 &&
+    typeof image.requestedHeight === "number" &&
+    Number.isSafeInteger(image.requestedHeight) && image.requestedHeight > 0 &&
+    typeof image.wasReduced === "boolean" && isSqliteBlobRef(image.pngRef);
+}
+
+function isSqliteRecoveryLayeredPsd(value: unknown): value is SqliteRecoveryLayeredPsd {
+  if (!exactKeys(value, ["shotId", "shotName", "width", "height", "psdRef"])) return false;
+  const psd = value as SqliteRecoveryLayeredPsd;
+  return typeof psd.shotId === "string" && typeof psd.shotName === "string" &&
+    Number.isSafeInteger(psd.width) && psd.width > 0 &&
+    Number.isSafeInteger(psd.height) && psd.height > 0 && isSqliteBlobRef(psd.psdRef);
+}
+
+function isPlainArtifactMetadata(
+  value: unknown,
+  keys: readonly string[],
+): value is Record<string, unknown> {
+  return exactKeys(value, keys) && typeof value === "object" && value !== null;
+}
+
+function isSqliteRecoveryArtifacts(value: unknown): value is SqliteRecoveryArtifacts {
+  if (!exactKeys(value, [
+    "images", "skippedArtifacts", "layeredPsds", "psdFallbacks", "blobs", "totalBytes",
+    "artifactCount",
+  ])) return false;
+  const artifacts = value as SqliteRecoveryArtifacts;
+  if (!Array.isArray(artifacts.images) || !artifacts.images.every(isSqliteRecoveryImage) ||
+    !Array.isArray(artifacts.layeredPsds) ||
+    !artifacts.layeredPsds.every(isSqliteRecoveryLayeredPsd) ||
+    !Array.isArray(artifacts.skippedArtifacts) ||
+    !artifacts.skippedArtifacts.every((item) =>
+      isPlainArtifactMetadata(item, ["shotId", "shotName", "pass", "reason"])) ||
+    !Array.isArray(artifacts.psdFallbacks) ||
+    !artifacts.psdFallbacks.every((item) =>
+      isPlainArtifactMetadata(item, ["shotId", "shotName", "reason"])) ||
+    !Array.isArray(artifacts.blobs) || !artifacts.blobs.every(isVerifiedBlobReceipt) ||
+    !isSafeNonNegativeInteger(artifacts.totalBytes) ||
+    artifacts.totalBytes > STUDIO_BG3D_SHOT_BATCH_MAX_TOTAL_BYTES ||
+    !isSafeNonNegativeInteger(artifacts.artifactCount)) return false;
+  const refs = [
+    ...artifacts.images.map(({ pngRef }) => pngRef),
+    ...artifacts.layeredPsds.map(({ psdRef }) => psdRef),
+  ];
+  const receiptKeys = new Set<string>();
+  if (artifacts.blobs.some((blob) => receiptKeys.size === receiptKeys.add(blob.key).size)) {
+    return false;
+  }
+  const receiptByHash = new Map(artifacts.blobs.map((blob) => [
+    `sha256:${blob.sha256}`,
+    blob,
+  ]));
+  if (refs.length !== artifacts.blobs.length || refs.some((ref) => {
+    const receipt = receiptByHash.get(ref.hash);
+    return !receipt || receipt.byteSize !== ref.byteSize;
+  })) return false;
+  const totalBytes = artifacts.blobs.reduce((total, blob) => total + blob.byteSize, 0);
+  const artifactCount = artifacts.images.length + artifacts.skippedArtifacts.length +
+    artifacts.layeredPsds.length + artifacts.psdFallbacks.length;
+  return totalBytes === artifacts.totalBytes && artifactCount === artifacts.artifactCount;
+}
+
+function isSqliteRecoveryArtifactRecord(value: unknown): value is SqliteRecoveryArtifactRecord {
+  if (!exactKeys(value, [
+    "kind", "version", "artifactKey", "recoveryKey", "shotId", "artifacts", "storageBytes",
+    "createdAt",
+  ])) return false;
+  const record = value as SqliteRecoveryArtifactRecord;
+  return record.kind === "toonspectrum-bg3d-shot-batch-shot-artifacts" && record.version === 1 &&
+    typeof record.artifactKey === "string" && typeof record.recoveryKey === "string" &&
+    typeof record.shotId === "string" &&
+    record.artifactKey === artifactKey(record.recoveryKey, record.shotId) &&
+    Number.isSafeInteger(record.storageBytes) && record.storageBytes > 0 &&
+    record.storageBytes <= STUDIO_BG3D_SHOT_BATCH_RECOVERY_MAX_ARTIFACT_STORAGE_BYTES &&
+    isSafeNonNegativeInteger(record.createdAt) && isSqliteRecoveryArtifacts(record.artifacts);
+}
+
+function isSqliteRecoveryCatalogEntry(value: unknown): value is SqliteRecoveryCatalogEntry {
+  if (!exactKeys(value, ["job", "lease", "artifacts"])) return false;
+  const entry = value as SqliteRecoveryCatalogEntry;
+  if (!isGcJobRecord(entry.job) ||
+    (entry.lease !== null && !isGcLeaseRecord(entry.lease)) ||
+    !Array.isArray(entry.artifacts) || !entry.artifacts.every(isSqliteRecoveryArtifactRecord)) {
+    return false;
+  }
+  if (entry.lease !== null && entry.lease.recoveryKey !== entry.job.recoveryKey) return false;
+  const seenKeys = new Set<string>();
+  const seenShots = new Set<string>();
+  for (const artifact of entry.artifacts) {
+    if (artifact.recoveryKey !== entry.job.recoveryKey || seenKeys.has(artifact.artifactKey) ||
+      seenShots.has(artifact.shotId)) return false;
+    seenKeys.add(artifact.artifactKey);
+    seenShots.add(artifact.shotId);
+  }
+  if (entry.job.artifactKeys.length !== entry.artifacts.length ||
+    entry.job.artifactKeys.some((key, index) => key !== entry.artifacts[index]?.artifactKey)) {
+    return false;
+  }
+  const artifactBytes = entry.artifacts.reduce(
+    (total, artifact) => total + artifact.artifacts.totalBytes,
+    0,
+  );
+  const artifactCount = entry.artifacts.reduce(
+    (total, artifact) => total + artifact.artifacts.artifactCount,
+    0,
+  );
+  const structuredBytes = entry.artifacts.reduce(
+    (total, artifact) => total + artifact.storageBytes,
+    0,
+  );
+  return artifactBytes === entry.job.totalArtifactBytes &&
+    artifactCount === entry.job.artifactCount &&
+    structuredBytes === entry.job.artifactStorageBytes;
+}
+
+function canonicalJobRecord(job: JobRecord): JobRecord {
+  return {
+    kind: job.kind,
+    version: job.version,
+    recoveryKey: job.recoveryKey,
+    plan: job.plan,
+    sourceRevision: job.sourceRevision,
+    queue: job.queue,
+    revision: job.revision,
+    activeRun: job.activeRun,
+    artifactKeys: [...job.artifactKeys],
+    totalArtifactBytes: job.totalArtifactBytes,
+    artifactCount: job.artifactCount,
+    jobStorageBytes: job.jobStorageBytes,
+    artifactStorageBytes: job.artifactStorageBytes,
+    createdAt: job.createdAt,
+    updatedAt: job.updatedAt,
+    expiresAt: job.expiresAt,
+    downloadRequestedAt: job.downloadRequestedAt,
+  };
+}
+
+function canonicalLeaseRecord(lease: LeaseRecord | null): LeaseRecord | null {
+  if (!lease) return null;
+  return {
+    kind: lease.kind,
+    version: lease.version,
+    recoveryKey: lease.recoveryKey,
+    ownerId: lease.ownerId,
+    leaseToken: lease.leaseToken,
+    fence: lease.fence,
+    acquiredAt: lease.acquiredAt,
+    heartbeatAt: lease.heartbeatAt,
+    expiresAt: lease.expiresAt,
+  };
+}
+
+function canonicalSqliteArtifacts(artifacts: SqliteRecoveryArtifacts): SqliteRecoveryArtifacts {
+  return {
+    images: artifacts.images.map((image) => ({
+      shotId: image.shotId,
+      shotName: image.shotName,
+      width: image.width,
+      height: image.height,
+      pass: image.pass,
+      requestedHeight: image.requestedHeight,
+      wasReduced: image.wasReduced,
+      pngRef: { ...image.pngRef },
+    })),
+    skippedArtifacts: artifacts.skippedArtifacts.map((item) => ({ ...item })),
+    layeredPsds: artifacts.layeredPsds.map((item) => ({
+      shotId: item.shotId,
+      shotName: item.shotName,
+      width: item.width,
+      height: item.height,
+      psdRef: { ...item.psdRef },
+    })),
+    psdFallbacks: artifacts.psdFallbacks.map((item) => ({ ...item })),
+    blobs: artifacts.blobs.map((blob) => ({ ...blob })),
+    totalBytes: artifacts.totalBytes,
+    artifactCount: artifacts.artifactCount,
+  };
+}
+
+function canonicalSqliteCatalog(catalog: SqliteRecoveryCatalog): SqliteRecoveryCatalog {
+  return {
+    kind: SQLITE_CATALOG_KIND,
+    version: SQLITE_CATALOG_VERSION,
+    revision: catalog.revision,
+    updatedAt: catalog.updatedAt,
+    entries: [...catalog.entries]
+      .sort((left, right) => compareStudioValidationStrings(
+        left.job.recoveryKey,
+        right.job.recoveryKey,
+      ))
+      .map((entry) => ({
+        job: canonicalJobRecord(entry.job),
+        lease: canonicalLeaseRecord(entry.lease),
+        artifacts: entry.artifacts.map((artifact) => ({
+          kind: artifact.kind,
+          version: artifact.version,
+          artifactKey: artifact.artifactKey,
+          recoveryKey: artifact.recoveryKey,
+          shotId: artifact.shotId,
+          artifacts: canonicalSqliteArtifacts(artifact.artifacts),
+          storageBytes: artifact.storageBytes,
+          createdAt: artifact.createdAt,
+        })),
+      })),
+  };
+}
+
+function serializeSqliteCatalog(catalog: SqliteRecoveryCatalog): string {
+  return JSON.stringify(canonicalSqliteCatalog(catalog));
+}
+
+function parseSqliteCatalog(raw: string | null): SqliteRecoveryCatalog {
+  if (raw === null) {
+    return {
+      kind: SQLITE_CATALOG_KIND,
+      version: SQLITE_CATALOG_VERSION,
+      revision: 0,
+      updatedAt: 0,
+      entries: [],
+    };
+  }
+  if (new TextEncoder().encode(raw).byteLength >
+    STUDIO_BG3D_SHOT_BATCH_RECOVERY_ORIGIN_MAX_BYTES) {
+    throw new StudioBg3dShotBatchRecoveryError("corrupt", "컷 배치 SQLite catalog가 한도를 벗어났습니다.");
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (cause) {
+    throw new StudioBg3dShotBatchRecoveryError(
+      "corrupt",
+      "컷 배치 SQLite catalog JSON이 손상되었습니다.",
+      { cause },
+    );
+  }
+  if (!exactKeys(parsed, ["kind", "version", "revision", "updatedAt", "entries"])) {
+    throw new StudioBg3dShotBatchRecoveryError("corrupt", "컷 배치 SQLite catalog 필드가 손상되었습니다.");
+  }
+  const catalog = parsed as SqliteRecoveryCatalog;
+  if (catalog.kind !== SQLITE_CATALOG_KIND || catalog.version !== SQLITE_CATALOG_VERSION ||
+    !isSafeNonNegativeInteger(catalog.revision) || !isSafeNonNegativeInteger(catalog.updatedAt) ||
+    !Array.isArray(catalog.entries) ||
+    catalog.entries.length > STUDIO_BG3D_SHOT_BATCH_RECOVERY_MAX_JOBS ||
+    !catalog.entries.every(isSqliteRecoveryCatalogEntry)) {
+    throw new StudioBg3dShotBatchRecoveryError("corrupt", "컷 배치 SQLite catalog가 유효하지 않습니다.");
+  }
+  const keys = catalog.entries.map(({ job }) => job.recoveryKey);
+  if (new Set(keys).size !== keys.length) {
+    throw new StudioBg3dShotBatchRecoveryError("corrupt", "컷 배치 SQLite catalog Job 키가 중복되었습니다.");
+  }
+  const artifactBytes = catalog.entries.reduce(
+    (total, entry) => total + entry.job.totalArtifactBytes,
+    0,
+  );
+  const structuredBytes = catalog.entries.reduce(
+    (total, entry) => total + entry.job.jobStorageBytes + entry.job.artifactStorageBytes,
+    0,
+  );
+  if (artifactBytes + structuredBytes > STUDIO_BG3D_SHOT_BATCH_RECOVERY_ORIGIN_MAX_BYTES ||
+    serializeSqliteCatalog(catalog) !== raw) {
+    throw new StudioBg3dShotBatchRecoveryError(
+      "corrupt",
+      "컷 배치 SQLite catalog 원장 또는 canonical 직렬화가 손상되었습니다.",
+    );
+  }
+  return catalog;
+}
+
+function recoveryCasOwner(recoveryKey: string): string {
+  return `${STUDIO_BG3D_SHOT_BATCH_RECOVERY_CAS_OWNER_PREFIX}${recoveryKey}`;
+}
+
+function artifactHashes(artifacts: readonly SqliteRecoveryArtifactRecord[]): `sha256:${string}`[] {
+  return [...new Set(artifacts.flatMap((artifact) => [
+    ...artifact.artifacts.images.map(({ pngRef }) => pngRef.hash),
+    ...artifact.artifacts.layeredPsds.map(({ psdRef }) => psdRef.hash),
+  ]))].sort(compareStudioValidationStrings);
+}
+
+let sharedRecoveryAssetStore: Promise<StudioOpfsAssetStore> | null = null;
+
+function acquireProductRecoveryAssetStore(): Promise<StudioOpfsAssetStore> {
+  sharedRecoveryAssetStore ??= Promise.resolve().then(() => {
+    const storage = typeof navigator === "undefined" ? null : navigator.storage;
+    if (!storage || typeof storage.getDirectory !== "function") {
+      throw new StudioBg3dShotBatchRecoveryError(
+        "storage-unavailable",
+        "OPFS를 사용할 수 없어 컷 배치 바이너리를 저장할 수 없습니다.",
+      );
+    }
+    return createStudioOpfsAssetStore({
+      fs: createStudioOpfsNativeFileSystem(
+        storage as unknown as StudioOpfsStorageManagerLike,
+        SQLITE_CAS_ROOT,
+      ),
+      estimator: storage,
+    });
+  });
+  return sharedRecoveryAssetStore;
+}
+
+interface BrowserLockManagerLike {
+  request<T>(
+    name: string,
+    options: { readonly mode: "exclusive" },
+    callback: () => Promise<T>,
+  ): Promise<T>;
+}
+
+function productRunExclusive(): StudioBg3dShotBatchRecoveryRunExclusive | null {
+  const manager = typeof navigator === "undefined"
+    ? null
+    : (navigator as Navigator & { locks?: BrowserLockManagerLike }).locks;
+  if (!manager || typeof manager.request !== "function") return null;
+  return <T>(task: () => Promise<T>) => manager.request(
+    STUDIO_BG3D_SHOT_BATCH_RECOVERY_SQLITE_LOCK_NAME,
+    { mode: "exclusive" },
+    task,
+  );
+}
+
+async function putVerifiedBlob(
+  store: StudioOpfsAssetStore,
+  blob: Blob,
+  receipt: SqliteRecoveryArtifacts["blobs"][number],
+  signal?: AbortSignal,
+): Promise<SqliteRecoveryBlobRef> {
+  throwIfAborted(signal);
+  const bytes = new Uint8Array(await awaitWithAbort(blob.arrayBuffer(), signal));
+  throwIfAborted(signal);
+  if (bytes.byteLength !== receipt.byteSize) {
+    throw new StudioBg3dShotBatchRecoveryError("corrupt", "컷 artifact 바이트 원장이 변경되었습니다.");
+  }
+  const written = await store.put(bytes, { mime: blob.type });
+  const expectedHash = `sha256:${receipt.sha256}` as const;
+  if (written.ref.hash !== expectedHash || written.ref.bytes !== receipt.byteSize) {
+    throw new StudioBg3dShotBatchRecoveryError(
+      "corrupt",
+      "OPFS CAS가 컷 artifact SHA-256 영수증과 다른 주소를 반환했습니다.",
+    );
+  }
+  return { hash: expectedHash, byteSize: receipt.byteSize, mime: blob.type };
+}
+
+async function persistSqliteArtifactRecord(
+  record: ArtifactRecord,
+  store: StudioOpfsAssetStore,
+  signal?: AbortSignal,
+): Promise<SqliteRecoveryArtifactRecord> {
+  const receipts = new Map(record.artifacts.blobs.map((blob) => [blob.key, blob]));
+  const images: SqliteRecoveryImage[] = [];
+  for (const image of record.artifacts.images) {
+    const receipt = receipts.get(`${record.shotId}:${image.pass}`);
+    if (!receipt || receipt.kind !== "png") {
+      throw new StudioBg3dShotBatchRecoveryError("corrupt", "PNG artifact 영수증이 없습니다.");
+    }
+    images.push({
+      shotId: image.shotId,
+      shotName: image.shotName,
+      width: image.width,
+      height: image.height,
+      pass: image.pass,
+      requestedHeight: image.requestedHeight,
+      wasReduced: image.wasReduced,
+      pngRef: await putVerifiedBlob(store, image.png, receipt, signal),
+    });
+  }
+  const layeredPsds: SqliteRecoveryLayeredPsd[] = [];
+  for (const psd of record.artifacts.layeredPsds) {
+    const receipt = receipts.get(`${record.shotId}:layered-psd`);
+    if (!receipt || receipt.kind !== "psd") {
+      throw new StudioBg3dShotBatchRecoveryError("corrupt", "PSD artifact 영수증이 없습니다.");
+    }
+    layeredPsds.push({
+      shotId: psd.shotId,
+      shotName: psd.shotName,
+      width: psd.width,
+      height: psd.height,
+      psdRef: await putVerifiedBlob(store, psd.psd, receipt, signal),
+    });
+  }
+  const persisted: SqliteRecoveryArtifactRecord = {
+    kind: record.kind,
+    version: record.version,
+    artifactKey: record.artifactKey,
+    recoveryKey: record.recoveryKey,
+    shotId: record.shotId,
+    artifacts: {
+      images,
+      skippedArtifacts: record.artifacts.skippedArtifacts.map((item) => ({ ...item })),
+      layeredPsds,
+      psdFallbacks: record.artifacts.psdFallbacks.map((item) => ({ ...item })),
+      blobs: record.artifacts.blobs.map((blob) => ({ ...blob })),
+      totalBytes: record.artifacts.totalBytes,
+      artifactCount: record.artifacts.artifactCount,
+    },
+    storageBytes: record.storageBytes,
+    createdAt: record.createdAt,
+  };
+  if (!isSqliteRecoveryArtifactRecord(persisted)) {
+    throw new StudioBg3dShotBatchRecoveryError("corrupt", "컷 artifact CAS envelope 생성에 실패했습니다.");
+  }
+  return persisted;
+}
+
+async function readVerifiedCasBlob(
+  store: StudioOpfsAssetStore,
+  ref: SqliteRecoveryBlobRef,
+  receipt: SqliteRecoveryArtifacts["blobs"][number],
+  signal?: AbortSignal,
+): Promise<Blob> {
+  throwIfAborted(signal);
+  if (ref.hash !== `sha256:${receipt.sha256}` || ref.byteSize !== receipt.byteSize) {
+    throw new StudioBg3dShotBatchRecoveryError("corrupt", "컷 artifact CAS 참조가 영수증과 다릅니다.");
+  }
+  let bytes: Uint8Array | null;
+  try {
+    bytes = await store.get(ref.hash, { verify: true });
+  } catch (cause) {
+    throw new StudioBg3dShotBatchRecoveryError(
+      "corrupt",
+      "컷 artifact OPFS CAS 검증에 실패했습니다.",
+      { cause },
+    );
+  }
+  throwIfAborted(signal);
+  if (!bytes || bytes.byteLength !== ref.byteSize) {
+    throw new StudioBg3dShotBatchRecoveryError("corrupt", "컷 artifact OPFS CAS 바이트가 없거나 잘렸습니다.");
+  }
+  return new Blob([Uint8Array.from(bytes).buffer], { type: ref.mime });
+}
+
+async function hydrateSqliteArtifactRecords(
+  plan: StudioBg3dShotBatchPlan,
+  job: JobRecord,
+  persisted: readonly SqliteRecoveryArtifactRecord[],
+  store: StudioOpfsAssetStore,
+  signal?: AbortSignal,
+): Promise<ArtifactRecord[]> {
+  const rawRecords: ArtifactRecord[] = [];
+  for (const record of persisted) {
+    const receipts = new Map(record.artifacts.blobs.map((blob) => [blob.key, blob]));
+    const images: StudioBg3dShotBatchImage[] = [];
+    for (const image of record.artifacts.images) {
+      const receipt = receipts.get(`${record.shotId}:${image.pass}`);
+      if (!receipt || receipt.kind !== "png") {
+        throw new StudioBg3dShotBatchRecoveryError("corrupt", "저장된 PNG artifact 영수증이 없습니다.");
+      }
+      images.push({
+        shotId: image.shotId,
+        shotName: image.shotName,
+        width: image.width,
+        height: image.height,
+        pass: image.pass,
+        requestedHeight: image.requestedHeight,
+        wasReduced: image.wasReduced,
+        png: await readVerifiedCasBlob(store, image.pngRef, receipt, signal),
+      });
+    }
+    const layeredPsds: StudioBg3dShotBatchLayeredPsd[] = [];
+    for (const psd of record.artifacts.layeredPsds) {
+      const receipt = receipts.get(`${record.shotId}:layered-psd`);
+      if (!receipt || receipt.kind !== "psd") {
+        throw new StudioBg3dShotBatchRecoveryError("corrupt", "저장된 PSD artifact 영수증이 없습니다.");
+      }
+      layeredPsds.push({
+        shotId: psd.shotId,
+        shotName: psd.shotName,
+        width: psd.width,
+        height: psd.height,
+        psd: await readVerifiedCasBlob(store, psd.psdRef, receipt, signal),
+      });
+    }
+    rawRecords.push({
+      kind: record.kind,
+      version: record.version,
+      artifactKey: record.artifactKey,
+      recoveryKey: record.recoveryKey,
+      shotId: record.shotId,
+      artifacts: {
+        images,
+        skippedArtifacts: record.artifacts.skippedArtifacts.map((item) => ({ ...item })),
+        layeredPsds,
+        psdFallbacks: record.artifacts.psdFallbacks.map((item) => ({ ...item })),
+        blobs: record.artifacts.blobs.map((blob) => ({ ...blob })),
+        totalBytes: record.artifacts.totalBytes,
+        artifactCount: record.artifacts.artifactCount,
+      },
+      storageBytes: record.storageBytes,
+      createdAt: record.createdAt,
+    });
+  }
+  return verifyArtifactRecords(plan, job, rawRecords, signal);
+}
+
+function pruneSqliteCatalog(
+  catalog: SqliteRecoveryCatalog,
+  now: number,
+): { readonly catalog: SqliteRecoveryCatalog; readonly removed: readonly string[] } {
+  const removed: string[] = [];
+  const entries = catalog.entries.filter((entry) => {
+    const expired = entry.job.expiresAt <= now &&
+      (!entry.lease || entry.lease.expiresAt <= now);
+    if (expired) removed.push(entry.job.recoveryKey);
+    return !expired;
+  });
+  return {
+    catalog: entries.length === catalog.entries.length
+      ? catalog
+      : { ...catalog, entries },
+    removed,
+  };
+}
+
+function replaceSqliteCatalogEntry(
+  catalog: SqliteRecoveryCatalog,
+  recoveryKey: string,
+  replacement: SqliteRecoveryCatalogEntry | null,
+  now: number,
+): SqliteRecoveryCatalog {
+  const entries = catalog.entries.filter((entry) => entry.job.recoveryKey !== recoveryKey);
+  if (replacement) entries.push(replacement);
+  const next: SqliteRecoveryCatalog = {
+    kind: SQLITE_CATALOG_KIND,
+    version: SQLITE_CATALOG_VERSION,
+    revision: catalog.revision + 1,
+    updatedAt: now,
+    entries,
+  };
+  return parseSqliteCatalog(serializeSqliteCatalog(next));
+}
+
+function applyRecoverySession(
+  target: StudioBg3dShotBatchRecoverySession,
+  source: StudioBg3dShotBatchRecoverySession,
+): void {
+  target.mode = source.mode;
+  target.persistence = source.persistence;
+  target.degradedReason = source.degradedReason;
+  target.queue = source.queue;
+  target.revision = source.revision;
+  target.fence = source.fence;
+  target.leaseToken = source.leaseToken;
+  target.totalArtifactBytes = source.totalArtifactBytes;
+  target.artifactCount = source.artifactCount;
+  target.jobStorageBytes = source.jobStorageBytes;
+  target.artifactStorageBytes = source.artifactStorageBytes;
+  target.activeRun = source.activeRun;
+  target.images = [...source.images];
+  target.skippedArtifacts = [...source.skippedArtifacts];
+  target.layeredPsds = [...source.layeredPsds];
+  target.psdFallbacks = [...source.psdFallbacks];
+  target.shotArtifacts = new Map(source.shotArtifacts);
+  target.released = source.released;
+}
+
 async function storagePersistence(
   manager: Pick<StorageManager, "persist"> | null,
 ): Promise<StudioBg3dShotBatchRecoveryPersistence> {
@@ -922,7 +1608,8 @@ async function storagePersistence(
   }
 }
 
-export class StudioBg3dShotBatchRecoveryStore {
+class LegacyIndexedDbStudioBg3dShotBatchRecoveryStore
+  implements StudioBg3dShotBatchRecoveryStore {
   private readonly now: () => number;
   private readonly ownerId: string;
   private readonly explicitFactory: IDBFactory | null | undefined;
@@ -2182,8 +2869,544 @@ export class StudioBg3dShotBatchRecoveryStore {
   }
 }
 
+class SqliteOpfsStudioBg3dShotBatchRecoveryStore
+  implements StudioBg3dShotBatchRecoveryStore {
+  private readonly now: () => number;
+  private readonly ownerId: string;
+  private readonly heartbeatEnabled: boolean;
+  private readonly storageManager: Pick<StorageManager, "estimate" | "persist"> | null;
+  private readonly acquireDatabase: () => Promise<StudioLocalDatabase>;
+  private readonly acquireAssetStore: () => Promise<StudioOpfsAssetStore>;
+  private readonly runExclusive: StudioBg3dShotBatchRecoveryRunExclusive | null;
+  private readonly delegate: LegacyIndexedDbStudioBg3dShotBatchRecoveryStore;
+  private readonly heartbeatTimers = new Map<string, ReturnType<typeof setInterval>>();
+  private readonly activeArtifacts = new Map<string, Map<string, ArtifactRecord>>();
+
+  constructor(options: StudioBg3dShotBatchRecoveryStoreOptions) {
+    this.now = options.now ?? Date.now;
+    this.ownerId = options.ownerId ?? randomId("bg3d-batch-owner");
+    this.heartbeatEnabled = options.heartbeat ?? true;
+    this.storageManager = options.storageManager === undefined
+      ? (typeof navigator === "undefined" ? null : navigator.storage ?? null)
+      : options.storageManager;
+    this.acquireDatabase = options.acquireDatabase ?? acquireStudioLocalDatabase;
+    this.acquireAssetStore = options.acquireAssetStore ?? acquireProductRecoveryAssetStore;
+    this.runExclusive = options.runExclusive === undefined
+      ? productRunExclusive()
+      : options.runExclusive;
+    this.delegate = new LegacyIndexedDbStudioBg3dShotBatchRecoveryStore({
+      indexedDB: null,
+      now: this.now,
+      ownerId: this.ownerId,
+      heartbeat: false,
+      storageManager: null,
+    });
+  }
+
+  private startHeartbeat(session: StudioBg3dShotBatchRecoverySession): void {
+    this.stopHeartbeat(session.plan.resumeKey);
+    if (!this.heartbeatEnabled) return;
+    const timer = setInterval(() => {
+      void this.renewLease(session).catch(() => {
+        // The next state mutation remains the authoritative error boundary.
+      });
+    }, STUDIO_BG3D_SHOT_BATCH_RECOVERY_HEARTBEAT_MS);
+    this.heartbeatTimers.set(session.plan.resumeKey, timer);
+  }
+
+  private stopHeartbeat(recoveryKey: string): void {
+    const timer = this.heartbeatTimers.get(recoveryKey);
+    if (timer !== undefined) clearInterval(timer);
+    this.heartbeatTimers.delete(recoveryKey);
+  }
+
+  private async loadCatalog(database: StudioLocalDatabase): Promise<SqliteRecoveryCatalog> {
+    try {
+      return parseSqliteCatalog(await database.kvGet(
+        STUDIO_BG3D_SHOT_BATCH_RECOVERY_SQLITE_NAMESPACE,
+        STUDIO_BG3D_SHOT_BATCH_RECOVERY_SQLITE_CATALOG_KEY,
+      ));
+    } catch (cause) {
+      if (cause instanceof StudioBg3dShotBatchRecoveryError) throw cause;
+      throw new StudioBg3dShotBatchRecoveryError(
+        "storage-unavailable",
+        "공유 V12 SQLite에서 컷 배치 복구 catalog를 읽지 못했습니다.",
+        { cause },
+      );
+    }
+  }
+
+  private async saveCatalog(
+    database: StudioLocalDatabase,
+    catalog: SqliteRecoveryCatalog,
+  ): Promise<void> {
+    const serialized = serializeSqliteCatalog(catalog);
+    parseSqliteCatalog(serialized);
+    try {
+      await database.kvSet(
+        STUDIO_BG3D_SHOT_BATCH_RECOVERY_SQLITE_NAMESPACE,
+        STUDIO_BG3D_SHOT_BATCH_RECOVERY_SQLITE_CATALOG_KEY,
+        serialized,
+      );
+    } catch (cause) {
+      if (isQuotaError(cause)) throw cause;
+      throw new StudioBg3dShotBatchRecoveryError(
+        "storage-unavailable",
+        "공유 V12 SQLite에 컷 배치 복구 catalog를 커밋하지 못했습니다.",
+        { cause },
+      );
+    }
+  }
+
+  private installMemoryCatalog(
+    catalog: SqliteRecoveryCatalog,
+    targetKey: string,
+    targetArtifacts: readonly ArtifactRecord[],
+  ): { readonly restore: () => void; readonly target: () => MemoryRecord | undefined } {
+    const keys = new Set(catalog.entries.map(({ job }) => job.recoveryKey));
+    keys.add(targetKey);
+    const previous = new Map<string, MemoryRecord | undefined>();
+    for (const key of keys) previous.set(key, memoryRecords.get(key));
+    memoryRecords.delete(targetKey);
+    for (const entry of catalog.entries) {
+      memoryRecords.set(entry.job.recoveryKey, {
+        job: canonicalJobRecord(entry.job),
+        lease: canonicalLeaseRecord(entry.lease),
+        artifacts: new Map(entry.job.recoveryKey === targetKey
+          ? targetArtifacts.map((artifact) => [artifact.artifactKey, artifact])
+          : []),
+      });
+    }
+    return {
+      target: () => memoryRecords.get(targetKey),
+      restore: () => {
+        for (const key of keys) {
+          const value = previous.get(key);
+          if (value === undefined) memoryRecords.delete(key);
+          else memoryRecords.set(key, value);
+        }
+      },
+    };
+  }
+
+  private async artifactRecordsForActiveSession(
+    session: StudioBg3dShotBatchRecoverySession,
+    entry: SqliteRecoveryCatalogEntry,
+    assetStore: StudioOpfsAssetStore,
+    signal?: AbortSignal,
+  ): Promise<ArtifactRecord[]> {
+    const cached = this.activeArtifacts.get(session.plan.resumeKey);
+    if (cached && entry.job.artifactKeys.every((key) => cached.has(key))) {
+      return entry.job.artifactKeys.map((key) => cached.get(key)!);
+    }
+    const hydrated = await hydrateSqliteArtifactRecords(
+      session.plan,
+      entry.job,
+      entry.artifacts,
+      assetStore,
+      signal,
+    );
+    this.activeArtifacts.set(
+      session.plan.resumeKey,
+      new Map(hydrated.map((artifact) => [artifact.artifactKey, artifact])),
+    );
+    return hydrated;
+  }
+
+  private workingSession(
+    source: StudioBg3dShotBatchRecoverySession,
+    entry: SqliteRecoveryCatalogEntry,
+    records: readonly ArtifactRecord[],
+  ): StudioBg3dShotBatchRecoverySession {
+    if (!entry.lease) {
+      throw new StudioBg3dShotBatchRecoveryError("lease-lost", "컷 배치 SQLite lease가 없습니다.");
+    }
+    assertLeaseAndRevision(source, entry.job, entry.lease, this.now());
+    const aggregate = aggregateArtifacts(records);
+    return {
+      plan: source.plan,
+      sourceRevision: source.sourceRevision,
+      ownerId: source.ownerId,
+      mode: "memory",
+      persistence: source.persistence,
+      degradedReason: null,
+      queue: entry.job.queue,
+      revision: entry.job.revision,
+      fence: entry.lease.fence,
+      leaseToken: entry.lease.leaseToken,
+      totalArtifactBytes: entry.job.totalArtifactBytes,
+      artifactCount: entry.job.artifactCount,
+      jobStorageBytes: entry.job.jobStorageBytes,
+      artifactStorageBytes: entry.job.artifactStorageBytes,
+      activeRun: entry.job.activeRun,
+      ...aggregate,
+      shotArtifacts: new Map(records.map(({ shotId, artifacts }) => [shotId, artifacts])),
+      released: false,
+    };
+  }
+
+  private async entryFromMemoryRecord(
+    record: MemoryRecord,
+    existing: SqliteRecoveryCatalogEntry | undefined,
+    assetStore: StudioOpfsAssetStore,
+    signal?: AbortSignal,
+  ): Promise<SqliteRecoveryCatalogEntry> {
+    const existingArtifacts = new Map(
+      (existing?.artifacts ?? []).map((artifact) => [artifact.artifactKey, artifact]),
+    );
+    const artifacts: SqliteRecoveryArtifactRecord[] = [];
+    for (const key of record.job.artifactKeys) {
+      const persisted = existingArtifacts.get(key);
+      if (persisted) {
+        artifacts.push(persisted);
+        continue;
+      }
+      const artifact = record.artifacts.get(key);
+      if (!artifact) {
+        throw new StudioBg3dShotBatchRecoveryError(
+          "corrupt",
+          "컷 배치 Job이 참조하는 신규 artifact가 메모리에 없습니다.",
+        );
+      }
+      artifacts.push(await persistSqliteArtifactRecord(artifact, assetStore, signal));
+    }
+    const entry: SqliteRecoveryCatalogEntry = {
+      job: canonicalJobRecord(record.job),
+      lease: canonicalLeaseRecord(record.lease),
+      artifacts,
+    };
+    if (!isSqliteRecoveryCatalogEntry(entry)) {
+      throw new StudioBg3dShotBatchRecoveryError("corrupt", "컷 배치 SQLite entry 생성에 실패했습니다.");
+    }
+    return entry;
+  }
+
+  private async clearRemovedOwners(
+    store: StudioOpfsAssetStore,
+    removed: readonly string[],
+  ): Promise<void> {
+    await Promise.all(removed.map((key) =>
+      store.setOwnerRefs(recoveryCasOwner(key), []).catch(() => [])));
+  }
+
+  private async authorizeCommit(
+    options: StudioBg3dShotBatchRecoveryCommitOptions,
+  ): Promise<void> {
+    if (!options.authorizeBeforeCommit) return;
+    throwIfAborted(options.signal);
+    const receipt = await awaitWithAbort(
+      Promise.resolve(options.authorizeBeforeCommit(options.signal)),
+      options.signal,
+    );
+    if (!receipt || typeof receipt !== "object" ||
+      typeof receipt.isLocallyCurrent !== "function") {
+      throw new StudioBg3dShotBatchRecoveryError(
+        "access-denied",
+        "현재 작품 접근 권한으로 컷 artifact를 커밋할 수 없습니다.",
+      );
+    }
+    assertAuthorizationReceipt(receipt, this.now());
+    throwIfAborted(options.signal);
+  }
+
+  private async mutateSession<T>(
+    session: StudioBg3dShotBatchRecoverySession,
+    operation: (
+      store: LegacyIndexedDbStudioBg3dShotBatchRecoveryStore,
+      working: StudioBg3dShotBatchRecoverySession,
+    ) => Promise<T>,
+    options: {
+      readonly signal?: AbortSignal;
+      readonly beforeCommit?: () => Promise<void>;
+    } = {},
+  ): Promise<T> {
+    if (session.mode === "memory") return operation(this.delegate, session);
+    if (!this.runExclusive) {
+      throw new StudioBg3dShotBatchRecoveryError(
+        "storage-unavailable",
+        "Web Locks가 없어 SQLite 컷 배치 CAS를 안전하게 실행할 수 없습니다.",
+      );
+    }
+    return this.runExclusive(async () => {
+      throwIfAborted(options.signal);
+      const [database, assetStore] = await Promise.all([
+        this.acquireDatabase(),
+        this.acquireAssetStore(),
+      ]);
+      const loaded = await this.loadCatalog(database);
+      const pruned = pruneSqliteCatalog(loaded, this.now());
+      const entry = pruned.catalog.entries.find(
+        ({ job }) => job.recoveryKey === session.plan.resumeKey,
+      );
+      if (!entry || !isJobRecord(entry.job, session.plan) ||
+        entry.job.sourceRevision !== session.sourceRevision) {
+        throw new StudioBg3dShotBatchRecoveryError(
+          entry ? "corrupt" : "lease-lost",
+          entry
+            ? "컷 배치 SQLite Job이 현재 Plan과 다릅니다."
+            : "컷 배치 SQLite Job이 없거나 만료되었습니다.",
+        );
+      }
+      const records = await this.artifactRecordsForActiveSession(
+        session,
+        entry,
+        assetStore,
+        options.signal,
+      );
+      const installed = this.installMemoryCatalog(
+        pruned.catalog,
+        session.plan.resumeKey,
+        records,
+      );
+      try {
+        const working = this.workingSession(session, entry, records);
+        const result = await operation(this.delegate, working);
+        throwIfAborted(options.signal);
+        const updatedRecord = installed.target();
+        const replacement = updatedRecord
+          ? await this.entryFromMemoryRecord(updatedRecord, entry, assetStore, options.signal)
+          : null;
+        if (replacement) {
+          await assetStore.setOwnerRefs(
+            recoveryCasOwner(session.plan.resumeKey),
+            artifactHashes(replacement.artifacts),
+          );
+        }
+        await options.beforeCommit?.();
+        throwIfAborted(options.signal);
+        const nextCatalog = replaceSqliteCatalogEntry(
+          pruned.catalog,
+          session.plan.resumeKey,
+          replacement,
+          this.now(),
+        );
+        await this.saveCatalog(database, nextCatalog);
+        await this.clearRemovedOwners(assetStore, [
+          ...pruned.removed,
+          ...(replacement ? [] : [session.plan.resumeKey]),
+        ]);
+        if (updatedRecord) {
+          this.activeArtifacts.set(
+            session.plan.resumeKey,
+            new Map(updatedRecord.artifacts),
+          );
+        } else {
+          this.activeArtifacts.delete(session.plan.resumeKey);
+        }
+        working.mode = "durable";
+        working.degradedReason = null;
+        applyRecoverySession(session, working);
+        return result;
+      } finally {
+        installed.restore();
+      }
+    });
+  }
+
+  async acquire(
+    plan: StudioBg3dShotBatchPlan,
+    sourceRevision: string,
+    options: StudioBg3dShotBatchRecoveryAcquireOptions = {},
+  ): Promise<StudioBg3dShotBatchRecoverySession> {
+    if (plan.scope.durability !== "durable" || !this.runExclusive) {
+      const memory = await this.delegate.acquire(plan, sourceRevision, options);
+      if (plan.scope.durability === "durable") {
+        memory.degradedReason =
+          "Web Locks가 없어 공유 SQLite의 탭 간 CAS를 보장할 수 없어 현재 탭 메모리에서만 복구합니다.";
+      }
+      this.startHeartbeat(memory);
+      return memory;
+    }
+    const verifiedPlan = await awaitWithAbort(hydrateStudioBg3dShotBatchPlan(plan), options.signal);
+    if (!verifiedPlan || !await awaitWithAbort(
+      verifyStudioBg3dShotBatchSourceRevision(verifiedPlan, sourceRevision),
+      options.signal,
+    )) {
+      throw new StudioBg3dShotBatchRecoveryError("corrupt", "컷 배치 Plan 또는 source snapshot 검증에 실패했습니다.");
+    }
+    const session = await this.runExclusive(async () => {
+      throwIfAborted(options.signal);
+      const [database, assetStore] = await Promise.all([
+        this.acquireDatabase(),
+        this.acquireAssetStore(),
+      ]);
+      const loaded = await this.loadCatalog(database);
+      const pruned = pruneSqliteCatalog(loaded, this.now());
+      const existing = pruned.catalog.entries.find(
+        ({ job }) => job.recoveryKey === verifiedPlan.resumeKey,
+      );
+      let records: ArtifactRecord[] = [];
+      if (existing) {
+        if (!isJobRecord(existing.job, verifiedPlan) ||
+          existing.job.sourceRevision !== sourceRevision) {
+          throw new StudioBg3dShotBatchRecoveryError(
+            "corrupt",
+            "저장된 컷 배치 SQLite Job이 현재 Plan 또는 source snapshot과 다릅니다.",
+          );
+        }
+        await assetStore.setOwnerRefs(
+          recoveryCasOwner(verifiedPlan.resumeKey),
+          artifactHashes(existing.artifacts),
+        );
+        records = await hydrateSqliteArtifactRecords(
+          verifiedPlan,
+          existing.job,
+          existing.artifacts,
+          assetStore,
+          options.signal,
+        );
+      }
+      const installed = this.installMemoryCatalog(pruned.catalog, verifiedPlan.resumeKey, records);
+      try {
+        const acquired = await this.delegate.acquire(verifiedPlan, sourceRevision, options);
+        const updatedRecord = installed.target();
+        if (!updatedRecord) {
+          throw new StudioBg3dShotBatchRecoveryError("corrupt", "SQLite acquire 결과 Job이 없습니다.");
+        }
+        const replacement = await this.entryFromMemoryRecord(
+          updatedRecord,
+          existing,
+          assetStore,
+          options.signal,
+        );
+        await assetStore.setOwnerRefs(
+          recoveryCasOwner(verifiedPlan.resumeKey),
+          artifactHashes(replacement.artifacts),
+        );
+        const nextCatalog = replaceSqliteCatalogEntry(
+          pruned.catalog,
+          verifiedPlan.resumeKey,
+          replacement,
+          this.now(),
+        );
+        await this.saveCatalog(database, nextCatalog);
+        await this.clearRemovedOwners(assetStore, pruned.removed);
+        acquired.mode = "durable";
+        acquired.persistence = await storagePersistence(this.storageManager);
+        acquired.degradedReason = null;
+        this.activeArtifacts.set(
+          verifiedPlan.resumeKey,
+          new Map(updatedRecord.artifacts),
+        );
+        return acquired;
+      } finally {
+        installed.restore();
+      }
+    });
+    this.startHeartbeat(session);
+    return session;
+  }
+
+  startShot(
+    session: StudioBg3dShotBatchRecoverySession,
+    shotId: string,
+  ): Promise<StudioBg3dShotBatchRunToken> {
+    return this.mutateSession(session, (store, working) => store.startShot(working, shotId));
+  }
+
+  completeShot(
+    session: StudioBg3dShotBatchRecoverySession,
+    token: StudioBg3dShotBatchRunToken,
+    artifacts: StudioBg3dShotBatchShotArtifacts,
+    options: StudioBg3dShotBatchRecoveryCommitOptions = {},
+  ): Promise<void> {
+    if (session.mode === "memory") {
+      return this.delegate.completeShot(session, token, artifacts, options);
+    }
+    return this.mutateSession(
+      session,
+      (store, working) => store.completeShot(working, token, artifacts, {
+        signal: options.signal,
+      }),
+      {
+        signal: options.signal,
+        beforeCommit: () => this.authorizeCommit(options),
+      },
+    );
+  }
+
+  failShot(
+    session: StudioBg3dShotBatchRecoverySession,
+    token: StudioBg3dShotBatchRunToken,
+    failureCode: StudioBg3dShotBatchFailureCode,
+  ): Promise<void> {
+    return this.mutateSession(
+      session,
+      (store, working) => store.failShot(working, token, failureCode),
+    );
+  }
+
+  resetInterrupted(session: StudioBg3dShotBatchRecoverySession): Promise<void> {
+    return this.mutateSession(session, (store, working) => store.resetInterrupted(working));
+  }
+
+  markDownloadRequested(session: StudioBg3dShotBatchRecoverySession): Promise<void> {
+    return this.mutateSession(session, (store, working) => store.markDownloadRequested(working));
+  }
+
+  private async renewLease(session: StudioBg3dShotBatchRecoverySession): Promise<void> {
+    if (session.released) return;
+    if (session.mode === "memory") {
+      const record = memoryRecords.get(session.plan.resumeKey);
+      if (!record?.lease || record.lease.ownerId !== session.ownerId ||
+        record.lease.leaseToken !== session.leaseToken || record.lease.fence !== session.fence) {
+        throw new StudioBg3dShotBatchRecoveryError("lease-lost", "메모리 컷 배치 lease를 갱신할 수 없습니다.");
+      }
+      const now = this.now();
+      record.lease = { ...record.lease, heartbeatAt: now, expiresAt: now + STUDIO_BG3D_SHOT_BATCH_RECOVERY_LEASE_MS };
+      return;
+    }
+    if (!this.runExclusive) return;
+    await this.runExclusive(async () => {
+      const database = await this.acquireDatabase();
+      const catalog = await this.loadCatalog(database);
+      const entry = catalog.entries.find(({ job }) => job.recoveryKey === session.plan.resumeKey);
+      if (!entry?.lease || entry.lease.ownerId !== session.ownerId ||
+        entry.lease.leaseToken !== session.leaseToken || entry.lease.fence !== session.fence ||
+        entry.job.revision !== session.revision || entry.lease.expiresAt <= this.now()) {
+        throw new StudioBg3dShotBatchRecoveryError("lease-lost", "SQLite 컷 배치 lease를 갱신할 수 없습니다.");
+      }
+      const now = this.now();
+      const nextEntry: SqliteRecoveryCatalogEntry = {
+        ...entry,
+        lease: { ...entry.lease, heartbeatAt: now, expiresAt: now + STUDIO_BG3D_SHOT_BATCH_RECOVERY_LEASE_MS },
+      };
+      await this.saveCatalog(
+        database,
+        replaceSqliteCatalogEntry(catalog, session.plan.resumeKey, nextEntry, now),
+      );
+    });
+  }
+
+  async release(session: StudioBg3dShotBatchRecoverySession): Promise<void> {
+    if (session.released) return;
+    this.stopHeartbeat(session.plan.resumeKey);
+    if (session.mode === "memory") {
+      await this.delegate.release(session);
+      return;
+    }
+    try {
+      await this.mutateSession(session, (store, working) => store.release(working));
+    } catch {
+      // Release is best effort. The persisted lease expiry and fence remain authoritative.
+      session.released = true;
+    } finally {
+      this.activeArtifacts.delete(session.plan.resumeKey);
+    }
+  }
+
+  async discard(session: StudioBg3dShotBatchRecoverySession): Promise<void> {
+    this.stopHeartbeat(session.plan.resumeKey);
+    await this.mutateSession(session, (store, working) => store.discard(working));
+    this.activeArtifacts.delete(session.plan.resumeKey);
+  }
+}
+
 export function createStudioBg3dShotBatchRecoveryStore(
   options: StudioBg3dShotBatchRecoveryStoreOptions = {},
 ): StudioBg3dShotBatchRecoveryStore {
-  return new StudioBg3dShotBatchRecoveryStore(options);
+  if (Object.prototype.hasOwnProperty.call(options, "indexedDB")) {
+    return new LegacyIndexedDbStudioBg3dShotBatchRecoveryStore(options);
+  }
+  return new SqliteOpfsStudioBg3dShotBatchRecoveryStore(options);
 }
