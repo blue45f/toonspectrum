@@ -1,0 +1,1078 @@
+{
+  "generatedAt": "2026-08-08T06:02:53.757Z",
+  "host": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpuModel": "Apple M2 Max",
+    "cpuCount": 12,
+    "totalMemGb": 32,
+    "node": "v24.16.0"
+  },
+  "target": {
+    "baseUrl": "http://127.0.0.1:4399",
+    "build": "production (pnpm run build), served by vite preview with gzip",
+    "browser": "Chromium via Playwright channel=chrome, headless, 1600x1000",
+    "crossOriginIsolated": true
+  },
+  "method": {
+    "coldContext": "모든 시나리오가 새 BrowserContext에서 /studio 를 다시 부팅 — lazy 청크가 실제로 콜드",
+    "serviceWorker": "차단(serviceWorkers:'block'). dist/sw.js 가 /assets/ 를 cache-first 로 가로채면 CDP 가 해당 응답을 0 바이트로 보고해 lazy 청크 비용이 통째로 사라진다. 최초 방문 사용자 기준과도 일치.",
+    "openMs": "클릭 → 해당 기능의 DOM(다이얼로그·뷰포트)이 실제로 화면에 보일 때까지",
+    "settleMs": "클릭 → 네트워크와 메인스레드가 800ms 동안 조용해질 때까지의 활성 시간",
+    "bytes": "CDP Network.loadingFinished#encodedDataLength — gzip 전송 실측 바이트",
+    "longTasks": "PerformanceObserver({entryTypes:[\"longtask\"]}) — 페이지 자체 관측, 50ms 초과 태스크",
+    "phases": "codeDeliveryMs = 마지막 js/wasm/css 응답 종료까지, postDeliveryMs = 그 이후(실행·초기화·첫 프레임·인코딩)",
+    "honesty": "도달 불가 시나리오는 status=unreachable 과 사유만 기록하며 추정치를 넣지 않음"
+  },
+  "results": [
+    {
+      "id": "studio-cold-boot",
+      "feature": "문서 로드",
+      "description": "/studio 콜드 부팅 — 네비게이션부터 상단 바 렌더까지",
+      "status": "ok",
+      "cold": {
+        "openMs": 1068.1,
+        "settleMs": 1707.9,
+        "bytes": 4509235,
+        "requestCount": 268,
+        "topRequests": [
+          {
+            "url": "/gh/orioncactus/pretendard@v1.3.9/packages/pretendard/dist/web/variable/woff2/PretendardVariable.woff2",
+            "bytes": 2058730
+          },
+          {
+            "url": "/assets/StudioPage-BH3qv46w.js",
+            "bytes": 566037
+          },
+          {
+            "url": "/assets/lib-FCHq9tEM.js",
+            "bytes": 145169
+          },
+          {
+            "url": "/css2",
+            "bytes": 101737
+          },
+          {
+            "url": "/assets/studio-konva-runtime-BPWjoavh.js",
+            "bytes": 88197
+          },
+          {
+            "url": "/assets/i18n-CdB262Tn.js",
+            "bytes": 72355
+          }
+        ],
+        "longTaskCount": 2,
+        "longTaskTotalMs": 118,
+        "longTaskMaxMs": 68,
+        "codeDeliveryMs": 1120.8,
+        "postDeliveryMs": 587.1
+      },
+      "extra": {
+        "editorRootMs": 1028.3,
+        "shellReadyMs": 1068.1
+      }
+    },
+    {
+      "id": "bg3d-open",
+      "feature": "3D/VRM",
+      "description": "3D 배경 (3D 장면 스튜디오) 최초 진입 — three.js + R3F",
+      "status": "ok",
+      "cold": {
+        "openMs": 386.1,
+        "settleMs": 1034.5,
+        "bytes": 536196,
+        "requestCount": 24,
+        "topRequests": [
+          {
+            "url": "/assets/StudioBackground3D-CD2qNvr6.js",
+            "bytes": 201966
+          },
+          {
+            "url": "/assets/three.module-Cg5BND52.js",
+            "bytes": 184146
+          },
+          {
+            "url": "/assets/react-three-fiber.esm-CZGyH4KL.js",
+            "bytes": 49830
+          },
+          {
+            "url": "/assets/studio-bg3d-meshopt-w_RR-yNe.js",
+            "bytes": 15207
+          },
+          {
+            "url": "/assets/studio-background-3d-model-Ct8T6k3x.js",
+            "bytes": 11296
+          },
+          {
+            "url": "/assets/studio-bg3d-magic-object-id-capture-XxMG8STA.js",
+            "bytes": 9779
+          }
+        ],
+        "longTaskCount": 0,
+        "longTaskTotalMs": 0,
+        "longTaskMaxMs": 0,
+        "codeDeliveryMs": 477.5,
+        "postDeliveryMs": 557
+      },
+      "warm": {
+        "openMs": 84.2,
+        "settleMs": 84.2,
+        "bytes": 0,
+        "requestCount": 0,
+        "topRequests": [],
+        "longTaskCount": 0,
+        "longTaskTotalMs": 0,
+        "longTaskMaxMs": 0,
+        "codeDeliveryMs": 0,
+        "postDeliveryMs": 84.2
+      }
+    },
+    {
+      "id": "mannequin-open",
+      "feature": "3D/VRM",
+      "description": "3D 데생 인형 최초 진입 — three.js (R3F 없음)",
+      "status": "ok",
+      "cold": {
+        "openMs": 837.5,
+        "settleMs": 837.5,
+        "bytes": 222748,
+        "requestCount": 6,
+        "topRequests": [
+          {
+            "url": "/assets/three.module-Cg5BND52.js",
+            "bytes": 184146
+          },
+          {
+            "url": "/assets/StudioMannequinPoserPanel-C1hV__aY.js",
+            "bytes": 26392
+          },
+          {
+            "url": "/assets/studio-bg3d-shot-png-worker-client-BOxUwTRv.js",
+            "bytes": 6220
+          },
+          {
+            "url": "/assets/studio-vrm-raster-capture-D03OPrqQ.js",
+            "bytes": 2755
+          },
+          {
+            "url": "/assets/studio-bg3d-straight-alpha-output-pass-DSoKXej4.js",
+            "bytes": 1823
+          },
+          {
+            "url": "/assets/studio-vrm-pose-solver-DVJEDYqs.js",
+            "bytes": 1412
+          }
+        ],
+        "longTaskCount": 0,
+        "longTaskTotalMs": 0,
+        "longTaskMaxMs": 0,
+        "codeDeliveryMs": 66.8,
+        "postDeliveryMs": 770.7
+      },
+      "warm": {
+        "openMs": 70.8,
+        "settleMs": 70.8,
+        "bytes": 0,
+        "requestCount": 0,
+        "topRequests": [],
+        "longTaskCount": 0,
+        "longTaskTotalMs": 0,
+        "longTaskMaxMs": 0,
+        "codeDeliveryMs": 0,
+        "postDeliveryMs": 70.8
+      }
+    },
+    {
+      "id": "vrm-poser-open",
+      "feature": "3D/VRM",
+      "description": "3D 캐릭터 VRM 포저 최초 진입 — three.js + @pixiv/three-vrm",
+      "status": "ok",
+      "cold": {
+        "openMs": 448.1,
+        "settleMs": 1161.3,
+        "bytes": 7834345,
+        "requestCount": 57,
+        "topRequests": [
+          {
+            "url": "/vrm/sample.vrm",
+            "bytes": 7287909
+          },
+          {
+            "url": "/assets/StudioVrmPoser-UARTfZsq.js",
+            "bytes": 188649
+          },
+          {
+            "url": "/assets/three.module-Cg5BND52.js",
+            "bytes": 184146
+          },
+          {
+            "url": "/assets/react-three-fiber.esm-CZGyH4KL.js",
+            "bytes": 49830
+          },
+          {
+            "url": "/assets/three-vrm.module-BufqB9Vk.js",
+            "bytes": 33906
+          },
+          {
+            "url": "/assets/studio-vrm-poser-utils-D2A8q1V8.js",
+            "bytes": 30792
+          }
+        ],
+        "longTaskCount": 2,
+        "longTaskTotalMs": 217,
+        "longTaskMaxMs": 164,
+        "codeDeliveryMs": 446.9,
+        "postDeliveryMs": 714.4
+      },
+      "warm": {
+        "openMs": 84,
+        "settleMs": 418.9,
+        "bytes": 7287909,
+        "requestCount": 37,
+        "topRequests": [
+          {
+            "url": "/vrm/sample.vrm",
+            "bytes": 7287909
+          },
+          {
+            "url": "http://127.0.0.1:4399/98f94afe-63d0-4dff-8059-17b2013b3a75",
+            "bytes": 0
+          },
+          {
+            "url": "http://127.0.0.1:4399/239ef0d0-846f-463e-82dc-06dcf028e262",
+            "bytes": 0
+          },
+          {
+            "url": "http://127.0.0.1:4399/fa92f4e0-d6ef-4bf9-802b-67d9daa75b9b",
+            "bytes": 0
+          },
+          {
+            "url": "http://127.0.0.1:4399/abbd754f-27fd-4b88-9a21-d6298dc7f727",
+            "bytes": 0
+          },
+          {
+            "url": "http://127.0.0.1:4399/4864d214-1cc2-4423-b8a4-f78359eefe20",
+            "bytes": 0
+          }
+        ],
+        "longTaskCount": 1,
+        "longTaskTotalMs": 147,
+        "longTaskMaxMs": 147,
+        "codeDeliveryMs": 0,
+        "postDeliveryMs": 418.9
+      }
+    },
+    {
+      "id": "hybrid-dcc-open",
+      "feature": "3D/VRM",
+      "description": "Hybrid 3D DCC 최초 진입 — three.js + OCCT/IFC 계열",
+      "status": "ok",
+      "cold": {
+        "openMs": 387.4,
+        "settleMs": 387.4,
+        "bytes": 377954,
+        "requestCount": 9,
+        "topRequests": [
+          {
+            "url": "/assets/three.module-Cg5BND52.js",
+            "bytes": 184146
+          },
+          {
+            "url": "/assets/studio-hybrid-dcc-workspace-C9fDVUL1.js",
+            "bytes": 71307
+          },
+          {
+            "url": "/assets/react-three-fiber.esm-CZGyH4KL.js",
+            "bytes": 49830
+          },
+          {
+            "url": "/assets/StudioHybridDccDialog-DK5wU35C.js",
+            "bytes": 47511
+          },
+          {
+            "url": "/assets/TransformControls-CLhLBsse.js",
+            "bytes": 7847
+          },
+          {
+            "url": "/assets/StudioThreeDToggle-B_ze_Raf.js",
+            "bytes": 6404
+          }
+        ],
+        "longTaskCount": 0,
+        "longTaskTotalMs": 0,
+        "longTaskMaxMs": 0,
+        "codeDeliveryMs": 75.8,
+        "postDeliveryMs": 311.6
+      },
+      "warm": {
+        "openMs": 58.4,
+        "settleMs": 58.4,
+        "bytes": 0,
+        "requestCount": 0,
+        "topRequests": [],
+        "longTaskCount": 0,
+        "longTaskTotalMs": 0,
+        "longTaskMaxMs": 0,
+        "codeDeliveryMs": 0,
+        "postDeliveryMs": 58.4
+      }
+    },
+    {
+      "id": "animatic-timeline-open",
+      "feature": "타임라인",
+      "description": "애니매틱 타임라인 다이얼로그 최초 오픈",
+      "status": "ok",
+      "cold": {
+        "openMs": 826.6,
+        "settleMs": 826.6,
+        "bytes": 11987,
+        "requestCount": 2,
+        "topRequests": [
+          {
+            "url": "/assets/StudioAnimaticTimelineDialog-sRSYqF07.js",
+            "bytes": 11802
+          },
+          {
+            "url": "/api/auth/session",
+            "bytes": 185
+          }
+        ],
+        "longTaskCount": 0,
+        "longTaskTotalMs": 0,
+        "longTaskMaxMs": 0,
+        "codeDeliveryMs": 35.6,
+        "postDeliveryMs": 791
+      },
+      "warm": {
+        "openMs": 41,
+        "settleMs": 41,
+        "bytes": 0,
+        "requestCount": 0,
+        "topRequests": [],
+        "longTaskCount": 0,
+        "longTaskTotalMs": 0,
+        "longTaskMaxMs": 0,
+        "codeDeliveryMs": 0,
+        "postDeliveryMs": 41
+      },
+      "extra": {
+        "scrub": {
+          "samplesMs": [
+            33.2,
+            14.4,
+            17.1,
+            17,
+            15.2,
+            16.9,
+            16.8,
+            16.2
+          ],
+          "p50Ms": 16.9,
+          "p95Ms": 33.2,
+          "totalDurationMsOfPlan": 2400
+        }
+      }
+    },
+    {
+      "id": "multilayer-timeline-open",
+      "feature": "타임라인",
+      "description": "다중 레이어 타임라인 패널 최초 오픈",
+      "status": "ok",
+      "cold": {
+        "openMs": 3005.1,
+        "settleMs": 3005.1,
+        "bytes": 8066,
+        "requestCount": 2,
+        "topRequests": [
+          {
+            "url": "/assets/StudioAnimTimelinePanel-XnQc41cp.js",
+            "bytes": 7881
+          },
+          {
+            "url": "/api/auth/session",
+            "bytes": 185
+          }
+        ],
+        "longTaskCount": 0,
+        "longTaskTotalMs": 0,
+        "longTaskMaxMs": 0,
+        "codeDeliveryMs": 2216,
+        "postDeliveryMs": 789.1
+      },
+      "warm": {
+        "openMs": 2215.3,
+        "settleMs": 2215.3,
+        "bytes": 0,
+        "requestCount": 0,
+        "topRequests": [],
+        "longTaskCount": 0,
+        "longTaskTotalMs": 0,
+        "longTaskMaxMs": 0,
+        "codeDeliveryMs": 0,
+        "postDeliveryMs": 2215.3
+      }
+    },
+    {
+      "id": "brush-library-open",
+      "feature": "패널 오픈",
+      "description": "브러시 전체 라이브러리 시트 최초 오픈 (lazy 청크 2개 경계)",
+      "status": "ok",
+      "cold": {
+        "openMs": 837.6,
+        "settleMs": 837.6,
+        "bytes": 14284,
+        "requestCount": 3,
+        "topRequests": [
+          {
+            "url": "/assets/StudioBrushLibrarySheet-DAn2qU6k.js",
+            "bytes": 13157
+          },
+          {
+            "url": "/assets/studio-brush-catalog-C6Rl75RO.js",
+            "bytes": 942
+          },
+          {
+            "url": "/api/auth/session",
+            "bytes": 185
+          }
+        ],
+        "longTaskCount": 0,
+        "longTaskTotalMs": 0,
+        "longTaskMaxMs": 0,
+        "codeDeliveryMs": 43.8,
+        "postDeliveryMs": 793.8
+      },
+      "warm": {
+        "openMs": 57.4,
+        "settleMs": 57.4,
+        "bytes": 0,
+        "requestCount": 0,
+        "topRequests": [],
+        "longTaskCount": 0,
+        "longTaskTotalMs": 0,
+        "longTaskMaxMs": 0,
+        "codeDeliveryMs": 0,
+        "postDeliveryMs": 57.4
+      }
+    },
+    {
+      "id": "filter-dialog-open",
+      "feature": "패널 오픈",
+      "description": "필터 다이얼로그 최초 오픈 (⌘⇧1 가우시안 블러)",
+      "status": "ok",
+      "cold": {
+        "openMs": 242.6,
+        "settleMs": 1098.3,
+        "bytes": 1026288,
+        "requestCount": 35,
+        "topRequests": [
+          {
+            "url": "/assets/sqlite3-BVKGSWc-.wasm",
+            "bytes": 865028
+          },
+          {
+            "url": "/assets/dist-D8XWdkMP.js",
+            "bytes": 63164
+          },
+          {
+            "url": "/assets/StudioFilterDialog-JJtSyeRC.js",
+            "bytes": 10134
+          },
+          {
+            "url": "/assets/studio-konva-filters-Bv3wHPSM.js",
+            "bytes": 10052
+          },
+          {
+            "url": "/assets/studio-filter-catalog-BlutgCpw.js",
+            "bytes": 9881
+          },
+          {
+            "url": "/assets/studio-gpu-filter-apply-Bn8SW7Od.js",
+            "bytes": 7023
+          }
+        ],
+        "longTaskCount": 1,
+        "longTaskTotalMs": 110,
+        "longTaskMaxMs": 110,
+        "codeDeliveryMs": 511,
+        "postDeliveryMs": 587.3
+      },
+      "warm": {
+        "openMs": 176.6,
+        "settleMs": 176.6,
+        "bytes": 0,
+        "requestCount": 1,
+        "topRequests": [
+          {
+            "url": "http://127.0.0.1:4399/f88a6dbe-5498-4303-b07b-dbf3b8f7e4a5",
+            "bytes": 0
+          }
+        ],
+        "longTaskCount": 1,
+        "longTaskTotalMs": 115,
+        "longTaskMaxMs": 115,
+        "codeDeliveryMs": 0,
+        "postDeliveryMs": 176.6
+      }
+    },
+    {
+      "id": "inspector-reopen",
+      "feature": "패널 오픈",
+      "description": "인스펙터(속성) 패널 닫았다 재오픈 — 콜드 비용은 부팅에 포함됨",
+      "status": "ok",
+      "cold": {
+        "openMs": 71.1,
+        "settleMs": 145,
+        "bytes": 185,
+        "requestCount": 1,
+        "topRequests": [
+          {
+            "url": "/api/auth/session",
+            "bytes": 185
+          }
+        ],
+        "longTaskCount": 0,
+        "longTaskTotalMs": 0,
+        "longTaskMaxMs": 0,
+        "codeDeliveryMs": 0,
+        "postDeliveryMs": 145
+      }
+    },
+    {
+      "id": "export-panel-open",
+      "feature": "내보내기",
+      "description": "내보내기 옵션 패널 최초 오픈 (프리셋·규격 UI 렌더)",
+      "status": "ok",
+      "cold": {
+        "openMs": 850.3,
+        "settleMs": 850.3,
+        "bytes": 56023,
+        "requestCount": 9,
+        "topRequests": [
+          {
+            "url": "/assets/StudioExportMenuPanel-C5MlrOlE.js",
+            "bytes": 14209
+          },
+          {
+            "url": "/assets/studio-dialogue-interchange-BxzAmtWs.js",
+            "bytes": 10089
+          },
+          {
+            "url": "/assets/studio-filter-catalog-BlutgCpw.js",
+            "bytes": 9881
+          },
+          {
+            "url": "/assets/StudioToolHintBubble-BSUKkV4V.js",
+            "bytes": 8460
+          },
+          {
+            "url": "/assets/studio-export-presets-CiEkPEH8.js",
+            "bytes": 5045
+          },
+          {
+            "url": "/assets/studio-pdf-export-Bmuqm34w.js",
+            "bytes": 2560
+          }
+        ],
+        "longTaskCount": 0,
+        "longTaskTotalMs": 0,
+        "longTaskMaxMs": 0,
+        "codeDeliveryMs": 54,
+        "postDeliveryMs": 796.3
+      },
+      "warm": {
+        "openMs": null,
+        "settleMs": 0,
+        "bytes": 0,
+        "requestCount": 0,
+        "topRequests": [],
+        "longTaskCount": 0,
+        "longTaskTotalMs": 0,
+        "longTaskMaxMs": 0,
+        "codeDeliveryMs": 0,
+        "postDeliveryMs": 0
+      }
+    },
+    {
+      "id": "templates-assets-open",
+      "feature": "패널 오픈",
+      "description": "템플릿·에셋 시트 최초 오픈",
+      "status": "ok",
+      "cold": {
+        "openMs": 65.6,
+        "settleMs": 65.6,
+        "bytes": 57025,
+        "requestCount": 8,
+        "topRequests": [
+          {
+            "url": "/assets/StudioAssetMenuPanel-cOoa6wUh.js",
+            "bytes": 20611
+          },
+          {
+            "url": "/assets/studio-filter-catalog-BlutgCpw.js",
+            "bytes": 9881
+          },
+          {
+            "url": "/assets/StudioToolHintBubble-BSUKkV4V.js",
+            "bytes": 8460
+          },
+          {
+            "url": "/assets/StudioAssetToolPopoverBody-D4kOdgh0.js",
+            "bytes": 8348
+          },
+          {
+            "url": "/assets/studio-marketplace-packages-DiCto5tY.js",
+            "bytes": 3317
+          },
+          {
+            "url": "/assets/StudioColorVisionHintPreview-38VOZXE5.js",
+            "bytes": 2215
+          }
+        ],
+        "longTaskCount": 0,
+        "longTaskTotalMs": 0,
+        "longTaskMaxMs": 0,
+        "codeDeliveryMs": 53.7,
+        "postDeliveryMs": 11.9
+      },
+      "warm": {
+        "openMs": 57,
+        "settleMs": 57,
+        "bytes": 0,
+        "requestCount": 0,
+        "topRequests": [],
+        "longTaskCount": 0,
+        "longTaskTotalMs": 0,
+        "longTaskMaxMs": 0,
+        "codeDeliveryMs": 0,
+        "postDeliveryMs": 57
+      }
+    },
+    {
+      "id": "team-panel-open",
+      "feature": "협업",
+      "description": "팀 작업 공간 패널 최초 오픈",
+      "status": "ok",
+      "cold": {
+        "openMs": 842.3,
+        "settleMs": 842.3,
+        "bytes": 28215,
+        "requestCount": 2,
+        "topRequests": [
+          {
+            "url": "/assets/StudioTeamPanel-CZNHEhFI.js",
+            "bytes": 26973
+          },
+          {
+            "url": "/assets/button-D-enJ2O8.js",
+            "bytes": 1242
+          }
+        ],
+        "longTaskCount": 0,
+        "longTaskTotalMs": 0,
+        "longTaskMaxMs": 0,
+        "codeDeliveryMs": 50,
+        "postDeliveryMs": 792.3
+      },
+      "warm": {
+        "openMs": 55.9,
+        "settleMs": 55.9,
+        "bytes": 0,
+        "requestCount": 0,
+        "topRequests": [],
+        "longTaskCount": 0,
+        "longTaskTotalMs": 0,
+        "longTaskMaxMs": 0,
+        "codeDeliveryMs": 0,
+        "postDeliveryMs": 55.9
+      },
+      "extra": {
+        "liveMode": null,
+        "liveCollaborationPanelPresent": false
+      }
+    },
+    {
+      "id": "export-png-current-page",
+      "feature": "내보내기",
+      "description": "PNG 현재 페이지 다운로드 (capture → encode → save)",
+      "status": "ok",
+      "cold": {
+        "openMs": 97.4,
+        "settleMs": 97.4,
+        "bytes": 28657,
+        "requestCount": 5,
+        "topRequests": [
+          {
+            "url": "/assets/studio-filter-catalog-BlutgCpw.js",
+            "bytes": 9881
+          },
+          {
+            "url": "/assets/StudioToolHintBubble-BSUKkV4V.js",
+            "bytes": 8460
+          },
+          {
+            "url": "/assets/studio-page-orchestration-runtime-kGJlM4-o.js",
+            "bytes": 6147
+          },
+          {
+            "url": "/assets/StudioColorVisionHintPreview-38VOZXE5.js",
+            "bytes": 2215
+          },
+          {
+            "url": "/assets/studio-capture-readiness-DvZtO7uT.js",
+            "bytes": 1954
+          }
+        ],
+        "longTaskCount": 0,
+        "longTaskTotalMs": 0,
+        "longTaskMaxMs": 0,
+        "codeDeliveryMs": 41,
+        "postDeliveryMs": 56.4
+      },
+      "extra": {
+        "strokesDrawnBeforeExport": 14,
+        "downloadFired": true,
+        "timeToDownloadMs": 97.4,
+        "suggestedFilename": "toonspectrum-comic.png",
+        "savedBytes": 179328,
+        "phaseNote": "openMs = 클릭→다운로드 이벤트(캡처+인코딩+저장 완료), codeDeliveryMs = 내보내기 청크·워커 코드 도착까지"
+      }
+    },
+    {
+      "id": "export-psd-layered",
+      "feature": "내보내기",
+      "description": "PSD (레이어별) 내보내기",
+      "status": "ok",
+      "cold": {
+        "openMs": 137.1,
+        "settleMs": 137.1,
+        "bytes": 90992,
+        "requestCount": 3,
+        "topRequests": [
+          {
+            "url": "/assets/dist-hYb9Mgpz.js",
+            "bytes": 83407
+          },
+          {
+            "url": "/assets/studio-psd-export-BKhWg2h1.js",
+            "bytes": 7172
+          },
+          {
+            "url": "/assets/__vite-browser-external-C7CMhtSr.js",
+            "bytes": 413
+          }
+        ],
+        "longTaskCount": 0,
+        "longTaskTotalMs": 0,
+        "longTaskMaxMs": 0,
+        "codeDeliveryMs": 34.4,
+        "postDeliveryMs": 102.7
+      },
+      "extra": {
+        "strokesDrawnBeforeExport": 14,
+        "downloadFired": true,
+        "timeToDownloadMs": 137.1,
+        "suggestedFilename": "toonspectrum-comic.psd",
+        "savedBytes": 393296,
+        "phaseNote": "openMs = 클릭→다운로드 이벤트(캡처+인코딩+저장 완료), codeDeliveryMs = 내보내기 청크·워커 코드 도착까지"
+      }
+    },
+    {
+      "id": "export-spec-slice-naver",
+      "feature": "내보내기",
+      "description": "규격 슬라이스 — 네이버 도전만화 프리셋 후 '규격으로 저장'",
+      "status": "ok",
+      "cold": {
+        "openMs": 85.1,
+        "settleMs": 85.1,
+        "bytes": 6147,
+        "requestCount": 1,
+        "topRequests": [
+          {
+            "url": "/assets/studio-page-orchestration-runtime-kGJlM4-o.js",
+            "bytes": 6147
+          }
+        ],
+        "longTaskCount": 0,
+        "longTaskTotalMs": 0,
+        "longTaskMaxMs": 0,
+        "codeDeliveryMs": 23.7,
+        "postDeliveryMs": 61.4
+      },
+      "extra": {
+        "strokesDrawnBeforeExport": 14,
+        "downloadFired": true,
+        "timeToDownloadMs": 85.1,
+        "suggestedFilename": "toonspectrum-webtoon-naver-challenge.jpg",
+        "savedBytes": 31262,
+        "phaseNote": "openMs = 클릭→다운로드 이벤트(캡처+인코딩+저장 완료), codeDeliveryMs = 내보내기 청크·워커 코드 도착까지"
+      }
+    },
+    {
+      "id": "export-svg-vector",
+      "feature": "내보내기",
+      "description": "SVG (벡터, 현재 페이지) 내보내기",
+      "status": "ok",
+      "cold": {
+        "openMs": 50.2,
+        "settleMs": 50.2,
+        "bytes": 2311,
+        "requestCount": 1,
+        "topRequests": [
+          {
+            "url": "/assets/studio-svg-export-worker-client-DTWYwxD5.js",
+            "bytes": 2311
+          }
+        ],
+        "longTaskCount": 0,
+        "longTaskTotalMs": 0,
+        "longTaskMaxMs": 0,
+        "codeDeliveryMs": 25.5,
+        "postDeliveryMs": 24.7
+      },
+      "extra": {
+        "strokesDrawnBeforeExport": 14,
+        "downloadFired": true,
+        "timeToDownloadMs": 50.2,
+        "suggestedFilename": "toonspectrum-comic.svg",
+        "savedBytes": 182424,
+        "phaseNote": "openMs = 클릭→다운로드 이벤트(캡처+인코딩+저장 완료), codeDeliveryMs = 내보내기 청크·워커 코드 도착까지"
+      }
+    },
+    {
+      "id": "collab-live-room-boot",
+      "feature": "협업",
+      "description": "?room= 라이브 룸으로 /studio 부팅 — CRDT/소켓 초기 연결 비용",
+      "status": "ok",
+      "cold": {
+        "openMs": 1431.6,
+        "settleMs": 1654.9,
+        "bytes": 4433675,
+        "requestCount": 260,
+        "topRequests": [
+          {
+            "url": "/gh/orioncactus/pretendard@v1.3.9/packages/pretendard/dist/web/variable/woff2/PretendardVariable.woff2",
+            "bytes": 2058735
+          },
+          {
+            "url": "/assets/StudioPage-BH3qv46w.js",
+            "bytes": 566037
+          },
+          {
+            "url": "/assets/lib-FCHq9tEM.js",
+            "bytes": 145169
+          },
+          {
+            "url": "/css2",
+            "bytes": 101740
+          },
+          {
+            "url": "/assets/studio-konva-runtime-BPWjoavh.js",
+            "bytes": 88197
+          },
+          {
+            "url": "/assets/i18n-CdB262Tn.js",
+            "bytes": 72355
+          }
+        ],
+        "longTaskCount": 1,
+        "longTaskTotalMs": 63,
+        "longTaskMaxMs": 63,
+        "codeDeliveryMs": 1081.8,
+        "postDeliveryMs": 573.1
+      },
+      "extra": {
+        "editorRootMs": 1425.5,
+        "shellReadyMs": 1431.6,
+        "liveMode": null,
+        "note": "VITE_STUDIO_LIVE_ORIGIN / VITE_STUDIO_REALTIME_ORIGIN 미설정 + 로컬 실시간 서버 없음 — 서버 왕복이 아니라 '연결 실패까지'의 비용"
+      }
+    },
+    {
+      "id": "document-10-pages",
+      "feature": "문서 로드",
+      "description": "10페이지 문서 구성 → 임시저장 → 페이지 전환",
+      "status": "ok",
+      "cold": {
+        "openMs": null,
+        "settleMs": 34.7,
+        "bytes": 7821,
+        "requestCount": 1,
+        "topRequests": [
+          {
+            "url": "/assets/studio-pages-history-durable-runtime-CRMkymwL.js",
+            "bytes": 7821
+          }
+        ],
+        "longTaskCount": 0,
+        "longTaskTotalMs": 0,
+        "longTaskMaxMs": 0,
+        "codeDeliveryMs": 35.4,
+        "postDeliveryMs": 0
+      },
+      "extra": {
+        "achievedPageCount": 10,
+        "pageAddMs": {
+          "p50": 49.5,
+          "p95": 51.1,
+          "max": 51.1,
+          "samples": [
+            48.3,
+            50.6,
+            50.4,
+            41.7,
+            49.2,
+            49.5,
+            51.1,
+            48.9,
+            49.6
+          ]
+        },
+        "autosaveDraftSave": {
+          "openMs": null,
+          "settleMs": 240.6,
+          "bytes": 20741,
+          "requestCount": 4,
+          "topRequests": [
+            {
+              "url": "/assets/studio-filter-catalog-BlutgCpw.js",
+              "bytes": 9881
+            },
+            {
+              "url": "/assets/StudioToolHintBubble-BSUKkV4V.js",
+              "bytes": 8460
+            },
+            {
+              "url": "/assets/StudioColorVisionHintPreview-38VOZXE5.js",
+              "bytes": 2215
+            },
+            {
+              "url": "/api/auth/session",
+              "bytes": 185
+            }
+          ],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "longTaskMaxMs": 0,
+          "codeDeliveryMs": 45.1,
+          "postDeliveryMs": 195.5
+        },
+        "pageSwitch": {
+          "openMs": null,
+          "settleMs": 0,
+          "bytes": 0,
+          "requestCount": 0,
+          "topRequests": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "longTaskMaxMs": 0,
+          "codeDeliveryMs": 0,
+          "postDeliveryMs": 0
+        }
+      }
+    },
+    {
+      "id": "document-30-pages",
+      "feature": "문서 로드",
+      "description": "30페이지 문서 구성 → 임시저장 → 페이지 전환",
+      "status": "ok",
+      "cold": {
+        "openMs": null,
+        "settleMs": 1124.1,
+        "bytes": 8006,
+        "requestCount": 2,
+        "topRequests": [
+          {
+            "url": "/assets/studio-pages-history-durable-runtime-CRMkymwL.js",
+            "bytes": 7821
+          },
+          {
+            "url": "/api/auth/session",
+            "bytes": 185
+          }
+        ],
+        "longTaskCount": 0,
+        "longTaskTotalMs": 0,
+        "longTaskMaxMs": 0,
+        "codeDeliveryMs": 34.7,
+        "postDeliveryMs": 1089.4
+      },
+      "extra": {
+        "achievedPageCount": 30,
+        "pageAddMs": {
+          "p50": 49.9,
+          "p95": 66.6,
+          "max": 67.3,
+          "samples": [
+            49.3,
+            49.5,
+            49.6,
+            42.1,
+            50.7,
+            49.6,
+            49.4,
+            42.7,
+            50.6,
+            47.8,
+            60.6,
+            48.1,
+            50.4,
+            49.1,
+            49.8,
+            51,
+            49.9,
+            66.6,
+            50.8,
+            48.3,
+            50.2,
+            49.9,
+            50,
+            59.3,
+            58.5,
+            52.9,
+            48.3,
+            56.9,
+            67.3
+          ]
+        },
+        "autosaveDraftSave": {
+          "openMs": null,
+          "settleMs": 70.2,
+          "bytes": 20556,
+          "requestCount": 3,
+          "topRequests": [
+            {
+              "url": "/assets/studio-filter-catalog-BlutgCpw.js",
+              "bytes": 9881
+            },
+            {
+              "url": "/assets/StudioToolHintBubble-BSUKkV4V.js",
+              "bytes": 8460
+            },
+            {
+              "url": "/assets/StudioColorVisionHintPreview-38VOZXE5.js",
+              "bytes": 2215
+            }
+          ],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "longTaskMaxMs": 0,
+          "codeDeliveryMs": 71.2,
+          "postDeliveryMs": 0
+        },
+        "pageSwitch": {
+          "openMs": null,
+          "settleMs": 0,
+          "bytes": 0,
+          "requestCount": 0,
+          "topRequests": [],
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "longTaskMaxMs": 0,
+          "codeDeliveryMs": 0,
+          "postDeliveryMs": 0
+        }
+      }
+    }
+  ]
+}

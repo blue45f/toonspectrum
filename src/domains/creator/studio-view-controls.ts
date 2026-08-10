@@ -3,6 +3,12 @@
  * View snapshots are session-only UI state: they never enter page history, CRDT, or exports.
  */
 
+import {
+  planStudioStageViewportClipBox,
+  type StudioStageViewportClipBox,
+  type StudioStageViewportClipViewport,
+} from "./studio-stage-viewport-clip";
+
 export const STUDIO_VIEW_ZOOM_MIN = 0.2;
 export const STUDIO_VIEW_ZOOM_MAX = 5;
 export const STUDIO_VIEW_ZOOM_STEP = 0.2;
@@ -112,6 +118,40 @@ export interface StudioViewStageLayoutInput {
   scale: number;
   canvasFlipH: boolean;
   canvasRotation?: number;
+}
+
+export interface StudioCanvasStageLayoutInput extends StudioViewStageLayoutInput {
+  /**
+   * Lay the Stage out as the document itself rather than as the artist's screen.
+   *
+   * Set while saving, exporting or capturing a timelapse frame. Every view-only decision has to be
+   * off in that mode, because those paths read Stage pixels as the document: a quarter turn or a
+   * horizontal flip would be baked into the output, and any Stage box smaller than
+   * `document × scale` would silently crop it.
+   */
+  captureDocumentView: boolean;
+  /**
+   * Live scroll viewport of the canvas host, when the adaptive viewport clip is armed.
+   *
+   * Only the editor canvas passes this. `captureDocumentView` discards it unconditionally, which
+   * is what keeps every export, save, thumbnail and timelapse path on the full-document Stage
+   * without each of them having to know the clip exists.
+   */
+  viewportClip?: StudioStageViewportClipViewport | null;
+}
+
+/** Stage layout for the editor canvas, including the on-screen document box it was clipped from. */
+export interface StudioCanvasStageLayout extends StudioViewStageLayout {
+  /**
+   * The unclipped Stage box — the document's full on-screen footprint.
+   *
+   * The zoom host keeps this box even when the Stage does not: the scroll extent, drop coordinates,
+   * the zoom anchor and every overlay positioned in document CSS space are measured against it.
+   */
+  readonly hostWidth: number;
+  readonly hostHeight: number;
+  /** Non-null when `width`/`height` describe a viewport window rather than the whole document. */
+  readonly clip: StudioStageViewportClipBox | null;
 }
 
 /** Props needed to lay a transformed document out inside an axis-aligned Konva Stage. */
@@ -648,6 +688,50 @@ export function planStudioViewStageLayout(
   };
 }
 
+/**
+ * The single decision point for "what box is the Konva Stage right now".
+ *
+ * Both consumers go through here so they cannot drift apart:
+ * - the live editor canvas (`StudioCanvasViewport`), which passes the artist's view state, and
+ * - the capture choke points (`studio-stage-document-view.ts`, and the `suppressViewTransform`
+ *   render that `captureReadyStageForPage()` waits for), which pass `captureDocumentView: true`.
+ *
+ * Keeping the branch here — rather than at each call site — means the viewport clip that stops zoom
+ * from reallocating a document-sized backing store is written once and is automatically excluded
+ * from every capture path.
+ * `studio-stage-document-raster-contract.test.ts` drives this function directly for that reason.
+ *
+ * The clip is a translation, not a projection: the window offset is subtracted from the Stage
+ * translation and added back by the caller as a CSS transform on the Stage container, so the
+ * document origin stays on the same screen pixel and pointer mapping is unchanged at every
+ * magnification, rotation and flip.
+ */
+export function planStudioCanvasStageLayout(
+  input: StudioCanvasStageLayoutInput
+): StudioCanvasStageLayout {
+  const host = planStudioViewStageLayout({
+    documentWidth: input.documentWidth,
+    documentHeight: input.documentHeight,
+    scale: input.scale,
+    canvasFlipH: input.captureDocumentView ? false : input.canvasFlipH,
+    canvasRotation: input.captureDocumentView ? 0 : input.canvasRotation,
+  });
+  const clip = input.captureDocumentView
+    ? null
+    : planStudioStageViewportClipBox(host.width, host.height, input.viewportClip);
+  if (!clip) return { ...host, hostWidth: host.width, hostHeight: host.height, clip: null };
+  return {
+    ...host,
+    width: clip.width,
+    height: clip.height,
+    x: host.x - clip.left,
+    y: host.y - clip.top,
+    hostWidth: host.width,
+    hostHeight: host.height,
+    clip,
+  };
+}
+
 function eventCode(event: StudioViewShortcutEvent): string {
   if (event.code) return event.code;
   const key = event.key?.toLowerCase();
@@ -690,6 +774,17 @@ export function resolveStudioViewShortcut(
     if (code === "Home") return "fit-width";
     if (code === "End") return "actual-pixels";
     if (code === "F11") return "fullscreen";
+    // 단독 `Q` 는 퀵 마스크(select.quick-mask)의 것이다 — conflict
+    // `q-quickmask-vs-grayscale` 의 해소. 페이지 마스터 핸들러가 퀵 마스크를 먼저
+    // 시도하고, 이미지 레이어가 없으면 여기로 흘러 내려와 색각 검수가 대신 켜졌다.
+    // 같은 배지를 두 명령이 달고 조건에 따라 다른 일을 하던 상태를 끊는다.
+    return null;
+  }
+
+  // ⌥Q — 색각 검수 흑백 명암. `⇧Q` 는 빠른 액세스 팔레트가 이미 쓰고 있어
+  // (StudioPage 마스터 핸들러) Shift 계열로는 옮길 수 없다.
+  if (event.altKey && !event.shiftKey) {
+    if (event.repeat) return null;
     if (code === "KeyQ") return "toggle-grayscale";
     return null;
   }

@@ -160,6 +160,9 @@ const EXPANSION_TUNING: Readonly<
   "mist-soft": {
     // Remains a build-up brush, but no longer starts below the browser's perceptual floor.
     tipSoftness: 0.72,
+    // Dense soft carriers — wide spacing made mist draw as separated beads.
+    spacingRatio: 0.09,
+    scatterRatio: 0.04,
     flow: { base: 0.32, mappings: [{ source: "pressure", from: 0.52, to: 1, curve: 0.92 }] },
   },
   "bokeh-scatter": {
@@ -169,19 +172,24 @@ const EXPANSION_TUNING: Readonly<
   },
   "bleeding-stain": {
     // Keep the irregular sponge edge, but move one wash pass clear of the near-white floor.
+    // Denser stations stop the stain reading as discrete round blobs while dragging.
+    spacingRatio: 0.09,
+    scatterRatio: 0.05,
     flow: { base: 0.34 },
   },
   "cotton-fiber": {
     // Preserve the cotton-soft custom hair map while a closer, less scattered carrier cadence
     // smooths its fibrous silhouette. The measured flow lifts useful strands above white-paper
     // contrast without crossing the preset's deliberately gradual first-contact density.
-    spacingRatio: 0.26,
-    scatterRatio: 0.28,
+    spacingRatio: 0.2,
+    scatterRatio: 0.22,
     flow: { base: 0.49 },
     grain: { space: "canvas-fixed", amount: 0.28, scale: 8.25, contrast: 0.38, seed: 0xebc6_79ee },
   },
   "watercolor-flat-wash": {
     // A flat wash should read on the first pass while retaining a deliberately low opacity ceiling.
+    spacingRatio: 0.09,
+    scatterRatio: 0.04,
     flow: { base: 0.28 },
   },
 
@@ -333,7 +341,11 @@ const EXPANSION_TUNING: Readonly<
   // ── 채색 ───────────────────────────────────────────────────────────────
   "watercolor-wet-bleed": {
     // Wet-on-wet wash: slow strokes deposit more water, fast strokes dry out.
+    // Soft tips hide most of the tip disk — keep stations dense so live strokes do not bead.
     tipSoftness: 0.86,
+    spacingRatio: 0.085,
+    scatterRatio: 0.035,
+    spacing: { mappings: [] },
     flow: {
       base: 0.46,
       mappings: [
@@ -348,10 +360,13 @@ const EXPANSION_TUNING: Readonly<
   "watercolor-edge-stain": {
     // Drying pool: high-contrast canvas-pinned blotches read as pigment edges.
     tipSoftness: 0.75,
+    spacingRatio: 0.09,
+    scatterRatio: 0.05,
     flow: { base: 0.36, mappings: [{ source: "pressure", from: 0.45, to: 1 }] },
     opacity: { jitter: { mode: "multiply", amount: 0.15 } },
     grain: { space: "canvas-fixed", amount: 0.34, scale: 14, contrast: 0.7, seed: 0x4b0a_1202 },
-    scatter: { mappings: [{ source: "speed", from: 0.7, to: 1.3 }] },
+    // Mild scatter only — wide speed scatter reopened visible holes in the wash body.
+    scatter: { mappings: [{ source: "speed", from: 0.85, to: 1.1 }] },
   },
   "oil-impasto-heavy": {
     // Impasto: near-continuous dabs plus stroke-locked ridge grain = thick paint.
@@ -743,15 +758,16 @@ const EXPANSION_TUNING: Readonly<
   },
   "watercolor-backrun-ring": {
     tipSoftness: 0.42,
-    spacingRatio: 0.34,
-    scatterRatio: 0.16,
+    // Continuous wash body — denser than the old sparse ring scatter so the stroke does not bead.
+    spacingRatio: 0.12,
+    scatterRatio: 0.08,
     width: {
       mappings: [{ source: "pressure", from: 0.66, to: 1.55, curve: 0.9 }],
       jitter: { mode: "multiply", amount: 0.22 },
     },
-    // Preserve the translucent backrun while keeping its first contact above the planner's
-    // 12-channel white-paper visibility floor (0.32 landed at 11.9292 after texture sampling).
-    flow: { base: 0.322, mappings: [{ source: "pressure", from: 0.3, to: 0.9 }] },
+    // Preserve the translucent backrun while keeping first contact above the planner's
+    // 12-channel white-paper visibility floor after denser carrier + soft dual-tip sampling.
+    flow: { base: 0.355, mappings: [{ source: "pressure", from: 0.3, to: 0.9 }] },
     opacity: { jitter: { mode: "multiply", amount: 0.16 } },
     angle: { jitter: { mode: "add", amount: 140 } },
     grain: { space: "canvas-fixed", amount: 0.24, scale: 14, contrast: 0.5, seed: 0x4b0a_2107 },
@@ -764,7 +780,9 @@ const EXPANSION_TUNING: Readonly<
   },
   "watercolor-wet-wash": {
     tipSoftness: 0.88,
-    spacingRatio: 0.11,
+    spacingRatio: 0.085,
+    scatterRatio: 0.035,
+    spacing: { mappings: [] },
     maxSpeed: 1.05,
     width: {
       mappings: [
@@ -773,8 +791,9 @@ const EXPANSION_TUNING: Readonly<
       ],
       jitter: { mode: "multiply", amount: 0.1 },
     },
+    // Slightly higher base after denser soft dual-tip carriers so first contact stays ≥Δ12.
     flow: {
-      base: 0.4,
+      base: 0.43,
       mappings: [
         { source: "pressure", from: 0.3, to: 1 },
         { source: "speed", from: 1.08, to: 0.62 },

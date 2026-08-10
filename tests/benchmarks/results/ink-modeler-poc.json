@@ -1,0 +1,149 @@
+{
+  "harness": "packages/studio-brush-platform/src/__tests__/ink-modeler.test.ts (INK_MODELER_POC=1)",
+  "generatedAt": "2026-08-08T03:01:23.696Z",
+  "host": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpu": "Apple M2 Max",
+    "node": "v24.16.0"
+  },
+  "upstream": {
+    "repo": "https://github.com/google/ink-stroke-modeler",
+    "commit": "f2388813b0b25bc3e33d143d369a8367ab2e30c8",
+    "emcc": "6.0.6",
+    "wasmBytes": 99256
+  },
+  "inkParams": "defaults per packages/studio-brush-platform/src/ink-modeler.ts INK_DEFAULT_PARAMS (minOutputRate 180, wobble 40ms/50–54px/s, spring 11/32400, drag 72, prediction off)",
+  "inputs": {
+    "seed": 1234,
+    "stepMs": 8,
+    "lineJitter": {
+      "points": 120,
+      "jitterPx": 1.5
+    },
+    "sharpCurve": {
+      "points": 121,
+      "apex": {
+        "x": 340,
+        "y": 120
+      },
+      "jitterPx": 0.75
+    },
+    "speedRamp": {
+      "points": 140,
+      "speedPxPerMs": [
+        0.2,
+        4
+      ]
+    }
+  },
+  "metrics": {
+    "highFreqReductionPct": "1 - jitterEnergy(out)/jitterEnergy(in) on lineJitter (chord-perpendicular MSE)",
+    "cornerErrorPx": "min distance of output polyline to the exact sharpCurve apex",
+    "endpoint": "distance of last (and second-to-last) output point to the raw pen-up point (wet trailing; note: the first-party stabilizer snaps its final sample by design)",
+    "throughputPtsPerMs": "raw input points modeled per ms, full JS/wasm boundary, 100 repeats after 10 warmups"
+  },
+  "candidates": [
+    {
+      "candidate": "ink-stroke-modeler",
+      "highFreqReductionPct": 87.4171,
+      "cornerErrorPx": 5.7026,
+      "endpoint": {
+        "lineJitter": {
+          "endpointDistancePx": 0.0865,
+          "penultimateGapPx": 0.3518
+        },
+        "sharpCurve": {
+          "endpointDistancePx": 0.0653,
+          "penultimateGapPx": 0.48
+        },
+        "speedRamp": {
+          "endpointDistancePx": 0.1979,
+          "penultimateGapPx": 0.2741
+        }
+      },
+      "throughputPtsPerMs": 2028.02
+    },
+    {
+      "candidate": "stabilizer-ema-0.35",
+      "highFreqReductionPct": 52.3571,
+      "cornerErrorPx": 3.0227,
+      "endpoint": {
+        "lineJitter": {
+          "endpointDistancePx": 0,
+          "penultimateGapPx": 6.0567
+        },
+        "sharpCurve": {
+          "endpointDistancePx": 0,
+          "penultimateGapPx": 8.8186
+        },
+        "speedRamp": {
+          "endpointDistancePx": 0,
+          "penultimateGapPx": 47.854
+        }
+      },
+      "throughputPtsPerMs": 9083.86
+    },
+    {
+      "candidate": "stabilizer-ema-0.7",
+      "highFreqReductionPct": 83.0161,
+      "cornerErrorPx": 8.3067,
+      "endpoint": {
+        "lineJitter": {
+          "endpointDistancePx": 0,
+          "penultimateGapPx": 11.9496
+        },
+        "sharpCurve": {
+          "endpointDistancePx": 0,
+          "penultimateGapPx": 18.1407
+        },
+        "speedRamp": {
+          "endpointDistancePx": 0,
+          "penultimateGapPx": 94.3028
+        }
+      },
+      "throughputPtsPerMs": 14510.14
+    },
+    {
+      "candidate": "stabilizer-spring-0.35",
+      "highFreqReductionPct": 74.3936,
+      "cornerErrorPx": 9.0401,
+      "endpoint": {
+        "lineJitter": {
+          "endpointDistancePx": 0,
+          "penultimateGapPx": 11.6911
+        },
+        "sharpCurve": {
+          "endpointDistancePx": 0,
+          "penultimateGapPx": 17.7422
+        },
+        "speedRamp": {
+          "endpointDistancePx": 0,
+          "penultimateGapPx": 92.1033
+        }
+      },
+      "throughputPtsPerMs": 13201.86
+    },
+    {
+      "candidate": "stabilizer-spring-0.7",
+      "highFreqReductionPct": 92.512,
+      "cornerErrorPx": 14.976,
+      "endpoint": {
+        "lineJitter": {
+          "endpointDistancePx": 0,
+          "penultimateGapPx": 21.623
+        },
+        "sharpCurve": {
+          "endpointDistancePx": 0,
+          "penultimateGapPx": 33.1334
+        },
+        "speedRamp": {
+          "endpointDistancePx": 0,
+          "penultimateGapPx": 168.2233
+        }
+      },
+      "throughputPtsPerMs": 15382.81
+    }
+  ],
+  "note": "numbers only — no verdict here; promotion is decided by the blind lab gate (ADR-0009) and recorded in ADR-0011 lane 3"
+}

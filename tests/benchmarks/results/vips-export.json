@@ -1,0 +1,43 @@
+{
+  "harness": "src/domains/creator/studio-vips-export.ts downscaleForExport (one-shot, scratchpad runner)",
+  "generatedAt": "2026-08-08T03:21:45.385Z",
+  "host": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpu": "Apple M2 Max",
+    "node": "v24.16.0"
+  },
+  "provider": {
+    "id": "wasm-vips-pipeline",
+    "package": "wasm-vips 0.0.18",
+    "kernel": "lanczos3",
+    "concurrency": 1
+  },
+  "methodology": {
+    "runsPerCase": 1,
+    "note": "24h soak (tests/benchmarks/harness/soak.ts, SOAK_MINUTES=1440, started 09:02 KST 2026-08-08) was running concurrently on this host per the no-interference rule; wall-clock is a single-run co-tenant measurement, not a quiet-host benchmark. wallMs covers the full provider call (newFromMemory copy-in + lanczos3 resize + writeToMemory copy-out). loadVipsForExport init is reported separately as loadMs.",
+    "loadMs": 55.99
+  },
+  "qualityEvidence": {
+    "source": "tests/benchmarks/results/quality-lab.json (2026-08-07)",
+    "downscale2048to512": "wasm-vips-lanczos3 PSNR 27.26dB / SSIM 0.9887 (winner) vs canvaskit-linear-nomips 25.31dB / 0.9834"
+  },
+  "runs": [
+    {
+      "case": "downscale-4096sq-quarter",
+      "source": "4096x4096",
+      "target": "1024x1024",
+      "inputMB": 64,
+      "wallMs": 192.56,
+      "mbPerSec": 332.36
+    },
+    {
+      "case": "downscale-webtoon-strip-2048x16384-quarter",
+      "source": "2048x16384",
+      "target": "512x4096",
+      "inputMB": 128,
+      "wallMs": 153.46,
+      "mbPerSec": 834.1
+    }
+  ]
+}

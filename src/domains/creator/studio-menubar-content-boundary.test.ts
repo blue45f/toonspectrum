@@ -108,7 +108,7 @@ describe("Studio menubar ownership boundary", () => {
     expect(menubar.source).toContain("onFocus={preloadStudioExportMenuPanel}");
   });
 
-  it("preserves the two-lane chrome, portal selectors, and Page-owned focus refs", () => {
+  it("preserves the two-lane chrome, accessible portal selectors, and Page-owned focus refs", () => {
     const page = moduleEdges("./StudioPage.tsx").source;
     const menubar = moduleEdges("./StudioMenubarContent.tsx").source;
 
@@ -116,7 +116,9 @@ describe("Studio menubar ownership boundary", () => {
     expect(menubar).toContain('data-studio-menubar-actions="true"');
     expect(menubar).toContain('data-studio-export-menu-panel="true"');
     expect(menubar).toContain('data-studio-project-actions-menu="true"');
-    expect(menubar.match(/createPortal\(/g)).toHaveLength(2);
+    expect(menubar).toContain('data-studio-menubar-overflow-panel="true"');
+    // Export, project actions, and the measured overflow menu each escape clipping through one portal.
+    expect(menubar.match(/createPortal\(/g)).toHaveLength(3);
     expect(menubar).toContain("document.body");
     expect(menubar).toContain("globalThis.setTimeout(() => setProjectActionsOpen(false), 0)");
     expect(page).toContain("exportMenuRef={exportMenuRef}");

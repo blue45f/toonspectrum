@@ -2,10 +2,21 @@ import { describe, expect, it } from "vitest";
 
 import {
   BUBBLE_AUTO_SHRINK_MIN_FONT_DEFAULT,
+  BUBBLE_LINE_HEIGHT_DEFAULTS,
+  BUBBLE_LINE_HEIGHT_FALLBACK,
   bubbleHorizontalPadding,
+  bubbleLetterSpacing,
+  bubbleTextFitsInBox,
   bubbleVerticalPadding,
   createCanvasBubbleTextMeasurer,
+  fitBubbleBoxHeightToText,
   fitBubbleFontSize,
+  measureBubbleTextBlock,
+  resolveBubbleFontFamily,
+  resolveBubbleFontSize,
+  resolveBubbleFontStyle,
+  resolveBubbleLineHeight,
+  withBubbleLetterSpacing,
   wrapBubbleTextLines,
   type BubbleTextMeasurer,
 } from "./studio-bubble-text-fit";
@@ -216,5 +227,118 @@ describe("createCanvasBubbleTextMeasurer", () => {
     const measurer = createCanvasBubbleTextMeasurer();
     expect(measurer.measureWidth("abcd", 20, "sans-serif", "normal")).toBeCloseTo(4 * 20 * 0.55);
     expect(measurer.measureWidth("", 20, "sans-serif", "normal")).toBe(0);
+  });
+});
+
+// ── 2026-08 브라우저 감사 회귀 계약 ──────────────────────────────────────────
+//
+// 결함의 뿌리는 "말풍선 기본 행간·글꼴 두께·패딩이 경로마다 달랐던 것"이었다:
+//   렌더 1.25/1.35/1.4 · commitEditText 1.1 · fitBubbleToText 1.2.
+// 아래 스위트는 그 기본값이 **한 곳에서만** 나오고, 그 값으로 잡은 상자에 대사가 실제로 다
+// 들어간다는 것을 고정한다.
+
+describe("resolveBubbleLineHeight (행간 단일 소스)", () => {
+  it("테마·세로쓰기 조합별 기본값을 렌더가 쓰는 값 그대로 돌려준다", () => {
+    expect(resolveBubbleLineHeight({ theme: "classic" })).toBe(1.25);
+    expect(resolveBubbleLineHeight({ theme: "soft" })).toBe(1.35);
+    expect(resolveBubbleLineHeight({ theme: "vivid" })).toBe(1.2);
+    // 세로쓰기는 테마보다 우선한다(열 간격 기본 1.4).
+    expect(resolveBubbleLineHeight({ theme: "vivid", vertical: true })).toBe(1.4);
+  });
+
+  it("요소가 지정한 행간이 언제나 우선한다", () => {
+    expect(resolveBubbleLineHeight({ lineHeight: 1.8, theme: "soft", vertical: true })).toBe(1.8);
+  });
+
+  it("테마를 모르면 표의 최댓값으로 폴백한다 — 과소평가는 글자를 잃지만 과대평가는 안 잃는다", () => {
+    expect(resolveBubbleLineHeight({})).toBe(BUBBLE_LINE_HEIGHT_FALLBACK);
+    expect(BUBBLE_LINE_HEIGHT_FALLBACK).toBe(
+      Math.max(...Object.values(BUBBLE_LINE_HEIGHT_DEFAULTS))
+    );
+    // 회귀 방지: 예전 commitEditText(1.1)/fitBubbleToText(1.2)는 실제 어떤 조합보다도 작았다.
+    for (const value of Object.values(BUBBLE_LINE_HEIGHT_DEFAULTS)) {
+      expect(value).toBeGreaterThan(1.1);
+    }
+  });
+
+  it("글꼴 두께 기본값은 렌더와 같은 bold — 측정만 normal이면 더 좁게 접힌다", () => {
+    expect(resolveBubbleFontStyle(undefined)).toBe("bold");
+    expect(resolveBubbleFontStyle("italic")).toBe("italic");
+    expect(resolveBubbleFontSize(undefined)).toBe(24);
+    expect(resolveBubbleFontSize(0)).toBe(24);
+    expect(resolveBubbleFontFamily(undefined)).toContain("Pretendard");
+  });
+
+  it("자간은 vivid만 0, 나머지 테마는 0.3", () => {
+    expect(bubbleLetterSpacing("vivid")).toBe(0);
+    expect(bubbleLetterSpacing("classic")).toBe(0.3);
+    expect(bubbleLetterSpacing("soft")).toBe(0.3);
+    expect(bubbleLetterSpacing(undefined)).toBe(0.3);
+  });
+});
+
+describe("withBubbleLetterSpacing", () => {
+  it("Konva.Text `_getTextWidth`와 같은 (글자수-1)×자간 규약을 쓴다", () => {
+    const spaced = withBubbleLetterSpacing(fakeMeasurer(1), 2);
+    // "가나다" = 3글자 → 3×20×1 + (3-1)×2 = 64
+    expect(spaced.measureWidth("가나다", 20, "sans-serif", "bold")).toBe(64);
+    expect(spaced.measureWidth("", 20, "sans-serif", "bold")).toBe(0);
+  });
+
+  it("자간이 0/미지정이면 원본 측정기를 그대로 돌려준다(하위호환)", () => {
+    const base = fakeMeasurer(1);
+    expect(withBubbleLetterSpacing(base, 0)).toBe(base);
+    expect(withBubbleLetterSpacing(base, undefined)).toBe(base);
+  });
+});
+
+describe("fitBubbleBoxHeightToText (높이 자동 확장)", () => {
+  // 한글 완성형은 전각(≈1.0em) — 예전 studio-fit의 0.62em 가정이 1.6배 낙관적이었던 지점.
+  const fullWidth = fakeMeasurer(1);
+  const base = {
+    boxWidth: 300,
+    fontSize: 24,
+    fontFamily: "Pretendard, sans-serif",
+    fontStyle: "bold",
+    lineHeight: 1.35,
+    letterSpacing: 0.3,
+  };
+
+  it("돌려준 높이는 자동 축소와 **같은 판정**을 통과한다(두 기능이 서로 모순되지 않는다)", () => {
+    for (const text of ["짧음", "가".repeat(103), "한 줄\n두 줄\n세 줄", "대사 ".repeat(40)]) {
+      const height = fitBubbleBoxHeightToText({ ...base, text }, fullWidth);
+      expect(
+        bubbleTextFitsInBox({ ...base, text, boxHeight: height }, base.fontSize, fullWidth)
+      ).toBe(true);
+    }
+  });
+
+  it("103자 한글 대사는 한 줄도 잘리지 않을 만큼 높이를 키운다", () => {
+    const text = "가".repeat(103);
+    const height = fitBubbleBoxHeightToText({ ...base, text }, fullWidth);
+    const { blockHeight, lines } = measureBubbleTextBlock({ ...base, text }, fullWidth);
+    expect(lines.length).toBeGreaterThan(8); // 감사 측정: 필요 9줄 / 표시 8줄이었다
+    expect(height - bubbleVerticalPadding(24).top - bubbleVerticalPadding(24).bottom)
+      .toBeGreaterThanOrEqual(blockHeight);
+  });
+
+  it("minHeight를 주면 수동으로 키운 크기를 줄이지 않는다", () => {
+    const height = fitBubbleBoxHeightToText({ ...base, text: "짧음", minHeight: 900 }, fullWidth);
+    expect(height).toBe(900);
+  });
+
+  it("대사가 길수록 단조 증가한다", () => {
+    const short = fitBubbleBoxHeightToText({ ...base, text: "가".repeat(10) }, fullWidth);
+    const long = fitBubbleBoxHeightToText({ ...base, text: "가".repeat(200) }, fullWidth);
+    expect(long).toBeGreaterThan(short);
+  });
+
+  it("세로쓰기는 열이 상자 폭 안에 들어올 때까지 높이를 키운다", () => {
+    const text = "세로쓰기 대사를 길게 적어 열이 여러 개로 늘어나게 만든다";
+    const input = { ...base, boxWidth: 120, text, vertical: true, lineHeight: 1.4 };
+    const height = fitBubbleBoxHeightToText(input, fullWidth);
+    expect(bubbleTextFitsInBox({ ...input, boxHeight: height }, base.fontSize, fullWidth)).toBe(true);
+    // 한 칸 낮추면 더 이상 안 들어간다 — 최소 높이를 찾았다는 뜻.
+    expect(bubbleTextFitsInBox({ ...input, boxHeight: height - 1 }, base.fontSize, fullWidth)).toBe(false);
   });
 });

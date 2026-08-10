@@ -63,6 +63,8 @@ export type StudioExportPackageIssueCode =
   | "TRIM_INVALID"
   | "BLEED_INVALID"
   | "BLEED_EXCEEDS_TRIM"
+  | "PRINT_DPI_BELOW_TARGET"
+  | "PRINT_DPI_UNREACHABLE"
   | "DIALOGUE_TXT_REQUIRED"
   | "DIALOGUE_TXT_EMPTY";
 
@@ -137,8 +139,12 @@ export function studioExportGeometryPreset(
 }
 
 /**
- * Recommend an integer export scale (1–3) so the canvas at that scale covers the
- * trim box at the target DPI. Matches the EXPORT_SCALES spirit used in the menu panel.
+ * Recommend an integer export scale for the 1–3 button row in the export menu.
+ *
+ * This is the *button-row* recommendation only: it is clamped to the scales the row can
+ * express, so it can silently under-deliver the requested DPI. Anything that reports or
+ * records print resolution must use {@link planStudioExportPrintGeometry}, which reports the
+ * exact scale, the DPI actually achieved, and whether the target is reachable at all.
  */
 export function recommendExportScaleForPrint(input: {
   canvasWidthPx: number;
@@ -161,6 +167,226 @@ export function recommendExportScaleForPrint(input: {
   const targetH = mmToPxAtDpi(trimHeightMm, dpi);
   const needed = Math.max(targetW / canvasWidthPx, targetH / canvasHeightPx);
   return Math.min(3, Math.max(1, Math.round(needed)));
+}
+
+/**
+ * Longest safe canvas side for a single `stage.toCanvas()` export — the conservative
+ * cross-browser limit already used by the strip exporter (`studio-export.MAX_CANVAS_DIM`).
+ */
+export const STUDIO_EXPORT_MAX_CANVAS_DIM = 16_384;
+/**
+ * Total pixel budget for one exported canvas. Browsers cap canvas *area* as well as side
+ * length (desktop Chrome/Safari refuse past ≈268 MPix and return a blank canvas), and every
+ * exported pixel costs 4 bytes of RGBA plus the encoder's copy. 100 MPix ≈ 400 MB per buffer
+ * is the conservative desktop-print ceiling — roughly A2 at 300 DPI.
+ */
+export const STUDIO_EXPORT_MAX_CANVAS_PIXELS = 100_000_000;
+
+function floorToHundredth(value: number): number {
+  return Math.floor(value * 100) / 100;
+}
+
+function ceilToHundredth(value: number): number {
+  return Math.ceil(value * 100) / 100;
+}
+
+/**
+ * Largest export scale that still produces a canvas the browser will actually rasterize.
+ * This is the real ceiling on print scale — the 1–3 button row is a UI convenience, not a
+ * safety limit, and clamping print geometry to it is what produced silently under-resolution
+ * "300 DPI" deliverables.
+ */
+export function studioExportMaxSafeScale(input: {
+  canvasWidthPx: number;
+  canvasHeightPx: number;
+  maxCanvasDim?: number;
+  maxCanvasPixels?: number;
+}): number {
+  const {
+    canvasWidthPx,
+    canvasHeightPx,
+    maxCanvasDim = STUDIO_EXPORT_MAX_CANVAS_DIM,
+    maxCanvasPixels = STUDIO_EXPORT_MAX_CANVAS_PIXELS,
+  } = input;
+  if (!(canvasWidthPx > 0) || !(canvasHeightPx > 0)) return 1;
+  const bySide = maxCanvasDim / Math.max(canvasWidthPx, canvasHeightPx);
+  const byArea = Math.sqrt(maxCanvasPixels / (canvasWidthPx * canvasHeightPx));
+  return Math.max(0.01, floorToHundredth(Math.min(bySide, byArea)));
+}
+
+export interface StudioExportPrintPlanInput {
+  /** Authored canvas size in CSS pixels. */
+  canvasWidthPx: number;
+  canvasHeightPx: number;
+  /** Target output DPI the author asked for. */
+  dpi: number;
+  trimWidthMm: number;
+  trimHeightMm: number;
+  bleedMm?: number;
+  /** Export scale currently selected in the menu. */
+  exportScale: number;
+  maxCanvasDim?: number;
+  maxCanvasPixels?: number;
+}
+
+export interface StudioExportPrintPlan {
+  readonly targetDpi: number;
+  /** Physical deliverable = trim + bleed on every side. */
+  readonly outputWidthMm: number;
+  readonly outputHeightMm: number;
+  /** Pixels the deliverable needs at the target DPI. */
+  readonly requiredWidthPx: number;
+  readonly requiredHeightPx: number;
+  /** Exact (unclamped) scale that would hit the target DPI. */
+  readonly neededScale: number;
+  readonly maxSafeScale: number;
+  /** Scale we can actually recommend: needed, never below 1×, never past the safe ceiling. */
+  readonly recommendedScale: number;
+  readonly recommendedDpi: number;
+  readonly recommendedWidthPx: number;
+  readonly recommendedHeightPx: number;
+  readonly currentScale: number;
+  readonly currentWidthPx: number;
+  readonly currentHeightPx: number;
+  /** DPI the current export scale really delivers against the output box. */
+  readonly currentDpi: number;
+  readonly meetsTargetDpi: boolean;
+  /** False when even the safe ceiling cannot reach the target — the canvas is too small. */
+  readonly reachable: boolean;
+  /** Canvas size that would reach the target DPI at `recommendedScale`. */
+  readonly requiredCanvasWidthPx: number;
+  readonly requiredCanvasHeightPx: number;
+  /** How far the printed page overruns the output box (canvas aspect ≠ output aspect). */
+  readonly overflowWidthMm: number;
+  readonly overflowHeightMm: number;
+  readonly issue: StudioExportPackageIssue | null;
+}
+
+function dpiForScale(input: {
+  canvasWidthPx: number;
+  canvasHeightPx: number;
+  outputWidthMm: number;
+  outputHeightMm: number;
+  scale: number;
+}): { dpi: number; widthPx: number; heightPx: number } {
+  const widthPx = Math.max(1, Math.round(input.canvasWidthPx * input.scale));
+  const heightPx = Math.max(1, Math.round(input.canvasHeightPx * input.scale));
+  const dpi = Math.min(
+    widthPx / (input.outputWidthMm / MM_PER_INCH),
+    heightPx / (input.outputHeightMm / MM_PER_INCH)
+  );
+  return { dpi, widthPx, heightPx };
+}
+
+/**
+ * Plan the print resolution of a raster export.
+ *
+ * Trim/bleed are **not** baked into the pixels — cropping to the output aspect would cut the
+ * author's drawing and letterbox-padding plus upscaling would fabricate resolution that does
+ * not exist. Instead the plan answers the only questions that decide whether a file is a
+ * usable print deliverable: how many pixels the output box needs, what DPI the current scale
+ * really delivers (the limiting axis — the one that still covers the full box), and what has
+ * to change when the target is out of reach.
+ *
+ * Returns null when there is no print geometry to plan for (screen/webtoon packs).
+ */
+export function planStudioExportPrintGeometry(
+  input: StudioExportPrintPlanInput
+): StudioExportPrintPlan | null {
+  const bleed = input.bleedMm != null && input.bleedMm >= 0 ? input.bleedMm : 0;
+  const outputWidthMm = input.trimWidthMm + bleed * 2;
+  const outputHeightMm = input.trimHeightMm + bleed * 2;
+  if (
+    !(input.canvasWidthPx > 0)
+    || !(input.canvasHeightPx > 0)
+    || !(input.dpi > 0)
+    || !(outputWidthMm > 0)
+    || !(outputHeightMm > 0)
+  ) {
+    return null;
+  }
+  const currentScale = input.exportScale > 0 ? input.exportScale : 1;
+  const requiredWidthPx = Math.ceil(mmToPxAtDpi(outputWidthMm, input.dpi));
+  const requiredHeightPx = Math.ceil(mmToPxAtDpi(outputHeightMm, input.dpi));
+  const neededScale = Math.max(
+    requiredWidthPx / input.canvasWidthPx,
+    requiredHeightPx / input.canvasHeightPx
+  );
+  const maxSafeScale = studioExportMaxSafeScale({
+    canvasWidthPx: input.canvasWidthPx,
+    canvasHeightPx: input.canvasHeightPx,
+    ...(input.maxCanvasDim != null ? { maxCanvasDim: input.maxCanvasDim } : {}),
+    ...(input.maxCanvasPixels != null ? { maxCanvasPixels: input.maxCanvasPixels } : {}),
+  });
+  // Never downscale below 1× to "hit" the target — that throws away authored detail. When the
+  // canvas is already denser than the target the file simply prints at its own higher DPI.
+  const recommendedScale = Math.min(
+    Math.max(1, maxSafeScale),
+    Math.max(1, ceilToHundredth(neededScale))
+  );
+
+  const geometry = {
+    canvasWidthPx: input.canvasWidthPx,
+    canvasHeightPx: input.canvasHeightPx,
+    outputWidthMm,
+    outputHeightMm,
+  };
+  const recommended = dpiForScale({ ...geometry, scale: recommendedScale });
+  const current = dpiForScale({ ...geometry, scale: currentScale });
+
+  const reachable = recommended.dpi >= input.dpi - 0.05;
+  const meetsTargetDpi = current.dpi >= input.dpi - 0.05;
+  const requiredCanvasWidthPx = Math.ceil(requiredWidthPx / recommendedScale);
+  const requiredCanvasHeightPx = Math.ceil(requiredHeightPx / recommendedScale);
+  const printedWidthMm = pxToMmAtDpi(current.widthPx, current.dpi);
+  const printedHeightMm = pxToMmAtDpi(current.heightPx, current.dpi);
+
+  let planIssue: StudioExportPackageIssue | null = null;
+  if (!reachable) {
+    planIssue = issue(
+      "PRINT_DPI_UNREACHABLE",
+      "error",
+      `현재 캔버스(${input.canvasWidthPx}×${input.canvasHeightPx}px)로는 ${Math.round(input.dpi)}DPI `
+        + `${outputWidthMm}×${outputHeightMm}mm 원고를 만들 수 없습니다. `
+        + `안전 배율 상한 ${maxSafeScale}×에서 최대 ${Math.round(recommended.dpi)}DPI입니다. `
+        + `캔버스를 ${requiredCanvasWidthPx}×${requiredCanvasHeightPx}px 이상으로 키운 뒤 다시 내보내세요. `
+        + `지금 저장하면 파일에는 실제 해상도 ${Math.round(current.dpi)}DPI가 기록됩니다.`
+    );
+  } else if (!meetsTargetDpi) {
+    planIssue = issue(
+      "PRINT_DPI_BELOW_TARGET",
+      "error",
+      `현재 배율 ${currentScale}×는 ${current.widthPx}×${current.heightPx}px = 실제 `
+        + `${Math.round(current.dpi)}DPI라 목표 ${Math.round(input.dpi)}DPI에 못 미칩니다. `
+        + `"배율 권장"으로 ${recommendedScale}×(${recommended.widthPx}×${recommended.heightPx}px, `
+        + `${Math.round(recommended.dpi)}DPI)를 적용하세요.`
+    );
+  }
+
+  return {
+    targetDpi: input.dpi,
+    outputWidthMm,
+    outputHeightMm,
+    requiredWidthPx,
+    requiredHeightPx,
+    neededScale,
+    maxSafeScale,
+    recommendedScale,
+    recommendedDpi: recommended.dpi,
+    recommendedWidthPx: recommended.widthPx,
+    recommendedHeightPx: recommended.heightPx,
+    currentScale,
+    currentWidthPx: current.widthPx,
+    currentHeightPx: current.heightPx,
+    currentDpi: current.dpi,
+    meetsTargetDpi,
+    reachable,
+    requiredCanvasWidthPx,
+    requiredCanvasHeightPx,
+    overflowWidthMm: Math.max(0, printedWidthMm - outputWidthMm),
+    overflowHeightMm: Math.max(0, printedHeightMm - outputHeightMm),
+    issue: planIssue,
+  };
 }
 
 function issue(

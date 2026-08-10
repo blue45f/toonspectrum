@@ -3,7 +3,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -12,11 +12,15 @@ import {
   STUDIO_PALETTE_INTERCHANGE_LIMITS,
 } from "./studio-palette-interchange";
 import {
-  PALETTE_LIBRARY_KEY,
-  savePalette,
+  deletePaletteInMemory,
+  renamePaletteInMemory,
   type StudioNamedPalette,
+  upsertPaletteInMemory,
 } from "./studio-palette-library";
-import { StudioPaletteLibraryPanel } from "./StudioPaletteLibraryPanel";
+import {
+  StudioPaletteLibraryPanel,
+  type StudioPaletteLibraryRepository,
+} from "./StudioPaletteLibraryPanel";
 
 const { downloadBlobMock } = vi.hoisted(() => ({ downloadBlobMock: vi.fn() }));
 
@@ -73,10 +77,61 @@ function paletteFixture(overrides: Partial<StudioNamedPalette> = {}): StudioName
   };
 }
 
+interface TestPaletteRepository extends StudioPaletteLibraryRepository {
+  readonly items: StudioNamedPalette[];
+  seed(item: StudioNamedPalette): void;
+}
+
+function createTestRepository(initial: readonly StudioNamedPalette[] = []): TestPaletteRepository {
+  let items = [...initial];
+  const listeners = new Set<() => void>();
+  const notify = () => {
+    for (const listener of listeners) listener();
+  };
+  return {
+    authority: "injected",
+    get items() {
+      return items;
+    },
+    seed(item) {
+      items = upsertPaletteInMemory(items, item);
+    },
+    async list() {
+      return items;
+    },
+    async save(item) {
+      items = upsertPaletteInMemory(items, item);
+      notify();
+      return items;
+    },
+    async rename(id, name) {
+      items = renamePaletteInMemory(items, id, name);
+      notify();
+      return items;
+    },
+    async delete(id) {
+      items = deletePaletteInMemory(items, id);
+      notify();
+      return items;
+    },
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+  };
+}
+
+let testRepository: TestPaletteRepository;
+
 function renderPanel(overrides: Partial<Parameters<typeof StudioPaletteLibraryPanel>[0]> = {}) {
   const onPickColor = vi.fn();
   const result = render(
-    <StudioPaletteLibraryPanel onPickColor={onPickColor} seedColors={["#abcdef"]} {...overrides} />
+    <StudioPaletteLibraryPanel
+      onPickColor={onPickColor}
+      seedColors={["#abcdef"]}
+      repository={testRepository}
+      {...overrides}
+    />
   );
   return { ...result, onPickColor };
 }
@@ -96,6 +151,7 @@ async function blobBytes(blob: Blob): Promise<Uint8Array> {
 
 beforeEach(() => {
   window.localStorage.clear();
+  testRepository = createTestRepository();
   downloadBlobMock.mockReset();
 });
 
@@ -120,7 +176,7 @@ describe("StudioPaletteLibraryPanel interchange", () => {
     fireEvent.change(importInput(), { target: { files: [file] } });
 
     expect(await screen.findByText(new RegExp(`${shortLabel}에서 .*2색을 가져왔어요`))).toBeTruthy();
-    expect(JSON.parse(window.localStorage.getItem(PALETTE_LIBRARY_KEY) ?? "[]")[0]).toMatchObject({
+    expect(testRepository.items[0]).toMatchObject({
       name: expectedPaletteName,
       colors: ["#112233", "#ff6600"],
     });
@@ -154,7 +210,7 @@ describe("StudioPaletteLibraryPanel interchange", () => {
     fireEvent.change(importInput(), { target: { files: [testFile("indexed-colors", act)] } });
 
     expect(await screen.findByText(/ACT에서 .*256색을 가져왔어요/u)).toBeTruthy();
-    expect(JSON.parse(window.localStorage.getItem(PALETTE_LIBRARY_KEY) ?? "[]")[0]?.colors[0]).toBe("#112233");
+    expect(testRepository.items[0]?.colors[0]).toBe("#112233");
   });
 
   it("does not misread a valid ACT table whose first colors resemble an empty ACO header", async () => {
@@ -165,7 +221,7 @@ describe("StudioPaletteLibraryPanel interchange", () => {
     fireEvent.change(importInput(), { target: { files: [testFile("indexed-colors.act", act)] } });
 
     expect(await screen.findByText(/ACT에서 .*256색을 가져왔어요/u)).toBeTruthy();
-    expect(JSON.parse(window.localStorage.getItem(PALETTE_LIBRARY_KEY) ?? "[]")[0]?.colors[0]).toBe("#000100");
+    expect(testRepository.items[0]?.colors[0]).toBe("#000100");
   });
 
   it.each(FORMAT_CASES)("exports a palette as %s with exact name, MIME and readable output", async (
@@ -174,8 +230,9 @@ describe("StudioPaletteLibraryPanel interchange", () => {
     shortLabel,
     mimeType
   ) => {
-    savePalette(window.localStorage, paletteFixture({ name: "theme" }));
+    testRepository.seed(paletteFixture({ name: "theme" }));
     renderPanel();
+    await screen.findByRole("button", { name: "theme GPL로 내보내기" });
     fireEvent.change(screen.getByRole("combobox", { name: "내보내기 형식" }), { target: { value: format } });
 
     fireEvent.click(screen.getByRole("button", { name: `theme ${shortLabel}로 내보내기` }));
@@ -190,10 +247,10 @@ describe("StudioPaletteLibraryPanel interchange", () => {
   });
 
   it("preserves the existing GPL filename and content contract", async () => {
-    savePalette(window.localStorage, paletteFixture({ name: "한글/팔레트" }));
+    testRepository.seed(paletteFixture({ name: "한글/팔레트" }));
     renderPanel();
 
-    fireEvent.click(screen.getByRole("button", { name: "한글/팔레트 GPL로 내보내기" }));
+    fireEvent.click(await screen.findByRole("button", { name: "한글/팔레트 GPL로 내보내기" }));
 
     await waitFor(() => expect(downloadBlobMock).toHaveBeenCalledOnce());
     const [blob, fileName] = downloadBlobMock.mock.calls[0] as [Blob, string];
@@ -239,8 +296,7 @@ describe("StudioPaletteLibraryPanel interchange", () => {
     fireEvent.change(importInput(), { target: { files: [testFile("large.css", `:root {\n${variables}\n}`)] } });
 
     expect(await screen.findByText(/앞쪽 1000색만/u)).toBeTruthy();
-    const stored = JSON.parse(window.localStorage.getItem(PALETTE_LIBRARY_KEY) ?? "[]") as StudioNamedPalette[];
-    expect(stored[0]?.colors).toHaveLength(1_000);
+    expect(testRepository.items[0]?.colors).toHaveLength(1_000);
   });
 
   it("rejects a file over the shared 4MB limit before reading its bytes", async () => {
@@ -279,24 +335,96 @@ describe("StudioPaletteLibraryPanel interchange", () => {
     expect(await screen.findByText(/GPL에서 .*2색을 가져왔어요/u)).toBeTruthy();
   });
 
-  it("uses 44px touch targets for import, select, item actions and swatches", () => {
-    savePalette(window.localStorage, paletteFixture());
+  it("uses 44px touch targets for import, select, item actions and swatches", async () => {
+    testRepository.seed(paletteFixture());
     renderPanel();
 
     expect(importInput().closest("label")?.className).toContain("min-h-11");
     expect(screen.getByRole("combobox", { name: "내보내기 형식" }).className).toContain("min-h-11");
-    expect(screen.getByRole("button", { name: "내 팔레트 이름 변경" }).className).toContain("size-11");
+    expect((await screen.findByRole("button", { name: "내 팔레트 이름 변경" })).className).toContain("size-11");
     expect(screen.getByRole("button", { name: "내 팔레트 GPL로 내보내기" }).className).toContain("size-11");
     expect(screen.getByRole("button", { name: "내 팔레트 색상 #112233 선택" }).className).toContain("size-11");
   });
 
-  it("creates a recent-color palette and keeps manual creation accessible", () => {
+  it("creates a recent-color palette and keeps manual creation accessible", async () => {
     renderPanel();
+    await screen.findByText("주입 저장소");
     fireEvent.click(screen.getByRole("button", { name: "최근 색으로 만들기" }));
-    expect(screen.getByRole("status").textContent).toContain("최근 사용 색");
+    expect((await screen.findByRole("status")).textContent).toContain("최근 사용 색");
 
     fireEvent.click(screen.getByRole("button", { name: "직접 입력" }));
     expect(screen.getByRole("textbox", { name: "새 팔레트 이름" })).toBeTruthy();
     expect(screen.getByRole("textbox", { name: "새 팔레트 색상 코드" })).toBeTruthy();
+  });
+
+  it("keeps a failed durable mutation in explicit current-tab memory", async () => {
+    const unavailableRepository: StudioPaletteLibraryRepository = {
+      authority: "injected",
+      async list() {
+        return [];
+      },
+      async save() {
+        throw new Error("OPFS quota unavailable");
+      },
+      async rename() {
+        throw new Error("not reached");
+      },
+      async delete() {
+        throw new Error("not reached");
+      },
+    };
+    renderPanel({ repository: unavailableRepository });
+    await screen.findByText("주입 저장소");
+
+    fireEvent.click(screen.getByRole("button", { name: "최근 색으로 만들기" }));
+
+    expect(await screen.findByText("현재 탭 메모리 임시 · 새로고침 시 사라짐")).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toContain("현재 탭 메모리에만");
+    expect(screen.getAllByText("최근 사용 색").length).toBeGreaterThan(0);
+  });
+
+  it("fences a hydration started during save from overwriting the mutation", async () => {
+    const stale = paletteFixture({ id: "stale", name: "오래된 팔레트" });
+    let listCalls = 0;
+    let listener: (() => void) | undefined;
+    let releaseStale: ((items: StudioNamedPalette[]) => void) | undefined;
+    const staleRead = new Promise<StudioNamedPalette[]>((resolve) => {
+      releaseStale = resolve;
+    });
+    const repository: StudioPaletteLibraryRepository = {
+      authority: "injected",
+      async list() {
+        listCalls += 1;
+        return listCalls === 1 ? [] : staleRead;
+      },
+      async save(palette) {
+        listener?.();
+        return [palette];
+      },
+      async rename() {
+        throw new Error("not reached");
+      },
+      async delete() {
+        throw new Error("not reached");
+      },
+      subscribe(next) {
+        listener = next;
+        return () => {
+          listener = undefined;
+        };
+      },
+    };
+    renderPanel({ repository });
+    await screen.findByText("주입 저장소");
+
+    fireEvent.click(screen.getByRole("button", { name: "최근 색으로 만들기" }));
+    expect(await screen.findByText(/팔레트를 만들었어요/u)).toBeTruthy();
+
+    await act(async () => {
+      releaseStale?.([stale]);
+      await staleRead;
+    });
+    expect(screen.queryByText("오래된 팔레트")).toBeNull();
+    expect(screen.getAllByText("최근 사용 색").length).toBeGreaterThan(0);
   });
 });

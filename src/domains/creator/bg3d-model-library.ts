@@ -13,6 +13,7 @@ import {
   StudioBg3dValidationWorkerError,
   validateStudioBg3dGlbOffMainThread,
 } from "./studio-bg3d-glb-validation-worker-client";
+import { getStudioBg3dLibrariesAuthority } from "./studio-bg3d-libraries-sqlite-opfs-authority";
 import { STUDIO_BG3D_CANONICAL_REQUIRED_GLTF_EXTENSIONS } from "./studio-bg3d-meshopt";
 import {
   inspectStudioBg3dModelThumbnailDataUrl,
@@ -25,6 +26,12 @@ import {
   type StudioBg3dModelAttachment,
   type StudioBg3dRightsStatus,
 } from "./studio-bg3d-scene-document";
+
+import type {
+  StudioBg3dLibrariesAuthority,
+  StudioBg3dLibraryBlobReceipt,
+} from "./studio-bg3d-libraries-sqlite-opfs-authority";
+import type { StudioOpfsContentHash } from "./studio-opfs-asset-store";
 
 const DB_NAME = "toonspectrum-studio-bg3d-model-library";
 export const BG3D_MODEL_LIBRARY_DB_VERSION = 3;
@@ -132,7 +139,7 @@ export interface Bg3dModelLibraryEntry {
   readonly id: string;
   readonly name: string;
   readonly format: Bg3dModelFormat;
-  readonly source: "sample" | "indexed-db";
+  readonly source: "sample" | "indexed-db" | "sqlite-opfs";
   readonly thumbnail: string | null;
   readonly createdAt: number;
   readonly updatedAt: number;
@@ -939,10 +946,10 @@ export function withDefaultBg3dModelEntry(
 }
 
 export function getDeletableModelIds(entries: readonly Bg3dModelLibraryEntry[]): string[] {
-  return entries.filter((entry) => entry.source === "indexed-db").map((entry) => entry.id);
+  return entries.filter((entry) => entry.source !== "sample").map((entry) => entry.id);
 }
 
-export async function listStoredBg3dModels(): Promise<Bg3dModelStoredRecord[]> {
+export async function legacyListStoredBg3dModels(): Promise<Bg3dModelStoredRecord[]> {
   return withDatabase(async (database) => {
     const transaction = database.transaction(MODEL_STORE, "readonly");
     const done = transactionDone(transaction);
@@ -953,7 +960,7 @@ export async function listStoredBg3dModels(): Promise<Bg3dModelStoredRecord[]> {
 }
 
 /** Finds a V2 record by its exact canonical content identity, never by a scene or storage key. */
-export async function getStoredBg3dModelByHash(hash: string): Promise<Bg3dVerifiedStoredRecord | null> {
+export async function legacyGetStoredBg3dModelByHash(hash: string): Promise<Bg3dVerifiedStoredRecord | null> {
   const canonicalHash = canonicalizeBg3dModelHash(hash);
   if (!canonicalHash) return null;
   return withDatabase(async (database) => {
@@ -968,7 +975,7 @@ export async function getStoredBg3dModelByHash(hash: string): Promise<Bg3dVerifi
 }
 
 /** Reads only canonical, bounded deletion evidence; malformed journal rows fail closed. */
-export async function getBg3dModelDeletionReceiptByHash(
+export async function legacyGetBg3dModelDeletionReceiptByHash(
   hash: string,
 ): Promise<Bg3dModelDeletionReceipt | null> {
   const canonicalHash = canonicalizeBg3dModelHash(hash);
@@ -990,7 +997,7 @@ export async function getBg3dModelDeletionReceiptByHash(
  * Both requests share one readonly transaction so restoration cannot combine values from opposite
  * sides of a concurrent delete or intentional reimport.
  */
-export async function resolveBg3dModelHash(
+export async function legacyResolveBg3dModelHash(
   hash: string,
   options: Bg3dModelDatabaseOperationOptions = {},
 ): Promise<Bg3dModelHashResolution> {
@@ -1098,13 +1105,13 @@ async function putVerifiedRecordsAtomically(
  * Validates every input before opening the single read/write transaction. A failing item therefore
  * cannot leave a partially imported batch. Existing and within-batch hashes are deduplicated.
  */
-export async function importVerifiedBg3dModelsAtomically(
+export async function legacyImportVerifiedBg3dModelsAtomically(
   inputs: readonly (Bg3dModelUploadSource | Bg3dModelImportItem)[],
   options: Bg3dModelVerificationOptions = {},
 ): Promise<Bg3dVerifiedStoredRecord[]> {
   if (inputs.length === 0) return [];
 
-  const storedRecords = await listStoredBg3dModels();
+  const storedRecords = await legacyListStoredBg3dModels();
   const existing = storedRecords.filter(isVerifiedBg3dModelRecord);
   const existingByHash = new Map(existing.map((record) => [record.contentHash, record] as const));
   const occupiedStorageIds = new Set(storedRecords.map((record) => record.id));
@@ -1166,18 +1173,18 @@ export async function importVerifiedBg3dModelsAtomically(
   return result;
 }
 
-export async function saveVerifiedBg3dModel(
+export async function legacySaveVerifiedBg3dModel(
   input: Bg3dModelUploadSource | Bg3dModelImportItem,
   options: Bg3dModelVerificationOptions = {},
 ): Promise<Bg3dVerifiedStoredRecord> {
-  const [record] = await importVerifiedBg3dModelsAtomically([input], options);
+  const [record] = await legacyImportVerifiedBg3dModelsAtomically([input], options);
   if (!record) throw createIndexedDbError();
   return record;
 }
 
 /** Current upload compatibility wrapper; GLTF/OBJ now fail closed before any storage write. */
-export async function saveUploadedBg3dModel(file: File): Promise<Bg3dVerifiedStoredRecord> {
-  return saveVerifiedBg3dModel(file);
+export async function legacySaveUploadedBg3dModel(file: File): Promise<Bg3dVerifiedStoredRecord> {
+  return legacySaveVerifiedBg3dModel(file);
 }
 
 /**
@@ -1236,7 +1243,7 @@ export async function revalidateStoredBg3dModelForRendering(
 async function promoteLegacyGlb(record: Bg3dLegacyStoredRecord): Promise<Bg3dVerifiedStoredRecord | null> {
   if (record.format !== "glb") return null;
   try {
-    const existing = await listStoredBg3dModels();
+    const existing = await legacyListStoredBg3dModels();
     const cumulativeUsedBytes = uniqueVerifiedRecords(existing.filter(isVerifiedBg3dModelRecord)).reduce(
       (sum, item) => sum + item.byteSize,
       0,
@@ -1289,7 +1296,7 @@ async function promoteLegacyGlb(record: Bg3dLegacyStoredRecord): Promise<Bg3dVer
  * V1 GLB is returned only after full validation and successful V2 promotion. Renderers must still
  * call admitStoredBg3dModelForRendering instead of parsing this record's Blob directly.
  */
-export async function getStoredBg3dModel(id: string): Promise<Bg3dVerifiedStoredRecord | null> {
+export async function legacyGetStoredBg3dModel(id: string): Promise<Bg3dVerifiedStoredRecord | null> {
   const record = await getRawStoredBg3dModel(id);
   if (!record) return null;
   if (isVerifiedBg3dModelRecord(record)) return record;
@@ -1297,17 +1304,17 @@ export async function getStoredBg3dModel(id: string): Promise<Bg3dVerifiedStored
 }
 
 /** Resolves local storage privately and returns only a fresh GLB validation success to renderers. */
-export async function admitStoredBg3dModelForRendering(
+export async function legacyAdmitStoredBg3dModelForRendering(
   storageId: string,
   options: Bg3dModelAdmissionOptions = {},
 ): Promise<StudioBg3dGlbValidationSuccess> {
   if (!isSafeBg3dModelStorageId(storageId)) throw createLibraryError("admission-failed");
-  const record = await getStoredBg3dModel(storageId);
+  const record = await legacyGetStoredBg3dModel(storageId);
   if (!record) throw createLibraryError("admission-failed");
   return revalidateStoredBg3dModelForRendering(record, options);
 }
 
-export async function getCachedBg3dModelThumbnail(id: string): Promise<string | null> {
+export async function legacyGetCachedBg3dModelThumbnail(id: string): Promise<string | null> {
   if (!isSafeBg3dModelStorageId(id)) return null;
   return withDatabase(async (database) => {
     const transaction = database.transaction(THUMBNAIL_STORE, "readonly");
@@ -1318,8 +1325,8 @@ export async function getCachedBg3dModelThumbnail(id: string): Promise<string | 
   });
 }
 
-export async function listBg3dModelLibraryEntries(): Promise<Bg3dModelLibraryEntry[]> {
-  const records = await listStoredBg3dModels();
+export async function legacyListBg3dModelLibraryEntries(): Promise<Bg3dModelLibraryEntry[]> {
+  const records = await legacyListStoredBg3dModels();
   const thumbnails = await withDatabase(async (database) => {
     const transaction = database.transaction(THUMBNAIL_STORE, "readonly");
     const done = transactionDone(transaction);
@@ -1341,7 +1348,7 @@ export async function listBg3dModelLibraryEntries(): Promise<Bg3dModelLibraryEnt
  * lookup, fence comparison, and thumbnail put share one IndexedDB transaction, preventing a late
  * capture or concurrent delete from resurrecting stale UI data.
  */
-export async function saveBg3dModelThumbnailIfCurrent(
+export async function legacySaveBg3dModelThumbnailIfCurrent(
   id: string,
   thumbnail: string,
   options: Bg3dModelThumbnailSaveOptions = {},
@@ -1388,15 +1395,15 @@ export async function saveBg3dModelThumbnailIfCurrent(
   });
 }
 
-export async function saveBg3dModelThumbnail(
+export async function legacySaveBg3dModelThumbnail(
   id: string,
   thumbnail: string,
   options: Bg3dModelThumbnailSaveOptions = {},
 ): Promise<void> {
-  await saveBg3dModelThumbnailIfCurrent(id, thumbnail, options);
+  await legacySaveBg3dModelThumbnailIfCurrent(id, thumbnail, options);
 }
 
-export async function deleteStoredBg3dModel(
+export async function legacyDeleteStoredBg3dModel(
   id: string,
   options: { readonly signal?: AbortSignal; readonly now?: number } = {},
 ): Promise<void> {
@@ -1453,7 +1460,681 @@ export async function deleteStoredBg3dModel(
   }, options);
 }
 
-/** Creates a scene-local attachment without exposing or reusing the IndexedDB storage key. */
+// ── V12 shared SQLite/OPFS product authority ──────────────────────────────
+
+export const BG3D_MODEL_LIBRARY_V12_MANIFEST_KIND =
+  "toonspectrum-studio-bg3d-model-library-v12";
+export const BG3D_MODEL_LIBRARY_V12_MANIFEST_VERSION = 1 as const;
+export const BG3D_MODEL_LIBRARY_V12_MAX_ENTRIES = 512;
+export const BG3D_MODEL_LIBRARY_V12_MAX_TOTAL_BYTES = 4 * 1024 * 1024 * 1024;
+export const BG3D_MODEL_LIBRARY_V12_MAX_DELETION_RECEIPTS = 2_048;
+export const BG3D_MODEL_LIBRARY_V12_MAX_MANIFEST_BYTES = 8 * 1024 * 1024;
+
+const V12_MODEL_MANIFEST_KEYS = [
+  "kind",
+  "version",
+  "revision",
+  "updatedAt",
+  "records",
+  "thumbnails",
+  "deletions",
+] as const;
+const V12_MODEL_RECORD_KEYS = [
+  "id",
+  "storageVersion",
+  "name",
+  "format",
+  "createdAt",
+  "updatedAt",
+  "contentHash",
+  "byteSize",
+  "mime",
+  "validationVersion",
+  "validatedAt",
+  "validatorProfile",
+  "validatorMetrics",
+  "rights",
+  "blobRef",
+] as const;
+const V12_THUMBNAIL_KEYS = ["id", "ref", "updatedAt", "captureRevision"] as const;
+const V12_BLOB_REF_KEYS = ["hash", "bytes", "mime"] as const;
+const V12_DELETION_KEYS = ["id", "contentHash", "storageModelId", "deletedAt"] as const;
+
+interface Bg3dModelV12StoredRecord {
+  readonly id: string;
+  readonly storageVersion: typeof BG3D_MODEL_STORAGE_VERSION;
+  readonly name: string;
+  readonly format: "glb";
+  readonly createdAt: number;
+  readonly updatedAt: number;
+  readonly contentHash: `sha256:${string}`;
+  readonly byteSize: number;
+  readonly mime: typeof STUDIO_BG3D_GLB_MIME;
+  readonly validationVersion: typeof BG3D_MODEL_VALIDATION_VERSION;
+  readonly validatedAt: number;
+  readonly validatorProfile: StudioBg3dGlbProfile;
+  readonly validatorMetrics: StudioBg3dGlbMetrics;
+  readonly rights: StudioBg3dAttachmentRights;
+  readonly blobRef: StudioBg3dLibraryBlobReceipt;
+}
+
+interface Bg3dModelV12ThumbnailRecord {
+  readonly id: string;
+  readonly ref: StudioBg3dLibraryBlobReceipt;
+  readonly updatedAt: number;
+  readonly captureRevision: number;
+}
+
+interface Bg3dModelV12Manifest {
+  readonly kind: typeof BG3D_MODEL_LIBRARY_V12_MANIFEST_KIND;
+  readonly version: typeof BG3D_MODEL_LIBRARY_V12_MANIFEST_VERSION;
+  readonly revision: number;
+  readonly updatedAt: number;
+  readonly records: readonly Bg3dModelV12StoredRecord[];
+  readonly thumbnails: readonly Bg3dModelV12ThumbnailRecord[];
+  readonly deletions: readonly Bg3dModelDeletionReceipt[];
+}
+
+export interface Bg3dModelV12StorageOptions {
+  readonly authority?: StudioBg3dLibrariesAuthority;
+}
+
+function v12ExactObject(
+  raw: unknown,
+  keys: readonly string[],
+): Record<string, unknown> | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const prototype = Object.getPrototypeOf(raw);
+  if (prototype !== Object.prototype && prototype !== null) return null;
+  const own = Object.keys(raw);
+  if (own.length !== keys.length || own.some((key) => !keys.includes(key))) return null;
+  return raw as Record<string, unknown>;
+}
+
+function v12BlobRef(raw: unknown): StudioBg3dLibraryBlobReceipt | null {
+  const value = v12ExactObject(raw, V12_BLOB_REF_KEYS);
+  if (
+    !value ||
+    typeof value.hash !== "string" ||
+    !/^sha256:[0-9a-f]{64}$/u.test(value.hash) ||
+    !Number.isSafeInteger(value.bytes) ||
+    (value.bytes as number) <= 0 ||
+    typeof value.mime !== "string" ||
+    value.mime.trim() !== value.mime ||
+    value.mime.length === 0
+  ) return null;
+  return {
+    hash: value.hash as StudioOpfsContentHash,
+    bytes: value.bytes as number,
+    mime: value.mime,
+  };
+}
+
+function v12ModelRecord(raw: unknown): Bg3dModelV12StoredRecord | null {
+  const value = v12ExactObject(raw, V12_MODEL_RECORD_KEYS);
+  if (!value) return null;
+  const blobRef = v12BlobRef(value.blobRef);
+  if (
+    value.storageVersion !== BG3D_MODEL_STORAGE_VERSION ||
+    !isSafeBg3dModelStorageId(value.id) ||
+    typeof value.name !== "string" ||
+    normalizeModelName(`${value.name}.glb`) !== value.name ||
+    value.format !== "glb" ||
+    !isSafeTimestamp(value.createdAt) ||
+    !isSafeTimestamp(value.updatedAt) ||
+    (value.updatedAt as number) < (value.createdAt as number) ||
+    canonicalizeBg3dModelHash(String(value.contentHash ?? "")) !== value.contentHash ||
+    !Number.isSafeInteger(value.byteSize) ||
+    (value.byteSize as number) < BG3D_MODEL_MIN_GLB_BYTES ||
+    (value.byteSize as number) > STUDIO_BG3D_GLB_MAX_BYTES ||
+    value.mime !== STUDIO_BG3D_GLB_MIME ||
+    value.validationVersion !== BG3D_MODEL_VALIDATION_VERSION ||
+    !isSafeTimestamp(value.validatedAt) ||
+    (value.validatorProfile !== "mobile" && value.validatorProfile !== "desktop") ||
+    !hasSafeMetrics(value.validatorMetrics) ||
+    (value.validatorMetrics as StudioBg3dGlbMetrics).byteSize !== value.byteSize ||
+    !hasSafeRights(value.rights) ||
+    !blobRef ||
+    blobRef.hash !== value.contentHash ||
+    blobRef.bytes !== value.byteSize ||
+    blobRef.mime !== STUDIO_BG3D_GLB_MIME_TYPE
+  ) return null;
+  return {
+    id: value.id,
+    storageVersion: BG3D_MODEL_STORAGE_VERSION,
+    name: value.name,
+    format: "glb",
+    createdAt: value.createdAt,
+    updatedAt: value.updatedAt,
+    contentHash: value.contentHash as `sha256:${string}`,
+    byteSize: value.byteSize as number,
+    mime: STUDIO_BG3D_GLB_MIME,
+    validationVersion: BG3D_MODEL_VALIDATION_VERSION,
+    validatedAt: value.validatedAt,
+    validatorProfile: value.validatorProfile,
+    validatorMetrics: Object.freeze({ ...(value.validatorMetrics as StudioBg3dGlbMetrics) }),
+    rights: Object.freeze({ ...(value.rights as StudioBg3dAttachmentRights) }),
+    blobRef,
+  };
+}
+
+function v12ThumbnailRecord(raw: unknown): Bg3dModelV12ThumbnailRecord | null {
+  const value = v12ExactObject(raw, V12_THUMBNAIL_KEYS);
+  const ref = v12BlobRef(value?.ref);
+  if (
+    !value ||
+    !isSafeBg3dModelStorageId(value.id) ||
+    !ref ||
+    !ref.mime.startsWith("image/") ||
+    !isSafeTimestamp(value.updatedAt) ||
+    !isSafeThumbnailCaptureRevision(value.captureRevision)
+  ) return null;
+  return {
+    id: value.id,
+    ref,
+    updatedAt: value.updatedAt,
+    captureRevision: value.captureRevision,
+  };
+}
+
+function canonicalV12Manifest(manifest: Bg3dModelV12Manifest): Bg3dModelV12Manifest {
+  return {
+    kind: BG3D_MODEL_LIBRARY_V12_MANIFEST_KIND,
+    version: BG3D_MODEL_LIBRARY_V12_MANIFEST_VERSION,
+    revision: manifest.revision,
+    updatedAt: manifest.updatedAt,
+    records: [...manifest.records].sort((left, right) => left.id.localeCompare(right.id)),
+    thumbnails: [...manifest.thumbnails].sort((left, right) => left.id.localeCompare(right.id)),
+    deletions: [...manifest.deletions].sort((left, right) => left.id.localeCompare(right.id)),
+  };
+}
+
+function emptyV12ModelManifest(): Bg3dModelV12Manifest {
+  return canonicalV12Manifest({
+    kind: BG3D_MODEL_LIBRARY_V12_MANIFEST_KIND,
+    version: BG3D_MODEL_LIBRARY_V12_MANIFEST_VERSION,
+    revision: 0,
+    updatedAt: 0,
+    records: [],
+    thumbnails: [],
+    deletions: [],
+  });
+}
+
+function serializeV12ModelManifest(manifest: Bg3dModelV12Manifest): string {
+  const raw = JSON.stringify(canonicalV12Manifest(manifest));
+  if (new TextEncoder().encode(raw).byteLength > BG3D_MODEL_LIBRARY_V12_MAX_MANIFEST_BYTES) {
+    throw createLibraryError("storage-unavailable");
+  }
+  return raw;
+}
+
+function parseV12ModelManifest(raw: string | null): Bg3dModelV12Manifest {
+  if (raw === null) return emptyV12ModelManifest();
+  if (new TextEncoder().encode(raw).byteLength > BG3D_MODEL_LIBRARY_V12_MAX_MANIFEST_BYTES) {
+    throw createLibraryError("stored-metadata-mismatch");
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw createLibraryError("stored-metadata-mismatch");
+  }
+  const value = v12ExactObject(parsed, V12_MODEL_MANIFEST_KEYS);
+  if (
+    !value ||
+    value.kind !== BG3D_MODEL_LIBRARY_V12_MANIFEST_KIND ||
+    value.version !== BG3D_MODEL_LIBRARY_V12_MANIFEST_VERSION ||
+    !Number.isSafeInteger(value.revision) ||
+    (value.revision as number) < 0 ||
+    !isSafeTimestamp(value.updatedAt) ||
+    !Array.isArray(value.records) ||
+    !Array.isArray(value.thumbnails) ||
+    !Array.isArray(value.deletions) ||
+    value.records.length > BG3D_MODEL_LIBRARY_V12_MAX_ENTRIES ||
+    value.thumbnails.length > BG3D_MODEL_LIBRARY_V12_MAX_ENTRIES ||
+    value.deletions.length > BG3D_MODEL_LIBRARY_V12_MAX_DELETION_RECEIPTS
+  ) throw createLibraryError("stored-metadata-mismatch");
+
+  const records = value.records.map(v12ModelRecord);
+  const thumbnails = value.thumbnails.map(v12ThumbnailRecord);
+  const deletions = value.deletions.map((candidate) => {
+    const exact = v12ExactObject(candidate, V12_DELETION_KEYS);
+    return exact && isBg3dModelDeletionReceipt(exact) ? exact : null;
+  });
+  if (records.some((record) => !record) || thumbnails.some((item) => !item) ||
+    deletions.some((receipt) => !receipt)) {
+    throw createLibraryError("stored-metadata-mismatch");
+  }
+  const typedRecords = records as Bg3dModelV12StoredRecord[];
+  const typedThumbnails = thumbnails as Bg3dModelV12ThumbnailRecord[];
+  const typedDeletions = deletions as Bg3dModelDeletionReceipt[];
+  if (
+    new Set(typedRecords.map(({ id }) => id)).size !== typedRecords.length ||
+    new Set(typedRecords.map(({ contentHash }) => contentHash)).size !== typedRecords.length ||
+    new Set(typedThumbnails.map(({ id }) => id)).size !== typedThumbnails.length ||
+    new Set(typedDeletions.map(({ id }) => id)).size !== typedDeletions.length ||
+    typedThumbnails.some(({ id }) => !typedRecords.some((record) => record.id === id)) ||
+    typedRecords.reduce((sum, record) => sum + record.byteSize, 0) >
+      BG3D_MODEL_LIBRARY_V12_MAX_TOTAL_BYTES
+  ) throw createLibraryError("stored-metadata-mismatch");
+  const manifest = canonicalV12Manifest({
+    kind: BG3D_MODEL_LIBRARY_V12_MANIFEST_KIND,
+    version: BG3D_MODEL_LIBRARY_V12_MANIFEST_VERSION,
+    revision: value.revision as number,
+    updatedAt: value.updatedAt as number,
+    records: typedRecords,
+    thumbnails: typedThumbnails,
+    deletions: typedDeletions,
+  });
+  if (JSON.stringify(manifest) !== raw) throw createLibraryError("stored-metadata-mismatch");
+  return manifest;
+}
+
+function v12ManifestRefs(raw: string | null): StudioOpfsContentHash[] {
+  const manifest = parseV12ModelManifest(raw);
+  return [...manifest.records.map(({ blobRef }) => blobRef.hash),
+    ...manifest.thumbnails.map(({ ref }) => ref.hash)].sort();
+}
+
+function v12RecordForManifest(
+  record: Bg3dVerifiedStoredRecord,
+  blobRef: StudioBg3dLibraryBlobReceipt,
+): Bg3dModelV12StoredRecord {
+  return {
+    id: record.id,
+    storageVersion: BG3D_MODEL_STORAGE_VERSION,
+    name: record.name,
+    format: "glb",
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+    contentHash: record.contentHash,
+    byteSize: record.byteSize,
+    mime: STUDIO_BG3D_GLB_MIME,
+    validationVersion: BG3D_MODEL_VALIDATION_VERSION,
+    validatedAt: record.validatedAt,
+    validatorProfile: record.validatorProfile,
+    validatorMetrics: Object.freeze({ ...record.validatorMetrics }),
+    rights: Object.freeze({ ...record.rights }),
+    blobRef,
+  };
+}
+
+async function hydrateV12ModelRecord(
+  record: Bg3dModelV12StoredRecord,
+  authority: StudioBg3dLibrariesAuthority,
+): Promise<Bg3dVerifiedStoredRecord> {
+  const bytes = await authority.readBlob(record.blobRef);
+  const hydrated: Bg3dVerifiedStoredRecord = Object.freeze({
+    ...record,
+    blob: new Blob([Uint8Array.from(bytes).buffer], { type: STUDIO_BG3D_GLB_MIME_TYPE }),
+    thumbnail: null,
+  });
+  if (!isVerifiedBg3dModelRecord(hydrated)) throw createLibraryError("stored-metadata-mismatch");
+  return hydrated;
+}
+
+function v12Authority(options: Bg3dModelV12StorageOptions): StudioBg3dLibrariesAuthority {
+  return options.authority ?? getStudioBg3dLibrariesAuthority();
+}
+
+function bytesFromThumbnailDataUrl(dataUrl: string): {
+  readonly bytes: Uint8Array;
+  readonly mime: string;
+} {
+  const inspected = inspectStudioBg3dModelThumbnailDataUrl(dataUrl);
+  if (!inspected) throw createLibraryError("invalid-file");
+  const marker = ";base64,";
+  const markerAt = inspected.dataUrl.indexOf(marker);
+  try {
+    const binary = atob(inspected.dataUrl.slice(markerAt + marker.length));
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+    if (bytes.byteLength !== inspected.byteLength) throw new Error("thumbnail-byte-length");
+    return { bytes, mime: inspected.mime };
+  } catch {
+    throw createLibraryError("invalid-file");
+  }
+}
+
+function thumbnailDataUrlFromBytes(mime: string, bytes: Uint8Array): string {
+  let binary = "";
+  const chunk = 0x8000;
+  for (let offset = 0; offset < bytes.byteLength; offset += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunk));
+  }
+  const value = `data:${mime};base64,${btoa(binary)}`;
+  const inspected = inspectStudioBg3dModelThumbnailDataUrl(value);
+  if (!inspected || inspected.byteLength !== bytes.byteLength || inspected.mime !== mime) {
+    throw createLibraryError("stored-metadata-mismatch");
+  }
+  return inspected.dataUrl;
+}
+
+export async function listStoredBg3dModelsV12(
+  options: Bg3dModelV12StorageOptions = {},
+): Promise<Bg3dVerifiedStoredRecord[]> {
+  const authority = v12Authority(options);
+  const manifest = parseV12ModelManifest(await authority.readManifest("models"));
+  return Promise.all(manifest.records.map((record) => hydrateV12ModelRecord(record, authority)));
+}
+
+export async function getStoredBg3dModelByHashV12(
+  hash: string,
+  options: Bg3dModelV12StorageOptions = {},
+): Promise<Bg3dVerifiedStoredRecord | null> {
+  const canonicalHash = canonicalizeBg3dModelHash(hash);
+  if (!canonicalHash) return null;
+  const authority = v12Authority(options);
+  const manifest = parseV12ModelManifest(await authority.readManifest("models"));
+  const record = manifest.records.find(({ contentHash }) => contentHash === canonicalHash);
+  return record ? hydrateV12ModelRecord(record, authority) : null;
+}
+
+export async function getBg3dModelDeletionReceiptByHashV12(
+  hash: string,
+  options: Bg3dModelV12StorageOptions = {},
+): Promise<Bg3dModelDeletionReceipt | null> {
+  const canonicalHash = canonicalizeBg3dModelHash(hash);
+  if (!canonicalHash) return null;
+  const manifest = parseV12ModelManifest(
+    await v12Authority(options).readManifest("models"),
+  );
+  return manifest.deletions.find(({ contentHash }) => contentHash === canonicalHash) ?? null;
+}
+
+export async function resolveBg3dModelHashV12(
+  hash: string,
+  options: Bg3dModelV12StorageOptions & Bg3dModelDatabaseOperationOptions = {},
+): Promise<Bg3dModelHashResolution> {
+  const canonicalHash = canonicalizeBg3dModelHash(hash);
+  if (!canonicalHash) return { record: null, deletionReceipt: null };
+  throwIfBg3dOperationAborted(options.signal);
+  const authority = v12Authority(options);
+  const manifest = parseV12ModelManifest(await authority.readManifest("models"));
+  const stored = manifest.records.find(({ contentHash }) => contentHash === canonicalHash);
+  const deletionReceipt = manifest.deletions.find(
+    ({ contentHash }) => contentHash === canonicalHash,
+  ) ?? null;
+  return {
+    record: stored ? await hydrateV12ModelRecord(stored, authority) : null,
+    deletionReceipt,
+  };
+}
+
+export async function importVerifiedBg3dModelsAtomicallyV12(
+  inputs: readonly (Bg3dModelUploadSource | Bg3dModelImportItem)[],
+  options: Bg3dModelVerificationOptions & Bg3dModelV12StorageOptions = {},
+): Promise<Bg3dVerifiedStoredRecord[]> {
+  if (inputs.length === 0) return [];
+  const authority = v12Authority(options);
+  const initial = parseV12ModelManifest(await authority.readManifest("models"));
+  const existingByHash = new Map(initial.records.map((record) => [record.contentHash, record]));
+  const occupiedIds = new Set(initial.records.map(({ id }) => id));
+  let cumulativeUsedBytes = options.cumulativeUsedBytes ?? 0;
+  const countedHashes = new Set<string>();
+  const preparedByHash = new Map<string, Bg3dVerifiedStoredRecord>();
+  const orderedHashes: `sha256:${string}`[] = [];
+  for (const input of inputs) {
+    const prepared = await prepareVerifiedBg3dModelRecordInternal(
+      input,
+      { ...options, cumulativeUsedBytes },
+      countedHashes,
+    );
+    orderedHashes.push(prepared.contentHash);
+    const duplicate = existingByHash.get(prepared.contentHash)
+      ?? preparedByHash.get(prepared.contentHash);
+    if (duplicate && !rightsMatch(duplicate.rights, prepared.rights)) {
+      throw createLibraryError("rights-conflict");
+    }
+    if (!duplicate && occupiedIds.has(prepared.id)) throw createLibraryError("storage-id-conflict");
+    if (!duplicate) occupiedIds.add(prepared.id);
+    if (!preparedByHash.has(prepared.contentHash)) preparedByHash.set(prepared.contentHash, prepared);
+    if (!countedHashes.has(prepared.contentHash)) {
+      countedHashes.add(prepared.contentHash);
+      cumulativeUsedBytes += prepared.byteSize;
+    }
+  }
+  throwIfBg3dOperationAborted(options.signal);
+  return authority.mutate("models", v12ManifestRefs, async (context) => {
+    const current = parseV12ModelManifest(context.currentRaw);
+    const byHash = new Map(current.records.map((record) => [record.contentHash, record]));
+    const byId = new Map(current.records.map((record) => [record.id, record]));
+    const emitted = new Map<string, Bg3dVerifiedStoredRecord>();
+    for (const prepared of preparedByHash.values()) {
+      const duplicate = byHash.get(prepared.contentHash);
+      if (duplicate) {
+        if (!rightsMatch(duplicate.rights, prepared.rights)) throw createLibraryError("rights-conflict");
+        emitted.set(duplicate.contentHash, await hydrateV12ModelRecord(duplicate, authority));
+        continue;
+      }
+      if (byId.has(prepared.id)) throw createLibraryError("storage-id-conflict");
+      const bytes = new Uint8Array(await prepared.blob.arrayBuffer());
+      const receipt = await context.putBlob(bytes, STUDIO_BG3D_GLB_MIME_TYPE);
+      if (receipt.hash !== prepared.contentHash || receipt.bytes !== prepared.byteSize) {
+        throw createLibraryError("hash-mismatch");
+      }
+      const stored = v12RecordForManifest(prepared, receipt);
+      byHash.set(stored.contentHash, stored);
+      byId.set(stored.id, stored);
+      emitted.set(stored.contentHash, prepared);
+    }
+    const records = [...byId.values()];
+    if (
+      records.length > BG3D_MODEL_LIBRARY_V12_MAX_ENTRIES ||
+      records.reduce((sum, record) => sum + record.byteSize, 0) >
+        BG3D_MODEL_LIBRARY_V12_MAX_TOTAL_BYTES
+    ) throw createLibraryError("storage-unavailable");
+    const importedHashes = new Set(preparedByHash.keys());
+    const next = canonicalV12Manifest({
+      ...current,
+      revision: current.revision + 1,
+      updatedAt: context.now,
+      records,
+      deletions: current.deletions.filter(({ contentHash }) => !importedHashes.has(contentHash)),
+    });
+    const result: Bg3dVerifiedStoredRecord[] = [];
+    const seen = new Set<string>();
+    for (const hash of orderedHashes) {
+      if (seen.has(hash)) continue;
+      const record = emitted.get(hash) ?? byHash.get(hash);
+      if (record) {
+        seen.add(hash);
+        result.push("blob" in record ? record : await hydrateV12ModelRecord(record, authority));
+      }
+    }
+    return { nextRaw: serializeV12ModelManifest(next), nextRefs: v12ManifestRefs(
+      serializeV12ModelManifest(next),
+    ), result };
+  }, options.signal);
+}
+
+export async function saveVerifiedBg3dModelV12(
+  input: Bg3dModelUploadSource | Bg3dModelImportItem,
+  options: Bg3dModelVerificationOptions & Bg3dModelV12StorageOptions = {},
+): Promise<Bg3dVerifiedStoredRecord> {
+  const [record] = await importVerifiedBg3dModelsAtomicallyV12([input], options);
+  if (!record) throw createLibraryError("storage-unavailable");
+  return record;
+}
+
+export function saveUploadedBg3dModelV12(
+  file: File,
+  options: Bg3dModelVerificationOptions & Bg3dModelV12StorageOptions = {},
+): Promise<Bg3dVerifiedStoredRecord> {
+  return saveVerifiedBg3dModelV12(file, options);
+}
+
+export async function getStoredBg3dModelV12(
+  id: string,
+  options: Bg3dModelV12StorageOptions = {},
+): Promise<Bg3dVerifiedStoredRecord | null> {
+  if (!isSafeBg3dModelStorageId(id)) return null;
+  const authority = v12Authority(options);
+  const manifest = parseV12ModelManifest(await authority.readManifest("models"));
+  const record = manifest.records.find((candidate) => candidate.id === id);
+  return record ? hydrateV12ModelRecord(record, authority) : null;
+}
+
+export async function admitStoredBg3dModelForRenderingV12(
+  storageId: string,
+  options: Bg3dModelAdmissionOptions & Bg3dModelV12StorageOptions = {},
+): Promise<StudioBg3dGlbValidationSuccess> {
+  const record = await getStoredBg3dModelV12(storageId, options);
+  if (!record) throw createLibraryError("admission-failed");
+  return revalidateStoredBg3dModelForRendering(record, options);
+}
+
+export async function getCachedBg3dModelThumbnailV12(
+  id: string,
+  options: Bg3dModelV12StorageOptions = {},
+): Promise<string | null> {
+  if (!isSafeBg3dModelStorageId(id)) return null;
+  const authority = v12Authority(options);
+  const manifest = parseV12ModelManifest(await authority.readManifest("models"));
+  const thumbnail = manifest.thumbnails.find((candidate) => candidate.id === id);
+  if (!thumbnail) return null;
+  return thumbnailDataUrlFromBytes(thumbnail.ref.mime, await authority.readBlob(thumbnail.ref));
+}
+
+export async function listBg3dModelLibraryEntriesV12(
+  options: Bg3dModelV12StorageOptions = {},
+): Promise<Bg3dModelLibraryEntry[]> {
+  const authority = v12Authority(options);
+  const manifest = parseV12ModelManifest(await authority.readManifest("models"));
+  const thumbnailPairs = await Promise.all(manifest.thumbnails.map(async (thumbnail) => [
+    thumbnail.id,
+    thumbnailDataUrlFromBytes(thumbnail.ref.mime, await authority.readBlob(thumbnail.ref)),
+  ] as const));
+  const thumbnails = new Map(thumbnailPairs);
+  const uploaded = [...manifest.records]
+    .sort((left, right) => right.updatedAt - left.updatedAt || left.id.localeCompare(right.id))
+    .map<Bg3dModelLibraryEntry>((record) => ({
+      id: record.id,
+      name: record.name,
+      format: "glb",
+      source: "sqlite-opfs",
+      thumbnail: thumbnails.get(record.id) ?? null,
+      createdAt: record.createdAt,
+      updatedAt: record.updatedAt,
+      status: "verified",
+      canUse: true,
+      statusMessage: BG3D_MODEL_VERIFIED_STATUS_MESSAGE,
+      contentHash: record.contentHash,
+      byteSize: record.byteSize,
+      commercialUse: record.rights.commercialUse,
+    }));
+  return [...SAMPLE_BG3D_MODEL_ENTRIES, ...uploaded];
+}
+
+export async function saveBg3dModelThumbnailIfCurrentV12(
+  id: string,
+  thumbnail: string,
+  options: Bg3dModelThumbnailSaveOptions & Bg3dModelV12StorageOptions = {},
+): Promise<boolean> {
+  if (!isSafeBg3dModelStorageId(id)) throw createLibraryError("invalid-file");
+  const captureRevision = options.captureRevision
+    ?? createBg3dModelThumbnailCaptureRevision(options.now);
+  if (!isSafeThumbnailCaptureRevision(captureRevision)) throw createLibraryError("invalid-file");
+  const payload = bytesFromThumbnailDataUrl(thumbnail);
+  const authority = v12Authority(options);
+  return authority.mutate("models", v12ManifestRefs, async (context) => {
+    const current = parseV12ModelManifest(context.currentRaw);
+    if (!current.records.some((record) => record.id === id)) throw createLibraryError("invalid-file");
+    const previous = current.thumbnails.find((candidate) => candidate.id === id);
+    if (previous && previous.captureRevision > captureRevision) {
+      return {
+        nextRaw: serializeV12ModelManifest(current),
+        nextRefs: v12ManifestRefs(serializeV12ModelManifest(current)),
+        result: false,
+      };
+    }
+    const ref = await context.putBlob(payload.bytes, payload.mime);
+    const next = canonicalV12Manifest({
+      ...current,
+      revision: current.revision + 1,
+      updatedAt: context.now,
+      thumbnails: [
+        ...current.thumbnails.filter((candidate) => candidate.id !== id),
+        { id, ref, updatedAt: resolveNow(options.now), captureRevision },
+      ],
+    });
+    const nextRaw = serializeV12ModelManifest(next);
+    return { nextRaw, nextRefs: v12ManifestRefs(nextRaw), result: true };
+  });
+}
+
+export async function saveBg3dModelThumbnailV12(
+  id: string,
+  thumbnail: string,
+  options: Bg3dModelThumbnailSaveOptions & Bg3dModelV12StorageOptions = {},
+): Promise<void> {
+  await saveBg3dModelThumbnailIfCurrentV12(id, thumbnail, options);
+}
+
+export async function deleteStoredBg3dModelV12(
+  id: string,
+  options: Bg3dModelV12StorageOptions & {
+    readonly signal?: AbortSignal;
+    readonly now?: number;
+  } = {},
+): Promise<void> {
+  throwIfBg3dOperationAborted(options.signal);
+  if (isSampleBg3dModelId(id)) return;
+  const authority = v12Authority(options);
+  await authority.mutate("models", v12ManifestRefs, async (context) => {
+    const current = parseV12ModelManifest(context.currentRaw);
+    const record = current.records.find((candidate) => candidate.id === id);
+    if (!record) {
+      const currentRaw = serializeV12ModelManifest(current);
+      return { nextRaw: currentRaw, nextRefs: v12ManifestRefs(currentRaw), result: undefined };
+    }
+    const deletedAt = options.now ?? context.now;
+    if (!isSafeTimestamp(deletedAt)) throw createLibraryError("invalid-file");
+    const receipt: Bg3dModelDeletionReceipt = {
+      id: record.contentHash,
+      contentHash: record.contentHash,
+      storageModelId: record.id,
+      deletedAt,
+    };
+    const deletions = [
+      ...current.deletions.filter(({ id: receiptId }) => receiptId !== receipt.id),
+      receipt,
+    ].sort((left, right) => right.deletedAt - left.deletedAt || left.id.localeCompare(right.id))
+      .slice(0, BG3D_MODEL_LIBRARY_V12_MAX_DELETION_RECEIPTS);
+    const next = canonicalV12Manifest({
+      ...current,
+      revision: current.revision + 1,
+      updatedAt: context.now,
+      records: current.records.filter((candidate) => candidate.id !== id),
+      thumbnails: current.thumbnails.filter((candidate) => candidate.id !== id),
+      deletions,
+    });
+    const nextRaw = serializeV12ModelManifest(next);
+    return { nextRaw, nextRefs: v12ManifestRefs(nextRaw), result: undefined };
+  }, options.signal);
+}
+
+/**
+ * Product-default storage API. The unsuffixed names intentionally resolve to V12 SQLite/OPFS;
+ * callers that need the former database must opt into the exported `legacy…` functions.
+ */
+export const listStoredBg3dModels = listStoredBg3dModelsV12;
+export const getStoredBg3dModelByHash = getStoredBg3dModelByHashV12;
+export const getBg3dModelDeletionReceiptByHash = getBg3dModelDeletionReceiptByHashV12;
+export const resolveBg3dModelHash = resolveBg3dModelHashV12;
+export const importVerifiedBg3dModelsAtomically = importVerifiedBg3dModelsAtomicallyV12;
+export const saveVerifiedBg3dModel = saveVerifiedBg3dModelV12;
+export const saveUploadedBg3dModel = saveUploadedBg3dModelV12;
+export const getStoredBg3dModel = getStoredBg3dModelV12;
+export const admitStoredBg3dModelForRendering = admitStoredBg3dModelForRenderingV12;
+export const getCachedBg3dModelThumbnail = getCachedBg3dModelThumbnailV12;
+export const listBg3dModelLibraryEntries = listBg3dModelLibraryEntriesV12;
+export const saveBg3dModelThumbnailIfCurrent = saveBg3dModelThumbnailIfCurrentV12;
+export const saveBg3dModelThumbnail = saveBg3dModelThumbnailV12;
+export const deleteStoredBg3dModel = deleteStoredBg3dModelV12;
+
+/** Creates a scene-local attachment without exposing or reusing the private local storage key. */
 export function createStudioBg3dModelAttachment(
   record: Bg3dVerifiedStoredRecord,
   options: {

@@ -3,7 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   VERTICAL_NO_BREAK_AFTER,
   VERTICAL_NO_BREAK_BEFORE,
+  classifyVerticalPunctuation,
   classifyVerticalGlyph,
+  isVerticalNoBreakAfter,
+  isVerticalNoBreakBefore,
   layoutVerticalText,
   measureVerticalTextBlock,
   segmentVerticalRuns,
@@ -68,6 +71,22 @@ describe("classifyVerticalGlyph", () => {
     }
   });
 
+  it("classifies Unicode opening, closing, stop, small, centered and stroke punctuation roles", () => {
+    for (const char of ["「", "『", "（", "【", "〈", "“", "‘", "⟦"]) {
+      expect(classifyVerticalPunctuation(char)).toBe("opening");
+      expect(isVerticalNoBreakAfter(char)).toBe(true);
+    }
+    for (const char of ["」", "』", "）", "】", "〉", "”", "’", "⟧"]) {
+      expect(classifyVerticalPunctuation(char)).toBe("closing");
+      expect(isVerticalNoBreakBefore(char)).toBe(true);
+    }
+    expect(classifyVerticalPunctuation("。")).toBe("stop");
+    expect(classifyVerticalPunctuation("ゃ")).toBe("small");
+    expect(classifyVerticalPunctuation("！")).toBe("centered");
+    expect(classifyVerticalPunctuation("ー")).toBe("stroke");
+    expect(classifyVerticalPunctuation("한")).toBe("none");
+  });
+
   it("nudges small kana up and to the right", () => {
     for (const char of ["ぁ", "っ", "ゃ", "ョ", "ヵ"]) {
       expect(classifyVerticalGlyph(char)).toEqual({ form: "shifted", offsetX: 0.08, offsetY: -0.08 });
@@ -99,6 +118,20 @@ describe("toVerticalGlyphs / segmentVerticalRuns", () => {
     ]);
   });
 
+  it("classifies an independent one-to-four digit run as tate-chu-yoko", () => {
+    expect(segmentVerticalRuns("가2026나")).toEqual([
+      { form: "upright", chars: ["가"] },
+      { form: "tate-chu-yoko", chars: ["2", "0", "2", "6"] },
+      { form: "upright", chars: ["나"] },
+    ]);
+    expect(segmentVerticalRuns("12345")).toEqual([
+      { form: "rotated", chars: ["1", "2", "3", "4", "5"] },
+    ]);
+    expect(segmentVerticalRuns("A12B")).toEqual([
+      { form: "rotated", chars: ["A", "1", "2", "B"] },
+    ]);
+  });
+
   it("isolates shifted punctuation into single-character runs", () => {
     expect(segmentVerticalRuns("가、나。")).toEqual([
       { form: "upright", chars: ["가"] },
@@ -107,7 +140,44 @@ describe("toVerticalGlyphs / segmentVerticalRuns", () => {
       { form: "shifted", chars: ["。"] },
     ]);
   });
+
+  it("never merges adjacent opening/closing punctuation with opposite roles", () => {
+    expect(segmentVerticalRuns("가」「『』나")).toEqual([
+      { form: "upright", chars: ["가"] },
+      { form: "rotated", chars: ["」"] },
+      { form: "rotated", chars: ["「"] },
+      { form: "rotated", chars: ["『"] },
+      { form: "rotated", chars: ["』"] },
+      { form: "upright", chars: ["나"] },
+    ]);
+  });
+
+  it("isolates stop and centered sentence punctuation while preserving their orientation", () => {
+    expect(segmentVerticalRuns("、。！？")).toEqual([
+      { form: "shifted", chars: ["、"] },
+      { form: "shifted", chars: ["。"] },
+      { form: "upright", chars: ["！"] },
+      { form: "upright", chars: ["？"] },
+    ]);
+  });
 });
+
+function layoutSourceText(layout: ReturnType<typeof layoutVerticalText>): string {
+  return layout.columns
+    .flatMap((column) => column.items)
+    .map((item) => item.text.replaceAll("\n", ""))
+    .join("");
+}
+
+function expectKinsokuValid(layout: ReturnType<typeof layoutVerticalText>): void {
+  for (const column of layout.columns) {
+    const chars = column.items.flatMap((item) => [...item.text.replaceAll("\n", "")]);
+    const first = chars[0];
+    const last = chars.at(-1);
+    if (first !== undefined) expect(isVerticalNoBreakBefore(first)).toBe(false);
+    if (last !== undefined) expect(isVerticalNoBreakAfter(last)).toBe(false);
+  }
+}
 
 describe("layoutVerticalText — 열 배치", () => {
   it("stacks characters top-to-bottom inside one column", () => {
@@ -157,6 +227,39 @@ describe("layoutVerticalText — 혼합 조판(한글 + 라틴 + 숫자 + 문장
     ]);
   });
 
+  it("fits one-to-four digits horizontally into exactly one vertical cell", () => {
+    const layout = layoutVerticalText(input({ text: "가2026나" }), HALF_EM);
+    const items = layout.columns[0]!.items;
+
+    expect(items.map((item) => [item.form, item.text, item.rotation])).toEqual([
+      ["upright", "가", 0],
+      ["tate-chu-yoko", "2026", 0],
+      ["upright", "나", 0],
+    ]);
+    expect(items[1]).toMatchObject({
+      length: 20,
+      glyphAdvance: 20,
+      horizontalScale: 0.5,
+      y: 20,
+    });
+    expect(layout.height).toBe(60);
+  });
+
+  it("keeps five digits and latin-adjacent digits in the rotated lane", () => {
+    const five = layoutVerticalText(input({ text: "12345" }), HALF_EM);
+    expect(five.columns[0]!.items[0]).toMatchObject({
+      form: "rotated",
+      rotation: 90,
+      horizontalScale: 1,
+    });
+    const mixed = layoutVerticalText(input({ text: "A12B" }), HALF_EM);
+    expect(mixed.columns[0]!.items[0]).toMatchObject({
+      form: "rotated",
+      text: "A12B",
+      rotation: 90,
+    });
+  });
+
   it("advances the column by the measured horizontal width of a rotated run", () => {
     const layout = layoutVerticalText(input({ text: "가OK9나" }), HALF_EM);
     const [hangul, latin, tail] = layout.columns[0]!.items;
@@ -180,6 +283,30 @@ describe("layoutVerticalText — 혼합 조판(한글 + 라틴 + 숫자 + 문장
   it("splits merged upright runs whenever a rotated or shifted item interrupts them", () => {
     const layout = layoutVerticalText(input({ text: "가나A다라" }), HALF_EM);
     expect(layout.columns[0]!.items.map((item) => item.text)).toEqual(["가\n나", "A", "다\n라"]);
+  });
+
+  it("keeps 、。！？ as independent role-aware cells without dropping a code point", () => {
+    const text = "가、。！？나";
+    const layout = layoutVerticalText(input({ text }), HALF_EM);
+    expect(layoutSourceText(layout)).toBe(text);
+    expect(layout.columns[0]!.items.map((item) => [item.text, item.form, item.punctuation])).toEqual([
+      ["가", "upright", "none"],
+      ["、", "shifted", "stop"],
+      ["。", "shifted", "stop"],
+      ["！", "upright", "centered"],
+      ["？", "upright", "centered"],
+      ["나", "upright", "none"],
+    ]);
+  });
+
+  it("keeps tate-chu-yoko atomic beside opening, closing and stop punctuation", () => {
+    const text = "「2026」、。！？";
+    const layout = layoutVerticalText(input({ text, maxColumnLength: 80 }), HALF_EM);
+    expect(layoutSourceText(layout)).toBe(text);
+    const tcy = layout.columns.flatMap((column) => column.items).filter((item) => item.form === "tate-chu-yoko");
+    expect(tcy).toHaveLength(1);
+    expect(tcy[0]).toMatchObject({ text: "2026", length: 20, punctuation: "none" });
+    expectKinsokuValid(layout);
   });
 });
 
@@ -209,6 +336,21 @@ describe("layoutVerticalText — 줄바꿈은 세로축으로 측정한다", () 
     expect(layout.overflow).toBe(false);
   });
 
+  it("treats a complete tate-chu-yoko run as one atomic wrapping cell", () => {
+    const layout = layoutVerticalText(
+      input({ text: "가2026나", maxColumnLength: 40 }),
+      HALF_EM,
+    );
+    expect(layout.columns).toHaveLength(2);
+    expect(layout.columns[0]!.items.map((item) => item.text)).toEqual([
+      "가",
+      "2026",
+    ]);
+    expect(layout.columns[1]!.items.map((item) => item.text)).toEqual(["나"]);
+    expect(layout.columns[0]!.length).toBe(40);
+    expect(layout.overflow).toBe(false);
+  });
+
   it("reports overflow when a single item cannot be shortened below the column length", () => {
     const layout = layoutVerticalText(input({ text: "가나다", maxColumnLength: 12 }), HALF_EM);
     expect(layout.overflow).toBe(true);
@@ -227,6 +369,25 @@ describe("layoutVerticalText — 줄바꿈은 세로축으로 측정한다", () 
 
     expect(layout.columns[0]!.items.map((item) => item.text)).toEqual(["가\n나"]);
     expect(layout.columns[1]!.items.map((item) => item.text)).toEqual(["「", "다\n라"]);
+  });
+
+  it("breaks between adjacent closing/opening punctuation without merging or glyph loss", () => {
+    const text = "가나」「다";
+    const layout = layoutVerticalText(input({ text, maxColumnLength: 40 }), HALF_EM);
+    expect(layoutSourceText(layout)).toBe(text);
+    expect(layout.columns.flatMap((column) => column.items).filter((item) => item.text === "」")).toHaveLength(1);
+    expect(layout.columns.flatMap((column) => column.items).filter((item) => item.text === "「")).toHaveLength(1);
+    expectKinsokuValid(layout);
+  });
+
+  it("handles nested paired punctuation across a column boundary without merging", () => {
+    const text = "가나「『다』」라";
+    const layout = layoutVerticalText(input({ text, maxColumnLength: 80 }), HALF_EM);
+    expect(layoutSourceText(layout)).toBe(text);
+    expect(layout.overflow).toBe(false);
+    expect(layout.columns).toHaveLength(2);
+    expectKinsokuValid(layout);
+    expect(layout.columns.flatMap((column) => column.items).map((item) => item.text).join("")).toContain("「『다』」");
   });
 
   it("adds the letter spacing to the vertical advance, not the horizontal one", () => {

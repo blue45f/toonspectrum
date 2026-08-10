@@ -561,7 +561,10 @@ async function runOne(browser: Browser, run: number, url: string): Promise<RunRe
 async function runMobileDrawing(browser: Browser, url: string): Promise<MobileRunResult> {
   const shot = join(SCRATCH, "studio-launch-mobile-drawing.png");
   const dotShot = join(SCRATCH, "studio-launch-mobile-dot.png");
-  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const ctx = await browser.newContext({
+    locale: "ko-KR",
+    viewport: { width: 390, height: 844 },
+  });
   const page = await ctx.newPage();
   const consoleErrors: string[] = [];
 
@@ -1133,6 +1136,7 @@ async function runMobileDockLayout(
   const ctx = await browser.newContext({
     hasTouch: true,
     isMobile: true,
+    locale: "ko-KR",
     viewport: { width, height: 844 },
   });
   const page = await ctx.newPage();

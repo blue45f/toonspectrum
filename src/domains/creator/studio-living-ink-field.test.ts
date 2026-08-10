@@ -6,6 +6,17 @@ import {
   createStudioLivingInkStrokeOperation,
   decodeStudioLivingInkSnapshot,
   encodeStudioLivingInkSnapshot,
+  studioLivingInkBrushBleedBoost,
+  studioLivingInkChromaBleedMultipliers,
+  studioLivingInkDepositionPathLength,
+  studioLivingInkDisplayReflectance,
+  studioLivingInkMeanMarkRadius,
+  studioLivingInkPigmentCoatFactor,
+  studioLivingInkPigmentDiffusionRates,
+  studioLivingInkPigmentOpticalDensity,
+  STUDIO_LIVING_INK_BRUSH_BLEED,
+  STUDIO_LIVING_INK_PIGMENT_COAT,
+  STUDIO_LIVING_INK_CHROMA_COEFFS,
   STUDIO_LIVING_INK_FIELD_VERSION,
   STUDIO_LIVING_INK_WHITE_GOUACHE_EXTINCTION,
   undoStudioLivingInkOperation,
@@ -101,6 +112,154 @@ async function applied(
 }
 
 describe("Studio Living Ink field", () => {
+  it("keeps InkWash chromatography chemistry ordered: red-absorbing dye escapes fastest", () => {
+    const zero = studioLivingInkChromaBleedMultipliers(0);
+    expect(zero[0]).toBeCloseTo(1, 10);
+    expect(zero[1]).toBeCloseTo(1, 10);
+    expect(zero[2]).toBeCloseTo(1, 10);
+    const full = studioLivingInkChromaBleedMultipliers(1);
+    expect(full[0]).toBeGreaterThan(full[1]);
+    expect(full[1]).toBeGreaterThan(full[2]);
+    expect(full[0]).toBeCloseTo(1 + STUDIO_LIVING_INK_CHROMA_COEFFS.redGain, 10);
+    expect(full[1]).toBeCloseTo(1 + STUDIO_LIVING_INK_CHROMA_COEFFS.greenGain, 10);
+    expect(full[2]).toBeCloseTo(
+      Math.max(
+        STUDIO_LIVING_INK_CHROMA_COEFFS.blueFloor,
+        1 - STUDIO_LIVING_INK_CHROMA_COEFFS.blueLoss,
+      ),
+      10,
+    );
+    expect(studioLivingInkBrushBleedBoost(0)).toBeCloseTo(STUDIO_LIVING_INK_BRUSH_BLEED.base, 10);
+    expect(studioLivingInkBrushBleedBoost(1)).toBeCloseTo(
+      STUDIO_LIVING_INK_BRUSH_BLEED.base + STUDIO_LIVING_INK_BRUSH_BLEED.gain,
+      10,
+    );
+    expect(studioLivingInkBrushBleedBoost(1)).toBeGreaterThan(studioLivingInkBrushBleedBoost(0) * 5);
+  });
+
+  it("ships the same pigment diffusion rates the WebGL2 runtime uploads each step", () => {
+    const quiet = studioLivingInkPigmentDiffusionRates({
+      bleed: 0.56,
+      mobility: 1,
+      dt: 1 / 60,
+      brushFootprint: 0,
+      chromaticSeparation: 1,
+    });
+    const tip = studioLivingInkPigmentDiffusionRates({
+      bleed: 0.56,
+      mobility: 1,
+      dt: 1 / 60,
+      brushFootprint: 1,
+      chromaticSeparation: 1,
+    });
+    // Red-absorbing channel bleeds faster than blue-absorbing when chroma is maxed.
+    expect(quiet[0]).toBeGreaterThan(quiet[1]);
+    expect(quiet[1]).toBeGreaterThan(quiet[2]);
+    // Active tip scrub multiplies bleed vs quiet paper.
+    expect(tip[0]).toBeGreaterThan(quiet[0] * 5);
+    expect(tip[1]).toBeGreaterThan(quiet[1] * 5);
+    expect(tip[2]).toBeGreaterThan(quiet[2] * 5);
+    // Dry paper (mobility 0) freezes diffusion regardless of tip.
+    const dry = studioLivingInkPigmentDiffusionRates({
+      bleed: 1,
+      mobility: 0,
+      dt: 1 / 60,
+      brushFootprint: 1,
+      chromaticSeparation: 1,
+    });
+    expect(dry).toEqual([0, 0, 0, 0]);
+    // Rates must be the exact values the runtime uploads (quiet/tip mix uniforms).
+    expect(quiet.every((rate) => rate >= 0 && rate <= STUDIO_LIVING_INK_BRUSH_BLEED.channelCeiling))
+      .toBe(true);
+    expect(tip.every((rate) => rate >= 0 && rate <= STUDIO_LIVING_INK_BRUSH_BLEED.channelCeiling))
+      .toBe(true);
+  });
+
+  it("runs a scripted ink→water→fix→second-layer sequence with fixed immutability", async () => {
+    const initial = session(16, 16);
+    const line = await applied(initial, ink(1, {
+      x: 8,
+      y: 8,
+      radius: 2.2,
+      pigmentMass: 4,
+      waterMass: 2,
+      color: [0.08, 0.1, 0.18, 1],
+    }));
+    const mobileAfterLine = total(line.session.state.mobilePigmentMass);
+    expect(mobileAfterLine).toBeGreaterThan(0);
+
+    const wash = await applied(line.session, {
+      kind: "water",
+      version: 1,
+      sequence: 2,
+      tool: "water-brush",
+      marks: [
+        { x: 6, y: 8, radius: 3, pressure: 0.9, speed: 30, waterMass: 6 },
+        { x: 10, y: 8, radius: 3, pressure: 0.9, speed: 30, waterMass: 6 },
+      ],
+      selection: null,
+    });
+    expect(total(wash.session.state.surfaceWater)).toBeGreaterThan(total(line.session.state.surfaceWater));
+    expect(total(wash.session.state.mobilePigmentMass)).toBeCloseTo(mobileAfterLine, 10);
+
+    const settled = await applied(wash.session, {
+      kind: "advance",
+      version: 1,
+      sequence: 3,
+      fixedTicks: 6,
+    });
+    expect(total(settled.session.state.mobilePigmentMass)).toBeGreaterThan(0);
+
+    const fixed = await applied(settled.session, {
+      kind: "fix",
+      version: 1,
+      sequence: 4,
+      scope: "all",
+      selection: null,
+    });
+    const fixedMass = total(fixed.session.state.fixedPigmentMass);
+    expect(total(fixed.session.state.mobilePigmentMass)).toBe(0);
+    expect(fixedMass).toBeGreaterThan(0);
+    expect(total(fixed.session.state.surfaceWater)).toBe(0);
+
+    const secondLayer = await applied(fixed.session, ink(5, {
+      x: 10,
+      y: 10,
+      radius: 1.8,
+      pigmentMass: 2.5,
+      waterMass: 1.5,
+      color: [0.05, 0.06, 0.1, 1],
+    }));
+    expect(total(secondLayer.session.state.mobilePigmentMass)).toBeGreaterThan(0);
+    expect(total(secondLayer.session.state.fixedPigmentMass)).toBeCloseTo(fixedMass, 10);
+
+    const mobileBeforeRewet = total(secondLayer.session.state.mobilePigmentMass);
+    const rewet = await applied(secondLayer.session, {
+      kind: "water",
+      version: 1,
+      sequence: 6,
+      tool: "water-brush",
+      marks: [{ x: 8, y: 8, radius: 4, pressure: 1, speed: 0, waterMass: 10 }],
+      selection: null,
+    });
+    // Water alone must not lift fixed pigment (rewet lift disabled, InkWash §07).
+    expect(total(rewet.session.state.fixedPigmentMass)).toBeCloseTo(fixedMass, 10);
+    expect(total(rewet.session.state.mobilePigmentMass)).toBeCloseTo(mobileBeforeRewet, 10);
+
+    const afterRewet = await applied(rewet.session, {
+      kind: "advance",
+      version: 1,
+      sequence: 7,
+      fixedTicks: 8,
+    });
+    // Natural fixation may grow the fixed well; rewet must never shrink it.
+    expect(total(afterRewet.session.state.fixedPigmentMass)).toBeGreaterThanOrEqual(fixedMass - 1e-9);
+    const pigmentBefore = mobileBeforeRewet + fixedMass;
+    const pigmentAfter = total(afterRewet.session.state.mobilePigmentMass)
+      + total(afterRewet.session.state.fixedPigmentMass);
+    expect(pigmentAfter).toBeCloseTo(pigmentBefore, 6);
+  });
+
   it("keeps white gouache canonical through dark→fix→white→save→fix→dark layering", async () => {
     const initial = session();
     const dark = await applied(initial, ink(1, {
@@ -464,5 +623,61 @@ describe("Studio Living Ink field", () => {
       { x: 0, y: 0, pressure: 0.3, timeMs: 0 },
       { x: 2_048, y: 0, pressure: 0.9, timeMs: 20 },
     ])).toThrow(/requires 4097 marks; maximum is 4096/);
+  });
+});
+
+describe("Studio Living Ink pigment coat", () => {
+  const linearFromSrgb = (channel: number) =>
+    channel <= 0.040_45 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+
+  it("re-encodes a linear channel back to the space the display resolve writes", () => {
+    for (const srgb of [0, 0.05, 0.2, 0.584, 0.95, 1]) {
+      expect(studioLivingInkDisplayReflectance(linearFromSrgb(srgb))).toBeCloseTo(srgb, 5);
+    }
+  });
+
+  it("reproduces the picked colour at one coat instead of collapsing onto one channel", () => {
+    // #ff9500 and #ff3b30 used to land on the same near-black red because their absorbances were
+    // taken in linear light and then multiplied far past unit optical depth.
+    const orange = [1, 0.584, 0].map(linearFromSrgb);
+    const vermilion = [1, 0.231, 0.188].map(linearFromSrgb);
+    const coat = (linear: number[]) =>
+      linear.map((channel) => Math.exp(-studioLivingInkPigmentOpticalDensity(channel)));
+    const [orangeR, orangeG, orangeB] = coat(orange);
+    const [, vermilionG, vermilionB] = coat(vermilion);
+    expect(orangeR!).toBeCloseTo(0.985, 2);
+    expect(orangeG!).toBeCloseTo(0.584, 2);
+    expect(orangeB!).toBeCloseTo(0.015, 2);
+    expect(vermilionG!).toBeCloseTo(0.231, 2);
+    expect(vermilionB!).toBeCloseTo(0.188, 2);
+    // The two hues stay far apart in green, which is the channel that used to be crushed to zero.
+    expect(orangeG! - vermilionG!).toBeGreaterThan(0.3);
+  });
+
+  it("lays one coat per pass no matter how the samples were batched", () => {
+    const radius = 8;
+    const reach = STUDIO_LIVING_INK_PIGMENT_COAT.profileReach * radius;
+    // A pixel is reached by roughly reach/pathLength batches, so coat x batches must stay at 1.
+    for (const pathLength of [reach / 4, reach / 2, reach]) {
+      const batches = reach / pathLength;
+      expect(studioLivingInkPigmentCoatFactor(pathLength, radius) * batches).toBeCloseTo(1, 6);
+    }
+  });
+
+  it("caps a long batch at one coat and floors a dwell so a tap still lays pigment", () => {
+    expect(studioLivingInkPigmentCoatFactor(1_000, 8)).toBe(1);
+    expect(studioLivingInkPigmentCoatFactor(0, 8)).toBe(1);
+    expect(studioLivingInkPigmentCoatFactor(1e-6, 8))
+      .toBe(STUDIO_LIVING_INK_PIGMENT_COAT.minimumCoat);
+  });
+
+  it("measures a batch from the previous batch's last mark, not from its own first mark", () => {
+    const marks = [
+      { x: 10, y: 0, radius: 4 },
+      { x: 13, y: 0, radius: 4 },
+    ];
+    expect(studioLivingInkDepositionPathLength(marks, null)).toBeCloseTo(3, 6);
+    expect(studioLivingInkDepositionPathLength(marks, { x: 4, y: 0 })).toBeCloseTo(9, 6);
+    expect(studioLivingInkMeanMarkRadius(marks)).toBeCloseTo(4, 6);
   });
 });

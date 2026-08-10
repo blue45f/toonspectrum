@@ -182,11 +182,17 @@ describe("StudioVrmPoser pose presets", () => {
       const asymmetryDeg = THREE.MathUtils.radToDeg(left.angleTo(mirroredRight));
       expect(asymmetryDeg, `${idle.id} arm asymmetry`).toBeGreaterThan(1);
 
-      // 어깨 내림(왼 -z / 오 +z)과 손가락 릴랙스 컬(왼 -z / 오 +z)이 실제로 적용된다.
+      // 어깨 내림(왼 -z / 오 +z). 손가락 릴랙스 컬은 모델 축 극성에 맞춰 ±Z 로 정렬된다.
       expect(bones.leftShoulder!.rotation.z, `${idle.id} left shoulder drop`).toBeLessThan(0);
       expect(bones.rightShoulder!.rotation.z, `${idle.id} right shoulder drop`).toBeGreaterThan(0);
-      expect(bones.leftIndexProximal!.rotation.z, `${idle.id} left finger curl`).toBeLessThan(0);
-      expect(bones.rightIndexProximal!.rotation.z, `${idle.id} right finger curl`).toBeGreaterThan(0);
+      expect(
+        Math.abs(bones.leftIndexProximal!.rotation.z),
+        `${idle.id} left finger curl magnitude`,
+      ).toBeGreaterThan(0.1);
+      expect(
+        Math.abs(bones.rightIndexProximal!.rotation.z),
+        `${idle.id} right finger curl magnitude`,
+      ).toBeGreaterThan(0.1);
     }
   });
 

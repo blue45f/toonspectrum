@@ -1,0 +1,107 @@
+{
+  "harness": "packages/studio-brush-platform/src/__tests__/ink-modeler-browser-probe.test.ts (INK_MODELER_BROWSER_PROBE=1)",
+  "generatedAt": "2026-08-08T03:16:57.449Z",
+  "host": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpu": "Apple M2 Max",
+    "node": "v24.16.0",
+    "loadavg1m5m15m": [
+      2.94,
+      2.97,
+      3.6
+    ]
+  },
+  "concurrentLoad": "measured on a shared dev host under live agent parallelism (sibling libmypaint agent + 24h soak in the same checkout) — loadavg above is the objective record; treat tail percentiles as upper bounds",
+  "browser": {
+    "launch": "playwright chromium headless",
+    "version": "140.0.7339.186",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.186 Safari/537.36",
+    "crossOriginIsolated": true,
+    "timerNote": "COOP/COEP served → crossOriginIsolated → Chromium performance.now() granularity 5µs (100µs otherwise); per-update samples below the granularity read as 0, so meanFromStrokeTotals (stroke wall time / points) is the precise central metric and p95/p99 capture the real tail"
+  },
+  "upstream": {
+    "repo": "https://github.com/google/ink-stroke-modeler",
+    "commit": "f2388813b0b25bc3e33d143d369a8367ab2e30c8",
+    "wasmBytes": 99256
+  },
+  "stroke": {
+    "points": 240,
+    "inputRateHz": 240,
+    "durationMs": 995.83,
+    "seed": 1234,
+    "jitterPx": 1.5,
+    "params": "INK_DEFAULT_PARAMS per packages/studio-brush-platform/src/ink-modeler.ts (minOutputRate 180, wobble 40ms/50–54px/s, spring 11/32400, drag 72, prediction off)"
+  },
+  "runs": {
+    "warmupStrokes": 5,
+    "measuredStrokes": 40,
+    "measuredUpdatesPerRun": 9600,
+    "method": "one _ism_update per raw point (sliding streaming shape) incl. HEAPF64 result readback, per-update wall time via performance.now(); identical new Function harness source in browser and node"
+  },
+  "browserRun": {
+    "perUpdateUs": {
+      "p50": 0,
+      "p95": 5,
+      "p99": 5,
+      "max": 1220,
+      "meanFromStrokeTotals": 0.775,
+      "meanQuantized": 0.613
+    },
+    "strokeTotalMs": {
+      "p50": 0.135,
+      "p95": 0.255,
+      "p99": 1.42,
+      "max": 1.42,
+      "mean": 0.186
+    },
+    "modeledOutputPoints": 9920
+  },
+  "nodeRun": {
+    "perUpdateUs": {
+      "p50": 0.375,
+      "p95": 0.792,
+      "p99": 1.333,
+      "max": 8.958,
+      "meanFromStrokeTotals": 0.5595,
+      "meanQuantized": 0.4674
+    },
+    "strokeTotalMs": {
+      "p50": 0.112,
+      "p95": 0.239,
+      "p99": 0.2497,
+      "max": 0.2497,
+      "mean": 0.1343
+    },
+    "modeledOutputPoints": 9920
+  },
+  "budgets": {
+    "125Hz": {
+      "budgetUs": 8000,
+      "headroomX": {
+        "vsMeanFromStrokeTotals": 10322.6,
+        "vsP50": null,
+        "vsP95": 1600,
+        "vsP99": 1600,
+        "vsMax": 6.6
+      }
+    },
+    "240Hz": {
+      "budgetUs": 4166.7,
+      "headroomX": {
+        "vsMeanFromStrokeTotals": 5376.3,
+        "vsP50": null,
+        "vsP95": 833.3,
+        "vsP99": 833.3,
+        "vsMax": 3.4
+      }
+    }
+  },
+  "browserVsNode": {
+    "meanPerUpdate": 1.39,
+    "p95PerUpdate": 6.31,
+    "p99PerUpdate": 3.75,
+    "strokeTotalMean": 1.38
+  },
+  "note": "numbers only — no verdict here; lane-3 promotion is decided by the blind lab gate (ADR-0009) and recorded in ADR-0011"
+}

@@ -10,6 +10,18 @@ const brushBaselineControllerSource = readFileSync(
   new URL("./useStudioBrushBaselineController.ts", import.meta.url),
   "utf8",
 );
+const leftToolRailSource = readFileSync(
+  new URL("./StudioLeftToolRail.tsx", import.meta.url),
+  "utf8",
+);
+const toolBeltSource = readFileSync(
+  new URL("./StudioToolBeltContent.tsx", import.meta.url),
+  "utf8",
+);
+const companionToolExecutorSource = readFileSync(
+  new URL("./studio-companion-tool-command-executor.ts", import.meta.url),
+  "utf8",
+);
 
 describe("StudioPage tool transition boundary", () => {
   it("clears every transient Inspector pointer owner through one central disarm", () => {
@@ -306,7 +318,7 @@ describe("StudioPage tool transition boundary", () => {
     expect(optionsStart).toBeGreaterThanOrEqual(0);
     expect(optionsEnd).toBeGreaterThan(optionsStart);
     expect(options).toMatch(
-      /setDrawMode: \(mode\) => \{\s+activatePrimaryCanvasTool\("draw", mode\);/u,
+      /setDrawMode: \(mode\) => \{\s+activateDrawToolWithProperties\(mode\);/u,
     );
     const brushSettingsStart = options.indexOf("openBrushStudio: () => {");
     const brushSettingsEnd = options.indexOf("recallBrushSlot:", brushSettingsStart);
@@ -333,8 +345,10 @@ describe("StudioPage tool transition boundary", () => {
     const transitionStart = studioPageSource.indexOf(
       "function activatePrimaryCanvasTool(",
     );
+    // Keep the pure stroke-safe transition free of inspector side effects; the
+    // CSP properties reveal lives in activateDrawToolWithProperties immediately after.
     const transitionEnd = studioPageSource.indexOf(
-      "function readActiveStrokeLifecycleRecovery()",
+      "function activateDrawToolWithProperties(",
       transitionStart,
     );
     const transition = studioPageSource.slice(transitionStart, transitionEnd);
@@ -366,13 +380,70 @@ describe("StudioPage tool transition boundary", () => {
     expect(transition).not.toContain("openInspectorRoute(");
 
     expect(shortcuts).toContain('activatePrimaryCanvasTool("select");');
-    expect(shortcuts).toContain('activatePrimaryCanvasTool("draw", "pen");');
-    expect(shortcuts).toContain('activatePrimaryCanvasTool("draw", "eraser");');
+    // Draw shortcuts surface properties via a dedicated wrapper (keep transition pure).
+    expect(shortcuts).toContain('activateDrawToolWithProperties("pen");');
+    expect(shortcuts).toContain('activateDrawToolWithProperties("eraser");');
+    expect(studioPageSource).toContain("function activateDrawToolWithProperties(");
+    expect(studioPageSource).toContain(
+      'openInspectorRoute({ primary: "properties" }, isMobile ? "draw" : null)',
+    );
 
     expect(escapeStart).toBeGreaterThanOrEqual(0);
     expect(escape).toContain("if (hasActiveDrawingPointerSession()) {");
     expect(escape).toContain("discardDrawingPointerSession();");
     expect(escape.indexOf("hasActiveDrawingPointerSession()"))
       .toBeLessThan(escape.indexOf("mobileSheet"));
+  });
+  // ── §15 UX 감사 회귀 고정 (docs/rewrite/ux-audit-v5.md §2.4)
+  it("gives every pen/eraser/select entry point the same side effects", () => {
+    // 감사 근거: 펜/지우개가 8곳에 복제되어 부수효과가 4갈래로 갈렸다(획 취소·disarm 유무).
+    // 완전한 CommandRegistry 통합은 다음 웨이브 몫이고, 여기서는 "부수효과 집합이 하나"만 고정한다.
+    for (const [label, source] of [
+      ["rail", leftToolRailSource],
+      ["tool belt", toolBeltSource],
+    ] as const) {
+      expect(source, label).toContain(
+        'activatePrimaryCanvasTool: (tool: "select" | "draw", drawMode?: DrawMode) => void;',
+      );
+      expect(source, label).not.toContain('setTool("draw");');
+      expect(source, label).not.toContain('setDrawMode("pen");');
+      expect(source, label).not.toContain('setDrawMode("eraser");');
+    }
+
+    const railDrawTool = leftToolRailSource.slice(
+      leftToolRailSource.indexOf("const activateDrawTool = ("),
+      leftToolRailSource.indexOf("/** Object free-transform path"),
+    );
+    expect(railDrawTool).toContain('activatePrimaryCanvasTool("draw", mode);');
+    // disarm 이 스포이드 해제까지 책임지므로 레일이 별도로 setEyedropperActive 를 부르지 않는다.
+    expect(railDrawTool).not.toContain("setEyedropperActive(false);");
+    expect(railDrawTool).not.toContain("disarmAllPixelTools();");
+
+    // 컴패니언 창도 같은 전이를 주입받는다 — 예전에는 disarm/setTool/setDrawMode 를 따로 받아
+    // 진행 중인 획 취소만 이 경로에서 빠졌다.
+    expect(companionToolExecutorSource).toContain(
+      'actions.activatePrimaryCanvasTool("draw", "pen");',
+    );
+    expect(companionToolExecutorSource).toContain(
+      'actions.activatePrimaryCanvasTool("draw", "eraser");',
+    );
+    expect(companionToolExecutorSource).not.toContain("actions.setTool(");
+    expect(companionToolExecutorSource).not.toContain("actions.setDrawMode(");
+    expect(studioPageSource).toContain(
+      "activatePrimaryCanvasToolRef.current = activatePrimaryCanvasTool;",
+    );
+  });
+
+  it("keeps the eyedropper a toggle on every surface, including the quick deck", () => {
+    // 감사 근거: 키보드 I·툴레일은 토글인데 Quick Deck/라디얼만 "항상 켜기"였다.
+    const start = studioPageSource.indexOf('function executeQuickAction(');
+    const end = studioPageSource.indexOf("const mobileHistoryGestureRef", start);
+    const quickAction = studioPageSource.slice(start, end);
+
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
+    expect(quickAction).toContain("setEyedropperActive(!eyedropperActive);");
+    expect(quickAction).not.toContain("setEyedropperActive(true);");
+    expect(quickAction).not.toContain("setEyedropperActive((");
   });
 });

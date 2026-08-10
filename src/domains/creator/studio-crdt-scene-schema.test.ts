@@ -7,6 +7,8 @@ import {
   DEFAULT_STUDIO_TILT_SHIFT_BLUR_OPTIONS,
 } from "./studio-advanced-blur-filter-kernels";
 import {
+  STUDIO_CRDT_MAX_RUBY_READING_LENGTH,
+  STUDIO_CRDT_MAX_RUBY_SPANS,
   STUDIO_CRDT_SCENE_ELEMENT_PAYLOAD_VERSION,
   isStudioCrdtImageAuxiliaryReferencePayload,
   isStudioCrdtTopologyReferencePayload,
@@ -335,5 +337,136 @@ describe("studio CRDT immutable filter-mask surface references", () => {
     for (const props of invalidProps) {
       expect(() => validateReference(props)).toThrow();
     }
+  });
+});
+
+function bubbleProps(overrides: StudioCrdtJsonObject = {}): StudioCrdtJsonObject {
+  return {
+    variant: "speech",
+    text: "漢字テ스트",
+    x: 40,
+    y: 60,
+    width: 220,
+    height: 120,
+    fill: "#ffffff",
+    textFill: "#111111",
+    rotation: 0,
+    ...overrides,
+  };
+}
+
+function textProps(overrides: StudioCrdtJsonObject = {}): StudioCrdtJsonObject {
+  return {
+    text: "漢字テ스트",
+    x: 10,
+    y: 20,
+    width: 180,
+    fontSize: 24,
+    fill: "#111111",
+    rotation: 0,
+    ...overrides,
+  };
+}
+
+function validateScene(type: "bubble" | "text", props: StudioCrdtJsonObject) {
+  return validateStudioCrdtSceneElementPayload({
+    version: STUDIO_CRDT_SCENE_ELEMENT_PAYLOAD_VERSION,
+    type,
+    props,
+  });
+}
+
+describe("studio CRDT dialogue ruby spans", () => {
+  it("syncs ruby spans on both dialogue element types with an identical canonical shape", () => {
+    const rubySpans = [
+      { start: 0, end: 2, ruby: "한자" },
+      { start: 3, end: 5, ruby: "테스트" },
+    ];
+
+    // 회귀 방지: 이 두 호출이 던지면 스튜디오 상단에
+    // "실시간 장면 동기화: bubble 요소의 rubySpans 속성은 동기화할 수 없습니다." 배너가 뜬다.
+    const bubble = validateScene("bubble", bubbleProps({ rubySpans }));
+    const text = validateScene("text", textProps({ rubySpans }));
+
+    expect(bubble.props.rubySpans).toEqual(rubySpans);
+    expect(text.props.rubySpans).toEqual(rubySpans);
+    // 정규 사본 — 입력 배열/항목을 그대로 물고 있지 않다.
+    expect(bubble.props.rubySpans).not.toBe(rubySpans);
+    expect((bubble.props.rubySpans as StudioCrdtJsonObject[])[0]).not.toBe(rubySpans[0]);
+  });
+
+  it("keeps spans that outrun the current text so shrinking a line is never a sync failure", () => {
+    const shortened = validateScene(
+      "bubble",
+      bubbleProps({ text: "가", rubySpans: [{ start: 0, end: 2, ruby: "한자" }] })
+    );
+    expect(shortened.props.rubySpans).toEqual([{ start: 0, end: 2, ruby: "한자" }]);
+  });
+
+  it("admits the authoring ceilings with headroom instead of undercutting them", () => {
+    const spans = Array.from({ length: STUDIO_CRDT_MAX_RUBY_SPANS }, (_unused, index) => ({
+      start: index * 2,
+      end: index * 2 + 1,
+      ruby: "가",
+    }));
+    expect(() => validateScene("text", textProps({ rubySpans: spans }))).not.toThrow();
+    expect(STUDIO_CRDT_MAX_RUBY_SPANS).toBeGreaterThanOrEqual(64);
+    expect(STUDIO_CRDT_MAX_RUBY_READING_LENGTH).toBeGreaterThanOrEqual(80);
+    expect(() =>
+      validateScene("text", textProps({
+        rubySpans: [{ start: 0, end: 2, ruby: "가".repeat(STUDIO_CRDT_MAX_RUBY_READING_LENGTH) }],
+      }))
+    ).not.toThrow();
+  });
+
+  it("rejects malformed ruby payloads instead of trusting an admitted key", () => {
+    const invalidSpans: unknown[] = [
+      "루비",
+      [{ start: 0, end: 2 }],
+      [{ start: 0, end: 2, ruby: "한자", note: "x" }],
+      [{ start: 0, end: 2, ruby: "" }],
+      [{ start: 0, end: 2, ruby: 12 }],
+      [{ start: 0, end: 2, ruby: "\u0007" }],
+      [{ start: 0, end: 2, ruby: "a\u0000b" }],
+      [{ start: 2, end: 2, ruby: "한자" }],
+      [{ start: 3, end: 1, ruby: "한자" }],
+      [{ start: -1, end: 2, ruby: "한자" }],
+      [{ start: 0.5, end: 2, ruby: "한자" }],
+      [{ start: 0, end: Number.MAX_SAFE_INTEGER, ruby: "한자" }],
+      [{ start: 0, end: 2, ruby: "가".repeat(STUDIO_CRDT_MAX_RUBY_READING_LENGTH + 1) }],
+      [null],
+      [["start", 0]],
+      Array.from({ length: STUDIO_CRDT_MAX_RUBY_SPANS + 1 }, (_unused, index) => ({
+        start: index * 2,
+        end: index * 2 + 1,
+        ruby: "가",
+      })),
+    ];
+
+    for (const rubySpans of invalidSpans) {
+      expect(() =>
+        validateScene("bubble", bubbleProps({ rubySpans: rubySpans as never }))
+      ).toThrow(/루비 구간|장면 확장/u);
+      expect(() =>
+        validateScene("text", textProps({ rubySpans: rubySpans as never }))
+      ).toThrow(/루비 구간|장면 확장/u);
+    }
+  });
+
+  it("still refuses ruby spans on element types whose renderers do not read them", () => {
+    expect(() =>
+      validateStudioCrdtSceneElementPayload({
+        version: STUDIO_CRDT_SCENE_ELEMENT_PAYLOAD_VERSION,
+        type: "sticker",
+        props: {
+          text: "★",
+          x: 0,
+          y: 0,
+          fontSize: 24,
+          rotation: 0,
+          rubySpans: [{ start: 0, end: 1, ruby: "별" }],
+        },
+      })
+    ).toThrow(/rubySpans 속성은 동기화할 수 없습니다/u);
   });
 });

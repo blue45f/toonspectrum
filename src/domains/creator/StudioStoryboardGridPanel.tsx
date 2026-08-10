@@ -22,6 +22,8 @@ import { Copy, LayoutGrid, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useState, type ReactElement } from "react";
 import { createPortal } from "react-dom";
 
+import { confirmStudioDestructiveAction } from "./studio-destructive-action-preview";
+import { studioDeletePageRequest } from "./studio-destructive-command-catalog";
 import { hasCustomPageName, pageDisplayName } from "./studio-page-meta";
 import { StudioPanelChip } from "./studio-panel-ui";
 import { StudioPageThumbnail, type StudioPageDnd } from "./StudioPageThumbnails";
@@ -236,7 +238,17 @@ export function StudioStoryboardGridPanel({
                       onClick={(e) => {
                         e.stopPropagation();
                         if (!canDelete) return;
-                        if (globalThis.confirm(`${idx + 1}페이지를 삭제할까요?`)) onDeletePage(p.id);
+                        void (async () => {
+                          if (
+                            !(await confirmStudioDestructiveAction(
+                              studioDeletePageRequest({
+                                pageNumber: idx + 1,
+                                elementCount: p.elements.length,
+                              })
+                            ))
+                          ) return;
+                          onDeletePage(p.id);
+                        })();
                       }}
                       disabled={!canDelete}
                       className="rounded bg-black/55 p-1 text-white hover:bg-bad/80 disabled:opacity-30"

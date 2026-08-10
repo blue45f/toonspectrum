@@ -73,6 +73,7 @@ function result(
       engineEpoch: input.engineEpoch,
       sourceElementId: input.plan.source.elementId,
       presetId: input.plan.presetId,
+      materialProfileId: input.plan.materialProfileId,
       seed: input.plan.seed,
       rasterWidth: input.plan.raster.width,
       rasterHeight: input.plan.raster.height,
@@ -98,6 +99,7 @@ function resultExpectation() {
     engineEpoch: input.engineEpoch,
     sourceElementId: input.plan.source.elementId,
     presetId: input.plan.presetId,
+    materialProfileId: input.plan.materialProfileId,
     seed: input.plan.seed,
     rasterWidth: input.plan.raster.width,
     rasterHeight: input.plan.raster.height,
@@ -122,6 +124,20 @@ describe("Studio Hokusai Worker protocol", () => {
     expect(snapshotStudioHokusaiWorkerRenderMessage({
       ...request(),
       engineEpoch: 0,
+    })).toBeNull();
+    expect(snapshotStudioHokusaiWorkerRenderMessage({
+      ...request(),
+      version: 2,
+    })).toBeNull();
+    const legacyPlan = request();
+    const { materialProfileId: _legacyMaterialProfile, ...legacyPlanFields } =
+      legacyPlan.plan;
+    expect(snapshotStudioHokusaiWorkerRenderMessage({
+      ...legacyPlan,
+      plan: {
+        ...legacyPlanFields,
+        version: "studio-hokusai-natural-media-v1",
+      },
     })).toBeNull();
     const malformed = request();
     expect(snapshotStudioHokusaiWorkerRenderMessage({

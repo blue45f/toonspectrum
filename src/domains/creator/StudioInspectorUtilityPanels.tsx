@@ -85,7 +85,7 @@ export function StudioInspectorCurrentBrushSummary({
       />
       <div className="flex items-center justify-between gap-2 px-1">
         <p className="min-w-0 text-[0.62rem] leading-relaxed text-fg-3">
-          하단 빠른 바와 같은 브러시 목록을 사용합니다.
+          하단 빠른 바와 같은 브러시 목록을 사용합니다. 선화·번짐·에어 모두 크기·농도·색 조작은 같습니다.
         </p>
         {onOpenBrushCatalog ? (
           <button
@@ -112,6 +112,8 @@ export function StudioInspectorBrushCatalogButton({
     <button
       type="button"
       aria-haspopup="dialog"
+      // 그리기 ▸ 브러시 프리셋 목록 메뉴 항목이 앵커·복귀 포커스로 되찾는 런처다.
+      data-studio-brush-catalog-launcher="true"
       onClick={(event) => onOpen(event.currentTarget)}
       className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-line bg-card px-2.5 text-[0.68rem] font-semibold text-fg-2 transition-colors hover:border-accent/40 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
     >

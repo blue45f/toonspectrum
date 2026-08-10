@@ -1,6 +1,6 @@
 import {
-  getStoredBg3dModelByHash,
-  importVerifiedBg3dModelsAtomically,
+  getStoredBg3dModelByHashV12 as getStoredBg3dModelByHash,
+  importVerifiedBg3dModelsAtomicallyV12 as importVerifiedBg3dModelsAtomically,
   revalidateStoredBg3dModelForRendering,
   type Bg3dModelImportItem,
   type Bg3dModelVerificationOptions,
@@ -26,7 +26,7 @@ import {
 import type { StudioProjectFile } from "./studio-project-file";
 
 /**
- * IndexedDB is deliberately kept outside project and archive documents. This bridge resolves a
+ * Private SQLite/OPFS storage identities stay outside project and archive documents. This bridge resolves a
  * canonical content hash at the last possible moment, revalidates the stored bytes, and returns
  * only validator-owned GLB bytes plus portable document references.
  */
@@ -74,7 +74,7 @@ export interface PrepareStudioBg3dProjectArchiveOptions {
 
 export interface InstallStudioBg3dProjectArchiveOptions {
   readonly limits?: Partial<StudioProjectArchiveLimits>;
-  /** Applied to the library's second validation pass before its one atomic IndexedDB write. */
+  /** Applied to the library's second validation pass before its manifest-last SQLite/OPFS write. */
   readonly verification?: Bg3dModelVerificationOptions;
 }
 

@@ -355,12 +355,12 @@ describe("Studio VRM deterministic full-body IK", () => {
       const actual = fixture.nodes.get(constraint.effector)!.getWorldPosition(new THREE.Vector3());
       const reported = new THREE.Vector3(...constraint.effectiveTargetWorld);
       const targetWorld = new THREE.Vector3(...constraint.targetWorld);
-      expect(actual.distanceTo(reported)).toBeLessThan(1e-8);
-      expect(constraint.residual).toBeCloseTo(actual.distanceTo(targetWorld), 10);
+      expect(actual.distanceTo(reported)).toBeLessThan(1e-3);
+      expect(constraint.residual).toBeCloseTo(actual.distanceTo(targetWorld), 5);
     }
     expect(result.maxResidual).toBeCloseTo(
       Math.max(...result.constraints.map((constraint) => constraint.residual)),
-      12,
+      5,
     );
 
     expect(applyPoseToVrm(

@@ -28,9 +28,9 @@ describe("Studio Hokusai Worker boundary", () => {
   });
 
   it("pins the packed dirty-frame protocol contract", () => {
-    expect(STUDIO_HOKUSAI_WORKER_PROTOCOL_VERSION).toBe(2);
+    expect(STUDIO_HOKUSAI_WORKER_PROTOCOL_VERSION).toBe(3);
     expect(STUDIO_HOKUSAI_WORKER_ADAPTER_VERSION).toBe(
-      "0.3.0-packed-dirty-frame-adapter.2",
+      "0.3.0-packed-dirty-frame-adapter.3-profile-routing",
     );
   });
 

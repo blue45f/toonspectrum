@@ -248,6 +248,10 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+function legacyStorage() {
+  return { legacyIndexedDb: globalThis.indexedDB } as const;
+}
+
 describe("VRM GLB validation and content identity", () => {
   const helloHash = "sha256:2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824";
 
@@ -307,11 +311,17 @@ describe("VRM IndexedDB durable identity", () => {
   it("validates before write, deduplicates by hash, and preserves the existing display metadata", async () => {
     const state = installFakeIndexedDb();
     const blob = vrmBlob(1);
-    const first = await saveVerifiedVrmBlob({ name: "First Hero.vrm", blob });
+    const first = await saveVerifiedVrmBlob(
+      { name: "First Hero.vrm", blob },
+      legacyStorage(),
+    );
     const stored = state.models.get(first.id)!;
     state.models.set(first.id, { ...stored, name: "내가 정한 이름", thumbnail: "data:image/png;base64,thumb" });
 
-    const duplicate = await saveVerifiedVrmBlob({ name: "Other Name.vrm", blob: new Blob([blob]) });
+    const duplicate = await saveVerifiedVrmBlob(
+      { name: "Other Name.vrm", blob: new Blob([blob]) },
+      legacyStorage(),
+    );
 
     expect(state.models.size).toBe(1);
     expect(state.writeCount).toBe(1);
@@ -331,7 +341,7 @@ describe("VRM IndexedDB durable identity", () => {
         name: "archive.vrm",
         blob: vrmBlob(0),
         expectedHash: `sha256:${"0".repeat(64)}`,
-      })
+      }, legacyStorage())
     ).rejects.toThrow("일치하지 않습니다");
     expect(state.requestedVersions).toEqual([]);
     expect(state.writeCount).toBe(0);
@@ -342,7 +352,7 @@ describe("VRM IndexedDB durable identity", () => {
     const invalid = legacyRecord("invalid", new Blob(["<html>"]), 1);
     const state = installFakeIndexedDb([invalid, valid]);
 
-    const listed = await listStoredVrmModels();
+    const listed = await listStoredVrmModels(legacyStorage());
 
     expect(listed).toHaveLength(2);
     expect(listed.find(({ id }) => id === "valid")?.contentHash).toMatch(/^sha256:[0-9a-f]{64}$/);
@@ -367,7 +377,7 @@ describe("VRM IndexedDB durable identity", () => {
       state.models.delete("deleted");
     };
 
-    await expect(listStoredVrmModels()).resolves.toHaveLength(3);
+    await expect(listStoredVrmModels(legacyStorage())).resolves.toHaveLength(3);
 
     expect(state.models.get("rename")).toMatchObject({ name: "새 이름", updatedAt: 2 });
     expect(state.models.get("rename")).not.toHaveProperty("contentHash");
@@ -379,9 +389,12 @@ describe("VRM IndexedDB durable identity", () => {
 
   it("looks up backfilled legacy models by canonical content hash", async () => {
     const state = installFakeIndexedDb([legacyRecord("legacy", vrmBlob(1))]);
-    const [listed] = await listStoredVrmModels();
+    const [listed] = await listStoredVrmModels(legacyStorage());
     if (!listed?.contentHash) throw new Error("Expected a backfilled content hash");
-    const found = await getStoredVrmModelByHash(listed.contentHash.toUpperCase());
+    const found = await getStoredVrmModelByHash(
+      listed.contentHash.toUpperCase(),
+      legacyStorage(),
+    );
 
     expect(found?.id).toBe("legacy");
     expect(state.models.get("legacy")?.contentHash).toBe(listed.contentHash);

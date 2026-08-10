@@ -114,9 +114,12 @@ describe("resolveStudioDrawingShortcut", () => {
     expect(resolveStudioDrawingShortcut({ code: "KeyX" })).toEqual({ type: "swap-colors" });
     expect(resolveStudioDrawingShortcut({ code: "KeyD" })).toEqual({ type: "default-colors" });
     expect(resolveStudioDrawingShortcut({ code: "KeyS" })).toEqual({ type: "cycle-stabilizer" });
-    expect(resolveStudioDrawingShortcut({ code: "KeyS", shiftKey: true })).toEqual({
-      type: "toggle-size-lock",
-    });
+    // 계약 변경(2026-08): ⇧S는 보기 리졸버가 `현재 보기 저장`으로 먼저 소비한다.
+    // 예전처럼 여기서 ⇧S를 주장하면 크기 잠금이 도달 불가 dead branch가 되므로 ⇧⌥S로 옮겼다.
+    expect(resolveStudioDrawingShortcut({ code: "KeyS", shiftKey: true })).toBeNull();
+    expect(
+      resolveStudioDrawingShortcut({ code: "KeyS", altKey: true, shiftKey: true })
+    ).toEqual({ type: "toggle-size-lock" });
     expect(resolveStudioDrawingShortcut({ code: "KeyS", altKey: true })).toEqual({
       type: "toggle-opacity-lock",
     });

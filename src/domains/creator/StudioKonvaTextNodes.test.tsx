@@ -3,7 +3,12 @@
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { buildTextPathData, normalizeTextPath } from "./studio-text-path";
+import {
+  buildTextPathData,
+  normalizeTextPath,
+  textPathAdvanceWidth,
+  textPathLength,
+} from "./studio-text-path";
 import {
   StudioKonvaStickerNode,
   StudioKonvaTextNode,
@@ -149,6 +154,38 @@ describe("StudioKonvaTextNode", () => {
       curvedEvent,
       { minFontSize: 10 },
     );
+  });
+
+  it("sizes the curved path by the measured text, not by the element box (D6)", () => {
+    // Konva TextPath는 경로 길이를 넘는 글자를 조용히 버린다 — 박스(220px)보다 긴 효과음
+    // 레터링(한글 12자 @40px ≈ 415px)이면 경로가 그만큼 길어져야 한 글자도 잃지 않는다.
+    const el = textElement({
+      fontSize: 40,
+      text: "가나다라마바사아자차카타",
+      textPath: { shape: "arcUp", curve: 70 },
+      width: 220,
+    });
+    render(<StudioKonvaTextNode {...commonProps()} el={el} />);
+
+    const curved = latest(konvaCapture.textPaths, "long curved text") as { data: string };
+    const advance = textPathAdvanceWidth({
+      text: el.text,
+      fontSize: el.fontSize,
+      fontFamily: "Pretendard, sans-serif",
+      fontStyle: "bold",
+      letterSpacing: 0,
+    });
+    expect(advance).toBeGreaterThan(el.width);
+    expect(curved.data).toBe(
+      buildTextPathData(normalizeTextPath(el.textPath), el.width, el.fontSize, advance),
+    );
+    // 박스 폭만 쓰던 시절의 경로는 233.8px(12자 중 6자)였다.
+    expect(textPathLength(normalizeTextPath(el.textPath), el.width, el.fontSize)).toBeLessThan(
+      advance,
+    );
+    expect(
+      textPathLength(normalizeTextPath(el.textPath), el.width, el.fontSize, advance),
+    ).toBeGreaterThanOrEqual(advance);
   });
 
   it("typesets vertical text as right-to-left columns with rotated latin runs", () => {
@@ -340,10 +377,11 @@ describe("StudioKonvaTextNode", () => {
     });
   });
 
-  it("skips ruby overlays for vertical text (base-only columns)", () => {
+  it("mounts upright ruby overlays beside vertical text without stealing interactions", () => {
+    const props = commonProps();
     render(
       <StudioKonvaTextNode
-        {...commonProps()}
+        {...props}
         el={textElement({
           fontSize: 20,
           text: "漢字",
@@ -355,9 +393,36 @@ describe("StudioKonvaTextNode", () => {
       />,
     );
 
-    // Vertical path paints column runs only — no smaller furigana overlay Text.
-    expect(konvaCapture.texts.every((node) => node.fontSize === 20)).toBe(true);
-    expect(konvaCapture.texts.some((node) => node.text === "かんじ")).toBe(false);
+    expect(konvaCapture.texts).toHaveLength(2);
+    expect(konvaCapture.texts[0]).toMatchObject({ text: "漢\n字", fontSize: 20 });
+    expect(konvaCapture.texts[1]).toMatchObject({
+      name: "studio-vertical-ruby",
+      text: "か\nん\nじ",
+      fontSize: 9,
+      listening: false,
+      rotation: 0,
+      wrap: "none",
+    });
+    expect(Number(konvaCapture.texts[1]!.x)).toBeGreaterThan(
+      Number(konvaCapture.texts[0]!.x) + 20,
+    );
+    const group = latest(konvaCapture.groups, "vertical ruby group");
+    expect(group.ref).toBe(props.innerRef);
+    expect(group).toMatchObject({ studioElementId: "text-1", x: 10, y: 20 });
+  });
+
+  it("renders tate-chu-yoko with the core horizontal scale in the vertical mount", () => {
+    render(
+      <StudioKonvaTextNode
+        {...commonProps()}
+        el={textElement({ fontSize: 20, text: "第12話", vertical: true })}
+      />,
+    );
+    const digits = konvaCapture.texts.find((node) => node.text === "12");
+    expect(digits).toBeDefined();
+    expect(digits).toMatchObject({ rotation: 0, lineHeight: 1, letterSpacing: 0 });
+    expect(Number(digits!.scaleX)).toBeGreaterThan(0);
+    expect(Number(digits!.scaleX)).toBeLessThanOrEqual(1);
   });
 });
 

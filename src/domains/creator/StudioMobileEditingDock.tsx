@@ -51,7 +51,11 @@ import {
 } from "./studio-draw-ux";
 import { elementLabel } from "./studio-element-label";
 import { preloadStudioInspectorDrawingSurface } from "./studio-inspector-aside-loader";
+import { localizeStudioText } from "./studio-localize-text";
 import {
+  STUDIO_MOBILE_DRAW_SHEET_COMPACT_MIN_HEIGHT,
+  STUDIO_MOBILE_DRAW_SHEET_DEFAULT_SNAP,
+  STUDIO_MOBILE_SHEET_DEFAULT_SNAP,
   studioMobileSheetSizeStyle,
   type StudioMobileSheetSnap,
 } from "./studio-mobile-sheet-snap";
@@ -103,6 +107,7 @@ import type {
 } from "./StudioBrushLibrarySheet";
 import type { StudioBrushDefaultRestoreViewState } from "./useStudioBrushBaselineController";
 
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 const ZOOM_MIN = 0.2;
@@ -196,7 +201,12 @@ function studioDrawSheetSizeStyle(
   snap: StudioMobileSheetSnap,
   keyboardInset: number,
 ): StudioDrawSheetStyle {
-  const baseSize = studioMobileSheetSizeStyle(snap, keyboardInset);
+  const baseSize = studioMobileSheetSizeStyle(
+    snap,
+    keyboardInset,
+    // Only the compact snap needs the floor; medium and full are already taller than it everywhere.
+    snap === "compact" ? STUDIO_MOBILE_DRAW_SHEET_COMPACT_MIN_HEIGHT : undefined,
+  );
   // Some compact editor breakpoints intentionally reduce the root rem size while the dock keeps
   // 44px touch targets plus borders/padding. A rem-only inset can therefore become shorter than
   // the physical dock and let the draw sheet cover its top edge. Keep a pixel floor that reflects
@@ -578,9 +588,50 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
     toggleStudioCommentPinPlacement,
     undo,
   } = stableHandlers;
-  const [drawSheetSnap, setDrawSheetSnap] = useState<StudioMobileSheetSnap>("medium");
-  const [brushManagerSheetSnap, setBrushManagerSheetSnap] =
-    useState<StudioMobileSheetSnap>("medium");
+  const t = useT();
+  // 도크 라벨은 로케일 팩 키를 우선하고, 팩이 아직 안 붙었거나 키가 없으면 저작 한국어로 되돌아온다.
+  // 기존 키가 정확히 같은 의미면 새 키를 만들지 않고 재사용한다(75개 팩 전부에 이미 번역이 있다).
+  const label = {
+    dock: localizeStudioText(t, "스튜디오 모바일 도구막대", "studio.mobileDock.label"),
+    drawingTools: localizeStudioText(t, "드로잉 도구", "studio.mobileDock.drawingTools"),
+    workspaceTools: localizeStudioText(t, "작업 공간", "studio.mobileDock.workspaceTools"),
+    select: localizeStudioText(t, "선택", "studio.settings.tool.select"),
+    pen: localizeStudioText(t, "펜", "studio.settings.tool.pen"),
+    pixel: localizeStudioText(t, "픽셀", "studio.mobileDock.tool.pixel"),
+    eraser: localizeStudioText(t, "지우개", "studio.settings.tool.eraser"),
+    fill: localizeStudioText(t, "채우기", "studio.mainMenu.item.draw.fill"),
+    shape: localizeStudioText(t, "도형", "studio.mobileDock.tool.shape"),
+    undo: localizeStudioText(t, "되돌리기", "studio.mobileDock.tool.undo"),
+    undoAria: localizeStudioText(t, "실행취소", "studio.mainMenu.item.edit.command.undo"),
+    redo: localizeStudioText(t, "다시", "studio.mobileDock.tool.redo"),
+    redoAria: localizeStudioText(t, "다시실행", "studio.mainMenu.item.edit.command.redo"),
+    brush: localizeStudioText(t, "브러시", "studio.quickStart.step.brush-kit.label"),
+    brushSettings: localizeStudioText(
+      t,
+      "브러시 설정 (굵기·색·프리셋)",
+      "studio.mobileDock.brushSettings",
+    ),
+    workspaceToggle: localizeStudioText(t, "작업", "studio.mobileDock.workspaceToggle"),
+    collapse: localizeStudioText(t, "접기", "studio.toolsCompanion.layoutSettings.collapse"),
+    expandWorkspaceTools: localizeStudioText(
+      t,
+      "작업 공간 도구 펼치기",
+      "studio.mobileDock.expandWorkspaceTools",
+    ),
+    collapseWorkspaceTools: localizeStudioText(
+      t,
+      "작업 공간 도구 접기",
+      "studio.mobileDock.collapseWorkspaceTools",
+    ),
+  };
+  // 브러시 시트는 판단 대상인 캔버스 위에 뜬다. medium 으로 열면 360×640 에서 캔버스가 126행(19.7%)만
+  // 남아 굵기를 바꿔도 결과를 볼 수 없다. compact 로 열고 그래버로 승격하게 둔다.
+  const [drawSheetSnap, setDrawSheetSnap] = useState<StudioMobileSheetSnap>(
+    STUDIO_MOBILE_DRAW_SHEET_DEFAULT_SNAP,
+  );
+  const [brushManagerSheetSnap, setBrushManagerSheetSnap] = useState<StudioMobileSheetSnap>(
+    STUDIO_MOBILE_SHEET_DEFAULT_SNAP,
+  );
   const [workspaceDockExpanded, setWorkspaceDockExpanded] = useState<boolean>(false);
   const scrollDescriptionId = useId();
   const primaryDockScrollRef = useRef<HTMLDivElement>(null);
@@ -918,6 +969,131 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
               </div>
             </div>
 
+            {/* 굵기·색이 시트의 첫 화면에 오도록 유지한다. 이 둘은 캔버스를 보면서 조절하는 값이라
+                프리셋·선 보정보다 먼저 와야 compact 스냅에서도 스크롤 없이 손이 닿는다. */}
+            {/* 굵기 + 투명도 — 큰 터치 슬라이더 */}
+            <div className="mb-2.5 space-y-2.5">
+              {drawMode !== "pixel" ? <div>
+                <span className="mb-1 flex items-center justify-between text-[0.7rem] font-medium text-fg-3">
+                  <span>{drawMode === "eraser" ? "지우개 굵기" : "굵기"}</span>
+                  <span className="tabular-nums text-fg-2">{strokeWidth}px</span>
+                </span>
+                <div className="grid grid-cols-[minmax(0,1fr)_4.5rem] items-center gap-2">
+                  <input
+                    type="range"
+                    min={STUDIO_BRUSH_SIZE_RANGE.min}
+                    max={STUDIO_BRUSH_SIZE_RANGE.max}
+                    value={strokeWidth}
+                    onChange={(e) => setStrokeWidth(Number(e.target.value))}
+                    className="h-11 w-full accent-accent"
+                    aria-label="브러시 굵기 슬라이더"
+                  />
+                  <label className="sr-only" htmlFor="mobile-brush-width">브러시 굵기 숫자</label>
+                  <input
+                    id="mobile-brush-width"
+                    type="number"
+                    min={STUDIO_BRUSH_SIZE_RANGE.min}
+                    max={STUDIO_BRUSH_SIZE_RANGE.max}
+                    inputMode="numeric"
+                    value={strokeWidth}
+                    onChange={(event) =>
+                      setStrokeWidth(
+                        Math.min(
+                          STUDIO_BRUSH_SIZE_RANGE.max,
+                          Math.max(
+                            STUDIO_BRUSH_SIZE_RANGE.min,
+                            Number(event.target.value) || STUDIO_BRUSH_SIZE_RANGE.min
+                          )
+                        )
+                      )
+                    }
+                    className="min-h-11 w-full rounded-lg border border-line bg-card px-2 text-center text-xs tabular-nums text-fg outline-none focus:border-accent"
+                  />
+                </div>
+              </div> : null}
+              {drawMode !== "eraser" && (
+                <div>
+                  <span className="mb-1 flex items-center justify-between text-[0.7rem] font-medium text-fg-3">
+                    <span>투명도</span>
+                    <span className="tabular-nums text-fg-2">{Math.round(brushOpacity * 100)}%</span>
+                  </span>
+                  <div className="grid grid-cols-[minmax(0,1fr)_4.5rem] items-center gap-2">
+                    <input
+                      type="range"
+                      min={STUDIO_BRUSH_OPACITY_RANGE.min * 100}
+                      max={STUDIO_BRUSH_OPACITY_RANGE.max * 100}
+                      step={1}
+                      value={Math.round(brushOpacity * 100)}
+                      onChange={(e) => setBrushOpacity(Number(e.target.value) / 100)}
+                      className="h-11 w-full accent-accent"
+                      aria-label="브러시 투명도 슬라이더"
+                    />
+                    <label className="sr-only" htmlFor="mobile-brush-opacity">브러시 투명도 숫자</label>
+                    <input
+                      id="mobile-brush-opacity"
+                      type="number"
+                      min={STUDIO_BRUSH_OPACITY_RANGE.min * 100}
+                      max={STUDIO_BRUSH_OPACITY_RANGE.max * 100}
+                      step={1}
+                      inputMode="numeric"
+                      value={Math.round(brushOpacity * 100)}
+                      onChange={(event) =>
+                        setBrushOpacity(
+                          Math.min(
+                            STUDIO_BRUSH_OPACITY_RANGE.max * 100,
+                            Math.max(
+                              STUDIO_BRUSH_OPACITY_RANGE.min * 100,
+                              Number(event.target.value) || STUDIO_BRUSH_OPACITY_RANGE.min * 100
+                            )
+                          ) / 100
+                        )
+                      }
+                      className="min-h-11 w-full rounded-lg border border-line bg-card px-2 text-center text-xs tabular-nums text-fg outline-none focus:border-accent"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 색상 — 지우개에선 의미 없으니 숨김 */}
+            {drawMode !== "eraser" && (
+              <div className="mb-2.5">
+                <p className="mb-1 text-[0.7rem] font-medium text-fg-3">색상</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  {DRAW_COLOR_SWATCHES.map((swatch) => (
+                    <button
+                      key={swatch}
+                      type="button"
+                      onClick={() => setColor(swatch)}
+                      aria-label={`색상 ${swatch}`}
+                      aria-pressed={color.toLowerCase() === swatch.toLowerCase()}
+                      className={cn(
+                        "size-11 rounded-xl transition-transform active:scale-95",
+                        color.toLowerCase() === swatch.toLowerCase()
+                          ? "ring-2 ring-accent ring-offset-2 ring-offset-panel"
+                          : "border border-line/60"
+                      )}
+                      style={{ background: swatch }}
+                    />
+                  ))}
+                  <label
+                    className="relative grid size-11 cursor-pointer place-items-center overflow-hidden rounded-xl border border-line shadow-sm"
+                    title="사용자 정의 색상"
+                    style={{ background: color }}
+                  >
+                    <input
+                      type="color"
+                      value={color}
+                      onChange={(e) => setColor(e.target.value)}
+                      aria-label="사용자 정의 브러시 색상"
+                      className="absolute inset-[-1px] h-[calc(100%+2px)] w-[calc(100%+2px)] cursor-pointer opacity-0"
+                    />
+                    <Palette size={14} className="text-white mix-blend-difference" aria-hidden />
+                  </label>
+                </div>
+              </div>
+            )}
+
             {/* 모드 전환 — 일반 브러시와 1px raw 픽셀 도구를 같은 것으로 오인하지 않게 분리한다. */}
             <div className="mb-2.5 grid grid-cols-4 gap-1 rounded-xl border border-line bg-card/60 p-1" role="group" aria-label="그리기 모드">
               {([
@@ -1053,13 +1229,14 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 </div>
                 {livingInk.supported ? (
                   <section
-                    aria-label="Living Ink 빠른 도구"
+                    aria-label="수채 번짐 빠른 도구"
                     data-studio-mobile-living-ink="true"
-                    className="mb-2.5 rounded-2xl border border-cyan-400/20 bg-cyan-500/5 p-2"
+                    data-studio-brush-behavior="wash"
+                    className="mb-2.5 rounded-2xl border border-line/70 bg-card/70 p-2"
                   >
                     <div className="mb-1.5 flex items-center justify-between gap-2 px-0.5">
-                      <p className="text-[0.68rem] font-bold text-fg-2">Living Ink</p>
-                      <p className="text-[0.6rem] text-fg-3">잉크 · 물 · 정착 · 지우기</p>
+                      <p className="text-[0.68rem] font-bold text-fg-2">수채 번짐</p>
+                      <p className="text-[0.6rem] text-fg-3">안료 · 물 · 정착 · 지우기 · 크기·농도는 위와 동일</p>
                     </div>
                     <div className="overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                       <StudioLivingInkControls {...livingInk} />
@@ -1068,129 +1245,6 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 ) : null}
               </>
             )}
-
-            {/* 색상 — 지우개에선 의미 없으니 숨김 */}
-            {drawMode !== "eraser" && (
-              <div className="mb-2.5">
-                <p className="mb-1 text-[0.7rem] font-medium text-fg-3">색상</p>
-                <div className="flex flex-wrap items-center gap-2">
-                  {DRAW_COLOR_SWATCHES.map((swatch) => (
-                    <button
-                      key={swatch}
-                      type="button"
-                      onClick={() => setColor(swatch)}
-                      aria-label={`색상 ${swatch}`}
-                      aria-pressed={color.toLowerCase() === swatch.toLowerCase()}
-                      className={cn(
-                        "size-11 rounded-xl transition-transform active:scale-95",
-                        color.toLowerCase() === swatch.toLowerCase()
-                          ? "ring-2 ring-accent ring-offset-2 ring-offset-panel"
-                          : "border border-line/60"
-                      )}
-                      style={{ background: swatch }}
-                    />
-                  ))}
-                  <label
-                    className="relative grid size-11 cursor-pointer place-items-center overflow-hidden rounded-xl border border-line shadow-sm"
-                    title="사용자 정의 색상"
-                    style={{ background: color }}
-                  >
-                    <input
-                      type="color"
-                      value={color}
-                      onChange={(e) => setColor(e.target.value)}
-                      aria-label="사용자 정의 브러시 색상"
-                      className="absolute inset-[-1px] h-[calc(100%+2px)] w-[calc(100%+2px)] cursor-pointer opacity-0"
-                    />
-                    <Palette size={14} className="text-white mix-blend-difference" aria-hidden />
-                  </label>
-                </div>
-              </div>
-            )}
-
-            {/* 굵기 + 투명도 — 큰 터치 슬라이더 */}
-            <div className="space-y-2.5">
-              {drawMode !== "pixel" ? <div>
-                <span className="mb-1 flex items-center justify-between text-[0.7rem] font-medium text-fg-3">
-                  <span>{drawMode === "eraser" ? "지우개 굵기" : "굵기"}</span>
-                  <span className="tabular-nums text-fg-2">{strokeWidth}px</span>
-                </span>
-                <div className="grid grid-cols-[minmax(0,1fr)_4.5rem] items-center gap-2">
-                  <input
-                    type="range"
-                    min={STUDIO_BRUSH_SIZE_RANGE.min}
-                    max={STUDIO_BRUSH_SIZE_RANGE.max}
-                    value={strokeWidth}
-                    onChange={(e) => setStrokeWidth(Number(e.target.value))}
-                    className="h-11 w-full accent-accent"
-                    aria-label="브러시 굵기 슬라이더"
-                  />
-                  <label className="sr-only" htmlFor="mobile-brush-width">브러시 굵기 숫자</label>
-                  <input
-                    id="mobile-brush-width"
-                    type="number"
-                    min={STUDIO_BRUSH_SIZE_RANGE.min}
-                    max={STUDIO_BRUSH_SIZE_RANGE.max}
-                    inputMode="numeric"
-                    value={strokeWidth}
-                    onChange={(event) =>
-                      setStrokeWidth(
-                        Math.min(
-                          STUDIO_BRUSH_SIZE_RANGE.max,
-                          Math.max(
-                            STUDIO_BRUSH_SIZE_RANGE.min,
-                            Number(event.target.value) || STUDIO_BRUSH_SIZE_RANGE.min
-                          )
-                        )
-                      )
-                    }
-                    className="min-h-11 w-full rounded-lg border border-line bg-card px-2 text-center text-xs tabular-nums text-fg outline-none focus:border-accent"
-                  />
-                </div>
-              </div> : null}
-              {drawMode !== "eraser" && (
-                <div>
-                  <span className="mb-1 flex items-center justify-between text-[0.7rem] font-medium text-fg-3">
-                    <span>투명도</span>
-                    <span className="tabular-nums text-fg-2">{Math.round(brushOpacity * 100)}%</span>
-                  </span>
-                  <div className="grid grid-cols-[minmax(0,1fr)_4.5rem] items-center gap-2">
-                    <input
-                      type="range"
-                      min={STUDIO_BRUSH_OPACITY_RANGE.min * 100}
-                      max={STUDIO_BRUSH_OPACITY_RANGE.max * 100}
-                      step={1}
-                      value={Math.round(brushOpacity * 100)}
-                      onChange={(e) => setBrushOpacity(Number(e.target.value) / 100)}
-                      className="h-11 w-full accent-accent"
-                      aria-label="브러시 투명도 슬라이더"
-                    />
-                    <label className="sr-only" htmlFor="mobile-brush-opacity">브러시 투명도 숫자</label>
-                    <input
-                      id="mobile-brush-opacity"
-                      type="number"
-                      min={STUDIO_BRUSH_OPACITY_RANGE.min * 100}
-                      max={STUDIO_BRUSH_OPACITY_RANGE.max * 100}
-                      step={1}
-                      inputMode="numeric"
-                      value={Math.round(brushOpacity * 100)}
-                      onChange={(event) =>
-                        setBrushOpacity(
-                          Math.min(
-                            STUDIO_BRUSH_OPACITY_RANGE.max * 100,
-                            Math.max(
-                              STUDIO_BRUSH_OPACITY_RANGE.min * 100,
-                              Number(event.target.value) || STUDIO_BRUSH_OPACITY_RANGE.min * 100
-                            )
-                          ) / 100
-                        )
-                      }
-                      className="min-h-11 w-full rounded-lg border border-line bg-card px-2 text-center text-xs tabular-nums text-fg outline-none focus:border-accent"
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
 
             {drawMode === "pen" ? (
               <div
@@ -1404,7 +1458,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
             1행: 그리기 도구(선택·펜·지우개·채우기·도형·실행취소·다시·브러시). 2행: 보조 내비(페이지·추가·속성·줌). */}
         {isMobile && (
           <nav
-            aria-label="스튜디오 모바일 도구막대"
+            aria-label={label.dock}
             data-studio-mobile-editing-dock="true"
             data-studio-mobile-dock-expanded={workspaceDockExpanded ? "true" : "false"}
             onFocusCapture={(event) => {
@@ -1424,13 +1478,13 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 ref={primaryDockScrollRef}
                 className="flex min-w-0 touch-pan-x items-stretch gap-0.5 overflow-x-auto overscroll-x-contain pr-1 [scrollbar-width:none] min-[360px]:gap-1 [&::-webkit-scrollbar]:hidden"
                 role="toolbar"
-                aria-label="드로잉 도구"
+                aria-label={label.drawingTools}
                 aria-describedby={`${scrollDescriptionId}-primary`}
                 data-studio-mobile-dock-scroll="primary"
               >
               <StudioDockButton
                 icon={MousePointer2}
-                label="선택"
+                label={label.select}
                 hintDescription="요소를 선택해 이동·크기 조절·정렬하고 속성 패널에서 세부 값을 편집합니다."
                 hintShortcut="V"
                 active={selectionModeActive}
@@ -1445,7 +1499,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
               <span aria-hidden className="my-1 w-px self-stretch bg-line/70" />
               <StudioDockButton
                 icon={Pencil}
-                label="펜"
+                label={label.pen}
                 hintDescription={penModeActive
                   ? drawSettingsOpen
                     ? "열려 있는 브러시 설정을 닫고 펜으로 그리던 캔버스로 돌아갑니다."
@@ -1472,7 +1526,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
               />
               <StudioDockButton
                 icon={Grid3X3}
-                label="픽셀"
+                label={label.pixel}
                 hintDescription={pixelModeActive
                   ? drawSettingsOpen
                     ? "픽셀 펜 설정을 닫고 1px 도트 작업으로 돌아갑니다."
@@ -1499,7 +1553,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
               />
               <StudioDockButton
                 icon={Eraser}
-                label="지우개"
+                label={label.eraser}
                 hintDescription="현재 레이어의 획을 지웁니다. 브러시 크기와 불투명도 설정을 그대로 활용합니다."
                 hintShortcut="E"
                 active={tool === "draw" && drawMode === "eraser"}
@@ -1515,7 +1569,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
               />
               <StudioDockButton
                 icon={PaintBucket}
-                label="채우기"
+                label={label.fill}
                 hintDescription={advancedFillUnsupportedReason
                   ? `${advancedFillUnsupportedReason} 눌러서 안전한 단일 래스터 후보를 찾거나 필요한 조건을 확인하세요.`
                   : "래스터의 닫힌 영역을 탭해 색을 채웁니다. 경계와 참조 범위는 채우기 속성에서 조절합니다."}
@@ -1534,7 +1588,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
               />
               <StudioDockButton
                 icon={Square}
-                label="도형"
+                label={label.shape}
                 hintDescription={shapeModeActive
                   ? drawSettingsOpen
                     ? "열려 있는 도형 설정을 닫고 캔버스로 돌아가 현재 도형을 계속 배치합니다."
@@ -1561,7 +1615,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
               <span aria-hidden className="my-1 w-px self-stretch bg-line/70" />
               <StudioDockButton
                 icon={Undo2}
-                label="되돌리기"
+                label={label.undo}
                 hintDescription="마지막 편집을 한 단계 되돌립니다. 공동 작업 변경 이력과 함께 안전하게 이동합니다."
                 hintUnavailableReason={undoDisabled ? undoUnavailableTitle : undefined}
                 disabled={undoDisabled}
@@ -1570,11 +1624,11 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                   setWorkspaceDockExpanded(false);
                   undo();
                 }}
-                aria-label="실행취소"
+                aria-label={label.undoAria}
               />
               <StudioDockButton
                 icon={Redo2}
-                label="다시"
+                label={label.redo}
                 hintDescription="되돌린 편집을 한 단계 다시 적용합니다."
                 hintUnavailableReason={redoDisabled ? redoUnavailableTitle : undefined}
                 disabled={redoDisabled}
@@ -1583,12 +1637,12 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                   setWorkspaceDockExpanded(false);
                   redo();
                 }}
-                aria-label="다시실행"
+                aria-label={label.redoAria}
               />
               <span aria-hidden className="my-1 w-px self-stretch bg-line/70" />
               <StudioDockButton
                 ref={mobileBrushDockButtonRef}
-                label="브러시"
+                label={label.brush}
                 hintDescription={drawSettingsOpen
                   ? "열려 있는 브러시 설정을 닫고 캔버스로 돌아갑니다."
                   : "브러시 설정을 열어 굵기·불투명도·색·보정·프리셋을 한곳에서 조절합니다."}
@@ -1596,7 +1650,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 hintPreviewVariant={drawSettingsOpen ? "collapse" : "expand"}
                 aria-expanded={drawSettingsOpen}
                 aria-controls={MOBILE_DRAW_SETTINGS_ID}
-                aria-label="브러시 설정 (굵기·색·프리셋)"
+                aria-label={label.brushSettings}
                 onPointerEnter={() => void loadStudioBrushStudio()}
                 onFocus={(event) => {
                   void loadStudioBrushStudio();
@@ -1625,7 +1679,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 type="button"
                 aria-controls={MOBILE_WORKSPACE_TOOLS_ID}
                 aria-expanded={workspaceDockExpanded}
-                aria-label={workspaceDockExpanded ? "작업 공간 도구 접기" : "작업 공간 도구 펼치기"}
+                aria-label={workspaceDockExpanded ? label.collapseWorkspaceTools : label.expandWorkspaceTools}
                 title={workspaceDockExpanded ? "작업 공간 도구 접기" : "댓글·페이지·레이어·줌 도구 펼치기"}
                 data-studio-mobile-workspace-toggle="true"
                 onFocus={preloadStudioInspectorDrawingSurface}
@@ -1645,7 +1699,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 ) : (
                   <ChevronUp size={17} strokeWidth={2} aria-hidden />
                 )}
-                <span>{workspaceDockExpanded ? "접기" : "작업"}</span>
+                <span>{workspaceDockExpanded ? label.collapse : label.workspaceToggle}</span>
                 {!workspaceDockExpanded && workspaceDockHasActiveTool ? (
                   <span
                     aria-hidden
@@ -1666,7 +1720,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
               hidden={!workspaceDockExpanded}
               className="flex min-w-0 items-stretch overflow-hidden border-t border-line/60 pt-1"
               role="toolbar"
-              aria-label="작업 공간"
+              aria-label={label.workspaceTools}
               aria-describedby={`${scrollDescriptionId}-secondary`}
               data-studio-mobile-control-side={mobileControlSide}
             >

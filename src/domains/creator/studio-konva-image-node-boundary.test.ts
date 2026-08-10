@@ -154,6 +154,7 @@ const IMAGE_NODE_PROPS = [
   "liveStrokeRef",
   "onHokusaiCanonicalImageReady",
   "onLivingInkCanonicalImageReady",
+  "rasterPresentationEligible",
 ] as const;
 
 const MOVED_DECLARATIONS = [
@@ -189,7 +190,7 @@ describe("Studio Konva image node boundary", () => {
     expect(page.source).not.toMatch(/\bUrlImage\b/u);
   });
 
-  it("preserves the exact twelve-prop effective image call contract", () => {
+  it("preserves the exact thirteen-prop effective image call contract", () => {
     const viewport = moduleShape("./StudioCanvasViewport.tsx");
     const imageNode = moduleShape("./StudioKonvaImageNode.tsx");
     const contract = propertyNames(
@@ -213,6 +214,8 @@ describe("Studio Konva image node boundary", () => {
       .toBe("{onHokusaiCanonicalImageReady}");
     expect(attributes.get("onLivingInkCanonicalImageReady"))
       .toBe("{onLivingInkCanonicalImageReady}");
+    expect(attributes.get("rasterPresentationEligible"))
+      .toBe("{!isNonInteractiveRender}");
   });
 
   it("keeps filters and the worker behind literal image-node intent boundaries", () => {
@@ -239,17 +242,34 @@ describe("Studio Konva image node boundary", () => {
     ).toBe(false);
   });
 
-  it("retains cache, worker abort, GIF, flip, and auto-fit mechanics verbatim", () => {
+  it("retains cache, worker abort, GIF, retained-source flip, and auto-fit mechanics", () => {
     const source = moduleShape("./StudioKonvaImageNode.tsx").source;
 
     expect(source).toContain("const IMAGE_FILTER_BUILD_CACHE_LIMIT = 200;");
     expect(source).toContain("const imageFilterBuildCache = new Map<string, ImageFilterBuild>();");
     expect(source).toContain("mod.registerStudioKonvaFilters(KonvaRuntime);");
     expect(source).toContain("controller.abort();");
+    expect(source).toContain(
+      "const filterRequestAtRef = useRef(Number.NEGATIVE_INFINITY);"
+    );
     expect(source).toContain("globalThis.cancelAnimationFrame(raf)");
     expect(source).toContain("if (el.frames && el.frames.length > 1) return;");
     expect(source).toContain("if (!liveStrokeRef?.current && now - lastDrawAt >= FRAME_INTERVAL_MS)");
-    expect(source).toContain("cx.scale(scaleX, scaleY);");
+    expect(source).toContain("function createStudioRasterFlippedDisplaySource(");
+    expect(source).toContain(
+      'context.translate(scaleX === -1 ? width : 0, scaleY === -1 ? height : 0);'
+    );
+    expect(source).toContain("context.scale(scaleX, scaleY);");
+    expect(source).toContain("context.drawImage(source, 0, 0);");
+    expect(source).toContain(
+      "commitDisplayImage(createStudioRasterFlippedDisplaySource(img, flipped, flippedY));"
+    );
+    expect(source).toContain("?? currentGpuFilteredCanvas");
+    expect(source).toContain(
+      "? (showComputedCanvas ? visibleComputedCanvas! : displayImg)"
+    );
+    expect(source).toContain('layer.on("draw.studioRasterPresentation", acknowledgeAfterDraw);');
+    expect(source).toContain("node.image() !== rasterPresentationSource");
     expect(source).toContain(
       "node.cache(cachePad > 0 ? { offset: cachePad } : { pixelRatio: filterDensity });"
     );

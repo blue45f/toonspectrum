@@ -22,6 +22,9 @@ function fakeStorage(initial: Record<string, string> = {}) {
     setItem: (key: string, value: string) => {
       data.set(key, value);
     },
+    removeItem: (key: string) => {
+      data.delete(key);
+    },
   };
 }
 
@@ -33,10 +36,12 @@ const noopChange = (_next: StudioAiSettings) => {
 describe("StudioIntegrationsSettingsPanel mount-time render contract", () => {
   afterEach(() => {
     Reflect.deleteProperty(globalThis, "localStorage");
+    Reflect.deleteProperty(globalThis, "sessionStorage");
   });
 
   it("renders both the AI assist section and the Unsplash section, unconfigured by default", () => {
     globalThis.localStorage = fakeStorage() as unknown as Storage;
+    globalThis.sessionStorage = fakeStorage() as unknown as Storage;
 
     const html = renderToStaticMarkup(
       <StudioIntegrationsSettingsPanel aiSettings={STUDIO_AI_DEFAULT_SETTINGS} onAiSettingsChange={noopChange} />
@@ -51,7 +56,7 @@ describe("StudioIntegrationsSettingsPanel mount-time render contract", () => {
     // 무료 스톡 이미지(Unsplash) 섹션 — 헤더·미등록 상태.
     expect(html).toContain("무료 스톡 이미지 (Unsplash)");
     expect(html).toContain("Unsplash Access Key");
-    expect(html).toContain("AI 키는 현재 탭 세션에만");
+    expect(html).toContain("AI 키와 Unsplash 키는 현재 탭 세션에만");
     expect(html).toContain("min-h-11 w-full");
     expect(html).toContain("size-11");
     expect(html).not.toContain("Access Key 등록됨");
@@ -59,6 +64,9 @@ describe("StudioIntegrationsSettingsPanel mount-time render contract", () => {
 
   it("reflects a saved AI API key and a saved Unsplash Access Key", () => {
     globalThis.localStorage = fakeStorage({
+      [STUDIO_STOCK_IMAGE_ACCESS_KEY_STORAGE_KEY]: "legacy-key-must-not-import",
+    }) as unknown as Storage;
+    globalThis.sessionStorage = fakeStorage({
       [STUDIO_STOCK_IMAGE_ACCESS_KEY_STORAGE_KEY]: "unsplash-existing-key",
     }) as unknown as Storage;
     const aiSettings: StudioAiSettings = { ...STUDIO_AI_DEFAULT_SETTINGS, apiKey: "sk-test-123" };
@@ -70,8 +78,9 @@ describe("StudioIntegrationsSettingsPanel mount-time render contract", () => {
     // AI 섹션에 전달한 apiKey가 (마스킹되어도) 실제로 그 값으로 채워졌는지 — type="password" 필드라
     // 화면엔 점으로 보이지만 DOM value 속성 자체엔 원문이 들어간다.
     expect(html).toContain('value="sk-test-123"');
-    // 스톡 이미지 섹션도 storage에서 읽은 키를 그대로 반영해 "등록됨" 배지가 뜬다.
+    // 스톡 이미지 섹션은 현재 탭의 sessionStorage 값만 반영해 "등록됨" 배지가 뜬다.
     expect(html).toContain("Access Key 등록됨");
     expect(html).toContain('value="unsplash-existing-key"');
+    expect(html).not.toContain("legacy-key-must-not-import");
   });
 });

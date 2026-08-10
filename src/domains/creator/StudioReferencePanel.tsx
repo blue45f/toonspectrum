@@ -652,9 +652,9 @@ export function StudioReferencePanel({
       panelDragListenersRef.current = null;
     };
     panelDragListenersRef.current = { onMove, onEnd };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onEnd);
-    window.addEventListener("pointercancel", onEnd);
+    window.addEventListener("pointermove", onMove, { passive: true });
+    window.addEventListener("pointerup", onEnd, { passive: true });
+    window.addEventListener("pointercancel", onEnd, { passive: true });
   }
 
   function resizeByKeyboard(event: KeyboardEvent<HTMLButtonElement>): void {

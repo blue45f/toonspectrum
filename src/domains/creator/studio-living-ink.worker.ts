@@ -16,6 +16,10 @@ import {
   parseStudioLivingInkExecutionOperation,
 } from "./studio-living-ink-execution-validation";
 import { StudioLivingInkWebGl2Runtime } from "./studio-living-ink-webgl2-runtime";
+import {
+  tryCreateStudioLivingInkWebGpuRuntime,
+  type StudioLivingInkWebGpuRuntime,
+} from "./studio-living-ink-webgpu-runtime";
 
 import type { StudioLivingInkOperation } from "./studio-living-ink-field";
 
@@ -31,6 +35,8 @@ interface JournalEntry {
   readonly options: StudioLivingInkExecutionApplyOptions;
 }
 
+type StudioLivingInkWorkerRuntime = StudioLivingInkWebGl2Runtime | StudioLivingInkWebGpuRuntime;
+
 type StudioLivingInkWorkerResponsePayload = StudioLivingInkWorkerResponse extends infer Response
   ? Response extends StudioLivingInkWorkerResponse
     ? Omit<Response, "version" | "requestId">
@@ -41,7 +47,7 @@ const workerScope = globalThis as unknown as LivingInkWorkerScope;
 const cancelledRequests = new Set<number>();
 const cancelAcknowledgements = new Map<number, number>();
 const queuedApplyRequests = new Set<number>();
-let runtime: StudioLivingInkWebGl2Runtime | null = null;
+let runtime: StudioLivingInkWorkerRuntime | null = null;
 let config: StudioLivingInkExecutionConfig | null = null;
 let journal: JournalEntry[] = [];
 let queue = Promise.resolve();
@@ -114,7 +120,7 @@ function isRequest(value: unknown): value is StudioLivingInkWorkerRequest {
   return false;
 }
 
-function probeCapabilities(): StudioLivingInkExecutionCapabilities {
+function probeWebGl2Capabilities(): StudioLivingInkExecutionCapabilities {
   if (typeof OffscreenCanvas !== "function") throw new Error("OffscreenCanvas is unavailable.");
   const canvas = new OffscreenCanvas(8, 8);
   const gl = canvas.getContext("webgl2", {
@@ -127,18 +133,66 @@ function probeCapabilities(): StudioLivingInkExecutionCapabilities {
   if (!gl || !gl.getExtension("EXT_color_buffer_float")) {
     throw new Error("Worker WebGL2 half-float rendering is unavailable.");
   }
+  const webgpu = Boolean((globalThis as { navigator?: { gpu?: GPU } }).navigator?.gpu);
   return Object.freeze({
-    backend: "webgl2-offscreen-half-float",
+    backend: webgpu ? "webgpu-offscreen-half-float" : "webgl2-offscreen-half-float",
     worker: true,
     offscreenCanvas: true,
     webgl2: true,
+    webgpu,
     halfFloatRenderable: true,
     rgba16Float: true,
     rg16Float: true,
     r16Float: true,
     maximumTextureSize: gl.getParameter(gl.MAX_TEXTURE_SIZE) as number,
-    pressureIterations: Object.freeze({ interactive: 10, settle: 22 }),
+    pressureIterations: Object.freeze({
+      interactive: STUDIO_LIVING_INK_EXECUTION_LIMITS.interactivePressureIterations,
+      settle: STUDIO_LIVING_INK_EXECUTION_LIMITS.settlePressureIterations,
+    }),
   });
+}
+
+function probeCapabilities(): StudioLivingInkExecutionCapabilities {
+  return probeWebGl2Capabilities();
+}
+
+/**
+ * Backend preference policy: **picture first, frame time second.**
+ *
+ * The material policy for this studio is explicit that handfeel and texture outrank throughput, and
+ * that performance may only ever veto — never win on its own. This function is where that ordering
+ * becomes code, because it is the only place a user's backend is chosen.
+ *
+ * The WGSL field runtime is roughly twice as fast as the GLSL one (7.7 ms against 14.7 ms per
+ * interactive operation on the reference Chromium probe). That is not, by itself, a reason to give
+ * anyone that runtime. When the WGSL display resolve was a bare `exp(-density)` it measured 0 paper
+ * texture standard deviation against the GLSL runtime's 3.6, and 0.67 ink darkness against 22.8 —
+ * so on a machine with a WebGPU adapter, "faster" meant "visibly worse", and the user had no way
+ * back. The preference is therefore conditional, and the condition is a demonstration rather than a
+ * capability flag: `tryCreateStudioLivingInkWebGpuRuntime` admits the WGSL runtime only after it
+ * has drawn a reference stroke on textured paper and measured both signals
+ * (`STUDIO_LIVING_INK_WGSL_ADMISSION`). A runtime that cannot meet those floors is disposed and
+ * this function falls through to WebGL2, whatever the adapter says it supports.
+ *
+ * The inverse direction matters just as much: WGSL must stay reachable, because on a machine
+ * without a usable WebGL2 context a faint picture is still better than no picture. So this ladder
+ * is "prove, else WebGL2, else WGSL-as-last-resort" — never "WebGL2 only".
+ *
+ * Flip conditions, both directions, in one place:
+ *  - WGSL is preferred while it passes the admission proof at runtime *and* the WebGPU lane of
+ *    `pnpm run verify:studio-living-ink-execution` reports `failures: []` — that lane runs the same
+ *    visual gates as the certified WebGL2 lane, so an empty list is the parity evidence.
+ *  - WGSL is demoted the moment either of those stops holding. Raising the admission floors toward
+ *    the GLSL-measured values (paper stddev ~3.6, stroke darkness ~22.8) is the intended way to
+ *    tighten this over time; lowering them to keep the faster backend is the one change this
+ *    comment exists to forbid.
+ */
+async function createPreferredRuntime(
+  nextConfig: StudioLivingInkExecutionConfig,
+): Promise<StudioLivingInkWorkerRuntime> {
+  const webgpu = await tryCreateStudioLivingInkWebGpuRuntime(nextConfig);
+  if (webgpu) return webgpu;
+  return new StudioLivingInkWebGl2Runtime(nextConfig);
 }
 
 async function yieldControl(): Promise<void> {
@@ -149,7 +203,7 @@ async function rebuildAcceptedJournal(): Promise<void> {
   if (!config) throw new Error("Living Ink cannot rebuild before initialization.");
   runtime?.dispose();
   runtime = null;
-  const replacement = new StudioLivingInkWebGl2Runtime(config);
+  const replacement = await createPreferredRuntime(config);
   try {
     for (let index = 0; index < journal.length; index += 1) {
       const entry = journal[index]!;
@@ -160,7 +214,7 @@ async function rebuildAcceptedJournal(): Promise<void> {
         () => false,
         yieldControl,
       );
-      if (applied.kind !== "living-ink/applied") {
+      if (!("kind" in applied) || applied.kind !== "living-ink/applied") {
         throw new Error("Living Ink journal replay unexpectedly produced a presentation frame.");
       }
     }
@@ -282,7 +336,7 @@ async function handle(request: StudioLivingInkWorkerRequest): Promise<void> {
       }
       runtime?.dispose();
       config = parsed.value;
-      runtime = new StudioLivingInkWebGl2Runtime(config);
+      runtime = await createPreferredRuntime(config);
       journal = [];
       disposed = false;
       message(request.requestId, { type: "living-ink/ready", capabilities: runtime.capabilities });

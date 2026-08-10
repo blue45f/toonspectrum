@@ -5,7 +5,7 @@
  * Both overlays are loaded only when their corresponding tool is active so
  * the animation/rendering code does not inflate the Studio route bootstrap.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Circle, Group, Image as KonvaImage, Line, Rect } from "react-konva/lib/ReactKonvaCore";
 
 import {
@@ -24,6 +24,7 @@ import {
   type NodeEditHandle,
   type NodeEditTool,
 } from "./studio-node-edit";
+import { mirrorStudioDrawSelectionIndicators } from "./studio-selection-chrome-mirror";
 import {
   brushStrokePreview,
   marchingAntsPasses,
@@ -37,6 +38,7 @@ import {
 
 import type { DrawEl } from "./studio-element-model";
 import type { OnionSkinLayer } from "./studio-frame-animation";
+import type Konva from "konva";
 
 function selectionModePreviewColors(
   mode: SelectionCombineMode
@@ -414,6 +416,9 @@ export interface StudioDrawSelectionOverlayProps {
   scale: number;
 }
 
+/** Name on each per-element indicator group, for scene-graph assertions and perf probes. */
+export const STUDIO_DRAW_SELECTION_INDICATOR_NAME = "studio-draw-selection-indicator";
+
 /**
  * Dashed "selected" boxes for draw(선화) elements.
  *
@@ -421,26 +426,56 @@ export interface StudioDrawSelectionOverlayProps {
  * so without this overlay a selected stroke shows no on-canvas selection chrome at all. Styling
  * mirrors the locked-element dashed rect in StudioPage (same accent, stroke and dash rhythm),
  * and everything is zoom-compensated so the indicator keeps a constant screen weight.
+ *
+ * **Live drag mirroring.** `drawSelectionIndicatorBox` measures `el.points`, which are document
+ * state and therefore frozen for the whole drag — the wrapper node is translated imperatively by
+ * Konva and only bakes its offset into `points` at drag end. Rendering the box from points alone
+ * left the indicator standing still while the stroke moved (measured: 227px of divergence over a
+ * 233px drag, never converging until pointer-up).
+ *
+ * So each indicator lives in its own group whose position mirrors the wrapper's live x/y through
+ * Konva's own `xChange`/`yChange` events. Those fire synchronously inside `Node._setAttr`, before
+ * the drag's `_requestDraw`, so the indicator and the ink land in the *same* rasterized frame with
+ * zero React commits — the same imperative discipline `translateGroupPreview` already uses for the
+ * multi-select overlay, and consistent with the hot-path de-React contract.
  */
 export function StudioDrawSelectionOverlay({ els, scale }: StudioDrawSelectionOverlayProps) {
+  const indicatorRefs = useRef(new Map<string, Konva.Group>());
+  // Identity of the mirrored set; re-subscribes when the selection itself changes.
+  const selectionKey = els.map((el) => el.id).join(" ");
+
+  useLayoutEffect(
+    () => mirrorStudioDrawSelectionIndicators(indicatorRefs.current),
+    [selectionKey]
+  );
+
   return (
     <Group listening={false}>
       {els.map((el) => {
         const box = drawSelectionIndicatorBox(el, { scale });
         if (!box) return null;
         return (
-          <Rect
+          <Group
             key={el.id}
-            x={box.x}
-            y={box.y}
-            width={box.width}
-            height={box.height}
-            stroke={DRAW_SELECTION_ACCENT}
-            strokeWidth={1.5 / scale}
-            dash={[7 / scale, 4 / scale]}
+            name={STUDIO_DRAW_SELECTION_INDICATOR_NAME}
             listening={false}
-            perfectDrawEnabled={false}
-          />
+            ref={(node: Konva.Group | null) => {
+              if (node) indicatorRefs.current.set(el.id, node);
+              else indicatorRefs.current.delete(el.id);
+            }}
+          >
+            <Rect
+              x={box.x}
+              y={box.y}
+              width={box.width}
+              height={box.height}
+              stroke={DRAW_SELECTION_ACCENT}
+              strokeWidth={1.5 / scale}
+              dash={[7 / scale, 4 / scale]}
+              listening={false}
+              perfectDrawEnabled={false}
+            />
+          </Group>
         );
       })}
     </Group>

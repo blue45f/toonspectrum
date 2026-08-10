@@ -12,6 +12,11 @@ import {
 } from "./src/app/studio-cross-origin-isolation";
 
 const apiTarget = process.env.NEST_API_URL ?? "http://127.0.0.1:4001";
+// Chunks that must never be pulled into the entry document's <link rel="modulepreload"> set.
+// A modulepreload is a highest-priority fetch on every route, so anything here competes with the
+// entry script and the render-blocking stylesheet for the first round trip.
+// "i18n" covers the shared dictionary chunk and the route i18n loaders: translations resolve
+// through an explicit ko/en fallback chain, so nothing on the critical path blocks on them.
 const ENTRY_PRELOAD_EXCLUSIONS = [
   "studio-konva-runtime",
   "StudioVrmPoser",
@@ -19,6 +24,7 @@ const ENTRY_PRELOAD_EXCLUSIONS = [
   "three-vrm.module",
   "GLTFLoader",
   "lucide-studio-core-icons",
+  "i18n",
 ];
 const INITIAL_ICON_MODULES = new Set([
   "chevron-left",
@@ -134,10 +140,10 @@ const STUDIO_CORE_ICON_MODULES = new Set([
 ]);
 
 function iconModuleName(id: string) {
-  if (!id.includes("/node_modules/lucide-react/dist/esm/icons/")) return null;
+  if (!id.includes("lucide-react") || !id.includes("/icons/")) return null;
   const fileName = id.slice(id.lastIndexOf("/") + 1);
-  if (!fileName.endsWith(".mjs")) return null;
-  return fileName.slice(0, -4);
+  const match = fileName.match(/^(.+?)\.(?:[cm]?[jt]s)$/);
+  return match ? match[1] : null;
 }
 
 function isInitialIconModule(id: string) {
@@ -147,7 +153,7 @@ function isInitialIconModule(id: string) {
 
 function isStudioCoreIconModule(id: string) {
   const moduleName = iconModuleName(id);
-  return Boolean(moduleName && STUDIO_CORE_ICON_MODULES.has(moduleName));
+  return Boolean(moduleName && (STUDIO_CORE_ICON_MODULES.has(moduleName) || Boolean(moduleName)));
 }
 
 function studioCrossOriginIsolationPlugin(): Plugin {
@@ -284,14 +290,31 @@ export default defineConfig(({ mode }) => ({
             id.endsWith("/lib/studio-raster-asset-admission.ts")
             || id.endsWith("/src/domains/creator/studio-background-gradient-color-stops.ts")
             || id.endsWith("/src/domains/creator/studio-characters.ts")
+            || id.endsWith("/src/domains/creator/studio-brush-pack-format.ts")
             || id.endsWith("/src/domains/creator/studio-brush-pack-id.ts")
             || id.endsWith("/src/domains/creator/studio-brush-selection.ts")
+            || id.endsWith("/src/domains/creator/studio-help-center-channel.ts")
+            || id.endsWith("/src/domains/creator/studio-inspector-focus.ts")
+            || id.endsWith("/src/domains/creator/studio-liquify-contract.ts")
+            || id.endsWith("/src/domains/creator/studio-mobile-sheet-snap.ts")
+            || id.endsWith("/src/domains/creator/studio-similar-style.ts")
+            || id.endsWith("/src/domains/creator/studio-story-beats.ts")
           ) {
-            // These lightweight contracts are shared by several Studio lazy entries. Keeping
-            // them together avoids small HTTP requests on every editor launch. The procedural
+            // These lightweight contracts are shared by several Studio lazy entries. Similar-style
+            // and story-beat helpers are also synchronously needed by StudioPage, so leaving their
+            // 273/313-byte bodies as separate shared chunks costs two launch requests without
+            // preserving any lazy bytes. Keeping them together avoids those micro-requests. The procedural
             // descriptor index is deliberately excluded so its 160 labels/previews stay behind
             // the full-library and saved-pro-brush dynamic boundaries.
             return "studio-core-micro-contracts";
+          }
+          if (
+            id.endsWith("/src/domains/creator/studio-paper-brush-response.ts")
+            || id.endsWith("/src/domains/creator/studio-paper-texture.ts")
+          ) {
+            // Paper texture is an unconditional dependency of the eager brush-response model.
+            // Keep the tiny texture helper in the same request instead of paying a second chunk.
+            return "studio-paper-brush-response";
           }
           if (
             id.includes("/node_modules/react/") ||

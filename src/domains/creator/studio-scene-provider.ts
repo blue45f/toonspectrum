@@ -77,10 +77,54 @@ export interface StudioSceneHitResult extends StudioSceneOverlayIdentity {
   readonly bounds: StudioSceneBounds;
 }
 
+/**
+ * Document → overlay-surface placement.
+ *
+ * Overlay shapes are authored in **document** units, while the surface is sized in **viewport CSS
+ * px**. Without this transform the two spaces are silently assumed to be identical, which only
+ * holds at 100% zoom with no flip and no rotation; at any other view state the overlay paints a
+ * correctly shaped rectangle in the wrong place at the wrong size. The fields mirror the primary
+ * host stage transform one-for-one so the overlay and the authoritative canvas cannot drift apart.
+ */
+export interface StudioSceneDocumentTransform {
+  readonly scaleX: number;
+  readonly scaleY: number;
+  readonly offsetX: number;
+  readonly offsetY: number;
+  /** Degrees, clockwise. Studio only uses 0/90/180/270. */
+  readonly rotation: number;
+}
+
+export const STUDIO_SCENE_IDENTITY_DOCUMENT_TRANSFORM: StudioSceneDocumentTransform =
+  Object.freeze({
+    scaleX: 1,
+    scaleY: 1,
+    offsetX: 0,
+    offsetY: 0,
+    rotation: 0,
+  });
+
+export function studioSceneDocumentTransformFromScale(
+  scale: number,
+): StudioSceneDocumentTransform {
+  return Object.freeze({
+    scaleX: scale,
+    scaleY: scale,
+    offsetX: 0,
+    offsetY: 0,
+    rotation: 0,
+  });
+}
+
 export interface StudioSceneViewportMetrics {
   readonly width: number;
   readonly height: number;
   readonly dpr: number;
+  /**
+   * Document → viewport placement for this surface. Omitting it means identity, i.e. one document
+   * unit is one CSS pixel; every zoomed, flipped or rotated host must supply it.
+   */
+  readonly documentTransform?: StudioSceneDocumentTransform;
 }
 
 export type StudioSceneWebGpuFallbackReason =
@@ -123,6 +167,7 @@ export interface StudioSceneProvider {
   ): StudioSceneOverlayIdentity;
   removeSelectableOverlay(documentId: string): boolean;
   documentIdForLabel(label: string): string | null;
+  /** `point` is in document units, the same space overlay shapes are authored in. */
   hitTest(point: StudioScenePoint): StudioSceneHitResult | null;
   render(): void;
   destroy(): void;
@@ -164,6 +209,52 @@ function assertPaint(paint: StudioSceneOverlayPaint, path: string): void {
   assertUnitInterval(paint.alpha, `${path}.alpha`);
 }
 
+export function validateStudioSceneDocumentTransform(
+  transform: StudioSceneDocumentTransform,
+): void {
+  if (
+    !isFiniteNumber(transform.scaleX) ||
+    !isFiniteNumber(transform.scaleY) ||
+    transform.scaleX === 0 ||
+    transform.scaleY === 0
+  ) {
+    throw new RangeError(
+      "Scene document transform scaleX/scaleY must be finite and non-zero.",
+    );
+  }
+  if (
+    !isFiniteNumber(transform.offsetX) ||
+    !isFiniteNumber(transform.offsetY) ||
+    !isFiniteNumber(transform.rotation)
+  ) {
+    throw new RangeError(
+      "Scene document transform offsetX/offsetY/rotation must be finite.",
+    );
+  }
+}
+
+export function resolveStudioSceneDocumentTransform(
+  viewport: StudioSceneViewportMetrics,
+): StudioSceneDocumentTransform {
+  return viewport.documentTransform ?? STUDIO_SCENE_IDENTITY_DOCUMENT_TRANSFORM;
+}
+
+/** Project a document-space point into the overlay surface's CSS-pixel space. */
+export function projectStudioSceneDocumentPoint(
+  transform: StudioSceneDocumentTransform,
+  point: StudioScenePoint,
+): StudioScenePoint {
+  const radians = (transform.rotation * Math.PI) / 180;
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+  const x = point.x * transform.scaleX;
+  const y = point.y * transform.scaleY;
+  return {
+    x: transform.offsetX + x * cos - y * sin,
+    y: transform.offsetY + x * sin + y * cos,
+  };
+}
+
 export function validateStudioSceneViewport(
   viewport: StudioSceneViewportMetrics,
 ): void {
@@ -178,6 +269,9 @@ export function validateStudioSceneViewport(
     throw new RangeError(
       "Scene viewport width, height, and DPR must be finite positive numbers.",
     );
+  }
+  if (viewport.documentTransform) {
+    validateStudioSceneDocumentTransform(viewport.documentTransform);
   }
 }
 

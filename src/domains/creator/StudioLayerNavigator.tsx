@@ -36,6 +36,7 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from "react";
 
+import { studioLayerSourcesBakeToSingleLayer } from "./studio-layer-merge";
 import {
   DEFAULT_STUDIO_LAYER_NAVIGATOR_FILTERS,
   STUDIO_LAYER_COLORS,
@@ -98,6 +99,8 @@ export type StudioLayerNavigatorAction =
     }
   | { type: "set-items-hidden"; ids: readonly string[]; hidden: boolean }
   | { type: "set-items-locked"; ids: readonly string[]; locked: boolean }
+  /** 0–1. Emitted by the row's inline opacity scrubber (V5 §15 레이어 행 동작 120px). */
+  | { type: "set-items-opacity"; ids: readonly string[]; opacity: number }
   | { type: "set-item-flag"; id: string; flag: StudioLayerNavigatorItemFlag; value: boolean }
   | { type: "assign-items-to-group"; ids: readonly string[]; groupId?: string }
   | { type: "set-items-role"; ids: readonly string[]; role?: StudioLayerRole }
@@ -195,6 +198,21 @@ function isLayerRowControl(target: EventTarget | null): boolean {
   return target instanceof Element && target.closest("[data-layer-row-control]") !== null;
 }
 
+/**
+ * The host can only bake a merge when every source is an image layer; anything else falls back to a
+ * non-destructive group, which *adds* a row. A control called 병합 that grows the layer list is the
+ * label lying about what it does, so every merge door reads this before the click and says which of
+ * the two outcomes it is actually about to produce.
+ *
+ * Returns null when the merge really does collapse into one layer.
+ */
+function mergeGroupFallbackNote(sources: readonly StudioLayerNavigatorItem[]): string | null {
+  if (sources.length < 2) return null;
+  if (studioLayerSourcesBakeToSingleLayer(sources)) return null;
+  const vectorCount = sources.filter((item) => item.type !== "image").length;
+  return `이미지가 아닌 레이어 ${vectorCount}개가 있어 한 장으로 굽지 못해요 — 원본을 지키는 그룹으로 묶이고 레이어 수는 줄지 않습니다.`;
+}
+
 
 export function StudioLayerNavigator({
   items,
@@ -213,6 +231,9 @@ export function StudioLayerNavigator({
   const filterPanelId = useId();
   const actionPopoverId = useId();
   const resultStatusId = useId();
+  const mergeFallbackNoteId = useId();
+  const flattenFallbackNoteId = useId();
+  const mergeDownFallbackNoteId = useId();
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState<StudioLayerNavigatorFilters>(() => ({
     ...DEFAULT_STUDIO_LAYER_NAVIGATOR_FILTERS,
@@ -284,6 +305,22 @@ export function StudioLayerNavigator({
   const commonSelectedRole = commonValue(batchSelectedItems.map((item) => item.role));
   const commonSelectedColor = commonValue(batchSelectedItems.map((item) => item.color));
 
+  // Merge pre-flight — see `mergeGroupFallbackNote`. Sources mirror the host planners exactly:
+  // merge-selected takes the batch, flatten-visible takes every effectively visible layer, and
+  // merge-down takes the row plus its BACK-side neighbour (displayItems is FRONT→BACK).
+  const effectivelyVisibleItems = displayItems.filter(
+    (item) =>
+      item.hidden !== true &&
+      (!item.groupId || availableGroupById.get(item.groupId)?.hidden !== true)
+  );
+  const batchMergeFallbackNote = mergeGroupFallbackNote(batchSelectedItems);
+  const flattenVisibleFallbackNote = mergeGroupFallbackNote(effectivelyVisibleItems);
+  function mergeDownFallbackNote(itemId: string): string | null {
+    const index = displayItems.findIndex((item) => item.id === itemId);
+    const below = index < 0 ? undefined : displayItems[index + 1];
+    return below ? mergeGroupFallbackNote([below, displayItems[index]!]) : null;
+  }
+
   const focusTargets: FocusTarget[] = [];
   for (const node of nodes) {
     if (node.kind === "item") {
@@ -340,6 +377,7 @@ export function StudioLayerNavigator({
   const activeItemLockedByGroup = activeItemGroup?.locked === true && activeItem?.locked !== true;
   const activeItemEffectivelyLocked = activeItem?.locked === true || activeItemGroup?.locked === true;
   const activeItemLocallyHidden = activeItem ? localHiddenIds.has(activeItem.id) : false;
+  const activeItemMergeDownFallbackNote = activeItem ? mergeDownFallbackNote(activeItem.id) : null;
 
   useEffect(() => {
     void pageKey;
@@ -694,6 +732,12 @@ export function StudioLayerNavigator({
     onToggleItemHidden: (itemId, hidden) => {
       onAction({ type: "set-items-hidden", ids: [itemId], hidden });
     },
+    onToggleItemLocked: (itemId, locked) => {
+      onAction({ type: "set-items-locked", ids: [itemId], locked });
+    },
+    onSetItemOpacity: (itemId, opacity) => {
+      onAction({ type: "set-items-opacity", ids: [itemId], opacity });
+    },
     onOpenItemActionMenu: (event, itemId) => {
       openActionMenu(event, { kind: "item", id: itemId });
     },
@@ -745,6 +789,7 @@ export function StudioLayerNavigator({
         mobileMultiSelect={mobileMultiSelect}
         readOnly={readOnly}
         hiddenByGroup={entry.group?.hidden === true && item.hidden !== true}
+        lockedByGroup={entry.group?.locked === true && item.locked !== true}
         actionOpen={actionTarget?.kind === "item" && actionTarget.id === item.id}
         actionPopoverId={actionPopoverId}
         stableHandlers={rowHandlers}
@@ -759,6 +804,17 @@ export function StudioLayerNavigator({
       data-page-key={pageKey}
       data-studio-shortcut-boundary="true"
     >
+      {/* The icon-only merge doors keep a stable accessible name; the caveat rides along as a
+          description so a screen-reader user hears "그룹으로 묶인다" before activating them. */}
+      {batchMergeFallbackNote ? (
+        <span id={mergeFallbackNoteId} className="sr-only">{batchMergeFallbackNote}</span>
+      ) : null}
+      {flattenVisibleFallbackNote ? (
+        <span id={flattenFallbackNoteId} className="sr-only">{flattenVisibleFallbackNote}</span>
+      ) : null}
+      {activeItemMergeDownFallbackNote ? (
+        <span id={mergeDownFallbackNoteId} className="sr-only">{activeItemMergeDownFallbackNote}</span>
+      ) : null}
       <div className="border-b border-line/70 bg-panel/70 p-2.5">
         <div className="flex items-center gap-2">
           <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent ring-1 ring-accent/15" aria-hidden>
@@ -1194,8 +1250,10 @@ export function StudioLayerNavigator({
             preferredSide="top"
             hint={{
               id: "layer-batch-merge-selected",
-              title: "선택 레이어 병합",
-              description: "선택한 두 개 이상의 레이어를 표시 순서대로 하나의 결과로 합칩니다.",
+              title: batchMergeFallbackNote ? "선택 레이어 묶기 (병합 보류)" : "선택 레이어 병합",
+              description:
+                batchMergeFallbackNote ??
+                "선택한 두 개 이상의 레이어를 표시 순서대로 하나의 결과로 합칩니다.",
               preview: "layer-merge",
               tip: "편집 가능한 원본을 유지하려면 병합 전에 프로젝트 체크포인트를 만들어 두세요.",
             }}
@@ -1206,6 +1264,8 @@ export function StudioLayerNavigator({
               onClick={() => onAction({ type: "merge-selected", ids: batchSelectedIds })}
               className={cn("grid size-8 shrink-0 place-items-center rounded border border-line bg-card text-fg-3 hover:bg-raised hover:text-fg", coarseTarget, focusRing)}
               aria-label="선택 레이어 병합"
+              aria-describedby={batchMergeFallbackNote ? mergeFallbackNoteId : undefined}
+              title={batchMergeFallbackNote ?? undefined}
             >
               <Layers3 size={13} />
             </button>
@@ -1216,8 +1276,10 @@ export function StudioLayerNavigator({
             preferredSide="top"
             hint={{
               id: "layer-batch-flatten-visible",
-              title: "표시 레이어 병합",
-              description: "현재 보이는 레이어 전체를 화면에 보이는 순서대로 하나의 결과로 합칩니다.",
+              title: flattenVisibleFallbackNote ? "표시 레이어 묶기 (병합 보류)" : "표시 레이어 병합",
+              description:
+                flattenVisibleFallbackNote ??
+                "현재 보이는 레이어 전체를 화면에 보이는 순서대로 하나의 결과로 합칩니다.",
               preview: "layer-merge",
               tip: "숨겨진 레이어는 결과에 포함되지 않아요.",
             }}
@@ -1228,6 +1290,8 @@ export function StudioLayerNavigator({
               onClick={() => onAction({ type: "flatten-visible" })}
               className={cn("grid size-8 shrink-0 place-items-center rounded border border-line bg-card text-fg-3 hover:bg-raised hover:text-fg", coarseTarget, focusRing)}
               aria-label="표시 레이어 병합"
+              aria-describedby={flattenVisibleFallbackNote ? flattenFallbackNoteId : undefined}
+              title={flattenVisibleFallbackNote ?? undefined}
             >
               <Grid2X2 size={13} />
             </button>
@@ -1391,14 +1455,24 @@ export function StudioLayerNavigator({
                     {editing && renameTarget
                       ? renderRenameInput(renameTarget, key)
                       : (
-                          <span className={cn(
-                            "min-w-0 flex-1 truncate text-[0.7rem] font-bold",
-                            selectedChildCount > 0 ? "text-fg" : "text-fg-2",
-                            node.group.hidden && "line-through decoration-fg-3/80"
-                          )}>
-                            {node.group.name}
-                            <span className="ml-1 text-[0.68rem] font-normal text-fg-3 lg:text-[0.58rem]">{node.empty ? "비어 있음" : node.entries.length}</span>
-                          </span>
+                          // The member count is its own chip, outside the truncating name. Inlined
+                          // and unitless it fused with the name — `병합 e6659cca` + `2` read as one
+                          // string, `병합 e6659cca2`.
+                          <>
+                            <span className={cn(
+                              "min-w-0 flex-1 truncate text-[0.7rem] font-bold",
+                              selectedChildCount > 0 ? "text-fg" : "text-fg-2",
+                              node.group.hidden && "line-through decoration-fg-3/80"
+                            )}>
+                              {node.group.name}
+                            </span>
+                            <span
+                              aria-hidden
+                              className="shrink-0 rounded bg-raised px-1 py-0.5 text-[0.62rem] font-normal tabular-nums text-fg-3 lg:text-[0.56rem]"
+                            >
+                              {node.empty ? "비어 있음" : `${node.entries.length}개`}
+                            </span>
+                          </>
                         )}
                     {selectedChildCount > 0 ? (
                       <span
@@ -1635,10 +1709,11 @@ export function StudioLayerNavigator({
                   setActionTarget(null);
                 }}
                 className={compactControl}
-                title="선택한 레이어를 하나로 병합합니다 (가능하면 래스터 베이크)"
-                aria-label="선택 레이어 병합"
+                title={batchMergeFallbackNote ?? "선택한 레이어를 한 장으로 굽습니다"}
+                aria-label={batchMergeFallbackNote ? "선택 묶기, 병합 보류" : "선택 레이어 병합"}
+                aria-describedby={batchMergeFallbackNote ? mergeFallbackNoteId : undefined}
               >
-                <Layers3 size={13} /> 선택 병합
+                <Layers3 size={13} /> {batchMergeFallbackNote ? "선택 묶기" : "선택 병합"}
               </button>
               <button
                 type="button"
@@ -1648,11 +1723,17 @@ export function StudioLayerNavigator({
                   setActionTarget(null);
                 }}
                 className={compactControl}
-                title="표시 중인 레이어를 하나로 병합합니다 (가능하면 래스터 베이크)"
-                aria-label="표시 레이어 병합"
+                title={flattenVisibleFallbackNote ?? "표시 중인 레이어를 한 장으로 굽습니다"}
+                aria-label={flattenVisibleFallbackNote ? "표시 묶기, 병합 보류" : "표시 레이어 병합"}
+                aria-describedby={flattenVisibleFallbackNote ? flattenFallbackNoteId : undefined}
               >
-                <Grid2X2 size={13} /> 표시 병합
+                <Grid2X2 size={13} /> {flattenVisibleFallbackNote ? "표시 묶기" : "표시 병합"}
               </button>
+              {batchMergeFallbackNote || flattenVisibleFallbackNote ? (
+                <p className="col-span-2 rounded-md bg-warning-soft/20 px-2 py-1.5 text-[0.6rem] leading-relaxed text-warning">
+                  {batchMergeFallbackNote ?? flattenVisibleFallbackNote}
+                </p>
+              ) : null}
               <button
                 type="button"
                 disabled={readOnly || batchSelectedIds.length === 0}
@@ -1837,10 +1918,15 @@ export function StudioLayerNavigator({
                   setActionTarget(null);
                 }}
                 className={compactControl}
-                title="아래 레이어와 병합합니다 (가능하면 래스터 베이크)"
-                aria-label="아래로 병합"
+                title={
+                  activeItemMergeDownFallbackNote
+                    ?? "아래 레이어와 한 장으로 굽습니다 (레이어 1장이 줄어요)"
+                }
+                aria-label={activeItemMergeDownFallbackNote ? "아래와 묶기, 병합 보류" : "아래로 병합"}
+                aria-describedby={activeItemMergeDownFallbackNote ? mergeDownFallbackNoteId : undefined}
               >
-                <Layers3 size={13} /> 아래로 병합
+                <Layers3 size={13} />
+                {activeItemMergeDownFallbackNote ? "아래와 묶기" : "아래로 병합"}
               </button>
               <button
                 type="button"
@@ -1850,11 +1936,21 @@ export function StudioLayerNavigator({
                   setActionTarget(null);
                 }}
                 className={compactControl}
-                title="표시 중인 레이어를 하나로 병합합니다 (가능하면 래스터 베이크)"
-                aria-label="표시 레이어 병합"
+                title={
+                  flattenVisibleFallbackNote
+                    ?? "표시 중인 레이어를 한 장으로 굽습니다"
+                }
+                aria-label={flattenVisibleFallbackNote ? "표시 묶기, 병합 보류" : "표시 레이어 병합"}
+                aria-describedby={flattenVisibleFallbackNote ? flattenFallbackNoteId : undefined}
               >
-                <Grid2X2 size={13} /> 표시 병합
+                <Grid2X2 size={13} />
+                {flattenVisibleFallbackNote ? "표시 묶기" : "표시 병합"}
               </button>
+              {activeItemMergeDownFallbackNote || flattenVisibleFallbackNote ? (
+                <p className="col-span-2 rounded-md bg-warning-soft/20 px-2 py-1.5 text-[0.6rem] leading-relaxed text-warning">
+                  {activeItemMergeDownFallbackNote ?? flattenVisibleFallbackNote}
+                </p>
+              ) : null}
               <button
                 type="button"
                 disabled={readOnly}

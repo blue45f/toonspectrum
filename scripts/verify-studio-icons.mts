@@ -295,7 +295,7 @@ async function main() {
     }
 
     // Open a main menu and ensure chevron + items layout (items are text; chevron on trigger)
-    await page.locator('[data-studio-main-menu="true"]').getByRole("button", { name: "그리기", exact: true }).click();
+    await page.locator('[data-studio-main-menu="true"]').getByRole("menuitem", { name: "그리기", exact: true }).click();
     const drawMenu = page.locator('[role="menu"][aria-label="그리기"]');
     await drawMenu.waitFor({ state: "visible", timeout: 4000 });
     const menuItems = await drawMenu.getByRole("menuitem").count();

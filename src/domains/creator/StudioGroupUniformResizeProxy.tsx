@@ -1,6 +1,8 @@
 import { Fragment, useEffectEvent, useLayoutEffect, useRef } from "react";
 import { Rect, Transformer } from "react-konva/lib/ReactKonvaCore";
 
+import { mirrorStudioDrawElementTranslation } from "./studio-selection-chrome-mirror";
+
 import type { StudioGroupUniformResizeBounds } from "./studio-group-uniform-resize";
 import type Konva from "konva";
 
@@ -44,9 +46,34 @@ export interface StudioGroupUniformResizeProxyProps {
   readonly mobile?: boolean;
   readonly coarse?: boolean;
   readonly enabled: boolean;
+  /**
+   * Opt in to a free transform: rotation handle plus independent width/height.
+   *
+   * Off by default because a mixed multi-selection is only safe under the uniform, axis-aligned
+   * planner. A single draw(선화) element turns it on — one point array can absorb a full affine
+   * exactly, so the extra degrees of freedom cost it nothing.
+   */
+  readonly freeTransform?: boolean;
+  /**
+   * Draw element whose live drag translation this proxy should follow.
+   *
+   * The proxy's Transformer is bound to an invisible Rect, not to the object, so Konva's own
+   * drag proxying never reaches it: dragging a selected stroke left the handle frame standing at
+   * the pre-drag position for the whole gesture (measured: 227px across a 233px drag). A
+   * multi-selection does not need this — StudioPage's `translateGroupPreview` already shifts the
+   * proxy imperatively for group drags.
+   */
+  readonly mirrorDragElementId?: string;
   /** Return false when effective locks or collaboration leases reject the gesture. */
   readonly onBegin: (sourceBounds: StudioGroupUniformResizeBounds) => boolean;
-  readonly onCommit: (targetBounds: StudioGroupUniformResizeBounds) => void;
+  /**
+   * Receives the post-gesture box. `rotationDeg` is the clockwise rotation about that box's
+   * origin, and is always 0 unless `freeTransform` is on.
+   */
+  readonly onCommit: (
+    targetBounds: StudioGroupUniformResizeBounds,
+    rotationDeg: number
+  ) => void;
   readonly onCancel: () => void;
 }
 
@@ -67,6 +94,8 @@ export function StudioGroupUniformResizeProxy({
   mobile = false,
   coarse = false,
   enabled,
+  freeTransform = false,
+  mirrorDragElementId,
   onBegin,
   onCommit,
   onCancel,
@@ -171,13 +200,16 @@ export function StudioGroupUniformResizeProxy({
       width: proxy.width() * proxy.scaleX(),
       height: proxy.height() * proxy.scaleY(),
     };
+    // Konva reports the box unrotated and carries the angle separately, which is exactly the
+    // scale-then-rotate decomposition the draw planner consumes.
+    const rotationDeg = freeTransform ? proxy.rotation() : 0;
     restoreProxy(active.sourceBounds);
 
-    if (!finitePositiveBounds(targetBounds)) {
+    if (!finitePositiveBounds(targetBounds) || !Number.isFinite(rotationDeg)) {
       onCancelRef.current();
       return;
     }
-    onCommit(targetBounds);
+    onCommit(targetBounds, rotationDeg);
   }
 
   useLayoutEffect(() => {
@@ -221,6 +253,57 @@ export function StudioGroupUniformResizeProxy({
     []
   );
 
+  // Follow the stroke's imperative drag translation so the handle frame is rasterized in the same
+  // frame as the ink. Skipped during an active resize, where the proxy is the thing being moved.
+  useLayoutEffect(() => {
+    const proxy = proxyRef.current;
+    if (!proxy || !mirrorDragElementId || !validBounds) return;
+    const stage = proxy.getStage();
+    if (!stage) return;
+    // Only ever restore what this effect hid, so a genuine `visible={false}` from props survives.
+    let parkedHere = false;
+    const detach = mirrorStudioDrawElementTranslation(stage, mirrorDragElementId, (offset) => {
+      if (activeSessionRef.current) return;
+      const x = bounds.x + offset.x;
+      const y = bounds.y + offset.y;
+      if (proxy.x() === x && proxy.y() === y) return;
+      // No forceUpdate: moving the proxy fires `absoluteTransformChange`, which the Transformer
+      // already listens to and answers by rebuilding its anchors.
+      proxy.position({ x, y });
+
+      // Park the handle frame for the duration of the move. Re-rastering nine anchors, the rotate
+      // handle and the dashed border on every drag frame doubled the layer's draw time (measured
+      // ~80ms -> ~157ms per drawScene), and a resize handle is not actionable mid-drag anyway.
+      // The stroke's own dashed selection indicator keeps the "selected" affordance, and it is a
+      // single unfilled Rect. Toggled imperatively so parking costs no React commit.
+      const dragging = offset.x !== 0 || offset.y !== 0;
+      const transformer = transformerRef.current;
+      if (!transformer) return;
+      if (dragging && transformer.visible()) {
+        transformer.visible(false);
+        parkedHere = true;
+        transformer.getLayer()?.batchDraw();
+      } else if (!dragging && parkedHere) {
+        transformer.visible(true);
+        parkedHere = false;
+        transformer.getLayer()?.batchDraw();
+      }
+    });
+    // Captured for cleanup: by teardown the ref may already point at a different Transformer, and
+    // only the instance this effect actually hid should be restored.
+    const parkedTransformer = transformerRef.current;
+    return () => {
+      detach();
+      // Unparking must not depend on a later React render: `visible` is driven by a prop whose
+      // value did not change while we hid the node, so the reconciler would never re-set it and
+      // the handles would stay invisible for the rest of the selection.
+      if (parkedHere && parkedTransformer) {
+        parkedTransformer.visible(true);
+        parkedTransformer.getLayer()?.batchDraw();
+      }
+    };
+  }, [mirrorDragElementId, bounds.x, bounds.y, validBounds]);
+
   const minimumSize = MINIMUM_VISUAL_SIZE_PX / scale;
 
   return (
@@ -245,17 +328,27 @@ export function StudioGroupUniformResizeProxy({
         name="studio-group-uniform-resize-transformer"
         visible={enabled && validBounds}
         resizeEnabled={enabled && validBounds}
-        rotateEnabled={false}
+        rotateEnabled={freeTransform && enabled && validBounds}
+        rotationSnaps={freeTransform ? [0, 45, 90, 135, 180, 225, 270, 315] : []}
+        rotationSnapTolerance={6}
         flipEnabled={false}
-        keepRatio
+        keepRatio={!freeTransform}
         centeredScaling={false}
         shouldOverdrawWholeArea={false}
-        enabledAnchors={[
-          "top-left",
-          "top-right",
-          "bottom-left",
-          "bottom-right",
-        ]}
+        enabledAnchors={
+          freeTransform
+            ? [
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right",
+                "middle-left",
+                "middle-right",
+                "top-center",
+                "bottom-center",
+              ]
+            : ["top-left", "top-right", "bottom-left", "bottom-right"]
+        }
         anchorSize={anchorVisualSize}
         anchorCornerRadius={anchorVisualSize / 2}
         anchorStroke={GROUP_SELECTION_ACCENT}

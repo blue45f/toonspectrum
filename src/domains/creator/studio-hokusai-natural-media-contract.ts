@@ -6,7 +6,7 @@ import {
 import type { DrawEl } from "./studio-element-model";
 
 export const STUDIO_HOKUSAI_NATURAL_MEDIA_CONTRACT_VERSION =
-  "studio-hokusai-natural-media-v1" as const;
+  "studio-hokusai-natural-media-v2" as const;
 export const STUDIO_HOKUSAI_RUNTIME_VERSION = "0.3.0" as const;
 
 export const STUDIO_HOKUSAI_NATURAL_MEDIA_LIMITS = Object.freeze({
@@ -54,8 +54,60 @@ export const STUDIO_HOKUSAI_NATURAL_MEDIA_PRESETS = Object.freeze([
 export type StudioHokusaiNaturalMediaPresetId =
   (typeof STUDIO_HOKUSAI_NATURAL_MEDIA_PRESETS)[number]["id"];
 
+/**
+ * Product material identity is intentionally independent from the libmypaint
+ * carrier preset. Chalk, crayon, pastel and charcoal can therefore share the
+ * quality-gated `charcoal` MYB dynamics without collapsing back to one visual
+ * texture; the same rule applies to the painterly `oil` carrier family.
+ */
+export const STUDIO_HOKUSAI_MATERIAL_PROFILES = Object.freeze([
+  { id: "pencil", carrierPresetId: "pencil" },
+  { id: "charcoal", carrierPresetId: "charcoal" },
+  { id: "chalk", carrierPresetId: "charcoal" },
+  { id: "crayon", carrierPresetId: "charcoal" },
+  { id: "pastel", carrierPresetId: "charcoal" },
+  { id: "oil-pastel", carrierPresetId: "charcoal" },
+  { id: "oil", carrierPresetId: "oil" },
+  { id: "acrylic", carrierPresetId: "oil" },
+  { id: "gouache", carrierPresetId: "oil" },
+  { id: "painterly", carrierPresetId: "oil" },
+  { id: "calligraphy", carrierPresetId: "calligraphy" },
+  { id: "marker", carrierPresetId: "marker" },
+] as const);
+
+export type StudioHokusaiMaterialProfileId =
+  (typeof STUDIO_HOKUSAI_MATERIAL_PROFILES)[number]["id"];
+
+const HOKUSAI_MATERIAL_PROFILE_CARRIER = new Map<
+  StudioHokusaiMaterialProfileId,
+  StudioHokusaiNaturalMediaPresetId
+>(STUDIO_HOKUSAI_MATERIAL_PROFILES.map((profile) => [
+  profile.id,
+  profile.carrierPresetId,
+]));
+
+export function studioHokusaiDefaultMaterialProfileId(
+  presetId: StudioHokusaiNaturalMediaPresetId,
+): StudioHokusaiMaterialProfileId {
+  if (presetId === "charcoal") return "charcoal";
+  if (presetId === "oil") return "oil";
+  return presetId;
+}
+
+export function studioHokusaiMaterialProfileIsCompatible(
+  presetId: StudioHokusaiNaturalMediaPresetId,
+  materialProfileId: unknown,
+): materialProfileId is StudioHokusaiMaterialProfileId {
+  return typeof materialProfileId === "string"
+    && HOKUSAI_MATERIAL_PROFILE_CARRIER.get(
+      materialProfileId as StudioHokusaiMaterialProfileId,
+    ) === presetId;
+}
+
 export interface StudioHokusaiNaturalMediaSettings {
   readonly presetId: StudioHokusaiNaturalMediaPresetId;
+  /** Omitted by v1 documents and resolved to the carrier's legacy profile. */
+  readonly materialProfileId?: StudioHokusaiMaterialProfileId;
   readonly color: `#${string}`;
   readonly sizeScale: number;
   readonly opacity: number;
@@ -88,6 +140,7 @@ export interface StudioHokusaiNaturalMediaRenderPlan {
     readonly revision: `hokusai-source-v1:${string}`;
   }>;
   readonly presetId: StudioHokusaiNaturalMediaPresetId;
+  readonly materialProfileId: StudioHokusaiMaterialProfileId;
   readonly color: `#${string}`;
   readonly opacity: number;
   readonly seed: number;
@@ -152,9 +205,17 @@ function isUint32(value: unknown): value is number {
 
 function normalizedSettings(
   candidate: StudioHokusaiNaturalMediaSettings,
-): StudioHokusaiNaturalMediaSettings | null {
+): (StudioHokusaiNaturalMediaSettings & Readonly<{
+  materialProfileId: StudioHokusaiMaterialProfileId;
+}>) | null {
+  const materialProfileId = candidate.materialProfileId
+    ?? studioHokusaiDefaultMaterialProfileId(candidate.presetId);
   if (
     !PRESET_IDS.has(candidate.presetId)
+    || !studioHokusaiMaterialProfileIsCompatible(
+      candidate.presetId,
+      materialProfileId,
+    )
     || typeof candidate.color !== "string"
     || !COLOR_PATTERN.test(candidate.color)
     || !Number.isFinite(candidate.sizeScale)
@@ -169,6 +230,7 @@ function normalizedSettings(
   }
   return Object.freeze({
     presetId: candidate.presetId,
+    materialProfileId,
     color: candidate.color.toLowerCase() as `#${string}`,
     sizeScale: candidate.sizeScale,
     opacity: candidate.opacity,
@@ -445,6 +507,7 @@ export function planStudioHokusaiNaturalMediaRender(
         revision: studioHokusaiSourceRevision(source),
       }),
       presetId: settings.presetId,
+      materialProfileId: settings.materialProfileId,
       color: settings.color,
       opacity: settings.opacity * clamp(finiteNumber(source.opacity, 1), 0, 1),
       seed: settings.seed,

@@ -147,7 +147,7 @@ describe("StudioVrmCharacterLibraryPanel", () => {
   });
 
   it("reflects active, deleting, and uploading transactions without enabling duplicate actions", () => {
-    const uploaded = createEntry("uploaded", "업로드 모델", "indexed-db");
+    const uploaded = createEntry("uploaded", "업로드 모델", "sqlite-opfs");
     renderPanel({
       entries: [createEntry("sample", "샘플 모델"), uploaded],
       activeModelId: uploaded.id,
@@ -173,7 +173,7 @@ describe("StudioVrmCharacterLibraryPanel", () => {
     const view = renderPanel({
       entries: [
         createEntry("sample", "썸네일 샘플", "sample", { thumbnail: "data:image/png;base64,sample" }),
-        createEntry("uploaded", "사용자 모델", "indexed-db"),
+        createEntry("uploaded", "사용자 모델", "sqlite-opfs"),
       ],
       activeModelId: "sample",
     });
@@ -182,7 +182,7 @@ describe("StudioVrmCharacterLibraryPanel", () => {
     expect(thumbnail?.getAttribute("alt")).toBe("");
     expect(thumbnail?.className).toContain("object-contain");
     expect(screen.getByText("번들")).toBeTruthy();
-    expect(screen.getByText("업로드")).toBeTruthy();
+    expect(screen.getByText("SQLite/OPFS")).toBeTruthy();
   });
 
   it("owns a multiple .vrm file picker and forwards its change exactly once", () => {
@@ -204,7 +204,7 @@ describe("StudioVrmCharacterLibraryPanel", () => {
   });
 
   it("selects and deletes exactly once while stopping delete click propagation", () => {
-    const entry = createEntry("uploaded", "업로드 대상", "indexed-db");
+    const entry = createEntry("uploaded", "업로드 대상", "sqlite-opfs");
     const onSelect = vi.fn();
     const onDelete = vi.fn();
     const onOuterClick = vi.fn();
@@ -231,7 +231,7 @@ describe("StudioVrmCharacterLibraryPanel", () => {
   });
 
   it("keeps labeled focus affordances and coarse-pointer delete targets", () => {
-    renderPanel({ entries: [createEntry("uploaded", "접근성 모델", "indexed-db")] });
+    renderPanel({ entries: [createEntry("uploaded", "접근성 모델", "sqlite-opfs")] });
 
     const panel = document.querySelector('[role="tabpanel"]');
     const search = screen.getByLabelText("캐릭터 라이브러리 검색");

@@ -35,6 +35,22 @@ export interface EmeresLibraryStorage {
 export const EMERES_LIBRARY_KEY = "toonspectrum-studio-emeres-library";
 export const MAX_EMERES_LIBRARY_ITEMS = 30; // studio-palette-library.ts의 MAX_PALETTES(40)보다 낮음 — 이미지라 항목당 용량이 더 큼.
 export const DEFAULT_EMERES_LIBRARY_ITEM_NAME = "이름 없는 틀";
+export const MAX_EMERES_LIBRARY_SERIALIZED_BYTES = 64 * 1024 * 1024;
+
+export type StudioEmeresLibraryErrorCode =
+  | "invalid-item"
+  | "corrupt-data"
+  | "library-too-large";
+
+export class StudioEmeresLibraryError extends Error {
+  readonly code: StudioEmeresLibraryErrorCode;
+
+  constructor(code: StudioEmeresLibraryErrorCode, message: string) {
+    super(message);
+    this.name = "StudioEmeresLibraryError";
+    this.code = code;
+  }
+}
 
 function isEmeresCategory(v: unknown): v is EmeresCategory {
   return typeof v === "string" && (EMERES_CATEGORIES as readonly string[]).includes(v);
@@ -67,6 +83,194 @@ function isStudioEmeresLibraryItem(v: unknown): v is StudioEmeresLibraryItem {
   return true;
 }
 
+const DATA_IMAGE_URL_RE = /^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/u;
+
+function exactItemProperties(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  const allowed = new Set([
+    "id",
+    "name",
+    "createdAt",
+    "updatedAt",
+    "src",
+    "width",
+    "height",
+    "category",
+  ]);
+  const keys = Object.keys(record);
+  if (keys.some((key) => !allowed.has(key))) return null;
+  return record;
+}
+
+function canonicalEmeresLibraryItem(value: unknown): StudioEmeresLibraryItem | null {
+  const record = exactItemProperties(value);
+  if (!record || !isStudioEmeresLibraryItem(record)) return null;
+  if (
+    record.id.trim() !== record.id
+    || record.id.length === 0
+    || record.id.length > 160
+    || record.name.trim() !== record.name
+    || record.name.length === 0
+    || record.name.length > 160
+    || !Number.isSafeInteger(record.createdAt)
+    || record.createdAt < 0
+    || !Number.isSafeInteger(record.updatedAt)
+    || record.updatedAt < record.createdAt
+    || !Number.isSafeInteger(record.width)
+    || !Number.isSafeInteger(record.height)
+    || !DATA_IMAGE_URL_RE.test(record.src)
+  ) {
+    return null;
+  }
+  return {
+    id: record.id,
+    name: record.name,
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+    src: record.src,
+    width: record.width,
+    height: record.height,
+    ...(record.category === undefined ? {} : { category: record.category }),
+  };
+}
+
+function canonicalEmeresLibraryItems(
+  values: readonly unknown[],
+): StudioEmeresLibraryItem[] {
+  if (values.length > MAX_EMERES_LIBRARY_ITEMS) {
+    throw new StudioEmeresLibraryError(
+      "library-too-large",
+      `이메레스 개인 보관함은 ${MAX_EMERES_LIBRARY_ITEMS}개를 넘을 수 없습니다.`,
+    );
+  }
+  const ids = new Set<string>();
+  const items = values.map((value) => {
+    const item = canonicalEmeresLibraryItem(value);
+    if (!item || ids.has(item.id)) {
+      throw new StudioEmeresLibraryError(
+        "invalid-item",
+        "이메레스 개인 보관함에 손상되거나 중복된 항목이 있습니다.",
+      );
+    }
+    ids.add(item.id);
+    return item;
+  });
+  return items;
+}
+
+export function serializeEmeresLibraryItems(
+  values: readonly StudioEmeresLibraryItem[],
+): string {
+  const serialized = JSON.stringify(canonicalEmeresLibraryItems(values));
+  if (new TextEncoder().encode(serialized).byteLength > MAX_EMERES_LIBRARY_SERIALIZED_BYTES) {
+    throw new StudioEmeresLibraryError(
+      "library-too-large",
+      "이메레스 개인 보관함이 SQLite 저장 상한을 넘었습니다.",
+    );
+  }
+  return serialized;
+}
+
+export function parseCanonicalEmeresLibraryItems(raw: string): StudioEmeresLibraryItem[] {
+  if (
+    typeof raw !== "string"
+    || new TextEncoder().encode(raw).byteLength > MAX_EMERES_LIBRARY_SERIALIZED_BYTES
+  ) {
+    throw new StudioEmeresLibraryError(
+      "library-too-large",
+      "이메레스 개인 보관함 저장값이 허용 크기를 넘었습니다.",
+    );
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new StudioEmeresLibraryError(
+      "corrupt-data",
+      "이메레스 개인 보관함 JSON이 손상되었습니다.",
+    );
+  }
+  if (!Array.isArray(parsed)) {
+    throw new StudioEmeresLibraryError(
+      "corrupt-data",
+      "이메레스 개인 보관함 저장값은 배열이어야 합니다.",
+    );
+  }
+  const items = canonicalEmeresLibraryItems(parsed);
+  if (JSON.stringify(items) !== raw) {
+    throw new StudioEmeresLibraryError(
+      "corrupt-data",
+      "이메레스 개인 보관함 저장값이 canonical 형식이 아닙니다.",
+    );
+  }
+  return items;
+}
+
+export function upsertEmeresLibraryItem(
+  items: readonly StudioEmeresLibraryItem[],
+  item: StudioEmeresLibraryItem,
+): StudioEmeresLibraryItem[] {
+  if (!isStudioEmeresLibraryItem(item)) {
+    throw new StudioEmeresLibraryError("invalid-item", "유효하지 않은 이메레스 항목입니다.");
+  }
+  return [item, ...items.filter((entry) => entry.id !== item.id)]
+    .slice(0, MAX_EMERES_LIBRARY_ITEMS);
+}
+
+export function renameEmeresLibraryItemInMemory(
+  items: readonly StudioEmeresLibraryItem[],
+  id: string,
+  name: string,
+  now: number = Date.now(),
+): StudioEmeresLibraryItem[] {
+  const trimmed = name.trim();
+  if (!trimmed || trimmed.length > 160 || !Number.isSafeInteger(now) || now < 0) {
+    return [...items];
+  }
+  return items.map((item) => (
+    item.id === id ? { ...item, name: trimmed, updatedAt: Math.max(item.createdAt, now) } : item
+  ));
+}
+
+export function setEmeresLibraryItemCategoryInMemory(
+  items: readonly StudioEmeresLibraryItem[],
+  id: string,
+  category: EmeresCategory | undefined,
+  now: number = Date.now(),
+): StudioEmeresLibraryItem[] {
+  if (
+    (category !== undefined && !isEmeresCategory(category))
+    || !Number.isSafeInteger(now)
+    || now < 0
+  ) {
+    return [...items];
+  }
+  return items.map((item) => {
+    if (item.id !== id) return item;
+    const updatedAt = Math.max(item.createdAt, now);
+    if (category === undefined) {
+      return {
+        id: item.id,
+        name: item.name,
+        createdAt: item.createdAt,
+        updatedAt,
+        src: item.src,
+        width: item.width,
+        height: item.height,
+      };
+    }
+    return { ...item, category, updatedAt };
+  });
+}
+
+export function deleteEmeresLibraryItemInMemory(
+  items: readonly StudioEmeresLibraryItem[],
+  id: string,
+): StudioEmeresLibraryItem[] {
+  return items.filter((item) => item.id !== id);
+}
+
 // ── 저장소 CRUD (studio-brush-library.ts와 동일한 패턴) ────────────────
 
 /** 저장된 항목 목록(최근 저장·캡처 순). 저장소 부재·파싱 실패 시 []. */
@@ -97,7 +301,7 @@ export function saveEmeresLibraryItem(
   storage: EmeresLibraryStorage | null | undefined,
   item: StudioEmeresLibraryItem
 ): StudioEmeresLibraryItem[] {
-  const next = [item, ...listEmeresLibraryItems(storage).filter((i) => i.id !== item.id)].slice(0, MAX_EMERES_LIBRARY_ITEMS);
+  const next = upsertEmeresLibraryItem(listEmeresLibraryItems(storage), item);
   persist(storage, next);
   return next;
 }
@@ -111,7 +315,7 @@ export function renameEmeresLibraryItem(
   const trimmed = name.trim();
   const current = listEmeresLibraryItems(storage);
   if (!trimmed) return current;
-  const next = current.map((i) => (i.id === id ? { ...i, name: trimmed, updatedAt: Date.now() } : i));
+  const next = renameEmeresLibraryItemInMemory(current, id, trimmed);
   persist(storage, next);
   return next;
 }
@@ -128,14 +332,14 @@ export function setEmeresLibraryItemCategory(
 ): StudioEmeresLibraryItem[] {
   const current = listEmeresLibraryItems(storage);
   if (category !== undefined && !isEmeresCategory(category)) return current;
-  const next = current.map((i) => (i.id === id ? { ...i, category, updatedAt: Date.now() } : i));
+  const next = setEmeresLibraryItemCategoryInMemory(current, id, category);
   persist(storage, next);
   return next;
 }
 
 /** 삭제. 새 목록 반환. */
 export function deleteEmeresLibraryItem(storage: EmeresLibraryStorage | null | undefined, id: string): StudioEmeresLibraryItem[] {
-  const next = listEmeresLibraryItems(storage).filter((i) => i.id !== id);
+  const next = deleteEmeresLibraryItemInMemory(listEmeresLibraryItems(storage), id);
   persist(storage, next);
   return next;
 }

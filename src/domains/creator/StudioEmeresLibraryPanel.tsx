@@ -8,18 +8,24 @@
 // disarmAllPixelTools() 대상에도 포함되지 않는다. 자세한 통합 지점은
 // docs/studio-emeres-library-integration.md 참고.
 import { ImagePlus, Pencil, X } from "lucide-react";
-import { useState, type ChangeEvent, type KeyboardEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type KeyboardEvent,
+} from "react";
 
 import {
   createEmeresLibraryItem,
-  deleteEmeresLibraryItem,
-  listEmeresLibraryItems,
+  deleteEmeresLibraryItemInMemory,
   MAX_EMERES_LIBRARY_ITEMS,
-  renameEmeresLibraryItem,
-  saveEmeresLibraryItem,
-  setEmeresLibraryItemCategory,
+  renameEmeresLibraryItemInMemory,
+  setEmeresLibraryItemCategoryInMemory,
   type StudioEmeresLibraryItem,
+  upsertEmeresLibraryItem,
 } from "./studio-emeres-library";
+import { getProductStudioEmeresSqliteRepository } from "./studio-emeres-sqlite-repository";
 import { EMERES_CATEGORIES, type EmeresCategory } from "./studio-emeres-templates";
 import { downscaleImageFile } from "./studio-image-utils";
 
@@ -33,22 +39,143 @@ export interface StudioEmeresLibraryPanelProps {
   /** 저장된 항목을 고르면 호출 — 실제 캔버스 삽입(밑그림 배치 + 펜 모드 전환)은 호출부(StudioPage)의
    *  addEmeresTemplate과 동일한 배치 로직으로 수행한다(위임 패턴, onApplyBrush와 동일 규약). */
   onPickItem: (item: StudioEmeresLibraryItem) => void;
+  /** Test/embed seam. Product code leaves this undefined and uses shared V12 SQLite/OPFS. */
+  repository?: StudioEmeresLibraryRepository;
 }
 
-export function StudioEmeresLibraryPanel({ onPickItem }: StudioEmeresLibraryPanelProps) {
-  // lazy 초기화 — 이 컴포넌트 자체가 lazyRetry로 필요할 때만 로드되므로 마운트 시점 동기 로드로 충분
-  // (StudioBrushLibraryPanel과 동일 논리).
-  const [items, setItems] = useState<StudioEmeresLibraryItem[]>(() => listEmeresLibraryItems(globalThis.localStorage));
+export interface StudioEmeresLibraryRepository {
+  readonly authority?: "sqlite" | "injected";
+  list(): Promise<StudioEmeresLibraryItem[]>;
+  save(item: StudioEmeresLibraryItem): Promise<StudioEmeresLibraryItem[]>;
+  rename(id: string, name: string): Promise<StudioEmeresLibraryItem[]>;
+  setCategory(
+    id: string,
+    category: EmeresCategory | undefined,
+  ): Promise<StudioEmeresLibraryItem[]>;
+  delete(id: string): Promise<StudioEmeresLibraryItem[]>;
+  subscribe?(listener: () => void): () => void;
+}
+
+const PRODUCT_REPOSITORY: StudioEmeresLibraryRepository =
+  getProductStudioEmeresSqliteRepository();
+
+export function StudioEmeresLibraryPanel({
+  onPickItem,
+  repository = PRODUCT_REPOSITORY,
+}: StudioEmeresLibraryPanelProps) {
+  const [items, setItems] = useState<StudioEmeresLibraryItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [doneMsg, setDoneMsg] = useState<string | null>(null);
   const [draft, setDraft] = useState<{ src: string; width: number; height: number } | null>(null);
   const [draftBusy, setDraftBusy] = useState(false);
+  const [mutationBusy, setMutationBusy] = useState(false);
   const [draftName, setDraftName] = useState("");
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renamingName, setRenamingName] = useState("");
+  const [storageState, setStorageState] = useState<
+    "loading" | "sqlite" | "injected" | "memory" | "unavailable"
+  >("loading");
+  const loadGenerationRef = useRef(0);
+  const mutationGenerationRef = useRef(0);
+  const mountedRef = useRef(true);
+  const memoryModeRef = useRef(false);
+  const mutationBusyRef = useRef(false);
 
-  function handleDelete(id: string) {
-    setItems(deleteEmeresLibraryItem(globalThis.localStorage, id));
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    memoryModeRef.current = false;
+
+    const hydrate = async () => {
+      const generation = ++loadGenerationRef.current;
+      setStorageState("loading");
+      try {
+        const loaded = await repository.list();
+        if (
+          !active
+          || !mountedRef.current
+          || generation !== loadGenerationRef.current
+          || memoryModeRef.current
+        ) {
+          return;
+        }
+        setItems(loaded);
+        setError(null);
+        setStorageState(repository.authority === "sqlite" ? "sqlite" : "injected");
+      } catch (cause) {
+        if (!active || !mountedRef.current || generation !== loadGenerationRef.current) return;
+        setError(
+          `SQLite/OPFS 이메레스 보관함을 열지 못했습니다: ${
+            cause instanceof Error ? cause.message : String(cause)
+          }`,
+        );
+        setStorageState("unavailable");
+      }
+    };
+
+    void hydrate();
+    const unsubscribe = repository.subscribe?.(() => void hydrate());
+    return () => {
+      active = false;
+      loadGenerationRef.current += 1;
+      unsubscribe?.();
+    };
+  }, [repository]);
+
+  async function commitMutation(
+    persisted: () => Promise<StudioEmeresLibraryItem[]>,
+    memoryUpdate: (current: readonly StudioEmeresLibraryItem[]) => StudioEmeresLibraryItem[],
+    successMessage: string,
+  ): Promise<void> {
+    if (mutationBusyRef.current) return;
+    mutationBusyRef.current = true;
+    const generation = ++mutationGenerationRef.current;
+    setMutationBusy(true);
+    setError(null);
+    setDoneMsg(null);
+    if (storageState === "memory") {
+      setItems((current) => memoryUpdate(current));
+      setDoneMsg(`${successMessage} 세션 메모리에만 유지됩니다.`);
+      mutationBusyRef.current = false;
+      setMutationBusy(false);
+      return;
+    }
+    try {
+      const next = await persisted();
+      if (!mountedRef.current || generation !== mutationGenerationRef.current) return;
+      setItems(next);
+      setStorageState(repository.authority === "sqlite" ? "sqlite" : "injected");
+      setDoneMsg(successMessage);
+    } catch (cause) {
+      if (!mountedRef.current || generation !== mutationGenerationRef.current) return;
+      setItems((current) => memoryUpdate(current));
+      memoryModeRef.current = true;
+      setStorageState("memory");
+      setError(
+        `SQLite/OPFS 저장에 실패해 변경을 현재 탭 메모리에만 유지합니다: ${
+          cause instanceof Error ? cause.message : String(cause)
+        }`,
+      );
+    } finally {
+      if (mountedRef.current && generation === mutationGenerationRef.current) {
+        mutationBusyRef.current = false;
+        setMutationBusy(false);
+      }
+    }
+  }
+
+  function handleDelete(id: string): void {
+    void commitMutation(
+      () => repository.delete(id),
+      (current) => deleteEmeresLibraryItemInMemory(current, id),
+      "틀을 삭제했습니다.",
+    );
   }
 
   function startRename(i: StudioEmeresLibraryItem) {
@@ -56,10 +183,16 @@ export function StudioEmeresLibraryPanel({ onPickItem }: StudioEmeresLibraryPane
     setRenamingName(i.name);
   }
 
-  function commitRename() {
+  function commitRename(): void {
     if (!renamingId) return;
-    setItems(renameEmeresLibraryItem(globalThis.localStorage, renamingId, renamingName));
+    const id = renamingId;
+    const name = renamingName;
     setRenamingId(null);
+    void commitMutation(
+      () => repository.rename(id, name),
+      (current) => renameEmeresLibraryItemInMemory(current, id, name),
+      "이름을 변경했습니다.",
+    );
   }
 
   function handleRenameKeyDown(e: KeyboardEvent<HTMLInputElement>) {
@@ -67,8 +200,13 @@ export function StudioEmeresLibraryPanel({ onPickItem }: StudioEmeresLibraryPane
     else if (e.key === "Escape") setRenamingId(null);
   }
 
-  function handleCategoryChange(id: string, value: string) {
-    setItems(setEmeresLibraryItemCategory(globalThis.localStorage, id, value === "" ? undefined : (value as EmeresCategory)));
+  function handleCategoryChange(id: string, value: string): void {
+    const category = value === "" ? undefined : (value as EmeresCategory);
+    void commitMutation(
+      () => repository.setCategory(id, category),
+      (current) => setEmeresLibraryItemCategoryInMemory(current, id, category),
+      "분류를 변경했습니다.",
+    );
   }
 
   async function handleUploadFile(e: ChangeEvent<HTMLInputElement>) {
@@ -93,17 +231,19 @@ export function StudioEmeresLibraryPanel({ onPickItem }: StudioEmeresLibraryPane
     }
   }
 
-  function handleConfirmSave() {
+  function handleConfirmSave(): void {
     if (!draft) return;
     // draft는 downscaleImageFile이 성공했을 때만 세팅되므로(항상 유한한 양수 width/height + 비어있지
     // 않은 src) createEmeresLibraryItem은 절대 던지지 않는다 — StudioBrandKitPanel.handleCreate와
     // 동일하게 try/catch가 필요 없다.
     const created = createEmeresLibraryItem(draftName, draft);
-    setItems(saveEmeresLibraryItem(globalThis.localStorage, created));
-    setError(null);
-    setDoneMsg(`"${created.name}" 틀을 저장했어요.`);
     setDraft(null);
     setDraftName("");
+    void commitMutation(
+      () => repository.save(created),
+      (current) => upsertEmeresLibraryItem(current, created),
+      `"${created.name}" 틀을 저장했어요.`,
+    );
   }
 
   function handleCancelDraft() {
@@ -112,7 +252,11 @@ export function StudioEmeresLibraryPanel({ onPickItem }: StudioEmeresLibraryPane
   }
 
   return (
-    <div className="space-y-2">
+    <div
+      className="space-y-2"
+      aria-busy={draftBusy || mutationBusy || storageState === "loading"}
+      data-studio-emeres-authority={storageState}
+    >
       <p className="rounded-lg border border-line bg-card px-2 py-1.5 text-[0.66rem] leading-snug text-fg-3">
         캔버스 요소를 우클릭해 &quot;이메레스로 저장&quot;을 누르거나, 이미지를 업로드해 나만의 밑그림 틀을 만들어보세요.
       </p>
@@ -127,6 +271,18 @@ export function StudioEmeresLibraryPanel({ onPickItem }: StudioEmeresLibraryPane
           {doneMsg}
         </p>
       )}
+
+      <p className="text-[0.6rem] font-semibold text-fg-3" role="status">
+        {storageState === "loading"
+          ? "SQLite/OPFS 보관함 확인 중"
+          : storageState === "sqlite"
+            ? "이 기기 SQLite/OPFS 저장"
+            : storageState === "memory"
+              ? "현재 탭 메모리 임시 · 새로고침 시 사라짐"
+              : storageState === "unavailable"
+                ? "SQLite/OPFS 사용 불가 · 저장되지 않음"
+                : "주입 저장소"}
+      </p>
 
       {draft ? (
         <div className="flex flex-col gap-1.5 rounded-lg border border-line bg-card p-2">
@@ -157,6 +313,7 @@ export function StudioEmeresLibraryPanel({ onPickItem }: StudioEmeresLibraryPane
             <button
               type="button"
               onClick={handleConfirmSave}
+              disabled={mutationBusy || storageState === "loading"}
               className="flex-1 rounded-lg bg-accent py-1.5 text-[0.66rem] font-semibold text-on-accent transition-colors hover:opacity-90"
             >
               저장
@@ -167,11 +324,18 @@ export function StudioEmeresLibraryPanel({ onPickItem }: StudioEmeresLibraryPane
         <label
           className={cx(
             "flex w-full cursor-pointer items-center justify-center gap-1 rounded-lg border border-line py-1.5 text-[0.66rem] font-semibold text-fg-2 transition-colors hover:bg-raised",
-            draftBusy && "pointer-events-none opacity-60"
+            (draftBusy || mutationBusy || storageState === "loading")
+              && "pointer-events-none opacity-60"
           )}
         >
           <ImagePlus size={11} /> {draftBusy ? "불러오는 중…" : "이미지 업로드"}
-          <input type="file" accept="image/*" className="hidden" onChange={handleUploadFile} disabled={draftBusy} />
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleUploadFile}
+            disabled={draftBusy || mutationBusy || storageState === "loading"}
+          />
         </label>
       )}
 
@@ -203,6 +367,7 @@ export function StudioEmeresLibraryPanel({ onPickItem }: StudioEmeresLibraryPane
                 <button
                   type="button"
                   onClick={() => startRename(i)}
+                  disabled={mutationBusy}
                   aria-label={`${i.name} 이름 변경`}
                   title="이름 변경"
                   className="shrink-0 text-fg-3 transition-colors hover:text-accent"
@@ -212,6 +377,7 @@ export function StudioEmeresLibraryPanel({ onPickItem }: StudioEmeresLibraryPane
                 <button
                   type="button"
                   onClick={() => handleDelete(i.id)}
+                  disabled={mutationBusy}
                   aria-label={`${i.name} 틀 삭제`}
                   title="삭제"
                   className="shrink-0 text-fg-3 transition-colors hover:text-bad"
@@ -222,6 +388,7 @@ export function StudioEmeresLibraryPanel({ onPickItem }: StudioEmeresLibraryPane
               <select
                 value={i.category ?? ""}
                 onChange={(e) => handleCategoryChange(i.id, e.target.value)}
+                disabled={mutationBusy}
                 aria-label={`${i.name} 분류`}
                 className="mb-1 h-5 w-full rounded border border-line bg-panel px-1 text-[0.58rem] text-fg-3 outline-none focus:border-accent"
               >
@@ -246,7 +413,7 @@ export function StudioEmeresLibraryPanel({ onPickItem }: StudioEmeresLibraryPane
       )}
 
       <p className="border-t border-line/60 pt-1.5 text-[0.6rem] leading-snug text-fg-3">
-        이 브라우저에만 저장돼요(다른 기기와 공유되지 않아요). 최대 {MAX_EMERES_LIBRARY_ITEMS}개까지 보관되고, 넘으면 가장 오래된 항목부터 사라져요.
+        이 기기의 공유 Studio SQLite/OPFS에 저장돼요(다른 기기와 공유되지 않아요). 최대 {MAX_EMERES_LIBRARY_ITEMS}개까지 보관되고, 넘으면 가장 오래된 항목부터 사라져요.
       </p>
     </div>
   );

@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  STUDIO_COMMAND_CATALOG,
+  STUDIO_MENU_ITEM_INVENTORY,
+} from "./studio-command-catalog";
+import {
   buildStudioMainMenuGroups,
   type StudioMainMenuBuilderState,
   type StudioMainMenuEditAvailability,
@@ -12,6 +16,7 @@ import type {
   StudioMainMenuGroup,
   StudioMainMenuItem,
 } from "./studio-main-menu-model";
+import type { CommandId } from "@toonspectrum/studio-command-registry";
 
 const AVAILABLE_EDIT_ACTIONS: StudioMainMenuEditAvailability = {
   undoDisabled: false,
@@ -55,6 +60,18 @@ const BASE_STATE: StudioMainMenuBuilderState = {
   leftPanelOpen: true,
   rightPanelOpen: true,
   lastFilterDraft: null,
+  clippingMaskActive: false,
+  clippingMaskDisabled: false,
+  imageLayerSelected: true,
+  activeToolCommandId: "tool.pen",
+  pixelSelectionTool: null,
+  quickMaskActive: false,
+  animationTimelineOpen: false,
+  onionSkinEnabled: false,
+  documentCommentsOpen: false,
+  canvasGridVisible: false,
+  vectorEraseToIntersection: false,
+  masterEditMode: false,
 };
 
 function createEditorActions(): StudioMainMenuEditorActions {
@@ -76,6 +93,7 @@ function createEditorActions(): StudioMainMenuEditorActions {
     duplicateSelected: vi.fn(),
     reorder: vi.fn(),
     openSelectedLayerCrop: vi.fn(),
+    toggleClippingMask: vi.fn(),
     addText: vi.fn(),
     addPage: vi.fn(),
     toggleHorizontalCanvasView: vi.fn(),
@@ -118,6 +136,9 @@ function createUiActions(): StudioMainMenuUiActions {
     toggleReferencePanel: vi.fn(),
     togglePageSequence: vi.fn(),
     openProductionInsights: vi.fn(),
+    toggleAnimationTimeline: vi.fn(),
+    openScrollPreview: vi.fn(),
+    openStoryboardGrid: vi.fn(),
     collapseSidePanels: vi.fn(),
     openToolsCompanion: vi.fn(),
     toggleQuickAccessPalette: vi.fn(),
@@ -126,6 +147,38 @@ function createUiActions(): StudioMainMenuUiActions {
     openShortcuts: vi.fn(),
     selectDrawMode: vi.fn(),
     enableSmartShape: vi.fn(),
+    activateTransformTool: vi.fn(),
+    openImageAdjustments: vi.fn(),
+    openLayerMask: vi.fn(),
+    openBrushPresetBrowser: vi.fn(),
+    openBrushStudio: vi.fn(),
+    openBrushLibrary: vi.fn(),
+    requestBrushPackImport: vi.fn(),
+    openNaturalMediaBrushes: vi.fn(),
+    activatePixelSelectionTool: vi.fn(),
+    enterQuickMask: vi.fn(),
+    commitQuickMask: vi.fn(),
+    openFrameAnimation: vi.fn(),
+    toggleOnionSkin: vi.fn(),
+    openAnimaticTimeline: vi.fn(),
+    openTeamPanel: vi.fn(),
+    toggleDocumentComments: vi.fn(),
+    openPageReview: vi.fn(),
+    openCheckpoints: vi.fn(),
+    openWriterRoom: vi.fn(),
+    openContinuityCheck: vi.fn(),
+    openProductionBible: vi.fn(),
+    openQuickStart: vi.fn(),
+    openPublishPackage: vi.fn(),
+    openPublishPreflight: vi.fn(),
+    openAssetRightsAudit: vi.fn(),
+    openAutoActions: vi.fn(),
+    openCanvasNavigator: vi.fn(),
+    openCanvasSettings: vi.fn(),
+    toggleCanvasGrid: vi.fn(),
+    toggleVectorEraseToIntersection: vi.fn(),
+    openDialogueBatch: vi.fn(),
+    openDialogueTranslate: vi.fn(),
   };
 }
 
@@ -179,6 +232,11 @@ describe("buildStudioMainMenuGroups", () => {
     }[key] ?? key)).groups;
 
     expect(english.find((group) => group.id === "help")?.label).toBe("Help");
+    // Groups the §15.3 regroup introduced have no shipped group-label key yet, so
+    // they fall back to English rather than showing Korean to everyone.
+    expect(english.find((group) => group.id === "layer")?.label).toBe("Layer");
+    expect(english.find((group) => group.id === "window")?.label).toBe("Window");
+    expect(korean.find((group) => group.id === "layer")?.label).toBe("레이어");
     expect(menuItem(english, "help", "feature-tutorials").label).toBe("Feature tutorials");
     expect(menuItem(english, "help", "shortcuts").label).toBe("Shortcut help");
     expect(korean.find((group) => group.id === "help")?.label).toBe("도움말");
@@ -192,133 +250,121 @@ describe("buildStudioMainMenuGroups", () => {
     expect(groups.map((group) => group.id)).toEqual([
       "file",
       "edit",
-      "insert",
       "view",
+      "canvas",
+      "layer",
+      "select",
+      "transform",
+      "brush",
       "filter",
-      "draw",
+      "vector",
+      "text",
+      "comic",
+      "animation",
+      "3d",
+      "collaboration",
+      "window",
       "ai",
       "help",
     ]);
-    expect(groups.map((group) => group.items.map((item) => item.id))).toEqual([
-      [
-        "export",
-        "copy-image",
-        "save-draft",
-        "publish",
-        "export-json",
-        "export-archive",
-        "import-json",
-        "import-psd",
-        "import-ora-cbz",
-        "project",
-      ],
-      [
-        "undo",
-        "redo",
-        "cut",
-        "copy",
-        "paste",
-        "paste-in-place",
-        "paste-file",
-        "select-all",
-        "deselect",
-        "invert-selection",
-        "clear-selection",
-        "duplicate",
-        "bring-front",
-        "bring-forward",
-        "send-back",
-        "send-backward",
-        "crop-layer",
-        "history",
-        "pen-pressure",
-        "app-settings",
-      ],
-      [
-        "template",
-        "collage",
-        "elements",
-        "bubble",
-        "text",
-        "image",
-        "mannequin3d",
-        "char",
-        "bg3d",
-        "ref",
-        "page",
-      ],
-      [
-        "zoom-in",
-        "zoom-out",
-        "flip-horizontal",
-        "rotate-left",
-        "rotate-right",
-        "reset-rotation",
-        "fit",
-        "actual-pixels",
-        "canvas-rulers",
-        "fullscreen",
-        "color-vision-original",
-        "color-vision-grayscale",
-        "color-vision-protanopia",
-        "color-vision-deuteranopia",
-        "color-vision-tritanopia",
-        "reference-window",
-        "page-sequence",
-        "save-current-view",
-        "restore-view",
-        "perspective-guide",
-        "reset-local-visibility",
-        "production-insights",
-        "density-focus",
-        "density-full",
-        "wide",
-        "tools-companion",
-        "canvas-only",
-        "quick-access-palette",
-        "left-panel",
-        "right-panel",
-        "app-settings",
-      ],
-      [
-        "last-filter",
-        "gaussian-blur",
-        "motion-blur",
-        "hue-saturation-brightness",
-        "brightness-contrast",
-        "color-curves",
-        "mosaic",
-        "radial-blur",
-        "zoom-blur",
-        "chromatic-aberration",
-        "glitch",
-        "scanline",
-        "vignette",
-        "lens-flare",
-        "emboss",
-        "solarize",
-        "threshold",
-        "oil-paint",
-        "surface-blur",
-        "lens-blur",
-        "field-iris-blur",
-        "tilt-shift-blur",
-        "selective-gaussian-blur",
-        "tileable-blur",
-        "line-cleanup",
-        "screentone-removal",
-        "jpeg-artifact-reduction",
-        "edge-aware-denoise",
-        "dust-scratches",
-        "difference-of-gaussians",
-        "color-to-alpha",
-        "duotone",
-        "noise-add",
-      ],
-      ["pen", "eraser", "fill", "smart-shape", "bg", "style"],
-      ["ai-assist", "stock", "integrations"],
-      ["feature-tutorials", "shortcuts"],
-    ]);
+    // Item order is pinned once, in `STUDIO_MENU_ITEM_INVENTORY`. Repeating the
+    // whole list here made the two copies drift every time a §15.3 row landed,
+    // so this asserts the grouping instead: each group's items, in order, are
+    // exactly the inventory's entries for that group, in order.
+    const inventoryByGroup = new Map<string, string[]>();
+    for (const qualified of STUDIO_MENU_ITEM_INVENTORY) {
+      const [group = "", item = ""] = qualified.split("/");
+      inventoryByGroup.set(group, [...(inventoryByGroup.get(group) ?? []), item]);
+    }
+    expect(groups.map((group) => group.items.map((item) => item.id))).toEqual(
+      groups.map((group) => inventoryByGroup.get(group.id) ?? []),
+    );
+  });
+
+  it("keeps every menu item id globally unique (audit finding menu-item-id-collision)", () => {
+    const { groups } = buildMenu();
+    const ids = groups.flatMap((group) => group.items.map((item) => item.id));
+
+    expect(new Set(ids).size).toBe(ids.length);
+    // The two Preferences entry points survive the regroup with distinct ids and
+    // their original handlers.
+    expect(menuItem(groups, "edit", "app-settings").label).toBe("애플리케이션 설정…");
+    expect(menuItem(groups, "window", "app-settings-window").label).toBe("애플리케이션 설정");
+  });
+
+  it("keeps relocated items on the locale keys the 75 shipped packs were authored against", () => {
+    const dictionary = {
+      "studio.mainMenu.item.view.left-panel.open": "Hide left panel",
+      "studio.mainMenu.item.view.canvas-rulers": "Canvas rulers",
+      "studio.mainMenu.item.view.reset-local-visibility": "Show layers I hid",
+      "studio.mainMenu.item.view.page-sequence.open": "Close page sequence",
+      "studio.mainMenu.item.view.app-settings": "Application settings",
+      "studio.mainMenu.item.insert.bg3d": "3D background",
+      "studio.mainMenu.item.insert.page": "New page",
+      "studio.mainMenu.item.draw.pen": "Pen",
+      "studio.mainMenu.edit.command.select-all": "Select all",
+      "studio.mainMenu.edit.command.bring-front": "Bring to front",
+      "studio.mainMenu.group.draw.label": "Brush",
+    } as const;
+    const { groups } = buildMenu(
+      { leftPanelOpen: true, pageSequenceOpen: true },
+      (key) => (dictionary as Record<string, string>)[key] ?? key,
+    );
+
+    expect(menuItem(groups, "window", "left-panel").label).toBe("Hide left panel");
+    expect(menuItem(groups, "canvas", "canvas-rulers").label).toBe("Canvas rulers");
+    expect(menuItem(groups, "layer", "reset-local-visibility").label).toBe("Show layers I hid");
+    expect(menuItem(groups, "comic", "page-sequence").label).toBe("Close page sequence");
+    expect(menuItem(groups, "window", "app-settings-window").label).toBe("Application settings");
+    expect(menuItem(groups, "3d", "bg3d").label).toBe("3D background");
+    expect(menuItem(groups, "comic", "page").label).toBe("New page");
+    expect(menuItem(groups, "brush", "pen").label).toBe("Pen");
+    expect(menuItem(groups, "select", "select-all").label).toBe("Select all");
+    expect(menuItem(groups, "layer", "bring-front").label).toBe("Bring to front");
+    // The Brush group reuses the shipped `draw` group-label key.
+    expect(groups.find((group) => group.id === "brush")?.label).toBe("Brush");
+  });
+
+  it("keeps relocated items on the disabled-reason copy they were authored with", () => {
+    const { groups } = buildMenu({
+      collaborationDocumentLocked: true,
+      hasLocallyHiddenLayers: false,
+      viewTransformSuppressed: false,
+      edit: Object.fromEntries(
+        Object.keys(AVAILABLE_EDIT_ACTIONS).map((key) => [key, true]),
+      ) as unknown as StudioMainMenuEditAvailability,
+    });
+
+    expect(menuItem(groups, "select", "select-all").unavailableReason).toBe(
+      "현재 페이지에 선택할 요소가 없거나 상호작용이 잠겨 있습니다.",
+    );
+    expect(menuItem(groups, "layer", "send-backward").unavailableReason).toBe(
+      "순서를 바꿀 요소 하나를 선택하고 문서 편집 잠금을 해제하세요.",
+    );
+    expect(menuItem(groups, "layer", "crop-layer").unavailableReason).toBe(
+      "편집 가능한 이미지 레이어가 필요합니다.",
+    );
+    expect(menuItem(groups, "layer", "reset-local-visibility").unavailableReason).toBe(
+      "나만 숨긴 레이어가 없습니다.",
+    );
+    expect(menuItem(groups, "comic", "page").unavailableReason).toBe(
+      "현재 문서가 협업 잠금 상태라 새 페이지를 추가할 수 없습니다.",
+    );
+  });
+
+  it("points every menu item at a command that exists in the catalog", () => {
+    const { groups } = buildMenu();
+    const known = new Set(STUDIO_COMMAND_CATALOG.map((entry) => entry.id));
+    const items = groups.flatMap((group) =>
+      group.items.map((item) => ({ id: `${group.id}/${item.id}`, commandId: item.commandId })),
+    );
+
+    expect(items.filter((item) => !item.commandId)).toEqual([]);
+    expect(
+      items.filter((item) => item.commandId && !known.has(item.commandId as CommandId)),
+    ).toEqual([]);
+    expect(items).toHaveLength(STUDIO_MENU_ITEM_INVENTORY.length);
+    expect(items.map((item) => item.id)).toEqual([...STUDIO_MENU_ITEM_INVENTORY]);
   });
 
   it("projects document, collaboration, edit, and view state without changing semantics", () => {
@@ -365,28 +411,28 @@ describe("buildStudioMainMenuGroups", () => {
     expect(menuItem(groups, "file", "export-archive").disabled).toBe(true);
     expect(menuItem(groups, "file", "import-psd").disabled).toBe(true);
     expect(menuItem(groups, "file", "import-ora-cbz").disabled).toBe(true);
-    expect(menuItem(groups, "insert", "page").disabled).toBe(true);
+    expect(menuItem(groups, "comic", "page").disabled).toBe(true);
 
-    for (const itemId of [
-      "undo",
-      "redo",
-      "cut",
-      "copy",
-      "paste",
-      "paste-in-place",
-      "paste-file",
-      "select-all",
-      "deselect",
-      "invert-selection",
-      "clear-selection",
-      "duplicate",
-      "bring-front",
-      "bring-forward",
-      "send-back",
-      "send-backward",
-      "crop-layer",
-    ]) {
-      expect(menuItem(groups, "edit", itemId).disabled, itemId).toBe(true);
+    for (const [groupId, itemId] of [
+      ["edit", "undo"],
+      ["edit", "redo"],
+      ["edit", "cut"],
+      ["edit", "copy"],
+      ["edit", "paste"],
+      ["edit", "paste-in-place"],
+      ["edit", "paste-file"],
+      ["edit", "clear-selection"],
+      ["edit", "duplicate"],
+      ["select", "select-all"],
+      ["select", "deselect"],
+      ["select", "invert-selection"],
+      ["layer", "bring-front"],
+      ["layer", "bring-forward"],
+      ["layer", "send-back"],
+      ["layer", "send-backward"],
+      ["layer", "crop-layer"],
+    ] as const) {
+      expect(menuItem(groups, groupId, itemId).disabled, itemId).toBe(true);
     }
 
     expect(menuItem(groups, "view", "flip-horizontal")).toMatchObject({
@@ -397,7 +443,7 @@ describe("buildStudioMainMenuGroups", () => {
       checked: true,
       disabled: true,
     });
-    expect(menuItem(groups, "view", "canvas-rulers")).toMatchObject({
+    expect(menuItem(groups, "canvas", "canvas-rulers")).toMatchObject({
       label: "캔버스 px 눈금자",
       checked: false,
       shortcut: "⌥⌘R",
@@ -421,8 +467,8 @@ describe("buildStudioMainMenuGroups", () => {
         hintKey: `color-vision:${previewVariant}`,
       });
     }
-    expect(menuItem(groups, "view", "reference-window").checked).toBe(true);
-    expect(menuItem(groups, "view", "page-sequence")).toMatchObject({
+    expect(menuItem(groups, "window", "reference-window").checked).toBe(true);
+    expect(menuItem(groups, "comic", "page-sequence")).toMatchObject({
       label: "페이지 시퀀스 닫기",
       checked: true,
     });
@@ -431,16 +477,16 @@ describe("buildStudioMainMenuGroups", () => {
       disabled: true,
     });
     expect(menuItem(groups, "view", "restore-view").disabled).toBe(true);
-    expect(menuItem(groups, "view", "perspective-guide").checked).toBe(true);
-    expect(menuItem(groups, "view", "reset-local-visibility").disabled).toBe(false);
-    expect(menuItem(groups, "view", "quick-access-palette")).toMatchObject({
+    expect(menuItem(groups, "canvas", "perspective-guide").checked).toBe(true);
+    expect(menuItem(groups, "layer", "reset-local-visibility").disabled).toBe(false);
+    expect(menuItem(groups, "window", "quick-access-palette")).toMatchObject({
       label: "빠른 액세스 불러오는 중…",
       shortcut: "⇧Q",
       checked: true,
       disabled: true,
     });
-    expect(menuItem(groups, "view", "left-panel").label).toBe("왼쪽 패널 보이기");
-    expect(menuItem(groups, "view", "right-panel").label).toBe("속성 패널 보이기");
+    expect(menuItem(groups, "window", "left-panel").label).toBe("왼쪽 패널 보이기");
+    expect(menuItem(groups, "window", "right-panel").label).toBe("속성 패널 보이기");
     expect(menuItem(groups, "filter", "last-filter")).toMatchObject({
       label: "마지막 필터 다시 열기",
       disabled: true,
@@ -484,7 +530,7 @@ describe("buildStudioMainMenuGroups", () => {
     expect(menuItem(groups, "file", "publish").unavailableReason).toContain(
       "협업 잠금"
     );
-    expect(menuItem(groups, "edit", "invert-selection").unavailableReason).toContain(
+    expect(menuItem(groups, "select", "invert-selection").unavailableReason).toContain(
       "픽셀 선택"
     );
     expect(menuItem(groups, "view", "restore-view").unavailableReason).toContain(
@@ -492,7 +538,40 @@ describe("buildStudioMainMenuGroups", () => {
     );
   });
 
-  it("routes file, edit, insert, and drawing commands to their injected owners", () => {
+  it("보기 메뉴의 검수·미리보기 3종을 주입된 ui 액션으로 보낸다", () => {
+    // 벨트에서 승격된 항목들이다. 여기서 어긋나면 메뉴에는 보이지만 아무것도 열지 않는,
+    // 도달성 테스트가 잡지 못하는 종류의 회귀가 된다(버튼은 가시하니까).
+    const { groups, ui } = buildMenu();
+
+    menuItem(groups, "view", "anim-timeline").onSelect();
+    menuItem(groups, "view", "vertical-scroll-preview").onSelect();
+    menuItem(groups, "view", "storyboard-grid").onSelect();
+
+    expect(ui.toggleAnimationTimeline).toHaveBeenCalledOnce();
+    expect(ui.openScrollPreview).toHaveBeenCalledOnce();
+    expect(ui.openStoryboardGrid).toHaveBeenCalledOnce();
+  });
+
+  it("마스터 편집 중에는 타임라인 항목이 벨트와 같은 이유로 잠긴다", () => {
+    const { groups } = buildMenu({ masterEditMode: true });
+    const timeline = menuItem(groups, "view", "anim-timeline");
+
+    expect(timeline.disabled).toBe(true);
+    expect(timeline.unavailableReason).toContain("마스터 편집");
+    // 나머지 둘은 히스토리 스크러빙을 쓰지 않으므로 잠기지 않는다.
+    expect(menuItem(groups, "view", "vertical-scroll-preview").disabled).toBeFalsy();
+    expect(menuItem(groups, "view", "storyboard-grid").disabled).toBeFalsy();
+  });
+
+  it("타임라인 항목은 열림 상태를 체크 표시로 반영한다", () => {
+    expect(menuItem(buildMenu().groups, "view", "anim-timeline").checked).toBe(false);
+    expect(
+      menuItem(buildMenu({ animationTimelineOpen: true }).groups, "view", "anim-timeline")
+        .checked,
+    ).toBe(true);
+  });
+
+  it("routes file, edit, layer, and drawing commands to their injected owners", () => {
     const { editor, groups, ui } = buildMenu();
 
     menuItem(groups, "file", "export").onSelect();
@@ -503,15 +582,15 @@ describe("buildStudioMainMenuGroups", () => {
     menuItem(groups, "file", "import-ora-cbz").onSelect();
     menuItem(groups, "edit", "paste").onSelect();
     menuItem(groups, "edit", "paste-in-place").onSelect();
-    menuItem(groups, "edit", "bring-forward").onSelect();
+    menuItem(groups, "layer", "bring-forward").onSelect();
     menuItem(groups, "edit", "pen-pressure").onSelect();
-    menuItem(groups, "insert", "template").onSelect();
-    menuItem(groups, "insert", "elements").onSelect();
-    menuItem(groups, "insert", "text").onSelect();
-    menuItem(groups, "insert", "page").onSelect();
-    menuItem(groups, "draw", "pen").onSelect();
-    menuItem(groups, "draw", "smart-shape").onSelect();
-    menuItem(groups, "draw", "fill").onSelect();
+    menuItem(groups, "window", "template").onSelect();
+    menuItem(groups, "vector", "elements").onSelect();
+    menuItem(groups, "text", "text").onSelect();
+    menuItem(groups, "comic", "page").onSelect();
+    menuItem(groups, "brush", "pen").onSelect();
+    menuItem(groups, "brush", "smart-shape").onSelect();
+    menuItem(groups, "brush", "fill").onSelect();
     menuItem(groups, "ai", "ai-assist").onSelect();
 
     expect(ui.openExportDownload).toHaveBeenCalledOnce();
@@ -541,15 +620,15 @@ describe("buildStudioMainMenuGroups", () => {
     menuItem(groups, "view", "zoom-in").onSelect();
     menuItem(groups, "view", "zoom-out").onSelect();
     menuItem(groups, "view", "rotate-left").onSelect();
-    menuItem(groups, "view", "canvas-rulers").onSelect();
+    menuItem(groups, "canvas", "canvas-rulers").onSelect();
     menuItem(groups, "view", "color-vision-tritanopia").onSelect();
-    menuItem(groups, "view", "density-focus").onSelect();
-    menuItem(groups, "view", "density-full").onSelect();
-    menuItem(groups, "view", "tools-companion").onSelect();
-    menuItem(groups, "view", "quick-access-palette").onSelect();
+    menuItem(groups, "window", "density-focus").onSelect();
+    menuItem(groups, "window", "density-full").onSelect();
+    menuItem(groups, "window", "tools-companion").onSelect();
+    menuItem(groups, "window", "quick-access-palette").onSelect();
     menuItem(groups, "help", "feature-tutorials").onSelect();
     menuItem(groups, "help", "shortcuts").onSelect();
-    menuItem(groups, "view", "app-settings").onSelect();
+    menuItem(groups, "window", "app-settings-window").onSelect();
     menuItem(groups, "filter", "last-filter").onSelect();
     menuItem(groups, "filter", "gaussian-blur").onSelect();
 
@@ -561,7 +640,7 @@ describe("buildStudioMainMenuGroups", () => {
     expect(editor.setStudioUiDensity).toHaveBeenNthCalledWith(1, "focus");
     expect(ui.collapseSidePanels).toHaveBeenCalledOnce();
     expect(editor.setStudioUiDensity).toHaveBeenNthCalledWith(2, "full");
-    expect(menuItem(groups, "view", "tools-companion").label).toBe(
+    expect(menuItem(groups, "window", "tools-companion").label).toBe(
       "멀티 디스플레이 작업공간…"
     );
     expect(ui.openToolsCompanion).toHaveBeenCalledOnce();

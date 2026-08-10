@@ -14,6 +14,7 @@ import { executeStudioBg3dBabylonCapture } from
   "./studio-bg3d-babylon-artifact-capture";
 import {
   createStudioBg3dBabylonSpecialistRuntime,
+  STUDIO_BG3D_BABYLON_DEVICE_LOSS_SIGNAL,
   type StudioBg3dBabylonEngineHandle,
   type StudioBg3dBabylonEngineSettings,
   type StudioBg3dBabylonRuntimeBindings,
@@ -30,6 +31,22 @@ export type StudioBg3dBabylonSpecialistEntryOptions = Omit<
 
 /** ToonSpectrum owns loss recovery by disposing and recreating the whole specialist runtime. */
 export const STUDIO_BG3D_BABYLON_DELEGATES_CONTEXT_LOSS_TO_RUNTIME = true;
+
+export function attachStudioBg3dBabylonDeviceLossSignal(
+  engine: StudioBg3dBabylonEngineHandle,
+  deviceLost: PromiseLike<unknown>,
+): StudioBg3dBabylonEngineHandle {
+  if (!deviceLost || typeof deviceLost.then !== "function") {
+    throw new TypeError("A valid GPUDevice.lost promise is required.");
+  }
+  Object.defineProperty(engine, STUDIO_BG3D_BABYLON_DEVICE_LOSS_SIGNAL, {
+    configurable: false,
+    enumerable: false,
+    value: deviceLost,
+    writable: false,
+  });
+  return engine;
+}
 
 const BABYLON_RUNTIME_BINDINGS: StudioBg3dBabylonRuntimeBindings = Object.freeze({
   createWebGlEngine(
@@ -69,7 +86,15 @@ const BABYLON_RUNTIME_BINDINGS: StudioBg3dBabylonRuntimeBindings = Object.freeze
       useHighPrecisionMatrix: true,
     });
     await engine.initAsync();
-    return engine as StudioBg3dBabylonEngineHandle;
+    try {
+      return attachStudioBg3dBabylonDeviceLossSignal(
+        engine as StudioBg3dBabylonEngineHandle,
+        engine._device.lost,
+      );
+    } catch (error) {
+      engine.dispose();
+      throw error;
+    }
   },
   createScene(engine: StudioBg3dBabylonEngineHandle) {
     return new Scene(engine as AbstractEngine);

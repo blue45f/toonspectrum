@@ -7,29 +7,15 @@
  * bytes untouched, rejects malformed state, and refuses work above the explicit pixel budget.
  */
 
+// The kind list itself lives in the engine-free registry so the top menu can name these
+// filters without loading these warp kernels. This module stays their public home.
+import { STUDIO_FILTER_UNION_WAVE_KINDS } from "./studio-filter-pack-registry";
+
+import type { StudioFilterUnionWaveKind } from "./studio-filter-pack-registry";
 import type { StudioImageDataLike } from "./studio-filters";
 
-export const STUDIO_FILTER_UNION_WAVE_KINDS = [
-  "wave-warp",
-  "ripple-warp",
-  "fisheye",
-  "twirl",
-  "pinch-bloat",
-  "lens-distortion",
-  "film-grain-pro",
-  "salt-pepper",
-  "rgb-noise",
-  "perlin-texture",
-  "pointillize",
-  "stained-glass",
-  "poster-edges",
-  "photocopy",
-  "normal-map",
-  "god-rays",
-] as const;
-
-export type StudioFilterUnionWaveKind =
-  (typeof STUDIO_FILTER_UNION_WAVE_KINDS)[number];
+export { STUDIO_FILTER_UNION_WAVE_KINDS };
+export type { StudioFilterUnionWaveKind };
 
 export type StudioFilterUnionWave = {
   kind: StudioFilterUnionWaveKind;

@@ -17,6 +17,7 @@ import {
   STUDIO_HOKUSAI_LIVE_AUTO_ROUTE_QUALITY_GATE,
   planStudioHokusaiLiveSegment,
   resolveStudioHokusaiLiveAutoRouteDecision,
+  resolveStudioHokusaiLiveMaterialProfile,
   resolveStudioHokusaiLivePreset,
   resolveStudioHokusaiLiveRoute,
   studioHokusaiLiveSampleFitsPinnedSegment,
@@ -42,6 +43,7 @@ const CAPABILITIES: StudioHokusaiLiveBrushCapabilities = {
   canonicalPng: true,
   liveCommitParityReceipt: true,
   materialTexture: "studio-hokusai-material-texture-v2",
+  materialProfileRouting: "identity-profile-v1",
   endpointPolicy: "tapered-start-no-dab-carrier-v1",
   mainThreadFullFrameCopy: false,
 };
@@ -221,6 +223,7 @@ class FakeHokusaiLiveWorker implements StudioHokusaiLiveWorkerLike {
         version: STUDIO_HOKUSAI_LIVE_BRUSH_PROTOCOL_VERSION,
         ...this.#lastIdentity,
         presetId: this.#config?.presetId,
+        materialProfileId: this.#config?.materialProfileId,
         seed: this.#config?.seed,
         sampleCount: 2,
         finalSequence: this.#lastSequence,
@@ -251,6 +254,15 @@ describe("Studio Hokusai live brush vertical slice", () => {
     expect(resolveStudioHokusaiLivePreset("pencil-6b")).toBe("pencil");
     expect(resolveStudioHokusaiLivePreset("charcoal")).toBe("charcoal");
     expect(resolveStudioHokusaiLivePreset("acrylic")).toBe("oil");
+    expect(resolveStudioHokusaiLiveMaterialProfile("charcoal")).toBe("charcoal");
+    expect(resolveStudioHokusaiLiveMaterialProfile("chalk")).toBe("chalk");
+    expect(resolveStudioHokusaiLiveMaterialProfile("crayon")).toBe("crayon");
+    expect(resolveStudioHokusaiLiveMaterialProfile("pastel")).toBe("pastel");
+    expect(resolveStudioHokusaiLiveMaterialProfile("oil-pastel")).toBe("oil-pastel");
+    expect(resolveStudioHokusaiLiveMaterialProfile("oil")).toBe("oil");
+    expect(resolveStudioHokusaiLiveMaterialProfile("acrylic")).toBe("acrylic");
+    expect(resolveStudioHokusaiLiveMaterialProfile("gouache")).toBe("gouache");
+    expect(resolveStudioHokusaiLiveMaterialProfile("brush")).toBe("painterly");
     expect(resolveStudioHokusaiLivePreset("parallel-pen")).toBeNull();
     expect(resolveStudioHokusaiLivePreset("alcohol-marker")).toBeNull();
     expect(resolveStudioHokusaiLivePreset("gpen")).toBeNull();
@@ -277,6 +289,7 @@ describe("Studio Hokusai live brush vertical slice", () => {
     expect(route.config.surfaceWidth * route.config.surfaceHeight)
       .toBeLessThanOrEqual(16_777_216);
     expect(route.config.logicalOriginY).toBeGreaterThan(0);
+    expect(route.config.materialProfileId).toBe("charcoal");
     expect(route.autoRoutePolicy).toEqual({
       version: STUDIO_HOKUSAI_LIVE_AUTO_ROUTE_POLICY_VERSION,
       qualityGate: STUDIO_HOKUSAI_LIVE_AUTO_ROUTE_QUALITY_GATE,
@@ -399,6 +412,36 @@ describe("Studio Hokusai live brush vertical slice", () => {
     expect(packedBatch.lastTimeMilliseconds).toBe(20);
   });
 
+  it("fails closed when a material profile does not match its MYB carrier", () => {
+    const route = resolveStudioHokusaiLiveRoute({
+      ...routeInput(),
+      brushId: "chalk",
+      providerState: "ready",
+      capabilities: CAPABILITIES,
+    });
+    expect(route.status).toBe("ready");
+    if (route.status !== "ready") return;
+    expect(route.config).toMatchObject({
+      presetId: "charcoal",
+      materialProfileId: "chalk",
+    });
+    const identity = {
+      type: "studio-hokusai-live/begin",
+      version: STUDIO_HOKUSAI_LIVE_BRUSH_PROTOCOL_VERSION,
+      requestId: 1,
+      engineEpoch: 1,
+      strokeId: "chalk-profile-validation",
+    } as const;
+    expect(snapshotStudioHokusaiLiveInboundMessage({
+      ...identity,
+      config: route.config,
+    })).not.toBeNull();
+    expect(snapshotStudioHokusaiLiveInboundMessage({
+      ...identity,
+      config: { ...route.config, materialProfileId: "acrylic" },
+    })).toBeNull();
+  });
+
   it("owns one monotonic fallback clock across missing-time append batches", async () => {
     const worker = new FakeHokusaiLiveWorker();
     const provider = new StudioHokusaiLiveBrushProvider({
@@ -503,6 +546,8 @@ describe("Studio Hokusai live brush vertical slice", () => {
     expect(frames).toHaveLength(1);
     expect(Array.from(frames[0]!)).toEqual([12, 34, 56, 255]);
     expect(completed.receipt).toMatchObject({
+      presetId: "charcoal",
+      materialProfileId: "charcoal",
       exactLiveCommitParity: true,
       materialTexture: "studio-hokusai-material-texture-v2",
       endpointPolicy: "tapered-start-no-dab-carrier-v1",
@@ -556,6 +601,53 @@ describe("Studio Hokusai live brush vertical slice", () => {
     expect(worker.sent.some(({ message }) => (
       (message as { type?: string }).type === "studio-hokusai-live/finish"
     ))).toBe(true);
+    provider.close();
+  });
+
+  it("waits for a pointer-up endpoint append to be presented before canonical finish", async () => {
+    const worker = new FakeHokusaiLiveWorker();
+    const provider = new StudioHokusaiLiveBrushProvider({
+      workerFactory: () => worker,
+      startupTimeoutMs: 1_000,
+      finishTimeoutMs: 1_000,
+    });
+    const warming = provider.prewarm();
+    worker.ready();
+    await warming;
+    const route = provider.admitStroke(routeInput());
+    expect(route.status).toBe("ready");
+    if (route.status !== "ready") return;
+    let resolveFirstFrame: (() => void) | null = null;
+    const firstFrame = new Promise<void>((resolve) => {
+      resolveFirstFrame = resolve;
+    });
+    const session = await provider.beginStroke(route, {
+      strokeId: "release-endpoint",
+      signal: new AbortController().signal,
+      onFrame: ({ sequence }) => {
+        if (sequence === 1) resolveFirstFrame?.();
+      },
+    });
+    expect(session.append([
+      { x: 720, y: 40_000, pressure: 0.4, timeMilliseconds: 1 },
+      { x: 722, y: 40_002, pressure: 0.6, timeMilliseconds: 11 },
+    ])).toBe(1);
+    await firstFrame;
+
+    expect(session.append([
+      { x: 724, y: 40_004, pressure: 0.8, timeMilliseconds: 21 },
+    ])).toBe(2);
+    const completedPromise = session.finish();
+    expect(worker.sent.some(({ message }) => (
+      (message as { type?: string }).type === "studio-hokusai-live/finish"
+    ))).toBe(false);
+
+    const completed = await completedPromise;
+    expect(completed.receipt.finalSequence).toBe(2);
+    const finish = worker.sent.find(({ message }) => (
+      (message as { type?: string }).type === "studio-hokusai-live/finish"
+    ))?.message as { finalSequence?: number } | undefined;
+    expect(finish?.finalSequence).toBe(2);
     provider.close();
   });
 

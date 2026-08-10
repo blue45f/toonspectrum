@@ -469,4 +469,86 @@ describe("exportPresetSlices", () => {
       })
     ).rejects.toThrow("내보낼 페이지가 없어요");
   });
+
+  // 연속 다운로드 차단 회피용 간격은 "다운로드 뒤 고정 정지"가 아니라
+  // "다운로드 사이 최소 간격"이다 — 다음 슬라이스 인코딩 시간이 간격에 함께 계산된다.
+  describe("다운로드 간격", () => {
+    /** 가짜 단조 시계 + 인코딩 비용을 가진 하네스. 실제 타이머를 쓰지 않는다. */
+    function runWithClock(encodeCostMs: number, delayMs: number) {
+      let clock = 0;
+      const slept: number[] = [];
+      const downloadedAt: number[] = [];
+      const files: { name: string; size: number }[] = [];
+      const created: FakeCanvas[] = [];
+      return exportPresetSlices({
+        // 690×3840 → 1280 높이 3장
+        pages: [asCanvas(new FakeCanvas(690, 3840))],
+        preset: naver,
+        format: "jpg",
+        title: "t",
+        delayMs,
+        now: () => clock,
+        sleep: async (ms) => {
+          slept.push(ms);
+          clock += ms;
+        },
+        createCanvas: (w, h) => {
+          const fake = new FakeCanvas(w, h);
+          created.push(fake);
+          const originalToBlob = fake.toBlob.bind(fake);
+          fake.toBlob = (callback) => {
+            clock += encodeCostMs; // 합성·인코딩에 실제로 흘러간 시간
+            originalToBlob(callback);
+          };
+          return asCanvas(fake);
+        },
+        download: (blob, name) => {
+          downloadedAt.push(clock);
+          files.push({ name, size: blob.size });
+        },
+      }).then((result) => ({ result, slept, downloadedAt, files, created }));
+    }
+
+    it("인코딩이 간격보다 오래 걸리면 추가 정지가 0이다", async () => {
+      const { result, slept, downloadedAt } = await runWithClock(300, 250);
+      expect(result.files).toBe(3);
+      expect(slept).toEqual([]);
+      expect(downloadedAt).toEqual([300, 600, 900]);
+    });
+
+    it("인코딩이 짧아도 다운로드 사이 최소 간격은 지킨다(모자란 만큼만 대기)", async () => {
+      const { slept, downloadedAt } = await runWithClock(100, 250);
+      // 고정 정지였다면 장당 250ms씩 총 500ms를 쉬었을 자리.
+      expect(slept).toEqual([150, 150]);
+      expect(downloadedAt).toEqual([100, 350, 600]);
+      for (let i = 1; i < downloadedAt.length; i += 1) {
+        expect(downloadedAt[i] - downloadedAt[i - 1]).toBeGreaterThanOrEqual(250);
+      }
+    });
+
+    it("delayMs 0이면 아무 대기도 하지 않는다", async () => {
+      const { slept, downloadedAt } = await runWithClock(100, 0);
+      expect(slept).toEqual([]);
+      expect(downloadedAt).toEqual([100, 200, 300]);
+    });
+
+    // 간격은 "언제 저장하는가"만 바꾼다 — 산출물(파일 수·이름·바이트·그려진 픽셀 연산)은
+    // delayMs 와 무관하게 동일해야 한다.
+    it("간격 값이 달라도 산출물은 완전히 동일하다", async () => {
+      const noDelay = await runWithClock(100, 0);
+      const withDelay = await runWithClock(100, 250);
+      const longEncode = await runWithClock(300, 250);
+
+      const shape = (run: Awaited<ReturnType<typeof runWithClock>>) => ({
+        result: run.result,
+        files: run.files,
+        canvases: run.created.map((c) => [c.width, c.height]),
+        drawImages: run.created.map((c) => c.ctx.drawImages),
+        fillRects: run.created.map((c) => c.ctx.fillRects),
+      });
+
+      expect(shape(withDelay)).toEqual(shape(noDelay));
+      expect(shape(longEncode)).toEqual(shape(noDelay));
+    });
+  });
 });

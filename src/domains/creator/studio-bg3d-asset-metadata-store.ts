@@ -8,6 +8,12 @@ import {
   type StudioBg3dAssetMetadata,
   type StudioBg3dAssetRightsReceipt,
 } from "./studio-bg3d-asset-metadata";
+import {
+  getStudioBg3dLibrariesAuthority,
+  StudioBg3dLibrariesAuthorityError,
+} from "./studio-bg3d-libraries-sqlite-opfs-authority";
+
+import type { StudioBg3dLibrariesAuthority } from "./studio-bg3d-libraries-sqlite-opfs-authority";
 
 export const STUDIO_BG3D_ASSET_METADATA_DATABASE_NAME =
   "toonspectrum-studio-bg3d-asset-metadata";
@@ -47,8 +53,10 @@ export class StudioBg3dAssetMetadataStoreError extends Error {
 
 export interface StudioBg3dAssetMetadataStoreOptions {
   readonly signal?: AbortSignal;
-  /** Dependency injection for tests and non-window runtimes. null explicitly disables storage. */
+  /** Explicit legacy import/test seam. Product defaults never inspect ambient IndexedDB. */
   readonly indexedDb?: IDBFactory | null;
+  /** V12 SQLite/OPFS authority injection for deterministic tests. */
+  readonly authority?: StudioBg3dLibrariesAuthority;
 }
 
 export interface StudioBg3dAssetMetadataMutationOptions
@@ -340,6 +348,280 @@ function validationFixture(patch: Record<string, unknown>): StudioBg3dAssetMetad
   return metadata;
 }
 
+export const STUDIO_BG3D_ASSET_METADATA_V12_MANIFEST_KIND =
+  "toonspectrum-studio-bg3d-asset-metadata-v12";
+export const STUDIO_BG3D_ASSET_METADATA_V12_MANIFEST_VERSION = 1 as const;
+export const STUDIO_BG3D_ASSET_METADATA_V12_MAX_MANIFEST_BYTES = 16 * 1024 * 1024;
+
+const METADATA_V12_MANIFEST_KEYS = [
+  "kind",
+  "version",
+  "revision",
+  "updatedAt",
+  "records",
+] as const;
+
+interface StudioBg3dAssetMetadataV12Manifest {
+  readonly kind: typeof STUDIO_BG3D_ASSET_METADATA_V12_MANIFEST_KIND;
+  readonly version: typeof STUDIO_BG3D_ASSET_METADATA_V12_MANIFEST_VERSION;
+  readonly revision: number;
+  readonly updatedAt: number;
+  readonly records: readonly StudioBg3dAssetMetadata[];
+}
+
+function usesExplicitLegacyIndexedDb(options: StudioBg3dAssetMetadataStoreOptions): boolean {
+  return Object.prototype.hasOwnProperty.call(options, "indexedDb");
+}
+
+function v12MetadataAuthority(
+  options: StudioBg3dAssetMetadataStoreOptions,
+): StudioBg3dLibrariesAuthority {
+  return options.authority ?? getStudioBg3dLibrariesAuthority();
+}
+
+function metadataV12Error(
+  cause: unknown,
+  fallback: StudioBg3dAssetMetadataStoreErrorCode = "transaction-failed",
+): StudioBg3dAssetMetadataStoreError {
+  if (cause instanceof StudioBg3dAssetMetadataStoreError) return cause;
+  if (cause instanceof StudioBg3dLibrariesAuthorityError) {
+    if (cause.code === "aborted") return storeError("aborted", cause);
+    if (cause.code === "corrupt") return storeError("invalid-stored-metadata", cause);
+    return storeError("storage-unavailable", cause);
+  }
+  return storeError(fallback, cause);
+}
+
+function exactMetadataV12Manifest(raw: unknown): Record<string, unknown> | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const prototype = Object.getPrototypeOf(raw);
+  if (prototype !== Object.prototype && prototype !== null) return null;
+  const keys = Object.keys(raw);
+  if (
+    keys.length !== METADATA_V12_MANIFEST_KEYS.length ||
+    keys.some((key) => !METADATA_V12_MANIFEST_KEYS.includes(
+      key as (typeof METADATA_V12_MANIFEST_KEYS)[number],
+    ))
+  ) return null;
+  return raw as Record<string, unknown>;
+}
+
+function canonicalMetadataV12Manifest(
+  manifest: StudioBg3dAssetMetadataV12Manifest,
+): StudioBg3dAssetMetadataV12Manifest {
+  return {
+    kind: STUDIO_BG3D_ASSET_METADATA_V12_MANIFEST_KIND,
+    version: STUDIO_BG3D_ASSET_METADATA_V12_MANIFEST_VERSION,
+    revision: manifest.revision,
+    updatedAt: manifest.updatedAt,
+    records: [...manifest.records].sort((left, right) =>
+      left.contentHash.localeCompare(right.contentHash)),
+  };
+}
+
+function emptyMetadataV12Manifest(): StudioBg3dAssetMetadataV12Manifest {
+  return canonicalMetadataV12Manifest({
+    kind: STUDIO_BG3D_ASSET_METADATA_V12_MANIFEST_KIND,
+    version: STUDIO_BG3D_ASSET_METADATA_V12_MANIFEST_VERSION,
+    revision: 0,
+    updatedAt: 0,
+    records: [],
+  });
+}
+
+function parseMetadataV12Manifest(raw: string | null): StudioBg3dAssetMetadataV12Manifest {
+  if (raw === null) return emptyMetadataV12Manifest();
+  if (new TextEncoder().encode(raw).byteLength >
+    STUDIO_BG3D_ASSET_METADATA_V12_MAX_MANIFEST_BYTES) {
+    throw storeError("invalid-stored-metadata");
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (cause) {
+    throw storeError("invalid-stored-metadata", cause);
+  }
+  const value = exactMetadataV12Manifest(parsed);
+  if (
+    !value ||
+    value.kind !== STUDIO_BG3D_ASSET_METADATA_V12_MANIFEST_KIND ||
+    value.version !== STUDIO_BG3D_ASSET_METADATA_V12_MANIFEST_VERSION ||
+    !Number.isSafeInteger(value.revision) ||
+    (value.revision as number) < 0 ||
+    !Number.isSafeInteger(value.updatedAt) ||
+    (value.updatedAt as number) < 0 ||
+    !Array.isArray(value.records) ||
+    value.records.length > STUDIO_BG3D_ASSET_METADATA_LIMITS.assetsPerQuery
+  ) throw storeError("invalid-stored-metadata");
+  const records: StudioBg3dAssetMetadata[] = [];
+  for (const candidate of value.records) {
+    const metadata = normalizeStudioBg3dAssetMetadata(candidate);
+    if (!metadata || JSON.stringify(metadata) !== JSON.stringify(candidate)) {
+      throw storeError("invalid-stored-metadata");
+    }
+    records.push(metadata);
+  }
+  if (new Set(records.map(({ contentHash }) => contentHash)).size !== records.length) {
+    throw storeError("invalid-stored-metadata");
+  }
+  const manifest = canonicalMetadataV12Manifest({
+    kind: STUDIO_BG3D_ASSET_METADATA_V12_MANIFEST_KIND,
+    version: STUDIO_BG3D_ASSET_METADATA_V12_MANIFEST_VERSION,
+    revision: value.revision as number,
+    updatedAt: value.updatedAt as number,
+    records,
+  });
+  if (JSON.stringify(manifest) !== raw) throw storeError("invalid-stored-metadata");
+  return manifest;
+}
+
+function serializeMetadataV12Manifest(manifest: StudioBg3dAssetMetadataV12Manifest): string {
+  const raw = JSON.stringify(canonicalMetadataV12Manifest(manifest));
+  if (new TextEncoder().encode(raw).byteLength >
+    STUDIO_BG3D_ASSET_METADATA_V12_MAX_MANIFEST_BYTES) {
+    throw storeError("invalid-metadata");
+  }
+  return raw;
+}
+
+async function listStudioBg3dAssetMetadataV12(
+  options: StudioBg3dAssetMetadataStoreOptions,
+): Promise<readonly StudioBg3dAssetMetadata[]> {
+  throwIfAborted(options.signal);
+  try {
+    const manifest = parseMetadataV12Manifest(
+      await v12MetadataAuthority(options).readManifest("metadata"),
+    );
+    throwIfAborted(options.signal);
+    return sortStudioBg3dAssetMetadata(manifest.records, "recent");
+  } catch (cause) {
+    throw metadataV12Error(cause);
+  }
+}
+
+async function getStudioBg3dAssetMetadataV12(
+  contentHash: unknown,
+  options: StudioBg3dAssetMetadataStoreOptions,
+): Promise<StudioBg3dAssetMetadata | null> {
+  throwIfAborted(options.signal);
+  const hash = canonicalHash(contentHash);
+  try {
+    const manifest = parseMetadataV12Manifest(
+      await v12MetadataAuthority(options).readManifest("metadata"),
+    );
+    throwIfAborted(options.signal);
+    return manifest.records.find((record) => record.contentHash === hash) ?? null;
+  } catch (cause) {
+    throw metadataV12Error(cause);
+  }
+}
+
+async function putStudioBg3dAssetMetadataV12(
+  values: readonly unknown[],
+  options: StudioBg3dAssetMetadataStoreOptions,
+): Promise<readonly StudioBg3dAssetMetadata[]> {
+  throwIfAborted(options.signal);
+  const metadata = preparePutBatch(values);
+  if (metadata.length === 0) return Object.freeze([]);
+  try {
+    return await v12MetadataAuthority(options).mutate("metadata", () => [], async (context) => {
+      const current = parseMetadataV12Manifest(context.currentRaw);
+      const byHash = new Map(current.records.map((record) => [record.contentHash, record]));
+      for (const candidate of metadata) {
+        const existing = byHash.get(candidate.contentHash);
+        if (existing && metadataFingerprint(existing) !== metadataFingerprint(candidate)) {
+          throw storeError("metadata-conflict");
+        }
+        byHash.set(candidate.contentHash, candidate);
+      }
+      if (byHash.size > STUDIO_BG3D_ASSET_METADATA_LIMITS.assetsPerQuery) {
+        throw storeError("invalid-metadata");
+      }
+      const next = canonicalMetadataV12Manifest({
+        ...current,
+        revision: current.revision + 1,
+        updatedAt: context.now,
+        records: [...byHash.values()],
+      });
+      return {
+        nextRaw: serializeMetadataV12Manifest(next),
+        nextRefs: [],
+        result: metadata,
+      };
+    }, options.signal);
+  } catch (cause) {
+    throw metadataV12Error(cause);
+  }
+}
+
+async function deleteStudioBg3dAssetMetadataV12(
+  contentHashes: readonly unknown[],
+  options: StudioBg3dAssetMetadataStoreOptions,
+): Promise<number> {
+  throwIfAborted(options.signal);
+  const hashes = prepareDeleteHashes(contentHashes);
+  if (hashes.length === 0) return 0;
+  try {
+    return await v12MetadataAuthority(options).mutate("metadata", () => [], async (context) => {
+      const current = parseMetadataV12Manifest(context.currentRaw);
+      const selected = new Set(hashes);
+      const records = current.records.filter(({ contentHash }) => !selected.has(contentHash));
+      const next = canonicalMetadataV12Manifest({
+        ...current,
+        revision: current.revision + 1,
+        updatedAt: context.now,
+        records,
+      });
+      return {
+        nextRaw: serializeMetadataV12Manifest(next),
+        nextRefs: [],
+        result: current.records.length - records.length,
+      };
+    }, options.signal);
+  } catch (cause) {
+    throw metadataV12Error(cause);
+  }
+}
+
+async function updateMetadataV12(
+  contentHash: unknown,
+  patchKey: "favorite" | "collections" | "tags" | "rights",
+  patchValue: unknown,
+  options: StudioBg3dAssetMetadataMutationOptions,
+): Promise<StudioBg3dAssetMetadata> {
+  throwIfAborted(options.signal);
+  const hash = canonicalHash(contentHash);
+  const now = validateMutationNow(options);
+  const validatedPatch = validationFixture({ [patchKey]: patchValue });
+  try {
+    return await v12MetadataAuthority(options).mutate("metadata", () => [], async (context) => {
+      const current = parseMetadataV12Manifest(context.currentRaw);
+      const existing = current.records.find((record) => record.contentHash === hash);
+      if (!existing) throw storeError("not-found");
+      const nextRecord = normalizeStudioBg3dAssetMetadata({
+        ...existing,
+        updatedAt: Math.max(existing.updatedAt, now),
+        [patchKey]: validatedPatch[patchKey],
+      });
+      if (!nextRecord || nextRecord.contentHash !== hash) throw storeError("invalid-metadata");
+      const next = canonicalMetadataV12Manifest({
+        ...current,
+        revision: current.revision + 1,
+        updatedAt: context.now,
+        records: current.records.map((record) =>
+          record.contentHash === hash ? nextRecord : record),
+      });
+      return {
+        nextRaw: serializeMetadataV12Manifest(next),
+        nextRefs: [],
+        result: nextRecord,
+      };
+    }, options.signal);
+  } catch (cause) {
+    throw metadataV12Error(cause);
+  }
+}
+
 async function updateMetadata(
   contentHash: unknown,
   patchKey: "favorite" | "collections" | "tags" | "rights",
@@ -371,6 +653,9 @@ async function updateMetadata(
 export async function listStudioBg3dAssetMetadata(
   options: StudioBg3dAssetMetadataStoreOptions = {},
 ): Promise<readonly StudioBg3dAssetMetadata[]> {
+  if (!usesExplicitLegacyIndexedDb(options)) {
+    return listStudioBg3dAssetMetadataV12(options);
+  }
   return withObjectStore("readonly", options, async (store) => {
     const raw = await requestResult(store.getAll(), options.signal);
     if (raw.length > STUDIO_BG3D_ASSET_METADATA_LIMITS.assetsPerQuery) {
@@ -385,6 +670,9 @@ export async function getStudioBg3dAssetMetadata(
   contentHash: unknown,
   options: StudioBg3dAssetMetadataStoreOptions = {},
 ): Promise<StudioBg3dAssetMetadata | null> {
+  if (!usesExplicitLegacyIndexedDb(options)) {
+    return getStudioBg3dAssetMetadataV12(contentHash, options);
+  }
   throwIfAborted(options.signal);
   const hash = canonicalHash(contentHash);
   return withObjectStore("readonly", options, async (store) => {
@@ -401,6 +689,9 @@ export async function putStudioBg3dAssetMetadataAtomically(
   values: readonly unknown[],
   options: StudioBg3dAssetMetadataStoreOptions = {},
 ): Promise<readonly StudioBg3dAssetMetadata[]> {
+  if (!usesExplicitLegacyIndexedDb(options)) {
+    return putStudioBg3dAssetMetadataV12(values, options);
+  }
   throwIfAborted(options.signal);
   const metadata = preparePutBatch(values);
   throwIfAborted(options.signal);
@@ -431,6 +722,9 @@ export async function deleteStudioBg3dAssetMetadataAtomically(
   contentHashes: readonly unknown[],
   options: StudioBg3dAssetMetadataStoreOptions = {},
 ): Promise<number> {
+  if (!usesExplicitLegacyIndexedDb(options)) {
+    return deleteStudioBg3dAssetMetadataV12(contentHashes, options);
+  }
   throwIfAborted(options.signal);
   const hashes = prepareDeleteHashes(contentHashes);
   throwIfAborted(options.signal);
@@ -452,6 +746,9 @@ export function updateStudioBg3dAssetFavorite(
   options: StudioBg3dAssetMetadataMutationOptions = {},
 ): Promise<StudioBg3dAssetMetadata> {
   if (typeof favorite !== "boolean") return Promise.reject(storeError("invalid-metadata"));
+  if (!usesExplicitLegacyIndexedDb(options)) {
+    return updateMetadataV12(contentHash, "favorite", favorite, options);
+  }
   return updateMetadata(contentHash, "favorite", favorite, options);
 }
 
@@ -460,6 +757,9 @@ export function updateStudioBg3dAssetCollections(
   collections: readonly StudioBg3dAssetCollection[],
   options: StudioBg3dAssetMetadataMutationOptions = {},
 ): Promise<StudioBg3dAssetMetadata> {
+  if (!usesExplicitLegacyIndexedDb(options)) {
+    return updateMetadataV12(contentHash, "collections", collections, options);
+  }
   return updateMetadata(contentHash, "collections", collections, options);
 }
 
@@ -468,6 +768,9 @@ export function updateStudioBg3dAssetTags(
   tags: readonly string[],
   options: StudioBg3dAssetMetadataMutationOptions = {},
 ): Promise<StudioBg3dAssetMetadata> {
+  if (!usesExplicitLegacyIndexedDb(options)) {
+    return updateMetadataV12(contentHash, "tags", tags, options);
+  }
   return updateMetadata(contentHash, "tags", tags, options);
 }
 
@@ -476,5 +779,8 @@ export function updateStudioBg3dAssetRights(
   rights: StudioBg3dAssetRightsReceipt,
   options: StudioBg3dAssetMetadataMutationOptions = {},
 ): Promise<StudioBg3dAssetMetadata> {
+  if (!usesExplicitLegacyIndexedDb(options)) {
+    return updateMetadataV12(contentHash, "rights", rights, options);
+  }
   return updateMetadata(contentHash, "rights", rights, options);
 }

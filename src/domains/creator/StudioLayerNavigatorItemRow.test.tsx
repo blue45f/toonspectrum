@@ -37,6 +37,8 @@ function rowHandlers(
     onRowClick: vi.fn(),
     onRowDoubleClick: vi.fn(),
     onToggleItemHidden: vi.fn(),
+    onToggleItemLocked: vi.fn(),
+    onSetItemOpacity: vi.fn(),
     onOpenItemActionMenu: vi.fn(),
     registerRowRef: vi.fn(),
     ...overrides,
@@ -64,6 +66,7 @@ function rowProps(
     mobileMultiSelect: false,
     readOnly: false,
     hiddenByGroup: false,
+    lockedByGroup: false,
     actionOpen: false,
     actionPopoverId: "layer-actions",
     stableHandlers: rowHandlers(),
@@ -314,5 +317,120 @@ describe("StudioLayerNavigatorItemRow", () => {
     expect(screen.getByRole("treeitem").getAttribute("aria-keyshortcuts")).toBe(
       "ArrowUp ArrowDown ArrowLeft ArrowRight Home End Enter Space F2 Shift+F10 Control+A Meta+A Control+G Meta+G Shift+Control+G Shift+Meta+G"
     );
+  });
+
+  it("puts 표시·잠금·불투명도 in the row itself, not behind the … popover", () => {
+    const onToggleItemHidden = vi.fn();
+    const onToggleItemLocked = vi.fn();
+    const onSetItemOpacity = vi.fn();
+    renderRow(
+      rowProps({
+        item: { ...ITEM, opacity: 0.6 },
+        stableHandlers: rowHandlers({
+          onToggleItemHidden,
+          onToggleItemLocked,
+          onSetItemOpacity,
+        }),
+      })
+    );
+
+    const row = screen.getByRole("treeitem");
+    const inline = row.querySelectorAll("[data-studio-layer-row-action]");
+    expect([...inline].map((node) => node.getAttribute("data-studio-layer-row-action")))
+      .toEqual(["visibility", "lock", "opacity", "menu"]);
+
+    fireEvent.click(screen.getByRole("button", { name: "주인공 원화 숨김" }));
+    expect(onToggleItemHidden).toHaveBeenCalledWith("line-art", true);
+
+    fireEvent.click(
+      row.querySelector<HTMLButtonElement>('[data-studio-layer-row-action="lock"]')!
+    );
+    expect(onToggleItemLocked).toHaveBeenCalledWith("line-art", true);
+
+    const opacity = screen.getByRole("slider", { name: "주인공 원화 불투명도" });
+    expect(opacity.getAttribute("aria-valuenow")).toBe("60");
+    expect(opacity.getAttribute("aria-valuetext")).toBe("60%");
+    fireEvent.keyDown(opacity, { key: "ArrowRight" });
+    // The preview is immediate; the document write lands once the gesture settles.
+    expect(opacity.getAttribute("aria-valuenow")).toBe("61");
+    fireEvent.blur(opacity);
+    expect(onSetItemOpacity).toHaveBeenCalledWith("line-art", 0.61);
+  });
+
+  it("keeps one opacity gesture at one document write while aria-valuenow tracks every step", () => {
+    // 측정된 결함(D7): 100 → 87 드래그 한 번이 히스토리 13칸을 먹었다. 스크러버는 제스처 중
+    // 프리뷰만 하고, 포인터를 떼거나 키 입력이 멎을 때 한 번만 문서에 쓴다.
+    const onSetItemOpacity = vi.fn();
+    renderRow(
+      rowProps({
+        item: { ...ITEM, opacity: 1 },
+        stableHandlers: rowHandlers({ onSetItemOpacity }),
+      })
+    );
+
+    const opacity = screen.getByRole("slider", { name: "주인공 원화 불투명도" });
+    const trail: (string | null)[] = [];
+    for (let press = 0; press < 8; press += 1) {
+      fireEvent.keyDown(opacity, { key: "ArrowLeft" });
+      trail.push(opacity.getAttribute("aria-valuenow"));
+    }
+
+    expect(trail).toEqual(["99", "98", "97", "96", "95", "94", "93", "92"]);
+    expect(opacity.getAttribute("aria-valuetext")).toBe("92%");
+    expect(onSetItemOpacity).not.toHaveBeenCalled();
+
+    fireEvent.blur(opacity);
+    expect(onSetItemOpacity).toHaveBeenCalledTimes(1);
+    expect(onSetItemOpacity).toHaveBeenCalledWith("line-art", 0.92);
+
+    // A trailing blur after the gesture already settled must not write the same edit twice.
+    fireEvent.blur(opacity);
+    expect(onSetItemOpacity).toHaveBeenCalledTimes(1);
+  });
+
+  it("commits a pointer scrub once, on release", () => {
+    const onSetItemOpacity = vi.fn();
+    renderRow(
+      rowProps({
+        item: { ...ITEM, opacity: 1 },
+        stableHandlers: rowHandlers({ onSetItemOpacity }),
+      })
+    );
+
+    const opacity = screen.getByRole("slider", { name: "주인공 원화 불투명도" });
+    opacity.setPointerCapture = vi.fn();
+    opacity.releasePointerCapture = vi.fn();
+    opacity.hasPointerCapture = vi.fn(() => true);
+
+    fireEvent.pointerDown(opacity, { pointerId: 7, button: 0, clientX: 200 });
+    for (const clientX of [191, 182, 173, 161]) {
+      fireEvent.pointerMove(opacity, { pointerId: 7, clientX });
+    }
+    expect(opacity.getAttribute("aria-valuenow")).toBe("87");
+    expect(onSetItemOpacity).not.toHaveBeenCalled();
+
+    fireEvent.pointerUp(opacity, { pointerId: 7 });
+    expect(onSetItemOpacity).toHaveBeenCalledTimes(1);
+    expect(onSetItemOpacity).toHaveBeenCalledWith("line-art", 0.87);
+  });
+
+  it("keeps the row's own tab stop — inline actions never add per-layer tab stops", () => {
+    renderRow(rowProps({ item: { ...ITEM, opacity: 1 }, tabStop: true }));
+    const row = screen.getByRole("treeitem");
+    expect(row.tabIndex).toBe(0);
+    for (const control of row.querySelectorAll("[data-layer-row-control]")) {
+      expect((control as HTMLElement).tabIndex).toBe(-1);
+    }
+  });
+
+  it("blocks 잠금/불투명도 when the parent group owns the lock or the page is read-only", () => {
+    renderRow(rowProps({ lockedByGroup: true, effectivelyLocked: true }));
+    const row = screen.getByRole("treeitem");
+    const lock = row.querySelector<HTMLButtonElement>('[data-studio-layer-row-action="lock"]');
+    expect(lock?.disabled).toBe(true);
+    expect(lock?.getAttribute("aria-label")).toBe("주인공 원화, 그룹에서 잠김");
+    expect(
+      screen.getByRole("slider", { name: "주인공 원화 불투명도" }).getAttribute("aria-disabled")
+    ).toBe("true");
   });
 });

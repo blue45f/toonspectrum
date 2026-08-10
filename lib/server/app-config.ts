@@ -4,12 +4,14 @@ import { eq } from "drizzle-orm";
 
 import { appSettings, db, dbClient, users } from "../db";
 
+import { isWhitelistedAdminEmail } from "./admin-emails";
 import { getSessionUserCached } from "./session";
 import { ensureUserLifecycleSchema, normalizeUserAccountStatus } from "./user-lifecycle";
 
 // 관리자(admin/operator 역할 또는 ADMIN_EMAILS 화이트리스트) 여부 — admin-authed 라우트 공용.
 // 세션 마이크로캐시(TTL 30초) 적용: admin-authed 요청마다 나가던 users SELECT 를 흡수한다.
 // 역할 변경 경로는 invalidateSessionUser 로 즉시 무효화된다(admin.service·me 갱신 참조).
+
 export async function isAdminUser(userId: string | null | undefined): Promise<boolean> {
   if (!userId) return false;
   try {
@@ -26,12 +28,7 @@ export async function isAdminUser(userId: string | null | undefined): Promise<bo
   if (normalizeUserAccountStatus(u.status) !== "active") return false;
   const role = String(u.role ?? "").toLowerCase();
   if (role === "admin" || role === "operator") return true;
-  const whitelist = String(process.env.ADMIN_EMAILS ?? "")
-    .toLowerCase()
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  return whitelist.includes(String(u.email ?? "").toLowerCase());
+  return isWhitelistedAdminEmail(u.email);
   } catch {
     return false; // DB(Neon) 불가 시 관리자 아님으로 안전 폴백.
   }

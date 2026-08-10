@@ -1,0 +1,64 @@
+import { readFileSync } from "node:fs";
+
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it } from "vitest";
+
+import { resolveStudioTiledDocPrimarySurfaceOwner } from "./studio-tiledoc-primary-surface-owner";
+import {
+  StudioTiledDocWebGpuSurface,
+} from "./StudioTiledDocWebGpuSurface";
+
+describe("StudioTiledDocWebGpuSurface product ownership", () => {
+  it("allows exactly one primary document owner and keeps pending frames hidden", () => {
+    expect(resolveStudioTiledDocPrimarySurfaceOwner("pending", true)).toBe("none");
+    expect(resolveStudioTiledDocPrimarySurfaceOwner("webgpu", true)).toBe("tiledoc-webgpu");
+    expect(resolveStudioTiledDocPrimarySurfaceOwner("fallback", true))
+      .toBe("canvas2d-fallback");
+    expect(resolveStudioTiledDocPrimarySurfaceOwner("webgpu", false)).toBe("none");
+  });
+
+  it("renders one hidden bounded document island before two-phase authority is granted", () => {
+    const html = renderToStaticMarkup(
+      <StudioTiledDocWebGpuSurface
+        generation={1}
+        surface={{
+          version: 1,
+          surfaceId: "raster:page:ink",
+          width: 8192,
+          height: 8192,
+          tileSize: 512,
+        }}
+        tiles={[]}
+        viewport={{
+          scaleX: 1,
+          scaleY: 1,
+          offsetX: 0,
+          offsetY: 0,
+          flipX: false,
+          surfaceBounds: { left: 10, top: 20, width: 512, height: 512 },
+        }}
+        documentViewport={{ x: 0, y: 0, width: 512, height: 512 }}
+      />
+    );
+    expect(html).toContain('data-studio-tiledoc-product-island="true"');
+    expect(html).toContain('data-studio-primary-surface-owner="none"');
+    expect((html.match(/data-studio-tiledoc-webgpu-canvas=/gu) ?? [])).toHaveLength(1);
+    expect(html).not.toContain("canvas2d-fallback");
+  });
+
+  it("wires the existing CRDT raster product island to tiledoc without taking Vello selection ownership", () => {
+    const surfaceSource = readFileSync(
+      new URL("./StudioRasterCrdtSurface.tsx", import.meta.url),
+      "utf8"
+    );
+    const tiledocSource = readFileSync(
+      new URL("./StudioTiledDocWebGpuSurface.tsx", import.meta.url),
+      "utf8"
+    );
+    expect(surfaceSource).toContain("<StudioTiledDocWebGpuSurface");
+    expect(surfaceSource).toContain("documentViewport={visibleDocumentRect}");
+    expect((surfaceSource.match(/<StudioTiledDocWebGpuSurface/gu) ?? [])).toHaveLength(1);
+    expect(tiledocSource).not.toContain("StudioVelloHubSurface");
+    expect(tiledocSource).toContain('STUDIO_TILEDOC_PRODUCT_RASTER_LAYER_ID');
+  });
+});

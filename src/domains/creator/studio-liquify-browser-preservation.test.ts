@@ -79,7 +79,7 @@ describe("bakeLiquifyStrokeToCanvas source preservation", () => {
     expect(written).toBeInstanceOf(NativeImageDataStub);
   });
 
-  it("work draw가 투명하게 남아도 frozen 스냅샷으로 초기화해 단일 bloat 밖의 픽셀을 보존한다", async () => {
+  it("한 결과 canvas에서 ROI snapshot을 복제해 단일 bloat 밖의 픽셀을 보존한다", async () => {
     const width = 64;
     const height = 64;
     const source: TestSource = { pixels: patternedImage(width, height) };
@@ -116,20 +116,28 @@ describe("bakeLiquifyStrokeToCanvas source preservation", () => {
           stroke: () => {},
           fillRect: () => {},
           clearRect: () => {},
-          // 첫 frozen 캔버스만 정상 스냅샷을 얻고, 두 번째 work draw는 브라우저 context
-          // 복구 타이밍을 모사해 투명 버퍼를 유지한다.
           drawImage: (image) => {
-            if (id !== 1) return;
             const input = (image as TestSource).pixels;
             pixels = { data: new Uint8ClampedArray(input.data), width: input.width, height: input.height };
           },
-          getImageData: () => ({
-            data: new Uint8ClampedArray(pixels.data),
-            width: pixels.width,
-            height: pixels.height,
-          }),
-          putImageData: (next) => {
-            pixels = { data: new Uint8ClampedArray(next.data), width: next.width, height: next.height };
+          getImageData: (sx, sy, sw, sh) => {
+            const data = new Uint8ClampedArray(sw * sh * 4);
+            for (let y = 0; y < sh; y += 1) {
+              for (let x = 0; x < sw; x += 1) {
+                const sourceOffset = ((sy + y) * canvasWidth + sx + x) * 4;
+                data.set(pixels.data.subarray(sourceOffset, sourceOffset + 4), (y * sw + x) * 4);
+              }
+            }
+            return { data, width: sw, height: sh };
+          },
+          putImageData: (next, dx, dy) => {
+            for (let y = 0; y < next.height; y += 1) {
+              for (let x = 0; x < next.width; x += 1) {
+                const sourceOffset = (y * next.width + x) * 4;
+                const targetOffset = ((dy + y) * canvasWidth + dx + x) * 4;
+                pixels.data.set(next.data.subarray(sourceOffset, sourceOffset + 4), targetOffset);
+              }
+            }
             buffers.set(id, pixels);
           },
         },
@@ -148,7 +156,8 @@ describe("bakeLiquifyStrokeToCanvas source preservation", () => {
     );
 
     expect(output).not.toBeNull();
-    const result = buffers.get(2)!;
+    expect(canvasId).toBe(1);
+    const result = buffers.get(1)!;
     const farOffset = (4 * width + 4) * 4;
     expect(result.data.slice(farOffset, farOffset + 4)).toEqual(
       source.pixels.data.slice(farOffset, farOffset + 4),

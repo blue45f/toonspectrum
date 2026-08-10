@@ -56,21 +56,19 @@ import {
 import { StudioBrushPresetIcon } from "./StudioBrushPresetIcon";
 import { StudioBrushTray } from "./StudioBrushTray";
 import { StudioDualColorWell } from "./StudioDualColorWell";
-import { StudioLivingInkControls } from "./StudioLivingInkControls";
+import {
+  StudioLivingInkControls,
+  type StudioLivingInkControlsProps,
+} from "./StudioLivingInkControls";
 import { StudioToolHintTarget } from "./StudioToolHint";
 
 import type { StudioBrushSlot } from "./studio-brush-slots";
 import type { StudioBrushTrayItem } from "./studio-creative-ux";
-import type { StudioLivingInkMaterialControls } from "./studio-living-ink-gpu-protocol";
-import type {
-  StudioLivingInkStrokeMode,
-  StudioLivingInkStudioState,
-} from "./studio-living-ink-studio-coordinator";
 
 import { cn } from "@/lib/utils";
 
 export type StudioDrawModeUi = "pen" | "pixel" | "eraser" | "shape";
-export type StudioSymmetryUi = "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope";
+export type StudioSymmetryUi = "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope" | "silk";
 export type StudioStabilizerModeUi = "standard" | "adaptive" | "precision";
 export type StudioPressureCurveUi = "soft" | "linear" | "firm";
 
@@ -147,24 +145,7 @@ export interface StudioDrawOptionsBarProps {
   shapeFill?: boolean;
   onShapeFillChange?: (filled: boolean) => void;
   shapeSlot?: ReactNode;
-  livingInk?: Readonly<{
-    supported: boolean;
-    state: StudioLivingInkStudioState;
-    mode: StudioLivingInkStrokeMode;
-    scope: "all" | "selection";
-    selectionAvailable: boolean;
-    busy: boolean;
-    fixAvailable: boolean;
-    fixUnavailableReason?: string;
-    material: StudioLivingInkMaterialControls;
-    materialLocked: boolean;
-    materialLockedReason?: string;
-    onModeChange: (mode: StudioLivingInkStrokeMode) => void;
-    onScopeChange: (scope: "all" | "selection") => void;
-    onFix: () => void;
-    onClear: () => void;
-    onMaterialChange: (patch: Partial<StudioLivingInkMaterialControls>) => void;
-  }>;
+  livingInk?: StudioLivingInkControlsProps;
   /** Float above the canvas bottom edge instead of consuming a second top row. */
   docked?: boolean;
   /** Desktop workspace chrome that the fixed dock must not cover. */
@@ -753,6 +734,25 @@ export function StudioDrawOptionsBar({
           </div>
         ) : null}
 
+        {/*
+          Quick starter shelf stays on the primary strip so wash/air (and favorites)
+          are one tap away — not buried under “세부 옵션”.
+        */}
+        {drawMode === "pen" ? (
+          <StudioBrushTray
+            activeBrushId={catalogBrushId}
+            brushCatalogItems={brushCatalogItems}
+            recentBrushIds={recentBrushIds}
+            favoriteBrushIds={favoriteBrushIds}
+            onSelect={onSelectBrush}
+            onOpenLibrary={toggleBrushCatalog}
+            libraryOpen={brushCatalogOpen}
+            // Prefer tray width so starter wash/air chips stay clickable without outer scroll.
+            className="min-w-[12.5rem] max-w-[min(26rem,48vw)] shrink-0"
+            aria-label="기본 프리셋 빠른 선택 — 즐겨찾기, 최근 사용, 추천"
+          />
+        ) : null}
+
         {drawMode === "pen" && livingInk ? (
           <StudioLivingInkControls {...livingInk} />
         ) : null}
@@ -1109,20 +1109,6 @@ export function StudioDrawOptionsBar({
             docked && "mt-1 rounded-lg border shadow-[0_14px_36px_oklch(0.06_0.01_70/0.52)]"
           )}
         >
-          {drawMode === "pen" ? (
-            <StudioBrushTray
-              activeBrushId={catalogBrushId}
-              brushCatalogItems={brushCatalogItems}
-              recentBrushIds={recentBrushIds}
-              favoriteBrushIds={favoriteBrushIds}
-              onSelect={onSelectBrush}
-              onOpenLibrary={toggleBrushCatalog}
-              libraryOpen={brushCatalogOpen}
-              className="w-[24rem] shrink-0"
-              aria-label="기본 프리셋 빠른 선택 — 즐겨찾기, 최근 사용, 추천"
-            />
-          ) : null}
-
           <div className="studio-opt-cluster shrink-0" role="group" aria-label="브러시 크기 프리셋">
             {STUDIO_BRUSH_SIZE_CHIPS.map((chip) => {
               const active = nearestStudioBrushSizeChip(strokeWidth) === chip.id;
@@ -1161,7 +1147,8 @@ export function StudioDrawOptionsBar({
                   sizeLocked
                     ? `잠금을 풀어 다음에 브러시 프리셋을 선택할 때 해당 프리셋의 기본 크기를 적용합니다. 현재 ${strokeWidth}px 값은 즉시 바뀌지 않아요.`
                     : `현재 ${strokeWidth}px을 고정해 다른 브러시 프리셋을 선택해도 그 프리셋의 기본 크기로 바뀌지 않게 합니다.`,
-                  undefined,
+                  // ⇧S는 보기 리졸버가 `현재 보기 저장`으로 선점하므로 크기 잠금 화음은 ⇧⌥S다.
+                  "⇧⌥S",
                   "brush-size",
                   sizeLocked ? "unlock" : "lock"
                 )}
@@ -1295,6 +1282,7 @@ export function StudioDrawOptionsBar({
                   { id: "horizontal" as const, label: "가로" },
                   { id: "radial" as const, label: "방사" },
                   { id: "kaleidoscope" as const, label: "만화경" },
+                  { id: "silk" as const, label: "실크" },
                 ] as const
               ).map((item) => (
                 <StudioToolHintTarget
@@ -1309,6 +1297,8 @@ export function StudioDrawOptionsBar({
                           ? "가로 중심축을 기준으로 위아래에 같은 획을 동시에 그립니다."
                           : item.id === "radial"
                             ? "중심을 둘러싼 여러 방향으로 획을 복제해 장식·효과선을 만듭니다."
+                            : item.id === "silk"
+                            ? "여러 팔로 퍼지는 생성형 대칭 문양(Silk 스타일)을 만듭니다."
                             : "회전과 반사를 함께 반복해 만화경처럼 연속된 무늬를 만듭니다.",
                     undefined,
                     "symmetry",

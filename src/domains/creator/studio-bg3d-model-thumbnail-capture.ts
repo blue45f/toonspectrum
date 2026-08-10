@@ -1,7 +1,7 @@
 import {
   createBg3dModelThumbnailCaptureRevision,
   isSafeBg3dModelStorageId,
-  saveBg3dModelThumbnailIfCurrent,
+  saveBg3dModelThumbnailIfCurrentV12 as saveBg3dModelThumbnailIfCurrent,
 } from "./bg3d-model-library";
 import {
   captureStudioBg3dRaster,

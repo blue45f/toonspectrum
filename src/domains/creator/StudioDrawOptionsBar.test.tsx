@@ -132,13 +132,42 @@ describe("StudioDrawOptionsBar", () => {
     fireEvent.click(favorite);
     expect(onToggleFavoriteBrush).toHaveBeenCalledWith("heart-stamp");
 
-    fireEvent.click(screen.getByRole("button", { name: "빠른 세부 옵션 펼치기" }));
+    // Quick shelf is always on the primary strip (wash/favorites one-tap; no expand required).
     const activeQuickBrush = screen.getByRole("option", {
       name: /즐겨찾기 브러시 하트 도장/,
     });
     expect(activeQuickBrush.getAttribute("aria-selected")).toBe("true");
     fireEvent.click(screen.getByRole("option", { name: /최근 사용 브러시 머리카락 결/ }));
     expect(onSelectBrush.mock.calls[0]?.[0]).toMatchObject({ id: "hair-fiber" });
+  });
+
+  it("surfaces wash and air starter chips without expanding advanced options", () => {
+    render(
+      <StudioDrawOptionsBar
+        drawMode="pen"
+        brushId="pen"
+        strokeWidth={6}
+        brushOpacity={1}
+        stabilizer={0}
+        color="#111111"
+        quickShapeActive={false}
+        onSelectBrush={vi.fn()}
+        onStrokeWidthChange={vi.fn()}
+        onOpacityChange={vi.fn()}
+        onStabilizerChange={vi.fn()}
+        onColorChange={vi.fn()}
+        onToggleQuickShape={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByRole("option", { name: /추천 브러시 수채 번짐/ }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("option", { name: /추천 브러시 소프트 에어브러시/ }),
+    ).toBeTruthy();
+    // Advanced still collapses size/stabilizer chrome; shelf itself is primary.
+    expect(screen.getByRole("button", { name: "빠른 세부 옵션 펼치기" })).toBeTruthy();
   });
 
   it("presents the selected brush as the current tool and reapplies its full preset in one click", () => {

@@ -1666,7 +1666,9 @@ function SymmetryPreview({
         ? "radial"
         : previewVariantMatches(variant, "kaleidoscope")
           ? "kaleidoscope"
-          : "vertical";
+          : previewVariantMatches(variant, "silk")
+            ? "silk"
+            : "vertical";
 
   if (mode === "none") {
     const freePath = "M48 70c9-35 31-50 57-35 18 11 19 35 50 39";
@@ -1722,6 +1724,37 @@ function SymmetryPreview({
         ))}
         <circle r="7" fill={COLOR.card} stroke={COLOR.fg} strokeWidth="2" />
         {animate ? <animateTransform attributeName="transform" additive="sum" type="rotate" dur="4.2s" values="0;45;45" keyTimes="0;.75;1" repeatCount="indefinite" /> : null}
+      </g>
+    );
+  }
+
+  if (mode === "silk") {
+    return (
+      <g data-preview-symmetry="silk" transform="translate(108 52)">
+        <circle r="36" fill="none" stroke={COLOR.cool} strokeDasharray="2 5" strokeWidth="1.2" opacity=".55" />
+        {Array.from({ length: 6 }, (_, index) => index * 60).map((angle) => (
+          <path
+            key={angle}
+            d="M4 0c8-10 18-16 30-18 2 8-1 16-8 22-7 6-16 9-22 8 5-4 7-9 6-14Z"
+            transform={`rotate(${angle})`}
+            fill={COLOR.accentSoft}
+            stroke={COLOR.accent}
+            strokeWidth="1.6"
+            opacity=".9"
+          />
+        ))}
+        <circle r="6" fill={COLOR.accent} stroke={COLOR.canvas} strokeWidth="2" />
+        {animate ? (
+          <animateTransform
+            attributeName="transform"
+            additive="sum"
+            type="rotate"
+            dur="5s"
+            values="0;60;60"
+            keyTimes="0;.7;1"
+            repeatCount="indefinite"
+          />
+        ) : null}
       </g>
     );
   }
@@ -2874,6 +2907,8 @@ function SelectionLayoutPreview({
     "align-bottom",
     "distribute-horizontal",
     "distribute-vertical",
+    "flip-horizontal",
+    "flip-vertical",
   ] as const;
   const operation =
     operations.find((candidate) => previewVariantMatches(variant, candidate)) ?? "group";
@@ -2895,10 +2930,21 @@ function SelectionLayoutPreview({
     if (operation === "distribute-vertical") {
       return { x: item.x, y: [17, 35.5, 60][index] ?? item.y };
     }
+    // Mirror about the selection AABB (x 55..161, y 24..86), matching planStudioSelectionFlip.
+    if (operation === "flip-horizontal") {
+      return { x: 216 - (item.x + item.width), y: item.y };
+    }
+    if (operation === "flip-vertical") {
+      return { x: item.x, y: 110 - (item.y + item.height) };
+    }
     return { x: item.x, y: item.y };
   });
-  const verticalGuide = ["align-left", "align-hcenter", "align-right"].includes(operation);
-  const horizontalGuide = ["align-top", "align-vcenter", "align-bottom"].includes(operation);
+  const verticalGuide = ["align-left", "align-hcenter", "align-right", "flip-horizontal"].includes(
+    operation,
+  );
+  const horizontalGuide = ["align-top", "align-vcenter", "align-bottom", "flip-vertical"].includes(
+    operation,
+  );
   const guideX = operation === "align-left" ? 55 : operation === "align-right" ? 161 : 108;
   const guideY = operation === "align-top" ? 24 : operation === "align-bottom" ? 86 : 55;
 

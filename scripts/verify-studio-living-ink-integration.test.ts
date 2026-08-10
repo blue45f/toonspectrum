@@ -31,12 +31,14 @@ function positive(): StudioLivingInkPositiveEvidence {
     strictRouteKey: ROUTE,
     presentationReceipt: {
       sequence: 4,
+      atMs: 100,
       routeKey: ROUTE,
       displaySha256: HASH_A,
       revision: 2,
     },
     canonicalHandoffReceipt: {
       sequence: 8,
+      atMs: 2_300,
       pngSha256: HASH_C,
     },
     overlayDrawCount: 3,
@@ -47,14 +49,25 @@ function positive(): StudioLivingInkPositiveEvidence {
     canonicalReceiptCount: 1,
     storedCanonicalPngHashMatched: true,
     workerFinalHashMatched: true,
+    physicalFirstPixelLatencyMs: 80,
+    physicalCanonicalHandoffLatencyMs: 2_100,
+    untouchedPaperPatchChangedPixels: 0,
+    untouchedPaperPatchMaxChannelDelta: 0,
+    canonicalUntouchedAlphaSampleCount: 4_096,
+    canonicalUntouchedNonTransparentPixels: 0,
+    canonicalUntouchedMaxAlpha: 0,
+    canonicalHandoffSelectedLayerCount: 0,
+    canonicalHandoffViewportMaxDelta: 0,
     undoLayerCount: 0,
     undoStoredElementCount: 0,
     redoLayerCount: 2,
     reloadLayerCount: 2,
     redoReceiptPreserved: true,
     reloadReceiptPreserved: true,
-    replayObservedLoading: true,
-    replayControlsDisabledWhileLoading: true,
+    replayAcceptedFrameObserved: true,
+    replayPreAcceptanceControlStateCount: 1,
+    replayControlsAbsentBeforeAcceptedFrame: false,
+    replayControlsFailClosedBeforeAcceptedFrame: true,
     physicsReadyAfterAcceptedHash: true,
     waterModeSelectableAfterReplay: true,
     fixEnabledAfterReplay: true,
@@ -70,6 +83,7 @@ function positive(): StudioLivingInkPositiveEvidence {
     fixedWaterRedoRestoredReceipt: true,
     fixedWaterReloadReceiptPreserved: true,
     screenshotLive: "/tmp/living-ink-live.png",
+    screenshotBlank: "/tmp/living-ink-blank.png",
     screenshotCommitted: "/tmp/living-ink-committed.png",
     screenshotReloaded: "/tmp/living-ink-reloaded.png",
     screenshotFixed: "/tmp/living-ink-fixed.png",
@@ -153,6 +167,30 @@ describe("Studio Living Ink production-preview integration evidence", () => {
       studioUrl,
     )).toBe(true);
     expect(expectedStudioLivingInkVerifierDiagnostic(
+      "500 http://127.0.0.1:5199/api/auth/session",
+      studioUrl,
+    )).toBe(true);
+    expect(expectedStudioLivingInkVerifierDiagnostic(
+      "GET http://127.0.0.1:5199/api/auth/session: net::ERR_FAILED",
+      studioUrl,
+    )).toBe(true);
+    expect(expectedStudioLivingInkVerifierDiagnostic(
+      "500 https://toonspectrum.example/api/auth/session",
+      "https://toonspectrum.example/studio",
+    )).toBe(false);
+    expect(expectedStudioLivingInkVerifierDiagnostic(
+      "[LEASE_BUSY] 이 작품의 복구 저장소를 다른 탭이나 창이 사용하고 있어요. "
+        + "lease ownerId=history-8eb0c88d-02b7-47ad-9f61-073931fba8fb epoch=1 "
+        + "expiresInMs=22388 @ http://127.0.0.1:5199/assets/"
+        + "studio-opfs-recovery-journal-CwN7ESH6.js",
+      studioUrl,
+    )).toBe(false);
+    expect(expectedStudioLivingInkVerifierDiagnostic(
+      "[LEASE_BUSY] unexpected lease warning @ http://127.0.0.1:5199/assets/"
+        + "studio-opfs-recovery-journal-CwN7ESH6.js",
+      studioUrl,
+    )).toBe(false);
+    expect(expectedStudioLivingInkVerifierDiagnostic(
       "No available adapters. @ https://toonspectrum.example/studio",
       "https://toonspectrum.example/studio",
     )).toBe(false);
@@ -211,6 +249,7 @@ describe("Studio Living Ink production-preview integration evidence", () => {
         presentationReceipt: null,
         canonicalHandoffReceipt: {
           sequence: 2,
+          atMs: 90,
           pngSha256: HASH_C,
         },
         presentationBeforeCanonicalHandoff: false,
@@ -232,14 +271,68 @@ describe("Studio Living Ink production-preview integration evidence", () => {
         undoLayerCount: 1,
         undoStoredElementCount: 2,
         reloadReceiptPreserved: false,
-        replayObservedLoading: false,
-        replayControlsDisabledWhileLoading: false,
+        replayAcceptedFrameObserved: false,
+        replayPreAcceptanceControlStateCount: 0,
+        replayControlsAbsentBeforeAcceptedFrame: false,
+        replayControlsFailClosedBeforeAcceptedFrame: false,
       },
     };
     expect(validateStudioLivingInkIntegrationResult(result)).toEqual(expect.arrayContaining([
       "Living Ink did not remain one atomic history/save-reload transaction",
       "water/fix/clear controls reactivated before an accepted replay receipt",
     ]));
+  });
+
+  it("rejects a canonical handoff that repaints untouched canvas paper", () => {
+    const baseline = successfulResult();
+    const result: StudioLivingInkIntegrationResult = {
+      ...baseline,
+      positive: {
+        ...baseline.positive!,
+        untouchedPaperPatchChangedPixels: 64,
+        untouchedPaperPatchMaxChannelDelta: 7,
+      },
+    };
+    expect(validateStudioLivingInkIntegrationResult(result)).toContain(
+      "canonical handoff changed untouched paper or emitted opaque off-stroke pixels",
+    );
+  });
+
+  it("rejects opaque canonical corners, auto-selection/viewport shift, and physical latency stalls", () => {
+    const baseline = successfulResult();
+    const result: StudioLivingInkIntegrationResult = {
+      ...baseline,
+      positive: {
+        ...baseline.positive!,
+        canonicalUntouchedNonTransparentPixels: 64,
+        canonicalUntouchedMaxAlpha: 255,
+        canonicalHandoffSelectedLayerCount: 1,
+        canonicalHandoffViewportMaxDelta: 44,
+        physicalFirstPixelLatencyMs: 1_501,
+        physicalCanonicalHandoffLatencyMs: 5_001,
+      },
+    };
+    expect(validateStudioLivingInkIntegrationResult(result)).toEqual(expect.arrayContaining([
+      "canonical handoff changed untouched paper or emitted opaque off-stroke pixels",
+      "canonical handoff selected the page image or shifted canvas viewport geometry",
+      "explicit physical mode exceeded first-pixel or canonical-handoff latency limits",
+    ]));
+  });
+
+  it("does not accept an empty pre-replay control sample unless absence was observed", () => {
+    const baseline = successfulResult();
+    const result: StudioLivingInkIntegrationResult = {
+      ...baseline,
+      positive: {
+        ...baseline.positive!,
+        replayPreAcceptanceControlStateCount: 0,
+        replayControlsAbsentBeforeAcceptedFrame: false,
+        replayControlsFailClosedBeforeAcceptedFrame: true,
+      },
+    };
+    expect(validateStudioLivingInkIntegrationResult(result)).toContain(
+      "water/fix/clear controls reactivated before an accepted replay receipt",
+    );
   });
 
   it("rejects a UI-only Fix that lacks canonical history, fixed Water parity, or reload proof", () => {
@@ -324,7 +417,8 @@ describe("Studio Living Ink production-preview integration evidence", () => {
     expect(source).toContain('studioLivingInkCanonicalHandoff === "presented"');
     expect(source).toContain('page.keyboard.press("Meta+z")');
     expect(source).toContain('page.keyboard.press("Meta+Shift+z")');
-    expect(source).toContain('page.reload({ waitUntil: "domcontentloaded"');
+    expect(source).toContain("reloadStudioAfterDurableWriterRelease(page, studioUrl)");
+    expect(source).toContain('name === "writer-lease.bin"');
     expect(source).toContain('const fixButton = controls.locator(\'[data-studio-living-ink-fix="true"]\')');
     expect(source).toContain("await fixButton.click()");
     expect(source).toContain('pair.receipt.journalKinds.at(-1) === "fix"');
@@ -336,6 +430,8 @@ describe("Studio Living Ink production-preview integration evidence", () => {
     expect(source).toContain('[data-studio-mobile-editing-dock="true"]');
     expect(source).toContain('data-studio-mobile-sheet") === "draw"');
     expect(source).toContain('[data-studio-open-brush-library="true"]');
+    expect(source).toContain('name: "수채 번짐 물리 모드"');
+    expect(source).toContain("await physicalMode.click()");
     expect(source).toContain('corruption === "final-receipt-hash"');
     expect(source).toContain('corruption === "journal-sequence"');
     expect(source).toContain('corruption === "canonical-png-hash"');

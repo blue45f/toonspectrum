@@ -68,13 +68,28 @@ describe("StudioProductionBiblePanel", () => {
   it("states the local-only boundary and persistence durability without implying cloud sync", () => {
     const localOnly = renderSurface();
     expect(localOnly).toContain('data-studio-production-bible-local-only="true"');
-    expect(localOnly).toContain("로컬 전용 · 서버 동기화 없음");
+    expect(localOnly).toContain("SQLite/OPFS 상태 확인 중 · 서버 동기화 없음");
+
+    const sqlite = renderSurface(fixture(), {
+      persistence: { backend: "sqlite", persisted: true },
+    });
+    expect(sqlite).toContain("이 기기 SQLite/OPFS 저장 · 서버 동기화 없음");
+
+    const sqliteReady = renderSurface(createEmptyStudioProductionBible(), {
+      persistence: { backend: "sqlite", persisted: false },
+    });
+    expect(sqliteReady).toContain("SQLite/OPFS 준비 · 첫 변경 시 저장");
 
     const memoryOnly = renderSurface(fixture(), {
       persistence: { backend: "memory", persisted: false },
     });
     expect(memoryOnly).toContain("메모리 임시 · 새로고침 전까지");
     expect(memoryOnly).not.toContain("클라우드");
+
+    const unavailable = renderSurface(fixture(), {
+      persistence: { backend: "unavailable", persisted: false },
+    });
+    expect(unavailable).toContain("SQLite/OPFS 사용 불가 · 저장되지 않음");
   });
 
   it("provides 44px touch controls, scroll-contained mobile regions, and named filters", () => {

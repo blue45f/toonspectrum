@@ -24,6 +24,10 @@ import {
 } from "react";
 
 import {
+  createStudioAnimaticSqlitePersistence,
+  type StudioAnimaticPersistencePort,
+} from "./studio-animatic-sqlite-persistence";
+import {
   addStudioAnimaticCue,
   createStudioAnimaticFromPages,
   exportStudioAnimaticDocument,
@@ -41,7 +45,6 @@ import {
   setStudioAnimaticSegmentTiming,
   STUDIO_ANIMATIC_MAX_CUES_PER_SEGMENT,
   STUDIO_ANIMATIC_MAX_IMPORT_BYTES,
-  studioAnimaticBrowserStorage,
   studioAnimaticStorageKey,
   validateStudioAnimaticDocument,
   type StudioAnimaticCueKind,
@@ -60,8 +63,10 @@ export interface StudioAnimaticTimelinePanelProps {
   readonly workScope: string;
   readonly pages: readonly StudioAnimaticPageLike[];
   readonly initialDocument?: StudioAnimaticDocument;
-  /** `undefined` uses localStorage; `null` deliberately enables current-tab memory only. */
+  /** Explicit synchronous compatibility/test seam. Product `undefined` never reads localStorage. */
   readonly storage?: StudioAnimaticStorage | null;
+  /** Product default is shared V12 SQLite/OPFS; `null` deliberately selects current-tab memory. */
+  readonly persistence?: StudioAnimaticPersistencePort | null;
   readonly reducedMotion?: boolean;
   readonly onDocumentChange?: (document: StudioAnimaticDocument) => void;
   readonly onPreviewSample?: (sample: StudioAnimaticPreviewSample) => void;
@@ -187,6 +192,7 @@ export function StudioAnimaticTimelinePanel({
   pages,
   initialDocument,
   storage,
+  persistence,
   reducedMotion,
   onDocumentChange,
   onPreviewSample,
@@ -197,7 +203,14 @@ export function StudioAnimaticTimelinePanel({
   const importInputId = useId();
   const effectiveReducedMotion = useReducedMotionOverride(reducedMotion);
   const [storageTarget] = useState<StudioAnimaticStorage | null>(() =>
-    storage === undefined ? studioAnimaticBrowserStorage() : storage
+    storage === undefined ? null : storage
+  );
+  const [persistenceTarget] = useState<StudioAnimaticPersistencePort | null>(() =>
+    storage !== undefined
+      ? null
+      : persistence === undefined
+        ? createStudioAnimaticSqlitePersistence()
+        : persistence
   );
   const [panelState, setPanelState] = useState<StudioAnimaticPanelState>(() =>
     initializePanelState({
@@ -216,6 +229,46 @@ export function StudioAnimaticTimelinePanel({
   const [playing, setPlaying] = useState(false);
   const [notice, setNotice] = useState<StudioAnimaticNotice | null>(null);
   const [importBusy, setImportBusy] = useState(false);
+  const [persistenceBusy, setPersistenceBusy] = useState(false);
+  const persistenceGenerationRef = useRef(0);
+  const persistenceQueueRef = useRef<Promise<void>>(Promise.resolve());
+
+  useEffect(() => {
+    if (!persistenceTarget || initialDocument) return;
+    let active = true;
+    const generation = ++persistenceGenerationRef.current;
+    setPersistenceBusy(true);
+    void persistenceTarget.load(workScope).catch((error: unknown) => ({
+      document: null,
+      status: "unavailable" as const,
+      error: `SQLite 애니매틱 읽기를 완료하지 못했습니다: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    })).then((loaded) => {
+      if (!active || generation !== persistenceGenerationRef.current) return;
+      if (loaded.document) {
+        setPanelState({
+          document: loaded.document,
+          storageStatus: loaded.status,
+          storageError: loaded.error,
+        });
+        setSelectedSegmentId(loaded.document.segments[0]?.id ?? null);
+      } else {
+        setPanelState((current) => ({
+          ...current,
+          storageStatus: loaded.status,
+          storageError: loaded.error,
+        }));
+      }
+      setPersistenceBusy(false);
+    });
+    return () => {
+      active = false;
+      if (generation === persistenceGenerationRef.current) {
+        persistenceGenerationRef.current += 1;
+      }
+    };
+  }, [initialDocument, persistenceTarget, workScope]);
 
   const animatic = panelState.document;
   const planned = animatic
@@ -301,6 +354,42 @@ export function StudioAnimaticTimelinePanel({
     document: StudioAnimaticDocument,
     successMessage: string
   ): void {
+    if (persistenceTarget) {
+      const generation = ++persistenceGenerationRef.current;
+      setPanelState({ document, storageStatus: "ok" });
+      onDocumentChange?.(document);
+      setPersistenceBusy(true);
+      setNotice({ tone: "good", message: `${successMessage} 로컬 SQL에 저장 중…` });
+      const write = persistenceQueueRef.current.then(async () => {
+        try {
+          return await persistenceTarget.save(document);
+        } catch (error) {
+          return {
+            ok: false,
+            error: `SQLite 애니매틱 저장을 완료하지 못했습니다: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          };
+        }
+      });
+      persistenceQueueRef.current = write.then(() => undefined, () => undefined);
+      void write.then((saved) => {
+        if (generation !== persistenceGenerationRef.current) return;
+        setPersistenceBusy(false);
+        setPanelState({
+          document,
+          storageStatus: saved.ok ? "ok" : "unavailable",
+          storageError: saved.error,
+        });
+        setNotice({
+          tone: saved.ok ? "good" : "warn",
+          message: saved.ok
+            ? successMessage
+            : `${successMessage} ${saved.error ?? "현재 탭에서만 유지됩니다."}`,
+        });
+      });
+      return;
+    }
     const saved = saveStudioAnimaticDocument(storageTarget, document);
     setPanelState({
       document,
@@ -429,13 +518,17 @@ export function StudioAnimaticTimelinePanel({
     });
   }
 
-  const storageUnavailable =
-    panelState.storageStatus === "unavailable" || storageTarget === null;
+  const storageUnavailable = panelState.storageStatus === "unavailable"
+    || (storageTarget === null && persistenceTarget === null);
 
   return (
     <section
       aria-label="웹툰 애니매틱 타임라인"
       data-studio-animatic="local-only"
+      data-studio-animatic-authority={
+        persistenceTarget ? "sqlite" : storageTarget ? "sync-adapter" : "memory"
+      }
+      aria-busy={importBusy || persistenceBusy}
       className={cx(
         "flex w-full min-w-0 flex-col overflow-hidden rounded-2xl border border-line bg-panel/95 shadow-xl backdrop-blur",
         className
@@ -478,7 +571,9 @@ export function StudioAnimaticTimelinePanel({
             <VolumeX size={12} aria-hidden />
             {storageUnavailable
               ? "현재 탭의 무음 미리보기"
-              : "브라우저 로컬 무음 미리보기"}
+              : persistenceTarget
+                ? "로컬 SQL 무음 미리보기"
+                : "브라우저 로컬 무음 미리보기"}
           </p>
           <p className="mt-0.5">
             음성통화·서버 스트리밍·AI 요청 없이 타이밍 메타데이터만

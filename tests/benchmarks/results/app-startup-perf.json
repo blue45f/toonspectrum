@@ -1,0 +1,2360 @@
+{
+  "schema": "toonspectrum.app-startup-perf/1",
+  "generatedAt": "2026-08-08T05:58:05.134Z",
+  "baseUrl": "http://localhost:4199",
+  "iterationsPerScenario": 3,
+  "longTaskWindowMs": 5000,
+  "bundle": {
+    "distBuiltAt": "2026-08-08T05:35:22.153Z",
+    "note": "This harness never builds; it measures whatever dist/ currently holds. Content hashes of the largest chunks are recorded below so a result set can prove every scenario hit the same artifact even when another process rebuilds concurrently.",
+    "largestChunkHashes": [
+      "studio-bg3d-babylon-runtime-ZqH5H4hD.js (3652 KiB)",
+      "web-ifc-api-zP1212uE.js (3455 KiB)",
+      "StudioPage-BH3qv46w.js (1879 KiB)",
+      "i18n-CdB262Tn.js (1839 KiB)",
+      "three.module-Cg5BND52.js (707 KiB)",
+      "StudioVrmPoser-UARTfZsq.js (659 KiB)",
+      "StudioBackground3D-CD2qNvr6.js (652 KiB)",
+      "lib-FCHq9tEM.js (502 KiB)"
+    ],
+    "staticManifest": {
+      "studioChunkCount": 185,
+      "studioRawBytes": 6293969,
+      "appChunkCount": 9,
+      "appRawBytes": 2410678
+    }
+  },
+  "host": {
+    "platform": "darwin",
+    "cpuModel": "Apple M2 Max",
+    "cpuCount": 12,
+    "totalMemGiB": 32,
+    "loadAverage": [
+      13.81,
+      11.68,
+      10.38
+    ],
+    "concurrentLoadNote": "Measured on a shared workstation with other Claude Code agents editing the same repository concurrently; loadAverage above is the 1/5/15-minute average captured at the end of the run. Absolute timings carry that background-load caveat; relative ordering of bottlenecks is stable across iterations."
+  },
+  "throttleProfiles": [
+    {
+      "id": "unthrottled",
+      "label": "desktop, no throttling",
+      "cpuThrottleRate": 1,
+      "network": "none"
+    },
+    {
+      "id": "cpu4x-slow4g",
+      "label": "CPU 4x + Slow 4G",
+      "cpuThrottleRate": 4,
+      "network": {
+        "offline": false,
+        "latency": 562.5,
+        "downloadThroughput": 209715.2,
+        "uploadThroughput": 96000
+      }
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "studio-cold-direct",
+      "label": "cold direct load of /studio (deep link)"
+    },
+    {
+      "id": "landing-cold",
+      "label": "cold load of / (landing)"
+    },
+    {
+      "id": "landing-to-studio-spa",
+      "label": "landing then in-app navigation to /studio"
+    }
+  ],
+  "results": {
+    "unthrottled": {
+      "studio-cold-direct": {
+        "iterations": 3,
+        "ttfbMs": 2,
+        "domContentLoadedMs": 259.6,
+        "loadEventMs": 259.8,
+        "fcpMs": 339.6,
+        "lcpMs": 1253.3,
+        "interactiveSurfaceMs": 2186,
+        "totalBlockingTimeMs": 961,
+        "longTaskCount": 9,
+        "longestTaskMs": 579,
+        "navigationCount": 1,
+        "crossOriginIsolated": true,
+        "jsRequestCount": 240,
+        "jsTransferBytes": 258789,
+        "jsDecodedBytes": 7355782,
+        "jsGzipBytes": 1811863,
+        "totalRequestCount": 250,
+        "totalTransferBytes": 425366,
+        "topJsChunks": [
+          {
+            "file": "StudioPage-BH3qv46w.js",
+            "decodedBytes": 1923881,
+            "transferBytes": 0,
+            "gzipBytes": 565217,
+            "requestedAtMs": 333.5
+          },
+          {
+            "file": "i18n-CdB262Tn.js",
+            "decodedBytes": 1883219,
+            "transferBytes": 72233,
+            "gzipBytes": 71933,
+            "requestedAtMs": 26.9
+          },
+          {
+            "file": "studio-konva-runtime-BPWjoavh.js",
+            "decodedBytes": 289352,
+            "transferBytes": 0,
+            "gzipBytes": 87761,
+            "requestedAtMs": 335.4
+          },
+          {
+            "file": "StudioInspectorAside-BGXmS6Cq.js",
+            "decodedBytes": 229819,
+            "transferBytes": 0,
+            "gzipBytes": 64219,
+            "requestedAtMs": 659.7
+          },
+          {
+            "file": "react-runtime-D6Z9ZTks.js",
+            "decodedBytes": 225069,
+            "transferBytes": 71718,
+            "gzipBytes": 71418,
+            "requestedAtMs": 26.8
+          },
+          {
+            "file": "index-CuOOiHOh.js",
+            "decodedBytes": 194087,
+            "transferBytes": 62518,
+            "gzipBytes": 62218,
+            "requestedAtMs": 26.7
+          },
+          {
+            "file": "studio-dynamic-brush-render-plan-B5FOTHv-.js",
+            "decodedBytes": 162730,
+            "transferBytes": 0,
+            "gzipBytes": 59142,
+            "requestedAtMs": 334.2
+          },
+          {
+            "file": "lucide-studio-core-icons-BLMKNl9G.js",
+            "decodedBytes": 94281,
+            "transferBytes": 27175,
+            "gzipBytes": 26875,
+            "requestedAtMs": 45.9
+          },
+          {
+            "file": "studio-dynamic-brush-coverage-renderer-Ct-00_3w.js",
+            "decodedBytes": 90327,
+            "transferBytes": 0,
+            "gzipBytes": 25475,
+            "requestedAtMs": 334.5
+          },
+          {
+            "file": "schemas-B_0pifLD.js",
+            "decodedBytes": 74041,
+            "transferBytes": 0,
+            "gzipBytes": 19615,
+            "requestedAtMs": 334
+          }
+        ],
+        "eagerDynamic": {
+          "requestCount": 55,
+          "decodedBytes": 1061813,
+          "chunks": [
+            {
+              "file": "StudioInspectorAside-BGXmS6Cq.js",
+              "decodedBytes": 229819,
+              "requestedAtMs": 659.7
+            },
+            {
+              "file": "Geometry-CXJRwVGX.js",
+              "decodedBytes": 62918,
+              "requestedAtMs": 858.9
+            },
+            {
+              "file": "studio-svg-export-DxYp8IAX.js",
+              "decodedBytes": 61602,
+              "requestedAtMs": 661.1
+            },
+            {
+              "file": "studio-filter-pack-DwLuwKLD.js",
+              "decodedBytes": 60722,
+              "requestedAtMs": 660.4
+            },
+            {
+              "file": "GraphicsContext-Ce-go-yp.js",
+              "decodedBytes": 54284,
+              "requestedAtMs": 860.1
+            },
+            {
+              "file": "RenderTargetSystem-C_FVkPd9.js",
+              "decodedBytes": 52317,
+              "requestedAtMs": 861.9
+            },
+            {
+              "file": "FederatedEventTarget-0ezemEeE.js",
+              "decodedBytes": 43362,
+              "requestedAtMs": 859.5
+            },
+            {
+              "file": "FilterSystem-B3EK-Zvs.js",
+              "decodedBytes": 39523,
+              "requestedAtMs": 861.3
+            },
+            {
+              "file": "Filter-D3isYKZO.js",
+              "decodedBytes": 38969,
+              "requestedAtMs": 859.8
+            },
+            {
+              "file": "StudioMenubarContent-C0xANU1A.js",
+              "decodedBytes": 38665,
+              "requestedAtMs": 640.8
+            },
+            {
+              "file": "studio-crdt-room-binding-D6dmaass.js",
+              "decodedBytes": 34234,
+              "requestedAtMs": 864.7
+            },
+            {
+              "file": "StudioLiveCanvasOverlay-CI9aap9d.js",
+              "decodedBytes": 29935,
+              "requestedAtMs": 658
+            },
+            {
+              "file": "GCManagedHash-hOlpxaIH.js",
+              "decodedBytes": 27135,
+              "requestedAtMs": 859.2
+            },
+            {
+              "file": "studio-opfs-recovery-journal-DwjhFGNA.js",
+              "decodedBytes": 26809,
+              "requestedAtMs": 677.5
+            },
+            {
+              "file": "generator-DkpM1S2c.js",
+              "decodedBytes": 23061,
+              "requestedAtMs": 661.3
+            },
+            {
+              "file": "store-BKfWX4zu.js",
+              "decodedBytes": 18112,
+              "requestedAtMs": 257.5
+            },
+            {
+              "file": "studio-raster-edit-preparation-CL_3GZPp.js",
+              "decodedBytes": 17995,
+              "requestedAtMs": 661.1
+            },
+            {
+              "file": "studio-professional-brush-dynamics-88V-a2jp.js",
+              "decodedBytes": 16869,
+              "requestedAtMs": 864.7
+            },
+            {
+              "file": "StudioPageThumbnails-DBRiluad.js",
+              "decodedBytes": 13419,
+              "requestedAtMs": 648.3
+            },
+            {
+              "file": "studio-crdt-recovery-vault-BG0-Eb8S.js",
+              "decodedBytes": 11330,
+              "requestedAtMs": 864.8
+            }
+          ]
+        },
+        "requestWaves": [
+          {
+            "startMs": 26.5,
+            "endMs": 45.9,
+            "requests": 11
+          },
+          {
+            "startMs": 257.4,
+            "endMs": 346.3,
+            "requests": 180
+          },
+          {
+            "startMs": 640.8,
+            "endMs": 708.5,
+            "requests": 31
+          },
+          {
+            "startMs": 858.9,
+            "endMs": 865,
+            "requests": 18
+          }
+        ],
+        "tinyChunkCount": 111,
+        "tinyChunkBytes": 200404,
+        "stylesheetBytes": 387335,
+        "mainFrameNavigations": [
+          "http://localhost:4199/studio"
+        ],
+        "topEvalCosts": [
+          {
+            "file": "StudioPage-BH3qv46w.js",
+            "compileMs": 121.2,
+            "evaluateMs": 0,
+            "totalMs": 121.2
+          },
+          {
+            "file": "lib-FCHq9tEM.js",
+            "compileMs": 28,
+            "evaluateMs": 0,
+            "totalMs": 28
+          },
+          {
+            "file": "i18n-CdB262Tn.js",
+            "compileMs": 19.3,
+            "evaluateMs": 0,
+            "totalMs": 19.3
+          },
+          {
+            "file": "studio-konva-runtime-BPWjoavh.js",
+            "compileMs": 17.5,
+            "evaluateMs": 0,
+            "totalMs": 17.5
+          },
+          {
+            "file": "studio-dynamic-brush-render-plan-B5FOTHv-.js",
+            "compileMs": 10.6,
+            "evaluateMs": 0,
+            "totalMs": 10.6
+          },
+          {
+            "file": "react-runtime-D6Z9ZTks.js",
+            "compileMs": 10.3,
+            "evaluateMs": 0,
+            "totalMs": 10.3
+          },
+          {
+            "file": "index-CuOOiHOh.js",
+            "compileMs": 9.7,
+            "evaluateMs": 0,
+            "totalMs": 9.7
+          },
+          {
+            "file": "StudioInspectorAside-BGXmS6Cq.js",
+            "compileMs": 9.7,
+            "evaluateMs": 0,
+            "totalMs": 9.7
+          },
+          {
+            "file": "studio-crdt-document-D_bHlxW3.js",
+            "compileMs": 7.7,
+            "evaluateMs": 0,
+            "totalMs": 7.7
+          },
+          {
+            "file": "schemas-B_0pifLD.js",
+            "compileMs": 4.2,
+            "evaluateMs": 0,
+            "totalMs": 4.2
+          },
+          {
+            "file": "studio-dynamic-brush-coverage-renderer-Ct-00_3w.js",
+            "compileMs": 3,
+            "evaluateMs": 0,
+            "totalMs": 3
+          },
+          {
+            "file": "studio-core-micro-contracts-C2CIdGvS.js",
+            "compileMs": 2.9,
+            "evaluateMs": 0,
+            "totalMs": 2.9
+          }
+        ],
+        "topLongTasks": [
+          {
+            "durationMs": 773,
+            "startMs": 1242,
+            "containerType": "window",
+            "containerName": ""
+          },
+          {
+            "durationMs": 579,
+            "startMs": 1578.1,
+            "containerType": "window",
+            "containerName": ""
+          },
+          {
+            "durationMs": 541,
+            "startMs": 1526.3,
+            "containerType": "window",
+            "containerName": ""
+          },
+          {
+            "durationMs": 203,
+            "startMs": 661.8,
+            "containerType": "window",
+            "containerName": ""
+          },
+          {
+            "durationMs": 197,
+            "startMs": 920.3,
+            "containerType": "window",
+            "containerName": ""
+          },
+          {
+            "durationMs": 196,
+            "startMs": 881.2,
+            "containerType": "window",
+            "containerName": ""
+          },
+          {
+            "durationMs": 134,
+            "startMs": 2015.1,
+            "containerType": "window",
+            "containerName": ""
+          },
+          {
+            "durationMs": 112,
+            "startMs": 2166.3,
+            "containerType": "window",
+            "containerName": ""
+          }
+        ],
+        "consoleErrorCount": 6,
+        "consoleErrorSamples": [
+          "Failed to load resource: the server responded with a status of 502 (Bad Gateway)"
+        ],
+        "interactiveSurfaceError": null
+      },
+      "landing-cold": {
+        "iterations": 3,
+        "ttfbMs": 1.7,
+        "domContentLoadedMs": 227.7,
+        "loadEventMs": 228,
+        "fcpMs": 336,
+        "lcpMs": 500,
+        "interactiveSurfaceMs": 314,
+        "totalBlockingTimeMs": 0,
+        "longTaskCount": 0,
+        "longestTaskMs": 0,
+        "navigationCount": 1,
+        "crossOriginIsolated": false,
+        "jsRequestCount": 26,
+        "jsTransferBytes": 458776,
+        "jsDecodedBytes": 3208513,
+        "jsGzipBytes": 451186,
+        "totalRequestCount": 38,
+        "totalTransferBytes": 603398,
+        "topJsChunks": [
+          {
+            "file": "i18n-CdB262Tn.js",
+            "decodedBytes": 1883219,
+            "transferBytes": 72233,
+            "gzipBytes": 71933,
+            "requestedAtMs": 3.4
+          },
+          {
+            "file": "three.module-Cg5BND52.js",
+            "decodedBytes": 724363,
+            "transferBytes": 183933,
+            "gzipBytes": 183633,
+            "requestedAtMs": 245.9
+          },
+          {
+            "file": "react-runtime-D6Z9ZTks.js",
+            "decodedBytes": 225069,
+            "transferBytes": 71718,
+            "gzipBytes": 71418,
+            "requestedAtMs": 3.3
+          },
+          {
+            "file": "index-CuOOiHOh.js",
+            "decodedBytes": 194087,
+            "transferBytes": 62518,
+            "gzipBytes": 62218,
+            "requestedAtMs": 3.3
+          },
+          {
+            "file": "lucide-studio-core-icons-BLMKNl9G.js",
+            "decodedBytes": 94281,
+            "transferBytes": 27175,
+            "gzipBytes": 26875,
+            "requestedAtMs": 26.7
+          },
+          {
+            "file": "HomePage-B0fo6d-W.js",
+            "decodedBytes": 23947,
+            "transferBytes": 9118,
+            "gzipBytes": 8818,
+            "requestedAtMs": 253.6
+          },
+          {
+            "file": "store-BKfWX4zu.js",
+            "decodedBytes": 18112,
+            "transferBytes": 6147,
+            "gzipBytes": 5847,
+            "requestedAtMs": 246.8
+          },
+          {
+            "file": "src-ODmnDaTP.js",
+            "decodedBytes": 10580,
+            "transferBytes": 4441,
+            "gzipBytes": 4141,
+            "requestedAtMs": 246.9
+          },
+          {
+            "file": "lucide-initial-icons-Q6dwqRL8.js",
+            "decodedBytes": 10133,
+            "transferBytes": 4432,
+            "gzipBytes": 4132,
+            "requestedAtMs": 3.3
+          },
+          {
+            "file": "IntroSplash-Uq0JXWkk.js",
+            "decodedBytes": 5517,
+            "transferBytes": 2801,
+            "gzipBytes": 2501,
+            "requestedAtMs": 245.9
+          }
+        ],
+        "eagerDynamic": {
+          "requestCount": 15,
+          "decodedBytes": 796714,
+          "chunks": [
+            {
+              "file": "three.module-Cg5BND52.js",
+              "decodedBytes": 724363,
+              "requestedAtMs": 245.9
+            },
+            {
+              "file": "HomePage-B0fo6d-W.js",
+              "decodedBytes": 23947,
+              "requestedAtMs": 253.6
+            },
+            {
+              "file": "store-BKfWX4zu.js",
+              "decodedBytes": 18112,
+              "requestedAtMs": 246.8
+            },
+            {
+              "file": "src-ODmnDaTP.js",
+              "decodedBytes": 10580,
+              "requestedAtMs": 246.9
+            },
+            {
+              "file": "IntroSplash-Uq0JXWkk.js",
+              "decodedBytes": 5517,
+              "requestedAtMs": 245.9
+            },
+            {
+              "file": "store-sync-BGvEYP_u.js",
+              "decodedBytes": 3347,
+              "requestedAtMs": 246.7
+            },
+            {
+              "file": "toast-host-B70vGMSs.js",
+              "decodedBytes": 1753,
+              "requestedAtMs": 4811.8
+            },
+            {
+              "file": "use-api-resource-D_AuMEB5.js",
+              "decodedBytes": 1667,
+              "requestedAtMs": 254
+            },
+            {
+              "file": "bootstrap-compat.js",
+              "decodedBytes": 1534,
+              "requestedAtMs": 3.5
+            },
+            {
+              "file": "age-gate-host-BZXDqmLy.js",
+              "decodedBytes": 1248,
+              "requestedAtMs": 4811.3
+            },
+            {
+              "file": "shimmer-title--VLQaHTX.js",
+              "decodedBytes": 1232,
+              "requestedAtMs": 253.9
+            },
+            {
+              "file": "count-up-psQb_xxX.js",
+              "decodedBytes": 1193,
+              "requestedAtMs": 253.7
+            },
+            {
+              "file": "genre-color-BdsPPd7Z.js",
+              "decodedBytes": 1070,
+              "requestedAtMs": 253.9
+            },
+            {
+              "file": "hero-banner-badge-Is_44-8w.js",
+              "decodedBytes": 622,
+              "requestedAtMs": 253.8
+            },
+            {
+              "file": "bootstrap-theme.js",
+              "decodedBytes": 529,
+              "requestedAtMs": 3.1
+            }
+          ]
+        },
+        "requestWaves": [
+          {
+            "startMs": 3.1,
+            "endMs": 26.7,
+            "requests": 11
+          },
+          {
+            "startMs": 245.9,
+            "endMs": 254,
+            "requests": 13
+          },
+          {
+            "startMs": 4811.3,
+            "endMs": 4811.8,
+            "requests": 2
+          }
+        ],
+        "tinyChunkCount": 16,
+        "tinyChunkBytes": 19205,
+        "stylesheetBytes": 390679,
+        "mainFrameNavigations": [
+          "http://localhost:4199/"
+        ],
+        "topEvalCosts": [
+          {
+            "file": "i18n-CdB262Tn.js",
+            "compileMs": 22.6,
+            "evaluateMs": 0,
+            "totalMs": 22.6
+          },
+          {
+            "file": "three.module-Cg5BND52.js",
+            "compileMs": 22,
+            "evaluateMs": 0,
+            "totalMs": 22
+          },
+          {
+            "file": "index-CuOOiHOh.js",
+            "compileMs": 12.7,
+            "evaluateMs": 0,
+            "totalMs": 12.7
+          },
+          {
+            "file": "react-runtime-D6Z9ZTks.js",
+            "compileMs": 9.7,
+            "evaluateMs": 0,
+            "totalMs": 9.7
+          },
+          {
+            "file": "lucide-studio-core-icons-BLMKNl9G.js",
+            "compileMs": 1.9,
+            "evaluateMs": 0,
+            "totalMs": 1.9
+          },
+          {
+            "file": "toast-store-C0TmqrVi.js",
+            "compileMs": 0.8,
+            "evaluateMs": 0,
+            "totalMs": 0.8
+          },
+          {
+            "file": "HomePage-B0fo6d-W.js",
+            "compileMs": 0.6,
+            "evaluateMs": 0,
+            "totalMs": 0.6
+          },
+          {
+            "file": "vanilla-DZJGj1NY.js",
+            "compileMs": 0.6,
+            "evaluateMs": 0,
+            "totalMs": 0.6
+          },
+          {
+            "file": "src-ODmnDaTP.js",
+            "compileMs": 0.5,
+            "evaluateMs": 0,
+            "totalMs": 0.5
+          },
+          {
+            "file": "store-BKfWX4zu.js",
+            "compileMs": 0.4,
+            "evaluateMs": 0,
+            "totalMs": 0.4
+          },
+          {
+            "file": "container-bgOXkusT.js",
+            "compileMs": 0.4,
+            "evaluateMs": 0,
+            "totalMs": 0.4
+          },
+          {
+            "file": "sw.js",
+            "compileMs": 0.1,
+            "evaluateMs": 0.2,
+            "totalMs": 0.3
+          }
+        ],
+        "topLongTasks": [
+          {
+            "durationMs": 249,
+            "startMs": 598.9,
+            "containerType": "window",
+            "containerName": ""
+          },
+          {
+            "durationMs": 51,
+            "startMs": 453.7,
+            "containerType": "window",
+            "containerName": ""
+          }
+        ],
+        "consoleErrorCount": 6,
+        "consoleErrorSamples": [
+          "Failed to load resource: the server responded with a status of 502 (Bad Gateway)"
+        ],
+        "interactiveSurfaceError": null
+      },
+      "landing-to-studio-spa": {
+        "iterations": 3,
+        "ttfbMs": 2.6,
+        "domContentLoadedMs": 267.5,
+        "loadEventMs": 267.7,
+        "fcpMs": 345.2,
+        "lcpMs": 1246.4,
+        "interactiveSurfaceMs": 1678,
+        "totalBlockingTimeMs": 1111,
+        "longTaskCount": 9,
+        "longestTaskMs": 654,
+        "navigationCount": 1,
+        "crossOriginIsolated": true,
+        "jsRequestCount": 240,
+        "jsTransferBytes": 600,
+        "jsDecodedBytes": 7520209,
+        "jsGzipBytes": 1856522,
+        "totalRequestCount": 250,
+        "totalTransferBytes": 53139,
+        "topJsChunks": [
+          {
+            "file": "StudioPage-BH3qv46w.js",
+            "decodedBytes": 1923881,
+            "transferBytes": 0,
+            "gzipBytes": 565217,
+            "requestedAtMs": 342.4
+          },
+          {
+            "file": "i18n-CdB262Tn.js",
+            "decodedBytes": 1883219,
+            "transferBytes": 0,
+            "gzipBytes": 71933,
+            "requestedAtMs": 39.8
+          },
+          {
+            "file": "studio-konva-runtime-BPWjoavh.js",
+            "decodedBytes": 289352,
+            "transferBytes": 0,
+            "gzipBytes": 87761,
+            "requestedAtMs": 343.9
+          },
+          {
+            "file": "StudioInspectorAside-BGXmS6Cq.js",
+            "decodedBytes": 229819,
+            "transferBytes": 0,
+            "gzipBytes": 64219,
+            "requestedAtMs": 731.2
+          },
+          {
+            "file": "react-runtime-D6Z9ZTks.js",
+            "decodedBytes": 225069,
+            "transferBytes": 0,
+            "gzipBytes": 71418,
+            "requestedAtMs": 39.7
+          },
+          {
+            "file": "index-CuOOiHOh.js",
+            "decodedBytes": 194087,
+            "transferBytes": 0,
+            "gzipBytes": 62218,
+            "requestedAtMs": 39.6
+          },
+          {
+            "file": "studio-crdt-document-D_bHlxW3.js",
+            "decodedBytes": 165610,
+            "transferBytes": 0,
+            "gzipBytes": 45188,
+            "requestedAtMs": 1091.7
+          },
+          {
+            "file": "studio-dynamic-brush-render-plan-B5FOTHv-.js",
+            "decodedBytes": 162730,
+            "transferBytes": 0,
+            "gzipBytes": 59142,
+            "requestedAtMs": 343
+          },
+          {
+            "file": "lucide-studio-core-icons-BLMKNl9G.js",
+            "decodedBytes": 94281,
+            "transferBytes": 0,
+            "gzipBytes": 26875,
+            "requestedAtMs": 51.8
+          },
+          {
+            "file": "studio-dynamic-brush-coverage-renderer-Ct-00_3w.js",
+            "decodedBytes": 90327,
+            "transferBytes": 0,
+            "gzipBytes": 25475,
+            "requestedAtMs": 343.2
+          }
+        ],
+        "eagerDynamic": {
+          "requestCount": 55,
+          "decodedBytes": 1226240,
+          "chunks": [
+            {
+              "file": "StudioInspectorAside-BGXmS6Cq.js",
+              "decodedBytes": 229819,
+              "requestedAtMs": 731.2
+            },
+            {
+              "file": "studio-crdt-document-D_bHlxW3.js",
+              "decodedBytes": 165610,
+              "requestedAtMs": 1091.7
+            },
+            {
+              "file": "Geometry-CXJRwVGX.js",
+              "decodedBytes": 62918,
+              "requestedAtMs": 1086.2
+            },
+            {
+              "file": "studio-svg-export-DxYp8IAX.js",
+              "decodedBytes": 61602,
+              "requestedAtMs": 732.8
+            },
+            {
+              "file": "studio-filter-pack-DwLuwKLD.js",
+              "decodedBytes": 60722,
+              "requestedAtMs": 732.1
+            },
+            {
+              "file": "GraphicsContext-Ce-go-yp.js",
+              "decodedBytes": 54284,
+              "requestedAtMs": 1087.4
+            },
+            {
+              "file": "RenderTargetSystem-C_FVkPd9.js",
+              "decodedBytes": 52317,
+              "requestedAtMs": 1089.2
+            },
+            {
+              "file": "FederatedEventTarget-0ezemEeE.js",
+              "decodedBytes": 43362,
+              "requestedAtMs": 1086.8
+            },
+            {
+              "file": "FilterSystem-B3EK-Zvs.js",
+              "decodedBytes": 39523,
+              "requestedAtMs": 1088.6
+            },
+            {
+              "file": "Filter-D3isYKZO.js",
+              "decodedBytes": 38969,
+              "requestedAtMs": 1087.1
+            },
+            {
+              "file": "StudioMenubarContent-C0xANU1A.js",
+              "decodedBytes": 38665,
+              "requestedAtMs": 714.6
+            },
+            {
+              "file": "studio-crdt-room-binding-D6dmaass.js",
+              "decodedBytes": 34234,
+              "requestedAtMs": 1092
+            },
+            {
+              "file": "StudioLiveCanvasOverlay-CI9aap9d.js",
+              "decodedBytes": 29935,
+              "requestedAtMs": 729.8
+            },
+            {
+              "file": "GCManagedHash-hOlpxaIH.js",
+              "decodedBytes": 27135,
+              "requestedAtMs": 1086.5
+            },
+            {
+              "file": "studio-opfs-recovery-journal-DwjhFGNA.js",
+              "decodedBytes": 26809,
+              "requestedAtMs": 903.7
+            },
+            {
+              "file": "generator-DkpM1S2c.js",
+              "decodedBytes": 23061,
+              "requestedAtMs": 732.9
+            },
+            {
+              "file": "store-BKfWX4zu.js",
+              "decodedBytes": 18112,
+              "requestedAtMs": 271.3
+            },
+            {
+              "file": "studio-raster-edit-preparation-CL_3GZPp.js",
+              "decodedBytes": 17995,
+              "requestedAtMs": 732.7
+            },
+            {
+              "file": "studio-professional-brush-dynamics-88V-a2jp.js",
+              "decodedBytes": 16869,
+              "requestedAtMs": 1091.9
+            },
+            {
+              "file": "StudioPageThumbnails-DBRiluad.js",
+              "decodedBytes": 13419,
+              "requestedAtMs": 722.2
+            }
+          ]
+        },
+        "requestWaves": [
+          {
+            "startMs": 39.2,
+            "endMs": 51.8,
+            "requests": 11
+          },
+          {
+            "startMs": 271.2,
+            "endMs": 354.6,
+            "requests": 180
+          },
+          {
+            "startMs": 714.6,
+            "endMs": 739.3,
+            "requests": 26
+          },
+          {
+            "startMs": 903.3,
+            "endMs": 905.1,
+            "requests": 5
+          },
+          {
+            "startMs": 1086.2,
+            "endMs": 1092.1,
+            "requests": 18
+          }
+        ],
+        "tinyChunkCount": 110,
+        "tinyChunkBytes": 199221,
+        "stylesheetBytes": 387335,
+        "mainFrameNavigations": [
+          "http://localhost:4199/",
+          "http://localhost:4199/studio"
+        ],
+        "topEvalCosts": [
+          {
+            "file": "StudioPage-BH3qv46w.js",
+            "compileMs": 142.1,
+            "evaluateMs": 0,
+            "totalMs": 142.1
+          },
+          {
+            "file": "lib-FCHq9tEM.js",
+            "compileMs": 29.3,
+            "evaluateMs": 0,
+            "totalMs": 29.3
+          },
+          {
+            "file": "i18n-CdB262Tn.js",
+            "compileMs": 28.1,
+            "evaluateMs": 0,
+            "totalMs": 28.1
+          },
+          {
+            "file": "StudioInspectorAside-BGXmS6Cq.js",
+            "compileMs": 26.1,
+            "evaluateMs": 0,
+            "totalMs": 26.1
+          },
+          {
+            "file": "studio-konva-runtime-BPWjoavh.js",
+            "compileMs": 20.2,
+            "evaluateMs": 0,
+            "totalMs": 20.2
+          },
+          {
+            "file": "react-runtime-D6Z9ZTks.js",
+            "compileMs": 10.2,
+            "evaluateMs": 0,
+            "totalMs": 10.2
+          },
+          {
+            "file": "studio-dynamic-brush-render-plan-B5FOTHv-.js",
+            "compileMs": 9.9,
+            "evaluateMs": 0,
+            "totalMs": 9.9
+          },
+          {
+            "file": "index-CuOOiHOh.js",
+            "compileMs": 8.5,
+            "evaluateMs": 0,
+            "totalMs": 8.5
+          },
+          {
+            "file": "studio-crdt-document-D_bHlxW3.js",
+            "compileMs": 6.9,
+            "evaluateMs": 0,
+            "totalMs": 6.9
+          },
+          {
+            "file": "studio-core-micro-contracts-C2CIdGvS.js",
+            "compileMs": 4.9,
+            "evaluateMs": 0,
+            "totalMs": 4.9
+          },
+          {
+            "file": "studio-crdt-raster-ops-L9SlWoqH.js",
+            "compileMs": 4.7,
+            "evaluateMs": 0,
+            "totalMs": 4.7
+          },
+          {
+            "file": "lucide-studio-core-icons-BLMKNl9G.js",
+            "compileMs": 4,
+            "evaluateMs": 0,
+            "totalMs": 4
+          }
+        ],
+        "topLongTasks": [
+          {
+            "durationMs": 933,
+            "startMs": 1443.6,
+            "containerType": "window",
+            "containerName": ""
+          },
+          {
+            "durationMs": 654,
+            "startMs": 1466.5,
+            "containerType": "window",
+            "containerName": ""
+          },
+          {
+            "durationMs": 570,
+            "startMs": 1625.2,
+            "containerType": "window",
+            "containerName": ""
+          },
+          {
+            "durationMs": 220,
+            "startMs": 875.4,
+            "containerType": "window",
+            "containerName": ""
+          },
+          {
+            "durationMs": 219,
+            "startMs": 889,
+            "containerType": "window",
+            "containerName": ""
+          },
+          {
+            "durationMs": 203,
+            "startMs": 889.5,
+            "containerType": "window",
+            "containerName": ""
+          },
+          {
+            "durationMs": 139,
+            "startMs": 2121.2,
+            "containerType": "window",
+            "containerName": ""
+          },
+          {
+            "durationMs": 117,
+            "startMs": 2388.9,
+            "containerType": "window",
+            "containerName": ""
+          }
+        ],
+        "consoleErrorCount": 9,
+        "consoleErrorSamples": [
+          "Failed to load resource: the server responded with a status of 502 (Bad Gateway)"
+        ],
+        "interactiveSurfaceError": null
+      }
+    },
+    "cpu4x-slow4g": {
+      "studio-cold-direct": {
+        "iterations": 3,
+        "ttfbMs": 1.8,
+        "domContentLoadedMs": 2937.4,
+        "loadEventMs": 2938.4,
+        "fcpMs": 3182.7,
+        "lcpMs": 7505,
+        "interactiveSurfaceMs": 6219,
+        "totalBlockingTimeMs": 3689,
+        "longTaskCount": 17,
+        "longestTaskMs": 808,
+        "navigationCount": 1,
+        "crossOriginIsolated": true,
+        "jsRequestCount": 241,
+        "jsTransferBytes": 258789,
+        "jsDecodedBytes": 7521392,
+        "jsGzipBytes": 1857051,
+        "totalRequestCount": 250,
+        "totalTransferBytes": 425066,
+        "topJsChunks": [
+          {
+            "file": "StudioPage-BH3qv46w.js",
+            "decodedBytes": 1923881,
+            "transferBytes": 0,
+            "gzipBytes": 565217,
+            "requestedAtMs": 3609.2
+          },
+          {
+            "file": "i18n-CdB262Tn.js",
+            "decodedBytes": 1883219,
+            "transferBytes": 72233,
+            "gzipBytes": 71933,
+            "requestedAtMs": 605.4
+          },
+          {
+            "file": "studio-konva-runtime-BPWjoavh.js",
+            "decodedBytes": 289352,
+            "transferBytes": 0,
+            "gzipBytes": 87761,
+            "requestedAtMs": 3617
+          },
+          {
+            "file": "StudioInspectorAside-BGXmS6Cq.js",
+            "decodedBytes": 229819,
+            "transferBytes": 0,
+            "gzipBytes": 64219,
+            "requestedAtMs": 5025.3
+          },
+          {
+            "file": "react-runtime-D6Z9ZTks.js",
+            "decodedBytes": 225069,
+            "transferBytes": 71718,
+            "gzipBytes": 71418,
+            "requestedAtMs": 604.6
+          },
+          {
+            "file": "index-CuOOiHOh.js",
+            "decodedBytes": 194087,
+            "transferBytes": 62518,
+            "gzipBytes": 62218,
+            "requestedAtMs": 604.5
+          },
+          {
+            "file": "studio-crdt-document-D_bHlxW3.js",
+            "decodedBytes": 165610,
+            "transferBytes": 0,
+            "gzipBytes": 45188,
+            "requestedAtMs": 5853.2
+          },
+          {
+            "file": "studio-dynamic-brush-render-plan-B5FOTHv-.js",
+            "decodedBytes": 162730,
+            "transferBytes": 0,
+            "gzipBytes": 59142,
+            "requestedAtMs": 3613.7
+          },
+          {
+            "file": "lucide-studio-core-icons-BLMKNl9G.js",
+            "decodedBytes": 94281,
+            "transferBytes": 27175,
+            "gzipBytes": 26875,
+            "requestedAtMs": 2132.6
+          },
+          {
+            "file": "studio-dynamic-brush-coverage-renderer-Ct-00_3w.js",
+            "decodedBytes": 90327,
+            "transferBytes": 0,
+            "gzipBytes": 25475,
+            "requestedAtMs": 3614.3
+          }
+        ],
+        "eagerDynamic": {
+          "requestCount": 56,
+          "decodedBytes": 1227423,
+          "chunks": [
+            {
+              "file": "StudioInspectorAside-BGXmS6Cq.js",
+              "decodedBytes": 229819,
+              "requestedAtMs": 5025.3
+            },
+            {
+              "file": "studio-crdt-document-D_bHlxW3.js",
+              "decodedBytes": 165610,
+              "requestedAtMs": 5853.2
+            },
+            {
+              "file": "Geometry-CXJRwVGX.js",
+              "decodedBytes": 62918,
+              "requestedAtMs": 5828
+            },
+            {
+              "file": "studio-svg-export-DxYp8IAX.js",
+              "decodedBytes": 61602,
+              "requestedAtMs": 5032.7
+            },
+            {
+              "file": "studio-filter-pack-DwLuwKLD.js",
+              "decodedBytes": 60722,
+              "requestedAtMs": 5029.3
+            },
+            {
+              "file": "GraphicsContext-Ce-go-yp.js",
+              "decodedBytes": 54284,
+              "requestedAtMs": 5833.6
+            },
+            {
+              "file": "RenderTargetSystem-C_FVkPd9.js",
+              "decodedBytes": 52317,
+              "requestedAtMs": 5841
+            },
+            {
+              "file": "FederatedEventTarget-0ezemEeE.js",
+              "decodedBytes": 43362,
+              "requestedAtMs": 5830.8
+            },
+            {
+              "file": "FilterSystem-B3EK-Zvs.js",
+              "decodedBytes": 39523,
+              "requestedAtMs": 5836.6
+            },
+            {
+              "file": "Filter-D3isYKZO.js",
+              "decodedBytes": 38969,
+              "requestedAtMs": 5832.1
+            },
+            {
+              "file": "StudioMenubarContent-C0xANU1A.js",
+              "decodedBytes": 38665,
+              "requestedAtMs": 4964.1
+            },
+            {
+              "file": "studio-crdt-room-binding-D6dmaass.js",
+              "decodedBytes": 34234,
+              "requestedAtMs": 5854.6
+            },
+            {
+              "file": "StudioLiveCanvasOverlay-CI9aap9d.js",
+              "decodedBytes": 29935,
+              "requestedAtMs": 5019.2
+            },
+            {
+              "file": "GCManagedHash-hOlpxaIH.js",
+              "decodedBytes": 27135,
+              "requestedAtMs": 5829
+            },
+            {
+              "file": "studio-opfs-recovery-journal-DwjhFGNA.js",
+              "decodedBytes": 26809,
+              "requestedAtMs": 5103
+            },
+            {
+              "file": "generator-DkpM1S2c.js",
+              "decodedBytes": 23061,
+              "requestedAtMs": 5032.8
+            },
+            {
+              "file": "store-BKfWX4zu.js",
+              "decodedBytes": 18112,
+              "requestedAtMs": 2953.7
+            },
+            {
+              "file": "studio-raster-edit-preparation-CL_3GZPp.js",
+              "decodedBytes": 17995,
+              "requestedAtMs": 5032.6
+            },
+            {
+              "file": "studio-professional-brush-dynamics-88V-a2jp.js",
+              "decodedBytes": 16869,
+              "requestedAtMs": 5854.3
+            },
+            {
+              "file": "StudioPageThumbnails-DBRiluad.js",
+              "decodedBytes": 13419,
+              "requestedAtMs": 5000
+            }
+          ]
+        },
+        "requestWaves": [
+          {
+            "startMs": 603.4,
+            "endMs": 605.5,
+            "requests": 10
+          },
+          {
+            "startMs": 2132.6,
+            "endMs": 2132.6,
+            "requests": 1
+          },
+          {
+            "startMs": 2953.6,
+            "endMs": 2970.6,
+            "requests": 5
+          },
+          {
+            "startMs": 3609.2,
+            "endMs": 3660.3,
+            "requests": 175
+          },
+          {
+            "startMs": 4964.1,
+            "endMs": 5109.2,
+            "requests": 29
+          },
+          {
+            "startMs": 5192.7,
+            "endMs": 5193.3,
+            "requests": 2
+          },
+          {
+            "startMs": 5828,
+            "endMs": 5855.9,
+            "requests": 19
+          }
+        ],
+        "tinyChunkCount": 111,
+        "tinyChunkBytes": 200404,
+        "stylesheetBytes": 387335,
+        "mainFrameNavigations": [
+          "http://localhost:4199/studio"
+        ],
+        "topEvalCosts": [
+          {
+            "file": "react-runtime-D6Z9ZTks.js",
+            "compileMs": 1030.4,
+            "evaluateMs": 0,
+            "totalMs": 1030.4
+          },
+          {
+            "file": "index-CuOOiHOh.js",
+            "compileMs": 915.2,
+            "evaluateMs": 0,
+            "totalMs": 915.2
+          },
+          {
+            "file": "i18n-CdB262Tn.js",
+            "compileMs": 755.3,
+            "evaluateMs": 0,
+            "totalMs": 755.3
+          },
+          {
+            "file": "StudioPage-BH3qv46w.js",
+            "compileMs": 139.7,
+            "evaluateMs": 0,
+            "totalMs": 139.7
+          },
+          {
+            "file": "lucide-studio-core-icons-BLMKNl9G.js",
+            "compileMs": 122.2,
+            "evaluateMs": 0,
+            "totalMs": 122.2
+          },
+          {
+            "file": "lib-FCHq9tEM.js",
+            "compileMs": 73.3,
+            "evaluateMs": 0,
+            "totalMs": 73.3
+          },
+          {
+            "file": "store-BKfWX4zu.js",
+            "compileMs": 62.2,
+            "evaluateMs": 0,
+            "totalMs": 62.2
+          },
+          {
+            "file": "src-ODmnDaTP.js",
+            "compileMs": 29.1,
+            "evaluateMs": 0,
+            "totalMs": 29.1
+          },
+          {
+            "file": "lucide-initial-icons-Q6dwqRL8.js",
+            "compileMs": 28,
+            "evaluateMs": 0,
+            "totalMs": 28
+          },
+          {
+            "file": "studio-crdt-document-D_bHlxW3.js",
+            "compileMs": 19.1,
+            "evaluateMs": 0,
+            "totalMs": 19.1
+          },
+          {
+            "file": "StudioInspectorAside-BGXmS6Cq.js",
+            "compileMs": 14.1,
+            "evaluateMs": 0,
+            "totalMs": 14.1
+          },
+          {
+            "file": "studio-core-micro-contracts-C2CIdGvS.js",
+            "compileMs": 13.3,
+            "evaluateMs": 0,
+            "totalMs": 13.3
+          }
+        ],
+        "topLongTasks": [
+          {
+            "durationMs": 813,
+            "startMs": 5044.3,
+            "containerType": "window",
+            "containerName": ""
+          },
+          {
+            "durationMs": 808,
+            "startMs": 4975.2,
+            "containerType": "window",
+            "containerName": ""
+          },
+          {
+            "durationMs": 799,
+            "startMs": 4963.4,
+            "containerType": "window",
+            "containerName": ""
+          },
+          {
+            "durationMs": 425,
+            "startMs": 5948.5,
+            "containerType": "window",
+            "containerName": ""
+          },
+          {
+            "durationMs": 420,
+            "startMs": 7056.9,
+            "containerType": "window",
+            "containerName": ""
+          },
+          {
+            "durationMs": 409,
+            "startMs": 8006.2,
+            "containerType": "window",
+            "containerName": ""
+          },
+          {
+            "durationMs": 408,
+            "startMs": 5872.3,
+            "containerType": "window",
+            "containerName": ""
+          },
+          {
+            "durationMs": 408,
+            "startMs": 6438.9,
+            "containerType": "window",
+            "containerName": ""
+          }
+        ],
+        "consoleErrorCount": 6,
+        "consoleErrorSamples": [
+          "Failed to load resource: the server responded with a status of 502 (Bad Gateway)"
+        ],
+        "interactiveSurfaceError": null
+      },
+      "landing-cold": {
+        "iterations": 3,
+        "ttfbMs": 2.2,
+        "domContentLoadedMs": 2923,
+        "loadEventMs": 2924.2,
+        "fcpMs": 3228,
+        "lcpMs": 4264,
+        "interactiveSurfaceMs": 2650,
+        "totalBlockingTimeMs": 218,
+        "longTaskCount": 4,
+        "longestTaskMs": 161,
+        "navigationCount": 1,
+        "crossOriginIsolated": false,
+        "jsRequestCount": 24,
+        "jsTransferBytes": 272042,
+        "jsDecodedBytes": 2478633,
+        "jsGzipBytes": 265052,
+        "totalRequestCount": 34,
+        "totalTransferBytes": 414809,
+        "topJsChunks": [
+          {
+            "file": "i18n-CdB262Tn.js",
+            "decodedBytes": 1883219,
+            "transferBytes": 72233,
+            "gzipBytes": 71933,
+            "requestedAtMs": 589
+          },
+          {
+            "file": "react-runtime-D6Z9ZTks.js",
+            "decodedBytes": 225069,
+            "transferBytes": 71718,
+            "gzipBytes": 71418,
+            "requestedAtMs": 588.8
+          },
+          {
+            "file": "index-CuOOiHOh.js",
+            "decodedBytes": 194087,
+            "transferBytes": 62518,
+            "gzipBytes": 62218,
+            "requestedAtMs": 587.7
+          },
+          {
+            "file": "lucide-studio-core-icons-BLMKNl9G.js",
+            "decodedBytes": 94281,
+            "transferBytes": 27175,
+            "gzipBytes": 26875,
+            "requestedAtMs": 2119.3
+          },
+          {
+            "file": "HomePage-B0fo6d-W.js",
+            "decodedBytes": 23947,
+            "transferBytes": 9118,
+            "gzipBytes": 8818,
+            "requestedAtMs": 2973.6
+          },
+          {
+            "file": "store-BKfWX4zu.js",
+            "decodedBytes": 18112,
+            "transferBytes": 6147,
+            "gzipBytes": 5847,
+            "requestedAtMs": 2952.3
+          },
+          {
+            "file": "src-ODmnDaTP.js",
+            "decodedBytes": 10580,
+            "transferBytes": 4441,
+            "gzipBytes": 4141,
+            "requestedAtMs": 2953.4
+          },
+          {
+            "file": "lucide-initial-icons-Q6dwqRL8.js",
+            "decodedBytes": 10133,
+            "transferBytes": 4432,
+            "gzipBytes": 4132,
+            "requestedAtMs": 588.8
+          },
+          {
+            "file": "store-sync-BGvEYP_u.js",
+            "decodedBytes": 3347,
+            "transferBytes": 1910,
+            "gzipBytes": 1610,
+            "requestedAtMs": 2952.2
+          },
+          {
+            "file": "middleware-BRlIkLFI.js",
+            "decodedBytes": 1913,
+            "transferBytes": 1253,
+            "gzipBytes": 953,
+            "requestedAtMs": 588.8
+          }
+        ],
+        "eagerDynamic": {
+          "requestCount": 13,
+          "decodedBytes": 66834,
+          "chunks": [
+            {
+              "file": "HomePage-B0fo6d-W.js",
+              "decodedBytes": 23947,
+              "requestedAtMs": 2973.6
+            },
+            {
+              "file": "store-BKfWX4zu.js",
+              "decodedBytes": 18112,
+              "requestedAtMs": 2952.3
+            },
+            {
+              "file": "src-ODmnDaTP.js",
+              "decodedBytes": 10580,
+              "requestedAtMs": 2953.4
+            },
+            {
+              "file": "store-sync-BGvEYP_u.js",
+              "decodedBytes": 3347,
+              "requestedAtMs": 2952.2
+            },
+            {
+              "file": "toast-host-B70vGMSs.js",
+              "decodedBytes": 1753,
+              "requestedAtMs": 7705.9
+            },
+            {
+              "file": "use-api-resource-D_AuMEB5.js",
+              "decodedBytes": 1667,
+              "requestedAtMs": 2975.9
+            },
+            {
+              "file": "bootstrap-compat.js",
+              "decodedBytes": 1534,
+              "requestedAtMs": 589
+            },
+            {
+              "file": "age-gate-host-BZXDqmLy.js",
+              "decodedBytes": 1248,
+              "requestedAtMs": 7702.6
+            },
+            {
+              "file": "shimmer-title--VLQaHTX.js",
+              "decodedBytes": 1232,
+              "requestedAtMs": 2974.7
+            },
+            {
+              "file": "count-up-psQb_xxX.js",
+              "decodedBytes": 1193,
+              "requestedAtMs": 2974.5
+            },
+            {
+              "file": "genre-color-BdsPPd7Z.js",
+              "decodedBytes": 1070,
+              "requestedAtMs": 2974.8
+            },
+            {
+              "file": "hero-banner-badge-Is_44-8w.js",
+              "decodedBytes": 622,
+              "requestedAtMs": 2974.6
+            },
+            {
+              "file": "bootstrap-theme.js",
+              "decodedBytes": 529,
+              "requestedAtMs": 587.6
+            }
+          ]
+        },
+        "requestWaves": [
+          {
+            "startMs": 587.6,
+            "endMs": 589,
+            "requests": 10
+          },
+          {
+            "startMs": 2119.3,
+            "endMs": 2119.3,
+            "requests": 1
+          },
+          {
+            "startMs": 2952.2,
+            "endMs": 2975.9,
+            "requests": 11
+          },
+          {
+            "startMs": 7702.6,
+            "endMs": 7705.9,
+            "requests": 2
+          }
+        ],
+        "tinyChunkCount": 16,
+        "tinyChunkBytes": 19205,
+        "stylesheetBytes": 387335,
+        "mainFrameNavigations": [
+          "http://localhost:4199/"
+        ],
+        "topEvalCosts": [
+          {
+            "file": "react-runtime-D6Z9ZTks.js",
+            "compileMs": 1031.8,
+            "evaluateMs": 0,
+            "totalMs": 1031.8
+          },
+          {
+            "file": "index-CuOOiHOh.js",
+            "compileMs": 914.3,
+            "evaluateMs": 0,
+            "totalMs": 914.3
+          },
+          {
+            "file": "i18n-CdB262Tn.js",
+            "compileMs": 754.5,
+            "evaluateMs": 0,
+            "totalMs": 754.5
+          },
+          {
+            "file": "lucide-studio-core-icons-BLMKNl9G.js",
+            "compileMs": 122.5,
+            "evaluateMs": 0,
+            "totalMs": 122.5
+          },
+          {
+            "file": "HomePage-B0fo6d-W.js",
+            "compileMs": 84.4,
+            "evaluateMs": 0,
+            "totalMs": 84.4
+          },
+          {
+            "file": "store-BKfWX4zu.js",
+            "compileMs": 80.6,
+            "evaluateMs": 0,
+            "totalMs": 80.6
+          },
+          {
+            "file": "src-ODmnDaTP.js",
+            "compileMs": 29.5,
+            "evaluateMs": 0,
+            "totalMs": 29.5
+          },
+          {
+            "file": "lucide-initial-icons-Q6dwqRL8.js",
+            "compileMs": 29,
+            "evaluateMs": 0,
+            "totalMs": 29
+          },
+          {
+            "file": "sw.js",
+            "compileMs": 0.1,
+            "evaluateMs": 0.2,
+            "totalMs": 0.3
+          },
+          {
+            "file": "toast-store-C0TmqrVi.js",
+            "compileMs": 0.2,
+            "evaluateMs": 0,
+            "totalMs": 0.2
+          },
+          {
+            "file": "rolldown-runtime-CMxvf4Kt.js",
+            "compileMs": 0.2,
+            "evaluateMs": 0,
+            "totalMs": 0.2
+          },
+          {
+            "file": "container-bgOXkusT.js",
+            "compileMs": 0.2,
+            "evaluateMs": 0,
+            "totalMs": 0.2
+          }
+        ],
+        "topLongTasks": [
+          {
+            "durationMs": 205,
+            "startMs": 5703,
+            "containerType": "window",
+            "containerName": ""
+          },
+          {
+            "durationMs": 161,
+            "startMs": 3021.1,
+            "containerType": "window",
+            "containerName": ""
+          },
+          {
+            "durationMs": 157,
+            "startMs": 3027.2,
+            "containerType": "window",
+            "containerName": ""
+          },
+          {
+            "durationMs": 154,
+            "startMs": 3009.8,
+            "containerType": "window",
+            "containerName": ""
+          },
+          {
+            "durationMs": 101,
+            "startMs": 2812.2,
+            "containerType": "window",
+            "containerName": ""
+          },
+          {
+            "durationMs": 100,
+            "startMs": 2827.4,
+            "containerType": "window",
+            "containerName": ""
+          },
+          {
+            "durationMs": 98,
+            "startMs": 2825.7,
+            "containerType": "window",
+            "containerName": ""
+          },
+          {
+            "durationMs": 95,
+            "startMs": 2929.7,
+            "containerType": "window",
+            "containerName": ""
+          }
+        ],
+        "consoleErrorCount": 5,
+        "consoleErrorSamples": [
+          "Failed to load resource: the server responded with a status of 502 (Bad Gateway)"
+        ],
+        "interactiveSurfaceError": null
+      },
+      "landing-to-studio-spa": {
+        "iterations": 3,
+        "ttfbMs": 5.9,
+        "domContentLoadedMs": 928.6,
+        "loadEventMs": 936.6,
+        "fcpMs": 1193.9,
+        "lcpMs": 5464.6,
+        "interactiveSurfaceMs": 6111,
+        "totalBlockingTimeMs": 4020,
+        "longTaskCount": 19,
+        "longestTaskMs": 866,
+        "navigationCount": 1,
+        "crossOriginIsolated": true,
+        "jsRequestCount": 241,
+        "jsTransferBytes": 600,
+        "jsDecodedBytes": 7879750,
+        "jsGzipBytes": 1960229,
+        "totalRequestCount": 250,
+        "totalTransferBytes": 92256,
+        "topJsChunks": [
+          {
+            "file": "StudioPage-BH3qv46w.js",
+            "decodedBytes": 1923881,
+            "transferBytes": 0,
+            "gzipBytes": 565217,
+            "requestedAtMs": 1218.7
+          },
+          {
+            "file": "i18n-CdB262Tn.js",
+            "decodedBytes": 1883219,
+            "transferBytes": 0,
+            "gzipBytes": 71933,
+            "requestedAtMs": 33.1
+          },
+          {
+            "file": "lib-FCHq9tEM.js",
+            "decodedBytes": 513597,
+            "transferBytes": 0,
+            "gzipBytes": 144688,
+            "requestedAtMs": 3432
+          },
+          {
+            "file": "studio-konva-runtime-BPWjoavh.js",
+            "decodedBytes": 289352,
+            "transferBytes": 0,
+            "gzipBytes": 87761,
+            "requestedAtMs": 1225.3
+          },
+          {
+            "file": "StudioInspectorAside-BGXmS6Cq.js",
+            "decodedBytes": 229819,
+            "transferBytes": 0,
+            "gzipBytes": 64219,
+            "requestedAtMs": 2624.4
+          },
+          {
+            "file": "react-runtime-D6Z9ZTks.js",
+            "decodedBytes": 225069,
+            "transferBytes": 0,
+            "gzipBytes": 71418,
+            "requestedAtMs": 32.9
+          },
+          {
+            "file": "index-CuOOiHOh.js",
+            "decodedBytes": 194087,
+            "transferBytes": 0,
+            "gzipBytes": 62218,
+            "requestedAtMs": 32.8
+          },
+          {
+            "file": "studio-dynamic-brush-render-plan-B5FOTHv-.js",
+            "decodedBytes": 162730,
+            "transferBytes": 0,
+            "gzipBytes": 59142,
+            "requestedAtMs": 1221.9
+          },
+          {
+            "file": "lucide-studio-core-icons-BLMKNl9G.js",
+            "decodedBytes": 94281,
+            "transferBytes": 0,
+            "gzipBytes": 26875,
+            "requestedAtMs": 628.3
+          },
+          {
+            "file": "studio-dynamic-brush-coverage-renderer-Ct-00_3w.js",
+            "decodedBytes": 90327,
+            "transferBytes": 0,
+            "gzipBytes": 25475,
+            "requestedAtMs": 1222.8
+          }
+        ],
+        "eagerDynamic": {
+          "requestCount": 56,
+          "decodedBytes": 1585781,
+          "chunks": [
+            {
+              "file": "lib-FCHq9tEM.js",
+              "decodedBytes": 513597,
+              "requestedAtMs": 3432
+            },
+            {
+              "file": "StudioInspectorAside-BGXmS6Cq.js",
+              "decodedBytes": 229819,
+              "requestedAtMs": 2624.4
+            },
+            {
+              "file": "Geometry-CXJRwVGX.js",
+              "decodedBytes": 62918,
+              "requestedAtMs": 3433.6
+            },
+            {
+              "file": "studio-svg-export-DxYp8IAX.js",
+              "decodedBytes": 61602,
+              "requestedAtMs": 2630.7
+            },
+            {
+              "file": "studio-filter-pack-DwLuwKLD.js",
+              "decodedBytes": 60722,
+              "requestedAtMs": 2628.4
+            },
+            {
+              "file": "GraphicsContext-Ce-go-yp.js",
+              "decodedBytes": 54284,
+              "requestedAtMs": 3439.3
+            },
+            {
+              "file": "RenderTargetSystem-C_FVkPd9.js",
+              "decodedBytes": 52317,
+              "requestedAtMs": 3446.5
+            },
+            {
+              "file": "FederatedEventTarget-0ezemEeE.js",
+              "decodedBytes": 43362,
+              "requestedAtMs": 3435.7
+            },
+            {
+              "file": "FilterSystem-B3EK-Zvs.js",
+              "decodedBytes": 39523,
+              "requestedAtMs": 3443.9
+            },
+            {
+              "file": "Filter-D3isYKZO.js",
+              "decodedBytes": 38969,
+              "requestedAtMs": 3437
+            },
+            {
+              "file": "StudioMenubarContent-C0xANU1A.js",
+              "decodedBytes": 38665,
+              "requestedAtMs": 2538.6
+            },
+            {
+              "file": "studio-crdt-room-binding-D6dmaass.js",
+              "decodedBytes": 34234,
+              "requestedAtMs": 3458
+            },
+            {
+              "file": "StudioLiveCanvasOverlay-CI9aap9d.js",
+              "decodedBytes": 29935,
+              "requestedAtMs": 2617.5
+            },
+            {
+              "file": "GCManagedHash-hOlpxaIH.js",
+              "decodedBytes": 27135,
+              "requestedAtMs": 3435.1
+            },
+            {
+              "file": "studio-opfs-recovery-journal-DwjhFGNA.js",
+              "decodedBytes": 26809,
+              "requestedAtMs": 2703.7
+            },
+            {
+              "file": "generator-DkpM1S2c.js",
+              "decodedBytes": 23061,
+              "requestedAtMs": 2630.8
+            },
+            {
+              "file": "store-BKfWX4zu.js",
+              "decodedBytes": 18112,
+              "requestedAtMs": 944.9
+            },
+            {
+              "file": "studio-raster-edit-preparation-CL_3GZPp.js",
+              "decodedBytes": 17995,
+              "requestedAtMs": 2629.7
+            },
+            {
+              "file": "studio-professional-brush-dynamics-88V-a2jp.js",
+              "decodedBytes": 16869,
+              "requestedAtMs": 3457.4
+            },
+            {
+              "file": "StudioPageThumbnails-DBRiluad.js",
+              "decodedBytes": 13419,
+              "requestedAtMs": 2575.7
+            }
+          ]
+        },
+        "requestWaves": [
+          {
+            "startMs": 32.6,
+            "endMs": 33.2,
+            "requests": 10
+          },
+          {
+            "startMs": 628.3,
+            "endMs": 628.3,
+            "requests": 1
+          },
+          {
+            "startMs": 944.1,
+            "endMs": 961.6,
+            "requests": 5
+          },
+          {
+            "startMs": 1218.7,
+            "endMs": 1268.6,
+            "requests": 175
+          },
+          {
+            "startMs": 2538.6,
+            "endMs": 2709.8,
+            "requests": 29
+          },
+          {
+            "startMs": 2802.6,
+            "endMs": 2803.2,
+            "requests": 2
+          },
+          {
+            "startMs": 3432,
+            "endMs": 3459.2,
+            "requests": 19
+          }
+        ],
+        "tinyChunkCount": 110,
+        "tinyChunkBytes": 199221,
+        "stylesheetBytes": 387335,
+        "mainFrameNavigations": [
+          "http://localhost:4199/",
+          "http://localhost:4199/studio"
+        ],
+        "topEvalCosts": [
+          {
+            "file": "three.module-Cg5BND52.js",
+            "compileMs": 1297.2,
+            "evaluateMs": 0,
+            "totalMs": 1297.2
+          },
+          {
+            "file": "react-runtime-D6Z9ZTks.js",
+            "compileMs": 1035,
+            "evaluateMs": 0,
+            "totalMs": 1035
+          },
+          {
+            "file": "index-CuOOiHOh.js",
+            "compileMs": 906.9,
+            "evaluateMs": 0,
+            "totalMs": 906.9
+          },
+          {
+            "file": "i18n-CdB262Tn.js",
+            "compileMs": 773.1,
+            "evaluateMs": 0,
+            "totalMs": 773.1
+          },
+          {
+            "file": "HomePage-B0fo6d-W.js",
+            "compileMs": 126.6,
+            "evaluateMs": 0,
+            "totalMs": 126.6
+          },
+          {
+            "file": "lucide-studio-core-icons-BLMKNl9G.js",
+            "compileMs": 123.9,
+            "evaluateMs": 0,
+            "totalMs": 123.9
+          },
+          {
+            "file": "StudioPage-BH3qv46w.js",
+            "compileMs": 110.8,
+            "evaluateMs": 0,
+            "totalMs": 110.8
+          },
+          {
+            "file": "store-BKfWX4zu.js",
+            "compileMs": 66.4,
+            "evaluateMs": 0,
+            "totalMs": 66.4
+          },
+          {
+            "file": "lib-FCHq9tEM.js",
+            "compileMs": 35.2,
+            "evaluateMs": 0,
+            "totalMs": 35.2
+          },
+          {
+            "file": "src-ODmnDaTP.js",
+            "compileMs": 28.5,
+            "evaluateMs": 0,
+            "totalMs": 28.5
+          },
+          {
+            "file": "lucide-initial-icons-Q6dwqRL8.js",
+            "compileMs": 21.1,
+            "evaluateMs": 0,
+            "totalMs": 21.1
+          },
+          {
+            "file": "studio-konva-runtime-BPWjoavh.js",
+            "compileMs": 18.9,
+            "evaluateMs": 0,
+            "totalMs": 18.9
+          }
+        ],
+        "topLongTasks": [
+          {
+            "durationMs": 887,
+            "startMs": 2877,
+            "containerType": "window",
+            "containerName": ""
+          },
+          {
+            "durationMs": 866,
+            "startMs": 2619.5,
+            "containerType": "window",
+            "containerName": ""
+          },
+          {
+            "durationMs": 819,
+            "startMs": 2643,
+            "containerType": "window",
+            "containerName": ""
+          },
+          {
+            "durationMs": 470,
+            "startMs": 6511.3,
+            "containerType": "window",
+            "containerName": ""
+          },
+          {
+            "durationMs": 461,
+            "startMs": 4991.8,
+            "containerType": "window",
+            "containerName": ""
+          },
+          {
+            "durationMs": 460,
+            "startMs": 6007.7,
+            "containerType": "window",
+            "containerName": ""
+          },
+          {
+            "durationMs": 457,
+            "startMs": 6857.4,
+            "containerType": "window",
+            "containerName": ""
+          },
+          {
+            "durationMs": 453,
+            "startMs": 3858.7,
+            "containerType": "window",
+            "containerName": ""
+          }
+        ],
+        "consoleErrorCount": 6,
+        "consoleErrorSamples": [
+          "Failed to load resource: the server responded with a status of 502 (Bad Gateway)"
+        ],
+        "interactiveSurfaceError": null
+      }
+    }
+  },
+  "rawRuns": {
+    "unthrottled": {
+      "studio-cold-direct": [
+        {
+          "interactiveSurfaceMs": 2186,
+          "wallClockMs": 7219,
+          "ttfbMs": 2,
+          "fcpMs": 342.6,
+          "lcpMs": 1254.3,
+          "loadEventMs": 262.1,
+          "tbtMs": 961,
+          "longTaskCount": 10,
+          "jsRequestCount": 240
+        },
+        {
+          "interactiveSurfaceMs": 2195,
+          "wallClockMs": 7228,
+          "ttfbMs": 2.1,
+          "fcpMs": 339.6,
+          "lcpMs": 1211.4,
+          "loadEventMs": 259.8,
+          "tbtMs": 910,
+          "longTaskCount": 9,
+          "jsRequestCount": 240
+        },
+        {
+          "interactiveSurfaceMs": 1107,
+          "wallClockMs": 6135,
+          "ttfbMs": 1.6,
+          "fcpMs": 334.5,
+          "lcpMs": 1253.3,
+          "loadEventMs": 254,
+          "tbtMs": 1213,
+          "longTaskCount": 9,
+          "jsRequestCount": 240
+        }
+      ],
+      "landing-cold": [
+        {
+          "interactiveSurfaceMs": 308,
+          "wallClockMs": 5314,
+          "ttfbMs": 2.1,
+          "fcpMs": 328,
+          "lcpMs": 500,
+          "loadEventMs": 222.4,
+          "tbtMs": 0,
+          "longTaskCount": 0,
+          "jsRequestCount": 24
+        },
+        {
+          "interactiveSurfaceMs": 314,
+          "wallClockMs": 5318,
+          "ttfbMs": 1.7,
+          "fcpMs": 336,
+          "lcpMs": 492,
+          "loadEventMs": 228,
+          "tbtMs": 0,
+          "longTaskCount": 0,
+          "jsRequestCount": 24
+        },
+        {
+          "interactiveSurfaceMs": 325,
+          "wallClockMs": 5333,
+          "ttfbMs": 1.7,
+          "fcpMs": 340,
+          "lcpMs": 1904,
+          "loadEventMs": 242.3,
+          "tbtMs": 200,
+          "longTaskCount": 2,
+          "jsRequestCount": 26
+        }
+      ],
+      "landing-to-studio-spa": [
+        {
+          "interactiveSurfaceMs": 1678,
+          "wallClockMs": 7010,
+          "ttfbMs": 2.6,
+          "fcpMs": 344,
+          "lcpMs": 1246.4,
+          "loadEventMs": 267.5,
+          "tbtMs": 1368,
+          "longTaskCount": 9,
+          "jsRequestCount": 240
+        },
+        {
+          "interactiveSurfaceMs": 1715,
+          "wallClockMs": 7043,
+          "ttfbMs": 2.4,
+          "fcpMs": 345.3,
+          "lcpMs": 1261.5,
+          "loadEventMs": 267.8,
+          "tbtMs": 1028,
+          "longTaskCount": 10,
+          "jsRequestCount": 240
+        },
+        {
+          "interactiveSurfaceMs": 1650,
+          "wallClockMs": 6972,
+          "ttfbMs": 3.9,
+          "fcpMs": 345.2,
+          "lcpMs": 1231.1,
+          "loadEventMs": 267.7,
+          "tbtMs": 1111,
+          "longTaskCount": 9,
+          "jsRequestCount": 240
+        }
+      ]
+    },
+    "cpu4x-slow4g": {
+      "studio-cold-direct": [
+        {
+          "interactiveSurfaceMs": 6219,
+          "wallClockMs": 11824,
+          "ttfbMs": 1.8,
+          "fcpMs": 3174,
+          "lcpMs": 8088.9,
+          "loadEventMs": 2936.3,
+          "tbtMs": 3540,
+          "longTaskCount": 17,
+          "jsRequestCount": 241
+        },
+        {
+          "interactiveSurfaceMs": 6173,
+          "wallClockMs": 11776,
+          "ttfbMs": 1.7,
+          "fcpMs": 3182.7,
+          "lcpMs": 7291.3,
+          "loadEventMs": 2938.4,
+          "tbtMs": 3755,
+          "longTaskCount": 17,
+          "jsRequestCount": 241
+        },
+        {
+          "interactiveSurfaceMs": 6444,
+          "wallClockMs": 12046,
+          "ttfbMs": 8,
+          "fcpMs": 3185.5,
+          "lcpMs": 7505,
+          "loadEventMs": 2939.4,
+          "tbtMs": 3689,
+          "longTaskCount": 19,
+          "jsRequestCount": 241
+        }
+      ],
+      "landing-cold": [
+        {
+          "interactiveSurfaceMs": 2970,
+          "wallClockMs": 8549,
+          "ttfbMs": 2.2,
+          "fcpMs": 3228,
+          "lcpMs": 4232,
+          "loadEventMs": 2927,
+          "tbtMs": 211,
+          "longTaskCount": 4,
+          "jsRequestCount": 24
+        },
+        {
+          "interactiveSurfaceMs": 2629,
+          "wallClockMs": 8202,
+          "ttfbMs": 2.2,
+          "fcpMs": 3204,
+          "lcpMs": 6956,
+          "loadEventMs": 2913,
+          "tbtMs": 369,
+          "longTaskCount": 5,
+          "jsRequestCount": 26
+        },
+        {
+          "interactiveSurfaceMs": 2650,
+          "wallClockMs": 8233,
+          "ttfbMs": 1.9,
+          "fcpMs": 3240,
+          "lcpMs": 4264,
+          "loadEventMs": 2924.2,
+          "tbtMs": 218,
+          "longTaskCount": 4,
+          "jsRequestCount": 24
+        }
+      ],
+      "landing-to-studio-spa": [
+        {
+          "interactiveSurfaceMs": 6536,
+          "wallClockMs": 14777,
+          "ttfbMs": 17,
+          "fcpMs": 1238.6,
+          "lcpMs": 5464.6,
+          "loadEventMs": 970.4,
+          "tbtMs": 4417,
+          "longTaskCount": 19,
+          "jsRequestCount": 240
+        },
+        {
+          "interactiveSurfaceMs": 5550,
+          "wallClockMs": 13817,
+          "ttfbMs": 5.9,
+          "fcpMs": 1193.9,
+          "lcpMs": 5081.6,
+          "loadEventMs": 936.6,
+          "tbtMs": 4020,
+          "longTaskCount": 19,
+          "jsRequestCount": 241
+        },
+        {
+          "interactiveSurfaceMs": 6111,
+          "wallClockMs": 14345,
+          "ttfbMs": 2.1,
+          "fcpMs": 1181.5,
+          "lcpMs": 5803.6,
+          "loadEventMs": 929.5,
+          "tbtMs": 3789,
+          "longTaskCount": 18,
+          "jsRequestCount": 241
+        }
+      ]
+    }
+  }
+}

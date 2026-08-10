@@ -32,6 +32,7 @@ import {
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+import { getProductStudioMannequinStateSqliteRepository } from "./studio-mannequin-bg3d-preset-sqlite-repository";
 import {
   STUDIO_MANNEQUIN_BODY_PRESETS,
   STUDIO_MANNEQUIN_DEFAULT_BODY_PARAMS,
@@ -53,15 +54,12 @@ import { createStudioMannequinPhotoPoseApplyPlan } from "./studio-mannequin-phot
 import {
   STUDIO_MANNEQUIN_POSE_CATEGORIES,
   STUDIO_MANNEQUIN_POSE_PRESETS,
-  STUDIO_MANNEQUIN_STATE_STORAGE_KEY,
   createStudioMannequinRestPose,
   encodeStudioMannequinShareHash,
   exportStudioMannequinStateToJSON,
   importStudioMannequinStateFromJSON,
   mirrorStudioMannequinPose,
   normalizeStudioMannequinPose,
-  parseStudioMannequinState,
-  serializeStudioMannequinState,
   type StudioMannequinPose,
   type StudioMannequinPoseCategory,
 } from "./studio-mannequin-poses";
@@ -106,6 +104,12 @@ export interface StudioMannequinPoserPanelProps {
 
 type MannequinTabId = "body" | "pose" | "joint" | "camera";
 type StudioMannequinWebcamLoadingStage = "engine" | "camera" | null;
+type StudioMannequinPersistenceStatus =
+  | "idle"
+  | "loading"
+  | "ready"
+  | "saving"
+  | "memory-only";
 
 const RAD_TO_DEG = 180 / Math.PI;
 const DEG_TO_RAD = Math.PI / 180;
@@ -619,6 +623,7 @@ export function StudioMannequinPoserPanel({
   const sceneRef = useRef<StudioMannequinSceneHandle | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
+  const [stateRepository] = useState(getProductStudioMannequinStateSqliteRepository);
 
   const [params, setParams] = useState<StudioMannequinBodyParams>(
     STUDIO_MANNEQUIN_DEFAULT_BODY_PARAMS,
@@ -634,6 +639,8 @@ export function StudioMannequinPoserPanel({
   const [copiedLink, setCopiedLink] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sceneError, setSceneError] = useState<string | null>(null);
+  const [persistenceStatus, setPersistenceStatus] =
+    useState<StudioMannequinPersistenceStatus>("idle");
 
   const [webcamActive, setWebcamActive] = useState(false);
   const [webcamLoadingStage, setWebcamLoadingStage] =
@@ -654,6 +661,10 @@ export function StudioMannequinPoserPanel({
   const webcamLoadingRef = useRef(false);
   const poseFrozenRef = useRef(false);
   const mirrorModeRef = useRef(true);
+  const mountedRef = useRef(false);
+  const hydrationGenerationRef = useRef(0);
+  const persistenceGenerationRef = useRef(0);
+  const stateRevisionRef = useRef(0);
   const webcamLoading = webcamLoadingStage !== null;
   webcamActiveRef.current = webcamActive;
   webcamLoadingRef.current = webcamLoading;
@@ -876,35 +887,91 @@ export function StudioMannequinPoserPanel({
   const stateRef = useRef({ params, pose });
   stateRef.current = { params, pose };
 
-  const persistState = useCallback(() => {
-    try {
-      localStorage.setItem(
-        STUDIO_MANNEQUIN_STATE_STORAGE_KEY,
-        serializeStudioMannequinState(stateRef.current),
-      );
-    } catch {
-      // 저장 실패 조용히 무시
-    }
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      hydrationGenerationRef.current += 1;
+      persistenceGenerationRef.current += 1;
+    };
   }, []);
 
+  useEffect(() => {
+    stateRevisionRef.current += 1;
+  }, [params, pose]);
+
+  const persistState = useCallback(async (): Promise<boolean> => {
+    const generation = persistenceGenerationRef.current + 1;
+    persistenceGenerationRef.current = generation;
+    setPersistenceStatus("saving");
+    try {
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        const revision = stateRevisionRef.current;
+        await stateRepository.save(stateRef.current);
+        if (!mountedRef.current || persistenceGenerationRef.current !== generation) return false;
+        if (stateRevisionRef.current === revision) {
+          setPersistenceStatus("ready");
+          setError(null);
+          return true;
+        }
+      }
+      throw new Error("저장 중 포즈가 계속 변경되어 안정된 스냅샷을 만들지 못했습니다.");
+    } catch (cause) {
+      if (mountedRef.current && persistenceGenerationRef.current === generation) {
+        setPersistenceStatus("memory-only");
+        setError(
+          `SQLite/OPFS에 데생 인형 상태를 저장하지 못했습니다. 현재 탭 메모리 임시 · 새로고침 시 사라짐. JSON 내보내기로 보존한 뒤 다시 닫아 주세요: ${getErrorText(cause, "저장소 오류")}`,
+        );
+      }
+      return false;
+    }
+  }, [stateRepository]);
+
   const closeWithPersist = useCallback(() => {
-    persistState();
-    onClose();
-  }, [onClose, persistState]);
+    releaseWebcamResources();
+    setWebcamActive(false);
+    setWebcamLoadingStage(null);
+    void persistState().then((saved) => {
+      if (saved && mountedRef.current) onClose();
+    });
+  }, [onClose, persistState, releaseWebcamResources]);
 
   useEffect(() => {
     if (!open) return;
-    try {
-      const stored = localStorage.getItem(STUDIO_MANNEQUIN_STATE_STORAGE_KEY);
-      const parsed = parseStudioMannequinState(stored);
-      if (parsed) {
-        setParams(parsed.params);
-        setPose(parsed.pose);
+    const generation = hydrationGenerationRef.current + 1;
+    hydrationGenerationRef.current = generation;
+    const startingRevision = stateRevisionRef.current;
+    let active = true;
+    setPersistenceStatus("loading");
+    setError(null);
+    void stateRepository.load().then((stored) => {
+      if (
+        !active ||
+        !mountedRef.current ||
+        hydrationGenerationRef.current !== generation ||
+        stateRevisionRef.current !== startingRevision
+      ) {
+        return;
       }
-    } catch {
-      // 로드 에러 시 기본값 유지
-    }
-  }, [open]);
+      if (stored) {
+        setParams(stored.params);
+        setPose(stored.pose);
+      }
+      setPersistenceStatus("ready");
+    }).catch((cause: unknown) => {
+      if (!active || !mountedRef.current || hydrationGenerationRef.current !== generation) return;
+      setPersistenceStatus("memory-only");
+      setError(
+        `SQLite/OPFS에서 데생 인형 상태를 불러오지 못해 기본값을 현재 탭 메모리에만 유지합니다. 현재 탭 메모리 임시 · 새로고침 시 사라짐: ${getErrorText(cause, "저장소 오류")}`,
+      );
+    });
+    return () => {
+      active = false;
+      if (hydrationGenerationRef.current === generation) {
+        hydrationGenerationRef.current += 1;
+      }
+    };
+  }, [open, stateRepository]);
 
   useEffect(() => {
     if (!open) return;
@@ -960,13 +1027,13 @@ export function StudioMannequinPoserPanel({
   useEffect(() => {
     if (!open) return;
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || capturing) return;
+      if (event.key !== "Escape" || capturing || persistenceStatus === "saving") return;
       event.preventDefault();
       closeWithPersist();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [open, capturing, closeWithPersist]);
+  }, [open, capturing, closeWithPersist, persistenceStatus]);
 
   const applyPosePreset = useCallback((presetId: string) => {
     const preset = STUDIO_MANNEQUIN_POSE_PRESETS.find((entry) => entry.id === presetId);
@@ -1053,8 +1120,7 @@ export function StudioMannequinPoserPanel({
         if (accepted === false) {
           throw new Error("편집 중 문서가 바뀌어 캡처를 삽입하지 않았습니다. 현재 페이지에서 다시 시도해 주세요.");
         }
-        persistState();
-        onClose();
+        if (await persistState()) onClose();
       } catch (cause) {
         setError(getErrorText(cause, "3D 데생 인형 캡처를 추가하지 못했습니다."));
       } finally {
@@ -1103,6 +1169,21 @@ export function StudioMannequinPoserPanel({
               <PersonStanding size={16} className="text-accent" aria-hidden />
               3D 데생 인형
             </h2>
+            <span
+              aria-live="polite"
+              className={cn(
+                "hidden text-[0.66rem] sm:inline",
+                persistenceStatus === "memory-only" ? "text-warn" : "text-fg-3",
+              )}
+            >
+              {persistenceStatus === "loading"
+                ? "SQLite 불러오는 중"
+                : persistenceStatus === "saving"
+                  ? "SQLite 저장 중"
+                  : persistenceStatus === "memory-only"
+                    ? "현재 탭 메모리 임시"
+                    : ""}
+            </span>
             <div className="hidden items-center gap-1 sm:flex">
               <button
                 type="button"
@@ -1142,6 +1223,7 @@ export function StudioMannequinPoserPanel({
           <button
             type="button"
             onClick={closeWithPersist}
+            disabled={persistenceStatus === "saving"}
             className={buttonClass({ size: "icon", variant: "quiet" })}
             aria-label="3D 데생 인형 닫기"
           >

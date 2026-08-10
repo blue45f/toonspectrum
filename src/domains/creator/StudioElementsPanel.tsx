@@ -20,12 +20,16 @@ import {
 import { writeStudioAssetDragPayload } from "./studio-insert-drag-writer";
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 import { serializeStudioLocalAssetDragPayload } from "./studio-shared-asset-drag";
+import { StudioSvgAssetPreview } from "./StudioSvgAssetPreview";
+
+import type { StudioSvgProductTournament } from "./studio-svg-vello-product-router";
 
 import { cn } from "@/lib/utils";
 
 export interface StudioElementsPanelProps {
   onAdd: (item: StudioElementItem) => void;
   onOpenBubbles?: () => void;
+  previewTournament?: Pick<StudioSvgProductTournament, "resolve">;
   className?: string;
 }
 
@@ -33,11 +37,15 @@ function ElementTile({
   item,
   onPick,
   placementHelpId,
+  previewTournament,
 }: {
   item: StudioElementItem;
   onPick: (item: StudioElementItem) => void;
   placementHelpId: string;
+  previewTournament?: Pick<StudioSvgProductTournament, "resolve">;
 }): ReactElement {
+  const [previewRequested, setPreviewRequested] = useState(false);
+
   function handleDragStart(event: DragEvent<HTMLButtonElement>) {
     writeStudioAssetDragPayload(
       event.dataTransfer,
@@ -56,6 +64,9 @@ function ElementTile({
       aria-label={item.label}
       aria-describedby={placementHelpId}
       onClick={() => onPick(item)}
+      onFocus={() => setPreviewRequested(true)}
+      onPointerEnter={() => setPreviewRequested(true)}
+      onPointerDown={() => setPreviewRequested(true)}
       draggable
       onDragStart={handleDragStart}
       data-studio-element={item.id}
@@ -67,13 +78,13 @@ function ElementTile({
       )}
     >
       <div className="relative flex h-12 w-full items-center justify-center overflow-hidden rounded bg-[oklch(0.94_0.01_78)] p-1">
-        <img
-          src={svgToDataUrl(item.svg)}
-          alt=""
-          aria-hidden
-          loading="lazy"
-          decoding="async"
-          className="h-full w-full object-contain transition-transform group-hover:scale-105"
+        <StudioSvgAssetPreview
+          assetId={item.id}
+          svg={item.svg}
+          width={item.width}
+          height={item.height}
+          requested={previewRequested}
+          tournament={previewTournament}
         />
         <Grip
           size={11}
@@ -91,6 +102,7 @@ function ElementTile({
 export function StudioElementsPanel({
   onAdd,
   onOpenBubbles,
+  previewTournament,
   className,
 }: StudioElementsPanelProps): ReactElement {
   const resultsId = useId();
@@ -219,6 +231,7 @@ export function StudioElementsPanel({
                 item={item}
                 onPick={handlePick}
                 placementHelpId={placementHelpId}
+                previewTournament={previewTournament}
               />
             ))}
           </div>
@@ -243,6 +256,7 @@ export function StudioElementsPanel({
                 item={item}
                 onPick={handlePick}
                 placementHelpId={placementHelpId}
+                previewTournament={previewTournament}
               />
             ))}
           </div>

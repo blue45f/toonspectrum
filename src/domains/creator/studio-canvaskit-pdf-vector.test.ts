@@ -388,6 +388,17 @@ describe("글꼴 임베드", () => {
     expect(document.pages[0]!.content).toContain("<4142> Tj");
   });
 
+  it("표준 14 폰트로 표현할 수 없는 유니코드는 물음표로 바꾸지 않고 fail-closed한다", () => {
+    expect(() => buildVectorPdf({
+      pages: [{
+        widthPt: 200,
+        heightPt: 100,
+        ops: [{ op: "text", text: "漢字", font: "F1", size: 12, x: 10, y: 20, color: { space: "gray", gray: 0 } }],
+      }],
+      fonts: [standardFont],
+    })).toThrow("CID TrueType 글꼴");
+  });
+
   it("CID 임베드는 Type0 + CIDFontType2 + FontFile2 체인을 만든다", () => {
     const bytes = buildVectorPdf({
       pages: [
@@ -419,6 +430,18 @@ describe("글꼴 임베드", () => {
     expect(fontStream).toBeDefined();
     expect(Array.from(fontStream!)).toEqual(Array.from(cidFont.kind === "truetype-cid" ? cidFont.fontBytes : []));
     expect(latin1(bytes)).toContain("/Length1 7");
+  });
+
+  it("CID 글꼴에 없는 루비/본문 글리프를 .notdef로 조용히 바꾸지 않는다", () => {
+    expect(() => buildVectorPdf({
+      pages: [{
+        widthPt: 200,
+        heightPt: 100,
+        ops: [{ op: "text", text: "漢", font: "F0", size: 12, x: 10, y: 20, color: { space: "gray", gray: 0 } }],
+      }],
+      fonts: [cidFont],
+      fontEmbeddingIntent: "editable",
+    })).toThrow("필요한 글리프");
   });
 
   it("CID 글꼴은 문서 의도를 생략하면 임베딩하지 않는다(fail-closed)", () => {

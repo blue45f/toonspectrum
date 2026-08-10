@@ -1,0 +1,158 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-08T20:33:02Z",
+  "authority": "V12 Vello-native SVG quality and browser WebGPU gate",
+  "environment": {
+    "os": "macOS 26.6",
+    "arch": "arm64",
+    "node": "v24.16.0",
+    "chromium": "140.0.7339.186",
+    "launch": "playwright chromium headless shell (metal, unsafe-webgpu)",
+    "adapter": {
+      "backend": "BrowserWebGpu",
+      "deviceType": "Other",
+      "name": "",
+      "driver": ""
+    }
+  },
+  "pins": {
+    "vello_svg": "0.10.0",
+    "usvg": "0.46.0",
+    "vello": "0.9.0",
+    "vello_cpu": "0.2.0",
+    "wgpu": "29.0.4",
+    "resvgWasmReference": "2.6.2"
+  },
+  "corpus": {
+    "authored": true,
+    "downloadedAssets": false,
+    "renderSize": [128, 128],
+    "timedSamples": 20,
+    "fixtures": ["curves", "gradients", "clip"]
+  },
+  "qualityAgainstResvg": [
+    {
+      "fixture": "curves",
+      "velloSvgNativeCpu": {
+        "psnrDb": 36.841,
+        "ssim": 0.995936,
+        "fuzzyMismatchPct": 0.036621
+      },
+      "customSceneIr": {
+        "psnrDb": 36.828,
+        "ssim": 0.995935,
+        "fuzzyMismatchPct": 0.036621
+      }
+    },
+    {
+      "fixture": "gradients",
+      "velloSvgNativeCpu": {
+        "psnrDb": 39.836,
+        "ssim": 0.995692,
+        "fuzzyMismatchPct": 0
+      },
+      "customSceneIr": {
+        "psnrDb": 39.836,
+        "ssim": 0.995692,
+        "fuzzyMismatchPct": 0
+      }
+    },
+    {
+      "fixture": "clip",
+      "velloSvgNativeCpu": {
+        "psnrDb": 42.79,
+        "ssim": 0.997639,
+        "fuzzyMismatchPct": 0.006104
+      },
+      "customSceneIr": {
+        "psnrDb": 42.79,
+        "ssim": 0.997639,
+        "fuzzyMismatchPct": 0.006104
+      }
+    }
+  ],
+  "meanSsimAgainstResvg": {
+    "velloSvgNativeCpu": 0.9964223333333333,
+    "customSceneIr": 0.996422
+  },
+  "nodeEndToEndGradientTiming": {
+    "includesParseAuditAndRender": true,
+    "velloSvgNativeCpu": {
+      "p50Ms": 3.552,
+      "p95Ms": 3.712,
+      "p99Ms": 3.866,
+      "peakObservedRssDeltaBytes": 147456
+    },
+    "customSceneIr": {
+      "p50Ms": 3.844,
+      "p95Ms": 3.994,
+      "p99Ms": 4.188,
+      "peakObservedRssDeltaBytes": 278528
+    },
+    "resvgReference": {
+      "p50Ms": 0.642,
+      "p95Ms": 1.008,
+      "p99Ms": 1.031,
+      "peakObservedRssDeltaBytes": 65536
+    }
+  },
+  "browserWebGpu": [
+    {
+      "fixture": "curves",
+      "gpuVsCpuFuzzyMismatchPct": 0.030518,
+      "gpu": { "p50Ms": 3, "p95Ms": 3.2, "p99Ms": 3.2 },
+      "cpu": { "p50Ms": 2.1, "p95Ms": 2.3, "p99Ms": 2.4 },
+      "deterministic": true,
+      "jsHeapObservedDeltaBytes": 0
+    },
+    {
+      "fixture": "gradients",
+      "gpuVsCpuFuzzyMismatchPct": 0,
+      "gpu": { "p50Ms": 3, "p95Ms": 3.1, "p99Ms": 3.2 },
+      "cpu": { "p50Ms": 3, "p95Ms": 3.2, "p99Ms": 3.2 },
+      "deterministic": true,
+      "jsHeapObservedDeltaBytes": 0
+    },
+    {
+      "fixture": "clip",
+      "gpuVsCpuFuzzyMismatchPct": 0,
+      "gpu": { "p50Ms": 3, "p95Ms": 3.4, "p99Ms": 3.6 },
+      "cpu": { "p50Ms": 3.5, "p95Ms": 3.7, "p99Ms": 3.8 },
+      "deterministic": true,
+      "jsHeapObservedDeltaBytes": 0
+    }
+  ],
+  "memoryAndBundle": {
+    "rgbaPixelBytesPerRender": 65536,
+    "gpuReadbackBytesPerRender": 65536,
+    "gpuMemoryPeakMeasured": false,
+    "gpuMemoryMeasurementReason": "WebGPU does not expose portable process/GPU heap telemetry; texture/readback allocation is reported instead",
+    "pkgGpuBeforeSvgBytes": 4627278,
+    "pkgGpuAfterSvgBytes": 5744423,
+    "pkgGpuDeltaBytes": 1117145,
+    "pkgGpuDeltaPct": 24.143,
+    "resvgReferenceWasmBytes": 2478606,
+    "cpuPkgChanged": false
+  },
+  "gates": {
+    "resvgReferenceSsimMinimum": 0.95,
+    "resvgReferenceFuzzyMismatchMaximumPct": 2,
+    "gpuCpuFuzzyMismatchMaximumPct": 0.8,
+    "gpuDeterminism": "byte-identical repeated readback",
+    "allPassed": true
+  },
+  "unsupportedRejectedBeforeRender": [
+    "text",
+    "raster-image",
+    "pattern",
+    "mask",
+    "filter",
+    "marker",
+    "use",
+    "symbol",
+    "nested-svg",
+    "external-reference",
+    "objectBoundingBox-clip",
+    "multi-node-or-nested-clip"
+  ]
+}

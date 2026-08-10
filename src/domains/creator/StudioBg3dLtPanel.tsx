@@ -16,7 +16,7 @@ import type {
 } from "./studio-bg3d-scene-document";
 import type { CSSProperties } from "react";
 
-type LtUserPresetLibraryStatus = "idle" | "ready" | "recovered" | "unavailable";
+type LtUserPresetLibraryStatus = "idle" | "ready" | "saving" | "memory-only";
 type LtUserPresetNotice = Readonly<{
   tone: "info" | "success" | "error";
   message: string;
@@ -321,7 +321,9 @@ export function StudioBg3dLtPanel({
                     </span>
                     <span className="flex items-center gap-1 text-[0.64rem] font-normal text-fg-3">
                       {ltUserPresetPayload.presets.length}/{STUDIO_BG3D_LT_PRESET_MAX_COUNT}
-                      {ltUserPresetLibraryStatus === "idle" ? " · 불러오는 중" : ""}
+                      {ltUserPresetLibraryStatus === "idle" ? " · SQLite 불러오는 중" : ""}
+                      {ltUserPresetLibraryStatus === "saving" ? " · SQLite 저장 중" : ""}
+                      {ltUserPresetLibraryStatus === "memory-only" ? " · 현재 탭 메모리 임시" : ""}
                       <ChevronDown className="transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none" size={13} aria-hidden />
                     </span>
                   </summary>
@@ -373,7 +375,7 @@ export function StudioBg3dLtPanel({
                         <button
                           type="button"
                           className={cx(CONTROL_BUTTON, "w-full border-accent/55 bg-accent text-on-accent hover:bg-accent/90")}
-                          disabled={ltUserPresetLibraryStatus === "idle" || ltUserPresetLibraryStatus === "unavailable"}
+                          disabled={ltUserPresetLibraryStatus === "idle"}
                           onClick={updateManagedLtUserPreset}
                         >
                           <Save size={14} aria-hidden />
@@ -383,7 +385,7 @@ export function StudioBg3dLtPanel({
                           <button
                             type="button"
                             className={cx(CONTROL_BUTTON, "border-line bg-panel text-fg-2 hover:bg-raised hover:text-fg")}
-                            disabled={ltUserPresetLibraryStatus === "idle" || ltUserPresetLibraryStatus === "unavailable"}
+                            disabled={ltUserPresetLibraryStatus === "idle"}
                             onClick={renameManagedLtUserPreset}
                           >
                             <PencilLine size={14} aria-hidden />
@@ -397,7 +399,7 @@ export function StudioBg3dLtPanel({
                                 ? "border-bad/60 bg-[oklch(0.66_0.20_25/0.12)] text-bad"
                                 : "border-line bg-panel text-fg-3 hover:bg-raised hover:text-bad"
                             )}
-                            disabled={ltUserPresetLibraryStatus === "idle" || ltUserPresetLibraryStatus === "unavailable"}
+                            disabled={ltUserPresetLibraryStatus === "idle"}
                             onClick={deleteManagedLtUserPreset}
                           >
                             <Trash2 size={14} aria-hidden />
@@ -411,7 +413,6 @@ export function StudioBg3dLtPanel({
                         className={cx(CONTROL_BUTTON, "mt-3 w-full border-accent/55 bg-accent text-on-accent hover:bg-accent/90")}
                         disabled={
                           ltUserPresetLibraryStatus === "idle" ||
-                          ltUserPresetLibraryStatus === "unavailable" ||
                           ltUserPresetPayload.presets.length >= STUDIO_BG3D_LT_PRESET_MAX_COUNT
                         }
                         onClick={saveCurrentLtAsUserPreset}

@@ -7,7 +7,7 @@ import {
   SlidersHorizontal,
   Undo2,
 } from "lucide-react";
-import { Profiler, Suspense, lazy, useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type ComponentProps, type ReactNode, type SetStateAction } from "react";
+import { Profiler, Suspense, lazy, useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type ChangeEvent, type ComponentProps, type ReactNode, type SetStateAction } from "react";
 import { flushSync } from "react-dom";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
@@ -24,6 +24,7 @@ import {
   studioActiveStrokeRecoveryFingerprint,
   type StudioActiveStrokePointerType,
 } from "./studio-active-stroke-lifecycle";
+import { resolveStudioActiveToolCommandId } from "./studio-active-tool-command";
 import { resolveStudioAdvancedFillEntry } from "./studio-advanced-fill-entry";
 import {
   loadStudioAdvancedFillSettings,
@@ -51,6 +52,7 @@ import {
 import {
   loadStudioAiRecentPrompts,
   pushStudioAiRecentPrompt,
+  STUDIO_AI_RECENT_PROMPTS_KEY,
   type StudioAiAssistToolId,
   type StudioAiRecentPromptsState,
 } from "./studio-ai-assist-ux";
@@ -85,12 +87,9 @@ import {
 import { resolveStudioAiImageReferences } from "./studio-ai-image-reference-resolution";
 import {
   createEmptyStudioAiImageReferenceDocument,
+  hydrateStudioAiImageReferenceDocument,
   type StudioAiImageReferenceDocument,
 } from "./studio-ai-image-reference-roles";
-import {
-  loadStudioAiImageReferenceDocument,
-  saveStudioAiImageReferenceDocument,
-} from "./studio-ai-image-reference-storage";
 import {
   createEmptyStudioAiProvenanceDocument,
   normalizeStudioAiProvenanceDocument,
@@ -167,7 +166,6 @@ import {
   studioAutosaveKey,
   studioLifecycleAutosaveSidecarKey,
   studioSharedAutosaveCompatibility,
-  writeStudioLifecycleAutosave,
   type StudioAutosavePayload,
   type StudioPendingStrokeDurabilityReason,
 } from "./studio-autosave";
@@ -202,6 +200,10 @@ import {
   isStudioBrushAliasId,
 } from "./studio-brush-alias-profile";
 import {
+  resolveStudioHokusaiProductLiveAdmission,
+  type StudioHokusaiProductLivePresetId,
+} from "./studio-brush-backend-quality-policy";
+import {
   normalizeStudioBrushDynamicsSettings,
   resolveStudioBrushDynamicsPresetId,
   studioBrushDynamicsSettingsForBrushId,
@@ -209,12 +211,7 @@ import {
   type StudioBrushDynamicsPresetId,
 } from "./studio-brush-dynamics";
 import {
-  browserBrushLibraryStorage,
-  BRUSH_LIBRARY_KEY,
   DEFAULT_STUDIO_BRUSH_SNAPSHOT,
-  listBrushes,
-  markBrushUsedWithResult,
-  restoreDeletedBrush,
   type DeletedBrushRecord,
   type StudioBrushStampTuning,
   type StudioBrushSnapshot,
@@ -224,6 +221,10 @@ import {
   planStudioDrawModeChange,
   planStudioStrokeWidthChange,
 } from "./studio-brush-mode-width";
+import {
+  STUDIO_BRUSH_PACK_ACCEPT,
+  studioBrushPackFormatOf,
+} from "./studio-brush-pack-format";
 import { isStudioBrushPackCatalogId } from "./studio-brush-pack-id";
 import {
   StudioBrushR8GrainHydrator,
@@ -237,9 +238,9 @@ import {
 } from "./studio-brush-selection";
 import {
   assignStudioBrushSlot,
-  loadStudioBrushSlotsState,
+  emptyStudioBrushSlots,
   rememberStudioBrushSlot,
-  saveStudioBrushSlotsState,
+  STUDIO_BRUSH_SLOT_COUNT,
   studioBrushSlotAt,
   type StudioBrushSlot,
   type StudioBrushSlotsState,
@@ -270,6 +271,16 @@ import {
   mergeStudioBubbles,
 } from "./studio-bubble-merge";
 import {
+  bubbleLetterSpacing,
+  bubbleTextBoxWidth,
+  bubbleVerticalPaddingTotal,
+  fitBubbleBoxHeightToText,
+  resolveBubbleFontFamily,
+  resolveBubbleFontSize,
+  resolveBubbleFontStyle,
+  resolveBubbleLineHeight,
+} from "./studio-bubble-text-fit";
+import {
   hasStudioCanonicalVNextQualityShadowRuntime,
   submitStudioCanonicalVNextQualityShadowFinalParity,
 } from "./studio-canonical-vnext-quality-shadow";
@@ -280,6 +291,7 @@ import {
 } from "./studio-canvas-cursor";
 import { resolveStudioCanvasGestureDisposition } from "./studio-canvas-gesture-arbitration";
 import {
+  recordStudioHotPathRender,
   recordStudioRenderProfile,
   studioElementIdOf,
 } from "./studio-canvas-shared-runtime";
@@ -309,12 +321,13 @@ import {
   listDurableStudioCheckpoints,
   studioCheckpointKey,
   type StudioCheckpoint,
-} from "./studio-checkpoints";
+} from "./studio-checkpoint-loader";
 import {
   StudioAppMenubar,
   StudioEdgeRailButton,
   StudioToolBelt,
 } from "./studio-chrome-ui";
+import { deleteSavedClipInMemory, upsertSavedClipInMemory } from "./studio-clips";
 import { shouldOwnStudioCoalescedBatchDraft } from "./studio-coalesced-batch-mutation";
 import {
   COLOR_RANGE_FUZZINESS_DEFAULT,
@@ -405,6 +418,20 @@ import {
   planStudioDeferredStrokePostprocess,
   replaceStudioPendingStrokePostprocess,
 } from "./studio-deferred-stroke-postprocess";
+import { confirmStudioDestructiveAction } from "./studio-destructive-action-preview";
+import {
+  settleStudioDestructiveCommit,
+  studioApplyCollageRequest,
+  studioApplyPanelLayoutRequest,
+  studioApplyTemplateRequest,
+  studioClearLivingInkRequest,
+  studioDeleteCheckpointRequest,
+  studioQuickComicReplaceRequest,
+  studioRemoveEmeresUnderlaysRequest,
+  studioRestoreCheckpointRequest,
+  studioSceneSnapshotReplaceRequest,
+  studioStartFromExampleRequest,
+} from "./studio-destructive-command-catalog";
 import {
   applyDialogueTextEdit,
   applyReplacePlanToPages,
@@ -424,6 +451,7 @@ import {
   DIALOGUE_LOCALE_PRESETS,
   SOURCE_LOCALE,
 } from "./studio-dialogue-translate";
+import { attachStudioDismissableSurface } from "./studio-dismissable-surface";
 import {
   loadStudioPsdExportModule,
   loadStudioPsdImportModule,
@@ -439,11 +467,14 @@ import {
 } from "./studio-dodge-burn";
 import { StudioDraftPreviewStore } from "./studio-draft-preview-store";
 import { isCompleteStudioDrawOp } from "./studio-draw-completion";
+import { planStudioDrawObjectTransform } from "./studio-draw-object-transform";
 import { planStudioDrawPointerRelease } from "./studio-draw-pointer-release-plan";
 import { planStudioDrawPointerStart } from "./studio-draw-pointer-start-plan";
 import {
+  executeStudioDraftPreviewBackdropBoundary,
   isDirectLiveDraftEl,
   isDirectLiveStampDraftEl,
+  planStudioDraftPreviewBackdropBoundary,
   resolveStudioDraftPreviewActiveLane,
   resolveStudioLiveInkStrokeStyle,
   studioLiveBrushEffectiveDiameter,
@@ -458,6 +489,7 @@ import {
   type StudioDrawingAssistDocument,
 } from "./studio-drawing-assist-document";
 import { createStudioDrawingPointerTransportController } from "./studio-drawing-pointer-transport";
+import { createStudioDrawingShortcutNoticeStore } from "./studio-drawing-shortcut-notice-store";
 import {
   adjustStudioBrushOpacity,
   adjustStudioBrushWidth,
@@ -497,6 +529,14 @@ import {
   type ExportFormat,
 } from "./studio-export";
 import { pickColorFromImageData } from "./studio-eyedropper";
+import {
+  planStudioSelectionFlip,
+  planStudioSelectionLayoutPatch,
+  planStudioZoomToSelection,
+  selectStudioFigmaDesignTargets,
+  type StudioFigmaSelectionLayoutPatch,
+  unionStudioSelectionBounds,
+} from "./studio-figma-selection-ux";
 import {
   collectOverlappingStudioFillReferenceLayers,
   composeStudioFillReferenceImageWithPageReferences,
@@ -590,7 +630,6 @@ import {
   type StudioHokusaiLiveSampleLike,
 } from "./studio-hokusai-live-brush-protocol";
 import {
-  resolveStudioHokusaiLivePreset,
   type StudioHokusaiLiveRouteResult,
 } from "./studio-hokusai-live-brush-router";
 import {
@@ -613,6 +652,11 @@ import {
   type CanvasImagePlacement,
 } from "./studio-image-placement";
 import {
+  loadStudioInkMeshLivePreviewModule,
+  type StudioInkMeshLivePreviewModule,
+  type StudioInkMeshLivePreviewRuntime,
+} from "./studio-ink-mesh-live-preview-loader";
+import {
   studioInkFallbackPressure,
 } from "./studio-ink-pressure-model";
 import {
@@ -622,6 +666,7 @@ import {
   STUDIO_INSERT_DRAG_MIME,
 } from "./studio-insert-drag-core";
 import { LazyStudioInspectorAside } from "./studio-inspector-aside-loader";
+import { requestStudioInspectorFocus } from "./studio-inspector-focus";
 import {
   navigateStudioInspector,
   type StudioInspectorLayout,
@@ -759,6 +804,11 @@ import {
   studioLiveWetInkOverlaySupportsElement,
 } from "./studio-live-wet-ink-overlay";
 import {
+  studioLivingInkAdmitsBrush,
+  studioLivingInkExplicitBrushKey,
+  studioLivingInkSupportsExplicitBrush,
+} from "./studio-living-ink-brush-admission";
+import {
   createStudioLivingInkCanonicalTransaction,
   studioLivingInkReceiptReplayToken,
   verifyStudioLivingInkCanonicalImageAuthority,
@@ -769,11 +819,19 @@ import {
   type StudioLivingInkMaterialControls,
 } from "./studio-living-ink-gpu-protocol";
 import {
+  createDefaultLivingInkInputRoutingState,
+  resolveLivingInkStrokeRoute,
+  withPencilSeen,
+  type StudioLivingInkInputRoutingState,
+} from "./studio-living-ink-input-routing";
+import {
   StudioLivingInkOverlayRenderer,
+  studioLivingInkCoverageIntersectsStroke,
   type StudioLivingInkOverlayPresentationReceipt,
 } from "./studio-living-ink-overlay";
 import {
   studioLivingInkCanReuseAcceptedAuthority,
+  studioLivingInkEffectiveScope,
   studioLivingInkFailureDisposition,
   studioLivingInkProductAdmissionBlocked,
   type StudioLivingInkAcceptedAuthority,
@@ -789,6 +847,8 @@ import {
   type StudioLivingInkStrokeMode,
   type StudioLivingInkStudioState,
 } from "./studio-living-ink-studio-coordinator";
+import { studioLivingInkVectorShadowElement } from "./studio-living-ink-vector-shadow";
+import { localizeStudioText } from "./studio-localize-text";
 import {
   createStudioMacroSession,
   recordStudioMacroCommand,
@@ -808,7 +868,9 @@ import {
   flipNormalizedPoint,
   MAGIC_WAND_TOLERANCE_DEFAULT,
 } from "./studio-magic-wand";
+import { bindStudioMainMenuEditorActions } from "./studio-main-menu-editor-bindings";
 import { buildStudioMainMenuGroups } from "./studio-main-menu-groups";
+import { bindStudioMainMenuSurfaceActions } from "./studio-main-menu-surface-bindings";
 import {
   composeMasterRenderElements,
   composeThumbPage,
@@ -853,6 +915,10 @@ import {
   type NodeEditHandle,
   type NodeEditTool,
 } from "./studio-node-edit";
+import {
+  projectStudioDocumentRectToClient,
+  type StudioSurfaceRect,
+} from "./studio-oncanvas-command-surfaces";
 import { useStudioPageDnd } from "./studio-page-dnd";
 import {
   isDefaultPageGrade,
@@ -864,6 +930,7 @@ import {
   StudioBrushLibraryPanel,
   StudioBrushStudio,
   StudioBrushCatalogPortal,
+  StudioCreativeCompetitorModesPanel,
   StudioFilterDialog,
   StudioLayerLiftDialog,
   StudioPublishContextBanner,
@@ -935,7 +1002,7 @@ import {
   createStudioPagesHistoryCommandJournalClient,
   type StudioHistoryJournalTransitionInput,
 } from "./studio-pages-history-command-journal-client";
-import { createPalette, savePalette } from "./studio-palette-library";
+import { createPalette } from "./studio-palette-library";
 import { withShotTag } from "./studio-panel-shot-tags";
 import {
   beginPanelSplitDrag,
@@ -976,6 +1043,11 @@ import {
   type PerspectiveRay,
   type VanishingPoint,
 } from "./studio-perspective-guide";
+import {
+  admitStudioPixelArtStrokeColor,
+  createStudioPixelArtMode,
+  type StudioPixelArtModeState,
+} from "./studio-pixel-art-mode";
 import {
   isStudioPixelPencilRenderMode,
   shouldAppendStudioPixelPencilSample,
@@ -1105,6 +1177,7 @@ import {
   studioRasterAuthorizedOperationIds,
   type StudioRasterHandoffCandidate,
 } from "./studio-raster-handoff-authority";
+import { expectStudioRasterImagePresentation } from "./studio-raster-image-presentation";
 import { canPublishStudioRasterLayer } from "./studio-raster-layer-write-guard";
 import { STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED } from "./studio-raster-publication-feature";
 import {
@@ -1132,6 +1205,8 @@ import {
   createEmptyStudioReleaseScheduleSnapshot,
   loadStudioReleaseScheduleRuntime,
 } from "./studio-release-schedule-loader";
+import { studioSafeModeQuality } from "./studio-reliability-status-store";
+import { publishStudioRenderBackend } from "./studio-render-backend-beacon";
 import {
   appendStudioPendingRasterRetouchGesturePoint,
   beginStudioPendingRasterRetouchGesture,
@@ -1142,7 +1217,17 @@ import {
   type StudioRasterRetouchGestureTool,
   type StudioRasterRetouchNormalizedPoint,
 } from "./studio-retouch-raster-gesture";
+import { announceStudioGpuDeviceLoss } from "./studio-safe-mode-runtime";
 import { layoutScenarioPanels, type ScenarioPanelAspect, type ScenarioPreviewItem } from "./studio-scenario-layout";
+import {
+  STUDIO_SCROLL_VIEWPORT_ORIGIN,
+  STUDIO_SCROLL_VIEWPORT_SETTLE_MS,
+  createStudioScrollViewportStore,
+  planStudioScrollViewportCommit,
+  studioScrollViewportsEqual,
+  type StudioScrollViewport,
+  type StudioScrollViewportStore,
+} from "./studio-scroll-viewport-store";
 import {
   clampCanvasPlacementCenter,
   computeAlignDeltas,
@@ -1225,6 +1310,10 @@ import {
   type StudioShared3dStageDccSource,
 } from "./studio-shared-3d-stage-document";
 import { verifyStudioSharedAssetContent } from "./studio-shared-asset-content";
+import {
+  DEFAULT_STUDIO_SILK_GENERATIVE_SPEC,
+  type StudioSilkGenerativeSpec,
+} from "./studio-silk-generative";
 import { sameCategoryItems } from "./studio-similar-style";
 import {
   EMPTY_FREEHAND_OBJECT_SNAP_LATCH,
@@ -1245,6 +1334,7 @@ import {
 } from "./studio-smart-guides";
 import { SMUDGE_RADIUS_DEFAULT, SMUDGE_STRENGTH_DEFAULT } from "./studio-smudge";
 import { useStudioStableHandlers } from "./studio-stable-handlers";
+import { readStudioStageInDocumentView } from "./studio-stage-document-view";
 import {
   acquireStudioStagePointerFrameMapperCache,
   shouldSynchronizeStudioStagePointerPosition,
@@ -1252,6 +1342,12 @@ import {
   type StudioStagePointerBatchMapper,
   type StudioStagePointerFrameMapperCache,
 } from "./studio-stage-pointer-coordinate";
+import { createStudioStickyNoteElement } from "./studio-sticky-note";
+import {
+  noteStudioSaveSucceeded,
+  reportStudioAutosaveFailure,
+  reportStudioSaveAuthorityDegraded,
+} from "./studio-storage-recovery-runtime";
 import { resolveShiftFreehandTransition } from "./studio-stroke-constrain";
 import {
   normalizeStudioStrokeGuideScale,
@@ -1262,6 +1358,10 @@ import {
   type StudioStrokeObjectSnapCache,
 } from "./studio-stroke-object-snap-cache";
 import { StudioStrokePostprocessWorkerClient } from "./studio-stroke-postprocess-worker-client";
+import {
+  STUDIO_STROKE_ROUTE_TOURNAMENT_LANES,
+  resolveStudioStrokeRoutePointerDownGate,
+} from "./studio-stroke-route-tournament";
 import {
   DEFAULT_SHAPE_PARAMS,
 } from "./studio-stroke-shapes";
@@ -1295,11 +1395,20 @@ import {
 } from "./studio-team-comment-refresh-session";
 import { suppressNextStudioToolHintFocus } from "./studio-tool-hint-focus-suppression";
 import {
+  bootStudioTournamentPersistence,
+  peekBootedStudioTournamentRuntime,
+} from "./studio-tournament-persistence-bootstrap";
+import {
   loadStudioUiDensityState,
   saveStudioUiDensityState,
   studioUiDensityAllows,
   type StudioUiDensityMode,
 } from "./studio-ui-density";
+import {
+  hasUnsavedStudioWork,
+  installStudioUnloadGuard,
+  studioPendingStrokeFingerprint,
+} from "./studio-unsaved-work-guard";
 import {
   studioVectorAsyncCommandStaleReason,
 } from "./studio-vector-async-command-guard";
@@ -1311,6 +1420,8 @@ import {
   currentStudioVectorReferenceBudgets,
   materializeStudioAdvancedFillVectorTarget,
   planStudioAdvancedFillVectorTarget,
+  prepareStudioVectorReferenceExport,
+  renderPreparedStudioVectorReference,
   renderStudioAdvancedFillVectorReference,
   renderStudioVectorReference,
   type StudioAdvancedFillVirtualTarget,
@@ -1389,17 +1500,23 @@ import {
   type StudioWorkAssetRenderPlaceholder,
   type StudioWorkAssetSceneReference,
 } from "./studio-work-asset-render-projection";
+import { readStudioWorkspaceDeviceSignalsFromGlobals } from "./studio-workspace-device-signals";
 import {
   STUDIO_WORKSPACE_LEFT_PANEL_WIDTH,
   STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH,
   areStudioWorkspaceLayoutsEqual,
+  captureStudioWorkspaceDeviceLayout,
   loadStudioWorkspacePersistence,
   normalizeStudioWorkspaceLayout,
-  resolveStudioWorkspace,
+  resolveStudioWorkspaceControlSide,
+  resolveStudioWorkspaceDeviceKind,
+  resolveStudioWorkspaceDeviceLayout,
   saveStudioWorkspaceState,
   studioWorkspaceOwnerScope,
   studioWorkspaceStorageKey,
   updateStudioWorkspaceLiveLayout,
+  type StudioMobileControlSide,
+  type StudioWorkspaceDeviceKind,
   type StudioWorkspaceLayout,
   type StudioWorkspaceLoadResult,
   type StudioWorkspaceSaveResult,
@@ -1416,6 +1533,7 @@ import {
   projectStudioWriterRoomToCanvasPlan,
   type StudioWriterRoomCanvasProjectionResult,
 } from "./studio-writer-room-canvas-projection";
+import { StudioBrushHud } from "./StudioBrushHud";
 import { StudioCanvasContextMenu } from "./StudioCanvasContextMenu";
 import {
   StudioCanvasViewport,
@@ -1426,6 +1544,8 @@ import {
 import {
   type CvdMode,
 } from "./StudioColorBlindPreview";
+import { StudioDestructiveConfirmHost } from "./StudioDestructiveConfirmHost";
+import { StudioHelpCenterHost } from "./StudioHelpCenterHost";
 import {
   StudioLazyPanelStack,
   type StudioLazyPanelStackHandlers,
@@ -1452,6 +1572,11 @@ import {
   type StudioPageListPaneHandlers,
 } from "./StudioPageListPane";
 import { StudioPanelResizeHandle } from "./StudioPanelResizeHandle";
+import { StudioScrollViewportSubscriber } from "./StudioScrollViewportSubscriber";
+import {
+  StudioSelectionContextBar,
+  type StudioSelectionAlignMode,
+} from "./StudioSelectionContextBar";
 import {
   StudioToolBeltContent,
   type FxPickerSection,
@@ -1480,7 +1605,10 @@ import type {
 } from "./studio-3d-insert-contract";
 import type { AdvancedFillMaskLike } from "./studio-advanced-fill";
 import type { StudioAdvancedFillPreview } from "./studio-advanced-fill-preview";
-import type { StudioAsset } from "./studio-asset-library";
+import type {
+  StudioAsset,
+  StudioAssetWithContentHash,
+} from "./studio-asset-library";
 import type {
   StudioAutoActionExecutionProgress,
   StudioAutoActionPlan,
@@ -1555,6 +1683,11 @@ import type {
   StudioLivingInkExecutionConfig,
 } from "./studio-living-ink-execution-protocol";
 import type { StudioLivingInkSelectionMask } from "./studio-living-ink-field";
+import type { StudioMainMenuSurfaceHandlerBundle } from "./studio-main-menu-surface-bindings";
+import type {
+  StudioMainMenuSurfaceState,
+  StudioPixelSelectionToolId,
+} from "./studio-main-menu-surface-contract";
 import type { MotionCutImage } from "./studio-motion-export";
 import type { PageState } from "./studio-page-state";
 import type { PaletteSuggestion } from "./studio-palette-suggest";
@@ -1664,6 +1797,9 @@ type StudioAutosaveOpfsSession = NonNullable<
   Awaited<ReturnType<typeof import("./studio-autosave-opfs-session").createStudioAutosaveOpfsSession>>
 >;
 
+type StudioAutosaveSqlitePort =
+  import("./studio-autosave-sqlite-store").StudioAutosaveSqlitePort;
+
 type StudioHybridDccWorkspacePersistence = ReturnType<
   typeof import("./studio-hybrid-dcc-workspace-persistence")
     .createStudioHybridDccWorkspacePersistenceFromFileSystem
@@ -1717,6 +1853,14 @@ type StudioHokusaiPinnedLiveStroke = {
   session: StudioHokusaiLiveStrokeSession | null;
   queuedSamples: StudioHokusaiLiveSampleLike[];
   forwardedSampleCount: number;
+  lastAppendedSequence: number;
+  lastMaterialFrameSequence: number;
+  materialCompositeBounds: Readonly<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }> | null;
   overlayPresented: boolean;
   failed: boolean;
   finishing: boolean;
@@ -1763,34 +1907,19 @@ type StudioLivingInkCanonicalHandoff = Readonly<{
   strokeId: string | null;
 }>;
 
-const STUDIO_LIVING_INK_BRUSH_IDS = new Set([
-  "watercolor",
-  "ink-wash",
-  "sumi",
-  "sumi-e",
-  "watercolor-flat-wash",
-  "watercolor-wet-wash",
-  "watercolor-edge-stain",
-  "watercolor-dry-granule",
-  "watercolor-backrun-ring",
-]);
-
-function studioLivingInkSupportsBrush(
-  brushId: string | null | undefined,
-  catalogId: string | null | undefined,
+function studioLivingInkSupportsElement(
+  element: DrawEl,
+  physicalModeEnabled: boolean,
 ): boolean {
-  return [brushId, catalogId]
-    .filter((value): value is string => typeof value === "string")
-    .map((value) => value.toLowerCase())
-    .some((id) => STUDIO_LIVING_INK_BRUSH_IDS.has(id) || /(?:watercolor|ink-wash|sumi)/u.test(id));
-}
-
-function studioLivingInkSupportsElement(element: DrawEl): boolean {
   return element.mode === "pen"
     && (element.kind ?? "freehand") === "freehand"
     && !element.fill
     && (element.symmetry?.type ?? "none") === "none"
-    && studioLivingInkSupportsBrush(element.brush, element.brushCatalogId);
+    && studioLivingInkAdmitsBrush({
+      brushId: element.brush,
+      catalogId: element.brushCatalogId,
+      physicalModeEnabled,
+    });
 }
 
 function studioLivingInkLinearColor(value: string): readonly [number, number, number, number] | null {
@@ -1805,16 +1934,15 @@ function studioLivingInkLinearColor(value: string): readonly [number, number, nu
   return Object.freeze([linear(match[1]!), linear(match[2]!), linear(match[3]!), 1]);
 }
 
-const STUDIO_HOKUSAI_AUTOMATIC_PRESETS = new Set(["pencil", "charcoal", "oil"]);
-
-function studioHokusaiAutomaticPreset(
+function studioHokusaiProductLivePreset(
   brushId: string,
   catalogId: string | null | undefined,
-): "pencil" | "charcoal" | "oil" | null {
-  const preset = resolveStudioHokusaiLivePreset(brushId, catalogId);
-  return preset && STUDIO_HOKUSAI_AUTOMATIC_PRESETS.has(preset)
-    ? preset as "pencil" | "charcoal" | "oil"
-    : null;
+): StudioHokusaiProductLivePresetId | null {
+  // Brush identity is not an opt-in. The committed full-size comparison failed both the visual
+  // parity and 1.2x throughput promotion gates, so the normal shelf never starts Hokusai live.
+  // The selected-stroke inspector remains the explicit, user-visible experimental surface.
+  const admission = resolveStudioHokusaiProductLiveAdmission({ brushId, catalogId });
+  return admission.status === "admitted" ? admission.presetId : null;
 }
 
 function studioHokusaiColor(value: string): `#${string}` | null {
@@ -2334,11 +2462,16 @@ function filterSfxPresets(presets: SfxPreset[], query: string): SfxPreset[] {
   });
 }
 
-// 스튜디오 전용 구글폰트 7종(글꼴 패널·말풍선 프리셋용) — 전 페이지 렌더 차단 경로(index.html)에는
-// 전역 폰트(Space Grotesk·Nanum Myeongjo)만 남기고, 이 7종은 스튜디오 마운트 시에만 주입한다.
+// 스튜디오 전용 구글폰트 8종(글꼴 패널·말풍선 프리셋용) — 전 페이지 렌더 차단 경로(index.html)에는
+// 전역 폰트 Space Grotesk 만 남기고, 이 8종은 스튜디오 마운트 시에만 주입한다.
+// Nanum Myeongjo(브랜드킷 "명조")도 여기 속한다. index.html 에 있을 땐 전 라우트가 184블록
+// 25,604 B(gzip)를 렌더 차단 경로에서 받았는데, 정작 그 글꼴이 필요한 건 캔버스에서 명조를 고른
+// 스튜디오 사용자뿐이다. 나머지 BRAND_KIT_FONTS 와 같은 <link> 에 둬야 아래 idle 프리로드 타이밍과
+// document.fonts "loadingdone" 재도색 보정이 8종에 똑같이 걸린다(Konva 캔버스 텍스트는 DOM 과 달리
+// 폰트 스왑을 스스로 감지하지 못한다). 웹 크롬 쪽 소비자는 src/app/serif-webfont.ts 가 담당한다.
 const STUDIO_FONTS_LINK_ID = "studio-google-fonts";
 const STUDIO_FONTS_CSS2_URL =
-  "https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=East+Sea+Dokdo&family=Gaegu:wght@400;700&family=Gamja+Flower&family=Jua&family=Nanum+Pen+Script&family=Yeon+Sung&display=swap";
+  "https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=East+Sea+Dokdo&family=Gaegu:wght@400;700&family=Gamja+Flower&family=Jua&family=Nanum+Myeongjo:wght@400;700&family=Nanum+Pen+Script&family=Yeon+Sung&display=swap";
 
 // 부착된 말풍선(tailAnchorId/tailAnchorPoint)의 꼬리 방향/비율/길이를 매 커밋마다 다시
 // 계산한다. commit()/commitCoalesced() 가 pagesHistory 에 넣기 직전(+ masterEditMode 분기
@@ -2551,6 +2684,38 @@ function studioWorkspaceStorage(): Storage | null {
   }
 }
 
+function studioBrushQuickSlotsDeviceProfile(): string {
+  const browserNavigator = globalThis.navigator;
+  const userAgent = browserNavigator?.userAgent ?? "";
+  const browserFamily = /(?:Edg|EdgiOS)\//u.test(userAgent)
+    ? "edge"
+    : /(?:Firefox|FxiOS)\//u.test(userAgent)
+      ? "firefox"
+      : /(?:Chrome|CriOS|Chromium)\//u.test(userAgent)
+        ? "chromium"
+        : /Safari\//u.test(userAgent)
+          ? "safari"
+          : "browser";
+  const navigatorWithUserAgentData = browserNavigator as Navigator & {
+    readonly userAgentData?: { readonly platform?: string };
+  };
+  const rawPlatform = navigatorWithUserAgentData?.userAgentData?.platform
+    ?? browserNavigator?.platform
+    ?? "unknown";
+  const platform = Array.from(
+    rawPlatform.trim().toLowerCase().replace(/[^\p{L}\p{N}._-]+/gu, "-"),
+  ).slice(0, 80).join("") || "unknown";
+  const maxTouchPoints = Number.isSafeInteger(browserNavigator?.maxTouchPoints)
+    ? Math.min(64, Math.max(0, browserNavigator.maxTouchPoints))
+    : 0;
+  const hardwareConcurrency = Number.isSafeInteger(browserNavigator?.hardwareConcurrency)
+    ? Math.min(256, Math.max(0, browserNavigator.hardwareConcurrency))
+    : 0;
+  return `browser-v1:${browserFamily}:${platform}:touch-${maxTouchPoints}:cores-${
+    hardwareConcurrency
+  }`;
+}
+
 function studioAdvancedFillStorage(): Storage | null {
   try {
     return typeof window === "undefined" ? null : window.localStorage;
@@ -2623,13 +2788,73 @@ type StudioToolsCompanionPrimaryRuntime = StudioCompanionPrimaryRuntime & {
 };
 
 type StudioPixelEditBrushRuntime = typeof import("./studio-pixel-edit-brush-runtime");
+type StudioBrushLibrarySqliteRepositoryModule = typeof import(
+  "./studio-brush-library-sqlite-repository"
+);
+type StudioBrushQuickSlotsSqliteRepositoryModule = typeof import(
+  "./studio-brush-slots-sqlite-repository"
+);
+type ProductStudioBrushQuickSlotsRepository = ReturnType<
+  StudioBrushQuickSlotsSqliteRepositoryModule["getProductStudioBrushQuickSlotsSqliteRepository"]
+>;
+type StudioBrushQuickSlotsSnapshot = Awaited<
+  ReturnType<ProductStudioBrushQuickSlotsRepository["load"]>
+>;
+type ProductBrushLibraryRepository =
+  StudioBrushLibrarySqliteRepositoryModule["openProductBrushLibraryRepository"] extends (
+    ...args: never[]
+  ) => Promise<infer Repository>
+    ? Repository
+    : never;
+type StudioLiquifyBrowserRuntime = typeof import("./studio-liquify-browser");
 
 let studioPixelEditBrushRuntimePromise: Promise<StudioPixelEditBrushRuntime> | null = null;
+let studioBrushLibrarySqliteRepositoryPromise:
+  Promise<StudioBrushLibrarySqliteRepositoryModule> | null = null;
+let studioBrushQuickSlotsSqliteRepositoryPromise:
+  Promise<StudioBrushQuickSlotsSqliteRepositoryModule> | null = null;
+let studioLiquifyBrowserRuntimePromise: Promise<StudioLiquifyBrowserRuntime> | null = null;
 
 function loadStudioPixelEditBrushRuntime(): Promise<StudioPixelEditBrushRuntime> {
   return studioPixelEditBrushRuntimePromise ??= import("./studio-pixel-edit-brush-runtime").catch(
     (error: unknown) => {
       studioPixelEditBrushRuntimePromise = null;
+      throw error;
+    }
+  );
+}
+
+function loadStudioBrushLibrarySqliteRepository(): Promise<StudioBrushLibrarySqliteRepositoryModule> {
+  return studioBrushLibrarySqliteRepositoryPromise ??= import(
+    "./studio-brush-library-sqlite-repository"
+  ).catch((error: unknown) => {
+    studioBrushLibrarySqliteRepositoryPromise = null;
+    throw error;
+  });
+}
+
+function loadStudioBrushQuickSlotsSqliteRepository():
+Promise<StudioBrushQuickSlotsSqliteRepositoryModule> {
+  return studioBrushQuickSlotsSqliteRepositoryPromise ??= import(
+    "./studio-brush-slots-sqlite-repository"
+  ).catch((error: unknown) => {
+    studioBrushQuickSlotsSqliteRepositoryPromise = null;
+    throw error;
+  });
+}
+
+async function readAllProductBrushes(
+  product: ProductBrushLibraryRepository,
+): Promise<StudioSavedBrush[]> {
+  const { readAllBrushesFromRepository } =
+    await loadStudioBrushLibrarySqliteRepository();
+  return readAllBrushesFromRepository(product.repository);
+}
+
+function loadStudioLiquifyBrowserRuntime(): Promise<StudioLiquifyBrowserRuntime> {
+  return studioLiquifyBrowserRuntimePromise ??= import("./studio-liquify-browser").catch(
+    (error: unknown) => {
+      studioLiquifyBrowserRuntimePromise = null;
       throw error;
     }
   );
@@ -2818,11 +3043,6 @@ function closedStudioLayerLiftUiState(): StudioLayerLiftUiState {
 }
 
 function StudioCuttoonEditor() {
-  // React Compiler는 이 컴포넌트를 구조적으로 컴파일하지 못한다(본문 dynamic import 40+,
-  // try/finally 다수). 명시적으로 옵트아웃하고, 무거운 JSX 영역은 컴파일되는 memo 자식
-  // (StudioInspectorAside/StudioToolBeltContent/StudioMenubarContent/StudioLeftToolRail 등)으로
-  // 옮겨 정착 커밋 렌더 비용을 자식 캐시로 흡수한다.
-  "use no memo";
   const navigate = useNavigate();
   const t = useT();
   const [params] = useSearchParams();
@@ -2922,6 +3142,12 @@ function StudioCuttoonEditor() {
     studioWorkAssetAdmissionCoordinator,
     studioWorkAssetHydrator,
   ]);
+  useEffect(() => {
+    // Persistence is a boot concern, never a pen-down dependency. The dynamic
+    // boundary keeps SQLite/OPFS out of the static Studio route while the
+    // synchronous stroke ladder remains pristine until hydration completes.
+    void bootStudioTournamentPersistence();
+  }, []);
   const studioLiveHeldResourcesRef = useRef<string[]>([]);
   const studioLiveMutationGenerationRef = useRef(0);
   const studioLivePendingMutationRef = useRef<{
@@ -3335,6 +3561,26 @@ function StudioCuttoonEditor() {
   const checkpointKey = studioCheckpointKey({ userId: studioAuthUserId, workId, remixId });
   const autosaveOpfsSessionRef =
     useRef<Promise<StudioAutosaveOpfsSession | null> | null>(null);
+  const autosaveSqliteStoreRef =
+    useRef<Promise<StudioAutosaveSqlitePort | null> | null>(null);
+  useEffect(() => {
+    const storePromise = import("./studio-autosave-sqlite-store")
+      .then(({ acquireStudioAutosaveSqliteStore }) =>
+        acquireStudioAutosaveSqliteStore()
+      )
+      .catch((cause: unknown) => {
+        if (import.meta.env.DEV) {
+          console.warn("Studio SQLite autosave authority is unavailable.", cause);
+        }
+        return null;
+      });
+    autosaveSqliteStoreRef.current = storePromise;
+    return () => {
+      if (autosaveSqliteStoreRef.current === storePromise) {
+        autosaveSqliteStoreRef.current = null;
+      }
+    };
+  }, []);
   useEffect(() => {
     const sessionPromise = import("./studio-autosave-opfs-session")
       .then(({ createStudioAutosaveOpfsSession }) =>
@@ -3355,25 +3601,9 @@ function StudioCuttoonEditor() {
     };
   }, [autosaveKey]);
   const [scenarioImageReferenceDocument, setScenarioImageReferenceDocument] =
-    useState<StudioAiImageReferenceDocument>(() =>
-      workId
-        ? loadStudioAiImageReferenceDocument(studioWorkspaceStorage(), {
-            workId,
-            userScope: studioAuthUserId,
-          })
-        : createEmptyStudioAiImageReferenceDocument()
+    useState<StudioAiImageReferenceDocument>(
+      createEmptyStudioAiImageReferenceDocument,
     );
-  useEffect(() => {
-    if (!workId) return;
-    const persistenceTimer = window.setTimeout(() => {
-      saveStudioAiImageReferenceDocument(
-        studioWorkspaceStorage(),
-        { workId, userScope: studioAuthUserId },
-        scenarioImageReferenceDocument
-      );
-    }, 160);
-    return () => window.clearTimeout(persistenceTimer);
-  }, [scenarioImageReferenceDocument, studioAuthUserId, workId]);
   const loggedIn = Boolean(studioAuthUserId);
   const liveRoomQueryParam = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("room") : null;
   const [draftCollaboration, setDraftCollaboration] =
@@ -3464,6 +3694,9 @@ function StudioCuttoonEditor() {
         });
         return;
       }
+      setDraftCollaboration({ status: "provisioning", identity, intent: "share-link" });
+      await new Promise<void>((resolve) => globalThis.requestAnimationFrame(() => resolve()));
+      if (controller.signal.aborted) return;
       const snapshotJson = JSON.stringify(currentStudioProjectSnapshot());
       const request = createStudioDraftCollaborationProvisionRequest({
         identity,
@@ -3471,7 +3704,6 @@ function StudioCuttoonEditor() {
         intent: "share-link",
         initialSnapshotByteLength: new TextEncoder().encode(snapshotJson).byteLength,
       });
-      setDraftCollaboration({ status: "provisioning", identity, intent: "share-link" });
       const room = await provisionCreatorDraftCollaborationRoom(request, {
         signal: controller.signal,
       });
@@ -3566,7 +3798,10 @@ function StudioCuttoonEditor() {
     setStudioWorkAssetReferences((current) => current.length === 0 ? current : []);
     setStudioWorkAssetLimitExceeded(false);
   }, [authorizedWorkAssetScopeId, studioWorkAssetHydrator]);
-  const collaborationDocumentUnavailable = expectsSharedDocument && !sharedDocument;
+  const collaborationDocumentUnavailable =
+    expectsSharedDocument &&
+    !sharedDocument &&
+    draftCollaboration?.status !== "provisioning";
   const collaborationReadOnly = Boolean(sharedDocument && sharedDocument.access !== "edit");
   const sourceHydrationPending = isStudioSourceHydrationPending(workId, remixId, workHydrated);
   const studioCrdtDocumentReady = Boolean(
@@ -3575,8 +3810,9 @@ function StudioCuttoonEditor() {
     studioCrdtSceneRuntimeRef.current &&
     studioCrdtReconciledDocument === studioCrdtDocument
   );
+  const isRealtimeTeamSession = Boolean(liveRoomQueryParam);
   const collaborationOperationSyncRequired = Boolean(
-    expectsSharedDocument && studioLiveParticipant && !collaborationReadOnly
+    expectsSharedDocument && isRealtimeTeamSession && studioLiveParticipant && !collaborationReadOnly
   );
   // A reconciled Y.Doc alone is insufficient: collaborative editing is exposed only while the
   // authoritative server or the browser-durable outbox can retain the next operation.
@@ -3738,7 +3974,7 @@ function StudioCuttoonEditor() {
       serverRevisionAbortRef.current = null;
     };
   }, []);
-  useLayoutEffect(() => {
+  useEffect(() => {
     studioLayerLiftRegistryRef.current ??= new StudioLayerLiftOperationRegistry();
     studioLayerLiftProviderRef.current ??=
       createStudioLayerLiftLocalForegroundProvider({
@@ -3788,9 +4024,7 @@ function StudioCuttoonEditor() {
   const pagesHistoryCommandJournalRef = useRef<ReturnType<
     typeof createStudioPagesHistoryCommandJournalClient
   > | null>(null);
-  pagesHistoryCommandJournalRef.current ??=
-    createStudioPageHistoryCommandJournalClient();
-  useLayoutEffect(() => {
+  useEffect(() => {
     // React Strict Mode replays effect setup/cleanup without a render between them. Recreate a
     // client during setup if the simulated cleanup disposed the render-created instance.
     pagesHistoryCommandJournalRef.current ??=
@@ -4235,7 +4469,7 @@ function StudioCuttoonEditor() {
     );
   }, [activePage.id, authorizedWorkAssetScopeId, studioCrdtDocument, studioWorkAssetHydrator]);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (!studioCrdtDocument || sourceHydrationPending) return;
     const applyFrontier = (
       frontier: {
@@ -4493,13 +4727,25 @@ function StudioCuttoonEditor() {
   const bg = activePage.bg;
   const bgGrad = activePage.bgGrad;
   const canvasH = activePage.canvasH;
-  const studioWorkAssetRenderProjection = projectStudioWorkAssetPageForRender<El>({
-    pageId: activePage.id,
-    elements: activePage.elements,
-    references: studioWorkAssetReferences,
-    hydrationRevision: studioWorkAssetHydrationRevision,
-    resolveState: (reference) => studioWorkAssetHydrator.get(reference),
-  });
+  // StudioCuttoonEditor is intentionally compiler-opted-out. Keep the heavyweight canvas
+  // projection identity-stable across unrelated editor commits so StudioCanvasViewport.memo can
+  // actually bail out instead of repainting the full Konva stage.
+  const studioWorkAssetRenderProjection = useMemo(
+    () => projectStudioWorkAssetPageForRender<El>({
+      pageId: activePage.id,
+      elements: activePage.elements,
+      references: studioWorkAssetReferences,
+      hydrationRevision: studioWorkAssetHydrationRevision,
+      resolveState: (reference) => studioWorkAssetHydrator.get(reference),
+    }),
+    [
+      activePage.elements,
+      activePage.id,
+      studioWorkAssetHydrationRevision,
+      studioWorkAssetHydrator,
+      studioWorkAssetReferences,
+    ]
+  );
   useLayoutEffect(() => {
     studioFilterMaskSurfaceHydrator.setScope(
       authorizedWorkAssetScopeId,
@@ -4521,25 +4767,39 @@ function StudioCuttoonEditor() {
     studioCrdtDocument,
     studioFilterMaskSurfaceHydrator,
   ]);
-  const studioFilterMaskRenderProjection =
-    projectStudioFilterMaskSurfacesForRender<El>({
+  const studioFilterMaskRenderProjection = useMemo(
+    () => projectStudioFilterMaskSurfacesForRender<El>({
       elements: studioWorkAssetRenderProjection.elements,
       hydrationRevision: studioFilterMaskHydrationRevision,
       resolveState: (surfaceId) => studioFilterMaskSurfaceHydrator.get(surfaceId),
-    });
-  const studioCanvasWorkAssetRenderProjection =
-    studioFilterMaskRenderProjection.elements === studioWorkAssetRenderProjection.elements
-      ? studioWorkAssetRenderProjection
-      : {
-          ...studioWorkAssetRenderProjection,
-          elements: studioFilterMaskRenderProjection.elements,
-        };
-  const studioFilterMaskMasterRenderElements =
-    projectStudioFilterMaskSurfacesForRender<El>({
+    }),
+    [
+      studioFilterMaskHydrationRevision,
+      studioFilterMaskSurfaceHydrator,
+      studioWorkAssetRenderProjection.elements,
+    ]
+  );
+  const studioCanvasWorkAssetRenderProjection = useMemo(
+    () => studioFilterMaskRenderProjection.elements === studioWorkAssetRenderProjection.elements
+        ? studioWorkAssetRenderProjection
+        : {
+            ...studioWorkAssetRenderProjection,
+            elements: studioFilterMaskRenderProjection.elements,
+          },
+    [studioFilterMaskRenderProjection.elements, studioWorkAssetRenderProjection]
+  );
+  const studioFilterMaskMasterRenderElements = useMemo(
+    () => projectStudioFilterMaskSurfacesForRender<El>({
       elements: studioBrushR8GrainMasterRenderElements,
       hydrationRevision: studioFilterMaskHydrationRevision,
       resolveState: (surfaceId) => studioFilterMaskSurfaceHydrator.get(surfaceId),
-    }).elements;
+    }).elements,
+    [
+      studioBrushR8GrainMasterRenderElements,
+      studioFilterMaskHydrationRevision,
+      studioFilterMaskSurfaceHydrator,
+    ]
+  );
   // useCallback: 페이지 목록/패널 memo 자식에서 렌더 중 호출 — prop 안정성 유지.
   const composeWorkAssetPreviewPage = useCallback(
     (page: PageState): PageState => {
@@ -4582,12 +4842,18 @@ function StudioCuttoonEditor() {
       : studioWorkAssetRenderProjection.placeholders,
     [studioWorkAssetLimitExceeded, studioWorkAssetRenderProjection.placeholders]);
   // 현재 페이지의 색보정(과거 저장본 안전 정규화) + 미리보기용 CSS filter 문자열.
-  const pageGrade = normalizePageGrade(activePage.grade);
+  const pageGrade = useMemo(
+    () => normalizePageGrade(activePage.grade),
+    [activePage.grade]
+  );
   const pageGradeCss = pageGradeToCssFilter(pageGrade);
   const pageGradeActive = !isDefaultPageGrade(pageGrade);
   // 레이어 그룹(폴더) — 과거 저장본 호환 위해 미설정 시 빈 배열.
   const groups = activePage.groups ?? EMPTY_LAYER_GROUPS;
-  const animTimeline = normalizeAnimationTimelineDoc(activePage.animTimeline);
+  const animTimeline = useMemo(
+    () => normalizeAnimationTimelineDoc(activePage.animTimeline),
+    [activePage.animTimeline]
+  );
   // 요소 수가 커져도 초안 rAF 리렌더마다 페이지 전체 Map 을 다시 만들지 않는다.
   const elementById = useMemo(() => {
     const map = new Map<string, El>();
@@ -4665,6 +4931,7 @@ function StudioCuttoonEditor() {
 
   // 그리드 스냅 상태
   const [snapEnabled, setSnapEnabled] = useState(() => appSettings.grids.snapToPixelGrid);
+
   const [showGrid, setShowGrid] = useState(() => appSettings.grids.showPixelGrid);
   const [gridSize, setGridSize] = useState(() => appSettings.grids.pixelGridSize);
   const [showRulers, setShowRulers] = useState(() => appSettings.grids.showCanvasRulers);
@@ -4759,6 +5026,25 @@ function StudioCuttoonEditor() {
   const [animaticTimelineOpen, setAnimaticTimelineOpen] = useState(false);
   const [productionBibleOpen, setProductionBibleOpen] = useState(false);
   const [hybridDccOpen, setHybridDccOpen] = useState(false);
+  const [creativeModesOpen, setCreativeModesOpen] = useState(false);
+  const creativeModesLabel = localizeStudioText(t, "크리에이티브 모드", "studio.creativeModes.title");
+  // 대화상자 자체가 "크리에이티브 모드"로 이름이 붙으므로 닫기 버튼은 앱 공용 키를 그대로 쓴다
+  // (75개 로케일 팩에 이미 번역이 있어 새 키를 만들 이유가 없다).
+  const creativeModesCloseLabel = localizeStudioText(t, "닫기", "common.close");
+  const creativeModesPanelRef = useRef<HTMLDivElement | null>(null);
+  const creativeModesTriggerRef = useRef<HTMLButtonElement | null>(null);
+  // 크리에이티브 모드 시트는 캔버스와 모바일 도크를 계속 쓸 수 있어야 하므로 모달이 아니다.
+  // 대신 Escape·바깥 탭 두 경로를 직접 붙여, 화면보다 큰 뷰포트에서도 탈출로가 사라지지 않게 한다.
+  useEffect(() => {
+    if (!creativeModesOpen) return;
+    const surface = creativeModesPanelRef.current;
+    if (!surface) return;
+    return attachStudioDismissableSurface({
+      ignore: [creativeModesTriggerRef.current],
+      onDismiss: () => setCreativeModesOpen(false),
+      surface,
+    });
+  }, [creativeModesOpen]);
   const hybridDccDraftPersistenceIdentityRef = useRef<{
     readonly ownerId: string;
     readonly workScope: string;
@@ -5512,7 +5798,7 @@ function StudioCuttoonEditor() {
   useEffect(() => {
     if (!checkpointPanelOpen) return;
     let checkpointLoadActive = true;
-    void listDurableStudioCheckpoints(globalThis.localStorage, checkpointKey)
+    void listDurableStudioCheckpoints(undefined, checkpointKey)
       .then((storedCheckpoints) => {
         if (checkpointLoadActive) setCheckpoints(storedCheckpoints);
       })
@@ -5596,15 +5882,74 @@ function StudioCuttoonEditor() {
   const [workspaceSyncNotice, setWorkspaceSyncNotice] = useState<string | null>(null);
   const [workspaceMenuEpoch, setWorkspaceMenuEpoch] = useState(0);
   const workspaceState = workspacePersistence.state;
-  const workspaceSnapshotLayout =
-    resolveStudioWorkspace(workspaceState, workspaceState.activeWorkspaceId)?.layout ??
-    workspaceState.liveLayout;
+  // Device adaptation is *applied* only when a workspace is applied, never continuously: docks that
+  // re-arrange because the artist reached for the keyboard mid-drawing would be worse than docks
+  // that stay where the profile put them. A pointer press writes a ref and, on the rare press that
+  // changes the classification, one state update — never per stroke, so the drawing route keeps its
+  // zero-render contract.
+  const workspaceDevicePointerTypeRef = useRef<string | null>(null);
+  const [workspaceControlSide, setWorkspaceControlSide] = useState<StudioMobileControlSide>(() =>
+    resolveStudioWorkspaceControlSide(
+      workspaceState,
+      workspaceState.liveLayout,
+      resolveStudioWorkspaceDeviceKind(readStudioWorkspaceDeviceSignalsFromGlobals(null))
+    )
+  );
+  function currentStudioWorkspaceDeviceKind(): StudioWorkspaceDeviceKind | null {
+    return resolveStudioWorkspaceDeviceKind(
+      readStudioWorkspaceDeviceSignalsFromGlobals(workspaceDevicePointerTypeRef.current)
+    );
+  }
+  // 기기 종류는 layout을 저자형으로 되돌릴 때(캡처) 필요해서 렌더가 읽을 수 있어야 한다. 다만 획마다
+  // 리렌더가 나면 안 되므로, 실제로 종류가 *바뀔 때만* 상태를 옮긴다 — 보통 세션당 0~1회다.
+  const [workspaceDeviceKind, setWorkspaceDeviceKind] =
+    useState<StudioWorkspaceDeviceKind | null>(() =>
+      resolveStudioWorkspaceDeviceKind(readStudioWorkspaceDeviceSignalsFromGlobals(null))
+    );
+  useEffect(() => {
+    const recordPointerType = (event: PointerEvent) => {
+      const pointerType = event.pointerType || null;
+      if (workspaceDevicePointerTypeRef.current === pointerType) return;
+      workspaceDevicePointerTypeRef.current = pointerType;
+      const next = currentStudioWorkspaceDeviceKind();
+      setWorkspaceDeviceKind((current) => (current === next ? current : next));
+    };
+    globalThis.addEventListener("pointerdown", recordPointerType, { passive: true, capture: true });
+    return () =>
+      globalThis.removeEventListener("pointerdown", recordPointerType, { capture: true });
+  }, []);
+  // Toggling the thumb-side preference is itself an application of handedness, so re-resolve here
+  // too. A device override still wins: a left-handed pen-display grip is a deliberate per-device
+  // choice, not something the owner-wide preference should silently undo.
+  const workspaceMobileControlSide = workspaceState.mobileControlSide;
+  const workspaceLiveLayout = workspaceState.liveLayout;
+  const syncWorkspaceControlSide = useEffectEvent(() => {
+    setWorkspaceControlSide(
+      resolveStudioWorkspaceControlSide(
+        workspaceState,
+        workspaceLiveLayout,
+        currentStudioWorkspaceDeviceKind()
+      )
+    );
+  });
+  useEffect(() => {
+    syncWorkspaceControlSide();
+  }, [workspaceMobileControlSide, workspaceLiveLayout]);
+  // 첫 페인트도 기기 오버라이드를 거친다. applyStudioWorkspaceLayout은 전환·소유자 변경·외부 동기화
+  // 에서만 도는데, 마운트는 그중 어느 것도 아니다. 이 시드가 없으면 데스크톱에서 저장한 배치가
+  // 펜 디스플레이에서 그대로 한 번 그려졌다가 프리셋을 다시 고를 때에야 맞춰진다.
+  //
+  // 해석 원본은 liveLayout이다 — 접어둔 도크가 새로고침 뒤에도 그대로여야 하고, liveLayout은
+  // captureStudioWorkspaceDeviceLayout 덕분에 저자형이라 기기 기하가 섞여 있지 않다.
+  const [initialWorkspaceDeviceLayout] = useState(() =>
+    resolveStudioWorkspaceDeviceLayout(workspaceState.liveLayout, workspaceDeviceKind)
+  );
   // 캔버스 넓게 쓰기 — 좌측 페이지 목록·우측 속성 패널을 접어 캔버스 폭을 키운다(데스크톱).
   const [leftPanelOpen, setLeftPanelOpen] = useState(
-    workspaceState.liveLayout.desktop.leftPanelOpen
+    initialWorkspaceDeviceLayout.desktop.leftPanelOpen
   );
   const [rightPanelOpen, setRightPanelOpen] = useState(
-    workspaceState.liveLayout.desktop.rightPanelOpen
+    initialWorkspaceDeviceLayout.desktop.rightPanelOpen
   );
   const [forceRightPanelOpen, setForceRightPanelOpen] = useState(false);
   const [inspectorLayout, setInspectorLayout] = useState<StudioInspectorLayout>(() =>
@@ -5951,13 +6296,13 @@ function StudioCuttoonEditor() {
   }, [isMobile, mobileSheet]);
   // 데스크톱: 캔버스와 도구 패널 너비를 드래그(또는 키보드)로 조절하는 스플리터.
   const leftResize = useResizable({
-    initial: workspaceSnapshotLayout.desktop.leftPanelWidth,
+    initial: initialWorkspaceDeviceLayout.desktop.leftPanelWidth,
     min: STUDIO_WORKSPACE_LEFT_PANEL_WIDTH.minimum,
     max: STUDIO_WORKSPACE_LEFT_PANEL_WIDTH.maximum,
     edge: "right",
   });
   const rightResize = useResizable({
-    initial: workspaceSnapshotLayout.desktop.rightPanelWidth,
+    initial: initialWorkspaceDeviceLayout.desktop.rightPanelWidth,
     min: STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH.minimum,
     max: STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH.maximum,
     edge: "left",
@@ -6058,23 +6403,34 @@ function StudioCuttoonEditor() {
   const visibleRightPanelOpen =
     rightPanelOpen && !presentationPanelsHidden && rightPanelDensityAllows;
   // useMemo: 렌더마다 새 정규화 객체가 메뉴바 memo 자식(작업공간 메뉴)을 재렌더시키지 않게.
+  //
+  // 화면 기하를 그대로 담지 않고 captureStudioWorkspaceDeviceLayout으로 되돌린다. 화면은 기기
+  // 오버라이드가 적용된 모습이라, 그걸 liveLayout.desktop에 그대로 넣으면 폰에서 한 번 연 것만으로
+  // 데스크톱 도크가 접힌 채 굳는다. 기기별 조정은 기기 슬롯에, 저자 기하는 desktop에 남긴다.
+  // 이 덕분에 liveLayout은 항상 저자형(authored-form)이고, 자동 저장·dirty 비교·메뉴 저장이 모두
+  // 같은 형태를 주고받는다.
   const liveWorkspaceLayout = useMemo(
     () =>
-      normalizeStudioWorkspaceLayout(
-        {
-          inspector: inspectorLayout,
-          desktop: {
-            leftPanelOpen,
-            rightPanelOpen,
-            leftPanelWidth: leftResize.width,
-            rightPanelWidth: rightResize.width,
+      captureStudioWorkspaceDeviceLayout(
+        workspaceState.liveLayout,
+        normalizeStudioWorkspaceLayout(
+          {
+            inspector: inspectorLayout,
+            desktop: {
+              leftPanelOpen,
+              rightPanelOpen,
+              leftPanelWidth: leftResize.width,
+              rightPanelWidth: rightResize.width,
+            },
+            drawingPalettes: drawingPaletteLayout,
+            quickActions: quickActionsPreferences,
           },
-          drawingPalettes: drawingPaletteLayout,
-          quickActions: quickActionsPreferences,
-        },
-        workspaceState.liveLayout
+          workspaceState.liveLayout
+        ),
+        workspaceDeviceKind
       ),
     [
+      workspaceDeviceKind,
       inspectorLayout,
       leftPanelOpen,
       rightPanelOpen,
@@ -6115,13 +6471,21 @@ function StudioCuttoonEditor() {
     clearSyncNotice = true
   ) {
     cancelDrawingPaletteDrag();
-    setInspectorLayout(layout.inspector);
-    setLeftPanelOpen(layout.desktop.leftPanelOpen);
-    setRightPanelOpenWithOverride(layout.desktop.rightPanelOpen);
-    leftResizeSetWidthRef.current(layout.desktop.leftPanelWidth);
-    rightResizeSetWidthRef.current(layout.desktop.rightPanelWidth);
-    setDrawingPaletteLayout(layout.drawingPalettes);
-    setQuickActionsPreferences(layout.quickActions);
+    // Applying a profile is the one moment its device overrides are consulted. The authored profile
+    // is left untouched; only what reaches the screen (and therefore the live layout) adapts, so an
+    // artist who saved a workspace on a desktop still gets that workspace back on a desktop.
+    const deviceKind = currentStudioWorkspaceDeviceKind();
+    const presented = resolveStudioWorkspaceDeviceLayout(layout, deviceKind);
+    setInspectorLayout(presented.inspector);
+    setLeftPanelOpen(presented.desktop.leftPanelOpen);
+    setRightPanelOpenWithOverride(presented.desktop.rightPanelOpen);
+    leftResizeSetWidthRef.current(presented.desktop.leftPanelWidth);
+    rightResizeSetWidthRef.current(presented.desktop.rightPanelWidth);
+    setWorkspaceControlSide(
+      resolveStudioWorkspaceControlSide(workspacePersistenceRef.current.state, layout, deviceKind)
+    );
+    setDrawingPaletteLayout(presented.drawingPalettes);
+    setQuickActionsPreferences(presented.quickActions);
     setMobileSheet(null);
     setQuickActionsOpen(false);
     closeStudioMenusForWorkspace(source);
@@ -6455,19 +6819,25 @@ function StudioCuttoonEditor() {
     if (workspacePersistence.ownerScope !== ownerScope) return;
     if (leftResize.dragging || rightResize.dragging || drawingPaletteDragging) return;
     if (pendingExternalWorkspaceSync) return;
-    const nextLayout = normalizeStudioWorkspaceLayout(
-      {
-        inspector: inspectorLayout,
-        desktop: {
-          leftPanelOpen,
-          rightPanelOpen,
-          leftPanelWidth: leftResize.width,
-          rightPanelWidth: rightResize.width,
+    // 화면 기하를 저자형으로 되돌려 저장한다. 되돌리지 않으면 폰에서 한 번 연 것이 데스크톱 도크로
+    // 굳어, 작가가 저술한 배치가 "마지막에 연 기기"로 영구히 덮인다.
+    const nextLayout = captureStudioWorkspaceDeviceLayout(
+      workspacePersistence.state.liveLayout,
+      normalizeStudioWorkspaceLayout(
+        {
+          inspector: inspectorLayout,
+          desktop: {
+            leftPanelOpen,
+            rightPanelOpen,
+            leftPanelWidth: leftResize.width,
+            rightPanelWidth: rightResize.width,
+          },
+          drawingPalettes: drawingPaletteLayout,
+          quickActions: quickActionsPreferences,
         },
-        drawingPalettes: drawingPaletteLayout,
-        quickActions: quickActionsPreferences,
-      },
-      workspacePersistence.state.liveLayout
+        workspacePersistence.state.liveLayout
+      ),
+      workspaceDeviceKind
     );
     if (
       areStudioWorkspaceLayoutsEqual(
@@ -6519,6 +6889,7 @@ function StudioCuttoonEditor() {
     rightResize.dragging,
     rightResize.width,
     studioAuthUserId,
+    workspaceDeviceKind,
     workspacePersistence.ownerScope,
     workspacePersistence.state,
   ]);
@@ -6561,6 +6932,19 @@ function StudioCuttoonEditor() {
   }, [currentWorkspaceOwnerScope, studioAuthUserId]);
   // 재사용 클립 보관함 — 선택 요소(그룹)를 저장해 다른 컷·회차에서 다시 꺼내 쓴다.
   const [clips, setClips] = useState<StudioClip[]>([]);
+  const [, setClipStorageState] = useState<
+    "idle" | "loading" | "sqlite" | "memory" | "unavailable"
+  >("idle");
+  const clipsRef = useRef<StudioClip[]>([]);
+  const clipMemoryModeRef = useRef(false);
+  const clipHydrationGenerationRef = useRef(0);
+  const clipMutationGenerationRef = useRef(0);
+  const clipMutationTailRef = useRef<Promise<void>>(Promise.resolve());
+
+  function replaceSavedClips(next: StudioClip[]): void {
+    clipsRef.current = next;
+    setClips(next);
+  }
 
   useEffect(() => {
     if (pageGradeActive) setPageGradePanelOpen(true);
@@ -6583,15 +6967,36 @@ function StudioCuttoonEditor() {
     elId: string | null;
   }>({ visible: false, x: 0, y: 0, elId: null });
 
-  // 미니맵 스크롤 정보 상태
-  const [scrollPos, setScrollPos] = useState({ left: 0, top: 0, width: 0, height: 0, scrollWidth: 0, scrollHeight: 0 });
+  // 미니맵 스크롤 정보 상태. 여기 있는 값은 **정착된** 뷰포트다 — 팬/스크롤 프레임마다
+  // 갱신되는 살아 있는 좌표는 아래 scrollViewportStore 가 들고 있고, 프레임 정확도가 필요한
+  // 구독자(룰러 바·미니맵 뷰포트 박스)만 그 스토어를 본다. 줌 제스처가 틱마다 setZoom 을
+  // 부르지 않는 것과 같은 계약이다(핫패스 탈React).
+  const [scrollPos, setScrollPos] = useState<StudioScrollViewport>(STUDIO_SCROLL_VIEWPORT_ORIGIN);
+  const scrollPosRef = useRef(scrollPos);
+  scrollPosRef.current = scrollPos;
+  const scrollViewportStoreRef = useRef<StudioScrollViewportStore | null>(null);
+  scrollViewportStoreRef.current ??= createStudioScrollViewportStore();
+  const scrollViewportStore = scrollViewportStoreRef.current;
+  /** React 에 아직 반영되지 않은 살아 있는 스크롤 좌표(정착 커밋 대기). */
+  const pendingScrollCommitRef = useRef<StudioScrollViewport | null>(null);
+  const scrollCommitSettleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flushScrollViewportCommitRef = useRef<() => void>(() => {});
   const scrollRafRef = useRef<number | null>(null);
   const updateScrollPosRef = useRef<() => void>(() => {});
   const revokeStudioRasterHandoffRef = useRef<() => void>(() => {});
+  // 핫패스 탈React 계약의 런타임 계측점. 의존성 배열이 없으므로 이 컴포넌트가 실제로
+  // 다시 렌더된 커밋에서만 실행된다(bail-out 은 세지 않는다). 하네스가 싱크를 미리
+  // 심어두지 않았다면 프로퍼티 조회 1회로 끝난다.
+  useEffect(() => {
+    recordStudioHotPathRender("studio:editor");
+  });
 
   // 임시저장 복구 여부 상태
   const [hasAutosave, setHasAutosave] = useState(false);
   const [autosaveChecked, setAutosaveChecked] = useState(false);
+  const autosaveRecoveryCandidateRef = useRef<
+    import("./studio-autosave-opfs-session").StudioAutosaveRecoveryCandidate | null
+  >(null);
   const [autosaveRestoreBlockedReason, setAutosaveRestoreBlockedReason] = useState<
     "legacy-unversioned" | "work-mismatch" | "revision-mismatch" | null
   >(null);
@@ -6689,7 +7094,9 @@ function StudioCuttoonEditor() {
   } | null>(null);
   // 단일 선택이 생기면 마퀴 다중선택은 해제(상호 배타).
   useEffect(() => {
-    if (selectedId) setMarqueeIds([]);
+    if (selectedId) {
+      setMarqueeIds((current) => current.length === 0 ? current : []);
+    }
   }, [selectedId]);
   // 작업면이 바뀌거나 요소가 제거되면 현재 작업면에 실제로 존재하는 ID만 남긴다. 댓글·대사·
   // 연속성 탐색처럼 페이지를 전환하면서 새 작업면의 요소를 의도적으로 선택하는 흐름은 보존한다.
@@ -6720,10 +7127,15 @@ function StudioCuttoonEditor() {
   useEffect(() => {
     const session = groupResizeRef.current;
     if (!session) return;
-    const currentIds = marqueeIdsRef.current;
+    // Multi-resize sessions track marquee only; single-draw free-scale tracks selectedId.
+    const currentIds =
+      marqueeIdsRef.current.length > 0
+        ? marqueeIdsRef.current
+        : selectedIdRef.current
+          ? [selectedIdRef.current]
+          : [];
     const currentIdSet = new Set(currentIds);
     const selectionStillMatches =
-      selectedIdRef.current === null &&
       currentIds.length === session.selectedIds.length &&
       currentIdSet.size === currentIds.length &&
       session.selectedIds.every((id) => currentIdSet.has(id));
@@ -6797,18 +7209,32 @@ function StudioCuttoonEditor() {
       bounds.height > 0
     );
   }
+  /**
+   * Active resize target IDs: multi-marquee first, else single selected object.
+   * Single draw free-scale uses the same uniform-resize planner as groups (CSP-style).
+   */
+  function currentCanvasResizeSelectionIds(): string[] {
+    const marquee = marqueeIdsRef.current;
+    if (marquee.length > 0) return [...marquee];
+    const single = selectedIdRef.current;
+    return single ? [single] : [];
+  }
   function beginCanvasSelectionResize(
     sourceBounds: StudioGroupUniformResizeBounds
   ): boolean {
     if (groupResizeRef.current || groupDragRef.current) return false;
-    const selectedIds = [...marqueeIdsRef.current];
+    const selectedIds = currentCanvasResizeSelectionIds();
     const uniqueIds = new Set(selectedIds);
     const currentElements = activeElementsRef.current;
     const currentById = new Map(
       currentElements.map((element) => [element.id, element])
     );
+    const singleDrawResize =
+      selectedIds.length === 1
+      && currentById.get(selectedIds[0]!)?.type === "draw";
+    // Multi-selection (2+) or a single freehand stroke — other single objects use Konva Transformer.
     if (
-      selectedIds.length < 2 ||
+      (selectedIds.length < 2 && !singleDrawResize) ||
       uniqueIds.size !== selectedIds.length ||
       !finitePositiveGroupResizeBounds(sourceBounds) ||
       activeSurfaceReviewLockedRef.current ||
@@ -6825,7 +7251,7 @@ function StudioCuttoonEditor() {
           ? collaborationAccessRef.current.locked
             ? collaborationLockMessage()
             : "이 작업면은 검토 잠금 상태예요. 잠금을 해제한 뒤 크기를 조절하세요."
-          : "그룹 크기를 조절할 수 없어요. 선택과 잠금 상태를 확인하세요."
+          : "크기를 조절할 수 없어요. 선택과 잠금 상태를 확인하세요."
       );
       return false;
     }
@@ -6847,13 +7273,14 @@ function StudioCuttoonEditor() {
     endLiveResourceEdit();
   }
   function commitCanvasSelectionResize(
-    targetBounds: StudioGroupUniformResizeBounds
+    targetBounds: StudioGroupUniformResizeBounds,
+    rotationDeg = 0
   ) {
     const session = groupResizeRef.current;
     groupResizeRef.current = null;
     if (!session) return;
     try {
-      const currentIds = marqueeIdsRef.current;
+      const currentIds = currentCanvasResizeSelectionIds();
       const currentIdSet = new Set(currentIds);
       const currentElements = activeElementsRef.current;
       const currentById = new Map(
@@ -6868,6 +7295,7 @@ function StudioCuttoonEditor() {
       );
       if (
         !finitePositiveGroupResizeBounds(targetBounds) ||
+        !Number.isFinite(rotationDeg) ||
         !selectionStillMatches ||
         !sourceStillMatches ||
         currentPageIdRef.current !== session.pageId ||
@@ -6876,19 +7304,46 @@ function StudioCuttoonEditor() {
         !canApplyStudioMutation(session.mutationTicket)
       ) {
         setError(
-          "그룹 크기 조절 중 선택이나 문서가 바뀌어 안전하게 취소했어요."
+          "크기 조절 중 선택이나 문서가 바뀌어 안전하게 취소했어요."
         );
         return;
       }
 
-      const next = planStudioGroupUniformResize({
-        items: currentElements,
-        selectedIds: session.selectedIds,
-        sourceBounds: session.sourceBounds,
-        targetBounds,
-        isLocked: (element) =>
-          isEffectivelyLocked(element, activeGroupsRef.current),
-      });
+      // A single stroke is one point array, so it can absorb rotation and independent width/height
+      // exactly; the group planner stays authoritative for every mixed/multi selection, where a
+      // general affine is not a safe default. Both bake into `points` and hand the result to the
+      // one document commit below, so undo/redo and CRDT publication are identical either way.
+      const soleSelection =
+        session.selectedIds.length === 1
+          ? currentById.get(session.selectedIds[0]!)
+          : undefined;
+      const soleSelectedDraw =
+        soleSelection && !isEffectivelyLocked(soleSelection, activeGroupsRef.current)
+          ? soleSelection
+          : undefined;
+      const next =
+        soleSelectedDraw?.type === "draw"
+          ? (() => {
+              const transformed = planStudioDrawObjectTransform({
+                el: soleSelectedDraw,
+                sourceBounds: session.sourceBounds,
+                targetBounds,
+                rotationDeg,
+              });
+              return transformed
+                ? currentElements.map((element) =>
+                    element.id === transformed.id ? transformed : element
+                  )
+                : [...currentElements];
+            })()
+          : planStudioGroupUniformResize({
+              items: currentElements,
+              selectedIds: session.selectedIds,
+              sourceBounds: session.sourceBounds,
+              targetBounds,
+              isLocked: (element) =>
+                isEffectivelyLocked(element, activeGroupsRef.current),
+            });
       const nextById = new Map(next.map((element) => [element.id, element]));
       const changed = session.selectedIds.some(
         (id) => nextById.get(id) !== currentById.get(id)
@@ -6901,7 +7356,7 @@ function StudioCuttoonEditor() {
           Math.abs(targetBounds.height - session.sourceBounds.height) > 1e-7;
         if (boundsChanged) {
           setError(
-            "선택 안에 크기를 조절할 수 없는 요소가 있어 그룹 전체를 변경하지 않았어요."
+            "선택 안에 크기를 조절할 수 없는 요소가 있어 변경하지 않았어요."
           );
         }
         return;
@@ -6912,7 +7367,11 @@ function StudioCuttoonEditor() {
           Math.round((targetBounds.width / session.sourceBounds.width) * 100)
         );
         setError(null);
-        announceDrawingShortcut(`그룹 크기 조절 · ${percent}%`);
+        announceDrawingShortcut(
+          session.selectedIds.length === 1
+            ? `레이어 크기 조절 · ${percent}%`
+            : `그룹 크기 조절 · ${percent}%`,
+        );
       }
     } finally {
       endLiveResourceEdit();
@@ -7162,23 +7621,26 @@ function StudioCuttoonEditor() {
         break;
     }
   }
-  const [drawingShortcutNotice, setDrawingShortcutNotice] = useState<{ id: number; message: string } | null>(null);
+  const [drawingShortcutNoticeStore] = useState(createStudioDrawingShortcutNoticeStore);
+  const drawingShortcutNotice = useSyncExternalStore(
+    drawingShortcutNoticeStore.subscribe,
+    drawingShortcutNoticeStore.getSnapshot,
+    drawingShortcutNoticeStore.getSnapshot,
+  );
   const drawingShortcutNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const drawingShortcutNoticeSequenceRef = useRef(0);
-  const activeDrawingShortcutNoticeMessageRef = useRef<string | null>(null);
   function announceDrawingShortcut(message: string) {
-    if (activeDrawingShortcutNoticeMessageRef.current === message) return;
-    activeDrawingShortcutNoticeMessageRef.current = message;
+    const publishedNotice = drawingShortcutNoticeStore.publish(message);
+    if (!publishedNotice) return;
     if (drawingShortcutNoticeTimerRef.current) {
       globalThis.clearTimeout(drawingShortcutNoticeTimerRef.current);
     }
-    drawingShortcutNoticeSequenceRef.current += 1;
-    setDrawingShortcutNotice({ id: drawingShortcutNoticeSequenceRef.current, message });
-    drawingShortcutNoticeTimerRef.current = globalThis.setTimeout(() => {
-      activeDrawingShortcutNoticeMessageRef.current = null;
-      setDrawingShortcutNotice(null);
-      drawingShortcutNoticeTimerRef.current = null;
+    const timer = globalThis.setTimeout(() => {
+      drawingShortcutNoticeStore.clear(publishedNotice.id);
+      if (drawingShortcutNoticeTimerRef.current === timer) {
+        drawingShortcutNoticeTimerRef.current = null;
+      }
     }, 1_400);
+    drawingShortcutNoticeTimerRef.current = timer;
   }
   useEffect(() => () => {
     if (drawingShortcutNoticeTimerRef.current) {
@@ -7186,6 +7648,33 @@ function StudioCuttoonEditor() {
     }
   }, []);
   const [color, setColor] = useState("#7c5cfc");
+  const [pixelArtMode, setPixelArtMode] = useState<StudioPixelArtModeState>(() => createStudioPixelArtMode());
+  const [silkGenerativeSpec, setSilkGenerativeSpec] = useState<StudioSilkGenerativeSpec>(
+    () => DEFAULT_STUDIO_SILK_GENERATIVE_SPEC,
+  );
+
+  // Pixel-art mode product admission (Piskel/Lospec): integer pencil + grid snap + palette lock.
+  useEffect(() => {
+    if (!pixelArtMode.enabled) return;
+    if (pixelArtMode.gridSnap) setSnapEnabled(true);
+    if (pixelArtMode.pixelPencil) {
+      setTool("draw");
+      setDrawMode("pixel");
+    }
+  }, [pixelArtMode.enabled, pixelArtMode.gridSnap, pixelArtMode.pixelPencil]);
+  function applyStudioDrawingColor(next: string) {
+    setColor(admitStudioPixelArtStrokeColor(next, pixelArtMode));
+  }
+  function insertStudioStickyNote(presetId: import("./studio-sticky-note").StudioStickyNotePresetId) {
+    const note = createStudioStickyNoteElement({
+      x: 80 + Math.random() * 40,
+      y: 120 + Math.random() * 40,
+      presetId,
+      text: "아이디어",
+    });
+    // Sticky notes ride the TextEl pipeline; stickyNoteFill is presentation metadata for hosts.
+    addEl(note as import("./studio-element-model").El);
+  }
   /** Photoshop/CSP foreground-background pair — X swaps. */
   const [secondaryColor, setSecondaryColor] = useState("#ffffff");
   /** View-only horizontal flip for checking drawing balance (CSP). */
@@ -7251,23 +7740,43 @@ function StudioCuttoonEditor() {
         console.error("Failed to load studio recent colors:", err);
       });
   };
-  // 저장된 클립 복원 — 클립 메뉴를 열 때만 모듈/localStorage를 읽어 초기 스튜디오 로드를 가볍게 유지한다.
+  // 저장된 클립 복원 — 클립 메뉴를 열 때만 V12 SQLite repository를 로드해 초기 진입을 가볍게
+  // 유지한다. 이전 브라우저 키는 LEGACY_DATA_MIGRATION=FALSE에 따라 자동으로 읽지 않는다.
   useEffect(() => {
     if (menu !== "clip") return;
     if (clipsLoadRef.current) return;
 
-    let alive = true;
-    clipsLoadRef.current = import("./studio-clips")
-      .then(({ listClips }) => {
-        if (!alive) return;
-        setClips(listClips(globalThis.localStorage));
+    const generation = ++clipHydrationGenerationRef.current;
+    setClipStorageState("loading");
+    clipsRepositoryRef.current ??= import("./studio-saved-clip-sqlite-repository")
+      .then(({ getProductStudioSavedClipSqliteRepository }) =>
+        getProductStudioSavedClipSqliteRepository());
+    clipsLoadRef.current = clipsRepositoryRef.current
+      .then((repository) => repository.list())
+      .then((loaded) => {
+        if (
+          !editorMountedRef.current
+          || generation !== clipHydrationGenerationRef.current
+          || clipMemoryModeRef.current
+        ) {
+          return;
+        }
+        replaceSavedClips(loaded);
+        setClipStorageState("sqlite");
       })
       .catch((err) => {
-        console.error("Failed to load studio clips:", err);
+        if (!editorMountedRef.current || generation !== clipHydrationGenerationRef.current) return;
+        setClipStorageState("unavailable");
+        setError(`SQLite/OPFS 클립 보관함을 열지 못했습니다. 기존 저장 키는 자동으로 읽지 않으며 현재 목록은 저장되지 않았습니다: ${
+          err instanceof Error ? err.message : String(err)
+        }`);
         clipsLoadRef.current = null;
       });
     return () => {
-      alive = false;
+      if (clipHydrationGenerationRef.current === generation) {
+        clipHydrationGenerationRef.current += 1;
+      }
+      clipsLoadRef.current = null;
     };
   }, [menu]);
   // 전체화면 상태 동기화 — ESC 등으로 빠져나가도 토글 상태가 맞도록 이벤트로 추적.
@@ -7400,11 +7909,216 @@ function StudioCuttoonEditor() {
   // 스탬프 브러시(잉크붓/정밀에어/그레인연필/물맛붓) 튜닝. 브러시 선택 경로에서 기본값을
   // 명시적으로 적용해, 저장 브러시를 불러온 직후 effect가 사용자 값을 덮어쓰지 않게 한다.
   const [stampTuning, setStampTuning] = useState<StudioBrushStampTuning | null>(null);
-  const [brushSlotsState, setBrushSlotsState] = useState<StudioBrushSlotsState>(() =>
-    loadStudioBrushSlotsState(
-      typeof globalThis.localStorage === "undefined" ? null : globalThis.localStorage
-    )
-  );
+  const brushSlotsOwnerScope = studioAuthUserId ?? "guest";
+  const [brushSlotsDeviceProfile] = useState(studioBrushQuickSlotsDeviceProfile);
+  const brushSlotsScope = {
+    ownerScope: brushSlotsOwnerScope,
+    deviceProfile: brushSlotsDeviceProfile,
+  };
+  const brushSlotsScopeKey = JSON.stringify([
+    brushSlotsScope.ownerScope,
+    brushSlotsScope.deviceProfile,
+  ]);
+  const brushSlotsScopeRef = useRef({ key: brushSlotsScopeKey, scope: brushSlotsScope });
+  brushSlotsScopeRef.current = { key: brushSlotsScopeKey, scope: brushSlotsScope };
+  const [brushSlotsProjection, setBrushSlotsProjection] = useState(() => ({
+    scopeKey: brushSlotsScopeKey,
+    state: emptyStudioBrushSlots(),
+  }));
+  const brushSlotsState = brushSlotsProjection.scopeKey === brushSlotsScopeKey
+    ? brushSlotsProjection.state
+    : emptyStudioBrushSlots();
+  const brushSlotsProjectionRef = useRef(brushSlotsProjection);
+  brushSlotsProjectionRef.current = brushSlotsProjection;
+  const brushSlotsDurableSnapshotRef = useRef<{
+    scopeKey: string;
+    snapshot: StudioBrushQuickSlotsSnapshot;
+  } | null>(null);
+  const brushSlotsHydrationGenerationRef = useRef(0);
+  const brushSlotsMutationGenerationRef = useRef(0);
+  const brushSlotsMutationTailRef = useRef<Promise<void>>(Promise.resolve());
+  const brushSlotsDirtyGenerationsByScopeRef = useRef(new Map<string, number[]>());
+
+  useEffect(() => {
+    let active = true;
+    const generation = brushSlotsHydrationGenerationRef.current + 1;
+    brushSlotsHydrationGenerationRef.current = generation;
+    const mutationGeneration = brushSlotsMutationGenerationRef.current;
+    const request = brushSlotsScopeRef.current;
+    if (brushSlotsProjectionRef.current.scopeKey !== request.key) {
+      const emptyProjection = { scopeKey: request.key, state: emptyStudioBrushSlots() };
+      brushSlotsProjectionRef.current = emptyProjection;
+      setBrushSlotsProjection(emptyProjection);
+    }
+    if (brushSlotsDurableSnapshotRef.current?.scopeKey !== request.key) {
+      brushSlotsDurableSnapshotRef.current = null;
+    }
+
+    void loadStudioBrushQuickSlotsSqliteRepository()
+      .then(({ getProductStudioBrushQuickSlotsSqliteRepository }) =>
+        getProductStudioBrushQuickSlotsSqliteRepository().load(request.scope))
+      .then((snapshot) => {
+        if (
+          !active
+          || !editorMountedRef.current
+          || brushSlotsHydrationGenerationRef.current !== generation
+          || brushSlotsMutationGenerationRef.current !== mutationGeneration
+          || brushSlotsScopeRef.current.key !== request.key
+        ) {
+          return;
+        }
+        brushSlotsDurableSnapshotRef.current = { scopeKey: request.key, snapshot };
+        const projection = { scopeKey: request.key, state: { slots: snapshot.slots } };
+        brushSlotsProjectionRef.current = projection;
+        setBrushSlotsProjection(projection);
+      })
+      .catch((cause) => {
+        if (
+          !active
+          || !editorMountedRef.current
+          || brushSlotsHydrationGenerationRef.current !== generation
+          || brushSlotsMutationGenerationRef.current !== mutationGeneration
+          || brushSlotsScopeRef.current.key !== request.key
+        ) {
+          return;
+        }
+        setError(
+          cause instanceof Error
+            ? `브러시 퀵 슬롯을 불러오지 못했어요: ${cause.message}`
+            : "브러시 퀵 슬롯을 불러오지 못했어요. SQLite 저장소를 확인해주세요.",
+        );
+      });
+    return () => {
+      active = false;
+    };
+  }, [brushSlotsScopeKey]);
+
+  function commitStudioBrushSlotsMutation(
+    update: (state: StudioBrushSlotsState) => StudioBrushSlotsState,
+    options: {
+      readonly successMessage?: string;
+      readonly failureMessage: string;
+    },
+  ): void {
+    const request = brushSlotsScopeRef.current;
+    const currentProjection = brushSlotsProjectionRef.current;
+    const currentState = currentProjection.scopeKey === request.key
+      ? currentProjection.state
+      : emptyStudioBrushSlots();
+    const desiredState = update(currentState);
+    const generation = brushSlotsMutationGenerationRef.current + 1;
+    brushSlotsMutationGenerationRef.current = generation;
+    const dirtyGenerations = brushSlotsDirtyGenerationsByScopeRef.current.get(request.key)
+      ?? Array.from({ length: STUDIO_BRUSH_SLOT_COUNT }, () => 0);
+    brushSlotsDirtyGenerationsByScopeRef.current.set(request.key, dirtyGenerations);
+    for (let index = 0; index < STUDIO_BRUSH_SLOT_COUNT; index += 1) {
+      if (
+        JSON.stringify(currentState.slots[index] ?? null)
+        !== JSON.stringify(desiredState.slots[index] ?? null)
+      ) {
+        dirtyGenerations[index] = generation;
+      }
+    }
+    const optimisticProjection = { scopeKey: request.key, state: desiredState };
+    brushSlotsProjectionRef.current = optimisticProjection;
+    setBrushSlotsProjection(optimisticProjection);
+
+    const persist = async (): Promise<void> => {
+      const activeDirtySlots = dirtyGenerations.flatMap((marker, slotIndex) =>
+        marker > 0 && marker <= generation ? [{ marker, slotIndex }] : []);
+      if (activeDirtySlots.length === 0) {
+        if (
+          editorMountedRef.current
+          && brushSlotsScopeRef.current.key === request.key
+          && brushSlotsMutationGenerationRef.current === generation
+          && options.successMessage
+        ) {
+          announceDrawingShortcut(options.successMessage);
+        }
+        return;
+      }
+      const repositoryModule = await loadStudioBrushQuickSlotsSqliteRepository();
+      const repository = repositoryModule.getProductStudioBrushQuickSlotsSqliteRepository();
+      const durable = brushSlotsDurableSnapshotRef.current?.scopeKey === request.key
+        ? brushSlotsDurableSnapshotRef.current.snapshot
+        : await repository.load(request.scope);
+      const applyDirtySlots = (
+        base: StudioBrushQuickSlotsSnapshot,
+        entries: readonly { marker: number; slotIndex: number }[],
+      ): StudioBrushSlotsState => {
+        const slots = [...base.slots];
+        for (const { slotIndex } of entries) {
+          slots[slotIndex] = desiredState.slots[slotIndex] ?? null;
+        }
+        return { slots };
+      };
+
+      let saved: StudioBrushQuickSlotsSnapshot;
+      let conflictResolved = false;
+      try {
+        saved = await repository.save(
+          request.scope,
+          applyDirtySlots(durable, activeDirtySlots),
+          durable.revision,
+        );
+      } catch (cause) {
+        if (
+          !cause
+          || typeof cause !== "object"
+          || !("code" in cause)
+          || cause.code !== "conflict"
+        ) {
+          throw cause;
+        }
+        const latest = await repository.load(request.scope);
+        const retryDirtySlots = activeDirtySlots.filter(
+          ({ marker, slotIndex }) => dirtyGenerations[slotIndex] === marker,
+        );
+        if (retryDirtySlots.length === 0) return;
+        saved = await repository.save(
+          request.scope,
+          applyDirtySlots(latest, retryDirtySlots),
+          latest.revision,
+        );
+        conflictResolved = true;
+      }
+
+      for (const { marker, slotIndex } of activeDirtySlots) {
+        if (dirtyGenerations[slotIndex] === marker) dirtyGenerations[slotIndex] = 0;
+      }
+      if (dirtyGenerations.every((marker) => marker === 0)) {
+        brushSlotsDirtyGenerationsByScopeRef.current.delete(request.key);
+      }
+      if (brushSlotsScopeRef.current.key !== request.key) return;
+      brushSlotsDurableSnapshotRef.current = { scopeKey: request.key, snapshot: saved };
+      if (!editorMountedRef.current) return;
+      if (conflictResolved) {
+        announceDrawingShortcut("다른 탭의 브러시 슬롯 변경을 다시 불러와 안전하게 병합했어요.");
+      }
+      if (brushSlotsMutationGenerationRef.current === generation) {
+        const projection = { scopeKey: request.key, state: { slots: saved.slots } };
+        brushSlotsProjectionRef.current = projection;
+        setBrushSlotsProjection(projection);
+        if (!conflictResolved && options.successMessage) {
+          announceDrawingShortcut(options.successMessage);
+        }
+      }
+    };
+    const operation = brushSlotsMutationTailRef.current.then(persist, persist);
+    brushSlotsMutationTailRef.current = operation.then(
+      () => undefined,
+      () => undefined,
+    );
+    void operation.catch((cause) => {
+      if (!editorMountedRef.current || brushSlotsScopeRef.current.key !== request.key) return;
+      const message = cause && typeof cause === "object" && "code" in cause
+        && cause.code === "conflict"
+        ? "다른 탭에서 브러시 슬롯이 다시 변경되어 현재 슬롯은 안전하게 유지했지만 저장하지 못했어요. 다시 시도해주세요."
+        : `${options.failureMessage} 현재 슬롯은 이 화면에만 유지되며 저장 완료로 처리하지 않았어요.`;
+      setError(message);
+      announceDrawingShortcut(message);
+    });
+  }
   /** Procreate size/opacity lock + Ibis recent/favorites for built-in brushes. */
   const {
     proDrawPrefs,
@@ -7468,23 +8182,66 @@ function StudioCuttoonEditor() {
   const [brushDynamics, setBrushDynamics] = useState<NormalizedStudioBrushDynamicsSettings>(() =>
     normalizeStudioBrushDynamicsSettings(DEFAULT_STUDIO_BRUSH_SNAPSHOT.brushDynamics)
   );
-  // 데스크톱 관리 패널과 모바일 퀵 선반이 같은 배열을 소비한다. 같은 탭의 localStorage 변경은
-  // storage 이벤트를 발생시키지 않으므로 StudioPage가 단일 source of truth를 소유한다.
-  const [savedBrushes, setSavedBrushes] = useState<StudioSavedBrush[]>(() =>
-    listBrushes(browserBrushLibraryStorage())
-  );
+  // 데스크톱 관리 패널과 모바일 퀵 선반은 같은 SQLite/OPFS authority를 소비한다. 배열은
+  // 화면 projection일 뿐이며 모든 mutation은 아래 product repository를 먼저 commit한다.
+  const [savedBrushes, setSavedBrushes] = useState<StudioSavedBrush[]>([]);
+  const brushProjectionGenerationRef = useRef(0);
+  const commitSavedBrushProjection = useCallback((
+    update: SetStateAction<StudioSavedBrush[]>,
+  ) => {
+    brushProjectionGenerationRef.current += 1;
+    setSavedBrushes(update);
+  }, []);
+  const brushRepositoryPromiseRef = useRef<Promise<ProductBrushLibraryRepository> | null>(null);
+  const productBrushRepository = useCallback(() => {
+    const repository = brushRepositoryPromiseRef.current
+      ?? loadStudioBrushLibrarySqliteRepository().then(
+        ({ openProductBrushLibraryRepository }) =>
+          openProductBrushLibraryRepository(),
+      );
+    brushRepositoryPromiseRef.current = repository;
+    return repository;
+  }, []);
+  const refreshSavedBrushesFromRepository = useCallback(async (
+    product?: ProductBrushLibraryRepository,
+  ) => {
+    const generation = brushProjectionGenerationRef.current + 1;
+    brushProjectionGenerationRef.current = generation;
+    const authority = product ?? await productBrushRepository();
+    const next = await readAllProductBrushes(authority);
+    if (brushProjectionGenerationRef.current === generation) {
+      setSavedBrushes(next);
+    }
+    return next;
+  }, [productBrushRepository]);
+  // 그리기 ▸ 브러시 가져오기 전용 입력. 라이브러리 패널의 컨트롤과 같은 매퍼를 쓰되,
+  // 메뉴에서 곧바로 파일 선택기를 열 수 있도록 StudioPage가 입력을 소유한다.
+  const brushPackImportInputRef = useRef<HTMLInputElement>(null);
+  const [brushPackImporting, setBrushPackImporting] = useState(false);
   const [pendingBrushDeletes, setPendingBrushDeletes] = useState<PendingBrushDelete[]>([]);
   const [pausedBrushDeleteId, setPausedBrushDeleteId] = useState<string | null>(null);
   const brushUndoToastRef = useRef<HTMLDivElement>(null);
   const brushUndoButtonRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    const handleBrushStorage = (event: StorageEvent) => {
-      if (event.key !== null && event.key !== BRUSH_LIBRARY_KEY) return;
-      setSavedBrushes(listBrushes(browserBrushLibraryStorage()));
+    let active = true;
+    const generation = brushProjectionGenerationRef.current + 1;
+    brushProjectionGenerationRef.current = generation;
+    void productBrushRepository()
+      .then(async (product) => {
+        const next = await readAllProductBrushes(product);
+        if (active && brushProjectionGenerationRef.current === generation) {
+          setSavedBrushes(next);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setError("브러시 라이브러리를 열지 못했어요. 저장소 권한과 여유 공간을 확인해주세요.");
+        }
+      });
+    return () => {
+      active = false;
     };
-    globalThis.addEventListener("storage", handleBrushStorage);
-    return () => globalThis.removeEventListener("storage", handleBrushStorage);
-  }, []);
+  }, [productBrushRepository]);
   useEffect(() => {
     const active = pendingBrushDeletes.filter((pending) => pending.id !== pausedBrushDeleteId);
     if (active.length === 0) return;
@@ -7508,24 +8265,17 @@ function StudioCuttoonEditor() {
     globalThis.requestAnimationFrame?.(() => brushUndoButtonRef.current?.focus({ preventScroll: true }));
   }
 
-  function undoBrushDelete(pending: PendingBrushDelete) {
-    const result = restoreDeletedBrush(browserBrushLibraryStorage(), pending.deleted);
-    if (result.status === "full") {
-      announceDrawingShortcut("브러시가 40개라 삭제를 복구하지 못했어요.");
-      return;
+  async function undoBrushDelete(pending: PendingBrushDelete) {
+    try {
+      const product = await productBrushRepository();
+      await product.repository.restore(pending.deleted);
+      await refreshSavedBrushesFromRepository(product);
+      setPendingBrushDeletes((current) => current.filter((candidate) => candidate.id !== pending.id));
+      setPausedBrushDeleteId((current) => current === pending.id ? null : current);
+      announceDrawingShortcut(`“${pending.deleted.brush.name}” 브러시를 복구했어요.`);
+    } catch {
+      announceDrawingShortcut("브러시 삭제를 복구하지 못했어요. 저장소 권한과 여유 공간을 확인해주세요.");
     }
-    if (result.status === "library-unreadable") {
-      announceDrawingShortcut("저장된 브러시 데이터를 읽지 못해 삭제 복구를 중단했어요.");
-      return;
-    }
-    if (result.status === "storage-error") {
-      announceDrawingShortcut("브라우저 저장소 오류로 삭제를 복구하지 못했어요.");
-      return;
-    }
-    setSavedBrushes(result.brushes);
-    setPendingBrushDeletes((current) => current.filter((candidate) => candidate.id !== pending.id));
-    setPausedBrushDeleteId((current) => current === pending.id ? null : current);
-    announceDrawingShortcut(`“${pending.deleted.brush.name}” 브러시를 복구했어요.`);
   }
 
   const currentBrushSnapshot: StudioBrushSnapshot = {
@@ -7599,18 +8349,22 @@ function StudioCuttoonEditor() {
     setTipAngle(saved.tipAngle);
     setTipRoundness(saved.tipRoundness);
     setBrushDynamics(normalizeStudioBrushDynamicsSettings(saved.brushDynamics));
-    const used = markBrushUsedWithResult(browserBrushLibraryStorage(), saved.id);
-    if (used.status === "updated") {
-      setSavedBrushes(used.brushes);
-    } else if (used.status === "missing") {
-      setSavedBrushes(used.brushes);
-      brushBaselineController.invalidate();
-      announceDrawingShortcut("브러시는 적용했지만 다른 탭에서 삭제되어 저장 목록을 새로 맞췄어요.");
-    } else if (used.status === "library-unreadable") {
-      announceDrawingShortcut("브러시는 적용했지만 저장 데이터를 읽지 못해 최근 사용 기록은 남기지 못했어요.");
-    } else if (used.status === "storage-error") {
-      announceDrawingShortcut("브러시는 적용했지만 브라우저 저장소 오류로 최근 사용 기록은 남기지 못했어요.");
-    }
+    const usedAt = Date.now();
+    void productBrushRepository()
+      .then(async (product) => {
+        const stored = await product.repository.getById(saved.id);
+        if (!stored) {
+          await refreshSavedBrushesFromRepository(product);
+          brushBaselineController.invalidate();
+          announceDrawingShortcut("브러시는 적용했지만 다른 탭에서 삭제되어 저장 목록을 새로 맞췄어요.");
+          return;
+        }
+        await product.repository.put({ ...stored, lastUsedAt: usedAt });
+        await refreshSavedBrushesFromRepository(product);
+      })
+      .catch(() => {
+        announceDrawingShortcut("브러시는 적용했지만 SQLite 사용 기록을 남기지 못했어요.");
+      });
   }
 
   function applyStudioBrushCatalogSelection(selection: StudioBrushCatalogSelection) {
@@ -7648,8 +8402,8 @@ function StudioCuttoonEditor() {
     commitProDrawPrefsMutation(
       (latest) => rememberRecentBrushId(latest, selection.catalogId)
     );
-    setBrushSlotsState((prev) => {
-      const next = rememberStudioBrushSlot(prev, {
+    commitStudioBrushSlotsMutation(
+      (prev) => rememberStudioBrushSlot(prev, {
         brushId: applied.brushId,
         ...(extendedSource
           ? {
@@ -7662,13 +8416,11 @@ function StudioCuttoonEditor() {
           : {}),
         strokeWidth: applied.strokeWidth,
         brushOpacity: applied.brushOpacity,
-      });
-      saveStudioBrushSlotsState(
-        typeof globalThis.localStorage === "undefined" ? null : globalThis.localStorage,
-        next
-      );
-      return next;
-    });
+      }),
+      {
+        failureMessage: "최근 브러시 슬롯을 SQLite에 저장하지 못했어요.",
+      },
+    );
   }
 
   function applyBuiltInBrushPreset(preset: BrushPreset) {
@@ -7723,6 +8475,175 @@ function StudioCuttoonEditor() {
       return;
     }
     toggleBuiltInBrushCatalog("desktop-dock", trigger);
+  }
+
+  /**
+   * §15.3 Brush menu rows open surfaces that anchor to (and return focus to) a
+   * launcher button, but a menu item's `onSelect` receives no event. The
+   * inspector's own launcher is preferred once it is mounted; the menubar row
+   * the artist just used is the fallback, so keyboard focus always lands on a
+   * real, still-connected control instead of the document body.
+   */
+  function resolveBrushMenuLauncher(): HTMLButtonElement | null {
+    const root = studioRootRef.current;
+    return (
+      root?.querySelector<HTMLButtonElement>('[data-studio-brush-catalog-launcher="true"]')
+      ?? root?.querySelector<HTMLButtonElement>('[data-studio-brush-manager-launcher="true"]')
+      ?? root?.querySelector<HTMLButtonElement>('[data-studio-main-menu-trigger="brush"]')
+      ?? null
+    );
+  }
+
+  /** Runs after the inspector route has committed, so late-mounted launchers exist. */
+  function afterInspectorCommit(run: () => void): void {
+    if (!globalThis.requestAnimationFrame) {
+      run();
+      return;
+    }
+    globalThis.requestAnimationFrame(() => {
+      globalThis.requestAnimationFrame?.(run);
+    });
+  }
+
+  /** 그리기 ▸ 브러시 프리셋 목록 — §15.3 Brush ▸ Preset Browser. */
+  function openBrushPresetBrowserFromMenu() {
+    activatePrimaryCanvasTool("draw", "pen");
+    openInspectorRoute({ primary: "properties" }, isMobile ? "draw" : null);
+    afterInspectorCommit(() => {
+      const launcher = resolveBrushMenuLauncher();
+      if (!launcher) {
+        announceDrawingShortcut("브러시 목록을 열지 못했어요. 오른쪽 패널의 ‘브러시 목록’을 눌러 주세요.");
+        return;
+      }
+      openBrushCatalogFromHelp(launcher);
+    });
+  }
+
+  /** 그리기 ▸ 브러시 스튜디오 — §15.3 Brush ▸ Brush Studio/Brush DNA. */
+  function openBrushStudioFromMenu() {
+    void loadStudioBrushStudio();
+    activatePrimaryCanvasTool("draw", "pen");
+    openInspectorRoute({ primary: "properties" }, isMobile ? "draw" : null);
+    // The section is collapsed by default; the bus opens and reveals it.
+    requestStudioInspectorFocus("tool.brush-studio");
+  }
+
+  /** 그리기 ▸ 자연 매체 · 안료 — §15.3 Brush ▸ Natural Media/Pigment. */
+  function openNaturalMediaBrushesFromMenu() {
+    activatePrimaryCanvasTool("draw", "pen");
+    openInspectorRoute({ primary: "properties" }, isMobile ? "draw" : null);
+    requestStudioInspectorFocus("tool.brush-engines");
+  }
+
+  /** 그리기 ▸ 내 브러시 — 저장 라이브러리(가져오기 버튼 포함). */
+  function openBrushLibraryFromMenu() {
+    activatePrimaryCanvasTool("draw", "pen");
+    if (isMobile) {
+      const launcher = resolveBrushMenuLauncher();
+      if (launcher) {
+        openBrushManager(launcher);
+        return;
+      }
+    }
+    openInspectorRoute({ primary: "properties" }, isMobile ? "draw" : null);
+    requestStudioInspectorFocus("brush.saved-library");
+  }
+
+  /**
+   * 그리기 ▸ 브러시 가져오기 — §15.3 Brush ▸ Import SUT/ABR/MYB/KPP.
+   *
+   * Clicked synchronously inside the menu's own activation so the picker keeps
+   * the user gesture, exactly like the PSD and project-archive rows.
+   */
+  function requestBrushPackImportFromMenu() {
+    const input = brushPackImportInputRef.current;
+    if (!input) {
+      setError("브러시 가져오기 입력을 아직 준비하지 못했어요. 잠시 후 다시 시도해 주세요.");
+      return;
+    }
+    input.click();
+  }
+
+  /**
+   * Menu-side import. Registers only what the mapper can actually draw and reads
+   * the parsers' unmapped/warning ledger out loud — the panel's control does the
+   * same, so neither entry point can quietly become the lenient one.
+   */
+  async function handleBrushPackImportFromMenu(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    const format = studioBrushPackFormatOf(file.name, file.type);
+    if (format === null) {
+      setError("브러시 파일 형식을 알아보지 못했어요. .abr · .myb · .kpp · .sut · .sutg · .bundle · .json 파일을 선택해 주세요.");
+      return;
+    }
+    if (format === "abr" || format === "json") {
+      // Both already have an owner (worker lane / JSON validator) inside the
+      // library panel; sending the artist there beats a second implementation.
+      openBrushLibraryFromMenu();
+      announceDrawingShortcut(
+        format === "abr"
+          ? "ABR 브러시 팩은 ‘내 브러시’의 가져오기에서 변환해요."
+          : "브러시 설정(.json)은 ‘내 브러시’의 가져오기에서 불러와요.",
+      );
+      return;
+    }
+    setBrushPackImporting(true);
+    try {
+      const importer = await import("./studio-brush-pack-import");
+      const product = await productBrushRepository();
+      // Keep each external format as an explicit product route. This prevents a
+      // future MYB/KPP-only parser signature from silently accepting a CSP or
+      // bundle container through an over-broad union.
+      let committed: Awaited<ReturnType<
+        typeof importer.importAndCommitStudioBrushProgramFile
+      >>;
+      switch (format) {
+        case "myb":
+          committed = await importer.importAndCommitStudioBrushProgramFile(
+            file, "myb", product.repository,
+          );
+          break;
+        case "kpp":
+          committed = await importer.importAndCommitStudioBrushProgramFile(
+            file, "kpp", product.repository,
+          );
+          break;
+        case "sut":
+          committed = await importer.importAndCommitStudioBrushProgramFile(
+            file, "sut", product.repository,
+          );
+          break;
+        case "sutg":
+          committed = await importer.importAndCommitStudioBrushProgramFile(
+            file, "sutg", product.repository,
+          );
+          break;
+        case "bundle":
+          committed = await importer.importAndCommitStudioBrushProgramFile(
+            file, "bundle", product.repository,
+          );
+          break;
+      }
+      if (committed.saved.savedCount === 0) {
+        setError("브러시 파일에 새로 저장할 항목이 없어요.");
+        return;
+      }
+      await refreshSavedBrushesFromRepository(product);
+      const label = importer.studioBrushPackFormatLabel(format);
+      const notes = importer.studioBrushPackImportNotes(committed.result);
+      announceDrawingShortcut(
+        `${label} 브러시 ${committed.saved.savedCount}개를 SQLite 내 브러시에 추가했어요.${notes.length > 0 ? ` ${notes.join(" ")}` : ""}`,
+      );
+      openBrushLibraryFromMenu();
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "브러시 프리셋 파일을 가져오지 못했어요.",
+      );
+    } finally {
+      setBrushPackImporting(false);
+    }
   }
 
   function closeBuiltInBrushCatalog(
@@ -7797,21 +8718,26 @@ function StudioCuttoonEditor() {
   }
   const drawingShortcutStateRef = useRef({ tool, drawMode, strokeWidth, brushOpacity });
   drawingShortcutStateRef.current = { tool, drawMode, strokeWidth, brushOpacity };
-  const [symmetryType, setSymmetryType] = useState<"none" | "vertical" | "horizontal" | "radial" | "kaleidoscope">("none");
+  const [symmetryType, setSymmetryType] = useState<"none" | "vertical" | "horizontal" | "radial" | "kaleidoscope" | "silk">("none");
   const [symmetryCenterX, setSymmetryCenterX] = useState<number>(() => CANVAS_W / 2);
   const [symmetryCenterY, setSymmetryCenterY] = useState<number>(540);
   const [symmetryRadialCount, setSymmetryRadialCount] = useState<number>(6);
-  const normalizedDrawingAssistDocument = normalizeStudioDrawingAssistDocument(activePage.drawingAssist, {
-    canvasWidth: CANVAS_W,
-    canvasHeight: canvasH,
-  });
-  const defaultedDrawingAssistDocument = activePage.drawingAssist === undefined
-    && appSettings.grids.showIsometricOnDraw
-    ? {
-        ...normalizedDrawingAssistDocument,
-        isometric: { ...normalizedDrawingAssistDocument.isometric, active: true },
-      }
-    : normalizedDrawingAssistDocument;
+  useEffect(() => {
+    if (symmetryType === "silk" && symmetryRadialCount < 6) setSymmetryRadialCount(8);
+  }, [symmetryType, symmetryRadialCount]);
+
+  const defaultedDrawingAssistDocument = useMemo(() => {
+    const normalized = normalizeStudioDrawingAssistDocument(activePage.drawingAssist, {
+      canvasWidth: CANVAS_W,
+      canvasHeight: canvasH,
+    });
+    return activePage.drawingAssist === undefined && appSettings.grids.showIsometricOnDraw
+      ? {
+          ...normalized,
+          isometric: { ...normalized.isometric, active: true },
+        }
+      : normalized;
+  }, [activePage.drawingAssist, appSettings.grids.showIsometricOnDraw, canvasH]);
   const [drawingAssistPreview, setDrawingAssistPreview] = useState<{
     pageId: string;
     source: StudioDrawingAssistDocument | undefined;
@@ -7819,13 +8745,22 @@ function StudioCuttoonEditor() {
   } | null>(null);
   const drawingAssistPreviewRef = useRef(drawingAssistPreview);
   drawingAssistPreviewRef.current = drawingAssistPreview;
-  const drawingAssistDocument = resolveStudioDrawingAssistPreviewDocument({
-    preview: drawingAssistPreview,
-    pageId: activePage.id,
-    source: activePage.drawingAssist,
-    fallback: defaultedDrawingAssistDocument,
-    viewport: { canvasWidth: CANVAS_W, canvasHeight: canvasH },
-  });
+  const drawingAssistDocument = useMemo(
+    () => resolveStudioDrawingAssistPreviewDocument({
+      preview: drawingAssistPreview,
+      pageId: activePage.id,
+      source: activePage.drawingAssist,
+      fallback: defaultedDrawingAssistDocument,
+      viewport: { canvasWidth: CANVAS_W, canvasHeight: canvasH },
+    }),
+    [
+      activePage.drawingAssist,
+      activePage.id,
+      canvasH,
+      defaultedDrawingAssistDocument,
+      drawingAssistPreview,
+    ]
+  );
   const advancedRulers = drawingAssistDocument.advanced;
   useEffect(() => {
     setDrawingAssistPreview(null);
@@ -7843,6 +8778,22 @@ function StudioCuttoonEditor() {
   const [eyedropperActive, setEyedropperActive] = useState(false);
   /** CSP vector eraser: click freehand ink and erase between nearest intersections. */
   const [eraseToIntersection, setEraseToIntersection] = useState(false);
+  /**
+   * §15.3 Vector ▸ Vector Eraser. Named rather than inlined into the options-bar
+   * handler bundle because the main menu needs the same door: the chip only
+   * renders while the eraser is already armed, so the mode was unreachable from
+   * anywhere else.
+   */
+  function toggleEraseToIntersectionMode() {
+    const next = !eraseToIntersection;
+    if (next) activatePrimaryCanvasTool("draw", "eraser");
+    setEraseToIntersection(next);
+    announceDrawingShortcut(
+      next
+        ? `${STUDIO_ERASE_TO_INTERSECTION_LABEL} 켜짐`
+        : `${STUDIO_ERASE_TO_INTERSECTION_LABEL} 꺼짐`
+    );
+  }
   /** Auto-color canvas scribble: click/drag selected line art to drop color seeds. */
   const [autoColorScribbleCanvasArmed, setAutoColorScribbleCanvasArmed] = useState(false);
   const [autoColorCanvasSeedHit, setAutoColorCanvasSeedHit] = useState<{
@@ -7885,6 +8836,18 @@ function StudioCuttoonEditor() {
   const [assets, setAssets] = useState<StudioAsset[]>([]);
   const [assetsLoading, setAssetsLoading] = useState(false);
   const [assetsLoaded, setAssetsLoaded] = useState(false);
+  const [, setAssetStorageState] = useState<
+    "idle" | "loading" | "sqlite-opfs" | "memory" | "unavailable"
+  >("idle");
+  const assetsRef = useRef<StudioAsset[]>([]);
+  const assetMemoryModeRef = useRef(false);
+  const assetHydrationGenerationRef = useRef(0);
+  const assetMutationGenerationRef = useRef(0);
+  const assetMutationTailRef = useRef<Promise<void>>(Promise.resolve());
+  function replaceStudioAssets(next: StudioAsset[]): void {
+    assetsRef.current = next;
+    setAssets(next);
+  }
   const scenarioImageReferenceAssets = useMemo(
     () => assets.filter(isStudioAiReferenceCompatibleAsset),
     [assets]
@@ -8603,6 +9566,9 @@ function StudioCuttoonEditor() {
   const sceneTemplatesLoadRef = useRef<Promise<void> | null>(null);
   const sfxLoadRef = useRef<Promise<void> | null>(null);
   const clipsLoadRef = useRef<Promise<void> | null>(null);
+  const clipsRepositoryRef = useRef<Promise<
+    import("./studio-saved-clip-sqlite-repository").StudioSavedClipSqliteRepository
+  > | null>(null);
 
   useEffect(() => {
     if (!workHydrated || !workId || !studioAuthUserId || !sharedDocument) return;
@@ -9330,15 +10296,33 @@ function StudioCuttoonEditor() {
     };
   }, [isSpacePressed, editing]);
 
-  // 미니맵용 스크롤 좌표 추적 리스너. scroll은 빈번하므로 rAF로 묶고 동일값이면 렌더를 생략한다.
+  // 미니맵용 스크롤 좌표 추적 리스너. scroll은 빈번하므로 rAF로 묶는다.
+  //
+  // 좌표는 항상 살아 있는 스토어로 먼저 나가고(React 작업 0), React 상태 커밋은
+  // planStudioScrollViewportCommit 이 정한다: 스크롤 오프셋만 바뀐 프레임(=팬 핫패스)은
+  // 정착 타이머로 미루고, 뷰포트 박스(리사이즈·패널 토글·줌 재배치)가 바뀌면 즉시 커밋한다.
+  // 프레임 정확도가 필요한 UI는 전부 스토어를 구독하므로 미루는 동안에도 화면은 동일하다.
   useEffect(() => {
+    const commitScrollViewport = (next: StudioScrollViewport) => {
+      pendingScrollCommitRef.current = null;
+      if (scrollCommitSettleTimerRef.current !== null) {
+        globalThis.clearTimeout(scrollCommitSettleTimerRef.current);
+        scrollCommitSettleTimerRef.current = null;
+      }
+      setScrollPos((prev) => (studioScrollViewportsEqual(prev, next) ? prev : next));
+    };
+    flushScrollViewportCommitRef.current = () => {
+      const pending = pendingScrollCommitRef.current;
+      if (!pending) return;
+      commitScrollViewport(pending);
+    };
     updateScrollPosRef.current = () => {
       if (scrollRafRef.current !== null) return;
       scrollRafRef.current = globalThis.requestAnimationFrame(() => {
         scrollRafRef.current = null;
         const wrap = wrapRef.current;
         if (!wrap) return;
-        const next = {
+        const next: StudioScrollViewport = {
           left: wrap.scrollLeft,
           top: wrap.scrollTop,
           width: wrap.clientWidth,
@@ -9346,19 +10330,33 @@ function StudioCuttoonEditor() {
           scrollWidth: wrap.scrollWidth,
           scrollHeight: wrap.scrollHeight,
         };
-        setScrollPos((prev) =>
-          prev.left === next.left &&
-          prev.top === next.top &&
-          prev.width === next.width &&
-          prev.height === next.height &&
-          prev.scrollWidth === next.scrollWidth &&
-          prev.scrollHeight === next.scrollHeight
-            ? prev
-            : next
+        scrollViewportStore.publish(next);
+        const mode = planStudioScrollViewportCommit(scrollPosRef.current, next);
+        if (mode === "none") {
+          pendingScrollCommitRef.current = null;
+          return;
+        }
+        if (mode === "immediate") {
+          commitScrollViewport(next);
+          return;
+        }
+        pendingScrollCommitRef.current = next;
+        if (scrollCommitSettleTimerRef.current !== null) {
+          globalThis.clearTimeout(scrollCommitSettleTimerRef.current);
+        }
+        scrollCommitSettleTimerRef.current = globalThis.setTimeout(
+          () => flushScrollViewportCommitRef.current(),
+          STUDIO_SCROLL_VIEWPORT_SETTLE_MS
         );
       });
     };
   });
+  useEffect(() => () => {
+    if (scrollCommitSettleTimerRef.current !== null) {
+      globalThis.clearTimeout(scrollCommitSettleTimerRef.current);
+      scrollCommitSettleTimerRef.current = null;
+    }
+  }, []);
   const updateScrollPos = () => updateScrollPosRef.current();
 
   useLayoutEffect(() => {
@@ -9385,6 +10383,12 @@ function StudioCuttoonEditor() {
       revokeStudioRasterHandoffRef.current();
       updateScrollPosRef.current();
     };
+    // Anything that starts touching the canvas (draw, select, pan) must see a
+    // settled viewport: the GPU/live-ink overlay surfaces are positioned from
+    // the React snapshot, so a scroll that is still inside its settle window is
+    // landed here before the gesture reads it.
+    const onPointerDownCapture = () => flushScrollViewportCommitRef.current();
+    wrap.addEventListener("pointerdown", onPointerDownCapture, { capture: true });
     wrap.addEventListener("scroll", onScroll, { passive: true });
     globalThis.addEventListener("resize", onResize);
     const resizeObserver = typeof ResizeObserver === "undefined"
@@ -9393,6 +10397,7 @@ function StudioCuttoonEditor() {
     resizeObserver?.observe(wrap);
     const timer = globalThis.setTimeout(onResize, 150);
     return () => {
+      wrap.removeEventListener("pointerdown", onPointerDownCapture, { capture: true });
       wrap.removeEventListener("scroll", onScroll);
       globalThis.removeEventListener("resize", onResize);
       resizeObserver?.disconnect();
@@ -9462,6 +10467,7 @@ function StudioCuttoonEditor() {
         releaseSchedule,
         publicationAnalytics,
         referenceBoard,
+        aiImageReferences: scenarioImageReferenceDocument,
         currentPageId,
         webtoonTheme,
         panelGutter,
@@ -9512,9 +10518,7 @@ function StudioCuttoonEditor() {
     }
     if (!hasMeaningfulAutosaveContent && !hasExistingAutosaveAuthority) return;
     const scheduledGeneration = studioRevisionProjectGenerationRef.current;
-    const scheduledPendingFingerprint = pendingBatch
-      ? `${pendingBatch.pageId}:${pendingBatch.strokes.map((stroke) => stroke.id).join(",")}`
-      : "";
+    const scheduledPendingFingerprint = studioPendingStrokeFingerprint(pendingBatch);
     const timer = setTimeout(() => {
       if (
         scheduledGeneration <= studioLifecycleDurableGenerationRef.current
@@ -9524,8 +10528,12 @@ function StudioCuttoonEditor() {
       }
       if (!hasMeaningfulAutosaveContent) {
         const sessionPromise = autosaveOpfsSessionRef.current;
+        const sqlitePromise = autosaveSqliteStoreRef.current;
         void (async () => {
-          const session = await (sessionPromise ?? Promise.resolve(null));
+          const [session, sqlite] = await Promise.all([
+            sessionPromise ?? Promise.resolve(null),
+            sqlitePromise ?? Promise.resolve(null),
+          ]);
           if (
             studioRevisionProjectGenerationRef.current !== scheduledGeneration
             || (
@@ -9533,7 +10541,22 @@ function StudioCuttoonEditor() {
               && autosaveOpfsSessionRef.current !== sessionPromise
             )
           ) return;
-          await session?.clear();
+          const savedAt = new Date().toISOString();
+          const attempted: Promise<unknown>[] = [];
+          if (session) attempted.push(session.clear(savedAt));
+          if (sqlite) attempted.push(sqlite.clear(autosaveKey, savedAt));
+          const results = await Promise.allSettled(attempted);
+          if (
+            results.length === 0
+            || results.every((result) => result.status === "rejected")
+          ) {
+            throw new AggregateError(
+              results.map((result) =>
+                result.status === "rejected" ? result.reason : null
+              ),
+              "Studio durable autosave tombstones failed",
+            );
+          }
           // 새 편집이 clear 도중 시작됐다면 그 편집의 기존 브라우저 복구 슬롯은 보존한다.
           // 뒤따르는 최신 세대 저장이 직렬 OPFS journal을 다시 채운다.
           if (studioRevisionProjectGenerationRef.current !== scheduledGeneration) return;
@@ -9553,6 +10576,8 @@ function StudioCuttoonEditor() {
         })().catch((cause: unknown) => {
           // Durable snapshot을 지우지 못했는데 local fallback만 지우면 다음 재진입에서 오래된
           // OPFS 내용이 복원된다. 두 권위를 그대로 보존하고 다음 편집/clear에서 재시도한다.
+          reportStudioSaveAuthorityDegraded(cause);
+          void reportStudioAutosaveFailure(cause);
           if (import.meta.env.DEV) {
             console.warn("Studio empty autosave tombstone could not be written.", cause);
           }
@@ -9569,14 +10594,20 @@ function StudioCuttoonEditor() {
           : {}),
       };
       const sessionPromise = autosaveOpfsSessionRef.current;
+      const sqlitePromise = autosaveSqliteStoreRef.current;
       void import("./studio-autosave-opfs-session")
         .then(async ({ persistStudioAutosaveWithOpfsPrimary }) => {
-          const session = await (sessionPromise ?? Promise.resolve(null));
-          await persistStudioAutosaveWithOpfsPrimary({
+          const [session, sqlite] = await Promise.all([
+            sessionPromise ?? Promise.resolve(null),
+            sqlitePromise ?? Promise.resolve(null),
+          ]);
+          const receipt = await persistStudioAutosaveWithOpfsPrimary({
             session,
+            sqlite,
             storage: globalThis.localStorage,
             key: autosaveKey,
             payload,
+            onDurableAuthorityDegraded: reportStudioSaveAuthorityDegraded,
           });
           if (
             sessionPromise !== null
@@ -9588,32 +10619,13 @@ function StudioCuttoonEditor() {
           );
           studioLifecycleDurablePendingFingerprintRef.current =
             scheduledPendingFingerprint;
+          noteStudioSaveSucceeded(receipt.authority);
         })
         .catch((cause: unknown) => {
-          // Module/session initialization is intentionally outside the hot edit path. If it
-          // cannot start, preserve the established synchronous recovery slot.
-          try {
-            globalThis.localStorage.setItem(
-              autosaveKey,
-              serializeStudioAutosave(payload)
-            );
-            globalThis.localStorage.removeItem(
-              studioLifecycleAutosaveSidecarKey(autosaveKey)
-            );
-            if (
-              sessionPromise === null
-              || autosaveOpfsSessionRef.current === sessionPromise
-            ) {
-              studioLifecycleDurableGenerationRef.current = Math.max(
-                studioLifecycleDurableGenerationRef.current,
-                scheduledGeneration
-              );
-              studioLifecycleDurablePendingFingerprintRef.current =
-                scheduledPendingFingerprint;
-            }
-          } catch {
-            // The diagnostic below reports both an unavailable OPFS authority and fallback.
-          }
+          // Keep the current in-memory generation dirty. Only an OPFS/SQLite receipt may advance
+          // the durable generation; browser KV is compatibility/discard-only in the V12 product.
+          // 무음 금지: 상태 레일에 도달시키고, 쿼터 압박이면 복구 저널 공간 회수까지 잇는다.
+          void reportStudioAutosaveFailure(cause);
           console.error("Auto-save failed:", cause);
         });
     }, 1500);
@@ -9707,6 +10719,7 @@ function StudioCuttoonEditor() {
   // (요소·게시 정보가 전부 빈 백업은 복구 가치가 없고, 과거 버전이 남긴 빈 페이로드도 거른다.)
   useEffect(() => {
     if (!workHydrated) return;
+    autosaveRecoveryCandidateRef.current = null;
     if (collaborationDocumentLocked) {
       setHasAutosave(false);
       setAutosaveRestoreBlockedReason(null);
@@ -9716,34 +10729,60 @@ function StudioCuttoonEditor() {
     setAutosaveChecked(false);
     let cancelled = false;
     const sessionPromise = autosaveOpfsSessionRef.current;
+    const sqlitePromise = autosaveSqliteStoreRef.current;
     const cancelIdle = scheduleIdle(() => {
       void (async () => {
-        let saved = readStudioAutosave(
-          globalThis.localStorage,
-          autosaveKey,
-          !workId && !remixId
-        );
+        let saved:
+          | import("./studio-autosave-opfs-session").StudioAutosaveRecoveryCandidate
+          | null;
         try {
           const [
             { reconcileStudioAutosaveWithOpfsPrimary },
             session,
+            sqlite,
           ] = await Promise.all([
             import("./studio-autosave-opfs-session"),
             sessionPromise ?? Promise.resolve(null),
+            sqlitePromise ?? Promise.resolve(null),
           ]);
           const reconciliation = await reconcileStudioAutosaveWithOpfsPrimary({
             session,
+            sqlite,
             storage: globalThis.localStorage,
             key: autosaveKey,
-            allowLegacy: !workId && !remixId,
+            allowLegacy: false,
           });
           saved = reconciliation.candidate;
         } catch (cause) {
+          let compatibility: ReturnType<typeof readStudioAutosave> = null;
+          try {
+            compatibility = readStudioAutosave(
+              globalThis.localStorage,
+              autosaveKey,
+              false,
+            );
+          } catch {
+            // localStorage is compatibility-only; denial must not fabricate a recovery candidate.
+          }
+          saved = compatibility
+            ? Object.freeze({
+                key: compatibility.key,
+                authority: "browser-storage-compatibility" as const,
+                savedAt: compatibility.payload.savedAt,
+                sequence: null,
+                revision: null,
+                payload: compatibility.payload,
+              })
+            : null;
+          reportStudioSaveAuthorityDegraded(cause);
           if (import.meta.env.DEV) {
             console.warn("Studio OPFS autosave reconciliation fell back.", cause);
           }
         }
         if (cancelled) return;
+        autosaveRecoveryCandidateRef.current = saved;
+        const compatibilityOnly =
+          saved?.authority === "browser-storage-compatibility";
         const compatibility =
           saved && workId && sharedDocument
             ? studioSharedAutosaveCompatibility(saved.payload, {
@@ -9752,8 +10791,19 @@ function StudioCuttoonEditor() {
               })
             : null;
         setAutosaveRestoreBlockedReason(
-          compatibility && !compatibility.compatible ? compatibility.reason : null
+          compatibilityOnly
+            ? "legacy-unversioned"
+            : compatibility && !compatibility.compatible
+              ? compatibility.reason
+              : null
         );
+        if (compatibilityOnly) {
+          reportStudioSaveAuthorityDegraded(
+            new Error(
+              "OPFS와 SQLite 자동저장 원본을 읽지 못해 localStorage 호환 백업만 찾았습니다. JSON 백업만 허용합니다."
+            )
+          );
+        }
         setHasAutosave(Boolean(saved));
         setAutosaveChecked(true);
       })();
@@ -9802,8 +10852,19 @@ function StudioCuttoonEditor() {
     if (!prepareStudioDocumentReplacement("임시저장본을 복구", { flushPending: true })) return;
     const mutationTicket = captureStudioMutationTicket();
     try {
-      const saved = readStudioAutosave(localStorage, autosaveKey, !workId && !remixId);
-      if (saved) {
+      const saved = autosaveRecoveryCandidateRef.current;
+      if (!saved) {
+        setError("복구할 내구 임시저장 데이터를 찾지 못했어요.");
+        return;
+      }
+      if (saved.authority === "browser-storage-compatibility") {
+        setAutosaveRestoreBlockedReason("legacy-unversioned");
+        setError(
+          "내구 저장소에서 확인되지 않은 호환 백업은 자동 복구하지 않아요. JSON 백업으로 내려받아 보관해 주세요."
+        );
+        return;
+      }
+      {
         if (workId && sharedDocument) {
           const compatibility = studioSharedAutosaveCompatibility(saved.payload, {
             workId,
@@ -9903,6 +10964,7 @@ function StudioCuttoonEditor() {
         setReferenceBoard(normalizeStudioReferenceBoardDocument(parsed.referenceBoard));
         // 문서 마스터 복구 — 백업에 없으면 빈 마스터(하위호환).
         setMaster(normalizeDocumentMaster(parsed.master) as DocumentMaster<El>);
+        autosaveRecoveryCandidateRef.current = null;
         setAutosaveRestoreBlockedReason(null);
         setHasAutosave(false);
       }
@@ -9913,12 +10975,33 @@ function StudioCuttoonEditor() {
 
   function clearAutosaveDurableAuthority() {
     const sessionPromise = autosaveOpfsSessionRef.current;
-    if (!sessionPromise) return;
-    void sessionPromise
-      .then((session) => session?.clear())
+    const sqlitePromise = autosaveSqliteStoreRef.current;
+    if (!sessionPromise && !sqlitePromise) return;
+    const savedAt = new Date().toISOString();
+    void Promise.all([
+      sessionPromise ?? Promise.resolve(null),
+      sqlitePromise ?? Promise.resolve(null),
+    ])
+      .then(async ([session, sqlite]) => {
+        const attempted: Promise<unknown>[] = [];
+        if (session) attempted.push(session.clear(savedAt));
+        if (sqlite) attempted.push(sqlite.clear(autosaveKey, savedAt));
+        const results = await Promise.allSettled(attempted);
+        if (
+          results.length > 0
+          && results.every((result) => result.status === "rejected")
+        ) {
+          throw new AggregateError(
+            results.map((result) =>
+              result.status === "rejected" ? result.reason : null
+            ),
+            "Studio durable autosave tombstones failed",
+          );
+        }
+      })
       .catch((cause: unknown) => {
         if (import.meta.env.DEV) {
-          console.warn("Studio OPFS autosave tombstone could not be written.", cause);
+          console.warn("Studio durable autosave tombstone could not be written.", cause);
         }
       });
   }
@@ -9929,16 +11012,17 @@ function StudioCuttoonEditor() {
       localStorage.removeItem(autosaveKey);
       localStorage.removeItem(studioLifecycleAutosaveSidecarKey(autosaveKey));
       if (!workId && !remixId) localStorage.removeItem(LEGACY_STUDIO_AUTOSAVE_KEY);
-      setHasAutosave(false);
-      setAutosaveRestoreBlockedReason(null);
     } catch {
       // 무시
     }
+    autosaveRecoveryCandidateRef.current = null;
+    setHasAutosave(false);
+    setAutosaveRestoreBlockedReason(null);
   }
 
   function downloadAutosaveBackup() {
     try {
-      const saved = readStudioAutosave(localStorage, autosaveKey, !workId && !remixId);
+      const saved = autosaveRecoveryCandidateRef.current;
       if (!saved) {
         setError("내려받을 임시저장 데이터를 찾지 못했어요.");
         return;
@@ -9987,6 +11071,9 @@ function StudioCuttoonEditor() {
 
   const onWrapMouseUp = () => {
     setIsPanning(false);
+    // The drag is over: land the deferred viewport snapshot in the same commit
+    // instead of waiting out the settle timer.
+    flushScrollViewportCommitRef.current();
   };
 
   const onMinimapClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -10435,6 +11522,83 @@ function StudioCuttoonEditor() {
   const hokusaiLiveOverlayVisibleRef = useRef(false);
   const hokusaiLiveFinalizingRef = useRef(false);
 
+  function clearStudioHokusaiVectorShadow(
+    state: StudioHokusaiPinnedLiveStroke,
+  ): void {
+    if (liveDraftVisualRef.current?.id === state.strokeId) {
+      liveDraftVisualRef.current = null;
+      liveDraftPendingRef.current = null;
+      liveDraftDirectRef.current = false;
+    }
+    if (draftPreviewStoreRef.current.getSnapshot().active?.id === state.strokeId) {
+      draftPreviewStoreRef.current.setActive(null);
+      draftPreviewNormalLayerRef.current?.drawScene();
+      draftPreviewDynamicLayerRef.current?.drawScene();
+    }
+    liveDraftLayerRef.current?.drawScene();
+  }
+
+  function studioHokusaiVectorTailShadow(
+    element: DrawEl,
+    state: StudioHokusaiPinnedLiveStroke,
+  ): DrawEl | null {
+    const sampleCount = Math.floor(element.points.length / 2);
+    const bounds = state.materialCompositeBounds;
+    if (!bounds) return null;
+    const margin = Math.max(1, state.route.config.radiusPixels * 1.5);
+    let presentedSampleCount = 0;
+    for (let index = 0; index < sampleCount; index += 1) {
+      const x = element.points[index * 2] ?? Number.NaN;
+      const y = element.points[index * 2 + 1] ?? Number.NaN;
+      const covered = Number.isFinite(x)
+        && Number.isFinite(y)
+        && x >= bounds.x - margin
+        && x <= bounds.x + bounds.width + margin
+        && y >= bounds.y - margin
+        && y <= bounds.y + bounds.height + margin;
+      if (!covered && presentedSampleCount > 0) break;
+      if (covered) presentedSampleCount = index + 1;
+    }
+    if (presentedSampleCount <= 0 || presentedSampleCount >= sampleCount) return null;
+    // Retain one overlap sample so the transient suffix joins the material prefix without a gap.
+    // A 0.6 alpha bridge approximates the current natural-media energy while the Worker catches
+    // up; unlike a full-vector shadow it cannot darken the already receipted material prefix.
+    const start = Math.max(0, Math.min(sampleCount - 1, presentedSampleCount - 1));
+    const slice = (values: number[] | undefined): number[] | undefined => values?.slice(start);
+    return {
+      ...element,
+      points: element.points.slice(start * 2),
+      pressures: slice(element.pressures),
+      tiltXs: slice(element.tiltXs),
+      tiltYs: slice(element.tiltYs),
+      twists: slice(element.twists),
+      speeds: slice(element.speeds),
+      tangentialPressures: slice(element.tangentialPressures),
+      altitudeAngles: slice(element.altitudeAngles),
+      azimuthAngles: slice(element.azimuthAngles),
+      contactWidths: slice(element.contactWidths),
+      contactHeights: slice(element.contactHeights),
+      sampleTimeOffsets: slice(element.sampleTimeOffsets),
+      opacity: Math.max(0.01, Math.min(1, (element.opacity ?? 1) * 0.6)),
+    };
+  }
+
+  function refreshStudioHokusaiVectorTailShadow(
+    state: StudioHokusaiPinnedLiveStroke,
+    element: DrawEl,
+  ): void {
+    if (state.strokeId !== element.id || state.failed || !state.overlayPresented) return;
+    if (draftPreviewStoreRef.current.getSnapshot().active?.id === state.strokeId) {
+      draftPreviewStoreRef.current.setActive(null);
+      draftPreviewNormalLayerRef.current?.drawScene();
+      draftPreviewDynamicLayerRef.current?.drawScene();
+    }
+    const tail = studioHokusaiVectorTailShadow(element, state);
+    liveDraftVisualRef.current = tail;
+    liveDraftDirectRef.current = tail !== null;
+    liveDraftLayerRef.current?.drawScene();
+  }
+
   function showStudioHokusaiVectorShadow(
     element?: DrawEl | null,
     pageId = currentPageIdRef.current,
@@ -10445,7 +11609,7 @@ function StudioCuttoonEditor() {
     if (pageId !== currentPageIdRef.current) return;
     const retained = element ?? drawingRef.current;
     if (retained) {
-      liveDraftVisualRef.current = retained;
+      liveDraftVisualRef.current = studioLivingInkVectorShadowElement(retained);
       liveDraftPendingRef.current = retained;
       liveDraftDirectRef.current = true;
     }
@@ -10473,6 +11637,7 @@ function StudioCuttoonEditor() {
   ): void {
     if (hokusaiLiveStrokeRef.current !== state) return;
     hokusaiLiveOverlaySurfaceRef.current?.renderer.clear();
+    clearStudioHokusaiVectorShadow(state);
     hokusaiLiveOverlayVisibleRef.current = false;
     hokusaiLiveStrokeRef.current = null;
     hokusaiLiveFinalizingRef.current = false;
@@ -10500,6 +11665,7 @@ function StudioCuttoonEditor() {
     if (!state || (strokeId && state.strokeId !== strokeId)) return;
     state.abortController.abort();
     hokusaiLiveOverlaySurfaceRef.current?.renderer.clear();
+    clearStudioHokusaiVectorShadow(state);
     hokusaiLiveOverlayVisibleRef.current = false;
     hokusaiLiveStrokeRef.current = null;
     hokusaiLiveFinalizingRef.current = false;
@@ -10554,7 +11720,7 @@ function StudioCuttoonEditor() {
       return;
     }
     try {
-      state.session.append(samples);
+      state.lastAppendedSequence = state.session.append(samples);
     } catch (cause) {
       failStudioHokusaiLiveStroke(
         state,
@@ -10580,7 +11746,7 @@ function StudioCuttoonEditor() {
       || canvasFlipH
       || canvasRotation !== 0
       || !color
-      || !studioHokusaiAutomaticPreset(element.brush ?? "pen", element.brushCatalogId)
+      || !studioHokusaiProductLivePreset(element.brush ?? "pen", element.brushCatalogId)
     ) return false;
     // Hokusai finishes asynchronously. Start it only from a clean history boundary so its one
     // canonical transaction cannot overtake an older 200ms deferred stroke batch.
@@ -10610,6 +11776,9 @@ function StudioCuttoonEditor() {
       session: null,
       queuedSamples: [],
       forwardedSampleCount: 0,
+      lastAppendedSequence: 0,
+      lastMaterialFrameSequence: 0,
+      materialCompositeBounds: null,
       overlayPresented: false,
       failed: false,
       finishing: false,
@@ -10638,12 +11807,37 @@ function StudioCuttoonEditor() {
           failStudioHokusaiLiveStroke(state, "질감 프레임을 캔버스에 표시하지 못했습니다.");
           return;
         }
+        const frameBounds = frame.logicalPlacement;
+        const previousBounds = state.materialCompositeBounds;
+        state.materialCompositeBounds = previousBounds
+          ? {
+              x: Math.min(previousBounds.x, frameBounds.x),
+              y: Math.min(previousBounds.y, frameBounds.y),
+              width:
+                Math.max(previousBounds.x + previousBounds.width, frameBounds.x + frameBounds.width)
+                - Math.min(previousBounds.x, frameBounds.x),
+              height:
+                Math.max(previousBounds.y + previousBounds.height, frameBounds.y + frameBounds.height)
+                - Math.min(previousBounds.y, frameBounds.y),
+            }
+          : { ...frameBounds };
+        if (frame.phase === "live") {
+          state.lastMaterialFrameSequence = Math.max(
+            state.lastMaterialFrameSequence,
+            frame.sequence,
+          );
+        }
         if (!state.overlayPresented) {
           state.overlayPresented = true;
           hokusaiLiveOverlayVisibleRef.current = true;
-          // The exact DrawEl remains retained but ceases presentation only after the first valid
-          // material frame has been composed. This handshake prevents a blank first contact.
-          liveDraftLayerRef.current?.drawScene();
+          clearStudioHokusaiVectorShadow(state);
+          // The exact DrawEl relinquishes presentation only after the first valid material frame
+          // has been composed. The clear helper repaints immediately, preventing a stale or blank
+          // handoff while the Hokusai overlay becomes the visible authority.
+        }
+        const retained = drawingRef.current;
+        if (retained?.id === state.strokeId) {
+          refreshStudioHokusaiVectorTailShadow(state, retained);
         }
       },
     });
@@ -10657,7 +11851,7 @@ function StudioCuttoonEditor() {
         const queued = state.queuedSamples;
         state.queuedSamples = [];
         try {
-          session.append(queued);
+          state.lastAppendedSequence = session.append(queued);
         } catch (cause) {
           failStudioHokusaiLiveStroke(
             state,
@@ -10677,7 +11871,7 @@ function StudioCuttoonEditor() {
   }
 
   useEffect(() => {
-    if (!studioHokusaiAutomaticPreset(brush, activeCatalogBrush.id)) return;
+    if (!studioHokusaiProductLivePreset(brush, activeCatalogBrush.id)) return;
     void hokusaiLiveProviderRef.current.prewarm().catch(() => undefined);
   }, [activeCatalogBrush.id, brush]);
 
@@ -10693,11 +11887,39 @@ function StudioCuttoonEditor() {
   const [livingInkState, setLivingInkState] = useState<StudioLivingInkStudioState>("unavailable");
   const [livingInkStateMessage, setLivingInkStateMessage] = useState<string | undefined>();
   const [livingInkMode, setLivingInkMode] = useState<StudioLivingInkStrokeMode>("ink");
+  const [livingInkPhysicalBrushKey, setLivingInkPhysicalBrushKey] = useState<string | null>(null);
+  const currentLivingInkExplicitBrushKey = studioLivingInkExplicitBrushKey(
+    brush,
+    activeCatalogBrush.id,
+  );
+  const livingInkPhysicalModeEnabled = currentLivingInkExplicitBrushKey !== null
+    && livingInkPhysicalBrushKey === currentLivingInkExplicitBrushKey;
   const [livingInkScope, setLivingInkScope] = useState<"all" | "selection">("all");
   const [livingInkMaterial, setLivingInkMaterial] = useState<StudioLivingInkMaterialControls>(
     () => ({ ...DEFAULT_STUDIO_LIVING_INK_MATERIAL_CONTROLS }),
   );
   const [livingInkBusy, setLivingInkBusy] = useState(false);
+  /** Dual-wield routing: once a pen has been seen, a finger draws water; barrel swaps ink/water. */
+  const livingInkInputRoutingRef = useRef<StudioLivingInkInputRoutingState>(
+    createDefaultLivingInkInputRoutingState("ink"),
+  );
+  const livingInkForceTouchRef = useRef<number | null>(null);
+  function releaseLivingInkInputPointer(): void {
+    livingInkInputRoutingRef.current = Object.freeze({
+      ...livingInkInputRoutingRef.current,
+      activePointerId: null,
+    });
+  }
+  useEffect(() => {
+    // Safari trackpad Force Touch → wash pressure. webkitForce is 1..~3.3; map to 0..1.
+    const onForce = (event: Event) => {
+      const force = (event as Event & { webkitForce?: number }).webkitForce;
+      if (typeof force !== "number" || !Number.isFinite(force)) return;
+      livingInkForceTouchRef.current = Math.min(1, Math.max(0, (force - 1) / 1.7));
+    };
+    globalThis.addEventListener("webkitmouseforcechanged", onForce as EventListener);
+    return () => globalThis.removeEventListener("webkitmouseforcechanged", onForce as EventListener);
+  }, []);
   const livingInkConfigRef = useRef<StudioLivingInkExecutionConfig | null>(null);
   const livingInkOverlaySurfaceRef = useRef<StudioLivingInkOverlaySurfaceState | null>(null);
   const livingInkStrokeRef = useRef<StudioLivingInkPinnedStroke | null>(null);
@@ -10719,38 +11941,6 @@ function StudioCuttoonEditor() {
       setLivingInkStateMessage(message);
     },
     onCapacityDiagnostic: (message) => setError(message),
-    onInteractiveFrame: (frame, routeKey) => {
-      const state = livingInkStrokeRef.current;
-      const surface = livingInkOverlaySurfaceRef.current;
-      if (
-        !state
-        || state.failed
-        || state.route.routeKey !== routeKey
-        || !surface
-        || state.surfaceKey !== surface.binding.surfaceKey
-      ) {
-        frame.image.close();
-        return;
-      }
-      const claim = claimStudioStrokeSurfaceLifecycle(state.route, {
-        phase: "append",
-        routeKey,
-        strokeId: state.strokeId,
-        kind: "living-ink",
-      });
-      if (claim.status !== "owned") {
-        frame.image.close();
-        failStudioLivingInkStroke(state, "라이브 표면 소유권 영수증이 일치하지 않습니다.");
-        return;
-      }
-      const accepted = surface.renderer.offer(
-        frame,
-        routeKey,
-        surface.binding.projection,
-        (receipt) => onStudioLivingInkOverlayPresented(state, receipt),
-      );
-      if (!accepted) failStudioLivingInkStroke(state, "물리 프레임을 캔버스에 표시하지 못했습니다.");
-    },
   });
 
   function onStudioLivingInkOverlayPresented(
@@ -10774,7 +11964,9 @@ function StudioCuttoonEditor() {
     if (!state.overlayPresented) {
       state.overlayPresented = true;
       livingInkOverlayVisibleRef.current = true;
-      liveDraftLayerRef.current?.drawScene();
+      // The first accepted material frame is the presentation receipt that may retire the exact
+      // vector shadow used while a fast contact outruns the Worker.
+      clearStudioLivingInkVectorShadow(state);
     }
   }
 
@@ -10789,6 +11981,22 @@ function StudioCuttoonEditor() {
       liveDraftVisualRef.current = retained;
       liveDraftPendingRef.current = retained;
       liveDraftDirectRef.current = true;
+    }
+    liveDraftLayerRef.current?.drawScene();
+  }
+
+  function clearStudioLivingInkVectorShadow(
+    state: Pick<StudioLivingInkPinnedStroke, "strokeId">,
+  ): void {
+    if (liveDraftVisualRef.current?.id === state.strokeId) {
+      liveDraftVisualRef.current = null;
+      liveDraftPendingRef.current = null;
+      liveDraftDirectRef.current = false;
+    }
+    if (draftPreviewStoreRef.current.getSnapshot().active?.id === state.strokeId) {
+      draftPreviewStoreRef.current.setActive(null);
+      draftPreviewNormalLayerRef.current?.drawScene();
+      draftPreviewDynamicLayerRef.current?.drawScene();
     }
     liveDraftLayerRef.current?.drawScene();
   }
@@ -10812,8 +12020,8 @@ function StudioCuttoonEditor() {
     void livingInkCoordinatorRef.current.cancelStroke(state.strokeId);
     setError(
       studioLivingInkFailureDisposition(state.mode) === "preserve-document-noop"
-        ? `Living Ink 물 도구를 적용하지 못해 문서를 변경하지 않았습니다. ${reason}`
-        : `Living Ink 물리 표면을 유지하지 못해 원본 벡터 획으로 복구합니다. ${reason}`,
+        ? `수채 번짐 물 도구를 적용하지 못해 문서를 변경하지 않았습니다. ${reason}`
+        : `수채 번짐 표면을 유지하지 못해 원본 벡터 획으로 복구합니다. ${reason}`,
     );
   }
 
@@ -10829,8 +12037,10 @@ function StudioCuttoonEditor() {
     });
     if (claim.status !== "owned") return;
     livingInkOverlaySurfaceRef.current?.renderer.clear();
+    clearStudioLivingInkVectorShadow(state);
     livingInkOverlayVisibleRef.current = false;
     livingInkStrokeRef.current = null;
+    releaseLivingInkInputPointer();
     livingInkFinalizingRef.current = false;
     studioStrokeSurfaceRouteRef.current = null;
     setLivingInkBusy(false);
@@ -10855,6 +12065,8 @@ function StudioCuttoonEditor() {
     livingInkOverlaySurfaceRef.current?.renderer.clear();
     livingInkOverlayVisibleRef.current = false;
     if (!handoff || handoff.kind === "stroke") {
+      const state = livingInkStrokeRef.current;
+      if (state) clearStudioLivingInkVectorShadow(state);
       livingInkStrokeRef.current = null;
       livingInkFinalizingRef.current = false;
       studioStrokeSurfaceRouteRef.current = null;
@@ -10874,7 +12086,7 @@ function StudioCuttoonEditor() {
       livingInkCanonicalHandoffTimerRef.current = null;
       if (!expected || livingInkCanonicalHandoffRef.current !== expected) return;
       const message = [
-        "Living Ink 저장 PNG의 실제 바이트 해시와 메인 캔버스 표시 영수증을 확인하지 못했습니다.",
+        "수채 번짐 저장 PNG의 실제 바이트 해시와 메인 캔버스 표시 영수증을 확인하지 못했습니다.",
         "물리 표면은 화면에 그대로 보존되며 실행 취소 후 다시 시도할 수 있습니다.",
       ].join(" ");
       setError(message);
@@ -10960,13 +12172,15 @@ function StudioCuttoonEditor() {
       !surface
       || !config
       || livingInkState !== "ready"
+      // Safe Mode 품질 저하 강제 지점 — 라이브 잉크만 멈추고 보통 획으로 계속 그린다.
+      || studioSafeModeQuality().livingInkSuspended
       || studioLivingInkProductAdmissionBlocked({
         busy: livingInkBusy,
         finalizing: livingInkFinalizingRef.current,
         hasActiveStroke: Boolean(livingInkStrokeRef.current),
         hasCanonicalHandoff: Boolean(livingInkCanonicalHandoffRef.current),
       })
-      || !studioLivingInkSupportsElement(element)
+      || !studioLivingInkSupportsElement(element, livingInkPhysicalModeEnabled)
       || quickShapeActive
       || postCorrection > 0
       || masterEditMode
@@ -10976,29 +12190,59 @@ function StudioCuttoonEditor() {
     ) return false;
     if (pendingStrokeCommitsRef.current && !flushPendingStrokeCommitsRef.current()) return false;
     const fieldScale = config.fieldWidth / CANVAS_W;
-    const selection = livingInkScope === "selection"
+    const scope = studioLivingInkEffectiveScope(
+      livingInkScope,
+      livingInkSelectionAvailable(),
+    );
+    const selection = scope === "selection"
       ? livingInkSelectionSnapshot(config)
       : null;
-    if (livingInkScope === "selection" && !selection) return false;
+    if (scope === "selection" && !selection) return false;
+    // Dual-wield routing: pen draws ink, a finger after the pen has been seen draws water, and
+    // the barrel button swaps momentarily — all without touching the toolbar.
+    livingInkInputRoutingRef.current = withPencilSeen(
+      {
+        ...livingInkInputRoutingRef.current,
+        uiMode: livingInkMode,
+        activePointerId: livingInkStrokeRef.current
+          ? livingInkInputRoutingRef.current.activePointerId
+          : null,
+      },
+      pointerEvent.pointerType,
+    );
+    const route = resolveLivingInkStrokeRoute(livingInkInputRoutingRef.current, {
+      pointerId: Math.max(0, pointerEvent.pointerId),
+      pointerType: pointerEvent.pointerType,
+      buttons: pointerEvent.buttons,
+      pressure: pointerEvent.pressure,
+      forceTouch: livingInkForceTouchRef.current,
+    });
+    // Palm rests and second contacts are rejected here rather than becoming stray strokes.
+    if (!route.accept) return false;
+    livingInkInputRoutingRef.current = Object.freeze({
+      ...livingInkInputRoutingRef.current,
+      activePointerId: Math.max(0, pointerEvent.pointerId),
+      uiMode: livingInkMode,
+    });
+    // Keep the toolbar honest when the barrel or a second finger resolved a different tool.
+    if (route.mode !== livingInkMode) setLivingInkMode(route.mode);
     return livingInkCoordinatorRef.current.admitStroke({
       pageId: activePage.id,
       strokeId: element.id,
       recipe: {
-        mode: livingInkMode,
+        mode: route.mode,
         tool: "pigment-water-brush",
         baseWidth: Math.max(0.5, studioLiveBrushEffectiveDiameter(element)),
         fieldScale,
-        waterLoad: livingInkMode === "water" ? 0.9 : Math.max(0.1, livingInkMaterial.flow),
-        pigmentLoad: livingInkMode === "water" ? 0 : Math.max(0.1, livingInkMaterial.brushPigmentLoad),
+        waterLoad: route.mode === "water" ? 0.9 : Math.max(0.1, livingInkMaterial.flow),
+        pigmentLoad: route.mode === "water" ? 0 : Math.max(0.1, livingInkMaterial.brushPigmentLoad),
         color: Object.freeze([
           color[0],
           color[1],
           color[2],
           Math.max(0.01, Math.min(1, element.opacity ?? 1)),
         ]),
-        pointerSource: pointerEvent.pointerType === "pen"
-          ? "pen"
-          : pointerEvent.pointerType === "touch" ? "finger" : "mouse",
+        pointerSource: route.pointerSource,
         selection,
       },
     });
@@ -11055,6 +12299,21 @@ function StudioCuttoonEditor() {
       && element.livingInkReceipt?.pageId === activePage.id
     );
     const receipt = canonicalImage?.livingInkReceipt;
+    if (!receipt && !livingInkPhysicalModeEnabled) {
+      livingInkAuthorityVerificationEpochRef.current += 1;
+      livingInkAuthorityVerificationAbortRef.current?.abort();
+      livingInkAuthorityVerificationAbortRef.current = null;
+      livingInkAcceptedAuthorityRef.current = null;
+      livingInkRejectedAuthorityRef.current = null;
+      livingInkConfigRef.current = null;
+      // Turning the explicit mode off also revokes an activation that may still be creating its
+      // Worker/provider. Coordinator epochs make a late activation dispose itself instead of
+      // publishing `ready` over this unavailable state.
+      void livingInkCoordinatorRef.current.dispose();
+      setLivingInkState("unavailable");
+      setLivingInkStateMessage("물리 번짐을 직접 켜면 전용 표면을 준비합니다.");
+      return;
+    }
     const freshPlan = planStudioLivingInkProductExecutionConfig({
       documentWidth: CANVAS_W,
       documentHeight: canvasH,
@@ -11063,7 +12322,7 @@ function StudioCuttoonEditor() {
     });
     const config = receipt?.config ?? (freshPlan.ok ? freshPlan.config : null);
     const qualityFailure = receipt && !studioLivingInkConfigMeetsProductQualityFloor(receipt.config)
-      ? "저장된 Living Ink 물리 필드가 현재 제품 해상도 하한보다 낮아 PNG만 보존하고 물리 편집은 열지 않았습니다."
+      ? "저장된 수채 번짐 필드가 현재 제품 해상도 하한보다 낮아 PNG만 보존하고 번짐 편집은 열지 않았습니다."
       : !freshPlan.ok ? freshPlan.message : null;
     if (!config || qualityFailure) {
       livingInkAuthorityVerificationEpochRef.current += 1;
@@ -11073,7 +12332,7 @@ function StudioCuttoonEditor() {
       livingInkRejectedAuthorityRef.current = null;
       livingInkConfigRef.current = null;
       setLivingInkState("unavailable");
-      setLivingInkStateMessage(qualityFailure ?? "Living Ink 물리 필드를 만들 수 없습니다.");
+      setLivingInkStateMessage(qualityFailure ?? "수채 번짐 필드를 만들 수 없습니다.");
       if (qualityFailure) setError(qualityFailure);
       void livingInkCoordinatorRef.current.dispose();
       return;
@@ -11155,7 +12414,7 @@ function StudioCuttoonEditor() {
       if (!ready && receipt) {
         livingInkAcceptedAuthorityRef.current = null;
         setError(
-          "저장된 Living Ink PNG는 그대로 보존했지만 GPU 물리 상태 재열기 검증에 실패해 물·정착 편집을 비활성화했습니다.",
+          "저장된 수채 번짐 PNG는 그대로 보존했지만 GPU 상태 재열기 검증에 실패해 물·정착 편집을 비활성화했습니다.",
         );
         return;
       }
@@ -11171,7 +12430,7 @@ function StudioCuttoonEditor() {
       if (!isCurrent() || (cause instanceof DOMException && cause.name === "AbortError")) return;
       const message = cause instanceof Error
         ? cause.message
-        : "Living Ink 저장 PNG 무결성을 확인하지 못했습니다.";
+        : "수채 번짐 저장 PNG 무결성을 확인하지 못했습니다.";
       livingInkAcceptedAuthorityRef.current = null;
       livingInkRejectedAuthorityRef.current = null;
       livingInkConfigRef.current = null;
@@ -11192,6 +12451,7 @@ function StudioCuttoonEditor() {
     canvasH,
     livingInkCanonicalSrc,
     livingInkMaterial,
+    livingInkPhysicalModeEnabled,
     livingInkReplayToken,
   ]);
 
@@ -11804,6 +13064,7 @@ function StudioCuttoonEditor() {
   function failOverGpuAuthorityAfterSurfaceLoss(): boolean {
     if (!gpuAuthoritySurfaceIsPending()) {
       webGpuBackendRef.current = "canvas2d";
+      publishStudioRenderBackend("canvas2d");
       gpuHandleBaselineRecoveryPendingRef.current = false;
       return true;
     }
@@ -11814,6 +13075,7 @@ function StudioCuttoonEditor() {
       // A lost imperative adapter may throw while the promotion fallback tries to hide or replace
       // its old pixels. The original queues are still ref-owned, so retain their remount baseline.
       webGpuBackendRef.current = "canvas2d";
+      publishStudioRenderBackend("canvas2d");
     }
     gpuHandleBaselineRecoveryPendingRef.current = !promoted
       && pendingGpuStrokesRef.current.length > 0;
@@ -11846,6 +13108,8 @@ function StudioCuttoonEditor() {
   }
   function onWebGpuBackendChange(backend: StudioGpuBackend) {
     webGpuBackendRef.current = backend;
+    // 진단 패널이 "지금 무엇으로 그리고 있나"를 실측으로 읽는 유일한 경로.
+    publishStudioRenderBackend(backend);
     if (backend !== "webgpu" || gpuLiveStrokePlannerRef.current) return;
     void import("./studio-webgpu-live-stroke-plan")
       .then(({ planStudioGpuLiveStroke }) => {
@@ -11860,6 +13124,8 @@ function StudioCuttoonEditor() {
     // Active and pointerup-settled authority share one whole-group failover path. A rejected
     // corrupted promotion keeps an exact baseline for a subsequently remounted canvas handle.
     failOverGpuAuthorityAfterSurfaceLoss();
+    // 무음 금지: 메인 캔버스 강등을 복구 상태기계와 상태 레일에 알린다(ux-audit-v5 §2.10).
+    announceStudioGpuDeviceLoss("main-canvas-device-lost");
   }
   function onWebGpuFrameReady(receipt: StudioGpuFrameReceipt) {
     const auditReceipt = receiveLiveStrokeGpuAuditReceipt(receipt);
@@ -12118,6 +13384,73 @@ function StudioCuttoonEditor() {
       });
     },
   });
+  /**
+   * On-canvas command surfaces (V5 §15 포인터 거리) — see
+   * `studio-oncanvas-command-surfaces.ts`. Every command here routes through the
+   * existing dispatchers (`executeQuickAction`, `reorder`, `alignSelected`,
+   * `openColorWheelAt`, `setStrokeWidth`), so the HUD and the context bar add a
+   * *surface*, never a second implementation.
+   */
+  const studioOnCanvasSurfaceHandlers = useStudioStableHandlers({
+    onStrokeWidthChange: (next: number) => setStrokeWidth(next),
+    onOpacityChange: (next: number) => setBrushOpacity(next),
+    onOpenColorWheel: (clientX: number, clientY: number) =>
+      openColorWheelAt(clientX, clientY),
+    onToggleEraser: () => executeQuickAction(drawMode === "eraser" ? "pen" : "eraser"),
+    onQuickAction: (action: StudioQuickActionId) => executeQuickAction(action),
+    onReorder: (direction: "front" | "back" | "forward" | "backward") =>
+      reorder(direction),
+    onAlign: (mode: StudioSelectionAlignMode) => alignSelected(mode),
+    getCanvasRect: (): StudioSurfaceRect | null => {
+      const wrap = wrapRef.current;
+      if (!wrap?.isConnected) return null;
+      const rect = wrap.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0
+        ? { left: rect.left, top: rect.top, width: rect.width, height: rect.height }
+        : null;
+    },
+    getSelectionRect: (): StudioSurfaceRect | null => {
+      const host = zoomHostRef.current;
+      if (!host?.isConnected || canvasH <= 0) return null;
+      const ids = currentCanvasSelectionIds();
+      if (ids.length === 0) return null;
+      let minX = Number.POSITIVE_INFINITY;
+      let minY = Number.POSITIVE_INFINITY;
+      let maxX = Number.NEGATIVE_INFINITY;
+      let maxY = Number.NEGATIVE_INFINITY;
+      for (const id of ids) {
+        const element = elementById.get(id);
+        if (!element) continue;
+        const bounds = elBounds(element);
+        minX = Math.min(minX, bounds.x);
+        minY = Math.min(minY, bounds.y);
+        maxX = Math.max(maxX, bounds.x + bounds.w);
+        maxY = Math.max(maxY, bounds.y + bounds.h);
+      }
+      if (!Number.isFinite(minX) || !Number.isFinite(minY)) return null;
+      const hostRect = host.getBoundingClientRect();
+      if (!(hostRect.width > 0) || !(hostRect.height > 0)) return null;
+      return projectStudioDocumentRectToClient({
+        documentWidth: CANVAS_W,
+        documentHeight: canvasH,
+        canvasFlipH,
+        canvasRotation,
+        rect: { x: minX, y: minY, w: maxX - minX, h: maxY - minY },
+        hostRect: {
+          left: hostRect.left,
+          top: hostRect.top,
+          width: hostRect.width,
+          height: hostRect.height,
+        },
+      });
+    },
+  });
+  /** Marquee wins when present; otherwise the single selection. */
+  const currentCanvasSelectionCount = marqueeIds.length > 0
+    ? marqueeIds.length
+    : selectedId
+      ? 1
+      : 0;
   function restoreStudioCanvasViewportFocus(): void {
     globalThis.requestAnimationFrame(() => {
       wrapRef.current?.focus({ preventScroll: true });
@@ -12172,6 +13505,35 @@ function StudioCuttoonEditor() {
   liveInkOverlayRendererRef.current ??= new StudioLiveInkOverlayRenderer();
   const liveInkPredictionRendererRef = useRef<StudioLiveInkPredictionRenderer>(null as never);
   liveInkPredictionRendererRef.current ??= new StudioLiveInkPredictionRenderer();
+  // Google Ink owns only the replaceable predicted mesh tail. The existing live-ink/Konva
+  // surfaces remain the single authoritative paint owner and the fail-visible fallback.
+  const inkMeshLivePreviewModuleRef = useRef<StudioInkMeshLivePreviewModule | null>(null);
+  const inkMeshLivePreviewRuntimeRef = useRef<StudioInkMeshLivePreviewRuntime | null>(null);
+  const [inkMeshLivePreviewRuntime, setInkMeshLivePreviewRuntime] =
+    useState<StudioInkMeshLivePreviewRuntime | null>(null);
+  useEffect(() => {
+    let mounted = true;
+    void loadStudioInkMeshLivePreviewModule()
+      .then((module) => {
+        if (!mounted) return;
+        const runtime = new module.StudioInkMeshLivePreviewRuntime();
+        inkMeshLivePreviewModuleRef.current = module;
+        inkMeshLivePreviewRuntimeRef.current = runtime;
+        setInkMeshLivePreviewRuntime(runtime);
+      })
+      .catch((cause: unknown) => {
+        if (import.meta.env.DEV) {
+          console.warn("Studio Ink Mesh preview is unavailable; Canvas ink remains active.", cause);
+        }
+      });
+    return () => {
+      mounted = false;
+      const runtime = inkMeshLivePreviewRuntimeRef.current;
+      inkMeshLivePreviewRuntimeRef.current = null;
+      inkMeshLivePreviewModuleRef.current = null;
+      runtime?.dispose();
+    };
+  }, []);
   // The Canvas append path mutates one pressure array for the duration of a stroke. Cache the
   // alias-mapped prefix and extend only its new suffix, otherwise remapping the full history on
   // every pointer frame would reintroduce O(N²) work for long fineliner/marker strokes.
@@ -12853,7 +14215,10 @@ function StudioCuttoonEditor() {
   }
   function relinquishGpuLiveInkToKonva(disableWebGpuForSession = false): boolean {
     failActiveLiveStrokeBackendAuditForCanvasFallback();
-    if (disableWebGpuForSession) webGpuBackendRef.current = "canvas2d";
+    if (disableWebGpuForSession) {
+      webGpuBackendRef.current = "canvas2d";
+      publishStudioRenderBackend("canvas2d");
+    }
     gpuLiveInkPinnedRef.current = false;
     gpuLiveSourceJournalRef.current = null;
     gpuLiveSourceJournalFirstStrokeIndexRef.current = 0;
@@ -12985,15 +14350,37 @@ function StudioCuttoonEditor() {
   const flushDirectLiveDraft = () => {
     const next = liveDraftPendingRef.current;
     if (!next) return;
+    const livingInkStroke = livingInkStrokeRef.current;
+    if (
+      livingInkStroke
+      && !livingInkStroke.failed
+      && livingInkStroke.strokeId === next.id
+    ) {
+      // Living Ink deliberately batches authoritative samples before asking the physical field
+      // for work. A fast browser move can therefore reach pointer-up with fewer than one material
+      // chunk. Keep the exact retained ink vector current until an accepted material-presentation
+      // receipt takes ownership; otherwise that legal sparse route appears as only its initial tap.
+      // Water has no pigment fallback and must remain visually owned by the physical surface.
+      if (!livingInkStroke.overlayPresented && livingInkStroke.mode === "ink") {
+        liveDraftVisualRef.current = studioLivingInkVectorShadowElement(next);
+        liveDraftLayerRef.current?.drawScene();
+      }
+      return;
+    }
     const hokusaiStroke = hokusaiLiveStrokeRef.current;
     if (
       hokusaiStroke
       && !hokusaiStroke.failed
       && hokusaiStroke.strokeId === next.id
     ) {
+      if (hokusaiStroke.overlayPresented) {
+        // Present only the input suffix not yet covered by a receipted material frame. This keeps
+        // a high-Hz pen responsive without double-painting the already-owned Hokusai prefix.
+        refreshStudioHokusaiVectorTailShadow(hokusaiStroke, next);
+        return;
+      }
       liveDraftVisualRef.current = next;
-      // Before the first valid material frame the retained vector is deliberately visible. Once
-      // receipted pixels arrive, the viewport Shape reads the visibility ref and stops painting it.
+      // Before the first valid material frame the exact retained vector is deliberately visible.
       liveDraftLayerRef.current?.drawScene();
       return;
     }
@@ -13079,13 +14466,26 @@ function StudioCuttoonEditor() {
    */
   const flushDirectLiveDraftNow = (next: DrawEl | null) => {
     if (!next) return;
+    const livingInkStroke = livingInkStrokeRef.current;
+    const directLivingInk = liveDraftDirectRef.current
+      && Boolean(
+        livingInkStroke
+        && !livingInkStroke.failed
+        && livingInkStroke.strokeId === next.id,
+      );
     const directInk = liveDraftDirectRef.current && isDirectLiveDraftEl(next);
     const directStamp = liveStampDraftDirectRef.current && isDirectLiveStampDraftEl(next);
     const directDynamic = liveDynamicBrushDraftDirectRef.current
       && studioLiveDynamicBrushOverlaySupportsElement(next);
     const directWetInk = liveWetInkDraftDirectRef.current
       && studioLiveWetInkOverlaySupportsElement(next);
-    if (!directInk && !directStamp && !directDynamic && !directWetInk) return;
+    if (
+      !directLivingInk
+      && !directInk
+      && !directStamp
+      && !directDynamic
+      && !directWetInk
+    ) return;
     liveDraftPendingRef.current = next;
     if (liveDraftRafRef.current !== null) {
       globalThis.cancelAnimationFrame(liveDraftRafRef.current);
@@ -13111,6 +14511,7 @@ function StudioCuttoonEditor() {
     gpuLiveAcceptedRequestIdRef.current = null;
     gpuFinalReceiptFallbackStrokeRef.current = null;
     gpuFinalReceiptRequestIdRef.current = null;
+    inkMeshLivePreviewRuntimeRef.current?.cancel();
     endPredictedInkTail();
     // 대기 중 커밋 배치를 먼저 동기화한다 — 아래의 즉시 클리어가 그 잉크까지 지우기 때문.
     flushPendingStrokeCommitsRef.current();
@@ -13136,6 +14537,46 @@ function StudioCuttoonEditor() {
     mainLayerRef.current?.batchDraw();
   };
   const scheduleDraft = (next: DrawEl | null) => {
+    const livingInkStroke = livingInkStrokeRef.current;
+    if (
+      next
+      && livingInkStroke
+      && !livingInkStroke.failed
+      && livingInkStroke.strokeId === next.id
+    ) {
+      // Predicted browser samples may also visit scheduleDraft. They stay inside the pinned Living
+      // Ink route instead of falling through isDirectLiveDraftEl and tearing down the specialist
+      // epoch merely because this brush is not a generic Canvas2D ink preset.
+      liveDraftPendingRef.current = next;
+      if (liveDraftRafRef.current === null) {
+        liveDraftRafRef.current = globalThis.requestAnimationFrame(() => {
+          liveDraftRafRef.current = null;
+          flushDirectLiveDraft();
+        });
+      }
+      return;
+    }
+    const hokusaiStroke = hokusaiLiveStrokeRef.current;
+    if (
+      next
+      && hokusaiStroke
+      && !hokusaiStroke.failed
+      && hokusaiStroke.strokeId === next.id
+    ) {
+      // Hokusai owns this one stroke even after its first material frame switches the retained
+      // vector layer off. Keep later pointer samples in the imperative lane so a subsequent rAF
+      // cannot republish the same DrawEl through StudioDraftPreviewLayers and double the live ink.
+      // The id guard deliberately does not suppress the next ordinary stroke while a canonical
+      // image from the prior Hokusai transaction is still decoding.
+      liveDraftPendingRef.current = next;
+      if (liveDraftRafRef.current === null) {
+        liveDraftRafRef.current = globalThis.requestAnimationFrame(() => {
+          liveDraftRafRef.current = null;
+          flushDirectLiveDraft();
+        });
+      }
+      return;
+    }
     if (next && liveWetInkDraftDirectRef.current) {
       if (studioLiveWetInkOverlaySupportsElement(next)) {
         liveDraftPendingRef.current = next;
@@ -13247,7 +14688,11 @@ function StudioCuttoonEditor() {
     if (requiresFinalGpuFallback && !promotedFinalGpuFallback) {
       // The exact vector remains visible until the committed main-layer draw receipt. Hiding the
       // unreceipted GPU pin below prevents a stale pre-correction/prefix frame from covering it.
-      draftPreviewStoreRef.current.settle(finalGpuFallbackStroke);
+      // `settle` mounts a different Konva layer; flush that React commit before hiding the only
+      // preceding surface so the transfer has a real presentation receipt, not merely store state.
+      flushSync(() => {
+        draftPreviewStoreRef.current.settle(finalGpuFallbackStroke);
+      });
     }
     const wasStampDirect = liveStampDraftDirectRef.current;
     const wasDynamicBrushDirect = liveDynamicBrushDraftDirectRef.current;
@@ -13304,11 +14749,12 @@ function StudioCuttoonEditor() {
       const renderer = liveDynamicBrushOverlayRendererRef.current;
       if (preserveInk && finalDynamicBrushStroke) {
         const seal = renderer.end(finalDynamicBrushStroke);
-        // The exact retained vector becomes visible synchronously before the transient coverage
-        // surface relinquishes authority. The existing draft FIFO then holds it until the main
-        // layer's committed-draw receipt releases that prefix.
-        draftPreviewStoreRef.current.settle(finalDynamicBrushStroke);
-        draftPreviewDynamicLayerRef.current?.drawScene();
+        // `settle` replaces the active dynamic layer with a settled-run layer. Commit that mount
+        // synchronously; its layout draw is the receipt that allows the transient canvas to go.
+        // The existing draft FIFO then holds it until the main-layer committed-draw receipt.
+        flushSync(() => {
+          draftPreviewStoreRef.current.settle(finalDynamicBrushStroke);
+        });
         if (seal.status === "settled") renderer.releaseSettledPrefix(1);
         else renderer.resetActive();
       } else {
@@ -13322,11 +14768,12 @@ function StudioCuttoonEditor() {
           pageEpoch: currentPageId,
           hidden: finalWetInkStroke.hidden === true,
         });
-        // Exact committed-runtime pixels are replaced synchronously, then the same DrawEl becomes
-        // the retained FIFO authority before the transient surface is released. Both mutations
-        // happen in one task, so there is no blank frame or doubled translucent wash.
-        draftPreviewStoreRef.current.settle(finalWetInkStroke);
-        draftPreviewNormalLayerRef.current?.drawScene();
+        // `settle` replaces the active normal layer with a settled-run layer. A direct draw on the
+        // old normal-layer ref is not a receipt for that new layer, so synchronously commit the
+        // store publication and its layout draw before releasing the exact wet-ink canvas.
+        flushSync(() => {
+          draftPreviewStoreRef.current.settle(finalWetInkStroke);
+        });
         if (seal.status === "settled") renderer.releaseSettledPrefix(1);
         else renderer.resetActive();
       } else {
@@ -13588,6 +15035,43 @@ function StudioCuttoonEditor() {
       globalThis.document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);
+  // 탭 종료 경고 — 미저장 편집이 남아 있을 때만 묻는다.
+  //
+  // `pagehide` 는 복구 사이드카를 남길 뿐 사용자에게 아무것도 알리지 않는다. 방금 그린 획이
+  // 아직 내구 저장소(그리고 서버 원고)에 닿지 않았는데 탭이 닫히면, 다른 기기에서 열었을 때
+  // 그 획은 없다. 그것이 마지막 남은 조용한 실패였다.
+  //
+  // 리스너는 **미저장 편집이 처음 생긴 뒤에만** 붙인다. 열어만 보고 나가는 문서에서
+  // beforeunload 를 등록해 bfcache 를 잃지 않기 위해서다. 한 번 붙은 뒤에도 판정은 매번
+  // 새로 하므로, 저장이 끝난 문서는 아무것도 묻지 않고 조용히 닫힌다.
+  const studioUnsavedWorkRef = useStudioStableHandlers<{
+    hasUnsavedStudioWorkNow: () => boolean;
+  }>({
+    hasUnsavedStudioWorkNow: () =>
+      hasUnsavedStudioWork({
+        hydrated: workHydrated,
+        editGeneration: studioRevisionProjectGenerationRef.current,
+        durableGeneration: studioLifecycleDurableGenerationRef.current,
+        pendingStrokeFingerprint: studioPendingStrokeFingerprint(
+          pendingStrokeCommitsRef.current
+        ),
+        durablePendingStrokeFingerprint:
+          studioLifecycleDurablePendingFingerprintRef.current,
+      }),
+  });
+  const [unloadGuardArmed, setUnloadGuardArmed] = useState(false);
+  useEffect(() => {
+    if (unloadGuardArmed) return;
+    if (!studioUnsavedWorkRef.hasUnsavedStudioWorkNow()) return;
+    setUnloadGuardArmed(true);
+  }, [pages, master, studioUnsavedWorkRef, unloadGuardArmed, workHydrated]);
+  useEffect(() => {
+    if (!unloadGuardArmed) return;
+    return installStudioUnloadGuard({
+      target: globalThis,
+      hasUnsavedWork: () => studioUnsavedWorkRef.hasUnsavedStudioWorkNow(),
+    });
+  }, [studioUnsavedWorkRef, unloadGuardArmed]);
   // ── 픽셀 선택 도구(포토샵식 마퀴/올가미) — studio-selection-tools 통합 상태 ──
   // 선택 영역·도구는 "이미지 요소 1개"에 귀속된다(요소가 바뀌면 아래 effect 가 해제).
   const [advancedFillActive, setAdvancedFillActive] = useState(false);
@@ -14304,6 +15788,7 @@ function StudioCuttoonEditor() {
   const [healCloneAligned, setHealCloneAligned] = useState(true);
   const [healCloneSourceAnchor, setHealCloneSourceAnchor] = useState<SelPoint | null>(null);
   const [healCloneBusy, setHealCloneBusy] = useState(false);
+  const healCloneAbortRef = useRef<AbortController | null>(null);
   // aligned 모드에서 스트로크를 넘어 유지되는 오프셋(정규화). React 상태가 아님 — 표시에 안 쓰인다.
   const healCloneOffsetRef = useRef<SelPoint | null>(null);
   // 인스펙터 자식에서 ref-prop을 직접 변이하지 않도록 소스 해제는 에디터 핸들러로 승격.
@@ -14320,19 +15805,46 @@ function StudioCuttoonEditor() {
     radiusNorm: number;
     points: SelPoint[];
   } | null>(null);
+  const healClonePreviewLineRef = useRef<Konva.Line>(null);
   const healCloneRafRef = useRef<number | null>(null);
-  const pendingHealCloneDragRef = useRef<{ points: SelPoint[] } | null>(null);
-  const [healCloneDragPreview, setHealCloneDragPreview] = useState<{ points: SelPoint[] } | null>(null);
+  const pendingHealCloneDragRef = useRef<{
+    frame: SelectionFrame;
+    radiusNorm: number;
+    points: SelPoint[];
+  } | null>(null);
+  const [healCloneDragPreview, setHealCloneDragPreview] = useState<{
+    points: SelPoint[];
+    lineRef: import("react").RefObject<Konva.Line | null>;
+  } | null>(null);
   // 브러시 원/소스 크로스헤어 호버 커서 — brushCursorRef(펜 도구)와 동일 기법: ref 직접 갱신,
   // React 리렌더 없음. 드래그 중에도(스트로크 반경 원이 그대로 따라오게) 계속 갱신한다.
   const healCloneCursorRef = useRef<Konva.Circle>(null);
   const healCloneSourceCursorRef = useRef<Konva.Circle>(null);
-  const scheduleHealCloneDragPreview = (next: { points: SelPoint[] } | null) => {
-    pendingHealCloneDragRef.current = next;
+  // 드래그 선은 최근 꼬리만 Konva 노드에 직접 반영한다. 전체 궤적은 굽기용 ref에 그대로 남지만,
+  // move마다 growing array를 React state로 복사하거나 Studio 루트를 다시 렌더하지 않는다.
+  const scheduleHealCloneDragPreview = (session: {
+    frame: SelectionFrame;
+    radiusNorm: number;
+    points: SelPoint[];
+  }) => {
+    pendingHealCloneDragRef.current = session;
     if (healCloneRafRef.current !== null) return;
     healCloneRafRef.current = globalThis.requestAnimationFrame(() => {
       healCloneRafRef.current = null;
-      setHealCloneDragPreview(pendingHealCloneDragRef.current);
+      const pending = pendingHealCloneDragRef.current;
+      const line = healClonePreviewLineRef.current;
+      if (!pending || !line) return;
+      const tailStart = Math.max(0, pending.points.length - 64);
+      const flat: number[] = [];
+      for (let index = tailStart; index < pending.points.length; index += 1) {
+        const point = pending.points[index]!;
+        flat.push(point.x * pending.frame.width, point.y * pending.frame.height);
+      }
+      if (flat.length === 2) flat.push(flat[0]!, flat[1]!);
+      line.points(flat);
+      line.strokeWidth(2 * pending.radiusNorm * pending.frame.width);
+      line.visible(flat.length > 0);
+      line.getLayer()?.batchDraw();
     });
   };
   const clearHealCloneDragPreview = () => {
@@ -14341,14 +15853,24 @@ function StudioCuttoonEditor() {
       globalThis.cancelAnimationFrame(healCloneRafRef.current);
       healCloneRafRef.current = null;
     }
+    const line = healClonePreviewLineRef.current;
+    if (line) {
+      line.points([]);
+      line.visible(false);
+      line.getLayer()?.batchDraw();
+    }
     setHealCloneDragPreview(null);
   };
   useEffect(() => () => {
     if (healCloneRafRef.current !== null) globalThis.cancelAnimationFrame(healCloneRafRef.current);
+    healCloneAbortRef.current?.abort();
+    healCloneAbortRef.current = null;
   }, []);
   // 선택 요소가 바뀌면 소스 앵커·진행 중 드래그·busy를 해제(모드는 유지 — pixelTool과 동일 정책).
   useEffect(() => {
     void selectedId;
+    healCloneAbortRef.current?.abort();
+    healCloneAbortRef.current = null;
     healCloneDragRef.current = null;
     clearHealCloneDragPreview();
     setHealCloneSourceAnchor(null);
@@ -14647,6 +16169,20 @@ function StudioCuttoonEditor() {
       masterEditMode,
     };
   }, [activePage.id, activePage.elements, isExporting, master, masterEditMode, pagesHi, timelapseCapturing]);
+  // 스테이지를 문서 전체로 되돌릴 때 필요한 기하. 동반 창(navigator) 캡처처럼 의존성 없는
+  // useCallback 안에서 캡처하는 경로가 현재 문서 크기·표시 배율을 읽어야 하므로 ref 로 보관한다.
+  const stageDocumentGeometryRef = useRef({
+    documentWidth: CANVAS_W,
+    documentHeight: canvasH,
+    effectiveScale: effScale,
+  });
+  useEffect(() => {
+    stageDocumentGeometryRef.current = {
+      documentWidth: CANVAS_W,
+      documentHeight: canvasH,
+      effectiveScale: effScale,
+    };
+  }, [canvasH, effScale]);
   // 내보내기 옵션(배율·포맷·투명 배경) — 다운로드 버튼 옆 팝오버에서 조정.
   // 배율은 플랫폼 규격(폭 690·800·1440…)에 맞추면 소수가 될 수 있어 number로 둔다.
   const [exportScale, setExportScale] = useState<number>(2);
@@ -14885,13 +16421,18 @@ function StudioCuttoonEditor() {
   };
 
   const disarmAllPixelToolsRef = useRef<() => void>(() => undefined);
+  // 컴패니언 명령 핸들러는 빈 deps 이펙트에 갇혀 있어 렌더마다 새로 만들어지는 전이 함수를
+  // 직접 캡처하면 stale closure가 된다. 로컬 레일·툴벨트와 같은 정본 전이를 ref로 흘린다.
+  const activatePrimaryCanvasToolRef = useRef<
+    (tool: "select" | "draw", drawMode?: DrawMode) => void
+  >(() => undefined);
   const companionCommandHandlerRef = useRef<(command: StudioCompanionCommandName) => void>(() => undefined);
   useEffect(() => {
     companionCommandHandlerRef.current = (command) => {
       const toolExecution = executeStudioCompanionToolCommand(command, {
-        disarmAllPixelTools: disarmAllPixelToolsRef.current,
-        setTool,
-        setDrawMode,
+        activatePrimaryCanvasTool: (tool, drawMode) => {
+          activatePrimaryCanvasToolRef.current(tool, drawMode);
+        },
       });
       if (toolExecution.handled) return;
       switch (command) {
@@ -15017,11 +16558,16 @@ function StudioCuttoonEditor() {
       isNavigatorCaptureBlocked: () => Boolean(
         drawingRef.current || drawingPointerTransportRef.current?.getSession()
       ),
+      // 동반 창 내비게이터는 "문서 전체 축소판"이다 — 화면 거울이 아니다. 다른 캡처 경로와 같은
+      // 초크 포인트를 지나 문서 전체 스테이지에서 읽는다(보기 전용 회전·반전도 함께 정규화된다).
       captureNavigatorCanvas: (maximumLongestEdge) => {
         const stage = stageRef.current;
         if (!stage) return null;
-        const longestEdge = Math.max(1, stage.width(), stage.height());
-        return stage.toCanvas({ pixelRatio: Math.min(1, maximumLongestEdge / longestEdge) });
+        const geometry = stageDocumentGeometryRef.current;
+        return readStudioStageInDocumentView(stage, geometry, () => {
+          const longestEdge = Math.max(1, stage.width(), stage.height());
+          return stage.toCanvas({ pixelRatio: Math.min(1, maximumLongestEdge / longestEdge) });
+        });
       },
       getReferenceProjection: (surfaceGeneration) => {
         const ready = companionReferenceCaptureRuntimeRef.current?.getProjection(surfaceGeneration);
@@ -15749,6 +17295,7 @@ function StudioCuttoonEditor() {
         groupId: masterEditMode ? undefined : element.groupId,
         hidden: element.hidden,
         locked: element.locked,
+        opacity: element.opacity,
         alphaLocked: element.alphaLocked,
         fillReference: element.type === "image" ? element.fillReference : undefined,
         masked: Boolean(element.maskSrc),
@@ -16883,10 +18430,18 @@ const pixelToolArmed =
     return resolvePixelSelectionAutoTarget(candidates, pos);
   };
   // 마칭앤츠 오버레이용 프레임/선택 — 이미지 요소가 아닐 땐 null(오버레이 미마운트).
-  const pixelOverlayFrame: SelectionFrame | null =
-    selected?.type === "image"
-      ? { x: selected.x, y: selected.y, width: selected.width, height: selected.height, rotation: selected.rotation }
-      : null;
+  const pixelOverlayFrame: SelectionFrame | null = useMemo(
+    () => selected?.type === "image"
+      ? {
+          x: selected.x,
+          y: selected.y,
+          width: selected.width,
+          height: selected.height,
+          rotation: selected.rotation,
+        }
+      : null,
+    [selected]
+  );
   const pixelOverlaySel = pixelSel && (pixelSel.subpaths.length > 0 || pixelSel.invert) ? pixelSel : null;
   // 자석 올가미(2026-07-24) — 올가미가 무장되고 옵션이 켜진 동안 대상 이미지의 휘도장을
   // 비동기 로드해 ref 에 캐시한다. 로드 전/실패 시엔 스냅 없는 일반 올가미로 조용히 폴백.
@@ -17106,9 +18661,18 @@ const puppetWarpArmed =
     [selected, resolveBg3dEditSource]
   );
   const contextMenuBg3dEditSource = resolveBg3dEditSource(contextMenuEl);
-  const showQuickStart = !canvasOnlyMode && !menu && !quickComicOpen && (
+  // Auto-coach only while the page is still idle. Late work/autosave hydration must not
+  // cover the canvas after the artist already opened Draw or placed content (backdrop was
+  // intercepting the primary brush tray in live tests).
+  const showQuickStart = !canvasOnlyMode && !quickComicOpen && (
     quickStartOpen ||
-    (workHydrated && !hasAutosave && elements.length === 0 && !quickStartDismissed)
+    (workHydrated
+      && autosaveChecked
+      && !hasAutosave
+      && !quickStartDismissed
+      && !menu
+      && elements.length === 0
+      && tool !== "draw")
   );
 
   // 삭제된 요소의 노드 참조가 nodeRefs에 남지 않도록 정리(누수 방지).
@@ -17619,23 +19183,198 @@ const puppetWarpArmed =
 
   // 커스텀 에셋 라이브러리 목록 불러오기 및 관리
   const loadAssetsList = async () => {
+    const generation = ++assetHydrationGenerationRef.current;
+    if (assetMemoryModeRef.current) {
+      setAssetsLoaded(true);
+      setAssetsLoading(false);
+      setAssetStorageState("memory");
+      return;
+    }
     setAssetsLoading(true);
+    setAssetStorageState("loading");
     try {
       const { listAssets } = await import("./studio-asset-library");
       const list = await listAssets();
-      setAssets(list);
+      if (!editorMountedRef.current || generation !== assetHydrationGenerationRef.current) return;
+      replaceStudioAssets(list);
+      setAssetStorageState("sqlite-opfs");
     } catch (err) {
       console.error("Failed to load custom assets:", err);
-      setAssets([]);
+      if (!editorMountedRef.current || generation !== assetHydrationGenerationRef.current) return;
+      const repositoryModule = await import(
+        "./studio-asset-library-sqlite-opfs-repository"
+      ).catch(() => null);
+      if (!editorMountedRef.current || generation !== assetHydrationGenerationRef.current) return;
+      const failClosed = repositoryModule
+        && err instanceof repositoryModule.StudioAssetLibraryRepositoryError
+        && err.code === "corrupt";
+      if (failClosed) {
+        setAssetStorageState("unavailable");
+        setError(`${err.message} 손상된 manifest나 누락된 blob을 일부만 불러오지 않았습니다.`);
+      } else {
+        assetMemoryModeRef.current = true;
+        setAssetStorageState("memory");
+        setError(`SQLite/OPFS 에셋 보관함을 열지 못해 현재 탭 메모리만 사용합니다. 새로고침하면 변경이 사라집니다: ${
+          err instanceof Error ? err.message : String(err)
+        }`);
+      }
     } finally {
-      setAssetsLoaded(true);
-      setAssetsLoading(false);
+      if (editorMountedRef.current && generation === assetHydrationGenerationRef.current) {
+        setAssetsLoaded(true);
+        setAssetsLoading(false);
+      }
     }
   };
 
+  async function createValidatedMemoryAsset(
+    input: import("./studio-asset-library").StudioAssetSaveInput,
+  ): Promise<StudioAssetWithContentHash> {
+    const assetLibrary = await import("./studio-asset-library");
+    const actualHash = await assetLibrary.hashStudioAssetDataUrl(input.dataUrl);
+    const expectedHash = assetLibrary.canonicalizeStudioAssetContentHash(input.contentHash);
+    if (input.contentHash !== undefined && expectedHash !== actualHash) {
+      throw new Error("제공된 contentHash가 실제 에셋 바이트 SHA-256과 일치하지 않습니다.");
+    }
+    return {
+      ...assetLibrary.createAssetRecord({ ...input, contentHash: actualHash }),
+      contentHash: actualHash,
+    };
+  }
+
+  async function canKeepAssetMutationInMemory(cause: unknown): Promise<boolean> {
+    const repositoryModule = await import(
+      "./studio-asset-library-sqlite-opfs-repository"
+    ).catch(() => null);
+    return repositoryModule === null
+      || repositoryModule.isStudioAssetLibraryMemoryFallbackError(cause);
+  }
+
+  function enqueueAssetMutation<T>(work: () => Promise<T>): Promise<T> {
+    const result = assetMutationTailRef.current.then(work, work);
+    assetMutationTailRef.current = result.then(() => undefined, () => undefined);
+    return result;
+  }
+
+  function saveStudioAssetMutation(
+    input: import("./studio-asset-library").StudioAssetSaveInput,
+  ): Promise<StudioAssetWithContentHash> {
+    return enqueueAssetMutation(async () => {
+      const generation = ++assetMutationGenerationRef.current;
+      assetHydrationGenerationRef.current += 1;
+      if (assetMemoryModeRef.current) {
+        const saved = await createValidatedMemoryAsset(input);
+        if (editorMountedRef.current && generation === assetMutationGenerationRef.current) {
+          replaceStudioAssets([
+            saved,
+            ...assetsRef.current.filter(({ id }) => id !== saved.id),
+          ]);
+          setAssetsLoaded(true);
+          setAssetsLoading(false);
+          setAssetStorageState("memory");
+        }
+        return saved;
+      }
+      try {
+        const { saveAsset } = await import("./studio-asset-library");
+        const saved = await saveAsset(input);
+        if (editorMountedRef.current && generation === assetMutationGenerationRef.current) {
+          assetHydrationGenerationRef.current += 1;
+          replaceStudioAssets([
+            saved,
+            ...assetsRef.current.filter(({ id }) => id !== saved.id),
+          ]);
+          setAssetsLoaded(true);
+          setAssetsLoading(false);
+          setAssetStorageState("sqlite-opfs");
+        }
+        return saved;
+      } catch (cause) {
+        if (!await canKeepAssetMutationInMemory(cause)) throw cause;
+        const saved = await createValidatedMemoryAsset(input);
+        assetMemoryModeRef.current = true;
+        if (editorMountedRef.current && generation === assetMutationGenerationRef.current) {
+          assetHydrationGenerationRef.current += 1;
+          replaceStudioAssets([
+            saved,
+            ...assetsRef.current.filter(({ id }) => id !== saved.id),
+          ]);
+          setAssetsLoaded(true);
+          setAssetsLoading(false);
+          setAssetStorageState("memory");
+          setError(`SQLite/OPFS 저장에 실패해 에셋을 현재 탭 메모리에만 유지합니다. 새로고침하면 사라집니다: ${
+            cause instanceof Error ? cause.message : String(cause)
+          }`);
+        }
+        return saved;
+      }
+    });
+  }
+
+  function deleteStudioAssetMutation(id: string): Promise<void> {
+    return enqueueAssetMutation(async () => {
+      const generation = ++assetMutationGenerationRef.current;
+      assetHydrationGenerationRef.current += 1;
+      if (!assetMemoryModeRef.current) {
+        try {
+          const { deleteAsset } = await import("./studio-asset-library");
+          await deleteAsset(id);
+          if (editorMountedRef.current && generation === assetMutationGenerationRef.current) {
+            setAssetStorageState("sqlite-opfs");
+          }
+        } catch (cause) {
+          if (!await canKeepAssetMutationInMemory(cause)) throw cause;
+          if (!editorMountedRef.current || generation !== assetMutationGenerationRef.current) return;
+          assetMemoryModeRef.current = true;
+          setAssetStorageState("memory");
+          setError(`SQLite/OPFS 삭제에 실패해 현재 탭 목록에서만 에셋을 숨깁니다. 새로고침하면 다시 나타날 수 있습니다: ${
+            cause instanceof Error ? cause.message : String(cause)
+          }`);
+        }
+      }
+      if (editorMountedRef.current && generation === assetMutationGenerationRef.current) {
+        replaceStudioAssets(assetsRef.current.filter((asset) => asset.id !== id));
+        setAssetsLoaded(true);
+        setAssetsLoading(false);
+      }
+    });
+  }
+
+  function renameStudioAssetMutation(id: string, name: string): Promise<void> {
+    return enqueueAssetMutation(async () => {
+      const generation = ++assetMutationGenerationRef.current;
+      assetHydrationGenerationRef.current += 1;
+      const assetLibrary = await import("./studio-asset-library");
+      const normalizedName = assetLibrary.normalizeAssetName(name);
+      if (!assetMemoryModeRef.current) {
+        try {
+          await assetLibrary.renameAsset(id, normalizedName);
+          if (editorMountedRef.current && generation === assetMutationGenerationRef.current) {
+            setAssetStorageState("sqlite-opfs");
+          }
+        } catch (cause) {
+          if (!await canKeepAssetMutationInMemory(cause)) throw cause;
+          if (!editorMountedRef.current || generation !== assetMutationGenerationRef.current) return;
+          assetMemoryModeRef.current = true;
+          setAssetStorageState("memory");
+          setError(`SQLite/OPFS 이름 변경에 실패해 현재 탭 메모리에서만 반영합니다. 새로고침하면 사라집니다: ${
+            cause instanceof Error ? cause.message : String(cause)
+          }`);
+        }
+      }
+      if (editorMountedRef.current && generation === assetMutationGenerationRef.current) {
+        replaceStudioAssets(assetsRef.current.map((asset) =>
+          asset.id === id ? { ...asset, name: normalizedName } : asset));
+        setAssetsLoaded(true);
+        setAssetsLoading(false);
+      }
+    });
+  }
+
+  const loadAssetsListFromEffect = useEffectEvent(loadAssetsList);
+
   useEffect(() => {
     if (menu === "asset") {
-      loadAssetsList();
+      void loadAssetsListFromEffect();
     }
   }, [menu]);
 
@@ -17644,9 +19383,7 @@ const puppetWarpArmed =
     if (!file) return;
     try {
       const { src, width, height } = await loadStudioCanvasImageFile(file);
-      const { saveAsset } = await import("./studio-asset-library");
-      await saveAsset({ name: file.name, dataUrl: src, width, height });
-      await loadAssetsList();
+      await saveStudioAssetMutation({ name: file.name, dataUrl: src, width, height });
     } catch (err) {
       setError(err instanceof Error ? err.message : "에셋 업로드 실패");
     } finally {
@@ -17656,10 +19393,8 @@ const puppetWarpArmed =
 
   async function onDeleteAsset(id: string) {
     try {
-      const { deleteAsset } = await import("./studio-asset-library");
-      await deleteAsset(id);
+      await deleteStudioAssetMutation(id);
       removeAssetFavorite(createStudioAssetFavoriteId("local", id));
-      await loadAssetsList();
     } catch (err) {
       setError(err instanceof Error ? err.message : "에셋 삭제 실패");
     }
@@ -18018,8 +19753,16 @@ const puppetWarpArmed =
   /** Tabbed AI assist hub — which tool card is open. */
   const [aiAssistTool, setAiAssistTool] = useState<StudioAiAssistToolId>("background");
   const [aiRecentPrompts, setAiRecentPrompts] = useState<StudioAiRecentPromptsState>(() =>
-    loadStudioAiRecentPrompts(globalThis.localStorage)
+    loadStudioAiRecentPrompts(globalThis.sessionStorage)
   );
+  useEffect(() => {
+    // Prompt text is session-private. Do not migrate the former persistent key.
+    try {
+      globalThis.localStorage.removeItem(STUDIO_AI_RECENT_PROMPTS_KEY);
+    } catch {
+      // Storage denial must not block AI Assist.
+    }
+  }, []);
   /** Composition panel draft (lifted so hub presets can fill it). */
   const [aiCompositionDraft, setAiCompositionDraft] = useState("");
   const [aiColorizePrompt, setAiColorizePrompt] = useState("파스텔톤 웹툰 셀 채색, 부드러운 그림자와 하이라이트");
@@ -18043,16 +19786,14 @@ const puppetWarpArmed =
     null
   );
   // 색상 팔레트 추천 — 결과가 색상 데이터(hex+용도 설명)라 대사/나레이션 제안과 동일한 이유로 AI 최초
-  // 사용 고지(runWithAiNotice) 대상이 아니다. "저장"은 새 상태를 만들지 않고 기존
-  // studio-palette-library.createPalette/savePalette를 그대로 재사용한다(아래
-  // saveSuggestedPaletteToLibrary 참고) — StudioPaletteLibraryPanel은 menu==="palette"일 때만
-  // 마운트되는 자기완결형 컴포넌트라, 다음에 그 탭을 열면 localStorage에서 새로 저장된 팔레트를 자동으로
-  // 읽어온다(별도 동기화 불필요).
+  // 사용 고지(runWithAiNotice) 대상이 아니다. "저장"은 아래 saveSuggestedPaletteToLibrary에서
+  // 패널과 동일한 V12 SQLite repository로 들어가며, 다음에 스타일 탭을 열 때 그 권위를 읽는다.
   const [aiPaletteSuggestMood, setAiPaletteSuggestMood] = useState("");
   const [aiPaletteSuggestBusy, setAiPaletteSuggestBusy] = useState(false);
   const [aiPaletteSuggestError, setAiPaletteSuggestError] = useState<string | null>(null);
   const [aiPaletteSuggestion, setAiPaletteSuggestion] = useState<PaletteSuggestion | null>(null);
   const [aiPaletteSuggestSavedMsg, setAiPaletteSuggestSavedMsg] = useState<string | null>(null);
+  const aiPaletteSaveGenerationRef = useRef(0);
   // 시나리오 자동 생성(투닝/투툰/WeToon 벤치마크, docs/studio-competitor-features.md §4 로드맵) — 별도
   // 전체화면 모달(StudioScenarioAutoLayoutPanel)로 열린다. aiAssist 팝오버의 다른 AI 기능들과 달리
   // 여러 장면을 순차 생성해 시간이 걸리고 미리보기 그리드가 필요해 320px 팝오버에 넣지 않는다.
@@ -18088,7 +19829,7 @@ const puppetWarpArmed =
   }
   useEffect(() => () => scenarioAbortControllerRef.current?.abort(), []);
   useEffect(() => {
-    if (scenarioOpen) void loadAssetsList();
+    if (scenarioOpen) void loadAssetsListFromEffect();
   }, [scenarioOpen]);
   // 생성형 AI 최초 사용 고지의 "확인 후 실행할 동작" — acknowledgeAiNotice가 확인 시 이 ref를
   // 실행한다. 기존엔 onGenerateAsset()만 하드코딩돼 있었는데, AI 배경 생성/자동 채색도 같은 고지를
@@ -18114,10 +19855,8 @@ const puppetWarpArmed =
   async function handleRenameAsset(id: string) {
     if (!renamingAssetName.trim()) return;
     try {
-      const { renameAsset } = await import("./studio-asset-library");
-      await renameAsset(id, renamingAssetName);
+      await renameStudioAssetMutation(id, renamingAssetName);
       setRenamingAssetId(null);
-      await loadAssetsList();
     } catch (err) {
       setError(err instanceof Error ? err.message : "에셋 이름 변경 실패");
     }
@@ -18144,10 +19883,7 @@ const puppetWarpArmed =
     setError(null);
     let operationId: string | null = null;
     try {
-      const [{ generateAsset }, { saveAsset }] = await Promise.all([
-        import("@/src/infrastructure/creator-client"),
-        import("./studio-asset-library"),
-      ]);
+      const { generateAsset } = await import("@/src/infrastructure/creator-client");
       if (!canApplyStudioMutation(mutationTicket)) return;
       operationId = beginTrackedStudioAiOperation("asset-image", {
         kind: "image",
@@ -18174,7 +19910,7 @@ const puppetWarpArmed =
         target: { pageId: activePage.id },
       });
       operationId = null;
-      const saved = await saveAsset({
+      const saved = await saveStudioAssetMutation({
         // 결과물이 생성형 AI 산출물임을 라이브러리에서도 식별할 수 있게 kind 로 표시(라벨/배지용).
         name: generated.name,
         dataUrl: generated.dataUrl,
@@ -18182,8 +19918,6 @@ const puppetWarpArmed =
         height: generated.height,
         kind: "ai",
       });
-      if (!canApplyStudioMutation(mutationTicket)) return;
-      await loadAssetsList();
       if (!canApplyStudioMutation(mutationTicket)) return;
       const generatedProvenance = finalizeStudioAiGeneratedAssetProvenance(requestProvenance, {
         model: generated.model,
@@ -19516,10 +21250,13 @@ const puppetWarpArmed =
     wetMixAbortRef.current = null;
     liquifyAbortRef.current?.abort();
     liquifyAbortRef.current = null;
+    healCloneAbortRef.current?.abort();
+    healCloneAbortRef.current = null;
     setSmudgeBusy(false);
     setDodgeBurnBusy(false);
     setWetMixBusy(false);
     setLiquifyBusy(false);
+    setHealCloneBusy(false);
     cancelPixelSelectionPointerSession();
     clearPendingPixelSelectionRasterGesture();
     pixelMarqueeRasterPreparationRunIdRef.current += 1;
@@ -19561,6 +21298,8 @@ const puppetWarpArmed =
     setWetMixActive(false); // ← 추가(혼색 브러시 무장 해제 — 설정값은 유지)
     setLiquifyActive(false);
     setHealCloneTool(null);
+    healCloneDragRef.current = null;
+    clearHealCloneDragPreview();
     setEyedropperActive(false);
     setBubbleAnchorPickActive(false);
     setColorRangePickActive(false); // ← 추가(샘플/허용량은 유지 — healClone "모드는 유지" 정책과 동일)
@@ -19582,7 +21321,7 @@ const puppetWarpArmed =
     setHistoryBrushActive(false); // ← 추가(소스 지정 상태는 그대로 둔다)
     setBubbleShapeEditActive(false); // ← 추가(말풍선 커스텀 모양 점 편집)
     setPuppetWarpActive(false); // ← 추가
-    setPuppetWarpPins([]); // ← 추가(핀도 함께 폐기 — 다른 도구로 전환 시 세션 종료)
+    setPuppetWarpPins((current) => current.length === 0 ? current : []); // ← 추가(핀도 함께 폐기 — 다른 도구로 전환 시 세션 종료)
     stopStudioCommentPlacementSession(); // ← 추가(자유 위치 댓글 핀 세션 해제)
   }
   disarmAllPixelToolsRef.current = disarmAllPixelTools;
@@ -20099,34 +21838,16 @@ const puppetWarpArmed =
   }
 
   /**
-   * 보기 전용 반전·회전은 캡처 픽셀에 굽지 않는다. Konva Stage의 루트 변환을 동기적으로
-   * 문서 좌표계로 되돌려 읽은 뒤, 사용자가 보고 있던 정확한 레이아웃을 즉시 복원한다.
+   * 보기 전용 반전·회전은 캡처 픽셀에 굽지 않고, 스테이지 래스터는 언제나 **문서 전체**다.
+   * 두 불변식과 복원 기하는 `studio-stage-document-view.ts` 가 단독으로 소유한다 — 여기서는
+   * 현재 문서 크기·표시 배율만 넘긴다.
    */
   function readStageInDocumentView<T>(stage: Konva.Stage, read: () => T): T {
-    const previous = {
-      width: stage.width(),
-      height: stage.height(),
-      x: stage.x(),
-      y: stage.y(),
-      rotation: stage.rotation(),
-      scaleX: stage.scaleX(),
-      scaleY: stage.scaleY(),
-    };
-
-    try {
-      stage.size({ width: CANVAS_W * effScale, height: canvasH * effScale });
-      stage.position({ x: 0, y: 0 });
-      stage.rotation(0);
-      stage.scale({ x: effScale, y: effScale });
-      stage.draw();
-      return read();
-    } finally {
-      stage.size({ width: previous.width, height: previous.height });
-      stage.position({ x: previous.x, y: previous.y });
-      stage.rotation(previous.rotation);
-      stage.scale({ x: previous.scaleX, y: previous.scaleY });
-      stage.draw();
-    }
+    return readStudioStageInDocumentView(
+      stage,
+      { documentWidth: CANVAS_W, documentHeight: canvasH, effectiveScale: effScale },
+      read
+    );
   }
   // 브랜드 킷 — 제목/본문 글꼴을 현재 선택된 텍스트/말풍선 요소에 적용.
   // selected가 없거나 text/bubble이 아니면 아무 것도 하지 않는다(패널의 canApplyFont로 사전 방지되지만 방어적으로 재확인).
@@ -21195,6 +22916,11 @@ const puppetWarpArmed =
       case "set-items-locked":
         patchLayerItems(action.ids, () => ({ locked: action.locked }));
         return;
+      case "set-items-opacity": {
+        const opacity = Math.min(1, Math.max(0, action.opacity));
+        patchLayerItems(action.ids, () => ({ opacity }));
+        return;
+      }
       case "merge-down": {
         void commitLayerMergePlan(
           planStudioLayerMergeDown({
@@ -22111,10 +23837,8 @@ const puppetWarpArmed =
       return;
     }
     if (comipoActionBusyRef.current) return;
-    if (
-      elements.length > 0 &&
-      !globalThis.confirm("현재 페이지를 빠른 웹툰 결과로 교체할까요?")
-    ) {
+    const quickComicRequest = studioQuickComicReplaceRequest(elements.length);
+    if (elements.length > 0 && !(await confirmStudioDestructiveAction(quickComicRequest))) {
       return;
     }
 
@@ -22136,7 +23860,13 @@ const puppetWarpArmed =
       setTool("select");
       setMenu(null);
       setSelectedId(null);
-      if (!commit(comipoSeedsToEls(assembled.seeds))) return;
+      if (
+        !settleStudioDestructiveCommit(
+          quickComicRequest,
+          commit(comipoSeedsToEls(assembled.seeds)),
+          undo
+        )
+      ) return;
       setQuickComicOpen(false);
       announceDrawingShortcut(
         `빠른 웹툰 완성 · ${assembled.frameCount}컷 · 말풍선 ${assembled.bubbleCount}개`
@@ -22150,20 +23880,20 @@ const puppetWarpArmed =
       comipoActionBusyRef.current = false;
     }
   }
-  function applySceneSnapshot(
+  async function applySceneSnapshot(
     snapshot: import("./studio-scene-snapshot-library").StudioSceneSnapshot
   ) {
     if (collaborationDocumentLocked) {
       setError(collaborationLockMessage());
       return;
     }
-    if (
-      !globalThis.confirm(
-        `현재 ${pageDisplayName(activePage, activePageIndex)} 전체를 “${snapshot.name}” 장면으로 교체할까요?`
-      )
-    ) {
-      return;
-    }
+    const sceneSnapshotRequest = studioSceneSnapshotReplaceRequest({
+      pageName: pageDisplayName(activePage, activePageIndex),
+      sceneName: snapshot.name,
+      currentElementCount: activePage.elements.length,
+      incomingElementCount: snapshot.page.elements.length,
+    });
+    if (!(await confirmStudioDestructiveAction(sceneSnapshotRequest))) return;
     const restoredPage: PageState = {
       ...snapshot.page,
       id: activePage.id,
@@ -22171,7 +23901,13 @@ const puppetWarpArmed =
     const nextPages = pages.map((page) =>
       page.id === activePage.id ? restoredPage : page
     );
-    if (!commitPages(nextPages)) return;
+    if (
+      !settleStudioDestructiveCommit(
+        sceneSnapshotRequest,
+        commitPages(nextPages),
+        undo
+      )
+    ) return;
     setWebtoonTheme(snapshot.theme);
     setSelectedId(null);
     setMarqueeIds([]);
@@ -22188,7 +23924,8 @@ const puppetWarpArmed =
       return;
     }
     if (comipoActionBusyRef.current) return;
-    if (elements.length > 0 && !globalThis.confirm("기존 작업을 지우고 예시를 불러올까요?")) return;
+    const exampleRequest = studioStartFromExampleRequest(elements.length);
+    if (elements.length > 0 && !(await confirmStudioDestructiveAction(exampleRequest))) return;
 
     const deferredAction = captureDeferredComipoAction();
     comipoActionBusyRef.current = true;
@@ -22216,7 +23953,11 @@ const puppetWarpArmed =
       setTool("select");
       setMenu(null);
       setSelectedId(null);
-      commit([...createQuickSampleFrames()]);
+      settleStudioDestructiveCommit(
+        exampleRequest,
+        commit([...createQuickSampleFrames()]),
+        undo
+      );
       dismissQuickStart();
       return;
     }
@@ -22233,7 +23974,7 @@ const puppetWarpArmed =
     setTool("select");
     setMenu(null);
     setSelectedId(null);
-    commit(sample);
+    settleStudioDestructiveCommit(exampleRequest, commit(sample), undo);
     dismissQuickStart();
   }
   // 삭제 버튼·Delete 키·퀵 액션·내비게이터가 모두 같은 명시적 삭제 정책을 사용한다. 잠금은
@@ -22587,6 +24328,95 @@ const puppetWarpArmed =
       patchEl(selected.id, { x: b.x + dx, y: b.y + dy } as Partial<El>);
     }
   }
+
+  /**
+   * Frame the current selection in the viewport (Figma "zoom to selection", ⇧F here —
+   * ⇧1–6 already belongs to the brush slots, so the Figma ⇧2 chord is not available).
+   */
+  function zoomToSelection() {
+    if (viewTransformSuppressed || zoomLockedRef.current) return;
+    const selectedEls = selectStudioFigmaDesignTargets(elements, marqueeIds, selected);
+    if (selectedEls.length === 0) {
+      announceDrawingShortcut("확대할 요소를 먼저 선택하세요");
+      return;
+    }
+    const bounds = unionStudioSelectionBounds(selectedEls);
+    const wrap = wrapRef.current;
+    if (!bounds || !wrap) return;
+    const maximumScale = isFullscreen || maximized || mobileImmersive || canvasOnlyMode ? 4 : 2.5;
+    const plan = planStudioZoomToSelection({
+      bounds,
+      viewportWidth: wrap.clientWidth,
+      viewportHeight: wrap.clientHeight,
+      documentWidth: CANVAS_W,
+      documentHeight: canvasH,
+      canvasFlipH,
+      canvasRotation,
+      maxScale: maximumScale,
+      minScale: 0.15,
+    });
+    if (!plan) return;
+    // Drop any in-flight wheel/pinch gesture first: with zoom already at 1, setZoom(1) bails out,
+    // so the cancel layout effect never runs and the gesture's leftover CSS transform plus its
+    // 170ms settle would undo this framing.
+    const pendingZoomGesture = zoomGestureRef.current;
+    if (pendingZoomGesture) {
+      zoomGestureRef.current = null;
+      if (pendingZoomGesture.raf) globalThis.cancelAnimationFrame(pendingZoomGesture.raf);
+      if (pendingZoomGesture.settleTimer) globalThis.clearTimeout(pendingZoomGesture.settleTimer);
+      zoomSettleAnchorRef.current = null;
+      const zoomHost = zoomHostRef.current;
+      if (zoomHost) {
+        zoomHost.style.transform = "";
+        zoomHost.style.willChange = "";
+      }
+    }
+    setScale(plan.scale);
+    setZoom(1);
+    requestAnimationFrame(() => {
+      const host = wrapRef.current;
+      if (!host) return;
+      host.scrollLeft = plan.scrollLeft;
+      host.scrollTop = plan.scrollTop;
+    });
+    announceDrawingShortcut("선택 영역으로 확대 · ⇧F");
+  }
+
+  /** Figma Flip H/V around the selection AABB center. */
+  function flipSelected(axis: "horizontal" | "vertical") {
+    const targets = selectStudioFigmaDesignTargets(elements, marqueeIds, selected);
+    if (targets.length === 0) return;
+    if (targets.some((element) => isEffectivelyLocked(element, groups))) {
+      setError("잠긴 레이어는 반전할 수 없어요. 잠금을 해제한 뒤 다시 시도하세요.");
+      return;
+    }
+    const next = planStudioSelectionFlip(
+      elements,
+      targets.map((element) => element.id),
+      axis,
+    );
+    if (!next) return;
+    if (next.every((element, index) => element === elements[index])) {
+      announceDrawingShortcut("이 선택은 반전할 수 없어요 · 이미지나 여러 요소를 골라 보세요");
+      return;
+    }
+    // commit() refuses (and explains why via setError) while saving, review-locked or
+    // collaboration-locked — announcing a flip it rejected would be a lie to the live region.
+    if (!commit(next)) return;
+    announceDrawingShortcut(axis === "horizontal" ? "좌우 반전" : "상하 반전");
+  }
+
+  function applyFigmaSelectionLayoutPatch(patch: StudioFigmaSelectionLayoutPatch) {
+    if (!selected || marqueeIds.length > 0) return;
+    if (isEffectivelyLocked(selected, groups)) {
+      setError("잠긴 레이어는 수정할 수 없어요.");
+      return;
+    }
+    const next = planStudioSelectionLayoutPatch(selected, patch);
+    if (!next) return;
+    patchEl(selected.id, next);
+  }
+
   function reorder(dir: "front" | "back" | "forward" | "backward") {
     if (marqueeIds.length > 0) {
       reorderSelectedElements(dir);
@@ -22611,7 +24441,7 @@ const puppetWarpArmed =
       } else {
         if (hasActiveDrawingPointerSession()) discardDrawingPointerSession();
         else discardStudioLivingInkStroke(livingInkStroke.strokeId);
-        announceDrawingShortcut("저장 중이던 Living Ink 획을 취소했습니다");
+        announceDrawingShortcut("저장 중이던 수채 번짐 획을 취소했습니다");
         return;
       }
     }
@@ -22658,7 +24488,7 @@ const puppetWarpArmed =
     }
     const livingInkStroke = livingInkStrokeRef.current;
     if (livingInkStroke && !livingInkStroke.transactionCommitted) {
-      announceDrawingShortcut("Living Ink 획을 저장한 뒤 다시 실행할 수 있어요");
+      announceDrawingShortcut("수채 번짐 획을 저장한 뒤 다시 실행할 수 있어요");
       return;
     }
     if (livingInkStroke?.transactionCommitted) releaseStudioLivingInkPresentation();
@@ -22727,13 +24557,15 @@ const puppetWarpArmed =
       activatePrimaryCanvasTool("select");
       setMobileSheet(null);
     } else if (action === "pen") {
-      activatePrimaryCanvasTool("draw", "pen");
+      activateDrawToolWithProperties("pen");
       setMobileSheet(null);
     } else if (action === "eraser") {
-      activatePrimaryCanvasTool("draw", "eraser");
+      activateDrawToolWithProperties("eraser");
       setMobileSheet(null);
     } else if (action === "eyedropper") {
-      setEyedropperActive(true);
+      // 키보드(I)·툴레일과 같은 토글 계약. Quick Deck/라디얼만 "항상 켜기"였던 탓에
+      // 같은 명령이 진입점마다 다르게 동작했다. 위 disarm이 이미 이전 소유자를 해제한다.
+      setEyedropperActive(!eyedropperActive);
       setMobileSheet(null);
     } else if (action === "properties") {
       openInspectorRoute({ primary: "properties" }, isMobile ? "props" : null);
@@ -23145,6 +24977,26 @@ const puppetWarpArmed =
         }
         return;
       }
+      // 파일 메뉴(`임시저장`)와 Quick Access deck이 ⌘S를 광고하므로 실제 핸들러를 여기에 둔다.
+      // 광고만 되고 바인딩이 없으면 브라우저 "페이지 저장" 대화상자가 대신 뜬다.
+      // 제목·대사 입력 중에도 저장은 동작해야 하므로 편집 게이트보다 앞에 배치한다.
+      if (
+        (e.metaKey || e.ctrlKey)
+        && !e.altKey
+        && !e.shiftKey
+        && e.code === "KeyS"
+        && !e.repeat
+      ) {
+        e.preventDefault();
+        if (collaborationDocumentLocked) {
+          announceDrawingShortcut(collaborationLockMessage());
+        } else if (saving) {
+          announceDrawingShortcut("이미 저장 중이에요");
+        } else {
+          void handleSave("draft");
+        }
+        return;
+      }
       if (!shouldHandleStudioEditEvent({
         typing,
         editing: Boolean(editing),
@@ -23183,12 +25035,12 @@ const puppetWarpArmed =
       }
       if (matchStudioShortcut(sc["tool-pen"], e)) {
         e.preventDefault();
-        activatePrimaryCanvasTool("draw", "pen");
+        activateDrawToolWithProperties("pen");
         return;
       }
       if (matchStudioShortcut(sc["tool-eraser"], e)) {
         e.preventDefault();
-        activatePrimaryCanvasTool("draw", "eraser");
+        activateDrawToolWithProperties("eraser");
         return;
       }
       if (matchStudioShortcut(sc["tool-fill"], e)) {
@@ -23212,7 +25064,7 @@ const puppetWarpArmed =
       if (matchStudioShortcut(sc["tool-pixel"], e)) {
         e.preventDefault();
         if (!activeSurfaceReviewLocked) {
-          activatePrimaryCanvasTool("draw", "pixel");
+          activateDrawToolWithProperties("pixel");
         }
         return;
       }
@@ -23310,6 +25162,21 @@ const puppetWarpArmed =
         e.preventDefault();
         resetView();
         announceDrawingShortcut("화면 리셋");
+        return;
+      }
+      if (matchStudioShortcut(sc["zoom-to-selection"], e) && !e.repeat) {
+        e.preventDefault();
+        zoomToSelection();
+        return;
+      }
+      if (matchStudioShortcut(sc["flip-selection-h"], e) && !e.repeat) {
+        e.preventDefault();
+        flipSelected("horizontal");
+        return;
+      }
+      if (matchStudioShortcut(sc["flip-selection-v"], e) && !e.repeat) {
+        e.preventDefault();
+        flipSelected("vertical");
         return;
       }
       if (matchStudioShortcut(sc["deselect-pixels"], e)) {
@@ -23594,8 +25461,8 @@ const puppetWarpArmed =
       ) {
         e.preventDefault();
         const index = Number(e.key) - 1;
-        setBrushSlotsState((prev) => {
-          const next = assignStudioBrushSlot(prev, index, {
+        commitStudioBrushSlotsMutation(
+          (prev) => assignStudioBrushSlot(prev, index, {
             brushId: brush,
             ...(activeCatalogBrush.sourcePresetId
               ? {
@@ -23606,14 +25473,12 @@ const puppetWarpArmed =
             brushDynamics,
             strokeWidth,
             brushOpacity,
-          });
-          saveStudioBrushSlotsState(
-            typeof globalThis.localStorage === "undefined" ? null : globalThis.localStorage,
-            next
-          );
-          return next;
-        });
-        announceDrawingShortcut(`슬롯 ${index + 1}에 저장`);
+          }),
+          {
+            successMessage: `슬롯 ${index + 1}에 저장`,
+            failureMessage: `슬롯 ${index + 1}을 SQLite에 저장하지 못했어요.`,
+          },
+        );
       } else if (
         !mod &&
         !e.altKey &&
@@ -23663,6 +25528,7 @@ const puppetWarpArmed =
         e.preventDefault();
         setShortcutsOpen((v) => !v);
       } else if (e.key === "Escape") {
+        // Quick Start dismisses itself via capture-phase Esc on StudioQuickStartPanel.
         if (groupResizeRef.current) {
           e.preventDefault();
           cancelCanvasSelectionResize();
@@ -23709,6 +25575,9 @@ const puppetWarpArmed =
           releaseBubbleShapePointerCapture();
           bubbleShapeDragRef.current = null;
         } else if (healCloneTool) {
+          healCloneAbortRef.current?.abort();
+          healCloneAbortRef.current = null;
+          setHealCloneBusy(false);
           setHealCloneTool(null);
           healCloneDragRef.current = null;
           clearHealCloneDragPreview();
@@ -24462,7 +26331,7 @@ const puppetWarpArmed =
   function onGenerateAiBackground() {
     const prompt = aiBgPrompt.trim();
     if (!prompt || aiBgBusy || !isStudioAiConfigured(aiSettings)) return;
-    setAiRecentPrompts(pushStudioAiRecentPrompt(globalThis.localStorage, "background", prompt));
+    setAiRecentPrompts(pushStudioAiRecentPrompt(globalThis.sessionStorage, "background", prompt));
     runWithAiNotice(() => void executeAiBackgroundGenerate(prompt, aiBgSize));
   }
 
@@ -25296,23 +27165,32 @@ const puppetWarpArmed =
     }
     setAiPaletteSuggestBusy(false);
   }
-  // 제안받은 팔레트를 기존 팔레트 라이브러리에 저장 — 새 타입/저장 경로를 만들지 않고
-  // studio-palette-library.createPalette(이름 폴백·중복 제거)+savePalette(localStorage upsert)를
-  // 그대로 재사용한다(StudioPaletteLibraryPanel의 handleCreateFromPaste와 동일한 호출 관례).
-  function saveSuggestedPaletteToLibrary(suggestion: PaletteSuggestion) {
+  // 제안받은 팔레트도 패널과 동일한 V12 SQLite authority에 저장한다. 이전 브라우저 키는 읽지
+  // 않으며, 내구성 쓰기가 실패하면 제안은 현재 패널 메모리에만 남고 저장 성공으로 표시하지 않는다.
+  async function saveSuggestedPaletteToLibrary(suggestion: PaletteSuggestion): Promise<void> {
+    const generation = ++aiPaletteSaveGenerationRef.current;
     try {
       const palette = createPalette(
         suggestion.name,
         suggestion.colors.map((c) => c.hex)
       );
-      savePalette(globalThis.localStorage, palette);
+      const { getProductStudioPaletteSqliteRepository } = await import(
+        "./studio-palette-sqlite-repository"
+      );
+      await getProductStudioPaletteSqliteRepository().save(palette);
+      if (!editorMountedRef.current || generation !== aiPaletteSaveGenerationRef.current) return;
       setAiPaletteSuggestError(null);
       setAiPaletteSuggestSavedMsg(
         `"${palette.name}" 팔레트로 저장했어요 (${palette.colors.length}색). "스타일" 탭에서 확인하세요.`
       );
     } catch (e) {
+      if (!editorMountedRef.current || generation !== aiPaletteSaveGenerationRef.current) return;
       setAiPaletteSuggestSavedMsg(null);
-      setAiPaletteSuggestError(e instanceof Error ? e.message : "팔레트를 저장하지 못했어요.");
+      setAiPaletteSuggestError(
+        `SQLite/OPFS 팔레트 저장에 실패했습니다. 제안은 현재 탭 메모리에만 남고 라이브러리에는 저장되지 않았습니다: ${
+          e instanceof Error ? e.message : String(e)
+        }`
+      );
     }
   }
 
@@ -25404,7 +27282,24 @@ const puppetWarpArmed =
     const mutationTicket = captureStudioMutationTicket();
     const { estimateBubbleHeight } = await import("./studio-fit");
     if (!canApplyStudioMutation(mutationTicket)) return;
-    const h = estimateBubbleHeight(selected.text, selected.width, selected.fontSize ?? 24, selected.lineHeight ?? 1.2);
+    // 행간·글꼴 두께·자간은 실제 렌더가 쓰는 값을 그대로 넘긴다 — 예전에는 여기만 1.2를 쓰고
+    // fontStyle/자간을 빼서, 이 버튼이 오히려 상자를 줄여 대사를 더 잘라먹었다(감사 측정).
+    const h = estimateBubbleHeight(
+      selected.text,
+      selected.width,
+      resolveBubbleFontSize(selected.fontSize),
+      resolveBubbleLineHeight({
+        lineHeight: selected.lineHeight,
+        vertical: selected.vertical,
+        theme: webtoonTheme,
+      }),
+      {
+        fontFamily: resolveBubbleFontFamily(selected.font),
+        fontStyle: resolveBubbleFontStyle(selected.fontStyle),
+        letterSpacing: bubbleLetterSpacing(webtoonTheme),
+        vertical: selected.vertical,
+      }
+    );
     patchEl(selected.id, { height: h });
   }
   function addFxOverlay(svgMarkup: string, w: number, h: number) {
@@ -25577,19 +27472,28 @@ const puppetWarpArmed =
     setContextMenu((prev) => ({ ...prev, visible: false }));
     if (!name) return;
     try {
-      const { createEmeresLibraryItem, saveEmeresLibraryItem } = await import("./studio-emeres-library");
+      const [{ createEmeresLibraryItem }, { getProductStudioEmeresSqliteRepository }] =
+        await Promise.all([
+          import("./studio-emeres-library"),
+          import("./studio-emeres-sqlite-repository"),
+        ]);
       const created = createEmeresLibraryItem(name, { src, width: Math.round(bounds.w), height: Math.round(bounds.h) });
-      saveEmeresLibraryItem(globalThis.localStorage, created);
+      await getProductStudioEmeresSqliteRepository().save(created);
     } catch (err) {
       console.error("Failed to save emeres library item:", err);
-      setError("이메레스로 저장하지 못했습니다.");
+      setError("SQLite/OPFS 이메레스 보관함에 저장하지 못했습니다.");
     }
   }
   const emeresUnderlayCount = elements.filter((e) => e.emeresSourceId != null).length;
-  function removeEmeresUnderlays() {
+  async function removeEmeresUnderlays() {
     if (emeresUnderlayCount === 0) return;
-    if (!globalThis.confirm(`이메레스 밑그림 ${emeresUnderlayCount}개를 전부 지울까요? 그 위에 그린 펜 선은 지워지지 않아요.`)) return;
-    commit(elements.filter((e) => e.emeresSourceId == null));
+    const emeresRequest = studioRemoveEmeresUnderlaysRequest(emeresUnderlayCount);
+    if (!(await confirmStudioDestructiveAction(emeresRequest))) return;
+    settleStudioDestructiveCommit(
+      emeresRequest,
+      commit(elements.filter((e) => e.emeresSourceId == null)),
+      undo
+    );
   }
   // 장면 템플릿 삽입 — runStudioPageAddSceneTemplate 단일 shipped 경로.
   async function addSceneTemplate(template: SceneTemplate) {
@@ -25793,6 +27697,77 @@ const puppetWarpArmed =
     if (next === pages || commitPages(next as PageState[])) setActiveDialogueLocale(locale);
   }
 
+  function commitSavedClipMutation(
+    persisted: (
+      repository: import("./studio-saved-clip-sqlite-repository").StudioSavedClipSqliteRepository,
+    ) => Promise<StudioClip[]>,
+    memoryUpdate: (current: readonly StudioClip[]) => StudioClip[],
+  ): Promise<"durable" | "memory" | "rejected"> {
+    const run = async (): Promise<"durable" | "memory" | "rejected"> => {
+      const generation = ++clipMutationGenerationRef.current;
+      clipHydrationGenerationRef.current += 1;
+      if (clipMemoryModeRef.current) {
+        try {
+          replaceSavedClips(memoryUpdate(clipsRef.current));
+          setClipStorageState("memory");
+          return "memory";
+        } catch (cause) {
+          if (editorMountedRef.current) {
+            setError(cause instanceof Error ? cause.message : "클립 변경을 적용하지 못했습니다.");
+          }
+          return "rejected";
+        }
+      }
+
+      try {
+        const repositoryModule = await import("./studio-saved-clip-sqlite-repository");
+        clipsRepositoryRef.current ??= Promise.resolve(
+          repositoryModule.getProductStudioSavedClipSqliteRepository(),
+        );
+        const next = await persisted(await clipsRepositoryRef.current);
+        if (!editorMountedRef.current || generation !== clipMutationGenerationRef.current) {
+          return "rejected";
+        }
+        // Fence a clip-menu hydration that may have started while this queued write was in flight.
+        clipHydrationGenerationRef.current += 1;
+        replaceSavedClips(next);
+        setClipStorageState("sqlite");
+        return "durable";
+      } catch (cause) {
+        if (!editorMountedRef.current || generation !== clipMutationGenerationRef.current) {
+          return "rejected";
+        }
+        const repositoryModule = await import("./studio-saved-clip-sqlite-repository").catch(() => null);
+        if (
+          repositoryModule
+          && cause instanceof repositoryModule.StudioSavedClipSqliteRepositoryError
+          && cause.code !== "unavailable"
+        ) {
+          setError(`${cause.message} 기존 클립은 삭제되지 않았고 새 데이터도 잘라내지 않았습니다.`);
+          return "rejected";
+        }
+        try {
+          replaceSavedClips(memoryUpdate(clipsRef.current));
+        } catch (validationError) {
+          setError(validationError instanceof Error
+            ? validationError.message
+            : "클립 변경을 적용하지 못했습니다.");
+          return "rejected";
+        }
+        clipMemoryModeRef.current = true;
+        setClipStorageState("memory");
+        setError(`SQLite/OPFS 저장에 실패해 클립 변경을 현재 탭 메모리에만 유지합니다. 새로고침하면 사라집니다: ${
+          cause instanceof Error ? cause.message : String(cause)
+        }`);
+        return "memory";
+      }
+    };
+
+    const result = clipMutationTailRef.current.then(run, run);
+    clipMutationTailRef.current = result.then(() => undefined, () => undefined);
+    return result;
+  }
+
   // 요소 평행이동(draw는 points, 그 외는 x/y) — 클립 정규화·삽입용.
   function shiftEl(el: El, dx: number, dy: number): El {
     return el.type === "draw"
@@ -25812,14 +27787,12 @@ const puppetWarpArmed =
       members.length > 1 ? "내 장면 클립" : selected.type === "bubble" ? "말풍선 클립" : "내 클립";
     const name = globalThis.prompt("클립 이름을 정해주세요", fallbackName)?.trim();
     if (!name) return;
-    try {
-      const { saveClip } = await import("./studio-clips");
-      setClips(saveClip(globalThis.localStorage, { id: uid(), name, createdAt: Date.now(), els }));
-    } catch (err) {
-      console.error("Failed to save studio clip:", err);
-      setError("클립을 저장하지 못했습니다.");
-    }
-    setMenu("clip");
+    const clip: StudioClip = { id: uid(), name, createdAt: Date.now(), els };
+    await commitSavedClipMutation(
+      (repository) => repository.save(clip),
+      (current) => upsertSavedClipInMemory(current, clip),
+    );
+    if (editorMountedRef.current) setMenu("clip");
   }
   // 클립을 캔버스에 삽입 — 새 id·새 그룹으로 화면 중앙 부근에 배치.
   function insertClip(clip: StudioClip) {
@@ -25859,13 +27832,10 @@ const puppetWarpArmed =
     setTool("select");
   }
   async function deleteClip(id: string) {
-    try {
-      const { removeClip } = await import("./studio-clips");
-      setClips(removeClip(globalThis.localStorage, id));
-    } catch (err) {
-      console.error("Failed to delete studio clip:", err);
-      setError("클립을 삭제하지 못했습니다.");
-    }
+    await commitSavedClipMutation(
+      (repository) => repository.delete(id),
+      (current) => deleteSavedClipInMemory(current, id),
+    );
   }
   function regenerateTemplate(tpl: TemplateSpec, gutter: number, currentEls: El[] = elements) {
     let nextFrames: FrameSpec[] = [];
@@ -25921,16 +27891,20 @@ const puppetWarpArmed =
     return [...newFrames, ...nonFrames];
   }
 
-  function applyTemplate(tpl: TemplateSpec) {
-    // confirm 전에 메뉴를 닫지 않는다 — 취소 시 다시 고를 수 있게.
-    if (elements.length > 0 && !globalThis.confirm("기존 작업을 지우고 템플릿을 적용할까요?")) return;
+  async function applyTemplate(tpl: TemplateSpec) {
+    // 승인 전에 메뉴를 닫지 않는다 — 취소 시 다시 고를 수 있게.
+    const templateRequest = studioApplyTemplateRequest({
+      elementCount: elements.length,
+      frameCount: tpl.frames.length,
+    });
+    if (elements.length > 0 && !(await confirmStudioDestructiveAction(templateRequest))) return;
     setMenu(null);
     setCanvasH(tpl.canvasH);
     setBg("#ffffff");
     setBgGrad(null);
     setCurrentTemplate(tpl);
     const nextEls = regenerateTemplate(tpl, panelGutter, []);
-    commit(nextEls);
+    settleStudioDestructiveCommit(templateRequest, commit(nextEls), undo);
     setSelectedId(null);
     announceDrawingShortcut(
       tpl.frames.length > 0
@@ -25941,7 +27915,11 @@ const puppetWarpArmed =
   // 코미Po!식 정형 컷 레이아웃 — assembleComipoPage 로 프레임·대사를 충돌 없이 배치.
   async function applyPanelLayout(layout: PanelLayoutPreset) {
     if (comipoActionBusyRef.current) return;
-    if (elements.length > 0 && !globalThis.confirm("기존 작업을 지우고 컷 템플릿을 적용할까요?")) return;
+    const panelLayoutRequest = studioApplyPanelLayoutRequest({
+      layoutName: layout.label,
+      elementCount: elements.length,
+    });
+    if (elements.length > 0 && !(await confirmStudioDestructiveAction(panelLayoutRequest))) return;
     const deferredAction = captureDeferredComipoAction();
     const script = dialogueScript.trim() || undefined;
     comipoActionBusyRef.current = true;
@@ -25961,7 +27939,11 @@ const puppetWarpArmed =
       setBg("#ffffff");
       setBgGrad(null);
       setCurrentTemplate(null);
-      commit(comipoSeedsToEls(assembled.seeds));
+      settleStudioDestructiveCommit(
+        panelLayoutRequest,
+        commit(comipoSeedsToEls(assembled.seeds)),
+        undo
+      );
       setSelectedId(null);
       announceDrawingShortcut(`「${layout.label}」컷 템플릿 적용`);
     } catch (error) {
@@ -25975,7 +27957,7 @@ const puppetWarpArmed =
   }
 
   /** PicsArt-class multi-photo collage — frames + optional cover-fit of existing images. */
-  function applyCollage(payload: {
+  async function applyCollage(payload: {
     canvasH: number;
     canvasBg: string;
     frames: readonly {
@@ -26001,10 +27983,14 @@ const puppetWarpArmed =
     replaceExisting: boolean;
   }) {
     setMenu(null);
+    const collageRequest = studioApplyCollageRequest({
+      elementCount: elements.length,
+      frameCount: payload.frames.length,
+    });
     if (
       payload.replaceExisting
       && elements.length > 0
-      && !globalThis.confirm("기존 작업을 지우고 콜라주를 적용할까요?")
+      && !(await confirmStudioDestructiveAction(collageRequest))
     ) {
       return;
     }
@@ -26050,7 +28036,11 @@ const puppetWarpArmed =
     }
 
     if (payload.replaceExisting) {
-      commit([...frameEls, ...placedImages]);
+      settleStudioDestructiveCommit(
+        collageRequest,
+        commit([...frameEls, ...placedImages]),
+        undo
+      );
     } else {
       const placedIds = new Set(placedImages.map((el) => el.id));
       const kept = elements.filter((el) => !placedIds.has(el.id));
@@ -26603,10 +28593,20 @@ const puppetWarpArmed =
     liquifyAbortRef.current = controller;
     setLiquifyBusy(true);
     try {
-      const img = await loadStudioPixelEditImage(target.src);
+      const [
+        { bakeLiquifyStrokeToCanvas },
+        {
+          encodeStudioRetouchCanvasPng,
+          loadStudioRetouchSourceImage,
+          studioRetouchSourceDimensions,
+        },
+      ] = await Promise.all([
+        loadStudioLiquifyBrowserRuntime(),
+        loadStudioPixelEditBrushRuntime(),
+      ]);
+      const img = await loadStudioRetouchSourceImage(target.src, controller.signal);
       if (controller.signal.aborted) return;
-      const w = img.naturalWidth || img.width;
-      const h = img.naturalHeight || img.height;
+      const { width: w, height: h } = studioRetouchSourceDimensions(img);
       // 정규화 → 디바이스 px 궤적
       const devicePts = points.map((p) => ({
         x: p.x * w,
@@ -26614,7 +28614,6 @@ const puppetWarpArmed =
         ...(p.pressure === undefined ? {} : { pressure: p.pressure }),
       }));
       const radiusDevice = (liquifyRadius / Math.max(1, target.width)) * w;
-      const { bakeLiquifyStrokeToCanvas } = await import("./studio-liquify-browser");
       const out = await bakeLiquifyStrokeToCanvas(
         img,
         w,
@@ -26631,13 +28630,14 @@ const puppetWarpArmed =
         }
       );
       if (!out) return;
-      const { encodeStudioRetouchCanvasPng } = await loadStudioPixelEditBrushRuntime();
       const src = await encodeStudioRetouchCanvasPng(out as HTMLCanvasElement, {
         signal: controller.signal,
       });
       if (!canApplyStudioMutation(mutationTicket)) return;
       if (src !== target.src && !isLatestLayerContentMutationLocked(target.id)) {
-        patchEl(target.id, { src } as Partial<El>);
+        if (patchEl(target.id, { src } as Partial<El>)) {
+          expectStudioRasterImagePresentation({ elementId: target.id, src });
+        }
       }
     } catch (err) {
       if (controller.signal.aborted || (err instanceof Error && err.name === "AbortError")) return;
@@ -26833,7 +28833,9 @@ const puppetWarpArmed =
       });
       if (!canApplyStudioMutation(mutationTicket)) return;
       if (src !== target.src && !isLatestLayerContentMutationLocked(target.id)) {
-        patchEl(target.id, { src } as Partial<El>);
+        if (patchEl(target.id, { src } as Partial<El>)) {
+          expectStudioRasterImagePresentation({ elementId: target.id, src });
+        }
       }
       setError(null);
     } catch (err) {
@@ -26866,15 +28868,17 @@ const puppetWarpArmed =
     try {
       const {
         encodeStudioRetouchCanvasPng,
+        loadStudioRetouchSourceImage,
+        planStudioRasterRetouchRegion,
         runStudioDodgeBurnRetouch,
+        studioRetouchSourceDimensions,
+        translateStudioRasterRetouchPoints,
       } = await loadStudioPixelEditBrushRuntime();
-      const img = await loadStudioPixelEditImage(target.src);
-      const w = img.naturalWidth || img.width;
-      const h = img.naturalHeight || img.height;
+      const img = await loadStudioRetouchSourceImage(target.src, controller.signal);
+      const { width: w, height: h } = studioRetouchSourceDimensions(img);
       const made = createStudioPixelEditCanvas(w, h);
       if (!made) throw new Error("캔버스를 만들 수 없습니다.");
       made.ctx.drawImage(img, 0, 0, w, h);
-      const imageData = made.ctx.getImageData(0, 0, w, h);
       const flipX = target.flipped ?? false;
       const flipY = target.flippedY ?? false;
       const pixelPoints = points.map((p) => {
@@ -26882,11 +28886,14 @@ const puppetWarpArmed =
         return { x: unflipped.x * w, y: unflipped.y * h };
       });
       const radiusPx = Math.max(1, (dodgeBurnRadius / Math.max(1, target.width)) * w);
+      const region = planStudioRasterRetouchRegion(pixelPoints, radiusPx, w, h);
+      if (!region) return;
+      const imageData = made.ctx.getImageData(region.x, region.y, region.width, region.height);
       const pixels = await runStudioDodgeBurnRetouch(
         imageData.data,
-        w,
-        h,
-        pixelPoints,
+        region.width,
+        region.height,
+        translateStudioRasterRetouchPoints(pixelPoints, region),
         {
           radiusPx,
           hardness: dodgeBurnHardness,
@@ -26897,15 +28904,17 @@ const puppetWarpArmed =
         },
         { signal: controller.signal },
       );
-      const output = made.ctx.createImageData(w, h);
+      const output = made.ctx.createImageData(region.width, region.height);
       output.data.set(pixels);
-      made.ctx.putImageData(output, 0, 0);
+      made.ctx.putImageData(output, region.x, region.y);
       const src = await encodeStudioRetouchCanvasPng(made.canvas, {
         signal: controller.signal,
       });
       if (!canApplyStudioMutation(mutationTicket)) return;
       if (src !== target.src && !isLatestLayerContentMutationLocked(target.id)) {
-        patchEl(target.id, { src } as Partial<El>);
+        if (patchEl(target.id, { src } as Partial<El>)) {
+          expectStudioRasterImagePresentation({ elementId: target.id, src });
+        }
       }
       setError(null);
     } catch (err) {
@@ -26998,15 +29007,17 @@ const puppetWarpArmed =
     try {
       const {
         encodeStudioRetouchCanvasPng,
+        loadStudioRetouchSourceImage,
+        planStudioRasterRetouchRegion,
         runStudioWetMixRetouch,
+        studioRetouchSourceDimensions,
+        translateStudioRasterRetouchPoints,
       } = await loadStudioPixelEditBrushRuntime();
-      const img = await loadStudioPixelEditImage(target.src);
-      const w = img.naturalWidth || img.width;
-      const h = img.naturalHeight || img.height;
+      const img = await loadStudioRetouchSourceImage(target.src, controller.signal);
+      const { width: w, height: h } = studioRetouchSourceDimensions(img);
       const made = createStudioPixelEditCanvas(w, h);
       if (!made) throw new Error("캔버스를 만들 수 없습니다.");
       made.ctx.drawImage(img, 0, 0, w, h);
-      const imageData = made.ctx.getImageData(0, 0, w, h);
       const flipX = target.flipped ?? false;
       const flipY = target.flippedY ?? false;
       const pixelPoints = points.map((p) => {
@@ -27014,11 +29025,14 @@ const puppetWarpArmed =
         return { x: unflipped.x * w, y: unflipped.y * h };
       });
       const radiusPx = Math.max(1, (wetMixRadius / Math.max(1, target.width)) * w);
+      const region = planStudioRasterRetouchRegion(pixelPoints, radiusPx, w, h);
+      if (!region) return;
+      const imageData = made.ctx.getImageData(region.x, region.y, region.width, region.height);
       const pixels = await runStudioWetMixRetouch(
         imageData.data,
-        w,
-        h,
-        pixelPoints,
+        region.width,
+        region.height,
+        translateStudioRasterRetouchPoints(pixelPoints, region),
         {
           radiusPx,
           hardness: wetMixHardness,
@@ -27029,15 +29043,17 @@ const puppetWarpArmed =
         },
         { signal: controller.signal },
       );
-      const output = made.ctx.createImageData(w, h);
+      const output = made.ctx.createImageData(region.width, region.height);
       output.data.set(pixels);
-      made.ctx.putImageData(output, 0, 0);
+      made.ctx.putImageData(output, region.x, region.y);
       const src = await encodeStudioRetouchCanvasPng(made.canvas, {
         signal: controller.signal,
       });
       if (!canApplyStudioMutation(mutationTicket)) return;
       if (src !== target.src && !isLatestLayerContentMutationLocked(target.id)) {
-        patchEl(target.id, { src } as Partial<El>);
+        if (patchEl(target.id, { src } as Partial<El>)) {
+          expectStudioRasterImagePresentation({ elementId: target.id, src });
+        }
       }
       setError(null);
     } catch (err) {
@@ -27326,7 +29342,7 @@ const puppetWarpArmed =
   }
 
   // ── 복구 브러시/도장 스트로크 굽기 — 스트로크 종료마다 자동 실행(별도 "적용" 버튼 없음, 붓처럼
-  // 즉시 반영). 원본 자연 해상도로 dab 목록을 계산해 굽고, 결과를 data URL로 교체(patchEl)해
+  // 즉시 반영). 원본 자연 해상도로 dab 목록을 계산해 굽고, 비동기 PNG 인코딩 결과로 교체(patchEl)해
   // 히스토리 1건(⌘Z 1회)으로 남긴다. target은 elementById에서 다시 읽는다(session.elId 기준) —
   // await 사이 selected가 바뀌어도 정확한 요소에 적용된다.
   async function bakeHealCloneDragStroke(session: {
@@ -27344,38 +29360,60 @@ const puppetWarpArmed =
       isEffectivelyLocked(target, groups)
     ) return;
     const mutationTicket = captureStudioMutationTicket();
+    const mode = healCloneTool ?? "clone";
+    const radius = healCloneRadius;
+    const hardness = healCloneHardness;
+    const opacity = healCloneOpacity;
+    healCloneAbortRef.current?.abort();
+    const controller = new AbortController();
+    healCloneAbortRef.current = controller;
     setHealCloneBusy(true);
     try {
-      const { bakeHealCloneStrokeToCanvas } = await loadStudioPixelEditBrushRuntime();
-      const img = await loadStudioPixelEditImage(target.src);
-      const w = img.naturalWidth || img.width;
-      const h = img.naturalHeight || img.height;
+      const {
+        bakeHealCloneStrokeToCanvas,
+        encodeStudioRetouchCanvasPng,
+        loadStudioRetouchSourceImage,
+        studioRetouchSourceDimensions,
+      } = await loadStudioPixelEditBrushRuntime();
+      const img = await loadStudioRetouchSourceImage(target.src, controller.signal);
+      const { width: w, height: h } = studioRetouchSourceDimensions(img);
       const dabs = planHealCloneDabs(session.points, session.offset, w, h, {
         flipX: target.flipped,
         flipY: target.flippedY,
       });
       if (dabs.length === 0) return;
-      const radiusPxDevice = healCloneRadius * (target.width > 0 ? w / target.width : 1);
+      const radiusPxDevice = radius * (target.width > 0 ? w / target.width : 1);
       const out = await bakeHealCloneStrokeToCanvas(
         img,
         w,
         h,
         dabs,
-        { radiusPx: radiusPxDevice, hardness: healCloneHardness, opacity: healCloneOpacity },
-        healCloneTool ?? "clone",
-        createStudioPixelEditCanvas
+        { radiusPx: radiusPxDevice, hardness, opacity },
+        mode,
+        createStudioPixelEditCanvas,
+        { signal: controller.signal },
       );
-      if (!out) throw new Error("복구 브러시 결과를 만들지 못했습니다.");
-      const src = (out as HTMLCanvasElement).toDataURL("image/png");
+      // A stroke whose source and destination footprints are both outside the raster is a valid
+      // no-op. Do not turn pointer cancellation/out-of-bounds input into an error toast or history.
+      if (!out) return;
+      const src = await encodeStudioRetouchCanvasPng(out as HTMLCanvasElement, {
+        signal: controller.signal,
+      });
       if (!canApplyStudioMutation(mutationTicket)) return;
       if (isLatestLayerContentMutationLocked(target.id)) return;
-      patchEl(target.id, { src } as Partial<El>);
+      if (src !== target.src && patchEl(target.id, { src } as Partial<El>)) {
+        expectStudioRasterImagePresentation({ elementId: target.id, src });
+      }
       setError(null);
     } catch (err) {
+      if (controller.signal.aborted || (err instanceof Error && err.name === "AbortError")) return;
       console.error("Failed to bake heal/clone stroke:", err);
       setError(err instanceof Error ? err.message : "복구 브러시 적용에 실패했습니다.");
     } finally {
-      setHealCloneBusy(false);
+      if (healCloneAbortRef.current === controller) {
+        healCloneAbortRef.current = null;
+        setHealCloneBusy(false);
+      }
     }
   }
 
@@ -28234,6 +30272,7 @@ const puppetWarpArmed =
     const discardedId = drawingRef.current?.id;
     discardStudioLivingInkStroke(discardedId);
     discardStudioHokusaiLiveStroke(discardedId);
+    inkMeshLivePreviewRuntimeRef.current?.cancel();
     if (discardedId) cancelLiveStrokeBackendAudit(discardedId);
     drawingCrdtPublisherRef.current.cancel(discardedId);
     if (discardedId) {
@@ -28286,6 +30325,13 @@ const puppetWarpArmed =
         setDrawMode,
       }
     );
+  }
+  activatePrimaryCanvasToolRef.current = activatePrimaryCanvasTool;
+  /** CSP/PPT: surface properties after a draw tool pick (rail, shortcuts, companion). */
+  function activateDrawToolWithProperties(nextDrawMode?: DrawMode) {
+    if (showQuickStart) dismissQuickStart();
+    activatePrimaryCanvasTool("draw", nextDrawMode);
+    openInspectorRoute({ primary: "properties" }, isMobile ? "draw" : null);
   }
   function readActiveStrokeLifecycleRecovery() {
     const activeStroke = drawingRef.current;
@@ -28354,6 +30400,7 @@ const puppetWarpArmed =
     const discardedId = drawingRef.current?.id;
     discardStudioLivingInkStroke(discardedId);
     discardStudioHokusaiLiveStroke(discardedId);
+    inkMeshLivePreviewRuntimeRef.current?.cancel();
     cancelAllLiveStrokeBackendAudits();
     drawingCrdtPublisherRef.current.cancel(discardedId);
     if (discardedId) {
@@ -28800,17 +30847,47 @@ const puppetWarpArmed =
         draftPreviewNormalLayerRef.current?.drawScene();
         draftPreviewDynamicLayerRef.current?.drawScene();
       }
+      // V12 §5 cutover: one synchronous tournament projection per stroke start decides, before
+      // any side-effecting begin call, which lanes may attempt admission. Pristine tournament
+      // state (no winner, nothing killed) admits every lane, so the gated ladder below evaluates
+      // byte-identically to the pre-tournament contract; a killed lane never begins, and a cached
+      // winner owns the head by denying the lanes ranked above it. SQLite/OPFS
+      // installs asynchronously after mount; before it is ready `peek` returns
+      // null and every lane remains admitted in its original order. No stroke
+      // constructs a fallback-backed runtime or waits for persistence I/O.
+      const strokeRouteTournamentRuntime = peekBootedStudioTournamentRuntime();
+      const strokeRouteTournamentGate = strokeRouteTournamentRuntime
+        ? resolveStudioStrokeRoutePointerDownGate({
+            lanes: STUDIO_STROKE_ROUTE_TOURNAMENT_LANES,
+            traits: {
+              pointCount: Math.floor(next.points.length / 2),
+              // An absent brush id normalizes to the "unknown" family bucket.
+              brushFamily: next.brush ?? "",
+              canvasScale: zoomRef.current,
+            },
+            state: strokeRouteTournamentRuntime,
+          })
+        : null;
+      if (strokeRouteTournamentGate?.selection.killIgnoredReason) {
+        console.warn(
+          "Studio stroke-route tournament kill list was ignored to keep a fallback chain.",
+          strokeRouteTournamentGate.selection.killIgnoredReason,
+        );
+      }
       // Admissions are side-effecting. Attempt them strictly in product priority order and stop
       // invoking lower providers after the first accepted owner; resolving all probes first would
       // start multiple translucent surfaces and create a cancellation race.
-      const livingInkAdmitted = pendingGpuAuthorityPromoted
+      const livingInkAdmitted = (strokeRouteTournamentGate?.admits("living-ink") ?? true)
+        && pendingGpuAuthorityPromoted
         && beginStudioLivingInkStroke(next, pointerSample);
-      const hokusaiPinned = pendingGpuAuthorityPromoted
+      const hokusaiPinned = (strokeRouteTournamentGate?.admits("hokusai") ?? true)
+        && pendingGpuAuthorityPromoted
         && !livingInkAdmitted
         && beginStudioHokusaiLiveStroke(next);
       const stampKind = resolveStudioStampBrushKind(next.brush);
       const stampDirect = Boolean(
-        !livingInkAdmitted
+        (strokeRouteTournamentGate?.admits("stamp") ?? true)
+        && !livingInkAdmitted
         && !hokusaiPinned
         && stampKind
         && isDirectLiveStampDraftEl(next)
@@ -28833,7 +30910,8 @@ const puppetWarpArmed =
       // 도착하지 않으면(조용히 실패하는 GPU 환경) 같은 스트로크 안에서 Konva 로 인계된다.
       // (미드스트로크 스크린샷 검증 완료 — drawImage 기반 픽셀 판정은 WebGPU 캔버스에서
       // 위음성을 내므로 합성 스크린샷/영수증으로만 판정한다.)
-      const gpuStartEligible = pendingGpuAuthorityPromoted
+      const gpuStartEligible = (strokeRouteTournamentGate?.admits("gpu") ?? true)
+        && pendingGpuAuthorityPromoted
         && !livingInkAdmitted
         && !hokusaiPinned
         && !stampDirect
@@ -28878,7 +30956,8 @@ const puppetWarpArmed =
       liveInkOverlayClearGenRef.current += 1;
       let liveInkOverlayStarted = false;
       if (
-        overlayCandidate
+        (strokeRouteTournamentGate?.admits("live-ink") ?? true)
+        && overlayCandidate
         && !livingInkAdmitted
         && !hokusaiPinned
         && !stampDirect
@@ -28900,7 +30979,8 @@ const puppetWarpArmed =
         // 다른 렌더러를 쓰는 새 획도 이전 커밋의 draw 영수증 대기 잉크를 지우면 안 된다.
         liveInkOverlayRendererRef.current.resetActive();
       }
-      const wetInkOverlayStarted = !pixelDirect
+      const wetInkOverlayStarted = (strokeRouteTournamentGate?.admits("wet-fallback") ?? true)
+        && !pixelDirect
         && !livingInkAdmitted
         && !hokusaiPinned
         && !stampDirect
@@ -28912,7 +30992,8 @@ const puppetWarpArmed =
           pageEpoch: currentPageId,
           hidden: next.hidden === true,
         }).status === "started";
-      const dynamicBrushDirect = !pixelDirect
+      const dynamicBrushDirect = (strokeRouteTournamentGate?.admits("dynamic") ?? true)
+        && !pixelDirect
         && !livingInkAdmitted
         && !hokusaiPinned
         && !stampDirect
@@ -28926,7 +31007,7 @@ const puppetWarpArmed =
         pointerId: Math.max(0, pointerSample.pointerId),
         strokeEpoch: studioStrokeSurfaceEpochRef.current++,
         livingInk: {
-          eligible: studioLivingInkSupportsElement(next),
+          eligible: studioLivingInkSupportsElement(next, livingInkPhysicalModeEnabled),
           providerState: livingInkState,
           capabilitiesAccepted: livingInkState === "ready",
           admitted: livingInkAdmitted,
@@ -28951,9 +31032,9 @@ const puppetWarpArmed =
           void livingInkCoordinatorRef.current.cancelStroke(next.id);
           if (livingInkMode === "water") {
             livingInkWaterNoopStrokeIdsRef.current.add(next.id);
-            setError("Living Ink 물 도구 route를 고정하지 못해 문서를 변경하지 않습니다.");
+            setError("수채 번짐 물 도구 경로를 고정하지 못해 문서를 변경하지 않습니다.");
           } else {
-            setError("Living Ink pointer route를 고정하지 못해 현재 획은 벡터로 보존합니다.");
+            setError("수채 번짐 포인터 경로를 고정하지 못해 현재 획은 벡터로 보존합니다.");
           }
           // No lower provider was started after Living Ink admission. Re-resolve this still-
           // pointerdown snapshot as ordinary Konva so the retained draft stays visible; this is
@@ -28963,7 +31044,7 @@ const puppetWarpArmed =
             pointerId: Math.max(0, pointerSample.pointerId),
             strokeEpoch: Math.max(0, studioStrokeSurfaceEpochRef.current - 1),
             livingInk: {
-              eligible: studioLivingInkSupportsElement(next),
+              eligible: studioLivingInkSupportsElement(next, livingInkPhysicalModeEnabled),
               providerState: livingInkState,
               capabilitiesAccepted: livingInkState === "ready",
               admitted: false,
@@ -29034,6 +31115,17 @@ const puppetWarpArmed =
         causalPostCorrectionEligible,
         nativePredictionEligible: predictionTailEligible,
       });
+      if (predictionTailEligible && !causalPostCorrectionEligible) {
+        // This is a bounded preview admission only: failure leaves the already-started Canvas2D
+        // live-ink + Perfect Freehand path untouched. The async host prewarms WASM/fabric before
+        // pointerdown, so begin itself never waits inside the contact task.
+        inkMeshLivePreviewRuntimeRef.current?.begin(
+          next,
+          liveBrushPressureSamplesFor(next),
+        );
+      } else {
+        inkMeshLivePreviewRuntimeRef.current?.cancel();
+      }
       // A pin grants only a write route, never visibility. The exact retained Konva vector stays
       // visible until coordinator token + imperative receipt both authorize the GPU frame.
       applyLiveStrokeBackendPresentationEffects();
@@ -29151,7 +31243,7 @@ const puppetWarpArmed =
       const pos = e.target.getStage()?.getRelativePointerPosition();
       if (pos) {
         const hex = pickCanvasColorAt(pos);
-        if (hex) setColor(hex);
+        if (hex) applyStudioDrawingColor(hex);
       }
       if (eyedropperActive) setEyedropperActive(false);
       return;
@@ -29547,8 +31639,11 @@ const puppetWarpArmed =
           : computeHealCloneSourceOffset(healCloneSourceAnchor, p);
       healCloneOffsetRef.current = offset;
       const radiusNorm = healCloneRadius / Math.max(1, selected.width);
-      healCloneDragRef.current = { elId: selected.id, frame, offset, radiusNorm, points: [p] };
-      scheduleHealCloneDragPreview({ points: [p] });
+      const session = { elId: selected.id, frame, offset, radiusNorm, points: [p] };
+      healCloneDragRef.current = session;
+      // 오버레이 마운트는 제스처당 한 번만 React에 알리고, 이후 move는 Line ref만 갱신한다.
+      setHealCloneDragPreview({ points: [p], lineRef: healClonePreviewLineRef });
+      scheduleHealCloneDragPreview(session);
       return;
     }
     // 히스토리 브러시 무장 중: 소스가 지정돼 있으면 일반 드래그로 스트로크 좌표를 누적한다(오프셋
@@ -29784,7 +31879,7 @@ const puppetWarpArmed =
     }
     if (tool === "draw") {
       if (livingInkFinalizingRef.current) {
-        announceDrawingShortcut("Living Ink 물리 프레임을 저장하는 중입니다 · 잠시 후 다음 획을 그려 주세요");
+        announceDrawingShortcut("수채 번짐 프레임을 저장하는 중입니다 · 잠시 후 다음 획을 그려 주세요");
         return;
       }
       if (hokusaiLiveFinalizingRef.current) {
@@ -29835,6 +31930,42 @@ const puppetWarpArmed =
         );
         return;
       }
+      const backdropPendingBatch = pendingStrokeCommitsRef.current;
+      const backdropBoundary = planStudioDraftPreviewBackdropBoundary({
+        incoming: {
+          brush: drawMode === "pen" ? brush : undefined,
+          fill:
+            drawMode === "lasso-fill"
+              ? color
+              : drawMode === "shape" && shapeFill && drawShape !== "line"
+                ? color
+                : undefined,
+          kind: drawMode === "shape" ? drawShape : "freehand",
+          mode: drawMode === "eraser" ? "eraser" : "pen",
+        },
+        pending: backdropPendingBatch?.pageId === activePage.id
+          ? backdropPendingBatch.strokes
+          : [],
+        hasRetainedDomBackdrop: backdropPendingBatch !== null && (
+          liveInkOverlayRendererRef.current.hasSettledStrokes
+          || liveStampOverlayRendererRef.current.hasSettledStrokes
+          || liveDynamicBrushOverlayRendererRef.current.hasSettledStrokes
+          || liveWetInkOverlayRendererRef.current.hasSettledStrokes
+          || pendingGpuStrokesRef.current.length > 0
+        ),
+      });
+      const backdropBoundaryExecution = executeStudioDraftPreviewBackdropBoundary({
+        plan: backdropBoundary,
+        flushSynchronously: flushSync,
+        flushPending: () => flushPendingStrokeCommitsRef.current(),
+        restorePointerPosition: () => stageRef.current?.setPointersPositions(pointerSample),
+      });
+      if (!backdropBoundaryExecution.ready) {
+        setError(
+          "앞선 획의 합성 순서를 확정하지 못해 새 획을 시작하지 않았어요. 잠금·동기화 상태를 확인한 뒤 다시 시도해 주세요."
+        );
+        return;
+      }
       // A CRDT stroke has its own conflict-free operation stream, so it must not claim the old
       // page-wide lease that prevented two artists from drawing at once. Keep the lease fallback
       // only while the durable document is not connected.
@@ -29846,7 +31977,8 @@ const puppetWarpArmed =
         endLiveResourceEdit();
         return;
       }
-      const pos = e.target.getStage()?.getRelativePointerPosition();
+      const pos = stageRef.current?.getRelativePointerPosition()
+        ?? e.target.getStage()?.getRelativePointerPosition();
       // Every early exit after a successful begin must release — stranded claimLock is collab-unsafe.
       if (!pos) {
         endLiveResourceEdit();
@@ -30701,10 +32833,14 @@ const puppetWarpArmed =
         const session = healCloneDragRef.current;
         const p = canvasPointToNormalized(pos.x, pos.y, session.frame);
         updateHealCloneCursorNodes(p, session.frame);
-        const nextPoints = appendBrushPoint(session.points, p, session.radiusNorm);
-        if (nextPoints !== session.points) {
-          session.points = nextPoints;
-          scheduleHealCloneDragPreview({ points: nextPoints });
+        // appendBrushPoint에 마지막 점 하나만 넘겨 동일한 sanitize/간격 규약을 O(1)로 재사용한다.
+        // 허용된 점만 mutable session에 push하므로 growing-array spread의 누적 O(n²)를 피한다.
+        const last = session.points[session.points.length - 1];
+        const tail = appendBrushPoint(last ? [last] : [], p, session.radiusNorm);
+        const appended = tail[last ? 1 : 0];
+        if (appended) {
+          session.points.push(appended);
+          scheduleHealCloneDragPreview(session);
         }
       }
       return;
@@ -31829,6 +33965,34 @@ const puppetWarpArmed =
             } else {
               scheduleDraft(predictedPreview);
             }
+            const inkMeshModule = inkMeshLivePreviewModuleRef.current;
+            const inkMeshRuntime = inkMeshLivePreviewRuntimeRef.current;
+            if (inkMeshModule && inkMeshRuntime) {
+              try {
+                const meshPreview = suffixDraft
+                  ? inkMeshModule.expandStudioInkMeshPredictedSuffix(
+                      authoritativeDrawing,
+                      predictedPreview,
+                      predictionStartSampleIndex,
+                    )
+                  : predictedPreview;
+                const meshReceipt = inkMeshRuntime.previewPredicted(
+                  meshPreview,
+                  authoritativePointCount,
+                  studioLiveBrushPressureSamples(meshPreview),
+                );
+                if (inkMeshModule.isStudioInkMeshRenderedReceipt(meshReceipt)) {
+                  // Canvas prediction remains the fail-visible CPU path, but exactly one transient
+                  // tail is visible in this frame. Its state stays intact so device loss can resume
+                  // on the next browser delivery without touching DrawEl/history.
+                  liveInkPredictionRendererRef.current.clear();
+                }
+              } catch {
+                // A malformed compact preview is non-authoritative. Drop only the mesh island and
+                // leave the already-rendered Canvas2D prediction + Perfect Freehand path untouched.
+                inkMeshRuntime.cancel();
+              }
+            }
           }
         } finally {
           drawingPredictionBatchMutationRef.current = false;
@@ -31865,6 +34029,13 @@ const puppetWarpArmed =
   function publishAuthoritativeFreehandSuffix(startSample: number): DrawEl | null {
     const authoritativeDrawing = drawingRef.current;
     if (!authoritativeDrawing) return null;
+    // The same coalesced suffix that becomes DrawEl/CRDT authority advances Google Ink's retained
+    // InProgressStroke. Any previously displayed estimate is replaced by this exact prefix before
+    // the normal live surface flushes; no predicted sample enters this call.
+    inkMeshLivePreviewRuntimeRef.current?.synchronizeAuthoritative(
+      authoritativeDrawing,
+      liveBrushPressureSamplesFor(authoritativeDrawing),
+    );
     appendStudioLivingInkAuthoritativeSuffix(authoritativeDrawing, startSample);
     appendStudioHokusaiAuthoritativeSuffix(authoritativeDrawing, startSample);
     if (liveDraftDirectRef.current || liveStampDraftDirectRef.current) {
@@ -32487,14 +34658,16 @@ const puppetWarpArmed =
       // The pointerup finally-block has already cleared the direct DrawEl refs. Install an exact
       // settled copy before removing the material overlay so async Worker failure never flashes a
       // blank frame while the React history commit reaches the main layer.
-      draftPreviewStoreRef.current.settle(finished);
-      draftPreviewNormalLayerRef.current?.drawScene();
+      flushSync(() => {
+        draftPreviewStoreRef.current.settle(finished);
+      });
     }
     const committed = commit(fallbackElements, undefined, state.pageId);
     hokusaiLiveOverlaySurfaceRef.current?.renderer.clear();
     hokusaiLiveOverlayVisibleRef.current = false;
     hokusaiLiveStrokeRef.current = null;
     hokusaiLiveFinalizingRef.current = false;
+    clearStudioHokusaiVectorShadow(state);
     if (committed) {
       if (currentPage) {
         setSelectedId(finished.id);
@@ -32529,8 +34702,8 @@ const puppetWarpArmed =
     setLivingInkBusy(false);
     void livingInkCoordinatorRef.current.cancelStroke(strokeId);
     liveDraftLayerRef.current?.drawScene();
-    announceDrawingShortcut("Living Ink 물 도구 · 변경 없음");
-    setError(`Living Ink 물 도구를 적용하지 못해 기존 PNG와 문서를 그대로 보존했습니다. ${reason}`);
+    announceDrawingShortcut("수채 번짐 물 도구 · 변경 없음");
+    setError(`수채 번짐 물 도구를 적용하지 못해 기존 PNG와 문서를 그대로 보존했습니다. ${reason}`);
   }
 
   function commitStudioLivingInkFallbackVector(
@@ -32555,13 +34728,18 @@ const puppetWarpArmed =
     );
     const currentPage = currentPageIdRef.current === state.pageId;
     if (currentPage) {
-      draftPreviewStoreRef.current.settle(finished);
-      draftPreviewNormalLayerRef.current?.drawScene();
+      // A failed/blank physical frame must transfer to the newly mounted settled-run layer before
+      // the Worker canvas is cleared. Merely mutating the external store is not a paint receipt.
+      flushSync(() => {
+        draftPreviewStoreRef.current.settle(finished);
+      });
+      clearStudioLivingInkVectorShadow(state);
     }
     const committed = commit(fallbackElements, undefined, state.pageId);
     livingInkOverlaySurfaceRef.current?.renderer.clear();
     livingInkOverlayVisibleRef.current = false;
     livingInkStrokeRef.current = null;
+    releaseLivingInkInputPointer();
     livingInkFinalizingRef.current = false;
     studioStrokeSurfaceRouteRef.current = null;
     setLivingInkBusy(false);
@@ -32571,15 +34749,15 @@ const puppetWarpArmed =
         setSelectedId(finished.id);
         queueCommittedStrokeSurfaceHandoff(state.pageId, [finished.id]);
       }
-      announceDrawingShortcut("Living Ink 복구 · 원본 벡터 획 저장");
-      setError(`Living Ink 결과를 원본 벡터로 저장했습니다. ${reason}`);
+      announceDrawingShortcut("수채 번짐 복구 · 원본 벡터 획 저장");
+      setError(`수채 번짐 결과를 원본 벡터로 저장했습니다. ${reason}`);
     } else {
       restorePendingStrokeCommits({
         pageId: state.pageId,
         strokes: [finished],
         retryCount: 0,
       });
-      setError(`Living Ink 결과를 즉시 저장하지 못해 복구 큐에 보존했습니다. ${reason}`);
+      setError(`수채 번짐 결과를 즉시 저장하지 못해 복구 큐에 보존했습니다. ${reason}`);
     }
     liveDraftLayerRef.current?.drawScene();
   }
@@ -32615,6 +34793,19 @@ const puppetWarpArmed =
         surface.binding.projection,
         (receipt) => onStudioLivingInkOverlayPresented(state, receipt),
       );
+      if (!studioLivingInkCoverageIntersectsStroke({
+        coverage: presentation.alphaCoverage,
+        outputWidth: presentation.width,
+        outputHeight: presentation.height,
+        documentWidth: CANVAS_W,
+        documentHeight: canvasH,
+        points: finished.points,
+        diameter: studioLiveBrushEffectiveDiameter(finished),
+      })) {
+        throw new Error(
+          "Living Ink canonical PNG가 원본 획의 위치에 표시 가능한 안료를 만들지 못해 원본 벡터를 유지합니다.",
+        );
+      }
       const result: StudioLivingInkCanonicalResult = Object.freeze({
         src: presentation.src,
         pngSha256: presentation.pngSha256,
@@ -32686,7 +34877,7 @@ const puppetWarpArmed =
         livingInkAcceptedAuthorityRef.current = null;
         livingInkRejectedAuthorityRef.current = committedAuthority;
         const message =
-          "Living Ink PNG는 저장됐지만 Worker 상태 고정에 실패해, 저장 영수증 재검증 전에는 물리 편집을 비활성화합니다.";
+          "수채 번짐 PNG는 저장됐지만 Worker 상태 고정에 실패해, 저장 영수증 재검증 전에는 물리 편집을 비활성화합니다.";
         setError(message);
         void livingInkCoordinatorRef.current.failClosed(message);
       } else {
@@ -32694,9 +34885,15 @@ const puppetWarpArmed =
         livingInkAcceptedAuthorityRef.current = committedAuthority;
       }
       if (currentPageIdRef.current === state.pageId) {
-        setSelectedId(transaction.transaction.selectionId);
+        // Automatic materialization is still part of the drawing gesture. Selecting the new
+        // page-sized image would mount image-editing chrome and move the canvas host between the
+        // live/released frame and the canonical handoff. The pixels and document coordinates are
+        // already identical; keep the drawing context stable and let the artist explicitly select
+        // the materialized layer afterward (same contract as Hokusai below).
+        setSelectedId(null);
+        setLivingInkScope("all");
       }
-      announceDrawingShortcut("Living Ink · 입력·놓을 때 물리 계산, 손을 떼면 2초 고정 settle");
+      announceDrawingShortcut("수채 번짐 · 입력·놓을 때 물리 계산, 손을 떼면 2초 고정 settle");
       // The exact live pixels stay visible until StudioKonvaImageNode synchronously draws the same
       // PNG hash into the main layer. No guessed requestAnimationFrame handoff is allowed.
     } catch (cause) {
@@ -32723,7 +34920,7 @@ const puppetWarpArmed =
       if (state.queuedSamples.length > 0) {
         const queued = state.queuedSamples;
         state.queuedSamples = [];
-        session.append(queued);
+        state.lastAppendedSequence = session.append(queued);
       }
       const result: StudioHokusaiLiveCanonicalResult = await session.finish();
       if (state.failed || hokusaiLiveStrokeRef.current !== state) {
@@ -32759,7 +34956,11 @@ const puppetWarpArmed =
         throw new Error("문서가 저장 중이거나 잠겨 있어 단일 Hokusai 트랜잭션을 확정하지 못했습니다.");
       }
       if (currentPageIdRef.current === state.pageId) {
-        setSelectedId(transaction.transaction.selectionId);
+        // Automatic brush materialization must not switch the editor into image-selection chrome.
+        // That contextual row changes the viewport's DOM offset while the pointer-up frame is
+        // being handed to the canonical PNG, making a stationary stroke appear to jump. Keep the
+        // drawing context stable; artists can explicitly select the materialized image afterward.
+        setSelectedId(null);
       }
       announceDrawingShortcut("Hokusai 자연매체 획 저장 완료");
       // StudioKonvaImageNode will release the material overlay only after the exact PNG is decoded
@@ -32920,8 +35121,9 @@ const puppetWarpArmed =
         hokusaiStroke.finalDrawing = finished;
         hokusaiStroke.finishing = true;
         hokusaiLiveFinalizingRef.current = true;
-        // The receipted material canvas remains visible while the Worker settles and hashes
-        // its canonical PNG. No provisional vector is committed, so undo receives one entry.
+        // session.finish() waits for the latest appended sequence to be presented and acknowledged
+        // before it posts the canonical finish. The bounded vector tail remains fail-visible during
+        // that async handshake, including a stabilizer endpoint appended on pointer-up.
         void finishStudioHokusaiLiveStroke(hokusaiStroke, finished);
         return "handled-preserve-ink";
       }
@@ -32966,6 +35168,17 @@ const puppetWarpArmed =
         pointerEvent,
         options.consumeReleaseSample !== false,
       );
+      if (authoritativeLiveStroke) {
+        // Seal the upstream InProgressStroke from hardware-backed DrawEl samples only. The mesh
+        // canvas is cleared immediately afterwards; normal release planning still owns document
+        // commit, anti-flicker handoff, and every settled pixel.
+        inkMeshLivePreviewRuntimeRef.current?.finish(
+          authoritativeLiveStroke,
+          liveBrushPressureSamplesFor(authoritativeLiveStroke),
+        );
+      } else {
+        inkMeshLivePreviewRuntimeRef.current?.cancel();
+      }
       if (drawingRef.current && isCompleteStudioDrawOp(drawingRef.current)) {
         const completedDrawing = drawingRef.current;
         completedLiveStrokeBackendAudit = true;
@@ -33225,6 +35438,41 @@ const puppetWarpArmed =
         completedLiveStrokeBackendAudit && deferInkCleanup
       );
       clearDraftPreview({ preserveInkForDeferredCommit: deferInkCleanup });
+      const finishingLivingInk = livingInkStrokeRef.current;
+      if (
+        deferInkCleanup
+        && finishingLivingInk?.finishing
+        && finishingLivingInk.finalDrawing
+        && !finishingLivingInk.overlayPresented
+      ) {
+        // A short contact can finish before the Worker presents even its first material frame.
+        // Restore the exact vector in the same pointer-up task and retire it only on a real frame
+        // or canonical-image receipt; otherwise the async finish window contains a blank canvas.
+        showStudioLivingInkVectorShadow(
+          finishingLivingInk.finalDrawing,
+          finishingLivingInk.pageId,
+        );
+      }
+      const finishingHokusai = hokusaiLiveStrokeRef.current;
+      if (
+        deferInkCleanup
+        && finishingHokusai?.finishing
+        && finishingHokusai.finalDrawing
+      ) {
+        if (!finishingHokusai.overlayPresented) {
+          // A fast pointer-up can outrun Hokusai's first dirty frame. Restore the exact retained
+          // vector synchronously, then relinquish it only when a real material frame owns pixels.
+          showStudioHokusaiVectorShadow(
+            finishingHokusai.finalDrawing,
+            finishingHokusai.pageId,
+          );
+        } else {
+          refreshStudioHokusaiVectorTailShadow(
+            finishingHokusai,
+            finishingHokusai.finalDrawing,
+          );
+        }
+      }
       // Re-rasterize the newest settled overlay stroke from the release-planner geometry so the
       // live Canvas footprint matches Konva/causal planning before committed-ink handoff. Without
       // this, residual thinning / endpoint promotion can leave a one-frame pop when settled ink is
@@ -34359,18 +36607,54 @@ const puppetWarpArmed =
         // 말풍선은 텍스트가 넘치지 않게 높이를 자동 확장(수동으로 키운 크기는 보존) — 단,
         // autoShrinkText(크기 고정 모드)가 켜져 있으면 높이는 건드리지 않는다(렌더 시점에
         // fitBubbleFontSize가 폰트 크기를 알아서 줄인다).
+        //
+        // 측정 노드는 **실제 렌더 KText와 완전히 같은 속성**으로 만들어야 한다. 예전에는
+        // lineHeight 1.1(실제 1.25~1.4)·fontStyle 미지정(실제 bold)·width `-36`(실제 패딩
+        // 2×bHPad)·높이 여유 `+28`(실제 상하 패딩 합)이라 블록 높이를 항상 과소평가했고,
+        // Konva.Text는 고정 height를 넘는 줄을 경고 없이 버려 대사가 조용히 잘렸다.
+        // 기본값·패딩은 전부 studio-bubble-text-fit 단일 소스에서 가져온다.
         let height: number | undefined;
         if (el && el.type === "bubble" && !el.autoShrinkText) {
-          const measure = new KonvaRuntime.Text({
-            text: finalValue || " ",
-            width: el.width - 36,
-            fontSize: el.fontSize ?? 24,
-            fontFamily: el.font ?? "Pretendard, sans-serif",
-            align: "center",
-            lineHeight: el.lineHeight ?? 1.1,
+          const fontSize = resolveBubbleFontSize(el.fontSize);
+          const fontFamily = resolveBubbleFontFamily(el.font);
+          const fontStyle = resolveBubbleFontStyle(el.fontStyle);
+          const lineHeight = resolveBubbleLineHeight({
+            lineHeight: el.lineHeight,
+            vertical: el.vertical,
+            theme: webtoonTheme,
           });
-          height = Math.max(el.height, Math.ceil(measure.height()) + 28);
-          measure.destroy();
+          const letterSpacing = bubbleLetterSpacing(webtoonTheme);
+          if (el.vertical) {
+            // 세로쓰기는 열 조판이라 가로 KText로 잴 수 없다 — 세로 코어를 쓰는 공유 계산.
+            height = fitBubbleBoxHeightToText({
+              text: finalValue,
+              boxWidth: el.width,
+              fontSize,
+              fontFamily,
+              fontStyle,
+              lineHeight,
+              letterSpacing,
+              vertical: true,
+              // blockAlign은 열 안 정렬일 뿐이라 "들어가느냐" 판정에는 영향이 없다(코어 계약).
+              minHeight: el.height,
+            });
+          } else {
+            const measure = new KonvaRuntime.Text({
+              text: finalValue || " ",
+              width: bubbleTextBoxWidth(el.width, fontSize),
+              fontSize,
+              fontFamily,
+              fontStyle,
+              align: el.align ?? "center",
+              lineHeight,
+              letterSpacing,
+            });
+            height = Math.max(
+              el.height,
+              Math.ceil(measure.height()) + bubbleVerticalPaddingTotal(fontSize)
+            );
+            measure.destroy();
+          }
         }
         patchEl(editing.id, { text: finalValue, ...(height !== undefined ? { height } : {}) } as Partial<El>);
       }
@@ -34605,6 +36889,7 @@ const puppetWarpArmed =
           characterBible,
           writerRoom,
           aiProvenance,
+          aiImageReferences: scenarioImageReferenceDocument,
           comments: studioComments,
           releaseSchedule,
           publicationAnalytics,
@@ -34739,11 +37024,6 @@ const puppetWarpArmed =
         return;
       }
 
-      saveStudioAiImageReferenceDocument(
-        studioWorkspaceStorage(),
-        { workId: savedWorkId, userScope: saveAuthScopeKey },
-        scenarioImageReferenceDocument
-      );
       clearAutosaveDurableAuthority();
       try {
         localStorage.removeItem(autosaveKey);
@@ -34905,6 +37185,31 @@ function clearSelectionForEdit() {
     );
     announceDrawingShortcut("레이어 자르기");
   }
+  // §15.3 Layer ▸ Mask/Clipping, Filter ▸ Adjustment Layer. Three menu doors onto
+  // surfaces the inspector already owns — same patch, same route, no second
+  // implementation. The audit measured all three at 3+ actions because the only
+  // path was 선택 → 속성 탭 → 스크롤 (`docs/rewrite/ux-audit-v5.md` §2.2).
+  function toggleSelectedClippingMask() {
+    if (!selected || selected.type === "frame") {
+      setError("클리핑할 레이어를 먼저 선택하세요.");
+      return;
+    }
+    const clipped = selected.clipBelow === true;
+    if (!patchEl(selected.id, { clipBelow: !clipped } as Partial<El>)) {
+      setError("잠긴 레이어는 클리핑을 바꿀 수 없어요. 잠금을 해제한 뒤 다시 시도하세요.");
+      return;
+    }
+    setError(null);
+    announceDrawingShortcut(clipped ? "아래 레이어 클리핑 해제" : "아래 레이어에 클리핑");
+  }
+  function openSelectedLayerAdjustments() {
+    openInspectorRoute({ primary: "properties", image: "quick" });
+    announceDrawingShortcut("레이어 보정 — 레벨과 톤 커브가 여기 있어요");
+  }
+  function openSelectedLayerMask() {
+    openInspectorRoute({ primary: "properties", image: "mask" });
+    announceDrawingShortcut("레이어 마스크 편집");
+  }
   function pixelSelectionToolForActivation(
     kind: PixelSelectionActivationKind,
   ): SelectionToolKind | "wand" | null {
@@ -34978,20 +37283,6 @@ function clearSelectionForEdit() {
       if (initialContext.input.documentMutationBlockedReason) {
         throw new Error(initialContext.input.documentMutationBlockedReason);
       }
-      const sourceSummary = rasterRuntime.summarizeStudioRasterPreparationSources({
-        width: initialContext.input.width,
-        height: initialContext.input.height,
-        elements: initialContext.input.elements,
-        groups: initialContext.input.groups,
-        theme: initialContext.input.theme,
-        bg: initialContext.input.bg,
-        bgGrad: initialContext.input.bgGrad,
-      });
-      if (sourceSummary.visibleContentCount === 0) {
-        throw new Error(
-          "픽셀 선택 대상으로 만들 표시 요소가 없습니다. 먼저 펜, 도형 또는 텍스트를 추가하세요.",
-        );
-      }
       const planned = rasterRuntime.planStudioEditableRasterCopy(initialContext.input);
       if (!planned.ok) throw new Error(planned.reason);
       const rendered = await rasterRuntime.renderStudioEditableRasterCopy(
@@ -35011,14 +37302,6 @@ function clearSelectionForEdit() {
         rasterRuntime,
         "pixel-selection",
       );
-      if (!rasterRuntime.isStudioEditableRasterCopyPlanCurrent(
-        planned.plan,
-        latestContext.input,
-      )) {
-        throw new Error(
-          "픽셀 선택 대상을 준비하는 동안 페이지가 바뀌었습니다. 최신 화면에서 다시 시도해 주세요.",
-        );
-      }
       const composite = {
         ...rasterRuntime.materializeStudioEditableRasterCopy({
           plan: planned.plan,
@@ -35282,14 +37565,42 @@ function clearSelectionForEdit() {
   /**
    * 리터치 도구의 한 번 클릭 진입 경계.
    *
-   * 선택 이미지 또는 유일한 이미지가 있으면 기존 직접 편집 경로를 사용한다. 이미지가 없거나
-   * 여러 장이라 대상이 모호하지만 페이지에 표시 콘텐츠가 있으면, 현재 보이는 결과를 원본 보존
-   * 합성본으로 만든 뒤 같은 도구를 자동 재개한다. 빈 페이지/잠금은 기존 정확한 오류를 유지한다.
+   * 1) 선택 이미지 → 그 레이어만 직접 편집
+   * 2) 선택 선화·도형·텍스트 등 비이미지 → 해당 id만 래스터 복사 후 재개 (페이지 전체가 아님)
+   * 3) 유일한 이미지 / 페이지 합성 폴백 → 기존 경로
    */
   function ensureOrPrepareRasterRetouchTarget(
     toolId: "crop" | "smudge" | "dodge-burn" | "wet-mix" | "liquify",
     toolLabel: string,
   ): ImageEl | null {
+    // Start parsing the rare-action brush runtime at brush activation so the first pointerup does
+    // not pay the dynamic-import cold start. Crop shares this raster-preparation seam but does not
+    // consume either brush chunk, so leave its activation free of that unrelated work.
+    if (toolId !== "crop") {
+      void loadStudioPixelEditBrushRuntime().catch(() => undefined);
+      if (toolId === "liquify") {
+        void loadStudioLiquifyBrowserRuntime().catch(() => undefined);
+      }
+    }
+    if (
+      selected
+      && selected.type !== "image"
+      && !isEffectivelyHidden(selected, groups)
+      && !isEffectivelyLocked(selected, groups)
+      && !localHiddenElementIds.has(selected.id)
+    ) {
+      const layerLabel =
+        selected.type === "draw"
+          ? "선택 선화 편집 복사본"
+          : selected.type === "text" || selected.type === "bubble"
+            ? "선택 텍스트 편집 복사본"
+            : "선택 레이어 편집 복사본";
+      void createEditableRasterCopyForInspector(toolId, {
+        sourceIds: [selected.id],
+        layerName: layerLabel,
+      });
+      return null;
+    }
     const directCandidates = elements.filter(
       (element): element is ImageEl =>
         element.type === "image"
@@ -35369,19 +37680,75 @@ function clearSelectionForEdit() {
     );
     announceDrawingShortcut("혼색 브러시 · 바닥색을 섞어가며 칠해 보세요");
   }
+  /**
+   * Free Transform (CSP/PS-style ⇧T) — always one selected layer when possible:
+   * - freehand stroke → select tool + uniform free-scale proxy handles
+   * - image without marquee → Konva free-transform of that image layer
+   * - image with marquee → content transform panel (pixel-region scale/rotate/flip)
+   * - other objects → select tool (Konva handles already attached)
+   */
   function openPixelSelectionTransform() {
+    if (activeSurfaceReviewLocked) {
+      setError("현재 작업면의 검토 잠금을 먼저 해제하세요.");
+      return;
+    }
+    // Vector stroke / freehand: object free-scale handles (not pixel marquee).
+    if (selected?.type === "draw") {
+      if (isEffectivelyLocked(selected, groups)) {
+        setError("잠긴 레이어는 변형할 수 없어요. 잠금을 해제한 뒤 다시 시도하세요.");
+        return;
+      }
+      disarmAllPixelTools();
+      setTool("select");
+      setMenu(null);
+      setError(null);
+      announceDrawingShortcut("모서리 핸들을 끌어 선택 선화 레이어의 크기·위치를 조절하세요");
+      return;
+    }
+    // Whole image layer free-transform (no marquee) — keep ops on this layer only.
+    if (
+      selected?.type === "image"
+      && !isEffectivelyLocked(selected, groups)
+      && !isSelectionUsable(pixelSel)
+    ) {
+      if (selectedImageMutationLocked) {
+        setError("선택한 이미지 레이어의 편집 잠금을 먼저 해제하세요.");
+        return;
+      }
+      disarmAllPixelTools();
+      setTool("select");
+      setMenu(null);
+      setError(null);
+      announceDrawingShortcut("모서리·회전 핸들로 선택 이미지 레이어를 변형하세요");
+      return;
+    }
+    // Shape / text / bubble with Konva transformer — just ensure select mode.
+    if (
+      selected
+      && selected.type !== "image"
+      && !isEffectivelyLocked(selected, groups)
+    ) {
+      disarmAllPixelTools();
+      setTool("select");
+      setMenu(null);
+      setError(null);
+      announceDrawingShortcut("모서리·회전 핸들로 선택 레이어를 변형하세요");
+      return;
+    }
+
     const target = ensurePixelToolTarget("내용 변형");
     if (!target) return;
     if (!isSelectionUsable(pixelSel)) {
-      // 변형은 "선택 안 픽셀"을 다루므로 대상만으로는 부족하다 — 조용히 무시하지 않고 안내한다.
-      setError("변형할 픽셀 영역을 먼저 선택하세요(사각/올가미 선택 후 다시 누르면 됩니다).");
-      return;
+      // Pixel marquee path when transform was requested without a free-transformable object.
+      commitPixelSelectionState((current) => selectAllPixels(current), "select-all");
+      announceDrawingShortcut("레이어 전체 선택 · 리터치에서 크기·회전·뒤집기를 적용하세요");
+    } else {
+      announceDrawingShortcut("리터치 패널에서 선택 영역의 내용 변형을 적용하세요");
     }
     openInspectorRoute(
       { primary: "properties", image: "retouch" },
       isMobile ? "props" : null
     );
-    announceDrawingShortcut("리터치 패널에서 내용 변형을 적용하세요");
   }
   function openImagePastePicker() {
     editMenuImageInputRef.current?.click();
@@ -35402,6 +37769,7 @@ function clearSelectionForEdit() {
     name: string,
     rasterRuntime: typeof import("./studio-raster-edit-preparation"),
     purpose: "page-filter" | "pixel-selection",
+    options?: { readonly sourceIds?: readonly string[] },
   ) {
     const currentHistory = pagesHistoryRef.current;
     const currentHistoryIndex = Math.max(
@@ -35410,7 +37778,7 @@ function clearSelectionForEdit() {
     );
     const currentPages = currentHistory[currentHistoryIndex] ?? pages;
     const targetPage = currentPages.find((page) => page.id === currentPageIdRef.current) ?? activePage;
-    return rasterRuntime.createStudioEditablePageRasterContext({
+    const context = rasterRuntime.createStudioEditablePageRasterContext({
       page: targetPage,
       canvasWidth: CANVAS_W,
       masterElements: masterRenderElsRef.current,
@@ -35428,6 +37796,25 @@ function clearSelectionForEdit() {
       purpose,
       budgets: currentStudioVectorReferenceBudgets(),
     });
+    const sourceIds = options?.sourceIds?.filter((id) =>
+      context.destinationElements.some((element) => element.id === id),
+    );
+    // Selected-layer copies omit page paper and hide only the chosen sources so crop/filter/
+    // retouch stay on one layer instead of flattening the whole page.
+    if (sourceIds && sourceIds.length > 0) {
+      return {
+        ...context,
+        input: {
+          ...context.input,
+          sourceIds,
+          includeBackground: false,
+          sourceDisposition: "hide-originals" as const,
+          sourceDispositionIds: sourceIds,
+          name,
+        },
+      };
+    }
+    return context;
   }
 
   function currentStudioFilterPageRasterContext(
@@ -35471,6 +37858,15 @@ function clearSelectionForEdit() {
       });
       return;
     }
+    // Selected vector/stroke layer: filter that layer only (not whole-page flatten).
+    const selectedLayerFilterIds =
+      selected
+      && selected.type !== "image"
+      && !isEffectivelyHidden(selected, groups)
+      && !isEffectivelyLocked(selected, groups)
+      && !localHiddenElementIds.has(selected.id)
+        ? [selected.id] as const
+        : null;
     disarmAllPixelTools();
     setTool("select");
     if (!prepareStudioDocumentReplacement("필터 미리보기를 준비", { flushPending: true })) return;
@@ -35478,7 +37874,10 @@ function clearSelectionForEdit() {
     const mutationTicket = captureStudioMutationTicket();
     const historyIndex = pagesHiRef.current;
     const pageId = currentPageIdRef.current;
-    const layerName = "필터 · 현재 페이지 합성";
+    const layerScopedFilter = Boolean(selectedLayerFilterIds?.length);
+    const layerName = layerScopedFilter
+      ? "필터 · 선택 레이어"
+      : "필터 · 현재 페이지 합성";
     const runId = ++studioFilterPreparationRunIdRef.current;
     studioFilterPreparationAbortRef.current?.abort();
     const controller = new AbortController();
@@ -35487,12 +37886,23 @@ function clearSelectionForEdit() {
     setStudioFilterPreview(null);
     setStudioFilterPreparationBusy(true);
     setError(null);
-    announceDrawingShortcut("선과 레이어를 필터 미리보기로 준비하고 있어요");
+    announceDrawingShortcut(
+      layerScopedFilter
+        ? "선택한 레이어만 필터 미리보기로 준비하고 있어요"
+        : "선과 레이어를 필터 미리보기로 준비하고 있어요",
+    );
 
     try {
       const rasterRuntime = await import("./studio-raster-edit-preparation");
       if (runId !== studioFilterPreparationRunIdRef.current || controller.signal.aborted) return;
-      const initialContext = currentStudioFilterPageRasterContext(layerName, rasterRuntime);
+      const initialContext = layerScopedFilter
+        ? currentStudioEditablePageRasterContext(
+          layerName,
+          rasterRuntime,
+          "page-filter",
+          { sourceIds: selectedLayerFilterIds! },
+        )
+        : currentStudioFilterPageRasterContext(layerName, rasterRuntime);
       const planned = rasterRuntime.planStudioEditableRasterCopy(initialContext.input);
       if (!planned.ok) throw new Error(planned.reason);
       const rendered = await rasterRuntime.renderStudioEditableRasterCopy(
@@ -35509,7 +37919,14 @@ function clearSelectionForEdit() {
         currentPageIdRef.current !== pageId ||
         !canApplyStudioMutation(mutationTicket)
       ) return;
-      const latestContext = currentStudioFilterPageRasterContext(layerName, rasterRuntime);
+      const latestContext = layerScopedFilter
+        ? currentStudioEditablePageRasterContext(
+          layerName,
+          rasterRuntime,
+          "page-filter",
+          { sourceIds: selectedLayerFilterIds! },
+        )
+        : currentStudioFilterPageRasterContext(layerName, rasterRuntime);
       if (!rasterRuntime.isStudioEditableRasterCopyPlanCurrent(planned.plan, latestContext.input)) {
         throw new Error("필터 미리보기 준비 중 페이지가 바뀌었습니다. 최신 화면에서 다시 시도해 주세요.");
       }
@@ -35519,7 +37936,8 @@ function clearSelectionForEdit() {
           rendered,
           newId: uid(),
         }),
-        filterPageComposite: true,
+        // Layer-scoped previews still use the composite apply pipeline, but are not full-page.
+        filterPageComposite: !layerScopedFilter,
         noClip: true,
       } satisfies ImageEl & El;
       studioFilterSessionIdRef.current += 1;
@@ -35535,7 +37953,11 @@ function clearSelectionForEdit() {
         kind,
         ...(initialDraft?.kind === kind ? { initialDraft } : {}),
       });
-      announceDrawingShortcut("원본을 보존한 페이지 필터 미리보기를 열었어요");
+      announceDrawingShortcut(
+        layerScopedFilter
+          ? "원본 레이어를 보존한 선택 레이어 필터 미리보기를 열었어요"
+          : "원본을 보존한 페이지 필터 미리보기를 열었어요",
+      );
     } catch (filterError) {
       if (controller.signal.aborted || runId !== studioFilterPreparationRunIdRef.current) return;
       setError(
@@ -35553,6 +37975,10 @@ function clearSelectionForEdit() {
 
   async function createEditableRasterCopyForInspector(
     resumeToolId?: StudioRasterToolId,
+    options?: {
+      readonly sourceIds?: readonly string[];
+      readonly layerName?: string;
+    },
   ) {
     if (studioFilterPreparationBusy) {
       announceDrawingShortcut("편집용 래스터 복사본을 준비하고 있어요");
@@ -35566,11 +37992,13 @@ function clearSelectionForEdit() {
     const resumePlan = resumeToolId
       ? resolveStudioRasterToolResumePlan(resumeToolId)
       : null;
+    const layerScoped = Boolean(options?.sourceIds?.length);
 
     const mutationTicket = captureStudioMutationTicket();
     const historyIndex = pagesHiRef.current;
     const pageId = currentPageIdRef.current;
-    const layerName = "편집용 래스터 복사본";
+    const layerName = options?.layerName
+      ?? (layerScoped ? "선택 레이어 편집 복사본" : "편집용 래스터 복사본");
     const runId = ++studioFilterPreparationRunIdRef.current;
     studioFilterPreparationAbortRef.current?.abort();
     const controller = new AbortController();
@@ -35580,23 +38008,32 @@ function clearSelectionForEdit() {
       : null;
     setStudioFilterPreparationBusy(true);
     setError(null);
-    announceDrawingShortcut("원본을 보존하며 편집용 래스터 복사본을 준비하고 있어요");
+    announceDrawingShortcut(
+      layerScoped
+        ? "선택한 레이어만 원본 보존 래스터로 준비하고 있어요"
+        : "원본을 보존하며 편집용 래스터 복사본을 준비하고 있어요",
+    );
 
     try {
       const rasterRuntime = await import("./studio-raster-edit-preparation");
       if (runId !== studioFilterPreparationRunIdRef.current || controller.signal.aborted) return;
+      const layerOptions = options?.sourceIds?.length
+        ? { sourceIds: options.sourceIds }
+        : undefined;
       const initialContext = currentStudioEditablePageRasterContext(
         layerName,
         rasterRuntime,
         "pixel-selection",
+        layerOptions,
       );
-      const planned = rasterRuntime.planStudioEditableRasterCopy(initialContext.input);
-      if (!planned.ok) throw new Error(planned.reason);
-      const rendered = await rasterRuntime.renderStudioEditableRasterCopy(
-        planned.plan,
-        renderStudioVectorReference,
+      const planned = await rasterRuntime.prepareAndRenderStudioEditableRasterCopy(
+        initialContext.input,
+        prepareStudioVectorReferenceExport,
+        renderPreparedStudioVectorReference,
         { signal: controller.signal },
       );
+      if (!planned.ok) throw new Error(planned.reason);
+      const rendered = planned.rendered;
       if (
         runId !== studioFilterPreparationRunIdRef.current ||
         controller.signal.aborted ||
@@ -35608,15 +38045,8 @@ function clearSelectionForEdit() {
         layerName,
         rasterRuntime,
         "pixel-selection",
+        layerOptions,
       );
-      if (!rasterRuntime.isStudioEditableRasterCopyPlanCurrent(
-        planned.plan,
-        latestContext.input,
-      )) {
-        throw new Error(
-          "편집용 래스터 복사본을 준비하는 동안 페이지가 바뀌었습니다. 최신 화면에서 다시 시도해 주세요.",
-        );
-      }
       const composite = {
         ...rasterRuntime.materializeStudioEditableRasterCopy({
           plan: planned.plan,
@@ -35640,24 +38070,32 @@ function clearSelectionForEdit() {
         !canApplyStudioMutation(mutationTicket)
       ) return;
       let rasterCopyCommitted = false;
-      // Keep the prepared target and Stage's event closure in one observable commit. Otherwise a
-      // fast first retouch contact can run against the previous vector-only render and replace the
-      // freshly appended composite with a stale source-element array.
+      // Keep the prepared target, its selection authority and the resumed retouch arm in one
+      // observable commit. Splitting them makes Konva draw the full Stage once for the document and
+      // again for selection/tool state before the pending first gesture can be replayed.
       flushSync(() => {
         rasterCopyCommitted = commit(applied.elements, undefined, pageId);
+        if (!rasterCopyCommitted) return;
+        expectStudioRasterImagePresentation({ elementId: composite.id, src: composite.src });
+        if (resumePlan?.kind === "activate-selection") {
+          pixelSelectionAutoTargetRef.current = composite.id;
+        } else if (resumePlan?.kind === "start-crop") {
+          cropAutoTargetRef.current = composite.id;
+        }
+        resetPixelSelectionHistoryState(composite.id, null);
+        setMarqueeIds((current) => current.length === 0 ? current : []);
+        setSelectedId(composite.id);
+        setPixelForceCircle(false);
+        setPixelTool(null);
+        setError(null);
+        if (resumePlan?.kind === "arm-retouch") {
+          if (resumePlan.retouchTool === "smudge") setSmudgeActive(true);
+          else if (resumePlan.retouchTool === "dodge-burn") setDodgeBurnActive(true);
+          else if (resumePlan.retouchTool === "wet-mix") setWetMixActive(true);
+          else setLiquifyActive(true);
+        }
       });
       if (!rasterCopyCommitted) return;
-      if (resumePlan?.kind === "activate-selection") {
-        pixelSelectionAutoTargetRef.current = composite.id;
-      } else if (resumePlan?.kind === "start-crop") {
-        cropAutoTargetRef.current = composite.id;
-      }
-      resetPixelSelectionHistoryState(composite.id, null);
-      setMarqueeIds([]);
-      setSelectedId(composite.id);
-      setPixelForceCircle(false);
-      setPixelTool(null);
-      setError(null);
       if (resumePlan?.kind === "arm-retouch") {
         attachPendingRasterRetouchTarget(runId, {
           frame: {
@@ -35670,28 +38108,29 @@ function clearSelectionForEdit() {
           id: composite.id,
         });
       }
+      const scopeLabel = layerScoped ? "선택 레이어 복사본" : "페이지 합성본";
       if (!resumePlan) {
-        announceDrawingShortcut("원본은 숨겨 보존하고 편집용 래스터 복사본을 선택했어요");
+        announceDrawingShortcut(
+          layerScoped
+            ? "선택 레이어 원본은 숨겨 보존하고 편집 복사본을 선택했어요"
+            : "원본은 숨겨 보존하고 편집용 래스터 복사본을 선택했어요",
+        );
         return;
       }
       switch (resumePlan.kind) {
         case "arm-retouch":
-          if (resumePlan.retouchTool === "smudge") setSmudgeActive(true);
-          else if (resumePlan.retouchTool === "dodge-burn") setDodgeBurnActive(true);
-          else if (resumePlan.retouchTool === "wet-mix") setWetMixActive(true);
-          else setLiquifyActive(true);
           openInspectorRoute(
             { primary: "properties", image: "retouch" },
             isMobile ? "props" : null,
           );
           announceDrawingShortcut(
             resumePlan.retouchTool === "smudge"
-              ? "페이지 합성본에서 혼합(스머지)을 시작해요"
+              ? `${scopeLabel}에서 혼합(스머지)을 시작해요`
               : resumePlan.retouchTool === "dodge-burn"
-                ? "페이지 합성본에서 닷지/번을 시작해요"
+                ? `${scopeLabel}에서 닷지/번을 시작해요`
                 : resumePlan.retouchTool === "wet-mix"
-                  ? "페이지 합성본에서 혼색 브러시를 시작해요"
-                  : "페이지 합성본에서 리퀴파이를 시작해요",
+                  ? `${scopeLabel}에서 혼색 브러시를 시작해요`
+                  : `${scopeLabel}에서 리퀴파이를 시작해요`,
           );
           return;
         case "start-crop":
@@ -35700,7 +38139,11 @@ function clearSelectionForEdit() {
             resumePlan.inspectorRoute,
             isMobile ? "props" : null,
           );
-          announceDrawingShortcut("페이지 합성본의 자르기 경계를 조절하세요");
+          announceDrawingShortcut(
+            layerScoped
+              ? "선택 레이어 자르기 경계를 조절하세요"
+              : "페이지 합성본의 자르기 경계를 조절하세요",
+          );
           return;
         case "activate-selection":
           applyPixelSelectionActivation(resumePlan.selectionTool);
@@ -35708,7 +38151,7 @@ function clearSelectionForEdit() {
             { primary: "properties", image: "retouch" },
             isMobile ? "props" : null,
           );
-          announceDrawingShortcut("페이지 합성본에서 픽셀 선택을 시작해요");
+          announceDrawingShortcut(`${scopeLabel}에서 픽셀 선택을 시작해요`);
           return;
         case "open-inspector":
           openInspectorRoute(
@@ -35800,11 +38243,19 @@ function clearSelectionForEdit() {
     handleExportProjectArchive,
     handleSave,
     invertSelectionForEdit,
+    openBrushLibraryFromMenu,
+    openBrushPresetBrowserFromMenu,
+    openBrushStudioFromMenu,
     openImagePastePicker,
+    openNaturalMediaBrushesFromMenu,
+    openPixelSelectionTransform,
+    openSelectedLayerAdjustments,
     openSelectedLayerCrop,
+    openSelectedLayerMask,
     openStudioFilter,
     openFeatureTutorial,
     pasteStudioElementsFromClipboard,
+    requestBrushPackImportFromMenu,
     redo,
     reorder,
     removeSelected,
@@ -35814,13 +38265,16 @@ function clearSelectionForEdit() {
     saveCurrentStudioView,
     selectAllForEdit,
     setActualPixelView,
+    setColorBlindPreview,
     setStudioUiDensity,
     showAllLocallyHiddenLayers,
     toggleAdvancedFill,
+    toggleCanvasRulers: studioCanvasRulerHandlers.toggleCanvasRulers,
     toggleFullscreen,
     toggleGrayscaleView,
     toggleHorizontalCanvasView,
     togglePerspectiveGuideView,
+    toggleSelectedClippingMask,
     toggleStudioQuickAccessPalette,
     undo,
   });
@@ -35893,10 +38347,111 @@ function clearSelectionForEdit() {
   const menuSharedNonOwnerSave = Boolean(sharedDocument && sharedDocument.role !== "owner");
   const menuHasSavedView = savedStudioView?.pageId === activePage.id;
   const menuHasLocallyHiddenLayers = localHiddenElementIds.size > 0;
+  // Layer ▸ Mask/Clipping + Filter ▸ Adjustment Layer gating. Booleans, not the
+  // element, so the menubar memo below survives selection-object churn.
+  const menuClippingMaskActive = selected?.type !== "frame" && selected?.clipBelow === true;
+  const menuClippingMaskDisabled =
+    !menuHasSingleElementSelection || !selected || selected.type === "frame";
+  const menuImageLayerSelected = selected?.type === "image";
+  // §15.3 Help ▸ Current Tool Help. 캔버스 포인터를 실제로 쥔 도구를 카탈로그 명령
+  // 하나로 환원한다 — 무장된 보조 도구가 기억된 기본 도구를 이긴다.
+  const menuActiveToolCommandId = resolveStudioActiveToolCommandId({
+    tool,
+    drawMode,
+    commentPlacementActive,
+    cropActive: cropArmed,
+    liquifyArmed,
+    dodgeBurnArmed,
+    wetMixArmed,
+    smudgeArmed,
+    quickMaskArmed,
+    eyedropperArmed: eyedropperActive,
+    quickShapeActive,
+    pixelSelectionTool: pixelToolArmed ? pixelTool : null,
+  });
+  // §15.3 rows whose feature shipped behind a panel and whose only door was the
+  // 프로젝트 작업 sheet, the mobile-only tool belt or an inspector tab. Bundled
+  // here so the composition below stays a projection: `bindStudioMainMenu
+  // SurfaceActions` is a name-for-name map, so the menu can only reach a surface
+  // this page already opens somewhere else.
+  const studioMainMenuSurfaceActions =
+    useStudioStableHandlers<StudioMainMenuSurfaceHandlerBundle>({
+      activatePixelSelectionToolFromInspector,
+      enterQuickMask,
+      commitQuickMask,
+      toggleAnimationTimeline: () => setTimelineOpen((open) => !open),
+      openFrameAnimationForSelected,
+      toggleOnionSkin: () =>
+        setOnionSkin((current) => ({ ...current, enabled: !current.enabled })),
+      openAnimaticTimeline: () => setAnimaticTimelineOpen(true),
+      // 데스크톱에서 라이브 세션이 없으면 프레즌스 독이 렌더되지 않아 이 패널을
+      // 열 방법이 아예 없었다. 댓글과는 상호 배타 — 시트 버튼과 같은 규칙이다.
+      openTeamPanel: () => {
+        setCommentsOpen(false);
+        setTeamPanelOpen(true);
+      },
+      toggleDocumentComments: () => {
+        setTeamPanelOpen(false);
+        setCommentsOpen((open) => !open);
+      },
+      openPageReview: () => setPageReviewOpen(true),
+      openCheckpointPanel: () => setCheckpointPanelOpen(true),
+      openWriterRoom: () => setWriterRoomOpen(true),
+      openStoryboardGrid: () => setStoryboardGridOpen(true),
+      openScrollPreview: () => setScrollPreviewOpen(true),
+      openContinuityCheck: () => setContinuityOpen(true),
+      openProductionBible: () => setProductionBibleOpen(true),
+      openQuickStart: () => setQuickStartOpen(true),
+      openPublishPackage: () => setPublishPackageOpen(true),
+      openPublishPreflight: () => setPublishPreflightOpen(true),
+      openAssetRightsAudit: () => setAssetRightsAuditOpen(true),
+      openAutoActions: () => void openAutoActions(),
+      openCanvasNavigatorRoute: () =>
+        openInspectorRoute({ primary: "document", document: "navigator" }),
+      openCanvasSettingsRoute: () =>
+        openInspectorRoute({ primary: "document", document: "canvas" }),
+      toggleCanvasGrid: () => setShowGrid((visible) => !visible),
+      toggleEraseToIntersection: toggleEraseToIntersectionMode,
+      openDialogueBatch: () => setDialogueBatchOpen(true),
+      openDialogueTranslate: () => setDialogueTranslateOpen(true),
+    });
+  // 무장된 픽셀 선택 도구를 메뉴가 읽는 단일 문자열로 환원한다. 원형 마퀴는
+  // `ellipse` + forceCircle 조합이고 색 범위는 별도 플래그라, 라디오 체크 표시를
+  // 항목마다 재계산하지 않도록 여기서 한 번만 정규화한다.
+  const menuPixelSelectionTool: StudioPixelSelectionToolId | null = colorRangePickActive
+    ? "color-range"
+    : pixelTool === "ellipse"
+      ? pixelForceCircle
+        ? "circle"
+        : "ellipse"
+      : pixelTool;
+  const studioMainMenuSurfaceState = useMemo<StudioMainMenuSurfaceState>(
+    () => ({
+      pixelSelectionTool: menuPixelSelectionTool,
+      quickMaskActive,
+      animationTimelineOpen: timelineOpen,
+      onionSkinEnabled: onionSkin.enabled,
+      documentCommentsOpen: commentsOpen,
+      canvasGridVisible: showGrid,
+      vectorEraseToIntersection: eraseToIntersection,
+      masterEditMode,
+    }),
+    [
+      commentsOpen,
+      eraseToIntersection,
+      masterEditMode,
+      menuPixelSelectionTool,
+      onionSkin.enabled,
+      quickMaskActive,
+      showGrid,
+      timelineOpen,
+    ],
+  );
   const studioMainMenuGroups = useMemo(
     () => {
       return buildStudioMainMenuGroups({
         state: {
+          ...studioMainMenuSurfaceState,
           sharedNonOwnerSave: menuSharedNonOwnerSave,
           saving,
           collaborationDocumentLocked,
@@ -35936,46 +38491,16 @@ function clearSelectionForEdit() {
           leftPanelOpen,
           rightPanelOpen,
           lastFilterDraft: lastStudioFilterDraft,
+          clippingMaskActive: menuClippingMaskActive,
+          clippingMaskDisabled: menuClippingMaskDisabled,
+          imageLayerSelected: menuImageLayerSelected,
+          activeToolCommandId: menuActiveToolCommandId,
         },
-        editor: {
-          copyImageToClipboard: studioMainMenuActions.handleCopyToClipboard,
-          save: studioMainMenuActions.handleSave,
-          exportProject: studioMainMenuActions.handleExportProject,
-          exportProjectArchive: studioMainMenuActions.handleExportProjectArchive,
-          undo: studioMainMenuActions.undo,
-          redo: studioMainMenuActions.redo,
-          cutSelectedElements: studioMainMenuActions.cutSelectedElements,
-          copySelectedElements: studioMainMenuActions.copySelectedElements,
-          pasteElements: studioMainMenuActions.pasteStudioElementsFromClipboard,
-          openImagePastePicker: studioMainMenuActions.openImagePastePicker,
-          selectAll: studioMainMenuActions.selectAllForEdit,
-          deselect: studioMainMenuActions.deselectForEdit,
-          invertSelection: studioMainMenuActions.invertSelectionForEdit,
-          clearSelection: studioMainMenuActions.clearSelectionForEdit,
-          duplicateSelected: studioMainMenuActions.duplicateSelected,
-          reorder: studioMainMenuActions.reorder,
-          openSelectedLayerCrop: studioMainMenuActions.openSelectedLayerCrop,
-          addText: studioMainMenuActions.addText,
-          addPage: studioMainMenuActions.addPage,
-          toggleHorizontalCanvasView: studioMainMenuActions.toggleHorizontalCanvasView,
-          rotateCanvasView: studioMainMenuActions.rotateCanvasView,
-          resetCanvasViewRotation: studioMainMenuActions.resetCanvasViewRotation,
-          fitCanvasToWidth: studioMainMenuActions.fitCanvasToWidth,
-          setActualPixelView: studioMainMenuActions.setActualPixelView,
-          toggleFullscreen: studioMainMenuActions.toggleFullscreen,
-          toggleCanvasRulers: studioCanvasRulerHandlers.toggleCanvasRulers,
-          setColorVisionMode: setColorBlindPreview,
-          saveCurrentStudioView: studioMainMenuActions.saveCurrentStudioView,
-          restoreSavedStudioView: studioMainMenuActions.restoreSavedStudioView,
-          togglePerspectiveGuideView: studioMainMenuActions.togglePerspectiveGuideView,
-          showAllLocallyHiddenLayers: studioMainMenuActions.showAllLocallyHiddenLayers,
-          setStudioUiDensity: studioMainMenuActions.setStudioUiDensity,
-          enterCanvasOnlyMode: studioMainMenuActions.enterCanvasOnlyMode,
-          openFeatureTutorial: () => studioMainMenuActions.openFeatureTutorial(null),
-          openStudioFilter: studioMainMenuActions.openStudioFilter,
-          toggleAdvancedFill: studioMainMenuActions.toggleAdvancedFill,
-        },
-          ui: {
+        // Name-for-name delegation; it carries no browser state, so it lives in
+        // the pure layer (`studio-main-menu-editor-bindings.ts`).
+        editor: bindStudioMainMenuEditorActions(studioMainMenuActions),
+        ui: {
+          ...bindStudioMainMenuSurfaceActions(studioMainMenuSurfaceActions),
           openExportDownload: () => {
             setProjectActionsOpen(false);
             setExportMenuOpen(true);
@@ -36055,6 +38580,14 @@ function clearSelectionForEdit() {
             studioMainMenuActions.activatePrimaryCanvasTool("draw", "pen");
             setQuickShapeActive(true);
           },
+          activateTransformTool: studioMainMenuActions.openPixelSelectionTransform,
+          openImageAdjustments: studioMainMenuActions.openSelectedLayerAdjustments,
+          openLayerMask: studioMainMenuActions.openSelectedLayerMask,
+          openBrushPresetBrowser: studioMainMenuActions.openBrushPresetBrowserFromMenu,
+          openBrushStudio: studioMainMenuActions.openBrushStudioFromMenu,
+          openBrushLibrary: studioMainMenuActions.openBrushLibraryFromMenu,
+          requestBrushPackImport: studioMainMenuActions.requestBrushPackImportFromMenu,
+          openNaturalMediaBrushes: studioMainMenuActions.openNaturalMediaBrushesFromMenu,
         },
       t,
       });
@@ -36068,6 +38601,10 @@ function clearSelectionForEdit() {
       isFullscreen,
       lastStudioFilterDraft,
       leftPanelOpen,
+      menuActiveToolCommandId,
+      menuClippingMaskActive,
+      menuClippingMaskDisabled,
+      menuImageLayerSelected,
       menuEditClearDisabled,
       menuEditCopyDisabled,
       menuEditCropDisabled,
@@ -36097,9 +38634,10 @@ function clearSelectionForEdit() {
       saving,
       setZoom,
       showRulers,
-      studioCanvasRulerHandlers,
       studioMainMenuActions,
       viewTransformSuppressed,
+      studioMainMenuSurfaceActions,
+      studioMainMenuSurfaceState,
       t,
       workId,
     ],
@@ -36213,13 +38751,13 @@ function clearSelectionForEdit() {
       }}
       aria-haspopup="menu"
       aria-expanded={quickActionsOpen}
-      aria-label={`퀵 메뉴 · ${workspaceState.mobileControlSide === "left" ? "왼쪽" : "오른쪽"} 엄지 위치`}
+      aria-label={`퀵 메뉴 · ${workspaceControlSide === "left" ? "왼쪽" : "오른쪽"} 엄지 위치`}
       className={mobileBarBtn(quickActionsOpen)}
     >
       <Command size={17} aria-hidden />
       <span>퀵 메뉴</span>
     </button>
-  ), [quickActionsOpen, workspaceState.mobileControlSide]);
+  ), [quickActionsOpen, workspaceControlSide]);
 
   const rasterExportOrchestration = useStudioRasterExportOrchestration({
     activePage,
@@ -36677,7 +39215,7 @@ function clearSelectionForEdit() {
 
   // The empty-dependency page lifecycle listeners below call through this ref, so every render
   // supplies the latest document/scope snapshot without reinstalling global handlers. This is a
-  // synchronous, private recovery write only; normal editing still uses the debounced autosave.
+  // best-effort durable recovery request; normal editing still uses the debounced autosave.
   persistPendingStrokeEmergencyAutosaveRef.current = (reason) => {
     const pendingBatch = pendingStrokeCommitsRef.current;
     const activeRecovery = readActiveStrokeLifecycleRecovery();
@@ -36753,33 +39291,45 @@ function clearSelectionForEdit() {
             : { kind: "local" },
       });
       if (emergency.ok) {
-        writeStudioLifecycleAutosave(
-          globalThis.localStorage,
-          autosaveKey,
-          emergency.payload,
-          {
-            // Startup recovery discovery is intentionally idle-scheduled. Until it completes,
-            // treat any contentful primary as unresolved so a fast edit + pagehide cannot replace
-            // the artist's older recovery before the banner has even had a chance to appear.
-            preservePrimary:
-              !autosaveChecked || hasAutosave || autosaveRestoreBlockedReason !== null,
-          }
-        );
+        const emergencyGeneration = studioRevisionProjectGenerationRef.current;
+        const durableWrites: Promise<"opfs-journal" | "sqlite-fallback">[] = [];
         const sessionPromise = autosaveOpfsSessionRef.current;
         if (sessionPromise) {
-          void sessionPromise
-            .then((session) => session?.write(emergency.payload))
-            .catch((cause: unknown) => {
-              // pagehide cannot await OPFS. The synchronous lifecycle sidecar remains the
-              // authoritative fallback and is reconciled into OPFS on the next Studio launch.
-              if (import.meta.env.DEV && reason !== "pagehide") {
-                console.warn("Studio lifecycle autosave stayed in the fallback slot.", cause);
-              }
-            });
+          durableWrites.push(sessionPromise.then(async (session) => {
+            if (!session) throw new Error("OPFS autosave authority is unavailable");
+            const receipt = await session.write(emergency.payload);
+            return receipt.authority;
+          }));
         }
-        studioLifecycleDurableGenerationRef.current =
-          studioRevisionProjectGenerationRef.current;
-        studioLifecycleDurablePendingFingerprintRef.current = pendingFingerprint;
+        const sqlitePromise = autosaveSqliteStoreRef.current;
+        if (sqlitePromise) {
+          durableWrites.push(sqlitePromise.then(async (sqlite) => {
+            if (!sqlite) throw new Error("SQLite autosave authority is unavailable");
+            await sqlite.write(autosaveKey, emergency.payload);
+            return "sqlite-fallback" as const;
+          }));
+        }
+        const durabilityAttempt = durableWrites.length > 0
+          ? Promise.any(durableWrites)
+          : Promise.reject(
+              new Error("OPFS journal and SQLite autosave authorities are unavailable")
+            );
+        void durabilityAttempt
+          .then((authority) => {
+            studioLifecycleDurableGenerationRef.current = Math.max(
+              studioLifecycleDurableGenerationRef.current,
+              emergencyGeneration
+            );
+            studioLifecycleDurablePendingFingerprintRef.current = pendingFingerprint;
+            noteStudioSaveSucceeded(authority);
+          })
+          .catch((cause: unknown) => {
+            // The exact payload remains in the current tab's memory. Do not advance either durable
+            // frontier until an OPFS/SQLite receipt exists, and make the loss of durability visible.
+            reportStudioSaveAuthorityDegraded(cause);
+            void reportStudioAutosaveFailure(cause);
+            console.error("Pending stroke emergency autosave failed:", cause);
+          });
       }
     } catch (cause) {
       // pagehide/unmount must stay non-blocking. Keep a diagnostic for development without
@@ -36870,6 +39420,9 @@ function clearSelectionForEdit() {
     setReleaseSchedule(normalizeReleaseSchedule(projectData.releaseSchedule));
     setPublicationAnalytics(publicationAnalyticsDocument);
     setReferenceBoard(normalizeStudioReferenceBoardDocument(projectData.referenceBoard));
+    setScenarioImageReferenceDocument(
+      hydrateStudioAiImageReferenceDocument(projectData.aiImageReferences),
+    );
     return true;
   }
 
@@ -36894,7 +39447,7 @@ function clearSelectionForEdit() {
     if (!ensureSharedDocumentAvailableForExport()) return false;
     try {
       setCheckpoints(
-        await createDurableStudioCheckpoint(globalThis.localStorage, checkpointKey, {
+        await createDurableStudioCheckpoint(undefined, checkpointKey, {
           name,
           payload: currentStudioProjectSnapshot(),
         })
@@ -36912,12 +39465,14 @@ function clearSelectionForEdit() {
   }
 
   async function restoreNamedCheckpoint(checkpoint: StudioCheckpoint) {
-    if (!globalThis.confirm(`'${checkpoint.name}' 시점으로 문서를 복원할까요? 현재 상태는 자동저장에 남을 수 있어요.`)) {
-      return;
-    }
+    const restoreRequest = studioRestoreCheckpointRequest({
+      checkpointName: checkpoint.name,
+      currentPageCount: pages.length,
+    });
+    if (!(await confirmStudioDestructiveAction(restoreRequest))) return;
     try {
       const applied = await applyStudioProjectSnapshot(parseStudioProjectFile(checkpoint.payload));
-      if (!applied) return;
+      if (!settleStudioDestructiveCommit(restoreRequest, applied, undo)) return;
       setCheckpointPanelOpen(false);
       setCheckpointError(null);
     } catch (error) {
@@ -36926,11 +39481,17 @@ function clearSelectionForEdit() {
   }
 
   async function removeNamedCheckpoint(checkpoint: StudioCheckpoint) {
-    if (!globalThis.confirm(`'${checkpoint.name}' 복구 지점을 삭제할까요?`)) return;
+    // 되돌릴 수 없는 유일한 파괴적 명령 — 저장소에서 스냅샷을 지우며 히스토리 커밋이 없다.
+    const deleteRequest = studioDeleteCheckpointRequest({
+      checkpointName: checkpoint.name,
+      savedAtLabel: checkpoint.createdAt,
+    });
+    if (!(await confirmStudioDestructiveAction(deleteRequest))) return;
     try {
       setCheckpoints(
-        await deleteDurableStudioCheckpoint(globalThis.localStorage, checkpointKey, checkpoint.id)
+        await deleteDurableStudioCheckpoint(undefined, checkpointKey, checkpoint.id)
       );
+      settleStudioDestructiveCommit(deleteRequest, true);
       setCheckpointError(null);
     } catch (error) {
       setCheckpointError(error instanceof Error ? error.message : "복구 지점을 삭제하지 못했어요.");
@@ -37639,18 +40200,30 @@ function clearSelectionForEdit() {
   const webGpuPreviewStrokes: readonly StudioGpuStroke[] = EMPTY_STUDIO_GPU_STROKES;
   // GPU/DOM raster surfaces are axis-aligned today. Quarter-turn views fail closed to the
   // authoritative Konva Stage until the GPU viewport contract can carry rotation explicitly.
-  const webGpuViewportSurface = canvasRotation === 0
-    ? planStudioWebGpuViewportSurface({
-        documentWidth: CANVAS_W,
-        documentHeight: canvasH,
-        documentScale: effScale,
-        scrollLeft: scrollPos.left,
-        scrollTop: scrollPos.top,
-        viewportWidth: scrollPos.width,
-        viewportHeight: scrollPos.height,
-        flipX: canvasFlipH,
-      })
-    : null;
+  const webGpuViewportSurface = useMemo(
+    () => canvasRotation === 0
+      ? planStudioWebGpuViewportSurface({
+          documentWidth: CANVAS_W,
+          documentHeight: canvasH,
+          documentScale: effScale,
+          scrollLeft: scrollPos.left,
+          scrollTop: scrollPos.top,
+          viewportWidth: scrollPos.width,
+          viewportHeight: scrollPos.height,
+          flipX: canvasFlipH,
+        })
+      : null,
+    [
+      canvasFlipH,
+      canvasH,
+      canvasRotation,
+      effScale,
+      scrollPos.height,
+      scrollPos.left,
+      scrollPos.top,
+      scrollPos.width,
+    ]
+  );
   // With no live strokes fed to the compositor this can never authorize a visible GPU frame
   // (the authority contract requires strokes.length > 0); keeping the real check exercises the
   // authority state machine for the future committed-surface handoff without a dead-code fork.
@@ -37735,12 +40308,20 @@ function clearSelectionForEdit() {
   const studioRasterAuthorizedLogSha256 = studioRasterServerAuthority.find(
     ({ surfaceId }) => surfaceId === studioRasterSurfaceId
   )?.logSha256 ?? null;
-  const studioRasterHiddenOperationIds = studioRasterAuthorizedOperationIds({
-    candidate: studioRasterHandoffCandidate,
-    currentBaseKey: studioRasterHandoffBaseKey,
-    authorizedRasterLogSha256: studioRasterAuthorizedLogSha256,
-    blocked: studioRasterHandoffBlocked,
-  });
+  const studioRasterHiddenOperationIds = useMemo(
+    () => studioRasterAuthorizedOperationIds({
+      candidate: studioRasterHandoffCandidate,
+      currentBaseKey: studioRasterHandoffBaseKey,
+      authorizedRasterLogSha256: studioRasterAuthorizedLogSha256,
+      blocked: studioRasterHandoffBlocked,
+    }),
+    [
+      studioRasterAuthorizedLogSha256,
+      studioRasterHandoffBaseKey,
+      studioRasterHandoffBlocked,
+      studioRasterHandoffCandidate,
+    ]
+  );
   const studioRasterAuthorizedAuthorityKey = studioRasterHiddenOperationIds.size > 0
     ? studioRasterHandoffCandidate?.authorityKey ?? null
     : null;
@@ -37846,6 +40427,9 @@ function clearSelectionForEdit() {
     addVanishingPointHandler,
     alignPerspectiveToEyeLevel,
     alignSelected,
+    zoomToSelection,
+    flipSelected,
+    applyFigmaSelectionLayoutPatch,
     announceDrawingShortcut,
     applyBgPreset,
     applyBrushDefaultRestoreTransaction,
@@ -37957,6 +40541,7 @@ function clearSelectionForEdit() {
   });
 
   const studioLeftToolRailHandlers = useStudioStableHandlers<StudioLeftToolRailHandlers>({
+    activatePrimaryCanvasTool,
     fitCanvasToWidth,
     openFrameAnimationForSelected,
     openPixelSelectionTransform,
@@ -37982,6 +40567,10 @@ function clearSelectionForEdit() {
       );
     },
     onPickImage,
+    revealDrawToolProperties: () => {
+      if (showQuickStart) dismissQuickStart();
+      openInspectorRoute({ primary: "properties" }, isMobile ? "draw" : null);
+    },
     toggleAdvancedFill,
     toggleDodgeBurnTool,
     toggleWetMixTool,
@@ -37992,6 +40581,7 @@ function clearSelectionForEdit() {
   });
 
   const studioToolBeltContentHandlers = useStudioStableHandlers<StudioToolBeltContentHandlers>({
+    activatePrimaryCanvasTool,
     openFrameAnimationForSelected,
     addBgScene,
     addBubble,
@@ -38096,6 +40686,17 @@ function clearSelectionForEdit() {
     exportCurrentPageToSvg,
     handleCapturePagesForPreset,
     handleCapturePagesForIndices,
+    // 검수·미리보기 7종: 툴벨트가 전 뷰포트에서 display:none이라 프로젝트 시트가 정본 진입점이다.
+    toggleAnimationTimeline: () => setTimelineOpen((open) => !open),
+    openTimelapse: () => setTimelapseOpen(true),
+    openStoryboardGrid: () => setStoryboardGridOpen(true),
+    openScrollPreview: () => setScrollPreviewOpen(true),
+    openContinuityCheck: () => setContinuityOpen(true),
+    toggleDocumentComments: () => {
+      setTeamPanelOpen(false);
+      setCommentsOpen((open) => !open);
+    },
+    openPageReview: () => setPageReviewOpen(true),
   });
 
   const studioLazyPanelStackHandlers = useStudioStableHandlers<StudioLazyPanelStackHandlers>({
@@ -38131,9 +40732,8 @@ function clearSelectionForEdit() {
       const mutationTicket = bg3dMutationTicketRef.current;
       if (!mutationTicket || !canApplyStudioMutation(mutationTicket)) return false;
       try {
-        const assetLibrary = await import("./studio-asset-library");
         if (!canApplyStudioMutation(mutationTicket)) return false;
-        const saved = await assetLibrary.saveAsset({
+        const saved = await saveStudioAssetMutation({
           name: capture.shotId ? "3D 저장 컷 · AI 구도 참조" : "3D 현재 샷 · AI 구도 참조",
           dataUrl: capture.dataUrl,
           width: capture.width,
@@ -38141,7 +40741,7 @@ function clearSelectionForEdit() {
           kind: "bg3d-ai-method",
         });
         if (!canApplyStudioMutation(mutationTicket)) {
-          await assetLibrary.deleteAsset(saved.id).catch(() => undefined);
+          await deleteStudioAssetMutation(saved.id).catch(() => undefined);
           return false;
         }
         const application = applyStudioBg3dAiMethodReference(
@@ -38150,16 +40750,12 @@ function clearSelectionForEdit() {
           capture,
         );
         if (!application.ok) {
-          await assetLibrary.deleteAsset(saved.id).catch(() => undefined);
+          await deleteStudioAssetMutation(saved.id).catch(() => undefined);
           setError(
             "구도·카메라 참조가 가득 찼어요. AI 이미지 참조 팩의 Method 항목 하나를 제거한 뒤 다시 시도해 주세요.",
           );
           return false;
         }
-        setAssets((current) => [
-          saved,
-          ...current.filter(({ id }) => id !== saved.id),
-        ]);
         setAssetsLoaded(true);
         setScenarioImageReferenceDocument(application.document);
         setScenarioError(null);
@@ -38350,7 +40946,7 @@ function clearSelectionForEdit() {
     );
     if (hasPersistedLayer) {
       setError(
-        "기존 Living Ink 획의 물리 결과를 바꾸지 않도록 재질을 잠갔습니다. 레이어를 지운 뒤 새 재질로 시작해 주세요.",
+        "기존 수채 번짐 획의 물리 결과를 바꾸지 않도록 재질을 잠갔습니다. 레이어를 지운 뒤 새 재질로 시작해 주세요.",
       );
       return;
     }
@@ -38367,12 +40963,15 @@ function clearSelectionForEdit() {
         hasCanonicalHandoff: Boolean(livingInkCanonicalHandoffRef.current),
       })
     ) return;
-    if (
-      kind === "clear"
-      &&
-      livingInkScope === "all"
-      && !globalThis.confirm("현재 페이지의 Living Ink 물리 레이어 전체를 지울까요? 실행 취소로 되돌릴 수 있습니다.")
-    ) return;
+    const scope = studioLivingInkEffectiveScope(
+      livingInkScope,
+      livingInkSelectionAvailable(),
+    );
+    const livingInkClearRequest =
+      kind === "clear" && scope === "all" ? studioClearLivingInkRequest() : null;
+    if (livingInkClearRequest && !(await confirmStudioDestructiveAction(livingInkClearRequest))) {
+      return;
+    }
     if (
       kind === "fix"
       && !activeElementsRef.current.some((element) =>
@@ -38380,17 +40979,17 @@ function clearSelectionForEdit() {
         && element.livingInkReceipt?.pageId === currentPageIdRef.current
       )
     ) {
-      setError("먼저 Living Ink 잉크나 물 획을 저장한 뒤 정착해 주세요.");
+      setError("먼저 수채 번짐 잉크나 물 획을 저장한 뒤 정착해 주세요.");
       return;
     }
     const surface = livingInkOverlaySurfaceRef.current;
     const config = livingInkConfigRef.current;
     if (!surface || !config) return;
-    const selection = livingInkScope === "selection"
+    const selection = scope === "selection"
       ? livingInkSelectionSnapshot(config)
       : null;
-    if (livingInkScope === "selection" && !selection) {
-      setError("현재 Living Ink 레이어에 사용할 수 있는 픽셀 선택이 없습니다.");
+    if (scope === "selection" && !selection) {
+      setError("현재 수채 번짐 레이어에 사용할 수 있는 픽셀 선택이 없습니다.");
       return;
     }
     const routeKey = `studio-living-ink-action:${activePage.id}:${kind}:${uid()}`;
@@ -38401,7 +41000,7 @@ function clearSelectionForEdit() {
       work = await livingInkCoordinatorRef.current.applyAction({
         routeKey,
         kind,
-        scope: livingInkScope,
+        scope,
         selection,
       });
       const presentation = await surface.renderer.presentCanonical(
@@ -38449,6 +41048,9 @@ function clearSelectionForEdit() {
         );
       }
       transactionCommitted = true;
+      if (livingInkClearRequest) {
+        settleStudioDestructiveCommit(livingInkClearRequest, true, undo);
+      }
       livingInkCanonicalHandoffRef.current = Object.freeze({
         token: `${routeKey}:canonical`,
         kind: "action",
@@ -38483,7 +41085,7 @@ function clearSelectionForEdit() {
       }
       setSelectedId(transaction.transaction.selectionId);
       announceDrawingShortcut(
-        `Living Ink · ${livingInkScope === "selection" ? "선택 영역" : "전체"} ${kind === "fix" ? "정착" : "지우기"}`,
+        `수채 번짐 · ${scope === "selection" ? "선택 영역" : "전체"} ${kind === "fix" ? "정착" : "지우기"}`,
       );
     } catch (cause) {
       if (work && !transactionCommitted) {
@@ -38496,7 +41098,7 @@ function clearSelectionForEdit() {
       setError(
         cause instanceof Error
           ? cause.message
-          : `Living Ink ${kind === "fix" ? "정착" : "지우기"}를 완료하지 못했습니다.`,
+          : `수채 번짐 ${kind === "fix" ? "정착" : "지우기"}를 완료하지 못했습니다.`,
       );
     } finally {
       // A committed action remains input-exclusive until StudioKonvaImageNode proves that the
@@ -38515,8 +41117,8 @@ function clearSelectionForEdit() {
 
   const studioOptionsBarsHandlers = useStudioStableHandlers<StudioOptionsBarsHandlers>({
     assignBrushSlot: (index) => {
-      setBrushSlotsState((prev) => {
-        const next = assignStudioBrushSlot(prev, index, {
+      commitStudioBrushSlotsMutation(
+        (prev) => assignStudioBrushSlot(prev, index, {
           brushId: brush,
           ...(activeCatalogBrush.sourcePresetId
             ? {
@@ -38527,14 +41129,12 @@ function clearSelectionForEdit() {
           brushDynamics,
           strokeWidth,
           brushOpacity,
-        });
-        saveStudioBrushSlotsState(
-          typeof globalThis.localStorage === "undefined" ? null : globalThis.localStorage,
-          next
-        );
-        return next;
-      });
-      announceDrawingShortcut(`슬롯 ${index + 1}에 저장`);
+        }),
+        {
+          successMessage: `슬롯 ${index + 1}에 저장`,
+          failureMessage: `슬롯 ${index + 1}을 SQLite에 저장하지 못했어요.`,
+        },
+      );
     },
     cycleStabilizer: () => {
       setStabilizer((prev) => {
@@ -38574,13 +41174,18 @@ function clearSelectionForEdit() {
     setBrushOpacity,
     setColor,
     setDrawMode: (mode) => {
-      activatePrimaryCanvasTool("draw", mode);
+      activateDrawToolWithProperties(mode);
       if (mode === "pen" && isStudioPixelPencilRenderMode(brush)) {
         setBrush("pen");
       }
     },
     setDrawShape,
     setLivingInkMode,
+    setLivingInkPhysicalModeEnabled: (enabled) => {
+      setLivingInkPhysicalBrushKey(
+        enabled ? currentLivingInkExplicitBrushKey : null,
+      );
+    },
     setLivingInkScope,
     setPostCorrection,
     setPressureCurvePreset: (id) => setPressureCurve(pressureCurveValueForPreset(id)),
@@ -38630,25 +41235,21 @@ function clearSelectionForEdit() {
       );
       announceDrawingShortcut(next.sizeLocked ? "크기 잠금" : "크기 잠금 해제");
     },
-    toggleEraseToIntersection: () => {
-      const next = !eraseToIntersection;
-      if (next) {
-        activatePrimaryCanvasTool("draw", "eraser");
-      }
-      setEraseToIntersection(next);
-      announceDrawingShortcut(
-        next
-          ? `${STUDIO_ERASE_TO_INTERSECTION_LABEL} 켜짐`
-          : `${STUDIO_ERASE_TO_INTERSECTION_LABEL} 꺼짐`
-      );
-    },
+    toggleEraseToIntersection: toggleEraseToIntersectionMode,
   });
 
   const livingInkPersistedLayer = elements.some((element) =>
     element.type === "image" && element.livingInkReceipt?.pageId === activePage.id
   );
   const livingInkSelectionReady = livingInkSelectionAvailable();
-  const livingInkBrushSupported = studioLivingInkSupportsBrush(brush, activeCatalogBrush.id);
+  const livingInkEffectiveScope = studioLivingInkEffectiveScope(
+    livingInkScope,
+    livingInkSelectionReady,
+  );
+  const livingInkBrushSupported = studioLivingInkSupportsExplicitBrush(
+    brush,
+    activeCatalogBrush.id,
+  );
   const studioOptionsBarsDrawModel = useMemo<StudioOptionsBarsDrawModel>(
     () => ({
       visible: tool === "draw" && !canvasOnlyMode,
@@ -38694,17 +41295,18 @@ function clearSelectionForEdit() {
       favoriteBrushIds: proDrawPrefs.favoriteBrushIds,
       livingInk: {
         supported: livingInkBrushSupported,
+        physicalModeEnabled: livingInkPhysicalModeEnabled,
         state: livingInkState,
         mode: livingInkMode,
-        scope: livingInkSelectionReady ? livingInkScope : "all",
+        scope: livingInkEffectiveScope,
         selectionAvailable: livingInkSelectionReady,
         busy: livingInkBusy,
         fixAvailable: livingInkPersistedLayer && livingInkState === "ready",
         fixUnavailableReason:
           livingInkStateMessage
           ?? (livingInkPersistedLayer
-            ? "Living Ink 물리 상태를 복원한 뒤 정착할 수 있습니다."
-            : "먼저 Living Ink 잉크나 물 획을 저장하면 정착을 사용할 수 있습니다."),
+            ? "수채 번짐 상태를 복원한 뒤 정착할 수 있습니다."
+            : "먼저 수채 번짐 잉크나 물 획을 저장하면 정착을 사용할 수 있습니다."),
         material: livingInkMaterial,
         materialLocked: livingInkPersistedLayer,
         materialLockedReason:
@@ -38747,8 +41349,9 @@ function clearSelectionForEdit() {
       livingInkBusy,
       livingInkMaterial,
       livingInkMode,
+      livingInkPhysicalModeEnabled,
       livingInkPersistedLayer,
-      livingInkScope,
+      livingInkEffectiveScope,
       livingInkSelectionReady,
       livingInkState,
       livingInkStateMessage,
@@ -38775,24 +41378,29 @@ function clearSelectionForEdit() {
     ]
   );
 
+  const selectionOptionsSuppressed =
+    advancedFillActive ||
+    commentPinArmed ||
+    cropRect !== null ||
+    dodgeBurnActive ||
+    eyedropperActive ||
+    liquifyActive ||
+    pixelTool !== null ||
+    smudgeActive ||
+    wetMixActive;
+  /**
+   * 선택 옵션 줄은 "선택 도구가 켜져 있는 동안" 항상 같은 높이를 차지한다.
+   * 예전에는 선택이 생기는 순간에만 44px 스트립이 flow 로 끼어들어 툴 레일·페이지
+   * 패널·캔버스·인스펙터가 통째로 아래로 밀렸다(브라우저 실측: 선택할 때마다 캔버스
+   * 원점이 95px 이동, 그중 44px 이 이 스트립). Photoshop/CSP 처럼 도구 옵션 줄을
+   * 상시 유지해 선택 상태가 캔버스 기하를 건드리지 못하게 한다.
+   */
+  const selectOptionsStripArmed = tool === "select" && !canvasOnlyMode && !selectionOptionsSuppressed;
+
   const studioOptionsBarsSelectionModel = useMemo<StudioOptionsBarsSelectionModel>(() => {
     const count = marqueeIds.length > 0 ? marqueeIds.length : selectedId ? 1 : 0;
-    const selectionOptionsSuppressed =
-      advancedFillActive ||
-      commentPinArmed ||
-      cropRect !== null ||
-      dodgeBurnActive ||
-      eyedropperActive ||
-      liquifyActive ||
-      pixelTool !== null ||
-      smudgeActive ||
-      wetMixActive;
     return {
-      visible:
-        tool === "select" &&
-        !canvasOnlyMode &&
-        !selectionOptionsSuppressed &&
-        count > 0,
+      visible: selectOptionsStripArmed && count > 0,
       count,
       label: selected ? elementLabel(selected) : null,
       locked: Boolean(selected?.locked),
@@ -38812,21 +41420,11 @@ function clearSelectionForEdit() {
     };
   }, [
     activeSurfaceReviewLocked,
-    advancedFillActive,
-    canvasOnlyMode,
-    commentPinArmed,
-    cropRect,
-    dodgeBurnActive,
-    eyedropperActive,
     groups,
-    liquifyActive,
     marqueeIds.length,
-    pixelTool,
+    selectOptionsStripArmed,
     selected,
     selectedId,
-    smudgeActive,
-    tool,
-    wetMixActive,
   ]);
 
   // 렌더 시점 ref 스냅샷 — RC 컴파일 자식(캔버스)은 렌더 중 ref 접근이 금지라, 비컴파일
@@ -38841,9 +41439,20 @@ function clearSelectionForEdit() {
   const nodeEditActiveHandleIndex = nodeEditDragRef.current?.session.pointIndex ?? null;
   const bubbleShapeActiveHandleIndex =
     bubbleShapeDragRef.current?.session.pointIndex ?? bubbleShapeSelectedPointIndex;
+  const sharedGutters = useMemo(
+    () => masterEditMode
+      ? []
+      : planSharedGutterSegments(
+          elements.filter((element): element is FrameEl =>
+            element.type === "frame" && !element.hidden
+          )
+        ),
+    [elements, masterEditMode]
+  );
 
   const studioCanvasViewportHandlers = useStudioStableHandlers<StudioCanvasViewportHandlers>({
   addPage,
+  closeViewToolWithFocus,
   beginCanvasSelectionResize,
   cancelCanvasSelectionResize,
   commitCanvasSelectionResize,
@@ -38864,6 +41473,8 @@ function clearSelectionForEdit() {
   commitTextTransformEnd,
     acknowledgeAiNotice,
     alignSelected,
+    zoomToSelection,
+    flipSelected,
     applyAdvancedFillPreview,
     applyBuiltInBrushPreset,
     applyDialogueReplacePlan,
@@ -38939,6 +41550,9 @@ function clearSelectionForEdit() {
     },
     stopStudioCommentPlacementSession,
     setMaster,
+    setCurrentPageId,
+    setDrawMode,
+    setRightPanelOpen: setRightPanelOpenWithOverride,
     setStudioUiDensity,
     setActualPixelView,
     startFromExample,
@@ -39037,6 +41651,9 @@ function clearSelectionForEdit() {
           : undefined
       }
     >
+    {/* 파괴적 명령 승인 표면. body 로 포털되므로 위치는 자유롭지만, 스튜디오 셸 안에 두어
+        스튜디오가 살아 있는 동안에만 seam 을 소유하게 한다. */}
+    <StudioDestructiveConfirmHost />
     <input
       ref={editMenuImageInputRef}
       type="file"
@@ -39068,6 +41685,15 @@ function clearSelectionForEdit() {
         disabled={projectArchiveBusy || collaborationDocumentLocked}
         onChange={(event) => void handleImportProjectArchive(event)}
         aria-label="프로젝트 아카이브 가져오기"
+      />
+      <input
+        ref={brushPackImportInputRef}
+        type="file"
+        accept={STUDIO_BRUSH_PACK_ACCEPT}
+        className="hidden"
+        disabled={brushPackImporting}
+        onChange={(event) => void handleBrushPackImportFromMenu(event)}
+        aria-label="브러시 가져오기 (ABR · MYB · KPP · SUT · SUTG · Krita 번들 · JSON)"
       />
       <input
         ref={psdImportInputRef}
@@ -39195,7 +41821,72 @@ function clearSelectionForEdit() {
         />
       </Suspense>
     ) : null}
-    {hybridDccOpen ? (
+    {!creativeModesOpen ? (
+    <button
+      ref={creativeModesTriggerRef}
+      type="button"
+      data-studio-creative-modes-trigger="true"
+      // 모바일에서는 도크(z-55) 위 여백에 앉힌다. bottom-4 로 두면 도크 좌측 도구를 덮어
+      // 선택·펜 탭이 이 필로 흘러간다. 데스크톱은 도크가 없으므로 lg 에서 원래 자리로 돌아온다.
+      className="fixed left-4 bottom-[calc(var(--studio-canvas-bottom-inset,7rem)+4rem)] z-[52] min-h-11 rounded-full border border-accent/50 bg-accent px-3 text-[0.72rem] font-bold text-on-accent shadow-xl lg:bottom-4 lg:z-[69]"
+      onClick={() => setCreativeModesOpen(true)}
+    >
+      {creativeModesLabel}
+    </button>
+  ) : null}
+  {creativeModesOpen ? (
+    <div
+      ref={creativeModesPanelRef}
+      role="dialog"
+      aria-label={creativeModesLabel}
+      data-studio-creative-modes-panel="true"
+      // 뷰포트보다 큰 내용을 안고 화면 밖으로 밀려나지 않도록 높이를 잘라 시트 자체가 스크롤한다.
+      // 모바일에서는 도크 위에서 멈춰 도구막대를 계속 쓸 수 있게 두고, 데스크톱 배치는 그대로다.
+      className="fixed inset-x-3 bottom-[calc(var(--studio-canvas-bottom-inset,7rem)+0.5rem)] z-[70] flex max-h-[calc(100dvh-var(--studio-canvas-bottom-inset,7rem)-4rem)] flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-2xl lg:inset-x-auto lg:left-1/2 lg:bottom-4 lg:max-h-[calc(100dvh-5rem)] lg:w-[min(22rem,calc(100vw-1.5rem))] lg:-translate-x-1/2"
+    >
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-line px-2 py-1">
+        <p className="min-w-0 truncate px-1 text-[0.72rem] font-bold text-fg">{creativeModesLabel}</p>
+        <button
+          type="button"
+          data-studio-creative-modes-close="true"
+          data-autofocus
+          aria-label={creativeModesCloseLabel}
+          className="grid size-11 shrink-0 place-items-center rounded-xl text-[0.9rem] font-bold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+          onClick={() => setCreativeModesOpen(false)}
+        >
+          <span aria-hidden>✕</span>
+        </button>
+      </div>
+      <div
+        data-studio-creative-modes-scroll="true"
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+      >
+      <Suspense fallback={null}>
+        <StudioCreativeCompetitorModesPanel
+          pixelArtMode={pixelArtMode}
+          onPixelArtModeChange={setPixelArtMode}
+          silkSpec={silkGenerativeSpec}
+          onSilkSpecChange={(spec) => {
+            setSilkGenerativeSpec(spec);
+            setSymmetryType("silk");
+            setSymmetryRadialCount(spec.arms);
+          }}
+          onAddStickyNote={insertStudioStickyNote}
+          onOpenSculpt={() => {
+            setCreativeModesOpen(false);
+            setHybridDccOpen(true);
+          }}
+          onStartEphemeralBoard={(session) => {
+            // Ephemeral board: focus canvas and keep share path in session for HUD.
+            setCreativeModesOpen(false);
+            console.info("[studio-ephemeral-board]", session.roomCode, session.title);
+          }}
+        />
+      </Suspense>
+      </div>
+    </div>
+  ) : null}
+  {hybridDccOpen ? (
       <Suspense
         fallback={(
           <div
@@ -39380,7 +42071,7 @@ function clearSelectionForEdit() {
         <button
           ref={brushUndoButtonRef}
           type="button"
-          onClick={() => undoBrushDelete(pendingBrushDelete)}
+          onClick={() => void undoBrushDelete(pendingBrushDelete)}
           className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl bg-warn/15 px-3 font-bold text-warn hover:bg-warn/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           <Undo2 size={14} aria-hidden /> 삭제 취소
@@ -39432,11 +42123,15 @@ function clearSelectionForEdit() {
           isExporting={isExporting}
           isMobile={isMobile}
           liveWorkspaceLayout={liveWorkspaceLayout}
+          resolveWorkspaceDeviceKind={currentStudioWorkspaceDeviceKind}
           loadedWork={loadedWork}
+          masterEditMode={masterEditMode}
           menu={menu}
           mobileImmersive={mobileImmersive}
           historyPanelOpen={historyPanelOpen}
+          openStudioCommentCount={openStudioCommentCount}
           pageCount={studioMenubarPageLabels.length}
+          pageEditLocked={pageEditLocked}
           pageLabels={studioMenubarPageLabels}
           dialoguePages={pages}
           projectActionsOpen={projectActionsOpen}
@@ -39632,6 +42327,24 @@ function clearSelectionForEdit() {
         ) : null}
       </div>
 
+      {/*
+        선택 옵션 줄의 자리를 미리 확보한다 — 선택이 생겨도 스트립이 새로 flow 에
+        끼어들지 않으므로 캔버스 원점이 0px 이동한다. 빈 줄로 두면 고장처럼 보여서
+        같은 높이의 안내 줄을 세워 둔다(오버레이가 아니라 예약이라 캔버스를 가리지도
+        않는다).
+      */}
+      {selectOptionsStripArmed && !studioOptionsBarsSelectionModel.visible ? (
+        <div
+          data-studio-select-options-reserve="true"
+          data-studio-icon-first="true"
+          className="relative z-[40] flex h-11 min-h-11 shrink-0 items-center gap-1.5 overflow-hidden border-b border-line bg-panel/70 px-2.5 text-[0.7rem] text-fg-3"
+        >
+          <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-line" />
+          <span className="truncate">
+            요소를 클릭하면 선택 옵션이 여기에 표시됩니다 · 드래그로 여러 개 선택
+          </span>
+        </div>
+      ) : null}
       <StudioOptionsBars
         draw={studioOptionsBarsDrawModel}
         selection={studioOptionsBarsSelectionModel}
@@ -39987,11 +42700,11 @@ function clearSelectionForEdit() {
           mannequinPoserOpen={mannequinPoserOpen}
           poserVrmOpen={poserVrmOpen}
           bg3dOpen={bg3dOpen}
+          hybridDccOpen={hybridDccOpen}
           selected={selected}
           selectedImageMutationLocked={selectedImageMutationLocked}
           setAppSettingsInitialTab={setAppSettingsInitialTab}
           setAppSettingsOpen={setAppSettingsOpen}
-          setDrawMode={setDrawMode}
           setDrawShape={setDrawShape}
           setEyedropperActive={setEyedropperActive}
           setMenu={setMenu}
@@ -40004,6 +42717,7 @@ function clearSelectionForEdit() {
           setMannequinPoserOpen={setMannequinPoserOpen}
           setPoserVrmOpen={setPoserVrmOpen}
           setBg3dOpen={setBg3dOpen}
+          setHybridDccOpen={setHybridDccOpen}
           setStrokeWidth={setStrokeWidth}
           setTool={setTool}
           setViewTool={setViewTool}
@@ -40030,29 +42744,37 @@ function clearSelectionForEdit() {
           >
           {showRulers && !canvasOnlyMode ? (
             <Suspense fallback={null}>
-              <StudioCanvasRulerBars
-                visible
-                scale={effScale}
-                scrollLeft={scrollPos.left}
-                scrollTop={scrollPos.top}
-                canvasWidth={CANVAS_W}
-                canvasHeight={canvasH}
-                guides={canvasGuides}
-                onAddGuide={(axis, pos) => {
-                  setCanvasGuides((g) => ({
-                    ...g,
-                    [axis === "h" ? "horizontal" : "vertical"]: [
-                      ...g[axis === "h" ? "horizontal" : "vertical"],
-                      pos,
-                    ],
-                  }));
-                }}
+              {/* 룰러 눈금은 스크롤 오프셋을 프레임 단위로 따라가야 한다. 스토어를 구독해
+                  이 서브트리만 다시 그리고, 페이지 커밋은 만들지 않는다. */}
+              <StudioScrollViewportSubscriber
+                store={scrollViewportStore}
+                render={(viewport) => (
+                  <StudioCanvasRulerBars
+                    visible
+                    scale={effScale}
+                    scrollLeft={viewport.left}
+                    scrollTop={viewport.top}
+                    canvasWidth={CANVAS_W}
+                    canvasHeight={canvasH}
+                    guides={canvasGuides}
+                    onAddGuide={(axis, pos) => {
+                      setCanvasGuides((g) => ({
+                        ...g,
+                        [axis === "h" ? "horizontal" : "vertical"]: [
+                          ...g[axis === "h" ? "horizontal" : "vertical"],
+                          pos,
+                        ],
+                      }));
+                    }}
+                  />
+                )}
               />
             </Suspense>
           ) : null}
           <StudioCanvasViewport
           liveDynamicBrushOverlayRenderer={liveDynamicBrushOverlayRenderer}
           liveWetInkOverlayRenderer={liveWetInkOverlayRenderer}
+          inkMeshLivePreviewRuntime={inkMeshLivePreviewRuntime}
           liveInkPredictionRenderer={liveInkPredictionRenderer}
           liveStampOverlayRenderer={liveStampOverlayRenderer}
           bubbleShapeActiveHandleIndex={bubbleShapeActiveHandleIndex}
@@ -40093,11 +42815,13 @@ function clearSelectionForEdit() {
           canvasH={canvasH}
           canvasOnlyMode={canvasOnlyMode}
           canvasInteractionBlocked={canvasInteractionBlocked}
+          canvasScrollViewport={scrollPos}
+          scrollViewportStore={scrollViewportStore}
           hardCanvasInteractionBlock={hardCanvasInteractionBlock}
           collaborationDocumentLocked={collaborationDocumentLocked}
           collaborationDocumentUnavailable={collaborationDocumentUnavailable}
           collaborationLockMessage={collaborationLockMessage}
-          closeViewToolWithFocus={closeViewToolWithFocus}
+          closeViewToolWithFocus={studioCanvasViewportHandlers.closeViewToolWithFocus}
           colorBlindPreview={colorBlindPreview}
           commentPinArmed={commentPinArmed}
           commentQuickReplyActive={
@@ -40109,7 +42833,7 @@ function clearSelectionForEdit() {
           dialogueBatchOpen={dialogueBatchOpen}
           dialogueTranslateOpen={dialogueTranslateOpen}
           drawingRef={drawingRef}
-          drawingShortcutNotice={hasAutosave || showMobileHint ? null : drawingShortcutNotice}
+          drawingShortcutNoticeStore={drawingShortcutNoticeStore}
           drawMode={drawMode}
           drawShape={drawShape}
           editing={editing}
@@ -40132,7 +42856,6 @@ function clearSelectionForEdit() {
           frameAnimTargetId={frameAnimTargetId}
           gpuCanvasShadowVisibleRef={gpuCanvasShadowVisibleRef}
           gpuLiveInkPinnedRef={gpuLiveInkPinnedRef}
-          hokusaiLiveOverlayVisibleRef={hokusaiLiveOverlayVisibleRef}
           livingInkOverlayVisibleRef={livingInkOverlayVisibleRef}
           gridSize={gridSize}
           groups={groups}
@@ -40232,10 +42955,10 @@ function clearSelectionForEdit() {
           setBg3dOpen={setBg3dOpen}
           setCanvasOnlyMode={setCanvasOnlyMode}
           setContextMenu={setContextMenu}
-          setCurrentPageId={setCurrentPageId}
+          setCurrentPageId={studioCanvasViewportHandlers.setCurrentPageId}
           setDialogueBatchOpen={setDialogueBatchOpen}
           setDialogueTranslateOpen={setDialogueTranslateOpen}
-          setDrawMode={setDrawMode}
+          setDrawMode={studioCanvasViewportHandlers.setDrawMode}
           setError={setError}
           setEyedropperActive={setEyedropperActive}
           setFollowingStudioSessionId={setFollowingStudioSessionId}
@@ -40252,7 +42975,7 @@ function clearSelectionForEdit() {
           setPuppetWarpPins={setPuppetWarpPins}
           setQuickShapeActive={setQuickShapeActive}
           setQuickStartOpen={setQuickStartOpen}
-          setRightPanelOpen={setRightPanelOpenWithOverride}
+          setRightPanelOpen={studioCanvasViewportHandlers.setRightPanelOpen}
           setSelectedId={setSelectedId}
           setSharedDocumentNotice={setSharedDocumentNotice}
           setShortcutsOpen={setShortcutsOpen}
@@ -40277,13 +43000,7 @@ function clearSelectionForEdit() {
           showQuickStart={showQuickStart}
           showWebtoonGuides={showWebtoonGuides}
           smartGuides={smartGuides}
-          sharedGutters={
-            masterEditMode
-              ? []
-              : planSharedGutterSegments(
-                  elements.filter((el): el is FrameEl => el.type === "frame" && !el.hidden)
-                )
-          }
+          sharedGutters={sharedGutters}
           smudgeArmed={smudgeArmed}
           dodgeBurnArmed={dodgeBurnArmed}
           dodgeBurnRadius={dodgeBurnRadius}
@@ -40359,6 +43076,37 @@ function clearSelectionForEdit() {
           setZoomLocked={setZoomLocked}
           zoomHostRef={zoomHostRef}
           stableHandlers={studioCanvasViewportHandlers}
+        />
+
+        <StudioBrushHud
+          visible={
+            tool === "draw"
+            && isStudioBrushCursorMode(drawMode)
+            && !canvasOnlyMode
+            && !canvasInteractionBlocked
+            && !isExporting
+            && !colorWheelOpen
+          }
+          strokeWidth={strokeWidth}
+          brushOpacity={brushOpacity}
+          color={color}
+          eraserActive={drawMode === "eraser"}
+          handedness={workspaceControlSide === "left" ? "left" : "right"}
+          canvasHostRef={wrapRef}
+          stableHandlers={studioOnCanvasSurfaceHandlers}
+        />
+        <StudioSelectionContextBar
+          visible={
+            tool === "select"
+            && currentCanvasSelectionCount > 0
+            && !canvasOnlyMode
+            && !canvasInteractionBlocked
+            && !isExporting
+          }
+          selectionCount={currentCanvasSelectionCount}
+          readOnly={activeSurfaceReviewLocked || pageEditLocked}
+          canDelete={!activeSurfaceReviewLocked && !pageEditLocked}
+          stableHandlers={studioOnCanvasSurfaceHandlers}
         />
 
         {pointCommentComposer ? (
@@ -40634,7 +43382,7 @@ function clearSelectionForEdit() {
           saving={saving}
           studioFilterPreparationBusy={studioFilterPreparationBusy}
           studioLayerLiftDisabledReason={studioLayerLiftDisabledReason}
-          scrollPos={scrollPos}
+          scrollViewportStore={scrollViewportStore}
           selected={selected}
           selectedBg3dEditSource={selectedBg3dEditSource}
           selectedBubbleTailGeometry={selectedBubbleTailGeometry}
@@ -40738,7 +43486,7 @@ function clearSelectionForEdit() {
           setPuppetWarpPins={setPuppetWarpPins}
           setQuickShapeActive={setQuickShapeActive}
           setRightPanelOpen={setRightPanelOpenWithOverride}
-          setSavedBrushes={setSavedBrushes}
+          setSavedBrushes={commitSavedBrushProjection}
           setShapeFill={setShapeFill}
           setSharedDocumentNotice={setSharedDocumentNotice}
           setShowGrid={setShowGrid}
@@ -40888,6 +43636,8 @@ function clearSelectionForEdit() {
           isMobile={isMobile}
           livingInk={{
             ...studioOptionsBarsDrawModel.livingInk,
+            onPhysicalModeEnabledChange:
+              studioOptionsBarsHandlers.setLivingInkPhysicalModeEnabled,
             onModeChange: studioOptionsBarsHandlers.setLivingInkMode,
             onScopeChange: studioOptionsBarsHandlers.setLivingInkScope,
             onFix: studioOptionsBarsHandlers.applyLivingInkFix,
@@ -40922,7 +43672,7 @@ function clearSelectionForEdit() {
           pressureMinSize={pressureMinSize}
           setPressureMinSize={setPressureMinSize}
           setQuickStartOpen={setQuickStartOpen}
-          setSavedBrushes={setSavedBrushes}
+          setSavedBrushes={commitSavedBrushProjection}
           setSelectedId={setSelectedId}
           setShapeFill={setShapeFill}
           setStampTuning={setStampTuning}
@@ -41434,6 +44184,13 @@ function clearSelectionForEdit() {
         </button>
       </div>
     ) : null}
+    {/*
+      §15.3 Help 그룹의 다섯 표면(현재 도구·용어 사전·진단·복구·라이선스·버그
+      리포트) 호스트. 자기 상태만 들고 채널로 요청을 받으므로 prop 이 없고, 열기
+      전에는 아무것도 렌더하지 않는다. 캔버스만 모드에서도 살아 있어야 해서
+      Container 밖 최상단에 둔다.
+    */}
+    <StudioHelpCenterHost />
     </div>
     </StudioToolHintPreferencesProvider>
     </StudioLiveCollaborationProvider>

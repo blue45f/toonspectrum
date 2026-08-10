@@ -69,6 +69,7 @@ export interface StudioOptionsBarsDrawModel {
   symmetryType: StudioSymmetryUi;
   livingInk: Readonly<{
     supported: boolean;
+    physicalModeEnabled: boolean;
     state: StudioLivingInkStudioState;
     mode: StudioLivingInkStrokeMode;
     scope: "all" | "selection";
@@ -128,6 +129,7 @@ export interface StudioOptionsBarsHandlers {
   toggleSelectedLock: () => void;
   toggleSizeLock: () => void;
   setLivingInkMode: (mode: StudioLivingInkStrokeMode) => void;
+  setLivingInkPhysicalModeEnabled: (enabled: boolean) => void;
   setLivingInkScope: (scope: "all" | "selection") => void;
   applyLivingInkFix: () => void;
   applyLivingInkClear: () => void;
@@ -219,6 +221,7 @@ export const StudioOptionsBars = memo(function StudioOptionsBars({
               ? undefined
               : {
                   ...draw.livingInk,
+                  onPhysicalModeEnabledChange: stableHandlers.setLivingInkPhysicalModeEnabled,
                   onModeChange: stableHandlers.setLivingInkMode,
                   onScopeChange: stableHandlers.setLivingInkScope,
                   onFix: stableHandlers.applyLivingInkFix,

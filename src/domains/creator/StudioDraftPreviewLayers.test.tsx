@@ -12,6 +12,11 @@ import type { DrawEl } from "./studio-element-model";
 import type { ReactNode } from "react";
 
 const layerHarness = vi.hoisted(() => ({
+  canvasByName: new Map<string, {
+    dataset: Record<string, string>;
+    nextElementSibling?: Element | null;
+    style: { mixBlendMode: string; zIndex: string };
+  }>(),
   drawSceneByName: new Map<string, () => void>(),
 }));
 
@@ -26,7 +31,15 @@ vi.mock("react-konva/lib/ReactKonvaCore", async () => {
       drawScene = vi.fn();
       layerHarness.drawSceneByName.set(name, drawScene);
     }
-    useImperativeHandle(ref, () => ({ drawScene }), [drawScene]);
+    let canvas = layerHarness.canvasByName.get(name);
+    if (!canvas) {
+      canvas = { dataset: {}, nextElementSibling: null, style: { mixBlendMode: "", zIndex: "" } };
+      layerHarness.canvasByName.set(name, canvas);
+    }
+    useImperativeHandle(ref, () => ({
+      drawScene,
+      getNativeCanvasElement: () => canvas,
+    }), [canvas, drawScene]);
     return createElement(
       "section",
       {
@@ -70,6 +83,7 @@ function draw(id: string, overrides: Partial<DrawEl> = {}): DrawEl {
 
 afterEach(() => {
   cleanup();
+  layerHarness.canvasByName.clear();
   layerHarness.drawSceneByName.clear();
 });
 
@@ -92,9 +106,9 @@ describe("StudioDraftPreviewLayers", () => {
 
     const view = render(<StudioDraftPreviewLayers store={store} />);
     const layers = view.getAllByTestId("draft-layer");
-    expect(layers).toHaveLength(1);
-    expect(layers[0]?.getAttribute("data-listening")).toBe("false");
-    expect(within(layers[0]!).getAllByTestId("draw-node").map((node) => ({
+    expect(layers).toHaveLength(2);
+    expect(layers.every((layer) => layer.dataset.listening === "false")).toBe(true);
+    expect(view.getAllByTestId("draw-node").map((node) => ({
       activeDraft: node.getAttribute("data-active-draft"),
       id: node.getAttribute("data-id"),
     }))).toEqual([
@@ -146,11 +160,11 @@ describe("StudioDraftPreviewLayers", () => {
     store.settle(draw("second"));
     const view = render(<StudioDraftPreviewLayers store={store} />);
     const normalDrawScene = layerHarness.drawSceneByName.get(
-      "studio-draft-preview-normal",
+      "studio-draft-preview-settled-source-over-0",
     );
 
     expect(normalDrawScene).toBeDefined();
-    expect(normalDrawScene).not.toHaveBeenCalled();
+    expect(normalDrawScene).toHaveBeenCalledTimes(1);
 
     for (const sampleCount of [4, 10, 20, 40]) {
       const points = Array.from({ length: sampleCount }, (_, index) => [index, index % 7]).flat();
@@ -167,7 +181,7 @@ describe("StudioDraftPreviewLayers", () => {
       "studio-draft-preview-fixed-fx",
     );
     expect(layers.map((layer) => layer.dataset.layerRole)).toEqual([
-      "studio-draft-preview-normal",
+      "studio-draft-preview-settled-source-over-0",
       "studio-draft-preview-fixed-fx",
     ]);
     expect(layers.every((layer) => layer.dataset.listening === "false")).toBe(true);
@@ -179,7 +193,7 @@ describe("StudioDraftPreviewLayers", () => {
       activeDraft: "true",
       id: "active-soft-glow",
     });
-    expect(normalDrawScene).not.toHaveBeenCalled();
+    expect(normalDrawScene).toHaveBeenCalledTimes(1);
     expect(fixedFxDrawScene).toHaveBeenCalledTimes(4);
     expect(layerHarness.drawSceneByName.get("studio-draft-preview-dynamic")).toBeUndefined();
 
@@ -204,7 +218,7 @@ describe("StudioDraftPreviewLayers", () => {
     }
     expect(resolveStudioDraftPreviewActiveLane(draw("highlighter", {
       brush: "highlighter",
-    }))).toBe("normal");
+    }))).toBe("backdrop-multiply");
     expect(resolveStudioDraftPreviewActiveLane(draw("oil", { brush: "oil" }))).toBe("normal");
     expect(resolveStudioDraftPreviewActiveLane(draw("dynamic", {
       brush: "ink-particle",
@@ -216,6 +230,45 @@ describe("StudioDraftPreviewLayers", () => {
       brush: "glow",
       fill: "#ffffff",
     }))).toBe("normal");
+  });
+
+  it("preserves FIFO blend order and applies multiply only to highlighter canvases", () => {
+    const store = new StudioDraftPreviewStore();
+    store.settle(draw("settled-highlighter", { brush: "highlighter" }));
+    store.settle(draw("normal-after", { brush: "oil" }));
+    store.setActive(draw("live-highlighter", { brush: "highlighter" }));
+
+    const view = render(<StudioDraftPreviewLayers store={store} />);
+    expect(view.getAllByTestId("draft-layer").map((layer) => layer.dataset.layerRole)).toEqual([
+      "studio-draft-preview-settled-backdrop-multiply-0",
+      "studio-draft-preview-settled-source-over-1",
+      "studio-draft-preview-backdrop-multiply",
+    ]);
+    expect(view.getAllByTestId("draw-node").map((node) => node.dataset.id)).toEqual([
+      "settled-highlighter",
+      "normal-after",
+      "live-highlighter",
+    ]);
+
+    expect(
+      layerHarness.canvasByName.get("studio-draft-preview-settled-backdrop-multiply-0"),
+    ).toMatchObject({
+      dataset: { studioDraftPreviewBlend: "backdrop-multiply" },
+      style: { mixBlendMode: "multiply", zIndex: "20" },
+    });
+    expect(
+      layerHarness.canvasByName.get("studio-draft-preview-settled-source-over-1"),
+    ).toMatchObject({
+      dataset: { studioDraftPreviewBlend: "source-over" },
+      style: { mixBlendMode: "normal", zIndex: "21" },
+    });
+    expect(
+      layerHarness.canvasByName.get("studio-draft-preview-backdrop-multiply"),
+    ).toMatchObject({
+      dataset: { studioDraftPreviewBlend: "backdrop-multiply" },
+      style: { mixBlendMode: "multiply", zIndex: "22" },
+    });
+    expect(view.getAllByTestId("draft-layer")).toHaveLength(3);
   });
 
   it("reacts through the narrow external-store source and unsubscribes on unmount", () => {

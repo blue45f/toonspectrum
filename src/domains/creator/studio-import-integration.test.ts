@@ -1269,12 +1269,18 @@ describe("가져오기 UI accept ↔ 디코더 경계", () => {
 
   it("브러시 팁·브러시 팩·VRM 입력의 accept가 해당 디코더와 일치한다", () => {
     expect(componentSource("StudioBrushStudio.tsx")).toContain('accept=".png,image/png"');
-    const brushLibraryAccept = /accept="([^"]+)"/u.exec(
-      componentSource("StudioBrushLibraryPanel.tsx").split("브러시 설정 또는 Photoshop ABR 가져오기")[0]!
-        .split("\n").slice(-6).join("\n")
+    // 브러시 팩 accept 는 라이브러리 패널과 그리기 메뉴가 같은 상수를 쓴다. 한쪽만
+    // 확장자를 늘리면 "파서는 있는데 고를 수 없는 포맷"이 다시 생기므로 상수 자체를 검사한다.
+    const accept = /export const STUDIO_BRUSH_PACK_ACCEPT =\s*"([^"]+)"/u.exec(
+      componentSource("studio-brush-pack-format.ts")
     );
-    expect(brushLibraryAccept?.[1]).toContain(".json");
-    expect(brushLibraryAccept?.[1]).toContain(".abr");
+    expect(accept).not.toBeNull();
+    for (const extension of [".json", ".abr", ".myb", ".kpp"]) {
+      expect(accept![1]!).toContain(extension);
+    }
+    for (const consumer of ["StudioBrushLibraryPanel.tsx", "StudioPage.tsx"]) {
+      expect(componentSource(consumer), consumer).toContain("accept={STUDIO_BRUSH_PACK_ACCEPT}");
+    }
     expect(componentSource("StudioVrmCharacterLibraryPanel.tsx")).toContain('accept=".vrm"');
   });
 

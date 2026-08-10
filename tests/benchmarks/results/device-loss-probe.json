@@ -1,0 +1,33 @@
+{
+  "harness": "packages/studio-engine-vello/src/__tests__/device-loss-browser-probe.test.ts (VELLO_DEVICE_LOSS_PROBE=1)",
+  "contract": "V12 §17.3 device loss: real device.destroy() → lost received → re-requestDevice → vello GPU render re-succeeds under the δ48 parity gate",
+  "note": "page-level GPUDevice is destroyed (wasm module holds its own device); state-machine behavior is covered by studio-device-loss-recovery.test.ts",
+  "measuredAt": "2026-08-08T04:57:54.604Z",
+  "browser": {
+    "launch": "playwright chromium headless shell (metal, unsafe-webgpu)",
+    "version": "140.0.7339.186"
+  },
+  "adapter": {
+    "backend": "BrowserWebGpu",
+    "deviceType": "Other",
+    "driver": "",
+    "driverInfo": "",
+    "name": ""
+  },
+  "scene": "01-solid-shapes",
+  "lossReason": "destroyed",
+  "lossMessagePresent": true,
+  "reacquireAttempts": 1,
+  "maxReacquireAttempts": 5,
+  "timingsMs": {
+    "baselineRenderMs": 65.19999998807907,
+    "destroyToLostMs": 1.100000023841858,
+    "lostToDeviceMs": 0.30000001192092896,
+    "deviceToRenderMs": 3.199999988079071,
+    "lostToRenderMs": 3.5
+  },
+  "parity": {
+    "fuzzyMismatchPct": 0,
+    "gatePct": 0.6
+  }
+}

@@ -92,6 +92,10 @@ export const STUDIO_BRUSH_RENDER_FAMILY: Readonly<Record<string, StudioBrushRend
   "flat-brush": "brush",
   watercolor: "watercolor",
   "ink-wash": "watercolor",
+  "inkwash-pen": "watercolor",
+  "inkwash-water-brush": "watercolor",
+  "inkwash-bleed-wash": "watercolor",
+  "inkwash-white-ink": "watercolor",
   gouache: "watercolor",
   oil: "oil",
   acrylic: "oil",
@@ -121,7 +125,24 @@ export const STUDIO_BRUSH_RENDER_FAMILY: Readonly<Record<string, StudioBrushRend
 
 export function resolveStudioBrushRenderFamily(brushId: unknown): StudioBrushRenderFamily {
   if (typeof brushId !== "string" || !brushId) return "pen";
-  return STUDIO_BRUSH_RENDER_FAMILY[brushId] ?? "pen";
+  const mapped = STUDIO_BRUSH_RENDER_FAMILY[brushId];
+  if (mapped) return mapped;
+  // Pack-expansion / alias ids keep one presentation family so wash/air/dry share UI chrome.
+  const id = brushId.toLowerCase();
+  if (/(?:watercolor|ink-?wash|inkwash|sumi|gouache|bleed-wash|wet-wash|flat-wash)/u.test(id)) {
+    return "watercolor";
+  }
+  if (/(?:airbrush|soft-brush|^spray$|mist-soft|grand-soft)/u.test(id)) return "airbrush";
+  if (/(?:charcoal|crayon|chalk|pastel|dry-media|pencil)/u.test(id)) {
+    if (id.includes("pastel") && !id.includes("highlighter")) return "pastel";
+    if (id.includes("pencil")) return "pencil";
+    return "dry-media";
+  }
+  if (/(?:oil|acrylic|paint-tube)/u.test(id)) return "oil";
+  if (/(?:marker|highlighter|felt-tip)/u.test(id)) {
+    return id.includes("highlighter") ? "highlighter" : "marker";
+  }
+  return "pen";
 }
 
 /**
@@ -221,6 +242,34 @@ export const BRUSH_PRESETS: BrushPreset[] = [
   { id: "flat-brush", name: "평붓(플랫)", defaultWidth: 18, defaultOpacity: 0.9 },
   { id: "watercolor", name: "수채 번짐", defaultWidth: 28, defaultOpacity: 0.55 },
   { id: "ink-wash", name: "수묵 번짐", defaultWidth: 30, defaultOpacity: 0.5 },
+  {
+    id: "inkwash-pen",
+    name: "잉크워시 딥펜(유체 잉크)",
+    defaultWidth: 8,
+    defaultOpacity: 0.95,
+    searchAliases: ["잉크워시 펜", "유체 잉크 펜", "inkwash pen", "fluid ink pen"],
+  },
+  {
+    id: "inkwash-water-brush",
+    name: "잉크워시 수채 붓(생동하는 물)",
+    defaultWidth: 32,
+    defaultOpacity: 0.6,
+    searchAliases: ["잉크워시 붓", "생동하는 물", "water brush", "living water brush"],
+  },
+  {
+    id: "inkwash-bleed-wash",
+    name: "잉크워시 번짐 워시",
+    defaultWidth: 36,
+    defaultOpacity: 0.5,
+    searchAliases: ["잉크워시 번짐", "유체 번짐", "inkwash bleed", "fluid bleed wash"],
+  },
+  {
+    id: "inkwash-white-ink",
+    name: "잉크워시 화이트 잉크",
+    defaultWidth: 16,
+    defaultOpacity: 0.85,
+    searchAliases: ["화이트 잉크", "하얀 잉크", "white ink", "fluid white ink"],
+  },
   { id: "gouache", name: "과슈 붓", defaultWidth: 24, defaultOpacity: 0.88 },
   { id: "oil", name: "유화 붓", defaultWidth: 22, defaultOpacity: 0.92 },
   { id: "acrylic", name: "아크릴 물감", defaultWidth: 20, defaultOpacity: 0.95 },

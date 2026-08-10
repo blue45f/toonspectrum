@@ -132,6 +132,25 @@ export const PALETTE_LIBRARY_KEY = "toonspectrum-studio-palette-library";
 export const MAX_PALETTES = 40; // studio-clips.ts의 MAX_CLIPS와 동일한 상한 정책을 따른다.
 export const MAX_COLORS_PER_PALETTE = 1000; // localStorage 용량 보호용 — 대형 브랜드 스와치북까지 여유 있게 수용.
 export const DEFAULT_PALETTE_NAME = "이름 없는 팔레트";
+export const MAX_PALETTE_NAME_LENGTH = 160;
+export const MAX_PALETTE_ID_LENGTH = 160;
+export const MAX_PALETTE_LIBRARY_SERIALIZED_BYTES = 2 * 1024 * 1024;
+export const STUDIO_PALETTE_LIBRARY_SCHEMA = "toonspectrum.studio.named-palettes";
+
+export type StudioPaletteLibraryErrorCode =
+  | "corrupt-data"
+  | "invalid-palette"
+  | "library-too-large";
+
+export class StudioPaletteLibraryError extends Error {
+  readonly code: StudioPaletteLibraryErrorCode;
+
+  constructor(code: StudioPaletteLibraryErrorCode, message: string) {
+    super(message);
+    this.name = "StudioPaletteLibraryError";
+    this.code = code;
+  }
+}
 
 function isStudioNamedPalette(v: unknown): v is StudioNamedPalette {
   if (!v || typeof v !== "object") return false;
@@ -146,7 +165,169 @@ function isStudioNamedPalette(v: unknown): v is StudioNamedPalette {
   );
 }
 
-/** 저장된 팔레트 목록(최근 저장·가져오기 순). 저장소 부재·파싱 실패 시 []. */
+function exactPaletteRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  const allowed = new Set(["id", "name", "createdAt", "updatedAt", "colors"]);
+  return Object.keys(record).every((key) => allowed.has(key))
+    && Object.keys(record).length === allowed.size
+    ? record
+    : null;
+}
+
+function canonicalPalette(value: unknown): StudioNamedPalette | null {
+  const record = exactPaletteRecord(value);
+  if (!record || !isStudioNamedPalette(record)) return null;
+  if (
+    record.id.trim() !== record.id
+    || record.id.length === 0
+    || record.id.length > MAX_PALETTE_ID_LENGTH
+    || record.name.trim() !== record.name
+    || record.name.length === 0
+    || record.name.length > MAX_PALETTE_NAME_LENGTH
+    || !Number.isSafeInteger(record.createdAt)
+    || record.createdAt < 0
+    || !Number.isSafeInteger(record.updatedAt)
+    || record.updatedAt < record.createdAt
+    || record.colors.length === 0
+    || record.colors.length > MAX_COLORS_PER_PALETTE
+    || record.colors.some((color) => !/^#[0-9a-f]{6}$/u.test(color))
+  ) {
+    return null;
+  }
+  return {
+    id: record.id,
+    name: record.name,
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+    colors: [...record.colors],
+  };
+}
+
+function canonicalPaletteLibrary(values: readonly unknown[]): StudioNamedPalette[] {
+  if (values.length > MAX_PALETTES) {
+    throw new StudioPaletteLibraryError(
+      "library-too-large",
+      `팔레트 라이브러리는 ${MAX_PALETTES}개를 넘을 수 없습니다.`,
+    );
+  }
+  const ids = new Set<string>();
+  return values.map((value) => {
+    const palette = canonicalPalette(value);
+    if (!palette || ids.has(palette.id)) {
+      throw new StudioPaletteLibraryError(
+        "invalid-palette",
+        "팔레트 라이브러리에 손상되거나 중복된 항목이 있습니다.",
+      );
+    }
+    ids.add(palette.id);
+    return palette;
+  });
+}
+
+function paletteLibraryEnvelope(items: readonly StudioNamedPalette[]) {
+  return {
+    schema: STUDIO_PALETTE_LIBRARY_SCHEMA,
+    version: 1 as const,
+    items,
+  };
+}
+
+export function serializeStudioPaletteLibrary(
+  values: readonly StudioNamedPalette[],
+): string {
+  const serialized = JSON.stringify(paletteLibraryEnvelope(canonicalPaletteLibrary(values)));
+  if (new TextEncoder().encode(serialized).byteLength > MAX_PALETTE_LIBRARY_SERIALIZED_BYTES) {
+    throw new StudioPaletteLibraryError(
+      "library-too-large",
+      "팔레트 라이브러리가 SQLite 저장 상한을 넘었습니다.",
+    );
+  }
+  return serialized;
+}
+
+export function parseCanonicalStudioPaletteLibrary(raw: string): StudioNamedPalette[] {
+  if (
+    typeof raw !== "string"
+    || new TextEncoder().encode(raw).byteLength > MAX_PALETTE_LIBRARY_SERIALIZED_BYTES
+  ) {
+    throw new StudioPaletteLibraryError(
+      "library-too-large",
+      "팔레트 라이브러리 저장값이 허용 크기를 넘었습니다.",
+    );
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new StudioPaletteLibraryError("corrupt-data", "팔레트 라이브러리 JSON이 손상되었습니다.");
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new StudioPaletteLibraryError("corrupt-data", "팔레트 라이브러리 envelope가 올바르지 않습니다.");
+  }
+  const envelope = parsed as Record<string, unknown>;
+  if (
+    Object.keys(envelope).sort().join(",") !== "items,schema,version"
+    || envelope.schema !== STUDIO_PALETTE_LIBRARY_SCHEMA
+    || envelope.version !== 1
+    || !Array.isArray(envelope.items)
+  ) {
+    throw new StudioPaletteLibraryError("corrupt-data", "팔레트 라이브러리 계약이 올바르지 않습니다.");
+  }
+  const items = canonicalPaletteLibrary(envelope.items);
+  if (serializeStudioPaletteLibrary(items) !== raw) {
+    throw new StudioPaletteLibraryError("corrupt-data", "팔레트 라이브러리가 canonical 형식이 아닙니다.");
+  }
+  return items;
+}
+
+export function upsertPaletteInMemory(
+  values: readonly StudioNamedPalette[],
+  palette: StudioNamedPalette,
+): StudioNamedPalette[] {
+  const current = canonicalPaletteLibrary(values);
+  const canonical = canonicalPalette(palette);
+  if (!canonical) {
+    throw new StudioPaletteLibraryError("invalid-palette", "유효하지 않은 팔레트입니다.");
+  }
+  const exists = current.some((item) => item.id === canonical.id);
+  if (!exists && current.length >= MAX_PALETTES) {
+    throw new StudioPaletteLibraryError(
+      "library-too-large",
+      `팔레트 라이브러리는 ${MAX_PALETTES}개를 넘을 수 없습니다. 기존 항목을 먼저 삭제해 주세요.`,
+    );
+  }
+  return [canonical, ...current.filter((item) => item.id !== canonical.id)];
+}
+
+export function renamePaletteInMemory(
+  values: readonly StudioNamedPalette[],
+  id: string,
+  name: string,
+  now: number = Date.now(),
+): StudioNamedPalette[] {
+  const current = canonicalPaletteLibrary(values);
+  const trimmed = name.trim();
+  if (!trimmed) return current;
+  if (trimmed.length > MAX_PALETTE_NAME_LENGTH || !Number.isSafeInteger(now) || now < 0) {
+    throw new StudioPaletteLibraryError("invalid-palette", "팔레트 이름 또는 수정 시각이 올바르지 않습니다.");
+  }
+  return current.map((palette) => palette.id === id
+    ? { ...palette, name: trimmed, updatedAt: Math.max(palette.createdAt, now) }
+    : palette);
+}
+
+export function deletePaletteInMemory(
+  values: readonly StudioNamedPalette[],
+  id: string,
+): StudioNamedPalette[] {
+  return canonicalPaletteLibrary(values).filter((palette) => palette.id !== id);
+}
+
+/**
+ * Legacy/test/import seam. V12 product boot must use studio-palette-sqlite-repository and must not
+ * call this helper automatically. 저장소 부재·파싱 실패 시 [].
+ */
 export function listPalettes(storage: PaletteStorage | null | undefined): StudioNamedPalette[] {
   if (!storage) return [];
   try {
@@ -169,7 +350,7 @@ function persist(storage: PaletteStorage | null | undefined, palettes: StudioNam
   }
 }
 
-/** 저장(같은 id면 교체하며 맨 앞으로, 새 항목도 맨 앞). 새 목록 반환. */
+/** Legacy sync seam only. V12 product code uses the queued SQLite repository. */
 export function savePalette(storage: PaletteStorage | null | undefined, palette: StudioNamedPalette): StudioNamedPalette[] {
   const next = [palette, ...listPalettes(storage).filter((p) => p.id !== palette.id)].slice(0, MAX_PALETTES);
   persist(storage, next);
@@ -206,13 +387,26 @@ export function createPalette(name: string, colors: string[]): StudioNamedPalett
   if (validated.length === 0) {
     throw new Error("유효한 색이 하나도 없어요. #rrggbb 형식의 색을 입력해주세요.");
   }
+  if (validated.length > MAX_COLORS_PER_PALETTE) {
+    throw new StudioPaletteLibraryError(
+      "library-too-large",
+      `팔레트 하나에는 최대 ${MAX_COLORS_PER_PALETTE}색만 저장할 수 있습니다.`,
+    );
+  }
+  const normalizedName = name.trim() || DEFAULT_PALETTE_NAME;
+  if (normalizedName.length > MAX_PALETTE_NAME_LENGTH) {
+    throw new StudioPaletteLibraryError(
+      "invalid-palette",
+      `팔레트 이름은 ${MAX_PALETTE_NAME_LENGTH}자를 넘을 수 없습니다.`,
+    );
+  }
   const now = Date.now();
   return {
     id: crypto.randomUUID(),
-    name: name.trim() || DEFAULT_PALETTE_NAME,
+    name: normalizedName,
     createdAt: now,
     updatedAt: now,
-    colors: validated.slice(0, MAX_COLORS_PER_PALETTE),
+    colors: validated,
   };
 }
 

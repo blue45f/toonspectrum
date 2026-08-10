@@ -126,10 +126,16 @@ describe("studio drawing library strategy", () => {
       brushPixelAuthority: false,
     });
     expect(pixi?.maintenanceNote).toContain("WebGPU-first/WebGL-fallback");
-    expect(pixi?.maintenanceNote).toContain("implemented but unwired");
+    expect(pixi?.maintenanceNote).toContain("always-on");
+    expect(pixi?.maintenanceNote).toContain("StudioPixiSceneOverlayHost");
     expect(pixi?.riskNotes).toContain(
       "It must never rasterize live or committed brush paint or share another renderer's GPUCanvasContext.",
     );
+    // The audit rationale must not contradict the maintenance note: the host is mounted, so the
+    // entry may not still describe the provider as unwired.
+    const pixiAudit = STUDIO_DRAWING_SOURCE_AUDIT.find((entry) => entry.id === "pixi");
+    expect(pixiAudit?.rationale).toContain("StudioPixiSceneOverlayHost");
+    expect(pixiAudit?.rationale).not.toContain("unwired");
     expect(resolveStudioDrawingLibraryStrategy("paper")).toMatchObject({
       productLayer: "vector-geometry",
       decision: "isolated-vector-geometry-provider",
@@ -211,16 +217,12 @@ describe("studio drawing library strategy", () => {
       packageName: "vello",
       license: "MIT OR Apache-2.0",
       productLayer: "gpu-vector-research",
-      decision: "research-only-gpu-vector-provider",
-      runtimeInstallation: "not-installed-research-only",
+      decision: "isolated-vector-geometry-provider",
+      runtimeInstallation: "installed-active",
       canonicalAuthority: false,
       brushPixelAuthority: false,
     });
-    expect(vello?.maintenanceNote).toContain("0.9.0");
-    expect(vello?.riskNotes.join(" ")).toContain("alpha");
-    expect(vello?.riskNotes.join(" ")).toContain(
-      "web is not a primary target",
-    );
+    expect(vello?.maintenanceNote).toContain("WGPU 2D vector path renderer engine");
     const servo = resolveStudioDrawingLibraryStrategy("servo");
     expect(servo).toMatchObject({
       packageName: "servo",

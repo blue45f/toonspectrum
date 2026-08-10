@@ -166,8 +166,8 @@ describe("Studio interchange capability registry", () => {
     });
   });
 
-  it("독점 CLIP/SUT/AI를 직접 지원한다고 과장하지 않고 bridge를 제시한다", () => {
-    for (const id of ["clip", "sut", "ai"]) {
+  it("독점 CLIP/AI를 직접 지원한다고 과장하지 않고 bridge를 제시한다", () => {
+    for (const id of ["clip", "ai"]) {
       const capability = studioInterchangeCapability(id)!;
       expect(capability.proprietary).toBe(true);
       expect(capability.import).toBe("unsupported");
@@ -177,7 +177,31 @@ describe("Studio interchange capability registry", () => {
     }
   });
 
-  it("PSD는 부분 왕복, PDF/SVG/WebM은 출력 전용으로 정직하게 표시한다", () => {
+  it("SUT/SUTG는 검증된 Worker 부분 가져오기만 공개하고 공식 호환을 주장하지 않는다", () => {
+    for (const id of ["sut", "sutg"]) {
+      const capability = studioInterchangeCapability(id)!;
+      expect(capability).toMatchObject({
+        import: "partial",
+        export: "unsupported",
+        roundTrip: "none",
+        status: "partial",
+        proprietary: true,
+        implementation: { import: "partial", export: "not-implemented" },
+        uiWiring: { import: "wired", export: "not-applicable" },
+        conformance: {
+          publicSpec: "not-claimed",
+          thirdPartyCertification: "not-claimed",
+        },
+      });
+      expect(capability.lossModel.join(" ")).toContain("preserve-only");
+      expect(capability.notes.join(" ")).toContain("원본");
+      expect(capability.productAssurance.officialThirdPartyCertification).toBe(false);
+      expect(capability.productAssurance.vendorTrademarkAuthorization).toBe(false);
+    }
+    expect(studioInterchangeCapabilitiesForExtension(".sutg").map(({ id }) => id)).toContain("sutg");
+  });
+
+  it("PSD는 부분 왕복, PDF/WebM은 출력 전용으로 정직하게 표시한다", () => {
     const psd = studioInterchangeCapability("psd")!;
     expect(psd).toMatchObject({
       import: "partial",
@@ -194,9 +218,32 @@ describe("Studio interchange capability registry", () => {
       maxDimensionPx: 30_000,
     });
     expect(psd.notes.join(" ")).toContain("linked-file");
-    for (const id of ["pdf", "svg", "webm"]) {
+    for (const id of ["pdf", "webm"]) {
       expect(studioInterchangeCapability(id)).toMatchObject({ import: "unsupported", export: "available", roundTrip: "none" });
     }
+  });
+
+  it("SVG는 실제 Elements 제품 island의 부분 import와 provider 역할을 정직하게 표시한다", () => {
+    const svg = studioInterchangeCapability("svg")!;
+    expect(svg).toMatchObject({
+      import: "partial",
+      export: "available",
+      roundTrip: "partial",
+      status: "partial",
+      implementation: { import: "partial", export: "implemented" },
+      uiWiring: { import: "partial", export: "wired" },
+      conformance: { publicSpec: "tested-public-subset" },
+      externalRequirements: { provider: "bundled-library" },
+    });
+    expect(svg.uiWiring.notes.join(" ")).toContain("StudioSvgAssetPreview");
+    expect(svg.lossModel.join(" ")).toContain("text·image·pattern·mask·filter·marker");
+    expect(svg.lossModel.join(" ")).toContain("SceneIR/resvg");
+    expect(svg.externalRequirements.providers).toEqual(expect.arrayContaining([
+      "vello_svg 0.10",
+      "CanvasKit 0.41.1",
+      "resvg-wasm",
+    ]));
+    expect(studioInterchangeCapabilitiesForExtension("svg").map(({ id }) => id)).toContain("svg");
   });
 
   it("벡터 PDF와 PDF/A-2b·PDF/X-4 후보를 평탄화 PDF와 분리한다", () => {

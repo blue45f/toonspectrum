@@ -1,10 +1,9 @@
 // Studio Brush Library — 이름 붙은 브러시 설정(펜 종류·크기·색상·손떨림 보정 등)을 저장·관리하고
 // JSON으로 가져오기/내보내기 한다. ibisPaint의 브러시/머티리얼 라이브러리에 대응하는 기능.
 //
-// studio-palette-library.ts(색상 팔레트를 localStorage에 저장/불러오기)와 완전히 동일한 저장 패턴
-// (localStorage 키 네이밍, MAX_* 개수 상한, 맨 앞에 추가하며 같은 id는 교체, rename은 순서 유지)을
-// 그대로 재사용한다 — 이 모듈은 "팔레트 라이브러리의 브러시 버전"이다. 색상 팔레트는 GIMP .gpl이라는
-// 기존 상호운용 포맷이 있어 그걸 썼지만, 브러시 설정(강도·필압 곡선 등)에는 그런 표준 포맷이 없으므로
+// 기존 localStorage envelope와 동기 API는 이전 호출부를 위해 계속 읽고 쓴다. 권위 계약은 브러시 수에
+// 상한을 두지 않으며, 대규모 라이브러리는 studio-brush-library-repository.ts의 비동기 페이지 포트로
+// SQLite/OPFS 같은 저장소에 연결한다. 브러시 설정(강도·필압 곡선 등)에는 단일 표준 포맷이 없으므로
 // 내보내기/가져오기는 이 앱 전용 JSON 포맷(kind: "toonspectrum-studio-brush")을 쓴다.
 //
 // 저장소(localStorage 호환 인터페이스)를 주입받아 순수하게 동작한다(studio-palette-library.ts와 동일).
@@ -121,9 +120,12 @@ export function browserBrushLibraryStorage(): BrushLibraryStorage | null {
 
 export const BRUSH_LIBRARY_KEY = "toonspectrum-studio-brush-library";
 export const BRUSH_LIBRARY_STORAGE_VERSION = 1;
-// Imported PNG/ABR tips are compact (at most 64×64 alpha), so 120 professional presets remain
-// comfortably below ordinary localStorage quotas while avoiding the old 40-brush pack truncation.
-export const MAX_BRUSHES = 120;
+export const BRUSH_LIBRARY_CAPACITY = "unbounded" as const;
+/**
+ * @deprecated 브러시 라이브러리에는 개수 상한이 없다. 이전 호출부의 수치 비교가 새 항목을 거부하지
+ * 않도록 무한대 센티널만 유지한다. 신규 코드는 BRUSH_LIBRARY_CAPACITY와 페이지 repository를 쓴다.
+ */
+export const MAX_BRUSHES = Number.POSITIVE_INFINITY;
 export const MAX_QUICK_BRUSHES = 8; // Procreate Recent와 같은, 한 번에 기억하기 좋은 빠른 접근 상한.
 export const DEFAULT_BRUSH_NAME = "이름 없는 브러시";
 
@@ -144,6 +146,7 @@ type BrushMutationFailureStatus = "storage-error" | "library-unreadable";
 
 export interface BrushSaveResult {
   brushes: StudioSavedBrush[];
+  /** `full`은 이전 호출부의 소스 호환만 위한 값이며 무제한 권위 구현은 반환하지 않는다. */
   status: "saved" | "full" | BrushMutationFailureStatus;
 }
 
@@ -151,6 +154,7 @@ export interface BrushBatchSaveResult {
   brushes: StudioSavedBrush[];
   savedCount: number;
   skippedCount: number;
+  /** `full`은 이전 호출부의 소스 호환만 위한 값이며 무제한 권위 구현은 반환하지 않는다. */
   status: "saved" | "partial" | "full" | BrushMutationFailureStatus;
 }
 
@@ -167,12 +171,14 @@ export interface BrushDeleteResult {
 
 export interface BrushRestoreResult {
   brushes: StudioSavedBrush[];
+  /** `full`은 이전 호출부의 소스 호환만 위한 값이며 무제한 권위 구현은 반환하지 않는다. */
   status: "restored" | "full" | BrushMutationFailureStatus;
 }
 
 export interface BrushDuplicateResult {
   brushes: StudioSavedBrush[];
   brush: StudioSavedBrush | null;
+  /** `full`은 이전 호출부의 소스 호환만 위한 값이며 무제한 권위 구현은 반환하지 않는다. */
   status: "duplicated" | "full" | "missing" | BrushMutationFailureStatus;
 }
 
@@ -544,7 +550,8 @@ export function sanitizeBrushSnapshot(raw: unknown): { snapshot: StudioBrushSnap
   };
 }
 
-function normalizeStoredBrush(v: unknown): StudioSavedBrush | null {
+/** SQL/OPFS repository가 payload를 같은 권위 규칙으로 검증할 때 재사용한다. */
+export function normalizeStoredBrush(v: unknown): StudioSavedBrush | null {
   if (!v || typeof v !== "object") return null;
   const o = v as Record<string, unknown>;
   if (
@@ -655,11 +662,7 @@ function persist(storage: BrushLibraryStorage | null | undefined, brushes: Studi
   }
 }
 
-/**
- * 저장(같은 id면 교체하며 맨 앞으로, 새 항목도 맨 앞).
- * 신규 저장이 상한에 닿으면 가장 오래된 브러시를 몰래 버리지 않고 full을 반환한다. 기존 id 갱신은
- * 40/40에서도 허용한다. UI는 이 결과로 삭제/내보내기 안내를 표면화할 수 있다.
- */
+/** 저장(같은 id면 교체하며 맨 앞으로, 새 항목도 맨 앞). 개수 상한이나 자동 퇴출은 없다. */
 export function saveBrushWithResult(
   storage: BrushLibraryStorage | null | undefined,
   brush: StudioSavedBrush
@@ -670,24 +673,20 @@ export function saveBrushWithResult(
   const current = read.brushes;
   const { snapshot: safeSnapshot } = sanitizeBrushSnapshot(brush);
   const safeBrush: StudioSavedBrush = replaceBrushSnapshot(brush, safeSnapshot);
-  const replacesExisting = current.some((candidate) => candidate.id === brush.id);
-  if (!replacesExisting && current.length >= MAX_BRUSHES) {
-    return { brushes: current, status: "full" };
-  }
   const next = [safeBrush, ...current.filter((b) => b.id !== brush.id)];
   if (!persist(storage, next)) return { brushes: current, status: "storage-error" };
   return { brushes: next, status: "saved" };
 }
 
-/** 배열만 필요한 기존 호출부를 위한 호환 래퍼. 신규 UI는 saveBrushWithResult로 full을 안내한다. */
+/** 배열만 필요한 기존 호출부를 위한 호환 래퍼. */
 export function saveBrush(storage: BrushLibraryStorage | null | undefined, brush: StudioSavedBrush): StudioSavedBrush[] {
   return saveBrushWithResult(storage, brush).brushes;
 }
 
 /**
- * Persist a third-party brush pack in one storage write. Capacity overflow is deterministic and
- * explicit: brushes keep source order, as many as fit are saved, and no half-written JSON state is
- * exposed if the single write fails.
+ * Persist a third-party brush pack in one storage write. Brushes keep source order, duplicate ids
+ * are deterministically collapsed to the first occurrence, and no half-written JSON state is
+ * exposed if the single write fails. Storage quota failures remain explicit storage errors.
  */
 export function saveBrushBatchWithResult(
   storage: BrushLibraryStorage | null | undefined,
@@ -715,18 +714,8 @@ export function saveBrushBatchWithResult(
     return { brushes: read.brushes, savedCount: 0, skippedCount: 0, status: "saved" };
   }
   const retained = read.brushes.filter((brush) => !incomingIds.has(brush.id));
-  const available = Math.max(0, MAX_BRUSHES - retained.length);
-  const accepted = unique.slice(0, available);
-  const skippedCount = incoming.length - accepted.length;
-  if (accepted.length === 0) {
-    return {
-      brushes: read.brushes,
-      savedCount: 0,
-      skippedCount,
-      status: "full",
-    };
-  }
-  const next = [...accepted, ...retained];
+  const skippedCount = incoming.length - unique.length;
+  const next = [...unique, ...retained];
   if (!persist(storage, next)) {
     return {
       brushes: read.brushes,
@@ -737,7 +726,7 @@ export function saveBrushBatchWithResult(
   }
   return {
     brushes: next,
-    savedCount: accepted.length,
+    savedCount: unique.length,
     skippedCount,
     status: skippedCount > 0 ? "partial" : "saved",
   };
@@ -764,7 +753,6 @@ export function updateBrushSnapshotWithResult(
     updatedAt: Date.now(),
   };
   const result = saveBrushWithResult(storage, updated);
-  // "full" can't happen here — replacesExisting is always true for an id already found above.
   if (result.status === "storage-error" || result.status === "library-unreadable") {
     return { brushes: result.brushes, status: result.status };
   }
@@ -823,7 +811,7 @@ export function deleteBrushWithRecord(
   return { brushes: next, deleted, status: "deleted" };
 }
 
-/** deleteBrushWithRecord가 보존한 위치에 브러시를 복원한다. 삭제 뒤 다른 탭에서 용량이 찼다면 거부한다. */
+/** deleteBrushWithRecord가 보존한 위치에 브러시를 복원한다. 같은 id는 한 항목으로 교체한다. */
 export function restoreDeletedBrush(
   storage: BrushLibraryStorage | null | undefined,
   deleted: DeletedBrushRecord
@@ -833,9 +821,6 @@ export function restoreDeletedBrush(
   if (readFailure) return { brushes: read.brushes, status: readFailure };
   const current = read.brushes;
   const withoutDuplicate = current.filter((brush) => brush.id !== deleted.brush.id);
-  if (withoutDuplicate.length >= MAX_BRUSHES && withoutDuplicate.length === current.length) {
-    return { brushes: current, status: "full" };
-  }
   const index = Math.max(0, Math.min(deleted.index, withoutDuplicate.length));
   const next = [
     ...withoutDuplicate.slice(0, index),
@@ -885,7 +870,6 @@ export function duplicateBrush(
   const current = read.brushes;
   const index = current.findIndex((brush) => brush.id === id);
   if (index < 0) return { brushes: current, brush: null, status: "missing" };
-  if (current.length >= MAX_BRUSHES) return { brushes: current, brush: null, status: "full" };
   const now = Date.now();
   const source = current[index];
   const brush: StudioSavedBrush = {
@@ -960,17 +944,28 @@ export function markBrushUsedWithResult(
     : { brushes: current, status: "storage-error" };
 }
 
-function brushActivityAt(brush: StudioSavedBrush): number {
+export function brushActivityAt(brush: StudioSavedBrush): number {
   return brush.lastUsedAt ?? brush.updatedAt;
+}
+
+function compareStableBrushId(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
+/** 페이지 cursor와 배열 정렬이 공유하는 완전 순서다. 동률에서도 id가 결정성을 보장한다. */
+export function compareBrushesForLibrary(
+  a: StudioSavedBrush,
+  b: StudioSavedBrush
+): number {
+  return Number(b.pinned) - Number(a.pinned)
+    || brushActivityAt(b) - brushActivityAt(a)
+    || b.createdAt - a.createdAt
+    || compareStableBrushId(a.id, b.id);
 }
 
 /** 전체 라이브러리: 고정 → 최근 적용 → 최근 수정 순. 입력 배열은 변경하지 않는다. */
 export function sortBrushesForLibrary(brushes: readonly StudioSavedBrush[]): StudioSavedBrush[] {
-  return [...brushes].sort((a, b) =>
-    Number(b.pinned) - Number(a.pinned)
-    || brushActivityAt(b) - brushActivityAt(a)
-    || b.createdAt - a.createdAt
-  );
+  return [...brushes].sort(compareBrushesForLibrary);
 }
 
 /** 모바일/컴팩트 선반: 고정 또는 사용 이력이 있는 브러시만, 고정 우선으로 최대 8개. */

@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StudioKonvaImageNode } from "./StudioKonvaImageNode";
 
 import type { ImageEl } from "./studio-element-model";
+import type { StudioGpuFilterPreviewFrame } from "./studio-gpu-filter-apply";
 
 interface WorkerRun {
   reject: (reason?: unknown) => void;
@@ -65,6 +66,35 @@ vi.mock("react-konva/lib/ReactKonvaCore", async () => {
     }),
   };
 });
+
+// The GPU filter module must be mocked like the other lazy chunks. Left real, its dynamic
+// import resolves at wall-clock time (heavy transform graph) while the tests run on fake
+// timers; `gpuFilterModule` is a dependency of the Worker filter effect, so a late arrival
+// re-runs that effect and cancels an in-flight worker run between a test's dispatch and
+// resolution — a load-dependent flake (the committed canvas silently stays the raw source).
+const gpuHarness = vi.hoisted(() => ({
+  apply: vi.fn(async (): Promise<{
+    data: Uint8ClampedArray;
+    height: number;
+    width: number;
+  } | null> => null),
+  createSurface: vi.fn(() => ({
+    canvas: document.createElement("canvas"),
+    dispose: vi.fn(),
+    present: vi.fn(),
+    revision: 0,
+  })),
+  eligible: false,
+  isEligible: vi.fn(() => false),
+  present: vi.fn(async (): Promise<StudioGpuFilterPreviewFrame | null> => null),
+}));
+
+vi.mock("./studio-gpu-filter-apply", () => ({
+  applyGpuFilterChain: gpuHarness.apply,
+  createStudioGpuFilterPresentationSurface: gpuHarness.createSurface,
+  isStudioGpuFilterChainEligible: gpuHarness.isEligible,
+  presentGpuFilterChain: gpuHarness.present,
+}));
 
 vi.mock("./studio-konva-filters", () => ({
   buildImageFilters: (el: ImageEl) => ({
@@ -185,6 +215,13 @@ beforeEach(() => {
   workerHarness.runs.length = 0;
   workerHarness.run.mockClear();
   workerHarness.requiresWorker = false;
+  gpuHarness.apply.mockClear();
+  gpuHarness.createSurface.mockClear();
+  gpuHarness.present.mockReset();
+  gpuHarness.present.mockImplementation(async () => null);
+  gpuHarness.eligible = false;
+  gpuHarness.isEligible.mockReset();
+  gpuHarness.isEligible.mockImplementation(() => gpuHarness.eligible);
   imageHarness.assigned.length = 0;
   canvasHarness.getImageDataCalls = 0;
   canvasHarness.getImageDataError = null;
@@ -666,6 +703,39 @@ describe("StudioKonvaImageNode async identity", () => {
     expect(konvaCapture.current?.image).toBeInstanceOf(HTMLCanvasElement);
   });
 
+  it("falls back to the worker lane when the GPU chain declines the request", async () => {
+    gpuHarness.eligible = true;
+    // Above the measured GPU/CPU crossover (~1140² for a one-step chain), so
+    // the size-aware lane order still puts the GPU lane at the head — that is
+    // the precondition for exercising its decline→worker fallback at all.
+    render(node(imageEl({ brightness: 0.2, width: 1_600, height: 1_600 })));
+    await load(imageHarness.assigned[0]!);
+    await flushWorkerDebounce();
+
+    expect(gpuHarness.isEligible).toHaveBeenCalled();
+    expect(gpuHarness.present).toHaveBeenCalledTimes(1);
+    expect(gpuHarness.apply).not.toHaveBeenCalled();
+    expect(workerHarness.runs).toHaveLength(1);
+
+    await act(async () => resolveRun(workerHarness.runs[0]!));
+    expect(konvaCapture.current?.image).toBeInstanceOf(HTMLCanvasElement);
+  });
+
+  it("skips the GPU lane below the crossover even when the chain is eligible", async () => {
+    gpuHarness.eligible = true;
+    // 20.4×10.4: the GPU lane's ~2.4 ms submit+readback floor dwarfs the work
+    // itself, so the cost model demotes it and the worker lane runs directly.
+    render(node(imageEl({ brightness: 0.2 })));
+    await load(imageHarness.assigned[0]!);
+    await flushWorkerDebounce();
+
+    expect(gpuHarness.apply).not.toHaveBeenCalled();
+    expect(workerHarness.runs).toHaveLength(1);
+
+    await act(async () => resolveRun(workerHarness.runs[0]!));
+    expect(konvaCapture.current?.image).toBeInstanceOf(HTMLCanvasElement);
+  });
+
   it("preserves full-image filtering when a mask is absent or explicitly disabled", async () => {
     render(node(imageEl({
       brightness: 0.2,
@@ -677,5 +747,91 @@ describe("StudioKonvaImageNode async identity", () => {
 
     expect(imageHarness.assigned.some((image) => image.src === "disabled-mask.png")).toBe(false);
     expect(workerHarness.runs).toHaveLength(1);
+  });
+
+  it("retains one GPU canvas per slider revision and reads only the final settled frame", async () => {
+    gpuHarness.eligible = true;
+    const surfaceCanvas = document.createElement("canvas");
+    surfaceCanvas.width = 1_200;
+    surfaceCanvas.height = 1_200;
+    const firstDispose = vi.fn();
+    const secondDispose = vi.fn();
+    const firstReadback = vi.fn(async () => ({
+      data: new Uint8ClampedArray(1_200 * 1_200 * 4),
+      height: 1_200,
+      width: 1_200,
+    }));
+    const secondReadback = vi.fn(async () => ({
+      data: new Uint8ClampedArray(1_200 * 1_200 * 4),
+      height: 1_200,
+      width: 1_200,
+    }));
+    gpuHarness.createSurface.mockReturnValue({
+      canvas: surfaceCanvas,
+      dispose: vi.fn(),
+      present: vi.fn(),
+      revision: 0,
+    });
+    gpuHarness.present
+      .mockResolvedValueOnce({
+        canvas: surfaceCanvas,
+        dispose: firstDispose,
+        height: 1_200,
+        readbackFinal: firstReadback,
+        revision: 1,
+        sourceRevision: 1,
+        width: 1_200,
+      })
+      .mockResolvedValueOnce({
+        canvas: surfaceCanvas,
+        dispose: secondDispose,
+        height: 1_200,
+        readbackFinal: secondReadback,
+        revision: 2,
+        sourceRevision: 1,
+        width: 1_200,
+      });
+
+    const view = render(node(imageEl({ brightness: 0.2, width: 1_200, height: 1_200 })));
+    await load(imageHarness.assigned[0]!);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(16);
+    });
+    await flush();
+
+    expect(gpuHarness.present).toHaveBeenCalledTimes(1);
+    expect(firstReadback).not.toHaveBeenCalled();
+    expect(workerHarness.runs).toHaveLength(0);
+    expect(konvaCapture.current?.image).toBe(surfaceCanvas);
+    expect(canvasHarness.getImageDataCalls).toBe(1);
+
+    view.rerender(node(imageEl({ brightness: 0.4, width: 1_200, height: 1_200 })));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(16);
+    });
+    await flush();
+
+    expect(gpuHarness.present).toHaveBeenCalledTimes(2);
+    expect(firstDispose).toHaveBeenCalledTimes(1);
+    expect(firstReadback).not.toHaveBeenCalled();
+    expect(secondReadback).not.toHaveBeenCalled();
+    expect(canvasHarness.getImageDataCalls).toBe(1);
+    expect(workerHarness.runs).toHaveLength(0);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(203);
+    });
+    expect(secondReadback).not.toHaveBeenCalled();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    await flush();
+
+    expect(gpuHarness.present).toHaveBeenCalledTimes(2);
+    expect(gpuHarness.apply).not.toHaveBeenCalled();
+    expect(secondReadback).toHaveBeenCalledTimes(1);
+    expect(workerHarness.runs).toHaveLength(0);
+    expect(konvaCapture.current?.image).toBeInstanceOf(HTMLCanvasElement);
+    expect(konvaCapture.current?.image).not.toBe(surfaceCanvas);
   });
 });

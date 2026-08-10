@@ -76,6 +76,28 @@ interface StudioBrushDefaultRestoreRecord {
  * brush state; this controller owns selection identity, stale-request invalidation, dirty
  * inspection, and the single safe restore undo.
  */
+function brushSnapshotFingerprint(s: StudioBrushSnapshot): string {
+  return [
+    s.brushId,
+    s.sourcePresetId ?? "",
+    s.strokeWidth,
+    s.brushOpacity,
+    s.stabilizer,
+    s.stabilizerMode ?? "",
+    s.postCorrection,
+    s.preserveCorners ? 1 : 0,
+    JSON.stringify(s.pressureCurve ?? null),
+    s.pressureMinSize,
+    s.useVelocityPressure ? 1 : 0,
+    s.velocitySensitivity,
+    s.tiltEnabled ? 1 : 0,
+    s.tipAngle,
+    s.tipRoundness,
+    JSON.stringify(s.brushDynamics ?? null),
+    JSON.stringify(s.stampTuning ?? null),
+  ].join("|");
+}
+
 export function useStudioBrushBaselineController(
   options: UseStudioBrushBaselineControllerOptions,
   runtime: StudioBrushBaselineControllerRuntime =
@@ -212,6 +234,8 @@ export function useStudioBrushBaselineController(
       });
   }, [activeBaseline, options.savedBrushes]);
 
+  const snapshotFingerprint = brushSnapshotFingerprint(options.currentSnapshot);
+
   useEffect(() => {
     const requestId = inspectionRequestRef.current + 1;
     inspectionRequestRef.current = requestId;
@@ -247,23 +271,7 @@ export function useStudioBrushBaselineController(
     };
   }, [
     activeBaseline,
-    options.currentSnapshot.brushId,
-    options.currentSnapshot.sourcePresetId,
-    options.currentSnapshot.strokeWidth,
-    options.currentSnapshot.brushOpacity,
-    options.currentSnapshot.stabilizer,
-    options.currentSnapshot.stabilizerMode,
-    options.currentSnapshot.postCorrection,
-    options.currentSnapshot.preserveCorners,
-    options.currentSnapshot.pressureCurve,
-    options.currentSnapshot.pressureMinSize,
-    options.currentSnapshot.useVelocityPressure,
-    options.currentSnapshot.velocitySensitivity,
-    options.currentSnapshot.tiltEnabled,
-    options.currentSnapshot.tipAngle,
-    options.currentSnapshot.tipRoundness,
-    options.currentSnapshot.brushDynamics,
-    options.currentSnapshot.stampTuning,
+    snapshotFingerprint,
     options.preserveStrokeWidth,
     options.preserveBrushOpacity,
   ]);

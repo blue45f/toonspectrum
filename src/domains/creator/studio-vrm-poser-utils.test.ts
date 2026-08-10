@@ -17,7 +17,15 @@ import {
   buildVrmPoseDataUrlMetadata,
   createFullStateLoadHandlers,
   applyVrmMaterialFx,
+  applyVrmCustomColors,
+  classifyVrmCustomColorPart,
+  classifyVrmCustomColorPartForMaterial,
   hasVrmMToonMaterial,
+  isVrmMannequinPaintColor,
+  isVrmNearBlackLitColor,
+  repairVrmTexturedNearBlackLitFactors,
+  scrubVrmMannequinColorCaches,
+  STUDIO_VRM_MANNEQUIN_COLOR_HEX,
   DEFAULT_VRM_MATERIAL_FX,
   type PoseBoneMap,
   type FingerRotationMap,
@@ -666,5 +674,251 @@ describe("VRM material fx (MToon shade/outline/rim/emissive)", () => {
     expect(() => applyVrmMaterialFx(vrm, DEFAULT_VRM_MATERIAL_FX)).not.toThrow();
     expect(`#${mat.shadeColorFactor.getHexString()}`).toBe("#ffffff");
     expect(`#${mat.outlineColorFactor.getHexString()}`).toBe("#000000");
+  });
+
+  it("applyVrmCustomColors preserves native VRM material color when customColors is empty or #ffffff", () => {
+    const { vrm } = createMinimalVrm();
+    const hairMat = new THREE.MeshStandardMaterial({ color: new THREE.Color("#4a2e12") });
+    addMesh(vrm.scene, "F00_Hair_00", hairMat);
+
+    // Initial call with empty customColors should keep original native hair color (#4a2e12)
+    applyVrmCustomColors(vrm, {});
+    expect(`#${hairMat.color.getHexString()}`).toBe("#4a2e12");
+
+    // Call with #ffffff should also preserve native hair color
+    applyVrmCustomColors(vrm, { hair: "#ffffff" });
+    expect(`#${hairMat.color.getHexString()}`).toBe("#4a2e12");
+  });
+
+  it("applyVrmCustomColors applies custom color and restores original native color on reset", () => {
+    const { vrm } = createMinimalVrm();
+    const topsMat = new THREE.MeshStandardMaterial({ color: new THREE.Color("#1a2b3c") });
+    addMesh(vrm.scene, "Tops_Cloth", topsMat);
+
+    // Apply custom color #ff0000
+    applyVrmCustomColors(vrm, { tops: "#ff0000" });
+    expect(`#${topsMat.color.getHexString()}`).toBe("#ff0000");
+
+    // Resetting custom colors to empty or #ffffff restores original #1a2b3c
+    applyVrmCustomColors(vrm, { tops: "#ffffff" });
+    expect(`#${topsMat.color.getHexString()}`).toBe("#1a2b3c");
+  });
+
+  it("applyVrmCustomColors refuses near-black originals so textured clothes do not restore to pure black", () => {
+    const { vrm } = createMinimalVrm();
+    const topsMat = new THREE.MeshStandardMaterial({
+      color: new THREE.Color("#000000"),
+      map: new THREE.Texture(),
+    });
+    addMesh(vrm.scene, "Tops_Cloth", topsMat);
+
+    expect(isVrmNearBlackLitColor(topsMat.color)).toBe(true);
+
+    applyVrmCustomColors(vrm, { tops: "#ff3366" });
+    expect(`#${topsMat.color.getHexString()}`).toBe("#ff3366");
+
+    // Reset must restore white lit factor, not the near-black poison that multiplies texture to black.
+    applyVrmCustomColors(vrm, {});
+    expect(`#${topsMat.color.getHexString()}`).toBe("#ffffff");
+  });
+
+  it("applyVrmCustomColors refuses mannequin clay as native original", () => {
+    const { vrm } = createMinimalVrm();
+    const topsMat = new THREE.MeshStandardMaterial({
+      color: new THREE.Color(STUDIO_VRM_MANNEQUIN_COLOR_HEX),
+    });
+    addMesh(vrm.scene, "Tops_Jacket", topsMat);
+
+    expect(isVrmMannequinPaintColor(topsMat.color)).toBe(true);
+
+    applyVrmCustomColors(vrm, { tops: "#2244aa" });
+    expect(`#${topsMat.color.getHexString()}`).toBe("#2244aa");
+
+    applyVrmCustomColors(vrm, { tops: "#ffffff" });
+    expect(`#${topsMat.color.getHexString()}`).toBe("#ffffff");
+  });
+
+  it("scrubVrmMannequinColorCaches drops clay/near-black cached originals", () => {
+    const { vrm } = createMinimalVrm();
+    const topsMat = new THREE.MeshStandardMaterial({ color: new THREE.Color("#abcdef") });
+    addMesh(vrm.scene, "Tops_Cloth", topsMat);
+    topsMat.userData.__vrmCustomColorOriginal = new THREE.Color("#000000");
+    topsMat.userData.__vrmCustomColorApplied = true;
+    topsMat.userData.__vrmMannequinActive = true;
+
+    scrubVrmMannequinColorCaches(vrm);
+
+    expect(topsMat.userData.__vrmMannequinActive).toBe(false);
+    expect(topsMat.userData.__vrmCustomColorOriginal).toBeUndefined();
+    expect(topsMat.userData.__vrmCustomColorApplied).toBe(false);
+  });
+
+  it("applyVrmCustomColors leaves materials alone while mannequin paint is active", () => {
+    const { vrm } = createMinimalVrm();
+    const topsMat = new THREE.MeshStandardMaterial({ color: new THREE.Color("#b7b2a8") });
+    topsMat.userData.__vrmMannequinActive = true;
+    addMesh(vrm.scene, "Tops_Cloth", topsMat);
+
+    applyVrmCustomColors(vrm, { tops: "#ff0000" });
+    expect(`#${topsMat.color.getHexString()}`).toBe("#b7b2a8");
+  });
+
+  it("classifies clothing materials on multi-material Body meshes by material name", () => {
+    expect(classifyVrmCustomColorPart("Body")).toBe("body");
+    expect(classifyVrmCustomColorPartForMaterial("Body", "F00_006_01_Tops_01_CLOTH")).toBe("tops");
+    expect(classifyVrmCustomColorPartForMaterial("Body", "F00_008_01_Bottoms_01_CLOTH")).toBe("bottoms");
+    expect(classifyVrmCustomColorPartForMaterial("Body", "Body_00_SKIN")).toBe("body");
+    expect(classifyVrmCustomColorPartForMaterial("Body", "HairBack_00_HAIR")).toBe("hair");
+    expect(classifyVrmCustomColorPart("Alicia_wear")).toBe("tops");
+    expect(classifyVrmCustomColorPart("cloth")).toBe("tops");
+    // "Hair_Top" must stay hair — a bare "top" substring cannot outrank the hair marker.
+    expect(classifyVrmCustomColorPart("F00_Hair_Top")).toBe("hair");
+    expect(classifyVrmCustomColorPart("Face_00")).toBe("face");
+  });
+
+  it("applyVrmCustomColors never repaints mannequin clay cached as an original", () => {
+    const { vrm } = createMinimalVrm();
+    const native = new THREE.Color("#c48a6a");
+    const bodyMat = new THREE.MeshStandardMaterial({ color: native.clone() });
+    addMesh(vrm.scene, "Body_Mesh", bodyMat);
+
+    // Race we have to survive: mannequin painted clay gray, then a recolor pass cached that
+    // gray as the material's "original".
+    bodyMat.color.set(STUDIO_VRM_MANNEQUIN_COLOR_HEX);
+    bodyMat.userData.__vrmCustomColorOriginal = new THREE.Color(STUDIO_VRM_MANNEQUIN_COLOR_HEX);
+    bodyMat.userData.__vrmCustomColorApplied = true;
+
+    // After a faithful restore to native albedo, clearing custom colors must not bring gray back.
+    bodyMat.color.copy(native);
+    applyVrmCustomColors(vrm, {});
+    expect(`#${bodyMat.color.getHexString()}`).toBe("#c48a6a");
+    expect(bodyMat.userData.__vrmCustomColorOriginal).toBeUndefined();
+  });
+
+  it("applyVrmCustomColors recolors only matching materials on a multi-material Body mesh", () => {
+    const { vrm } = createMinimalVrm();
+    const skin = new THREE.MeshStandardMaterial({
+      name: "Body_00_SKIN",
+      color: new THREE.Color("#ffccaa"),
+    });
+    const tops = new THREE.MeshStandardMaterial({
+      name: "Tops_01_CLOTH",
+      color: new THREE.Color("#ffffff"),
+      map: new THREE.Texture(),
+    });
+    const bottoms = new THREE.MeshStandardMaterial({
+      name: "Bottoms_01_CLOTH",
+      color: new THREE.Color("#ffffff"),
+      map: new THREE.Texture(),
+    });
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1), [skin, tops, bottoms]);
+    mesh.name = "Body";
+    vrm.scene.add(mesh);
+
+    applyVrmCustomColors(vrm, { tops: "#ff0000", bottoms: "#0000ff" });
+    expect(`#${skin.color.getHexString()}`).toBe("#ffccaa");
+    expect(`#${tops.color.getHexString()}`).toBe("#ff0000");
+    expect(`#${bottoms.color.getHexString()}`).toBe("#0000ff");
+
+    applyVrmCustomColors(vrm, {});
+    expect(`#${tops.color.getHexString()}`).toBe("#ffffff");
+    expect(`#${bottoms.color.getHexString()}`).toBe("#ffffff");
+    expect(`#${skin.color.getHexString()}`).toBe("#ffccaa");
+  });
+
+  it("repairVrmTexturedNearBlackLitFactors restores white lit on textured clothes", () => {
+    const { vrm } = createMinimalVrm();
+    const tops = new THREE.MeshStandardMaterial({
+      name: "Tops_01_CLOTH",
+      color: new THREE.Color("#000000"),
+      map: new THREE.Texture(),
+    });
+    addMesh(vrm.scene, "Body", tops);
+
+    const fixed = repairVrmTexturedNearBlackLitFactors(vrm);
+    expect(fixed).toBe(1);
+    expect(`#${tops.color.getHexString()}`).toBe("#ffffff");
+  });
+
+  it("applyVrmCustomColors idle pass repairs textured near-black clothes on load", () => {
+    const { vrm } = createMinimalVrm();
+    const tops = new THREE.MeshStandardMaterial({
+      name: "Tops_01_CLOTH",
+      color: new THREE.Color("#000000"),
+      map: new THREE.Texture(),
+    });
+    addMesh(vrm.scene, "Body", tops);
+
+    applyVrmCustomColors(vrm, {});
+    expect(`#${tops.color.getHexString()}`).toBe("#ffffff");
+  });
+
+  it("repairs an unrelated near-black slot while preserving an active custom color", () => {
+    const { vrm } = createMinimalVrm();
+    const tops = new THREE.MeshStandardMaterial({
+      name: "Tops_01_CLOTH",
+      color: new THREE.Color("#ffffff"),
+      map: new THREE.Texture(),
+    });
+    const bottoms = new THREE.MeshStandardMaterial({
+      name: "Bottoms_01_CLOTH",
+      color: new THREE.Color("#000000"),
+      map: new THREE.Texture(),
+    });
+    const mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(0.1, 0.1, 0.1),
+      [tops, bottoms],
+    );
+    mesh.name = "Body";
+    vrm.scene.add(mesh);
+
+    applyVrmCustomColors(vrm, { tops: "#ff3366" });
+
+    expect(`#${tops.color.getHexString()}`).toBe("#ff3366");
+    expect(tops.userData.__vrmCustomColorApplied).toBe(true);
+    expect(`#${bottoms.color.getHexString()}`).toBe("#ffffff");
+  });
+
+  it("recolors a dark albedo texture and restores the native map on reset", () => {
+    const { vrm } = createMinimalVrm();
+    const nativePixels = new Uint8Array([
+      0, 0, 0, 255,
+      32, 32, 32, 255,
+    ]);
+    const nativeMap = new THREE.DataTexture(
+      nativePixels,
+      2,
+      1,
+      THREE.RGBAFormat,
+      THREE.UnsignedByteType,
+    );
+    const bottoms = new THREE.MeshStandardMaterial({
+      name: "Bottoms_01_CLOTH",
+      color: new THREE.Color("#ffffff"),
+      map: nativeMap,
+    });
+    addMesh(vrm.scene, "Body", bottoms);
+
+    applyVrmCustomColors(vrm, { bottoms: "#22cc88" });
+
+    expect(bottoms.map).not.toBe(nativeMap);
+    expect(bottoms.map).toBeInstanceOf(THREE.DataTexture);
+    expect(`#${bottoms.color.getHexString()}`).toBe("#ffffff");
+    const generatedMap = bottoms.map as THREE.DataTexture;
+    const generatedPixels = (generatedMap.image as { data: Uint8Array }).data;
+    expect(generatedPixels[0]).toBeGreaterThan(0);
+    expect(generatedPixels[1]).toBeGreaterThan(generatedPixels[0]!);
+    expect(generatedPixels[2]).toBeGreaterThan(generatedPixels[0]!);
+    expect(generatedPixels[3]).toBe(255);
+    let disposed = false;
+    generatedMap.addEventListener("dispose", () => {
+      disposed = true;
+    });
+
+    applyVrmCustomColors(vrm, {});
+
+    expect(bottoms.map).toBe(nativeMap);
+    expect(`#${bottoms.color.getHexString()}`).toBe("#ffffff");
+    expect(disposed).toBe(true);
   });
 });

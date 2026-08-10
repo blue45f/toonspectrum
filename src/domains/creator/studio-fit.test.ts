@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 
+import { bubbleTextFitsInBox, type BubbleTextMeasurer } from "./studio-bubble-text-fit";
 import { containFitInFrame, coverFitInFrame, estimateBubbleHeight } from "./studio-fit";
 
 const frame = { x: 100, y: 200, width: 400, height: 300 };
@@ -65,5 +66,70 @@ describe("estimateBubbleHeight", () => {
     const wide = estimateBubbleHeight("같은 길이의 대사 같은 길이의 대사", 500, 22);
     const narrow = estimateBubbleHeight("같은 길이의 대사 같은 길이의 대사", 150, 22);
     expect(narrow).toBeGreaterThan(wide);
+  });
+});
+
+// ── D3 회귀 계약(2026-08 브라우저 감사) ─────────────────────────────────────
+//
+// 예전 estimateBubbleHeight 는 `charsPerLine = usableWidth / (fontSize * 0.62)` 였다. 0.62는
+// 라틴 문자 평균 폭 비율인데 한글 완성형은 전각(≈1.0em)이라 한 줄에 1.6배 많이 들어간다고
+// 계산했고, 그래서 "높이를 텍스트에 맞춤" 버튼이 상자를 오히려 **줄여** 대사를 더 잘라먹었다
+// (측정: 클릭 전 8자 소실 → 클릭 후 22자 소실 · 265px → 210px).
+describe("estimateBubbleHeight — 한글 전각 폭 회귀", () => {
+  /** 한글 완성형 = 1em 폭. 실제 Pretendard 측정값과 사실상 같은 비율이다. */
+  const fullWidth: BubbleTextMeasurer = {
+    measureWidth: (text, fontPx) => [...text].length * fontPx,
+  };
+  const legacyCharsPerLineModel = (text: string, width: number, fontSize: number) => {
+    const usableWidth = Math.max(1, width - 22 * 1.4);
+    const charsPerLine = Math.max(4, Math.floor(usableWidth / (fontSize * 0.62)));
+    const lines = Math.max(text.split("\n").length, Math.ceil(Math.max(1, text.length) / charsPerLine), 1);
+    return Math.round(lines * fontSize * 1.2 + 22 * 1.6);
+  };
+
+  it("돌려준 높이에 대사가 실제로 다 들어간다(같은 판정 공유)", () => {
+    const text = "가".repeat(103);
+    const height = estimateBubbleHeight(text, 300, 24, 1.35, { letterSpacing: 0.3, measurer: fullWidth });
+    expect(
+      bubbleTextFitsInBox(
+        {
+          text,
+          boxWidth: 300,
+          boxHeight: height,
+          fontFamily: "Pretendard, sans-serif",
+          fontStyle: "bold",
+          lineHeight: 1.35,
+          letterSpacing: 0.3,
+        },
+        24,
+        fullWidth
+      )
+    ).toBe(true);
+  });
+
+  it("옛 0.62 글자수 모델보다 크다 — 그 모델은 한글 줄 수를 1.6배 과소평가했다", () => {
+    const text = "가".repeat(103);
+    const now = estimateBubbleHeight(text, 300, 24, 1.35, { letterSpacing: 0.3, measurer: fullWidth });
+    expect(now).toBeGreaterThan(legacyCharsPerLineModel(text, 300, 24));
+  });
+
+  it("세로쓰기 말풍선도 열이 상자 폭 안에 들어올 높이를 돌려준다", () => {
+    const text = "세로쓰기 대사를 충분히 길게 적어 여러 열로 늘어나게 만든다";
+    const height = estimateBubbleHeight(text, 140, 24, 1.4, { vertical: true, measurer: fullWidth });
+    expect(
+      bubbleTextFitsInBox(
+        {
+          text,
+          boxWidth: 140,
+          boxHeight: height,
+          fontFamily: "Pretendard, sans-serif",
+          fontStyle: "bold",
+          lineHeight: 1.4,
+          vertical: true,
+        },
+        24,
+        fullWidth
+      )
+    ).toBe(true);
   });
 });

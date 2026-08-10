@@ -1,0 +1,66 @@
+{
+  "lane": "ADR-0011 lane 3 — google/ink brush-geometry (mesh) wasm build attempt (V12 codex §11.2 step 1)",
+  "recordedAtUtc": "2026-08-08T05:03:00Z",
+  "buildAttempt": {
+    "outcome": "success-first-link",
+    "upstream": {
+      "repo": "https://github.com/google/ink",
+      "commit": "1d0daba661f3035f42f3649b8e6a0061b47aa759",
+      "moduleVersion": "1.1.0",
+      "license": "Apache-2.0"
+    },
+    "strategyMeasured": {
+      "bazel": "upstream is Bazel-only (MODULE.bazel; no CMakeLists.txt anywhere) with heavyweight toolchain graph measured in MODULE.bazel: rules_go 0.59.0 + Go 1.23.6, toolchains_llvm 19.1.0, dawn git_override (patched), skia git checkout, protobuf 34 — a wasm cc_toolchain config for emcc is not provided upstream, so a Bazel emscripten lane was rejected inside the timebox without installing bazelisk",
+      "chosen": "direct em++ subset compile (same strategy as the libmypaint lane): 76 translation units from ink/{types,color,geometry,brush,strokes}, excluding *_test/_benchmark/fuzz/JNI/test helpers and ink/geometry/tessellator.cc"
+    },
+    "dependencyGraphMeasured": {
+      "libtess2": "NOT needed — only ink/geometry/tessellator.cc and ink/strokes/internal/jni/mesh_creation_native.cc (Android util, excluded per §11.2 rule 2) reference it",
+      "skia": "NOT needed in lane — grep hits were SkewX/SkewY false positives and one comment; Skia/Dawn belong to ink/rendering",
+      "protobuf": "NOT needed in lane — proto surfaces live in ink/storage",
+      "abseil": "REQUIRED at 20260526.0 (MODULE.bazel pin); the ink-stroke-modeler lane's 20250512.0 archives are insufficient (ink 1.1.0 uses absl/status/status_macros.h etc.), so abseil-cpp 20260526.0 (5650e9cf76d3be4318d5fa3af38ee483ddfd5e4a) was built separately with emcmake",
+      "inkStrokeModeler": "NOT a dependency — ink 1.1.0 vendors its own input models (PassthroughModel / SlidingWindowModel in ink/strokes/internal/stroke_input_modeler/); the bridge selects PassthroughModel so the existing ink-modeler lane output chains in without double smoothing"
+    },
+    "measuredSteps": {
+      "cloneDepth1Seconds": 1.1,
+      "abseilEmcmakeBuildSeconds": 22.4,
+      "inkSubsetTranslationUnits": 76,
+      "inkSubsetCompileSeconds": 12.9,
+      "inkSubsetCompileFailures": 0,
+      "upstreamSourcePatches": 0,
+      "bridgeLinkSeconds": 3.5,
+      "toolchain": "emsdk emcc 6.0.6, -O3 -std=c++20"
+    },
+    "artifact": {
+      "wasmBytes": 538378,
+      "mjsBytesWithBanner": 14999,
+      "committedTo": "packages/studio-brush-platform/src/ink-mesh/ (INTEGRITY.sha256 pinned, verify:studio-engine gate)"
+    },
+    "apiSurface": "imk_generate(pre-modeled points stride-4 f64, BrushTip params, pressure->size behavior) -> positions f32 + surface-UV texCoords f32 + triangle indices u32; noise_seed pinned 0 (deterministic replay)"
+  },
+  "measuredRuntime": {
+    "generatedAtUtc": "2026-08-08T05:03:49.494Z",
+    "harness": "packages/studio-brush-platform/src/__tests__/ink-mesh.test.ts (INK_MESH_POC=1)",
+    "upstreamCommit": "1d0daba661f3035f42f3649b8e6a0061b47aa759",
+    "wasmBytes": 538378,
+    "stroke": {
+      "points": 240,
+      "spanPx": 180,
+      "durationMs": 800
+    },
+    "mesh": {
+      "vertexCount": 36,
+      "triangleCount": 34
+    },
+    "generationMs": {
+      "p50": 0.47887500000001637,
+      "p95": 0.538791999999944,
+      "runs": 50
+    }
+  },
+  "notes": [
+    "generationMs includes the full TS<->wasm boundary (input marshalling + mesh copy-out).",
+    "mesh density follows brush epsilon: the harness default (size 8, epsilon 0.16) simplifies the smooth 240-point wave to 36 vertices; epsilon 0.05 on the same wave measured 66 vertices / 64 triangles in the standalone smoke.",
+    "Vello smoke (tests/visual/ink-mesh-vello-smoke.test.ts) renders the boundary-loop PathIR approximation per §11.3 editing-proxy rules — the mesh body itself is NOT tessellated into Vello paths in production.",
+    "Numbers only — gate promotion decisions belong to the blind lab (ADR-0009) per ADR-0011."
+  ]
+}

@@ -21,7 +21,11 @@ import {
 } from "./studio-advanced-blur-filters";
 import { normalizeColorToAlpha } from "./studio-color-to-alpha";
 import {
-  STUDIO_FILTER_UNION_WAVE_KINDS,
+  STUDIO_FILTER_PACK_KINDS,
+  STUDIO_FILTER_PACK_LABELS,
+  type StudioFilterPackKind,
+} from "./studio-filter-pack-registry";
+import {
   isIdentityStudioFilterUnionWave,
   normalizeStudioFilterUnionWave,
   type StudioFilterUnionWave,
@@ -298,38 +302,12 @@ function attrNumber(value: unknown): number | undefined {
 // 필터 팩 카탈로그 — 다이얼로그가 데이터 기반으로 컨트롤을 그리는 파라미터 스키마.
 // ---------------------------------------------------------------------------
 
-export const STUDIO_FILTER_PACK_KINDS = [
-  "mosaic",
-  "radial-blur",
-  "zoom-blur",
-  "lens-blur",
-  "field-iris-blur",
-  "tilt-shift-blur",
-  "selective-gaussian-blur",
-  "tileable-blur",
-  "chromatic-aberration",
-  "glitch",
-  "scanline",
-  "vignette",
-  "lens-flare",
-  "emboss",
-  "solarize",
-  "threshold",
-  "oil-paint",
-  "surface-blur",
-  "line-cleanup",
-  "screentone-removal",
-  "jpeg-artifact-reduction",
-  "edge-aware-denoise",
-  "dust-scratches",
-  "difference-of-gaussians",
-  "color-to-alpha",
-  "duotone",
-  "noise-add",
-  ...STUDIO_FILTER_UNION_WAVE_KINDS,
-] as const;
-
-export type StudioFilterPackKind = (typeof STUDIO_FILTER_PACK_KINDS)[number];
+// 종류 목록과 라벨은 엔진이 없는 레지스트리가 단일 소스다 — 상단 메뉴처럼 첫 청크에 있는
+// 모듈이 "무슨 필터가 있는지"만 알기 위해 이 파일(픽셀 엔진 전체)을 끌어오지 않게 하려는
+// 분리다. 아래 스키마(STUDIO_FILTER_PACK_DEFS)는 계속 여기서 살고, 계약 테스트가 두 라벨을
+// 대조해 다이얼로그와 메뉴가 다른 이름을 보이는 상황을 막는다.
+export { STUDIO_FILTER_PACK_KINDS, STUDIO_FILTER_PACK_LABELS };
+export type { StudioFilterPackKind };
 
 const PACK_KIND_SET: ReadonlySet<string> = new Set(STUDIO_FILTER_PACK_KINDS);
 
@@ -1308,12 +1286,6 @@ export const STUDIO_FILTER_PACK_DEFS: Readonly<
     { amount: 68, scale: 7, detail: 152, centerX: 28, centerY: 20 },
   ),
 };
-
-/** 메뉴/라벨 소비자용 — kind → 한국어 라벨. */
-export const STUDIO_FILTER_PACK_LABELS: Readonly<Record<StudioFilterPackKind, string>> =
-  Object.fromEntries(
-    STUDIO_FILTER_PACK_KINDS.map((kind) => [kind, STUDIO_FILTER_PACK_DEFS[kind].label]),
-  ) as Record<StudioFilterPackKind, string>;
 
 /** 상단 메뉴 등록 순서 카탈로그 — studio-main-menu-groups가 이 배열을 그대로 항목화한다. */
 export const STUDIO_FILTER_PACK_MENU: readonly { kind: StudioFilterPackKind; label: string }[] =

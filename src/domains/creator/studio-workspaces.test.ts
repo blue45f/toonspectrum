@@ -9,6 +9,7 @@ import {
 } from "./studio-drawing-palettes";
 import { STUDIO_INSPECTOR_LAYOUT_STORAGE_KEY } from "./studio-inspector-layout";
 import {
+  QUICK_ACTION_IDS,
   QUICK_ACTION_SLOTS,
   STUDIO_QUICK_ACTIONS_STORAGE_KEY,
 } from "./studio-quick-actions";
@@ -17,6 +18,7 @@ import {
   STUDIO_CLASSIC_WORKSPACE_IDS,
   STUDIO_DEFAULT_WORKSPACE_IDS,
   STUDIO_DEFAULT_WORKSPACES,
+  STUDIO_EXPANDED_WORKSPACE_IDS,
   STUDIO_LEGACY_LEFT_PANEL_WIDTH_STORAGE_KEY,
   STUDIO_LEGACY_RIGHT_PANEL_WIDTH_STORAGE_KEY,
   STUDIO_PRO_COMIC_PALETTE_PRIORITY,
@@ -27,6 +29,9 @@ import {
   STUDIO_WORKSPACE_RAW_MAX_BYTES,
   STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH,
   STUDIO_WORKSPACE_STATE_VERSION,
+  STUDIO_WORKSPACE_ABSENT_CATALOGUE_REQUIREMENTS,
+  STUDIO_WORKSPACE_CATALOGUE_COVERAGE,
+  STUDIO_WORKSPACE_DEVICE_KINDS,
   STUDIO_WORKSPACE_STORAGE_KEY,
   areStudioWorkspaceLayoutsEqual,
   deleteStudioWorkspace,
@@ -44,6 +49,9 @@ import {
   renameStudioWorkspace,
   reorderStudioWorkspace,
   resolveStudioWorkspace,
+  resolveStudioWorkspaceControlSide,
+  resolveStudioWorkspaceDeviceKind,
+  resolveStudioWorkspaceDeviceLayout,
   saveStudioWorkspace,
   saveStudioWorkspaceState,
   studioWorkspaceOwnerScope,
@@ -118,8 +126,17 @@ function withEditedDrawingPalettes(
   });
 }
 
+/** The only profiles allowed to depart from the default dock widths. */
+const WIDTH_TUNED_WORKSPACE_IDS = new Set<string>([
+  "pro-comic",
+  "csp-migration",
+  "pen-display",
+  "mobile-draw",
+  "photo-edit",
+]);
+
 describe("built-in Studio workspaces", () => {
-  it("preserves the six classic presets and adds one immutable professional comic preset", () => {
+  it("preserves the seven shipped presets and completes an immutable twelve-profile catalogue", () => {
     expect(STUDIO_CLASSIC_WORKSPACE_IDS).toEqual([
       "storyboard",
       "lineart",
@@ -131,12 +148,20 @@ describe("built-in Studio workspaces", () => {
     expect(STUDIO_DEFAULT_WORKSPACES.map((workspace) => workspace.id)).toEqual(
       STUDIO_DEFAULT_WORKSPACE_IDS
     );
-    expect(STUDIO_DEFAULT_WORKSPACE_IDS).toEqual([
+    // Every previously shipped id survives verbatim, so a saved activeWorkspaceId still resolves.
+    expect(STUDIO_DEFAULT_WORKSPACE_IDS.slice(0, 7)).toEqual([
       ...STUDIO_CLASSIC_WORKSPACE_IDS,
       "pro-comic",
     ]);
+    expect(STUDIO_DEFAULT_WORKSPACE_IDS).toEqual([
+      ...STUDIO_CLASSIC_WORKSPACE_IDS,
+      "pro-comic",
+      ...STUDIO_EXPANDED_WORKSPACE_IDS,
+    ]);
+    expect(STUDIO_DEFAULT_WORKSPACE_IDS).toHaveLength(12);
     expect(new Set(STUDIO_DEFAULT_WORKSPACES.map((workspace) => workspace.name)).size)
-      .toBe(7);
+      .toBe(12);
+    expect(new Set(STUDIO_DEFAULT_WORKSPACE_IDS).size).toBe(12);
 
     for (const workspace of STUDIO_DEFAULT_WORKSPACES) {
       expect(Object.isFrozen(workspace)).toBe(true);
@@ -152,7 +177,7 @@ describe("built-in Studio workspaces", () => {
       expect(workspace.layout.drawingPalettes).toEqual(
         DEFAULT_STUDIO_DRAWING_PALETTE_LAYOUT
       );
-      if (workspace.id !== "pro-comic") {
+      if (!WIDTH_TUNED_WORKSPACE_IDS.has(workspace.id)) {
         expect(workspace.layout.desktop.leftPanelWidth).toBe(
           STUDIO_WORKSPACE_LEFT_PANEL_WIDTH.default
         );
@@ -199,6 +224,59 @@ describe("built-in Studio workspaces", () => {
       "pages",
       "materials-quick-access",
     ]);
+  });
+
+  it("only arranges inspector sections, docks, palettes and quick actions this build renders", () => {
+    // A profile that named a panel Studio does not expose would resolve to an unrelated pane.
+    // These are the four axes StudioWorkspaceLayout can actually address.
+    const primarySections = new Set(["properties", "layers", "document", "publish"]);
+    const imageSections = new Set(["quick", "fill", "retouch", "mask", "transform"]);
+    const documentSections = new Set(["canvas", "grade", "navigator"]);
+    const quickActionIds = new Set(QUICK_ACTION_IDS);
+
+    for (const workspace of STUDIO_DEFAULT_WORKSPACES) {
+      expect(primarySections.has(workspace.layout.inspector.primary)).toBe(true);
+      expect(imageSections.has(workspace.layout.inspector.image)).toBe(true);
+      expect(documentSections.has(workspace.layout.inspector.document)).toBe(true);
+      for (const slot of QUICK_ACTION_SLOTS) {
+        expect(quickActionIds.has(workspace.layout.quickActions.slots[slot])).toBe(true);
+      }
+      expect([...workspace.layout.drawingPalettes.order].sort()).toEqual(
+        [...DEFAULT_STUDIO_DRAWING_PALETTE_LAYOUT.order].sort(),
+      );
+      expect(workspace.name.length).toBeGreaterThan(0);
+      expect(workspace.description.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("maps every requested catalogue profile to a real workspace or records its absence", () => {
+    expect(STUDIO_WORKSPACE_CATALOGUE_COVERAGE).toHaveLength(12);
+    const shippedIds = new Set<string>(STUDIO_DEFAULT_WORKSPACE_IDS);
+
+    for (const entry of STUDIO_WORKSPACE_CATALOGUE_COVERAGE) {
+      expect(Object.isFrozen(entry)).toBe(true);
+      if (entry.workspaceId === null) {
+        // An absence must say why, so the gap stays auditable instead of looking like an oversight.
+        expect(entry.absence).toBeTruthy();
+        expect((entry.absence ?? "").length).toBeGreaterThan(20);
+        continue;
+      }
+      expect(entry.absence).toBeNull();
+      expect(shippedIds.has(entry.workspaceId)).toBe(true);
+    }
+
+    expect(new Set(STUDIO_WORKSPACE_CATALOGUE_COVERAGE.map((entry) => entry.requirement)).size)
+      .toBe(12);
+    expect(STUDIO_WORKSPACE_ABSENT_CATALOGUE_REQUIREMENTS).toEqual([
+      "Vector Design",
+      "Animation",
+      "Pose & 3D",
+    ]);
+    // Every profile the catalogue does claim must be a distinct workspace, never a duplicate.
+    const claimed = STUDIO_WORKSPACE_CATALOGUE_COVERAGE
+      .filter((entry) => entry.workspaceId !== null)
+      .map((entry) => entry.workspaceId);
+    expect(new Set(claimed).size).toBe(claimed.length);
   });
 
   it("keeps built-ins outside owner storage and lists custom workspaces after them", () => {
@@ -557,6 +635,34 @@ describe("Studio workspace owner-scoped persistence", () => {
     });
   });
 
+  it("starts V12 clean and ignores every pre-V12 workspace key by default", () => {
+    const legacyKey = "toonspectrum-studio-workspaces:v1:guest";
+    const storage = memoryStorage({
+      [legacyKey]: JSON.stringify({
+        ...DEFAULT_STUDIO_WORKSPACE_STATE,
+        version: 1,
+        mobileControlSide: "left",
+      }),
+      [STUDIO_INSPECTOR_LAYOUT_STORAGE_KEY]: JSON.stringify({ primary: "layers" }),
+      "toonspectrum:studio:workspaces:guest": JSON.stringify({
+        kind: "toonspectrum.studio-workspaces",
+        payloadVersion: STUDIO_WORKSPACE_PAYLOAD_VERSION,
+        ownerScope: "guest",
+        state: DEFAULT_STUDIO_WORKSPACE_STATE,
+      }),
+    });
+
+    expect(loadStudioWorkspacePersistence(storage, null)).toMatchObject({
+      state: DEFAULT_STUDIO_WORKSPACE_STATE,
+      source: "default",
+      status: "session-only",
+      failure: null,
+    });
+    expect(storage.values.has(legacyKey)).toBe(true);
+    expect(storage.values.has(STUDIO_INSPECTOR_LAYOUT_STORAGE_KEY)).toBe(true);
+    expect(studioWorkspaceStorageKey(null)).toContain("workspaces-v12");
+  });
+
   it("migrates a prior owner-scoped v1 key and deletes it only after verified v3 write", () => {
     const userId = "legacy-owner@example.com";
     const currentKey = studioWorkspaceStorageKey(userId);
@@ -586,7 +692,9 @@ describe("Studio workspace owner-scoped persistence", () => {
       },
     };
 
-    const loaded = loadStudioWorkspacePersistence(storage, userId);
+    const loaded = loadStudioWorkspacePersistence(storage, userId, {
+      legacyDataPolicy: "import-explicit",
+    });
     const persistedEnvelope = JSON.parse(values.get(currentKey) ?? "null") as {
       payloadVersion?: unknown;
     };
@@ -616,7 +724,9 @@ describe("Studio workspace owner-scoped persistence", () => {
       }),
     });
 
-    const loaded = loadStudioWorkspacePersistence(storage, null);
+    const loaded = loadStudioWorkspacePersistence(storage, null, {
+      legacyDataPolicy: "import-explicit",
+    });
 
     expect(loaded).toMatchObject({
       source: "legacy-v1",
@@ -641,7 +751,9 @@ describe("Studio workspace owner-scoped persistence", () => {
       },
     };
 
-    expect(loadStudioWorkspacePersistence(storage, null)).toMatchObject({
+    expect(loadStudioWorkspacePersistence(storage, null, {
+      legacyDataPolicy: "import-explicit",
+    })).toMatchObject({
       source: "legacy-v1",
       status: "session-only",
       failure: "verification-failed",
@@ -672,7 +784,9 @@ describe("Studio workspace owner-scoped persistence", () => {
       [STUDIO_LEGACY_RIGHT_PANEL_WIDTH_STORAGE_KEY]: "9999",
     };
     const guestStorage = memoryStorage(initial);
-    const guest = loadStudioWorkspacePersistence(guestStorage, null);
+    const guest = loadStudioWorkspacePersistence(guestStorage, null, {
+      legacyDataPolicy: "import-explicit",
+    });
 
     expect(guest).toMatchObject({
       source: "legacy-preferences",
@@ -1255,5 +1369,302 @@ describe("legacy Studio preference migration", () => {
     });
     expect(migrated.mobileControlSide).toBe("right");
     expect(migrated.applyQuickActionsOnSwitch).toBe(true);
+  });
+});
+
+describe("Studio workspace device overrides", () => {
+  function workspace(id: string) {
+    const found = STUDIO_DEFAULT_WORKSPACES.find((candidate) => candidate.id === id);
+    if (!found) throw new Error(`missing workspace ${id}`);
+    return found;
+  }
+
+  it("declares a closed device axis every built-in override is validated against", () => {
+    expect(STUDIO_WORKSPACE_DEVICE_KINDS).toEqual([
+      "pen-display",
+      "mobile",
+      "keyboard",
+      "mouse",
+      "touch",
+    ]);
+    const allowed = new Set<string>(STUDIO_WORKSPACE_DEVICE_KINDS);
+    for (const entry of STUDIO_DEFAULT_WORKSPACES) {
+      for (const [device, override] of Object.entries(entry.layout.deviceOverrides)) {
+        expect(allowed.has(device)).toBe(true);
+        expect(Object.isFrozen(override)).toBe(true);
+        expect(typeof override.desktop.leftPanelOpen).toBe("boolean");
+        expect(override.desktop.leftPanelWidth)
+          .toBeGreaterThanOrEqual(STUDIO_WORKSPACE_LEFT_PANEL_WIDTH.minimum);
+        expect(override.desktop.rightPanelWidth)
+          .toBeGreaterThanOrEqual(STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH.minimum);
+      }
+    }
+  });
+
+  it("reclaims the screen on handheld surfaces and narrows the dock on a pen display", () => {
+    const lineart = workspace("lineart").layout;
+    expect(resolveStudioWorkspaceDeviceLayout(lineart, "mobile").desktop).toMatchObject({
+      leftPanelOpen: false,
+      rightPanelOpen: false,
+    });
+    expect(resolveStudioWorkspaceDeviceLayout(lineart, "touch").desktop.rightPanelOpen)
+      .toBe(false);
+    const penDisplay = resolveStudioWorkspaceDeviceLayout(lineart, "pen-display").desktop;
+    expect(penDisplay.rightPanelOpen).toBe(true);
+    expect(penDisplay.rightPanelWidth).toBeLessThan(lineart.desktop.rightPanelWidth);
+    // Keyboard navigation needs every landmark reachable by Tab.
+    expect(resolveStudioWorkspaceDeviceLayout(lineart, "keyboard").desktop).toMatchObject({
+      leftPanelOpen: true,
+      rightPanelOpen: true,
+    });
+  });
+
+  it("returns the desktop layout untouched when no override applies", () => {
+    const publish = workspace("publish").layout;
+    expect(resolveStudioWorkspaceDeviceLayout(publish, "pen-display").desktop)
+      .toEqual(publish.desktop);
+    expect(resolveStudioWorkspaceDeviceLayout(publish, null).desktop).toEqual(publish.desktop);
+    expect(resolveStudioWorkspaceDeviceLayout(publish).desktop).toEqual(publish.desktop);
+    // Overriding docks must never disturb the workspace's tools or inspector.
+    const mobile = resolveStudioWorkspaceDeviceLayout(workspace("lineart").layout, "mobile");
+    expect(mobile.inspector).toEqual(workspace("lineart").layout.inspector);
+    expect(mobile.quickActions).toEqual(workspace("lineart").layout.quickActions);
+    expect(mobile.drawingPalettes).toEqual(workspace("lineart").layout.drawingPalettes);
+  });
+
+  it("lets a workspace override handedness only where it deliberately set one", () => {
+    const state = updateStudioWorkspacePreferences(DEFAULT_STUDIO_WORKSPACE_STATE, {
+      mobileControlSide: "right",
+    });
+    const penDisplayProfile = workspace("pen-display").layout;
+    expect(resolveStudioWorkspaceControlSide(state, penDisplayProfile, "pen-display"))
+      .toBe("left");
+    // Every other surface still inherits the owner-wide preference.
+    expect(resolveStudioWorkspaceControlSide(state, penDisplayProfile, "mobile")).toBe("right");
+    expect(resolveStudioWorkspaceControlSide(state, penDisplayProfile, null)).toBe("right");
+    const leftHanded = updateStudioWorkspacePreferences(state, { mobileControlSide: "left" });
+    expect(resolveStudioWorkspaceControlSide(leftHanded, workspace("lineart").layout, "mobile"))
+      .toBe("left");
+  });
+
+  it("classifies the input surface from observable runtime signals", () => {
+    expect(resolveStudioWorkspaceDeviceKind({ keyboardDriven: true, pointerType: "mouse" }))
+      .toBe("keyboard");
+    expect(resolveStudioWorkspaceDeviceKind({
+      pointerType: "pen",
+      coarsePointer: true,
+      viewportWidth: 1_920,
+    })).toBe("pen-display");
+    expect(resolveStudioWorkspaceDeviceKind({
+      pointerType: "pen",
+      maxTouchPoints: 5,
+      viewportWidth: 390,
+    })).toBe("mobile");
+    expect(resolveStudioWorkspaceDeviceKind({ maxTouchPoints: 5, viewportWidth: 375 }))
+      .toBe("mobile");
+    expect(resolveStudioWorkspaceDeviceKind({ pointerType: "touch", viewportWidth: 1_280 }))
+      .toBe("touch");
+    expect(resolveStudioWorkspaceDeviceKind({ pointerType: "mouse", viewportWidth: 1_440 }))
+      .toBe("mouse");
+    // No signal at all means no adaptation, not a guess.
+    expect(resolveStudioWorkspaceDeviceKind({})).toBeNull();
+    expect(resolveStudioWorkspaceDeviceKind({ pointerType: "unknown" })).toBeNull();
+  });
+
+  it("believes an observed press over the hardware's touch census", () => {
+    // Most laptops now report touch points whether or not anyone touches the screen. Reading that
+    // as "handheld" handed a desktop artist the both-docks-closed layout mid-session.
+    expect(resolveStudioWorkspaceDeviceKind({
+      pointerType: "mouse",
+      maxTouchPoints: 10,
+      viewportWidth: 1_680,
+    })).toBe("mouse");
+    // An iPad on a keyboard case still drives a pen or a finger, and stays a touch surface.
+    expect(resolveStudioWorkspaceDeviceKind({
+      pointerType: "touch",
+      maxTouchPoints: 5,
+      coarsePointer: true,
+      viewportWidth: 1_180,
+    })).toBe("touch");
+    // Before the first press only a coarse *primary* pointer is evidence of a finger-first screen;
+    // touch points alone are not, and first paint is exactly when nothing has been pressed yet.
+    expect(resolveStudioWorkspaceDeviceKind({ maxTouchPoints: 10, viewportWidth: 1_680 }))
+      .toBeNull();
+    expect(resolveStudioWorkspaceDeviceKind({ coarsePointer: true, viewportWidth: 1_180 }))
+      .toBe("touch");
+  });
+
+  it("carries overrides through save, switch, reload and dirty comparison", () => {
+    const base = DEFAULT_STUDIO_WORKSPACE_STATE;
+    const withOverride = updateStudioWorkspaceLiveLayout(base, normalizeStudioWorkspaceLayout({
+      ...base.liveLayout,
+      deviceOverrides: {
+        mobile: {
+          desktop: {
+            leftPanelOpen: false,
+            rightPanelOpen: false,
+            leftPanelWidth: 128,
+            rightPanelWidth: 240,
+          },
+          controlSide: "left",
+        },
+      },
+    }));
+    expect(withOverride.liveLayout.deviceOverrides.mobile?.controlSide).toBe("left");
+    expect(areStudioWorkspaceLayoutsEqual(withOverride.liveLayout, base.liveLayout)).toBe(false);
+    expect(isStudioWorkspaceDirty(withOverride)).toBe(true);
+
+    const saved = saveStudioWorkspace(withOverride, "모바일 커스텀");
+    const custom = saved.customWorkspaces.at(-1);
+    expect(custom?.layout.deviceOverrides.mobile?.controlSide).toBe("left");
+    expect(isStudioWorkspaceDirty(saved)).toBe(false);
+
+    const switched = switchStudioWorkspace(saved, "publish");
+    expect(switched.liveLayout.deviceOverrides)
+      .toEqual(resolveStudioWorkspace(switched, "publish")?.layout.deviceOverrides);
+    const back = switchStudioWorkspace(switched, custom?.id ?? "");
+    expect(back.liveLayout.deviceOverrides.mobile?.controlSide).toBe("left");
+    expect(reloadStudioWorkspace(back).liveLayout.deviceOverrides.mobile?.controlSide)
+      .toBe("left");
+  });
+
+  it("drops unknown devices and malformed overrides from untrusted payloads", () => {
+    const layout = normalizeStudioWorkspaceLayout({
+      ...DEFAULT_STUDIO_WORKSPACE_STATE.liveLayout,
+      deviceOverrides: {
+        mobile: { desktop: { leftPanelOpen: false }, controlSide: "left" },
+        hologram: { desktop: { leftPanelOpen: false } },
+        touch: "not-an-object",
+        keyboard: { desktop: { leftPanelWidth: 99_999 }, controlSide: "sideways" },
+      },
+    });
+    expect(Object.keys(layout.deviceOverrides).sort()).toEqual(["keyboard", "mobile"]);
+    expect(layout.deviceOverrides.mobile?.desktop.leftPanelOpen).toBe(false);
+    // An out-of-range width clamps rather than rejecting the whole override.
+    expect(layout.deviceOverrides.keyboard?.desktop.leftPanelWidth)
+      .toBe(STUDIO_WORKSPACE_LEFT_PANEL_WIDTH.maximum);
+    // An unrecognized control side inherits instead of persisting nonsense.
+    expect(layout.deviceOverrides.keyboard?.controlSide).toBeNull();
+  });
+});
+
+describe("Studio workspace v3 to v4 migration", () => {
+  const OWNER = "guest";
+
+  it("keeps a v3 owner payload and gives its layouts an empty device axis", () => {
+    const v3State = {
+      version: 3,
+      activeWorkspaceId: "custom-1",
+      liveLayout: {
+        inspector: { primary: "properties", image: "fill", document: "grade" },
+        desktop: {
+          leftPanelOpen: false,
+          rightPanelOpen: true,
+          leftPanelWidth: 200,
+          rightPanelWidth: 300,
+        },
+        drawingPalettes: DEFAULT_STUDIO_DRAWING_PALETTE_LAYOUT,
+        quickActions: DEFAULT_STUDIO_WORKSPACE_STATE.liveLayout.quickActions,
+      },
+      customWorkspaces: [{
+        id: "custom-1",
+        name: "이전 작업공간",
+        layout: {
+          inspector: { primary: "layers", image: "mask", document: "navigator" },
+          desktop: {
+            leftPanelOpen: true,
+            rightPanelOpen: true,
+            leftPanelWidth: 176,
+            rightPanelWidth: 320,
+          },
+          drawingPalettes: DEFAULT_STUDIO_DRAWING_PALETTE_LAYOUT,
+          quickActions: DEFAULT_STUDIO_WORKSPACE_STATE.liveLayout.quickActions,
+        },
+      }],
+      mobileControlSide: "left",
+      applyQuickActionsOnSwitch: false,
+    };
+    const storage = memoryStorage({
+      [studioWorkspaceStorageKey(null)]: JSON.stringify({
+        kind: "toonspectrum.studio-workspaces",
+        payloadVersion: 3,
+        ownerScope: OWNER,
+        state: v3State,
+      }),
+    });
+
+    const loaded = loadStudioWorkspacePersistence(storage, null);
+    expect(loaded.status).toBe("persisted");
+    expect(loaded.failure).toBeNull();
+    // Nothing the artist configured may be lost by the version bump.
+    expect(loaded.state.activeWorkspaceId).toBe("custom-1");
+    expect(loaded.state.mobileControlSide).toBe("left");
+    expect(loaded.state.applyQuickActionsOnSwitch).toBe(false);
+    expect(loaded.state.customWorkspaces).toHaveLength(1);
+    expect(loaded.state.customWorkspaces[0]?.name).toBe("이전 작업공간");
+    expect(loaded.state.customWorkspaces[0]?.layout.desktop).toMatchObject({
+      leftPanelWidth: 176,
+      rightPanelWidth: 320,
+    });
+    expect(loaded.state.liveLayout.inspector.document).toBe("grade");
+    // A v3 layout simply had no device axis; it migrates to "no adaptation", not to a guess.
+    expect(loaded.state.liveLayout.deviceOverrides).toEqual({});
+    expect(loaded.state.customWorkspaces[0]?.layout.deviceOverrides).toEqual({});
+
+    const rewritten = JSON.parse(storage.values.get(studioWorkspaceStorageKey(null)) ?? "{}");
+    expect(rewritten.payloadVersion).toBe(STUDIO_WORKSPACE_PAYLOAD_VERSION);
+    expect(rewritten.state.version).toBe(STUDIO_WORKSPACE_STATE_VERSION);
+  });
+
+  it("still resolves a saved workspace id from before the catalogue grew", () => {
+    for (const id of ["storyboard", "lineart", "coloring", "lettering", "review", "publish", "pro-comic"]) {
+      const migrated = normalizeStudioWorkspaceState({
+        version: 3,
+        activeWorkspaceId: id,
+        liveLayout: DEFAULT_STUDIO_WORKSPACE_STATE.liveLayout,
+        customWorkspaces: [],
+        mobileControlSide: "right",
+        applyQuickActionsOnSwitch: true,
+      });
+      expect(migrated.activeWorkspaceId).toBe(id);
+      expect(resolveStudioWorkspace(migrated, id)?.id).toBe(id);
+    }
+  });
+});
+
+describe("Studio workspace payload budget with the device axis", () => {
+  it("keeps a fully loaded owner payload inside the 64 KiB storage budget", () => {
+    const heavyOverrides = Object.fromEntries(
+      STUDIO_WORKSPACE_DEVICE_KINDS.map((device) => [device, {
+        desktop: {
+          leftPanelOpen: false,
+          rightPanelOpen: true,
+          leftPanelWidth: STUDIO_WORKSPACE_LEFT_PANEL_WIDTH.maximum,
+          rightPanelWidth: STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH.maximum,
+        },
+        controlSide: "left",
+      }]),
+    );
+    let state = updateStudioWorkspaceLiveLayout(
+      DEFAULT_STUDIO_WORKSPACE_STATE,
+      normalizeStudioWorkspaceLayout({
+        ...DEFAULT_STUDIO_WORKSPACE_STATE.liveLayout,
+        deviceOverrides: heavyOverrides,
+      }),
+    );
+    for (let index = 0; index < STUDIO_WORKSPACE_MAX_CUSTOM; index += 1) {
+      state = saveStudioWorkspace(state, `가득 찬 작업공간 ${"자".repeat(20)}${index}`);
+    }
+    expect(state.customWorkspaces).toHaveLength(STUDIO_WORKSPACE_MAX_CUSTOM);
+
+    const storage = memoryStorage();
+    const saved = saveStudioWorkspaceState(storage, null, state);
+    // Every device override on every workspace must still fit, or the artist silently loses
+    // their whole catalogue the first time they configure one.
+    expect(saved.failure).toBeNull();
+    expect(saved.status).toBe("persisted");
+    const raw = storage.values.get(studioWorkspaceStorageKey(null)) ?? "";
+    expect(new TextEncoder().encode(raw).byteLength)
+      .toBeLessThan(STUDIO_WORKSPACE_RAW_MAX_BYTES);
   });
 });

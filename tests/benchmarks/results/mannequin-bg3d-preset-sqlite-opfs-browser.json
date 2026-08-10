@@ -1,0 +1,851 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-08T22:06:31.392Z",
+  "status": "pass",
+  "pass": true,
+  "benchmark": {
+    "status": "ok",
+    "pass": true,
+    "schemaVersion": 1,
+    "normal": {
+      "phase": "normal",
+      "status": "ok",
+      "pass": true,
+      "schemaVersion": 1,
+      "execution": "vite-production-build-chromium-dedicated-worker-opfs-sahpool",
+      "authority": {
+        "kind": "sqlite-opfs-sahpool",
+        "productRepositories": [
+          "createStudioMannequinStateSqliteRepository",
+          "createStudioBg3dLtPresetSqliteRepository"
+        ],
+        "productFactoriesUseDefaultAcquire": true,
+        "runtimeAcquire": "acquireStudioLocalDatabase",
+        "requestedVfs": "opfs",
+        "namespaces": [
+          "studio-mannequin-state-v12",
+          "studio-bg3d-lt-user-presets-v12"
+        ],
+        "keys": [
+          "state-v1",
+          "library-v1"
+        ],
+        "opfsDirectory": "toonspectrum-studio-sqlite",
+        "logicalDatabaseFilename": "studio-local-v12.db",
+        "expectedOpenFilename": "/studio-local-v12.db",
+        "openedOpfsDatabaseFilenames": [
+          "/studio-local-v12.db",
+          "/studio-local-v12.db"
+        ],
+        "installedOpfsDirectories": [
+          "toonspectrum-studio-sqlite",
+          "toonspectrum-studio-sqlite"
+        ],
+        "memoryDatabaseOpenCount": 0,
+        "openedMemoryDatabaseFilenames": [],
+        "localStorageApiPresent": false,
+        "localStorageReadCount": 0,
+        "localStorageWriteCount": 0,
+        "localStorageFallbackUsed": false,
+        "memoryFallbackUsed": false,
+        "closeCompletedBeforeReopen": true
+      },
+      "support": {
+        "wasm": true,
+        "opfs": true
+      },
+      "capabilities": {
+        "dedicatedWorker": true,
+        "secureContext": true,
+        "crossOriginIsolated": true,
+        "navigatorStorageGetDirectory": true,
+        "syncAccessHandle": true,
+        "localStorageApiPresent": false
+      },
+      "browser": {
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.186 Safari/537.36",
+        "hardwareConcurrency": 12
+      },
+      "opening": {
+        "sqliteWasmInitMs": 39.295,
+        "coldOpenMs": 30.875,
+        "reopenMs": 0.445
+      },
+      "mannequin": {
+        "namespace": "studio-mannequin-state-v12",
+        "key": "state-v1",
+        "maximumDefinition": "all-19-joints-all-7-body-params-and-3-axis-pelvis",
+        "jointCount": 19,
+        "bodyParamCount": 7,
+        "pelvisAxisCount": 3,
+        "canonicalBytes": 1307,
+        "canonicalSha256": "d9d8d7e30309dd47f1e005efdcf5b1db830a275502717149024a3e50f1ece052",
+        "persistedBeforeCloseExact": true,
+        "reopenedCanonicalBytesExact": true,
+        "reopenedSemanticExact": true,
+        "reopenedSha256": "d9d8d7e30309dd47f1e005efdcf5b1db830a275502717149024a3e50f1ece052",
+        "saves": {
+          "successfulCount": 100,
+          "distribution": {
+            "sampleCount": 100,
+            "percentileMethod": "nearest-rank-ceil",
+            "samplesMs": [
+              2.835,
+              1.895,
+              1.805,
+              2.08,
+              2.365,
+              2.45,
+              2.24,
+              2.52,
+              2.26,
+              2.33,
+              2.435,
+              2.395,
+              2.325,
+              2.255,
+              2.515,
+              2.335,
+              2.25,
+              2.445,
+              2.435,
+              2.155,
+              2.135,
+              2.92,
+              2.335,
+              2.365,
+              2.575,
+              2.185,
+              2.145,
+              2.23,
+              2.48,
+              2.32,
+              2.155,
+              2.235,
+              2.11,
+              2.155,
+              2.18,
+              2.39,
+              2.155,
+              2.155,
+              2.28,
+              2.34,
+              2.655,
+              2.39,
+              2.395,
+              2.37,
+              2.205,
+              2.24,
+              2.6,
+              2.325,
+              2.26,
+              2.455,
+              2.395,
+              2.225,
+              2.27,
+              2.575,
+              2.31,
+              2.205,
+              2.42,
+              2.63,
+              2.225,
+              2.235,
+              2.355,
+              2.345,
+              2.195,
+              2.195,
+              2.41,
+              2.105,
+              2.175,
+              2.305,
+              2.465,
+              2.19,
+              2.215,
+              2.33,
+              2.28,
+              2.38,
+              2.245,
+              2.415,
+              2.185,
+              2.27,
+              2.415,
+              2.44,
+              2.165,
+              2.18,
+              2.505,
+              2.23,
+              2.075,
+              2.29,
+              2.315,
+              2.31,
+              2.3,
+              2.41,
+              2.265,
+              2.195,
+              2.12,
+              2.56,
+              3.42,
+              2.305,
+              2.555,
+              2.34,
+              2.22,
+              2.395
+            ],
+            "minMs": 1.805,
+            "p50Ms": 2.305,
+            "p95Ms": 2.6,
+            "p99Ms": 2.92,
+            "maxMs": 3.42,
+            "meanMs": 2.3262
+          }
+        },
+        "loads": {
+          "successfulCount": 100,
+          "mismatchCount": 0,
+          "distribution": {
+            "sampleCount": 100,
+            "percentileMethod": "nearest-rank-ceil",
+            "samplesMs": [
+              0.2,
+              0.195,
+              0.175,
+              0.175,
+              0.19,
+              0.185,
+              0.17,
+              0.17,
+              0.16,
+              0.165,
+              0.17,
+              0.17,
+              0.165,
+              0.175,
+              0.165,
+              0.175,
+              0.16,
+              0.185,
+              0.17,
+              0.17,
+              0.17,
+              0.16,
+              0.175,
+              0.175,
+              0.195,
+              0.155,
+              0.165,
+              0.165,
+              0.165,
+              0.2,
+              0.195,
+              0.195,
+              0.18,
+              0.17,
+              0.175,
+              0.165,
+              0.165,
+              0.165,
+              0.17,
+              0.165,
+              0.2,
+              0.2,
+              0.18,
+              0.165,
+              0.16,
+              0.165,
+              0.155,
+              0.16,
+              0.16,
+              0.175,
+              0.22,
+              0.2,
+              0.165,
+              0.165,
+              0.16,
+              0.175,
+              0.165,
+              0.175,
+              0.195,
+              0.175,
+              0.185,
+              0.165,
+              0.16,
+              0.175,
+              0.165,
+              0.18,
+              0.195,
+              0.295,
+              0.23,
+              0.205,
+              0.195,
+              0.175,
+              0.175,
+              0.17,
+              0.17,
+              0.175,
+              0.18,
+              0.185,
+              0.2,
+              0.17,
+              0.17,
+              0.175,
+              0.2,
+              0.18,
+              0.17,
+              0.17,
+              0.165,
+              0.16,
+              0.175,
+              0.165,
+              0.17,
+              0.18,
+              0.165,
+              0.165,
+              0.165,
+              0.16,
+              0.19,
+              0.215,
+              0.175,
+              0.17
+            ],
+            "minMs": 0.155,
+            "p50Ms": 0.17,
+            "p95Ms": 0.2,
+            "p99Ms": 0.23,
+            "maxMs": 0.295,
+            "meanMs": 0.1771
+          }
+        }
+      },
+      "bg3dLt": {
+        "namespace": "studio-bg3d-lt-user-presets-v12",
+        "key": "library-v1",
+        "maximumDefinition": "32-presets-with-80-char-ids-60-char-names-and-240-char-descriptions",
+        "presetCount": 32,
+        "idLength": 80,
+        "nameLength": 60,
+        "descriptionLength": 240,
+        "byteBudget": 65536,
+        "canonicalBytes": 28447,
+        "canonicalSha256": "74803df944d4b36d9e9d55ee69514a391bcfbae84f43a86a77dff9ab19b6242f",
+        "persistedBeforeCloseExact": true,
+        "reopenedCanonicalBytesExact": true,
+        "reopenedSemanticExact": true,
+        "reopenedSha256": "74803df944d4b36d9e9d55ee69514a391bcfbae84f43a86a77dff9ab19b6242f",
+        "saves": {
+          "successfulCount": 100,
+          "distribution": {
+            "sampleCount": 100,
+            "percentileMethod": "nearest-rank-ceil",
+            "samplesMs": [
+              11.48,
+              9.44,
+              9.195,
+              9.11,
+              8.38,
+              9.29,
+              8.72,
+              8.87,
+              8.91,
+              8.89,
+              8.775,
+              8.625,
+              8.68,
+              8.51,
+              8.53,
+              9.01,
+              8.54,
+              8.5,
+              8.805,
+              8.51,
+              9.18,
+              9.56,
+              8.645,
+              8.685,
+              8.895,
+              8.85,
+              8.595,
+              9.155,
+              8.69,
+              8.61,
+              8.97,
+              8.755,
+              8.58,
+              9.52,
+              8.52,
+              8.085,
+              9.35,
+              8.89,
+              8.715,
+              8.935,
+              9.105,
+              9.03,
+              8.61,
+              8.865,
+              9.07,
+              8.7,
+              8.975,
+              8.155,
+              8.695,
+              8.39,
+              8.715,
+              10.655,
+              8.76,
+              8.905,
+              8.755,
+              8.625,
+              8.915,
+              8.765,
+              8.565,
+              8.66,
+              9.415,
+              8.22,
+              9.68,
+              8.235,
+              9.375,
+              8.66,
+              8.625,
+              8.165,
+              8.765,
+              7.965,
+              8.8,
+              8.175,
+              8.76,
+              8.16,
+              8.74,
+              8.1,
+              8.63,
+              8.02,
+              8.005,
+              10.445,
+              8.23,
+              8.655,
+              8.11,
+              8.9,
+              8.6,
+              8.79,
+              8.05,
+              9.08,
+              8.24,
+              8.745,
+              8.42,
+              8.685,
+              8.775,
+              8.85,
+              7.725,
+              8.875,
+              7.965,
+              8.395,
+              8.915,
+              8.365
+            ],
+            "minMs": 7.725,
+            "p50Ms": 8.715,
+            "p95Ms": 9.52,
+            "p99Ms": 10.655,
+            "maxMs": 11.48,
+            "meanMs": 8.7618
+          }
+        },
+        "loads": {
+          "successfulCount": 100,
+          "mismatchCount": 0,
+          "distribution": {
+            "sampleCount": 100,
+            "percentileMethod": "nearest-rank-ceil",
+            "samplesMs": [
+              4.265,
+              4.185,
+              4.63,
+              3.945,
+              4.19,
+              3.945,
+              3.995,
+              4.87,
+              4.04,
+              4.055,
+              4.405,
+              4.03,
+              4.345,
+              3.995,
+              3.955,
+              4.025,
+              4.22,
+              4.65,
+              3.915,
+              4.115,
+              4.59,
+              3.905,
+              5.08,
+              4.06,
+              4.125,
+              4.61,
+              4.59,
+              4.51,
+              4.595,
+              4.16,
+              5.165,
+              4.195,
+              4.78,
+              4.63,
+              3.885,
+              4.615,
+              4.12,
+              4.105,
+              4.465,
+              3.96,
+              4.685,
+              4.11,
+              3.93,
+              3.97,
+              3.94,
+              4.56,
+              4.005,
+              3.975,
+              4.14,
+              4.235,
+              4.105,
+              4.195,
+              4.62,
+              4.125,
+              4.265,
+              4.105,
+              4.215,
+              4.99,
+              4.055,
+              4.215,
+              4.02,
+              4,
+              5.125,
+              3.975,
+              4.215,
+              4.045,
+              4.69,
+              4.33,
+              4.155,
+              4.01,
+              5.275,
+              3.83,
+              4.57,
+              4.445,
+              3.94,
+              4.44,
+              4.805,
+              5.27,
+              4.275,
+              3.985,
+              4.35,
+              4.385,
+              4.76,
+              4.065,
+              3.875,
+              3.915,
+              4.04,
+              3.93,
+              3.945,
+              4.065,
+              4.07,
+              4.345,
+              3.955,
+              4.265,
+              4.225,
+              4.07,
+              4.165,
+              3.955,
+              4.015,
+              4.035
+            ],
+            "minMs": 3.83,
+            "p50Ms": 4.14,
+            "p95Ms": 4.99,
+            "p99Ms": 5.27,
+            "maxMs": 5.275,
+            "meanMs": 4.2619
+          }
+        }
+      },
+      "memory": {
+        "before": {
+          "performanceMemoryApiExposed": false,
+          "performanceMemory": null,
+          "userAgentSpecificMemoryApiExposed": false,
+          "userAgentSpecificMemory": null,
+          "userAgentSpecificMemoryError": null
+        },
+        "after": {
+          "performanceMemoryApiExposed": false,
+          "performanceMemory": null,
+          "userAgentSpecificMemoryApiExposed": false,
+          "userAgentSpecificMemory": null,
+          "userAgentSpecificMemoryError": null
+        },
+        "unavailableApisRemainNull": true
+      },
+      "opfs": {
+        "exists": true,
+        "entries": [
+          {
+            "path": ".opaque",
+            "kind": "directory",
+            "sizeBytes": null
+          },
+          {
+            "path": ".opaque/00svpivjah7io",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/6162by33fi3",
+            "kind": "file",
+            "sizeBytes": 258048
+          },
+          {
+            "path": ".opaque/e528pqg11p",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/o4u3j1xi0qs",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/o6jq2e8oye",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/sfblvmbfzff",
+            "kind": "file",
+            "sizeBytes": 4096
+          }
+        ],
+        "fileCount": 6,
+        "totalFileBytes": 278528
+      },
+      "storage": {
+        "usageBytes": 279894,
+        "quotaBytes": 2157178642,
+        "usageDetails": {
+          "fileSystem": 279894
+        }
+      },
+      "securityPolicyViolations": []
+    },
+    "forcedTermination": {
+      "workerTerminateCalled": true,
+      "closeCalledBeforeTerminate": false,
+      "seed": {
+        "phase": "termination-seed",
+        "status": "ready",
+        "pass": true,
+        "closeCalled": false,
+        "mannequin": {
+          "bytes": 1307,
+          "sha256": "d9d8d7e30309dd47f1e005efdcf5b1db830a275502717149024a3e50f1ece052",
+          "persistedExact": true
+        },
+        "bg3dLt": {
+          "bytes": 28447,
+          "sha256": "74803df944d4b36d9e9d55ee69514a391bcfbae84f43a86a77dff9ab19b6242f",
+          "persistedExact": true
+        },
+        "openedOpfsDatabaseFilenames": [
+          "/studio-local-v12.db"
+        ],
+        "memoryDatabaseOpenCount": 0,
+        "localStorageApiPresent": false
+      },
+      "verify": {
+        "phase": "termination-verify",
+        "status": "ok",
+        "pass": true,
+        "reopenAfterTerminateMs": 9.285,
+        "reopenedCanonicalExact": true,
+        "mannequin": {
+          "canonicalBytesExact": true,
+          "semanticExact": true,
+          "bytes": 1307,
+          "expectedSha256": "d9d8d7e30309dd47f1e005efdcf5b1db830a275502717149024a3e50f1ece052",
+          "reopenedSha256": "d9d8d7e30309dd47f1e005efdcf5b1db830a275502717149024a3e50f1ece052"
+        },
+        "bg3dLt": {
+          "canonicalBytesExact": true,
+          "semanticExact": true,
+          "bytes": 28447,
+          "expectedSha256": "74803df944d4b36d9e9d55ee69514a391bcfbae84f43a86a77dff9ab19b6242f",
+          "reopenedSha256": "74803df944d4b36d9e9d55ee69514a391bcfbae84f43a86a77dff9ab19b6242f"
+        },
+        "openedOpfsDatabaseFilenames": [
+          "/studio-local-v12.db"
+        ],
+        "memoryDatabaseOpenCount": 0,
+        "localStorageApiPresent": false,
+        "closeCalledAfterVerification": true
+      },
+      "recoveryElapsedMs": 331.605,
+      "pass": true
+    },
+    "pageSecurityPolicyViolations": []
+  },
+  "diagnostics": {
+    "browserVersion": "140.0.7339.186",
+    "consoleErrors": [],
+    "consoleWarnings": [],
+    "pageErrors": [],
+    "requestFailures": [],
+    "errorResponses": [],
+    "requests": [
+      {
+        "method": "GET",
+        "resourceType": "document",
+        "url": "http://127.0.0.1:50631/"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:50631/assets/index-BUtKLC9i.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:50631/assets/mannequin-bg3d-preset-sqlite-opfs-browser-client-C-RzgYlN.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:50631/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:50631/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:50631/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:50631/assets/mannequin-bg3d-preset-sqlite-opfs-browser-client-C-RzgYlN.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:50631/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:50631/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:50631/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:50631/assets/mannequin-bg3d-preset-sqlite-opfs-browser-client-C-RzgYlN.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:50631/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:50631/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:50631/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      }
+    ],
+    "responses": [
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:50631/"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:50631/assets/index-BUtKLC9i.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:50631/assets/mannequin-bg3d-preset-sqlite-opfs-browser-client-C-RzgYlN.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:50631/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:50631/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:50631/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:50631/assets/mannequin-bg3d-preset-sqlite-opfs-browser-client-C-RzgYlN.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:50631/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:50631/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:50631/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:50631/assets/mannequin-bg3d-preset-sqlite-opfs-browser-client-C-RzgYlN.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:50631/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:50631/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:50631/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      }
+    ],
+    "responseHeaders": {
+      "contentSecurityPolicy": "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'; worker-src 'self'; style-src 'none'; img-src 'none'; font-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+      "crossOriginOpenerPolicy": "same-origin",
+      "crossOriginEmbedderPolicy": "require-corp",
+      "crossOriginResourcePolicy": "same-origin"
+    }
+  },
+  "productionBuild": {
+    "mode": "vite-production-build",
+    "assets": [
+      ".vite/manifest.json",
+      "assets/index-BUtKLC9i.js",
+      "assets/index-BUtKLC9i.js.map",
+      "assets/mannequin-bg3d-preset-sqlite-opfs-browser-client-C-RzgYlN.js",
+      "assets/mannequin-bg3d-preset-sqlite-opfs-browser-client-C-RzgYlN.js.map",
+      "assets/sqlite3-BVKGSWc-.wasm",
+      "assets/sqlite3-opfs-async-proxy-D_xnb1D8.js",
+      "assets/sqlite3-worker1-N5XM9NUp.js",
+      "assets/sqlite3-worker1-N5XM9NUp.js.map",
+      "index.html"
+    ],
+    "scratchDirectory": "/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/toonspectrum-mannequin-bg3d-opfs-512GL3"
+  },
+  "validationIssues": []
+}

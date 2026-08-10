@@ -33,7 +33,6 @@ describe("Studio tool-hint preview authorship audit", () => {
     ["menubar", "menubar-publish", "publish"],
     ["mainMenu", "main-menu-file", "file-workflow"],
     ["mainMenu", "main-menu-edit", "edit-workflow"],
-    ["mainMenu", "main-menu-insert", "insert-content"],
     ["mainMenu", "main-menu-view", "view-workflow"],
     ["mainMenu", "main-menu-filter", "filter"],
     ["mainMenu", "main-menu-draw", "draw-workflow"],

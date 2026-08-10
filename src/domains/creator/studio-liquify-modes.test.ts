@@ -218,7 +218,7 @@ describe("studio liquify commercial modes", () => {
       { mode: "bloat" }
     );
     expect(bloat).not.toBeNull();
-    expect(bloatCalls).toEqual(["canvas-1:draw", "canvas-2:draw", "canvas-2:put"]);
+    expect(bloatCalls).toEqual(["canvas-1:draw", "canvas-1:put"]);
 
     const pushCalls: string[] = [];
     const push = await bakeLiquifyStrokeToCanvas(

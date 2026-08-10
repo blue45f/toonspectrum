@@ -33,9 +33,23 @@ describe("StudioCreatorPackMarketplacePanel", () => {
   });
 
   it("offers a real transactional uninstall path for installed portable packs", () => {
-    expect(panelSource).toContain("uninstallStudioCreatorPack(pack, storage)");
+    expect(panelSource).toContain("uninstallStudioCreatorPackProduct(pack, { storage })");
+    expect(panelSource).toContain("installStudioCreatorPackProduct(pack, { storage })");
+    expect(panelSource).toContain("무제한 · 로컬 SQL");
     expect(panelSource).toContain('"기기에서 제거"');
     expect(panelSource).toContain("status.status === \"conflict\"");
     expect(panelSource).toContain("key={`${pack.metadata.id}:${refreshToken}`}");
+    expect(panelSource).toContain('|| pack.metadata.kind === "palette"');
+  });
+
+  it("labels the palette pack as the same local SQL authority used by the palette panel", () => {
+    const html = renderToStaticMarkup(
+      <StudioCreatorPackMarketplacePanel initialOpen />,
+    );
+    const paletteCard = html.split(
+      'data-studio-creator-pack="ts-creator-pack-story-palettes"',
+    )[1]?.split("</article>")[0];
+    expect(paletteCard).toContain("무제한 · 로컬 SQL");
+    expect(paletteCard).not.toContain("기기 로컬");
   });
 });

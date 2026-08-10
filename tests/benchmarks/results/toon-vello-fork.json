@@ -1,0 +1,91 @@
+{
+  "harness": "packages/studio-engine-vello/src/__tests__/toon-vello-fork-browser-probe.test.ts (TOON_VELLO_FORK_PROBE=1)",
+  "measuredAt": "2026-08-08T05:41:29.065Z",
+  "browser": {
+    "launch": "playwright chromium headless shell (metal, unsafe-webgpu)",
+    "version": "140.0.7339.186"
+  },
+  "adapter": {
+    "backend": "BrowserWebGpu",
+    "deviceType": "Other",
+    "driver": "",
+    "driverInfo": "",
+    "name": ""
+  },
+  "forkTrack": {
+    "vendor": "crates/vendor/wgpu-toon (crates.io wgpu 29.0.4 + TOON-PATCH 0001, feature `toon-fabric`)",
+    "upstreamCrateSha256": "76e8840e1ba2881d4cbb18d2147627a56af426ff064c0401eb0c8410c6325d07",
+    "buildTrackA": "cargo check --target wasm32-unknown-unknown --features lottie (toon-fabric off; vendored crate is API-identical to upstream)",
+    "buildTrackB": "wasm-pack build --target web --release --out-dir pkg-gpu -- --features lottie,fabric",
+    "patchSurface": [
+      "wgpu::webgpu public handle module (backport of wgpu 30.0.0)",
+      "Device::as_webgpu / Queue::as_webgpu / Texture::as_webgpu (backport of wgpu 30.0.0)",
+      "Device::create_texture_from_webgpu_handle (backport of wgpu 30.0.0, minus DropCallback)",
+      "Device::from_webgpu_handle — external GPUDevice/GPUQueue adoption; absent from wgpu 30 too, upstream PR candidate (V12 §5.4)"
+    ]
+  },
+  "note": "wall-clock includes submit->completion roundtrip floor; adoptedRenderToSharedTexture has no readback and no pixel array crossing the wasm boundary (V12 §6.3 L4), l0Exchange is the pre-fork baseline measured in the same run",
+  "wasmExports": [
+    "adapter_version",
+    "adopt_gpu_device",
+    "default",
+    "fabric_device_adopted",
+    "fabric_device_handle",
+    "fit_polyline_json",
+    "initSync",
+    "probe_webgpu",
+    "render_lottie_gpu_json",
+    "render_scene_gpu_json",
+    "render_scene_gpu_texture_json",
+    "render_scene_json",
+    "shape_text_json",
+    "shape_text_vertical_json"
+  ],
+  "adoption": {
+    "adoptedFlag": true,
+    "sameDeviceObject": true
+  },
+  "l4TextureSharing": {
+    "bindingAccepted": true,
+    "validationError": null
+  },
+  "pixelParityVsL0Lane": {
+    "equal": true,
+    "detail": null
+  },
+  "exchangeCost": [
+    {
+      "size": 256,
+      "bytes": 262144,
+      "adoptedRenderToSharedTextureP50Ms": 2.699999988079071,
+      "l4BindAndConsumeP50Ms": 2.300000011920929,
+      "sameDeviceCopyP50Ms": 2.399999976158142,
+      "l0RenderReadbackP50Ms": 2.700000047683716,
+      "l0UploadToFabricP50Ms": 2.400000035762787,
+      "l0ExchangeP50Ms": 5.100000083446503,
+      "exchangeSpeedupVsL0": 1.8888889281347456
+    },
+    {
+      "size": 512,
+      "bytes": 1048576,
+      "adoptedRenderToSharedTextureP50Ms": 2.600000023841858,
+      "l4BindAndConsumeP50Ms": 2.399999976158142,
+      "sameDeviceCopyP50Ms": 2.399999976158142,
+      "l0RenderReadbackP50Ms": 3.099999964237213,
+      "l0UploadToFabricP50Ms": 2.399999976158142,
+      "l0ExchangeP50Ms": 5.499999940395355,
+      "exchangeSpeedupVsL0": 2.115384573061791
+    },
+    {
+      "size": 1024,
+      "bytes": 4194304,
+      "adoptedRenderToSharedTextureP50Ms": 3,
+      "l4BindAndConsumeP50Ms": 2.399999976158142,
+      "sameDeviceCopyP50Ms": 2.399999976158142,
+      "l0RenderReadbackP50Ms": 4.400000035762787,
+      "l0UploadToFabricP50Ms": 2.899999976158142,
+      "l0ExchangeP50Ms": 7.300000011920929,
+      "exchangeSpeedupVsL0": 2.4333333373069763
+    }
+  ]
+}

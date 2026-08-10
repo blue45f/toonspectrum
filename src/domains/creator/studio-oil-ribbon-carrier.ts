@@ -20,9 +20,21 @@ export interface StudioOilRibbonPath {
   readonly points: readonly number[];
 }
 
-export interface StudioOilRibbonBristleLane extends StudioOilRibbonPath {
+/**
+ * One deposit of bristle relief.
+ *
+ * A lane is a *band of equal load*, not a single hair: every run in `runs` — from any bristle and
+ * any part of the path — is stroked in ONE `stroke()`/`<path>` operation. That is what keeps a
+ * self-crossing honest. Per-run compositing made two arms of a figure-eight stack their ridges and
+ * turned the crossing into a knot; a single paint pass rasterises the union of the band's coverage
+ * once, so a ridge crossing another ridge of the same load deposits exactly once.
+ */
+export interface StudioOilRibbonBristleLane {
+  readonly runs: readonly StudioOilRibbonPath[];
   readonly lineWidth: number;
   readonly opacity: number;
+  /** Load band this deposit represents; `0` is the dry film, higher indices are loaded ridges. */
+  readonly loadBand: number;
 }
 
 export interface StudioOilRibbonCarrierPlan {
@@ -244,6 +256,36 @@ function mean(values: readonly number[]): number {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
+/**
+ * Stations per emitted bristle run.
+ *
+ * The planner already varies each bristle's tooth per station (`hash2(si, 31 + i*7, seed)` in
+ * `planOilBrushDabs` drives `radiusYRatio` and `opacity`), but collapsing a whole stroke into one
+ * `mean()` width and one `mean()` opacity erased every bit of that: a 770 px oil stroke measured a
+ * length-axis coefficient of variation of 0.002, i.e. it was constant along its own travel. Cutting
+ * each hair into short runs lets the load change as the brush travels. Runs share their boundary
+ * station with the next run, so the hair stays continuous.
+ */
+const BRISTLE_RUN_STATIONS = 6;
+
+/**
+ * Load bands the runs are quantised into.
+ *
+ * Two, because bands are the compositing unit: everything inside one band is a single paint pass,
+ * so a self-crossing inside a band costs nothing, while a crossing between bands costs exactly one
+ * extra deposit. More bands would buy more tones and more knot.
+ */
+const BRISTLE_LOAD_BANDS = 2;
+
+/** Virtual overlaps folded into one deposit. See `planStudioOilRibbonCarrier` for the body budget. */
+const BRISTLE_VIRTUAL_OVERLAPS = 12;
+
+interface PlannedBristleRun {
+  readonly points: readonly number[];
+  readonly load: number;
+  readonly width: number;
+}
+
 function planBristleLanes(
   stations: readonly OilCarrierStation[],
 ): readonly StudioOilRibbonBristleLane[] {
@@ -251,27 +293,78 @@ function planBristleLanes(
   const bristleCount = Math.min(
     ...stations.map((station) => station.source.bristles.length),
   );
-  const lanes: StudioOilRibbonBristleLane[] = [];
+  const planned: PlannedBristleRun[] = [];
+  let minimumLoad = Number.POSITIVE_INFINITY;
+  let maximumLoad = Number.NEGATIVE_INFINITY;
   for (let bristleIndex = 0; bristleIndex < bristleCount; bristleIndex += 1) {
-    const widths: number[] = [];
-    const opacities: number[] = [];
-    const points: number[] = [];
-    for (const station of stations) {
-      const bristle = station.source.bristles[bristleIndex]!;
-      const offset = station.radiusY * bristle.offsetRatio;
-      points.push(
-        station.x + station.normalX * offset,
-        station.y + station.normalY * offset,
-      );
-      widths.push(Math.max(0.12, station.radiusY * bristle.radiusYRatio * 2));
-      opacities.push(station.opacity * bristle.opacity);
+    for (
+      let runStart = 0;
+      runStart < stations.length - 1;
+      runStart += BRISTLE_RUN_STATIONS
+    ) {
+      const runEnd = Math.min(stations.length - 1, runStart + BRISTLE_RUN_STATIONS);
+      const points: number[] = [];
+      for (let index = runStart; index <= runEnd; index += 1) {
+        const station = stations[index]!;
+        const bristle = station.source.bristles[bristleIndex]!;
+        const offset = station.radiusY * bristle.offsetRatio;
+        points.push(
+          station.x + station.normalX * offset,
+          station.y + station.normalY * offset,
+        );
+      }
+      // One representative station per run rather than the run's mean. Averaging is what erased the
+      // tooth: the per-station noise is independent, so a mean over six stations shrinks its
+      // amplitude by √6 and a mean over a whole stroke annihilates it.
+      const sample = stations[Math.min(runEnd, runStart + (BRISTLE_RUN_STATIONS >> 1))]!;
+      const sampleBristle = sample.source.bristles[bristleIndex]!;
+      const load = clamp(sample.opacity * sampleBristle.opacity, 0, 1);
+      minimumLoad = Math.min(minimumLoad, load);
+      maximumLoad = Math.max(maximumLoad, load);
+      planned.push({
+        points,
+        load,
+        // A ridge left by one bristle is a material fraction of the ribbon, not a hairline: the
+        // planner's `radiusYRatio` put five ~1 px lanes inside a ~19 px ribbon, so the relief could
+        // not be resolved at all. Size against the lane pitch instead — the five offsets are
+        // 0.36·radiusY apart, so a 0.22–0.26·radiusY ridge leaves a real furrow between neighbours
+        // rather than either a hairline or a solid repaint of the body.
+        width: Math.max(0.35, sample.radiusY * (0.17 + sampleBristle.radiusYRatio * 1.1)),
+      });
     }
+  }
+  if (planned.length === 0) return [];
+
+  const span = maximumLoad - minimumLoad;
+  const bands: PlannedBristleRun[][] = Array.from(
+    { length: BRISTLE_LOAD_BANDS },
+    () => [],
+  );
+  for (const run of planned) {
+    const normalized = span > POINT_EPSILON ? (run.load - minimumLoad) / span : 0;
+    const band = Math.min(
+      BRISTLE_LOAD_BANDS - 1,
+      Math.floor(normalized * BRISTLE_LOAD_BANDS),
+    );
+    bands[band]!.push(run);
+  }
+
+  const lanes: StudioOilRibbonBristleLane[] = [];
+  for (const [loadBand, runs] of bands.entries()) {
+    if (runs.length === 0) continue;
     lanes.push(Object.freeze({
-      points: quantizedPoints(points),
-      lineWidth: quantize(mean(widths)),
-      // The old overlapping ellipses accumulated the same ridge several times. Composite that
-      // load once while retaining a continuous lane instead of periodic darker capsules.
-      opacity: quantize(accumulatedOpacity(mean(opacities), 5)),
+      runs: Object.freeze(runs.map((run) => Object.freeze({
+        points: quantizedPoints(run.points),
+      }))),
+      lineWidth: quantize(mean(runs.map(({ width }) => width))),
+      // The old overlapping ellipses accumulated the same ridge several times. Fold that load into
+      // one deposit per band, so the deposit still cannot bead but the brush's own tooth reaches
+      // the pixels — and a band that crosses itself is still exactly one deposit.
+      opacity: quantize(accumulatedOpacity(
+        mean(runs.map(({ load }) => load)),
+        BRISTLE_VIRTUAL_OVERLAPS,
+      )),
+      loadBand,
     }));
   }
   return Object.freeze(lanes);
@@ -291,10 +384,12 @@ export function planStudioOilRibbonCarrier(
       : stations.length === 1
         ? directionalTap(stations[0]!)
         : variableWidthBody(stations),
-    // Six virtual overlaps preserve the loaded acrylic/oil density of the previous dense carrier
-    // while depositing it once through the connected outline. This avoids a 10–15% contrast loss
-    // that was visible when the geometric migration used only four virtual deposits.
-    bodyOpacity: quantize(accumulatedOpacity(averageOpacity, 6)),
+    // The body is the paint the bristles have already spread, not the finished mark. Six virtual
+    // overlaps drove it to ~0.92 alpha, which left the bristle relief nothing to be relieved
+    // against — every ridge landed on an already opaque slab. Three overlaps keep the load clearly
+    // dominant while reserving headroom, and the strengthened lanes bring the ridge pixels back to
+    // the same peak the six-overlap body used to reach on its own.
+    bodyOpacity: quantize(accumulatedOpacity(averageOpacity, 3)),
     bristleLanes: planBristleLanes(stations),
     repeatedBodyStampCount: 0,
   });

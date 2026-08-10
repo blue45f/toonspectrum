@@ -62,7 +62,6 @@ import {
 
 export const STUDIO_CREATOR_FILTER_PRESET_LIBRARY_KEY =
   "toonspectrum.studio-creator-filter-presets.v1" as const;
-export const STUDIO_CREATOR_FILTER_PRESET_LIBRARY_MAX = 40;
 
 export interface StudioCreatorPackStorage {
   getItem(key: string): string | null;
@@ -409,7 +408,7 @@ export function listStudioCreatorFilterPresets(
       storage.getItem(STUDIO_CREATOR_FILTER_PRESET_LIBRARY_KEY) ?? "[]",
     ) as unknown;
     return Array.isArray(parsed)
-      ? parsed.filter(isFilterPreset).slice(0, STUDIO_CREATOR_FILTER_PRESET_LIBRARY_MAX)
+      ? parsed.filter(isFilterPreset)
       : [];
   } catch {
     return [];
@@ -423,10 +422,9 @@ function saveFilterPresets(
   try {
     storage.setItem(
       STUDIO_CREATOR_FILTER_PRESET_LIBRARY_KEY,
-      JSON.stringify(presets.slice(0, STUDIO_CREATOR_FILTER_PRESET_LIBRARY_MAX)),
+      JSON.stringify(presets),
     );
-    return listStudioCreatorFilterPresets(storage).length
-      === Math.min(presets.length, STUDIO_CREATOR_FILTER_PRESET_LIBRARY_MAX);
+    return listStudioCreatorFilterPresets(storage).length === presets.length;
   } catch {
     return false;
   }
@@ -577,8 +575,6 @@ function installFilters(
       updatedAt: now,
     } satisfies StudioCreatorInstalledFilterPreset;
   });
-  const newCount = incoming.filter((preset) => !existing.has(preset.id)).length;
-  if (current.length + newCount > STUDIO_CREATOR_FILTER_PRESET_LIBRARY_MAX) return "full";
   const incomingIds = new Set(incoming.map((preset) => preset.id));
   return saveFilterPresets(
     storage,

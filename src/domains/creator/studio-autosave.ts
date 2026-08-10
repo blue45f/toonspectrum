@@ -1,4 +1,8 @@
 import {
+  hydrateStudioAiImageReferenceDocument,
+  type StudioAiImageReferenceDocument,
+} from "./studio-ai-image-reference-roles";
+import {
   normalizeStudioAiProvenanceDocument,
   type StudioAiProvenanceDocument,
 } from "./studio-ai-provenance";
@@ -15,7 +19,7 @@ import { migrateStudioShared3dStageCollectionDocument } from
   "./studio-shared-3d-stage-collection";
 
 export const LEGACY_STUDIO_AUTOSAVE_KEY = "toonspectrum-studio-autosave";
-const STUDIO_AUTOSAVE_PREFIX = "toonspectrum-studio-autosave:v2";
+const STUDIO_AUTOSAVE_PREFIX = "toonspectrum-studio-autosave:v12";
 
 export interface StudioAutosaveStorage {
   getItem(key: string): string | null;
@@ -74,6 +78,8 @@ export type StudioAutosavePayload = {
   referenceBoard?: StudioReferenceBoardDocument;
   /** Private, document-scoped AI operation history. Prompt text is redacted during hydration. */
   aiProvenance?: StudioAiProvenanceDocument;
+  /** Metadata-only project references; image bytes remain in the asset CAS. */
+  aiImageReferences?: StudioAiImageReferenceDocument;
   title?: string;
   description?: string;
   tagsText?: string;
@@ -255,6 +261,9 @@ export function parseStudioAutosave(raw: string | null): StudioAutosavePayload |
       aiProvenance: Object.hasOwn(record, "aiProvenance")
         ? normalizeStudioAiProvenanceDocument(record.aiProvenance)
         : undefined,
+      aiImageReferences: Object.hasOwn(record, "aiImageReferences")
+        ? hydrateStudioAiImageReferenceDocument(record.aiImageReferences)
+        : undefined,
       title: typeof record.title === "string" ? record.title : undefined,
       description: typeof record.description === "string" ? record.description : undefined,
       tagsText: typeof record.tagsText === "string" ? record.tagsText : undefined,
@@ -325,6 +334,9 @@ export function serializeStudioAutosave(payload: StudioAutosavePayload): string 
     ...(payload.aiProvenance === undefined
       ? {}
       : { aiProvenance: normalizeStudioAiProvenanceDocument(payload.aiProvenance) }),
+    ...(payload.aiImageReferences === undefined
+      ? {}
+      : { aiImageReferences: hydrateStudioAiImageReferenceDocument(payload.aiImageReferences) }),
   });
 }
 
@@ -434,6 +446,7 @@ export function studioAutosaveHasContent(payload: StudioAutosavePayload): boolea
       ((payload.publicationAnalytics as { records: unknown[] }).records.length > 0)) ||
     studioReferenceBoardHasContent(payload.referenceBoard) ||
     (payload.aiProvenance?.operations.length ?? 0) > 0 ||
+    (payload.aiImageReferences?.references.length ?? 0) > 0 ||
     studioAutosavePublishPackHasContent(payload.publishPack) ||
     (payload.title ?? "").trim().length > 0 ||
     (payload.description ?? "").trim().length > 0 ||

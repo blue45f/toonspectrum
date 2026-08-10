@@ -1,0 +1,84 @@
+{
+  "harness": "packages/studio-engine-vello/src/__tests__/gpu-fabric-browser-probe.test.ts (GPU_FABRIC_BROWSER_PROBE=1)",
+  "measuredAt": "2026-08-08T04:59:23.284Z",
+  "browser": {
+    "launch": "playwright chromium headless shell (metal, unsafe-webgpu)",
+    "version": "140.0.7339.186"
+  },
+  "adapter": {
+    "backend": "BrowserWebGpu",
+    "deviceType": "Other",
+    "driver": "",
+    "driverInfo": "",
+    "name": ""
+  },
+  "note": "wall-clock includes submit->completion roundtrip floor; currentExchange = vello internal-device render+readback+JS boundary followed by fabric-device writeTexture (V12 §6.3 L0)",
+  "velloDeviceInjection": {
+    "supported": false,
+    "wasmExports": [
+      "adapter_version",
+      "default",
+      "fit_polyline_json",
+      "initSync",
+      "probe_webgpu",
+      "render_lottie_gpu_json",
+      "render_scene_gpu_json",
+      "render_scene_json",
+      "shape_text_json",
+      "shape_text_vertical_json"
+    ],
+    "deviceInjectionExports": [],
+    "sourceEvidence": "crates/studio-engine-vello/src/gpu_web.rs acquire_context() creates its own wgpu Instance(BROWSER_WEBGPU) -> request_adapter -> request_device; wgpu 29.0.4 (vello 0.9 pin): src/lib.rs `mod backend` is private, backend::webgpu::WebDevice.inner is pub(crate), no public constructor from a JS GPUDevice; Device::from_custom requires a full custom DeviceInterface backend (not adoption)",
+    "patchBacklog": "toon-vello fork track item #1: expose Device/Queue adoption of an external browser GPUDevice (wgpu backend::webgpu public from_webgpu handle constructors, or wgpu 30 handle API once vello unlocks it) + Texture::from_webgpu_handle for zero-copy wrap"
+  },
+  "fabricDevice": {
+    "maxTextureDimension2D": 8192,
+    "maxBufferSize": 268435456,
+    "maxStorageBufferBindingSize": 134217728,
+    "maxComputeWorkgroupsPerDimension": 65535,
+    "maxComputeInvocationsPerWorkgroup": 256,
+    "timestampQuery": true,
+    "features": [
+      "core-features-and-limits",
+      "timestamp-query"
+    ]
+  },
+  "crossDeviceSharing": {
+    "rejected": true,
+    "syncError": null,
+    "validationError": "[Texture (unlabeled 64x64 px, TextureFormat::RGBA8Unorm)] is associated with [Device], and cannot be used with [Device].\n - While encoding [CommandEncoder (unlabeled)].CopyTextureToTexture([Texture (unlabeled 64x64 px, TextureFormat::RGBA8Unorm)], [Texture (unlabeled 64x64 px, TextureFormat::RGBA8Unorm)], [Extent3D width:64, height:64, depthOrArrayLayers:1]).\n - While finishing [CommandEncoder (unlabeled)].\n"
+  },
+  "fabricKernelParity": true,
+  "interopCost": [
+    {
+      "size": 256,
+      "bytes": 262144,
+      "velloRenderReadbackP50Ms": 3.100000023841858,
+      "uploadToFabricP50Ms": 2.599999964237213,
+      "currentExchangeP50Ms": 5.699999988079071,
+      "sameDeviceCopyP50Ms": 2.600000023841858,
+      "cpuRoundtripP50Ms": 5.200000047683716,
+      "fabricKernelDispatchP50Ms": 2.599999964237213
+    },
+    {
+      "size": 512,
+      "bytes": 1048576,
+      "velloRenderReadbackP50Ms": 3.199999988079071,
+      "uploadToFabricP50Ms": 2.600000023841858,
+      "currentExchangeP50Ms": 5.800000011920929,
+      "sameDeviceCopyP50Ms": 2.600000023841858,
+      "cpuRoundtripP50Ms": 5.399999976158142,
+      "fabricKernelDispatchP50Ms": 2.599999964237213
+    },
+    {
+      "size": 1024,
+      "bytes": 4194304,
+      "velloRenderReadbackP50Ms": 4.5,
+      "uploadToFabricP50Ms": 3,
+      "currentExchangeP50Ms": 7.5,
+      "sameDeviceCopyP50Ms": 2.600000023841858,
+      "cpuRoundtripP50Ms": 5.900000035762787,
+      "fabricKernelDispatchP50Ms": 2.600000023841858
+    }
+  ]
+}

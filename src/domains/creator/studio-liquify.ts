@@ -33,6 +33,9 @@
  * 들어와야 한다 — 호출부(StudioPage)가 flipNormalizedPoint로 되돌린 뒤 자연 해상도로 스케일해서 넘긴다.
  */
 import {
+  LIQUIFY_MAX_FIELD_CELLS,
+  LIQUIFY_MAX_INPUT_POINTS,
+  LIQUIFY_MAX_DISPLACEMENT_RADIUS_RATIO,
   normalizeStudioLiquifyMode,
   type StudioLiquifyBrushDynamics,
   type StudioLiquifyMode,
@@ -53,6 +56,9 @@ export {
   LIQUIFY_STABILIZER_RANGE,
   LIQUIFY_STRENGTH_DEFAULT,
   LIQUIFY_STRENGTH_RANGE,
+  LIQUIFY_MAX_FIELD_CELLS,
+  LIQUIFY_MAX_INPUT_POINTS,
+  LIQUIFY_MAX_DISPLACEMENT_RADIUS_RATIO,
   STUDIO_LIQUIFY_MODES,
   normalizeStudioLiquifyMode,
   type StudioLiquifyBrushDynamics,
@@ -80,14 +86,10 @@ export type LiquifyDisplacementOptions = StudioLiquifyBrushDynamics & {
 // 리샘플 간격 = radiusPx * 이 비율(studio-smudge.ts의 SMUDGE_STEP_RATIO와 동일한 정신 — 촘촘할수록
 // 부드럽지만 세그먼트 수가 늘어 느려진다). 병적으로 길거나 루프 도는 스트로크 방어 상한도 동일.
 const LIQUIFY_STEP_RATIO = 0.35;
-export const LIQUIFY_MAX_INPUT_POINTS = 20_000;
 export const LIQUIFY_MAX_RESAMPLED_POINTS = 2_000;
-/** dx+dy Float32Array 합계 128MiB. 입력 크기와 무관하게 단일 스트로크 할당을 유한하게 묶는다. */
-export const LIQUIFY_MAX_FIELD_CELLS = 16_777_216;
 /** 병적 장거리/반복 경로가 Worker 한 작업에서 만드는 최대 dab×셀 방문 추정치. */
 export const LIQUIFY_MAX_DAB_CELL_VISITS = 96_000_000;
 /** 여러 dab이 겹쳐도 한 번의 스트로크가 반경의 두 배보다 멀리 픽셀을 접지 않게 한다. */
-const LIQUIFY_MAX_DISPLACEMENT_RADIUS_RATIO = 2;
 const LIQUIFY_MAX_TWIRL_RADIANS = Math.PI / 3;
 const LIQUIFY_MAX_RADIAL_SCALE_DELTA = 0.45;
 
@@ -365,6 +367,18 @@ export type LiquifyDisplacementField = {
 };
 
 /**
+ * src/dst가 전체 이미지가 아닌 동일한 부분 픽셀 버퍼일 때의 전역 좌표 계약. field와 stroke는
+ * 계속 전체 canvas 좌표를 사용한다. 이 좌표계를 보존해야 ROI 실행도 전체 프레임 실행과 동일한
+ * 전역 경계 clamp 및 부동소수점 bilinear 샘플 위치를 갖는다.
+ */
+export type LiquifyImageRegion = {
+  readonly originX: number;
+  readonly originY: number;
+  readonly canvasWidth: number;
+  readonly canvasHeight: number;
+};
+
+/**
  * 스트로크 궤적 → 변위 필드. Push는 points.length<2(방향을 정할 수 없음), 그 외 모드는
  * points.length<1, radiusPx<=0, strength<=0 또는 캔버스 크기가 비정상이면 null이다.
  *
@@ -549,6 +563,40 @@ export function sampleBilinearClamped(
   return out;
 }
 
+function sampleBilinearClampedFromRegion(
+  img: StudioImageDataLike,
+  globalX: number,
+  globalY: number,
+  region: LiquifyImageRegion,
+): [number, number, number, number] {
+  if (img.width <= 0 || img.height <= 0) return [0, 0, 0, 0];
+  const sx = clampFloat(globalX, 0, region.canvasWidth - 1);
+  const sy = clampFloat(globalY, 0, region.canvasHeight - 1);
+  const globalX0 = Math.floor(sx);
+  const globalY0 = Math.floor(sy);
+  const globalX1 = Math.min(region.canvasWidth - 1, globalX0 + 1);
+  const globalY1 = Math.min(region.canvasHeight - 1, globalY0 + 1);
+  const x0 = clampInt(globalX0 - region.originX, 0, img.width - 1);
+  const y0 = clampInt(globalY0 - region.originY, 0, img.height - 1);
+  const x1 = clampInt(globalX1 - region.originX, 0, img.width - 1);
+  const y1 = clampInt(globalY1 - region.originY, 0, img.height - 1);
+  const tx = sx - globalX0;
+  const ty = sy - globalY0;
+  const i00 = (y0 * img.width + x0) * 4;
+  const i10 = (y0 * img.width + x1) * 4;
+  const i01 = (y1 * img.width + x0) * 4;
+  const i11 = (y1 * img.width + x1) * 4;
+  const out: [number, number, number, number] = [0, 0, 0, 0];
+  for (let channel = 0; channel < 4; channel += 1) {
+    const top = img.data[i00 + channel]!
+      + (img.data[i10 + channel]! - img.data[i00 + channel]!) * tx;
+    const bottom = img.data[i01 + channel]!
+      + (img.data[i11 + channel]! - img.data[i01 + channel]!) * tx;
+    out[channel] = top + (bottom - top) * ty;
+  }
+  return out;
+}
+
 /**
  * 변위 필드를 backward mapping으로 렌더 — dst의 각 필드 셀 (x,y)에 대해 src의 (x-dx, y-dy)를
  * bilinear 샘플링해 덮어쓴다. 호출 전 dst는 이미 src와 동일한 픽셀(원본 그대로)로 초기화돼 있어야
@@ -562,11 +610,18 @@ export function applyLiquifyDisplacement(
   src: StudioImageDataLike,
   dst: StudioImageDataLike,
   field: LiquifyDisplacementField,
-  options: Pick<LiquifyDisplacementOptions, "signal"> = {}
+  options: Pick<LiquifyDisplacementOptions, "signal"> & {
+    readonly region?: LiquifyImageRegion;
+  } = {}
 ): void {
   throwIfLiquifyAborted(options.signal);
-  const w = dst.width;
-  const h = dst.height;
+  const region = options.region;
+  const originX = region?.originX ?? 0;
+  const originY = region?.originY ?? 0;
+  const w = region?.canvasWidth ?? dst.width;
+  const h = region?.canvasHeight ?? dst.height;
+  const regionEndX = originX + dst.width;
+  const regionEndY = originY + dst.height;
   const fieldWidth = Number.isSafeInteger(field.width) && field.width > 0 ? field.width : 0;
   const fieldHeight = Number.isSafeInteger(field.height) && field.height > 0 ? field.height : 0;
   const expectedCells = fieldWidth * fieldHeight;
@@ -590,12 +645,15 @@ export function applyLiquifyDisplacement(
     for (let lx = 0; lx < fieldWidth; lx += 1) {
       const x = field.originX + lx;
       if (x < 0 || x >= w) continue;
+      if (x < originX || x >= regionEndX || y < originY || y >= regionEndY) continue;
       const idx = rowOffset + lx;
       const ddx = field.dx[idx]!;
       const ddy = field.dy[idx]!;
       if (!Number.isFinite(ddx) || !Number.isFinite(ddy) || (ddx === 0 && ddy === 0)) continue;
-      const [r, g, b, a] = sampleBilinearClamped(src, x - ddx, y - ddy);
-      const dstIdx = (y * w + x) * 4;
+      const [r, g, b, a] = region
+        ? sampleBilinearClampedFromRegion(src, x - ddx, y - ddy, region)
+        : sampleBilinearClamped(src, x - ddx, y - ddy);
+      const dstIdx = ((y - originY) * dst.width + (x - originX)) * 4;
       dst.data[dstIdx] = r;
       dst.data[dstIdx + 1] = g;
       dst.data[dstIdx + 2] = b;

@@ -12,14 +12,11 @@ import {
   useEffectEvent,
   useRef,
   useState,
+  type CSSProperties,
   type ReactElement,
   type RefObject,
 } from "react";
 
-import {
-  browserStudioCreatorPackStorage,
-  listStudioCreatorFilterPresets,
-} from "./studio-creator-filter-preset-reader";
 import {
   createStudioEffectId,
   isStudioEffectFavorite,
@@ -38,6 +35,14 @@ import {
   type StudioFilterCatalogGroup,
   type StudioFilterDialogCatalogEntry,
 } from "./studio-filter-catalog";
+import {
+  acquireProductFilterLibraryRepository,
+  subscribeStudioFilterLibraryChanges,
+  type ProductFilterLibraryAuthority,
+  type ProductFilterLibraryRepository,
+  type StudioFilterLibraryPage,
+  type StudioFilterLibraryPreset,
+} from "./studio-filter-library-sqlite-repository";
 import {
   STUDIO_FILTER_LABELS,
   cloneStudioFilterDraft,
@@ -71,6 +76,8 @@ import { buttonClass } from "@/components/ui/button-utils";
 import { cn } from "@/lib/utils";
 
 type FilterPatch = Partial<ImageFilterFields>;
+
+const STUDIO_FILTER_LIBRARY_DIALOG_PAGE_SIZE = 128;
 
 export type StudioFilterApplicationScope = "whole" | StudioSelectionFilterMaskScope;
 
@@ -155,6 +162,8 @@ interface StudioFilterDialogProps {
     scope: StudioFilterApplicationScope,
   ) => void;
   onClose: () => void;
+  /** Tests may inject a repository; product defaults to the shared OPFS SQLite runtime. */
+  acquireFilterLibrary?: () => Promise<ProductFilterLibraryRepository>;
 }
 
 interface NumberControlProps {
@@ -334,6 +343,80 @@ function defaultDraft(kind: StudioFilterKind): StudioFilterDraft {
   return createStudioFilterDraft(kind, {});
 }
 
+/** 상단 메뉴·툴바처럼 원고 단축키를 삼키는 표면. 여기로 포커스를 돌려주면 ⌘Z가 죽는다. */
+const STUDIO_SHORTCUT_BOUNDARY_SELECTOR =
+  "[data-studio-shortcut-boundary='true'], [aria-modal='true']";
+
+/** 스크림 자체의 페인트 — 위치는 밴드마다 인라인 style이 정한다. */
+const STUDIO_FILTER_SCRIM_PAINT =
+  "absolute bg-[oklch(0.08_0.01_70/0.78)] backdrop-blur-sm";
+
+interface StudioFilterPreviewCutout {
+  height: number;
+  left: number;
+  top: number;
+  width: number;
+}
+
+function sameCutout(
+  left: StudioFilterPreviewCutout | null,
+  right: StudioFilterPreviewCutout | null,
+): boolean {
+  if (left === null || right === null) return left === right;
+  return (
+    left.top === right.top &&
+    left.left === right.left &&
+    left.width === right.width &&
+    left.height === right.height
+  );
+}
+
+/** 뷰포트 좌표 사각형을 정수 px로 스냅한다(서브픽셀 잔상 방지). */
+function cutoutFromRect(rect: DOMRect): StudioFilterPreviewCutout | null {
+  if (!(rect.width > 0) || !(rect.height > 0)) return null;
+  const top = Math.floor(rect.top);
+  const left = Math.floor(rect.left);
+  return {
+    height: Math.ceil(rect.bottom) - top,
+    left,
+    top,
+    width: Math.ceil(rect.right) - left,
+  };
+}
+
+/**
+ * 캔버스 구멍을 뺀 스크림 밴드(위/아래/왼/오른). 모달 바깥이 비활성이라는 신호는 그대로 두면서
+ * 풀해상도로 계산된 미리보기를 아티스트가 실제로 볼 수 있게 캔버스 영역만 칠하지 않는다.
+ */
+function studioFilterScrimBands(
+  cutout: StudioFilterPreviewCutout,
+): readonly { key: string; style: CSSProperties }[] {
+  const bottom = cutout.top + cutout.height;
+  const right = cutout.left + cutout.width;
+  return [
+    { key: "top", style: { top: 0, left: 0, right: 0, height: Math.max(0, cutout.top) } },
+    { key: "bottom", style: { top: Math.max(0, bottom), left: 0, right: 0, bottom: 0 } },
+    {
+      key: "left",
+      style: {
+        top: Math.max(0, cutout.top),
+        left: 0,
+        width: Math.max(0, cutout.left),
+        height: cutout.height,
+      },
+    },
+    {
+      key: "right",
+      style: {
+        top: Math.max(0, cutout.top),
+        left: Math.max(0, right),
+        right: 0,
+        height: cutout.height,
+      },
+    },
+  ].filter((band) => band.style.height !== 0 && band.style.width !== 0);
+}
+
 export function StudioFilterDialog({
   activeKey,
   kind,
@@ -351,6 +434,7 @@ export function StudioFilterDialog({
   onPreview,
   onApply,
   onClose,
+  acquireFilterLibrary = acquireProductFilterLibraryRepository,
 }: StudioFilterDialogProps): ReactElement {
   const dialogRef = useRef<HTMLElement>(null);
   // 히스토그램 원본 — src 키 LRU 캐시(디코드는 다이얼로그 세션당 최대 1회).
@@ -375,9 +459,20 @@ export function StudioFilterDialog({
       studioFilterEffectId(kind),
     ),
   );
-  const [installedCreatorPresets] = useState(() =>
-    listStudioCreatorFilterPresets(browserStudioCreatorPackStorage()),
-  );
+  const [installedCreatorPresets, setInstalledCreatorPresets] = useState<
+    readonly StudioFilterLibraryPreset[]
+  >([]);
+  const [filterLibraryCursor, setFilterLibraryCursor] = useState<
+    StudioFilterLibraryPage["nextCursor"]
+  >(null);
+  const [filterLibraryHasMore, setFilterLibraryHasMore] = useState(false);
+  const [filterLibraryTotalCount, setFilterLibraryTotalCount] = useState(0);
+  const [filterLibraryPageLoading, setFilterLibraryPageLoading] = useState(false);
+  const filterLibraryProductRef = useRef<ProductFilterLibraryRepository | null>(null);
+  const filterLibraryQueryGenerationRef = useRef(0);
+  const [filterLibraryAuthority, setFilterLibraryAuthority] = useState<
+    ProductFilterLibraryAuthority | "loading" | "error"
+  >("loading");
   const installedPackPresets = isStudioFilterPackKind(activeKind)
     ? installedCreatorPresets.filter((preset) => preset.engine === activeKind)
     : [];
@@ -387,17 +482,162 @@ export function StudioFilterDialog({
     effectFavoriteState,
   );
   const reportPreview = useEffectEvent(onPreview);
+  // 미리보기가 켜져 있을 때 스크림에서 제외할 캔버스 영역(뷰포트 좌표). 측정 불가면 null → 통짜 스크림.
+  const [previewCutout, setPreviewCutout] = useState<StudioFilterPreviewCutout | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const generation = filterLibraryQueryGenerationRef.current + 1;
+    filterLibraryQueryGenerationRef.current = generation;
+    async function loadInstalledPresets(): Promise<void> {
+      if (!isStudioFilterPackKind(activeKind)) {
+        setInstalledCreatorPresets([]);
+        setFilterLibraryCursor(null);
+        setFilterLibraryHasMore(false);
+        setFilterLibraryTotalCount(0);
+        return;
+      }
+      setFilterLibraryAuthority("loading");
+      try {
+        const product = await acquireFilterLibrary();
+        const page = await product.repository.query({
+          cursor: null,
+          engine: activeKind,
+          limit: STUDIO_FILTER_LIBRARY_DIALOG_PAGE_SIZE,
+        });
+        if (!active || filterLibraryQueryGenerationRef.current !== generation) return;
+        filterLibraryProductRef.current = product;
+        setInstalledCreatorPresets(page.items);
+        setFilterLibraryCursor(page.nextCursor);
+        setFilterLibraryHasMore(page.hasMore);
+        setFilterLibraryTotalCount(page.totalCount);
+        setFilterLibraryAuthority(product.authority);
+      } catch {
+        if (!active || filterLibraryQueryGenerationRef.current !== generation) return;
+        setInstalledCreatorPresets([]);
+        setFilterLibraryCursor(null);
+        setFilterLibraryHasMore(false);
+        setFilterLibraryTotalCount(0);
+        setFilterLibraryAuthority("error");
+      }
+    }
+    void loadInstalledPresets();
+    const unsubscribe = subscribeStudioFilterLibraryChanges(() => {
+      void loadInstalledPresets();
+    });
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [acquireFilterLibrary, activeKind]);
+
+  async function loadMoreInstalledFilterPresets(): Promise<void> {
+    if (
+      filterLibraryPageLoading
+      || !filterLibraryHasMore
+      || filterLibraryCursor === null
+      || !isStudioFilterPackKind(activeKind)
+    ) return;
+    const product = filterLibraryProductRef.current;
+    if (!product) return;
+    const generation = filterLibraryQueryGenerationRef.current;
+    setFilterLibraryPageLoading(true);
+    try {
+      const page = await product.repository.query({
+        cursor: filterLibraryCursor,
+        engine: activeKind,
+        limit: STUDIO_FILTER_LIBRARY_DIALOG_PAGE_SIZE,
+      });
+      if (filterLibraryQueryGenerationRef.current !== generation) return;
+      setInstalledCreatorPresets((current) => {
+        const ids = new Set(current.map((preset) => preset.id));
+        return [...current, ...page.items.filter((preset) => !ids.has(preset.id))];
+      });
+      setFilterLibraryCursor(page.nextCursor);
+      setFilterLibraryHasMore(page.hasMore);
+      setFilterLibraryTotalCount(page.totalCount);
+    } catch {
+      if (filterLibraryQueryGenerationRef.current === generation) {
+        setFilterLibraryAuthority("error");
+      }
+    } finally {
+      if (filterLibraryQueryGenerationRef.current === generation) {
+        setFilterLibraryPageLoading(false);
+      }
+    }
+  }
 
   useStudioModalSheet({
     activeKey,
     dialogRef,
     onDismiss: onClose,
     resolveInitialFocus: (dialog) => dialog.querySelector<HTMLElement>("[data-autofocus='true']"),
+    /**
+     * 이 다이얼로그는 상단 메뉴에서 열리고, 메뉴 트리거는 단축키 경계 안에 있다. 기본 복귀 규칙대로
+     * 트리거로 포커스를 돌려주면 이미 닫힌 메뉴가 키보드 소유권을 쥐고 적용 직후 ⌘Z가 통째로 막힌다.
+     * 모달은 "연 자리"로 돌아가야 하고 여기서 그 자리는 작업 캔버스다.
+     */
+    resolveReturnFocus: () => {
+      const root = rootRef.current;
+      const ownerDocument = root?.ownerDocument ?? globalThis.document ?? null;
+      if (!ownerDocument) return null;
+      const launcher = ownerDocument.activeElement;
+      const launcherSwallowsShortcuts =
+        launcher !== null &&
+        typeof (launcher as HTMLElement).closest === "function" &&
+        (launcher as HTMLElement).closest(STUDIO_SHORTCUT_BOUNDARY_SELECTOR) !== null;
+      if (!launcherSwallowsShortcuts) return null;
+      return (root ?? ownerDocument).querySelector<HTMLElement>(
+        "[data-studio-canvas-viewport]",
+      );
+    },
     rootRef,
   });
 
   useEffect(() => {
-    reportPreview(previewEnabled ? studioFilterDraftToPatch(draft) : null);
+    if (!previewEnabled) {
+      setPreviewCutout(null);
+      return;
+    }
+    const root = rootRef.current;
+    const ownerDocument = root?.ownerDocument ?? globalThis.document ?? null;
+    const view = ownerDocument?.defaultView ?? null;
+    const viewport = (root ?? ownerDocument)?.querySelector<HTMLElement>(
+      "[data-studio-canvas-viewport]",
+    );
+    if (!view || !viewport) return;
+    let frame: number | null = null;
+    const measure = () => {
+      frame = null;
+      const next = cutoutFromRect(viewport.getBoundingClientRect());
+      setPreviewCutout((current) => (sameCutout(current, next) ? current : next));
+    };
+    const schedule = () => {
+      if (frame !== null) return;
+      frame = view.requestAnimationFrame(measure);
+    };
+    measure();
+    const observer =
+      typeof view.ResizeObserver === "function" ? new view.ResizeObserver(schedule) : null;
+    observer?.observe(viewport);
+    view.addEventListener("resize", schedule);
+    view.addEventListener("scroll", schedule, true);
+    return () => {
+      if (frame !== null) view.cancelAnimationFrame(frame);
+      observer?.disconnect();
+      view.removeEventListener("resize", schedule);
+      view.removeEventListener("scroll", schedule, true);
+    };
+  }, [previewEnabled, rootRef]);
+
+  useEffect(() => {
+    let frameId: number | null = null;
+    frameId = requestAnimationFrame(() => {
+      reportPreview(previewEnabled ? studioFilterDraftToPatch(draft) : null);
+    });
+    return () => {
+      if (frameId !== null) cancelAnimationFrame(frameId);
+    };
   }, [draft, previewEnabled]);
 
   useEffect(() => {
@@ -450,14 +690,38 @@ export function StudioFilterDialog({
 
   return (
     <div className="fixed inset-0 z-[80] grid place-items-center p-2 sm:p-4">
+      {/*
+        스크림은 페인트만 밴드로 쪼갠다 — 클릭 캐처는 여전히 화면 전체를 덮는 이 버튼 하나이므로
+        캔버스 구멍을 클릭해도 예전과 똑같이 다이얼로그가 닫히고, 뒤 캔버스로 입력이 새지 않는다.
+      */}
       <button
         type="button"
         tabIndex={-1}
         aria-hidden="true"
         data-studio-modal-backdrop="true"
+        data-studio-filter-preview-cutout={previewCutout ? "true" : undefined}
         onClick={onClose}
-        className="absolute inset-0 cursor-default bg-[oklch(0.08_0.01_70/0.78)] backdrop-blur-sm"
-      />
+        className="absolute inset-0 cursor-default"
+      >
+        {previewCutout ? (
+          <>
+            {studioFilterScrimBands(previewCutout).map((band) => (
+              <span key={band.key} className={STUDIO_FILTER_SCRIM_PAINT} style={band.style} />
+            ))}
+            <span
+              className="absolute rounded-sm ring-1 ring-accent/45"
+              style={{
+                top: previewCutout.top,
+                left: previewCutout.left,
+                width: previewCutout.width,
+                height: previewCutout.height,
+              }}
+            />
+          </>
+        ) : (
+          <span className={cn(STUDIO_FILTER_SCRIM_PAINT, "inset-0")} />
+        )}
+      </button>
       <section
         ref={dialogRef}
         role="dialog"
@@ -679,16 +943,38 @@ export function StudioFilterDialog({
 
             {isStudioFilterPackDraft(draft) ? (
               <>
+                <p
+                  role={filterLibraryAuthority === "error" ? "alert" : "status"}
+                  data-studio-filter-library-authority={filterLibraryAuthority}
+                  className={cn(
+                    "rounded-lg border px-3 py-2 text-[0.64rem] font-semibold",
+                    filterLibraryAuthority === "error"
+                      ? "border-bad/30 bg-bad/10 text-bad"
+                      : "border-line bg-card/70 text-fg-3",
+                  )}
+                >
+                  {filterLibraryAuthority === "sqlite"
+                    ? `${filterLibraryTotalCount}개 · 무제한 · 로컬 SQL`
+                    : filterLibraryAuthority === "memory-session"
+                      ? `${filterLibraryTotalCount}개 · 비영속 메모리 세션 · 브라우저 종료 시 사라짐`
+                      : filterLibraryAuthority === "error"
+                        ? "필터 카탈로그 SQL을 읽지 못했습니다. 기존 데이터로 조용히 강등하지 않았습니다."
+                        : "로컬 SQL 필터 카탈로그 연결 중…"}
+                </p>
                 {installedPackPresets.length > 0 ? (
                   <section
                     aria-label="설치한 Creator Pack 필터 프리셋"
                     className="rounded-lg border border-accent/25 bg-accent-soft/35 p-2.5"
                   >
                     <p className="text-[0.68rem] font-bold text-fg">
-                      설치한 Creator Pack 프리셋
+                      {filterLibraryAuthority === "memory-session"
+                        ? "현재 세션 Creator Pack 필터 프리셋"
+                        : "설치한 Creator Pack 필터 프리셋"}
                     </p>
                     <p className="mt-0.5 text-[0.62rem] leading-relaxed text-fg-3">
-                      선택하면 현재 다이얼로그 값과 비파괴 미리보기에 즉시 반영됩니다.
+                      {filterLibraryAuthority === "memory-session"
+                        ? "현재 세션에만 유지됩니다. 선택하면 비파괴 미리보기에 즉시 반영됩니다."
+                        : "선택하면 현재 다이얼로그 값과 비파괴 미리보기에 즉시 반영됩니다."}
                     </p>
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {installedPackPresets.map((preset) => (
@@ -709,6 +995,22 @@ export function StudioFilterDialog({
                         </button>
                       ))}
                     </div>
+                    {filterLibraryHasMore ? (
+                      <button
+                        type="button"
+                        disabled={filterLibraryPageLoading}
+                        onClick={() => void loadMoreInstalledFilterPresets()}
+                        className={cn(
+                          "mt-2 min-h-11 rounded-lg border border-line bg-card px-3 text-[0.68rem] font-semibold text-fg-2 hover:border-accent/45 hover:bg-raised disabled:cursor-wait disabled:opacity-60",
+                          STUDIO_EASE,
+                          STUDIO_FOCUS_RING,
+                        )}
+                      >
+                        {filterLibraryPageLoading
+                          ? "프리셋 불러오는 중…"
+                          : `더 불러오기 (${installedCreatorPresets.length}/${filterLibraryTotalCount})`}
+                      </button>
+                    ) : null}
                   </section>
                 ) : null}
                 {isStudioFilterUnionWaveKind(draft.kind) ? (

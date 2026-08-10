@@ -5,6 +5,8 @@ import {
   fingerprintStudioVectorReference,
   materializeStudioAdvancedFillVectorTarget,
   planStudioAdvancedFillVectorTarget,
+  prepareStudioVectorReferenceExport,
+  renderPreparedStudioVectorReference,
   renderStudioAdvancedFillVectorReference,
   renderStudioVectorReference,
   StudioVectorReferenceError,
@@ -311,6 +313,72 @@ describe("renderStudioAdvancedFillVectorReference", () => {
 });
 
 describe("renderStudioVectorReference generic seam", () => {
+  it("keeps the exact pressure-outline export in the prepared intermediate", async () => {
+    const stroke = draw("prepared-gpen-outline");
+    const exportInput = {
+      width: 320,
+      height: 240,
+      elements: [stroke],
+      transparentBg: true,
+    } as const;
+    const expected = exportPageToSvg(exportInput);
+    const prepared = await prepareStudioVectorReferenceExport(exportInput, {
+      workerFactory: null,
+    });
+
+    expect(prepared.result).toEqual(expected);
+    expect(prepared.result.skipped).toEqual([]);
+    expect(prepared.result.svg).toMatch(/<(?:path|image)\b/u);
+  });
+
+  it("rasterizes the exact prepared export without running a second serialization phase", async () => {
+    const text: Extract<El, { type: "text" }> = {
+      id: "prepared-title",
+      type: "text",
+      text: "한 번만 직렬화",
+      x: 12,
+      y: 18,
+      width: 180,
+      fontSize: 24,
+      fill: "#111111",
+      rotation: 0,
+    };
+    const prepared = await prepareStudioVectorReferenceExport({
+      width: 320,
+      height: 240,
+      elements: [text],
+      fingerprintNamespace: "prepared-vector-v1",
+    }, { workerFactory: null });
+    const rasterize = vi.fn(rasterizer());
+
+    const result = await renderPreparedStudioVectorReference(prepared, { rasterize });
+
+    expect(rasterize).toHaveBeenCalledOnce();
+    expect(rasterize.mock.calls[0]?.[0].svg).toBe(prepared.result.svg);
+    expect(prepared.result.svg).toContain("한 번만 직렬화");
+    expect(result.fingerprint).toBe(
+      fingerprintStudioVectorReference(prepared.result.svg, "prepared-vector-v1"),
+    );
+    expect(result.execution).toBe(prepared.execution);
+  });
+
+  it("can abort between prepared export and rasterization without touching the rasterizer", async () => {
+    const prepared = await prepareStudioVectorReferenceExport({
+      width: 320,
+      height: 240,
+      elements: [draw("abort-between-phases")],
+    }, { workerFactory: null });
+    const controller = new AbortController();
+    const rasterize = vi.fn(rasterizer());
+    controller.abort();
+
+    await expect(renderPreparedStudioVectorReference(prepared, {
+      signal: controller.signal,
+      rasterize,
+    })).rejects.toMatchObject({ name: "AbortError", code: "aborted" });
+    expect(rasterize).not.toHaveBeenCalled();
+  });
+
   it("lets later attachment-less filters select a different explicit vector subset", async () => {
     const text: Extract<El, { type: "text" }> = {
       id: "title",

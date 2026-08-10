@@ -11,10 +11,18 @@ import {
   type StudioLivingInkExecutionReceipt,
 } from "./studio-living-ink-execution-protocol";
 import {
-  studioLivingInkOpticalDensityFromReflectance,
+  studioLivingInkChromaBleedMultipliers,
+  studioLivingInkDepositionPathLength,
+  studioLivingInkMeanMarkRadius,
+  studioLivingInkPigmentCoatFactor,
+  studioLivingInkPigmentDiffusionRates,
+  studioLivingInkPigmentOpticalDensity,
+  STUDIO_LIVING_INK_PIGMENT_COAT,
+  STUDIO_LIVING_INK_SURFACE_COVERAGE,
   STUDIO_LIVING_INK_WHITE_GOUACHE_EXTINCTION,
   STUDIO_LIVING_INK_WHITE_GOUACHE_LOAD_GAIN,
 } from "./studio-living-ink-field";
+import { studioLivingInkVelocityDampingForStep } from "./studio-living-ink-wgsl-shaders";
 import { sha256HexPortable } from "./studio-sha256";
 
 import type {
@@ -311,6 +319,13 @@ uniform float bleed;
 uniform float chromatography;
 uniform float capillaryTransport;
 uniform float edgeDeposition;
+// Active brush footprint (uv center + radius in aspect-corrected space). radius <= 0 disables.
+uniform vec3 brushFootprint;
+uniform float aspect;
+// Channel bleed rates from studioLivingInkChromaBleedMultipliers / pigmentDiffusionRates (TS).
+uniform vec3 chromaMultipliers;
+uniform vec4 separatedDiffusionQuiet;
+uniform vec4 separatedDiffusionTip;
 void main(){
   vec4 current = texture(pigmentTexture, uv);
   float wetness = texture(wetTexture, uv).r;
@@ -323,19 +338,23 @@ void main(){
   float wetUpper = texture(wetTexture, uv + vec2(0.0, fineTexel.y)).r;
   vec2 wetGradient = 0.5 * vec2(wetRight - wetLeft, wetUpper - wetLower);
   vec2 towardWetCenter = normalize(wetGradient + vec2(1e-6));
-  vec2 capillaryBacktrace = towardWetCenter * fineTexel
-    * (0.22 + capillaryTransport * 0.68) * mobility;
+  float capillaryReach = 0.22 + capillaryTransport * 0.68;
+  vec2 capillaryBacktrace = towardWetCenter * fineTexel * capillaryReach * mobility;
   vec2 baseOrigin = clamp(
     uv - velocity * dt * mobility + capillaryBacktrace,
     vec2(0.0),
     vec2(1.0)
   );
+  // InkWash §06 chemistry: channel-asymmetric advection samples + TS-uploaded diffusion rates so
+  // wet edges chromatograph into a dark core with a cool halo rather than a monochrome blur.
+  float C = clamp(chromatography, 0.0, 1.0);
+  vec3 chroma = chromaMultipliers;
   vec2 separationDirection = normalize(velocity + wetGradient * 4.0 + vec2(1e-5));
   vec2 chromaShift = separationDirection
-    * fineTexel * chromatography * mobility * dt * 20.0;
-  float red = texture(pigmentTexture, clamp(baseOrigin - chromaShift, vec2(0.0), vec2(1.0))).r;
-  float green = texture(pigmentTexture, baseOrigin).g;
-  float blue = texture(pigmentTexture, clamp(baseOrigin + chromaShift * 1.35, vec2(0.0), vec2(1.0))).b;
+    * fineTexel * C * mobility * dt * 20.0;
+  float red = texture(pigmentTexture, clamp(baseOrigin - chromaShift * chroma.r, vec2(0.0), vec2(1.0))).r;
+  float green = texture(pigmentTexture, clamp(baseOrigin - chromaShift * chroma.g * 0.15, vec2(0.0), vec2(1.0))).g;
+  float blue = texture(pigmentTexture, clamp(baseOrigin + chromaShift * chroma.b * 1.35, vec2(0.0), vec2(1.0))).b;
   float white = texture(pigmentTexture, baseOrigin).a;
   vec4 transported = vec4(red, green, blue, white);
   vec2 axialTexel = fineTexel * (1.0 + bleed * 3.8);
@@ -353,14 +372,19 @@ void main(){
     texture(pigmentTexture, baseOrigin - diagonalTexel)
   );
   vec4 neighbors = mix(axialNeighbors, diagonalNeighbors, 0.5);
-  // Diffusion is a rate, not a per-frame blend. Scaling by fixed dt prevents a wet stroke from
-  // exploding into folded directional wedges as settle ticks accumulate.
-  float diffusion = clamp(bleed * mobility * dt * 9.0, 0.0, 0.2);
-  vec4 separatedDiffusion = vec4(
-    clamp(diffusion * (1.0 + chromatography * 0.55), 0.0, 0.9),
-    clamp(diffusion, 0.0, 0.9),
-    clamp(diffusion * (1.0 - chromatography * 0.35), 0.0, 0.9),
-    clamp(diffusion * 0.45, 0.0, 0.6)
+  // Scrubbing under the active brush accelerates bleed. Rates are computed in TS
+  // (studioLivingInkPigmentDiffusionRates) for footprint 0 and 1, then mixed by the tip gaussian.
+  float brush = 0.0;
+  if (brushFootprint.z > 0.0){
+    vec2 brushDelta = uv - brushFootprint.xy;
+    brushDelta.x *= aspect;
+    brush = exp(-dot(brushDelta, brushDelta) / max(brushFootprint.z * brushFootprint.z, 1e-8));
+  }
+  // Rates are precomputed at mobility=1; scale by local wet mobility so dry paper stays frozen.
+  vec4 separatedDiffusion = clamp(
+    mix(separatedDiffusionQuiet, separatedDiffusionTip, brush) * mobility,
+    vec4(0.0),
+    vec4(0.92)
   );
   vec4 evolved = mix(transported, neighbors, separatedDiffusion);
   float wetGradientStrength = length(wetGradient);
@@ -371,6 +395,51 @@ void main(){
   evolved.rgb *= 1.0 + edgePool * dt * 2.4;
   float saturatedWashCenter = smoothstep(0.26, 0.7, wetness);
   evolved.rgb *= 1.0 - bleed * saturatedWashCenter * dt * 0.42;
+  // Deegan transport (the "coffee ring") — why a dwell mark must empty its own centre.
+  // capillaryBacktrace above already carries pigment down the wetness gradient: water leaving the
+  // puddle to replace what evaporates at the pinned front drags its suspended pigment outward.
+  // But pigment here is an *areal density*, and semi-Lagrangian advection transports a sampled
+  // value, which silently drops the compressibility term of the conservation law
+  //   dc/dt = -c * div(u).
+  // For a radial dwell flow div(u) > 0 everywhere inside the front (the same annulus of water
+  // spreads over a larger circumference), so omitting it is exactly what leaves the darkest
+  // pigment sitting dead centre and reads as an ink dot instead of a wash. The velocity solver
+  // cannot supply this term either: an evaporation-driven flux is divergent by construction —
+  // mass leaves the film as vapour, not sideways — and pressure projection deletes precisely that
+  // component. So it belongs here, on the pigment field.
+  //
+  // The divergence of that displacement field d = A*n is available almost for free, and it splits
+  // into exactly the two things a wash does:
+  //   div(d) = A * div(n)      geometric spreading — the same ring of water covers a longer
+  //                            circumference as it moves out, so the interior thins. This is the
+  //                            term that stops a dwell mark from reading as a dot.
+  //          + grad(A) . n     deceleration — transport weakens as the film thins toward the
+  //                            front, so pigment piles into the drying edge (the hard rim).
+  // div(n) is the curvature of the wet level set, (laplacian(wet) - d2wet/dn2) / |grad wet|, and
+  // equals -1/r around a round dwell mark, so it is singular at the crest of a puddle. The bound
+  // below is not cosmetic: the wet pass advances its capillary front with a stencil several texels
+  // wide (parallelReach and its far probe), so a front curvature tighter than roughly twice that
+  // reach is not represented in the wetness field at all — measuring it there returns paper grain,
+  // not surface shape, and would turn fibre noise into a pigment sink.
+  // grad(A).n reduces to reach * dMobility/dWet * |grad wet|, because A varies only through the
+  // mobility ramp and n is the unit wetness gradient.
+  float wetLaplacian = wetLeft + wetRight + wetLower + wetUpper - 4.0 * wetness;
+  vec2 frontNormalStep = towardWetCenter * fineTexel;
+  float wetSecondDerivativeAlongNormal =
+    texture(wetTexture, clamp(uv + frontNormalStep, vec2(0.0), vec2(1.0))).r
+    + texture(wetTexture, clamp(uv - frontNormalStep, vec2(0.0), vec2(1.0))).r
+    - 2.0 * wetness;
+  float resolvedFrontCurvature = 0.08;
+  float frontCurvature = clamp(
+    (wetLaplacian - wetSecondDerivativeAlongNormal) / max(wetGradientStrength, 1e-5),
+    -resolvedFrontCurvature,
+    resolvedFrontCurvature
+  );
+  float mobilityRamp = clamp((wetness - 0.015) / 0.445, 0.0, 1.0);
+  float mobilitySlope = 6.0 * mobilityRamp * (1.0 - mobilityRamp) / 0.445;
+  float displacementDivergence = capillaryReach
+    * (mobility * frontCurvature + mobilitySlope * wetGradientStrength);
+  evolved.rgb *= clamp(1.0 + displacementDivergence, 0.8, 1.3);
   // Advection is a rate over the fixed step. Replacing most of the pigment texture every tick
   // bleaches the water path and piles all colour at the two ends of a stroke. A dt-scaled blend
   // retains resident pigment while still moving a bounded fraction toward the capillary front.
@@ -622,7 +691,24 @@ void main(){
     * wetGate * clamp(wetGradient * 6.0, 0.0, 1.0);
   vec2 centered = uv - vec2(0.5);
   color *= 1.0 - dot(centered, centered) * vignetteAmount;
-  outColor = vec4(clamp(color, vec3(0.0), vec3(1.0)), 1.0);
+  // Paper is paper only where the wash is. This surface is committed to the document as a
+  // page-sized layer, so an opaque sheet repaints the whole page — one stroke used to turn a
+  // 1440x2160 export from pure white to warm cream everywhere, baked into the delivered PNG.
+  // Presence is the union of pigment, opaque white and standing water, so every mark the resolve
+  // can draw still carries its own fibre, tooth and granulation, and nothing else does.
+  float washPresence = 1.0 - exp(-${STUDIO_LIVING_INK_SURFACE_COVERAGE.presenceGain.toFixed(1)} * (
+    max(max(opticalDensity.r, opticalDensity.g), opticalDensity.b)
+    + clamp(mobileWhiteCoverage, 0.0, 1.0)
+    + wetGate
+  ));
+  vec3 shown = mix(vec3(1.0), clamp(color, vec3(0.0), vec3(1.0)), clamp(washPresence, 0.0, 1.0));
+  // Un-premultiply against the page so compositing this layer back over white reproduces "shown"
+  // exactly, and so the layer's multiply blend reads as backdrop * shown over artwork underneath.
+  float surfaceAlpha = 1.0 - min(shown.r, min(shown.g, shown.b));
+  vec3 straight = surfaceAlpha > ${STUDIO_LIVING_INK_SURFACE_COVERAGE.alphaEpsilon}
+    ? (shown - vec3(1.0 - surfaceAlpha)) / surfaceAlpha
+    : vec3(1.0);
+  outColor = vec4(clamp(straight, vec3(0.0), vec3(1.0)), surfaceAlpha);
 }`;
 
 function integer(value: unknown, minimum: number, maximum: number): value is number {
@@ -877,13 +963,32 @@ export class StudioLivingInkWebGl2Runtime {
   private disposed = false;
   private passCount = 0;
   private fixSelectionEnabled = false;
+  /** Avoid allocating and uploading a full 1024² mask for the overwhelmingly common no-selection stroke. */
+  private selectionTextureHasFullCoverage = true;
+  /** Active brush footprint in field-cell space; radiusCells <= 0 disables scrubbing boost. */
+  private brushFootprint: Readonly<{ x: number; y: number; radiusCells: number }> = Object.freeze({
+    x: 0,
+    y: 0,
+    radiusCells: 0,
+  });
+  /**
+   * Last deposited ink mark, kept across operations so a batch knows the path length it covers.
+   *
+   * Product code forwards a stroke as a run of suffix operations, so the distance a batch actually
+   * travels includes the gap back to the previous batch's last mark. Journal replay applies the same
+   * operations in the same order, so this stays deterministic.
+   */
+  private lastInkMark: Readonly<{ x: number; y: number }> | null = null;
 
   constructor(config: StudioLivingInkExecutionConfig) {
     validateStudioLivingInkExecutionConfig(config);
     this.config = Object.freeze({ ...config });
     this.canvas = new OffscreenCanvas(config.displayWidth, config.displayHeight);
     const gl = this.canvas.getContext("webgl2", {
-      alpha: false,
+      // The resolve writes wash coverage in alpha so an untouched page stays transparent; the
+      // transferred ImageBitmap has to carry it, and it is authored straight, not premultiplied.
+      alpha: true,
+      premultipliedAlpha: false,
       antialias: false,
       depth: false,
       desynchronized: true,
@@ -909,12 +1014,16 @@ export class StudioLivingInkWebGl2Runtime {
       worker: true,
       offscreenCanvas: true,
       webgl2: true,
+      webgpu: false,
       halfFloatRenderable: true,
       rgba16Float: true,
       rg16Float: true,
       r16Float: true,
       maximumTextureSize,
-      pressureIterations: Object.freeze({ interactive: 10, settle: 22 }),
+      pressureIterations: Object.freeze({
+        interactive: STUDIO_LIVING_INK_EXECUTION_LIMITS.interactivePressureIterations,
+        settle: STUDIO_LIVING_INK_EXECUTION_LIMITS.settlePressureIterations,
+      }),
     });
     const aspect = config.fieldWidth / config.fieldHeight;
     if (aspect >= 1) {
@@ -1007,11 +1116,19 @@ export class StudioLivingInkWebGl2Runtime {
     }
   }
 
+  /**
+   * Drain GL errors. `gl.getError()` is a full GPU pipeline sync — calling it after every pass
+   * made interactive strokes hitch hard. Only call at high-level stage boundaries.
+   */
   private assertNoGlError(stage: string): void {
-    const error = this.gl.getError();
-    if (error !== this.gl.NO_ERROR) {
-      throw new Error(`Living Ink WebGL error ${error} during ${stage}.`);
+    const gl = this.gl;
+    const first = gl.getError();
+    if (first === gl.NO_ERROR) return;
+    // Drain the error queue so a sticky flag does not poison the next frame.
+    while (gl.getError() !== gl.NO_ERROR) {
+      /* drain */
     }
+    throw new Error(`Living Ink WebGL error ${first} during ${stage}.`);
   }
 
   private readonly onContextLost = (event: Event): void => {
@@ -1062,13 +1179,18 @@ export class StudioLivingInkWebGl2Runtime {
     this.clearSurface(this.resources.divergence);
     this.clearSurface(this.resources.curl);
     this.clearSurface(this.resources.selection, 1);
+    this.selectionTextureHasFullCoverage = true;
     this.dirtyBounds = null;
+    this.lastInkMark = null;
   }
 
   private uploadSelection(selection: StudioLivingInkSelectionMask | null): boolean {
     const gl = this.gl;
     const width = this.config.fieldWidth;
     const height = this.config.fieldHeight;
+    // Full coverage is the steady-state path for ordinary strokes. Avoid allocating and uploading
+    // the same width×height 255 mask for every operation; selected edits still invalidate this bit.
+    if (!selection && this.selectionTextureHasFullCoverage) return false;
     const pixels = new Uint8Array(width * height);
     if (!selection) {
       pixels.fill(255);
@@ -1088,6 +1210,7 @@ export class StudioLivingInkWebGl2Runtime {
     gl.bindTexture(gl.TEXTURE_2D, this.resources.selection.texture);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, width, height, gl.RED, gl.UNSIGNED_BYTE, pixels);
+    this.selectionTextureHasFullCoverage = selection === null;
     return selection !== null;
   }
 
@@ -1194,6 +1317,10 @@ export class StudioLivingInkWebGl2Runtime {
     }
     const selectionEnabled = this.uploadSelection(operation.selection);
     if (operation.kind === "ink") this.clearDouble(this.resources.strokeDeposit);
+    const coat = studioLivingInkPigmentCoatFactor(
+      studioLivingInkDepositionPathLength(operation.marks, this.lastInkMark),
+      studioLivingInkMeanMarkRadius(operation.marks),
+    );
     let previousX: number | null = null;
     let previousY: number | null = null;
     let previousRadius: number | null = null;
@@ -1212,6 +1339,7 @@ export class StudioLivingInkWebGl2Runtime {
       const pressure = clamp(mark.pressure, 0.02, 1);
       const relativeSpeed = clamp(mark.speed / Math.max(1, this.config.fieldHeight * 3), 0, 1);
       const waterOnly = operation.kind === "water";
+      const penTool = operation.kind === "ink" && operation.tool === "pen";
       const broad = waterOnly || (operation.kind === "ink" && operation.tool !== "pen");
       const radiusScale = broad
         ? (0.72 + Math.sqrt(pressure) * 0.58) * (1 + relativeSpeed * 0.22)
@@ -1219,7 +1347,17 @@ export class StudioLivingInkWebGl2Runtime {
       const radius = Math.max(0.25, mark.radius * radiusScale);
       const speedLoad = broad ? 0.62 + (1 - relativeSpeed) * 0.38 : 0.5 + (1 - relativeSpeed) * 0.65;
       const load = (0.18 + pressure * 0.82) * speedLoad;
-      const wetAmount = clamp(mark.waterMass * load, 0, 4);
+      // InkWash pen lays a faint wetness (~0.16) so a wash moments later can feather the line.
+      const wetAmount = clamp(
+        Math.max(mark.waterMass * load, penTool ? 0.16 * load : 0),
+        0,
+        4,
+      );
+      this.brushFootprint = Object.freeze({
+        x: mark.x,
+        y: mark.y,
+        radiusCells: broad ? radius : radius * 2.35,
+      });
       this.splat(
         this.resources.wet,
         mark.x,
@@ -1237,10 +1375,17 @@ export class StudioLivingInkWebGl2Runtime {
       if (operation.kind === "ink") {
         const pigmentMark = operation.marks[index]!;
         const pigment = pigmentMark.pigmentMass * load;
+        // One pass is one coat: divide the batch by the path length it covers and by the measured
+        // gain of the resolve, then scale by the stroke's own opacity as the CPU oracle already did.
+        // Opaque white is a coverage well rather than an optical density, so it keeps the raw load.
+        const pigmentCoat = pigment
+          * clamp(pigmentMark.color[3], 0, 1)
+          * coat
+          / STUDIO_LIVING_INK_PIGMENT_COAT.resolveGain;
         const white = operation.tool === "white-gouache";
-        const densityRed = studioLivingInkOpticalDensityFromReflectance(pigmentMark.color[0]) * pigment;
-        const densityGreen = studioLivingInkOpticalDensityFromReflectance(pigmentMark.color[1]) * pigment;
-        const densityBlue = studioLivingInkOpticalDensityFromReflectance(pigmentMark.color[2]) * pigment;
+        const densityRed = studioLivingInkPigmentOpticalDensity(pigmentMark.color[0]) * pigmentCoat;
+        const densityGreen = studioLivingInkPigmentOpticalDensity(pigmentMark.color[1]) * pigmentCoat;
+        const densityBlue = studioLivingInkPigmentOpticalDensity(pigmentMark.color[2]) * pigmentCoat;
         const deposit: readonly [number, number, number, number] = white
           ? [
               0,
@@ -1342,7 +1487,11 @@ export class StudioLivingInkWebGl2Runtime {
       previousY = mark.y;
       previousRadius = radius;
       previousWetAmount = wetAmount;
-      if ((index + 1) % 16 === 0) {
+      // Do NOT interleave full Stable Fluids steps per mark. Each step is ~10+ fullscreen passes
+      // plus pressure Jacobi; doing that every few marks made interactive strokes hitch. InkWash
+      // advances once per animation frame after stamps; we match that with the post-deposit
+      // simulationTicks budget in apply() instead.
+      if ((index + 1) % 32 === 0) {
         await yieldControl();
         if (isCancelled()) throw new DOMException("Living Ink request cancelled.", "AbortError");
       }
@@ -1362,8 +1511,17 @@ export class StudioLivingInkWebGl2Runtime {
       this.drawDirty(this.resources.mobile.write, bounds);
       this.resources.mobile.swap();
       this.syncDoubleDirty(this.resources.mobile, bounds);
-      this.assertNoGlError("continuous-stroke-deposit-merge");
+      // continuous-stroke-deposit-merge: one physical pigment write after the capsule union pass.
+      const last = operation.marks[operation.marks.length - 1]!;
+      this.lastInkMark = Object.freeze({ x: last.x, y: last.y });
     }
+    // Pen-up: clear the scrub tip so post-stroke settle/advance/fix ticks do not keep a ghost
+    // brushFootprint localizing bleed forever (InkWash only boosts under the live pointer).
+    this.clearBrushFootprint();
+  }
+
+  private clearBrushFootprint(): void {
+    this.brushFootprint = Object.freeze({ x: 0, y: 0, radiusCells: 0 });
   }
 
   private simulationBounds(): StudioLivingInkBounds {
@@ -1434,10 +1592,14 @@ export class StudioLivingInkWebGl2Runtime {
     this.resources.mobile.swap();
     this.syncDoubleDirty(this.resources.fixed, bounds);
     this.syncDoubleDirty(this.resources.mobile, bounds);
-    this.assertNoGlError("mobile-fixed-exchange");
   }
 
-  private step(dt: number, fixing: boolean, pressureIterations: number): void {
+  private step(
+    dt: number,
+    fixing: boolean,
+    pressureIterations: number,
+    velocitySettling = false,
+  ): void {
     const gl = this.gl;
     this.advanceDirtyHalo();
     const bounds = this.simulationBounds();
@@ -1448,18 +1610,21 @@ export class StudioLivingInkWebGl2Runtime {
     gl.uniform1f(this.programs.velocity.uniforms.dt, dt);
     gl.uniform1f(
       this.programs.velocity.uniforms.damping,
-      Math.exp(-dt * (3 - material.flow * 2.35)) * (fixing ? Math.exp(-dt * 7) : 1),
+      studioLivingInkVelocityDampingForStep(
+        material.flow,
+        dt,
+        fixing,
+        velocitySettling,
+      ),
     );
     this.drawDirty(this.resources.velocity.write, bounds);
     this.resources.velocity.swap();
     this.syncDoubleDirty(this.resources.velocity, bounds);
-    this.assertNoGlError("velocity-advection");
 
     this.bind(this.programs.curl);
     gl.uniform1i(this.programs.curl.uniforms.velocityTexture, textureUnit(gl, this.resources.velocity.read, 0));
     gl.uniform2f(this.programs.curl.uniforms.texel, 1 / this.coarseWidth, 1 / this.coarseHeight);
     this.draw(this.resources.curl);
-    this.assertNoGlError("curl");
 
     this.bind(this.programs.vorticity);
     gl.uniform1i(this.programs.vorticity.uniforms.velocityTexture, textureUnit(gl, this.resources.velocity.read, 0));
@@ -1470,28 +1635,27 @@ export class StudioLivingInkWebGl2Runtime {
     this.drawDirty(this.resources.velocity.write, bounds);
     this.resources.velocity.swap();
     this.syncDoubleDirty(this.resources.velocity, bounds);
-    this.assertNoGlError("vorticity");
 
     this.bind(this.programs.divergence);
     gl.uniform1i(this.programs.divergence.uniforms.velocityTexture, textureUnit(gl, this.resources.velocity.read, 0));
     gl.uniform2f(this.programs.divergence.uniforms.texel, 1 / this.coarseWidth, 1 / this.coarseHeight);
     this.draw(this.resources.divergence);
     this.clearPressure();
-    this.assertNoGlError("divergence-and-pressure-clear");
 
+    // Jacobi: each iteration samples pressure.read and writes pressure.write then swaps.
+    // Mid-iteration syncDoubleDirty was a full dirty-region copy per pass (×N) and is unnecessary
+    // while we always read from the swapped read buffer for the next residual.
     this.bind(this.programs.pressure);
     gl.uniform1i(this.programs.pressure.uniforms.divergenceTexture, textureUnit(gl, this.resources.divergence, 1));
     gl.uniform2f(this.programs.pressure.uniforms.texel, 1 / this.coarseWidth, 1 / this.coarseHeight);
     for (let iteration = 0; iteration < pressureIterations; iteration += 1) {
-      // syncDoubleDirty uses the copy program, so every Jacobi iteration must explicitly restore
-      // the pressure program before touching its uniform locations.
       this.bind(this.programs.pressure);
       gl.uniform1i(this.programs.pressure.uniforms.pressureTexture, textureUnit(gl, this.resources.pressure.read, 0));
       this.drawDirty(this.resources.pressure.write, bounds);
       this.resources.pressure.swap();
-      this.syncDoubleDirty(this.resources.pressure, bounds);
-      this.assertNoGlError("pressure-jacobi");
     }
+    // Restore spare buffer identity for later dirty scissor passes that assume ping-pong parity.
+    this.syncDoubleDirty(this.resources.pressure, bounds);
 
     this.bind(this.programs.gradient);
     gl.uniform1i(this.programs.gradient.uniforms.velocityTexture, textureUnit(gl, this.resources.velocity.read, 0));
@@ -1500,7 +1664,6 @@ export class StudioLivingInkWebGl2Runtime {
     this.drawDirty(this.resources.velocity.write, bounds);
     this.resources.velocity.swap();
     this.syncDoubleDirty(this.resources.velocity, bounds);
-    this.assertNoGlError("pressure-gradient");
 
     const dryWindow = 2 + (1 - material.dryRate) * 16;
     this.bind(this.programs.wet);
@@ -1518,7 +1681,6 @@ export class StudioLivingInkWebGl2Runtime {
     this.drawDirty(this.resources.wet.write, bounds);
     this.resources.wet.swap();
     this.syncDoubleDirty(this.resources.wet, bounds);
-    this.assertNoGlError("wetness-capillary-advection");
 
     this.bind(this.programs.pigment);
     gl.uniform1i(this.programs.pigment.uniforms.pigmentTexture, textureUnit(gl, this.resources.mobile.read, 0));
@@ -1530,10 +1692,56 @@ export class StudioLivingInkWebGl2Runtime {
     gl.uniform1f(this.programs.pigment.uniforms.chromatography, material.chromaticSeparation);
     gl.uniform1f(this.programs.pigment.uniforms.capillaryTransport, material.capillaryCreep);
     gl.uniform1f(this.programs.pigment.uniforms.edgeDeposition, material.dryingEdgeDeposition);
+    gl.uniform1f(this.programs.pigment.uniforms.aspect, this.config.fieldWidth / this.config.fieldHeight);
+    const brushRadiusUv = this.brushFootprint.radiusCells > 0
+      ? this.brushFootprint.radiusCells / this.config.fieldHeight
+      : 0;
+    gl.uniform3f(
+      this.programs.pigment.uniforms.brushFootprint,
+      this.brushFootprint.x / this.config.fieldWidth,
+      1 - this.brushFootprint.y / this.config.fieldHeight,
+      brushRadiusUv,
+    );
+    // Shared InkWash §06 chemistry: same TS helpers compute quiet (no tip) and tip diffusion rates.
+    const chroma = studioLivingInkChromaBleedMultipliers(material.chromaticSeparation);
+    gl.uniform3f(
+      this.programs.pigment.uniforms.chromaMultipliers,
+      chroma[0],
+      chroma[1],
+      chroma[2],
+    );
+    // mobility=1 is the worst-case wet cell; the shader still gates transport by local mobility.
+    const quietRates = studioLivingInkPigmentDiffusionRates({
+      bleed: material.bleed,
+      mobility: 1,
+      dt,
+      brushFootprint: 0,
+      chromaticSeparation: material.chromaticSeparation,
+    });
+    const tipRates = studioLivingInkPigmentDiffusionRates({
+      bleed: material.bleed,
+      mobility: 1,
+      dt,
+      brushFootprint: 1,
+      chromaticSeparation: material.chromaticSeparation,
+    });
+    gl.uniform4f(
+      this.programs.pigment.uniforms.separatedDiffusionQuiet,
+      quietRates[0],
+      quietRates[1],
+      quietRates[2],
+      quietRates[3],
+    );
+    gl.uniform4f(
+      this.programs.pigment.uniforms.separatedDiffusionTip,
+      tipRates[0],
+      tipRates[1],
+      tipRates[2],
+      tipRates[3],
+    );
     this.drawDirty(this.resources.mobile.write, bounds);
     this.resources.mobile.swap();
     this.syncDoubleDirty(this.resources.mobile, bounds);
-    this.assertNoGlError("pigment-chromatography-advection");
 
     if (fixing) {
       const settle = 1 - Math.exp(-dt * 5);
@@ -1641,24 +1849,30 @@ export class StudioLivingInkWebGl2Runtime {
     this.markDirty(operationBounds);
     if (operation.kind === "ink" || operation.kind === "water") {
       await this.applyDepositions(operation, isCancelled, yieldControl);
-    } else if (operation.kind === "clear") {
-      if (operation.scope === "selection" && !operation.selection) {
-        throw new Error("Living Ink selected clear requires a selection mask.");
+      // applyDepositions already clears the tip; keep a defensive clear before the settle loop.
+      this.clearBrushFootprint();
+    } else {
+      // advance/fix/clear never have a live tip — scrub boost must not revive a previous stroke.
+      this.clearBrushFootprint();
+      if (operation.kind === "clear") {
+        if (operation.scope === "selection" && !operation.selection) {
+          throw new Error("Living Ink selected clear requires a selection mask.");
+        }
+        if (operation.scope === "all") this.clearAll();
+        else {
+          this.uploadSelection(operation.selection);
+          this.clearMasked(this.resources.mobile);
+          this.clearMasked(this.resources.fixed);
+          this.clearMasked(this.resources.wet);
+          this.clearMasked(this.resources.velocity);
+          this.clearMasked(this.resources.pressure);
+        }
+      } else if (operation.kind === "fix") {
+        if (operation.scope === "selection" && !operation.selection) {
+          throw new Error("Living Ink selected fix requires a selection mask.");
+        }
+        this.fixSelectionEnabled = this.uploadSelection(operation.selection);
       }
-      if (operation.scope === "all") this.clearAll();
-      else {
-        this.uploadSelection(operation.selection);
-        this.clearMasked(this.resources.mobile);
-        this.clearMasked(this.resources.fixed);
-        this.clearMasked(this.resources.wet);
-        this.clearMasked(this.resources.velocity);
-        this.clearMasked(this.resources.pressure);
-      }
-    } else if (operation.kind === "fix") {
-      if (operation.scope === "selection" && !operation.selection) {
-        throw new Error("Living Ink selected fix requires a selection mask.");
-      }
-      this.fixSelectionEnabled = this.uploadSelection(operation.selection);
     }
     this.assertNoGlError("operation-deposition-or-mask");
     const quality = options.quality ?? (operation.kind === "fix" ? "settle" : "interactive");
@@ -1677,12 +1891,16 @@ export class StudioLivingInkWebGl2Runtime {
     if (!integer(ticks, 0, STUDIO_LIVING_INK_EXECUTION_LIMITS.maximumAdvanceTicks)) {
       throw new Error("Living Ink simulation tick budget exceeded.");
     }
+    const velocitySettling = operation.kind === "advance" && quality === "settle";
+    // Settle/advance ticks after pen-up must not keep a ghost scrub tip from the last mark.
+    this.clearBrushFootprint();
     for (let tick = 0; tick < ticks; tick += 1) {
       if (isCancelled()) throw new DOMException("Living Ink request cancelled.", "AbortError");
       this.step(
         STUDIO_LIVING_INK_EXECUTION_LIMITS.fixedTimeStepSeconds,
         operation.kind === "fix",
         pressureIterations,
+        velocitySettling,
       );
       this.assertNoGlError("fixed-step-simulation");
       if ((tick + 1) % 6 === 0) await yieldControl();

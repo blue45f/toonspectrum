@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "artifactId": "google-ink-mesh",
+  "components": [
+    {
+      "name": "google/ink",
+      "version": "1.1.0",
+      "commit": "1d0daba661f3035f42f3649b8e6a0061b47aa759",
+      "license": "Apache-2.0",
+      "upstream": "https://github.com/google/ink",
+      "copiedLicense": "LICENSE-GOOGLE-INK",
+      "licenseSha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "name": "abseil-cpp",
+      "version": "20260526.0",
+      "commit": "5650e9cf76d3be4318d5fa3af38ee483ddfd5e4a",
+      "license": "Apache-2.0",
+      "upstream": "https://github.com/abseil/abseil-cpp",
+      "copiedLicense": "LICENSE-ABSEIL",
+      "licenseSha256": "c79a7fea0e3cac04cd43f20e7b648e5a0ff8fa5344e644b0ee09ca1162b62747"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "ink_mesh.mjs",
+      "sha256": "e81d758845ef37cca23fa47330fc23c109fc813ffcbe332f813b4bd15ad29493"
+    },
+    {
+      "path": "ink_mesh.wasm",
+      "sha256": "baee81840296eab12301803261d47200560d78c955a97a6679cbe67527ebbc3d"
+    }
+  ]
+}

@@ -564,7 +564,7 @@ export function StudioPressureHudMeter({
   );
 }
 
-export type StudioSymmetryVisual = "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope";
+export type StudioSymmetryVisual = "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope" | "silk";
 
 /** Symmetry mode glyphs for the options strip (CSP mirror tools). */
 export function StudioSymmetryGlyph({
@@ -658,6 +658,18 @@ export function StudioSymmetryGlyph({
             />
           ))}
           <circle cx={7} cy={7} r={4.85} fill="none" stroke="currentColor" strokeWidth={0.75} opacity={0.45} />
+        </>
+      )}
+      {mode === "silk" && (
+        <>
+          {/* Distinct from vertical/radial: spiral arms + open ring, no center cross. */}
+          <circle cx={7} cy={7} r={4.6} fill="none" stroke="currentColor" strokeWidth={0.85} opacity={0.4} />
+          <path
+            d="M7 7 C8.4 6.2, 9.8 4.6, 10.6 3.1 C11.2 4.8, 10.4 6.6, 9.1 7.6 C10.6 7.9, 11.8 9.1, 12.1 10.5 C10.4 10.2, 8.7 9.2, 7.7 7.9 C7.4 9.4, 6.2 10.7, 4.7 11.1 C4.9 9.5, 5.8 8, 7 7 Z"
+            fill="currentColor"
+            opacity={0.88}
+          />
+          <circle cx={7} cy={7} r={0.85} fill="currentColor" opacity={0.95} />
         </>
       )}
     </svg>

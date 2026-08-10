@@ -8,6 +8,7 @@ import {
   STUDIO_BG3D_DEPTH_FLOAT32_PROFILE,
 } from "./studio-bg3d-artifact-capture-v2";
 import {
+  STUDIO_BG3D_BABYLON_DEVICE_LOSS_SIGNAL,
   StudioBg3dBabylonSpecialistError,
   createStudioBg3dBabylonSpecialistRuntime,
   sanitizeStudioBg3dBabylonSpecialistResult,
@@ -46,6 +47,8 @@ class FakeObservable implements StudioBg3dBabylonObservableLike {
 }
 
 class FakeEngine implements StudioBg3dBabylonEngineHandle {
+  readonly deviceLoss = deferred<unknown>();
+  readonly [STUDIO_BG3D_BABYLON_DEVICE_LOSS_SIGNAL] = this.deviceLoss.promise;
   readonly onContextLostObservable = new FakeObservable();
   readonly onContextRestoredObservable = new FakeObservable();
   readonly dispose = vi.fn();
@@ -195,6 +198,32 @@ describe("Studio Babylon isolated specialist runtime", () => {
     expect(harness.webGpu).toHaveBeenCalledOnce();
     expect(harness.webGl).not.toHaveBeenCalled();
     await runtime.dispose();
+  });
+
+  it("fails closed when a WebGPU binding omits the direct GPUDevice.lost signal", async () => {
+    const harness = bindingHarness();
+    const engine: StudioBg3dBabylonEngineHandle = {
+      onContextLostObservable: new FakeObservable(),
+      onContextRestoredObservable: new FakeObservable(),
+      dispose: vi.fn(),
+    };
+    const runtime = createStudioBg3dBabylonSpecialistRuntime({
+      backend: "webgpu",
+      canvas: new FakeCanvas() as unknown as HTMLCanvasElement,
+      loadBindings: async () => ({
+        ...harness.bindings,
+        createWebGpuEngine: async () => engine,
+      }),
+    });
+
+    await expect(runtime.runIsolated(job("missing-device-loss-signal"))).rejects.toMatchObject({
+      cause: { message: "Babylon WebGPU binding did not expose GPUDevice.lost." },
+      code: "engine-init-failed",
+    });
+    expect(engine.dispose).toHaveBeenCalledOnce();
+    expect(runtime.getState()).toMatchObject({ engineInitialized: false, status: "idle" });
+    await runtime.dispose();
+    expect(engine.dispose).toHaveBeenCalledOnce();
   });
 
   it("aborts a pending WebGPU initialization and disposes a late engine result", async () => {
@@ -399,39 +428,67 @@ describe("Studio Babylon isolated specialist runtime", () => {
     await runtime.dispose();
   });
 
-  it("invalidates a lost WebGPU device and allows the next serialized job to create a new one", async () => {
+  it("defers lost WebGPU disposal until active work settles and recreates exactly once", async () => {
     const harness = bindingHarness();
     const started = deferred<void>();
+    const observedAbort = deferred<void>();
+    const releaseAfterLoss = deferred<void>();
     const runtime = createStudioBg3dBabylonSpecialistRuntime({
       backend: "webgpu",
       canvas: new FakeCanvas() as unknown as HTMLCanvasElement,
       loadBindings: async () => harness.bindings,
-      execute(context) {
+      async execute(context) {
         if (context.job.id === "retry") {
           return { kind: "metrics", values: { retried: true } };
         }
         started.resolve();
-        return new Promise((_resolve, reject) => {
-          context.signal.addEventListener(
-            "abort",
-            () => reject(new DOMException("device lost", "AbortError")),
-            { once: true },
-          );
-        });
+        context.signal.addEventListener("abort", () => observedAbort.resolve(), { once: true });
+        await releaseAfterLoss.promise;
+        throw new DOMException("device lost", "AbortError");
       },
     });
 
     const first = runtime.runIsolated(job("device-loss"));
     await started.promise;
+    harness.engines[0]?.deviceLoss.resolve({ reason: "unknown" });
+    await observedAbort.promise;
+    const stateAtLoss = runtime.getState();
+    expect(stateAtLoss).toMatchObject({
+      activeJobId: "device-loss",
+      contextLost: true,
+      engineInitialized: false,
+      status: "context-lost",
+    });
+    expect(harness.engines[0]?.dispose).not.toHaveBeenCalled();
     harness.engines[0]?.onContextLostObservable.emit();
+    expect(runtime.getState().epoch).toBe(stateAtLoss.epoch);
+
+    releaseAfterLoss.resolve();
     await expect(first).rejects.toMatchObject({ code: "context-lost" });
-    expect(runtime.getState().contextLost).toBe(false);
+    expect(harness.engines[0]?.dispose).toHaveBeenCalledOnce();
+    expect(runtime.getState()).toMatchObject({
+      contextLost: false,
+      engineInitialized: false,
+      status: "idle",
+    });
 
     await expect(runtime.runIsolated(job("retry"))).resolves.toMatchObject({
       values: { retried: true },
     });
     expect(harness.webGpu).toHaveBeenCalledTimes(2);
     await runtime.dispose();
+    expect(harness.engines[0]?.dispose).toHaveBeenCalledOnce();
+    expect(harness.engines[1]?.dispose).toHaveBeenCalledOnce();
+
+    const epochAfterDispose = runtime.getState().epoch;
+    harness.engines[1]?.deviceLoss.resolve({ reason: "destroyed" });
+    await Promise.resolve();
+    expect(runtime.getState()).toMatchObject({
+      disposed: true,
+      epoch: epochAfterDispose,
+      status: "disposed",
+    });
+    expect(harness.engines[1]?.dispose).toHaveBeenCalledOnce();
   });
 
   it("aborts active work on idempotent disposal and rejects every later job", async () => {

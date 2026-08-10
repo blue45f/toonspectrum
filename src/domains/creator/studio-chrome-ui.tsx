@@ -866,12 +866,39 @@ export function StudioRailToolButton({
 }
 
 /** Thin hairline inside the vertical tool rail. */
-export function StudioRailDivider({ className }: { className?: string }): ReactElement {
+export function StudioRailDivider({
+  className,
+  label,
+  ...rest
+}: {
+  className?: string;
+  /** Short CSP-style group caption under the hairline (scannable tool belt). */
+  label?: string;
+} & Record<string, string | number | undefined>): ReactElement {
+  if (label) {
+    return (
+      <span
+        role="separator"
+        aria-label={label}
+        className={cn(
+          "my-1 flex w-full max-w-[2.75rem] flex-col items-center gap-0.5 px-0.5",
+          className,
+        )}
+        {...rest}
+      >
+        <span aria-hidden className="h-px w-6 shrink-0 bg-line/80" />
+        <span className="select-none text-center text-[0.5rem] font-semibold leading-tight tracking-tight text-fg-3">
+          {label}
+        </span>
+      </span>
+    );
+  }
   return (
     <span
       role="separator"
       aria-hidden
       className={cn("my-1 h-px w-6 shrink-0 bg-line/80", className)}
+      {...rest}
     />
   );
 }

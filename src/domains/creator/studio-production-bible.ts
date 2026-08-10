@@ -183,9 +183,11 @@ export interface StudioProductionBibleLocalStorage {
 }
 
 export type StudioProductionBiblePersistenceBackend =
-  | "indexeddb"
-  | "local-storage"
-  | "memory";
+  | "sqlite"
+  | "memory"
+  | "unavailable"
+  | "legacy-indexeddb"
+  | "legacy-local-storage";
 
 export interface StudioProductionBiblePersistenceResult {
   readonly bible: StudioProductionBible;
@@ -197,10 +199,21 @@ export interface StudioProductionBiblePersistenceResult {
 }
 
 export interface StudioProductionBibleRepositoryOptions {
-  /** undefined = use the browser global, null = explicitly disable. */
+  /**
+   * V12 never reads legacy stores by default. Tests/dev import tools must opt in and inject the
+   * exact adapters they intend to inspect; browser globals are deliberately never discovered.
+   */
+  readonly legacyDataPolicy?: "discard" | "import-explicit";
   readonly indexedDB?: IDBFactory | null;
-  /** undefined = use the browser global, null = explicitly disable. */
   readonly localStorage?: StudioProductionBibleLocalStorage | null;
+}
+
+export interface StudioProductionBibleRepository {
+  load(key: string): Promise<StudioProductionBiblePersistenceResult>;
+  save(
+    key: string,
+    value: StudioProductionBible
+  ): Promise<StudioProductionBiblePersistenceResult>;
 }
 
 const PATCH_FIELDS = new Set<string>([
@@ -215,7 +228,9 @@ const PATCH_FIELDS = new Set<string>([
   "linkedPropIds",
   "referenceAssetIds",
 ]);
-const PRODUCTION_BIBLE_STORAGE_PREFIX = "toonspectrum-studio-production-bible:v1";
+const PRODUCTION_BIBLE_STORAGE_PREFIX = "toonspectrum-studio-production-bible:v12";
+const PRODUCTION_BIBLE_LEGACY_STORAGE_PREFIX =
+  "toonspectrum-studio-production-bible:v1";
 const PRODUCTION_BIBLE_DB_NAME = "toonspectrum-studio-production-bible";
 const PRODUCTION_BIBLE_DB_VERSION = 1;
 const PRODUCTION_BIBLE_STORE_NAME = "documents";
@@ -279,7 +294,7 @@ function normalizeId(value: unknown): string {
     : "";
 }
 
-function normalizeStorageKey(value: unknown): string {
+export function normalizeStudioProductionBibleStorageKey(value: unknown): string {
   return typeof value === "string" ? value.trim().slice(0, 512) : "";
 }
 
@@ -894,35 +909,47 @@ export function studioProductionBibleStorageKey(input: {
   readonly workId?: string | null;
   readonly remixId?: string | null;
 }): string {
+  return scopedProductionBibleStorageKey(PRODUCTION_BIBLE_STORAGE_PREFIX, input);
+}
+
+/** Explicit test/dev import seam for the discarded pre-V12 browser-store namespace. */
+export function studioProductionBibleLegacyStorageKey(input: {
+  readonly userId?: string | null;
+  readonly workId?: string | null;
+  readonly remixId?: string | null;
+}): string {
+  return scopedProductionBibleStorageKey(PRODUCTION_BIBLE_LEGACY_STORAGE_PREFIX, input);
+}
+
+function scopedProductionBibleStorageKey(
+  prefix: string,
+  input: {
+    readonly userId?: string | null;
+    readonly workId?: string | null;
+    readonly remixId?: string | null;
+  }
+): string {
   const owner = encodeURIComponent(input.userId?.trim() || "guest");
   const documentId = input.workId
     ? `work:${encodeURIComponent(input.workId)}`
     : input.remixId
       ? `remix:${encodeURIComponent(input.remixId)}`
       : "new";
-  return `${PRODUCTION_BIBLE_STORAGE_PREFIX}:${owner}:${documentId}`;
+  return `${prefix}:${owner}:${documentId}`;
 }
 
 function resolveIndexedDb(
   options: StudioProductionBibleRepositoryOptions
 ): IDBFactory | null {
-  if (options.indexedDB !== undefined) return options.indexedDB;
-  try {
-    return globalThis.indexedDB ?? null;
-  } catch {
-    return null;
-  }
+  if (options.legacyDataPolicy !== "import-explicit") return null;
+  return options.indexedDB ?? null;
 }
 
 function resolveLocalStorage(
   options: StudioProductionBibleRepositoryOptions
 ): StudioProductionBibleLocalStorage | null {
-  if (options.localStorage !== undefined) return options.localStorage;
-  try {
-    return globalThis.localStorage ?? null;
-  } catch {
-    return null;
-  }
+  if (options.legacyDataPolicy !== "import-explicit") return null;
+  return options.localStorage ?? null;
 }
 
 function openProductionBibleDatabase(factory: IDBFactory): Promise<IDBDatabase> {
@@ -995,9 +1022,11 @@ function warningText(messages: readonly string[]): string | undefined {
 }
 
 /**
- * Metadata-only local repository. IDB is primary and localStorage is a compact mirror/fallback;
- * memory always receives the last accepted value so a quota/private-mode failure does not erase
- * the in-session edit. Every result says localOnly=true because no server sync is implied.
+ * Explicit legacy import/test repository. The default policy is discard and therefore touches no
+ * IndexedDB or localStorage global. Supplying `legacyDataPolicy: "import-explicit"` plus concrete
+ * adapters is the only way to inspect the pre-V12 stores. Product code uses the SQLite repository.
+ * Memory always receives the last accepted edit so an injected-adapter failure is surfaced without
+ * losing the in-session value.
  */
 export class StudioProductionBibleLocalRepository {
   private readonly memory = new Map<string, StudioProductionBible>();
@@ -1007,7 +1036,7 @@ export class StudioProductionBibleLocalRepository {
   ) {}
 
   async load(key: string): Promise<StudioProductionBiblePersistenceResult> {
-    const normalizedKey = normalizeStorageKey(key);
+    const normalizedKey = normalizeStudioProductionBibleStorageKey(key);
     if (!normalizedKey) {
       return {
         bible: createEmptyStudioProductionBible(),
@@ -1023,14 +1052,17 @@ export class StudioProductionBibleLocalRepository {
       try {
         const serialized = await readProductionBibleFromIndexedDb(indexedDb, normalizedKey);
         if (serialized !== null) {
-          const bible = normalizeStudioProductionBible(serialized);
-          this.memory.set(normalizedKey, bible);
-          return {
-            bible,
-            backend: "indexeddb",
-            persisted: true,
-            localOnly: true,
-          };
+          const imported = parseStudioProductionBibleImport(serialized);
+          if (imported.ok) {
+            this.memory.set(normalizedKey, imported.bible);
+            return {
+              bible: imported.bible,
+              backend: "legacy-indexeddb",
+              persisted: true,
+              localOnly: true,
+            };
+          }
+          warnings.push(`IndexedDB 레거시 바이블을 가져오지 않았습니다: ${imported.error}`);
         }
       } catch {
         warnings.push("IndexedDB를 읽지 못해 로컬 저장소로 전환했습니다.");
@@ -1042,15 +1074,18 @@ export class StudioProductionBibleLocalRepository {
       try {
         const serialized = localStorage.getItem(normalizedKey);
         if (serialized !== null) {
-          const bible = normalizeStudioProductionBible(serialized);
-          this.memory.set(normalizedKey, bible);
-          return {
-            bible,
-            backend: "local-storage",
-            persisted: true,
-            localOnly: true,
-            ...(warningText(warnings) ? { warning: warningText(warnings) } : {}),
-          };
+          const imported = parseStudioProductionBibleImport(serialized);
+          if (imported.ok) {
+            this.memory.set(normalizedKey, imported.bible);
+            return {
+              bible: imported.bible,
+              backend: "legacy-local-storage",
+              persisted: true,
+              localOnly: true,
+              ...(warningText(warnings) ? { warning: warningText(warnings) } : {}),
+            };
+          }
+          warnings.push(`localStorage 레거시 바이블을 가져오지 않았습니다: ${imported.error}`);
         }
       } catch {
         warnings.push("localStorage를 읽지 못해 메모리 복구본을 사용합니다.");
@@ -1071,7 +1106,7 @@ export class StudioProductionBibleLocalRepository {
     key: string,
     value: StudioProductionBible
   ): Promise<StudioProductionBiblePersistenceResult> {
-    const normalizedKey = normalizeStorageKey(key);
+    const normalizedKey = normalizeStudioProductionBibleStorageKey(key);
     const bible = normalizeStudioProductionBible(value);
     const serialized = serializeStudioProductionBible(bible);
     const warnings: string[] = [];
@@ -1100,7 +1135,7 @@ export class StudioProductionBibleLocalRepository {
         }
         return {
           bible,
-          backend: "indexeddb",
+          backend: "legacy-indexeddb",
           persisted: true,
           localOnly: true,
           ...(warningText(warnings) ? { warning: warningText(warnings) } : {}),
@@ -1116,7 +1151,7 @@ export class StudioProductionBibleLocalRepository {
         localStorage.setItem(normalizedKey, serialized);
         return {
           bible,
-          backend: "local-storage",
+          backend: "legacy-local-storage",
           persisted: true,
           localOnly: true,
           ...(warningText(warnings) ? { warning: warningText(warnings) } : {}),

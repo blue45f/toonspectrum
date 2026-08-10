@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   STUDIO_LIVING_INK_EXECUTION_ENGINE_VERSION,
+  STUDIO_LIVING_INK_EXECUTION_LIMITS,
   STUDIO_LIVING_INK_EXECUTION_PROTOCOL_VERSION,
   type StudioLivingInkExecutionApplied,
   type StudioLivingInkExecutionCapabilities,
@@ -53,12 +54,16 @@ const capabilities: StudioLivingInkExecutionCapabilities = {
   worker: true,
   offscreenCanvas: true,
   webgl2: true,
+  webgpu: false,
   halfFloatRenderable: true,
   rgba16Float: true,
   rg16Float: true,
   r16Float: true,
   maximumTextureSize: 16_384,
-  pressureIterations: { interactive: 10, settle: 22 },
+  pressureIterations: {
+    interactive: STUDIO_LIVING_INK_EXECUTION_LIMITS.interactivePressureIterations,
+    settle: STUDIO_LIVING_INK_EXECUTION_LIMITS.settlePressureIterations,
+  },
 };
 
 function bitmap(): ImageBitmap & { closed: boolean } {

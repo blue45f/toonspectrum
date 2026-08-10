@@ -20,6 +20,11 @@ import {
 } from "./studio-opfs-recovery-journal";
 import { sha256HexPortable } from "./studio-sha256";
 
+import type {
+  StudioAutosaveSqlitePort,
+  StudioAutosaveSqliteReadResult,
+} from "./studio-autosave-sqlite-store";
+
 export const STUDIO_AUTOSAVE_OPFS_ENVELOPE_KIND =
   "toonspectrum:studio-autosave-opfs-checkpoint" as const;
 export const STUDIO_AUTOSAVE_OPFS_ENVELOPE_VERSION = 1 as const;
@@ -60,18 +65,49 @@ export type StudioAutosaveOpfsReadResult =
     }>
   | null;
 
+export type StudioAutosaveDurableAuthority =
+  | "opfs-journal"
+  | "sqlite-fallback";
+
+export type StudioAutosaveRecoveryAuthority =
+  | StudioAutosaveDurableAuthority
+  | "browser-storage-compatibility";
+
+export type StudioAutosavePersistenceAuthority = StudioAutosaveDurableAuthority;
+
 export type StudioAutosavePersistenceReceipt = Readonly<{
-  authority: "opfs-journal" | "browser-storage-fallback";
+  authority: StudioAutosavePersistenceAuthority;
   savedAt: string;
   sequence: number | null;
   revision: number | null;
 }>;
 
+export type StudioAutosaveRecoveryCandidate = Readonly<{
+  key: string;
+  authority: StudioAutosaveRecoveryAuthority;
+  savedAt: string;
+  sequence: number | null;
+  revision: number | null;
+  payload: StudioAutosavePayload;
+}>;
+
 export type StudioAutosaveReconciliation = Readonly<{
-  candidate: Readonly<{ key: string; payload: StudioAutosavePayload }> | null;
-  authority: "opfs-journal" | "browser-storage-fallback";
+  candidate: StudioAutosaveRecoveryCandidate | null;
+  compatibilityCandidate: StudioAutosaveRecoveryCandidate | null;
+  authority: StudioAutosaveRecoveryAuthority | null;
+  durability: "durable" | "compatibility-only" | "none";
   migratedToOpfs: boolean;
 }>;
+
+export class StudioAutosaveDurabilityError extends Error {
+  constructor(cause: unknown) {
+    super(
+      "OPFS와 SQLite 자동저장에 실패했습니다. 현재 작업은 메모리에 남아 있지만 내구 저장되지 않았습니다.",
+      { cause },
+    );
+    this.name = "StudioAutosaveDurabilityError";
+  }
+}
 
 export interface StudioAutosaveOpfsJournalPort {
   scan(options?: { readonly signal?: AbortSignal }): Promise<StudioOpfsRecoveryScan>;
@@ -452,10 +488,13 @@ export class StudioAutosaveOpfsSession {
 
   async dispose(): Promise<void> {
     if (this.#disposed) return;
+    // Close admission synchronously. Effect cleanup and page/route transitions can overlap a
+    // pending checkpoint; leaving the flag open until its tail settles lets a stale closure append
+    // behind the tail that disposal is waiting for and strand the renewed writer lease.
+    this.#disposed = true;
     await this.#tail;
     const writer = this.#writer;
     this.#writer = null;
-    this.#disposed = true;
     if (!writer) return;
     try {
       await this.#journal.releaseWriter(writer);
@@ -505,101 +544,270 @@ export async function createStudioAutosaveOpfsSession(
   });
 }
 
+function browserRecoveryCandidate(
+  candidate: Readonly<{ key: string; payload: StudioAutosavePayload }> | null,
+): StudioAutosaveRecoveryCandidate | null {
+  return candidate
+    ? Object.freeze({
+        key: candidate.key,
+        authority: "browser-storage-compatibility" as const,
+        savedAt: candidate.payload.savedAt,
+        sequence: null,
+        revision: null,
+        payload: candidate.payload,
+      })
+    : null;
+}
+
+function discardAutosaveBrowserCompatibility(
+  storage: StudioAutosaveStorage,
+  key: string,
+): void {
+  try {
+    storage.removeItem(key);
+    storage.removeItem(studioLifecycleAutosaveSidecarKey(key));
+  } catch {
+    // Browser KV is compatibility/discard-only; cleanup denial never changes durable authority.
+  }
+}
+
 export async function persistStudioAutosaveWithOpfsPrimary(input: {
   readonly session: StudioAutosaveOpfsSession | null;
+  readonly sqlite?: StudioAutosaveSqlitePort | null;
   readonly storage: StudioAutosaveStorage;
   readonly key: string;
   readonly payload: StudioAutosavePayload;
   readonly signal?: AbortSignal;
+  /**
+   * OPFS 저널과 SQLite 권위가 모두 실패했을 때 호출된다. 현재 메모리 작업은 유지되지만
+   * 브라우저 KV에 쓰거나 저장 성공으로 승격하지 않는다.
+   */
+  readonly onDurableAuthorityDegraded?: (cause: unknown) => void;
 }): Promise<StudioAutosavePersistenceReceipt> {
+  let durableFailure: unknown = !input.session && !input.sqlite
+    ? new Error("OPFS journal and SQLite autosave authorities are unavailable")
+    : null;
   if (input.session) {
     try {
       const receipt = await input.session.write(input.payload, input.signal);
-      input.storage.setItem(input.key, serializeStudioAutosave(input.payload));
-      input.storage.removeItem(studioLifecycleAutosaveSidecarKey(input.key));
+      try {
+        await input.sqlite?.write(input.key, input.payload);
+      } catch {
+        // OPFS가 권위이므로 SQLite 미러 실패는 저장 성공을 강등시키지 않는다.
+      }
+      discardAutosaveBrowserCompatibility(input.storage, input.key);
       return receipt;
-    } catch {
-      // The synchronous browser slot remains a bounded compatibility and lifecycle fallback.
+    } catch (cause: unknown) {
+      durableFailure = cause;
     }
   }
-  input.storage.setItem(input.key, serializeStudioAutosave(input.payload));
-  input.storage.removeItem(studioLifecycleAutosaveSidecarKey(input.key));
-  return Object.freeze({
-    authority: "browser-storage-fallback",
-    savedAt: input.payload.savedAt,
-    sequence: null,
-    revision: null,
-  });
+  if (input.sqlite) {
+    try {
+      await input.sqlite.write(input.key, input.payload);
+      discardAutosaveBrowserCompatibility(input.storage, input.key);
+      return Object.freeze({
+        authority: "sqlite-fallback",
+        savedAt: input.payload.savedAt,
+        sequence: null,
+        revision: null,
+      });
+    } catch (cause: unknown) {
+      durableFailure = durableFailure === null
+        ? cause
+        : new AggregateError(
+            [durableFailure, cause],
+            "OPFS journal and SQLite autosave authorities both failed",
+          );
+    }
+  }
+  if (durableFailure !== null) {
+    try {
+      input.onDurableAuthorityDegraded?.(durableFailure);
+    } catch {
+      // 관측자 격리 — 고지 실패가 명시적인 durability error까지 막지 않는다.
+    }
+  }
+  throw new StudioAutosaveDurabilityError(durableFailure);
 }
 
 export async function reconcileStudioAutosaveWithOpfsPrimary(input: {
   readonly session: StudioAutosaveOpfsSession | null;
+  readonly sqlite?: StudioAutosaveSqlitePort | null;
   readonly storage: StudioAutosaveStorage;
   readonly key: string;
   readonly allowLegacy?: boolean;
   readonly signal?: AbortSignal;
 }): Promise<StudioAutosaveReconciliation> {
-  const local = readStudioAutosave(
-    input.storage,
-    input.key,
-    input.allowLegacy ?? false,
-  );
-  if (!input.session) {
-    return Object.freeze({
-      candidate: local,
-      authority: "browser-storage-fallback",
-      migratedToOpfs: false,
-    });
-  }
-  let durable: StudioAutosaveOpfsReadResult;
+  let compatibilityCandidate: StudioAutosaveRecoveryCandidate | null = null;
   try {
-    durable = await input.session.readLatest(input.signal);
+    compatibilityCandidate = browserRecoveryCandidate(readStudioAutosave(
+      input.storage,
+      input.key,
+      input.allowLegacy ?? false,
+    ));
   } catch {
-    return Object.freeze({
-      candidate: local,
-      authority: "browser-storage-fallback",
-      migratedToOpfs: false,
-    });
+    // Browser storage is a compatibility input only. Its denial must never hide OPFS/SQLite data.
   }
-  const localTime = local ? timestamp(local.payload.savedAt) : -1;
-  const durableTime = durable ? timestamp(durable.savedAt) : -1;
-  if (durable?.state === "cleared" && durableTime >= localTime) {
-    input.storage.removeItem(input.key);
-    input.storage.removeItem(studioLifecycleAutosaveSidecarKey(input.key));
-    return Object.freeze({
-      candidate: null,
-      authority: "opfs-journal",
-      migratedToOpfs: false,
-    });
-  }
-  if (durable?.state === "snapshot" && durableTime >= localTime) {
-    input.storage.setItem(input.key, serializeStudioAutosave(durable.payload));
-    input.storage.removeItem(studioLifecycleAutosaveSidecarKey(input.key));
-    return Object.freeze({
-      candidate: Object.freeze({ key: input.key, payload: durable.payload }),
-      authority: "opfs-journal",
-      migratedToOpfs: false,
-    });
-  }
-  if (local) {
+  type Candidate = Readonly<{
+    key: string;
+    source: StudioAutosaveDurableAuthority;
+    state: "snapshot" | "cleared";
+    savedAt: string;
+    payload: StudioAutosavePayload | null;
+    sequence: number | null;
+    revision: number | null;
+  }>;
+  const candidates: Candidate[] = [];
+  let sqliteReadable = false;
+  if (input.sqlite) {
     try {
-      await input.session.write(local.payload, input.signal);
-      return Object.freeze({
-        candidate: local,
-        authority: "opfs-journal",
-        migratedToOpfs: true,
-      });
+      const sqliteResult: StudioAutosaveSqliteReadResult = await input.sqlite.read(input.key);
+      sqliteReadable = true;
+      if (sqliteResult) {
+        candidates.push(Object.freeze({
+          key: input.key,
+          source: "sqlite-fallback",
+          state: sqliteResult.state,
+          savedAt: sqliteResult.savedAt,
+          payload: sqliteResult.state === "snapshot" ? sqliteResult.payload : null,
+          sequence: null,
+          revision: null,
+        }));
+      }
     } catch {
+      // 손상/개방 실패 SQLite 행은 덮어쓰지 않고 다른 권위로 복구한다.
+    }
+  }
+  let opfsReadable = false;
+  if (input.session) {
+    try {
+      const durable = await input.session.readLatest(input.signal);
+      opfsReadable = true;
+      if (durable) {
+        candidates.push(Object.freeze({
+          key: input.key,
+          source: "opfs-journal",
+          state: durable.state,
+          savedAt: durable.savedAt,
+          payload: durable.state === "snapshot" ? durable.payload : null,
+          sequence: durable.sequence,
+          revision: durable.revision,
+        }));
+      }
+    } catch {
+      // SQLite와 브라우저 슬롯을 계속 평가한다.
+    }
+  }
+  const sourceRank: Record<StudioAutosaveDurableAuthority, number> = {
+    "opfs-journal": 3,
+    "sqlite-fallback": 2,
+  };
+  candidates.sort((left, right) => (
+    timestamp(right.savedAt) - timestamp(left.savedAt)
+    || Number(right.state === "cleared") - Number(left.state === "cleared")
+    || sourceRank[right.source] - sourceRank[left.source]
+  ));
+  let winner = candidates[0] ?? null;
+  let migratedToOpfs = false;
+
+  if (winner && input.session && opfsReadable && winner.source === "sqlite-fallback") {
+    try {
+      const receipt = winner.state === "snapshot"
+        ? await input.session.write(winner.payload!, input.signal)
+        : await input.session.clear(winner.savedAt, input.signal);
+      winner = Object.freeze({
+        ...winner,
+        source: "opfs-journal",
+        sequence: receipt.sequence,
+        revision: receipt.revision,
+      });
+      migratedToOpfs = true;
+    } catch {
+      // 원래 SQLite 승자를 그대로 유지한다.
+    }
+  }
+
+  if (!winner) {
+    if (compatibilityCandidate) {
       return Object.freeze({
-        candidate: local,
-        authority: "browser-storage-fallback",
+        candidate: compatibilityCandidate,
+        compatibilityCandidate,
+        authority: "browser-storage-compatibility",
+        durability: "compatibility-only",
         migratedToOpfs: false,
       });
     }
+    return Object.freeze({
+      candidate: null,
+      compatibilityCandidate: null,
+      authority: opfsReadable
+        ? "opfs-journal"
+        : input.sqlite && sqliteReadable
+          ? "sqlite-fallback"
+          : null,
+      durability: "none",
+      migratedToOpfs: false,
+    });
+  }
+
+  if (winner.state === "cleared") {
+    const compatibilityIsNewer = compatibilityCandidate !== null
+      && timestamp(compatibilityCandidate.savedAt) > timestamp(winner.savedAt);
+    if (compatibilityIsNewer) {
+      return Object.freeze({
+        candidate: compatibilityCandidate,
+        compatibilityCandidate,
+        authority: "browser-storage-compatibility",
+        durability: "compatibility-only",
+        migratedToOpfs,
+      });
+    }
+    discardAutosaveBrowserCompatibility(input.storage, input.key);
+    if (winner.source === "opfs-journal" && input.sqlite) {
+      try {
+        await input.sqlite.clear(input.key, winner.savedAt);
+      } catch {
+        // OPFS tombstone remains authoritative.
+      }
+    }
+    return Object.freeze({
+      candidate: null,
+      compatibilityCandidate: null,
+      authority: winner.source,
+      durability: "none",
+      migratedToOpfs,
+    });
+  }
+
+  if (
+    compatibilityCandidate === null
+    || timestamp(compatibilityCandidate.savedAt) <= timestamp(winner.savedAt)
+  ) {
+    discardAutosaveBrowserCompatibility(input.storage, input.key);
+  }
+  if (winner.source === "opfs-journal" && input.sqlite) {
+    try {
+      await input.sqlite.write(input.key, winner.payload!);
+    } catch {
+      // OPFS snapshot remains authoritative.
+    }
   }
   return Object.freeze({
-    candidate: null,
-    authority: "opfs-journal",
-    migratedToOpfs: false,
+    candidate: Object.freeze({
+      key: winner.key,
+      authority: winner.source,
+      savedAt: winner.savedAt,
+      sequence: winner.sequence,
+      revision: winner.revision,
+      payload: winner.payload!,
+    }),
+    compatibilityCandidate:
+      compatibilityCandidate
+      && timestamp(compatibilityCandidate.savedAt) > timestamp(winner.savedAt)
+        ? compatibilityCandidate
+        : null,
+    authority: winner.source,
+    durability: "durable",
+    migratedToOpfs,
   });
 }

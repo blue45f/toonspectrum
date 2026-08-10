@@ -1,0 +1,98 @@
+{
+  "generatedAt": "2026-08-08T03:07:25.294Z",
+  "pin": {
+    "libmypaint": "v1.6.1 (2768251dacce3939136c839aeca413f4aa4241d0)",
+    "emcc": "6.0.6",
+    "build": "packages/studio-brush-platform/src/libmypaint/bridge/build.sh (json-c bypassed; injection API only)",
+    "hokusai": "hokusai-core 0.3.0 via packages/studio-hokusai-wasm"
+  },
+  "harness": {
+    "width": 192,
+    "height": 96,
+    "sampleCount": 96,
+    "seed": 7,
+    "stroke": "standardZigzagStrokeSamples (linear 0→1 pressure ramp)",
+    "throughputRuns": 12,
+    "throughputStat": "median ms of full render (program brush + stroke + RGBA8 readback)"
+  },
+  "wasmBytes": {
+    "mjs": 12702,
+    "wasm": 82503
+  },
+  "brushes": {
+    "wash-soft": {
+      "libmypaint": {
+        "sha256": "b98e029c245d08c216ef25ad94ae56cca6a118c815a57344f0d98714eb13de87",
+        "totalAlpha": 195437,
+        "inkedPixels": 4636,
+        "meanInkedAlpha": 0.1653191561352755
+      },
+      "hokusai": {
+        "sha256": "65f6e511d33fe7cdd0db778b059710d007fa88128e107ebe5320dab87c26682e",
+        "totalAlpha": 197636,
+        "inkedPixels": 4610,
+        "meanInkedAlpha": 0.16812215558674662
+      },
+      "parity": {
+        "columnProfileCorrelation": 0.9997229617814045,
+        "coverageRatio": 0.9888734845878281,
+        "inkedPixelRatio": 1.005639913232104
+      },
+      "throughput": {
+        "libmypaintMsMedian": 0.9275205000000142,
+        "hokusaiMsMedian": 1.755416500000024,
+        "libmypaintPxPerMs": 19872.33705346644,
+        "hokusaiPxPerMs": 10500.072205086228,
+        "hokusaiOverLibmypaint": 0.5283763141112103
+      },
+      "largeBrushThroughput": {
+        "dabDiameterPx": 180,
+        "libmypaintMsMedian": 8.74060449999996,
+        "hokusaiMsMedian": 25.20112449999999,
+        "hokusaiOverLibmypaint": 0.346833908145645
+      }
+    },
+    "ink-crisp": {
+      "libmypaint": {
+        "sha256": "1c9d3a81fb26547c41eed5453062bb7b470c216e7b292620192e43c50072355b",
+        "totalAlpha": 372887,
+        "inkedPixels": 2830,
+        "meanInkedAlpha": 0.5167144737753758
+      },
+      "hokusai": {
+        "sha256": "e301162afcf5469e773627ced145204e510d941e7400ed8de77775947a4af0e2",
+        "totalAlpha": 372896,
+        "inkedPixels": 2837,
+        "meanInkedAlpha": 0.5154519756439763
+      },
+      "parity": {
+        "columnProfileCorrelation": 0.999999986645572,
+        "coverageRatio": 0.9999758645842273,
+        "inkedPixelRatio": 0.9975326048642933
+      },
+      "throughput": {
+        "libmypaintMsMedian": 0.7328954999999269,
+        "hokusaiMsMedian": 1.4742914999999357,
+        "libmypaintPxPerMs": 25149.560885558498,
+        "hokusaiPxPerMs": 12502.27651722933,
+        "hokusaiOverLibmypaint": 0.49711708980209063
+      },
+      "largeBrushThroughput": {
+        "dabDiameterPx": 180,
+        "libmypaintMsMedian": 9.79972900000007,
+        "hokusaiMsMedian": 30.83266649999996,
+        "hokusaiOverLibmypaint": 0.3178359224947373
+      }
+    }
+  },
+  "gate": {
+    "rule": "matrix E11↔E12: Hokusai may demote libmypaint to reference-only when quality is at parity AND Hokusai throughput ≥ 1.2× libmypaint",
+    "hokusaiThroughputAdvantageMin": 0.3178359224947373,
+    "hokusaiPasses20pctGate": false,
+    "notes": [
+      "alpha channel is the cross-engine parity axis; RGB stays in each engine's native channel space (libmypaint v1 non-linear fix15 vs hokusai linear→sRGB readout)",
+      "throughput numbers are from the machine that regenerated this file; deterministic fields (shas, ink stats, correlations) are asserted in CI, timing is recorded evidence only",
+      "largeBrushThroughput is a 180px-dab proxy for the matrix 1000px gate (full-size run pending); the verdict takes the min advantage across standard + large lanes"
+    ]
+  }
+}

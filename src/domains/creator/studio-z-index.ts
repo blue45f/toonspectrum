@@ -18,6 +18,9 @@
  *       absolute dropdowns inside menubar overflow were clipped to ~0 height)
  *  110  shortcuts help / brush studio
  *  120  emergency legal notices
+ *  150  destructive-action approval (must outrank every surface that can raise one —
+ *       layer lift sits at 140, interchange loss preview at 130. A승인 창이 자기를 띄운
+ *       화면 아래로 가려지면 사용자는 "아무 일도 안 일어난 것"으로 본다.)
  */
 
 export const STUDIO_Z = {
@@ -34,6 +37,8 @@ export const STUDIO_Z = {
   workspace: 100,
   help: 110,
   legal: 120,
+  /** 파괴적 명령 승인 창 — 자기를 띄운 모든 표면 위. */
+  destructiveConfirm: 150,
 } as const;
 
 export type StudioZLayer = keyof typeof STUDIO_Z;
@@ -52,4 +57,5 @@ export const STUDIO_Z_CLASS = {
   workspace: "z-[100]",
   help: "z-[110]",
   legal: "z-[120]",
+  destructiveConfirm: "z-[150]",
 } as const;

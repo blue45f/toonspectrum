@@ -5,17 +5,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   addCustomFont,
+  formatCustomFontBytes,
   MAX_CUSTOM_FONT_FILE_BYTES,
   MAX_CUSTOM_FONT_TOTAL_BYTES,
   type StudioCustomFont,
+  type StudioFontFaceBinarySource,
   type StudioFontFaceLike,
   type StudioFontSetLike,
 } from "./studio-custom-fonts";
 import { StudioCustomFontsPanel } from "./StudioCustomFontsPanel";
 
+import type {
+  StudioCustomFontRepository,
+  StudioCustomFontWithContentHash,
+} from "./studio-custom-font-sqlite-opfs-repository";
+
 import { useI18n } from "@/lib/i18n";
 
-type FakeFontFaceFactory = (family: string, source: string) => StudioFontFaceLike;
+type FakeFontFaceFactory = (family: string, source: StudioFontFaceBinarySource) => StudioFontFaceLike;
 
 function fontBytes(signature: readonly number[], size = 64): Uint8Array {
   const bytes = new Uint8Array(size);
@@ -84,6 +91,36 @@ function importInput(): HTMLInputElement {
   return screen.getByLabelText("글꼴 파일 가져오기") as HTMLInputElement;
 }
 
+function durableFont(
+  family: string,
+  id = `font-${family.toLowerCase().replaceAll(" ", "-")}`,
+): StudioCustomFontWithContentHash {
+  const verifiedBytes = fontBytes([...TTF_SIGNATURE], 128);
+  return {
+    id,
+    family,
+    fileName: `${family}.ttf`,
+    byteLength: verifiedBytes.byteLength,
+    contentHash: `sha256:${"a".repeat(64)}`,
+    format: "ttf",
+    createdAt: 1_800_000_000_000,
+    verifiedBytes,
+  };
+}
+
+function fakeRepository(
+  overrides: Partial<StudioCustomFontRepository> = {},
+): StudioCustomFontRepository {
+  return {
+    authority: "sqlite-opfs",
+    list: vi.fn(async () => []),
+    save: vi.fn(async ({ fileName }) => durableFont(fileName.replace(/\.ttf$/u, ""))),
+    delete: vi.fn(async () => undefined),
+    cleanupOrphans: vi.fn(async () => 0),
+    ...overrides,
+  };
+}
+
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
@@ -98,7 +135,7 @@ describe("StudioCustomFontsPanel", () => {
     renderPanel();
 
     expect(screen.getByText("아직 담은 글꼴이 없어요")).toBeTruthy();
-    expect(screen.getByText(/0 B \/ 3 MB 사용/u)).toBeTruthy();
+    expect(screen.getByText(`0 B / ${formatCustomFontBytes(MAX_CUSTOM_FONT_TOTAL_BYTES)} 사용`)).toBeTruthy();
     expect(screen.getByRole("progressbar", { name: "글꼴 보관함 사용량" }).getAttribute("aria-valuenow")).toBe("0");
   });
 
@@ -147,7 +184,7 @@ describe("StudioCustomFontsPanel", () => {
     fireEvent.change(importInput(), { target: { files: [file] } });
 
     const alert = await screen.findByRole("alert");
-    expect(alert.textContent).toContain("2 MB");
+    expect(alert.textContent).toContain(formatCustomFontBytes(MAX_CUSTOM_FONT_FILE_BYTES));
     expect(file.arrayBuffer).not.toHaveBeenCalled();
     expect(onFontsChange).not.toHaveBeenCalled();
   });
@@ -180,7 +217,7 @@ describe("StudioCustomFontsPanel", () => {
     renderPanel({ fonts });
 
     expect(screen.getByText(/A\.ttf · 1\.5 KB/u)).toBeTruthy();
-    expect(screen.getByText(/1\.5 KB \/ 3 MB 사용/u)).toBeTruthy();
+    expect(screen.getByText(`1.5 KB / ${formatCustomFontBytes(MAX_CUSTOM_FONT_TOTAL_BYTES)} 사용`)).toBeTruthy();
     expect(screen.getByLabelText("담은 글꼴 1개")).toBeTruthy();
   });
 
@@ -221,5 +258,112 @@ describe("StudioCustomFontsPanel", () => {
     expect(bar.getAttribute("aria-valuenow")).toBe(
       String(Math.round((300_000 / MAX_CUSTOM_FONT_TOTAL_BYTES) * 100))
     );
+  });
+
+  it("hydrates the product repository, verifies binary FontFace registration, and exposes authority", async () => {
+    const font = durableFont("본고딕");
+    const repository = fakeRepository({ list: vi.fn(async () => [font]) });
+    const sources: StudioFontFaceBinarySource[] = [];
+    const { set } = fakeFontSet();
+
+    render(
+      <StudioCustomFontsPanel
+        repository={repository}
+        fontSet={set}
+        createFontFace={(family, source) => {
+          sources.push(source);
+          return { family, load: async () => ({ family }) };
+        }}
+      />,
+    );
+
+    expect(await screen.findByText("본고딕")).toBeTruthy();
+    expect(screen.getByText(/SQLite manifest · OPFS SHA-256/u)).toBeTruthy();
+    expect(sources).toHaveLength(1);
+    expect(sources[0]).toBeInstanceOf(ArrayBuffer);
+    expect(new Uint8Array(sources[0] as ArrayBuffer)).toEqual(font.verifiedBytes);
+  });
+
+  it("saves and deletes through the async durable repository instead of controlled callbacks", async () => {
+    const saved = durableFont("프로 CJK", "font-pro-cjk");
+    const repository = fakeRepository({
+      save: vi.fn(async () => saved),
+      delete: vi.fn(async () => undefined),
+    });
+    const { set } = fakeFontSet();
+    render(
+      <StudioCustomFontsPanel
+        repository={repository}
+        fontSet={set}
+        createFontFace={okFactory()}
+      />,
+    );
+    await screen.findByText(/SQLite manifest · OPFS SHA-256/u);
+
+    fireEvent.change(importInput(), {
+      target: { files: [fontFile("프로 CJK.ttf", fontBytes([...TTF_SIGNATURE]))] },
+    });
+    expect(await screen.findByText("프로 CJK")).toBeTruthy();
+    expect(repository.save).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "프로 CJK 글꼴 삭제" }));
+    await waitFor(() => expect(repository.delete).toHaveBeenCalledWith("font-pro-cjk"));
+    await waitFor(() => expect(screen.queryByText("프로 CJK")).toBeNull());
+  });
+
+  it("fences a stale hydration after the repository prop changes", async () => {
+    let resolveFirst: ((fonts: StudioCustomFontWithContentHash[]) => void) | undefined;
+    const first = fakeRepository({
+      list: vi.fn(() => new Promise<StudioCustomFontWithContentHash[]>((resolve) => {
+        resolveFirst = resolve;
+      })),
+    });
+    const second = fakeRepository({ list: vi.fn(async () => [durableFont("최신 글꼴")]) });
+    const { set } = fakeFontSet();
+    const rendered = render(
+      <StudioCustomFontsPanel repository={first} fontSet={set} createFontFace={okFactory()} />,
+    );
+    rendered.rerender(
+      <StudioCustomFontsPanel repository={second} fontSet={set} createFontFace={okFactory()} />,
+    );
+
+    expect(await screen.findByText("최신 글꼴")).toBeTruthy();
+    resolveFirst?.([durableFont("오래된 글꼴")]);
+    await Promise.resolve();
+    expect(screen.queryByText("오래된 글꼴")).toBeNull();
+    expect(screen.getByText("최신 글꼴")).toBeTruthy();
+  });
+
+  it("uses an explicitly labelled memory-only session when SQLite/OPFS cannot open", async () => {
+    const { set } = fakeFontSet();
+    render(
+      <StudioCustomFontsPanel
+        loadRepository={async () => Promise.reject({ code: "unavailable" })}
+        fontSet={set}
+        createFontFace={okFactory()}
+      />,
+    );
+    expect(await screen.findByText(/현재 탭 메모리 임시/u)).toBeTruthy();
+
+    fireEvent.change(importInput(), {
+      target: { files: [fontFile("임시글꼴.ttf", fontBytes([...TTF_SIGNATURE]))] },
+    });
+    expect(await screen.findByText("임시글꼴")).toBeTruthy();
+    expect(await screen.findByText(/현재 탭 메모리에만 담았어요/u)).toBeTruthy();
+  });
+
+  it("fails closed and disables import for a corrupt manifest instead of showing partial fonts", async () => {
+    const { set } = fakeFontSet();
+    render(
+      <StudioCustomFontsPanel
+        loadRepository={async () => Promise.reject({ code: "corrupt" })}
+        fontSet={set}
+        createFontFace={okFactory()}
+      />,
+    );
+
+    expect((await screen.findByRole("alert")).textContent).toMatch(/일부 항목을 표시하지 않았습니다/u);
+    expect(importInput().disabled).toBe(true);
+    expect(screen.getByText(/저장소 무결성 확인 실패/u)).toBeTruthy();
   });
 });

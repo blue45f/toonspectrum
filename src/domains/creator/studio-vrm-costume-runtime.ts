@@ -2,6 +2,7 @@ import * as THREE from "three";
 
 import {
   classifyMeshName,
+  resolveCostumeMaterialBaseHex,
   tintColor,
   type CostumeSlot,
   type CostumeState,
@@ -25,10 +26,41 @@ const isolatedCostumeMaterialMeshes = new WeakSet<THREE.Mesh>();
 function materialBaseHex(mat: THREE.Material): string {
   const cached = costumeBaseColorCache.get(mat);
   if (cached) return cached;
-  const color = (mat as unknown as { color?: THREE.Color }).color;
-  const hex = color ? `#${color.getHexString()}` : "#cccccc";
-  costumeBaseColorCache.set(mat, hex);
-  return hex;
+  const colored = mat as THREE.Material & {
+    color?: THREE.Color;
+    map?: THREE.Texture | null;
+  };
+  const currentHex = colored.color ? `#${colored.color.getHexString()}` : "#cccccc";
+  const resolved = resolveCostumeMaterialBaseHex(currentHex, {
+    hasMap: Boolean(colored.map),
+    cached: null,
+  });
+  if (resolved.cacheable) {
+    costumeBaseColorCache.set(mat, resolved.hex);
+  }
+  return resolved.hex;
+}
+
+/**
+ * Clone materials lazily at the first recolor. Keeping the authored material on load preserves
+ * VRoid/MToon textures and avoids a native-albedo flash followed by black garments.
+ */
+function isolateCostumeMaterialsForRecolor(mesh: THREE.Mesh): THREE.Material[] {
+  let materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+  if (isolatedCostumeMaterialMeshes.has(mesh)) {
+    return materials.filter((material): material is THREE.Material => Boolean(material));
+  }
+  const mannequinPoisoned = materials.some((material) => {
+    const candidate = material as THREE.Material & { userData?: Record<string, unknown> };
+    return candidate?.userData?.__vrmMannequinActive === true;
+  });
+  if (mannequinPoisoned) {
+    return materials.filter((material): material is THREE.Material => Boolean(material));
+  }
+  materials = materials.map((material) => material.clone());
+  mesh.material = Array.isArray(mesh.material) ? materials : materials[0]!;
+  isolatedCostumeMaterialMeshes.add(mesh);
+  return materials;
 }
 
 /** 씬그래프를 순회해 의상 슬롯에 해당하는 메시를 수집한다(피부·얼굴·눈·머리 제외). */
@@ -38,7 +70,7 @@ export function collectStudioVrmCostumeMeshes(vrm: VRM): StudioVrmCostumeMeshEnt
   vrm.scene.traverse((obj) => {
     if (!(obj as THREE.Mesh).isMesh) return;
     const mesh = obj as THREE.Mesh;
-    let materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
     const matNames = materials.map((m) => (m as THREE.Material | undefined)?.name)
       .filter(Boolean) as string[];
     const materialClasses = matNames.map((name) => classifyMeshName(name));
@@ -60,17 +92,7 @@ export function collectStudioVrmCostumeMeshes(vrm: VRM): StudioVrmCostumeMeshEnt
       duplicateIndex += 1;
     }
     seenKeys.add(key);
-    // Costume recolor must never mutate a material shared by skin, hair, or another primitive.
-    // Clone once per installed mesh and keep MToon/physical subclasses through Material.clone().
-    if (!isolatedCostumeMaterialMeshes.has(mesh)) {
-      materials = materials.map((material) => material.clone());
-      mesh.material = Array.isArray(mesh.material) ? materials : materials[0]!;
-      isolatedCostumeMaterialMeshes.add(mesh);
-    }
-    // 원본 색 캡처
-    materials.forEach((m) => {
-      if (m) materialBaseHex(m as THREE.Material);
-    });
+    // Do not clone or cache materials while collecting. Recolor owns the isolation boundary.
     entries.push({ key, label: mesh.name || matNames[0] || "메시", slot: cls.slot, mesh });
   });
   return entries;
@@ -84,16 +106,47 @@ export function applyStudioVrmCostumeState(
   for (const entry of entries) {
     entry.mesh.visible = !state.hidden.includes(entry.key);
     const target = state.recolor[entry.key];
-    const materials = Array.isArray(entry.mesh.material)
-      ? entry.mesh.material
-      : [entry.mesh.material];
+    if (!target && !isolatedCostumeMaterialMeshes.has(entry.mesh)) {
+      const nativeMaterials = Array.isArray(entry.mesh.material)
+        ? entry.mesh.material
+        : [entry.mesh.material];
+      for (const material of nativeMaterials) {
+        const candidate = material as (THREE.Material & {
+          userData?: Record<string, unknown>;
+        }) | undefined;
+        if (candidate?.userData?.__vrmCostumeRecolorApplied === true) {
+          candidate.userData.__vrmCostumeRecolorApplied = false;
+        }
+      }
+      continue;
+    }
+
+    const materials = target
+      ? isolateCostumeMaterialsForRecolor(entry.mesh)
+      : (Array.isArray(entry.mesh.material) ? entry.mesh.material : [entry.mesh.material]);
+
     materials.forEach((m) => {
-      const mat = m as (THREE.Material & { color?: THREE.Color }) | undefined;
+      const mat = m as (THREE.Material & {
+        color?: THREE.Color;
+        userData: Record<string, unknown>;
+      }) | undefined;
       if (!mat || !mat.color) return;
-      const base = materialBaseHex(mat);
-      const next = target ? tintColor(base, target) : base;
-      mat.color.set(next);
-      mat.needsUpdate = true;
+      if (mat.userData.__vrmMannequinActive === true) return;
+
+      if (target) {
+        const base = materialBaseHex(mat);
+        mat.color.set(tintColor(base, target));
+        mat.userData.__vrmCostumeRecolorApplied = true;
+        mat.needsUpdate = true;
+        return;
+      }
+
+      if (mat.userData.__vrmCostumeRecolorApplied === true) {
+        const base = materialBaseHex(mat);
+        mat.color.set(base);
+        mat.userData.__vrmCostumeRecolorApplied = false;
+        mat.needsUpdate = true;
+      }
     });
   }
 }

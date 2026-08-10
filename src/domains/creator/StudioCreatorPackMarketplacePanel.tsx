@@ -13,7 +13,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useState, type ReactElement } from "react";
+import { useEffect, useState, type ReactElement } from "react";
 
 import {
   STUDIO_CREATOR_PACK_CATALOG,
@@ -21,12 +21,16 @@ import {
   type StudioCreatorPackKind,
 } from "./studio-creator-pack-catalog";
 import {
+  inspectStudioCreatorPackInstallStateProduct,
+  installStudioCreatorPackProduct,
+  uninstallStudioCreatorPackProduct,
+} from "./studio-creator-pack-product-runtime";
+import {
   browserStudioCreatorPackStorage,
   inspectStudioCreatorPackInstallState,
-  installStudioCreatorPack,
   studioCreatorPackRuntimeSummary,
-  uninstallStudioCreatorPack,
   type StudioCreatorPackInstallResult,
+  type StudioCreatorPackInstallState,
 } from "./studio-creator-pack-runtime";
 import { filterStudioMarketplacePackages } from "./studio-marketplace-packages";
 
@@ -65,7 +69,41 @@ function PackCard({
   readonly onStatus: (result: StudioCreatorPackInstallResult) => void;
 }) {
   const storage = browserStudioCreatorPackStorage();
-  const state = inspectStudioCreatorPackInstallState(pack, storage);
+  const usesSqlCatalog = pack.metadata.kind === "filter"
+    || pack.metadata.kind === "brush"
+    || pack.metadata.kind === "palette";
+  const [state, setState] = useState<StudioCreatorPackInstallState>(() =>
+    usesSqlCatalog
+      ? "available"
+      : inspectStudioCreatorPackInstallState(pack, storage),
+  );
+  const [pending, setPending] = useState(usesSqlCatalog);
+  useEffect(() => {
+    let active = true;
+    setPending(true);
+    void inspectStudioCreatorPackInstallStateProduct(pack, { storage })
+      .then((next) => {
+        if (active) setState(next);
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        onStatus({
+          status: "storage-error",
+          installedCount: 0,
+          message: `${pack.metadata.name} · ${
+            usesSqlCatalog ? "로컬 SQL 카탈로그" : "기기 저장소"
+          } 상태를 읽지 못했습니다: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        });
+      })
+      .finally(() => {
+        if (active) setPending(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [onStatus, pack, refreshToken, storage, usesSqlCatalog]);
   const bundled = state === "bundled";
   const installed = state === "installed";
   const blocked = state === "invalid"
@@ -129,15 +167,18 @@ function PackCard({
       <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto] gap-1.5">
         <button
           type="button"
-          disabled={bundled || blocked}
+          disabled={bundled || blocked || pending}
           onClick={() => {
-            const result = installed
-              ? uninstallStudioCreatorPack(pack, storage)
-              : installStudioCreatorPack(pack, storage);
-            onStatus({
-              ...result,
-              message: `${pack.metadata.name} · ${result.message}`,
-            });
+            setPending(true);
+            const operation = installed
+              ? uninstallStudioCreatorPackProduct(pack, { storage })
+              : installStudioCreatorPackProduct(pack, { storage });
+            void operation.then((result) => {
+              onStatus({
+                ...result,
+                message: `${pack.metadata.name} · ${result.message}`,
+              });
+            }).finally(() => setPending(false));
           }}
           className={cx(
             "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg px-3 text-[0.62rem] font-bold transition-colors",
@@ -155,10 +196,14 @@ function PackCard({
           {installed
             ? <Trash2 size={14} aria-hidden />
             : <PackageCheck size={14} aria-hidden />}
-          {actionLabel}
+          {pending ? "로컬 SQL 확인 중…" : actionLabel}
         </button>
         <span className="inline-flex min-h-11 items-center rounded-lg border border-line px-2 text-[0.54rem] font-semibold text-fg-3">
-          {bundled ? "도구에서 바로 사용" : "기기 로컬"}
+          {bundled
+            ? "도구에서 바로 사용"
+            : usesSqlCatalog
+              ? "무제한 · 로컬 SQL"
+              : "기기 로컬"}
         </span>
       </div>
     </article>

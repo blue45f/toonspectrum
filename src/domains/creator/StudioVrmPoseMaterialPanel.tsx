@@ -1,6 +1,8 @@
 import { Download, Loader2, Sparkles, Trash2, Upload } from "lucide-react";
-import { useId, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useId, useRef, useState, type ChangeEvent } from "react";
 
+import { confirmStudioDestructiveAction } from "./studio-destructive-action-preview";
+import { studioDeletePoseMaterialRequest } from "./studio-destructive-command-catalog";
 import {
   STUDIO_POSE_SCOPES,
   isStudioHumanoidBoneInScope,
@@ -12,6 +14,7 @@ import {
   type StudioPoseMaterial,
 } from "./studio-pose-material";
 import {
+  EMPTY_STUDIO_POSE_MATERIAL_LIBRARY,
   STUDIO_POSE_MATERIAL_LIBRARY_MAX_BYTES,
   deleteStudioPoseMaterial,
   exportStudioPoseMaterialLibrary,
@@ -23,6 +26,10 @@ import {
   type StudioPoseMaterialLibraryPayload,
   type StudioPoseMaterialStorage,
 } from "./studio-pose-material-library";
+import {
+  createStudioVrmPoseMaterialSqliteRepository,
+  type StudioVrmPoseMaterialSqliteRepository,
+} from "./studio-vrm-pose-material-sqlite-repository";
 
 import type {
   StudioVrmPoseMaterialApplyResult,
@@ -44,8 +51,10 @@ interface StudioVrmPoseMaterialPanelProps {
   readonly onMaterialDeleted?: (materialId: string) => void;
   /** Invalidates pose provenance when merge-import replaces the content behind an existing id. */
   readonly onMaterialReplaced?: (materialId: string) => void;
-  /** Test/integration injection. Undefined resolves browser localStorage; null is explicit unavailable. */
+  /** Explicit legacy import/test seam. Product defaults never resolve or auto-read localStorage. */
   readonly storage?: StudioPoseMaterialStorage | null;
+  /** Async product/test seam. Undefined selects the shared V12 SQLite/OPFS repository. */
+  readonly repository?: StudioVrmPoseMaterialSqliteRepository;
 }
 
 type MessageTone = "neutral" | "success" | "warning" | "error";
@@ -55,6 +64,7 @@ interface PanelState {
   readonly payload: StudioPoseMaterialLibraryPayload;
   readonly message: string;
   readonly messageTone: MessageTone;
+  readonly authority: "hydrating" | "sqlite" | "memory" | "legacy";
 }
 
 const SCOPE_LABELS: Readonly<Record<StudioPoseScope, string>> = Object.freeze({
@@ -67,15 +77,6 @@ const SCOPE_LABELS: Readonly<Record<StudioPoseScope, string>> = Object.freeze({
 });
 
 let fallbackMaterialIdSequence = 0;
-
-function resolveBrowserPoseMaterialStorage(): StudioPoseMaterialStorage | null {
-  if (typeof window === "undefined") return null;
-  try {
-    return window.localStorage;
-  } catch {
-    return null;
-  }
-}
 
 function createPoseMaterialId(): string {
   try {
@@ -164,14 +165,29 @@ export function StudioVrmPoseMaterialPanel({
   onMaterialDeleted,
   onMaterialReplaced,
   storage,
+  repository: repositoryOverride,
 }: StudioVrmPoseMaterialPanelProps) {
   const nameInputId = useId();
   const captureScopeId = useId();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [storageAdapter] = useState<StudioPoseMaterialStorage | null>(() =>
-    storage === undefined ? resolveBrowserPoseMaterialStorage() : storage
+  const legacyStorageSeam = storage !== undefined;
+  const storageAdapter = storage ?? null;
+  const [repository] = useState<StudioVrmPoseMaterialSqliteRepository>(() =>
+    repositoryOverride ?? createStudioVrmPoseMaterialSqliteRepository()
   );
+  const mountedRef = useRef(false);
+  const mutationGenerationRef = useRef(0);
+  const mutationTailRef = useRef<Promise<void>>(Promise.resolve());
   const [panelState, setPanelState] = useState<PanelState>(() => {
+    if (!legacyStorageSeam) {
+      return {
+        loadStatus: "missing",
+        payload: EMPTY_STUDIO_POSE_MATERIAL_LIBRARY,
+        message: "SQLite/OPFS 포즈 소재를 불러오는 중입니다.",
+        messageTone: "neutral",
+        authority: "hydrating",
+      };
+    }
     const loaded = loadStudioPoseMaterialLibrary(storageAdapter);
     const message = loadStatusMessage(loaded.status);
     return {
@@ -179,6 +195,7 @@ export function StudioVrmPoseMaterialPanel({
       payload: loaded.payload,
       message,
       messageTone: message ? "warning" : "neutral",
+      authority: "legacy",
     };
   });
   const [materialName, setMaterialName] = useState("");
@@ -189,12 +206,68 @@ export function StudioVrmPoseMaterialPanel({
   const [importing, setImporting] = useState(false);
   const strengthSliderId = useId();
 
+  useEffect(() => {
+    mountedRef.current = true;
+    if (legacyStorageSeam) {
+      return () => {
+        mountedRef.current = false;
+        mutationGenerationRef.current += 1;
+      };
+    }
+
+    const hydrationGeneration = mutationGenerationRef.current;
+    void repository.load().then((payload) => {
+      if (
+        !mountedRef.current
+        || mutationGenerationRef.current !== hydrationGeneration
+      ) return;
+      setPanelState({
+        loadStatus: payload.materials.length === 0 ? "missing" : "loaded",
+        payload,
+        message: "",
+        messageTone: "neutral",
+        authority: "sqlite",
+      });
+    }).catch((error: unknown) => {
+      if (
+        !mountedRef.current
+        || mutationGenerationRef.current !== hydrationGeneration
+      ) return;
+      setPanelState({
+        loadStatus: "read-error",
+        payload: EMPTY_STUDIO_POSE_MATERIAL_LIBRARY,
+        message: `SQLite/OPFS 포즈 소재를 검증해 불러오지 못했습니다. 원문 보호를 위해 변경을 막았습니다: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        messageTone: "error",
+        authority: "memory",
+      });
+    });
+
+    return () => {
+      mountedRef.current = false;
+      mutationGenerationRef.current += 1;
+    };
+  }, [legacyStorageSeam, repository]);
+
   const storageReadOnly = ["future", "corrupt", "read-error", "unavailable"].includes(
     panelState.loadStatus
-  );
+  ) || panelState.authority === "hydrating";
   const mutationDisabled = disabled || storageReadOnly || importing;
 
-  function updateFromMutation(
+  function inMemoryStorage(
+    payload: StudioPoseMaterialLibraryPayload,
+  ): StudioPoseMaterialStorage {
+    let value = JSON.stringify(payload);
+    return {
+      getItem: () => value,
+      setItem: (_key, next) => {
+        value = next;
+      },
+    };
+  }
+
+  function commitMutation(
     result: ReturnType<typeof upsertStudioPoseMaterial>,
     successMessage: string,
   ): boolean {
@@ -206,11 +279,50 @@ export function StudioVrmPoseMaterialPanel({
       }));
       return false;
     }
+    if (!legacyStorageSeam) {
+      const generation = mutationGenerationRef.current + 1;
+      mutationGenerationRef.current = generation;
+      const optimisticPayload = result.payload;
+      setPanelState({
+        loadStatus: "loaded",
+        payload: optimisticPayload,
+        message: "SQLite/OPFS에 저장하는 중입니다.",
+        messageTone: "neutral",
+        authority: "sqlite",
+      });
+      const persisted = mutationTailRef.current
+        .catch(() => undefined)
+        .then(() => repository.save(optimisticPayload));
+      mutationTailRef.current = persisted.then(() => undefined, () => undefined);
+      void persisted.then((payload) => {
+        if (!mountedRef.current || mutationGenerationRef.current !== generation) return;
+        setPanelState({
+          loadStatus: "loaded",
+          payload,
+          message: successMessage,
+          messageTone: "success",
+          authority: "sqlite",
+        });
+      }).catch((error: unknown) => {
+        if (!mountedRef.current || mutationGenerationRef.current !== generation) return;
+        setPanelState({
+          loadStatus: "loaded",
+          payload: optimisticPayload,
+          message: `SQLite/OPFS 저장에 실패해 변경을 현재 탭 메모리에만 유지합니다. 현재 탭 메모리 임시 · 새로고침 시 사라짐: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+          messageTone: "error",
+          authority: "memory",
+        });
+      });
+      return true;
+    }
     setPanelState({
       loadStatus: "loaded",
       payload: result.payload,
       message: successMessage,
       messageTone: "success",
+      authority: "legacy",
     });
     return true;
   }
@@ -241,8 +353,11 @@ export function StudioVrmPoseMaterialPanel({
       return;
     }
     if (
-      updateFromMutation(
-        upsertStudioPoseMaterial(storageAdapter, material),
+      commitMutation(
+        upsertStudioPoseMaterial(
+          legacyStorageSeam ? storageAdapter : inMemoryStorage(panelState.payload),
+          material,
+        ),
         `“${material.name}” 소재에 ${material.bones.length}개 본을 저장했습니다.`,
       )
     ) {
@@ -276,11 +391,18 @@ export function StudioVrmPoseMaterialPanel({
     }));
   }
 
-  function handleDelete(material: StudioPoseMaterial): void {
-    if (!globalThis.confirm(`“${material.name}” 포즈 소재를 이 기기에서 삭제할까요?`)) return;
+  async function handleDelete(material: StudioPoseMaterial): Promise<void> {
     if (
-      updateFromMutation(
-        deleteStudioPoseMaterial(storageAdapter, material.id),
+      !(await confirmStudioDestructiveAction(
+        studioDeletePoseMaterialRequest(material.name),
+      ))
+    ) return;
+    if (
+      commitMutation(
+        deleteStudioPoseMaterial(
+          legacyStorageSeam ? storageAdapter : inMemoryStorage(panelState.payload),
+          material.id,
+        ),
         `“${material.name}” 소재를 삭제했습니다. 이미 적용된 캐릭터 자세는 유지됩니다.`,
       )
     ) {
@@ -289,7 +411,9 @@ export function StudioVrmPoseMaterialPanel({
   }
 
   function handleExport(): void {
-    const result = exportStudioPoseMaterialLibrary(storageAdapter);
+    const result = exportStudioPoseMaterialLibrary(
+      legacyStorageSeam ? storageAdapter : inMemoryStorage(panelState.payload),
+    );
     if (!result.ok) {
       setPanelState((current) => ({
         ...current,
@@ -334,8 +458,12 @@ export function StudioVrmPoseMaterialPanel({
         return;
       }
       const json = await file.text();
-      const result = importStudioPoseMaterialLibrary(storageAdapter, json, "merge");
-      const updated = updateFromMutation(
+      const result = importStudioPoseMaterialLibrary(
+        legacyStorageSeam ? storageAdapter : inMemoryStorage(panelState.payload),
+        json,
+        "merge",
+      );
+      const updated = commitMutation(
         result,
         "검증된 포즈 소재를 기존 라이브러리에 병합했습니다.",
       );
@@ -455,6 +583,7 @@ export function StudioVrmPoseMaterialPanel({
           className={`mt-2 text-[0.65rem] leading-relaxed ${messageClass(panelState.messageTone)}`}
           role="status"
           aria-live="polite"
+          data-studio-vrm-pose-material-authority={panelState.authority}
         >
           {panelState.message}
         </p>
@@ -518,7 +647,7 @@ export function StudioVrmPoseMaterialPanel({
                   <button
                     type="button"
                     disabled={mutationDisabled}
-                    onClick={() => handleDelete(material)}
+                    onClick={() => void handleDelete(material)}
                     className="grid size-11 shrink-0 place-items-center rounded-lg border border-line bg-card text-fg-3 hover:border-bad/40 hover:text-bad disabled:opacity-45"
                     aria-label={`${material.name} 포즈 소재 삭제`}
                   >

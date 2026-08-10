@@ -391,4 +391,39 @@ describe("incremental dirty bounds and renderer-neutral tile uploads", () => {
     expect(target.dirtyBounds).toEqual(dirty);
     expect(studioWetInkFieldDigest(target)).toBe(before);
   });
+
+  it("renders multi-spectral Beer-Lambert subtractive optical transmission and white gouache scattering correctly", () => {
+    const sumiField = field({
+      width: 32,
+      height: 32,
+      tileSize: 32,
+      spectralAbsorption: { r: 1.0, g: 0.96, b: 0.88 },
+    });
+    deposit(sumiField, [{ x: 16, y: 16, timeMs: 0 }], { radius: 10 });
+    const sumiUploads = planStudioWetInkTileUploads(sumiField);
+    expect(sumiUploads.ok).toBe(true);
+    if (!sumiUploads.ok) return;
+    expect(sumiUploads.value[0]?.rgba.some((byte) => byte > 0)).toBe(true);
+
+    const gouacheField = field({
+      width: 32,
+      height: 32,
+      tileSize: 32,
+      spectralAbsorption: { r: -1.0, g: -1.0, b: -1.0 },
+    });
+    deposit(gouacheField, [{ x: 16, y: 16, timeMs: 0 }], { radius: 10 });
+    const gouacheUploads = planStudioWetInkTileUploads(gouacheField);
+    expect(gouacheUploads.ok).toBe(true);
+    if (!gouacheUploads.ok) return;
+    const rgba = gouacheUploads.value[0]?.rgba ?? new Uint8ClampedArray(0);
+    // White gouache pixels must have R=255, G=255, B=255 and non-zero scattering alpha
+    let foundWhitePixel = false;
+    for (let index = 0; index < rgba.length; index += 4) {
+      if (rgba[index] === 255 && rgba[index + 1] === 255 && rgba[index + 2] === 255 && rgba[index + 3]! > 0) {
+        foundWhitePixel = true;
+        break;
+      }
+    }
+    expect(foundWhitePixel).toBe(true);
+  });
 });

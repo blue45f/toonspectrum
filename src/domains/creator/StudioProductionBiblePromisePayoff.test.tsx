@@ -105,6 +105,7 @@ describe("Production Bible Promise·Payoff integration", () => {
   it("persists the ledger through the existing local repository boundary", async () => {
     const values = new Map<string, string>();
     const repository = new StudioProductionBibleLocalRepository({
+      legacyDataPolicy: "import-explicit",
       indexedDB: null,
       localStorage: {
         getItem: (key) => values.get(key) ?? null,
@@ -127,7 +128,7 @@ describe("Production Bible Promise·Payoff integration", () => {
     const saved = await repository.save("promise-test", bible);
     const loaded = await repository.load("promise-test");
 
-    expect(saved.backend).toBe("local-storage");
+    expect(saved.backend).toBe("legacy-local-storage");
     expect(saved.localOnly).toBe(true);
     expect(loaded.bible.promisePayoffLedger).toEqual(ledger);
     expect(loaded.bible.entries[0]?.id).toBe("scene-rooftop");

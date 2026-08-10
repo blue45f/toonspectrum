@@ -1,0 +1,281 @@
+{
+  "generatedBy": "scripts/verify-studio-living-ink-execution.mjs",
+  "note": "Per-backend numbers for the actual-Chromium Living Ink probe. The WebGL2 lane is the certified blocking gate; the WebGPU lane runs the identical harness so the WGSL field runtime is measured on a real adapter instead of being shipped unverified.",
+  "status": "ok",
+  "webgpuVisualParity": {
+    "status": "reached",
+    "reason": "the WGSL field runtime passes every gate the GLSL runtime passes",
+    "unresolvedGates": [],
+    "regressedGates": [],
+    "repairedGates": [],
+    "recordedGap": []
+  },
+  "backends": {
+    "webgl2": {
+      "id": "webgl2",
+      "label": "WebGL2 half-float GLSL runtime",
+      "blocking": true,
+      "status": "ok",
+      "reason": null,
+      "backend": "real-chromium-dedicated-worker-offscreen-webgl2-half-float-v1",
+      "capabilities": {
+        "backend": "webgl2-offscreen-half-float",
+        "worker": true,
+        "offscreenCanvas": true,
+        "webgl2": true,
+        "webgpu": false,
+        "halfFloatRenderable": true,
+        "rgba16Float": true,
+        "rg16Float": true,
+        "r16Float": true,
+        "maximumTextureSize": 8192,
+        "pressureIterations": {
+          "interactive": 12,
+          "settle": 22
+        }
+      },
+      "launchArguments": [
+        "--no-sandbox",
+        "--disable-features=WebGPU"
+      ],
+      "lineBounds": {
+        "x": 20,
+        "y": 71,
+        "width": 214,
+        "height": 19
+      },
+      "bloomBounds": {
+        "x": 20,
+        "y": 53,
+        "width": 215,
+        "height": 53
+      },
+      "fixedInvariant": true,
+      "cancelRollback": true,
+      "deterministicReplay": true,
+      "deferredPresentation": {
+        "operationCount": 81,
+        "appliedAckCount": 81,
+        "ackReadbackCount": 0,
+        "ackImageBitmapCount": 0,
+        "explicitPresentationFrames": 1,
+        "presentEveryOperationFrames": 81,
+        "baselineHash": "sha256:75300d3159d087584cab320f94901ed58f0ec7f00f3f4109577f00db4a7a9d67",
+        "deferredHash": "sha256:75300d3159d087584cab320f94901ed58f0ec7f00f3f4109577f00db4a7a9d67",
+        "endpointExact": true,
+        "finalRevision": 81
+      },
+      "visualQuality": {
+        "sumiLocalContrast": 25.32691040842871,
+        "sumiPeakDensityOverPaper": 237.02022397892057,
+        "pigmentRegionStandardDeviation": 62.227079153478456,
+        "fiberGranulationResidual": 2.9963703703703697,
+        "bloomEdgeConcentration": 164.1041666666672,
+        "lineWashHeightExpansion": 34,
+        "isolatedBloomRadialShape": {
+          "meanRadius": 27,
+          "coefficientOfVariation": 0.16343459623300896,
+          "maximumAdjacentJumpRatio": 0.14814814814814814,
+          "normalizedHighFrequencyEdgeCurvature": 0.03806584362139917,
+          "angularCoverage": 1,
+          "dominantLobeCount": 2
+        },
+        "isolatedBloomAsymmetry": {
+          "leftRightMirrorResidual": 0.4981960502046912,
+          "topBottomMirrorResidual": 0.6701244482687199,
+          "centroidOffsetX": -2.9774508397661776,
+          "centroidOffsetY": 6.768294909242869
+        },
+        "isolatedBloomBounds": {
+          "x": 95,
+          "y": 58,
+          "width": 62,
+          "height": 48
+        },
+        "isolatedBloomGranulationResidual": 1.8030612244897948,
+        "isolatedBloomRimMinusCenterDarkness": -12.582954668397718,
+        "isolatedBloomAspectRatio": 1.2916666666666667,
+        "centralWashBandToMaximumRatio": 0.6921423739397474,
+        "minimumWashBandToMaximumRatio": 0.6871363896549981,
+        "washBandDarkness": [
+          49.67962962962937,
+          40.75524691358026,
+          41.05216049382725,
+          44.770987654321,
+          59.3117283950613
+        ],
+        "continuousCapsule": {
+          "normalizedHighFrequencyResidual": 0.010945051753821912,
+          "maximumAdjacentJumpRatio": 0.14138438880706924,
+          "startEndToInteriorRatio": 0.9729677246482573,
+          "minimumToMedianRatio": 0.817378497790869
+        },
+        "selfIntersectionLuminanceRatio": 0.9818971759594497,
+        "redBlueCentroidSeparationPixels": 0.5037208032434582,
+        "paperLuminanceStandardDeviation": 4.180586429234691,
+        "wetSheenAndBloomDifference": 57.127508361204015,
+        "whiteCoverageLightening": 230.84082031250054,
+        "whiteCenterLuminance": 243.2701822916666,
+        "whiteCenterLuminanceDeltaFromPaper": 2.1038411458333997,
+        "darkOverWhiteDensityGain": 113.63053385416633
+      },
+      "persistedJournalReload": {
+        "serialization": "json-operation-journal-fresh-worker-runtime",
+        "operationCount": 6,
+        "whiteHashBeforeReload": "sha256:c554c216734052c9dcd249ba1509aefd021d89efc53cb1738b09452a32ec3305",
+        "whiteHashAfterReload": "sha256:c554c216734052c9dcd249ba1509aefd021d89efc53cb1738b09452a32ec3305",
+        "whiteExact": true,
+        "darkOverWhiteHashBeforeReload": "sha256:f2eca5c440326ebaf70632614c86bea1d642c2de30d897c66991ba826ab0eebf",
+        "darkOverWhiteHashAfterReload": "sha256:f2eca5c440326ebaf70632614c86bea1d642c2de30d897c66991ba826ab0eebf",
+        "darkOverWhiteExact": true
+      },
+      "nearBlackReflectanceParity": {
+        "belowFloorHash": "sha256:714f5fe4765106cc9232542e7de2538bc21a78bab4ee14609d812bff7444f478",
+        "atFloorHash": "sha256:714f5fe4765106cc9232542e7de2538bc21a78bab4ee14609d812bff7444f478",
+        "exact": true
+      },
+      "workerCrashRecovery": {
+        "rejectedImmediately": true,
+        "workerInstances": 2,
+        "recoveredBackend": "webgl2-offscreen-half-float",
+        "reinitialized": true,
+        "postCrashFrameHash": "sha256:662332e83f50d708ef92d7872ed5ade470338c2266add33afb55c89ae73b8153"
+      },
+      "failures": []
+    },
+    "webgpu": {
+      "id": "webgpu",
+      "label": "WebGPU WGSL field runtime",
+      "blocking": false,
+      "status": "ok",
+      "reason": null,
+      "backend": "real-chromium-dedicated-worker-offscreen-webgpu-half-float-v1",
+      "capabilities": {
+        "backend": "webgpu-offscreen-half-float",
+        "worker": true,
+        "offscreenCanvas": true,
+        "webgl2": false,
+        "webgpu": true,
+        "halfFloatRenderable": true,
+        "rgba16Float": true,
+        "rg16Float": true,
+        "r16Float": true,
+        "maximumTextureSize": 8192,
+        "pressureIterations": {
+          "interactive": 12,
+          "settle": 22
+        }
+      },
+      "launchArguments": [
+        "--no-sandbox",
+        "--enable-unsafe-webgpu",
+        "--enable-features=WebGPU",
+        "--use-angle=metal"
+      ],
+      "lineBounds": {
+        "x": 20,
+        "y": 70,
+        "width": 214,
+        "height": 20
+      },
+      "bloomBounds": {
+        "x": 20,
+        "y": 55,
+        "width": 215,
+        "height": 53
+      },
+      "fixedInvariant": true,
+      "cancelRollback": true,
+      "deterministicReplay": true,
+      "deferredPresentation": {
+        "operationCount": 81,
+        "appliedAckCount": 81,
+        "ackReadbackCount": 0,
+        "ackImageBitmapCount": 0,
+        "explicitPresentationFrames": 1,
+        "presentEveryOperationFrames": 81,
+        "baselineHash": "sha256:4911efe88503000b1025fe9174a613aac15efea061dd208a134f6bc2fc8c41b9",
+        "deferredHash": "sha256:4911efe88503000b1025fe9174a613aac15efea061dd208a134f6bc2fc8c41b9",
+        "endpointExact": true,
+        "finalRevision": 81
+      },
+      "visualQuality": {
+        "sumiLocalContrast": 26.339789196307077,
+        "sumiPeakDensityOverPaper": 238.09041501976353,
+        "pigmentRegionStandardDeviation": 64.76160354604556,
+        "fiberGranulationResidual": 2.7012962962962987,
+        "bloomEdgeConcentration": 136.72192028985592,
+        "lineWashHeightExpansion": 33,
+        "isolatedBloomRadialShape": {
+          "meanRadius": 28.444444444444443,
+          "coefficientOfVariation": 0.12808986275054376,
+          "maximumAdjacentJumpRatio": 0.10546875,
+          "normalizedHighFrequencyEdgeCurvature": 0.0341796875,
+          "angularCoverage": 1,
+          "dominantLobeCount": 3
+        },
+        "isolatedBloomAsymmetry": {
+          "leftRightMirrorResidual": 0.5472384057696283,
+          "topBottomMirrorResidual": 0.5092121075884259,
+          "centroidOffsetX": -1.6212000864189093,
+          "centroidOffsetY": 3.12426924738881
+        },
+        "isolatedBloomBounds": {
+          "x": 98,
+          "y": 57,
+          "width": 63,
+          "height": 52
+        },
+        "isolatedBloomGranulationResidual": 1.777534013605436,
+        "isolatedBloomRimMinusCenterDarkness": -14.310234772260067,
+        "isolatedBloomAspectRatio": 1.2115384615384615,
+        "centralWashBandToMaximumRatio": 0.9373905553131368,
+        "minimumWashBandToMaximumRatio": 0.7892654951008512,
+        "washBandDarkness": [
+          44.06820987654338,
+          42.9854938271605,
+          51.05277777777762,
+          49.592901234567925,
+          54.46265432098723
+        ],
+        "continuousCapsule": {
+          "normalizedHighFrequencyResidual": 0.010431338028169018,
+          "maximumAdjacentJumpRatio": 0.11918604651162784,
+          "startEndToInteriorRatio": 1.008433797879071,
+          "minimumToMedianRatio": 0.8154069767441862
+        },
+        "selfIntersectionLuminanceRatio": 0.9839343091752946,
+        "redBlueCentroidSeparationPixels": 0.5484737636408031,
+        "paperLuminanceStandardDeviation": 4.683953527163046,
+        "wetSheenAndBloomDifference": 57.29090022296544,
+        "whiteCoverageLightening": 229.89322916666706,
+        "whiteCenterLuminance": 241.28873697916654,
+        "whiteCenterLuminanceDeltaFromPaper": 2.090494791666714,
+        "darkOverWhiteDensityGain": 112.72656249999955
+      },
+      "persistedJournalReload": {
+        "serialization": "json-operation-journal-fresh-worker-runtime",
+        "operationCount": 6,
+        "whiteHashBeforeReload": "sha256:661e3c00c9a0ef2aa89074637d7d18a17b66ae8f9468c534da8031ac479d2b1c",
+        "whiteHashAfterReload": "sha256:661e3c00c9a0ef2aa89074637d7d18a17b66ae8f9468c534da8031ac479d2b1c",
+        "whiteExact": true,
+        "darkOverWhiteHashBeforeReload": "sha256:6e581fe0d7994e2350d5f0a807d46d791de52e51fe6e8723cebba9fa7989f282",
+        "darkOverWhiteHashAfterReload": "sha256:6e581fe0d7994e2350d5f0a807d46d791de52e51fe6e8723cebba9fa7989f282",
+        "darkOverWhiteExact": true
+      },
+      "nearBlackReflectanceParity": {
+        "belowFloorHash": "sha256:a46e712cfe48d4d69d3f5bac83f77babfbc9ba69c025e837f6d99dec4328af14",
+        "atFloorHash": "sha256:a46e712cfe48d4d69d3f5bac83f77babfbc9ba69c025e837f6d99dec4328af14",
+        "exact": true
+      },
+      "workerCrashRecovery": {
+        "rejectedImmediately": true,
+        "workerInstances": 2,
+        "recoveredBackend": "webgpu-offscreen-half-float",
+        "reinitialized": true,
+        "postCrashFrameHash": "sha256:1b56eb948e922ed15d3c9767cc15cd339a1b00f95ad5b627dc5451432e3c06d0"
+      },
+      "failures": []
+    }
+  }
+}

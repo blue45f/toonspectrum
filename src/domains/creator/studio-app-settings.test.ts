@@ -63,7 +63,7 @@ describe("studio-app-settings", () => {
 
   it("keeps the new selection, retouch, and view tools aligned across both catalogs", () => {
     const expected = [
-      { railId: "blend", actionId: "tool-blend", label: "혼합(스머지)", shortcut: "N" },
+      { railId: "blend", actionId: "tool-blend", label: "문지르기", shortcut: "N" },
       { railId: "liquify", actionId: "tool-liquify", label: "리퀴파이", shortcut: "J" },
       { railId: "marquee-circle", actionId: "tool-marquee-circle", label: "원형 선택", shortcut: "Shift+M" },
       { railId: "crop", actionId: "tool-crop", label: "자르기", shortcut: "C" },

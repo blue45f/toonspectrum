@@ -1,0 +1,49 @@
+{
+  "version": 11,
+  "width": 128,
+  "height": 128,
+  "background": { "r": 1, "g": 1, "b": 1, "a": 1 },
+  "nodes": [
+    {
+      "id": "horizontal",
+      "kind": "fill-path",
+      "path": { "verbs": [
+        { "v": "M", "x": 8, "y": 8 },
+        { "v": "L", "x": 120, "y": 8 },
+        { "v": "L", "x": 120, "y": 56 },
+        { "v": "L", "x": 8, "y": 56 },
+        { "v": "Z" }
+      ] },
+      "paint": {
+        "kind": "linear-gradient",
+        "from": [8, 8],
+        "to": [120, 8],
+        "stops": [
+          { "offset": 0, "color": { "r": 0.9, "g": 0.15, "b": 0.15, "a": 1 } },
+          { "offset": 0.5, "color": { "r": 0.95, "g": 0.85, "b": 0.2, "a": 1 } },
+          { "offset": 1, "color": { "r": 0.1, "g": 0.4, "b": 0.85, "a": 1 } }
+        ]
+      }
+    },
+    {
+      "id": "diagonal",
+      "kind": "fill-path",
+      "path": { "verbs": [
+        { "v": "M", "x": 24, "y": 68 },
+        { "v": "L", "x": 104, "y": 68 },
+        { "v": "L", "x": 104, "y": 120 },
+        { "v": "L", "x": 24, "y": 120 },
+        { "v": "Z" }
+      ] },
+      "paint": {
+        "kind": "linear-gradient",
+        "from": [24, 68],
+        "to": [104, 120],
+        "stops": [
+          { "offset": 0, "color": { "r": 0.05, "g": 0.05, "b": 0.1, "a": 1 } },
+          { "offset": 1, "color": { "r": 0.7, "g": 0.95, "b": 0.85, "a": 1 } }
+        ]
+      }
+    }
+  ]
+}

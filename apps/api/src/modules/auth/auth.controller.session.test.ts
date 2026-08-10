@@ -205,4 +205,22 @@ describe("AuthController session truth source", () => {
     expect(JSON.stringify(result)).not.toContain("token");
     expect(JSON.stringify(result)).not.toContain("sessionVersion");
   });
+
+  it("exposes admin role for built-in ADMIN_EMAILS whitelist accounts even when DB role is user", () => {
+    const result = authResponseUser({
+      id: "owner",
+      name: "Owner",
+      email: "blue45f@gmail.com",
+      image: null,
+      role: "user",
+    });
+
+    expect(result).toEqual({
+      id: "owner",
+      name: "Owner",
+      email: "blue45f@gmail.com",
+      image: null,
+      role: "admin",
+    });
+  });
 });

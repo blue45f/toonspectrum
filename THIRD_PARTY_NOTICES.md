@@ -32,6 +32,12 @@ obscure, or claim ownership of these libraries.
 | `hokusai-brush`, `hokusai-core`, and `hokusai-tile-mem` | 0.3.0 | MIT OR Apache-2.0 | <https://github.com/reearth/hokusai/tree/f7e998173c0e7427b95afe0b6947e3103da60f00> |
 | `wasm-bindgen` family | 0.2.123 | MIT OR Apache-2.0 | <https://github.com/wasm-bindgen/wasm-bindgen/tree/0.2.123> |
 | `unicode-ident` data tables | 1.0.24 | (MIT OR Apache-2.0) AND Unicode-3.0 | <https://github.com/dtolnay/unicode-ident/tree/1.0.24> |
+| Vello CPU stack (`vello_cpu`, Parley, HarfRust, Skrifa and transitive crates) | feature-locked Cargo graph | per-crate SPDX expressions | <https://github.com/linebender/vello> |
+| Vello GPU stack (`vello`, Velato, `vello_svg`, usvg, wgpu and transitive crates) | `fabric,lottie,svg` feature-locked Cargo graph | per-crate SPDX expressions | <https://github.com/linebender/vello> |
+| `google/ink` mesh subset | 1.1.0 / `1d0daba661f3035f42f3649b8e6a0061b47aa759` | Apache-2.0 | <https://github.com/google/ink> |
+| `google/ink-stroke-modeler` | 0.1.0 / `f2388813b0b25bc3e33d143d369a8367ab2e30c8` | Apache-2.0 | <https://github.com/google/ink-stroke-modeler> |
+| `abseil-cpp` linked into Google Ink WASM | 20260526.0 and 20250512.0 | Apache-2.0 | <https://github.com/abseil/abseil-cpp> |
+| `libmypaint` WASM | 1.6.1 / `2768251dacce3939136c839aeca413f4aa4241d0` | ISC | <https://github.com/mypaint/libmypaint> |
 
 Some npm archives do not contain a standalone `LICENSE` file even though their
 package metadata declares an SPDX license. In particular,
@@ -66,6 +72,32 @@ manifest without requiring Rust. `pnpm run
 verify:studio-hokusai-wasm:rebuild` additionally requires the pinned Rust
 1.97.1, Cargo 1.97.1, and wasm-pack 0.15.0 toolchain and proves that a clean
 release rebuild is byte-identical to the checked-in JS, types and WASM.
+
+The checked-in Vello CPU and GPU artifacts have an independent fail-closed
+notice boundary. `crates/studio-engine-vello/THIRD_PARTY_INVENTORY.json`
+records the exact `wasm32-unknown-unknown` package sets, Cargo.lock checksums,
+binary hashes and package-to-license-document mapping. The CPU `pkg` inventory
+contains 85 external crates. The GPU `pkg-gpu` inventory contains 144 external
+crates for the exact `fabric,lottie,svg` feature set, including Vello, Velato,
+`vello_svg`, usvg, Parley, HarfRust and all three resolved Skrifa versions.
+Both artifact directories ship a `NOTICE` and exact source-derived license
+bundle (`crates/studio-engine-vello/pkg/THIRD_PARTY_LICENSES.txt` and
+`crates/studio-engine-vello/pkg-gpu/THIRD_PARTY_LICENSES.txt`). A separate
+`THIRD_PARTY_NOTICES.sha256` pins those source notice artifacts without
+changing the engine binary integrity manifests.
+
+The independently emitted Google Ink Mesh, google/ink-stroke-modeler and
+libmypaint Emscripten artifacts are not inferred from pnpm. Their locked
+provenance is stored in
+`packages/studio-brush-platform/src/ink-mesh/THIRD_PARTY_INVENTORY.json`,
+`packages/studio-brush-platform/src/ink-modeler/THIRD_PARTY_INVENTORY.json`,
+and
+`packages/studio-brush-platform/src/libmypaint/THIRD_PARTY_INVENTORY.json`.
+Each artifact directory ships a hash-locked `NOTICE` and exact copies of the
+upstream Google Ink, Google Ink Stroke Modeler, abseil-cpp, or libmypaint
+license files. The release generator validates both the copied text and the
+opaque JavaScript/WASM SHA-256 values, so omitting a component, artifact, or
+license copy fails `pnpm run audit:licenses`.
 
 The OCCT integration loads `opencascade.js` as an independently emitted,
 lazy browser module and WASM asset. ToonSpectrum does not modify or statically

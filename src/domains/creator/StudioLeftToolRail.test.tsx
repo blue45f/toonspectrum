@@ -17,6 +17,7 @@ interface MockRailButtonProps {
   readonly "aria-controls"?: string;
   readonly "aria-expanded"?: boolean;
   readonly "aria-keyshortcuts"?: string;
+  readonly "data-studio-rail-tool-id"?: string;
   readonly active?: boolean;
   readonly className?: string;
   readonly description?: string;
@@ -31,11 +32,18 @@ interface MockRailButtonProps {
 }
 
 vi.mock("./studio-chrome-ui", () => ({
-  StudioRailDivider: () => <hr />,
+  StudioRailDivider: (props: Record<string, string | undefined>) => (
+    <hr
+      data-studio-rail-group-divider={props["data-studio-rail-group-divider"]}
+      data-studio-rail-group-label={props.label}
+      aria-label={props.label}
+    />
+  ),
   StudioRailToolButton: ({
     "aria-controls": ariaControls,
     "aria-expanded": ariaExpanded,
     "aria-keyshortcuts": ariaKeyShortcuts,
+    "data-studio-rail-tool-id": railToolId,
     active,
     className,
     description,
@@ -60,6 +68,7 @@ vi.mock("./studio-chrome-ui", () => ({
       data-hint-description={description}
       data-hint-preview={hintPreview}
       data-hint-preview-variant={hintPreviewVariant}
+      data-studio-rail-tool-id={railToolId}
       data-unavailable-reason={unavailableReason}
       disabled={disabled}
       onClick={onClick}
@@ -114,6 +123,7 @@ const USABLE_SELECTION = {
 
 function createHandlers(): StudioLeftToolRailHandlers {
   return {
+    activatePrimaryCanvasTool: vi.fn(),
     fitCanvasToWidth: vi.fn(),
     openFrameAnimationForSelected: vi.fn(),
     openPixelSelectionTransform: vi.fn(),
@@ -127,6 +137,7 @@ function createHandlers(): StudioLeftToolRailHandlers {
     onRequestPixelSelection: vi.fn(),
     onRequestSelectImage: vi.fn(),
     onPickImage: vi.fn(async () => undefined),
+    revealDrawToolProperties: vi.fn(),
     toggleAdvancedFill: vi.fn(),
     toggleDodgeBurnTool: vi.fn(),
     toggleWetMixTool: vi.fn(),
@@ -168,7 +179,6 @@ function createProps(overrides: Partial<RailProps> = {}): RailProps {
     selectedImageMutationLocked: false,
     setAppSettingsInitialTab: vi.fn(),
     setAppSettingsOpen: vi.fn(),
-    setDrawMode: vi.fn(),
     setDrawShape: vi.fn(),
     setEyedropperActive: vi.fn(),
     setMenu: vi.fn(),
@@ -288,15 +298,14 @@ describe("StudioLeftToolRail", () => {
     render(<StudioLeftToolRail {...props} />);
 
     fireEvent.click(screen.getByRole("button", { name: "펜 (B)" }));
-    expect(props.setTool).toHaveBeenCalledWith("draw");
-    expect(props.setDrawMode).toHaveBeenCalledWith("pen");
+    expect(props.stableHandlers.activatePrimaryCanvasTool).toHaveBeenCalledWith("draw", "pen");
 
     fireEvent.click(screen.getByRole("button", { name: "픽셀 펜 (P)" }));
-    expect(props.setDrawMode).toHaveBeenCalledWith("pixel");
+    expect(props.stableHandlers.activatePrimaryCanvasTool).toHaveBeenCalledWith("draw", "pixel");
     expect(props.setStrokeWidth).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "사각형 도형" }));
-    expect(props.setDrawMode).toHaveBeenCalledWith("shape");
+    expect(props.stableHandlers.activatePrimaryCanvasTool).toHaveBeenCalledWith("draw", "shape");
     expect(props.setDrawShape).toHaveBeenCalledWith("rect");
 
     fireEvent.click(screen.getByRole("button", { name: "텍스트 추가" }));
@@ -358,21 +367,41 @@ describe("StudioLeftToolRail", () => {
       );
     }
 
-    const selectionRecovery = screen.getByRole<HTMLButtonElement>("button", {
-      name: "선택 시작하기",
+    // No raster target: transform arms object select ("선택 후 변형"), not pixel marquee.
+    const transformPickRecovery = screen.getByRole<HTMLButtonElement>("button", {
+      name: "선택 후 변형",
     });
     const imageRecovery = screen.getByRole<HTMLButtonElement>("button", {
       name: "이미지 선택하기",
     });
-    expect(selectionRecovery.disabled).toBe(false);
-    expect(selectionRecovery.className).toContain("size-11");
+    expect(transformPickRecovery.disabled).toBe(false);
+    expect(transformPickRecovery.className).toContain("size-11");
     expect(imageRecovery.disabled).toBe(false);
     expect(imageRecovery.className).toContain("size-11");
 
-    fireEvent.click(selectionRecovery);
+    fireEvent.click(transformPickRecovery);
     fireEvent.click(imageRecovery);
-    expect(props.stableHandlers.onRequestPixelSelection).toHaveBeenCalledOnce();
+    expect(props.setTool).toHaveBeenCalledWith("select");
+    expect(props.stableHandlers.onRequestPixelSelection).not.toHaveBeenCalled();
     expect(props.stableHandlers.onRequestSelectImage).toHaveBeenCalledOnce();
+  });
+
+  it("starts pixel marquee recovery when a raster target exists but nothing is free-transformable", () => {
+    const props = createProps({
+      pixelSel: null,
+      pixelToolTargetAvailable: true,
+      rasterRetouchTargetAvailable: true,
+      selected: null,
+    });
+    render(<StudioLeftToolRail {...props} />);
+
+    const selectionRecovery = screen.getByRole<HTMLButtonElement>("button", {
+      name: "선택 시작하기",
+    });
+    expect(selectionRecovery.disabled).toBe(false);
+    fireEvent.click(selectionRecovery);
+    expect(props.stableHandlers.onRequestPixelSelection).toHaveBeenCalledOnce();
+    expect(props.setTool).not.toHaveBeenCalledWith("select");
   });
 
   it("disables only inactive raster-retouch tools when neither image nor page target is available", () => {
@@ -605,10 +634,13 @@ describe("StudioLeftToolRail", () => {
     fireEvent.click(screen.getByRole("button", { name: "투시도" }));
 
     expect(props.setPerspectiveRulerActive).toHaveBeenCalledWith(true);
-    expect(props.stableHandlers.disarmAllPixelTools).toHaveBeenCalledOnce();
-    expect(props.setTool).toHaveBeenCalledWith("draw");
-    expect(props.setDrawMode).toHaveBeenCalledWith("pen");
-    expect(props.setEyedropperActive).toHaveBeenCalledWith(false);
+    // 획 취소·disarm(스포이드 해제 포함)은 전이 함수가 단독으로 책임진다.
+    expect(props.stableHandlers.activatePrimaryCanvasTool).toHaveBeenCalledExactlyOnceWith(
+      "draw",
+      "pen",
+    );
+    expect(props.stableHandlers.disarmAllPixelTools).not.toHaveBeenCalled();
+    expect(props.setTool).not.toHaveBeenCalled();
     expect(props.stableHandlers.announceDrawingShortcut).toHaveBeenCalledWith(
       "투시도 켜짐 · 소실점 방향으로 펜 선을 맞춰요",
     );
@@ -673,7 +705,7 @@ describe("StudioLeftToolRail", () => {
       "펜 (B)",
       "픽셀 펜 (P)",
       "지우개 (E)",
-      "라쏘 필",
+      "올가미 채우기",
       "투시도",
       "스마트 도형 켜기",
       "사각형 도형",
@@ -774,5 +806,85 @@ describe("StudioLeftToolRail", () => {
     fireEvent.pointerDown(document.body);
 
     expect(outsideProps.setRailMoreOpen).toHaveBeenCalledWith(false);
+  });
+
+  it("renders the live tool belt in STUDIO_CHROME_RAIL_TOOL_GROUPS order", async () => {
+    const { STUDIO_CHROME_DEFAULT_RAIL_TOOL_ORDER } = await import("./studio-chrome-ia-map");
+    render(<StudioLeftToolRail {...createProps()} />);
+    const rail = screen.getByRole("toolbar", { name: "그리기 도구" });
+    const scroll = rail.querySelector('[data-studio-tool-rail-scroll="true"]');
+    expect(scroll).not.toBeNull();
+    const liveIds = Array.from(
+      scroll!.querySelectorAll<HTMLElement>("[data-studio-rail-tool-id]"),
+    ).map((node) => node.getAttribute("data-studio-rail-tool-id"));
+    expect(liveIds).toEqual([...STUDIO_CHROME_DEFAULT_RAIL_TOOL_ORDER]);
+    // Draw tools before marquee/transform; view tools after 3D/reference.
+    expect(liveIds.indexOf("pen")).toBeLessThan(liveIds.indexOf("marquee-rect"));
+    expect(liveIds.indexOf("marquee-rect")).toBeLessThan(liveIds.indexOf("transform"));
+    expect(liveIds.indexOf("vrm3d")).toBeLessThan(liveIds.indexOf("zoom"));
+  });
+
+  it("labels rail group dividers from the chrome IA map (CSP scannable groups)", async () => {
+    const { STUDIO_CHROME_RAIL_TOOL_GROUPS } = await import("./studio-chrome-ia-map");
+    render(<StudioLeftToolRail {...createProps()} />);
+    for (const group of STUDIO_CHROME_RAIL_TOOL_GROUPS) {
+      const divider = document.querySelector(
+        `[data-studio-rail-group-divider="${group.id}"]`,
+      );
+      expect(divider, `missing divider for ${group.id}`).not.toBeNull();
+      expect(divider!.getAttribute("data-studio-rail-group-label")).toBe(group.labelKo);
+    }
+  });
+
+  it("reveals draw properties when a rail draw tool is picked", () => {
+    const props = createProps();
+    render(<StudioLeftToolRail {...props} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "펜 (B)" }));
+    expect(props.stableHandlers.activatePrimaryCanvasTool).toHaveBeenCalledWith("draw", "pen");
+    expect(props.stableHandlers.revealDrawToolProperties).toHaveBeenCalledOnce();
+
+    fireEvent.click(screen.getByRole("button", { name: "지우개 (E)" }));
+    expect(props.stableHandlers.activatePrimaryCanvasTool).toHaveBeenCalledWith("draw", "eraser");
+    expect(props.stableHandlers.revealDrawToolProperties).toHaveBeenCalledTimes(2);
+
+    fireEvent.click(screen.getByRole("button", { name: "사각형 도형" }));
+    expect(props.stableHandlers.activatePrimaryCanvasTool).toHaveBeenCalledWith("draw", "shape");
+    expect(props.setDrawShape).toHaveBeenCalledWith("rect");
+    expect(props.stableHandlers.revealDrawToolProperties).toHaveBeenCalledTimes(3);
+  });
+
+  it("offers free transform (not marquee recovery) when a stroke layer is selected", () => {
+    const stroke = {
+      id: "draw-1",
+      type: "draw",
+      mode: "pen",
+      points: [10, 10, 80, 60],
+      strokeWidth: 4,
+      stroke: "#111",
+      opacity: 1,
+    } as El;
+    const props = createProps({ selected: stroke });
+    render(<StudioLeftToolRail {...props} />);
+    const transform = screen.getByRole("button", { name: "변형 (⇧T)" });
+    expect(transform.hasAttribute("disabled")).toBe(false);
+    fireEvent.click(transform);
+    expect(props.stableHandlers.openPixelSelectionTransform).toHaveBeenCalledOnce();
+    expect(props.stableHandlers.onRequestPixelSelection).not.toHaveBeenCalled();
+  });
+
+  it("arms select tool instead of pixel marquee when nothing is selected on a vector page", () => {
+    const props = createProps({
+      selected: null,
+      pixelToolTargetAvailable: false,
+      rasterRetouchTargetAvailable: false,
+    });
+    render(<StudioLeftToolRail {...props} />);
+    const transform = screen.getByRole("button", { name: "선택 후 변형" });
+    fireEvent.click(transform);
+    expect(props.setTool).toHaveBeenCalledWith("select");
+    expect(props.stableHandlers.announceDrawingShortcut).toHaveBeenCalled();
+    expect(props.stableHandlers.onRequestPixelSelection).not.toHaveBeenCalled();
+    expect(props.stableHandlers.openPixelSelectionTransform).not.toHaveBeenCalled();
   });
 });

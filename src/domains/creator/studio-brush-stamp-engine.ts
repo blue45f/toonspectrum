@@ -10,7 +10,13 @@
  * 이 계약 덕에 뷰포트 리플레이·커밋 핸드오프에서 획의 모양이 변하지 않는다.
  */
 
-export type StudioStampBrushKind = "airbrush" | "pencil" | "ink" | "watercolor";
+export type StudioStampBrushKind =
+  | "airbrush"
+  | "pencil"
+  | "ink"
+  | "watercolor"
+  | "mypaint"
+  | "krita-auto";
 
 /**
  * One logical stamp stroke may be replayed from an imported/collaborative document. A finite cap
@@ -27,11 +33,18 @@ export function resolveStudioStampBrushKind(
     case "ink-brush":
       return "ink";
     case "airbrush-fine":
+    case "airbrush-soft":
       return "airbrush";
     case "pencil-grain":
       return "pencil";
     case "wash-brush":
       return "watercolor";
+    case "mypaint-smudge-oil":
+    case "mypaint-watercolor-expressive":
+      return "mypaint";
+    case "krita-auto-soft":
+    case "krita-dual-pattern":
+      return "krita-auto";
     default:
       return null;
   }
@@ -59,6 +72,8 @@ const STAMP_SPACING_RATIO: Record<StudioStampBrushKind, number> = {
   ink: 0.32,
   // 수채는 dab 이 겹치며 링이 연속된 젖은 경계로 읽히도록 촘촘하게 찍는다.
   watercolor: 0.11,
+  mypaint: 0.2,
+  "krita-auto": 0.15,
 };
 
 /** 종류별 기본 파라미터 — UI 슬라이더의 초기값이자 스타일 미지정 필드의 폴백. */
@@ -70,6 +85,8 @@ export const STUDIO_STAMP_BRUSH_DEFAULTS: Record<
   pencil: { flow: 0.62, hardness: 0.85, minSizeRatio: 0.35 },
   ink: { flow: 1, hardness: 1, minSizeRatio: 0.08 },
   watercolor: { flow: 0.3, hardness: 0.35, minSizeRatio: 0.6 },
+  mypaint: { flow: 0.75, hardness: 0.6, minSizeRatio: 0.25 },
+  "krita-auto": { flow: 0.85, hardness: 0.75, minSizeRatio: 0.3 },
 };
 
 /** 사용자 조절 가능한 스탬프 파라미터(부분 지정) — DrawEl.stamp 로 획에 영속화된다. */
@@ -180,6 +197,80 @@ function stampDotPlan(
   };
 }
 
+const dabTipCanvasCache = new Map<string, HTMLCanvasElement>();
+const MAX_DAB_TIP_CACHE_SIZE = 128;
+
+function getCachedDabTipCanvas(
+  kind: StudioStampBrushKind,
+  color: string,
+  radius: number,
+  hardness: number
+): HTMLCanvasElement | null {
+  const roundedRadius = Math.max(1, Math.round(radius));
+  const roundedHardness = Math.round(hardness * 20) / 20;
+  const key = `${kind}:${color}:${roundedRadius}:${roundedHardness}`;
+  const existing = dabTipCanvasCache.get(key);
+  if (existing) return existing;
+
+  if (typeof document === "undefined") return null;
+  const size = roundedRadius * 2 + 4;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+
+  const cx = size / 2;
+  const cy = size / 2;
+  const r = roundedRadius;
+
+  if (kind === "airbrush" || kind === "watercolor") {
+    const gradient = ctx.createRadialGradient(cx, cy, r * roundedHardness * 0.85, cx, cy, r);
+    gradient.addColorStop(0, color);
+    gradient.addColorStop(1, "transparent");
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+    if (kind === "watercolor") {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = Math.max(0.25, r * 0.06);
+      ctx.beginPath();
+      ctx.arc(cx, cy, r * 0.94, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  } else if (kind === "mypaint") {
+    const gradient = ctx.createRadialGradient(cx, cy, r * roundedHardness * 0.5, cx, cy, r);
+    gradient.addColorStop(0, color);
+    gradient.addColorStop(0.8, color);
+    gradient.addColorStop(1, "transparent");
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (kind === "krita-auto") {
+    const gradient = ctx.createRadialGradient(cx, cy, r * roundedHardness * 0.7, cx, cy, r);
+    gradient.addColorStop(0, color);
+    gradient.addColorStop(1, "transparent");
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  if (dabTipCanvasCache.size >= MAX_DAB_TIP_CACHE_SIZE) {
+    const firstKey = dabTipCanvasCache.keys().next().value;
+    if (firstKey) dabTipCanvasCache.delete(firstKey);
+  }
+  dabTipCanvasCache.set(key, canvas);
+  return canvas;
+}
+
 function drawDab(
   context: CanvasRenderingContext2D,
   style: StudioStampBrushStyle,
@@ -190,36 +281,37 @@ function drawDab(
   index: number
 ): void {
   const kind = style.kind;
-  if (kind === "airbrush" || kind === "watercolor") {
-    const hardness = clamp01(style.hardness);
-    const gradient = context.createRadialGradient(x, y, radius * hardness * 0.85, x, y, radius);
-    gradient.addColorStop(0, style.color);
-    gradient.addColorStop(1, "transparent");
-    context.globalAlpha = alpha;
-    context.fillStyle = gradient;
-    context.beginPath();
-    context.arc(x, y, radius, 0, Math.PI * 2);
-    context.fill();
-    if (kind === "watercolor") {
-      // 웻엣지: 가장자리에 살짝 진한 링을 얹어 수채 특유의 경계 침전을 흉내낸다.
-      // 링은 은은해야 한다 — 강하면 dab 이 구슬처럼 분리돼 보인다(촘촘한 간격과 세트).
-      context.globalAlpha = alpha * 0.22;
-      context.strokeStyle = style.color;
-      context.lineWidth = Math.max(0.35, radius * 0.1);
-      context.beginPath();
-      context.arc(x, y, radius * 0.94, 0, Math.PI * 2);
-      context.stroke();
-    }
-    return;
-  }
+  const hardness = clamp01(style.hardness);
+  const isRealCanvas =
+    typeof window !== "undefined" &&
+    typeof (context.canvas as unknown) === "object" &&
+    context.canvas !== null;
+
   if (kind === "pencil") {
-    // 종이 그레인: 결정적 지터로 위치·도포량을 흔들고, 미세 점 2개를 곁들여 톱니를 만든다.
     const jx = (stampJitter(index, 11) - 0.5) * radius * 0.5;
     const jy = (stampJitter(index, 23) - 0.5) * radius * 0.5;
+    const dabRadius = radius * (0.82 + 0.18 * stampJitter(index, 41));
+    let fillStyle: string | CanvasGradient = style.color;
+    if (typeof context.createRadialGradient === "function") {
+      const gradient = context.createRadialGradient(
+        x + jx,
+        y + jy,
+        dabRadius * 0.25,
+        x + jx,
+        y + jy,
+        dabRadius
+      );
+      if (gradient && typeof gradient.addColorStop === "function") {
+        gradient.addColorStop(0, style.color);
+        gradient.addColorStop(0.72, style.color);
+        gradient.addColorStop(1, "transparent");
+        fillStyle = gradient;
+      }
+    }
     context.globalAlpha = alpha * (0.7 + 0.3 * stampJitter(index, 37));
-    context.fillStyle = style.color;
+    context.fillStyle = fillStyle;
     context.beginPath();
-    context.arc(x + jx, y + jy, radius * (0.82 + 0.18 * stampJitter(index, 41)), 0, Math.PI * 2);
+    context.arc(x + jx, y + jy, dabRadius, 0, Math.PI * 2);
     context.fill();
     context.globalAlpha = alpha * 0.45;
     for (let grain = 0; grain < 2; grain += 1) {
@@ -231,7 +323,75 @@ function drawDab(
     }
     return;
   }
-  // ink: 경계가 선명한 원 dab — 속도·필압 반응 폭이 질감의 전부라 형태는 단순하게 유지한다.
+
+  if (isRealCanvas) {
+    const cachedTip = getCachedDabTipCanvas(kind, style.color, radius, hardness);
+    if (cachedTip) {
+      let dabAlpha = alpha;
+      if (kind === "mypaint") dabAlpha = alpha * 0.9;
+      else if (kind === "krita-auto") dabAlpha = alpha * 0.95;
+      context.globalAlpha = dabAlpha;
+      context.drawImage(cachedTip, x - cachedTip.width / 2, y - cachedTip.height / 2);
+      return;
+    }
+  }
+
+  if (kind === "airbrush" || kind === "watercolor") {
+    if (typeof context.createRadialGradient === "function") {
+      const gradient = context.createRadialGradient(x, y, radius * hardness * 0.85, x, y, radius);
+      if (gradient && typeof gradient.addColorStop === "function") {
+        gradient.addColorStop(0, style.color);
+        gradient.addColorStop(1, "transparent");
+        context.fillStyle = gradient;
+      } else {
+        context.fillStyle = style.color;
+      }
+    } else {
+      context.fillStyle = style.color;
+    }
+    context.globalAlpha = alpha;
+    context.beginPath();
+    context.arc(x, y, radius, 0, Math.PI * 2);
+    context.fill();
+    if (kind === "watercolor") {
+      context.globalAlpha = alpha * 0.12;
+      context.strokeStyle = style.color;
+      context.lineWidth = Math.max(0.25, radius * 0.06);
+      context.beginPath();
+      context.arc(x, y, radius * 0.94, 0, Math.PI * 2);
+      context.stroke();
+    }
+    return;
+  }
+
+  if (kind === "mypaint" || kind === "krita-auto") {
+    if (typeof context.createRadialGradient === "function") {
+      const gradient = context.createRadialGradient(
+        x,
+        y,
+        radius * hardness * (kind === "mypaint" ? 0.5 : 0.7),
+        x,
+        y,
+        radius
+      );
+      if (gradient && typeof gradient.addColorStop === "function") {
+        gradient.addColorStop(0, style.color);
+        gradient.addColorStop(kind === "mypaint" ? 0.8 : 1, style.color);
+        gradient.addColorStop(1, "transparent");
+        context.fillStyle = gradient;
+      } else {
+        context.fillStyle = style.color;
+      }
+    } else {
+      context.fillStyle = style.color;
+    }
+    context.globalAlpha = alpha * (kind === "mypaint" ? 0.9 : 0.95);
+    context.beginPath();
+    context.arc(x, y, radius, 0, Math.PI * 2);
+    context.fill();
+    return;
+  }
+
   context.globalAlpha = alpha;
   context.fillStyle = style.color;
   context.beginPath();

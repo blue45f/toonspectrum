@@ -200,4 +200,30 @@ describe("studio liquify pointer ownership", () => {
     })!;
     expect(mouse.points).toEqual([{ x: 0.2, y: 0.2 }]);
   });
+
+  it("move 누적은 세션 소유 배열에 O(1) append하고 거리 필터 시 할당하지 않는다", () => {
+    const session = beginStudioLiquifyPointerSession({
+      elId: "image-1",
+      frame,
+      point: { x: 0.1, y: 0.1 },
+      pointer: { pointerId: 41, pointerType: "mouse" },
+    })!;
+    const points = session.points;
+
+    const appended = appendStudioLiquifyPointerPoint(
+      session,
+      { pointerId: 41, pointerType: "mouse" },
+      { x: 0.4, y: 0.4 },
+    );
+    const filtered = appendStudioLiquifyPointerPoint(
+      appended,
+      { pointerId: 41, pointerType: "mouse" },
+      { x: 0.4001, y: 0.4001 },
+    );
+
+    expect(appended).toBe(session);
+    expect(filtered).toBe(session);
+    expect(session.points).toBe(points);
+    expect(points).toEqual([{ x: 0.1, y: 0.1 }, { x: 0.4, y: 0.4 }]);
+  });
 });

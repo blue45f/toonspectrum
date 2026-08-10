@@ -1,4 +1,9 @@
-/** Safe, versioned browser-storage adapter for user-authored BG3D LT presets. */
+/**
+ * Explicit pre-V12 localStorage import/test seam for BG3D LT presets.
+ *
+ * Product boot must not call this adapter or probe its keys. V12 uses the shared SQLite/OPFS
+ * repository and only user-initiated legacy import tooling may pass a storage object here.
+ */
 
 import {
   EMPTY_STUDIO_BG3D_LT_USER_PRESET_PAYLOAD,

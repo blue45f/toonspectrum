@@ -218,11 +218,12 @@ describe("StudioAppSettingsPanel", () => {
     expect(activeToolbarTab).toContain("pointer-coarse:min-h-11");
     expect(activeToolbarTab).toContain("pointer-coarse:min-w-11");
     expect(search).toContain("pointer-coarse:h-11");
+    // slice(0, -1) hides the last catalog tool (view rotate after CSP rail regroup).
     for (const label of [
       "선택 위로",
       "선택 아래로",
       "선택 숨기기",
-      "참고 이미지 표시",
+      "보기 회전 표시",
     ]) {
       const action = openingButtonTagByAriaLabel(html, label);
       expect(action, label).toContain("pointer-coarse:min-h-11");

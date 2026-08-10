@@ -79,7 +79,12 @@ describe("Studio inspector canvas-controls boundary", () => {
     // 의도적 변경(2026-07-27): 공통 inspector interaction policy 배선(3_600 → 3_620).
     // 의도적 변경(2026-07-28): 선택 없는 래스터 도구 복구 경로와 패널 배선(3_620 → 3_960).
     // 의도적 변경(2026-07-29): Paper Worker 경로 정리·잠금 중 취소 배선(3_960 → 4_000).
-    expect(inspector.split("\n").length).toBeLessThanOrEqual(4_000);
+    // 의도적 변경(2026-08-05): inspector context testid 배선(4_000 → 4_010).
+    // 의도적 변경(2026-08-05): empty-state coach CTA 블록(4_010 → 4_050).
+    // 의도적 변경(2026-08-07): 선택 디자인(X/Y/W/H·반전·선택 확대) 패널 배선(4_050 → 4_070).
+    // 의도적 변경(2026-08-08): Wave D 점진적 노출 — Advanced 섹션 15개 래핑 + 통합 검색 호스트(4_070 → 4_130).
+    // 의도적 변경(2026-08-10): V12 제품 SQLite quick-slot 권위 배선 7줄(4_130 → 4_137).
+    expect(inspector.split("\n").length).toBeLessThanOrEqual(4_137);
     expect(leaf).not.toContain('"use no memo"');
     expect(leaf).not.toMatch(/\b(?:memo|useCallback|useMemo)\s*\(/u);
     expect(leaf).toContain("export function StudioInspectorCanvasControls(");

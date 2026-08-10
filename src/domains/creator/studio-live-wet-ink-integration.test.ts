@@ -66,4 +66,61 @@ describe("live wet-ink product boundary", () => {
     expect(overlaySource).toContain("seed: exact.value.seed");
     expect(overlaySource).toContain("consumeStudioWetInkDirtyBounds");
   });
+
+  it("commits the settled Konva layer before releasing the transient wet canvas", () => {
+    const clearStart = studioPageSource.indexOf("const clearDraftPreview =");
+    const clearEnd = studioPageSource.indexOf(
+      "const DEFERRED_STROKE_COMMIT_IDLE_MS",
+      clearStart,
+    );
+    const clear = studioPageSource.slice(clearStart, clearEnd);
+    const seal = clear.indexOf("const seal = renderer.end(finalWetInkStroke");
+    const settle = clear.indexOf(
+      "draftPreviewStoreRef.current.settle(finalWetInkStroke)",
+      seal,
+    );
+    const flushReceipt = clear.lastIndexOf("flushSync(() => {", settle);
+    const release = clear.indexOf("renderer.releaseSettledPrefix(1)", settle);
+
+    expect(seal).toBeGreaterThan(0);
+    expect(flushReceipt).toBeGreaterThan(seal);
+    expect(settle).toBeGreaterThan(flushReceipt);
+    expect(release).toBeGreaterThan(settle);
+    expect(clear.slice(settle, release)).not.toContain(
+      "draftPreviewNormalLayerRef.current?.drawScene()",
+    );
+  });
+
+  it("keeps the exact vector fail-visible when a canonical Living Ink frame is blank", () => {
+    const fallback = studioPageSource.slice(
+      studioPageSource.indexOf("function commitStudioLivingInkFallbackVector"),
+      studioPageSource.indexOf("async function finishStudioLivingInkStroke"),
+    );
+    const finish = studioPageSource.slice(
+      studioPageSource.indexOf("async function finishStudioLivingInkStroke"),
+      studioPageSource.indexOf("async function finishStudioHokusaiLiveStroke"),
+    );
+    expect(finish).toContain("studioLivingInkCoverageIntersectsStroke({");
+    expect(finish).toContain("원본 벡터를 유지합니다");
+    expect(fallback).toContain("flushSync(() => {");
+    expect(fallback).toContain("draftPreviewStoreRef.current.settle(finished)");
+    expect(fallback.indexOf("draftPreviewStoreRef.current.settle(finished)"))
+      .toBeLessThan(fallback.indexOf("livingInkOverlaySurfaceRef.current?.renderer.clear()"));
+  });
+
+  it("restores a fast Living Ink contact until its first material presentation receipt", () => {
+    const finish = studioPageSource.slice(
+      studioPageSource.indexOf("function finishDrawingPointer"),
+      studioPageSource.indexOf("function onStagePointerCancel"),
+    );
+    const clear = finish.indexOf(
+      "clearDraftPreview({ preserveInkForDeferredCommit: deferInkCleanup })",
+    );
+    const restore = finish.indexOf("showStudioLivingInkVectorShadow(", clear);
+    const hokusai = finish.indexOf("const finishingHokusai", clear);
+    expect(clear).toBeGreaterThan(0);
+    expect(restore).toBeGreaterThan(clear);
+    expect(restore).toBeLessThan(hokusai);
+    expect(finish.slice(clear, restore)).toContain("!finishingLivingInk.overlayPresented");
+  });
 });

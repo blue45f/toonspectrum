@@ -32,19 +32,22 @@ export const STUDIO_APP_SETTINGS_TABS = [
 ] as const;
 export type StudioAppSettingsTab = (typeof STUDIO_APP_SETTINGS_TABS)[number];
 
-/** Left tool-rail ids that users can reorder/hide (Toolbar settings tab). */
+/**
+ * Left tool-rail catalog — order matches CSP-style groups in `studio-chrome-ia-map`
+ * (선택·이동 → 그리기 → 채색·보정 → 선택 범위 → 변형 → 오브젝트 → 3D·참고 → 보기).
+ */
 export const STUDIO_RAIL_TOOL_CATALOG = [
   { id: "select", label: "선택", labelKey: "studio.settings.tool.select", defaultShortcut: "V" },
   { id: "hand", label: "핸드(팬)", labelKey: "studio.settings.tool.hand", defaultShortcut: "Space" },
   { id: "pen", label: "펜", labelKey: "studio.settings.tool.pen", defaultShortcut: "B" },
   { id: "pixel-pencil", label: "픽셀 펜", labelKey: "studio.settings.tool.pixelPencil", defaultShortcut: "P" },
   { id: "eraser", label: "지우개", labelKey: "studio.settings.tool.eraser", defaultShortcut: "E" },
-  { id: "blend", label: "혼합(스머지)", labelKey: "studio.settings.tool.blend", defaultShortcut: "N" },
+  { id: "blend", label: "문지르기", labelKey: "studio.settings.tool.blend", defaultShortcut: "N" },
   { id: "wet-mix", label: "혼색 브러시", labelKey: "studio.settings.tool.wetMix", defaultShortcut: "Shift+N" },
   { id: "dodge-burn", label: "닷지/번", labelKey: "studio.settings.tool.dodgeBurn", defaultShortcut: "O" },
   { id: "liquify", label: "리퀴파이", labelKey: "studio.settings.tool.liquify", defaultShortcut: "J" },
-  { id: "fill", label: "페인트 버킷", labelKey: "studio.settings.tool.fill", defaultShortcut: "G" },
-  { id: "lasso-fill", label: "라쏘 필", labelKey: "studio.settings.tool.lassoFill", defaultShortcut: "" },
+  { id: "fill", label: "채우기", labelKey: "studio.settings.tool.fill", defaultShortcut: "G" },
+  { id: "lasso-fill", label: "올가미 채우기", labelKey: "studio.settings.tool.lassoFill", defaultShortcut: "" },
   { id: "eyedropper", label: "스포이드", labelKey: "studio.settings.tool.eyedropper", defaultShortcut: "I" },
   { id: "marquee-rect", label: "사각 선택", labelKey: "studio.settings.tool.marqueeRect", defaultShortcut: "M" },
   { id: "marquee-circle", label: "원형 선택", labelKey: "studio.settings.tool.marqueeCircle", defaultShortcut: "Shift+M" },
@@ -59,14 +62,15 @@ export const STUDIO_RAIL_TOOL_CATALOG = [
   { id: "image", label: "이미지", labelKey: "studio.settings.tool.image", defaultShortcut: "" },
   { id: "comment", label: "위치 댓글", labelKey: "studio.settings.tool.comment", defaultShortcut: "Alt+C" },
   { id: "perspective", label: "투시도", labelKey: "studio.settings.tool.perspective", defaultShortcut: "" },
-  { id: "zoom", label: "보기 확대·축소", labelKey: "studio.settings.tool.zoom", defaultShortcut: "Z" },
-  { id: "zoom-fit", label: "너비에 맞춤", labelKey: "studio.settings.tool.zoomFit", defaultShortcut: "Home" },
-  { id: "rotate-view", label: "보기 회전", labelKey: "studio.settings.tool.rotateView", defaultShortcut: "R" },
   { id: "frame-anim", label: "프레임 애니", labelKey: "studio.settings.tool.frameAnim", defaultShortcut: "" },
   { id: "mannequin3d", label: "3D 데생 인형", labelKey: "studio.settings.tool.mannequin", defaultShortcut: "" },
   { id: "vrm3d", label: "3D 캐릭터", labelKey: "studio.settings.tool.vrm3d", defaultShortcut: "" },
   { id: "bg3d", label: "3D 배경", labelKey: "studio.settings.tool.bg3d", defaultShortcut: "" },
+  { id: "hybrid-dcc", label: "Hybrid 3D DCC", labelKey: "studio.settings.tool.hybridDcc", defaultShortcut: "" },
   { id: "reference", label: "참고 이미지", labelKey: "studio.settings.tool.reference", defaultShortcut: "" },
+  { id: "zoom", label: "보기 확대·축소", labelKey: "studio.settings.tool.zoom", defaultShortcut: "Z" },
+  { id: "zoom-fit", label: "너비에 맞춤", labelKey: "studio.settings.tool.zoomFit", defaultShortcut: "Home" },
+  { id: "rotate-view", label: "보기 회전", labelKey: "studio.settings.tool.rotateView", defaultShortcut: "R" },
 ] as const;
 
 export type StudioRailToolId = (typeof STUDIO_RAIL_TOOL_CATALOG)[number]["id"];
@@ -82,7 +86,7 @@ export const STUDIO_SHORTCUT_ACTIONS = [
   { id: "tool-pen", label: "펜", labelKey: "studio.settings.shortcut.toolPen", defaultKeys: "B" },
   { id: "tool-pixel", label: "픽셀 펜", labelKey: "studio.settings.shortcut.toolPixel", defaultKeys: "P" },
   { id: "tool-eraser", label: "지우개", labelKey: "studio.settings.shortcut.toolEraser", defaultKeys: "E" },
-  { id: "tool-fill", label: "페인트 버킷", labelKey: "studio.settings.shortcut.toolFill", defaultKeys: "G" },
+  { id: "tool-fill", label: "채우기", labelKey: "studio.settings.shortcut.toolFill", defaultKeys: "G" },
   { id: "tool-eyedropper", label: "스포이드", labelKey: "studio.settings.shortcut.toolEyedropper", defaultKeys: "I" },
   { id: "tool-lasso", label: "올가미 선택", labelKey: "studio.settings.shortcut.toolLasso", defaultKeys: "L" },
   { id: "tool-marquee", label: "사각 선택", labelKey: "studio.settings.shortcut.toolMarqueeRect", defaultKeys: "M" },
@@ -90,7 +94,7 @@ export const STUDIO_SHORTCUT_ACTIONS = [
   { id: "tool-transform", label: "변형", labelKey: "studio.settings.shortcut.toolTransform", defaultKeys: "Shift+T" },
   { id: "tool-crop", label: "자르기", labelKey: "studio.settings.shortcut.toolCrop", defaultKeys: "C" },
   { id: "tool-comment", label: "위치 댓글", labelKey: "studio.settings.shortcut.toolComment", defaultKeys: "Alt+C" },
-  { id: "tool-blend", label: "혼합(스머지)", labelKey: "studio.settings.shortcut.toolBlend", defaultKeys: "N" },
+  { id: "tool-blend", label: "문지르기", labelKey: "studio.settings.shortcut.toolBlend", defaultKeys: "N" },
   { id: "tool-wet-mix", label: "혼색 브러시", labelKey: "studio.settings.shortcut.toolWetMix", defaultKeys: "Shift+N" },
   { id: "tool-dodge-burn", label: "닷지/번", labelKey: "studio.settings.shortcut.toolDodgeBurn", defaultKeys: "O" },
   { id: "tool-liquify", label: "리퀴파이", labelKey: "studio.settings.shortcut.toolLiquify", defaultKeys: "J" },
@@ -107,6 +111,9 @@ export const STUDIO_SHORTCUT_ACTIONS = [
   { id: "brush-larger", label: "브러시 크게", labelKey: "studio.settings.shortcut.brushLarger", defaultKeys: "]" },
   { id: "flip-canvas", label: "캔버스 좌우 반전(보기)", labelKey: "studio.settings.shortcut.flipCanvas", defaultKeys: "H" },
   { id: "reset-view", label: "화면 리셋(줌·위치·반전)", labelKey: "studio.settings.shortcut.resetView", defaultKeys: "Shift+0" },
+  { id: "zoom-to-selection", label: "선택 영역으로 확대", labelKey: "studio.settings.shortcut.zoomToSelection", defaultKeys: "Shift+F" },
+  { id: "flip-selection-h", label: "선택 좌우 반전", labelKey: "studio.settings.shortcut.flipSelectionH", defaultKeys: "Shift+H" },
+  { id: "flip-selection-v", label: "선택 상하 반전", labelKey: "studio.settings.shortcut.flipSelectionV", defaultKeys: "Shift+V" },
   { id: "shortcuts-help", label: "단축키 도움말", labelKey: "studio.settings.shortcut.help", defaultKeys: "?" },
 ] as const;
 

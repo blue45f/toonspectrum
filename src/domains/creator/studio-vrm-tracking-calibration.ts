@@ -29,9 +29,6 @@ export interface TrackingCalibration {
 /** 샘플링 프레임 수(~0.7s@30fps). */
 export const CALIBRATION_SAMPLE_FRAMES = 20;
 
-/** localStorage 영속 키. */
-export const CALIBRATION_STORAGE_KEY = "studio_tracking_calibration";
-
 const CALIBRATION_VERSION = 1;
 
 const CALIBRATION_FIELDS = [
@@ -140,7 +137,7 @@ export function applyCalibration(
   };
 }
 
-/** localStorage 저장용 직렬화(버전 필드 포함). */
+/** SQLite/파일 경계용 정규 직렬화(버전 필드 포함). */
 export function serializeCalibration(cal: TrackingCalibration): string {
   return JSON.stringify({ v: CALIBRATION_VERSION, ...cal });
 }

@@ -1,5 +1,5 @@
 /**
- * Studio Translation Memory — browser-local, deterministic dialogue translation memory.
+ * Studio Translation Memory — engine-neutral, deterministic dialogue translation memory.
  *
  * This module deliberately has no network, React or StudioPage dependency. Exact reuse is scoped
  * by work + speaker + source/target locale + NFKC/whitespace-normalized source. Fuzzy matches are
@@ -1085,6 +1085,7 @@ export function saveStudioTranslationMemory(
   }
 }
 
+/** Explicit test/embed compatibility helper; the V12 product default must not call this. */
 export function studioTranslationMemoryBrowserStorage(): Storage | null {
   try {
     return typeof globalThis.localStorage === "undefined"

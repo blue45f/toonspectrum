@@ -1,12 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  STUDIO_HOKUSAI_LIVE_DOCUMENT_RECEIPT_VERSION,
   snapshotStudioHokusaiLiveDocumentReceipt,
 } from "./studio-hokusai-live-brush-document-receipt";
 import {
   StudioHokusaiLiveOverlayRenderer,
   projectStudioHokusaiLiveFrame,
 } from "./studio-hokusai-live-brush-overlay";
+import {
+  STUDIO_HOKUSAI_LIVE_BRUSH_PROTOCOL_VERSION,
+} from "./studio-hokusai-live-brush-protocol";
 import {
   createStudioHokusaiLiveCanonicalTransaction,
 } from "./studio-hokusai-live-brush-transaction";
@@ -54,11 +58,12 @@ function canonicalResult(): StudioHokusaiLiveCanonicalResult {
     pngBytes,
     receipt: {
       kind: "studio-hokusai-live/canonical-receipt",
-      version: 1,
+      version: STUDIO_HOKUSAI_LIVE_BRUSH_PROTOCOL_VERSION,
       requestId: 1,
       engineEpoch: 1,
       strokeId: "stroke-hokusai-live",
       presetId: "charcoal",
+      materialProfileId: "charcoal",
       seed: 7,
       sampleCount: 2,
       finalSequence: 2,
@@ -161,12 +166,43 @@ describe("Studio Hokusai live document transaction", () => {
       sourceElementId: original.id,
       canonical: {
         exactLiveCommitParity: true,
+        materialProfileId: "charcoal",
         inputHash: INPUT_HASH,
         settledPixelHash: HASH,
         pngHash: PNG_HASH,
       },
     });
     expect(receipt?.sourceRevision).toMatch(/^hokusai-source-v1:[a-f0-9]{16}$/u);
+  });
+
+  it("restores legacy receipts to their carrier profile and rejects incompatible profiles", () => {
+    const legacy = canonicalResult().receipt as unknown as Record<string, unknown>;
+    const { materialProfileId: _legacyProfile, ...withoutProfile } = legacy;
+    const base = {
+      kind: "studio-hokusai-live/document-receipt",
+      version: 1,
+      liveAdapterVersion: "0.3.0-packed-dirty-live-adapter.2",
+      sourceElementId: "stroke-hokusai-live",
+      sourceRevision: "hokusai-source-v1:0123456789abcdef",
+    } as const;
+    expect(snapshotStudioHokusaiLiveDocumentReceipt({
+      ...base,
+      canonical: { ...withoutProfile, version: 1 },
+    })?.canonical.materialProfileId).toBe("charcoal");
+    expect(snapshotStudioHokusaiLiveDocumentReceipt({
+      ...base,
+      canonical: { ...legacy, version: 1, materialProfileId: "acrylic" },
+    })).toBeNull();
+    expect(snapshotStudioHokusaiLiveDocumentReceipt({
+      ...base,
+      version: STUDIO_HOKUSAI_LIVE_DOCUMENT_RECEIPT_VERSION,
+      canonical: { ...legacy, version: 1 },
+    })).toBeNull();
+    expect(snapshotStudioHokusaiLiveDocumentReceipt({
+      ...base,
+      liveAdapterVersion: "0.3.0-packed-dirty-live-adapter.3-profile-routing",
+      canonical: { ...legacy, version: 1 },
+    })).toBeNull();
   });
 
   it("fails closed before mutation when the receipt or source identity changes", () => {

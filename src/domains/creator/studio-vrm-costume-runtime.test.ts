@@ -15,7 +15,7 @@ function createVrm(scene: THREE.Group): VRM {
 }
 
 describe("Studio VRM baked costume runtime", () => {
-  it("isolates a costume material once and always reapplies color from its cached base", () => {
+  it("keeps authored materials on load, then isolates once at the first recolor", () => {
     const scene = new THREE.Group();
     const geometry = new THREE.BoxGeometry();
     const sharedMaterial = new THREE.MeshStandardMaterial({ color: "#336699" });
@@ -26,20 +26,21 @@ describe("Studio VRM baked costume runtime", () => {
     const vrm = createVrm(scene);
 
     const firstEntries = collectStudioVrmCostumeMeshes(vrm);
-    const isolatedMaterial = mesh.material as THREE.MeshStandardMaterial;
     expect(firstEntries).toHaveLength(1);
     expect(firstEntries[0]).toMatchObject({ key: "Body", label: "Body", slot: "outer" });
-    expect(isolatedMaterial).not.toBe(sharedMaterial);
+    expect(mesh.material).toBe(sharedMaterial);
 
     const secondEntries = collectStudioVrmCostumeMeshes(vrm);
-    expect(mesh.material).toBe(isolatedMaterial);
+    expect(mesh.material).toBe(sharedMaterial);
     expect(secondEntries[0]?.mesh).toBe(mesh);
 
     applyStudioVrmCostumeState(secondEntries, {
       hidden: ["Body"],
       recolor: { Body: "#cc3300" },
     });
+    const isolatedMaterial = mesh.material as THREE.MeshStandardMaterial;
     expect(mesh.visible).toBe(false);
+    expect(isolatedMaterial).not.toBe(sharedMaterial);
     expect(isolatedMaterial.color.getHexString()).not.toBe("336699");
     expect(sharedMaterial.color.getHexString()).toBe("336699");
 

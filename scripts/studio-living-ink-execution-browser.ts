@@ -614,10 +614,16 @@ async function main(): Promise<void> {
   }, 4);
   const providers: StudioLivingInkExecutionProvider[] = [];
   try {
-    const bloomProvider = await createStudioLivingInkExecutionProvider(config);
+    // Constructed by hand rather than through the factory so the harness keeps the capability
+    // record the Worker answers with: it names the runtime that actually executed (WebGL2 GLSL or
+    // the WGSL field runtime), which is what makes this probe a per-backend gate instead of a
+    // gate on whichever backend the launch flags happened to select.
+    const bloomProvider = new StudioLivingInkExecutionProvider(config);
     providers.push(bloomProvider);
+    const capabilities = await bloomProvider.initialize();
     const lineFrame = await bloomProvider.apply(darkInk(1, lineMarks()));
     const lineReceiptHash = lineFrame.receipt.displaySha256;
+    const lineReceiptBackend = lineFrame.receipt.backend;
     const lineImage = drawFrame(lineFrame, "line");
     const normalizedDisplayHash = await bottomUpHash(lineImage);
     const waterFrame = await bloomProvider.apply({
@@ -944,13 +950,33 @@ async function main(): Promise<void> {
     );
     const result = {
       status: "ok",
-      backend: "real-chromium-dedicated-worker-offscreen-webgl2-half-float-v1",
+      /*
+       * Backend identity comes from the *receipt* — the runtime that actually executed the
+       * operation — not from the capability record.
+       *
+       * `capabilities.backend` is not a reliable witness here. When the WGSL runtime is refused,
+       * the WebGPU factory falls back to a WebGL2 runtime and stamps
+       * `backend: "webgpu-offscreen-half-float"` onto its capabilities so callers can still see
+       * that a GPU device exists. Reading identity from that stamp let a whole lane run GLSL while
+       * reporting itself as the WGSL lane: two WGSL kernels failed to compile (an invalid pipeline
+       * silently drops its dispatches), the runtime was rejected, WebGL2 answered every operation,
+       * and the visual numbers looked like near-parity because they *were* GLSL's numbers.
+       * `receipt.backend` is written by the runtime that ran, so it cannot be stamped over.
+       */
+      backend: lineReceiptBackend === "webgpu-offscreen-half-float"
+        ? "real-chromium-dedicated-worker-offscreen-webgpu-half-float-v1"
+        : "real-chromium-dedicated-worker-offscreen-webgl2-half-float-v1",
+      executedBackend: lineReceiptBackend,
+      capabilities,
       viewport: { width: WIDTH, height: HEIGHT },
       executionContract: {
-        worker: true,
-        offscreenCanvas: true,
-        webgl2: true,
-        halfFloatFields: true,
+        worker: capabilities.worker,
+        offscreenCanvas: capabilities.offscreenCanvas,
+        // Either GPU API is acceptable; the runner asserts which one this lane was meant to get.
+        gpuApi: capabilities.webgl2 || capabilities.webgpu,
+        webgl2: capabilities.webgl2,
+        webgpu: capabilities.webgpu,
+        halfFloatFields: capabilities.halfFloatRenderable,
         rgba8Readback: true,
       },
       line: {
@@ -1065,7 +1091,18 @@ async function main(): Promise<void> {
       workerCrashRecovery: {
         rejectedImmediately: workerCrashRejected,
         workerInstances: crashWorkers.length,
-        reinitialized: recoveredCapabilities.backend === "webgl2-offscreen-half-float",
+        /*
+         * Recovery is proved by coming back on the *same* backend the epoch started on, not by
+         * naming one. Hard-coding "webgl2-offscreen-half-float" here made this gate structurally
+         * unreachable for the WGSL lane: recovery demonstrably worked there — the epoch was
+         * rejected immediately, a second Worker was created, and it rendered a real post-crash
+         * frame — yet the assertion could only ever be false because the lane's runtime reports
+         * "webgpu-offscreen-half-float". Comparing against the observed backend keeps the
+         * assertion strictly stronger (a silent downgrade to the other runtime still fails) while
+         * being answerable by either shipped backend.
+         */
+        recoveredBackend: recoveredCapabilities.backend,
+        reinitialized: recoveredCapabilities.backend === capabilities.backend,
         postCrashFrameHash: recoveredFrameHash,
       },
       performance: {

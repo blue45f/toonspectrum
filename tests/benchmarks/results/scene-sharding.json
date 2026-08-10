@@ -1,0 +1,155 @@
+{
+  "harness": "tests/benchmarks/harness/scene-sharding.ts",
+  "generatedAt": "2026-08-08T05:13:09.632Z",
+  "host": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpu": "Apple M2 Max",
+    "cores": 12,
+    "node": "v24.16.0"
+  },
+  "config": {
+    "warmup": 1,
+    "iterations": 3,
+    "paths": 15000,
+    "canvas": "1024x1024",
+    "seed": 1508154057,
+    "grids": [
+      "2x2",
+      "1x4"
+    ],
+    "note": "scene generation mirrored verbatim from large-scene.ts (identical seeded-LCG stream); shard scenes keep the source coordinate space and each shard owns a disjoint rect (measured: vello_cpu f32 math is not bit-stable under integer translation, so translated shards were rejected in favor of subset+region extraction); sequential shard rendering by design — parallelization is v2, dirtyShardRepaint rows carry the incremental-repaint payoff"
+  },
+  "engine": "vello_cpu 0.2.0 (baseline SIMD, single thread, wasm) — renderSceneToPixels includes zod normalize + JSON serialize per call (§9.2 boundary); fragment rows quantify the recording cache's effect on exactly that boundary share",
+  "single": {
+    "iterations": 3,
+    "samplesMs": [
+      15982.257,
+      15968.849,
+      15994.999
+    ],
+    "p50Ms": 15982.257,
+    "p95Ms": 15994.999,
+    "meanMs": 15982.035,
+    "pixelSha256": "bb8fa1f5822e737f857d136bf8b2bf93a9e4e068fbc72425572b7045c016c459"
+  },
+  "shardCombos": [
+    {
+      "grid": "2x2",
+      "planMs": 10.815,
+      "shardNodeCounts": [
+        4808,
+        4841,
+        4968,
+        4850
+      ],
+      "nodeDuplicationFactor": 1.2978,
+      "sharded": {
+        "iterations": 3,
+        "samplesMs": [
+          21694.346,
+          21660.346,
+          21682.12
+        ],
+        "p50Ms": 21682.12,
+        "p95Ms": 21694.346,
+        "meanMs": 21678.938
+      },
+      "overheadVsSinglePct": 35.66,
+      "perShardMs": [
+        5312.872,
+        5410.083,
+        5535.878,
+        5422.533
+      ],
+      "dirtyShardRepaint": {
+        "minShardMs": 5312.872,
+        "maxShardMs": 5535.878,
+        "maxShardShareOfSingle": 0.3464
+      },
+      "pixelIdenticalToSingle": true,
+      "composedSha256": "bb8fa1f5822e737f857d136bf8b2bf93a9e4e068fbc72425572b7045c016c459"
+    },
+    {
+      "grid": "1x4",
+      "planMs": 7.462,
+      "shardNodeCounts": [
+        4366,
+        5109,
+        5097,
+        4490
+      ],
+      "nodeDuplicationFactor": 1.2708,
+      "sharded": {
+        "iterations": 3,
+        "samplesMs": [
+          21210.77,
+          21200.949,
+          21204.001
+        ],
+        "p50Ms": 21204.001,
+        "p95Ms": 21210.77,
+        "meanMs": 21205.24
+      },
+      "overheadVsSinglePct": 32.67,
+      "perShardMs": [
+        4662.878,
+        5828.625,
+        5860.998,
+        4850.791
+      ],
+      "dirtyShardRepaint": {
+        "minShardMs": 4662.878,
+        "maxShardMs": 5860.998,
+        "maxShardShareOfSingle": 0.3667
+      },
+      "pixelIdenticalToSingle": true,
+      "composedSha256": "bb8fa1f5822e737f857d136bf8b2bf93a9e4e068fbc72425572b7045c016c459"
+    }
+  ],
+  "fragmentCache": {
+    "encodeCold": {
+      "iterations": 3,
+      "samplesMs": [
+        1072.626,
+        1071.812,
+        1069.295
+      ],
+      "p50Ms": 1071.812,
+      "p95Ms": 1072.626,
+      "meanMs": 1071.244
+    },
+    "encodeWarm": {
+      "iterations": 3,
+      "samplesMs": [
+        5.622,
+        4.758,
+        5.042
+      ],
+      "p50Ms": 5.042,
+      "p95Ms": 5.622,
+      "meanMs": 5.141
+    },
+    "encodeSpeedupX": 212.58,
+    "warmFragmentRender": {
+      "iterations": 3,
+      "samplesMs": [
+        15930.608,
+        15938.544,
+        15920.851
+      ],
+      "p50Ms": 15930.608,
+      "p95Ms": 15938.544,
+      "meanMs": 15930.001
+    },
+    "warmRenderDeltaVsSingleP50Ms": 51.649,
+    "pixelIdenticalToSingle": true,
+    "metrics": {
+      "identityHits": 135000,
+      "digestHits": 0,
+      "misses": 60000,
+      "evictions": 0,
+      "entries": 15000
+    }
+  }
+}

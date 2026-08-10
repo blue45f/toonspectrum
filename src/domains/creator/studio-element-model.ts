@@ -225,6 +225,22 @@ export interface ImageEl {
   bg3dLtRenderMode?: StudioBg3dLtRenderMode;
 }
 
+export interface StudioDialogueRubySpan {
+  /** UTF-16 code-unit offsets, matching textarea selection and CRDT serialization. */
+  readonly start: number;
+  readonly end: number;
+  readonly ruby: string;
+}
+
+export interface StudioDialogueRangeFormat {
+  /** UTF-16 code-unit offsets, matching ruby spans and selection commands. */
+  readonly start: number;
+  readonly end: number;
+  readonly fontSize?: number;
+  readonly fontStyle?: "normal" | "bold" | "italic" | "bold italic";
+  readonly textColor?: string;
+}
+
 export interface TextEl {
   id: string;
   type: "text";
@@ -254,6 +270,10 @@ export interface TextEl {
   gradientDirection?: "vertical" | "horizontal";
   gradient?: StudioGradientSpec; // 멀티스톱 그라데이션(엔진) — 있으면 위 2색 레거시 필드보다 우선.
   textPath?: TextPathConfig; // 곡선 텍스트(아치/물결/원) — 미설정/none이면 직선.
+  /** Lossless dialogue ruby annotations. Rendering/exporters must report unsupported spans. */
+  rubySpans?: readonly StudioDialogueRubySpan[];
+  /** Optional range-local typography retained independently of the base text style. */
+  rangeFormats?: readonly StudioDialogueRangeFormat[];
   skewX?: number; // 가로 기울임(도, -60..60) — studio-skew 직렬화 규약. 미설정=0.
   skewY?: number; // 세로 기울임(도) — studio-skew 직렬화 규약. 미설정=0.
 }
@@ -277,6 +297,10 @@ export interface BubbleEl {
   fontSize?: number; // 말풍선 글자 크기(미설정 시 24)
   lineHeight?: number; // 행간(배수, 미설정 시 1.1)
   vertical?: boolean;
+  /** Lossless dialogue ruby annotations. Rendering/exporters must report unsupported spans. */
+  rubySpans?: readonly StudioDialogueRubySpan[];
+  /** Optional range-local typography retained independently of the base text style. */
+  rangeFormats?: readonly StudioDialogueRangeFormat[];
   align?: "left" | "center" | "right";
   fontStyle?: "normal" | "bold" | "italic" | "bold italic";
   tailXRatio?: number;
@@ -490,7 +514,7 @@ export interface DrawEl extends StudioBrushCatalogIdentityMetadata, StudioElemen
   // 도형 파라미터(별 꼭짓점/다각형 변/모서리 반경) — 미설정 시 기존 하드코딩과 동일한 기본값.
   shapeParams?: ShapeParams;
   symmetry?: {
-    type: "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope";
+    type: "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope" | "silk";
     centerX: number;
     centerY: number;
     radialCount?: number;

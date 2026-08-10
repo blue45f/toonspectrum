@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { hydrateStudioAiImageReferenceDocument } from
+  "./studio-ai-image-reference-roles";
 import {
   appendStudioAiOperation,
   createEmptyStudioAiProvenanceDocument,
@@ -24,6 +26,15 @@ import { createNativePluralShared3dStageFixture } from
   "./studio-shared-3d-stage-test-fixture";
 
 const PRIVATE_PROMPT = "공개하면 안 되는 반전 프롬프트";
+const AI_IMAGE_REFERENCES = hydrateStudioAiImageReferenceDocument({
+  version: 1,
+  references: [{
+    id: "style-ref-1",
+    role: "style",
+    asset: { assetId: "asset-style-1", sha256: `sha256:${"b".repeat(64)}` },
+    guidance: "선 질감만 참고",
+  }],
+});
 
 function retainedAiProvenance() {
   return appendStudioAiOperation(
@@ -45,6 +56,7 @@ function retainedAiProvenance() {
 
 describe("studio autosave", () => {
   it("사용자와 문서 문맥별로 키를 격리한다", () => {
+    expect(studioAutosaveKey({})).toBe("toonspectrum-studio-autosave:v12:guest:new");
     expect(studioAutosaveKey({ userId: "u1", workId: "w1" })).not.toBe(
       studioAutosaveKey({ userId: "u1", workId: "w2" })
     );
@@ -325,6 +337,19 @@ describe("studio autosave", () => {
     const parsed = parseStudioAutosave(serialized);
 
     expect(parsed?.referenceBoard).toEqual(referenceBoard);
+    expect(serialized).not.toContain("data:");
+    expect(parsed && studioAutosaveHasContent(parsed)).toBe(true);
+  });
+
+  it("AI image role metadata alone is durable recovery content", () => {
+    const serialized = serializeStudioAutosave({
+      version: 2,
+      savedAt: "2026-08-10T00:00:00.000Z",
+      pagesList: [{ id: "p1", elements: [] }],
+      aiImageReferences: AI_IMAGE_REFERENCES,
+    });
+    const parsed = parseStudioAutosave(serialized);
+    expect(parsed?.aiImageReferences).toEqual(AI_IMAGE_REFERENCES);
     expect(serialized).not.toContain("data:");
     expect(parsed && studioAutosaveHasContent(parsed)).toBe(true);
   });

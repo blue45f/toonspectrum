@@ -2,6 +2,11 @@ import {
   type DodgeBurnPixelPoint,
   type DodgeBurnSettings,
 } from "./studio-dodge-burn";
+import { loadFloodFillSourceImage } from "./studio-flood-fill";
+import {
+  rememberStudioRasterEditSurface,
+  takeStudioRasterEditSurface,
+} from "./studio-raster-edit-surface-cache";
 import { runStudioRetouchWorker } from "./studio-retouch-worker-client";
 import {
   type WetMixPixelPoint,
@@ -23,6 +28,31 @@ function createRetouchAbortError(): Error {
 
 function throwIfAborted(signal: AbortSignal | undefined): void {
   if (signal?.aborted) throw createRetouchAbortError();
+}
+
+export type StudioRetouchSourceImage = HTMLImageElement | HTMLCanvasElement;
+
+export function studioRetouchSourceDimensions(source: StudioRetouchSourceImage): {
+  readonly height: number;
+  readonly width: number;
+} {
+  const naturalWidth = "naturalWidth" in source ? Number(source.naturalWidth) : 0;
+  const naturalHeight = "naturalHeight" in source ? Number(source.naturalHeight) : 0;
+  return {
+    width: naturalWidth || Number(source.width),
+    height: naturalHeight || Number(source.height),
+  };
+}
+
+/** Uses the exact just-encoded surface when possible, otherwise decodes the authoritative PNG. */
+export async function loadStudioRetouchSourceImage(
+  src: string,
+  signal?: AbortSignal,
+): Promise<StudioRetouchSourceImage> {
+  throwIfAborted(signal);
+  const cached = takeStudioRasterEditSurface(src);
+  if (cached) return cached;
+  return loadFloodFillSourceImage(src, signal);
 }
 
 export async function runStudioDodgeBurnRetouch(
@@ -92,7 +122,12 @@ export async function encodeStudioRetouchCanvasPng(
   options: StudioRetouchBrowserOptions = {},
 ): Promise<string> {
   throwIfAborted(options.signal);
-  if (typeof canvas.toBlob !== "function") return canvas.toDataURL("image/png");
+  if (typeof canvas.toBlob !== "function") {
+    const src = canvas.toDataURL("image/png");
+    throwIfAborted(options.signal);
+    rememberStudioRasterEditSurface(src, canvas);
+    return src;
+  }
   const blob = await new Promise<Blob>((resolve, reject) => {
     let settled = false;
     const cleanup = () => options.signal?.removeEventListener("abort", onAbort);
@@ -114,5 +149,8 @@ export async function encodeStudioRetouchCanvasPng(
     }), "image/png");
   });
   throwIfAborted(options.signal);
-  return blobToDataUrl(blob, options.signal);
+  const src = await blobToDataUrl(blob, options.signal);
+  throwIfAborted(options.signal);
+  rememberStudioRasterEditSurface(src, canvas);
+  return src;
 }

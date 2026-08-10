@@ -37,7 +37,12 @@ describe("Studio inspector raster recovery boundary", () => {
     const implementation = functionBody(pageSource, "createEditableRasterCopyForInspector");
 
     expect(implementation).toContain('"pixel-selection"');
-    expect(implementation).toContain("isStudioEditableRasterCopyPlanCurrent");
+    expect(implementation).toContain("prepareAndRenderStudioEditableRasterCopy");
+    expect(implementation).toContain("prepareStudioVectorReferenceExport");
+    expect(implementation).toContain("renderPreparedStudioVectorReference");
+    expect(implementation).not.toContain("planStudioEditableRasterCopy");
+    expect(implementation).not.toContain("renderStudioEditableRasterCopy");
+    expect(implementation).not.toContain("isStudioEditableRasterCopyPlanCurrent");
     expect(implementation).toContain("applyStudioEditableRasterCopy");
     expect(implementation).toContain("flushSync(() => {");
     expect(implementation).toContain("commit(applied.elements");
@@ -50,6 +55,68 @@ describe("Studio inspector raster recovery boundary", () => {
     expect(pageSource).toContain("createEditableRasterCopyForInspector,");
     expect(pageSource).toContain("studioFilterPreparationBusy={studioFilterPreparationBusy}");
     expect(pageSource).toContain("timelinePlaying={timelinePlaying}");
+  });
+
+  it("coalesces raster commit, selection authority and retouch arm before replay", () => {
+    const implementation = functionBody(pageSource, "createEditableRasterCopyForInspector");
+    const flushStart = implementation.indexOf("flushSync(() => {");
+    const commitIndex = implementation.indexOf(
+      "rasterCopyCommitted = commit(applied.elements, undefined, pageId);",
+      flushStart,
+    );
+    const successGuard = implementation.indexOf(
+      "if (!rasterCopyCommitted) return;",
+      commitIndex,
+    );
+    const flushEnd = implementation.indexOf("\n      });", successGuard);
+    const attachIndex = implementation.indexOf("attachPendingRasterRetouchTarget", flushEnd);
+
+    expect(flushStart).toBeGreaterThanOrEqual(0);
+    expect(commitIndex).toBeGreaterThan(flushStart);
+    expect(successGuard).toBeGreaterThan(commitIndex);
+    expect(flushEnd).toBeGreaterThan(successGuard);
+    for (const successOnlyMutation of [
+      "pixelSelectionAutoTargetRef.current = composite.id",
+      "cropAutoTargetRef.current = composite.id",
+      "resetPixelSelectionHistoryState(composite.id, null)",
+      "expectStudioRasterImagePresentation({ elementId: composite.id, src: composite.src })",
+      "setMarqueeIds((current) => current.length === 0 ? current : [])",
+      "setSelectedId(composite.id)",
+      "setPixelForceCircle(false)",
+      "setPixelTool(null)",
+      "setSmudgeActive(true)",
+      "setDodgeBurnActive(true)",
+      "setWetMixActive(true)",
+      "setLiquifyActive(true)",
+    ]) {
+      const mutationIndex = implementation.indexOf(successOnlyMutation, successGuard);
+      expect(mutationIndex, successOnlyMutation).toBeGreaterThan(successGuard);
+      expect(mutationIndex, successOnlyMutation).toBeLessThan(flushEnd);
+    }
+
+    expect(attachIndex).toBeGreaterThan(flushEnd);
+    expect(implementation.indexOf("setCropRect(initialCropRect())", flushEnd))
+      .toBeGreaterThan(flushEnd);
+    expect(implementation.indexOf("applyPixelSelectionActivation", flushEnd))
+      .toBeGreaterThan(flushEnd);
+  });
+
+  it.each([
+    "applySmudgeStroke",
+    "applyDodgeBurnStroke",
+    "applyWetMixStroke",
+    "applyLiquifyStroke",
+    "bakeHealCloneDragStroke",
+  ])("expects an exact presentation only after %s commits its new src", (functionName) => {
+    const implementation = functionBody(pageSource, functionName);
+    const patchIndex = implementation.indexOf("patchEl(target.id, { src }");
+    const expectationIndex = implementation.indexOf(
+      "expectStudioRasterImagePresentation({ elementId: target.id, src })",
+    );
+
+    expect(patchIndex).toBeGreaterThanOrEqual(0);
+    expect(expectationIndex).toBeGreaterThan(patchIndex);
+    expect(implementation.slice(patchIndex, expectationIndex)).toContain(")) {");
   });
 
   it("journals and replays the first retouch gesture drawn during vector raster preparation", () => {
@@ -108,7 +175,10 @@ describe("Studio inspector raster recovery boundary", () => {
     const transform = functionBody(pageSource, "openPixelSelectionTransform");
     const frameAnimation = functionBody(pageSource, "openFrameAnimationForSelected");
 
+    // Free-transform: strokes/objects first; image content transform still uses pixel target.
+    expect(transform).toContain('selected?.type === "draw"');
     expect(transform).toContain('ensurePixelToolTarget("내용 변형")');
+    expect(transform).toContain("selectAllPixels");
     expect(transform).not.toContain("ensureOrPrepareRasterRetouchTarget");
     expect(frameAnimation).not.toContain("ensureOrPrepareRasterRetouchTarget");
   });

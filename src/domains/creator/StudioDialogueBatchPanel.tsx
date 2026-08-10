@@ -1601,7 +1601,7 @@ export function StudioDialogueBatchPanel({
                                         }))
                                       }
                                       onPointerDown={(event) => event.stopPropagation()}
-                                      placeholder="예: かんじ"
+                                      placeholder="예: 한자"
                                       maxLength={80}
                                       aria-label={`${item.pageIndex + 1}페이지 선택 구간 루비 읽기`}
                                       className="mt-1 min-h-11 w-full rounded-lg border border-line bg-card px-2 text-[0.66rem] text-fg outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"

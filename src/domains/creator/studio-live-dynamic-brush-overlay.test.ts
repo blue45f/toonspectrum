@@ -1423,6 +1423,8 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
       stroke: element.stroke,
       stampGrid: retainedPlan.plan.renderBudget.stampGrid,
       markBudget: retainedPlan.plan.markBudget,
+      // StudioDrawNode가 하는 것과 같은 전달 — 종이 결은 요소가 아니라 렌더 플랜이 들고 온다.
+      ...(retainedPlan.plan.paper ? { paper: retainedPlan.plan.paper } : {}),
     }).coveragePlan;
     expect(retainedMarks.ok).toBe(true);
     if (!retainedMarks.ok) return;

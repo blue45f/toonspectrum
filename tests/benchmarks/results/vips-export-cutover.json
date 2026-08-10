@@ -1,0 +1,81 @@
+{
+  "harness": "tests/benchmarks/harness/vips-export-cutover.ts (pnpm exec tsx …) — one-shot cutover measurement",
+  "generatedAt": "2026-08-08T05:20:49.049Z",
+  "host": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpu": "Apple M2 Max",
+    "node": "v24.16.0"
+  },
+  "cutover": {
+    "wiring": "src/domains/creator/studio-export-presets.ts exportPresetSlices → prepareVipsRoutedPresetPages",
+    "routing": "src/domains/creator/studio-vips-export.ts planVipsExportRoute (edge 8192 / area 8192² / input 16384²)",
+    "fallback": "vips 로드·리샘플 실패 시 기존 drawImage 경로 + PresetExportResult.qualityWarning 표면화"
+  },
+  "methodology": {
+    "runsPerCase": 1,
+    "reference": "float area-average (fractional pixel coverage, rectangular) — quality-lab 방법론의 비정수 배율 일반화",
+    "beforeLane": "CanvasKit linear/no-mips drawImageRectOptions — 브라우저 ctx.drawImage 프록시(quality-lab canvaskit-linear-nomips 와 동일)",
+    "afterLane": "prepareVipsRoutedPresetPages → downscaleForExport (wasm-vips lanczos3, concurrency 1) — 실배선 경로 그대로",
+    "note": "wallMs 는 단일 실행 실측(공유 개발 호스트). after.wallMs 는 prepare 전체(복사 포함), loadMs 는 wasm 초기화 별도."
+  },
+  "routes": [
+    {
+      "canvas": "720x8191",
+      "route": "canvaskit"
+    },
+    {
+      "canvas": "720x8192",
+      "route": "canvaskit"
+    },
+    {
+      "canvas": "720x8193",
+      "route": "vips"
+    },
+    {
+      "canvas": "4096x4096",
+      "route": "canvaskit"
+    },
+    {
+      "canvas": "2048x16384",
+      "route": "vips"
+    },
+    {
+      "canvas": "16384x16384",
+      "route": "vips"
+    },
+    {
+      "canvas": "16385x16384",
+      "route": "out-of-core"
+    }
+  ],
+  "pristine": {
+    "case": "square-4096-instagram1080",
+    "route": "canvaskit",
+    "pagePassedThroughUntouched": true,
+    "sourceSha256": "da0cdcff5a9cb264c2896ae1a9c79b2845efbf6a1cc05efb35e58209dd2a748a",
+    "sourceSha256AfterPrepare": "da0cdcff5a9cb264c2896ae1a9c79b2845efbf6a1cc05efb35e58209dd2a748a",
+    "bytesIdentical": true
+  },
+  "routed": {
+    "case": "webtoon-strip-2048x16384-naver690",
+    "route": "vips",
+    "source": "2048x16384",
+    "target": "690x5520",
+    "inputMB": 128,
+    "before": {
+      "lane": "canvaskit-linear-nomips (browser drawImage proxy)",
+      "wallMs": 211.42,
+      "psnrDb": 22.18,
+      "ssim": 0.9639
+    },
+    "after": {
+      "lane": "wasm-vips-lanczos3 (cutover: prepareVipsRoutedPresetPages)",
+      "wallMs": 233.71,
+      "loadMs": 47.65,
+      "psnrDb": 28.86,
+      "ssim": 0.991
+    },
+    "cutoverMatchesDirectLane": true
+  }
+}

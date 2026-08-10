@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 
 import {
+  discardLegacyStudioStockImageAccessKey,
   isStudioStockImageConfigured,
   loadStudioStockImageAccessKey,
   saveStudioStockImageAccessKey,
@@ -11,8 +12,7 @@ import {
   type StudioStockImageStorage,
 } from "./studio-stock-image-client";
 
-// 인메모리 storage — studio-ai-client.test.ts의 createMemoryStorage와 동일하게 localStorage
-// 인터페이스만 흉내낸다.
+// 인메모리 Web Storage — sessionStorage/localStorage 양쪽 DI 계약을 흉내낸다.
 function createMemoryStorage(): StudioStockImageStorage & { data: Map<string, string> } {
   const data = new Map<string, string>();
   return {
@@ -20,6 +20,9 @@ function createMemoryStorage(): StudioStockImageStorage & { data: Map<string, st
     getItem: (key) => data.get(key) ?? null,
     setItem: (key, value) => {
       data.set(key, value);
+    },
+    removeItem: (key) => {
+      data.delete(key);
     },
   };
 }
@@ -72,6 +75,13 @@ describe("studio-stock-image-client access key storage", () => {
     saveStudioStockImageAccessKey(storage, ACCESS_KEY);
     expect(loadStudioStockImageAccessKey(storage)).toBe(ACCESS_KEY);
     expect(storage.data.get(STUDIO_STOCK_IMAGE_ACCESS_KEY_STORAGE_KEY)).toBe(ACCESS_KEY);
+  });
+
+  it("discards the legacy persistent key without importing it", () => {
+    const legacyStorage = createMemoryStorage();
+    legacyStorage.data.set(STUDIO_STOCK_IMAGE_ACCESS_KEY_STORAGE_KEY, ACCESS_KEY);
+    discardLegacyStudioStockImageAccessKey(legacyStorage);
+    expect(legacyStorage.data.has(STUDIO_STOCK_IMAGE_ACCESS_KEY_STORAGE_KEY)).toBe(false);
   });
 
   it("isStudioStockImageConfigured requires a non-blank key", () => {

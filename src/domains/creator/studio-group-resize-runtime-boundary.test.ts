@@ -85,9 +85,12 @@ describe("Studio group uniform-resize runtime boundary", () => {
 
   it("starts one exact multi-selection lease after validating IDs, locks, and source bounds", () => {
     const source = functionBody("beginCanvasSelectionResize");
+    const idsHelper = functionBody("currentCanvasResizeSelectionIds");
     const boundsGuard = functionBody("finitePositiveGroupResizeBounds");
 
-    expectSourceToken(source, "marqueeIdsRef.current", "resize begin");
+    expectSourceToken(source, "currentCanvasResizeSelectionIds()", "resize begin");
+    expectSourceToken(idsHelper, "marqueeIdsRef.current", "resize ids helper");
+    expectSourceToken(idsHelper, "selectedIdRef.current", "resize single-object ids");
     expectSourceToken(source, "new Set", "resize begin");
     expectSourceToken(source, "activeElementsRef.current", "resize begin");
     expectSourceToken(source, "currentPageIdRef.current", "resize page snapshot");
@@ -107,12 +110,10 @@ describe("Studio group uniform-resize runtime boundary", () => {
     expectSourceToken(source, "!currentById.has(id)", "resize missing-ID guard");
     expectSourceToken(source, "sourceElements:", "resize element identity snapshot");
     expect(source).not.toContain("completeSelectedGroupId()");
-    expect(
-      /(?:marqueeIdsRef\.current|selectedIds)\.length\s*(?:<\s*2|<=\s*1)/.test(
-        source,
-      ),
-      "resize begin must reject selections smaller than two items",
-    ).toBe(true);
+    // Multi-select (2+) or a single freehand stroke (CSP free-scale on one layer).
+    expectSourceToken(source, "singleDrawResize", "single stroke free-scale");
+    expectSourceToken(source, 'type === "draw"', "single stroke free-scale");
+    expect(source).toContain("selectedIds.length < 2 && !singleDrawResize");
     expect(source.indexOf("isEffectivelyLocked")).toBeLessThan(
       source.indexOf("beginLiveResourceEdit("),
     );
@@ -127,7 +128,7 @@ describe("Studio group uniform-resize runtime boundary", () => {
     expectSourceToken(source, "groupResizeRef.current", "resize commit");
     expectSourceToken(source, "currentPageIdRef.current", "resize page identity");
     expectSourceToken(source, "masterEditModeRef.current", "resize master identity");
-    expectSourceToken(source, "marqueeIdsRef.current", "resize commit");
+    expectSourceToken(source, "currentCanvasResizeSelectionIds()", "resize commit");
     expectSourceToken(source, "selectionStillMatches", "resize selection identity");
     expectSourceToken(source, "sourceStillMatches", "resize element identity");
     expectSourceToken(

@@ -9,6 +9,10 @@ import {
   formatStudioShortcutChord,
   type StudioShortcutActionId,
 } from "./studio-app-settings";
+import {
+  studioSearchTextMatches,
+  tokenizeStudioSearchQuery,
+} from "./studio-search-text";
 
 import { useI18n, useT } from "@/lib/i18n";
 
@@ -93,7 +97,14 @@ const GROUPS: ShortcutGroup[] = [
       { keys: "⌘A", labelKey: "studio.shortcuts.row.edit.selectAll" },
       { keys: "⌘D", labelKey: "studio.shortcuts.row.edit.deselect", actionId: "deselect-pixels" },
       { keys: "⌘⇧I", labelKey: "studio.shortcuts.row.edit.invert", actionId: "invert-pixels" },
-      { keys: "Q", labelKey: "studio.shortcuts.row.edit.quickMask" },
+      {
+        // 단독 `Q` 는 퀵 마스크만의 화음이다. 색각 검수 흑백 명암이 같은 `Q` 를 주장하던
+        // 충돌(`q-quickmask-vs-grayscale`)은 2026-08-08 에 grayscale 을 `⌥Q` 로 옮겨
+        // 해소했다 — 이 행과 선택 메뉴의 배지가 이제 같은 것을 가리킨다.
+        keys: "Q",
+        labelKey: "studio.shortcuts.row.edit.quickMask",
+        searchAliases: ["퀵 마스크", "퀵마스크", "마스크로 칠하기", "quick mask", "quickmask"],
+      },
       { keys: "⌘J", labelKey: "studio.shortcuts.row.edit.duplicate" },
       {
         keys: "G",
@@ -220,10 +231,6 @@ const FAMILIAR_OPERATION_ICONS = {
   recover: RotateCcw,
 } as const;
 
-function normalizeHelpSearch(value: string): string {
-  return value.trim().toLocaleLowerCase().replaceAll(/\s+/gu, "");
-}
-
 function displayKeysForRow(
   row: ShortcutRow,
   shortcuts: Partial<Record<StudioShortcutActionId, string>> | Record<string, string> | undefined
@@ -278,21 +285,19 @@ export function StudioShortcutsHelp({
     ? SHORTCUT_HELP_COPY.ko
     : SHORTCUT_HELP_COPY.en;
   const [searchQuery, setSearchQuery] = useState("");
-  const normalizedSearchQuery = normalizeHelpSearch(searchQuery);
+  const searching = tokenizeStudioSearchQuery(searchQuery).length > 0;
+  // 매칭 규칙은 통합 Command Search 와 같은 `studio-search-text` 를 쓴다.
+  // 감사 §2.8 이 "네 검색창이 서로 다르게 판단한다"를 결함으로 셌다.
   const visibleGroups = GROUPS.map((group) => ({
     ...group,
-    rows: group.rows.filter((row) => {
-      if (!normalizedSearchQuery) return true;
-      const searchable = [
+    rows: group.rows.filter((row) =>
+      studioSearchTextMatches(searchQuery, [
         t(group.titleKey),
         t(row.labelKey),
         row.keysKey ? t(row.keysKey) : displayKeysForRow(row, shortcuts),
         ...(row.searchAliases ?? []),
-      ]
-        .map(normalizeHelpSearch)
-        .join(" ");
-      return searchable.includes(normalizedSearchQuery);
-    }),
+      ]),
+    ),
   })).filter((group) => group.rows.length > 0);
   const visibleShortcutCount = visibleGroups.reduce((count, group) => count + group.rows.length, 0);
 
@@ -428,7 +433,7 @@ export function StudioShortcutsHelp({
           </div>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-4">
-          {!normalizedSearchQuery ? (
+          {!searching ? (
             <section aria-labelledby="studio-familiar-operations-title">
               <h3 id="studio-familiar-operations-title" className="text-[0.68rem] font-semibold text-fg-2">
                 {copy.familiarTitle}
@@ -455,10 +460,10 @@ export function StudioShortcutsHelp({
             </section>
           ) : null}
 
-          <section aria-labelledby="studio-shortcut-list-title" className={normalizedSearchQuery ? "" : "mt-4"}>
+          <section aria-labelledby="studio-shortcut-list-title" className={searching ? "" : "mt-4"}>
             <div className="mb-2 flex items-center justify-between gap-3">
               <h3 id="studio-shortcut-list-title" className="text-[0.68rem] font-semibold text-fg-2">
-                {normalizedSearchQuery ? copy.result(visibleShortcutCount) : copy.allShortcuts}
+                {searching ? copy.result(visibleShortcutCount) : copy.allShortcuts}
               </h3>
               <span className="text-[0.62rem] text-fg-3">{copy.toggleHint}</span>
             </div>

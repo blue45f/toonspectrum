@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="stripes" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ef4444"/>
+      <stop offset="0.5" stop-color="#facc15"/>
+      <stop offset="1" stop-color="#22c55e"/>
+    </linearGradient>
+    <clipPath id="bubble"><path d="M16 56 C16 24 38 12 68 12 C101 12 116 31 112 61 C108 89 84 102 58 99 L34 116 L39 93 C24 84 16 72 16 56 Z"/></clipPath>
+  </defs>
+  <rect width="128" height="128" fill="#ffffff"/>
+  <g clip-path="url(#bubble)" opacity="0.94">
+    <rect x="8" y="4" width="112" height="116" fill="url(#stripes)"/>
+    <path d="M0 34 L128 82 M0 57 L128 105" stroke="#1e293b" stroke-width="8"/>
+  </g>
+</svg>

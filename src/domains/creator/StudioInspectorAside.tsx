@@ -59,7 +59,7 @@ import {
 } from "./studio-dodge-burn";
 import { STUDIO_DRAW_SHAPE_PICKER_KINDS } from "./studio-draw-hud";
 import { STUDIO_BRUSH_OPACITY_RANGE, STUDIO_BRUSH_SIZE_RANGE } from "./studio-draw-ux";
-import { type StudioDrawingPaletteLayout } from "./studio-drawing-palettes";
+import { toggleStudioDrawingPalette, type StudioDrawingPaletteLayout } from "./studio-drawing-palettes";
 import { type DrawMode, type DrawShapeKind, type StudioMenu, type Tool } from "./studio-editor-tool-model";
 import { type StudioEffectFavoriteState, type StudioEffectId } from "./studio-effect-favorites";
 import { containingPanel, elBounds } from "./studio-element-geometry";
@@ -75,16 +75,22 @@ import {
   type TextEl,
 } from "./studio-element-model";
 import { type StudioExtendedBlendModeId } from "./studio-extended-blend";
+import {
+  resolveStudioFigmaSelectionLayoutMetrics,
+  selectStudioFigmaDesignTargets,
+  type StudioFigmaSelectionLayoutPatch,
+} from "./studio-figma-selection-ux";
 import { type FilterMaskPaintMode } from "./studio-filter-mask";
 import { type StudioFilterKind } from "./studio-filter-menu";
 import { legacyTextGradientToSpec } from "./studio-gradient-engine";
 import { type HealCloneMode } from "./studio-heal-clone";
+import { openStudioHelpCenter } from "./studio-help-center-channel";
 import { uid } from "./studio-id";
 import {
   resolveStudioInspectorContentMode,
   resolveStudioInspectorInteractionPolicy,
 } from "./studio-inspector-interaction-policy";
-import { type StudioImageInspectorSection, type StudioInspectorLayout } from "./studio-inspector-layout";
+import { normalizeStudioInspectorLayout, type StudioImageInspectorSection, type StudioInspectorLayout } from "./studio-inspector-layout";
 import { resolveStudioInspectorRasterToolPolicy } from "./studio-inspector-raster-tool-policy";
 import {
   executeStudioInspectorArmedChange,
@@ -197,8 +203,11 @@ import {
 import { normalizeSkewPatch } from "./studio-skew";
 import { normalizeShapeParams, normalizeStrokeStyle } from "./studio-stroke-shapes";
 import { normalizeTextPath, type TextPathConfig } from "./studio-text-path";
-import { projectStudioViewRectToDocumentRect, type StudioViewRotation } from "./studio-view-controls";
+import { type StudioViewRotation } from "./studio-view-controls";
 import { StudioBgRemoveButton } from "./StudioBgRemoveButton";
+import { StudioCommandSearchHost } from "./StudioCommandSearchHost";
+import { StudioCustomFontsPanel } from "./StudioCustomFontsPanel";
+import { StudioFigmaDesignPanel } from "./StudioFigmaDesignPanel";
 import {
   StudioHokusaiNaturalMediaInspectorMount,
   type StudioHokusaiNaturalMediaReplaceHandler,
@@ -210,6 +219,8 @@ import { StudioInspectorDrawModeControls } from "./StudioInspectorDrawModeContro
 import { StudioInspectorFocusSpeedFrameControls } from "./StudioInspectorFocusSpeedFrameControls";
 import { StudioInspectorFreehandPathControls } from "./StudioInspectorFreehandPathControls";
 import { StudioInspectorNavigator } from "./StudioInspectorNavigator";
+import { StudioInspectorSection } from "./StudioInspectorSection";
+import { StudioInspectorSelectionStrokeControls } from "./StudioInspectorSelectionStrokeControls";
 import {
   StudioInspectorBrushCatalogButton,
   StudioInspectorCurrentBrushSummary,
@@ -223,6 +234,7 @@ import { StudioPanelLoading } from "./StudioLazySurfaceFallback";
 import { StudioLineCleanupPanel } from "./StudioLineCleanupPanel";
 import { StudioLineCorrectionControls } from "./StudioLineCorrectionControls";
 import { StudioMagicWandPanel } from "./StudioMagicWandPanel";
+import { StudioMinimapViewportBox } from "./StudioMinimapViewportBox";
 import { StudioMobileSheetHandle } from "./StudioMobileSheetHandle";
 import { StudioProceduralArtisticBrushInspectorSection } from "./StudioProceduralArtisticBrushInspectorSection";
 import { StudioQuickMaskPanel } from "./StudioQuickMaskPanel";
@@ -243,6 +255,7 @@ import type {
   StudioBrushDefaultRestoreDirection,
   StudioBrushDefaultRestoreTransaction,
 } from "./studio-brush-default-restore";
+import type { StudioScrollViewportStore } from "./studio-scroll-viewport-store";
 import type { StudioLayerNavigatorAction } from "./StudioLayerNavigator";
 import type { StudioMobileSheet } from "./StudioMobileEditingDock";
 
@@ -263,6 +276,9 @@ export interface StudioInspectorAsideHandlers {
   createLayerMaskFromSelection: (outside: boolean) => void;
   addVanishingPointHandler: () => void;
   alignSelected: (mode: "left" | "hcenter" | "right" | "top" | "vcenter" | "bottom" | "distributeH" | "distributeV") => void;
+  zoomToSelection: () => void;
+  flipSelected: (axis: "horizontal" | "vertical") => void;
+  applyFigmaSelectionLayoutPatch: (patch: StudioFigmaSelectionLayoutPatch) => void;
   announceDrawingShortcut: (message: string) => void;
   applyBgPreset: (p: BgPreset) => void;
   applyBrushDefaultRestoreTransaction: (
@@ -513,7 +529,12 @@ interface StudioInspectorAsideProps {
   saving: boolean;
   studioFilterPreparationBusy: boolean;
   studioLayerLiftDisabledReason: string | null;
-  scrollPos: { left: number; top: number; width: number; height: number; scrollWidth: number; scrollHeight: number; };
+  /**
+   * Live canvas scroll offset. The minimap viewport box tracks the scroll at
+   * frame rate, so it subscribes to this store instead of re-rendering the whole
+   * aside from a `StudioPage` state value once per pan frame.
+   */
+  scrollViewportStore: StudioScrollViewportStore;
   selected: El | null;
   selectedBg3dEditSource: { readonly scene?: StudioBg3dSceneDocument; readonly legacyDataUrl?: string; } | null;
   selectedBubbleTailGeometry: import("./studio-bubble-custom-shape").BubbleShapeGeometry | null;
@@ -655,7 +676,7 @@ interface StudioInspectorAsideProps {
   setSymmetryCenterX: import("react").Dispatch<import("react").SetStateAction<number>>;
   setSymmetryCenterY: import("react").Dispatch<import("react").SetStateAction<number>>;
   setSymmetryRadialCount: import("react").Dispatch<import("react").SetStateAction<number>>;
-  setSymmetryType: import("react").Dispatch<import("react").SetStateAction<"none" | "vertical" | "horizontal" | "radial" | "kaleidoscope">>;
+  setSymmetryType: import("react").Dispatch<import("react").SetStateAction<"none" | "vertical" | "horizontal" | "radial" | "kaleidoscope" | "silk">>;
   setTiltEnabled: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setTipAngle: import("react").Dispatch<import("react").SetStateAction<number>>;
   setTipRoundness: import("react").Dispatch<import("react").SetStateAction<number>>;
@@ -703,7 +724,7 @@ interface StudioInspectorAsideProps {
   symmetryCenterX: number;
   symmetryCenterY: number;
   symmetryRadialCount: number;
-  symmetryType: "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope";
+  symmetryType: "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope" | "silk";
   tagsText: string;
   timelinePlaying: boolean;
   tiltEnabled: boolean;
@@ -873,7 +894,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   saving,
   studioFilterPreparationBusy,
   studioLayerLiftDisabledReason,
-  scrollPos,
+  scrollViewportStore,
   selected,
   selectedBg3dEditSource,
   selectedBubbleTailGeometry,
@@ -1084,6 +1105,9 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
     createLayerMaskFromSelection,
     addVanishingPointHandler,
     alignSelected,
+    zoomToSelection,
+    flipSelected,
+    applyFigmaSelectionLayoutPatch,
     announceDrawingShortcut,
     applyBgPreset,
     applyBrushDefaultRestoreTransaction,
@@ -1478,16 +1502,6 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
     currentBrushSnapshot.sourcePresetName
     ?? BRUSH_PRESETS.find((preset) => preset.id === brush)?.name
     ?? brush;
-  const minimapViewportRect = projectStudioViewRectToDocumentRect({
-    documentWidth: CANVAS_W,
-    documentHeight: canvasH,
-    canvasFlipH,
-    canvasRotation,
-    x: scrollPos.left / effScale,
-    y: scrollPos.top / effScale,
-    width: scrollPos.width / effScale,
-    height: scrollPos.height / effScale,
-  });
   const canvasControlsDisabled = inspectorInteractionPolicy.page.disabled;
   const drawingAssistControlsDisabled = inspectorInteractionPolicy.page.disabled;
   const drawingAssistDisabledReason = inspectorInteractionPolicy.page.reason;
@@ -1543,6 +1557,33 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
               접기 <ChevronRight size={12} />
             </button>
           </div>
+          {/*
+            통합 Command Search 진입점. 감사 §2.8 이 센 네 개의 부분 검색창을
+            대신하고, 인스펙터가 접은 Advanced 컨트롤의 대체 도달 경로이기도
+            하다(F1).
+          */}
+          {/* 명령 검색 결과를 실제 도움말 목적지에 연결해 클릭·Enter no-op을 막는다. */}
+          <StudioCommandSearchHost
+            hideTrigger={isMobile}
+            onNavigateInspector={(route) => {
+              changeInspectorLayout(
+                normalizeStudioInspectorLayout({ ...inspectorLayout, ...route }),
+              );
+            }}
+            onOpenTutorial={(tutorialId) => openFeatureTutorial(tutorialId)}
+            onExpandPalette={(paletteId) => {
+              if (!drawingPaletteLayout.collapsed[paletteId]) return;
+              changeDrawingPaletteLayout(
+                toggleStudioDrawingPalette(drawingPaletteLayout, paletteId),
+              );
+            }}
+            onOpenHelp={(_helpNodeId, commandId) =>
+              openStudioHelpCenter({
+                section: "current-tool",
+                toolCommandId: commandId,
+              })
+            }
+          />
           <StudioInspectorNavigator
             layout={inspectorLayout}
             selectedType={
@@ -1685,10 +1726,28 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
             onPatch={patchPageGrade}
             onReset={resetPageGrade}
           />
+          {/* Outside the `selected` branch on purpose: a marquee selection has no single
+              `selected` element, and position/flip/frame are exactly what it needs. */}
+          {inspectorContentMode === "selection" && (
+            <div hidden={inspectorLayout.primary !== "properties"}>
+              <StudioFigmaDesignPanel
+                metrics={resolveStudioFigmaSelectionLayoutMetrics(
+                  selectStudioFigmaDesignTargets(elements, marqueeIds, selected),
+                )}
+                disabled={inspectorInteractionPolicy.selection.disabled}
+                onChange={applyFigmaSelectionLayoutPatch}
+                onZoomToSelection={zoomToSelection}
+                onFlipHorizontal={() => flipSelected("horizontal")}
+                onFlipVertical={() => flipSelected("vertical")}
+              />
+            </div>
+          )}
+
           {inspectorContentMode === "selection" && selected && (
             <div
               role="tabpanel"
               aria-label="선택 요소 속성"
+              data-testid="studio-inspector-context-selection"
               hidden={inspectorLayout.primary !== "properties"}
               className="rounded-xl border border-line bg-panel/40 p-3"
             >
@@ -1723,47 +1782,14 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                 <legend className="sr-only">선택 요소 편집 설정</legend>
                 <Suspense fallback={<StudioPanelLoading label="속성 패널을 여는 중..." />}>
                 <p className="mb-2 text-xs font-semibold text-fg-3">선택한 요소</p>
+
               {selected.type === "draw" && (
+                <StudioInspectorSection sectionId="element.shape-style" loadingLabel="도형 스타일을 여는 중...">
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                    선 색상
-                    <input
-                      type="color"
-                      value={selected.stroke || "#16100c"}
-                      aria-label="선 색상"
-                      onChange={(e) => patchEl(selected.id, { stroke: e.target.value } as Partial<El>)}
-                      className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent"
-                    />
-                  </div>
-                  <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                    선 두께
-                    <span className="flex items-center gap-1.5">
-                      <input
-                        type="range"
-                        min={1}
-                        max={48}
-                        value={selected.strokeWidth ?? 3}
-                        onChange={(e) => patchEl(selected.id, { strokeWidth: Number(e.target.value) } as Partial<El>)}
-                        className="w-24 accent-accent cursor-pointer"
-                      />
-                      <span className="w-8 text-right text-xs tabular-nums text-fg-3">{selected.strokeWidth ?? 3}px</span>
-                    </span>
-                  </label>
-                  <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                    불투명도
-                    <span className="flex items-center gap-1.5">
-                      <input
-                        type="range"
-                        min={0.1}
-                        max={1}
-                        step={0.05}
-                        value={selected.opacity ?? 1}
-                        onChange={(e) => patchEl(selected.id, { opacity: Number(e.target.value) } as Partial<El>)}
-                        className="w-24 accent-accent cursor-pointer"
-                      />
-                      <span className="w-8 text-right text-xs tabular-nums text-fg-3">{Math.round((selected.opacity ?? 1) * 100)}%</span>
-                    </span>
-                  </label>
+                  <StudioInspectorSelectionStrokeControls
+                    selected={selected}
+                    patchEl={patchEl}
+                  />
                   {(selected.kind === "rect" ||
                     selected.kind === "ellipse" ||
                     selected.kind === "star" ||
@@ -1849,6 +1875,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                     />
                   )}
                 </div>
+                </StudioInspectorSection>
               )}
 
               {(selected.type === "text" || selected.type === "bubble") && (
@@ -1862,11 +1889,11 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                   />
                 </label>
               )}
-              
+
               {selected.type === "text" && (
-                <div className="mt-2.5 border-t border-line/40 pt-2.5 space-y-2.5">
-                  <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">채우기 스타일</p>
-                  
+                <StudioInspectorSection sectionId="element.text-fill" loadingLabel="글자 채우기 스타일을 여는 중...">
+                <div className="space-y-2.5">
+
                   <div className="flex gap-1.5 bg-card rounded-lg p-0.5 border border-line">
                     {[
                       { label: "단색 채우기", v: "solid" },
@@ -1896,11 +1923,14 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                         allowClear={false}
                         title="그라데이션 편집"
                       />
-                      
+
                     </div>
                   )}
                 </div>
+                </StudioInspectorSection>
               )}
+              {selected.type === "bubble" && (
+                <StudioInspectorSection sectionId="element.bubble" loadingLabel="말풍선 설정을 여는 중...">
               {selected.type === "bubble" && (
                 <StudioInspectorBubbleAppearanceControls
                   recentColors={recentColors}
@@ -1974,6 +2004,10 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                   />
                 </Suspense>
               )}
+                </StudioInspectorSection>
+              )}
+              {(selected.type === "text" || selected.type === "bubble") && (
+                <StudioInspectorSection sectionId="element.typography" loadingLabel="타이포그래피를 여는 중...">
               {(selected.type === "text" || selected.type === "bubble") && (
                 <>
                   <div className="mt-2">
@@ -2006,6 +2040,12 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                         </button>
                       ))}
                     </div>
+                  </div>
+                  <div className="mt-3 border-t border-line/30 pt-3">
+                    <StudioCustomFontsPanel
+                      canApplyFont
+                      onApplyFont={(font) => patchEl(selected.id, { font } as Partial<El>)}
+                    />
                   </div>
                   <div className="mt-2 flex items-center justify-between gap-2 text-sm text-fg-2">
                     글자 크기
@@ -2322,8 +2362,16 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                   )}
                 </div>
               )}
-              {selected.type !== "frame" && containingPanel(selected, elements) && (
-                <label className="mt-2 flex items-center justify-between gap-2 text-sm text-fg-2">
+                </StudioInspectorSection>
+              )}
+              {/* 안이 전부 비면 헤더만 남으므로, 하나라도 그려질 때만 섹션을 낸다. */}
+              {selected.type !== "frame" &&
+                (selected.type === "image" ||
+                  selected.type === "bubble" ||
+                  containingPanel(selected, elements)) && (
+              <StudioInspectorSection sectionId="element.constraints" loadingLabel="배치 제약을 여는 중...">
+              {containingPanel(selected, elements) && (
+                <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
                   패널 안에 가두기
                   <input
                     type="checkbox"
@@ -2343,8 +2391,22 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                   {containingPanel(selected, elements) ? "패널에 꽉 채우기" : "캔버스에 꽉 채우기"}
                 </button>
               )}
+              {(selected.type === "image" || selected.type === "bubble") && (
+                <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
+                  비율 잠금 (변형 시 종횡비 유지)
+                  <input
+                    type="checkbox"
+                    checked={!!selected.lockAspect}
+                    onChange={(e) => patchEl(selected.id, { lockAspect: e.target.checked } as Partial<El>)}
+                    className="size-4 accent-accent cursor-pointer"
+                  />
+                </label>
+              )}
+              </StudioInspectorSection>
+              )}
               {(selected.type === "text" || selected.type === "bubble") && (
-                <div className="mt-2.5 border-t border-line/40 pt-2.5 space-y-2">
+                <StudioInspectorSection sectionId="element.text-align" loadingLabel="글자 정렬을 여는 중...">
+                <div className="space-y-2">
                   <div className="flex items-center justify-between gap-2 text-sm text-fg-2">
                     글자 정렬
                     <div className="flex gap-1">
@@ -2369,7 +2431,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                       ))}
                     </div>
                   </div>
-                  
+
                   <label className="flex items-center justify-between gap-2 text-sm text-fg-2 cursor-pointer">
                     세로 쓰기 (세로 연출)
                     <input
@@ -2390,6 +2452,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                     </button>
                   )}
                 </div>
+                </StudioInspectorSection>
               )}
               {selected.type !== "frame" && (
                 <label className="mt-2 flex items-center justify-between gap-2 text-sm text-fg-2">
@@ -2405,18 +2468,6 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                     />
                     <span className="w-9 text-right text-xs tabular-nums text-fg-3">{Math.round((selected.opacity ?? 1) * 100)}%</span>
                   </span>
-                </label>
-              )}
-
-              {(selected.type === "image" || selected.type === "bubble") && (
-                <label className="mt-2 flex items-center justify-between gap-2 text-sm text-fg-2">
-                  비율 잠금 (변형 시 종횡비 유지)
-                  <input
-                    type="checkbox"
-                    checked={!!selected.lockAspect}
-                    onChange={(e) => patchEl(selected.id, { lockAspect: e.target.checked } as Partial<El>)}
-                    className="size-4 accent-accent cursor-pointer"
-                  />
                 </label>
               )}
 
@@ -2478,6 +2529,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
               )}
 
               {selected.type === "image" && (
+                <StudioInspectorSection sectionId="element.blend-extended" loadingLabel="확장 블렌드를 여는 중...">
                 <Suspense fallback={null}>
                   <StudioExtendedBlendPanel
                     mode={extendedBlendMode}
@@ -2492,11 +2544,12 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                     onApply={() => void applyExtendedBlendMergeDown()}
                   />
                 </Suspense>
+                </StudioInspectorSection>
               )}
 
               {selected.type !== "draw" && (
-                <div className="mt-3 border-t border-line/50 pt-3 space-y-2">
-                  <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">위치 및 크기</p>
+                <StudioInspectorSection sectionId="element.layout" loadingLabel="배치를 여는 중...">
+                <div className="space-y-2">
                   <div className="grid grid-cols-2 gap-2">
                     <label className="flex flex-col gap-0.5">
                       <span className="text-[0.66rem] text-fg-3">가로 위치 (X)</span>
@@ -2561,22 +2614,23 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                     )}
                   </div>
                 </div>
-              )}
-
-              {/* 기울이기(Skew) — 이미지/텍스트/스티커 자유 변형. 도 단위 저장, Konva 렌더 시 tangent 변환(studio-skew). */}
-              {(selected.type === "image" || selected.type === "text" || selected.type === "sticker") && (
-                <div className="mt-3 border-t border-line/50 pt-3">
-                  <StudioSkewPanel
-                    value={{ skewX: selected.skewX, skewY: selected.skewY }}
-                    onPatch={(patch) => patchEl(selected.id, normalizeSkewPatch(patch) as Partial<El>)}
-                    onReset={() => patchEl(selected.id, { skewX: undefined, skewY: undefined } as Partial<El>)}
-                  />
-                </div>
+                {/* 기울이기(Skew) — 이미지/텍스트/스티커 자유 변형. 도 단위 저장, Konva 렌더 시 tangent 변환(studio-skew). */}
+                {(selected.type === "image" || selected.type === "text" || selected.type === "sticker") && (
+                  <div className="mt-3 border-t border-line/50 pt-3">
+                    <StudioSkewPanel
+                      value={{ skewX: selected.skewX, skewY: selected.skewY }}
+                      onPatch={(patch) => patchEl(selected.id, normalizeSkewPatch(patch) as Partial<El>)}
+                      onReset={() => patchEl(selected.id, { skewX: undefined, skewY: undefined } as Partial<El>)}
+                    />
+                  </div>
+                )}
+                </StudioInspectorSection>
               )}
 
               {(selected.type === "focusLines"
                 || selected.type === "speedLines"
                 || selected.type === "frame") ? (
+                <StudioInspectorSection sectionId="element.effect-lines" loadingLabel="집중선·속도선을 여는 중...">
                 <StudioInspectorFocusSpeedFrameControls
                   selected={selected}
                   panelGutter={panelGutter}
@@ -2599,6 +2653,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                     setSharedDocumentNotice(null);
                   }}
                 />
+                </StudioInspectorSection>
               ) : null}
 
               {(selected.type === "image" || selected.type === "draw") && (
@@ -3200,6 +3255,9 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                     글자 편집
                   </button>
                 )}
+              </div>
+              <StudioInspectorSection sectionId="element.order-align" loadingLabel="정렬·순서를 여는 중...">
+                <div className="flex flex-wrap gap-1.5">
                 {selected.type === "image" && (
                   <>
                     {(selected.vrmScene || parseStudio3dTool(selected.src) === "vrm-poser") && (
@@ -3276,6 +3334,9 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                 <button type="button" onClick={() => alignSelected("bottom")} className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1" })} title="아래쪽 정렬">
                   <AlignEndHorizontal size={14} />
                 </button>
+                </div>
+              </StudioInspectorSection>
+              <div className="mt-3 flex flex-wrap gap-1.5">
                 <button type="button" onClick={duplicateSelected} className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1" })} title="복제 (⌘J)">
                   <Copy size={14} />
                 </button>
@@ -3305,10 +3366,79 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
             </div>
           )}
 
+          {inspectorContentMode === "empty" && (
+            <div
+              role="tabpanel"
+              aria-label="시작 안내"
+              data-testid="studio-inspector-empty-coach"
+              hidden={inspectorLayout.primary !== "properties"}
+              className="rounded-xl border border-line bg-panel/40 p-3"
+            >
+              <p className="text-xs font-bold tracking-tight text-fg">캔버스에서 바로 시작</p>
+              <p className="mt-1 text-[0.7rem] leading-snug text-fg-3">
+                빈 화면에 그려도 됩니다. 선택 후 모서리 핸들로 크기를 조절하고, 자르기는 레이어에서 바로 열 수 있어요.
+              </p>
+              <div className="mt-2.5 grid grid-cols-2 gap-1.5">
+                <button
+                  type="button"
+                  aria-label="펜으로 그리기"
+                  className="min-h-11 rounded-lg border border-accent/40 bg-accent-soft px-2.5 py-2 text-left text-[0.72rem] font-semibold text-fg transition-colors hover:border-accent/70"
+                  onClick={() => {
+                    disarmAllPixelTools();
+                    setTool("draw");
+                    setDrawMode("pen");
+                    setEyedropperActive(false);
+                    announceDrawingShortcut("펜 · 캔버스에 바로 그려 보세요");
+                  }}
+                >
+                  펜으로 그리기
+                  <span className="mt-0.5 block text-[0.62rem] font-medium text-fg-3">단축키 B</span>
+                </button>
+                <button
+                  type="button"
+                  aria-label="선택 도구"
+                  className="min-h-11 rounded-lg border border-line bg-card px-2.5 py-2 text-left text-[0.72rem] font-semibold text-fg-2 transition-colors hover:border-accent/50 hover:bg-raised hover:text-fg"
+                  onClick={() => {
+                    disarmAllPixelTools();
+                    setTool("select");
+                    setEyedropperActive(false);
+                    announceDrawingShortcut("선택 · 클릭하거나 드래그해 고르세요");
+                  }}
+                >
+                  선택 도구
+                  <span className="mt-0.5 block text-[0.62rem] font-medium text-fg-3">단축키 V</span>
+                </button>
+                <button
+                  type="button"
+                  aria-label="레이어 패널 열기"
+                  className="min-h-11 rounded-lg border border-line bg-card px-2.5 py-2 text-left text-[0.72rem] font-semibold text-fg-2 transition-colors hover:border-accent/50 hover:bg-raised hover:text-fg"
+                  onClick={() => {
+                    changeInspectorLayout({ ...inspectorLayout, primary: "layers" });
+                  }}
+                >
+                  레이어 패널
+                  <span className="mt-0.5 block text-[0.62rem] font-medium text-fg-3">순서·표시</span>
+                </button>
+                <button
+                  type="button"
+                  aria-label="기능 튜토리얼 열기"
+                  className="min-h-11 rounded-lg border border-line bg-card px-2.5 py-2 text-left text-[0.72rem] font-semibold text-fg-2 transition-colors hover:border-accent/50 hover:bg-raised hover:text-fg"
+                  onClick={() => {
+                    openFeatureTutorial(null);
+                  }}
+                >
+                  기능 튜토리얼
+                  <span className="mt-0.5 block text-[0.62rem] font-medium text-fg-3">따라 하기</span>
+                </button>
+              </div>
+            </div>
+          )}
+
           {inspectorContentMode === "drawing" && (
             <div
               role="tabpanel"
               aria-label="그리기 도구 설정"
+              data-testid="studio-inspector-context-drawing-panel"
               hidden={inspectorLayout.primary !== "properties"}
               className="min-h-0 lg:flex lg:flex-1 lg:flex-col"
             >
@@ -3450,9 +3580,9 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                   </label>
                 ) : null}
 
-                {/* 투명도 슬라이더 */}
+                {/* 불투명도 슬라이더 — 요소 인스펙터와 같은 명칭을 쓴다(V5 §15 "모드가 달라도 동일 명칭"). */}
                 <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                  <span>투명도</span>
+                  <span>불투명도</span>
                   <span className="flex items-center gap-1.5">
                     <input
                       type="range"
@@ -3503,19 +3633,6 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                   ))
                   : null}
 
-                {drawMode !== "pixel" ? (
-                  <StudioLineCorrectionControls
-                    stabilizer={stabilizer}
-                    onStabilizerChange={setStabilizer}
-                    mode={stabilizerMode}
-                    onModeChange={setStabilizerMode}
-                    postCorrection={postCorrection}
-                    onPostCorrectionChange={setPostCorrection}
-                    preserveCorners={preserveCorners}
-                    onPreserveCornersChange={setPreserveCorners}
-                  />
-                ) : null}
-
                 {drawMode === "pen" && (
                   <Suspense fallback={null}>
                     <StudioQuickShapePanel
@@ -3543,7 +3660,23 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                   </Suspense>
                 )}
 
+                {drawMode !== "pixel" ? (
+                  <StudioInspectorSection sectionId="tool.line-correction" loadingLabel="선 보정을 여는 중...">
+                    <StudioLineCorrectionControls
+                      stabilizer={stabilizer}
+                      onStabilizerChange={setStabilizer}
+                      mode={stabilizerMode}
+                      onModeChange={setStabilizerMode}
+                      postCorrection={postCorrection}
+                      onPostCorrectionChange={setPostCorrection}
+                      preserveCorners={preserveCorners}
+                      onPreserveCornersChange={setPreserveCorners}
+                    />
+                  </StudioInspectorSection>
+                ) : null}
+
                 {drawMode !== "shape" && drawMode !== "pixel" ? (
+                  <StudioInspectorSection sectionId="tool.brush-studio" loadingLabel="브러시 스튜디오를 여는 중...">
                   <Suspense fallback={<div className="h-40 animate-pulse rounded-xl bg-raised/35 motion-reduce:animate-none" aria-hidden />}>
                     <StudioBrushStudio
                       brushId={brush}
@@ -3576,7 +3709,9 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                       onRestoreDefaults={applyBrushDefaultRestoreTransaction}
                     />
                   </Suspense>
+                  </StudioInspectorSection>
                 ) : null}
+                <StudioInspectorSection sectionId="tool.brush-engines" loadingLabel="브러시 엔진을 여는 중...">
                 <StudioHokusaiNaturalMediaInspectorMount
                   visible={drawMode !== "shape" && drawMode !== "pixel"}
                   selected={selected} currentColor={color}
@@ -3595,11 +3730,12 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                 {drawMode !== "shape" && drawMode !== "pixel" ? (
                   <StudioProceduralArtisticBrushInspectorSection key={`${currentPageId}:${masterEditMode ? "master" : "page"}`} currentColor={color} canvasHeight={canvasH} pageId={currentPageId} masterEditMode={masterEditMode} disabled={collaborationDocumentLocked || activeSurfaceReviewLocked} disabledReason={collaborationDocumentLocked ? "협업 문서 잠금을 해제한 뒤 절차적 질감을 만들 수 있어요." : activeSurfaceReviewLocked ? "표면 리뷰를 마친 뒤 절차적 질감을 만들 수 있어요." : null} onInsert={addProceduralArtisticBrushRaster} />
                 ) : null}
+                </StudioInspectorSection>
                 {/* 대칭 그리기 자 (Symmetry Ruler) — RAW 픽셀 입력에는 적용하지 않는다. */}
                 {drawMode !== "pixel" ? (
-                  <div className="pt-2.5 border-t border-line/35 space-y-2">
-                  <p className="text-xs font-semibold text-fg-3">대칭 자 (Symmetry)</p>
-                  
+                  <StudioInspectorSection sectionId="tool.symmetry" loadingLabel="대칭 자를 여는 중...">
+                  <div className="space-y-2">
+
                   <div className="grid grid-cols-5 gap-1">
                     {([
                       { id: "none", label: "없음" },
@@ -3677,7 +3813,9 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                     </div>
                   )}
                   </div>
+                  </StudioInspectorSection>
                 ) : null}
+                <StudioInspectorSection sectionId="tool.rulers" loadingLabel="자·가이드를 여는 중...">
                 <Suspense fallback={null}>
                   <StudioPerspectivePanel
                     active={perspectiveRulerActive}
@@ -3738,6 +3876,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                     onSetActiveSnap={setActiveAdvancedRuler}
                   />
                 </Suspense>
+                </StudioInspectorSection>
               </div>
                   </>
                 }
@@ -3959,18 +4098,16 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                   );
                 })
                   : null}
-                {/* Render scroll window box — 액센트 프레임 + 바깥 영역 딤(오버플로 히든 활용) */}
-                {scrollPos.scrollWidth > 0 && (
-                  <div
-                    className="pointer-events-none absolute rounded-[2px] border border-accent shadow-[0_0_0_240px_oklch(0.1_0.01_70/0.35)]"
-                    style={{
-                      left: `${(minimapViewportRect.x / CANVAS_W) * 100}%`,
-                      top: `${(minimapViewportRect.y / canvasH) * 100}%`,
-                      width: `${(minimapViewportRect.width / CANVAS_W) * 100}%`,
-                      height: `${(minimapViewportRect.height / canvasH) * 100}%`,
-                    }}
-                  />
-                )}
+                {/* Render scroll window box — 액센트 프레임 + 바깥 영역 딤(오버플로 히든 활용).
+                    팬 중에도 프레임 정확도를 지켜야 하므로 살아 있는 스크롤 스토어를 구독하는
+                    전용 리프로 분리했다(이 박스만 다시 그려지고 인스펙터 렌더는 없다). */}
+                <StudioMinimapViewportBox
+                  store={scrollViewportStore}
+                  canvasHeight={canvasH}
+                  effScale={effScale}
+                  canvasFlipH={canvasFlipH}
+                  canvasRotation={canvasRotation}
+                />
               </div>
             </div>
           </div>

@@ -165,6 +165,19 @@ describe("Studio freehand hot-path boundary", () => {
     );
   });
 
+  // What this pins is an *invariant*, not a spelling: a freehand pointer frame
+  // must reach the screen as exactly one retained preview commit that is painted
+  // inside the same coalesced frame, and it must land in the isolated draft
+  // preview store rather than in StudioPage state. `flushSync` is how that
+  // "commit and paint in one frame" part is currently spelled — changing the
+  // spelling is allowed, dropping the invariant is not.
+  //
+  // Source text alone cannot see the invariant being broken through some other
+  // code path (the measured pan regression re-rendered the whole editor every
+  // frame while every assertion in this file still passed), so the runtime
+  // counterpart is `tests/benchmarks/harness/studio-runtime-commit-gate.ts` with
+  // budgets in `studio-hot-path-commit-budget.ts`: `stroke:pen-paced` allows the
+  // per-frame store commits this test protects, and zero editor renders.
   it("commits one retained freehand preview and paints it inside the same coalesced frame", () => {
     const schedule = functionBody(
       "const scheduleDraft =",

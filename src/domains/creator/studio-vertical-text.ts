@@ -28,8 +28,9 @@
  *
  * 그래서 이 모듈은 **치환 테이블을 두지 않고, 모양이 달라져야 하는 글자는 전부 기하학적 90°
  * 회전으로 만든다**. 괄호류·대시류·장음표의 "세로 전용 글리프"는 정의상 가로 글리프를 90°
- * 돌린 모양이므로, 회전은 근사가 아니라 정확한 재현이다. 반대로 한글·한자·가나처럼 정사각
- * 글리프는 회전하면 안 되므로 직립으로 남긴다.
+ * 돌린 모양과 대체로 일치한다. 다만 폰트별 광학 위치·전용 GSUB 글리프까지 같다는 뜻은 아니므로
+ * 이 경로를 **결정적 기하 폴백**으로 명시한다. 반대로 한글·한자·가나처럼 정사각 글리프는
+ * 회전하면 안 되므로 직립으로 남긴다.
  *
  * 분류는 코드포인트만 보는 **순수 함수** `classifyVerticalGlyph()` 하나로 끝난다(§2 표 참고).
  *
@@ -39,9 +40,11 @@
  *  A. ROTATE(90° 시계방향) — 가로 모양을 눕혀야 세로쓰기 모양이 되는 것들
  *     A1. 라틴/그리스/키릴 문자와 ASCII 숫자, 그리고 그 사이를 잇는 ASCII 기호
  *         (U+0021–U+007E 중 §B에 없는 것 전부, U+00C0–U+024F, U+0370–U+04FF).
- *         연속 구간은 하나의 **회전 런**으로 묶어 단어가 통째로 읽히게 한다(일본/한국 세로
- *         조판의 기본 동작 — 종중횡조(縦中横, tate-chu-yoko)는 v1 범위 밖, §5 참고).
+ *         연속 구간은 하나의 **회전 런**으로 묶어 단어가 통째로 읽히게 한다. 단, 독립된
+ *         ASCII 숫자 1–4자리는 한 세로 셀 안에 가로로 맞추는 종중횡조(縦中横)로 배치한다.
  *     A2. 괄호·따옴표류: ()[]{}〈〉《》「」『』【】〔〕（）［］｛｝〖〗〘〙〚〛"" ''
+ *         여는/닫는 약물은 Unicode Ps/Pi/Pe/Pf 역할을 보존해 **각각 독립 셀**로 분절한다.
+ *         따라서 `」「`처럼 방향 역할이 반대인 인접 약물을 하나의 회전 런으로 합치지 않는다.
  *     A3. 획 모양 기호: ー(U+30FC) 〜(U+301C) ～(U+FF5E) ‐‑‒–—―(U+2010–2015) ─(U+2500)
  *         －(U+FF0D) -(U+002D) _(U+005F) ＿(U+FF3F) ￣(U+FFE3) …(U+2026) ‥(U+2025)
  *         ∥(U+2225) ＝(U+FF1D) =(U+003D)
@@ -69,7 +72,9 @@
  *    넘으면 다음 열로 넘긴다. 직립 글자의 세로 전진량은 `fontSize + letterSpacing`,
  *    회전 런의 전진량은 **가로 폭 측정값**(그래서 measurer가 필요하다).
  *  - 금칙(kinsoku) 최소 규칙: `、。，．？！ゝ` 등 §VERTICAL_NO_BREAK_BEFORE는 열 첫머리에
- *    올 수 없고, 여는 괄호는 열 끝에 올 수 없다. 위반하면 직전 글자를 함께 다음 열로 내린다.
+ *    올 수 없고, 여는 괄호는 열 끝에 올 수 없다. 넘침 시 최대 32개 셀만 역탐색해 가장 가까운
+ *    유효 break를 고른다. 유효 break가 없는 중첩 약물은 조용히 버리지 않고 해당 열에 매달아
+ *    `overflow=true`로 드러낸다(무한 역추적 없음).
  *  - `blockAlign`은 가로쓰기의 `align`과 같은 의미를 세로축에 적용한다:
  *    start=위 맞춤 · center=가운데 · end=아래 맞춤(호출부가 el.align을 매핑한다).
  *
@@ -84,11 +89,10 @@
  *   · rotated: rotation=90 이라 노드의 로컬 +x가 월드 +y가 된다 → 런이 아래로 흐른다.
  *
  * ────────────────────────────────────────────────────────────────────────────
- * §5. v1 범위 밖(의도적 미구현)
+ * §5. 현재 범위 밖
  * ────────────────────────────────────────────────────────────────────────────
- *  - 종중횡조(縦中横): 2자리 숫자를 직립으로 나란히 눕히는 조판. 지금은 회전 런으로 처리한다.
  *  - 루비(후리가나), 할주(割注), 세로 밑줄/방점.
- *  - OpenType `vert`/`vrt2` 치환(§1의 이유로 채택하지 않음).
+ *  - 제품 Canvas/SVG 경로의 OpenType `vert`/`vrt2` 강제 활성화(엔진 PathIR 레인이 담당).
  */
 
 /** 글자 폭 측정 포트 — studio-bubble-text-fit.ts의 `BubbleTextMeasurer`와 구조적으로 동일. */
@@ -97,13 +101,13 @@ export interface VerticalTextMeasurer {
 }
 
 /** 세로쓰기에서 한 글자가 취하는 형태. */
-export type VerticalGlyphForm = "upright" | "rotated" | "shifted";
+export type VerticalGlyphForm = "upright" | "rotated" | "shifted" | "tate-chu-yoko";
 
 export interface VerticalGlyphClass {
   readonly form: VerticalGlyphForm;
-  /** em 단위 가로 보정(오른쪽이 +). form이 "shifted"일 때만 0이 아니다. */
+  /** em 단위 가로 보정(오른쪽이 +). 문장부호/작은 가나의 세로 광학 위치에 사용한다. */
   readonly offsetX: number;
-  /** em 단위 세로 보정(아래가 +). form이 "shifted"일 때만 0이 아니다. */
+  /** em 단위 세로 보정(아래가 +). 문장부호/작은 가나의 세로 광학 위치에 사용한다. */
   readonly offsetY: number;
 }
 
@@ -114,33 +118,88 @@ const SHIFTED_STOP: VerticalGlyphClass = { form: "shifted", offsetX: 0.5, offset
 /** 작은 가나 — 오른쪽 위로 살짝(§2 C2). */
 const SHIFTED_SMALL_KANA: VerticalGlyphClass = { form: "shifted", offsetX: 0.08, offsetY: -0.08 };
 
+/** Unicode/JIS 계열 여는 약물. 명시 집합 밖 Ps/Pi도 분류기에서 수용한다. */
+const OPENING_PUNCTUATION = "([{（［｛｟〈《「『【〔〖〘〚“‘〝";
+/** Unicode/JIS 계열 닫는 약물. 명시 집합 밖 Pe/Pf도 분류기에서 수용한다. */
+const CLOSING_PUNCTUATION = ")]｝）］｠〉》」』】〕〗〙〛”’〞}";
 /** §2 A2 — 괄호·따옴표류(회전). */
-const ROTATED_BRACKETS = "()[]{}〈〉《》「」『』【】〔〕〖〗〘〙〚〛（）［］｛｝｟｠“”‘’";
+const ROTATED_BRACKETS = `${OPENING_PUNCTUATION}${CLOSING_PUNCTUATION}`;
 /** §2 A3 — 획 모양 기호(회전). */
 const ROTATED_STROKES = "ー〜～‐‑‒–—―─－-_＿￣…‥∥＝=";
 /** §2 C1 — 우상단으로 옮기는 마침표/쉼표류. */
 const SHIFTED_STOPS = "、。，．｡､";
 /** §2 C2 — 작은 가나. */
 const SMALL_KANA = "ぁぃぅぇぉっゃゅょゎゕゖァィゥェォッャュョヮヵヶ";
+/** 셀 중심에 직립 배치하되 행두 금칙을 적용하는 전각 약물. ASCII는 UAX #50대로 회전한다. */
+const CENTERED_SENTENCE_PUNCTUATION = "！？：；・･!?;:";
 
 const ROTATED_BRACKET_SET: ReadonlySet<string> = new Set([...ROTATED_BRACKETS]);
 const ROTATED_STROKE_SET: ReadonlySet<string> = new Set([...ROTATED_STROKES]);
 const SHIFTED_STOP_SET: ReadonlySet<string> = new Set([...SHIFTED_STOPS]);
 const SMALL_KANA_SET: ReadonlySet<string> = new Set([...SMALL_KANA]);
+const OPENING_PUNCTUATION_SET: ReadonlySet<string> = new Set([...OPENING_PUNCTUATION]);
+const CLOSING_PUNCTUATION_SET: ReadonlySet<string> = new Set([...CLOSING_PUNCTUATION]);
+const CENTERED_SENTENCE_PUNCTUATION_SET: ReadonlySet<string> = new Set([
+  ...CENTERED_SENTENCE_PUNCTUATION,
+]);
+
+/** 세로 조판에서 줄 경계와 광학 배치를 결정하는 Unicode 약물 역할. */
+export type VerticalPunctuationRole =
+  | "none"
+  | "opening"
+  | "closing"
+  | "stop"
+  | "small"
+  | "centered"
+  | "stroke";
+
+const UNICODE_OPENING_PUNCTUATION = /^(?:\p{Ps}|\p{Pi})$/u;
+const UNICODE_CLOSING_PUNCTUATION = /^(?:\p{Pe}|\p{Pf})$/u;
+
+/**
+ * 명시 JIS/CJK 집합을 우선하고 Unicode General_Category(Ps/Pi/Pe/Pf)를 보조로 쓰는 약물 분류.
+ * 코드포인트 하나만 받으며 서로게이트 페어에도 결정적이다.
+ */
+export function classifyVerticalPunctuation(char: string): VerticalPunctuationRole {
+  if (SHIFTED_STOP_SET.has(char)) return "stop";
+  if (SMALL_KANA_SET.has(char)) return "small";
+  if (OPENING_PUNCTUATION_SET.has(char) || UNICODE_OPENING_PUNCTUATION.test(char)) return "opening";
+  if (CLOSING_PUNCTUATION_SET.has(char) || UNICODE_CLOSING_PUNCTUATION.test(char)) return "closing";
+  if (CENTERED_SENTENCE_PUNCTUATION_SET.has(char)) return "centered";
+  if (ROTATED_STROKE_SET.has(char)) return "stroke";
+  return "none";
+}
 
 /** 열 첫머리에 올 수 없는 글자(행두 금칙). */
 export const VERTICAL_NO_BREAK_BEFORE: ReadonlySet<string> = new Set([
   ...SHIFTED_STOPS,
   ...SMALL_KANA,
-  "？", "！", "?", "!", "：", "；", ":", ";", "、", "。", "・",
-  "」", "』", "）", "]", ")", "}", "】", "〉", "》", "〕", "”", "’",
+  ...CENTERED_SENTENCE_PUNCTUATION,
+  ...CLOSING_PUNCTUATION,
   "ー", "…", "‥",
 ]);
 
 /** 열 끝에 올 수 없는 글자(행말 금칙 — 여는 괄호류). */
 export const VERTICAL_NO_BREAK_AFTER: ReadonlySet<string> = new Set([
-  "「", "『", "（", "(", "[", "{", "【", "〈", "《", "〔", "“", "‘",
+  ...OPENING_PUNCTUATION,
 ]);
+
+/** 동적 Unicode 약물까지 포함하는 행두 금칙 판정. */
+export function isVerticalNoBreakBefore(char: string): boolean {
+  const role = classifyVerticalPunctuation(char);
+  return (
+    VERTICAL_NO_BREAK_BEFORE.has(char)
+    || role === "closing"
+    || role === "stop"
+    || role === "small"
+    || role === "centered"
+  );
+}
+
+/** 동적 Unicode 약물까지 포함하는 행말 금칙 판정. */
+export function isVerticalNoBreakAfter(char: string): boolean {
+  return VERTICAL_NO_BREAK_AFTER.has(char) || classifyVerticalPunctuation(char) === "opening";
+}
 
 /**
  * §2의 규칙표를 그대로 구현한 **순수 분류기**. 입력은 한 글자(코드포인트 하나 — 서로게이트
@@ -155,7 +214,10 @@ export function classifyVerticalGlyph(char: string): VerticalGlyphClass {
   if (SMALL_KANA_SET.has(char)) return SHIFTED_SMALL_KANA;
 
   // A2/A3 — 명시 회전 집합.
-  if (ROTATED_BRACKET_SET.has(char)) return ROTATED;
+  const punctuation = classifyVerticalPunctuation(char);
+  if (punctuation === "opening" || punctuation === "closing" || ROTATED_BRACKET_SET.has(char)) {
+    return ROTATED;
+  }
   if (ROTATED_STROKE_SET.has(char)) return ROTATED;
 
   // A1 — 라틴/그리스/키릴 + 그 사이의 ASCII 기호. 전각 영숫자(U+FF01~)는 정사각이라 제외한다.
@@ -187,6 +249,8 @@ export interface VerticalTextLayoutInput {
 
 export interface VerticalTextItem {
   readonly form: VerticalGlyphForm;
+  /** Unicode/JIS 약물 역할. 일반 글자와 종중횡조는 `none`. */
+  readonly punctuation: VerticalPunctuationRole;
   /** upright는 글자들을 "\n"으로 이어 하나의 노드로 그린다(런 병합). 나머지는 원문 그대로. */
   readonly text: string;
   readonly x: number;
@@ -196,6 +260,8 @@ export interface VerticalTextItem {
   readonly length: number;
   /** upright 런에서 글자 하나의 세로 전진량(px) — 렌더러가 lineHeight로 환산해 쓴다. */
   readonly glyphAdvance: number;
+  /** 縦中横의 가로 압축 비율. 그 외 form은 항상 1. */
+  readonly horizontalScale: number;
 }
 
 export interface VerticalTextColumn {
@@ -228,13 +294,17 @@ export function toVerticalGlyphs(text: string): string[] {
   return [...text];
 }
 
-/** 연속 구간을 런으로 묶는다. shifted는 위치 보정이 글자마다 필요해 항상 1글자 런이다. */
+/**
+ * 연속 구간을 런으로 묶는다. 광학/금칙 역할이 있는 약물은 같은 `rotated`/`upright` 형식이어도
+ * 항상 1글자 런으로 격리한다. 라틴 내부 하이픈·장음 같은 stroke만 읽기 흐름 보존을 위해 병합한다.
+ */
 export function segmentVerticalRuns(text: string): VerticalRun[] {
   const runs: VerticalRun[] = [];
   let current: { form: VerticalGlyphForm; chars: string[] } | null = null;
   for (const char of toVerticalGlyphs(text)) {
     const { form } = classifyVerticalGlyph(char);
-    if (form === "shifted") {
+    const punctuation = classifyVerticalPunctuation(char);
+    if (form === "shifted" || (punctuation !== "none" && punctuation !== "stroke")) {
       if (current) runs.push(current);
       current = null;
       runs.push({ form, chars: [char] });
@@ -248,7 +318,17 @@ export function segmentVerticalRuns(text: string): VerticalRun[] {
     current = { form, chars: [char] };
   }
   if (current) runs.push(current);
-  return runs;
+  return runs.map((run) => {
+    if (
+      run.form === "rotated"
+      && run.chars.length >= 1
+      && run.chars.length <= 4
+      && run.chars.every((char) => /^[0-9]$/u.test(char))
+    ) {
+      return { form: "tate-chu-yoko" as const, chars: run.chars };
+    }
+    return run;
+  });
 }
 
 /** 배치 도중의 열 — 아직 x가 정해지지 않았다(열 수를 알아야 x를 계산할 수 있다). */
@@ -259,6 +339,9 @@ interface PendingItem {
   readonly offsetY: number;
   readonly length: number;
   readonly glyphAdvance: number;
+  readonly horizontalScale: number;
+  /** 렌더 병합과 금칙 판정용 약물 역할. */
+  readonly punctuation: VerticalPunctuationRole;
   /** 금칙 판정용 — 이 아이템의 첫 글자와 마지막 글자. */
   readonly firstChar: string;
   readonly lastChar: string;
@@ -269,6 +352,9 @@ function pendingLength(items: readonly PendingItem[]): number {
   for (const item of items) total += item.length;
   return total;
 }
+
+/** 금칙 역탐색은 입력 길이와 무관하게 이 셀 수에서 끝난다. */
+export const VERTICAL_KINSOKU_BACKTRACK_LIMIT = 32;
 
 /**
  * 회전 런을 열 길이 안에 들어가도록 글자 단위로 강제 분할한다(가로쓰기 hardBreakWord의 세로판).
@@ -334,17 +420,34 @@ export function layoutVerticalText(
         column.push(item);
         return;
       }
-      // 열 넘김 — 금칙 처리(§3): 새 열 첫머리에 오면 안 되는 글자면 직전 아이템을 데려간다.
-      const carried: PendingItem[] = [];
-      if (column.length > 1 && VERTICAL_NO_BREAK_BEFORE.has(item.firstChar)) {
-        carried.push(column.pop()!);
+      // 열 넘김 — 가장 가까운 유효 경계를 제한적으로 역탐색한다. suffix 첫 글자가 행두
+      // 금칙이거나 prefix 마지막 글자가 행말 금칙이면 한 셀 더 뒤로 간다. 인접 `」「`와
+      // 닫는 약물 연쇄를 글자 단위로 다룰 수 있는 이유가 약물이 독립 PendingItem이기 때문이다.
+      const combined = [...column, item];
+      const minimumBreak = Math.max(1, column.length - VERTICAL_KINSOKU_BACKTRACK_LIMIT);
+      let breakAt: number | null = null;
+      for (let candidate = column.length; candidate >= minimumBreak; candidate -= 1) {
+        const before = combined[candidate - 1];
+        const after = combined[candidate];
+        if (!before || !after) continue;
+        if (isVerticalNoBreakAfter(before.lastChar)) continue;
+        if (isVerticalNoBreakBefore(after.firstChar)) continue;
+        if (pendingLength(combined.slice(candidate)) > maxColumnLength) continue;
+        breakAt = candidate;
+        break;
       }
-      while (column.length > 1 && VERTICAL_NO_BREAK_AFTER.has(column[column.length - 1]!.lastChar)) {
-        carried.unshift(column.pop()!);
+
+      if (breakAt !== null) {
+        column = combined.slice(0, breakAt);
+        flush();
+        column.push(...combined.slice(breakAt));
+        return;
       }
-      flush();
-      for (const carriedItem of carried) column.push(carriedItem);
+
+      // 중첩 괄호처럼 제한 안에서 유효 break가 존재하지 않으면 약물을 버리거나 무한
+      // backtrack하지 않는다. 해당 열에 매달고 overflow를 표면화한다.
       column.push(item);
+      overflow = true;
     };
 
     for (const run of segmentVerticalRuns(paragraph)) {
@@ -358,6 +461,8 @@ export function layoutVerticalText(
           offsetY,
           length: fontSize + letterSpacing,
           glyphAdvance: fontSize + letterSpacing,
+          horizontalScale: 1,
+          punctuation: classifyVerticalPunctuation(char),
           firstChar: char,
           lastChar: char,
         });
@@ -373,10 +478,29 @@ export function layoutVerticalText(
             offsetY: 0,
             length: fontSize + letterSpacing,
             glyphAdvance: fontSize + letterSpacing,
+            horizontalScale: 1,
+            punctuation: classifyVerticalPunctuation(char),
             firstChar: char,
             lastChar: char,
           });
         }
+        continue;
+      }
+      if (run.form === "tate-chu-yoko") {
+        const runText = run.chars.join("");
+        const measured = Math.max(1, measure(runText));
+        push({
+          form: "tate-chu-yoko",
+          text: runText,
+          offsetX: 0,
+          offsetY: 0,
+          length: fontSize + letterSpacing,
+          glyphAdvance: fontSize + letterSpacing,
+          horizontalScale: Math.min(1, fontSize / measured),
+          punctuation: "none",
+          firstChar: run.chars[0]!,
+          lastChar: run.chars[run.chars.length - 1]!,
+        });
         continue;
       }
       // 회전 런 — 단어가 통째로 읽히도록 원자적으로 넣되, 열보다 길면 강제 분할한다.
@@ -390,6 +514,8 @@ export function layoutVerticalText(
           offsetY: 0,
           length: runLength,
           glyphAdvance: runLength,
+          horizontalScale: 1,
+          punctuation: classifyVerticalPunctuation(run.chars[0]!),
           firstChar: run.chars[0]!,
           lastChar: run.chars[run.chars.length - 1]!,
         });
@@ -404,6 +530,8 @@ export function layoutVerticalText(
           offsetY: 0,
           length: measure(piece) + letterSpacing,
           glyphAdvance: measure(piece) + letterSpacing,
+          horizontalScale: 1,
+          punctuation: classifyVerticalPunctuation(piece[0]!),
           firstChar: piece[0]!,
           lastChar: piece[piece.length - 1]!,
         });
@@ -428,6 +556,8 @@ export function layoutVerticalText(
       if (
         item.form === "upright"
         && previous?.form === "upright"
+        && item.punctuation === "none"
+        && previous.punctuation === "none"
         && previous.glyphAdvance === item.glyphAdvance
       ) {
         // 연속 직립 글자는 하나의 노드로 병합한다(노드 수 절감 — 렌더러가 "\n"으로 쌓아 그린다).
@@ -441,12 +571,14 @@ export function layoutVerticalText(
       }
       merged.push({
         form: item.form,
+        punctuation: item.punctuation,
         text: item.text,
         x: centerX - fontSize / 2 + item.offsetX * fontSize,
         y: cursor + item.offsetY * fontSize,
         rotation: item.form === "rotated" ? 90 : 0,
         length: item.length,
         glyphAdvance: item.glyphAdvance,
+        horizontalScale: item.horizontalScale,
       });
       cursor += item.length;
     }
@@ -476,15 +608,26 @@ export function verticalBlockAlign(align: "left" | "center" | "right" | undefine
  * 한 곳에서만 계산한다.
  *  · upright/shifted: 폭 `boxWidth`짜리 가운데 정렬 상자에 글자를 "\n"으로 쌓고, 열 방향
  *    전진량을 `lineHeight` 배수로 환산한다(자간이 있으면 1보다 커진다).
+ *  · tate-chu-yoko: 역비율 폭 상자를 `scaleX`로 압축해 시각 폭을 정확히 1em으로 맞춘다.
  *  · rotated: 한 줄짜리 노드를 90° 돌린다(로컬 +x가 월드 +y가 되어 런이 아래로 흐른다).
  */
 export function verticalTextItemGeometry(
   item: VerticalTextItem,
   fontSize: number
-): { boxWidth: number; lineHeight: number } {
+): { boxWidth: number; lineHeight: number; scaleX: number } {
+  const scaleX =
+    item.form === "tate-chu-yoko"
+      ? Math.max(0.01, Math.min(1, item.horizontalScale))
+      : 1;
   return {
-    boxWidth: Math.max(1, fontSize),
-    lineHeight: item.form === "rotated" ? 1 : Math.max(0.01, item.glyphAdvance / Math.max(1, fontSize)),
+    // Konva/SVG scale from the item's left edge. An inverse-width box keeps
+    // the scaled visual width exactly one em and therefore centered at item.x.
+    boxWidth: Math.max(1, fontSize) / scaleX,
+    lineHeight:
+      item.form === "rotated" || item.form === "tate-chu-yoko"
+        ? 1
+        : Math.max(0.01, item.glyphAdvance / Math.max(1, fontSize)),
+    scaleX,
   };
 }
 

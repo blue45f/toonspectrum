@@ -33,7 +33,8 @@ export type StudioSymmetryHud =
   | "vertical"
   | "horizontal"
   | "radial"
-  | "kaleidoscope";
+  | "kaleidoscope"
+  | "silk";
 
 export function studioSymmetryHudLabel(type: StudioSymmetryHud): string | null {
   switch (type) {
@@ -47,6 +48,8 @@ export function studioSymmetryHudLabel(type: StudioSymmetryHud): string | null {
       return "대칭 방사";
     case "kaleidoscope":
       return "대칭 만화경";
+    case "silk":
+      return "대칭 실크";
   }
 }
 

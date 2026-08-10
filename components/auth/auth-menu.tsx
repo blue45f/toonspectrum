@@ -50,8 +50,8 @@ export function AuthMenu({
     if (defaultOpen) setModal(true);
   }, [defaultOpen]);
 
-  // 관리자 콘솔 링크 노출 — 세션 role 은 화이트리스트(ADMIN_EMAILS) 승격을 반영 못 하므로
-  // /api/admin/me 프로브로 실제 권한을 확인(성공=관리자)해 게이트한다.
+  // 관리자 콘솔 링크 노출 — 세션 role(화이트리스트 승격 반영) + /api/admin/me 프로브.
+  // 프로브는 세션 role 이 stale 한 탭/캐시에서도 링크가 보이도록 하는 2차 게이트.
   useEffect(() => {
     if (status !== "authenticated" || !uid) {
       setIsAdmin(false);
@@ -97,7 +97,13 @@ export function AuthMenu({
   const u = session.user;
   const initial = (u.name ?? u.email ?? "U").charAt(0).toUpperCase();
   const imageSrc = safeProfileImageSrc(u.image);
-  const showAdmin = (u.role ?? "") === "admin" || (u.role ?? "") === "operator" || isAdmin;
+  const userEmail = (u.email ?? "").trim().toLowerCase();
+  // 서버 세션이 admin 을 주면 즉시 표시. 화이트리스트 이메일은 배포 지연/세션 stale 대비 폴백.
+  const showAdmin =
+    (u.role ?? "") === "admin" ||
+    (u.role ?? "") === "operator" ||
+    userEmail === "blue45f@gmail.com" ||
+    isAdmin;
   const fallbackName = t("auth.menu.fallbackName");
 
   async function handleSignOut() {

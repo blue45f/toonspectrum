@@ -224,20 +224,27 @@ describe("Studio ToolBelt content module boundary", () => {
       initializer.arguments[0] as ts.ObjectLiteralExpression
     ).toSorted();
 
-    expect(handlerNames).toHaveLength(73);
-    expect(wiredHandlerNames).toHaveLength(73);
+    expect(handlerNames).toHaveLength(74);
+    expect(wiredHandlerNames).toHaveLength(74);
     expect(wiredHandlerNames).toEqual(handlerNames);
     expect(page.source).toContain("stableHandlers={studioToolBeltContentHandlers}");
   });
 
-  it("disarms transient canvas tools before mobile select, pen, and eraser transitions", () => {
+  // 계약 변경(2026-08, docs/rewrite/ux-audit-v5.md §2.4): 벨트가 disarm+setTool 을 직접 조합하면
+  // 진행 중인 획 취소가 이 경로에서만 빠진다. 레일·키보드·컴패니언과 같은 정본 전이를 쓴다.
+  it("routes mobile select, pen, and eraser through the stroke-safe primary transition", () => {
     const page = moduleShape("./StudioPage.tsx").source;
     const toolBelt = moduleShape("./StudioToolBeltContent.tsx").source;
 
-    expect(page).toContain("disarmAllPixelTools,");
-    expect(toolBelt).toContain("disarmAllPixelTools: () => void;");
-    expect(toolBelt.match(/disarmAllPixelTools\(\);\s+setTool\("select"\)/gu)).toHaveLength(1);
-    expect(toolBelt.match(/disarmAllPixelTools\(\);\s+setTool\("draw"\)/gu)).toHaveLength(2);
+    expect(page).toContain("activatePrimaryCanvasTool,");
+    expect(toolBelt).toContain(
+      'activatePrimaryCanvasTool: (tool: "select" | "draw", drawMode?: DrawMode) => void;',
+    );
+    expect(toolBelt.match(/activatePrimaryCanvasTool\("select"\)/gu)).toHaveLength(1);
+    expect(toolBelt.match(/activatePrimaryCanvasTool\("draw", "(?:pen|eraser)"\)/gu))
+      .toHaveLength(2);
+    expect(toolBelt).not.toContain('setTool("select")');
+    expect(toolBelt).not.toContain('setTool("draw")');
   });
 
   it("preserves all 203 props at the single Page call site", () => {

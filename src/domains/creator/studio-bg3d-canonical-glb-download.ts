@@ -1,6 +1,6 @@
 import {
   canonicalizeBg3dModelHash,
-  getStoredBg3dModelByHash,
+  getStoredBg3dModelByHashV12 as getStoredBg3dModelByHash,
   isSafeBg3dModelStorageId,
   isVerifiedBg3dModelRecord,
   revalidateStoredBg3dModelForRendering,
@@ -54,7 +54,7 @@ export class StudioBg3dCanonicalGlbDownloadError extends Error {
 }
 
 export interface StudioBg3dCanonicalGlbDownloadRequest {
-  /** Private IndexedDB row identity captured with the visible library entry. */
+  /** Private local SQLite/OPFS row identity captured with the visible library entry. */
   readonly storageId: string;
   /** Canonical content identity captured with the same visible library entry. */
   readonly expectedContentHash: string;

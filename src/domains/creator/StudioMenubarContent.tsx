@@ -3,6 +3,7 @@ import {
   Box,
   Camera,
   ChevronDown,
+  ChevronsRight,
   Clapperboard,
   ClipboardCheck,
   Download,
@@ -18,6 +19,8 @@ import {
   Music4,
   Package,
   PlaySquare,
+  Save,
+  Send,
   ShieldCheck,
   Redo2,
   Undo2,
@@ -28,9 +31,17 @@ import {
 import {
   Suspense,
   memo,
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
   type ChangeEvent,
   type ComponentProps,
   type Dispatch,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactElement,
   type RefObject,
   type SetStateAction,
 } from "react";
@@ -44,6 +55,7 @@ import {
   preloadStudioExportMenuPanel,
 } from "./studio-page-lazy-ui";
 import { studioWriterRoomHasContent } from "./studio-writer-room";
+import { StudioProjectReviewActions } from "./StudioProjectReviewActions";
 import { StudioToolHintTarget } from "./StudioToolHint";
 import { StudioWorkspaceMenuGate } from "./StudioWorkspaceMenuGate";
 
@@ -52,6 +64,7 @@ import type { StudioCharacterBible } from "./studio-character-bible";
 import type { StudioMenu } from "./studio-editor-tool-model";
 import type { ExportFormat } from "./studio-export";
 import type { StudioInkMlExportResult } from "./studio-inkml-interchange";
+import type { StudioProjectReviewActionHandlers } from "./studio-project-review-actions";
 import type { PsdExportResult } from "./studio-psd-export";
 import type {
   StudioRasterEncoded,
@@ -64,6 +77,7 @@ import type { StudioToolbarGroupId } from "./studio-toolbar-groups";
 import type { WatermarkSettings } from "./studio-watermark";
 import type { StudioWillV1PageExportResult } from "./studio-will-v1-export-bridge";
 import type {
+  StudioWorkspaceDeviceKind,
   StudioWorkspaceLayout,
   StudioWorkspaceLoadResult,
   StudioWorkspaceSaveResult,
@@ -161,7 +175,256 @@ const MENUBAR_HINTS = {
   },
 } satisfies Readonly<Record<string, StudioToolHintSpec>>;
 
-export interface StudioMenubarContentHandlers {
+const MENUBAR_OVERFLOW_HINT = {
+  id: "menubar-overflow",
+  title: "가려진 메뉴",
+  description:
+    "메뉴바 폭이 모자라 잘린 상위 메뉴 목록입니다. 고르면 그 메뉴가 보이는 위치로 이동하며 바로 열립니다.",
+  tip: "폭이 넉넉해지면 이 버튼은 스스로 사라져요.",
+} satisfies StudioToolHintSpec;
+
+/** 메뉴바 가로 레인의 실측 상태 — 폭 브레이크포인트가 아니라 기하로만 판정한다. */
+export interface StudioMenubarLaneOverflow {
+  /** 오른쪽으로 더 볼 내용이 남아 있는가(페이드 큐의 유일한 근거). */
+  scrollable: boolean;
+  /** 레인 밖으로 잘려 마우스로 못 누르는 상위 메뉴 그룹 id. */
+  hiddenGroupIds: readonly string[];
+}
+
+export interface StudioMenubarTriggerBox {
+  id: string;
+  left: number;
+  right: number;
+}
+
+const MENUBAR_OVERFLOW_EPSILON = 1;
+
+/**
+ * D9 회귀의 근본 원인 교정 — 오버플로 여부는 **폭 브레이크포인트가 아니라 실측**이다.
+ *
+ * §15.3 메뉴 그룹이 17개(+transform)로 늘어난 뒤로는 1920px에서도 마지막 그룹이 잘린다.
+ * `xl:hidden` 같은 폭 게이트는 "데스크톱이면 다 보인다"는 이제 거짓인 가정을 인코딩한 것이라
+ * 데스크톱에서 스크롤 단서도, 마우스로 도달할 방법도 함께 사라졌다.
+ */
+// 이 순수 해석기를 여기 두는 것은 의도적이다 — 오버플로 판정이 이 메뉴바 마크업과 한 몸이라
+// 같은 파일에서 회귀 테스트되어야 한다(레이아웃과 판정이 갈라지면 D9 가 조용히 돌아온다).
+// eslint-disable-next-line react-refresh/only-export-components
+export function resolveStudioMenubarLaneOverflow(
+  lane: { left: number; right: number; scrollLeft: number; scrollWidth: number; clientWidth: number; },
+  triggers: readonly StudioMenubarTriggerBox[],
+): StudioMenubarLaneOverflow {
+  const scrollable =
+    lane.clientWidth > 0
+    && lane.scrollWidth - lane.scrollLeft - lane.clientWidth > MENUBAR_OVERFLOW_EPSILON;
+  const hiddenGroupIds = triggers
+    .filter((trigger) => trigger.right - trigger.left > 0)
+    .filter(
+      (trigger) =>
+        trigger.left < lane.left - MENUBAR_OVERFLOW_EPSILON
+        || trigger.right > lane.right + MENUBAR_OVERFLOW_EPSILON,
+    )
+    .map((trigger) => trigger.id);
+  return { scrollable, hiddenGroupIds };
+}
+
+const EMPTY_LANE_OVERFLOW: StudioMenubarLaneOverflow = Object.freeze({
+  scrollable: false,
+  hiddenGroupIds: Object.freeze([]) as readonly string[],
+});
+
+function measureStudioMenubarLaneOverflow(
+  lane: HTMLElement | null,
+): StudioMenubarLaneOverflow {
+  if (!lane) return EMPTY_LANE_OVERFLOW;
+  const laneRect = lane.getBoundingClientRect();
+  if (laneRect.width <= 0) return EMPTY_LANE_OVERFLOW;
+  const triggers: StudioMenubarTriggerBox[] = [];
+  for (const node of lane.querySelectorAll<HTMLElement>("[data-studio-main-menu-trigger]")) {
+    const id = node.dataset.studioMainMenuTrigger;
+    if (!id) continue;
+    const rect = node.getBoundingClientRect();
+    triggers.push({ id, left: rect.left, right: rect.right });
+  }
+  return resolveStudioMenubarLaneOverflow(
+    {
+      left: laneRect.left,
+      right: laneRect.right,
+      scrollLeft: lane.scrollLeft,
+      scrollWidth: lane.scrollWidth,
+      clientWidth: lane.clientWidth,
+    },
+    triggers,
+  );
+}
+
+function sameGroupIds(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((id, index) => id === b[index]);
+}
+
+/**
+ * 잘린 메뉴 그룹으로 가는 정본 진입점. 스크롤 힌트와 달리 Tab 으로 닿고 Enter 로 열리며,
+ * 실제 열기는 `StudioMainMenu` 트리거에 위임해 드롭다운 구현을 이중화하지 않는다.
+ */
+function StudioMenubarOverflowMenu({
+  groups,
+  onReveal,
+}: {
+  groups: readonly { id: string; label: string; }[];
+  onReveal: (groupId: string) => void;
+}): ReactElement | null {
+  const [open, setOpen] = useState(false);
+  const panelId = useId();
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const [coords, setCoords] = useState({ top: 44, right: 12 });
+
+  const closeMenu = useCallback((restoreFocus: boolean) => {
+    setOpen(false);
+    if (restoreFocus) buttonRef.current?.focus({ preventScroll: true });
+  }, []);
+
+  const openMenu = useCallback(() => {
+    const rect = buttonRef.current?.getBoundingClientRect();
+    if (rect && typeof window !== "undefined") {
+      setCoords({
+        top: rect.bottom + 6,
+        right: Math.max(8, window.innerWidth - rect.right),
+      });
+    }
+    setOpen(true);
+  }, []);
+
+  // 목록은 실측이라 상호작용 도중에도 비워질 수 있다(창을 넓히면 곧바로 0개).
+  const hasGroups = groups.length > 0;
+  useEffect(() => {
+    if (!hasGroups) setOpen(false);
+  }, [hasGroups]);
+
+  useEffect(() => {
+    if (!open) return;
+    itemRefs.current[0]?.focus({ preventScroll: true });
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (buttonRef.current?.contains(target) || panelRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      event.preventDefault();
+      closeMenu(true);
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown, true);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [closeMenu, open]);
+
+  const focusItem = (index: number) => {
+    if (groups.length === 0) return;
+    const next = (index + groups.length) % groups.length;
+    itemRefs.current[next]?.focus({ preventScroll: true });
+  };
+
+  const handlePanelKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const currentIndex = Number(
+      (event.target as HTMLElement | null)?.getAttribute?.("data-studio-menubar-overflow-index"),
+    );
+    const index = Number.isSafeInteger(currentIndex) ? currentIndex : 0;
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      focusItem(index + 1);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      focusItem(index - 1);
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      focusItem(0);
+    } else if (event.key === "End") {
+      event.preventDefault();
+      focusItem(groups.length - 1);
+    }
+  };
+
+  if (!hasGroups) return null;
+
+  return (
+    <div className="relative flex shrink-0 items-center" data-studio-menubar-overflow="true">
+      <StudioToolHintTarget hint={MENUBAR_OVERFLOW_HINT} preferredSide="bottom">
+        <button
+          ref={buttonRef}
+          type="button"
+          data-studio-menubar-overflow-menu="true"
+          aria-haspopup="menu"
+          aria-expanded={open}
+          aria-controls={open ? panelId : undefined}
+          aria-label={`가려진 메뉴 ${groups.length}개`}
+          onClick={() => (open ? closeMenu(true) : openMenu())}
+          onKeyDown={(event) => {
+            if (event.key !== "ArrowDown" || open) return;
+            event.preventDefault();
+            openMenu();
+          }}
+          className={cn(
+            buttonClass({ size: "sm", variant: open ? "solid" : "quiet" }),
+            "min-h-9 shrink-0 gap-0.5 px-1.5 text-[0.72rem] font-semibold tabular-nums"
+          )}
+        >
+          <ChevronsRight size={14} aria-hidden />
+          {groups.length}
+        </button>
+      </StudioToolHintTarget>
+      {open && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              ref={panelRef}
+              id={panelId}
+              role="menu"
+              aria-label="가려진 메뉴"
+              tabIndex={-1}
+              data-studio-menubar-overflow-panel="true"
+              data-studio-shortcut-boundary="true"
+              onKeyDown={handlePanelKeyDown}
+              style={{ top: coords.top, right: coords.right }}
+              className="fixed z-[100] max-h-[min(70dvh,26rem)] min-w-44 overflow-y-auto overscroll-contain rounded-2xl border border-line bg-panel py-1.5 shadow-2xl"
+            >
+              {groups.map((group, index) => (
+                <button
+                  key={group.id}
+                  ref={(node) => {
+                    itemRefs.current[index] = node;
+                  }}
+                  type="button"
+                  role="menuitem"
+                  tabIndex={index === 0 ? 0 : -1}
+                  data-studio-menubar-overflow-item={group.id}
+                  data-studio-menubar-overflow-index={index}
+                  onClick={() => {
+                    setOpen(false);
+                    onReveal(group.id);
+                  }}
+                  className="mx-1 flex w-[calc(100%-0.5rem)] items-center gap-2 rounded-xl px-2.5 py-2 text-left text-[0.78rem] font-medium text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:bg-raised focus-visible:text-fg"
+                >
+                  {group.label}
+                </button>
+              ))}
+            </div>,
+            document.body
+          )
+        : null}
+    </div>
+  );
+}
+
+/**
+ * 검수·미리보기 진입점 7종. 예전에는 툴벨트에만 트리거가 있었는데 벨트 호스트가
+ * 전 뷰포트에서 `display:none`이라 도달 불가였다 — `StudioProjectReviewActions` 상단 주석 참조.
+ * `useStudioStableHandlers` 계약상 핸들러 백은 평면(함수만)이어야 해서 여기에 펼쳐 둔다.
+ */
+export interface StudioMenubarContentHandlers extends StudioProjectReviewActionHandlers {
   applyStudioWorkspaceLayout: (layout: StudioWorkspaceLayout) => void;
   cancelInterchangeImport: () => void;
   changeMobileImmersiveMode: (enabled: boolean) => void;
@@ -215,11 +478,18 @@ export interface StudioMenubarContentProps {
   isExporting: boolean;
   isMobile: boolean;
   liveWorkspaceLayout: StudioWorkspaceLayout;
+  /** Samples the input surface in use, for device-aware workspace resolution. */
+  resolveWorkspaceDeviceKind: () => StudioWorkspaceDeviceKind | null;
   loadedWork: WorkDetail | null;
+  masterEditMode: boolean;
   menu: StudioMenu | null;
   mobileImmersive: boolean;
   historyPanelOpen: boolean;
+  /** 미해결 문서 댓글 수 — 프로젝트 시트의 댓글 진입점 배지. */
+  openStudioCommentCount: number;
   pageCount: number;
+  /** 현재 페이지가 검토 잠금인지 — 페이지 검토 진입점 라벨에 반영. */
+  pageEditLocked: boolean;
   pageLabels: string[];
   /** Optional story pages for dialogue TXT package export preflight. */
   dialoguePages?: readonly import("./studio-dialogue-batch").DialoguePageLike[] | null;
@@ -291,11 +561,15 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
   isExporting,
   isMobile,
   liveWorkspaceLayout,
+  resolveWorkspaceDeviceKind,
   loadedWork,
+  masterEditMode,
   menu,
   mobileImmersive,
   historyPanelOpen,
+  openStudioCommentCount,
   pageCount,
+  pageEditLocked,
   pageLabels,
   dialoguePages = null,
   projectActionsOpen,
@@ -371,23 +645,134 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
     exportCurrentPageToSvg,
     handleCapturePagesForPreset,
     handleCapturePagesForIndices,
+    toggleAnimationTimeline,
+    openTimelapse,
+    openStoryboardGrid,
+    openScrollPreview,
+    openContinuityCheck,
+    toggleDocumentComments,
+    openPageReview,
   } = stableHandlers;
+  const commentsLocked =
+    collaborationDocumentLocked && !sharedDocument?.capabilities.view;
+
+  const menubarLaneRef = useRef<HTMLDivElement | null>(null);
+  const [laneOverflow, setLaneOverflow] = useState<StudioMenubarLaneOverflow>(
+    EMPTY_LANE_OVERFLOW
+  );
+
+  useEffect(() => {
+    const lane = menubarLaneRef.current;
+    if (!lane) return;
+    let frame = 0;
+    const sync = () => {
+      frame = 0;
+      const next = measureStudioMenubarLaneOverflow(lane);
+      setLaneOverflow((prev) =>
+        prev.scrollable === next.scrollable
+        && sameGroupIds(prev.hiddenGroupIds, next.hiddenGroupIds)
+          ? prev
+          : next
+      );
+    };
+    const schedule = () => {
+      if (frame !== 0) return;
+      if (typeof requestAnimationFrame === "function") {
+        frame = requestAnimationFrame(sync);
+        return;
+      }
+      sync();
+    };
+    schedule();
+    lane.addEventListener("scroll", schedule, { passive: true });
+    // Chrome leaves a *partially* visible control where it is when focus lands on it, so a
+    // keyboard user could own a menu group whose label was still half outside the lane.
+    // Finish the reveal ourselves — focus must never stop on obscured chrome.
+    const revealFocusedControl = (event: FocusEvent) => {
+      const target = event.target as HTMLElement | null;
+      const control = target?.closest?.<HTMLElement>(
+        "button,[tabindex]:not([tabindex='-1'])"
+      );
+      if (!control || !lane.contains(control)) return;
+      if (typeof control.scrollIntoView !== "function") return;
+      const laneRect = lane.getBoundingClientRect();
+      const rect = control.getBoundingClientRect();
+      if (
+        rect.left >= laneRect.left - MENUBAR_OVERFLOW_EPSILON
+        && rect.right <= laneRect.right + MENUBAR_OVERFLOW_EPSILON
+      ) {
+        return;
+      }
+      control.scrollIntoView({ block: "nearest", inline: "nearest" });
+    };
+    lane.addEventListener("focusin", revealFocusedControl);
+    // 레인 폭(뷰포트·사이드패널)과 메뉴 콘텐츠(lazy 청크 도착·그룹 증감) 양쪽을 본다.
+    const resizeObserver =
+      typeof ResizeObserver === "function" ? new ResizeObserver(schedule) : null;
+    resizeObserver?.observe(lane);
+    const mutationObserver =
+      typeof MutationObserver === "function" ? new MutationObserver(schedule) : null;
+    mutationObserver?.observe(lane, { childList: true, subtree: true });
+    return () => {
+      if (frame !== 0 && typeof cancelAnimationFrame === "function") {
+        cancelAnimationFrame(frame);
+      }
+      lane.removeEventListener("scroll", schedule);
+      lane.removeEventListener("focusin", revealFocusedControl);
+      resizeObserver?.disconnect();
+      mutationObserver?.disconnect();
+    };
+  }, [mobileImmersive, studioMainMenuGroups]);
+
+  const overflowMenuGroups = useMemo(() => {
+    const labels = new Map(studioMainMenuGroups.map((group) => [group.id, group.label]));
+    return laneOverflow.hiddenGroupIds.flatMap((id) => {
+      const label = labels.get(id);
+      return label === undefined ? [] : [{ id, label }];
+    });
+  }, [laneOverflow.hiddenGroupIds, studioMainMenuGroups]);
+
+  /**
+   * 오버플로 목록에서 고른 그룹을 레인 안으로 끌어온 뒤 원래 트리거를 그대로 누른다.
+   * 드롭다운 구현은 `StudioMainMenu` 하나로 유지된다(두 번째 메뉴 구현 = 두 번째 회귀).
+   */
+  const revealMenuGroup = useCallback((groupId: string) => {
+    const lane = menubarLaneRef.current;
+    if (!lane) return;
+    for (const node of lane.querySelectorAll<HTMLButtonElement>(
+      "[data-studio-main-menu-trigger]"
+    )) {
+      if (node.dataset.studioMainMenuTrigger !== groupId) continue;
+      if (typeof node.scrollIntoView === "function") {
+        node.scrollIntoView({ block: "nearest", inline: "center" });
+      }
+      node.focus({ preventScroll: true });
+      node.click();
+      return;
+    }
+  }, []);
+
   return (
     <>
         {/* 가져오기 파일 입력은 StudioPage 루트(data-studio-document-import-inputs)에 상시 마운트한다.
             메뉴바 lazy 청크/패널 게이트와 무관하게 파일 메뉴·프로젝트 도구 버튼이 같은 ref 를 클릭한다.
             (2026-07-24: 패널 안 조건부 마운트 → 무반응 버그 수정 후, lazy menubar 레이스까지 제거) */}
         <div
+          ref={menubarLaneRef}
           data-studio-menubar-primary="true"
           className={cn(
             "flex min-w-0 flex-1 items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
             mobileImmersive && "hidden"
           )}
         >
-          {/* Document context and application commands may compress; publish actions never do. */}
+          {/* Keep document/workspace context intact; the primary lane scrolls when commands exceed width. */}
           <div
             className={cn(
-              "flex min-w-0 shrink items-center gap-1.5",
+              // This lane contains the workspace dialog trigger. Let the primary menubar scroll
+              // instead of shrinking this wrapper beneath the adjacent history cluster; after a
+              // user traverses all 18 menus at laptop width, a zero-width wrapper otherwise leaves
+              // the visible workspace button covered by History and unreachable by pointer.
+              "flex min-w-max shrink-0 items-center gap-1.5",
               mobileImmersive && "hidden"
             )}
           >
@@ -410,6 +795,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               key={`${currentWorkspaceOwnerScope}:${workspaceMenuEpoch}`}
               state={workspaceState}
               liveLayout={liveWorkspaceLayout}
+              resolveDeviceKind={resolveWorkspaceDeviceKind}
               persistence={workspacePersistence}
               onStateChange={persistStudioWorkspaceState}
               onApplyLayout={applyStudioWorkspaceLayout}
@@ -505,10 +891,12 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               className={cn("hidden min-w-max shrink-0 md:flex", mobileImmersive && "!hidden")}
             />
           </Suspense>
-          {/* Wide layouts expose high-frequency insert shortcuts; narrower widths use Insert. */}
+          {/* Wide layouts expose high-frequency insert shortcuts; narrower widths use Insert.
+              These are fixed-size chips: `min-w-0` made them collapse to 0px and paint on top
+              of the menubar instead of taking their turn in the scrollable lane. */}
           <div
             className={cn(
-              "hidden min-w-0 items-center gap-0.5 xl:flex",
+              "hidden shrink-0 items-center gap-0.5 xl:flex",
               mobileImmersive && "!hidden"
             )}
             role="group"
@@ -551,14 +939,21 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
           </StudioToolHintTarget>
           </div>
           <span aria-hidden className="mx-0.5 hidden h-4 w-px shrink-0 bg-line xl:block" />
-          {/* 태블릿·컴팩트 노트북까지 제목·앱 메뉴 레인이 스크롤될 때 오른쪽 페이드로
-              이어짐을 알린다. xl부터는 삽입 바로가기까지 안정적으로 들어오므로 숨긴다. */}
+          {/* 오른쪽 페이드는 **실제로 더 볼 내용이 남았을 때만** 켜진다. 폭 브레이크포인트로
+              감추던 예전 방식은 17개 그룹이 1920px에서도 넘치면서 거짓이 됐다(D9).
+              레이아웃 진동을 막으려고 언마운트 대신 투명도만 바꾼다. */}
           <span
             aria-hidden
             data-studio-menubar-overflow-cue="true"
-            className="pointer-events-none sticky right-0 -mr-2 h-8 w-4 shrink-0 self-center bg-gradient-to-l from-panel to-transparent xl:hidden"
+            data-overflowing={laneOverflow.scrollable ? "true" : "false"}
+            className={cn(
+              "pointer-events-none sticky right-0 -mr-2 h-8 w-4 shrink-0 self-center bg-gradient-to-l from-panel to-transparent transition-opacity motion-reduce:transition-none",
+              laneOverflow.scrollable ? "opacity-100" : "opacity-0"
+            )}
           />
         </div>
+        {/* 잘린 그룹으로 가는 정본 경로. 스크롤 레인 밖(형제)이라 절대 같이 잘리지 않는다. */}
+        <StudioMenubarOverflowMenu groups={overflowMenuGroups} onReveal={revealMenuGroup} />
         {/* 파일·내보내기 — 드로잉 앱 메뉴바 */}
         <div
           data-studio-menubar-actions="true"
@@ -594,7 +989,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                   // Windowed: sticky exit keeps the control reachable while the long title lane
                   // scrolls. Immersive: no sticky/ring — the compact pill has no scroll sibling.
                   !mobileImmersive &&
-                    "sticky left-0 z-20 shadow-[0_0_0_4px_var(--color-canvas)]",
+                    "sticky left-0 z-20 shadow-[0_0_0_4px_var(--color-canvas)] max-[359px]:size-11 max-[359px]:justify-center max-[359px]:px-0",
                   mobileImmersive &&
                     "rounded-full border border-line/70 bg-raised/80 px-2.5 text-fg"
                 )}
@@ -604,7 +999,9 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 ) : (
                   <Maximize2 size={15} aria-hidden />
                 )}
-                {mobileImmersive ? "종료" : "전체화면"}
+                <span className={!mobileImmersive ? "max-[359px]:sr-only" : undefined}>
+                  {mobileImmersive ? "종료" : "전체화면"}
+                </span>
               </button>
             </StudioToolHintTarget>
           ) : null}
@@ -709,7 +1106,13 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 )
               : null}
           </div>
-          <div ref={projectActionsRef} className="relative shrink-0 max-sm:hidden">
+          {/* 폰 폭에서도 보여야 한다. 이 시트는 검수·미리보기 7종의 유일한 포인터 경로인데
+              (`StudioProjectReviewActions` 주석), 430px 기본 상태에서는 앱 메뉴바가
+              `md:flex` + 몰입 `!hidden`이고 툴벨트도 몰입에서 숨어 대체 경로가 없다.
+              시트 본문은 이미 `grid-cols-2` / `inset-x-2` / safe-area 패딩으로 폰 레이아웃을
+              갖고 있었다 — 막고 있던 건 트리거뿐이었다. 라벨은 `max-xl:sr-only`라 좁은 폭에서
+              아이콘만 차지한다. */}
+          <div ref={projectActionsRef} className="relative shrink-0">
             <StudioToolHintTarget hint={MENUBAR_HINTS.project} preferredSide="bottom">
               <button
                 type="button"
@@ -724,14 +1127,20 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                 className={buttonClass({
                   size: "sm",
                   variant: "quiet",
-                  className: "min-h-11 shrink-0 gap-1.5 whitespace-nowrap",
+                  // `min-w-11`은 셰브론을 접는 폭에서도 44px 터치 타깃을 지킨다
+                  // (`verify:studio-mobile-top`은 메뉴바 컨트롤의 가로·세로 모두 하드 체크).
+                  className: "min-h-11 min-w-11 shrink-0 gap-1.5 whitespace-nowrap",
                 })}
               >
                 <Folder size={14} aria-hidden /> <span className="max-xl:sr-only">프로젝트</span>
+                {/* 320px 창모드 메뉴바는 [전체 화면 드로잉][프로젝트][임시저장][게시하기]로
+                    320px를 5px 넘겨 `overflow-hidden` 레인이 게시 버튼을 잘랐다
+                    (`verify:studio-mobile-top`의 하드 실패). 셰브론은 순수 장식이고
+                    열림 상태는 `aria-expanded`가 이미 전달하므로, 가장 좁은 폭에서만 접는다. */}
                 <ChevronDown
                   size={13}
                   className={cn(
-                    "transition-transform motion-reduce:transition-none",
+                    "transition-transform motion-reduce:transition-none max-sm:hidden",
                     projectActionsOpen && "rotate-180"
                   )}
                   aria-hidden
@@ -1131,6 +1540,24 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
           >
             <Package size={14} /> 게시 패키지
           </button>
+          {/* 벨트 전용이던 검수·미리보기 7종의 정본 진입점. 벨트 호스트는 전 뷰포트에서
+              display:none이라 여기가 유일한 포인터 경로다(StudioProjectReviewActions 주석). */}
+          <StudioProjectReviewActions
+            masterEditMode={masterEditMode}
+            pageEditLocked={pageEditLocked}
+            commentsLocked={commentsLocked}
+            commentsLockedReason={commentsLocked ? collaborationLockMessage() : ""}
+            openCommentCount={openStudioCommentCount}
+            handlers={{
+              toggleAnimationTimeline,
+              openTimelapse,
+              openStoryboardGrid,
+              openScrollPreview,
+              openContinuityCheck,
+              toggleDocumentComments,
+              openPageReview,
+            }}
+          />
               </div>,
               document.body
             )
@@ -1162,12 +1589,19 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                   variant: "quiet",
                   className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50",
                 }),
-                isMobile && "min-h-11",
+                isMobile &&
+                  "min-h-11 max-[359px]:size-11 max-[359px]:justify-center max-[359px]:px-0",
                 mobileImmersive && "rounded-full border border-line/70 bg-raised/80 px-2.5"
               )}
             >
-              {saving ? <Loader2 size={14} className="animate-spin motion-reduce:animate-none" aria-hidden /> : null}
-              {sharedDocument && sharedDocument.role !== "owner" ? "공동 저장" : "임시저장"}
+              {saving ? (
+                <Loader2 size={14} className="animate-spin motion-reduce:animate-none" aria-hidden />
+              ) : (
+                <Save size={14} className="hidden max-[359px]:block" aria-hidden />
+              )}
+              <span className="max-[359px]:sr-only">
+                {sharedDocument && sharedDocument.role !== "owner" ? "공동 저장" : "임시저장"}
+              </span>
             </button>
           </StudioToolHintTarget>
           {!sharedDocument || sharedDocument.role === "owner" ? (
@@ -1197,12 +1631,19 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                     variant: "solid",
                     className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50",
                   }),
-                  isMobile && "min-h-11",
+                  isMobile &&
+                    "min-h-11 max-[359px]:size-11 max-[359px]:justify-center max-[359px]:px-0",
                   mobileImmersive && "rounded-full px-3 shadow-none"
                 )}
               >
-                {saving ? <Loader2 size={14} className="animate-spin motion-reduce:animate-none" aria-hidden /> : null}
-                {workId ? "수정 게시" : "게시하기"}
+                {saving ? (
+                  <Loader2 size={14} className="animate-spin motion-reduce:animate-none" aria-hidden />
+                ) : (
+                  <Send size={14} className="hidden max-[359px]:block" aria-hidden />
+                )}
+                <span className="max-[359px]:sr-only">
+                  {workId ? "수정 게시" : "게시하기"}
+                </span>
               </button>
             </StudioToolHintTarget>
           ) : null}

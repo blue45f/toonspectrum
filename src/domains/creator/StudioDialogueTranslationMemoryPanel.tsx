@@ -11,7 +11,7 @@ import {
   ShieldCheck,
   X,
 } from "lucide-react";
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import {
   createStudioTranslationMemoryEntry,
@@ -26,14 +26,18 @@ import {
   STUDIO_TRANSLATION_MEMORY_MAX_ENTRIES,
   STUDIO_TRANSLATION_MEMORY_MAX_IMPORT_BYTES,
   STUDIO_TRANSLATION_MEMORY_MAX_TRANSLATION_CHARS,
-  studioTranslationMemoryBrowserStorage,
   upsertStudioTranslationMemoryEntry,
   type StudioTranslationMemoryEntry,
   type StudioTranslationMemoryGlossaryConflict,
   type StudioTranslationMemoryGlossaryRule,
+  type StudioTranslationMemoryLoadResult,
   type StudioTranslationMemoryStatus,
   type StudioTranslationMemoryStorage,
 } from "./studio-translation-memory";
+import {
+  createStudioTranslationMemorySqlitePersistence,
+  type StudioTranslationMemoryPersistence,
+} from "./studio-translation-memory-sqlite-persistence";
 
 import { cx } from "@/lib/cx";
 
@@ -48,8 +52,13 @@ export interface StudioDialogueTranslationMemoryPanelProps {
   /** Existing free-form glossary text can be passed without coupling the host to TM parsing. */
   readonly glossaryText?: string;
   readonly initialTranslation?: string;
-  /** `undefined` uses localStorage; `null` deliberately selects in-memory-only mode. */
+  /**
+   * Compatibility seam for tests/embeds. `undefined` uses shared V12 SQLite; `null` explicitly
+   * selects memory-only mode. Product code must not pass the former localStorage authority.
+   */
   readonly storage?: StudioTranslationMemoryStorage | null;
+  /** Test seam for the async product authority; ignored when `storage` is explicitly provided. */
+  readonly persistence?: StudioTranslationMemoryPersistence;
   readonly onReuse: (
     translation: string,
     entry: StudioTranslationMemoryEntry
@@ -62,6 +71,17 @@ type PanelNotice = {
   readonly tone: "good" | "warn" | "bad";
   readonly message: string;
 };
+
+type TranslationMemoryAuthority =
+  | {
+      readonly kind: "sqlite";
+      readonly persistence: StudioTranslationMemoryPersistence;
+    }
+  | {
+      readonly kind: "storage-compat";
+      readonly storage: StudioTranslationMemoryStorage;
+    }
+  | { readonly kind: "memory" };
 
 const STATUS_LABEL: Record<StudioTranslationMemoryStatus, string> = {
   draft: "초안",
@@ -238,6 +258,7 @@ export function StudioDialogueTranslationMemoryPanel({
   glossaryText = "",
   initialTranslation = "",
   storage,
+  persistence,
   onReuse,
   onClose,
   className,
@@ -245,15 +266,82 @@ export function StudioDialogueTranslationMemoryPanel({
   const resolvedGlossaryRules =
     glossaryRules ?? parseStudioTranslationMemoryGlossaryText(glossaryText);
   const importInputId = useId();
-  const [storageTarget] = useState<StudioTranslationMemoryStorage | null>(() =>
-    storage === undefined ? studioTranslationMemoryBrowserStorage() : storage
-  );
-  const [library, setLibrary] = useState(() =>
-    loadStudioTranslationMemory(storageTarget)
-  );
+  const [authority] = useState<TranslationMemoryAuthority>(() => {
+    if (storage === null) return { kind: "memory" };
+    if (storage !== undefined) {
+      return { kind: "storage-compat", storage };
+    }
+    return {
+      kind: "sqlite",
+      persistence:
+        persistence ?? createStudioTranslationMemorySqlitePersistence(),
+    };
+  });
+  const [library, setLibrary] = useState<StudioTranslationMemoryLoadResult>(() => {
+    if (authority.kind === "storage-compat") {
+      return loadStudioTranslationMemory(authority.storage);
+    }
+    if (authority.kind === "memory") {
+      return loadStudioTranslationMemory(null);
+    }
+    return { entries: [], status: "empty" };
+  });
+  const [hydrating, setHydrating] = useState(authority.kind === "sqlite");
+  const [persistenceBusy, setPersistenceBusy] = useState(false);
   const [translationDraft, setTranslationDraft] = useState(initialTranslation);
   const [notice, setNotice] = useState<PanelNotice | null>(null);
   const [importBusy, setImportBusy] = useState(false);
+  const mountedRef = useRef(true);
+  const entriesRef = useRef(library.entries);
+  const hydrationGenerationRef = useRef(0);
+  const saveGenerationRef = useRef(0);
+  const pendingWritesRef = useRef(0);
+  const writeQueueRef = useRef<Promise<void>>(Promise.resolve());
+
+  useEffect(() => {
+    mountedRef.current = true;
+    if (authority.kind !== "sqlite") {
+      return () => {
+        mountedRef.current = false;
+      };
+    }
+
+    const generation = ++hydrationGenerationRef.current;
+    void authority.persistence
+      .load()
+      .then((loaded) => {
+        if (
+          !mountedRef.current
+          || generation !== hydrationGenerationRef.current
+        ) {
+          return;
+        }
+        entriesRef.current = loaded.entries;
+        setLibrary(loaded);
+        setHydrating(false);
+      })
+      .catch((error: unknown) => {
+        if (
+          !mountedRef.current
+          || generation !== hydrationGenerationRef.current
+        ) {
+          return;
+        }
+        setLibrary({
+          entries: [],
+          status: "unavailable",
+          error: `SQLite 번역 메모리를 읽지 못했습니다: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        });
+        setHydrating(false);
+      });
+
+    return () => {
+      mountedRef.current = false;
+      hydrationGenerationRef.current += 1;
+    };
+  }, [authority]);
 
   const query = {
     workScope,
@@ -271,9 +359,87 @@ export function StudioDialogueTranslationMemoryPanel({
 
   function commitEntries(
     next: readonly StudioTranslationMemoryEntry[],
-    successMessage: string
+    successMessage: string,
+    allowInvalidRecovery = false,
   ): void {
-    const saved = saveStudioTranslationMemory(storageTarget, next);
+    if (hydrating) {
+      setNotice({
+        tone: "warn",
+        message: "SQLite 번역 메모리를 불러온 뒤 저장할 수 있습니다.",
+      });
+      return;
+    }
+    if (library.status === "invalid" && !allowInvalidRecovery) {
+      setNotice({
+        tone: "bad",
+        message:
+          "손상된 저장 데이터를 덮어쓰지 않았습니다. 검증된 JSON을 명시적으로 가져와 복구하세요.",
+      });
+      return;
+    }
+
+    entriesRef.current = next;
+    if (authority.kind === "sqlite") {
+      const generation = ++saveGenerationRef.current;
+      pendingWritesRef.current += 1;
+      setPersistenceBusy(true);
+      setLibrary({ entries: next, status: "ok" });
+      setNotice({
+        tone: "good",
+        message: `${successMessage} SQLite에 저장 중입니다.`,
+      });
+
+      const write = writeQueueRef.current.then(() =>
+        authority.persistence.save(next)
+      );
+      writeQueueRef.current = write.then(
+        () => undefined,
+        () => undefined,
+      );
+      void write
+        .then((saved) => {
+          if (!mountedRef.current || generation !== saveGenerationRef.current) {
+            return;
+          }
+          setLibrary((current) => ({
+            entries: current.entries,
+            status: saved.ok ? "ok" : "unavailable",
+            error: saved.error,
+          }));
+          setNotice({
+            tone: saved.ok ? "good" : "warn",
+            message: saved.ok
+              ? successMessage
+              : `${successMessage} ${saved.error ?? "현재 탭에서만 유지됩니다."}`,
+          });
+        })
+        .catch((error: unknown) => {
+          if (!mountedRef.current || generation !== saveGenerationRef.current) {
+            return;
+          }
+          const message = `SQLite 번역 메모리 저장을 완료하지 못했습니다: ${
+            error instanceof Error ? error.message : String(error)
+          }`;
+          setLibrary((current) => ({
+            entries: current.entries,
+            status: "unavailable",
+            error: message,
+          }));
+          setNotice({ tone: "warn", message: `${successMessage} ${message}` });
+        })
+        .finally(() => {
+          pendingWritesRef.current = Math.max(0, pendingWritesRef.current - 1);
+          if (mountedRef.current && pendingWritesRef.current === 0) {
+            setPersistenceBusy(false);
+          }
+        });
+      return;
+    }
+
+    const saved = saveStudioTranslationMemory(
+      authority.kind === "storage-compat" ? authority.storage : null,
+      next,
+    );
     setLibrary({
       entries: next,
       status: saved.ok ? "ok" : "unavailable",
@@ -301,8 +467,8 @@ export function StudioDialogueTranslationMemoryPanel({
     const entry = matches.exact
       ? { ...created.entry, createdAt: matches.exact.entry.createdAt }
       : created.entry;
-    const next = upsertStudioTranslationMemoryEntry(library.entries, entry);
-    commitEntries(next, "번역 초안을 로컬 메모리에 저장했습니다.");
+    const next = upsertStudioTranslationMemoryEntry(entriesRef.current, entry);
+    commitEntries(next, "번역 초안을 저장했습니다.");
     setTranslationDraft("");
   }
 
@@ -311,7 +477,7 @@ export function StudioDialogueTranslationMemoryPanel({
     status: StudioTranslationMemoryStatus
   ): void {
     const next = setStudioTranslationMemoryEntryStatus(
-      library.entries,
+      entriesRef.current,
       entry.id,
       status
     );
@@ -332,7 +498,7 @@ export function StudioDialogueTranslationMemoryPanel({
 
   function invalidate(entry: StudioTranslationMemoryEntry): void {
     const next = invalidateStudioTranslationMemoryEntry(
-      library.entries,
+      entriesRef.current,
       entry.id
     );
     commitEntries(next, "번역을 무효화하고 재검토 대상으로 표시했습니다.");
@@ -368,7 +534,7 @@ export function StudioDialogueTranslationMemoryPanel({
     try {
       const imported = importStudioTranslationMemory(
         await file.text(),
-        library.entries
+        entriesRef.current,
       );
       if (!imported.ok) {
         setNotice({ tone: "bad", message: imported.error });
@@ -378,7 +544,8 @@ export function StudioDialogueTranslationMemoryPanel({
         imported.entries,
         `${imported.accepted.toLocaleString("ko-KR")}개 항목을 가져왔습니다. 중복 ${imported.duplicates.toLocaleString("ko-KR")}개·제외 ${(
           imported.rejected + imported.truncated
-        ).toLocaleString("ko-KR")}개.`
+        ).toLocaleString("ko-KR")}개.`,
+        true,
       );
     } catch {
       setNotice({
@@ -421,12 +588,14 @@ export function StudioDialogueTranslationMemoryPanel({
   }
 
   const storageUnavailable =
-    library.status === "unavailable" || storageTarget === null;
+    library.status === "unavailable" || authority.kind === "memory";
 
   return (
     <section
       aria-label="대사 번역 메모리"
       data-studio-translation-memory="local-only"
+      data-studio-translation-memory-authority={authority.kind}
+      aria-busy={hydrating || persistenceBusy}
       className={cx(
         "flex w-full min-w-0 flex-col overflow-hidden rounded-2xl border border-line bg-panel/95 shadow-xl backdrop-blur",
         className
@@ -467,13 +636,23 @@ export function StudioDialogueTranslationMemoryPanel({
         >
           <p className="flex items-center gap-1 font-semibold">
             <HardDrive size={12} aria-hidden />
-            {storageUnavailable
-              ? "현재 탭 메모리에서만 유지"
-              : "이 브라우저에만 로컬 저장"}
+            {hydrating
+              ? "SQLite 번역 메모리 불러오는 중"
+              : storageUnavailable
+                ? "현재 탭 메모리에서만 유지"
+                : library.status === "invalid"
+                  ? "SQLite 저장 데이터 손상"
+                : persistenceBusy
+                  ? "SQLite/OPFS에 저장 중"
+                  : authority.kind === "sqlite"
+                    ? "SQLite/OPFS에 로컬 저장"
+                    : "호스트 로컬 저장소 사용"}
           </p>
           <p className="mt-0.5">
             서버·팀원·다른 기기에는 자동 동기화하지 않습니다.
-            {storageUnavailable
+            {hydrating
+              ? " 기존 저장 데이터를 확인하기 전에는 쓰기를 시작하지 않습니다."
+              : storageUnavailable
               ? " 새로고침하면 사라질 수 있습니다."
               : " 필요하면 JSON으로 직접 옮기세요."}
           </p>
@@ -604,7 +783,12 @@ export function StudioDialogueTranslationMemoryPanel({
           <button
             type="button"
             onClick={saveDraft}
-            disabled={!sourceText.trim() || !translationDraft.trim()}
+            disabled={
+              !sourceText.trim()
+              || !translationDraft.trim()
+              || hydrating
+              || library.status === "invalid"
+            }
             className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl bg-accent px-3 text-xs font-semibold text-on-accent transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
           >
             <Check size={13} aria-hidden />
@@ -643,6 +827,7 @@ export function StudioDialogueTranslationMemoryPanel({
               type="file"
               accept="application/json,.json"
               className="sr-only"
+              disabled={importBusy || hydrating}
               onChange={(event) => {
                 const file = event.currentTarget.files?.[0];
                 event.currentTarget.value = "";
@@ -651,10 +836,10 @@ export function StudioDialogueTranslationMemoryPanel({
             />
             <label
               htmlFor={importInputId}
-              aria-disabled={importBusy}
+              aria-disabled={importBusy || hydrating}
               className={cx(
                 "inline-flex min-h-11 cursor-pointer items-center justify-center gap-1 rounded-xl border border-line bg-panel px-2.5 text-[0.67rem] font-medium text-fg-2 transition-colors hover:bg-raised",
-                importBusy && "pointer-events-none opacity-50"
+                (importBusy || hydrating) && "pointer-events-none opacity-50"
               )}
             >
               <FileUp size={12} aria-hidden />

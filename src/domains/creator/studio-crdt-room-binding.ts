@@ -103,7 +103,7 @@ export interface StudioCrdtRoomBindingOptions {
   recoveryVault?: StudioCrdtRecoveryVault;
   randomId?: () => string;
   onStatus?: (status: StudioCrdtBindingStatus) => void;
-  /** Bounds a wedged IndexedDB call before the authoritative server fallback is attempted. */
+  /** Bounds a wedged SQLite/OPFS outbox call before the authoritative server fallback. */
   persistenceTimeoutMs?: number;
   setTimeout?: (handler: () => void, delay: number) => unknown;
   clearTimeout?: (handle: unknown) => void;
@@ -348,7 +348,7 @@ export class StudioCrdtRoomBinding {
     if (this.closed) return;
     this.batchSubscription?.flush();
     const deadline = Date.now() + Math.max(0, Math.min(2_000, timeoutMs));
-    // The final sub-frame batch must reach IndexedDB even when the socket is already offline.
+    // The final sub-frame batch must reach SQLite/OPFS even when the socket is already offline.
     // A later binding's scoped outbox list is serialized behind this write, so a work switch
     // cannot overtake the pending commit and strand the user's final stroke.
     await this.persistPendingBeforeClose(deadline);
@@ -706,6 +706,7 @@ export class StudioCrdtRoomBinding {
           return;
         }
         pending.attempts += 1;
+        await this.persistRetryMetadata(pending, classification);
         this.emitStatus({
           state: "retrying",
           message: messageFrom(error, "실시간 획 전송을 다시 시도합니다."),
@@ -729,11 +730,45 @@ export class StudioCrdtRoomBinding {
 
   private scheduleRetry(attempt = 1): void {
     if (this.closed || this.recoveryState || this.retryTimer !== null) return;
-    const delay = Math.min(RETRY_MAX_MS, RETRY_MIN_MS * 2 ** Math.min(5, attempt - 1));
+    const delay = this.retryDelay(attempt);
     this.retryTimer = this.scheduleTimeout(() => {
       this.retryTimer = null;
       void this.drainPending();
     }, delay);
+  }
+
+  private retryDelay(attempt: number): number {
+    return Math.min(RETRY_MAX_MS, RETRY_MIN_MS * 2 ** Math.min(5, attempt - 1));
+  }
+
+  private async persistRetryMetadata(
+    pending: PendingUpdate,
+    failure: StudioCrdtFailureClassification,
+  ): Promise<void> {
+    const scope = this.outboxScope;
+    if (!scope || !this.outbox.recordRetry) return;
+    const attemptedAt = Date.now();
+    try {
+      await this.withPersistenceTimeout(
+        this.outbox.recordRetry(scope, pending.request.workId, pending.request.updateId, {
+          attemptCount: pending.attempts,
+          attemptedAt,
+          nextRetryAt: attemptedAt + this.retryDelay(pending.attempts),
+          errorCode: failure.code,
+          errorMessage: failure.message,
+        }),
+      );
+    } catch (error) {
+      this.durabilityWarning = messageFrom(
+        error,
+        "CRDT 재시도 메타데이터를 로컬 SQLite 보관함에 기록하지 못했습니다.",
+      );
+      this.emitStatus({
+        state: "error",
+        message: this.durabilityWarning,
+        durabilityAtRisk: true,
+      });
+    }
   }
 
   private scheduleSyncRetry(attempt = 1): void {

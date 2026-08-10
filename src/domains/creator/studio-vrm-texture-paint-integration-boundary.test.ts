@@ -70,8 +70,9 @@ describe("Studio VRM texture-paint production integration boundary", () => {
     );
 
     expect(eagerLoad).toBeLessThan(libraryHydration);
+    // 의도적 변경(2026-08-07): 취소된 로드가 status=loading 에 갇히지 않도록 설치 여부(vrmRef)까지 확인.
     expect(poserSource).toContain(
-      "if (modelLoadTargetIdRef.current === targetEntry.id) return;",
+      "if (modelLoadTargetIdRef.current === targetEntry.id && vrmRef.current) return;",
     );
     expect(readyFrame).toContain("useLayoutEffect(() => {");
     expect(readyFrame).toContain("settledFrame = requestAnimationFrame(() => invalidate())");
@@ -110,10 +111,10 @@ describe("Studio VRM texture-paint production integration boundary", () => {
     expect(poserSource).toContain("texturePaintRuntimeRef.current?.commitStroke(pointerId)");
     expect(poserSource).toContain("texturePaintRuntimeRef.current?.cancelStroke(pointerId)");
     expect(poserSource).toContain(
-      'window.addEventListener("pointerup", finishMatchingPointer)',
+      'window.addEventListener("pointerup", finishMatchingPointer, { passive: true })',
     );
     expect(poserSource).toContain(
-      'window.addEventListener("pointercancel", cancelMatchingPointer)',
+      'window.addEventListener("pointercancel", cancelMatchingPointer, { passive: true })',
     );
     expect(poserSource).toContain(
       'gl.domElement.addEventListener("lostpointercapture", cancelMatchingPointer)',
@@ -370,9 +371,21 @@ describe("Studio VRM texture-paint production integration boundary", () => {
       "onEyedropperToggle={() =>",
     );
     expect(runtimeSource).toContain("async sampleBaseColor(");
-    expect(runtimeSource).toContain(
-      "if (this.sampling || this.filling || this.pending || this.active) {",
+    const sampleGuard = sourceBetween(
+      runtimeSource,
+      "async sampleBaseColor(",
+      "if (input.signal?.aborted)",
     );
+    for (const mutuallyExclusiveOperation of [
+      "this.sampling",
+      "this.filling",
+      "this.pending",
+      "this.active",
+      "this.surfaceSession",
+    ]) {
+      expect(sampleGuard).toContain(mutuallyExclusiveOperation);
+    }
+    expect(sampleGuard).toContain('return this.fail("pointer-active");');
   });
 
   it("arms ColorDrop as a pending tap while preserving brush pointerdown latency", () => {
@@ -562,7 +575,7 @@ describe("Studio VRM texture-paint production integration boundary", () => {
     expect(movementGate).toBeLessThan(execute);
 
     expect(pointerLifecycle).toContain(
-      'window.addEventListener("pointermove", cancelPendingTapOnMove)',
+      'window.addEventListener("pointermove", cancelPendingTapOnMove, { passive: true })',
     );
     expect(pointerLifecycle).toContain(
       "pending.pointerId !== event.pointerId",
@@ -571,7 +584,7 @@ describe("Studio VRM texture-paint production integration boundary", () => {
       '"pointerdown",\n      cancelPendingTapOnAdditionalPointer,\n      true',
     );
     expect(pointerLifecycle).toContain(
-      'window.addEventListener("pointercancel", cancelMatchingPointer)',
+      'window.addEventListener("pointercancel", cancelMatchingPointer, { passive: true })',
     );
     expect(pointerLifecycle).toContain(
       'gl.domElement.addEventListener("lostpointercapture", cancelMatchingPointer)',

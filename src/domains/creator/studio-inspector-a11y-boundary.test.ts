@@ -35,6 +35,17 @@ const inspectorSources = [
       "utf8"
     ),
   },
+  {
+    file: "StudioInspectorSelectionStrokeControls.tsx",
+    source: readFileSync(
+      new URL("./StudioInspectorSelectionStrokeControls.tsx", import.meta.url),
+      "utf8"
+    ),
+  },
+  {
+    file: "StudioFigmaDesignPanel.tsx",
+    source: readFileSync(new URL("./StudioFigmaDesignPanel.tsx", import.meta.url), "utf8"),
+  },
 ] as const;
 const inspectorSource = inspectorSources.map(({ source }) => source).join("\n");
 

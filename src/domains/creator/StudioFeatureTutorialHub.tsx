@@ -27,6 +27,10 @@ import {
   type StudioTutorialProgress,
   type StudioTutorialTryAction,
 } from "./studio-feature-tutorials";
+import {
+  studioSearchTextMatches,
+  tokenizeStudioSearchQuery,
+} from "./studio-search-text";
 
 import { useI18n, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -78,10 +82,6 @@ const STUDIO_CATEGORY_LABEL_KEYS: Record<StudioTutorialCategory, string> = {
   aiExport: "studio.tutorial.category.aiExport",
 };
 
-function normalizeTutorialSearchText(value: string): string {
-  return value.trim().toLocaleLowerCase().replace(/\s+/gu, " ");
-}
-
 function localizedTutorialBadge(
   badge: string,
   localizedTitle: string,
@@ -119,26 +119,31 @@ function localizedTutorialSearchText(
       : "",
   ]);
 
-  return normalizeTutorialSearchText([
+  return [
     source.title,
     source.summary,
     ...source.steps.flatMap((step) => [step.title, step.body, step.tip ?? ""]),
     localizeText(source.title, `studio.tutorial.${tutorial.id}.title`, t),
     localizeText(source.summary, `studio.tutorial.${tutorial.id}.summary`, t),
     ...localizedSteps,
-  ].join(" "));
+  ].join(" ");
 }
 
+/**
+ * 매칭 규칙은 통합 Command Search 와 같은 `studio-search-text` 를 쓴다. 코퍼스만
+ * 여기 고유(원문 ko + 로케일 문자열 양쪽)로 남는다.
+ */
 function filterStudioFeatureTutorials(
   tutorials: readonly StudioFeatureTutorial[],
   query: string,
   t: (key: string) => string,
   preferKoreanSource: boolean,
 ): StudioFeatureTutorial[] {
-  const normalizedQuery = normalizeTutorialSearchText(query);
-  if (!normalizedQuery) return [...tutorials];
+  if (tokenizeStudioSearchQuery(query).length === 0) return [...tutorials];
   return tutorials.filter((tutorial) =>
-    localizedTutorialSearchText(tutorial, t, preferKoreanSource).includes(normalizedQuery)
+    studioSearchTextMatches(query, [
+      localizedTutorialSearchText(tutorial, t, preferKoreanSource),
+    ])
   );
 }
 

@@ -1,0 +1,183 @@
+{
+  "harness": "tests/benchmarks/harness/filter-candidates.ts",
+  "generatedAt": "2026-08-07T14:30:14.524Z",
+  "host": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpu": "Apple M2 Max",
+    "node": "v24.16.0"
+  },
+  "config": {
+    "warmup": 3,
+    "iterations": 20
+  },
+  "reports": [
+    {
+      "candidate": "opencv-js",
+      "version": "5.0.0-release.1 (@techstark/opencv-js, dev-only)",
+      "loadMs": 353.5,
+      "operations": {
+        "canny-512": {
+          "p50Ms": 1.372,
+          "p95Ms": 2.033,
+          "meanMs": 1.436,
+          "samplesMs": [
+            2.018,
+            2.033,
+            1.435,
+            1.47,
+            1.368,
+            1.344,
+            1.317,
+            1.313,
+            1.316,
+            1.319,
+            1.401,
+            1.387,
+            1.346,
+            1.373,
+            1.355,
+            1.351,
+            1.353,
+            1.472,
+            1.372,
+            1.377
+          ],
+          "outputChecksum": 0,
+          "nonZeroBytes": 2956
+        },
+        "dilate-5x5-512": {
+          "p50Ms": 0.476,
+          "p95Ms": 0.545,
+          "meanMs": 0.473,
+          "samplesMs": [
+            0.458,
+            0.494,
+            0.545,
+            0.486,
+            0.506,
+            0.508,
+            0.474,
+            0.47,
+            0.482,
+            0.519,
+            0.476,
+            0.48,
+            0.479,
+            0.438,
+            0.433,
+            0.433,
+            0.436,
+            0.434,
+            0.444,
+            0.469
+          ],
+          "outputChecksum": 507757,
+          "nonZeroBytes": 261630
+        },
+        "gaussian-9x9-512": {
+          "p50Ms": 3.214,
+          "p95Ms": 3.336,
+          "meanMs": 3.214,
+          "samplesMs": [
+            3.191,
+            3.22,
+            3.258,
+            3.196,
+            3.13,
+            3.141,
+            3.309,
+            3.165,
+            3.179,
+            3.192,
+            3.231,
+            3.205,
+            3.211,
+            3.284,
+            3.217,
+            3.219,
+            3.336,
+            3.271,
+            3.214,
+            3.1
+          ],
+          "outputChecksum": 496251,
+          "nonZeroBytes": 260597
+        }
+      },
+      "notes": [
+        "analysis lane candidate (magic wand / line extraction / dust) per matrix E16",
+        "worker isolation + lazy load mandatory before any production wiring"
+      ]
+    },
+    {
+      "candidate": "wasm-vips",
+      "version": "0.0.18 (dev-only)",
+      "loadMs": 48.5,
+      "operations": {
+        "resize-2048-to-512": {
+          "p50Ms": 16.429,
+          "p95Ms": 17.528,
+          "meanMs": 16.436,
+          "samplesMs": [
+            17.528,
+            16.467,
+            15.964,
+            15.83,
+            16.199,
+            16.254,
+            16.766,
+            16.19,
+            15.797,
+            16.491,
+            16.429,
+            16.364,
+            16.692,
+            16.232,
+            16.846,
+            16.719,
+            17.235,
+            16.081,
+            16.093,
+            16.551
+          ],
+          "outputChecksum": 2611462,
+          "nonZeroBytes": 1045483
+        },
+        "gaussblur-sigma4-2048": {
+          "p50Ms": 46.74,
+          "p95Ms": 60.472,
+          "meanMs": 47.606,
+          "samplesMs": [
+            46.752,
+            48.446,
+            46.859,
+            48.927,
+            48.374,
+            47.065,
+            44.956,
+            44.942,
+            46.026,
+            46.098,
+            46.689,
+            45.569,
+            45.978,
+            44.895,
+            47.318,
+            56.742,
+            60.472,
+            43.808,
+            45.457,
+            46.74
+          ],
+          "outputChecksum": 41345934,
+          "nonZeroBytes": 16721848
+        }
+      },
+      "notes": [
+        "large-final/export lane candidate per matrix E17 (LGPL — isolated deployment mode required)",
+        "single-thread concurrency pinned for deterministic baseline; SMP needs COOP/COEP workers"
+      ]
+    }
+  ]
+}

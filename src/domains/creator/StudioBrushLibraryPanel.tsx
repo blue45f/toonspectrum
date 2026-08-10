@@ -1,6 +1,9 @@
-// 브러시 라이브러리 패널 — StudioPage가 소유하는 단일 목록을 데스크톱/모바일과 공유하는
-// controlled consumer다. 이름 붙은 브러시 설정을 저장·고정·복제·이름변경·안전 삭제하고,
-// 앱 전용 JSON과 Photoshop ABR 팩을 가져오고, 안전한 앱 전용 JSON으로 내보낸다.
+// 브러시 라이브러리 패널 — OPFS SQLite를 제품 권위로 사용하고 StudioPage가 소유한 배열은
+// 기존 데스크톱/모바일 소비자를 위한 controlled projection으로 갱신한다. 이름 붙은 브러시 설정을
+// 저장·고정·복제·이름변경·안전 삭제하고,
+// 앱 전용 JSON·Photoshop ABR·libmypaint MYB·Krita KPP 를 가져오고, 안전한 앱 전용 JSON으로
+// 내보낸다. MYB/KPP 는 그릴 수 있는 범위만 등록하고 나머지는 경고로 노출한다
+// (studio-brush-pack-import.ts).
 import {
   Check,
   ChevronDown,
@@ -17,29 +20,43 @@ import {
   Upload,
   Waves,
 } from "lucide-react";
-import { useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
+import {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type KeyboardEvent,
+} from "react";
 
 import { BRUSH_PRESETS } from "./studio-brush";
 import { studioCoreBrushCatalogItemById } from "./studio-brush-catalog-core";
 import {
-  browserBrushLibraryStorage,
   brushFileName,
   createBrush,
-  deleteBrushWithRecord,
-  duplicateBrush,
   importBrushFromJson,
-  MAX_BRUSHES,
-  renameBrushWithResult,
-  saveBrushBatchWithResult,
-  saveBrushWithResult,
+  sanitizeBrushSnapshot,
   sortBrushesForLibrary,
-  toggleBrushPinnedWithResult,
-  updateBrushSnapshotWithResult,
   writeBrushJson,
   type DeletedBrushRecord,
   type StudioBrushSnapshot,
   type StudioSavedBrush,
 } from "./studio-brush-library";
+import {
+  BrushLibraryRepositoryError,
+  type BrushLibraryPage,
+} from "./studio-brush-library-repository";
+import {
+  STUDIO_BRUSH_LIBRARY_CHANGED_EVENT,
+  openProductBrushLibraryRepository,
+  type ProductBrushLibraryAuthority,
+  type ProductBrushLibraryRepository,
+} from "./studio-brush-library-sqlite-repository";
+import {
+  STUDIO_BRUSH_PACK_ACCEPT,
+  studioBrushPackFormatOf,
+} from "./studio-brush-pack-format";
 import { studioBrushPackDescriptorById } from "./studio-brush-pack-index";
 import {
   studioBrushPreviewDashArray,
@@ -50,6 +67,7 @@ import {
   studioBrushPreviewStrokeWidth,
 } from "./studio-brush-visual";
 import { downloadBlob } from "./studio-export";
+import { useStudioInspectorFocusScroll } from "./studio-inspector-focus-effect";
 import { STUDIO_STABILIZER_MODES } from "./studio-stroke-stabilizer";
 
 import { cx } from "@/lib/cx";
@@ -183,8 +201,35 @@ function SavedBrushStrokePreview({ brush }: { brush: StudioSavedBrush }) {
 }
 
 const storageErrorMessage = "브러시를 이 브라우저에 저장하지 못했어요. 저장소 권한이나 여유 공간을 확인해주세요.";
+const storageQuotaMessage = "브러시 개수 제한은 없지만 이 기기의 저장 공간이 부족해 저장하지 못했어요. 불필요한 파일을 정리한 뒤 다시 시도해주세요.";
 const libraryUnreadableMessage = "저장된 브러시 데이터를 안전하게 읽지 못해 변경을 막았어요. 브라우저 저장 데이터를 백업한 뒤 복구해주세요.";
-const capacityMessage = `브러시가 ${MAX_BRUSHES}/${MAX_BRUSHES}개예요. 기존 브러시를 내보낸 뒤 삭제하면 새 브러시를 저장할 수 있어요.`;
+const BRUSH_LIBRARY_PRODUCT_PAGE_SIZE = 256;
+
+function brushLibraryAuthorityLabel(
+  authority: ProductBrushLibraryAuthority | "loading" | "error",
+  displayedTotal: string,
+): string {
+  if (authority === "sqlite") {
+    return `저장·가져오기·공유·재적용 · ${displayedTotal}개 · 무제한 · 로컬 SQL`;
+  }
+  if (authority === "memory-session") {
+    return `세션 편집·가져오기·공유·재적용 · ${displayedTotal}개 · 비영속 메모리 · 브라우저 종료 시 사라짐`;
+  }
+  if (authority === "error") {
+    return "브러시 카탈로그를 사용할 수 없습니다 · 저장되지 않음";
+  }
+  return "로컬 SQL 브러시 카탈로그 연결 중…";
+}
+
+function brushMutationMessage(
+  authority: ProductBrushLibraryAuthority,
+  durable: string,
+  session: string,
+): string {
+  return authority === "sqlite"
+    ? durable
+    : `${session} 브라우저를 닫으면 사라져요.`;
+}
 
 export interface StudioBrushLibraryPanelProps {
   currentSnapshot: StudioBrushSnapshot;
@@ -193,6 +238,8 @@ export interface StudioBrushLibraryPanelProps {
   onBrushesChange: (brushes: StudioSavedBrush[]) => void;
   onApplyBrush: (brush: StudioSavedBrush) => void;
   onBrushDeleted: (deleted: DeletedBrushRecord) => void;
+  /** 테스트/호스트 주입 seam. 제품 기본은 공유 OPFS SQLite 런타임이다. */
+  repositoryFactory?: () => Promise<ProductBrushLibraryRepository>;
 }
 
 export function StudioBrushLibraryPanel({
@@ -202,6 +249,7 @@ export function StudioBrushLibraryPanel({
   onBrushesChange,
   onApplyBrush,
   onBrushDeleted,
+  repositoryFactory = openProductBrushLibraryRepository,
 }: StudioBrushLibraryPanelProps) {
   const [error, setError] = useState<string | null>(null);
   const [doneMsg, setDoneMsg] = useState<string | null>(null);
@@ -211,70 +259,256 @@ export function StudioBrushLibraryPanel({
   const [renamingName, setRenamingName] = useState("");
   const [importing, setImporting] = useState(false);
   const [viewMode, setViewMode] = useState<"stroke" | "text">("stroke");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [pinnedOnly, setPinnedOnly] = useState(false);
+  const deferredSearchQuery = useDeferredValue(searchQuery.trim());
+  const [repositoryAuthority, setRepositoryAuthority] = useState<
+    ProductBrushLibraryAuthority | "loading" | "error"
+  >("loading");
+  const [repositoryBusy, setRepositoryBusy] = useState(false);
+  const [pageLoading, setPageLoading] = useState(false);
+  const [pageCursor, setPageCursor] = useState<BrushLibraryPage["nextCursor"]>(null);
+  const [hasMorePages, setHasMorePages] = useState(false);
+  const [totalCount, setTotalCount] = useState<number | null>(brushes.length);
   const saveTriggerRef = useRef<HTMLButtonElement>(null);
   const renameReturnFocusRef = useRef<HTMLButtonElement | null>(null);
+  const sectionRef = useRef<HTMLElement>(null);
+  const repositoryPromiseRef = useRef<Promise<ProductBrushLibraryRepository> | null>(null);
+  const mutationClockRef = useRef<() => number>(Date.now);
+  const pageGenerationRef = useRef(0);
+  const loadedDepthRef = useRef(BRUSH_LIBRARY_PRODUCT_PAGE_SIZE);
+  const brushesRef = useRef(brushes);
+  brushesRef.current = brushes;
   const orderedBrushes = sortBrushesForLibrary(brushes);
+  const displayedTotal = totalCount === null
+    ? `${brushes.length}${hasMorePages ? "+" : ""}`
+    : String(totalCount);
 
-  function setMutationError(status: "storage-error" | "library-unreadable") {
-    setError(status === "library-unreadable" ? libraryUnreadableMessage : storageErrorMessage);
+  const pageRequest = useCallback((cursor: string | null, limit: number) => {
+    return {
+      cursor,
+      limit,
+      ...(deferredSearchQuery ? { search: deferredSearchQuery } : {}),
+      ...(pinnedOnly ? { pinned: true } : {}),
+    };
+  }, [deferredSearchQuery, pinnedOnly]);
+
+  // 그리기 ▸ 내 브러시 메뉴 항목이 인스펙터를 열고 이 목록까지 스크롤한다.
+  useStudioInspectorFocusScroll("brush.saved-library", sectionRef);
+
+  useEffect(() => {
+    let active = true;
+    const generation = ++pageGenerationRef.current;
+    setPageLoading(true);
+    const repositoryPromise = repositoryPromiseRef.current ?? repositoryFactory();
+    repositoryPromiseRef.current = repositoryPromise;
+    void repositoryPromise
+      .then(async (product) => {
+        const page = await product.repository.query(
+          pageRequest(null, BRUSH_LIBRARY_PRODUCT_PAGE_SIZE),
+        );
+        if (!active || generation !== pageGenerationRef.current) return;
+        const stored = [...page.items];
+        loadedDepthRef.current = Math.max(BRUSH_LIBRARY_PRODUCT_PAGE_SIZE, stored.length);
+        setRepositoryAuthority(product.authority);
+        setPageCursor(page.nextCursor);
+        setHasMorePages(page.hasMore);
+        setTotalCount(page.totalCount ?? null);
+        onBrushesChange(stored);
+      })
+      .catch((caught: unknown) => {
+        if (!active || generation !== pageGenerationRef.current) return;
+        setRepositoryAuthority("error");
+        setError(
+          caught instanceof BrushLibraryRepositoryError
+            && (caught.code === "corrupt" || caught.code === "unsupported-version")
+            ? libraryUnreadableMessage
+            : storageErrorMessage,
+        );
+      })
+      .finally(() => {
+        if (active && generation === pageGenerationRef.current) setPageLoading(false);
+      });
+    return () => {
+      active = false;
+      if (generation === pageGenerationRef.current) pageGenerationRef.current += 1;
+    };
+  }, [onBrushesChange, pageRequest, repositoryFactory]);
+
+  useEffect(() => {
+    const handleLibraryChange = () => {
+      setRepositoryBusy(true);
+      void productRepository()
+        .then((product) => refreshFromRepository(product))
+        .catch(setRepositoryError)
+        .finally(() => setRepositoryBusy(false));
+    };
+    globalThis.addEventListener?.(STUDIO_BRUSH_LIBRARY_CHANGED_EVENT, handleLibraryChange);
+    return () => {
+      globalThis.removeEventListener?.(STUDIO_BRUSH_LIBRARY_CHANGED_EVENT, handleLibraryChange);
+    };
+  });
+
+  function productRepository(): Promise<ProductBrushLibraryRepository> {
+    const repositoryPromise = repositoryPromiseRef.current ?? repositoryFactory();
+    repositoryPromiseRef.current = repositoryPromise;
+    return repositoryPromise;
+  }
+
+  function setRepositoryError(caught: unknown): void {
+    if (caught instanceof BrushLibraryRepositoryError && caught.code === "quota-exceeded") {
+      setError(storageQuotaMessage);
+      setDoneMsg(null);
+      return;
+    }
+    if (
+      caught instanceof BrushLibraryRepositoryError
+      && (
+        caught.code === "corrupt"
+        || caught.code === "unsupported-version"
+        || caught.code === "read-error"
+      )
+    ) {
+      setError(libraryUnreadableMessage);
+    } else {
+      setError(storageErrorMessage);
+    }
     setDoneMsg(null);
   }
 
-  function handleDelete(id: string) {
-    setError(null);
-    setDoneMsg(null);
-    const result = deleteBrushWithRecord(browserBrushLibraryStorage(), id);
-    if (result.status === "storage-error" || result.status === "library-unreadable") {
-      setMutationError(result.status);
-      return;
-    }
-    if (!result.deleted) return;
-    onBrushesChange(result.brushes);
-    onBrushDeleted(result.deleted);
+  async function refreshFromRepository(
+    product: ProductBrushLibraryRepository,
+  ): Promise<StudioSavedBrush[]> {
+    const generation = ++pageGenerationRef.current;
+    const retainedDepth = Math.max(
+      BRUSH_LIBRARY_PRODUCT_PAGE_SIZE,
+      loadedDepthRef.current,
+      brushesRef.current.length,
+    );
+    const page = await product.repository.query(pageRequest(null, retainedDepth));
+    if (generation !== pageGenerationRef.current) return brushesRef.current;
+    const stored = [...page.items];
+    loadedDepthRef.current = retainedDepth;
+    onBrushesChange(stored);
+    setRepositoryAuthority(product.authority);
+    setPageCursor(page.nextCursor);
+    setHasMorePages(page.hasMore);
+    setTotalCount(page.totalCount ?? null);
+    return stored;
   }
 
-  function handleTogglePinned(id: string) {
+  async function handleLoadMore(): Promise<void> {
+    if (!hasMorePages || pageCursor === null || pageLoading || repositoryBusy) return;
+    const generation = ++pageGenerationRef.current;
     setError(null);
-    setDoneMsg(null);
-    const result = toggleBrushPinnedWithResult(browserBrushLibraryStorage(), id);
-    if (result.status === "storage-error" || result.status === "library-unreadable") {
-      setMutationError(result.status);
-      return;
+    setPageLoading(true);
+    try {
+      const product = await productRepository();
+      const page = await product.repository.query(
+        pageRequest(pageCursor, BRUSH_LIBRARY_PRODUCT_PAGE_SIZE),
+      );
+      if (generation !== pageGenerationRef.current) return;
+      const merged = new Map(
+        brushesRef.current.map((brush) => [brush.id, brush] as const),
+      );
+      for (const brush of page.items) merged.set(brush.id, brush);
+      const stored = [...merged.values()];
+      loadedDepthRef.current = Math.max(loadedDepthRef.current, stored.length);
+      onBrushesChange(stored);
+      setRepositoryAuthority(product.authority);
+      setPageCursor(page.nextCursor);
+      setHasMorePages(page.hasMore);
+      setTotalCount(page.totalCount ?? null);
+    } catch (caught) {
+      if (generation === pageGenerationRef.current) setRepositoryError(caught);
+    } finally {
+      if (generation === pageGenerationRef.current) setPageLoading(false);
     }
-    if (result.status === "updated") onBrushesChange(result.brushes);
   }
 
-  function handleOverwrite(brush: StudioSavedBrush) {
+  async function handleDelete(id: string) {
     setError(null);
     setDoneMsg(null);
-    const result = updateBrushSnapshotWithResult(browserBrushLibraryStorage(), brush.id, currentSnapshot);
-    if (result.status === "storage-error" || result.status === "library-unreadable") {
-      setMutationError(result.status);
-      return;
+    setRepositoryBusy(true);
+    try {
+      const product = await productRepository();
+      const deleted = await product.repository.delete(id);
+      if (!deleted) return;
+      await refreshFromRepository(product);
+      onBrushDeleted(deleted);
+    } catch (caught) {
+      setRepositoryError(caught);
+    } finally {
+      setRepositoryBusy(false);
     }
-    if (result.status !== "updated") return;
-    onBrushesChange(result.brushes);
-    setDoneMsg(`"${brush.name}" 브러시를 지금 설정으로 덮어썼어요.`);
   }
 
-  function handleDuplicate(id: string) {
+  async function handleTogglePinned(id: string) {
     setError(null);
     setDoneMsg(null);
-    const result = duplicateBrush(browserBrushLibraryStorage(), id);
-    if (result.status === "full") {
-      setError(capacityMessage);
-      return;
+    setRepositoryBusy(true);
+    try {
+      const product = await productRepository();
+      const brush = await product.repository.getById(id);
+      if (!brush) return;
+      await product.repository.put({ ...brush, pinned: !brush.pinned });
+      await refreshFromRepository(product);
+    } catch (caught) {
+      setRepositoryError(caught);
+    } finally {
+      setRepositoryBusy(false);
     }
-    if (result.status === "storage-error" || result.status === "library-unreadable") {
-      setMutationError(result.status);
-      return;
-    }
-    if (result.status !== "duplicated" || !result.brush) return;
-    onBrushesChange(result.brushes);
-    setDoneMsg(`"${result.brush.name}" 브러시를 복제했어요.`);
+  }
+
+  async function handleOverwrite(brush: StudioSavedBrush) {
     setError(null);
-    setRenamingId(result.brush.id);
-    setRenamingName(result.brush.name);
+    setDoneMsg(null);
+    setRepositoryBusy(true);
+    try {
+      const product = await productRepository();
+      const existing = await product.repository.getById(brush.id);
+      if (!existing) return;
+      const { snapshot } = sanitizeBrushSnapshot(currentSnapshot);
+      await product.repository.put({
+        ...existing,
+        ...snapshot,
+        updatedAt: mutationClockRef.current(),
+      });
+      await refreshFromRepository(product);
+      setDoneMsg(brushMutationMessage(
+        product.authority,
+        `"${brush.name}" 브러시를 지금 설정으로 덮어썼어요.`,
+        `"${brush.name}" 브러시를 현재 세션 설정으로 바꿨어요.`,
+      ));
+    } catch (caught) {
+      setRepositoryError(caught);
+    } finally {
+      setRepositoryBusy(false);
+    }
+  }
+
+  async function handleDuplicate(id: string) {
+    setError(null);
+    setDoneMsg(null);
+    setRepositoryBusy(true);
+    try {
+      const product = await productRepository();
+      const duplicated = await product.repository.duplicate(id);
+      if (!duplicated) return;
+      await refreshFromRepository(product);
+      setDoneMsg(brushMutationMessage(
+        product.authority,
+        `"${duplicated.name}" 브러시를 복제했어요.`,
+        `"${duplicated.name}" 브러시를 현재 세션에서 복제했어요.`,
+      ));
+      setError(null);
+      setRenamingId(duplicated.id);
+      setRenamingName(duplicated.name);
+    } catch (caught) {
+      setRepositoryError(caught);
+    } finally {
+      setRepositoryBusy(false);
+    }
   }
 
   function startRename(brush: StudioSavedBrush, trigger: HTMLButtonElement) {
@@ -292,50 +526,124 @@ export function StudioBrushLibraryPanel({
     });
   }
 
-  function commitRename(restoreFocus = false) {
+  async function commitRename(restoreFocus = false) {
     if (!renamingId) return;
     setError(null);
     setDoneMsg(null);
-    const result = renameBrushWithResult(browserBrushLibraryStorage(), renamingId, renamingName);
-    if (result.status === "storage-error" || result.status === "library-unreadable") {
-      setMutationError(result.status);
-    } else if (result.status === "updated") {
-      onBrushesChange(result.brushes);
-    }
+    const id = renamingId;
+    const name = renamingName.trim();
     setRenamingId(null);
-    if (restoreFocus) finishRenameFocus();
+    if (!name) {
+      if (restoreFocus) finishRenameFocus();
+      return;
+    }
+    setRepositoryBusy(true);
+    try {
+      const product = await productRepository();
+      const brush = await product.repository.getById(id);
+      if (brush) {
+        await product.repository.put({
+          ...brush,
+          name,
+          updatedAt: mutationClockRef.current(),
+        });
+        await refreshFromRepository(product);
+      }
+    } catch (caught) {
+      setRepositoryError(caught);
+    } finally {
+      setRepositoryBusy(false);
+      if (restoreFocus) finishRenameFocus();
+    }
   }
 
   function handleRenameKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.key === "Enter") commitRename(true);
+    if (event.key === "Enter") void commitRename(true);
     else if (event.key === "Escape") {
       setRenamingId(null);
       finishRenameFocus();
     }
   }
 
-  function storeNewBrush(brush: StudioSavedBrush, successMessage: string) {
-    const result = saveBrushWithResult(browserBrushLibraryStorage(), brush);
-    if (result.status === "full") {
-      setError(capacityMessage);
+  async function storeNewBrush(
+    brush: StudioSavedBrush,
+    successMessage: (authority: ProductBrushLibraryAuthority) => string,
+  ): Promise<boolean> {
+    setRepositoryBusy(true);
+    try {
+      const product = await productRepository();
+      await product.repository.put(brush);
+      await refreshFromRepository(product);
+      setError(null);
+      setDoneMsg(successMessage(product.authority));
+      return true;
+    } catch (caught) {
+      setRepositoryError(caught);
       return false;
+    } finally {
+      setRepositoryBusy(false);
     }
-    if (result.status === "storage-error" || result.status === "library-unreadable") {
-      setMutationError(result.status);
-      return false;
-    }
-    onBrushesChange(result.brushes);
-    setError(null);
-    setDoneMsg(successMessage);
-    return true;
   }
 
-  function handleSaveCurrent() {
+  async function handleSaveCurrent() {
     const created = createBrush(newName, currentSnapshot);
-    if (!storeNewBrush(created, `"${created.name}" 브러시를 저장했어요.`)) return;
+    if (!await storeNewBrush(created, (authority) => brushMutationMessage(
+      authority,
+      `"${created.name}" 브러시를 저장했어요.`,
+      `"${created.name}" 브러시를 현재 세션에 보관했어요.`,
+    ))) return;
     setNewName("");
     setCreatorOpen(false);
     globalThis.requestAnimationFrame?.(() => saveTriggerRef.current?.focus({ preventScroll: true }));
+  }
+
+  /** Engine-neutral external presets commit to SQLite or the explicitly labelled session. */
+  async function importBrushProgramFile(
+    file: File,
+    format: "myb" | "kpp" | "sut" | "sutg" | "bundle",
+  ) {
+    setImporting(true);
+    setRepositoryBusy(true);
+    try {
+      const {
+        importAndCommitStudioBrushProgramFile,
+        studioBrushPackFormatLabel,
+        studioBrushPackImportNotes,
+      } = await import("./studio-brush-pack-import");
+      const product = await productRepository();
+      const committed = await importAndCommitStudioBrushProgramFile(
+        file,
+        format,
+        product.repository,
+      );
+      await refreshFromRepository(product);
+      const label = studioBrushPackFormatLabel(format);
+      const imported = committed.saved.savedCount;
+      const skipped = committed.saved.skippedDuplicateCount;
+      const onlyBrush = imported === 1 ? committed.materialized[0] : undefined;
+      const details = [product.authority === "sqlite"
+        ? onlyBrush
+          ? `${label} 브러시 "${onlyBrush.name}"을(를) SQLite 내 브러시에 저장했어요.`
+          : `${label}에서 브러시 ${imported}개를 SQLite 내 브러시에 저장했어요.`
+        : onlyBrush
+          ? `${label} 브러시 "${onlyBrush.name}"을(를) 현재 비영속 세션에 추가했어요.`
+          : `${label}에서 브러시 ${imported}개를 현재 비영속 세션에 추가했어요.`];
+      if (skipped > 0) details.push(`중복 ID ${skipped}개는 건너뛰었어요.`);
+      if (product.authority === "memory-session") {
+        details.push("브라우저를 닫으면 사라지므로 필요한 브러시는 파일로 내보내 주세요.");
+      }
+      details.push(...studioBrushPackImportNotes(committed.result));
+      setError(null);
+      setDoneMsg(details.join(" "));
+    } catch (caught) {
+      if (caught instanceof BrushLibraryRepositoryError) setRepositoryError(caught);
+      else setError(
+        caught instanceof Error ? caught.message : "브러시 프리셋 파일을 가져오지 못했어요.",
+      );
+    } finally {
+      setImporting(false);
+      setRepositoryBusy(false);
+    }
   }
 
   async function handleImportFile(event: ChangeEvent<HTMLInputElement>) {
@@ -344,35 +652,46 @@ export function StudioBrushLibraryPanel({
     if (!file) return;
     setError(null);
     setDoneMsg(null);
-    const abr = /\.abr$/iu.test(file.name) || file.type === "application/x-photoshop";
-    if (abr) {
+    const format = studioBrushPackFormatOf(file.name, file.type);
+    if (
+      format === "myb"
+      || format === "kpp"
+      || format === "sut"
+      || format === "sutg"
+      || format === "bundle"
+    ) {
+      await importBrushProgramFile(file, format);
+      return;
+    }
+    if (format === "abr") {
       setImporting(true);
       try {
         const { importStudioAbrFile } = await import("./studio-abr-import-client");
         const result = await importStudioAbrFile(file);
         const imported = result.brushes.map((candidate) => createBrush(candidate.name, candidate.snapshot));
-        const saved = saveBrushBatchWithResult(browserBrushLibraryStorage(), imported);
-        if (saved.status === "storage-error" || saved.status === "library-unreadable") {
-          setMutationError(saved.status);
-          return;
-        }
-        if (saved.status === "full") {
-          setError(capacityMessage);
-          return;
-        }
-        onBrushesChange(saved.brushes);
+        const product = await productRepository();
+        const saved = await product.repository.putMany(imported);
+        await refreshFromRepository(product);
         const details = [`ABR에서 브러시 ${saved.savedCount}개를 가져왔어요.`];
-        const skipped = result.skippedBrushCount + saved.skippedCount;
-        if (skipped > 0) details.push(`${skipped}개는 펜촉 누락 또는 라이브러리 한도로 건너뛰었어요.`);
+        if (product.authority === "memory-session") {
+          details.push("현재 비영속 세션에만 추가했으며 브라우저를 닫으면 사라져요.");
+        }
+        const skipped = result.skippedBrushCount + saved.skippedDuplicateCount;
+        if (skipped > 0) details.push(`${skipped}개는 펜촉 누락 또는 중복 ID라 건너뛰었어요.`);
         if (result.approximatedBrushCount > 0) {
           details.push(`${result.approximatedBrushCount}개의 Photoshop 전용 효과는 가장 가까운 Studio 다이내믹스로 변환했어요.`);
         }
         setDoneMsg(details.join(" "));
       } catch (caught) {
-        setError(caught instanceof Error ? caught.message : "ABR 브러시 팩을 가져오지 못했어요.");
+        if (caught instanceof BrushLibraryRepositoryError) setRepositoryError(caught);
+        else setError(caught instanceof Error ? caught.message : "ABR 브러시 팩을 가져오지 못했어요.");
       } finally {
         setImporting(false);
       }
+      return;
+    }
+    if (format !== "json") {
+      setError("브러시 파일 형식을 알아보지 못했어요. .abr · .myb · .kpp · .sut · .sutg · .bundle · .json 파일을 선택해 주세요.");
       return;
     }
     if (file.size > MAX_IMPORT_FILE_BYTES) {
@@ -381,7 +700,7 @@ export function StudioBrushLibraryPanel({
     }
     setImporting(true);
     const reader = new FileReader();
-    reader.onload = (loadEvent) => {
+    reader.onload = async (loadEvent) => {
       const text = loadEvent.target?.result;
       if (typeof text !== "string") {
         setError("브러시 설정 파일을 읽지 못했어요.");
@@ -395,7 +714,9 @@ export function StudioBrushLibraryPanel({
         if (adjustedFields.length > 0) {
           parts.push(`일부 값(${adjustedFields.join(", ")})은 안전 범위로 보정했어요.`);
         }
-        storeNewBrush(imported, parts.join(" "));
+        await storeNewBrush(imported, (authority) => authority === "sqlite"
+          ? parts.join(" ")
+          : `${parts.join(" ")} 현재 비영속 세션에만 추가했으며 브라우저를 닫으면 사라져요.`);
       } catch (caught) {
         setError(caught instanceof Error ? caught.message : "브러시 설정 파일을 가져오지 못했어요.");
       } finally {
@@ -445,18 +766,40 @@ export function StudioBrushLibraryPanel({
     }
   }
 
+  async function handleApplySavedBrush(brush: StudioSavedBrush): Promise<void> {
+    setError(null);
+    setRepositoryBusy(true);
+    try {
+      const product = await productRepository();
+      const used = await product.repository.put({
+        ...brush,
+        lastUsedAt: mutationClockRef.current(),
+      });
+      await refreshFromRepository(product);
+      onApplyBrush(used);
+    } catch (caught) {
+      setRepositoryError(caught);
+    } finally {
+      setRepositoryBusy(false);
+    }
+  }
+
   return (
     <section
+      ref={sectionRef}
       className="space-y-2 border-t border-line/35 pt-2"
       aria-label="내 브러시"
       data-studio-brush-library-scope="saved"
       data-studio-brush-surface-role="user-library-management"
+      data-studio-brush-library-authority={repositoryAuthority}
+      data-studio-brush-library-loaded-count={brushes.length}
+      aria-busy={repositoryBusy || pageLoading || repositoryAuthority === "loading"}
     >
       <div className="flex items-center justify-between gap-2">
         <div>
           <p className="text-[0.68rem] font-semibold text-fg-2">내 브러시 · 사용자 설정</p>
           <p className="text-[0.6rem] tabular-nums text-fg-3">
-            저장·가져오기·공유·재적용 · {brushes.length}/{MAX_BRUSHES}
+            {brushLibraryAuthorityLabel(repositoryAuthority, displayedTotal)}
           </p>
         </div>
         <label className="flex min-h-11 shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-line px-2 text-[0.62rem] font-semibold text-fg-2 transition-colors hover:bg-raised focus-within:outline focus-within:outline-2 focus-within:outline-accent lg:min-h-8">
@@ -466,13 +809,37 @@ export function StudioBrushLibraryPanel({
           {importing ? "변환 중…" : "가져오기"}
           <input
             type="file"
-            accept=".json,.abr,application/json,application/octet-stream,application/x-photoshop"
-            aria-label="브러시 설정 또는 Photoshop ABR 가져오기"
+            accept={STUDIO_BRUSH_PACK_ACCEPT}
+            aria-label="브러시 설정 · Photoshop ABR · Clip Studio SUT/SUTG · libmypaint MYB · Krita KPP/번들 가져오기"
             className="sr-only"
             disabled={importing}
             onChange={handleImportFile}
           />
         </label>
+      </div>
+
+      <div className="flex min-w-0 items-center gap-1.5">
+        <input
+          type="search"
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.target.value)}
+          placeholder="이름·프리셋 검색"
+          aria-label="내 브러시 검색"
+          className="h-11 min-w-0 flex-1 rounded-lg border border-line bg-panel px-2 text-xs text-fg outline-none placeholder:text-fg-3 focus:border-accent lg:h-8"
+        />
+        <button
+          type="button"
+          aria-label="고정 브러시만 보기"
+          aria-pressed={pinnedOnly}
+          onClick={() => setPinnedOnly((active) => !active)}
+          className={cx(
+            "flex min-h-11 shrink-0 items-center gap-1 rounded-lg border border-line px-2 text-[0.62rem] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8",
+            pinnedOnly ? "bg-accent-soft text-accent" : "text-fg-3 hover:bg-raised hover:text-fg",
+          )}
+        >
+          <Pin size={12} className={pinnedOnly ? "fill-current" : undefined} aria-hidden />
+          고정만
+        </button>
       </div>
 
       {error ? <p className="text-[0.64rem] leading-relaxed text-bad" role="alert">{error}</p> : null}
@@ -483,12 +850,18 @@ export function StudioBrushLibraryPanel({
         type="button"
         onClick={() => setCreatorOpen((open) => !open)}
         aria-expanded={creatorOpen}
+        disabled={repositoryAuthority === "loading" || repositoryAuthority === "error"}
         className={cx(
           "flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-line text-[0.68rem] font-semibold transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-9",
           creatorOpen ? "bg-raised text-fg" : "text-fg-2"
         )}
       >
-        <Save size={13} aria-hidden /> 현재 브러시 저장
+        <Save size={13} aria-hidden />
+        {repositoryAuthority === "sqlite"
+          ? "현재 브러시 저장"
+          : repositoryAuthority === "memory-session"
+            ? "현재 브러시 세션에 보관"
+            : "브러시 카탈로그 준비 중"}
       </button>
       {creatorOpen ? (
         <div className="flex flex-col gap-1.5 rounded-lg border border-line bg-card p-2">
@@ -501,7 +874,7 @@ export function StudioBrushLibraryPanel({
             // eslint-disable-next-line jsx-a11y/no-autofocus -- 명시적 저장 동작 뒤 열리는 짧은 이름 입력 단계다.
             autoFocus
             onKeyDown={(event) => {
-              if (event.key === "Enter") handleSaveCurrent();
+              if (event.key === "Enter") void handleSaveCurrent();
               else if (event.key === "Escape") {
                 setCreatorOpen(false);
                 globalThis.requestAnimationFrame?.(() => saveTriggerRef.current?.focus({ preventScroll: true }));
@@ -509,8 +882,8 @@ export function StudioBrushLibraryPanel({
             }}
             className="h-11 rounded-lg border border-line bg-panel px-2 text-xs text-fg outline-none focus:border-accent lg:h-8"
           />
-          <button type="button" onClick={handleSaveCurrent} className="min-h-11 rounded-lg bg-accent text-[0.68rem] font-semibold text-on-accent hover:bg-accent-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:min-h-8">
-            저장
+          <button type="button" onClick={() => void handleSaveCurrent()} className="min-h-11 rounded-lg bg-accent text-[0.68rem] font-semibold text-on-accent hover:bg-accent-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:min-h-8">
+            {repositoryAuthority === "sqlite" ? "저장" : "세션에 보관"}
           </button>
         </div>
       ) : null}
@@ -525,8 +898,8 @@ export function StudioBrushLibraryPanel({
           >
             <button
               type="button"
-              title="저장 브러시 획 미리보기"
-              aria-label="저장 브러시 획 미리보기"
+              title="내 브러시 획 미리보기"
+              aria-label="내 브러시 획 미리보기"
               aria-pressed={viewMode === "stroke"}
               data-studio-saved-brush-view-option="stroke"
               onClick={() => setViewMode("stroke")}
@@ -542,8 +915,8 @@ export function StudioBrushLibraryPanel({
             </button>
             <button
               type="button"
-              title="저장 브러시 이름 목록"
-              aria-label="저장 브러시 이름 목록"
+              title="내 브러시 이름 목록"
+              aria-label="내 브러시 이름 목록"
               aria-pressed={viewMode === "text"}
               data-studio-saved-brush-view-option="text"
               onClick={() => setViewMode("text")}
@@ -563,17 +936,22 @@ export function StudioBrushLibraryPanel({
 
       {orderedBrushes.length === 0 ? (
         <p className="rounded-lg border border-dashed border-line px-3 py-4 text-center text-[0.64rem] leading-relaxed text-fg-3">
-          현재 펜 설정을 저장하면 모바일에서도 바로 꺼내 쓸 수 있어요.
+          {repositoryAuthority === "sqlite"
+            ? "현재 펜 설정을 저장하면 모바일에서도 바로 꺼내 쓸 수 있어요."
+            : repositoryAuthority === "memory-session"
+              ? "현재 펜 설정을 이 세션에 보관할 수 있어요. 브라우저를 닫기 전에 파일로 내보내 주세요."
+              : "브러시 카탈로그를 준비하고 있어요."}
         </p>
       ) : (
-        <ul
-          data-studio-saved-brush-view={viewMode}
-          className={cx(
-            "lg:max-h-80 lg:overflow-y-auto lg:pr-1",
-            viewMode === "stroke" ? "space-y-1.5" : "space-y-1"
-          )}
-        >
-          {orderedBrushes.map((brush) => (
+        <>
+          <ul
+            data-studio-saved-brush-view={viewMode}
+            className={cx(
+              "lg:max-h-80 lg:overflow-y-auto lg:pr-1",
+              viewMode === "stroke" ? "space-y-1.5" : "space-y-1"
+            )}
+          >
+            {orderedBrushes.map((brush) => (
             <li
               key={brush.id}
               className={cx(
@@ -588,7 +966,7 @@ export function StudioBrushLibraryPanel({
                     value={renamingName}
                     onChange={(event) => setRenamingName(event.target.value)}
                     aria-label={`${brush.name} 새 이름`}
-                    onBlur={() => commitRename(false)}
+                    onBlur={() => void commitRename(false)}
                     onKeyDown={handleRenameKeyDown}
                     // eslint-disable-next-line jsx-a11y/no-autofocus -- 사용자가 복제/이름 변경을 요청한 직후의 인라인 편집이다.
                     autoFocus
@@ -606,7 +984,7 @@ export function StudioBrushLibraryPanel({
                 ) : null}
                 <button
                   type="button"
-                  onClick={() => handleTogglePinned(brush.id)}
+                  onClick={() => void handleTogglePinned(brush.id)}
                   aria-label={`${brush.name} ${brush.pinned ? "고정 해제" : "빠른 선반에 고정"}`}
                   aria-pressed={brush.pinned}
                   title={brush.pinned ? "고정 해제" : "빠른 선반에 고정"}
@@ -621,7 +999,7 @@ export function StudioBrushLibraryPanel({
 
               <button
                 type="button"
-                onClick={() => onApplyBrush(brush)}
+                onClick={() => void handleApplySavedBrush(brush)}
                 aria-pressed={activeBrushId === brush.id}
                 aria-label={`${brush.name} 브러시 적용, ${savedBrushPresetLabel(brush)}, ${brush.strokeWidth}px, ${Math.round(brush.brushOpacity * 100)}퍼센트`}
                 className={cx(
@@ -679,10 +1057,10 @@ export function StudioBrushLibraryPanel({
                   />
                 </summary>
                 <div className="grid grid-cols-3 gap-1 pt-1 sm:grid-cols-6">
-                <button type="button" onClick={() => handleOverwrite(brush)} aria-label={`${brush.name} 브러시를 지금 설정으로 덮어쓰기`} title="지금 설정으로 덮어쓰기 (같은 브러시에 저장)" className="flex min-h-11 items-center justify-center gap-1 rounded-lg text-[0.6rem] font-medium text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8">
+                <button type="button" onClick={() => void handleOverwrite(brush)} aria-label={`${brush.name} 브러시를 지금 설정으로 덮어쓰기`} title={repositoryAuthority === "sqlite" ? "지금 설정으로 덮어쓰기 (같은 브러시에 저장)" : "지금 설정으로 덮어쓰기 (현재 세션에만 반영)"} className="flex min-h-11 items-center justify-center gap-1 rounded-lg text-[0.6rem] font-medium text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8">
                   <RefreshCw size={12} aria-hidden /> 덮어쓰기
                 </button>
-                <button type="button" onClick={() => handleDuplicate(brush.id)} aria-label={`${brush.name} 복제`} className="flex min-h-11 items-center justify-center gap-1 rounded-lg text-[0.6rem] font-medium text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8">
+                <button type="button" onClick={() => void handleDuplicate(brush.id)} aria-label={`${brush.name} 복제`} className="flex min-h-11 items-center justify-center gap-1 rounded-lg text-[0.6rem] font-medium text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8">
                   <Copy size={12} aria-hidden /> 복제
                 </button>
                 <button type="button" onClick={(event) => startRename(brush, event.currentTarget)} aria-label={`${brush.name} 이름 변경`} className="flex min-h-11 items-center justify-center gap-1 rounded-lg text-[0.6rem] font-medium text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8">
@@ -694,14 +1072,26 @@ export function StudioBrushLibraryPanel({
                 <button type="button" onClick={() => void handleShare(brush)} aria-label={`${brush.name} 브러시 공유`} className="flex min-h-11 items-center justify-center gap-1 rounded-lg text-[0.6rem] font-medium text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8">
                   <Share2 size={12} aria-hidden /> 공유
                 </button>
-                <button type="button" onClick={() => handleDelete(brush.id)} aria-label={`${brush.name} 브러시 삭제`} className="flex min-h-11 items-center justify-center gap-1 rounded-lg text-[0.6rem] font-medium text-fg-3 hover:bg-bad/10 hover:text-bad focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8">
+                <button type="button" onClick={() => void handleDelete(brush.id)} aria-label={`${brush.name} 브러시 삭제`} className="flex min-h-11 items-center justify-center gap-1 rounded-lg text-[0.6rem] font-medium text-fg-3 hover:bg-bad/10 hover:text-bad focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8">
                   <Trash2 size={12} aria-hidden /> 삭제
                 </button>
                 </div>
               </details>
             </li>
-          ))}
-        </ul>
+            ))}
+          </ul>
+          {hasMorePages ? (
+            <button
+              type="button"
+              disabled={pageLoading || repositoryBusy}
+              onClick={() => void handleLoadMore()}
+              className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-line text-[0.68rem] font-semibold text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-60 lg:min-h-9"
+            >
+              {pageLoading ? <LoaderCircle size={13} className="animate-spin" aria-hidden /> : null}
+              {pageLoading ? "불러오는 중…" : `더 불러오기 (${brushes.length}/${displayedTotal})`}
+            </button>
+          ) : null}
+        </>
       )}
     </section>
   );

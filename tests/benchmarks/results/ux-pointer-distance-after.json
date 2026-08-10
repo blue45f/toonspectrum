@@ -1,0 +1,784 @@
+{
+  "$schema": "https://toonspectrum.local/schemas/ux-pointer-distance.json",
+  "gate": "V5 §15 포인터 거리 — on-canvas command surfaces",
+  "generatedAt": "2026-08-08T11:49:40.810Z",
+  "route": "/studio (guest, no auth session)",
+  "build": "vite build → vite preview (production bundle)",
+  "host": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpus": 12
+  },
+  "budgets": {
+    "brushHud": 80,
+    "selectionCommand": 180,
+    "layerRowAction": 120
+  },
+  "anchorContract": {
+    "brushHud": "cursor → every brush HUD control centre",
+    "selectionCommand": "selection bounding box → every selection command centre",
+    "layerRowAction": "layer row centre → every inline row action centre",
+    "note": "V5 §15 states the budgets per surface. The 2026-08-08 audit measured all ten items from the canvas visible centre because no anchored surface existed; `auditParity` below keeps that comparison honest."
+  },
+  "auditParity": {
+    "source": "tests/benchmarks/results/ux-audit.json",
+    "before": {
+      "nearestAnyInteractiveControl": {
+        "label": "맞춤 (하단 뷰바)",
+        "distance": 388
+      },
+      "brushHudPx": 388,
+      "brushSizePx": 423,
+      "brushOpacityPx": 555,
+      "selectionCommandPx": 495,
+      "transformAfterSelectPx": 556,
+      "layerRowActionPx": 614,
+      "budgetsMet": 0,
+      "budgetsTotal": 10
+    }
+  },
+  "viewports": {
+    "430": {
+      "viewport": {
+        "width": 430,
+        "height": 932
+      },
+      "canvasRect": {
+        "x": 0,
+        "y": 133.453125,
+        "width": 430,
+        "height": 645
+      },
+      "canvasVisibleCenter": [
+        215,
+        456
+      ],
+      "measuredAnchor": [
+        215,
+        456
+      ],
+      "nearestInteractiveExcludingNewSurfaces": {
+        "label": "픽셀 펜",
+        "distancePx": 49.95310300672022,
+        "rect": {
+          "left": 117.5,
+          "top": 438.453125,
+          "width": 95.5,
+          "height": 44
+        }
+      },
+      "nearestInteractiveIncludingNewSurfaces": {
+        "label": "색 선택 · 현재 #7c5cfc",
+        "distancePx": 37.16436057926499,
+        "rect": {
+          "left": 173,
+          "top": 406,
+          "width": 40,
+          "height": 40
+        }
+      },
+      "brushHud": {
+        "side": "top",
+        "withinBudgetFlag": "true",
+        "rect": {
+          "left": 173,
+          "top": 362,
+          "width": 84,
+          "height": 84
+        },
+        "controls": [
+          {
+            "label": "브러시 크기",
+            "rect": {
+              "left": 173,
+              "top": 362,
+              "width": 40,
+              "height": 40
+            },
+            "centerDistancePx": 77.15610602710342,
+            "edgeDistancePx": 53.99018148946736
+          },
+          {
+            "label": "브러시 불투명도",
+            "rect": {
+              "left": 217,
+              "top": 362,
+              "width": 40,
+              "height": 40
+            },
+            "centerDistancePx": 77.15610602710342,
+            "edgeDistancePx": 53.99018148946736
+          },
+          {
+            "label": "색 선택 · 현재 #7c5cfc",
+            "rect": {
+              "left": 173,
+              "top": 406,
+              "width": 40,
+              "height": 40
+            },
+            "centerDistancePx": 37.16436057926499,
+            "edgeDistancePx": 10.152078470225938
+          },
+          {
+            "label": "지우개로 전환",
+            "rect": {
+              "left": 217,
+              "top": 406,
+              "width": 40,
+              "height": 40
+            },
+            "centerDistancePx": 37.16436057926499,
+            "edgeDistancePx": 10.152078470225938
+          }
+        ]
+      },
+      "commandRouting": {
+        "hudEraserToggle": {
+          "available": true,
+          "before": "지우개로 전환",
+          "after": "펜으로 전환",
+          "toggled": true
+        },
+        "selection": {
+          "available": true,
+          "command": "duplicate",
+          "barStillVisible": true
+        }
+      },
+      "selection": {
+        "selectionRect": {
+          "left": 179,
+          "top": 467.953125,
+          "width": 72,
+          "height": 48
+        },
+        "pointerPoint": {
+          "x": 215,
+          "y": 491.953125
+        },
+        "bar": {
+          "side": "top",
+          "rect": {
+            "left": 98,
+            "top": 486,
+            "width": 234,
+            "height": 44
+          },
+          "barToSelectionPx": 82.20896968862719,
+          "controls": [
+            {
+              "command": "duplicate",
+              "rect": {
+                "left": 102,
+                "top": 490,
+                "width": 36,
+                "height": 36
+              },
+              "fromSelectionBoxPx": 59,
+              "fromPointerPx": 96.34574301579507
+            },
+            {
+              "command": "forward",
+              "rect": {
+                "left": 140,
+                "top": 490,
+                "width": 36,
+                "height": 36
+              },
+              "fromSelectionBoxPx": 21,
+              "fromPointerPx": 59.2157259287229
+            },
+            {
+              "command": "backward",
+              "rect": {
+                "left": 178,
+                "top": 490,
+                "width": 36,
+                "height": 36
+              },
+              "fromSelectionBoxPx": 0,
+              "fromPointerPx": 24.86970440647868
+            },
+            {
+              "command": "bring-front",
+              "rect": {
+                "left": 216,
+                "top": 490,
+                "width": 36,
+                "height": 36
+              },
+              "fromSelectionBoxPx": 0,
+              "fromPointerPx": 24.86970440647868
+            },
+            {
+              "command": "properties",
+              "rect": {
+                "left": 254,
+                "top": 490,
+                "width": 36,
+                "height": 36
+              },
+              "fromSelectionBoxPx": 21,
+              "fromPointerPx": 59.2157259287229
+            },
+            {
+              "command": "delete",
+              "rect": {
+                "left": 292,
+                "top": 490,
+                "width": 36,
+                "height": 36
+              },
+              "fromSelectionBoxPx": 59,
+              "fromPointerPx": 96.34574301579507
+            }
+          ]
+        }
+      },
+      "layerRow": {
+        "available": false,
+        "reason": "the shell does not present the layer navigator panel at this viewport (pre-existing responsive behaviour, not a Wave C regression)"
+      },
+      "budgets": {
+        "brushHud": {
+          "maxPx": 77.2,
+          "budgetPx": 80,
+          "pass": true
+        },
+        "selectionCommand": {
+          "maxPx": 59,
+          "budgetPx": 180,
+          "pass": true
+        },
+        "layerRowAction": {
+          "maxPx": null,
+          "budgetPx": 120,
+          "pass": false
+        }
+      }
+    },
+    "900": {
+      "viewport": {
+        "width": 900,
+        "height": 900
+      },
+      "canvasRect": {
+        "x": 0,
+        "y": 124.671875,
+        "width": 900,
+        "height": 1350
+      },
+      "canvasVisibleCenter": [
+        450,
+        512
+      ],
+      "measuredAnchor": [
+        450,
+        512
+      ],
+      "nearestInteractiveExcludingNewSurfaces": {
+        "label": "색상 #ffcc00",
+        "distancePx": 27.16834027648554,
+        "rect": {
+          "left": 451,
+          "top": 504.796875,
+          "width": 44,
+          "height": 44
+        }
+      },
+      "nearestInteractiveIncludingNewSurfaces": {
+        "label": "색상 #ffcc00",
+        "distancePx": 27.16834027648554,
+        "rect": {
+          "left": 451,
+          "top": 504.796875,
+          "width": 44,
+          "height": 44
+        }
+      },
+      "brushHud": {
+        "side": "top",
+        "withinBudgetFlag": "true",
+        "rect": {
+          "left": 414,
+          "top": 426,
+          "width": 72,
+          "height": 72
+        },
+        "controls": [
+          {
+            "label": "브러시 크기",
+            "rect": {
+              "left": 414,
+              "top": 426,
+              "width": 34,
+              "height": 34
+            },
+            "centerDistancePx": 71.89208738800053,
+            "edgeDistancePx": 52.37413821729105
+          },
+          {
+            "label": "브러시 불투명도",
+            "rect": {
+              "left": 452,
+              "top": 426,
+              "width": 34,
+              "height": 34
+            },
+            "centerDistancePx": 71.89208738800053,
+            "edgeDistancePx": 52.37413821729105
+          },
+          {
+            "label": "색 선택 · 현재 #7c5cfc",
+            "rect": {
+              "left": 414,
+              "top": 464,
+              "width": 34,
+              "height": 34
+            },
+            "centerDistancePx": 36.646159130308675,
+            "edgeDistancePx": 14.474774747950528
+          },
+          {
+            "label": "지우개로 전환",
+            "rect": {
+              "left": 452,
+              "top": 464,
+              "width": 34,
+              "height": 34
+            },
+            "centerDistancePx": 36.646159130308675,
+            "edgeDistancePx": 14.474774747950528
+          }
+        ]
+      },
+      "commandRouting": {
+        "hudEraserToggle": {
+          "available": true,
+          "before": "지우개로 전환",
+          "after": "펜으로 전환",
+          "toggled": true
+        },
+        "selection": {
+          "available": true,
+          "command": "duplicate",
+          "barStillVisible": true
+        }
+      },
+      "selection": {
+        "selectionRect": {
+          "left": 414,
+          "top": 524.3359375,
+          "width": 72,
+          "height": 48
+        },
+        "pointerPoint": {
+          "x": 450,
+          "y": 548.3359375
+        },
+        "bar": {
+          "side": "top",
+          "rect": {
+            "left": 333,
+            "top": 542,
+            "width": 234,
+            "height": 44
+          },
+          "barToSelectionPx": 82.14442527648427,
+          "controls": [
+            {
+              "command": "duplicate",
+              "rect": {
+                "left": 337,
+                "top": 546,
+                "width": 36,
+                "height": 36
+              },
+              "fromSelectionBoxPx": 59,
+              "fromPointerPx": 96.28272354895194
+            },
+            {
+              "command": "forward",
+              "rect": {
+                "left": 375,
+                "top": 546,
+                "width": 36,
+                "height": 36
+              },
+              "fromSelectionBoxPx": 21,
+              "fromPointerPx": 59.113136052859744
+            },
+            {
+              "command": "backward",
+              "rect": {
+                "left": 413,
+                "top": 546,
+                "width": 36,
+                "height": 36
+              },
+              "fromSelectionBoxPx": 0,
+              "fromPointerPx": 24.624436115450568
+            },
+            {
+              "command": "bring-front",
+              "rect": {
+                "left": 451,
+                "top": 546,
+                "width": 36,
+                "height": 36
+              },
+              "fromSelectionBoxPx": 0,
+              "fromPointerPx": 24.624436115450568
+            },
+            {
+              "command": "properties",
+              "rect": {
+                "left": 489,
+                "top": 546,
+                "width": 36,
+                "height": 36
+              },
+              "fromSelectionBoxPx": 21,
+              "fromPointerPx": 59.113136052859744
+            },
+            {
+              "command": "delete",
+              "rect": {
+                "left": 527,
+                "top": 546,
+                "width": 36,
+                "height": 36
+              },
+              "fromSelectionBoxPx": 59,
+              "fromPointerPx": 96.28272354895194
+            }
+          ]
+        }
+      },
+      "layerRow": {
+        "available": false,
+        "reason": "the shell does not present the layer navigator panel at this viewport (pre-existing responsive behaviour, not a Wave C regression)"
+      },
+      "budgets": {
+        "brushHud": {
+          "maxPx": 71.9,
+          "budgetPx": 80,
+          "pass": true
+        },
+        "selectionCommand": {
+          "maxPx": 59,
+          "budgetPx": 180,
+          "pass": true
+        },
+        "layerRowAction": {
+          "maxPx": null,
+          "budgetPx": 120,
+          "pass": false
+        }
+      }
+    },
+    "1600": {
+      "viewport": {
+        "width": 1600,
+        "height": 1000
+      },
+      "canvasRect": {
+        "x": 224,
+        "y": 69.671875,
+        "width": 1084,
+        "height": 1626
+      },
+      "canvasVisibleCenter": [
+        766,
+        535
+      ],
+      "measuredAnchor": [
+        766,
+        535
+      ],
+      "nearestInteractiveExcludingNewSurfaces": {
+        "label": "전체 — 전체 모드 — 모든 메뉴·패널·AI·3D 도구를 표시합니다.",
+        "distancePx": 356.8265476665503,
+        "rect": {
+          "left": 760.15625,
+          "top": 879.609375,
+          "width": 24,
+          "height": 24
+        }
+      },
+      "nearestInteractiveIncludingNewSurfaces": {
+        "label": "색 선택 · 현재 #7c5cfc",
+        "distancePx": 36.21953949878306,
+        "rect": {
+          "left": 730,
+          "top": 487,
+          "width": 34,
+          "height": 34
+        }
+      },
+      "brushHud": {
+        "side": "top",
+        "withinBudgetFlag": "true",
+        "rect": {
+          "left": 730,
+          "top": 449,
+          "width": 72,
+          "height": 72
+        },
+        "controls": [
+          {
+            "label": "브러시 크기",
+            "rect": {
+              "left": 730,
+              "top": 449,
+              "width": 34,
+              "height": 34
+            },
+            "centerDistancePx": 71.40998733723389,
+            "edgeDistancePx": 51.874506421785895
+          },
+          {
+            "label": "브러시 불투명도",
+            "rect": {
+              "left": 768,
+              "top": 449,
+              "width": 34,
+              "height": 34
+            },
+            "centerDistancePx": 71.40998733723389,
+            "edgeDistancePx": 51.874506421785895
+          },
+          {
+            "label": "색 선택 · 현재 #7c5cfc",
+            "rect": {
+              "left": 730,
+              "top": 487,
+              "width": 34,
+              "height": 34
+            },
+            "centerDistancePx": 36.21953949878306,
+            "edgeDistancePx": 13.979741288876069
+          },
+          {
+            "label": "지우개로 전환",
+            "rect": {
+              "left": 768,
+              "top": 487,
+              "width": 34,
+              "height": 34
+            },
+            "centerDistancePx": 36.21953949878306,
+            "edgeDistancePx": 13.979741288876069
+          }
+        ]
+      },
+      "commandRouting": {
+        "hudEraserToggle": {
+          "available": true,
+          "before": "지우개로 전환",
+          "after": "펜으로 전환",
+          "toggled": true
+        },
+        "selection": {
+          "available": true,
+          "command": "duplicate",
+          "barStillVisible": true
+        }
+      },
+      "selection": {
+        "selectionRect": {
+          "left": 730,
+          "top": 546.8359375,
+          "width": 72,
+          "height": 48
+        },
+        "pointerPoint": {
+          "x": 766,
+          "y": 570.8359375
+        },
+        "bar": {
+          "side": "top",
+          "rect": {
+            "left": 661,
+            "top": 546,
+            "width": 210,
+            "height": 40
+          },
+          "barToSelectionPx": 69.00506352075843,
+          "controls": [
+            {
+              "command": "duplicate",
+              "rect": {
+                "left": 665,
+                "top": 550,
+                "width": 32,
+                "height": 32
+              },
+              "fromSelectionBoxPx": 49,
+              "fromPointerPx": 85.1374552797058
+            },
+            {
+              "command": "forward",
+              "rect": {
+                "left": 699,
+                "top": 550,
+                "width": 32,
+                "height": 32
+              },
+              "fromSelectionBoxPx": 15,
+              "fromPointerPx": 51.228764298037746
+            },
+            {
+              "command": "backward",
+              "rect": {
+                "left": 733,
+                "top": 550,
+                "width": 32,
+                "height": 32
+              },
+              "fromSelectionBoxPx": 0,
+              "fromPointerPx": 17.67445307509984
+            },
+            {
+              "command": "bring-front",
+              "rect": {
+                "left": 767,
+                "top": 550,
+                "width": 32,
+                "height": 32
+              },
+              "fromSelectionBoxPx": 0,
+              "fromPointerPx": 17.67445307509984
+            },
+            {
+              "command": "properties",
+              "rect": {
+                "left": 801,
+                "top": 550,
+                "width": 32,
+                "height": 32
+              },
+              "fromSelectionBoxPx": 15,
+              "fromPointerPx": 51.228764298037746
+            },
+            {
+              "command": "delete",
+              "rect": {
+                "left": 835,
+                "top": 550,
+                "width": 32,
+                "height": 32
+              },
+              "fromSelectionBoxPx": 49,
+              "fromPointerPx": 85.1374552797058
+            }
+          ]
+        }
+      },
+      "layerRow": {
+        "available": true,
+        "inline": {
+          "rect": {
+            "left": 1336,
+            "top": 472.53125,
+            "width": 249,
+            "height": 39.265625
+          },
+          "rowCount": 2,
+          "actions": [
+            {
+              "action": "visibility",
+              "label": "✏️ 그림 숨김",
+              "rect": {
+                "left": 1440,
+                "top": 476.15625,
+                "width": 32,
+                "height": 32
+              },
+              "fromRowCenterPx": 4.500006781678917
+            },
+            {
+              "action": "lock",
+              "label": "✏️ 그림 잠금",
+              "rect": {
+                "left": 1476,
+                "top": 478.15625,
+                "width": 28,
+                "height": 28
+              },
+              "fromRowCenterPx": 29.500001034494158
+            },
+            {
+              "action": "opacity",
+              "label": "✏️ 그림 불투명도",
+              "rect": {
+                "left": 1508,
+                "top": 478.15625,
+                "width": 36,
+                "height": 28
+              },
+              "fromRowCenterPx": 65.50000046591722
+            },
+            {
+              "action": "menu",
+              "label": "✏️ 그림 레이어 작업",
+              "rect": {
+                "left": 1548,
+                "top": 476.15625,
+                "width": 32,
+                "height": 32
+              },
+              "fromRowCenterPx": 103.50000029485582
+            }
+          ]
+        },
+        "popoverRoute": {
+          "lock": {
+            "label": "잠금",
+            "rect": {
+              "left": 1351,
+              "top": 536.921875,
+              "width": 106.5,
+              "height": 32
+            },
+            "distancePx": 82.79839539378257
+          },
+          "opacity": null
+        }
+      },
+      "budgets": {
+        "brushHud": {
+          "maxPx": 71.4,
+          "budgetPx": 80,
+          "pass": true
+        },
+        "selectionCommand": {
+          "maxPx": 49,
+          "budgetPx": 180,
+          "pass": true
+        },
+        "layerRowAction": {
+          "maxPx": 103.5,
+          "budgetPx": 120,
+          "pass": true
+        }
+      }
+    }
+  },
+  "violations": [],
+  "notPresented": [
+    {
+      "viewport": "900",
+      "surface": "layerRowAction"
+    },
+    {
+      "viewport": "430",
+      "surface": "layerRowAction"
+    }
+  ],
+  "desktopCoverageComplete": true,
+  "failure": null,
+  "passed": true,
+  "runtimeMs": 38675
+}

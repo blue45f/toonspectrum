@@ -21,7 +21,7 @@ function sourceSection(
 
 const studioPage = source("./StudioPage.tsx");
 const menubar = source("./StudioMenubarContent.tsx");
-const menuCatalogue = source("./studio-main-menu-groups.ts");
+const menuCatalogue = source("./studio-main-menu-items-document.ts");
 const archiveApply = source("./studio-archive-import-apply.ts");
 const deviceProfile = source("./studio-document-import-device-profile.ts");
 const interchangeCommit = source("./studio-document-interchange-commit.ts");

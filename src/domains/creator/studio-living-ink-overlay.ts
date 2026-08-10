@@ -25,7 +25,19 @@ export interface StudioLivingInkCanonicalPresentation {
   readonly pngSha256: `sha256:${string}`;
   readonly width: number;
   readonly height: number;
+  /** Measured from the exact RGBA pixels encoded into `src`, never inferred from a GPU receipt. */
+  readonly alphaCoverage: StudioLivingInkAlphaCoverage;
   readonly presentation: StudioLivingInkOverlayPresentationReceipt;
+}
+
+export interface StudioLivingInkAlphaCoverage {
+  readonly pixelCount: number;
+  readonly bounds: Readonly<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }> | null;
 }
 
 interface PendingFrame {
@@ -71,6 +83,103 @@ function base64FromBytes(bytes: Uint8Array): string {
   }
   // Encoding each chunk separately is safe only on a multiple-of-three boundary. chunkSize is.
   return chunks.join("");
+}
+
+/** Counts actual encoded ink coverage; a receipt/hash alone can also describe a blank frame. */
+export function measureStudioLivingInkAlphaCoverage(
+  rgba: Uint8ClampedArray,
+  width: number,
+  height: number,
+): StudioLivingInkAlphaCoverage {
+  if (
+    !Number.isInteger(width)
+    || !Number.isInteger(height)
+    || width <= 0
+    || height <= 0
+    || rgba.length !== width * height * 4
+  ) {
+    throw new RangeError("Living Ink RGBA coverage dimensions are invalid.");
+  }
+  let pixelCount = 0;
+  let minX = width;
+  let minY = height;
+  let maxX = -1;
+  let maxY = -1;
+  for (let alphaOffset = 3; alphaOffset < rgba.length; alphaOffset += 4) {
+    if (rgba[alphaOffset] === 0) continue;
+    const pixelIndex = (alphaOffset - 3) / 4;
+    const x = pixelIndex % width;
+    const y = Math.floor(pixelIndex / width);
+    pixelCount += 1;
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x);
+    maxY = Math.max(maxY, y);
+  }
+  return Object.freeze({
+    pixelCount,
+    bounds: pixelCount === 0
+      ? null
+      : Object.freeze({
+          x: minX,
+          y: minY,
+          width: maxX - minX + 1,
+          height: maxY - minY + 1,
+        }),
+  });
+}
+
+/**
+ * Ensures the encoded physical frame covers the authored document-space gesture before its exact
+ * vector source may be hidden. This catches blank, vertically flipped and stale-page GPU frames.
+ */
+export function studioLivingInkCoverageIntersectsStroke(input: Readonly<{
+  coverage: StudioLivingInkAlphaCoverage;
+  outputWidth: number;
+  outputHeight: number;
+  documentWidth: number;
+  documentHeight: number;
+  points: readonly number[];
+  diameter: number;
+}>): boolean {
+  const bounds = input.coverage.bounds;
+  if (
+    input.coverage.pixelCount <= 0
+    || !bounds
+    || !finitePositive(input.outputWidth)
+    || !finitePositive(input.outputHeight)
+    || !finitePositive(input.documentWidth)
+    || !finitePositive(input.documentHeight)
+  ) return false;
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  for (let index = 0; index + 1 < input.points.length; index += 2) {
+    const x = input.points[index];
+    const y = input.points[index + 1];
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    minX = Math.min(minX, x!);
+    minY = Math.min(minY, y!);
+    maxX = Math.max(maxX, x!);
+    maxY = Math.max(maxY, y!);
+  }
+  if (![minX, minY, maxX, maxY].every(Number.isFinite)) return false;
+  const padding = Number.isFinite(input.diameter)
+    ? Math.max(0.5, input.diameter / 2)
+    : 0.5;
+  const scaleX = input.outputWidth / input.documentWidth;
+  const scaleY = input.outputHeight / input.documentHeight;
+  const expectedLeft = (minX - padding) * scaleX;
+  const expectedTop = (minY - padding) * scaleY;
+  const expectedRight = (maxX + padding) * scaleX;
+  const expectedBottom = (maxY + padding) * scaleY;
+  const actualRight = bounds.x + bounds.width;
+  const actualBottom = bounds.y + bounds.height;
+  return bounds.x < expectedRight
+    && actualRight > expectedLeft
+    && bounds.y < expectedBottom
+    && actualBottom > expectedTop;
 }
 
 /**
@@ -179,12 +288,20 @@ export class StudioLivingInkOverlayRenderer {
     const output = document.createElement("canvas");
     output.width = frame.image.width;
     output.height = frame.image.height;
-    const outputContext = output.getContext("2d", { alpha: false });
+    // Alpha must survive: the canonical PNG becomes a page-sized document layer, and the resolve
+    // uses alpha to say where the wash actually is. `{ alpha: false }` here flattened the wash onto
+    // an opaque paper sheet, so one stroke repainted the whole page in the exported PNG.
+    const outputContext = output.getContext("2d", { alpha: true });
     if (!outputContext) {
       frame.image.close();
       throw new Error("Living Ink canonical 표면을 만들 수 없습니다.");
     }
     outputContext.drawImage(frame.image, 0, 0);
+    const alphaCoverage = measureStudioLivingInkAlphaCoverage(
+      outputContext.getImageData(0, 0, output.width, output.height).data,
+      output.width,
+      output.height,
+    );
     const presentation = this.#draw({ frame, routeKey, projection, onPresented });
     if (!presentation) throw new Error("Living Ink 최종 프레임을 표시하지 못했습니다.");
 
@@ -196,6 +313,7 @@ export class StudioLivingInkOverlayRenderer {
       pngSha256,
       width: output.width,
       height: output.height,
+      alphaCoverage,
       presentation,
     });
   }

@@ -33,8 +33,8 @@ describe("studio edit menu catalog", () => {
       { id: "duplicate", label: "복제", shortcut: "⌘J" },
       { id: "bring-front", label: "레이어 · 맨 위로", shortcut: "⌘⇧]" },
       { id: "bring-forward", label: "레이어 · 위로", shortcut: "⌘]" },
-      { id: "send-back", label: "레이어 · 맨 뒤로", shortcut: "⌘[" },
-      { id: "send-backward", label: "레이어 · 뒤로", shortcut: "⌘⇧[" },
+      { id: "send-back", label: "레이어 · 맨 뒤로", shortcut: "⌘⇧[" },
+      { id: "send-backward", label: "레이어 · 뒤로", shortcut: "⌘[" },
       { id: "crop-layer", label: "레이어 자르기…" },
       { id: "history", label: "작업 내역" },
       { id: "pen-pressure", label: "펜 압력 설정…" },
@@ -213,10 +213,43 @@ describe("studio edit shortcuts", () => {
     [{ code: "KeyJ", metaKey: true }, "duplicate"],
     [{ code: "BracketRight", metaKey: true, shiftKey: true }, "bring-front"],
     [{ code: "BracketRight", metaKey: true }, "bring-forward"],
-    [{ code: "BracketLeft", metaKey: true }, "send-back"],
-    [{ code: "BracketLeft", metaKey: true, shiftKey: true }, "send-backward"],
+    [{ code: "BracketLeft", metaKey: true }, "send-backward"],
+    [{ code: "BracketLeft", metaKey: true, shiftKey: true }, "send-back"],
   ] as const)("maps %o to %s", (event, expected) => {
     expect(resolveStudioEditShortcut(event)).toBe(expected);
+  });
+
+  it("keeps the two bracket pairs symmetric — ⇧ always means 'all the way'", () => {
+    // 업계 표준(Photoshop·클립스튜디오·일러스트레이터)과 같은 배치. 한쪽 쌍만 뒤집히면
+    // 사용자는 ⌘[ 한 번에 레이어를 문서 맨 뒤로 날려버린다(측정된 D6 결함).
+    for (const modifier of [{ metaKey: true }, { ctrlKey: true }] as const) {
+      expect(resolveStudioEditShortcut({ code: "BracketRight", ...modifier })).toBe("bring-forward");
+      expect(resolveStudioEditShortcut({ code: "BracketLeft", ...modifier })).toBe("send-backward");
+      expect(resolveStudioEditShortcut({ code: "BracketRight", ...modifier, shiftKey: true })).toBe("bring-front");
+      expect(resolveStudioEditShortcut({ code: "BracketLeft", ...modifier, shiftKey: true })).toBe("send-back");
+    }
+  });
+
+  it("advertises the chord each bracket resolver actually returns", () => {
+    // 표기와 동작이 어긋나면 오작동보다 나쁘다 — 메뉴 라벨을 리졸버로 검증한다.
+    const chordOf = (id: "bring-front" | "bring-forward" | "send-back" | "send-backward") =>
+      STUDIO_EDIT_MENU_COMMANDS[id].shortcut;
+    const resolvedChordOf = (event: Parameters<typeof resolveStudioEditShortcut>[0]) => {
+      const id = resolveStudioEditShortcut(event);
+      if (
+        id !== "bring-front"
+        && id !== "bring-forward"
+        && id !== "send-back"
+        && id !== "send-backward"
+      ) {
+        throw new Error(`Expected a layer-order shortcut, received ${String(id)}`);
+      }
+      return chordOf(id);
+    };
+    expect(resolvedChordOf({ code: "BracketLeft", metaKey: true })).toBe("⌘[");
+    expect(resolvedChordOf({ code: "BracketLeft", metaKey: true, shiftKey: true })).toBe("⌘⇧[");
+    expect(resolvedChordOf({ code: "BracketRight", metaKey: true })).toBe("⌘]");
+    expect(resolvedChordOf({ code: "BracketRight", metaKey: true, shiftKey: true })).toBe("⌘⇧]");
   });
 
   it("does not steal plain paste, merged-copy, Alt, repeats, or IME input", () => {

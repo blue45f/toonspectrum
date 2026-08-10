@@ -31,6 +31,10 @@ import { isIdentityBlurFx, normalizeBlurFx } from "./studio-blur";
 import { isIdentityColorBalance, normalizeColorBalance } from "./studio-color-balance";
 import { isIdentityCurve, isIdentityCurveChannels, normalizeCurve } from "./studio-curves";
 import {
+  acquireStudioGpuDevice,
+  acquireStudioGpuFilterRuntimeOnFabric,
+} from "./studio-gpu-fabric";
+import {
   STUDIO_GPU_FILTER_BINDINGS,
   STUDIO_GPU_FILTER_DISPATCH_ROW_THREADS,
   STUDIO_GPU_FILTER_KERNELS,
@@ -44,6 +48,7 @@ import {
   packStudioGpuLut3Uniform,
   patchStudioGpuFilterPixelCount,
 } from "./studio-gpu-filter-kernels";
+import { createStudioGpuFilterPresentationSurface } from "./studio-gpu-filter-presentation";
 import { acquireStudioGpuFilterRuntime } from "./studio-gpu-filter-runtime";
 import {
   STUDIO_GPU_GAUSSIAN_FLOAT_BYTES_PER_PIXEL,
@@ -59,12 +64,18 @@ import { isIdentityLevels, isIdentityLevelsChannels, normalizeLevels } from "./s
 
 import type { StudioImageDataLike } from "./studio-filters";
 import type { StudioGpuFilterKernelId } from "./studio-gpu-filter-kernels";
+import type {
+  StudioGpuFilterPresentationCanvas,
+  StudioGpuFilterPresentationSurface,
+} from "./studio-gpu-filter-presentation";
 import type { StudioGpuFilterRuntimeOptions } from "./studio-gpu-filter-runtime";
 import type {
   StudioGpuSpatialFilterKernelId,
   StudioGpuSpatialFilterKernelSpec,
 } from "./studio-gpu-filter-spatial-kernels";
 import type { ImageFilterFields } from "./studio-konva-filter-fields";
+
+export { createStudioGpuFilterPresentationSurface };
 
 /** GPU 경로가 담당하는 보정 필드(이 외의 활성 필드가 있으면 전체 CPU 폴백). */
 export const STUDIO_GPU_FILTER_SUPPORTED_FIELDS = [
@@ -111,6 +122,30 @@ export interface StudioGpuFilterApplyOptions extends StudioGpuFilterRuntimeOptio
   readonly sourceRevision?: string | number;
   /** False means a newer edit superseded this request; stale pixels are never published. */
   readonly isSourceRevisionCurrent?: (revision: string | number) => boolean;
+}
+
+export interface StudioGpuFilterPreviewFailure {
+  readonly phase: "compute" | "presentation" | "final-readback";
+  readonly message: string;
+}
+
+export interface StudioGpuFilterPreviewOptions extends StudioGpuFilterApplyOptions {
+  /** Reused by the image node so slider ticks retain one browser-owned GPU canvas. */
+  readonly surface?: StudioGpuFilterPresentationSurface;
+  /** Presentation failure is observable before the caller enters its Worker/Konva fallback. */
+  readonly onFailure?: (failure: StudioGpuFilterPreviewFailure) => void;
+}
+
+export interface StudioGpuFilterPreviewFrame {
+  readonly canvas: StudioGpuFilterPresentationCanvas;
+  readonly width: number;
+  readonly height: number;
+  readonly revision: number;
+  readonly sourceRevision?: string | number;
+  /** The only GPU→CPU transition. Call after interaction settles or for canonical export. */
+  readbackFinal(): Promise<StudioImageDataLike | null>;
+  /** Releases the retained GPU buffer without reading it back. Idempotent. */
+  dispose(): void;
 }
 
 // buildImageFilters 의 isActiveNumber 복제(비공개 함수).
@@ -397,26 +432,45 @@ function requestSuperseded(options?: StudioGpuFilterApplyOptions): boolean {
   return false;
 }
 
+interface StudioGpuFilterExecutionLease {
+  readonly buffer: GPUBuffer;
+  readonly byteLength: number;
+  readonly height: number;
+  readonly runtime: Awaited<ReturnType<typeof acquireStudioGpuFilterRuntime>> & object;
+  readonly width: number;
+  readback(): Promise<Uint8ClampedArray | null>;
+  release(): void;
+}
+
+function safeDestroyGpuBuffer(buffer: GPUBuffer): void {
+  try {
+    buffer.destroy();
+  } catch {
+    // A lost device may already have destroyed every lease.
+  }
+}
+
 /**
- * 보정 체인을 WebGPU 컴퓨트로 실행한다. 커널들은 하나의 커맨드 인코더 안에서 픽셀 버퍼
- * ping-pong 으로 이어지며(중간 readback 없음) 마지막 버퍼만 한 번 read back 한다.
- * 입력 imageData 는 변형하지 않고 새 버퍼를 돌려준다.
- *
- * null 반환 = GPU 미처리(미지원/부적격/실패) — 호출부는 CPU 경로로 폴백한다.
+ * Executes the compute chain and retains its final packed buffer. This function never maps a
+ * staging buffer. The caller must choose either direct GPU presentation or an explicit final
+ * readback, then release the lease.
  */
-export async function applyGpuFilterChain(
+async function executeGpuFilterChain(
   imageData: StudioImageDataLike,
   el: ImageFilterFields,
   options?: StudioGpuFilterApplyOptions,
-): Promise<StudioImageDataLike | null> {
+): Promise<StudioGpuFilterExecutionLease | null> {
   if (!isValidImageData(imageData) || requestSuperseded(options)) return null;
   const plan = planStudioGpuFilterChain(el);
   if (!plan) return null;
 
-  // acquireStudioGpuFilterRuntime({ gpu }) creates an isolated runtime for a harness/embedding
-  // override. apply owns that runtime because it is not exposed to the caller.
+  // Explicit gpu overrides remain isolated harness/embed runtimes owned by this apply call.
+  // Production calls share the StudioGpuFabric device/runtime so per-apply cleanup cannot destroy
+  // the shared device and repeated previews reuse adapter, pipeline, and buffer-pool state.
   const ownsRuntime = options !== undefined && "gpu" in options;
-  const runtime = await acquireStudioGpuFilterRuntime(options);
+  const runtime = ownsRuntime
+    ? await acquireStudioGpuFilterRuntime(options)
+    : await acquireStudioGpuFilterRuntimeOnFabric();
   if (!runtime) return null;
   if (runtime.lost || requestSuperseded(options)) {
     if (ownsRuntime) runtime.dispose();
@@ -457,6 +511,7 @@ export async function applyGpuFilterChain(
   const transientBuffers: GPUBuffer[] = [];
   const leasedBuffers: { buffer: GPUBuffer; byteLength: number }[] = [];
   let recycleLeasedBuffers = false;
+  let retainedBuffer: GPUBuffer | null = null;
   let pushedErrorScopes = 0;
   try {
     // 검증/OOM 오류는 예외를 던지지 않는다 — error scope 로 잡아 fail-closed(null) 한다.
@@ -567,10 +622,46 @@ export async function applyGpuFilterChain(
     pushedErrorScopes -= 1;
     if (validationError || oomError || runtime.lost || requestSuperseded(options)) return null;
 
-    const bytes = await runtime.readbackPixels(current, byteLength);
-    if (bytes.length !== byteLength || runtime.lost || requestSuperseded(options)) return null;
+    retainedBuffer = current;
     recycleLeasedBuffers = true;
-    return { data: bytes, width: imageData.width, height: imageData.height };
+    let released = false;
+    let readbackPromise: Promise<Uint8ClampedArray | null> | null = null;
+    const release = (): void => {
+      if (released) return;
+      released = true;
+      if (!runtime.lost) runtime.releasePixelBuffer(current, byteLength);
+      else safeDestroyGpuBuffer(current);
+      if (ownsRuntime) runtime.dispose();
+    };
+    return {
+      buffer: current,
+      byteLength,
+      height: imageData.height,
+      runtime,
+      width: imageData.width,
+      readback: () => {
+        if (released) return Promise.resolve(null);
+        if (readbackPromise) return readbackPromise;
+        readbackPromise = (async () => {
+          try {
+            if (runtime.lost || requestSuperseded(options)) return null;
+            const bytes = await runtime.readbackPixels(current, byteLength);
+            if (
+              bytes.length !== byteLength
+              || runtime.lost
+              || requestSuperseded(options)
+            ) return null;
+            return bytes;
+          } catch {
+            return null;
+          } finally {
+            release();
+          }
+        })();
+        return readbackPromise;
+      },
+      release,
+    };
   } catch {
     return null;
   } finally {
@@ -591,15 +682,114 @@ export async function applyGpuFilterChain(
       }
     }
     for (const lease of leasedBuffers) {
+      if (lease.buffer === retainedBuffer) continue;
       if (recycleLeasedBuffers) runtime.releasePixelBuffer(lease.buffer, lease.byteLength);
       else {
-        try {
-          lease.buffer.destroy();
-        } catch {
-          // 검증/OOM/lost 경로에서는 오염 가능성이 있는 lease를 절대 풀에 되돌리지 않는다.
-        }
+        // 검증/OOM/lost 경로에서는 오염 가능성이 있는 lease를 절대 풀에 되돌리지 않는다.
+        safeDestroyGpuBuffer(lease.buffer);
       }
     }
-    if (ownsRuntime) runtime.dispose();
+    if (ownsRuntime && !retainedBuffer) runtime.dispose();
   }
+}
+
+/**
+ * Canonical/final WebGPU filter execution. This API intentionally performs one explicit readback;
+ * interactive callers must use presentGpuFilterChain and defer readbackFinal until settle/export.
+ */
+export async function applyGpuFilterChain(
+  imageData: StudioImageDataLike,
+  el: ImageFilterFields,
+  options?: StudioGpuFilterApplyOptions,
+): Promise<StudioImageDataLike | null> {
+  const execution = await executeGpuFilterChain(imageData, el, options);
+  if (!execution) return null;
+  const bytes = await execution.readback();
+  if (!bytes) return null;
+  return { data: bytes, width: execution.width, height: execution.height };
+}
+
+/**
+ * Interactive WebGPU filter execution. The returned canvas is updated directly from the final GPU
+ * storage buffer. No GPU→CPU readback occurs until the caller invokes readbackFinal().
+ */
+export async function presentGpuFilterChain(
+  imageData: StudioImageDataLike,
+  el: ImageFilterFields,
+  options?: StudioGpuFilterPreviewOptions,
+): Promise<StudioGpuFilterPreviewFrame | null> {
+  const execution = await executeGpuFilterChain(imageData, el, options);
+  if (!execution) {
+    options?.onFailure?.({
+      phase: "compute",
+      message: "The WebGPU filter compute chain was unavailable.",
+    });
+    return null;
+  }
+
+  const ownsSurface = !options?.surface;
+  const surface = options?.surface ?? createStudioGpuFilterPresentationSurface();
+  // The shared filter runtime intentionally exposes a Proxy device whose destroy() releases its
+  // fabric lease. WebGPU methods bind correctly through that facade, but WebIDL dictionary brand
+  // checks (GPUCanvasContext.configure({ device })) require the native GPUDevice object itself.
+  // Acquire a short-lived lease from the same fabric epoch solely for presentation. The compute
+  // buffer and canvas pipeline therefore stay on one physical device with no copy/readback.
+  const isolatedRuntime = options !== undefined && "gpu" in options;
+  const presentationLease = isolatedRuntime ? null : await acquireStudioGpuDevice();
+  if (!isolatedRuntime && !presentationLease) {
+    execution.release();
+    if (ownsSurface) surface.dispose();
+    options?.onFailure?.({
+      phase: "presentation",
+      message: "The native Studio GPU presentation device was unavailable.",
+    });
+    return null;
+  }
+  const presented = await surface.present({
+    device: presentationLease?.device ?? execution.runtime.device,
+    pixels: execution.buffer,
+    width: execution.width,
+    height: execution.height,
+  }).finally(() => presentationLease?.release());
+  if (presented.status !== "presented") {
+    execution.release();
+    if (ownsSurface) surface.dispose();
+    options?.onFailure?.({ phase: "presentation", message: presented.reason });
+    return null;
+  }
+
+  let disposed = false;
+  let finalPromise: Promise<StudioImageDataLike | null> | null = null;
+  const dispose = (): void => {
+    if (disposed) return;
+    disposed = true;
+    if (!finalPromise) execution.release();
+    if (ownsSurface) surface.dispose();
+  };
+  return {
+    canvas: surface.canvas,
+    height: execution.height,
+    revision: presented.revision,
+    sourceRevision: options?.sourceRevision,
+    width: execution.width,
+    readbackFinal: () => {
+      if (finalPromise) return finalPromise;
+      if (disposed) return Promise.resolve(null);
+      finalPromise = (async () => {
+        const bytes = await execution.readback();
+        disposed = true;
+        if (ownsSurface) surface.dispose();
+        if (!bytes) {
+          options?.onFailure?.({
+            phase: "final-readback",
+            message: "The settled WebGPU filter frame could not be read back.",
+          });
+          return null;
+        }
+        return { data: bytes, width: execution.width, height: execution.height };
+      })();
+      return finalPromise;
+    },
+    dispose,
+  };
 }

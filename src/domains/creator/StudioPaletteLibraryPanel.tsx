@@ -1,18 +1,21 @@
 // Palette library manager. The compact panel is mounted inside Studio's lazy style popover;
 // binary/text interchange codecs remain in a second intent-loaded chunk.
 import { AlertTriangle, CheckCircle2, Download, Pencil, Plus, Upload, X } from "lucide-react";
-import { useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
 
 import { downloadBlob } from "./studio-export";
 import {
   createPalette,
-  deletePalette,
-  listPalettes,
+  deletePaletteInMemory,
   paletteFileName,
-  renamePalette,
-  savePalette,
+  renamePaletteInMemory,
+  upsertPaletteInMemory,
   type StudioNamedPalette,
 } from "./studio-palette-library";
+import {
+  getProductStudioPaletteSqliteRepository,
+  StudioPaletteSqliteRepositoryError,
+} from "./studio-palette-sqlite-repository";
 
 import { cx } from "@/lib/cx";
 
@@ -135,7 +138,21 @@ export interface StudioPaletteLibraryPanelProps {
   onPickColor: (hex: string) => void;
   /** Candidate colors used by “최근 색으로 만들기”. */
   seedColors?: string[];
+  /** Test/embed seam. Product code leaves this undefined and uses shared V12 SQLite/OPFS. */
+  repository?: StudioPaletteLibraryRepository;
 }
+
+export interface StudioPaletteLibraryRepository {
+  readonly authority?: "sqlite" | "injected";
+  list(): Promise<StudioNamedPalette[]>;
+  save(palette: StudioNamedPalette): Promise<StudioNamedPalette[]>;
+  rename(id: string, name: string): Promise<StudioNamedPalette[]>;
+  delete(id: string): Promise<StudioNamedPalette[]>;
+  subscribe?(listener: () => void): () => void;
+}
+
+const PRODUCT_REPOSITORY: StudioPaletteLibraryRepository =
+  getProductStudioPaletteSqliteRepository();
 
 function formatOption(format: StudioPaletteInterchangeFormat) {
   return FORMAT_OPTIONS.find((option) => option.id === format) ?? FORMAT_OPTIONS[0];
@@ -227,11 +244,25 @@ function uniqueDetails(details: readonly string[]): string[] {
   return [...new Set(details.map((detail) => detail.trim()).filter(Boolean))];
 }
 
-export function StudioPaletteLibraryPanel({ onPickColor, seedColors }: StudioPaletteLibraryPanelProps) {
-  const [palettes, setPalettes] = useState<StudioNamedPalette[]>(() => listPalettes(globalThis.localStorage));
+export function StudioPaletteLibraryPanel({
+  onPickColor,
+  seedColors,
+  repository = PRODUCT_REPOSITORY,
+}: StudioPaletteLibraryPanelProps) {
+  const [palettes, setPalettes] = useState<StudioNamedPalette[]>([]);
   const [message, setMessage] = useState<OperationMessage | null>(null);
   const [busyOperation, setBusyOperation] = useState<BusyOperation | null>(null);
+  const [mutationBusy, setMutationBusy] = useState(false);
+  const [storageState, setStorageState] = useState<
+    "loading" | "sqlite" | "injected" | "memory" | "unavailable"
+  >("loading");
   const busyRef = useRef(false);
+  const mutationBusyRef = useRef(false);
+  const mountedRef = useRef(true);
+  const memoryModeRef = useRef(false);
+  const loadGenerationRef = useRef(0);
+  const mutationGenerationRef = useRef(0);
+  const palettesRef = useRef<StudioNamedPalette[]>([]);
   const [exportFormat, setExportFormat] = useState<StudioPaletteInterchangeFormat>("gpl");
   const [creatorOpen, setCreatorOpen] = useState(false);
   const [newName, setNewName] = useState("");
@@ -239,24 +270,158 @@ export function StudioPaletteLibraryPanel({ onPickColor, seedColors }: StudioPal
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renamingName, setRenamingName] = useState("");
   const selectedFormat = formatOption(exportFormat);
-  const busy = busyOperation !== null;
+  const busy = busyOperation !== null || mutationBusy;
 
-  function handleDelete(id: string) {
-    if (busyRef.current) return;
-    setPalettes(deletePalette(globalThis.localStorage, id));
-    setMessage(null);
+  function replacePalettes(next: StudioNamedPalette[]): void {
+    palettesRef.current = next;
+    setPalettes(next);
+  }
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    memoryModeRef.current = false;
+
+    const hydrate = async () => {
+      const generation = ++loadGenerationRef.current;
+      setStorageState("loading");
+      try {
+        const loaded = await repository.list();
+        if (
+          !active
+          || !mountedRef.current
+          || generation !== loadGenerationRef.current
+          || memoryModeRef.current
+        ) {
+          return;
+        }
+        replacePalettes(loaded);
+        setMessage(null);
+        setStorageState(repository.authority === "sqlite" ? "sqlite" : "injected");
+      } catch (cause) {
+        if (!active || !mountedRef.current || generation !== loadGenerationRef.current) return;
+        setStorageState("unavailable");
+        setMessage({
+          tone: "error",
+          title: `SQLite/OPFS 팔레트 라이브러리를 열지 못했습니다: ${
+            cause instanceof Error ? cause.message : String(cause)
+          }`,
+          details: ["기존 localStorage 팔레트는 자동으로 읽지 않습니다."],
+        });
+      }
+    };
+
+    void hydrate();
+    const unsubscribe = repository.subscribe?.(() => void hydrate());
+    return () => {
+      active = false;
+      loadGenerationRef.current += 1;
+      unsubscribe?.();
+    };
+  }, [repository]);
+
+  async function commitMutation(
+    persisted: () => Promise<StudioNamedPalette[]>,
+    memoryUpdate: (current: readonly StudioNamedPalette[]) => StudioNamedPalette[],
+  ): Promise<"durable" | "memory" | "rejected"> {
+    if (mutationBusyRef.current) return "rejected";
+    mutationBusyRef.current = true;
+    const generation = ++mutationGenerationRef.current;
+    setMutationBusy(true);
+    loadGenerationRef.current += 1;
+
+    if (storageState === "memory") {
+      try {
+        replacePalettes(memoryUpdate(palettesRef.current));
+        return "memory";
+      } catch (cause) {
+        setMessage({
+          tone: "error",
+          title: cause instanceof Error ? cause.message : "팔레트 변경을 적용하지 못했습니다.",
+          details: [],
+        });
+        return "rejected";
+      } finally {
+        mutationBusyRef.current = false;
+        setMutationBusy(false);
+      }
+    }
+
+    try {
+      const next = await persisted();
+      if (!mountedRef.current || generation !== mutationGenerationRef.current) return "rejected";
+      // A repository subscription can start list() while the write is still in flight. Invalidate
+      // that read before publishing the mutation result so a late snapshot cannot roll the UI back.
+      loadGenerationRef.current += 1;
+      replacePalettes(next);
+      setStorageState(repository.authority === "sqlite" ? "sqlite" : "injected");
+      return "durable";
+    } catch (cause) {
+      if (!mountedRef.current || generation !== mutationGenerationRef.current) return "rejected";
+      if (cause instanceof StudioPaletteSqliteRepositoryError && cause.code !== "unavailable") {
+        setMessage({ tone: "error", title: cause.message, details: ["항목을 줄이거나 데이터를 고친 뒤 다시 시도해 주세요."] });
+        return "rejected";
+      }
+      try {
+        replacePalettes(memoryUpdate(palettesRef.current));
+      } catch (validationError) {
+        setMessage({
+          tone: "error",
+          title: validationError instanceof Error ? validationError.message : "팔레트 변경을 적용하지 못했습니다.",
+          details: [],
+        });
+        return "rejected";
+      }
+      memoryModeRef.current = true;
+      setStorageState("memory");
+      setMessage({
+        tone: "error",
+        title: "SQLite/OPFS 저장에 실패해 변경을 현재 탭 메모리에만 유지합니다.",
+        details: [
+          "새로고침하면 이 변경은 사라집니다.",
+          cause instanceof Error ? cause.message : String(cause),
+        ],
+      });
+      return "memory";
+    } finally {
+      if (mountedRef.current && generation === mutationGenerationRef.current) {
+        mutationBusyRef.current = false;
+        setMutationBusy(false);
+      }
+    }
+  }
+
+  function handleDelete(id: string): void {
+    if (busyRef.current || mutationBusyRef.current) return;
+    void commitMutation(
+      () => repository.delete(id),
+      (current) => deletePaletteInMemory(current, id),
+    ).then((outcome) => {
+      if (outcome === "durable" && mountedRef.current) setMessage(null);
+    });
   }
 
   function startRename(palette: StudioNamedPalette) {
-    if (busyRef.current) return;
+    if (busyRef.current || mutationBusyRef.current) return;
     setRenamingId(palette.id);
     setRenamingName(palette.name);
   }
 
-  function commitRename() {
-    if (!renamingId || busyRef.current) return;
-    setPalettes(renamePalette(globalThis.localStorage, renamingId, renamingName));
+  function commitRename(): void {
+    if (!renamingId || busyRef.current || mutationBusyRef.current) return;
+    const id = renamingId;
+    const name = renamingName;
     setRenamingId(null);
+    void commitMutation(
+      () => repository.rename(id, name),
+      (current) => renamePaletteInMemory(current, id, name),
+    );
   }
 
   function handleRenameKeyDown(event: KeyboardEvent<HTMLInputElement>) {
@@ -264,12 +429,19 @@ export function StudioPaletteLibraryPanel({ onPickColor, seedColors }: StudioPal
     else if (event.key === "Escape") setRenamingId(null);
   }
 
-  function handleCreateFromRecent() {
-    if (busyRef.current || !seedColors || seedColors.length === 0) return;
+  function handleCreateFromRecent(): void {
+    if (busyRef.current || mutationBusyRef.current || !seedColors || seedColors.length === 0) return;
     try {
       const palette = createPalette("최근 사용 색", seedColors);
-      setPalettes(savePalette(globalThis.localStorage, palette));
-      setMessage({ tone: "success", title: `“${palette.name}” 팔레트를 만들었어요.`, details: [`${palette.colors.length}색`] });
+      void commitMutation(
+        () => repository.save(palette),
+        (current) => upsertPaletteInMemory(current, palette),
+      ).then((outcome) => {
+        if (!mountedRef.current || outcome === "rejected") return;
+        setMessage(outcome === "durable"
+          ? { tone: "success", title: `“${palette.name}” 팔레트를 만들었어요.`, details: [`${palette.colors.length}색`] }
+          : { tone: "warning", title: `“${palette.name}” 팔레트는 현재 탭 메모리에만 있습니다.`, details: ["새로고침하면 사라집니다."] });
+      });
     } catch (error) {
       setMessage({
         tone: "error",
@@ -279,16 +451,23 @@ export function StudioPaletteLibraryPanel({ onPickColor, seedColors }: StudioPal
     }
   }
 
-  function handleCreateFromPaste() {
-    if (busyRef.current) return;
+  function handleCreateFromPaste(): void {
+    if (busyRef.current || mutationBusyRef.current) return;
     const colors = newColorsText.split(/[\s,]+/u).map((value) => value.trim()).filter(Boolean);
     try {
       const palette = createPalette(newName, colors);
-      setPalettes(savePalette(globalThis.localStorage, palette));
-      setMessage({ tone: "success", title: `“${palette.name}” 팔레트를 만들었어요.`, details: [`${palette.colors.length}색`] });
-      setNewName("");
-      setNewColorsText("");
-      setCreatorOpen(false);
+      void commitMutation(
+        () => repository.save(palette),
+        (current) => upsertPaletteInMemory(current, palette),
+      ).then((outcome) => {
+        if (!mountedRef.current || outcome === "rejected") return;
+        setMessage(outcome === "durable"
+          ? { tone: "success", title: `“${palette.name}” 팔레트를 만들었어요.`, details: [`${palette.colors.length}색`] }
+          : { tone: "warning", title: `“${palette.name}” 팔레트는 현재 탭 메모리에만 있습니다.`, details: ["새로고침하면 사라집니다."] });
+        setNewName("");
+        setNewColorsText("");
+        setCreatorOpen(false);
+      });
     } catch (error) {
       setMessage({
         tone: "error",
@@ -321,7 +500,11 @@ export function StudioPaletteLibraryPanel({ onPickColor, seedColors }: StudioPal
         updatedAt: now,
         colors: imported.palette.colors.map((color) => color.hex),
       };
-      setPalettes(savePalette(globalThis.localStorage, palette));
+      const outcome = await commitMutation(
+        () => repository.save(palette),
+        (current) => upsertPaletteInMemory(current, palette),
+      );
+      if (!mountedRef.current || outcome === "rejected") return;
       const namedColorCount = imported.palette.colors.filter((color) => Boolean(color.name)).length;
       const details = uniqueDetails([
         ...imported.warnings.map((item) => item.message),
@@ -329,10 +512,14 @@ export function StudioPaletteLibraryPanel({ onPickColor, seedColors }: StudioPal
         ...(imported.truncated ? [`앞쪽 ${interchange.STUDIO_PALETTE_INTERCHANGE_LIMITS.maxColors}색만 저장했습니다.`] : []),
         ...(namedColorCount > 0 ? [`색 이름 ${namedColorCount}개는 현재 라이브러리에서 색값만 저장됩니다.`] : []),
       ]);
-      setMessage({
+      setMessage(outcome === "durable" ? {
         tone: details.length > 0 ? "warning" : "success",
         title: `${formatOption(format).shortLabel}에서 “${palette.name}” ${palette.colors.length}색을 가져왔어요.`,
         details,
+      } : {
+        tone: "warning",
+        title: `“${palette.name}” 팔레트는 현재 탭 메모리에만 있습니다.`,
+        details: ["SQLite/OPFS 저장에 실패했습니다. 새로고침하면 사라집니다.", ...details],
       });
     } catch (error) {
       setMessage({
@@ -342,7 +529,7 @@ export function StudioPaletteLibraryPanel({ onPickColor, seedColors }: StudioPal
       });
     } finally {
       busyRef.current = false;
-      setBusyOperation(null);
+      if (mountedRef.current) setBusyOperation(null);
     }
   }
 
@@ -383,16 +570,32 @@ export function StudioPaletteLibraryPanel({ onPickColor, seedColors }: StudioPal
       });
     } finally {
       busyRef.current = false;
-      setBusyOperation(null);
+      if (mountedRef.current) setBusyOperation(null);
     }
   }
 
   return (
-    <section aria-label="내 팔레트 라이브러리" aria-busy={busy}>
+    <section
+      aria-label="내 팔레트 라이브러리"
+      aria-busy={busy}
+      data-studio-palette-authority={storageState}
+    >
       <div className="mb-2">
         <p className="text-xs font-semibold text-fg">내 팔레트</p>
         <p className="mt-0.5 text-[0.66rem] leading-relaxed text-fg-3">GPL·Adobe·JASC·CSS·JSON을 한 곳에서 교환합니다.</p>
       </div>
+
+      <p className="mb-2 text-[0.6rem] font-semibold text-fg-3" aria-live="polite">
+        {storageState === "loading"
+          ? "SQLite/OPFS 팔레트 확인 중"
+          : storageState === "sqlite"
+            ? "이 기기 SQLite/OPFS 저장"
+            : storageState === "memory"
+              ? "현재 탭 메모리 임시 · 새로고침 시 사라짐"
+              : storageState === "unavailable"
+                ? "SQLite/OPFS 사용 불가 · 저장되지 않음"
+                : "주입 저장소"}
+      </p>
 
       {message && (
         <div
@@ -421,7 +624,7 @@ export function StudioPaletteLibraryPanel({ onPickColor, seedColors }: StudioPal
         </div>
       )}
 
-      {busy && (
+      {busyOperation && (
         <p className="sr-only" role="status" aria-live="polite">
           {busyOperation.kind === "import" ? "팔레트 파일을 확인하고 있어요." : "팔레트 파일을 만들고 있어요."}
         </p>

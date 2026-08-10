@@ -69,6 +69,27 @@ export interface BrandKitStorage {
 export const BRAND_KIT_KEY = "toonspectrum-studio-brand-kits";
 export const MAX_BRAND_KITS = 40; // studio-clips.ts MAX_CLIPS / studio-palette-library.ts MAX_PALETTES 와 동일 상한 정책.
 export const DEFAULT_BRAND_KIT_NAME = "이름 없는 브랜드 킷";
+export const MAX_BRAND_KIT_NAME_LENGTH = 160;
+export const MAX_BRAND_KIT_ID_LENGTH = 160;
+export const MAX_BRAND_KIT_FONT_LENGTH = 512;
+export const MAX_BRAND_KIT_LOGO_DATA_URL_BYTES = 4 * 1024 * 1024;
+export const MAX_BRAND_KIT_LIBRARY_SERIALIZED_BYTES = 64 * 1024 * 1024;
+export const STUDIO_BRAND_KIT_LIBRARY_SCHEMA = "toonspectrum.studio.brand-kits";
+
+export type StudioBrandKitLibraryErrorCode =
+  | "corrupt-data"
+  | "invalid-kit"
+  | "library-too-large";
+
+export class StudioBrandKitLibraryError extends Error {
+  readonly code: StudioBrandKitLibraryErrorCode;
+
+  constructor(code: StudioBrandKitLibraryErrorCode, message: string) {
+    super(message);
+    this.name = "StudioBrandKitLibraryError";
+    this.code = code;
+  }
+}
 
 /** 문서 마스터에서 "브랜드 킷 로고"를 식별하는 고정 id — 일반 요소는 uid()(crypto.randomUUID())를
  *  쓰지만, 이 값은 재적용 시 새 요소를 쌓지 않고 같은 자리(위치·크기)에 교체하기 위해
@@ -96,7 +117,208 @@ function isBrandKit(v: unknown): v is BrandKit {
   );
 }
 
-/** 저장된 킷 목록(최근 저장 순). 저장소 부재·파싱 실패·형식 불일치 항목은 안전하게 걸러진다. */
+const BRAND_LOGO_DATA_URL_RE = /^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/u;
+
+function exactRecord(
+  value: unknown,
+  keys: readonly string[],
+): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  const allowed = new Set(keys);
+  return Object.keys(record).length === allowed.size
+    && Object.keys(record).every((key) => allowed.has(key))
+    ? record
+    : null;
+}
+
+function canonicalLogo(value: unknown): BrandKitLogo | null {
+  if (value === null) return null;
+  const record = exactRecord(value, ["dataUrl", "width", "height"]);
+  if (
+    !record
+    || !isBrandKitLogo(record)
+    || !BRAND_LOGO_DATA_URL_RE.test(record.dataUrl)
+    || new TextEncoder().encode(record.dataUrl).byteLength > MAX_BRAND_KIT_LOGO_DATA_URL_BYTES
+    || !Number.isSafeInteger(record.width)
+    || !Number.isSafeInteger(record.height)
+    || record.width <= 0
+    || record.height <= 0
+    || record.width > 8_192
+    || record.height > 8_192
+  ) {
+    return null;
+  }
+  return { dataUrl: record.dataUrl, width: record.width, height: record.height };
+}
+
+function canonicalBrandKit(value: unknown): BrandKit | null {
+  const record = exactRecord(value, [
+    "id",
+    "name",
+    "createdAt",
+    "updatedAt",
+    "paletteId",
+    "headingFont",
+    "bodyFont",
+    "logo",
+  ]);
+  if (!record || !isBrandKit(record)) return null;
+  const logo = canonicalLogo(record.logo);
+  if (
+    (record.logo !== null && logo === null)
+    || record.id.trim() !== record.id
+    || record.id.length === 0
+    || record.id.length > MAX_BRAND_KIT_ID_LENGTH
+    || record.name.trim() !== record.name
+    || record.name.length === 0
+    || record.name.length > MAX_BRAND_KIT_NAME_LENGTH
+    || !Number.isSafeInteger(record.createdAt)
+    || record.createdAt < 0
+    || !Number.isSafeInteger(record.updatedAt)
+    || record.updatedAt < record.createdAt
+    || (typeof record.paletteId === "string" && (
+      record.paletteId.trim() !== record.paletteId
+      || record.paletteId.length === 0
+      || record.paletteId.length > MAX_BRAND_KIT_ID_LENGTH
+    ))
+    || record.headingFont.trim() !== record.headingFont
+    || record.headingFont.length === 0
+    || record.headingFont.length > MAX_BRAND_KIT_FONT_LENGTH
+    || record.bodyFont.trim() !== record.bodyFont
+    || record.bodyFont.length === 0
+    || record.bodyFont.length > MAX_BRAND_KIT_FONT_LENGTH
+  ) {
+    return null;
+  }
+  return {
+    id: record.id,
+    name: record.name,
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+    paletteId: record.paletteId,
+    headingFont: record.headingFont,
+    bodyFont: record.bodyFont,
+    logo,
+  };
+}
+
+function canonicalBrandKitLibrary(values: readonly unknown[]): BrandKit[] {
+  if (values.length > MAX_BRAND_KITS) {
+    throw new StudioBrandKitLibraryError(
+      "library-too-large",
+      `브랜드 킷은 ${MAX_BRAND_KITS}개를 넘을 수 없습니다.`,
+    );
+  }
+  const ids = new Set<string>();
+  return values.map((value) => {
+    const kit = canonicalBrandKit(value);
+    if (!kit || ids.has(kit.id)) {
+      throw new StudioBrandKitLibraryError(
+        "invalid-kit",
+        "브랜드 킷 라이브러리에 손상되거나 중복된 항목이 있습니다.",
+      );
+    }
+    ids.add(kit.id);
+    return kit;
+  });
+}
+
+function brandKitEnvelope(items: readonly BrandKit[]) {
+  return {
+    schema: STUDIO_BRAND_KIT_LIBRARY_SCHEMA,
+    version: 1 as const,
+    items,
+  };
+}
+
+export function serializeStudioBrandKitLibrary(values: readonly BrandKit[]): string {
+  const serialized = JSON.stringify(brandKitEnvelope(canonicalBrandKitLibrary(values)));
+  if (new TextEncoder().encode(serialized).byteLength > MAX_BRAND_KIT_LIBRARY_SERIALIZED_BYTES) {
+    throw new StudioBrandKitLibraryError(
+      "library-too-large",
+      "브랜드 킷 라이브러리가 SQLite 저장 상한을 넘었습니다.",
+    );
+  }
+  return serialized;
+}
+
+export function parseCanonicalStudioBrandKitLibrary(raw: string): BrandKit[] {
+  if (
+    typeof raw !== "string"
+    || new TextEncoder().encode(raw).byteLength > MAX_BRAND_KIT_LIBRARY_SERIALIZED_BYTES
+  ) {
+    throw new StudioBrandKitLibraryError(
+      "library-too-large",
+      "브랜드 킷 저장값이 허용 크기를 넘었습니다.",
+    );
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new StudioBrandKitLibraryError("corrupt-data", "브랜드 킷 JSON이 손상되었습니다.");
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new StudioBrandKitLibraryError("corrupt-data", "브랜드 킷 envelope가 올바르지 않습니다.");
+  }
+  const envelope = parsed as Record<string, unknown>;
+  if (
+    Object.keys(envelope).sort().join(",") !== "items,schema,version"
+    || envelope.schema !== STUDIO_BRAND_KIT_LIBRARY_SCHEMA
+    || envelope.version !== 1
+    || !Array.isArray(envelope.items)
+  ) {
+    throw new StudioBrandKitLibraryError("corrupt-data", "브랜드 킷 저장 계약이 올바르지 않습니다.");
+  }
+  const items = canonicalBrandKitLibrary(envelope.items);
+  if (serializeStudioBrandKitLibrary(items) !== raw) {
+    throw new StudioBrandKitLibraryError("corrupt-data", "브랜드 킷 저장값이 canonical 형식이 아닙니다.");
+  }
+  return items;
+}
+
+export function upsertBrandKitInMemory(
+  values: readonly BrandKit[],
+  kit: BrandKit,
+): BrandKit[] {
+  const current = canonicalBrandKitLibrary(values);
+  const canonical = canonicalBrandKit(kit);
+  if (!canonical) {
+    throw new StudioBrandKitLibraryError("invalid-kit", "유효하지 않은 브랜드 킷입니다.");
+  }
+  const exists = current.some((item) => item.id === canonical.id);
+  if (!exists && current.length >= MAX_BRAND_KITS) {
+    throw new StudioBrandKitLibraryError(
+      "library-too-large",
+      `브랜드 킷은 ${MAX_BRAND_KITS}개를 넘을 수 없습니다. 기존 킷을 먼저 삭제해 주세요.`,
+    );
+  }
+  return [canonical, ...current.filter((item) => item.id !== canonical.id)];
+}
+
+export function renameBrandKitInMemory(
+  values: readonly BrandKit[],
+  id: string,
+  name: string,
+  now: number = Date.now(),
+): BrandKit[] {
+  const current = canonicalBrandKitLibrary(values);
+  const trimmed = name.trim();
+  if (!trimmed) return current;
+  if (trimmed.length > MAX_BRAND_KIT_NAME_LENGTH || !Number.isSafeInteger(now) || now < 0) {
+    throw new StudioBrandKitLibraryError("invalid-kit", "브랜드 킷 이름 또는 수정 시각이 올바르지 않습니다.");
+  }
+  return current.map((kit) => kit.id === id
+    ? { ...kit, name: trimmed, updatedAt: Math.max(kit.createdAt, now) }
+    : kit);
+}
+
+export function deleteBrandKitInMemory(values: readonly BrandKit[], id: string): BrandKit[] {
+  return canonicalBrandKitLibrary(values).filter((kit) => kit.id !== id);
+}
+
+/** Legacy/test/import seam. V12 product boot never probes this key automatically. */
 export function listBrandKits(storage: BrandKitStorage | null | undefined): BrandKit[] {
   if (!storage) return [];
   try {
@@ -119,7 +341,7 @@ function persist(storage: BrandKitStorage | null | undefined, kits: BrandKit[]):
   }
 }
 
-/** 저장(같은 id면 교체하며 맨 앞으로, 새 항목도 맨 앞). MAX_BRAND_KITS로 자른다. */
+/** Legacy sync seam only. The V12 product uses the queued SQLite repository. */
 export function saveBrandKit(storage: BrandKitStorage | null | undefined, kit: BrandKit): BrandKit[] {
   const next = [kit, ...listBrandKits(storage).filter((k) => k.id !== kit.id)].slice(0, MAX_BRAND_KITS);
   persist(storage, next);

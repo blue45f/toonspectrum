@@ -32,8 +32,26 @@ describe("Studio lazy i18n assets", () => {
     for (const locale of STUDIO_I18N_ASSET_LOCALES) {
       const dictionary = parseStudioI18nDictionary(readAsset(locale));
       expect(dictionary).not.toBeNull();
-      expect(Object.keys(dictionary ?? {})).toHaveLength(1_243);
+      expect(Object.keys(dictionary ?? {})).toHaveLength(1_269);
     }
+    // The mobile dock used to hardcode Korean labels; every pack must now carry the keys that
+    // replaced them, so an `en` viewport cannot fall back to Korean chrome.
+    for (const key of [
+      "studio.mobileDock.label",
+      "studio.mobileDock.tool.pixel",
+      "studio.mobileDock.tool.shape",
+      "studio.mobileDock.tool.undo",
+      "studio.mobileDock.tool.redo",
+      "studio.mobileDock.brushSettings",
+      "studio.creativeModes.title",
+    ]) {
+      for (const locale of STUDIO_I18N_ASSET_LOCALES) {
+        expect(parseStudioI18nDictionary(readAsset(locale))?.[key]).toBeTruthy();
+      }
+      expect(resolveI18nValue("ko", key)).not.toBe(key);
+    }
+    expect(resolveI18nValue("en", "studio.mobileDock.tool.shape")).toBe("Shape");
+    expect(resolveI18nValue("ko", "studio.mobileDock.tool.shape")).toBe("도형");
     expect(resolveI18nValue("ko", "studio.canvas.wheelMode.zoom")).toBe(
       "휠: 캔버스 확대·축소",
     );

@@ -1,0 +1,1568 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-08T20:07:35.642Z",
+  "status": "pass",
+  "pass": true,
+  "benchmark": {
+    "status": "ok",
+    "pass": true,
+    "schemaVersion": 1,
+    "execution": "vite-production-build-chromium-dedicated-worker-opfs-sahpool",
+    "authority": {
+      "kind": "sqlite-opfs-sahpool",
+      "requestedVfs": "opfs",
+      "productOpenExpression": "openStudioLocalDatabase({ vfs: \"opfs\", loadSqlite })",
+      "productRepository": "createSqliteFilterLibraryRepository",
+      "sqlitePackage": "@sqlite.org/sqlite-wasm 3.53.0-build1",
+      "opfsDirectory": "toonspectrum-studio-sqlite",
+      "logicalDatabaseFilename": "studio-local-v12.db",
+      "expectedOpenFilename": "/studio-local-v12.db",
+      "openedOpfsDatabaseFilenames": [
+        "/studio-local-v12.db",
+        "/studio-local-v12.db"
+      ],
+      "installedOpfsDirectories": [
+        "toonspectrum-studio-sqlite",
+        "toonspectrum-studio-sqlite"
+      ],
+      "opfsDatabaseOpenCount": 2,
+      "nonV12DatabaseOpenCount": 0,
+      "memoryDatabaseOpenCount": 0,
+      "memoryDatabaseOpenFilenames": [],
+      "memoryVfsUsed": false,
+      "localStorageApiPresent": false,
+      "localStorageFallbackUsed": false,
+      "closeCompletedBeforeReopen": true
+    },
+    "policy": {
+      "noFilterCatalogCap": true,
+      "legacyDataMigration": false,
+      "discardExistingStudioData": true
+    },
+    "support": {
+      "wasm": true,
+      "opfs": true
+    },
+    "capabilities": {
+      "dedicatedWorker": true,
+      "secureContext": true,
+      "crossOriginIsolated": true,
+      "navigatorStorageGetDirectory": true,
+      "syncAccessHandle": true,
+      "cryptoSubtle": true,
+      "localStorageApiPresent": false
+    },
+    "browser": {
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.186 Safari/537.36",
+      "language": "en-US",
+      "hardwareConcurrency": 12,
+      "deviceMemoryGiB": 8
+    },
+    "config": {
+      "presetCount": 10000,
+      "insertBatchSize": 250,
+      "insertBatchCount": 40,
+      "pageSize": 257,
+      "lookupSampleCount": 200,
+      "querySampleCountPerCase": 60,
+      "sourcePayloadBytes": 3761900
+    },
+    "insertion": {
+      "initialCount": 0,
+      "insertedCount": 10000,
+      "totalMs": 2071.29,
+      "throughputPresetsPerSecond": 4827.91,
+      "batchSamples": [
+        {
+          "index": 0,
+          "count": 250,
+          "ms": 17.58
+        },
+        {
+          "index": 1,
+          "count": 250,
+          "ms": 20.56
+        },
+        {
+          "index": 2,
+          "count": 250,
+          "ms": 22.75
+        },
+        {
+          "index": 3,
+          "count": 250,
+          "ms": 26.605
+        },
+        {
+          "index": 4,
+          "count": 250,
+          "ms": 28.055
+        },
+        {
+          "index": 5,
+          "count": 250,
+          "ms": 30.035
+        },
+        {
+          "index": 6,
+          "count": 250,
+          "ms": 39.78
+        },
+        {
+          "index": 7,
+          "count": 250,
+          "ms": 32.84
+        },
+        {
+          "index": 8,
+          "count": 250,
+          "ms": 31.84
+        },
+        {
+          "index": 9,
+          "count": 250,
+          "ms": 39.225
+        },
+        {
+          "index": 10,
+          "count": 250,
+          "ms": 39.135
+        },
+        {
+          "index": 11,
+          "count": 250,
+          "ms": 39.665
+        },
+        {
+          "index": 12,
+          "count": 250,
+          "ms": 39.785
+        },
+        {
+          "index": 13,
+          "count": 250,
+          "ms": 42.76
+        },
+        {
+          "index": 14,
+          "count": 250,
+          "ms": 46.825
+        },
+        {
+          "index": 15,
+          "count": 250,
+          "ms": 42.97
+        },
+        {
+          "index": 16,
+          "count": 250,
+          "ms": 42.57
+        },
+        {
+          "index": 17,
+          "count": 250,
+          "ms": 49.245
+        },
+        {
+          "index": 18,
+          "count": 250,
+          "ms": 50.305
+        },
+        {
+          "index": 19,
+          "count": 250,
+          "ms": 51.59
+        },
+        {
+          "index": 20,
+          "count": 250,
+          "ms": 48.03
+        },
+        {
+          "index": 21,
+          "count": 250,
+          "ms": 55.035
+        },
+        {
+          "index": 22,
+          "count": 250,
+          "ms": 64.11
+        },
+        {
+          "index": 23,
+          "count": 250,
+          "ms": 60.595
+        },
+        {
+          "index": 24,
+          "count": 250,
+          "ms": 61.66
+        },
+        {
+          "index": 25,
+          "count": 250,
+          "ms": 58.85
+        },
+        {
+          "index": 26,
+          "count": 250,
+          "ms": 55.775
+        },
+        {
+          "index": 27,
+          "count": 250,
+          "ms": 59.92
+        },
+        {
+          "index": 28,
+          "count": 250,
+          "ms": 67.77
+        },
+        {
+          "index": 29,
+          "count": 250,
+          "ms": 90.215
+        },
+        {
+          "index": 30,
+          "count": 250,
+          "ms": 83.185
+        },
+        {
+          "index": 31,
+          "count": 250,
+          "ms": 70.99
+        },
+        {
+          "index": 32,
+          "count": 250,
+          "ms": 66.795
+        },
+        {
+          "index": 33,
+          "count": 250,
+          "ms": 71.87
+        },
+        {
+          "index": 34,
+          "count": 250,
+          "ms": 80.81
+        },
+        {
+          "index": 35,
+          "count": 250,
+          "ms": 67.665
+        },
+        {
+          "index": 36,
+          "count": 250,
+          "ms": 66
+        },
+        {
+          "index": 37,
+          "count": 250,
+          "ms": 72.21
+        },
+        {
+          "index": 38,
+          "count": 250,
+          "ms": 71.21
+        },
+        {
+          "index": 39,
+          "count": 250,
+          "ms": 64.165
+        }
+      ],
+      "distribution": {
+        "sampleCount": 40,
+        "percentileMethod": "nearest-rank-ceil",
+        "samplesMs": [
+          17.58,
+          20.56,
+          22.75,
+          26.605,
+          28.055,
+          30.035,
+          39.78,
+          32.84,
+          31.84,
+          39.225,
+          39.135,
+          39.665,
+          39.785,
+          42.76,
+          46.825,
+          42.97,
+          42.57,
+          49.245,
+          50.305,
+          51.59,
+          48.03,
+          55.035,
+          64.11,
+          60.595,
+          61.66,
+          58.85,
+          55.775,
+          59.92,
+          67.77,
+          90.215,
+          83.185,
+          70.99,
+          66.795,
+          71.87,
+          80.81,
+          67.665,
+          66,
+          72.21,
+          71.21,
+          64.165
+        ],
+        "minMs": 17.58,
+        "p50Ms": 50.305,
+        "p95Ms": 80.81,
+        "p99Ms": 90.215,
+        "maxMs": 90.215,
+        "meanMs": 51.7745
+      }
+    },
+    "durability": {
+      "closedOnce": true,
+      "reopenMs": 0.695,
+      "reopenProbeId": "opfs-filter-09999",
+      "reopenProbeName": "line OPFS 작가 필터 09999"
+    },
+    "keysetFullScan": {
+      "pageCount": 39,
+      "observedCount": 10000,
+      "uniqueCount": 10000,
+      "expectedTotalCount": 10000,
+      "firstPageTotalCount": 10000,
+      "duplicateCount": 0,
+      "missingCount": 0,
+      "unexpectedCount": 0,
+      "missingIds": [],
+      "unexpectedIds": [],
+      "orderMismatchCount": 0,
+      "expectedOrderDigestSha256": "3f57901a139ebf1826176bcb5cd591540092faf3f11d1cd3eef0add097ef7435",
+      "observedOrderDigestSha256": "3f57901a139ebf1826176bcb5cd591540092faf3f11d1cd3eef0add097ef7435",
+      "pageReceipts": [
+        {
+          "index": 0,
+          "itemCount": 257,
+          "firstId": "opfs-filter-00000",
+          "lastId": "opfs-filter-06331",
+          "nextCursorDigestSha256": "a3cba5ab49abf49bffee3fa3c885557be381318c3aedb4871b024a1d43fc624c",
+          "totalCount": 10000,
+          "ms": 30.69
+        },
+        {
+          "index": 1,
+          "itemCount": 257,
+          "firstId": "opfs-filter-07332",
+          "lastId": "opfs-filter-03666",
+          "nextCursorDigestSha256": "0b44df26e848a8d17eeb548007ccbb658832c094924a94c8921b06b1567c6e36",
+          "totalCount": 10000,
+          "ms": 26
+        },
+        {
+          "index": 2,
+          "itemCount": 257,
+          "firstId": "opfs-filter-04667",
+          "lastId": "opfs-filter-09000",
+          "nextCursorDigestSha256": "470efae4561677ab2341be71bbe58f51242b348f39f10228595b69182cd626f2",
+          "totalCount": 10000,
+          "ms": 25.37
+        },
+        {
+          "index": 3,
+          "itemCount": 257,
+          "firstId": "opfs-filter-08000",
+          "lastId": "opfs-filter-00027",
+          "nextCursorDigestSha256": "50df590aa9215972845e2600bb236433ccf42e859aba96ead8bcac68e7c08c59",
+          "totalCount": 10000,
+          "ms": 4.445
+        },
+        {
+          "index": 4,
+          "itemCount": 257,
+          "firstId": "opfs-filter-09028",
+          "lastId": "opfs-filter-01055",
+          "nextCursorDigestSha256": "b966900474413e8a0d6ce3dd8917f3604480eec983fd82f66c326b25c89f8bd3",
+          "totalCount": 10000,
+          "ms": 4.355
+        },
+        {
+          "index": 5,
+          "itemCount": 257,
+          "firstId": "opfs-filter-00055",
+          "lastId": "opfs-filter-02083",
+          "nextCursorDigestSha256": "9ea4887ce3df769abbec6ac92cb8945f48884ff2e7b2fb878cb6e6bd53240380",
+          "totalCount": 10000,
+          "ms": 4.535
+        },
+        {
+          "index": 6,
+          "itemCount": 257,
+          "firstId": "opfs-filter-01083",
+          "lastId": "opfs-filter-03111",
+          "nextCursorDigestSha256": "ecb3075dcfdd4faa7c72309371611e9e46628ac1bc2346569a258c28bb072624",
+          "totalCount": 10000,
+          "ms": 4.33
+        },
+        {
+          "index": 7,
+          "itemCount": 257,
+          "firstId": "opfs-filter-02111",
+          "lastId": "opfs-filter-04139",
+          "nextCursorDigestSha256": "8ad7c69d925162cc6c1d3e44ef0973234c89ae92733a38cac7aa21838d2a6d4a",
+          "totalCount": 10000,
+          "ms": 4.305
+        },
+        {
+          "index": 8,
+          "itemCount": 257,
+          "firstId": "opfs-filter-03139",
+          "lastId": "opfs-filter-07167",
+          "nextCursorDigestSha256": "52b75de409cba79d8e3af48adf4276fda45d98d769efa744ccd2898d6f093c7f",
+          "totalCount": 10000,
+          "ms": 4.66
+        },
+        {
+          "index": 9,
+          "itemCount": 257,
+          "firstId": "opfs-filter-06167",
+          "lastId": "opfs-filter-00194",
+          "nextCursorDigestSha256": "baa513b47092e11e33f1d147071c81abf9d3ffb4dce09b55587ef3a75dc03944",
+          "totalCount": 10000,
+          "ms": 4.41
+        },
+        {
+          "index": 10,
+          "itemCount": 257,
+          "firstId": "opfs-filter-09195",
+          "lastId": "opfs-filter-02222",
+          "nextCursorDigestSha256": "384c9767e85ce0f78d6b427d7d63c73706d118fa5ccf0b1fdb38312291823784",
+          "totalCount": 10000,
+          "ms": 4.235
+        },
+        {
+          "index": 11,
+          "itemCount": 257,
+          "firstId": "opfs-filter-00222",
+          "lastId": "opfs-filter-02250",
+          "nextCursorDigestSha256": "9e5d67895722fa7ebcd523636d9b4483400e438b3a04c1689d9f0863e5fc6a77",
+          "totalCount": 10000,
+          "ms": 4.455
+        },
+        {
+          "index": 12,
+          "itemCount": 257,
+          "firstId": "opfs-filter-01250",
+          "lastId": "opfs-filter-03278",
+          "nextCursorDigestSha256": "7ac1783177470803a8f20d3efa98769b67d6c6b9a43d5068b8b19b173197ba5e",
+          "totalCount": 10000,
+          "ms": 5.095
+        },
+        {
+          "index": 13,
+          "itemCount": 257,
+          "firstId": "opfs-filter-02278",
+          "lastId": "opfs-filter-04306",
+          "nextCursorDigestSha256": "deaeaba0d5067cf85e2dca625e0a2f1585eb53e58851c2230bb96d5130550117",
+          "totalCount": 10000,
+          "ms": 5.875
+        },
+        {
+          "index": 14,
+          "itemCount": 257,
+          "firstId": "opfs-filter-03306",
+          "lastId": "opfs-filter-05334",
+          "nextCursorDigestSha256": "a20df5642edc1ffbaf9ca1bdbf4501ac3138ec3635eff2bd3b3be37d27f06d86",
+          "totalCount": 10000,
+          "ms": 4.725
+        },
+        {
+          "index": 15,
+          "itemCount": 257,
+          "firstId": "opfs-filter-04334",
+          "lastId": "opfs-filter-08362",
+          "nextCursorDigestSha256": "cc7e25368c3ffdfaac12b4de5220b5d24eafff14373a66e291320607c1e65e0c",
+          "totalCount": 10000,
+          "ms": 4.4
+        },
+        {
+          "index": 16,
+          "itemCount": 257,
+          "firstId": "opfs-filter-07362",
+          "lastId": "opfs-filter-01389",
+          "nextCursorDigestSha256": "aa071ab34840d74b3b3f55cabdca8f22a922ec9395982d252d40df95c8326dda",
+          "totalCount": 10000,
+          "ms": 4.525
+        },
+        {
+          "index": 17,
+          "itemCount": 257,
+          "firstId": "opfs-filter-00389",
+          "lastId": "opfs-filter-03417",
+          "nextCursorDigestSha256": "0980ed7d8e7b00f614e8254a4688ce388310c392c79ce357afb96d835ef68274",
+          "totalCount": 10000,
+          "ms": 4.65
+        },
+        {
+          "index": 18,
+          "itemCount": 257,
+          "firstId": "opfs-filter-02417",
+          "lastId": "opfs-filter-04445",
+          "nextCursorDigestSha256": "3fcf28c1cc1a90cd1d18785a011825f5d588dca488172d49b929cf5bf3899316",
+          "totalCount": 10000,
+          "ms": 4.695
+        },
+        {
+          "index": 19,
+          "itemCount": 257,
+          "firstId": "opfs-filter-02445",
+          "lastId": "opfs-filter-04473",
+          "nextCursorDigestSha256": "37de3394adb0fded7c09ce8ad3e2a9fe1840211df6f954c5007d2bcc60e009b2",
+          "totalCount": 10000,
+          "ms": 4.77
+        },
+        {
+          "index": 20,
+          "itemCount": 257,
+          "firstId": "opfs-filter-03473",
+          "lastId": "opfs-filter-05501",
+          "nextCursorDigestSha256": "71895a8d83eb53348ffbc90d25ce378ced4a3880cc696d025c1f46934ea36ffe",
+          "totalCount": 10000,
+          "ms": 4.77
+        },
+        {
+          "index": 21,
+          "itemCount": 257,
+          "firstId": "opfs-filter-04501",
+          "lastId": "opfs-filter-06529",
+          "nextCursorDigestSha256": "c89a4282438be653f7de19d41784b0fee9c939ec9930882c1abb16ef52fe3edf",
+          "totalCount": 10000,
+          "ms": 5.07
+        },
+        {
+          "index": 22,
+          "itemCount": 257,
+          "firstId": "opfs-filter-05529",
+          "lastId": "opfs-filter-09557",
+          "nextCursorDigestSha256": "cfb7cca5c4e5b6290e5a88c323703ad1067575949ef13e3cee9e30ac1b577adb",
+          "totalCount": 10000,
+          "ms": 4.825
+        },
+        {
+          "index": 23,
+          "itemCount": 257,
+          "firstId": "opfs-filter-08557",
+          "lastId": "opfs-filter-02584",
+          "nextCursorDigestSha256": "bde2c26544f9abe742bf6b53609b3258e41452200d44189ee3f33509c46c3660",
+          "totalCount": 10000,
+          "ms": 4.7
+        },
+        {
+          "index": 24,
+          "itemCount": 257,
+          "firstId": "opfs-filter-01584",
+          "lastId": "opfs-filter-04612",
+          "nextCursorDigestSha256": "f54e910e51fffc9b285585eb09a64e28b79f38760f69be01a3ffd8e114686a08",
+          "totalCount": 10000,
+          "ms": 4.985
+        },
+        {
+          "index": 25,
+          "itemCount": 257,
+          "firstId": "opfs-filter-03612",
+          "lastId": "opfs-filter-05640",
+          "nextCursorDigestSha256": "0e472327dc23346f28d1748830994ba34bea885aeb026a1c732ad8b6aa083095",
+          "totalCount": 10000,
+          "ms": 5.895
+        },
+        {
+          "index": 26,
+          "itemCount": 257,
+          "firstId": "opfs-filter-04640",
+          "lastId": "opfs-filter-06668",
+          "nextCursorDigestSha256": "748e701501059ca2f040dffc4a4cef8b24c257f77905e19bb98a84a6477b5b48",
+          "totalCount": 10000,
+          "ms": 11.815
+        },
+        {
+          "index": 27,
+          "itemCount": 257,
+          "firstId": "opfs-filter-04668",
+          "lastId": "opfs-filter-06696",
+          "nextCursorDigestSha256": "8c6a1f54ee229b662c2a9ae83c771ffdb967a6c147958c8ace19de92f53c8ee5",
+          "totalCount": 10000,
+          "ms": 13.71
+        },
+        {
+          "index": 28,
+          "itemCount": 257,
+          "firstId": "opfs-filter-05696",
+          "lastId": "opfs-filter-07724",
+          "nextCursorDigestSha256": "427f6e4d9ffe114aae9eaceb0d474149f933b469bf24d2377ce4d9990a24a01d",
+          "totalCount": 10000,
+          "ms": 5.135
+        },
+        {
+          "index": 29,
+          "itemCount": 257,
+          "firstId": "opfs-filter-06724",
+          "lastId": "opfs-filter-00751",
+          "nextCursorDigestSha256": "8de9b3717b9e0c1f4de2f07bd2555513b99df0a9fe6175956b6e99bb60e5bb86",
+          "totalCount": 10000,
+          "ms": 4.65
+        },
+        {
+          "index": 30,
+          "itemCount": 257,
+          "firstId": "opfs-filter-09752",
+          "lastId": "opfs-filter-03779",
+          "nextCursorDigestSha256": "2caaa738596c950843a448dec8e5c2ab5aa4d557a7170d44391f57424dd38886",
+          "totalCount": 10000,
+          "ms": 5.06
+        },
+        {
+          "index": 31,
+          "itemCount": 257,
+          "firstId": "opfs-filter-02779",
+          "lastId": "opfs-filter-05807",
+          "nextCursorDigestSha256": "fc306dfe1616c5452cff1f37a2190ad920943768675c081a420bf66242ba7469",
+          "totalCount": 10000,
+          "ms": 5.08
+        },
+        {
+          "index": 32,
+          "itemCount": 257,
+          "firstId": "opfs-filter-04807",
+          "lastId": "opfs-filter-06835",
+          "nextCursorDigestSha256": "de942f1eb71c723e2fe572d5e27a62b60a2141f96a36b8d3f3953ca7a791c78b",
+          "totalCount": 10000,
+          "ms": 4.9
+        },
+        {
+          "index": 33,
+          "itemCount": 257,
+          "firstId": "opfs-filter-05835",
+          "lastId": "opfs-filter-07863",
+          "nextCursorDigestSha256": "3fb69ad464e73a1e60cd26bf69fd67d393dd5337daca25f7fb2c83146617d088",
+          "totalCount": 10000,
+          "ms": 5.33
+        },
+        {
+          "index": 34,
+          "itemCount": 257,
+          "firstId": "opfs-filter-06863",
+          "lastId": "opfs-filter-08891",
+          "nextCursorDigestSha256": "13becf0e94207ecf977a5362d35f31ed9bc74baf11f1f37613f003eb702b2e0d",
+          "totalCount": 10000,
+          "ms": 4.82
+        },
+        {
+          "index": 35,
+          "itemCount": 257,
+          "firstId": "opfs-filter-06891",
+          "lastId": "opfs-filter-08919",
+          "nextCursorDigestSha256": "d6daf72d16544daf327dd5ec303231412a4ec999c862915e8a46afb98a15dea0",
+          "totalCount": 10000,
+          "ms": 4.825
+        },
+        {
+          "index": 36,
+          "itemCount": 257,
+          "firstId": "opfs-filter-07919",
+          "lastId": "opfs-filter-01946",
+          "nextCursorDigestSha256": "b77a134b908c7a0a5df8f77e211bcfb730f90f5ad22665faecd9d92688ebecb1",
+          "totalCount": 10000,
+          "ms": 5.345
+        },
+        {
+          "index": 37,
+          "itemCount": 257,
+          "firstId": "opfs-filter-00946",
+          "lastId": "opfs-filter-04974",
+          "nextCursorDigestSha256": "5ea405c3754834a9154bf4146b151e4c971ca3260db1bee3a83a62bd6551445f",
+          "totalCount": 10000,
+          "ms": 5.23
+        },
+        {
+          "index": 38,
+          "itemCount": 234,
+          "firstId": "opfs-filter-03974",
+          "lastId": "opfs-filter-00999",
+          "nextCursorDigestSha256": null,
+          "totalCount": 10000,
+          "ms": 4.83
+        }
+      ],
+      "distribution": {
+        "sampleCount": 39,
+        "percentileMethod": "nearest-rank-ceil",
+        "samplesMs": [
+          30.69,
+          26,
+          25.37,
+          4.445,
+          4.355,
+          4.535,
+          4.33,
+          4.305,
+          4.66,
+          4.41,
+          4.235,
+          4.455,
+          5.095,
+          5.875,
+          4.725,
+          4.4,
+          4.525,
+          4.65,
+          4.695,
+          4.77,
+          4.77,
+          5.07,
+          4.825,
+          4.7,
+          4.985,
+          5.895,
+          11.815,
+          13.71,
+          5.135,
+          4.65,
+          5.06,
+          5.08,
+          4.9,
+          5.33,
+          4.82,
+          4.825,
+          5.345,
+          5.23,
+          4.83
+        ],
+        "minMs": 4.235,
+        "p50Ms": 4.825,
+        "p95Ms": 26,
+        "p99Ms": 30.69,
+        "maxMs": 30.69,
+        "meanMs": 6.9615
+      }
+    },
+    "structuredIntegrity": {
+      "productPayloadIndexValidationPath": "createSqliteFilterLibraryRepository.query -> sqlRecordToStudioFilterPreset",
+      "validatedCanonicalRowCount": 10000,
+      "canonicalNormalizationMismatchCount": 0,
+      "lookupMismatchCount": 0,
+      "allChecksPassed": true
+    },
+    "idLookup": {
+      "mismatchCount": 0,
+      "distribution": {
+        "sampleCount": 200,
+        "percentileMethod": "nearest-rank-ceil",
+        "samplesMs": [
+          0.37,
+          0.225,
+          0.185,
+          0.215,
+          0.17,
+          0.17,
+          0.175,
+          0.17,
+          0.18,
+          0.185,
+          0.175,
+          0.17,
+          0.175,
+          0.16,
+          0.175,
+          0.15,
+          0.155,
+          0.175,
+          0.35,
+          0.32,
+          0.31,
+          0.275,
+          0.31,
+          0.265,
+          0.285,
+          0.29,
+          0.3,
+          0.2,
+          0.175,
+          0.205,
+          0.2,
+          0.155,
+          0.19,
+          0.165,
+          0.16,
+          0.17,
+          0.205,
+          0.17,
+          0.2,
+          0.165,
+          0.18,
+          0.185,
+          0.16,
+          0.16,
+          0.17,
+          0.2,
+          0.175,
+          0.165,
+          0.155,
+          0.16,
+          0.16,
+          0.165,
+          0.155,
+          0.15,
+          0.17,
+          0.15,
+          0.15,
+          0.15,
+          0.155,
+          0.2,
+          0.265,
+          0.185,
+          0.245,
+          0.255,
+          0.36,
+          0.315,
+          0.27,
+          0.205,
+          0.19,
+          0.185,
+          0.155,
+          0.165,
+          0.16,
+          0.165,
+          0.155,
+          0.165,
+          0.145,
+          0.165,
+          0.16,
+          0.165,
+          0.165,
+          0.155,
+          0.195,
+          0.175,
+          0.17,
+          0.19,
+          0.175,
+          0.17,
+          0.15,
+          0.17,
+          0.145,
+          0.17,
+          0.145,
+          0.165,
+          0.165,
+          0.165,
+          0.165,
+          0.155,
+          0.17,
+          0.17,
+          0.165,
+          0.145,
+          0.15,
+          0.16,
+          0.18,
+          0.28,
+          0.305,
+          0.285,
+          0.27,
+          0.18,
+          0.28,
+          0.285,
+          0.275,
+          0.255,
+          0.19,
+          0.165,
+          0.185,
+          0.2,
+          0.21,
+          0.21,
+          0.17,
+          0.165,
+          0.2,
+          0.175,
+          0.15,
+          0.195,
+          0.2,
+          0.255,
+          0.26,
+          0.19,
+          0.175,
+          0.2,
+          0.195,
+          0.185,
+          0.19,
+          0.195,
+          0.195,
+          0.205,
+          0.205,
+          0.195,
+          0.2,
+          0.2,
+          0.25,
+          0.235,
+          0.195,
+          0.18,
+          0.195,
+          0.2,
+          0.19,
+          0.195,
+          0.27,
+          0.255,
+          0.25,
+          0.245,
+          0.24,
+          0.25,
+          0.2,
+          0.24,
+          0.21,
+          0.165,
+          0.175,
+          0.2,
+          0.185,
+          0.2,
+          0.19,
+          0.185,
+          0.19,
+          0.2,
+          0.185,
+          0.22,
+          0.195,
+          0.21,
+          0.2,
+          0.205,
+          0.2,
+          0.205,
+          0.19,
+          0.275,
+          0.255,
+          0.285,
+          0.29,
+          0.275,
+          0.285,
+          0.22,
+          0.18,
+          0.215,
+          0.205,
+          0.2,
+          0.195,
+          0.17,
+          0.615,
+          0.21,
+          0.19,
+          0.185,
+          0.175,
+          0.165,
+          0.16,
+          0.17,
+          0.165,
+          0.165
+        ],
+        "minMs": 0.145,
+        "p50Ms": 0.19,
+        "p95Ms": 0.29,
+        "p99Ms": 0.36,
+        "maxMs": 0.615,
+        "meanMs": 0.202
+      }
+    },
+    "queries": [
+      {
+        "id": "nfkc-search-comic",
+        "request": {
+          "search": "ＣＯＭＩＣ",
+          "limit": 64
+        },
+        "expectedCount": 1667,
+        "observedTotalCount": 1667,
+        "mismatchCount": 0,
+        "firstPageDigestSha256": "884d74840810ea123bc075a5568913095694a40ff8e4e46b6c6d2df6c4c8c0d9",
+        "distribution": {
+          "sampleCount": 60,
+          "percentileMethod": "nearest-rank-ceil",
+          "samplesMs": [
+            6.115,
+            4.355,
+            4.12,
+            4.52,
+            4.06,
+            4.155,
+            4.34,
+            4.14,
+            3.78,
+            4.155,
+            3.975,
+            3.925,
+            4.005,
+            4.305,
+            3.81,
+            3.805,
+            3.565,
+            4.375,
+            3.475,
+            4.15,
+            3.81,
+            4.69,
+            3.685,
+            4.27,
+            3.8,
+            4.115,
+            3.76,
+            3.66,
+            4.105,
+            4.22,
+            3.775,
+            3.685,
+            4.47,
+            3.98,
+            3.98,
+            3.83,
+            5.04,
+            6.41,
+            4.565,
+            4.76,
+            6.17,
+            6.055,
+            5.97,
+            5.77,
+            3.73,
+            5.07,
+            4.805,
+            4.195,
+            4.015,
+            4.025,
+            3.835,
+            4.285,
+            4.31,
+            4.025,
+            4.145,
+            4.42,
+            3.65,
+            3.46,
+            3.43,
+            3.49
+          ],
+          "minMs": 3.43,
+          "p50Ms": 4.115,
+          "p95Ms": 6.055,
+          "p99Ms": 6.41,
+          "maxMs": 6.41,
+          "meanMs": 4.2766
+        }
+      },
+      {
+        "id": "category-comic",
+        "request": {
+          "category": "comic",
+          "limit": 64
+        },
+        "expectedCount": 1667,
+        "observedTotalCount": 1667,
+        "mismatchCount": 0,
+        "firstPageDigestSha256": "884d74840810ea123bc075a5568913095694a40ff8e4e46b6c6d2df6c4c8c0d9",
+        "distribution": {
+          "sampleCount": 60,
+          "percentileMethod": "nearest-rank-ceil",
+          "samplesMs": [
+            2.875,
+            1.4,
+            1.335,
+            1.66,
+            1.295,
+            1.305,
+            1.24,
+            1.36,
+            1.465,
+            1.53,
+            1.235,
+            1.17,
+            1.125,
+            1.115,
+            1.11,
+            1.445,
+            1.37,
+            1.26,
+            1.17,
+            1.165,
+            1.13,
+            1.315,
+            1.48,
+            1.325,
+            1.19,
+            1.395,
+            1.135,
+            1.175,
+            1.15,
+            1.64,
+            1.635,
+            1.37,
+            1.27,
+            1.12,
+            1.49,
+            1.445,
+            1.215,
+            1.16,
+            1.335,
+            1.41,
+            1.255,
+            1.545,
+            1.375,
+            1.2,
+            1.11,
+            1.155,
+            1.29,
+            1.315,
+            1.51,
+            1.305,
+            1.135,
+            1.14,
+            1.285,
+            1.185,
+            1.455,
+            1.585,
+            1.26,
+            1.415,
+            2.25,
+            1.67
+          ],
+          "minMs": 1.11,
+          "p50Ms": 1.305,
+          "p95Ms": 1.66,
+          "p99Ms": 2.875,
+          "maxMs": 2.875,
+          "meanMs": 1.3576
+        }
+      },
+      {
+        "id": "favorite-only",
+        "request": {
+          "favorite": true,
+          "limit": 64
+        },
+        "expectedCount": 770,
+        "observedTotalCount": 770,
+        "mismatchCount": 0,
+        "firstPageDigestSha256": "f18d336a57f05453f2f0a7050826200ae49965969e526aac1d4cce4f2e3efe53",
+        "distribution": {
+          "sampleCount": 60,
+          "percentileMethod": "nearest-rank-ceil",
+          "samplesMs": [
+            1.6,
+            1.24,
+            1.13,
+            1.21,
+            1.22,
+            1.155,
+            1.955,
+            1.43,
+            1.28,
+            1.29,
+            1.275,
+            1.745,
+            1.4,
+            1.29,
+            1.475,
+            1.255,
+            1.33,
+            2.375,
+            1.375,
+            1.345,
+            1.335,
+            1.255,
+            1.445,
+            1.32,
+            1.375,
+            1.175,
+            1.16,
+            1.1,
+            1.135,
+            1.32,
+            1.515,
+            1.24,
+            1.125,
+            1.09,
+            1.095,
+            1.17,
+            1.55,
+            1.495,
+            1.15,
+            1.135,
+            1.095,
+            1.125,
+            1.165,
+            1.41,
+            1.46,
+            1.31,
+            1.16,
+            1.16,
+            1.3,
+            1.35,
+            1.415,
+            1.21,
+            1.115,
+            1.105,
+            1.115,
+            1.14,
+            1.415,
+            1.305,
+            1.28,
+            1.41
+          ],
+          "minMs": 1.09,
+          "p50Ms": 1.28,
+          "p95Ms": 1.6,
+          "p99Ms": 2.375,
+          "maxMs": 2.375,
+          "meanMs": 1.3101
+        }
+      },
+      {
+        "id": "category-engine-favorite",
+        "request": {
+          "category": "comic",
+          "engine": "vignette",
+          "favorite": true,
+          "limit": 64
+        },
+        "expectedCount": 129,
+        "observedTotalCount": 129,
+        "mismatchCount": 0,
+        "firstPageDigestSha256": "884d74840810ea123bc075a5568913095694a40ff8e4e46b6c6d2df6c4c8c0d9",
+        "distribution": {
+          "sampleCount": 60,
+          "percentileMethod": "nearest-rank-ceil",
+          "samplesMs": [
+            1.49,
+            1.335,
+            1.295,
+            1.32,
+            1.325,
+            1.4,
+            1.25,
+            1.16,
+            1.44,
+            1.43,
+            1.28,
+            1.155,
+            1.12,
+            1.115,
+            1.09,
+            1.785,
+            1.345,
+            1.165,
+            1.16,
+            1.13,
+            1.145,
+            1.185,
+            1.705,
+            1.3,
+            1.19,
+            1.115,
+            1.085,
+            1.125,
+            1.435,
+            1.495,
+            1.3,
+            1.18,
+            1.12,
+            1.09,
+            1.145,
+            1.24,
+            1.395,
+            1.15,
+            1.07,
+            1.09,
+            1.12,
+            1.11,
+            1.455,
+            1.355,
+            1.56,
+            1.23,
+            1.115,
+            1.09,
+            1.155,
+            1.5,
+            1.28,
+            1.09,
+            1.07,
+            1.15,
+            1.145,
+            1.36,
+            1.47,
+            1.39,
+            1.325,
+            1.325
+          ],
+          "minMs": 1.07,
+          "p50Ms": 1.19,
+          "p95Ms": 1.5,
+          "p99Ms": 1.785,
+          "maxMs": 1.785,
+          "meanMs": 1.2608
+        }
+      }
+    ],
+    "opfs": {
+      "before": {
+        "exists": false,
+        "error": {
+          "name": "NotFoundError",
+          "message": "A requested file or directory could not be found at the time an operation was processed.",
+          "stack": null
+        },
+        "entries": [],
+        "fileCount": 0,
+        "totalFileBytes": 0
+      },
+      "afterInsert": {
+        "exists": true,
+        "entries": [
+          {
+            "path": ".opaque",
+            "kind": "directory",
+            "sizeBytes": null
+          },
+          {
+            "path": ".opaque/bvxbniz4ob",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/fchl2l975dn",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/k8pfz4w0whl",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/o5163yb47tl",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/w853uzwqrk",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/wilu5pakte",
+            "kind": "file",
+            "sizeBytes": 8515584
+          }
+        ],
+        "fileCount": 6,
+        "totalFileBytes": 8536064
+      },
+      "final": {
+        "exists": true,
+        "entries": [
+          {
+            "path": ".opaque",
+            "kind": "directory",
+            "sizeBytes": null
+          },
+          {
+            "path": ".opaque/bvxbniz4ob",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/fchl2l975dn",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/k8pfz4w0whl",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/o5163yb47tl",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/w853uzwqrk",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/wilu5pakte",
+            "kind": "file",
+            "sizeBytes": 8515584
+          }
+        ],
+        "fileCount": 6,
+        "totalFileBytes": 8536064
+      }
+    },
+    "storage": {
+      "before": {
+        "usageBytes": 0,
+        "quotaBytes": 1868068182,
+        "usageDetails": {}
+      },
+      "afterInsert": {
+        "usageBytes": 8537424,
+        "quotaBytes": 1868068182,
+        "usageDetails": {
+          "fileSystem": 8537424
+        }
+      },
+      "final": {
+        "usageBytes": 8537424,
+        "quotaBytes": 1868068182,
+        "usageDetails": {
+          "fileSystem": 8537424
+        }
+      }
+    },
+    "memory": {
+      "before": {
+        "performanceMemory": null,
+        "userAgentSpecific": null,
+        "userAgentSpecificError": null
+      },
+      "afterInsert": {
+        "performanceMemory": null,
+        "userAgentSpecific": null,
+        "userAgentSpecificError": null
+      },
+      "final": {
+        "performanceMemory": null,
+        "userAgentSpecific": null,
+        "userAgentSpecificError": null
+      }
+    },
+    "securityPolicyViolations": [],
+    "pageMemory": {
+      "before": {
+        "performanceMemory": {
+          "usedJSHeapSizeBytes": 670072,
+          "totalJSHeapSizeBytes": 1575872,
+          "jsHeapSizeLimitBytes": 4294705152
+        },
+        "userAgentSpecific": null,
+        "userAgentSpecificError": {
+          "name": "SecurityError",
+          "message": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available.",
+          "stack": "SecurityError: Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available.\n    at n (http://127.0.0.1:55598/assets/index-DyfgB1_E.js:1:1022)\n    at i (http://127.0.0.1:55598/assets/index-DyfgB1_E.js:1:1515)\n    at http://127.0.0.1:55598/assets/index-DyfgB1_E.js:1:2439"
+        }
+      },
+      "after": {
+        "performanceMemory": {
+          "usedJSHeapSizeBytes": 1298791,
+          "totalJSHeapSizeBytes": 1871183,
+          "jsHeapSizeLimitBytes": 4294705152
+        },
+        "userAgentSpecific": null,
+        "userAgentSpecificError": {
+          "name": "SecurityError",
+          "message": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available.",
+          "stack": "SecurityError: Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available.\n    at n (http://127.0.0.1:55598/assets/index-DyfgB1_E.js:1:1022)\n    at Worker.<anonymous> (http://127.0.0.1:55598/assets/index-DyfgB1_E.js:1:1963)"
+        }
+      }
+    },
+    "pageSecurityPolicyViolations": []
+  },
+  "diagnostics": {
+    "browserVersion": "140.0.7339.186",
+    "consoleErrors": [],
+    "consoleWarnings": [],
+    "pageErrors": [],
+    "requestFailures": [],
+    "errorResponses": [],
+    "requests": [
+      {
+        "method": "GET",
+        "resourceType": "document",
+        "url": "http://127.0.0.1:55598/"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:55598/assets/index-DyfgB1_E.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:55598/assets/filter-library-opfs-browser-client-D-sJeIXF.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:55598/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:55598/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:55598/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      }
+    ],
+    "responses": [
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:55598/"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:55598/assets/index-DyfgB1_E.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:55598/assets/filter-library-opfs-browser-client-D-sJeIXF.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:55598/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:55598/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:55598/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      }
+    ],
+    "responseHeaders": {
+      "contentSecurityPolicy": "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'; worker-src 'self'; style-src 'none'; img-src 'none'; font-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+      "crossOriginOpenerPolicy": "same-origin",
+      "crossOriginEmbedderPolicy": "require-corp",
+      "crossOriginResourcePolicy": "same-origin"
+    }
+  },
+  "productionBuild": {
+    "mode": "vite-production-build",
+    "assets": [
+      ".vite/manifest.json",
+      "assets/filter-library-opfs-browser-client-D-sJeIXF.js",
+      "assets/filter-library-opfs-browser-client-D-sJeIXF.js.map",
+      "assets/index-DyfgB1_E.js",
+      "assets/index-DyfgB1_E.js.map",
+      "assets/sqlite3-BVKGSWc-.wasm",
+      "assets/sqlite3-opfs-async-proxy-D_xnb1D8.js",
+      "assets/sqlite3-worker1-N5XM9NUp.js",
+      "assets/sqlite3-worker1-N5XM9NUp.js.map",
+      "index.html"
+    ],
+    "scratchDirectory": "/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/toonspectrum-filter-library-opfs-Nc7pLe"
+  },
+  "validationIssues": []
+}

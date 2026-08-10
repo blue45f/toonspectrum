@@ -16,7 +16,7 @@ import { createServer } from "node:net";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { chromium, type Locator, type Page } from "playwright";
+import { chromium, type BrowserContext, type Locator, type Page } from "playwright";
 
 import {
   STUDIO_BG3D_ARTIFACT_CAPTURE_VERSION,
@@ -80,6 +80,13 @@ export const BABYLON_STABLE_ID_PARITY_WIDTHS = [63, 65] as const;
 export const BABYLON_STABLE_ID_PARITY_HEIGHT = 64;
 export const BABYLON_ALIGNED_RASTER_SMOKE_SIZE = 64;
 const BABYLON_STABLE_ID_ENGINE_INIT_TIMEOUT_MS = 60_000;
+export const STUDIO_3D_WEBGPU_MAX_BROWSER_ATTEMPTS = 2;
+export const STUDIO_3D_WEBGPU_PROOF_SHARDS = Object.freeze([
+  "babylon-artifact-parity",
+  "magic-layer-alignment",
+] as const);
+export type Studio3dWebGpuProofShard =
+  (typeof STUDIO_3D_WEBGPU_PROOF_SHARDS)[number];
 export const STUDIO_3D_WEBGPU_SWIFTSHADER_LAUNCH_ARGS = Object.freeze([
   "--no-sandbox",
   "--enable-unsafe-webgpu",
@@ -89,6 +96,198 @@ export const STUDIO_3D_WEBGPU_SWIFTSHADER_LAUNCH_ARGS = Object.freeze([
   "--use-angle=swiftshader",
   "--enable-unsafe-swiftshader",
 ]);
+export const STUDIO_VRM_CHROMA_DELTA_THRESHOLD = 40;
+export const STUDIO_VRM_COLOR_MIN_RATIO = 0.015;
+export const STUDIO_VRM_MANNEQUIN_MAX_RATIO = 0.005;
+
+export type StudioVrmChromaMetrics = Readonly<{
+  chromaticPixels: number;
+  pixelCount: number;
+  ratio: number;
+}>;
+
+export type Studio3dWebGpuRetryReason =
+  | "context-or-device-lost"
+  | "external-instance-map-readback";
+
+type Studio3dWebGpuRetryErrorEntry = Readonly<{
+  code: string | null;
+  message: string;
+  name: string;
+}>;
+
+function collectStudio3dWebGpuRetryErrorEntries(
+  cause: unknown,
+): readonly Studio3dWebGpuRetryErrorEntry[] {
+  const entries: Studio3dWebGpuRetryErrorEntry[] = [];
+  const seen = new Set<unknown>();
+  let current: unknown = cause;
+  for (let depth = 0; depth < 8 && current !== undefined; depth += 1) {
+    if (typeof current !== "object" || current === null || seen.has(current)) {
+      if (current !== undefined && !seen.has(current)) {
+        entries.push({ code: null, message: String(current), name: "Error" });
+      }
+      break;
+    }
+    seen.add(current);
+    const record = current as {
+      readonly cause?: unknown;
+      readonly code?: unknown;
+      readonly message?: unknown;
+      readonly name?: unknown;
+    };
+    entries.push({
+      code: typeof record.code === "string" ? record.code : null,
+      message: typeof record.message === "string"
+        ? record.message
+        : Object.prototype.toString.call(current),
+      name: typeof record.name === "string" ? record.name : "Error",
+    });
+    if (!("cause" in record)) break;
+    current = record.cause;
+  }
+  return entries;
+}
+
+/**
+ * Classifies only transient GPU-process/device lifetime failures. Semantic capture, parity,
+ * assertion, and timeout failures deliberately return null so CI cannot turn a product
+ * regression into a green retry.
+ */
+export function classifyStudio3dWebGpuRetryableFailure(
+  cause: unknown,
+): Studio3dWebGpuRetryReason | null {
+  const entries = collectStudio3dWebGpuRetryErrorEntries(cause);
+  // A deadline remains authoritative even when cleanup subsequently rejects an in-flight
+  // mapAsync. Retrying that chain would hide a real verifier timeout behind a disposal symptom.
+  if (entries.some((entry) =>
+    entry.name === "TimeoutError" ||
+    entry.code === "timeout" ||
+    /\b(?:timed out|timeout)\b/iu.test(entry.message)
+  )) {
+    return null;
+  }
+  for (const entry of entries) {
+    if (entry.code === "context-lost" || entry.code === "device-lost") {
+      return "context-or-device-lost";
+    }
+    if (/\[(?:context|device)-lost\]/u.test(entry.message)) {
+      return "context-or-device-lost";
+    }
+    if (
+      /\b(?:WebGPU\s+|GPU\s+)?(?:device|context)(?:\s+(?:is|was))?\s+lost(?:[.:;]|$)/iu.test(
+        entry.message,
+      )
+    ) {
+      return "context-or-device-lost";
+    }
+  }
+  for (const entry of entries) {
+    const abortError = entry.name === "AbortError" || /\bAbortError\b/u.test(entry.message);
+    if (
+      abortError &&
+      /\bmapAsync\b/u.test(entry.message) &&
+      entry.message.includes("A valid external Instance reference no longer exists")
+    ) {
+      return "external-instance-map-readback";
+    }
+  }
+  return null;
+}
+
+export async function runStudio3dWebGpuConformanceWithFreshBrowserRetry(
+  runAttempt: (attempt: number) => Promise<void>,
+  onRetry?: (details: Readonly<{
+    attempt: number;
+    cause: unknown;
+    reason: Studio3dWebGpuRetryReason;
+  }>) => void | Promise<void>,
+): Promise<void> {
+  for (let attempt = 1; attempt <= STUDIO_3D_WEBGPU_MAX_BROWSER_ATTEMPTS; attempt += 1) {
+    try {
+      await runAttempt(attempt);
+      return;
+    } catch (cause) {
+      const reason = classifyStudio3dWebGpuRetryableFailure(cause);
+      if (reason === null || attempt === STUDIO_3D_WEBGPU_MAX_BROWSER_ATTEMPTS) {
+        throw cause;
+      }
+      await onRetry?.({ attempt, cause, reason });
+    }
+  }
+}
+
+/**
+ * Gives each heavyweight proof phase its own Chromium process and retry budget. A device loss in
+ * the later Magic proof therefore cannot force an already-passed Babylon artifact proof to replay
+ * on the replacement device. The inner retry classifier remains the only recovery gate, so
+ * semantic, parity, assertion, and timeout failures still stop the suite immediately.
+ */
+export async function runStudio3dWebGpuProofShardsWithFreshBrowserRetry(
+  runShardAttempt: (
+    shard: Studio3dWebGpuProofShard,
+    attempt: number,
+  ) => Promise<void>,
+  onRetry?: (details: Readonly<{
+    attempt: number;
+    cause: unknown;
+    reason: Studio3dWebGpuRetryReason;
+    shard: Studio3dWebGpuProofShard;
+  }>) => void | Promise<void>,
+): Promise<void> {
+  for (const shard of STUDIO_3D_WEBGPU_PROOF_SHARDS) {
+    await runStudio3dWebGpuConformanceWithFreshBrowserRetry(
+      (attempt) => runShardAttempt(shard, attempt),
+      async (details) => {
+        await onRetry?.({ ...details, shard });
+      },
+    );
+  }
+}
+
+type Studio3dWebGpuShardCloseBoundary = Readonly<{
+  close: () => Promise<void> | void;
+  label: string;
+}>;
+
+/**
+ * Runs one proof and always attempts every close boundary in order. The proof error remains the
+ * authoritative failure when cleanup also fails, while cleanup failures after a successful proof
+ * are surfaced so the next shard cannot start under a false fresh-process assumption.
+ */
+export async function runStudio3dWebGpuShardWithCleanup(
+  runProof: () => Promise<void>,
+  closeBoundaries: readonly Studio3dWebGpuShardCloseBoundary[],
+): Promise<void> {
+  let proofFailed = false;
+  let proofFailure: unknown;
+  try {
+    await runProof();
+  } catch (cause) {
+    proofFailed = true;
+    proofFailure = cause;
+  }
+
+  const cleanupFailures: { cause: unknown; label: string }[] = [];
+  for (const boundary of closeBoundaries) {
+    try {
+      await boundary.close();
+    } catch (cause) {
+      cleanupFailures.push({ cause, label: boundary.label });
+    }
+  }
+
+  if (proofFailed) throw proofFailure;
+  if (cleanupFailures.length === 1) throw cleanupFailures[0]!.cause;
+  if (cleanupFailures.length > 1) {
+    throw new AggregateError(
+      cleanupFailures.map(({ cause }) => cause),
+      `WebGPU shard cleanup failed at ${cleanupFailures
+        .map(({ label }) => label)
+        .join(", ")}`,
+    );
+  }
+}
 
 export function createBabylonStableIdParityRequests():
 readonly StudioBg3dArtifactCaptureRequestV2[] {
@@ -393,6 +592,39 @@ function assertCondition(condition: unknown, message: string): asserts condition
   if (!condition) throw new Error(message);
 }
 
+export function collectStudioVrmMannequinChromaFailures(
+  baseline: StudioVrmChromaMetrics,
+  mannequin: StudioVrmChromaMetrics,
+  restored: StudioVrmChromaMetrics,
+): readonly string[] {
+  const failures: string[] = [];
+  if (baseline.pixelCount <= 0 || baseline.ratio < STUDIO_VRM_COLOR_MIN_RATIO) {
+    failures.push(
+      `the default VRM frame is not demonstrably colored (${baseline.ratio.toFixed(4)})`,
+    );
+  }
+  if (mannequin.pixelCount <= 0 || mannequin.ratio > STUDIO_VRM_MANNEQUIN_MAX_RATIO) {
+    failures.push(
+      `the mannequin frame did not become neutral (${mannequin.ratio.toFixed(4)})`,
+    );
+  }
+  if (restored.pixelCount <= 0 || restored.ratio < STUDIO_VRM_COLOR_MIN_RATIO) {
+    failures.push(
+      `the VRM frame stayed grayscale after mannequin mode was disabled (${restored.ratio.toFixed(4)})`,
+    );
+  }
+  if (
+    baseline.ratio >= STUDIO_VRM_COLOR_MIN_RATIO
+    && restored.ratio < baseline.ratio * 0.65
+  ) {
+    failures.push(
+      `the restored VRM frame retained less than 65% of its baseline chroma ` +
+        `(${restored.ratio.toFixed(4)} vs ${baseline.ratio.toFixed(4)})`,
+    );
+  }
+  return failures;
+}
+
 function delay(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
@@ -514,11 +746,11 @@ async function configureStudio(page: Page): Promise<void> {
   });
 }
 
-async function openInsertMenu(page: Page): Promise<Locator> {
+async function openThreeDMenu(page: Page): Promise<Locator> {
   const mainMenu = page.locator('[data-studio-main-menu="true"]');
   await mainMenu.waitFor({ state: "visible", timeout: 20_000 });
-  await mainMenu.getByRole("button", { name: "삽입", exact: true }).click();
-  const menu = page.locator('[role="menu"][aria-label="삽입"]');
+  await mainMenu.getByRole("menuitem", { name: "3D", exact: true }).click();
+  const menu = page.locator('[role="menu"][aria-label="3D"]');
   await menu.waitFor({ state: "visible", timeout: 5_000 });
   return menu;
 }
@@ -535,6 +767,65 @@ async function waitForCanvasDialogTeardown(dialog: Locator, page: Page): Promise
   // R3F defers renderer teardown by 500ms. The compatibility patch also removes an unconsumed
   // planned-loss listener after one bounded second, so wait through both lifetimes.
   await page.waitForTimeout(1_650);
+}
+
+async function waitForLocatorEnabled(
+  locator: Locator,
+  page: Page,
+  timeoutMs = 30_000,
+): Promise<void> {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    if (
+      await locator.isVisible().catch(() => false)
+      && await locator.isEnabled().catch(() => false)
+    ) {
+      return;
+    }
+    await page.waitForTimeout(100);
+  }
+  throw new Error(`locator did not become enabled within ${String(timeoutMs)}ms`);
+}
+
+async function measureStudioVrmChroma(
+  page: Page,
+  canvas: Locator,
+): Promise<StudioVrmChromaMetrics> {
+  await canvas.evaluate(() => new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  }));
+  const screenshot = await canvas.screenshot({ animations: "disabled", type: "png" });
+  return page.evaluate(async ({ base64, threshold }) => {
+    const bytes = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
+    const bitmap = await createImageBitmap(new Blob([bytes], { type: "image/png" }));
+    const surface = new OffscreenCanvas(bitmap.width, bitmap.height);
+    const context = surface.getContext("2d", { willReadFrequently: true });
+    if (!context) {
+      bitmap.close();
+      throw new Error("could not create the VRM chroma measurement context");
+    }
+    context.drawImage(bitmap, 0, 0);
+    bitmap.close();
+    const pixels = context.getImageData(0, 0, surface.width, surface.height).data;
+    const pixelCount = pixels.length / 4;
+    let chromaticPixels = 0;
+    for (let offset = 0; offset < pixels.length; offset += 4) {
+      const red = pixels[offset]!;
+      const green = pixels[offset + 1]!;
+      const blue = pixels[offset + 2]!;
+      if (Math.max(red, green, blue) - Math.min(red, green, blue) >= threshold) {
+        chromaticPixels += 1;
+      }
+    }
+    return {
+      chromaticPixels,
+      pixelCount,
+      ratio: pixelCount > 0 ? chromaticPixels / pixelCount : 0,
+    };
+  }, {
+    base64: screenshot.toString("base64"),
+    threshold: STUDIO_VRM_CHROMA_DELTA_THRESHOLD,
+  });
 }
 
 async function triggerObservableLiveContextLoss(dialog: Locator): Promise<{
@@ -650,15 +941,61 @@ async function run(page: Page, studioUrl: string): Promise<void> {
     `opening /studio eagerly requested Babylon specialist code:\n${babylonSpecialistRequests.join("\n")}`,
   );
 
-  const characterMenu = await openInsertMenu(page);
+  const characterMenu = await openThreeDMenu(page);
   await characterMenu.getByRole("menuitem", { name: "3D 캐릭터", exact: true }).click();
   const characterDialog = page.locator('[data-studio-vrm-dialog="true"]');
   await characterDialog.waitFor({ state: "visible", timeout: 25_000 });
-  await page.waitForTimeout(1_000);
+  const insertCharacterButton = characterDialog.getByRole("button", {
+    name: "이 포즈로 추가",
+    exact: true,
+  });
+  await waitForLocatorEnabled(insertCharacterButton, page);
 
   assertCondition(
     sharedPoseRequests.length === 0,
     `opening the local character editor eagerly requested the shared-pose API:\n${sharedPoseRequests.join("\n")}`,
+  );
+
+  // The static poser renders on demand. This transition catches imperative material restores
+  // that update Three objects correctly but leave the last gray framebuffer on screen.
+  const vrmCanvas = characterDialog.getByRole("group", {
+    name: "3D 캐릭터 편집 뷰포트",
+    exact: true,
+  });
+  await vrmCanvas.waitFor({ state: "visible", timeout: 5_000 });
+  const baselineChroma = await measureStudioVrmChroma(page, vrmCanvas);
+  await characterDialog.getByRole("tab", { name: "체형·색", exact: true }).click();
+  const mannequinSwitch = characterDialog.getByRole("switch", {
+    name: "중립 데생 인형 보기",
+    exact: true,
+  });
+  await mannequinSwitch.click();
+  assertCondition(
+    await mannequinSwitch.getAttribute("aria-checked") === "true",
+    "the mannequin switch did not activate",
+  );
+  const mannequinChroma = await measureStudioVrmChroma(page, vrmCanvas);
+  await mannequinSwitch.click();
+  assertCondition(
+    await mannequinSwitch.getAttribute("aria-checked") === "false",
+    "the mannequin switch did not deactivate",
+  );
+  const restoredChroma = await measureStudioVrmChroma(page, vrmCanvas);
+  const chromaFailures = collectStudioVrmMannequinChromaFailures(
+    baselineChroma,
+    mannequinChroma,
+    restoredChroma,
+  );
+  assertCondition(
+    chromaFailures.length === 0,
+    `VRM mannequin color transition failed:\n${chromaFailures.join("\n")}\n` +
+      JSON.stringify({ baselineChroma, mannequinChroma, restoredChroma }),
+  );
+  console.log(
+    "[verify-studio-3d-console] VRM chroma PASS " +
+      `baseline=${baselineChroma.ratio.toFixed(4)} ` +
+      `mannequin=${mannequinChroma.ratio.toFixed(4)} ` +
+      `restored=${restoredChroma.ratio.toFixed(4)}`,
   );
 
   await page.route(
@@ -682,16 +1019,14 @@ async function run(page: Page, studioUrl: string): Promise<void> {
   );
   // Exercise the actual VRM render-target readback -> short-lived OffscreenCanvas PNG Worker ->
   // editor insertion path before deliberately losing a separate Canvas context below.
-  await characterDialog.getByRole("button", { name: "이 포즈로 추가", exact: true }).click({
-    timeout: 30_000,
-  });
+  await insertCharacterButton.click({ timeout: 30_000 });
   await waitForCanvasDialogTeardown(characterDialog, page);
   assertCondition(
     pngEncoderWorkers.length > 0,
     "VRM insertion did not start the shared off-main PNG encoder",
   );
 
-  const liveLossMenu = await openInsertMenu(page);
+  const liveLossMenu = await openThreeDMenu(page);
   await liveLossMenu.getByRole("menuitem", { name: "3D 캐릭터", exact: true }).click();
   const liveLossDialog = page.locator('[data-studio-vrm-dialog="true"]');
   await liveLossDialog.waitFor({ state: "visible", timeout: 25_000 });
@@ -713,7 +1048,7 @@ async function run(page: Page, studioUrl: string): Promise<void> {
   }
   await closeCanvasDialog(liveLossDialog, page);
 
-  const backgroundMenu = await openInsertMenu(page);
+  const backgroundMenu = await openThreeDMenu(page);
   const backgroundMenuItem = backgroundMenu.getByRole("menuitem", {
     name: "3D 배경",
     exact: true,
@@ -878,10 +1213,16 @@ async function runBabylonStableIdOrientationParityProof(
   rootUrl: string,
 ): Promise<void> {
   await page.goto(rootUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
-  const graphicsSupport = await page.evaluate(() => ({
-    gpu: "gpu" in navigator && Boolean(navigator.gpu),
-    webgl2: Boolean(document.createElement("canvas").getContext("webgl2")),
-  }));
+  const graphicsSupport = await page.evaluate(() => {
+    const probeCanvas = document.createElement("canvas");
+    const webgl2 = probeCanvas.getContext("webgl2");
+    const supported = Boolean(webgl2);
+    webgl2?.getExtension("WEBGL_lose_context")?.loseContext();
+    return {
+      gpu: "gpu" in navigator && Boolean(navigator.gpu),
+      webgl2: supported,
+    };
+  });
   assertCondition(graphicsSupport.gpu, "WebGPU is unavailable for the stable-ID alignment proof");
   assertCondition(graphicsSupport.webgl2, "WebGL2 is unavailable beside the WebGPU proof");
 
@@ -1531,9 +1872,16 @@ async function runMagicLayerProductionAlignmentProof(
   page: Page,
   rootUrl: string,
 ): Promise<void> {
-  const graphicsSupport = await page.evaluate(() => ({
-    webgl2: Boolean(document.createElement("canvas").getContext("webgl2")),
-  }));
+  // This proof runs in a fresh Chromium process instead of inheriting navigation and GPU state
+  // from the Babylon artifact proof. Establish a same-origin document before dynamic imports.
+  await page.goto(rootUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  const graphicsSupport = await page.evaluate(() => {
+    const probeCanvas = document.createElement("canvas");
+    const webgl2 = probeCanvas.getContext("webgl2");
+    const supported = Boolean(webgl2);
+    webgl2?.getExtension("WEBGL_lose_context")?.loseContext();
+    return { webgl2: supported };
+  });
   assertCondition(
     graphicsSupport.webgl2,
     "WebGL2 is unavailable for the Magic Layer production alignment proof",
@@ -2420,6 +2768,45 @@ async function runMagicLayerProductionAlignmentProof(
   );
 }
 
+async function runStudio3dWebGpuConformanceBrowserAttempt(
+  rootUrl: string,
+  shard: Studio3dWebGpuProofShard,
+): Promise<void> {
+  // Keep the conformance browser process exclusive. Chromium/Dawn SwiftShader has a materially
+  // smaller device-lifetime surface when the normal Studio browser has not been launched yet.
+  const webGpuBrowser = await chromium.launch({
+    headless: true,
+    args: [...STUDIO_3D_WEBGPU_SWIFTSHADER_LAUNCH_ARGS],
+  });
+  let webGpuContext: BrowserContext | null = null;
+  await runStudio3dWebGpuShardWithCleanup(
+    async () => {
+      webGpuContext = await webGpuBrowser.newContext({
+        locale: "ko-KR",
+        viewport: { width: 1_440, height: 1_000 },
+      });
+      const webGpuPage = await webGpuContext.newPage();
+      switch (shard) {
+        case "babylon-artifact-parity":
+          await runBabylonStableIdOrientationParityProof(webGpuPage, rootUrl);
+          break;
+        case "magic-layer-alignment":
+          await runMagicLayerProductionAlignmentProof(webGpuPage, rootUrl);
+          break;
+      }
+    },
+    [
+      {
+        close: async () => {
+          await webGpuContext?.close();
+        },
+        label: "browser context",
+      },
+      { close: () => webGpuBrowser.close(), label: "browser" },
+    ],
+  );
+}
+
 async function main(): Promise<void> {
   verifyPatchedThreeRuntime();
   assertCondition(
@@ -2444,26 +2831,25 @@ async function main(): Promise<void> {
   let browser: Awaited<ReturnType<typeof chromium.launch>> | null = null;
   try {
     await waitForServer(rootUrl);
-    browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
     // Use Playwright's pinned Chromium rather than a machine-global Chrome channel. Pin Dawn's
     // WebGPU adapter as well as ANGLE's WebGL adapter: --use-angle alone does not select the
     // WebGPU device, so a GPU-less runner can otherwise lose its default Dawn device mid-proof.
-    const webGpuBrowser = await chromium.launch({
-      headless: true,
-      args: [...STUDIO_3D_WEBGPU_SWIFTSHADER_LAUNCH_ARGS],
-    });
-    try {
-      const webGpuContext = await webGpuBrowser.newContext({
-        locale: "ko-KR",
-        viewport: { width: 1_440, height: 1_000 },
-      });
-      const webGpuPage = await webGpuContext.newPage();
-      await runBabylonStableIdOrientationParityProof(webGpuPage, rootUrl);
-      await runMagicLayerProductionAlignmentProof(webGpuPage, rootUrl);
-      await webGpuContext.close();
-    } finally {
-      await webGpuBrowser.close();
-    }
+    // No normal Chromium process exists until every proof shard has closed. Each shard gets at
+    // most one fresh-process retry only for classified device/context lifetime failures; semantic
+    // and parity failures remain immediate hard failures and completed shards are never replayed.
+    await runStudio3dWebGpuProofShardsWithFreshBrowserRetry(
+      async (shard) => {
+        await runStudio3dWebGpuConformanceBrowserAttempt(rootUrl, shard);
+        console.log(`[verify-studio-3d-console] WebGPU shard PASS ${shard}`);
+      },
+      ({ attempt, reason, shard }) => {
+        console.warn(
+          `[verify-studio-3d-console] transient WebGPU ${reason} in ${shard}; ` +
+            `closed attempt ${String(attempt)} and starting one fresh browser retry`,
+        );
+      },
+    );
+    browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
     // This verifier intentionally asserts the shipped Korean Studio labels below. Pin the browser
     // locale so a developer machine or CI runner whose default locale is English does not turn a
     // healthy 3D runtime check into a menu-locator failure before either editor is opened.

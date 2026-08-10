@@ -3,17 +3,17 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { createRef } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { STUDIO_CREATOR_PACK_CATALOG } from "./studio-creator-pack-catalog";
-import {
-  installStudioCreatorPack,
-  type StudioCreatorPackStorage,
-} from "./studio-creator-pack-runtime";
 import { STUDIO_FILTER_DIALOG_CATALOG } from "./studio-filter-catalog";
+import {
+  STUDIO_FILTER_LIBRARY_DATA_POLICY,
+  type ProductFilterLibraryRepository,
+  type StudioFilterLibraryPreset,
+} from "./studio-filter-library-sqlite-repository";
 import { StudioFilterDialog } from "./StudioFilterDialog";
 
 const filterDialogCatalogCount = STUDIO_FILTER_DIALOG_CATALOG.length;
@@ -29,7 +29,60 @@ const filterDialogSource = readFileSync(
 afterEach(() => {
   cleanup();
   window.localStorage.clear();
+  document.body.replaceChildren();
 });
+
+const CANVAS_RECT = {
+  bottom: 700,
+  height: 500,
+  left: 300,
+  right: 1200,
+  top: 200,
+  width: 900,
+  x: 300,
+  y: 200,
+} as const;
+
+/** 실제 스튜디오와 같은 형태의 루트 + 포커스 가능한 작업 캔버스 뷰포트(jsdom은 레이아웃이 없다). */
+function mountStudioRootWithCanvas(): {
+  root: HTMLElement;
+  rootRef: { current: HTMLElement | null };
+  viewport: HTMLElement;
+} {
+  const root = document.createElement("div");
+  const viewport = document.createElement("div");
+  viewport.setAttribute("data-studio-canvas-viewport", "");
+  viewport.tabIndex = 0;
+  const rect = { ...CANVAS_RECT, toJSON: () => ({}) } as DOMRect;
+  viewport.getBoundingClientRect = () => rect;
+  viewport.getClientRects = () => [rect] as unknown as DOMRectList;
+  root.append(viewport);
+  document.body.append(root);
+  return { root, rootRef: { current: root }, viewport };
+}
+
+function backdrop(): HTMLElement {
+  return document.querySelector<HTMLElement>("[data-studio-modal-backdrop='true']")!;
+}
+
+/**
+ * jsdom에는 레이아웃이 없어 모든 요소가 getClientRects().length === 0이고, 그러면 모달이 초기
+ * 포커스를 다이얼로그 안으로 못 옮긴다. 그 상태로 언마운트하면 React가 커밋 뮤테이션 단계에서
+ * "커밋 직전 포커스"(= 런처)를 되돌려 놓아, 실제 브라우저에서는 일어나지 않는 결과가 나온다.
+ * 최소한의 레이아웃만 흉내 내 진짜 포커스 복귀 경로를 측정한다.
+ */
+function withStubbedLayout<T>(run: () => T): T {
+  const original = Element.prototype.getClientRects;
+  const rect = { ...CANVAS_RECT, toJSON: () => ({}) } as DOMRect;
+  Element.prototype.getClientRects = function getClientRects() {
+    return [rect] as unknown as DOMRectList;
+  };
+  try {
+    return run();
+  } finally {
+    Element.prototype.getClientRects = original;
+  }
+}
 
 function renderMotionFilterDialog(
   mutationLocked = false,
@@ -247,40 +300,197 @@ describe("StudioFilterDialog", () => {
     expect(filterDialogSource).toMatch(/label="대비"[\s\S]*?min=\{-80\}[\s\S]*?max=\{80\}/u);
   });
 
-  it("surfaces an installed Creator Pack preset in the matching live filter dialog", () => {
-    const values = new Map<string, string>();
-    const target: StudioCreatorPackStorage = {
-      getItem: (key) => values.get(key) ?? null,
-      setItem: (key, value) => {
-        values.set(key, value);
-      },
-      removeItem: (key) => {
-        values.delete(key);
+  it("surfaces a matching preset from the SQLite product repository", async () => {
+    const sqlPreset: StudioFilterLibraryPreset = {
+      id: "creator-pack:filter-pack:vignette-1",
+      packageId: "filter-pack",
+      entryId: "vignette-1",
+      name: "대사 집중 비네트",
+      engine: "vignette",
+      values: { darkness: 35, size: 45, roundness: 100, feather: 60 },
+      installedAt: 1_000,
+      updatedAt: 1_000,
+      category: "creator-pack",
+      favorite: false,
+      sortOrder: 0,
+      packageVersion: "12.0.0",
+      packageFingerprint: "fixture",
+    };
+    const product: ProductFilterLibraryRepository = {
+      authority: "sqlite",
+      legacyDataPolicy: STUDIO_FILTER_LIBRARY_DATA_POLICY,
+      repository: {
+        query: vi.fn().mockResolvedValue({
+          items: [sqlPreset],
+          nextCursor: null,
+          hasMore: false,
+          totalCount: 1,
+        }),
+        getById: vi.fn(),
+        put: vi.fn(),
+        putMany: vi.fn(),
+        delete: vi.fn(),
+        deleteMany: vi.fn(),
+        setFavorite: vi.fn(),
       },
     };
-    const filterPack = STUDIO_CREATOR_PACK_CATALOG.find(
-      (pack) => pack.metadata.kind === "filter",
-    )!;
-    expect(installStudioCreatorPack(filterPack, target, 1_000).status).toBe("installed");
-    vi.stubGlobal("localStorage", target);
-    try {
-      const html = renderToStaticMarkup(
-        <StudioFilterDialog
-          activeKey="filter:vignette"
-          kind="vignette"
-          image={{}}
-          rootRef={createRef<HTMLElement>()}
-          onPreview={vi.fn()}
-          onApply={vi.fn()}
-          onClose={vi.fn()}
-        />,
-      );
-      expect(html).toContain("설치한 Creator Pack 프리셋");
-      expect(html).toContain("대사 집중 비네트");
-      expect(html).not.toContain("야간 듀오톤");
-    } finally {
-      vi.unstubAllGlobals();
-    }
+    render(
+      <StudioFilterDialog
+        activeKey="filter:vignette"
+        kind="vignette"
+        image={{}}
+        rootRef={createRef<HTMLElement>()}
+        acquireFilterLibrary={() => Promise.resolve(product)}
+        onPreview={vi.fn()}
+        onApply={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+    await waitFor(() => expect(screen.getByText("대사 집중 비네트")).toBeTruthy());
+    expect(screen.getByText("1개 · 무제한 · 로컬 SQL")).toBeTruthy();
+    expect(product.repository.query).toHaveBeenCalledWith({
+      cursor: null,
+      engine: "vignette",
+      limit: 128,
+    });
+  });
+
+  it("labels the SQLite-unavailable memory session as non-persistent and never unlimited", async () => {
+    const sessionPreset: StudioFilterLibraryPreset = {
+      id: "creator-pack:session:vignette-1",
+      packageId: "session",
+      entryId: "vignette-1",
+      name: "세션 비네트",
+      engine: "vignette",
+      values: { darkness: 30, size: 50, roundness: 90, feather: 55 },
+      installedAt: 2_000,
+      updatedAt: 2_000,
+      category: "creator-pack",
+      favorite: false,
+      sortOrder: 0,
+      packageVersion: "12.0.0",
+      packageFingerprint: "session-only",
+    };
+    const product: ProductFilterLibraryRepository = {
+      authority: "memory-session",
+      legacyDataPolicy: STUDIO_FILTER_LIBRARY_DATA_POLICY,
+      repository: {
+        query: vi.fn().mockResolvedValue({
+          items: [sessionPreset],
+          nextCursor: null,
+          hasMore: false,
+          totalCount: 1,
+        }),
+        getById: vi.fn(),
+        put: vi.fn(),
+        putMany: vi.fn(),
+        delete: vi.fn(),
+        deleteMany: vi.fn(),
+        setFavorite: vi.fn(),
+      },
+    };
+    const { container } = render(
+      <StudioFilterDialog
+        activeKey="filter:vignette-session"
+        kind="vignette"
+        image={{}}
+        rootRef={createRef<HTMLElement>()}
+        acquireFilterLibrary={() => Promise.resolve(product)}
+        onPreview={vi.fn()}
+        onApply={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText(
+      "1개 · 비영속 메모리 세션 · 브라우저 종료 시 사라짐",
+    )).toBeTruthy());
+    expect(container.querySelector("[data-studio-filter-library-authority]")
+      ?.getAttribute("data-studio-filter-library-authority")).toBe("memory-session");
+    expect(screen.getByText("현재 세션 Creator Pack 필터 프리셋")).toBeTruthy();
+    expect(screen.getByText(/현재 세션에만 유지됩니다/u)).toBeTruthy();
+    expect(container.textContent).not.toContain("무제한");
+    expect(container.textContent).not.toContain("호환 저장소");
+  });
+
+  it("keyset-pages installed SQL presets instead of rendering the whole catalog", async () => {
+    const first: StudioFilterLibraryPreset = {
+      id: "creator-pack:filter-pack:vignette-1",
+      packageId: "filter-pack",
+      entryId: "vignette-1",
+      name: "첫 프리셋",
+      engine: "vignette",
+      values: { darkness: 35, size: 45, roundness: 100, feather: 60 },
+      installedAt: 1_000,
+      updatedAt: 1_000,
+      category: "creator-pack",
+      favorite: false,
+      sortOrder: 0,
+      packageVersion: "12.0.0",
+      packageFingerprint: "fixture",
+    };
+    const second = {
+      ...first,
+      id: "creator-pack:filter-pack:vignette-2",
+      entryId: "vignette-2",
+      name: "둘째 프리셋",
+      sortOrder: 1,
+    };
+    const cursor = {
+      favorite: false,
+      sortOrder: 0,
+      updatedAt: 1_000,
+      id: first.id,
+    };
+    const query = vi.fn()
+      .mockResolvedValueOnce({
+        items: [first],
+        nextCursor: cursor,
+        hasMore: true,
+        totalCount: 2,
+      })
+      .mockResolvedValueOnce({
+        items: [second],
+        nextCursor: null,
+        hasMore: false,
+        totalCount: 2,
+      });
+    const product: ProductFilterLibraryRepository = {
+      authority: "sqlite",
+      legacyDataPolicy: STUDIO_FILTER_LIBRARY_DATA_POLICY,
+      repository: {
+        query,
+        getById: vi.fn(),
+        put: vi.fn(),
+        putMany: vi.fn(),
+        delete: vi.fn(),
+        deleteMany: vi.fn(),
+        setFavorite: vi.fn(),
+      },
+    };
+    render(
+      <StudioFilterDialog
+        activeKey="filter:vignette-paged"
+        kind="vignette"
+        image={{}}
+        rootRef={createRef<HTMLElement>()}
+        acquireFilterLibrary={() => Promise.resolve(product)}
+        onPreview={vi.fn()}
+        onApply={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    const loadMore = await screen.findByRole("button", { name: "더 불러오기 (1/2)" });
+    expect(screen.queryByText("둘째 프리셋")).toBeNull();
+    fireEvent.click(loadMore);
+    await waitFor(() => expect(screen.getByText("둘째 프리셋")).toBeTruthy());
+    expect(query).toHaveBeenNthCalledWith(2, {
+      cursor,
+      engine: "vignette",
+      limit: 128,
+    });
+    expect(screen.queryByRole("button", { name: /더 불러오기/u })).toBeNull();
   });
 
   it("renders schema-driven sliders for filter-pack kinds (vignette)", () => {
@@ -455,5 +665,119 @@ describe("StudioFilterDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "적용" }));
     expect(onApply).toHaveBeenCalledTimes(1);
     expect(onApply.mock.calls[0]?.[1]).toMatchObject({ kind: "lens-flare" });
+  });
+
+  it("cuts the canvas out of the scrim while the canvas preview is on, without changing dismissal", () => {
+    const { rootRef } = mountStudioRootWithCanvas();
+    const onClose = vi.fn();
+    render(
+      <StudioFilterDialog
+        activeKey="filter:motion-blur"
+        kind="motion-blur"
+        image={{}}
+        rootRef={rootRef}
+        onPreview={vi.fn()}
+        onApply={vi.fn()}
+        onClose={onClose}
+      />,
+    );
+
+    const scrim = backdrop();
+    expect(scrim.dataset.studioFilterPreviewCutout).toBe("true");
+    const bands = [...scrim.querySelectorAll("span")].filter((band) =>
+      band.className.includes("backdrop-blur-sm"),
+    );
+    expect(bands).toHaveLength(4);
+    // 캔버스 사각형(300,200 ~ 1200,700)이 어느 밴드에도 칠해지지 않는다.
+    expect(bands.map((band) => band.getAttribute("style"))).toEqual([
+      "top: 0px; left: 0px; right: 0px; height: 200px;",
+      "top: 700px; left: 0px; right: 0px; bottom: 0px;",
+      "top: 200px; left: 0px; width: 300px; height: 500px;",
+      "top: 200px; left: 1200px; right: 0px; height: 500px;",
+    ]);
+    // 클릭 캐처는 여전히 화면 전체 하나 — 바깥 클릭 해제 동작은 그대로다.
+    expect(scrim.className).toContain("absolute inset-0");
+    fireEvent.click(scrim);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("restores the whole-screen scrim when the artist turns the canvas preview off", () => {
+    const { rootRef } = mountStudioRootWithCanvas();
+    render(
+      <StudioFilterDialog
+        activeKey="filter:motion-blur"
+        kind="motion-blur"
+        image={{}}
+        rootRef={rootRef}
+        onPreview={vi.fn()}
+        onApply={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "캔버스 미리보기" }));
+
+    const scrim = backdrop();
+    expect(scrim.dataset.studioFilterPreviewCutout).toBeUndefined();
+    const bands = [...scrim.querySelectorAll("span")].filter((band) =>
+      band.className.includes("backdrop-blur-sm"),
+    );
+    expect(bands).toHaveLength(1);
+    expect(bands[0]?.className).toContain("inset-0");
+  });
+
+  it("returns focus to the working canvas instead of the shortcut-swallowing menu trigger", () => {
+    withStubbedLayout(() => {
+      const { root, rootRef, viewport } = mountStudioRootWithCanvas();
+      const menu = document.createElement("nav");
+      menu.setAttribute("data-studio-shortcut-boundary", "true");
+      const trigger = document.createElement("button");
+      menu.append(trigger);
+      root.append(menu);
+      trigger.focus();
+      expect(document.activeElement).toBe(trigger);
+
+      const view = render(
+        <StudioFilterDialog
+          activeKey="filter:motion-blur"
+          kind="motion-blur"
+          image={{}}
+          rootRef={rootRef}
+          onPreview={vi.fn()}
+          onApply={vi.fn()}
+          onClose={vi.fn()}
+        />,
+      );
+      // 모달은 먼저 다이얼로그 안으로 포커스를 가져간다.
+      expect(document.activeElement).not.toBe(trigger);
+
+      view.unmount();
+
+      expect(document.activeElement).toBe(viewport);
+    });
+  });
+
+  it("keeps the default trigger restoration when the launcher does not swallow shortcuts", () => {
+    withStubbedLayout(() => {
+      const { root, rootRef } = mountStudioRootWithCanvas();
+      const trigger = document.createElement("button");
+      root.append(trigger);
+      trigger.focus();
+
+      const view = render(
+        <StudioFilterDialog
+          activeKey="filter:motion-blur"
+          kind="motion-blur"
+          image={{}}
+          rootRef={rootRef}
+          onPreview={vi.fn()}
+          onApply={vi.fn()}
+          onClose={vi.fn()}
+        />,
+      );
+      view.unmount();
+
+      expect(document.activeElement).toBe(trigger);
+    });
   });
 });

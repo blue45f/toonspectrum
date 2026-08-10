@@ -23,6 +23,10 @@ import {
   studioInkFallbackPressure,
 } from "./studio-ink-pressure-model";
 import {
+  resolveStudioCausalInkNib,
+  type StudioCausalInkNib,
+} from "./studio-marker-nib-profile";
+import {
   fillStudioPixelPencilCells,
   isStudioPixelPencilRenderMode,
   planStudioPixelPencilCells,
@@ -36,7 +40,147 @@ import type { StudioLiveInkStrokeStyle } from "./studio-live-ink-overlay";
 import type { StudioStrokePaintModel } from "./studio-stroke-paint-model";
 import type Konva from "konva";
 
-export type StudioDraftPreviewActiveLane = "normal" | "fixed-fx" | "dynamic" | null;
+export type StudioDraftPreviewCompositeMode = "source-over" | "backdrop-multiply";
+
+export interface StudioDraftPreviewCompositeRun {
+  readonly elements: readonly DrawEl[];
+  readonly key: string;
+  readonly mode: StudioDraftPreviewCompositeMode;
+}
+
+export const STUDIO_DRAFT_PREVIEW_MAX_SETTLED_COMPOSITE_LAYERS = 2;
+
+export type StudioDraftPreviewCompositeRunPlan =
+  | readonly []
+  | readonly [StudioDraftPreviewCompositeRun]
+  | readonly [StudioDraftPreviewCompositeRun, StudioDraftPreviewCompositeRun];
+
+export interface StudioDraftPreviewBackdropBoundaryPlan {
+  readonly action: "continue" | "flush";
+  readonly reason: "within-layer-bound" | "retained-dom-backdrop" | "third-blend-run";
+}
+
+export interface StudioDraftPreviewBackdropBoundaryExecution {
+  readonly ready: boolean;
+  readonly synchronized: boolean;
+}
+
+export type StudioDraftPreviewActiveLane =
+  | "normal"
+  | "backdrop-multiply"
+  | "fixed-fx"
+  | "dynamic"
+  | null;
+
+/**
+ * Returns the DOM-canvas blend contract required by one retained preview element.
+ *
+ * A Konva Layer is a separate transparent HTMLCanvasElement. Therefore a highlighter Shape using
+ * Canvas2D `multiply` cannot see committed pixels in a lower Layer: its first source is simply
+ * painted onto transparency. The Layer canvas itself must multiply against the already-composited
+ * backdrop. This mode is deliberately limited to the one-wash freehand highlighter path; applying
+ * it to a mixed run would incorrectly multiply ordinary drafts as well.
+ */
+export function resolveStudioDraftPreviewCompositeMode(
+  element: Pick<DrawEl, "brush" | "fill" | "kind" | "mode">,
+): StudioDraftPreviewCompositeMode {
+  if (
+    element.mode === "pen"
+    && (element.kind ?? "freehand") === "freehand"
+    && !element.fill
+    && resolveStudioBrushRenderFamily(element.brush) === "highlighter"
+  ) return "backdrop-multiply";
+  return "source-over";
+}
+
+function collectStudioDraftPreviewCompositeRuns(
+  elements: readonly DrawEl[],
+): StudioDraftPreviewCompositeRun[] {
+  const runs: Array<{
+    elements: DrawEl[];
+    key: string;
+    mode: StudioDraftPreviewCompositeMode;
+  }> = [];
+  for (const element of elements) {
+    const mode = resolveStudioDraftPreviewCompositeMode(element);
+    const previous = runs.at(-1);
+    if (previous?.mode === mode) {
+      previous.elements.push(element);
+      continue;
+    }
+    runs.push({
+      elements: [element],
+      key: `${element.id}:${mode}`,
+      mode,
+    });
+  }
+  return runs;
+}
+
+/**
+ * Decides whether the existing 200 ms retained queue must be made canonical before pointerdown.
+ *
+ * A multiply preview can see retained Konva canvases, but an older native DOM live surface is a
+ * separate authority sibling. That sibling must be synchronously handed to the main scene before
+ * the new wash owns its first sample. Independently, a third alternating blend run would require a
+ * third full-DPR Konva Layer, so it is also a hard flush boundary.
+ */
+export function planStudioDraftPreviewBackdropBoundary(input: {
+  readonly incoming: Pick<DrawEl, "brush" | "fill" | "kind" | "mode">;
+  readonly pending: readonly DrawEl[];
+  readonly hasRetainedDomBackdrop: boolean;
+}): StudioDraftPreviewBackdropBoundaryPlan {
+  const incomingMode = resolveStudioDraftPreviewCompositeMode(input.incoming);
+  if (incomingMode === "backdrop-multiply" && input.hasRetainedDomBackdrop) {
+    return { action: "flush", reason: "retained-dom-backdrop" };
+  }
+  const pendingRuns = collectStudioDraftPreviewCompositeRuns(input.pending);
+  const projectedRunCount = pendingRuns.length + (
+    pendingRuns.at(-1)?.mode === incomingMode ? 0 : 1
+  );
+  if (projectedRunCount > STUDIO_DRAFT_PREVIEW_MAX_SETTLED_COMPOSITE_LAYERS) {
+    return { action: "flush", reason: "third-blend-run" };
+  }
+  return { action: "continue", reason: "within-layer-bound" };
+}
+
+/** Executes the planned authority handoff before the caller reads the first pointer coordinate. */
+export function executeStudioDraftPreviewBackdropBoundary(input: {
+  readonly plan: StudioDraftPreviewBackdropBoundaryPlan;
+  readonly flushSynchronously: (flush: () => void) => void;
+  readonly flushPending: () => boolean;
+  readonly restorePointerPosition: () => void;
+}): StudioDraftPreviewBackdropBoundaryExecution {
+  if (input.plan.action === "continue") {
+    return { ready: true, synchronized: false };
+  }
+  let ready = false;
+  input.flushSynchronously(() => {
+    ready = input.flushPending();
+  });
+  if (!ready) return { ready: false, synchronized: false };
+  input.restorePointerPosition();
+  return { ready: true, synchronized: true };
+}
+
+/**
+ * Preserves FIFO paint order while sharing one canvas between adjacent drafts with the same blend.
+ * Alternating normal/highlighter strokes remain separate DOM layers so a later source-over stroke
+ * can cover an earlier wash exactly as it will after the main-layer commit.
+ */
+export function planStudioDraftPreviewCompositeRuns(
+  elements: readonly DrawEl[],
+): StudioDraftPreviewCompositeRunPlan {
+  const runs = collectStudioDraftPreviewCompositeRuns(elements);
+  if (runs.length > STUDIO_DRAFT_PREVIEW_MAX_SETTLED_COMPOSITE_LAYERS) {
+    throw new RangeError(
+      "Studio draft preview exceeded the two-layer blend boundary; flush pending strokes before starting the next blend run.",
+    );
+  }
+  if (runs.length === 0) return [];
+  if (runs.length === 1) return [runs[0]!];
+  return [runs[0]!, runs[1]!];
+}
 
 /**
  * Chooses the smallest preview surface that preserves the brush's accepted pixel semantics.
@@ -55,6 +199,9 @@ export function resolveStudioDraftPreviewActiveLane(
   ) return "dynamic";
 
   const brushFamily = resolveStudioBrushRenderFamily(active.brush);
+  if (resolveStudioDraftPreviewCompositeMode(active) === "backdrop-multiply") {
+    return "backdrop-multiply";
+  }
   if (
     active.mode === "pen"
     && (active.kind ?? "freehand") === "freehand"
@@ -133,6 +280,8 @@ export interface StudioCausalInkDrawContract {
   readonly paintModel?: StudioStrokePaintModel;
   readonly opacity: number;
   readonly composite: GlobalCompositeOperation;
+  /** Chisel/bullet footprint for the marker family; omitted brushes keep the round dab. */
+  readonly nib?: StudioCausalInkNib;
 }
 
 export function resolveStudioCausalInkDrawContract(
@@ -155,6 +304,8 @@ export function resolveStudioCausalInkDrawContract(
     paintModel: isStudioStrokePaintModelCompatible(el) ? el.paintModel : undefined,
     opacity: Math.min(1, Math.max(0, el.opacity ?? 1)),
     composite: eraser ? "destination-out" : "source-over",
+    // An eraser lifts ink with its own footprint, not with the selected marker's wedge.
+    ...(eraser ? {} : { nib: resolveStudioCausalInkNib(el.brush) }),
   };
 }
 
@@ -258,7 +409,8 @@ export function drawStudioCausalInkDabs(
   strokeWidth: number,
   minDistance: number,
   pressureModel?: StudioInkPressureModel,
-  paintModel?: StudioStrokePaintModel
+  paintModel?: StudioStrokePaintModel,
+  nib?: StudioCausalInkNib
 ): void {
   const plan = planStudioCausalInk({
     points,
@@ -267,7 +419,7 @@ export function drawStudioCausalInkDabs(
     size: strokeWidth,
     pressureModel,
   });
-  fillStudioCausalInkDabs(context, plan.dabs, strokeColor, paintModel);
+  fillStudioCausalInkDabs(context, plan.dabs, strokeColor, paintModel, nib);
 }
 
 /** Draws the already-resolved contract without reapplying alias or pressure transformations. */
@@ -283,7 +435,8 @@ export function drawStudioCausalInkContract(
     contract.strokeWidth,
     contract.minDistance,
     contract.pressureModel,
-    contract.paintModel
+    contract.paintModel,
+    contract.nib
   );
 }
 

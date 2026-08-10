@@ -1,6 +1,9 @@
 /// <reference lib="webworker" />
 
 import {
+  planStudioHokusaiContactDwell,
+} from "./studio-hokusai-contact-dwell";
+import {
   STUDIO_HOKUSAI_LIVE_ADAPTER_VERSION,
   STUDIO_HOKUSAI_LIVE_BRUSH_PROTOCOL_VERSION,
   STUDIO_HOKUSAI_LIVE_SAMPLE_STRIDE,
@@ -12,6 +15,7 @@ import {
   type StudioHokusaiLiveWorkerOutboundMessage,
 } from "./studio-hokusai-live-brush-protocol";
 import {
+  STUDIO_HOKUSAI_NATURAL_MEDIA_CONTRACT_VERSION,
   STUDIO_HOKUSAI_NATURAL_MEDIA_LIMITS,
 } from "./studio-hokusai-natural-media-contract";
 import {
@@ -211,7 +215,7 @@ function applyOpacity(pixels: Uint8Array, opacity: number): void {
 function materialPlan(stroke: ActiveStroke) {
   return {
     kind: "studio-hokusai-natural-media/render-plan" as const,
-    version: "studio-hokusai-natural-media-v1" as const,
+    version: STUDIO_HOKUSAI_NATURAL_MEDIA_CONTRACT_VERSION,
     engine: {
       id: "reearth-hokusai" as const,
       version: "0.3.0" as const,
@@ -226,6 +230,7 @@ function materialPlan(stroke: ActiveStroke) {
       revision: "hokusai-source-v1:0000000000000000" as const,
     },
     presetId: stroke.config.presetId,
+    materialProfileId: stroke.config.materialProfileId,
     color: stroke.config.color,
     opacity: stroke.config.opacity,
     seed: stroke.config.seed,
@@ -523,6 +528,41 @@ async function emitLiveFrame(
   });
 }
 
+/**
+ * Deposit the planned contact dwell for a stroke whose carrier never reached one dab of travel.
+ *
+ * This runs strictly after `finishStroke` observed an empty dirty region for the whole stroke, so
+ * it cannot alter the geometry of any stroke that already composed pixels. The dwell re-opens the
+ * same canvas with the stroke's own seed and brush snapshot, so the deposited mark is a
+ * deterministic function of the admitted config plus the artist's own contact samples. The
+ * synthesized samples are deliberately absent from `inputChunks`/`sampleCount`: the receipt keeps
+ * describing the artist's input, and the recovery stays a pure function of it.
+ */
+async function depositContactDwell(stroke: ActiveStroke): Promise<PackedDirtyFrame | null> {
+  if (stroke.compositeBounds) return null;
+  const dwell = planStudioHokusaiContactDwell({
+    samples: stroke.samples,
+    radiusPixels: stroke.config.radiusPixels,
+    surfaceWidth: stroke.config.surfaceWidth,
+    surfaceHeight: stroke.config.surfaceHeight,
+  });
+  if (!dwell) return null;
+  stroke.canvas.beginStroke(stroke.brush, stroke.config.seed);
+  for (const sample of dwell) {
+    stroke.canvas.addSample(
+      stroke.brush,
+      sample.x,
+      sample.y,
+      sample.pressure,
+      sample.tiltX,
+      sample.tiltY,
+      sample.timeMilliseconds,
+    );
+  }
+  stroke.canvas.finishStroke(stroke.brush);
+  return takePackedDirtyFrame(stroke);
+}
+
 /** One full-frame read is permitted only at canonical finish, never on a live pointer batch. */
 async function completeCanonicalStroke(stroke: ActiveStroke): Promise<void> {
   const bounds = stroke.compositeBounds;
@@ -593,6 +633,7 @@ async function completeCanonicalStroke(stroke: ActiveStroke): Promise<void> {
       engineEpoch: stroke.engineEpoch,
       strokeId: stroke.strokeId,
       presetId: stroke.config.presetId,
+      materialProfileId: stroke.config.materialProfileId,
       seed: stroke.config.seed,
       sampleCount: stroke.sampleCount,
       finalSequence: stroke.lastSequence,
@@ -685,6 +726,7 @@ async function main(): Promise<void> {
       canonicalPng: true,
       liveCommitParityReceipt: true,
       materialTexture: "studio-hokusai-material-texture-v2",
+      materialProfileRouting: "identity-profile-v1",
       endpointPolicy: "tapered-start-no-dab-carrier-v1",
       mainThreadFullFrameCopy: false,
     },
@@ -811,7 +853,11 @@ async function main(): Promise<void> {
       try {
         stroke.finishing = true;
         stroke.canvas.finishStroke(stroke.brush);
-        const tail = await takePackedDirtyFrame(stroke);
+        // A zero-travel gesture (a deliberate tap) leaves the carrier with nothing to deposit.
+        // Recover it as one bounded contact dwell instead of failing the whole stroke, so a tap
+        // lands the natural-media point an artist expects rather than an exact-vector apology.
+        const tail = await takePackedDirtyFrame(stroke)
+          ?? await depositContactDwell(stroke);
         if (tail) {
           // The main-thread overlay must compose and acknowledge the finish tail before canonical
           // completion. This prevents the pointer-up image from popping to a different result.

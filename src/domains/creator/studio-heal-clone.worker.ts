@@ -1,6 +1,7 @@
-import { applyHealCloneDabs } from "./studio-heal-clone";
+import { applyHealCloneDabsFromSeparateRegions } from "./studio-heal-clone";
 import {
   STUDIO_HEAL_CLONE_WORKER_PROTOCOL_VERSION,
+  assertStudioHealCloneWorkerRequest,
   studioHealCloneSuccessTransfers,
   type StudioHealCloneWorkerFailureMessage,
   type StudioHealCloneWorkerResponseMessage,
@@ -30,15 +31,18 @@ function serializeWorkerError(error: unknown): StudioHealCloneWorkerFailureMessa
 workerScope.onmessage = (event) => {
   const message = event.data;
   if (
-    message.type !== "studio-heal-clone/run" ||
-    message.version !== STUDIO_HEAL_CLONE_WORKER_PROTOCOL_VERSION
+    !message
+    || typeof message !== "object"
+    || message.type !== "studio-heal-clone/run"
+    || message.version !== STUDIO_HEAL_CLONE_WORKER_PROTOCOL_VERSION
   ) {
     return;
   }
 
   try {
+    assertStudioHealCloneWorkerRequest(message.request);
     const { src, dst, dabs, radiusPx, hardness, opacity, mode } = message.request;
-    applyHealCloneDabs(src, dst, dabs, radiusPx, hardness, opacity, mode);
+    applyHealCloneDabsFromSeparateRegions(src, dst, dabs, radiusPx, hardness, opacity, mode);
     const response: StudioHealCloneWorkerSuccessMessage = {
       type: "studio-heal-clone/success",
       version: STUDIO_HEAL_CLONE_WORKER_PROTOCOL_VERSION,

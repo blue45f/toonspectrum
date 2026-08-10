@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   STUDIO_CANONICAL_FILTER_CURVE_INTERPOLATION,
@@ -19,6 +19,8 @@ import {
   STUDIO_ENGINE_WEBGPU_FILTER_UNSHARP_WGSL,
   StudioEngineWebGpuFilterRuntime,
 } from "./studio-engine-webgpu-filter-runtime";
+import { resetStudioReliabilityStatus } from "./studio-reliability-status-store";
+import { disposeStudioSafeModeRuntime } from "./studio-safe-mode-runtime";
 
 import type {
   StudioCanonicalFilterExecutionPlan,
@@ -28,6 +30,13 @@ import type {
 import type {
   StudioEngineWebGpuFilterExecutionRequest,
 } from "./studio-engine-webgpu-filter-runtime";
+
+// 디바이스 로스 고지는 세션 단위 Safe Mode 상태기계를 세운다(백오프 타이머 포함).
+// 테스트마다 내려서 타이머와 전역 신호가 다음 테스트로 새지 않게 한다.
+afterEach(() => {
+  disposeStudioSafeModeRuntime();
+  resetStudioReliabilityStatus();
+});
 
 interface Deferred<T> {
   readonly promise: Promise<T>;

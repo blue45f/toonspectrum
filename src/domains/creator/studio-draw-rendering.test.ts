@@ -9,10 +9,14 @@ import {
   drawLiveFreehandDraftToContext,
   drawStudioCausalInkContract,
   drawStudioCausalInkDabs,
+  executeStudioDraftPreviewBackdropBoundary,
   getSymmetricPoints,
   isDirectLiveDraftEl,
   isDirectLiveStampDraftEl,
+  planStudioDraftPreviewBackdropBoundary,
+  planStudioDraftPreviewCompositeRuns,
   resolveStudioCausalInkDrawContract,
+  resolveStudioDraftPreviewCompositeMode,
   resolveStudioLiveInkStrokeStyle,
   studioLiveBrushEffectiveDiameter,
   studioLiveBrushPressure,
@@ -248,6 +252,124 @@ describe("studio draw rendering bounds and symmetry", () => {
 
     expect(variations).toHaveLength(64);
     expect(variations.flat().every(Number.isFinite)).toBe(true);
+  });
+});
+
+describe("studio draft preview destination-aware composition", () => {
+  it("limits backdrop multiplication to unfilled freehand highlighter paint", () => {
+    expect(resolveStudioDraftPreviewCompositeMode(drawEl({
+      brush: "highlighter",
+      mode: "pen",
+    }))).toBe("backdrop-multiply");
+    expect(resolveStudioDraftPreviewCompositeMode(drawEl({
+      brush: "chisel-highlighter",
+      mode: "pen",
+      kind: "freehand",
+    }))).toBe("backdrop-multiply");
+    expect(resolveStudioDraftPreviewCompositeMode(drawEl({
+      brush: "highlighter",
+      fill: "#ffffff",
+      kind: "rect",
+      mode: "pen",
+    }))).toBe("source-over");
+    expect(resolveStudioDraftPreviewCompositeMode(drawEl({
+      brush: "oil",
+      mode: "pen",
+    }))).toBe("source-over");
+    expect(resolveStudioDraftPreviewCompositeMode(drawEl({
+      brush: "highlighter",
+      mode: "eraser",
+    }))).toBe("source-over");
+  });
+
+  it("groups only adjacent equivalent modes and never reorders the bounded retained FIFO", () => {
+    const highlighterA = drawEl({ id: "highlighter-a", brush: "highlighter", mode: "pen" });
+    const highlighterB = drawEl({ id: "highlighter-b", brush: "pastel-highlighter", mode: "pen" });
+    const normalAfter = drawEl({ id: "normal-after", brush: "oil", mode: "pen" });
+
+    const runs = planStudioDraftPreviewCompositeRuns([
+      highlighterA,
+      highlighterB,
+      normalAfter,
+    ]);
+    expect(runs.map(({ elements, mode }) => ({
+      ids: elements.map(({ id }) => id),
+      mode,
+    }))).toEqual([
+      {
+        ids: ["highlighter-a", "highlighter-b"],
+        mode: "backdrop-multiply",
+      },
+      { ids: ["normal-after"], mode: "source-over" },
+    ]);
+  });
+
+  it("plans a synchronous boundary for retained DOM ink and for a third blend transition", () => {
+    const pen = drawEl({ id: "pen", brush: "pen", mode: "pen" });
+    const wash = drawEl({ id: "wash", brush: "highlighter", mode: "pen" });
+    const oil = drawEl({ id: "oil", brush: "oil", mode: "pen" });
+
+    expect(planStudioDraftPreviewBackdropBoundary({
+      incoming: wash,
+      pending: [pen],
+      hasRetainedDomBackdrop: true,
+    })).toEqual({ action: "flush", reason: "retained-dom-backdrop" });
+    expect(planStudioDraftPreviewBackdropBoundary({
+      incoming: oil,
+      pending: [pen, wash],
+      hasRetainedDomBackdrop: false,
+    })).toEqual({ action: "flush", reason: "third-blend-run" });
+    expect(planStudioDraftPreviewBackdropBoundary({
+      incoming: oil,
+      pending: [wash],
+      hasRetainedDomBackdrop: false,
+    })).toEqual({ action: "continue", reason: "within-layer-bound" });
+  });
+
+  it("flushes before restoring the pointer and never admits a first sample after failure", () => {
+    const events: string[] = [];
+    const plan = { action: "flush", reason: "retained-dom-backdrop" } as const;
+    const success = executeStudioDraftPreviewBackdropBoundary({
+      plan,
+      flushSynchronously: (flush) => {
+        events.push("flush-sync:start");
+        flush();
+        events.push("flush-sync:end");
+      },
+      flushPending: () => {
+        events.push("commit:pending-pen");
+        return true;
+      },
+      restorePointerPosition: () => events.push("pointer:first-sample-restored"),
+    });
+    events.push("crdt:begin-highlighter");
+
+    expect(success).toEqual({ ready: true, synchronized: true });
+    expect(events).toEqual([
+      "flush-sync:start",
+      "commit:pending-pen",
+      "flush-sync:end",
+      "pointer:first-sample-restored",
+      "crdt:begin-highlighter",
+    ]);
+
+    const failedEvents: string[] = [];
+    const failure = executeStudioDraftPreviewBackdropBoundary({
+      plan,
+      flushSynchronously: (flush) => flush(),
+      flushPending: () => false,
+      restorePointerPosition: () => failedEvents.push("must-not-run"),
+    });
+    expect(failure).toEqual({ ready: false, synchronized: false });
+    expect(failedEvents).toEqual([]);
+  });
+
+  it("rejects a third settled full-stage run instead of allocating canvases without a bound", () => {
+    expect(() => planStudioDraftPreviewCompositeRuns([
+      drawEl({ id: "normal-before", brush: "watercolor", mode: "pen" }),
+      drawEl({ id: "wash", brush: "highlighter", mode: "pen" }),
+      drawEl({ id: "normal-after", brush: "oil", mode: "pen" }),
+    ])).toThrow(/two-layer blend boundary/u);
   });
 });
 

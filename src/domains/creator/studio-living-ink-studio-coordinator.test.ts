@@ -204,6 +204,33 @@ describe("StudioLivingInkStudioCoordinator", () => {
     work.frame.image.close();
   });
 
+  it("never reads the GPU field back while pointer chunks are still arriving", async () => {
+    const provider = new FakeProvider();
+    const coordinator = await activated(provider);
+    coordinator.admitStroke({ pageId: "page-1", strokeId: "hot-path", recipe });
+    coordinator.pinActiveRoute("hot-path", "route-hot-path");
+
+    expect(coordinator.append(
+      "hot-path",
+      "route-hot-path",
+      Array.from({ length: 8 }, (_, index) => sample(index)),
+    )).toBe(true);
+    await vi.waitFor(() => expect(provider.simulationAcks).toHaveLength(1));
+    expect(provider.renderCount).toBe(0);
+
+    expect(coordinator.append(
+      "hot-path",
+      "route-hot-path",
+      Array.from({ length: 8 }, (_, index) => sample(index + 8)),
+    )).toBe(true);
+    await vi.waitFor(() => expect(provider.simulationAcks).toHaveLength(2));
+    expect(provider.renderCount).toBe(0);
+
+    const work = await coordinator.finishStroke("hot-path", "route-hot-path");
+    expect(provider.renderCount).toBe(1);
+    work.frame.image.close();
+  });
+
   it("removes only the synthetic bridge anchor and preserves a real same-position dwell", async () => {
     const provider = new FakeProvider();
     const coordinator = await activated(provider);
@@ -292,20 +319,13 @@ describe("StudioLivingInkStudioCoordinator", () => {
 
   it("owns admission, append, bounded settle, acceptance, and replay as one positive lifecycle", async () => {
     const first = new FakeProvider();
-    const presented: string[] = [];
-    const coordinator = await activated(first, {
-      onInteractiveFrame: (next, routeKey) => {
-        presented.push(routeKey);
-        next.image.close();
-      },
-    });
+    const coordinator = await activated(first);
     expect(coordinator.admitStroke({ pageId: "page-1", strokeId: "stroke-1", recipe })).toBe(true);
     expect(coordinator.pinActiveRoute("stroke-1", "route-1")).toBe(true);
     expect(coordinator.append("stroke-1", "route-1", [sample(0), sample(1)])).toBe(true);
     const work = await coordinator.finishStroke("stroke-1", "route-1");
     expect(coordinator.acceptFinishedStroke(work)).toBe(true);
     work.frame.image.close();
-    expect(presented).toEqual([]);
 
     const replay = new FakeProvider();
     const reopened = new StudioLivingInkStudioCoordinator({ providerFactory: async () => replay });
@@ -447,6 +467,58 @@ describe("StudioLivingInkStudioCoordinator", () => {
     expect(coordinator.state).toBe("unavailable");
     releaseApply();
     await Promise.resolve();
+  });
+
+  it("invalidates and disposes a provider that finishes loading after physical mode is disabled", async () => {
+    let resolveProvider!: (provider: FakeProvider) => void;
+    const provider = new FakeProvider();
+    const coordinator = new StudioLivingInkStudioCoordinator({
+      providerFactory: () => new Promise<StudioLivingInkCoordinatorProvider>((resolve) => {
+        resolveProvider = resolve;
+      }),
+    });
+
+    const activation = coordinator.activate({ pageId: "page-1", config });
+    await Promise.resolve();
+    expect(coordinator.state).toBe("loading");
+
+    await expect(coordinator.dispose()).resolves.toBeUndefined();
+    expect(coordinator.state).toBe("unavailable");
+    expect(coordinator.pageId).toBeNull();
+
+    resolveProvider(provider);
+    await expect(activation).resolves.toBe(false);
+    expect(provider.disposed).toHaveBeenCalledTimes(1);
+    expect(coordinator.state).toBe("unavailable");
+    expect(coordinator.pageId).toBeNull();
+  });
+
+  it("disposes the loading provider immediately when physical replay is disabled mid-operation", async () => {
+    let releaseReplay!: () => void;
+    const provider = new FakeProvider();
+    provider.pendingApply = new Promise<void>((resolve) => { releaseReplay = resolve; });
+    const coordinator = new StudioLivingInkStudioCoordinator({
+      providerFactory: async () => provider,
+    });
+    const journal: StudioLivingInkOperation[] = [{
+      kind: "advance",
+      version: 1,
+      sequence: 1,
+      fixedTicks: 1,
+    }];
+
+    const activation = coordinator.activate({ pageId: "page-1", config, journal });
+    while (provider.operations.length === 0) await Promise.resolve();
+    expect(coordinator.state).toBe("loading");
+
+    await expect(coordinator.dispose()).resolves.toBeUndefined();
+    expect(provider.disposed).toHaveBeenCalledTimes(1);
+    expect(coordinator.state).toBe("unavailable");
+
+    releaseReplay();
+    await expect(activation).resolves.toBe(false);
+    expect(provider.disposed).toHaveBeenCalledTimes(1);
+    expect(coordinator.state).toBe("unavailable");
   });
 
   it("cancels and rebuilds committed authority without waiting for a hung apply", async () => {

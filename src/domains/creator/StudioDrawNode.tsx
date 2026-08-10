@@ -34,10 +34,14 @@ import {
 import {
   resolveStudioBrushDynamicsPresetId,
 } from "./studio-brush-dynamics";
-import { resolveStudioBrushSinglePointRoute } from "./studio-brush-runtime-contract";
+import {
+  resolveStudioBrushRuntimeContract,
+  resolveStudioBrushSinglePointRoute,
+} from "./studio-brush-runtime-contract";
 import {
   resolveStudioStampBrushKind,
 } from "./studio-brush-stamp-engine";
+import { resolveStudioCalligraphyRenderTip } from "./studio-calligraphy-nib-profile";
 import { planStudioCalligraphyRibbon } from "./studio-calligraphy-ribbon";
 import {
   DEFAULT_STUDIO_CAUSAL_WATERCOLOR_MAX_DABS,
@@ -79,6 +83,7 @@ import {
   planStudioHighlighterWashRibbon,
   planStudioHighlighterWashTap,
   resolveStudioHighlighterWashBrushId,
+  traceStudioHighlighterWashDetail,
   traceStudioHighlighterWashPlan,
 } from "./studio-highlighter-wash-ribbon";
 import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "./studio-material-pressure-model";
@@ -106,6 +111,7 @@ import {
 } from "./studio-pixel-pencil";
 import {
   planStudioRetainedMediaPressureCurve,
+  planStudioRetainedMediaTapDab,
   resolveStudioRetainedMediaPressure,
   resolveStudioRetainedMediaPressureProfileId,
 } from "./studio-retained-media-pressure";
@@ -296,9 +302,11 @@ export const StudioDrawNode = memo(function StudioDrawNode({
   const kind = el.kind ?? "freehand";
   // 패턴 채우기 타일(로드 전 null) — 우선순위: 패턴 > 그라데이션 > 단색(fillPriority).
   const patternImage = usePatternFillImage(el.pattern);
-  const composite = el.mode === "eraser" ? "destination-out" : "source-over";
+  const isEraserOperation = el.mode === "eraser"
+    || (el.brush ? resolveStudioBrushRuntimeContract(el.brush)?.operation === "erase" : false);
+  const composite = isEraserOperation ? "destination-out" : "source-over";
   const opacity = el.opacity ?? 1;
-  const stroke = el.mode === "eraser" ? "#16100c" : el.stroke;
+  const stroke = isEraserOperation ? "#16100c" : el.stroke;
   const strokeWidth = Math.max(1, el.strokeWidth);
   // 스트로크 스타일(점선/선 끝) + 도형 파라미터 — 미설정 요소는 기본값으로 정규화된다.
   const strokeStyle = normalizeStrokeStyle(el.strokeStyle);
@@ -347,6 +355,8 @@ export const StudioDrawNode = memo(function StudioDrawNode({
         stroke,
         stampGrid: dynamicBrushPlan.renderBudget.stampGrid,
         markBudget: dynamicBrushPlan.markBudget,
+        // 종이 결은 획이 아니라 캔버스의 성질이라 요소 스냅샷이 아니라 렌더 플랜이 들고 온다.
+        ...(dynamicBrushPlan.paper ? { paper: dynamicBrushPlan.paper } : {}),
       })
     : null;
   const dynamicCoverageMarkPlan = dynamicCoverageAndLegacyMarkPlan?.coveragePlan ?? null;
@@ -1294,7 +1304,9 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               ),
               stylusSamples,
               aliasStrokeWidth,
-              el.brushTip
+              // Pre-nib-table documents carry no brushTip; the catalogue nib stands in so a stored
+              // fountain/parallel pen renders as the pen it was drawn with.
+              resolveStudioCalligraphyRenderTip(brush, el.brushTip)
             );
             const ribbon = planStudioCalligraphyRibbon(segments);
             return (
@@ -1544,33 +1556,66 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               el.materialPressureModel
               !== STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1
             ) {
+              // A pointerdown that never travelled has no polyline to stroke: a one-coordinate
+              // `<Line>` only emits a `moveTo`. Legacy documents therefore need the same contact
+              // dot the canonical ribbon plans below, or a tap reads as an unresponsive canvas.
+              const legacyTapDab = planStudioRetainedMediaTapDab(
+                renderPath.points,
+                undefined,
+                "pencil",
+              );
               if (aliasPencilPasses.length > 0) {
                 return (
                   <Group key={index} opacity={opacity} listening={false}>
-                    {aliasPencilPasses.map((pass) => (
-                      <Line
-                        key={pass.role}
-                        points={processStudioPencilAliasPassPoints(
-                          renderPath.points,
-                          pass.jitterRadius,
-                        )}
-                        stroke={stroke}
-                        strokeWidth={Math.max(
-                          0.5,
-                          aliasStrokeWidth * pass.widthScale,
-                        )}
-                        opacity={pass.opacityScale}
-                        lineCap="round"
-                        lineJoin="round"
-                        tension={renderPath.tension}
-                        globalCompositeOperation={composite}
-                        listening={false}
-                      />
-                    ))}
+                    {aliasPencilPasses.map((pass) => {
+                      const passWidth = Math.max(
+                        0.5,
+                        aliasStrokeWidth * pass.widthScale,
+                      );
+                      return legacyTapDab ? (
+                        <KCircle
+                          key={pass.role}
+                          x={legacyTapDab.x}
+                          y={legacyTapDab.y}
+                          radius={Math.max(0.25, passWidth / 2)}
+                          fill={stroke}
+                          opacity={pass.opacityScale}
+                          globalCompositeOperation={composite}
+                          listening={false}
+                        />
+                      ) : (
+                        <Line
+                          key={pass.role}
+                          points={processStudioPencilAliasPassPoints(
+                            renderPath.points,
+                            pass.jitterRadius,
+                          )}
+                          stroke={stroke}
+                          strokeWidth={passWidth}
+                          opacity={pass.opacityScale}
+                          lineCap="round"
+                          lineJoin="round"
+                          tension={renderPath.tension}
+                          globalCompositeOperation={composite}
+                          listening={false}
+                        />
+                      );
+                    })}
                   </Group>
                 );
               }
-              return (
+              return legacyTapDab ? (
+                <KCircle
+                  key={index}
+                  x={legacyTapDab.x}
+                  y={legacyTapDab.y}
+                  radius={Math.max(0.25, strokeWidth / 2)}
+                  fill={stroke}
+                  opacity={opacity}
+                  globalCompositeOperation={composite}
+                  listening={false}
+                />
+              ) : (
                 <Line
                   key={index}
                   points={processPencilPoints(renderPath.points)}
@@ -1595,6 +1640,42 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                   opacityScale: 1,
                   jitterRadius: 0.75,
                 }];
+            // Detected on the accepted geometry, never on the per-pass grain jitter: a tap whose
+            // samples the jitter has nudged apart would otherwise be planned as a sub-pixel ribbon
+            // sliver instead of the nib the user pressed down, and read as an unresponsive canvas.
+            const tapDab = planStudioRetainedMediaTapDab(
+              renderPath.points,
+              el.pressures,
+              pressureProfile,
+              { minimumDiameterRatio: el.materialMinimumDiameterRatio },
+            );
+            if (tapDab) {
+              return (
+                <Group key={index} opacity={opacity} listening={false}>
+                  {passes.map((pass) => (
+                    <KCircle
+                      key={pass.role}
+                      x={tapDab.x}
+                      y={tapDab.y}
+                      radius={Math.max(
+                        0.35,
+                        Math.max(0.5, aliasStrokeWidth * pass.widthScale)
+                        * tapDab.sizeScale
+                        / 2,
+                      )}
+                      fill={stroke}
+                      opacity={Math.min(
+                        1,
+                        pass.opacityScale
+                        * Math.sqrt(tapDab.opacityScale * tapDab.flowScale),
+                      )}
+                      globalCompositeOperation={composite}
+                      listening={false}
+                    />
+                  ))}
+                </Group>
+              );
+            }
             const passPlans = passes.map((pass) => {
               const curve = planStudioRetainedMediaPressureCurve(
                 processStudioPencilAliasPassPoints(
@@ -1689,11 +1770,20 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                 sceneFunc={(context) => {
                   if (washPlan.runs.length === 0) return;
                   context.save();
-                  context.globalAlpha *= washPlan.opacityScale;
+                  const washAlpha = context.globalAlpha * washPlan.opacityScale;
+                  context.globalAlpha = washAlpha;
                   context.fillStyle = stroke;
                   context.beginPath();
                   traceStudioHighlighterWashPlan(context, washPlan);
                   context.fill();
+                  // Rim pooling and fibre streaks: one extra compound fill, so a self-crossing
+                  // still receives at most one detail wash.
+                  if (washPlan.detailRuns.length > 0) {
+                    context.globalAlpha = washAlpha * washPlan.detailOpacityScale;
+                    context.beginPath();
+                    traceStudioHighlighterWashDetail(context, washPlan);
+                    context.fill();
+                  }
                   context.restore();
                 }}
                 opacity={opacity}
@@ -2047,8 +2137,13 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                       Math.max(0, lane.opacity * opacity),
                     );
                     context.lineWidth = Math.max(0.12, lane.lineWidth);
+                    // One path, one stroke per load band. Stroking each run separately made a
+                    // figure-eight deposit its ridges twice at the crossing and read as a knot;
+                    // a single stroke rasterises the band's whole coverage before compositing.
                     context.beginPath();
-                    traceStudioOilRibbonPath(context, lane);
+                    for (const run of lane.runs) {
+                      traceStudioOilRibbonPath(context, run);
+                    }
                     context.stroke();
                   }
                   context.restore();

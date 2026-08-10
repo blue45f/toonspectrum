@@ -2,6 +2,11 @@ import { eq } from "drizzle-orm";
 
 import { db, users } from "../../../../../lib/db";
 import {
+  isWhitelistedAdminEmail,
+  resolveEffectiveAdminRole,
+} from "../../../../../lib/server/admin-emails";
+import { invalidateSessionUser } from "../../../../../lib/server/session";
+import {
   ensureUserLifecycleSchema,
   getUserAuthBlock,
 } from "../../../../../lib/server/user-lifecycle";
@@ -44,6 +49,9 @@ const DEMO_SESSION_USERS: Readonly<Record<string, Omit<AuthSessionUser, "id">>> 
  * deliberately returns only profile fields that the browser may hydrate and
  * rechecks lifecycle status to close the small suspend/delete race between
  * middleware authentication and controller execution.
+ *
+ * ADMIN_EMAILS 화이트리스트 계정은 DB role 이 user 여도 세션에 admin 으로 노출하고,
+ * 한 번 조회되면 DB 도 admin 으로 지연 승격한다(메뉴 링크·게이트가 role 만으로도 동작).
  */
 export async function resolveAuthSessionUser(
   userId: string,
@@ -66,12 +74,22 @@ export async function resolveAuthSessionUser(
     .limit(1);
 
   if (!user || getUserAuthBlock(user)) return null;
+
+  const dbRole = normalizeAuthSessionRole(user.role);
+  const role = resolveEffectiveAdminRole(dbRole, user.email) as AuthSessionRole;
+
+  // 화이트리스트 지연 승격 — 다음 요청부터 DB role 자체가 admin 이라 세션·API 가 일치한다.
+  if (role === "admin" && dbRole !== "admin" && isWhitelistedAdminEmail(user.email)) {
+    await db.update(users).set({ role: "admin" }).where(eq(users.id, user.id));
+    invalidateSessionUser(user.id);
+  }
+
   return {
     id: user.id,
     name: user.name,
     email: user.email,
     image: user.image,
-    role: normalizeAuthSessionRole(user.role),
+    role,
   };
 }
 

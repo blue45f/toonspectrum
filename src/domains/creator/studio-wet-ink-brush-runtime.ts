@@ -46,7 +46,13 @@ const STUDIO_WET_INK_BRUSH_MAX_POINT_COUNT = 65_536;
 const REVISION_HASH_OFFSET = 0x811c9dc5;
 const REVISION_HASH_PRIME = 0x01000193;
 
-export type StudioWetInkBrushId = "watercolor" | "ink-wash";
+export type StudioWetInkBrushId =
+  | "watercolor"
+  | "ink-wash"
+  | "inkwash-pen"
+  | "inkwash-water-brush"
+  | "inkwash-bleed-wash"
+  | "inkwash-white-ink";
 export type StudioWetInkBrushReplayPhase = "live" | "committed";
 
 export interface StudioWetInkBrushReplayOptions {
@@ -87,9 +93,32 @@ export interface StudioWetInkBrushReplayPlan {
   readonly simulationSteps: number;
 }
 
+export interface StudioInkwashAbsorptionSpectrum {
+  readonly name: string;
+  readonly r: number;
+  readonly g: number;
+  readonly b: number;
+}
+
+export const STUDIO_INKWASH_SPECTRA_PRESETS: Readonly<Record<string, StudioInkwashAbsorptionSpectrum>> = Object.freeze({
+  "sumi-black": { name: "수묵 먹빛 (Sumi Black)", r: 1.0, g: 0.96, b: 0.88 },
+  "indigo-wash": { name: "인디고 수채 (Indigo Wash)", r: 0.2, g: 0.6, b: 1.0 },
+  "sepia-ink": { name: "세피아 잉크 (Sepia Ink)", r: 0.9, g: 0.6, b: 0.3 },
+  "vermilion-red": { name: "주홍 연지 (Vermilion Red)", r: 1.0, g: 0.25, b: 0.15 },
+  "cobalt-blue": { name: "코발트 블루 (Cobalt Blue)", r: 0.1, g: 0.45, b: 0.95 },
+  "forest-green": { name: "녹송 수묵 (Forest Green)", r: 0.2, g: 0.75, b: 0.35 },
+  "plum-blossom": { name: "매화 자홍 (Plum Blossom Ink)", r: 0.85, g: 0.2, b: 0.55 },
+  "pine-smoke": { name: "송묵 연묵 (Pine Smoke Ink)", r: 0.98, g: 0.95, b: 0.90 },
+  "bamboo-green": { name: "청죽 먹빛 (Bamboo Ink)", r: 0.25, g: 0.72, b: 0.45 },
+  "autumn-gold": { name: "추황 묵빛 (Autumn Gold Ink)", r: 0.88, g: 0.65, b: 0.18 },
+  "mineral-azurite": { name: "석청 藍 (Mineral Azurite)", r: 0.15, g: 0.38, b: 0.88 },
+  "white-highlight": { name: "화이트 하이라이트 (White Ink)", r: -1.0, g: -1.0, b: -1.0 },
+});
+
 export interface StudioWetInkBrushPhysicalMaterial {
   readonly absorption: number;
   readonly bleed: number;
+  readonly chromatography?: number;
   readonly dryingRate: number;
   readonly edgeDarkening: number;
   readonly fixationRate: number;
@@ -99,6 +128,7 @@ export interface StudioWetInkBrushPhysicalMaterial {
   readonly pigmentLoad: number;
   readonly waterLoad: number;
   readonly wetnessLoad: number;
+  readonly spectralAbsorption?: StudioInkwashAbsorptionSpectrum;
 }
 
 /**
@@ -245,7 +275,14 @@ function finiteCoordinate(value: unknown): value is number {
 }
 
 function exactWetInkBrushId(value: unknown): StudioWetInkBrushId | null {
-  return value === "watercolor" || value === "ink-wash" ? value : null;
+  return value === "watercolor"
+    || value === "ink-wash"
+    || value === "inkwash-pen"
+    || value === "inkwash-water-brush"
+    || value === "inkwash-bleed-wash"
+    || value === "inkwash-white-ink"
+    ? (value as StudioWetInkBrushId)
+    : null;
 }
 
 /**
@@ -366,6 +403,70 @@ function wetInkGeometry(
 function fieldMaterial(
   brushId: StudioWetInkBrushId,
 ): StudioWetInkBrushPhysicalMaterial {
+  if (brushId === "inkwash-water-brush") {
+    return {
+      absorption: 0.005,
+      bleed: 0.52,
+      dryingRate: 0.022,
+      edgeDarkening: 0.25,
+      fixationRate: 0.04,
+      granulation: 0.35,
+      hardness: 0.2,
+      paperRoughness: 0.45,
+      pigmentLoad: 0.05,
+      waterLoad: 1.5,
+      wetnessLoad: 1.5,
+      spectralAbsorption: STUDIO_INKWASH_SPECTRA_PRESETS["indigo-wash"],
+    };
+  }
+  if (brushId === "inkwash-bleed-wash") {
+    return {
+      absorption: 0.032,
+      bleed: 0.48,
+      dryingRate: 0.028,
+      edgeDarkening: 0.75,
+      fixationRate: 0.12,
+      granulation: 0.72,
+      hardness: 0.38,
+      paperRoughness: 0.8,
+      pigmentLoad: 1.25,
+      waterLoad: 1.2,
+      wetnessLoad: 1.25,
+      spectralAbsorption: STUDIO_INKWASH_SPECTRA_PRESETS["sumi-black"],
+    };
+  }
+  if (brushId === "inkwash-pen") {
+    return {
+      absorption: 0.04,
+      bleed: 0.22,
+      dryingRate: 0.05,
+      edgeDarkening: 0.82,
+      fixationRate: 0.25,
+      granulation: 0.25,
+      hardness: 0.75,
+      paperRoughness: 0.5,
+      pigmentLoad: 1.4,
+      waterLoad: 0.4,
+      wetnessLoad: 0.45,
+      spectralAbsorption: STUDIO_INKWASH_SPECTRA_PRESETS["sumi-black"],
+    };
+  }
+  if (brushId === "inkwash-white-ink") {
+    return {
+      absorption: 0.015,
+      bleed: 0.28,
+      dryingRate: 0.04,
+      edgeDarkening: 0.35,
+      fixationRate: 0.2,
+      granulation: 0.3,
+      hardness: 0.5,
+      paperRoughness: 0.5,
+      pigmentLoad: 1.2,
+      waterLoad: 0.6,
+      wetnessLoad: 0.65,
+      spectralAbsorption: STUDIO_INKWASH_SPECTRA_PRESETS["white-highlight"],
+    };
+  }
   if (brushId === "ink-wash") {
     return {
       absorption: 0.028,
@@ -379,6 +480,7 @@ function fieldMaterial(
       pigmentLoad: 1.16,
       waterLoad: 0.78,
       wetnessLoad: 0.88,
+      spectralAbsorption: STUDIO_INKWASH_SPECTRA_PRESETS["sumi-black"],
     };
   }
   return {
@@ -393,6 +495,7 @@ function fieldMaterial(
     pigmentLoad: 0.76,
     waterLoad: 0.98,
     wetnessLoad: 0.96,
+    spectralAbsorption: STUDIO_INKWASH_SPECTRA_PRESETS["indigo-wash"],
   };
 }
 
@@ -500,12 +603,14 @@ export function planStudioWetInkBrushReplay(
     maxUploadBytes: STUDIO_WET_INK_BRUSH_MAX_UPLOAD_BYTES,
     absorption: material.absorption,
     bleed: material.bleed,
+    chromatography: material.chromatography,
     dryingRate: material.dryingRate,
     edgeDarkening: material.edgeDarkening,
     fixationRate: material.fixationRate,
     granulation: material.granulation,
     paperRoughness: material.paperRoughness,
     inkColor: recipe.inkColor,
+    spectralAbsorption: material.spectralAbsorption,
   });
   if (!field.ok) return planFailure("field-budget", field.reason);
 

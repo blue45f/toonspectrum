@@ -50,6 +50,7 @@ export interface StudioWetInkFieldConfigInput {
   /** Explicit finite-difference coefficient; capped at 0.24 for four-neighbour stability. */
   readonly waterDiffusion?: number;
   readonly pigmentDiffusion?: number;
+  readonly chromatography?: number;
   readonly bleed?: number;
   readonly absorption?: number;
   readonly evaporation?: number;
@@ -59,6 +60,7 @@ export interface StudioWetInkFieldConfigInput {
   readonly granulation?: number;
   readonly paperRoughness?: number;
   readonly inkColor?: StudioWetInkRgb;
+  readonly spectralAbsorption?: StudioWetInkRgb;
 }
 
 export interface StudioWetInkFieldConfig {
@@ -72,6 +74,7 @@ export interface StudioWetInkFieldConfig {
   readonly maxUploadBytes: number;
   readonly waterDiffusion: number;
   readonly pigmentDiffusion: number;
+  readonly chromatography: number;
   readonly bleed: number;
   readonly absorption: number;
   readonly evaporation: number;
@@ -81,6 +84,7 @@ export interface StudioWetInkFieldConfig {
   readonly granulation: number;
   readonly paperRoughness: number;
   readonly inkColor: StudioWetInkRgb;
+  readonly spectralAbsorption?: StudioWetInkRgb;
 }
 
 export interface StudioWetInkBounds {
@@ -221,6 +225,7 @@ export const DEFAULT_STUDIO_WET_INK_FIELD_CONFIG = Object.freeze({
   maxUploadBytes: 16 * 1024 * 1024,
   waterDiffusion: 0.18,
   pigmentDiffusion: 0.105,
+  chromatography: 0.45,
   bleed: 0.32,
   absorption: 0.022,
   evaporation: 0.012,
@@ -230,6 +235,7 @@ export const DEFAULT_STUDIO_WET_INK_FIELD_CONFIG = Object.freeze({
   granulation: 0.36,
   paperRoughness: 0.5,
   inkColor: Object.freeze({ r: 30, g: 37, b: 42 }),
+  spectralAbsorption: Object.freeze({ r: 1.0, g: 0.96, b: 0.88 }),
 });
 
 function failure<T>(
@@ -321,6 +327,8 @@ export function createStudioWetInkField(
       input.waterDiffusion ?? DEFAULT_STUDIO_WET_INK_FIELD_CONFIG.waterDiffusion,
     pigmentDiffusion:
       input.pigmentDiffusion ?? DEFAULT_STUDIO_WET_INK_FIELD_CONFIG.pigmentDiffusion,
+    chromatography:
+      input.chromatography ?? DEFAULT_STUDIO_WET_INK_FIELD_CONFIG.chromatography,
     bleed: input.bleed ?? DEFAULT_STUDIO_WET_INK_FIELD_CONFIG.bleed,
     absorption: input.absorption ?? DEFAULT_STUDIO_WET_INK_FIELD_CONFIG.absorption,
     evaporation: input.evaporation ?? DEFAULT_STUDIO_WET_INK_FIELD_CONFIG.evaporation,
@@ -335,6 +343,7 @@ export function createStudioWetInkField(
   if (
     !inRange(coefficients.waterDiffusion, 0, 0.24)
     || !inRange(coefficients.pigmentDiffusion, 0, 0.24)
+    || !inRange(coefficients.chromatography, 0, 1)
     || !inRange(coefficients.bleed, 0, 1)
     || !inRange(coefficients.absorption, 0, 0.25)
     || !inRange(coefficients.evaporation, 0, 0.25)
@@ -348,6 +357,7 @@ export function createStudioWetInkField(
   }
   const inkColor = normalizeRgb(input.inkColor);
   if (!inkColor) return failure("invalid-config", "Wet-ink pigment color is invalid.");
+  const spectralAbsorption = input.spectralAbsorption ?? DEFAULT_STUDIO_WET_INK_FIELD_CONFIG.spectralAbsorption;
 
   return {
     ok: true,
@@ -365,6 +375,7 @@ export function createStudioWetInkField(
         maxUploadBytes,
         ...coefficients,
         inkColor,
+        spectralAbsorption,
       },
       tiles: new Map(),
       allocatedCells: 0,
@@ -1220,25 +1231,65 @@ function tileOverlapsBounds(
     && tile.originY + tile.height > bounds.y;
 }
 
+function clampByte(value: number): number {
+  return value <= 0 ? 0 : value >= 255 ? 255 : Math.round(value);
+}
+
 function renderTileRgba(
   field: StudioWetInkField,
   tile: StudioWetInkTile,
 ): Uint8ClampedArray {
-  const rgba = new Uint8ClampedArray(tile.width * tile.height * 4);
+  const bytes = new Uint8Array(tile.width * tile.height * 4);
   const color = field.config.inkColor;
+  const spec = field.config.spectralAbsorption ?? { r: 1.0, g: 0.96, b: 0.88 };
+  const paperRoughness = field.config.paperRoughness ?? 0.72;
+  const edgeDarkening = field.config.edgeDarkening ?? 0.68;
+  const chromatography = field.config.chromatography ?? 0.45;
+
+  const isWhiteHighlight = spec.r < 0 || spec.g < 0 || spec.b < 0;
+
   for (let index = 0; index < tile.width * tile.height; index += 1) {
     const paper = tile.paper[index]!;
-    const mobile = tile.pigment[index]! * (0.62 + tile.wetness[index]! * 0.2);
+    const wetness = tile.wetness[index]!;
+    const mobile = tile.pigment[index]! * (0.62 + wetness * 0.2);
     const fixed = tile.stain[index]!;
-    const density = Math.max(0, mobile + fixed) * (0.92 + (paper - 0.5) * 0.12);
-    const alpha = clamp01(1 - Math.exp(-density * 1.7));
+    const grainBump = (paper - 0.5) * paperRoughness * 0.55;
+    const wetEdgeContrast = Math.pow(Math.max(0, wetness), 1.35) * edgeDarkening * 0.35;
+    const density = Math.max(0, mobile + fixed + wetEdgeContrast) * (0.92 + grainBump);
+
+    let r: number;
+    let g: number;
+    let b: number;
+    let a: number;
+
+    if (isWhiteHighlight) {
+      const scattering = clamp01(1 - Math.exp(-density * 2.2));
+      r = 255;
+      g = 255;
+      b = 255;
+      a = Math.round(scattering * 255);
+    } else {
+      const chromFringe = chromatography * (paper - 0.5) * 0.3;
+      const transR = Math.exp(-density * spec.r * 1.7 * (1.0 + chromFringe));
+      const transG = Math.exp(-density * spec.g * 1.7);
+      const transB = Math.exp(-density * spec.b * 1.7 * (1.0 - chromFringe));
+
+      r = clampByte(color.r * transR);
+      g = clampByte(color.g * transG);
+      b = clampByte(color.b * transB);
+
+      const alphaExtinction = clamp01(1 - Math.min(transR, Math.min(transG, transB)));
+      a = Math.round(alphaExtinction * 255);
+    }
+
     const offset = index * 4;
-    rgba[offset] = color.r;
-    rgba[offset + 1] = color.g;
-    rgba[offset + 2] = color.b;
-    rgba[offset + 3] = Math.round(alpha * 255);
+    bytes[offset] = r;
+    bytes[offset + 1] = g;
+    bytes[offset + 2] = b;
+    bytes[offset + 3] = a;
   }
-  return rgba;
+
+  return new Uint8ClampedArray(bytes.buffer);
 }
 
 /**

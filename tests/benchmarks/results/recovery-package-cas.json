@@ -1,0 +1,114 @@
+{
+  "schema": "toonspectrum.studio-v12-recovery-package-benchmark",
+  "version": 1,
+  "measuredAt": "2026-08-08T20:56:35.533Z",
+  "runtime": {
+    "node": "v24.16.0",
+    "platform": "darwin",
+    "architecture": "arm64",
+    "sqlite": "@sqlite.org/sqlite-wasm 3.53.0-build1",
+    "databaseVfs": "memory"
+  },
+  "workload": {
+    "scene": {
+      "width": 2048,
+      "height": 2048
+    },
+    "recoveredSeq": 33,
+    "snapshotSeq": 32,
+    "journalTailEntries": 1,
+    "attachments": 8,
+    "attachmentBytes": 1048576,
+    "packageBytes": 1055639,
+    "iterations": {
+      "export": 30,
+      "import": 30,
+      "restoreToFreshSqlite": 12
+    }
+  },
+  "quality": {
+    "deterministicExportBytes": true,
+    "sourceSeq": 33,
+    "restoredSeq": 33,
+    "sourceProjectDigest": "d51567ff40f6da8e",
+    "restoredProjectDigest": "d51567ff40f6da8e",
+    "digestAndSeqEqual": true,
+    "importedAttachmentHashesVerified": 8
+  },
+  "latency": {
+    "export": {
+      "samples": 30,
+      "p50Ms": 4.544999999999959,
+      "p95Ms": 4.970292000000029,
+      "p99Ms": 5.033916999999974,
+      "minMs": 4.091167000000041,
+      "maxMs": 5.033916999999974
+    },
+    "importAuthenticate": {
+      "samples": 30,
+      "p50Ms": 27.922207999999955,
+      "p95Ms": 34.30250000000001,
+      "p99Ms": 40.99570799999992,
+      "minMs": 27.2048749999999,
+      "maxMs": 40.99570799999992
+    },
+    "restoreToFreshSqlite": {
+      "samples": 12,
+      "p50Ms": 0.29816699999992125,
+      "p95Ms": 0.41899999999986903,
+      "p99Ms": 0.41899999999986903,
+      "minMs": 0.26245799999992414,
+      "maxMs": 0.41899999999986903
+    }
+  },
+  "memory": {
+    "measurement": "Node process observation; not browser OPFS/WASM peak",
+    "startRssBytes": 206913536,
+    "startArrayBuffersBytes": 10670644,
+    "observedPeakRssBytes": 320503808,
+    "observedPeakRssDeltaBytes": 113590272,
+    "observedPeakArrayBuffersBytes": 68690424,
+    "observedPeakArrayBuffersDeltaBytes": 58019780,
+    "endRssBytes": 320503808,
+    "endArrayBuffersBytes": 15821353
+  },
+  "hashCandidates": {
+    "inputBytes": 8388608,
+    "sha256WebCrypto": {
+      "samples": 40,
+      "p50Ms": 3.5266659999999774,
+      "p95Ms": 3.6660839999999553,
+      "p99Ms": 4.301999999999907,
+      "minMs": 3.3948749999999563,
+      "maxMs": 4.301999999999907,
+      "directRuntimeDependency": true,
+      "incrementalBundleBytes": 0,
+      "license": "Web Platform API",
+      "browserSupport": "SubtleCrypto.digest('SHA-256')"
+    },
+    "blake3WasmCandidate": {
+      "samples": 40,
+      "p50Ms": 10.47649999999976,
+      "p95Ms": 10.877042000000074,
+      "p99Ms": 13.41991599999983,
+      "minMs": 10.20233300000018,
+      "maxMs": 13.41991599999983,
+      "version": "2.1.5",
+      "license": "MIT",
+      "directRuntimeDependency": false,
+      "installedVia": "wrangler devDependency transitively",
+      "browserWasmBytes": 34398,
+      "browserSupport": "separate WebAssembly module and async initialization"
+    }
+  },
+  "verdict": {
+    "selected": "webcrypto-sha256",
+    "reason": [
+      "existing Studio project archive and OPFS CAS address compatibility",
+      "zero incremental runtime bundle bytes",
+      "direct browser platform support",
+      "BLAKE3 is only a non-addressable transitive dev dependency"
+    ],
+    "blake3ReplacementCondition": "Direct dependency, lazy browser chunk, multi-device throughput, and dual-address migration must jointly beat SHA-256 without breaking existing sha256 references."
+  }
+}

@@ -711,6 +711,7 @@ const FINGER_ROTATION_BONE_ORDER = [
   "rightLittleIntermediate",
   "rightLittleDistal",
 ] as const satisfies readonly VRMHumanBoneName[];
+const FINGER_ROTATION_BONE_SET = new Set<VRMHumanBoneName>(FINGER_ROTATION_BONE_ORDER);
 /**
  * Runtime pose application is deliberately derived from the same semantic allowlist used by the
  * portable pose-material boundary. Arbitrary object keys can therefore never address scene nodes,
@@ -764,7 +765,8 @@ export function getPoseBoneRotation(poseBone: PoseBone | undefined) {
 function applyEulerRotation(humanoid: NonNullable<VRM["humanoid"]>, boneName: VRMHumanBoneName, rotation: Vec3) {
   const bone = humanoid.getNormalizedBoneNode(boneName);
   if (!bone) return;
-  bone.rotation.set(rotation[0], rotation[1], rotation[2]);
+  const order = boneName.includes("Hand") || boneName.includes("Arm") || boneName.includes("Finger") ? "YXZ" : "XYZ";
+  bone.rotation.set(rotation[0], rotation[1], rotation[2], order);
   bone.updateMatrixWorld(true);
 }
 
@@ -817,6 +819,285 @@ function aimBoneToWorldDirection(humanoid: NonNullable<VRM["humanoid"]>, boneNam
   const aimQuaternion = new THREE.Quaternion().setFromUnitVectors(restParentDirection, targetParentDirection);
   bone.quaternion.premultiply(aimQuaternion);
   bone.updateMatrixWorld(true);
+}
+
+/**
+ * World-space palm normal (out of the palm face, not the dorsal/back).
+ *
+ * VRM left/right finger axes are mirrored: after limb aim, left hands need
+ * along×across while right hands need across×along to point palm-out. A single
+ * winding made one side look correct and the other look like a spun wrist.
+ */
+export function estimateVrmPalmNormal(vrm: VRM, side: "left" | "right"): THREE.Vector3 | null {
+  const humanoid = vrm.humanoid;
+  if (!humanoid) return null;
+  const hand = humanoid.getNormalizedBoneNode(`${side}Hand`);
+  const middle = humanoid.getNormalizedBoneNode(`${side}MiddleProximal`);
+  const thumb =
+    humanoid.getNormalizedBoneNode(`${side}ThumbProximal`)
+    ?? humanoid.getNormalizedBoneNode(`${side}ThumbMetacarpal`);
+  if (!hand || !middle) return null;
+
+  const handPos = new THREE.Vector3();
+  const middlePos = new THREE.Vector3();
+  hand.getWorldPosition(handPos);
+  middle.getWorldPosition(middlePos);
+  const along = middlePos.clone().sub(handPos);
+  if (!normalizeDirection(along)) return null;
+
+  const thumbPos = new THREE.Vector3();
+  if (thumb) {
+    thumb.getWorldPosition(thumbPos);
+  } else {
+    // Degenerate fallback: slight side offset so a normal still exists.
+    thumbPos.copy(handPos).add(new THREE.Vector3(side === "left" ? -0.02 : 0.02, 0, 0));
+  }
+  const across = thumbPos.sub(handPos);
+  if (!normalizeDirection(across)) return null;
+
+  return palmNormalFromAlongAcross(along, across, side);
+}
+
+/** Side-aware palm-out normal from finger axes (see estimateVrmPalmNormal). */
+function palmNormalFromAlongAcross(
+  along: THREE.Vector3,
+  across: THREE.Vector3,
+  side: "left" | "right",
+): THREE.Vector3 | null {
+  const palm = side === "right"
+    ? new THREE.Vector3().crossVectors(across, along)
+    : new THREE.Vector3().crossVectors(along, across);
+  return normalizeDirection(palm) ? palm : null;
+}
+
+/**
+ * Limb aiming uses setFromUnitVectors, which leaves an uncontrolled twist around the bone axis.
+ * Most bundled VRoids then show palms facing outward or camera-back after natural idle aims.
+ * Lumi happened to residual-twist into a readable pose; others did not.
+ *
+ * For relaxed / hanging arms, twist each hand so the palm faces:
+ *   medial (toward midline) + slightly down + slightly character-forward (+Z).
+ * Raised arms (wave, fist) are skipped so expressive poses stay intact.
+ *
+ * Returns how many hands were corrected.
+ */
+export function correctVrmHangingHandPalmTwist(vrm: VRM): number {
+  const humanoid = vrm.humanoid;
+  if (!humanoid) return 0;
+
+  let corrected = 0;
+  for (const side of ["left", "right"] as const) {
+    if (orientRelaxedHandPalm(humanoid, side)) corrected += 1;
+  }
+  if (corrected > 0) {
+    vrm.scene.updateMatrixWorld(true);
+  }
+  return corrected;
+}
+
+/** Max forearm twist per pass (larger snaps read as a spun wrist). */
+export const STUDIO_VRM_HANGING_PALM_TWIST_MAX_RAD = THREE.MathUtils.degToRad(28);
+/** Fraction of remaining twist error applied each pass. */
+export const STUDIO_VRM_HANGING_PALM_TWIST_BLEND = 0.5;
+/** Max extra pitch used only to kill obvious palm-up residuals. */
+export const STUDIO_VRM_HANGING_PALM_PITCH_MAX_RAD = THREE.MathUtils.degToRad(10);
+/**
+ * If palm already faces this far toward the body midline, skip forearm twist.
+ * Natural idle with side-aware winding is often already ≥0.75 — twisting then
+ * looks like the wrist was wrenched the wrong way.
+ */
+export const STUDIO_VRM_HANGING_PALM_ALREADY_MEDIAL = 0.42;
+
+/**
+ * Desired palm normal for a relaxed hand on a standing character facing +Z.
+ * Pure "toward hips" pulls palms camera-back when hands sit in front of the torso.
+ * Keep the target mild so the wrist only needs a small twist from limb-aim residual.
+ */
+export function desiredRelaxedPalmNormal(
+  side: "left" | "right",
+  handWorldPos: THREE.Vector3,
+  spineWorldPos: THREE.Vector3,
+): THREE.Vector3 {
+  // Medial: left hand (+X) wants -X, right hand (-X) wants +X. Fall back to side label
+  // when the hand sits near the midplane.
+  const sideSign = Math.abs(handWorldPos.x) > 0.04
+    ? Math.sign(handWorldPos.x)
+    : (side === "left" ? 1 : -1);
+  const medial = new THREE.Vector3(-sideSign, 0, 0);
+
+  // Soft pull toward the torso (spine/chest) without letting a forward hand force -Z palms.
+  const towardTorso = spineWorldPos.clone().sub(handWorldPos);
+  if (normalizeDirection(towardTorso)) {
+    towardTorso.x *= 0.4;
+    towardTorso.y = Math.min(0, towardTorso.y) * 0.4;
+    towardTorso.z = Math.max(0, towardTorso.z) * 0.12;
+  } else {
+    towardTorso.set(0, 0, 0);
+  }
+
+  // Mild down + mild forward — extreme targets force 100°+ twists that look like spun wrists.
+  const desired = medial
+    .multiplyScalar(0.72)
+    .add(towardTorso)
+    .add(new THREE.Vector3(0, -0.38, 0.32));
+  if (!normalizeDirection(desired)) {
+    return new THREE.Vector3(-sideSign, -0.38, 0.32).normalize();
+  }
+  return desired;
+}
+
+function measurePalmNormalFromBones(
+  hand: THREE.Object3D,
+  middle: THREE.Object3D,
+  thumb: THREE.Object3D | null,
+  side: "left" | "right",
+): THREE.Vector3 | null {
+  const handPos = new THREE.Vector3();
+  const middlePos = new THREE.Vector3();
+  hand.getWorldPosition(handPos);
+  middle.getWorldPosition(middlePos);
+  const along = middlePos.clone().sub(handPos);
+  if (!normalizeDirection(along)) return null;
+  const thumbPos = new THREE.Vector3();
+  if (thumb) {
+    thumb.getWorldPosition(thumbPos);
+  } else {
+    thumbPos.copy(handPos).add(new THREE.Vector3(side === "left" ? -0.02 : 0.02, 0, 0));
+  }
+  const across = thumbPos.sub(handPos);
+  if (!normalizeDirection(across)) return null;
+  return palmNormalFromAlongAcross(along, across, side);
+}
+
+function applyWorldTwistToHand(
+  hand: THREE.Object3D,
+  worldAxis: THREE.Vector3,
+  angle: number,
+): void {
+  if (!hand.parent || !Number.isFinite(angle) || Math.abs(angle) < THREE.MathUtils.degToRad(1)) {
+    return;
+  }
+  const parentWorldQ = new THREE.Quaternion();
+  hand.parent.getWorldQuaternion(parentWorldQ);
+  const handWorldQ = new THREE.Quaternion();
+  hand.getWorldQuaternion(handWorldQ);
+  const twist = new THREE.Quaternion().setFromAxisAngle(worldAxis, angle);
+  const newWorldQ = twist.clone().multiply(handWorldQ);
+  hand.quaternion.copy(parentWorldQ.clone().invert().multiply(newWorldQ));
+  hand.updateMatrixWorld(true);
+}
+
+function orientRelaxedHandPalm(
+  humanoid: NonNullable<VRM["humanoid"]>,
+  side: "left" | "right",
+): boolean {
+  const hand = humanoid.getNormalizedBoneNode(`${side}Hand`);
+  const lowerArm = humanoid.getNormalizedBoneNode(`${side}LowerArm`);
+  const middle = humanoid.getNormalizedBoneNode(`${side}MiddleProximal`);
+  const thumb =
+    humanoid.getNormalizedBoneNode(`${side}ThumbProximal`)
+    ?? humanoid.getNormalizedBoneNode(`${side}ThumbMetacarpal`);
+  const spine =
+    humanoid.getNormalizedBoneNode("chest")
+    ?? humanoid.getNormalizedBoneNode("spine")
+    ?? humanoid.getNormalizedBoneNode("hips");
+  if (!hand || !lowerArm || !middle || !spine || !hand.parent) return false;
+
+  const handPos = new THREE.Vector3();
+  const lowerPos = new THREE.Vector3();
+  hand.getWorldPosition(handPos);
+  lowerArm.getWorldPosition(lowerPos);
+
+  // Twist axis = forearm (lower arm → hand).
+  const forearmAxis = handPos.clone().sub(lowerPos);
+  if (!normalizeDirection(forearmAxis)) return false;
+  // Skip clearly raised arms. Allow slight forward hang (natural idle often has z>0).
+  if (forearmAxis.y > -0.15) return false;
+
+  const palm = measurePalmNormalFromBones(hand, middle, thumb, side);
+  if (!palm) return false;
+
+  const spinePos = new THREE.Vector3();
+  spine.getWorldPosition(spinePos);
+  const desired = desiredRelaxedPalmNormal(side, handPos, spinePos);
+
+  // Already facing the body? Do not twist — residual limb-aim + side-aware winding
+  // is already medial for most bundled VRoids; further twist reads as a reversed wrist.
+  const medialAxis = new THREE.Vector3(
+    -(Math.abs(handPos.x) > 0.04 ? Math.sign(handPos.x) : (side === "left" ? 1 : -1)),
+    0,
+    0,
+  );
+  const medialScore = palm.dot(medialAxis);
+  let changed = false;
+
+  if (medialScore < STUDIO_VRM_HANGING_PALM_ALREADY_MEDIAL) {
+    // Pass 1 — small partial forearm twist only when clearly non-medial.
+    const palmProj = palm.clone().addScaledVector(forearmAxis, -palm.dot(forearmAxis));
+    const desiredProj = desired.clone().addScaledVector(forearmAxis, -desired.dot(forearmAxis));
+    if (normalizeDirection(palmProj) && normalizeDirection(desiredProj)) {
+      const sin = forearmAxis.dot(new THREE.Vector3().crossVectors(palmProj, desiredProj));
+      const cos = palmProj.dot(desiredProj);
+      let angle = Math.atan2(sin, cos);
+      if (Number.isFinite(angle)) {
+        angle *= STUDIO_VRM_HANGING_PALM_TWIST_BLEND;
+        angle = THREE.MathUtils.clamp(
+          angle,
+          -STUDIO_VRM_HANGING_PALM_TWIST_MAX_RAD,
+          STUDIO_VRM_HANGING_PALM_TWIST_MAX_RAD,
+        );
+        if (Math.abs(angle) >= THREE.MathUtils.degToRad(1.5)) {
+          applyWorldTwistToHand(hand, forearmAxis, angle);
+          changed = true;
+        }
+      }
+    }
+  }
+
+  // Pass 2 — only kill obvious palm-up (never chase deep thigh targets).
+  const palmAfter = measurePalmNormalFromBones(hand, middle, thumb, side);
+  if (!palmAfter) return changed;
+  if (palmAfter.y > 0.18) {
+    const worldDown = new THREE.Vector3(0, -1, 0);
+    const pitchAxis = new THREE.Vector3().crossVectors(forearmAxis, worldDown);
+    if (normalizeDirection(pitchAxis)) {
+      const magnitude = THREE.MathUtils.clamp(
+        (palmAfter.y - 0.08) * 0.85,
+        THREE.MathUtils.degToRad(2),
+        STUDIO_VRM_HANGING_PALM_PITCH_MAX_RAD,
+      );
+      const parentWorldQ = new THREE.Quaternion();
+      hand.parent!.getWorldQuaternion(parentWorldQ);
+      const baseLocal = hand.quaternion.clone();
+      const handWorldQ = new THREE.Quaternion();
+      hand.getWorldQuaternion(handWorldQ);
+      let bestAngle = 0;
+      let bestY = palmAfter.y;
+      for (const sign of [1, -1] as const) {
+        const trial = magnitude * sign;
+        const twist = new THREE.Quaternion().setFromAxisAngle(pitchAxis, trial);
+        const newWorldQ = twist.clone().multiply(handWorldQ);
+        hand.quaternion.copy(parentWorldQ.clone().invert().multiply(newWorldQ));
+        hand.updateMatrixWorld(true);
+        const trialPalm = measurePalmNormalFromBones(hand, middle, thumb, side);
+        const trialY = trialPalm?.y ?? Number.POSITIVE_INFINITY;
+        const trialMedial = trialPalm ? trialPalm.dot(medialAxis) : -1;
+        const baseMedial = palmAfter.dot(medialAxis);
+        if (trialY < bestY - 0.02 && trialMedial > baseMedial - 0.12) {
+          bestY = trialY;
+          bestAngle = trial;
+        }
+        hand.quaternion.copy(baseLocal);
+        hand.updateMatrixWorld(true);
+      }
+      if (bestAngle !== 0 && bestY < palmAfter.y - 0.02) {
+        applyWorldTwistToHand(hand, pitchAxis, bestAngle);
+        changed = true;
+      }
+    }
+  }
+
+  return changed;
 }
 
 const translatedBoneBasePositions = new WeakMap<THREE.Object3D, THREE.Vector3>();
@@ -882,6 +1163,7 @@ export function applyPoseToVrm(
   bones: PoseBoneMap,
   yOffset: number,
   rawTranslations: StudioVrmPoseTranslations = EMPTY_STUDIO_VRM_POSE_TRANSLATIONS,
+  options: { readonly skipPalmCorrect?: boolean } = {},
 ) {
   const humanoid = vrm.humanoid;
   if (!humanoid) return false;
@@ -919,11 +1201,29 @@ export function applyPoseToVrm(
   });
 
   POST_DIRECTION_ROTATION_BONE_ORDER.forEach((boneName) => {
+    // Finger curls always go through applyFingerRotations so model-axis polarity can be fixed.
+    if (FINGER_ROTATION_BONE_SET.has(boneName)) return;
     const rotation = bones[boneName]?.rotation;
     if (rotation) {
       applyEulerRotation(humanoid, boneName, rotation);
     }
   });
+
+  // Optional finger eulers carried in the pose map (natural idle, extras) — polarity-aware.
+  const fingerEdits: Partial<Record<VRMHumanBoneName, Vec3>> = {};
+  for (const boneName of FINGER_ROTATION_BONE_ORDER) {
+    const rotation = bones[boneName]?.rotation;
+    if (rotation) fingerEdits[boneName] = rotation;
+  }
+  if (Object.keys(fingerEdits).length > 0) {
+    applyFingerRotations(vrm, fingerEdits);
+  }
+
+  // One hanging-palm pass after limbs + hand euler + fingers (unless caller defers).
+  // Stacking this with a second call after applyPoserVisualState fingers spun wrists.
+  if (!options.skipPalmCorrect) {
+    correctVrmHangingHandPalmTwist(vrm);
+  }
 
   humanoid.update();
   if (!applyPoseTranslations(vrm, translations)) return false;
@@ -950,33 +1250,509 @@ export function applyExpressionWeightsToVrm(vrm: VRM, weights: Record<string, nu
   return true;
 }
 
-export function applyVrmCustomColors(vrm: VRM, customColors: Record<string, string>) {
+/** Mannequin clay gray — never cache as native albedo factor. */
+export const STUDIO_VRM_MANNEQUIN_COLOR_HEX = "#b7b2a8" as const;
+
+function colorHexLower(color: THREE.Color): string {
+  return `#${color.getHexString().toLowerCase()}`;
+}
+
+export function isVrmMannequinPaintColor(color: THREE.Color): boolean {
+  return colorHexLower(color) === STUDIO_VRM_MANNEQUIN_COLOR_HEX;
+}
+
+/** Near-black lit factors multiply texture albedo to pure black — refuse as "native". */
+export function isVrmNearBlackLitColor(color: THREE.Color): boolean {
+  return color.r <= 0.02 && color.g <= 0.02 && color.b <= 0.02;
+}
+
+/**
+ * Map a single mesh/material name to a recolor slot.
+ * Hair before bare "top" (Hair_Top); face before body/head; cloth before generic body.
+ */
+export function classifyVrmCustomColorPart(nameRaw: string): string | null {
+  const name = nameRaw.toLowerCase();
+  if (!name.trim()) return null;
+  if (name.includes("hair") || name.includes("kami")) return "hair";
+  if (
+    name.includes("face")
+    || name.includes("eye")
+    || name.includes("mouth")
+    || name.includes("brow")
+    || name.includes("lash")
+    || name.includes("tooth")
+  ) {
+    return "face";
+  }
+  // Clothing before body — VRoid bakes Tops/Bottoms materials onto a node named "Body".
+  // Bottoms before generic "cloth" so names like Bottoms_01_CLOTH do not fall into tops.
+  if (
+    name.includes("bottoms")
+    || name.includes("bottom")
+    || name.includes("pants")
+    || name.includes("skirt")
+    || name.includes("shoes")
+    || name.includes("boot")
+    || name.includes("sock")
+    || name.includes("acc")
+  ) {
+    return "bottoms";
+  }
+  if (
+    name.includes("tops")
+    || name.includes("clothes")
+    || name.includes("cloth")
+    || name.includes("shirt")
+    || name.includes("jacket")
+    || name.includes("coat")
+    || name.includes("wear")
+    || /(^|[^a-z])top([^a-z]|$)/.test(name)
+  ) {
+    return "tops";
+  }
+  if (
+    name.includes("body")
+    || name.includes("skin")
+    || name.includes("hand")
+    || name.includes("leg")
+    || name.includes("arm")
+    || name.includes("foot")
+    || name.includes("head")
+    || name.includes("neck")
+    || name.includes("torso")
+  ) {
+    return "body";
+  }
+  return null;
+}
+
+/**
+ * Prefer material name over mesh name so multi-material "Body" meshes (skin + tops + bottoms
+ * + hair) recolor only the matching primitive, not the entire body as one slot.
+ */
+export function classifyVrmCustomColorPartForMaterial(
+  meshName: string,
+  materialName?: string | null,
+): string | null {
+  return classifyVrmCustomColorPart(materialName ?? "")
+    ?? classifyVrmCustomColorPart(meshName);
+}
+
+function isActiveCustomColorHex(hex: string | undefined): hex is string {
+  if (!hex || typeof hex !== "string") return false;
+  const normalized = hex.trim().toLowerCase();
+  return normalized !== "" && normalized !== "#ffffff" && normalized !== "#fff";
+}
+
+function isMToonOutlineMaterial(mat: THREE.Material & { isOutline?: boolean }): boolean {
+  return mat.isOutline === true;
+}
+
+type VrmCustomColorReadableTexture = {
+  width: number;
+  height: number;
+  data: Uint8ClampedArray;
+  lowLuma: number;
+  highLuma: number;
+};
+
+type VrmCustomColorTextureState = {
+  originalMap: THREE.Texture;
+  originalShadeMultiplyTexture: THREE.Texture | null | undefined;
+  generatedMap: THREE.DataTexture;
+  targetHex: string;
+};
+
+type VrmCustomColorTexturedMaterial = THREE.Material & {
+  color?: THREE.Color;
+  map?: THREE.Texture | null;
+  shadeMultiplyTexture?: THREE.Texture | null;
+  userData: Record<string, unknown>;
+};
+
+const VRM_CUSTOM_COLOR_TEXTURE_STATE_KEY = "__vrmCustomColorTextureState";
+const VRM_CUSTOM_COLOR_TEXTURE_MAX_PIXELS = 4096 * 4096;
+const vrmCustomColorTextureAnalysisCache = new WeakMap<
+  THREE.Texture,
+  VrmCustomColorReadableTexture | null
+>();
+
+function vrmCustomColorTextureLuma(r: number, g: number, b: number): number {
+  return Math.round((54 * r + 183 * g + 19 * b) / 256);
+}
+
+function vrmCustomColorTexturePercentile(
+  histogram: Uint32Array,
+  visiblePixels: number,
+  percentile: number,
+): number {
+  const target = Math.max(1, Math.ceil(visiblePixels * percentile));
+  let accumulated = 0;
+  for (let value = 0; value < histogram.length; value += 1) {
+    accumulated += histogram[value] ?? 0;
+    if (accumulated >= target) return value;
+  }
+  return 255;
+}
+
+function analyzeVrmCustomColorTexture(
+  texture: THREE.Texture,
+): VrmCustomColorReadableTexture | null {
+  if (vrmCustomColorTextureAnalysisCache.has(texture)) {
+    return vrmCustomColorTextureAnalysisCache.get(texture) ?? null;
+  }
+
+  const image = texture.image as {
+    width?: unknown;
+    height?: unknown;
+    data?: unknown;
+  } | null | undefined;
+  const width = typeof image?.width === "number" ? Math.floor(image.width) : 0;
+  const height = typeof image?.height === "number" ? Math.floor(image.height) : 0;
+  const pixelCount = width * height;
+  if (
+    width <= 0
+    || height <= 0
+    || !Number.isSafeInteger(pixelCount)
+    || pixelCount > VRM_CUSTOM_COLOR_TEXTURE_MAX_PIXELS
+  ) {
+    vrmCustomColorTextureAnalysisCache.set(texture, null);
+    return null;
+  }
+
+  let pixels: Uint8ClampedArray | null = null;
+  if (
+    (image?.data instanceof Uint8Array || image?.data instanceof Uint8ClampedArray)
+    && image.data.byteLength === pixelCount * 4
+    && texture.format === THREE.RGBAFormat
+    && texture.type === THREE.UnsignedByteType
+  ) {
+    pixels = new Uint8ClampedArray(image.data.byteLength);
+    pixels.set(image.data);
+  } else if (typeof document !== "undefined") {
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext("2d", { willReadFrequently: true });
+      if (context) {
+        context.drawImage(image as CanvasImageSource, 0, 0, width, height);
+        const source = context.getImageData(0, 0, width, height).data;
+        pixels = new Uint8ClampedArray(source.length);
+        pixels.set(source);
+      }
+      canvas.width = 0;
+      canvas.height = 0;
+    } catch {
+      pixels = null;
+    }
+  }
+
+  if (!pixels) {
+    vrmCustomColorTextureAnalysisCache.set(texture, null);
+    return null;
+  }
+
+  const histogram = new Uint32Array(256);
+  let visiblePixels = 0;
+  let lumaTotal = 0;
+  for (let offset = 0; offset < pixels.length; offset += 4) {
+    if ((pixels[offset + 3] ?? 0) < 16) continue;
+    const luma = vrmCustomColorTextureLuma(
+      pixels[offset] ?? 0,
+      pixels[offset + 1] ?? 0,
+      pixels[offset + 2] ?? 0,
+    );
+    histogram[luma] = (histogram[luma] ?? 0) + 1;
+    lumaTotal += luma;
+    visiblePixels += 1;
+  }
+
+  if (visiblePixels === 0) {
+    vrmCustomColorTextureAnalysisCache.set(texture, null);
+    return null;
+  }
+
+  const averageLuma = lumaTotal / visiblePixels;
+  const highLuma = vrmCustomColorTexturePercentile(histogram, visiblePixels, 0.9);
+  // Light albedo already accepts the normal material-color multiply path. Only synthesize
+  // a replacement for dark maps where multiplication cannot reveal the requested hue.
+  if (averageLuma > 82 || highLuma > 140) {
+    vrmCustomColorTextureAnalysisCache.set(texture, null);
+    return null;
+  }
+
+  const readable = {
+    width,
+    height,
+    data: pixels,
+    lowLuma: vrmCustomColorTexturePercentile(histogram, visiblePixels, 0.05),
+    highLuma,
+  };
+  vrmCustomColorTextureAnalysisCache.set(texture, readable);
+  return readable;
+}
+
+function parseVrmCustomColorRgb(hex: string): [number, number, number] | null {
+  const match = /^#?([0-9a-f]{6})$/iu.exec(hex.trim());
+  if (!match?.[1]) return null;
+  const value = Number.parseInt(match[1], 16);
+  return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
+}
+
+function writeVrmCustomColorTexturePixels(
+  target: Uint8Array,
+  readable: VrmCustomColorReadableTexture,
+  hex: string,
+): boolean {
+  const rgb = parseVrmCustomColorRgb(hex);
+  if (!rgb || target.byteLength !== readable.data.byteLength) return false;
+  const [targetR, targetG, targetB] = rgb;
+  const span = Math.max(24, readable.highLuma - readable.lowLuma);
+  for (let offset = 0; offset < readable.data.length; offset += 4) {
+    const sourceR = readable.data[offset] ?? 0;
+    const sourceG = readable.data[offset + 1] ?? 0;
+    const sourceB = readable.data[offset + 2] ?? 0;
+    const luma = vrmCustomColorTextureLuma(sourceR, sourceG, sourceB);
+    const detail = THREE.MathUtils.clamp((luma - readable.lowLuma) / span, 0, 1);
+    // Even a pure-black albedo receives 45% of the requested color, while native
+    // highlights reach the full target. This preserves folds without black × tint collapse.
+    const brightness = 0.45 + 0.55 * detail;
+    target[offset] = Math.round(targetR * brightness);
+    target[offset + 1] = Math.round(targetG * brightness);
+    target[offset + 2] = Math.round(targetB * brightness);
+    target[offset + 3] = readable.data[offset + 3] ?? 0;
+  }
+  return true;
+}
+
+function copyVrmCustomColorTextureSampling(
+  source: THREE.Texture,
+  target: THREE.DataTexture,
+): void {
+  if (source.matrixAutoUpdate) source.updateMatrix();
+  target.mapping = source.mapping;
+  target.channel = source.channel;
+  target.wrapS = source.wrapS;
+  target.wrapT = source.wrapT;
+  target.magFilter = source.magFilter;
+  target.minFilter = source.minFilter;
+  target.anisotropy = source.anisotropy;
+  target.colorSpace = source.colorSpace;
+  target.offset.copy(source.offset);
+  target.repeat.copy(source.repeat);
+  target.center.copy(source.center);
+  target.rotation = source.rotation;
+  target.matrixAutoUpdate = source.matrixAutoUpdate;
+  target.matrix.copy(source.matrix);
+  target.generateMipmaps = source.generateMipmaps;
+  target.premultiplyAlpha = source.premultiplyAlpha;
+  target.unpackAlignment = source.unpackAlignment;
+  target.flipY = source.flipY;
+  target.name = source.name
+    ? `${source.name} · Studio custom color`
+    : "Studio VRM custom color";
+}
+
+function restoreVrmCustomColorTexture(material: VrmCustomColorTexturedMaterial): boolean {
+  const state = material.userData[VRM_CUSTOM_COLOR_TEXTURE_STATE_KEY] as
+    | VrmCustomColorTextureState
+    | undefined;
+  if (!state) return false;
+  if (material.map === state.generatedMap) material.map = state.originalMap;
+  if (material.shadeMultiplyTexture === state.generatedMap) {
+    material.shadeMultiplyTexture = state.originalShadeMultiplyTexture;
+  }
+  state.generatedMap.dispose();
+  delete material.userData[VRM_CUSTOM_COLOR_TEXTURE_STATE_KEY];
+  material.needsUpdate = true;
+  return true;
+}
+
+function applyVrmCustomColorTexture(
+  material: VrmCustomColorTexturedMaterial,
+  targetHex: string,
+): boolean {
+  let state = material.userData[VRM_CUSTOM_COLOR_TEXTURE_STATE_KEY] as
+    | VrmCustomColorTextureState
+    | undefined;
+  if (
+    state
+    && material.map !== state.generatedMap
+    && material.map !== state.originalMap
+  ) {
+    state.generatedMap.dispose();
+    delete material.userData[VRM_CUSTOM_COLOR_TEXTURE_STATE_KEY];
+    state = undefined;
+  }
+
+  const originalMap = state?.originalMap ?? material.map;
+  if (!originalMap) {
+    if (state) restoreVrmCustomColorTexture(material);
+    return false;
+  }
+  const readable = analyzeVrmCustomColorTexture(originalMap);
+  if (!readable) {
+    if (state) restoreVrmCustomColorTexture(material);
+    return false;
+  }
+
+  if (!state) {
+    const data = new Uint8Array(readable.data.byteLength);
+    const generatedMap = new THREE.DataTexture(
+      data,
+      readable.width,
+      readable.height,
+      THREE.RGBAFormat,
+      THREE.UnsignedByteType,
+    );
+    copyVrmCustomColorTextureSampling(originalMap, generatedMap);
+    state = {
+      originalMap,
+      originalShadeMultiplyTexture: material.shadeMultiplyTexture,
+      generatedMap,
+      targetHex: "",
+    };
+    material.userData[VRM_CUSTOM_COLOR_TEXTURE_STATE_KEY] = state;
+  }
+
+  if (state.targetHex !== targetHex) {
+    const target = (state.generatedMap.image as { data: Uint8Array }).data;
+    if (!writeVrmCustomColorTexturePixels(target, readable, targetHex)) {
+      restoreVrmCustomColorTexture(material);
+      return false;
+    }
+    state.targetHex = targetHex;
+    state.generatedMap.needsUpdate = true;
+  }
+  material.map = state.generatedMap;
+  if (state.originalShadeMultiplyTexture === state.originalMap) {
+    material.shadeMultiplyTexture = state.generatedMap;
+  }
+  material.needsUpdate = true;
+  return true;
+}
+
+export function scrubVrmMannequinColorCaches(vrm: VRM) {
   vrm.scene.traverse((obj) => {
-    if ((obj as Partial<THREE.Mesh>).isMesh) {
-      const mesh = obj as THREE.Mesh;
-      const name = mesh.name.toLowerCase();
-
-      let part: string | null = null;
-      if (name.includes("tops") || name.includes("top") || name.includes("clothes") || name.includes("shirt")) part = "tops";
-      else if (name.includes("bottoms") || name.includes("bottom") || name.includes("pants") || name.includes("skirt") || name.includes("shoes") || name.includes("acc")) part = "bottoms";
-      else if (name.includes("hair")) part = "hair";
-      else if (name.includes("body") || name.includes("skin") || name.includes("hand") || name.includes("leg") || name.includes("arm") || name.includes("head") || name.includes("foot")) part = "body";
-      else if (name.includes("face") || name.includes("eye") || name.includes("mouth") || name.includes("brow")) part = "face";
-
-      if (part && customColors[part]) {
-        const hex = customColors[part]!;
-        const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-
-        materials.forEach((mat) => {
-          const colored = mat as THREE.Material & { color?: THREE.Color };
-          if (colored.color) {
-            colored.color.set(hex);
-            colored.needsUpdate = true;
-          }
-        });
+    if (!(obj as Partial<THREE.Mesh>).isMesh) return;
+    const mesh = obj as THREE.Mesh;
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    for (const mat of materials) {
+      if (!mat?.userData) continue;
+      mat.userData.__vrmMannequinActive = false;
+      const original = mat.userData.__vrmCustomColorOriginal as THREE.Color | undefined;
+      if (original && (isVrmMannequinPaintColor(original) || isVrmNearBlackLitColor(original))) {
+        delete mat.userData.__vrmCustomColorOriginal;
+        mat.userData.__vrmCustomColorApplied = false;
       }
     }
   });
+}
+
+/**
+ * Safety net for "original clothes flash then pure black":
+ * textured materials whose lit factor collapsed to near-black (color × map = black).
+ * Skips mannequin paint, outline materials, and materials with an active custom recolor.
+ * Returns how many materials were repaired.
+ */
+export function repairVrmTexturedNearBlackLitFactors(vrm: VRM): number {
+  let repaired = 0;
+  vrm.scene.traverse((obj) => {
+    if (!(obj as Partial<THREE.Mesh>).isMesh) return;
+    const mesh = obj as THREE.Mesh;
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    for (const mat of materials) {
+      const colored = mat as THREE.Material & {
+        color?: THREE.Color;
+        map?: THREE.Texture | null;
+        isOutline?: boolean;
+        userData: Record<string, unknown>;
+      };
+      if (!colored?.color || !colored.map) continue;
+      if (colored.userData.__vrmMannequinActive === true) continue;
+      if (isMToonOutlineMaterial(colored)) continue;
+      if (colored.userData.__vrmCustomColorApplied === true) continue;
+      if (colored.userData.__vrmCostumeRecolorApplied === true) continue;
+      if (!isVrmNearBlackLitColor(colored.color) && !isVrmMannequinPaintColor(colored.color)) continue;
+      colored.color.set("#ffffff");
+      colored.needsUpdate = true;
+      if (colored.userData.__vrmCustomColorOriginal) {
+        delete colored.userData.__vrmCustomColorOriginal;
+      }
+      repaired += 1;
+    }
+  });
+  return repaired;
+}
+
+/**
+ * Recolor VRM mesh slots without destroying native albedo.
+ * - Classify per material (VRoid Body mesh holds skin+tops+bottoms together).
+ * - No active custom hex → leave materials alone (textures + lit factor).
+ * - Never cache mannequin clay or near-black as "native" (black × texture = pure black clothes).
+ * - After idle pass, repair any textured near-black lit factors left by races.
+ */
+export function applyVrmCustomColors(vrm: VRM, customColors: Record<string, string>) {
+  vrm.scene.traverse((obj) => {
+    if (!(obj as Partial<THREE.Mesh>).isMesh) return;
+    const mesh = obj as THREE.Mesh;
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+
+    materials.forEach((mat) => {
+      const colored = mat as THREE.Material & {
+        color?: THREE.Color;
+        map?: THREE.Texture | null;
+        isOutline?: boolean;
+        name?: string;
+        userData: Record<string, unknown>;
+      };
+      if (!colored.color) return;
+      if (colored.userData.__vrmMannequinActive === true) return;
+      // Outline pass materials must keep their own factors — recoloring them blacks silhouettes.
+      if (isMToonOutlineMaterial(colored)) return;
+
+      const part = classifyVrmCustomColorPartForMaterial(mesh.name, colored.name);
+      const customHex = part ? customColors[part] : undefined;
+      const hasCustom = isActiveCustomColorHex(customHex);
+      let original = colored.userData.__vrmCustomColorOriginal as THREE.Color | undefined;
+
+      if (original && (isVrmMannequinPaintColor(original) || isVrmNearBlackLitColor(original))) {
+        delete colored.userData.__vrmCustomColorOriginal;
+        colored.userData.__vrmCustomColorApplied = false;
+        original = undefined;
+      }
+
+      if (hasCustom) {
+        if (!original) {
+          if (isVrmMannequinPaintColor(colored.color) || isVrmNearBlackLitColor(colored.color)) {
+            // Prefer white lit factor so textured clothing keeps albedo under a tint.
+            original = new THREE.Color("#ffffff");
+          } else {
+            original = colored.color.clone();
+          }
+          colored.userData.__vrmCustomColorOriginal = original;
+        }
+        const textureColorApplied = applyVrmCustomColorTexture(colored, customHex);
+        colored.color.set(textureColorApplied ? "#ffffff" : customHex);
+        colored.needsUpdate = true;
+        colored.userData.__vrmCustomColorApplied = true;
+        return;
+      }
+
+      restoreVrmCustomColorTexture(colored);
+      if (colored.userData.__vrmCustomColorApplied === true && original) {
+        colored.color.copy(original);
+        colored.needsUpdate = true;
+        colored.userData.__vrmCustomColorApplied = false;
+      }
+    });
+  });
+
+  // Heal textured clothes that collapsed to pure black lit×map.
+  // Skip only materials that are actively custom-repainted or costume-repainted; leave
+  // other slots visible for near-black map lighting artifacts.
+  repairVrmTexturedNearBlackLitFactors(vrm);
 }
 
 // ── 재질 효과(MToon 셰이딩/외곽선/림라이트) ─────────────────────────────
@@ -1100,13 +1876,101 @@ export function applyVrmMaterialFx(vrm: VRM, fx: VrmMaterialFx) {
 
 export type FingerRotationMap = Partial<Record<VRMHumanBoneName, Vec3>>;
 
+function middleTipPalmDot(vrm: VRM, side: "left" | "right"): number | null {
+  const humanoid = vrm.humanoid;
+  if (!humanoid) return null;
+  const hand = humanoid.getNormalizedBoneNode(`${side}Hand`);
+  const tip =
+    humanoid.getNormalizedBoneNode(`${side}MiddleDistal`)
+    ?? humanoid.getNormalizedBoneNode(`${side}MiddleProximal`);
+  if (!hand || !tip) return null;
+  const palm = estimateVrmPalmNormal(vrm, side);
+  if (!palm) return null;
+  const tipDir = tip.getWorldPosition(new THREE.Vector3())
+    .sub(hand.getWorldPosition(new THREE.Vector3()));
+  if (!normalizeDirection(tipDir)) return null;
+  return tipDir.dot(palm);
+}
+
+function zeroFingerSide(
+  humanoid: NonNullable<VRM["humanoid"]>,
+  side: "left" | "right",
+): void {
+  for (const boneName of FINGER_ROTATION_BONE_ORDER) {
+    if (!String(boneName).startsWith(side)) continue;
+    const node = humanoid.getNormalizedBoneNode(boneName);
+    if (node) node.rotation.set(0, 0, 0);
+  }
+}
+
+function applyFingerSide(
+  humanoid: NonNullable<VRM["humanoid"]>,
+  fingers: FingerRotationMap,
+  side: "left" | "right",
+  polarity: 1 | -1,
+): void {
+  for (const boneName of FINGER_ROTATION_BONE_ORDER) {
+    if (!String(boneName).startsWith(side)) continue;
+    const rot = fingers[boneName];
+    if (!rot) continue;
+    applyEulerRotation(humanoid, boneName, [
+      polarity * rot[0],
+      polarity * rot[1],
+      polarity * rot[2],
+    ]);
+  }
+}
+
+/**
+ * Some bundled VRM rest axes (notably sample.vrm / 루미) mirror finger local Z relative to
+ * typical VRoid samples. After the body/palm pose is live, pick the curl polarity that moves
+ * the middle fingertip toward the palm (−palm normal), not into hyperextension.
+ */
+export function resolveFingerCurlPolarity(
+  vrm: VRM,
+  fingers: FingerRotationMap,
+  side: "left" | "right",
+): 1 | -1 {
+  const humanoid = vrm.humanoid;
+  if (!humanoid) return 1;
+  const hasSide = FINGER_ROTATION_BONE_ORDER.some(
+    (boneName) => String(boneName).startsWith(side) && fingers[boneName],
+  );
+  if (!hasSide) return 1;
+
+  zeroFingerSide(humanoid, side);
+  humanoid.update();
+  vrm.scene.updateMatrixWorld(true);
+  const baseline = middleTipPalmDot(vrm, side);
+  if (baseline === null) return 1;
+
+  applyFingerSide(humanoid, fingers, side, 1);
+  humanoid.update();
+  vrm.scene.updateMatrixWorld(true);
+  const positive = middleTipPalmDot(vrm, side);
+  if (positive === null) return 1;
+
+  // Prefer the polarity that decreases tip·palm (curl into the palm surface).
+  // If +1 makes the tip more palm-normal-aligned, the axes are inverted → use -1.
+  return positive - baseline > 0.04 ? -1 : 1;
+}
+
 export function applyFingerRotations(vrm: VRM, fingers: FingerRotationMap) {
   const humanoid = vrm.humanoid;
   if (!humanoid) return;
-  FINGER_ROTATION_BONE_ORDER.forEach((boneName) => {
-    const rot = fingers[boneName];
-    if (rot) applyEulerRotation(humanoid, boneName, rot);
-  });
+  if (Object.keys(fingers).length === 0) return;
+
+  // Body/palm pose must already be on the skeleton (applyPoseToVrm first).
+  vrm.scene.updateMatrixWorld(true);
+  const leftPolarity = resolveFingerCurlPolarity(vrm, fingers, "left");
+  const rightPolarity = resolveFingerCurlPolarity(vrm, fingers, "right");
+
+  // resolve* leaves each side at its trial pose; re-apply both with chosen polarities.
+  zeroFingerSide(humanoid, "left");
+  zeroFingerSide(humanoid, "right");
+  applyFingerSide(humanoid, fingers, "left", leftPolarity);
+  applyFingerSide(humanoid, fingers, "right", rightPolarity);
+  humanoid.update();
   vrm.scene.updateMatrixWorld(true);
 }
 
@@ -1601,10 +2465,14 @@ export function applyPoserVisualState(
     fingerEdits = {},
     bodyScale,
   } = state;
-  applyPoseToVrm(vrm, stripFingerBones(bones), yOffset, poseTranslations);
+  // Defer palm correct until after finger polarity so we only twist wrists once.
+  applyPoseToVrm(vrm, stripFingerBones(bones), yOffset, poseTranslations, {
+    skipPalmCorrect: true,
+  });
   if (Object.keys(fingerEdits).length) {
     applyFingerRotations(vrm, fingerEdits);
   }
+  correctVrmHangingHandPalmTwist(vrm);
   if (bodyScale) {
     applyBodyScale(vrm, bodyScale);
   }

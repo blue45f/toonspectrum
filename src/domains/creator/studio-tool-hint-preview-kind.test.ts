@@ -32,9 +32,10 @@ describe("Studio tool hint preview kind/variant contract", () => {
         (variants) => variants.length > 0
       )
     ).toHaveLength(40);
+    // 의도적 변경(2026-08-07): selection-layout에 flip-horizontal·flip-vertical 추가(179 → 181).
     expect(
       Object.values(STUDIO_TOOL_HINT_PREVIEW_VARIANTS).flat()
-    ).toHaveLength(178);
+    ).toHaveLength(181);
 
     for (const kind of STUDIO_TOOL_HINT_PREVIEW_KINDS) {
       expect(studioToolHintPreviewSpec(kind)).toEqual({ kind });

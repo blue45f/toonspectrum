@@ -30,7 +30,8 @@ describe("soft coloured-pencil endpoint visibility", () => {
       minSizeRatio: 0.36,
       minOpacityRatio: 0.92,
     });
-    expect(dabs).toHaveLength(11);
+    // continuous-carrier-quality-v3 densifies dry-media stations slightly on short flicks.
+    expect(dabs).toHaveLength(13);
     expect(Math.min(...dabs.map(({ size }) => size))).toBeGreaterThan(
       selection.defaultWidth * 0.3,
     );

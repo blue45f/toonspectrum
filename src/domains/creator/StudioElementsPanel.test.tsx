@@ -1,9 +1,14 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { StudioElementsPanel } from "./StudioElementsPanel";
+
+import type {
+  StudioSvgProductDecision,
+  StudioSvgProductInput,
+} from "./studio-svg-vello-product-router";
 
 afterEach(() => {
   cleanup();
@@ -11,6 +16,50 @@ afterEach(() => {
 });
 
 describe("StudioElementsPanel expanded catalog UX", () => {
+  it("consumes the SVG product tournament in the real Elements tile while preserving the source item", async () => {
+    const resolve = vi.fn(async (
+      _input: StudioSvgProductInput,
+    ): Promise<StudioSvgProductDecision> => ({
+      kind: "studio-svg-product-decision" as const,
+      revision: 1 as const,
+      assetId: "shape-superellipse",
+      sourceDigest: `sha256:${"0".repeat(64)}` as const,
+      providerId: "browser-native-svg" as const,
+      route: "trusted-browser-preservation" as const,
+      audit: null,
+      visualGate: null,
+      pixels: null,
+      sourcePreserved: true as const,
+      editable: false,
+      interactiveGpuReadbackBytes: 0 as const,
+      fallbackFrom: "vello-svg-native" as const,
+      reasons: ["trusted source preserved"],
+      warnings: [],
+      unsupported: ["element:text"],
+    }));
+    const onAdd = vi.fn();
+    render(
+      <StudioElementsPanel
+        onAdd={onAdd}
+        previewTournament={{ resolve }}
+      />,
+    );
+
+    const tile = screen.getByTitle("슈퍼타원");
+    fireEvent.pointerEnter(tile);
+    await waitFor(() => expect(resolve).toHaveBeenCalledOnce());
+    const routedInput = resolve.mock.calls[0]?.[0];
+    expect(routedInput).toMatchObject({
+      assetId: "shape-superellipse",
+      trust: "bundled-catalog",
+    });
+    expect(routedInput?.svg).toContain("<svg");
+
+    fireEvent.click(tile);
+    expect(onAdd).toHaveBeenCalledOnce();
+    expect(onAdd.mock.calls[0]?.[0].svg).toBe(routedInput?.svg);
+  });
+
   it("keeps the large catalog navigable with scrollable categories and touch targets", () => {
     render(<StudioElementsPanel onAdd={vi.fn()} />);
 

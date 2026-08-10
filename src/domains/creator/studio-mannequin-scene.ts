@@ -529,9 +529,9 @@ export function createStudioMannequinScene(
   }
 
   renderer.domElement.addEventListener("pointerdown", handlePointerDown);
-  renderer.domElement.addEventListener("pointermove", handlePointerMove);
-  renderer.domElement.addEventListener("pointerup", finishDrag);
-  renderer.domElement.addEventListener("pointercancel", finishDrag);
+  renderer.domElement.addEventListener("pointermove", handlePointerMove, { passive: true });
+  renderer.domElement.addEventListener("pointerup", finishDrag, { passive: true });
+  renderer.domElement.addEventListener("pointercancel", finishDrag, { passive: true });
 
   // ── 캡처 ─────────────────────────────────────────────────────────────────
 

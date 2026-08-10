@@ -49,6 +49,25 @@ for (const entry of requiredEntries) {
 }
 
 // Root scripts wired into the build/lint/test chain.
+// V11.1 §12.1/§Phase 8 — 인플레이스 교체 가드: 병렬 Studio 앱·버전 접미사 소스 경로 금지.
+const forbiddenParallelPaths = [
+  "apps/studio-web-v11",
+  "apps/asset-market-v11",
+  "apps/benchmark-lab-v11",
+  "studio-v11",
+];
+for (const forbidden of forbiddenParallelPaths) {
+  if (exists(forbidden)) issues.push(`forbidden parallel studio path exists: ${forbidden}`);
+}
+for (const base of ["packages", "crates", "apps"]) {
+  if (!exists(base)) continue;
+  for (const entry of fs.readdirSync(path.join(ROOT, base))) {
+    if (/-v\d+$/.test(entry)) {
+      issues.push(`version-suffixed source directory violates V11.1: ${base}/${entry}`);
+    }
+  }
+}
+
 const requiredScripts = [
   "dev",
   "build",

@@ -1,4 +1,5 @@
 import {
+  Box,
   Boxes,
   Circle,
   CircleDashed,
@@ -46,6 +47,7 @@ import {
   type StudioRailToolId,
 } from "./studio-app-settings";
 import { type BubbleVariant } from "./studio-assets";
+import { studioChromeRailGroupLabel } from "./studio-chrome-ia-map";
 import {
   StudioRailDivider,
   StudioRailToolButton,
@@ -140,6 +142,12 @@ function measureStudioRailMorePosition(
 }
 
 export interface StudioLeftToolRailHandlers {
+  /**
+   * 선택/그리기 전환의 단일 정본. 진행 중인 획 취소 → 픽셀 도구 disarm(스포이드 포함) →
+   * tool/drawMode 커밋을 한 순서로 수행한다. 레일이 setTool/setDrawMode를 직접 만지면
+   * 같은 명령이 진입점마다 다른 부수효과를 갖게 되므로 항상 이 핸들러를 거친다.
+   */
+  activatePrimaryCanvasTool: (tool: "select" | "draw", drawMode?: DrawMode) => void;
   fitCanvasToWidth: () => void;
   openFrameAnimationForSelected: () => void;
   openPixelSelectionTransform: () => void;
@@ -157,6 +165,11 @@ export interface StudioLeftToolRailHandlers {
   onRequestPixelSelection: () => void;
   onRequestSelectImage: () => void;
   onPickImage: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
+  /**
+   * CSP/PPT-style: when a draw tool is picked from the rail, surface the
+   * properties inspector so size/color/brush options are one glance away.
+   */
+  revealDrawToolProperties: () => void;
   toggleAdvancedFill: () => void;
   toggleDodgeBurnTool: () => void;
   toggleWetMixTool: () => void;
@@ -197,11 +210,11 @@ interface StudioLeftToolRailProps {
   mannequinPoserOpen?: boolean;
   poserVrmOpen?: boolean;
   bg3dOpen?: boolean;
+  hybridDccOpen?: boolean;
   selected: El | null;
   selectedImageMutationLocked: boolean;
   setAppSettingsInitialTab: import("react").Dispatch<import("react").SetStateAction<StudioAppSettingsTab>>;
   setAppSettingsOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setDrawMode: import("react").Dispatch<import("react").SetStateAction<DrawMode>>;
   setDrawShape: import("react").Dispatch<import("react").SetStateAction<DrawShapeKind>>;
   setEyedropperActive: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setMenu: import("react").Dispatch<import("react").SetStateAction<StudioMenu | null>>;
@@ -214,6 +227,7 @@ interface StudioLeftToolRailProps {
   setMannequinPoserOpen?: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setPoserVrmOpen?: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setBg3dOpen?: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setHybridDccOpen?: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setStrokeWidth: import("react").Dispatch<import("react").SetStateAction<number>>;
   setTool: import("react").Dispatch<import("react").SetStateAction<Tool>>;
   setViewTool: import("react").Dispatch<import("react").SetStateAction<"zoom" | "rotate" | null>>;
@@ -256,11 +270,11 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
   mannequinPoserOpen = false,
   poserVrmOpen = false,
   bg3dOpen = false,
+  hybridDccOpen = false,
   selected,
   selectedImageMutationLocked,
   setAppSettingsInitialTab,
   setAppSettingsOpen,
-  setDrawMode,
   setDrawShape,
   setEyedropperActive,
   setMenu,
@@ -273,6 +287,8 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
   setMannequinPoserOpen,
   setPoserVrmOpen,
   setBg3dOpen,
+  setHybridDccOpen,
+  setStrokeWidth: _setStrokeWidth,
   setTool,
   setViewTool,
   dodgeBurnActive,
@@ -364,6 +380,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
     top: 8,
   });
   const {
+    activatePrimaryCanvasTool,
     addBubble,
     addText,
     announceDrawingShortcut,
@@ -374,6 +391,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
     onRequestPixelSelection,
     onRequestSelectImage,
     onPickImage,
+    revealDrawToolProperties,
     toggleAdvancedFill,
     toggleStudioCommentPinPlacement,
     toggleDodgeBurnTool,
@@ -385,12 +403,41 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
     openPixelSelectionTransform,
     openSelectedLayerCrop,
   } = stableHandlers;
-  const pixelTransformNeedsSelection =
-    !pixelToolTargetAvailable || !isSelectionUsable(pixelSel);
+  /** Pick a draw mode from the rail and surface context properties (CSP/PPT IA). */
+  const activateDrawTool = (mode: DrawMode, shape?: DrawShapeKind) => {
+    // 진행 중인 획 취소 + disarm(스포이드 포함) + tool/drawMode 커밋은 전이 함수가 정본이다.
+    activatePrimaryCanvasTool("draw", mode);
+    if (shape !== undefined) setDrawShape(shape);
+    setMenu(null);
+    // First tool click should clear first-use chrome so the canvas stays the focus.
+    revealDrawToolProperties();
+  };
+  /** Object free-transform path (stroke handles / Konva) — no pixel marquee needed. */
+  const objectFreeTransformReady =
+    selected !== null
+    && !activeSurfaceReviewLocked
+    && !(selected.type === "image" && selectedImageMutationLocked);
+  const pixelContentTransformReady =
+    pixelToolTargetAvailable && isSelectionUsable(pixelSel);
+  /**
+   * Image-only content-transform recovery: start a marquee on a raster target.
+   * Vector-first pages should NOT fall through here — that used to label the tool
+   * "선택 시작하기" and open pixel marquee, which felt broken vs free-transform.
+   */
+  const pixelTransformRecoveryAvailable =
+    !objectFreeTransformReady
+    && !pixelContentTransformReady
+    && pixelToolTargetAvailable
+    && !activeSurfaceReviewLocked
+    && !selectedImageLocked;
+  /** No selection yet: arm select tool so the next click free-transforms. */
+  const objectTransformPickRecoveryAvailable =
+    !objectFreeTransformReady
+    && !pixelContentTransformReady
+    && !pixelToolTargetAvailable
+    && !activeSurfaceReviewLocked;
   const frameAnimationNeedsImage =
     selected?.type !== "image" || !pixelToolTargetAvailable;
-  const pixelTransformRecoveryAvailable =
-    pixelTransformNeedsSelection && !activeSurfaceReviewLocked && !selectedImageLocked;
   const frameAnimationRecoveryAvailable =
     frameAnimationNeedsImage && !activeSurfaceReviewLocked && !selectedImageLocked;
 
@@ -530,6 +577,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
                 "mannequin3d",
                 "vrm3d",
                 "bg3d",
+                "hybrid-dcc",
                 "reference",
               ] as StudioRailToolId[]
             )
@@ -578,22 +626,26 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
             className={cn(mobileImmersive && "hidden")}
             footer={railMoreFooter}
           >
-            {isRailToolVisible("select") ? (
+            <StudioRailDivider
+              data-studio-rail-group-divider="navigate-select"
+              label={studioChromeRailGroupLabel("navigate-select")}
+            />
+{isRailToolVisible("select") ? (
             <StudioRailToolButton
+              data-studio-rail-tool-id="select"
               icon={MousePointer2}
               label="선택 (V)"
               description="캔버스 위 요소를 클릭·드래그로 고르고 옮기거나 크기를 바꿉니다. 여러 개를 드래그해 함께 선택할 수 있어요."
               active={tool === "select" && !selectionSubtoolActive}
               onClick={() => {
-                disarmAllPixelTools();
-                setTool("select");
-                setEyedropperActive(false);
+                activatePrimaryCanvasTool("select");
                 setMenu(null);
               }}
             />
             ) : null}
-            {isRailToolVisible("hand") ? (
+{isRailToolVisible("hand") ? (
             <StudioRailToolButton
+              data-studio-rail-tool-id="hand"
               icon={Hand}
               label="핸드 (팬)"
               description="캔버스를 드래그해 이동합니다. Space 키와 같은 역할입니다."
@@ -606,8 +658,149 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               }}
             />
             ) : null}
-            {isRailToolVisible("marquee-rect") ? (
+            <StudioRailDivider
+              data-studio-rail-group-divider="draw"
+              label={studioChromeRailGroupLabel("draw")}
+            />
+{isRailToolVisible("pen") ? (
             <StudioRailToolButton
+              data-studio-rail-tool-id="pen"
+              icon={Pencil}
+              label="펜 (B)"
+              description="자유선으로 그립니다. 필압·보정·브러시 프리셋은 하단 옵션 도크와 브러시 스튜디오에서 조절해요."
+              active={tool === "draw" && drawMode === "pen" && !drawToolTemporarilyOverridden}
+              disabled={activeSurfaceReviewLocked}
+              unavailableReason={activeSurfaceReviewLocked ? REVIEW_LOCK_REASON : undefined}
+              grouped
+              onClick={() => activateDrawTool("pen")}
+            />
+            ) : null}
+{isRailToolVisible("pixel-pencil") ? (
+            <StudioRailToolButton
+              data-studio-rail-tool-id="pixel-pencil"
+              icon={Grid3X3}
+              label="픽셀 펜 (P)"
+              description="1px 하드 픽셀 펜으로 그립니다. 안티앨리어스·필압 없이 또렷한 선을 남깁니다."
+              active={tool === "draw" && drawMode === "pixel" && !drawToolTemporarilyOverridden}
+              disabled={activeSurfaceReviewLocked}
+              unavailableReason={activeSurfaceReviewLocked ? REVIEW_LOCK_REASON : undefined}
+              onClick={() => activateDrawTool("pixel")}
+            />
+            ) : null}
+{isRailToolVisible("eraser") ? (
+            <StudioRailToolButton
+              data-studio-rail-tool-id="eraser"
+              icon={Eraser}
+              label="지우개 (E)"
+              description="현재 레이어/획 위를 지웁니다. 굵기는 펜과 같은 크기 칩으로 맞출 수 있어요."
+              active={tool === "draw" && drawMode === "eraser" && !drawToolTemporarilyOverridden}
+              disabled={activeSurfaceReviewLocked}
+              unavailableReason={activeSurfaceReviewLocked ? REVIEW_LOCK_REASON : undefined}
+              onClick={() => activateDrawTool("eraser")}
+            />
+            ) : null}
+            <StudioRailDivider
+              data-studio-rail-group-divider="paint-retouch"
+              label={studioChromeRailGroupLabel("paint-retouch")}
+            />
+{isRailToolVisible("blend") ? (
+            <StudioRailToolButton
+              data-studio-rail-tool-id="blend"
+              icon={Wind}
+              label={labelWithShortcut(smudgeHelp.railName, smudgeShortcut)}
+              aria-keyshortcuts={smudgeShortcut || undefined}
+              description={rasterRetouchDescription(smudgeHelp.summary)}
+              active={smudgeActive}
+              disabled={!smudgeActive && !rasterRetouchCanStart}
+              unavailableReason={rasterRetouchUnavailableReason(smudgeActive)}
+              onClick={toggleSmudgeTool}
+            />
+            ) : null}
+{isRailToolVisible("wet-mix") ? (
+            <StudioRailToolButton
+              data-studio-rail-tool-id="wet-mix"
+              icon={Droplets}
+              label={labelWithShortcut(wetMixHelp.railName, wetMixShortcut)}
+              aria-keyshortcuts={wetMixShortcut || undefined}
+              description={rasterRetouchDescription(wetMixHelp.summary)}
+              active={wetMixActive}
+              disabled={!wetMixActive && !rasterRetouchCanStart}
+              unavailableReason={rasterRetouchUnavailableReason(wetMixActive)}
+              onClick={toggleWetMixTool}
+            />
+            ) : null}
+{isRailToolVisible("dodge-burn") ? (
+            <StudioRailToolButton
+              data-studio-rail-tool-id="dodge-burn"
+              icon={Sun}
+              label={labelWithShortcut(dodgeBurnHelp.railName, dodgeBurnShortcut)}
+              aria-keyshortcuts={dodgeBurnShortcut || undefined}
+              description={rasterRetouchDescription(dodgeBurnHelp.summary)}
+              active={dodgeBurnActive}
+              disabled={!dodgeBurnActive && !rasterRetouchCanStart}
+              unavailableReason={rasterRetouchUnavailableReason(dodgeBurnActive)}
+              onClick={toggleDodgeBurnTool}
+            />
+            ) : null}
+{isRailToolVisible("liquify") ? (
+            <StudioRailToolButton
+              data-studio-rail-tool-id="liquify"
+              icon={Move}
+              label={labelWithShortcut(liquifyHelp.railName, liquifyShortcut)}
+              aria-keyshortcuts={liquifyShortcut || undefined}
+              description={rasterRetouchDescription(liquifyHelp.summary)}
+              active={liquifyActive}
+              disabled={!liquifyActive && !rasterRetouchCanStart}
+              unavailableReason={rasterRetouchUnavailableReason(liquifyActive)}
+              onClick={toggleLiquifyTool}
+            />
+            ) : null}
+{isRailToolVisible("fill") ? (
+            <StudioRailToolButton
+              data-studio-rail-tool-id="fill"
+              icon={PaintBucket}
+              label="채우기 (G)"
+              description={advancedFillUnsupportedReason
+                ? `선 안을 탭해 색을 채웁니다. ${advancedFillUnsupportedReason} 눌러서 안전한 단일 래스터 후보를 찾거나 필요한 조건을 확인하세요.`
+                : "선 안을 탭해 색을 채웁니다. 경계 인식과 참조 레이어 설정은 속성 패널에서 조정해요."}
+              active={advancedFillActive}
+              onClick={toggleAdvancedFill}
+            />
+            ) : null}
+{isRailToolVisible("lasso-fill") ? (
+            <StudioRailToolButton
+              data-studio-rail-tool-id="lasso-fill"
+              icon={Paintbrush}
+              label="올가미 채우기"
+              description="닫힌 궤적을 그려 현재 색으로 채웁니다."
+              active={tool === "draw" && drawMode === "lasso-fill"}
+              disabled={activeSurfaceReviewLocked}
+              unavailableReason={activeSurfaceReviewLocked ? REVIEW_LOCK_REASON : undefined}
+              onClick={() => activateDrawTool("lasso-fill")}
+            />
+            ) : null}
+{isRailToolVisible("eyedropper") ? (
+            <StudioRailToolButton
+              data-studio-rail-tool-id="eyedropper"
+              icon={Pipette}
+              label="스포이드 (I / Alt+클릭)"
+              description="캔버스 색을 샘플링해 주 색으로 가져옵니다. 펜으로 그리는 중엔 Alt+클릭으로도 동작해요."
+              active={eyedropperActive}
+              onClick={() => {
+                const next = !eyedropperActive;
+                if (next) disarmAllPixelTools();
+                setEyedropperActive(next);
+                setMenu(null);
+              }}
+            />
+            ) : null}
+            <StudioRailDivider
+              data-studio-rail-group-divider="selection"
+              label={studioChromeRailGroupLabel("selection")}
+            />
+{isRailToolVisible("marquee-rect") ? (
+            <StudioRailToolButton
+              data-studio-rail-tool-id="marquee-rect"
               icon={SquareDashedMousePointer}
               label="사각 선택 (M)"
               description="이미지 픽셀을 사각형으로 선택합니다. Shift=정사각, Alt=중심 확장."
@@ -623,8 +816,9 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               onClick={() => togglePixelMarquee("rect")}
             />
             ) : null}
-            {isRailToolVisible("marquee-circle") ? (
+{isRailToolVisible("marquee-circle") ? (
             <StudioRailToolButton
+              data-studio-rail-tool-id="marquee-circle"
               icon={CircleDashed}
               label="원형 선택"
               description="이미지 픽셀을 정원으로 선택합니다. Alt=중심 확장."
@@ -640,189 +834,9 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               onClick={() => togglePixelMarquee("circle")}
             />
             ) : null}
-            {isRailToolVisible("transform") ? (
+{isRailToolVisible("lasso") ? (
             <StudioRailToolButton
-              icon={Maximize2}
-              label={pixelTransformRecoveryAvailable ? "선택 시작하기" : "변형 (⇧T)"}
-              description={
-                pixelTransformRecoveryAvailable
-                  ? "변형할 이미지 레이어를 먼저 고르세요. 이미지 안에서 변형할 픽셀 영역을 먼저 선택하세요. 지금 사각 선택을 시작하고, 선택 뒤 이 위치에서 변형을 바로 열 수 있어요."
-                  : "픽셀 선택이 있으면 속성→리터치에서 내용 변형(스케일·회전·뒤집기)을 적용합니다."
-              }
-              active={false}
-              disabled={activeSurfaceReviewLocked || selectedImageLocked}
-              unavailableReason={
-                activeSurfaceReviewLocked
-                  ? REVIEW_LOCK_REASON
-                  : selectedImageMutationLocked
-                    ? IMAGE_EDIT_LOCK_REASON
-                    : undefined
-              }
-              className={pixelTransformRecoveryAvailable ? "size-11" : undefined}
-              onClick={
-                pixelTransformRecoveryAvailable
-                  ? onRequestPixelSelection
-                  : openPixelSelectionTransform
-              }
-            />
-            ) : null}
-            {isRailToolVisible("crop") ? (
-            <StudioRailToolButton
-              icon={Crop}
-              label="자르기 (C)"
-              description={rasterRetouchDescription(
-                "가장자리와 모서리를 끌어 필요한 영역만 남깁니다. 적용 전까지 원본은 바뀌지 않아요."
-              )}
-              active={cropActive}
-              disabled={!cropActive && !rasterRetouchCanStart}
-              unavailableReason={rasterRetouchUnavailableReason(cropActive)}
-              onClick={openSelectedLayerCrop}
-            />
-            ) : null}
-            {isRailToolVisible("pen") ? (
-            <StudioRailToolButton
-              icon={Pencil}
-              label="펜 (B)"
-              description="자유선으로 그립니다. 필압·보정·브러시 프리셋은 하단 옵션 도크와 브러시 스튜디오에서 조절해요."
-              active={tool === "draw" && drawMode === "pen" && !drawToolTemporarilyOverridden}
-              disabled={activeSurfaceReviewLocked}
-              unavailableReason={activeSurfaceReviewLocked ? REVIEW_LOCK_REASON : undefined}
-              grouped
-              onClick={() => {
-                disarmAllPixelTools();
-                setTool("draw");
-                setDrawMode("pen");
-                setEyedropperActive(false);
-                setMenu(null);
-              }}
-            />
-            ) : null}
-            {isRailToolVisible("pixel-pencil") ? (
-            <StudioRailToolButton
-              icon={Grid3X3}
-              label="픽셀 펜 (P)"
-              description="1px 하드 픽셀 펜으로 그립니다. 안티앨리어스·필압 없이 또렷한 선을 남깁니다."
-              active={tool === "draw" && drawMode === "pixel" && !drawToolTemporarilyOverridden}
-              disabled={activeSurfaceReviewLocked}
-              unavailableReason={activeSurfaceReviewLocked ? REVIEW_LOCK_REASON : undefined}
-              onClick={() => {
-                disarmAllPixelTools();
-                setTool("draw");
-                setDrawMode("pixel");
-                setEyedropperActive(false);
-                setMenu(null);
-              }}
-            />
-            ) : null}
-            {isRailToolVisible("eraser") ? (
-            <StudioRailToolButton
-              icon={Eraser}
-              label="지우개 (E)"
-              description="현재 레이어/획 위를 지웁니다. 굵기는 펜과 같은 크기 칩으로 맞출 수 있어요."
-              active={tool === "draw" && drawMode === "eraser" && !drawToolTemporarilyOverridden}
-              disabled={activeSurfaceReviewLocked}
-              unavailableReason={activeSurfaceReviewLocked ? REVIEW_LOCK_REASON : undefined}
-              onClick={() => {
-                disarmAllPixelTools();
-                setTool("draw");
-                setDrawMode("eraser");
-                setEyedropperActive(false);
-                setMenu(null);
-              }}
-            />
-            ) : null}
-            {isRailToolVisible("blend") ? (
-            <StudioRailToolButton
-              icon={Wind}
-              label={labelWithShortcut(smudgeHelp.railName, smudgeShortcut)}
-              aria-keyshortcuts={smudgeShortcut || undefined}
-              description={rasterRetouchDescription(smudgeHelp.summary)}
-              active={smudgeActive}
-              disabled={!smudgeActive && !rasterRetouchCanStart}
-              unavailableReason={rasterRetouchUnavailableReason(smudgeActive)}
-              onClick={toggleSmudgeTool}
-            />
-            ) : null}
-            {isRailToolVisible("wet-mix") ? (
-            <StudioRailToolButton
-              icon={Droplets}
-              label={labelWithShortcut(wetMixHelp.railName, wetMixShortcut)}
-              aria-keyshortcuts={wetMixShortcut || undefined}
-              description={rasterRetouchDescription(wetMixHelp.summary)}
-              active={wetMixActive}
-              disabled={!wetMixActive && !rasterRetouchCanStart}
-              unavailableReason={rasterRetouchUnavailableReason(wetMixActive)}
-              onClick={toggleWetMixTool}
-            />
-            ) : null}
-            {isRailToolVisible("dodge-burn") ? (
-            <StudioRailToolButton
-              icon={Sun}
-              label={labelWithShortcut(dodgeBurnHelp.railName, dodgeBurnShortcut)}
-              aria-keyshortcuts={dodgeBurnShortcut || undefined}
-              description={rasterRetouchDescription(dodgeBurnHelp.summary)}
-              active={dodgeBurnActive}
-              disabled={!dodgeBurnActive && !rasterRetouchCanStart}
-              unavailableReason={rasterRetouchUnavailableReason(dodgeBurnActive)}
-              onClick={toggleDodgeBurnTool}
-            />
-            ) : null}
-            {isRailToolVisible("liquify") ? (
-            <StudioRailToolButton
-              icon={Move}
-              label={labelWithShortcut(liquifyHelp.railName, liquifyShortcut)}
-              aria-keyshortcuts={liquifyShortcut || undefined}
-              description={rasterRetouchDescription(liquifyHelp.summary)}
-              active={liquifyActive}
-              disabled={!liquifyActive && !rasterRetouchCanStart}
-              unavailableReason={rasterRetouchUnavailableReason(liquifyActive)}
-              onClick={toggleLiquifyTool}
-            />
-            ) : null}
-            {isRailToolVisible("fill") ? (
-            <StudioRailToolButton
-              icon={PaintBucket}
-              label="채우기 (G)"
-              description={advancedFillUnsupportedReason
-                ? `선 안을 탭해 색을 채웁니다. ${advancedFillUnsupportedReason} 눌러서 안전한 단일 래스터 후보를 찾거나 필요한 조건을 확인하세요.`
-                : "선 안을 탭해 색을 채웁니다. 경계 인식과 참조 레이어 설정은 속성 패널에서 조정해요."}
-              active={advancedFillActive}
-              onClick={toggleAdvancedFill}
-            />
-            ) : null}
-            {isRailToolVisible("eyedropper") ? (
-            <StudioRailToolButton
-              icon={Pipette}
-              label="스포이드 (I / Alt+클릭)"
-              description="캔버스 색을 샘플링해 주 색으로 가져옵니다. 펜으로 그리는 중엔 Alt+클릭으로도 동작해요."
-              active={eyedropperActive}
-              onClick={() => {
-                const next = !eyedropperActive;
-                if (next) disarmAllPixelTools();
-                setEyedropperActive(next);
-                setMenu(null);
-              }}
-            />
-            ) : null}
-            {isRailToolVisible("lasso-fill") ? (
-            <StudioRailToolButton
-              icon={Paintbrush}
-              label="라쏘 필"
-              description="닫힌 궤적을 그려 현재 색으로 채웁니다."
-              active={tool === "draw" && drawMode === "lasso-fill"}
-              disabled={activeSurfaceReviewLocked}
-              unavailableReason={activeSurfaceReviewLocked ? REVIEW_LOCK_REASON : undefined}
-              onClick={() => {
-                disarmAllPixelTools();
-                setTool("draw");
-                setDrawMode("lasso-fill");
-                setEyedropperActive(false);
-                setMenu(null);
-              }}
-            />
-            ) : null}
-            {isRailToolVisible("lasso") ? (
-            <StudioRailToolButton
+              data-studio-rail-tool-id="lasso"
               icon={Lasso}
               label={
                 pixelTool === "lasso"
@@ -870,95 +884,87 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               }}
             />
             ) : null}
-            {isRailToolVisible("comment") ? (
-            <StudioRailToolButton
-              icon={MessageSquare}
-              label={commentPinArmed
-                ? "댓글 핀 배치 취소"
-                : formattedCommentShortcut
-                  ? `댓글 핀 배치 (${formattedCommentShortcut})`
-                  : "댓글 핀 배치"}
-              description={commentPinArmed
-                ? "댓글 핀 배치를 취소하고 이전 편집 도구로 돌아갑니다."
-                : `캔버스의 정확한 위치를 클릭해 댓글을 남깁니다. ${formattedCommentShortcut ? `${formattedCommentShortcut}로 바로 시작하고, ` : ""}⇧·C로 핀을 숨길 수 있어요.`}
-              aria-keyshortcuts={commentShortcut || undefined}
-              hintPreview={commentPinArmed ? "dismiss" : "comment"}
-              active={commentPinArmed}
-              onClick={toggleStudioCommentPinPlacement}
+            <StudioRailDivider
+              data-studio-rail-group-divider="transform"
+              label={studioChromeRailGroupLabel("transform")}
             />
-            ) : null}
-            {isRailToolVisible("perspective") ? (
+{isRailToolVisible("transform") ? (
             <StudioRailToolButton
-              icon={Triangle}
-              label="투시도"
-              description="소실점 가이드로 원근을 맞춥니다."
-              active={perspectiveRulerActive}
-              disabled={activeSurfaceReviewLocked}
-              unavailableReason={activeSurfaceReviewLocked ? REVIEW_LOCK_REASON : undefined}
+              data-studio-rail-tool-id="transform"
+              icon={Maximize2}
+              label={
+                pixelTransformRecoveryAvailable
+                  ? "선택 시작하기"
+                  : objectTransformPickRecoveryAvailable
+                    ? "선택 후 변형"
+                    : "변형 (⇧T)"
+              }
+              description={
+                pixelTransformRecoveryAvailable
+                  ? "이미지 픽셀 내용 변형을 위해 사각 선택을 시작합니다. 선택 뒤 다시 누르면 스케일·회전·뒤집기 패널이 열려요."
+                  : objectTransformPickRecoveryAvailable
+                    ? "변형할 선·도형·이미지를 캔버스에서 먼저 고르세요. 선택 도구로 전환합니다."
+                    : objectFreeTransformReady
+                      ? selected?.type === "draw"
+                        ? "선택한 선화 레이어의 모서리 핸들로 크기·위치를 조절합니다. 이미지 픽셀 부분 변형은 사각 선택 후 다시 눌러 주세요."
+                        : selected?.type === "image" && !isSelectionUsable(pixelSel)
+                          ? "이미지 레이어 전체를 선택해 내용 변형(스케일·회전·뒤집기) 패널을 엽니다. 부분만 바꾸려면 먼저 사각·올가미 선택하세요."
+                          : "선택한 객체의 모서리·회전 핸들로 변형하거나, 픽셀 선택이 있으면 내용 변형 패널을 엽니다."
+                      : "픽셀 선택이 있으면 속성→리터치에서 내용 변형(스케일·회전·뒤집기)을 적용합니다."
+              }
+              active={false}
+              disabled={activeSurfaceReviewLocked || selectedImageLocked}
+              unavailableReason={
+                activeSurfaceReviewLocked
+                  ? REVIEW_LOCK_REASON
+                  : selectedImageMutationLocked
+                    ? IMAGE_EDIT_LOCK_REASON
+                    : undefined
+              }
+              className={
+                pixelTransformRecoveryAvailable || objectTransformPickRecoveryAvailable
+                  ? "size-11"
+                  : undefined
+              }
               onClick={() => {
-                const next = !perspectiveRulerActive;
-                setPerspectiveRulerActive(next);
-                if (next) {
-                  disarmAllPixelTools();
-                  setTool("draw");
-                  setDrawMode("pen");
-                  setEyedropperActive(false);
-                  announceDrawingShortcut("투시도 켜짐 · 소실점 방향으로 펜 선을 맞춰요");
-                } else {
-                  announceDrawingShortcut("투시도 꺼짐");
+                if (pixelTransformRecoveryAvailable) {
+                  onRequestPixelSelection();
+                  return;
                 }
-                setMenu(null);
+                if (objectTransformPickRecoveryAvailable) {
+                  disarmAllPixelTools();
+                  setTool("select");
+                  setMenu(null);
+                  announceDrawingShortcut(
+                    "변형할 요소를 클릭해 선택하세요 · 모서리 핸들로 크기 조절",
+                  );
+                  return;
+                }
+                openPixelSelectionTransform();
               }}
             />
             ) : null}
-            {isRailToolVisible("zoom-fit") ? (
+{isRailToolVisible("crop") ? (
             <StudioRailToolButton
-              icon={ScanLine}
-              label="너비에 맞춤 (Home)"
-              description="캔버스 폭에 맞춰 확대·축소합니다."
-              hintPreview="zoom-view"
-              hintPreviewVariant="fit-width"
-              disabled={viewTransformSuppressed}
-              unavailableReason={viewTransformSuppressed ? "내보내기·저장이 끝난 뒤 보기를 조절하세요." : undefined}
-              onClick={fitCanvasToWidth}
+              data-studio-rail-tool-id="crop"
+              icon={Crop}
+              label="자르기 (C)"
+              description={rasterRetouchDescription(
+                "가장자리와 모서리를 끌어 필요한 영역만 남깁니다. 적용 전까지 원본은 바뀌지 않아요."
+              )}
+              active={cropActive}
+              disabled={!cropActive && !rasterRetouchCanStart}
+              unavailableReason={rasterRetouchUnavailableReason(cropActive)}
+              onClick={openSelectedLayerCrop}
             />
             ) : null}
-            {isRailToolVisible("zoom") ? (
-            <StudioRailToolButton
-              icon={Search}
-              label={zoomViewToolLabel}
-              description={zoomViewToolOpen
-                ? "현재 확대·축소 HUD를 닫고 적용한 보기 배율은 그대로 유지합니다."
-                : "확대·축소 HUD를 열어 배율·화면 맞춤·100% 보기를 빠르게 조절합니다."}
-              {...zoomViewToolHintProps}
-              active={zoomViewToolOpen}
-              disabled={viewTransformSuppressed}
-              unavailableReason={viewTransformSuppressed ? "내보내기·저장이 끝난 뒤 보기를 조절하세요." : undefined}
-              aria-expanded={zoomViewToolOpen}
-              aria-controls="studio-view-tools-hud-zoom"
-              data-studio-view-tool-trigger="zoom"
-              onClick={() => setViewTool((current) => current === "zoom" ? null : "zoom")}
+            <StudioRailDivider
+              data-studio-rail-group-divider="objects"
+              label={studioChromeRailGroupLabel("objects")}
             />
-            ) : null}
-            {isRailToolVisible("rotate-view") ? (
+{isRailToolVisible("smart-shape") ? (
             <StudioRailToolButton
-              icon={RotateCw}
-              label={rotateViewToolLabel}
-              description={rotateViewToolOpen
-                ? "현재 회전 HUD를 닫고 적용한 보기 회전·반전 상태는 그대로 유지합니다."
-                : "회전 HUD를 열어 캔버스를 좌·우 90°로 돌리거나 수평 반전합니다. 문서와 내보내기는 바뀌지 않아요."}
-              {...rotateViewToolHintProps}
-              active={rotateViewToolOpen}
-              disabled={viewTransformSuppressed}
-              unavailableReason={viewTransformSuppressed ? "내보내기·저장이 끝난 뒤 보기를 조절하세요." : undefined}
-              aria-expanded={rotateViewToolOpen}
-              aria-controls="studio-view-tools-hud-rotate"
-              data-studio-view-tool-trigger="rotate"
-              onClick={() => setViewTool((current) => current === "rotate" ? null : "rotate")}
-            />
-            ) : null}
-            {isRailToolVisible("smart-shape") ? (
-            <StudioRailToolButton
+              data-studio-rail-tool-id="smart-shape"
               icon={Shapes}
               label={quickShapeActive ? "스마트 도형 끄기" : "스마트 도형 켜기"}
               description={quickShapeActive
@@ -973,10 +979,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               onClick={() => {
                 const next = !quickShapeActive;
                 if (next) {
-                  disarmAllPixelTools();
-                  setTool("draw");
-                  setDrawMode("pen");
-                  setEyedropperActive(false);
+                  activateDrawTool("pen");
                   announceDrawingShortcut("스마트 도형 켜짐 · 그려서 손을 떼면 다듬어요");
                 } else {
                   announceDrawingShortcut("스마트 도형 꺼짐");
@@ -986,45 +989,33 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               }}
             />
             ) : null}
-            {isRailToolVisible("shape-rect") ? (
+{isRailToolVisible("shape-rect") ? (
             <StudioRailToolButton
+              data-studio-rail-tool-id="shape-rect"
               icon={Square}
               label="사각형 도형"
               description="드래그로 사각형을 그립니다. Shift를 누르면 정사각형으로 맞출 수 있어요."
               active={tool === "draw" && drawMode === "shape" && drawShape === "rect"}
               disabled={activeSurfaceReviewLocked}
               unavailableReason={activeSurfaceReviewLocked ? REVIEW_LOCK_REASON : undefined}
-              onClick={() => {
-                disarmAllPixelTools();
-                setTool("draw");
-                setDrawMode("shape");
-                setDrawShape("rect");
-                setEyedropperActive(false);
-                setMenu(null);
-              }}
+              onClick={() => activateDrawTool("shape", "rect")}
             />
             ) : null}
-            {isRailToolVisible("shape-ellipse") ? (
+{isRailToolVisible("shape-ellipse") ? (
             <StudioRailToolButton
+              data-studio-rail-tool-id="shape-ellipse"
               icon={Circle}
               label="타원 도형"
               description="드래그로 타원을 그립니다. Shift를 누르면 정원으로 맞출 수 있어요."
               active={tool === "draw" && drawMode === "shape" && drawShape === "ellipse"}
               disabled={activeSurfaceReviewLocked}
               unavailableReason={activeSurfaceReviewLocked ? REVIEW_LOCK_REASON : undefined}
-              onClick={() => {
-                disarmAllPixelTools();
-                setTool("draw");
-                setDrawMode("shape");
-                setDrawShape("ellipse");
-                setEyedropperActive(false);
-                setMenu(null);
-              }}
+              onClick={() => activateDrawTool("shape", "ellipse")}
             />
             ) : null}
-            <StudioRailDivider />
-            {isRailToolVisible("text") ? (
+{isRailToolVisible("text") ? (
             <StudioRailToolButton
+              data-studio-rail-tool-id="text"
               icon={TypeIcon}
               label="텍스트 추가"
               description="캔버스에 글자 상자를 추가합니다. 폰트·정렬·효과는 우측 속성에서 편집해요."
@@ -1035,8 +1026,9 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               }}
             />
             ) : null}
-            {isRailToolVisible("bubble") ? (
+{isRailToolVisible("bubble") ? (
             <StudioRailToolButton
+              data-studio-rail-tool-id="bubble"
               icon={MessageCircle}
               label="말풍선 추가"
               description="만화 말풍선을 넣습니다. 꼬리 위치·스타일 프리셋은 말풍선 패널에서 바꿀 수 있어요."
@@ -1047,7 +1039,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               }}
             />
             ) : null}
-            {isRailToolVisible("image") ? (
+{isRailToolVisible("image") ? (
             <StudioToolHintTarget
               disabled={activeSurfaceReviewLocked}
               unavailableReason={activeSurfaceReviewLocked ? REVIEW_LOCK_REASON : undefined}
@@ -1060,6 +1052,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               }}
             >
               <label
+                data-studio-rail-tool-id="image"
                 aria-disabled={activeSurfaceReviewLocked}
                 className={cn(
                   "relative grid size-10 place-items-center rounded-2xl border border-transparent text-fg-2 xl:size-11",
@@ -1084,9 +1077,53 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               </label>
             </StudioToolHintTarget>
             ) : null}
-            <StudioRailDivider />
-            {isRailToolVisible("frame-anim") ? (
+{isRailToolVisible("comment") ? (
             <StudioRailToolButton
+              data-studio-rail-tool-id="comment"
+              icon={MessageSquare}
+              label={commentPinArmed
+                ? "댓글 핀 배치 취소"
+                : formattedCommentShortcut
+                  ? `댓글 핀 배치 (${formattedCommentShortcut})`
+                  : "댓글 핀 배치"}
+              description={commentPinArmed
+                ? "댓글 핀 배치를 취소하고 이전 편집 도구로 돌아갑니다."
+                : `캔버스의 정확한 위치를 클릭해 댓글을 남깁니다. ${formattedCommentShortcut ? `${formattedCommentShortcut}로 바로 시작하고, ` : ""}⇧·C로 핀을 숨길 수 있어요.`}
+              aria-keyshortcuts={commentShortcut || undefined}
+              hintPreview={commentPinArmed ? "dismiss" : "comment"}
+              active={commentPinArmed}
+              onClick={toggleStudioCommentPinPlacement}
+            />
+            ) : null}
+{isRailToolVisible("perspective") ? (
+            <StudioRailToolButton
+              data-studio-rail-tool-id="perspective"
+              icon={Triangle}
+              label="투시도"
+              description="소실점 가이드로 원근을 맞춥니다."
+              active={perspectiveRulerActive}
+              disabled={activeSurfaceReviewLocked}
+              unavailableReason={activeSurfaceReviewLocked ? REVIEW_LOCK_REASON : undefined}
+              onClick={() => {
+                const next = !perspectiveRulerActive;
+                setPerspectiveRulerActive(next);
+                if (next) {
+                  activateDrawTool("pen");
+                  announceDrawingShortcut("투시도 켜짐 · 소실점 방향으로 펜 선을 맞춰요");
+                } else {
+                  announceDrawingShortcut("투시도 꺼짐");
+                }
+                setMenu(null);
+              }}
+            />
+            ) : null}
+            <StudioRailDivider
+              data-studio-rail-group-divider="media-3d"
+              label={studioChromeRailGroupLabel("media-3d")}
+            />
+{isRailToolVisible("frame-anim") ? (
+            <StudioRailToolButton
+              data-studio-rail-tool-id="frame-anim"
               icon={Film}
               label={frameAnimationRecoveryAvailable ? "이미지 선택하기" : "프레임 애니메이션"}
               description={
@@ -1111,8 +1148,9 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               }
             />
             ) : null}
-            {isRailToolVisible("mannequin3d") ? (
+{isRailToolVisible("mannequin3d") ? (
             <StudioRailToolButton
+              data-studio-rail-tool-id="mannequin3d"
               icon={PersonStanding}
               label="3D 데생 인형"
               description="모델 파일 없이 체형을 조절하고 포즈를 잡아 드로잉 참고 이미지로 캡처합니다."
@@ -1121,8 +1159,9 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               onClick={() => setMannequinPoserOpen?.((v) => !v)}
             />
             ) : null}
-            {isRailToolVisible("vrm3d") ? (
+{isRailToolVisible("vrm3d") ? (
             <StudioRailToolButton
+              data-studio-rail-tool-id="vrm3d"
               icon={UsersRound}
               label="3D 캐릭터"
               description="베이스 캐릭터를 고른 뒤 포즈, 표정, 의상과 색상을 조정해 투명 배경 이미지로 추가합니다."
@@ -1131,8 +1170,9 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               onClick={() => setPoserVrmOpen?.((v) => !v)}
             />
             ) : null}
-            {isRailToolVisible("bg3d") ? (
+{isRailToolVisible("bg3d") ? (
             <StudioRailToolButton
+              data-studio-rail-tool-id="bg3d"
               icon={Boxes}
               label="3D 배경"
               description="3D 오브젝트와 씬을 배치하고 카메라 앵글을 조절해 웹툰 배경 이미지를 추출합니다."
@@ -1141,8 +1181,20 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               onClick={() => setBg3dOpen?.((v) => !v)}
             />
             ) : null}
-            {studioUiDensityAllows(uiDensityMode, "toolbar-reference") && isRailToolVisible("reference") ? (
+{isRailToolVisible("hybrid-dcc") ? (
+            <StudioRailToolButton
+              data-studio-rail-tool-id="hybrid-dcc"
+              icon={Box}
+              label="Hybrid 3D DCC"
+              description="메시·불리언·CAD/스컬프/클로스·샷·.toon3d 하이브리드 워크스페이스를 엽니다. 웹툰 세트장 구축과 컷 연출을 한 화면에서 처리합니다."
+              active={hybridDccOpen}
+              accented
+              onClick={() => setHybridDccOpen?.((v) => !v)}
+            />
+            ) : null}
+{studioUiDensityAllows(uiDensityMode, "toolbar-reference") && isRailToolVisible("reference") ? (
               <StudioRailToolButton
+              data-studio-rail-tool-id="reference"
                 icon={PictureInPicture2}
                 label="참고 이미지"
                 description="캔버스와 분리된 참고 이미지를 띄워 구도·색·의상을 보면서 작업합니다. 완성 원고에는 포함되지 않아요."
@@ -1155,6 +1207,59 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
                 onMouseEnter={preloadStudioReferencePanel}
                 onFocus={preloadStudioReferencePanel}
               />
+            ) : null}
+            <StudioRailDivider
+              data-studio-rail-group-divider="view"
+              label={studioChromeRailGroupLabel("view")}
+            />
+{isRailToolVisible("zoom") ? (
+            <StudioRailToolButton
+              data-studio-rail-tool-id="zoom"
+              icon={Search}
+              label={zoomViewToolLabel}
+              description={zoomViewToolOpen
+                ? "현재 확대·축소 HUD를 닫고 적용한 보기 배율은 그대로 유지합니다."
+                : "확대·축소 HUD를 열어 배율·화면 맞춤·100% 보기를 빠르게 조절합니다."}
+              {...zoomViewToolHintProps}
+              active={zoomViewToolOpen}
+              disabled={viewTransformSuppressed}
+              unavailableReason={viewTransformSuppressed ? "내보내기·저장이 끝난 뒤 보기를 조절하세요." : undefined}
+              aria-expanded={zoomViewToolOpen}
+              aria-controls="studio-view-tools-hud-zoom"
+              data-studio-view-tool-trigger="zoom"
+              onClick={() => setViewTool((current) => current === "zoom" ? null : "zoom")}
+            />
+            ) : null}
+{isRailToolVisible("zoom-fit") ? (
+            <StudioRailToolButton
+              data-studio-rail-tool-id="zoom-fit"
+              icon={ScanLine}
+              label="너비에 맞춤 (Home)"
+              description="캔버스 폭에 맞춰 확대·축소합니다."
+              hintPreview="zoom-view"
+              hintPreviewVariant="fit-width"
+              disabled={viewTransformSuppressed}
+              unavailableReason={viewTransformSuppressed ? "내보내기·저장이 끝난 뒤 보기를 조절하세요." : undefined}
+              onClick={fitCanvasToWidth}
+            />
+            ) : null}
+{isRailToolVisible("rotate-view") ? (
+            <StudioRailToolButton
+              data-studio-rail-tool-id="rotate-view"
+              icon={RotateCw}
+              label={rotateViewToolLabel}
+              description={rotateViewToolOpen
+                ? "현재 회전 HUD를 닫고 적용한 보기 회전·반전 상태는 그대로 유지합니다."
+                : "회전 HUD를 열어 캔버스를 좌·우 90°로 돌리거나 수평 반전합니다. 문서와 내보내기는 바뀌지 않아요."}
+              {...rotateViewToolHintProps}
+              active={rotateViewToolOpen}
+              disabled={viewTransformSuppressed}
+              unavailableReason={viewTransformSuppressed ? "내보내기·저장이 끝난 뒤 보기를 조절하세요." : undefined}
+              aria-expanded={rotateViewToolOpen}
+              aria-controls="studio-view-tools-hud-rotate"
+              data-studio-view-tool-trigger="rotate"
+              onClick={() => setViewTool((current) => current === "rotate" ? null : "rotate")}
+            />
             ) : null}
           </StudioVerticalToolRail>
         ) : null}

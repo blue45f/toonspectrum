@@ -49,6 +49,10 @@ export type StudioBrushAliasId =
   | "flat-brush"
   | "watercolor"
   | "ink-wash"
+  | "inkwash-pen"
+  | "inkwash-water-brush"
+  | "inkwash-bleed-wash"
+  | "inkwash-white-ink"
   | "gouache"
   | "oil"
   | "acrylic"
@@ -375,6 +379,62 @@ export const STUDIO_BRUSH_ALIAS_PROFILES = {
       coreOpacityScale: 1.55,
       diffuseRadiusScale: 1.55,
       diffuseOpacityScale: 0.62,
+    },
+  },
+  "inkwash-pen": {
+    version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
+    id: "inkwash-pen",
+    family: "watercolor",
+    diameterScale: 0.65,
+    pressure: { minimum: 0.12, maximum: 1.1, exponent: 1.2 },
+    watercolor: {
+      spacingRatio: 0.18,
+      coreRadiusScale: 0.85,
+      coreOpacityScale: 1.6,
+      diffuseRadiusScale: 1.25,
+      diffuseOpacityScale: 0.45,
+    },
+  },
+  "inkwash-water-brush": {
+    version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
+    id: "inkwash-water-brush",
+    family: "watercolor",
+    diameterScale: 1.2,
+    pressure: { minimum: 0.3, maximum: 1.0, exponent: 0.7 },
+    watercolor: {
+      spacingRatio: 0.28,
+      coreRadiusScale: 0.5,
+      coreOpacityScale: 0.2,
+      diffuseRadiusScale: 1.8,
+      diffuseOpacityScale: 0.85,
+    },
+  },
+  "inkwash-bleed-wash": {
+    version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
+    id: "inkwash-bleed-wash",
+    family: "watercolor",
+    diameterScale: 1.35,
+    pressure: { minimum: 0.15, maximum: 1.0, exponent: 0.8 },
+    watercolor: {
+      spacingRatio: 0.25,
+      coreRadiusScale: 0.7,
+      coreOpacityScale: 1.1,
+      diffuseRadiusScale: 1.9,
+      diffuseOpacityScale: 0.78,
+    },
+  },
+  "inkwash-white-ink": {
+    version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
+    id: "inkwash-white-ink",
+    family: "watercolor",
+    diameterScale: 0.85,
+    pressure: { minimum: 0.25, maximum: 1.0, exponent: 0.9 },
+    watercolor: {
+      spacingRatio: 0.22,
+      coreRadiusScale: 0.92,
+      coreOpacityScale: 1.4,
+      diffuseRadiusScale: 1.3,
+      diffuseOpacityScale: 0.55,
     },
   },
   gouache: {

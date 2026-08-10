@@ -98,15 +98,35 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- Pretendard(주 한국어 UI 폰트)는 jsDelivr에서 옴 — 렌더 임계 경로라 연결을 미리 warm -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-    <!-- 임계 경로에는 전역 폰트 2종만 — Space Grotesk(--font-display)·Nanum Myeongjo(--font-serif).
-         스튜디오 전용 7종(Jua·Black Han Sans·Gaegu 등)은 StudioPage 마운트 시 동적 주입한다. -->
+    <!-- 임계 경로에 남는 Google Font 는 Space Grotesk(--font-display) 하나뿐이다. globals.css 의
+         numeral/eyebrow 유틸이 전 라우트에서 쓰므로 전역이어야 하는데, 라틴 전용이라 스타일시트가
+         12블록 543 B(gzip 실측)에 그친다.
+         Nanum Myeongjo(--font-serif)는 여기서 뺐다 — 한글이 유니코드 범위별로 쪼개져 혼자
+         184블록 25,604 B 로 기존 <link> 25,974 B 의 98.6 % 였는데, /studio 부팅 화면에는
+         font-serif 를 쓰는 DOM 이 한 곳도 없다. 두 실사용처로 각각 넘겼다:
+         웹 크롬(랜딩·탐색·운세·리뷰·디자인)은 src/app/serif-webfont.ts 가 렌더 직전에 주입하고,
+         스튜디오는 브랜드킷 "명조"(BRAND_KIT_FONTS)를 위해 나머지 8종과 같은 idle 프리로드
+         (StudioPage.tsx STUDIO_FONTS_CSS2_URL)에 합류시켰다 — Konva 캔버스 텍스트는 폰트 스왑을
+         스스로 감지하지 못해 그 레인의 재도색 훅과 한 벌로 있어야 한다.
+         스튜디오 전용 8종(Jua·Black Han Sans·Gaegu·명조 등)은 StudioPage 마운트 시 동적 주입한다. -->
     <link
-      href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
+    <!-- dynamic-subset: unicode-range 로 쪼갠 서브셋만 받는다. 통짜 PretendardVariable.woff2 는
+         2.06 MB 였고 콜드 부팅 4.51 MB 의 45.6 % 를 혼자 차지했다(docs/perf/heavy-feature-findings.md §4-2).
+         같은 빌드에서 스타일시트만 바꿔 A/B 실측(2026-08-08, /studio 콜드 부팅, gzip 전송 실측):
+         통짜 4,482,765 B / 268req → 서브셋 2,863,241 B / 284req (-1.62 MB, -36 %),
+         woff2 2,058,718 B(1개) → 451,469 B(17개). CLS 0.04091 로 동일.
+         같은 jsDelivr 오리진이라 CSP(font-src)·preconnect 는 그대로 유효하고,
+         font-display:swap 도 통짜 CSS 와 동일하므로 FOUT 동작은 바뀌지 않는다.
+         글리프 대조(한글 완성형·희귀 음절·자모·라틴·숫자·문장부호·한글 문장부호·기호·통화·한자·전각
+         231자)에서 차이가 난 건 ⌘·⌥·✓ 셋뿐이고, 이건 서브셋에 U+2318/2325/2713 범위가 없어
+         폰트 스택 다음 순번(-apple-system/Segoe UI)이 그리는 것이다 — 두부(.notdef)가 아니라
+         OS 기본 기호 글리프이고, 한글은 한 글자도 바뀌지 않는다. -->
     <link
       rel="stylesheet"
-      href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css"
+      href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
     />
   </head>
   <body>

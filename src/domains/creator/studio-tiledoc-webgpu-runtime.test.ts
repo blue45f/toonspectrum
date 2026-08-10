@@ -10,10 +10,45 @@ import type {
   StudioTileDocWebGpuPresentRequest,
   StudioTileDocWebGpuPresentResult,
 } from "./studio-tiledoc-webgpu-bridge";
+import type { StudioTileDocWebGpuCompositeConsumerStats } from "./studio-tiledoc-webgpu-composite-consumer";
 
 interface Deferred<Value> {
   readonly promise: Promise<Value>;
   readonly resolve: (value: Value) => void;
+}
+
+function emptyConsumerStats(deviceGeneration: number): StudioTileDocWebGpuCompositeConsumerStats {
+  return {
+    active: false,
+    disposed: false,
+    deviceGeneration,
+    retainedEntries: 0,
+    retainedBytes: 0,
+    uploadPoolEntries: 0,
+    uploadPoolBytes: 0,
+    activeUploadBytes: 0,
+    sourceCacheEntries: 0,
+    sourceCacheBytes: 0,
+    sourceCacheHits: 0,
+    sourceCacheMisses: 0,
+    sourceCacheEvictions: 0,
+    retainedCacheHits: 0,
+    retainedCacheMisses: 0,
+    retainedCacheEvictions: 0,
+    compositeCacheReuses: 0,
+    sourceUploadCount: 0,
+    sourcePayloadBytesUploaded: 0,
+    physicalBytesUploaded: 0,
+    presentedFrames: 0,
+    presentationDraws: 0,
+    hotPathReadbackCount: 0,
+    validationReadbackCount: 0,
+    validationReadbackBytes: 0,
+    trackedGpuBytes: 0,
+    peakTrackedGpuBytes: 0,
+    deviceOwnership: "none",
+    deviceEpoch: 0,
+  };
 }
 
 class FakeAnimationFrames {
@@ -137,15 +172,7 @@ function runtimeHarness(options: {
       present: vi.fn(),
       invalidate: consumerInvalidate,
       dispose: consumerDispose,
-      stats: () => ({
-        active: false,
-        disposed: false,
-        deviceGeneration: 1,
-        retainedEntries: 0,
-        retainedBytes: 0,
-        uploadPoolEntries: 0,
-        uploadPoolBytes: 0,
-      }),
+      stats: () => emptyConsumerStats(1),
     };
   });
   bridgeFactory.mockImplementation(() => ({
@@ -502,15 +529,7 @@ describe("StudioTileDocWebGpuRuntime", () => {
         present: vi.fn(),
         invalidate: vi.fn(),
         dispose: consumerDispose,
-        stats: () => ({
-          active: false,
-          disposed: false,
-          deviceGeneration: 0,
-          retainedEntries: 0,
-          retainedBytes: 0,
-          uploadPoolEntries: 0,
-          uploadPoolBytes: 0,
-        }),
+        stats: () => emptyConsumerStats(0),
       }),
       createBridge: () => {
         throw new Error("bridge construction failed");

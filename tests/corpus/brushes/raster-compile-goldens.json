@@ -1,0 +1,30 @@
+{
+  "harness": "tests/visual/raster-brush-compile.test.ts",
+  "engine": "compileRasterBrush → studio-hokusai-wasm (hokusai 0.3.0 pinned, packed transparent RGBA8)",
+  "canvas": {
+    "width": 192,
+    "height": 96,
+    "samples": 96
+  },
+  "path": "standardZigzagStrokeSamples (linear 0→1 pressure ramp)",
+  "variants": [
+    {
+      "id": "wash-soft",
+      "seed": 5,
+      "mybSha256": "8d9eb55914f0ce7a86e6e988f4366869dad96c09e5590ef0018f09c0940f4f08",
+      "frameSha256": "65f6e511d33fe7cdd0db778b059710d007fa88128e107ebe5320dab87c26682e",
+      "inkedPixels": 4610,
+      "unmapped": [],
+      "warnings": []
+    },
+    {
+      "id": "ink-crisp",
+      "seed": 11,
+      "mybSha256": "8d0fcea0f4e5610e6b4695008a3a4f91093e82437be4f37a6ca272f8434ef305",
+      "frameSha256": "e301162afcf5469e773627ced145204e510d941e7400ed8de77775947a4af0e2",
+      "inkedPixels": 2837,
+      "unmapped": [],
+      "warnings": []
+    }
+  ]
+}

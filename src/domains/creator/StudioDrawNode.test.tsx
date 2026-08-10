@@ -1240,16 +1240,19 @@ describe("StudioDrawNode orchestration", () => {
       return result;
     };
 
+    // Two compound fills, never more: one base wash and one rim/fibre detail wash. Each pass is a
+    // single fill, so a self-crossing still receives each wash at most once — the invariant this
+    // test guards — while the marker stops printing a single flat alpha over its whole area.
     expect(renderWash(false)).toEqual({
       lineCount: 0,
       shapeCount: 1,
-      fillCount: 1,
+      fillCount: 2,
       strokeCount: 0,
     });
     expect(renderWash(true)).toEqual({
       lineCount: 0,
       shapeCount: 1,
-      fillCount: 1,
+      fillCount: 2,
       strokeCount: 0,
     });
   });
@@ -1468,6 +1471,7 @@ describe("StudioDrawNode orchestration", () => {
           boundsSpan:
             Math.max(...xs) - Math.min(...xs)
             + Math.max(...ys) - Math.min(...ys),
+          detailAlpha: context.fillAlphas[1],
           fillCount: context.fillPolygons.length,
           separateCaps: context.arcs.length + context.fillRects.length,
           strokeCount: context.strokeWidths.length,
@@ -1483,7 +1487,11 @@ describe("StudioDrawNode orchestration", () => {
 
       expect(heavy.boundsSpan).toBeGreaterThan(light.boundsSpan);
       expect(heavy.alpha).toBeGreaterThan(light.alpha);
-      expect(heavy.fillCount).toBe(1);
+      // Base wash + detail wash; still no per-segment capsule stack.
+      expect(heavy.fillCount).toBe(2);
+      // The rim/fibre wash is a lighter second glaze, never a repaint of the whole body.
+      expect(heavy.detailAlpha).toBeGreaterThan(0);
+      expect(heavy.detailAlpha).toBeLessThan(heavy.alpha ?? 0);
       expect(heavy.separateCaps).toBe(0);
       expect(heavy.strokeCount).toBe(0);
       expect(liveHeavy).toEqual(heavy);
@@ -1544,10 +1552,89 @@ describe("StudioDrawNode orchestration", () => {
     );
 
     expect(active).toEqual(retained);
-    expect(active.fillCount).toBe(1);
+    expect(active.fillCount).toBe(2);
     expect(exportedOutline).toEqual(active.outline);
     expect(exportedAlpha).toBeCloseTo(active.alpha ?? 0, 6);
     expect(exported).not.toContain("data-pressure-endcap=");
+  });
+
+  it.each([
+    ["one accepted sample", [4, 7], [0.5]],
+    ["two coincident samples", [4, 7, 4, 7], [0.5, 0.5]],
+    ["three coincident samples", [4, 7, 4, 7, 4, 7], [0.5, 0.5, 0.5]],
+  ])(
+    "deposits a full pencil nib when a gesture never travels — %s",
+    (_name, points, pressures) => {
+      render(
+        <StudioDrawNode
+          el={drawEl({
+            brush: "pencil",
+            mode: "pen",
+            points: [...points],
+            pressures: [...pressures],
+            sampleSpacing: 1,
+            materialPressureModel: STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
+            strokeWidth: 6,
+            opacity: 1,
+          })}
+        />,
+      );
+      const context = new AliasSceneContext();
+      for (const shape of captured("Shape")) {
+        (shape.props.sceneFunc as (context: CanvasRenderingContext2D) => void)(
+          context as unknown as CanvasRenderingContext2D,
+        );
+      }
+      const dots = captured("Circle");
+
+      // The grain jitter separates coincident samples by well under a pixel. Planning that as a
+      // ribbon produced a sliver whose coverage was invisible against the page, so a tap has to
+      // reach the same nib the single-sample route already draws.
+      expect(dots).toHaveLength(1);
+      expect(dots[0]!.props).toMatchObject({ x: 4, y: 7, radius: 3, fill: "#123456" });
+      expect(Number(dots[0]!.props.opacity)).toBeGreaterThan(0.5);
+      expect(context.fillPolygons).toEqual([]);
+    },
+  );
+
+  it("keeps the travelling pencil ribbon untouched by the tap route", () => {
+    const renderRibbon = () => {
+      const view = render(
+        <StudioDrawNode
+          el={drawEl({
+            brush: "pencil",
+            mode: "pen",
+            points: [0, 0, 12, 4, 24, 0],
+            pressures: [0.3, 0.6, 0.9],
+            sampleSpacing: 1,
+            materialPressureModel: STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1,
+            strokeWidth: 6,
+            opacity: 1,
+          })}
+        />,
+      );
+      const context = new AliasSceneContext();
+      for (const shape of captured("Shape")) {
+        (shape.props.sceneFunc as (context: CanvasRenderingContext2D) => void)(
+          context as unknown as CanvasRenderingContext2D,
+        );
+      }
+      const result = {
+        circles: captured("Circle").length,
+        polygons: context.fillPolygons.map((polygon) => [...polygon]),
+        alphas: [...context.fillAlphas],
+      };
+      view.unmount();
+      konvaCapture.nodes.length = 0;
+      return result;
+    };
+    const first = renderRibbon();
+    const replay = renderRibbon();
+
+    // A stroke with extent must never reach the contact dab, and must stay byte-for-byte stable.
+    expect(first.circles).toBe(0);
+    expect(first.polygons.length).toBeGreaterThan(2);
+    expect(replay).toEqual(first);
   });
 
   it("keeps the soft-pencil two-pass material on a one-point tap", () => {

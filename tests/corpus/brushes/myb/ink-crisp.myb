@@ -1,0 +1,32 @@
+{
+  "version": 3,
+  "group": "ToonSpectrum Corpus",
+  "comment": "Crisp ink — hard, dense-dab corpus brush (raster compile bridge)",
+  "settings": {
+    "opaque": {
+      "base_value": 0.95,
+      "inputs": {
+        "pressure": [[0.0, -0.35], [1.0, 0.05]]
+      }
+    },
+    "opaque_multiply": {
+      "base_value": 0.0,
+      "inputs": {
+        "pressure": [[0.0, 0.0], [1.0, 1.0]]
+      }
+    },
+    "hardness": { "base_value": 0.92 },
+    "anti_aliasing": { "base_value": 1.0 },
+    "radius_logarithmic": {
+      "base_value": 1.45,
+      "inputs": {
+        "pressure": [[0.0, -0.55], [1.0, 0.25]]
+      }
+    },
+    "dabs_per_actual_radius": { "base_value": 5.5 },
+    "pressure_gain_log": { "base_value": 0.15 },
+    "color_h": { "base_value": 0.0 },
+    "color_s": { "base_value": 0.0 },
+    "color_v": { "base_value": 0.08 }
+  }
+}

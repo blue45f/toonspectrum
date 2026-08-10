@@ -86,7 +86,13 @@ function canonicalScene(options: {
 async function loadLibrary(factory = new IDBFactory()) {
   vi.stubGlobal("indexedDB", factory);
   vi.resetModules();
-  const library = await import("./bg3d-template-library");
+  const module = await import("./bg3d-template-library");
+  const library = {
+    ...module,
+    deleteBg3dTemplate: module.legacyDeleteBg3dTemplate,
+    listBg3dTemplates: module.legacyListBg3dTemplates,
+    saveBg3dTemplate: module.legacySaveBg3dTemplate,
+  };
   return { factory, library };
 }
 

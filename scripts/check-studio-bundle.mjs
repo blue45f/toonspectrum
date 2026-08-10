@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { gzipSync } from "node:zlib";
@@ -146,6 +147,119 @@ const budgets = {
   app: { raw: 510_000, gzip: 170_000 },
 };
 
+// ---------------------------------------------------------------------------
+// Ratchet gate (2026-08-08)
+// ---------------------------------------------------------------------------
+// The reference budgets above stayed advisory, and the 2026-08-08 startup
+// measurement showed what that cost: 12 overruns shipped while this script
+// exited 0 (Studio route 2.06x, app entry 4.73x its reference). Turning the
+// references into hard failures today would break the build outright, so the
+// gate instead ratchets against the *last accepted measurement* recorded in
+// scripts/bundle-baseline.json:
+//
+//   - growing past baseline + tolerance      -> exit 1 (regression)
+//   - staying flat or shrinking              -> pass, and improvements are
+//                                               reported so they can be locked
+//   - UPDATE_BUNDLE_BASELINE=1 (--update-baseline) rewrites the baseline to
+//     the current measurement (explicit acceptance, both directions)
+//   - TIGHTEN_BUNDLE_BASELINE=1 (--tighten) locks improvements only, never
+//     loosens a number
+//
+// The references above remain telemetry: they answer "how far from the design
+// target are we", the baseline answers "did this build make it worse".
+const baselinePath = path.resolve(
+  process.env.STUDIO_BUNDLE_BASELINE ?? path.join("scripts", "bundle-baseline.json"),
+);
+const baselineSchema = "toonspectrum.bundle-baseline/1";
+const cliFlags = new Set(process.argv.slice(2));
+const hasFlag = (flagName, envName) =>
+  cliFlags.has(flagName) || process.env[envName] === "1";
+const updateBaselineRequested = hasFlag("--update-baseline", "UPDATE_BUNDLE_BASELINE");
+const tightenBaselineRequested = hasFlag("--tighten", "TIGHTEN_BUNDLE_BASELINE");
+const runtimeProbeRequested = hasFlag("--runtime", "STUDIO_BUNDLE_RUNTIME");
+const verboseReportRequested = hasFlag("--verbose", "STUDIO_BUNDLE_VERBOSE");
+
+// Byte metrics drift by a few hundred bytes on pure codegen churn, so a flat 2%
+// absorbs noise without absorbing a real regression. Chunk counts are small
+// integers where every +1 is an extra round trip, so they get the same relative
+// tolerance plus a 2-chunk absolute floor for the small closures.
+const ratchetPolicy = { byteTolerance: 0.02, countTolerance: 0.02, countSlack: 2 };
+
+// Onboarding overlays the runtime probe dismisses so it measures a returning
+// user's cold entry rather than the first-run tour. Declared here because the
+// probe is awaited from the main block, above its own definition.
+const runtimeQuickStartKey = "toonspectrum-studio-quick-start-dismissed";
+const runtimeMobileHintKey = "toonspectrum-studio-mobile-hint-dismissed";
+
+/** Every number the gate measures, in declaration order, for the ratchet + report. */
+const measurements = [];
+
+function recordMeasurement(group, key, kind, value, reference = null) {
+  measurements.push({ group, key, kind, value, reference });
+}
+
+function ratchetCeiling(kind, baselineValue) {
+  if (kind === "count") {
+    return Math.max(
+      baselineValue + ratchetPolicy.countSlack,
+      Math.floor(baselineValue * (1 + ratchetPolicy.countTolerance)),
+    );
+  }
+  return Math.floor(baselineValue * (1 + ratchetPolicy.byteTolerance));
+}
+
+function formatKiB(bytes) {
+  return `${(bytes / 1024).toFixed(1)} KiB`;
+}
+
+function formatMeasurement(kind, value) {
+  return kind === "count" ? String(value) : formatKiB(value);
+}
+
+function formatRatio(actual, reference) {
+  if (!Number.isFinite(reference) || reference <= 0) return "-";
+  return `${(actual / reference).toFixed(2)}x`;
+}
+
+/**
+ * Vite content hashes change every build; the module identity does not.
+ * The `$`-anchored fixed width matters: chunk names contain hyphens too
+ * (`studio-dynamic-brush-render-plan-B5FOTHv-.js`), so a greedy class would
+ * eat the name and collapse unrelated chunks into one identity.
+ */
+function chunkIdentity(fileName) {
+  return fileName.replace(/-[A-Za-z0-9_-]{8}\.js$/u, "").replace(/\.js$/u, "");
+}
+
+/** Emitted asset name for a request URL, or "" when the URL is unparseable. */
+function resourceFileName(url) {
+  try {
+    return new URL(url).pathname.split("/").pop() ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function renderTable(headers, rows) {
+  const widths = headers.map((header, column) =>
+    Math.max(header.length, ...rows.map((row) => String(row[column]).length)),
+  );
+  const renderRow = (cells) =>
+    cells
+      .map((cell, column) =>
+        column === 0
+          ? String(cell).padEnd(widths[column])
+          : String(cell).padStart(widths[column]),
+      )
+      .join("  ")
+      .trimEnd();
+  return [
+    renderRow(headers),
+    widths.map((width) => "-".repeat(width)).join("  "),
+    ...rows.map((row) => renderRow(row)),
+  ].join("\n");
+}
+
 function fail(message) {
   console.error(`studio bundle check failed: ${message}`);
   process.exitCode = 1;
@@ -187,6 +301,8 @@ if (!fs.existsSync(manifestPath)) {
   }
 
   function checkBudget(label, actual, budget) {
+    recordMeasurement("static", `${label} raw`, "bytes", actual.raw, budget.raw);
+    recordMeasurement("static", `${label} gzip`, "bytes", actual.gzip, budget.gzip);
     if (actual.raw > budget.raw) {
       bundleObservations.push(
         `${label} static JS is ${describe(actual.raw)} raw (reference ${describe(budget.raw)})`,
@@ -200,6 +316,7 @@ if (!fs.existsSync(manifestPath)) {
   }
 
   function observeCount(label, actual, reference) {
+    recordMeasurement("static", `${label} chunks`, "count", actual, reference);
     if (actual > reference) {
       bundleObservations.push(
         `${label} uses ${actual} static JS requests (reference ${reference})`,
@@ -715,19 +832,534 @@ if (!fs.existsSync(manifestPath)) {
       fail(`optional WebGL intro returned to the app entry: ${eagerWebglIntro.join(", ")}`);
     }
 
-    if (!process.exitCode) {
-      for (const observation of bundleObservations) {
-        console.warn(`studio bundle observation: ${observation}`);
+    // --- entry modulepreload contract -------------------------------------
+    // A <link rel="modulepreload"> is a highest-priority fetch on *every* route. The chunks below
+    // are either route-specific engines or resolve behind an explicit fallback chain, so none of
+    // them may sit on the entry document's critical path. Keep in sync with
+    // ENTRY_PRELOAD_EXCLUSIONS in vite.config.ts.
+    const entryPreloadExclusions = [
+      "studio-konva-runtime",
+      "StudioVrmPoser",
+      "three.module",
+      "three-vrm.module",
+      "GLTFLoader",
+      "lucide-studio-core-icons",
+      "i18n",
+    ];
+    const entryHtmlPath = path.join(outputDirectory, "index.html");
+    if (!fs.existsSync(entryHtmlPath)) {
+      fail(`missing ${path.relative(process.cwd(), entryHtmlPath)}`);
+    } else {
+      const entryHtml = fs.readFileSync(entryHtmlPath, "utf8");
+      const preloadedHrefs = [...entryHtml.matchAll(/<link[^>]*rel="modulepreload"[^>]*>/g)]
+        .map((match) => /href="([^"]+)"/.exec(match[0])?.[1])
+        .filter((href) => typeof href === "string");
+      const leaked = preloadedHrefs.filter((href) =>
+        entryPreloadExclusions.some((chunkName) => href.includes(chunkName)),
+      );
+      if (leaked.length > 0) {
+        fail(
+          `entry document modulepreloads excluded chunk(s): ${leaked.join(", ")} `
+            + "(see ENTRY_PRELOAD_EXCLUSIONS in vite.config.ts)",
+        );
       }
-      console.log(
+    }
+
+    // --- no locale mega-dictionary in the shell ---------------------------
+    // Every locale but ko/en ships as a lazy public/i18n/app/<locale>.json asset. If the whole
+    // DICT is ever inlined back into a shell chunk, the i18n chunk balloons past this cap long
+    // before anyone notices the extra megabyte of parse work on the critical path.
+    const i18nShellChunkCeilingBytes = 256 * 1024;
+    for (const key of appKeys) {
+      const entry = manifest[key];
+      const fileName = path.basename(entry.file);
+      if (!/(?:^|[-/])i18n[-.]/.test(fileName)) continue;
+      const rawBytes = fs.statSync(path.join(outputDirectory, entry.file)).size;
+      if (rawBytes > i18nShellChunkCeilingBytes) {
+        fail(
+          `app shell i18n chunk ${fileName} is ${formatKiB(rawBytes)} raw (cap ${formatKiB(i18nShellChunkCeilingBytes)}); `
+            + "locale dictionaries belong in public/i18n/app/<locale>.json, not the shell",
+        );
+      }
+    }
+
+    // Chunk counts the reference budgets never observed. They are the cheapest
+    // signal for "a lazy boundary silently joined the eager graph".
+    recordMeasurement("static", "Studio route chunks", "count", studioKeys.size);
+    recordMeasurement("static", "app entry chunks", "count", appKeys.size);
+
+    // Manifest file names of everything the static graph already accounts for.
+    // Anything the browser downloads that is NOT in here arrived through a
+    // dynamic import — the blind spot the runtime probe exists to measure.
+    const staticClosureFileNames = new Set(
+      [...studioKeys, ...appKeys].map((key) => path.basename(manifest[key].file)),
+    );
+
+    const runtimeReport = runtimeProbeRequested
+      ? await probeRuntimeStartup(staticClosureFileNames)
+      : null;
+    if (runtimeReport) {
+      for (const metric of runtimeReport.metrics) {
+        recordMeasurement("runtime", metric.key, metric.kind, metric.value);
+      }
+    }
+
+    reportBundleGate({
+      runtimeReport,
+      structuralSummary:
         `studio bundle structural check passed: Studio ${studioKeys.size} chunks, ${describe(studioSize.raw)} raw / ${describe(studioSize.gzip)} gzip; `
           + `StudioPage ${describe(studioEntrySize.raw)} raw / ${describe(studioEntrySize.gzip)} gzip; `
           + `after app shell ${studioIncrementalKeys.size} chunks, ${describe(studioIncrementalSize.raw)} raw / ${describe(studioIncrementalSize.gzip)} gzip; `
           + `app ${appKeys.size} chunks, ${describe(appSize.raw)} raw / ${describe(appSize.gzip)} gzip; `
           + `${bundleObservations.length} non-blocking size/request observation(s)`,
-      );
-    }
+    });
   } catch (error) {
     fail(error instanceof Error ? error.message : String(error));
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Baseline I/O
+// ---------------------------------------------------------------------------
+
+/** Repo-relative when it lives in the repo, absolute when it does not. */
+function baselineDisplayPath() {
+  const relative = path.relative(process.cwd(), baselinePath);
+  return relative.startsWith("..") ? baselinePath : relative;
+}
+
+function loadBaseline() {
+  if (!fs.existsSync(baselinePath)) return null;
+  const parsed = JSON.parse(fs.readFileSync(baselinePath, "utf8"));
+  if (parsed.schema !== baselineSchema) {
+    throw new Error(
+      `${baselineDisplayPath()} has schema ${JSON.stringify(parsed.schema)}, expected ${JSON.stringify(baselineSchema)}`,
+    );
+  }
+  return parsed;
+}
+
+function writeBaseline({ previous, runtimeReport, tightenOnly }) {
+  const nextStatic = { ...(previous?.static ?? {}) };
+  let changed = 0;
+  for (const measurement of measurements) {
+    if (measurement.group !== "static") continue;
+    const current = nextStatic[measurement.key];
+    if (tightenOnly && typeof current === "number" && measurement.value >= current) continue;
+    if (current !== measurement.value) changed += 1;
+    nextStatic[measurement.key] = measurement.value;
+  }
+
+  let nextRuntime = previous?.runtime ?? null;
+  if (runtimeReport) {
+    const previousRuntimeMetrics = previous?.runtime?.metrics ?? {};
+    const runtimeMetrics = { ...(tightenOnly ? previousRuntimeMetrics : {}) };
+    for (const metric of runtimeReport.metrics) {
+      const current = previousRuntimeMetrics[metric.key];
+      if (tightenOnly && typeof current === "number" && metric.value >= current) continue;
+      if (current !== metric.value) changed += 1;
+      runtimeMetrics[metric.key] = metric.value;
+    }
+    nextRuntime = {
+      recordedAt: new Date().toISOString(),
+      probe: runtimeReport.probe,
+      metrics: runtimeMetrics,
+      // Hash-free module identities, so the list survives rebuilds and a diff
+      // says *which* module became eager rather than only how many did.
+      eagerDynamicChunks: runtimeReport.eagerChunks.map((chunk) => chunk.name).sort(),
+    };
+  }
+
+  const next = {
+    schema: baselineSchema,
+    recordedAt: new Date().toISOString(),
+    note:
+      "Last accepted measurement of scripts/check-studio-bundle.mjs. Regressions beyond the "
+      + "tolerance fail the build; see docs/perf/bundle-gate.md. Regenerate with "
+      + "UPDATE_BUNDLE_BASELINE=1 node scripts/check-studio-bundle.mjs.",
+    policy: {
+      ...ratchetPolicy,
+      authority: "scripts/check-studio-bundle.mjs (this file records the values only)",
+    },
+    static: nextStatic,
+    runtime: nextRuntime,
+  };
+  fs.mkdirSync(path.dirname(baselinePath), { recursive: true });
+  fs.writeFileSync(baselinePath, `${JSON.stringify(next, null, 2)}\n`);
+  return changed;
+}
+
+// ---------------------------------------------------------------------------
+// Ratchet evaluation + report
+// ---------------------------------------------------------------------------
+
+function evaluateRatchet(group, baselineMetrics) {
+  const rows = [];
+  const seen = new Set();
+  for (const measurement of measurements) {
+    if (measurement.group !== group) continue;
+    seen.add(measurement.key);
+    const baselineValue = baselineMetrics?.[measurement.key];
+    if (typeof baselineValue !== "number") {
+      rows.push({ ...measurement, baselineValue: null, ceiling: null, status: "unbaselined" });
+      continue;
+    }
+    const ceiling = ratchetCeiling(measurement.kind, baselineValue);
+    const improvedFloor = measurement.kind === "count"
+      ? baselineValue
+      : Math.floor(baselineValue * (1 - ratchetPolicy.byteTolerance));
+    const status = measurement.value > ceiling
+      ? "REGRESSED"
+      : measurement.value < improvedFloor
+        ? "improved"
+        : "ok";
+    rows.push({ ...measurement, baselineValue, ceiling, status });
+  }
+  const stale = Object.keys(baselineMetrics ?? {}).filter((key) => !seen.has(key));
+  return { rows, stale };
+}
+
+function ratchetTable(rows) {
+  return renderTable(
+    ["metric", "current", "baseline", "max allowed", "vs baseline", "status"],
+    rows.map((row) => [
+      row.key,
+      formatMeasurement(row.kind, row.value),
+      row.baselineValue === null ? "-" : formatMeasurement(row.kind, row.baselineValue),
+      row.ceiling === null ? "-" : formatMeasurement(row.kind, row.ceiling),
+      row.baselineValue === null ? "-" : formatRatio(row.value, row.baselineValue),
+      row.status,
+    ]),
+  );
+}
+
+function reportReferenceOverages() {
+  const overages = measurements
+    .filter((measurement) => measurement.reference !== null && measurement.value > measurement.reference)
+    .map((measurement) => ({
+      ...measurement,
+      ratio: measurement.value / measurement.reference,
+    }))
+    .sort((left, right) => right.ratio - left.ratio);
+
+  console.log("");
+  console.log(
+    `reference budgets: ${overages.length} of ${measurements.filter((m) => m.reference !== null).length} measurements exceed their design reference`,
+  );
+  console.log(
+    "  (references are telemetry, not release vetoes — the ratchet below is what fails the build)",
+  );
+  if (overages.length === 0) return;
+  console.log(
+    renderTable(
+      ["item", "current", "reference", "ratio"],
+      overages.map((overage) => [
+        `  ${overage.key}`,
+        formatMeasurement(overage.kind, overage.value),
+        formatMeasurement(overage.kind, overage.reference),
+        formatRatio(overage.value, overage.reference),
+      ]),
+    ),
+  );
+}
+
+function reportRuntimeSection(runtimeReport, baseline) {
+  console.log("");
+  if (!runtimeReport) {
+    const recorded = baseline?.runtime;
+    if (!recorded) {
+      console.log(
+        "eager-dynamic: not measured (run `node scripts/check-studio-bundle.mjs --runtime` to record a baseline)",
+      );
+      return;
+    }
+    console.log(
+      `eager-dynamic (last recorded ${recorded.recordedAt}, NOT re-measured this run — pass --runtime to re-measure)`,
+    );
+    console.log(
+      renderTable(
+        ["item", "recorded"],
+        Object.entries(recorded.metrics).map(([key, value]) => [
+          `  ${key}`,
+          key.includes("bytes") ? formatKiB(value) : String(value),
+        ]),
+      ),
+    );
+    console.log(
+      `  ${recorded.eagerDynamicChunks.length} module(s) declared dynamic in the manifest were loaded during startup with no user input`,
+    );
+    return;
+  }
+
+  console.log(
+    `eager-dynamic (measured now: ${runtimeReport.probe.url}, settle ${runtimeReport.probe.settleMs} ms, `
+      + `interactive ${runtimeReport.probe.interactiveMs ?? "n/a"} ms, crossOriginIsolated ${runtimeReport.probe.crossOriginIsolated})`,
+  );
+  console.log(
+    renderTable(
+      ["item", "measured"],
+      runtimeReport.metrics.map((metric) => [
+        `  ${metric.key}`,
+        formatMeasurement(metric.kind, metric.value),
+      ]),
+    ),
+  );
+  const top = runtimeReport.eagerChunks.slice(0, 12);
+  if (top.length > 0) {
+    console.log("  heaviest chunks the manifest calls dynamic but startup loads anyway:");
+    console.log(
+      renderTable(
+        ["chunk", "decoded", "arrived"],
+        top.map((chunk) => [
+          `    ${chunk.name}`,
+          formatKiB(chunk.decodedBytes),
+          `+${Math.round(chunk.startMs)} ms`,
+        ]),
+      ),
+    );
+  }
+  const recordedNames = new Set(baseline?.runtime?.eagerDynamicChunks ?? []);
+  if (recordedNames.size > 0) {
+    const currentNames = new Set(runtimeReport.eagerChunks.map((chunk) => chunk.name));
+    const added = [...currentNames].filter((name) => !recordedNames.has(name)).sort();
+    const removed = [...recordedNames].filter((name) => !currentNames.has(name)).sort();
+    if (added.length > 0) console.log(`  newly eager vs baseline: ${added.join(", ")}`);
+    if (removed.length > 0) console.log(`  no longer eager vs baseline: ${removed.join(", ")}`);
+    if (added.length === 0 && removed.length === 0) {
+      console.log("  eager-dynamic module set is identical to the baseline");
+    }
+  }
+}
+
+function reportBundleGate({ runtimeReport, structuralSummary }) {
+  const baseline = loadBaseline();
+
+  for (const observation of bundleObservations) {
+    console.warn(`studio bundle observation: ${observation}`);
+  }
+  reportReferenceOverages();
+
+  console.log("");
+  if (!baseline && !updateBaselineRequested) {
+    fail(
+      `missing ${baselineDisplayPath()}; create it with `
+        + "\"UPDATE_BUNDLE_BASELINE=1 node scripts/check-studio-bundle.mjs\"",
+    );
+    return;
+  }
+
+  const staticRatchet = evaluateRatchet("static", baseline?.static);
+  const runtimeRatchet = runtimeReport
+    ? evaluateRatchet("runtime", baseline?.runtime?.metrics)
+    : { rows: [], stale: [] };
+  const rows = [...staticRatchet.rows, ...runtimeRatchet.rows];
+  const regressions = rows.filter((row) => row.status === "REGRESSED");
+  const improvements = rows.filter((row) => row.status === "improved");
+  const unbaselined = rows.filter((row) => row.status === "unbaselined");
+
+  console.log(
+    `ratchet vs ${baselineDisplayPath()}`
+      + (baseline ? ` (recorded ${baseline.recordedAt})` : " (new baseline)")
+      + `: tolerance +${(ratchetPolicy.byteTolerance * 100).toFixed(0)}% bytes, `
+      + `+${(ratchetPolicy.countTolerance * 100).toFixed(0)}%/${ratchetPolicy.countSlack} chunks`,
+  );
+  if (verboseReportRequested || regressions.length > 0 || unbaselined.length > 0) {
+    console.log(ratchetTable(verboseReportRequested ? rows : [...regressions, ...unbaselined]));
+  }
+  console.log(
+    `  ${rows.length - regressions.length - unbaselined.length} within baseline, `
+      + `${improvements.length} improved, ${regressions.length} regressed, ${unbaselined.length} unbaselined`
+      + (verboseReportRequested ? "" : " (pass --verbose for the full table)"),
+  );
+  if (staticRatchet.stale.length > 0) {
+    console.log(`  baseline entries no longer measured: ${staticRatchet.stale.join(", ")}`);
+  }
+
+  reportRuntimeSection(runtimeReport, baseline);
+  console.log("");
+
+  if (updateBaselineRequested || tightenBaselineRequested) {
+    const changed = writeBaseline({
+      previous: baseline,
+      runtimeReport,
+      tightenOnly: !updateBaselineRequested,
+    });
+    console.log(
+      `${updateBaselineRequested ? "baseline updated" : "baseline tightened"}: `
+        + `${changed} value(s) rewritten in ${baselineDisplayPath()}`
+        + (updateBaselineRequested && regressions.length > 0
+          ? ` (${regressions.length} regression(s) explicitly accepted)`
+          : ""),
+    );
+  } else {
+    for (const row of regressions) {
+      fail(
+        `${row.key} regressed to ${formatMeasurement(row.kind, row.value)} `
+          + `(baseline ${formatMeasurement(row.kind, row.baselineValue)}, `
+          + `max allowed ${formatMeasurement(row.kind, row.ceiling)}, `
+          + `${formatRatio(row.value, row.baselineValue)}); shrink it or accept it with `
+          + "UPDATE_BUNDLE_BASELINE=1",
+      );
+    }
+    for (const row of unbaselined) {
+      fail(
+        `${row.key} has no baseline entry; record it with UPDATE_BUNDLE_BASELINE=1`,
+      );
+    }
+    if (improvements.length > 0) {
+      console.log(
+        `${improvements.length} measurement(s) improved — lock them in with TIGHTEN_BUNDLE_BASELINE=1`,
+      );
+    }
+  }
+
+  if (!process.exitCode) console.log(structuralSummary);
+}
+
+// ---------------------------------------------------------------------------
+// Runtime probe: "declared dynamic, loaded anyway"
+// ---------------------------------------------------------------------------
+// A manifest cannot answer this. `checkDynamicBoundary` only proves a module is
+// absent from the static graph, which an import awaited at mount satisfies just
+// as well as one behind a button. The 2026-08-08 measurement found 55 such
+// chunks (1,037 KiB) arriving within 1.1 s of a cold /studio entry. The only
+// way to see them is to load the built bundle in a browser and diff what was
+// actually fetched against the manifest closure — which is what this does.
+
+async function waitForPreviewServer(baseUrl, child, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (child.exitCode !== null) {
+      throw new Error(`vite preview exited early with code ${child.exitCode}`);
+    }
+    try {
+      const response = await fetch(baseUrl, { redirect: "manual" });
+      if (response.status < 500) return;
+    } catch {
+      // server not up yet
+    }
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+  throw new Error(`vite preview did not become reachable at ${baseUrl}`);
+}
+
+async function probeRuntimeStartup(staticClosureFileNames) {
+  const port = Number(process.env.STUDIO_BUNDLE_RUNTIME_PORT ?? 4288);
+  const settleMs = Number(process.env.STUDIO_BUNDLE_RUNTIME_SETTLE_MS ?? 5000);
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const viteBin = path.resolve("node_modules", "vite", "bin", "vite.js");
+  if (!fs.existsSync(viteBin)) {
+    throw new Error("--runtime needs node_modules/vite (install dependencies first)");
+  }
+  let chromium;
+  try {
+    ({ chromium } = await import("playwright"));
+  } catch {
+    throw new Error("--runtime needs the playwright package (install dependencies first)");
+  }
+
+  const server = spawn(
+    process.execPath,
+    [
+      viteBin,
+      "preview",
+      "--port",
+      String(port),
+      "--strictPort",
+      // Bind explicitly: vite's default `localhost` resolves to ::1 on macOS,
+      // which the IPv4 probe below would never reach.
+      "--host",
+      "127.0.0.1",
+      "--outDir",
+      outputDirectory,
+    ],
+    { stdio: ["ignore", "pipe", "pipe"] },
+  );
+  const serverLog = [];
+  server.stdout.on("data", (chunk) => serverLog.push(String(chunk)));
+  server.stderr.on("data", (chunk) => serverLog.push(String(chunk)));
+
+  try {
+    await waitForPreviewServer(baseUrl, server, 90_000).catch((error) => {
+      throw new Error(`${error.message}\n${serverLog.join("").slice(-2000)}`);
+    });
+
+    const browser = await chromium.launch({ headless: true });
+    try {
+      const context = await browser.newContext({
+        viewport: { width: 1440, height: 900 },
+        deviceScaleFactor: 1,
+      });
+      // Resource Timing defaults to a 250-entry buffer; Studio blows past that.
+      await context.addInitScript(`(() => {
+        try { performance.setResourceTimingBufferSize(3000); } catch {}
+        try {
+          localStorage.setItem(${JSON.stringify(runtimeQuickStartKey)}, "1");
+          localStorage.setItem(${JSON.stringify(runtimeMobileHintKey)}, "1");
+        } catch {}
+      })();`);
+      const page = await context.newPage();
+      const startedAt = Date.now();
+      await page.goto(`${baseUrl}/studio`, { waitUntil: "commit", timeout: 180_000 });
+      let interactiveMs = null;
+      try {
+        await page.waitForSelector(".konvajs-content, canvas", {
+          state: "attached",
+          timeout: 120_000,
+        });
+        interactiveMs = Date.now() - startedAt;
+      } catch {
+        // Record the probe anyway: a Studio that never paints is a different
+        // failure, and the byte accounting is still the signal we want.
+      }
+      // Keep observing after first paint so mount-time dynamic imports that
+      // resolve late are still attributed to "startup, no user input".
+      await page.waitForTimeout(settleMs);
+
+      const observed = await page.evaluate(() => ({
+        crossOriginIsolated: Boolean(globalThis.crossOriginIsolated),
+        resources: performance.getEntriesByType("resource").map((entry) => ({
+          name: entry.name,
+          startMs: entry.startTime,
+          decodedBytes: entry.decodedBodySize,
+        })),
+      }));
+
+      const scripts = observed.resources
+        .map((resource) => ({ ...resource, fileName: resourceFileName(resource.name) }))
+        .filter((resource) => resource.fileName.endsWith(".js"));
+
+      const eager = scripts
+        .filter((resource) => !staticClosureFileNames.has(resource.fileName))
+        .map((resource) => ({
+          name: chunkIdentity(resource.fileName),
+          file: resource.fileName,
+          decodedBytes: resource.decodedBytes,
+          startMs: resource.startMs,
+        }))
+        .sort((left, right) => right.decodedBytes - left.decodedBytes);
+
+      const sum = (records) => records.reduce((total, record) => total + record.decodedBytes, 0);
+      return {
+        probe: {
+          url: "/studio",
+          settleMs,
+          viewport: "1440x900",
+          interactiveMs,
+          crossOriginIsolated: observed.crossOriginIsolated,
+        },
+        metrics: [
+          { key: "startup JS requests", kind: "count", value: scripts.length },
+          { key: "startup JS decoded bytes", kind: "bytes", value: sum(scripts) },
+          { key: "eager-dynamic requests", kind: "count", value: eager.length },
+          { key: "eager-dynamic decoded bytes", kind: "bytes", value: sum(eager) },
+        ],
+        eagerChunks: eager,
+      };
+    } finally {
+      await browser.close();
+    }
+  } finally {
+    server.kill("SIGTERM");
   }
 }

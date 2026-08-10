@@ -26,6 +26,10 @@ import {
 } from "react";
 
 import {
+  openProductBrushLibraryRepository,
+  readAllBrushesFromRepository,
+} from "./studio-brush-library-sqlite-repository";
+import {
   createStudioCommunityPublishManifest,
   listStudioCommunityShareCandidates,
   projectCreatorMarketplaceRecordToAssets,
@@ -34,19 +38,34 @@ import {
   type StudioCommunityShareCandidateKind,
 } from "./studio-community-marketplace";
 import {
+  inspectStudioCreatorPackInstallStateProduct,
+  installStudioCreatorPackProduct,
+  uninstallStudioCreatorPackProduct,
+} from "./studio-creator-pack-product-runtime";
+import {
   browserStudioCreatorPackStorage,
   inspectStudioCreatorPackInstallState,
-  installStudioCreatorPack,
-  uninstallStudioCreatorPack,
+  type StudioCreatorPackInstallState,
 } from "./studio-creator-pack-runtime";
+import {
+  acquireProductFilterLibraryRepository,
+  readAllFilterPresetsFromRepository,
+  subscribeStudioFilterLibraryChanges,
+  type StudioFilterLibraryPreset,
+} from "./studio-filter-library-sqlite-repository";
 import {
   STUDIO_MARKETPLACE_REDISTRIBUTION_NOTICE,
 } from "./studio-marketplace-packages";
 import {
   createStudioOriginalFreeAssetRecord,
 } from "./studio-original-free-asset-packs";
+import {
+  getProductStudioPaletteSqliteRepository,
+} from "./studio-palette-sqlite-repository";
 
 import type { StudioAsset } from "./studio-asset-library";
+import type { StudioSavedBrush } from "./studio-brush-library";
+import type { StudioNamedPalette } from "./studio-palette-library";
 import type {
   CreatorMarketplaceResourceKind,
   CreatorMarketplaceResourceLicense,
@@ -244,9 +263,48 @@ function CommunityRecordCard({
   );
   const [deleteArmed, setDeleteArmed] = useState(false);
   const storage = browserStudioCreatorPackStorage();
-  const installState = projection.status === "installable"
-    ? inspectStudioCreatorPackInstallState(projection.pack, storage)
-    : null;
+  const usesSqlCatalog = projection.status === "installable"
+    && (
+      projection.pack.metadata.kind === "filter"
+      || projection.pack.metadata.kind === "brush"
+      || projection.pack.metadata.kind === "palette"
+    );
+  const [installState, setInstallState] = useState<StudioCreatorPackInstallState | null>(() =>
+    projection.status !== "installable"
+      ? null
+      : usesSqlCatalog
+        ? "available"
+        : inspectStudioCreatorPackInstallState(projection.pack, storage),
+  );
+  const [installPending, setInstallPending] = useState(usesSqlCatalog);
+  useEffect(() => {
+    const effectProjection = projectCreatorMarketplaceRecordToStudioPack(record);
+    if (effectProjection.status !== "installable") return;
+    let active = true;
+    setInstallPending(true);
+    void inspectStudioCreatorPackInstallStateProduct(effectProjection.pack, { storage })
+      .then((state) => {
+        if (active) setInstallState(state);
+      })
+      .catch((error: unknown) => {
+        if (active) {
+          onStatus(
+            `${record.name} · ${
+              usesSqlCatalog ? "로컬 SQL 카탈로그" : "기기 저장소"
+            } 상태를 읽지 못했습니다: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+            true,
+          );
+        }
+      })
+      .finally(() => {
+        if (active) setInstallPending(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [onStatus, record, refreshToken, storage, usesSqlCatalog]);
   const installed = installState === "installed";
   const bundled = installState === "bundled";
   const installBlocked = installState === "invalid"
@@ -292,15 +350,16 @@ function CommunityRecordCard({
               "studio.community.install.free",
             );
 
-  function handleInstall() {
+  async function handleInstall(): Promise<void> {
     if (projection.status !== "installable") return;
+    setInstallPending(true);
     const result = installed
-      ? uninstallStudioCreatorPack(projection.pack, storage)
-      : installStudioCreatorPack(projection.pack, storage);
+      ? await uninstallStudioCreatorPackProduct(projection.pack, { storage })
+      : await installStudioCreatorPackProduct(projection.pack, { storage });
+    setInstallPending(false);
     onStatus(`${record.name} · ${result.message}`, [
       "invalid",
       "conflict",
-      "full",
       "storage-error",
     ].includes(result.status));
   }
@@ -484,8 +543,8 @@ function CommunityRecordCard({
       ) : projection.status === "installable" ? (
         <button
           type="button"
-          onClick={handleInstall}
-          disabled={bundled || installBlocked}
+          onClick={() => void handleInstall()}
+          disabled={bundled || installBlocked || installPending}
           className={cx(
             "mt-2 w-full",
             installed
@@ -493,7 +552,7 @@ function CommunityRecordCard({
               : PRIMARY,
           )}
         >
-          {installActionLabel}
+          {installPending ? "로컬 SQL 확인 중…" : installActionLabel}
         </button>
       ) : (
         <p className="mt-2 rounded-md border border-warn/25 bg-warn/10 px-2 py-1.5 text-[0.55rem] leading-relaxed text-warn">
@@ -513,7 +572,77 @@ function ShareResourceForm({
 }) {
   const t = useT();
   const [refreshToken, setRefreshToken] = useState(0);
-  const candidates = listStudioCommunityShareCandidates();
+  const [filterPresets, setFilterPresets] = useState<
+    readonly StudioFilterLibraryPreset[]
+  >([]);
+  const [brushes, setBrushes] = useState<readonly StudioSavedBrush[]>([]);
+  const [palettes, setPalettes] = useState<readonly StudioNamedPalette[]>([]);
+  const [filterLoadError, setFilterLoadError] = useState<string | null>(null);
+  const [creativeLoadError, setCreativeLoadError] = useState<string | null>(null);
+  useEffect(() => {
+    let active = true;
+    async function loadFilters(): Promise<void> {
+      try {
+        const product = await acquireProductFilterLibraryRepository();
+        const filters = await readAllFilterPresetsFromRepository(product.repository);
+        if (active) {
+          setFilterPresets(filters);
+          setFilterLoadError(null);
+        }
+      } catch (error) {
+        if (active) {
+          setFilterPresets([]);
+          setFilterLoadError(
+            error instanceof Error ? error.message : String(error),
+          );
+        }
+      }
+    }
+    void loadFilters();
+    const unsubscribe = subscribeStudioFilterLibraryChanges(() => void loadFilters());
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [refreshToken]);
+  useEffect(() => {
+    let active = true;
+    const paletteRepository = getProductStudioPaletteSqliteRepository();
+    async function loadCreativeLibraries(): Promise<void> {
+      try {
+        const brushProduct = await openProductBrushLibraryRepository();
+        if (brushProduct.authority !== "sqlite") {
+          throw new Error("브러시 SQLite/OPFS 권위를 사용할 수 없습니다.");
+        }
+        const [storedBrushes, storedPalettes] = await Promise.all([
+          readAllBrushesFromRepository(brushProduct.repository),
+          paletteRepository.list(),
+        ]);
+        if (active) {
+          setBrushes(storedBrushes);
+          setPalettes(storedPalettes);
+          setCreativeLoadError(null);
+        }
+      } catch (error) {
+        if (active) {
+          setBrushes([]);
+          setPalettes([]);
+          setCreativeLoadError(error instanceof Error ? error.message : String(error));
+        }
+      }
+    }
+    void loadCreativeLibraries();
+    const unsubscribe = paletteRepository.subscribe(() => void loadCreativeLibraries());
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [refreshToken]);
+  const candidates = listStudioCommunityShareCandidates({
+    brushes,
+    filters: filterPresets,
+    palettes,
+  });
   const candidateKey = (candidate: StudioCommunityShareCandidate) =>
     `${candidate.kind}:${candidate.id}`;
   const [selectedCandidateKey, setSelectedCandidateKey] = useState(
@@ -587,6 +716,16 @@ function ShareResourceForm({
           {STUDIO_MARKETPLACE_REDISTRIBUTION_NOTICE}
         </p>
       </div>
+      {filterLoadError ? (
+        <p role="alert" className="rounded-lg border border-bad/25 bg-bad/10 px-2.5 py-2 text-[0.58rem] text-bad">
+          필터 카탈로그 SQL을 읽지 못했습니다: {filterLoadError}
+        </p>
+      ) : null}
+      {creativeLoadError ? (
+        <p role="alert" className="rounded-lg border border-bad/25 bg-bad/10 px-2.5 py-2 text-[0.58rem] text-bad">
+          브러시·팔레트 SQLite를 읽지 못했습니다: {creativeLoadError}
+        </p>
+      ) : null}
       <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-1.5">
         <select
           value={candidate ? candidateKey(candidate) : ""}

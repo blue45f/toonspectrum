@@ -3,6 +3,11 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const runtime = readFileSync(new URL("./studio-living-ink-webgl2-runtime.ts", import.meta.url), "utf8");
+const webGpuRuntime = readFileSync(
+  new URL("./studio-living-ink-webgpu-pure-runtime.ts", import.meta.url),
+  "utf8",
+);
+const wgsl = readFileSync(new URL("./studio-living-ink-wgsl-shaders.ts", import.meta.url), "utf8");
 const worker = readFileSync(new URL("./studio-living-ink.worker.ts", import.meta.url), "utf8");
 const provider = readFileSync(new URL("./studio-living-ink-provider.ts", import.meta.url), "utf8");
 const validation = readFileSync(
@@ -39,12 +44,38 @@ describe("Living Ink actual execution boundary", () => {
     expect(runtime).toContain("fixDurationSeconds");
   });
 
+  it("ships InkWash §06 chromatography chemistry and brush-tip scrub bleed on the GPU path", () => {
+    // Chemistry is computed in TS helpers and uploaded as uniforms — not re-derived only in GLSL.
+    expect(runtime).toContain("studioLivingInkChromaBleedMultipliers");
+    expect(runtime).toContain("studioLivingInkPigmentDiffusionRates");
+    expect(runtime).toContain("chromaMultipliers");
+    expect(runtime).toContain("separatedDiffusionQuiet");
+    expect(runtime).toContain("separatedDiffusionTip");
+    expect(runtime).toContain("mix(separatedDiffusionQuiet, separatedDiffusionTip, brush)");
+    expect(runtime).toContain("uniform vec3 brushFootprint");
+    expect(runtime).toContain("clearBrushFootprint");
+    expect(runtime).toContain("0.16 * load");
+    // Interactive path must not interleave a full fluid step every few marks (stutter).
+    expect(runtime).not.toContain("interleaved-wash-step");
+    expect(runtime).toContain("paper * exp(-opticalDensity)");
+    expect(runtime).toContain("bleachCoverage");
+    // Ghost tip must not survive pen-up into settle/advance/fix ticks.
+    expect(runtime).toContain("this.clearBrushFootprint()");
+    const clearAfterDeposit = runtime.indexOf("this.clearBrushFootprint()");
+    const settleLoop = runtime.indexOf("for (let tick = 0; tick < ticks; tick += 1)");
+    expect(clearAfterDeposit).toBeGreaterThan(0);
+    expect(settleLoop).toBeGreaterThan(clearAfterDeposit);
+  });
+
   it("keeps continuous Gaussian segments, selection orientation and ping-pong identity explicit", () => {
     expect(runtime).toContain("float along = clamp");
     expect(runtime).toContain("private syncDoubleDirty");
-    expect(runtime.match(/this\.syncDoubleDirty\(/g)?.length).toBeGreaterThanOrEqual(9);
+    // Jacobi mid-loop sync was removed for interactive perf; remaining syncs still cover parity.
+    expect(runtime.match(/this\.syncDoubleDirty\(/g)?.length).toBeGreaterThanOrEqual(6);
     expect(runtime).toContain("this.advanceDirtyHalo();");
     expect(runtime).toContain("height - 1 - (selection.bounds.y + row)");
+    expect(runtime).toContain("if (!selection && this.selectionTextureHasFullCoverage) return false;");
+    expect(runtime).toContain("this.selectionTextureHasFullCoverage = selection === null;");
     expect(runtime).toContain("accepted = clamp(settle * coverage");
     expect(runtime).toContain("strokeDeposit");
     expect(runtime).toContain("MERGE_DEPOSIT_FRAGMENT");
@@ -75,6 +106,33 @@ describe("Living Ink actual execution boundary", () => {
     expect(verifier).toContain("result.fixedInvariant?.maximumRgbDifference !== 0");
   });
 
+  it("damps release-settle velocity without activating fixation chemistry in either backend", () => {
+    for (const source of [runtime, webGpuRuntime]) {
+      expect(source).toContain(
+        'const velocitySettling = operation.kind === "advance" && quality === "settle";',
+      );
+    }
+    expect(runtime).toMatch(
+      /operation\.kind === "fix",\s+pressureIterations,\s+velocitySettling,/,
+    );
+    expect(webGpuRuntime).toContain(
+      'this.step(operation.kind === "fix", pressureIterations, velocitySettling)',
+    );
+    expect(runtime).toContain(
+      "studioLivingInkVelocityDampingForStep(\n        material.flow,\n        dt,\n        fixing,\n        velocitySettling,",
+    );
+    expect(runtime).toContain("if (fixing) {");
+    expect(runtime).toContain("Math.exp(-dt / (fixing ? 0.25 : dryWindow))");
+    expect(webGpuRuntime).toContain("fixTransfer: fixing ? 1 - Math.exp(-dt * 5) : 0");
+    expect(webGpuRuntime).toContain("if (fixing) {");
+    expect(wgsl).toContain("STUDIO_LIVING_INK_RELEASE_VELOCITY_DAMPING_RATE_PER_SECOND = 60");
+    expect(wgsl).toContain("studioLivingInkVelocityDampingForStep(");
+    expect(wgsl).toContain("if (fixing) return studioLivingInkVelocityDamping(flow, dt, true)");
+    expect(wgsl).toContain(
+      "studioLivingInkEvaporationMultiplier(input.dryRate, input.dt, input.fixing)",
+    );
+  });
+
   it("gates organic wash quality and continuous-stroke artifacts against actual pixels", () => {
     for (const token of [
       "normalizedHighFrequencyEdgeCurvature",
@@ -92,6 +150,54 @@ describe("Living Ink actual execution boundary", () => {
     expect(verifier).toContain("actual Chromium Worker crash");
     expect(verifier).toContain("two to four smooth capillary lobes");
     expect(verifier).toContain("simulation ACK batching dropped input");
+  });
+
+  it("empties the centre of a dwell wash through the divergence of its own capillary flow", () => {
+    // A dwell mark's outflow is divergent by construction, so the pressure-projected velocity
+    // field cannot carry it and semi-Lagrangian value advection cannot express its dilution. The
+    // pigment pass therefore has to scale density by the divergence of the displacement it uses,
+    // or the mark dries as an ink dot with its darkest point dead centre.
+    expect(runtime).toContain("capillaryBacktrace");
+    expect(runtime).toContain("frontCurvature");
+    expect(runtime).toContain("wetSecondDerivativeAlongNormal");
+    expect(runtime).toContain("displacementDivergence");
+    // Both halves of div(A*n) must be present: geometric spreading empties the interior and the
+    // along-flow slowdown deposits that pigment into the drying rim. Keeping only the first is a
+    // pigment sink that bleaches every wash.
+    expect(runtime).toContain("mobility * frontCurvature");
+    expect(runtime).toContain("mobilitySlope * wetGradientStrength");
+    expect(verifier).toContain("central ink dot or an artificial hollow ring");
+  });
+
+  it("gates both shipped GPU backends instead of whichever one the launch flags selected", () => {
+    // The Worker prefers the WGSL field runtime whenever a WebGPU adapter exists, so a probe that
+    // launches one browser leaves the other shipped backend completely unverified.
+    expect(verifier).toContain("BACKEND_LANES");
+    expect(verifier).toContain("--enable-unsafe-webgpu");
+    expect(verifier).toContain("--use-angle=metal");
+    expect(verifier).toContain("--disable-features=WebGPU");
+    expect(verifier).toContain("real-chromium-dedicated-worker-offscreen-webgpu-half-float-v1");
+    expect(verifier).toContain("webgpuVisualParity");
+    // The WGSL gap is a ratchet, not an exemption: the run fails when the observed gap grows *or*
+    // shrinks without the record being updated, so neither a regression nor a repair can pass
+    // unnoticed. No threshold is per-backend.
+    expect(verifier).toContain("WEBGPU_RECORDED_PARITY_GAP");
+    expect(verifier).toContain("regressedGates");
+    expect(verifier).toContain("repairedGates");
+    /*
+     * Backend identity has to come from the receipt of an operation that actually ran, not from a
+     * literal and not from the capability record.
+     *
+     * The capability record is not a witness here: when the WGSL runtime is refused, the WebGPU
+     * factory falls back to a WebGL2 runtime and stamps `webgpu-offscreen-half-float` onto its
+     * capabilities. Reading identity from that stamp let the WGSL lane run GLSL end to end while
+     * reporting itself as the WGSL lane — two kernels had failed to compile, and an invalid
+     * pipeline drops its dispatches silently, so the lane's "near-parity" numbers were GLSL's own.
+     */
+    expect(browserGate).toContain("lineReceiptBackend = lineFrame.receipt.backend");
+    expect(browserGate).toContain('lineReceiptBackend === "webgpu-offscreen-half-float"');
+    expect(browserGate).toContain("await bloomProvider.initialize()");
+    expect(verifier).not.toContain('backend !== "real-chromium-dedicated-worker-offscreen-webgl2');
   });
 
   it("serializes all input and rolls failed or cancelled mutations back before acknowledgement", () => {

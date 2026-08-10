@@ -1,6 +1,8 @@
-import type {
-  StudioHokusaiNaturalMediaPresetId,
-  StudioHokusaiNaturalMediaRenderPlan,
+import {
+  studioHokusaiMaterialProfileIsCompatible,
+  type StudioHokusaiMaterialProfileId,
+  type StudioHokusaiNaturalMediaPresetId,
+  type StudioHokusaiNaturalMediaRenderPlan,
 } from "./studio-hokusai-natural-media-contract";
 
 export const STUDIO_HOKUSAI_NATURAL_MEDIA_TEXTURE_VERSION =
@@ -17,6 +19,7 @@ export const STUDIO_HOKUSAI_LOCAL_DIRECTION_INDEX_LIMITS = Object.freeze({
 export interface StudioHokusaiNaturalMediaTextureMetrics {
   readonly version: typeof STUDIO_HOKUSAI_NATURAL_MEDIA_TEXTURE_VERSION;
   readonly presetId: StudioHokusaiNaturalMediaPresetId;
+  readonly materialProfileId: StudioHokusaiMaterialProfileId;
   readonly visiblePixels: number;
   readonly alphaChangedPixels: number;
   readonly colorChangedPixels: number;
@@ -78,7 +81,9 @@ function valueNoise1d(
   coordinate: number,
   lane: number,
   seed: number,
+  diagnostics?: NoiseEvaluationDiagnostics,
 ): number {
+  if (diagnostics) diagnostics.count += 1;
   const lower = Math.floor(coordinate);
   const fraction = coordinate - lower;
   const eased = fraction * fraction * (3 - 2 * fraction);
@@ -94,7 +99,9 @@ function valueNoise2d(
   y: number,
   lane: number,
   seed: number,
+  diagnostics?: NoiseEvaluationDiagnostics,
 ): number {
+  if (diagnostics) diagnostics.count += 1;
   const lowerX = Math.floor(x);
   const lowerY = Math.floor(y);
   const fractionX = x - lowerX;
@@ -113,6 +120,16 @@ function valueNoise2d(
     easedX,
   );
   return mix(top, bottom, easedY);
+}
+
+interface MaterialTextureSample {
+  readonly alpha: number;
+  readonly color: number;
+  readonly lift: number;
+}
+
+interface NoiseEvaluationDiagnostics {
+  count: number;
 }
 
 function dominantStrokeDirection(
@@ -316,7 +333,8 @@ function pencilTexture(
   x: number,
   y: number,
   seed: number,
-): Readonly<{ alpha: number; color: number; lift: number }> {
+  diagnostics?: NoiseEvaluationDiagnostics,
+): MaterialTextureSample {
   // Low-frequency coordinate warping prevents independent fibre/tooth fields
   // from locking into a visible weave. The graphite fibre is itself a 2-D
   // anisotropic field rather than a 1-D stripe, so it stays irregular while
@@ -326,12 +344,14 @@ function pencilTexture(
     y * 0.018,
     8,
     seed ^ 0x6ab3_91e5,
+    diagnostics,
   );
   const warpY = valueNoise2d(
     x * -0.015 + y * 0.009,
     x * 0.009 + y * 0.015,
     9,
     seed ^ 0x381d_e72b,
+    diagnostics,
   );
   const warpedX = x + (warpX - 0.5) * 5.2;
   const warpedY = y + (warpY - 0.5) * 5.2;
@@ -340,18 +360,21 @@ function pencilTexture(
     warpedX * -0.014 + warpedY * 0.052,
     11,
     seed ^ 0x50a3_7e91,
+    diagnostics,
   );
   const paper = valueNoise2d(
     warpedX * 0.44,
     warpedY * 0.44,
     12,
     seed ^ 0x8dc4_5a13,
+    diagnostics,
   );
   const tooth = valueNoise2d(
     warpedX * -0.15 + warpedY * 0.12,
     warpedX * 0.12 + warpedY * 0.15,
     13,
     seed ^ 0x2f6e_2b1d,
+    diagnostics,
   );
   const graphite = 0.34 * fibre + 0.39 * paper + 0.27 * tooth;
   return {
@@ -365,7 +388,8 @@ function charcoalTexture(
   x: number,
   y: number,
   seed: number,
-): Readonly<{ alpha: number; color: number; lift: number }> {
+  diagnostics?: NoiseEvaluationDiagnostics,
+): MaterialTextureSample {
   // Warp the paper domain before sampling the pigment fields. Sampling a
   // coarse value-noise lattice directly made its square interpolation cells
   // readable at high zoom and amplified Hokusai's circular dab joints on long
@@ -376,6 +400,7 @@ function charcoalTexture(
     x * -0.005 + y * 0.014,
     19,
     seed ^ 0x4dc8_72a1,
+    diagnostics,
   );
   const warpOffset = domainWarp - 0.5;
   // One shared low-frequency sample is deliberately projected on two
@@ -388,18 +413,21 @@ function charcoalTexture(
     warpedX * -0.035 + warpedY * 0.083,
     21,
     seed ^ 0x1c35_7d9b,
+    diagnostics,
   );
   const coarseB = valueNoise2d(
     warpedX * -0.049 + warpedY * 0.071,
     warpedX * 0.063 + warpedY * 0.044,
     22,
     seed ^ 0xa46f_28c7,
+    diagnostics,
   );
   const fine = valueNoise2d(
     warpedX * 0.29 + warpedY * 0.17,
     warpedX * -0.14 + warpedY * 0.31,
     23,
     seed ^ 0x73bd_14e5,
+    diagnostics,
   );
   const broadPigment = 0.56 * coarseA + 0.44 * coarseB;
   const carbonGrain = broadPigment * 0.78 + fine * 0.22;
@@ -413,12 +441,100 @@ function charcoalTexture(
   };
 }
 
+function pigmentFields(
+  x: number,
+  y: number,
+  seed: number,
+  lane: number,
+  broadScale: number,
+  fineScale: number,
+  diagnostics?: NoiseEvaluationDiagnostics,
+): Readonly<{ broad: number; fine: number; fibre: number }> {
+  const warp = valueNoise2d(
+    x * 0.011 + y * 0.007,
+    x * -0.008 + y * 0.014,
+    lane,
+    seed ^ 0x6d2b_79f5,
+    diagnostics,
+  ) - 0.5;
+  const warpedX = x + warp * (5.2 + lane * 0.11);
+  const warpedY = y - warp * (4.1 + lane * 0.07);
+  const broad = valueNoise2d(
+    warpedX * broadScale + warpedY * broadScale * 0.57,
+    warpedX * broadScale * -0.43 + warpedY * broadScale * 0.91,
+    lane + 1,
+    seed ^ 0x9e37_79b9,
+    diagnostics,
+  );
+  const fine = valueNoise2d(
+    warpedX * fineScale - warpedY * fineScale * 0.31,
+    warpedX * fineScale * 0.47 + warpedY * fineScale * 0.88,
+    lane + 2,
+    seed ^ 0x85eb_ca6b,
+    diagnostics,
+  );
+  const fibre = valueNoise2d(
+    warpedX * fineScale * 0.73 + warpedY * 0.041,
+    warpedX * -0.037 + warpedY * fineScale * 0.19,
+    lane + 3,
+    seed ^ 0xc2b2_ae35,
+    diagnostics,
+  );
+  return { broad, fine, fibre };
+}
+
+function chalkTexture(
+  x: number,
+  y: number,
+  seed: number,
+  diagnostics?: NoiseEvaluationDiagnostics,
+): MaterialTextureSample {
+  const field = pigmentFields(x, y, seed, 41, 0.058, 0.41, diagnostics);
+  const powder = field.broad * 0.47 + field.fine * 0.31 + field.fibre * 0.22;
+  return {
+    alpha: 0.48 + powder * 0.47,
+    color: 0.77 + powder * 0.34,
+    lift: 0.012 + (1 - field.fine) * 0.035,
+  };
+}
+
+function crayonTexture(
+  x: number,
+  y: number,
+  seed: number,
+  diagnostics?: NoiseEvaluationDiagnostics,
+): MaterialTextureSample {
+  const field = pigmentFields(x, y, seed, 47, 0.082, 0.33, diagnostics);
+  const wax = field.broad * 0.33 + field.fine * 0.2 + field.fibre * 0.47;
+  return {
+    alpha: 0.68 + wax * 0.31,
+    color: 0.73 + wax * 0.43,
+    lift: Math.max(0, field.fibre - 0.58) * 0.065,
+  };
+}
+
+function pastelTexture(
+  x: number,
+  y: number,
+  seed: number,
+  diagnostics?: NoiseEvaluationDiagnostics,
+): MaterialTextureSample {
+  const field = pigmentFields(x, y, seed, 53, 0.039, 0.52, diagnostics);
+  const powder = field.broad * 0.58 + field.fine * 0.3 + field.fibre * 0.12;
+  return {
+    alpha: 0.43 + powder * 0.52,
+    color: 0.72 + powder * 0.42,
+    lift: 0.018 + (1 - field.broad) * 0.052,
+  };
+}
+
 function oilTexture(
   x: number,
   y: number,
   seed: number,
   directionRadians: number,
-): Readonly<{ alpha: number; color: number; lift: number }> {
+  diagnostics?: NoiseEvaluationDiagnostics,
+): MaterialTextureSample {
   const tangentX = Math.cos(directionRadians);
   const tangentY = Math.sin(directionRadians);
   const normalX = -tangentY;
@@ -432,11 +548,13 @@ function oilTexture(
     across * 1.15 + along * 0.018,
     31,
     seed ^ 0x9e57_41b3,
+    diagnostics,
   );
   const broadBristle = valueNoise1d(
     across * 0.21 - along * 0.007,
     32,
     seed ^ 0x4b16_f2d9,
+    diagnostics,
   );
   const ridge = 0.68 * fineBristle + 0.32 * broadBristle;
   return {
@@ -446,15 +564,155 @@ function oilTexture(
   };
 }
 
+/**
+ * Two oblique document-coordinate fields are enough to add broken pigment
+ * body to the two bristle evaluations above. Earlier profiles called the full
+ * four-field powder kernel after `oilTexture`, tripling oil's per-pixel noise
+ * cost. This compact pair keeps acrylic/oil-pastel/painterly at a strict 2x
+ * oil budget while retaining non-square, deterministic variation.
+ */
+function compactPaintBodyFields(
+  x: number,
+  y: number,
+  seed: number,
+  lane: number,
+  broadScale: number,
+  detailScale: number,
+  diagnostics?: NoiseEvaluationDiagnostics,
+): Readonly<{ broad: number; detail: number }> {
+  const broad = valueNoise2d(
+    x * broadScale + y * broadScale * 0.61,
+    x * broadScale * -0.47 + y * broadScale * 0.89,
+    lane,
+    seed ^ 0x6d2b_79f5,
+    diagnostics,
+  );
+  const detail = valueNoise2d(
+    x * detailScale - y * detailScale * 0.29,
+    x * detailScale * 0.43 + y * detailScale * 0.83,
+    lane + 1,
+    seed ^ 0x85eb_ca6b,
+    diagnostics,
+  );
+  return { broad, detail };
+}
+
+function oilPastelTexture(
+  x: number,
+  y: number,
+  seed: number,
+  directionRadians: number,
+  diagnostics?: NoiseEvaluationDiagnostics,
+): MaterialTextureSample {
+  const oil = oilTexture(
+    x,
+    y,
+    seed ^ 0x7f4a_7c15,
+    directionRadians,
+    diagnostics,
+  );
+  const tooth = compactPaintBodyFields(
+    x,
+    y,
+    seed,
+    59,
+    0.046,
+    0.28,
+    diagnostics,
+  );
+  const wax = tooth.broad * 0.42 + tooth.detail * 0.58;
+  return {
+    alpha: 0.73 + (oil.alpha * 0.45 + wax * 0.55) * 0.26,
+    color: 0.68 + (oil.color * 0.38 + wax * 0.62) * 0.43,
+    lift: oil.lift * 0.32 + Math.max(0, wax - 0.62) * 0.09,
+  };
+}
+
+function acrylicTexture(
+  x: number,
+  y: number,
+  seed: number,
+  directionRadians: number,
+  diagnostics?: NoiseEvaluationDiagnostics,
+): MaterialTextureSample {
+  const oil = oilTexture(
+    x,
+    y,
+    seed ^ 0x1656_67b1,
+    directionRadians,
+    diagnostics,
+  );
+  const polymer = compactPaintBodyFields(
+    x,
+    y,
+    seed,
+    67,
+    0.031,
+    0.24,
+    diagnostics,
+  );
+  return {
+    alpha: 0.85 + (oil.alpha * 0.55 + polymer.broad * 0.45) * 0.14,
+    color: 0.75 + (oil.color * 0.63 + polymer.detail * 0.37) * 0.34,
+    lift: Math.max(0, polymer.detail - 0.66) * 0.085,
+  };
+}
+
+function gouacheTexture(
+  x: number,
+  y: number,
+  seed: number,
+  diagnostics?: NoiseEvaluationDiagnostics,
+): MaterialTextureSample {
+  const field = pigmentFields(x, y, seed, 71, 0.026, 0.21, diagnostics);
+  const matte = field.broad * 0.69 + field.fine * 0.21 + field.fibre * 0.1;
+  return {
+    alpha: 0.88 + matte * 0.11,
+    color: 0.78 + matte * 0.27,
+    lift: 0.018 + (1 - field.fine) * 0.035,
+  };
+}
+
+function painterlyTexture(
+  x: number,
+  y: number,
+  seed: number,
+  directionRadians: number,
+  diagnostics?: NoiseEvaluationDiagnostics,
+): MaterialTextureSample {
+  const oil = oilTexture(
+    x,
+    y,
+    seed ^ 0x27d4_eb2f,
+    directionRadians,
+    diagnostics,
+  );
+  const broken = compactPaintBodyFields(
+    x,
+    y,
+    seed,
+    79,
+    0.044,
+    0.37,
+    diagnostics,
+  );
+  const body = oil.alpha * 0.5 + broken.broad * 0.3 + broken.detail * 0.2;
+  return {
+    alpha: 0.71 + body * 0.28,
+    color: 0.65 + (oil.color * 0.53 + broken.detail * 0.47) * 0.49,
+    lift: oil.lift * 0.7 + Math.max(0, broken.detail - 0.55) * 0.1,
+  };
+}
+
 function materialCoverage(
   alpha: number,
-  presetId: "pencil" | "charcoal" | "oil",
+  materialProfileId: StudioHokusaiMaterialProfileId,
 ): number {
   const normalized = alpha / 255;
   // A monotonic contrast transfer suppresses Hokusai's low-alpha circular
   // halo without a blur/median pass. It keeps partial paper tooth inside the
   // body and cannot invert one-pass/retrace coverage ordering.
-  switch (presetId) {
+  switch (materialProfileId) {
     case "pencil":
       // A sub-3px graphite stroke is dominated by antialias coverage rather
       // than a fully opaque core. A gamma below one raises those legitimate
@@ -469,9 +727,81 @@ function materialCoverage(
       // monotonic sub-linear transfer lifts legitimate overlap coverage while
       // preserving pressure order and never painting transparent pixels.
       return Math.min(1, normalized ** 0.86 * 1.28);
+    case "chalk":
+      return Math.min(1, normalized ** 0.8 * 1.3);
+    case "crayon":
+      return Math.min(1, normalized ** 0.94 * 1.22);
+    case "pastel":
+      return Math.min(1, normalized ** 0.82 * 1.26);
+    case "oil-pastel":
+      return Math.min(1, normalized ** 0.98 * 1.2);
     case "oil":
       return Math.min(1, normalized ** 1.18 * 1.28);
+    case "acrylic":
+      return Math.min(1, normalized ** 1.06 * 1.24);
+    case "gouache":
+      return Math.min(1, normalized ** 0.92 * 1.2);
+    case "painterly":
+      return Math.min(1, normalized ** 1.1 * 1.25);
+    case "calligraphy":
+    case "marker":
+      return normalized;
   }
+}
+
+function materialTexture(
+  materialProfileId: StudioHokusaiMaterialProfileId,
+  x: number,
+  y: number,
+  seed: number,
+  directionRadians: number,
+  diagnostics?: NoiseEvaluationDiagnostics,
+): MaterialTextureSample {
+  switch (materialProfileId) {
+    case "pencil":
+      return pencilTexture(x, y, seed, diagnostics);
+    case "charcoal":
+      return charcoalTexture(x, y, seed, diagnostics);
+    case "chalk":
+      return chalkTexture(x, y, seed, diagnostics);
+    case "crayon":
+      return crayonTexture(x, y, seed, diagnostics);
+    case "pastel":
+      return pastelTexture(x, y, seed, diagnostics);
+    case "oil-pastel":
+      return oilPastelTexture(x, y, seed, directionRadians, diagnostics);
+    case "oil":
+      return oilTexture(x, y, seed, directionRadians, diagnostics);
+    case "acrylic":
+      return acrylicTexture(x, y, seed, directionRadians, diagnostics);
+    case "gouache":
+      return gouacheTexture(x, y, seed, diagnostics);
+    case "painterly":
+      return painterlyTexture(x, y, seed, directionRadians, diagnostics);
+    case "calligraphy":
+    case "marker":
+      return { alpha: 1, color: 1, lift: 0 };
+  }
+}
+
+/**
+ * Deterministic operation-count probe for CI. It executes the same profile
+ * kernel as production but counts noise-field evaluations instead of relying
+ * on machine-dependent wall-clock timing.
+ */
+export function studioHokusaiMaterialProfileNoiseEvaluationCount(
+  materialProfileId: StudioHokusaiMaterialProfileId,
+): number {
+  const diagnostics: NoiseEvaluationDiagnostics = { count: 0 };
+  materialTexture(
+    materialProfileId,
+    37.25,
+    19.75,
+    0x1234_5678,
+    Math.PI / 7,
+    diagnostics,
+  );
+  return diagnostics.count;
 }
 
 /**
@@ -517,6 +847,12 @@ export function applyStudioHokusaiNaturalMediaTextureV2(
   ) {
     throw new RangeError("Hokusai material texture pixel layout is invalid.");
   }
+  if (!studioHokusaiMaterialProfileIsCompatible(
+    plan.presetId,
+    plan.materialProfileId,
+  )) {
+    throw new RangeError("Hokusai material profile does not match its carrier preset.");
+  }
   const directionRadians = dominantStrokeDirection(plan.samples);
   if (
     plan.presetId !== "pencil"
@@ -537,6 +873,7 @@ export function applyStudioHokusaiNaturalMediaTextureV2(
     return Object.freeze({
       version: STUDIO_HOKUSAI_NATURAL_MEDIA_TEXTURE_VERSION,
       presetId: plan.presetId,
+      materialProfileId: plan.materialProfileId,
       visiblePixels,
       alphaChangedPixels: 0,
       colorChangedPixels: 0,
@@ -551,7 +888,13 @@ export function applyStudioHokusaiNaturalMediaTextureV2(
   let alphaChangedPixels = 0;
   let colorChangedPixels = 0;
   const inverseScale = 1 / plan.raster.scale;
-  const localOilDirection = plan.presetId === "oil"
+  const directionAwareProfile = (
+    plan.materialProfileId === "oil"
+    || plan.materialProfileId === "oil-pastel"
+    || plan.materialProfileId === "acrylic"
+    || plan.materialProfileId === "painterly"
+  );
+  const localMaterialDirection = directionAwareProfile
     ? localStrokeDirectionResolver(plan, directionRadians)
     : null;
   for (let y = dirtyY; y < dirtyY + dirtyHeight; y += 1) {
@@ -566,19 +909,23 @@ export function applyStudioHokusaiNaturalMediaTextureV2(
       if (alpha <= 0) continue;
       visiblePixels += 1;
       const documentX = plan.logicalBounds.x + x * inverseScale;
-      const texture = plan.presetId === "pencil"
-        ? pencilTexture(documentX, documentY, plan.seed)
-        : plan.presetId === "charcoal"
-          ? charcoalTexture(documentX, documentY, plan.seed)
-          : oilTexture(
-              documentX,
-              documentY,
-              plan.seed,
-              localOilDirection?.resolve(x, y) ?? directionRadians,
-            );
-      const coverage = materialCoverage(alpha, plan.presetId);
-      const materialAlpha = plan.presetId === "charcoal"
-        ? texture.alpha ** (1 + (1 - coverage) * 0.55)
+      const texture = materialTexture(
+        plan.materialProfileId,
+        documentX,
+        documentY,
+        plan.seed,
+        localMaterialDirection?.resolve(x, y) ?? directionRadians,
+      );
+      const coverage = materialCoverage(alpha, plan.materialProfileId);
+      const powderCoefficient = plan.materialProfileId === "charcoal"
+        ? 0.55
+        : plan.materialProfileId === "chalk"
+          ? 0.42
+          : plan.materialProfileId === "pastel"
+            ? 0.32
+            : 0;
+      const materialAlpha = powderCoefficient > 0
+        ? texture.alpha ** (1 + (1 - coverage) * powderCoefficient)
         : texture.alpha;
       const texturedAlpha = Math.max(
         1,
@@ -600,12 +947,13 @@ export function applyStudioHokusaiNaturalMediaTextureV2(
   return Object.freeze({
     version: STUDIO_HOKUSAI_NATURAL_MEDIA_TEXTURE_VERSION,
     presetId: plan.presetId,
+    materialProfileId: plan.materialProfileId,
     visiblePixels,
     alphaChangedPixels,
     colorChangedPixels,
     dominantDirectionRadians: directionRadians,
-    directionIndexMode: localOilDirection?.mode ?? "not-applicable",
-    directionIndexSegments: localOilDirection?.indexedSegments ?? 0,
-    directionIndexCellReferences: localOilDirection?.cellReferences ?? 0,
+    directionIndexMode: localMaterialDirection?.mode ?? "not-applicable",
+    directionIndexSegments: localMaterialDirection?.indexedSegments ?? 0,
+    directionIndexCellReferences: localMaterialDirection?.cellReferences ?? 0,
   });
 }

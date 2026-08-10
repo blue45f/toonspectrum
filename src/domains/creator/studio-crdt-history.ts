@@ -113,7 +113,26 @@ export function reconcileStudioCrdtSceneGraphHistory<
     changed = true;
   };
 
+  const boundedCurrentIndex = Math.max(0, Math.min(currentIndex, history.length - 1));
+
+  // Reconcile current active snapshot first so the artist sees the converged state immediately
+  const currentSnapshot = history[boundedCurrentIndex];
+  if (currentSnapshot) {
+    const current = reconcileStudioCrdtSceneGraphPages(
+      currentSnapshot,
+      frontier.strokes,
+      frontier.sceneElements,
+      frontier.pages,
+      frontier.layerGroups,
+      changedIds !== null ? undefined : (changedIds ?? undefined),
+      referenceSources
+    );
+    if (current.changed) replaceSnapshot(boundedCurrentIndex, current.pages);
+  }
+
+  // Reconcile remaining history steps for remote-safe undo
   for (let index = 0; index < history.length; index += 1) {
+    if (index === boundedCurrentIndex) continue;
     const snapshot = nextHistory[index];
     if (!snapshot) continue;
     const reconciled = reconcileStudioCrdtSceneGraphPages(
@@ -126,23 +145,6 @@ export function reconcileStudioCrdtSceneGraphHistory<
       referenceSources
     );
     if (reconciled.changed) replaceSnapshot(index, reconciled.pages);
-  }
-
-  if (changedIds !== null) {
-    const boundedCurrentIndex = Math.max(0, Math.min(currentIndex, history.length - 1));
-    const currentSnapshot = nextHistory[boundedCurrentIndex];
-    if (currentSnapshot) {
-      const current = reconcileStudioCrdtSceneGraphPages(
-        currentSnapshot,
-        frontier.strokes,
-        frontier.sceneElements,
-        frontier.pages,
-        frontier.layerGroups,
-        undefined,
-        referenceSources
-      );
-      if (current.changed) replaceSnapshot(boundedCurrentIndex, current.pages);
-    }
   }
 
   return { history: nextHistory, changed };

@@ -1,17 +1,79 @@
+// @vitest-environment jsdom
+
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
+import { cleanup, fireEvent, render } from "@testing-library/react";
+import { useState } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { STUDIO_CURVE_MAX_CONTROL_POINTS } from "./studio-curves";
+import { STUDIO_CURVE_MAX_CONTROL_POINTS, type CurvePoint } from "./studio-curves";
 import { StudioCurvePanel } from "./StudioCurvePanel";
 
 import type { StudioImageDataLike } from "./studio-filters";
 
 const curvePanelSource = readFileSync(
-  new URL("./StudioCurvePanel.tsx", import.meta.url),
+  resolve(process.cwd(), "src/domains/creator/StudioCurvePanel.tsx"),
   "utf8",
 );
+
+// SVG viewBox(170)와 CSS 크기를 1:1로 맞춰 clientX/Y를 그대로 SVG 좌표로 읽게 한다.
+const SVG_SIZE = 170;
+
+function stubSvgGeometry(svg: SVGSVGElement): void {
+  svg.getBoundingClientRect = () =>
+    ({
+      bottom: SVG_SIZE,
+      height: SVG_SIZE,
+      left: 0,
+      right: SVG_SIZE,
+      toJSON: () => ({}),
+      top: 0,
+      width: SVG_SIZE,
+      x: 0,
+      y: 0,
+    }) as DOMRect;
+}
+
+function ControlledCurvePanel({
+  initial,
+  onEmit,
+}: {
+  initial: CurvePoint[];
+  onEmit: (points: CurvePoint[]) => void;
+}): React.ReactElement {
+  const [points, setPoints] = useState(initial);
+  return (
+    <StudioCurvePanel
+      points={points}
+      onChange={(next) => {
+        onEmit(next);
+        setPoints(next);
+      }}
+      onReset={vi.fn()}
+    />
+  );
+}
+
+function renderControlledCurvePanel(initial: CurvePoint[] = [
+  { x: 0, y: 0 },
+  { x: 255, y: 255 },
+]) {
+  const onEmit = vi.fn<(points: CurvePoint[]) => void>();
+  const view = render(<ControlledCurvePanel initial={initial} onEmit={onEmit} />);
+  const svg = view.container.querySelector<SVGSVGElement>(
+    'svg[aria-label^="톤 커브 편집기"]',
+  )!;
+  stubSvgGeometry(svg);
+  return { onEmit, svg, view };
+}
+
+function visiblePointCount(svg: SVGSVGElement): number {
+  return svg.querySelectorAll('circle[r="4"]').length;
+}
+
+afterEach(cleanup);
 
 function renderCurvePanel(): string {
   return renderToStaticMarkup(
@@ -165,5 +227,66 @@ describe("StudioCurvePanel", () => {
     expect(html).toMatch(/disabled=""[^>]*title="채널마다 제어점은 최대 16개/);
     expect(html).toContain("채널마다 최대 16개까지 사용할 수 있습니다.");
     expect(curvePanelSource).toContain("if (curvePointLimitReached) return;");
+  });
+
+  it("adds a point where the graph is clicked and hands the same gesture straight to the drag", () => {
+    const { onEmit, svg } = renderControlledCurvePanel();
+    expect(visiblePointCount(svg)).toBe(2);
+
+    // 그래프 정중앙 — 어떤 제어점과도 멀어 예전에는 아무 일도 일어나지 않던 좌표.
+    // detail은 Chromium의 실제 pointerdown 값(0)을 쓴다 — 클릭 횟수에 기대지 않는다는 계약.
+    fireEvent.pointerDown(svg, { button: 0, clientX: 85, clientY: 85, detail: 0 });
+
+    expect(visiblePointCount(svg)).toBe(3);
+    expect(onEmit).toHaveBeenCalledTimes(1);
+    expect(onEmit.mock.calls[0]?.[0]).toEqual([
+      { x: 0, y: 0 },
+      { x: 128, y: 128 },
+      { x: 255, y: 255 },
+    ]);
+
+    // 손을 떼지 않은 채 그대로 끌면 방금 만든 점이 따라온다(다시 잡을 필요 없음).
+    fireEvent.pointerMove(svg, { clientX: 85, clientY: 45 });
+    const dragged = onEmit.mock.calls.at(-1)?.[0];
+    expect(onEmit.mock.calls.length).toBeGreaterThan(1);
+    expect(dragged?.[1]).toEqual({ x: 128, y: 195 });
+    expect(visiblePointCount(svg)).toBe(3);
+  });
+
+  it("keeps a point created by the first press when the gesture becomes a double click", () => {
+    const { svg } = renderControlledCurvePanel();
+
+    fireEvent.pointerDown(svg, { button: 0, clientX: 85, clientY: 85, detail: 0 });
+    fireEvent.pointerUp(svg, { clientX: 85, clientY: 85 });
+    fireEvent.pointerDown(svg, { button: 0, clientX: 85, clientY: 85, detail: 0 });
+    fireEvent.pointerUp(svg, { clientX: 85, clientY: 85 });
+    fireEvent.doubleClick(svg, { clientX: 85, clientY: 85, detail: 2 });
+
+    expect(visiblePointCount(svg)).toBe(3);
+  });
+
+  it("still deletes an existing middle point on a later double click", () => {
+    const { svg } = renderControlledCurvePanel([
+      { x: 0, y: 0 },
+      { x: 128, y: 128 },
+      { x: 255, y: 255 },
+    ]);
+    expect(visiblePointCount(svg)).toBe(3);
+
+    fireEvent.pointerDown(svg, { button: 0, clientX: 85, clientY: 85, detail: 0 });
+    fireEvent.pointerUp(svg, { clientX: 85, clientY: 85 });
+    fireEvent.pointerDown(svg, { button: 0, clientX: 85, clientY: 85, detail: 0 });
+    fireEvent.pointerUp(svg, { clientX: 85, clientY: 85 });
+    fireEvent.doubleClick(svg, { clientX: 85, clientY: 85, detail: 2 });
+
+    expect(visiblePointCount(svg)).toBe(2);
+  });
+
+  it("documents the pointer contract next to the keyboard one", () => {
+    const html = renderCurvePanel();
+
+    expect(html).toContain("그래프의 빈 곳을 클릭하면 그 자리에 점이 생기고 그대로 드래그됩니다.");
+    expect(html).toContain("점 위를 더블클릭하면 삭제됩니다.");
+    expect(html).toContain("화살표 키로 1, Shift+화살표로 10씩 이동합니다.");
   });
 });

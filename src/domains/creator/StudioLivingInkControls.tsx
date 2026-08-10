@@ -1,5 +1,6 @@
-import { Droplets, Eraser, LockKeyhole, Paintbrush, Waves } from "lucide-react";
+import { Droplets, Eraser, LockKeyhole, Paintbrush, Power, Waves } from "lucide-react";
 
+import { STUDIO_WASH_INK_PRODUCT_LABEL_KO } from "./studio-brush-behavior-ui";
 import { DEFAULT_STUDIO_LIVING_INK_MATERIAL_CONTROLS } from "./studio-living-ink-gpu-protocol";
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 import { studioToolHintFromLabel } from "./studio-tool-hints";
@@ -13,8 +14,12 @@ import type {
 
 import { cn } from "@/lib/utils";
 
+const WASH = STUDIO_WASH_INK_PRODUCT_LABEL_KO;
+
 export interface StudioLivingInkControlsProps {
   readonly supported: boolean;
+  readonly physicalModeEnabled: boolean;
+  readonly onPhysicalModeEnabledChange: (enabled: boolean) => void;
   readonly state: StudioLivingInkStudioState;
   readonly mode: StudioLivingInkStrokeMode;
   readonly onModeChange: (mode: StudioLivingInkStrokeMode) => void;
@@ -39,14 +44,16 @@ const buttonClass = cn(
 );
 
 function stateLabel(state: StudioLivingInkStudioState): string {
-  if (state === "ready") return "물리 필드 준비됨";
-  if (state === "loading") return "물리 필드 복원 중";
-  if (state === "failed") return "물리 필드 복원 실패 · 일반 수채로 안전 전환";
+  if (state === "ready") return "번짐 준비됨";
+  if (state === "loading") return "번짐 상태 복원 중";
+  if (state === "failed") return "번짐 복원 실패 · 일반 수채로 안전 전환";
   return "이 기기에서는 일반 수채로 안전 전환";
 }
 
 export function StudioLivingInkControls({
   supported,
+  physicalModeEnabled,
+  onPhysicalModeEnabledChange,
   state,
   mode,
   onModeChange,
@@ -60,50 +67,84 @@ export function StudioLivingInkControls({
   onClear,
   material,
   materialLocked,
-  materialLockedReason = "기존 물리 레이어의 재질을 바꾸면 과거 획의 결과도 달라집니다. 현재 레이어를 지운 뒤 새 재질로 시작해 주세요.",
+  materialLockedReason = "이미 그려 둔 번짐 레이어의 재질을 바꾸면 과거 획 결과도 달라집니다. 레이어를 지운 뒤 새 재질로 시작해 주세요.",
   onMaterialChange,
 }: StudioLivingInkControlsProps) {
   if (!supported) return null;
   const ready = state === "ready" && !busy;
+  const physicalBrushReady = ready && physicalModeEnabled;
   const selectionScopeDisabled = !selectionAvailable;
   return (
     <div
       data-studio-living-ink-controls="true"
       data-studio-living-ink-state={state}
-      className="flex shrink-0 items-center gap-1 rounded-xl border border-cyan-400/25 bg-cyan-500/5 px-1 py-0.5"
+      data-studio-living-ink-physical-mode={physicalModeEnabled ? "enabled" : "disabled"}
+      data-studio-brush-behavior="wash"
+      className="flex shrink-0 items-center gap-1 rounded-xl border border-line/70 bg-card/70 px-1 py-0.5"
     >
+      <span className="hidden select-none px-1 text-[0.55rem] font-bold tracking-tight text-fg-3 sm:inline">
+        {WASH}
+      </span>
+      <StudioToolHintTarget
+        hint={studioToolHintFromLabel(
+          `${WASH} 물리 모드`,
+          physicalModeEnabled
+            ? "전체 물·안료 시뮬레이션을 사용합니다. 끄면 각 획이 다른 브러시처럼 독립된 빠른 레이어로 저장됩니다."
+            : "기본값은 빠른 독립 획입니다. 물·안료가 이전 획과 계속 섞이는 전용 표면이 필요할 때만 물리 모드를 켜세요.",
+          undefined,
+          "ink",
+        )}
+      >
+        <button
+          type="button"
+          data-studio-living-ink-physical-toggle="true"
+          disabled={busy}
+          aria-pressed={physicalModeEnabled}
+          aria-label={`${WASH} 물리 모드`}
+          onClick={() => onPhysicalModeEnabledChange(!physicalModeEnabled)}
+          className={cn(
+            buttonClass,
+            physicalModeEnabled
+              ? "border-accent/60 bg-accent-soft text-accent"
+              : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg",
+            busy && "cursor-not-allowed opacity-45",
+          )}
+        >
+          <Power size={14} aria-hidden />
+        </button>
+      </StudioToolHintTarget>
       <div
         role="group"
-        aria-label="Living Ink 도구"
+        aria-label={`${WASH} 도구`}
         className="flex items-center rounded-lg bg-canvas/70 p-0.5"
       >
         {([
-          ["ink", "잉크", Paintbrush],
+          ["ink", "안료", Paintbrush],
           ["water", "물", Waves],
         ] as const).map(([id, label, Icon]) => (
           <StudioToolHintTarget
             key={id}
             hint={studioToolHintFromLabel(
-              `Living Ink · ${label}`,
+              `${WASH} · ${label}`,
               id === "ink"
-                ? "선택한 수채·수묵 브러시로 이동 가능한 안료와 물을 함께 놓습니다. 필압과 속도가 농도·번짐에 반영돼요."
-                : "마른 픽셀을 흐리게 지우지 않고, 아직 정착되지 않은 안료에 물과 흐름을 주입해 다시 번지게 합니다.",
+                ? "수채·수묵 브러시로 안료와 물을 함께 놓습니다. 펜(애플 펜슬)이 곧 안료이고, 배럴 버튼을 누르는 동안만 물로 바뀌어요. 필압·속도가 번짐에 반영됩니다."
+                : "이미 올린 안료에 물과 흐름만 더해 다시 번지게 합니다. 펜을 한 번 쓴 뒤 손가락으로 그리면 이 물 브러시로 자동 전환돼요. 마른 픽셀을 흐리게 지우는 지우개와는 달라요.",
               undefined,
               "ink",
             )}
           >
             <button
               type="button"
-              disabled={!ready}
+              disabled={!physicalBrushReady}
               aria-pressed={mode === id}
-              aria-label={`Living Ink ${label}`}
+              aria-label={`${WASH} ${label}`}
               onClick={() => onModeChange(id)}
               className={cn(
                 buttonClass,
                 mode === id
-                  ? "border-cyan-400/65 bg-cyan-400/16 text-cyan-200"
+                  ? "border-accent/60 bg-accent-soft text-accent"
                   : "border-transparent text-fg-3 hover:bg-raised hover:text-fg",
-                !ready && "cursor-not-allowed opacity-45",
+                !physicalBrushReady && "cursor-not-allowed opacity-45",
               )}
             >
               <Icon size={15} aria-hidden />
@@ -114,16 +155,16 @@ export function StudioLivingInkControls({
 
       <StudioToolHintTarget
         hint={studioToolHintFromLabel(
-          "Living Ink 처리 범위",
+          `${WASH} 처리 범위`,
           selectionAvailable
-            ? "전체 물리 레이어 또는 현재 픽셀 선택만 정착·지우기 대상으로 고정합니다. 실행을 누르는 순간 선택 마스크가 복사돼요."
-            : "현재 Living Ink 레이어에 픽셀 선택이 없어 전체 범위만 사용할 수 있습니다.",
+            ? "전체 번짐 레이어 또는 현재 픽셀 선택만 정착·지우기 대상으로 고정합니다. 실행 순간 선택 마스크가 복사돼요."
+            : "현재 번짐 레이어에 픽셀 선택이 없어 전체 범위만 사용할 수 있습니다.",
         )}
       >
-        <label className="sr-only" htmlFor="studio-living-ink-scope">Living Ink 처리 범위</label>
+        <label className="sr-only" htmlFor="studio-living-ink-scope">{WASH} 처리 범위</label>
         <select
           id="studio-living-ink-scope"
-          aria-label="Living Ink 처리 범위"
+          aria-label={`${WASH} 처리 범위`}
           value={selectionScopeDisabled ? "all" : scope}
           disabled={!ready}
           onChange={(event) => onScopeChange(event.target.value === "selection" ? "selection" : "all")}
@@ -141,8 +182,8 @@ export function StudioLivingInkControls({
         disabled={!ready || !fixAvailable}
         unavailableReason={!fixAvailable ? fixUnavailableReason : undefined}
         hint={studioToolHintFromLabel(
-          "Living Ink 정착",
-          "현재 이동 가능한 안료를 종이에 정착해 이후 물 브러시로 다시 움직이지 않게 합니다.",
+          `${WASH} 정착`,
+          "아직 움직이는 안료를 종이에 고정해, 이후 물 도구로 다시 움직이지 않게 합니다.",
           undefined,
           "layer-lock",
           "lock",
@@ -152,7 +193,7 @@ export function StudioLivingInkControls({
           type="button"
           data-studio-living-ink-fix="true"
           disabled={!ready || !fixAvailable}
-          aria-label="Living Ink 정착"
+          aria-label={`${WASH} 정착`}
           onClick={onFix}
           className={cn(
             buttonClass,
@@ -166,10 +207,10 @@ export function StudioLivingInkControls({
       <StudioToolHintTarget
         disabled={!ready}
         hint={studioToolHintFromLabel(
-          "Living Ink 지우기",
+          `${WASH} 지우기`,
           scope === "selection"
-            ? "실행 시점에 복사한 선택 마스크의 알파만큼 물·이동 안료·정착 안료를 지웁니다. 실행 취소는 한 단계입니다."
-            : "현재 Living Ink 물리 레이어 전체를 지웁니다. 확인 뒤 실행되며 실행 취소는 한 단계입니다.",
+            ? "선택 마스크 영역의 물·이동 안료·정착 안료를 지웁니다. 실행 취소는 한 단계입니다."
+            : "현재 번짐 레이어 전체를 지웁니다. 확인 뒤 실행되며 실행 취소는 한 단계입니다.",
           undefined,
           "erase",
         )}
@@ -178,7 +219,7 @@ export function StudioLivingInkControls({
           type="button"
           data-studio-living-ink-clear="true"
           disabled={!ready}
-          aria-label="Living Ink 지우기"
+          aria-label={`${WASH} 지우기`}
           onClick={onClear}
           className={cn(
             buttonClass,
@@ -191,7 +232,7 @@ export function StudioLivingInkControls({
 
       <details className="group relative">
         <summary
-          aria-label="Living Ink 재질 설정"
+          aria-label={`${WASH} 재질 설정`}
           className={cn(
             "grid size-8 cursor-pointer list-none place-items-center rounded-lg border border-line bg-card text-fg-3 hover:bg-raised hover:text-fg pointer-coarse:size-11",
             STUDIO_FOCUS_RING,
@@ -209,11 +250,63 @@ export function StudioLivingInkControls({
               {materialLockedReason}
             </p>
           ) : null}
+
+          <div className="mb-2.5">
+            <span className="mb-1 block text-[0.62rem] font-bold text-fg-2">종이 질감</span>
+            <div className="grid grid-cols-4 gap-1">
+              {[
+                { name: "전통 한지", fiber: 0.55, tooth: 0.40, gran: 0.35 },
+                { name: "수채화지", fiber: 0.75, tooth: 0.82, gran: 0.65 },
+                { name: "켄트지", fiber: 0.15, tooth: 0.18, gran: 0.10 },
+                { name: "거친 코튼", fiber: 0.90, tooth: 0.95, gran: 0.85 },
+                { name: "크라프트", fiber: 0.65, tooth: 0.60, gran: 0.50 },
+                { name: "아마포", fiber: 0.45, tooth: 0.70, gran: 0.40 },
+                { name: "파스텔 펠트", fiber: 0.30, tooth: 0.50, gran: 0.25 },
+                { name: "매끄러움", fiber: 0.00, tooth: 0.00, gran: 0.00 },
+              ].map((preset) => {
+                const isActive =
+                  Math.abs(material.paperFiber - preset.fiber) < 0.05 &&
+                  Math.abs(material.paperTooth - preset.tooth) < 0.05;
+                return (
+                  <button
+                    key={preset.name}
+                    type="button"
+                    disabled={busy || materialLocked}
+                    onClick={() =>
+                      onMaterialChange({
+                        paperFiber: preset.fiber,
+                        paperTooth: preset.tooth,
+                        granulation: preset.gran,
+                      })
+                    }
+                    className={cn(
+                      "h-6 rounded border px-1 text-[0.55rem] font-medium transition-colors",
+                      isActive
+                        ? "border-accent bg-accent/15 text-accent font-bold"
+                        : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg",
+                    )}
+                  >
+                    {preset.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {([
             ["flow", "안료 흐름"],
             ["bleed", "번짐"],
             ["dryRate", "건조 속도"],
+            ["chromaticSeparation", "색상 분리"],
+            ["brushPigmentLoad", "브러시 안료"],
+            ["capillaryCreep", "모세관 확산"],
+            ["vorticity", "소용돌이"],
+            ["dryingEdgeDeposition", "테두리 응집"],
+            ["edgeDarkening", "가장자리 암화"],
+            ["wetSheen", "젖은 광택"],
+            ["beerLambertDensity", "광학 밀도"],
             ["paperFiber", "종이 섬유"],
+            ["paperTooth", "종이 요철"],
             ["granulation", "과립"],
           ] as const).map(([key, label]) => (
             <label key={key} className="mb-2 grid grid-cols-[4.7rem_1fr_2rem] items-center gap-2 text-[0.62rem] text-fg-2">
@@ -227,7 +320,7 @@ export function StudioLivingInkControls({
                 disabled={busy || materialLocked}
                 onChange={(event) => onMaterialChange({ [key]: Number(event.target.value) })}
                 className="studio-range min-w-0"
-                aria-label={`Living Ink ${label}`}
+                aria-label={`${WASH} ${label}`}
               />
               <span className="tabular-nums text-right text-fg-3">{Math.round(material[key] * 100)}</span>
             </label>

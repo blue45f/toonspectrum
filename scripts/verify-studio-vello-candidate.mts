@@ -3,6 +3,11 @@ import {
   STUDIO_VELLO_PROMOTION_GATES,
 } from "../src/domains/creator/studio-vello-candidate-promotion";
 import {
+  STUDIO_VELLO_HUB_PRODUCT_CAPABILITY,
+  STUDIO_VELLO_HYBRID_SPARSE_CANDIDATE,
+  resolveStudioVelloHubProductCapability,
+} from "../src/domains/creator/studio-vello-hub-capability";
+import {
   STUDIO_VELLO_CHROME_PAGE_REPEATABILITY,
   STUDIO_VELLO_OBSERVED_FRAME_RUNS,
   STUDIO_VELLO_OBSERVED_POC_DECISION,
@@ -54,22 +59,30 @@ function main(): void {
     "The recorded Chrome page-repeatability suite contains failures",
   );
   invariant(
-    STUDIO_VELLO_CURRENT_CANDIDATE_EVALUATION.status === "research-only",
-    "Vello must remain research-only until every promotion gate passes",
-  );
-  invariant(
     STUDIO_VELLO_CURRENT_CANDIDATE_EVALUATION.allHardGatesPassed === false,
-    "The audited Vello version unexpectedly reports every hard gate as passed",
+    "The historical whole-canvas candidate unexpectedly reports every hard gate as passed",
+  );
+  const productCapability = resolveStudioVelloHubProductCapability({
+    globalObject: {},
+  });
+  invariant(
+    STUDIO_VELLO_HUB_PRODUCT_CAPABILITY.enabledByDefault
+      && productCapability.enabled
+      && productCapability.scope === "accelerated-selection-overlay",
+    "The measured bounded VelloHub product seam must be enabled by default",
   );
   invariant(
-    STUDIO_VELLO_CURRENT_CANDIDATE_EVALUATION.runtimeActivationAllowed === false
-      && STUDIO_VELLO_OBSERVED_POC_DECISION.productRuntimeActivationAllowed === false,
-    "Vello runtime activation is forbidden by the current evidence",
-  );
-  invariant(
-    STUDIO_VELLO_OBSERVED_POC_DECISION.brushPixelAuthorityAllowed === false
+    STUDIO_VELLO_HUB_PRODUCT_CAPABILITY.brushPixelAuthority === false
+      && STUDIO_VELLO_HUB_PRODUCT_CAPABILITY.canonicalDocumentAuthority === false
+      && STUDIO_VELLO_OBSERVED_POC_DECISION.brushPixelAuthorityAllowed === false
       && STUDIO_VELLO_OBSERVED_POC_DECISION.canonicalAuthorityAllowed === false,
-    "Observed PoC results must not grant brush-pixel or canonical authority",
+    "The bounded product seam must not grant brush-pixel or canonical authority",
+  );
+  invariant(
+    STUDIO_VELLO_HYBRID_SPARSE_CANDIDATE.eligible === false
+      && STUDIO_VELLO_HYBRID_SPARSE_CANDIDATE.status
+        === "unavailable-upstream-api",
+    "Hybrid/Sparse GPU must remain an explicit unavailable candidate until its API exists",
   );
   invariant(
     STUDIO_VELLO_PROMOTION_GATES.every(({ hard }) => hard),
@@ -101,10 +114,18 @@ function main(): void {
     `${STUDIO_VELLO_CURRENT_CANDIDATE_EVALUATION.score.passedGateCount}/`
     + `${STUDIO_VELLO_PROMOTION_GATES.length} promotion gates passed`,
   );
+  log(
+    `product seam active: ${STUDIO_VELLO_HUB_PRODUCT_CAPABILITY.id} `
+    + `scope=${STUDIO_VELLO_HUB_PRODUCT_CAPABILITY.scope}; `
+    + "whole-canvas/input/brush authority remains outside this promotion",
+  );
+  log(
+    `Hybrid/Sparse candidate: ${STUDIO_VELLO_HYBRID_SPARSE_CANDIDATE.status}`,
+  );
   log(`limitations ${STUDIO_VELLO_OBSERVED_POC_LIMITATIONS.length}`);
   log(
     "OK: recorded aggregates are internally consistent; "
-    + "Vello remains an isolated research candidate and product activation is fail-closed",
+    + "the bounded /studio VelloHub seam is active with visual-gated CPU fallback",
   );
 }
 

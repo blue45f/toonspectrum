@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -179,6 +179,24 @@ describe("VRM library helpers", () => {
     expect(problems).toEqual([]);
   });
 
+  // 위 검사의 반대 방향. public/vrm 은 통째로 dist 로 복사돼 배포 산출물의 절반 이상을
+  // 차지한다(2026-08 실측: .vrm 88개 443.7MB / dist 735MB). 카탈로그에서 빠졌는데 파일만
+  // 남으면 아무도 못 여는 수백 MB가 조용히 배포에 실린다 — 고아 파일을 여기서 막는다.
+  // 의도적으로 남기는 파일은 BUNDLED_VRM_RIGHTS_BLOCKS 에 사유와 함께 등록해야 한다.
+  it("ships no orphan .vrm file that the catalog cannot reach", () => {
+    const vrmDir = join(process.cwd(), "public", "vrm");
+    const catalogFileNames = new Set(SAMPLE_VRMS.map((sample) => sample.url.replace("/vrm/", "")));
+    const documentedFileNames = new Set(
+      BUNDLED_VRM_RIGHTS_BLOCKS.map((block) => block.url.replace("/vrm/", "")),
+    );
+
+    const orphans = readdirSync(vrmDir)
+      .filter((fileName) => fileName.toLowerCase().endsWith(".vrm"))
+      .filter((fileName) => !catalogFileNames.has(fileName) && !documentedFileNames.has(fileName));
+
+    expect(orphans).toEqual([]);
+  });
+
   it("resolves sample urls by id and falls back to the default", () => {
     expect(sampleVrmUrl("cool-alien")).toBe("/vrm/CoolAlien.vrm");
     expect(sampleVrmUrl("devil")).toBe("/vrm/Devil.vrm");
@@ -240,7 +258,7 @@ describe("VRM library helpers", () => {
       {
         id: "upload-1",
         name: "Action Hero",
-        source: "indexed-db",
+        source: "sqlite-opfs",
         thumbnail: null,
         createdAt: 1,
         updatedAt: 1,

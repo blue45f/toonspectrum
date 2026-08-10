@@ -29,7 +29,7 @@ describe("patched minimatch 3 security compatibility", () => {
   });
 
   it("uses the bounded brace-expansion 5 security release", () => {
-    expect(braceExpansionPackage.version).toBe("5.0.8");
+    expect(braceExpansionPackage.version).toBe("5.0.9");
     expect(minimatch.braceExpand("panel-{1..3}")).toEqual([
       "panel-1",
       "panel-2",

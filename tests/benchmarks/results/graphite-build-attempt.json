@@ -1,0 +1,70 @@
+{
+  "harness": "manual build attempt — ADR-0011 lane 4 (Skia Graphite + Dawn WASM), quarantine-reason replacement by measurement",
+  "generatedAt": "2026-08-08T13:10:00+09:00",
+  "host": {
+    "os": "macOS (Darwin 25.6.0, arm64)",
+    "emsdk": "6.0.6 (preinstalled ~/emsdk, symlinked to third_party/externals/emsdk)",
+    "ninja": "1.13.2 (brew)",
+    "cmake": "4.4.2 (brew)",
+    "python": "3.12.13"
+  },
+  "upstream": {
+    "skia": {
+      "repo": "https://github.com/google/skia (mirror of skia.googlesource.com/skia)",
+      "commitPin": "33e64a812c0b36f253cb2f59c950ecb1232f575e",
+      "commitDate": "2026-08-07T16:57:53-07:00",
+      "checkout": "git clone --depth 1 → ~/toolchains/skia",
+      "emsdkPinUpstream": "4.0.7 (bin/activate-emsdk EMSDK_VERSION, matches MODULE.bazel)"
+    },
+    "dawnDepsPin": "bf6225076ff56f6d3867df3c0ee91c99fe0fca05 (skia DEPS)",
+    "emdawnwebgpuPort": "dawn v20260423.175430 (emcc 6.0.6 tools/ports/emdawnwebgpu.py EXTERNAL_PORT)"
+  },
+  "buildTarget": {
+    "spec": "modules/canvaskit/compile.sh webgpu — the in-tree Graphite+Dawn CanvasKit path",
+    "gnArgsKey": "skia_enable_graphite=true skia_enable_ganesh=false skia_use_dawn=true skia_use_webgpu=true skia_canvaskit_enable_webgpu=true target_cpu=wasm is_official_build=true",
+    "depsStrategy": "selective DEPS sync (24 pins) instead of full tools/git-sync-deps; emsdk NOT synced (symlink to preinstalled 6.0.6)"
+  },
+  "timings": {
+    "checkoutSeconds": { "skiaClone": 7, "minimalDepsSync": 52, "dawnCmakeExtraDepsSync": 32, "total": 91, "timeboxSeconds": 1500 },
+    "gnConfigure": "fetch-gn + gn gen passed inside attempt A (<1min, no missing-BUILD errors with the 17-pin minimal set)",
+    "buildAttemptsSeconds": { "A": 112, "B": 179, "C": 185, "total": 476, "timeboxSeconds": 2400 },
+    "diskUsage": "~3.3GB under ~/toolchains/skia (externals 3.0GB)"
+  },
+  "attempts": [
+    {
+      "id": "A",
+      "config": "stock compile.sh webgpu, 17 minimal DEPS pins",
+      "result": "FAIL at 1283/1826",
+      "firstRootError": "FAILED: libdawn_combined.a — third_party/dawn/build_dawn.py aborts: 'Third party path .../third_party/externals/egl-registry not found - did you sync your DEPS?' (dawn_cmake requires 7 more externals even for target_os=wasm)",
+      "classification": "dependency-level, bypassable"
+    },
+    {
+      "id": "B",
+      "config": "attempt A + 7 extra DEPS pins (egl-registry, glslang, opengl-registry, vulkan-headers, vulkan-utility-libraries, webgpu-headers, swiftshader)",
+      "result": "FAIL — all 16 graphite/dawn TUs",
+      "firstRootError": "fatal error: 'webgpu/webgpu_cpp.h' file not found (e.g. src/gpu/graphite/dawn/DawnBuffer.h:11) — emsdk >= 5 removed the bundled USE_WEBGPU headers; Skia's is_canvaskit dawn config sets include_dirs=[] with comment 'Emscripten includes its own WebGPU headers', which is only true for the emsdk 4.0.7 Skia pins",
+      "alsoMeasured": "dawn_cmake/tint_cmake themselves PASS — but dawn_native is compiled by host clang (measured -triple arm64-apple-macosx26.0.0) for a target_os=wasm build: libdawn_combined.a is a Mach-O archive, i.e. architecture poison for the eventual wasm link",
+      "classification": "toolchain contract break (emsdk 6.x vs Skia's emsdk 4.0.7 pin)"
+    },
+    {
+      "id": "C",
+      "config": "attempt B + gn extra_cflags=[\"--use-port=emdawnwebgpu\"] + modules/canvaskit/BUILD.gn ldflags patch (-sUSE_WEBGPU=1 → --use-port=emdawnwebgpu; EXPORTED_RUNTIME_METHODS drop JsValStore)",
+      "result": "FAIL at 1770/1783 — 9 graphite/dawn TUs; 1774/1783 targets compiled clean under emcc 6.0.6 (all Skia core, SkSL, skottie, paragraph, icu/harfbuzz/freetype/codecs, canvaskit bindings TUs; 7/16 graphite dawn TUs)",
+      "firstRootError": "webgpu.h API drift inside Skia's #if defined(__EMSCRIPTEN__) legacy branches: wgpu::ShaderModuleWGSLDescriptor / SupportedLimits / ImageCopyTexture / ImageCopyBuffer / ErrorCallback / RenderPassTimestampWrites / ComputePassTimestampWrites / VertexStepMode::VertexBufferNotUsed / WGPUBufferMapAsyncStatus_* / old OnSubmittedWorkDone signature do not exist in emdawnwebgpu (dawn v20260423) headers. Failing TUs: DawnBuffer, DawnErrorChecker, DawnCaps, DawnGraphiteUtils, DawnGraphicsPipeline, DawnCommandBuffer, DawnQueueManager, DawnResourceProvider, DawnSharedContext",
+      "classification": "upstream source-level migration required (not config-bypassable); ~63 __EMSCRIPTEN__ guard sites across src/gpu/graphite/dawn/* are written for emsdk 4.0.7's frozen old-spec webgpu.h"
+    }
+  ],
+  "additionalFindings": [
+    "CK_ENABLE_WEBGPU is defined by NO gn rule at this pin (grep over *.gn/*.gni = 0 hits; only CK_ENABLE_WEBGL exists) — even in the official compile.sh webgpu config, canvaskit_bindings.cpp's WebGPU surface (#ifdef CK_ENABLE_WEBGPU, incl. MakeGPUDeviceContext) compiles as dead code: the JS-facing WebGPU bindings are not wired",
+    "modules/canvaskit/webgpu.js interop depends on JsValStore from emscripten's removed library_html5_webgpu.js; emdawnwebgpu keeps emscripten_webgpu_get_device + Module['preinitializedWebGPUDevice'] as migration shims but has no JsValStore",
+    "emcc 6.0.6 direct probe: -sUSE_WEBGPU=1 → 'No longer supported; replaced by --use-port=emdawnwebgpu'",
+    "emdawnwebgpu port itself works on emcc 6.0.6 (trivial webgpu_cpp.h program compiles+links, 49,685B js)"
+  ],
+  "wasmArtifact": null,
+  "verdict": "BUILD GATE NOT PASSED — pipeline now exists and is reproducible (checkout 91s, 3 attempts 476s, well inside timeboxes), but Skia ToT's CanvasKit Graphite+Dawn wasm lane is hard-wired to the EOL emsdk 4.0.7 old-spec WebGPU path. Reaching a linked wasm requires upstream (or fork-level) migration of ~63 __EMSCRIPTEN__ guard sites + CK_ENABLE_WEBGPU wiring + JsValStore-free interop + an emscripten-toolchain dawn_cmake for target_os=wasm.",
+  "retryConditions": [
+    "Skia upstream migrates src/gpu/graphite/dawn __EMSCRIPTEN__ branches and CanvasKit webgpu bindings to emdawnwebgpu (watch modules/canvaskit + third_party/dawn for emdawnwebgpu adoption)",
+    "or reproduce on Skia's pinned emsdk 4.0.7 (rejected as default: EOL toolchain, diverges from the repo's emsdk 6.0.6 standard used by ink/libmypaint lanes, and still leaves CK_ENABLE_WEBGPU unwired + Mach-O dawn_combined poison to resolve)"
+  ],
+  "note": "Selective 24-pin DEPS sync + emsdk symlink is the reproducible recipe; sync script kept at scratchpad (sync_min_deps.py) and inlined in ADR lane row. No repo packages/ integration attempted per task scope (no linked wasm to measure)."
+}

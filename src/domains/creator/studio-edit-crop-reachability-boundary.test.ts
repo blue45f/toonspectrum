@@ -123,6 +123,14 @@ describe("Studio edit crop reachability boundary", () => {
     expect(availability).toContain("selectedImage: selected?.type === \"image\"");
   });
 
+  it("scopes crop/retouch preparation to the selected non-image layer when present", () => {
+    const page = source("./StudioPage.tsx");
+    expect(page).toContain("sourceIds: [selected.id]");
+    expect(page).toContain("선택 선화 편집 복사본");
+    expect(page).toContain("선택한 레이어만 원본 보존 래스터로 준비하고 있어요");
+    expect(page).toContain("includeBackground: false");
+  });
+
   it("keeps the left rail Crop button on the same availability gate", () => {
     const rail = source("./StudioLeftToolRail.tsx");
     expect(rail).toContain("const rasterRetouchCanStart =");

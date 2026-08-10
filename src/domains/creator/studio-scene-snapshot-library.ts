@@ -723,6 +723,48 @@ export function cloneStudioSceneSnapshot(
   return cloned;
 }
 
+/**
+ * V12 SQLite repositories store the exact IndexedDB record envelope rather than a renderer or
+ * browser-engine object. Keeping this codec beside the existing validators gives both backends one
+ * canonical, fail-closed data contract.
+ */
+export function serializeStudioSceneSnapshot(
+  snapshot: StudioSceneSnapshot,
+): string {
+  const record = recordFromSnapshot(snapshot);
+  if (!record) throw libraryError("invalid-entry", "Invalid scene snapshot.");
+  const canonical = snapshotFromStoredRecord(record);
+  if (!canonical) {
+    throw libraryError("invalid-entry", "Unable to canonicalize scene snapshot.");
+  }
+  return JSON.stringify(record);
+}
+
+export function parseCanonicalStudioSceneSnapshot(raw: string): StudioSceneSnapshot {
+  if (
+    typeof raw !== "string"
+    || raw.length === 0
+    || raw.length > STUDIO_SCENE_SNAPSHOT_MAX_BYTES + 1_000_000
+  ) {
+    throw libraryError("corrupt-data", "Invalid scene snapshot record size.");
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw libraryError("corrupt-data", "Invalid scene snapshot record JSON.");
+  }
+  const snapshot = snapshotFromStoredRecord(parsed);
+  if (!snapshot) {
+    throw libraryError("corrupt-data", "Invalid scene snapshot record.");
+  }
+  const canonical = serializeStudioSceneSnapshot(snapshot);
+  if (canonical !== raw) {
+    throw libraryError("corrupt-data", "Non-canonical scene snapshot record.");
+  }
+  return snapshot;
+}
+
 export function filterStudioSceneSnapshots(
   snapshots: readonly StudioSceneSnapshot[],
   query: string

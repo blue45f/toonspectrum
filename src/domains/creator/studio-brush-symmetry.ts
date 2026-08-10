@@ -1,7 +1,7 @@
 import type { StudioDynamicBrushDab } from "./studio-brush-dynamics";
 
 export interface StudioBrushSymmetrySpec {
-  type: "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope";
+  type: "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope" | "silk";
   centerX: number;
   centerY: number;
   radialCount?: number;
@@ -73,7 +73,12 @@ export function studioBrushSymmetryTransforms(
     return [{ ...IDENTITY }, aroundCenter(1, 0, 0, -1, centerX, centerY)];
   }
 
-  const count = radialCount(symmetry.radialCount);
+  // Silk generative: kaleidoscope family with denser default arms.
+  const count = radialCount(
+    symmetry.type === "silk"
+      ? (symmetry.radialCount ?? 8)
+      : symmetry.radialCount,
+  );
   const transforms: StudioBrushSymmetryTransform[] = [{ ...IDENTITY }];
   for (let index = 1; index < count; index++) {
     const angle = index * 2 * Math.PI / count;
@@ -81,7 +86,7 @@ export function studioBrushSymmetryTransforms(
     const sin = Math.sin(angle);
     transforms.push(aroundCenter(cos, sin, -sin, cos, centerX, centerY));
   }
-  if (symmetry.type === "kaleidoscope") {
+  if (symmetry.type === "kaleidoscope" || symmetry.type === "silk") {
     for (let index = 0; index < count; index++) {
       const axisAngle = index * Math.PI / count;
       const cos = Math.cos(2 * axisAngle);

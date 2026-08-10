@@ -404,6 +404,8 @@ describe("StudioDialogueBatchPanel EX-style structure editing", () => {
     }));
 
     const rubyInput = screen.getByLabelText("1페이지 선택 구간 루비 읽기");
+    // 한국 웹툰 스튜디오의 한자 독음 입력이므로 예시는 한글이어야 한다(일본어 예시 회귀 금지).
+    expect(rubyInput.getAttribute("placeholder")).toBe("예: 한자");
     fireEvent.change(rubyInput, { target: { value: "かんじ" } });
     const applyRuby = screen.getByRole("button", { name: "루비 달기" });
     fireEvent.pointerDown(applyRuby);

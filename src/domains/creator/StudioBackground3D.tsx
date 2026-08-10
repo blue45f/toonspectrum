@@ -70,26 +70,6 @@ import { createPortal, flushSync } from "react-dom";
 import * as THREE from "three";
 
 import {
-  admitStoredBg3dModelForRendering,
-  createStudioBg3dModelAttachment,
-  deleteStoredBg3dModel,
-  getStoredBg3dModel,
-  getStoredBg3dModelByHash,
-  importVerifiedBg3dModelsAtomically,
-  listBg3dModelLibraryEntries,
-  resolveBg3dModelHash,
-  type Bg3dModelImportItem,
-  type Bg3dModelLibraryEntry,
-  type Bg3dVerifiedStoredRecord,
-} from "./bg3d-model-library";
-import {
-  deleteBg3dTemplate,
-  instantiateBg3dTemplateDocument,
-  listBg3dTemplates,
-  saveBg3dTemplate,
-  type Bg3dTemplateLibraryEntry,
-} from "./bg3d-template-library";
-import {
   createStudioBg3dAiMethodReferenceCapture,
   type StudioBg3dAiMethodReferenceCapture,
 } from "./studio-3d-ai-reference-handoff";
@@ -245,11 +225,7 @@ import {
   type StudioBg3dLtUserPresetMutationResult,
   type StudioBg3dLtUserPresetMutationSuccess,
 } from "./studio-bg3d-lt-preset-library";
-import {
-  loadStudioBg3dLtUserPresetsFromStorage,
-  saveStudioBg3dLtUserPresetsToStorage,
-  type StudioBg3dLtPresetStorage,
-} from "./studio-bg3d-lt-preset-storage";
+import { getProductStudioBg3dLtPresetSqliteRepository } from "./studio-bg3d-lt-preset-repository-loader";
 import {
   STUDIO_BG3D_LT_BUILT_IN_PRESETS,
   STUDIO_BG3D_LT_PRESET_MAX_COUNT,
@@ -305,6 +281,19 @@ import {
   studioBg3dModalOperationCoordinator,
   type StudioBg3dModalSession,
 } from "./studio-bg3d-modal-operation-coordinator";
+import {
+  admitStoredBg3dModelForRenderingV12 as admitStoredBg3dModelForRendering,
+  createStudioBg3dModelAttachment,
+  deleteStoredBg3dModelV12 as deleteStoredBg3dModel,
+  getStoredBg3dModelV12 as getStoredBg3dModel,
+  getStoredBg3dModelByHashV12 as getStoredBg3dModelByHash,
+  importVerifiedBg3dModelsAtomicallyV12 as importVerifiedBg3dModelsAtomically,
+  listBg3dModelLibraryEntriesV12 as listBg3dModelLibraryEntries,
+  resolveBg3dModelHashV12 as resolveBg3dModelHash,
+  type Bg3dModelImportItem,
+  type Bg3dModelLibraryEntry,
+  type Bg3dVerifiedStoredRecord,
+} from "./studio-bg3d-model-library-loader";
 import {
   assertStudioBg3dModelPlacementAdmission,
   calculateStudioBg3dPlacedModelBytes,
@@ -507,6 +496,13 @@ import {
   type ResolveStudioBg3dSurfaceSnapInput,
 } from "./studio-bg3d-surface-snap";
 import {
+  deleteBg3dTemplateV12 as deleteBg3dTemplate,
+  instantiateBg3dTemplateDocument,
+  listBg3dTemplatesV12 as listBg3dTemplates,
+  saveBg3dTemplateV12 as saveBg3dTemplate,
+  type Bg3dTemplateLibraryEntry,
+} from "./studio-bg3d-template-library-loader";
+import {
   calculateStudioBg3dThreeReparentTransform,
   calculateStudioBg3dThreeWorldMatrix,
   calculateStudioBg3dThreeWorldDeltaTransform,
@@ -654,16 +650,17 @@ const VIEW_EDITOR_SECTIONS = [
   { id: "camera", label: "카메라 · 환경" },
   { id: "physics", label: "물리 배치" },
 ] as const satisfies readonly { id: ViewEditorSection; label: string }[];
-type LtUserPresetLibraryStatus = "idle" | "ready" | "recovered" | "unavailable";
+type LtUserPresetLibraryStatus =
+  | "idle"
+  | "ready"
+  | "saving"
+  | "memory-only";
 type LtUserPresetNoticeTone = "info" | "success" | "error";
 type LtUserPresetNotice = {
   readonly tone: LtUserPresetNoticeTone;
   readonly message: string;
 };
-/**
- * 캡처 어댑터와, 그 어댑터가 렌더에 쓰는 바로 그 카메라를 같은 스냅샷으로 묶는다. 캡처 프레임을
- * 적용하려면 어댑터가 렌더하는 카메라의 view 창을 정확히 같은 프레임으로 잡아야 한다.
- */
+/** Couples a capture adapter with the exact live camera whose view window it renders. */
 type CaptureState = {
   adapter: StudioBg3dCaptureAdapter | null;
   camera: THREE.Camera | null;
@@ -792,15 +789,6 @@ const EMPTY_THREE_MORPH_TARGETS: readonly StudioBg3dThreeMorphDescriptor[] = Obj
 
 let fallbackLtUserPresetIdSequence = 0;
 
-function getBrowserLtPresetStorage(): StudioBg3dLtPresetStorage | null {
-  if (typeof window === "undefined") return null;
-  try {
-    return window.localStorage;
-  } catch {
-    return null;
-  }
-}
-
 function fallbackLtUserPresetToken(): string {
   fallbackLtUserPresetIdSequence += 1;
   const randomWords = Array.from({ length: 4 }, () =>
@@ -809,11 +797,7 @@ function fallbackLtUserPresetToken(): string {
   return `fallback-${randomWords}-${fallbackLtUserPresetIdSequence.toString(36)}`;
 }
 
-/**
- * Generates a caller-owned stable id. Web Crypto is preferred; the non-security fallback combines
- * random words with a monotonic sequence and verifies every candidate against current ids. It
- * never derives identity from a mutable display name or from wall-clock time alone.
- */
+/** Generates a collision-checked stable id via Web Crypto or random words plus a sequence. */
 function generateLtUserPresetId(payload: StudioBg3dLtPresetPayload): string | null {
   const occupied = new Set([
     ...STUDIO_BG3D_LT_BUILT_IN_PRESETS.map((preset) => preset.id),
@@ -1548,12 +1532,7 @@ interface StudioBg3dBabylonSpecialistEntry {
 let studioBg3dBabylonSpecialistEntryPromise:
   Promise<StudioBg3dBabylonSpecialistEntry> | null = null;
 
-/**
- * The only Babylon production import boundary. It is deliberately invoked from the explicit
- * diagnostic action or an explicitly enabled Magic Layer insertion, never from modal mount,
- * render, hover/focus preload, or CaptureBridge. A rejected chunk load is evicted so the same user
- * action can retry after a transient failure.
- */
+/** Explicit-action-only Babylon import boundary; rejected chunk loads remain retryable. */
 function loadStudioBg3dBabylonSpecialistEntry():
   Promise<StudioBg3dBabylonSpecialistEntry> {
   const existing = studioBg3dBabylonSpecialistEntryPromise;
@@ -1774,10 +1753,7 @@ function SkyClearColorController({ clearColor }: { clearColor: string }) {
 
 type OrbitLike = { target?: THREE.Vector3; update?: () => void } | null;
 
-/* Canvas 내부에서 카메라/컨트롤을 잡아 줌·프리셋 같은 명령형 동작을 패널 오버레이(Canvas 밖 HTML 버튼)에
-   노출한다. target을 OrbitControls의 JSX prop으로 매 렌더 다시 넘기면(리터럴 배열은 매번 새 참조라
-   drei가 매 커밋마다 controls.target.set(...)을 호출) 사용자가 패닝한 뒤에도 다른 상태 변경(도형 이동 등)
-   때마다 시점이 원점으로 되돌아가 버린다. 그래서 초기 타깃/프리셋 적용은 전부 여기서 명령형으로만 수행한다. */
+/* Owns imperative camera/control updates so rerenders never reset the user's Orbit target. */
 function BgViewportController({ onReady }: { onReady: (api: BgViewportApi | null) => void }) {
   const camera = useThree((s) => s.camera);
   const controls = useThree((s) => s.controls) as OrbitLike;
@@ -1919,10 +1895,7 @@ function formatBg3dSunTime(hours: number): string {
   return `${String(wholeHours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
-/* 단면(Section) 컷 — 전역 renderer.clippingPlanes 하나로 SketchUp 단면 평면을 재현한다.
-   평면 수학은 studio-bg3d-section-plane.ts의 순수 함수가 담당하고, 여기서는 상태의 원시 필드만
-   의존성으로 삼아(객체 identity 아님) 실제 값이 바뀔 때만 렌더러에 반영한다. 언마운트/비활성 시
-   클리핑 배열을 비워 원상 복구한다 — 평면은 GPU 자원이 아니라 별도 dispose가 필요 없다. */
+/* Applies the pure section equation to renderer clipping state and clears it on teardown. */
 function applyBg3dSectionClippingPlanes(
   gl: THREE.WebGLRenderer,
   state: StudioBg3dSectionPlaneState,
@@ -1952,9 +1925,7 @@ function BgSectionPlaneController({ state }: { state: StudioBg3dSectionPlaneStat
   return null;
 }
 
-/* 160cm 인체 스케일 가이드 — SketchUp의 기준 인물처럼 벽·가구 크기를 즉시 가늠하게 하는
-   뷰포트 보조물. BgGroundHelper와 같은 캡처 제외 계약이라 씬 데이터·PNG/LT 결과물에는 절대
-   포함되지 않고, raycast를 비워 선택·표면 스냅을 가로채지 않는다. */
+/* 160cm non-captured, non-raycast scale guide for judging scene proportions. */
 const BG_SCALE_GUIDE_PARTS = buildStudioBg3dScaleGuideParts();
 
 function BgScaleGuide({ visible }: { visible: boolean }) {
@@ -2074,11 +2045,7 @@ interface BgPrimitiveMeshProps {
   children?: React.ReactNode;
 }
 
-/* 도형 하나의 렌더 — 셰이딩 채움 + 검은 엣지 오버레이를 항상 함께 그린다.
-   라인아트 모드에서도 채움 메시를 visible={false}로 숨기지 않고 unlit 흰색(meshBasicMaterial)으로만
-   바꾸는 게 핵심: 깊이쓰기가 계속 켜져 있어 (1) 가려진 도형의 엣지가 앞 도형에 정확히 가려지는
-   hidden-line-removal이 유지되고 (2) three.js/R3F가 invisible 오브젝트는 레이캐스트에서 제외하므로
-   라인아트 미리보기 중에도 클릭 선택이 계속 동작한다. */
+/* Keeps the fill mesh visible in line-art mode for hidden-line depth and raycast selection. */
 function BgPrimitiveMesh({ prim, geometryPool, lineArt, showEdges, selected, onSelect, onSurfacePick, onSurfacePreview, registerRef, children }: BgPrimitiveMeshProps) {
   const { geometry, edges } = geometryPool.get(prim.kind);
   const groupRef = useRef<THREE.Group>(null);
@@ -2698,11 +2665,7 @@ export function StudioBackground3D({
   const [primitives, setPrimitives] = useState<BgPrimitive[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [transformMode, setTransformMode] = useState<TransformModeId>("translate");
-  /**
-   * `null` preserves the editor's established mode-aware defaults: rotation uses local axes while
-   * move/scale use world axes. Once the user chooses a space, that explicit preference stays
-   * stable while switching tools and remains view-only (it never enters scene history).
-   */
+  /** Null keeps mode defaults; an explicit transform space is view-only and tool-stable. */
   const [transformSpaceOverride, setTransformSpaceOverride] =
     useState<TransformSpace | null>(null);
   const [lineArtPreview, setLineArtPreview] = useState(false);
@@ -2737,6 +2700,12 @@ export function StudioBackground3D({
   const [physicsError, setPhysicsError] = useState<string | null>(null);
   const [physicsPreviewRevision, setPhysicsPreviewRevision] = useState(0);
   const [ltEditorSection, setLtEditorSection] = useState<LtEditorSection>("line");
+  const [ltPresetPanelActivated, setLtPresetPanelActivated] = useState(false);
+  const [ltUserPresetRepository] = useState(
+    getProductStudioBg3dLtPresetSqliteRepository,
+  );
+  const ltUserPresetHydrationGenerationRef = useRef(0);
+  const ltUserPresetMutationGenerationRef = useRef(0);
   const [ltUserPresetPayload, setLtUserPresetPayload] = useState<StudioBg3dLtPresetPayload>(
     EMPTY_STUDIO_BG3D_LT_USER_PRESET_PAYLOAD
   );
@@ -3443,9 +3412,7 @@ export function StudioBackground3D({
                   ? "다른 3D 캡처가 진행 중입니다. 완료하거나 취소한 뒤 컷 배치 출력을 다시 실행해 주세요."
                   : null;
 
-  // This editor is portalled to document.body, so body is the nearest shared root that contains
-  // both the dialog and the Studio launcher. Setting it in an earlier layout effect satisfies the
-  // shared modal hook's rootRef contract before that hook activates focus isolation.
+  // The body root covers both the portalled dialog and launcher before focus isolation activates.
   useLayoutEffect(() => {
     modalRootRef.current = modalDialogRef.current?.ownerDocument.body ?? null;
   }, [open]);
@@ -3475,10 +3442,9 @@ export function StudioBackground3D({
     setPhysicsPhase(next);
   };
 
-  // 검증 로더가 성공 시점에 만든 자원 snapshot만 캐시가 소유한다. 언마운트/닫힘 때 loader.dispose를
-  // 호출하므로 공유 geometry/material/texture/ImageBitmap을 빠뜨리거나 두 번 해제하지 않는다.
+  // The cache owns only verified-loader snapshots and disposes each shared resource once.
   useEffect(() => {
-    if (!open) return;
+    if (!open || !modelsPanelActivated) return;
     componentActiveRef.current = true;
     const cache = modelRootCacheRef.current;
     const pending = modelLoadPendingRef.current;
@@ -3493,53 +3459,51 @@ export function StudioBackground3D({
       attachmentByStorageId.clear();
       storageIdByAttachment.clear();
     };
-  }, [open, setTemplateLibrary, setTemplateLibraryStatus]);
+  }, [modelsPanelActivated, open, setTemplateLibrary, setTemplateLibraryStatus]);
 
-  // 사용자 LT 프리셋은 장면 문서와 분리된 로컬 라이브러리다. 저장소가 차단되거나 손상돼도
-  // 3D 장면 복원/캡처를 막지 않고, 검증된 빈 payload로만 폴백한다.
+  // LT presets use fail-closed SQLite/OPFS authority with an explicit tab-memory fallback.
   useEffect(() => {
-    if (!open) return;
-    const storage = getBrowserLtPresetStorage();
+    if (!open || !ltPresetPanelActivated) return;
+    const hydrationGeneration = ltUserPresetHydrationGenerationRef.current + 1;
+    ltUserPresetHydrationGenerationRef.current = hydrationGeneration;
+    const mutationGeneration = ltUserPresetMutationGenerationRef.current;
+    let active = true;
     setLtPreferredPresetId(null);
     setLtManagedUserPresetId(null);
     setLtDeleteConfirmId(null);
     setLtUserPresetName("");
     setLtUserPresetDescription(DEFAULT_LT_USER_PRESET_DESCRIPTION);
-    if (!storage) {
-      setLtUserPresetPayload(EMPTY_STUDIO_BG3D_LT_USER_PRESET_PAYLOAD);
-      setLtUserPresetLibraryStatus("unavailable");
-      setLtUserPresetNotice({
-        tone: "error",
-        message: "브라우저 저장소를 사용할 수 없어 사용자 프리셋을 불러오지 못했습니다.",
-      });
-      return;
-    }
-
-    const loaded = loadStudioBg3dLtUserPresetsFromStorage(storage);
-    setLtUserPresetPayload(loaded.payload);
-    if (loaded.status === "unavailable") {
-      setLtUserPresetLibraryStatus("unavailable");
-      setLtUserPresetNotice({
-        tone: "error",
-        message: "브라우저 저장소 읽기가 차단되어 사용자 프리셋을 안전한 빈 상태로 열었습니다.",
-      });
-      return;
-    }
-    if (loaded.status === "recovered") {
-      setLtUserPresetLibraryStatus("recovered");
-      setLtUserPresetNotice({
-        tone: loaded.rewritten ? "info" : "error",
-        message: loaded.rewritten
-          ? loaded.quarantined
-            ? "손상된 프리셋 저장값을 격리하고 빈 라이브러리로 복구했습니다."
-            : "손상된 프리셋 저장값을 초기화했지만 백업 사본은 남기지 못했습니다."
-          : "손상된 프리셋은 무시했지만 저장소 복구가 완료되지 않았습니다.",
-      });
-      return;
-    }
-    setLtUserPresetLibraryStatus("ready");
+    setLtUserPresetPayload(EMPTY_STUDIO_BG3D_LT_USER_PRESET_PAYLOAD);
+    setLtUserPresetLibraryStatus("idle");
     setLtUserPresetNotice(null);
-  }, [open, setTemplateLibrary, setTemplateLibraryStatus]);
+
+    void ltUserPresetRepository.load().then((payload) => {
+      if (
+        !active ||
+        ltUserPresetHydrationGenerationRef.current !== hydrationGeneration ||
+        ltUserPresetMutationGenerationRef.current !== mutationGeneration
+      ) {
+        return;
+      }
+      setLtUserPresetPayload(payload);
+      setLtUserPresetLibraryStatus("ready");
+      setLtUserPresetNotice(null);
+    }).catch((cause: unknown) => {
+      if (!active || ltUserPresetHydrationGenerationRef.current !== hydrationGeneration) return;
+      setLtUserPresetPayload(EMPTY_STUDIO_BG3D_LT_USER_PRESET_PAYLOAD);
+      setLtUserPresetLibraryStatus("memory-only");
+      setLtUserPresetNotice({
+        tone: "error",
+        message: `SQLite/OPFS에서 LT 프리셋을 불러오지 못했습니다. 현재 탭 메모리 임시 · 새로고침 시 사라짐: ${cause instanceof Error ? cause.message : String(cause)}`,
+      });
+    });
+    return () => {
+      active = false;
+      if (ltUserPresetHydrationGenerationRef.current === hydrationGeneration) {
+        ltUserPresetHydrationGenerationRef.current += 1;
+      }
+    };
+  }, [ltPresetPanelActivated, ltUserPresetRepository, open]);
 
   // CSS 뷰포트, DPR, 포인터, 데이터 절약/기기 성능 신호를 명시적으로 수집해 순수 품질 정책에 전달한다.
   useEffect(() => {
@@ -3566,7 +3530,7 @@ export function StudioBackground3D({
 
   // 모델 라이브러리 목록은 모달이 열릴 때 한 번 읽어온다(VRM 포저의 listVrmLibraryEntries() 패턴과 동일).
   useEffect(() => {
-    if (!open) return;
+    if (!open || !modelsPanelActivated) return;
     const session = modalAssetSessionRef.current;
     if (!session) return;
     setModelLibraryStatus("loading");
@@ -3588,10 +3552,10 @@ export function StudioBackground3D({
           setModelLibraryStatus("error");
         });
       });
-  }, [open, setTemplateLibrary, setTemplateLibraryStatus]);
+  }, [modelsPanelActivated, open, setTemplateLibrary, setTemplateLibraryStatus]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !modelsPanelActivated) return;
     const session = modalAssetSessionRef.current;
     if (!session) return;
     setTemplateLibraryStatus("loading");
@@ -3607,11 +3571,9 @@ export function StudioBackground3D({
           setTemplateLibraryStatus("error");
         });
       });
-  }, [open, setTemplateLibrary, setTemplateLibraryStatus]);
+  }, [modelsPanelActivated, open, setTemplateLibrary, setTemplateLibraryStatus]);
 
-  // 신규 장면 문서는 hash로 검증 레코드를 찾고, admission→Three 안전 파서를 모두 통과한 뒤 runtime
-  // 배열로 hydrate한다. 실패한 모델 노드는 절대 저장 시 조용히 제거하지 않고 업데이트 자체를 잠근다.
-  // initialScene이 없을 때만 과거 PNG fragment를 읽어 하위 호환한다.
+  // Restore only hash-admitted models; failures lock updates, while legacy PNG needs no SceneIR.
   useEffect(() => {
     if (!open || !modelRenderer) return;
     const session = modalAssetSessionRef.current;
@@ -3793,7 +3755,7 @@ export function StudioBackground3D({
           try {
             const record = await getStoredBg3dModel(storageId);
             if (!record) throw new Error("missing-record");
-            const attachment = createStudioBg3dModelAttachment(record);
+            const attachment = await createStudioBg3dModelAttachment(record);
             await admitAndCacheModel({
               record,
               document: DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
@@ -3838,9 +3800,7 @@ export function StudioBackground3D({
     };
   }, [open, initialDataUrl, initialScene, modelRenderer]);
 
-  // 편집이 멈추면(디바운스) 스냅샷을 히스토리에 적재한다. 도형·커스텀 모델·장면 문서를 한 타임라인에
-  // 묶어 배경/조명/LT 설정도 도형과 같은 Ctrl+Z 계약을 따른다. 카메라 Orbit의 매 프레임 임시 시점은
-  // sceneBaseDocument에 쓰지 않으므로 히스토리를 과도하게 채우지 않는다.
+  // 편집이 멈추면(디바운스) scene snapshots unify edits but exclude transient Orbit views.
   useEffect(() => {
     if (isRestoringScene || isBatchRenderingShots) return;
     const timer = setTimeout(() => {
@@ -4044,10 +4004,7 @@ export function StudioBackground3D({
     return plan;
   };
 
-  // 씬 템플릿(교실/카페/거리 등 완성된 공간) 추가 — addComposite와 동일한 "추가 = 선택" UX.
-  // instantiateSceneTemplate이 이미 여러 프리셋/도형을 조합한 BgPrimitive[]를 통째로 돌려주므로,
-  // 그대로 append하고 첫 항목을 선택한다. undo/redo는 기존 디바운스 스냅샷 effect(§primitives 변화
-  // 감시)가 그대로 처리해 템플릿 하나를 통째로 추가해도 Ctrl+Z 한 번에 전부 되돌아간다.
+  // Append the whole template, select its first item, and undo it as one debounced snapshot.
   const addSceneTemplate = (templateId: string) => {
     const template = BG_SCENE_TEMPLATES.find((t) => t.id === templateId);
     if (!template) return;
@@ -4850,7 +4807,7 @@ export function StudioBackground3D({
       ?? parseStudioGeneric3dWorkflowMetadata(existingAttachment)?.classification
       ?? null;
     const attachment = withStudioGeneric3dWorkflowMetadata(
-      existingAttachment ?? createStudioBg3dModelAttachment(record),
+      existingAttachment ?? await createStudioBg3dModelAttachment(record),
       { sourceFormat, classification },
     );
     const live = physicsRuntimeSourceRef.current;
@@ -5126,7 +5083,7 @@ export function StudioBackground3D({
             ...live.primitives.map((primitive) => primitive.id),
             ...live.customModels.map((model) => model.id),
           ]);
-          const instantiated = instantiateBg3dTemplateDocument(
+          const instantiated = await instantiateBg3dTemplateDocument(
             entry.document,
             occupiedNodeIds,
             generateId,
@@ -5391,7 +5348,7 @@ export function StudioBackground3D({
             const sourceFormat =
               normalizeStudioGeneric3dSourceFormat(plannedSourceFormats[index] ?? "glb") ?? "glb";
             const attachment = withStudioGeneric3dWorkflowMetadata(
-              existing ?? createStudioBg3dModelAttachment(record),
+              existing ?? await createStudioBg3dModelAttachment(record),
               {
                 sourceFormat,
                 classification: genericModelClassifications.get(record.id) ?? null,
@@ -5540,10 +5497,7 @@ export function StudioBackground3D({
             deletePersistedModel: (storageModelId) =>
               deleteStoredBg3dModel(storageModelId, { signal: lease.signal }),
           });
-          // Do not check the lease after this await: IndexedDB completion is authoritative when a
-          // late abort loses the commit race. The coordinator keeps this destructive lane
-          // quarantined and commits the prepared reconciliation while this session remains current;
-          // a replacement session replays the durable deletion journal during restoration.
+          // A committed deletion is authoritative; reconcile it or replay its durable journal.
           if (!plan.ok) {
             removalPreflightFailed = true;
             throw new Error("scene-removal-preflight-failed");
@@ -5602,6 +5556,7 @@ export function StudioBackground3D({
 
   const handlePanelTabChange = (tab: BgPanelTab) => {
     if (tab === "models") setModelsPanelActivated(true);
+    if (tab === "lt") setLtPresetPanelActivated(true);
     setActivePanelTab(tab);
     if (panelScrollRef.current) panelScrollRef.current.scrollTop = 0;
   };
@@ -5621,18 +5576,34 @@ export function StudioBackground3D({
     result: StudioBg3dLtUserPresetMutationSuccess,
     successMessage: string
   ): boolean {
-    const storage = getBrowserLtPresetStorage();
-    if (!storage || !saveStudioBg3dLtUserPresetsToStorage(storage, result.canonicalJson)) {
-      setLtUserPresetLibraryStatus("unavailable");
+    const generation = ltUserPresetMutationGenerationRef.current + 1;
+    ltUserPresetMutationGenerationRef.current = generation;
+    setLtUserPresetPayload(result.payload);
+    setLtUserPresetLibraryStatus("saving");
+    setLtUserPresetNotice({ tone: "info", message: "SQLite/OPFS에 프리셋을 저장하는 중입니다." });
+    void ltUserPresetRepository.save(result.payload).then((persisted) => {
+      if (
+        !componentActiveRef.current ||
+        ltUserPresetMutationGenerationRef.current !== generation
+      ) {
+        return;
+      }
+      setLtUserPresetPayload(persisted);
+      setLtUserPresetLibraryStatus("ready");
+      setLtUserPresetNotice({ tone: "success", message: successMessage });
+    }).catch((cause: unknown) => {
+      if (
+        !componentActiveRef.current ||
+        ltUserPresetMutationGenerationRef.current !== generation
+      ) {
+        return;
+      }
+      setLtUserPresetLibraryStatus("memory-only");
       setLtUserPresetNotice({
         tone: "error",
-        message: "브라우저 저장소에 프리셋을 기록하지 못했습니다. 저장 공간과 사이트 권한을 확인해 주세요.",
+        message: `SQLite/OPFS 저장에 실패해 변경을 현재 탭 메모리에만 유지합니다. 현재 탭 메모리 임시 · 새로고침 시 사라짐: ${cause instanceof Error ? cause.message : String(cause)}`,
       });
-      return false;
-    }
-    setLtUserPresetPayload(result.payload);
-    setLtUserPresetLibraryStatus("ready");
-    setLtUserPresetNotice({ tone: "success", message: successMessage });
+    });
     return true;
   }
 
@@ -5879,12 +5850,7 @@ export function StudioBackground3D({
     setError(null);
   }
 
-  /**
-   * 렌즈/투영 계열 카메라 편집의 단일 경로. 현재 라이브 시점을 먼저 읽어 문서 카메라와 동기화한
-   * 뒤 패치를 얹는다 — 그래야 fov만 바꿔도 저장돼 있던 옛 position으로 시점이 튀지 않는다.
-   * 투영 전환은 R3F 기본 카메라를 재마운트하므로 applyOrDeferStudioBg3dHistoryCamera가
-   * undo/redo와 동일한 지연 적용 계약으로 처리한다.
-   */
+  /** Camera-lens edits patch the live view; projection remounts reuse deferred history apply. */
   function cameraLensInteractionLocked(): boolean {
     return (
       captureInFlightRef.current ||
@@ -6873,9 +6839,7 @@ export function StudioBackground3D({
         try {
           archive = await buildStudioBg3dShotBatchArchiveInWorker(images, archiveOptions);
         } catch (cause) {
-          // The ready handshake guarantees no caller-owned Blob reached the Worker in this case,
-          // so a single bounded main-thread build is safe. Once ready, every failure is terminal:
-          // retrying could duplicate expensive work or conceal a protocol/integrity violation.
+          // Before Worker readiness, one bounded main-thread retry is safe; later failures are terminal.
           if (!isStudioBg3dShotBatchWorkerUnavailableError(cause)) throw cause;
           archive = await buildStudioBg3dShotBatchArchive(images, archiveOptions);
         }
@@ -7070,9 +7034,7 @@ export function StudioBackground3D({
     deleteSelectedRef.current = deleteSelectedEntity;
   });
 
-  // 키보드 단축키: T/R/S 변환 모드, ⌘/Ctrl+Z(+Shift) undo/redo, Delete/Backspace 삭제,
-  // Escape와 Tab 포커스 루프는 useStudioModalSheet가 전담한다. 숫자 입력 필드가 있으므로
-  // 편집 중에는 캔버스 단축키만 무시한다.
+  // 키보드 단축키: skip text editing; the modal hook owns Escape and Tab focus behavior.
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -7167,9 +7129,7 @@ export function StudioBackground3D({
   }
 
   function requestUserClose() {
-    // The header sits outside the inert editor grid, so the ref is the synchronous authority for
-    // clicks that can arrive before React commits capture/delete UI state. Successful insertion
-    // closes via `onClose` directly after its transaction has completed.
+    // The synchronous guard covers header clicks that precede capture/delete state commits.
     const thumbnailLease = modelThumbnailGpuLeaseRef.current;
     if (thumbnailLease) {
       const session = modalAssetSessionRef.current;
@@ -7249,9 +7209,7 @@ export function StudioBackground3D({
     setLineArtPreview(false);
     setIsCapturing(true);
     try {
-      // The asset writer is needed only after an explicit user save. Keep it outside the 3D
-      // editor activation graph, while the synchronous capture guard above prevents a second
-      // save or modal close during the bounded chunk load.
+      // Load the asset writer only on explicit save while the capture guard excludes re-entry.
       const { saveAsset } = await import("./studio-asset-library");
       const captureAdapter = await acquireStudioBg3dCaptureAdapterAfterViewTransition({
         isActive: () => componentActiveRef.current,
@@ -7670,8 +7628,7 @@ export function StudioBackground3D({
 
       const sourceSize = await getStudioBg3dCaptureSourceSize(captureAdapter);
       if (!isInsertCurrent() || captureAdapterIsStale()) return;
-      // 캡처 비율은 뷰포트 캔버스 크기가 아니라 문서가 소유한 값에서 나온다. 값이 없는(레거시)
-      // 문서만 예전처럼 뷰포트 비율을 그대로 따르고, 그때 프레임은 뷰포트 전체와 정확히 같다.
+      // The document owns capture aspect; legacy documents retain the full viewport ratio.
       const captureFrame = resolveStudioBg3dCaptureFrame({
         viewportWidth: sourceSize.width,
         viewportHeight: sourceSize.height,
@@ -7680,9 +7637,7 @@ export function StudioBackground3D({
       if (!captureFrame) {
         throw new Error("LT capture frame admission failed.");
       }
-      // HiDPI 화면에서 프리뷰(디바이스 픽셀 밀도 렌더)와 삽입 결과의 선명도가 일치하도록
-      // exportHeight에 dpr(1..3 클램프)만 곱한다 — 슈퍼샘플은 LT 주선/톤이 px 단위라 룩이
-      // 변해 의도적으로 제외. 픽셀 예산·4096 edge 캡은 resolveStudioBg3dLtCaptureSize가 지킨다.
+      // Clamp DPR to 1..3; the size resolver enforces pixel and 4096-edge budgets.
       const captureDensity = Math.min(3, Math.max(1, globalThis.devicePixelRatio || 1));
       const captureSize = resolveStudioBg3dLtCaptureSize({
         sourceWidth: sourceSize.width,
@@ -7710,9 +7665,7 @@ export function StudioBackground3D({
           adapted.document.camera,
           captureFrame,
         );
-      // 프레임이 뷰포트와 다를 때만 카메라 view 창을 잡는다(렌즈 시프트와 선형 합성). 크롭 없는
-      // 자동 경로에서는 카메라를 아예 건드리지 않아 예전 결과와 완전히 동일하다. 크롭이 필요한데
-      // 카메라를 못 잡으면 늘어난 그림을 삽입하는 대신 실패한다(fail-closed).
+      // Apply a camera view offset only for crop frames and fail closed if it cannot be acquired.
       const releaseCaptureFrameViewOffset = applyStudioBg3dCaptureFrameViewOffset(
         captureRef.current.adapter === captureAdapter ? captureRef.current.camera : null,
         captureFrame,
@@ -9973,9 +9926,7 @@ export function StudioBackground3D({
                   </div>
                 ) : null}
 
-                {/* 세이프 프레임: 삽입될 사각형을 그대로 그리고, 잘려 나갈 영역을 레터/필러박스로
-                    덮는다. 캡처와 같은 순수 함수에서 나오므로 화면과 결과가 어긋날 수 없다.
-                    pointer-events-none이라 Orbit·선택 히트테스트에는 전혀 관여하지 않는다. */}
+                {/* Capture-derived, pointer-transparent safe frame and crop mask. */}
                 {!effectiveIsQuadView && !isCapturing && viewportBoxSize && ltCaptureSafeFrame ? (
                   <div className="pointer-events-none absolute inset-0 z-20" aria-hidden="true">
                     <div

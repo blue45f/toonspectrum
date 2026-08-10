@@ -70,7 +70,7 @@ export function StudioVrmCharacterLibraryPanel({
   );
   const visibleEntries = filteredEntries.slice(0, visibleCount);
   const hiddenEntryCount = Math.max(0, filteredEntries.length - visibleEntries.length);
-  const hasUploadedModels = entries.some((entry) => entry.source === "indexed-db");
+  const hasUploadedModels = entries.some((entry) => entry.source !== "sample");
 
   return (
     <section
@@ -291,12 +291,16 @@ export function StudioVrmCharacterLibraryPanel({
                       isActive ? "bg-accent text-on-accent" : "bg-raised text-fg-3",
                     )}
                   >
-                    {entry.source === "sample" ? "번들" : "업로드"}
+                    {entry.source === "sample"
+                      ? "번들"
+                      : entry.source === "memory"
+                        ? "현재 탭 임시"
+                        : "SQLite/OPFS"}
                   </span>
                 </span>
               </button>
 
-              {entry.source === "indexed-db" ? (
+              {entry.source !== "sample" ? (
                 <button
                   type="button"
                   aria-label={`${entry.name} 삭제`}

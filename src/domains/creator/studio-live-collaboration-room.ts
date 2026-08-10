@@ -476,6 +476,13 @@ export class StudioLiveRoom {
       pageId: patch.pageId === undefined ? this.presence.pageId : patch.pageId,
       ...(tool === undefined ? {} : { tool }),
     };
+    if (
+      next.visibility === this.presence.visibility &&
+      next.pageId === this.presence.pageId &&
+      next.tool === this.presence.tool
+    ) {
+      return;
+    }
     // Envelope creation is also the runtime validator for UI-derived page ids.
     createStudioLiveEnvelope({
       workId: this.workId,
@@ -485,13 +492,6 @@ export class StudioLiveRoom {
       kind: "presence:heartbeat",
       payload: next,
     });
-    if (
-      next.visibility === this.presence.visibility &&
-      next.pageId === this.presence.pageId &&
-      next.tool === this.presence.tool
-    ) {
-      return;
-    }
     this.presence = next;
     if (this.ready) this.sendPresence("presence:heartbeat");
   }

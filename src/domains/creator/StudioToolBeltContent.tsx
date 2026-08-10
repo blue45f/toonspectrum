@@ -445,6 +445,12 @@ export type FxPickerSection =
   | "overlay";
 
 export interface StudioToolBeltContentHandlers {
+  /**
+   * 선택/그리기 전환의 단일 정본. 진행 중인 획 취소 → 픽셀 도구 disarm(스포이드 포함) →
+   * tool/drawMode 커밋을 한 순서로 수행한다. 도구 벨트가 setTool/setDrawMode를 직접 만지면
+   * 같은 명령이 진입점마다 다른 부수효과를 갖게 되므로 항상 이 핸들러를 거친다.
+   */
+  activatePrimaryCanvasTool: (tool: "select" | "draw", drawMode?: DrawMode) => void;
   openFrameAnimationForSelected: () => void;
   addBgScene: (bg: StudioBgScene) => void;
   addBubble: (
@@ -781,7 +787,6 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
     setColor,
     setCommentsOpen,
     setContinuityOpen,
-    setDrawMode,
     setHistoryPanelOpen,
     setLeftPanelOpen,
     setMannequinPoserOpen,
@@ -795,7 +800,6 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
     setTeamPanelOpen,
     setTimelapseOpen,
     setTimelineOpen,
-    setTool,
     setZoom,
     sharedDocument,
     teamPanelOpen,
@@ -808,10 +812,10 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
     stableHandlers,
   } = props;
   const {
+    activatePrimaryCanvasTool,
     addDiagonalSplit,
     addFrame,
     addText,
-    disarmAllPixelTools,
     ensureRecentColorsLoaded,
     enterCanvasOnlyMode,
     fitCanvasToWidth,
@@ -979,8 +983,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
           <button
             type="button"
             onClick={() => {
-              disarmAllPixelTools();
-              setTool("select");
+              activatePrimaryCanvasTool("select");
               setMenu(null);
             }}
             className={toolBtn(tool === "select")}
@@ -998,9 +1001,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
             type="button"
             disabled={activeSurfaceReviewLocked}
             onClick={() => {
-              disarmAllPixelTools();
-              setTool("draw");
-              setDrawMode("pen");
+              activatePrimaryCanvasTool("draw", "pen");
               setMenu(null);
             }}
             className={cn(toolBtn(tool === "draw" && drawMode === "pen"), "disabled:cursor-not-allowed disabled:opacity-40")}
@@ -1018,9 +1019,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
             type="button"
             disabled={activeSurfaceReviewLocked}
             onClick={() => {
-              disarmAllPixelTools();
-              setTool("draw");
-              setDrawMode("eraser");
+              activatePrimaryCanvasTool("draw", "eraser");
               setMenu(null);
             }}
             className={cn(toolBtn(tool === "draw" && drawMode === "eraser"), "disabled:cursor-not-allowed disabled:opacity-40")}

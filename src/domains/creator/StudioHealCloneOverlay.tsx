@@ -1,8 +1,9 @@
 /**
  * Studio Heal/Clone Overlay — 복구 브러시/도장의 소스 앵커 크로스헤어 + 진행 중 스트로크 미리보기
  * (Konva). StudioPerspectiveOverlay.tsx 와 동일한 이유로 lazy-load 하지 않고 일반 import 로 쓴다
- * (react-konva 는 Stage 트리 밖으로 포탈될 수 없다). 상태 없는 순수 프레젠테이션(fully-controlled,
- * StudioPage 가 좌표를 소유) — listening=false, 포인터는 Stage 핸들러가 처리한다.
+ * (react-konva 는 Stage 트리 밖으로 포탈될 수 없다). 정적 앵커와 최초 점은 React가 그리고,
+ * 진행 중인 선은 StudioPage가 전달한 Konva ref로 직접 갱신한다. listening=false라 포인터는 Stage
+ * 핸들러가 계속 처리하며, 매 move마다 Studio 루트를 다시 렌더하지 않는다.
  *
  * 여기 없는 것(의도적): 포인터를 실시간으로 따라다니는 호버 브러시 원 + 소스 크로스헤어는
  * ref-mutated(브러시 도구의 brushCursorRef 기법)라 이 컴포넌트의 "완전히 상태로만 제어됨" 순수성을
@@ -13,13 +14,14 @@ import { Circle as KCircle, Group, Line } from "react-konva/lib/ReactKonvaCore";
 import { brushStrokePreview, type SelectionFrame, type SelPoint } from "./studio-selection-tools";
 
 import type { HealCloneMode } from "./studio-heal-clone";
-import type { ReactElement } from "react";
+import type { Line as KonvaLine } from "konva/lib/shapes/Line";
+import type { ReactElement, RefObject } from "react";
 
 export type StudioHealCloneOverlayProps = {
   frame: SelectionFrame;
   scale: number; // effScale
   sourceAnchor: SelPoint | null; // 정적 마커
-  drag: { points: SelPoint[] } | null; // RAF 스로틀된 진행 중 스트로크, pixelDragPreview 와 동일 형태
+  drag: { points: SelPoint[]; lineRef?: RefObject<KonvaLine | null> } | null;
   radiusPx: number; // 표시 px — brushStrokePreview 의 radiusNorm 변환은 이 컴포넌트(호출자)가 한다
   mode: HealCloneMode;
 };
@@ -61,6 +63,7 @@ export function StudioHealCloneOverlay({
       )}
       {strokePreview && (
         <Line
+          ref={drag?.lineRef}
           points={strokePreview.points}
           stroke={STROKE_COLORS[mode]}
           strokeWidth={strokePreview.strokeWidth}

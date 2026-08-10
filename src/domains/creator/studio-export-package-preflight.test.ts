@@ -3,14 +3,18 @@ import { describe, expect, it } from "vitest";
 import {
   mmToPxAtDpi,
   planStudioExportDialogueTxt,
+  planStudioExportPrintGeometry,
   preflightStudioExportPackage,
   pxToMmAtDpi,
   recommendExportScaleForPrint,
   resolveStudioExportPageRange,
   STUDIO_EXPORT_BLEED_MM_RANGE,
   STUDIO_EXPORT_DPI_RANGE,
+  STUDIO_EXPORT_MAX_CANVAS_DIM,
+  STUDIO_EXPORT_MAX_CANVAS_PIXELS,
   STUDIO_EXPORT_TRIM_MM_RANGE,
   studioExportGeometryPreset,
+  studioExportMaxSafeScale,
   validateStudioExportGeometry,
 } from "./studio-export-package-preflight";
 
@@ -274,5 +278,131 @@ describe("planStudioExportDialogueTxt / preflightStudioExportPackage", () => {
     });
     expect(emptyDialogue.canExport).toBe(false);
     expect(emptyDialogue.errors.some((issue) => issue.code === "DIALOGUE_TXT_EMPTY")).toBe(true);
+  });
+});
+
+describe("studioExportMaxSafeScale", () => {
+  it("bounds scale by canvas side and pixel-area budget, not by the 1–3 button row", () => {
+    expect(STUDIO_EXPORT_MAX_CANVAS_DIM).toBe(16_384);
+    expect(STUDIO_EXPORT_MAX_CANVAS_PIXELS).toBe(100_000_000);
+
+    // 720×1080 webtoon page: 11.34× before the area budget bites — the 3× cap was never a
+    // safety limit for this canvas.
+    expect(studioExportMaxSafeScale({ canvasWidthPx: 720, canvasHeightPx: 1080 })).toBeCloseTo(11.34, 2);
+
+    // A tall page is bounded by the 16384 px side limit instead.
+    expect(
+      studioExportMaxSafeScale({ canvasWidthPx: 200, canvasHeightPx: 8000 })
+    ).toBeCloseTo(2.04, 2);
+  });
+});
+
+describe("planStudioExportPrintGeometry", () => {
+  const a4 = {
+    canvasWidthPx: 720,
+    canvasHeightPx: 1080,
+    dpi: 300,
+    trimWidthMm: 210,
+    trimHeightMm: 297,
+    bleedMm: 3,
+  };
+
+  it("reports the DPI the current scale really delivers instead of the requested one", () => {
+    const plan = planStudioExportPrintGeometry({ ...a4, exportScale: 3 });
+    expect(plan).not.toBeNull();
+    // Output box = trim + bleed on every side.
+    expect(plan!.outputWidthMm).toBe(216);
+    expect(plan!.outputHeightMm).toBe(303);
+    expect(plan!.requiredWidthPx).toBe(2552);
+    expect(plan!.requiredHeightPx).toBe(3579);
+    // 3× is 2160×3240 px — 254 DPI against a 216×303 mm sheet, not 300.
+    expect(plan!.currentWidthPx).toBe(2160);
+    expect(plan!.currentHeightPx).toBe(3240);
+    expect(Math.round(plan!.currentDpi)).toBe(254);
+    expect(plan!.meetsTargetDpi).toBe(false);
+    expect(plan!.issue?.code).toBe("PRINT_DPI_BELOW_TARGET");
+    expect(plan!.issue?.severity).toBe("error");
+    expect(plan!.issue?.message).toContain("254DPI");
+    expect(plan!.issue?.message).toContain("300DPI");
+  });
+
+  it("recommends the exact scale that reaches the target instead of clamping to 3×", () => {
+    const plan = planStudioExportPrintGeometry({ ...a4, exportScale: 3 })!;
+    // The legacy button-row recommender silently clamps this to 3× (261 DPI).
+    expect(
+      recommendExportScaleForPrint({
+        canvasWidthPx: 720,
+        canvasHeightPx: 1080,
+        trimWidthMm: 210,
+        trimHeightMm: 297,
+        dpi: 300,
+      })
+    ).toBe(3);
+    expect(plan.neededScale).toBeGreaterThan(3);
+    expect(plan.recommendedScale).toBe(3.55);
+    expect(plan.recommendedWidthPx).toBe(2556);
+    expect(plan.recommendedHeightPx).toBe(3834);
+    expect(plan.recommendedDpi).toBeGreaterThanOrEqual(300);
+    expect(plan.reachable).toBe(true);
+  });
+
+  it("clears the issue once the recommended scale is applied", () => {
+    const plan = planStudioExportPrintGeometry({ ...a4, exportScale: 3.55 })!;
+    expect(plan.meetsTargetDpi).toBe(true);
+    expect(plan.issue).toBeNull();
+    expect(Math.round(plan.currentDpi)).toBe(301);
+  });
+
+  it("blocks with the required canvas size when the target is out of reach", () => {
+    const plan = planStudioExportPrintGeometry({
+      canvasWidthPx: 4000,
+      canvasHeightPx: 4000,
+      dpi: 600,
+      trimWidthMm: 500,
+      trimHeightMm: 500,
+      exportScale: 1,
+    })!;
+    expect(plan.reachable).toBe(false);
+    expect(plan.issue?.code).toBe("PRINT_DPI_UNREACHABLE");
+    expect(plan.issue?.severity).toBe("error");
+    expect(plan.issue?.message).toContain("4000×4000px");
+    expect(plan.requiredCanvasWidthPx).toBeGreaterThan(4000);
+    expect(plan.issue?.message).toContain(`${plan.requiredCanvasWidthPx}×${plan.requiredCanvasHeightPx}px`);
+  });
+
+  it("never recommends a downscale when the canvas already exceeds the target", () => {
+    const plan = planStudioExportPrintGeometry({
+      canvasWidthPx: 4000,
+      canvasHeightPx: 6000,
+      dpi: 300,
+      trimWidthMm: 210,
+      trimHeightMm: 297,
+      bleedMm: 3,
+      exportScale: 1,
+    })!;
+    expect(plan.neededScale).toBeLessThan(1);
+    expect(plan.recommendedScale).toBe(1);
+    expect(plan.meetsTargetDpi).toBe(true);
+    expect(plan.issue).toBeNull();
+  });
+
+  it("surfaces how far the printed page overruns the output box", () => {
+    const plan = planStudioExportPrintGeometry({ ...a4, exportScale: 3.55 })!;
+    // 720×1080 is taller than 216×303 mm, so height overflows while width lands on the box.
+    expect(plan.overflowWidthMm).toBeCloseTo(0, 1);
+    expect(plan.overflowHeightMm).toBeGreaterThan(10);
+  });
+
+  it("returns null when there is no print geometry to plan", () => {
+    expect(
+      planStudioExportPrintGeometry({
+        canvasWidthPx: 720,
+        canvasHeightPx: 1080,
+        dpi: 72,
+        trimWidthMm: 0,
+        trimHeightMm: 0,
+        exportScale: 2,
+      })
+    ).toBeNull();
   });
 });

@@ -19,7 +19,9 @@ export const STUDIO_COLOR_VISION_HINTS = {
     id: "color-vision:grayscale",
     title: "흑백 명암 보기",
     description: "색을 제거한 화면으로 밝고 어두운 값의 구분과 인물·배경의 명암 대비를 확인합니다. 원본 색은 보존됩니다.",
-    shortcut: "Q",
+    // 2026-08-08: 단독 `Q` 는 퀵 마스크가 가져갔다(conflict `q-quickmask-vs-grayscale`).
+    // 힌트·메뉴 배지·보기 리졸버가 같은 값을 말해야 하므로 여기도 `⌥Q`.
+    shortcut: "⌥Q",
     preview: "color-vision",
     previewVariant: "grayscale",
     tip: "중요한 인물과 말풍선이 배경에 묻히지 않는지 먼저 확인하세요.",

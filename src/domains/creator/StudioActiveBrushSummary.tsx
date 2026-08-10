@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactElement, type ReactNode } from "react";
 
+import { resolveStudioBrushBehaviorPresentation } from "./studio-brush-behavior-ui";
 import {
   studioCoreBrushCatalogItemById,
   studioBrushCatalogKindLabel,
@@ -121,6 +122,7 @@ export function StudioActiveBrushSummary({
         ? "세부 정보 지연"
         : "정보 불러오는 중"
       : studioBrushTipLabel(null);
+  const behavior = resolveStudioBrushBehaviorPresentation(brushId);
   const calligraphy = catalogItem?.previewStyle === "calligraphy";
 
   useEffect(() => {
@@ -141,10 +143,12 @@ export function StudioActiveBrushSummary({
   return (
     <div
       data-studio-active-brush-summary="true"
+      data-studio-brush-behavior={behavior.kind}
       data-studio-brush-metadata-state={
         needsProMetadata ? (metadataFailed ? "error" : catalogItem ? "loaded" : "loading") : "ready"
       }
       aria-busy={needsProMetadata && !metadataFailed && !catalogItem ? true : undefined}
+      title={behavior.hintKo}
       className={cn(
         "flex min-w-0 items-center gap-2 rounded-xl border border-line/70 bg-card/75 p-2",
         className,
@@ -171,6 +175,17 @@ export function StudioActiveBrushSummary({
           </span>
         </span>
         <span className="mt-1 flex min-w-0 flex-wrap items-center gap-1 text-[0.6rem] leading-none text-fg-3">
+          <span
+            className={cn(
+              "rounded-md px-1.5 py-1 font-semibold",
+              behavior.kind === "wash"
+                ? "bg-accent-soft text-accent"
+                : "bg-raised text-fg-2",
+            )}
+            data-studio-brush-behavior-chip={behavior.kind}
+          >
+            {behavior.labelKo}
+          </span>
           <span className="rounded-md bg-raised px-1.5 py-1 font-semibold text-fg-2">
             {mediaLabel} · {tipLabel}
           </span>

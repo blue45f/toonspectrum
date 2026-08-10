@@ -1,0 +1,67 @@
+{
+  "harness": "tests/benchmarks/harness/quality-lab.ts",
+  "generatedAt": "2026-08-07T14:56:30.050Z",
+  "host": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpu": "Apple M2 Max",
+    "node": "v24.16.0"
+  },
+  "references": {
+    "downscale": "float box-average reduction (engine-independent)",
+    "blur": "separable float gaussian, radius 4 sigma, clamp edges"
+  },
+  "downscale2048to512": [
+    {
+      "candidate": "nearest-floor",
+      "psnrDb": 13.92,
+      "ssim": 0.7918,
+      "wallMs": 3.18,
+      "artifact": "downscale-nearest-floor.png"
+    },
+    {
+      "candidate": "canvaskit-cubic-mitchell",
+      "psnrDb": 23.78,
+      "ssim": 0.9768,
+      "wallMs": 30.03,
+      "artifact": "downscale-canvaskit-cubic-mitchell.png"
+    },
+    {
+      "candidate": "canvaskit-linear-nomips",
+      "psnrDb": 25.31,
+      "ssim": 0.9834,
+      "wallMs": 14.96,
+      "artifact": "downscale-canvaskit-linear-nomips.png"
+    },
+    {
+      "candidate": "wasm-vips-lanczos3",
+      "psnrDb": 27.26,
+      "ssim": 0.9887,
+      "wallMs": 123.64,
+      "artifact": "downscale-wasm-vips-lanczos3.png"
+    }
+  ],
+  "gaussianBlurSigma4": [
+    {
+      "candidate": "canvaskit-imagefilter",
+      "psnrDb": 47.94,
+      "ssim": 0.9874,
+      "wallMs": 29.53,
+      "artifact": "blur-canvaskit-imagefilter.png"
+    },
+    {
+      "candidate": "opencv-gaussian",
+      "psnrDb": 36.58,
+      "ssim": 0.9701,
+      "wallMs": 42.08,
+      "artifact": "blur-opencv-gaussian.png"
+    },
+    {
+      "candidate": "wasm-vips-gaussblur",
+      "psnrDb": 43.93,
+      "ssim": 0.9687,
+      "wallMs": 97.01,
+      "artifact": "blur-wasm-vips-gaussblur.png"
+    }
+  ]
+}

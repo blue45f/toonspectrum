@@ -1,7 +1,7 @@
 /**
  * Studio 스톡 사진 검색 — BYOK(Bring Your Own Key) Unsplash API 클라이언트.
  *
- * studio-ai-client.ts와 **동일한 아키텍처 원칙**(localStorage에만 키 저장·throw하지 않는 Result
+ * studio-ai-client.ts와 **동일한 아키텍처 원칙**(sessionStorage에만 키 저장·throw하지 않는 Result
  * 계약·키 미설정 시 fetch 자체를 호출하지 않음)을 따르되, 벤더 중립(OpenAI 호환) 설계는 아니다 —
  * Unsplash Search Photos API(`GET /search/photos`, `Authorization: Client-ID {ACCESS_KEY}` 헤더,
  * `{ errors: string[] }` 에러 응답)는 다른 스톡 사진 서비스(Pexels·Pixabay 등)와 공유하는 업계
@@ -11,7 +11,7 @@
  * Key 하나만 입력한다.
  *
  * **서버를 거치지 않는다** — Access Key는 이 앱 백엔드로 절대 전송되지 않고 브라우저
- * localStorage에만 저장되며, fetch도 브라우저 → Unsplash로 직접 나간다("$0 서버비용" 원칙과 일치 —
+ * 현재 탭의 sessionStorage에만 저장되며, fetch도 브라우저 → Unsplash로 직접 나간다("$0 서버비용" 원칙과 일치 —
  * 사용자가 자기 키로 자기 무료 할당량을 쓴다). 코드 어디에도 Access Key를 하드코딩하지 않는다.
  *
  * 순수 로직이다(DOM/Konva 의존 없음, 결정적) — 유일한 예외는 맨 아래 `inlineStockPhotoForCanvas`
@@ -50,7 +50,7 @@
 // ── 설정 저장 ──────────────────────────────────────────────────────────────
 
 /**
- * localStorage 호환 인터페이스 — studio-ai-client.ts의 `StudioAiStorage`와 구조가 동일한 DI
+ * Web Storage 호환 인터페이스 — studio-ai-client.ts의 `StudioAiStorage`와 구조가 동일한 DI
  * 패턴이지만, 의도적으로 **독립된 타입**이다(studio-ai-client.ts를 import하지 않는다) — 두 BYOK
  * 기능(AI 어시스트 / 스톡 사진 검색)을 코드 레벨에서도 완전히 분리해 두어, 한쪽을 건드려도 다른
  * 쪽이 영향받지 않게 한다.
@@ -58,10 +58,12 @@
 export interface StudioStockImageStorage {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
+  removeItem(key: string): void;
 }
 
 /**
- * studio-ai-client.ts의 "toonspectrum-studio-ai-settings"와 나란한 네임스페이스이되 별도 키.
+ * studio-ai-client.ts와 독립된 sessionStorage 키. 같은 문자열의 과거 localStorage 값은
+ * 보안상 자동 마이그레이션하지 않고 설정 패널 마운트 시 명시적으로 폐기한다.
  * 값은 JSON이 아니라 원문 Access Key 문자열 그대로 저장한다 — 저장할 필드가 이거 하나뿐이라 JSON
  * 래핑(및 필드별 관대한 폴백 파싱)이 불필요한 의례이기 때문이다(studio-ai-client.ts의 다중 필드
  * 설정 객체와의 유일한 구조적 차이 — §5 대신 통합 설계 문서의 "설계 결정" 절 참고).
@@ -78,7 +80,7 @@ export function loadStudioStockImageAccessKey(storage: StudioStockImageStorage |
   }
 }
 
-/** 저장 — 실패(쿼터 초과·시크릿 모드 등)는 조용히 무시한다(studio-ai-client.ts saveStudioAiSettings와 동일 정책). */
+/** 현재 탭 세션 저장 — 실패(쿼터 초과·시크릿 모드 등)는 조용히 무시한다. */
 export function saveStudioStockImageAccessKey(
   storage: StudioStockImageStorage | null | undefined,
   accessKey: string
@@ -88,6 +90,18 @@ export function saveStudioStockImageAccessKey(
     storage.setItem(STUDIO_STOCK_IMAGE_ACCESS_KEY_STORAGE_KEY, accessKey);
   } catch {
     // 무시.
+  }
+}
+
+/** 과거 영구 localStorage 자격 증명을 값 읽기 없이 폐기한다. */
+export function discardLegacyStudioStockImageAccessKey(
+  storage: StudioStockImageStorage | null | undefined,
+): void {
+  if (!storage) return;
+  try {
+    storage.removeItem(STUDIO_STOCK_IMAGE_ACCESS_KEY_STORAGE_KEY);
+  } catch {
+    // Legacy cleanup failure must not break the settings surface.
   }
 }
 

@@ -41,6 +41,13 @@ import {
   resolveStudioDynamicBrushCoverageBudgetContract,
   type StudioDynamicBrushSegmentedDabVariation,
 } from "./studio-dynamic-brush-coverage-renderer";
+import { resolveStudioPaperBrushResponse } from "./studio-paper-brush-response";
+import {
+  resolveStudioDocumentPaperSurface,
+  studioPaperGranulationIsActive,
+  type StudioPaperGranulationSettings,
+  type StudioPaperSurfaceSettings,
+} from "./studio-paper-granulation-runtime";
 import {
   studioSplatterOriginAnchorMarkCount,
 } from "./studio-splatter-origin-anchor";
@@ -61,6 +68,15 @@ export interface StudioDynamicBrushRenderPlan {
   readonly markBudget: number;
   readonly renderBudget: StudioDynamicBrushRenderBudgetPlan;
   readonly usesCausalDepositPlan: boolean;
+  /**
+   * 이 도구가 종이와 어떻게 만나는가. 도구 물성(브러시 id → 정책 표)과 문서가 깔아 둔 종이를
+   * 여기서 한 번 합쳐 두면 Canvas·라이브 오버레이·SVG 세 소비자가 같은 결을 본다.
+   * 종이를 타지 않는 도구(잉크·기술펜)에서는 undefined라 커버리지 플랜이 정확한 항등을 탄다.
+   */
+  readonly paper?: Readonly<{
+    readonly response: StudioPaperGranulationSettings;
+    readonly surface: StudioPaperSurfaceSettings;
+  }>;
   readonly dabVariations: readonly StudioDynamicBrushSegmentedDabVariation[]
     | readonly (readonly StudioDynamicBrushDab[])[];
 }
@@ -277,12 +293,23 @@ export function planStudioDynamicBrushRender(
     );
   }
 
+  const paperResponse = resolveStudioPaperBrushResponse(
+    typeof element.brush === "string" && element.brush ? element.brush : dynamicBrushId,
+  );
+  const paper = studioPaperGranulationIsActive(paperResponse)
+    ? Object.freeze({
+        response: paperResponse,
+        surface: resolveStudioDocumentPaperSurface(),
+      })
+    : undefined;
+
   return Object.freeze({
     status: "ready",
     plan: Object.freeze({
       dynamics,
       materialIdentity,
       seed,
+      ...(paper ? { paper } : {}),
       markBudget,
       renderBudget,
       usesCausalDepositPlan,

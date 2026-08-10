@@ -75,7 +75,10 @@ export function appendStudioLiquifyPointerPoint(
   if (!isStudioLiquifyPointerOwner(session, pointer)) return session;
   const last = session.points.at(-1);
   if (last && Math.hypot(point.x - last.x, point.y - last.y) < minimumDistance) return session;
-  return { ...session, points: [...session.points, pointWithPointerPressure(point, pointer)] };
+  // 세션은 StudioPage의 ref가 단독 소유하고 points도 공개 타입부터 mutable이다. 매 move마다 누적
+  // 배열 전체를 복사하면 n개 점에 O(n²) 복사가 발생하므로 다른 raster brush와 동일하게 제자리 append한다.
+  session.points.push(pointWithPointerPressure(point, pointer));
+  return session;
 }
 
 export function endStudioLiquifyPointerSession(

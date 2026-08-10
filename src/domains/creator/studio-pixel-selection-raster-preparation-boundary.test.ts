@@ -97,7 +97,9 @@ describe("Studio pixel marquee vector-only raster preparation boundary", () => {
     expect(prepare).toContain("planStudioEditableRasterCopy(");
     expect(prepare).toContain("renderStudioEditableRasterCopy(");
     expect(prepare).toContain("renderStudioVectorReference");
-    expect(prepare).toContain("isStudioEditableRasterCopyPlanCurrent(");
+    // applyStudioEditableRasterCopy owns the one synchronous current-plan check. Repeating it in
+    // this caller would recalculate the canonical fingerprint with no async gap between checks.
+    expect(prepare).not.toContain("isStudioEditableRasterCopyPlanCurrent(");
     expect(prepare).toContain("materializeStudioEditableRasterCopy(");
     expect(prepare).toContain("applyStudioEditableRasterCopy(");
     expect(prepare.match(/\bcommit\(/gu)).toHaveLength(1);
@@ -111,7 +113,8 @@ describe("Studio pixel marquee vector-only raster preparation boundary", () => {
 
     expect(prepare).toContain("prepareStudioDocumentReplacement");
     expect(prepare).toContain("flushPending: true");
-    expect(prepare).toContain("visibleContentCount");
+    expect(prepare).not.toContain("summarizeStudioRasterPreparationSources");
+    expect(prepare).toContain("planStudioEditableRasterCopy");
     expect(prepare).toContain("documentMutationBlockedReason");
     expect(prepare).toContain("pagesHiRef.current !== historyIndex");
     expect(prepare).toContain("currentPageIdRef.current !== pageId");

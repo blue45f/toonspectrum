@@ -1,0 +1,498 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-08T20:34:27.055Z",
+  "status": "pass",
+  "pass": true,
+  "benchmark": {
+    "status": "ok",
+    "pass": true,
+    "schemaVersion": 1,
+    "normal": {
+      "phase": "normal",
+      "status": "ok",
+      "pass": true,
+      "schemaVersion": 1,
+      "execution": "vite-production-build-chromium-dedicated-worker-opfs-sahpool",
+      "authority": {
+        "kind": "sqlite-opfs-sahpool",
+        "productPersistence": "createStudioProductionBibleSqlitePersistence",
+        "productFactoryUsesDefaultAcquire": true,
+        "runtimeAcquire": "acquireStudioLocalDatabase",
+        "requestedVfs": "opfs",
+        "namespace": "studio-production-bible-v12",
+        "opfsDirectory": "toonspectrum-studio-sqlite",
+        "logicalDatabaseFilename": "studio-local-v12.db",
+        "expectedOpenFilename": "/studio-local-v12.db",
+        "openedOpfsDatabaseFilenames": [
+          "/studio-local-v12.db",
+          "/studio-local-v12.db"
+        ],
+        "installedOpfsDirectories": [
+          "toonspectrum-studio-sqlite",
+          "toonspectrum-studio-sqlite"
+        ],
+        "memoryDatabaseOpenCount": 0,
+        "localStorageApiPresent": false,
+        "localStorageFallbackUsed": false,
+        "closeCompletedBeforeReopen": true
+      },
+      "policy": {
+        "legacyDataMigration": false,
+        "discardExistingStudioData": true,
+        "legacyStorageKey": "toonspectrum-studio-production-bible:v1:legacy-artist:work:legacy-episode",
+        "v12StorageKey": "toonspectrum-studio-production-bible:v12:legacy-artist:work:legacy-episode",
+        "legacyKeyReadByProduct": false,
+        "legacyPayloadRemainedUntouched": true
+      },
+      "support": {
+        "wasm": true,
+        "opfs": true
+      },
+      "capabilities": {
+        "dedicatedWorker": true,
+        "secureContext": true,
+        "crossOriginIsolated": true,
+        "navigatorStorageGetDirectory": true,
+        "syncAccessHandle": true,
+        "localStorageApiPresent": false
+      },
+      "browser": {
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.186 Safari/537.36",
+        "hardwareConcurrency": 12
+      },
+      "opening": {
+        "sqliteWasmInitMs": 29.74,
+        "coldOpenMs": 31.565,
+        "reopenMs": 0.445
+      },
+      "saves": {
+        "successfulCount": 60,
+        "distribution": {
+          "sampleCount": 60,
+          "percentileMethod": "nearest-rank-ceil",
+          "samplesMs": [
+            3.685,
+            2.885,
+            2.58,
+            2.675,
+            2.41,
+            2.995,
+            2.635,
+            2.755,
+            2.525,
+            2.505,
+            2.38,
+            2.5,
+            2.58,
+            2.385,
+            2.385,
+            2.63,
+            2.505,
+            2.615,
+            2.685,
+            2.245,
+            2.265,
+            2.54,
+            2.56,
+            2.415,
+            2.615,
+            2.655,
+            2.185,
+            2.35,
+            2.295,
+            2.335,
+            2.335,
+            2.6,
+            2.74,
+            2.345,
+            2.325,
+            2.45,
+            2.715,
+            2.42,
+            2.415,
+            1.775,
+            1.975,
+            2.425,
+            2.895,
+            2.875,
+            2.14,
+            2.425,
+            2.25,
+            2.345,
+            2.645,
+            2.555,
+            2.275,
+            2.275,
+            2.305,
+            2.51,
+            2.45,
+            2.355,
+            2.67,
+            2.165,
+            2.595,
+            2.22
+          ],
+          "minMs": 1.775,
+          "p50Ms": 2.45,
+          "p95Ms": 2.885,
+          "p99Ms": 3.685,
+          "maxMs": 3.685,
+          "meanMs": 2.4874
+        }
+      },
+      "loads": {
+        "successfulCount": 60,
+        "mismatchCount": 0,
+        "distribution": {
+          "sampleCount": 60,
+          "percentileMethod": "nearest-rank-ceil",
+          "samplesMs": [
+            0.275,
+            0.285,
+            0.28,
+            0.24,
+            0.265,
+            0.25,
+            0.235,
+            0.235,
+            0.235,
+            0.245,
+            0.24,
+            0.27,
+            0.275,
+            0.35,
+            0.285,
+            0.275,
+            0.235,
+            0.235,
+            1.465,
+            0.47,
+            0.23,
+            0.21,
+            0.22,
+            0.215,
+            0.235,
+            0.225,
+            0.245,
+            0.25,
+            0.275,
+            0.26,
+            0.24,
+            0.26,
+            0.24,
+            0.235,
+            0.215,
+            0.215,
+            0.47,
+            0.255,
+            0.265,
+            0.22,
+            0.245,
+            0.265,
+            0.22,
+            0.23,
+            0.215,
+            0.195,
+            0.215,
+            0.24,
+            0.23,
+            0.385,
+            0.28,
+            0.245,
+            0.24,
+            0.375,
+            0.25,
+            0.2,
+            0.22,
+            0.21,
+            0.23,
+            0.245
+          ],
+          "minMs": 0.195,
+          "p50Ms": 0.24,
+          "p95Ms": 0.385,
+          "p99Ms": 1.465,
+          "maxMs": 1.465,
+          "meanMs": 0.276
+        }
+      },
+      "canonical": {
+        "bytes": 1010,
+        "digestSha256": "54f5dda0c051309e77d14c4e7039d635aa295ddc638b4432ec13f646a2e935df",
+        "persistedBeforeCloseExact": true,
+        "reopenedExact": true,
+        "strictRoundTrip": true
+      },
+      "isolation": {
+        "ownerKey": "toonspectrum-studio-production-bible:v12:artist-other:work:episode-main",
+        "workKey": "toonspectrum-studio-production-bible:v12:artist-main:work:episode-other",
+        "mainKey": "toonspectrum-studio-production-bible:v12:artist-main:work:episode-main",
+        "pass": true
+      },
+      "corruption": {
+        "corruptBackend": "unavailable",
+        "nonCanonicalBackend": "unavailable",
+        "failClosed": true
+      },
+      "faults": {
+        "quota": {
+          "injection": "synthetic-acquireDatabase-QuotaExceededError",
+          "loadBackend": "unavailable",
+          "saveBackend": "memory",
+          "silentFallback": false,
+          "actualBrowserQuotaEnforcement": "quarantined-no-portable-quota-control"
+        },
+        "sahInstall": {
+          "injection": "openStudioLocalDatabase-installOpfsSAHPoolVfs-throws",
+          "loadBackend": "unavailable",
+          "saveBackend": "memory",
+          "silentFallback": false,
+          "errorSurfaced": true
+        }
+      },
+      "opfs": {
+        "exists": true,
+        "entries": [
+          {
+            "path": ".opaque",
+            "kind": "directory",
+            "sizeBytes": null
+          },
+          {
+            "path": ".opaque/29qlctmz6n3",
+            "kind": "file",
+            "sizeBytes": 184320
+          },
+          {
+            "path": ".opaque/9cdz5s8vxn",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/bip09760cnp",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/bu7q9kwj5f",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/htm9fmhigkv",
+            "kind": "file",
+            "sizeBytes": 4096
+          },
+          {
+            "path": ".opaque/hz291jyogtb",
+            "kind": "file",
+            "sizeBytes": 4096
+          }
+        ],
+        "fileCount": 6,
+        "totalFileBytes": 204800
+      },
+      "storage": {
+        "usageBytes": 206162,
+        "quotaBytes": 2154780842,
+        "usageDetails": {
+          "fileSystem": 206162
+        }
+      },
+      "securityPolicyViolations": []
+    },
+    "forcedTermination": {
+      "workerTerminateCalled": true,
+      "closeCalledBeforeTerminate": false,
+      "seed": {
+        "phase": "termination-seed",
+        "status": "ready",
+        "pass": true,
+        "key": "toonspectrum-studio-production-bible:v12:artist-crash:work:episode-crash",
+        "canonical": "{\"version\":1,\"entries\":[{\"id\":\"scene-reunion\",\"kind\":\"scene\",\"name\":\"강제 종료 직전 문서\",\"aliases\":[],\"description\":\"윤이 잃어버린 열쇠를 돌려받는다.\",\"visualKeywords\":[],\"colors\":[],\"timeOfDay\":\"\",\"linkedCharacterIds\":[\"character-yun\"],\"linkedLocationIds\":[\"location-rooftop\"],\"linkedPropIds\":[\"prop-key\"],\"referenceAssetIds\":[]},{\"id\":\"location-rooftop\",\"kind\":\"location\",\"name\":\"학교 옥상\",\"aliases\":[\"옥상\"],\"description\":\"낡은 철망과 물탱크가 있는 반복 장소\",\"visualKeywords\":[\"역광\",\"철망\"],\"colors\":[\"남색\",\"주황\"],\"timeOfDay\":\"해질녘\",\"linkedCharacterIds\":[],\"linkedLocationIds\":[],\"linkedPropIds\":[],\"referenceAssetIds\":[\"asset-rooftop\"]},{\"id\":\"prop-key\",\"kind\":\"prop\",\"name\":\"은색 열쇠\",\"aliases\":[],\"description\":\"\",\"visualKeywords\":[],\"colors\":[],\"timeOfDay\":\"\",\"linkedCharacterIds\":[\"character-yun\"],\"linkedLocationIds\":[],\"linkedPropIds\":[],\"referenceAssetIds\":[\"asset-key\"]}],\"promisePayoffLedger\":{\"version\":1,\"currentEpisode\":1,\"entries\":[]}}",
+        "digestSha256": "3beb69f5a45bac269c9a1d10f2ccab134f54f7dd536b605993d256090f63df8d",
+        "openedOpfsDatabaseFilenames": [
+          "/studio-local-v12.db"
+        ],
+        "closeCalled": false
+      },
+      "verify": {
+        "phase": "termination-verify",
+        "status": "ok",
+        "pass": true,
+        "key": "toonspectrum-studio-production-bible:v12:artist-crash:work:episode-crash",
+        "reopenedCanonicalExact": true,
+        "digestSha256": "3beb69f5a45bac269c9a1d10f2ccab134f54f7dd536b605993d256090f63df8d",
+        "reopenAfterTerminateMs": 9.215,
+        "openedOpfsDatabaseFilenames": [
+          "/studio-local-v12.db"
+        ],
+        "closeCalledAfterVerification": true
+      },
+      "recoveryElapsedMs": 319.83,
+      "pass": true
+    },
+    "pageSecurityPolicyViolations": []
+  },
+  "diagnostics": {
+    "browserVersion": "140.0.7339.186",
+    "consoleErrors": [],
+    "consoleWarnings": [],
+    "pageErrors": [],
+    "requestFailures": [],
+    "errorResponses": [],
+    "requests": [
+      {
+        "method": "GET",
+        "resourceType": "document",
+        "url": "http://127.0.0.1:58570/"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:58570/assets/index-BcX22zd2.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:58570/assets/production-bible-sqlite-opfs-browser-client-B_dcvF16.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:58570/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:58570/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:58570/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:58570/assets/production-bible-sqlite-opfs-browser-client-B_dcvF16.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:58570/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:58570/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:58570/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:58570/assets/production-bible-sqlite-opfs-browser-client-B_dcvF16.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:58570/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:58570/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:58570/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      }
+    ],
+    "responses": [
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:58570/"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:58570/assets/index-BcX22zd2.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:58570/assets/production-bible-sqlite-opfs-browser-client-B_dcvF16.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:58570/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:58570/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:58570/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:58570/assets/production-bible-sqlite-opfs-browser-client-B_dcvF16.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:58570/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:58570/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:58570/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:58570/assets/production-bible-sqlite-opfs-browser-client-B_dcvF16.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:58570/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:58570/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:58570/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      }
+    ],
+    "responseHeaders": {
+      "contentSecurityPolicy": "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'; worker-src 'self'; style-src 'none'; img-src 'none'; font-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+      "crossOriginOpenerPolicy": "same-origin",
+      "crossOriginEmbedderPolicy": "require-corp",
+      "crossOriginResourcePolicy": "same-origin"
+    }
+  },
+  "productionBuild": {
+    "mode": "vite-production-build",
+    "assets": [
+      ".vite/manifest.json",
+      "assets/index-BcX22zd2.js",
+      "assets/index-BcX22zd2.js.map",
+      "assets/production-bible-sqlite-opfs-browser-client-B_dcvF16.js",
+      "assets/production-bible-sqlite-opfs-browser-client-B_dcvF16.js.map",
+      "assets/sqlite3-BVKGSWc-.wasm",
+      "assets/sqlite3-opfs-async-proxy-D_xnb1D8.js",
+      "assets/sqlite3-worker1-N5XM9NUp.js",
+      "assets/sqlite3-worker1-N5XM9NUp.js.map",
+      "index.html"
+    ],
+    "scratchDirectory": "/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/toonspectrum-production-bible-opfs-rkm0EC"
+  },
+  "validationIssues": []
+}

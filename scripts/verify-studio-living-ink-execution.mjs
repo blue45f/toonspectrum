@@ -1,4 +1,11 @@
-/** Actual Chromium gate for the independent ToonSpectrum Living Ink execution provider. */
+/**
+ * Actual Chromium gate for the independent ToonSpectrum Living Ink execution provider.
+ *
+ * The Worker picks its runtime from what the browser exposes: a WebGPU adapter selects the WGSL
+ * field runtime, otherwise the WebGL2/GLSL runtime. Running one browser therefore only ever gated
+ * one of the two shipped backends. This runner drives the same harness once per backend lane so a
+ * WebGPU user cannot silently receive a worse result than a WebGL2 user.
+ */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
@@ -9,6 +16,10 @@ import { createServer as createViteServer } from "vite";
 
 const EVIDENCE_ROOT = process.env.TOONSPECTRUM_LIVING_INK_VERIFY_DIR
   ?? join(tmpdir(), `toonspectrum-living-ink-${Date.now()}`);
+const PROBE_RESULTS_PATH = new URL(
+  "../tests/benchmarks/results/living-ink-probe.json",
+  import.meta.url,
+);
 const HARNESS_PATH = "/__studio_living_ink_execution__";
 const ENTRY = "/scripts/studio-living-ink-execution-browser.ts";
 const TIMEOUT_MS = 180_000;
@@ -23,6 +34,74 @@ const INKWASH_ORACLE = Object.freeze({
 });
 const CSP = "default-src 'none'; script-src 'self'; connect-src 'self'; worker-src 'self' blob:; "
   + "img-src 'self' data: blob:; style-src 'unsafe-inline'; object-src 'none'; base-uri 'none'";
+
+/**
+ * One lane per shipped backend. `--use-angle=metal` plus `--enable-unsafe-webgpu` is the same
+ * launch recipe the Vello gpu-browser probe uses to obtain a real adapter on this platform; the
+ * WebGL2 lane explicitly disables WebGPU so it keeps gating the GLSL runtime on machines where
+ * Chromium enables WebGPU by default.
+ */
+const BACKEND_LANES = Object.freeze([
+  Object.freeze({
+    id: "webgl2",
+    label: "WebGL2 half-float GLSL runtime",
+    blocking: true,
+    expectedBackend: "real-chromium-dedicated-worker-offscreen-webgl2-half-float-v1",
+    launchArguments: Object.freeze(["--no-sandbox", "--disable-features=WebGPU"]),
+  }),
+  Object.freeze({
+    id: "webgpu",
+    label: "WebGPU WGSL field runtime",
+    blocking: false,
+    expectedBackend: "real-chromium-dedicated-worker-offscreen-webgpu-half-float-v1",
+    launchArguments: Object.freeze([
+      "--no-sandbox",
+      "--enable-unsafe-webgpu",
+      "--enable-features=WebGPU",
+      "--use-angle=metal",
+    ]),
+  }),
+]);
+
+/**
+ * Recorded parity gap for the non-blocking WGSL lane, as a ratchet rather than an exemption.
+ * Nothing here relaxes a threshold: the WGSL runtime is measured against exactly the same gates as
+ * GLSL, and the run fails if the observed gap differs from this list in either direction — a new
+ * regression, or a gate that started passing and was not removed from the record.
+ *
+ * **It is empty. The WGSL field runtime passes every gate the GLSL runtime passes.**
+ *
+ * Keeping the mechanism (and this note) after reaching parity is the point: an empty list means any
+ * WGSL regression now fails the run outright, and the history below is what a reader needs to
+ * recognise the two failure shapes this lane has already produced once.
+ *
+ * The first measured run recorded nineteen entries with a single cause: the WGSL display buffer was
+ * allocated with `MAP_READ | STORAGE | …`, which WebGPU forbids, so the buffer was invalid from
+ * allocation, the `display` pass's bind group was rejected, and the Beer-Lambert resolve never ran.
+ * Every readback was zeros — which is why the receipt agreed with the screen and no hash-based
+ * check objected: both sides were hashing the same blank.
+ *
+ * Fixing that left fifteen, and they were not one bug either. Two were gates a blank frame had
+ * satisfied vacuously; twelve were real content differences, because the WGSL display resolve was a
+ * bare `exp(-density)` with no paper fibre, granulation, edge deposition, near-black floor or wash
+ * calibration, and the field kernels had lost the anisotropic capillary stencil, the Deegan
+ * compressibility term and the white-gouache bleaching exchange; one was a harness assertion that
+ * hard-coded the WebGL2 backend and so could never be satisfied on this lane.
+ *
+ * Those are all closed. Two lessons are worth carrying, because both defects were *invisible* to a
+ * green-looking run:
+ *
+ * 1. A WGSL reserved word in a declaration (`from: vec2f`) does not throw. `createComputePipeline`
+ *    returns an invalid pipeline and every dispatch against it is silently dropped, so the runtime
+ *    computes nothing while still presenting a plausible frame.
+ * 2. When the WGSL runtime is refused, the WebGPU factory falls back to a WebGL2 runtime and stamps
+ *    the WebGPU backend name onto its capabilities. For one measured run this lane therefore ran
+ *    GLSL end to end while reporting itself as the WGSL lane, and its "near-parity" numbers were
+ *    GLSL's own. The harness now takes backend identity from the receipt of an operation that
+ *    actually ran; `src/domains/creator/studio-living-ink-wgsl-shaders.test.ts` guards the first.
+ */
+const WEBGPU_RECORDED_PARITY_GAP = Object.freeze([]);
+
 
 function freePort() {
   return new Promise((resolve, reject) => {
@@ -63,7 +142,7 @@ function html() {
 h1{margin:0 0 16px;font-size:20px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
 .card{padding:10px;border:1px solid #374151;border-radius:12px;background:#1f2937}h2{margin:0 0 8px;font-size:13px}
 canvas{display:block;width:100%;height:auto;border-radius:8px;background:#f7f3ea;image-rendering:auto}
-</style></head><body><h1>ToonSpectrum Living Ink · actual Worker/WebGL2 gate</h1><main class="grid">${cards}</main>
+</style></head><body><h1>ToonSpectrum Living Ink · actual Worker GPU gate (WebGL2 and WebGPU lanes)</h1><main class="grid">${cards}</main>
 <script type="module" src="${ENTRY}"></script></body></html>`;
 }
 
@@ -71,15 +150,23 @@ function writeJson(name, value) {
   writeFileSync(join(EVIDENCE_ROOT, name), `${JSON.stringify(value, null, 2)}\n`);
 }
 
-function validate(result, diagnostics) {
+function validate(result, diagnostics, lane) {
   const failures = [];
   if (result?.status !== "ok") return [`browser harness failed: ${result?.message ?? "unknown"}`];
-  if (result.backend !== "real-chromium-dedicated-worker-offscreen-webgl2-half-float-v1") {
-    failures.push("actual Worker/WebGL2 backend identity missing");
+  if (result.backend !== lane.expectedBackend) {
+    failures.push(
+      `actual Worker backend identity missing: lane ${lane.id} ran ${result.backend} `
+      + `instead of ${lane.expectedBackend}`,
+    );
   }
-  if (!Object.values(result.executionContract ?? {}).every(Boolean)) {
-    failures.push("execution capability contract is incomplete");
-  }
+  const contract = result.executionContract ?? {};
+  if (
+    !contract.worker
+    || !contract.offscreenCanvas
+    || !contract.gpuApi
+    || !contract.halfFloatFields
+    || !contract.rgba8Readback
+  ) failures.push("execution capability contract is incomplete");
   if (!result.line?.normalizedDisplayHashMatchesReceipt) {
     failures.push("bottom-up RGBA8 readback did not normalize to the displayed ImageBitmap");
   }
@@ -220,6 +307,131 @@ function validate(result, diagnostics) {
   return failures;
 }
 
+async function runLane(lane, port) {
+  const laneDirectory = join(EVIDENCE_ROOT, lane.id);
+  mkdirSync(laneDirectory, { recursive: true });
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: true, args: [...lane.launchArguments] });
+  } catch (error) {
+    return {
+      id: lane.id,
+      label: lane.label,
+      blocking: lane.blocking,
+      status: "unavailable",
+      reason: `Chromium could not launch for lane ${lane.id}: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      failures: [],
+      result: null,
+      diagnostics: null,
+    };
+  }
+  try {
+    const page = await browser.newPage({ viewport: { width: 1_120, height: 900 } });
+    const diagnostics = {
+      browserVersion: browser.version(),
+      launchArguments: [...lane.launchArguments],
+      consoleErrors: [],
+      consoleWarnings: [],
+      pageErrors: [],
+      requestFailures: [],
+    };
+    page.on("console", (message) => {
+      if (message.type() === "error") diagnostics.consoleErrors.push(message.text());
+      if (message.type() === "warning") diagnostics.consoleWarnings.push(message.text());
+    });
+    page.on("pageerror", (error) => diagnostics.pageErrors.push(error.message));
+    page.on("requestfailed", (request) => diagnostics.requestFailures.push(
+      `${request.method()} ${request.url()}: ${request.failure()?.errorText ?? "unknown"}`,
+    ));
+    await page.goto(`http://127.0.0.1:${port}${HARNESS_PATH}`, { waitUntil: "domcontentloaded" });
+    await page.waitForFunction(
+      () => window.__studioLivingInkExecutionResult !== undefined,
+      undefined,
+      { timeout: TIMEOUT_MS },
+    );
+    const result = await page.evaluate(() => window.__studioLivingInkExecutionResult);
+    writeJson(join(lane.id, "metrics.json"), result);
+    writeJson(join(lane.id, "browser-diagnostics.json"), diagnostics);
+    for (const id of ["line", "long-stroke", "self-intersection", "bloom", "water-field", "flow-field", "radial-wash", "selection", "white-layer", "dark-over-white", "cancel-recovery"]) {
+      await page.locator(`#${id}-card`).screenshot({ path: join(laneDirectory, `${id}.png`) });
+    }
+    await page.screenshot({ path: join(laneDirectory, "living-ink-full.png"), fullPage: true });
+    const failures = validate(result, diagnostics, lane);
+    return {
+      id: lane.id,
+      label: lane.label,
+      blocking: lane.blocking,
+      status: failures.length ? "failed" : "ok",
+      reason: null,
+      failures,
+      result,
+      diagnostics,
+    };
+  } finally {
+    await browser.close();
+  }
+}
+
+function laneSummary(lane, result) {
+  return {
+    id: lane.id,
+    label: lane.label,
+    blocking: lane.blocking,
+    status: lane.status,
+    reason: lane.reason,
+    backend: result?.backend ?? null,
+    capabilities: result?.capabilities ?? null,
+    launchArguments: lane.diagnostics?.launchArguments ?? null,
+    lineBounds: result?.line?.bounds ?? null,
+    bloomBounds: result?.bloom?.bounds ?? null,
+    fixedInvariant: result?.fixedInvariant?.exact ?? false,
+    cancelRollback: result?.cancelRecovery?.exact ?? false,
+    deterministicReplay: result?.deterministicReplay?.sameRuntimeClassExact ?? false,
+    deferredPresentation: result?.deferredPresentation ?? null,
+    visualQuality: result?.visualQuality ?? null,
+    persistedJournalReload: result?.persistedJournalReload ?? null,
+    nearBlackReflectanceParity: result?.nearBlackReflectanceParity ?? null,
+    workerCrashRecovery: result?.workerCrashRecovery ?? null,
+    performance: result?.performance ?? null,
+    failures: lane.failures,
+  };
+}
+
+/**
+ * The WGSL lane is measured against the same gates but does not block on its own failures; it
+ * blocks on *changes* to the recorded gap. That keeps the second backend genuinely gated — it can
+ * neither regress unnoticed nor stay broken once someone repairs it — without pretending the two
+ * runtimes are already at parity.
+ */
+function parityVerdict(lane) {
+  if (!lane || lane.status === "unavailable") {
+    return {
+      status: "unavailable",
+      reason: lane?.reason ?? "WebGPU lane did not run",
+      unresolvedGates: [],
+      regressedGates: [],
+      repairedGates: [],
+      recordedGap: [...WEBGPU_RECORDED_PARITY_GAP],
+    };
+  }
+  const observed = [...lane.failures].sort();
+  const recorded = [...WEBGPU_RECORDED_PARITY_GAP].sort();
+  const regressedGates = observed.filter((entry) => !recorded.includes(entry));
+  const repairedGates = recorded.filter((entry) => !observed.includes(entry));
+  return {
+    status: observed.length === 0 ? "reached" : "blocked",
+    reason: observed.length === 0
+      ? "the WGSL field runtime passes every gate the GLSL runtime passes"
+      : "the WGSL field runtime does not yet match the GLSL runtime on these gates",
+    unresolvedGates: observed,
+    regressedGates,
+    repairedGates,
+    recordedGap: recorded,
+  };
+}
+
 async function main() {
   mkdirSync(EVIDENCE_ROOT, { recursive: true });
   const port = await freePort();
@@ -242,67 +454,70 @@ async function main() {
     }],
   });
   await vite.listen();
-  let browser = null;
   try {
-    browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
-    const page = await browser.newPage({ viewport: { width: 1_120, height: 900 } });
-    const diagnostics = {
-      browserVersion: browser.version(),
-      consoleErrors: [],
-      consoleWarnings: [],
-      pageErrors: [],
-      requestFailures: [],
-    };
-    page.on("console", (message) => {
-      if (message.type() === "error") diagnostics.consoleErrors.push(message.text());
-      if (message.type() === "warning") diagnostics.consoleWarnings.push(message.text());
-    });
-    page.on("pageerror", (error) => diagnostics.pageErrors.push(error.message));
-    page.on("requestfailed", (request) => diagnostics.requestFailures.push(
-      `${request.method()} ${request.url()}: ${request.failure()?.errorText ?? "unknown"}`,
-    ));
-    await page.goto(`http://127.0.0.1:${port}${HARNESS_PATH}`, { waitUntil: "domcontentloaded" });
-    await page.waitForFunction(
-      () => window.__studioLivingInkExecutionResult !== undefined,
-      undefined,
-      { timeout: TIMEOUT_MS },
-    );
-    const result = await page.evaluate(() => window.__studioLivingInkExecutionResult);
-    writeJson("metrics.json", result);
-    writeJson("browser-diagnostics.json", diagnostics);
-    for (const id of ["line", "long-stroke", "self-intersection", "bloom", "water-field", "flow-field", "radial-wash", "selection", "white-layer", "dark-over-white", "cancel-recovery"]) {
-      await page.locator(`#${id}-card`).screenshot({ path: join(EVIDENCE_ROOT, `${id}.png`) });
+    const lanes = [];
+    for (const lane of BACKEND_LANES) lanes.push(await runLane(lane, port));
+    const certified = lanes.find((lane) => lane.blocking);
+    const webgpu = lanes.find((lane) => lane.id === "webgpu");
+    const parity = parityVerdict(webgpu);
+    const failures = [...(certified?.failures ?? ["certified WebGL2 lane did not run"])];
+    // A second backend nobody can measure is the state this runner exists to end.
+    if (parity.status === "unavailable") {
+      failures.push(`WebGPU lane was never executed, so the WGSL runtime stayed unverified: ${parity.reason}`);
     }
-    await page.screenshot({ path: join(EVIDENCE_ROOT, "living-ink-full.png"), fullPage: true });
-    const failures = validate(result, diagnostics);
+    if (parity.regressedGates.length) {
+      failures.push(`WebGPU lane regressed on gates outside the recorded gap: ${parity.regressedGates.join("; ")}`);
+    }
+    if (parity.repairedGates.length) {
+      failures.push(`WebGPU lane now passes recorded-gap gates; remove them from WEBGPU_RECORDED_PARITY_GAP: ${parity.repairedGates.join("; ")}`);
+    }
     const summary = {
       status: failures.length ? "failed" : "ok",
-      backend: result?.backend ?? null,
-      lineBounds: result?.line?.bounds ?? null,
-      bloomBounds: result?.bloom?.bounds ?? null,
-      fixedInvariant: result?.fixedInvariant?.exact ?? false,
-      cancelRollback: result?.cancelRecovery?.exact ?? false,
-      deterministicReplay: result?.deterministicReplay?.sameRuntimeClassExact ?? false,
-      deferredPresentation: result?.deferredPresentation ?? null,
+      // Retained for readers that only look at the certified lane.
+      backend: certified?.result?.backend ?? null,
+      lineBounds: certified?.result?.line?.bounds ?? null,
+      bloomBounds: certified?.result?.bloom?.bounds ?? null,
+      fixedInvariant: certified?.result?.fixedInvariant?.exact ?? false,
+      cancelRollback: certified?.result?.cancelRecovery?.exact ?? false,
+      deterministicReplay: certified?.result?.deterministicReplay?.sameRuntimeClassExact ?? false,
+      deferredPresentation: certified?.result?.deferredPresentation ?? null,
       oracle: {
         ...INKWASH_ORACLE,
         scaledLineWashHeightExpansion:
           INKWASH_ORACLE.lineWashHeightExpansion
-          * ((result?.viewport?.height ?? 0) / INKWASH_ORACLE.viewportHeight),
+          * ((certified?.result?.viewport?.height ?? 0) / INKWASH_ORACLE.viewportHeight),
       },
-      visualQuality: result?.visualQuality ?? null,
-      persistedJournalReload: result?.persistedJournalReload ?? null,
-      nearBlackReflectanceParity: result?.nearBlackReflectanceParity ?? null,
-      workerCrashRecovery: result?.workerCrashRecovery ?? null,
-      performance: result?.performance ?? null,
+      visualQuality: certified?.result?.visualQuality ?? null,
+      persistedJournalReload: certified?.result?.persistedJournalReload ?? null,
+      nearBlackReflectanceParity: certified?.result?.nearBlackReflectanceParity ?? null,
+      workerCrashRecovery: certified?.result?.workerCrashRecovery ?? null,
+      performance: certified?.result?.performance ?? null,
+      backends: Object.fromEntries(lanes.map((lane) => [lane.id, laneSummary(lane, lane.result)])),
+      webgpuVisualParity: parity,
       failures,
       evidenceDirectory: EVIDENCE_ROOT,
     };
     writeJson("summary.json", summary);
+    writeFileSync(PROBE_RESULTS_PATH, `${JSON.stringify({
+      generatedBy: "scripts/verify-studio-living-ink-execution.mjs",
+      note:
+        "Per-backend numbers for the actual-Chromium Living Ink probe. The WebGL2 lane is the "
+        + "certified blocking gate; the WebGPU lane runs the identical harness so the WGSL field "
+        + "runtime is measured on a real adapter instead of being shipped unverified.",
+      status: summary.status,
+      webgpuVisualParity: parity,
+      // Wall-clock timings live in the evidence directory only; they would churn this file on
+      // every run and hide the numbers a reviewer actually diffs.
+      backends: Object.fromEntries(
+        Object.entries(summary.backends).map(([id, lane]) => [
+          id,
+          Object.fromEntries(Object.entries(lane).filter(([key]) => key !== "performance")),
+        ]),
+      ),
+    }, null, 2)}\n`);
     console.log(JSON.stringify(summary, null, 2));
     if (failures.length) process.exitCode = 1;
   } finally {
-    if (browser) await browser.close();
     await vite.close();
   }
 }

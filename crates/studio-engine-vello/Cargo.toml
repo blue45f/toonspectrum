@@ -1,0 +1,93 @@
+[package]
+name = "studio-engine-vello"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "ToonStudio V11 deterministic CPU reference renderer: SceneIR JSON -> RGBA8 via vello_cpu (Linebender sparse-strip CPU renderer)."
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+vello_cpu = "0.2.0"
+# V12 WebGPU wasm PoC lane — optional, excluded from default wasm-pack builds.
+vello = { version = "0.9", optional = true }
+# V12 Velato lane — Lottie(bodymovin) -> vello Scene lowering; velato 0.11.0
+# depends on vello ^0.9 (crates.io index 실측), unified with our 0.9.0 pin.
+velato = { version = "0.11", optional = true }
+# V12 native SVG lane. vello_svg 0.10.0 is the first release that pins
+# vello 0.9.0, so it unifies with this crate's GPU stack. Raster image codecs
+# stay disabled: the bounded lane rejects image/pattern/filter/mask/text before
+# lowering instead of accepting vello_svg's red-box/bbox approximations.
+vello_svg = { version = "=0.10.0", optional = true, default-features = false }
+# Raw XML capability audit before usvg normalizes or drops unsupported syntax.
+# usvg 0.46 already uses this exact parser line, so it adds no second XML stack.
+roxmltree = { version = "=0.21.1", optional = true }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+wasm-bindgen = "0.2"
+parley = { version = "0.11", default-features = false, features = ["std", "system"] }
+# Parley 0.11 intentionally exposes horizontal paragraph layout only. The
+# vertical single-style lane therefore calls the same pinned HarfRust shaper
+# directly with Direction::TopToBottom so GSUB vert/vrt2 are real substitutions,
+# not feature-presence claims or Unicode presentation-form rewrites.
+harfrust = { version = "0.10", default-features = false, features = ["std"] }
+skrifa = "0.43"
+
+[features]
+default = []
+gpu = ["dep:vello", "dep:wasm-bindgen-futures", "dep:js-sys"]
+# V12 §5 toon-vello fork track — StudioGpuFabric device adoption.
+# Track A (`upstream`, default): `toon-fabric` off, so crates/vendor/wgpu-toon
+# compiles byte-equivalent to crates.io wgpu 29.0.4 and this module is absent.
+# Track B (`toon`): this feature on, enabling the vendored patch and the
+# `adopt_gpu_device` / `render_scene_gpu_texture_json` entry points.
+# See docs/engines/vello-baseline.md §3.
+fabric = ["gpu", "dep:wgpu"]
+# Velato Lottie lane (ADR-0011): rides on the gpu render path, so it is a
+# strict superset feature — `pkg-gpu` is built with `--features lottie`.
+lottie = ["gpu", "dep:velato"]
+# SVG parsing/lowering is usable by the vello_cpu reference without WebGPU;
+# the browser pkg-gpu combines this with `gpu`/`lottie` at build time.
+svg = ["dep:vello_svg", "dep:roxmltree"]
+
+# V12 lane 2 (ADR-0011): browser WebGPU async entry needs the JS futures
+# bridge; both stay optional so the default CPU wasm artifact is unchanged.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen-futures = { version = "0.4", optional = true }
+js-sys = { version = "0.3", optional = true }
+# V12 §5 fork track: only the `fabric` feature needs wgpu by name (to turn on
+# `wgpu/toon-fabric`); vello pulls the same crate transitively otherwise.
+wgpu = { version = "29.0.4", optional = true, default-features = false, features = ["toon-fabric"] }
+
+# ---------------------------------------------------------------------------
+# V12 §5.1 toon-vello fork track — the fork is a first-class product asset, not
+# a hidden temporary patch. `crates/vendor/wgpu-toon` is crates.io wgpu 29.0.4
+# (sha256 76e8840e1ba2881d4cbb18d2147627a56af426ff064c0401eb0c8410c6325d07,
+# verified against the crates.io index) plus six commented hunks, all gated
+# behind its `toon-fabric` feature. With the feature off — the default, i.e.
+# build track A — every hunk compiles out and the crate is API-identical to
+# upstream, which is what makes track A a real upstream-regression detector.
+# `crates/vendor/wgpu-toon/UPSTREAM.sha256` pins every vendored file and
+# `tests/vendor_patch_parity.rs` fails on any undeclared drift.
+# ---------------------------------------------------------------------------
+[patch.crates-io]
+wgpu = { path = "../vendor/wgpu-toon" }
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+
+# ADR-0010: Vello GPU(Classic) 네이티브 검증 전용 — wasm 산출물에 포함되지 않는다.
+# velato: tests/lottie_parity.rs가 src/lottie.rs를 #[path]로 포함해 기본
+# 피처에서도 Lottie 레인을 네이티브 검증한다(gpu_scene.rs와 같은 패턴).
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+vello = "0.9"
+velato = "0.11"
+pollster = "0.4"
+# V12 lane 5 재개 게이트 2단계: tests/wgsl_variant_validation.rs가 커밋 WGSL
+# variant 코퍼스(tests/corpus/wgsl-variants/)를 naga로 전수 파싱+검증한다.
+# 버전은 wgpu 경유로 이미 Cargo.lock에 있는 29.0.x 와 통일.
+naga = { version = "29.0", features = ["wgsl-in"] }

@@ -12,6 +12,15 @@ describe("admin API security boundaries", () => {
     expect(service).toMatch(/async getConfig\(userId: string\) \{\s*await requireAdminUser\(userId\);\s*return getAppConfig\(\);/);
   });
 
+  it("does not gate /admin/me on ensureAdminSchema DDL (runtime role may lack CREATE)", () => {
+    const service = readFileSync(join(process.cwd(), "apps/api/src/modules/admin/admin.service.ts"), "utf8");
+    const match = service.match(/async getAdminMe\(userId: string\) \{([\s\S]*?)\n {2}async getConfig/);
+    expect(match).not.toBeNull();
+    const body = match![1].replace(/\/\/[^\n]*/g, "");
+    expect(body).toMatch(/await requireAdminUser\(userId\)/);
+    expect(body).not.toMatch(/await ensureAdminSchema\s*\(/);
+  });
+
   it("correctly escapes LIKE wildcards and escape characters in escapeLike function", () => {
     const serviceContent = readFileSync(join(process.cwd(), "apps/api/src/modules/admin/admin.service.ts"), "utf8");
     const match = serviceContent.match(/function escapeLike\s*\(\s*value\s*:\s*string\s*\)\s*:\s*string\s*\{\s*(return\s+value\.replace\([\s\S]*?\);\s*)\}/);

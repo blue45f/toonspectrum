@@ -57,10 +57,12 @@ describe("Studio VRM portable pose-material production boundary", () => {
     expect(poserSource).toContain('{ id: "gaze", label: "시선/턱", bones: ["leftEye", "rightEye", "jaw"] }');
   });
 
-  it("keeps future/corrupt storage read-only and legacy Euler poses separate", () => {
+  it("keeps future/corrupt rows read-only, uses SQLite merge, and separates legacy Euler poses", () => {
     expect(panelSource).toContain('["future", "corrupt", "read-error", "unavailable"]');
-    expect(panelSource).toContain('importStudioPoseMaterialLibrary(storageAdapter, json, "merge")');
-    expect(panelSource).not.toContain('importStudioPoseMaterialLibrary(storageAdapter, json, "replace"');
+    expect(panelSource).toContain("legacyStorageSeam ? storageAdapter : inMemoryStorage(panelState.payload)");
+    expect(panelSource).toContain("repository.save(optimisticPayload)");
+    expect(panelSource).toContain('json,\n        "merge",');
+    expect(panelSource).not.toContain('json,\n        "replace",');
     expect(panelSource).toContain("onMaterialReplaced?.(material.id)");
     expect(poserSource).toContain("mergeStudioVrmFingerRotationsIntoBones(customBones, fingerEdits)");
     expect(poserSource).toContain('activePoseId.startsWith("pose-material:")');

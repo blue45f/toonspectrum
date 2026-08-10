@@ -18,6 +18,11 @@ describe("StudioInspectorDrawModeControls", () => {
     const { rerender } = render(
       <StudioInspectorDrawModeControls drawMode="pen" {...props} />
     );
+    // Active draw tool → stable inspector context surface (CSP property dock).
+    expect(screen.getByTestId("studio-inspector-context-drawing")).toBeTruthy();
+    expect(screen.getByTestId("studio-inspector-draw-mode")).toBeTruthy();
+    expect(screen.getByText("그리기 도구 설정")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "펜" }).getAttribute("aria-pressed")).toBe("true");
     expect(screen.queryByRole("region", { name: "픽셀 펜 특성" })).toBeNull();
 
     rerender(<StudioInspectorDrawModeControls drawMode="pixel" {...props} />);
@@ -28,6 +33,7 @@ describe("StudioInspectorDrawModeControls", () => {
     expect(
       screen.getByRole("button", { name: "픽셀 펜" }).getAttribute("aria-pressed")
     ).toBe("true");
+    expect(screen.getByTestId("studio-inspector-context-drawing")).toBeTruthy();
   });
 
   it("normalizes fixed pixel settings and initializes shape mode", () => {

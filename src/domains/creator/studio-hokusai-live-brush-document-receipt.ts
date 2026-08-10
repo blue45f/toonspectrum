@@ -6,9 +6,16 @@ import {
 } from "./studio-hokusai-live-brush-protocol";
 import {
   STUDIO_HOKUSAI_NATURAL_MEDIA_PRESETS,
+  studioHokusaiDefaultMaterialProfileId,
+  studioHokusaiMaterialProfileIsCompatible,
 } from "./studio-hokusai-natural-media-contract";
 
-export const STUDIO_HOKUSAI_LIVE_DOCUMENT_RECEIPT_VERSION = 1 as const;
+export const STUDIO_HOKUSAI_LIVE_DOCUMENT_RECEIPT_VERSION = 2 as const;
+
+const STUDIO_HOKUSAI_LEGACY_LIVE_DOCUMENT_RECEIPT_VERSION = 1 as const;
+const STUDIO_HOKUSAI_LEGACY_LIVE_BRUSH_PROTOCOL_VERSION = 1 as const;
+const STUDIO_HOKUSAI_LEGACY_LIVE_ADAPTER_VERSION =
+  "0.3.0-packed-dirty-live-adapter.2" as const;
 
 /**
  * Small, JSON-safe authority sidecar stored on the canonical PNG ImageEl.
@@ -68,17 +75,28 @@ function snapshotPlacement(value: unknown): Readonly<{
 
 function snapshotCanonicalReceipt(
   value: unknown,
+  wireVersion: typeof STUDIO_HOKUSAI_LIVE_BRUSH_PROTOCOL_VERSION
+    | typeof STUDIO_HOKUSAI_LEGACY_LIVE_BRUSH_PROTOCOL_VERSION,
 ): StudioHokusaiLiveCanonicalReceipt | null {
   if (!record(value)) return null;
+  const presetId = value.presetId as StudioHokusaiLiveCanonicalReceipt["presetId"];
+  const legacy = wireVersion === STUDIO_HOKUSAI_LEGACY_LIVE_BRUSH_PROTOCOL_VERSION;
+  const materialProfileId = legacy
+    ? value.materialProfileId ?? studioHokusaiDefaultMaterialProfileId(presetId)
+    : value.materialProfileId;
   if (
     value.kind !== "studio-hokusai-live/canonical-receipt"
-    || value.version !== STUDIO_HOKUSAI_LIVE_BRUSH_PROTOCOL_VERSION
+    || value.version !== wireVersion
     || !integer(value.requestId, 1)
     || !integer(value.engineEpoch, 1)
     || typeof value.strokeId !== "string"
     || value.strokeId.length === 0
     || value.strokeId.length > 512
     || !PRESET_IDS.has(String(value.presetId))
+    || !studioHokusaiMaterialProfileIsCompatible(
+      presetId,
+      materialProfileId,
+    )
     || !integer(value.seed)
     || value.seed > 0xffff_ffff
     || !integer(value.sampleCount, 1)
@@ -127,7 +145,8 @@ function snapshotCanonicalReceipt(
     requestId: value.requestId,
     engineEpoch: value.engineEpoch,
     strokeId: value.strokeId,
-    presetId: value.presetId as StudioHokusaiLiveCanonicalReceipt["presetId"],
+    presetId,
+    materialProfileId,
     seed: value.seed,
     sampleCount: value.sampleCount,
     finalSequence: value.finalSequence,
@@ -180,18 +199,27 @@ export function createStudioHokusaiLiveDocumentReceipt(input: Readonly<{
 export function snapshotStudioHokusaiLiveDocumentReceipt(
   value: unknown,
 ): StudioHokusaiLiveDocumentReceipt | null {
+  if (!record(value) || value.kind !== "studio-hokusai-live/document-receipt") {
+    return null;
+  }
+  const currentWire = value.version === STUDIO_HOKUSAI_LIVE_DOCUMENT_RECEIPT_VERSION
+    && value.liveAdapterVersion === STUDIO_HOKUSAI_LIVE_ADAPTER_VERSION;
+  const legacyWire = value.version === STUDIO_HOKUSAI_LEGACY_LIVE_DOCUMENT_RECEIPT_VERSION
+    && value.liveAdapterVersion === STUDIO_HOKUSAI_LEGACY_LIVE_ADAPTER_VERSION;
   if (
-    !record(value)
-    || value.kind !== "studio-hokusai-live/document-receipt"
-    || value.version !== STUDIO_HOKUSAI_LIVE_DOCUMENT_RECEIPT_VERSION
-    || value.liveAdapterVersion !== STUDIO_HOKUSAI_LIVE_ADAPTER_VERSION
+    (!currentWire && !legacyWire)
     || typeof value.sourceElementId !== "string"
     || value.sourceElementId.length === 0
     || value.sourceElementId.length > 512
     || typeof value.sourceRevision !== "string"
     || !SOURCE_REVISION_PATTERN.test(value.sourceRevision)
   ) return null;
-  const canonical = snapshotCanonicalReceipt(value.canonical);
+  const canonical = snapshotCanonicalReceipt(
+    value.canonical,
+    currentWire
+      ? STUDIO_HOKUSAI_LIVE_BRUSH_PROTOCOL_VERSION
+      : STUDIO_HOKUSAI_LEGACY_LIVE_BRUSH_PROTOCOL_VERSION,
+  );
   if (!canonical) return null;
   return Object.freeze({
     kind: "studio-hokusai-live/document-receipt",

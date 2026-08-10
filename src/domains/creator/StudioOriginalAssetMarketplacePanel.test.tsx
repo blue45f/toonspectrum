@@ -78,6 +78,15 @@ describe("StudioOriginalAssetMarketplacePanel", () => {
     expect(html).toContain("로컬 라이브러리에 추가");
   });
 
+  it("uses the V12 SQLite product repository and never reads or writes localStorage", () => {
+    expect(panelSource).toContain("getProductStudioMarketplaceLibrarySqliteRepository");
+    expect(panelSource).toContain("repository.list()");
+    expect(panelSource).toContain("repository.save(nextState");
+    expect(panelSource).not.toContain("globalThis.localStorage");
+    expect(panelSource).not.toContain("loadStudioMarketplaceLibrary(currentStorage())");
+    expect(panelSource).not.toContain("saveStudioMarketplaceLibrary(storage");
+  });
+
   it("keeps the upload/share rights boundary visible and explicit", () => {
     const html = renderPanel();
 

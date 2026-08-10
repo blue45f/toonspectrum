@@ -472,6 +472,76 @@ describe("StudioTileDocWebGpuCompositeConsumer", () => {
     expect(harness.uploadFirstBytes.at(-1)).toBe(30);
   });
 
+  it("reuses retained composite and source textures when viewport scope and layer order revisit content", async () => {
+    const harness = fakeGpuHarness();
+    const store = new StudioTiledDocumentStore({
+      documentWidth: 128,
+      documentHeight: 64,
+      tileSize: 64,
+    });
+    store.writeTile("back", 0, 0, paint(10));
+    store.writeTile("front", 0, 0, paint(20));
+    store.writeTile("back", 1, 0, paint(30));
+    const consumer = new StudioTileDocWebGpuCompositeConsumer({
+      canvas: harness.canvas,
+      gpu: harness.gpu,
+    });
+    const bridge = new StudioTileDocWebGpuBridge({ store, consumer });
+    const layers = [{ id: "back" }, { id: "front" }] as const;
+
+    await bridge.present({ viewport: { x: 0, y: 0, width: 64, height: 64 }, layers });
+    await bridge.present({ viewport: { x: 64, y: 0, width: 64, height: 64 }, layers });
+    expect(harness.writeTexture).toHaveBeenCalledTimes(3);
+
+    await bridge.present({ viewport: { x: 0, y: 0, width: 64, height: 64 }, layers });
+    expect(harness.writeTexture).toHaveBeenCalledTimes(3);
+    expect(consumer.stats()).toMatchObject({
+      compositeCacheReuses: 1,
+      retainedCacheHits: 1,
+      sourceCacheEntries: 3,
+    });
+
+    await bridge.present({
+      viewport: { x: 0, y: 0, width: 64, height: 64 },
+      layers: [...layers].reverse(),
+    });
+    expect(harness.writeTexture).toHaveBeenCalledTimes(3);
+    expect(consumer.stats()).toMatchObject({
+      sourceCacheHits: 2,
+      sourceCacheMisses: 3,
+      sourceUploadCount: 3,
+    });
+  });
+
+  it("leases the product GPU fabric device without destroying shared ownership", async () => {
+    const harness = fakeGpuHarness();
+    const release = vi.fn();
+    const acquireDevice = vi.fn(async () => ({
+      device: harness.device,
+      epoch: 17,
+      lost: false,
+      released: false,
+      release,
+    }));
+    const consumer = new StudioTileDocWebGpuCompositeConsumer({
+      canvas: harness.canvas,
+      acquireDevice: acquireDevice as typeof import("./studio-gpu-fabric").acquireStudioGpuDevice,
+    });
+
+    expect(await consumer.present(frame(), new AbortController().signal)).toMatchObject({
+      status: "presented",
+      deviceGeneration: 17,
+    });
+    expect(consumer.stats()).toMatchObject({
+      deviceOwnership: "studio-gpu-fabric",
+      deviceEpoch: 17,
+    });
+    expect(harness.adapterRequest).not.toHaveBeenCalled();
+    consumer.dispose();
+    expect(release).toHaveBeenCalledTimes(1);
+    expect(harness.device.destroy).not.toHaveBeenCalled();
+  });
+
   it("performs a full dirty rebuild after paired consumer and bridge invalidation", async () => {
     const harness = fakeGpuHarness();
     const store = new StudioTiledDocumentStore({
@@ -531,7 +601,8 @@ describe("StudioTileDocWebGpuCompositeConsumer", () => {
     await bridge.present(request);
     expect(consumer.stats()).toMatchObject({
       retainedEntries: 1,
-      uploadPoolEntries: 1,
+      uploadPoolEntries: 0,
+      sourceCacheEntries: 1,
     });
 
     store.deleteTile("ink", 0, 0);
@@ -601,7 +672,8 @@ describe("StudioTileDocWebGpuCompositeConsumer", () => {
     expect(result).toMatchObject({ status: "presented", deviceGeneration: 1 });
     expect(consumer.stats()).toMatchObject({
       retainedEntries: 1,
-      uploadPoolEntries: 1,
+      uploadPoolEntries: 0,
+      sourceCacheEntries: 1,
     });
 
     const info = { reason: "unknown", message: "test loss" } as GPUDeviceLostInfo;
@@ -612,6 +684,7 @@ describe("StudioTileDocWebGpuCompositeConsumer", () => {
     expect(consumer.stats()).toMatchObject({
       retainedEntries: 0,
       uploadPoolEntries: 0,
+      sourceCacheEntries: 0,
     });
 
     const recoveredResult = await consumer.present(frame({

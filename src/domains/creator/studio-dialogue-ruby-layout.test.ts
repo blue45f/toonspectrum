@@ -5,8 +5,34 @@ import {
   estimateDialogueTextAdvanceWidth,
   planDialogueRubyOverlayPlacements,
   planDialogueRubyRuns,
+  planDialogueVerticalRubyOverlayPlacements,
   readDialogueRubySpans,
 } from "./studio-dialogue-ruby-layout";
+import { layoutVerticalText } from "./studio-vertical-text";
+
+const VERTICAL_MEASURER = {
+  measureWidth(text: string, fontPx: number) {
+    return estimateDialogueTextAdvanceWidth(text, fontPx);
+  },
+};
+
+function verticalLayout(
+  text: string,
+  options: { align?: "start" | "center" | "end"; lineHeight?: number; max?: number } = {},
+) {
+  return layoutVerticalText(
+    {
+      text,
+      fontSize: 20,
+      lineHeight: options.lineHeight ?? 1.4,
+      letterSpacing: 2,
+      fontFamily: "Test CJK",
+      maxColumnLength: options.max ?? 200,
+      blockAlign: options.align ?? "start",
+    },
+    VERTICAL_MEASURER,
+  );
+}
 
 describe("planDialogueRubyRuns", () => {
   it("returns a single base-only run when spans are absent or empty", () => {
@@ -196,5 +222,209 @@ describe("planDialogueRubyOverlayPlacements", () => {
       x: 0,
       baseWidth: 40,
     });
+  });
+});
+
+describe("planDialogueVerticalRubyOverlayPlacements", () => {
+  it("places Japanese and Korean readings upright on the right of vertical base spans", () => {
+    const text = "漢字한국";
+    const layout = verticalLayout(text);
+    const plan = planDialogueVerticalRubyOverlayPlacements(
+      text,
+      [
+        { start: 0, end: 2, ruby: "かんじ" },
+        { start: 2, end: 4, ruby: "한글" },
+      ],
+      layout,
+      { fontSize: 20, lineHeight: 1.4, letterSpacing: 2 },
+    );
+
+    expect(plan.unsupported).toEqual([]);
+    expect(plan.placements).toHaveLength(2);
+    expect(plan.placements[0]).toMatchObject({
+      base: "漢字",
+      ruby: "かんじ",
+      orientation: "vertical-upright",
+      writingMode: "vertical-rl",
+      side: "right",
+      column: 0,
+      start: 0,
+      end: 2,
+      rubyFontSize: 9,
+    });
+    expect(plan.placements[0]!.x).toBeGreaterThan(
+      plan.placements[0]!.baseX + plan.placements[0]!.baseWidth,
+    );
+    expect(plan.placements[1]).toMatchObject({ base: "한국", ruby: "한글" });
+    expect(Object.isFrozen(plan)).toBe(true);
+    expect(Object.isFrozen(plan.placements[0])).toBe(true);
+  });
+
+  it("maps UTF-16 spans without splitting a surrogate pair", () => {
+    const text = "𠮷野";
+    const layout = verticalLayout(text);
+    const valid = planDialogueVerticalRubyOverlayPlacements(
+      text,
+      [{ start: 0, end: 2, ruby: "よし" }],
+      layout,
+      { fontSize: 20, lineHeight: 1.4 },
+    );
+    expect(valid.placements[0]).toMatchObject({ base: "𠮷", start: 0, end: 2 });
+    expect(valid.unsupported).toEqual([]);
+
+    const split = planDialogueVerticalRubyOverlayPlacements(
+      text,
+      [{ start: 1, end: 2, ruby: "broken" }],
+      layout,
+      { fontSize: 20, lineHeight: 1.4 },
+    );
+    expect(split.placements).toEqual([]);
+    expect(split.unsupported).toEqual([
+      expect.objectContaining({ code: "split-surrogate-pair", spanIndex: 0 }),
+    ]);
+  });
+
+  it("splits a reading across explicit newline columns without losing ruby glyphs", () => {
+    const text = "東京\n都心";
+    const layout = verticalLayout(text);
+    const plan = planDialogueVerticalRubyOverlayPlacements(
+      text,
+      [{ start: 0, end: text.length, ruby: "とうきょうとしん" }],
+      layout,
+      { fontSize: 20, lineHeight: 1.4, letterSpacing: 2 },
+    );
+
+    expect(plan.placements).toHaveLength(2);
+    expect(plan.placements.map((placement) => placement.column)).toEqual([0, 1]);
+    expect(plan.placements.map((placement) => placement.ruby).join("")).toBe("とうきょうとしん");
+    expect(plan.placements[0]!.x).toBeGreaterThan(plan.placements[1]!.x);
+    expect(plan.warnings).toEqual([
+      expect.objectContaining({ code: "span-split-across-columns", spanIndex: 0 }),
+    ]);
+  });
+
+  it("tracks automatic column progression and multiple independent spans", () => {
+    const text = "一二三四五六";
+    const layout = verticalLayout(text, { max: 66 });
+    const plan = planDialogueVerticalRubyOverlayPlacements(
+      text,
+      [
+        { start: 0, end: 2, ruby: "いちに" },
+        { start: 4, end: 6, ruby: "ごろく" },
+      ],
+      layout,
+      { fontSize: 20, lineHeight: 1.4, letterSpacing: 2 },
+    );
+    expect(plan.unsupported).toEqual([]);
+    expect(plan.placements.map((placement) => placement.base)).toEqual(["一二", "五六"]);
+    expect(plan.placements[0]!.column).toBe(0);
+    expect(plan.placements[1]!.column).toBe(1);
+  });
+
+  it("centers ruby against aligned base geometry and follows line-height column spacing", () => {
+    const start = verticalLayout("漢字\n語", { align: "start", lineHeight: 1.2 });
+    const centered = verticalLayout("漢字\n語", { align: "center", lineHeight: 2 });
+    const startPlan = planDialogueVerticalRubyOverlayPlacements(
+      "漢字\n語",
+      [{ start: 3, end: 4, ruby: "ご" }],
+      start,
+      { fontSize: 20, lineHeight: 1.2, letterSpacing: 2 },
+    );
+    const centeredPlan = planDialogueVerticalRubyOverlayPlacements(
+      "漢字\n語",
+      [{ start: 3, end: 4, ruby: "ご" }],
+      centered,
+      { fontSize: 20, lineHeight: 2, letterSpacing: 2 },
+    );
+    expect(centeredPlan.placements[0]!.baseY).toBeGreaterThan(startPlan.placements[0]!.baseY);
+    expect(centeredPlan.placements[0]!.x - startPlan.placements[0]!.x).toBeGreaterThan(0);
+    const placement = centeredPlan.placements[0]!;
+    expect(placement.y + placement.height / 2).toBeCloseTo(
+      placement.baseY + placement.baseHeight / 2,
+    );
+  });
+
+  it("surfaces malformed, overlapping, empty, and unmappable spans explicitly", () => {
+    const text = "漢字";
+    const layout = verticalLayout(text);
+    const plan = planDialogueVerticalRubyOverlayPlacements(
+      text,
+      [
+        { start: 0, end: 1, ruby: "かん" },
+        { start: 0, end: 2, ruby: "overlap" },
+        { start: 1.5, end: 2, ruby: "fraction" },
+        { start: -1, end: 1, ruby: "outside" },
+        { start: 1, end: 2, ruby: "   " },
+      ],
+      layout,
+      { fontSize: 20, lineHeight: 1.4 },
+    );
+    expect(plan.placements).toHaveLength(1);
+    expect(plan.unsupported.map((issue) => issue.code).sort()).toEqual([
+      "empty-reading",
+      "fractional-offset",
+      "out-of-range",
+      "overlapping-span",
+    ].sort());
+
+    const mismatched = planDialogueVerticalRubyOverlayPlacements(
+      text,
+      [{ start: 0, end: 1, ruby: "かん" }],
+      verticalLayout("別文"),
+      { fontSize: 20, lineHeight: 1.4 },
+    );
+    expect(mismatched.placements).toEqual([]);
+    expect(mismatched.unsupported).toEqual([
+      expect.objectContaining({ code: "layout-source-mismatch", spanIndex: null }),
+    ]);
+
+    const emptySource = planDialogueVerticalRubyOverlayPlacements(
+      "",
+      [{ start: 0, end: 1, ruby: "x" }],
+      verticalLayout(""),
+      { fontSize: 20, lineHeight: 1.4 },
+    );
+    expect(emptySource.placements).toEqual([]);
+    expect(emptySource.unsupported).toEqual([
+      expect.objectContaining({ code: "out-of-range", spanIndex: 0 }),
+    ]);
+  });
+
+  it("maps tate-chu-yoko source digits to one upright base cell", () => {
+    const text = "第12話";
+    const layout = verticalLayout(text);
+    const plan = planDialogueVerticalRubyOverlayPlacements(
+      text,
+      [{ start: 1, end: 3, ruby: "じゅうに" }],
+      layout,
+      { fontSize: 20, lineHeight: 1.4, letterSpacing: 2 },
+    );
+    expect(plan.unsupported).toEqual([]);
+    expect(plan.placements[0]).toMatchObject({ base: "12", baseHeight: 22 });
+  });
+
+  it("bounds hostile sizing options and reports every adjustment", () => {
+    const plan = planDialogueVerticalRubyOverlayPlacements(
+      "漢",
+      [{ start: 0, end: 1, ruby: "かん" }],
+      verticalLayout("漢"),
+      {
+        fontSize: 20,
+        lineHeight: 99,
+        letterSpacing: 999,
+        rubySizeRatio: 9,
+        sideGap: -10,
+      },
+    );
+    expect(plan.placements[0]!.rubyFontSize).toBe(13);
+    expect(plan.placements[0]!.x).toBe(
+      plan.placements[0]!.baseX + plan.placements[0]!.baseWidth,
+    );
+    expect(plan.warnings.map((warning) => warning.code)).toEqual([
+      "bounded-option",
+      "bounded-option",
+      "bounded-option",
+      "bounded-option",
+    ]);
   });
 });

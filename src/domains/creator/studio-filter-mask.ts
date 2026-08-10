@@ -214,6 +214,37 @@ export function applyFilterMaskToPixels(input: {
   const flipY = transform?.flipY === true;
   const padX = clampPadRatio(transform?.padRatioX);
   const padY = clampPadRatio(transform?.padRatioY);
+  const isDirect =
+    !flipX
+    && !flipY
+    && padX === 0
+    && padY === 0
+    && coverage.width === width
+    && coverage.height === height;
+
+  if (isDirect) {
+    const data = coverage.data;
+    let p = 0;
+    for (let i = 0; i < data.length; i += 1, p += 4) {
+      const val = data[i]!;
+      if (val === 255) continue;
+      if (val === 0) {
+        target[p] = original[p]!;
+        target[p + 1] = original[p + 1]!;
+        target[p + 2] = original[p + 2]!;
+        target[p + 3] = original[p + 3]!;
+      } else {
+        const m = val / 255;
+        const inv = 1 - m;
+        target[p] = target[p]! * m + original[p]! * inv;
+        target[p + 1] = target[p + 1]! * m + original[p + 1]! * inv;
+        target[p + 2] = target[p + 2]! * m + original[p + 2]! * inv;
+        target[p + 3] = target[p + 3]! * m + original[p + 3]! * inv;
+      }
+    }
+    return true;
+  }
+
   const spanX = 1 - 2 * padX;
   const spanY = 1 - 2 * padY;
   let p = 0;

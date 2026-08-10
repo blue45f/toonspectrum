@@ -1,0 +1,145 @@
+{
+  "schema": "toonspectrum.i18n-fix/1",
+  "generatedAt": "2026-08-08T06:25:00.000Z",
+  "summary": "Split lib/i18n.ts (75 inlined locale dictionaries, 2,135,813 source bytes) into lazy public/i18n/app/<locale>.json assets, compiled only the ko/en fallback pair into the shell, and excluded the i18n chunk from the entry document's modulepreload set.",
+  "method": {
+    "build": "pnpm run build (tsc + vite build), same worktree, before and after",
+    "bundleMeasurement": "node scripts/check-studio-bundle.mjs against dist/.vite/manifest.json",
+    "preloadMeasurement": "grep of <link rel=\"modulepreload\"> in dist/index.html",
+    "gzip": "node:zlib gzipSync level 9",
+    "caveat": "StudioPage.tsx was being edited concurrently by another agent during the after-build; the +4.7 KiB drift in StudioPage entry and Studio-route-after-app-shell comes from that, not from this change. Every i18n-attributable delta below is isolated to the app entry graph and the i18n chunk."
+  },
+  "localeAudit": {
+    "note": "Measured by importing the pre-change DICT and diffing every locale against en, key by key.",
+    "localeCount": 75,
+    "referenceKeyCount": 525,
+    "byteIdenticalToEnglish": 1,
+    "byteIdenticalToEnglishNote": "Only en itself. The startup-findings claim that 67 locales are byte-identical to English overstates the mechanism: every locale differs in at least 12 keys. The substance holds — those 12-15 keys are nav/common labels and 97%+ of each locale renders English.",
+    "tiers": {
+      "realTranslation": {
+        "threshold": ">= 0.5 of en keys distinct",
+        "locales": ["ko", "en", "ja", "zh", "zh-hant"],
+        "ratios": { "ko": 0.962, "en": 1, "ja": 0.9791, "zh": 0.9581, "zh-hant": 0.9581 }
+      },
+      "appShellOnly": {
+        "threshold": "~0.085 of en keys distinct (apiError/error/copyright/common/nav surfaces)",
+        "locales": ["es", "fr", "de"],
+        "ratio": 0.0854
+      },
+      "navigationLabelsOnly": {
+        "threshold": "0.0228 - 0.0286 of en keys distinct (12-15 nav/common labels)",
+        "localeCount": 67,
+        "locales": [
+          "id", "vi", "th", "ru", "pt", "it", "ar", "hi", "tr", "nl", "pl", "sv", "fil", "ms",
+          "af", "am", "as", "az", "be", "bg", "bn", "bs", "ca", "cs", "da", "el", "et", "eu",
+          "fa", "fi", "gl", "gu", "he", "hr", "hu", "hy", "is", "ka", "kk", "km", "kn", "ky",
+          "lo", "lt", "lv", "mk", "ml", "mn", "mr", "my", "ne", "no", "or", "pa", "ro", "si",
+          "sk", "sl", "sq", "sr", "sw", "ta", "te", "uk", "ur", "uz", "zu"
+        ]
+      }
+    }
+  },
+  "bundle": {
+    "appEntry": {
+      "rawBytesBefore": 2410678,
+      "rawBytesAfter": 589725,
+      "rawKiBBefore": 2354.2,
+      "rawKiBAfter": 575.9,
+      "rawDeltaKiB": -1778.3,
+      "rawDeltaPercent": -75.5,
+      "gzipKiBBefore": 233.1,
+      "gzipKiBAfter": 181.3,
+      "gzipDeltaKiB": -51.8,
+      "gzipDeltaPercent": -22.2,
+      "chunkCountBefore": 9,
+      "chunkCountAfter": 9
+    },
+    "studioRoute": {
+      "rawKiBBefore": 6146.5,
+      "rawKiBAfter": 4372.9,
+      "rawDeltaKiB": -1773.6,
+      "gzipKiBBefore": 1439.0,
+      "gzipKiBAfter": 1389.0,
+      "gzipDeltaKiB": -50.0,
+      "chunkCountBefore": 185,
+      "chunkCountAfter": 185
+    },
+    "bg3dEditorActivation": {
+      "rawKiBBefore": 4546.5,
+      "rawKiBAfter": 2768.2,
+      "gzipKiBBefore": 873.9,
+      "gzipKiBAfter": 822.0
+    },
+    "i18nChunk": {
+      "fileBefore": "assets/i18n-CdB262Tn.js",
+      "fileAfter": "assets/i18n-BObx3U0p.js",
+      "rawBytesBefore": 1883219,
+      "rawBytesAfter": 61914,
+      "rawDeltaPercent": -96.7,
+      "gzipBytesBefore": 71933,
+      "gzipBytesAfter": 18615,
+      "gzipDeltaPercent": -74.1,
+      "rawToGzipRatioBefore": 26.2,
+      "rawToGzipRatioAfter": 3.3
+    },
+    "lazyLocaleAssets": {
+      "path": "dist/i18n/app/<locale>.json",
+      "count": 75,
+      "totalBytes": 2034924,
+      "averageBytes": 27132,
+      "exampleRawBytes": { "sv": 26863 },
+      "exampleGzipBytes": { "sv": 7514 },
+      "loadedPerSession": "0 for ko/en (compiled into the shell), otherwise exactly 1 for the active locale"
+    },
+    "sourceFile": {
+      "path": "lib/i18n.ts",
+      "bytesBefore": 2135813,
+      "bytesAfter": 32771,
+      "linesBefore": 40737,
+      "linesAfter": 994,
+      "note": "The dictionaries left; an explicit lazy loader, fallback-status contract and asset parser arrived."
+    }
+  },
+  "entryModulePreload": {
+    "contract": "ENTRY_PRELOAD_EXCLUSIONS in vite.config.ts, enforced by scripts/check-studio-bundle.mjs against dist/index.html",
+    "before": [
+      "/assets/rolldown-runtime-CMxvf4Kt.js",
+      "/assets/lucide-initial-icons-Q6dwqRL8.js",
+      "/assets/react-runtime-D6Z9ZTks.js",
+      "/assets/middleware-BRlIkLFI.js",
+      "/assets/vanilla-DZJGj1NY.js",
+      "/assets/react-BXLiwOWs.js",
+      "/assets/i18n-CdB262Tn.js"
+    ],
+    "after": [
+      "/assets/rolldown-runtime-CMxvf4Kt.js",
+      "/assets/lucide-initial-icons-Q6dwqRL8.js",
+      "/assets/react-runtime-D6Z9ZTks.js",
+      "/assets/middleware-BRlIkLFI.js",
+      "/assets/vanilla-DZJGj1NY.js",
+      "/assets/react-BXLiwOWs.js"
+    ],
+    "removedFromCriticalPath": {
+      "chunk": "i18n",
+      "decodedBytes": 1883219,
+      "transferBytesOnEveryRoute": 71933,
+      "arrivedAtMsUnthrottled": 26.9,
+      "compileMsUnthrottled": 19.3,
+      "compileMsCpu4x": 755.3
+    },
+    "tradeoff": "The i18n chunk is still a static dependency of the app entry, so dropping the modulepreload costs one round trip of discovery latency after the entry chunk parses. At 18.6 KiB gzip that is a far better trade than competing with the entry script and the render-blocking stylesheet for first-round-trip bandwidth."
+  },
+  "fallbackContract": {
+    "builtIn": ["ko", "en"],
+    "chain": "requested locale (and its parents) -> en -> ko -> raw key",
+    "assetResolution": "resolveAppI18nAssetLocale() narrows a request to a published asset using the candidate chain WITHOUT the fallback chain, so \"no dictionary published\" stays distinguishable from \"English dictionary published\"",
+    "states": ["builtin", "loaded", "unavailable", "failed"],
+    "observability": "getAppI18nLocaleStatus(locale) always reports which asset served the locale and why it fell back; a failed load also warns once on the console",
+    "emptyStringFix": "resolveTranslation now treats a defined key as an answer instead of a truthy one. en publishes \"\" for ageGate.yearSuffix/monthSuffix/daySuffix and authors.people; the previous truthiness test skipped those and rendered the Korean units to every non-Korean locale."
+  },
+  "regressionGates": [
+    "scripts/check-studio-bundle.mjs: dist/index.html must not modulepreload any ENTRY_PRELOAD_EXCLUSIONS chunk (hard failure)",
+    "scripts/check-studio-bundle.mjs: no app-shell i18n chunk may exceed 256 KiB raw (hard failure)",
+    "lib/__tests__/i18n-locale-assets.test.ts: generated catalog must match the assets on disk, every asset must cover the 525-key baseline, only the active locale loads, fallback states are explicit"
+  ]
+}

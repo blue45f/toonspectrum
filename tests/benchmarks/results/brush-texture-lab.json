@@ -1,0 +1,678 @@
+{
+  "harness": "tests/benchmarks/harness/brush-texture-lab.ts",
+  "generatedAt": "2026-08-08T05:58:42.565Z",
+  "host": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpu": "Apple M2 Max",
+    "node": "v24.16.0"
+  },
+  "pin": {
+    "libmypaint": "libmypaint 1.6.1+2768251d (emcc)",
+    "libmypaintBuild": "packages/studio-brush-platform/src/libmypaint/bridge/build.sh (json-c bypassed; injection API only)",
+    "hokusai": "hokusai-core 0.3.0 via packages/studio-hokusai-wasm",
+    "corpus": "tests/corpus/brushes/myb/{wash-soft,ink-crisp}.myb",
+    "deltaE": "CIEDE2000 (Sharma/Wu/Dalal 2005) via tests/benchmarks/harness/color-lab.ts"
+  },
+  "roles": {
+    "libmypaint": "reference",
+    "hokusai": "challenger"
+  },
+  "definitions": {
+    "grainSpectralDensity": "w(x,y) = (A(x,y) − Ā)·h(x)·h(y) with Hann h(i) = 0.5(1 − cos(2πi/(N−1))); F = Σ w·exp(−2πi(kx·x + ky·y)/N); P = |F|²/N⁴; f = hypot(k̂x,k̂y)/N cycles/px (k̂ = k for k ≤ N/2 else k − N); E_low = ΣP over 0 < f ≤ 1/32 (period ≥ 32 px, the stroke's falloff envelope), E_mid over 1/32 < f ≤ 1/8 (period 8–32 px, the dab-scale grain band — the corpus brushes' measured dab cadence in this lane is 13.3 px and 19.6 px, bracketed ~1.5× on each side), E_high over f > 1/8 (period < 8 px, sub-dab noise); ratio_b = E_b/(E_low+E_mid+E_high). Ratios are only interpretable next to totalPowerExDc: a flat interior has near-zero power everywhere.",
+    "edgeQuality": "Per column, A* = max_y A; walk outward from the centre row to the linearly interpolated crossings of 0.9·A* (y90) and 0.1·A* (y10); transitionWidth = |y10 − y90| px, averaged over all columns and both sides; transitionWidthPerRadius = transitionWidth / mean(distance from centre to outermost A > 0). Discreteness: 32-bin histogram of the COVERAGE A/A* over the y90..y10 band (±1 px) with probabilities p_i, H = −Σ p_i log2 p_i bits, aliasingIndex = 1 − H/log2(32) ∈ [0,1] (1 = the transition repeats a few coverage levels — stair-stepping; 0 = fully graded). Peak normalisation is required: an absolute-alpha histogram would score a faint brush as discrete purely for being faint. gradationDensity = mean over column-sides of |{distinct 8-bit alpha in the band}| / (band rows); 1 = every transition row carries its own level. Width and discreteness are entangled by construction (a narrow transition has fewer rows) and must be read together.",
+    "dabOverlapUniformity": "Centre-row alpha a(x) over M interior columns, linearly detrended: d(x) = a(x) − (α + βx) with (α,β) the OLS fit; rippleRms = sqrt(mean d²); rippleCv = rippleRms / mean(a). Dominant period from the Hann-tapered 1-D DFT: k* = argmax_{1≤k≤M/2} |D(k)|², ripplePeriod = M/k*. expectedDabSpacing = measuredRadius / dabs_per_actual_radius (libmypaint spaces dabs at actual_radius/dabs_per_actual_radius); ripplePeriodOverDabSpacing ≈ 1 means the ripple IS the dab cadence.",
+    "pressureResponseLinearity": "m(x) = Σ_y A(x,y) is the cross-section ink mass; on the rising half of a triangular 0→1→0 ramp p(x) = 2(x − x₀)/L is known exactly. Over p ∈ [0.1,0.9]: r2Linear = 1 − SS_res/SS_tot for the OLS fit m = a + b·p (ideal = a straight line), r2LogLinear = the same for ln m = a + b·p (exponential response — libmypaint's radius is exp(base + c·p)). taperAsymmetry = sqrt(mean (m(x) − m(2·xm − x))²) / mean((m(x) + m(2·xm − x))/2) about the apex xm; 0 = identical start/end tapers at equal pressure.",
+    "colourMixingAccuracy": "Two crossing colour strokes on one surface, rendered twice: with the brush's own smudge, and with smudge forced to 0. The no-smudge frame IS the linear reference (source-over C = α_B·C_B + (1 − α_B)·C_A). Both frames are composited onto opaque white over the intersection window and compared with CIEDE2000; mean and max are reported. 0 = no colour-mixing model engaged."
+  },
+  "lanes": {
+    "texture": {
+      "width": 448,
+      "height": 256,
+      "centreY": 128,
+      "x0": 64,
+      "x1": 384,
+      "sampleCount": 140,
+      "sampleIntervalMs": 6,
+      "pressure": 0.7,
+      "radiusLogarithmicBase": 4.2,
+      "grainWindow": {
+        "size": 64,
+        "centreX": 224
+      },
+      "interior": {
+        "xLo": 144,
+        "xHi": 304
+      },
+      "edgeColumnStep": 4,
+      "note": "One straight constant-pressure stroke feeds grain + edge + ripple. radius_logarithmic.base_value is pinned so the same 64×64 interior window fits strictly inside both corpus brushes' cores (at native radius ink-crisp's core is ~11 px tall); each brush keeps its own pressure curve, hardness and dab spacing. pressure 0.7 is the highest constant pressure at which neither brush clips alpha at 255 — clipping would erase the interior variation these metrics measure."
+    },
+    "pressure": {
+      "width": 288,
+      "height": 96,
+      "centreY": 48,
+      "x0": 24,
+      "x1": 264,
+      "sampleCount": 160,
+      "sampleIntervalMs": 6,
+      "analysisPressureLo": 0.1,
+      "analysisPressureHi": 0.9,
+      "note": "Native corpus radius, triangular 0→1→0 pressure ramp, constant sample rate (so speed dynamics are symmetric and any asymmetry is history, not speed)."
+    },
+    "mixing": {
+      "size": 160,
+      "strokeLo": 20,
+      "strokeHi": 140,
+      "sampleCount": 80,
+      "sampleIntervalMs": 6,
+      "secondStrokeStartMs": 480,
+      "windowSize": 16,
+      "colorA": [
+        0.02,
+        0.85,
+        0.85
+      ],
+      "colorB": [
+        0.62,
+        0.85,
+        0.85
+      ],
+      "note": "Native corpus radius, constant pressure 1. Colour A horizontal then colour B vertical across it, on one surface."
+    },
+    "seed": 7
+  },
+  "measurements": {
+    "wash-soft": {
+      "dabsPerActualRadius": 3.4,
+      "hardness": 0.34,
+      "smudge": 0.22,
+      "libmypaint": {
+        "frameSha256": {
+          "texture": "e62ac0ee2b3467380d08f93c1a654d04aa936cc2ac3332bcd6193d9bf3cdba5e",
+          "pressure": "7c66c972e8b54b6e78143ac80bcf20a071293e4e13d012c3213cb9e4a81923f2",
+          "mixing": "8b8d6bf3e56d75d0447599edb7371422558949608deaee760fec19f960c8c95e",
+          "mixingLinear": "7387ba8a1e92026150ff593ba7c0078cadc8a01fce0b9620cea71b8dcdadc5e8"
+        },
+        "grain": {
+          "windowSize": 64,
+          "windowMeanAlpha": 0.246999,
+          "windowStdAlpha": 0.038235,
+          "totalPowerExDc": 0.000130573701,
+          "totalPowerExDcNormalised": 0.002140246,
+          "lowBandEnergy": 0.000125663314,
+          "midBandEnergy": 0.000004762742,
+          "highBandEnergy": 1.47644e-7,
+          "lowBandRatio": 0.962394,
+          "midBandRatio": 0.036476,
+          "highBandRatio": 0.001131,
+          "midBandPowerNormalised": 0.0000780666,
+          "peakRadialFrequencyCyclesPerPx": 0.015625,
+          "peakRadialPeriodPx": 64,
+          "midBandPeakPeriodPx": 28.6217,
+          "radialSpectrum": [
+            0,
+            0.000014666032,
+            7.94674e-7,
+            1.4572e-8,
+            1.847e-9,
+            1.75e-10,
+            5.7e-10,
+            3.61e-10,
+            1.04e-10,
+            2.38e-10,
+            1.31e-10,
+            3.7e-11,
+            1.05e-10,
+            7e-11,
+            2.6e-11,
+            3e-11,
+            3.7e-11,
+            5.4e-11,
+            3.1e-11,
+            1.8e-11,
+            4.2e-11,
+            3.1e-11,
+            5.3e-11,
+            4.6e-11,
+            1.7e-11,
+            3.8e-11,
+            4.9e-11,
+            1.8e-11,
+            1.5e-11,
+            4.8e-11,
+            6.4e-11,
+            2.8e-11,
+            1.7e-11,
+            9e-12,
+            6e-12,
+            1e-11,
+            9e-12,
+            1.6e-11,
+            1.4e-11,
+            1.1e-11,
+            9e-12,
+            1.5e-11,
+            8e-12,
+            2.2e-11,
+            1.5e-11,
+            0,
+            0
+          ]
+        },
+        "edge": {
+          "columnsMeasured": 40,
+          "measuredRadiusPx": 66.5,
+          "peakAlpha": 73.8,
+          "transitionWidthPx": 44.04,
+          "transitionWidthPerRadius": 0.662256,
+          "bandSampleCount": 3824,
+          "distinctAlphaLevels": 64,
+          "gradationDensity": 0.995745,
+          "alphaEntropyBits": 4.726691,
+          "aliasingIndex": 0.054662
+        },
+        "ripple": {
+          "samples": 160,
+          "centrelineMeanAlpha": 73.8688,
+          "rippleRmsAlpha": 0.337665,
+          "rippleCv": 0.004571,
+          "ripplePeriodPx": 20,
+          "expectedDabSpacingPx": 19.5588,
+          "ripplePeriodOverDabSpacing": 1.022556,
+          "saturatedCentrelineFraction": 0
+        },
+        "pressure": {
+          "columnsFitted": 97,
+          "massAtPressure": {
+            "0.25": 0.3804,
+            "0.50": 1.5373,
+            "0.75": 4.2745
+          },
+          "r2Linear": 0.873549,
+          "r2LogLinear": 0.974484,
+          "taperAsymmetry": 0.404113,
+          "saturatedCorePixels": 0
+        },
+        "mixing": {
+          "smudgeBaseValue": 0.22,
+          "intersectionMeanAlpha": 198.7148,
+          "deltaE00VsLinearMean": 7.376384,
+          "deltaE00VsLinearMax": 8.324587,
+          "identicalToLinear": false
+        }
+      },
+      "hokusai": {
+        "frameSha256": {
+          "texture": "80f43a6971420f026cd6f7dca0a98d621106afdf907702cd769af3b9773c6f89",
+          "pressure": "0475cae5cca27bcdbb7b59160bdf471702bcc843dc644e2c7350222a3c7f9e91",
+          "mixing": "5d17fe0c7cef120f8818d18d3fd5a8e8ea0ee03536291ecbdb56ea993f9729eb",
+          "mixingLinear": "c9067dd047e4366953f6bb7d6f585fc829a88b6443d4ac9294b777727dc2bce6"
+        },
+        "grain": {
+          "windowSize": 64,
+          "windowMeanAlpha": 0.246929,
+          "windowStdAlpha": 0.038273,
+          "totalPowerExDc": 0.000130388973,
+          "totalPowerExDcNormalised": 0.0021384447,
+          "lowBandEnergy": 0.000125465483,
+          "midBandEnergy": 0.000004779893,
+          "highBandEnergy": 1.43597e-7,
+          "lowBandRatio": 0.96224,
+          "midBandRatio": 0.036659,
+          "highBandRatio": 0.001101,
+          "midBandPowerNormalised": 0.0000783926,
+          "peakRadialFrequencyCyclesPerPx": 0.015625,
+          "peakRadialPeriodPx": 64,
+          "midBandPeakPeriodPx": 28.6217,
+          "radialSpectrum": [
+            0,
+            0.000014641014,
+            7.9479e-7,
+            1.5745e-8,
+            1.443e-9,
+            2.19e-10,
+            5.68e-10,
+            3.9e-10,
+            1.76e-10,
+            2.49e-10,
+            9.2e-11,
+            3e-11,
+            6.8e-11,
+            4.6e-11,
+            3.3e-11,
+            3.3e-11,
+            2.8e-11,
+            2.8e-11,
+            2.7e-11,
+            3e-11,
+            4.1e-11,
+            2.4e-11,
+            4.2e-11,
+            3.4e-11,
+            1.8e-11,
+            4.3e-11,
+            4.9e-11,
+            2e-11,
+            1.4e-11,
+            4.9e-11,
+            8.3e-11,
+            2.8e-11,
+            1.6e-11,
+            1.1e-11,
+            1.1e-11,
+            7e-12,
+            2.3e-11,
+            1.3e-11,
+            1.1e-11,
+            1.4e-11,
+            1.1e-11,
+            1.6e-11,
+            1.3e-11,
+            2.6e-11,
+            2.5e-11,
+            0,
+            0
+          ]
+        },
+        "edge": {
+          "columnsMeasured": 40,
+          "measuredRadiusPx": 66.5,
+          "peakAlpha": 73.8,
+          "transitionWidthPx": 44.045,
+          "transitionWidthPerRadius": 0.662331,
+          "bandSampleCount": 3824,
+          "distinctAlphaLevels": 63,
+          "gradationDensity": 0.996277,
+          "alphaEntropyBits": 4.730287,
+          "aliasingIndex": 0.053943
+        },
+        "ripple": {
+          "samples": 160,
+          "centrelineMeanAlpha": 73.8563,
+          "rippleRmsAlpha": 0.345209,
+          "rippleCv": 0.004674,
+          "ripplePeriodPx": 20,
+          "expectedDabSpacingPx": 19.5588,
+          "ripplePeriodOverDabSpacing": 1.022556,
+          "saturatedCentrelineFraction": 0
+        },
+        "pressure": {
+          "columnsFitted": 97,
+          "massAtPressure": {
+            "0.25": 0.3843,
+            "0.50": 1.5294,
+            "0.75": 4.2824
+          },
+          "r2Linear": 0.874248,
+          "r2LogLinear": 0.970657,
+          "taperAsymmetry": 0.402687,
+          "saturatedCorePixels": 0
+        },
+        "mixing": {
+          "smudgeBaseValue": 0.22,
+          "intersectionMeanAlpha": 198.5938,
+          "deltaE00VsLinearMean": 4.454886,
+          "deltaE00VsLinearMax": 5.222426,
+          "identicalToLinear": false
+        }
+      },
+      "crossEngine": {
+        "grainMidBandRatioDelta": 0.000183,
+        "grainLowBandRatioDelta": -0.000154,
+        "transitionWidthDeltaPx": 0.005,
+        "aliasingIndexDelta": -0.000719,
+        "rippleCvDelta": 0.000103,
+        "r2LogLinearDelta": -0.003827,
+        "mixingCrossEngineDeltaE00Mean": 18.174328,
+        "mixingCrossEngineDeltaE00Max": 20.943397
+      }
+    },
+    "ink-crisp": {
+      "dabsPerActualRadius": 5.5,
+      "hardness": 0.92,
+      "smudge": 0,
+      "libmypaint": {
+        "frameSha256": {
+          "texture": "db80741fe35758c2555b477fbc8d579516cf5349f76a0939f592740ef843bea5",
+          "pressure": "d9ecc8d663829cff66c7c47c11ca4d0012e8f10f97c571afebee3364b3981668",
+          "mixing": "d819de79a3226e708e35e9d73aa2f025e0aa3fc53132eb95e50d6aeeca29d0cc",
+          "mixingLinear": "d819de79a3226e708e35e9d73aa2f025e0aa3fc53132eb95e50d6aeeca29d0cc"
+        },
+        "grain": {
+          "windowSize": 64,
+          "windowMeanAlpha": 0.754038,
+          "windowStdAlpha": 0.016087,
+          "totalPowerExDc": 0.000026082497,
+          "totalPowerExDcNormalised": 0.0000458735,
+          "lowBandEnergy": 0.000010521809,
+          "midBandEnergy": 0.000012664852,
+          "highBandEnergy": 0.000002895836,
+          "lowBandRatio": 0.403405,
+          "midBandRatio": 0.485569,
+          "highBandRatio": 0.111026,
+          "midBandPowerNormalised": 0.0000222748,
+          "peakRadialFrequencyCyclesPerPx": 0.015625,
+          "peakRadialPeriodPx": 64,
+          "midBandPeakPeriodPx": 12.8,
+          "radialSpectrum": [
+            0,
+            0.000001235178,
+            6.0845e-8,
+            2.42e-9,
+            1.53029e-7,
+            1.90548e-7,
+            2.7052e-8,
+            9.3e-11,
+            6.34e-10,
+            2.0535e-8,
+            1.8944e-8,
+            1.108e-9,
+            3.4e-11,
+            1.44e-10,
+            1.685e-9,
+            8.8e-10,
+            3.2e-11,
+            1.3e-11,
+            1.2e-11,
+            2.5e-11,
+            2.1e-11,
+            2.2e-11,
+            1.3e-11,
+            2.3e-11,
+            4.3e-11,
+            3.6e-11,
+            2.7e-11,
+            1.6e-11,
+            5.1e-11,
+            8.1e-11,
+            6.9e-11,
+            5e-11,
+            2.9e-11,
+            2.8e-11,
+            2.5e-11,
+            1.6e-11,
+            2.8e-11,
+            4e-11,
+            2.6e-11,
+            4.1e-11,
+            2.5e-11,
+            3.4e-11,
+            4.8e-11,
+            3.4e-11,
+            1e-12,
+            0,
+            0
+          ]
+        },
+        "edge": {
+          "columnsMeasured": 40,
+          "measuredRadiusPx": 73.325,
+          "peakAlpha": 195.45,
+          "transitionWidthPx": 30.235,
+          "transitionWidthPerRadius": 0.412342,
+          "bandSampleCount": 2714,
+          "distinctAlphaLevels": 116,
+          "gradationDensity": 0.782115,
+          "alphaEntropyBits": 4.132138,
+          "aliasingIndex": 0.173572
+        },
+        "ripple": {
+          "samples": 160,
+          "centrelineMeanAlpha": 195.4188,
+          "rippleRmsAlpha": 2.306036,
+          "rippleCv": 0.0118,
+          "ripplePeriodPx": 13.3333,
+          "expectedDabSpacingPx": 13.3318,
+          "ripplePeriodOverDabSpacing": 1.000114,
+          "saturatedCentrelineFraction": 0
+        },
+        "pressure": {
+          "columnsFitted": 97,
+          "massAtPressure": {
+            "0.25": 1.0353,
+            "0.50": 3.1765,
+            "0.75": 7.3333
+          },
+          "r2Linear": 0.908483,
+          "r2LogLinear": 0.980607,
+          "taperAsymmetry": 0.037298,
+          "saturatedCorePixels": 424
+        },
+        "mixing": {
+          "smudgeBaseValue": 0,
+          "intersectionMeanAlpha": 239.0625,
+          "deltaE00VsLinearMean": 0,
+          "deltaE00VsLinearMax": 0,
+          "identicalToLinear": true
+        }
+      },
+      "hokusai": {
+        "frameSha256": {
+          "texture": "5f82ac56a9ffbe7ba319ed02f5d6a40173e57e2914d162c411e634e91f084973",
+          "pressure": "f1e2d749c5249302d00c21f4ce0b85d36b4036b549cc488e43f85aeaebc66523",
+          "mixing": "0591721cb927d2f82ad14ce800ff2f9a49f542932c9ebb684bfe35bca95f76c3",
+          "mixingLinear": "0591721cb927d2f82ad14ce800ff2f9a49f542932c9ebb684bfe35bca95f76c3"
+        },
+        "grain": {
+          "windowSize": 64,
+          "windowMeanAlpha": 0.754038,
+          "windowStdAlpha": 0.016087,
+          "totalPowerExDc": 0.000026082497,
+          "totalPowerExDcNormalised": 0.0000458735,
+          "lowBandEnergy": 0.000010521809,
+          "midBandEnergy": 0.000012664852,
+          "highBandEnergy": 0.000002895836,
+          "lowBandRatio": 0.403405,
+          "midBandRatio": 0.485569,
+          "highBandRatio": 0.111026,
+          "midBandPowerNormalised": 0.0000222748,
+          "peakRadialFrequencyCyclesPerPx": 0.015625,
+          "peakRadialPeriodPx": 64,
+          "midBandPeakPeriodPx": 12.8,
+          "radialSpectrum": [
+            0,
+            0.000001235178,
+            6.0845e-8,
+            2.42e-9,
+            1.53029e-7,
+            1.90548e-7,
+            2.7052e-8,
+            9.3e-11,
+            6.34e-10,
+            2.0535e-8,
+            1.8944e-8,
+            1.108e-9,
+            3.4e-11,
+            1.44e-10,
+            1.685e-9,
+            8.8e-10,
+            3.2e-11,
+            1.3e-11,
+            1.2e-11,
+            2.5e-11,
+            2.1e-11,
+            2.2e-11,
+            1.3e-11,
+            2.3e-11,
+            4.3e-11,
+            3.6e-11,
+            2.7e-11,
+            1.6e-11,
+            5.1e-11,
+            8.1e-11,
+            6.9e-11,
+            5e-11,
+            2.9e-11,
+            2.8e-11,
+            2.5e-11,
+            1.6e-11,
+            2.8e-11,
+            4e-11,
+            2.6e-11,
+            4.1e-11,
+            2.5e-11,
+            3.4e-11,
+            4.8e-11,
+            3.4e-11,
+            1e-12,
+            0,
+            0
+          ]
+        },
+        "edge": {
+          "columnsMeasured": 40,
+          "measuredRadiusPx": 73.325,
+          "peakAlpha": 195.45,
+          "transitionWidthPx": 30.235,
+          "transitionWidthPerRadius": 0.412342,
+          "bandSampleCount": 2714,
+          "distinctAlphaLevels": 116,
+          "gradationDensity": 0.782115,
+          "alphaEntropyBits": 4.132138,
+          "aliasingIndex": 0.173572
+        },
+        "ripple": {
+          "samples": 160,
+          "centrelineMeanAlpha": 195.4188,
+          "rippleRmsAlpha": 2.306036,
+          "rippleCv": 0.0118,
+          "ripplePeriodPx": 13.3333,
+          "expectedDabSpacingPx": 13.3318,
+          "ripplePeriodOverDabSpacing": 1.000114,
+          "saturatedCentrelineFraction": 0
+        },
+        "pressure": {
+          "columnsFitted": 97,
+          "massAtPressure": {
+            "0.25": 1.0353,
+            "0.50": 3.1765,
+            "0.75": 7.3333
+          },
+          "r2Linear": 0.908483,
+          "r2LogLinear": 0.980607,
+          "taperAsymmetry": 0.037298,
+          "saturatedCorePixels": 424
+        },
+        "mixing": {
+          "smudgeBaseValue": 0,
+          "intersectionMeanAlpha": 239.0625,
+          "deltaE00VsLinearMean": 0,
+          "deltaE00VsLinearMax": 0,
+          "identicalToLinear": true
+        }
+      },
+      "crossEngine": {
+        "grainMidBandRatioDelta": 0,
+        "grainLowBandRatioDelta": 0,
+        "transitionWidthDeltaPx": 0,
+        "aliasingIndexDelta": 0,
+        "rippleCvDelta": 0,
+        "r2LogLinearDelta": 0,
+        "mixingCrossEngineDeltaE00Mean": 21.384322,
+        "mixingCrossEngineDeltaE00Max": 24.404715
+      }
+    }
+  },
+  "gate": {
+    "rule": "Regression band for a measured metric = [min/2, max·2] over the two engines (2× headroom around the measurement, clamped to 1 for [0,1] metrics). tests/visual/brush-texture-quality.test.ts hardcodes these bounds with the measured values quoted, and additionally re-renders both engines and re-derives every metric to catch drift below the band width.",
+    "bounds": {
+      "wash-soft": {
+        "grainMidBandRatio": {
+          "lo": 0.018238,
+          "hi": 0.073318
+        },
+        "grainLowBandRatio": {
+          "lo": 0.48112,
+          "hi": 1
+        },
+        "grainTotalPowerExDc": {
+          "lo": 0.000065,
+          "hi": 0.000261
+        },
+        "edgeTransitionWidthPx": {
+          "lo": 22.02,
+          "hi": 88.09
+        },
+        "edgeTransitionWidthPerRadius": {
+          "lo": 0.331128,
+          "hi": 1
+        },
+        "edgeAliasingIndex": {
+          "lo": 0.026972,
+          "hi": 0.109324
+        },
+        "edgeGradationDensity": {
+          "lo": 0.497873,
+          "hi": 1
+        },
+        "rippleCv": {
+          "lo": 0.002286,
+          "hi": 0.009348
+        },
+        "pressureR2LogLinear": {
+          "lo": 0.485329,
+          "hi": 1
+        },
+        "pressureTaperAsymmetry": {
+          "lo": 0.201344,
+          "hi": 0.808226
+        },
+        "mixingDeltaE00VsLinearMean": {
+          "lo": 2.227443,
+          "hi": 14.752768
+        }
+      },
+      "ink-crisp": {
+        "grainMidBandRatio": {
+          "lo": 0.242785,
+          "hi": 0.971138
+        },
+        "grainLowBandRatio": {
+          "lo": 0.201703,
+          "hi": 0.80681
+        },
+        "grainTotalPowerExDc": {
+          "lo": 0.000013,
+          "hi": 0.000052
+        },
+        "edgeTransitionWidthPx": {
+          "lo": 15.1175,
+          "hi": 60.47
+        },
+        "edgeTransitionWidthPerRadius": {
+          "lo": 0.206171,
+          "hi": 0.824684
+        },
+        "edgeAliasingIndex": {
+          "lo": 0.086786,
+          "hi": 0.347144
+        },
+        "edgeGradationDensity": {
+          "lo": 0.391058,
+          "hi": 1
+        },
+        "rippleCv": {
+          "lo": 0.0059,
+          "hi": 0.0236
+        },
+        "pressureR2LogLinear": {
+          "lo": 0.490304,
+          "hi": 1
+        },
+        "pressureTaperAsymmetry": {
+          "lo": 0.018649,
+          "hi": 0.074596
+        },
+        "mixingDeltaE00VsLinearMean": {
+          "lo": 0,
+          "hi": 0
+        }
+      }
+    },
+    "notes": [
+      "Alpha is the cross-engine axis. RGB readback differs by construction (libmypaint v1 non-linear fix15 vs hokusai linear→sRGB), so crossEngine.mixingCrossEngineDeltaE00* is recorded as evidence only and is never gated; the within-engine deltaE00VsLinear* numbers compare two frames from the SAME engine and are therefore self-consistent.",
+      "grain ratios are dimensionless and only interpretable together with grain.totalPowerExDc — a perfectly flat interior has near-zero power in every band.",
+      "pressure.saturatedCorePixels counts pixels at alpha 255 in the pressure lane: for an opaque brush the cross-section mass saturates into a pure width measurement near the apex, which is a property of the brush, not an artefact."
+    ]
+  }
+}

@@ -1,0 +1,291 @@
+{
+  "harness": "packages/studio-engine-registry/src/__tests__/wgsl-variants-pipeline-probe.test.ts (WGSL_VARIANT_PIPELINE_PROBE=1)",
+  "note": "V12 lane 5 (WESL_SHADER_PLATFORM) 마지막 재개 게이트 근거 — 512² RGBA 5연산 체인(밝기→대비→HSL→레벨→커브): 정적 커널 경로 모사(파이프라인 5·프레임당 5디스패치 핑퐁) vs 융합 variant(파이프라인 1·1디스패치) 실측",
+  "measuredAt": "2026-08-08T00:14:15.069Z",
+  "browser": {
+    "launch": "playwright chromium headless shell (metal, unsafe-webgpu)",
+    "version": "140.0.7339.186"
+  },
+  "adapter": {
+    "vendor": "apple",
+    "architecture": "metal-3",
+    "device": "",
+    "description": ""
+  },
+  "concurrentLoad": {
+    "note": "24h 소크(pnpm run soak:studio-engine → tests/benchmarks/harness/soak.ts + vitest fork workers)가 측정 내내 이 머신에서 병행 실행 중 — 절대 시간은 부풀려질 수 있어 A/B 프레임 교차 실행 + 중앙값(p50) 기반 비교로 설계했다",
+    "loadavgBeforeLaunch": [
+      3.371,
+      4.628,
+      4.105
+    ],
+    "loadavgAfterMeasurement": [
+      3.371,
+      4.628,
+      4.105
+    ],
+    "cpuCount": 12
+  },
+  "config": {
+    "image": "512x512 RGBA (deterministic LCG)",
+    "pixelCount": 262144,
+    "chain": [
+      "brightness",
+      "contrast",
+      "hsl",
+      "levels",
+      "curves"
+    ],
+    "totalFramesPerApproach": 60,
+    "warmupFramesExcluded": 10,
+    "measuredFrames": 50,
+    "frameSync": "device.queue.onSubmittedWorkDone() per frame",
+    "scheduling": "A/B frames interleaved per iteration (background-load drift fairness)",
+    "gpuTiming": "timestamp-query — 별도 페이즈에서 동일 프레임 수 교차 계측(A: 패스 5개 begin/end 10쿼리 → 합·스팬, B: 단일 패스 2쿼리)"
+  },
+  "approaches": {
+    "staticPathEmulation": {
+      "pipelineCount": 5,
+      "dispatchesPerFrame": 5,
+      "intermediateBuffers": "ping-pong x2",
+      "variantKeys": [
+        "wgslfx-v1-bc-d269a5e7",
+        "wgslfx-v1-bc-6c89a728",
+        "wgslfx-v1-hsl-29b08829",
+        "wgslfx-v1-lv-113694b0",
+        "wgslfx-v1-cv-4bfd893b"
+      ],
+      "pipelineCreate": {
+        "totalMs": 15,
+        "perPipelineMs": [
+          4.4,
+          2.7,
+          2.6,
+          2.8,
+          2.5
+        ]
+      },
+      "frame": {
+        "p50": 2.6,
+        "p95": 2.7,
+        "p99": 2.8,
+        "mean": 2.61,
+        "stddev": 0.093,
+        "min": 2.3,
+        "max": 2.8,
+        "jankP99OverP50": 1.077
+      },
+      "frameSamplesMs": [
+        2.5,
+        2.7,
+        2.6,
+        2.5,
+        2.6,
+        2.7,
+        2.7,
+        2.6,
+        2.4,
+        2.6,
+        2.6,
+        2.5,
+        2.6,
+        2.7,
+        2.7,
+        2.7,
+        2.5,
+        2.8,
+        2.7,
+        2.6,
+        2.7,
+        2.6,
+        2.6,
+        2.6,
+        2.6,
+        2.8,
+        2.6,
+        2.7,
+        2.7,
+        2.7,
+        2.6,
+        2.6,
+        2.6,
+        2.6,
+        2.6,
+        2.7,
+        2.3,
+        2.6,
+        2.6,
+        2.6,
+        2.6,
+        2.6,
+        2.7,
+        2.6,
+        2.4,
+        2.6,
+        2.6,
+        2.6,
+        2.6,
+        2.5
+      ],
+      "gpuExecutionMs": {
+        "passSum": {
+          "p50": 0.142,
+          "p95": 0.418,
+          "p99": 1.543,
+          "mean": 0.202,
+          "stddev": 0.279,
+          "min": 0.12,
+          "max": 1.543,
+          "jankP99OverP50": 10.898
+        },
+        "firstBeginToLastEndSpan": {
+          "p50": 0.145,
+          "p95": 0.422,
+          "p99": 1.546,
+          "mean": 0.205,
+          "stddev": 0.279,
+          "min": 0.122,
+          "max": 1.546,
+          "jankP99OverP50": 10.685
+        }
+      }
+    },
+    "fusedVariant": {
+      "pipelineCount": 1,
+      "dispatchesPerFrame": 1,
+      "intermediateBuffers": "none",
+      "variantKey": "wgslfx-v1-bc.bc.hsl.lv.cv-d8ac14e5",
+      "pipelineCreate": {
+        "totalMs": 2.5,
+        "perPipelineMs": [
+          2.5
+        ]
+      },
+      "frame": {
+        "p50": 2.6,
+        "p95": 2.7,
+        "p99": 2.8,
+        "mean": 2.584,
+        "stddev": 0.104,
+        "min": 2.3,
+        "max": 2.8,
+        "jankP99OverP50": 1.077
+      },
+      "frameSamplesMs": [
+        2.5,
+        2.5,
+        2.7,
+        2.7,
+        2.6,
+        2.4,
+        2.6,
+        2.7,
+        2.7,
+        2.6,
+        2.7,
+        2.7,
+        2.5,
+        2.5,
+        2.5,
+        2.6,
+        2.6,
+        2.4,
+        2.6,
+        2.6,
+        2.6,
+        2.4,
+        2.6,
+        2.6,
+        2.7,
+        2.4,
+        2.7,
+        2.6,
+        2.5,
+        2.3,
+        2.6,
+        2.6,
+        2.6,
+        2.6,
+        2.6,
+        2.6,
+        2.6,
+        2.6,
+        2.3,
+        2.6,
+        2.6,
+        2.6,
+        2.6,
+        2.7,
+        2.7,
+        2.6,
+        2.6,
+        2.6,
+        2.6,
+        2.8
+      ],
+      "gpuExecutionMs": {
+        "pass": {
+          "p50": 0.037,
+          "p95": 0.969,
+          "p99": 1.452,
+          "mean": 0.105,
+          "stddev": 0.274,
+          "min": 0.035,
+          "max": 1.452,
+          "jankP99OverP50": 38.862
+        }
+      }
+    }
+  },
+  "comparison": {
+    "pipelineCountReduction": "5 → 1 (-80%)",
+    "pipelineCreateTotalRatioAOverB": 6,
+    "frameP50SpeedupAOverB": 1,
+    "frameP95SpeedupAOverB": 1,
+    "frameP99SpeedupAOverB": 1,
+    "jankStddevRatioAOverB": 0.894,
+    "jankP99OverP50": {
+      "staticPath": 1.077,
+      "fused": 1.077
+    },
+    "gpuExecutionP50SpeedupAOverB": 3.838
+  },
+  "pixelParity": {
+    "tolerancePerChannel": 2,
+    "totalColorChannels": 786432,
+    "staticVsCpu": {
+      "maxColorDiff": 0,
+      "mismatchedColorChannels": 0,
+      "alphaMismatches": 0
+    },
+    "fusedVsCpu": {
+      "maxColorDiff": 0,
+      "mismatchedColorChannels": 0,
+      "alphaMismatches": 0
+    },
+    "staticVsFused": {
+      "maxColorDiff": 0,
+      "mismatchedColorChannels": 0,
+      "alphaMismatches": 0
+    }
+  },
+  "gate": {
+    "criterion": "파이프라인 수 감소(정의적 5→1) + jank 감소 실측(벽시계 프레임 stddev·p99/p50, 최초 사용 파이프라인 생성 스톨, GPU 패스 실행 시간)",
+    "pipelineCountReduced": true,
+    "pipelineCreateTimeReduced": true,
+    "wallClockFrame": {
+      "timerResolutionMs": 0.1,
+      "p50DeltaMs": 0,
+      "frameP50Reduced": false,
+      "jankStddevReduced": false,
+      "jankP99OverP50Reduced": false,
+      "verdict": "parity-at-sync-floor",
+      "note": "512² 체인의 GPU 실행(수백µs)이 submit→onSubmittedWorkDone 왕복(~2.5ms)에 가려져 두 방식 모두 같은 측정 플로어에 앉는다 — 벽시계 프레임/jank 차이는 타이머 해상도(100µs) 이내"
+    },
+    "gpuExecution": {
+      "available": true,
+      "reduced": true
+    },
+    "passed": true
+  }
+}

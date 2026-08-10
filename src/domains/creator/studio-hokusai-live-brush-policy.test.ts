@@ -16,6 +16,7 @@ import {
 } from "./studio-hokusai-live-brush-router";
 import {
   planStudioHokusaiNaturalMediaRender,
+  type StudioHokusaiMaterialProfileId,
   type StudioHokusaiNaturalMediaPresetId,
 } from "./studio-hokusai-natural-media-contract";
 import {
@@ -48,6 +49,23 @@ const EXPECTED_CORE_AUTO_ROUTE = new Map<string, StudioHokusaiNaturalMediaPreset
   ["brush", "oil"],
   ["flat-brush", "oil"],
 ]);
+const EXPECTED_CORE_MATERIAL_PROFILE = new Map<string, StudioHokusaiMaterialProfileId>([
+  ...[...EXPECTED_CORE_AUTO_ROUTE.keys()]
+    .filter((identity) => EXPECTED_CORE_AUTO_ROUTE.get(identity) === "pencil")
+    .map((identity) => [identity, "pencil" as const] as const),
+  ["charcoal", "charcoal"],
+  ["chalk", "chalk"],
+  ["crayon", "crayon"],
+  ["dry-media", "charcoal"],
+  ["pastel", "pastel"],
+  ["oil-pastel", "oil-pastel"],
+  ["oil", "oil"],
+  ["acrylic", "acrylic"],
+  ["paint-tube", "painterly"],
+  ["gouache", "gouache"],
+  ["brush", "painterly"],
+  ["flat-brush", "painterly"],
+]);
 
 const CAPABILITIES: StudioHokusaiLiveBrushCapabilities = {
   engine: "reearth-hokusai",
@@ -62,6 +80,7 @@ const CAPABILITIES: StudioHokusaiLiveBrushCapabilities = {
   canonicalPng: true,
   liveCommitParityReceipt: true,
   materialTexture: "studio-hokusai-material-texture-v2",
+  materialProfileRouting: "identity-profile-v1",
   endpointPolicy: "tapered-start-no-dab-carrier-v1",
   mainThreadFullFrameCopy: false,
 };
@@ -118,7 +137,7 @@ describe("Studio Hokusai auto-route catalogue quality policy", () => {
     ]);
   });
 
-  it("audits all 226 identities and never promotes a procedural carrier as charcoal", () => {
+  it("audits all 230 identities and never promotes a procedural carrier as charcoal", () => {
     const professional = materializeAllStudioBrushPackSelections();
     const identities = [
       ...BRUSH_PRESETS.map((preset) => ({
@@ -132,9 +151,9 @@ describe("Studio Hokusai auto-route catalogue quality policy", () => {
         runtimeBrushId: selection.runtimeBrushId,
       })),
     ];
-    expect(identities).toHaveLength(226);
+    expect(identities).toHaveLength(230);
     expect(STUDIO_BRUSH_PACK_DESCRIPTORS).toHaveLength(professional.length);
-    expect(new Set(identities.map(({ catalogId }) => catalogId))).toHaveLength(226);
+    expect(new Set(identities.map(({ catalogId }) => catalogId))).toHaveLength(230);
 
     const admitted = identities.filter(({ catalogId, runtimeBrushId }) => (
       resolveStudioHokusaiLiveAutoRouteDecision(runtimeBrushId, catalogId).status
@@ -168,6 +187,7 @@ describe("Studio Hokusai auto-route catalogue quality policy", () => {
 
     for (const [index, preset] of eligiblePresets.entries()) {
       const presetId = EXPECTED_CORE_AUTO_ROUTE.get(preset.id)!;
+      const materialProfileId = EXPECTED_CORE_MATERIAL_PROFILE.get(preset.id)!;
       const color = (preset.defaultColor ?? stableColor(index)) as `#${string}`;
       const seed = stableSeed(preset.id);
       const route = resolveStudioHokusaiLiveRoute({
@@ -189,6 +209,7 @@ describe("Studio Hokusai auto-route catalogue quality policy", () => {
       expect(route.presetId).toBe(presetId);
       expect(route.config).toMatchObject({
         presetId,
+        materialProfileId,
         radiusPixels: preset.defaultWidth,
         opacity: preset.defaultOpacity,
         color,
@@ -205,6 +226,7 @@ describe("Studio Hokusai auto-route catalogue quality policy", () => {
         sourceStroke(preset.id, preset.defaultWidth, color),
         {
           presetId,
+          materialProfileId,
           color,
           sizeScale: 1,
           opacity: preset.defaultOpacity,
@@ -216,6 +238,7 @@ describe("Studio Hokusai auto-route catalogue quality policy", () => {
       if (!planned.ok) continue;
       expect(planned.plan).toMatchObject({
         presetId,
+        materialProfileId,
         color,
         opacity: preset.defaultOpacity,
         seed,
@@ -234,6 +257,7 @@ describe("Studio Hokusai auto-route catalogue quality policy", () => {
         "pressure-response",
         "exact-live-commit-receipt",
         "catalog-default-config-snapshot",
+        "identity-specific-material-profile",
       ],
     });
     const withheld = STUDIO_HOKUSAI_LIVE_AUTO_ROUTE_POLICY.withheldSpecialistIdentities;

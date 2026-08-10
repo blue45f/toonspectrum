@@ -15,6 +15,7 @@ import {
   StudioTileDocWebGpuCompositeConsumer,
   type StudioTileDocWebGpuCompositeConsumerOptions,
   type StudioTileDocWebGpuCompositeConsumerStats,
+  type StudioTileDocWebGpuValidationReadback,
 } from "./studio-tiledoc-webgpu-composite-consumer";
 
 import type { StudioTileDocCompositeLayer } from "./studio-tiledoc-composite-plan";
@@ -140,6 +141,9 @@ interface RuntimeConsumer {
   stats(): StudioTileDocWebGpuCompositeConsumerStats;
   invalidate(): void;
   dispose(): void;
+  readbackRetainedTileForValidation?(
+    tileId: string
+  ): Promise<StudioTileDocWebGpuValidationReadback | null>;
 }
 
 interface RuntimeBridge {
@@ -346,6 +350,17 @@ export class StudioTileDocWebGpuRuntime {
       bridge: this.bridge?.stats() ?? null,
       consumer: this.consumer?.stats() ?? null,
     });
+  }
+
+  /** Quality-lab only; never called by frame scheduling or product interaction paths. */
+  public readbackRetainedTileForValidation(
+    tileId: string
+  ): Promise<StudioTileDocWebGpuValidationReadback | null> {
+    if (this.disposed || this.active || this.pending || !this.consumer) {
+      return Promise.resolve(null);
+    }
+    return this.consumer.readbackRetainedTileForValidation?.(tileId)
+      ?? Promise.resolve(null);
   }
 
   public resize(input: StudioTileDocWebGpuRuntimeResize): StudioTileDocWebGpuRuntimeResizeResult {

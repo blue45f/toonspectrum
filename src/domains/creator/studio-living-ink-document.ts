@@ -52,7 +52,8 @@ export interface StudioLivingInkCanonicalResult {
 export interface StudioLivingInkCanonicalTransaction {
   readonly kind: "studio-living-ink/canonical-transaction";
   readonly version: 1;
-  readonly historyLabel: "Living Ink 물리 잉크";
+  /** Product-facing undo label (Korean “수채 번짐”, not internal Living Ink codename). */
+  readonly historyLabel: "수채 번짐 물리 잉크";
   readonly historyEntryCount: 1;
   readonly canonicalImageId: string;
   readonly hiddenSourceId: string | null;
@@ -173,13 +174,13 @@ export async function verifyStudioLivingInkCanonicalImageAuthority(input: Readon
   ) {
     return canonicalImageFailure(
       "receipt-invalid",
-      "Living Ink 물리 영수증 또는 operation journal이 손상되었습니다.",
+      "수채 번짐 물리 영수증 또는 operation journal이 손상되었습니다.",
     );
   }
   if (receipt.pageId !== input.expectedPageId) {
     return canonicalImageFailure(
       "page-mismatch",
-      "Living Ink PNG 영수증이 현재 페이지를 가리키지 않습니다.",
+      "수채 번짐 PNG 영수증이 현재 페이지를 가리키지 않습니다.",
     );
   }
   if (
@@ -191,14 +192,14 @@ export async function verifyStudioLivingInkCanonicalImageAuthority(input: Readon
   ) {
     return canonicalImageFailure(
       "geometry-mismatch",
-      "Living Ink canonical PNG의 문서 좌표 또는 크기가 영수증과 다릅니다.",
+      "수채 번짐 저장 PNG의 문서 좌표 또는 크기가 영수증과 다릅니다.",
     );
   }
   const bytes = decodeCanonicalPngDataUrl(input.image.src);
   if (!bytes) {
     return canonicalImageFailure(
       "png-invalid",
-      "Living Ink canonical 레이어가 실제 PNG 바이트가 아닙니다.",
+      "수채 번짐 저장 레이어가 실제 PNG 바이트가 아닙니다.",
     );
   }
   const actual = await sha256Bytes(bytes);
@@ -206,7 +207,7 @@ export async function verifyStudioLivingInkCanonicalImageAuthority(input: Readon
   if (actual !== receipt.canonicalPngSha256) {
     return canonicalImageFailure(
       "png-sha256-mismatch",
-      "Living Ink canonical PNG의 실제 바이트 SHA-256이 저장 영수증과 다릅니다.",
+      "수채 번짐 저장 PNG의 실제 바이트 SHA-256이 저장 영수증과 다릅니다.",
     );
   }
   return Object.freeze({
@@ -290,10 +291,10 @@ export function createStudioLivingInkCanonicalTransaction(input: Readonly<{
   const source = sourceIndex >= 0 ? input.elements[sourceIndex] : null;
   const drawSource = source?.type === "draw" ? source as DrawEl : null;
   if (input.sourceElementId && (!drawSource || drawSource.hidden === true)) {
-    return failure("source-unavailable", "Living Ink의 복원 가능한 원본 자유곡선을 찾지 못했습니다.");
+    return failure("source-unavailable", "수채 번짐의 복원 가능한 원본 자유곡선을 찾지 못했습니다.");
   }
   if (drawSource && (input.mutationLocked || drawSource.locked)) {
-    return failure("source-locked", "잠긴 획에는 Living Ink 결과를 적용할 수 없습니다.");
+    return failure("source-locked", "잠긴 획에는 수채 번짐 결과를 적용할 수 없습니다.");
   }
 
   const existingImageIndex = input.elements.findIndex((element) =>
@@ -303,7 +304,7 @@ export function createStudioLivingInkCanonicalTransaction(input: Readonly<{
     existingImageIndex < 0
     && input.elements.some(({ id }) => id === input.canonicalImageId)
   ) {
-    return failure("duplicate-image-id", "Living Ink PNG 레이어 ID가 기존 요소와 겹칩니다.");
+    return failure("duplicate-image-id", "수채 번짐 PNG 레이어 ID가 기존 요소와 겹칩니다.");
   }
 
   const previousReceipt = existingImageIndex >= 0
@@ -317,7 +318,7 @@ export function createStudioLivingInkCanonicalTransaction(input: Readonly<{
     ],
   });
   if (!receipt || !input.result.src.startsWith("data:image/png;base64,")) {
-    return failure("canonical-invalid", "Living Ink 물리 상태 또는 canonical PNG 영수증이 올바르지 않습니다.");
+    return failure("canonical-invalid", "수채 번짐 물리 상태 또는 저장 PNG 영수증이 올바르지 않습니다.");
   }
 
   const next = input.elements.slice();
@@ -325,7 +326,7 @@ export function createStudioLivingInkCanonicalTransaction(input: Readonly<{
     const hiddenSource: DrawEl = Object.freeze({
       ...drawSource,
       hidden: true,
-      name: `${drawSource.name ?? drawSource.brushCatalogName ?? drawSource.brush ?? "선화"} · Living Ink 복원 원본`,
+      name: `${drawSource.name ?? drawSource.brushCatalogName ?? drawSource.brush ?? "선화"} · 수채 번짐 복원 원본`,
     });
     next[sourceIndex] = hiddenSource;
   }
@@ -343,7 +344,7 @@ export function createStudioLivingInkCanonicalTransaction(input: Readonly<{
     width: input.result.documentWidth,
     height: input.result.documentHeight,
     rotation: 0,
-    name: "Living Ink · 물리 잉크/물/정착",
+    name: "수채 번짐 · 물리 잉크/물/정착",
     lockAspect: true,
     blendMode: "multiply",
     livingInkReceipt: receipt,
@@ -361,7 +362,7 @@ export function createStudioLivingInkCanonicalTransaction(input: Readonly<{
     transaction: Object.freeze({
       kind: "studio-living-ink/canonical-transaction",
       version: 1,
-      historyLabel: "Living Ink 물리 잉크",
+      historyLabel: "수채 번짐 물리 잉크",
       historyEntryCount: 1,
       canonicalImageId: canonicalImage.id,
       hiddenSourceId: drawSource?.id ?? null,

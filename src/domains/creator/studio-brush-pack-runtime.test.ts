@@ -566,7 +566,8 @@ describe("procedural brush pack runtime", () => {
       { id: "palette-knife-edge", tip: "c344c2cf", dabs: "ae46755f", count: 70 },
       { id: "watercolor-salt-bloom", tip: "206daca6", dabs: "c11da11a", count: 7 },
       { id: "ribbon-satin-fold", tip: "30f1532a", dabs: "ac5ec2b4", count: 17 },
-      { id: "smoke-wisp-layered", tip: "115d49be", dabs: "a4a3d63c", count: 16 },
+      // Denser soft wash carriers (continuous-carrier-quality-v3) add stations on layered smoke.
+      { id: "smoke-wisp-layered", tip: "115d49be", dabs: "b9897050", count: 26 },
       { id: "flower-petal-scatter", tip: "a7be40ba", dabs: "616763b3", count: 9 },
       { id: "halftone-gradient-dot", tip: "ea3c1dbd", dabs: "96b49af2", count: 13 },
       { id: "focus-ray-streak", tip: "194e1e56", dabs: "9d9ff412", count: 27 },

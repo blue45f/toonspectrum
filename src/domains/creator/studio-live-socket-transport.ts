@@ -303,7 +303,9 @@ export function resolveStudioLiveSocketRuntimeEndpoint(
 
 function runtimeSocketEndpoint(): string | null {
   return resolveStudioLiveSocketRuntimeEndpoint({
-    explicitOrigin: import.meta.env.VITE_STUDIO_LIVE_ORIGIN,
+    explicitOrigin:
+      import.meta.env.VITE_STUDIO_LIVE_ORIGIN ||
+      import.meta.env.VITE_STUDIO_REALTIME_ORIGIN,
     locationOrigin: globalThis.location?.origin,
     development: import.meta.env.DEV,
     devProxyEnabled:

@@ -1,8 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   createStudioOpfsRecoveryJournal,
   decideStudioOpfsRecoveryBackend,
+  describeStudioOpfsRecoveryJournalError,
   StudioOpfsRecoveryJournalError,
   type StudioOpfsRecoveryByteSource,
   type StudioOpfsRecoveryJournalAdapter,
@@ -489,6 +490,32 @@ describe("StudioOpfsRecoveryJournal integrity and version fences", () => {
 });
 
 describe("StudioOpfsRecoveryJournal writer fencing and abort", () => {
+  it("keeps the writer id out of the user-facing message but not out of the diagnostics", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const harness = makeHarness();
+      await acquire(harness, "autosave-06cb7b0c-1d1d-474b-8644-a88d56c5c463");
+
+      const busy = await acquire(harness, "writer-b").then(
+        () => null,
+        (cause: unknown) => cause as StudioOpfsRecoveryJournalError,
+      );
+
+      expect(busy?.code).toBe("LEASE_BUSY");
+      // 강등 배너는 error.message 를 그대로 읽는다 — 사람이 읽을 문장만 있어야 한다.
+      expect(busy?.message).toBe("이 작품의 복구 저장소를 다른 탭이나 창이 사용하고 있어요.");
+      expect(busy?.message).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}/u);
+      // 진단은 지워지지 않고 자리만 옮겼다 — 로그·버그리포트 쪽.
+      expect(busy?.diagnostics).toContain("autosave-06cb7b0c-1d1d-474b-8644-a88d56c5c463");
+      expect(describeStudioOpfsRecoveryJournalError(busy!)).toContain("[LEASE_BUSY]");
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining("autosave-06cb7b0c-1d1d-474b-8644-a88d56c5c463"),
+      );
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it("increments the epoch after expiry and rejects every stale-writer mutation", async () => {
     const harness = makeHarness();
     const writerA = await acquire(harness, "writer-a");

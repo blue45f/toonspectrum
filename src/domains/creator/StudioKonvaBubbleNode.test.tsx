@@ -18,7 +18,6 @@ import {
   bubbleHorizontalPadding,
   bubbleVerticalPadding,
 } from "./studio-bubble-text-fit";
-import { formatVerticalText } from "./studio-bubble-text-runtime";
 import { StudioKonvaBubbleNode } from "./StudioKonvaBubbleNode";
 
 import type { El } from "./studio-element-model";
@@ -301,7 +300,7 @@ describe("StudioKonvaBubbleNode text and interaction", () => {
     expect(texts[1]!.y).toBeCloseTo(verticalPadding.top - 9 * 0.9);
   });
 
-  it("skips ruby overlays for vertical bubbles (base-only formatVerticalText)", () => {
+  it("mounts upright ruby overlays beside vertical bubble columns", () => {
     const source = "漢字";
     render(
       <StudioKonvaBubbleNode
@@ -317,14 +316,56 @@ describe("StudioKonvaBubbleNode text and interaction", () => {
       />,
     );
 
-    expect(konvaCapture.texts).toHaveLength(1);
-    expect(konvaCapture.texts[0]).toMatchObject({
-      text: formatVerticalText(source),
-      fontSize: 24,
+    expect(konvaCapture.texts).toHaveLength(2);
+    expect(konvaCapture.texts[0]).toMatchObject({ text: "漢\n字", fontSize: 24 });
+    expect(konvaCapture.texts[1]).toMatchObject({
+      name: "studio-vertical-ruby",
+      text: "か\nん\nじ",
+      listening: false,
+      rotation: 0,
+      wrap: "none",
     });
+    expect(Number(konvaCapture.texts[1]!.x)).toBeGreaterThan(
+      Number(konvaCapture.texts[0]!.x) + 24,
+    );
+    // The overlay remains inside the same nested vertical group as the base text.
+    expect(konvaCapture.groups).toHaveLength(2);
   });
 
-  it("preserves auto-shrink, vertical formatting, and the shared padding geometry", () => {
+  it("preserves tate-chu-yoko horizontal scaling in vertical bubbles", () => {
+    render(
+      <StudioKonvaBubbleNode
+        {...commonProps()}
+        el={bubbleElement({ fontSize: 24, text: "第12話", vertical: true })}
+      />,
+    );
+    const digits = konvaCapture.texts.find((node) => node.text === "12");
+    expect(digits).toBeDefined();
+    expect(digits).toMatchObject({ rotation: 0, lineHeight: 1, letterSpacing: 0 });
+    expect(Number(digits!.scaleX)).toBeGreaterThan(0);
+    expect(Number(digits!.scaleX)).toBeLessThanOrEqual(1);
+  });
+
+  // D4 회귀 계약(2026-08 브라우저 감사): 레거시 formatVerticalText 전치 근사는 열 길이를 상자
+  // 높이로 끊지 못해, Konva.Text 의 무음 절단에 그대로 걸렸다("안녕하세요" 5자 중 3자만 렌더).
+  // 지금은 studio-vertical-text 코어가 열을 끊으므로 상자가 좁아도 한 글자도 잃지 않는다.
+  it("renders every vertical glyph even when the box is far too short (no silent truncation)", () => {
+    const source = "안녕하세요";
+    render(
+      <StudioKonvaBubbleNode
+        {...commonProps()}
+        el={bubbleElement({ fontSize: 24, height: 100, text: source, vertical: true, width: 200 })}
+      />,
+    );
+
+    const painted = konvaCapture.texts
+      .map((text) => String(text.text ?? "").split("\n").join(""))
+      .join("");
+    expect([...painted].sort().join("")).toBe([...source].sort().join(""));
+    expect(painted).toHaveLength(source.length);
+  });
+
+  it("preserves auto-shrink and the shared padding geometry for vertical bubbles", () => {
     const context = {
       font: "",
       measureText: (value: string) => ({ width: value.length * 40 }),
@@ -349,19 +390,65 @@ describe("StudioKonvaBubbleNode text and interaction", () => {
       />,
     );
 
+    const columnGroup = latest(konvaCapture.groups, "vertical column group");
     const text = latest(konvaCapture.texts, "auto-shrunk text");
     const fontSize = text.fontSize as number;
-    const horizontalPadding = bubbleHorizontalPadding(fontSize);
-    const verticalPadding = bubbleVerticalPadding(fontSize);
     expect(fontSize).toBeLessThan(30);
+    // 열 블록은 공유 패딩 안쪽에 놓인다(좌우/상하 모두 패딩 이상).
+    expect(columnGroup.x as number).toBeGreaterThanOrEqual(bubbleHorizontalPadding(fontSize));
+    expect(columnGroup.y as number).toBeGreaterThanOrEqual(bubbleVerticalPadding(fontSize).top);
+    // 자동 축소를 했어도 대사는 한 글자도 사라지지 않는다.
+    const painted = konvaCapture.texts
+      .map((node) => String(node.text ?? "").split("\n").join(""))
+      .join("");
+    expect(painted).toHaveLength(source.length);
+  });
+
+  // D1/D2 회귀 계약: 기본(크기 고정 아님) 모드에서 Konva.Text 는 고정 height 를 넘는 줄을
+  // 경고 없이 버린다. 렌더가 실제 블록 높이만큼 페인트 상자를 넓혀 그 절단을 원천 차단한다.
+  it("widens the horizontal paint box past the bubble so overflowing dialogue is never dropped", () => {
+    const context = {
+      font: "",
+      measureText: (value: string) => ({ width: value.length * 24 }),
+    } as unknown as CanvasRenderingContext2D;
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation((
+      ((contextId: string) => contextId === "2d" ? context : null) as
+        typeof HTMLCanvasElement.prototype.getContext
+    ));
+    const long = "가".repeat(103);
+    render(
+      <StudioKonvaBubbleNode
+        {...commonProps()}
+        el={bubbleElement({ fontSize: 24, height: 100, text: long, width: 300 })}
+      />,
+    );
+
+    const text = latest(konvaCapture.texts, "bubble text");
+    const boxHeight = Math.max(8, 100 - bubbleVerticalPadding(24).top - bubbleVerticalPadding(24).bottom);
+    const paintHeight = text.height as number;
+    expect(text.text).toBe(long);
+    expect(paintHeight).toBeGreaterThan(boxHeight);
+    // 페인트 상자를 넓힌 만큼 y 를 위로 되돌려 시각 중심은 그대로 유지한다.
+    expect(text.y as number).toBeCloseTo(bubbleVerticalPadding(24).top - (paintHeight - boxHeight) / 2);
+    // Konva 가 버리지 않을 만큼 충분한 높이여야 한다(줄 수 × fontSize × lineHeight 이상).
+    const lines = Math.ceil(paintHeight / (24 * 1.25));
+    expect(lines * 24 * 1.25).toBeLessThanOrEqual(paintHeight + 0.001);
+  });
+
+  it("keeps the paint box identical to the text box when dialogue fits", () => {
+    render(
+      <StudioKonvaBubbleNode
+        {...commonProps()}
+        el={bubbleElement({ fontSize: 24, height: 200, text: "짧은 대사", width: 300 })}
+      />,
+    );
+
+    const text = latest(konvaCapture.texts, "bubble text");
+    const padding = bubbleVerticalPadding(24);
     expect(text).toMatchObject({
-      height: Math.max(8, 60 - verticalPadding.top - verticalPadding.bottom),
-      letterSpacing: 0.3,
-      lineHeight: 1.4,
-      text: formatVerticalText(source),
-      width: Math.max(8, 100 - horizontalPadding * 2),
-      x: horizontalPadding,
-      y: verticalPadding.top,
+      height: Math.max(8, 200 - padding.top - padding.bottom),
+      y: padding.top,
+      x: bubbleHorizontalPadding(24),
     });
   });
 

@@ -1,11 +1,11 @@
 /**
  * Non-destructive "editable raster copy" preparation.
  *
- * The plan uses the exact Studio SVG serializer as a fidelity preflight, then the shared
- * Worker-capable SVG -> PNG seam performs the expensive browser rasterization. The original
- * document elements are never removed or patched by this module. Callers materialize one new
- * full-page ImageEl only after an explicit confirmation or an operation (such as filters) whose
- * contract says it creates a merged copy.
+ * The compatibility planner uses the exact Studio SVG serializer as a fidelity preflight. The
+ * async retouch path instead reuses one Worker export for that preflight and the shared SVG -> PNG
+ * rasterizer, avoiding a duplicate main-thread serialization. The original document elements are
+ * never removed or patched by this module. Callers materialize one new full-page ImageEl only
+ * after an explicit confirmation or an operation whose contract says it creates a merged copy.
  */
 
 import { isEffectivelyHidden, isEffectivelyLocked } from "./studio-layers";
@@ -19,6 +19,7 @@ import type { SvgExportResult, SvgExportTheme } from "./studio-svg-export";
 import type {
   StudioVectorReferenceInput,
   StudioVectorReferenceBudgets,
+  StudioVectorReferencePreparedExport,
   StudioVectorReferenceRenderOptions,
   StudioVectorReferenceResult,
 } from "./studio-vector-fill-reference";
@@ -240,6 +241,24 @@ export type StudioEditableRasterCopyRenderer = (
   options?: StudioVectorReferenceRenderOptions,
 ) => Promise<StudioVectorReferenceResult>;
 
+export type StudioEditableRasterCopyExportPreparer = (
+  input: StudioVectorReferenceInput,
+  options?: StudioVectorReferenceRenderOptions,
+) => Promise<StudioVectorReferencePreparedExport>;
+
+export type StudioEditableRasterCopyPreparedRenderer = (
+  prepared: StudioVectorReferencePreparedExport,
+  options?: Pick<StudioVectorReferenceRenderOptions, "signal" | "rasterize">,
+) => Promise<StudioVectorReferenceResult>;
+
+export type StudioEditableRasterCopyPreparedResult =
+  | {
+      readonly ok: true;
+      readonly plan: StudioEditableRasterCopyPlan;
+      readonly rendered: StudioVectorReferenceResult;
+    }
+  | Extract<StudioEditableRasterCopyPlanResult, { ok: false }>;
+
 function normalizeCopyName(value: string | undefined): string {
   let safeValue = "";
   for (const character of value ?? "편집용 래스터 복사본") {
@@ -264,13 +283,27 @@ function validDimensions(
     && Number.isSafeInteger(height)
     && width > 0
     && height > 0
-    && width * height <= maxPixelCount;
+    && width <= Math.floor(maxPixelCount / height);
 }
 
 function boundedByteBudget(value: number | undefined, hardMaximum: number): number {
   return Number.isSafeInteger(value) && (value ?? 0) > 0
     ? Math.min(value!, hardMaximum)
     : hardMaximum;
+}
+
+function currentBudgetsAreNotStricter(
+  planned: StudioVectorReferenceBudgets | undefined,
+  current: StudioVectorReferenceBudgets | undefined,
+): boolean {
+  return boundedByteBudget(current?.maxPixelCount, EDITABLE_RASTER_COPY_MAX_PIXELS)
+      >= boundedByteBudget(planned?.maxPixelCount, EDITABLE_RASTER_COPY_MAX_PIXELS)
+    && boundedByteBudget(current?.maxSourceBytes, EDITABLE_RASTER_COPY_MAX_SOURCE_BYTES)
+      >= boundedByteBudget(planned?.maxSourceBytes, EDITABLE_RASTER_COPY_MAX_SOURCE_BYTES)
+    && boundedByteBudget(current?.maxSvgBytes, EDITABLE_RASTER_COPY_MAX_SVG_BYTES)
+      >= boundedByteBudget(planned?.maxSvgBytes, EDITABLE_RASTER_COPY_MAX_SVG_BYTES)
+    && boundedByteBudget(current?.maxPngBytes, EDITABLE_RASTER_COPY_MAX_PNG_BYTES)
+      >= boundedByteBudget(planned?.maxPngBytes, EDITABLE_RASTER_COPY_MAX_PNG_BYTES);
 }
 
 function utf8ByteLength(value: string): number {
@@ -721,6 +754,7 @@ interface StudioRasterPreparationAnalysis {
 
 function analyzeStudioRasterPreparationSources(
   input: StudioRasterPreparationSourceSummaryInput,
+  preparedExport?: SvgExportResult,
 ): StudioRasterPreparationAnalysis {
   const groups = [...(input.groups ?? [])];
   const visible = input.elements.filter((element) => !isEffectivelyHidden(element, groups));
@@ -799,7 +833,7 @@ function analyzeStudioRasterPreparationSources(
       structurallyUnsupported.set(element.id, "레이어 그룹 변형은 합성 렌더러에서 지원되지 않습니다.");
     }
   }
-  const exported = exportPageToSvg({
+  const exported = preparedExport ?? exportPageToSvg({
     width: input.width,
     height: input.height,
     elements: visibleContributing,
@@ -852,19 +886,92 @@ export function summarizeStudioRasterPreparationSources(
   return analyzeStudioRasterPreparationSources(input).summary;
 }
 
-function fidelityReason(labels: readonly string[]): string {
-  const unique = [...new Set(labels)].slice(0, 3);
-  const detail = unique.length > 0 ? ` (${unique.join(" · ")})` : "";
-  return `일부 표시 요소를 화면과 똑같이 합성할 수 없어 편집용 복사본을 만들지 않았습니다${detail}. 지원되지 않는 합성이나 지우개 획을 먼저 정리해 주세요.`;
+/**
+ * The preflight's loss labels are authored for the SVG export dialog ("…는 SVG에 없어…"), which is
+ * the wrong vocabulary the moment the same label surfaces on a filter: an artist reading it learns
+ * nothing about what to do next. Fail-closed is right — a filter must never quietly produce
+ * something other than what is on screen — so the copy, not the gate, is what changes here. Each
+ * known blocker maps to the edit that clears it; anything unmapped falls back to the one action
+ * that always works (bake that layer to an image first).
+ */
+const FIDELITY_ACTIONS: readonly { readonly match: RegExp; readonly action: string }[] = [
+  {
+    match: /자동 줄바꿈/u,
+    action:
+      "말풍선·글상자의 글이 상자보다 길어 자동으로 줄이 바뀝니다. 상자를 조금 넓히거나 원하는 자리에서 엔터로 줄을 나눈 뒤 다시 시도해 주세요.",
+  },
+  {
+    match: /지우개/u,
+    action:
+      "지우개로 지운 자국이 남은 그리기 레이어가 있습니다. 그 레이어를 먼저 이미지로 병합한 뒤 다시 시도해 주세요.",
+  },
+  {
+    match: /세로쓰기/u,
+    action:
+      "세로쓰기 안의 영문·숫자 구간은 줄 나눔이 화면과 조금 달라질 수 있습니다. 해당 텍스트를 가로쓰기로 바꾸거나 이미지로 병합한 뒤 다시 시도해 주세요.",
+  },
+  {
+    match: /외부 주소/u,
+    action:
+      "인터넷 주소로 연결된 이미지가 있습니다. 그 이미지를 작업 파일에 넣어 두거나(다시 올리기) 잠시 숨긴 뒤 다시 시도해 주세요.",
+  },
+  {
+    match: /혼합 모드|클리핑 마스크|아래 레이어로 자르기/u,
+    action:
+      "혼합 모드나 아래 레이어로 자르기가 걸린 레이어가 있습니다. 그 레이어를 먼저 아래 레이어와 병합한 뒤 다시 시도해 주세요.",
+  },
+  {
+    match: /픽셀 필터·색보정/u,
+    action:
+      "이미 색보정이 걸려 있는 이미지 레이어가 있습니다. 그 보정을 레이어에 먼저 적용(병합)한 뒤 다시 시도해 주세요.",
+  },
+  {
+    match: /중복 요소 id|연결되지 않은 레이어 그룹|레이어 그룹 변형|올바르지 않습니다/u,
+    action:
+      "레이어 구조가 어긋난 요소가 있습니다. 문제 레이어를 그룹에서 꺼내거나 지운 뒤 다시 시도해 주세요.",
+  },
+];
+
+const FIDELITY_FALLBACK_ACTION =
+  "화면과 똑같이 합칠 수 없는 레이어가 있습니다. 그 레이어를 먼저 이미지로 병합한 뒤 다시 시도해 주세요.";
+
+function fidelityAction(label: string): string {
+  return FIDELITY_ACTIONS.find((entry) => entry.match.test(label))?.action
+    ?? FIDELITY_FALLBACK_ACTION;
 }
 
-/**
- * Fast deterministic preflight. This serializes but does not allocate a Canvas or decode images.
- * Any skipped *or approximated* element fails closed so a merged copy never silently changes art.
- */
-export function planStudioEditableRasterCopy(
+function fidelityReason(labels: readonly string[]): string {
+  const actions = [...new Set(labels.map(fidelityAction))].slice(0, 2);
+  const detail = actions.length > 0 ? ` ${actions.join(" ")}` : ` ${FIDELITY_FALLBACK_ACTION}`;
+  return `화면에 보이는 그대로 만들 수 없어 아무것도 바꾸지 않았습니다.${detail}`;
+}
+
+interface StudioEditableRasterCopyCandidate {
+  readonly pageId: string;
+  readonly width: number;
+  readonly height: number;
+  readonly sourceElements: readonly El[];
+  readonly groups: readonly LayerGroup[];
+  readonly theme?: SvgExportTheme;
+  readonly includeBackground: boolean;
+  readonly bg?: string;
+  readonly bgGrad?: readonly string[] | null;
+  readonly name: string;
+  readonly insertionIndex: number;
+  readonly sourceDisposition: "preserve-visible" | "hide-originals";
+  readonly sourceDispositionIds: readonly string[];
+  readonly sourceFingerprint: string;
+  readonly budgets?: StudioVectorReferenceBudgets;
+}
+
+type StudioEditableRasterCopyCandidateResult =
+  | { readonly ok: true; readonly candidate: StudioEditableRasterCopyCandidate }
+  | Extract<StudioEditableRasterCopyPlanResult, { ok: false }>;
+
+/** Cheap ownership, lock and source-budget checks shared by sync and Worker-fused planners. */
+function preflightStudioEditableRasterCopy(
   input: StudioEditableRasterCopyInput,
-): StudioEditableRasterCopyPlanResult {
+): StudioEditableRasterCopyCandidateResult {
   const pageId = input.pageId.trim();
   if (!pageId) {
     return { ok: false, code: "invalid-page-id", reason: "편집용 복사본을 연결할 페이지를 찾지 못했습니다." };
@@ -880,11 +987,7 @@ export function planStudioEditableRasterCopy(
     input.budgets?.maxPixelCount,
     EDITABLE_RASTER_COPY_MAX_PIXELS,
   );
-  if (!validDimensions(
-    input.width,
-    input.height,
-    maxPixelCount,
-  )) {
+  if (!validDimensions(input.width, input.height, maxPixelCount)) {
     const requestedPixels = Number.isSafeInteger(input.width) && Number.isSafeInteger(input.height)
       ? input.width * input.height
       : null;
@@ -937,8 +1040,8 @@ export function planStudioEditableRasterCopy(
     };
   }
   const sourceDispositionIds = [...requestedDispositionIds].filter((id) => sourceIds.has(id));
+  const groups = [...(input.groups ?? [])];
   if (sourceDisposition === "hide-originals") {
-    const groups = [...(input.groups ?? [])];
     const lockedDispositionIds = sourceElements
       .filter(
         (element) =>
@@ -984,16 +1087,42 @@ export function planStudioEditableRasterCopy(
       reason: "표시 레이어 데이터가 안전 처리 한도를 넘었습니다. 페이지를 나누거나 일부 레이어를 먼저 병합해 주세요.",
     };
   }
+  return {
+    ok: true,
+    candidate: {
+      pageId,
+      width: input.width,
+      height: input.height,
+      sourceElements,
+      groups,
+      theme: input.theme,
+      includeBackground,
+      bg: input.bg,
+      bgGrad: input.bgGrad,
+      name: normalizeCopyName(input.name),
+      insertionIndex: normalizeInsertionIndex(input.insertionIndex, input.elements.length),
+      sourceDisposition,
+      sourceDispositionIds,
+      sourceFingerprint,
+      budgets: input.budgets ? { ...input.budgets } : undefined,
+    },
+  };
+}
+
+function finalizeStudioEditableRasterCopyPlan(
+  candidate: StudioEditableRasterCopyCandidate,
+  preparedExport?: SvgExportResult,
+): StudioEditableRasterCopyPlanResult {
   const sourceAnalysis = analyzeStudioRasterPreparationSources({
-    width: input.width,
-    height: input.height,
-    elements: sourceElements,
-    groups: input.groups,
-    theme: input.theme,
-    bg: input.bg,
-    bgGrad: input.bgGrad,
-    hasPageBackground: includeBackground,
-  });
+    width: candidate.width,
+    height: candidate.height,
+    elements: candidate.sourceElements,
+    groups: candidate.groups,
+    theme: candidate.theme,
+    bg: candidate.bg,
+    bgGrad: candidate.bgGrad,
+    hasPageBackground: candidate.includeBackground,
+  }, preparedExport);
   const sourceSummary = sourceAnalysis.summary;
   if (sourceSummary.unsupportedVisibleCount > 0) {
     return {
@@ -1002,7 +1131,6 @@ export function planStudioEditableRasterCopy(
       reason: fidelityReason(sourceSummary.unsupportedReasons),
     };
   }
-  const groups = [...(input.groups ?? [])];
   const exported = sourceAnalysis.exported;
   if (!exported) {
     return {
@@ -1019,7 +1147,7 @@ export function planStudioEditableRasterCopy(
     };
   }
   if (utf8ByteLength(exported.svg) > boundedByteBudget(
-    input.budgets?.maxSvgBytes,
+    candidate.budgets?.maxSvgBytes,
     EDITABLE_RASTER_COPY_MAX_SVG_BYTES,
   )) {
     return {
@@ -1028,32 +1156,67 @@ export function planStudioEditableRasterCopy(
       reason: "합성된 벡터 데이터가 안전 처리 한도를 넘었습니다. 페이지를 나누거나 일부 레이어를 먼저 병합해 주세요.",
     };
   }
-
   return {
     ok: true,
     plan: {
-      pageId,
-      width: input.width,
-      height: input.height,
-      sourceElements,
-      sourceIds: sourceElements.map((element) => element.id),
-      groups,
-      theme: input.theme,
-      includeBackground,
-      bg: input.bg,
-      bgGrad: input.bgGrad,
-      name: normalizeCopyName(input.name),
-      insertionIndex: normalizeInsertionIndex(input.insertionIndex, input.elements.length),
-      sourceDisposition,
-      sourceDispositionIds,
+      pageId: candidate.pageId,
+      width: candidate.width,
+      height: candidate.height,
+      sourceElements: candidate.sourceElements,
+      sourceIds: candidate.sourceElements.map((element) => element.id),
+      groups: candidate.groups,
+      theme: candidate.theme,
+      includeBackground: candidate.includeBackground,
+      bg: candidate.bg,
+      bgGrad: candidate.bgGrad,
+      name: candidate.name,
+      insertionIndex: candidate.insertionIndex,
+      sourceDisposition: candidate.sourceDisposition,
+      sourceDispositionIds: candidate.sourceDispositionIds,
       frame: sourceSummary.frame,
       sourceBounds: sourceSummary.sourceBounds,
       sourceSummary,
-      sourceFingerprint,
+      sourceFingerprint: candidate.sourceFingerprint,
       sourceElementCount: exported.elementCount,
-      budgets: input.budgets,
+      budgets: candidate.budgets,
     },
   };
+}
+
+/**
+ * Established synchronous planner retained for menus, summaries and compatibility callers.
+ * It still performs one exact main-realm SVG export as its fidelity preflight.
+ */
+export function planStudioEditableRasterCopy(
+  input: StudioEditableRasterCopyInput,
+): StudioEditableRasterCopyPlanResult {
+  const preflight = preflightStudioEditableRasterCopy(input);
+  if (!preflight.ok) return preflight;
+  return finalizeStudioEditableRasterCopyPlan(preflight.candidate);
+}
+
+function editableRasterCopyVectorInput(
+  candidate: StudioEditableRasterCopyCandidate,
+): StudioVectorReferenceInput {
+  return {
+    width: candidate.width,
+    height: candidate.height,
+    elements: candidate.sourceElements,
+    groups: candidate.groups,
+    theme: candidate.theme,
+    transparentBg: !candidate.includeBackground,
+    bg: candidate.bg,
+    bgGrad: candidate.bgGrad,
+    fingerprintNamespace: EDITABLE_RASTER_COPY_NAMESPACE,
+    budgets: candidate.budgets,
+  };
+}
+
+function throwIfEditableRasterPreparationAborted(signal?: AbortSignal): void {
+  if (!signal?.aborted) return;
+  const error = new Error("편집용 래스터 복사본 준비를 취소했습니다.");
+  error.name = "AbortError";
+  throw error;
 }
 
 export function describeStudioEditableRasterSelectionSurface(
@@ -1088,6 +1251,13 @@ export async function renderStudioEditableRasterCopy(
     fingerprintNamespace: EDITABLE_RASTER_COPY_NAMESPACE,
     budgets: plan.budgets,
   }, options);
+  return validateStudioEditableRasterCopyRender(plan, result);
+}
+
+function validateStudioEditableRasterCopyRender(
+  plan: StudioEditableRasterCopyPlan,
+  result: StudioVectorReferenceResult,
+): StudioVectorReferenceResult {
   const pngByteLength = pngDataUrlByteLength(result.dataUrl);
   if (!new RegExp(`^${EDITABLE_RASTER_COPY_NAMESPACE}:[0-9a-f]{16}$`, "u").test(result.fingerprint)) {
     throw new Error("필터를 준비하는 동안 페이지 내용이 바뀌었습니다. 최신 화면에서 다시 시도해 주세요.");
@@ -1114,6 +1284,47 @@ export async function renderStudioEditableRasterCopy(
     // pre/post-lazy SVG implementation fingerprint.
     fingerprint: plan.sourceFingerprint,
     pngByteLength,
+  };
+}
+
+/**
+ * Worker-fused cold path for retouch preparation.
+ *
+ * Ownership/lock/source limits are checked before serialization. The single prepared SVG result
+ * then supplies both the fidelity plan (`skipped`, count and SVG budget) and the rasterizer, so
+ * this path never invokes the synchronous `exportPageToSvg` preflight on the interaction thread.
+ * The established synchronous `planStudioEditableRasterCopy` API remains available unchanged for
+ * callers that cannot cross an async boundary.
+ */
+export async function prepareAndRenderStudioEditableRasterCopy(
+  input: StudioEditableRasterCopyInput,
+  prepareVectorReference: StudioEditableRasterCopyExportPreparer,
+  renderPreparedVectorReference: StudioEditableRasterCopyPreparedRenderer,
+  options: StudioVectorReferenceRenderOptions = {},
+): Promise<StudioEditableRasterCopyPreparedResult> {
+  throwIfEditableRasterPreparationAborted(options.signal);
+  const preflight = preflightStudioEditableRasterCopy(input);
+  if (!preflight.ok) return preflight;
+
+  const prepared = await prepareVectorReference(
+    editableRasterCopyVectorInput(preflight.candidate),
+    options,
+  );
+  throwIfEditableRasterPreparationAborted(options.signal);
+
+  const planned = finalizeStudioEditableRasterCopyPlan(
+    preflight.candidate,
+    prepared.result,
+  );
+  if (!planned.ok) return planned;
+  throwIfEditableRasterPreparationAborted(options.signal);
+
+  const rendered = await renderPreparedVectorReference(prepared, options);
+  throwIfEditableRasterPreparationAborted(options.signal);
+  return {
+    ok: true,
+    plan: planned.plan,
+    rendered: validateStudioEditableRasterCopyRender(planned.plan, rendered),
   };
 }
 
@@ -1145,21 +1356,94 @@ export function materializeStudioEditableRasterCopy(input: {
   };
 }
 
-/** Re-plan current inputs after an await and reject a stale source before committing one new layer. */
+/**
+ * Revalidate document ownership after an await without repeating SVG fidelity serialization.
+ *
+ * The initial plan already proved renderer fidelity. At commit time only document/source identity,
+ * visibility, mutation locks and placement can have gone stale; canonical source fingerprinting is
+ * sufficient for those checks and keeps a first pixel gesture from paying two more synchronous
+ * `exportPageToSvg` passes.
+ */
 export function isStudioEditableRasterCopyPlanCurrent(
   plan: StudioEditableRasterCopyPlan,
   current: StudioEditableRasterCopyInput,
 ): boolean {
-  const next = planStudioEditableRasterCopy(current);
-  return next.ok
-    && next.plan.pageId === plan.pageId
-    && next.plan.sourceFingerprint === plan.sourceFingerprint
-    && next.plan.insertionIndex === plan.insertionIndex
-    && next.plan.sourceDisposition === plan.sourceDisposition
-    && next.plan.sourceDispositionIds.length === plan.sourceDispositionIds.length
-    && next.plan.sourceDispositionIds.every(
-      (id, index) => id === plan.sourceDispositionIds[index],
-    );
+  if (
+    current.documentMutationBlockedReason
+    || current.pageId.trim() !== plan.pageId
+    || !validDimensions(
+      current.width,
+      current.height,
+      boundedByteBudget(current.budgets?.maxPixelCount, EDITABLE_RASTER_COPY_MAX_PIXELS),
+    )
+    || !currentBudgetsAreNotStricter(plan.budgets, current.budgets)
+  ) return false;
+
+  const includeBackground = current.includeBackground ?? true;
+  const sourceDisposition = current.sourceDisposition ?? "preserve-visible";
+  if (sourceDisposition !== plan.sourceDisposition) return false;
+
+  const selectedSources = selectCopySources(current);
+  if (selectedSources.mismatchIds.length > 0) return false;
+  const sourceElements = selectedSources.sourceElements;
+  if (
+    sourceElements.length === 0
+    && (!includeBackground || sourceDisposition === "hide-originals")
+  ) return false;
+  if (
+    sourceElements.length !== plan.sourceIds.length
+    || sourceElements.some((element, index) => element.id !== plan.sourceIds[index])
+  ) return false;
+
+  const requestedDispositionIds = current.sourceDispositionIds
+    ? new Set(current.sourceDispositionIds)
+    : sourceDisposition === "hide-originals"
+      ? new Set(sourceElements.map((element) => element.id))
+      : new Set<string>();
+  if ([...requestedDispositionIds].some(
+    (id) => !current.elements.some((element) => element.id === id),
+  )) return false;
+  const sourceIds = new Set(sourceElements.map((element) => element.id));
+  const sourceDispositionIds = [...requestedDispositionIds].filter((id) => sourceIds.has(id));
+  if (
+    sourceDispositionIds.length !== plan.sourceDispositionIds.length
+    || sourceDispositionIds.some((id, index) => id !== plan.sourceDispositionIds[index])
+  ) return false;
+
+  const groups = [...(current.groups ?? [])];
+  const knownGroupIds = new Set(groups.map((group) => group.id));
+  if (sourceElements.some(
+    (element) => element.groupId && !knownGroupIds.has(element.groupId),
+  )) return false;
+  if (sourceElements.some((element) => {
+    const group = element.groupId
+      ? groups.find((candidate) => candidate.id === element.groupId)
+      : null;
+    return Boolean(group && hasUnsupportedGroupTransform(group));
+  })) return false;
+  if (
+    sourceDisposition === "hide-originals"
+    && sourceElements.some(
+      (element) => requestedDispositionIds.has(element.id) && isEffectivelyLocked(element, groups),
+    )
+  ) return false;
+  if (normalizeInsertionIndex(current.insertionIndex, current.elements.length) !== plan.insertionIndex) {
+    return false;
+  }
+
+  try {
+    return fingerprintEditableRasterCopySource({
+      width: current.width,
+      height: current.height,
+      sourceElements,
+      theme: current.theme,
+      includeBackground,
+      bg: current.bg,
+      bgGrad: current.bgGrad,
+    }) === plan.sourceFingerprint;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -1185,7 +1469,7 @@ export function applyStudioEditableRasterCopy(input: {
     return {
       ok: false,
       code: "stale-plan",
-      reason: "필터 미리보기 중 페이지 내용이나 잠금 상태가 바뀌었습니다. 최신 화면에서 다시 시도해 주세요.",
+      reason: "편집용 래스터를 준비하는 동안 페이지 내용이나 잠금 상태가 바뀌었습니다. 최신 화면에서 다시 시도해 주세요.",
     };
   }
 
@@ -1200,7 +1484,7 @@ export function applyStudioEditableRasterCopy(input: {
     return {
       ok: false,
       code: "invalid-composite",
-      reason: "필터 합성 결과가 올바른 PNG가 아니어서 원본을 변경하지 않았습니다.",
+      reason: "래스터 합성 결과가 올바른 PNG가 아니어서 원본을 변경하지 않았습니다.",
     };
   }
   if (pngByteLength > maxPngBytes) {

@@ -5,51 +5,48 @@ import {
   type StudioCompanionToolCommandActions,
 } from "./studio-companion-tool-command-executor";
 
-import type { DrawMode, Tool } from "./studio-editor-tool-model";
+import type { DrawMode } from "./studio-editor-tool-model";
 import type { StudioCompanionCommandName } from "./studio-tools-companion";
 
 interface ActionHarness {
   actions: StudioCompanionToolCommandActions;
+  activatePrimaryCanvasTool: ReturnType<
+    typeof vi.fn<(tool: "select" | "draw", drawMode?: DrawMode) => void>
+  >;
   calls: string[];
-  disarmAllPixelTools: ReturnType<typeof vi.fn<() => void>>;
-  setDrawMode: ReturnType<typeof vi.fn<(mode: DrawMode) => void>>;
-  setTool: ReturnType<typeof vi.fn<(tool: Tool) => void>>;
 }
 
 function createActionHarness(): ActionHarness {
   const calls: string[] = [];
-  const disarmAllPixelTools = vi.fn(() => {
-    calls.push("disarm");
-  });
-  const setTool = vi.fn((tool: Tool) => {
-    calls.push(`tool:${tool}`);
-  });
-  const setDrawMode = vi.fn((mode: DrawMode) => {
-    calls.push(`draw-mode:${mode}`);
-  });
+  const activatePrimaryCanvasTool = vi.fn(
+    (tool: "select" | "draw", drawMode?: DrawMode) => {
+      calls.push(drawMode === undefined ? `tool:${tool}` : `tool:${tool}:${drawMode}`);
+    },
+  );
 
   return {
-    actions: { disarmAllPixelTools, setDrawMode, setTool },
+    actions: { activatePrimaryCanvasTool },
+    activatePrimaryCanvasTool,
     calls,
-    disarmAllPixelTools,
-    setDrawMode,
-    setTool,
   };
 }
 
 describe("executeStudioCompanionToolCommand", () => {
+  // 계약 변경(2026-08): 컴패니언도 로컬 레일·툴벨트·키보드와 같은 정본 전이를 쓴다.
+  // disarm/setTool/setDrawMode를 따로 주입하면 진행 중인 획 취소가 이 경로에만 빠져서
+  // "같은 명령, 다른 부수효과"가 다시 생긴다.
   it.each([
-    ["select", ["disarm", "tool:select"]],
-    ["pen", ["disarm", "tool:draw", "draw-mode:pen"]],
-    ["eraser", ["disarm", "tool:draw", "draw-mode:eraser"]],
-  ] as const)("runs %s in canonical disarm-first order", (command, expectedCalls) => {
+    ["select", ["tool:select"]],
+    ["pen", ["tool:draw:pen"]],
+    ["eraser", ["tool:draw:eraser"]],
+  ] as const)("routes %s through the stroke-safe primary transition", (command, expectedCalls) => {
     const harness = createActionHarness();
 
     const result = executeStudioCompanionToolCommand(command, harness.actions);
 
     expect(result).toEqual({ handled: true });
     expect(harness.calls).toEqual(expectedCalls);
-    expect(harness.disarmAllPixelTools).toHaveBeenCalledTimes(1);
+    expect(harness.activatePrimaryCanvasTool).toHaveBeenCalledTimes(1);
   });
 
   it("does not change draw mode for select", () => {
@@ -57,8 +54,7 @@ describe("executeStudioCompanionToolCommand", () => {
 
     executeStudioCompanionToolCommand("select", harness.actions);
 
-    expect(harness.setTool).toHaveBeenCalledExactlyOnceWith("select");
-    expect(harness.setDrawMode).not.toHaveBeenCalled();
+    expect(harness.activatePrimaryCanvasTool).toHaveBeenCalledExactlyOnceWith("select");
   });
 
   it.each([
@@ -82,9 +78,7 @@ describe("executeStudioCompanionToolCommand", () => {
 
       expect(result).toEqual({ handled: false });
       expect(harness.calls).toEqual([]);
-      expect(harness.disarmAllPixelTools).not.toHaveBeenCalled();
-      expect(harness.setTool).not.toHaveBeenCalled();
-      expect(harness.setDrawMode).not.toHaveBeenCalled();
+      expect(harness.activatePrimaryCanvasTool).not.toHaveBeenCalled();
     }
   );
 });

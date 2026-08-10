@@ -1,5 +1,5 @@
 import { BookOpen, CircleHelp, Clapperboard, Eraser, FlipHorizontal2, Grid3X3, ImagePlus, Keyboard, Lock, Maximize2, MessageSquare, Minimize2, Minus, Mouse, MousePointer2, PaintBucket, Pencil, PenTool, Plus, Shapes, Sparkles, Square, Unlock, Wind } from "lucide-react";
-import { Fragment, Profiler, Suspense, memo, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type SetStateAction } from "react";
+import { Fragment, Profiler, Suspense, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type SetStateAction } from "react";
 import { createPortal } from "react-dom";
 import { Stage, Layer, Rect, Group, Circle as KCircle, Transformer, Shape, Text } from "react-konva/lib/ReactKonvaCore";
 
@@ -14,7 +14,11 @@ import { BRUSH_PRESETS, type BrushPreset } from "./studio-brush";
 import { studioBrushAliasEffectiveDiameter } from "./studio-brush-alias-profile";
 import { BUBBLE_MERGE_MIN_COUNT, bubbleMergeUnavailableReason } from "./studio-bubble-merge";
 import { isStudioBrushCursorMode, studioCanvasCursorClassName, studioCanvasViewportCursorClassName } from "./studio-canvas-cursor";
-import { recordStudioRenderProfile, studioElementIdOf } from "./studio-canvas-shared-runtime";
+import {
+  recordStudioHotPathRender,
+  recordStudioRenderProfile,
+  studioElementIdOf,
+} from "./studio-canvas-shared-runtime";
 import { StudioHudPill, StudioStatusBar } from "./studio-chrome-ui";
 import { type CropRect } from "./studio-crop";
 import { type DialogueReplacePlan } from "./studio-dialogue-batch";
@@ -29,10 +33,12 @@ import { elementLabel } from "./studio-element-label";
 import { type FilterMaskPaintMode } from "./studio-filter-mask";
 import { clampFrameIndex, frameIndexOf, MAX_ANIM_FRAMES, onionSkinLayers, type OnionSkinSettings } from "./studio-frame-animation";
 import { type SharedGutterSegment } from "./studio-frame-folder";
+import { planGroupClickSelectionRelease } from "./studio-group-selection";
 import { type HealCloneMode } from "./studio-heal-clone";
 import { computeHistoryBrushAvailability } from "./studio-history-brush";
 import { type StudioHokusaiLiveOverlayProjection } from "./studio-hokusai-live-brush-overlay";
 import { uid } from "./studio-id";
+import { type StudioInkMeshLivePreviewRuntime } from "./studio-ink-mesh-live-preview-loader";
 import { imageFilterCacheKey } from "./studio-konva-filter-fields";
 import { shouldApplyLayerMask, type LayerMaskPaintMode } from "./studio-layer-mask";
 import { isEffectivelyHidden, isEffectivelyLocked, type LayerGroup } from "./studio-layers";
@@ -52,14 +58,26 @@ import { movePuppetPin, type PuppetPin } from "./studio-puppet-warp";
 import { type QuickMaskBrushMode } from "./studio-quick-mask";
 import { type StudioRasterHandoffCandidate } from "./studio-raster-handoff-authority";
 import { STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED } from "./studio-raster-publication-feature";
+import { type StudioScrollViewport, type StudioScrollViewportStore } from "./studio-scroll-viewport-store";
 import { unionBounds } from "./studio-selection";
 import { type PixelSelection, type PolyLassoSession, type SelectionDragState, type SelectionFrame, type SelPoint } from "./studio-selection-tools";
 import { type SmartGuideOverlay } from "./studio-smart-guides";
+import {
+  applyStudioStageViewportClip,
+  resolveStudioStageViewportClipArmed,
+  studioStageBackingPixels,
+  type StudioStageViewportClipRuntime,
+} from "./studio-stage-viewport-clip";
 import { normalizeShapeParams } from "./studio-stroke-shapes";
 import { studioUiDensityDescription, studioUiDensityLabel, type StudioUiDensityMode } from "./studio-ui-density";
 import { materializeStudioAdvancedFillVectorTarget } from "./studio-vector-fill-reference";
+import { resolveStudioVelloHubProductCapability } from "./studio-vello-hub";
+import {
+  StudioVelloHubSurface,
+  type StudioVelloHubAuthority,
+} from "./studio-vello-hub-surface";
 import { STUDIO_VIEW_ACTION_HINTS } from "./studio-view-action-hints";
-import { planStudioViewStageLayout, stepStudioViewZoom, toggleStudioCanvasWheelMode, type StudioViewRotation } from "./studio-view-controls";
+import { planStudioCanvasStageLayout, stepStudioViewZoom, toggleStudioCanvasWheelMode, type StudioViewRotation } from "./studio-view-controls";
 import { StudioViewToolsHud } from "./studio-view-tools-hud-loader";
 import { type StudioWorkAssetRenderPlaceholder } from "./studio-work-asset-render-projection";
 import { StudioBrushCursor } from "./StudioBrushCursor";
@@ -69,11 +87,13 @@ import { colorBlindFilterStyle, StudioColorBlindFilterDefs, type CvdMode } from 
 import { StudioDraftPreviewLayers } from "./StudioDraftPreviewLayers";
 import { StudioDrawNode } from "./StudioDrawNode";
 import { StudioGroupUniformResizeProxy } from "./StudioGroupUniformResizeProxy";
+import { StudioInkMeshLivePreviewHost } from "./StudioInkMeshLivePreviewHost";
 import { StudioKonvaBubbleNode } from "./StudioKonvaBubbleNode";
 import { StudioKonvaImageNode } from "./StudioKonvaImageNode";
 import { StudioFocusLinesNode, StudioFramePanel, StudioSpeedLinesNode, StudioWorkAssetPlaceholderNode } from "./StudioKonvaPrimitiveNodes";
 import { StudioKonvaStickerNode, StudioKonvaTextNode } from "./StudioKonvaTextNodes";
 import { StudioPageSequenceStrip } from "./StudioPageSequenceStrip";
+import { StudioPixiSceneOverlayHost } from "./StudioPixiSceneOverlayHost";
 import { StudioToolHintTarget } from "./StudioToolHint";
 
 import type { StudioAdvancedFillPreview } from "./studio-advanced-fill-preview";
@@ -81,6 +101,7 @@ import type { StudioCrdtDocument } from "./studio-crdt-document";
 import type { StudioRasterOverlaySourceElement } from "./studio-crdt-raster-ui-bridge";
 import type { StudioDialogueImportApplyResult, StudioDialogueImportMatchMode, StudioDialogueInterchangeDocument } from "./studio-dialogue-interchange";
 import type { StudioDraftPreviewStore } from "./studio-draft-preview-store";
+import type { StudioDrawingShortcutNoticeStore } from "./studio-drawing-shortcut-notice-store";
 import type { DrawMode, DrawShapeKind, StudioMenu, Tool } from "./studio-editor-tool-model";
 import type { DrawEl, El, FrameEl, ImageEl } from "./studio-element-model";
 import type { StudioTutorialTryAction } from "./studio-feature-tutorials";
@@ -111,6 +132,81 @@ function localizeText(
   const translated = t(key);
   return translated === key ? fallback : translated;
 }
+
+function StudioDrawingShortcutNoticeLayer({
+  canvasOnlyMode,
+  drawMode,
+  hasAutosave,
+  noticeStore,
+  quickShapeActive,
+  tool,
+}: {
+  readonly canvasOnlyMode: boolean;
+  readonly drawMode: DrawMode;
+  readonly hasAutosave: boolean;
+  readonly noticeStore: StudioDrawingShortcutNoticeStore;
+  readonly quickShapeActive: boolean;
+  readonly tool: Tool;
+}) {
+  const t = useT();
+  const snapshot = useSyncExternalStore(
+    noticeStore.subscribe,
+    noticeStore.getSnapshot,
+    noticeStore.getSnapshot,
+  );
+  const notice = hasAutosave ? null : snapshot;
+
+  return (
+    <div
+      className="pointer-events-none absolute bottom-16 left-1/2 z-40 -translate-x-1/2"
+      style={
+        tool === "draw" && !canvasOnlyMode
+          ? { bottom: "calc(var(--studio-draw-options-height, 3.75rem) + 0.75rem)" }
+          : undefined
+      }
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+    >
+      {notice ? (
+        <span
+          key={notice.id}
+          className="mx-3 block max-w-[min(28rem,calc(100vw-1.5rem))] whitespace-normal rounded-lg border border-line bg-panel/95 px-3 py-1.5 text-center text-xs font-semibold leading-relaxed text-fg shadow-lg backdrop-blur motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1"
+        >
+          {notice.message}
+        </span>
+      ) : null}
+      {quickShapeActive && tool === "draw" && drawMode === "pen" && !notice ? (
+        <span className="mx-3 inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-panel/95 px-3 py-1 text-center text-[0.68rem] font-semibold text-accent shadow-lg backdrop-blur">
+          <Shapes size={12} aria-hidden />
+          {localizeText(t, "스마트 도형 · 선·원·네모 등을 그리고 손을 떼면 다듬어요 (잠시 멈추면 미리보기)", "studio.quickShape.notice")}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function readStageDevicePixelRatio(): number {
+  const ratio = globalThis.devicePixelRatio;
+  return typeof ratio === "number" && Number.isFinite(ratio) && ratio > 0 ? ratio : 1;
+}
+
+/*
+ * Two frozen style objects rather than an inline literal, so React only ever writes the Stage
+ * container's style when the clip actually turns on or off. The clip *offset* is written straight
+ * to `style.transform` by the scroll follower, and `transform` appears in neither object — React
+ * therefore never clears it out from under the follower.
+ *
+ * Drawing owns the contact stream; browser panning would otherwise cancel a fast finger stroke. The
+ * wrap's explicit two-finger pinch handler still receives bubbled touch events.
+ */
+const STUDIO_STAGE_DOCUMENT_STYLE = { touchAction: "none" } as const;
+const STUDIO_STAGE_CLIPPED_STYLE = {
+  touchAction: "none",
+  position: "absolute",
+  left: 0,
+  top: 0,
+} as const;
 
 function liveNodeDisplayBounds(
   node: Konva.Node | null | undefined,
@@ -305,12 +401,14 @@ function StudioViewInputModeControls({
 
 export interface StudioCanvasViewportHandlers {
   addPage: () => void;
+  closeViewToolWithFocus: (options?: { preferCanvas?: boolean }) => void;
   beginCanvasSelectionResize: (
     sourceBounds: StudioGroupUniformResizeBounds
   ) => boolean;
   cancelCanvasSelectionResize: () => void;
   commitCanvasSelectionResize: (
-    targetBounds: StudioGroupUniformResizeBounds
+    targetBounds: StudioGroupUniformResizeBounds,
+    rotationDeg: number
   ) => void;
   fitCanvasToWidth: () => void;
   onWebGpuFrameInvalid: () => void;
@@ -344,6 +442,8 @@ export interface StudioCanvasViewportHandlers {
   commitTextTransformEnd: (elId: string, fontSize: number, e: Konva.KonvaEventObject<Event>, opts: { minFontSize: number; patchWidth?: boolean }) => void;
   acknowledgeAiNotice: () => void;
   alignSelected: (mode: "left" | "hcenter" | "right" | "top" | "vcenter" | "bottom" | "distributeH" | "distributeV") => void;
+  zoomToSelection: () => void;
+  flipSelected: (axis: "horizontal" | "vertical") => void;
   applyAdvancedFillPreview: () => void;
   applyBuiltInBrushPreset: (preset: BrushPreset) => void;
   applyDialogueReplacePlan: (plan: DialogueReplacePlan) => void;
@@ -427,6 +527,9 @@ export interface StudioCanvasViewportHandlers {
   reanchorStudioCommentPin: (payload: StudioCommentPinReanchorPayload) => void;
   stopStudioCommentPlacementSession: () => void;
   setMaster: (next: Parameters<import("react").Dispatch<import("react").SetStateAction<DocumentMaster<El>>>>[0]) => void;
+  setCurrentPageId: (value: import("react").SetStateAction<string>) => boolean;
+  setDrawMode: import("react").Dispatch<import("react").SetStateAction<DrawMode>>;
+  setRightPanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setStudioUiDensity: (mode: StudioUiDensityMode) => void;
   snapBoundFunc: (pos: { x: number; y: number; }) => { x: number; y: number; };
   startEditText: (id: string) => void;
@@ -458,6 +561,7 @@ export interface StudioLivingInkOverlaySurfaceBinding {
 export interface StudioCanvasViewportProps {
   liveDynamicBrushOverlayRenderer: StudioLiveDynamicBrushOverlayRenderer;
   liveWetInkOverlayRenderer: import("./studio-live-wet-ink-overlay").StudioLiveWetInkOverlayRenderer;
+  inkMeshLivePreviewRuntime: StudioInkMeshLivePreviewRuntime | null;
   liveInkPredictionRenderer: StudioLiveInkPredictionRenderer;
   liveStampOverlayRenderer: StudioLiveStampOverlayRenderer;
   bubbleShapeActiveHandleIndex: number | null;
@@ -511,12 +615,20 @@ export interface StudioCanvasViewportProps {
   dialogueBatchOpen: boolean;
   dialogueTranslateOpen: boolean;
   drawingRef: import("react").RefObject<DrawEl | null>;
-  drawingShortcutNotice: { id: number; message: string; } | null;
+  drawingShortcutNoticeStore: StudioDrawingShortcutNoticeStore;
   drawMode: DrawMode;
   drawShape: DrawShapeKind;
   editing: { id: string; } | null;
   eyedropperActive: boolean;
   effScale: number;
+  /** Settled scroll viewport of the canvas host. Frame-accurate values come from the store below. */
+  canvasScrollViewport: StudioScrollViewport;
+  /**
+   * Live scroll viewport publisher. The clipped Stage has to follow the scroll offset every frame,
+   * and the React snapshot above is deliberately deferred to gesture settle, so the Stage tracks
+   * this store imperatively instead of re-rendering the editor once per pan frame.
+   */
+  scrollViewportStore: StudioScrollViewportStore;
   elementById: Map<string, El>;
   elements: El[];
   studioFilterPageComposite: (ImageEl & El) | null;
@@ -527,7 +639,6 @@ export interface StudioCanvasViewportProps {
   frameAnimTargetId: string | null;
   gpuCanvasShadowVisibleRef: import("react").RefObject<boolean>;
   gpuLiveInkPinnedRef: import("react").RefObject<boolean>;
-  hokusaiLiveOverlayVisibleRef: import("react").RefObject<boolean>;
   livingInkOverlayVisibleRef: import("react").RefObject<boolean>;
   gridSize: number;
   groups: LayerGroup[];
@@ -709,7 +820,7 @@ export interface StudioCanvasViewportProps {
   symmetryCenterX: number;
   symmetryCenterY: number;
   symmetryRadialCount: number;
-  symmetryType: "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope";
+  symmetryType: "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope" | "silk";
   textAiConfigured: boolean;
   timelapseCapturing: boolean;
   timelineFocusedTrackId: string | null;
@@ -756,6 +867,7 @@ export interface StudioCanvasViewportProps {
 export const StudioCanvasViewport = memo(function StudioCanvasViewport({
   liveDynamicBrushOverlayRenderer,
   liveWetInkOverlayRenderer,
+  inkMeshLivePreviewRuntime,
   liveInkPredictionRenderer,
   liveStampOverlayRenderer,
   bubbleShapeActiveHandleIndex,
@@ -809,12 +921,14 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
   dialogueBatchOpen,
   dialogueTranslateOpen,
   drawingRef,
-  drawingShortcutNotice,
+  drawingShortcutNoticeStore,
   drawMode,
   drawShape,
   editing,
   eyedropperActive,
   effScale,
+  canvasScrollViewport,
+  scrollViewportStore,
   elementById,
   elements,
   studioFilterPageComposite,
@@ -825,7 +939,6 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
   frameAnimTargetId,
   gpuCanvasShadowVisibleRef,
   gpuLiveInkPinnedRef,
-  hokusaiLiveOverlayVisibleRef,
   livingInkOverlayVisibleRef,
   gridSize,
   groups,
@@ -1055,6 +1168,8 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
     commitCanvasSelectionResize,
     acknowledgeAiNotice,
     alignSelected,
+    zoomToSelection,
+    flipSelected,
     applyAdvancedFillPreview,
     applyBuiltInBrushPreset,
     applyDialogueReplacePlan,
@@ -1164,6 +1279,15 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
     canonicalDryMediaCanvasAuthority,
     setCanonicalDryMediaCanvasAuthority,
   ] = useState<StudioCanonicalVNextDryMediaCanvasAuthority | null>(null);
+  const velloHubCapability = resolveStudioVelloHubProductCapability();
+  const [velloHubAuthority, setVelloHubAuthority] =
+    useState<StudioVelloHubAuthority>(() => ({
+      status: velloHubCapability.enabled ? "idle" : "disabled",
+      backendId: null,
+      decision: null,
+      reason: velloHubCapability.reason,
+    }));
+  const [pixiMountParent, setPixiMountParent] = useState<HTMLDivElement | null>(null);
   const hokusaiLiveCanvasRef = useRef<HTMLCanvasElement>(null);
   const livingInkCanvasRef = useRef<HTMLCanvasElement>(null);
   const hokusaiSurfaceLeft = webGpuViewportSurface?.surface.left;
@@ -1435,16 +1559,128 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
   const editingFallbackToModal = !!editingTarget && (
     canvasFlipH || canvasRotation !== 0 || editingVertical
   );
+  // 핫패스 탈React 계약의 런타임 계측점 — StudioPage 와 같은 규약(의존성 없는 effect 이므로
+  // 실제 렌더된 커밋만 센다). 하네스가 싱크를 심지 않으면 no-op 이다.
+  useEffect(() => {
+    recordStudioHotPathRender("studio:canvas");
+  });
   // 보기 변환은 문서 데이터가 아니다. 저장·내보내기·타임랩스 캡처 프레임에서는
   // Stage를 정규 좌표계로 되돌려 회전/반전이 결과 픽셀에 굽히지 않게 한다.
   const suppressViewTransform = isExporting || saving || timelapseCapturing;
-  const stageViewLayout = planStudioViewStageLayout({
+  // 적응형 뷰포트 클립 — 스테이지 백킹 스토어가 임계를 넘을 때만 보이는 영역으로 줄인다.
+  // 임계·이력(히스테리시스) 근거는 studio-stage-viewport-clip.ts 상단 실측 표에 있다.
+  const [stageDevicePixelRatio, setStageDevicePixelRatio] = useState(readStageDevicePixelRatio);
+  useEffect(() => {
+    // DPR 은 창을 다른 배율의 모니터로 옮길 때 바뀌고, 그때 resize 가 함께 발행된다.
+    const syncDevicePixelRatio = () => {
+      const next = readStageDevicePixelRatio();
+      setStageDevicePixelRatio((current) => (current === next ? current : next));
+    };
+    globalThis.addEventListener("resize", syncDevicePixelRatio);
+    return () => globalThis.removeEventListener("resize", syncDevicePixelRatio);
+  }, []);
+  // 이력값은 state 가 아니라 ref 다 — 임계를 넘는 순간 그 렌더에서 바로 클립돼야 하고
+  // (한 프레임 늦으면 그 프레임에 32Mpx 를 할당한다), 결정이 바뀌었다고 추가 렌더를 만들면
+  // 줌 정착 커밋 예산(studio-hot-path-commit-budget.ts)을 잡아먹는다.
+  const stageClipArmedRef = useRef(false);
+  const stageClipArmed = resolveStudioStageViewportClipArmed(
+    studioStageBackingPixels({
+      documentWidth: CANVAS_W,
+      documentHeight: canvasH,
+      scale: effScale,
+      devicePixelRatio: stageDevicePixelRatio,
+    }),
+    stageClipArmedRef.current
+  );
+  useEffect(() => {
+    stageClipArmedRef.current = stageClipArmed;
+  }, [stageClipArmed]);
+  const stageViewLayout = planStudioCanvasStageLayout({
     documentWidth: CANVAS_W,
     documentHeight: canvasH,
     scale: effScale,
-    canvasFlipH: suppressViewTransform ? false : canvasFlipH,
-    canvasRotation: suppressViewTransform ? 0 : canvasRotation,
+    canvasFlipH,
+    canvasRotation,
+    captureDocumentView: suppressViewTransform,
+    viewportClip: stageClipArmed
+      ? {
+          viewportWidth: canvasScrollViewport.width,
+          viewportHeight: canvasScrollViewport.height,
+          scrollLeft: canvasScrollViewport.left,
+          scrollTop: canvasScrollViewport.top,
+        }
+      : null,
   });
+  const stageViewClip = stageViewLayout.clip;
+  // Pixi 선택 오버레이는 Stage 와 같은 문서→뷰포트 배치를 써야 한다. Stage 는 뷰포트 클립만큼
+  // 원점을 당겨 두고 컨테이너 CSS transform 으로 되돌리지만, 이 캔버스는 클립되지 않은 줌 호스트
+  // 박스를 그대로 덮으므로 클립 오프셋을 다시 더해 "클립 이전" 배치를 복원한다.
+  const pixiSceneDocumentTransform = useMemo(
+    () => ({
+      scaleX: stageViewLayout.scaleX,
+      scaleY: stageViewLayout.scaleY,
+      offsetX: stageViewLayout.x + (stageViewClip?.left ?? 0),
+      offsetY: stageViewLayout.y + (stageViewClip?.top ?? 0),
+      rotation: stageViewLayout.rotation,
+    }),
+    [
+      stageViewLayout.scaleX,
+      stageViewLayout.scaleY,
+      stageViewLayout.x,
+      stageViewLayout.y,
+      stageViewLayout.rotation,
+      stageViewClip?.left,
+      stageViewClip?.top,
+    ],
+  );
+  // Stable identity prevents the async Vello/Pixi selection island from rerendering when an
+  // unrelated inspector or status control commits while the selected document ids are unchanged.
+  const acceleratedSceneSelectedIds = useMemo(
+    () => marqueeIds.length > 0 ? marqueeIds : selectedId ? [selectedId] : [],
+    [marqueeIds, selectedId],
+  );
+  const readVelloHubPenDown = useCallback(
+    () => drawingRef.current !== null,
+    [drawingRef],
+  );
+  const stageClipRuntimeRef = useRef<StudioStageViewportClipRuntime | null>(null);
+  // React 는 정착된 스크롤 스냅샷으로 Stage 를 커밋하므로, 커밋 직후 살아 있는 스크롤 값으로
+  // 다시 맞춘다. 컨테이너 transform 과 stage.x/y 는 크기가 같고 부호가 반대라, 둘 중 하나만
+  // 반영된 프레임은 포인터 좌표를 스크롤 델타만큼 어긋나게 만든다 — 항상 같이 쓴다.
+  useLayoutEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    if (!stageViewClip) {
+      stageClipRuntimeRef.current = null;
+      const container = stage.container();
+      if (container && container.style.transform) container.style.transform = "";
+      return;
+    }
+    const runtime: StudioStageViewportClipRuntime = {
+      stageWidth: stageViewLayout.hostWidth,
+      stageHeight: stageViewLayout.hostHeight,
+      width: stageViewClip.width,
+      height: stageViewClip.height,
+      baseX: stageViewLayout.x + stageViewClip.left,
+      baseY: stageViewLayout.y + stageViewClip.top,
+      appliedLeft: Number.NaN,
+      appliedTop: Number.NaN,
+    };
+    stageClipRuntimeRef.current = runtime;
+    const live = scrollViewportStore.getSnapshot();
+    applyStudioStageViewportClip(stage, runtime, live.left, live.top);
+  });
+  useEffect(() => {
+    // 팬 핫패스: 스크롤 프레임마다 React 를 통과하지 않고 스테이지 창만 옮긴다.
+    const followScroll = () => {
+      const stage = stageRef.current;
+      const runtime = stageClipRuntimeRef.current;
+      if (!stage || !runtime) return;
+      const live = scrollViewportStore.getSnapshot();
+      applyStudioStageViewportClip(stage, runtime, live.left, live.top);
+    };
+    return scrollViewportStore.subscribe(followScroll);
+  }, [scrollViewportStore, stageRef]);
   const editingUseOverlay = !!editingTarget && !editingFallbackToModal;
   const canvasCursorInput = {
     tool,
@@ -1628,26 +1864,45 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
   const alignmentSelectionDisabledReason =
     selectionMutationDisabledReason ??
     (selectionLockedCount > 0
-      ? "잠긴 객체가 포함되어 있어 정렬·분배할 수 없어요. 선택 항목의 잠금을 모두 해제하세요."
+      ? "잠긴 객체가 포함되어 있어 정렬·분배·반전할 수 없어요. 선택 항목의 잠금을 모두 해제하세요."
       : topLevelSelectedGroupIds.size > 0 && !completeSelectionGroup
-        ? "여러 그룹의 내부 배치를 보호하려고 정렬·분배를 잠갔어요. 그룹 하나씩 선택해 정렬하세요."
+        ? "여러 그룹의 내부 배치를 보호하려고 정렬·분배·반전을 잠갔어요. 그룹 하나씩 선택해 주세요."
         : null);
-  const multiSelectionVisibleBounds = marqueeIds.length > 1
-    ? canvasSelectionEls
-        .filter((element) => !isEffectivelyHidden(element, groups))
-        .map((element) =>
-          // draw의 select-only hit Shape는 scene geometry가 없어 Konva Group clientRect에
-          // 원점(0,0)을 끼워 넣을 수 있다. 그러면 그룹 union이 캔버스 좌상단까지 부풀고
-          // 이름 배지가 화면 밖으로 사라진다. 선화는 권위 points 기반 bounds를 사용한다.
-          element.type === "draw"
-            ? elBounds(element)
-            : liveNodeDisplayBounds(
-                nodeRefsRef.current[element.id],
-                mainLayerRef.current,
-                elBounds(element)
-              )
-        )
-    : [];
+  // Multi-marquee (2+) or single freehand stroke — strokes have no Konva Transformer, so
+  // they share the uniform-resize proxy used for groups (competitive free-scale on one layer).
+  const singleDrawFreeScale =
+    marqueeIds.length === 0
+    && canvasSelectionEls.length === 1
+    && canvasSelectionEls[0]?.type === "draw"
+    && !isEffectivelyHidden(canvasSelectionEls[0]!, groups)
+    && !isEffectivelyLocked(canvasSelectionEls[0]!, groups);
+  const multiSelectionVisibleBounds =
+    marqueeIds.length > 1 || singleDrawFreeScale
+      ? canvasSelectionEls
+          .filter((element) => !isEffectivelyHidden(element, groups))
+          .map((element) => {
+            // draw의 select-only hit Shape는 scene geometry가 없어 Konva Group clientRect에
+            // 원점(0,0)을 끼워 넣을 수 있다. 그러면 그룹 union이 캔버스 좌상단까지 부풀고
+            // 이름 배지가 화면 밖으로 사라진다. 선화는 권위 points 기반 bounds를 사용한다.
+            if (element.type === "draw") {
+              const raw = elBounds(element);
+              // Horizontal/vertical freehand lines can report 0 height/width; free-scale
+              // handles require a positive box, so pad by stroke radius.
+              const pad = Math.max(1, Number(element.strokeWidth) > 0 ? element.strokeWidth / 2 : 1);
+              return {
+                x: raw.x - pad,
+                y: raw.y - pad,
+                w: Math.max(pad * 2, raw.w + pad * 2),
+                h: Math.max(pad * 2, raw.h + pad * 2),
+              };
+            }
+            return liveNodeDisplayBounds(
+              nodeRefsRef.current[element.id],
+              mainLayerRef.current,
+              elBounds(element),
+            );
+          })
+      : [];
   const multiSelectionBounds =
     multiSelectionVisibleBounds.length > 0
       ? unionBounds(multiSelectionVisibleBounds)
@@ -1666,8 +1921,8 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
     !hardCanvasInteractionBlock &&
     !activeSurfaceReviewLocked &&
     selectionMutationDisabledReason === null &&
-    marqueeIds.length > 1 &&
-    canvasSelectionEls.length === marqueeIds.length &&
+    (marqueeIds.length > 1 || singleDrawFreeScale) &&
+    canvasSelectionEls.length === (marqueeIds.length > 1 ? marqueeIds.length : 1) &&
     selectionLockState === "unlocked" &&
     multiSelectionBounds !== null &&
     multiSelectionBounds.w > 0 &&
@@ -1740,6 +1995,64 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
     const elementId = studioElementIdOf(event.target);
     if (elementId) selectElementFromCanvas(elementId, event, true);
   };
+  /**
+   * 다중 선택 좁히기의 "뗌" 단계 — Figma/PPT/CSP 규약의 나머지 절반.
+   *
+   * 누름(`onSelect` → `planGroupClickSelection`)은 이미 선택된 멤버를 Shift 없이 눌러도 다중 선택을
+   * 유지한다. 그래야 이어지는 드래그가 선택 전체를 함께 옮긴다. 하나로 좁히는 일은 "드래그 없이 뗐을
+   * 때"만 일어나야 하는데, Konva 는 실제 드래그가 시작되면 `click`/`tap` 을 발화하지 않으므로
+   * (DragAndDrop `_endDragBefore` 가 `_mouseListenClick`/`_touchListenClick` 을 내린다)
+   * Stage 로 버블링된 이 두 이벤트가 곧 "드래그 없는 뗌"이다. 별도의 이동거리 추정이 필요 없다.
+   *
+   * 판정 자체는 `studio-group-selection` 의 순수 함수가 누름과 같은 규칙으로 계산한다 — 두 단계가
+   * 갈라지지 않는다. 좁힐 게 없으면 `null` 이라 이 핸들러는 아무 상태도 건드리지 않는다.
+   */
+  const narrowCanvasSelectionOnRelease = (
+    event: Konva.KonvaEventObject<MouseEvent | TouchEvent>
+  ) => {
+    if (
+      canvasInteractionBlocked ||
+      tool !== "select" ||
+      commentPinArmed ||
+      eyedropperActive ||
+      advancedFillArmed ||
+      pixelToolArmed ||
+      cropArmed ||
+      smudgeArmed ||
+      dodgeBurnArmed ||
+      wetMixArmed ||
+      liquifyArmed ||
+      panelSplitArmed ||
+      nodeEditArmed ||
+      healCloneArmed ||
+      layerMaskPaintArmed ||
+      filterMaskPaintArmed ||
+      quickMaskArmed ||
+      historyBrushArmed ||
+      bubbleShapeArmed ||
+      puppetWarpArmed
+    ) {
+      return;
+    }
+    // Konva 는 `mouseup` 에서 버튼과 무관하게 자체 `click` 을 합성한다. 우클릭(컨텍스트 메뉴)과
+    // macOS 의 Ctrl+클릭은 선택을 좁히는 제스처가 아니다 — 멀티 선택에 대고 우클릭했는데 메뉴가
+    // 하나짜리 선택에 적용되면 안 된다.
+    const mouse = event.evt as Partial<MouseEvent> | undefined;
+    if (typeof mouse?.button === "number" && mouse.button !== 0) return;
+    if (mouse?.ctrlKey === true) return;
+    const elementId = studioElementIdOf(event.target);
+    if (!elementId) return;
+    const narrowed = planGroupClickSelectionRelease({
+      items: elements,
+      groups,
+      clickedId: elementId,
+      current: { selectedId, marqueeIds, activeGroupId },
+      additive: mouse?.shiftKey === true,
+    });
+    if (!narrowed) return;
+    setSelectedId(narrowed.selectedId);
+    setMarqueeIds(narrowed.marqueeIds);
+  };
   return (
         <div
           className={cn(
@@ -1773,6 +2086,8 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
             onToggleSelectionLock={toggleSelectedElementsLocked}
             onReorderSelection={reorderSelectedElements}
             onAlignSelection={alignSelected}
+            onZoomToSelection={zoomToSelection}
+            onFlipSelection={flipSelected}
             showBubbleMerge={showBubbleMerge}
             bubbleMergeDisabledReason={bubbleMergeReason}
             onMergeBubbles={mergeSelectedBubbles}
@@ -2034,7 +2349,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
               "bg-[oklch(0.145_0.008_70)]",
               "[background-image:linear-gradient(oklch(0.162_0.008_70)_1px,transparent_1px),linear-gradient(90deg,oklch(0.162_0.008_70)_1px,transparent_1px)]",
               "[background-size:24px_24px]",
-              "focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent lg:max-h-none",
+              "focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent focus-visible:shadow-[inset_0_0_0_1px_oklch(0.72_0.14_55/0.45)] lg:max-h-none",
               canvasOnlyMode && "min-h-0 flex-1 max-h-none overscroll-contain",
               mobileImmersive
                 ? "min-h-0 flex-1 max-h-none rounded-xl overscroll-contain"
@@ -2214,7 +2529,10 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
               invariant (surface + Stage share this filter ancestor, vignette stays outside) is
               pinned by studio-raster-handoff-authority.test.ts. */}
           <div
-            ref={zoomHostRef}
+            ref={(node) => {
+              zoomHostRef.current = node;
+              setPixiMountParent(node);
+            }}
             data-studio-canvas-cursor={canvasCursorClassName.replace("cursor-", "")}
             data-studio-brush-cursor-style={
               tool === "draw" && isStudioBrushCursorMode(drawMode)
@@ -2227,28 +2545,40 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 : undefined
             }
             data-studio-comment-placement-active={commentPinArmed ? "true" : undefined}
+            data-studio-vello-hub-authority={velloHubAuthority.status}
+            data-studio-vello-hub-backend={velloHubAuthority.backendId ?? undefined}
             className={cn(
               "relative rounded-sm shadow-[0_0_0_1px_oklch(0.3_0.012_64/0.55),0_18px_50px_oklch(0.08_0.01_70/0.45)]",
               canvasCursorClassName,
               hardCanvasInteractionBlock && "pointer-events-none select-none",
               (sourceHydrationPending || collaborationDocumentUnavailable) && "invisible absolute inset-0"
             )}
-            style={{ width: stageViewLayout.width, height: stageViewLayout.height }}
+            style={{
+              // 줌 호스트는 항상 문서 박스를 유지한다 — 스크롤 범위, 드롭 좌표, 줌 앵커,
+              // WebGPU/라이브잉크 오버레이 좌표계가 전부 이 박스를 기준으로 한다.
+              // 뷰포트 클립이 줄이는 것은 아래 Konva Stage 하나뿐이다.
+              height: stageViewLayout.hostHeight,
+              isolation: "isolate",
+              width: stageViewLayout.hostWidth,
+            }}
           >
           <div
             data-studio-post-processing-scope=""
             className="relative"
-            style={{ filter: [pageGradeCss, colorBlindFilterStyle(colorBlindPreview).filter].filter(Boolean).join(" ") || undefined }}
+            style={{
+              filter: [pageGradeCss, colorBlindFilterStyle(colorBlindPreview).filter].filter(Boolean).join(" ") || undefined,
+              // 클립된 Stage 는 흐름에서 빠지므로(absolute) 이 래퍼에 문서 박스를 명시로 박는다.
+              // 안 그러면 래퍼가 높이 0 으로 붕괴하고, inset-0 오버레이와 스크롤 범위가 함께 죽는다.
+              height: stageViewLayout.hostHeight,
+              width: stageViewLayout.hostWidth,
+            }}
           >
           <Profiler id="studio:stage" onRender={recordStudioRenderProfile}>
           <Stage
             ref={stageRef}
             width={stageViewLayout.width}
             height={stageViewLayout.height}
-            // Drawing owns the contact stream; browser panning would otherwise cancel a fast
-            // finger stroke. The wrap's explicit two-finger pinch handler still receives bubbled
-            // touch events, and a second touch cancels an unfinished finger stroke above.
-            style={{ touchAction: tool === "draw" || liquifyArmed ? "none" : "auto" }}
+            style={stageViewClip ? STUDIO_STAGE_CLIPPED_STYLE : STUDIO_STAGE_DOCUMENT_STYLE}
             scaleX={stageViewLayout.scaleX}
             scaleY={stageViewLayout.scaleY}
             x={stageViewLayout.x}
@@ -2258,6 +2588,8 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
             onPointerMove={onStageMove}
             onPointerUp={onStageUp}
             onPointerCancel={onStagePointerCancel}
+            onClick={narrowCanvasSelectionOnRelease}
+            onTap={narrowCanvasSelectionOnRelease}
             onDblClick={enterGroupFromCanvasGesture}
             onDblTap={enterGroupFromCanvasGesture}
             onMouseLeave={() => {
@@ -2602,6 +2934,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                         liveStrokeRef={drawingRef}
                         onHokusaiCanonicalImageReady={onHokusaiCanonicalImageReady}
                         onLivingInkCanonicalImageReady={onLivingInkCanonicalImageReady}
+                        rasterPresentationEligible={!isNonInteractiveRender}
                       />
                     </Fragment>
                   );
@@ -2662,6 +2995,8 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                       : [];
                   const hitKind = liveEl.kind ?? "freehand";
                   const hitShapeParams = normalizeShapeParams(liveEl.shapeParams);
+                  // Generous screen-space hit pad so thin strokes stay clickable at high zoom
+                  // (layer-scoped transform/crop starts with a reliable single-layer select).
                   const hitStrokeWidth = Math.max(
                     liveEl.mode === "eraser"
                       ? liveEl.strokeWidth
@@ -2669,7 +3004,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                           liveEl.brush,
                           liveEl.strokeWidth
                         ),
-                    10 / Math.max(effScale, 0.001)
+                    16 / Math.max(effScale, 0.001)
                   );
                   const hitClosedShape =
                     hitKind === "rect" ||
@@ -3005,7 +3340,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
               {!isExporting &&
                 tool === "select" &&
                 !activeSurfaceReviewLocked &&
-                marqueeIds.length > 1 &&
+                (marqueeIds.length > 1 || singleDrawFreeScale) &&
                 multiSelectionBounds &&
                 multiSelectionBounds.w >= 0 &&
                 multiSelectionBounds.h >= 0 && (() => {
@@ -3013,7 +3348,11 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                   const constrained = selectionLockState !== "unlocked";
                   const label =
                     completeSelectionGroup?.name?.trim() ||
-                    (completeSelectionGroup ? "그룹" : "다중 선택");
+                    (completeSelectionGroup
+                      ? "그룹"
+                      : singleDrawFreeScale
+                        ? "선화 레이어"
+                        : "다중 선택");
                   const lockStateLabel =
                     selectionLockState === "locked"
                       ? "잠금"
@@ -3124,7 +3463,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                     </Group>
                   );
                 })()}
-              {marqueeIds.length > 1 && multiSelectionBounds ? (
+              {(marqueeIds.length > 1 || singleDrawFreeScale) && multiSelectionBounds ? (
                 <StudioGroupUniformResizeProxy
                   bounds={{
                     x: multiSelectionBounds.x,
@@ -3136,6 +3475,14 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                   mobile={isMobile}
                   coarse={hasCoarsePointer}
                   enabled={groupResizeEnabled}
+                  // One stroke can absorb rotation and independent width/height exactly, so it
+                  // gets the full handle set. A multi-selection stays on uniform corners.
+                  freeTransform={singleDrawFreeScale}
+                  // Group drags already shift the proxy through translateGroupPreview; a lone
+                  // stroke has no such path, so the proxy follows the wrapper's transform itself.
+                  mirrorDragElementId={
+                    singleDrawFreeScale ? canvasSelectionEls[0]?.id : undefined
+                  }
                   onBegin={beginCanvasSelectionResize}
                   onCommit={commitCanvasSelectionResize}
                   onCancel={cancelCanvasSelectionResize}
@@ -3257,7 +3604,6 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                         gpuLiveInkPinnedRef.current
                         && !gpuCanvasShadowVisibleRef.current
                       )
-                      || hokusaiLiveOverlayVisibleRef.current
                       || livingInkOverlayVisibleRef.current
                       || liveInkOverlayRendererRef.current.isActive
                       || liveStampOverlayRenderer.isActive
@@ -3674,7 +4020,48 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 flipX={canvasFlipH}
               />
             ) : null}
+            {transientPenInkSurfaceEnabled && webGpuViewportSurface && inkMeshLivePreviewRuntime ? (
+              <StudioInkMeshLivePreviewHost
+                runtime={inkMeshLivePreviewRuntime}
+                left={webGpuViewportSurface.surface.left}
+                top={webGpuViewportSurface.surface.top}
+                width={webGpuViewportSurface.surface.width}
+                height={webGpuViewportSurface.surface.height}
+                documentScale={effScale}
+                documentWidth={CANVAS_W}
+                flipX={canvasFlipH}
+              />
+            ) : null}
           </Suspense>
+          <StudioVelloHubSurface
+            enabled={velloHubCapability.enabled}
+            mountParent={pixiMountParent}
+            width={stageViewLayout.hostWidth}
+            height={stageViewLayout.hostHeight}
+            documentTransform={pixiSceneDocumentTransform}
+            documentWidth={CANVAS_W}
+            documentHeight={canvasH}
+            elements={elements}
+            selectedIds={acceleratedSceneSelectedIds}
+            isPenDown={readVelloHubPenDown}
+            onAuthorityChange={setVelloHubAuthority}
+          />
+          <StudioPixiSceneOverlayHost
+            enabled={
+              !velloHubCapability.enabled
+              || velloHubAuthority.status === "fallback"
+            }
+            mountParent={pixiMountParent}
+            // Vello Hub와 같은 renderer-neutral selection seam. Vello가 admission/render에
+            // 실패한 경우에만 Pixi가 명시적으로 이 island의 단독 소유권을 되찾는다.
+            width={stageViewLayout.hostWidth}
+            height={stageViewLayout.hostHeight}
+            documentTransform={pixiSceneDocumentTransform}
+            documentWidth={CANVAS_W}
+            documentHeight={canvasH}
+            elements={elements}
+            selectedIds={acceleratedSceneSelectedIds}
+          />
           {webGpuViewportSurface ? (
             <canvas
               ref={livingInkCanvasRef}
@@ -3781,6 +4168,8 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 elementById={elementById}
                 nodeRefsRef={nodeRefsRef}
                 effScale={effScale}
+                stageOriginOffsetX={stageViewClip?.left ?? 0}
+                stageOriginOffsetY={stageViewClip?.top ?? 0}
                 onCommit={commitEditText}
                 onCancel={cancelEditText}
               />
@@ -3837,32 +4226,14 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
             </Suspense>
           ) : null}
 
-          <div
-            className="pointer-events-none absolute bottom-16 left-1/2 z-40 -translate-x-1/2"
-            style={
-              tool === "draw" && !canvasOnlyMode
-                ? { bottom: "calc(var(--studio-draw-options-height, 3.75rem) + 0.75rem)" }
-                : undefined
-            }
-            role="status"
-            aria-live="polite"
-            aria-atomic="true"
-          >
-            {drawingShortcutNotice ? (
-              <span
-                key={drawingShortcutNotice.id}
-                className="mx-3 block max-w-[min(28rem,calc(100vw-1.5rem))] whitespace-normal rounded-lg border border-line bg-panel/95 px-3 py-1.5 text-center text-xs font-semibold leading-relaxed text-fg shadow-lg backdrop-blur motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1"
-              >
-                {drawingShortcutNotice.message}
-              </span>
-            ) : null}
-            {quickShapeActive && tool === "draw" && drawMode === "pen" && !drawingShortcutNotice ? (
-              <span className="mx-3 inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-panel/95 px-3 py-1 text-center text-[0.68rem] font-semibold text-accent shadow-lg backdrop-blur">
-                <Shapes size={12} aria-hidden />
-                {localizeText(t, "스마트 도형 · 선·원·네모 등을 그리고 손을 떼면 다듬어요 (잠시 멈추면 미리보기)", "studio.quickShape.notice")}
-              </span>
-            ) : null}
-          </div>
+          <StudioDrawingShortcutNoticeLayer
+            canvasOnlyMode={canvasOnlyMode}
+            drawMode={drawMode}
+            hasAutosave={hasAutosave}
+            noticeStore={drawingShortcutNoticeStore}
+            quickShapeActive={quickShapeActive}
+            tool={tool}
+          />
 
           <button
             type="button"

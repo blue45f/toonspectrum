@@ -8,16 +8,32 @@
  *   2. 밀도를 분리형 박스 블러로 확산해 젖은 종이 위의 번짐 범위를 만든다.
  *   3. 확산된 안료가 밝은 이웃으로 넘어가는 부분에 edgeBleed를 더하고, 안쪽에는
  *      약한 농도 고임(pooling)을 더한다.
- *   4. 결정적 다중 스케일 종이결과 안료 과립(granulation)을 입힌 뒤 종이색과 먹색을 보간한다.
- *   5. 결과를 원본과 strength만큼 블렌드한다. 블렌드에는 원본 알파를 곱해 투명 경계의
+ *   4. edgeDarkening이 켜져 있으면 확산 밀도를 습윤 필드로 보고 안료를 마르는 쪽으로
+ *      실제로 이송해 가장자리 링(wet edge)을 만든다.
+ *   5. 종이 높이맵의 *골*에 안료가 더 남도록 정착시키고(granulation), 같은 높이맵으로
+ *      종이 명암을 흔든 뒤 종이색과 먹색을 보간한다.
+ *   6. 결과를 원본과 strength만큼 블렌드한다. 블렌드에는 원본 알파를 곱해 투명 경계의
  *      RGB 헤일로를 막고, 알파 채널 자체는 절대 변경하지 않는다.
  *
- * 물리 유체 시뮬레이션은 아니며, 실시간 캔버스 필터에 적합한 O(width*height) 근사다.
+ * 4·5단계의 물리는 `studio-paper-texture`의 순수 CPU 참조 구현에 있다(Curtis et al. 1997
+ * 얕은 물 모델의 edge darkening / granulation 항목). 이 파일은 그 커널을 래스터 필터
+ * 파이프라인에 접합하기만 한다.
+ *
+ * 전체는 물리 유체 시뮬레이션이 아니며, 실시간 캔버스 필터에 적합한 O(width*height) 근사다.
  * Math.random/DOM/Konva에 의존하지 않아 같은 입력·설정·seed는 항상 같은 결과를 낸다.
  */
 
 import { hexToRgb } from "./studio-filters";
-import { hash2 } from "./studio-grain";
+import {
+  DEFAULT_PAPER_GRAIN_KIND,
+  accumulateEdgeDarkening,
+  createPaperGranulationGain,
+  createPaperHeightField,
+  normalizePaperGrainKind,
+  PAPER_REFERENCE_TILE,
+  type PaperGrainKind,
+  type PaperHeightField,
+} from "./studio-paper-texture";
 
 import type { StudioImageDataLike } from "./studio-filters";
 
@@ -25,15 +41,24 @@ import type { StudioImageDataLike } from "./studio-filters";
 // 파라미터 타입·기본값·범위
 // ---------------------------------------------------------------------------
 
-/** 수묵 번짐 재질 설정. 모든 퍼센트 값은 0..100 범위다. */
+/**
+ * 수묵 번짐 재질 설정. 모든 퍼센트 값은 0..100 범위다.
+ *
+ * `paperKind`/`edgeDarkening`은 **선택 필드**로 두었다. 저장된 문서와 `STUDIO_LOOKS`의
+ * inkWash 패치가 7키 객체로 이미 유통 중이라, 필수 키를 늘리면 그 값들이 normalize
+ * round-trip에서 어긋난다. 키가 없으면 `DEFAULT_INK_WASH_PAPER_KIND` /
+ * `DEFAULT_INK_WASH_EDGE_DARKENING`(=0, 항등)이 적용된다.
+ */
 export type InkWash = {
   strength: number; // 0..100, 0이면 항등
   spread: number; // 1..12 px, 안료 확산 반경
   edgeBleed: number; // 0..100, 밝은 이웃으로 스며드는 가장자리 안료
-  granulation: number; // 0..100, 안료 알갱이/농도 불균일
-  paper: number; // 0..100, 따뜻한 종이색·섬유 질감
+  granulation: number; // 0..100, 종이 골에 안료가 가라앉는 입자 침착
+  paper: number; // 0..100, 따뜻한 종이색·요철 명암
   inkColor: string; // #rrggbb 안료색
   seed: number; // 0..9999 결정적 재질 시드
+  paperKind?: PaperGrainKind; // 선택: 세목/중목/황목 종이 결
+  edgeDarkening?: number; // 선택: 0..100, 마르며 가장자리로 몰리는 안료(0이면 항등)
 };
 
 /** 기본값은 항등(강도 0)이다. 나머지는 수묵화에 적당한 시작점으로 둔다. */
@@ -47,15 +72,37 @@ export const DEFAULT_INK_WASH: InkWash = {
   seed: 41,
 };
 
+/** `paperKind`가 없을 때 쓰는 종이 — 실물 수채 표준인 중목(cold-press). */
+export const DEFAULT_INK_WASH_PAPER_KIND: PaperGrainKind = DEFAULT_PAPER_GRAIN_KIND;
+/** `edgeDarkening`이 없을 때의 값. 0 = 기존 저장본과 픽셀 동일(항등). */
+export const DEFAULT_INK_WASH_EDGE_DARKENING = 0;
+
 export const INK_WASH_STRENGTH_RANGE = { min: 0, max: 100, step: 1 } as const;
 export const INK_WASH_SPREAD_RANGE = { min: 1, max: 12, step: 1 } as const;
 export const INK_WASH_EDGE_BLEED_RANGE = { min: 0, max: 100, step: 1 } as const;
 export const INK_WASH_GRANULATION_RANGE = { min: 0, max: 100, step: 1 } as const;
 export const INK_WASH_PAPER_RANGE = { min: 0, max: 100, step: 1 } as const;
+export const INK_WASH_EDGE_DARKENING_RANGE = { min: 0, max: 100, step: 1 } as const;
 
 const INK_WASH_SEED_MIN = 0;
 const INK_WASH_SEED_MAX = 9999;
 const HEX6_RE = /^#[0-9a-f]{6}$/i;
+/** 종이 타일 한 변(px). seamless라 큰 캔버스에서 wrap 반복해도 이음선이 없다. */
+const INK_WASH_PAPER_TILE = PAPER_REFERENCE_TILE;
+/** 가장자리 어두워짐 건조 반복 횟수. 링 대비와 필터 비용의 절충점. */
+const INK_WASH_EDGE_DARKENING_STEPS = 6;
+/**
+ * 습윤 프로파일 블러 반경 = spread * 이 배수(최대 24).
+ *
+ * 안료 확산용 `spread` 블러를 그대로 습윤 필드로 쓰면 워시 내부가 평평해져 그래디언트가
+ * 0이 되고 링만 생긴 채 중심부가 밝아지지 않는다. 물웅덩이는 안료보다 훨씬 넓게 퍼지고
+ * 접시처럼 완만하므로 더 넓은 블러가 실제 수막 두께에 가깝다. 반경보다 큰 워시의 중앙이
+ * 여전히 평평한 것은 물리적으로 맞다 — 넓은 워시는 테두리만 진해진다.
+ */
+const INK_WASH_WET_PROFILE_SCALE = 3;
+const INK_WASH_WET_PROFILE_MAX_RADIUS = 24;
+/** 종이 요철 → 명암 진폭. (h-0.5)는 대략 ±0.35이므로 최대 ±8 정도로 흔든다. */
+const INK_WASH_PAPER_SHADE_GAIN = 22;
 
 // ---------------------------------------------------------------------------
 // 정규화·항등 판정
@@ -73,10 +120,25 @@ function normalizeInkColor(raw: unknown): string {
 /**
  * 저장본·Konva attrs 등 외부 입력을 안전한 수묵 번짐 설정으로 정규화한다.
  * spread/seed는 픽셀 반경·해시 입력이라 내림해 정수화하고, 색은 #rrggbb만 받는다.
+ *
+ * 선택 필드(`paperKind`/`edgeDarkening`)는 **입력에 있을 때만** 출력에 넣는다.
+ * 없는 키를 채워 넣으면 7키로 저장된 기존 문서·룩 패치가 `value === normalize(value)`
+ * round-trip을 잃기 때문이다(적용 시점 기본값은 `applyInkWash`가 해석한다).
  */
 export function normalizeInkWash(effect?: Partial<InkWash> | null): InkWash {
   const src = effect && typeof effect === "object" ? effect : {};
+  const optional: Partial<InkWash> = {};
+  if (src.paperKind !== undefined) optional.paperKind = normalizePaperGrainKind(src.paperKind);
+  if (src.edgeDarkening !== undefined) {
+    optional.edgeDarkening = clampTo(
+      src.edgeDarkening,
+      INK_WASH_EDGE_DARKENING_RANGE.min,
+      INK_WASH_EDGE_DARKENING_RANGE.max,
+      DEFAULT_INK_WASH_EDGE_DARKENING,
+    );
+  }
   return {
+    ...optional,
     strength: clampTo(src.strength, INK_WASH_STRENGTH_RANGE.min, INK_WASH_STRENGTH_RANGE.max, DEFAULT_INK_WASH.strength),
     spread: Math.floor(clampTo(src.spread, INK_WASH_SPREAD_RANGE.min, INK_WASH_SPREAD_RANGE.max, DEFAULT_INK_WASH.spread)),
     edgeBleed: clampTo(
@@ -103,55 +165,37 @@ export function isIdentityInkWash(effect: Pick<InkWash, "strength">): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// 결정적 재질 노이즈 — 낮은 해상도 격자를 보간해 해시 호출과 고주파 깜빡임을 줄인다.
+// 종이 결 타일 — seamless 절차 높이맵을 wrap 반복해 쓴다(캔버스 크기와 무관하게 O(타일)).
 // ---------------------------------------------------------------------------
 
-type NoiseField = {
-  values: Float32Array;
-  columns: number;
-  rows: number;
-  cellWidth: number;
-  cellHeight: number;
-};
+/**
+ * (종류, seed)가 같으면 높이맵도 같으므로 작은 FIFO 캐시로 재생성을 피한다.
+ * 캐시는 읽기 전용으로만 소비되고(가중치는 매번 새 버퍼), 관측 가능한 동작을 바꾸지 않는다.
+ */
+const PAPER_TILE_CACHE_LIMIT = 8;
+const paperTileCache = new Map<string, PaperHeightField>();
 
-function smoothstep01(t: number): number {
-  return t * t * (3 - 2 * t);
-}
-
-function createNoiseField(
-  width: number,
-  height: number,
-  cellWidth: number,
-  cellHeight: number,
-  seed: number,
-): NoiseField {
-  // 오른쪽/아래 보간에 필요한 한 칸을 추가한다.
-  const columns = Math.floor((width - 1) / cellWidth) + 2;
-  const rows = Math.floor((height - 1) / cellHeight) + 2;
-  const values = new Float32Array(columns * rows);
-  for (let y = 0; y < rows; y++) {
-    const row = y * columns;
-    for (let x = 0; x < columns; x++) values[row + x] = hash2(x, y, seed);
+function paperTile(kind: PaperGrainKind, seed: number): PaperHeightField {
+  const key = `${kind}:${seed}`;
+  const cached = paperTileCache.get(key);
+  if (cached) return cached;
+  const field = createPaperHeightField({
+    kind,
+    width: INK_WASH_PAPER_TILE,
+    height: INK_WASH_PAPER_TILE,
+    seed,
+  });
+  if (paperTileCache.size >= PAPER_TILE_CACHE_LIMIT) {
+    const oldest = paperTileCache.keys().next();
+    if (!oldest.done) paperTileCache.delete(oldest.value);
   }
-  return { values, columns, rows, cellWidth, cellHeight };
+  paperTileCache.set(key, field);
+  return field;
 }
 
-/** 저해상도 해시 격자의 부드러운 이중선형 보간값(0..1). */
-function sampleNoise(field: NoiseField, x: number, y: number): number {
-  const rawX = x / field.cellWidth;
-  const rawY = y / field.cellHeight;
-  const left = Math.min(field.columns - 2, Math.max(0, Math.floor(rawX)));
-  const top = Math.min(field.rows - 2, Math.max(0, Math.floor(rawY)));
-  const tx = smoothstep01(Math.min(1, Math.max(0, rawX - left)));
-  const ty = smoothstep01(Math.min(1, Math.max(0, rawY - top)));
-  const topOffset = top * field.columns + left;
-  const a = field.values[topOffset]!;
-  const b = field.values[topOffset + 1]!;
-  const c = field.values[topOffset + field.columns]!;
-  const d = field.values[topOffset + field.columns + 1]!;
-  const topValue = a + (b - a) * tx;
-  const bottomValue = c + (d - c) * tx;
-  return topValue + (bottomValue - topValue) * ty;
+/** 픽셀 좌표를 종이 타일 인덱스로 wrap 한다. 타일이 seamless라 반복 이음선이 없다. */
+function paperTileIndex(x: number, y: number): number {
+  return (y % INK_WASH_PAPER_TILE) * INK_WASH_PAPER_TILE + (x % INK_WASH_PAPER_TILE);
 }
 
 // ---------------------------------------------------------------------------
@@ -227,11 +271,23 @@ function isUsableRaster(img: StudioImageDataLike): boolean {
 // 적용 — 안료 밀도 → 확산/edge bleed → 종이/안료 합성
 // ---------------------------------------------------------------------------
 
+/** 확산 밀도와 원본 밀도를 합쳐 edgeBleed 이후의 안료량을 낸다. */
+function resolveBleedPigment(original: number, diffused: number, bleedStrength: number): number {
+  // 밖으로 번진 안료가 핵심이고, 안쪽 농도 고임은 약하게 보조한다.
+  const outwardBleed = Math.max(0, diffused - original);
+  const innerPooling = Math.max(0, original - diffused);
+  return clampUnit(original + bleedStrength * (outwardBleed * 0.92 + innerPooling * 0.18));
+}
+
 /**
  * 수묵 번짐을 제자리 적용한다. 입력 알파는 완전히 보존한다.
  *
- * edgeBleed=0이면 비싼 확산 버퍼를 만들지 않아 단순 먹/종이 재질 변환만 수행한다.
- * spread가 큰 경우도 슬라이딩 윈도 박스 블러 두 패스만 쓰므로 반경에 비례해 느려지지 않는다.
+ * edgeBleed와 edgeDarkening이 모두 0이면 비싼 확산 버퍼를 만들지 않아 단순 먹/종이
+ * 재질 변환만 수행한다. spread가 큰 경우도 슬라이딩 윈도 박스 블러 두 패스만 쓰므로
+ * 반경에 비례해 느려지지 않는다.
+ *
+ * edgeDarkening은 확산 밀도를 습윤 필드로 삼아 안료를 실제로 이송하는 추가 패스라
+ * (기본 6회 반복) 켜면 비용이 눈에 띄게 늘어난다. 기본값 0으로 옵트인이다.
  */
 export function applyInkWash(img: StudioImageDataLike, input: InkWash): void {
   const effect = normalizeInkWash(input);
@@ -242,13 +298,14 @@ export function applyInkWash(img: StudioImageDataLike, input: InkWash): void {
   const bleedStrength = effect.edgeBleed / 100;
   const paperStrength = effect.paper / 100;
   const granulationStrength = effect.granulation / 100;
+  const edgeDarkeningStrength = (effect.edgeDarkening ?? DEFAULT_INK_WASH_EDGE_DARKENING) / 100;
   const applyStrength = effect.strength / 100;
   const ink = hexToRgb(effect.inkColor);
 
-  // edgeBleed가 있을 때만 원본 안료 밀도와 확산 버퍼를 잡는다.
+  // 확산 버퍼는 edgeBleed 또는 edgeDarkening이 필요로 할 때만 잡는다.
   let sourceDensity: Uint8Array | null = null;
   let diffusedDensity: Float32Array | null = null;
-  if (bleedStrength > 0) {
+  if (bleedStrength > 0 || edgeDarkeningStrength > 0) {
     sourceDensity = new Uint8Array(count);
     for (let pixel = 0; pixel < count; pixel++) {
       sourceDensity[pixel] = Math.round(sourcePigment(data, pixel * 4) * 255);
@@ -256,11 +313,38 @@ export function applyInkWash(img: StudioImageDataLike, input: InkWash): void {
     diffusedDensity = boxBlurScalar(sourceDensity, width, height, effect.spread);
   }
 
-  // 종이결은 느린 얼룩 + 가로로 긴 섬유를 섞는다. paper=0이면 아예 할당하지 않는다.
-  const paperCloud = paperStrength > 0 ? createNoiseField(width, height, 18, 18, effect.seed + 17) : null;
-  const paperFibres = paperStrength > 0 ? createNoiseField(width, height, 22, 3, effect.seed + 41) : null;
-  // 안료 과립은 더 촘촘한 격자. 같은 seed에서 안정적이며 scale만 다른 종이결과 독립적이다.
-  const granules = granulationStrength > 0 ? createNoiseField(width, height, 2, 2, effect.seed + 89) : null;
+  // 가장자리 어두워짐: 넓게 퍼진 습윤 프로파일을 만들고, 안료를 마르는 쪽으로 이송한다.
+  let movedPigment: Float32Array | null = null;
+  if (edgeDarkeningStrength > 0 && sourceDensity && diffusedDensity) {
+    const wetRadius = Math.min(INK_WASH_WET_PROFILE_MAX_RADIUS, Math.max(1, effect.spread * INK_WASH_WET_PROFILE_SCALE));
+    const wetProfile = boxBlurScalar(sourceDensity, width, height, wetRadius);
+    let wetPeak = 0;
+    for (let pixel = 0; pixel < count; pixel++) {
+      if (wetProfile[pixel]! > wetPeak) wetPeak = wetProfile[pixel]!;
+    }
+    const pigmentField = new Float32Array(count);
+    const wetField = new Float32Array(count);
+    const wetScale = wetPeak > 0 ? 1 / wetPeak : 0;
+    for (let pixel = 0; pixel < count; pixel++) {
+      pigmentField[pixel] = resolveBleedPigment(
+        sourceDensity[pixel]! / 255,
+        diffusedDensity[pixel]! / 255,
+        bleedStrength,
+      );
+      // 최고점을 1로 맞춰 옅은 워시도 짙은 워시와 같은 건조 곡선을 타게 한다.
+      wetField[pixel] = clampUnit(wetProfile[pixel]! * wetScale);
+    }
+    movedPigment = accumulateEdgeDarkening(
+      { pigment: pigmentField, wetness: wetField, width, height },
+      { strength: edgeDarkeningStrength, steps: INK_WASH_EDGE_DARKENING_STEPS },
+    );
+  }
+
+  // 종이 요철 높이맵 하나가 종이 명암과 안료 침착을 동시에 만든다(같은 종이니 같은 결).
+  const needsPaperTile = paperStrength > 0 || granulationStrength > 0;
+  const paper = needsPaperTile ? paperTile(effect.paperKind ?? DEFAULT_INK_WASH_PAPER_KIND, effect.seed) : null;
+  const granulationGain
+    = paper && granulationStrength > 0 ? createPaperGranulationGain(paper, { strength: granulationStrength }) : null;
 
   // 종이를 100%로 올려도 과도하게 노랗지 않게, 따뜻한 미색으로만 살짝 이동시킨다.
   const paperBaseR = 255 - 12 * paperStrength;
@@ -271,28 +355,24 @@ export function applyInkWash(img: StudioImageDataLike, input: InkWash): void {
     for (let x = 0; x < width; x++) {
       const pixel = y * width + x;
       const offset = pixel * 4;
-      const originalPigment = sourceDensity ? sourceDensity[pixel]! / 255 : sourcePigment(data, offset);
-      let pigment = originalPigment;
-
-      if (diffusedDensity) {
-        const diffused = diffusedDensity[pixel]! / 255;
-        // 밖으로 번진 안료가 핵심이고, 안쪽 농도 고임은 약하게 보조한다.
-        const outwardBleed = Math.max(0, diffused - originalPigment);
-        const innerPooling = Math.max(0, originalPigment - diffused);
-        pigment = clampUnit(pigment + bleedStrength * (outwardBleed * 0.92 + innerPooling * 0.18));
+      const tileIndex = paper ? paperTileIndex(x, y) : 0;
+      let pigment: number;
+      if (movedPigment) {
+        pigment = clampUnit(movedPigment[pixel]!);
+      } else if (sourceDensity && diffusedDensity) {
+        pigment = resolveBleedPigment(sourceDensity[pixel]! / 255, diffusedDensity[pixel]! / 255, bleedStrength);
+      } else {
+        pigment = sourcePigment(data, offset);
       }
 
-      if (granules) {
-        const grain = sampleNoise(granules, x, y) * 2 - 1;
-        // 안료가 있는 곳에서만 과립이 보여 흰 종이까지 점 노이즈가 퍼지지 않는다.
-        pigment = clampUnit(pigment * (1 + grain * granulationStrength * 0.27));
+      if (granulationGain) {
+        // 골(낮은 높이)일수록 gain이 커져 안료가 몰린다. 안료가 없는 흰 종이는 그대로다.
+        pigment = clampUnit(pigment * (1 + granulationGain[tileIndex]!));
       }
 
       let paperShift = 0;
-      if (paperCloud && paperFibres) {
-        const cloudy = sampleNoise(paperCloud, x, y) - 0.5;
-        const fibre = sampleNoise(paperFibres, x, y) - 0.5;
-        paperShift = (cloudy * 0.68 + fibre * 0.32) * paperStrength * 16;
+      if (paper && paperStrength > 0) {
+        paperShift = (paper.values[tileIndex]! - 0.5) * paperStrength * INK_WASH_PAPER_SHADE_GAIN;
       }
 
       const paperR = clampByte(paperBaseR + paperShift * 0.86);
@@ -317,6 +397,12 @@ export function applyInkWash(img: StudioImageDataLike, input: InkWash): void {
 
 export type InkWashPreset = { id: string; label: string; tip: string; value: InkWash };
 
+/**
+ * 프리셋은 의도적으로 7키만 싣는다. `paperKind`/`edgeDarkening`을 넣어도
+ * `studio-konva-filters.ts`의 attr 브리지가 아직 그 둘을 전달하지 않아 Konva 렌더에서
+ * 조용히 사라진다. 브리지가 확장된 뒤 값을 채우는 것이 맞다.
+ * granulation은 브리지를 그대로 타므로, 종이 골 침착 물리 교체는 즉시 프리셋에 반영된다.
+ */
 export const INK_WASH_PRESETS: InkWashPreset[] = [
   {
     id: "none",
@@ -361,6 +447,11 @@ function attrNumber(value: unknown): number | undefined {
 /**
  * Konva node attrs에서 `inkWash*` 값을 읽는 어댑터. attrs가 없거나 strength가 0이면 no-op다.
  * 이 함수도 DOM/Konva 런타임을 import하지 않아 Vitest에서 일반 객체로 호출할 수 있다.
+ *
+ * 접합 주의: `inkWashPaperKind`/`inkWashEdgeDarkening`는 여기서 읽지만, 현재
+ * `studio-konva-filters.ts`의 attr 브리지가 7개 값만 복사하므로 Konva 경로로는 아직
+ * 도달하지 않는다(그래서 `INK_WASH_PRESETS`도 두 값을 싣지 않는다 — 조용한 손실 방지).
+ * 브리지에 두 줄이 추가되면 별도 변경 없이 바로 살아난다.
  */
 export function inkWashKonvaFilter(this: { attrs?: Record<string, unknown> }, imageData: StudioImageDataLike): void {
   const attrs = this.attrs;
@@ -375,6 +466,8 @@ export function inkWashKonvaFilter(this: { attrs?: Record<string, unknown> }, im
       paper: attrNumber(attrs.inkWashPaper),
       inkColor: typeof attrs.inkWashColor === "string" ? attrs.inkWashColor : undefined,
       seed: attrNumber(attrs.inkWashSeed),
+      paperKind: typeof attrs.inkWashPaperKind === "string" ? normalizePaperGrainKind(attrs.inkWashPaperKind) : undefined,
+      edgeDarkening: attrNumber(attrs.inkWashEdgeDarkening),
     }),
   );
 }

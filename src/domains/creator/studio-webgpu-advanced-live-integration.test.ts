@@ -6,6 +6,15 @@ function source(fileName: string): string {
   return readFileSync(new URL(fileName, import.meta.url), "utf8");
 }
 
+function expectInOrder(value: string, fragments: readonly string[]): void {
+  let cursor = -1;
+  for (const fragment of fragments) {
+    const next = value.indexOf(fragment, cursor + 1);
+    expect(next, `Expected ${JSON.stringify(fragment)} after index ${cursor}`).toBeGreaterThan(cursor);
+    cursor = next;
+  }
+}
+
 describe("Studio advanced WebGPU live-ink integration", () => {
   it("pins only an exactly prepared advanced stroke and keeps the legacy overlay as fallback", () => {
     const page = source("./StudioPage.tsx");
@@ -34,9 +43,22 @@ describe("Studio advanced WebGPU live-ink integration", () => {
       expect(liveSurfaceStart).toContain(higherPriorityOwner);
     }
     expect(page).toContain('destination: "transparent-overlay"');
-    expect(page).toContain(
-      "const gpuStartEligible = pendingGpuAuthorityPromoted"
+    const gpuEligibility = liveSurfaceStart.slice(
+      liveSurfaceStart.indexOf("const gpuStartEligible ="),
+      liveSurfaceStart.indexOf("gpuLiveOperationOrderKeyRef.current ="),
     );
+    expectInOrder(gpuEligibility, [
+      '(strokeRouteTournamentGate?.admits("gpu") ?? true)',
+      "pendingGpuAuthorityPromoted",
+      "!livingInkAdmitted",
+      "!hokusaiPinned",
+      "!stampDirect",
+      'STUDIO_VISIBLE_LIVE_INK_PREFERENCE === "webgpu"',
+      'webGpuBackendRef.current === "webgpu"',
+      "gpuLiveStrokePlannerRef.current !== null",
+      "!pixelDirect",
+      "isDirectLiveDraftEl(next)",
+    ]);
   });
 
   it("keeps an exact Konva shadow until dual receipt authority swaps surfaces atomically", () => {
@@ -84,9 +106,7 @@ describe("Studio advanced WebGPU live-ink integration", () => {
     expect(promotion).toBeGreaterThan(-1);
     expect(stampStart).toBeGreaterThan(promotion);
     expect(page).toContain(") || promotePendingGpuAuthoritiesToKonva()");
-    expect(page).toContain(
-      "const gpuStartEligible = pendingGpuAuthorityPromoted"
-    );
+    expect(page.indexOf("const gpuStartEligible =", stampStart)).toBeGreaterThan(stampStart);
     expect(page).toContain(
       "webGpuCanvasHandleRef.current?.setPinnedPresentationVisible(false)"
     );

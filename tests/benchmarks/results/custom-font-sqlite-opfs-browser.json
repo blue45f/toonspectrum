@@ -1,0 +1,2268 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-08T22:54:30.141Z",
+  "status": "pass",
+  "pass": true,
+  "fontSources": [
+    {
+      "id": "cjk-medium",
+      "class": "cjk-5-30-mib",
+      "url": "/__custom-font-fixture__/cjk-medium",
+      "sourcePath": "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+      "fileName": "Arial Unicode.ttf",
+      "byteLength": 23278008,
+      "sha256": "876af2cd4854644e7f3e7feb2f688997fdb3343c6df6693611209c9dfb47ccec",
+      "contentHash": "sha256:876af2cd4854644e7f3e7feb2f688997fdb3343c6df6693611209c9dfb47ccec",
+      "format": "ttf",
+      "mimeType": "font/ttf",
+      "licenseCaveat": "Locally installed macOS system font used only as benchmark input. The file is not copied, committed, bundled, or redistributed; use and redistribution remain governed by the OS/font license. This evidence grants no redistribution or embedding rights."
+    },
+    {
+      "id": "largest-ttc",
+      "class": "largest-ttc-under-128-mib",
+      "url": "/__custom-font-fixture__/largest-ttc",
+      "sourcePath": "/System/Library/Fonts/Supplemental/Songti.ttc",
+      "fileName": "Songti.ttc",
+      "byteLength": 66933080,
+      "sha256": "6873ac2ccab5c2e74d87d6b690f3773098dd6a6238805363a3b3567f2caf6f47",
+      "contentHash": "sha256:6873ac2ccab5c2e74d87d6b690f3773098dd6a6238805363a3b3567f2caf6f47",
+      "format": "ttc",
+      "mimeType": "font/collection",
+      "licenseCaveat": "Locally installed macOS system font used only as benchmark input. The file is not copied, committed, bundled, or redistributed; use and redistribution remain governed by the OS/font license. This evidence grants no redistribution or embedding rights."
+    }
+  ],
+  "benchmark": {
+    "status": "ok",
+    "pass": true,
+    "schemaVersion": 1,
+    "fixtureSelection": [
+      {
+        "id": "cjk-medium",
+        "class": "cjk-5-30-mib",
+        "url": "/__custom-font-fixture__/cjk-medium",
+        "sourcePath": "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+        "fileName": "Arial Unicode.ttf",
+        "byteLength": 23278008,
+        "sha256": "876af2cd4854644e7f3e7feb2f688997fdb3343c6df6693611209c9dfb47ccec",
+        "contentHash": "sha256:876af2cd4854644e7f3e7feb2f688997fdb3343c6df6693611209c9dfb47ccec",
+        "format": "ttf",
+        "mimeType": "font/ttf",
+        "licenseCaveat": "Locally installed macOS system font used only as benchmark input. The file is not copied, committed, bundled, or redistributed; use and redistribution remain governed by the OS/font license. This evidence grants no redistribution or embedding rights."
+      },
+      {
+        "id": "largest-ttc",
+        "class": "largest-ttc-under-128-mib",
+        "url": "/__custom-font-fixture__/largest-ttc",
+        "sourcePath": "/System/Library/Fonts/Supplemental/Songti.ttc",
+        "fileName": "Songti.ttc",
+        "byteLength": 66933080,
+        "sha256": "6873ac2ccab5c2e74d87d6b690f3773098dd6a6238805363a3b3567f2caf6f47",
+        "contentHash": "sha256:6873ac2ccab5c2e74d87d6b690f3773098dd6a6238805363a3b3567f2caf6f47",
+        "format": "ttc",
+        "mimeType": "font/collection",
+        "licenseCaveat": "Locally installed macOS system font used only as benchmark input. The file is not copied, committed, bundled, or redistributed; use and redistribution remain governed by the OS/font license. This evidence grants no redistribution or embedding rights."
+      }
+    ],
+    "primary": {
+      "phase": "primary",
+      "status": "ok",
+      "pass": true,
+      "schemaVersion": 1,
+      "execution": "vite-production-build-chromium-module-dedicated-worker-real-sqlite-opfs-sahpool-product-cas",
+      "authority": {
+        "repository": "StudioCustomFontSqliteOpfsRepository",
+        "repositoryFactory": "createStudioCustomFontSqliteOpfsRepository-no-options",
+        "repositoryAuthority": "sqlite-opfs",
+        "runtimeAcquire": "acquireStudioLocalDatabase",
+        "requestedVfs": "opfs",
+        "sqliteOpfsDirectory": "toonspectrum-studio-sqlite",
+        "sqliteDatabaseFilename": "studio-local-v12.db",
+        "expectedOpenFilename": "/studio-local-v12.db",
+        "openedOpfsDatabaseFilenames": [
+          "/studio-local-v12.db"
+        ],
+        "installedOpfsDirectories": [
+          "toonspectrum-studio-sqlite"
+        ],
+        "openedMemoryDatabaseFilenames": [],
+        "casOpfsRoot": "toonspectrum-studio-assets",
+        "casKind": "opfs",
+        "namespace": "studio-custom-font-library-v12",
+        "manifestKey": "manifest-v1",
+        "owner": "studio-custom-font-library-v12",
+        "webLockName": "toonspectrum-studio-custom-font-library-v12",
+        "normalCloseCompleted": true
+      },
+      "support": {
+        "wasm": true,
+        "opfs": true
+      },
+      "capabilities": {
+        "dedicatedWorker": true,
+        "secureContext": true,
+        "crossOriginIsolated": true,
+        "navigatorStorageGetDirectory": true,
+        "syncAccessHandle": true,
+        "cryptoSubtle": true,
+        "webLocks": true
+      },
+      "browser": {
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.186 Safari/537.36",
+        "hardwareConcurrency": 12,
+        "graphicsAdapter": null,
+        "graphicsAdapterReason": "No WebGPU rendering is used by this storage/FontFace benchmark"
+      },
+      "opening": {
+        "sqliteWasmInitMs": 29.3,
+        "coldOpenMs": 32.66
+      },
+      "classes": {
+        "medium": {
+          "fixture": {
+            "id": "cjk-medium",
+            "class": "cjk-5-30-mib",
+            "url": "/__custom-font-fixture__/cjk-medium",
+            "sourcePath": "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+            "fileName": "Arial Unicode.ttf",
+            "byteLength": 23278008,
+            "sha256": "876af2cd4854644e7f3e7feb2f688997fdb3343c6df6693611209c9dfb47ccec",
+            "contentHash": "sha256:876af2cd4854644e7f3e7feb2f688997fdb3343c6df6693611209c9dfb47ccec",
+            "format": "ttf",
+            "mimeType": "font/ttf",
+            "licenseCaveat": "Locally installed macOS system font used only as benchmark input. The file is not copied, committed, bundled, or redistributed; use and redistribution remain governed by the OS/font license. This evidence grants no redistribution or embedding rights."
+          },
+          "baselineId": "cjk-medium-baseline",
+          "family": "Arial Unicode",
+          "coldSaveMs": 181.25,
+          "saveCycles": 30,
+          "loadCycles": 30,
+          "saveMismatchCount": 0,
+          "loadMismatchCount": 0,
+          "saveDistribution": {
+            "sampleCount": 30,
+            "percentileMethod": "nearest-rank-ceil",
+            "samplesMs": [
+              136.135,
+              138.14,
+              139.84,
+              138.62,
+              141.58,
+              143.675,
+              143.31,
+              138.74,
+              136.6,
+              137.005,
+              137.045,
+              135.765,
+              136.25,
+              136.4,
+              135.405,
+              137.21,
+              136.525,
+              137,
+              135.92,
+              136.66,
+              136.515,
+              135.63,
+              136.25,
+              136.28,
+              137.365,
+              136.415,
+              138.615,
+              137.94,
+              136.02,
+              139.87
+            ],
+            "minMs": 135.405,
+            "p50Ms": 136.66,
+            "p95Ms": 143.31,
+            "p99Ms": 143.675,
+            "maxMs": 143.675,
+            "meanMs": 137.6242
+          },
+          "loadDistribution": {
+            "sampleCount": 30,
+            "percentileMethod": "nearest-rank-ceil",
+            "samplesMs": [
+              76.54,
+              75.815,
+              77.085,
+              75.885,
+              80,
+              85.13,
+              76.69,
+              76.015,
+              74.13,
+              76.415,
+              73.995,
+              73.89,
+              73.985,
+              73.88,
+              73.88,
+              74.655,
+              74.3,
+              74.535,
+              73.995,
+              74.275,
+              73.45,
+              73.095,
+              72.975,
+              72.86,
+              73.78,
+              73.67,
+              74.66,
+              74.31,
+              77.975,
+              74.85
+            ],
+            "minMs": 72.86,
+            "p50Ms": 74.3,
+            "p95Ms": 80,
+            "p99Ms": 85.13,
+            "maxMs": 85.13,
+            "meanMs": 75.224
+          },
+          "finalByteLength": 23278008,
+          "finalContentHash": "sha256:876af2cd4854644e7f3e7feb2f688997fdb3343c6df6693611209c9dfb47ccec",
+          "finalExplicitSha256": "876af2cd4854644e7f3e7feb2f688997fdb3343c6df6693611209c9dfb47ccec",
+          "exactAfterEveryRepositoryVerifiedLoad": true,
+          "exactExplicitShaAfterLoads": true,
+          "repositoryInternalVerifySha256": true
+        },
+        "largestTtc": {
+          "fixture": {
+            "id": "largest-ttc",
+            "class": "largest-ttc-under-128-mib",
+            "url": "/__custom-font-fixture__/largest-ttc",
+            "sourcePath": "/System/Library/Fonts/Supplemental/Songti.ttc",
+            "fileName": "Songti.ttc",
+            "byteLength": 66933080,
+            "sha256": "6873ac2ccab5c2e74d87d6b690f3773098dd6a6238805363a3b3567f2caf6f47",
+            "contentHash": "sha256:6873ac2ccab5c2e74d87d6b690f3773098dd6a6238805363a3b3567f2caf6f47",
+            "format": "ttc",
+            "mimeType": "font/collection",
+            "licenseCaveat": "Locally installed macOS system font used only as benchmark input. The file is not copied, committed, bundled, or redistributed; use and redistribution remain governed by the OS/font license. This evidence grants no redistribution or embedding rights."
+          },
+          "baselineId": "largest-ttc-baseline",
+          "family": "Songti",
+          "coldSaveMs": 497.03,
+          "saveCycles": 30,
+          "loadCycles": 30,
+          "saveMismatchCount": 0,
+          "loadMismatchCount": 0,
+          "saveDistribution": {
+            "sampleCount": 30,
+            "percentileMethod": "nearest-rank-ceil",
+            "samplesMs": [
+              386.085,
+              388.005,
+              376.655,
+              382.58,
+              379.2,
+              384.545,
+              378.875,
+              381.175,
+              390.91,
+              396.45,
+              380.995,
+              375.445,
+              387.7,
+              376.95,
+              382.355,
+              385.75,
+              384.795,
+              380.305,
+              386.05,
+              384.725,
+              380.89,
+              383.64,
+              387.29,
+              384.06,
+              379.765,
+              399.88,
+              375.545,
+              385.645,
+              386.405,
+              383.33
+            ],
+            "minMs": 375.445,
+            "p50Ms": 383.64,
+            "p95Ms": 396.45,
+            "p99Ms": 399.88,
+            "maxMs": 399.88,
+            "meanMs": 383.8667
+          },
+          "loadDistribution": {
+            "sampleCount": 30,
+            "percentileMethod": "nearest-rank-ceil",
+            "samplesMs": [
+              212.25,
+              217.455,
+              217.885,
+              216.775,
+              217.545,
+              215.455,
+              220.59,
+              232.305,
+              238.99,
+              234.32,
+              224.545,
+              222.455,
+              222.61,
+              218.86,
+              216.445,
+              213.5,
+              217.13,
+              216.89,
+              225.275,
+              221.605,
+              218.02,
+              218.72,
+              216.655,
+              215.48,
+              216.2,
+              217.465,
+              216.745,
+              217.825,
+              217.575,
+              223.135
+            ],
+            "minMs": 212.25,
+            "p50Ms": 217.575,
+            "p95Ms": 234.32,
+            "p99Ms": 238.99,
+            "maxMs": 238.99,
+            "meanMs": 220.0235
+          },
+          "finalByteLength": 66933080,
+          "finalContentHash": "sha256:6873ac2ccab5c2e74d87d6b690f3773098dd6a6238805363a3b3567f2caf6f47",
+          "finalExplicitSha256": "6873ac2ccab5c2e74d87d6b690f3773098dd6a6238805363a3b3567f2caf6f47",
+          "exactAfterEveryRepositoryVerifiedLoad": true,
+          "exactExplicitShaAfterLoads": true,
+          "repositoryInternalVerifySha256": true
+        }
+      },
+      "finalLibrary": {
+        "count": 2,
+        "totalBytes": 90211088,
+        "mediumExact": true,
+        "largestTtcExact": true,
+        "mediumExplicitSha256": "876af2cd4854644e7f3e7feb2f688997fdb3343c6df6693611209c9dfb47ccec",
+        "largestTtcExplicitSha256": "6873ac2ccab5c2e74d87d6b690f3773098dd6a6238805363a3b3567f2caf6f47",
+        "manifestBytes": 557,
+        "manifestCanonical": true,
+        "manifestContainsBinaryEncoding": false,
+        "ownerRefs": [
+          "sha256:6873ac2ccab5c2e74d87d6b690f3773098dd6a6238805363a3b3567f2caf6f47",
+          "sha256:876af2cd4854644e7f3e7feb2f688997fdb3343c6df6693611209c9dfb47ccec"
+        ],
+        "casEntries": [
+          {
+            "hash": "sha256:876af2cd4854644e7f3e7feb2f688997fdb3343c6df6693611209c9dfb47ccec",
+            "bytes": 23278008,
+            "storedBytes": 23278008,
+            "codec": "identity",
+            "mime": "font/ttf",
+            "path": "blobs/876af2cd4854644e7f3e7feb2f688997fdb3343c6df6693611209c9dfb47ccec.bin"
+          },
+          {
+            "hash": "sha256:6873ac2ccab5c2e74d87d6b690f3773098dd6a6238805363a3b3567f2caf6f47",
+            "bytes": 66933080,
+            "storedBytes": 66933080,
+            "codec": "identity",
+            "mime": "font/collection",
+            "path": "blobs/6873ac2ccab5c2e74d87d6b690f3773098dd6a6238805363a3b3567f2caf6f47.bin"
+          }
+        ]
+      },
+      "operationCounts": {
+        "baselineSaves": 3,
+        "measuredSaves": 60,
+        "measuredLoads": 60,
+        "measuredDeletes": 61
+      },
+      "fallback": {
+        "indexedDbAccessCount": 0,
+        "localStorageAccessCount": 0,
+        "memoryDatabaseOpenCount": 0,
+        "memoryAssetStoreCount": 0,
+        "indexedDbProbeInstalled": true,
+        "localStorageProbeInstalled": true,
+        "indexedDbOriginallyPresent": true,
+        "localStorageOriginallyPresent": false,
+        "totalFallbackCount": 0
+      },
+      "memory": {
+        "before": {
+          "performanceMemory": null,
+          "performanceMemoryUnavailableReason": "performance.memory is not exposed in this Dedicated Worker",
+          "userAgentSpecificMemory": null,
+          "userAgentSpecificMemoryUnavailableReason": "performance.measureUserAgentSpecificMemory is not exposed in this Dedicated Worker"
+        },
+        "after": {
+          "performanceMemory": null,
+          "performanceMemoryUnavailableReason": "performance.memory is not exposed in this Dedicated Worker",
+          "userAgentSpecificMemory": null,
+          "userAgentSpecificMemoryUnavailableReason": "performance.measureUserAgentSpecificMemory is not exposed in this Dedicated Worker"
+        }
+      },
+      "storage": {
+        "usageBytes": 90468357,
+        "quotaBytes": 2210979223
+      },
+      "opfs": {
+        "sqlite": {
+          "root": "toonspectrum-studio-sqlite",
+          "exists": true,
+          "entries": [
+            {
+              "path": ".opaque",
+              "kind": "directory",
+              "sizeBytes": null
+            },
+            {
+              "path": ".opaque/5bs8x6zexdg",
+              "kind": "file",
+              "sizeBytes": 4096
+            },
+            {
+              "path": ".opaque/cdx8q6ipuss",
+              "kind": "file",
+              "sizeBytes": 4096
+            },
+            {
+              "path": ".opaque/g5wsxpvqg6m",
+              "kind": "file",
+              "sizeBytes": 4096
+            },
+            {
+              "path": ".opaque/hafzmdd6dzc",
+              "kind": "file",
+              "sizeBytes": 4096
+            },
+            {
+              "path": ".opaque/qeux0m1pc8",
+              "kind": "file",
+              "sizeBytes": 4096
+            },
+            {
+              "path": ".opaque/r1tori78sr7",
+              "kind": "file",
+              "sizeBytes": 233472
+            }
+          ],
+          "fileCount": 6,
+          "totalFileBytes": 253952
+        },
+        "cas": {
+          "root": "toonspectrum-studio-assets",
+          "exists": true,
+          "entries": [
+            {
+              "path": "blobs",
+              "kind": "directory",
+              "sizeBytes": null
+            },
+            {
+              "path": "blobs/6873ac2ccab5c2e74d87d6b690f3773098dd6a6238805363a3b3567f2caf6f47.bin",
+              "kind": "file",
+              "sizeBytes": 66933080
+            },
+            {
+              "path": "blobs/876af2cd4854644e7f3e7feb2f688997fdb3343c6df6693611209c9dfb47ccec.bin",
+              "kind": "file",
+              "sizeBytes": 23278008
+            },
+            {
+              "path": "index.json",
+              "kind": "file",
+              "sizeBytes": 869
+            }
+          ],
+          "fileCount": 3,
+          "totalFileBytes": 90211957
+        }
+      },
+      "securityPolicyViolations": []
+    },
+    "normalReopen": {
+      "phase": "reopen",
+      "status": "ok",
+      "pass": true,
+      "normalCloseReopenInFreshWorker": true,
+      "reopenDatabaseMs": 8.7,
+      "verifiedListMs": 295.185,
+      "recoveryLatencyMs": 303.885,
+      "receipts": [
+        {
+          "id": "cjk-medium-baseline",
+          "fixtureId": "cjk-medium",
+          "family": "Arial Unicode",
+          "byteLength": 23278008,
+          "contentHash": "sha256:876af2cd4854644e7f3e7feb2f688997fdb3343c6df6693611209c9dfb47ccec",
+          "explicitSha256": "876af2cd4854644e7f3e7feb2f688997fdb3343c6df6693611209c9dfb47ccec",
+          "exact": true
+        },
+        {
+          "id": "largest-ttc-baseline",
+          "fixtureId": "largest-ttc",
+          "family": "Songti",
+          "byteLength": 66933080,
+          "contentHash": "sha256:6873ac2ccab5c2e74d87d6b690f3773098dd6a6238805363a3b3567f2caf6f47",
+          "explicitSha256": "6873ac2ccab5c2e74d87d6b690f3773098dd6a6238805363a3b3567f2caf6f47",
+          "exact": true
+        }
+      ],
+      "authority": {
+        "openedOpfsDatabaseFilenames": [
+          "/studio-local-v12.db"
+        ],
+        "openedMemoryDatabaseFilenames": [],
+        "casKind": "opfs"
+      },
+      "fallback": {
+        "indexedDbAccessCount": 0,
+        "localStorageAccessCount": 0,
+        "memoryDatabaseOpenCount": 0,
+        "memoryAssetStoreCount": 0,
+        "indexedDbProbeInstalled": true,
+        "localStorageProbeInstalled": true,
+        "indexedDbOriginallyPresent": true,
+        "localStorageOriginallyPresent": false,
+        "totalFallbackCount": 0
+      },
+      "memory": {
+        "before": {
+          "performanceMemory": null,
+          "performanceMemoryUnavailableReason": "performance.memory is not exposed in this Dedicated Worker",
+          "userAgentSpecificMemory": null,
+          "userAgentSpecificMemoryUnavailableReason": "performance.measureUserAgentSpecificMemory is not exposed in this Dedicated Worker"
+        },
+        "after": {
+          "performanceMemory": null,
+          "performanceMemoryUnavailableReason": "performance.memory is not exposed in this Dedicated Worker",
+          "userAgentSpecificMemory": null,
+          "userAgentSpecificMemoryUnavailableReason": "performance.measureUserAgentSpecificMemory is not exposed in this Dedicated Worker"
+        }
+      },
+      "fontPayloadsTransferred": 2,
+      "closeCompleted": true,
+      "recoveryCycles": 30,
+      "allRecoverySamplesPassed": true,
+      "reopenDatabaseDistribution": {
+        "sampleCount": 30,
+        "percentileMethod": "nearest-rank-ceil",
+        "samplesMs": [
+          8.7,
+          8.44,
+          9.005,
+          8.8,
+          8.435,
+          8.71,
+          9.015,
+          8.505,
+          8.685,
+          8.66,
+          8.99,
+          8.955,
+          8.42,
+          8.115,
+          8.395,
+          8.56,
+          8.285,
+          8.795,
+          8.635,
+          9.06,
+          8.415,
+          9.47,
+          9.205,
+          9.25,
+          8.84,
+          9.555,
+          9.345,
+          9.77,
+          9.105,
+          9.22
+        ],
+        "minMs": 8.115,
+        "p50Ms": 8.795,
+        "p95Ms": 9.555,
+        "p99Ms": 9.77,
+        "maxMs": 9.77,
+        "meanMs": 8.8447
+      },
+      "verifiedListDistribution": {
+        "sampleCount": 30,
+        "percentileMethod": "nearest-rank-ceil",
+        "samplesMs": [
+          295.185,
+          313.68,
+          305.265,
+          297.055,
+          301.865,
+          298.5,
+          302.42,
+          297.935,
+          301,
+          304.205,
+          296.185,
+          312.84,
+          292.865,
+          286.435,
+          294.6,
+          294.69,
+          298.375,
+          295.435,
+          293.63,
+          301.305,
+          300.425,
+          298.87,
+          305.47,
+          295.415,
+          309.6,
+          292.535,
+          292.375,
+          293.46,
+          294.13,
+          296.62
+        ],
+        "minMs": 286.435,
+        "p50Ms": 297.055,
+        "p95Ms": 312.84,
+        "p99Ms": 313.68,
+        "maxMs": 313.68,
+        "meanMs": 298.7457
+      },
+      "recoveryDistribution": {
+        "sampleCount": 30,
+        "percentileMethod": "nearest-rank-ceil",
+        "samplesMs": [
+          303.885,
+          322.12,
+          314.27,
+          305.855,
+          310.3,
+          307.21,
+          311.435,
+          306.44,
+          309.685,
+          312.865,
+          305.175,
+          321.795,
+          301.285,
+          294.55,
+          302.995,
+          303.25,
+          306.66,
+          304.23,
+          302.265,
+          310.365,
+          308.84,
+          308.34,
+          314.675,
+          304.665,
+          318.44,
+          302.09,
+          301.72,
+          303.23,
+          303.235,
+          305.84
+        ],
+        "minMs": 294.55,
+        "p50Ms": 305.855,
+        "p95Ms": 321.795,
+        "p99Ms": 322.12,
+        "maxMs": 322.12,
+        "meanMs": 307.5903
+      }
+    },
+    "fontFace": {
+      "pass": true,
+      "decodeReceipts": [
+        {
+          "family": "Arial Unicode",
+          "fileName": "Arial Unicode.ttf",
+          "format": "ttf",
+          "byteLength": 23278008,
+          "decodeMs": 33.015,
+          "status": "loaded",
+          "documentFontsCheck": true,
+          "pass": true,
+          "error": null
+        },
+        {
+          "family": "Songti",
+          "fileName": "Songti.ttc",
+          "format": "ttc",
+          "byteLength": 66933080,
+          "decodeMs": 47.855,
+          "status": "loaded",
+          "documentFontsCheck": true,
+          "pass": true,
+          "error": null
+        }
+      ],
+      "render": {
+        "canvas": {
+          "width": 1400,
+          "height": 340,
+          "colorSpace": "srgb"
+        },
+        "samples": [
+          "한글 손맛 필압 정밀 2026",
+          "日本語の線画精度 中文字体渲染精度",
+          "가나다 ABC 123 · 한中日"
+        ],
+        "firstPixelSha256": "6c496d748ba2d3af84e7e4b31306748acba4f6fba65704e54789f9291b218911",
+        "secondPixelSha256": "6c496d748ba2d3af84e7e4b31306748acba4f6fba65704e54789f9291b218911",
+        "firstPngSha256": "654ff4798b8c4a0d86111fd2f8c32b871a2eb7a727f1218a43691ac0fa68d063",
+        "secondPngSha256": "654ff4798b8c4a0d86111fd2f8c32b871a2eb7a727f1218a43691ac0fa68d063",
+        "pngBytes": 53160,
+        "nonWhitePixels": 45247,
+        "deterministic": true,
+        "browserRasterEvidenceScope": "same-production-build-same-Chromium-same-system-font-bytes-two-renders"
+      },
+      "explicitReason": null
+    },
+    "faults": {
+      "phase": "faults",
+      "status": "ok",
+      "pass": true,
+      "missingCasObject": {
+        "deleted": true,
+        "failClosed": {
+          "pass": true,
+          "error": {
+            "name": "StudioCustomFontRepositoryError",
+            "message": "사용자 글꼴 CAS metadata가 manifest와 일치하지 않습니다: cjk-medium-baseline",
+            "code": "corrupt",
+            "stack": "StudioCustomFontRepositoryError: 사용자 글꼴 CAS metadata가 manifest와 일치하지 않습니다: cjk-medium-baseline\n    at Nr (http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js:278:36930)\n    at Pr (http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js:278:37017)\n    at qr (http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js:278:40717)\n    at async Object.list (http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js:278:42686)\n    at async ji (http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js:278:61405)\n    at async Ni (http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js:278:63575)",
+            "cause": null
+          },
+          "returnedPartialList": false
+        },
+        "restoredHash": "sha256:876af2cd4854644e7f3e7feb2f688997fdb3343c6df6693611209c9dfb47ccec",
+        "recoveryExact": true
+      },
+      "corruptCasObject": {
+        "mutation": "same-length-final-byte-xor-ff-on-physical-opfs-blob",
+        "failClosed": {
+          "pass": true,
+          "error": {
+            "name": "StudioCustomFontRepositoryError",
+            "message": "사용자 글꼴 blob 읽기 중 OPFS 무결성 검증에 실패했습니다.",
+            "code": "corrupt",
+            "stack": "StudioCustomFontRepositoryError: 사용자 글꼴 blob 읽기 중 OPFS 무결성 검증에 실패했습니다.\n    at Ir (http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js:278:37252)\n    at qr (http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js:278:41021)\n    at async Object.list (http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js:278:42686)\n    at async ji (http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js:278:61405)\n    at async Ni (http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js:278:63912)",
+            "cause": {
+              "name": "StudioOpfsError",
+              "message": "저장된 자산의 내용이 원본과 달라요. 파일을 다시 가져와주세요."
+            }
+          },
+          "returnedPartialList": false
+        },
+        "deletedBeforeRestore": true,
+        "restoredHash": "sha256:876af2cd4854644e7f3e7feb2f688997fdb3343c6df6693611209c9dfb47ccec",
+        "recoveryExact": true
+      },
+      "metadataMismatch": {
+        "mutation": "canonical-manifest-byteLength-and-totalBytes-plus-one",
+        "failClosed": {
+          "pass": true,
+          "error": {
+            "name": "StudioCustomFontRepositoryError",
+            "message": "사용자 글꼴 CAS metadata가 manifest와 일치하지 않습니다: cjk-medium-baseline",
+            "code": "corrupt",
+            "stack": "StudioCustomFontRepositoryError: 사용자 글꼴 CAS metadata가 manifest와 일치하지 않습니다: cjk-medium-baseline\n    at Nr (http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js:278:36930)\n    at Pr (http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js:278:37017)\n    at qr (http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js:278:40717)\n    at async Object.list (http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js:278:42686)\n    at async ji (http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js:278:61405)\n    at async Ni (http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js:278:64504)",
+            "cause": null
+          },
+          "returnedPartialList": false
+        },
+        "originalManifestRestored": true,
+        "recoveryExact": true
+      },
+      "partialListsReturned": 0,
+      "silentFallbacks": 0,
+      "fallback": {
+        "indexedDbAccessCount": 0,
+        "localStorageAccessCount": 0,
+        "memoryDatabaseOpenCount": 0,
+        "memoryAssetStoreCount": 0,
+        "indexedDbProbeInstalled": true,
+        "localStorageProbeInstalled": true,
+        "indexedDbOriginallyPresent": true,
+        "localStorageOriginallyPresent": false,
+        "totalFallbackCount": 0
+      },
+      "closeCompleted": true
+    },
+    "forcedTermination": {
+      "pass": true,
+      "workerTerminateCalled": true,
+      "terminateCallDelayMs": 0.005,
+      "committedReceipt": {
+        "phase": "termination-seed",
+        "status": "ready",
+        "pass": true,
+        "committedSaveMs": 145.71,
+        "manifestCommitted": true,
+        "id": "forced-termination-committed-font",
+        "byteLength": 23278008,
+        "contentHash": "sha256:876af2cd4854644e7f3e7feb2f688997fdb3343c6df6693611209c9dfb47ccec",
+        "databaseIntentionallyLeftOpen": true,
+        "closeCalledBeforeReceipt": false,
+        "fallback": {
+          "indexedDbAccessCount": 0,
+          "localStorageAccessCount": 0,
+          "memoryDatabaseOpenCount": 0,
+          "memoryAssetStoreCount": 0,
+          "indexedDbProbeInstalled": true,
+          "localStorageProbeInstalled": true,
+          "indexedDbOriginallyPresent": true,
+          "localStorageOriginallyPresent": false,
+          "totalFallbackCount": 0
+        }
+      },
+      "recovery": {
+        "phase": "termination-verify",
+        "status": "ok",
+        "pass": true,
+        "id": "forced-termination-committed-font",
+        "exactHashAndBytes": true,
+        "explicitSha256": "876af2cd4854644e7f3e7feb2f688997fdb3343c6df6693611209c9dfb47ccec",
+        "reopenDatabaseMs": 9.865,
+        "totalOpenFunctionMs": 38.975,
+        "verifiedListMs": 374.345,
+        "recoveryLatencyMs": 384.21,
+        "fallback": {
+          "indexedDbAccessCount": 0,
+          "localStorageAccessCount": 0,
+          "memoryDatabaseOpenCount": 0,
+          "memoryAssetStoreCount": 0,
+          "indexedDbProbeInstalled": true,
+          "localStorageProbeInstalled": true,
+          "indexedDbOriginallyPresent": true,
+          "localStorageOriginallyPresent": false,
+          "totalFallbackCount": 0
+        },
+        "closeCalledAfterVerification": true
+      },
+      "forcedRecoveryElapsedMs": 738.86,
+      "workerVerifyElapsedMs": 487.625,
+      "internalRecoveryDistribution": {
+        "sampleCount": 1,
+        "percentileMethod": "nearest-rank-ceil",
+        "samplesMs": [
+          384.21
+        ],
+        "minMs": 384.21,
+        "p50Ms": 384.21,
+        "p95Ms": 384.21,
+        "p99Ms": 384.21,
+        "maxMs": 384.21,
+        "meanMs": 384.21
+      },
+      "pageRecoveryDistribution": {
+        "sampleCount": 1,
+        "percentileMethod": "nearest-rank-ceil",
+        "samplesMs": [
+          738.86
+        ],
+        "minMs": 738.86,
+        "p50Ms": 738.86,
+        "p95Ms": 738.86,
+        "p99Ms": 738.86,
+        "maxMs": 738.86,
+        "meanMs": 738.86
+      }
+    },
+    "pageMemory": {
+      "before": {
+        "performanceMemory": {
+          "jsHeapSizeLimitBytes": 4294705152,
+          "totalJSHeapSizeBytes": 1855037,
+          "usedJSHeapSizeBytes": 705417
+        },
+        "performanceMemoryUnavailableReason": null,
+        "userAgentSpecificMemory": null,
+        "userAgentSpecificMemoryUnavailableReason": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
+      },
+      "after": {
+        "performanceMemory": {
+          "jsHeapSizeLimitBytes": 4294705152,
+          "totalJSHeapSizeBytes": 187535824,
+          "usedJSHeapSizeBytes": 185781756
+        },
+        "performanceMemoryUnavailableReason": null,
+        "userAgentSpecificMemory": null,
+        "userAgentSpecificMemoryUnavailableReason": "Failed to execute 'measureUserAgentSpecificMemory' on 'Performance': performance.measureUserAgentSpecificMemory is not available."
+      }
+    },
+    "pageSecurityPolicyViolations": []
+  },
+  "diagnostics": {
+    "browserVersion": "140.0.7339.186",
+    "consoleErrors": [],
+    "consoleWarnings": [],
+    "pageErrors": [],
+    "requestFailures": [],
+    "errorResponses": [],
+    "requests": [
+      {
+        "method": "GET",
+        "resourceType": "document",
+        "url": "http://127.0.0.1:53903/"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/index-CPNEEwb-.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:53903/__custom-font-fixture__/cjk-medium"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:53903/__custom-font-fixture__/largest-ttc"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:53903/__custom-font-fixture__/cjk-medium"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:53903/__custom-font-fixture__/cjk-medium"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "method": "GET",
+        "resourceType": "fetch",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "method": "GET",
+        "resourceType": "script",
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      }
+    ],
+    "responses": [
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/index-CPNEEwb-.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/__custom-font-fixture__/cjk-medium"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/__custom-font-fixture__/largest-ttc"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/__custom-font-fixture__/cjk-medium"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/__custom-font-fixture__/cjk-medium"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-BVKGSWc-.wasm"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs"
+      },
+      {
+        "status": 200,
+        "url": "http://127.0.0.1:53903/assets/sqlite3-opfs-async-proxy-D_xnb1D8.js?vfs=opfs-wl"
+      }
+    ],
+    "responseHeaders": {
+      "contentSecurityPolicy": "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'; worker-src 'self'; style-src 'none'; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+      "crossOriginOpenerPolicy": "same-origin",
+      "crossOriginEmbedderPolicy": "require-corp",
+      "crossOriginResourcePolicy": "same-origin"
+    }
+  },
+  "productionBuild": {
+    "mode": "vite-production-build",
+    "assets": [
+      ".vite/manifest.json",
+      "assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js",
+      "assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js.map",
+      "assets/index-CPNEEwb-.js",
+      "assets/index-CPNEEwb-.js.map",
+      "assets/sqlite3-BVKGSWc-.wasm",
+      "assets/sqlite3-opfs-async-proxy-D_xnb1D8.js",
+      "assets/sqlite3-worker1-N5XM9NUp.js",
+      "assets/sqlite3-worker1-N5XM9NUp.js.map",
+      "index.html"
+    ],
+    "assetReceipts": [
+      {
+        "path": ".vite/manifest.json",
+        "bytes": 131,
+        "sha256": "57f7d436d5e45148039bbce61aacaf561cd6d16954cb2dad1f97a3c1dfdba01f"
+      },
+      {
+        "path": "assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js",
+        "bytes": 313451,
+        "sha256": "b556572aad0fa5bd13b5566d67c37a8da8368b9089c8d01a9262908ab7c08954"
+      },
+      {
+        "path": "assets/custom-font-sqlite-opfs-browser-worker-Czv9NqhU.js.map",
+        "bytes": 1268888,
+        "sha256": "cd9d0e9284bc6adb6e18985cfbd17c27331b63254539e8b646ed26e4f3abcb2f"
+      },
+      {
+        "path": "assets/index-CPNEEwb-.js",
+        "bytes": 9999,
+        "sha256": "314500b1753c0ac4e173ec22ba2dc724b56484efe21c2891116802366e02dadd"
+      },
+      {
+        "path": "assets/index-CPNEEwb-.js.map",
+        "bytes": 25362,
+        "sha256": "a04e5e59aeb18f239d28f78eaed51e5ea390eaa06685d23f6d09f3569378428c"
+      },
+      {
+        "path": "assets/sqlite3-BVKGSWc-.wasm",
+        "bytes": 864752,
+        "sha256": "02d7e48164395fa68f81c6ec33e9da5461be397dc57602ac0cd89b4bbba1d312"
+      },
+      {
+        "path": "assets/sqlite3-opfs-async-proxy-D_xnb1D8.js",
+        "bytes": 32289,
+        "sha256": "502762db7bd24130f345df6a42883166ec0a91815207940328c9739bb0f5ec2f"
+      },
+      {
+        "path": "assets/sqlite3-worker1-N5XM9NUp.js",
+        "bytes": 210936,
+        "sha256": "59ad1400d591205b546260d229a3f2b1cff9d6ee2ec5e0dac76a0971fd035b74"
+      },
+      {
+        "path": "assets/sqlite3-worker1-N5XM9NUp.js.map",
+        "bytes": 882206,
+        "sha256": "f72f3d62b3d6720b9228340979dd60490ec8f9dfcf473641f4b6fa9b92a1fc5f"
+      },
+      {
+        "path": "index.html",
+        "bytes": 394,
+        "sha256": "916cd9f7cf860e2bb51d251fc8991d1a326cb58b9f123bbb0e0e56ccd778faf8"
+      }
+    ],
+    "fontBytesBundled": false,
+    "scratchDirectory": "/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/toonspectrum-custom-font-opfs-qFNNNO"
+  },
+  "validationIssues": []
+}

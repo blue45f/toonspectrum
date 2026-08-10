@@ -38,6 +38,18 @@ function expectInOrder(value: string, fragments: readonly string[]): void {
   }
 }
 
+function expectProvenanceBeforeFirstAwait(name: string): void {
+  const value = functionSource(name);
+  const captureIndex = value.indexOf("captureStudioAiGeneratedAssetProvenance");
+  const firstAwaitIndex = value.indexOf("await ");
+  expect(captureIndex, `${name} must capture request provenance`).toBeGreaterThanOrEqual(0);
+  expect(firstAwaitIndex, `${name} must perform an asynchronous image request`).toBeGreaterThanOrEqual(0);
+  expect(
+    captureIndex,
+    `${name} must capture provenance before its first await`,
+  ).toBeLessThan(firstAwaitIndex);
+}
+
 describe("Studio AI generated asset fail-closed boundary", () => {
   it("discards the pending notice action before closing and wires the named cancel handler", () => {
     expectInOrder(functionSource("cancelAiNotice"), [
@@ -50,18 +62,15 @@ describe("Studio AI generated asset fail-closed boundary", () => {
   });
 
   it("captures request provenance before image awaits and never derives it after completion", () => {
-    for (const [functionName, requestCall] of [
-      ["executeGenerateAsset", "await Promise.all"],
-      ["executeAiBackgroundGenerate", "await generateBackgroundImage"],
-      ["executeAiColorize", "await colorizeLineArt"],
-      ["executeAiCharacterConsistency", "await generateConsistentCharacterImage"],
-      ["executeGenerateScenarioImages", "await generateImageWithRoleReferences"],
-      ["executeRegenerateScenarioImage", "await generateImageWithRoleReferences"],
+    for (const functionName of [
+      "executeGenerateAsset",
+      "executeAiBackgroundGenerate",
+      "executeAiColorize",
+      "executeAiCharacterConsistency",
+      "executeGenerateScenarioImages",
+      "executeRegenerateScenarioImage",
     ] as const) {
-      expectInOrder(functionSource(functionName), [
-        "captureStudioAiGeneratedAssetProvenance",
-        requestCall,
-      ]);
+      expectProvenanceBeforeFirstAwait(functionName);
     }
     expect(source).not.toContain("currentImageAiProvenance");
   });

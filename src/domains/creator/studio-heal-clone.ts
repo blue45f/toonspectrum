@@ -174,6 +174,91 @@ export function healLocalMeanRadius(radiusPx: number): number {
   return Math.max(2, Math.round((Number.isFinite(radiusPx) ? radiusPx : 0) * 0.6));
 }
 
+type HealCloneColorShift = Readonly<{ r: number; g: number; b: number }>;
+const NO_HEAL_CLONE_COLOR_SHIFT: HealCloneColorShift = { r: 0, g: 0, b: 0 };
+
+function computeHealCloneColorShift(
+  source: StudioImageDataLike,
+  destinationContext: StudioImageDataLike,
+  dab: HealCloneDab,
+  radiusPx: number,
+  mode: HealCloneMode,
+): HealCloneColorShift {
+  if (mode !== "heal") return NO_HEAL_CLONE_COLOR_SHIFT;
+  const meanRadius = healLocalMeanRadius(radiusPx);
+  const sourceMean = localMeanColor(source, dab.srcX, dab.srcY, meanRadius);
+  const destinationMean = localMeanColor(
+    destinationContext,
+    dab.destX,
+    dab.destY,
+    meanRadius,
+  );
+  if (!sourceMean || !destinationMean) return NO_HEAL_CLONE_COLOR_SHIFT;
+  return {
+    r: destinationMean.r - sourceMean.r,
+    g: destinationMean.g - sourceMean.g,
+    b: destinationMean.b - sourceMean.b,
+  };
+}
+
+function stampHealCloneDabWithColorShift(
+  src: StudioImageDataLike,
+  dst: StudioImageDataLike,
+  dab: HealCloneDab,
+  radiusPx: number,
+  hardness: number,
+  opacity: number,
+  shift: HealCloneColorShift,
+): void {
+  const R = Number.isFinite(radiusPx) ? Math.max(0, radiusPx) : 0;
+  const op = clampUnit(opacity);
+  if (R <= 0 || op <= 0) return;
+  if (
+    !Number.isFinite(dab.srcX) ||
+    !Number.isFinite(dab.srcY) ||
+    !Number.isFinite(dab.destX) ||
+    !Number.isFinite(dab.destY)
+  ) {
+    return;
+  }
+  const hard = clampUnit(hardness);
+  const edgeStart = R * hard;
+  const span = Math.max(1e-6, R - edgeStart);
+  const rCeil = Math.ceil(R);
+  const sw = src.width;
+  const sh = src.height;
+  const dw = dst.width;
+  const dh = dst.height;
+
+  for (let oy = -rCeil; oy <= rCeil; oy += 1) {
+    for (let ox = -rCeil; ox <= rCeil; ox += 1) {
+      const dist = Math.hypot(ox, oy);
+      if (dist > R) continue;
+      const alpha = dist <= edgeStart ? op : op * (1 - (dist - edgeStart) / span);
+      if (alpha <= 0) continue;
+
+      const sx = Math.round(dab.srcX + ox);
+      const sy = Math.round(dab.srcY + oy);
+      const dx = Math.round(dab.destX + ox);
+      const dy = Math.round(dab.destY + oy);
+      if (sx < 0 || sy < 0 || sx >= sw || sy >= sh) continue;
+      if (dx < 0 || dy < 0 || dx >= dw || dy >= dh) continue;
+
+      const sIdx = (sy * sw + sx) * 4;
+      const dIdx = (dy * dw + dx) * 4;
+      const r = clampByte(src.data[sIdx]! + shift.r);
+      const g = clampByte(src.data[sIdx + 1]! + shift.g);
+      const b = clampByte(src.data[sIdx + 2]! + shift.b);
+      const a = src.data[sIdx + 3]!; // 알파는 시프트 없이 그대로.
+
+      dst.data[dIdx] = dst.data[dIdx]! * (1 - alpha) + r * alpha;
+      dst.data[dIdx + 1] = dst.data[dIdx + 1]! * (1 - alpha) + g * alpha;
+      dst.data[dIdx + 2] = dst.data[dIdx + 2]! * (1 - alpha) + b * alpha;
+      dst.data[dIdx + 3] = dst.data[dIdx + 3]! * (1 - alpha) + a * alpha;
+    }
+  }
+}
+
 /**
  * 도장 1개 적용 — dst(제자리 변형)에 src(읽기 전용, 스트로크 시작 시점 고정 스냅샷)의 대응
  * 위치를 원형으로 복사한다. hardness<1이면 가장자리로 갈수록 알파가 선형으로 줄어든다
@@ -206,58 +291,15 @@ export function stampHealCloneDab(
   ) {
     return;
   }
-  const hard = clampUnit(hardness);
-
-  let shiftR = 0;
-  let shiftG = 0;
-  let shiftB = 0;
-  if (mode === "heal") {
-    const mr = healLocalMeanRadius(R);
-    const srcMean = localMeanColor(src, dab.srcX, dab.srcY, mr);
-    const dstMean = localMeanColor(src, dab.destX, dab.destY, mr); // src 에서, dest 좌표 기준(주변 문맥)
-    if (srcMean && dstMean) {
-      shiftR = dstMean.r - srcMean.r;
-      shiftG = dstMean.g - srcMean.g;
-      shiftB = dstMean.b - srcMean.b;
-    }
-    // else: 창이 양쪽 다 이미지 밖이면 시프트 0 그대로 — heal 이 clone 처럼 동작하는 안전 폴백.
-  }
-
-  const edgeStart = R * hard;
-  const span = Math.max(1e-6, R - edgeStart);
-  const rCeil = Math.ceil(R);
-  const sw = src.width;
-  const sh = src.height;
-  const dw = dst.width;
-  const dh = dst.height;
-
-  for (let oy = -rCeil; oy <= rCeil; oy += 1) {
-    for (let ox = -rCeil; ox <= rCeil; ox += 1) {
-      const dist = Math.hypot(ox, oy);
-      if (dist > R) continue;
-      const alpha = dist <= edgeStart ? op : op * (1 - (dist - edgeStart) / span);
-      if (alpha <= 0) continue;
-
-      const sx = Math.round(dab.srcX + ox);
-      const sy = Math.round(dab.srcY + oy);
-      const dx = Math.round(dab.destX + ox);
-      const dy = Math.round(dab.destY + oy);
-      if (sx < 0 || sy < 0 || sx >= sw || sy >= sh) continue;
-      if (dx < 0 || dy < 0 || dx >= dw || dy >= dh) continue;
-
-      const sIdx = (sy * sw + sx) * 4;
-      const dIdx = (dy * dw + dx) * 4;
-      const r = clampByte(src.data[sIdx]! + shiftR);
-      const g = clampByte(src.data[sIdx + 1]! + shiftG);
-      const b = clampByte(src.data[sIdx + 2]! + shiftB);
-      const a = src.data[sIdx + 3]!; // 알파는 시프트 없이 그대로.
-
-      dst.data[dIdx] = dst.data[dIdx]! * (1 - alpha) + r * alpha;
-      dst.data[dIdx + 1] = dst.data[dIdx + 1]! * (1 - alpha) + g * alpha;
-      dst.data[dIdx + 2] = dst.data[dIdx + 2]! * (1 - alpha) + b * alpha;
-      dst.data[dIdx + 3] = dst.data[dIdx + 3]! * (1 - alpha) + a * alpha;
-    }
-  }
+  stampHealCloneDabWithColorShift(
+    src,
+    dst,
+    dab,
+    R,
+    hardness,
+    op,
+    computeHealCloneColorShift(src, src, dab, R, mode),
+  );
 }
 
 /** 스트로크 전체(도장 목록) 적용 — stampHealCloneDab 을 순서대로 호출한다(뒤 도장이 앞을 덮는다). */
@@ -272,5 +314,40 @@ export function applyHealCloneDabs(
 ): void {
   for (const dab of dabs) {
     stampHealCloneDab(src, dst, dab, radiusPx, hardness, opacity, mode);
+  }
+}
+
+/**
+ * Frozen source와 mutable destination을 서로 다른 잘린 영역으로 실행한다. dab의 src 좌표는 src
+ * 버퍼 기준이고 dest 좌표는 dst 버퍼 기준이므로 두 버퍼의 크기가 달라도 된다.
+ *
+ * heal의 destination local mean은 반드시 스트로크 시작 시점이어야 한다. 별도 frozen destination
+ * 복사본을 Worker로 보내지 않도록 모든 색 시프트를 dst 변형 전에 먼저 계산한 다음 도장을 순서대로
+ * 누적한다. 이는 full-frame 엔진이 frozen src에서 source/destination 평균을 읽는 결과와 동일하다.
+ */
+export function applyHealCloneDabsFromSeparateRegions(
+  src: StudioImageDataLike,
+  dst: StudioImageDataLike,
+  dabs: readonly HealCloneDab[],
+  radiusPx: number,
+  hardness: number,
+  opacity: number,
+  mode: HealCloneMode,
+): void {
+  const radius = Number.isFinite(radiusPx) ? Math.max(0, radiusPx) : 0;
+  const shifts = mode === "heal"
+    ? dabs.map((dab) => computeHealCloneColorShift(src, dst, dab, radius, mode))
+    : null;
+  for (let index = 0; index < dabs.length; index += 1) {
+    const dab = dabs[index]!;
+    stampHealCloneDabWithColorShift(
+      src,
+      dst,
+      dab,
+      radius,
+      hardness,
+      opacity,
+      shifts?.[index] ?? NO_HEAL_CLONE_COLOR_SHIFT,
+    );
   }
 }

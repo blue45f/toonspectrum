@@ -8,9 +8,6 @@ import {
 
 export const STUDIO_CREATOR_FILTER_PRESET_LIBRARY_KEY =
   "toonspectrum.studio-creator-filter-presets.v1" as const;
-export const STUDIO_CREATOR_FILTER_PRESET_LIBRARY_MAX = 40;
-
-const STUDIO_CREATOR_FILTER_PRESET_LIBRARY_MAX_BYTES = 64 * 1_024;
 
 export interface StudioCreatorPackStorage {
   getItem(key: string): string | null;
@@ -54,7 +51,7 @@ function isExactNormalizedFilterValues(
   return params.every((param) => normalized[param.key] === values[param.key]);
 }
 
-function isInstalledFilterPreset(
+export function isStudioCreatorInstalledFilterPreset(
   value: unknown,
 ): value is StudioCreatorInstalledFilterPreset {
   const item = record(value);
@@ -97,14 +94,12 @@ export function listStudioCreatorFilterPresets(
   try {
     const serialized =
       storage.getItem(STUDIO_CREATOR_FILTER_PRESET_LIBRARY_KEY) ?? "[]";
-    if (serialized.length > STUDIO_CREATOR_FILTER_PRESET_LIBRARY_MAX_BYTES) return [];
     const parsed = JSON.parse(serialized) as unknown;
     if (!Array.isArray(parsed)) return [];
 
     const presets: StudioCreatorInstalledFilterPreset[] = [];
     for (const candidate of parsed) {
-      if (isInstalledFilterPreset(candidate)) presets.push(candidate);
-      if (presets.length === STUDIO_CREATOR_FILTER_PRESET_LIBRARY_MAX) break;
+      if (isStudioCreatorInstalledFilterPreset(candidate)) presets.push(candidate);
     }
     return presets;
   } catch {

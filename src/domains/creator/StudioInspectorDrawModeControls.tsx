@@ -36,12 +36,13 @@ export function StudioInspectorDrawModeControls({
   onSymmetryChange,
 }: StudioInspectorDrawModeControlsProps) {
   return (
-    <>
+    <div data-testid="studio-inspector-context-drawing" className="contents">
       <p className="text-xs font-semibold text-fg-3">그리기 도구 설정</p>
       <div
         className="flex gap-1 rounded-lg border border-line bg-card p-0.5"
         role="group"
         aria-label="그리기 모드"
+        data-testid="studio-inspector-draw-mode"
       >
         {DRAW_MODES.map(({ label, value, Icon }) => (
           <button
@@ -111,6 +112,6 @@ export function StudioInspectorDrawModeControls({
           </p>
         </section>
       ) : null}
-    </>
+    </div>
   );
 }

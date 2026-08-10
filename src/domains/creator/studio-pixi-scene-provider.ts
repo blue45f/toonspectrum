@@ -1,9 +1,11 @@
 import {
   STUDIO_SCENE_PROVIDER_CONTRACT_REVISION,
   getStudioSceneShapeBounds,
+  resolveStudioSceneDocumentTransform,
   studioSceneShapeContainsPoint,
   validateStudioSceneSelectableOverlay,
   validateStudioSceneViewport,
+  type StudioSceneDocumentTransform,
   type StudioSceneHitResult,
   type StudioSceneOverlayIdentity,
   type StudioScenePoint,
@@ -147,10 +149,21 @@ function compareOverlayEntries(
     : left.overlay.documentId.localeCompare(right.overlay.documentId);
 }
 
+/**
+ * Selection chrome must keep a constant on-screen thickness like the primary stage's non-scaling
+ * stroke contract. The root carries the document scale, so authored width is divided before draw;
+ * this mirrors the authoritative canvas while preserving Pixi's independent overlay ownership.
+ */
+function chromeStrokeScale(transform: StudioSceneDocumentTransform): number {
+  const magnitude = Math.max(Math.abs(transform.scaleX), Math.abs(transform.scaleY));
+  return magnitude > 0 ? 1 / magnitude : 1;
+}
+
 function configureGraphicsShape(
   runtime: StudioPixiRuntime,
   graphics: Graphics,
   overlay: StudioSceneSelectableOverlay,
+  strokeScale: number,
 ): void {
   const fill = overlay.fill ?? DEFAULT_FILL;
   const stroke = overlay.stroke ?? DEFAULT_STROKE;
@@ -184,7 +197,7 @@ function configureGraphicsShape(
   graphics.stroke({
     color: stroke.color,
     alpha: stroke.alpha,
-    width: stroke.width,
+    width: stroke.width * strokeScale,
   });
   graphics.visible = overlay.visible !== false;
   graphics.alpha = overlay.opacity ?? 1;
@@ -245,6 +258,27 @@ class PixiStudioSceneProvider implements StudioSceneProvider {
     this.canvas = input.canvas;
     this.currentViewport = Object.freeze({ ...input.viewport });
     this.receipt = input.receipt;
+    this.applyDocumentTransform();
+  }
+
+  /**
+   * Overlay geometry stays in document units; the root carries the document → viewport transform,
+   * so one place (and only one place) knows about zoom, flip and rotation.
+   */
+  private applyDocumentTransform(): void {
+    const transform = resolveStudioSceneDocumentTransform(this.currentViewport);
+    this.root.position.set(transform.offsetX, transform.offsetY);
+    this.root.scale.set(transform.scaleX, transform.scaleY);
+    this.root.rotation = (transform.rotation * Math.PI) / 180;
+  }
+
+  private redrawChromeForScale(): void {
+    const strokeScale = chromeStrokeScale(
+      resolveStudioSceneDocumentTransform(this.currentViewport),
+    );
+    for (const entry of this.entries.values()) {
+      configureGraphicsShape(this.runtime, entry.graphics, entry.overlay, strokeScale);
+    }
   }
 
   get viewport(): StudioSceneViewportMetrics {
@@ -272,9 +306,15 @@ class PixiStudioSceneProvider implements StudioSceneProvider {
   resize(viewport: StudioSceneViewportMetrics): void {
     this.assertAlive();
     validateStudioSceneViewport(viewport);
+    const previous = resolveStudioSceneDocumentTransform(this.currentViewport);
     this.app.renderer.resize(viewport.width, viewport.height, viewport.dpr);
     applyCanvasCssViewport(this.canvas, viewport);
     this.currentViewport = Object.freeze({ ...viewport });
+    this.applyDocumentTransform();
+    const next = resolveStudioSceneDocumentTransform(this.currentViewport);
+    if (previous.scaleX !== next.scaleX || previous.scaleY !== next.scaleY) {
+      this.redrawChromeForScale();
+    }
   }
 
   upsertSelectableOverlay(
@@ -289,7 +329,12 @@ class PixiStudioSceneProvider implements StudioSceneProvider {
     const graphics = existing?.graphics ?? new this.runtime.Graphics();
 
     graphics.label = label;
-    configureGraphicsShape(this.runtime, graphics, storedOverlay);
+    configureGraphicsShape(
+      this.runtime,
+      graphics,
+      storedOverlay,
+      chromeStrokeScale(resolveStudioSceneDocumentTransform(this.currentViewport)),
+    );
 
     if (!existing) {
       this.root.addChild(graphics);
@@ -398,10 +443,13 @@ function destroyFailedApplication(
 export async function createStudioPixiSceneProvider(
   options: CreateStudioPixiSceneProviderOptions,
 ): Promise<StudioSceneProvider> {
-  const viewport = {
+  const viewport: StudioSceneViewportMetrics = {
     width: options.width,
     height: options.height,
     dpr: options.dpr,
+    ...(options.documentTransform
+      ? { documentTransform: options.documentTransform }
+      : {}),
   };
   validateStudioSceneViewport(viewport);
 
