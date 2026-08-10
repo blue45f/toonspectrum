@@ -1,4 +1,6 @@
 /** @vitest-environment jsdom */
+import { readFileSync } from "node:fs";
+
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -14,6 +16,18 @@ afterEach(() => {
 });
 
 describe("StudioBgRemoveButton", () => {
+  it("keeps the foreground engine behind the explicit quick action", () => {
+    const source = readFileSync(
+      "src/domains/creator/StudioBgRemoveButton.tsx",
+      "utf8",
+    );
+
+    expect(source).not.toMatch(
+      /import\s+\{\s*removeBackground\s*\}\s+from\s+["']\.\/studio-bg-remove["']/u,
+    );
+    expect(source).toContain('await import("./studio-bg-remove")');
+  });
+
   it("prioritizes the non-destructive layer flow and keeps quick removal separate", () => {
     const onOpenLayerLift = vi.fn();
     render(

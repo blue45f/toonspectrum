@@ -6,6 +6,10 @@ const pageSource = readFileSync(
   new URL("./StudioPage.tsx", import.meta.url),
   "utf8",
 );
+const layerLiftCompositorSource = readFileSync(
+  new URL("./studio-layer-lift-compositor.ts", import.meta.url),
+  "utf8",
+);
 
 function sourceBetween(
   source: string,
@@ -21,6 +25,15 @@ function sourceBetween(
 }
 
 describe("Studio content-aware fill bundle boundary", () => {
+  it("keeps the pixel kernel behind explicit Layer Lift composition", () => {
+    expect(layerLiftCompositorSource).not.toMatch(
+      /import\s+\{[^}]*contentAwareFillPixels[^}]*\}\s+from\s+["']\.\/studio-content-aware-fill["']/u,
+    );
+    expect(layerLiftCompositorSource).toContain(
+      'await import("./studio-content-aware-fill")',
+    );
+  });
+
   it("loads the optional fill engine in parallel with image decoding after the user invokes it", () => {
     const applySource = sourceBetween(
       pageSource,

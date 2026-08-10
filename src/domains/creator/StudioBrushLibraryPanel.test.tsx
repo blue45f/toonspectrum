@@ -152,6 +152,21 @@ describe("StudioBrushLibraryPanel", () => {
 
   it("획과 이름 목록을 바꿔도 저장 브러시 적용·관리 계약을 유지한다", async () => {
     const onApplyBrush = vi.fn();
+    const values = new Map<string, string>([
+      [
+        BRUSH_LIBRARY_KEY,
+        JSON.stringify({ version: BRUSH_LIBRARY_STORAGE_VERSION, brushes: [saved] }),
+      ],
+    ]);
+    const repository = createStorageBrushLibraryRepository({
+      getItem: (key) => values.get(key) ?? null,
+      setItem: (key, value) => values.set(key, value),
+    });
+    const repositoryFactory = vi.fn(async () => ({
+      authority: "sqlite" as const,
+      repository,
+      migration: null,
+    }));
     const { container } = render(
       <StudioBrushLibraryPanel
         currentSnapshot={snapshot}
@@ -159,8 +174,14 @@ describe("StudioBrushLibraryPanel", () => {
         onBrushesChange={vi.fn()}
         onApplyBrush={onApplyBrush}
         onBrushDeleted={vi.fn()}
+        repositoryFactory={repositoryFactory}
       />
     );
+
+    await waitFor(() => expect(
+      container.querySelector("[data-studio-brush-library-authority]")
+        ?.getAttribute("data-studio-brush-library-authority"),
+    ).toBe("sqlite"));
 
     const list = () => container.querySelector<HTMLElement>("[data-studio-saved-brush-view]");
     expect(list()?.dataset.studioSavedBrushView).toBe("stroke");
