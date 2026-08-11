@@ -108,7 +108,9 @@ describe("Studio inspector bubble-appearance boundary", () => {
     // 의도적 변경(2026-08-08): Wave D 점진적 노출 — Advanced 섹션 15개 래핑 + 통합 검색 호스트(4_070 → 4_130).
     // 의도적 변경(2026-08-10): V12 제품 SQLite quick-slot 권위 배선 7줄(4_130 → 4_137).
     // 의도적 변경(2026-08-11): linked-pass raster lease/read-only projection 배선 8줄.
-    expect(inspector.split("\n").length).toBeLessThanOrEqual(4_145);
+    // 의도적 통합(2026-08-12): main의 raster preparation busy fail-closed 배선 5줄을
+    // linked-pass projection과 함께 보존(4_145 → 4_150).
+    expect(inspector.split("\n").length).toBeLessThanOrEqual(4_150);
     expect(leaf.source).not.toContain('"use no memo"');
     expect(leaf.source).not.toMatch(/\b(?:memo|useCallback|useMemo)\s*\(/u);
     expect(leaf.source).toContain(
