@@ -35,7 +35,7 @@ describe("Studio continuous brush frame-budget profiler", () => {
     )).toThrow(/too small/u);
   });
 
-  it("profiles every sibling canvas but avoids pixel readback in the timed long-stroke loop", () => {
+  it("profiles every sibling canvas with a bounded compositor blank-frame probe", () => {
     expect(profilerSource).toContain(
       'const compositorRoot = root.parentElement?.closest<HTMLElement>(".relative") ?? root;',
     );
@@ -43,15 +43,35 @@ describe("Studio continuous brush frame-budget profiler", () => {
       'compositorRoot.querySelectorAll<HTMLCanvasElement>("canvas")',
     );
     expect(profilerSource).toContain('PerformanceObserver.supportedEntryTypes.includes("longtask")');
-    expect(profilerSource).not.toContain("getImageData(");
+    expect(profilerSource).toContain("const BLANK_PROBE_WIDTH = 64;");
+    expect(profilerSource).toContain("const BLANK_PROBE_HEIGHT = 32;");
+    expect(profilerSource).toContain("blankFrameObservationCount");
+    expect(profilerSource).toContain("blankFrameCount");
+    expect(profilerSource).toContain("getImageData(");
     expect(profilerSource).not.toContain("toDataURL(");
   });
 
   it("keeps canvas-call instrumentation opt-in and restores patched browser prototypes", () => {
     expect(profilerSource).toContain("captureRenderWorkload?: boolean");
-    expect(profilerSource).toContain("if (!captureRenderWorkload || renderPhase === null) return");
+    expect(profilerSource).toContain("instrumentationExcludedContexts.has(context)");
     expect(profilerSource).toContain("restoreRenderInstrumentation();");
     expect(profilerSource).toContain("movingLongTaskDurationsMs");
     expect(profilerSource).toContain("releaseLongTaskDurationsMs");
+  });
+
+  it("measures synchronous append and seal work at 120/240Hz without prefix batching", () => {
+    expect(profilerSource).toContain("pointerAppendDurationsMs");
+    expect(profilerSource).toContain("pointerUpMainThreadMs");
+    expect(profilerSource).toContain("queueMicrotask(() => {");
+    expect(profilerSource).toContain("execution.targetInputSamples");
+    expect(profilerSource).toContain("execution.intendedStrokeDurationMs");
+    expect(profilerSource).toContain("await page.mouse.move(");
+    expect(profilerSource).not.toContain("steps: execution.targetInputSamples");
+  });
+
+  it("fails full coverage closed until product route and resource receipts are exposed", () => {
+    expect(profilerSource).toContain("data-studio-canonical-brush-provider-route");
+    expect(profilerSource).toContain("__studioBrushCompetitiveRouteDiagnostics");
+    expect(profilerSource).toContain("routeDiagnostics = snapshot");
   });
 });

@@ -3,11 +3,13 @@
  *
  * The browser-side probe timestamps trusted pointer events with performance.now(), then samples a
  * small compositor patch on each requestAnimationFrame. Probe patches sit behind the moving cursor,
- * so cursor motion is not mistaken for ink. Hardware-sensitive tails are diagnostic; missing ink
- * and an individual >=200ms response remain strict regressions.
+ * so cursor motion is not mistaken for ink. The default command is a hard per-stroke smoke gate;
+ * the explicit competitive mode additionally requires the complete route/workload/rate/DPR and
+ * long-session resource matrices. Historical 34-200ms thresholds are telemetry only.
  *
  * Run after `pnpm build`:
  *   pnpm run verify:studio-brush-latency
+ *   pnpm run verify:studio-brush-latency -- --competitive-long-stroke
  */
 import { spawn, type ChildProcess } from "node:child_process";
 import { appendFileSync, mkdirSync, readdirSync, unlinkSync, writeFileSync } from "node:fs";
@@ -25,7 +27,16 @@ import {
 } from "../src/domains/creator/studio-brush-catalog";
 
 import {
+  STUDIO_BRUSH_COMPETITIVE_DESKTOP_VIEWPORT,
+  STUDIO_BRUSH_COMPETITIVE_EXECUTION_CASES,
+  STUDIO_BRUSH_COMPETITIVE_FRAME_BUDGETS,
+  STUDIO_BRUSH_COMPETITIVE_LONG_SESSION_COMMIT_COUNTS,
+  STUDIO_BRUSH_COMPETITIVE_PROVIDER_ROUTES,
+  evaluateStudioBrushCompetitiveCoverage,
+  evaluateStudioBrushCompetitiveLongSession,
   evaluateStudioBrushFrameBudget,
+  type StudioBrushCompetitiveExecutionCase,
+  type StudioBrushCompetitiveLongSessionEvidence,
   type StudioBrushFrameBudgetEvaluation,
   type StudioBrushFrameBudgetMetrics,
 } from "./studio-brush-frame-budget-policy";
@@ -84,12 +95,17 @@ interface BrushLatencyResult {
   readonly source: StudioBrushCatalogItem["source"];
   readonly runtimeMs: number;
   readonly metrics: StudioBrushLatencyCaseMetrics;
-  readonly evaluation: ReturnType<typeof evaluateStudioBrushLatencyCase>;
+  readonly legacyLatencyTelemetry: ReturnType<typeof evaluateStudioBrushLatencyCase>;
   readonly frameBudgetMetrics: StudioBrushFrameBudgetMetrics;
   readonly frameBudgetEvaluation: StudioBrushFrameBudgetEvaluation;
+  readonly competitiveExecutionCase: StudioBrushCompetitiveExecutionCase | null;
+  readonly actualViewport: Readonly<{ width: number; height: number }>;
+  readonly actualDeviceScaleFactor: number;
   readonly artifacts: Readonly<{ live: string; settled: string }>;
   readonly browserErrors: BrowserErrors;
 }
+
+const COMPETITIVE_LONG_STROKE_FLAG = "--competitive-long-stroke";
 
 function log(message: string): void {
   const line = `[verify-studio-brush-latency] ${message}`;
@@ -103,6 +119,12 @@ function log(message: string): void {
 
 function invariant(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
+}
+
+export function studioBrushCompetitiveLongStrokeRequested(
+  argv: readonly string[] = process.argv.slice(2),
+): boolean {
+  return argv.includes(COMPETITIVE_LONG_STROKE_FLAG);
 }
 
 function cleanScratch(): void {
@@ -607,16 +629,26 @@ async function runBrushLatency(
   studioUrl: string,
   id: StudioBrushLatencyId,
   brush: StudioBrushCatalogItem,
+  competitiveExecutionCase: StudioBrushCompetitiveExecutionCase | null,
 ): Promise<BrushLatencyResult> {
   const started = performance.now();
+  const requestedViewport = competitiveExecutionCase
+    ? STUDIO_BRUSH_COMPETITIVE_DESKTOP_VIEWPORT
+    : { width: 1_440, height: 1_100 };
+  const requestedDeviceScaleFactor = competitiveExecutionCase?.deviceScaleFactor ?? 1;
   const context = await browser.newContext({
-    viewport: { width: 1440, height: 1100 },
-    deviceScaleFactor: 1,
+    viewport: requestedViewport,
+    deviceScaleFactor: requestedDeviceScaleFactor,
   });
   const page = await context.newPage();
-  const browserErrors = collectBrowserErrors(page, id, studioUrl);
-  const livePath = join(SCRATCH, `studio-brush-latency-${id}-live.png`);
-  const settledPath = join(SCRATCH, `studio-brush-latency-${id}-settled.png`);
+  const caseSuffix = competitiveExecutionCase
+    ? `-${competitiveExecutionCase.workloadId}-${competitiveExecutionCase.pointerRateHz}hz-dpr`
+      + `${competitiveExecutionCase.deviceScaleFactor}`
+    : "-smoke";
+  const caseLabel = `${id}${caseSuffix}`;
+  const browserErrors = collectBrowserErrors(page, caseLabel, studioUrl);
+  const livePath = join(SCRATCH, `studio-brush-latency-${caseLabel}-live.png`);
+  const settledPath = join(SCRATCH, `studio-brush-latency-${caseLabel}-settled.png`);
 
   try {
     await prepareStudio(page, studioUrl);
@@ -668,7 +700,7 @@ async function runBrushLatency(
       pointerMoves,
       pointerUp,
     };
-    const evaluation = evaluateStudioBrushLatencyCase(metrics);
+    const legacyLatencyTelemetry = evaluateStudioBrushLatencyCase(metrics);
     const frameRoute = createStudioBrushFrameBudgetRoute(
       stageBox,
       viewport,
@@ -681,6 +713,7 @@ async function runBrushLatency(
           .map((candidate) => candidate.trim())
           .includes(id)
         ?? false,
+      ...(competitiveExecutionCase ? { executionCase: competitiveExecutionCase } : {}),
     });
     const frameBudgetMetrics: StudioBrushFrameBudgetMetrics = {
       id,
@@ -688,19 +721,22 @@ async function runBrushLatency(
       firstPixelChangedPixels: pointerDown.changedPixels,
       firstPixelMaxChannelDelta: pointerDown.maxChannelDelta,
       firstPixelTimedOut: pointerDown.timedOut,
-      settleMs: pointerUp.settleMs,
-      settleTimedOut: pointerUp.timedOut,
+      settleMs: frameRuntime.pointerUpToFirstFrameMs ?? Number.POSITIVE_INFINITY,
+      settleTimedOut: frameRuntime.pointerUpToFirstFrameMs === null,
       ...frameRuntime,
     };
     const frameBudgetEvaluation = evaluateStudioBrushFrameBudget(frameBudgetMetrics);
+    const actualViewport = page.viewportSize();
+    invariant(actualViewport, `${caseLabel}: browser viewport is unavailable`);
+    const actualDeviceScaleFactor = await page.evaluate(() => globalThis.devicePixelRatio);
     const runtimeMs = performance.now() - started;
     log(
-      `${id}: ${evaluation.ok ? "OK" : "FAIL"} · `
-        + `${evaluation.summary.sampleCount} inputs · `
-        + `p50 ${evaluation.summary.p50Ms.toFixed(1)}ms · `
-        + `p95 ${evaluation.summary.p95Ms.toFixed(1)}ms · `
-        + `max ${evaluation.summary.maxMs.toFixed(1)}ms · `
-        + `dropped ${evaluation.summary.droppedVisualFrames} · `
+      `${caseLabel}: LEGACY ${legacyLatencyTelemetry.ok ? "OK" : "FAIL"} · `
+        + `${legacyLatencyTelemetry.summary.sampleCount} inputs · `
+        + `p50 ${legacyLatencyTelemetry.summary.p50Ms.toFixed(1)}ms · `
+        + `p95 ${legacyLatencyTelemetry.summary.p95Ms.toFixed(1)}ms · `
+        + `max ${legacyLatencyTelemetry.summary.maxMs.toFixed(1)}ms · `
+        + `dropped ${legacyLatencyTelemetry.summary.droppedVisualFrames} · `
         + `settle ${pointerUp.settleMs.toFixed(1)}ms `
         + `(first ${pointerUp.firstVisualChangeMs?.toFixed(1) ?? "none"}, `
         + `last ${pointerUp.lastVisualChangeMs?.toFixed(1) ?? "none"}) · `
@@ -708,7 +744,7 @@ async function runBrushLatency(
         + `Δ${pointerUp.liveToSettledMaxChannelDelta} · ${runtimeMs.toFixed(0)}ms`,
     );
     log(
-      `${id} continuous: ${frameBudgetEvaluation.ok ? "OK" : "FAIL"} · `
+      `${caseLabel} continuous: ${frameBudgetEvaluation.ok ? "OK" : "FAIL"} · `
         + `frame p50 ${frameBudgetEvaluation.summary.moveFrameP50Ms.toFixed(1)}ms · `
         + `p95 ${frameBudgetEvaluation.summary.moveFrameP95Ms.toFixed(1)}ms · `
         + `input→frame p95 `
@@ -719,8 +755,8 @@ async function runBrushLatency(
         + `long task ${frameBudgetEvaluation.summary.longestLongTaskMs.toFixed(1)}ms · `
         + `${frameRuntime.compositorCanvasCount} compositor surfaces`,
     );
-    for (const finding of evaluation.findings) {
-      log(`${id} ${finding.level.toUpperCase()} ${finding.code}: ${finding.message}`);
+    for (const finding of legacyLatencyTelemetry.findings) {
+      log(`${id} LEGACY ${finding.level.toUpperCase()} ${finding.code}: ${finding.message}`);
     }
     for (const finding of frameBudgetEvaluation.findings) {
       log(
@@ -733,9 +769,12 @@ async function runBrushLatency(
       source: brush.source,
       runtimeMs,
       metrics,
-      evaluation,
+      legacyLatencyTelemetry,
       frameBudgetMetrics,
       frameBudgetEvaluation,
+      competitiveExecutionCase,
+      actualViewport,
+      actualDeviceScaleFactor,
       artifacts: { live: livePath, settled: settledPath },
       browserErrors,
     };
@@ -787,9 +826,40 @@ async function stopChildProcess(child: ChildProcess): Promise<void> {
   }
 }
 
+async function runCompetitiveLongSessionResourceProbe(
+  browser: Browser,
+  studioUrl: string,
+): Promise<readonly StudioBrushCompetitiveLongSessionEvidence[]> {
+  const context = await browser.newContext({
+    viewport: STUDIO_BRUSH_COMPETITIVE_DESKTOP_VIEWPORT,
+    deviceScaleFactor: 2,
+  });
+  const page = await context.newPage();
+  try {
+    await prepareStudio(page, studioUrl);
+    return await page.evaluate(async (commitCounts) => {
+      type ResourceProbe = {
+        run(input: { readonly commitCounts: readonly number[] }): Promise<unknown>;
+      };
+      const probe = (
+        globalThis as typeof globalThis & {
+          __studioBrushCompetitiveLongSessionProbe?: ResourceProbe;
+        }
+      ).__studioBrushCompetitiveLongSessionProbe;
+      if (!probe || typeof probe.run !== "function") return [];
+      const result = await probe.run({ commitCounts });
+      return Array.isArray(result) ? result : [];
+    }, STUDIO_BRUSH_COMPETITIVE_LONG_SESSION_COMMIT_COUNTS) as
+      readonly StudioBrushCompetitiveLongSessionEvidence[];
+  } finally {
+    await context.close();
+  }
+}
+
 async function main(): Promise<void> {
   cleanScratch();
   const started = performance.now();
+  const competitiveLongStroke = studioBrushCompetitiveLongStrokeRequested();
   const catalogById = new Map(
     STUDIO_ALL_BRUSH_CATALOG_ITEMS.map((brush) => [brush.id, brush]),
   );
@@ -802,8 +872,11 @@ async function main(): Promise<void> {
     ? STUDIO_BRUSH_LATENCY_IDS.filter((id) => requestedIdSet.has(id))
     : STUDIO_BRUSH_LATENCY_IDS;
   invariant(
-    requestedIds.length === requestedIdSet.size
-      && representativeIds.length === requestedIdSet.size,
+    requestedIds.length === 0
+      || (
+        requestedIds.length === requestedIdSet.size
+        && representativeIds.length === requestedIdSet.size
+      ),
     "TOONSPECTRUM_BRUSH_LATENCY_IDS contains an unknown or duplicate representative id",
   );
   const representatives = representativeIds.map((id) => {
@@ -833,52 +906,104 @@ async function main(): Promise<void> {
 
   let browser: Browser | null = null;
   const results: BrushLatencyResult[] = [];
-  const executionFailures: Array<{ id: StudioBrushLatencyId; message: string }> = [];
+  const executionFailures: Array<{ caseId: string; message: string }> = [];
   try {
     await waitForServer(origin);
     browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
+    const executionCases: readonly (StudioBrushCompetitiveExecutionCase | null)[] =
+      competitiveLongStroke ? STUDIO_BRUSH_COMPETITIVE_EXECUTION_CASES : [null];
     for (const { id, brush } of representatives) {
-      try {
-        results.push(await runBrushLatency(browser, studioUrl, id, brush));
-      } catch (error) {
-        const message = error instanceof Error ? error.stack ?? error.message : String(error);
-        executionFailures.push({ id, message });
-        log(`${id}: EXECUTION FAILURE ${message}`);
+      for (const executionCase of executionCases) {
+        const caseId = executionCase
+          ? `${id}:${executionCase.workloadId}:${executionCase.pointerRateHz}hz:`
+            + `dpr${executionCase.deviceScaleFactor}`
+          : `${id}:smoke`;
+        try {
+          results.push(await runBrushLatency(
+            browser,
+            studioUrl,
+            id,
+            brush,
+            executionCase,
+          ));
+        } catch (error) {
+          const message = error instanceof Error ? error.stack ?? error.message : String(error);
+          executionFailures.push({ caseId, message });
+          log(`${caseId}: EXECUTION FAILURE ${message}`);
+        }
       }
     }
+    const longSessionEvidence = competitiveLongStroke
+      ? await runCompetitiveLongSessionResourceProbe(browser, studioUrl)
+      : [];
+    const longSessionCoverage = evaluateStudioBrushCompetitiveLongSession(longSessionEvidence);
+    const competitiveCoverage = evaluateStudioBrushCompetitiveCoverage(results.flatMap((result) => {
+      const executionCase = result.competitiveExecutionCase;
+      if (!executionCase) return [];
+      return [{
+        id: result.id,
+        workloadId: executionCase.workloadId,
+        pointerRateHz: executionCase.pointerRateHz,
+        targetInputSamples: executionCase.targetInputSamples,
+        observedInputSamples: result.frameBudgetMetrics.observedPointerMoves,
+        intendedStrokeDurationMs: executionCase.intendedStrokeDurationMs,
+        observedStrokeDurationMs: result.frameBudgetMetrics.strokeDurationMs,
+        requestedViewportWidth: STUDIO_BRUSH_COMPETITIVE_DESKTOP_VIEWPORT.width,
+        requestedViewportHeight: STUDIO_BRUSH_COMPETITIVE_DESKTOP_VIEWPORT.height,
+        actualViewportWidth: result.actualViewport.width,
+        actualViewportHeight: result.actualViewport.height,
+        requestedDeviceScaleFactor: executionCase.deviceScaleFactor,
+        actualDeviceScaleFactor: result.actualDeviceScaleFactor,
+        expectedProviderRoute: STUDIO_BRUSH_COMPETITIVE_PROVIDER_ROUTES[result.id],
+        observedProviderRoute: result.frameBudgetMetrics.observedProviderRoute,
+        routeDiagnostics: result.frameBudgetMetrics.routeDiagnostics,
+        hardAcceptanceOk: result.frameBudgetEvaluation.ok,
+      }];
+    }));
     const unexpectedBrowserErrors = results.flatMap((result) => [
       ...result.browserErrors.console,
       ...result.browserErrors.page,
       ...result.browserErrors.responses,
     ]);
     const report = {
-      kind: "toonspectrum-studio-brush-latency-browser-v2",
+      kind: "toonspectrum-studio-brush-latency-browser-v3",
       generatedAt: new Date().toISOString(),
+      mode: competitiveLongStroke ? "competitive-long-stroke" : "smoke",
       route: studioUrl,
       scratch: SCRATCH,
       policy: {
-        strictInputStallMs: 200,
+        hardAcceptance: STUDIO_BRUSH_COMPETITIVE_FRAME_BUDGETS,
         inputTimeoutMs: INPUT_TIMEOUT_MS,
         settleObservationMs: SETTLE_OBSERVATION_MS,
+        legacyTelemetryOnly: true,
         note:
-          "The compositor-aware pixel probe blocks missing ink and >=200ms response stalls. "
-          + "The non-readback continuous probe additionally blocks severe move-frame, input "
-          + "delivery, long-task, and settlement regressions; competitive frame tails remain "
-          + "diagnostics until CI hardware distributions justify tighter portable limits.",
+          "The competitive gate hard-fails pointer/append p95 or p99 tails, compositor latency, "
+          + "lost delivery, blank frames, >=50ms long tasks, and >50ms pointerup/settle work. "
+          + "Historical 34-200ms thresholds are emitted only as legacy telemetry and never "
+          + "contribute to this report's ok value.",
       },
+      coverageComplete: competitiveLongStroke && competitiveCoverage.ok,
+      competitiveCoverage,
+      longSessionCoverageComplete: competitiveLongStroke && longSessionCoverage.ok,
+      longSessionCoverage,
+      longSessionEvidence,
       runtimeMs: performance.now() - started,
       results,
       executionFailures,
       unexpectedBrowserErrors,
       ok:
-        results.length === representatives.length
+        results.length === representatives.length * executionCases.length
         && executionFailures.length === 0
-        && results.every((result) => result.evaluation.ok)
         && results.every((result) => result.frameBudgetEvaluation.ok)
+        && (!competitiveLongStroke || competitiveCoverage.ok)
+        && (!competitiveLongStroke || longSessionCoverage.ok)
         && unexpectedBrowserErrors.length === 0,
     };
     writeFileSync(REPORT_PATH, `${JSON.stringify(report, null, 2)}\n`);
-    log(`report ${REPORT_PATH} · ${results.length}/${representatives.length} brushes`);
+    log(
+      `report ${REPORT_PATH} · ${results.length}/`
+        + `${representatives.length * executionCases.length} cases`,
+    );
     invariant(report.ok, "Studio brush latency gate failed; inspect its JSON report");
     log("ALL REPRESENTATIVE BRUSH LATENCY GATES OK");
   } finally {

@@ -1,4 +1,8 @@
-import type { StudioBrushFrameRuntimeSample } from "./studio-brush-frame-budget-policy";
+import type {
+  StudioBrushCompetitiveExecutionCase,
+  StudioBrushCompetitiveRouteDiagnostics,
+  StudioBrushFrameRuntimeSample,
+} from "./studio-brush-frame-budget-policy";
 import type { Page } from "playwright";
 
 export interface StudioBrushFramePoint {
@@ -13,12 +17,15 @@ export interface StudioBrushFrameRoute {
 
 export interface StudioBrushFrameBudgetProfileOptions {
   readonly captureRenderWorkload?: boolean;
+  readonly executionCase?: StudioBrushCompetitiveExecutionCase;
 }
 
 const WARMUP_FRAME_INTERVALS = 8;
 const TAIL_FRAMES = 4;
 const MOVE_INTERVAL_MS = 2;
 const ROUTE_POINT_COUNT = 73;
+const BLANK_PROBE_WIDTH = 64;
+const BLANK_PROBE_HEIGHT = 32;
 
 export function createStudioBrushFrameBudgetRoute(
   stageBox: { x: number; y: number; width: number; height: number },
@@ -89,9 +96,33 @@ export async function profileStudioBrushFrameBudget(
   if (!first || route.points.length < 2) {
     throw new Error("continuous frame-budget route requires at least two points");
   }
+  const routeBounds = route.points.reduce((bounds, point) => ({
+    left: Math.min(bounds.left, point.x),
+    top: Math.min(bounds.top, point.y),
+    right: Math.max(bounds.right, point.x),
+    bottom: Math.max(bounds.bottom, point.y),
+  }), {
+    left: first.x,
+    top: first.y,
+    right: first.x,
+    bottom: first.y,
+  });
+  const blankProbeRect = {
+    x: routeBounds.left - 48,
+    y: routeBounds.top - 48,
+    width: Math.max(1, routeBounds.right - routeBounds.left + 96),
+    height: Math.max(1, routeBounds.bottom - routeBounds.top + 96),
+  };
   await page.mouse.move(first.x, first.y);
   await page.waitForTimeout(32);
-  await page.evaluate(({ captureRenderWorkload, tailFrames, warmupIntervals }) => {
+  await page.evaluate(({
+    blankProbeHeight,
+    blankProbeRect: sampleRect,
+    blankProbeWidth,
+    captureRenderWorkload,
+    tailFrames,
+    warmupIntervals,
+  }) => {
     type RenderPhase = "moving" | "release";
     interface MutableRenderCallPhase {
       totalCalls: number;
@@ -125,8 +156,16 @@ export async function profileStudioBrushFrameBudget(
       readonly moveToFrameLatenciesMs: readonly number[];
       readonly observedPointerMoves: number;
       readonly observedCoalescedSamples: number;
+      readonly pointerAppendDurationsMs: readonly number[];
+      readonly pointerUpMainThreadMs: number | null;
+      readonly pointerUpToFirstFrameMs: number | null;
+      readonly blankFrameObservationCount: number;
+      readonly blankFrameCount: number;
+      readonly observedProviderRoute: string | null;
+      readonly routeDiagnostics: StudioBrushCompetitiveRouteDiagnostics | null;
       readonly strokeDurationMs: number;
       readonly longTaskDurationsMs: readonly number[];
+      readonly longTaskObserverAvailable: boolean;
       readonly compositorCanvasCount: number;
       readonly renderWorkload?: BrowserRenderWorkload;
     }
@@ -147,6 +186,9 @@ export async function profileStudioBrushFrameBudget(
         const rect = canvas.getBoundingClientRect();
         return rect.width > 0 && rect.height > 0 && canvas.width > 0 && canvas.height > 0;
       }).length;
+    const longTaskObserverAvailable =
+      typeof PerformanceObserver !== "undefined"
+      && PerformanceObserver.supportedEntryTypes.includes("longtask");
     const globalState = globalThis as typeof globalThis & {
       __studioBrushFrameBudgetProbe?: BrowserFrameProbeState;
     };
@@ -156,9 +198,11 @@ export async function profileStudioBrushFrameBudget(
     const moveFrameIntervalsMs: number[] = [];
     const moveToFrameLatenciesMs: number[] = [];
     const pendingMoveTimes: number[] = [];
+    const pointerAppendDurationsMs: number[] = [];
     const longTaskEntries: Array<{ startTime: number; duration: number }> = [];
     const renderSurfaces = new Map<string, MutableRenderSurface>();
     const contextLabels = new WeakMap<object, string>();
+    const instrumentationExcludedContexts = new WeakSet<object>();
     const restoreRenderPatches: Array<() => void> = [];
     const movingCallsPerFrame: number[] = [];
     const movingMarksPerFrame: number[] = [];
@@ -173,11 +217,68 @@ export async function profileStudioBrushFrameBudget(
     let observedCoalescedSamples = 0;
     let pointerDownAt: number | null = null;
     let pointerUpAt: number | null = null;
+    let pointerUpMainThreadMs: number | null = null;
+    let blankFrameObservationCount = 0;
+    let blankFrameCount = 0;
+    let blankProbeSawInk = false;
+    let observedProviderRoute: string | null = null;
     let lastWarmupFrameAt: number | null = null;
     let lastMoveFrameAt: number | null = null;
     let remainingTailFrames = tailFrames;
     let rafId = 0;
     let observer: PerformanceObserver | null = null;
+
+    const blankCanvas = new OffscreenCanvas(blankProbeWidth, blankProbeHeight);
+    const blankContext = blankCanvas.getContext("2d", { willReadFrequently: true });
+    if (!blankContext) throw new Error("frame-budget blank probe could not allocate a canvas");
+    instrumentationExcludedContexts.add(blankContext);
+    const sampleCompositor = (): Uint8ClampedArray => {
+      blankContext.clearRect(0, 0, blankProbeWidth, blankProbeHeight);
+      for (const canvas of compositorRoot.querySelectorAll<HTMLCanvasElement>("canvas")) {
+        const rect = canvas.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0 || canvas.width <= 0 || canvas.height <= 0) {
+          continue;
+        }
+        const sourceX = (sampleRect.x - rect.left) * canvas.width / rect.width;
+        const sourceY = (sampleRect.y - rect.top) * canvas.height / rect.height;
+        const sourceWidth = sampleRect.width * canvas.width / rect.width;
+        const sourceHeight = sampleRect.height * canvas.height / rect.height;
+        blankContext.drawImage(
+          canvas,
+          sourceX,
+          sourceY,
+          sourceWidth,
+          sourceHeight,
+          0,
+          0,
+          blankProbeWidth,
+          blankProbeHeight,
+        );
+      }
+      return blankContext.getImageData(
+        0,
+        0,
+        blankProbeWidth,
+        blankProbeHeight,
+      ).data;
+    };
+    const blankBaseline = sampleCompositor();
+    const compositorDiffersFromBaseline = (): boolean => {
+      const current = sampleCompositor();
+      let changedPixels = 0;
+      let maxChannelDelta = 0;
+      for (let offset = 0; offset < blankBaseline.length; offset += 4) {
+        const delta = Math.max(
+          Math.abs(blankBaseline[offset]! - current[offset]!),
+          Math.abs(blankBaseline[offset + 1]! - current[offset + 1]!),
+          Math.abs(blankBaseline[offset + 2]! - current[offset + 2]!),
+          Math.abs(blankBaseline[offset + 3]! - current[offset + 3]!),
+        );
+        maxChannelDelta = Math.max(maxChannelDelta, delta);
+        if (delta > 3) changedPixels += 1;
+      }
+      return changedPixels >= 2 && maxChannelDelta >= 4;
+    };
 
     const heapUsed = (): number | null => {
       const memory = (
@@ -254,7 +355,11 @@ export async function profileStudioBrushFrameBudget(
       "measureText",
     ]);
     const recordRenderCall = (context: object, method: string): void => {
-      if (!captureRenderWorkload || renderPhase === null) return;
+      if (
+        !captureRenderWorkload
+        || renderPhase === null
+        || instrumentationExcludedContexts.has(context)
+      ) return;
       const id = contextLabel(context);
       let surface = renderSurfaces.get(id);
       if (!surface) {
@@ -339,6 +444,9 @@ export async function profileStudioBrushFrameBudget(
       lastMoveFrameAt = null;
       renderPhase = "moving";
       heapUsedAtPointerDown = heapUsed();
+      observedProviderRoute = document
+        .querySelector<HTMLElement>('[data-studio-brush-active-pill="true"]')
+        ?.getAttribute("data-studio-canonical-brush-provider-route") ?? null;
     };
     const onPointerMove = (event: PointerEvent): void => {
       if (pointerDownAt === null || pointerUpAt !== null) return;
@@ -349,12 +457,18 @@ export async function profileStudioBrushFrameBudget(
       ).getCoalescedEvents?.();
       observedCoalescedSamples += Math.max(1, coalesced?.length ?? 0);
       pendingMoveTimes.push(observedAt);
+      queueMicrotask(() => {
+        pointerAppendDurationsMs.push(Math.max(0, performance.now() - observedAt));
+      });
     };
     const onPointerUp = (): void => {
       if (pointerDownAt === null || pointerUpAt !== null) return;
       pointerUpAt = performance.now();
       renderPhase = "release";
       heapUsedAtPointerUp = heapUsed();
+      queueMicrotask(() => {
+        pointerUpMainThreadMs = Math.max(0, performance.now() - pointerUpAt!);
+      });
     };
     const finish = (): void => {
       const warmup = warmupFrameIntervalsMs
@@ -381,6 +495,19 @@ export async function profileStudioBrushFrameBudget(
           : []
       ));
       heapUsedAfterRelease = heapUsed();
+      let routeDiagnostics: StudioBrushCompetitiveRouteDiagnostics | null = null;
+      try {
+        const snapshot = (
+          globalThis as typeof globalThis & {
+            __studioBrushCompetitiveRouteDiagnostics?: { snapshot(): unknown };
+          }
+        ).__studioBrushCompetitiveRouteDiagnostics?.snapshot();
+        if (snapshot && typeof snapshot === "object") {
+          routeDiagnostics = snapshot as StudioBrushCompetitiveRouteDiagnostics;
+        }
+      } catch {
+        // Full competitive coverage fails closed on the null diagnostics receipt.
+      }
       state.result = {
         nominalFrameMs: Math.max(8, Math.min(33.334, nominalFrameMs)),
         warmupFrameIntervalsMs,
@@ -388,12 +515,20 @@ export async function profileStudioBrushFrameBudget(
         moveToFrameLatenciesMs,
         observedPointerMoves,
         observedCoalescedSamples,
+        pointerAppendDurationsMs,
+        pointerUpMainThreadMs,
+        pointerUpToFirstFrameMs,
+        blankFrameObservationCount,
+        blankFrameCount,
+        observedProviderRoute,
+        routeDiagnostics,
         strokeDurationMs: Math.max(0, end - start),
         longTaskDurationsMs: longTaskEntries.flatMap((entry) => (
           entry.startTime <= tailEnd && entry.startTime + entry.duration >= start
             ? [entry.duration]
             : []
         )),
+        longTaskObserverAvailable,
         compositorCanvasCount,
         ...(captureRenderWorkload
           ? {
@@ -423,6 +558,13 @@ export async function profileStudioBrushFrameBudget(
         lastWarmupFrameAt = now;
         if (warmupFrameIntervalsMs.length >= warmupIntervals) state.ready = true;
       } else {
+        const compositorHasInk = compositorDiffersFromBaseline();
+        if (blankProbeSawInk) {
+          blankFrameObservationCount += 1;
+          if (!compositorHasInk) blankFrameCount += 1;
+        } else if (compositorHasInk) {
+          blankProbeSawInk = true;
+        }
         if (pendingMoveTimes.length > 0) {
           for (const eventAt of pendingMoveTimes.splice(0)) {
             moveToFrameLatenciesMs.push(Math.max(0, observedAt - eventAt));
@@ -453,10 +595,7 @@ export async function profileStudioBrushFrameBudget(
     globalThis.addEventListener("pointermove", onPointerMove, true);
     globalThis.addEventListener("pointerup", onPointerUp, true);
     globalThis.addEventListener("pointercancel", onPointerUp, true);
-    if (
-      typeof PerformanceObserver !== "undefined"
-      && PerformanceObserver.supportedEntryTypes.includes("longtask")
-    ) {
+    if (longTaskObserverAvailable) {
       observer = new PerformanceObserver((list) => {
         for (const entry of list.getEntries()) {
           longTaskEntries.push({ startTime: entry.startTime, duration: entry.duration });
@@ -471,6 +610,9 @@ export async function profileStudioBrushFrameBudget(
     globalState.__studioBrushFrameBudgetProbe = state;
     rafId = requestAnimationFrame(tick);
   }, {
+    blankProbeHeight: BLANK_PROBE_HEIGHT,
+    blankProbeRect,
+    blankProbeWidth: BLANK_PROBE_WIDTH,
     captureRenderWorkload: options.captureRenderWorkload === true,
     tailFrames: TAIL_FRAMES,
     warmupIntervals: WARMUP_FRAME_INTERVALS,
@@ -482,16 +624,49 @@ export async function profileStudioBrushFrameBudget(
   ), undefined, { timeout: 2_000 });
 
   await page.mouse.down();
-  for (const point of route.points.slice(1)) {
-    await page.mouse.move(point.x, point.y);
-    await page.waitForTimeout(MOVE_INTERVAL_MS);
+  let expectedPointerMoves = 0;
+  const execution = options.executionCase;
+  if (execution) {
+    const executionStartedAt = performance.now();
+    const traversalSamples = Math.max(2, execution.pointerRateHz);
+    for (let sampleIndex = 0; sampleIndex < execution.targetInputSamples; sampleIndex += 1) {
+      const traversalIndex = Math.floor(sampleIndex / traversalSamples);
+      const positionInTraversal = sampleIndex % traversalSamples + 1;
+      const forwardProgress = positionInTraversal / traversalSamples;
+      const progress = traversalIndex % 2 === 0 ? forwardProgress : 1 - forwardProgress;
+      const routePosition = progress * (route.points.length - 1);
+      const leftIndex = Math.min(route.points.length - 2, Math.floor(routePosition));
+      const localProgress = routePosition - leftIndex;
+      const left = route.points[leftIndex]!;
+      const right = route.points[leftIndex + 1]!;
+      await page.mouse.move(
+        left.x + (right.x - left.x) * localProgress,
+        left.y + (right.y - left.y) * localProgress,
+      );
+      expectedPointerMoves += 1;
+      const dueAt = executionStartedAt
+        + execution.intendedStrokeDurationMs * expectedPointerMoves / execution.targetInputSamples;
+      const remainingMs = dueAt - performance.now();
+      if (remainingMs > 0) await page.waitForTimeout(remainingMs);
+    }
+  } else {
+    for (const point of route.points.slice(1)) {
+      await page.mouse.move(point.x, point.y);
+      expectedPointerMoves += 1;
+      await page.waitForTimeout(MOVE_INTERVAL_MS);
+    }
   }
   await page.mouse.up();
   await page.waitForFunction(() => Boolean(
     (globalThis as typeof globalThis & {
       __studioBrushFrameBudgetProbe?: { result?: unknown };
     }).__studioBrushFrameBudgetProbe?.result,
-  ), undefined, { timeout: Math.max(3_000, route.durationTargetMs * 5) });
+  ), undefined, {
+    timeout: Math.max(
+      3_000,
+      (execution?.intendedStrokeDurationMs ?? route.durationTargetMs) * 1.5 + 3_000,
+    ),
+  });
   const result = await page.evaluate(() => {
     const value = (globalThis as typeof globalThis & {
       __studioBrushFrameBudgetProbe?: {
@@ -504,6 +679,6 @@ export async function profileStudioBrushFrameBudget(
   await page.mouse.move(4, 4);
   return {
     ...result,
-    expectedPointerMoves: route.points.length - 1,
+    expectedPointerMoves,
   };
 }

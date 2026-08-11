@@ -2,7 +2,10 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { expectedStudioBrushLatencyPreviewFailure } from "./verify-studio-brush-latency.mts";
+import {
+  expectedStudioBrushLatencyPreviewFailure,
+  studioBrushCompetitiveLongStrokeRequested,
+} from "./verify-studio-brush-latency.mts";
 
 const verifierSource = readFileSync(
   new URL("./verify-studio-brush-latency.mts", import.meta.url),
@@ -35,9 +38,18 @@ describe("studio brush latency verifier compositor boundary", () => {
   it("allows an exact representative subset for focused performance regressions", () => {
     expect(verifierSource).toContain("process.env.TOONSPECTRUM_BRUSH_LATENCY_IDS");
     expect(verifierSource).toContain("STUDIO_BRUSH_LATENCY_IDS.filter");
+    expect(verifierSource).toContain("requestedIds.length === 0");
     expect(verifierSource).toContain(
       "TOONSPECTRUM_BRUSH_LATENCY_IDS contains an unknown or duplicate representative id",
     );
+  });
+
+  it("keeps the multi-hour competitive matrix behind one explicit CLI flag", () => {
+    expect(studioBrushCompetitiveLongStrokeRequested([])).toBe(false);
+    expect(studioBrushCompetitiveLongStrokeRequested(["--competitive-long-stroke"]))
+      .toBe(true);
+    expect(studioBrushCompetitiveLongStrokeRequested(["--competitive-long-strokes"]))
+      .toBe(false);
   });
 
   it("suppresses optional API failures only for its own exact loopback preview", () => {
