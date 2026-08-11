@@ -12,16 +12,24 @@ import type { SceneSeed } from "./studio-scene-templates";
  */
 
 export const STUDIO_WEBTOON_DESIGN_TOKEN_VERSION = 1 as const;
+export const STUDIO_WEBTOON_DESIGN_TOKEN_MAX_SERIALIZED_BYTES =
+  2 * 1_024 * 1_024;
 
 export const STUDIO_WEBTOON_DESIGN_TOKEN_LIMITS = Object.freeze({
   maxAxes: 12,
   maxModeValuesPerAxis: 32,
-  maxTokens: 512,
-  maxOverridesPerToken: 64,
-  maxTotalOverrides: 2_048,
+  /** @deprecated Product totals are governed by maxSerializedBytes, not a count ceiling. */
+  maxTokens: Number.POSITIVE_INFINITY,
+  /** @deprecated Product totals are governed by maxSerializedBytes, not a count ceiling. */
+  maxOverridesPerToken: Number.POSITIVE_INFINITY,
+  /** @deprecated Product totals are governed by maxSerializedBytes, not a count ceiling. */
+  maxTotalOverrides: Number.POSITIVE_INFINITY,
   maxInheritanceDepth: 64,
-  maxPaletteColors: 256,
-  maxPaletteRoles: 64,
+  /** @deprecated Product totals are governed by maxSerializedBytes, not a count ceiling. */
+  maxPaletteColors: Number.POSITIVE_INFINITY,
+  /** @deprecated Product totals are governed by maxSerializedBytes, not a count ceiling. */
+  maxPaletteRoles: Number.POSITIVE_INFINITY,
+  maxSerializedBytes: STUDIO_WEBTOON_DESIGN_TOKEN_MAX_SERIALIZED_BYTES,
   maxDashSegments: 32,
   maxDiagnostics: 256,
   maxIdLength: 128,
@@ -267,6 +275,353 @@ export class StudioWebtoonDesignTokenError extends Error {
     this.code = code;
     this.details = details;
   }
+}
+
+const MAX_CANONICAL_JSON_NESTING_DEPTH = 64;
+
+function invalidAdmission(reason: string): never {
+  throw new StudioWebtoonDesignTokenError(
+    "INVALID_DOCUMENT",
+    "The webtoon design-token input is not safe to inspect.",
+    { reason },
+  );
+}
+
+function serializedBudgetExceeded(
+  label: string,
+  count = STUDIO_WEBTOON_DESIGN_TOKEN_MAX_SERIALIZED_BYTES + 1,
+): never {
+  throw new StudioWebtoonDesignTokenError(
+    "LIMIT_EXCEEDED",
+    `${label} exceeds the canonical UTF-8 design-token byte budget.`,
+    {
+      count,
+      limit: STUDIO_WEBTOON_DESIGN_TOKEN_MAX_SERIALIZED_BYTES,
+      label,
+    },
+  );
+}
+
+function addCanonicalBytes(
+  current: number,
+  additional: number,
+  label: string,
+): number {
+  if (
+    !Number.isSafeInteger(additional)
+    || additional < 0
+    || current > STUDIO_WEBTOON_DESIGN_TOKEN_MAX_SERIALIZED_BYTES - additional
+  ) {
+    serializedBudgetExceeded(label);
+  }
+  return current + additional;
+}
+
+/** JSON string-literal UTF-8 bytes without allocating a second, potentially huge string. */
+function canonicalJsonStringByteLength(value: string, label: string): number {
+  let bytes = 2; // opening and closing quotes
+  for (let index = 0; index < value.length; index += 1) {
+    const codeUnit = value.charCodeAt(index);
+    let nextBytes: number;
+    if (codeUnit === 0x22 || codeUnit === 0x5c) {
+      nextBytes = 2;
+    } else if (codeUnit <= 0x1f) {
+      nextBytes =
+        codeUnit === 0x08
+        || codeUnit === 0x09
+        || codeUnit === 0x0a
+        || codeUnit === 0x0c
+        || codeUnit === 0x0d
+          ? 2
+          : 6;
+    } else if (codeUnit <= 0x7f) {
+      nextBytes = 1;
+    } else if (codeUnit <= 0x7ff) {
+      nextBytes = 2;
+    } else if (codeUnit >= 0xd800 && codeUnit <= 0xdbff) {
+      const nextCodeUnit = value.charCodeAt(index + 1);
+      if (nextCodeUnit >= 0xdc00 && nextCodeUnit <= 0xdfff) {
+        nextBytes = 4;
+        index += 1;
+      } else {
+        // Well-formed JSON escapes a lone surrogate as \udxxx.
+        nextBytes = 6;
+      }
+    } else if (codeUnit >= 0xdc00 && codeUnit <= 0xdfff) {
+      nextBytes = 6;
+    } else {
+      nextBytes = 3;
+    }
+    bytes = addCanonicalBytes(bytes, nextBytes, label);
+  }
+  return bytes;
+}
+
+function ownDataDescriptor(
+  value: object,
+  key: PropertyKey,
+  label: string,
+): PropertyDescriptor {
+  let descriptor: PropertyDescriptor | undefined;
+  try {
+    descriptor = Object.getOwnPropertyDescriptor(value, key);
+  } catch {
+    invalidAdmission(`${label} cannot be reflected safely.`);
+  }
+  if (!descriptor || !("value" in descriptor) || descriptor.get || descriptor.set) {
+    invalidAdmission(`${label} must be an own data property.`);
+  }
+  return descriptor;
+}
+
+function assertCanonicalPrototype(value: object, array: boolean, label: string): void {
+  let prototype: object | null;
+  try {
+    prototype = Object.getPrototypeOf(value) as object | null;
+  } catch {
+    invalidAdmission(`${label} prototype cannot be reflected safely.`);
+  }
+  if (
+    prototype !== null
+    && prototype !== Object.prototype
+    && !(array && prototype === Array.prototype)
+  ) {
+    invalidAdmission(`${label} must use a plain JSON prototype.`);
+  }
+}
+
+function canonicalJsonArrayLength(value: readonly unknown[], label: string): number {
+  const descriptor = ownDataDescriptor(value, "length", `${label}.length`);
+  const length = descriptor.value;
+  if (!Number.isSafeInteger(length) || length < 0) {
+    invalidAdmission(`${label} must have a safe array length.`);
+  }
+  if (length > 0) {
+    const first = ownDataDescriptor(value, "0", `${label}[0]`);
+    if (!first.enumerable) invalidAdmission(`${label} must be a dense JSON array.`);
+  }
+  // `0` plus a comma costs at least two bytes per array member. This is derived from the
+  // canonical byte contract and rejects hostile sparse lengths before any proportional clone.
+  const minimumBytes = length === 0 ? 2 : length * 2 + 1;
+  if (
+    !Number.isSafeInteger(minimumBytes)
+    || minimumBytes > STUDIO_WEBTOON_DESIGN_TOKEN_MAX_SERIALIZED_BYTES
+  ) {
+    serializedBudgetExceeded(label, minimumBytes);
+  }
+  return length as number;
+}
+
+function ownEnumerableStringKeys(value: object, label: string): string[] {
+  let keys: readonly PropertyKey[];
+  try {
+    keys = Reflect.ownKeys(value);
+  } catch {
+    invalidAdmission(`${label} keys cannot be reflected safely.`);
+  }
+  if (keys.length > STUDIO_WEBTOON_DESIGN_TOKEN_MAX_SERIALIZED_BYTES) {
+    serializedBudgetExceeded(label, keys.length);
+  }
+  const result: string[] = [];
+  for (const key of keys) {
+    if (typeof key !== "string") {
+      invalidAdmission(`${label} must not contain symbol keys.`);
+    }
+    const descriptor = ownDataDescriptor(value, key, `${label}.${key}`);
+    if (!descriptor.enumerable) {
+      invalidAdmission(`${label}.${key} must be an enumerable data property.`);
+    }
+    result.push(key);
+  }
+  return result.sort(compareText);
+}
+
+function canonicalInspectableJsonByteLength(
+  value: unknown,
+  label: string,
+  active: Set<object> = new Set(),
+  depth = 0,
+  arrayEntry = false,
+): number {
+  if (value === undefined) return arrayEntry ? 4 : 0;
+  if (value === null) return 4;
+  if (typeof value === "string") {
+    return canonicalJsonStringByteLength(value, label);
+  }
+  if (typeof value === "boolean") return value ? 4 : 5;
+  if (typeof value === "number") {
+    const serialized = Number.isFinite(value) ? JSON.stringify(value) : "null";
+    return serialized.length;
+  }
+  if (
+    typeof value === "bigint"
+    || typeof value === "function"
+    || typeof value === "symbol"
+  ) {
+    invalidAdmission(`${label} contains a non-JSON value.`);
+  }
+  if (depth > MAX_CANONICAL_JSON_NESTING_DEPTH) {
+    invalidAdmission(`${label} exceeds the safe JSON nesting depth.`);
+  }
+
+  const objectValue = value as object;
+  if (active.has(objectValue)) {
+    invalidAdmission(`${label} contains a cyclic reference.`);
+  }
+  active.add(objectValue);
+  try {
+    if (Array.isArray(objectValue)) {
+      assertCanonicalPrototype(objectValue, true, label);
+      const length = canonicalJsonArrayLength(objectValue, label);
+      // Validate the complete shape before visiting values, so a late sparse/accessor entry never
+      // causes a partial snapshot allocation.
+      for (let index = 0; index < length; index += 1) {
+        const descriptor = ownDataDescriptor(
+          objectValue,
+          String(index),
+          `${label}[${index}]`,
+        );
+        if (!descriptor.enumerable) {
+          invalidAdmission(`${label} must be a dense JSON array.`);
+        }
+      }
+      let bytes = 2;
+      for (let index = 0; index < length; index += 1) {
+        if (index > 0) bytes = addCanonicalBytes(bytes, 1, label);
+        const descriptor = ownDataDescriptor(
+          objectValue,
+          String(index),
+          `${label}[${index}]`,
+        );
+        bytes = addCanonicalBytes(
+          bytes,
+          canonicalInspectableJsonByteLength(
+            descriptor.value,
+            `${label}[${index}]`,
+            active,
+            depth + 1,
+            true,
+          ),
+          label,
+        );
+      }
+      return bytes;
+    }
+
+    assertCanonicalPrototype(objectValue, false, label);
+    const keys = ownEnumerableStringKeys(objectValue, label);
+    let bytes = 2;
+    let included = 0;
+    for (const key of keys) {
+      const descriptor = ownDataDescriptor(objectValue, key, `${label}.${key}`);
+      if (descriptor.value === undefined) continue;
+      if (included > 0) bytes = addCanonicalBytes(bytes, 1, label);
+      bytes = addCanonicalBytes(
+        bytes,
+        canonicalJsonStringByteLength(key, label),
+        label,
+      );
+      bytes = addCanonicalBytes(bytes, 1, label); // colon
+      bytes = addCanonicalBytes(
+        bytes,
+        canonicalInspectableJsonByteLength(
+          descriptor.value,
+          `${label}.${key}`,
+          active,
+          depth + 1,
+        ),
+        label,
+      );
+      included += 1;
+    }
+    return bytes;
+  } finally {
+    active.delete(objectValue);
+  }
+}
+
+function snapshotInspectableJson(
+  value: unknown,
+  label: string,
+  active: Set<object> = new Set(),
+  depth = 0,
+): unknown {
+  if (value === null || typeof value !== "object") return value;
+  if (depth > MAX_CANONICAL_JSON_NESTING_DEPTH) {
+    invalidAdmission(`${label} exceeds the safe JSON nesting depth.`);
+  }
+  if (active.has(value)) invalidAdmission(`${label} contains a cyclic reference.`);
+  active.add(value);
+  try {
+    if (Array.isArray(value)) {
+      assertCanonicalPrototype(value, true, label);
+      const length = canonicalJsonArrayLength(value, label);
+      for (let index = 0; index < length; index += 1) {
+        const descriptor = ownDataDescriptor(value, String(index), `${label}[${index}]`);
+        if (!descriptor.enumerable) invalidAdmission(`${label} must be a dense JSON array.`);
+      }
+      const result: unknown[] = [];
+      for (let index = 0; index < length; index += 1) {
+        const descriptor = ownDataDescriptor(value, String(index), `${label}[${index}]`);
+        result.push(
+          snapshotInspectableJson(
+            descriptor.value,
+            `${label}[${index}]`,
+            active,
+            depth + 1,
+          ),
+        );
+      }
+      return result;
+    }
+
+    assertCanonicalPrototype(value, false, label);
+    const result: Record<string, unknown> = {};
+    for (const key of ownEnumerableStringKeys(value, label)) {
+      const descriptor = ownDataDescriptor(value, key, `${label}.${key}`);
+      Object.defineProperty(result, key, {
+        configurable: true,
+        enumerable: true,
+        value: snapshotInspectableJson(
+          descriptor.value,
+          `${label}.${key}`,
+          active,
+          depth + 1,
+        ),
+        writable: true,
+      });
+    }
+    return result;
+  } finally {
+    active.delete(value);
+  }
+}
+
+function snapshotDesignTokenInput(
+  input: unknown,
+): StudioWebtoonDesignTokenDocumentInput {
+  canonicalInspectableJsonByteLength(input, "design-token input");
+  const snapshot = snapshotInspectableJson(input, "design-token input");
+  canonicalInspectableJsonByteLength(snapshot, "design-token input snapshot");
+  if (!isRecord(snapshot)) {
+    invalidAdmission("The design-token input root must be an object.");
+  }
+  return snapshot as unknown as StudioWebtoonDesignTokenDocumentInput;
+}
+
+function addCanonicalArrayEntry(
+  currentBytes: number,
+  itemCount: number,
+  value: unknown,
+  label: string,
+): number {
+  const separatorBytes = itemCount > 0 ? 1 : 0;
+  const itemBytes = canonicalInspectableJsonByteLength(value, label);
+  return addCanonicalBytes(
+    addCanonicalBytes(currentBytes, separatorBytes, label),
+    itemBytes,
+    label,
+  );
 }
 
 export interface ResolveStudioWebtoonDesignTokenOptions<
@@ -660,7 +1015,6 @@ function normalizePatch(
         const colors = rawValue.colors;
         if (
           Array.isArray(colors)
-          && colors.length <= STUDIO_WEBTOON_DESIGN_TOKEN_LIMITS.maxPaletteColors
           && colors.every(isBoundedString)
         ) {
           result.colors = Object.freeze(colors.map((color) => color.trim()));
@@ -672,8 +1026,6 @@ function normalizePatch(
         const roles = rawValue.roles;
         if (
           isRecord(roles)
-          && Object.keys(roles).length
-            <= STUDIO_WEBTOON_DESIGN_TOKEN_LIMITS.maxPaletteRoles
           && Object.keys(roles).every(isBoundedString)
           && Object.values(roles).every(isBoundedString)
         ) {
@@ -884,17 +1236,13 @@ function detectReferenceCycles(
 export function createStudioWebtoonDesignTokenDocument(
   input: StudioWebtoonDesignTokenDocumentInput,
 ): StudioWebtoonDesignTokenDocument {
-  const rawAxes = Array.isArray(input.axes) ? input.axes : [];
-  const rawTokens = Array.isArray(input.tokens) ? input.tokens : [];
+  const admittedInput = snapshotDesignTokenInput(input);
+  const rawAxes = Array.isArray(admittedInput.axes) ? admittedInput.axes : [];
+  const rawTokens = Array.isArray(admittedInput.tokens) ? admittedInput.tokens : [];
   assertCollectionLimit(
     rawAxes.length,
     STUDIO_WEBTOON_DESIGN_TOKEN_LIMITS.maxAxes,
     "mode axes",
-  );
-  assertCollectionLimit(
-    rawTokens.length,
-    STUDIO_WEBTOON_DESIGN_TOKEN_LIMITS.maxTokens,
-    "design tokens",
   );
 
   let diagnosticsTruncated = false;
@@ -916,19 +1264,20 @@ export function createStudioWebtoonDesignTokenDocument(
   };
 
   if (
-    input.version !== undefined
-    && input.version !== STUDIO_WEBTOON_DESIGN_TOKEN_VERSION
+    admittedInput.version !== undefined
+    && admittedInput.version !== STUDIO_WEBTOON_DESIGN_TOKEN_VERSION
   ) {
     addDiagnostic({
       code: "INVALID_VERSION",
       path: "version",
       message: "Unsupported webtoon design-token document version.",
-      relatedIds: [String(input.version)],
+      relatedIds: [String(admittedInput.version)],
     });
   }
 
   const axes: StudioWebtoonDesignModeAxis[] = [];
   const axisById = new Map<string, StudioWebtoonDesignModeAxis>();
+  let axesCanonicalBytes = 2;
   rawAxes.forEach((rawAxis, axisIndex) => {
     const rawAxisRecord = isRecord(rawAxis) ? rawAxis : {};
     const id = normalizeIdentifier(
@@ -1001,6 +1350,12 @@ export function createStudioWebtoonDesignTokenDocument(
       defaultValueId,
       values: Object.freeze(values),
     });
+    axesCanonicalBytes = addCanonicalArrayEntry(
+      axesCanonicalBytes,
+      axes.length,
+      axis,
+      "canonical mode axes",
+    );
     axes.push(axis);
     axisById.set(id, axis);
   });
@@ -1008,7 +1363,7 @@ export function createStudioWebtoonDesignTokenDocument(
 
   const tokens: StudioWebtoonDesignToken[] = [];
   const tokenById = new Map<string, StudioWebtoonDesignToken>();
-  let totalOverrides = 0;
+  let tokensCanonicalBytes = 2;
   rawTokens.forEach((rawToken, tokenIndex) => {
     const rawTokenRecord = isRecord(rawToken) ? rawToken : {};
     const id = normalizeIdentifier(
@@ -1044,19 +1399,9 @@ export function createStudioWebtoonDesignTokenDocument(
     const rawOverrides = Array.isArray(rawTokenRecord.overrides)
       ? rawTokenRecord.overrides
       : [];
-    assertCollectionLimit(
-      rawOverrides.length,
-      STUDIO_WEBTOON_DESIGN_TOKEN_LIMITS.maxOverridesPerToken,
-      `mode overrides for ${id}`,
-    );
-    totalOverrides += rawOverrides.length;
-    assertCollectionLimit(
-      totalOverrides,
-      STUDIO_WEBTOON_DESIGN_TOKEN_LIMITS.maxTotalOverrides,
-      "total mode overrides",
-    );
     const overrides: StudioWebtoonDesignModeOverride<StudioWebtoonDesignTokenCategory>[] = [];
     const overrideIds = new Set<string>();
+    let overridesCanonicalBytes = 2;
     rawOverrides.forEach((rawOverride, overrideIndex) => {
       const rawOverrideRecord = isRecord(rawOverride) ? rawOverride : {};
       const overrideId = normalizeIdentifier(
@@ -1089,24 +1434,29 @@ export function createStudioWebtoonDesignTokenDocument(
           addDiagnostic,
         );
       }
-      overrides.push(
-        Object.freeze({
-          id: overrideId,
-          selector: normalizeSelector(
-            rawOverrideRecord.selector,
-            `tokens.${tokenIndex}.overrides.${overrideIndex}.selector`,
-            axisById,
-            addDiagnostic,
-          ),
-          priority: normalizedPriority,
-          value: normalizePatch(
-            typedCategory,
-            rawOverrideRecord.value,
-            `tokens.${tokenIndex}.overrides.${overrideIndex}.value`,
-            addDiagnostic,
-          ),
-        }),
+      const override = Object.freeze({
+        id: overrideId,
+        selector: normalizeSelector(
+          rawOverrideRecord.selector,
+          `tokens.${tokenIndex}.overrides.${overrideIndex}.selector`,
+          axisById,
+          addDiagnostic,
+        ),
+        priority: normalizedPriority,
+        value: normalizePatch(
+          typedCategory,
+          rawOverrideRecord.value,
+          `tokens.${tokenIndex}.overrides.${overrideIndex}.value`,
+          addDiagnostic,
+        ),
+      });
+      overridesCanonicalBytes = addCanonicalArrayEntry(
+        overridesCanonicalBytes,
+        overrides.length,
+        override,
+        `canonical mode overrides for ${id}`,
       );
+      overrides.push(override);
     });
     overrides.sort(compareOverrides);
     const extendsTokenId =
@@ -1129,6 +1479,12 @@ export function createStudioWebtoonDesignTokenDocument(
         ? { overrides: Object.freeze(overrides) }
         : {}),
     }) as StudioWebtoonDesignToken;
+    tokensCanonicalBytes = addCanonicalArrayEntry(
+      tokensCanonicalBytes,
+      tokens.length,
+      token,
+      "canonical design tokens",
+    );
     tokens.push(token);
     tokenById.set(id, token);
   });
@@ -1162,7 +1518,7 @@ export function createStudioWebtoonDesignTokenDocument(
 
   diagnostics.sort(compareDiagnostics);
   const frozenDiagnostics = Object.freeze(diagnostics);
-  return Object.freeze({
+  const document = Object.freeze({
     version: STUDIO_WEBTOON_DESIGN_TOKEN_VERSION,
     axes: Object.freeze(axes),
     tokens: Object.freeze(tokens),
@@ -1170,6 +1526,15 @@ export function createStudioWebtoonDesignTokenDocument(
     diagnosticsTruncated,
     usable: frozenDiagnostics.length === 0 && !diagnosticsTruncated,
   });
+  canonicalInspectableJsonByteLength(
+    {
+      axes: document.axes,
+      tokens: document.tokens,
+      version: document.version,
+    },
+    "canonical design-token document",
+  );
+  return document;
 }
 
 function assertUsableDocument(

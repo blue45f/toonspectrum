@@ -8,6 +8,7 @@ import {
   resolveStudioWebtoonDesignToken,
   serializeStudioWebtoonDesignTokenDocument,
   STUDIO_WEBTOON_BUILTIN_MODE_AXES,
+  STUDIO_WEBTOON_DESIGN_TOKEN_MAX_SERIALIZED_BYTES,
   STUDIO_WEBTOON_DESIGN_TOKEN_LIMITS,
   StudioWebtoonDesignTokenError,
   type StudioWebtoonDesignToken,
@@ -317,6 +318,190 @@ describe("studio webtoon design tokens", () => {
       ),
     ).toBe(true);
     expect(deepDocument.usable).toBe(false);
+  });
+
+  it("admits 1,000+ tokens, overrides, palette colors, and roles under the canonical byte budget", () => {
+    const tokenCount = 1_201;
+    const overrideCount = 2_100;
+    const colorCount = 1_205;
+    const roleCount = 1_101;
+    const bulkTokens = Array.from({ length: tokenCount }, (_, index) =>
+      typographyToken(`type.bulk.${index}`));
+    const overrides = Array.from({ length: overrideCount }, (_, index) => ({
+      id: `override-${index}`,
+      selector: {},
+      value: {},
+    }));
+    const colors = Array.from(
+      { length: colorCount },
+      (_, index) => `#${index.toString(16).padStart(6, "0")}`,
+    );
+    const roles = Object.fromEntries(
+      Array.from({ length: roleCount }, (_, index) => [
+        `role-${index}`,
+        colors[index % colors.length],
+      ]),
+    );
+    const document = createStudioWebtoonDesignTokenDocument({
+      version: 1,
+      axes: [],
+      tokens: [
+        ...bulkTokens,
+        typographyToken("type.overridden", { overrides }),
+        {
+          id: "palette.large",
+          label: "Large palette",
+          category: "palette",
+          value: { colors, roles },
+        },
+      ],
+    });
+
+    expect(document.usable).toBe(true);
+    expect(document.tokens).toHaveLength(tokenCount + 2);
+    expect(
+      document.tokens.find(({ id }) => id === "type.overridden")?.overrides,
+    ).toHaveLength(overrideCount);
+    const palette = resolveStudioWebtoonDesignToken<"palette">(
+      document,
+      "palette.large",
+    );
+    expect(palette.value.colors).toHaveLength(colorCount);
+    expect(Object.keys(palette.value.roles)).toHaveLength(roleCount);
+    expect(
+      new TextEncoder().encode(
+        serializeStudioWebtoonDesignTokenDocument(document),
+      ).byteLength,
+    ).toBeLessThanOrEqual(STUDIO_WEBTOON_DESIGN_TOKEN_MAX_SERIALIZED_BYTES);
+    expect(STUDIO_WEBTOON_DESIGN_TOKEN_LIMITS).toMatchObject({
+      maxTokens: Number.POSITIVE_INFINITY,
+      maxOverridesPerToken: Number.POSITIVE_INFINITY,
+      maxTotalOverrides: Number.POSITIVE_INFINITY,
+      maxPaletteColors: Number.POSITIVE_INFINITY,
+      maxPaletteRoles: Number.POSITIVE_INFINITY,
+      maxSerializedBytes: STUDIO_WEBTOON_DESIGN_TOKEN_MAX_SERIALIZED_BYTES,
+    });
+  });
+
+  it("rejects byte overflow atomically without changing the committed document identity or result", () => {
+    const committed = documentWith([
+      typographyToken("type.committed", { value: { fontSizePx: 24 } }),
+    ]);
+    const committedAxes = committed.axes;
+    const committedTokens = committed.tokens;
+    const committedToken = committed.tokens[0];
+    const committedSnapshot = serializeStudioWebtoonDesignTokenDocument(committed);
+    const maximumColor = "가".repeat(
+      STUDIO_WEBTOON_DESIGN_TOKEN_LIMITS.maxStringLength,
+    );
+    const encodedColorBytes = new TextEncoder().encode(
+      JSON.stringify(maximumColor),
+    ).byteLength + 1;
+    const overflowingColors = Array.from({
+      length:
+        Math.ceil(
+          STUDIO_WEBTOON_DESIGN_TOKEN_MAX_SERIALIZED_BYTES
+            / encodedColorBytes,
+        ) + 1,
+    }, () => maximumColor);
+
+    expectTokenError(
+      () =>
+        createStudioWebtoonDesignTokenDocument({
+          version: 1,
+          axes: committed.axes,
+          tokens: [
+            ...committed.tokens,
+            {
+              id: "palette.overflow",
+              label: "Overflow",
+              category: "palette",
+              value: { colors: overflowingColors, roles: {} },
+            },
+          ],
+        }),
+      "LIMIT_EXCEEDED",
+    );
+    expect(committed.axes).toBe(committedAxes);
+    expect(committed.tokens).toBe(committedTokens);
+    expect(committed.tokens[0]).toBe(committedToken);
+    expect(serializeStudioWebtoonDesignTokenDocument(committed)).toBe(
+      committedSnapshot,
+    );
+  });
+
+  it("fails typed-closed on accessors, sparse arrays, and cycles without invoking getters", () => {
+    let getterCalls = 0;
+    const accessorTokens: unknown[] = [];
+    Object.defineProperty(accessorTokens, "0", {
+      enumerable: true,
+      get() {
+        getterCalls += 1;
+        return typographyToken("type.hostile");
+      },
+    });
+    accessorTokens.length = 1;
+    expectTokenError(
+      () =>
+        createStudioWebtoonDesignTokenDocument({
+          version: 1,
+          axes: [],
+          tokens: accessorTokens as readonly StudioWebtoonDesignToken[],
+        }),
+      "INVALID_DOCUMENT",
+    );
+    expect(getterCalls).toBe(0);
+
+    const sparseTokens: unknown[] = [];
+    sparseTokens.length =
+      STUDIO_WEBTOON_DESIGN_TOKEN_MAX_SERIALIZED_BYTES + 1;
+    expectTokenError(
+      () =>
+        createStudioWebtoonDesignTokenDocument({
+          version: 1,
+          axes: [],
+          tokens: sparseTokens as readonly StudioWebtoonDesignToken[],
+        }),
+      "INVALID_DOCUMENT",
+    );
+
+    const cyclicValue: Record<string, unknown> = {};
+    cyclicValue.self = cyclicValue;
+    expectTokenError(
+      () =>
+        createStudioWebtoonDesignTokenDocument({
+          version: 1,
+          axes: [],
+          tokens: [
+            typographyToken("type.cyclic", {
+              value: cyclicValue as never,
+            }),
+          ],
+        }),
+      "INVALID_DOCUMENT",
+    );
+  });
+
+  it("keeps diagnostics bounded and exposes truncation as the validation backpressure receipt", () => {
+    const document = createStudioWebtoonDesignTokenDocument({
+      version: 1,
+      axes: [],
+      tokens: Array.from(
+        {
+          length: STUDIO_WEBTOON_DESIGN_TOKEN_LIMITS.maxDiagnostics + 20,
+        },
+        (_, index) =>
+          typographyToken(`type.noisy.${index}`, {
+            value: { [`unknown-${index}`]: true } as never,
+          }),
+      ),
+    });
+
+    expect(document.diagnostics).toHaveLength(
+      STUDIO_WEBTOON_DESIGN_TOKEN_LIMITS.maxDiagnostics,
+    );
+    expect(document.diagnosticsTruncated).toBe(true);
+    expect(document.usable).toBe(false);
   });
 
   it("supplies complete deterministic defaults for every typed category", () => {
