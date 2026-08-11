@@ -137,13 +137,13 @@ describe("competitor specialty brush expansion", () => {
 
   it("keeps the 71+160 catalogue exhaustive and assigns unique runtime variants", () => {
     expect(STUDIO_BRUSH_CATALOG_COUNTS).toEqual({
-      core: 71,
+      core: 87,
       pro: 160,
-      total: 231,
+      total: 247,
     });
-    expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(231);
+    expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(247);
     expect(new Set(STUDIO_ALL_BRUSH_CATALOG_ITEMS.map(({ id }) => id)).size)
-      .toBe(231);
+      .toBe(247);
     for (const id of SPECIALTY_IDS) {
       expect(resolveStudioBrushRuntimeContract(id)).toMatchObject({
         id,

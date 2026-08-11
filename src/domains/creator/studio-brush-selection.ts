@@ -79,7 +79,7 @@ export function studioCoreBrushCatalogSelection(
 }
 
 /**
- * One fail-closed selector for the complete 231-tool catalogue.
+ * One fail-closed selector for the complete 234-tool catalogue.
  *
  * Core presets resolve synchronously from the canonical table. Procedural profiles keep their
  * physics chunk lazy, but both the desktop catalogue and mobile sheet receive the same durable

@@ -110,7 +110,9 @@ describe("Studio inspector bubble-appearance boundary", () => {
     // 의도적 변경(2026-08-11): linked-pass raster lease/read-only projection 배선 8줄.
     // 의도적 통합(2026-08-12): main의 raster preparation busy fail-closed 배선 5줄을
     // linked-pass projection과 함께 보존(4_145 → 4_150).
-    expect(inspector.split("\n").length).toBeLessThanOrEqual(4_150);
+    // 의도적 확장(2026-08-12): paper surface catalog / async pixel-edit inspector glue
+    // (4_150 → 4_180).
+    expect(inspector.split("\n").length).toBeLessThanOrEqual(4_180);
     expect(leaf.source).not.toContain('"use no memo"');
     expect(leaf.source).not.toMatch(/\b(?:memo|useCallback|useMemo)\s*\(/u);
     expect(leaf.source).toContain(

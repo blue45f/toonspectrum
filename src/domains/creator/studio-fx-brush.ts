@@ -1336,10 +1336,9 @@ export function planOilBrushDabs(input: FxOilPlanInput): FxOilDab[] {
     2,
     FX_OIL_DAB_CAP,
   ));
-  // A coarse 22%-of-diameter cadence exposed every individual ellipse along curves. Keep the
-  // deterministic dab model, but make the wet carrier dense enough to read as one continuous load
-  // of paint. Long strokes still remain bounded by sampleStations' whole-path redistribution.
-  const spacing = Math.max(0.55, baseWidth * 0.085);
+  // Dense wet carrier so stations read as one continuous load of paint without becoming a stamp
+  // lattice. Long strokes remain bounded by sampleStations' whole-path redistribution.
+  const spacing = Math.max(0.5, baseWidth * 0.068);
   const stations = sampleStations(points, spacing, maxDabs);
   const dabs: FxOilDab[] = [];
 
@@ -1357,29 +1356,49 @@ export function planOilBrushDabs(input: FxOilPlanInput): FxOilDab[] {
     const tangentX = tangentEnd.x - tangentStart.x;
     const tangentY = tangentEnd.y - tangentStart.y;
     if (Math.hypot(tangentX, tangentY) > POINT_EPS) {
-      ang = Math.atan2(tangentY, tangentX) + (n1 - 0.5) * 0.08;
+      ang = Math.atan2(tangentY, tangentX) + (n1 - 0.5) * 0.07;
     }
-    const size = baseWidth * (0.62 + st.pressure * 0.48) * (0.94 + n2 * 0.12);
-    const rx = Math.max(0.4, size * 0.58);
-    const ry = Math.max(0.25, size * (0.38 + n3 * 0.045));
-    const normalJitter = (n2 - 0.5) * baseWidth * 0.025;
+    // Pressure owns a clear, monotonic hand-feel: light contact is a narrow wet skid, heavy
+    // contact fans the head and loads pigment. A soft curve (0.82) keeps early stylus response
+    // lively without snapping to the full filbert width.
+    const pressureFeel = Math.pow(clamp(st.pressure, 0, 1), 0.82);
+    const size = baseWidth
+      * (0.48 + pressureFeel * 0.72)
+      * (0.93 + n2 * 0.14);
+    const rx = Math.max(0.4, size * (0.54 + pressureFeel * 0.08));
+    // Heavier pressure flattens the minor axis slightly so the bristle bed fans across the stroke.
+    const ry = Math.max(
+      0.25,
+      size * (0.34 + pressureFeel * 0.1 + n3 * 0.05),
+    );
+    const normalJitter = (n2 - 0.5) * baseWidth * (0.018 + pressureFeel * 0.014);
     const tap = stations.length === 1;
-    const bristles = [-0.72, -0.36, 0, 0.36, 0.72].map(
+    // Seven lanes: competitive oil/acrylic reads as a real brush head, not five schematic hairs.
+    // Offsets stay within the ribbon so the continuous carrier still owns the silhouette.
+    const bristleOffsets = [-0.88, -0.58, -0.3, 0, 0.3, 0.58, 0.88];
+    const bristles = bristleOffsets.map(
       (offsetRatio, bristleIndex): FxOilBristle => {
         const tooth = hash2(si, 31 + bristleIndex * 7, seed);
+        // Contact widens under pressure: outer hairs only load once the stylus digs in.
+        const edge = Math.abs(offsetRatio);
+        const contact = clamp(
+          pressureFeel * (1.08 - edge * 0.55) + tooth * 0.12 - 0.08,
+          0,
+          1,
+        );
+        const loaded = contact > 0.42 && tooth > 0.38;
         return {
-          offsetRatio,
-          radiusXRatio: 0.7 + tooth * 0.22,
-          radiusYRatio: 0.045 + tooth * 0.035,
-          // Bristle load is bimodal, not uniform: a hair either carries paint and leaves a ridge
-          // or it skims and leaves a dry film. A 0.10–0.22 uniform band gave the ribbon carrier
-          // nothing to build relief from — every ridge landed at the same tone and the measured
-          // stroke came out perfectly smooth (length-axis CV 0.002). Splitting the range also
-          // keeps self-crossings honest: the extra ink a second pass adds is proportional to
-          // a·(1−a), which is worst exactly at the mid alphas this mapping avoids.
-          opacity: tooth > 0.55
-            ? 0.3 + (tooth - 0.55) * 0.62
-            : 0.02 + tooth * 0.05,
+          offsetRatio: offsetRatio * (0.9 + pressureFeel * 0.14),
+          radiusXRatio: 0.62 + tooth * 0.28 + pressureFeel * 0.08,
+          // Ridges must remain a material fraction of radiusY after the ribbon carrier's
+          // 0.17 + ratio*1.1 width map — keep them resolvable without repainting the body.
+          radiusYRatio: 0.055 + tooth * 0.05 + contact * 0.03,
+          // Bimodal load with pressure-gated contact: skimming hairs stay near-dry film while
+          // loaded ridges carry a clear pigment step. Self-crossings stay honest because mid-alpha
+          // stacking (worst a·(1−a)) is avoided on the dominant band.
+          opacity: loaded
+            ? 0.34 + contact * 0.42 + (tooth - 0.38) * 0.28
+            : 0.015 + tooth * 0.045 * (0.35 + pressureFeel * 0.65),
         };
       }
     );
@@ -1390,8 +1409,8 @@ export function planOilBrushDabs(input: FxOilPlanInput): FxOilDab[] {
       radiusY: ry,
       angleRad: ang,
       opacity: tap
-        ? clamp(0.62 + st.pressure * 0.28, 0.55, 0.92)
-        : clamp(0.22 + st.pressure * 0.24 + n2 * 0.04, 0.18, 0.52),
+        ? clamp(0.58 + pressureFeel * 0.36, 0.52, 0.96)
+        : clamp(0.16 + pressureFeel * 0.38 + n2 * 0.045, 0.14, 0.62),
       bristles,
     });
   }

@@ -7,6 +7,7 @@ import type { StudioLinked3dRenderDocument } from
   "./studio-linked-3d-render-document";
 import type { PageGrade } from "./studio-page-grade";
 import type { PageReviewState } from "./studio-page-review";
+import type { StudioPaperSurfaceSettings } from "./studio-paper-granulation-runtime";
 import type { StudioShared3dStagePersistedState } from
   "./studio-shared-3d-stage-collection";
 
@@ -16,6 +17,16 @@ export interface PageState {
   bg: string;
   bgGrad: string[] | null;
   canvasH: number;
+  /**
+   * Document paper sheet for brush granulation (kind + seed).
+   * Missing on legacy pages → cold-press default at runtime.
+   */
+  paperSurface?: StudioPaperSurfaceSettings;
+  /**
+   * When true, stage paints a seamless paper-grain fill over the page background.
+   * Missing on legacy pages → true (paper choice should be visible).
+   */
+  paperGrainVisible?: boolean;
   grade?: PageGrade; // 페이지 전체 색보정(밝기/대비/채도/색조/세피아/흑백/비네트). 미설정=보정 없음.
   groups?: LayerGroup[]; // 레이어 그룹(폴더). 미설정=그룹 없음.
   animTimeline?: AnimationTimelineDoc; // 다중 레이어 타임라인(studio-anim-tracks). 미설정=타임라인 없음(기존 문서 100% 호환).

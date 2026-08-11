@@ -80,7 +80,7 @@ describe("Studio oil/acrylic ribbon raster crossing quality", () => {
     // Every run of a band is a subpath of ONE paint operation, so where the figure-eight crosses
     // itself the band's coverage is rasterised before compositing and the ridge is laid down once.
     // This is the structural guarantee the luminance probe below can only sample.
-    expect(carrier.bristleLanes.length).toBeLessThanOrEqual(2);
+    expect(carrier.bristleLanes.length).toBeLessThanOrEqual(3);
     expect(carrier.bristleLanes.length).toBeGreaterThan(0);
     expect(new Set(carrier.bristleLanes.map(({ loadBand }) => loadBand)).size)
       .toBe(carrier.bristleLanes.length);

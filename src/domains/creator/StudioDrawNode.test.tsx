@@ -870,8 +870,9 @@ describe("StudioDrawNode orchestration", () => {
     );
 
     const [planInput, finalize] = watercolorCapture.causalPlan.mock.calls[0]!;
-    expect(planInput?.baseWidth).toBeCloseTo(17.6);
-    expect(planInput?.spacing).toBeCloseTo(3.872);
+    // ink-wash diameterScale 0.92 × strokeWidth 20; spacingRatio 0.18 of scaled width.
+    expect(planInput?.baseWidth).toBeCloseTo(18.4);
+    expect(planInput?.spacing).toBeCloseTo(3.312);
     expect(planInput?.pressures).toEqual([
       expect.any(Number),
       expect.any(Number),

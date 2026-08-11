@@ -1033,6 +1033,15 @@ import {
   type PanelSplitPreview,
 } from "./studio-panel-split";
 import {
+  DEFAULT_STUDIO_PAPER_SURFACE,
+  normalizeStudioPaperSurfaceSettings,
+  setStudioDocumentPaperSurface,
+} from "./studio-paper-granulation-runtime";
+import {
+  getStudioPaperSurfaceCatalogEntry,
+  planStudioPaperSurfaceSelection,
+} from "./studio-paper-surface-catalog";
+import {
   refineStudioDrawElementWithPaper,
   studioPaperVectorDocumentIneligibilityReason,
 } from "./studio-paper-vector-document-adapter";
@@ -1260,7 +1269,6 @@ import {
 } from "./studio-selection";
 import {
   commitStudioSelectionFilterMaskTransaction,
-  createStudioSelectionFilterMaskTransaction,
 } from "./studio-selection-filter-mask-transaction";
 import {
   appendBrushPoint,
@@ -1721,6 +1729,7 @@ import type { MotionCutImage } from "./studio-motion-export";
 import type { PageState } from "./studio-page-state";
 import type { PaletteSuggestion } from "./studio-palette-suggest";
 import type { PanelLayoutPreset } from "./studio-panel-layouts";
+import type { PaperGrainKind } from "./studio-paper-texture";
 import type { StudioProjectDocumentSessionProvenance } from "./studio-project-document-session";
 import type { PsdExportEl, PsdExportResult } from "./studio-psd-export";
 import type { StudioPublicationAnalyticsDocument } from "./studio-publication-analytics";
@@ -2199,6 +2208,29 @@ function createStudioPixelEditCanvas(
   canvas.height = Math.max(1, Math.round(height));
   const ctx = canvas.getContext("2d");
   return ctx ? { canvas, ctx } : null;
+}
+
+/**
+ * Selection adjust/transform/fill used to call canvas.toDataURL synchronously after full-frame
+ * compose — that freezes the page on large layers. Prefer the retouch encoder (toBlob + surface
+ * cache) and fall back to the pure async PNG helper when the retouch runtime fails to load.
+ */
+async function encodeStudioPixelEditResultPng(
+  canvas: HTMLCanvasElement,
+  signal?: AbortSignal,
+): Promise<string> {
+  // Load failures fall back to the pure async encoder. Encode-time failures must surface.
+  const runtime = await loadStudioPixelEditBrushRuntime().catch(() => null);
+  if (runtime) {
+    return runtime.encodeStudioRetouchCanvasPng(canvas, { signal });
+  }
+  const { encodeStudioPixelEditCanvasPng } = await import("./studio-pixel-edit-async");
+  return encodeStudioPixelEditCanvasPng(canvas, { signal });
+}
+
+async function yieldStudioPixelEditMainThread(): Promise<void> {
+  const { yieldStudioMainThread } = await import("./studio-pixel-edit-async");
+  return yieldStudioMainThread();
 }
 
 function StudioInspectorAsideFallback({
@@ -4891,6 +4923,15 @@ function StudioCuttoonEditor({
   const bg = activePage.bg;
   const bgGrad = activePage.bgGrad;
   const canvasH = activePage.canvasH;
+  const paperGrainKind: PaperGrainKind = normalizeStudioPaperSurfaceSettings(
+    activePage.paperSurface,
+  ).kind;
+  // Keep the process-global paper granulation surface aligned with the active page sheet.
+  useEffect(() => {
+    setStudioDocumentPaperSurface(
+      normalizeStudioPaperSurfaceSettings(activePage.paperSurface),
+    );
+  }, [activePage.id, activePage.paperSurface]);
   // StudioCuttoonEditor is intentionally compiler-opted-out. Keep the heavyweight canvas
   // projection identity-stable across unrelated editor commits so StudioCanvasViewport.memo can
   // actually bail out instead of repainting the full Konva stage.
@@ -5062,6 +5103,22 @@ function StudioCuttoonEditor({
   const setCanvasH = (newH: number | ((prev: number) => number)) => {
     const raw = typeof newH === "function" ? newH(activePage.canvasH) : newH;
     updateActivePage({ canvasH: clampStudioCanvasHeight(raw) });
+  };
+
+  const setPaperGrainKind = (kind: PaperGrainKind) => {
+    const surface = planStudioPaperSurfaceSelection(
+      kind,
+      activePage.paperSurface?.seed ?? DEFAULT_STUDIO_PAPER_SURFACE.seed,
+    );
+    setStudioDocumentPaperSurface(surface);
+    updateActivePage({ paperSurface: surface });
+  };
+  const setPaperGrainVisible = (visible: boolean) => {
+    updateActivePage({ paperGrainVisible: visible });
+  };
+  const applyPaperTintBackground = () => {
+    const entry = getStudioPaperSurfaceCatalogEntry(paperGrainKind);
+    updateActivePage({ bg: entry.tintBg, bgGrad: null });
   };
 
   function updateActivePage(patch: Partial<Omit<PageState, "id">>) {
@@ -9279,9 +9336,17 @@ function StudioCuttoonEditor({
   const [symmetryCenterY, setSymmetryCenterY] = useState<number>(540);
   const [symmetryRadialCount, setSymmetryRadialCount] = useState<number>(6);
   function prepareStudioSymmetryForBrush(brushId: unknown) {
-    if (!isStudioBrushEraserAliasId(brushId) || symmetryType === "none") return;
-    setSymmetryType("none");
-    announceDrawingShortcut("떡지우개의 저농도 지우기를 유지하려고 대칭을 껐어요.");
+    if (isStudioBrushEraserAliasId(brushId) && symmetryType !== "none") {
+      setSymmetryType("none");
+      announceDrawingShortcut("떡지우개의 저농도 지우기를 유지하려고 대칭을 껐어요.");
+      return;
+    }
+    // Sketchpad-class Mirror brush: auto-enable vertical twinning through canvas centre.
+    if (brushId === "sketchpad-mirror" && symmetryType === "none") {
+      setSymmetryType("vertical");
+      setSymmetryCenterX(CANVAS_W / 2);
+      announceDrawingShortcut("스케치패드 미러 — 세로 대칭을 켰어요.");
+    }
   }
   function changeStudioSymmetryType(
     next: "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope" | "silk",
@@ -14360,6 +14425,24 @@ function StudioCuttoonEditor({
   liveInkOverlayRendererRef.current ??= new StudioLiveInkOverlayRenderer();
   const liveInkPredictionRendererRef = useRef<StudioLiveInkPredictionRenderer>(null as never);
   liveInkPredictionRendererRef.current ??= new StudioLiveInkPredictionRenderer();
+  // Drop cached just-encoded raster surfaces and clear live overlay bitmaps when leaving Studio
+  // so multi-megapixel canvases cannot outlive the route.
+  useEffect(() => {
+    return () => {
+      void import("./studio-raster-edit-surface-cache").then((mod) => {
+        mod.clearStudioRasterEditSurfaces();
+      });
+      try {
+        liveDynamicBrushOverlayRendererRef.current?.clear?.();
+        liveStampOverlayRendererRef.current?.clear?.();
+        liveWetInkOverlayRendererRef.current?.clear?.();
+        liveInkOverlayRendererRef.current?.clear?.();
+        liveInkPredictionRendererRef.current?.clear?.();
+      } catch {
+        // Overlay may already be torn down with the stage.
+      }
+    };
+  }, []);
   // Google Ink owns only the replaceable predicted mesh tail. The existing live-ink/Konva
   // surfaces remain the single authoritative paint owner and the fail-visible fallback.
   const inkMeshLivePreviewModuleRef = useRef<StudioInkMeshLivePreviewModule | null>(null);
@@ -23527,7 +23610,8 @@ const puppetWarpArmed =
       const outImage = made.ctx.createImageData(width, height);
       outImage.data.set(blended.data);
       made.ctx.putImageData(outImage, 0, 0);
-      const src = made.canvas.toDataURL("image/png");
+      await yieldStudioPixelEditMainThread();
+      const src = await encodeStudioPixelEditResultPng(made.canvas);
       // name은 ImageEl 리터럴이 아닌 병합 계약(StudioMergeBakeComposite)과 동일하게 spread로 싣는다.
       const composite: ImageEl = {
         ...{ name: `확장 블렌드 ${extendedBlendModeLabel(extendedBlendMode)}` },
@@ -29682,6 +29766,7 @@ const puppetWarpArmed =
     const sel = pixelSel;
     setPixelBusy(true);
     try {
+      const { runStudioPixelEditBakePipeline } = await import("./studio-pixel-edit-async");
       const img = await loadStudioPixelEditImage(target.src);
       const w = img.naturalWidth || img.width;
       const h = img.naturalHeight || img.height;
@@ -29693,12 +29778,15 @@ const puppetWarpArmed =
         flipY: target.flippedY,
       });
       if (!maskPlan) return;
-      const mask = rasterizeSelectionMask(maskPlan, createStudioPixelEditCanvas);
-      const out = mask && applySelectionAdjustToCanvas(img, w, h, mask, plan, createStudioPixelEditCanvas);
-      if (!out) throw new Error("조정 캔버스를 만들지 못했습니다.");
-      // 팩토리가 HTMLCanvasElement 만 만들므로 구조 타입 → DOM 타입 복원은 안전하다.
-      // PNG: 삭제(투명)·페더의 알파를 보존하는 무손실 포맷.
-      const src = (out as HTMLCanvasElement).toDataURL("image/png");
+      // Full-frame mask + adjust + PNG used to run as one synchronous main-thread burst.
+      // Yield between stages and encode via toBlob so UI can still paint/handle input.
+      const src = await runStudioPixelEditBakePipeline({
+        rasterize: () => rasterizeSelectionMask(maskPlan, createStudioPixelEditCanvas),
+        apply: (mask) => applySelectionAdjustToCanvas(img, w, h, mask, plan, createStudioPixelEditCanvas),
+        encode: (out) => encodeStudioPixelEditResultPng(out as HTMLCanvasElement),
+        yieldControl: yieldStudioPixelEditMainThread,
+      });
+      if (!src) throw new Error("조정 캔버스를 만들지 못했습니다.");
       if (!canApplyStudioMutation(mutationTicket)) return;
       if (isLatestLayerContentMutationLocked(target.id)) return;
       if (!patchEl(target.id, { src } as Partial<El>)) return;
@@ -29738,10 +29826,12 @@ const puppetWarpArmed =
       });
       if (!maskPlan) return;
       const mask = rasterizeSelectionMask(maskPlan, createStudioPixelEditCanvas);
+      await yieldStudioPixelEditMainThread();
       const extracted =
         mask && extractSelectionToCanvas(img, w, h, mask, bounds, createStudioPixelEditCanvas);
       if (!extracted) throw new Error("선택 영역을 추출하지 못했습니다.");
-      const src = (extracted.canvas as HTMLCanvasElement).toDataURL("image/png");
+      await yieldStudioPixelEditMainThread();
+      const src = await encodeStudioPixelEditResultPng(extracted.canvas as HTMLCanvasElement);
       // 원본 픽셀 박스 → 표시 정규화(반전 되돌림) → 페이지 좌표. 회전은 프레임이 흡수한다.
       const nx = target.flipped ? 1 - (extracted.cropX + extracted.cropWidth) / w : extracted.cropX / w;
       const ny = target.flippedY ? 1 - (extracted.cropY + extracted.cropHeight) / h : extracted.cropY / h;
@@ -29777,7 +29867,8 @@ const puppetWarpArmed =
           createStudioPixelEditCanvas
         );
         if (!cleared) throw new Error("원본에서 선택 영역을 지우지 못했습니다.");
-        cutSrc = (cleared as HTMLCanvasElement).toDataURL("image/png");
+        await yieldStudioPixelEditMainThread();
+        cutSrc = await encodeStudioPixelEditResultPng(cleared as HTMLCanvasElement);
       }
       if (!canApplyStudioMutation(mutationTicket)) return;
       if (cutSrc !== null && isLatestLayerContentMutationLocked(target.id)) return;
@@ -29806,6 +29897,7 @@ const puppetWarpArmed =
     const sel = pixelSel;
     setPixelBusy(true);
     try {
+      const { runStudioPixelEditBakePipeline } = await import("./studio-pixel-edit-async");
       const img = await loadStudioPixelEditImage(target.src);
       const w = img.naturalWidth || img.width;
       const h = img.naturalHeight || img.height;
@@ -29816,7 +29908,6 @@ const puppetWarpArmed =
         flipY: target.flippedY,
       });
       if (!maskPlan) return;
-      const mask = rasterizeSelectionMask(maskPlan, createStudioPixelEditCanvas);
       const boundsN = selectionBoundsNorm(sel);
       const boundsPx = boundsN
         ? {
@@ -29826,11 +29917,21 @@ const puppetWarpArmed =
             h: boundsN.h * h,
           }
         : undefined;
-      const out =
-        mask &&
-        applySelectionContentTransformToCanvas(img, w, h, mask, transform, createStudioPixelEditCanvas, boundsPx);
-      if (!out) throw new Error("변형 캔버스를 만들지 못했습니다.");
-      const src = (out as HTMLCanvasElement).toDataURL("image/png");
+      const src = await runStudioPixelEditBakePipeline({
+        rasterize: () => rasterizeSelectionMask(maskPlan, createStudioPixelEditCanvas),
+        apply: (mask) => applySelectionContentTransformToCanvas(
+          img,
+          w,
+          h,
+          mask,
+          transform,
+          createStudioPixelEditCanvas,
+          boundsPx,
+        ),
+        encode: (out) => encodeStudioPixelEditResultPng(out as HTMLCanvasElement),
+        yieldControl: yieldStudioPixelEditMainThread,
+      });
+      if (!src) throw new Error("변형 캔버스를 만들지 못했습니다.");
       if (!canApplyStudioMutation(mutationTicket)) return;
       if (isLatestLayerContentMutationLocked(target.id)) return;
       // 협업 잠금/스냅샷 경합으로 커밋이 거절되면 마퀴만 먼저 움직여 픽셀과
@@ -29876,7 +29977,7 @@ const puppetWarpArmed =
     const sel = pixelSel;
     setPixelBusy(true);
     try {
-      const [{ bakeContentAwareFillToCanvas }, img] = await Promise.all([
+      const [{ bakeContentAwareFillToCanvasAsync }, img] = await Promise.all([
         import("./studio-content-aware-fill"),
         loadStudioPixelEditImage(target.src),
       ]);
@@ -29889,9 +29990,19 @@ const puppetWarpArmed =
       });
       if (!maskPlan) return;
       const mask = rasterizeSelectionMask(maskPlan, createStudioPixelEditCanvas);
-      const out = mask && bakeContentAwareFillToCanvas(img, mask, w, h, undefined, createStudioPixelEditCanvas);
+      await yieldStudioPixelEditMainThread();
+      // Cooperative tile yields keep large fills from monopolizing the main thread.
+      const out = mask && await bakeContentAwareFillToCanvasAsync(
+        img,
+        mask,
+        w,
+        h,
+        { yieldControl: yieldStudioPixelEditMainThread },
+        createStudioPixelEditCanvas,
+      );
       if (!out) throw new Error("채우기 캔버스를 만들지 못했습니다.");
-      const src = (out as HTMLCanvasElement).toDataURL("image/png");
+      await yieldStudioPixelEditMainThread();
+      const src = await encodeStudioPixelEditResultPng(out as HTMLCanvasElement);
       if (!canApplyStudioMutation(mutationTicket)) return;
       if (isLatestLayerContentMutationLocked(target.id)) return;
       if (!patchEl(target.id, { src } as Partial<El>)) return;
@@ -30448,7 +30559,8 @@ const puppetWarpArmed =
         createStudioPixelEditCanvas
       );
       if (!out) throw new Error("마스크 결과를 만들지 못했습니다.");
-      const maskSrc = (out as HTMLCanvasElement).toDataURL("image/png");
+      await yieldStudioPixelEditMainThread();
+      const maskSrc = await encodeStudioPixelEditResultPng(out as HTMLCanvasElement);
       if (!canApplyStudioMutation(mutationTicket)) return;
       if (isLatestLayerContentMutationLocked(target.id)) return;
       patchEl(target.id, { maskSrc, maskEnabled: true } as Partial<El>);
@@ -30476,9 +30588,11 @@ const puppetWarpArmed =
       const h = img.naturalHeight || img.height;
       const out = createLayerMaskCanvas(w, h, fill, createStudioPixelEditCanvas);
       if (!out) return;
+      await yieldStudioPixelEditMainThread();
+      const maskSrc = await encodeStudioPixelEditResultPng(out as HTMLCanvasElement);
       if (!canApplyStudioMutation(mutationTicket)) return;
       if (isLatestLayerContentMutationLocked(target.id)) return;
-      patchEl(target.id, { maskSrc: (out as HTMLCanvasElement).toDataURL("image/png"), maskEnabled: true } as Partial<El>);
+      patchEl(target.id, { maskSrc, maskEnabled: true } as Partial<El>);
     })();
   }
   /**
@@ -30518,10 +30632,12 @@ const puppetWarpArmed =
           ? invertLayerMaskAlpha(selectionMask, w, h, createStudioPixelEditCanvas)
           : selectionMask;
         if (!mask) throw new Error("마스크를 반전하지 못했습니다.");
+        await yieldStudioPixelEditMainThread();
+        const maskSrc = await encodeStudioPixelEditResultPng(mask as HTMLCanvasElement);
         if (!canApplyStudioMutation(mutationTicket)) return;
         if (isLatestLayerContentMutationLocked(target.id)) return;
         patchEl(target.id, {
-          maskSrc: (mask as HTMLCanvasElement).toDataURL("image/png"),
+          maskSrc,
           maskEnabled: true,
         } as Partial<El>);
         setError(null);
@@ -30563,9 +30679,11 @@ const puppetWarpArmed =
       const maskImg = await loadStudioPixelEditImage(target.maskSrc!);
       const out = invertLayerMaskAlpha(maskImg, w, h, createStudioPixelEditCanvas);
       if (!out) return;
+      await yieldStudioPixelEditMainThread();
+      const maskSrc = await encodeStudioPixelEditResultPng(out as HTMLCanvasElement);
       if (!canApplyStudioMutation(mutationTicket)) return;
       if (isLatestLayerContentMutationLocked(target.id)) return;
-      patchEl(target.id, { maskSrc: (out as HTMLCanvasElement).toDataURL("image/png") } as Partial<El>);
+      patchEl(target.id, { maskSrc } as Partial<El>);
     })();
   }
 
@@ -30604,7 +30722,8 @@ const puppetWarpArmed =
         createStudioPixelEditCanvas
       );
       if (!out) throw new Error("필터 마스크 결과를 만들지 못했습니다.");
-      const filterMaskSrc = (out as HTMLCanvasElement).toDataURL("image/png");
+      await yieldStudioPixelEditMainThread();
+      const filterMaskSrc = await encodeStudioPixelEditResultPng(out as HTMLCanvasElement);
       if (!canApplyStudioMutation(mutationTicket)) return;
       if (isLatestLayerContentMutationLocked(target.id)) return;
       patchEl(target.id, { filterMaskSrc, filterMaskEnabled: true } as Partial<El>);
@@ -30632,9 +30751,11 @@ const puppetWarpArmed =
       const h = img.naturalHeight || img.height;
       const out = createLayerMaskCanvas(w, h, fill, createStudioPixelEditCanvas);
       if (!out) return;
+      await yieldStudioPixelEditMainThread();
+      const filterMaskSrc = await encodeStudioPixelEditResultPng(out as HTMLCanvasElement);
       if (!canApplyStudioMutation(mutationTicket)) return;
       if (isLatestLayerContentMutationLocked(target.id)) return;
-      patchEl(target.id, { filterMaskSrc: (out as HTMLCanvasElement).toDataURL("image/png"), filterMaskEnabled: true } as Partial<El>);
+      patchEl(target.id, { filterMaskSrc, filterMaskEnabled: true } as Partial<El>);
     })();
   }
   function deleteFilterMask() {
@@ -30669,9 +30790,11 @@ const puppetWarpArmed =
       const maskImg = await loadStudioPixelEditImage(target.filterMaskSrc!);
       const out = invertLayerMaskAlpha(maskImg, w, h, createStudioPixelEditCanvas);
       if (!out) return;
+      await yieldStudioPixelEditMainThread();
+      const filterMaskSrc = await encodeStudioPixelEditResultPng(out as HTMLCanvasElement);
       if (!canApplyStudioMutation(mutationTicket)) return;
       if (isLatestLayerContentMutationLocked(target.id)) return;
-      patchEl(target.id, { filterMaskSrc: (out as HTMLCanvasElement).toDataURL("image/png") } as Partial<El>);
+      patchEl(target.id, { filterMaskSrc } as Partial<El>);
     })();
   }
 
@@ -30816,7 +30939,8 @@ const puppetWarpArmed =
         createStudioPixelEditCanvas
       );
       if (!out) throw new Error("히스토리 브러시 결과를 만들지 못했습니다.");
-      const src = (out as HTMLCanvasElement).toDataURL("image/png");
+      await yieldStudioPixelEditMainThread();
+      const src = await encodeStudioPixelEditResultPng(out as HTMLCanvasElement);
       if (!canApplyStudioMutation(mutationTicket)) return;
       if (isLatestLayerContentMutationLocked(target.id)) return;
       patchEl(target.id, { src } as Partial<El>);
@@ -31443,8 +31567,9 @@ const puppetWarpArmed =
         plan.source.sw,
         plan.source.sh
       );
-      // PNG: 투명 배경(누끼·스티커) 알파를 보존하는 무손실 포맷.
-      const src = out.canvas.toDataURL("image/png");
+      // PNG: 투명 배경(누끼·스티커) 알파를 보존하는 무손실 포맷. Async encode avoids main-thread freeze.
+      await yieldStudioPixelEditMainThread();
+      const src = await encodeStudioPixelEditResultPng(out.canvas);
       if (!canApplyStudioMutation(mutationTicket)) return;
       if (isLatestLayerContentMutationLocked(target.id)) return;
       patchEl(target.id, {
@@ -31488,7 +31613,8 @@ const puppetWarpArmed =
         flipY: target.flippedY,
       });
       if (!out) throw new Error("퍼펫 워프 결과를 만들지 못했습니다.");
-      const src = (out as HTMLCanvasElement).toDataURL("image/png");
+      await yieldStudioPixelEditMainThread();
+      const src = await encodeStudioPixelEditResultPng(out as HTMLCanvasElement);
       if (!canApplyStudioMutation(mutationTicket)) return;
       if (isLatestLayerContentMutationLocked(target.id)) return;
       patchEl(target.id, { src } as Partial<El>);
@@ -42144,6 +42270,9 @@ function clearSelectionForEdit() {
     setBg,
     setBgGrad,
     setCanvasH,
+    setPaperGrainKind,
+    setPaperGrainVisible,
+    applyPaperTintBackground,
     setDescription,
     setDrawingPaletteDragging: changeDrawingPaletteDragging,
     setIsometricAngleDegClamped,
@@ -44959,6 +45088,8 @@ function clearSelectionForEdit() {
           canvasH={canvasH}
           canvasRotation={canvasRotation}
           collaborationDocumentLocked={collaborationDocumentLocked}
+          paperGrainKind={paperGrainKind}
+          paperGrainVisible={activePage.paperGrainVisible !== false}
           color={color}
           colorRangeFuzziness={colorRangeFuzziness}
           colorRangePickActive={colorRangePickActive}
@@ -45672,7 +45803,10 @@ function clearSelectionForEdit() {
                     || !canApplyStudioMutation(mutationTicket)
                     || isLatestLayerContentMutationLocked(target.id)
                   ) return;
-                  const result = createStudioSelectionFilterMaskTransaction({
+                  const { createStudioSelectionFilterMaskTransactionAsync } = await import(
+                    "./studio-selection-filter-mask-transaction"
+                  );
+                  const result = await createStudioSelectionFilterMaskTransactionAsync({
                     target,
                     selection,
                     scope: applicationScope,
@@ -45680,8 +45814,8 @@ function clearSelectionForEdit() {
                     imageHeight: source.naturalHeight || source.height,
                     filterPatch: patch,
                     createCanvas: createStudioPixelEditCanvas,
-                    serializeMask: (mask) =>
-                      (mask as HTMLCanvasElement).toDataURL("image/png"),
+                    serializeMask: async (mask) =>
+                      encodeStudioPixelEditResultPng(mask as HTMLCanvasElement),
                     mutationLocked:
                       activeSurfaceReviewLocked || isEffectivelyLocked(target, groups),
                   });

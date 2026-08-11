@@ -48,8 +48,11 @@ describe("Studio content-aware fill bundle boundary", () => {
       pageSource.match(/import\("\.\/studio-content-aware-fill"\)/gu),
     ).toHaveLength(1);
     expect(applySource).toMatch(
-      /const \[\{ bakeContentAwareFillToCanvas \}, img\] = await Promise\.all\(\[\s*import\("\.\/studio-content-aware-fill"\),\s*loadStudioPixelEditImage\(target\.src\),\s*\]\)/u,
+      /const \[\{ bakeContentAwareFillToCanvasAsync \}, img\] = await Promise\.all\(\[\s*import\("\.\/studio-content-aware-fill"\),\s*loadStudioPixelEditImage\(target\.src\),\s*\]\)/u,
     );
+    expect(applySource).toContain("bakeContentAwareFillToCanvasAsync");
+    expect(applySource).toContain("yieldControl: yieldStudioPixelEditMainThread");
+    expect(applySource).toContain("encodeStudioPixelEditResultPng");
     expect(applySource.indexOf("Promise.all")).toBeLessThan(
       applySource.indexOf("const w ="),
     );

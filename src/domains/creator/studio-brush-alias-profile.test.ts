@@ -144,8 +144,9 @@ describe("studio brush alias profiles", () => {
     expect(watercolor?.baseWidth).toBe(20);
     expect(watercolor?.spacing).toBeCloseTo(6.8);
     const inkWash = resolveStudioBrushAliasWatercolorPlanSettings("ink-wash", 20);
-    expect(inkWash?.baseWidth).toBeCloseTo(17.6);
-    expect(inkWash?.spacing).toBeCloseTo(3.872);
+    // Sumi is slightly narrower than toolbar size, denser stations, stronger core vs pale wash.
+    expect(inkWash?.baseWidth).toBeCloseTo(18.4);
+    expect(inkWash?.spacing).toBeCloseTo(3.312);
     expect(resolveStudioBrushAliasWatercolorPlanSettings("pen", 20)).toBeNull();
 
     const source = [
@@ -157,12 +158,17 @@ describe("studio brush alias profiles", () => {
     expect(source[0]).toEqual({ x: 1, y: 2, radius: 10, opacity: 0.6, role: "core" });
     expect(wash).toHaveLength(2);
     expect(wash[0]).toMatchObject({ x: 1, y: 2, role: "core" });
-    expect(wash[0]?.radius).toBeCloseTo(7.8);
-    expect(wash[0]?.opacity).toBeCloseTo(0.93);
+    expect(wash[0]?.radius).toBeCloseTo(7.2);
+    expect(wash[0]?.opacity).toBeCloseTo(1);
     expect(wash[1]).toMatchObject({ x: 3, y: 4, role: "diffuse" });
-    expect(wash[1]?.radius).toBeCloseTo(18.6);
-    expect(wash[1]?.opacity).toBeCloseTo(0.124);
+    expect(wash[1]?.radius).toBeCloseTo(20.64);
+    expect(wash[1]?.opacity).toBeCloseTo(0.104);
     expect(applyStudioBrushAliasWatercolorMaterial("pen", source)).toBe(source);
+
+    // Pressure hand-feel is not identity: light samples stay thinner than full pressure.
+    const light = mapStudioBrushAliasPressure("ink-wash", 0.1);
+    const heavy = mapStudioBrushAliasPressure("ink-wash", 0.95);
+    expect(heavy).toBeGreaterThan(light * 1.5);
   });
 
   it("keeps standard pencil one-pass while soft pencil plans a pale skirt and rough core", () => {

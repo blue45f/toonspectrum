@@ -1098,7 +1098,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
         );
         expect(maximumGap).toBeLessThan(brushDynamics.width.base * 1.1);
       } else {
-        // Core dry media now owns one non-overpainting full-prefix union. The command is compact,
+        // Core dry media owns one non-overpainting full-prefix union. The command is compact,
         // but its byte receipt must still contain the complete high-resolution fibre geometry.
         expect(liveMarks).toHaveLength(1);
         expect(liveMarks[0]?.unionGeometry).toMatchObject({
@@ -1264,6 +1264,8 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
         expect(appended.status, `${brushId}: append ${count}`).toBe("appended");
         if (appended.status !== "appended") continue;
         expect(appended.appendedMarks).toBe(1);
+        // One-fill cumulative union: each prefix replaces the transient surface from the full
+        // accepted geometry so live multi-append stays byte-identical to one-shot commit.
         expect(live.activeCanvas.clearCount()).toBe(activeClearsBefore + 1);
         expect(live.presentationCanvas.clearCount()).toBeGreaterThan(
           presentationClearsBefore,
@@ -1298,6 +1300,8 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
         expect(retainedMarks[0]?.unionGeometry?.sha256).toBe(
           liveGeometry?.sha256,
         );
+        if (sealed.status !== "settled") return;
+        expect(sealed.markCount).toBe(liveMarks.length);
       }
 
       const complete = elementAt(96);

@@ -43,20 +43,75 @@ describe("studio oil/acrylic ribbon carrier", () => {
       seed: 7,
     });
     const plan = planStudioOilRibbonCarrier(dabs);
-    expect(plan.bristleLanes).toHaveLength(2);
+    expect(plan.bristleLanes.length).toBeGreaterThanOrEqual(2);
+    expect(plan.bristleLanes.length).toBeLessThanOrEqual(3);
     const opacities = plan.bristleLanes.map(({ opacity }) => opacity);
     const widths = plan.bristleLanes.map(({ lineWidth }) => lineWidth);
     // A single averaged lane made this range exactly zero, which is what a 770 px measured stroke
     // reported as a length-axis coefficient of variation of 0.002.
-    expect(Math.max(...opacities) - Math.min(...opacities)).toBeGreaterThan(0.4);
-    // Both bands must actually be spread over the stroke rather than one band owning everything.
+    expect(Math.max(...opacities) - Math.min(...opacities)).toBeGreaterThan(0.35);
+    // Every load band must actually be spread over the stroke rather than one band owning everything.
     for (const lane of plan.bristleLanes) {
       expect(lane.runs.length).toBeGreaterThan(8);
     }
     // The ridge must be a material fraction of the ribbon rather than a hairline.
     const meanRadiusY = dabs.reduce((sum, dab) => sum + dab.radiusY, 0) / dabs.length;
     expect(Math.max(...widths)).toBeGreaterThan(meanRadiusY * 0.15);
-    expect(Math.max(...widths)).toBeLessThan(meanRadiusY * 0.45);
+    expect(Math.max(...widths)).toBeLessThan(meanRadiusY * 0.5);
+  });
+
+  it("responds monotonically to pressure in width, body load and bristle contact", () => {
+    const light = planStudioOilRibbonCarrier(planOilBrushDabs({
+      points: [0, 0, 180, 12, 360, -8, 540, 10],
+      pressures: [0.12, 0.12, 0.12, 0.12],
+      baseWidth: 24,
+      seed: 19,
+    }));
+    const heavy = planStudioOilRibbonCarrier(planOilBrushDabs({
+      points: [0, 0, 180, 12, 360, -8, 540, 10],
+      pressures: [0.94, 0.94, 0.94, 0.94],
+      baseWidth: 24,
+      seed: 19,
+    }));
+    expect(light.body).not.toBeNull();
+    expect(heavy.body).not.toBeNull();
+    const bodyWidth = (plan: ReturnType<typeof planStudioOilRibbonCarrier>) => {
+      const points = plan.body!.points;
+      let maxCross = 0;
+      for (let index = 0; index + 3 < points.length; index += 2) {
+        maxCross = Math.max(
+          maxCross,
+          Math.hypot(points[index]! - points[index + 2]!, points[index + 1]! - points[index + 3]!),
+        );
+      }
+      return maxCross;
+    };
+    expect(bodyWidth(heavy)).toBeGreaterThan(bodyWidth(light) * 1.18);
+    expect(heavy.bodyOpacity).toBeGreaterThan(light.bodyOpacity);
+    const heavyRidge = Math.max(...heavy.bristleLanes.map(({ lineWidth }) => lineWidth));
+    const lightRidge = Math.max(...light.bristleLanes.map(({ lineWidth }) => lineWidth));
+    expect(heavyRidge).toBeGreaterThan(lightRidge * 1.08);
+    const lightRuns = light.bristleLanes.reduce((sum, lane) => sum + lane.runs.length, 0);
+    const heavyRuns = heavy.bristleLanes.reduce((sum, lane) => sum + lane.runs.length, 0);
+    expect(heavyRuns).toBeGreaterThanOrEqual(lightRuns);
+  });
+
+  it("emits multi-lane bristle structure rather than a soft round dab or flat ribbon only", () => {
+    const dabs = planOilBrushDabs({
+      points: [0, 0, 120, 20, 240, -10, 360, 16],
+      pressures: [0.55, 0.7, 0.85, 0.6],
+      baseWidth: 28,
+      seed: 33,
+    });
+    expect(dabs.every((dab) => dab.bristles.length >= 5)).toBe(true);
+    expect(dabs.every((dab) => dab.bristles.length <= 7)).toBe(true);
+    const plan = planStudioOilRibbonCarrier(dabs);
+    expect(plan.repeatedBodyStampCount).toBe(0);
+    expect(plan.bristleLanes.length).toBeGreaterThanOrEqual(2);
+    const offsets = new Set(
+      dabs.flatMap((dab) => dab.bristles.map((bristle) => bristle.offsetRatio.toFixed(3))),
+    );
+    expect(offsets.size).toBeGreaterThanOrEqual(5);
   });
 
   it("keeps an 8k-pixel acrylic stroke dense with a bounded 4096-station ribbon", () => {

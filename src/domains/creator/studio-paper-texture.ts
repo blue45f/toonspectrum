@@ -31,9 +31,26 @@
 // 종이 프리셋
 // ---------------------------------------------------------------------------
 
-export const PAPER_GRAIN_KINDS = ["hot-press", "cold-press", "rough"] as const;
+/**
+ * 문서 단위 종이 표면 카탈로그.
+ *
+ * 앞의 3종(hot/cold/rough)은 수채지 표면 가공의 고전 등급이며 기존 문서·잉크워시와 호환된다.
+ * 뒤의 종들은 스케치·만화장·동양화 워크플로에서 자주 고르는 실물 매체 근사다.
+ */
+export const PAPER_GRAIN_KINDS = [
+  "hot-press",
+  "cold-press",
+  "rough",
+  "bristol",
+  "washi",
+  "kraft",
+  "canvas",
+  "charcoal",
+  "newsprint",
+  "pastel-board",
+] as const;
 
-/** 수채지 표면 가공 3종. 실물 종이 등급명을 그대로 쓴다. */
+/** 절차적 종이 표면 종류. */
 export type PaperGrainKind = (typeof PAPER_GRAIN_KINDS)[number];
 
 /** 수채화 기본 종이. 실물에서도 cold-press(중목)가 표준 사생지다. */
@@ -66,14 +83,19 @@ export interface PaperTextureParams {
 export const PAPER_REFERENCE_TILE = 128;
 
 /**
- * 종이 3종 파라미터 — 실물 수채지의 표면 가공 차이를 그대로 옮겼다.
+ * 종이 표면 파라미터 — 실물 매체 차이를 절차적 높이맵 축으로 옮긴다.
  *
- * - **hot-press(세목)**: 뜨거운 롤러로 눌러 결을 죽인 매끈한 종이. 요철 파장이 짧고(4px)
- *   진폭이 낮아 granulation이 거의 생기지 않는다. 옥타브 2 = 미세 결만.
- * - **cold-press(중목)**: 압착 없이 펠트 결이 남은 표준 사생지. 8px 요철 + 초지기 발
- *   방향(가로)으로 늘어난 이방성 1.55. 수채 특유의 얼룩덜룩한 침착이 가장 잘 보인다.
- * - **rough(황목)**: 펠트 자국을 그대로 살린 거친 종이. 16px 굵은 요철 + 옥타브 5로
- *   깊은 골을 만든다. toothBias 1.3이 골 면적을 넓혀 안료가 크게 뭉친다.
+ * - **hot-press(세목)**: 뜨거운 롤러로 눌러 결을 죽인 매끈한 종이. 요철 파장이 짧고
+ *   진폭이 낮아 granulation이 거의 생기지 않는다.
+ * - **cold-press(중목)**: 표준 사생지. 초지기 발 방향 이방성으로 수채 얼룩이 잘 보인다.
+ * - **rough(황목)**: 펠트 자국이 굵은 거친 종이. 깊은 골에 안료가 크게 뭉친다.
+ * - **bristol(브리스톨)**: hot-press보다 더 매끈한 일러스트/마커 용지.
+ * - **washi(한지)**: 긴 섬유 이방성 + 중간 요철. 수묵·동양화 느낌.
+ * - **kraft(크라프트)**: 포장지 느낌의 중간 결. 톤 스케치에 적합.
+ * - **canvas(캔버스 천)**: 씨실·날실 격자 근사(낮은 이방성 + 중간 주파수 요철).
+ * - **charcoal(목탄지)**: 매우 거친 이빨. 목탄·콩테가 골에 잘 남는다.
+ * - **newsprint(신문지)**: 미세·조밀한 저진폭 결. 빠른 스케치용.
+ * - **pastel-board(파스텔지)**: 건성 매체용 중간 이빨 + 높은 toothBias.
  */
 export const PAPER_TEXTURE_PRESETS: Readonly<Record<PaperGrainKind, PaperTextureParams>> = {
   "hot-press": {
@@ -102,6 +124,69 @@ export const PAPER_TEXTURE_PRESETS: Readonly<Record<PaperGrainKind, PaperTexture
     fibreAnisotropy: 1.2,
     amplitude: 0.78,
     toothBias: 1.3,
+  },
+  bristol: {
+    octaves: 2,
+    baseCells: 40,
+    lacunarity: 2,
+    persistence: 0.35,
+    fibreAnisotropy: 1,
+    amplitude: 0.12,
+    toothBias: 0.88,
+  },
+  washi: {
+    octaves: 4,
+    baseCells: 12,
+    lacunarity: 2,
+    persistence: 0.58,
+    fibreAnisotropy: 2.35,
+    amplitude: 0.42,
+    toothBias: 1.18,
+  },
+  kraft: {
+    octaves: 3,
+    baseCells: 18,
+    lacunarity: 2,
+    persistence: 0.5,
+    fibreAnisotropy: 1.35,
+    amplitude: 0.4,
+    toothBias: 1.08,
+  },
+  canvas: {
+    octaves: 3,
+    baseCells: 14,
+    lacunarity: 2,
+    persistence: 0.48,
+    fibreAnisotropy: 0.85,
+    amplitude: 0.55,
+    toothBias: 1.05,
+  },
+  charcoal: {
+    octaves: 5,
+    baseCells: 7,
+    lacunarity: 2,
+    persistence: 0.68,
+    fibreAnisotropy: 1.15,
+    amplitude: 0.88,
+    toothBias: 1.38,
+  },
+  newsprint: {
+    octaves: 3,
+    baseCells: 36,
+    lacunarity: 2,
+    persistence: 0.45,
+    fibreAnisotropy: 1.1,
+    amplitude: 0.22,
+    toothBias: 0.98,
+  },
+  "pastel-board": {
+    octaves: 4,
+    baseCells: 11,
+    lacunarity: 2,
+    persistence: 0.6,
+    fibreAnisotropy: 1.25,
+    amplitude: 0.62,
+    toothBias: 1.28,
   },
 };
 
@@ -235,9 +320,99 @@ function octaveCells(baseCells: number, axisLength: number, factor: number, octa
 }
 
 /**
+ * Kind-specific micro-structure layered on top of fBm.
+ * All terms are seamless in u,v ∈ [0,1) so large canvases tile without seams.
+ * These are physical structure approximations (weave, long fibre, pore beds), not photo stamps.
+ */
+function specialtyMicrostructure(
+  kind: PaperGrainKind,
+  u: number,
+  v: number,
+  seed: number,
+): number {
+  switch (kind) {
+    case "canvas": {
+      // Orthogonal warp/weft with slight yarn irregularity — stronger than pure fBm "roughness".
+      const warp = Math.sin(u * Math.PI * 2 * 18 + seed * 0.01);
+      const weft = Math.sin(v * Math.PI * 2 * 18 + seed * 0.013);
+      const yarn = periodicValueNoise(u, v, 36, 36, seed + 17);
+      const crossing = warp * weft;
+      return 0.5 + 0.28 * crossing + 0.12 * yarn + 0.08 * (warp * 0.5 + weft * 0.5);
+    }
+    case "washi": {
+      // Long kozo-like fibres: anisotropic streaks + sparse nodes where fibres cross.
+      const fibreA = periodicValueNoise(u, v, 6, 48, seed + 3);
+      const fibreB = periodicValueNoise(u + 0.17, v, 5, 52, seed + 11);
+      const node = periodicValueNoise(u, v, 14, 14, seed + 23);
+      const ridge = Math.max(0, fibreA - 0.55) * 1.4 + Math.max(0, fibreB - 0.58) * 1.2;
+      return clampUnit(0.42 + ridge * 0.55 + (node - 0.5) * 0.12);
+    }
+    case "charcoal": {
+      // Sparse deep tooth beds for dry media lodging — heavy-tailed pores, not uniform noise.
+      const bed = periodicValueNoise(u, v, 10, 10, seed + 7);
+      const pore = periodicValueNoise(u, v, 28, 28, seed + 19);
+      const deep = Math.pow(Math.max(0, 0.72 - bed), 1.6);
+      return clampUnit(0.55 + deep * 0.7 - (pore - 0.5) * 0.18);
+    }
+    case "kraft": {
+      // Recycled-fibre flecks + mild board grain.
+      const fleck = periodicValueNoise(u, v, 40, 40, seed + 5);
+      const board = periodicValueNoise(u, v, 9, 14, seed + 13);
+      const speck = fleck > 0.82 ? (fleck - 0.82) * 3.2 : 0;
+      return clampUnit(0.5 + (board - 0.5) * 0.35 + speck * 0.45);
+    }
+    case "newsprint": {
+      // Dense fine pulp + mild machine direction.
+      const pulp = periodicValueNoise(u, v, 48, 44, seed + 9);
+      const machine = periodicValueNoise(u, v, 64, 12, seed + 21);
+      return clampUnit(0.5 + (pulp - 0.5) * 0.55 + (machine - 0.5) * 0.18);
+    }
+    case "pastel-board": {
+      // Even tooth bed with sanded plateaus — holds pastel without extreme peaks.
+      const tooth = periodicValueNoise(u, v, 16, 16, seed + 15);
+      const plateau = periodicValueNoise(u, v, 7, 7, seed + 27);
+      const grit = Math.pow(tooth, 0.85);
+      return clampUnit(0.48 + (grit - 0.5) * 0.62 + (plateau - 0.5) * 0.12);
+    }
+    case "bristol": {
+      // Near-plate finish with only micro polish marks.
+      const polish = periodicValueNoise(u, v, 56, 56, seed + 31);
+      return clampUnit(0.5 + (polish - 0.5) * 0.16);
+    }
+    case "hot-press":
+    case "cold-press":
+    case "rough":
+    default:
+      return 0.5;
+  }
+}
+
+function specialtyMixWeight(kind: PaperGrainKind): number {
+  switch (kind) {
+    case "canvas":
+      return 0.42;
+    case "washi":
+      return 0.38;
+    case "charcoal":
+      return 0.4;
+    case "kraft":
+      return 0.28;
+    case "newsprint":
+      return 0.24;
+    case "pastel-board":
+      return 0.32;
+    case "bristol":
+      return 0.18;
+    default:
+      return 0;
+  }
+}
+
+/**
  * 시드 기반 절차 높이맵을 만든다. 항상 새 버퍼를 반환하는 순수 함수다.
  *
  * fbm을 먼저 쌓고(0..1), toothBias 감마로 골/봉우리 비대칭을 준 뒤,
+ * 매체별 미세 구조(천 직조·한지 장섬유·목탄 이빨 등)를 섞고,
  * **타일 평균만** 빼서 0.5 중심으로 옮긴다. 표준편차로 정규화하지 않으므로
  * RMS 거칠기는 옥타브 구성과 amplitude에서 실제로 창발한다(프리셋 간 유의차의 근거).
  */
@@ -265,6 +440,9 @@ export function createPaperHeightField(options?: PaperHeightFieldOptions): Paper
     amplitude *= params.persistence;
   }
 
+  const microWeight = specialtyMixWeight(kind);
+  const baseWeight = 1 - microWeight;
+
   let shapedSum = 0;
   for (let y = 0; y < height; y++) {
     const v = y / height;
@@ -276,7 +454,9 @@ export function createPaperHeightField(options?: PaperHeightFieldOptions): Paper
           += amplitudes[octave]!
           * periodicValueNoise(u, v, cellsX[octave]!, cellsY[octave]!, seed + octave * OCTAVE_SEED_STRIDE);
       }
-      const shaped = (fbm / amplitudeSum) ** params.toothBias;
+      const base = (fbm / amplitudeSum) ** params.toothBias;
+      const micro = specialtyMicrostructure(kind, u, v, seed);
+      const shaped = clampUnit(base * baseWeight + micro * microWeight);
       values[y * width + x] = shaped;
       shapedSum += shaped;
     }

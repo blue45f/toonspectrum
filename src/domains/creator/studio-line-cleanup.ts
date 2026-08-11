@@ -139,5 +139,7 @@ export async function cleanupLineArt(
   applyLineArtCleanup(imageData, opts);
 
   ctx.putImageData(imageData, 0, 0);
-  return canvas.toDataURL("image/png");
+  // Async PNG encode keeps large line-art cleanup off the synchronous toDataURL path.
+  const { encodeStudioPixelEditCanvasPng } = await import("./studio-pixel-edit-async");
+  return encodeStudioPixelEditCanvasPng(canvas);
 }

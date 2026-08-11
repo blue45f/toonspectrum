@@ -36,14 +36,26 @@ describe("종이 종류 정규화", () => {
   it("알 수 없는 값은 기본 종이(중목)로 되돌린다", () => {
     expect(normalizePaperGrainKind("rough")).toBe("rough");
     expect(normalizePaperGrainKind("hot-press")).toBe("hot-press");
-    expect(normalizePaperGrainKind("washi")).toBe(DEFAULT_PAPER_GRAIN_KIND);
+    expect(normalizePaperGrainKind("washi")).toBe("washi");
+    expect(normalizePaperGrainKind("papyrus")).toBe(DEFAULT_PAPER_GRAIN_KIND);
     expect(normalizePaperGrainKind(undefined)).toBe(DEFAULT_PAPER_GRAIN_KIND);
     expect(normalizePaperGrainKind(7)).toBe(DEFAULT_PAPER_GRAIN_KIND);
     expect(DEFAULT_PAPER_GRAIN_KIND).toBe("cold-press");
   });
 
-  it("프리셋 3종이 모두 존재하고 결의 굵기·진폭이 단조롭게 커진다", () => {
-    expect(PAPER_GRAIN_KINDS).toEqual(["hot-press", "cold-press", "rough"]);
+  it("수채 3종은 결의 굵기·진폭이 단조롭게 커지고, 확장 카탈로그도 프리셋을 갖는다", () => {
+    expect(PAPER_GRAIN_KINDS).toEqual([
+      "hot-press",
+      "cold-press",
+      "rough",
+      "bristol",
+      "washi",
+      "kraft",
+      "canvas",
+      "charcoal",
+      "newsprint",
+      "pastel-board",
+    ]);
     const hot = PAPER_TEXTURE_PRESETS["hot-press"];
     const cold = PAPER_TEXTURE_PRESETS["cold-press"];
     const rough = PAPER_TEXTURE_PRESETS.rough;
@@ -52,6 +64,12 @@ describe("종이 종류 정규화", () => {
     expect(cold.baseCells).toBeGreaterThan(rough.baseCells);
     expect(hot.amplitude).toBeLessThan(cold.amplitude);
     expect(cold.amplitude).toBeLessThan(rough.amplitude);
+    for (const kind of PAPER_GRAIN_KINDS) {
+      expect(PAPER_TEXTURE_PRESETS[kind]).toBeDefined();
+      const field = createPaperHeightField({ kind, width: 32, height: 32, seed: 7 });
+      expect(field.values.length).toBe(32 * 32);
+      expect(field.kind).toBe(kind);
+    }
   });
 });
 
@@ -121,11 +139,37 @@ describe("createPaperHeightField", () => {
     expect(mean(flat.values)).toBeCloseTo(0.5, 6);
   });
 
+  it("specialty papers keep unique structure while remaining seamless and deterministic", () => {
+    for (const kind of ["canvas", "washi", "charcoal"] as const) {
+      const a = createPaperHeightField({ kind, width: 48, height: 48, seed: 9 });
+      const b = createPaperHeightField({ kind, width: 48, height: 48, seed: 9 });
+      expect(Array.from(a.values)).toEqual(Array.from(b.values));
+      expect(spread(a.values)).toBeGreaterThan(0.02);
+      // Horizontal seam: first column equals last+1 wrap.
+      for (let y = 0; y < 48; y++) {
+        expect(samplePaperHeight(a, 0, y)).toBe(samplePaperHeight(a, 48, y));
+        expect(samplePaperHeight(a, xSample(y), 0)).toBe(samplePaperHeight(a, xSample(y), 48));
+      }
+    }
+    // Canvas weave should not collapse to cold-press statistics.
+    const canvas = createPaperHeightField({ kind: "canvas", width: 64, seed: 3 });
+    const cold = createPaperHeightField({ kind: "cold-press", width: 64, seed: 3 });
+    let differing = 0;
+    for (let i = 0; i < canvas.values.length; i++) {
+      if (Math.abs(canvas.values[i]! - cold.values[i]!) > 1e-4) differing += 1;
+    }
+    expect(differing).toBeGreaterThan(canvas.values.length * 0.2);
+  });
+
   it("정규화된 params를 그대로 노출해 프리셋 근거를 추적할 수 있다", () => {
     const field = createPaperHeightField({ kind: "hot-press", params: { octaves: 3 } });
     expect(field.params).toEqual({ ...PAPER_TEXTURE_PRESETS["hot-press"], octaves: 3 });
   });
 });
+
+function xSample(y: number): number {
+  return (y * 7 + 3) % 48;
+}
 
 describe("samplePaperHeight", () => {
   it("양/음 방향 모두 주기 wrap 한다", () => {

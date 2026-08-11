@@ -182,9 +182,10 @@ describe("planOilBrushDabs", () => {
       expect(d.radiusY).toBeGreaterThan(0);
       expect(d.opacity).toBeGreaterThan(0);
       expect(Number.isFinite(d.angleRad)).toBe(true);
-      expect(d.bristles).toHaveLength(5);
+      expect(d.bristles.length).toBeGreaterThanOrEqual(5);
+      expect(d.bristles.length).toBeLessThanOrEqual(7);
       for (const bristle of d.bristles) {
-        expect(Math.abs(bristle.offsetRatio)).toBeLessThanOrEqual(0.72);
+        expect(Math.abs(bristle.offsetRatio)).toBeLessThanOrEqual(1.05);
         expect(bristle.radiusXRatio).toBeGreaterThan(0.6);
         expect(bristle.radiusYRatio).toBeGreaterThan(0);
         expect(bristle.opacity).toBeGreaterThan(0);

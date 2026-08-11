@@ -61,6 +61,8 @@ function canvasProps(
     magicResizeStrategy: "reposition",
     masterEditMode: false,
     panelGutter: 24,
+    paperGrainKind: "cold-press",
+    paperGrainVisible: true,
     showGrid: true,
     showAlignmentGuides: true,
     showWebtoonGuides: false,
@@ -84,6 +86,9 @@ function canvasProps(
     onMagicResizeStrategyChange: vi.fn(),
     onMoveUserGuide: vi.fn(),
     onOpenBackgroundEditor: vi.fn(),
+    onPaperGrainKindChange: vi.fn(),
+    onPaperGrainVisibleChange: vi.fn(),
+    onApplyPaperTintBackground: vi.fn(),
     onPanelGutterChange: vi.fn(),
     onShowGridChange: vi.fn(),
     onShowWebtoonGuidesChange: vi.fn(),
@@ -96,6 +101,16 @@ function canvasProps(
 }
 
 describe("StudioInspectorCanvasControls", () => {
+  it("종이 질감 선택을 부모 callback으로 전달한다", () => {
+    const props = canvasProps();
+    render(<StudioInspectorCanvasControls {...props} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "한지" }));
+    expect(props.onPaperGrainKindChange).toHaveBeenCalledWith("washi");
+    fireEvent.click(screen.getByRole("button", { name: "목탄지" }));
+    expect(props.onPaperGrainKindChange).toHaveBeenCalledWith("charcoal");
+  });
+
   it("배경·그라디언트·편집기·캔버스 높이 동작을 부모 callback으로 전달한다", () => {
     const props = canvasProps();
     render(<StudioInspectorCanvasControls {...props} />);

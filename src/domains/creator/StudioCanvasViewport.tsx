@@ -2,6 +2,7 @@ import { BookOpen, CircleHelp, Clapperboard, Eraser, FlipHorizontal2, Grid3X3, I
 import { Fragment, Profiler, Suspense, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type SetStateAction } from "react";
 import { createPortal } from "react-dom";
 import { Stage, Layer, Rect, Group, Circle as KCircle, Transformer, Shape, Text } from "react-konva/lib/ReactKonvaCore";
+// Image is not required — paper grain uses fillPatternImage on Rect.
 
 import { ClipMaskGroup } from "./ClipMaskGroup";
 import { studioAdjustmentStackToFilterFields } from "./studio-adjustment-stack";
@@ -60,6 +61,13 @@ import { StudioAnimTimelinePanel, StudioAppSettingsPanel, StudioBubbleShapeOverl
 import { pageDisplayName } from "./studio-page-meta";
 import { isEligibleForPanelAutoFit } from "./studio-panel-autofit";
 import { type PanelSplitPreview } from "./studio-panel-split";
+import {
+  normalizeStudioPaperSurfaceSettings,
+} from "./studio-paper-granulation-runtime";
+import {
+  getStudioPaperSurfacePreviewTile,
+  studioPaperSurfacePreviewOpacity,
+} from "./studio-paper-surface-preview";
 import { type VanishingPoint } from "./studio-perspective-guide";
 import { movePuppetPin, type PuppetPin } from "./studio-puppet-warp";
 import { type QuickMaskBrushMode } from "./studio-quick-mask";
@@ -1300,6 +1308,25 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
   const hokusaiSurfaceTop = webGpuViewportSurface?.surface.top;
   const hokusaiSurfaceWidth = webGpuViewportSurface?.surface.width;
   const hokusaiSurfaceHeight = webGpuViewportSurface?.surface.height;
+
+  // Document paper grain preview: one seamless tile from the same height field as brush granulation.
+  // Off by paperGrainVisible === false; default on when unset (legacy pages).
+  const paperSurfaceForPreview = useMemo(
+    () => normalizeStudioPaperSurfaceSettings(activePage.paperSurface),
+    [activePage.paperSurface],
+  );
+  const paperGrainVisible = activePage.paperGrainVisible !== false;
+  const paperGrainPatternImage = useMemo(() => {
+    if (!paperGrainVisible || isExporting) return null;
+    return getStudioPaperSurfacePreviewTile(paperSurfaceForPreview, {
+      size: 128,
+      grainStrength: 0.32,
+      tintHex: bgGrad ? undefined : bg,
+    });
+  }, [paperGrainVisible, isExporting, paperSurfaceForPreview, bg, bgGrad]);
+  const paperGrainOpacity = paperGrainVisible
+    ? studioPaperSurfacePreviewOpacity(paperSurfaceForPreview.kind)
+    : 0;
 
   useLayoutEffect(() => {
     const canvas = hokusaiLiveCanvasRef.current;
@@ -2671,6 +2698,25 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                     : undefined
                 }
               />
+              {/* Seamless paper grain — same height field as brush granulation, 128² tile + pattern repeat. */}
+              {paperGrainPatternImage ? (
+                <Rect
+                  name="paper-grain"
+                  x={0}
+                  y={0}
+                  width={CANVAS_W}
+                  height={canvasH}
+                  listening={false}
+                  perfectDrawEnabled={false}
+                  // Konva runtime accepts canvas tiles; React-Konva props narrow to HTMLImageElement.
+                  fillPatternImage={paperGrainPatternImage as unknown as HTMLImageElement}
+                  fillPatternRepeat="repeat"
+                  fillPatternScaleX={1}
+                  fillPatternScaleY={1}
+                  opacity={paperGrainOpacity}
+                  globalCompositeOperation="multiply"
+                />
+              ) : null}
             </Layer>
             <Layer ref={mainLayerRef}>
               <StudioCanvasGuideUnderlay

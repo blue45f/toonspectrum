@@ -111,6 +111,15 @@ const INTENTIONALLY_DISCONTINUOUS_PREVIEWS = new Set([
 const INTENTIONALLY_DISCONTINUOUS_CATALOG_IDS = new Set([
   "spray",
   "splatter",
+  // Sketchpad lattice + clean-room web kits intentionally deposit sparse/stationed
+  // marks (tile grids, multi-agent swarms, dash stitches, scatter stamps, hatch lattices).
+  "sketchpad-tile",
+  "web-multi-agent",
+  "web-dash-stitch",
+  "web-scatter-stamp",
+  "web-hatch-color",
+  "web-dot-tone",
+  "web-gravity-drip",
 ]);
 
 const INTERIOR_START = 0.08;

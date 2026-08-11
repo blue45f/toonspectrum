@@ -1,0 +1,191 @@
+/**
+ * Perf-safe paper surface presentation helpers.
+ *
+ * Generates a seamless tile (default 128²) from the same height field used for brush
+ * granulation, then caches pattern canvases so the stage can fillPattern-repeat without
+ * regenerating megapixel textures every frame.
+ */
+
+import {
+  DEFAULT_STUDIO_PAPER_SURFACE,
+  normalizeStudioPaperSurfaceSettings,
+  type StudioPaperSurfaceSettings,
+} from "./studio-paper-granulation-runtime";
+import {
+  getStudioPaperSurfaceCatalogEntry,
+  type StudioPaperSurfaceCatalogEntry,
+} from "./studio-paper-surface-catalog";
+import {
+  createPaperHeightField,
+  PAPER_REFERENCE_TILE,
+  type PaperGrainKind,
+} from "./studio-paper-texture";
+
+export interface StudioPaperSurfacePreviewOptions {
+  readonly size?: number;
+  /** 0..1 visual grain strength on the backdrop (default 0.22 — readable but not muddy). */
+  readonly grainStrength?: number;
+  /** Optional solid tint override; catalog swatch is default. */
+  readonly tintHex?: string;
+  /** Multiply opacity of the grain layer 0..1 (Konva fill opacity is separate). */
+  readonly grainOpacity?: number;
+}
+
+interface CacheEntry {
+  readonly key: string;
+  readonly canvas: HTMLCanvasElement;
+  readonly width: number;
+  readonly height: number;
+}
+
+const MAX_CACHE = 12;
+const cache = new Map<string, CacheEntry>();
+
+function clamp01(value: number, fallback: number): number {
+  if (!Number.isFinite(value)) return fallback;
+  return value <= 0 ? 0 : value >= 1 ? 1 : value;
+}
+
+function parseHexRgb(hex: string): { r: number; g: number; b: number } {
+  const raw = hex.trim().replace(/^#/, "");
+  if (raw.length === 3) {
+    const r = Number.parseInt(raw[0]! + raw[0]!, 16);
+    const g = Number.parseInt(raw[1]! + raw[1]!, 16);
+    const b = Number.parseInt(raw[2]! + raw[2]!, 16);
+    if ([r, g, b].every((n) => Number.isFinite(n))) return { r, g, b };
+  }
+  if (raw.length >= 6) {
+    const r = Number.parseInt(raw.slice(0, 2), 16);
+    const g = Number.parseInt(raw.slice(2, 4), 16);
+    const b = Number.parseInt(raw.slice(4, 6), 16);
+    if ([r, g, b].every((n) => Number.isFinite(n))) return { r, g, b };
+  }
+  return { r: 244, g: 239, b: 230 };
+}
+
+function cacheKey(
+  surface: StudioPaperSurfaceSettings,
+  size: number,
+  grainStrength: number,
+  tintHex: string,
+  grainOpacity: number,
+): string {
+  return [
+    surface.kind,
+    surface.seed,
+    size,
+    grainStrength.toFixed(3),
+    tintHex,
+    grainOpacity.toFixed(3),
+  ].join("|");
+}
+
+function touch(entry: CacheEntry): HTMLCanvasElement {
+  cache.delete(entry.key);
+  cache.set(entry.key, entry);
+  while (cache.size > MAX_CACHE) {
+    const oldest = cache.keys().next().value as string | undefined;
+    if (!oldest) break;
+    cache.delete(oldest);
+  }
+  return entry.canvas;
+}
+
+/**
+ * Build (or reuse) a seamless paper tile canvas for Konva fillPatternImage.
+ * Works in browser; returns null when document/canvas is unavailable (SSR/tests without DOM).
+ */
+export function getStudioPaperSurfacePreviewTile(
+  surfaceInput?: unknown,
+  options: StudioPaperSurfacePreviewOptions = {},
+): HTMLCanvasElement | null {
+  if (typeof document === "undefined") return null;
+  const surface = normalizeStudioPaperSurfaceSettings(surfaceInput ?? DEFAULT_STUDIO_PAPER_SURFACE);
+  const size = Math.max(
+    32,
+    Math.min(256, Math.round(options.size ?? PAPER_REFERENCE_TILE)),
+  );
+  const grainStrength = clamp01(options.grainStrength ?? 0.28, 0.28);
+  const entryMeta = getStudioPaperSurfaceCatalogEntry(surface.kind);
+  const tintHex = options.tintHex ?? entryMeta.swatch;
+  const grainOpacity = clamp01(options.grainOpacity ?? 1, 1);
+  const key = cacheKey(surface, size, grainStrength, tintHex, grainOpacity);
+  const hit = cache.get(key);
+  if (hit) return touch(hit);
+
+  const field = createPaperHeightField({
+    kind: surface.kind,
+    seed: surface.seed,
+    width: size,
+    height: size,
+  });
+  const { r, g, b } = parseHexRgb(tintHex);
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return null;
+  const image = ctx.createImageData(size, size);
+  const data = image.data;
+  // Soft lighting: height as normal-ish shade so weave/fibre reads as surface, not noise static.
+  for (let i = 0; i < field.values.length; i++) {
+    const h = field.values[i]!;
+    // Mid-gray centered; valleys darker, peaks lighter — then blend onto tint.
+    const shade = (h - 0.5) * 2; // -1..1
+    const lit = 1 + shade * grainStrength * 0.55;
+    const grain = 1 + shade * grainStrength * 0.35;
+    const rr = Math.round(Math.min(255, Math.max(0, r * lit * (1 - grainOpacity * 0.08) + r * grain * grainOpacity * 0.08)));
+    const gg = Math.round(Math.min(255, Math.max(0, g * lit * (1 - grainOpacity * 0.08) + g * grain * grainOpacity * 0.08)));
+    const bb = Math.round(Math.min(255, Math.max(0, b * lit)));
+    const o = i * 4;
+    data[o] = rr;
+    data[o + 1] = gg;
+    data[o + 2] = bb;
+    data[o + 3] = 255;
+  }
+  ctx.putImageData(image, 0, 0);
+  const stored: CacheEntry = { key, canvas, width: size, height: size };
+  cache.set(key, stored);
+  while (cache.size > MAX_CACHE) {
+    const oldest = cache.keys().next().value as string | undefined;
+    if (!oldest) break;
+    cache.delete(oldest);
+  }
+  return canvas;
+}
+
+/** Deterministic backdrop opacity — rougher papers show a bit more tooth, never overpower strokes. */
+export function studioPaperSurfacePreviewOpacity(kind: PaperGrainKind | unknown): number {
+  const entry = getStudioPaperSurfaceCatalogEntry(kind);
+  return Math.min(0.55, Math.max(0.18, 0.16 + entry.tooth * 0.34));
+}
+
+export function resolveStudioPaperSurfaceTint(
+  surfaceInput?: unknown,
+  preferCatalogSwatch = true,
+): string {
+  const surface = normalizeStudioPaperSurfaceSettings(surfaceInput ?? DEFAULT_STUDIO_PAPER_SURFACE);
+  if (!preferCatalogSwatch) return "#ffffff";
+  return getStudioPaperSurfaceCatalogEntry(surface.kind).swatch;
+}
+
+export function clearStudioPaperSurfacePreviewCache(): void {
+  cache.clear();
+}
+
+export function studioPaperSurfacePreviewCacheStats(): { entries: number } {
+  return { entries: cache.size };
+}
+
+/** Plan an optional page bg tint when the user opts into "tint background with paper". */
+export function planStudioPaperTintBackgroundApply(
+  kind: PaperGrainKind,
+  options?: { readonly previousBg?: string },
+): { readonly bg: string; readonly catalog: StudioPaperSurfaceCatalogEntry } {
+  const catalog = getStudioPaperSurfaceCatalogEntry(kind);
+  return {
+    bg: catalog.swatch,
+    catalog,
+    ...(options?.previousBg ? { previousBg: options.previousBg } : {}),
+  } as { readonly bg: string; readonly catalog: StudioPaperSurfaceCatalogEntry };
+}

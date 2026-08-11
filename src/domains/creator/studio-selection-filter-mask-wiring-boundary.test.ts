@@ -21,7 +21,9 @@ describe("selection filter-mask StudioPage wiring boundary", () => {
   });
 
   it("hands one combined helper payload to one patchEl commit", () => {
-    const start = pageSource.indexOf("const result = createStudioSelectionFilterMaskTransaction({");
+    const start = pageSource.indexOf(
+      "const result = await createStudioSelectionFilterMaskTransactionAsync({",
+    );
     const end = pageSource.indexOf("announceDrawingShortcut(", start);
     expect(start).toBeGreaterThan(-1);
     expect(end).toBeGreaterThan(start);
@@ -29,6 +31,7 @@ describe("selection filter-mask StudioPage wiring boundary", () => {
 
     expect(boundary).toContain("filterPatch: patch");
     expect(boundary).toContain("commitStudioSelectionFilterMaskTransaction(");
+    expect(boundary).toContain("encodeStudioPixelEditResultPng");
     expect(boundary.match(/patchEl\(/gu)).toHaveLength(1);
     expect(boundary).toContain("transaction.patch as Partial<El>");
   });

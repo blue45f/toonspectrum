@@ -371,14 +371,16 @@ export const STUDIO_BRUSH_ALIAS_PROFILES = {
     version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
     id: "ink-wash",
     family: "watercolor",
-    diameterScale: 0.88,
-    pressure: { minimum: 0.2, maximum: 1, exponent: 0.8 },
+    diameterScale: 0.92,
+    // Sumi hand-feel: light pressure keeps a dense core with a narrow bleed skirt; heavy pressure
+    // opens the wash and feeds the wet edge. Distinct from soft watercolor's flatter diffuse load.
+    pressure: { minimum: 0.14, maximum: 1.08, exponent: 0.74 },
     watercolor: {
-      spacingRatio: 0.22,
-      coreRadiusScale: 0.78,
-      coreOpacityScale: 1.55,
-      diffuseRadiusScale: 1.55,
-      diffuseOpacityScale: 0.62,
+      spacingRatio: 0.18,
+      coreRadiusScale: 0.72,
+      coreOpacityScale: 1.78,
+      diffuseRadiusScale: 1.72,
+      diffuseOpacityScale: 0.52,
     },
   },
   "inkwash-pen": {
@@ -455,15 +457,17 @@ export const STUDIO_BRUSH_ALIAS_PROFILES = {
     version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
     id: "oil",
     family: "causal-ink",
-    diameterScale: 1,
-    pressure: IDENTITY_PRESSURE,
+    diameterScale: 1.05,
+    // Soft early swell, strong late load — matches the oil-ribbon pressureFeel curve so alias
+    // diameter and the continuous carrier respond with the same hand-feel.
+    pressure: { minimum: 0.28, maximum: 1.18, exponent: 0.82 },
   },
   acrylic: {
     version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,
     id: "acrylic",
     family: "oil",
-    diameterScale: 1.35,
-    pressure: IDENTITY_PRESSURE,
+    diameterScale: 1.38,
+    pressure: { minimum: 0.32, maximum: 1.22, exponent: 0.78 },
   },
   airbrush: {
     version: STUDIO_BRUSH_ALIAS_PROFILE_VERSION,

@@ -84,33 +84,33 @@ export function studioHokusaiNaturalMediaPresetSettings(
     case "oil":
       return {
         anti_aliasing: setting(1),
-        dabs_per_actual_radius: setting(10.5),
-        dabs_per_basic_radius: setting(0.8),
-        direction_filter: setting(0.4),
+        dabs_per_actual_radius: setting(11.5),
+        dabs_per_basic_radius: setting(0.85),
+        direction_filter: setting(0.38),
         elliptical_dab_angle: setting(0, {
           direction: [[0, 0], [180, 180]],
         }),
-        elliptical_dab_ratio: setting(1.65, {
-          pressure: [[0, -0.18], [1, 0.12]],
+        elliptical_dab_ratio: setting(1.78, {
+          pressure: [[0, -0.28], [0.45, -0.04], [1, 0.18]],
         }),
-        hardness: setting(0.94, {
-          pressure: [[0, -0.06], [1, 0.05]],
+        hardness: setting(0.9, {
+          pressure: [[0, -0.1], [1, 0.08]],
         }),
-        opaque: setting(0.95, {
-          pressure: [[0, -0.12], [0.5, -0.01], [1, 0.05]],
+        opaque: setting(0.96, {
+          pressure: [[0, -0.22], [0.4, -0.04], [1, 0.08]],
         }),
         opaque_linearize: setting(0.98),
         opaque_multiply: setting(0, {
-          pressure: [[0, 0], [0.08, 0.28], [1, 1]],
+          pressure: [[0, 0], [0.05, 0.18], [0.2, 0.72], [1, 1]],
         }),
         // Hokusai/libmypaint's canonical spectral-pigment switch is
         // `paint_mode`; the unknown `paint` key silently disables it.
-        paint_mode: setting(0.82),
-        radius_logarithmic: setting(1.4, {
-          pressure: [[0, -0.15], [0.5, 0.22], [1, 0.68]],
+        paint_mode: setting(0.88),
+        radius_logarithmic: setting(1.45, {
+          pressure: [[0, -0.32], [0.35, -0.02], [0.65, 0.28], [1, 0.78]],
         }),
-        slow_tracking: setting(0.85),
-        slow_tracking_per_dab: setting(0.32),
+        slow_tracking: setting(0.78),
+        slow_tracking_per_dab: setting(0.28),
         // The selected-stroke transform starts on a transparent surface.
         // Spectral paint is retained, while opacity-destructive smudge
         // feedback is disabled so retracing can only add coverage.

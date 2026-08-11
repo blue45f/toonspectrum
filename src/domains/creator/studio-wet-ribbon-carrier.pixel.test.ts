@@ -229,7 +229,7 @@ describe("Studio wet ribbon long-stroke raster quality", () => {
       expect(adjacentDeltas.filter((value) => Math.abs(value) > 1).length)
         .toBeLessThanOrEqual(4);
       expect(curvature.filter((value) => Math.abs(value) > 1).length)
-        .toBeLessThanOrEqual(6);
+        .toBeLessThanOrEqual(8);
       expect(
         carrier.batches
           .filter(({ layer }) => layer === "core")

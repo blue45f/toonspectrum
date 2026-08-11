@@ -96,6 +96,23 @@ export type ContentAwareFillOptions = {
   tilePx?: number;
 };
 
+/**
+ * Cooperative main-thread options for large fills. Sync {@link contentAwareFillPixels} ignores
+ * these — use {@link contentAwareFillPixelsAsync} / {@link bakeContentAwareFillToCanvasAsync}.
+ */
+export type ContentAwareFillAsyncOptions = ContentAwareFillOptions & {
+  /** Yield between tile batches so UI input/paint can run. */
+  yieldControl?: () => Promise<void>;
+  /**
+   * How many BFS tiles to process between yields. Default 48 — large enough to keep throughput,
+   * small enough that a full-frame fill does not freeze the page for multi-second stretches.
+   */
+  yieldEveryTiles?: number;
+};
+
+/** Default tile batch size for cooperative content-aware fill. */
+export const CONTENT_AWARE_FILL_YIELD_EVERY_TILES_DEFAULT = 48;
+
 function clampNum(v: number, lo: number, hi: number, fallback: number): number {
   if (!Number.isFinite(v)) return fallback;
   return v < lo ? lo : v > hi ? hi : v;
@@ -540,18 +557,28 @@ function smoothTileSeams(
  * 복제본을 그대로 반환한다(no-op, 히스토리에 무의미한 변화를 남기지 않도록 호출부가 판단할 수 있게
  * `contentAwareFillHasWork`로 미리 확인하는 것을 권장 — 아래 참고).
  */
-export function contentAwareFillPixels(
+type ContentAwareFillRunState = {
+  width: number;
+  height: number;
+  maskAlpha: Float32Array;
+  grid: FillGrid;
+  work: Uint8ClampedArray;
+  queue: number[];
+  tryEnqueue: (tc: number, tr: number) => void;
+};
+
+function prepareContentAwareFillRun(
   source: StudioImageDataLike,
   mask: StudioImageDataLike,
-  opts?: ContentAwareFillOptions
-): StudioImageDataLike {
+  opts?: ContentAwareFillOptions,
+): ContentAwareFillRunState | { noop: StudioImageDataLike } {
   const width = source.width;
   const height = source.height;
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
-    return cloneImageData(source);
+    return { noop: cloneImageData(source) };
   }
   if (mask.width !== width || mask.height !== height) {
-    return cloneImageData(source);
+    return { noop: cloneImageData(source) };
   }
 
   const maskAlpha = new Float32Array(width * height);
@@ -569,11 +596,9 @@ export function contentAwareFillPixels(
   );
 
   const grid = computeContentAwareFillGrid(maskAlpha, width, height, requestedTilePx);
-  if (!grid) return cloneImageData(source); // 선택 없음 — 채울 게 없다.
+  if (!grid) return { noop: cloneImageData(source) }; // 선택 없음 — 채울 게 없다.
 
   const work = source.data.slice() as Uint8ClampedArray;
-
-  // BFS — 이웃 중 하나라도 이미 알려진 구멍 타일만 큐에 넣는다(중복 큐잉 방지용 queued 플래그 별도).
   const total = grid.cols * grid.rows;
   const queued = new Uint8Array(total);
   const queue: number[] = [];
@@ -597,32 +622,42 @@ export function contentAwareFillPixels(
     for (let tc = 0; tc < grid.cols; tc += 1) tryEnqueue(tc, tr);
   }
 
-  let qi = 0;
-  while (qi < queue.length) {
-    const idx = queue[qi]!;
-    qi += 1;
-    const tc = idx % grid.cols;
-    const tr = Math.floor(idx / grid.cols);
-    const rect = tileRectPx(grid, tc, tr);
-    const best = pickBestCandidateCore(work, width, height, maskAlpha, grid, rect);
-    // 후보를 못 찾았으면(best=null) 이 타일은 filled=1로 표시하지 않는다 — 이전 버그: 후보를 못
-    // 찾은 타일도 무조건 filled=1로 찍으면, (a) 실제로는 원본(구멍) 픽셀이 그대로인데도
-    // resolvedWeightAt/isTileKnownIdx가 "신뢰 가능"으로 오판해 이후 다른 타일들의 SSD 비교·복사가
-    // 이 타일의 미해결 원본 픽셀을 진짜 문맥인 것처럼 베끼는 연쇄(오염 전파)로 이어지고, (b) 아래
-    // 폴백 스윕은 filled===0인 타일만 골라내므로 이 타일은 평균색 폴백 대상에서도 영영 빠진다(§design
-    // §5-4가 약속하는 "고립된 구멍은 평균색으로" 안전망이 무력화된다 — 이미지 전체 선택처럼 진짜
-    // 알려진 픽셀이 하나도 없는 경우, 최초로 실패하는 타일 하나의 원본 내용이 그리드 전체로 잘못
-    // 전파되어 버렸다). best를 찾았을 때만 filled=1로 찍어야 이 타일이 실패하면 정직하게 "아직
-    // 미해결"로 남고, 마지막 폴백 스윕에 정확히 걸린다.
-    if (best) {
-      copyTileFill(work, width, maskAlpha, rect, best);
-      grid.filled[idx] = 1;
-    }
-    tryEnqueue(tc - 1, tr);
-    tryEnqueue(tc + 1, tr);
-    tryEnqueue(tc, tr - 1);
-    tryEnqueue(tc, tr + 1);
+  return { width, height, maskAlpha, grid, work, queue, tryEnqueue };
+}
+
+function processContentAwareFillTile(
+  state: ContentAwareFillRunState,
+  queueIndex: number,
+): number {
+  const { width, height, maskAlpha, grid, work, queue, tryEnqueue } = state;
+  const idx = queue[queueIndex]!;
+  const tc = idx % grid.cols;
+  const tr = Math.floor(idx / grid.cols);
+  const rect = tileRectPx(grid, tc, tr);
+  const best = pickBestCandidateCore(work, width, height, maskAlpha, grid, rect);
+  // 후보를 못 찾았으면(best=null) 이 타일은 filled=1로 표시하지 않는다 — 이전 버그: 후보를 못
+  // 찾은 타일도 무조건 filled=1로 찍으면, (a) 실제로는 원본(구멍) 픽셀이 그대로인데도
+  // resolvedWeightAt/isTileKnownIdx가 "신뢰 가능"으로 오판해 이후 다른 타일들의 SSD 비교·복사가
+  // 이 타일의 미해결 원본 픽셀을 진짜 문맥인 것처럼 베끼는 연쇄(오염 전파)로 이어지고, (b) 아래
+  // 폴백 스윕은 filled===0인 타일만 골라내므로 이 타일은 평균색 폴백 대상에서도 영영 빠진다(§design
+  // §5-4가 약속하는 "고립된 구멍은 평균색으로" 안전망이 무력화된다 — 이미지 전체 선택처럼 진짜
+  // 알려진 픽셀이 하나도 없는 경우, 최초로 실패하는 타일 하나의 원본 내용이 그리드 전체로 잘못
+  // 전파되어 버렸다). best를 찾았을 때만 filled=1로 찍어야 이 타일이 실패하면 정직하게 "아직
+  // 미해결"로 남고, 마지막 폴백 스윕에 정확히 걸린다.
+  if (best) {
+    copyTileFill(work, width, maskAlpha, rect, best);
+    grid.filled[idx] = 1;
   }
+  tryEnqueue(tc - 1, tr);
+  tryEnqueue(tc + 1, tr);
+  tryEnqueue(tc, tr - 1);
+  tryEnqueue(tc, tr + 1);
+  return queueIndex + 1;
+}
+
+function finalizeContentAwareFillRun(state: ContentAwareFillRunState): StudioImageDataLike {
+  const { width, height, maskAlpha, grid, work } = state;
+  const total = grid.cols * grid.rows;
 
   // 폴백 — BFS 프론티어가 닿지 못했거나(고립된 구멍) 후보를 못 찾은 타일을 평균색으로 마저 채운다.
   const remaining: number[] = [];
@@ -642,6 +677,52 @@ export function contentAwareFillPixels(
   smoothTileSeams(work, width, height, maskAlpha, grid);
 
   return { data: work, width, height };
+}
+
+export function contentAwareFillPixels(
+  source: StudioImageDataLike,
+  mask: StudioImageDataLike,
+  opts?: ContentAwareFillOptions
+): StudioImageDataLike {
+  const prepared = prepareContentAwareFillRun(source, mask, opts);
+  if ("noop" in prepared) return prepared.noop;
+
+  let qi = 0;
+  while (qi < prepared.queue.length) {
+    qi = processContentAwareFillTile(prepared, qi);
+  }
+
+  return finalizeContentAwareFillRun(prepared);
+}
+
+/**
+ * Same pixel result as {@link contentAwareFillPixels}, but yields between BFS tile batches so a
+ * large selection fill does not monopolize the main thread for the entire run.
+ */
+export async function contentAwareFillPixelsAsync(
+  source: StudioImageDataLike,
+  mask: StudioImageDataLike,
+  opts?: ContentAwareFillAsyncOptions,
+): Promise<StudioImageDataLike> {
+  const prepared = prepareContentAwareFillRun(source, mask, opts);
+  if ("noop" in prepared) return prepared.noop;
+
+  const yieldEvery = Math.max(
+    1,
+    Math.round(opts?.yieldEveryTiles ?? CONTENT_AWARE_FILL_YIELD_EVERY_TILES_DEFAULT),
+  );
+  const yieldControl = opts?.yieldControl;
+  let qi = 0;
+  let processed = 0;
+  while (qi < prepared.queue.length) {
+    qi = processContentAwareFillTile(prepared, qi);
+    processed += 1;
+    if (yieldControl && processed % yieldEvery === 0) {
+      await yieldControl();
+    }
+  }
+
+  return finalizeContentAwareFillRun(prepared);
 }
 
 /**
@@ -685,14 +766,13 @@ export type ContentAwareFillCanvasFactory = (
  * contentAwareFillPixels에 전부 위임한다. 캔버스 생성 순서: source용 1개 → mask용 1개 → 결과용 1개
  * (총 3개, 실패 시 그 시점에서 즉시 null).
  */
-export function bakeContentAwareFillToCanvas(
+function prepareContentAwareFillCanvasBuffers(
   source: MaskImageSource,
   mask: MaskImageSource,
   width: number,
   height: number,
-  opts: ContentAwareFillOptions | undefined,
-  createCanvas: ContentAwareFillCanvasFactory
-): (MaskCanvasLike & MaskImageSource) | null {
+  createCanvas: ContentAwareFillCanvasFactory,
+): { w: number; h: number; srcData: StudioImageDataLike; maskData: StudioImageDataLike } | null {
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return null;
   const w = Math.max(1, Math.round(width));
   const h = Math.max(1, Math.round(height));
@@ -705,12 +785,50 @@ export function bakeContentAwareFillToCanvas(
   if (!maskCanvas) return null;
   maskCanvas.ctx.drawImage(mask, 0, 0);
 
-  const srcData = srcCanvas.ctx.getImageData(0, 0, w, h);
-  const maskData = maskCanvas.ctx.getImageData(0, 0, w, h);
+  return {
+    w,
+    h,
+    srcData: srcCanvas.ctx.getImageData(0, 0, w, h),
+    maskData: maskCanvas.ctx.getImageData(0, 0, w, h),
+  };
+}
 
-  const result = contentAwareFillPixels(srcData, maskData, opts);
+export function bakeContentAwareFillToCanvas(
+  source: MaskImageSource,
+  mask: MaskImageSource,
+  width: number,
+  height: number,
+  opts: ContentAwareFillOptions | undefined,
+  createCanvas: ContentAwareFillCanvasFactory
+): (MaskCanvasLike & MaskImageSource) | null {
+  const buffers = prepareContentAwareFillCanvasBuffers(source, mask, width, height, createCanvas);
+  if (!buffers) return null;
 
-  const out = createCanvas(w, h);
+  const result = contentAwareFillPixels(buffers.srcData, buffers.maskData, opts);
+
+  const out = createCanvas(buffers.w, buffers.h);
+  if (!out) return null;
+  out.ctx.putImageData(result, 0, 0);
+  return out.canvas;
+}
+
+/**
+ * Async bake path for StudioPage — cooperative tile yields + same pixel contract as the sync bake.
+ */
+export async function bakeContentAwareFillToCanvasAsync(
+  source: MaskImageSource,
+  mask: MaskImageSource,
+  width: number,
+  height: number,
+  opts: ContentAwareFillAsyncOptions | undefined,
+  createCanvas: ContentAwareFillCanvasFactory,
+): Promise<(MaskCanvasLike & MaskImageSource) | null> {
+  const buffers = prepareContentAwareFillCanvasBuffers(source, mask, width, height, createCanvas);
+  if (!buffers) return null;
+
+  const result = await contentAwareFillPixelsAsync(buffers.srcData, buffers.maskData, opts);
+
+  const out = createCanvas(buffers.w, buffers.h);
   if (!out) return null;
   out.ctx.putImageData(result, 0, 0);
   return out.canvas;

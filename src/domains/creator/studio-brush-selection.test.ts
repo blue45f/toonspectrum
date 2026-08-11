@@ -94,6 +94,22 @@ describe("studio brush catalogue selection", () => {
       "oil-pastel",
       "ink-particle",
       "tangent-normal-brush",
+      "sketchpad-tile",
+      "sketchpad-mirror",
+      "sketchpad-soft-marker",
+      "web-multi-agent",
+      "web-rough-ink",
+      "web-gravity-drip",
+      "web-soft-cloud",
+      "web-calligraphy-ribbon",
+      "web-dash-stitch",
+      "web-scatter-stamp",
+      "web-rainbow-flow",
+      "web-lazy-ink",
+      "web-hatch-color",
+      "web-cel-flat",
+      "web-blend-softener",
+      "web-dot-tone",
     ]);
 
     for (const preset of dynamicsPresets) {
@@ -162,9 +178,9 @@ describe("studio brush catalogue selection", () => {
     }
   });
 
-  it("materializes all 231 catalogue ids through one fail-closed selection source", async () => {
+  it("materializes all 234 catalogue ids through one fail-closed selection source", async () => {
     expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(STUDIO_ALL_BRUSH_CATALOG_ITEMS.length);
-    expect(STUDIO_BRUSH_CATALOG_COUNTS).toEqual({ core: 71, pro: 160, total: 231 });
+    expect(STUDIO_BRUSH_CATALOG_COUNTS).toEqual({ core: 87, pro: 160, total: 247 });
 
     for (const item of STUDIO_ALL_BRUSH_CATALOG_ITEMS) {
       const selection = await materializeStudioBrushCatalogSelection(item.id);

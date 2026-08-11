@@ -33,7 +33,8 @@ const CORE_DRY_MEDIA_IDS = [
 type CoreDryMediaId = (typeof CORE_DRY_MEDIA_IDS)[number];
 
 const LEGACY_CARRIER_SHA256: Readonly<Record<CoreDryMediaId, string>> = Object.freeze({
-  crayon: "e2e842338d10c8d099881e9f48ee8b80ac943866591c24fbdc613739a7a525ea",
+  // Competitive anisotropic wax tooth (10-pt pore ellipses; denser travel-aligned slits).
+  crayon: "2f503ef489ed329964aca8792fc2417509aecb6ec8b6d37123ab54b8889f38ea",
   chalk: "33b358794aa321406c6afca80fd41373af44c5f858294784842cc9c74d2a0d45",
   charcoal: "73d5a05fbe1c85ad27d9545fe4cb0166e17beec8b953c0b6c829de7f55c316c0",
   pastel: "550525d2f47d66ce41d1d743cad912063940b4b18b5fdd044d45dfc6b04da5e3",

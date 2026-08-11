@@ -4,8 +4,10 @@ import {
   CONTENT_AWARE_FILL_TILE_PX_DEFAULT,
   CONTENT_AWARE_FILL_TILE_PX_RANGE,
   bakeContentAwareFillToCanvas,
+  bakeContentAwareFillToCanvasAsync,
   contentAwareFillHasWork,
   contentAwareFillPixels,
+  contentAwareFillPixelsAsync,
   type ContentAwareFillCanvasFactory,
   type ContentAwareFillCtx2DLike,
 } from "./studio-content-aware-fill";
@@ -433,5 +435,47 @@ describe("bakeContentAwareFillToCanvas", () => {
     const mask: FakeSource = { testImage: rectMask(10, 10, { x: 2, y: 2, w: 3, h: 3 }) };
     const out = bakeContentAwareFillToCanvas(source, mask, 10, 10, undefined, factory);
     expect(out).toBeNull();
+  });
+});
+
+describe("contentAwareFillPixelsAsync — cooperative yield parity", () => {
+  it("matches the sync pixel result while yielding every tile", async () => {
+    const source = solidImage(60, 60, 120, 180, 90, 255);
+    const mask = rectMask(60, 60, { x: 20, y: 20, w: 20, h: 20 });
+    let yields = 0;
+    const asyncOut = await contentAwareFillPixelsAsync(source, mask, {
+      yieldEveryTiles: 1,
+      yieldControl: async () => {
+        yields += 1;
+      },
+    });
+    const syncOut = contentAwareFillPixels(source, mask);
+    expect(asyncOut.data).toEqual(syncOut.data);
+    expect(yields).toBeGreaterThan(0);
+  });
+
+  it("bakeContentAwareFillToCanvasAsync matches sync bake pixels", async () => {
+    const log: string[] = [];
+    const buffers = new Map<number, StudioImageDataLike>();
+    const factory = fakeContentAwareFillFactory(log, buffers);
+    const source: FakeSource = { testImage: solidImage(20, 20, 40, 50, 60) };
+    const mask: FakeSource = { testImage: rectMask(20, 20, { x: 6, y: 6, w: 8, h: 8 }) };
+    const sync = bakeContentAwareFillToCanvas(source, mask, 20, 20, undefined, factory);
+    const log2: string[] = [];
+    const buffers2 = new Map<number, StudioImageDataLike>();
+    const factory2 = fakeContentAwareFillFactory(log2, buffers2);
+    const asyncOut = await bakeContentAwareFillToCanvasAsync(
+      source,
+      mask,
+      20,
+      20,
+      { yieldEveryTiles: 2, yieldControl: async () => undefined },
+      factory2,
+    );
+    expect(asyncOut).not.toBeNull();
+    expect(sync).not.toBeNull();
+    const syncId = (sync as unknown as FakeSource).testImage;
+    const asyncId = (asyncOut as unknown as FakeSource).testImage;
+    expect(asyncId?.data).toEqual(syncId?.data);
   });
 });

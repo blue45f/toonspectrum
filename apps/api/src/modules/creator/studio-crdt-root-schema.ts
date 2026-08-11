@@ -181,6 +181,15 @@ const STUDIO_CRDT_KNOWN_INCOMPATIBLE_LAYERED_FLOW_BRUSH_IDS = new Set([
   "colored-pencil",
   "screentone",
   "crosshatch",
+  // Dynamic / non pen-marker families must not claim layered-flow-v1 (browser mirror).
+  "sketchpad-tile",
+  "web-multi-agent",
+  "web-gravity-drip",
+  "web-soft-cloud",
+  "web-calligraphy-ribbon",
+  "web-scatter-stamp",
+  "web-blend-softener",
+  "web-dot-tone",
 ]);
 const STUDIO_CRDT_BOUNDED_FLOW_DYNAMIC_BRUSH_IDS = new Set([
   "ink-particle",
@@ -198,6 +207,22 @@ const STUDIO_CRDT_BOUNDED_FLOW_DYNAMIC_BRUSH_IDS = new Set([
   "charcoal",
   "pastel",
   "oil-pastel",
+  "sketchpad-tile",
+  "sketchpad-mirror",
+  "sketchpad-soft-marker",
+  "web-multi-agent",
+  "web-rough-ink",
+  "web-gravity-drip",
+  "web-soft-cloud",
+  "web-calligraphy-ribbon",
+  "web-dash-stitch",
+  "web-scatter-stamp",
+  "web-rainbow-flow",
+  "web-lazy-ink",
+  "web-hatch-color",
+  "web-cel-flat",
+  "web-blend-softener",
+  "web-dot-tone",
 ]);
 const STUDIO_CRDT_SCENE_INDEX_ROOT = "scene-elements";
 const STUDIO_CRDT_PAGE_INDEX_ROOT = "studio-pages";

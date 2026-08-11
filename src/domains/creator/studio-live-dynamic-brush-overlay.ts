@@ -1319,8 +1319,37 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       const planAcceptedDabs = plan.acceptedPrefixReceipt
         ? plan.acceptedPrefixReceipt.acceptedDabsPerVariation
         : planningDabPrefix.length;
-      if (planAcceptedDabs !== planningDabPrefix.length) {
-        return this.failActive("mark-budget");
+      // Charge multi-lane expansion at admission time and degrade gracefully. A partial accepted
+      // prefix is still a valid long stroke — hard-failing mid-contact turned competitive
+      // frame-budget workloads into freezes and all-or-nothing mark-budget collapse.
+      const admittedPlanningDabs = Math.min(
+        planAcceptedDabs,
+        planningDabPrefix.length,
+      );
+      if (admittedPlanningDabs <= 0) {
+        return {
+          status: "noop",
+          consumedSourcePoints: active.consumedSourcePoints,
+          appendedDabs: 0,
+          appendedMarks: 0,
+          ...(active.acceptedPrefixReceipt
+            ? { acceptedPrefixReceipt: active.acceptedPrefixReceipt }
+            : {}),
+        };
+      }
+      const admittedSuffixDabs = dryMediaPredecessor
+        ? Math.max(0, admittedPlanningDabs - 1)
+        : admittedPlanningDabs;
+      if (admittedSuffixDabs <= 0 && dryMediaPredecessor) {
+        return {
+          status: "noop",
+          consumedSourcePoints: active.consumedSourcePoints,
+          appendedDabs: 0,
+          appendedMarks: 0,
+          ...(active.acceptedPrefixReceipt
+            ? { acceptedPrefixReceipt: active.acceptedPrefixReceipt }
+            : {}),
+        };
       }
       if (dryMediaPredecessor) {
         if (
@@ -1340,21 +1369,24 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       const cumulativeMarks = snapshotDryMediaUnionAccumulator(
         active.dryMediaUnionAccumulator,
       );
-      // The expensive causal deposit and material bridge are now O(new suffix). Repainting the
-      // single canonical union keeps the transient command byte-identical to pointer-up while the
-      // active coverage surface remains one-opacity, crossing-safe paint authority.
+      // Crossing-safe one-opacity authority: clear and paint the complete cumulative union in one
+      // fill. Suffix-only source-over would leave multi-append live pixels different from a
+      // one-shot exactPlan/commit (pores punch the whole bed; self-crossings stay single-deposit).
+      // The causal deposit/bridge remain O(suffix); only the replaceable live raster is full-prefix.
       this.clearActiveRect();
       if (!this.drawMarksToActive(cumulativeMarks, active.style.opacity)) {
         return this.failActive("surface-render");
       }
-      active.acceptedCausalDabCount += acceptedDabPrefix.length;
-      active.lastAcceptedCausalDab = acceptedDabPrefix.at(-1);
+      active.acceptedCausalDabCount += admittedSuffixDabs;
+      active.lastAcceptedCausalDab = acceptedDabPrefix[admittedSuffixDabs - 1]
+        ?? acceptedDabPrefix.at(-1);
+      // One stroke-local union mark was painted; seal/replay markCount must match that authority.
       active.markCount = cumulativeMarks.length;
       active.r8AlphaMapBytes = 0;
       return {
         status: "appended",
         consumedSourcePoints: active.consumedSourcePoints,
-        appendedDabs: acceptedDabPrefix.length,
+        appendedDabs: admittedSuffixDabs,
         appendedMarks: plan.marks.length,
         ...(active.acceptedPrefixReceipt
           ? { acceptedPrefixReceipt: active.acceptedPrefixReceipt }

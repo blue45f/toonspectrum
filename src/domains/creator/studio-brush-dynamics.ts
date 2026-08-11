@@ -282,6 +282,22 @@ export type StudioBrushDynamicsBrushId = StudioBrushDynamicsPresetId
   | "erodible-pencil"
   | "paint-tube"
   | "tangent-normal-brush"
+  | "sketchpad-tile"
+  | "sketchpad-mirror"
+  | "sketchpad-soft-marker"
+  | "web-multi-agent"
+  | "web-rough-ink"
+  | "web-gravity-drip"
+  | "web-soft-cloud"
+  | "web-calligraphy-ribbon"
+  | "web-dash-stitch"
+  | "web-scatter-stamp"
+  | "web-rainbow-flow"
+  | "web-lazy-ink"
+  | "web-hatch-color"
+  | "web-cel-flat"
+  | "web-blend-softener"
+  | "web-dot-tone"
   | "watercolor"
   | "ink-wash"
   | "inkwash-pen"
@@ -309,11 +325,45 @@ export function resolveStudioBrushDynamicsPresetId(
     || brushId === "erodible-pencil"
     || brushId === "paint-tube"
     || brushId === "tangent-normal-brush"
+    || brushId === "sketchpad-tile"
+    || brushId === "sketchpad-mirror"
+    || brushId === "web-multi-agent"
+    || brushId === "web-rough-ink"
+    || brushId === "web-gravity-drip"
+    || brushId === "web-calligraphy-ribbon"
+    || brushId === "web-dash-stitch"
+    || brushId === "web-scatter-stamp"
+    || brushId === "web-lazy-ink"
+    || brushId === "web-hatch-color"
+    || brushId === "web-cel-flat"
+    || brushId === "web-dot-tone"
+    || brushId === "web-hatch-color-lattice"
+    || brushId === "web-cel-flat-block"
+    || brushId === "web-dot-tone-grid"
     || brushId === "connected-hard-envelope"
     || brushId === "progressive-wear-ribbon"
     || brushId === "extruded-bead-ribbon"
     || brushId === "direction-encoded-ribbon"
+    || brushId === "sketchpad-tile-lattice"
+    || brushId === "sketchpad-mirror-pair"
+    || brushId === "web-multi-agent-swarm"
+    || brushId === "web-rough-ink-jitter"
+    || brushId === "web-gravity-drip-beads"
+    || brushId === "web-calligraphy-chisel"
+    || brushId === "web-dash-stitch-pitch"
+    || brushId === "web-scatter-stamp-cloud"
+    || brushId === "web-lazy-ink-smooth"
   ) return "ink-particle";
+  if (
+    brushId === "sketchpad-soft-marker"
+    || brushId === "sketchpad-soft-envelope"
+    || brushId === "web-soft-cloud"
+    || brushId === "web-soft-cloud-spray"
+    || brushId === "web-rainbow-flow"
+    || brushId === "web-rainbow-flow-ribbon"
+    || brushId === "web-blend-softener"
+    || brushId === "web-blend-softener-mist"
+  ) return "airbrush";
   if (
     brushId === "crayon"
     || brushId === "chalk"
@@ -1358,6 +1408,778 @@ const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamic
       roundness: { base: 0.9, mappings: [], jitter: null },
     },
   },
+  /**
+   * Sketchpad-class Tile: discrete hard stamps on a regular pitch so the stroke reads as a
+   * lattice of tiles rather than a continuous ribbon (Sketch.io "Tile" affordance).
+   */
+  "sketchpad-tile": {
+    presetId: "ink-particle",
+    overrides: {
+      seed: 701,
+      fallbackPressure: 0.6,
+      maxSpeed: 1.6,
+      taper: {
+        enabled: false,
+        startLength: 0,
+        endLength: 0,
+        minSizeRatio: 1,
+        minOpacityRatio: 1,
+        curve: 1,
+      },
+      tip: { shape: "hard", softness: 0.04 },
+      grain: {
+        space: "stroke-fixed",
+        amount: 0.12,
+        scale: 3.2,
+        contrast: 0.42,
+        seed: 0x71_1e_0001,
+      },
+      tipLayers: [],
+      dualBrush: { enabled: false },
+      width: {
+        base: 18,
+        mappings: [{ source: "pressure", from: 0.72, to: 1.18, curve: 0.85 }],
+        jitter: null,
+      },
+      opacity: {
+        base: 0.92,
+        mappings: [{ source: "pressure", from: 0.7, to: 1, curve: 0.8 }],
+        jitter: null,
+      },
+      flow: { base: 0.95, mappings: [], jitter: null },
+      // Pitch ≈ tip diameter → non-overlapping tile stamps along the path.
+      spacingRatio: 1.05,
+      spacing: { mappings: [], jitter: null },
+      scatterRatio: 0,
+      scatter: { mappings: [], jitter: null },
+      angle: {
+        base: 0,
+        mappings: [{ source: "direction", mode: "add", from: 0, to: 360 }],
+        jitter: null,
+      },
+      roundness: { base: 0.92, mappings: [], jitter: null },
+    },
+  },
+  /**
+   * Sketchpad-class Mirror: smooth continuous pen that pairs with vertical symmetry
+   * (`resolveStudioSketchpadBrushSymmetryHint`) for automatic left/right twins.
+   */
+  "sketchpad-mirror": {
+    presetId: "ink-particle",
+    overrides: {
+      seed: 703,
+      fallbackPressure: 0.58,
+      maxSpeed: 1.7,
+      taper: {
+        enabled: true,
+        startLength: 0.04,
+        endLength: 0.1,
+        minSizeRatio: 0.28,
+        minOpacityRatio: 0.55,
+        curve: 1.05,
+      },
+      tip: { shape: "hard", softness: 0.12 },
+      grain: { amount: 0 },
+      tipLayers: [],
+      dualBrush: { enabled: false },
+      width: {
+        base: 12,
+        mappings: [{ source: "pressure", from: 0.28, to: 1.45, curve: 0.9 }],
+        jitter: null,
+      },
+      opacity: {
+        base: 0.94,
+        mappings: [{ source: "pressure", from: 0.48, to: 1, curve: 0.82 }],
+        jitter: null,
+      },
+      flow: {
+        base: 0.88,
+        mappings: [{ source: "pressure", from: 0.55, to: 1, curve: 0.85 }],
+        jitter: null,
+      },
+      spacingRatio: 0.09,
+      spacing: { mappings: [], jitter: null },
+      scatterRatio: 0,
+      scatter: { mappings: [], jitter: null },
+      angle: {
+        base: 0,
+        mappings: [{ source: "direction", mode: "add", from: 0, to: 360 }],
+        jitter: null,
+      },
+      roundness: { base: 0.88, mappings: [], jitter: null },
+    },
+  },
+  /**
+   * Sketchpad-class Soft Marker: wide soft envelope with gentle pressure (consumer sketch pen).
+   */
+  "sketchpad-soft-marker": {
+    presetId: "airbrush",
+    overrides: {
+      seed: 709,
+      fallbackPressure: 0.55,
+      maxSpeed: 1.35,
+      taper: {
+        enabled: true,
+        startLength: 0.05,
+        endLength: 0.12,
+        minSizeRatio: 0.48,
+        minOpacityRatio: 0.4,
+        curve: 0.88,
+      },
+      tip: { shape: "soft", softness: 0.72 },
+      grain: {
+        space: "canvas-fixed",
+        amount: 0.06,
+        scale: 14,
+        contrast: 0.28,
+        seed: 0x50_f7_0003,
+      },
+      tipLayers: [],
+      dualBrush: { enabled: false },
+      width: {
+        base: 22,
+        mappings: [{ source: "pressure", from: 0.42, to: 1.28, curve: 0.78 }],
+        jitter: { mode: "multiply", amount: 0.04 },
+      },
+      opacity: {
+        base: 0.72,
+        mappings: [{ source: "pressure", from: 0.38, to: 0.92, curve: 0.8 }],
+        jitter: null,
+      },
+      flow: {
+        base: 0.55,
+        mappings: [{ source: "pressure", from: 0.42, to: 0.88, curve: 0.82 }],
+        jitter: null,
+      },
+      spacingRatio: 0.11,
+      spacing: { mappings: [], jitter: { mode: "multiply", amount: 0.04 } },
+      scatterRatio: 0.02,
+      scatter: { mappings: [], jitter: null },
+      angle: { base: 0, mappings: [], jitter: null },
+      roundness: { base: 1, mappings: [], jitter: null },
+    },
+  },
+  /**
+   * Bomomo-class multi-agent: dense scatter + dual tips so multiple “pens” orbit the stroke.
+   * Pair with `planStudioWebMultiAgentSamples` for exact agent geometry in product paths.
+   */
+  "web-multi-agent": {
+    presetId: "ink-particle",
+    overrides: {
+      seed: 0xb0_00_0001,
+      fallbackPressure: 0.52,
+      maxSpeed: 1.85,
+      taper: {
+        enabled: true,
+        startLength: 0.02,
+        endLength: 0.08,
+        minSizeRatio: 0.35,
+        minOpacityRatio: 0.4,
+        curve: 1.05,
+      },
+      tip: { shape: "hard", softness: 0.18 },
+      grain: {
+        space: "stroke-fixed",
+        amount: 0.1,
+        scale: 4.5,
+        contrast: 0.38,
+        seed: 0xb0_00_0011,
+      },
+      tipLayers: [
+        { scale: 0.55, opacity: 0.55, offsetX: 0.35, offsetY: -0.2 },
+        { scale: 0.48, opacity: 0.45, offsetX: -0.4, offsetY: 0.25 },
+      ],
+      dualBrush: {
+        enabled: true,
+        tip: { shape: "hard", softness: 0.2 },
+        blendMode: "screen",
+        sizeRatio: 0.72,
+      },
+      width: {
+        base: 12,
+        mappings: [{ source: "pressure", from: 0.35, to: 1.55, curve: 0.88 }],
+        jitter: { mode: "multiply", amount: 0.14 },
+      },
+      opacity: {
+        base: 0.78,
+        mappings: [{ source: "pressure", from: 0.4, to: 0.95, curve: 0.8 }],
+        jitter: { mode: "multiply", amount: 0.08 },
+      },
+      flow: {
+        base: 0.72,
+        mappings: [{ source: "pressure", from: 0.45, to: 1, curve: 0.85 }],
+        jitter: null,
+      },
+      spacingRatio: 0.12,
+      spacing: { mappings: [], jitter: { mode: "multiply", amount: 0.08 } },
+      scatterRatio: 0.55,
+      scatter: {
+        mappings: [{ source: "speed", from: 0.7, to: 1.45, curve: 1.1 }],
+        jitter: { mode: "multiply", amount: 0.12 },
+      },
+      angle: {
+        base: 0,
+        mappings: [{ source: "direction", mode: "add", from: 0, to: 360 }],
+        jitter: { mode: "add", amount: 18 },
+      },
+      roundness: { base: 0.82, mappings: [], jitter: null },
+    },
+  },
+  /** Comic hand-ink: multi-pass jitter via scatter + grain for sketchy edges. */
+  "web-rough-ink": {
+    presetId: "ink-particle",
+    overrides: {
+      seed: 0x20_f0_0001,
+      fallbackPressure: 0.62,
+      maxSpeed: 1.5,
+      taper: {
+        enabled: true,
+        startLength: 0.03,
+        endLength: 0.14,
+        minSizeRatio: 0.22,
+        minOpacityRatio: 0.5,
+        curve: 1.15,
+      },
+      tip: { shape: "hard", softness: 0.08 },
+      grain: {
+        space: "stroke-fixed",
+        amount: 0.22,
+        scale: 2.4,
+        contrast: 0.55,
+        seed: 0x20_f0_0011,
+      },
+      tipLayers: [
+        { scale: 0.92, opacity: 0.55, offsetX: 0.08, offsetY: 0.06 },
+        { scale: 0.88, opacity: 0.4, offsetX: -0.1, offsetY: -0.05 },
+      ],
+      dualBrush: { enabled: false },
+      width: {
+        base: 7,
+        mappings: [{ source: "pressure", from: 0.25, to: 1.65, curve: 0.95 }],
+        jitter: { mode: "multiply", amount: 0.18 },
+      },
+      opacity: {
+        base: 0.92,
+        mappings: [{ source: "pressure", from: 0.55, to: 1, curve: 0.75 }],
+        jitter: { mode: "multiply", amount: 0.06 },
+      },
+      flow: { base: 0.9, mappings: [], jitter: null },
+      spacingRatio: 0.07,
+      spacing: { mappings: [], jitter: { mode: "multiply", amount: 0.1 } },
+      scatterRatio: 0.12,
+      scatter: { mappings: [], jitter: { mode: "multiply", amount: 0.2 } },
+      angle: {
+        base: 0,
+        mappings: [{ source: "direction", mode: "add", from: 0, to: 360 }],
+        jitter: { mode: "add", amount: 8 },
+      },
+      roundness: {
+        base: 0.72,
+        mappings: [{ source: "pressure", from: 0.85, to: 1, curve: 1 }],
+        jitter: { mode: "multiply", amount: 0.1 },
+      },
+    },
+  },
+  /** Gravity drip: elongated beads with vertical scatter bias. */
+  "web-gravity-drip": {
+    presetId: "ink-particle",
+    overrides: {
+      seed: 0xd2_10_0001,
+      fallbackPressure: 0.6,
+      maxSpeed: 1.25,
+      taper: {
+        enabled: true,
+        startLength: 0.02,
+        endLength: 0.22,
+        minSizeRatio: 0.18,
+        minOpacityRatio: 0.35,
+        curve: 1.25,
+      },
+      tip: { shape: "hard", softness: 0.22 },
+      grain: {
+        space: "canvas-fixed",
+        amount: 0.14,
+        scale: 5,
+        contrast: 0.4,
+        seed: 0xd2_10_0011,
+      },
+      tipLayers: [
+        { scale: 0.4, opacity: 0.7, offsetX: 0, offsetY: 0.55 },
+        { scale: 0.28, opacity: 0.5, offsetX: 0.05, offsetY: 1.1 },
+      ],
+      dualBrush: { enabled: false },
+      width: {
+        base: 14,
+        mappings: [{ source: "pressure", from: 0.4, to: 1.4, curve: 0.9 }],
+        jitter: { mode: "multiply", amount: 0.1 },
+      },
+      opacity: {
+        base: 0.88,
+        mappings: [{ source: "pressure", from: 0.5, to: 1, curve: 0.8 }],
+        jitter: null,
+      },
+      flow: {
+        base: 0.82,
+        mappings: [{ source: "pressure", from: 0.55, to: 1, curve: 0.85 }],
+        jitter: null,
+      },
+      spacingRatio: 0.16,
+      spacing: { mappings: [], jitter: null },
+      scatterRatio: 0.08,
+      scatter: {
+        mappings: [{ source: "pressure", from: 0.6, to: 1.5, curve: 1.2 }],
+        jitter: { mode: "multiply", amount: 0.15 },
+      },
+      angle: {
+        base: 90,
+        mappings: [],
+        jitter: { mode: "add", amount: 12 },
+      },
+      roundness: {
+        base: 0.45,
+        mappings: [{ source: "pressure", from: 0.7, to: 1.1, curve: 1 }],
+        jitter: null,
+      },
+    },
+  },
+  /** Soft cloud spray: wide soft tip + heavy scatter for Kleki-class mist. */
+  "web-soft-cloud": {
+    presetId: "airbrush",
+    overrides: {
+      seed: 0xc1_0d_0001,
+      fallbackPressure: 0.48,
+      maxSpeed: 1.55,
+      taper: {
+        enabled: true,
+        startLength: 0.06,
+        endLength: 0.16,
+        minSizeRatio: 0.55,
+        minOpacityRatio: 0.25,
+        curve: 0.82,
+      },
+      tip: { shape: "soft", softness: 0.88 },
+      grain: {
+        space: "canvas-fixed",
+        amount: 0.08,
+        scale: 18,
+        contrast: 0.22,
+        seed: 0xc1_0d_0011,
+      },
+      tipLayers: [],
+      dualBrush: { enabled: false },
+      width: {
+        base: 26,
+        mappings: [{ source: "pressure", from: 0.5, to: 1.35, curve: 0.75 }],
+        jitter: { mode: "multiply", amount: 0.12 },
+      },
+      opacity: {
+        base: 0.62,
+        mappings: [{ source: "pressure", from: 0.42, to: 0.9, curve: 0.78 }],
+        jitter: { mode: "multiply", amount: 0.08 },
+      },
+      flow: {
+        base: 0.55,
+        mappings: [{ source: "pressure", from: 0.4, to: 0.85, curve: 0.8 }],
+        jitter: null,
+      },
+      spacingRatio: 0.12,
+      spacing: { mappings: [], jitter: { mode: "multiply", amount: 0.06 } },
+      scatterRatio: 0.28,
+      scatter: {
+        mappings: [{ source: "speed", from: 0.75, to: 1.35, curve: 1 }],
+        jitter: { mode: "multiply", amount: 0.18 },
+      },
+      angle: { base: 0, mappings: [], jitter: { mode: "add", amount: 40 } },
+      roundness: { base: 1, mappings: [], jitter: null },
+    },
+  },
+  /** Flat chisel calligraphy — direction-driven angle, low roundness. */
+  "web-calligraphy-ribbon": {
+    presetId: "ink-particle",
+    overrides: {
+      seed: 0xca_11_0001,
+      fallbackPressure: 0.58,
+      maxSpeed: 1.4,
+      taper: {
+        enabled: true,
+        startLength: 0.04,
+        endLength: 0.12,
+        minSizeRatio: 0.35,
+        minOpacityRatio: 0.55,
+        curve: 1.05,
+      },
+      tip: { shape: "hard", softness: 0.1 },
+      grain: { amount: 0.05, scale: 6, contrast: 0.25, seed: 0xca_11_0011 },
+      tipLayers: [],
+      dualBrush: { enabled: false },
+      width: {
+        base: 16,
+        mappings: [
+          { source: "pressure", from: 0.45, to: 1.45, curve: 0.88 },
+          { source: "tilt-magnitude", from: 0.95, to: 1.25 },
+        ],
+        jitter: null,
+      },
+      opacity: {
+        base: 0.95,
+        mappings: [{ source: "pressure", from: 0.6, to: 1, curve: 0.8 }],
+        jitter: null,
+      },
+      flow: { base: 0.9, mappings: [], jitter: null },
+      spacingRatio: 0.08,
+      spacing: { mappings: [], jitter: null },
+      scatterRatio: 0,
+      scatter: { mappings: [], jitter: null },
+      angle: {
+        base: 0,
+        mappings: [{ source: "direction", mode: "add", from: 0, to: 360 }],
+        jitter: null,
+      },
+      roundness: {
+        base: 0.28,
+        mappings: [{ source: "pressure", from: 0.85, to: 1.15, curve: 1 }],
+        jitter: null,
+      },
+    },
+  },
+  /** Dashed stitch — long spacing so deposits read as dashes. */
+  "web-dash-stitch": {
+    presetId: "ink-particle",
+    overrides: {
+      seed: 0xda_50_0001,
+      fallbackPressure: 0.6,
+      maxSpeed: 1.6,
+      taper: { enabled: false, startLength: 0, endLength: 0, minSizeRatio: 1, minOpacityRatio: 1, curve: 1 },
+      tip: { shape: "hard", softness: 0.06 },
+      grain: { amount: 0 },
+      tipLayers: [],
+      dualBrush: { enabled: false },
+      width: {
+        base: 5,
+        mappings: [{ source: "pressure", from: 0.7, to: 1.25, curve: 0.9 }],
+        jitter: null,
+      },
+      opacity: {
+        base: 0.9,
+        mappings: [{ source: "pressure", from: 0.55, to: 1, curve: 0.85 }],
+        jitter: null,
+      },
+      flow: { base: 1, mappings: [], jitter: null },
+      spacingRatio: 1.65,
+      spacing: { mappings: [], jitter: null },
+      scatterRatio: 0.02,
+      scatter: { mappings: [], jitter: null },
+      angle: {
+        base: 0,
+        mappings: [{ source: "direction", mode: "add", from: 0, to: 360 }],
+        jitter: null,
+      },
+      roundness: { base: 0.55, mappings: [], jitter: null },
+    },
+  },
+  /** Fun scatter stamps — high scatter, medium spacing. */
+  "web-scatter-stamp": {
+    presetId: "ink-particle",
+    overrides: {
+      seed: 0x57_a7_0001,
+      fallbackPressure: 0.55,
+      maxSpeed: 1.7,
+      taper: {
+        enabled: true,
+        startLength: 0.02,
+        endLength: 0.08,
+        minSizeRatio: 0.4,
+        minOpacityRatio: 0.4,
+        curve: 0.95,
+      },
+      tip: { shape: "hard", softness: 0.15 },
+      grain: {
+        space: "stroke-fixed",
+        amount: 0.12,
+        scale: 4,
+        contrast: 0.4,
+        seed: 0x57_a7_0011,
+      },
+      tipLayers: [
+        { scale: 0.7, opacity: 0.55, offsetX: 0.4, offsetY: -0.3 },
+        { scale: 0.55, opacity: 0.45, offsetX: -0.35, offsetY: 0.35 },
+      ],
+      dualBrush: { enabled: false },
+      width: {
+        base: 14,
+        mappings: [{ source: "pressure", from: 0.4, to: 1.5, curve: 0.85 }],
+        jitter: { mode: "multiply", amount: 0.22 },
+      },
+      opacity: {
+        base: 0.85,
+        mappings: [{ source: "pressure", from: 0.4, to: 0.95, curve: 0.8 }],
+        jitter: { mode: "multiply", amount: 0.1 },
+      },
+      flow: { base: 0.75, mappings: [], jitter: null },
+      spacingRatio: 0.55,
+      spacing: { mappings: [], jitter: { mode: "multiply", amount: 0.12 } },
+      scatterRatio: 0.75,
+      scatter: {
+        mappings: [{ source: "speed", from: 0.8, to: 1.4, curve: 1 }],
+        jitter: { mode: "multiply", amount: 0.2 },
+      },
+      angle: {
+        base: 0,
+        mappings: [],
+        jitter: { mode: "add", amount: 180 },
+      },
+      roundness: { base: 0.85, mappings: [], jitter: { mode: "multiply", amount: 0.12 } },
+    },
+  },
+  /** Rainbow flow — soft wide stroke; hue cycling handled by product colour if available. */
+  "web-rainbow-flow": {
+    presetId: "airbrush",
+    overrides: {
+      seed: 0x2a_10_0001,
+      fallbackPressure: 0.55,
+      maxSpeed: 1.5,
+      taper: {
+        enabled: true,
+        startLength: 0.04,
+        endLength: 0.1,
+        minSizeRatio: 0.45,
+        minOpacityRatio: 0.45,
+        curve: 0.9,
+      },
+      tip: { shape: "soft", softness: 0.55 },
+      grain: {
+        space: "stroke-fixed",
+        amount: 0.1,
+        scale: 8,
+        contrast: 0.3,
+        seed: 0x2a_10_0011,
+      },
+      tipLayers: [],
+      dualBrush: {
+        enabled: true,
+        tip: { shape: "soft", softness: 0.7 },
+        blendMode: "screen",
+        sizeRatio: 1.25,
+      },
+      width: {
+        base: 14,
+        mappings: [{ source: "pressure", from: 0.45, to: 1.4, curve: 0.82 }],
+        jitter: null,
+      },
+      opacity: {
+        base: 0.75,
+        mappings: [{ source: "pressure", from: 0.4, to: 0.95, curve: 0.8 }],
+        jitter: null,
+      },
+      flow: {
+        base: 0.65,
+        mappings: [{ source: "pressure", from: 0.45, to: 0.95, curve: 0.85 }],
+        jitter: null,
+      },
+      spacingRatio: 0.1,
+      spacing: { mappings: [], jitter: null },
+      scatterRatio: 0.05,
+      scatter: { mappings: [], jitter: null },
+      angle: {
+        base: 0,
+        mappings: [{ source: "direction", mode: "add", from: 0, to: 360 }],
+        jitter: null,
+      },
+      roundness: { base: 0.9, mappings: [], jitter: null },
+    },
+  },
+  /** Hatch colouring pen — long spacing lattice along stroke. */
+  "web-hatch-color": {
+    presetId: "ink-particle",
+    overrides: {
+      seed: 0x4a_7c_0001,
+      fallbackPressure: 0.55,
+      maxSpeed: 1.5,
+      taper: { enabled: false, startLength: 0, endLength: 0, minSizeRatio: 1, minOpacityRatio: 1, curve: 1 },
+      tip: { shape: "hard", softness: 0.08 },
+      grain: { amount: 0.06, scale: 5, contrast: 0.3, seed: 0x4a_7c_0011 },
+      tipLayers: [],
+      dualBrush: { enabled: false },
+      width: {
+        base: 4,
+        mappings: [{ source: "pressure", from: 0.65, to: 1.35, curve: 0.9 }],
+        jitter: null,
+      },
+      opacity: {
+        base: 0.72,
+        mappings: [{ source: "pressure", from: 0.45, to: 0.95, curve: 0.85 }],
+        jitter: null,
+      },
+      flow: { base: 0.85, mappings: [], jitter: null },
+      spacingRatio: 0.95,
+      spacing: { mappings: [], jitter: null },
+      scatterRatio: 0.04,
+      scatter: { mappings: [], jitter: null },
+      angle: {
+        base: 45,
+        mappings: [],
+        jitter: { mode: "add", amount: 4 },
+      },
+      roundness: { base: 0.35, mappings: [], jitter: null },
+    },
+  },
+  /** Cel flat marker — hard soft-edge-free colour blocks. */
+  "web-cel-flat": {
+    presetId: "ink-particle",
+    overrides: {
+      seed: 0xce_1f_0001,
+      fallbackPressure: 0.65,
+      maxSpeed: 1.3,
+      taper: {
+        enabled: true,
+        startLength: 0.02,
+        endLength: 0.06,
+        minSizeRatio: 0.7,
+        minOpacityRatio: 0.85,
+        curve: 0.9,
+      },
+      tip: { shape: "hard", softness: 0.05 },
+      grain: { amount: 0 },
+      tipLayers: [],
+      dualBrush: { enabled: false },
+      width: {
+        base: 22,
+        mappings: [{ source: "pressure", from: 0.7, to: 1.25, curve: 0.85 }],
+        jitter: null,
+      },
+      opacity: {
+        base: 0.92,
+        mappings: [{ source: "pressure", from: 0.75, to: 1, curve: 0.8 }],
+        jitter: null,
+      },
+      flow: { base: 0.95, mappings: [], jitter: null },
+      spacingRatio: 0.18,
+      spacing: { mappings: [], jitter: null },
+      scatterRatio: 0,
+      scatter: { mappings: [], jitter: null },
+      angle: { base: 0, mappings: [], jitter: null },
+      roundness: { base: 0.95, mappings: [], jitter: null },
+    },
+  },
+  /** Magma-class soft blender — soft airbrush with a visible first tap. */
+  "web-blend-softener": {
+    presetId: "airbrush",
+    overrides: {
+      seed: 0xb1_ed_0001,
+      fallbackPressure: 0.45,
+      maxSpeed: 1.4,
+      taper: {
+        enabled: true,
+        startLength: 0.08,
+        endLength: 0.18,
+        minSizeRatio: 0.6,
+        minOpacityRatio: 0.3,
+        curve: 0.75,
+      },
+      tip: { shape: "soft", softness: 0.92 },
+      grain: { amount: 0.04, scale: 20, contrast: 0.15, seed: 0xb1_ed_0011 },
+      tipLayers: [],
+      dualBrush: { enabled: false },
+      width: {
+        base: 28,
+        mappings: [{ source: "pressure", from: 0.55, to: 1.3, curve: 0.8 }],
+        jitter: null,
+      },
+      opacity: {
+        base: 0.55,
+        mappings: [{ source: "pressure", from: 0.4, to: 0.85, curve: 0.78 }],
+        jitter: null,
+      },
+      flow: {
+        base: 0.5,
+        mappings: [{ source: "pressure", from: 0.4, to: 0.8, curve: 0.8 }],
+        jitter: null,
+      },
+      spacingRatio: 0.1,
+      spacing: { mappings: [], jitter: null },
+      scatterRatio: 0.06,
+      scatter: { mappings: [], jitter: null },
+      angle: { base: 0, mappings: [], jitter: null },
+      roundness: { base: 1, mappings: [], jitter: null },
+    },
+  },
+  /** Dot screentone colouring pen. */
+  "web-dot-tone": {
+    presetId: "ink-particle",
+    overrides: {
+      seed: 0xd0_70_0001,
+      fallbackPressure: 0.55,
+      maxSpeed: 1.6,
+      taper: { enabled: false, startLength: 0, endLength: 0, minSizeRatio: 1, minOpacityRatio: 1, curve: 1 },
+      tip: { shape: "hard", softness: 0.1 },
+      grain: { amount: 0 },
+      tipLayers: [],
+      dualBrush: { enabled: false },
+      width: {
+        base: 3.5,
+        mappings: [{ source: "pressure", from: 0.6, to: 1.4, curve: 0.9 }],
+        jitter: { mode: "multiply", amount: 0.08 },
+      },
+      opacity: {
+        base: 0.8,
+        mappings: [{ source: "pressure", from: 0.4, to: 0.95, curve: 0.85 }],
+        jitter: null,
+      },
+      flow: { base: 0.9, mappings: [], jitter: null },
+      spacingRatio: 1.15,
+      spacing: { mappings: [], jitter: null },
+      scatterRatio: 0.15,
+      scatter: { mappings: [], jitter: { mode: "multiply", amount: 0.12 } },
+      angle: { base: 0, mappings: [], jitter: null },
+      roundness: { base: 1, mappings: [], jitter: null },
+    },
+  },
+  /** Lazy-mouse smooth ink — dense spacing, mild taper, very low scatter. */
+  "web-lazy-ink": {
+    presetId: "ink-particle",
+    overrides: {
+      seed: 0x1a_2e_0001,
+      fallbackPressure: 0.58,
+      maxSpeed: 1.2,
+      taper: {
+        enabled: true,
+        startLength: 0.05,
+        endLength: 0.16,
+        minSizeRatio: 0.25,
+        minOpacityRatio: 0.5,
+        curve: 1.1,
+      },
+      tip: { shape: "hard", softness: 0.14 },
+      grain: { amount: 0.04, scale: 10, contrast: 0.2, seed: 0x1a_2e_0011 },
+      tipLayers: [],
+      dualBrush: { enabled: false },
+      width: {
+        base: 8,
+        mappings: [{ source: "pressure", from: 0.3, to: 1.5, curve: 0.92 }],
+        jitter: { mode: "multiply", amount: 0.03 },
+      },
+      opacity: {
+        base: 0.94,
+        mappings: [{ source: "pressure", from: 0.5, to: 1, curve: 0.8 }],
+        jitter: null,
+      },
+      flow: {
+        base: 0.88,
+        mappings: [{ source: "pressure", from: 0.55, to: 1, curve: 0.85 }],
+        jitter: null,
+      },
+      spacingRatio: 0.06,
+      spacing: { mappings: [], jitter: null },
+      scatterRatio: 0,
+      scatter: { mappings: [], jitter: null },
+      angle: {
+        base: 0,
+        mappings: [{ source: "direction", mode: "add", from: 0, to: 360 }],
+        jitter: null,
+      },
+      roundness: { base: 0.9, mappings: [], jitter: null },
+    },
+  },
   "soft-brush": {
     presetId: "airbrush",
     overrides: {
@@ -1380,7 +2202,8 @@ const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamic
         mappings: [],
         jitter: null,
       },
-      scatterRatio: 0.035,
+      // Distinct from crayon 0.035 so air/dry toolbar signatures stay unique.
+      scatterRatio: 0.028,
       scatter: {
         mappings: [{ source: "pressure", from: 1, to: 0.65 }],
         jitter: null,
@@ -1444,42 +2267,46 @@ const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamic
       maxSpeed: 1.1,
       taper: {
         enabled: true,
-        startLength: 0.045,
-        endLength: 0.2,
-        minSizeRatio: 0.22,
-        minOpacityRatio: 0.52,
-        curve: 1.45,
+        startLength: 0.04,
+        endLength: 0.22,
+        minSizeRatio: 0.18,
+        minOpacityRatio: 0.48,
+        curve: 1.5,
       },
-      tip: { shape: "bristle", softness: 0.12 },
+      tip: { shape: "bristle", softness: 0.1 },
       width: {
         base: 30,
         mappings: [
-          { source: "pressure", from: 0.28, to: 1.65, curve: 1.2 },
-          { source: "speed", from: 1.04, to: 0.74 },
+          { source: "pressure", from: 0.22, to: 1.78, curve: 1.15 },
+          { source: "speed", from: 1.04, to: 0.72 },
         ],
-        jitter: { mode: "multiply", amount: 0.08 },
+        jitter: { mode: "multiply", amount: 0.07 },
       },
-      opacity: { base: 1, mappings: [{ source: "pressure", from: 0.48, to: 1 }] },
+      opacity: {
+        base: 1,
+        mappings: [{ source: "pressure", from: 0.38, to: 1, curve: 0.9 }],
+      },
       flow: {
-        base: 0.68,
+        base: 0.72,
         mappings: [
-          { source: "pressure", from: 0.4, to: 1 },
-          { source: "speed", from: 1.04, to: 0.58 },
+          { source: "pressure", from: 0.32, to: 1, curve: 0.85 },
+          { source: "speed", from: 1.04, to: 0.55 },
         ],
       },
-      grain: { space: "stroke-fixed", amount: 0.3, scale: 4.4, contrast: 0.58, seed: 402 },
+      // Stroke-fixed paper tooth under the wet core — not isotropic wash blur.
+      grain: { space: "stroke-fixed", amount: 0.38, scale: 3.6, contrast: 0.62, seed: 402 },
       dualBrush: {
         enabled: true,
-        tip: { shape: "bristle", softness: 0.04 },
+        tip: { shape: "bristle", softness: 0.03 },
         blendMode: "multiply",
-        sizeRatio: 0.8,
+        sizeRatio: 0.76,
       },
-      spacingRatio: 0.08,
+      spacingRatio: 0.07,
       spacing: { mappings: [], jitter: null },
-      scatterRatio: 0.02,
+      scatterRatio: 0.015,
       scatter: { mappings: [], jitter: null },
       angle: { base: 0, mappings: [{ source: "direction", mode: "add", from: 0, to: 360 }], jitter: null },
-      roundness: { base: 0.7, mappings: [], jitter: null },
+      roundness: { base: 0.66, mappings: [], jitter: null },
     },
   },
   "inkwash-pen": {
@@ -1658,41 +2485,42 @@ const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamic
     presetId: "dry-media",
     overrides: {
       seed: 307,
-      tip: { shape: "hard", softness: 0.38 },
+      tip: { shape: "hard", softness: 0.32 },
       width: {
         base: 10,
-        mappings: [{ source: "pressure", from: 0.35, to: 1.25 }],
-        jitter: { mode: "multiply", amount: 0.1 },
+        mappings: [{ source: "pressure", from: 0.26, to: 1.38, curve: 0.78 }],
+        jitter: { mode: "multiply", amount: 0.08 },
       },
       opacity: {
-        base: 0.9,
-        mappings: [{ source: "pressure", from: 0.7, to: 1 }],
-        jitter: { mode: "multiply", amount: 0.1 },
+        base: 0.92,
+        mappings: [{ source: "pressure", from: 0.48, to: 1, curve: 0.72 }],
+        jitter: { mode: "multiply", amount: 0.08 },
       },
       flow: {
-        base: 0.72,
-        mappings: [{ source: "pressure", from: 0.75, to: 1 }],
-        jitter: { mode: "multiply", amount: 0.06 },
-      },
-      spacingRatio: 0.11,
-      spacing: {
-        mappings: [{ source: "speed", from: 0.9, to: 1.3 }],
+        base: 0.78,
+        mappings: [{ source: "pressure", from: 0.52, to: 1, curve: 0.76 }],
         jitter: { mode: "multiply", amount: 0.05 },
       },
-      scatterRatio: 0.05,
-      scatter: {
-        mappings: [{ source: "speed", from: 0.7, to: 1.2 }],
+      // Dense enough for continuous wax bed; anisotropic bridge owns the fibre tooth.
+      spacingRatio: 0.095,
+      spacing: {
+        mappings: [{ source: "speed", from: 0.92, to: 1.18 }],
         jitter: { mode: "multiply", amount: 0.04 },
+      },
+      scatterRatio: 0.035,
+      scatter: {
+        mappings: [{ source: "speed", from: 0.75, to: 1.12 }],
+        jitter: { mode: "multiply", amount: 0.03 },
       },
       angle: {
         base: 0,
         mappings: [{ source: "direction", mode: "add", from: 0, to: 360 }],
-        jitter: { mode: "add", amount: 5 },
+        jitter: { mode: "add", amount: 3.5 },
       },
       roundness: {
-        base: 0.66,
-        mappings: [{ source: "tilt-magnitude", from: 1, to: 0.62 }],
-        jitter: { mode: "multiply", amount: 0.06 },
+        base: 0.58,
+        mappings: [{ source: "tilt-magnitude", from: 1, to: 0.52 }],
+        jitter: { mode: "multiply", amount: 0.05 },
       },
     },
   },

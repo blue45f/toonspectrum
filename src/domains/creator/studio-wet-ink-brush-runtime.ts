@@ -469,17 +469,19 @@ function fieldMaterial(
   }
   if (brushId === "ink-wash") {
     return {
-      absorption: 0.028,
-      bleed: 0.38,
-      dryingRate: 0.042,
-      edgeDarkening: 0.68,
-      fixationRate: 0.145,
-      granulation: 0.62,
-      hardness: 0.46,
-      paperRoughness: 0.72,
-      pigmentLoad: 1.16,
-      waterLoad: 0.78,
-      wetnessLoad: 0.88,
+      // Competitive sumi: stronger wet-edge ring, denser core pigment, and tooth-aware granulation
+      // that stays materially distinct from soft watercolor (lower bleed, flatter edge).
+      absorption: 0.034,
+      bleed: 0.46,
+      dryingRate: 0.038,
+      edgeDarkening: 0.82,
+      fixationRate: 0.132,
+      granulation: 0.74,
+      hardness: 0.52,
+      paperRoughness: 0.8,
+      pigmentLoad: 1.34,
+      waterLoad: 0.86,
+      wetnessLoad: 0.94,
       spectralAbsorption: STUDIO_INKWASH_SPECTRA_PRESETS["sumi-black"],
     };
   }

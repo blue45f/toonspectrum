@@ -504,12 +504,14 @@ function crayonTexture(
   seed: number,
   diagnostics?: NoiseEvaluationDiagnostics,
 ): MaterialTextureSample {
-  const field = pigmentFields(x, y, seed, 47, 0.082, 0.33, diagnostics);
-  const wax = field.broad * 0.33 + field.fine * 0.2 + field.fibre * 0.47;
+  // Anisotropic wax: fibre lanes dominate so the grain follows the stylus, not an isotropic tile.
+  const field = pigmentFields(x, y, seed, 47, 0.096, 0.28, diagnostics);
+  const wax = field.broad * 0.22 + field.fine * 0.18 + field.fibre * 0.6;
+  const tooth = Math.max(0, field.fibre - 0.48);
   return {
-    alpha: 0.68 + wax * 0.31,
-    color: 0.73 + wax * 0.43,
-    lift: Math.max(0, field.fibre - 0.58) * 0.065,
+    alpha: 0.58 + wax * 0.4,
+    color: 0.68 + wax * 0.5,
+    lift: tooth * 0.09 + Math.max(0, field.fine - 0.62) * 0.03,
   };
 }
 
@@ -541,35 +543,41 @@ function oilTexture(
   const normalY = tangentX;
   const across = x * normalX + y * normalY;
   const along = x * tangentX + y * tangentY;
-  // Long, coherent ridges vary mostly across the stroke. A much slower
-  // along-stroke field prevents ruler-straight bands while keeping the bristle
-  // direction readable through curves and at high zoom.
+  // Multi-scale bristle ridges: fine hairs, mid-width clumps and a slow load undulation.
+  // Along-stroke modulation stays weak so the axis stays readable through curves and zoom.
   const fineBristle = valueNoise1d(
-    across * 1.15 + along * 0.018,
+    across * 1.42 + along * 0.022,
     31,
     seed ^ 0x9e57_41b3,
     diagnostics,
   );
+  const midBristle = valueNoise1d(
+    across * 0.48 + along * 0.011,
+    33,
+    seed ^ 0x2c1b_8e47,
+    diagnostics,
+  );
   const broadBristle = valueNoise1d(
-    across * 0.21 - along * 0.007,
+    across * 0.18 - along * 0.006,
     32,
     seed ^ 0x4b16_f2d9,
     diagnostics,
   );
-  const ridge = 0.68 * fineBristle + 0.32 * broadBristle;
+  const ridge = 0.5 * fineBristle + 0.32 * midBristle + 0.18 * broadBristle;
+  const impasto = Math.max(0, ridge - 0.42);
   return {
-    alpha: 0.75 + ridge * 0.25,
-    color: 0.69 + ridge * 0.45,
-    lift: Math.max(0, ridge - 0.48) * 0.24,
+    alpha: 0.68 + ridge * 0.32,
+    color: 0.62 + ridge * 0.52,
+    lift: impasto * 0.34 + Math.max(0, midBristle - 0.55) * 0.08,
   };
 }
 
 /**
  * Two oblique document-coordinate fields are enough to add broken pigment
- * body to the two bristle evaluations above. Earlier profiles called the full
- * four-field powder kernel after `oilTexture`, tripling oil's per-pixel noise
- * cost. This compact pair keeps acrylic/oil-pastel/painterly at a strict 2x
- * oil budget while retaining non-square, deterministic variation.
+ * body to the multi-scale bristle evaluations above. Earlier profiles called
+ * the full four-field powder kernel after `oilTexture`, exploding oil's
+ * per-pixel noise cost. This compact pair keeps acrylic/oil-pastel/painterly
+ * within a 2× oil budget while retaining non-square, deterministic variation.
  */
 function compactPaintBodyFields(
   x: number,

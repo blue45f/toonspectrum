@@ -161,12 +161,12 @@ describe("studio brush backend integration audit", () => {
 });
 
 describe("studio brush backend quality classification", () => {
-  it("classifies all 71 core tools exactly once and keeps dry/wet media off causal ink", () => {
+  it("classifies all 87 core tools exactly once and keeps dry/wet media off causal ink", () => {
     const presetIds = BRUSH_PRESETS.map(({ id }) => id).sort();
     const routeIds = Object.keys(STUDIO_CORE_BRUSH_BACKEND_ROUTE_PROFILES).sort();
     const runtimeIds = STUDIO_BRUSH_RUNTIME_CONTRACT.map(({ id }) => id).sort();
 
-    expect(presetIds).toHaveLength(71);
+    expect(presetIds).toHaveLength(87);
     expect(routeIds).toEqual(presetIds);
     expect(runtimeIds).toEqual(presetIds);
 
@@ -246,7 +246,7 @@ describe("studio brush backend quality classification", () => {
     }
   });
 
-  it("covers the complete 231-tool shelf without duplicate or unclassified ids", () => {
+  it("covers the complete 234-tool shelf without duplicate or unclassified ids", () => {
     const ids = STUDIO_ALL_BRUSH_CATALOG_ITEMS.map(({ id }) => id);
     expect(ids).toHaveLength(STUDIO_ALL_BRUSH_CATALOG_ITEMS.length);
     expect(new Set(ids).size).toBe(ids.length);

@@ -434,7 +434,7 @@ describe("normalizeInkWash — 선택 필드(paperKind/edgeDarkening)", () => {
 
   it("무효한 선택 값은 안전한 기본으로 접는다", () => {
     expect(
-      normalizeInkWash({ paperKind: "washi" as never, edgeDarkening: 999 }),
+      normalizeInkWash({ paperKind: "papyrus" as never, edgeDarkening: 999 }),
     ).toMatchObject({ paperKind: "cold-press", edgeDarkening: 100 });
     expect(normalizeInkWash({ edgeDarkening: Number.NaN })).toMatchObject({ edgeDarkening: 0 });
   });

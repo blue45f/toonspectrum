@@ -65,7 +65,7 @@ describe("Studio Hokusai Worker boundary", () => {
   });
 
   it("uses the canonical libmypaint spectral-pigment setting for oil", () => {
-    expect(presetSource).toContain("paint_mode: setting(0.82)");
+    expect(presetSource).toContain("paint_mode: setting(0.88)");
     expect(presetSource).not.toMatch(/\bpaint:\s*setting\(/u);
   });
 

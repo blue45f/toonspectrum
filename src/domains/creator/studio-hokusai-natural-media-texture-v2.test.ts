@@ -322,11 +322,11 @@ describe("Studio Hokusai natural-media texture v2", () => {
       chalk: 4,
       crayon: 4,
       pastel: 4,
-      "oil-pastel": 4,
-      oil: 2,
-      acrylic: 4,
+      "oil-pastel": 5,
+      oil: 3,
+      acrylic: 5,
       gouache: 4,
-      painterly: 4,
+      painterly: 5,
     });
     expect(counts.get("acrylic"))
       .toBeLessThanOrEqual((counts.get("oil") ?? 0) * 2);

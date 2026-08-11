@@ -354,6 +354,9 @@ export interface StudioInspectorAsideHandlers {
   setBg: (newBg: string | ((prev: string) => string)) => void;
   setBgGrad: (newGrad: string[] | null | ((prev: string[] | null) => string[] | null)) => void;
   setCanvasH: (newH: number | ((prev: number) => number)) => void;
+  setPaperGrainKind: (kind: import("./studio-paper-texture").PaperGrainKind) => void;
+  setPaperGrainVisible: (visible: boolean) => void;
+  applyPaperTintBackground: () => void;
   setDescription: (next: Parameters<import("react").Dispatch<import("react").SetStateAction<string>>>[0]) => void;
   setDrawingPaletteDragging: (dragging: boolean) => void;
   setIsometricAngleDegClamped: (next: number) => void;
@@ -412,6 +415,8 @@ interface StudioInspectorAsideProps {
   canvasH: number;
   canvasRotation: StudioViewRotation;
   collaborationDocumentLocked: boolean;
+  paperGrainKind: import("./studio-paper-texture").PaperGrainKind;
+  paperGrainVisible: boolean;
   color: string;
   colorRangeFuzziness: number;
   colorRangePickActive: boolean;
@@ -775,6 +780,8 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   canvasH,
   canvasRotation,
   collaborationDocumentLocked,
+  paperGrainKind,
+  paperGrainVisible,
   color,
   colorRangeFuzziness,
   colorRangePickActive,
@@ -1179,6 +1186,9 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
     setBg,
     setBgGrad,
     setCanvasH,
+    setPaperGrainKind,
+    setPaperGrainVisible,
+    applyPaperTintBackground,
     setDescription,
     setDrawingPaletteDragging,
     setIsometricAngleDegClamped,
@@ -1654,6 +1664,8 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
             magicResizeStrategy={magicResizeStrategy}
             masterEditMode={masterEditMode}
             panelGutter={panelGutter}
+            paperGrainKind={paperGrainKind}
+            paperGrainVisible={paperGrainVisible}
             showAlignmentGuides={showAlignmentGuides}
             showGrid={showGrid}
             showWebtoonGuides={showWebtoonGuides}
@@ -1697,6 +1709,9 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
               )
             )}
             onOpenBackgroundEditor={withCanvasControlsGuard(() => setMenu("bgFill"))}
+            onPaperGrainKindChange={withCanvasControlsGuard(setPaperGrainKind)}
+            onPaperGrainVisibleChange={withCanvasControlsGuard(setPaperGrainVisible)}
+            onApplyPaperTintBackground={withCanvasControlsGuard(applyPaperTintBackground)}
             onPanelGutterChange={withCanvasControlsGuard((nextGutter) => {
               setPanelGutter(nextGutter);
               setSharedDocumentNotice(null);

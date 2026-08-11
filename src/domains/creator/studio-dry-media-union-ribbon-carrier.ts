@@ -183,14 +183,15 @@ interface DryMediaNegativeGrainPolicy {
 }
 
 const DRY_MEDIA_NEGATIVE_GRAIN_POLICY = Object.freeze({
-  // Sparse, long wax scratches over a dense body.
+  // Continuous anisotropic wax tooth: longer, slightly denser slits along the travel direction
+  // so the bed never reads as isotropic noise tiles or isolated lozenges.
   crayon: Object.freeze({
-    density: 0.34,
-    lengthRatio: 0.42,
-    widthRatio: 0.12,
-    maximumHalfLength: 0.72,
-    maximumHalfWidth: 0.24,
-    lateralWander: 0.42,
+    density: 0.42,
+    lengthRatio: 0.52,
+    widthRatio: 0.1,
+    maximumHalfLength: 0.88,
+    maximumHalfWidth: 0.2,
+    lateralWander: 0.34,
   }),
   // Many hairline carbon gaps preserve a fibrous stick texture.
   charcoal: Object.freeze({
@@ -564,6 +565,7 @@ function negativeGrainSlitPolygon(
   if (halfLength * 2 >= length * 0.68 || halfWidth >= minimumHalfWidth * 0.4) {
     return null;
   }
+  // Ten vertices keep elongated pores round enough at 200% zoom (tests require ≥20 coords).
   return oppositeWinding(ellipsePolygon(
     centerX,
     centerY,

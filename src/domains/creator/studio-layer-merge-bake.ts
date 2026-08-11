@@ -53,7 +53,16 @@ export interface StudioMergeBakeCanvas {
     drawImage(image: CanvasImageSource, dx: number, dy: number, dw: number, dh: number): void;
   } | null;
   toDataURL(type?: string): string;
+  /** Optional async encoder surface (HTMLCanvasElement.toBlob). */
+  toBlob?: (
+    callback: (blob: Blob | null) => void,
+    type?: string,
+    quality?: number,
+  ) => void;
 }
+
+/** Optional PNG encoder for the async merge bake path (toBlob-first preferred). */
+export type StudioMergeBakePngEncoder = (canvas: StudioMergeBakeCanvas) => Promise<string>;
 
 export type StudioMergeBakeImageLoader = (src: string) => Promise<CanvasImageSource>;
 
@@ -115,14 +124,23 @@ export function planStudioMergeBakeMode(
   return { mode: "raster" };
 }
 
-/** Synchronous composite when images are already loaded CanvasImageSources. */
-export function bakeStudioMergeCompositeSync(input: {
+type StudioMergeCompositeCanvasResult =
+  | {
+      ok: true;
+      canvas: StudioMergeBakeCanvas;
+      bounds: StudioLayerBounds;
+      width: number;
+      height: number;
+      resultName: string;
+    }
+  | StudioMergeBakeResult;
+
+function composeStudioMergeCanvas(input: {
   plan: StudioLayerMergePlan;
   sources: readonly StudioMergeBakeImageSource[];
   imagesById: ReadonlyMap<string, CanvasImageSource>;
-  newId: string;
   createCanvas: (width: number, height: number) => StudioMergeBakeCanvas;
-}): StudioMergeBakeResult {
+}): StudioMergeCompositeCanvasResult {
   const mode = planStudioMergeBakeMode(input.sources);
   if (mode.mode === "group") return { ok: true, mode: "group", reason: mode.reason };
 
@@ -157,13 +175,27 @@ export function bakeStudioMergeCompositeSync(input: {
     ctx.restore();
   }
 
-  let src: string;
-  try {
-    src = canvas.toDataURL("image/png");
-  } catch {
-    return { ok: false, reason: "병합 이미지를 인코딩하지 못했습니다." };
-  }
+  return {
+    ok: true,
+    canvas,
+    bounds,
+    width,
+    height,
+    resultName: input.plan.resultName,
+  };
+}
 
+function compositeFromEncodedCanvas(
+  input: {
+    newId: string;
+    canvas: StudioMergeBakeCanvas;
+    bounds: StudioLayerBounds;
+    width: number;
+    height: number;
+    resultName: string;
+  },
+  src: string,
+): StudioMergeBakeResult {
   return {
     ok: true,
     mode: "raster",
@@ -171,15 +203,43 @@ export function bakeStudioMergeCompositeSync(input: {
       id: input.newId,
       type: "image",
       src,
-      x: bounds.x,
-      y: bounds.y,
-      width,
-      height,
+      x: input.bounds.x,
+      y: input.bounds.y,
+      width: input.width,
+      height: input.height,
       rotation: 0,
-      name: input.plan.resultName,
+      name: input.resultName,
       opacity: 1,
     },
   };
+}
+
+/** Synchronous composite when images are already loaded CanvasImageSources. */
+export function bakeStudioMergeCompositeSync(input: {
+  plan: StudioLayerMergePlan;
+  sources: readonly StudioMergeBakeImageSource[];
+  imagesById: ReadonlyMap<string, CanvasImageSource>;
+  newId: string;
+  createCanvas: (width: number, height: number) => StudioMergeBakeCanvas;
+}): StudioMergeBakeResult {
+  const composed = composeStudioMergeCanvas(input);
+  if (!("canvas" in composed)) return composed;
+
+  let src: string;
+  try {
+    src = composed.canvas.toDataURL("image/png");
+  } catch {
+    return { ok: false, reason: "병합 이미지를 인코딩하지 못했습니다." };
+  }
+
+  return compositeFromEncodedCanvas({
+    newId: input.newId,
+    canvas: composed.canvas,
+    bounds: composed.bounds,
+    width: composed.width,
+    height: composed.height,
+    resultName: composed.resultName,
+  }, src);
 }
 
 /** Async browser bake using HTMLImageElement loading. */
@@ -189,6 +249,11 @@ export async function bakeStudioMergeComposite(input: {
   newId: string;
   loadImage?: StudioMergeBakeImageLoader;
   createCanvas?: (width: number, height: number) => StudioMergeBakeCanvas;
+  /**
+   * Prefer async PNG encode (toBlob). Defaults to {@link encodeStudioPixelEditCanvasPng} when
+   * the canvas looks like a real HTMLCanvasElement; otherwise falls back to toDataURL.
+   */
+  encodePng?: StudioMergeBakePngEncoder;
 }): Promise<StudioMergeBakeResult> {
   const mode = planStudioMergeBakeMode(input.sources);
   if (mode.mode === "group") return { ok: true, mode: "group", reason: mode.reason };
@@ -204,13 +269,41 @@ export async function bakeStudioMergeComposite(input: {
       return { ok: false, reason: "이미지 소스를 불러오지 못했습니다." };
     }
   }
-  return bakeStudioMergeCompositeSync({
+
+  const composed = composeStudioMergeCanvas({
     plan: input.plan,
     sources: input.sources,
     imagesById,
-    newId: input.newId,
     createCanvas,
   });
+  if (!("canvas" in composed)) return composed;
+
+  try {
+    const encode = input.encodePng ?? defaultEncodeMergePng;
+    const src = await encode(composed.canvas);
+    return compositeFromEncodedCanvas({
+      newId: input.newId,
+      canvas: composed.canvas,
+      bounds: composed.bounds,
+      width: composed.width,
+      height: composed.height,
+      resultName: composed.resultName,
+    }, src);
+  } catch {
+    return { ok: false, reason: "병합 이미지를 인코딩하지 못했습니다." };
+  }
+}
+
+async function defaultEncodeMergePng(canvas: StudioMergeBakeCanvas): Promise<string> {
+  if (typeof canvas.toBlob === "function" || typeof (canvas as HTMLCanvasElement).toDataURL === "function") {
+    try {
+      const { encodeStudioPixelEditCanvasPng } = await import("./studio-pixel-edit-async");
+      return encodeStudioPixelEditCanvasPng(canvas as HTMLCanvasElement);
+    } catch {
+      // Fall through to synchronous toDataURL for test fakes / restricted runtimes.
+    }
+  }
+  return canvas.toDataURL("image/png");
 }
 
 export function applyStudioMergeBakeToElements<T extends { id: string }>(

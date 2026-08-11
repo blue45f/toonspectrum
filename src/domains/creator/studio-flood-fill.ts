@@ -121,6 +121,9 @@ export function scanFloodRegionMask(
   return matched;
 }
 
+/** Yield every this many paint pixels so multi-megapixel flood fills do not monopolize the UI. */
+const FLOOD_FILL_PAINT_YIELD_EVERY = 64_000;
+
 /**
  * 페인트 통 채색 — src(데이터 URL 등)에서 (startXRatio, startYRatio) 지점과 같은 색으로 이어진
  * 영역을 fillColorHex 로 칠한 PNG data URL 을 반환한다.
@@ -160,15 +163,31 @@ export async function floodFillImage(
     return src;
   }
 
+  // Yield once after decode/draw so pointer-up UI can paint before the BFS.
+  const { encodeStudioPixelEditCanvasPng, yieldStudioMainThread } = await import(
+    "./studio-pixel-edit-async"
+  );
+  await yieldStudioMainThread();
+
   const matched = scanFloodRegionMask(data, w, h, startX, startY, tolerance);
-  for (let pos = 0; pos < w * h; pos++) {
+  await yieldStudioMainThread();
+
+  const total = w * h;
+  let painted = 0;
+  for (let pos = 0; pos < total; pos++) {
     if (!matched[pos]) continue;
     const idx = pos * 4;
     data[idx] = fr;
     data[idx + 1] = fg;
     data[idx + 2] = fb;
+    painted += 1;
+    if (painted % FLOOD_FILL_PAINT_YIELD_EVERY === 0) {
+      await yieldStudioMainThread();
+    }
   }
 
   ctx.putImageData(imageData, 0, 0);
-  return canvas.toDataURL("image/png");
+  await yieldStudioMainThread();
+  // Async PNG encode avoids multi-megapixel main-thread freezes after the BFS paint pass.
+  return encodeStudioPixelEditCanvasPng(canvas);
 }

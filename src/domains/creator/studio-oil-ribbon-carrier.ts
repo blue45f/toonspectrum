@@ -266,19 +266,19 @@ function mean(values: readonly number[]): number {
  * each hair into short runs lets the load change as the brush travels. Runs share their boundary
  * station with the next run, so the hair stays continuous.
  */
-const BRISTLE_RUN_STATIONS = 6;
+const BRISTLE_RUN_STATIONS = 5;
 
 /**
  * Load bands the runs are quantised into.
  *
- * Two, because bands are the compositing unit: everything inside one band is a single paint pass,
- * so a self-crossing inside a band costs nothing, while a crossing between bands costs exactly one
- * extra deposit. More bands would buy more tones and more knot.
+ * Three bands: dry film, mid ridge, and loaded impasto. Each band is still one paint pass so a
+ * self-crossing inside a band costs nothing; the extra mid band restores the multi-tone bristle
+ * bed competitive oil reads as without returning to per-run compositing knots.
  */
-const BRISTLE_LOAD_BANDS = 2;
+const BRISTLE_LOAD_BANDS = 3;
 
 /** Virtual overlaps folded into one deposit. See `planStudioOilRibbonCarrier` for the body budget. */
-const BRISTLE_VIRTUAL_OVERLAPS = 12;
+const BRISTLE_VIRTUAL_OVERLAPS = 14;
 
 interface PlannedBristleRun {
   readonly points: readonly number[];
@@ -324,12 +324,10 @@ function planBristleLanes(
       planned.push({
         points,
         load,
-        // A ridge left by one bristle is a material fraction of the ribbon, not a hairline: the
-        // planner's `radiusYRatio` put five ~1 px lanes inside a ~19 px ribbon, so the relief could
-        // not be resolved at all. Size against the lane pitch instead — the five offsets are
-        // 0.36·radiusY apart, so a 0.22–0.26·radiusY ridge leaves a real furrow between neighbours
-        // rather than either a hairline or a solid repaint of the body.
-        width: Math.max(0.35, sample.radiusY * (0.17 + sampleBristle.radiusYRatio * 1.1)),
+        // Size ridges against lane pitch so seven hairs leave real furrows without repainting the
+        // body. 0.15–0.28·radiusY keeps impasto readable at 1× while surviving the body opacity
+        // headroom reserved below.
+        width: Math.max(0.38, sample.radiusY * (0.15 + sampleBristle.radiusYRatio * 1.18)),
       });
     }
   }
@@ -352,17 +350,18 @@ function planBristleLanes(
   const lanes: StudioOilRibbonBristleLane[] = [];
   for (const [loadBand, runs] of bands.entries()) {
     if (runs.length === 0) continue;
+    // Higher load bands keep more of the virtual-overlap accumulation so impasto ridges sit above
+    // the dry film without needing a second source-over pass at the crossing.
+    const bandOverlap = BRISTLE_VIRTUAL_OVERLAPS + loadBand * 3;
     lanes.push(Object.freeze({
       runs: Object.freeze(runs.map((run) => Object.freeze({
         points: quantizedPoints(run.points),
       }))),
       lineWidth: quantize(mean(runs.map(({ width }) => width))),
-      // The old overlapping ellipses accumulated the same ridge several times. Fold that load into
-      // one deposit per band, so the deposit still cannot bead but the brush's own tooth reaches
-      // the pixels — and a band that crosses itself is still exactly one deposit.
+      // One deposit per band: no bead, self-crossing stays a single paint of the ridge.
       opacity: quantize(accumulatedOpacity(
         mean(runs.map(({ load }) => load)),
-        BRISTLE_VIRTUAL_OVERLAPS,
+        bandOverlap,
       )),
       loadBand,
     }));
@@ -384,12 +383,9 @@ export function planStudioOilRibbonCarrier(
       : stations.length === 1
         ? directionalTap(stations[0]!)
         : variableWidthBody(stations),
-    // The body is the paint the bristles have already spread, not the finished mark. Six virtual
-    // overlaps drove it to ~0.92 alpha, which left the bristle relief nothing to be relieved
-    // against — every ridge landed on an already opaque slab. Three overlaps keep the load clearly
-    // dominant while reserving headroom, and the strengthened lanes bring the ridge pixels back to
-    // the same peak the six-overlap body used to reach on its own.
-    bodyOpacity: quantize(accumulatedOpacity(averageOpacity, 3)),
+    // Body is the paint the bristles have already spread. Two virtual overlaps leave clear headroom
+    // so multi-band ridges can still carve tonal relief on top of a continuous wet film.
+    bodyOpacity: quantize(accumulatedOpacity(averageOpacity, 2)),
     bristleLanes: planBristleLanes(stations),
     repeatedBodyStampCount: 0,
   });
