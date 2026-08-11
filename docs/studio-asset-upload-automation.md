@@ -155,7 +155,7 @@ pnpm run studio:batch -- \
 - `--upload-only`: 기존 manifest 업로드만 수행 (`--manifest`를 upload 쪽에 별도 전달)
 - `--` 이전: manifest 생성 옵션, `--` 이후: 업로드 옵션
 
-## 1) 사전 준비
+## 3) 사전 준비
 
 - API가 동작하는 base URL 확인 (로컬: `http://127.0.0.1:4001`, 운영: `https://www.toonstudio.cloud` 등)
 - manifest 파일 존재 여부 확인
@@ -172,7 +172,7 @@ pnpm run studio:batch -- \
 - `TOONSTUDIO_SESSION_TOKEN` (우선권 1)
 - `TOONSTUDIO_SESSION_COOKIE` (토큰이 없을 때 대체값)
 
-## 2) 실행 등록된 스크립트
+## 4) 실행 등록된 스크립트
 
 ```bash
 pnpm run studio:upload-assets -- --help
@@ -184,7 +184,7 @@ pnpm run studio:upload-assets -- --base-url https://www.toonstudio.cloud --sessi
 
 > `pnpm`의 `--` 사용은 스크립트 인자를 넘길 때의 표준 관습입니다.
 
-## 3) 운영 배포와의 연결
+## 5) 운영 배포와의 연결
 
 이 스크립트는 **배포 스크립트가 아니라 운영 API에 자산을 업로드하는 운영 워크플로 보조 수단**입니다.
 운영 배포 자체는 기존 배포 가이드를 따라 진행해야 합니다.
@@ -302,7 +302,7 @@ pnpm run studio:upload-assets -- --manifest batch_generated/manifest.json --type
 pnpm run studio:upload-assets -- --manifest batch_generated/manifest.json --type auto --max-items 50 --auto-demo-login
 ```
 
-## 7) 운영 배포 체크리스트 (Go-Live)
+## 6) 운영 배포 체크리스트 (Go-Live)
 
 1. 워크플로우 실행 전 `workflow_dispatch`에서 manifest 경로를 맞춤
 2. Secret 입력(`TOONSTUDIO_SESSION_TOKEN` 또는 `TOONSTUDIO_SESSION_COOKIE`)이 존재하는지 확인
