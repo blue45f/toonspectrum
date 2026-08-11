@@ -10,9 +10,9 @@
  *
  * ── 용량 예산(왜 이 숫자인가) ────────────────────────────────────────────
  * CJK TTC·다축 variable font는 수십 MiB가 될 수 있다. 제품 상한은 파일 128 MiB,
- * 라이브러리 2 GiB, 512개다. 이는 작은 localStorage 쿼터에서 유래한 제한이 아니라 한 번의
- * File.arrayBuffer/FontFace 메모리 폭주와 manifest 탐색 비용을 막는 안전 경계다. 실제 디스크
- * 여유는 OPFS quota estimator가 별도로 검사한다.
+ * 라이브러리 2 GiB다. 항목 수는 제품 총량으로 제한하지 않고 SQLite cursor page로 읽는다.
+ * 한 번의 File.arrayBuffer/FontFace 메모리 폭주는 개별 파일·page hydration 바이트 경계가
+ * 막고, 실제 디스크 여유는 OPFS quota estimator가 별도로 검사한다.
  */
 
 import { firstFontFamilyName } from "./studio-google-fonts";
@@ -43,7 +43,6 @@ export const MAX_CUSTOM_FONT_FAMILY_LENGTH = 64;
 
 export const MAX_CUSTOM_FONT_FILE_BYTES = 128 * 1024 * 1024;
 export const MAX_CUSTOM_FONT_TOTAL_BYTES = 2 * 1024 * 1024 * 1024;
-export const MAX_CUSTOM_FONTS = 512;
 
 const FORMAT_MIME: Record<StudioCustomFontFormat, string> = {
   ttf: "font/ttf",
@@ -137,11 +136,15 @@ export function normalizeStudioCustomFontFamily(raw: string): string {
 
 function uniqueFamily(base: string, taken: ReadonlySet<string>): string {
   if (!taken.has(base)) return base;
-  for (let suffix = 2; suffix < 1_000; suffix++) {
-    const candidate = `${base} (${suffix})`;
+  // `taken.size + 2`개의 suffix 후보 중 하나는 반드시 비어 있다. 고정 999회 탐색 뒤
+  // Date.now()로 빠지던 옛 경로는 1,000개가 넘는 동명 family에서 충돌할 수 있었다.
+  for (let suffix = 2; suffix <= taken.size + 2; suffix += 1) {
+    const suffixText = ` (${suffix})`;
+    const candidate = `${base.slice(0, MAX_CUSTOM_FONT_FAMILY_LENGTH - suffixText.length).trim()}${suffixText}`;
     if (!taken.has(candidate)) return candidate;
   }
-  return `${base} (${Date.now()})`;
+  // 위 pigeonhole 경계상 도달하지 않는다. 타입 수준의 total function을 유지한다.
+  return base;
 }
 
 /**
@@ -238,15 +241,6 @@ export function addCustomFont(
         `글꼴 파일이 ${formatCustomFontBytes(bytes.byteLength)}로 한 개당 `
         + `${formatCustomFontBytes(MAX_CUSTOM_FONT_FILE_BYTES)} 한도를 넘었어요. `
         + "필요한 굵기만 서브셋한 WOFF2로 변환해 주세요.",
-    };
-  }
-  if (current.length >= MAX_CUSTOM_FONTS) {
-    return {
-      status: "rejected",
-      fonts: current,
-      message:
-        `사용자 글꼴은 ${MAX_CUSTOM_FONTS}개까지 보관할 수 있어요`
-        + `(현재 ${current.length}개). 쓰지 않는 글꼴을 지운 뒤 다시 시도해주세요.`,
     };
   }
   const used = totalCustomFontBytes(current);
@@ -382,10 +376,16 @@ export function parseCustomFonts(raw: string | null | undefined): StudioCustomFo
   const fonts: StudioCustomFont[] = [];
   const ids = new Set<string>();
   const families = new Set<string>();
+  let admittedBytes = 0;
   for (const record of records) {
-    if (fonts.length >= MAX_CUSTOM_FONTS) break;
     const font = normalizeStoredFont(record);
     if (!font || ids.has(font.id) || families.has(font.family)) continue;
+    admittedBytes += font.byteLength;
+    if (!Number.isSafeInteger(admittedBytes) || admittedBytes > MAX_CUSTOM_FONT_TOTAL_BYTES) {
+      // Legacy import is best-effort for malformed rows, but never returns a silently truncated
+      // prefix when the otherwise-valid library exceeds the canonical logical byte authority.
+      return [];
+    }
     ids.add(font.id);
     families.add(font.family);
     fonts.push(font);

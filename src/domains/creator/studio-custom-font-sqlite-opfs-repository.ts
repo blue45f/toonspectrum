@@ -12,7 +12,6 @@ import {
   deriveCustomFontFamily,
   MAX_CUSTOM_FONT_FILE_BYTES,
   MAX_CUSTOM_FONT_TOTAL_BYTES,
-  MAX_CUSTOM_FONTS,
   normalizeStudioCustomFontFamily,
   sniffStudioFontFormat,
   studioCustomFontMime,
@@ -21,6 +20,7 @@ import {
 } from "./studio-custom-fonts";
 import { isStudioLocalDatabaseCommitOutcomeUnknownError } from "./studio-local-database-commit-outcome";
 import { acquireStudioLocalDatabase } from "./studio-local-database-runtime";
+import { sha256HexPortable } from "./studio-sha256";
 
 import type { StudioLocalDatabase } from "./studio-local-database";
 import type { StudioOpfsAssetStore } from "./studio-opfs-asset-store";
@@ -31,7 +31,6 @@ export const STUDIO_CUSTOM_FONT_CAS_OWNER = "studio-custom-font-library-v12";
 export const STUDIO_CUSTOM_FONT_LOCK_NAME = "toonspectrum-studio-custom-font-library-v12";
 
 export const STUDIO_CUSTOM_FONT_LIMITS = Object.freeze({
-  fonts: MAX_CUSTOM_FONTS,
   individualBytes: MAX_CUSTOM_FONT_FILE_BYTES,
   logicalBytes: MAX_CUSTOM_FONT_TOTAL_BYTES,
   manifestBytes: 2 * 1024 * 1024,
@@ -39,6 +38,12 @@ export const STUDIO_CUSTOM_FONT_LIMITS = Object.freeze({
   familyCodePoints: 64,
   fileNameCodePoints: 512,
 } as const);
+
+export const STUDIO_CUSTOM_FONT_DEFAULT_PAGE_SIZE = 32;
+export const STUDIO_CUSTOM_FONT_MAX_PAGE_SIZE = 64;
+export const STUDIO_CUSTOM_FONT_MAX_PAGE_HYDRATED_BYTES = MAX_CUSTOM_FONT_FILE_BYTES;
+export const STUDIO_CUSTOM_FONT_MAX_COMPATIBILITY_ENTRIES = 256;
+export const STUDIO_CUSTOM_FONT_MAX_COMPATIBILITY_HYDRATED_BYTES = 256 * 1024 * 1024;
 
 const MANIFEST_VERSION = 1 as const;
 const UTF8 = new TextEncoder();
@@ -51,7 +56,11 @@ export type StudioCustomFontRepositoryErrorCode =
   | "corrupt"
   | "unavailable"
   | "quota-exceeded"
-  | "not-found";
+  | "not-found"
+  | "invalid-cursor"
+  | "invalid-page-size"
+  | "aborted"
+  | "backpressure";
 
 export class StudioCustomFontRepositoryError extends Error {
   readonly code: StudioCustomFontRepositoryErrorCode;
@@ -106,9 +115,43 @@ export interface StudioCustomFontSaveInput {
   readonly contentHash?: string;
 }
 
+export interface StudioCustomFontPageRequest {
+  readonly pageSize: number;
+  readonly cursor?: string | null;
+  readonly maxHydratedBytes?: number;
+  readonly signal?: AbortSignal;
+}
+
+export interface StudioCustomFontPage {
+  readonly fonts: readonly StudioCustomFontWithContentHash[];
+  readonly nextCursor: string | null;
+  readonly totalEntries: number;
+  readonly totalBytes: number;
+  readonly hydratedBytes: number;
+}
+
+export interface StudioCustomFontMaterializationRequest {
+  readonly maxEntries: number;
+  readonly maxHydratedBytes: number;
+  readonly pageSize?: number;
+  readonly signal?: AbortSignal;
+}
+
+export interface StudioCustomFontMaterializationReceipt {
+  readonly fonts: readonly StudioCustomFontWithContentHash[];
+  readonly truncated: boolean;
+  readonly nextCursor: string | null;
+  readonly totalEntries: number;
+  readonly totalBytes: number;
+  readonly hydratedBytes: number;
+}
+
 export interface StudioCustomFontRepository {
   readonly authority: "sqlite-opfs";
-  list(): Promise<StudioCustomFontWithContentHash[]>;
+  page(request: StudioCustomFontPageRequest): Promise<StudioCustomFontPage>;
+  materialize(
+    request: StudioCustomFontMaterializationRequest,
+  ): Promise<StudioCustomFontMaterializationReceipt>;
   save(input: StudioCustomFontSaveInput): Promise<StudioCustomFontWithContentHash>;
   delete(id: string): Promise<void>;
   cleanupOrphans(): Promise<number>;
@@ -267,9 +310,6 @@ function canonicalEntry(value: unknown): StudioCustomFontManifestEntry {
 function buildManifest(
   values: readonly StudioCustomFontManifestEntry[],
 ): StudioCustomFontManifestV1 {
-  if (values.length > STUDIO_CUSTOM_FONT_LIMITS.fonts) {
-    invalid(`사용자 글꼴은 ${STUDIO_CUSTOM_FONT_LIMITS.fonts}개까지 보관할 수 있습니다.`);
-  }
   const entries = values.map(canonicalEntry).sort((left, right) =>
     left.createdAt - right.createdAt || left.id.localeCompare(right.id, "en"));
   const ids = new Set<string>();
@@ -329,6 +369,78 @@ export function parseStudioCustomFontManifest(raw: string | null): StudioCustomF
   }
 }
 
+const PAGE_CURSOR_PREFIX = "studio-custom-font-page-v1:";
+
+function manifestDigest(manifest: StudioCustomFontManifestV1): string {
+  return sha256HexPortable(UTF8.encode(JSON.stringify(manifest)));
+}
+
+function encodePageCursor(digest: string, offset: number): string {
+  return `${PAGE_CURSOR_PREFIX}${digest}:${offset.toString(36)}`;
+}
+
+function decodePageCursor(
+  cursor: string | null | undefined,
+  digest: string,
+  entryCount: number,
+): number {
+  if (cursor === null || cursor === undefined) return 0;
+  if (typeof cursor !== "string" || cursor.length > 160 || !cursor.startsWith(PAGE_CURSOR_PREFIX)) {
+    fail("invalid-cursor", "사용자 글꼴 page cursor 형식이 올바르지 않습니다.");
+  }
+  const body = cursor.slice(PAGE_CURSOR_PREFIX.length);
+  const separator = body.indexOf(":");
+  const cursorDigest = body.slice(0, separator);
+  const rawOffset = body.slice(separator + 1);
+  const offset = Number.parseInt(rawOffset, 36);
+  if (
+    separator < 1
+    || cursorDigest !== digest
+    || !Number.isSafeInteger(offset)
+    || offset < 1
+    || offset >= entryCount
+    || offset.toString(36) !== rawOffset
+    || encodePageCursor(digest, offset) !== cursor
+  ) {
+    fail("invalid-cursor", "사용자 글꼴 page cursor가 오래됐거나 위조되었습니다.");
+  }
+  return offset;
+}
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) fail("aborted", "사용자 글꼴 page 읽기가 취소되었습니다.");
+}
+
+function normalizePageRequest(request: StudioCustomFontPageRequest): {
+  readonly pageSize: number;
+  readonly maxHydratedBytes: number;
+} {
+  if (
+    !Number.isSafeInteger(request.pageSize)
+    || request.pageSize < 1
+    || request.pageSize > STUDIO_CUSTOM_FONT_MAX_PAGE_SIZE
+  ) {
+    fail(
+      "invalid-page-size",
+      `사용자 글꼴 pageSize는 1~${STUDIO_CUSTOM_FONT_MAX_PAGE_SIZE}여야 합니다.`,
+    );
+  }
+  const maxHydratedBytes = request.maxHydratedBytes
+    ?? STUDIO_CUSTOM_FONT_MAX_PAGE_HYDRATED_BYTES;
+  if (
+    !Number.isSafeInteger(maxHydratedBytes)
+    || maxHydratedBytes < 1
+    || maxHydratedBytes > STUDIO_CUSTOM_FONT_MAX_PAGE_HYDRATED_BYTES
+  ) {
+    fail(
+      "invalid-page-size",
+      `사용자 글꼴 page hydration 예산은 1~${STUDIO_CUSTOM_FONT_MAX_PAGE_HYDRATED_BYTES}바이트여야 합니다.`,
+    );
+  }
+  throwIfAborted(request.signal);
+  return { pageSize: request.pageSize, maxHydratedBytes };
+}
+
 function uniqueHashes(entries: readonly StudioCustomFontManifestEntry[]): string[] {
   return [...new Set(entries.map(({ contentHash }) => contentHash))].sort();
 }
@@ -350,7 +462,7 @@ async function verifiedFontBytes(
     if (sniffStudioFontFormat(bytes) !== entry.format) {
       corrupt(`사용자 글꼴 CAS 바이트의 포맷이 manifest와 다릅니다: ${entry.id}`);
     }
-    return Uint8Array.from(bytes);
+    return bytes;
   } catch (error) {
     if (error instanceof StudioCustomFontRepositoryError) throw error;
     throw repositoryError(error, "blob 읽기");
@@ -369,6 +481,8 @@ function hydratedFont(
     contentHash: entry.contentHash,
     format: entry.format,
     createdAt: entry.createdAt,
+    // Create one caller-owned copy only after all CAS and font-container checks pass. The former
+    // verifiedFontBytes + hydration double-copy retained 256 MiB for one legal 128 MiB font.
     verifiedBytes: Uint8Array.from(bytes),
   };
 }
@@ -445,6 +559,51 @@ export function createStudioCustomFontSqliteOpfsRepository(
     }
   }
 
+  async function readPage(
+    database: StudioLocalDatabase,
+    store: StudioOpfsAssetStore,
+    request: StudioCustomFontPageRequest,
+  ): Promise<StudioCustomFontPage> {
+    const { pageSize, maxHydratedBytes } = normalizePageRequest(request);
+    const manifest = await readManifest(database);
+    throwIfAborted(request.signal);
+    const digest = manifestDigest(manifest);
+    const offset = decodePageCursor(request.cursor, digest, manifest.entries.length);
+    if (manifest.entries.length > 0) await assertOwnerCoverage(store, manifest);
+    throwIfAborted(request.signal);
+
+    const fonts: StudioCustomFontWithContentHash[] = [];
+    let hydratedBytes = 0;
+    let position = offset;
+    while (position < manifest.entries.length && fonts.length < pageSize) {
+      throwIfAborted(request.signal);
+      const entry = manifest.entries[position]!;
+      if (hydratedBytes + entry.byteLength > maxHydratedBytes) {
+        if (fonts.length === 0) {
+          fail(
+            "backpressure",
+            `다음 사용자 글꼴 ${entry.byteLength}바이트가 page hydration 예산 ${maxHydratedBytes}바이트를 넘습니다.`,
+          );
+        }
+        break;
+      }
+      const bytes = await verifiedFontBytes(store, entry);
+      throwIfAborted(request.signal);
+      fonts.push(hydratedFont(entry, bytes));
+      hydratedBytes += entry.byteLength;
+      position += 1;
+    }
+    return {
+      fonts,
+      nextCursor: position < manifest.entries.length
+        ? encodePageCursor(digest, position)
+        : null,
+      totalEntries: manifest.entries.length,
+      totalBytes: manifest.totalBytes,
+      hydratedBytes,
+    };
+  }
+
   async function commitManifest(
     database: StudioLocalDatabase,
     store: StudioOpfsAssetStore,
@@ -493,19 +652,100 @@ export function createStudioCustomFontSqliteOpfsRepository(
   return {
     authority: "sqlite-opfs",
 
-    async list() {
+    async page(request) {
       await mutationTail;
       const { database, store } = await resources();
-      const manifest = await readManifest(database);
-      if (manifest.entries.length > 0) await assertOwnerCoverage(store, manifest);
-      const fonts: StudioCustomFontWithContentHash[] = [];
-      for (const entry of manifest.entries) {
-        fonts.push(hydratedFont(entry, await verifiedFontBytes(store, entry)));
+      return readPage(database, store, request);
+    },
+
+    async materialize(request) {
+      await mutationTail;
+      if (
+        !Number.isSafeInteger(request.maxEntries)
+        || request.maxEntries < 1
+        || request.maxEntries > STUDIO_CUSTOM_FONT_MAX_COMPATIBILITY_ENTRIES
+        || !Number.isSafeInteger(request.maxHydratedBytes)
+        || request.maxHydratedBytes < 1
+        || request.maxHydratedBytes > STUDIO_CUSTOM_FONT_MAX_COMPATIBILITY_HYDRATED_BYTES
+      ) {
+        fail(
+          "invalid-page-size",
+          "사용자 글꼴 compatibility materialization 영수증 예산이 허용 범위를 벗어났습니다.",
+        );
       }
-      await store.setOwnerRefs(STUDIO_CUSTOM_FONT_CAS_OWNER, uniqueHashes(manifest.entries))
-        .catch(() => []);
-      await store.sweep().catch(() => undefined);
-      return fonts;
+      const pageSize = request.pageSize ?? STUDIO_CUSTOM_FONT_DEFAULT_PAGE_SIZE;
+      normalizePageRequest({ pageSize, signal: request.signal });
+      const { database, store } = await resources();
+      const fonts: StudioCustomFontWithContentHash[] = [];
+      let cursor: string | null = null;
+      let totalEntries = 0;
+      let totalBytes = 0;
+      let hydratedBytes = 0;
+      do {
+        const remainingEntries = request.maxEntries - fonts.length;
+        const remainingBytes = request.maxHydratedBytes - hydratedBytes;
+        if (remainingEntries < 1 || remainingBytes < 1) {
+          return {
+            fonts,
+            truncated: cursor !== null || fonts.length < totalEntries,
+            nextCursor: cursor,
+            totalEntries,
+            totalBytes,
+            hydratedBytes,
+          };
+        }
+        let page: StudioCustomFontPage;
+        try {
+          page = await readPage(database, store, {
+            pageSize: Math.min(pageSize, remainingEntries),
+            cursor,
+            maxHydratedBytes: Math.min(
+              STUDIO_CUSTOM_FONT_MAX_PAGE_HYDRATED_BYTES,
+              remainingBytes,
+            ),
+            signal: request.signal,
+          });
+        } catch (error) {
+          if (
+            error instanceof StudioCustomFontRepositoryError
+            && error.code === "backpressure"
+            && fonts.length > 0
+          ) {
+            return {
+              fonts,
+              truncated: true,
+              nextCursor: cursor,
+              totalEntries,
+              totalBytes,
+              hydratedBytes,
+            };
+          }
+          throw error;
+        }
+        fonts.push(...page.fonts);
+        hydratedBytes += page.hydratedBytes;
+        totalEntries = page.totalEntries;
+        totalBytes = page.totalBytes;
+        cursor = page.nextCursor;
+        if (fonts.length >= request.maxEntries || hydratedBytes >= request.maxHydratedBytes) {
+          return {
+            fonts,
+            truncated: cursor !== null,
+            nextCursor: cursor,
+            totalEntries,
+            totalBytes,
+            hydratedBytes,
+          };
+        }
+      } while (cursor !== null);
+      return {
+        fonts,
+        truncated: false,
+        nextCursor: null,
+        totalEntries,
+        totalBytes,
+        hydratedBytes,
+      };
     },
 
     save(input) {
@@ -519,9 +759,6 @@ export function createStudioCustomFontSqliteOpfsRepository(
         const format = sniffStudioFontFormat(input.bytes);
         if (!format) invalid("TTF·OTF·TTC·WOFF·WOFF2 글꼴 바이트가 아닙니다.");
         const current = await readManifest(database);
-        if (current.entries.length >= STUDIO_CUSTOM_FONT_LIMITS.fonts) {
-          invalid(`사용자 글꼴은 ${STUDIO_CUSTOM_FONT_LIMITS.fonts}개까지 보관할 수 있습니다.`);
-        }
         if (current.totalBytes + input.bytes.byteLength > STUDIO_CUSTOM_FONT_LIMITS.logicalBytes) {
           invalid("사용자 글꼴 라이브러리가 2 GiB 논리 상한을 넘습니다.");
         }

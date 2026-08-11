@@ -18,7 +18,6 @@ import {
   formatCustomFontBytes,
   MAX_CUSTOM_FONT_FILE_BYTES,
   MAX_CUSTOM_FONT_TOTAL_BYTES,
-  MAX_CUSTOM_FONTS,
   registerStudioCustomFont,
   registerStudioCustomFonts,
   removeCustomFont,
@@ -29,7 +28,10 @@ import {
 } from "./studio-custom-fonts";
 import { STUDIO_EASE, STUDIO_FOCUS_RING, StudioEmptyState, StudioSectionHeader } from "./studio-panel-ui";
 
-import type { StudioCustomFontRepository } from "./studio-custom-font-sqlite-opfs-repository";
+import type {
+  StudioCustomFontPage,
+  StudioCustomFontRepository,
+} from "./studio-custom-font-sqlite-opfs-repository";
 
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -80,6 +82,8 @@ type StudioCustomFontStorageState =
   | "unavailable"
   | "controlled";
 
+const PRODUCT_FONT_PAGE_SIZE = 32;
+
 async function loadProductRepository(): Promise<StudioCustomFontRepository> {
   const module = await import("./studio-custom-font-sqlite-opfs-repository");
   return module.getProductStudioCustomFontRepository();
@@ -109,9 +113,14 @@ export function StudioCustomFontsPanel({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [pageBusy, setPageBusy] = useState(false);
+  const [nextPageCursor, setNextPageCursor] = useState<string | null>(null);
+  const [productTotalEntries, setProductTotalEntries] = useState(0);
+  const [productTotalBytes, setProductTotalBytes] = useState(0);
   const busyRef = useRef(false);
   const mountedRef = useRef(false);
   const repositoryRef = useRef<StudioCustomFontRepository | null>(repository ?? null);
+  const pageAbortRef = useRef<AbortController | null>(null);
   const hydrationGenerationRef = useRef(0);
   const mutationGenerationRef = useRef(0);
   const mutationTailRef = useRef<Promise<void>>(Promise.resolve());
@@ -123,6 +132,8 @@ export function StudioCustomFontsPanel({
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      pageAbortRef.current?.abort();
+      pageAbortRef.current = null;
       hydrationGenerationRef.current += 1;
       mutationGenerationRef.current += 1;
     };
@@ -134,26 +145,37 @@ export function StudioCustomFontsPanel({
       return;
     }
     const generation = ++hydrationGenerationRef.current;
+    pageAbortRef.current?.abort();
+    const controller = new AbortController();
+    pageAbortRef.current = controller;
+    busyRef.current = false;
+    setPageBusy(false);
     setStorageState("loading");
     setError(null);
     const resolveRepository = repository
       ? Promise.resolve(repository)
       : (loadRepository ?? loadProductRepository)();
     void resolveRepository.then(async (resolved) => {
-      const loaded = await resolved.list();
+      const page = await resolved.page({
+        pageSize: PRODUCT_FONT_PAGE_SIZE,
+        signal: controller.signal,
+      });
       const registrations = await registerStudioCustomFonts(
-        loaded,
+        page.fonts,
         fontSet === undefined ? browserFontSet() : fontSet,
         createFontFace === undefined ? undefined : createFontFace,
       );
       if (!mountedRef.current || generation !== hydrationGenerationRef.current) return;
       repositoryRef.current = resolved;
-      setProductFonts(loaded);
+      setProductFonts([...page.fonts]);
+      setNextPageCursor(page.nextCursor);
+      setProductTotalEntries(page.totalEntries);
+      setProductTotalBytes(page.totalBytes);
       setStorageState("sqlite-opfs");
       const failures = registrations.filter((result) => result.status === "failed");
       if (failures.length > 0) {
         setNotice(
-          `${loaded.length}개 글꼴의 OPFS 무결성은 확인했지만 ${failures.length}개는 `
+          `${page.fonts.length}개 글꼴의 OPFS 무결성은 확인했지만 ${failures.length}개는 `
           + "이 브라우저 FontFace에 등록하지 못했어요.",
         );
       }
@@ -171,6 +193,7 @@ export function StudioCustomFontsPanel({
         "사용자 글꼴 manifest 또는 OPFS blob의 무결성을 확인하지 못해 일부 항목을 표시하지 않았습니다.",
       );
     });
+    return () => controller.abort();
   }, [controlled, createFontFace, fontSet, loadRepository, repository]);
 
   function enqueueMutation<T>(task: () => Promise<T>): Promise<T> {
@@ -179,7 +202,66 @@ export function StudioCustomFontsPanel({
     return run;
   }
 
-  const usedBytes = totalCustomFontBytes(activeFonts);
+  async function registerPage(page: StudioCustomFontPage): Promise<number> {
+    const knownIds = new Set(activeFonts.map(({ id }) => id));
+    const registrations = await registerStudioCustomFonts(
+      page.fonts.filter(({ id }) => !knownIds.has(id)),
+      fontSet === undefined ? browserFontSet() : fontSet,
+      createFontFace === undefined ? undefined : createFontFace,
+    );
+    return registrations.filter(({ status }) => status === "failed").length;
+  }
+
+  async function loadNextProductPage() {
+    const durableRepository = repositoryRef.current;
+    const cursor = nextPageCursor;
+    if (!durableRepository || !cursor || pageBusy || busyRef.current || storageState !== "sqlite-opfs") {
+      return;
+    }
+    const generation = hydrationGenerationRef.current;
+    pageAbortRef.current?.abort();
+    const controller = new AbortController();
+    pageAbortRef.current = controller;
+    busyRef.current = true;
+    setPageBusy(true);
+    setError(null);
+    try {
+      const page = await durableRepository.page({
+        pageSize: PRODUCT_FONT_PAGE_SIZE,
+        cursor,
+        signal: controller.signal,
+      });
+      const failures = await registerPage(page);
+      if (!mountedRef.current || generation !== hydrationGenerationRef.current) return;
+      // Keep one CAS-hydrated page resident. Traversal intent replaces the viewport instead of
+      // gradually reconstructing the former unbounded list() heap.
+      setProductFonts([...page.fonts]);
+      setNextPageCursor(page.nextCursor);
+      setProductTotalEntries(page.totalEntries);
+      setProductTotalBytes(page.totalBytes);
+      if (failures > 0) {
+        setNotice(`${page.fonts.length}개를 더 확인했지만 ${failures}개는 FontFace에 등록하지 못했어요.`);
+      }
+    } catch (cause) {
+      if (!mountedRef.current || generation !== hydrationGenerationRef.current) return;
+      if (storageErrorCode(cause) === "aborted") return;
+      setError(
+        storageErrorCode(cause) === "invalid-cursor"
+          ? "글꼴 보관함이 바뀌어 목록 cursor가 만료됐어요. 패널을 다시 열어주세요."
+          : "사용자 글꼴 다음 page를 안전하게 읽지 못했습니다.",
+      );
+    } finally {
+      if (mountedRef.current && generation === hydrationGenerationRef.current) {
+        busyRef.current = false;
+        setPageBusy(false);
+      }
+      if (pageAbortRef.current === controller) pageAbortRef.current = null;
+    }
+  }
+
+  const productPaged = !controlled && storageState === "sqlite-opfs";
+  const usedBytes = productPaged ? productTotalBytes : totalCustomFontBytes(activeFonts);
+  const totalEntries = productPaged ? productTotalEntries : activeFonts.length;
   const usedPercent = Math.min(100, Math.round((usedBytes / MAX_CUSTOM_FONT_TOTAL_BYTES) * 100));
 
   async function handleImportFile(event: ChangeEvent<HTMLInputElement>) {
@@ -205,6 +287,14 @@ export function StudioCustomFontsPanel({
               limitSize: formatCustomFontBytes(MAX_CUSTOM_FONT_FILE_BYTES),
             },
           ),
+        );
+        return;
+      }
+      if (file.size > MAX_CUSTOM_FONT_TOTAL_BYTES - usedBytes) {
+        setError(
+          `보관함 용량이 ${formatCustomFontBytes(usedBytes)}/`
+          + `${formatCustomFontBytes(MAX_CUSTOM_FONT_TOTAL_BYTES)}라 `
+          + `${formatCustomFontBytes(file.size)}를 더 담을 수 없어요.`,
         );
         return;
       }
@@ -271,29 +361,27 @@ export function StudioCustomFontsPanel({
           }
           registrationStatus = registered.status;
           if (!mountedRef.current || generation !== mutationGenerationRef.current) return;
+          const refreshed = await durableRepository.page({ pageSize: PRODUCT_FONT_PAGE_SIZE });
+          if (!mountedRef.current || generation !== mutationGenerationRef.current) return;
           storedFont = saved;
-          nextFonts = [...activeFonts.filter((font) => font.id !== saved.id), saved];
+          const byId = new Map(refreshed.fonts.map((font) => [font.id, font]));
+          byId.set(saved.id, saved);
+          nextFonts = [...byId.values()];
           setProductFonts(nextFonts);
+          setNextPageCursor(refreshed.nextCursor);
+          setProductTotalEntries(refreshed.totalEntries);
+          setProductTotalBytes(refreshed.totalBytes);
         } catch (cause) {
           if (!mountedRef.current || generation !== mutationGenerationRef.current) return;
           const code = storageErrorCode(cause);
           if (code === "unavailable" || code === "quota-exceeded") {
-            const fallback = addCustomFont(activeFonts, { fileName: file.name, bytes });
-            if (fallback.status === "rejected") {
-              setError(fallback.message);
-              return;
-            }
-            const registered = await register(fallback.font);
-            if (registered.status === "failed") {
-              setError(registered.message);
-              return;
-            }
-            storedFont = fallback.font;
-            nextFonts = fallback.fonts;
-            setProductFonts(nextFonts);
-            setStorageState("memory-only");
-            setNotice(
-              `“${fallback.font.family}” 글꼴은 현재 탭 메모리에만 담았어요. 새로고침하면 사라져요.`,
+            // A paged durable library does not have every family resident, so synthesizing a
+            // memory-only entry here could collide with an off-page CSS family. Preserve the
+            // canonical library and report the failed write instead.
+            setError(
+              code === "quota-exceeded"
+                ? "기기 저장 공간이 부족해 글꼴을 담지 않았어요. 기존 보관함은 그대로 유지됩니다."
+                : "SQLite/OPFS 저장을 완료하지 못해 글꼴을 담지 않았어요. 기존 보관함은 그대로 유지됩니다.",
             );
             return;
           }
@@ -357,10 +445,20 @@ export function StudioCustomFontsPanel({
     const generation = ++mutationGenerationRef.current;
     busyRef.current = true;
     setBusy(true);
-    void enqueueMutation(() => durableRepository.delete(font.id)).then(() => {
+    void enqueueMutation(async () => {
+      await durableRepository.delete(font.id);
+      return durableRepository.page({ pageSize: PRODUCT_FONT_PAGE_SIZE });
+    }).then(async (page) => {
+      const failures = await registerPage(page);
       if (!mountedRef.current || generation !== mutationGenerationRef.current) return;
-      setProductFonts((current) => removeCustomFont(current, font.id));
+      setProductFonts([...page.fonts]);
+      setNextPageCursor(page.nextCursor);
+      setProductTotalEntries(page.totalEntries);
+      setProductTotalBytes(page.totalBytes);
       setNotice(`“${font.family}” 글꼴을 SQLite/OPFS 보관함에서 삭제했어요.`);
+      if (failures > 0) {
+        setNotice(`글꼴을 삭제했지만 새 page의 ${failures}개는 FontFace에 등록하지 못했어요.`);
+      }
     }).catch((cause: unknown) => {
       if (!mountedRef.current || generation !== mutationGenerationRef.current) return;
       if (storageErrorCode(cause) !== "corrupt") {
@@ -379,7 +477,7 @@ export function StudioCustomFontsPanel({
   return (
     <section
       aria-label={t("studio.customFonts.title")}
-      aria-busy={busy || storageState === "loading"}
+      aria-busy={busy || pageBusy || storageState === "loading"}
       data-studio-custom-font-authority={storageState}
     >
       <StudioSectionHeader
@@ -409,7 +507,7 @@ export function StudioCustomFontsPanel({
           "flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-line bg-card px-2 text-[0.72rem] font-semibold text-fg-2",
           STUDIO_EASE,
           "hover:bg-raised focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent",
-          (busy || storageState === "loading" || storageState === "unavailable")
+          (busy || pageBusy || storageState === "loading" || storageState === "unavailable")
             && "pointer-events-none cursor-wait opacity-55",
         )}
       >
@@ -420,7 +518,7 @@ export function StudioCustomFontsPanel({
           accept={CUSTOM_FONT_ACCEPT}
           aria-label={t("studio.customFonts.importAria")}
           className="sr-only"
-          disabled={busy || storageState === "loading" || storageState === "unavailable"}
+          disabled={busy || pageBusy || storageState === "loading" || storageState === "unavailable"}
           onChange={(event) => void handleImportFile(event)}
         />
       </label>
@@ -441,9 +539,9 @@ export function StudioCustomFontsPanel({
           <span className="tabular-nums">
             {tText(
               t,
-              `${activeFonts.length}/${MAX_CUSTOM_FONTS}개`,
-              "studio.customFonts.storageCount",
-              { count: activeFonts.length, max: MAX_CUSTOM_FONTS },
+              `총 ${totalEntries.toLocaleString("ko-KR")}개`,
+              "studio.customFonts.storageCountUnbounded",
+              { count: totalEntries },
             )}
           </span>
         </div>
@@ -496,16 +594,19 @@ export function StudioCustomFontsPanel({
           />
         </div>
       ) : (
-        <ul
-          className="mt-2 max-h-72 space-y-1.5 overflow-y-auto pr-1"
-          aria-label={tText(
-            t,
-            `담은 글꼴 ${activeFonts.length}개`,
-            "studio.customFonts.listAria",
-            { count: activeFonts.length },
-          )}
-        >
-          {activeFonts.map((font) => (
+        <div className="mt-2">
+          <ul
+            className="max-h-72 space-y-1.5 overflow-y-auto pr-1"
+            aria-label={productPaged
+              ? `담은 글꼴 총 ${totalEntries.toLocaleString("ko-KR")}개 중 ${activeFonts.length.toLocaleString("ko-KR")}개 표시`
+              : tText(
+                t,
+                `담은 글꼴 ${activeFonts.length}개`,
+                "studio.customFonts.listAria",
+                { count: activeFonts.length },
+              )}
+          >
+            {activeFonts.map((font) => (
             <li key={font.id} className="rounded-lg border border-line bg-card px-2 py-1.5">
               <div className="flex items-center gap-0.5">
                 <span className="min-w-0 flex-1">
@@ -524,7 +625,7 @@ export function StudioCustomFontsPanel({
                   <button
                     type="button"
                     onClick={() => onApplyFont(customFontCssValue(font))}
-                    disabled={!canApplyFont || busy}
+                    disabled={!canApplyFont || busy || pageBusy}
                     aria-label={tText(t, `${font.family} 글꼴 적용`, "studio.customFonts.applyAria", { fontName: font.family })}
                     title={canApplyFont
                       ? t("studio.customFonts.applyToText")
@@ -542,7 +643,7 @@ export function StudioCustomFontsPanel({
                 <button
                   type="button"
                   onClick={() => handleDelete(font)}
-                  disabled={busy}
+                  disabled={busy || pageBusy}
                   aria-label={tText(t, `${font.family} 글꼴 삭제`, "studio.customFonts.deleteAria", { fontName: font.family })}
                   title={t("studio.customFonts.delete")}
                   className={cn(
@@ -555,8 +656,26 @@ export function StudioCustomFontsPanel({
                 </button>
               </div>
             </li>
-          ))}
-        </ul>
+            ))}
+          </ul>
+          {nextPageCursor && (
+            <button
+              type="button"
+              className={cn(
+                "mt-2 min-h-11 w-full rounded-lg border border-line bg-card px-3 text-xs font-semibold text-fg-2",
+                STUDIO_EASE,
+                STUDIO_FOCUS_RING,
+                "hover:bg-raised disabled:cursor-wait disabled:opacity-50",
+              )}
+              disabled={pageBusy || busy}
+              onClick={() => void loadNextProductPage()}
+            >
+              {pageBusy
+                ? "글꼴 더 불러오는 중"
+                : `글꼴 더 보기 (${activeFonts.length.toLocaleString("ko-KR")}/${totalEntries.toLocaleString("ko-KR")})`}
+            </button>
+          )}
+        </div>
       )}
     </section>
   );

@@ -11,7 +11,6 @@ import {
   listCustomFonts,
   MAX_CUSTOM_FONT_FILE_BYTES,
   MAX_CUSTOM_FONT_TOTAL_BYTES,
-  MAX_CUSTOM_FONTS,
   parseCustomFonts,
   registerStudioCustomFont,
   registerStudioCustomFonts,
@@ -260,16 +259,15 @@ describe("addCustomFont", () => {
     expect(remainingCustomFontBytes(result.fonts)).toBe(0);
   });
 
-  it("rejects past the count cap", () => {
+  it("admits more than 512 fonts while the logical byte budget remains available", () => {
     let fonts: StudioCustomFont[] = [];
-    for (let index = 0; index < MAX_CUSTOM_FONTS; index++) {
+    for (let index = 0; index < 513; index++) {
       fonts = added(fonts, `Font${index}.ttf`).fonts;
     }
     const result = addCustomFont(fonts, { fileName: "OneMore.ttf", bytes: TTF });
-    expect(result.status).toBe("rejected");
-    if (result.status !== "rejected") throw new Error("unreachable");
-    expect(result.message).toContain(String(MAX_CUSTOM_FONTS));
-    expect(result.fonts).toHaveLength(MAX_CUSTOM_FONTS);
+    expect(result.status).toBe("added");
+    if (result.status !== "added") throw new Error(result.message);
+    expect(result.fonts).toHaveLength(514);
   });
 
   it("dedupes the derived family against fonts already in the library", () => {
@@ -378,14 +376,13 @@ describe("serializeCustomFonts / parseCustomFonts", () => {
     expect(() => serializeCustomFonts([productFont])).toThrow(/legacy data-url store/u);
   });
 
-  it("caps the parsed record count", () => {
+  it("does not silently truncate a byte-bounded legacy library after 512 records", () => {
     let fonts: StudioCustomFont[] = [];
-    for (let index = 0; index < MAX_CUSTOM_FONTS; index++) {
+    for (let index = 0; index < 1_001; index++) {
       fonts = added(fonts, `Font${index}.ttf`).fonts;
     }
-    const extra = { ...fonts[0]!, id: "extra", family: "Extra" };
-    const raw = JSON.stringify({ version: 1, fonts: [...fonts, extra] });
-    expect(parseCustomFonts(raw)).toHaveLength(MAX_CUSTOM_FONTS);
+    const raw = JSON.stringify({ version: 1, fonts });
+    expect(parseCustomFonts(raw)).toHaveLength(1_001);
   });
 
   it("still reads a legacy bare array", () => {

@@ -16,6 +16,7 @@ import {
 import { StudioCustomFontsPanel } from "./StudioCustomFontsPanel";
 
 import type {
+  StudioCustomFontPage,
   StudioCustomFontRepository,
   StudioCustomFontWithContentHash,
 } from "./studio-custom-font-sqlite-opfs-repository";
@@ -113,11 +114,34 @@ function fakeRepository(
 ): StudioCustomFontRepository {
   return {
     authority: "sqlite-opfs",
-    list: vi.fn(async () => []),
+    page: vi.fn(async () => fontPage([])),
+    materialize: vi.fn(async () => ({
+      fonts: [],
+      truncated: false,
+      nextCursor: null,
+      totalEntries: 0,
+      totalBytes: 0,
+      hydratedBytes: 0,
+    })),
     save: vi.fn(async ({ fileName }) => durableFont(fileName.replace(/\.ttf$/u, ""))),
     delete: vi.fn(async () => undefined),
     cleanupOrphans: vi.fn(async () => 0),
     ...overrides,
+  };
+}
+
+function fontPage(
+  fonts: readonly StudioCustomFontWithContentHash[],
+  nextCursor: string | null = null,
+  totalEntries = fonts.length,
+  totalBytes = fonts.reduce((sum, font) => sum + font.byteLength, 0),
+): StudioCustomFontPage {
+  return {
+    fonts,
+    nextCursor,
+    totalEntries,
+    totalBytes,
+    hydratedBytes: fonts.reduce((sum, font) => sum + font.byteLength, 0),
   };
 }
 
@@ -185,6 +209,22 @@ describe("StudioCustomFontsPanel", () => {
 
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain(formatCustomFontBytes(MAX_CUSTOM_FONT_FILE_BYTES));
+    expect(file.arrayBuffer).not.toHaveBeenCalled();
+    expect(onFontsChange).not.toHaveBeenCalled();
+  });
+
+  it("rejects a logical-byte overflow before reading another font into memory", async () => {
+    const resident = {
+      ...storedFont("Resident.ttf", fontBytes([...TTF_SIGNATURE]), "resident"),
+      byteLength: MAX_CUSTOM_FONT_TOTAL_BYTES,
+    };
+    const { onFontsChange } = renderPanel({ fonts: [resident] });
+    const file = fontFile("Overflow.ttf", fontBytes([...TTF_SIGNATURE]));
+
+    fireEvent.change(importInput(), { target: { files: [file] } });
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain(formatCustomFontBytes(MAX_CUSTOM_FONT_TOTAL_BYTES));
     expect(file.arrayBuffer).not.toHaveBeenCalled();
     expect(onFontsChange).not.toHaveBeenCalled();
   });
@@ -262,7 +302,7 @@ describe("StudioCustomFontsPanel", () => {
 
   it("hydrates the product repository, verifies binary FontFace registration, and exposes authority", async () => {
     const font = durableFont("본고딕");
-    const repository = fakeRepository({ list: vi.fn(async () => [font]) });
+    const repository = fakeRepository({ page: vi.fn(async () => fontPage([font])) });
     const sources: StudioFontFaceBinarySource[] = [];
     const { set } = fakeFontSet();
 
@@ -282,6 +322,37 @@ describe("StudioCustomFontsPanel", () => {
     expect(sources).toHaveLength(1);
     expect(sources[0]).toBeInstanceOf(ArrayBuffer);
     expect(new Uint8Array(sources[0] as ArrayBuffer)).toEqual(font.verifiedBytes);
+  });
+
+  it("shows an unbounded total and loads later font pages only after cursor intent", async () => {
+    const first = durableFont("첫 페이지", "font-first");
+    const second = durableFont("둘째 페이지", "font-second");
+    const page = vi.fn()
+      .mockResolvedValueOnce(fontPage([first], "cursor-2", 513, first.byteLength + second.byteLength))
+      .mockResolvedValueOnce(fontPage([second], null, 513, first.byteLength + second.byteLength));
+    const repository = fakeRepository({ page });
+    const { set } = fakeFontSet();
+    render(
+      <StudioCustomFontsPanel
+        repository={repository}
+        fontSet={set}
+        createFontFace={okFactory()}
+      />,
+    );
+
+    expect(await screen.findByText("첫 페이지")).toBeTruthy();
+    expect(screen.getByText("총 513개")).toBeTruthy();
+    expect(screen.queryByText(/\/512개/u)).toBeNull();
+    expect(screen.queryByText("둘째 페이지")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "글꼴 더 보기 (1/513)" }));
+
+    expect(await screen.findByText("둘째 페이지")).toBeTruthy();
+    expect(screen.queryByText("첫 페이지")).toBeNull();
+    expect(page).toHaveBeenLastCalledWith(expect.objectContaining({
+      pageSize: 32,
+      cursor: "cursor-2",
+    }));
+    expect(screen.queryByRole("button", { name: /글꼴 더 보기/u })).toBeNull();
   });
 
   it("saves and deletes through the async durable repository instead of controlled callbacks", async () => {
@@ -312,13 +383,14 @@ describe("StudioCustomFontsPanel", () => {
   });
 
   it("fences a stale hydration after the repository prop changes", async () => {
-    let resolveFirst: ((fonts: StudioCustomFontWithContentHash[]) => void) | undefined;
+    let resolveFirst: ((page: StudioCustomFontPage) => void) | undefined;
     const first = fakeRepository({
-      list: vi.fn(() => new Promise<StudioCustomFontWithContentHash[]>((resolve) => {
+      page: vi.fn(() => new Promise<StudioCustomFontPage>((resolve) => {
         resolveFirst = resolve;
       })),
     });
-    const second = fakeRepository({ list: vi.fn(async () => [durableFont("최신 글꼴")]) });
+    const secondFont = durableFont("최신 글꼴");
+    const second = fakeRepository({ page: vi.fn(async () => fontPage([secondFont])) });
     const { set } = fakeFontSet();
     const rendered = render(
       <StudioCustomFontsPanel repository={first} fontSet={set} createFontFace={okFactory()} />,
@@ -328,7 +400,7 @@ describe("StudioCustomFontsPanel", () => {
     );
 
     expect(await screen.findByText("최신 글꼴")).toBeTruthy();
-    resolveFirst?.([durableFont("오래된 글꼴")]);
+    resolveFirst?.(fontPage([durableFont("오래된 글꼴")]));
     await Promise.resolve();
     expect(screen.queryByText("오래된 글꼴")).toBeNull();
     expect(screen.getByText("최신 글꼴")).toBeTruthy();

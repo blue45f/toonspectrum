@@ -1,14 +1,17 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import {
   createStudioCustomFontSqliteOpfsRepository,
   parseStudioCustomFontManifest,
   serializeStudioCustomFontManifest,
   STUDIO_CUSTOM_FONT_CAS_OWNER,
+  STUDIO_CUSTOM_FONT_MAX_COMPATIBILITY_ENTRIES,
+  STUDIO_CUSTOM_FONT_MAX_PAGE_SIZE,
   STUDIO_CUSTOM_FONT_LIMITS,
   STUDIO_CUSTOM_FONT_SQLITE_MANIFEST_KEY,
   STUDIO_CUSTOM_FONT_SQLITE_NAMESPACE,
   type StudioCustomFontManifestEntry,
+  type StudioCustomFontWithContentHash,
 } from "./studio-custom-font-sqlite-opfs-repository";
 import { openStudioLocalDatabase } from "./studio-local-database";
 import { StudioLocalDatabaseCommitOutcomeUnknownError } from "./studio-local-database-commit-outcome";
@@ -83,6 +86,20 @@ async function fixture(options: {
   return { database, fs, store, repository };
 }
 
+async function listAllFonts(
+  repository: ReturnType<typeof createStudioCustomFontSqliteOpfsRepository>,
+  pageSize = STUDIO_CUSTOM_FONT_MAX_PAGE_SIZE,
+) {
+  const fonts: StudioCustomFontWithContentHash[] = [];
+  let cursor: string | null = null;
+  do {
+    const page = await repository.page({ pageSize, cursor });
+    fonts.push(...page.fonts);
+    cursor = page.nextCursor;
+  } while (cursor !== null);
+  return fonts;
+}
+
 function proxyDatabase(
   database: StudioLocalDatabase,
   override: Partial<Pick<StudioLocalDatabase, "kvGet" | "kvSet">>,
@@ -134,7 +151,7 @@ describe("custom-font SQLite canonical manifest plus OPFS SHA-256 CAS", () => {
       mimeType: "font/ttf",
     });
     expect(await store.ownerRefs(STUDIO_CUSTOM_FONT_CAS_OWNER)).toEqual([saved.contentHash]);
-    const listed = await repository.list();
+    const listed = await listAllFonts(repository);
     expect(listed).toHaveLength(1);
     expect(listed[0]?.dataUrl).toBeUndefined();
     expect(listed[0]?.verifiedBytes).toEqual(original);
@@ -156,7 +173,7 @@ describe("custom-font SQLite canonical manifest plus OPFS SHA-256 CAS", () => {
       store: reopenedStore,
       createId: () => "unused-font",
     });
-    const listed = await reopened.repository.list();
+    const listed = await listAllFonts(reopened.repository);
     expect(listed.map(({ id, contentHash }) => ({ id, contentHash }))).toEqual([{
       id: saved.id,
       contentHash: saved.contentHash,
@@ -173,7 +190,7 @@ describe("custom-font SQLite canonical manifest plus OPFS SHA-256 CAS", () => {
     );
     await store.delete(saved.contentHash);
 
-    await expect(repository.list()).rejects.toMatchObject({ code: "corrupt" });
+    await expect(repository.page({ pageSize: 16 })).rejects.toMatchObject({ code: "corrupt" });
     expect(await database.kvGet(
       STUDIO_CUSTOM_FONT_SQLITE_NAMESPACE,
       STUDIO_CUSTOM_FONT_SQLITE_MANIFEST_KEY,
@@ -189,7 +206,7 @@ describe("custom-font SQLite canonical manifest plus OPFS SHA-256 CAS", () => {
     expect(tampered.byteLength).toBe(saved.byteLength);
     await fs.write(stat!.path, tampered);
 
-    await expect(repository.list()).rejects.toMatchObject({ code: "corrupt" });
+    await expect(repository.page({ pageSize: 16 })).rejects.toMatchObject({ code: "corrupt" });
   });
 
   it("rejects torn, noncanonical, unknown-field, and forged-total manifests", async () => {
@@ -205,7 +222,7 @@ describe("custom-font SQLite canonical manifest plus OPFS SHA-256 CAS", () => {
         STUDIO_CUSTOM_FONT_SQLITE_MANIFEST_KEY,
         raw,
       );
-      await expect(repository.list()).rejects.toMatchObject({ code: "corrupt" });
+      await expect(repository.page({ pageSize: 16 })).rejects.toMatchObject({ code: "corrupt" });
     }
   });
 
@@ -224,7 +241,7 @@ describe("custom-font SQLite canonical manifest plus OPFS SHA-256 CAS", () => {
       repository.save({ fileName: "Family.ttf", bytes: fontBytes(22) }),
       repository.save({ fileName: "Family.ttf", bytes: fontBytes(23) }),
     ]);
-    const listed = await repository.list();
+    const listed = await listAllFonts(repository);
 
     expect(listed.map(({ id }) => id)).toEqual([first.id, second.id, third.id]);
     expect(listed.map(({ family }) => family).sort()).toEqual([
@@ -289,7 +306,7 @@ describe("custom-font SQLite canonical manifest plus OPFS SHA-256 CAS", () => {
       STUDIO_CUSTOM_FONT_SQLITE_MANIFEST_KEY,
     )).toBe(manifestBefore);
     expect(await store.ownerRefs(STUDIO_CUSTOM_FONT_CAS_OWNER)).toEqual([first.contentHash]);
-    expect((await stable.repository.list()).map(({ id }) => id)).toEqual([first.id]);
+    expect((await listAllFonts(stable.repository)).map(({ id }) => id)).toEqual([first.id]);
   });
 
   it("keeps old and candidate font blobs pinned when the commit response is lost", async () => {
@@ -327,10 +344,9 @@ describe("custom-font SQLite canonical manifest plus OPFS SHA-256 CAS", () => {
     expect((await store.sweep({ graceMs: 0 })).removed).toHaveLength(0);
   });
 
-  it("enforces professional but bounded count, per-file, and 2 GiB logical limits", async () => {
+  it("retains per-file and 2 GiB logical limits without a product-total count limit", async () => {
     expect(STUDIO_CUSTOM_FONT_LIMITS.individualBytes).toBe(128 * 1024 * 1024);
     expect(STUDIO_CUSTOM_FONT_LIMITS.logicalBytes).toBe(2 * 1024 * 1024 * 1024);
-    expect(STUDIO_CUSTOM_FONT_LIMITS.fonts).toBe(512);
     expect(() => serializeStudioCustomFontManifest([
       manifestEntry(1, { byteLength: STUDIO_CUSTOM_FONT_LIMITS.individualBytes + 1 }),
     ])).toThrow(/바이트 크기/u);
@@ -339,19 +355,162 @@ describe("custom-font SQLite canonical manifest plus OPFS SHA-256 CAS", () => {
       contentHash: `sha256:${index.toString(16).padStart(64, "0")}`,
       byteLength: STUDIO_CUSTOM_FONT_LIMITS.individualBytes,
     }));
-    const { database, repository } = await fixture();
+    const { database, repository, store } = await fixture();
+    const put = vi.spyOn(store, "put");
+    const fullManifest = serializeStudioCustomFontManifest(fullEntries);
     await database.kvSet(
       STUDIO_CUSTOM_FONT_SQLITE_NAMESPACE,
       STUDIO_CUSTOM_FONT_SQLITE_MANIFEST_KEY,
-      serializeStudioCustomFontManifest(fullEntries),
+      fullManifest,
     );
     await expect(repository.save({ fileName: "Overflow.ttf", bytes: fontBytes(31) }))
       .rejects.toMatchObject({ code: "invalid" });
+    expect(put).not.toHaveBeenCalled();
+    expect(await database.kvGet(
+      STUDIO_CUSTOM_FONT_SQLITE_NAMESPACE,
+      STUDIO_CUSTOM_FONT_SQLITE_MANIFEST_KEY,
+    )).toBe(fullManifest);
+  });
 
-    expect(() => serializeStudioCustomFontManifest([
-      ...Array.from({ length: STUDIO_CUSTOM_FONT_LIMITS.fonts }, (_, index) => manifestEntry(index)),
-      manifestEntry(STUDIO_CUSTOM_FONT_LIMITS.fonts),
-    ])).toThrow(/512개/u);
+  it("saves the 513th font and reopens all entries through bounded cursor pages", async () => {
+    const filename = `custom-font-513-${crypto.randomUUID()}.sqlite3`;
+    const fs = createStudioOpfsMemoryFileSystem();
+    const firstDatabase = await openMemoryDatabase(filename, false);
+    const first = await fixture({ database: firstDatabase, fs });
+    const bytes = fontBytes(41);
+    const put = await first.store.put(bytes, { mime: "font/ttf", codec: "identity" });
+    const seedEntries = Array.from({ length: 512 }, (_, index) => manifestEntry(index, {
+      contentHash: put.ref.hash,
+      byteLength: bytes.byteLength,
+    }));
+    await first.database.kvSet(
+      STUDIO_CUSTOM_FONT_SQLITE_NAMESPACE,
+      STUDIO_CUSTOM_FONT_SQLITE_MANIFEST_KEY,
+      serializeStudioCustomFontManifest(seedEntries),
+    );
+    await first.store.setOwnerRefs(STUDIO_CUSTOM_FONT_CAS_OWNER, [put.ref.hash]);
+    await first.repository.save({
+      id: "font-0512",
+      fileName: "CJK-Family-512.ttf",
+      bytes,
+    });
+    await firstDatabase.close();
+
+    const reopenedDatabase = await openMemoryDatabase(filename);
+    const reopened = await fixture({
+      database: reopenedDatabase,
+      fs,
+      store: createStudioOpfsAssetStore({ fs, graceMs: 0 }),
+    });
+    const listed = await listAllFonts(reopened.repository, 37);
+    expect(listed).toHaveLength(513);
+    expect(listed.some(({ id }) => id === "font-0512")).toBe(true);
+  });
+
+  it("traverses 1,001+ entries without hydrating more than the requested page", async () => {
+    const { database, repository, store } = await fixture();
+    const bytes = fontBytes(43);
+    const put = await store.put(bytes, { mime: "font/ttf", codec: "identity" });
+    const entries = Array.from({ length: 1_001 }, (_, index) => manifestEntry(index, {
+      contentHash: put.ref.hash,
+      byteLength: bytes.byteLength,
+    }));
+    await database.kvSet(
+      STUDIO_CUSTOM_FONT_SQLITE_NAMESPACE,
+      STUDIO_CUSTOM_FONT_SQLITE_MANIFEST_KEY,
+      serializeStudioCustomFontManifest(entries),
+    );
+    await store.setOwnerRefs(STUDIO_CUSTOM_FONT_CAS_OWNER, [put.ref.hash]);
+
+    const ids: string[] = [];
+    let cursor: string | null = null;
+    let pages = 0;
+    do {
+      const page = await repository.page({ pageSize: 37, cursor });
+      expect(page.fonts.length).toBeLessThanOrEqual(37);
+      expect(page.hydratedBytes).toBe(page.fonts.length * bytes.byteLength);
+      ids.push(...page.fonts.map(({ id }) => id));
+      cursor = page.nextCursor;
+      pages += 1;
+    } while (cursor !== null);
+    expect(ids).toHaveLength(1_001);
+    expect(new Set(ids).size).toBe(1_001);
+    expect(pages).toBeGreaterThan(27);
+  });
+
+  it("binds opaque cursors to the manifest and fails closed for malformed, stale, and aborted reads", async () => {
+    const { repository, store } = await fixture();
+    await repository.save({ id: "font-a", fileName: "A.ttf", bytes: fontBytes(45) });
+    await repository.save({ id: "font-b", fileName: "B.ttf", bytes: fontBytes(47) });
+    const first = await repository.page({ pageSize: 1 });
+    expect(first.nextCursor).toEqual(expect.any(String));
+
+    await expect(repository.page({ pageSize: 1, cursor: "forged" }))
+      .rejects.toMatchObject({ code: "invalid-cursor" });
+    await repository.save({ id: "font-c", fileName: "C.ttf", bytes: fontBytes(49) });
+    await expect(repository.page({ pageSize: 1, cursor: first.nextCursor }))
+      .rejects.toMatchObject({ code: "invalid-cursor" });
+
+    const get = vi.spyOn(store, "get");
+    const callsBeforeAbort = get.mock.calls.length;
+    const controller = new AbortController();
+    controller.abort();
+    await expect(repository.page({ pageSize: 1, signal: controller.signal }))
+      .rejects.toMatchObject({ code: "aborted" });
+    expect(get.mock.calls).toHaveLength(callsBeforeAbort);
+  });
+
+  it("rejects invalid page and compatibility budgets instead of clamping caller intent", async () => {
+    const { repository } = await fixture();
+    await expect(repository.page({ pageSize: 0 }))
+      .rejects.toMatchObject({ code: "invalid-page-size" });
+    await expect(repository.page({ pageSize: STUDIO_CUSTOM_FONT_MAX_PAGE_SIZE + 1 }))
+      .rejects.toMatchObject({ code: "invalid-page-size" });
+    await expect(repository.materialize({
+      maxEntries: STUDIO_CUSTOM_FONT_MAX_COMPATIBILITY_ENTRIES + 1,
+      maxHydratedBytes: 1,
+    }))
+      .rejects.toMatchObject({ code: "invalid-page-size" });
+    await expect(repository.materialize({ maxEntries: 1, maxHydratedBytes: 0 }))
+      .rejects.toMatchObject({ code: "invalid-page-size" });
+  });
+
+  it("applies byte backpressure before the next CAS hydration and returns explicit materialization receipts", async () => {
+    const { repository, store } = await fixture();
+    const bytes = fontBytes(51, 96);
+    await repository.save({ id: "font-a", fileName: "A.ttf", bytes });
+    await repository.save({ id: "font-b", fileName: "B.ttf", bytes });
+    const get = vi.spyOn(store, "get");
+
+    const first = await repository.page({ pageSize: 2, maxHydratedBytes: 100 });
+    expect(first.fonts).toHaveLength(1);
+    expect(first.hydratedBytes).toBe(96);
+    expect(first.nextCursor).toEqual(expect.any(String));
+    expect(get).toHaveBeenCalledTimes(1);
+    const second = await repository.page({
+      pageSize: 2,
+      cursor: first.nextCursor,
+      maxHydratedBytes: 100,
+    });
+    expect(second.fonts).toHaveLength(1);
+    expect(second.nextCursor).toBeNull();
+
+    const receipt = await repository.materialize({
+      maxEntries: 1,
+      maxHydratedBytes: 100,
+      pageSize: 1,
+    });
+    expect(receipt).toMatchObject({
+      truncated: true,
+      totalEntries: 2,
+      totalBytes: 192,
+      hydratedBytes: 96,
+    });
+    expect(receipt.fonts).toHaveLength(1);
+    expect(receipt.nextCursor).toEqual(expect.any(String));
+
+    await expect(repository.page({ pageSize: 1, maxHydratedBytes: 95 }))
+      .rejects.toMatchObject({ code: "backpressure" });
   });
 
   it("rejects a caller-provided hash that differs from the actual font bytes", async () => {
@@ -368,7 +527,7 @@ describe("custom-font SQLite canonical manifest plus OPFS SHA-256 CAS", () => {
     const saved = await repository.save({ fileName: "Delete.ttf", bytes: fontBytes(35) });
     await repository.delete(saved.id);
 
-    await expect(repository.list()).resolves.toEqual([]);
+    await expect(listAllFonts(repository)).resolves.toEqual([]);
     expect(await store.ownerRefs(STUDIO_CUSTOM_FONT_CAS_OWNER)).toEqual([]);
     expect(await store.has(saved.contentHash)).toBe(false);
   });
