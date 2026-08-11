@@ -11,11 +11,13 @@ import {
   STUDIO_DRY_MEDIA_UNION_CONTINUATION_MAX_INFLIGHT_BYTES,
   STUDIO_DRY_MEDIA_UNION_CONTINUATION_MAX_PAGE_COUNT,
   STUDIO_DRY_MEDIA_UNION_CONTINUATION_PROTOCOL_VERSION,
-  packStudioDryMediaUnionContinuationPages,
+  createStudioDryMediaUnionContinuationPackCursor,
+  packStudioDryMediaUnionContinuationPageBatch,
   studioDryMediaUnionContinuationPageTransferables,
   type StudioDryMediaUnionContinuationAppendRequest,
   type StudioDryMediaUnionContinuationFrameReceipt,
   type StudioDryMediaUnionContinuationPage,
+  type StudioDryMediaUnionContinuationPackCursor,
   type StudioDryMediaUnionContinuationRequest,
   type StudioDryMediaUnionPagedRootReceipt,
 } from "./studio-dry-media-union-continuation-protocol";
@@ -66,6 +68,8 @@ export type StudioDryMediaUnionContinuationAppendAdmission =
       groupCount: number;
       pageCount: number;
       physicalPageByteLength: number;
+      inputComplete: boolean;
+      nextCursor: StudioDryMediaUnionContinuationPackCursor | null;
       completion: Promise<void>;
     }>
   | Readonly<{
@@ -82,6 +86,16 @@ export type StudioDryMediaUnionContinuationAppendAdmission =
         | "group-too-large"
         | "pack-failed";
     }>;
+
+export interface StudioDryMediaUnionContinuationPresentationAck {
+  readonly contract: "studio-dry-media-union-presentation-ack-v1";
+  readonly version: 1;
+  readonly strokeId: string;
+  readonly workerGeneration: number;
+  readonly sequence: number;
+  readonly presentationGeneration: number;
+  readonly tileCount: number;
+}
 
 export interface StudioDryMediaUnionContinuationWorkerClient {
   readonly available: boolean;
@@ -100,6 +114,7 @@ export interface StudioDryMediaUnionContinuationWorkerClient {
    */
   tryAppend(
     marks: readonly StudioDynamicBrushCoverageMark[],
+    cursor?: StudioDryMediaUnionContinuationPackCursor,
   ): StudioDryMediaUnionContinuationAppendAdmission;
   seal(): Promise<StudioDryMediaUnionPagedRootReceipt>;
   cancel(): Promise<void>;
@@ -114,12 +129,18 @@ export interface StudioDryMediaUnionContinuationWorkerClient {
     plannedGroupCount: number;
     admittedGroupCount: number;
     presentedGroupCount: number;
+    receivedPageCount: number;
+    plannedPageCount: number;
+    admittedPageCount: number;
+    presentedPageCount: number;
     queueCount: number;
     queuePhysicalPageByteLength: number;
     inflightPhysicalPageByteLength: number;
     queuedPhysicalPageByteLength: number;
     maximumQueuePhysicalPageByteLength: number;
     transferCount: number;
+    continuationPending: boolean;
+    presentationPending: boolean;
     scratchReservationActive: boolean;
     scratchResidentByteLength: number;
     state:
@@ -141,8 +162,10 @@ export interface StudioDryMediaUnionContinuationWorkerClientOptions {
   readonly memory64Coordinator: StudioDryMediaUnionContinuationMemory64Coordinator;
   readonly workerFactory?: () => StudioDryMediaUnionContinuationWorkerLike | null;
   readonly timeoutMilliseconds?: number;
-  /** Returning true transfers presentation ownership of every bitmap to the caller. */
-  readonly onFrame: (frame: StudioDryMediaUnionContinuationFrameReceipt) => boolean;
+  /** Resolves only after every tile is uploaded/drawn; a valid ACK transfers bitmap ownership. */
+  readonly onFrame: (
+    frame: StudioDryMediaUnionContinuationFrameReceipt,
+  ) => Promise<StudioDryMediaUnionContinuationPresentationAck>;
 }
 
 type ClientState = ReturnType<
@@ -165,6 +188,7 @@ interface PendingControl<T> {
 interface AppendJob {
   readonly sequence: number;
   readonly firstGroupIndex: number;
+  readonly firstPageIndex: number;
   readonly groupCount: number;
   readonly physicalPageByteLength: number;
   readonly logicalByteLength: number;
@@ -175,7 +199,15 @@ interface AppendJob {
   requestId: number | null;
 }
 
+interface PendingPresentation {
+  readonly job: AppendJob;
+  readonly frame: StudioDryMediaUnionContinuationFrameReceipt;
+  readonly timer: ReturnType<typeof setTimeout>;
+  frameOwned: boolean;
+}
+
 const MAX_OUTSTANDING_APPEND_REQUESTS = 2;
+const MAX_FRAME_READBACK_PIXEL_AREA = 1024 * 1024;
 const RESPONSE_ACK_KEYS = Object.freeze([
   "kind",
   "version",
@@ -250,6 +282,60 @@ function exactDataRecord(
     : null;
 }
 
+function frozenOwnDataValue(value: unknown, key: PropertyKey): unknown {
+  if (value === null || typeof value !== "object") return undefined;
+  try {
+    if (!Object.isFrozen(value)) return undefined;
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    return descriptor && "value" in descriptor ? descriptor.value : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * A multi-request delivery must be immutable because earlier pages become
+ * durable before a later suffix is packed. This walks only container objects;
+ * scalar coordinates remain getter-free validated by the bounded packer.
+ */
+function snapshotImmutableContinuationDelivery(
+  marks: readonly StudioDynamicBrushCoverageMark[],
+): readonly StudioDynamicBrushCoverageMark[] | null {
+  if (!Array.isArray(marks)) return null;
+  const markCount = Object.getOwnPropertyDescriptor(marks, "length")?.value;
+  if (!Number.isSafeInteger(markCount) || (markCount as number) < 0) return null;
+  const authorityMarks: StudioDynamicBrushCoverageMark[] = [];
+  let visitedContainers = 1;
+  for (let markIndex = 0; markIndex < (markCount as number); markIndex += 1) {
+    const markDescriptor = Object.getOwnPropertyDescriptor(marks, String(markIndex));
+    const mark = markDescriptor && "value" in markDescriptor
+      ? markDescriptor.value
+      : undefined;
+    const ribbon = frozenOwnDataValue(mark, "ribbon");
+    const compositing = frozenOwnDataValue(ribbon, "compositing");
+    const groups = frozenOwnDataValue(compositing, "groups");
+    if (!Array.isArray(groups) || !Object.isFrozen(groups)) return null;
+    const groupCount = frozenOwnDataValue(groups, "length");
+    if (!Number.isSafeInteger(groupCount) || (groupCount as number) <= 0) return null;
+    visitedContainers += 4;
+    for (let groupIndex = 0; groupIndex < (groupCount as number); groupIndex += 1) {
+      const group = frozenOwnDataValue(groups, String(groupIndex));
+      const polygons = frozenOwnDataValue(group, "polygons");
+      if (!Array.isArray(polygons) || !Object.isFrozen(polygons)) return null;
+      const polygonCount = frozenOwnDataValue(polygons, "length");
+      if (!Number.isSafeInteger(polygonCount) || (polygonCount as number) <= 0) return null;
+      visitedContainers += 2 + (polygonCount as number);
+      if (visitedContainers > 1_000_000) return null;
+      for (let polygonIndex = 0; polygonIndex < (polygonCount as number); polygonIndex += 1) {
+        const polygon = frozenOwnDataValue(polygons, String(polygonIndex));
+        if (!Array.isArray(polygon) || !Object.isFrozen(polygon)) return null;
+      }
+    }
+    authorityMarks.push(mark as StudioDynamicBrushCoverageMark);
+  }
+  return Object.freeze(authorityMarks);
+}
+
 function denseDataArray(value: unknown, maximumLength: number): readonly unknown[] | null {
   if (!Array.isArray(value)) return null;
   let descriptors: Record<string, PropertyDescriptor>;
@@ -285,6 +371,22 @@ function safeBudgetByteCount(value: unknown): value is number | bigint {
     : safeNonNegativeInteger(value);
 }
 
+function validTransferredBitmap(value: unknown, width: number, height: number): boolean {
+  if (typeof globalThis.ImageBitmap === "function") {
+    try {
+      return value instanceof globalThis.ImageBitmap
+        && value.width === width
+        && value.height === height;
+    } catch {
+      return false;
+    }
+  }
+  const record = dataRecord(value);
+  return record?.width === width
+    && record.height === height
+    && typeof record.close === "function";
+}
+
 function snapshotFrame(
   value: unknown,
   expected: Readonly<{
@@ -294,6 +396,7 @@ function snapshotFrame(
     presentationGeneration: number;
     width: number;
     height: number;
+    groupCount: number;
   }>,
 ): StudioDryMediaUnionContinuationFrameReceipt | null {
   const frame = exactDataRecord(value, [
@@ -304,6 +407,8 @@ function snapshotFrame(
     "sequence",
     "presentationGeneration",
     "programDigest",
+    "status",
+    "coverage",
     "tiles",
   ]);
   if (
@@ -315,12 +420,42 @@ function snapshotFrame(
     || frame.sequence !== expected.sequence
     || frame.presentationGeneration !== expected.presentationGeneration
     || frame.programDigest !== STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_DIGEST
+    || frame.status !== "rendered"
   ) return null;
   const rawTiles = denseDataArray(
     frame.tiles,
     STUDIO_DRY_MEDIA_UNION_CONTINUATION_SCRATCH_SLOT_COUNT,
   );
   if (!rawTiles) return null;
+  const rawCoverage = exactDataRecord(frame.coverage, [
+    "contract",
+    "version",
+    "admittedGroupCount",
+    "visibleGroupCount",
+    "contourVisitCount",
+    "coordinateVisitCount",
+    "tileCount",
+    "tilePixelArea",
+    "rasterPixelArea",
+    "clearPixelArea",
+    "readbackPixelArea",
+  ]);
+  if (
+    !rawCoverage
+    || rawCoverage.contract !== "studio-dry-media-union-frame-coverage-v1"
+    || rawCoverage.version !== 1
+    || !safeNonNegativeInteger(rawCoverage.admittedGroupCount)
+    || !safeNonNegativeInteger(rawCoverage.visibleGroupCount)
+    || !safeNonNegativeInteger(rawCoverage.contourVisitCount)
+    || !safeNonNegativeInteger(rawCoverage.coordinateVisitCount)
+    || !safeNonNegativeInteger(rawCoverage.tileCount)
+    || !safeNonNegativeInteger(rawCoverage.tilePixelArea)
+    || !safeNonNegativeInteger(rawCoverage.rasterPixelArea)
+    || !safeNonNegativeInteger(rawCoverage.clearPixelArea)
+    || !safeNonNegativeInteger(rawCoverage.readbackPixelArea)
+    || rawCoverage.admittedGroupCount !== expected.groupCount
+    || rawCoverage.visibleGroupCount > rawCoverage.admittedGroupCount
+  ) return null;
   const tiles: StudioDryMediaUnionContinuationFrameReceipt["tiles"][number][] = [];
   const tileKeys = new Set<string>();
   let pixelCount = 0;
@@ -340,8 +475,6 @@ function snapshotFrame(
       || !safeNonNegativeInteger(tile.tileY)
       || !safeNonNegativeInteger(tile.x)
       || !safeNonNegativeInteger(tile.y)
-      || tile.x !== tile.tileX * STUDIO_DRY_MEDIA_UNION_CONTINUATION_SCRATCH_MAX_TILE_EDGE
-      || tile.y !== tile.tileY * STUDIO_DRY_MEDIA_UNION_CONTINUATION_SCRATCH_MAX_TILE_EDGE
       || !safeNonNegativeInteger(tile.width)
       || !safeNonNegativeInteger(tile.height)
       || tile.width <= 0
@@ -354,8 +487,23 @@ function snapshotFrame(
       || tile.y >= expected.height
       || tile.x + tile.width > expected.width
       || tile.y + tile.height > expected.height
-      || tile.bitmap === null
-      || typeof tile.bitmap !== "object"
+      || !validTransferredBitmap(tile.bitmap, tile.width, tile.height)
+    ) return null;
+    const tileOriginX = tile.tileX
+      * STUDIO_DRY_MEDIA_UNION_CONTINUATION_SCRATCH_MAX_TILE_EDGE;
+    const tileOriginY = tile.tileY
+      * STUDIO_DRY_MEDIA_UNION_CONTINUATION_SCRATCH_MAX_TILE_EDGE;
+    if (
+      tile.x < tileOriginX
+      || tile.y < tileOriginY
+      || tile.x + tile.width > Math.min(
+        tileOriginX + STUDIO_DRY_MEDIA_UNION_CONTINUATION_SCRATCH_MAX_TILE_EDGE,
+        expected.width,
+      )
+      || tile.y + tile.height > Math.min(
+        tileOriginY + STUDIO_DRY_MEDIA_UNION_CONTINUATION_SCRATCH_MAX_TILE_EDGE,
+        expected.height,
+      )
     ) return null;
     const tileKey = `${tile.tileX}:${tile.tileY}`;
     if (tileKeys.has(tileKey)) return null;
@@ -367,6 +515,32 @@ function snapshotFrame(
     ) return null;
     tiles.push(tile as unknown as StudioDryMediaUnionContinuationFrameReceipt["tiles"][number]);
   }
+  if (
+    rawCoverage.tileCount !== tiles.length
+    || rawCoverage.tilePixelArea !== pixelCount
+    || (
+      rawCoverage.visibleGroupCount === 0
+      && (
+        rawCoverage.contourVisitCount !== 0
+        || rawCoverage.coordinateVisitCount !== 0
+        || rawCoverage.tileCount !== 0
+        || rawCoverage.rasterPixelArea !== 0
+        || rawCoverage.clearPixelArea !== 0
+        || rawCoverage.readbackPixelArea !== 0
+      )
+    )
+    || (
+      rawCoverage.visibleGroupCount > 0
+      && (
+        rawCoverage.contourVisitCount <= 0
+        || rawCoverage.coordinateVisitCount < rawCoverage.contourVisitCount * 6
+        || rawCoverage.rasterPixelArea <= 0
+        || rawCoverage.clearPixelArea !== rawCoverage.rasterPixelArea
+        || rawCoverage.readbackPixelArea < rawCoverage.rasterPixelArea
+        || rawCoverage.readbackPixelArea > MAX_FRAME_READBACK_PIXEL_AREA
+      )
+    )
+  ) return null;
   return Object.freeze({
     contract: "studio-dry-media-union-frame-v1",
     version: 1,
@@ -375,6 +549,20 @@ function snapshotFrame(
     sequence: expected.sequence,
     presentationGeneration: frame.presentationGeneration,
     programDigest: STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_DIGEST,
+    status: "rendered",
+    coverage: Object.freeze({
+      contract: "studio-dry-media-union-frame-coverage-v1" as const,
+      version: 1 as const,
+      admittedGroupCount: rawCoverage.admittedGroupCount,
+      visibleGroupCount: rawCoverage.visibleGroupCount,
+      contourVisitCount: rawCoverage.contourVisitCount,
+      coordinateVisitCount: rawCoverage.coordinateVisitCount,
+      tileCount: rawCoverage.tileCount,
+      tilePixelArea: rawCoverage.tilePixelArea,
+      rasterPixelArea: rawCoverage.rasterPixelArea,
+      clearPixelArea: rawCoverage.clearPixelArea,
+      readbackPixelArea: rawCoverage.readbackPixelArea,
+    }),
     tiles: Object.freeze(tiles),
   });
 }
@@ -390,31 +578,75 @@ function closeFrame(frame: StudioDryMediaUnionContinuationFrameReceipt | null): 
   }
 }
 
+function closeBitmapCandidate(value: unknown, seen: Set<object>): void {
+  if (value === null || typeof value !== "object" || seen.has(value)) return;
+  seen.add(value);
+  try {
+    if (typeof globalThis.ImageBitmap === "function") {
+      if (value instanceof globalThis.ImageBitmap) value.close();
+      return;
+    }
+    const record = dataRecord(value);
+    if (record && typeof record.close === "function") record.close.call(value);
+  } catch {
+    // A malformed or already-detached frame cannot retain presentation ownership.
+  }
+}
+
 function closePotentialFrame(value: unknown): void {
   const response = dataRecord(value);
-  const rawFrame = response?.frame;
-  const frameRecord = dataRecord(rawFrame);
-  if (
-    !frameRecord
-    || typeof frameRecord.strokeId !== "string"
-    || !safeNonNegativeInteger(frameRecord.workerGeneration)
-    || !safeNonNegativeInteger(frameRecord.sequence)
-  ) return;
-  closeFrame(snapshotFrame(rawFrame, {
-    strokeId: frameRecord.strokeId,
-    workerGeneration: frameRecord.workerGeneration,
-    sequence: frameRecord.sequence,
-    presentationGeneration: safeNonNegativeInteger(frameRecord.presentationGeneration)
-      ? frameRecord.presentationGeneration
-      : 0,
-    width: Number.MAX_SAFE_INTEGER,
-    height: Number.MAX_SAFE_INTEGER,
-  }));
+  const frame = response ? dataRecord(response.frame) : null;
+  const rawTiles = frame
+    ? denseDataArray(
+        frame.tiles,
+        STUDIO_DRY_MEDIA_UNION_CONTINUATION_SCRATCH_SLOT_COUNT,
+      )
+    : null;
+  if (!rawTiles) return;
+  const seen = new Set<object>();
+  for (const rawTile of rawTiles) {
+    const tile = dataRecord(rawTile);
+    if (tile) closeBitmapCandidate(tile.bitmap, seen);
+  }
 }
 
 function snapshotAllocationAck(value: unknown) {
   const record = exactDataRecord(value, RESPONSE_ACK_KEYS);
   return record ? snapshotMemory64CrossRealmAllocationAck(record) : null;
+}
+
+function snapshotPresentationAck(
+  value: unknown,
+  frame: StudioDryMediaUnionContinuationFrameReceipt,
+): StudioDryMediaUnionContinuationPresentationAck | null {
+  const ack = exactDataRecord(value, [
+    "contract",
+    "version",
+    "strokeId",
+    "workerGeneration",
+    "sequence",
+    "presentationGeneration",
+    "tileCount",
+  ]);
+  if (
+    !ack
+    || ack.contract !== "studio-dry-media-union-presentation-ack-v1"
+    || ack.version !== 1
+    || ack.strokeId !== frame.strokeId
+    || ack.workerGeneration !== frame.workerGeneration
+    || ack.sequence !== frame.sequence
+    || ack.presentationGeneration !== frame.presentationGeneration
+    || ack.tileCount !== frame.tiles.length
+  ) return null;
+  return Object.freeze({
+    contract: "studio-dry-media-union-presentation-ack-v1",
+    version: 1,
+    strokeId: frame.strokeId,
+    workerGeneration: frame.workerGeneration,
+    sequence: frame.sequence,
+    presentationGeneration: frame.presentationGeneration,
+    tileCount: frame.tiles.length,
+  });
 }
 
 function snapshotRootReceipt(
@@ -424,6 +656,7 @@ function snapshotRootReceipt(
     generation: number;
     sequence: number;
     groupCount: number;
+    contourPageCount: number;
     presentationGeneration: number;
   }>,
 ): StudioDryMediaUnionPagedRootReceipt | null {
@@ -465,6 +698,9 @@ function snapshotRootReceipt(
     || receipt.programVersion !== STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_VERSION
     || receipt.programDigest !== STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_DIGEST
     || receipt.groupCount !== expected.groupCount
+    || !safeNonNegativeInteger(receipt.pageCount)
+    || !safeNonNegativeInteger(receipt.bitmapPageCount)
+    || receipt.pageCount !== expected.contourPageCount + receipt.bitmapPageCount
     || receipt.presentationGeneration !== expected.presentationGeneration
     || typeof receipt.rootDigest !== "string"
     || !sha256.test(receipt.rootDigest)
@@ -494,21 +730,21 @@ function snapshotBeginInput(
   if (
     !input
     || typeof input.strokeId !== "string"
-    || input.strokeId.trim().length === 0
-    || input.strokeId.length > 512
+    || !/^[a-zA-Z0-9._-]{1,192}$/u.test(input.strokeId)
     || !safeNonNegativeInteger(input.presentationGeneration)
     || typeof input.width !== "number"
     || !Number.isSafeInteger(input.width)
     || input.width <= 0
+    || input.width > 32_768
     || typeof input.height !== "number"
     || !Number.isSafeInteger(input.height)
     || input.height <= 0
+    || input.height > 32_768
     || !transform
     || transform.length !== 6
     || !transform.every((entry) => typeof entry === "number" && Number.isFinite(entry))
     || typeof input.color !== "string"
-    || input.color.length === 0
-    || input.color.length > 128
+    || !/^#[0-9a-f]{6}$/u.test(input.color)
     || !budget
     || !["availableBytes", "availablePages", "reservedBytes"].every(
       (key) => budget[key] !== undefined || key === "reservedBytes",
@@ -599,15 +835,25 @@ export function createStudioDryMediaUnionContinuationWorkerClient(
   let plannedGroupCount = 0;
   let admittedGroupCount = 0;
   let presentedGroupCount = 0;
+  let receivedPageCount = 0;
+  let plannedPageCount = 0;
+  let admittedPageCount = 0;
+  let presentedPageCount = 0;
   let queuePhysicalPageByteLength = 0;
   let maximumQueuePhysicalPageByteLength = 0;
   let transferCount = 0;
+  let pendingContinuation: Readonly<{
+    sourceMarks: WeakRef<readonly StudioDynamicBrushCoverageMark[]>;
+    authorityMarks: readonly StudioDynamicBrushCoverageMark[];
+    cursor: StudioDryMediaUnionContinuationPackCursor;
+  }> | null = null;
 
   let beginning: PendingControl<void> | null = null;
   let sealing: PendingControl<StudioDryMediaUnionPagedRootReceipt> | null = null;
   let cancelling: PendingControl<void> | null = null;
   let inflight: AppendJob | null = null;
   let queued: AppendJob | null = null;
+  let presenting: PendingPresentation | null = null;
 
   const releaseReservation = (): void => {
     if (!reservationToken || reservationReleaseAttempted) return;
@@ -651,6 +897,17 @@ export function createStudioDryMediaUnionContinuationWorkerClient(
     job.completion.reject(error);
   };
 
+  const releasePresentation = (): void => {
+    const lease = presenting;
+    if (!lease) return;
+    clearTimeout(lease.timer);
+    if (lease.frameOwned) {
+      lease.frameOwned = false;
+      closeFrame(lease.frame);
+    }
+    presenting = null;
+  };
+
   const poison = (message: string): void => {
     if (["sealed", "cancelled", "poisoned", "disposed"].includes(state)) return;
     const error = new Error(message);
@@ -671,10 +928,12 @@ export function createStudioDryMediaUnionContinuationWorkerClient(
       cancelling.deferred.reject(error);
       cancelling = null;
     }
+    releasePresentation();
     rejectAppend(inflight, error);
     rejectAppend(queued, error);
     inflight = null;
     queued = null;
+    pendingContinuation = null;
     queuePhysicalPageByteLength = 0;
     detachTransport();
   };
@@ -778,7 +1037,7 @@ export function createStudioDryMediaUnionContinuationWorkerClient(
     pending.deferred.resolve(undefined);
   };
 
-  const handleAppended = (response: Record<string, unknown>): void => {
+  const handleAppended = async (response: Record<string, unknown>): Promise<void> => {
     const job = inflight;
     const exact = exactDataRecord(response, [
       "type",
@@ -794,6 +1053,7 @@ export function createStudioDryMediaUnionContinuationWorkerClient(
     ]);
     if (
       !job
+      || presenting !== null
       || state !== "ready"
       || !exact
       || exact.version !== STUDIO_DRY_MEDIA_UNION_CONTINUATION_PROTOCOL_VERSION
@@ -817,6 +1077,7 @@ export function createStudioDryMediaUnionContinuationWorkerClient(
       presentationGeneration,
       width: surfaceWidth,
       height: surfaceHeight,
+      groupCount: job.groupCount,
     });
     if (!frame) {
       closePotentialFrame(response);
@@ -827,27 +1088,42 @@ export function createStudioDryMediaUnionContinuationWorkerClient(
     job.timer = null;
     admittedSequence = job.sequence;
     admittedGroupCount = job.firstGroupIndex + job.groupCount;
-    let presented: boolean;
+    admittedPageCount = job.firstPageIndex + job.pageCount;
+    presenting = {
+      job,
+      frame,
+      frameOwned: true,
+      timer: timeout("studio-dry-media-continuation-presentation-timeout"),
+    };
+    let acknowledgementCandidate: unknown;
     try {
-      presented = onFrame(frame) === true;
+      acknowledgementCandidate = await onFrame(frame);
     } catch (error) {
-      closeFrame(frame);
       poison(error instanceof Error
         ? error.message
         : "studio-dry-media-continuation-frame-observer-failed");
       return;
     }
-    if (!presented) {
-      closeFrame(frame);
+    if (state !== "ready" || inflight !== job || presenting?.job !== job) {
+      releasePresentation();
+      return;
+    }
+    const presentationAck = snapshotPresentationAck(acknowledgementCandidate, frame);
+    if (!presentationAck) {
+      releasePresentation();
       poison("studio-dry-media-continuation-frame-not-presented");
       return;
     }
     presentedSequence = job.sequence;
     presentedGroupCount = admittedGroupCount;
+    presentedPageCount = admittedPageCount;
     queuePhysicalPageByteLength = Math.max(
       0,
       queuePhysicalPageByteLength - job.physicalPageByteLength,
     );
+    clearTimeout(presenting.timer);
+    presenting.frameOwned = false;
+    presenting = null;
     inflight = null;
     job.completion.resolve(undefined);
     pump();
@@ -869,6 +1145,7 @@ export function createStudioDryMediaUnionContinuationWorkerClient(
           generation,
           sequence: presentedSequence,
           groupCount: presentedGroupCount,
+          contourPageCount: presentedPageCount,
           presentationGeneration,
         })
       : null;
@@ -916,6 +1193,7 @@ export function createStudioDryMediaUnionContinuationWorkerClient(
     }
     clearTimeout(pending.timer);
     cancelling = null;
+    pendingContinuation = null;
     state = "cancelled";
     terminalReason = "studio-dry-media-continuation-cancelled";
     detachTransport();
@@ -955,7 +1233,11 @@ export function createStudioDryMediaUnionContinuationWorkerClient(
         handleReady(response);
         break;
       case "studio-dry-media-union/appended":
-        handleAppended(response);
+        void handleAppended(response).catch((error: unknown) => {
+          poison(error instanceof Error
+            ? error.message
+            : "studio-dry-media-continuation-presentation-failed");
+        });
         break;
       case "studio-dry-media-union/sealed":
         handleSealed(response);
@@ -1068,7 +1350,7 @@ export function createStudioDryMediaUnionContinuationWorkerClient(
       post(request);
       return pending.promise;
     },
-    tryAppend(marks) {
+    tryAppend(marks, cursorCandidate) {
       if (state !== "ready") {
         return Object.freeze({ ok: false, status: "rejected", reason: "not-ready" });
       }
@@ -1076,21 +1358,42 @@ export function createStudioDryMediaUnionContinuationWorkerClient(
       if (outstandingCount >= MAX_OUTSTANDING_APPEND_REQUESTS) {
         return Object.freeze({ ok: false, status: "backpressure", reason: "queue-full" });
       }
-      let packed: ReturnType<typeof packStudioDryMediaUnionContinuationPages>;
+      if (
+        (pendingContinuation !== null
+          && (marks !== pendingContinuation.sourceMarks.deref()
+            || cursorCandidate !== pendingContinuation.cursor))
+        || (pendingContinuation === null && cursorCandidate !== undefined)
+      ) {
+        return Object.freeze({ ok: false, status: "rejected", reason: "invalid-cursor" });
+      }
+      const cursor = pendingContinuation?.cursor
+        ?? createStudioDryMediaUnionContinuationPackCursor(
+          plannedGroupCount,
+          plannedPageCount,
+        );
+      if (
+        !cursor
+        || cursor.nextGlobalGroupIndex !== plannedGroupCount
+        || cursor.nextPageIndex !== plannedPageCount
+      ) {
+        return Object.freeze({ ok: false, status: "rejected", reason: "invalid-cursor" });
+      }
+      let packed: ReturnType<typeof packStudioDryMediaUnionContinuationPageBatch>;
       try {
-        packed = packStudioDryMediaUnionContinuationPages(marks, plannedGroupCount);
+        packed = packStudioDryMediaUnionContinuationPageBatch(
+          pendingContinuation?.authorityMarks ?? marks,
+          cursor,
+        );
       } catch {
         return Object.freeze({ ok: false, status: "rejected", reason: "pack-failed" });
       }
       if (packed.status !== "packed") {
         return Object.freeze({ ok: false, status: "rejected", reason: packed.reason });
       }
-      if (!packed.inputComplete || packed.nextCursor !== null) {
-        return Object.freeze({
-          ok: false,
-          status: "backpressure",
-          reason: "append-window-exceeded",
-        });
+      const authorityMarks = pendingContinuation?.authorityMarks
+        ?? (packed.inputComplete ? null : snapshotImmutableContinuationDelivery(marks));
+      if (!packed.inputComplete && !authorityMarks) {
+        return Object.freeze({ ok: false, status: "rejected", reason: "invalid-group" });
       }
       const physicalPageByteLength = packed.pages.reduce(
         (sum, page) => sum + page.buffer.byteLength,
@@ -1116,6 +1419,7 @@ export function createStudioDryMediaUnionContinuationWorkerClient(
       const job: AppendJob = {
         sequence,
         firstGroupIndex: plannedGroupCount,
+        firstPageIndex: plannedPageCount,
         groupCount: packed.groupCount,
         physicalPageByteLength,
         logicalByteLength: packed.logicalByteLength,
@@ -1129,12 +1433,21 @@ export function createStudioDryMediaUnionContinuationWorkerClient(
       plannedSequence = sequence;
       receivedGroupCount += packed.groupCount;
       plannedGroupCount += packed.groupCount;
+      receivedPageCount += packed.pages.length;
+      plannedPageCount += packed.pages.length;
       queuePhysicalPageByteLength += physicalPageByteLength;
       maximumQueuePhysicalPageByteLength = Math.max(
         maximumQueuePhysicalPageByteLength,
         queuePhysicalPageByteLength,
       );
       queued = job;
+      pendingContinuation = packed.inputComplete
+        ? null
+        : Object.freeze({
+            sourceMarks: pendingContinuation?.sourceMarks ?? new WeakRef(marks),
+            authorityMarks: authorityMarks!,
+            cursor: packed.nextCursor!,
+          });
       pump();
       return Object.freeze({
         ok: true,
@@ -1144,6 +1457,8 @@ export function createStudioDryMediaUnionContinuationWorkerClient(
         groupCount: job.groupCount,
         pageCount: job.pageCount,
         physicalPageByteLength,
+        inputComplete: packed.inputComplete,
+        nextCursor: packed.nextCursor,
         completion: completion.promise,
       });
     },
@@ -1159,6 +1474,10 @@ export function createStudioDryMediaUnionContinuationWorkerClient(
         || receivedGroupCount !== plannedGroupCount
         || plannedGroupCount !== admittedGroupCount
         || admittedGroupCount !== presentedGroupCount
+        || receivedPageCount !== plannedPageCount
+        || plannedPageCount !== admittedPageCount
+        || admittedPageCount !== presentedPageCount
+        || pendingContinuation !== null
       ) {
         return Promise.reject(new Error("studio-dry-media-continuation-not-quiescent"));
       }
@@ -1193,10 +1512,12 @@ export function createStudioDryMediaUnionContinuationWorkerClient(
           beginning.deferred.reject(new Error(terminalReason));
           beginning = null;
         }
+        releasePresentation();
         rejectAppend(inflight, new Error(terminalReason));
         rejectAppend(queued, new Error(terminalReason));
         inflight = null;
         queued = null;
+        pendingContinuation = null;
         queuePhysicalPageByteLength = 0;
         state = "cancelled";
         detachTransport();
@@ -1204,11 +1525,13 @@ export function createStudioDryMediaUnionContinuationWorkerClient(
       }
       if (state === "idle") {
         terminalReason = "studio-dry-media-continuation-cancelled";
+        pendingContinuation = null;
         state = "cancelled";
         detachTransport();
         return Promise.resolve();
       }
       if (state !== "ready") return Promise.resolve();
+      pendingContinuation = null;
       state = "cancelling";
       requestId = nextSafe(requestId);
       const pending = deferred<void>();
@@ -1245,10 +1568,12 @@ export function createStudioDryMediaUnionContinuationWorkerClient(
         cancelling.deferred.reject(error);
         cancelling = null;
       }
+      releasePresentation();
       rejectAppend(inflight, error);
       rejectAppend(queued, error);
       inflight = null;
       queued = null;
+      pendingContinuation = null;
       queuePhysicalPageByteLength = 0;
       state = "disposed";
       detachTransport();
@@ -1265,12 +1590,18 @@ export function createStudioDryMediaUnionContinuationWorkerClient(
         plannedGroupCount,
         admittedGroupCount,
         presentedGroupCount,
+        receivedPageCount,
+        plannedPageCount,
+        admittedPageCount,
+        presentedPageCount,
         queueCount,
         queuePhysicalPageByteLength,
         inflightPhysicalPageByteLength: inflight?.physicalPageByteLength ?? 0,
         queuedPhysicalPageByteLength: queued?.physicalPageByteLength ?? 0,
         maximumQueuePhysicalPageByteLength,
         transferCount,
+        continuationPending: pendingContinuation !== null,
+        presentationPending: presenting !== null,
         scratchReservationActive:
           reservationToken !== null && !reservationReleaseAttempted,
         scratchResidentByteLength,

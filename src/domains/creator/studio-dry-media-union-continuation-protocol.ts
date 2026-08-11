@@ -691,11 +691,25 @@ export interface StudioDryMediaUnionContinuationTilePatch {
 export interface StudioDryMediaUnionContinuationFrameReceipt {
   readonly contract: "studio-dry-media-union-frame-v1";
   readonly version: 1;
+  readonly status: "rendered";
   readonly strokeId: string;
   readonly workerGeneration: number;
   readonly sequence: number;
   readonly presentationGeneration: number;
   readonly programDigest: typeof STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_DIGEST;
+  readonly coverage: Readonly<{
+    readonly contract: "studio-dry-media-union-frame-coverage-v1";
+    readonly version: 1;
+    readonly admittedGroupCount: number;
+    readonly visibleGroupCount: number;
+    readonly contourVisitCount: number;
+    readonly coordinateVisitCount: number;
+    readonly tileCount: number;
+    readonly tilePixelArea: number;
+    readonly rasterPixelArea: number;
+    readonly clearPixelArea: number;
+    readonly readbackPixelArea: number;
+  }>;
   readonly tiles: readonly StudioDryMediaUnionContinuationTilePatch[];
 }
 

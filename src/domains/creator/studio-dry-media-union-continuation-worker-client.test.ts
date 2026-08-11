@@ -13,6 +13,8 @@ import {
 } from "./studio-brush-dynamics";
 import {
   STUDIO_DRY_MEDIA_UNION_CONTINUATION_MAX_INFLIGHT_BYTES,
+  type StudioDryMediaUnionContinuationFrameReceipt,
+  type StudioDryMediaUnionContinuationPackCursor,
   type StudioDryMediaUnionContinuationRequest,
   type StudioDryMediaUnionContinuationResponse,
 } from "./studio-dry-media-union-continuation-protocol";
@@ -21,6 +23,7 @@ import {
 } from "./studio-dry-media-union-continuation-scratch-arena";
 import {
   createStudioDryMediaUnionContinuationWorkerClient,
+  type StudioDryMediaUnionContinuationPresentationAck,
   type StudioDryMediaUnionContinuationWorkerLike,
 } from "./studio-dry-media-union-continuation-worker-client";
 import {
@@ -162,8 +165,15 @@ function readyFor(
   };
 }
 
-function bitmap() {
-  return { close: vi.fn() } as unknown as ImageBitmap;
+function bitmap(dimensions: Readonly<{ width: number; height: number }> = {
+  width: 128,
+  height: 128,
+}) {
+  return {
+    width: dimensions.width,
+    height: dimensions.height,
+    close: vi.fn(),
+  } as unknown as ImageBitmap;
 }
 
 function appendedFor(
@@ -173,6 +183,18 @@ function appendedFor(
   StudioDryMediaUnionContinuationResponse,
   { readonly type: "studio-dry-media-union/appended" }
 > {
+  const groupCount = request.pages.reduce(
+    (sum, page) => sum + page.stationIndexes.length,
+    0,
+  );
+  const contourVisitCount = request.pages.reduce(
+    (sum, page) => sum + page.contourCoordinateOffsets.length - 1,
+    0,
+  );
+  const coordinateVisitCount = request.pages.reduce(
+    (sum, page) => sum + page.coordinates.length,
+    0,
+  );
   return {
     type: "studio-dry-media-union/appended",
     version: 1,
@@ -186,11 +208,25 @@ function appendedFor(
     frame: {
       contract: "studio-dry-media-union-frame-v1",
       version: 1,
+      status: "rendered",
       strokeId: request.strokeId,
       workerGeneration: request.workerGeneration,
       sequence: request.sequence,
       presentationGeneration: 9,
       programDigest: STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_DIGEST,
+      coverage: {
+        contract: "studio-dry-media-union-frame-coverage-v1",
+        version: 1,
+        admittedGroupCount: groupCount,
+        visibleGroupCount: groupCount,
+        contourVisitCount,
+        coordinateVisitCount,
+        tileCount: 1,
+        tilePixelArea: 128 * 128,
+        rasterPixelArea: 16,
+        clearPixelArea: 16,
+        readbackPixelArea: 16,
+      },
       tiles: [{
         tileX: 0,
         tileY: 0,
@@ -226,7 +262,7 @@ function sealedFor(
       rootDigest: "1".repeat(64),
       contentDigest: "2".repeat(64),
       metadataDigest: "3".repeat(64),
-      pageCount: 1,
+      pageCount: groupCount > 0 ? 2 : 1,
       indexPageCount: 1,
       bitmapPageCount: 1,
       groupCount,
@@ -256,7 +292,9 @@ function cancelledFor(request: CancelRequest): StudioDryMediaUnionContinuationRe
 }
 
 function markWithGroups(groupCount: number): StudioDynamicBrushCoverageMark {
-  const groups = Array.from({ length: groupCount }, (_, stationIndex) => Object.freeze({
+  const groups = Object.freeze(Array.from(
+    { length: groupCount },
+    (_, stationIndex) => Object.freeze({
     stationIndex,
     polygons: Object.freeze([
       Object.freeze([
@@ -268,8 +306,9 @@ function markWithGroups(groupCount: number): StudioDynamicBrushCoverageMark {
         0.5,
       ]),
     ]),
-  }));
-  return {
+    }),
+  ));
+  return Object.freeze({
     x: 0,
     y: 0,
     radiusX: 1,
@@ -277,19 +316,19 @@ function markWithGroups(groupCount: number): StudioDynamicBrushCoverageMark {
     angleRadians: 0,
     alpha: 1,
     color: "#332211",
-    ribbon: {
+    ribbon: Object.freeze({
       kind: "dry-media-union-ribbon-polygon",
       version: STUDIO_DRY_MEDIA_UNION_RIBBON_CARRIER_VERSION,
       role: "stroke-union",
-      polygons: groups.flatMap((group) => group.polygons),
-      compositing: {
+      polygons: Object.freeze(groups.flatMap((group) => group.polygons)),
+      compositing: Object.freeze({
         kind: "causal-group-alpha-max",
         version: STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_VERSION,
         programDigest: STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_DIGEST,
         groups,
-      },
-    },
-  };
+      }),
+    }),
+  });
 }
 
 function beginInput() {
@@ -308,20 +347,36 @@ function beginInput() {
   };
 }
 
+function presentationAck(
+  frame: StudioDryMediaUnionContinuationFrameReceipt,
+): StudioDryMediaUnionContinuationPresentationAck {
+  return Object.freeze({
+    contract: "studio-dry-media-union-presentation-ack-v1",
+    version: 1,
+    strokeId: frame.strokeId,
+    workerGeneration: frame.workerGeneration,
+    sequence: frame.sequence,
+    presentationGeneration: frame.presentationGeneration,
+    tileCount: frame.tiles.length,
+  });
+}
+
 function createHarness(
   setup: Readonly<{
-    onFrame?: (frame: Parameters<
-      ReturnType<typeof createStudioDryMediaUnionContinuationWorkerClient>["tryAppend"]
-    >[0]) => boolean;
+    onFrame?: (
+      frame: StudioDryMediaUnionContinuationFrameReceipt,
+    ) => boolean | Promise<boolean>;
   }> = {},
 ) {
   const worker = new FakeWorker();
   const authority = createCoordinator();
-  const onFrame = vi.fn((frame: unknown) => {
+  const onFrame = vi.fn(async (frame: StudioDryMediaUnionContinuationFrameReceipt) => {
     if (setup.onFrame) {
-      return setup.onFrame(frame as never);
+      const accepted = await setup.onFrame(frame);
+      if (!accepted) return null as never;
     }
-    return true;
+    for (const tile of frame.tiles) tile.bitmap.close();
+    return presentationAck(frame);
   });
   const client = createStudioDryMediaUnionContinuationWorkerClient({
     memory64Coordinator: authority.coordinator,
@@ -357,6 +412,21 @@ function expectReleased(harness: ReturnType<typeof createHarness>): void {
 }
 
 describe("dry-media continuation Worker client", () => {
+  it.each([
+    ["unsafe stroke identity", { strokeId: "stroke with spaces" }],
+    ["oversized width", { width: 32_769 }],
+    ["oversized height", { height: 32_769 }],
+  ] as const)("rejects %s before reserving shared scratch", async (_, override) => {
+    const harness = createHarness();
+    const reserve = vi.spyOn(harness.coordinator, "reserveCrossRealm");
+    await expect(harness.client.begin({ ...beginInput(), ...override })).rejects.toThrow(
+      "invalid-begin",
+    );
+    expect(reserve).not.toHaveBeenCalled();
+    expect(harness.worker.requests).toHaveLength(0);
+    expect(harness.worker.terminate).toHaveBeenCalledTimes(1);
+  });
+
   it("reserves exact brush scratch before BEGIN and acknowledges READY before becoming ready", async () => {
     const harness = createHarness();
     const pending = harness.client.begin(beginInput());
@@ -408,6 +478,10 @@ describe("dry-media continuation Worker client", () => {
       plannedGroupCount: 5,
       admittedGroupCount: 0,
       presentedGroupCount: 0,
+      receivedPageCount: 2,
+      plannedPageCount: 2,
+      admittedPageCount: 0,
+      presentedPageCount: 0,
       queueCount: 2,
     });
     expect(harness.client.stats().queuePhysicalPageByteLength).toBeLessThanOrEqual(
@@ -423,6 +497,7 @@ describe("dry-media continuation Worker client", () => {
       (request): request is AppendRequest => request.type === "studio-dry-media-union/append",
     );
     expect(appendRequests()).toHaveLength(1);
+    expect(appendRequests()[0]!.pages.map((page) => page.pageIndex)).toEqual([0]);
     harness.worker.emit(appendedFor(appendRequests()[0]!));
     await expect(first.ok ? first.completion : Promise.reject()).resolves.toBeUndefined();
     expect(appendRequests()).toHaveLength(2);
@@ -431,9 +506,13 @@ describe("dry-media continuation Worker client", () => {
       presentedSequence: 1,
       admittedGroupCount: 2,
       presentedGroupCount: 2,
+      admittedPageCount: 1,
+      presentedPageCount: 1,
       queueCount: 1,
     });
 
+    expect(appendRequests()[1]!.pages.map((page) => page.pageIndex)).toEqual([1]);
+    expect(appendRequests()[1]!.pages[0]!.firstGroupIndex).toBe(2);
     harness.worker.emit(appendedFor(appendRequests()[1]!));
     await expect(second.ok ? second.completion : Promise.reject()).resolves.toBeUndefined();
     expect(harness.client.stats()).toMatchObject({
@@ -445,6 +524,10 @@ describe("dry-media continuation Worker client", () => {
       plannedGroupCount: 5,
       admittedGroupCount: 5,
       presentedGroupCount: 5,
+      receivedPageCount: 2,
+      plannedPageCount: 2,
+      admittedPageCount: 2,
+      presentedPageCount: 2,
       queueCount: 0,
       queuePhysicalPageByteLength: 0,
     });
@@ -452,24 +535,251 @@ describe("dry-media continuation Worker client", () => {
     expectReleased(harness);
   });
 
-  it("rejects an incomplete bounded pack without advancing any cursor or transfer", async () => {
+  it("admits a bounded prefix and resumes 4,097 groups without drop or page reuse", async () => {
     const harness = createHarness();
     await beginReady(harness);
-    const before = harness.client.stats();
-    const result = harness.client.tryAppend([markWithGroups(4_097)]);
-
-    expect(result).toEqual({
-      ok: false,
-      status: "backpressure",
-      reason: "append-window-exceeded",
+    const marks = [markWithGroups(4_097)];
+    const first = harness.client.tryAppend(marks);
+    expect(first).toMatchObject({
+      ok: true,
+      groupCount: 4_096,
+      inputComplete: false,
     });
-    expect(harness.client.stats()).toEqual(before);
-    expect(harness.worker.requests.filter((request) => (
-      request.type === "studio-dry-media-union/append"
-    ))).toHaveLength(0);
+    if (!first.ok || !first.nextCursor) throw new Error("Expected prefix cursor.");
+    const second = harness.client.tryAppend(marks, first.nextCursor);
+    expect(second).toMatchObject({
+      ok: true,
+      groupCount: 1,
+      inputComplete: true,
+      nextCursor: null,
+    });
+    if (!second.ok) throw new Error("Expected suffix admission.");
+
+    const appendRequests = () => harness.worker.requests.filter(
+      (request): request is AppendRequest => request.type === "studio-dry-media-union/append",
+    );
+    expect(appendRequests()).toHaveLength(1);
+    const firstRequest = appendRequests()[0]!;
+    expect(firstRequest.pages[0]!.pageIndex).toBe(0);
+    harness.worker.emit(appendedFor(firstRequest));
+    await first.completion;
+    expect(appendRequests()).toHaveLength(2);
+    const secondRequest = appendRequests()[1]!;
+    expect(secondRequest.pages[0]!.pageIndex).toBe(first.pageCount);
+    expect(secondRequest.pages[0]!.firstGroupIndex).toBe(4_096);
+    harness.worker.emit(appendedFor(secondRequest));
+    await second.completion;
+
+    const beforeStale = harness.client.stats();
+    expect(harness.client.tryAppend(marks, first.nextCursor)).toEqual({
+      ok: false,
+      status: "rejected",
+      reason: "invalid-cursor",
+    });
+    expect(harness.client.stats()).toEqual(beforeStale);
+    expect(harness.client.stats()).toMatchObject({
+      admittedGroupCount: 4_097,
+      presentedGroupCount: 4_097,
+      admittedPageCount: first.pageCount + second.pageCount,
+      presentedPageCount: first.pageCount + second.pageCount,
+    });
     harness.client.dispose();
     expectReleased(harness);
   });
+
+  it("drains the immutable delivery snapshot after the caller replaces its mutable outer slot", async () => {
+    const harness = createHarness();
+    await beginReady(harness);
+    const marks = [markWithGroups(4_097)];
+    const first = harness.client.tryAppend(marks);
+    if (!first.ok || !first.nextCursor) throw new Error("Expected bounded prefix.");
+    marks[0] = markWithGroups(1);
+    const firstRequest = harness.worker.requests.at(-1) as AppendRequest;
+    harness.worker.emit(appendedFor(firstRequest));
+    await first.completion;
+
+    const resumed = harness.client.tryAppend(marks, first.nextCursor);
+    if (!resumed.ok) throw new Error("Expected immutable continuation resume.");
+    expect(resumed.groupCount).toBe(1);
+    expect(resumed.inputComplete).toBe(true);
+    const resumedRequest = harness.worker.requests.at(-1) as AppendRequest;
+    expect(resumedRequest.pages[0]?.firstGroupIndex).toBe(4_096);
+    harness.worker.emit(appendedFor(resumedRequest));
+    await resumed.completion;
+    expect(harness.client.stats()).toMatchObject({
+      admittedGroupCount: 4_097,
+      presentedGroupCount: 4_097,
+      continuationPending: false,
+    });
+    harness.client.dispose();
+    expectReleased(harness);
+  });
+
+  it("blocks seal, new delivery, and copied cursors until the exact pending suffix resumes", async () => {
+    const harness = createHarness();
+    await beginReady(harness);
+    const marks = [markWithGroups(4_097)];
+    const first = harness.client.tryAppend(marks);
+    if (!first.ok || !first.nextCursor) throw new Error("Expected prefix cursor.");
+    const request = harness.worker.requests.at(-1) as AppendRequest;
+    harness.worker.emit(appendedFor(request));
+    await first.completion;
+
+    expect(harness.client.stats().continuationPending).toBe(true);
+    await expect(harness.client.seal()).rejects.toThrow("not-quiescent");
+    expect(harness.client.tryAppend([markWithGroups(1)])).toEqual({
+      ok: false,
+      status: "rejected",
+      reason: "invalid-cursor",
+    });
+    expect(harness.client.tryAppend(marks, { ...first.nextCursor })).toEqual({
+      ok: false,
+      status: "rejected",
+      reason: "invalid-cursor",
+    });
+
+    const suffix = harness.client.tryAppend(marks, first.nextCursor);
+    expect(suffix).toMatchObject({ ok: true, groupCount: 1, inputComplete: true });
+    if (!suffix.ok) throw new Error("Expected exact suffix cursor.");
+    harness.worker.emit(appendedFor(harness.worker.requests.at(-1) as AppendRequest));
+    await suffix.completion;
+    expect(harness.client.stats().continuationPending).toBe(false);
+    harness.client.dispose();
+    expectReleased(harness);
+  });
+
+  it("drains 10,000 causal groups across three exact bounded requests", async () => {
+    const harness = createHarness();
+    await beginReady(harness);
+    const marks = [markWithGroups(10_000)];
+    let cursor: StudioDryMediaUnionContinuationPackCursor | undefined;
+    let acceptedGroups = 0;
+    let expectedPageIndex = 0;
+    let requestCount = 0;
+    do {
+      const admission = harness.client.tryAppend(marks, cursor);
+      expect(admission.ok).toBe(true);
+      if (!admission.ok) throw new Error("Expected bounded delivery admission.");
+      const request = harness.worker.requests.at(-1) as AppendRequest;
+      expect(request.pages[0]!.pageIndex).toBe(expectedPageIndex);
+      expectedPageIndex += request.pages.length;
+      acceptedGroups += admission.groupCount;
+      requestCount += 1;
+      harness.worker.emit(appendedFor(request));
+      await admission.completion;
+      cursor = admission.nextCursor ?? undefined;
+    } while (cursor);
+
+    expect(requestCount).toBe(3);
+    expect(acceptedGroups).toBe(10_000);
+    expect(harness.client.stats()).toMatchObject({
+      receivedGroupCount: 10_000,
+      plannedGroupCount: 10_000,
+      admittedGroupCount: 10_000,
+      presentedGroupCount: 10_000,
+      continuationPending: false,
+    });
+    harness.client.dispose();
+    expectReleased(harness);
+  });
+
+  it("does not advance presented authority until an exact async presentation ACK", async () => {
+    let resolvePresentation!: (accepted: boolean) => void;
+    const presentation = new Promise<boolean>((resolve) => {
+      resolvePresentation = resolve;
+    });
+    const harness = createHarness({ onFrame: () => presentation });
+    await beginReady(harness);
+    const append = harness.client.tryAppend([markWithGroups(1)]);
+    if (!append.ok) throw new Error("Expected append admission.");
+    harness.worker.emit(appendedFor(harness.worker.requests.at(-1) as AppendRequest));
+    await Promise.resolve();
+
+    expect(harness.client.stats()).toMatchObject({
+      admittedSequence: 1,
+      presentedSequence: 0,
+      presentationPending: true,
+    });
+    await expect(harness.client.seal()).rejects.toThrow("not-quiescent");
+    resolvePresentation(true);
+    await append.completion;
+    expect(harness.client.stats()).toMatchObject({
+      admittedSequence: 1,
+      presentedSequence: 1,
+      presentationPending: false,
+    });
+    harness.client.dispose();
+    expectReleased(harness);
+  });
+
+  it("times out a stalled presentation and releases its frame and reservation exactly once", async () => {
+    vi.useFakeTimers();
+    try {
+      const frameBitmap = bitmap();
+      const harness = createHarness({
+        onFrame: () => new Promise<boolean>(() => undefined),
+      });
+      await beginReady(harness);
+      const append = harness.client.tryAppend([markWithGroups(1)]);
+      if (!append.ok) throw new Error("Expected append admission.");
+      const request = harness.worker.requests.at(-1) as AppendRequest;
+      harness.worker.emit(appendedFor(request, frameBitmap));
+      await Promise.resolve();
+
+      expect(harness.client.stats()).toMatchObject({
+        queueCount: 1,
+        presentationPending: true,
+      });
+      const rejection = expect(append.completion).rejects.toThrow("presentation-timeout");
+      await vi.advanceTimersByTimeAsync(501);
+      await rejection;
+
+      expect(frameBitmap.close).toHaveBeenCalledTimes(1);
+      expect(harness.client.stats()).toMatchObject({
+        queueCount: 0,
+        presentationPending: false,
+        state: "poisoned",
+      });
+      expectReleased(harness);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it.each(["cancel", "dispose", "error"] as const)(
+    "reclaims a presentation lease immediately on %s while the observer is stalled",
+    async (action) => {
+      const frameBitmap = bitmap();
+      const harness = createHarness({
+        onFrame: () => new Promise<boolean>(() => undefined),
+      });
+      await beginReady(harness);
+      const append = harness.client.tryAppend([markWithGroups(1)]);
+      if (!append.ok) throw new Error("Expected append admission.");
+      const request = harness.worker.requests.at(-1) as AppendRequest;
+      harness.worker.emit(appendedFor(request, frameBitmap));
+      await Promise.resolve();
+      expect(harness.client.stats().presentationPending).toBe(true);
+
+      if (action === "cancel") await harness.client.cancel();
+      else if (action === "dispose") harness.client.dispose();
+      else harness.worker.emitError("error", "presentation-worker-failed");
+
+      await expect(append.completion).rejects.toThrow(
+        action === "cancel"
+          ? "cancelled"
+          : action === "dispose"
+            ? "disposed"
+            : "presentation-worker-failed",
+      );
+      expect(frameBitmap.close).toHaveBeenCalledTimes(1);
+      expect(harness.client.stats()).toMatchObject({
+        queueCount: 0,
+        presentationPending: false,
+      });
+      expectReleased(harness);
+    },
+  );
 
   it("advances admitted on ACK but requires onFrame true before presented", async () => {
     const frameBitmap = bitmap();
@@ -487,8 +797,10 @@ describe("dry-media continuation Worker client", () => {
     expect(harness.client.stats()).toMatchObject({
       admittedSequence: 1,
       admittedGroupCount: 4,
+      admittedPageCount: 1,
       presentedSequence: 0,
       presentedGroupCount: 0,
+      presentedPageCount: 0,
       state: "poisoned",
     });
     expectReleased(harness);
@@ -555,6 +867,62 @@ describe("dry-media continuation Worker client", () => {
     expectReleased(harness);
   });
 
+  it("accepts one exact dirty subrect while rejecting a patch that crosses its tile", async () => {
+    const dirtyBitmap = bitmap({ width: 4, height: 3 });
+    const harness = createHarness();
+    await beginReady(harness);
+    const append = harness.client.tryAppend([markWithGroups(1)]);
+    if (!append.ok) throw new Error("Expected append admission.");
+    const request = harness.worker.requests.at(-1) as AppendRequest;
+    const response = appendedFor(request, dirtyBitmap);
+    harness.worker.emit({
+      ...response,
+      frame: {
+        ...response.frame,
+        coverage: {
+          ...response.frame.coverage,
+          tilePixelArea: 12,
+        },
+        tiles: [{
+          tileX: 0,
+          tileY: 0,
+          x: 5,
+          y: 7,
+          width: 4,
+          height: 3,
+          bitmap: dirtyBitmap,
+        }],
+      },
+    });
+    await append.completion;
+    expect(harness.onFrame).toHaveBeenCalledTimes(1);
+
+    const crossingBitmap = bitmap({ width: 4, height: 3 });
+    const next = harness.client.tryAppend([markWithGroups(1)]);
+    if (!next.ok) throw new Error("Expected second append admission.");
+    const nextRequest = harness.worker.requests.at(-1) as AppendRequest;
+    const crossing = appendedFor(nextRequest, crossingBitmap);
+    harness.worker.emit({
+      ...crossing,
+      frame: {
+        ...crossing.frame,
+        coverage: { ...crossing.frame.coverage, tilePixelArea: 12 },
+        tiles: [{
+          tileX: 0,
+          tileY: 0,
+          x: 126,
+          y: 7,
+          width: 4,
+          height: 3,
+          bitmap: crossingBitmap,
+        }],
+      },
+    });
+    await expect(next.completion).rejects.toThrow("frame-mismatch");
+    expect(crossingBitmap.close).toHaveBeenCalledTimes(1);
+    expectReleased(harness);
+  });
+
   it("closes the frame and poisons when the presentation observer throws", async () => {
     const frameBitmap = bitmap();
     const harness = createHarness({
@@ -618,6 +986,7 @@ describe("dry-media continuation Worker client", () => {
   it.each([
     ["non-SHA digest", { metadataDigest: "NOT-SHA" }],
     ["stale presentation generation", { presentationGeneration: 10 }],
+    ["missing contour page", { pageCount: 0 }],
   ] as const)("fails closed on a %s root receipt", async (_, override) => {
     const harness = createHarness();
     await beginReady(harness);

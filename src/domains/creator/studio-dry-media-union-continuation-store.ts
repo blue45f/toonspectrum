@@ -747,7 +747,6 @@ export function createStudioDryMediaUnionContinuationStore(
         || !rawContourPages
         || rawContourPages.length === 0
         || !rawBitmapPages
-        || rawBitmapPages.length === 0
         || !presentation
       ) throw new TypeError("Invalid dry-media seal input.");
       const contourPages: StudioDryMediaUnionContinuationStoredPage[] = [];
@@ -944,7 +943,6 @@ export function createStudioDryMediaUnionContinuationStore(
         || !rawContourPages
         || rawContourPages.length === 0
         || !rawBitmapPages
-        || rawBitmapPages.length === 0
         || !presentation
       ) return null;
       const contourPages: StudioDryMediaUnionContinuationStoredPage[] = [];
