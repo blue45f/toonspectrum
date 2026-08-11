@@ -13,6 +13,10 @@ import {
 } from "./studio-geometry-nodes-serialization";
 
 import type { StudioGeometryGraph } from "./studio-geometry-nodes-graph";
+import type {
+  StudioGeometryNodeDefinition,
+  StudioGeometryNodeRegistry,
+} from "./studio-geometry-nodes-registry";
 import type { StudioGeometryNodesParseResult } from "./studio-geometry-nodes-serialization";
 
 function unwrap(result: StudioGeometryNodesParseResult): StudioGeometryGraph {
@@ -28,6 +32,40 @@ function envelope(overrides: Record<string, unknown>): Record<string, unknown> {
     nodes: [],
     links: [],
     ...overrides,
+  };
+}
+
+const linearNodeDefinition: StudioGeometryNodeDefinition = {
+  type: "linear-test",
+  label: "대규모 직렬화 테스트",
+  summary: "문서 개수 admission 회귀 전용 노드",
+  inputs: [{ key: "geometry", label: "지오메트리", type: "geometry" }],
+  outputs: [{ key: "geometry", label: "지오메트리", type: "geometry" }],
+  params: [],
+  evaluate: () => {
+    throw new Error("직렬화 테스트 노드는 평가하지 않습니다.");
+  },
+};
+
+const linearNodeRegistry: StudioGeometryNodeRegistry = {
+  get: (type) => (type === linearNodeDefinition.type ? linearNodeDefinition : undefined),
+  list: () => [linearNodeDefinition],
+};
+
+function createLargeLinearGraph(nodeCount: number): StudioGeometryGraph {
+  return {
+    nodes: Array.from({ length: nodeCount }, (_, index) => ({
+      id: `n${index}`,
+      type: linearNodeDefinition.type,
+      params: {},
+    })),
+    links: Array.from({ length: Math.max(0, nodeCount - 1) }, (_, index) => ({
+      fromNode: `n${index}`,
+      fromSocket: "geometry",
+      toNode: `n${index + 1}`,
+      toSocket: "geometry",
+    })),
+    outputNodeId: nodeCount > 0 ? `n${nodeCount - 1}` : null,
   };
 }
 
@@ -79,6 +117,26 @@ describe("studio-geometry-nodes-serialization · 라운드트립", () => {
     const graph = createStudioGeometryNodesStarterGraph();
     const asObject: unknown = JSON.parse(serializeStudioGeometryNodesGraph(graph));
     expect(unwrap(parseStudioGeometryNodesGraph(asObject)).nodes).toHaveLength(3);
+  });
+
+  it("1,001 노드·1,000 링크를 바이트 예산 안에서 무손실 왕복한다", () => {
+    const graph = createLargeLinearGraph(1_001);
+    const serialized = serializeStudioGeometryNodesGraph(graph);
+    expect(new TextEncoder().encode(serialized).byteLength).toBeLessThanOrEqual(
+      STUDIO_GEOMETRY_NODES_DOC_MAX_BYTES
+    );
+
+    const fromString = unwrap(parseStudioGeometryNodesGraph(serialized, linearNodeRegistry));
+    expect(fromString.nodes).toHaveLength(1_001);
+    expect(fromString.links).toHaveLength(1_000);
+    expect(serializeStudioGeometryNodesGraph(fromString)).toBe(serialized);
+
+    const fromObject = unwrap(
+      parseStudioGeometryNodesGraph(JSON.parse(serialized) as unknown, linearNodeRegistry)
+    );
+    expect(fromObject).toEqual(fromString);
+    expect(STUDIO_GEOMETRY_NODES_DOC_MAX_NODES).toBe(Number.POSITIVE_INFINITY);
+    expect(STUDIO_GEOMETRY_NODES_DOC_MAX_LINKS).toBe(Number.POSITIVE_INFINITY);
   });
 
   it("복원한 그래프가 평가까지 통과한다(왕복 후에도 실제로 동작)", () => {
@@ -226,29 +284,6 @@ describe("studio-geometry-nodes-serialization · 손상 입력(예외 없이 거
       code: "dangling-link",
     },
     {
-      name: "노드 상한 초과",
-      input: envelope({
-        nodes: Array.from({ length: STUDIO_GEOMETRY_NODES_DOC_MAX_NODES + 1 }, (_, i) => ({
-          id: `n${i}`,
-          type: "mesh-cube",
-          params: {},
-        })),
-      }),
-      code: "node-limit",
-    },
-    {
-      name: "링크 상한 초과",
-      input: envelope({
-        links: Array.from({ length: STUDIO_GEOMETRY_NODES_DOC_MAX_LINKS + 1 }, () => ({
-          fromNode: "a",
-          fromSocket: "geometry",
-          toNode: "b",
-          toSocket: "geometry",
-        })),
-      }),
-      code: "link-limit",
-    },
-    {
       name: "문자열 바이트 상한 초과",
       input: "x".repeat(STUDIO_GEOMETRY_NODES_DOC_MAX_BYTES + 1),
       code: "too-large",
@@ -301,6 +336,63 @@ describe("studio-geometry-nodes-serialization · 손상 입력(예외 없이 거
     expect(restored.nodes[0].params.size).toBe(2);
   });
 
+  it("객체 입력의 getter를 한 번도 실행하지 않고 fail-closed 한다", () => {
+    let getterCalls = 0;
+    const input = envelope({});
+    Object.defineProperty(input, "nodes", {
+      enumerable: true,
+      get: () => {
+        getterCalls += 1;
+        throw new Error("실행되면 안 됩니다");
+      },
+    });
+
+    let result: StudioGeometryNodesParseResult | null = null;
+    expect(() => {
+      result = parseStudioGeometryNodesGraph(input);
+    }).not.toThrow();
+    expect(getterCalls).toBe(0);
+    expect(result).toMatchObject({ ok: false, code: "invalid-json" });
+  });
+
+  it("순환 참조·희소 배열을 throw 없이 fail-closed 한다", () => {
+    const cyclic = envelope({});
+    cyclic.self = cyclic;
+    const sparseNodes = new Array<unknown>(2);
+    sparseNodes[1] = { id: "n1", type: "mesh-cube", params: {} };
+
+    expect(() => parseStudioGeometryNodesGraph(cyclic)).not.toThrow();
+    expect(parseStudioGeometryNodesGraph(cyclic)).toMatchObject({
+      ok: false,
+      code: "invalid-json",
+    });
+    expect(() => parseStudioGeometryNodesGraph(envelope({ nodes: sparseNodes }))).not.toThrow();
+    expect(parseStudioGeometryNodesGraph(envelope({ nodes: sparseNodes }))).toMatchObject({
+      ok: false,
+      code: "invalid-json",
+    });
+  });
+
+  it("객체 입력도 256KiB canonical UTF-8 admission을 우회하지 못한다", () => {
+    const oversizedObject = envelope({
+      nodes: [
+        {
+          id: "n",
+          type: "mesh-cube",
+          params: { ignoredPadding: "가".repeat(STUDIO_GEOMETRY_NODES_DOC_MAX_BYTES) },
+        },
+      ],
+    });
+    const result = parseStudioGeometryNodesGraph(oversizedObject);
+    expect(result).toMatchObject({ ok: false, code: "too-large" });
+  });
+
+  it("UTF-16 length가 작아도 UTF-8 바이트가 상한을 넘는 문자열을 거부한다", () => {
+    const input = `"${"가".repeat(Math.ceil(STUDIO_GEOMETRY_NODES_DOC_MAX_BYTES / 2))}"`;
+    expect(input.length).toBeLessThan(STUDIO_GEOMETRY_NODES_DOC_MAX_BYTES);
+    expect(parseStudioGeometryNodesGraph(input)).toMatchObject({ ok: false, code: "too-large" });
+  });
+
   it("사이클이 든 문서도 파싱은 되지만 평가에서 거부된다(관심사 분리)", () => {
     const parsed = unwrap(
       parseStudioGeometryNodesGraph(
@@ -323,16 +415,4 @@ describe("studio-geometry-nodes-serialization · 손상 입력(예외 없이 거
     if (!result.ok) expect(result.code).toBe("graph-invalid");
   });
 
-  it("정상 문서는 상한 바로 아래까지 받아들인다(경계값)", () => {
-    const atLimit = envelope({
-      nodes: Array.from({ length: STUDIO_GEOMETRY_NODES_DOC_MAX_NODES }, (_, i) => ({
-        id: `n${i}`,
-        type: "mesh-cube",
-        params: {},
-      })),
-    });
-    const result = parseStudioGeometryNodesGraph(atLimit);
-    expect(result.ok).toBe(true);
-    if (result.ok) expect(result.graph.nodes).toHaveLength(STUDIO_GEOMETRY_NODES_DOC_MAX_NODES);
-  });
 });

@@ -2,7 +2,7 @@
  * 지오메트리 노드 — 방어적 직렬화(문서 스키마 · 라운드트립 · 손상 입력 처리).
  *
  * 레포의 기존 문서 관례(`studio-bg3d-scene-document.ts`)를 따른다: kind/version 봉투,
- * 바이트·개수 상한, **예외를 절대 던지지 않는 파서**. 파서는 어떤 쓰레기 입력이 와도
+ * UTF-8 바이트 admission, **예외를 절대 던지지 않는 파서**. 파서는 어떤 쓰레기 입력이 와도
  * `{ ok:false, code, detail }` 로 수렴한다 — `JSON.parse` 실패, null, 문자열, 배열,
  * 버전 불일치, 정의되지 않은 노드 타입, 끊어진 링크, NaN 파라미터, 상한 초과 전부.
  *
@@ -36,9 +36,14 @@ import type { StudioGeometryNodeRegistry } from "./studio-geometry-nodes-registr
 export const STUDIO_GEOMETRY_NODES_DOC_KIND = "toonspectrum.geometry-nodes" as const;
 export const STUDIO_GEOMETRY_NODES_DOC_VERSION = 1 as const;
 export const STUDIO_GEOMETRY_NODES_DOC_MAX_BYTES = 256 * 1024;
-export const STUDIO_GEOMETRY_NODES_DOC_MAX_NODES = 256;
-export const STUDIO_GEOMETRY_NODES_DOC_MAX_LINKS = 512;
+/** @deprecated 문서 총량은 개수가 아니라 canonical UTF-8 바이트 admission으로 제한한다. */
+export const STUDIO_GEOMETRY_NODES_DOC_MAX_NODES = Number.POSITIVE_INFINITY;
+/** @deprecated 문서 총량은 개수가 아니라 canonical UTF-8 바이트 admission으로 제한한다. */
+export const STUDIO_GEOMETRY_NODES_DOC_MAX_LINKS = Number.POSITIVE_INFINITY;
 export const STUDIO_GEOMETRY_NODES_DOC_MAX_ID_LENGTH = 80;
+
+const STUDIO_GEOMETRY_NODES_DOC_MAX_OBJECT_DEPTH = 512;
+const studioGeometryNodesUtf8Encoder = new TextEncoder();
 
 export type StudioGeometryNodesDocErrorCode =
   | "dangling-link"
@@ -80,6 +85,170 @@ interface SerializedDocument {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+type SafeObjectSnapshotResult =
+  | { readonly ok: true; readonly value: unknown }
+  | { readonly ok: false; readonly code: "invalid-json" | "too-large"; readonly detail: string };
+
+interface SafeObjectSnapshotBudget {
+  remainingBytes: number;
+}
+
+function objectSnapshotTooLarge(): SafeObjectSnapshotResult {
+  return {
+    ok: false,
+    code: "too-large",
+    detail: `객체 canonical UTF-8 문서가 상한 ${STUDIO_GEOMETRY_NODES_DOC_MAX_BYTES}B를 초과합니다.`,
+  };
+}
+
+function utf8ByteLength(value: string): number {
+  return studioGeometryNodesUtf8Encoder.encode(value).byteLength;
+}
+
+function consumeSnapshotBytes(
+  budget: SafeObjectSnapshotBudget,
+  bytes: number
+): SafeObjectSnapshotResult | null {
+  if (bytes > budget.remainingBytes) {
+    return objectSnapshotTooLarge();
+  }
+  budget.remainingBytes -= bytes;
+  return null;
+}
+
+function invalidObjectSnapshot(detail: string): SafeObjectSnapshotResult {
+  return { ok: false, code: "invalid-json", detail };
+}
+
+/**
+ * 이미 파싱된 객체를 JSON 의미론의 own-data 스냅샷으로 바꾼다.
+ * descriptor만 읽으므로 getter/toJSON/상속 property를 실행하지 않고, 복제하는 동안
+ * JSON canonical UTF-8 크기를 증분 계산해 개수 상한 없이도 메모리 폭증을 막는다.
+ */
+function snapshotObjectValue(
+  value: unknown,
+  path: string,
+  depth: number,
+  budget: SafeObjectSnapshotBudget,
+  ancestors: WeakSet<object>
+): SafeObjectSnapshotResult {
+  if (value === null) {
+    const failure = consumeSnapshotBytes(budget, 4);
+    return failure ?? { ok: true, value: null };
+  }
+  if (typeof value === "string") {
+    // UTF-8은 UTF-16 code unit 수보다 작아지지 않는다. 먼저 거부해
+    // 상한보다 큰 문자열의 JSON.stringify/TextEncoder 임시 할당을 막는다.
+    if (value.length + 2 > budget.remainingBytes) {
+      return objectSnapshotTooLarge();
+    }
+    const token = JSON.stringify(value);
+    const failure = consumeSnapshotBytes(budget, utf8ByteLength(token));
+    return failure ?? { ok: true, value };
+  }
+  if (typeof value === "boolean") {
+    const failure = consumeSnapshotBytes(budget, value ? 4 : 5);
+    return failure ?? { ok: true, value };
+  }
+  if (typeof value === "number") {
+    const token = JSON.stringify(value) ?? "null";
+    const failure = consumeSnapshotBytes(budget, utf8ByteLength(token));
+    return failure ?? { ok: true, value };
+  }
+  if (typeof value !== "object") {
+    return invalidObjectSnapshot(`${path}에 JSON으로 안전하지 않은 값이 있습니다.`);
+  }
+  if (depth > STUDIO_GEOMETRY_NODES_DOC_MAX_OBJECT_DEPTH) {
+    return invalidObjectSnapshot(`${path}의 중첩이 안전 범위를 초과합니다.`);
+  }
+  if (ancestors.has(value)) {
+    return invalidObjectSnapshot(`${path}에 순환 참조가 있습니다.`);
+  }
+
+  ancestors.add(value);
+  try {
+    if (Array.isArray(value)) {
+      const lengthDescriptor = Object.getOwnPropertyDescriptor(value, "length");
+      if (!lengthDescriptor || !("value" in lengthDescriptor)) {
+        return invalidObjectSnapshot(`${path}.length가 own-data property가 아닙니다.`);
+      }
+      const length = lengthDescriptor.value;
+      if (!Number.isSafeInteger(length) || length < 0) {
+        return invalidObjectSnapshot(`${path}.length가 유효하지 않습니다.`);
+      }
+      const envelopeFailure = consumeSnapshotBytes(budget, 2 + Math.max(0, length - 1));
+      if (envelopeFailure) return envelopeFailure;
+
+      const snapshot = new Array<unknown>(length);
+      for (let index = 0; index < length; index++) {
+        const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+        if (!descriptor || !("value" in descriptor) || !descriptor.enumerable) {
+          return invalidObjectSnapshot(`${path}[${index}]가 희소하거나 data property가 아닙니다.`);
+        }
+        const child = snapshotObjectValue(
+          descriptor.value,
+          `${path}[${index}]`,
+          depth + 1,
+          budget,
+          ancestors
+        );
+        if (!child.ok) return child;
+        snapshot[index] = child.value;
+      }
+      return { ok: true, value: snapshot };
+    }
+
+    const snapshot: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
+    let writtenKeys = 0;
+    for (const key of Reflect.ownKeys(value)) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (!descriptor) {
+        return invalidObjectSnapshot(`${path}의 property descriptor가 불안정합니다.`);
+      }
+      if (!("value" in descriptor)) {
+        return invalidObjectSnapshot(`${path}.${String(key)}가 accessor property입니다.`);
+      }
+      if (typeof key !== "string" || !descriptor.enumerable) continue;
+      const separatorBytes = writtenKeys === 0 ? 0 : 1;
+      if (separatorBytes + key.length + 3 > budget.remainingBytes) {
+        return objectSnapshotTooLarge();
+      }
+      const keyBytes = utf8ByteLength(JSON.stringify(key));
+      const propertyFailure = consumeSnapshotBytes(budget, separatorBytes + keyBytes + 1);
+      if (propertyFailure) return propertyFailure;
+      const child = snapshotObjectValue(
+        descriptor.value,
+        `${path}.${key}`,
+        depth + 1,
+        budget,
+        ancestors
+      );
+      if (!child.ok) return child;
+      snapshot[key] = child.value;
+      writtenKeys += 1;
+    }
+    const envelopeFailure = consumeSnapshotBytes(budget, 2);
+    return envelopeFailure ?? { ok: true, value: snapshot };
+  } finally {
+    ancestors.delete(value);
+  }
+}
+
+function createSafeObjectSnapshot(input: object): SafeObjectSnapshotResult {
+  try {
+    return snapshotObjectValue(
+      input,
+      "$",
+      0,
+      { remainingBytes: STUDIO_GEOMETRY_NODES_DOC_MAX_BYTES },
+      new WeakSet<object>()
+    );
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    return invalidObjectSnapshot(`객체 안전 스냅샷 실패: ${detail}`);
+  }
 }
 
 function fail(
@@ -148,12 +317,23 @@ export function parseStudioGeometryNodesGraph(
     if (input.length > STUDIO_GEOMETRY_NODES_DOC_MAX_BYTES) {
       return fail("too-large", `문서 ${input.length}B > 상한 ${STUDIO_GEOMETRY_NODES_DOC_MAX_BYTES}B`);
     }
+    const inputBytes = utf8ByteLength(input);
+    if (inputBytes > STUDIO_GEOMETRY_NODES_DOC_MAX_BYTES) {
+      return fail(
+        "too-large",
+        `문서 ${inputBytes}B > 상한 ${STUDIO_GEOMETRY_NODES_DOC_MAX_BYTES}B`
+      );
+    }
     try {
       raw = JSON.parse(input);
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       return fail("invalid-json", `JSON 파싱 실패: ${detail}`);
     }
+  } else if (typeof input === "object" && input !== null) {
+    const snapshot = createSafeObjectSnapshot(input);
+    if (!snapshot.ok) return fail(snapshot.code, snapshot.detail);
+    raw = snapshot.value;
   }
   if (!isRecord(raw)) return fail("not-an-object", "문서가 객체가 아닙니다.");
   if (raw.kind !== STUDIO_GEOMETRY_NODES_DOC_KIND) {
@@ -164,13 +344,6 @@ export function parseStudioGeometryNodesGraph(
   }
   if (!Array.isArray(raw.nodes)) return fail("invalid-node", "nodes 가 배열이 아닙니다.");
   if (!Array.isArray(raw.links)) return fail("invalid-link", "links 가 배열이 아닙니다.");
-  if (raw.nodes.length > STUDIO_GEOMETRY_NODES_DOC_MAX_NODES) {
-    return fail("node-limit", `노드 ${raw.nodes.length} > 상한 ${STUDIO_GEOMETRY_NODES_DOC_MAX_NODES}`);
-  }
-  if (raw.links.length > STUDIO_GEOMETRY_NODES_DOC_MAX_LINKS) {
-    return fail("link-limit", `링크 ${raw.links.length} > 상한 ${STUDIO_GEOMETRY_NODES_DOC_MAX_LINKS}`);
-  }
-
   const nodes: StudioGeometryGraphNode[] = [];
   const seenIds = new Set<string>();
   for (let i = 0; i < raw.nodes.length; i++) {
