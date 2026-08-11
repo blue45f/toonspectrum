@@ -336,3 +336,96 @@ export function planStudioWebAwareDynamicBrushDabs(
     input.settings,
   );
 }
+
+/** Live pointer frames target ~4k Canvas marks (see STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET). */
+export const STUDIO_WEB_DRAWING_LIVE_MARK_BUDGET_DEFAULT = 4_096;
+
+export interface StudioWebDrawingLiveMaxDabsRecommendation {
+  readonly family: StudioWebDrawingBrushFamily;
+  readonly maxDabs: number;
+  readonly sampleCount: number;
+  readonly uncappedDabCount: number;
+  readonly markBudget: number;
+  readonly marksPerDab: number;
+  readonly capped: boolean;
+  readonly empty: boolean;
+}
+
+/**
+ * Recommend a live maxDabs ceiling from kit sample volume and the live mark budget.
+ * Competitive swarms (multi-agent) often explode samples; this keeps pointer frames under budget
+ * without changing committed document fidelity (callers still pass higher max for commit).
+ */
+export function recommendStudioWebDrawingLiveMaxDabs(
+  input: StudioWebDrawingBridgeInput & {
+    readonly markBudget?: number;
+    readonly marksPerDab?: number;
+  },
+): StudioWebDrawingLiveMaxDabsRecommendation {
+  const markBudget = Math.max(
+    1,
+    Math.round(finite(input.markBudget, STUDIO_WEB_DRAWING_LIVE_MARK_BUDGET_DEFAULT)),
+  );
+  const marksPerDab = Math.max(1, Math.round(finite(input.marksPerDab, 1)));
+  const audit = auditStudioWebDrawingBridgePlan({
+    ...input,
+    // Uncapped sample count for capacity planning.
+    maxDabs: 65_536,
+  });
+  if (audit.empty || audit.family === "none") {
+    return Object.freeze({
+      family: audit.family,
+      maxDabs: 1,
+      sampleCount: 0,
+      uncappedDabCount: 0,
+      markBudget,
+      marksPerDab,
+      capped: false,
+      empty: true,
+    });
+  }
+  const byMarks = Math.max(1, Math.floor(markBudget / marksPerDab));
+  const callerCap = Math.max(
+    1,
+    Math.min(65_536, Math.round(finite(input.maxDabs, byMarks))),
+  );
+  const maxDabs = Math.min(byMarks, callerCap, audit.sampleCount);
+  return Object.freeze({
+    family: audit.family,
+    maxDabs,
+    sampleCount: audit.sampleCount,
+    uncappedDabCount: audit.sampleCount,
+    markBudget,
+    marksPerDab,
+    capped: maxDabs < audit.sampleCount,
+    empty: false,
+  });
+}
+
+/**
+ * Progressive live-frame slice: keep a prefix of planned dabs under a hard ceiling.
+ * Returns the same array reference when no slice is needed (allocation-light).
+ */
+export function sliceStudioDynamicDabsForLiveFrame<
+  T extends { readonly index: number },
+>(
+  dabs: readonly T[],
+  maxDabs: number,
+): {
+  readonly dabs: readonly T[];
+  readonly sliced: boolean;
+  readonly dropped: number;
+} {
+  const limit = Math.max(0, Math.floor(maxDabs));
+  if (limit <= 0) {
+    return Object.freeze({ dabs: Object.freeze([] as T[]), sliced: true, dropped: dabs.length });
+  }
+  if (dabs.length <= limit) {
+    return Object.freeze({ dabs, sliced: false, dropped: 0 });
+  }
+  return Object.freeze({
+    dabs: dabs.slice(0, limit),
+    sliced: true,
+    dropped: dabs.length - limit,
+  });
+}

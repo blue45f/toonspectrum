@@ -7,6 +7,7 @@ import {
   listStudioLiveLayerOwnershipLocksOnPage,
   resolveStudioLiveLayerOwnership,
   reuseOrBuildStudioLiveLayerOwnershipByItemId,
+  studioLiveSelectionEditGate,
   summarizeStudioLiveSelectionOwnership,
 } from "./studio-live-layer-ownership";
 import {
@@ -168,6 +169,21 @@ describe("studio live layer ownership", () => {
     expect(free.blocksLocalEdit).toBe(false);
     expect(free.bannerLabel).toBeNull();
     expect(free.freeCount).toBe(1);
+
+    const blockedGate = studioLiveSelectionEditGate({
+      selectedIds: [layerA, layerB],
+      ownershipByItemId,
+    });
+    expect(blockedGate.allowed).toBe(false);
+    expect(blockedGate.reason).toContain("민수");
+    expect(blockedGate.summary.blockedCount).toBe(1);
+
+    const freeGate = studioLiveSelectionEditGate({
+      selectedIds: [layerB],
+      ownershipByItemId,
+    });
+    expect(freeGate.allowed).toBe(true);
+    expect(freeGate.reason).toBeNull();
   });
 
   it("reuses the dense ownership map when lock fingerprint is unchanged", () => {

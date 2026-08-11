@@ -304,6 +304,37 @@ export function summarizeStudioLiveSelectionOwnership(input: {
 }
 
 /**
+ * Gate multi-layer / selection-level edits from the dense ownership projection.
+ * Peer or page-peer ownership on any selected id blocks local batch mutations.
+ */
+export function studioLiveSelectionEditGate(input: {
+  readonly selectedIds: readonly string[];
+  readonly ownershipByItemId: ReadonlyMap<string, StudioLiveLayerOwnership>;
+}): {
+  readonly allowed: boolean;
+  readonly reason: string | null;
+  readonly summary: StudioLiveSelectionOwnershipSummary;
+} {
+  const summary = summarizeStudioLiveSelectionOwnership(input);
+  if (!summary.blocksLocalEdit) {
+    return Object.freeze({
+      allowed: true,
+      reason: null,
+      summary,
+    });
+  }
+  const who = summary.primaryPeerName?.trim() || "다른 편집자";
+  return Object.freeze({
+    allowed: false,
+    reason:
+      summary.blockedCount === 1
+        ? `${who}가 선택한 레이어를 편집 중입니다. 잠금이 풀릴 때까지 기다려 주세요.`
+        : `${who} 등이 선택한 레이어 ${summary.blockedCount}개를 편집 중입니다. 잠금이 풀릴 때까지 기다려 주세요.`,
+    summary,
+  });
+}
+
+/**
  * Rebuild ownership only when the active-lease fingerprint or element set changes.
  * Returns the previous map reference when nothing material changed at `now`.
  *

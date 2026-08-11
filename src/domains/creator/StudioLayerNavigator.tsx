@@ -70,6 +70,7 @@ import {
 import { useStudioLiveCollaboration } from "./studio-live-collaboration-context";
 import {
   reuseOrBuildStudioLiveLayerOwnershipByItemId,
+  studioLiveSelectionEditGate,
   summarizeStudioLiveSelectionOwnership,
   type StudioLiveLayerOwnership,
 } from "./studio-live-layer-ownership";
@@ -278,6 +279,13 @@ export function StudioLayerNavigator({
     selectedIds,
     ownershipByItemId: liveOwnershipByItemId,
   });
+  const selectionEditGate = studioLiveSelectionEditGate({
+    selectedIds,
+    ownershipByItemId: liveOwnershipByItemId,
+  });
+  const liveSelectionBlocked = selectionEditGate.allowed === false;
+  /** Document read-only or peer-held selection — blocks batch and item mutations. */
+  const mutationDisabled = readOnly || liveSelectionBlocked;
   const filterPanelId = useId();
   const actionPopoverId = useId();
   const resultStatusId = useId();
@@ -351,7 +359,9 @@ export function StudioLayerNavigator({
         ? "검색·필터를 지운 뒤 그룹을 만들 수 있어요."
         : selectionContainsGroupedItems
           ? "기존 그룹이 포함되어 있어요. 먼저 그룹을 해제해 주세요."
-          : undefined;
+          : liveSelectionBlocked
+            ? (selectionEditGate.reason ?? "다른 참가자가 편집 중인 레이어예요.")
+            : undefined;
   const commonSelectedRole = commonValue(batchSelectedItems.map((item) => item.role));
   const commonSelectedColor = commonValue(batchSelectedItems.map((item) => item.color));
 
@@ -1199,7 +1209,7 @@ export function StudioLayerNavigator({
             {outsideSelectionCount > 0 ? ` · 밖 ${outsideSelectionCount}` : ""}
           </span>
           <StudioToolHintTarget
-            disabled={readOnly || batchShowIds.length === 0}
+            disabled={mutationDisabled || batchShowIds.length === 0}
             unavailableReason={
               readOnly
                 ? "읽기 전용 작업공간에서는 레이어 표시 상태를 바꿀 수 없어요."
@@ -1219,7 +1229,7 @@ export function StudioLayerNavigator({
           >
             <button
               type="button"
-              disabled={readOnly || batchShowIds.length === 0}
+              disabled={mutationDisabled || batchShowIds.length === 0}
               onClick={() => onAction({ type: "set-items-hidden", ids: batchShowIds, hidden: false })}
               className={cn("grid size-8 shrink-0 place-items-center rounded border border-line bg-card text-fg-3 hover:bg-raised hover:text-fg", coarseTarget, focusRing)}
               aria-label={`현재 결과의 선택 ${batchShowIds.length}개 표시${batchShowBlockedCount > 0 ? `, 숨긴 상위 그룹 ${batchShowBlockedCount}개 제외` : ""}`}
@@ -1228,7 +1238,7 @@ export function StudioLayerNavigator({
             </button>
           </StudioToolHintTarget>
           <StudioToolHintTarget
-            disabled={readOnly || batchSelectedIds.length === 0}
+            disabled={mutationDisabled || batchSelectedIds.length === 0}
             unavailableReason={
               readOnly
                 ? "읽기 전용 작업공간에서는 레이어를 숨길 수 없어요."
@@ -1247,7 +1257,7 @@ export function StudioLayerNavigator({
           >
             <button
               type="button"
-              disabled={readOnly || batchSelectedIds.length === 0}
+              disabled={mutationDisabled || batchSelectedIds.length === 0}
               onClick={() => onAction({ type: "set-items-hidden", ids: batchSelectedIds, hidden: true })}
               className={cn("grid size-8 shrink-0 place-items-center rounded border border-line bg-card text-fg-3 hover:bg-raised hover:text-fg", coarseTarget, focusRing)}
               aria-label={`현재 결과의 선택 ${batchSelectedIds.length}개 숨김`}
@@ -1256,7 +1266,7 @@ export function StudioLayerNavigator({
             </button>
           </StudioToolHintTarget>
           <StudioToolHintTarget
-            disabled={readOnly || batchSelectedIds.length === 0}
+            disabled={mutationDisabled || batchSelectedIds.length === 0}
             unavailableReason={
               readOnly
                 ? "읽기 전용 작업공간에서는 레이어를 잠글 수 없어요."
@@ -1274,7 +1284,7 @@ export function StudioLayerNavigator({
           >
             <button
               type="button"
-              disabled={readOnly || batchSelectedIds.length === 0}
+              disabled={mutationDisabled || batchSelectedIds.length === 0}
               onClick={() => onAction({ type: "set-items-locked", ids: batchSelectedIds, locked: true })}
               className={cn("grid size-8 shrink-0 place-items-center rounded border border-line bg-card text-fg-3 hover:bg-raised hover:text-fg", coarseTarget, focusRing)}
               aria-label={`현재 결과의 선택 ${batchSelectedIds.length}개 잠금`}
@@ -1283,7 +1293,7 @@ export function StudioLayerNavigator({
             </button>
           </StudioToolHintTarget>
           <StudioToolHintTarget
-            disabled={readOnly || batchUnlockIds.length === 0}
+            disabled={mutationDisabled || batchUnlockIds.length === 0}
             unavailableReason={
               readOnly
                 ? "읽기 전용 작업공간에서는 레이어 잠금을 해제할 수 없어요."
@@ -1303,7 +1313,7 @@ export function StudioLayerNavigator({
           >
             <button
               type="button"
-              disabled={readOnly || batchUnlockIds.length === 0}
+              disabled={mutationDisabled || batchUnlockIds.length === 0}
               onClick={() => onAction({ type: "set-items-locked", ids: batchUnlockIds, locked: false })}
               className={cn("grid size-8 shrink-0 place-items-center rounded border border-line bg-card text-fg-3 hover:bg-raised hover:text-fg", coarseTarget, focusRing)}
               aria-label={`현재 결과의 선택 ${batchUnlockIds.length}개 잠금 해제${batchUnlockBlockedCount > 0 ? `, 잠긴 상위 그룹 ${batchUnlockBlockedCount}개 제외` : ""}`}
@@ -1312,7 +1322,7 @@ export function StudioLayerNavigator({
             </button>
           </StudioToolHintTarget>
           <StudioToolHintTarget
-            disabled={readOnly || batchSelectedIds.length < 2}
+            disabled={mutationDisabled || batchSelectedIds.length < 2}
             unavailableReason={
               readOnly
                 ? "읽기 전용 작업공간에서는 레이어를 병합할 수 없어요."
@@ -1333,7 +1343,7 @@ export function StudioLayerNavigator({
           >
             <button
               type="button"
-              disabled={readOnly || batchSelectedIds.length < 2}
+              disabled={mutationDisabled || batchSelectedIds.length < 2}
               onClick={() => onAction({ type: "merge-selected", ids: batchSelectedIds })}
               className={cn("grid size-8 shrink-0 place-items-center rounded border border-line bg-card text-fg-3 hover:bg-raised hover:text-fg", coarseTarget, focusRing)}
               aria-label="선택 레이어 병합"
@@ -1344,7 +1354,7 @@ export function StudioLayerNavigator({
             </button>
           </StudioToolHintTarget>
           <StudioToolHintTarget
-            disabled={readOnly}
+            disabled={mutationDisabled}
             unavailableReason={readOnly ? "읽기 전용 작업공간에서는 표시 레이어를 병합할 수 없어요." : undefined}
             preferredSide="top"
             hint={{
@@ -1359,7 +1369,7 @@ export function StudioLayerNavigator({
           >
             <button
               type="button"
-              disabled={readOnly}
+              disabled={mutationDisabled}
               onClick={() => onAction({ type: "flatten-visible" })}
               className={cn("grid size-8 shrink-0 place-items-center rounded border border-line bg-card text-fg-3 hover:bg-raised hover:text-fg", coarseTarget, focusRing)}
               aria-label="표시 레이어 병합"
@@ -1571,7 +1581,7 @@ export function StudioLayerNavigator({
                           value: !node.group.locked,
                         });
                       }}
-                      disabled={readOnly}
+                      disabled={mutationDisabled}
                       className={cn(
                         "grid size-8 shrink-0 place-items-center rounded text-fg-3 hover:bg-raised disabled:opacity-35",
                         coarseTarget,
@@ -1599,7 +1609,7 @@ export function StudioLayerNavigator({
                           value: !node.group.hidden,
                         });
                       }}
-                      disabled={readOnly}
+                      disabled={mutationDisabled}
                       className={cn("grid size-8 shrink-0 place-items-center rounded text-fg-3 hover:bg-raised disabled:opacity-35", coarseTarget, focusRing)}
                       aria-label={node.group.hidden ? `${node.group.name} 그룹 표시` : `${node.group.name} 그룹 숨김`}
                     >
@@ -1705,7 +1715,7 @@ export function StudioLayerNavigator({
                 그룹
                 <select
                   value={commonSelectedGroup ?? ""}
-                  disabled={readOnly || groupingDisabled || filterActive || batchSelectedIds.length === 0}
+                  disabled={mutationDisabled || groupingDisabled || filterActive || batchSelectedIds.length === 0}
                   onChange={(event) => setSelectedGroup(event.target.value, batchSelectedIds)}
                   aria-label="선택 레이어 그룹"
                   title={
@@ -1726,7 +1736,7 @@ export function StudioLayerNavigator({
                 작업 역할
                 <select
                   value={commonSelectedRole ?? ""}
-                  disabled={readOnly || batchSelectedIds.length === 0}
+                  disabled={mutationDisabled || batchSelectedIds.length === 0}
                   onChange={(event) => setSelectedRole(event.target.value, batchSelectedIds)}
                   aria-label="선택 레이어 역할"
                   className={cn("mt-1 min-h-9 w-full rounded-md border border-line bg-card px-2 text-xs text-fg max-lg:min-h-11 pointer-coarse:min-h-11", focusRing)}
@@ -1740,7 +1750,7 @@ export function StudioLayerNavigator({
                 색 라벨
                 <select
                   value={commonSelectedColor ?? ""}
-                  disabled={readOnly || batchSelectedIds.length === 0}
+                  disabled={mutationDisabled || batchSelectedIds.length === 0}
                   onChange={(event) => setSelectedColor(event.target.value, batchSelectedIds)}
                   aria-label="선택 레이어 색 라벨"
                   className={cn("mt-1 min-h-9 w-full rounded-md border border-line bg-card px-2 text-xs text-fg max-lg:min-h-11 pointer-coarse:min-h-11", focusRing)}
@@ -1776,7 +1786,7 @@ export function StudioLayerNavigator({
               </button>
               <button
                 type="button"
-                disabled={readOnly || batchSelectedIds.length < 2}
+                disabled={mutationDisabled || batchSelectedIds.length < 2}
                 onClick={() => {
                   onAction({ type: "merge-selected", ids: batchSelectedIds });
                   setActionTarget(null);
@@ -1790,7 +1800,7 @@ export function StudioLayerNavigator({
               </button>
               <button
                 type="button"
-                disabled={readOnly}
+                disabled={mutationDisabled}
                 onClick={() => {
                   onAction({ type: "flatten-visible" });
                   setActionTarget(null);
@@ -1809,7 +1819,7 @@ export function StudioLayerNavigator({
               ) : null}
               <button
                 type="button"
-                disabled={readOnly || batchSelectedIds.length === 0}
+                disabled={mutationDisabled || batchSelectedIds.length === 0}
                 onClick={() => {
                   onAction({ type: "delete-items", ids: batchSelectedIds });
                   setActionTarget(null);
@@ -1833,7 +1843,7 @@ export function StudioLayerNavigator({
             </div>
           ) : activeItem ? (
             <div className="mt-2 grid grid-cols-2 gap-1.5">
-              <button type="button" disabled={readOnly} onClick={() => beginRename("item", activeItem.id, activeItem.label)} className={compactControl}>
+              <button type="button" disabled={mutationDisabled} onClick={() => beginRename("item", activeItem.id, activeItem.label)} className={compactControl}>
                 <TypeIcon size={13} /> 이름 변경
               </button>
               {activeItem.type === "frame" ? (
@@ -1859,7 +1869,7 @@ export function StudioLayerNavigator({
               ) : null}
               <button
                 type="button"
-                disabled={readOnly || activeItemHiddenByGroup}
+                disabled={mutationDisabled || activeItemHiddenByGroup}
                 onClick={() => onAction({ type: "set-items-hidden", ids: [activeItem.id], hidden: !activeItem.hidden })}
                 className={compactControl}
                 title={activeItemHiddenByGroup ? "상위 그룹이 숨겨져 있어 그룹을 먼저 표시해야 해요" : undefined}
@@ -1892,7 +1902,7 @@ export function StudioLayerNavigator({
               ) : null}
               <button
                 type="button"
-                disabled={readOnly || activeItemLockedByGroup}
+                disabled={mutationDisabled || activeItemLockedByGroup}
                 onClick={() => onAction({ type: "set-items-locked", ids: [activeItem.id], locked: !activeItem.locked })}
                 className={compactControl}
                 title={activeItemLockedByGroup ? "상위 그룹이 잠겨 있어 그룹 잠금을 먼저 해제해야 해요" : undefined}
@@ -1902,14 +1912,14 @@ export function StudioLayerNavigator({
               </button>
               {activeItem.type === "image" ? (
                 <>
-                  <button type="button" disabled={readOnly || activeItemEffectivelyLocked} onClick={() => onAction({ type: "set-item-flag", id: activeItem.id, flag: "alphaLocked", value: !activeItem.alphaLocked })} className={compactControl}>
+                  <button type="button" disabled={mutationDisabled || activeItemEffectivelyLocked} onClick={() => onAction({ type: "set-item-flag", id: activeItem.id, flag: "alphaLocked", value: !activeItem.alphaLocked })} className={compactControl}>
                     <Grid2X2 size={13} /> {activeItem.alphaLocked ? "알파 락 해제" : "알파 락"}
                   </button>
-                  <button type="button" disabled={readOnly} onClick={() => onAction({ type: "set-item-flag", id: activeItem.id, flag: "fillReference", value: !activeItem.fillReference })} className={compactControl}>
+                  <button type="button" disabled={mutationDisabled} onClick={() => onAction({ type: "set-item-flag", id: activeItem.id, flag: "fillReference", value: !activeItem.fillReference })} className={compactControl}>
                     <ScanLine size={13} /> {activeItem.fillReference ? "참조 해제" : "채우기 참조"}
                   </button>
                   {activeItem.masked ? (
-                    <button type="button" disabled={readOnly || activeItemEffectivelyLocked} onClick={() => onAction({ type: "set-item-flag", id: activeItem.id, flag: "maskEnabled", value: activeItem.maskEnabled === false })} className={compactControl}>
+                    <button type="button" disabled={mutationDisabled || activeItemEffectivelyLocked} onClick={() => onAction({ type: "set-item-flag", id: activeItem.id, flag: "maskEnabled", value: activeItem.maskEnabled === false })} className={compactControl}>
                       <Layers3 size={13} /> {activeItem.maskEnabled === false ? "마스크 켜기" : "마스크 끄기"}
                     </button>
                   ) : null}
@@ -1917,7 +1927,7 @@ export function StudioLayerNavigator({
               ) : null}
               <button
                 type="button"
-                disabled={readOnly || filterActive}
+                disabled={mutationDisabled || filterActive}
                 onClick={() => onAction({ type: "move-item", id: activeItem.id, direction: "up" })}
                 className={compactControl}
                 title={filterActive ? "검색·필터를 지우면 전체 레이어 순서를 바꿀 수 있어요" : "앞으로 이동"}
@@ -1926,7 +1936,7 @@ export function StudioLayerNavigator({
               </button>
               <button
                 type="button"
-                disabled={readOnly || filterActive}
+                disabled={mutationDisabled || filterActive}
                 onClick={() => onAction({ type: "move-item", id: activeItem.id, direction: "down" })}
                 className={compactControl}
                 title={filterActive ? "검색·필터를 지우면 전체 레이어 순서를 바꿀 수 있어요" : "뒤로 이동"}
@@ -1944,7 +1954,7 @@ export function StudioLayerNavigator({
                 그룹
                 <select
                   value={availableGroups.some((group) => group.id === activeItem.groupId) ? activeItem.groupId : ""}
-                  disabled={readOnly || groupingDisabled || filterActive}
+                  disabled={mutationDisabled || groupingDisabled || filterActive}
                   onChange={(event) => setSelectedGroup(event.target.value, [activeItem.id])}
                   title={
                     groupingDisabled
@@ -1963,7 +1973,7 @@ export function StudioLayerNavigator({
                 <span className="inline-flex items-center gap-1"><Tags size={11} /> 작업 역할</span>
                 <select
                   value={activeItem.role ?? ""}
-                  disabled={readOnly}
+                  disabled={mutationDisabled}
                   onChange={(event) => setSelectedRole(event.target.value, [activeItem.id])}
                   className={cn("mt-1 min-h-9 w-full rounded-md border border-line bg-card px-2 text-xs text-fg max-lg:min-h-11 pointer-coarse:min-h-11", focusRing)}
                 >
@@ -1975,7 +1985,7 @@ export function StudioLayerNavigator({
                 <span className="inline-flex items-center gap-1"><Palette size={11} /> 색 라벨</span>
                 <select
                   value={activeItem.color ?? ""}
-                  disabled={readOnly}
+                  disabled={mutationDisabled}
                   onChange={(event) => setSelectedColor(event.target.value, [activeItem.id])}
                   className={cn("mt-1 min-h-9 w-full rounded-md border border-line bg-card px-2 text-xs text-fg max-lg:min-h-11 pointer-coarse:min-h-11", focusRing)}
                 >
@@ -1985,7 +1995,7 @@ export function StudioLayerNavigator({
               </label>
               <button
                 type="button"
-                disabled={readOnly}
+                disabled={mutationDisabled}
                 onClick={() => {
                   onAction({ type: "merge-down", id: activeItem.id });
                   setActionTarget(null);
@@ -2003,7 +2013,7 @@ export function StudioLayerNavigator({
               </button>
               <button
                 type="button"
-                disabled={readOnly}
+                disabled={mutationDisabled}
                 onClick={() => {
                   onAction({ type: "flatten-visible" });
                   setActionTarget(null);
@@ -2026,7 +2036,7 @@ export function StudioLayerNavigator({
               ) : null}
               <button
                 type="button"
-                disabled={readOnly}
+                disabled={mutationDisabled}
                 onClick={() => onAction({ type: "delete-items", ids: [activeItem.id] })}
                 className={cn(compactControl, "col-span-2 text-bad")}
               >
@@ -2035,7 +2045,7 @@ export function StudioLayerNavigator({
             </div>
           ) : activeGroup ? (
             <div className="mt-2 grid grid-cols-2 gap-1.5">
-              <button type="button" disabled={readOnly} onClick={() => beginRename("group", activeGroup.id, activeGroup.name)} className={compactControl}>
+              <button type="button" disabled={mutationDisabled} onClick={() => beginRename("group", activeGroup.id, activeGroup.name)} className={compactControl}>
                 <TypeIcon size={13} /> 이름 변경
               </button>
               <button
@@ -2052,17 +2062,17 @@ export function StudioLayerNavigator({
                 <ListChecks size={13} />
                 {activeGroupAllSelected ? "그룹 선택 해제" : "모두 선택"}
               </button>
-              <button type="button" disabled={readOnly} onClick={() => onAction({ type: "set-group-flag", groupId: activeGroup.id, flag: "hidden", value: !activeGroup.hidden })} className={compactControl}>
+              <button type="button" disabled={mutationDisabled} onClick={() => onAction({ type: "set-group-flag", groupId: activeGroup.id, flag: "hidden", value: !activeGroup.hidden })} className={compactControl}>
                 {activeGroup.hidden ? <Eye size={13} /> : <EyeOff size={13} />}
                 {activeGroup.hidden ? "그룹 표시" : "그룹 숨김"}
               </button>
-              <button type="button" disabled={readOnly} onClick={() => onAction({ type: "set-group-flag", groupId: activeGroup.id, flag: "locked", value: !activeGroup.locked })} className={compactControl}>
+              <button type="button" disabled={mutationDisabled} onClick={() => onAction({ type: "set-group-flag", groupId: activeGroup.id, flag: "locked", value: !activeGroup.locked })} className={compactControl}>
                 {activeGroup.locked ? <LockOpen size={13} /> : <Lock size={13} />}
                 {activeGroup.locked ? "잠금 해제" : "그룹 잠금"}
               </button>
               <button
                 type="button"
-                disabled={readOnly || groupingDisabled || filterActive || activeGroupItemIds.length === 0}
+                disabled={mutationDisabled || groupingDisabled || filterActive || activeGroupItemIds.length === 0}
                 onClick={() => onAction({ type: "move-group", groupId: activeGroup.id, direction: "up" })}
                 className={compactControl}
                 title={filterActive ? "검색·필터를 지우면 그룹 블록 순서를 바꿀 수 있어요" : "그룹 블록을 앞으로 이동"}
@@ -2071,7 +2081,7 @@ export function StudioLayerNavigator({
               </button>
               <button
                 type="button"
-                disabled={readOnly || groupingDisabled || filterActive || activeGroupItemIds.length === 0}
+                disabled={mutationDisabled || groupingDisabled || filterActive || activeGroupItemIds.length === 0}
                 onClick={() => onAction({ type: "move-group", groupId: activeGroup.id, direction: "down" })}
                 className={compactControl}
                 title={filterActive ? "검색·필터를 지우면 그룹 블록 순서를 바꿀 수 있어요" : "그룹 블록을 뒤로 이동"}
@@ -2085,7 +2095,7 @@ export function StudioLayerNavigator({
               ) : null}
               <button
                 type="button"
-                disabled={readOnly || groupingDisabled || filterActive}
+                disabled={mutationDisabled || groupingDisabled || filterActive}
                 onClick={() => onAction({ type: "ungroup", groupId: activeGroup.id })}
                 className={cn(compactControl, "col-span-2")}
                 title={

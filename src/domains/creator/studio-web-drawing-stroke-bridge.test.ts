@@ -10,7 +10,10 @@ import {
   isStudioWebDrawingBrushId,
   planStudioWebAwareDynamicBrushDabs,
   planStudioWebDrawingDynamicDabs,
+  recommendStudioWebDrawingLiveMaxDabs,
+  sliceStudioDynamicDabsForLiveFrame,
   STUDIO_WEB_DRAWING_ALL_BRUSH_IDS,
+  STUDIO_WEB_DRAWING_LIVE_MARK_BUDGET_DEFAULT,
 } from "./studio-web-drawing-stroke-bridge";
 
 const POINTS = Object.freeze([100, 100, 120, 108, 150, 120, 180, 140, 200, 160]);
@@ -148,5 +151,71 @@ describe("studio web drawing stroke bridge", () => {
     expect(nonWeb.family).toBe("none");
     expect(nonWeb.empty).toBe(true);
     expect(nonWeb.dabCount).toBe(0);
+  });
+
+  it("recommends a live maxDabs ceiling under the mark budget for swarm brushes", () => {
+    const uncapped = recommendStudioWebDrawingLiveMaxDabs({
+      brushId: "web-multi-agent",
+      points: POINTS,
+      pressures: PRESSURES,
+      baseWidth: 8,
+      seed: 3,
+      markBudget: STUDIO_WEB_DRAWING_LIVE_MARK_BUDGET_DEFAULT,
+      maxDabs: 65_536,
+    });
+    expect(uncapped.family).toBe("competitive");
+    expect(uncapped.empty).toBe(false);
+    expect(uncapped.uncappedDabCount).toBeGreaterThan(0);
+    expect(uncapped.maxDabs).toBeLessThanOrEqual(
+      STUDIO_WEB_DRAWING_LIVE_MARK_BUDGET_DEFAULT,
+    );
+    expect(uncapped.maxDabs).toBeLessThanOrEqual(uncapped.uncappedDabCount);
+
+    const tight = recommendStudioWebDrawingLiveMaxDabs({
+      brushId: "web-multi-agent",
+      points: POINTS,
+      pressures: PRESSURES,
+      baseWidth: 8,
+      seed: 3,
+      markBudget: 16,
+      marksPerDab: 4,
+      maxDabs: 65_536,
+    });
+    expect(tight.maxDabs).toBeLessThanOrEqual(4); // 16/4
+    expect(tight.capped).toBe(true);
+
+    const nonWeb = recommendStudioWebDrawingLiveMaxDabs({
+      brushId: "pen",
+      points: POINTS,
+    });
+    expect(nonWeb.empty).toBe(true);
+    expect(nonWeb.family).toBe("none");
+  });
+
+  it("slices live dabs to a hard ceiling without reallocating when under budget", () => {
+    const settings = studioBrushDynamicsSettingsForBrushId("web-multi-agent")!;
+    const dabs = planStudioWebDrawingDynamicDabs(
+      {
+        brushId: "web-multi-agent",
+        points: POINTS,
+        pressures: PRESSURES,
+        baseWidth: 8,
+        seed: 3,
+        maxDabs: 64,
+      },
+      settings,
+    )!;
+    expect(dabs.length).toBeGreaterThan(4);
+
+    const under = sliceStudioDynamicDabsForLiveFrame(dabs, dabs.length + 10);
+    expect(under.sliced).toBe(false);
+    expect(under.dropped).toBe(0);
+    expect(under.dabs).toBe(dabs);
+
+    const over = sliceStudioDynamicDabsForLiveFrame(dabs, 5);
+    expect(over.sliced).toBe(true);
+    expect(over.dabs).toHaveLength(5);
+    expect(over.dropped).toBe(dabs.length - 5);
+    expect(over.dabs[0]).toBe(dabs[0]);
   });
 });

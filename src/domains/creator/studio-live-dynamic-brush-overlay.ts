@@ -91,6 +91,8 @@ import { isStudioBoundedFlowPaintModelCompatible } from "./studio-stroke-paint-m
 import {
   isStudioWebDrawingBrushId,
   planStudioWebDrawingDynamicDabs,
+  recommendStudioWebDrawingLiveMaxDabs,
+  sliceStudioDynamicDabsForLiveFrame,
 } from "./studio-web-drawing-stroke-bridge";
 
 import type { DrawEl } from "./studio-element-model";
@@ -1783,9 +1785,23 @@ export class StudioLiveDynamicBrushOverlayRenderer {
         style.dynamics,
       );
     };
-    let dabs = planWebDabs(MAX_LEGACY_LIVE_DABS)
+    // Web kits can explode sample counts (swarm/kaleido). Cap the first live plan to the
+    // mark budget before render-budget planning so pointer frames stay allocation-light.
+    const webLiveCap = isStudioWebDrawingBrushId(style.brushId)
+      ? recommendStudioWebDrawingLiveMaxDabs({
+          brushId: style.brushId,
+          points: planInput.points,
+          pressures: planInput.pressures,
+          baseWidth: planInput.baseWidth,
+          seed: planInput.seed,
+          markBudget: STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET,
+          maxDabs: MAX_LEGACY_LIVE_DABS,
+        }).maxDabs
+      : MAX_LEGACY_LIVE_DABS;
+    const initialLiveMaxDabs = Math.min(MAX_LEGACY_LIVE_DABS, webLiveCap);
+    let dabs = planWebDabs(initialLiveMaxDabs)
       ?? planNormalizedStudioDynamicBrushDabs(
-        { ...planInput, maxDabs: MAX_LEGACY_LIVE_DABS },
+        { ...planInput, maxDabs: initialLiveMaxDabs },
         style.dynamics,
       );
     const coverageBudget = resolveStudioDynamicBrushCoverageBudgetContract(
@@ -1810,6 +1826,12 @@ export class StudioLiveDynamicBrushOverlayRenderer {
           style.dynamics,
         );
     }
+    // Final hard slice if planner still overshoots (defensive; avoids multi-frame freezes).
+    const liveSlice = sliceStudioDynamicDabsForLiveFrame(
+      dabs,
+      renderBudget.maxDabsPerVariation,
+    );
+    dabs = liveSlice.dabs as StudioDynamicBrushDab[];
     const marks = planStudioDynamicBrushCoverageMarks({
       dabVariations: studioDynamicBrushDabVariationsFromTransforms(
         dabs,
@@ -1834,7 +1856,10 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       stampGrid: renderBudget.stampGrid,
       r8AlphaMapBytes:
         marks.r8TextureAlphaMapReceipt?.alphaMapBytes ?? 0,
-      dabCapped: renderBudget.dabCapped || dabs.length >= MAX_LEGACY_LIVE_DABS,
+      dabCapped:
+        renderBudget.dabCapped
+        || liveSlice.sliced
+        || dabs.length >= initialLiveMaxDabs,
     };
   }
 
