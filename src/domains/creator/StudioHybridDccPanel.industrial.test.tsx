@@ -90,6 +90,29 @@ afterEach(() => {
 });
 
 describe("StudioHybridDccPanel industrial wiring", () => {
+  it("uses the route-owned workbench mode without duplicating mode authority", () => {
+    const onWorkbenchModeChange = vi.fn();
+    const view = render(
+      <StudioHybridDccPanel
+        onWorkbenchModeChange={onWorkbenchModeChange}
+        workbenchMode="cad"
+      />,
+    );
+
+    expect(screen.getByText("치수가 정확한 솔리드 제작")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "컷과 비사실 렌더 작업 모드" }));
+    expect(onWorkbenchModeChange).toHaveBeenCalledWith("shot");
+    expect(screen.getByText("치수가 정확한 솔리드 제작")).toBeTruthy();
+
+    view.rerender(
+      <StudioHybridDccPanel
+        onWorkbenchModeChange={onWorkbenchModeChange}
+        workbenchMode="shot"
+      />,
+    );
+    expect(screen.getByText("카메라 컷과 웹툰용 선화 전달")).toBeTruthy();
+  });
+
   it("guides beginners by work mode and commits numeric transforms as document authority", async () => {
     const onWorkspaceChange = vi.fn();
     render(<StudioHybridDccPanel onWorkspaceChange={onWorkspaceChange} />);

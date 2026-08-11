@@ -102,6 +102,7 @@ import {
 import { StudioHybridDccViewport } from "./StudioHybridDccViewport";
 
 import type { StudioHybridDccBg3dHandoffResult } from "./studio-hybrid-dcc-bg3d-handoff";
+import type { StudioDccWorkbenchMode } from "./studio-workspace-route";
 
 const STUDIO_HYBRID_DCC_WORKBENCH_MODES = [
   { id: "model", label: "모델링", accessibleLabel: "모델링 작업 모드" },
@@ -112,9 +113,6 @@ const STUDIO_HYBRID_DCC_WORKBENCH_MODES = [
   { id: "shot", label: "컷·선화", accessibleLabel: "컷과 비사실 렌더 작업 모드" },
 ] as const;
 
-type StudioHybridDccWorkbenchMode =
-  (typeof STUDIO_HYBRID_DCC_WORKBENCH_MODES)[number]["id"];
-
 function friendlyHybridDccAssetName(assetId: string, index: number): string {
   if (/^(?:asset-)?cube(?:-|$)/iu.test(assetId)) return "큐브";
   const roomPart = /-part-(\d+)$/u.exec(assetId);
@@ -123,7 +121,7 @@ function friendlyHybridDccAssetName(assetId: string, index: number): string {
 }
 
 const STUDIO_HYBRID_DCC_MODE_GUIDE: Record<
-  StudioHybridDccWorkbenchMode,
+  StudioDccWorkbenchMode,
   { readonly title: string; readonly description: string }
 > = {
   model: {
@@ -219,6 +217,8 @@ export interface StudioHybridDccPanelProps {
   readonly workspaceDocumentId?: string;
   readonly onWorkspaceChange?: (workspace: StudioHybridDccWorkspace) => void;
   readonly persistenceStatus?: StudioHybridDccPersistenceStatus;
+  readonly workbenchMode?: StudioDccWorkbenchMode;
+  readonly onWorkbenchModeChange?: (mode: StudioDccWorkbenchMode) => void;
 }
 
 export type StudioHybridDccPersistenceStatus =
@@ -245,7 +245,9 @@ export function StudioHybridDccPanel({
   initialWorkspace,
   onOpenInBackground3D,
   onWorkspaceChange,
+  onWorkbenchModeChange,
   persistenceStatus,
+  workbenchMode: controlledWorkbenchMode,
   workspaceDocumentId,
 }: StudioHybridDccPanelProps) {
   const [ws, setWs] = useState<StudioHybridDccWorkspace>(() =>
@@ -260,8 +262,13 @@ export function StudioHybridDccPanel({
     "준비됨 · 큐브를 추가하거나 모델을 가져와 3D 제작을 시작하세요.",
   );
   const [busy, setBusy] = useState(false);
-  const [workbenchMode, setWorkbenchMode] =
-    useState<StudioHybridDccWorkbenchMode>("model");
+  const [localWorkbenchMode, setLocalWorkbenchMode] =
+    useState<StudioDccWorkbenchMode>("model");
+  const workbenchMode = controlledWorkbenchMode ?? localWorkbenchMode;
+  const changeWorkbenchMode = (mode: StudioDccWorkbenchMode) => {
+    if (controlledWorkbenchMode === undefined) setLocalWorkbenchMode(mode);
+    onWorkbenchModeChange?.(mode);
+  };
   const [modifierError, setModifierError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const mountedRef = useRef(true);
@@ -976,7 +983,7 @@ export function StudioHybridDccPanel({
                 ? "min-h-11 shrink-0 rounded-lg bg-accent px-3 text-xs font-semibold text-on-accent shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                 : "min-h-11 shrink-0 rounded-lg px-3 text-xs font-medium text-fg-2 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             }
-            onClick={() => setWorkbenchMode(mode.id)}
+            onClick={() => changeWorkbenchMode(mode.id)}
           >
             {mode.label}
           </button>

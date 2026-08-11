@@ -62,6 +62,7 @@ import {
   type StudioUploadHydrationStatus,
   type StudioUploadPublishScope,
 } from "./studio-upload-publish-safety";
+import { resolveStudioUploadWorkId } from "./studio-upload-route";
 import { StudioPublishContextBanner, type PublishContext } from "./StudioPublishContextBanner";
 
 import { Container } from "@/components/section";
@@ -89,13 +90,18 @@ function uid() {
   return `up-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export function StudioUploadPublish() {
+export interface StudioUploadPublishProps {
+  /** Canonical route identity. Undefined keeps the legacy query-only entry compatible. */
+  readonly workId?: string | null;
+}
+
+export function StudioUploadPublish({ workId: routeWorkId }: StudioUploadPublishProps = {}) {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const { data: session } = useSession();
   const authUserId = session?.user?.id ?? null;
   const loggedIn = authUserId !== null;
-  const workId = params.get("id");
+  const workId = resolveStudioUploadWorkId(routeWorkId, params.get("id"));
   useDocumentTitle(workId ? "업로드 작품 수정" : "이미지 업로드 게시");
 
   const seriesId = params.get("seriesId");

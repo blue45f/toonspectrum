@@ -8,7 +8,10 @@ import { AuthSessionProvider } from "@/components/auth/session-provider";
 import { CommandPaletteHost } from "@/components/command-palette-host";
 import { RandomIntro } from "@/components/RandomIntro";
 import { pingVisit } from "@/lib/visits-api";
-import { shouldPreserveStudioRouteLifecycle } from "@/src/domains/creator/studio-workspace-route";
+import {
+  isStudioRoutePathname,
+  shouldPreserveStudioRouteLifecycle,
+} from "@/src/domains/creator/studio-workspace-route";
 
 // 공용 fx 키프레임/유틸(.pf-* + --ts-fx-* 토큰). 전역에서 한 번만 import 합니다.
 import "@toonspectrum/core/fx/fx.css";
@@ -30,22 +33,29 @@ const ToastHost = lazy(() =>
 // 라우트 전환 시 스크롤을 최상단으로 되돌리고, 본문 랜드마크로 포커스를 옮긴다(a11y).
 // 첫 진입(직접 연 위치)은 포커스를 가로채지 않습니다.
 function ScrollToTop() {
-  const { pathname } = useLocation();
-  const previousPathnameRef = useRef<string | null>(null);
+  const { pathname, search } = useLocation();
+  const previousLocationRef = useRef<{ pathname: string; search: string } | null>(null);
 
   useEffect(() => {
-    const previousPathname = previousPathnameRef.current;
-    previousPathnameRef.current = pathname;
+    const previousLocation = previousLocationRef.current;
+    const currentLocation = { pathname, search };
+    previousLocationRef.current = currentLocation;
+    // Search-only navigation was historically inert outside Studio. Preserve that behavior so
+    // filters and search inputs do not repeatedly move focus to the main landmark.
     if (
-      previousPathname !== null
-      && shouldPreserveStudioRouteLifecycle(previousPathname, pathname)
+      previousLocation?.pathname === pathname
+      && !isStudioRoutePathname(pathname)
+    ) return;
+    if (
+      previousLocation !== null
+      && shouldPreserveStudioRouteLifecycle(previousLocation, currentLocation)
     ) {
       return;
     }
     globalThis.scrollTo({ top: 0, left: 0 });
-    if (previousPathname === null) return;
+    if (previousLocation === null) return;
     document.getElementById("main-content")?.focus({ preventScroll: true });
-  }, [pathname]);
+  }, [pathname, search]);
 
   return null;
 }

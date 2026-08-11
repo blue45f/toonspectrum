@@ -6,10 +6,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StudioHybridDccDialog } from "./StudioHybridDccDialog";
 
 vi.mock("./StudioHybridDccPanel", () => ({
-  StudioHybridDccPanel: () => (
+  StudioHybridDccPanel: ({
+    onWorkbenchModeChange,
+    workbenchMode,
+  }: {
+    onWorkbenchModeChange?: (mode: "shot") => void;
+    workbenchMode?: string;
+  }) => (
     <div>
       <button type="button">뷰포트 실행</button>
+      <button type="button" onClick={() => onWorkbenchModeChange?.("shot")}>
+        Shot 모드
+      </button>
       <input aria-label="오브젝트 이름" />
+      <output data-testid="workbench-mode">{workbenchMode}</output>
     </div>
   ),
 }));
@@ -96,6 +106,34 @@ describe("StudioHybridDccDialog", () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
+  it("renders the route-owned workspace without a visual backdrop and controls its mode", () => {
+    const onClose = vi.fn();
+    const onWorkbenchModeChange = vi.fn();
+    render(
+      <StudioHybridDccDialog
+        open
+        onClose={onClose}
+        onWorkbenchModeChange={onWorkbenchModeChange}
+        presentation="workspace"
+        workbenchMode="cad"
+        workspaceDocumentId="work-1:page-1"
+        onWorkspaceChange={vi.fn()}
+      />,
+    );
+
+    const dialog = screen.getByRole("dialog", { name: "ToonSpectrum 전문 3D 제작" });
+    expect(dialog.getAttribute("aria-modal")).toBe("true");
+    expect(document.querySelector('[data-studio-modal-backdrop="true"]')).toBeNull();
+    expect(document.querySelector('[data-studio-hybrid-dcc-presentation="workspace"]')).not.toBeNull();
+    expect(screen.getByTestId("workbench-mode").textContent).toBe("cad");
+    const backButton = screen.getByRole("button", { name: "캔버스로 돌아가기" });
+    expect(document.activeElement).toBe(backButton);
+    fireEvent.click(screen.getByRole("button", { name: "Shot 모드" }));
+    expect(onWorkbenchModeChange).toHaveBeenCalledWith("shot");
+    fireEvent.click(backButton);
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
   it("isolates background state, keeps the backdrop pointer-only, and restores the launcher", () => {
     const launcher = document.createElement("button");
     launcher.textContent = "3D Workbench 열기";
@@ -137,5 +175,40 @@ describe("StudioHybridDccDialog", () => {
     expect(view.container.hasAttribute("inert")).toBe(false);
     expect(document.activeElement).toBe(launcher);
     launcher.remove();
+  });
+
+  it("falls back to the Studio landmark when a route launcher disappears before mount", () => {
+    const main = document.createElement("main");
+    main.id = "main-content";
+    main.tabIndex = -1;
+    document.body.append(main);
+    const removedLauncher = document.createElement("button");
+    removedLauncher.textContent = "사라지는 메뉴 항목";
+    document.body.append(removedLauncher);
+    removedLauncher.focus();
+    removedLauncher.remove();
+    const view = render(
+      <StudioHybridDccDialog
+        open
+        onClose={vi.fn()}
+        returnFocus={removedLauncher}
+        presentation="workspace"
+        workspaceDocumentId="work-1:page-1"
+        onWorkspaceChange={vi.fn()}
+      />,
+    );
+
+    view.rerender(
+      <StudioHybridDccDialog
+        open={false}
+        onClose={vi.fn()}
+        returnFocus={removedLauncher}
+        presentation="workspace"
+        workspaceDocumentId="work-1:page-1"
+        onWorkspaceChange={vi.fn()}
+      />,
+    );
+    expect(document.activeElement).toBe(main);
+    main.remove();
   });
 });
