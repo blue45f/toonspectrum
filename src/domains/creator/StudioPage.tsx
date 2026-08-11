@@ -1355,6 +1355,7 @@ import {
   computeSmartSnap,
   planFreehandObjectSnapPoint,
   shouldApplyStrokeObjectSnap,
+  shouldMutateStrokeWithObjectSnap,
   smartGuideOverlaysEqual,
   snapPointToObjectGuides,
   type FreehandObjectSnapLatch,
@@ -33596,6 +33597,7 @@ const puppetWarpArmed =
         if (
           shouldApplyStrokeObjectSnap({
             snapEnabled,
+            showAlignmentGuides,
             mode: next.mode,
             kind: next.kind ?? "freehand",
             sampleIndex: 0,
@@ -33862,6 +33864,7 @@ const puppetWarpArmed =
     if (
       !shouldApplyStrokeObjectSnap({
         snapEnabled,
+        showAlignmentGuides,
         mode: options.mode,
         kind: options.kind,
         sampleIndex: options.sampleIndex,
@@ -33876,8 +33879,8 @@ const puppetWarpArmed =
     if (others.length === 0) return { x, y };
     const threshold = SMART_SNAP_THRESHOLD / Math.max(effScale, 1e-6);
     const kind = options.kind ?? "freehand";
-    // The policy above excludes freehand. Keep the defensive branch for older persisted/custom
-    // kinds, while normal shape/line placement uses nearest-edge snap.
+    // Freehand uses latch-based edge following so continuous samples do not zigzag between
+    // nearby object edges. Shapes/lines use nearest-edge capture for explicit placement.
     const snap = kind === "freehand"
       ? (() => {
           const planned = planFreehandObjectSnapPoint({
@@ -33901,6 +33904,10 @@ const puppetWarpArmed =
       ));
     } else {
       applySmartGuides(EMPTY_SMART_GUIDE_OVERLAY);
+    }
+    // Guide-only mode (alignment guides on, snap master off): preview guides without bending ink.
+    if (!shouldMutateStrokeWithObjectSnap({ snapEnabled })) {
+      return { x, y };
     }
     return { x: snap.x, y: snap.y };
   }
@@ -34906,8 +34913,8 @@ const puppetWarpArmed =
       }
       [targetX, targetY] = snapStrokePointToIsometricGrid(targetX, targetY, isometricAxisRayRef.current);
     } else if (current.mode !== "eraser" && !pointerSample.shiftKey) {
-      // Object snapping is restricted to explicit shape/line placement by
-      // shouldApplyStrokeObjectSnap. Freehand samples pass through unchanged.
+      // Freehand uses latch-based object-edge following when snap and/or alignment guides are on.
+      // Guide-only mode paints overlays without rewriting ink coordinates.
       const sampleIndex = Math.max(0, Math.floor(current.points.length / 2));
       const snapped = applyStrokeObjectSnapToPoint(targetX, targetY, {
         mode: current.mode,

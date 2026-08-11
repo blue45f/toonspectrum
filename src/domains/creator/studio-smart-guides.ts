@@ -233,25 +233,38 @@ export interface PointObjectSnapResult {
  * Whether stroke/shape placement should consult object edges for this sample.
  *
  * - Eraser / directional rulers (perspective, isometric, advanced) stay out of the way.
- * - Freehand never snaps. Mutating sampled brush coordinates when a guide is acquired produces
- *   visible corners and input latency; alignment guides are a placement aid, not a stroke ruler.
+ * - Freehand uses latch-based edge following (`planFreehandObjectSnapPoint`) when snap or
+ *   alignment guides are on — mutating samples is gated separately so guides can preview
+ *   without bending the stroke when only guide display is enabled.
  * - Shape/line endpoints may snap because they are explicit placement gestures.
  */
 export function shouldApplyStrokeObjectSnap(input: {
   readonly snapEnabled: boolean;
+  /** When true, freehand/shape may consult guides for overlay even if pixel-snap is off. */
+  readonly showAlignmentGuides?: boolean;
   readonly mode?: string;
   readonly kind?: string;
   readonly directionalRulerActive?: boolean;
   /** 0-based index of the sample about to be written (0 = stroke origin). */
   readonly sampleIndex: number;
 }): boolean {
-  if (!input.snapEnabled) return false;
   if (input.mode === "eraser") return false;
   if (input.directionalRulerActive) return false;
-  if ((input.kind ?? "freehand") === "freehand") return false;
   // sampleIndex is reserved for callers that branch UI hints or endpoint phases.
   void input.sampleIndex;
-  return true;
+  // Object-edge consultation is independent from pure pixel-grid snap: either master switch
+  // (snap master or alignment-guide visibility) is enough to plan a guide result.
+  return input.snapEnabled || input.showAlignmentGuides === true;
+}
+
+/**
+ * Whether the planned object-snap result should rewrite stroke coordinates.
+ * Freehand and shapes both mutate only when the snap master is on; guide-only mode previews.
+ */
+export function shouldMutateStrokeWithObjectSnap(input: {
+  readonly snapEnabled: boolean;
+}): boolean {
+  return input.snapEnabled === true;
 }
 
 /**

@@ -11,6 +11,7 @@ import {
   computeSmartSnap,
   planFreehandObjectSnapPoint,
   shouldApplyStrokeObjectSnap,
+  shouldMutateStrokeWithObjectSnap,
   smartGuideOverlaysEqual,
   snapPointToObjectGuides,
   type GuideBox,
@@ -406,14 +407,21 @@ describe("stroke/shape object snap — point placement", () => {
     expect(snap.y).toBe(200);
   });
 
-  it("never mutates freehand samples and still allows explicit shape endpoints", () => {
+  it("consults freehand/shape guides when snap or alignment guides are on", () => {
     expect(shouldApplyStrokeObjectSnap({
       snapEnabled: true,
       kind: "freehand",
       sampleIndex: 0,
-    })).toBe(false);
+    })).toBe(true);
     expect(shouldApplyStrokeObjectSnap({
-      snapEnabled: true,
+      snapEnabled: false,
+      showAlignmentGuides: true,
+      kind: "freehand",
+      sampleIndex: 3,
+    })).toBe(true);
+    expect(shouldApplyStrokeObjectSnap({
+      snapEnabled: false,
+      showAlignmentGuides: false,
       kind: "freehand",
       sampleIndex: 3,
     })).toBe(false);
@@ -434,6 +442,11 @@ describe("stroke/shape object snap — point placement", () => {
       sampleIndex: 0,
       directionalRulerActive: true,
     })).toBe(false);
+  });
+
+  it("mutates stroke coordinates only when the snap master is on", () => {
+    expect(shouldMutateStrokeWithObjectSnap({ snapEnabled: true })).toBe(true);
+    expect(shouldMutateStrokeWithObjectSnap({ snapEnabled: false })).toBe(false);
   });
 
   it("latches freehand mid samples to the acquired edge and refuses guide hopping", () => {
