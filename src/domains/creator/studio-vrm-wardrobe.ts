@@ -1210,6 +1210,49 @@ export function buildGarmentParts(itemId: string, metricsRaw: WardrobeMetrics, f
       for (const s of SIDES) parts.push(...shoeParts(m, s, "loafers", f));
       break;
     }
+    case "cyberpunk_suit": {
+      parts.push(torsoShell(m, { rMul: 1.15 * f, roughness: 0.3, metalness: 0.6 }));
+      for (const s of SIDES) {
+        parts.push(limbSleeve(s === "left" ? "leftUpperArm" : "rightUpperArm", m.upperArm[s], { coverage: 1.0, r: armR(s, 1.3), roughness: 0.3, metalness: 0.6 }));
+        parts.push(limbSleeve(s === "left" ? "leftLowerArm" : "rightLowerArm", m.lowerArm[s], { coverage: 0.94, r: armR(s, 1.2), roughness: 0.3, metalness: 0.6 }));
+      }
+      parts.push({ bone: "spine", shape: { kind: "box", w: m.shoulderW * 0.15, h: m.spineToNeck * 0.2, d: 0.02 }, offset: scaleVec(m.up, m.spineToNeck * 0.5), color: "#06b6d4", roughness: 0.1, metalness: 0.9 });
+      break;
+    }
+    case "hanbok_modern": {
+      parts.push(torsoShell(m, { rMul: 1.12 * f, roughness: 0.35 }));
+      for (const s of SIDES) {
+        parts.push(limbSleeve(s === "left" ? "leftUpperArm" : "rightUpperArm", m.upperArm[s], { coverage: 1.02, r: armR(s, 1.4), roughness: 0.35 }));
+        parts.push(limbSleeve(s === "left" ? "leftLowerArm" : "rightLowerArm", m.lowerArm[s], { coverage: 0.96, r: armR(s, 1.35), flare: 1.3, roughness: 0.35 }));
+      }
+      parts.push({ bone: "spine", shape: { kind: "torus", r: m.shoulderW * 0.28, tube: m.shoulderW * 0.05 }, offset: scaleVec(m.up, m.spineToNeck * 0.94), align: m.up, color: "#f8fafc", roughness: 0.35 });
+      break;
+    }
+    case "trenchcoat": {
+      const skirtLen = m.upperLeg.left.len * 1.1;
+      parts.push(torsoShell(m, { rMul: 1.16 * f, roughness: 0.85 }));
+      parts.push(skirtCone(m, { len: skirtLen, rTopMul: 1.18 * f, flare: 1.35 }));
+      for (const s of SIDES) {
+        parts.push(limbSleeve(s === "left" ? "leftUpperArm" : "rightUpperArm", m.upperArm[s], { coverage: 1.02, r: armR(s, 1.35), roughness: 0.85 }));
+        parts.push(limbSleeve(s === "left" ? "leftLowerArm" : "rightLowerArm", m.lowerArm[s], { coverage: 0.96, r: armR(s, 1.25), roughness: 0.85 }));
+      }
+      parts.push({ bone: "hips", shape: { kind: "torus", r: Math.max(m.hipW * 0.98, m.shoulderW * 0.44) * f, tube: 0.018 }, offset: scaleVec(m.up, m.hipsToSpine * 0.4), align: m.up, color: "#451a03", roughness: 0.6 });
+      break;
+    }
+    case "tactical_vest": {
+      parts.push(torsoShell(m, { rMul: 1.18 * f, topExt: 0.85, bottomExt: 2.3, roughness: 0.88 }));
+      const fwd = m.footForward.left;
+      for (const side of [-1, 1] as const) {
+        parts.push({
+          bone: "spine",
+          shape: { kind: "box", w: m.shoulderW * 0.16, h: m.hipsToSpine * 0.35, d: 0.022 },
+          offset: addVec(addVec(scaleVec(m.up, m.spineToNeck * 0.2), scaleVec(fwd, m.shoulderW * 0.54 * f)), [side * m.shoulderW * 0.16, 0, 0]),
+          color: "#374151",
+          roughness: 0.9,
+        });
+      }
+      break;
+    }
     default:
       break;
   }

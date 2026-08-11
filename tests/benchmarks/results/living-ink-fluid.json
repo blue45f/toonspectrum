@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-10",
+  "generatedAt": "2026-08-11",
   "revision": "wgsl-field-v2",
   "oracle": "cpu-reference-mirror-of-wgsl-kernels",
   "sections": [
@@ -83,67 +83,67 @@
           {
             "iterations": 0,
             "reduction": 0,
-            "milliseconds": 5.527833999999984
+            "milliseconds": 8.344083000000069
           },
           {
             "iterations": 1,
             "reduction": 0.09157809105755532,
-            "milliseconds": 3.4055420000000822
+            "milliseconds": 7.644999999999982
           },
           {
             "iterations": 2,
             "reduction": 0.1710620993891092,
-            "milliseconds": 5.11545799999999
+            "milliseconds": 10.626334000000043
           },
           {
             "iterations": 4,
             "reduction": 0.30219825390513855,
-            "milliseconds": 4.684582999999975
+            "milliseconds": 4.672708999999941
           },
           {
             "iterations": 6,
             "reduction": 0.40425424418057165,
-            "milliseconds": 6.2799589999999625
+            "milliseconds": 6.30704199999991
           },
           {
             "iterations": 8,
             "reduction": 0.4843866060113574,
-            "milliseconds": 0.8025840000000244
+            "milliseconds": 10.939833000000135
           },
           {
             "iterations": 10,
             "reduction": 0.5477456922481041,
-            "milliseconds": 0.8689999999999145
+            "milliseconds": 0.9797079999998459
           },
           {
             "iterations": 12,
             "reduction": 0.5981555168352946,
-            "milliseconds": 0.9666250000000218
+            "milliseconds": 0.994707999999946
           },
           {
             "iterations": 16,
             "reduction": 0.671024677911479,
-            "milliseconds": 1.161416000000031
+            "milliseconds": 1.1768329999999878
           },
           {
             "iterations": 22,
             "reduction": 0.7367943246945253,
-            "milliseconds": 2.969249999999988
+            "milliseconds": 2.7362080000000333
           },
           {
             "iterations": 32,
             "reduction": 0.7915652504810287,
-            "milliseconds": 1.8983329999999796
+            "milliseconds": 1.885915999999952
           },
           {
             "iterations": 48,
             "reduction": 0.8296844726518429,
-            "milliseconds": 2.5800420000000486
+            "milliseconds": 2.626459000000068
           },
           {
             "iterations": 64,
             "reduction": 0.8486755997786537,
-            "milliseconds": 4.586000000000013
+            "milliseconds": 4.05012499999998
           }
         ]
       },
@@ -153,67 +153,67 @@
           {
             "iterations": 0,
             "reduction": 0,
-            "milliseconds": 0.48433299999999235
+            "milliseconds": 1.7722919999998794
           },
           {
             "iterations": 1,
             "reduction": 0.30563398215041204,
-            "milliseconds": 1.20799999999997
+            "milliseconds": 0.49862499999994725
           },
           {
             "iterations": 2,
             "reduction": 0.2962978357841195,
-            "milliseconds": 1.2765840000000708
+            "milliseconds": 0.5359160000000429
           },
           {
             "iterations": 4,
             "reduction": 0.3355845897673906,
-            "milliseconds": 0.6233330000000024
+            "milliseconds": 0.625
           },
           {
             "iterations": 6,
             "reduction": 0.34731879499911156,
-            "milliseconds": 0.7189580000000433
+            "milliseconds": 0.7240829999998368
           },
           {
             "iterations": 8,
             "reduction": 0.35215282069056286,
-            "milliseconds": 0.8008329999998978
+            "milliseconds": 0.8186659999998938
           },
           {
             "iterations": 10,
             "reduction": 0.3545482622428314,
-            "milliseconds": 0.8962920000000167
+            "milliseconds": 0.9002499999999145
           },
           {
             "iterations": 12,
             "reduction": 0.3558880952814777,
-            "milliseconds": 0.9724159999999529
+            "milliseconds": 0.9917499999999109
           },
           {
             "iterations": 16,
             "reduction": 0.35723549964096657,
-            "milliseconds": 1.1556249999999864
+            "milliseconds": 1.1667090000000826
           },
           {
             "iterations": 22,
             "reduction": 0.35804519083805164,
-            "milliseconds": 1.4266670000000659
+            "milliseconds": 1.466083000000026
           },
           {
             "iterations": 32,
             "reduction": 0.3585113316963854,
-            "milliseconds": 1.8679160000000365
+            "milliseconds": 1.8940000000000055
           },
           {
             "iterations": 48,
             "reduction": 0.3587356221652306,
-            "milliseconds": 2.6629159999999956
+            "milliseconds": 2.6419590000000426
           },
           {
             "iterations": 64,
             "reduction": 0.3588133146187308,
-            "milliseconds": 3.272958000000017
+            "milliseconds": 3.326000000000022
           }
         ]
       }
@@ -387,7 +387,7 @@
     },
     "midBandPowerRatio": 0.9390686771455719,
     "brushTextureLabWashSoftMidBandRatio": 0.036,
-    "finding": "Confinement multiplies coarse-grid enstrophy by 24.8× at vorticity 1, but the pigment's mid-band power moves only ~0.94×: the bilinear resample inside the semi-Lagrangian pigment transport smooths faster than the extra eddies imprint. The visible-texture bottleneck is the transport scheme, not the fluid. Next slice: a MacCormack/BFECC corrector on advect-pigment, measured on this same window."
+    "finding": "Confinement multiplies coarse-grid enstrophy by 26.3× at vorticity 1, but the pigment's mid-band power moves only ~0.94×: the bilinear resample inside the semi-Lagrangian pigment transport smooths faster than the extra eddies imprint. The visible-texture bottleneck is the transport scheme, not the fluid. Next slice: a MacCormack/BFECC corrector on advect-pigment, measured on this same window."
   },
   "capillaryOutflow": {
     "frames": 45,

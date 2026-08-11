@@ -34,6 +34,69 @@
       "fibreAnisotropy": 1.2,
       "amplitude": 0.78,
       "toothBias": 1.3
+    },
+    "bristol": {
+      "octaves": 2,
+      "baseCells": 40,
+      "lacunarity": 2,
+      "persistence": 0.35,
+      "fibreAnisotropy": 1,
+      "amplitude": 0.12,
+      "toothBias": 0.88
+    },
+    "washi": {
+      "octaves": 4,
+      "baseCells": 12,
+      "lacunarity": 2,
+      "persistence": 0.58,
+      "fibreAnisotropy": 2.35,
+      "amplitude": 0.42,
+      "toothBias": 1.18
+    },
+    "kraft": {
+      "octaves": 3,
+      "baseCells": 18,
+      "lacunarity": 2,
+      "persistence": 0.5,
+      "fibreAnisotropy": 1.35,
+      "amplitude": 0.4,
+      "toothBias": 1.08
+    },
+    "canvas": {
+      "octaves": 3,
+      "baseCells": 14,
+      "lacunarity": 2,
+      "persistence": 0.48,
+      "fibreAnisotropy": 0.85,
+      "amplitude": 0.55,
+      "toothBias": 1.05
+    },
+    "charcoal": {
+      "octaves": 5,
+      "baseCells": 7,
+      "lacunarity": 2,
+      "persistence": 0.68,
+      "fibreAnisotropy": 1.15,
+      "amplitude": 0.88,
+      "toothBias": 1.38
+    },
+    "newsprint": {
+      "octaves": 3,
+      "baseCells": 36,
+      "lacunarity": 2,
+      "persistence": 0.45,
+      "fibreAnisotropy": 1.1,
+      "amplitude": 0.22,
+      "toothBias": 0.98
+    },
+    "pastel-board": {
+      "octaves": 4,
+      "baseCells": 11,
+      "lacunarity": 2,
+      "persistence": 0.6,
+      "fibreAnisotropy": 1.25,
+      "amplitude": 0.62,
+      "toothBias": 1.28
     }
   },
   "paperStats": {
@@ -84,6 +147,118 @@
       "max": 0.8388,
       "mean": 0.5,
       "sha256": "4a21633ffbc667a3"
+    },
+    "bristol": {
+      "rmsRoughness": 0.01703,
+      "autocorrelationX": 2.249,
+      "autocorrelationY": 2.302,
+      "fibreAnisotropyMeasured": 0.977,
+      "seamRatioX": 0.867,
+      "seamRatioY": 0.844,
+      "seamStepX": 0.00701,
+      "interiorStepX": 0.00809,
+      "seamStepY": 0.00674,
+      "interiorStepY": 0.00798,
+      "min": 0.4534,
+      "max": 0.5454,
+      "mean": 0.5,
+      "sha256": "90da84c76255b73c"
+    },
+    "washi": {
+      "rmsRoughness": 0.04104,
+      "autocorrelationX": 7.428,
+      "autocorrelationY": 2.653,
+      "fibreAnisotropyMeasured": 2.8,
+      "seamRatioX": 0.863,
+      "seamRatioY": 1.037,
+      "seamStepX": 0.00866,
+      "interiorStepX": 0.01004,
+      "seamStepY": 0.02204,
+      "interiorStepY": 0.02126,
+      "min": 0.3901,
+      "max": 0.6501,
+      "mean": 0.5,
+      "sha256": "99f262914becdd32"
+    },
+    "kraft": {
+      "rmsRoughness": 0.04488,
+      "autocorrelationX": 4.836,
+      "autocorrelationY": 3.685,
+      "fibreAnisotropyMeasured": 1.312,
+      "seamRatioX": 0.608,
+      "seamRatioY": 0.769,
+      "seamStepX": 0.00783,
+      "interiorStepX": 0.01288,
+      "seamStepY": 0.01298,
+      "interiorStepY": 0.01688,
+      "min": 0.3662,
+      "max": 0.6302,
+      "mean": 0.5,
+      "sha256": "5651dbc56a3e7544"
+    },
+    "canvas": {
+      "rmsRoughness": 0.06116,
+      "autocorrelationX": 2.649,
+      "autocorrelationY": 2.74,
+      "fibreAnisotropyMeasured": 0.967,
+      "seamRatioX": 1.36,
+      "seamRatioY": 1.418,
+      "seamStepX": 0.03495,
+      "interiorStepX": 0.02569,
+      "seamStepY": 0.03566,
+      "interiorStepY": 0.02514,
+      "min": 0.3237,
+      "max": 0.7112,
+      "mean": 0.5,
+      "sha256": "4381e77a8f06b1b9"
+    },
+    "charcoal": {
+      "rmsRoughness": 0.07665,
+      "autocorrelationX": 10.759,
+      "autocorrelationY": 9.257,
+      "fibreAnisotropyMeasured": 1.162,
+      "seamRatioX": 0.844,
+      "seamRatioY": 0.89,
+      "seamStepX": 0.01489,
+      "interiorStepX": 0.01765,
+      "seamStepY": 0.01778,
+      "interiorStepY": 0.01999,
+      "min": 0.3171,
+      "max": 0.7471,
+      "mean": 0.5,
+      "sha256": "d524ccc137d06c13"
+    },
+    "newsprint": {
+      "rmsRoughness": 0.02668,
+      "autocorrelationX": 2.296,
+      "autocorrelationY": 2.157,
+      "fibreAnisotropyMeasured": 1.065,
+      "seamRatioX": 0.848,
+      "seamRatioY": 0.799,
+      "seamStepX": 0.01202,
+      "interiorStepX": 0.01418,
+      "seamStepY": 0.01184,
+      "interiorStepY": 0.01481,
+      "min": 0.418,
+      "max": 0.58,
+      "mean": 0.5,
+      "sha256": "d7f3e80ca344f7aa"
+    },
+    "pastel-board": {
+      "rmsRoughness": 0.06341,
+      "autocorrelationX": 6.621,
+      "autocorrelationY": 5.762,
+      "fibreAnisotropyMeasured": 1.149,
+      "seamRatioX": 0.838,
+      "seamRatioY": 0.74,
+      "seamStepX": 0.01302,
+      "interiorStepX": 0.01555,
+      "seamStepY": 0.01351,
+      "interiorStepY": 0.01824,
+      "min": 0.3292,
+      "max": 0.6995,
+      "mean": 0.5,
+      "sha256": "6d6e2f40aae015bf"
     }
   },
   "granulation": {
@@ -298,6 +473,216 @@
         "alphaDeltaHeightCorrelation": -0.9842
       },
       "rough/phthalo-blue": {
+        "alphaDeltaMovedPixels": 0,
+        "midBandRatio": 0.025778,
+        "lowBandRatio": 0.973862,
+        "highBandRatio": 0.000359,
+        "midBandRatioGainVsSmoothWash": 1,
+        "midBandPowerNormalised": 0.000116375,
+        "midBandPeakPeriodPx": 28.622,
+        "alphaDeltaHeightCorrelation": 0
+      },
+      "bristol/ultramarine-blue": {
+        "alphaDeltaMovedPixels": 3807,
+        "midBandRatio": 0.09338,
+        "lowBandRatio": 0.837878,
+        "highBandRatio": 0.068742,
+        "midBandRatioGainVsSmoothWash": 3.622,
+        "midBandPowerNormalised": 0.000474486,
+        "midBandPeakPeriodPx": 28.622,
+        "alphaDeltaHeightCorrelation": -0.9852
+      },
+      "bristol/sumi-ink": {
+        "alphaDeltaMovedPixels": 1977,
+        "midBandRatio": 0.027055,
+        "lowBandRatio": 0.971064,
+        "highBandRatio": 0.001881,
+        "midBandRatioGainVsSmoothWash": 1.05,
+        "midBandPowerNormalised": 0.000122017,
+        "midBandPeakPeriodPx": 28.622,
+        "alphaDeltaHeightCorrelation": -0.9097
+      },
+      "bristol/phthalo-blue": {
+        "alphaDeltaMovedPixels": 0,
+        "midBandRatio": 0.025778,
+        "lowBandRatio": 0.973862,
+        "highBandRatio": 0.000359,
+        "midBandRatioGainVsSmoothWash": 1,
+        "midBandPowerNormalised": 0.000116375,
+        "midBandPeakPeriodPx": 28.622,
+        "alphaDeltaHeightCorrelation": 0
+      },
+      "washi/ultramarine-blue": {
+        "alphaDeltaMovedPixels": 3932,
+        "midBandRatio": 0.282955,
+        "lowBandRatio": 0.601688,
+        "highBandRatio": 0.115357,
+        "midBandRatioGainVsSmoothWash": 10.976,
+        "midBandPowerNormalised": 0.001503807,
+        "midBandPeakPeriodPx": 12.8,
+        "alphaDeltaHeightCorrelation": -0.9874
+      },
+      "washi/sumi-ink": {
+        "alphaDeltaMovedPixels": 3052,
+        "midBandRatio": 0.031657,
+        "lowBandRatio": 0.965127,
+        "highBandRatio": 0.003216,
+        "midBandRatioGainVsSmoothWash": 1.228,
+        "midBandPowerNormalised": 0.00013831,
+        "midBandPeakPeriodPx": 28.622,
+        "alphaDeltaHeightCorrelation": -0.9695
+      },
+      "washi/phthalo-blue": {
+        "alphaDeltaMovedPixels": 0,
+        "midBandRatio": 0.025778,
+        "lowBandRatio": 0.973862,
+        "highBandRatio": 0.000359,
+        "midBandRatioGainVsSmoothWash": 1,
+        "midBandPowerNormalised": 0.000116375,
+        "midBandPeakPeriodPx": 28.622,
+        "alphaDeltaHeightCorrelation": 0
+      },
+      "kraft/ultramarine-blue": {
+        "alphaDeltaMovedPixels": 3939,
+        "midBandRatio": 0.463693,
+        "lowBandRatio": 0.460785,
+        "highBandRatio": 0.075523,
+        "midBandRatioGainVsSmoothWash": 17.988,
+        "midBandPowerNormalised": 0.00401669,
+        "midBandPeakPeriodPx": 28.622,
+        "alphaDeltaHeightCorrelation": -0.9873
+      },
+      "kraft/sumi-ink": {
+        "alphaDeltaMovedPixels": 3131,
+        "midBandRatio": 0.038012,
+        "lowBandRatio": 0.958694,
+        "highBandRatio": 0.003294,
+        "midBandRatioGainVsSmoothWash": 1.475,
+        "midBandPowerNormalised": 0.000169854,
+        "midBandPeakPeriodPx": 28.622,
+        "alphaDeltaHeightCorrelation": -0.9755
+      },
+      "kraft/phthalo-blue": {
+        "alphaDeltaMovedPixels": 0,
+        "midBandRatio": 0.025778,
+        "lowBandRatio": 0.973862,
+        "highBandRatio": 0.000359,
+        "midBandRatioGainVsSmoothWash": 1,
+        "midBandPowerNormalised": 0.000116375,
+        "midBandPeakPeriodPx": 28.622,
+        "alphaDeltaHeightCorrelation": 0
+      },
+      "canvas/ultramarine-blue": {
+        "alphaDeltaMovedPixels": 3991,
+        "midBandRatio": 0.283843,
+        "lowBandRatio": 0.465001,
+        "highBandRatio": 0.251157,
+        "midBandRatioGainVsSmoothWash": 11.011,
+        "midBandPowerNormalised": 0.002955291,
+        "midBandPeakPeriodPx": 21.333,
+        "alphaDeltaHeightCorrelation": -0.9861
+      },
+      "canvas/sumi-ink": {
+        "alphaDeltaMovedPixels": 3369,
+        "midBandRatio": 0.033131,
+        "lowBandRatio": 0.955939,
+        "highBandRatio": 0.010929,
+        "midBandRatioGainVsSmoothWash": 1.285,
+        "midBandPowerNormalised": 0.000148373,
+        "midBandPeakPeriodPx": 28.622,
+        "alphaDeltaHeightCorrelation": -0.9798
+      },
+      "canvas/phthalo-blue": {
+        "alphaDeltaMovedPixels": 0,
+        "midBandRatio": 0.025778,
+        "lowBandRatio": 0.973862,
+        "highBandRatio": 0.000359,
+        "midBandRatioGainVsSmoothWash": 1,
+        "midBandPowerNormalised": 0.000116375,
+        "midBandPeakPeriodPx": 28.622,
+        "alphaDeltaHeightCorrelation": 0
+      },
+      "charcoal/ultramarine-blue": {
+        "alphaDeltaMovedPixels": 4043,
+        "midBandRatio": 0.395011,
+        "lowBandRatio": 0.538884,
+        "highBandRatio": 0.066105,
+        "midBandRatioGainVsSmoothWash": 15.323,
+        "midBandPowerNormalised": 0.005195971,
+        "midBandPeakPeriodPx": 28.622,
+        "alphaDeltaHeightCorrelation": -0.9818
+      },
+      "charcoal/sumi-ink": {
+        "alphaDeltaMovedPixels": 3664,
+        "midBandRatio": 0.039345,
+        "lowBandRatio": 0.955813,
+        "highBandRatio": 0.004842,
+        "midBandRatioGainVsSmoothWash": 1.526,
+        "midBandPowerNormalised": 0.000166232,
+        "midBandPeakPeriodPx": 28.622,
+        "alphaDeltaHeightCorrelation": -0.9845
+      },
+      "charcoal/phthalo-blue": {
+        "alphaDeltaMovedPixels": 0,
+        "midBandRatio": 0.025778,
+        "lowBandRatio": 0.973862,
+        "highBandRatio": 0.000359,
+        "midBandRatioGainVsSmoothWash": 1,
+        "midBandPowerNormalised": 0.000116375,
+        "midBandPeakPeriodPx": 28.622,
+        "alphaDeltaHeightCorrelation": 0
+      },
+      "newsprint/ultramarine-blue": {
+        "alphaDeltaMovedPixels": 3884,
+        "midBandRatio": 0.146439,
+        "lowBandRatio": 0.723163,
+        "highBandRatio": 0.130398,
+        "midBandRatioGainVsSmoothWash": 5.681,
+        "midBandPowerNormalised": 0.000899383,
+        "midBandPeakPeriodPx": 28.622,
+        "alphaDeltaHeightCorrelation": -0.9868
+      },
+      "newsprint/sumi-ink": {
+        "alphaDeltaMovedPixels": 2640,
+        "midBandRatio": 0.027813,
+        "lowBandRatio": 0.968628,
+        "highBandRatio": 0.003559,
+        "midBandRatioGainVsSmoothWash": 1.079,
+        "midBandPowerNormalised": 0.000126157,
+        "midBandPeakPeriodPx": 28.622,
+        "alphaDeltaHeightCorrelation": -0.9528
+      },
+      "newsprint/phthalo-blue": {
+        "alphaDeltaMovedPixels": 0,
+        "midBandRatio": 0.025778,
+        "lowBandRatio": 0.973862,
+        "highBandRatio": 0.000359,
+        "midBandRatioGainVsSmoothWash": 1,
+        "midBandPowerNormalised": 0.000116375,
+        "midBandPeakPeriodPx": 28.622,
+        "alphaDeltaHeightCorrelation": 0
+      },
+      "pastel-board/ultramarine-blue": {
+        "alphaDeltaMovedPixels": 4000,
+        "midBandRatio": 0.275467,
+        "lowBandRatio": 0.675541,
+        "highBandRatio": 0.048992,
+        "midBandRatioGainVsSmoothWash": 10.686,
+        "midBandPowerNormalised": 0.004877804,
+        "midBandPeakPeriodPx": 28.622,
+        "alphaDeltaHeightCorrelation": -0.9825
+      },
+      "pastel-board/sumi-ink": {
+        "alphaDeltaMovedPixels": 3446,
+        "midBandRatio": 0.041193,
+        "lowBandRatio": 0.955558,
+        "highBandRatio": 0.003249,
+        "midBandRatioGainVsSmoothWash": 1.598,
+        "midBandPowerNormalised": 0.000218454,
+        "midBandPeakPeriodPx": 28.622,
+        "alphaDeltaHeightCorrelation": -0.9804
+      },
+      "pastel-board/phthalo-blue": {
         "alphaDeltaMovedPixels": 0,
         "midBandRatio": 0.025778,
         "lowBandRatio": 0.973862,

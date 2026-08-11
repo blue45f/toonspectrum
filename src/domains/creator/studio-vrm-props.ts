@@ -186,6 +186,15 @@ const VRM_PROP_BASES = [
   { id: "nameTag", label: "명찰", category: "body", defaultBone: "chest", defaultPosition: [0.09, 0.05, 0.09], defaultRotationDeg: [0, 0, 0], defaultScale: 1, defaultColor: "#f8fafc", hint: "학교·회사 컷." },
   { id: "apron", label: "앞치마", category: "body", defaultBone: "chest", defaultPosition: [0, -0.08, 0.08], defaultRotationDeg: [0, 0, 0], defaultScale: 1, defaultColor: "#f8fafc", hint: "요리·카페 컷." },
   { id: "tail", label: "꼬리", category: "body", defaultBone: "hips", defaultPosition: [0, 0, -0.08], defaultRotationDeg: [20, 0, 0], defaultScale: 1, defaultColor: "#f5c6a0", hint: "동물귀 코스튬." },
+  // Blender 5.2 생성 3D GLB 소품
+  { id: "blender_cyber_katana", label: "블렌더 사이버 카타나", category: "hand", defaultBone: "rightHand", defaultPosition: [0, 0, 0], defaultRotationDeg: [0, 0, -90], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 사이버 카타나 검." },
+  { id: "blender_magic_staff", label: "블렌더 마법 지팡이", category: "hand", defaultBone: "rightHand", defaultPosition: [0, -0.2, 0], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 발광 수정 지팡이." },
+  { id: "blender_scifi_drone", label: "블렌더 SF 탐사 드론", category: "body", defaultBone: "chest", defaultPosition: [0.35, 0.25, 0.4], defaultRotationDeg: [0, 0, 0], defaultScale: 0.8, defaultColor: null, hint: "Blender 5.2 생성 SF 탐사 드론." },
+  { id: "blender_neon_bench", label: "블렌더 네온 벤치", category: "body", defaultBone: "hips", defaultPosition: [0, -0.4, 0], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 카본 네온 벤치." },
+  { id: "blender_cyber_visor", label: "블렌더 사이버 바이저", category: "head", defaultBone: "head", defaultPosition: [0, 0.04, 0.02], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 사이버 헬멧 바이저." },
+  { id: "blender_holo_tablet", label: "블렌더 홀로 태블릿", category: "hand", defaultBone: "leftHand", defaultPosition: [0, 0.02, 0.02], defaultRotationDeg: [45, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 발광 홀로그램 태블릿." },
+  { id: "blender_rune_shield", label: "블렌더 룬 방패", category: "hand", defaultBone: "leftHand", defaultPosition: [0.05, 0, 0], defaultRotationDeg: [0, 90, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 룬문자 마법 방패." },
+  { id: "blender_arcade_cabinet", label: "블렌더 아케이드 게임기", category: "body", defaultBone: "hips", defaultPosition: [0, -0.85, -0.2], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 레트로 아케이드 캐비닛." },
 ] as const satisfies readonly LegacyPropDef[];
 
 export type VrmPropId = (typeof VRM_PROP_BASES)[number]["id"];
@@ -409,6 +418,55 @@ const PROP_PROFILES: Record<VrmPropId, PropProfile> = {
   nameTag: { anchors: [anchor("surface", "surface", [0, 0, -0.004])], fit: fit("shoulder", 0.32, 0.72, 1.4) },
   apron: { anchors: [anchor("surface", "surface", [0, 0.05, 0])], fit: fit("shoulder", 0.32, 0.7, 1.5) },
   tail: { anchors: [anchor("surface", "surface", [0, 0, 0.02], [0, 0, -1])], fit: fit("hip", 0.18, 0.7, 1.5) },
+  blender_cyber_katana: {
+    anchors: [
+      handAnchor("primary", "primary", [0, -0.35, 0], 0.015),
+      handAnchor("secondary", "secondary", [0, -0.28, 0], 0.015),
+    ],
+    grip: grip("cylinder", 0.015, 62, 46),
+    fit: fit("avatarHeight", 1.65, 0.72, 1.45),
+    secondaryGripInfluence: 0.8,
+  },
+  blender_magic_staff: {
+    anchors: [
+      handAnchor("primary", "primary", [0, -0.2, 0], 0.014),
+      handAnchor("secondary", "secondary", [0, -0.06, 0], 0.014),
+    ],
+    grip: grip("cylinder", 0.014, 60, 44),
+    fit: fit("avatarHeight", 1.65, 0.72, 1.5),
+    secondaryGripInfluence: 0.8,
+  },
+  blender_scifi_drone: {
+    anchors: [handAnchor("primary", "primary", [0, 0, 0], 0.025)],
+    grip: grip("flat", 0.025, 20, 20),
+    fit: fit("hand", 0.075, 0.7, 1.5),
+  },
+  blender_neon_bench: {
+    anchors: [anchor("surface", "surface", [0, 0.45, 0])],
+    fit: fit("hip", 0.18, 0.7, 1.5),
+  },
+  blender_cyber_visor: {
+    anchors: [anchor("surface", "surface", [0, 0, 0])],
+    fit: fit("head", 0.18, 0.72, 1.45),
+  },
+  blender_holo_tablet: {
+    anchors: [handAnchor("primary", "primary", [0, -0.01, 0], 0.012)],
+    grip: grip("flat", 0.012, 30, 30),
+    fit: fit("hand", 0.075, 0.7, 1.4),
+  },
+  blender_rune_shield: {
+    anchors: [
+      handAnchor("primary", "primary", [0, 0, 0], 0.02),
+      handAnchor("secondary", "secondary", [0, 0.1, 0], 0.02),
+    ],
+    grip: grip("handle", 0.02, 60, 40),
+    fit: fit("shoulder", 0.32, 0.7, 1.5),
+    secondaryGripInfluence: 0.75,
+  },
+  blender_arcade_cabinet: {
+    anchors: [anchor("surface", "surface", [0, 0.85, 0])],
+    fit: fit("avatarHeight", 1.65, 0.7, 1.5),
+  },
 };
 
 export const VRM_PROPS: readonly PropDef[] = VRM_PROP_BASES.map((def) => ({
