@@ -1,4 +1,12 @@
 import {
+  createStudioDryMediaUnionCasLifecycle,
+  type StudioDryMediaUnionCasBlobReference,
+  type StudioDryMediaUnionCasLifecyclePublication,
+  type StudioDryMediaUnionCasLifecyclePersistence,
+  type StudioDryMediaUnionCasLifecycleTransaction,
+  type StudioDryMediaUnionLifecycleManagedCas,
+} from "./studio-dry-media-union-continuation-cas-lifecycle";
+import {
   StudioOpfsSyncAccessError,
   probeStudioOpfsSyncAccessCapability,
   type StudioOpfsSyncAccessHandleLike,
@@ -18,6 +26,15 @@ const MAX_STAGING_BYTES = 1024 * 1024;
 const SHA256_HEX = /^[a-f0-9]{64}$/u;
 const PENDING_FILE = /^([a-f0-9]{64})\.pending$/u;
 const SAFE_STROKE_ID = /^[a-zA-Z0-9._-]{1,192}$/u;
+const LIFECYCLE_RECORD_NAME = /^[a-z0-9-]{1,96}\.json$/u;
+const LIFECYCLE_RECORD_DOMAIN = "toonspectrum/studio-dry-media-union/lifecycle-record-v1";
+const LIFECYCLE_RECORD_MAX_BYTES = 8 * 1024 * 1024;
+const LIFECYCLE_TRANSACTIONS_FILE = "lifecycle-transaction.json";
+const LIFECYCLE_PENDING_REFERENCES_FILE = "lifecycle-pending-references.json";
+const LIFECYCLE_MEMBERSHIP_PREFIX = "lifecycle-membership-";
+const LIFECYCLE_PUBLICATION_PREFIX = "lifecycle-publication-";
+const _textEncoder = new TextEncoder();
+const _textDecoder = new TextDecoder("utf-8", { fatal: true });
 
 interface SyncHandle extends StudioOpfsSyncAccessHandleLike {
   getSize(): number;
@@ -110,6 +127,354 @@ function bytesEqual(left: Uint8Array, right: Uint8Array): boolean {
     mismatch |= left[index]! ^ right[index]!;
   }
   return mismatch === 0;
+}
+
+function serializeRecord(value: unknown): Uint8Array {
+  const bytes = _textEncoder.encode(JSON.stringify(value));
+  if (bytes.byteLength > LIFECYCLE_RECORD_MAX_BYTES) {
+    throw new StudioOpfsSyncAccessError(
+      "WRITE_FAILED",
+      "Dry-media lifecycle record exceeded max byte budget.",
+    );
+  }
+  return bytes;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function unwrapLifecycleRecord(value: unknown): unknown {
+  if (
+    !isRecord(value)
+    || value.contract !== LIFECYCLE_RECORD_DOMAIN
+    || !isRecord(value.payload)
+  ) {
+    return value;
+  }
+  return value.payload;
+}
+
+function isValidSnapshotTransactionKeys(record: Record<string, unknown>): boolean {
+  const keys = Object.keys(record);
+  return keys.length === 5
+    && keys.includes("contract")
+    && keys.includes("version")
+    && keys.includes("phase")
+    && keys.includes("rootDigest")
+    && keys.includes("cursor");
+}
+
+function snapshotTransaction(value: unknown): StudioDryMediaUnionCasLifecycleTransaction | null {
+  if (!isRecord(value) || !isValidSnapshotTransactionKeys(value)) return null;
+  if (
+    value.contract !== "studio-dry-media-union-cas-lifecycle-transaction-v1"
+    || value.version !== 1
+    || (value.phase !== "pending"
+      && value.phase !== "publishing"
+      && value.phase !== "rollback"
+      && value.phase !== "preparing-release"
+      && value.phase !== "releasing")
+    || typeof value.cursor !== "number"
+    || !Number.isSafeInteger(value.cursor)
+    || value.cursor < 0
+    || (value.rootDigest !== null
+      && (typeof value.rootDigest !== "string" || !SHA256_HEX.test(value.rootDigest)))
+    || (value.phase === "pending" && (value.rootDigest !== null || value.cursor !== 0))
+    || (value.phase !== "pending" && value.rootDigest === null && value.phase !== "rollback")
+  ) {
+    return null;
+  }
+  return Object.freeze({
+    contract: value.contract,
+    version: value.version,
+    phase: value.phase,
+    rootDigest: value.rootDigest,
+    cursor: value.cursor,
+  });
+}
+
+function recordFileNameForPublication(rootDigest: string): string {
+  return `${LIFECYCLE_PUBLICATION_PREFIX}${rootDigest}.json`;
+}
+
+function recordFileNameForMembership(reference: StudioDryMediaUnionCasBlobReference): string {
+  return `${LIFECYCLE_MEMBERSHIP_PREFIX}${reference.kind}-${reference.digest}.json`;
+}
+
+function parseRecord<T>(directory: StudioOpfsSyncDirectoryHandleLike, name: string): Promise<T | null> {
+  if (!LIFECYCLE_RECORD_NAME.test(name)) {
+    throw new StudioOpfsSyncAccessError(
+      "INVALID_ARGUMENT",
+      "Dry-media lifecycle record name is malformed.",
+    );
+  }
+  return openHandle(directory, name, false)
+    .then((handle) => {
+      if (!handle) return null;
+      try {
+        const size = handle.getSize();
+        if (size <= 0 || size > LIFECYCLE_RECORD_MAX_BYTES) {
+          throw new StudioOpfsSyncAccessError(
+            "READ_FAILED",
+            "Dry-media lifecycle record exceeded allowed size.",
+          );
+        }
+        const raw = _textDecoder.decode(readAll(handle, size));
+        try {
+          return JSON.parse(raw) as T;
+        } catch {
+          throw new StudioOpfsSyncAccessError(
+            "READ_FAILED",
+            "Dry-media lifecycle record is not valid JSON.",
+          );
+        }
+      } finally {
+        handle.close();
+      }
+    });
+}
+
+function writeRecord(
+  directory: StudioOpfsSyncDirectoryHandleLike,
+  name: string,
+  value: unknown,
+): Promise<void> {
+  if (!LIFECYCLE_RECORD_NAME.test(name)) {
+    throw new StudioOpfsSyncAccessError(
+      "INVALID_ARGUMENT",
+      "Dry-media lifecycle record name is malformed.",
+    );
+  }
+  return openHandle(directory, name, true)
+    .then((handle) => {
+      if (!handle) throw new Error("unreachable lifecycle create");
+      try {
+        const bytes = serializeRecord(value);
+        handle.truncate(0);
+        writeAll(handle, bytes, 0);
+        handle.truncate(bytes.byteLength);
+        flush(handle, "final");
+      } finally {
+        handle.close();
+      }
+    });
+}
+
+function removeRecord(directory: StudioOpfsSyncDirectoryHandleLike, name: string): Promise<void> {
+  if (!LIFECYCLE_RECORD_NAME.test(name)) {
+    return Promise.resolve();
+  }
+  return removeIfPresent(directory, name);
+}
+
+function transactionEnvelope<T>(payload: T): object {
+  return {
+    contract: LIFECYCLE_RECORD_DOMAIN,
+    version: 1,
+    payload,
+  };
+}
+
+class StudioDryMediaUnionContinuationOpfsCasLifecyclePersistence
+implements StudioDryMediaUnionCasLifecyclePersistence {
+  constructor(
+    private readonly roots: StudioOpfsSyncDirectoryHandleLike,
+    private readonly directories: Readonly<
+      Record<StudioFreehandInputCasBlobKind, StudioOpfsSyncDirectoryHandleLike>
+    >,
+  ) {}
+
+  async loadTransaction(): Promise<StudioDryMediaUnionCasLifecycleTransaction | null> {
+    const raw = await parseRecord<unknown>(this.roots, LIFECYCLE_TRANSACTIONS_FILE);
+    if (raw === null) return null;
+    const unwrapped = unwrapLifecycleRecord(raw);
+    return snapshotTransaction(unwrapped);
+  }
+
+  async saveTransaction(value: StudioDryMediaUnionCasLifecycleTransaction): Promise<void> {
+    sanitizeRootDigest(value.rootDigest ?? "0".repeat(64));
+    await writeRecord(this.roots, LIFECYCLE_TRANSACTIONS_FILE, transactionEnvelope(value));
+  }
+
+  async deleteTransaction(): Promise<void> {
+    await removeRecord(this.roots, LIFECYCLE_TRANSACTIONS_FILE);
+  }
+
+  async appendPendingReference(reference: StudioDryMediaUnionCasBlobReference): Promise<void> {
+    const pending = await this.readPendingReferences();
+    const next = [...pending, reference];
+    await writeRecord(
+      this.roots,
+      LIFECYCLE_PENDING_REFERENCES_FILE,
+      transactionEnvelope(next),
+    );
+  }
+
+  async readPendingReferences(): Promise<readonly StudioDryMediaUnionCasBlobReference[]> {
+    const raw = await parseRecord<unknown>(this.roots, LIFECYCLE_PENDING_REFERENCES_FILE);
+    if (raw === null) return [];
+    const unwrapped = unwrapLifecycleRecord(raw);
+    return validateReferencePayload(unwrapped);
+  }
+
+  async clearPendingReferences(): Promise<void> {
+    await removeRecord(this.roots, LIFECYCLE_PENDING_REFERENCES_FILE);
+  }
+
+  async loadPublication(
+    rootDigest: string,
+  ): Promise<StudioDryMediaUnionCasLifecyclePublication | null> {
+    const value = await parseRecord<unknown>(
+      this.roots,
+      recordFileNameForPublication(sanitizeRootDigest(rootDigest)),
+    );
+    if (value === null) return null;
+    if (!isRecord(value) || !isRecord((value as { readonly payload?: unknown }).payload)) return null;
+    const record = value as { readonly payload?: unknown };
+    const payload = record.payload;
+    if (
+      !isRecord(payload)
+      || payload.contract !== "studio-dry-media-union-cas-lifecycle-publication-v1"
+    ) {
+      return null;
+    }
+    if (
+      payload.version !== 1
+      || payload.rootDigest !== rootDigest
+      || !Array.isArray(payload.references)
+      || !SHA256_HEX.test(payload.rootDigest)
+    ) return null;
+    const references = validateReferencePayload(payload.references);
+    if (!references.some((reference) => reference.kind === "root" && reference.digest === rootDigest)) {
+      return null;
+    }
+    return Object.freeze({
+      contract: payload.contract,
+      version: payload.version,
+      rootDigest: payload.rootDigest,
+      references: Object.freeze(references),
+    }) as StudioDryMediaUnionCasLifecyclePublication;
+  }
+
+  async savePublication(value: StudioDryMediaUnionCasLifecyclePublication): Promise<void> {
+    const references = validateReferencePayload(value.references);
+    if (!references.some((reference) => reference.kind === "root" && reference.digest === value.rootDigest)) {
+      throw new TypeError("Publication root is missing in references.");
+    }
+    await writeRecord(
+      this.roots,
+      recordFileNameForPublication(sanitizeRootDigest(value.rootDigest)),
+      transactionEnvelope({
+        contract: value.contract,
+        version: value.version,
+        rootDigest: value.rootDigest,
+        references,
+      }),
+    );
+  }
+
+  async deletePublication(rootDigest: string): Promise<void> {
+    await removeRecord(
+      this.roots,
+      recordFileNameForPublication(sanitizeRootDigest(rootDigest)),
+    );
+  }
+
+  async loadMembership(reference: StudioDryMediaUnionCasBlobReference): Promise<readonly string[]> {
+    const value = await parseRecord<unknown>(
+      this.roots,
+      recordFileNameForMembership(reference),
+    );
+    if (value === null) return [];
+    if (!isRecord(value) || !isRecord((value as { readonly payload?: unknown }).payload)) return [];
+    const record = value as { readonly payload?: unknown };
+    try {
+      return sanitizeMembershipArray(record.payload);
+    } catch {
+      return [];
+    }
+  }
+
+  async saveMembership(
+    reference: StudioDryMediaUnionCasBlobReference,
+    rootDigests: readonly string[],
+  ): Promise<void> {
+    const sorted = [...new Set(rootDigests)]
+      .filter((value) => SHA256_HEX.test(value))
+      .sort((left, right) => (left < right ? -1 : left > right ? 1 : 0));
+    await writeRecord(
+      this.roots,
+      recordFileNameForMembership(reference),
+      transactionEnvelope(sorted),
+    );
+  }
+
+  async deleteMembership(reference: StudioDryMediaUnionCasBlobReference): Promise<void> {
+    await removeRecord(this.roots, recordFileNameForMembership(reference));
+  }
+
+  async deleteBlob(reference: StudioDryMediaUnionCasBlobReference): Promise<void> {
+    const pendingName = pendingFileName(reference.digest);
+    const finalName = finalFileName(reference.digest);
+    await removeIfPresent(this.directories[reference.kind], finalName);
+    await removeIfPresent(this.directories[reference.kind], pendingName);
+  }
+}
+
+function sanitizeRootDigest(input: string): string {
+  if (!SHA256_HEX.test(input)) throw new TypeError("Invalid dry-media lifecycle digest.");
+  return input;
+}
+
+function validateReferencePayload(input: unknown): StudioDryMediaUnionCasBlobReference[] {
+  if (!Array.isArray(input) || input.length === 0) return [];
+  const references: StudioDryMediaUnionCasBlobReference[] = [];
+  const seen = new Set<string>();
+  for (const candidate of input) {
+    if (!candidate || typeof candidate !== "object") throw new TypeError("invalid reference");
+    const entry = candidate as StudioDryMediaUnionCasBlobReference;
+    if (
+      (entry.kind !== "page" && entry.kind !== "index" && entry.kind !== "metadata" && entry.kind !== "root")
+      || typeof entry.digest !== "string"
+      || !SHA256_HEX.test(entry.digest)
+      || !Number.isSafeInteger(entry.byteLength)
+      || entry.byteLength <= 0
+    ) {
+      throw new TypeError("invalid reference");
+    }
+    const key = `${entry.kind}:${entry.digest}`;
+    if (seen.has(key)) {
+      throw new TypeError("duplicate reference");
+    }
+    seen.add(key);
+    references.push({
+      kind: entry.kind,
+      digest: entry.digest,
+      byteLength: entry.byteLength,
+    });
+  }
+  return references;
+}
+
+function sanitizeMembershipArray(input: unknown): readonly string[] {
+  if (!Array.isArray(input)) throw new TypeError("invalid membership");
+  const deduped = [...input];
+  deduped.sort();
+  const roots: string[] = [];
+  let previous = "";
+  for (const candidate of deduped) {
+    if (
+      typeof candidate !== "string"
+      || !SHA256_HEX.test(candidate)
+      || (previous !== "" && candidate <= previous)
+    ) {
+      throw new TypeError("invalid membership");
+    }
+    roots.push(candidate);
+    previous = candidate;
+  }
+  return Object.freeze(roots);
 }
 
 type DigestFileState =
@@ -519,7 +884,7 @@ class StudioDryMediaUnionOpfsCasStore implements StudioFreehandInputBinaryCasSto
 
 export async function createStudioDryMediaUnionContinuationOpfsCasStore(
   scope: unknown = globalThis,
-): Promise<StudioFreehandInputBinaryCasStore> {
+): Promise<StudioFreehandInputBinaryCasStore & StudioDryMediaUnionLifecycleManagedCas> {
   const capability = probeStudioOpfsSyncAccessCapability(scope);
   if (!capability.supported) {
     throw new StudioOpfsSyncAccessError(
@@ -546,8 +911,17 @@ export async function createStudioDryMediaUnionContinuationOpfsCasStore(
     recoverDirectory(metadata),
     recoverDirectory(roots),
   ]);
-  return new StudioDryMediaUnionOpfsCasStore({
+  const cas = new StudioDryMediaUnionOpfsCasStore({
     directories: { page, index, metadata, root: roots },
     staging,
   });
+  const lifecyclePersistence = new StudioDryMediaUnionContinuationOpfsCasLifecyclePersistence(
+    roots,
+    { page, index, metadata, root: roots },
+  );
+  const dryMediaUnionLifecycle = createStudioDryMediaUnionCasLifecycle(
+    lifecyclePersistence,
+  );
+  await dryMediaUnionLifecycle.reconcile();
+  return Object.assign(cas, { dryMediaUnionLifecycle });
 }
