@@ -8,6 +8,7 @@ import { AuthSessionProvider } from "@/components/auth/session-provider";
 import { CommandPaletteHost } from "@/components/command-palette-host";
 import { RandomIntro } from "@/components/RandomIntro";
 import { pingVisit } from "@/lib/visits-api";
+import { shouldPreserveStudioRouteLifecycle } from "@/src/domains/creator/studio-workspace-route";
 
 // 공용 fx 키프레임/유틸(.pf-* + --ts-fx-* 토큰). 전역에서 한 번만 import 합니다.
 import "@toonspectrum/core/fx/fx.css";
@@ -30,14 +31,19 @@ const ToastHost = lazy(() =>
 // 첫 진입(직접 연 위치)은 포커스를 가로채지 않습니다.
 function ScrollToTop() {
   const { pathname } = useLocation();
-  const isFirstRender = useRef(true);
+  const previousPathnameRef = useRef<string | null>(null);
 
   useEffect(() => {
-    globalThis.scrollTo({ top: 0, left: 0 });
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
+    const previousPathname = previousPathnameRef.current;
+    previousPathnameRef.current = pathname;
+    if (
+      previousPathname !== null
+      && shouldPreserveStudioRouteLifecycle(previousPathname, pathname)
+    ) {
       return;
     }
+    globalThis.scrollTo({ top: 0, left: 0 });
+    if (previousPathname === null) return;
     document.getElementById("main-content")?.focus({ preventScroll: true });
   }, [pathname]);
 
