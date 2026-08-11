@@ -26,6 +26,7 @@ export type StudioBg3dAtomicAttemptErrorCode =
   | "binding-load-failed"
   | "capability-unavailable"
   | "context-lost"
+  | "device-lost"
   | "engine-init-failed"
   | "renderer-unavailable"
   | "unsupported-artifact"
@@ -92,6 +93,7 @@ const FALLBACK_ELIGIBLE_CODES = new Set<StudioBg3dAtomicAttemptErrorCode>([
   "binding-load-failed",
   "capability-unavailable",
   "context-lost",
+  "device-lost",
   "engine-init-failed",
   "renderer-unavailable",
   "unsupported-artifact",

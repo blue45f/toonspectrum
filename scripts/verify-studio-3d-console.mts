@@ -82,10 +82,25 @@ export const BABYLON_ALIGNED_RASTER_SMOKE_SIZE = 64;
 const BABYLON_STABLE_ID_ENGINE_INIT_TIMEOUT_MS = 60_000;
 export const STUDIO_3D_WEBGPU_MAX_BROWSER_ATTEMPTS = 3;
 export const STUDIO_3D_WEBGPU_BROWSER_CHANNEL = "chromium" as const;
+export const STUDIO_3D_WEBGPU_DIAGNOSTIC_PREFIX =
+  "[verify-studio-3d-console:webgpu-diagnostic]" as const;
+export const STUDIO_3D_WEBGPU_DIAGNOSTIC_MAX_LOG_LENGTH = 4_096;
 export const STUDIO_3D_WEBGPU_PROOF_SHARDS = Object.freeze([
   "babylon-artifact-parity",
   "magic-layer-alignment",
 ] as const);
+
+export function formatStudio3dWebGpuDiagnosticConsoleMessage(
+  value: unknown,
+): string | null {
+  if (
+    typeof value !== "string" ||
+    !value.startsWith(STUDIO_3D_WEBGPU_DIAGNOSTIC_PREFIX)
+  ) {
+    return null;
+  }
+  return value.slice(0, STUDIO_3D_WEBGPU_DIAGNOSTIC_MAX_LOG_LENGTH);
+}
 export type Studio3dWebGpuProofShard =
   (typeof STUDIO_3D_WEBGPU_PROOF_SHARDS)[number];
 export const STUDIO_3D_WEBGPU_SWIFTSHADER_LAUNCH_ARGS = Object.freeze([
@@ -116,6 +131,11 @@ type Studio3dWebGpuRetryErrorEntry = Readonly<{
   message: string;
   name: string;
 }>;
+
+const STUDIO_3D_WEBGPU_LOSS_MESSAGE_PATTERN =
+  /\b(?:WebGPU\s+|GPU\s+)?(?:device|context)(?:\s+(?:is|was))?\s+lost(?=[.:;,()]|$|\s+(?:after|because|due(?:\s+to)?|during|while)\b)/iu;
+const STUDIO_3D_WEBGPU_SERIALIZED_ATTEMPT_LOSS_PATTERN =
+  /attempts=\[[^\]]{0,2048}"errorCode":"(?:context|device)-lost"/u;
 
 function collectStudio3dWebGpuRetryErrorEntries(
   cause: unknown,
@@ -159,13 +179,53 @@ export function classifyStudio3dWebGpuRetryableFailure(
   cause: unknown,
 ): Studio3dWebGpuRetryReason | null {
   const entries = collectStudio3dWebGpuRetryErrorEntries(cause);
-  // A deadline remains authoritative even when cleanup subsequently rejects an in-flight
-  // mapAsync. Retrying that chain would hide a real verifier timeout behind a disposal symptom.
-  if (entries.some((entry) =>
-    entry.name === "TimeoutError" ||
-    entry.code === "timeout" ||
-    /\b(?:timed out|timeout)\b/iu.test(entry.message)
-  )) {
+  // An explicit deadline remains authoritative even when cleanup subsequently rejects an
+  // in-flight mapAsync. Retrying that chain would hide a real verifier timeout behind a disposal
+  // symptom. A device-lost payload may itself mention a GPU watchdog timeout, however, so textual
+  // timeout evidence only vetoes a later (inner) or absent structured loss marker.
+  if (entries.some((entry) => entry.name === "TimeoutError" || entry.code === "timeout")) {
+    return null;
+  }
+  let firstLossPosition: readonly [entryIndex: number, messageIndex: number] | null = null;
+  let firstTimeoutPosition: readonly [entryIndex: number, messageIndex: number] | null = null;
+  for (const [entryIndex, entry] of entries.entries()) {
+    const structuredLoss = entry.code === "context-lost" || entry.code === "device-lost";
+    const bracketedLossIndex = entry.message.search(/\[(?:context|device)-lost\]/u);
+    const attemptLossIndex = entry.message.search(
+      STUDIO_3D_WEBGPU_SERIALIZED_ATTEMPT_LOSS_PATTERN,
+    );
+    const serializedLossIndex = bracketedLossIndex < 0
+      ? attemptLossIndex
+      : attemptLossIndex < 0
+        ? bracketedLossIndex
+        : Math.min(bracketedLossIndex, attemptLossIndex);
+    const ordinaryLossIndex = entry.message.search(STUDIO_3D_WEBGPU_LOSS_MESSAGE_PATTERN);
+    const lossIndex = structuredLoss
+      ? 0
+      : serializedLossIndex < 0
+        ? ordinaryLossIndex
+        : ordinaryLossIndex < 0
+          ? serializedLossIndex
+          : Math.min(serializedLossIndex, ordinaryLossIndex);
+    if (firstLossPosition === null && lossIndex >= 0) {
+      firstLossPosition = [entryIndex, lossIndex];
+    }
+    const timeoutIndex = entry.message.search(/\b(?:timed out|timeout)\b/iu);
+    if (firstTimeoutPosition === null && timeoutIndex >= 0) {
+      firstTimeoutPosition = [entryIndex, timeoutIndex];
+    }
+  }
+  if (
+    firstTimeoutPosition &&
+    (
+      !firstLossPosition ||
+      firstTimeoutPosition[0] < firstLossPosition[0] ||
+      (
+        firstTimeoutPosition[0] === firstLossPosition[0] &&
+        firstTimeoutPosition[1] < firstLossPosition[1]
+      )
+    )
+  ) {
     return null;
   }
   for (const entry of entries) {
@@ -175,11 +235,10 @@ export function classifyStudio3dWebGpuRetryableFailure(
     if (/\[(?:context|device)-lost\]/u.test(entry.message)) {
       return "context-or-device-lost";
     }
-    if (
-      /\b(?:WebGPU\s+|GPU\s+)?(?:device|context)(?:\s+(?:is|was))?\s+lost(?:[.:;]|$)/iu.test(
-        entry.message,
-      )
-    ) {
+    if (STUDIO_3D_WEBGPU_SERIALIZED_ATTEMPT_LOSS_PATTERN.test(entry.message)) {
+      return "context-or-device-lost";
+    }
+    if (STUDIO_3D_WEBGPU_LOSS_MESSAGE_PATTERN.test(entry.message)) {
       return "context-or-device-lost";
     }
   }
@@ -1293,6 +1352,7 @@ async function runBabylonStableIdOrientationParityProof(
     canonicalDocumentJson: documentJson,
     entryUrl: specialistEntryUrl,
     stableIdRequests: idRequests,
+    webGpuDiagnosticPrefix,
     webGpuEngineInitializationTimeoutMs,
   }) => {
     type CaptureRequest = {
@@ -1338,6 +1398,7 @@ async function runBabylonStableIdOrientationParityProof(
         readonly backend: "webgl2" | "webgpu";
         readonly canvas: HTMLCanvasElement;
         readonly engineInitializationTimeoutMs?: number;
+        readonly onDiagnostic?: (diagnostic: unknown) => void;
         readonly settings: {
           readonly failIfMajorPerformanceCaveat: boolean;
         };
@@ -1572,6 +1633,11 @@ async function runBabylonStableIdOrientationParityProof(
         engineInitializationTimeoutMs: backend === "webgpu"
           ? webGpuEngineInitializationTimeoutMs
           : undefined,
+        onDiagnostic: backend === "webgpu"
+          ? (diagnostic) => {
+              console.warn(`${webGpuDiagnosticPrefix}${JSON.stringify(diagnostic)}`);
+            }
+          : undefined,
         settings: { failIfMajorPerformanceCaveat: false },
       });
       const stableSummaries = [];
@@ -1742,6 +1808,7 @@ async function runBabylonStableIdOrientationParityProof(
     canonicalDocumentJson,
     entryUrl,
     stableIdRequests,
+    webGpuDiagnosticPrefix: STUDIO_3D_WEBGPU_DIAGNOSTIC_PREFIX,
     webGpuEngineInitializationTimeoutMs: BABYLON_STABLE_ID_ENGINE_INIT_TIMEOUT_MS,
   });
 
@@ -1951,6 +2018,7 @@ async function runMagicLayerProductionAlignmentProof(
     threeCaptureUrl,
     threeModuleUrl,
     viewport,
+    webGpuDiagnosticPrefix,
   }) => {
     type ThreeConstructor = new (...args: never[]) => {
       readonly type?: unknown;
@@ -2000,6 +2068,131 @@ async function runMagicLayerProductionAlignmentProof(
         "../src/domains/creator/studio-bg3d-runtime-adapter"
       ).createStudioBg3dRuntimeSnapshot;
     };
+
+    const absentOwnData = Symbol("absent-own-data");
+
+    function ownDataValue(
+      value: unknown,
+      key: string,
+    ): unknown | typeof absentOwnData {
+      if ((typeof value !== "object" && typeof value !== "function") || value === null) {
+        return absentOwnData;
+      }
+      try {
+        const descriptor = Object.getOwnPropertyDescriptor(value, key);
+        return descriptor && "value" in descriptor
+          ? descriptor.value
+          : absentOwnData;
+      } catch {
+        return absentOwnData;
+      }
+    }
+
+    function boundedOwnString(
+      value: unknown | typeof absentOwnData,
+      maximumLength: number,
+      fallback: string,
+    ): string {
+      return typeof value === "string" ? value.slice(0, maximumLength) : fallback;
+    }
+
+    function safeDisplayValue(
+      value: unknown,
+      key: "message" | "name",
+    ): unknown | typeof absentOwnData {
+      if ((typeof value !== "object" && typeof value !== "function") || value === null) {
+        return absentOwnData;
+      }
+      try {
+        return Reflect.get(value, key);
+      } catch {
+        return absentOwnData;
+      }
+    }
+
+    function boundedReceiptString(
+      value: unknown | typeof absentOwnData,
+      maximumLength: number,
+      fallback: string,
+    ): string {
+      return boundedOwnString(value, maximumLength, fallback)
+        .replace(/[^a-z0-9-]/giu, "?");
+    }
+
+    function atomicAttemptsReceipt(value: unknown): string {
+      const attemptsValue = ownDataValue(value, "attempts");
+      if (attemptsValue === absentOwnData) return "";
+      try {
+        if (!Array.isArray(attemptsValue)) return "";
+        const lengthValue = ownDataValue(attemptsValue, "length");
+        if (
+          typeof lengthValue !== "number" ||
+          !Number.isSafeInteger(lengthValue) ||
+          lengthValue < 0
+        ) {
+          return "";
+        }
+        const receipts: string[] = [];
+        const attemptCount = Math.min(lengthValue, 4);
+        for (let index = 0; index < attemptCount; index += 1) {
+          const attempt = ownDataValue(attemptsValue, String(index));
+          const runtimeId = boundedReceiptString(
+            ownDataValue(attempt, "runtimeId"),
+            128,
+            "unknown",
+          );
+          const outcome = boundedReceiptString(
+            ownDataValue(attempt, "outcome"),
+            32,
+            "unknown",
+          );
+          const rawErrorCode = ownDataValue(attempt, "errorCode");
+          const errorCode = typeof rawErrorCode === "string"
+            ? boundedReceiptString(rawErrorCode, 64, "unknown")
+            : null;
+          receipts.push(JSON.stringify({ runtimeId, outcome, errorCode }));
+        }
+        return ` attempts=[${receipts.join(",")}]`;
+      } catch {
+        return "";
+      }
+    }
+
+    function errorChain(cause: unknown): string {
+      const seen = new Set<unknown>();
+      const entries: string[] = [];
+      let current: unknown = cause;
+      for (let depth = 0; depth < 8 && current !== undefined; depth += 1) {
+        if (seen.has(current)) {
+          entries.push("[circular cause]");
+          break;
+        }
+        seen.add(current);
+        if (typeof current !== "object" || current === null) {
+          try {
+            entries.push(String(current).slice(0, 512));
+          } catch {
+            entries.push("[unprintable cause]");
+          }
+          break;
+        }
+        const name = boundedOwnString(safeDisplayValue(current, "name"), 128, "Error");
+        const rawCode = ownDataValue(current, "code");
+        const code = typeof rawCode === "string" ? `[${rawCode.slice(0, 128)}]` : "";
+        const message = boundedOwnString(
+          safeDisplayValue(current, "message"),
+          512,
+          "[object]",
+        );
+        entries.push(
+          `${name}${code}: ${message}${atomicAttemptsReceipt(current)}`.slice(0, 2_048),
+        );
+        const nextCause = ownDataValue(current, "cause");
+        if (nextCause === absentOwnData) break;
+        current = nextCause;
+      }
+      return entries.join(" <- ").slice(0, 4_096);
+    }
 
     const threeModule = await import(threeModuleUrl) as Record<string, unknown>;
     const threeCaptureModule = await import(threeCaptureUrl) as Pick<
@@ -2588,15 +2781,42 @@ async function runMagicLayerProductionAlignmentProof(
                 backend,
                 canvas,
                 capabilities,
+                onDiagnostic: backend === "webgpu"
+                  ? (diagnostic) => {
+                      console.warn(
+                        `${webGpuDiagnosticPrefix}${JSON.stringify(diagnostic)}`,
+                      );
+                    }
+                  : undefined,
                 settings,
               });
             },
             signal: controller.signal,
           });
         } catch (cause) {
-          throw new Error(`[${scenario.id}] product Magic object-ID capture failed`, { cause });
+          throw new Error(
+            `[${scenario.id}] product Magic object-ID capture failed: ${errorChain(cause)}`,
+            { cause },
+          );
         } finally {
           for (const canvas of ownedBabylonCanvases) canvas.remove();
+        }
+        const webGpuAttempt = objectIdCapture.attempts[0];
+        if (
+          objectIdCapture.fallbackUsed &&
+          webGpuAttempt?.outcome === "failed" &&
+          (
+            webGpuAttempt.errorCode === "context-lost" ||
+            webGpuAttempt.errorCode === "device-lost"
+          )
+        ) {
+          // Playwright transports Error name/message/stack but not custom cause/code fields. Keep
+          // the authoritative GPU-loss receipt in the top-level message so the Node retry policy
+          // can distinguish this transient loss from a semantic Magic alignment failure.
+          throw new Error(
+            `[${scenario.id}] product Magic WebGPU attempt failed ` +
+              `[${webGpuAttempt.errorCode}] before WebGL2 fallback`,
+          );
         }
         if (
           objectIdCapture.backend !== "webgpu" ||
@@ -2777,6 +2997,7 @@ async function runMagicLayerProductionAlignmentProof(
       "Three production module",
     )),
     viewport: MAGIC_ALIGNMENT_VIEWPORT,
+    webGpuDiagnosticPrefix: STUDIO_3D_WEBGPU_DIAGNOSTIC_PREFIX,
   });
 
   const expectedScenarios = createMagicLayerAlignmentProofScenarios();
@@ -2847,6 +3068,10 @@ async function runStudio3dWebGpuConformanceBrowserAttempt(
         viewport: { width: 1_440, height: 1_000 },
       });
       const webGpuPage = await webGpuContext.newPage();
+      webGpuPage.on("console", (message) => {
+        const diagnostic = formatStudio3dWebGpuDiagnosticConsoleMessage(message.text());
+        if (diagnostic) console.warn(diagnostic);
+      });
       switch (shard) {
         case "babylon-artifact-parity":
           await runBabylonStableIdOrientationParityProof(webGpuPage, rootUrl);

@@ -127,6 +127,25 @@ describe("Studio BG3D atomic specialist failover", () => {
     ]);
   });
 
+  it("keeps an authoritative WebGPU device loss eligible for isolated fallback", async () => {
+    const run = vi.fn()
+      .mockRejectedValueOnce(new StudioBg3dBabylonSpecialistError("device-lost"))
+      .mockResolvedValueOnce(metrics);
+
+    const result = await runStudioBg3dAtomicSpecialist(inputFor(run));
+
+    expect(result.runtimeId).toBe("babylon-webgl-lab");
+    expect(result.fallbackUsed).toBe(true);
+    expect(result.attempts).toEqual([
+      {
+        errorCode: "device-lost",
+        outcome: "failed",
+        runtimeId: "babylon-webgpu-lab",
+      },
+      { outcome: "succeeded", runtimeId: "babylon-webgl-lab" },
+    ]);
+  });
+
   it.each([
     "adapter-not-registered",
     "capability-unavailable",

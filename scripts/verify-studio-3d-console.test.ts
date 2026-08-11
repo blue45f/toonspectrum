@@ -17,11 +17,14 @@ import {
   createBabylonStableIdParityRequests,
   classifyStudio3dWebGpuRetryableFailure,
   collectStudioVrmMannequinChromaFailures,
+  formatStudio3dWebGpuDiagnosticConsoleMessage,
   isExpectedStaticPreviewSocketIoHandshakeClose,
   runStudio3dWebGpuConformanceWithFreshBrowserRetry,
   runStudio3dWebGpuProofShardsWithFreshBrowserRetry,
   runStudio3dWebGpuShardWithCleanup,
   STUDIO_3D_WEBGPU_BROWSER_CHANNEL,
+  STUDIO_3D_WEBGPU_DIAGNOSTIC_MAX_LOG_LENGTH,
+  STUDIO_3D_WEBGPU_DIAGNOSTIC_PREFIX,
   STUDIO_3D_WEBGPU_MAX_BROWSER_ATTEMPTS,
   STUDIO_3D_WEBGPU_PROOF_SHARDS,
   STUDIO_3D_WEBGPU_SWIFTSHADER_LAUNCH_ARGS,
@@ -219,7 +222,6 @@ describe("3D WebGPU conformance browser boundary", () => {
       "async function runStudio3dWebGpuConformanceBrowserAttempt(",
       "async function main(): Promise<void>",
     );
-
     expect(STUDIO_3D_WEBGPU_BROWSER_CHANNEL).toBe("chromium");
     expect(webGpuAttempt).toContain(
       "channel: STUDIO_3D_WEBGPU_BROWSER_CHANNEL",
@@ -232,6 +234,69 @@ describe("3D WebGPU conformance browser boundary", () => {
     expect(webGpuAttempt).toContain(
       "version=${webGpuBrowser.version()}",
     );
+  });
+
+  it("relays bounded production device diagnostics outside the retry cause chain", () => {
+    const babylonProof = sourceBetween(
+      "async function runBabylonStableIdOrientationParityProof(",
+      "async function runMagicLayerProductionAlignmentProof(",
+    );
+    const webGpuAttempt = sourceBetween(
+      "async function runStudio3dWebGpuConformanceBrowserAttempt(",
+      "async function main(): Promise<void>",
+    );
+    const magicProof = sourceBetween(
+      "async function runMagicLayerProductionAlignmentProof(",
+      "async function runStudio3dWebGpuConformanceBrowserAttempt(",
+    );
+    const listenerIndex = webGpuAttempt.indexOf('webGpuPage.on("console"');
+    const proofIndex = webGpuAttempt.indexOf(
+      "await runBabylonStableIdOrientationParityProof(webGpuPage, rootUrl);",
+    );
+
+    expect(STUDIO_3D_WEBGPU_DIAGNOSTIC_PREFIX).toBe(
+      "[verify-studio-3d-console:webgpu-diagnostic]",
+    );
+    expect(babylonProof).toContain('readonly onDiagnostic?: (diagnostic: unknown) => void;');
+    expect(babylonProof).toContain('onDiagnostic: backend === "webgpu"');
+    expect(babylonProof).toContain(
+      "console.warn(`${webGpuDiagnosticPrefix}${JSON.stringify(diagnostic)}`);",
+    );
+    expect(magicProof).toContain('onDiagnostic: backend === "webgpu"');
+    expect(magicProof).toContain(
+      "`${webGpuDiagnosticPrefix}${JSON.stringify(diagnostic)}`",
+    );
+    expect(magicProof).toContain(
+      "product Magic object-ID capture failed: ${errorChain(cause)}",
+    );
+    expect(magicProof).toContain("Object.getOwnPropertyDescriptor(value, key)");
+    expect(magicProof).toContain("return Reflect.get(value, key);");
+    expect(magicProof).toContain('safeDisplayValue(current, "name")');
+    expect(magicProof).toContain('safeDisplayValue(current, "message")');
+    expect(magicProof).toContain('const attemptsValue = ownDataValue(value, "attempts");');
+    expect(magicProof).toContain("const attemptCount = Math.min(lengthValue, 4);");
+    expect(magicProof).toContain("JSON.stringify({ runtimeId, outcome, errorCode })");
+    expect(magicProof).toContain('entries.push("[circular cause]")');
+    expect(magicProof).toContain('entries.join(" <- ").slice(0, 4_096)');
+    expect(magicProof).toContain(
+      "[${webGpuAttempt.errorCode}] before WebGL2 fallback",
+    );
+    expect(listenerIndex).toBeGreaterThanOrEqual(0);
+    expect(proofIndex).toBeGreaterThan(listenerIndex);
+    expect(webGpuAttempt).toContain(
+      "formatStudio3dWebGpuDiagnosticConsoleMessage(message.text())",
+    );
+    expect(webGpuAttempt).not.toContain(
+      "classifyStudio3dWebGpuRetryableFailure(value)",
+    );
+  });
+
+  it("admits only prefixed WebGPU diagnostics and bounds their CI log line", () => {
+    expect(formatStudio3dWebGpuDiagnosticConsoleMessage("ordinary warning")).toBeNull();
+    const oversized = `${STUDIO_3D_WEBGPU_DIAGNOSTIC_PREFIX}${"x".repeat(8_192)}`;
+    const formatted = formatStudio3dWebGpuDiagnosticConsoleMessage(oversized);
+    expect(formatted).toHaveLength(STUDIO_3D_WEBGPU_DIAGNOSTIC_MAX_LOG_LENGTH);
+    expect(formatted?.startsWith(STUDIO_3D_WEBGPU_DIAGNOSTIC_PREFIX)).toBe(true);
   });
 
   it("pins both Dawn WebGPU and ANGLE WebGL to SwiftShader", () => {
@@ -295,6 +360,14 @@ describe("3D WebGPU conformance browser boundary", () => {
       "context-or-device-lost",
     ],
     [
+      "Playwright-transported Magic device loss",
+      new Error(
+        "page.evaluate: product Magic object-ID capture failed: " +
+          "StudioBg3dBabylonSpecialistError[device-lost]: GPU watchdog timeout",
+      ),
+      "context-or-device-lost",
+    ],
+    [
       "exact Chromium external-instance readback abort",
       new DOMException(
         "Failed to execute 'mapAsync' on 'GPUBuffer': " +
@@ -313,6 +386,78 @@ describe("3D WebGPU conformance browser boundary", () => {
     ],
   ] as const)("classifies only retryable GPU lifetime failure: %s", (_label, error, reason) => {
     expect(classifyStudio3dWebGpuRetryableFailure(error)).toBe(reason);
+  });
+
+  it("keeps an outer verifier timeout authoritative over an inner cleanup loss", () => {
+    const loss = Object.assign(new Error("GPU queue timeout after the device was lost"), {
+      code: "device-lost",
+    });
+    const deadline = new Error("TimeoutError: Magic proof timed out", { cause: loss });
+
+    expect(classifyStudio3dWebGpuRetryableFailure(loss)).toBe(
+      "context-or-device-lost",
+    );
+    expect(classifyStudio3dWebGpuRetryableFailure(deadline)).toBeNull();
+  });
+
+  it("orders plain device-loss and watchdog-timeout evidence within one transported message", () => {
+    expect(classifyStudio3dWebGpuRetryableFailure(
+      new Error("WebGPU device was lost after watchdog timeout."),
+    )).toBe("context-or-device-lost");
+    expect(classifyStudio3dWebGpuRetryableFailure(
+      new Error("GPU watchdog timeout; WebGPU device was lost."),
+    )).toBeNull();
+  });
+
+  it("classifies transported atomic attempts only when a candidate receipt records loss", () => {
+    const deviceLossAttempts = JSON.stringify([
+      {
+        runtimeId: "babylon-webgpu-lab",
+        outcome: "failed",
+        errorCode: "device-lost",
+      },
+      {
+        runtimeId: "babylon-webgl-lab",
+        outcome: "failed",
+        errorCode: "engine-init-failed",
+      },
+    ]);
+    const ordinaryFailureAttempts = JSON.stringify([
+      {
+        runtimeId: "babylon-webgpu-lab",
+        outcome: "failed",
+        errorCode: "engine-init-failed",
+      },
+      {
+        runtimeId: "babylon-webgl-lab",
+        outcome: "failed",
+        errorCode: "renderer-unavailable",
+      },
+    ]);
+
+    expect(classifyStudio3dWebGpuRetryableFailure(new Error(
+      "page.evaluate: StudioBg3dAtomicSpecialistError[all-candidates-failed]: " +
+        `atomic capture failed attempts=${deviceLossAttempts}`,
+    ))).toBe("context-or-device-lost");
+    expect(classifyStudio3dWebGpuRetryableFailure(new Error(
+      "page.evaluate: StudioBg3dAtomicSpecialistError[all-candidates-failed]: " +
+        `atomic capture failed attempts=${ordinaryFailureAttempts}`,
+    ))).toBeNull();
+  });
+
+  it("preserves a real DOMException display marker across a Playwright-style message", () => {
+    const browserCause = new DOMException(
+      "Failed to execute 'mapAsync' on 'GPUBuffer': " +
+        "A valid external Instance reference no longer exists.",
+      "AbortError",
+    );
+    const transported = new Error(
+      `page.evaluate: ${browserCause.name}: ${browserCause.message}`,
+    );
+
+    expect(classifyStudio3dWebGpuRetryableFailure(transported)).toBe(
+      "external-instance-map-readback",
+    );
   });
 
   it.each([
