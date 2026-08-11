@@ -186,15 +186,20 @@ export function listStudioLiveLayerOwnershipLocksOnPage(
 }
 
 /**
- * Deterministic lock-set fingerprint so UI can skip ownership map rebuilds when
- * the room re-emits an equal lease snapshot under a new array identity.
+ * Deterministic fingerprint of **active** leases at `now` so UI can skip ownership
+ * map rebuilds when the room re-emits an equal snapshot under a new array identity.
+ *
+ * Expired leases are omitted: when `now` advances past `leaseUntil`, the fingerprint
+ * changes and callers must rebuild (cannot reuse a map that still marks peers as owners).
  */
 export function fingerprintStudioLiveLocks(
   locks: readonly StudioLiveLockLike[],
+  now = Date.now(),
 ): string {
   if (locks.length === 0) return "";
   const parts: string[] = [];
   for (const lock of locks) {
+    if (!isActiveLock(lock, now)) continue;
     const session = lock.owner?.sessionId ?? "";
     parts.push(`${lock.resource}\0${session}\0${lock.leaseUntil}`);
   }
@@ -299,8 +304,12 @@ export function summarizeStudioLiveSelectionOwnership(input: {
 }
 
 /**
- * Rebuild ownership only when lock fingerprint or element set changes.
- * Returns the previous map reference when nothing material changed.
+ * Rebuild ownership only when the active-lease fingerprint or element set changes.
+ * Returns the previous map reference when nothing material changed at `now`.
+ *
+ * Callers should pass a consistent `now` (or rely on Date.now()) so that when
+ * leases expire between heartbeats, the active fingerprint drops and the map
+ * rebuilds to free ownership instead of freezing peer badges.
  */
 export function reuseOrBuildStudioLiveLayerOwnershipByItemId(input: {
   readonly pageId: string;
@@ -328,7 +337,9 @@ export function reuseOrBuildStudioLiveLayerOwnershipByItemId(input: {
   const pageId = typeof input.pageId === "string" ? input.pageId.trim() : "";
   const self =
     typeof input.selfSessionId === "string" ? input.selfSessionId.trim() : "";
-  const fingerprint = fingerprintStudioLiveLocks(input.locks);
+  const now = input.now ?? Date.now();
+  // Active-only fingerprint: expired leases must not keep a peer map alive.
+  const fingerprint = fingerprintStudioLiveLocks(input.locks, now);
   const elementKey = input.elementIds.join("\0");
   if (
     input.previous
@@ -351,7 +362,7 @@ export function reuseOrBuildStudioLiveLayerOwnershipByItemId(input: {
     elementIds: input.elementIds,
     locks: input.locks,
     selfSessionId: self,
-    now: input.now,
+    now,
   });
   return {
     fingerprint,

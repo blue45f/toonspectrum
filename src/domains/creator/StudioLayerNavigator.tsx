@@ -278,7 +278,8 @@ export function StudioLayerNavigator({
     selectedIds,
     ownershipByItemId: liveOwnershipByItemId,
   });
-  const filterPanelId = useId();  const actionPopoverId = useId();
+  const filterPanelId = useId();
+  const actionPopoverId = useId();
   const resultStatusId = useId();
   const mergeFallbackNoteId = useId();
   const flattenFallbackNoteId = useId();

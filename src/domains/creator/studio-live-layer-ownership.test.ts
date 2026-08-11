@@ -197,7 +197,7 @@ describe("studio live layer ownership", () => {
     expect(second.reused).toBe(true);
     expect(second.map).toBe(first.map);
     expect(second.fingerprint).toBe(first.fingerprint);
-    expect(second.fingerprint).toBe(fingerprintStudioLiveLocks(locks));
+    expect(second.fingerprint).toBe(fingerprintStudioLiveLocks(locks, now));
     expect(second.fingerprint.length).toBeGreaterThan(0);
 
     const third = reuseOrBuildStudioLiveLayerOwnershipByItemId({
@@ -213,5 +213,63 @@ describe("studio live layer ownership", () => {
     expect(third.reused).toBe(false);
     expect(third.map).not.toBe(first.map);
     expect(third.map.get(layerB)?.ownerDisplayName).toBe("지민");
+  });
+
+  it("does not reuse a peer map after leaseUntil expires with the same lock list", () => {
+    const leaseUntil = now + 5_000;
+    const locks = [
+      lock(
+        studioLiveElementResource(pageId, layerA),
+        "peer",
+        "민수",
+        leaseUntil,
+      ),
+    ];
+    const whileActive = reuseOrBuildStudioLiveLayerOwnershipByItemId({
+      pageId,
+      elementIds: [layerA, layerB],
+      locks,
+      selfSessionId: "me",
+      now,
+      previous: null,
+    });
+    expect(whileActive.reused).toBe(false);
+    expect(whileActive.map.get(layerA)?.kind).toBe("peer");
+    expect(whileActive.fingerprint).toBe(
+      fingerprintStudioLiveLocks(locks, now),
+    );
+
+    // Same lock array, clock past lease — must rebuild to free (not freeze peer badge).
+    const afterExpiry = reuseOrBuildStudioLiveLayerOwnershipByItemId({
+      pageId,
+      elementIds: [layerA, layerB],
+      locks,
+      selfSessionId: "me",
+      now: leaseUntil + 1,
+      previous: whileActive,
+    });
+    expect(afterExpiry.reused).toBe(false);
+    expect(afterExpiry.map).not.toBe(whileActive.map);
+    expect(afterExpiry.map.get(layerA)).toBeUndefined();
+    expect(afterExpiry.fingerprint).toBe("");
+    expect(
+      resolveStudioLiveLayerOwnership({
+        pageId,
+        elementId: layerA,
+        locks,
+        selfSessionId: "me",
+        now: leaseUntil + 1,
+      }),
+    ).toEqual(FREE_STUDIO_LIVE_LAYER_OWNERSHIP);
+    // Direct build at the same now matches the reuse path.
+    expect(
+      buildStudioLiveLayerOwnershipByItemId({
+        pageId,
+        elementIds: [layerA, layerB],
+        locks,
+        selfSessionId: "me",
+        now: leaseUntil + 1,
+      }).size,
+    ).toBe(0);
   });
 });
