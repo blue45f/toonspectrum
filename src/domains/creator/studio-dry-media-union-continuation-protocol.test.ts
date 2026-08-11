@@ -12,6 +12,7 @@ import {
   STUDIO_DRY_MEDIA_UNION_CONTINUATION_MAX_PAGE_COUNT,
   STUDIO_DRY_MEDIA_UNION_CONTINUATION_PAGE_TARGET_BYTES,
   createStudioDryMediaUnionContinuationPackCursor,
+  hydrateStudioDryMediaUnionContinuationPage,
   packStudioDryMediaUnionContinuationPageBatch,
   packStudioDryMediaUnionContinuationPages,
   snapshotStudioDryMediaUnionContinuationPackCursor,
@@ -410,5 +411,26 @@ describe("dry-media union continuation protocol", () => {
     expect(lastPage.firstGroupIndex + lastPage.stationIndexes.length).toBe(9_000);
     expect(pageDigest(batches)).toMatch(/^[a-f0-9]{64}$/u);
     expect(pageDigest(batches)).toBe(pageDigest(repeated));
+  });
+
+  it("rehydrates one copied bounded slab and rejects a forged header before view construction", () => {
+    const packed = requirePacked(packStudioDryMediaUnionContinuationPages([
+      markWithGroups(17, 18),
+    ]));
+    const source = packed.pages[0]!;
+    const hydrated = hydrateStudioDryMediaUnionContinuationPage(source.buffer);
+
+    expect(hydrated).not.toBeNull();
+    expect(hydrated?.buffer).not.toBe(source.buffer);
+    expect(hydrated?.stationIndexes).toEqual(source.stationIndexes);
+    expect(hydrated?.groupContourOffsets).toEqual(source.groupContourOffsets);
+    expect(hydrated?.coordinates).toEqual(source.coordinates);
+    new Uint8Array(source.buffer).fill(0);
+    expect(validateStudioDryMediaUnionContinuationPage(hydrated)).toBe(true);
+
+    const forged = hydrated!.buffer.slice(0);
+    new DataView(forged).setUint32(20, 0xffff_ffff, true);
+    expect(hydrateStudioDryMediaUnionContinuationPage(forged)).toBeNull();
+    expect(hydrateStudioDryMediaUnionContinuationPage(new ArrayBuffer(127))).toBeNull();
   });
 });

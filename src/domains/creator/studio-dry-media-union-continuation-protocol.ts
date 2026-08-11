@@ -265,6 +265,79 @@ function buildPage(
   });
 }
 
+/**
+ * Rehydrates one immutable bounded contour slab without retaining the caller's
+ * ArrayBuffer. The page header is preflighted before any length-derived views
+ * are constructed, and the shared validator remains the final authority.
+ */
+export function hydrateStudioDryMediaUnionContinuationPage(
+  candidate: unknown,
+): StudioDryMediaUnionContinuationPage | null {
+  if (
+    !(candidate instanceof ArrayBuffer)
+    || candidate.byteLength < STUDIO_DRY_MEDIA_UNION_CONTINUATION_PAGE_HEADER_BYTES
+    || candidate.byteLength > STUDIO_DRY_MEDIA_UNION_CONTINUATION_MAX_GROUP_BYTES
+  ) return null;
+  const buffer = candidate.slice(0);
+  try {
+    const header = new DataView(
+      buffer,
+      0,
+      STUDIO_DRY_MEDIA_UNION_CONTINUATION_PAGE_HEADER_BYTES,
+    );
+    const pageIndex = header.getUint32(12, true);
+    const firstGroupIndex = header.getUint32(16, true);
+    const groupCount = header.getUint32(20, true);
+    const contourCount = header.getUint32(24, true);
+    const coordinateCount = header.getUint32(28, true);
+    const byteLength = pageByteLength(groupCount, contourCount, coordinateCount);
+    if (
+      groupCount <= 0
+      || groupCount > STUDIO_DRY_MEDIA_UNION_CONTINUATION_MAX_GROUP_COUNT
+      || contourCount <= 0
+      || coordinateCount < 6
+      || !Number.isSafeInteger(byteLength)
+      || byteLength !== buffer.byteLength
+      || byteLength > STUDIO_DRY_MEDIA_UNION_CONTINUATION_MAX_GROUP_BYTES
+    ) return null;
+    let byteOffset = STUDIO_DRY_MEDIA_UNION_CONTINUATION_PAGE_HEADER_BYTES;
+    const stationIndexes = new Uint32Array(buffer, byteOffset, groupCount);
+    byteOffset += stationIndexes.byteLength;
+    const groupEntryIndexes = new Uint32Array(buffer, byteOffset, groupCount);
+    byteOffset += groupEntryIndexes.byteLength;
+    const groupContourOffsets = new Uint32Array(buffer, byteOffset, groupCount + 1);
+    byteOffset += groupContourOffsets.byteLength;
+    const contourCoordinateOffsets = new Uint32Array(
+      buffer,
+      byteOffset,
+      contourCount + 1,
+    );
+    byteOffset += contourCoordinateOffsets.byteLength;
+    byteOffset = Math.ceil(byteOffset / Float64Array.BYTES_PER_ELEMENT)
+      * Float64Array.BYTES_PER_ELEMENT;
+    const coordinates = new Float64Array(buffer, byteOffset, coordinateCount);
+    byteOffset += coordinates.byteLength;
+    const groupBounds = new Float64Array(buffer, byteOffset, groupCount * 4);
+    const page = Object.freeze({
+      contract: "studio-dry-media-union-contour-page-v1" as const,
+      version: 1 as const,
+      pageIndex,
+      firstGroupIndex,
+      byteLength,
+      buffer,
+      stationIndexes,
+      groupEntryIndexes,
+      groupContourOffsets,
+      contourCoordinateOffsets,
+      coordinates,
+      groupBounds,
+    });
+    return validateStudioDryMediaUnionContinuationPage(page) ? page : null;
+  } catch {
+    return null;
+  }
+}
+
 function freezePackCursor(
   entryIndex: number,
   groupIndex: number,
