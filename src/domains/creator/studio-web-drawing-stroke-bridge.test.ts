@@ -211,11 +211,20 @@ describe("studio web drawing stroke bridge", () => {
     expect(under.sliced).toBe(false);
     expect(under.dropped).toBe(0);
     expect(under.dabs).toBe(dabs);
+    expect(under.preservedEndpoint).toBe(false);
 
     const over = sliceStudioDynamicDabsForLiveFrame(dabs, 5);
     expect(over.sliced).toBe(true);
     expect(over.dabs).toHaveLength(5);
     expect(over.dropped).toBe(dabs.length - 5);
     expect(over.dabs[0]).toBe(dabs[0]);
+    // Endpoint preserved: last output dab is the planned tip, not a mid-path station.
+    expect(over.preservedEndpoint).toBe(true);
+    expect(over.dabs[over.dabs.length - 1]).toBe(dabs[dabs.length - 1]);
+
+    const tipOnly = sliceStudioDynamicDabsForLiveFrame(dabs, 1);
+    expect(tipOnly.dabs).toHaveLength(1);
+    expect(tipOnly.dabs[0]).toBe(dabs[dabs.length - 1]);
+    expect(tipOnly.preservedEndpoint).toBe(true);
   });
 });

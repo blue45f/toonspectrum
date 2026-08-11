@@ -451,6 +451,96 @@ def build_outfit_cyberpunk_suit():
     apply_subsurf(suit, 2)
     export_outfit_glb("outfit_cyberpunk_suit.glb")
 
+# 4 New Round-3 Props
+def build_cyber_sniper_rifle():
+    reset_scene()
+    mat_metal = create_material("SniperMetal", base_color=(0.08, 0.1, 0.12, 1.0), metallic=0.9, roughness=0.2)
+    mat_scope = create_material("ScopeGlow", base_color=(1.0, 0.1, 0.2, 1.0), emission_color=(1.0, 0.2, 0.3, 1.0), emission_strength=5.0)
+    bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0, 0.5, 0))
+    barrel = bpy.context.active_object
+    barrel.scale = (0.04, 1.2, 0.08)
+    barrel.data.materials.append(mat_metal)
+    bpy.ops.mesh.primitive_cylinder_add(radius=0.03, depth=0.25, location=(0, 0.4, 0.08))
+    scope = bpy.context.active_object
+    scope.rotation_euler = (math.radians(90), 0, 0)
+    scope.data.materials.append(mat_scope)
+    export_glb("cyber_sniper_rifle.glb")
+
+def build_magic_wand_staff():
+    reset_scene()
+    mat_wood = create_material("WandWood", base_color=(0.3, 0.18, 0.1, 1.0), roughness=0.6)
+    mat_star = create_material("StarGlow", base_color=(1.0, 0.85, 0.2, 1.0), emission_color=(1.0, 0.9, 0.3, 1.0), emission_strength=6.0)
+    bpy.ops.mesh.primitive_cylinder_add(radius=0.015, depth=0.8, location=(0, 0.4, 0))
+    handle = bpy.context.active_object
+    handle.data.materials.append(mat_wood)
+    bpy.ops.mesh.primitive_ico_sphere_add(radius=0.06, location=(0, 0.8, 0))
+    star = bpy.context.active_object
+    star.data.materials.append(mat_star)
+    export_glb("fantasy_magic_wand_staff.glb")
+
+def build_steampunk_airship():
+    reset_scene()
+    mat_hull = create_material("AirshipHull", base_color=(0.55, 0.38, 0.22, 1.0), roughness=0.5)
+    mat_brass = create_material("AirshipBrass", base_color=(0.85, 0.65, 0.25, 1.0), metallic=0.9, roughness=0.25)
+    bpy.ops.mesh.primitive_cylinder_add(radius=0.4, depth=1.8, location=(0, 0.5, 0))
+    balloon = bpy.context.active_object
+    balloon.rotation_euler = (math.radians(90), 0, 0)
+    balloon.data.materials.append(mat_hull)
+    apply_subsurf(balloon, 2)
+    export_glb("steampunk_airship.glb")
+
+def build_cyberpunk_motorcycle():
+    reset_scene()
+    mat_frame = create_material("BikeFrame", base_color=(0.85, 0.1, 0.2, 1.0), metallic=0.8, roughness=0.2)
+    mat_wheel = create_material("BikeWheel", base_color=(0.05, 0.05, 0.05, 1.0), metallic=0.3, roughness=0.7)
+    for y in [-0.55, 0.55]:
+        bpy.ops.mesh.primitive_torus_add(major_radius=0.25, minor_radius=0.08, location=(0, y, 0.25))
+        wheel = bpy.context.active_object
+        wheel.rotation_euler = (0, math.radians(90), 0)
+        wheel.data.materials.append(mat_wheel)
+    bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0, 0, 0.35))
+    body = bpy.context.active_object
+    body.scale = (0.28, 1.0, 0.35)
+    body.data.materials.append(mat_frame)
+    export_glb("cyberpunk_motorcycle.glb")
+
+# 4 New Round-3 Outfits
+def build_outfit_exosuit():
+    reset_scene()
+    mat = create_material("ExosuitArmor", base_color=(0.15, 0.2, 0.25, 1.0), metallic=0.85, roughness=0.25)
+    bpy.ops.mesh.primitive_cylinder_add(radius=0.27, depth=1.15, location=(0, 0, 0.7))
+    suit = bpy.context.active_object
+    suit.data.materials.append(mat)
+    apply_subsurf(suit, 2)
+    export_outfit_glb("outfit_cyber_suit_v2.glb")
+
+def build_outfit_kimono():
+    reset_scene()
+    mat = create_material("KimonoSilk", base_color=(0.2, 0.45, 0.75, 1.0), roughness=0.4, sheen=0.7)
+    bpy.ops.mesh.primitive_cylinder_add(radius=0.29, depth=1.1, location=(0, 0, 0.68))
+    robe = bpy.context.active_object
+    robe.data.materials.append(mat)
+    apply_subsurf(robe, 2)
+    export_outfit_glb("outfit_kimono_traditional.glb")
+
+def build_outfit_spacesuit():
+    reset_scene()
+    mat = create_material("SpaceSuitFabric", base_color=(0.92, 0.92, 0.95, 1.0), roughness=0.35)
+    bpy.ops.mesh.primitive_cylinder_add(radius=0.28, depth=1.2, location=(0, 0, 0.65))
+    suit = bpy.context.active_object
+    suit.data.materials.append(mat)
+    apply_subsurf(suit, 2)
+    export_outfit_glb("outfit_space_suit.glb")
+
+def build_outfit_punk_jacket():
+    reset_scene()
+    mat = create_material("RiderLeather", base_color=(0.08, 0.08, 0.1, 1.0), metallic=0.2, roughness=0.3)
+    bpy.ops.mesh.primitive_cylinder_add(radius=0.25, depth=0.7, location=(0, 0, 0.95))
+    jacket = bpy.context.active_object
+    jacket.data.materials.append(mat)
+    apply_subsurf(jacket, 2)
+    export_outfit_glb("outfit_punk_jacket.glb")
+
 if __name__ == "__main__":
     print("🚀 Starting Blender 5.2 3D Asset & Outfit Generation...")
     build_cyber_katana()
@@ -462,13 +552,19 @@ if __name__ == "__main__":
     build_rune_shield()
     build_arcade_cabinet()
     
-    # 4 New Props
+    # 4 Round-2 Props
     build_medieval_greatsword()
     build_cyber_hoverbike()
     build_magic_chest()
     build_modern_smartphone()
+
+    # 4 Round-3 Props
+    build_cyber_sniper_rifle()
+    build_magic_wand_staff()
+    build_steampunk_airship()
+    build_cyberpunk_motorcycle()
     
-    # Generate 14 High-Poly Outfits
+    # Generate 18 High-Poly Outfits
     build_outfit_tshirt()
     build_outfit_tank()
     build_outfit_cardigan()
@@ -479,11 +575,15 @@ if __name__ == "__main__":
     build_outfit_scrubs()
     build_outfit_scrubpants()
     build_outfit_shorts()
-    
-    # 4 New Outfits
     build_outfit_hanbok_modern()
     build_outfit_trenchcoat()
     build_outfit_tactical_vest()
     build_outfit_cyberpunk_suit()
+
+    # 4 Round-3 Outfits
+    build_outfit_exosuit()
+    build_outfit_kimono()
+    build_outfit_spacesuit()
+    build_outfit_punk_jacket()
     
-    print("✨ All 26 3D Assets & High-Poly Outfits Generated Successfully!")
+    print("✨ All 34 3D Assets & High-Poly Outfits Generated Successfully!")

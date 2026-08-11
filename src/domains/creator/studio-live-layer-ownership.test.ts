@@ -8,6 +8,7 @@ import {
   resolveStudioLiveLayerOwnership,
   reuseOrBuildStudioLiveLayerOwnershipByItemId,
   studioLiveSelectionEditGate,
+  summarizeStudioLiveActiveOwners,
   summarizeStudioLiveSelectionOwnership,
 } from "./studio-live-layer-ownership";
 import {
@@ -229,6 +230,51 @@ describe("studio live layer ownership", () => {
     expect(third.reused).toBe(false);
     expect(third.map).not.toBe(first.map);
     expect(third.map.get(layerB)?.ownerDisplayName).toBe("지민");
+  });
+
+  it("summarizes active owners for presence chips with peer vs self contrast", () => {
+    const locks = [
+      lock(studioLiveElementResource(pageId, layerA), "peer", "민수"),
+      lock(studioLiveElementResource(pageId, layerB), "me", "나"),
+      lock(studioLivePageResource(pageId), "peer2", "지민"),
+    ];
+    const summary = summarizeStudioLiveActiveOwners({
+      locks,
+      selfSessionId: "me",
+      now,
+      nameLimit: 2,
+    });
+    expect(summary.activeLockCount).toBe(3);
+    expect(summary.selfLockCount).toBe(1);
+    expect(summary.peerLockCount).toBe(2);
+    expect(summary.peerOwnerNames).toEqual(["민수", "지민"]);
+    expect(summary.label).toContain("활성 편집 잠금 3개");
+    expect(summary.label).toContain("민수");
+    expect(summary.label).toContain("나 1");
+
+    const empty = summarizeStudioLiveActiveOwners({ locks: [], selfSessionId: "me", now });
+    expect(empty.activeLockCount).toBe(0);
+    expect(empty.label).toBeNull();
+
+    const expiredOnly = summarizeStudioLiveActiveOwners({
+      locks: [
+        lock(studioLiveElementResource(pageId, layerA), "peer", "민수", now - 1),
+      ],
+      selfSessionId: "me",
+      now,
+    });
+    expect(expiredOnly.activeLockCount).toBe(0);
+    expect(expiredOnly.label).toBeNull();
+
+    // Room-pruned path: omit now → count every snapshot row without time filter.
+    const snapshotPath = summarizeStudioLiveActiveOwners({
+      locks: [
+        lock(studioLiveElementResource(pageId, layerA), "peer", "민수", now - 1),
+      ],
+      selfSessionId: "me",
+    });
+    expect(snapshotPath.activeLockCount).toBe(1);
+    expect(snapshotPath.peerOwnerNames).toEqual(["민수"]);
   });
 
   it("does not reuse a peer map after leaseUntil expires with the same lock list", () => {

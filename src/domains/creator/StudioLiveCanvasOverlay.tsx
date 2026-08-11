@@ -39,6 +39,7 @@ import {
   type StudioCanvasCommentPin,
 } from "./studio-live-canvas-overlay-model";
 import { useStudioLiveCollaboration } from "./studio-live-collaboration-context";
+import { summarizeStudioLiveActiveOwners } from "./studio-live-layer-ownership";
 import {
   INITIAL_STUDIO_LIVE_SYNC_SNAPSHOT,
   formatStudioLiveLastAck,
@@ -109,6 +110,8 @@ export interface StudioLivePresenceDockProps {
    * Zero hides the lock chip so solo sessions stay quiet.
    */
   activeLockCount?: number;
+  /** Richer lock-chip title (owners) from `summarizeStudioLiveActiveOwners`. */
+  activeLockLabel?: string | null;
   followingSessionId: string | null;
   onOpenTeam: () => void;
   onToggleFollow: (sessionId: string) => void;
@@ -1193,6 +1196,7 @@ export function StudioLivePresenceDock({
   alwaysOn = false,
   peers,
   activeLockCount = 0,
+  activeLockLabel = null,
   followingSessionId,
   onOpenTeam,
   onToggleFollow,
@@ -1205,6 +1209,12 @@ export function StudioLivePresenceDock({
     Number.isFinite(activeLockCount) && activeLockCount > 0
       ? Math.floor(activeLockCount)
       : 0;
+  const lockLabel =
+    typeof activeLockLabel === "string" && activeLockLabel.trim().length > 0
+      ? activeLockLabel.trim()
+      : lockCount > 0
+        ? `활성 편집 잠금 ${lockCount}개 · 레이어 소유권은 네비게이터 배지로 표시됩니다`
+        : null;
   const visibleCount = studioPresenceVisiblePeerCount(peers.length, 5);
   const visiblePeers = peers.slice(0, visibleCount);
   const mobileHiddenPeerCount = Math.max(0, peers.length - 2);
@@ -1278,8 +1288,9 @@ export function StudioLivePresenceDock({
         <button
           type="button"
           data-studio-presence-lock-count={lockCount}
-          aria-label={`활성 편집 잠금 ${lockCount}개, 팀 작업 공간 열기`}
-          title={`활성 편집 잠금 ${lockCount}개 · 레이어 소유권은 네비게이터 배지로 표시됩니다`}
+          data-studio-presence-lock-label={lockLabel ?? undefined}
+          aria-label={`${lockLabel ?? `활성 편집 잠금 ${lockCount}개`}, 팀 작업 공간 열기`}
+          title={lockLabel ?? undefined}
           className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1 rounded-full border border-accent/35 bg-accent-soft px-2.5 text-[0.68rem] font-bold tabular-nums text-accent transition-colors hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           onClick={onOpenTeam}
         >
@@ -1381,11 +1392,15 @@ export function StudioLivePresenceDockConnected({
   onFollowPage,
 }: StudioLivePresenceDockConnectedProps) {
   const live = useStudioLiveCollaboration();
-  const { availability, peers, locks, sync } = live;
+  const { availability, peers, locks, sync, room } = live;
   const followedPeer = peers.find((peer) => peer.sessionId === followingSessionId) ?? null;
   const alwaysOn = studioLivePresenceAlwaysVisible(availability, peers.length);
-  // Room lock snapshots are already lease-pruned; avoid Date.now() during render (React purity).
-  const activeLockCount = locks.length;
+  // Room lock snapshots are lease-pruned; omit `now` so the pure summary counts the snapshot
+  // without calling Date.now during render (React purity).
+  const lockOwners = summarizeStudioLiveActiveOwners({
+    locks,
+    selfSessionId: room?.participant.sessionId,
+  });
 
   useEffect(() => {
     if (followedPeer?.pageId) onFollowPage(followedPeer.pageId);
@@ -1403,7 +1418,8 @@ export function StudioLivePresenceDockConnected({
       operationSyncReady={operationSyncReady}
       alwaysOn
       peers={peers}
-      activeLockCount={activeLockCount}
+      activeLockCount={lockOwners.activeLockCount}
+      activeLockLabel={lockOwners.label}
       followingSessionId={followingSessionId}
       onOpenTeam={onOpenTeam}
       onToggleFollow={onToggleFollow}

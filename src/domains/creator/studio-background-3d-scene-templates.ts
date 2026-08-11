@@ -610,6 +610,32 @@ export const BG_SCENE_TEMPLATES: BgSceneTemplate[] = [
       { type: "composite", presetId: "prop_table_set", anchor: [2.2, 0, 1.8] },
     ],
   },
+  {
+    id: "space_station_bridge",
+    category: "urban",
+    label: "SF 우주선 함교",
+    description: "메탈릭 덱 · 제어 콘솔 · 아크 윈도우",
+    footprint: { width: 11, depth: 11 },
+    placements: [
+      { type: "primitive", kind: "plane", position: [0, 0, 0], rotation: [-Math.PI / 2, 0, 0], scale: [11, 11, 1], color: "#1e293b" },
+      { type: "composite", presetId: "building_tower", anchor: [0, 0, -4.2] },
+      { type: "composite", presetId: "prop_vending", anchor: [-3.8, 0, -2.5] },
+      { type: "composite", presetId: "prop_streetlamp", anchor: [3.8, 0, -2.5] },
+    ],
+  },
+  {
+    id: "fantasy_dungeon_hall",
+    category: "nature",
+    label: "판타지 던전 알현실",
+    description: "돌 마루 석조 기둥 · 횃불 다이 · 중앙 알현 단상",
+    footprint: { width: 12, depth: 12 },
+    placements: [
+      { type: "primitive", kind: "plane", position: [0, 0, 0], rotation: [-Math.PI / 2, 0, 0], scale: [12, 12, 1], color: "#334155" },
+      { type: "composite", presetId: "building_temple", anchor: [0, 0, -4.5] },
+      { type: "composite", presetId: "rock_cluster", anchor: [-4.2, 0, -2.5] },
+      { type: "composite", presetId: "rock_cluster", anchor: [4.2, 0, -2.5] },
+    ],
+  },
 ];
 
 // ── 전개 함수 ─────────────────────────────────────────────────────────────

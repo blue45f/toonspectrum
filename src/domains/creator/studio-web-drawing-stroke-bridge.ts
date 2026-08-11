@@ -403,8 +403,10 @@ export function recommendStudioWebDrawingLiveMaxDabs(
 }
 
 /**
- * Progressive live-frame slice: keep a prefix of planned dabs under a hard ceiling.
- * Returns the same array reference when no slice is needed (allocation-light).
+ * Progressive live-frame slice under a hard ceiling.
+ *
+ * When decimating, keeps the stroke **endpoint** (last dab) so live preview does not
+ * leave the tip frozen mid-path. Same array reference when no slice is needed.
  */
 export function sliceStudioDynamicDabsForLiveFrame<
   T extends { readonly index: number },
@@ -415,17 +417,43 @@ export function sliceStudioDynamicDabsForLiveFrame<
   readonly dabs: readonly T[];
   readonly sliced: boolean;
   readonly dropped: number;
+  readonly preservedEndpoint: boolean;
 } {
   const limit = Math.max(0, Math.floor(maxDabs));
   if (limit <= 0) {
-    return Object.freeze({ dabs: Object.freeze([] as T[]), sliced: true, dropped: dabs.length });
+    return Object.freeze({
+      dabs: Object.freeze([] as T[]),
+      sliced: true,
+      dropped: dabs.length,
+      preservedEndpoint: false,
+    });
   }
   if (dabs.length <= limit) {
-    return Object.freeze({ dabs, sliced: false, dropped: 0 });
+    return Object.freeze({
+      dabs,
+      sliced: false,
+      dropped: 0,
+      preservedEndpoint: false,
+    });
   }
+  if (limit === 1) {
+    // Prefer the newest tip so the cursor feels attached to the stroke end.
+    const tip = dabs[dabs.length - 1]!;
+    return Object.freeze({
+      dabs: Object.freeze([tip]),
+      sliced: true,
+      dropped: dabs.length - 1,
+      preservedEndpoint: true,
+    });
+  }
+  const head = dabs.slice(0, limit - 1);
+  const last = dabs[dabs.length - 1]!;
+  const alreadyHasLast = head[head.length - 1] === last;
+  const out = alreadyHasLast ? dabs.slice(0, limit) : [...head, last];
   return Object.freeze({
-    dabs: dabs.slice(0, limit),
+    dabs: Object.freeze(out),
     sliced: true,
-    dropped: dabs.length - limit,
+    dropped: dabs.length - out.length,
+    preservedEndpoint: true,
   });
 }

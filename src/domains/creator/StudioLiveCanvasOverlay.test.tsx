@@ -1085,6 +1085,7 @@ describe("StudioLiveCanvasOverlay", () => {
         alwaysOn
         peers={[]}
         activeLockCount={3}
+        activeLockLabel="활성 편집 잠금 3개 · 민수, 지민 · 나 1 · 레이어 소유권은 네비게이터 배지로 표시됩니다"
         followingSessionId={null}
         onOpenTeam={noop}
         onToggleFollow={noop}
@@ -1092,6 +1093,8 @@ describe("StudioLiveCanvasOverlay", () => {
     );
     expect(withLocks).toContain('data-studio-presence-lock-count="3"');
     expect(withLocks).toContain("활성 편집 잠금 3개");
+    expect(withLocks).toContain("민수");
+    expect(withLocks).toContain('data-studio-presence-lock-label=');
 
     const withoutLocks = renderToStaticMarkup(
       <StudioLivePresenceDock

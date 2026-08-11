@@ -207,6 +207,87 @@ export function fingerprintStudioLiveLocks(
   return parts.join("\n");
 }
 
+export interface StudioLiveActiveOwnersSummary {
+  readonly activeLockCount: number;
+  readonly selfLockCount: number;
+  readonly peerLockCount: number;
+  /** Distinct peer display names, stable insertion order, capped by nameLimit. */
+  readonly peerOwnerNames: readonly string[];
+  /** Null when no active leases — presence chips stay quiet. */
+  readonly label: string | null;
+}
+
+/**
+ * Compact presence-dock projection: how many leases are live and who holds them.
+ * Peer names are de-duplicated; self leases are counted separately.
+ *
+ * When `now` is omitted, every lock in the snapshot is counted (room snapshots are
+ * already lease-pruned). Pass `now` in tests or clients that keep expired rows.
+ */
+export function summarizeStudioLiveActiveOwners(input: {
+  readonly locks: readonly StudioLiveLockLike[];
+  readonly selfSessionId?: string;
+  readonly now?: number;
+  readonly nameLimit?: number;
+}): StudioLiveActiveOwnersSummary {
+  const filterByTime = typeof input.now === "number" && Number.isFinite(input.now);
+  const now = filterByTime ? input.now! : 0;
+  const self =
+    typeof input.selfSessionId === "string" ? input.selfSessionId.trim() : "";
+  const nameLimit = Math.max(
+    1,
+    Math.min(8, Math.floor(input.nameLimit ?? 3)),
+  );
+
+  let activeLockCount = 0;
+  let selfLockCount = 0;
+  let peerLockCount = 0;
+  const peerNames: string[] = [];
+  const seenPeers = new Set<string>();
+
+  for (const lock of input.locks) {
+    if (filterByTime && !isActiveLock(lock, now)) continue;
+    activeLockCount += 1;
+    const session = lock.owner?.sessionId ?? "";
+    if (self && session === self) {
+      selfLockCount += 1;
+      continue;
+    }
+    peerLockCount += 1;
+    if (seenPeers.has(session)) continue;
+    seenPeers.add(session);
+    if (peerNames.length >= nameLimit) continue;
+    const name = lock.owner?.displayName?.trim();
+    peerNames.push(name && name.length > 0 ? name : "참가자");
+  }
+
+  let label: string | null = null;
+  if (activeLockCount > 0) {
+    const parts: string[] = [`활성 편집 잠금 ${activeLockCount}개`];
+    if (peerNames.length > 0) {
+      const extraPeers = Math.max(0, seenPeers.size - peerNames.length);
+      parts.push(
+        extraPeers > 0
+          ? `${peerNames.join(", ")} 외 ${extraPeers}명`
+          : peerNames.join(", "),
+      );
+    }
+    if (selfLockCount > 0) {
+      parts.push(`나 ${selfLockCount}`);
+    }
+    parts.push("레이어 소유권은 네비게이터 배지로 표시됩니다");
+    label = parts.join(" · ");
+  }
+
+  return Object.freeze({
+    activeLockCount,
+    selfLockCount,
+    peerLockCount,
+    peerOwnerNames: Object.freeze(peerNames),
+    label,
+  });
+}
+
 export interface StudioLiveSelectionOwnershipSummary {
   readonly selectedCount: number;
   readonly blockedCount: number;

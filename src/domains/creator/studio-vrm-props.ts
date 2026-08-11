@@ -199,6 +199,10 @@ const VRM_PROP_BASES = [
   { id: "blender_cyber_hoverbike", label: "블렌더 SF 호버바이크", category: "body", defaultBone: "hips", defaultPosition: [0, -0.5, 0], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 사이버 호버바이크." },
   { id: "blender_magic_chest", label: "블렌더 마법 보물상자", category: "body", defaultBone: "hips", defaultPosition: [0, -0.7, 0.3], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 발광 보물상자." },
   { id: "blender_modern_smartphone", label: "블렌더 모던 스마트폰", category: "hand", defaultBone: "rightHand", defaultPosition: [0, 0.01, 0.01], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 슬림 스마트폰." },
+  { id: "blender_cyber_sniper_rifle", label: "블렌더 사이버 저격 소총", category: "hand", defaultBone: "rightHand", defaultPosition: [0, 0, 0], defaultRotationDeg: [0, 0, -90], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 사이버 저격 소총." },
+  { id: "blender_magic_wand_staff", label: "블렌더 요술봉 지팡이", category: "hand", defaultBone: "rightHand", defaultPosition: [0, -0.1, 0], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 별/달 발광 요술봉." },
+  { id: "blender_steampunk_airship", label: "블렌더 스팀펑크 비행선", category: "body", defaultBone: "hips", defaultPosition: [0, 0.8, 0], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 스팀펑크 비행선." },
+  { id: "blender_cyberpunk_motorcycle", label: "블렌더 사이버 바이크", category: "body", defaultBone: "hips", defaultPosition: [0, -0.5, 0], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 사이버펑크 바이크." },
 ] as const satisfies readonly LegacyPropDef[];
 
 export type VrmPropId = (typeof VRM_PROP_BASES)[number]["id"];
@@ -488,6 +492,24 @@ const PROP_PROFILES: Record<VrmPropId, PropProfile> = {
     anchors: [handAnchor("primary", "primary", [0, 0, 0], 0.009)],
     grip: grip("flat", 0.009, 38, 34),
     fit: fit("hand", 0.075, 0.72, 1.4),
+  },
+  blender_cyber_sniper_rifle: {
+    anchors: [handAnchor("primary", "primary", [0, 0.2, 0], 0.018)],
+    grip: grip("handle", 0.018, 75, 55),
+    fit: fit("avatarHeight", 1.65, 0.8, 1.5),
+  },
+  blender_magic_wand_staff: {
+    anchors: [handAnchor("primary", "primary", [0, 0.2, 0], 0.012)],
+    grip: grip("cylinder", 0.012, 60, 40),
+    fit: fit("avatarHeight", 1.65, 0.7, 1.4),
+  },
+  blender_steampunk_airship: {
+    anchors: [anchor("surface", "surface", [0, 0.5, 0])],
+    fit: fit("avatarHeight", 1.65, 0.8, 1.6),
+  },
+  blender_cyberpunk_motorcycle: {
+    anchors: [anchor("seat", "surface", [0, 0.35, 0])],
+    fit: fit("avatarHeight", 1.65, 0.8, 1.6),
   },
 };
 
