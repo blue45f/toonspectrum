@@ -88,6 +88,10 @@ import {
   studioSplatterOriginAnchorMarkCount,
 } from "./studio-splatter-origin-anchor";
 import { isStudioBoundedFlowPaintModelCompatible } from "./studio-stroke-paint-model";
+import {
+  isStudioWebDrawingBrushId,
+  planStudioWebDrawingDynamicDabs,
+} from "./studio-web-drawing-stroke-bridge";
 
 import type { DrawEl } from "./studio-element-model";
 import type { StudioLiveInkSurface } from "./studio-live-ink-overlay";
@@ -1764,10 +1768,26 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       baseOpacity: style.dynamics.opacity.base,
       seed: style.seed,
     };
-    let dabs = planNormalizedStudioDynamicBrushDabs(
-      { ...planInput, maxDabs: MAX_LEGACY_LIVE_DABS },
-      style.dynamics,
-    );
+    const planWebDabs = (maxDabs: number): StudioDynamicBrushDab[] | null => {
+      if (!isStudioWebDrawingBrushId(style.brushId)) return null;
+      return planStudioWebDrawingDynamicDabs(
+        {
+          brushId: style.brushId,
+          points: planInput.points,
+          pressures: planInput.pressures,
+          baseWidth: planInput.baseWidth,
+          baseOpacity: planInput.baseOpacity,
+          seed: planInput.seed,
+          maxDabs,
+        },
+        style.dynamics,
+      );
+    };
+    let dabs = planWebDabs(MAX_LEGACY_LIVE_DABS)
+      ?? planNormalizedStudioDynamicBrushDabs(
+        { ...planInput, maxDabs: MAX_LEGACY_LIVE_DABS },
+        style.dynamics,
+      );
     const coverageBudget = resolveStudioDynamicBrushCoverageBudgetContract(
       style.materialIdentity,
       style.dynamics,
@@ -1784,10 +1804,11 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       markBudget: STUDIO_DYNAMIC_BRUSH_LIVE_MARK_BUDGET,
     });
     if (renderBudget.maxDabsPerVariation < dabs.length) {
-      dabs = planNormalizedStudioDynamicBrushDabs(
-        { ...planInput, maxDabs: renderBudget.maxDabsPerVariation },
-        style.dynamics,
-      );
+      dabs = planWebDabs(renderBudget.maxDabsPerVariation)
+        ?? planNormalizedStudioDynamicBrushDabs(
+          { ...planInput, maxDabs: renderBudget.maxDabsPerVariation },
+          style.dynamics,
+        );
     }
     const marks = planStudioDynamicBrushCoverageMarks({
       dabVariations: studioDynamicBrushDabVariationsFromTransforms(

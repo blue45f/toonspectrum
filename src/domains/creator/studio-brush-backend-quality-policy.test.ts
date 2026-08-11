@@ -161,12 +161,12 @@ describe("studio brush backend integration audit", () => {
 });
 
 describe("studio brush backend quality classification", () => {
-  it("classifies all 93 core tools exactly once and keeps dry/wet media off causal ink", () => {
+  it("classifies all 99 core tools exactly once and keeps dry/wet media off causal ink", () => {
     const presetIds = BRUSH_PRESETS.map(({ id }) => id).sort();
     const routeIds = Object.keys(STUDIO_CORE_BRUSH_BACKEND_ROUTE_PROFILES).sort();
     const runtimeIds = STUDIO_BRUSH_RUNTIME_CONTRACT.map(({ id }) => id).sort();
 
-    expect(presetIds).toHaveLength(93);
+    expect(presetIds).toHaveLength(99);
     expect(routeIds).toEqual(presetIds);
     expect(runtimeIds).toEqual(presetIds);
 

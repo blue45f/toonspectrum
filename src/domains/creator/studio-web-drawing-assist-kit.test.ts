@@ -23,8 +23,8 @@ const PATH = Object.freeze([
 ]);
 
 describe("studio web drawing assist kit", () => {
-  it("exposes six assist brush ids", () => {
-    expect(STUDIO_WEB_ASSIST_BRUSH_IDS).toHaveLength(6);
+  it("exposes twelve assist brush ids", () => {
+    expect(STUDIO_WEB_ASSIST_BRUSH_IDS).toHaveLength(12);
     expect(isStudioWebAssistBrushId("web-kaleido-ink")).toBe(true);
     expect(isStudioWebAssistBrushId("web-grid-ink")).toBe(true);
     expect(isStudioWebAssistBrushId("web-lazy-ink")).toBe(false);
@@ -117,6 +117,21 @@ describe("studio web drawing assist kit", () => {
       expect(samples.length, id).toBeGreaterThan(0);
     }
     expect(planStudioWebAssistSamplesForBrush("pen", PATH)).toEqual([]);
+  });
+
+  it("wave-3 planners: spiro, zigzag, neon, flat, smudge, cross-hatch", () => {
+    const spiro = planStudioWebAssistSamplesForBrush("web-spiro-orbit", PATH, { baseSize: 5 });
+    expect(spiro.length).toBe(PATH.length * 3);
+    const zig = planStudioWebAssistSamplesForBrush("web-zigzag-edge", PATH);
+    expect(zig).toHaveLength(PATH.length);
+    const neon = planStudioWebAssistSamplesForBrush("web-neon-tube", PATH);
+    expect(neon.length).toBe(PATH.length * 2);
+    const flat = planStudioWebAssistSamplesForBrush("web-pressure-flat", PATH);
+    expect(flat.every((s) => s.pressure === 0.72)).toBe(true);
+    const smudge = planStudioWebAssistSamplesForBrush("web-smudge-trail", PATH);
+    expect(smudge.length).toBeGreaterThan(PATH.length);
+    const hatch = planStudioWebAssistSamplesForBrush("web-cross-hatch-pen", PATH);
+    expect(hatch.some((s) => s.agent === 1)).toBe(true);
   });
 
   it("rejects invalid coordinates", () => {

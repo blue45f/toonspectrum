@@ -126,6 +126,11 @@ const INTENTIONALLY_DISCONTINUOUS_CATALOG_IDS = new Set([
   "web-radial-burst",
   "web-mirror-ink",
   "web-grid-ink",
+  "web-spiro-orbit",
+  "web-zigzag-edge",
+  "web-neon-tube",
+  "web-smudge-trail",
+  "web-cross-hatch-pen",
 ]);
 
 const INTERIOR_START = 0.08;

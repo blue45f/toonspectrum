@@ -1055,6 +1055,12 @@ const CORE_ROUTE_PROFILE_BY_ID = Object.freeze({
   "web-radial-burst": "spray-dynamics",
   "web-mirror-ink": "continuous-catalog-dynamics",
   "web-grid-ink": "spray-dynamics",
+  "web-spiro-orbit": "spray-dynamics",
+  "web-zigzag-edge": "continuous-catalog-dynamics",
+  "web-neon-tube": "spray-dynamics",
+  "web-pressure-flat": "continuous-catalog-dynamics",
+  "web-smudge-trail": "spray-dynamics",
+  "web-cross-hatch-pen": "spray-dynamics",
   screentone: "stamp-specialist",
   crosshatch: "stamp-specialist",
 } as const satisfies Readonly<Record<

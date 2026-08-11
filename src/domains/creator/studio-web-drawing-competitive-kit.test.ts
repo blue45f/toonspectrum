@@ -48,13 +48,13 @@ describe("studio web drawing competitive kit", () => {
     expect(isStudioWebCompetitiveBrushId("silk-flow")).toBe(false);
   });
 
-  it("wires all 19 web competitive+coloring+assist brushes into the core catalogue", () => {
+  it("wires all 25 web competitive+coloring+assist brushes into the core catalogue", () => {
     const webIds = [
       ...STUDIO_WEB_COMPETITIVE_BRUSH_IDS,
       ...STUDIO_WEB_COLORING_BRUSH_IDS,
       ...STUDIO_WEB_ASSIST_BRUSH_IDS,
     ];
-    expect(webIds).toHaveLength(19);
+    expect(webIds).toHaveLength(25);
     const presetIds = new Set(BRUSH_PRESETS.map((preset) => preset.id));
     for (const id of webIds) {
       expect(presetIds.has(id), `${id}: missing preset`).toBe(true);

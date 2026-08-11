@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   applyStudioWebComicCelGrade,
+  applyStudioWebHalftoneGrade,
+  applyStudioWebInkEdgeBoostGrade,
   applyStudioWebSoftColorBoostGrade,
   applyStudioWebWatercolorWashGrade,
   isStudioWebColoringBrushId,
@@ -141,6 +143,34 @@ describe("studio web drawing coloring kit", () => {
       { levels: 4, edgeStrength: 0.8 },
     );
     expect(changed).toBeGreaterThan(0);
+  });
+
+  it("halftone and ink-edge boost grades mutate non-flat images", () => {
+    const width = 16;
+    const height = 16;
+    const data = new Uint8ClampedArray(width * height * 4);
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const o = (y * width + x) * 4;
+        const v = x < 8 ? 40 : 200;
+        data[o] = v;
+        data[o + 1] = v;
+        data[o + 2] = v;
+        data[o + 3] = 255;
+      }
+    }
+    expect(
+      applyStudioWebHalftoneGrade(
+        { data: new Uint8ClampedArray(data), width, height },
+        { pitch: 4, strength: 0.7 },
+      ),
+    ).toBeGreaterThan(0);
+    expect(
+      applyStudioWebInkEdgeBoostGrade(
+        { data: new Uint8ClampedArray(data), width, height },
+        { strength: 0.6 },
+      ),
+    ).toBeGreaterThan(0);
   });
 
   it("watercolor wash and soft colour boost grades mutate pixels when strength > 0", () => {

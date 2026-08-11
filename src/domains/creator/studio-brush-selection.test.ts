@@ -116,6 +116,12 @@ describe("studio brush catalogue selection", () => {
       "web-radial-burst",
       "web-mirror-ink",
       "web-grid-ink",
+      "web-spiro-orbit",
+      "web-zigzag-edge",
+      "web-neon-tube",
+      "web-pressure-flat",
+      "web-smudge-trail",
+      "web-cross-hatch-pen",
     ]);
 
     for (const preset of dynamicsPresets) {
@@ -186,7 +192,7 @@ describe("studio brush catalogue selection", () => {
 
   it("materializes all 234 catalogue ids through one fail-closed selection source", async () => {
     expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(STUDIO_ALL_BRUSH_CATALOG_ITEMS.length);
-    expect(STUDIO_BRUSH_CATALOG_COUNTS).toEqual({ core: 93, pro: 160, total: 253 });
+    expect(STUDIO_BRUSH_CATALOG_COUNTS).toEqual({ core: 99, pro: 160, total: 259 });
 
     for (const item of STUDIO_ALL_BRUSH_CATALOG_ITEMS) {
       const selection = await materializeStudioBrushCatalogSelection(item.id);

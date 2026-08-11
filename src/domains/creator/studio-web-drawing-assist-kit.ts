@@ -17,6 +17,13 @@ export const STUDIO_WEB_ASSIST_BRUSH_IDS = Object.freeze([
   "web-radial-burst",
   "web-mirror-ink",
   "web-grid-ink",
+  // Wave-3: more public web-drawing / whiteboard assist genres
+  "web-spiro-orbit",
+  "web-zigzag-edge",
+  "web-neon-tube",
+  "web-pressure-flat",
+  "web-smudge-trail",
+  "web-cross-hatch-pen",
 ] as const);
 
 export type StudioWebAssistBrushId =
@@ -512,6 +519,396 @@ export function planStudioWebGridInkSamples(
 }
 
 // ---------------------------------------------------------------------------
+// Spiro / orbital pen (generative canvas-sketch / spirograph toys)
+// ---------------------------------------------------------------------------
+
+export interface StudioWebSpiroOrbitSpec {
+  readonly orbits: number;
+  readonly radius: number;
+  readonly baseSize: number;
+  readonly seed: number;
+}
+
+export const DEFAULT_STUDIO_WEB_SPIRO_ORBIT_SPEC: StudioWebSpiroOrbitSpec =
+  Object.freeze({
+    orbits: 3,
+    radius: 14,
+    baseSize: 5,
+    seed: 0x51_00_0001,
+  });
+
+export function planStudioWebSpiroOrbitSamples(
+  points: readonly StudioWebAssistPoint[],
+  spec: Partial<StudioWebSpiroOrbitSpec> = {},
+): readonly StudioWebAssistSample[] {
+  const orbits = clampInt(
+    spec.orbits ?? DEFAULT_STUDIO_WEB_SPIRO_ORBIT_SPEC.orbits,
+    1,
+    8,
+    3,
+  );
+  const radius = clamp(
+    finite(spec.radius, DEFAULT_STUDIO_WEB_SPIRO_ORBIT_SPEC.radius),
+    2,
+    80,
+  );
+  const baseSize = clamp(
+    finite(spec.baseSize, DEFAULT_STUDIO_WEB_SPIRO_ORBIT_SPEC.baseSize),
+    0.5,
+    40,
+  );
+  const seed = clampInt(
+    spec.seed ?? 0x51_00_0001,
+    0,
+    0xffffff,
+    0x51_00_0001,
+  );
+  const path = sanitize(points);
+  if (path.length === 0) return Object.freeze([]);
+
+  const samples: StudioWebAssistSample[] = [];
+  let index = 0;
+  let traveled = 0;
+  for (let i = 0; i < path.length; i++) {
+    const p = path[i]!;
+    const prev = path[Math.max(0, i - 1)]!;
+    traveled += Math.hypot(p.x - prev.x, p.y - prev.y);
+    const pressure = clamp(finite(p.pressure, 0.55), 0.05, 1);
+    for (let o = 0; o < orbits; o++) {
+      const phase = traveled * (0.18 + o * 0.07)
+        + hash01(o, 1, 1, seed) * Math.PI * 2;
+      const rad = radius * (0.45 + o * 0.22) * (0.7 + pressure * 0.4);
+      samples.push(Object.freeze({
+        x: p.x + Math.cos(phase) * rad,
+        y: p.y + Math.sin(phase) * rad,
+        pressure,
+        size: baseSize * (0.65 + pressure * 0.5) * (1 - o * 0.08),
+        opacity: clamp(0.5 + pressure * 0.4, 0.15, 0.95),
+        angleRadians: phase + Math.PI / 2,
+        agent: o,
+        index: index++,
+      }));
+    }
+  }
+  return Object.freeze(samples);
+}
+
+// ---------------------------------------------------------------------------
+// Zigzag edge decoration (hand-drawn banner / rough outline toys)
+// ---------------------------------------------------------------------------
+
+export interface StudioWebZigzagEdgeSpec {
+  readonly amplitude: number;
+  readonly wavelength: number;
+  readonly baseSize: number;
+}
+
+export const DEFAULT_STUDIO_WEB_ZIGZAG_EDGE_SPEC: StudioWebZigzagEdgeSpec =
+  Object.freeze({
+    amplitude: 5,
+    wavelength: 10,
+    baseSize: 4,
+  });
+
+export function planStudioWebZigzagEdgeSamples(
+  points: readonly StudioWebAssistPoint[],
+  spec: Partial<StudioWebZigzagEdgeSpec> = {},
+): readonly StudioWebAssistSample[] {
+  const amplitude = clamp(
+    finite(spec.amplitude, DEFAULT_STUDIO_WEB_ZIGZAG_EDGE_SPEC.amplitude),
+    0.5,
+    40,
+  );
+  const wavelength = clamp(
+    finite(spec.wavelength, DEFAULT_STUDIO_WEB_ZIGZAG_EDGE_SPEC.wavelength),
+    2,
+    80,
+  );
+  const baseSize = clamp(
+    finite(spec.baseSize, DEFAULT_STUDIO_WEB_ZIGZAG_EDGE_SPEC.baseSize),
+    0.5,
+    40,
+  );
+  const path = sanitize(points);
+  if (path.length === 0) return Object.freeze([]);
+
+  const samples: StudioWebAssistSample[] = [];
+  let index = 0;
+  let traveled = 0;
+  for (let i = 0; i < path.length; i++) {
+    const p = path[i]!;
+    const prev = path[Math.max(0, i - 1)]!;
+    const dx = p.x - prev.x;
+    const dy = p.y - prev.y;
+    const len = Math.hypot(dx, dy);
+    traveled += len;
+    const nx = len > POINT_EPS ? -dy / len : 0;
+    const ny = len > POINT_EPS ? dx / len : 1;
+    const pressure = clamp(finite(p.pressure, 0.55), 0.05, 1);
+    const zig = Math.sin((traveled / wavelength) * Math.PI * 2);
+    const off = zig * amplitude * (0.55 + pressure * 0.55);
+    samples.push(Object.freeze({
+      x: p.x + nx * off,
+      y: p.y + ny * off,
+      pressure,
+      size: baseSize * (0.7 + pressure * 0.45),
+      opacity: clamp(0.75 + pressure * 0.22, 0.3, 1),
+      angleRadians: Math.atan2(dy, dx),
+      agent: 0,
+      index: index++,
+    }));
+  }
+  return Object.freeze(samples);
+}
+
+// ---------------------------------------------------------------------------
+// Neon tube (core + soft halo stations — browser neon pen toys)
+// ---------------------------------------------------------------------------
+
+export interface StudioWebNeonTubeSpec {
+  readonly baseSize: number;
+  readonly haloScale: number;
+}
+
+export const DEFAULT_STUDIO_WEB_NEON_TUBE_SPEC: StudioWebNeonTubeSpec =
+  Object.freeze({
+    baseSize: 10,
+    haloScale: 2.4,
+  });
+
+export function planStudioWebNeonTubeSamples(
+  points: readonly StudioWebAssistPoint[],
+  spec: Partial<StudioWebNeonTubeSpec> = {},
+): readonly StudioWebAssistSample[] {
+  const baseSize = clamp(
+    finite(spec.baseSize, DEFAULT_STUDIO_WEB_NEON_TUBE_SPEC.baseSize),
+    1,
+    80,
+  );
+  const haloScale = clamp(
+    finite(spec.haloScale, DEFAULT_STUDIO_WEB_NEON_TUBE_SPEC.haloScale),
+    1.2,
+    4,
+  );
+  const path = sanitize(points);
+  if (path.length === 0) return Object.freeze([]);
+
+  const samples: StudioWebAssistSample[] = [];
+  let index = 0;
+  for (let i = 0; i < path.length; i++) {
+    const p = path[i]!;
+    const prev = path[Math.max(0, i - 1)]!;
+    const angle = Math.atan2(p.y - prev.y, p.x - prev.x);
+    const pressure = clamp(finite(p.pressure, 0.55), 0.05, 1);
+    // Halo first (under), then bright core.
+    samples.push(Object.freeze({
+      x: p.x,
+      y: p.y,
+      pressure,
+      size: baseSize * haloScale * (0.7 + pressure * 0.4),
+      opacity: clamp(0.18 + pressure * 0.12, 0.08, 0.35),
+      angleRadians: angle,
+      agent: 0,
+      index: index++,
+    }));
+    samples.push(Object.freeze({
+      x: p.x,
+      y: p.y,
+      pressure,
+      size: baseSize * (0.55 + pressure * 0.45),
+      opacity: clamp(0.85 + pressure * 0.15, 0.5, 1),
+      angleRadians: angle,
+      agent: 1,
+      index: index++,
+    }));
+  }
+  return Object.freeze(samples);
+}
+
+// ---------------------------------------------------------------------------
+// Pressure-flat comic ink (equalized pressure hard pen)
+// ---------------------------------------------------------------------------
+
+export interface StudioWebPressureFlatSpec {
+  readonly baseSize: number;
+  readonly targetPressure: number;
+}
+
+export const DEFAULT_STUDIO_WEB_PRESSURE_FLAT_SPEC: StudioWebPressureFlatSpec =
+  Object.freeze({
+    baseSize: 7,
+    targetPressure: 0.72,
+  });
+
+export function planStudioWebPressureFlatSamples(
+  points: readonly StudioWebAssistPoint[],
+  spec: Partial<StudioWebPressureFlatSpec> = {},
+): readonly StudioWebAssistSample[] {
+  const baseSize = clamp(
+    finite(spec.baseSize, DEFAULT_STUDIO_WEB_PRESSURE_FLAT_SPEC.baseSize),
+    0.5,
+    60,
+  );
+  const target = clamp(
+    finite(spec.targetPressure, DEFAULT_STUDIO_WEB_PRESSURE_FLAT_SPEC.targetPressure),
+    0.2,
+    1,
+  );
+  const path = sanitize(points);
+  if (path.length === 0) return Object.freeze([]);
+
+  const samples: StudioWebAssistSample[] = [];
+  let index = 0;
+  for (let i = 0; i < path.length; i++) {
+    const p = path[i]!;
+    const prev = path[Math.max(0, i - 1)]!;
+    samples.push(Object.freeze({
+      x: p.x,
+      y: p.y,
+      pressure: target,
+      size: baseSize,
+      opacity: 0.96,
+      angleRadians: Math.atan2(p.y - prev.y, p.x - prev.x),
+      agent: 0,
+      index: index++,
+    }));
+  }
+  return Object.freeze(samples);
+}
+
+// ---------------------------------------------------------------------------
+// Smudge trail (lag ghost copies behind tip — soft blender trail genre)
+// ---------------------------------------------------------------------------
+
+export interface StudioWebSmudgeTrailSpec {
+  readonly ghosts: number;
+  readonly lag: number;
+  readonly baseSize: number;
+}
+
+export const DEFAULT_STUDIO_WEB_SMUDGE_TRAIL_SPEC: StudioWebSmudgeTrailSpec =
+  Object.freeze({
+    ghosts: 4,
+    lag: 0.55,
+    baseSize: 18,
+  });
+
+export function planStudioWebSmudgeTrailSamples(
+  points: readonly StudioWebAssistPoint[],
+  spec: Partial<StudioWebSmudgeTrailSpec> = {},
+): readonly StudioWebAssistSample[] {
+  const ghosts = clampInt(
+    spec.ghosts ?? DEFAULT_STUDIO_WEB_SMUDGE_TRAIL_SPEC.ghosts,
+    1,
+    10,
+    4,
+  );
+  const lag = clamp(
+    finite(spec.lag, DEFAULT_STUDIO_WEB_SMUDGE_TRAIL_SPEC.lag),
+    0.1,
+    0.95,
+  );
+  const baseSize = clamp(
+    finite(spec.baseSize, DEFAULT_STUDIO_WEB_SMUDGE_TRAIL_SPEC.baseSize),
+    2,
+    120,
+  );
+  const path = sanitize(points);
+  if (path.length === 0) return Object.freeze([]);
+
+  const samples: StudioWebAssistSample[] = [];
+  let index = 0;
+  let gx = path[0]!.x;
+  let gy = path[0]!.y;
+  for (let i = 0; i < path.length; i++) {
+    const p = path[i]!;
+    const pressure = clamp(finite(p.pressure, 0.45), 0.05, 1);
+    // Cascade ghost tips that lag progressively.
+    let cx = gx;
+    let cy = gy;
+    for (let g = 0; g < ghosts; g++) {
+      const t = lag * (0.55 + g * 0.08);
+      cx = cx * (1 - t) + p.x * t;
+      cy = cy * (1 - t) + p.y * t;
+      samples.push(Object.freeze({
+        x: cx,
+        y: cy,
+        pressure,
+        size: baseSize * (1.15 - g * 0.12) * (0.7 + pressure * 0.45),
+        opacity: clamp((0.22 - g * 0.03) * (0.7 + pressure * 0.5), 0.04, 0.4),
+        angleRadians: Math.atan2(p.y - gy, p.x - gx),
+        agent: g,
+        index: index++,
+      }));
+    }
+    gx = gx * (1 - lag) + p.x * lag;
+    gy = gy * (1 - lag) + p.y * lag;
+  }
+  return Object.freeze(samples);
+}
+
+// ---------------------------------------------------------------------------
+// Live cross-hatch pen (two-angle lattice while drawing)
+// ---------------------------------------------------------------------------
+
+export interface StudioWebCrossHatchPenSpec {
+  readonly spacing: number;
+  readonly baseSize: number;
+}
+
+export const DEFAULT_STUDIO_WEB_CROSS_HATCH_PEN_SPEC: StudioWebCrossHatchPenSpec =
+  Object.freeze({
+    spacing: 7,
+    baseSize: 2.8,
+  });
+
+export function planStudioWebCrossHatchPenSamples(
+  points: readonly StudioWebAssistPoint[],
+  spec: Partial<StudioWebCrossHatchPenSpec> = {},
+): readonly StudioWebAssistSample[] {
+  const spacing = clamp(
+    finite(spec.spacing, DEFAULT_STUDIO_WEB_CROSS_HATCH_PEN_SPEC.spacing),
+    2,
+    32,
+  );
+  const baseSize = clamp(
+    finite(spec.baseSize, DEFAULT_STUDIO_WEB_CROSS_HATCH_PEN_SPEC.baseSize),
+    0.4,
+    20,
+  );
+  const path = sanitize(points);
+  if (path.length === 0) return Object.freeze([]);
+
+  const angles = [Math.PI / 4, -Math.PI / 4];
+  const samples: StudioWebAssistSample[] = [];
+  let index = 0;
+  for (let a = 0; a < angles.length; a++) {
+    const angle = angles[a]!;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    let lastAlong = -1e9;
+    for (let i = 0; i < path.length; i++) {
+      const p = path[i]!;
+      const along = p.x * cos + p.y * sin;
+      if (along - lastAlong < spacing * 0.55 && i > 0) continue;
+      lastAlong = along;
+      const pressure = clamp(finite(p.pressure, 0.55), 0.05, 1);
+      samples.push(Object.freeze({
+        x: p.x,
+        y: p.y,
+        pressure,
+        size: baseSize * (0.7 + pressure * 0.5),
+        opacity: clamp(0.4 + pressure * 0.45, 0.12, 0.95),
+        angleRadians: angle,
+        agent: a,
+        index: index++,
+      }));
+    }
+  }
+  return Object.freeze(samples);
+}
+
+// ---------------------------------------------------------------------------
 // Path assist helpers (product may pre-process freehand before paint)
 // ---------------------------------------------------------------------------
 
@@ -595,6 +992,31 @@ export function planStudioWebAssistSamplesForBrush(
       });
     case "web-grid-ink":
       return planStudioWebGridInkSamples(points, {
+        baseSize: options.baseSize,
+      });
+    case "web-spiro-orbit":
+      return planStudioWebSpiroOrbitSamples(points, {
+        baseSize: options.baseSize,
+        seed: options.seed,
+      });
+    case "web-zigzag-edge":
+      return planStudioWebZigzagEdgeSamples(points, {
+        baseSize: options.baseSize,
+      });
+    case "web-neon-tube":
+      return planStudioWebNeonTubeSamples(points, {
+        baseSize: options.baseSize,
+      });
+    case "web-pressure-flat":
+      return planStudioWebPressureFlatSamples(points, {
+        baseSize: options.baseSize,
+      });
+    case "web-smudge-trail":
+      return planStudioWebSmudgeTrailSamples(points, {
+        baseSize: options.baseSize,
+      });
+    case "web-cross-hatch-pen":
+      return planStudioWebCrossHatchPenSamples(points, {
         baseSize: options.baseSize,
       });
     default:

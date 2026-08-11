@@ -534,6 +534,85 @@ export function applyStudioWebWatercolorWashGrade(
   return changed;
 }
 
+/** Soft half-tone dots over luminance (comic screen assist, not a full filter pack). */
+export function applyStudioWebHalftoneGrade(
+  image: StudioImageRgbaLike,
+  options: { readonly pitch?: number; readonly strength?: number } = {},
+): number {
+  const pitch = clampInt(options.pitch ?? 6, 3, 24, 6);
+  const strength = clamp(finite(options.strength, 0.55), 0, 1);
+  if (strength <= 0) return 0;
+  const { data, width, height } = image;
+  let changed = 0;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const o = (y * width + x) * 4;
+      const a = data[o + 3]!;
+      if (a === 0) continue;
+      const r = data[o]!;
+      const g = data[o + 1]!;
+      const b = data[o + 2]!;
+      const luma = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+      const cx = ((x % pitch) + 0.5) / pitch - 0.5;
+      const cy = ((y % pitch) + 0.5) / pitch - 0.5;
+      const d = Math.hypot(cx, cy);
+      // Darker luma → larger black dots.
+      const radius = (1 - luma) * 0.55 * strength;
+      const ink = d < radius ? 0 : 1;
+      const nr = Math.round(r * ink + (1 - ink) * (r * (1 - strength * 0.85)));
+      const ng = Math.round(g * ink + (1 - ink) * (g * (1 - strength * 0.85)));
+      const nb = Math.round(b * ink + (1 - ink) * (b * (1 - strength * 0.85)));
+      // When inside dot, force dark ink.
+      const tr = d < radius ? Math.round(r * (1 - strength)) : nr;
+      const tg = d < radius ? Math.round(g * (1 - strength)) : ng;
+      const tb = d < radius ? Math.round(b * (1 - strength)) : nb;
+      if (tr !== r || tg !== g || tb !== b) {
+        data[o] = tr;
+        data[o + 1] = tg;
+        data[o + 2] = tb;
+        changed += 1;
+      }
+    }
+  }
+  return changed;
+}
+
+/** Emphasize ink edges for scan-to-webtoon finishing. */
+export function applyStudioWebInkEdgeBoostGrade(
+  image: StudioImageRgbaLike,
+  options: { readonly strength?: number } = {},
+): number {
+  const strength = clamp(finite(options.strength, 0.45), 0, 1);
+  if (strength <= 0) return 0;
+  const { data, width, height } = image;
+  if (width < 2 || height < 2) return 0;
+  const source = new Uint8ClampedArray(data.subarray(0, width * height * 4));
+  let changed = 0;
+  const luma = (o: number) =>
+    0.299 * source[o]! + 0.587 * source[o + 1]! + 0.114 * source[o + 2]!;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const o = (y * width + x) * 4;
+      const xl = Math.max(0, x - 1);
+      const xr = Math.min(width - 1, x + 1);
+      const yt = Math.max(0, y - 1);
+      const yb = Math.min(height - 1, y + 1);
+      const gx = luma((y * width + xr) * 4) - luma((y * width + xl) * 4);
+      const gy = luma((yb * width + x) * 4) - luma((yt * width + x) * 4);
+      const edge = Math.min(1, Math.sqrt(gx * gx + gy * gy) / 40);
+      const darken = 1 - edge * strength * 0.75;
+      for (let c = 0; c < 3; c++) {
+        const next = Math.round(source[o + c]! * darken);
+        if (data[o + c] !== next) {
+          data[o + c] = next;
+          changed += 1;
+        }
+      }
+    }
+  }
+  return changed;
+}
+
 /** Soft colour grade boost (saturation + mild contrast) for finishing. */
 export function applyStudioWebSoftColorBoostGrade(
   image: StudioImageRgbaLike,
