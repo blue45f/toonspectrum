@@ -8,6 +8,8 @@ import {
   type StudioCaptureStageLike,
 } from "./studio-capture-readiness";
 
+import type { StudioLinked3dPassCasAuthority } from "./studio-linked-3d-pass-transaction";
+
 afterEach(() => {
   vi.useRealTimers();
 });
@@ -19,6 +21,18 @@ function stage(): StudioCaptureStageLike & { drawCount: number } {
       this.drawCount += 1;
     },
   };
+}
+
+const LINKED_3D_LOCATOR = `studio-opfs-cas:sha256:${"a".repeat(64)}`;
+
+function linked3dPassAuthority(): StudioLinked3dPassCasAuthority {
+  return {
+    kind: "opfs",
+    put: vi.fn(),
+    get: vi.fn(),
+    ownerRefs: vi.fn(),
+    setOwnerRefs: vi.fn(),
+  } as unknown as StudioLinked3dPassCasAuthority;
 }
 
 describe("waitForStudioCaptureReady", () => {
@@ -96,7 +110,7 @@ describe("waitForStudioCaptureReady", () => {
   it("honors cancellation before any image work begins", async () => {
     const controller = new AbortController();
     controller.abort();
-    const preloadImage = vi.fn(async () => undefined);
+    const preloadImage = vi.fn(async (_source: string, _signal?: AbortSignal) => undefined);
 
     await expect(waitForStudioCaptureReady({
       pageId: "page-1",
@@ -151,6 +165,187 @@ describe("waitForStudioCaptureReady", () => {
 
     await expect(promise).rejects.toMatchObject({ code: "asset-limit" });
     expect(preloadImage).not.toHaveBeenCalled();
+  });
+
+  it("resolves a strict linked-3D CAS locator with the injected authority and revokes after preload", async () => {
+    const targetStage = stage();
+    const authority = linked3dPassAuthority();
+    const revoke = vi.fn();
+    const resolveLinked3dPassRasterSource = vi.fn(async () => ({
+      src: "blob:verified-linked-3d-pass",
+      revoke,
+    }));
+    const preloadImage = vi.fn(async (_source: string, _signal?: AbortSignal) => undefined);
+
+    await expect(waitForStudioCaptureReady({
+      pageId: "page-1",
+      getRenderedPageId: () => "page-1",
+      getStage: () => targetStage,
+      assetSources: [LINKED_3D_LOCATOR, "blob:ordinary"],
+      linked3dPassAuthority: authority,
+      resolveLinked3dPassRasterSource,
+      nextFrame: async () => undefined,
+      waitForFonts: async () => undefined,
+      preloadImage,
+    })).resolves.toBeDefined();
+
+    expect(resolveLinked3dPassRasterSource).toHaveBeenCalledOnce();
+    expect(resolveLinked3dPassRasterSource).toHaveBeenCalledWith(
+      LINKED_3D_LOCATOR,
+      authority,
+      expect.any(AbortSignal),
+    );
+    expect(preloadImage.mock.calls.map(([source]) => source)).toEqual(expect.arrayContaining([
+      "blob:verified-linked-3d-pass",
+      "blob:ordinary",
+    ]));
+    expect(preloadImage).not.toHaveBeenCalledWith(LINKED_3D_LOCATOR, expect.anything());
+    expect(revoke).toHaveBeenCalledOnce();
+  });
+
+  it("waits for an exact linked-pass Konva draw receipt before returning the capture stage", async () => {
+    const targetStage = stage();
+    const waitForRasterPresentations = vi.fn(async (
+      identities: readonly { elementId: string; src: string }[],
+      requestDraw: () => void,
+    ) => {
+      expect(targetStage.drawCount).toBe(0);
+      expect(identities).toEqual([{ elementId: "line-1", src: LINKED_3D_LOCATOR }]);
+      requestDraw();
+      expect(targetStage.drawCount).toBe(1);
+    });
+
+    await expect(waitForStudioCaptureReady({
+      pageId: "page-1",
+      getRenderedPageId: () => "page-1",
+      getStage: () => targetStage,
+      rasterPresentationIdentities: [{ elementId: "line-1", src: LINKED_3D_LOCATOR }],
+      waitForRasterPresentations,
+      nextFrame: async () => undefined,
+      waitForFonts: async () => undefined,
+      preloadImage: async () => undefined,
+    })).resolves.toBe(targetStage);
+
+    expect(waitForRasterPresentations).toHaveBeenCalledOnce();
+  });
+
+  it("fails closed before resolver or preload when a linked-3D locator hash is not strict", async () => {
+    const resolveLinked3dPassRasterSource = vi.fn();
+    const preloadImage = vi.fn(async () => undefined);
+
+    await expect(waitForStudioCaptureReady({
+      pageId: "page-1",
+      getRenderedPageId: () => "page-1",
+      getStage: () => stage(),
+      assetSources: [`studio-opfs-cas:sha256:${"A".repeat(64)}`],
+      resolveLinked3dPassRasterSource,
+      nextFrame: async () => undefined,
+      waitForFonts: async () => undefined,
+      preloadImage,
+    })).rejects.toMatchObject({ code: "asset-load" });
+
+    expect(resolveLinked3dPassRasterSource).not.toHaveBeenCalled();
+    expect(preloadImage).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when CAS authority rejects a well-formed locator hash", async () => {
+    const resolveLinked3dPassRasterSource = vi.fn(async () => {
+      throw new Error("integrity-mismatch");
+    });
+    const preloadImage = vi.fn(async () => undefined);
+
+    await expect(waitForStudioCaptureReady({
+      pageId: "page-1",
+      getRenderedPageId: () => "page-1",
+      getStage: () => stage(),
+      assetSources: [LINKED_3D_LOCATOR],
+      resolveLinked3dPassRasterSource,
+      nextFrame: async () => undefined,
+      waitForFonts: async () => undefined,
+      preloadImage,
+    })).rejects.toMatchObject({ code: "asset-load" });
+
+    expect(resolveLinked3dPassRasterSource).toHaveBeenCalledOnce();
+    expect(preloadImage).not.toHaveBeenCalled();
+  });
+
+  it("revokes a resolved linked-3D Blob URL exactly once when preload fails", async () => {
+    const revoke = vi.fn();
+
+    await expect(waitForStudioCaptureReady({
+      pageId: "page-1",
+      getRenderedPageId: () => "page-1",
+      getStage: () => stage(),
+      assetSources: [LINKED_3D_LOCATOR],
+      resolveLinked3dPassRasterSource: async () => ({
+        src: "blob:decode-error",
+        revoke,
+      }),
+      nextFrame: async () => undefined,
+      waitForFonts: async () => undefined,
+      preloadImage: async () => {
+        throw new Error("decode failed");
+      },
+    })).rejects.toMatchObject({ code: "asset-load" });
+
+    expect(revoke).toHaveBeenCalledOnce();
+  });
+
+  it("revokes a resolved linked-3D Blob URL exactly once on cancellation", async () => {
+    const controller = new AbortController();
+    const revoke = vi.fn();
+    let notePreloadStarted: (() => void) | null = null;
+    const preloadStarted = new Promise<void>((resolve) => {
+      notePreloadStarted = resolve;
+    });
+    const promise = waitForStudioCaptureReady({
+      pageId: "page-1",
+      getRenderedPageId: () => "page-1",
+      getStage: () => stage(),
+      assetSources: [LINKED_3D_LOCATOR],
+      signal: controller.signal,
+      resolveLinked3dPassRasterSource: async () => ({
+        src: "blob:cancelled",
+        revoke,
+      }),
+      nextFrame: async () => undefined,
+      waitForFonts: async () => undefined,
+      preloadImage: (_source, signal) => new Promise((_resolve, reject) => {
+        notePreloadStarted?.();
+        signal?.addEventListener("abort", () => reject(new Error("cancelled")), { once: true });
+      }),
+    });
+
+    await preloadStarted;
+    controller.abort();
+    await expect(promise).rejects.toMatchObject({ code: "aborted" });
+    expect(revoke).toHaveBeenCalledOnce();
+  });
+
+  it("revokes a resolved linked-3D Blob URL exactly once when readiness times out", async () => {
+    vi.useFakeTimers();
+    const revoke = vi.fn();
+    const preloadImage = vi.fn(() => new Promise<void>(() => undefined));
+    const promise = waitForStudioCaptureReady({
+      pageId: "page-1",
+      getRenderedPageId: () => "page-1",
+      getStage: () => stage(),
+      assetSources: [LINKED_3D_LOCATOR],
+      timeoutMs: 250,
+      resolveLinked3dPassRasterSource: async () => ({
+        src: "blob:timed-out",
+        revoke,
+      }),
+      nextFrame: async () => undefined,
+      waitForFonts: async () => undefined,
+      preloadImage,
+    });
+
+    await vi.waitFor(() => expect(preloadImage).toHaveBeenCalledOnce());
+    const assertion = expect(promise).rejects.toMatchObject({ code: "render-timeout" });
+    await vi.advanceTimersByTimeAsync(250);
+    await assertion;
+    expect(revoke).toHaveBeenCalledOnce();
   });
 });
 

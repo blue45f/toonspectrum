@@ -319,6 +319,18 @@ export function isStudioBg3dLtPngDataUrl(value: unknown): value is string {
   return body.length > 0 && body.length % 4 === 0 && BASE64_BODY_PATTERN.test(body);
 }
 
+function isStudioBg3dLtPersistedLayerSource(
+  value: unknown,
+  role: unknown,
+): value is string {
+  return isStudioBg3dLtPngDataUrl(value)
+    || (
+      role === "main-line"
+      && typeof value === "string"
+      && /^studio-opfs-cas:sha256:[a-f0-9]{64}$/u.test(value)
+    );
+}
+
 /**
  * Accepts the two historical BG3D fragment forms and returns only the canonical PNG data URL.
  * Fragments are deliberately forbidden everywhere else: new render output and metadata bundles
@@ -672,7 +684,7 @@ export function planStudioBg3dLtLayers<
 
       for (const element of bundleElements) {
         if (
-          !isStudioBg3dLtPngDataUrl(element.src) ||
+          !isStudioBg3dLtPersistedLayerSource(element.src, element.bg3dLtRole) ||
           !isRole(element.bg3dLtRole) ||
           element.bg3dLtBundleId !== bundleId ||
           (element.bg3dLtRenderMode !== "combined" && element.bg3dLtRenderMode !== "separated")

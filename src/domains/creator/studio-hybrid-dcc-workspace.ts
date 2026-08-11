@@ -38,7 +38,7 @@ import {
   createStudioEditableMeshFromPolygons,
   createStudioUnitCubeMesh,
   dissolveStudioEditableMeshFaces,
-  extrudeStudioEditableMeshFaces,
+  extrudeStudioEditableMeshFacesWithReceipt,
   hashStudioEditableMesh,
   insetStudioEditableMeshFaces,
   knifeStudioEditableMesh,
@@ -48,6 +48,8 @@ import {
   studioEditableMeshToTriangleSoup,
   weldStudioEditableMesh,
   type StudioEditableMesh,
+  type StudioEditableMeshExtrudeRegionMutation,
+  type StudioEditableMeshExtrudeRegionReceipt,
 } from "./studio-editable-half-edge-mesh";
 import { assertRenderCacheIsNotAuthority } from "./studio-geometry-authority";
 import {
@@ -56,10 +58,21 @@ import {
   type StudioGeoNodesPrimitiveKind,
 } from "./studio-geometry-nodes-workspace-bridge";
 import { importStudioGradeAAsset } from "./studio-grade-a-import-pipeline";
+import {
+  createStudioHybridDccComponentSelection,
+  mutateStudioHybridDccComponentSelection,
+  reconcileStudioHybridDccSelectionAfterExtrudeRegion,
+  resolveStudioHybridDccSelectedOrDefaultFaceIds,
+  validateStudioHybridDccComponentSelection,
+  type StudioHybridDccComponentSelection,
+  type StudioHybridDccMeshSelectionSource,
+  type StudioHybridDccSelectionResult,
+} from "./studio-hybrid-dcc-component-selection";
 import { scanStudioHybridDccCorruption } from "./studio-hybrid-dcc-diagnostics";
 import {
   createStudioHybridDccSession,
   hybridDccCommitGeometry,
+  hybridDccCommitTopologyMutation,
   hybridDccCommitObjectTransform,
   hybridDccDuplicateAsset,
   hybridDccRegisterAsset,
@@ -446,6 +459,114 @@ export function workspaceCommitObjectTransform(
   };
 }
 
+/** Builds the exact mesh provenance consumed by component-selection authority. */
+export function workspaceComponentSelectionSource(
+  ws: StudioHybridDccWorkspace,
+  assetId = ws.activeAssetId,
+): StudioHybridDccMeshSelectionSource | null {
+  if (!assetId) return null;
+  const record = ws.session.state.geometry.records[assetId];
+  if (!record) return null;
+  return {
+    assetId,
+    mesh: record.mesh,
+    meshRevision: record.revision,
+    sourceHash: record.meshHash,
+  };
+}
+
+function requireStudioHybridDccSelectionValue<T>(
+  result: StudioHybridDccSelectionResult<T>,
+): T {
+  if (result.ok) return result.value;
+  throw new Error(result.diagnostics.map(({ message }) => message).join(" · "));
+}
+
+function commitWorkspaceExtrudeRegion(
+  ws: StudioHybridDccWorkspace,
+  assetId: string,
+  mutation: StudioEditableMeshExtrudeRegionMutation,
+): StudioHybridDccWorkspace {
+  const session = hybridDccCommitTopologyMutation(
+    ws.session,
+    assetId,
+    mutation.mesh,
+    {
+      kind: "geometry.extrude-region",
+      receipt: mutation.receipt,
+    },
+  );
+  const bridge = mutateStudioSharedObjectGeometry(
+    ws.bridge,
+    assetId,
+    mutation.receipt.resultMeshHash,
+  );
+  return { ...ws, session, bridge, activeAssetId: assetId };
+}
+
+export interface StudioHybridDccWorkspaceExtrudeRegionResult {
+  readonly workspace: StudioHybridDccWorkspace;
+  readonly selection: StudioHybridDccComponentSelection;
+  readonly receipt: StudioEditableMeshExtrudeRegionReceipt;
+}
+
+/**
+ * Product region-extrude boundary: canonical face selection in, cap-face selection out.
+ * Receipt hashes and stable-ID remaps are verified before the new selection becomes authoritative.
+ */
+export function workspaceExtrudeRegionActive(
+  ws: StudioHybridDccWorkspace,
+  selection: StudioHybridDccComponentSelection,
+  distance: number,
+): StudioHybridDccWorkspaceExtrudeRegionResult {
+  const assetId = ws.activeAssetId;
+  if (!assetId) throw new Error("no active asset");
+  const record = ws.session.state.geometry.records[assetId];
+  if (!record) throw new Error(`missing ${assetId}`);
+  if (selection.mode !== "face" || selection.elementIds.length === 0) {
+    throw new Error("region extrude requires a non-empty face selection");
+  }
+
+  const source = workspaceComponentSelectionSource(ws, assetId)!;
+  const resolved = requireStudioHybridDccSelectionValue(
+    resolveStudioHybridDccSelectedOrDefaultFaceIds(selection, source),
+  );
+  const canonicalFaceSelection = requireStudioHybridDccSelectionValue(
+    mutateStudioHybridDccComponentSelection(
+      createStudioHybridDccComponentSelection(),
+      {
+        mode: "face",
+        operation: "replace",
+        ids: resolved.ids,
+        activeId: resolved.activeId,
+        source,
+      },
+    ),
+  );
+  const extruded = extrudeStudioEditableMeshFacesWithReceipt(
+    record.mesh,
+    resolved.ids,
+    distance,
+  );
+  if (!extruded.ok) throw new Error(extruded.detail);
+
+  const workspace = commitWorkspaceExtrudeRegion(ws, assetId, extruded.value);
+  const resultSource = workspaceComponentSelectionSource(workspace, assetId)!;
+  const reconciled = requireStudioHybridDccSelectionValue(
+    reconcileStudioHybridDccSelectionAfterExtrudeRegion(
+      canonicalFaceSelection,
+      source,
+      resultSource,
+      extruded.value.receipt,
+    ),
+  );
+  return {
+    workspace,
+    selection: reconciled,
+    receipt: extruded.value.receipt,
+  };
+}
+
 export function workspaceExtrudeActive(
   ws: StudioHybridDccWorkspace,
   distance: number,
@@ -455,12 +576,9 @@ export function workspaceExtrudeActive(
   if (!id) throw new Error("no active asset");
   const record = ws.session.state.geometry.records[id];
   if (!record) throw new Error(`missing ${id}`);
-  const extruded = extrudeStudioEditableMeshFaces(record.mesh, faceIds, distance);
+  const extruded = extrudeStudioEditableMeshFacesWithReceipt(record.mesh, faceIds, distance);
   if (!extruded.ok) throw new Error(extruded.detail);
-  const session = hybridDccCommitGeometry(ws.session, id, extruded.value);
-  const hash = hashStudioEditableMesh(extruded.value);
-  const bridge = mutateStudioSharedObjectGeometry(ws.bridge, id, hash);
-  return { ...ws, session, bridge, activeAssetId: id };
+  return commitWorkspaceExtrudeRegion(ws, id, extruded.value);
 }
 
 export function workspaceKnifeActive(
@@ -763,6 +881,62 @@ export function workspaceRedo(ws: StudioHybridDccWorkspace): StudioHybridDccWork
       ? ws.activeAssetId
       : Object.keys(session.state.geometry.records).sort().at(-1) ?? null,
   };
+}
+
+/**
+ * Aligns selection after snapshot-backed undo/redo without guessing an inverse topology remap.
+ *
+ * Object IDs survive when their authority records still exist. Component IDs survive only when
+ * asset ID, mesh revision, and source hash are exactly unchanged. A topology transition clears
+ * and rebinds them because a cap ID may otherwise alias an unrelated restored face.
+ */
+export function workspaceReconcileSelectionAfterHistory(
+  ws: StudioHybridDccWorkspace,
+  selection: StudioHybridDccComponentSelection,
+): StudioHybridDccComponentSelection {
+  if (selection.mode === "object") {
+    const objectIds = selection.objectIds.filter((assetId) => (
+      Object.hasOwn(ws.session.state.geometry.records, assetId)
+    ));
+    const activeId = selection.activeObjectId && objectIds.includes(selection.activeObjectId)
+      ? selection.activeObjectId
+      : objectIds.at(-1) ?? null;
+    return requireStudioHybridDccSelectionValue(
+      mutateStudioHybridDccComponentSelection(
+        createStudioHybridDccComponentSelection(),
+        {
+          mode: "object",
+          operation: "replace",
+          ids: objectIds,
+          activeId,
+        },
+      ),
+    );
+  }
+
+  const source = workspaceComponentSelectionSource(
+    ws,
+    selection.provenance?.assetId ?? selection.activeObjectId ?? ws.activeAssetId,
+  );
+  if (!source) return createStudioHybridDccComponentSelection();
+  if (selection.provenance?.assetId === source.assetId
+    && selection.provenance.meshRevision === source.meshRevision
+    && selection.provenance.sourceHash === source.sourceHash) {
+    return requireStudioHybridDccSelectionValue(
+      validateStudioHybridDccComponentSelection(selection, source),
+    );
+  }
+  return requireStudioHybridDccSelectionValue(
+    mutateStudioHybridDccComponentSelection(
+      createStudioHybridDccComponentSelection(),
+      {
+        mode: selection.mode,
+        operation: "replace",
+        ids: [],
+        source,
+      },
+    ),
+  );
 }
 
 export function workspaceDiagnostics(ws: StudioHybridDccWorkspace) {

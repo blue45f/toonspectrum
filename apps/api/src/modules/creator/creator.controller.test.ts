@@ -150,6 +150,8 @@ describe("CreatorController collaboration collection endpoints", () => {
       ownerScopeKey: "owner",
       targetWorkId: "work-provisional",
       expectedGraphRevision: 0,
+      expectedWorkRevision: 2,
+      finalStatus: "published",
       clientMutationId: PROMOTION_MUTATION_ID,
     };
 
@@ -208,7 +210,7 @@ describe("CreatorController collaboration collection endpoints", () => {
     const provision = {
       draftDocumentId: DRAFT_ID,
       ownerScopeKey: "owner",
-      intent: "share-link" as const,
+      intent: "cloud-save" as const,
       clientMutationId: PROVISION_MUTATION_ID,
       initialSnapshotByteLength: 1_024,
     };
@@ -217,6 +219,8 @@ describe("CreatorController collaboration collection endpoints", () => {
       ownerScopeKey: "owner",
       targetWorkId: "work-provisional",
       expectedGraphRevision: 0,
+      expectedWorkRevision: 2,
+      finalStatus: "published" as const,
       clientMutationId: PROMOTION_MUTATION_ID,
     };
     creatorService.provisionDraftCollaborationRoom.mockResolvedValue(activeRoom);
@@ -262,6 +266,8 @@ describe("CreatorController collaboration collection endpoints", () => {
           ownerScopeKey: "owner",
           targetWorkId: "work-provisional",
           expectedGraphRevision: 0,
+          expectedWorkRevision: 2,
+          finalStatus: "draft",
           clientMutationId: PROMOTION_MUTATION_ID,
         }
       )

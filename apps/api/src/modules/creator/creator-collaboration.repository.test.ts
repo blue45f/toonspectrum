@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { db } from "../../../../../lib/db";
+import { CreatorDraftCollaborationStatusLockedError } from "../../../../../lib/server/creator-provisional-work-status";
+import {
+  StudioLinked3dPassAssetFenceError,
+  type StudioLinked3dPassAssetRow,
+} from "../../../../../lib/studio-linked-3d-pass-asset-fence";
 
 import {
   buildCreatorCollaborationWorkQuery,
@@ -170,6 +175,7 @@ class MemoryCollaborationStore
   workRevisionAppendCount = 0;
   transactionCount = 0;
   readonly crdtServerSequences = new Map<string, bigint>();
+  readonly linkedPassAssets = new Map<string, StudioLinked3dPassAssetRow>();
   readonly saveLockOrder: string[] = [];
   lockedWorkIds: string[] = [];
   lockedUserIds: string[] = [];
@@ -481,6 +487,14 @@ class MemoryCollaborationStore
     };
   }
 
+  async findStudioLinked3dPassAssets(workId: string, assetIds: readonly string[]) {
+    this.saveLockOrder.push(`linked-pass-assets:${workId}`);
+    return assetIds.flatMap((assetId) => {
+      const row = this.linkedPassAssets.get(`${workId}\u0000${assetId}`);
+      return row ? [row] : [];
+    });
+  }
+
   async updateAccessibleDocument(
     actorUserId: string,
     workId: string,
@@ -537,6 +551,88 @@ const BASE_DATE = new Date("2026-07-12T00:00:00.000Z");
 const DEFAULT_NOW = new Date("2026-07-14T00:06:00.000Z");
 const PENDING_INVITATION_ID = "00000000-0000-4000-8000-000000000003";
 const DECLINED_INVITATION_ID = "00000000-0000-4000-8000-000000000004";
+const LINKED_PASS_HASH = "a".repeat(64);
+const LINKED_PASS_SOURCE_HASH = `sha256:${"b".repeat(64)}`;
+const LINKED_PASS_ASSET_ID = `linked3d-pass-sha256-${LINKED_PASS_HASH}`;
+const LINKED_PASS_LOCATOR = `studio-opfs-cas:sha256:${LINKED_PASS_HASH}`;
+
+function linkedPassDocument(linkCount = 1): Record<string, unknown> {
+  const elements = Array.from({ length: linkCount }, (_, index) => ({
+    id: `line-linked-${index}`,
+    type: "image",
+    src: LINKED_PASS_LOCATOR,
+  }));
+  const links = Array.from({ length: linkCount }, (_, index) => ({
+    bundleId: `bundle-linked-${index}`,
+    shotId: `shot-linked-${index}`,
+    sourceShotId: null,
+    stageSourceHash: LINKED_PASS_SOURCE_HASH,
+    layers: [{ elementId: `line-linked-${index}`, role: "main-line" }],
+    passRevision: {
+      revision: 1,
+      sourceHash: LINKED_PASS_SOURCE_HASH,
+      sceneHash: LINKED_PASS_SOURCE_HASH,
+      cameraHash: LINKED_PASS_SOURCE_HASH,
+      baseGeometryHash: LINKED_PASS_SOURCE_HASH,
+      topologyHash: LINKED_PASS_SOURCE_HASH,
+      objectIdentityHash: LINKED_PASS_SOURCE_HASH,
+      objectStableIds: ["obj/room"],
+      passRootHash: LINKED_PASS_SOURCE_HASH,
+      artifact: {
+        pass: "line",
+        role: "main-line",
+        contentHash: `sha256:${LINKED_PASS_HASH}`,
+        byteSize: 68,
+        mime: "image/png",
+        width: 64,
+        height: 32,
+        locator: LINKED_PASS_LOCATOR,
+      },
+    },
+    corrections: [],
+  }));
+  return {
+    pagesList: [{
+      id: "page-linked",
+      elements,
+      linked3dRender: {
+        kind: "toonspectrum.studio-linked-3d-render",
+        version: 2,
+        authority: "studio-project-linked-3d-pass-index",
+        links,
+      },
+    }],
+  };
+}
+
+function linkedPassAssetRow(
+  patch: Partial<StudioLinked3dPassAssetRow> = {}
+): StudioLinked3dPassAssetRow {
+  return {
+    workId: "work-1",
+    assetId: LINKED_PASS_ASSET_ID,
+    elementType: "image",
+    mimeType: "image/png",
+    descriptor: {
+      version: 1,
+      element: {
+        id: LINKED_PASS_ASSET_ID,
+        type: "image",
+        x: 0,
+        y: 0,
+        width: 64,
+        height: 32,
+        rotation: 0,
+      },
+    },
+    byteSize: 68,
+    sha256: LINKED_PASS_HASH,
+    intrinsicWidth: 64,
+    intrinsicHeight: 32,
+    decodedRgbaBytes: 64 * 32 * 4,
+    ...patch,
+  };
+}
 
 function createFixture(now = DEFAULT_NOW) {
   const store = new MemoryCollaborationStore();
@@ -1875,6 +1971,113 @@ describe("CreatorCollaborationRepository", () => {
     ).rejects.toThrow("invalid creator shared document mutation");
     expect(store.documentUpdateCount).toBe(1);
     expect(store.workRevisionAppendCount).toBe(1);
+  });
+
+  it("active hidden provisional work의 owner도 shared PATCH로 게시할 수 없다", async () => {
+    const { repository, store } = createFixture();
+    const work = store.works.get("work-1");
+    if (!work) throw new Error("missing test work");
+    Object.assign(work, {
+      status: "draft",
+      hidden: true,
+      revision: 1,
+      draftCollaborationStatus: "active",
+      draftCollaborationExpiresAt: new Date(DEFAULT_NOW.getTime() + 60_000),
+      draftCollaborationOwnerUserId: "owner",
+    });
+
+    await expect(
+      repository.saveSharedDocument("owner", "work-1", 1, BigInt(0), {
+        status: "published",
+      })
+    ).rejects.toBeInstanceOf(CreatorDraftCollaborationStatusLockedError);
+    expect(store.lockedWorkIds).toContain("work-1");
+    expect(store.documentUpdateCount).toBe(0);
+    expect(store.workRevisionAppendCount).toBe(0);
+    expect(store.works.get("work-1")).toMatchObject({
+      status: "draft",
+      hidden: true,
+      revision: 1,
+    });
+
+    await expect(
+      repository.saveSharedDocument("owner", "work-1", 1, BigInt(0), {
+        status: "draft",
+      })
+    ).resolves.toMatchObject({ workId: "work-1", revision: 2 });
+  });
+
+  it("공유 저장은 work lock 안에서 exact linked-pass asset을 확인한 뒤 revision을 쓴다", async () => {
+    const { repository, store } = createFixture();
+    store.linkedPassAssets.set(
+      `work-1\u0000${LINKED_PASS_ASSET_ID}`,
+      linkedPassAssetRow()
+    );
+
+    await expect(repository.saveSharedDocument("editor", "work-1", 1, BigInt(0), {
+      title: "linked pass saved",
+      doc: linkedPassDocument(),
+    })).resolves.toMatchObject({ workId: "work-1", revision: 2 });
+
+    const workLockIndex = store.saveLockOrder.indexOf("work-row:work-1");
+    const assetReadIndex = store.saveLockOrder.indexOf("linked-pass-assets:work-1");
+    expect(workLockIndex).toBeGreaterThanOrEqual(0);
+    expect(assetReadIndex).toBeGreaterThan(workLockIndex);
+    expect(store.documentUpdateCount).toBe(1);
+    expect(store.workRevisionAppendCount).toBe(1);
+    expect(store.works.get("work-1")?.doc).toEqual(linkedPassDocument());
+  });
+
+  it("공유 PATCH는 byte budget 안의 65 linked passes를 손실 없이 저장한다", async () => {
+    const { repository, store } = createFixture();
+    const doc = linkedPassDocument(65);
+    store.linkedPassAssets.set(
+      `work-1\u0000${LINKED_PASS_ASSET_ID}`,
+      linkedPassAssetRow(),
+    );
+
+    await expect(repository.saveSharedDocument("editor", "work-1", 1, BigInt(0), {
+      doc,
+    })).resolves.toMatchObject({ workId: "work-1", revision: 2 });
+    expect(store.works.get("work-1")?.doc).toEqual(doc);
+  });
+
+  it.each([
+    ["missing row", null],
+    ["mismatched intrinsic receipt", linkedPassAssetRow({ intrinsicWidth: 63 })],
+  ])("공유 저장은 %s이면 문서와 revision을 함께 rollback한다", async (_name, row) => {
+    const { repository, store } = createFixture();
+    if (row) store.linkedPassAssets.set(`work-1\u0000${LINKED_PASS_ASSET_ID}`, row);
+
+    const error = await repository.saveSharedDocument("editor", "work-1", 1, BigInt(0), {
+      doc: linkedPassDocument(),
+    }).catch((cause: unknown) => cause);
+
+    expect(error).toBeInstanceOf(StudioLinked3dPassAssetFenceError);
+    expect((error as StudioLinked3dPassAssetFenceError).code).toBe(
+      row ? "asset-mismatch" : "asset-missing"
+    );
+    expect(store.works.get("work-1")?.revision ?? 1).toBe(1);
+    expect(store.works.get("work-1")?.doc).toBeUndefined();
+    expect(store.documentUpdateCount).toBe(0);
+    expect(store.workRevisionAppendCount).toBe(0);
+  });
+
+  it("공유 저장은 locator를 receipt 바깥에 숨긴 문서를 asset 조회 전에 거부한다", async () => {
+    const { repository, store } = createFixture();
+    const doc = linkedPassDocument();
+    const page = (doc.pagesList as Array<{ elements: Array<Record<string, unknown>> }>)[0]!;
+    page.elements[0]!.maskSrc = LINKED_PASS_LOCATOR;
+    store.linkedPassAssets.set(
+      `work-1\u0000${LINKED_PASS_ASSET_ID}`,
+      linkedPassAssetRow()
+    );
+
+    await expect(repository.saveSharedDocument("editor", "work-1", 1, BigInt(0), {
+      doc,
+    })).rejects.toMatchObject({ code: "invalid-reserved-locator" });
+    expect(store.saveLockOrder).not.toContain("linked-pass-assets:work-1");
+    expect(store.documentUpdateCount).toBe(0);
   });
 
   it("stale CRDT sequence는 advisory lock 안에서 전용 conflict로 저장을 중단한다", async () => {

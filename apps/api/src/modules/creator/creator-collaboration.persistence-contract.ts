@@ -3,6 +3,7 @@ import type {
   CreatorCollaborationStatus,
 } from "./creator-collaboration.policy";
 import type { CreatorWorkRevisionSnapshot } from "../../../../../lib/server/creator-work-revisions";
+import type { StudioLinked3dPassAssetRow } from "../../../../../lib/studio-linked-3d-pass-asset-fence";
 
 export type CreatorCollaborationInvitationAction = "accept" | "decline";
 
@@ -233,6 +234,11 @@ export interface CreatorCollaborationUnitOfWork {
     actorUserId: string,
     workId: string
   ): Promise<CreatorSharedDocumentMetaRecord | null>;
+  /** Called only after the transaction has acquired the creator_work row lock. */
+  findStudioLinked3dPassAssets(
+    workId: string,
+    assetIds: readonly string[]
+  ): Promise<readonly StudioLinked3dPassAssetRow[]>;
   updateAccessibleDocument(
     actorUserId: string,
     workId: string,

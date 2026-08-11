@@ -1262,7 +1262,7 @@ describe("studio dynamic brush bounded coverage renderer", () => {
     );
 
     expect(studioPageSource).toContain(
-      "<StudioCuttoonEditor key={editorScopeKey} />",
+      "<StudioCuttoonEditor key={editorScopeKey} studioRoute={studioRoute} />",
     );
     expect(studioPageSource).toContain(
       "disposeStudioDynamicCoverageCommittedCache();",

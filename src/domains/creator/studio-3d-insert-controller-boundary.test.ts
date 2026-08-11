@@ -221,17 +221,21 @@ describe("Studio 3D insert controller boundary", () => {
     expect(backgroundInsert).toContain("if (!patchEl(targetElementId, {");
     expect(backgroundInsert).toContain("if (!addEl({");
     expect(backgroundInsert).toContain(
-      "if (targetElementId && result.magicFilterMask) {"
+      "if (targetElementId && renderResult.magicFilterMask) {"
+    );
+    expect(backgroundInsert).toContain("if (isRealtimeTeamSession) {");
+    expect(backgroundInsert.indexOf("if (isRealtimeTeamSession) {")).toBeLessThan(
+      backgroundInsert.indexOf("const plan = planStudioBg3dLtLayers")
     );
     expect(backgroundInsert.indexOf(
-      "if (targetElementId && result.magicFilterMask) {"
+      "if (targetElementId && renderResult.magicFilterMask) {"
     )).toBeLessThan(backgroundInsert.indexOf(
       "const plan = planStudioBg3dLtLayers"
     ));
     expect(backgroundInsert).toContain("const magicAttachment = detachPlan?.ok");
     expect(backgroundInsert).toContain(": attachStudioBg3dMagicFilterMaskToLtPlan({");
     expect(backgroundInsert).toContain(
-      "if (!commit(nextElements, {"
+      "if (nextLinkedRender === null || !commit(nextElements, {"
     );
     expect(backgroundInsert.indexOf("setSelectedId(plan.anchorElementId);")).toBeGreaterThan(
       backgroundInsert.indexOf(

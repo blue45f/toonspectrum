@@ -7,6 +7,7 @@ import {
   createStudioDraftCollaborationPromotionRequest,
   createStudioDraftCollaborationProvisionRequest,
   loadOrCreateStudioDraftCollaborationIdentity,
+  retireStudioDraftCollaborationIdentity,
   type StudioDraftCollaborationIdentity,
   type StudioDraftCollaborationIdentityRepository,
   type StudioDraftCollaborationTemporaryRoom,
@@ -145,6 +146,48 @@ describe("local Studio draft collaboration SQLite identity", () => {
     expect(rotated.draftDocumentId).toBe(`draft_${UUIDS.draftB}`);
   });
 
+  it("serializes exact retirement, rotates the same scope, and preserves a newer identity", async () => {
+    const store = memoryStore();
+    const repository = createStudioDraftCollaborationIdentityRepository(store);
+    const acquireRepository = async () => repository;
+    const first = await loadOrCreateStudioDraftCollaborationIdentity({
+      documentScopeKey: "autosave:new-work",
+      ownerScopeKey: "account-a",
+      now: NOW,
+      createUuid: () => UUIDS.draftA,
+    }, acquireRepository);
+
+    // Invocation order is the authority: both calls share the same SQLite write queue even when
+    // their promises are awaited together.
+    const retirement = repository.retireExact(first);
+    const replacement = repository.loadOrCreate({
+      documentScopeKey: "autosave:new-work",
+      ownerScopeKey: "account-a",
+      now: NOW + 1,
+      createUuid: () => UUIDS.draftB,
+    });
+    await expect(retirement).resolves.toBe(true);
+    await expect(replacement).resolves.toMatchObject({
+      draftDocumentId: `draft_${UUIDS.draftB}`,
+      persistence: "persistent",
+    });
+
+    await expect(
+      retireStudioDraftCollaborationIdentity(first, acquireRepository)
+    ).resolves.toBe(false);
+    const stableReplacement = await repository.loadOrCreate({
+      documentScopeKey: "autosave:new-work",
+      ownerScopeKey: "account-a",
+      now: NOW + 2,
+      createUuid: () => {
+        throw new Error("stale retirement must not rotate the replacement");
+      },
+    });
+    expect(stableReplacement.draftDocumentId).toBe(`draft_${UUIDS.draftB}`);
+    expect([...store.values.values()][0]).toContain(`draft_${UUIDS.draftB}`);
+    expect([...store.values.values()][0]).not.toContain(`draft_${UUIDS.draftA}`);
+  });
+
   it("returns an explicit memory-only identity when SQLite/OPFS is blocked", async () => {
     const result = await loadOrCreateStudioDraftCollaborationIdentity({
       documentScopeKey: "autosave:new-work",
@@ -157,6 +200,15 @@ describe("local Studio draft collaboration SQLite identity", () => {
 
     expect(result.persistence).toBe("memory-only");
     expect(result.draftDocumentId).toBe(`draft_${UUIDS.draftA}`);
+  });
+
+  it("treats a memory-only identity as already retired without opening SQLite", async () => {
+    await expect(retireStudioDraftCollaborationIdentity(
+      identity({ persistence: "memory-only" }),
+      async () => {
+        throw new Error("memory-only retirement must not open SQLite");
+      },
+    )).resolves.toBe(true);
   });
 
   it("rejects whitespace-rewritten scope keys and invalid UUID generators", async () => {
@@ -182,11 +234,11 @@ describe("local Studio draft collaboration SQLite identity", () => {
 
 
 describe("lazy draft collaboration provision and promotion contract", () => {
-  it("builds an idempotent provision request only on explicit share or invite intent", () => {
+  it("builds an idempotent provision request for an explicit cloud-save intent", () => {
     const request = createStudioDraftCollaborationProvisionRequest({
       identity: identity(),
       actorAuthScopeKey: "account-a",
-      intent: "invite-member",
+      intent: "cloud-save",
       initialSnapshotByteLength: 1_024,
       now: NOW + 1,
       createUuid: () => UUIDS.mutation,
@@ -196,7 +248,7 @@ describe("lazy draft collaboration provision and promotion contract", () => {
       version: 1,
       draftDocumentId: `draft_${UUIDS.draftA}`,
       ownerScopeKey: "account-a",
-      intent: "invite-member",
+      intent: "cloud-save",
       clientMutationId: UUIDS.mutation,
       initialSnapshotByteLength: 1_024,
       requestedAt: new Date(NOW + 1).toISOString(),
@@ -269,6 +321,8 @@ describe("lazy draft collaboration provision and promotion contract", () => {
       room: room(),
       actorAuthScopeKey: "account-a",
       targetWorkId: "saved-work-1",
+      expectedWorkRevision: 9,
+      finalStatus: "published",
       now: NOW + 1,
       createUuid: () => UUIDS.mutation,
     });
@@ -279,6 +333,8 @@ describe("lazy draft collaboration provision and promotion contract", () => {
       ownerScopeKey: "account-a",
       targetWorkId: "saved-work-1",
       expectedGraphRevision: 7,
+      expectedWorkRevision: 9,
+      finalStatus: "published",
       clientMutationId: UUIDS.mutation,
     });
     expect(() =>
@@ -287,6 +343,30 @@ describe("lazy draft collaboration provision and promotion contract", () => {
         room: room({ draftDocumentId: `draft_${UUIDS.draftB}` }),
         actorAuthScopeKey: "account-a",
         targetWorkId: "saved-work-1",
+        expectedWorkRevision: 9,
+        finalStatus: "published",
+        now: NOW + 1,
+      })
+    ).toThrow("승격할 수 없습니다");
+    expect(() =>
+      createStudioDraftCollaborationPromotionRequest({
+        identity: identity(),
+        room: room(),
+        actorAuthScopeKey: "account-a",
+        targetWorkId: "saved-work-1",
+        expectedWorkRevision: 0,
+        finalStatus: "published",
+        now: NOW + 1,
+      })
+    ).toThrow("승격할 수 없습니다");
+    expect(() =>
+      createStudioDraftCollaborationPromotionRequest({
+        identity: identity(),
+        room: room(),
+        actorAuthScopeKey: "account-a",
+        targetWorkId: "saved-work-1",
+        expectedWorkRevision: 9,
+        finalStatus: "hidden" as never,
         now: NOW + 1,
       })
     ).toThrow("승격할 수 없습니다");
@@ -296,6 +376,8 @@ describe("lazy draft collaboration provision and promotion contract", () => {
         room: room(),
         actorAuthScopeKey: "account-a",
         targetWorkId: "different-work",
+        expectedWorkRevision: 9,
+        finalStatus: "published",
         now: NOW + 1,
       })
     ).toThrow("승격할 수 없습니다");

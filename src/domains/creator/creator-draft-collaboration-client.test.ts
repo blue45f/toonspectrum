@@ -62,6 +62,8 @@ function promotionRequest(
     ownerScopeKey: OWNER_SCOPE_KEY,
     targetWorkId: WORK_ID,
     expectedGraphRevision: 0,
+    expectedWorkRevision: 2,
+    finalStatus: "published",
     clientMutationId: PROMOTION_MUTATION_ID,
     requestedAt: new Date(NOW).toISOString(),
     ...overrides,
@@ -125,13 +127,15 @@ afterEach(() => {
 
 describe("creator draft collaboration client", () => {
   it("provisions with the strict server DTO, retry key, and bounded room response", async () => {
+    const request = provisionRequest({ intent: "cloud-save" });
+    const response = activeRoom({ provisionIntent: "cloud-save" });
     const transport = vi.fn(
       async (_request: CreatorDraftCollaborationTransportRequest) =>
-        jsonResponse(activeRoom())
+        jsonResponse(response)
     );
     const client = clientFor(transport);
 
-    await expect(client.provision(provisionRequest())).resolves.toEqual(activeRoom());
+    await expect(client.provision(request)).resolves.toEqual(response);
 
     expect(transport).toHaveBeenCalledOnce();
     const sent = transport.mock.calls[0]?.[0];
@@ -144,7 +148,7 @@ describe("creator draft collaboration client", () => {
       body: {
         draftDocumentId: DRAFT_ID,
         ownerScopeKey: OWNER_SCOPE_KEY,
-        intent: "share-link",
+        intent: "cloud-save",
         clientMutationId: PROVISION_MUTATION_ID,
         initialSnapshotByteLength: 1_024,
       },
@@ -212,6 +216,8 @@ describe("creator draft collaboration client", () => {
           ownerScopeKey: OWNER_SCOPE_KEY,
           targetWorkId: WORK_ID,
           expectedGraphRevision: 0,
+          expectedWorkRevision: 2,
+          finalStatus: "published",
           clientMutationId: PROMOTION_MUTATION_ID,
         },
       })
@@ -237,7 +243,23 @@ describe("creator draft collaboration client", () => {
     await expect(client.provision(provisionRequest({
       initialSnapshotByteLength: 2_048,
     }))).rejects.toBeInstanceOf(CreatorDraftCollaborationInputError);
+    await expect(client.provision(provisionRequest({
+      intent: "cloud-save",
+    }))).rejects.toBeInstanceOf(CreatorDraftCollaborationInputError);
     expect(transport).toHaveBeenCalledTimes(2);
+
+    const promotionTransport = vi.fn(async () => jsonResponse(promotedRoom()));
+    const promotionClient = clientFor(promotionTransport);
+    const promotion = promotionRequest();
+    await promotionClient.promote(promotion);
+    await promotionClient.promote(promotion);
+    await expect(promotionClient.promote(promotionRequest({
+      expectedWorkRevision: 3,
+    }))).rejects.toBeInstanceOf(CreatorDraftCollaborationInputError);
+    await expect(promotionClient.promote(promotionRequest({
+      finalStatus: "draft",
+    }))).rejects.toBeInstanceOf(CreatorDraftCollaborationInputError);
+    expect(promotionTransport).toHaveBeenCalledTimes(2);
   });
 
   it("propagates a caller abort and never starts a pre-aborted request", async () => {
@@ -349,6 +371,23 @@ describe("creator draft collaboration client", () => {
     }
   );
 
+  it("exposes the bounded current work revision from a publication conflict", async () => {
+    const client = clientFor(async () =>
+      jsonResponse({
+        code: "creator_draft_collaboration_work_revision_conflict",
+        currentWorkRevision: 12,
+      }, 409)
+    );
+
+    await expect(client.promote(promotionRequest())).rejects.toMatchObject({
+      kind: "conflict",
+      status: 409,
+      serverCode: "creator_draft_collaboration_work_revision_conflict",
+      currentGraphRevision: null,
+      currentWorkRevision: 12,
+    });
+  });
+
   it("fails closed on invalid JSON, media type, schema, declared size, and actual size", async () => {
     const invalidJson = clientFor(async () =>
       new Response("{", {
@@ -376,6 +415,13 @@ describe("creator draft collaboration client", () => {
     await expect(extraField.provision(provisionRequest())).rejects.toBeInstanceOf(
       CreatorDraftCollaborationResponseContractError
     );
+
+    const unknownIntent = clientFor(async () =>
+      jsonResponse(activeRoom({ provisionIntent: "background-save" }))
+    );
+    await expect(
+      unknownIntent.provision(provisionRequest())
+    ).rejects.toBeInstanceOf(CreatorDraftCollaborationResponseContractError);
 
     const declaredOversize = clientFor(async () =>
       new Response("{}", {
@@ -452,6 +498,12 @@ describe("creator draft collaboration client", () => {
     }))).rejects.toBeInstanceOf(CreatorDraftCollaborationInputError);
     await expect(client.promote(promotionRequest({
       expectedGraphRevision: 2_147_483_647,
+    }))).rejects.toBeInstanceOf(CreatorDraftCollaborationInputError);
+    await expect(client.promote(promotionRequest({
+      expectedWorkRevision: 0,
+    }))).rejects.toBeInstanceOf(CreatorDraftCollaborationInputError);
+    await expect(client.promote(promotionRequest({
+      finalStatus: "hidden" as never,
     }))).rejects.toBeInstanceOf(CreatorDraftCollaborationInputError);
     await expect(client.provision(provisionRequest(), {
       timeoutMs: 60_001,

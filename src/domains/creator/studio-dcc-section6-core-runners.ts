@@ -73,7 +73,7 @@ import {
   bevelStudioEditableMeshEdges,
   createStudioUnitCubeMesh,
   dissolveStudioEditableMeshFaces,
-  extrudeStudioEditableMeshFaces,
+  extrudeStudioEditableMeshFacesWithReceipt,
   hashStudioEditableMesh,
   insetStudioEditableMeshFaces,
   knifeStudioEditableMesh,
@@ -340,9 +340,24 @@ export const STUDIO_DCC_SECTION6_CORE_RUNNERS: Readonly<
   },
   "MOD-004": () => {
     const mesh = cube();
-    const e = extrudeStudioEditableMeshFaces(mesh, [0], 0.2);
+    const e = extrudeStudioEditableMeshFacesWithReceipt(mesh, [0, 2], 0.2);
     if (!e.ok) throw new Error(e.detail);
-    return ok("MOD-004", { facesAfter: e.value.faces.length });
+    const { receipt, mesh: result } = e.value;
+    if (receipt.connectedRegionCount !== 1
+      || receipt.boundaryHalfEdgeIds.length !== 6
+      || receipt.sideFaceIds.length !== 6
+      || receipt.faceRemap.entries.length !== mesh.faces.length
+      || result.faces.length !== 12) {
+      throw new Error("region extrude contract mismatch");
+    }
+    return ok("MOD-004", {
+      facesAfter: result.faces.length,
+      boundaryEdges: receipt.boundaryHalfEdgeIds.length,
+      sideFaces: receipt.sideFaceIds.length,
+      connectedRegions: receipt.connectedRegionCount,
+      sourceHash: receipt.sourceMeshHash,
+      resultHash: receipt.resultMeshHash,
+    });
   },
   "MOD-005": () => {
     const mesh = cube();

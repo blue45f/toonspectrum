@@ -77,8 +77,9 @@ describe("studio auto-color hints panel export boundary", () => {
       /import\s*\(\s*["']\.\/studio-auto-color-hints-worker-client["']\s*\)/u,
     );
     expect(mountSnippet).toContain("runStudioAutoColorHintsWorker");
-    // Selected image layer src is plumbed for on-demand pixel decode (not raw ImageData props).
-    expect(mountSnippet).toMatch(/\bimageSrc=\{selected\.src\}/u);
+    // Reserved linked-pass locators are resolved through the shared verified raster presentation
+    // before on-demand pixel decode (never passed to the panel as a raw private scheme).
+    expect(mountSnippet).toMatch(/\bimageSrc=\{selectedReadableImageSource\}/u);
     expect(mountSnippet).not.toMatch(/\bimage=\{/u);
     // Explicit apply patches selected.src; work-asset destructive lock removes only that handler.
     expect(mountSnippet).toMatch(/\bonApplyResult=/u);

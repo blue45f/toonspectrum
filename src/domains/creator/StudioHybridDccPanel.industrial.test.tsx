@@ -90,6 +90,29 @@ afterEach(() => {
 });
 
 describe("StudioHybridDccPanel industrial wiring", () => {
+  it("uses the route-owned workbench mode without duplicating mode authority", () => {
+    const onWorkbenchModeChange = vi.fn();
+    const view = render(
+      <StudioHybridDccPanel
+        onWorkbenchModeChange={onWorkbenchModeChange}
+        workbenchMode="cad"
+      />,
+    );
+
+    expect(screen.getByText("치수가 정확한 솔리드 제작")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "컷과 비사실 렌더 작업 모드" }));
+    expect(onWorkbenchModeChange).toHaveBeenCalledWith("shot");
+    expect(screen.getByText("치수가 정확한 솔리드 제작")).toBeTruthy();
+
+    view.rerender(
+      <StudioHybridDccPanel
+        onWorkbenchModeChange={onWorkbenchModeChange}
+        workbenchMode="shot"
+      />,
+    );
+    expect(screen.getByText("카메라 컷과 웹툰용 선화 전달")).toBeTruthy();
+  });
+
   it("guides beginners by work mode and commits numeric transforms as document authority", async () => {
     const onWorkspaceChange = vi.fn();
     render(<StudioHybridDccPanel onWorkspaceChange={onWorkspaceChange} />);
@@ -130,7 +153,8 @@ describe("StudioHybridDccPanel industrial wiring", () => {
     });
 
     fireEvent.click(screen.getByRole("button", { name: "조형 작업 모드" }));
-    expect(screen.getByText("점토처럼 조형하고 메시 정리")).toBeTruthy();
+    expect(screen.getByText("조형 실험실 · voxel-lite")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /표면 조형 \(실험\)/u })).toBeTruthy();
     expect(screen.getByRole("button", { name: /복셀 리메시/u })).toBeTruthy();
   });
 
@@ -238,7 +262,7 @@ describe("StudioHybridDccPanel industrial wiring", () => {
         /CAD revolve 완료/u,
       );
     });
-    fireEvent.click(screen.getByRole("button", { name: "Sculpt" }));
+    fireEvent.click(screen.getByRole("button", { name: /Sculpt · voxel-lite 실험/u }));
     await waitFor(() => {
       expect(document.querySelector("[data-studio-hybrid-dcc-log]")?.textContent).toMatch(
         /Sculpt 완료/u,

@@ -6,6 +6,8 @@ import { createEmptyStudioAiProvenanceDocument } from "./studio-ai-provenance";
 import { createEmptyStudioCharacterBible } from "./studio-character-bible";
 import { createEmptyStudioCommentsDocument } from "./studio-comments";
 import { creatorWorkSnapshotToStudioProject } from "./studio-creator-work-project";
+import { createStudioLinked3dRenderPageFixture } from
+  "./studio-linked-3d-render-test-fixture";
 import { createEmptyStudioPublicationAnalyticsDocument } from "./studio-publication-analytics";
 import { DEFAULT_STUDIO_PUBLISH_COMPLIANCE } from "./studio-publish-compliance";
 import { DEFAULT_STUDIO_PUBLISH_PACKAGE_SETTINGS } from "./studio-publish-package";
@@ -99,6 +101,43 @@ describe("normalizeStudioSaveTags", () => {
 });
 
 describe("buildStudioSavePayload", () => {
+  it("rejects page-owned linked-pass locators inside the document master", () => {
+    const linkedPage = createStudioLinked3dRenderPageFixture("master-linked-page");
+    const linkedRaster = linkedPage.elements.find((element) =>
+      element.type === "image" && element.src.startsWith("studio-opfs-cas:"));
+    expect(linkedRaster).toBeDefined();
+    expect(() => buildStudioSavePayload(saveInput({
+      document: {
+        ...saveInput().document,
+        master: { elements: [linkedRaster!] },
+      },
+    }))).toThrow("문서 마스터");
+  });
+
+  it("rejects a reserved locator hidden in a nested page raster field without a sidecar", () => {
+    const linkedPage = createStudioLinked3dRenderPageFixture("nested-linked-page");
+    const linkedRaster = linkedPage.elements.find((element) =>
+      element.type === "image" && element.src.startsWith("studio-opfs-cas:"));
+    expect(linkedRaster?.type).toBe("image");
+    if (!linkedRaster || linkedRaster.type !== "image") throw new Error("fixture missing image");
+    expect(() => buildStudioSavePayload(saveInput({
+      document: {
+        ...saveInput().document,
+        pagesList: [{
+          ...saveInput().document.pagesList[0]!,
+          elements: [{
+            ...linkedRaster,
+            src: "data:image/png;base64,ordinary",
+            maskSrc: linkedRaster.src,
+            bg3dScene: undefined,
+            bg3dLtBundleId: undefined,
+            bg3dLtRole: undefined,
+          }],
+        }],
+      },
+    }))).toThrow("reserved 상태");
+  });
+
   it("projects the captured snapshot while preserving extension fields and owned-field precedence", () => {
     const input = saveInput();
     const extensionBase = input.document.extensionBase;
@@ -217,6 +256,35 @@ describe("buildStudioSavePayload", () => {
     expect((payload.doc as { pagesList?: Array<{ shared3dStage?: unknown }> })
       .pagesList?.[0]?.shared3dStage).toEqual(shared3dStage);
     expect(hydrated.pagesList[0]?.shared3dStage).toEqual(shared3dStage);
+  });
+
+  it("round-trips the linked Scene Shot receipt and rejects a dangling save candidate", () => {
+    const linkedPage = createStudioLinked3dRenderPageFixture();
+    const base = saveInput();
+    const payload = buildStudioSavePayload({
+      ...base,
+      document: { ...base.document, pagesList: [linkedPage] },
+    });
+    const savedPage = (payload.doc as { pagesList?: typeof base.document.pagesList }).pagesList?.[0];
+    const hydrated = creatorWorkSnapshotToStudioProject(payload);
+
+    expect(savedPage?.linked3dRender).toEqual(linkedPage.linked3dRender);
+    expect(savedPage?.shared3dStage).toEqual(linkedPage.shared3dStage);
+    expect(hydrated.pagesList[0]?.linked3dRender).toEqual(linkedPage.linked3dRender);
+    expect(() => buildStudioSavePayload({
+      ...base,
+      document: {
+        ...base.document,
+        pagesList: [{ ...linkedPage, shared3dStage: undefined }],
+      },
+    })).toThrow("연결형 3D 렌더 권위");
+    expect(() => buildStudioSavePayload({
+      ...base,
+      document: {
+        ...base.document,
+        pagesList: [{ ...linkedPage, linked3dRender: undefined }],
+      },
+    })).toThrow("reserved 상태");
   });
 });
 

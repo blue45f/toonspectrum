@@ -443,9 +443,9 @@ describe("workspace expansion CAD/sculpt/cloth/collab/UV/mirror", () => {
         : vertex),
     };
     const microSession = hybridDccCommitGeometry(second.session, "cloth-cube", microEdited);
-    // Legacy renderer hash rounds positions to five decimals; the exact SHA-256 cache identity
-    // must still notice this edit and restart instead of overwriting it with stale solver state.
-    expect(microSession.state.geometry.records["cloth-cube"]!.meshHash).toBe(secondHash);
+    // Exact streaming geometry authority and the cloth cache identity must both notice a
+    // sub-micrometre edit, so stale solver state can never overwrite it.
+    expect(microSession.state.geometry.records["cloth-cube"]!.meshHash).not.toBe(secondHash);
     const restarted = workspaceClothStep({ ...second, session: microSession });
     expect(clothCache(restarted, "cloth-cube")?.stepIndex).toBe(1);
   });

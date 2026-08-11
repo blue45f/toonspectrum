@@ -233,7 +233,18 @@ export async function persistStudioVrmTexturePaintRuntime(
   }
   const deps = dependencies(options.dependencies);
   const textures: StudioVrmSurfacePaintTexture[] = [];
+  const artifacts = new Map<StudioVrmTexturePaintArtifactHash, StudioVrmTexturePaintArtifact>();
   const seenBindings = new Map<string, StudioVrmSurfacePaintTexture>();
+  const exportedBindingCount = exported.value.reduce(
+    (count, target) => count + target.bindings.length,
+    0,
+  );
+  if (
+    !Number.isSafeInteger(exportedBindingCount)
+    || exportedBindingCount > STUDIO_VRM_SURFACE_PAINT_MAX_TEXTURES
+  ) {
+    throw new StudioVrmTexturePaintPersistenceError("budget-exceeded");
+  }
   for (const target of exported.value) {
     throwIfAborted(options.signal);
     const firstBinding = target.bindings[0];
@@ -252,7 +263,7 @@ export async function persistStudioVrmTexturePaintRuntime(
       expectedWidth: target.width,
       expectedHeight: target.height,
     }, { signal: options.signal });
-    await deps.saveArtifact(artifact, { signal: options.signal });
+    artifacts.set(artifact.metadata.contentHash, artifact);
     for (const binding of target.bindings) {
       const texture = textureFromArtifact(binding, artifact);
       const identity = bindingIdentity(binding);
@@ -272,6 +283,10 @@ export async function persistStudioVrmTexturePaintRuntime(
   }
   textures.sort(compareTextures);
   ensureSceneBudgets(textures);
+  for (const artifact of artifacts.values()) {
+    throwIfAborted(options.signal);
+    await deps.saveArtifact(artifact, { signal: options.signal });
+  }
   return Object.freeze({
     version: 1,
     textures: Object.freeze(textures),

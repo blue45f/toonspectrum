@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { createStudioLinked3dRenderPageFixture } from
+  "./studio-linked-3d-render-test-fixture";
 import { parseStudioProjectFile, type StudioProjectFile } from "./studio-project-file";
 import {
   diffStudioProjectRevisions,
@@ -60,6 +62,27 @@ function changesOfKind(
 }
 
 describe("studio revision semantic diff", () => {
+  it("reports linked Scene Shot receipt changes as page properties", () => {
+    const linkedPage = createStudioLinked3dRenderPageFixture();
+    const withoutReceipt = {
+      ...linkedPage,
+      elements: linkedPage.elements.map((element) => element.type === "image"
+        ? { ...element, src: "data:image/png;base64,AA==" }
+        : element),
+      linked3dRender: undefined,
+    };
+    const before = project([withoutReceipt as unknown as Record<string, unknown>]);
+    const after = project([linkedPage as unknown as Record<string, unknown>]);
+    const result = diffStudioProjectRevisions(before, after);
+
+    expect(changesOfKind(result.changes, "page-properties-changed")).toEqual([
+      expect.objectContaining({
+        pageId: linkedPage.id,
+        fields: ["linked3dRender"],
+      }),
+    ]);
+  });
+
   it("ignores transient state, object key order, and explicit semantic defaults without serializing", () => {
     const before = project([
       page("page-1", [{

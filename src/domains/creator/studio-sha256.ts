@@ -107,10 +107,13 @@ function compressSha256Block(
   state[7] = (state[7] + h) >>> 0;
 }
 
-function writeUint64BitLength(target: Uint8Array, byteLength: number): void {
-  const bitLength = byteLength * 8;
-  const high = Math.floor(bitLength / 0x1_0000_0000);
-  const low = bitLength >>> 0;
+function writeUint64BitLength(
+  target: Uint8Array,
+  byteLengthHigh: number,
+  byteLengthLow: number
+): void {
+  const high = ((byteLengthHigh << 3) | (byteLengthLow >>> 29)) >>> 0;
+  const low = (byteLengthLow << 3) >>> 0;
   const offset = target.length - 8;
   target[offset] = high >>> 24;
   target[offset + 1] = high >>> 16;
@@ -122,6 +125,103 @@ function writeUint64BitLength(target: Uint8Array, byteLength: number): void {
   target[offset + 7] = low;
 }
 
+export interface StudioPortableSha256 {
+  /** Consumes the chunk synchronously without retaining the caller's buffer. */
+  update(bytes: Uint8Array): StudioPortableSha256;
+  /** Finalizes the digest exactly once and returns lowercase hexadecimal. */
+  finalizeHex(): string;
+}
+
+class PortableSha256 implements StudioPortableSha256 {
+  private readonly state = [...SHA256_INITIAL_STATE];
+  private readonly words = new Uint32Array(64);
+  private readonly pending = new Uint8Array(64);
+  private pendingLength = 0;
+  private byteLengthHigh = 0;
+  private byteLengthLow = 0;
+  private finalized = false;
+
+  update(bytes: Uint8Array): StudioPortableSha256 {
+    this.assertOpen();
+    this.addByteLength(bytes.byteLength);
+
+    let offset = 0;
+    if (this.pendingLength > 0) {
+      const copied = Math.min(64 - this.pendingLength, bytes.byteLength);
+      this.pending.set(bytes.subarray(0, copied), this.pendingLength);
+      this.pendingLength += copied;
+      offset = copied;
+      if (this.pendingLength === 64) {
+        compressSha256Block(this.state, this.pending, 0, this.words);
+        this.pendingLength = 0;
+      }
+    }
+
+    while (offset + 64 <= bytes.byteLength) {
+      compressSha256Block(this.state, bytes, offset, this.words);
+      offset += 64;
+    }
+
+    if (offset < bytes.byteLength) {
+      this.pendingLength = bytes.byteLength - offset;
+      this.pending.set(bytes.subarray(offset), 0);
+    }
+    return this;
+  }
+
+  finalizeHex(): string {
+    this.assertOpen();
+    this.finalized = true;
+
+    const finalBlock = new Uint8Array(64);
+    finalBlock.set(this.pending.subarray(0, this.pendingLength));
+    finalBlock[this.pendingLength] = 0x80;
+
+    if (this.pendingLength >= 56) {
+      compressSha256Block(this.state, finalBlock, 0, this.words);
+      finalBlock.fill(0);
+    }
+    writeUint64BitLength(
+      finalBlock,
+      this.byteLengthHigh,
+      this.byteLengthLow
+    );
+    compressSha256Block(this.state, finalBlock, 0, this.words);
+
+    return this.state
+      .map((word) => word.toString(16).padStart(8, "0"))
+      .join("");
+  }
+
+  private addByteLength(byteLength: number): void {
+    const lowIncrement = byteLength >>> 0;
+    const nextLow = (this.byteLengthLow + lowIncrement) >>> 0;
+    const carry = nextLow < this.byteLengthLow ? 1 : 0;
+    this.byteLengthLow = nextLow;
+    this.byteLengthHigh = (
+      this.byteLengthHigh
+      + Math.floor(byteLength / 0x1_0000_0000)
+      + carry
+    ) >>> 0;
+  }
+
+  private assertOpen(): void {
+    if (this.finalized) {
+      throw new Error("Portable SHA-256 hasher is already finalized");
+    }
+  }
+}
+
+/**
+ * Creates a dependency-free incremental SHA-256 hasher.
+ *
+ * Working memory remains constant: complete blocks are compressed directly from each input
+ * chunk and only an incomplete 64-byte block is copied into the hasher.
+ */
+export function createSha256Portable(): StudioPortableSha256 {
+  return new PortableSha256();
+}
+
 /**
  * Returns a deterministic lowercase hexadecimal SHA-256 digest.
  *
@@ -129,24 +229,5 @@ function writeUint64BitLength(target: Uint8Array, byteLength: number): void {
  * rejects SHA-256. Native Web Crypto remains the preferred path for normal browsers.
  */
 export function sha256HexPortable(bytes: Uint8Array): string {
-  const state = [...SHA256_INITIAL_STATE];
-  const words = new Uint32Array(64);
-  let offset = 0;
-  while (offset + 64 <= bytes.byteLength) {
-    compressSha256Block(state, bytes, offset, words);
-    offset += 64;
-  }
-
-  const remaining = bytes.byteLength - offset;
-  const tail = new Uint8Array(remaining < 56 ? 64 : 128);
-  tail.set(bytes.subarray(offset));
-  tail[remaining] = 0x80;
-  writeUint64BitLength(tail, bytes.byteLength);
-  for (let tailOffset = 0; tailOffset < tail.byteLength; tailOffset += 64) {
-    compressSha256Block(state, tail, tailOffset, words);
-  }
-
-  return state
-    .map((word) => word.toString(16).padStart(8, "0"))
-    .join("");
+  return createSha256Portable().update(bytes).finalizeHex();
 }

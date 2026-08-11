@@ -15,11 +15,11 @@ import {
   STUDIO_VRM_SCENE_DOCUMENT_V4_MAX_BYTES,
   STUDIO_VRM_SCENE_DOCUMENT_V5_MAX_BYTES,
   STUDIO_VRM_SCENE_DOCUMENT_VERSION,
-  STUDIO_VRM_SURFACE_PAINT_MAX_DECODED_PIXELS,
   STUDIO_VRM_SURFACE_PAINT_MAX_DIMENSION,
   STUDIO_VRM_SURFACE_PAINT_MAX_TEXTURES,
   STUDIO_VRM_SURFACE_PAINT_TEXTURE_MAX_BYTES,
   STUDIO_VRM_SURFACE_PAINT_TOTAL_MAX_BYTES,
+  StudioVrmSceneDocumentBudgetError,
   areStudioVrmSceneDocumentsEqual,
   createDefaultStudioVrmSceneDocument,
   migrateStudioVrmLegacyMetadata,
@@ -34,6 +34,20 @@ import {
 
 function mutableDefault(): Record<string, unknown> {
   return JSON.parse(JSON.stringify(createDefaultStudioVrmSceneDocument())) as Record<string, unknown>;
+}
+
+function expectVrmSceneBudgetError(
+  operation: () => unknown,
+  code: StudioVrmSceneDocumentBudgetError["code"],
+): void {
+  try {
+    operation();
+  } catch (cause) {
+    expect(cause).toBeInstanceOf(StudioVrmSceneDocumentBudgetError);
+    expect((cause as StudioVrmSceneDocumentBudgetError).code).toBe(code);
+    return;
+  }
+  throw new Error(`Expected Studio VRM scene budget error: ${code}.`);
 }
 
 function canonicalScene(overrides: Partial<StudioVrmSceneDocument>): StudioVrmSceneDocument {
@@ -776,8 +790,20 @@ describe("studio-vrm-scene-document", () => {
         ),
       },
     };
-    expect(normalizeStudioVrmSceneDocument(excessiveCount).surfacePaint.textures)
-      .toHaveLength(STUDIO_VRM_SURFACE_PAINT_MAX_TEXTURES);
+    const sixtyFive = {
+      ...mutableDefault(),
+      surfacePaint: {
+        version: 1,
+        textures: Array.from({ length: 65 }, (_, index) => texture(index + 1)),
+      },
+    };
+    const normalizedSixtyFive = normalizeStudioVrmSceneDocument(sixtyFive);
+    expect(normalizedSixtyFive.surfacePaint.textures).toHaveLength(65);
+    expect(serializeStudioVrmSceneDocument(normalizedSixtyFive)).not.toBeNull();
+    expectVrmSceneBudgetError(
+      () => normalizeStudioVrmSceneDocument(excessiveCount),
+      "surface-paint-count-budget-exceeded",
+    );
     expect(serializeStudioVrmSceneDocument(excessiveCount)).toBeNull();
 
     const excessiveBytes = {
@@ -792,10 +818,10 @@ describe("studio-vrm-scene-document", () => {
         ],
       },
     };
-    const byteBounded = normalizeStudioVrmSceneDocument(excessiveBytes).surfacePaint.textures;
-    expect(byteBounded).toHaveLength(1);
-    expect(byteBounded.reduce((sum, item) => sum + item.byteSize, 0))
-      .toBeLessThanOrEqual(STUDIO_VRM_SURFACE_PAINT_TOTAL_MAX_BYTES);
+    expectVrmSceneBudgetError(
+      () => normalizeStudioVrmSceneDocument(excessiveBytes),
+      "surface-paint-byte-budget-exceeded",
+    );
     expect(serializeStudioVrmSceneDocument(excessiveBytes)).toBeNull();
 
     const excessivePixels = {
@@ -808,10 +834,10 @@ describe("studio-vrm-scene-document", () => {
         })),
       },
     };
-    const pixelBounded = normalizeStudioVrmSceneDocument(excessivePixels).surfacePaint.textures;
-    expect(pixelBounded).toHaveLength(2);
-    expect(pixelBounded.reduce((sum, item) => sum + item.width * item.height, 0))
-      .toBe(STUDIO_VRM_SURFACE_PAINT_MAX_DECODED_PIXELS);
+    expectVrmSceneBudgetError(
+      () => normalizeStudioVrmSceneDocument(excessivePixels),
+      "surface-paint-decoded-pixel-budget-exceeded",
+    );
     expect(serializeStudioVrmSceneDocument(excessivePixels)).toBeNull();
 
     const invalidPerTexture = [

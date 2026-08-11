@@ -1,7 +1,10 @@
 import { z } from "zod";
 
 import {
+  STUDIO_DRAFT_COLLABORATION_FINAL_STATUSES,
+  STUDIO_DRAFT_COLLABORATION_PROVISION_INTENTS,
   STUDIO_DRAFT_COLLABORATION_POLICY,
+  type StudioDraftCollaborationProvisionIntent,
   type StudioDraftCollaborationPromotionRequest,
   type StudioDraftCollaborationProvisionRequest,
   type StudioDraftCollaborationTemporaryRoom,
@@ -34,8 +37,11 @@ const ExactScopeSchema = z
   .max(160)
   .refine((value) => value.trim() === value);
 const GraphRevisionSchema = z.number().int().min(0).max(MAX_GRAPH_REVISION);
+const WorkRevisionSchema = z.number().int().min(1).max(MAX_GRAPH_REVISION);
 const IsoDateTimeSchema = z.iso.datetime({ offset: true });
-const ProvisionIntentSchema = z.enum(["share-link", "invite-member"]);
+const ProvisionIntentSchema = z.enum(
+  STUDIO_DRAFT_COLLABORATION_PROVISION_INTENTS
+);
 
 const ProvisionRequestSchema = z
   .object({
@@ -63,6 +69,8 @@ const PromotionRequestSchema = z
     expectedGraphRevision: GraphRevisionSchema.refine(
       (revision) => revision < MAX_GRAPH_REVISION
     ),
+    expectedWorkRevision: WorkRevisionSchema,
+    finalStatus: z.enum(STUDIO_DRAFT_COLLABORATION_FINAL_STATUSES),
     clientMutationId: MutationIdSchema,
     requestedAt: IsoDateTimeSchema,
   })
@@ -133,7 +141,7 @@ export interface CreatorDraftCollaborationRoomResponse
   extends StudioDraftCollaborationTemporaryRoom {
   readonly status: CreatorDraftCollaborationRoomStatus;
   readonly initialSnapshotByteLength: number;
-  readonly provisionIntent: "share-link" | "invite-member";
+  readonly provisionIntent: StudioDraftCollaborationProvisionIntent;
   readonly promotedAt: string | null;
 }
 
@@ -218,6 +226,7 @@ export class CreatorDraftCollaborationHttpError extends Error {
   readonly serverCode: string | null;
   readonly retryAfterMs: number | null;
   readonly currentGraphRevision: number | null;
+  readonly currentWorkRevision: number | null;
 
   constructor(input: {
     readonly kind: CreatorDraftCollaborationHttpErrorKind;
@@ -226,6 +235,7 @@ export class CreatorDraftCollaborationHttpError extends Error {
     readonly serverCode?: string | null;
     readonly retryAfterMs?: number | null;
     readonly currentGraphRevision?: number | null;
+    readonly currentWorkRevision?: number | null;
   }) {
     super(input.message);
     this.name = "CreatorDraftCollaborationHttpError";
@@ -234,6 +244,7 @@ export class CreatorDraftCollaborationHttpError extends Error {
     this.serverCode = input.serverCode ?? null;
     this.retryAfterMs = input.retryAfterMs ?? null;
     this.currentGraphRevision = input.currentGraphRevision ?? null;
+    this.currentWorkRevision = input.currentWorkRevision ?? null;
   }
 }
 
@@ -242,6 +253,7 @@ interface ErrorPayload {
   readonly message: string | null;
   readonly retryAfterSeconds: number | null;
   readonly currentGraphRevision: number | null;
+  readonly currentWorkRevision: number | null;
 }
 
 interface CombinedAbort {
@@ -272,6 +284,7 @@ function parseErrorPayload(value: unknown): ErrorPayload {
       message: null,
       retryAfterSeconds: null,
       currentGraphRevision: null,
+      currentWorkRevision: null,
     };
   }
   const retryAfterSeconds =
@@ -286,11 +299,18 @@ function parseErrorPayload(value: unknown): ErrorPayload {
     && (value.currentGraphRevision as number) <= MAX_GRAPH_REVISION
       ? (value.currentGraphRevision as number)
       : null;
+  const currentWorkRevision =
+    Number.isSafeInteger(value.currentWorkRevision)
+    && (value.currentWorkRevision as number) >= 1
+    && (value.currentWorkRevision as number) <= MAX_GRAPH_REVISION
+      ? (value.currentWorkRevision as number)
+      : null;
   return {
     code: safeServerString(value.code, 120),
     message: safeServerString(value.message, 500),
     retryAfterSeconds,
     currentGraphRevision,
+    currentWorkRevision,
   };
 }
 
@@ -439,6 +459,8 @@ function createHttpError(
       response.status === 429 ? (headerRetryAfter ?? bodyRetryAfter) : null,
     currentGraphRevision:
       response.status === 409 ? payload.currentGraphRevision : null,
+    currentWorkRevision:
+      response.status === 409 ? payload.currentWorkRevision : null,
   });
 }
 
@@ -627,6 +649,8 @@ export function createCreatorDraftCollaborationClient(
         ownerScopeKey: parsed.ownerScopeKey,
         targetWorkId: parsed.targetWorkId,
         expectedGraphRevision: parsed.expectedGraphRevision,
+        expectedWorkRevision: parsed.expectedWorkRevision,
+        finalStatus: parsed.finalStatus,
         clientMutationId: parsed.clientMutationId,
       };
       assertMutationFingerprint(

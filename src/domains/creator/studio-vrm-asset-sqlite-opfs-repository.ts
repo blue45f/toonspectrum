@@ -1,10 +1,10 @@
 /**
  * V12 durable authority for user VRM binaries, thumbnails, and texture-paint PNG artifacts.
  *
- * Large immutable bytes are content-addressed in a dedicated OPFS root. SQLite stores only two
- * strict canonical manifests. A save is ordered as blob -> OPFS commit marker -> owner refs ->
- * SQLite manifest, so the manifest is always the last durable authority transition. Anything
- * left before that transition is an orphan and can be removed by the bounded collector.
+ * Large immutable bytes are content-addressed in a dedicated OPFS root. SQLite stores two strict
+ * canonical roots plus immutable, byte-bounded metadata pages. A save is ordered as blob -> OPFS
+ * commit marker -> metadata pages -> owner refs -> SQLite root, so the root is always the last
+ * durable authority transition. Anything left before that transition is recoverable staging data.
  */
 
 import { acquireStudioLocalDatabase } from "./studio-local-database-runtime";
@@ -36,6 +36,7 @@ export const STUDIO_VRM_ASSET_SQLITE_MANIFEST_KEY = "manifest-v1";
 export const STUDIO_VRM_ASSET_CAS_OWNER = "studio-vrm-assets-v12";
 
 export const STUDIO_VRM_MODEL_ASSET_LIMITS = Object.freeze({
+  /** Historical total limit; v2 reuses it only as a bounded metadata page size. */
   maxModels: 512,
   maxModelBytes: 128 * 1024 * 1024,
   maxAggregateModelBytes: 16 * 1024 * 1024 * 1024,
@@ -45,6 +46,7 @@ export const STUDIO_VRM_MODEL_ASSET_LIMITS = Object.freeze({
 });
 
 export const STUDIO_VRM_TEXTURE_ASSET_LIMITS = Object.freeze({
+  /** Historical total limit; v2 reuses it only as a bounded metadata page size. */
   maxArtifacts: 128,
   maxArtifactBytes: 96_000_000,
   maxAggregateBytes: 96_000_000,
@@ -53,8 +55,12 @@ export const STUDIO_VRM_TEXTURE_ASSET_LIMITS = Object.freeze({
 
 const MODEL_MANIFEST_KIND = "toonspectrum.studio-vrm-model-asset-manifest" as const;
 const TEXTURE_MANIFEST_KIND = "toonspectrum.studio-vrm-texture-asset-manifest" as const;
+const MODEL_PAGE_KIND = "toonspectrum.studio-vrm-model-asset-page" as const;
+const TEXTURE_PAGE_KIND = "toonspectrum.studio-vrm-texture-asset-page" as const;
 const COMMIT_KIND = "toonspectrum.studio-vrm-asset-cas-commit" as const;
 const MANIFEST_VERSION = 1 as const;
+const PAGED_MANIFEST_VERSION = 2 as const;
+const PAGED_MANIFEST_MAX_PAGES = 16_384;
 const COMMIT_VERSION = 1 as const;
 const VRM_MIME = "model/gltf-binary" as const;
 const HASH_PATTERN = /^sha256:[0-9a-f]{64}$/u;
@@ -113,6 +119,63 @@ interface TextureManifestV1 {
   readonly artifacts: readonly TextureManifestEntry[];
 }
 
+interface ManifestPageDescriptor {
+  readonly key: string;
+  readonly checksum: string;
+  readonly byteLength: number;
+  readonly assetBytes: number;
+  readonly count: number;
+  readonly firstKey: string;
+  readonly lastKey: string;
+}
+
+interface ModelManifestV2 {
+  readonly kind: typeof MODEL_MANIFEST_KIND;
+  readonly version: typeof PAGED_MANIFEST_VERSION;
+  readonly generation: number;
+  readonly totalModels: number;
+  readonly totalModelBytes: number;
+  readonly pages: readonly ManifestPageDescriptor[];
+  readonly sampleThumbnails: readonly SampleThumbnailEntry[];
+}
+
+interface TextureManifestV2 {
+  readonly kind: typeof TEXTURE_MANIFEST_KIND;
+  readonly version: typeof PAGED_MANIFEST_VERSION;
+  readonly generation: number;
+  readonly totalArtifacts: number;
+  readonly totalArtifactBytes: number;
+  readonly pages: readonly ManifestPageDescriptor[];
+}
+
+interface ModelManifestPageV2 {
+  readonly kind: typeof MODEL_PAGE_KIND;
+  readonly version: typeof PAGED_MANIFEST_VERSION;
+  readonly generation: number;
+  readonly index: number;
+  readonly models: readonly ModelManifestEntry[];
+}
+
+interface TextureManifestPageV2 {
+  readonly kind: typeof TEXTURE_PAGE_KIND;
+  readonly version: typeof PAGED_MANIFEST_VERSION;
+  readonly generation: number;
+  readonly index: number;
+  readonly artifacts: readonly TextureManifestEntry[];
+}
+
+interface LoadedModelManifest {
+  readonly raw: string | null;
+  readonly manifest: ModelManifestV1;
+  readonly pageKeys: readonly string[];
+}
+
+interface LoadedTextureManifest {
+  readonly raw: string | null;
+  readonly manifest: TextureManifestV1;
+  readonly pageKeys: readonly string[];
+}
+
 interface CasCommitV1 {
   readonly kind: typeof COMMIT_KIND;
   readonly version: typeof COMMIT_VERSION;
@@ -137,6 +200,28 @@ export interface StudioVrmModelAssetMetadata {
 export interface StudioVrmModelAsset extends StudioVrmModelAssetMetadata {
   readonly bytes: Uint8Array;
   readonly thumbnail: StudioVrmThumbnailAsset | null;
+}
+
+export type StudioVrmAssetPageCursor = string & {
+  readonly __studioVrmAssetPageCursor: unique symbol;
+};
+
+export interface StudioVrmModelMetadataPage {
+  readonly items: readonly StudioVrmModelAssetMetadata[];
+  readonly cursor: StudioVrmAssetPageCursor;
+  readonly nextCursor: StudioVrmAssetPageCursor | null;
+  readonly totalCount: number;
+  readonly totalBytes: number;
+  readonly generation: number;
+}
+
+export interface StudioVrmTextureMetadataPage {
+  readonly items: readonly StudioVrmTexturePaintArtifactMetadata[];
+  readonly cursor: StudioVrmAssetPageCursor;
+  readonly nextCursor: StudioVrmAssetPageCursor | null;
+  readonly totalCount: number;
+  readonly totalBytes: number;
+  readonly generation: number;
 }
 
 export interface StudioVrmThumbnailAsset {
@@ -212,6 +297,10 @@ export class StudioVrmAssetRepositoryError extends Error {
 
 export interface StudioVrmAssetSqliteOpfsRepository {
   readonly authority: "sqlite-opfs";
+  queryModelMetadataPage(options?: {
+    readonly cursor?: string | null;
+    readonly signal?: AbortSignal;
+  }): Promise<StudioVrmModelMetadataPage | null>;
   listModelMetadata(signal?: AbortSignal): Promise<StudioVrmModelAssetMetadata[]>;
   getModel(id: string, signal?: AbortSignal): Promise<StudioVrmModelAsset | null>;
   getModelByHash(hash: string, signal?: AbortSignal): Promise<StudioVrmModelAsset | null>;
@@ -231,6 +320,10 @@ export interface StudioVrmAssetSqliteOpfsRepository {
     input: SaveStudioVrmTextureAssetInput,
     signal?: AbortSignal,
   ): Promise<SaveStudioVrmTextureAssetResult>;
+  queryTextureMetadataPage(options?: {
+    readonly cursor?: string | null;
+    readonly signal?: AbortSignal;
+  }): Promise<StudioVrmTextureMetadataPage | null>;
   getTexture(hash: string, signal?: AbortSignal): Promise<StudioVrmTextureAsset | null>;
   cleanupOrphans(options?: {
     readonly maxRemovals?: number;
@@ -295,6 +388,11 @@ function storageFailure(cause: unknown, operation: string): never {
     }
   }
   fail("unavailable", `VRM SQLite/OPFS ${operation} failed.`, cause);
+}
+
+/** Canonical manifests use deterministic UTF-16 code-unit order, matching JSON key routing. */
+function compareManifestKeys(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
 }
 
 function exactRecord(value: unknown, keys: readonly string[]): Record<string, unknown> | null {
@@ -506,9 +604,9 @@ function canonicalModelManifest(value: ModelManifestV1): ModelManifestV1 {
     kind: MODEL_MANIFEST_KIND,
     version: MANIFEST_VERSION,
     generation: value.generation,
-    models: [...value.models].sort((left, right) => left.id.localeCompare(right.id)),
+    models: [...value.models].sort((left, right) => compareManifestKeys(left.id, right.id)),
     sampleThumbnails: [...value.sampleThumbnails]
-      .sort((left, right) => left.id.localeCompare(right.id)),
+      .sort((left, right) => compareManifestKeys(left.id, right.id)),
   };
 }
 
@@ -518,12 +616,33 @@ function canonicalTextureManifest(value: TextureManifestV1): TextureManifestV1 {
     version: MANIFEST_VERSION,
     generation: value.generation,
     artifacts: [...value.artifacts]
-      .sort((left, right) => left.contentHash.localeCompare(right.contentHash)),
+      .sort((left, right) => compareManifestKeys(left.contentHash, right.contentHash)),
   };
 }
 
 function encodedBytes(value: string): number {
   return UTF8.encode(value).byteLength;
+}
+
+function checkedAggregate(
+  values: readonly number[],
+  maximum: number,
+  code: StudioVrmAssetRepositoryErrorCode,
+  message: string,
+): number {
+  let total = 0;
+  for (const value of values) {
+    if (!safeInteger(value, 0) || value > maximum - total) fail(code, message);
+    total += value;
+  }
+  return total;
+}
+
+function nextManifestGeneration(current: number): number {
+  if (!safeInteger(current, 0) || current >= Number.MAX_SAFE_INTEGER) {
+    fail("limit", "VRM asset manifest generation is exhausted.");
+  }
+  return current + 1;
 }
 
 function parseModelManifest(raw: string | null): ModelManifestV1 {
@@ -574,6 +693,12 @@ function parseModelManifest(raw: string | null): ModelManifestV1 {
     models: models as ModelManifestEntry[],
     sampleThumbnails: thumbnails as SampleThumbnailEntry[],
   });
+  checkedAggregate(
+    manifest.models.map((entry) => entry.byteSize),
+    STUDIO_VRM_MODEL_ASSET_LIMITS.maxAggregateModelBytes,
+    "corrupt",
+    "VRM model SQLite manifest exceeds its aggregate model byte limit.",
+  );
   if (JSON.stringify(manifest) !== raw) {
     fail("corrupt", "VRM model SQLite manifest is not canonical JSON.");
   }
@@ -614,10 +739,469 @@ function parseTextureManifest(raw: string | null): TextureManifestV1 {
     generation: record.generation,
     artifacts: artifacts as TextureManifestEntry[],
   });
+  checkedAggregate(
+    manifest.artifacts.map((entry) => entry.receipt.byteLength),
+    STUDIO_VRM_TEXTURE_ASSET_LIMITS.maxAggregateBytes,
+    "corrupt",
+    "VRM texture SQLite manifest exceeds its aggregate artifact byte limit.",
+  );
   if (JSON.stringify(manifest) !== raw) {
     fail("corrupt", "VRM texture SQLite manifest is not canonical JSON.");
   }
   return manifest;
+}
+
+function manifestChecksum(value: string): string {
+  let checksum = 0x811c9dc5;
+  for (let index = 0; index < value.length; index += 1) {
+    checksum ^= value.charCodeAt(index);
+    checksum = Math.imul(checksum, 0x01000193);
+  }
+  return (checksum >>> 0).toString(16).padStart(8, "0");
+}
+
+function pageDescriptor(
+  value: unknown,
+  prefix: "model" | "texture",
+): ManifestPageDescriptor | null {
+  const record = exactRecord(value, [
+    "assetBytes",
+    "byteLength",
+    "checksum",
+    "count",
+    "firstKey",
+    "key",
+    "lastKey",
+  ]);
+  if (
+    !record
+    || typeof record.key !== "string"
+    || !new RegExp(`^manifest-v2-${prefix}-page-[0-9]+-[0-9]+-[a-f0-9]{8}$`, "u")
+      .test(record.key)
+    || typeof record.checksum !== "string"
+    || !/^[a-f0-9]{8}$/u.test(record.checksum)
+    || !safeInteger(record.byteLength, 1)
+    || !safeInteger(record.assetBytes, 0)
+    || !safeInteger(record.count, 1)
+    || typeof record.firstKey !== "string"
+    || typeof record.lastKey !== "string"
+    || record.firstKey.length < 1
+    || record.lastKey.length < 1
+    || compareManifestKeys(record.firstKey, record.lastKey) > 0
+  ) return null;
+  return {
+    key: record.key,
+    checksum: record.checksum,
+    byteLength: record.byteLength,
+    assetBytes: record.assetBytes,
+    count: record.count,
+    firstKey: record.firstKey,
+    lastKey: record.lastKey,
+  };
+}
+
+function parseModelManifestV2Root(raw: string): ModelManifestV2 {
+  if (encodedBytes(raw) > STUDIO_VRM_MODEL_ASSET_LIMITS.maxManifestBytes) {
+    fail("limit", "VRM model paged manifest root exceeds its byte limit.");
+  }
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(raw) as unknown;
+  } catch (cause) {
+    fail("corrupt", "VRM model paged manifest JSON is corrupt.", cause);
+  }
+  const record = exactRecord(decoded, [
+    "generation",
+    "kind",
+    "pages",
+    "sampleThumbnails",
+    "totalModelBytes",
+    "totalModels",
+    "version",
+  ]);
+  if (
+    !record
+    || record.kind !== MODEL_MANIFEST_KIND
+    || record.version !== PAGED_MANIFEST_VERSION
+    || !safeInteger(record.generation, 1)
+    || !safeInteger(record.totalModels, 0)
+    || !safeInteger(record.totalModelBytes, 0)
+    || record.totalModelBytes > STUDIO_VRM_MODEL_ASSET_LIMITS.maxAggregateModelBytes
+    || !Array.isArray(record.pages)
+    || record.pages.length > PAGED_MANIFEST_MAX_PAGES
+    || !Array.isArray(record.sampleThumbnails)
+    || record.sampleThumbnails.length > STUDIO_VRM_MODEL_ASSET_LIMITS.maxSampleThumbnails
+  ) fail("corrupt", "VRM model paged manifest envelope is invalid.");
+  const pages = record.pages.map((value) => pageDescriptor(value, "model"));
+  const sampleThumbnails = record.sampleThumbnails.map(sampleThumbnailEntry);
+  if (pages.some((page) => page === null) || sampleThumbnails.some((entry) => entry === null)) {
+    fail("corrupt", "VRM model paged manifest contains an invalid descriptor.");
+  }
+  const typedPages = pages as ManifestPageDescriptor[];
+  const typedThumbnails = sampleThumbnails as SampleThumbnailEntry[];
+  const rootBytes = encodedBytes(raw);
+  const totalPageBytes = checkedAggregate(
+    typedPages.map((page) => page.byteLength),
+    STUDIO_VRM_MODEL_ASSET_LIMITS.maxManifestBytes - rootBytes,
+    "corrupt",
+    "VRM model paged manifest exceeds its aggregate metadata byte limit.",
+  );
+  const totalModels = checkedAggregate(
+    typedPages.map((page) => page.count),
+    PAGED_MANIFEST_MAX_PAGES * STUDIO_VRM_MODEL_ASSET_LIMITS.maxModels,
+    "corrupt",
+    "VRM model paged manifest count overflows its bounded page authority.",
+  );
+  const totalModelBytes = checkedAggregate(
+    typedPages.map((page) => page.assetBytes),
+    STUDIO_VRM_MODEL_ASSET_LIMITS.maxAggregateModelBytes,
+    "corrupt",
+    "VRM model paged manifest exceeds its aggregate model byte limit.",
+  );
+  if (
+    new Set(typedPages.map((page) => page.key)).size !== typedPages.length
+    || typedPages.some((page) => page.count > STUDIO_VRM_MODEL_ASSET_LIMITS.maxModels)
+    || typedPages.some((page, index) =>
+      page.key !== `manifest-v2-model-page-${record.generation}-${index}-${page.checksum}`)
+    || typedPages.some((page, index) =>
+      index > 0 && compareManifestKeys(typedPages[index - 1]!.lastKey, page.firstKey) >= 0)
+    || rootBytes + totalPageBytes > STUDIO_VRM_MODEL_ASSET_LIMITS.maxManifestBytes
+    || totalModels !== record.totalModels
+    || totalModelBytes !== record.totalModelBytes
+    || new Set(typedThumbnails.map((entry) => entry.id)).size !== typedThumbnails.length
+  ) fail("corrupt", "VRM model paged manifest totals or identities are invalid.");
+  const manifest: ModelManifestV2 = {
+    kind: MODEL_MANIFEST_KIND,
+    version: PAGED_MANIFEST_VERSION,
+    generation: record.generation,
+    totalModels: record.totalModels,
+    totalModelBytes: record.totalModelBytes,
+    pages: typedPages,
+    sampleThumbnails: [...typedThumbnails]
+      .sort((left, right) => compareManifestKeys(left.id, right.id)),
+  };
+  if (JSON.stringify(manifest) !== raw) {
+    fail("corrupt", "VRM model paged manifest is not canonical JSON.");
+  }
+  return manifest;
+}
+
+function parseTextureManifestV2Root(raw: string): TextureManifestV2 {
+  if (encodedBytes(raw) > STUDIO_VRM_TEXTURE_ASSET_LIMITS.maxManifestBytes) {
+    fail("limit", "VRM texture paged manifest root exceeds its byte limit.");
+  }
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(raw) as unknown;
+  } catch (cause) {
+    fail("corrupt", "VRM texture paged manifest JSON is corrupt.", cause);
+  }
+  const record = exactRecord(decoded, [
+    "generation",
+    "kind",
+    "pages",
+    "totalArtifactBytes",
+    "totalArtifacts",
+    "version",
+  ]);
+  if (
+    !record
+    || record.kind !== TEXTURE_MANIFEST_KIND
+    || record.version !== PAGED_MANIFEST_VERSION
+    || !safeInteger(record.generation, 1)
+    || !safeInteger(record.totalArtifacts, 0)
+    || !safeInteger(record.totalArtifactBytes, 0)
+    || record.totalArtifactBytes > STUDIO_VRM_TEXTURE_ASSET_LIMITS.maxAggregateBytes
+    || !Array.isArray(record.pages)
+    || record.pages.length > PAGED_MANIFEST_MAX_PAGES
+  ) fail("corrupt", "VRM texture paged manifest envelope is invalid.");
+  const pages = record.pages.map((value) => pageDescriptor(value, "texture"));
+  if (pages.some((page) => page === null)) {
+    fail("corrupt", "VRM texture paged manifest contains an invalid descriptor.");
+  }
+  const typedPages = pages as ManifestPageDescriptor[];
+  const rootBytes = encodedBytes(raw);
+  const totalPageBytes = checkedAggregate(
+    typedPages.map((page) => page.byteLength),
+    STUDIO_VRM_TEXTURE_ASSET_LIMITS.maxManifestBytes - rootBytes,
+    "corrupt",
+    "VRM texture paged manifest exceeds its aggregate metadata byte limit.",
+  );
+  const totalArtifacts = checkedAggregate(
+    typedPages.map((page) => page.count),
+    PAGED_MANIFEST_MAX_PAGES * STUDIO_VRM_TEXTURE_ASSET_LIMITS.maxArtifacts,
+    "corrupt",
+    "VRM texture paged manifest count overflows its bounded page authority.",
+  );
+  const totalArtifactBytes = checkedAggregate(
+    typedPages.map((page) => page.assetBytes),
+    STUDIO_VRM_TEXTURE_ASSET_LIMITS.maxAggregateBytes,
+    "corrupt",
+    "VRM texture paged manifest exceeds its aggregate artifact byte limit.",
+  );
+  if (
+    new Set(typedPages.map((page) => page.key)).size !== typedPages.length
+    || typedPages.some((page) => page.count > STUDIO_VRM_TEXTURE_ASSET_LIMITS.maxArtifacts)
+    || typedPages.some((page, index) =>
+      page.key !== `manifest-v2-texture-page-${record.generation}-${index}-${page.checksum}`)
+    || typedPages.some((page, index) =>
+      index > 0 && compareManifestKeys(typedPages[index - 1]!.lastKey, page.firstKey) >= 0)
+    || rootBytes + totalPageBytes > STUDIO_VRM_TEXTURE_ASSET_LIMITS.maxManifestBytes
+    || totalArtifacts !== record.totalArtifacts
+    || totalArtifactBytes !== record.totalArtifactBytes
+  ) fail("corrupt", "VRM texture paged manifest totals or identities are invalid.");
+  const manifest: TextureManifestV2 = {
+    kind: TEXTURE_MANIFEST_KIND,
+    version: PAGED_MANIFEST_VERSION,
+    generation: record.generation,
+    totalArtifacts: record.totalArtifacts,
+    totalArtifactBytes: record.totalArtifactBytes,
+    pages: typedPages,
+  };
+  if (JSON.stringify(manifest) !== raw) {
+    fail("corrupt", "VRM texture paged manifest is not canonical JSON.");
+  }
+  return manifest;
+}
+
+function parseModelManifestPage(
+  raw: string | null,
+  descriptor: ManifestPageDescriptor,
+  generation: number,
+  index: number,
+): readonly ModelManifestEntry[] {
+  if (
+    raw === null
+    || encodedBytes(raw) !== descriptor.byteLength
+    || manifestChecksum(raw) !== descriptor.checksum
+  ) fail("corrupt", "VRM model manifest page is missing or checksum-mismatched.");
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(raw) as unknown;
+  } catch (cause) {
+    fail("corrupt", "VRM model manifest page JSON is corrupt.", cause);
+  }
+  const record = exactRecord(decoded, ["generation", "index", "kind", "models", "version"]);
+  if (
+    !record
+    || record.kind !== MODEL_PAGE_KIND
+    || record.version !== PAGED_MANIFEST_VERSION
+    || record.generation !== generation
+    || record.index !== index
+    || !Array.isArray(record.models)
+    || record.models.length !== descriptor.count
+    || record.models.length > STUDIO_VRM_MODEL_ASSET_LIMITS.maxModels
+  ) fail("corrupt", "VRM model manifest page envelope is invalid.");
+  const models = record.models.map(modelEntry);
+  if (models.some((entry) => entry === null)) {
+    fail("corrupt", "VRM model manifest page contains an invalid entry.");
+  }
+  const typed = (models as ModelManifestEntry[])
+    .sort((left, right) => compareManifestKeys(left.id, right.id));
+  if (
+    typed[0]?.id !== descriptor.firstKey
+    || typed.at(-1)?.id !== descriptor.lastKey
+    || typed.reduce((sum, entry) => sum + entry.byteSize, 0) !== descriptor.assetBytes
+    || new Set(typed.map((entry) => entry.id)).size !== typed.length
+    || new Set(typed.map((entry) => entry.contentHash)).size !== typed.length
+  ) fail("corrupt", "VRM model manifest page identities or totals are invalid.");
+  const canonical: ModelManifestPageV2 = {
+    kind: MODEL_PAGE_KIND,
+    version: PAGED_MANIFEST_VERSION,
+    generation,
+    index,
+    models: typed,
+  };
+  if (JSON.stringify(canonical) !== raw) {
+    fail("corrupt", "VRM model manifest page is not canonical JSON.");
+  }
+  return Object.freeze(typed);
+}
+
+function parseTextureManifestPage(
+  raw: string | null,
+  descriptor: ManifestPageDescriptor,
+  generation: number,
+  index: number,
+): readonly TextureManifestEntry[] {
+  if (
+    raw === null
+    || encodedBytes(raw) !== descriptor.byteLength
+    || manifestChecksum(raw) !== descriptor.checksum
+  ) fail("corrupt", "VRM texture manifest page is missing or checksum-mismatched.");
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(raw) as unknown;
+  } catch (cause) {
+    fail("corrupt", "VRM texture manifest page JSON is corrupt.", cause);
+  }
+  const record = exactRecord(decoded, ["artifacts", "generation", "index", "kind", "version"]);
+  if (
+    !record
+    || record.kind !== TEXTURE_PAGE_KIND
+    || record.version !== PAGED_MANIFEST_VERSION
+    || record.generation !== generation
+    || record.index !== index
+    || !Array.isArray(record.artifacts)
+    || record.artifacts.length !== descriptor.count
+    || record.artifacts.length > STUDIO_VRM_TEXTURE_ASSET_LIMITS.maxArtifacts
+  ) fail("corrupt", "VRM texture manifest page envelope is invalid.");
+  const artifacts = record.artifacts.map(textureEntry);
+  if (artifacts.some((entry) => entry === null)) {
+    fail("corrupt", "VRM texture manifest page contains an invalid entry.");
+  }
+  const typed = (artifacts as TextureManifestEntry[])
+    .sort((left, right) => compareManifestKeys(left.contentHash, right.contentHash));
+  if (
+    typed[0]?.contentHash !== descriptor.firstKey
+    || typed.at(-1)?.contentHash !== descriptor.lastKey
+    || typed.reduce((sum, entry) => sum + entry.receipt.byteLength, 0) !== descriptor.assetBytes
+    || new Set(typed.map((entry) => entry.contentHash)).size !== typed.length
+  ) fail("corrupt", "VRM texture manifest page identities or totals are invalid.");
+  const canonical: TextureManifestPageV2 = {
+    kind: TEXTURE_PAGE_KIND,
+    version: PAGED_MANIFEST_VERSION,
+    generation,
+    index,
+    artifacts: typed,
+  };
+  if (JSON.stringify(canonical) !== raw) {
+    fail("corrupt", "VRM texture manifest page is not canonical JSON.");
+  }
+  return Object.freeze(typed);
+}
+
+interface PreparedManifestPage {
+  readonly descriptor: ManifestPageDescriptor;
+  readonly raw: string;
+}
+
+function prepareModelManifestV2(
+  manifest: ModelManifestV1,
+): { readonly root: ModelManifestV2; readonly raw: string; readonly pages: readonly PreparedManifestPage[] } {
+  const canonical = canonicalModelManifest(manifest);
+  if (!safeInteger(canonical.generation, 1)) {
+    fail("limit", "VRM model paged manifest generation is invalid.");
+  }
+  const totalModelBytes = checkedAggregate(
+    canonical.models.map((entry) => entry.byteSize),
+    STUDIO_VRM_MODEL_ASSET_LIMITS.maxAggregateModelBytes,
+    "limit",
+    "VRM model library reached its aggregate byte limit.",
+  );
+  const pages: PreparedManifestPage[] = [];
+  for (
+    let offset = 0;
+    offset < canonical.models.length;
+    offset += STUDIO_VRM_MODEL_ASSET_LIMITS.maxModels
+  ) {
+    const models = canonical.models.slice(offset, offset + STUDIO_VRM_MODEL_ASSET_LIMITS.maxModels);
+    const index = pages.length;
+    const page: ModelManifestPageV2 = {
+      kind: MODEL_PAGE_KIND,
+      version: PAGED_MANIFEST_VERSION,
+      generation: canonical.generation,
+      index,
+      models,
+    };
+    const raw = JSON.stringify(page);
+    const checksum = manifestChecksum(raw);
+    pages.push({
+      raw,
+      descriptor: {
+        key: `manifest-v2-model-page-${canonical.generation}-${index}-${checksum}`,
+        checksum,
+        byteLength: encodedBytes(raw),
+        assetBytes: models.reduce((sum, entry) => sum + entry.byteSize, 0),
+        count: models.length,
+        firstKey: models[0]!.id,
+        lastKey: models.at(-1)!.id,
+      },
+    });
+  }
+  const root: ModelManifestV2 = {
+    kind: MODEL_MANIFEST_KIND,
+    version: PAGED_MANIFEST_VERSION,
+    generation: canonical.generation,
+    totalModels: canonical.models.length,
+    totalModelBytes,
+    pages: pages.map((page) => page.descriptor),
+    sampleThumbnails: canonical.sampleThumbnails,
+  };
+  const raw = JSON.stringify(root);
+  const metadataBytes = encodedBytes(raw) + pages.reduce(
+    (sum, page) => sum + page.descriptor.byteLength,
+    0,
+  );
+  if (metadataBytes > STUDIO_VRM_MODEL_ASSET_LIMITS.maxManifestBytes) {
+    fail("limit", "VRM model paged manifest exceeds its aggregate metadata byte limit.");
+  }
+  return Object.freeze({ root, raw, pages: Object.freeze(pages) });
+}
+
+function prepareTextureManifestV2(
+  manifest: TextureManifestV1,
+): { readonly root: TextureManifestV2; readonly raw: string; readonly pages: readonly PreparedManifestPage[] } {
+  const canonical = canonicalTextureManifest(manifest);
+  if (!safeInteger(canonical.generation, 1)) {
+    fail("limit", "VRM texture paged manifest generation is invalid.");
+  }
+  const totalArtifactBytes = checkedAggregate(
+    canonical.artifacts.map((entry) => entry.receipt.byteLength),
+    STUDIO_VRM_TEXTURE_ASSET_LIMITS.maxAggregateBytes,
+    "limit",
+    "VRM texture-paint library reached its aggregate byte limit.",
+  );
+  const pages: PreparedManifestPage[] = [];
+  for (
+    let offset = 0;
+    offset < canonical.artifacts.length;
+    offset += STUDIO_VRM_TEXTURE_ASSET_LIMITS.maxArtifacts
+  ) {
+    const artifacts = canonical.artifacts.slice(
+      offset,
+      offset + STUDIO_VRM_TEXTURE_ASSET_LIMITS.maxArtifacts,
+    );
+    const index = pages.length;
+    const page: TextureManifestPageV2 = {
+      kind: TEXTURE_PAGE_KIND,
+      version: PAGED_MANIFEST_VERSION,
+      generation: canonical.generation,
+      index,
+      artifacts,
+    };
+    const raw = JSON.stringify(page);
+    const checksum = manifestChecksum(raw);
+    pages.push({
+      raw,
+      descriptor: {
+        key: `manifest-v2-texture-page-${canonical.generation}-${index}-${checksum}`,
+        checksum,
+        byteLength: encodedBytes(raw),
+        assetBytes: artifacts.reduce((sum, entry) => sum + entry.receipt.byteLength, 0),
+        count: artifacts.length,
+        firstKey: artifacts[0]!.contentHash,
+        lastKey: artifacts.at(-1)!.contentHash,
+      },
+    });
+  }
+  const root: TextureManifestV2 = {
+    kind: TEXTURE_MANIFEST_KIND,
+    version: PAGED_MANIFEST_VERSION,
+    generation: canonical.generation,
+    totalArtifacts: canonical.artifacts.length,
+    totalArtifactBytes,
+    pages: pages.map((page) => page.descriptor),
+  };
+  const raw = JSON.stringify(root);
+  const metadataBytes = encodedBytes(raw) + pages.reduce(
+    (sum, page) => sum + page.descriptor.byteLength,
+    0,
+  );
+  if (metadataBytes > STUDIO_VRM_TEXTURE_ASSET_LIMITS.maxManifestBytes) {
+    fail("limit", "VRM texture paged manifest exceeds its aggregate metadata byte limit.");
+  }
+  return Object.freeze({ root, raw, pages: Object.freeze(pages) });
 }
 
 function modelMetadata(entry: ModelManifestEntry): StudioVrmModelAssetMetadata {
@@ -713,6 +1297,18 @@ function uniqueLiveHashes(
   return [...hashes].sort();
 }
 
+function unionLiveHashes(
+  previousModels: ModelManifestV1,
+  previousTextures: TextureManifestV1,
+  nextModels: ModelManifestV1,
+  nextTextures: TextureManifestV1,
+): StudioVrmAssetHash[] {
+  return [...new Set([
+    ...uniqueLiveHashes(previousModels, previousTextures),
+    ...uniqueLiveHashes(nextModels, nextTextures),
+  ])].sort();
+}
+
 function resolvedTextureLimit(
   value: number | undefined,
   maximum: number,
@@ -726,16 +1322,17 @@ function resolvedTextureLimit(
 }
 
 function resolveTextureLimits(value: SaveStudioVrmTextureAssetInput["limits"]): {
-  maxArtifacts: number;
   maxArtifactBytes: number;
   maxAggregateBytes: number;
 } {
-  return {
-    maxArtifacts: resolvedTextureLimit(
-      value?.maxArtifacts,
+  if (value?.maxArtifacts !== undefined) {
+    resolvedTextureLimit(
+      value.maxArtifacts,
       STUDIO_VRM_TEXTURE_ASSET_LIMITS.maxArtifacts,
       "maxArtifacts",
-    ),
+    );
+  }
+  return {
     maxArtifactBytes: resolvedTextureLimit(
       value?.maxArtifactBytes,
       STUDIO_VRM_TEXTURE_ASSET_LIMITS.maxArtifactBytes,
@@ -815,11 +1412,96 @@ export function createStudioVrmAssetSqliteOpfsRepository(
     }
   }
 
+  function decodedManifestVersion(raw: string): unknown {
+    try {
+      const decoded = JSON.parse(raw) as unknown;
+      return typeof decoded === "object" && decoded !== null && !Array.isArray(decoded)
+        ? (decoded as Record<string, unknown>).version
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function readModelManifest(
+    databaseHandle: StudioLocalDatabase,
+    raw: string | null,
+  ): Promise<LoadedModelManifest> {
+    if (raw === null || decodedManifestVersion(raw) !== PAGED_MANIFEST_VERSION) {
+      return { raw, manifest: parseModelManifest(raw), pageKeys: [] };
+    }
+    const root = parseModelManifestV2Root(raw);
+    const pageRaws = await Promise.all(root.pages.map((page) =>
+      databaseHandle.kvGet(STUDIO_VRM_MODEL_SQLITE_NAMESPACE, page.key)));
+    const models = root.pages.flatMap((page, index) =>
+      parseModelManifestPage(pageRaws[index] ?? null, page, root.generation, index));
+    if (
+      encodedBytes(raw) + root.pages.reduce((sum, page) => sum + page.byteLength, 0)
+        > STUDIO_VRM_MODEL_ASSET_LIMITS.maxManifestBytes
+      || models.length !== root.totalModels
+      || models.reduce((sum, entry) => sum + entry.byteSize, 0) !== root.totalModelBytes
+      || new Set(models.map((entry) => entry.id)).size !== models.length
+      || new Set(models.map((entry) => entry.contentHash)).size !== models.length
+      || models.some((entry, index) =>
+        index > 0 && compareManifestKeys(models[index - 1]!.id, entry.id) >= 0)
+    ) fail("corrupt", "VRM model paged manifest pages are inconsistent.");
+    return {
+      raw,
+      manifest: {
+        kind: MODEL_MANIFEST_KIND,
+        version: MANIFEST_VERSION,
+        generation: root.generation,
+        models,
+        sampleThumbnails: root.sampleThumbnails,
+      },
+      pageKeys: root.pages.map((page) => page.key),
+    };
+  }
+
+  async function readTextureManifest(
+    databaseHandle: StudioLocalDatabase,
+    raw: string | null,
+  ): Promise<LoadedTextureManifest> {
+    if (raw === null || decodedManifestVersion(raw) !== PAGED_MANIFEST_VERSION) {
+      return { raw, manifest: parseTextureManifest(raw), pageKeys: [] };
+    }
+    const root = parseTextureManifestV2Root(raw);
+    const pageRaws = await Promise.all(root.pages.map((page) =>
+      databaseHandle.kvGet(STUDIO_VRM_TEXTURE_SQLITE_NAMESPACE, page.key)));
+    const artifacts = root.pages.flatMap((page, index) =>
+      parseTextureManifestPage(pageRaws[index] ?? null, page, root.generation, index));
+    if (
+      encodedBytes(raw) + root.pages.reduce((sum, page) => sum + page.byteLength, 0)
+        > STUDIO_VRM_TEXTURE_ASSET_LIMITS.maxManifestBytes
+      || artifacts.length !== root.totalArtifacts
+      || artifacts.reduce((sum, entry) => sum + entry.receipt.byteLength, 0)
+        !== root.totalArtifactBytes
+      || new Set(artifacts.map((entry) => entry.contentHash)).size !== artifacts.length
+      || artifacts.some((entry, index) =>
+        index > 0 && compareManifestKeys(
+          artifacts[index - 1]!.contentHash,
+          entry.contentHash,
+        ) >= 0)
+    ) fail("corrupt", "VRM texture paged manifest pages are inconsistent.");
+    return {
+      raw,
+      manifest: {
+        kind: TEXTURE_MANIFEST_KIND,
+        version: MANIFEST_VERSION,
+        generation: root.generation,
+        artifacts,
+      },
+      pageKeys: root.pages.map((page) => page.key),
+    };
+  }
+
   async function readManifests(databaseHandle: StudioLocalDatabase): Promise<{
     modelRaw: string | null;
     models: ModelManifestV1;
+    modelPageKeys: readonly string[];
     textureRaw: string | null;
     textures: TextureManifestV1;
+    texturePageKeys: readonly string[];
   }> {
     const [modelRaw, textureRaw] = await Promise.all([
       databaseHandle.kvGet(
@@ -831,12 +1513,118 @@ export function createStudioVrmAssetSqliteOpfsRepository(
         STUDIO_VRM_ASSET_SQLITE_MANIFEST_KEY,
       ),
     ]);
+    const [models, textures] = await Promise.all([
+      readModelManifest(databaseHandle, modelRaw),
+      readTextureManifest(databaseHandle, textureRaw),
+    ]);
     return {
       modelRaw,
-      models: parseModelManifest(modelRaw),
+      models: models.manifest,
+      modelPageKeys: models.pageKeys,
       textureRaw,
-      textures: parseTextureManifest(textureRaw),
+      textures: textures.manifest,
+      texturePageKeys: textures.pageKeys,
     };
+  }
+
+  async function findModelEntryById(
+    databaseHandle: StudioLocalDatabase,
+    id: string,
+  ): Promise<{
+    readonly model: ModelManifestEntry | null;
+    readonly sampleThumbnail: SampleThumbnailEntry | null;
+  }> {
+    const raw = await databaseHandle.kvGet(
+      STUDIO_VRM_MODEL_SQLITE_NAMESPACE,
+      STUDIO_VRM_ASSET_SQLITE_MANIFEST_KEY,
+    );
+    if (raw === null || decodedManifestVersion(raw) !== PAGED_MANIFEST_VERSION) {
+      const manifest = parseModelManifest(raw);
+      return {
+        model: manifest.models.find((entry) => entry.id === id) ?? null,
+        sampleThumbnail: manifest.sampleThumbnails.find((entry) => entry.id === id) ?? null,
+      };
+    }
+    const root = parseModelManifestV2Root(raw);
+    const sampleThumbnail = root.sampleThumbnails.find((entry) => entry.id === id) ?? null;
+    const pageIndex = root.pages.findIndex((page) => (
+      compareManifestKeys(page.firstKey, id) <= 0
+      && compareManifestKeys(id, page.lastKey) <= 0
+    ));
+    const descriptor = root.pages[pageIndex];
+    if (pageIndex < 0 || !descriptor) return { model: null, sampleThumbnail };
+    const pageRaw = await databaseHandle.kvGet(
+      STUDIO_VRM_MODEL_SQLITE_NAMESPACE,
+      descriptor.key,
+    );
+    const models = parseModelManifestPage(pageRaw, descriptor, root.generation, pageIndex);
+    return {
+      model: models.find((entry) => entry.id === id) ?? null,
+      sampleThumbnail,
+    };
+  }
+
+  async function findModelEntryByHash(
+    databaseHandle: StudioLocalDatabase,
+    contentHash: StudioVrmAssetHash,
+  ): Promise<ModelManifestEntry | null> {
+    const raw = await databaseHandle.kvGet(
+      STUDIO_VRM_MODEL_SQLITE_NAMESPACE,
+      STUDIO_VRM_ASSET_SQLITE_MANIFEST_KEY,
+    );
+    if (raw === null || decodedManifestVersion(raw) !== PAGED_MANIFEST_VERSION) {
+      return parseModelManifest(raw).models.find(
+        (entry) => entry.contentHash === contentHash,
+      ) ?? null;
+    }
+    const root = parseModelManifestV2Root(raw);
+    for (let index = 0; index < root.pages.length; index += 1) {
+      const descriptor = root.pages[index]!;
+      const pageRaw = await databaseHandle.kvGet(
+        STUDIO_VRM_MODEL_SQLITE_NAMESPACE,
+        descriptor.key,
+      );
+      const model = parseModelManifestPage(
+        pageRaw,
+        descriptor,
+        root.generation,
+        index,
+      ).find((entry) => entry.contentHash === contentHash);
+      if (model) return model;
+    }
+    return null;
+  }
+
+  async function findTextureEntryByHash(
+    databaseHandle: StudioLocalDatabase,
+    contentHash: StudioVrmAssetHash,
+  ): Promise<TextureManifestEntry | null> {
+    const raw = await databaseHandle.kvGet(
+      STUDIO_VRM_TEXTURE_SQLITE_NAMESPACE,
+      STUDIO_VRM_ASSET_SQLITE_MANIFEST_KEY,
+    );
+    if (raw === null || decodedManifestVersion(raw) !== PAGED_MANIFEST_VERSION) {
+      return parseTextureManifest(raw).artifacts.find(
+        (entry) => entry.contentHash === contentHash,
+      ) ?? null;
+    }
+    const root = parseTextureManifestV2Root(raw);
+    const pageIndex = root.pages.findIndex((page) => (
+      compareManifestKeys(page.firstKey, contentHash) <= 0
+      && compareManifestKeys(contentHash, page.lastKey) <= 0
+    ));
+    const descriptor = root.pages[pageIndex];
+    if (pageIndex < 0 || !descriptor) return null;
+    const pageRaw = await databaseHandle.kvGet(
+      STUDIO_VRM_TEXTURE_SQLITE_NAMESPACE,
+      descriptor.key,
+    );
+    return parseTextureManifestPage(
+      pageRaw,
+      descriptor,
+      root.generation,
+      pageIndex,
+    ).find((entry) => entry.contentHash === contentHash) ?? null;
   }
 
   async function committedBlob(
@@ -908,6 +1696,7 @@ export function createStudioVrmAssetSqliteOpfsRepository(
   async function commitModelManifest(
     databaseHandle: StudioLocalDatabase,
     baselineRaw: string | null,
+    previous: ModelManifestV1,
     next: ModelManifestV1,
     textures: TextureManifestV1,
   ): Promise<void> {
@@ -919,30 +1708,86 @@ export function createStudioVrmAssetSqliteOpfsRepository(
       fail("conflict", "VRM model manifest generation changed before commit.");
     }
     const canonical = canonicalModelManifest(next);
-    const serialized = JSON.stringify(canonical);
-    if (encodedBytes(serialized) > STUDIO_VRM_MODEL_ASSET_LIMITS.maxManifestBytes) {
-      fail("limit", "VRM model SQLite manifest exceeds its byte limit.");
+    const prepared = prepareModelManifestV2(canonical);
+    const priorPageKeys = baselineRaw && decodedManifestVersion(baselineRaw) === PAGED_MANIFEST_VERSION
+      ? parseModelManifestV2Root(baselineRaw).pages.map((page) => page.key)
+      : [];
+    try {
+      for (const page of prepared.pages) {
+        await databaseHandle.kvSet(
+          STUDIO_VRM_MODEL_SQLITE_NAMESPACE,
+          page.descriptor.key,
+          page.raw,
+        );
+      }
+      await assets().setOwnerRefs(
+        STUDIO_VRM_ASSET_CAS_OWNER,
+        unionLiveHashes(previous, textures, canonical, textures),
+      );
+      await databaseHandle.kvSet(
+        STUDIO_VRM_MODEL_SQLITE_NAMESPACE,
+        STUDIO_VRM_ASSET_SQLITE_MANIFEST_KEY,
+        prepared.raw,
+      );
+    } catch (cause) {
+      let persistedRoot: string | null;
+      try {
+        persistedRoot = await databaseHandle.kvGet(
+          STUDIO_VRM_MODEL_SQLITE_NAMESPACE,
+          STUDIO_VRM_ASSET_SQLITE_MANIFEST_KEY,
+        );
+      } catch {
+        // The root write may have reached durable storage even though both the write acknowledgement
+        // and verification read failed. Preserve the pre-root union refs and every staged page; a
+        // later reopen can then resolve the authoritative generation without data loss.
+        throw cause;
+      }
+      if (persistedRoot !== prepared.raw) {
+        if (persistedRoot === baselineRaw) {
+          try {
+            await assets().setOwnerRefs(
+              STUDIO_VRM_ASSET_CAS_OWNER,
+              uniqueLiveHashes(previous, textures),
+            );
+          } catch {
+            // Preserve the original commit failure; a later bounded collector/retry repairs refs.
+          }
+          await Promise.all(prepared.pages.map((page) =>
+            databaseHandle.kvDelete(
+              STUDIO_VRM_MODEL_SQLITE_NAMESPACE,
+              page.descriptor.key,
+            ).catch(() => undefined)));
+        }
+        throw cause;
+      }
+      // SQLite may report an I/O failure after the root became durable. The union owner refs are
+      // already safe, so finish as the committed generation instead of inviting a duplicate retry.
     }
-    await assets().setOwnerRefs(
-      STUDIO_VRM_ASSET_CAS_OWNER,
-      uniqueLiveHashes(canonical, textures),
-    );
-    await databaseHandle.kvSet(
-      STUDIO_VRM_MODEL_SQLITE_NAMESPACE,
-      STUDIO_VRM_ASSET_SQLITE_MANIFEST_KEY,
-      serialized,
-    );
     const persisted = await databaseHandle.kvGet(
       STUDIO_VRM_MODEL_SQLITE_NAMESPACE,
       STUDIO_VRM_ASSET_SQLITE_MANIFEST_KEY,
     );
-    if (persisted !== serialized) fail("conflict", "VRM model manifest commit was superseded.");
+    if (persisted !== prepared.raw) fail("conflict", "VRM model manifest commit was superseded.");
+    await assets().setOwnerRefs(
+      STUDIO_VRM_ASSET_CAS_OWNER,
+      uniqueLiveHashes(canonical, textures),
+    ).catch(() => {
+      // The pre-root union still retains every old and new live blob. Exact ref compaction is a
+      // recoverable leak-only optimization and must not turn a committed root into a false failure.
+    });
+    await Promise.all(priorPageKeys
+      .filter((key) => !prepared.pages.some((page) => page.descriptor.key === key))
+      .map((key) => databaseHandle.kvDelete(
+        STUDIO_VRM_MODEL_SQLITE_NAMESPACE,
+        key,
+      ).catch(() => undefined)));
   }
 
   async function commitTextureManifest(
     databaseHandle: StudioLocalDatabase,
     baselineRaw: string | null,
     models: ModelManifestV1,
+    previous: TextureManifestV1,
     next: TextureManifestV1,
   ): Promise<void> {
     const currentRaw = await databaseHandle.kvGet(
@@ -953,24 +1798,76 @@ export function createStudioVrmAssetSqliteOpfsRepository(
       fail("conflict", "VRM texture manifest generation changed before commit.");
     }
     const canonical = canonicalTextureManifest(next);
-    const serialized = JSON.stringify(canonical);
-    if (encodedBytes(serialized) > STUDIO_VRM_TEXTURE_ASSET_LIMITS.maxManifestBytes) {
-      fail("limit", "VRM texture SQLite manifest exceeds its byte limit.");
+    const prepared = prepareTextureManifestV2(canonical);
+    const priorPageKeys = baselineRaw && decodedManifestVersion(baselineRaw) === PAGED_MANIFEST_VERSION
+      ? parseTextureManifestV2Root(baselineRaw).pages.map((page) => page.key)
+      : [];
+    try {
+      for (const page of prepared.pages) {
+        await databaseHandle.kvSet(
+          STUDIO_VRM_TEXTURE_SQLITE_NAMESPACE,
+          page.descriptor.key,
+          page.raw,
+        );
+      }
+      await assets().setOwnerRefs(
+        STUDIO_VRM_ASSET_CAS_OWNER,
+        unionLiveHashes(models, previous, models, canonical),
+      );
+      await databaseHandle.kvSet(
+        STUDIO_VRM_TEXTURE_SQLITE_NAMESPACE,
+        STUDIO_VRM_ASSET_SQLITE_MANIFEST_KEY,
+        prepared.raw,
+      );
+    } catch (cause) {
+      let persistedRoot: string | null;
+      try {
+        persistedRoot = await databaseHandle.kvGet(
+          STUDIO_VRM_TEXTURE_SQLITE_NAMESPACE,
+          STUDIO_VRM_ASSET_SQLITE_MANIFEST_KEY,
+        );
+      } catch {
+        // Ambiguous SQLite durability is not equivalent to a missing root. Keep union ownership and
+        // staged pages intact so either durable outcome remains recoverable on the next open.
+        throw cause;
+      }
+      if (persistedRoot !== prepared.raw) {
+        if (persistedRoot === baselineRaw) {
+          try {
+            await assets().setOwnerRefs(
+              STUDIO_VRM_ASSET_CAS_OWNER,
+              uniqueLiveHashes(models, previous),
+            );
+          } catch {
+            // Preserve the original commit failure; a later bounded collector/retry repairs refs.
+          }
+          await Promise.all(prepared.pages.map((page) =>
+            databaseHandle.kvDelete(
+              STUDIO_VRM_TEXTURE_SQLITE_NAMESPACE,
+              page.descriptor.key,
+            ).catch(() => undefined)));
+        }
+        throw cause;
+      }
+      // Root authority won despite the surfaced SQLite failure; keep the safe union and finish.
     }
-    await assets().setOwnerRefs(
-      STUDIO_VRM_ASSET_CAS_OWNER,
-      uniqueLiveHashes(models, canonical),
-    );
-    await databaseHandle.kvSet(
-      STUDIO_VRM_TEXTURE_SQLITE_NAMESPACE,
-      STUDIO_VRM_ASSET_SQLITE_MANIFEST_KEY,
-      serialized,
-    );
     const persisted = await databaseHandle.kvGet(
       STUDIO_VRM_TEXTURE_SQLITE_NAMESPACE,
       STUDIO_VRM_ASSET_SQLITE_MANIFEST_KEY,
     );
-    if (persisted !== serialized) fail("conflict", "VRM texture manifest commit was superseded.");
+    if (persisted !== prepared.raw) fail("conflict", "VRM texture manifest commit was superseded.");
+    await assets().setOwnerRefs(
+      STUDIO_VRM_ASSET_CAS_OWNER,
+      uniqueLiveHashes(models, canonical),
+    ).catch(() => {
+      // The pre-root union remains safe if exact post-root compaction cannot be persisted.
+    });
+    await Promise.all(priorPageKeys
+      .filter((key) => !prepared.pages.some((page) => page.descriptor.key === key))
+      .map((key) => databaseHandle.kvDelete(
+        STUDIO_VRM_TEXTURE_SQLITE_NAMESPACE,
+        key,
+      ).catch(() => undefined)));
   }
 
   async function queued<T>(
@@ -1007,11 +1904,58 @@ export function createStudioVrmAssetSqliteOpfsRepository(
   return {
     authority: "sqlite-opfs",
 
+    queryModelMetadataPage(options = {}) {
+      return queued(options.signal, async (databaseHandle) => {
+        const raw = await databaseHandle.kvGet(
+          STUDIO_VRM_MODEL_SQLITE_NAMESPACE,
+          STUDIO_VRM_ASSET_SQLITE_MANIFEST_KEY,
+        );
+        if (raw === null || decodedManifestVersion(raw) !== PAGED_MANIFEST_VERSION) {
+          const manifest = parseModelManifest(raw);
+          if (manifest.models.length === 0) return null;
+          const cursor = `manifest-v1-model-page-0-${manifestChecksum(raw ?? "")}`;
+          if (options.cursor !== undefined && options.cursor !== null && options.cursor !== cursor) {
+            return null;
+          }
+          return Object.freeze({
+            items: Object.freeze(manifest.models.map(modelMetadata)),
+            cursor: cursor as StudioVrmAssetPageCursor,
+            nextCursor: null,
+            totalCount: manifest.models.length,
+            totalBytes: manifest.models.reduce((sum, entry) => sum + entry.byteSize, 0),
+            generation: manifest.generation,
+          });
+        }
+        const root = parseModelManifestV2Root(raw);
+        if (root.pages.length === 0) return null;
+        const pageIndex = options.cursor === undefined || options.cursor === null
+          ? 0
+          : root.pages.findIndex((page) => page.key === options.cursor);
+        const descriptor = root.pages[pageIndex];
+        if (pageIndex < 0 || !descriptor) return null;
+        const pageRaw = await databaseHandle.kvGet(
+          STUDIO_VRM_MODEL_SQLITE_NAMESPACE,
+          descriptor.key,
+        );
+        const models = parseModelManifestPage(pageRaw, descriptor, root.generation, pageIndex);
+        return Object.freeze({
+          items: Object.freeze(models.map(modelMetadata)),
+          cursor: descriptor.key as StudioVrmAssetPageCursor,
+          nextCursor: (root.pages[pageIndex + 1]?.key ?? null) as StudioVrmAssetPageCursor | null,
+          totalCount: root.totalModels,
+          totalBytes: root.totalModelBytes,
+          generation: root.generation,
+        });
+      });
+    },
+
     listModelMetadata(signal) {
       return queued(signal, async (databaseHandle) => {
         const { models } = await readManifests(databaseHandle);
         return [...models.models]
-          .sort((left, right) => right.updatedAt - left.updatedAt || left.id.localeCompare(right.id))
+          .sort((left, right) => (
+            right.updatedAt - left.updatedAt || compareManifestKeys(left.id, right.id)
+          ))
           .map(modelMetadata);
       });
     },
@@ -1019,8 +1963,7 @@ export function createStudioVrmAssetSqliteOpfsRepository(
     getModel(id, signal) {
       return queued(signal, async (databaseHandle) => {
         if (!ID_PATTERN.test(id)) return null;
-        const { models } = await readManifests(databaseHandle);
-        const entry = models.models.find((candidate) => candidate.id === id);
+        const entry = (await findModelEntryById(databaseHandle, id)).model;
         if (!entry) return null;
         return {
           ...modelMetadata(entry),
@@ -1034,8 +1977,7 @@ export function createStudioVrmAssetSqliteOpfsRepository(
       return queued(signal, async (databaseHandle) => {
         const contentHash = hash(value.toLowerCase());
         if (!contentHash) return null;
-        const { models } = await readManifests(databaseHandle);
-        const entry = models.models.find((candidate) => candidate.contentHash === contentHash);
+        const entry = await findModelEntryByHash(databaseHandle, contentHash);
         if (!entry) return null;
         return {
           ...modelMetadata(entry),
@@ -1061,15 +2003,13 @@ export function createStudioVrmAssetSqliteOpfsRepository(
           || input.updatedAt < input.createdAt
         ) fail("invalid", "VRM model asset input is invalid or noncanonical.");
         const state = await readManifests(databaseHandle);
+        const nextGeneration = nextManifestGeneration(state.models.generation);
         const duplicate = state.models.models.find(
           (candidate) => candidate.contentHash === input.expectedHash,
         );
         if (duplicate) {
           await readCommittedBlob(duplicate.blob, signal);
           return { metadata: modelMetadata(duplicate), deduplicated: true };
-        }
-        if (state.models.models.length >= STUDIO_VRM_MODEL_ASSET_LIMITS.maxModels) {
-          fail("limit", "VRM model library reached its entry limit.");
         }
         const aggregate = state.models.models.reduce((sum, entry) => sum + entry.byteSize, 0);
         if (
@@ -1099,10 +2039,16 @@ export function createStudioVrmAssetSqliteOpfsRepository(
         };
         const next: ModelManifestV1 = {
           ...state.models,
-          generation: state.models.generation + 1,
+          generation: nextGeneration,
           models: [...state.models.models, entry],
         };
-        await commitModelManifest(databaseHandle, state.modelRaw, next, state.textures);
+        await commitModelManifest(
+          databaseHandle,
+          state.modelRaw,
+          state.models,
+          next,
+          state.textures,
+        );
         return { metadata: modelMetadata(entry), deduplicated: false };
       });
     },
@@ -1118,6 +2064,7 @@ export function createStudioVrmAssetSqliteOpfsRepository(
           || !validTimestamp(updatedAt)
         ) fail("invalid", "VRM thumbnail input is invalid or exceeds its byte limit.");
         const state = await readManifests(databaseHandle);
+        const nextGeneration = nextManifestGeneration(state.models.generation);
         const put = await assets().put(Uint8Array.from(thumbnail.bytes), {
           mime: thumbnail.mimeType,
           codec: "identity",
@@ -1140,7 +2087,7 @@ export function createStudioVrmAssetSqliteOpfsRepository(
           };
           next = {
             ...state.models,
-            generation: state.models.generation + 1,
+            generation: nextGeneration,
             models,
           };
         } else {
@@ -1150,21 +2097,26 @@ export function createStudioVrmAssetSqliteOpfsRepository(
           ) fail("limit", "VRM sample thumbnail library reached its entry limit.");
           next = {
             ...state.models,
-            generation: state.models.generation + 1,
+            generation: nextGeneration,
             sampleThumbnails: [...filtered, { id, blob: descriptor, updatedAt }],
           };
         }
-        await commitModelManifest(databaseHandle, state.modelRaw, next, state.textures);
+        await commitModelManifest(
+          databaseHandle,
+          state.modelRaw,
+          state.models,
+          next,
+          state.textures,
+        );
       });
     },
 
     getThumbnail(id, signal) {
       return queued(signal, async (databaseHandle) => {
         if (!ID_PATTERN.test(id)) return null;
-        const { models } = await readManifests(databaseHandle);
-        const model = models.models.find((entry) => entry.id === id);
-        const descriptor = model?.thumbnail
-          ?? models.sampleThumbnails.find((entry) => entry.id === id)?.blob
+        const lookup = await findModelEntryById(databaseHandle, id);
+        const descriptor = lookup.model?.thumbnail
+          ?? lookup.sampleThumbnail?.blob
           ?? null;
         return readThumbnail(descriptor, signal);
       });
@@ -1183,11 +2135,17 @@ export function createStudioVrmAssetSqliteOpfsRepository(
         ) return false;
         const next: ModelManifestV1 = {
           ...state.models,
-          generation: state.models.generation + 1,
+          generation: nextManifestGeneration(state.models.generation),
           models,
           sampleThumbnails,
         };
-        await commitModelManifest(databaseHandle, state.modelRaw, next, state.textures);
+        await commitModelManifest(
+          databaseHandle,
+          state.modelRaw,
+          state.models,
+          next,
+          state.textures,
+        );
         return true;
       });
     },
@@ -1203,6 +2161,7 @@ export function createStudioVrmAssetSqliteOpfsRepository(
           || input.bytes.byteLength > limits.maxArtifactBytes
         ) fail("invalid", "VRM texture-paint asset input is invalid or exceeds its byte limit.");
         const state = await readManifests(databaseHandle);
+        const nextGeneration = nextManifestGeneration(state.textures.generation);
         const existingIndex = state.textures.artifacts.findIndex(
           (entry) => entry.contentHash === receipt.contentHash,
         );
@@ -1210,9 +2169,6 @@ export function createStudioVrmAssetSqliteOpfsRepository(
           (sum, entry, index) => sum + (index === existingIndex ? 0 : entry.receipt.byteLength),
           0,
         );
-        if (existingIndex < 0 && state.textures.artifacts.length >= limits.maxArtifacts) {
-          fail("limit", "VRM texture-paint library reached its artifact count limit.");
-        }
         if (aggregate + receipt.byteLength > limits.maxAggregateBytes) {
           fail("limit", "VRM texture-paint library reached its aggregate byte limit.");
         }
@@ -1232,11 +2188,70 @@ export function createStudioVrmAssetSqliteOpfsRepository(
         else artifacts.push(entry);
         const next: TextureManifestV1 = {
           ...state.textures,
-          generation: state.textures.generation + 1,
+          generation: nextGeneration,
           artifacts,
         };
-        await commitTextureManifest(databaseHandle, state.textureRaw, state.models, next);
+        await commitTextureManifest(
+          databaseHandle,
+          state.textureRaw,
+          state.models,
+          state.textures,
+          next,
+        );
         return { receipt, deduplicated: existingIndex >= 0 || deduplicated };
+      });
+    },
+
+    queryTextureMetadataPage(options = {}) {
+      return queued(options.signal, async (databaseHandle) => {
+        const raw = await databaseHandle.kvGet(
+          STUDIO_VRM_TEXTURE_SQLITE_NAMESPACE,
+          STUDIO_VRM_ASSET_SQLITE_MANIFEST_KEY,
+        );
+        if (raw === null || decodedManifestVersion(raw) !== PAGED_MANIFEST_VERSION) {
+          const manifest = parseTextureManifest(raw);
+          if (manifest.artifacts.length === 0) return null;
+          const cursor = `manifest-v1-texture-page-0-${manifestChecksum(raw ?? "")}`;
+          if (options.cursor !== undefined && options.cursor !== null && options.cursor !== cursor) {
+            return null;
+          }
+          return Object.freeze({
+            items: Object.freeze(manifest.artifacts.map((entry) => entry.receipt)),
+            cursor: cursor as StudioVrmAssetPageCursor,
+            nextCursor: null,
+            totalCount: manifest.artifacts.length,
+            totalBytes: manifest.artifacts.reduce(
+              (sum, entry) => sum + entry.receipt.byteLength,
+              0,
+            ),
+            generation: manifest.generation,
+          });
+        }
+        const root = parseTextureManifestV2Root(raw);
+        if (root.pages.length === 0) return null;
+        const pageIndex = options.cursor === undefined || options.cursor === null
+          ? 0
+          : root.pages.findIndex((page) => page.key === options.cursor);
+        const descriptor = root.pages[pageIndex];
+        if (pageIndex < 0 || !descriptor) return null;
+        const pageRaw = await databaseHandle.kvGet(
+          STUDIO_VRM_TEXTURE_SQLITE_NAMESPACE,
+          descriptor.key,
+        );
+        const artifacts = parseTextureManifestPage(
+          pageRaw,
+          descriptor,
+          root.generation,
+          pageIndex,
+        );
+        return Object.freeze({
+          items: Object.freeze(artifacts.map((entry) => entry.receipt)),
+          cursor: descriptor.key as StudioVrmAssetPageCursor,
+          nextCursor: (root.pages[pageIndex + 1]?.key ?? null) as StudioVrmAssetPageCursor | null,
+          totalCount: root.totalArtifacts,
+          totalBytes: root.totalArtifactBytes,
+          generation: root.generation,
+        });
       });
     },
 
@@ -1244,10 +2259,7 @@ export function createStudioVrmAssetSqliteOpfsRepository(
       return queued(signal, async (databaseHandle) => {
         const contentHash = hash(value.toLowerCase());
         if (!contentHash) return null;
-        const { textures } = await readManifests(databaseHandle);
-        const entry = textures.artifacts.find(
-          (candidate) => candidate.contentHash === contentHash,
-        );
+        const entry = await findTextureEntryByHash(databaseHandle, contentHash);
         if (!entry) return null;
         return {
           receipt: entry.receipt,

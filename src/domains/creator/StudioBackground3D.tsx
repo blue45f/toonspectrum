@@ -82,13 +82,9 @@ import {
 } from "./studio-background-3d-composites";
 import {
   cloneBgCustomModelInstances,
-  collectStudioBg3dThreeJoints,
-  collectStudioBg3dThreeMorphTargets,
-  computeAutoFitScale,
   createStudioBg3dEditableThreeClone,
   createBgCustomModelInstance,
   duplicateBgCustomModelInstance,
-  loadVerifiedStudioBg3dGlbWithThree,
   isStudioBg3dThreeTwoBoneIkChainSupported,
   measureBg3dObjectSize,
   parseBg3dSceneWithModelsFromDataUrl,
@@ -96,7 +92,6 @@ import {
   StudioBg3dThreeOperationError,
   type BgCustomModelInstance,
   type StudioBg3dEditableThreeClone,
-  type StudioBg3dThreeLoadSuccess,
   type StudioBg3dThreeJointDescriptor,
   type StudioBg3dThreeMorphDescriptor,
 } from "./studio-background-3d-model";
@@ -275,14 +270,11 @@ import {
 } from "./studio-bg3d-measurement";
 import { readStudioBg3dMeasurementPointFromThreeEvent } from "./studio-bg3d-measurement-three-adapter";
 import {
-  combineStudioBg3dAbortSignals,
   StudioBg3dStaleModalOperationError,
-  studioBg3dGlobalAssetLoadGate,
   studioBg3dModalOperationCoordinator,
   type StudioBg3dModalSession,
 } from "./studio-bg3d-modal-operation-coordinator";
 import {
-  admitStoredBg3dModelForRenderingV12 as admitStoredBg3dModelForRendering,
   createStudioBg3dModelAttachment,
   deleteStoredBg3dModelV12 as deleteStoredBg3dModel,
   getStoredBg3dModelV12 as getStoredBg3dModel,
@@ -295,11 +287,20 @@ import {
   type Bg3dVerifiedStoredRecord,
 } from "./studio-bg3d-model-library-loader";
 import {
-  assertStudioBg3dModelPlacementAdmission,
+  assertStudioBg3dModelAttachmentAdmission,
   calculateStudioBg3dPlacedModelBytes,
   StudioBg3dModelPlacementAdmissionError,
   totalStudioBg3dModelAttachmentBytes,
 } from "./studio-bg3d-model-placement-admission";
+import {
+  admitAndCacheStudioBg3dModel as admitAndCacheModel,
+  attachmentMatchesRecord,
+  bindModelAttachment,
+  disposeStudioBg3dModelCache as disposeModelCache,
+  readGenericWorkflowMapsFromAttachments,
+  withStudioGeneric3dWorkflowMetadata,
+  type StudioBg3dModelRootCacheEntry as ModelRootCacheEntry,
+} from "./studio-bg3d-model-runtime-admission";
 import { encodeStudioBg3dModelThumbnailPng } from "./studio-bg3d-model-thumbnail-encode";
 import {
   applyStudioBg3dMoodRig,
@@ -422,7 +423,6 @@ import {
   type StudioBg3dMorphLayer,
   type StudioBg3dQuaternion,
   type StudioBg3dModelAttachment,
-  type StudioBg3dSceneBudgets,
   type StudioBg3dSceneDocument,
   type StudioBg3dToneOutputSettings,
 } from "./studio-bg3d-scene-document";
@@ -437,8 +437,8 @@ import {
   type StudioBg3dSceneRemovalSuccess,
 } from "./studio-bg3d-scene-removal";
 import {
-  adaptStudioBg3dRuntimeToDocument,
   hydrateStudioBg3dDocumentToRuntime,
+  tryAdaptStudioBg3dRuntimeToDocument,
 } from "./studio-bg3d-scene-runtime";
 import {
   DEFAULT_STUDIO_BG3D_SECTION_PLANE_STATE,
@@ -450,7 +450,6 @@ import {
 } from "./studio-bg3d-section-plane";
 import {
   createStudioBg3dSemanticRenderPassPlan,
-  type StudioBg3dSemanticMaterialClassificationResult,
   type StudioBg3dSemanticMaterialConfidence,
   type StudioBg3dSemanticMaterialSlot,
 } from "./studio-bg3d-semantic-materials";
@@ -521,18 +520,14 @@ import {
 } from "./studio-bg3d-three-instancing";
 import { resolveStudioBg3dThreeCenterGroundLocalPosition } from "./studio-bg3d-three-model-alignment";
 import { applyStudioBg3dThreeWebglRenderSettings } from "./studio-bg3d-three-render-settings";
-import { classifyStudioBg3dThreeSemanticMaterials } from "./studio-bg3d-three-semantic-materials";
 import {
   createStudioGeneric3dRightsFromAttachment,
   createStudioGeneric3dVerifiedManifest,
   type StudioGeneric3dClassification,
-  type StudioGeneric3dManifestHints,
   type StudioGeneric3dSourceFormat,
 } from "./studio-generic-3d-model-mode";
 import { createStudioGeneric3dPoseProxies } from "./studio-generic-3d-pose-proxy";
-import { inspectStudioGeneric3dRuntimeHints } from "./studio-generic-3d-runtime-hints";
 import {
-  attachStudioGeneric3dWorkflowMetadata,
   mergeStudioGeneric3dWorkflowMaps,
   normalizeStudioGeneric3dClassification,
   normalizeStudioGeneric3dSourceFormat,
@@ -641,7 +636,9 @@ export interface StudioBackground3DProps {
     signal: AbortSignal,
   ) => Promise<boolean>;
   onClose: () => void;
-  onInsert: (result: StudioBackground3DInsertResult) => boolean | void;
+  onInsert: (
+    result: StudioBackground3DInsertResult,
+  ) => boolean | void | Promise<boolean | void>;
   onUseAsAiMethodReference?: (
     capture: StudioBg3dAiMethodReferenceCapture,
   ) => boolean | void | Promise<boolean | void>;
@@ -743,16 +740,6 @@ function createStudioBg3dHistorySnapshot(input: {
     document: input.document,
   };
 }
-type ModelRootCacheEntry = Pick<StudioBg3dThreeLoadSuccess, "root" | "dispose" | "animations"> & {
-  readonly record: Bg3dVerifiedStoredRecord;
-  readonly metrics: StudioBg3dThreeLoadSuccess["metrics"];
-  readonly admittedProfiles: Set<StudioBg3dResolvedDeviceQuality["profile"]>;
-  readonly joints: readonly StudioBg3dThreeJointDescriptor[];
-  readonly morphTargets: readonly StudioBg3dThreeMorphDescriptor[];
-  readonly semanticMaterials: StudioBg3dSemanticMaterialClassificationResult;
-  readonly genericHints: StudioGeneric3dManifestHints;
-};
-
 interface ModelThumbnailGpuLease {
   readonly released: Promise<void>;
   release(): void;
@@ -1179,11 +1166,6 @@ type BrowserNavigatorCapabilities = Navigator & {
   readonly deviceMemory?: number;
 };
 
-interface ModelBindingMaps {
-  readonly attachmentByStorageModelId: Map<string, StudioBg3dModelAttachment>;
-  readonly storageModelIdByAttachmentId: Map<string, string>;
-}
-
 function canonicalSceneDocument(raw: StudioBg3dSceneDocument | undefined): StudioBg3dSceneDocument | null {
   if (!raw) return null;
   const migrated = migrateStudioBg3dSceneDocument(raw);
@@ -1243,211 +1225,6 @@ function resolveDeviceQuality(
     mode,
     signals: collectDeviceSignals(host),
   });
-}
-
-function rightsMatchRecord(
-  attachment: StudioBg3dModelAttachment,
-  record: Bg3dVerifiedStoredRecord
-): boolean {
-  return attachment.rights.status === record.rights.status
-    && attachment.rights.commercialUse === record.rights.commercialUse
-    && attachment.rights.attributionRequired === record.rights.attributionRequired
-    && attachment.rights.attribution === record.rights.attribution
-    && attachment.rights.licenseName === record.rights.licenseName;
-}
-
-function attachmentMatchesRecord(
-  attachment: StudioBg3dModelAttachment,
-  record: Bg3dVerifiedStoredRecord
-): boolean {
-  return attachment.hash === record.contentHash
-    && attachment.byteSize === record.byteSize
-    && attachment.mime === record.mime
-    && rightsMatchRecord(attachment, record);
-}
-
-function bindModelAttachment(
-  maps: ModelBindingMaps,
-  record: Bg3dVerifiedStoredRecord,
-  attachment: StudioBg3dModelAttachment
-): boolean {
-  if (!attachmentMatchesRecord(attachment, record) || attachment.id === record.id) return false;
-  const existingAttachment = maps.attachmentByStorageModelId.get(record.id);
-  const existingStorageId = maps.storageModelIdByAttachmentId.get(attachment.id);
-  if (
-    (existingAttachment && existingAttachment.id !== attachment.id) ||
-    (existingStorageId && existingStorageId !== record.id)
-  ) {
-    return false;
-  }
-  maps.attachmentByStorageModelId.set(record.id, attachment);
-  maps.storageModelIdByAttachmentId.set(attachment.id, record.id);
-  return true;
-}
-
-/** Writes sanitized generic-3D workflow metadata onto a scene-local attachment (fail-closed). */
-function withStudioGeneric3dWorkflowMetadata(
-  attachment: StudioBg3dModelAttachment,
-  meta: {
-    readonly classification?: StudioGeneric3dClassification | null;
-    readonly sourceFormat?: StudioGeneric3dSourceFormat | null;
-  },
-): StudioBg3dModelAttachment {
-  return attachStudioGeneric3dWorkflowMetadata(
-    { ...attachment },
-    {
-      ...(meta.classification != null ? { classification: meta.classification } : {}),
-      ...(meta.sourceFormat != null ? { sourceFormat: meta.sourceFormat } : {}),
-    },
-  );
-}
-
-function readGenericWorkflowMapsFromAttachments(
-  attachmentByStorageModelId: ReadonlyMap<string, StudioBg3dModelAttachment>,
-): {
-  readonly sourceFormats: Map<string, StudioGeneric3dSourceFormat>;
-  readonly classifications: Map<string, StudioGeneric3dClassification>;
-} {
-  const sourceFormats = new Map<string, StudioGeneric3dSourceFormat>();
-  const classifications = new Map<string, StudioGeneric3dClassification>();
-  for (const [storageId, attachment] of attachmentByStorageModelId) {
-    const workflow = parseStudioGeneric3dWorkflowMetadata(attachment);
-    if (!workflow) continue;
-    if (workflow.sourceFormat) sourceFormats.set(storageId, workflow.sourceFormat);
-    if (workflow.classification) classifications.set(storageId, workflow.classification);
-  }
-  return { sourceFormats, classifications };
-}
-
-async function admitAndCacheModel(args: {
-  readonly record: Bg3dVerifiedStoredRecord;
-  readonly document: StudioBg3dSceneDocument;
-  readonly quality: StudioBg3dResolvedDeviceQuality;
-  readonly cumulativeUsedBytes: number;
-  readonly renderer: THREE.WebGLRenderer | null;
-  readonly cache: Map<string, ModelRootCacheEntry>;
-  readonly pending: Map<string, Promise<ModelRootCacheEntry>>;
-  readonly isActive: () => boolean;
-  readonly signal?: AbortSignal;
-  /** Called only by the invocation that actually installs a newly decoded cache entry. */
-  readonly onCacheEntryCreated?: (storageId: string, entry: ModelRootCacheEntry) => void;
-}): Promise<ModelRootCacheEntry> {
-  if (!args.isActive() || args.signal?.aborted) {
-    throw new StudioBg3dStaleModalOperationError();
-  }
-  const policy = deriveStudioBg3dGlbValidationPolicy(args.document, args.quality);
-  const selectedBudgets: StudioBg3dSceneBudgets = policy.budgets[policy.profile];
-  const cached = args.cache.get(args.record.id);
-  if (cached) {
-    // Decoded-byte attestation is cached per profile, but scene admission is not. A re-add after
-    // deletion and every queued placement must be checked against the current live scene budget.
-    assertStudioBg3dModelPlacementAdmission({
-      record: args.record,
-      cachedRecord: cached.record,
-      metrics: cached.metrics,
-      budgets: selectedBudgets,
-      cumulativeUsedBytes: args.cumulativeUsedBytes,
-      maximumCumulativeBytes: selectedBudgets.complexity.maxModelBytes,
-    });
-    if (!cached.admittedProfiles.has(policy.profile)) {
-      await admitStoredBg3dModelForRendering(args.record.id, {
-        profile: policy.profile,
-        budgets: policy.budgets,
-        cumulativeUsedBytes: args.cumulativeUsedBytes,
-        maximumCumulativeBytes: selectedBudgets.complexity.maxModelBytes,
-        signal: args.signal,
-      });
-      if (!args.isActive()) throw new StudioBg3dStaleModalOperationError();
-      cached.admittedProfiles.add(policy.profile);
-    }
-    if (!args.isActive()) throw new StudioBg3dStaleModalOperationError();
-    return cached;
-  }
-  const pending = args.pending.get(args.record.id);
-  if (pending) {
-    await pending;
-    return admitAndCacheModel(args);
-  }
-
-  const task = studioBg3dGlobalAssetLoadGate.run(async (lease): Promise<ModelRootCacheEntry> => {
-    lease.throwIfRevoked();
-    const combinedSignal = combineStudioBg3dAbortSignals(
-      args.signal ? [args.signal, lease.signal] : [lease.signal],
-    );
-    try {
-      const verification = await admitStoredBg3dModelForRendering(args.record.id, {
-        profile: policy.profile,
-        budgets: policy.budgets,
-        cumulativeUsedBytes: args.cumulativeUsedBytes,
-        maximumCumulativeBytes: selectedBudgets.complexity.maxModelBytes,
-        signal: combinedSignal.signal,
-      });
-      lease.throwIfRevoked();
-      if (!args.isActive()) throw new StudioBg3dStaleModalOperationError();
-      const loaded = await loadVerifiedStudioBg3dGlbWithThree(verification, selectedBudgets, {
-        renderer: args.renderer,
-      });
-      if (!lease.isCurrent() || !args.isActive()) {
-        if (loaded.ok) loaded.dispose();
-        lease.throwIfRevoked();
-        throw new StudioBg3dStaleModalOperationError();
-      }
-      if (!loaded.ok) throw new StudioBg3dThreeOperationError(loaded.code);
-      assertStudioBg3dModelPlacementAdmission({
-        record: args.record,
-        metrics: loaded.metrics,
-        budgets: selectedBudgets,
-        cumulativeUsedBytes: args.cumulativeUsedBytes,
-        maximumCumulativeBytes: selectedBudgets.complexity.maxModelBytes,
-      });
-      loaded.root.scale.setScalar(computeAutoFitScale(measureBg3dObjectSize(loaded.root)));
-      loaded.root.traverse((object) => {
-        const renderable = object as THREE.Mesh;
-        if (!renderable.isMesh) return;
-        renderable.castShadow = true;
-        renderable.receiveShadow = true;
-      });
-      if (!lease.isCurrent() || !args.isActive()) {
-        loaded.dispose();
-        lease.throwIfRevoked();
-        throw new StudioBg3dStaleModalOperationError();
-      }
-      const joints = collectStudioBg3dThreeJoints(loaded.root);
-      const entry: ModelRootCacheEntry = {
-        root: loaded.root,
-        animations: loaded.animations,
-        dispose: loaded.dispose,
-        record: args.record,
-        metrics: loaded.metrics,
-        admittedProfiles: new Set([policy.profile]),
-        joints,
-        morphTargets: collectStudioBg3dThreeMorphTargets(loaded.root),
-        semanticMaterials: classifyStudioBg3dThreeSemanticMaterials(loaded.root),
-        genericHints: inspectStudioGeneric3dRuntimeHints(loaded.root, joints),
-      };
-      if (!lease.isCurrent() || !args.isActive()) {
-        entry.dispose();
-        lease.throwIfRevoked();
-        throw new StudioBg3dStaleModalOperationError();
-      }
-      args.cache.set(args.record.id, entry);
-      args.onCacheEntryCreated?.(args.record.id, entry);
-      return entry;
-    } finally {
-      combinedSignal.dispose();
-    }
-  }, { isCurrent: args.isActive });
-  args.pending.set(args.record.id, task);
-  try {
-    return await task;
-  } finally {
-    if (args.pending.get(args.record.id) === task) args.pending.delete(args.record.id);
-  }
-}
-
-function disposeModelCache(cache: Map<string, ModelRootCacheEntry>): void {
-  for (const entry of cache.values()) entry.dispose();
-  cache.clear();
 }
 
 /* ── 헬퍼: 라디안 ↔ 도(deg) 변환. 상태 자체는 항상 라디안(BgPrimitive 계약)으로 두고
@@ -2764,12 +2541,17 @@ export function StudioBackground3D({
     const session = modalAssetSessionRef.current;
     if (!session || !isModalAssetSessionCurrent(session)) return;
     const currentView = viewportApiRef.current?.readView() ?? sceneBaseDocument.camera;
-    const adapted = adaptStudioBg3dRuntimeToDocument({
+    const adaptation = tryAdaptStudioBg3dRuntimeToDocument({
       primitives,
       customModels,
       attachmentByStorageModelId: attachmentByStorageModelIdRef.current,
       baseDocument: { ...sceneBaseDocument, camera: currentView },
     });
+    if (!adaptation.ok) {
+      setError("현재 장면이 안전 예산을 초과해 템플릿 저장을 시작하지 않았습니다. 장면을 나누거나 일부 오브젝트를 정리해 주세요.");
+      return;
+    }
+    const adapted = adaptation.value;
     if (
       adapted.diagnostics.length > 0 ||
       adapted.omittedDiagnosticCount > 0 ||
@@ -3799,9 +3581,30 @@ export function StudioBackground3D({
     setCanRedo(historyIndexRef.current < historyRef.current.length - 1);
   };
 
+  const canAdmitSceneNodes = (additionalNodeCount: number): boolean => {
+    const live = physicsRuntimeSourceRef.current;
+    const nodeLimit = Math.min(
+      STUDIO_BG3D_SCENE_DOCUMENT_MAX_NODES,
+      live.document.budgets.complexity.maxNodes,
+    );
+    if (
+      !Number.isSafeInteger(additionalNodeCount) ||
+      additionalNodeCount < 0 ||
+      live.primitives.length + live.customModels.length > nodeLimit - additionalNodeCount
+    ) {
+      setError(`이 장면에는 오브젝트를 최대 ${nodeLimit.toLocaleString()}개까지 둘 수 있습니다. 장면을 나누거나 기존 오브젝트를 정리해 주세요.`);
+      return false;
+    }
+    return true;
+  };
+
   const addPrimitive = (kind: BgPrimitiveKind) => {
-    const next = createPrimitive(kind, primitives.length);
-    setPrimitives((prev) => [...prev, next]);
+    if (!canAdmitSceneNodes(1)) return;
+    const live = physicsRuntimeSourceRef.current;
+    const next = createPrimitive(kind, live.primitives.length);
+    const nextPrimitives = [...live.primitives, next];
+    physicsRuntimeSourceRef.current = { ...live, primitives: nextPrimitives };
+    setPrimitives(nextPrimitives);
     setSelectedIds(new Set([next.id]));
   };
 
@@ -3810,8 +3613,12 @@ export function StudioBackground3D({
   const addComposite = (presetId: string) => {
     const preset = COMPOSITE_PRESETS.find((p) => p.id === presetId);
     if (!preset) return;
-    const parts = instantiateCompositePreset(preset, primitives.length);
-    setPrimitives((prev) => [...prev, ...parts]);
+    const live = physicsRuntimeSourceRef.current;
+    const parts = instantiateCompositePreset(preset, live.primitives.length);
+    if (parts.length === 0 || !canAdmitSceneNodes(parts.length)) return;
+    const nextPrimitives = [...live.primitives, ...parts];
+    physicsRuntimeSourceRef.current = { ...live, primitives: nextPrimitives };
+    setPrimitives(nextPrimitives);
     setSelectedIds(new Set([parts[0].id]));
   };
 
@@ -3875,18 +3682,24 @@ export function StudioBackground3D({
   const addSceneTemplate = (templateId: string) => {
     const template = BG_SCENE_TEMPLATES.find((t) => t.id === templateId);
     if (!template) return;
-    const parts = instantiateSceneTemplate(template, primitives.length);
-    if (parts.length === 0) return;
-    setPrimitives((prev) => [...prev, ...parts]);
+    const live = physicsRuntimeSourceRef.current;
+    const parts = instantiateSceneTemplate(template, live.primitives.length);
+    if (parts.length === 0 || !canAdmitSceneNodes(parts.length)) return;
+    const nextPrimitives = [...live.primitives, ...parts];
+    physicsRuntimeSourceRef.current = { ...live, primitives: nextPrimitives };
+    setPrimitives(nextPrimitives);
     setSelectedIds(new Set([parts[0].id]));
   };
 
   // 방 만들기 스펙 → BgPrimitive[] 전개 추가 — addSceneTemplate과 동일한 "추가 = 선택" UX와
   // 디바운스 히스토리 계약(Ctrl+Z 한 번에 방 전체가 되돌아간다).
   const addRoomBuild = () => {
-    const parts = instantiateStudioBg3dRoomBuild(roomBuilderSpec, primitives.length);
-    if (parts.length === 0) return;
-    setPrimitives((prev) => [...prev, ...parts]);
+    const live = physicsRuntimeSourceRef.current;
+    const parts = instantiateStudioBg3dRoomBuild(roomBuilderSpec, live.primitives.length);
+    if (parts.length === 0 || !canAdmitSceneNodes(parts.length)) return;
+    const nextPrimitives = [...live.primitives, ...parts];
+    physicsRuntimeSourceRef.current = { ...live, primitives: nextPrimitives };
+    setPrimitives(nextPrimitives);
     setSelectedIds(new Set([parts[0].id]));
   };
 
@@ -3958,18 +3771,19 @@ export function StudioBackground3D({
 
   const duplicateSelected = () => {
     if (selectedIds.size === 0) return;
+    const live = physicsRuntimeSourceRef.current;
     const newPrimitives: BgPrimitive[] = [];
     const newModels: BgCustomModelInstance[] = [];
     const newIds = new Set<string>();
 
     for (const id of selectedIds) {
-      const p = primitives.find(x => x.id === id);
+      const p = live.primitives.find(x => x.id === id);
       if (p) {
         const clone = duplicatePrimitive(p);
         newPrimitives.push(clone);
         newIds.add(clone.id);
       } else {
-        const m = customModels.find(x => x.id === id);
+        const m = live.customModels.find(x => x.id === id);
         if (m) {
           const clone = duplicateBgCustomModelInstance(m);
           newModels.push(clone);
@@ -3978,12 +3792,16 @@ export function StudioBackground3D({
       }
     }
 
-    if (newPrimitives.length > 0) {
-      setPrimitives((prev) => [...prev, ...newPrimitives]);
-    }
-    if (newModels.length > 0) {
-      setCustomModels((prev) => [...prev, ...newModels]);
-    }
+    if (!canAdmitSceneNodes(newPrimitives.length + newModels.length)) return;
+    const nextPrimitives = [...live.primitives, ...newPrimitives];
+    const nextCustomModels = [...live.customModels, ...newModels];
+    physicsRuntimeSourceRef.current = {
+      ...live,
+      primitives: nextPrimitives,
+      customModels: nextCustomModels,
+    };
+    if (newPrimitives.length > 0) setPrimitives(nextPrimitives);
+    if (newModels.length > 0) setCustomModels(nextCustomModels);
     setSelectedIds(newIds);
   };
 
@@ -4678,6 +4496,13 @@ export function StudioBackground3D({
       { sourceFormat, classification },
     );
     const live = physicsRuntimeSourceRef.current;
+    assertStudioBg3dModelAttachmentAdmission({
+      models: live.customModels,
+      attachments: attachmentByStorageModelIdRef.current,
+      candidateAttachments: [attachment],
+      maximumAttachments: STUDIO_BG3D_SCENE_DOCUMENT_MAX_ATTACHMENTS,
+      maximumCumulativeBytes: live.document.budgets.complexity.maxModelBytes,
+    });
     const cumulativeUsedBytes = calculateStudioBg3dPlacedModelBytes(
       live.customModels,
       attachmentByStorageModelIdRef.current,
@@ -4760,6 +4585,7 @@ export function StudioBackground3D({
     const current = placementSessionRef.current;
     const asset = placementPreviewAsset;
     if (current.phase !== "preview" || !asset) return;
+    if (!canAdmitSceneNodes(1)) return;
     const moved = transitionStudioBg3dPlacementSession(current, {
       type: "pointer-move",
       placementToken: current.identity.placementToken,
@@ -4791,8 +4617,29 @@ export function StudioBackground3D({
       return;
     }
 
-    const rotation = new THREE.Euler().setFromQuaternion(orientation, "XYZ");
     const runtime = physicsRuntimeSourceRef.current;
+    const attachment = attachmentByStorageModelIdRef.current.get(asset.modelId);
+    if (!attachment) {
+      setError("배치할 3D 모델의 장면 연결 정보를 확인할 수 없어 장면을 변경하지 않았습니다.");
+      return;
+    }
+    try {
+      assertStudioBg3dModelAttachmentAdmission({
+        models: runtime.customModels,
+        attachments: attachmentByStorageModelIdRef.current,
+        candidateAttachments: [attachment],
+        maximumAttachments: STUDIO_BG3D_SCENE_DOCUMENT_MAX_ATTACHMENTS,
+        maximumCumulativeBytes: runtime.document.budgets.complexity.maxModelBytes,
+      });
+    } catch (admissionFailure) {
+      setError(
+        admissionFailure instanceof StudioBg3dModelPlacementAdmissionError
+          ? admissionFailure.message
+          : "3D 모델 원본 개수 예산을 확인할 수 없어 장면을 변경하지 않았습니다.",
+      );
+      return;
+    }
+    const rotation = new THREE.Euler().setFromQuaternion(orientation, "XYZ");
     const next: BgCustomModelInstance = {
       ...createBgCustomModelInstance(asset.modelId, runtime.customModels.length),
       position: position.toArray() as [number, number, number],
@@ -4821,6 +4668,7 @@ export function StudioBackground3D({
       applyingTemplateId !== null || deletingModelId !== null ||
       isStudioBg3dPhysicsTransientPhase(physicsPhaseRef.current)
     ) return;
+    if (!canAdmitSceneNodes(1)) return;
     setError(null);
     try {
       await studioBg3dModalOperationCoordinator.runSceneMutation(
@@ -5064,6 +4912,19 @@ export function StudioBackground3D({
             throw new Error("template-node-collision");
           }
 
+          const preparedAttachments = prepared.customModels.map((model) => {
+            const attachment = prepared.nextAttachmentByStorageId.get(model.modelId);
+            if (!attachment) throw new Error("template-attachment-binding");
+            return attachment;
+          });
+          assertStudioBg3dModelAttachmentAdmission({
+            models: current.customModels,
+            attachments: prepared.nextAttachmentByStorageId,
+            candidateAttachments: preparedAttachments,
+            maximumAttachments: STUDIO_BG3D_SCENE_DOCUMENT_MAX_ATTACHMENTS,
+            maximumCumulativeBytes: current.document.budgets.complexity.maxModelBytes,
+          });
+
           attachmentByStorageModelIdRef.current.clear();
           storageModelIdByAttachmentIdRef.current.clear();
           for (const [storageId, attachment] of prepared.nextAttachmentByStorageId) {
@@ -5144,11 +5005,15 @@ export function StudioBackground3D({
     try {
       const policy = deriveStudioBg3dGlbValidationPolicy(sceneBaseDocument, deviceQuality);
       modelImportRuntime = await import("./studio-bg3d-model-import");
+      const loadedModelImportRuntime = modelImportRuntime;
       if (!isModalAssetSessionCurrent(session)) throw new StudioBg3dStaleModalOperationError();
       if (importController.signal.aborted) {
         throw new modelImportRuntime.StudioBg3dModelImportError("aborted");
       }
       const importPlan = modelImportRuntime.planStudioBg3dModelImports(files);
+      if (!canAdmitSceneNodes(importPlan.items.length)) {
+        throw new modelImportRuntime.StudioBg3dModelImportError("node-budget-exceeded");
+      }
       const hasSelectedMtl = [...importPlan.resources.keys()].some((path) =>
         path.toLocaleLowerCase("en-US").endsWith(".mtl")
       );
@@ -5197,7 +5062,25 @@ export function StudioBackground3D({
           lease.throwIfRevoked();
           const libraryEntries = await listBg3dModelLibraryEntries();
           lease.throwIfRevoked();
-          const liveModels = physicsRuntimeSourceRef.current.customModels;
+          const liveScene = physicsRuntimeSourceRef.current;
+          const liveModels = liveScene.customModels;
+          const nodeLimit = Math.min(
+            STUDIO_BG3D_SCENE_DOCUMENT_MAX_NODES,
+            liveScene.document.budgets.complexity.maxNodes,
+          );
+          if (liveScene.primitives.length + liveModels.length > nodeLimit - saved.length) {
+            throw new loadedModelImportRuntime.StudioBg3dModelImportError("node-budget-exceeded");
+          }
+          assertStudioBg3dModelAttachmentAdmission({
+            models: liveModels,
+            attachments: attachmentByStorageModelIdRef.current,
+            candidateAttachments: saved.map((record) => ({
+              hash: record.contentHash,
+              byteSize: record.byteSize,
+            })),
+            maximumAttachments: STUDIO_BG3D_SCENE_DOCUMENT_MAX_ATTACHMENTS,
+            maximumCumulativeBytes: liveScene.document.budgets.complexity.maxModelBytes,
+          });
           const stagedAttachments = new Map<string, StudioBg3dModelAttachment>();
           let cumulativeUsedBytes = calculateStudioBg3dPlacedModelBytes(
             liveModels,
@@ -5270,6 +5153,26 @@ export function StudioBackground3D({
           nextStorageIdByAttachment,
           placements,
         }) => {
+          const current = physicsRuntimeSourceRef.current;
+          const nodeLimit = Math.min(
+            STUDIO_BG3D_SCENE_DOCUMENT_MAX_NODES,
+            current.document.budgets.complexity.maxNodes,
+          );
+          if (current.primitives.length + current.customModels.length > nodeLimit - placements.length) {
+            throw new loadedModelImportRuntime.StudioBg3dModelImportError("node-budget-exceeded");
+          }
+          const candidateAttachments = placements.map((placement) => {
+            const attachment = nextAttachmentByStorageId.get(placement.modelId);
+            if (!attachment) throw new Error("attachment-binding");
+            return attachment;
+          });
+          assertStudioBg3dModelAttachmentAdmission({
+            models: current.customModels,
+            attachments: nextAttachmentByStorageId,
+            candidateAttachments,
+            maximumAttachments: STUDIO_BG3D_SCENE_DOCUMENT_MAX_ATTACHMENTS,
+            maximumCumulativeBytes: current.document.budgets.complexity.maxModelBytes,
+          });
           attachmentByStorageModelIdRef.current.clear();
           storageModelIdByAttachmentIdRef.current.clear();
           for (const [id, attachment] of nextAttachmentByStorageId) {
@@ -5290,12 +5193,12 @@ export function StudioBackground3D({
             mergeStudioGeneric3dWorkflowMaps(previous, importedFormats),
           );
           if (placements.length > 0) {
-            const current = physicsRuntimeSourceRef.current;
+            const nextCustomModels = [...current.customModels, ...placements];
             physicsRuntimeSourceRef.current = {
               ...current,
-              customModels: [...current.customModels, ...placements],
+              customModels: nextCustomModels,
             };
-            setCustomModels((previous) => [...previous, ...placements]);
+            setCustomModels(nextCustomModels);
             setSelectedIds(new Set([placements[placements.length - 1].id]));
             setRefTick((n) => n + 1);
           }
@@ -5310,6 +5213,8 @@ export function StudioBackground3D({
       setError(
         modelImportRuntime && importFailure instanceof modelImportRuntime.StudioBg3dModelImportError
           ? importFailure.message
+          : importFailure instanceof StudioBg3dModelPlacementAdmissionError
+            ? importFailure.message
           : importFailure instanceof StudioBg3dThreeOperationError
             ? importFailure.message
           : importController.signal.aborted
@@ -5876,12 +5781,17 @@ export function StudioBackground3D({
       return null;
     }
     const currentView = viewportApiRef.current?.readView() ?? sceneBaseDocument.camera;
-    const adapted = adaptStudioBg3dRuntimeToDocument({
+    const adaptation = tryAdaptStudioBg3dRuntimeToDocument({
       primitives,
       customModels,
       attachmentByStorageModelId: attachmentByStorageModelIdRef.current,
       baseDocument: { ...sceneBaseDocument, camera: currentView },
     });
+    if (!adaptation.ok) {
+      setError("현재 장면이 안전 예산을 초과해 컷 기록을 시작하지 않았습니다. 장면을 나누거나 일부 오브젝트를 정리해 주세요.");
+      return null;
+    }
+    const adapted = adaptation.value;
     if (
       adapted.diagnostics.length > 0 ||
       adapted.omittedDiagnosticCount > 0 ||
@@ -7046,12 +6956,17 @@ export function StudioBackground3D({
         transparentBackground: backgroundSnapshot.transparent,
       },
     };
-    const adapted = adaptStudioBg3dRuntimeToDocument({
+    const adaptation = tryAdaptStudioBg3dRuntimeToDocument({
       primitives,
       customModels,
       attachmentByStorageModelId: attachmentByStorageModelIdRef.current,
       baseDocument: currentBaseDocument,
     });
+    if (!adaptation.ok) {
+      setError("현재 장면이 안전 예산을 초과해 소재 저장을 시작하지 않았습니다. 장면을 나누거나 일부 오브젝트를 정리해 주세요.");
+      return;
+    }
+    const adapted = adaptation.value;
     if (
       adapted.diagnostics.length > 0 ||
       adapted.omittedDiagnosticCount > 0 ||
@@ -7178,12 +7093,17 @@ export function StudioBackground3D({
         transparentBackground: backgroundSnapshot.transparent,
       },
     };
-    const adapted = adaptStudioBg3dRuntimeToDocument({
+    const adaptation = tryAdaptStudioBg3dRuntimeToDocument({
       primitives,
       customModels,
       attachmentByStorageModelId: attachmentByStorageModelIdRef.current,
       baseDocument: currentBaseDocument,
     });
+    if (!adaptation.ok) {
+      setError("현재 장면이 안전 예산을 초과해 AI 구도 참조 캡처를 시작하지 않았습니다. 장면을 나누거나 일부 오브젝트를 정리해 주세요.");
+      return;
+    }
+    const adapted = adaptation.value;
     if (
       adapted.diagnostics.length > 0 ||
       adapted.omittedDiagnosticCount > 0 ||
@@ -7394,12 +7314,17 @@ export function StudioBackground3D({
         transparentBackground: backgroundSnapshot.transparent,
       },
     };
-    const adapted = adaptStudioBg3dRuntimeToDocument({
+    const adaptation = tryAdaptStudioBg3dRuntimeToDocument({
       primitives,
       customModels,
       attachmentByStorageModelId: attachmentByStorageModelIdRef.current,
       baseDocument: currentBaseDocument,
     });
+    if (!adaptation.ok) {
+      setError("현재 장면이 안전 예산을 초과해 추가를 시작하지 않았습니다. 장면을 나누거나 일부 오브젝트를 정리해 주세요.");
+      return;
+    }
+    const adapted = adaptation.value;
     if (
       adapted.diagnostics.length > 0 ||
       adapted.omittedDiagnosticCount > 0 ||
@@ -7692,7 +7617,7 @@ export function StudioBackground3D({
         receiptAuthority.captureElementIds,
         sharedCharacters,
       );
-      const accepted = onInsert({
+      const accepted = await onInsert({
         kind: "separated",
         width: rendered.width,
         height: rendered.height,
@@ -8852,12 +8777,18 @@ export function StudioBackground3D({
       return;
     }
 
-    const adapted = adaptStudioBg3dRuntimeToDocument({
+    const adaptation = tryAdaptStudioBg3dRuntimeToDocument({
       primitives,
       customModels,
       attachmentByStorageModelId: attachmentByStorageModelIdRef.current,
       baseDocument: sceneBaseDocument,
     });
+    if (!adaptation.ok) {
+      setPhysicsError("현재 장면이 안전 예산을 초과해 물리 미리보기를 시작하지 않았습니다.");
+      transitionPhysicsPhase("error");
+      return;
+    }
+    const adapted = adaptation.value;
     if (
       adapted.diagnostics.length > 0 || adapted.omittedDiagnosticCount > 0 ||
       adapted.counts.droppedPrimitives > 0 || adapted.counts.droppedCustomModels > 0 ||
@@ -10680,18 +10611,30 @@ export function StudioBackground3D({
                                       title="복제"
                                       className="grid size-11 shrink-0 place-items-center rounded text-fg-3 hover:bg-accent-soft hover:text-accent sm:size-6"
                                       onClick={() => {
+                                        if (!canAdmitSceneNodes(1)) return;
+                                        const live = physicsRuntimeSourceRef.current;
                                         if (item.kind === "primitive") {
-                                          const source = primitives.find((p) => p.id === item.id);
+                                          const source = live.primitives.find((p) => p.id === item.id);
                                           if (!source) return;
                                           const clone = duplicatePrimitive(source);
-                                          setPrimitives((prev) => [...prev, clone]);
+                                          const nextPrimitives = [...live.primitives, clone];
+                                          physicsRuntimeSourceRef.current = {
+                                            ...live,
+                                            primitives: nextPrimitives,
+                                          };
+                                          setPrimitives(nextPrimitives);
                                           setSelectedIds(new Set([clone.id]));
                                           return;
                                         }
-                                        const source = customModels.find((m) => m.id === item.id);
+                                        const source = live.customModels.find((m) => m.id === item.id);
                                         if (!source) return;
                                         const clone = duplicateBgCustomModelInstance(source);
-                                        setCustomModels((prev) => [...prev, clone]);
+                                        const nextCustomModels = [...live.customModels, clone];
+                                        physicsRuntimeSourceRef.current = {
+                                          ...live,
+                                          customModels: nextCustomModels,
+                                        };
+                                        setCustomModels(nextCustomModels);
                                         setSelectedIds(new Set([clone.id]));
                                       }}
                                     >

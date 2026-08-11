@@ -64,7 +64,7 @@ describe("Studio VRM texture-paint production integration boundary", () => {
     );
     const libraryHydration = requiredIndex(
       poserSource,
-      "listVrmLibraryEntries()",
+      "queryUploadedVrmLibraryEntriesPage({",
       eagerLoad,
     );
     const readyFrame = sourceBetween(

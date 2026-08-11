@@ -35,7 +35,7 @@ export type StudioVrmInsertHandler = (
 
 export type StudioBg3dInsertHandler = (
   result: StudioBackground3DInsertResult
-) => boolean;
+) => boolean | Promise<boolean>;
 
 export interface StudioBg3dPerspectiveGuideAnchor {
   readonly x: number;
@@ -133,7 +133,7 @@ export interface ApplyStudioBg3dInsertResultInput {
   readonly applyRenderedImage: (
     result: StudioBackground3DInsertResult,
     targetElementId?: string
-  ) => boolean;
+  ) => boolean | Promise<boolean>;
 }
 
 function isPositiveFiniteDimension(value: number | undefined): value is number {
@@ -212,7 +212,7 @@ export function applyStudioBg3dInsertResult({
   admitMutation,
   targetElementId,
   applyRenderedImage,
-}: ApplyStudioBg3dInsertResultInput): boolean {
+}: ApplyStudioBg3dInsertResultInput): boolean | Promise<boolean> {
   if (!mutationTicket || !admitMutation(mutationTicket)) return false;
   return applyRenderedImage(result, targetElementId);
 }

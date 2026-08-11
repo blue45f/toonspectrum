@@ -230,8 +230,26 @@ export async function restoreStudioServerRevision({
       throw new Error("복원된 작품 형식은 컷툰 편집기와 호환되지 않아 자동 적용하지 않았어요.");
     }
 
+    const restoredProject = creatorWorkSnapshotToStudioProject(restoredWork);
+    const { hydrateStudioLinked3dPassCloudProject } = await import(
+      "./studio-linked-3d-pass-cloud-project"
+    );
     documentSaveInFlightRef.current = false;
-    if (!(await applyStudioProjectSnapshot(creatorWorkSnapshotToStudioProject(restoredWork)))) {
+    const applied = await hydrateStudioLinked3dPassCloudProject({
+      workId: restoreWorkId,
+      project: restoredProject,
+      signal: restoreController.signal,
+      apply: async (candidate) => {
+        if (
+          !restoreScopeStillCurrent()
+          || !canApplyStudioMutation(restoreMutationTicket)
+        ) {
+          return false;
+        }
+        return await applyStudioProjectSnapshot(candidate);
+      },
+    });
+    if (!applied) {
       lockStudioMutationsNow();
       setDocumentReloadRequired(true);
       setServerRevisionError(

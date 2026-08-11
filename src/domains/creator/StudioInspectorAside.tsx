@@ -245,6 +245,8 @@ import {
   type StudioRasterRecoveryRequest,
 } from "./StudioRasterToolRecoveryPanel";
 import { StudioSkewPanel } from "./StudioSkewPanel";
+import { useStudioRasterSourcePresentation } from
+  "./use-studio-raster-source-presentation";
 
 import type {
   StudioAdvancedRuler,
@@ -540,7 +542,7 @@ interface StudioInspectorAsideProps {
   selectedBubbleTailGeometry: import("./studio-bubble-custom-shape").BubbleShapeGeometry | null;
   selectedContentMutationLocked: boolean;
   selectedId: string | null;
-  selectedReadableImageSource: string | null;
+  selectedRasterSource: string | null;
   selectedWorkAssetDestructiveEditReason: string | null;
   setSelectedId: import("react").Dispatch<import("react").SetStateAction<string | null>>;
   autoColorScribbleCanvasArmed?: boolean;
@@ -899,7 +901,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   selectedBubbleTailGeometry,
   selectedContentMutationLocked,
   selectedId,
-  selectedReadableImageSource,
+  selectedRasterSource,
   selectedWorkAssetDestructiveEditReason,
   setSelectedId,
   autoColorScribbleCanvasArmed = false,
@@ -1204,6 +1206,11 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
     toggleLayerSolo,
     updateAdvancedFillSettings,
   } = stableHandlers;
+  const selectedRasterPresentation = useStudioRasterSourcePresentation(
+    selectedRasterSource,
+    { consumer: "studio-inspector-selected-image" },
+  );
+  const selectedReadableImageSource = selectedRasterPresentation.src;
   const [activatedImageInspectorTabs, setActivatedImageInspectorTabs] = useState<
     ReadonlySet<StudioImageInspectorSection>
   >(() => new Set());
@@ -2769,8 +2776,9 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                       ) : null}
                       {selected.type === "image" ? (
                         <>
+                          {selectedReadableImageSource ? (
                           <StudioAutoColorHintsPanel
-                            imageSrc={selected.src}
+                            imageSrc={selectedReadableImageSource}
                             scribbleCanvasArmed={autoColorScribbleCanvasArmed}
                             onScribbleCanvasArmedChange={
                               setAutoColorScribbleCanvasArmed
@@ -2827,6 +2835,14 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                               }
                             }
                           />
+                          ) : (
+                            <p
+                              role="status"
+                              className="rounded-lg border border-line bg-card/50 px-3 py-2 text-xs text-fg-3"
+                            >
+                              검증된 이미지 바이트를 준비하는 중입니다.
+                            </p>
+                          )}
                           {!selectedWorkAssetDestructiveEditReason ? (
                             <StudioLineCleanupPanel
                               src={selected.src}

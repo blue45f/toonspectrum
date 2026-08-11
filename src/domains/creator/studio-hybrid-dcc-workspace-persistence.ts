@@ -8,6 +8,10 @@
  */
 
 import {
+  buildStudioBg3dRoomParts,
+  getStudioBg3dRoomPreset,
+} from "./studio-bg3d-room-builder";
+import {
   canonicalStudioCommandJson,
   restoreStudioCommandJournal,
   serializeStudioCommandJournal,
@@ -30,6 +34,7 @@ import {
   type StudioHybridDccSession,
 } from "./studio-hybrid-dcc-document";
 import {
+  hashStudioHybridDccObjectTransform,
   normalizeStudioHybridDccObjectTransform,
 } from "./studio-hybrid-dcc-object-transform";
 import {
@@ -44,6 +49,7 @@ import {
   type StudioLiveBridgeDocument,
   type StudioSharedSetObject,
 } from "./studio-live-2d3d-bridge";
+import { serializeStudioMeshModifierStack } from "./studio-mesh-modifier-stack";
 import {
   createStudioOpfsRecoveryJournal,
   createStudioOpfsRecoveryJournalAdapter,
@@ -77,6 +83,7 @@ export const STUDIO_HYBRID_DCC_WORKSPACE_PERSISTENCE_MAX_BYTES = 48 * 1024 * 102
 const TEXT_ENCODER = new TextEncoder();
 const TEXT_DECODER = new TextDecoder("utf-8", { fatal: true });
 const SHA256_PATTERN = /^sha256:[0-9a-f]{64}$/u;
+const PRE_SLICE_MESH_HASH_PATTERN = /^mesh:[0-9a-f]{8}$/u;
 const SAFE_GROUP_ID = /^[A-Za-z0-9][A-Za-z0-9._:@/-]{0,159}$/u;
 const MAX_SCOPE_PART_LENGTH = 256;
 const MAX_HISTORY_SNAPSHOTS = 2_048;
@@ -508,14 +515,71 @@ function snapshotWorkspace(
   return cloneJsonSafe(payload, "Hybrid DCC workspace", maxBytes);
 }
 
+function hashPreSliceModifierStack(
+  meshHash: string,
+  stack: Parameters<typeof serializeStudioMeshModifierStack>[0],
+): string {
+  const canonical = JSON.stringify({
+    sourceHash: meshHash,
+    ...serializeStudioMeshModifierStack(stack),
+  });
+  return `modifier-stack:sha256:${sha256HexPortable(TEXT_ENCODER.encode(canonical))}`;
+}
+
+/**
+ * Reconstructs the v3 state hash exactly as 7b039bbc did, while retaining the persisted legacy
+ * mesh hashes and Rights BOM. This is verification-only; successful callers immediately mint a
+ * fresh exact-SHA snapshot through snapshotStudioHybridDccState.
+ */
+function hashPreSliceV3Snapshot(
+  snapshot: StudioHybridDccPersistedSnapshot,
+  state: ReturnType<typeof restoreStudioHybridDccStateFromSnapshot>,
+): string {
+  const assetById = new Map(snapshot.assets.map((asset) => [asset.assetId, asset] as const));
+  const assetIds = Object.keys(state.geometry.records).sort();
+  const meshFingerprints = assetIds.map((assetId) => {
+    const asset = assetById.get(assetId);
+    const record = state.geometry.records[assetId];
+    if (!asset || !record) {
+      persistenceError("CORRUPT_PAYLOAD", `legacy v3 geometry asset ${assetId}가 누락되었습니다.`);
+    }
+    return `${assetId}:${asset.meshHash}:${hashPreSliceModifierStack(
+      asset.meshHash,
+      record.modifierStack,
+    )}`;
+  });
+  const parts = [
+    state.documentId,
+    String(state.version),
+    String(state.commandCount),
+    String(assetIds.length),
+    ...meshFingerprints,
+    ...Object.keys(state.objectTransforms)
+      .sort()
+      .map((assetId) => (
+        `${assetId}:${hashStudioHybridDccObjectTransform(state.objectTransforms[assetId]!)}`
+      )),
+    ...snapshot.dirtyNodeIds,
+    ...snapshot.rightsBom.map((record) => canonicalStudioCommandJson(record)).sort(),
+    ...snapshot.dependencies.map((dependency) => canonicalStudioCommandJson(dependency)).sort(),
+    snapshot.milestoneLabel ?? "",
+  ];
+  return `sha256:${sha256HexPortable(TEXT_ENCODER.encode(parts.join("|")))}`;
+}
+
+interface ValidatedPersistedSnapshot {
+  readonly snapshot: StudioHybridDccPersistedSnapshot;
+  readonly state: ReturnType<typeof restoreStudioHybridDccStateFromSnapshot>;
+  readonly persistedStateHash: string;
+  readonly legacyMeshHashByAssetId: ReadonlyMap<string, string>;
+  readonly migratedPreSliceAuthority: boolean;
+}
+
 function validateSnapshot(
   value: unknown,
   expectedDocumentId: string | null,
   path: string,
-): {
-  readonly snapshot: StudioHybridDccPersistedSnapshot;
-  readonly state: ReturnType<typeof restoreStudioHybridDccStateFromSnapshot>;
-} {
+): ValidatedPersistedSnapshot {
   const snapshot = value as StudioHybridDccRestorableSnapshot;
   let state;
   try {
@@ -526,9 +590,30 @@ function validateSnapshot(
   if (typeof snapshot.stateHash !== "string" || !SHA256_PATTERN.test(snapshot.stateHash)) {
     persistenceError("CORRUPT_PAYLOAD", `${path} 문서 stateHash 형식이 올바르지 않습니다.`);
   }
-  if (snapshot.version === STUDIO_HYBRID_DCC_DOCUMENT_VERSION
-    && state.stateHash !== snapshot.stateHash) {
-    persistenceError("INTEGRITY_FAILED", `${path} 문서 stateHash가 일치하지 않습니다.`);
+  const legacyMeshHashByAssetId = new Map<string, string>();
+  let migratedPreSliceAuthority = false;
+  if (snapshot.version === STUDIO_HYBRID_DCC_DOCUMENT_VERSION) {
+    for (const asset of snapshot.assets) {
+      if (PRE_SLICE_MESH_HASH_PATTERN.test(asset.meshHash)) {
+        legacyMeshHashByAssetId.set(asset.assetId, asset.meshHash);
+      }
+    }
+    if (legacyMeshHashByAssetId.size > 0
+      && legacyMeshHashByAssetId.size !== snapshot.assets.length) {
+      persistenceError(
+        "INTEGRITY_FAILED",
+        `${path} legacy/exact mesh hash의 부분 이관 상태는 허용되지 않습니다.`,
+      );
+    }
+    if (legacyMeshHashByAssetId.size > 0) {
+      const preSliceHash = hashPreSliceV3Snapshot(snapshot, state);
+      if (preSliceHash !== snapshot.stateHash) {
+        persistenceError("INTEGRITY_FAILED", `${path} legacy v3 문서 stateHash가 일치하지 않습니다.`);
+      }
+      migratedPreSliceAuthority = true;
+    } else if (state.stateHash !== snapshot.stateHash) {
+      persistenceError("INTEGRITY_FAILED", `${path} 문서 stateHash가 일치하지 않습니다.`);
+    }
   }
   if (expectedDocumentId !== null && state.documentId !== expectedDocumentId) {
     persistenceError("CORRUPT_PAYLOAD", `${path} 문서 ID가 현재 작업 문서와 다릅니다.`);
@@ -551,6 +636,9 @@ function validateSnapshot(
       ...state,
       geometry: { ...state.geometry, records },
     },
+    persistedStateHash: snapshot.stateHash,
+    legacyMeshHashByAssetId,
+    migratedPreSliceAuthority,
   };
 }
 
@@ -562,7 +650,14 @@ function validateGroupId(value: unknown, path: string): string | null {
   return value;
 }
 
-function restoreSession(value: unknown): StudioHybridDccSession {
+interface RestoredPersistedSession {
+  readonly session: StudioHybridDccSession;
+  readonly persistedStateHash: string;
+  readonly currentLegacyMeshHashByAssetId: ReadonlyMap<string, string>;
+  readonly migratedPreSliceAuthority: boolean;
+}
+
+function restoreSession(value: unknown): RestoredPersistedSession {
   const record = assertRecord(value, "$.payload.session");
   assertExactKeys(record, [
     "state",
@@ -586,12 +681,14 @@ function restoreSession(value: unknown): StudioHybridDccSession {
     "$.payload.session.redoStack",
     MAX_HISTORY_SNAPSHOTS,
   );
-  const undoStack = undoValues.map((snapshot, index) => (
-    validateSnapshot(snapshot, documentId, `$.payload.session.undoStack[${index}]`).snapshot
+  const validatedUndo = undoValues.map((snapshot, index) => (
+    validateSnapshot(snapshot, documentId, `$.payload.session.undoStack[${index}]`)
   ));
-  const redoStack = redoValues.map((snapshot, index) => (
-    validateSnapshot(snapshot, documentId, `$.payload.session.redoStack[${index}]`).snapshot
+  const validatedRedo = redoValues.map((snapshot, index) => (
+    validateSnapshot(snapshot, documentId, `$.payload.session.redoStack[${index}]`)
   ));
+  const undoStack = validatedUndo.map(({ snapshot }) => snapshot);
+  const redoStack = validatedRedo.map(({ snapshot }) => snapshot);
   const undoGroupValues = assertArray(
     record.undoGroupStack,
     "$.payload.session.undoGroupStack",
@@ -627,14 +724,21 @@ function restoreSession(value: unknown): StudioHybridDccSession {
     persistenceError("CORRUPT_PAYLOAD", "저장된 Lamport 시계가 문서 명령 수보다 작습니다.");
   }
   return {
-    state: current.state,
-    journal,
-    undoStack,
-    redoStack,
-    lastGroupId: validateGroupId(record.lastGroupId, "$.payload.session.lastGroupId"),
-    undoGroupStack,
-    redoGroupStack,
-    lamport,
+    session: {
+      state: current.state,
+      journal,
+      undoStack,
+      redoStack,
+      lastGroupId: validateGroupId(record.lastGroupId, "$.payload.session.lastGroupId"),
+      undoGroupStack,
+      redoGroupStack,
+      lamport,
+    },
+    persistedStateHash: current.persistedStateHash,
+    currentLegacyMeshHashByAssetId: current.legacyMeshHashByAssetId,
+    migratedPreSliceAuthority: current.migratedPreSliceAuthority
+      || validatedUndo.some(({ migratedPreSliceAuthority }) => migratedPreSliceAuthority)
+      || validatedRedo.some(({ migratedPreSliceAuthority }) => migratedPreSliceAuthority),
   };
 }
 
@@ -749,11 +853,97 @@ function assertNullableJsonObject<T>(value: unknown, path: string): T | null {
   return value as T;
 }
 
-function restoreWorkspace(value: unknown): StudioHybridDccWorkspace {
+interface RestoredPersistedWorkspace {
+  readonly workspace: StudioHybridDccWorkspace;
+  readonly persistedStateHash: string;
+  readonly migratedPreSliceAuthority: boolean;
+}
+
+function isVerifiedPreSliceRoomBridgeObject(object: StudioSharedSetObject): boolean {
+  if (object.id !== "room-shell"
+    || object.materialId !== "wall"
+    || object.visible !== true
+    || object.transform !== undefined) {
+    return false;
+  }
+  const match = /^room:([A-Za-z0-9][A-Za-z0-9._-]{0,79}):([1-9][0-9]{0,5})$/u.exec(
+    object.geometryHash,
+  );
+  if (!match) return false;
+  const partCount = Number(match[2]);
+  if (!Number.isSafeInteger(partCount) || partCount <= 0 || partCount > MAX_BRIDGE_OBJECTS) {
+    return false;
+  }
+  const preset = getStudioBg3dRoomPreset(match[1]);
+  if (!preset) return false;
+  try {
+    return buildStudioBg3dRoomParts(preset.spec).length === partCount;
+  } catch {
+    return false;
+  }
+}
+
+function migratePreSliceBridgeAuthority(
+  bridge: StudioLiveBridgeDocument,
+  session: StudioHybridDccSession,
+  legacyMeshHashByAssetId: ReadonlyMap<string, string>,
+): { readonly bridge: StudioLiveBridgeDocument; readonly migrated: boolean } {
+  if (legacyMeshHashByAssetId.size === 0) return { bridge, migrated: false };
+  let migrated = false;
+  const objects = bridge.set.objects.map((object) => {
+    const legacyHash = legacyMeshHashByAssetId.get(object.id);
+    const authorityRecord = session.state.geometry.records[object.id];
+    if (!legacyHash || !authorityRecord) {
+      if (isVerifiedPreSliceRoomBridgeObject(object)) return object;
+      persistenceError(
+        "INTEGRITY_FAILED",
+        `legacy bridge object ${object.id}가 문서 geometry authority와 연결되지 않습니다.`,
+      );
+    }
+    if (object.geometryHash !== legacyHash) {
+      // A pre-slice nonempty modifier stack stored its evaluated resultHash in the bridge while
+      // keeping the source mesh canonical in the document. The preview mesh was intentionally not
+      // persisted, so its legacy fingerprint cannot become authority here. Accept only the legacy
+      // fingerprint shape as a disposable cache marker, reset it to exact source authority, and
+      // let workspaceRefreshModifierPreviews materialize a fresh exact cache after cold load.
+      const isDisposableModifierPreview = authorityRecord.modifierStack.modifiers.length > 0
+        && PRE_SLICE_MESH_HASH_PATTERN.test(object.geometryHash);
+      if (!isDisposableModifierPreview) {
+        persistenceError(
+          "INTEGRITY_FAILED",
+          `legacy bridge object ${object.id}의 geometryHash가 검증된 mesh hash와 다릅니다.`,
+        );
+      }
+    }
+    migrated = true;
+    return { ...object, geometryHash: authorityRecord.meshHash };
+  });
+  if (!migrated) return { bridge, migrated: false };
+  return {
+    bridge: {
+      ...bridge,
+      set: createStudioSharedSet(bridge.set.id, objects),
+      shots: bridge.shots.map((shot) => ({
+        ...shot,
+        dirtyPasses: [...STUDIO_TOON_PASS_KINDS],
+      })),
+    },
+    migrated: true,
+  };
+}
+
+function restoreWorkspace(value: unknown): RestoredPersistedWorkspace {
   const record = assertRecord(value, "$.payload");
   assertExactKeys(record, ["session", "bridge", "aux"], "$.payload");
-  const session = restoreSession(record.session);
-  const bridge = restoreBridge(record.bridge);
+  const restoredSession = restoreSession(record.session);
+  const session = restoredSession.session;
+  const restoredBridge = restoreBridge(record.bridge);
+  const bridgeMigration = migratePreSliceBridgeAuthority(
+    restoredBridge,
+    session,
+    restoredSession.currentLegacyMeshHashByAssetId,
+  );
+  const bridge = bridgeMigration.bridge;
   const aux = assertRecord(record.aux, "$.payload.aux");
   assertExactKeys(aux, [
     "activeAssetId",
@@ -797,40 +987,45 @@ function restoreWorkspace(value: unknown): StudioHybridDccWorkspace {
   assertSafeInteger(collab.epoch, "$.payload.aux.collab.epoch");
   assertRecord(collab.locks, "$.payload.aux.collab.locks");
   return {
-    revision: STUDIO_HYBRID_DCC_WORKSPACE_REVISION,
-    session,
-    bridge,
-    activeAssetId,
-    lastImportReport: aux.lastImportReport,
-    lastUvMap: decodeUvMap(aux.lastUvMap),
-    lastRetarget: assertNullableJsonObject<StudioRetargetReport>(
-      aux.lastRetarget,
-      "$.payload.aux.lastRetarget",
-    ),
-    lastExport: assertNullableJsonObject<StudioMeshExportResult>(
-      aux.lastExport,
-      "$.payload.aux.lastExport",
-    ),
-    lastSpring: assertNullableJsonObject<StudioSpringBone>(
-      aux.lastSpring,
-      "$.payload.aux.lastSpring",
-    ),
-    lastOcct: decodeOcctResult(aux.lastOcct),
-    lastDynatopo: assertNullableJsonObject<StudioHybridDccWorkspace["lastDynatopo"]>(
-      aux.lastDynatopo,
-      "$.payload.aux.lastDynatopo",
-    ),
-    lastRetopo: assertNullableJsonObject<StudioHybridDccWorkspace["lastRetopo"]>(
-      aux.lastRetopo,
-      "$.payload.aux.lastRetopo",
-    ),
-    bom,
-    collab,
-    clothStep,
-    // The canonical stepped mesh is persisted in the document. Velocity/rest continuation is an
-    // explicitly transient solver cache and starts fresh after a cold restore.
-    clothRuntimeCache: null,
-    animSampleTime,
+    workspace: {
+      revision: STUDIO_HYBRID_DCC_WORKSPACE_REVISION,
+      session,
+      bridge,
+      activeAssetId,
+      lastImportReport: aux.lastImportReport,
+      lastUvMap: decodeUvMap(aux.lastUvMap),
+      lastRetarget: assertNullableJsonObject<StudioRetargetReport>(
+        aux.lastRetarget,
+        "$.payload.aux.lastRetarget",
+      ),
+      lastExport: assertNullableJsonObject<StudioMeshExportResult>(
+        aux.lastExport,
+        "$.payload.aux.lastExport",
+      ),
+      lastSpring: assertNullableJsonObject<StudioSpringBone>(
+        aux.lastSpring,
+        "$.payload.aux.lastSpring",
+      ),
+      lastOcct: decodeOcctResult(aux.lastOcct),
+      lastDynatopo: assertNullableJsonObject<StudioHybridDccWorkspace["lastDynatopo"]>(
+        aux.lastDynatopo,
+        "$.payload.aux.lastDynatopo",
+      ),
+      lastRetopo: assertNullableJsonObject<StudioHybridDccWorkspace["lastRetopo"]>(
+        aux.lastRetopo,
+        "$.payload.aux.lastRetopo",
+      ),
+      bom,
+      collab,
+      clothStep,
+      // The canonical stepped mesh is persisted in the document. Velocity/rest continuation is an
+      // explicitly transient solver cache and starts fresh after a cold restore.
+      clothRuntimeCache: null,
+      animSampleTime,
+    },
+    persistedStateHash: restoredSession.persistedStateHash,
+    migratedPreSliceAuthority: restoredSession.migratedPreSliceAuthority
+      || bridgeMigration.migrated,
   };
 }
 
@@ -1021,7 +1216,8 @@ function decodeEnvelope(input: {
   if (typeof record.documentStateHash !== "string" || !SHA256_PATTERN.test(record.documentStateHash)) {
     persistenceError("CORRUPT_PAYLOAD", "3D 문서 stateHash 형식이 올바르지 않습니다.");
   }
-  const workspace = restoreWorkspace(record.payload);
+  const restored = restoreWorkspace(record.payload);
+  const workspace = restored.workspace;
   const payloadRecord = assertRecord(record.payload, "$.payload");
   const sessionRecord = assertRecord(payloadRecord.session, "$.payload.session");
   const stateRecord = assertRecord(sessionRecord.state, "$.payload.session.state");
@@ -1033,14 +1229,25 @@ function decodeEnvelope(input: {
     "$.payload.session.state.stateHash",
     256,
   );
-  const expectedEnvelopeStateHash = documentVersion === STUDIO_HYBRID_DCC_DOCUMENT_VERSION
-    ? workspace.session.state.stateHash
-    : persistedStateHash;
-  if (expectedEnvelopeStateHash !== record.documentStateHash) {
+  if (persistedStateHash !== restored.persistedStateHash) {
+    persistenceError("INTEGRITY_FAILED", "복구 전 3D 문서 stateHash 권위가 일치하지 않습니다.");
+  }
+  if (persistedStateHash !== record.documentStateHash) {
     persistenceError("INTEGRITY_FAILED", "복구한 3D 문서 stateHash가 envelope와 일치하지 않습니다.");
   }
+  const migratedEnvelope = restored.migratedPreSliceAuthority
+    && documentVersion === STUDIO_HYBRID_DCC_DOCUMENT_VERSION
+    ? createEnvelope({
+        kind: "workspace",
+        scopeKey: input.scopeKey,
+        savedAt,
+        payload: snapshotWorkspace(workspace, input.maxBytes),
+        documentStateHash: workspace.session.state.stateHash,
+        maxBytes: input.maxBytes,
+      }).envelope
+    : null;
   return {
-    envelope: {
+    envelope: migratedEnvelope ?? {
       ...(record as unknown as StudioHybridDccWorkspacePersistenceEnvelopeV1),
       savedAt,
       payloadByteLength,

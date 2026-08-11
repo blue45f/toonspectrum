@@ -1,10 +1,15 @@
 import { randomUUID } from "node:crypto";
 
+import { assertCreatorDraftCollaborationStatusMutationAllowed } from "../../../../../lib/server/creator-provisional-work-status";
 import {
   CREATOR_WORK_REVISION_MAX,
   createCreatorWorkRevisionSnapshot,
   creatorWorkRevisionRetentionCutoff,
 } from "../../../../../lib/server/creator-work-revisions";
+import {
+  assertStudioLinked3dPassAssetRows,
+  extractStudioLinked3dPassAssetRequirements,
+} from "../../../../../lib/studio-linked-3d-pass-asset-fence";
 
 import { createDefaultCreatorCollaborationPersistence } from "./creator-collaboration.drizzle-persistence";
 import {
@@ -810,6 +815,11 @@ export class CreatorCollaborationRepository {
       ) {
         throw new CreatorCollaborationForbiddenError("document_owner_fields_denied");
       }
+      assertCreatorDraftCollaborationStatusMutationAllowed({
+        hidden: context.work.hidden === true,
+        draftCollaborationStatus: context.work.draftCollaborationStatus,
+        requestedStatus: patch.status,
+      });
       const current = await unit.findAccessibleDocument(actorUserId, workId);
       if (!current) {
         throw new CreatorCollaborationForbiddenError("document_edit_denied");
@@ -819,6 +829,22 @@ export class CreatorCollaborationRepository {
       }
       if (current.revision >= CREATOR_WORK_REVISION_MAX) {
         throw new Error("creator work revision limit reached");
+      }
+      const linkedPassRequirements = extractStudioLinked3dPassAssetRequirements({
+        cover: Object.hasOwn(patch, "cover") ? patch.cover : current.cover,
+        pages: Object.hasOwn(patch, "pages") ? patch.pages : current.pages,
+        doc: Object.hasOwn(patch, "doc") ? patch.doc : current.doc,
+      });
+      if (linkedPassRequirements.length > 0) {
+        const rows = await unit.findStudioLinked3dPassAssets(
+          workId,
+          linkedPassRequirements.map(({ assetId }) => assetId)
+        );
+        assertStudioLinked3dPassAssetRows({
+          workId,
+          requirements: linkedPassRequirements,
+          rows,
+        });
       }
 
       const now = this.now();

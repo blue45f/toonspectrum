@@ -131,6 +131,7 @@ describe("Studio server-revision restore controller boundary", () => {
     expect(controller.dynamicImports).toEqual([
       "@/src/infrastructure/creator-client",
       "./studio-shared-document-client",
+      "./studio-linked-3d-pass-cloud-project",
       "./studio-shared-document-client",
     ]);
     expect(restore).toContain("saveNamedCheckpoint(studioServerRestoreCheckpointName(");
@@ -147,6 +148,9 @@ describe("Studio server-revision restore controller boundary", () => {
     expect(restore).toContain("restoreWorkRevision(");
     expect(restore).toContain("restoredWork.revision !== committedRevision");
     expect(restore).toContain("restoredShared.revision !== committedRevision");
+    expect(restore).toContain("await hydrateStudioLinked3dPassCloudProject({");
+    expect(restore).toContain("signal: restoreController.signal");
+    expect(restore).toContain("return await applyStudioProjectSnapshot(candidate)");
     expect(restore).toContain("setDocumentReloadRequired(true)");
     expect(restore).toContain('cause.name === "WorkRevisionConflictError"');
     expect(restore).toContain("globalThis.localStorage.removeItem(autosaveKey)");

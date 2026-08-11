@@ -7,9 +7,9 @@ import {
   SlidersHorizontal,
   Undo2,
 } from "lucide-react";
-import { Profiler, Suspense, lazy, useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type ChangeEvent, type ComponentProps, type ReactNode, type SetStateAction } from "react";
+import { Profiler, Suspense, lazy, useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type ChangeEvent, type ComponentProps, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { flushSync } from "react-dom";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 import { studioCreationLinkParams } from "./creator-studio-links";
 import { applyStudioBg3dAiMethodReference } from "./studio-3d-ai-reference-application";
@@ -410,6 +410,7 @@ import {
   smoothPointsAroundIndex,
   updateSmoothStrengthDrag,
 } from "./studio-curve-smoothing";
+import { resolveStudioDccRouteAccess } from "./studio-dcc-route-access";
 import {
   STUDIO_DEFERRED_STROKE_POSTPROCESS_TIMEOUT_MS,
   planStudioDeferredStrokePostprocess,
@@ -668,6 +669,7 @@ import {
   type StudioInspectorLayout,
   type StudioInspectorRoute,
 } from "./studio-inspector-layout";
+import { resolveStudioInteractiveThreeDSurfaceAdmission } from "./studio-interactive-3d-surface";
 import {
   clampIsometricAngleDeg,
   clampIsometricCellSize,
@@ -749,6 +751,26 @@ import {
   type LayerGroup,
   type LayerItemReorderDirection,
 } from "./studio-layers";
+import {
+  commitStudioLinked3dPreparedPass,
+  prepareStudioLinked3dLinePass,
+} from "./studio-linked-3d-pass-transaction";
+import {
+  studioLinked3dPassDestructiveEditReason,
+  studioLinked3dPassSourceReplacementReason,
+} from "./studio-linked-3d-raster-edit-policy";
+import {
+  createStudioLinked3dCorrectionProvenance,
+  detachStudioLinked3dCorrections,
+  ensureStudioLinked3dRenderShot,
+  materializeStudioLinked3dLinePassLocator,
+  parseStudioLinked3dRenderDocument,
+  reconcileStudioLinked3dRenderDocumentAfterElementMutation,
+  removeStudioLinked3dRenderLinks,
+  upsertStudioLinked3dRenderLink,
+  validateStudioLinked3dRenderDocumentAgainstPage,
+  validateStudioLinked3dReservedPageState,
+} from "./studio-linked-3d-render-document";
 import { type StudioLiquifyMode } from "./studio-liquify-contract";
 import {
   appendStudioLiquifyPointerPoint,
@@ -1505,6 +1527,16 @@ import {
 } from "./studio-work-asset-render-projection";
 import { readStudioWorkspaceDeviceSignalsFromGlobals } from "./studio-workspace-device-signals";
 import {
+  createStudioDccNavigationState,
+  parseStudioWorkspaceRoute,
+  studioCanvasHref,
+  studioDccHref,
+  studioWorkspaceReturnHref,
+  type StudioDccWorkbenchMode,
+  type StudioWorkspaceRoute,
+  type StudioWorkspaceRouteErrorCode,
+} from "./studio-workspace-route";
+import {
   STUDIO_WORKSPACE_LEFT_PANEL_WIDTH,
   STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH,
   areStudioWorkspaceLayoutsEqual,
@@ -1550,6 +1582,7 @@ import {
 } from "./StudioColorBlindPreview";
 import { StudioDestructiveConfirmHost } from "./StudioDestructiveConfirmHost";
 import { StudioHelpCenterHost } from "./StudioHelpCenterHost";
+import { StudioHybridDccRouteGate } from "./StudioHybridDccRouteGate";
 import {
   StudioLazyPanelStack,
   type StudioLazyPanelStackHandlers,
@@ -2696,13 +2729,54 @@ function isStudioAiReferenceCompatibleAsset(asset: Pick<StudioAsset, "dataUrl">)
   return /^data:image\/(?:png|jpeg|webp);base64,/iu.test(asset.dataUrl);
 }
 
+const STUDIO_LINKED_3D_CLOUD_SAVE_RECOVERY_STATE_KEY =
+  "studioLinked3dCloudSaveRecovery" as const;
+const STUDIO_LINKED_3D_CLOUD_SAVE_RECOVERY_NOTICE =
+  "이전 cloud-save가 이미 완료된 작품을 열었습니다. 현재 로컬 초안은 덮어쓰지 않고 보존했습니다.";
+
+function studioLinked3dCloudSaveRecoveryNotice(
+  state: unknown,
+  workId: string | null,
+): string | null {
+  if (!workId || typeof state !== "object" || state === null || Array.isArray(state)) return null;
+  const receipt = (state as Record<string, unknown>)[
+    STUDIO_LINKED_3D_CLOUD_SAVE_RECOVERY_STATE_KEY
+  ];
+  if (typeof receipt !== "object" || receipt === null || Array.isArray(receipt)) return null;
+  const record = receipt as Record<string, unknown>;
+  return record.version === 1 && record.workId === workId
+    ? STUDIO_LINKED_3D_CLOUD_SAVE_RECOVERY_NOTICE
+    : null;
+}
+
+function withStudioLinked3dCloudSaveRecoveryState(
+  state: unknown,
+  workId: string,
+): Record<string, unknown> {
+  const base = typeof state === "object" && state !== null && !Array.isArray(state)
+    ? state as Record<string, unknown>
+    : {};
+  return {
+    ...base,
+    [STUDIO_LINKED_3D_CLOUD_SAVE_RECOVERY_STATE_KEY]: { version: 1, workId },
+  };
+}
+
 export function StudioPage() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [params] = useSearchParams();
   const { data: session } = useSession();
-  const workId = params.get("id");
+  const studioRoute = parseStudioWorkspaceRoute({
+    pathname: location.pathname,
+    search: location.search,
+  });
+  const workId = studioRoute.valid ? studioRoute.workId : null;
   const remixId = params.get("remix");
   const authScopeKey = session?.user?.id ?? null;
-  const uploadMode = params.get("mode") === "upload";
+  const uploadMode = studioRoute.valid
+    && studioRoute.surface === "canvas"
+    && params.get("mode") === "upload";
   const draftRouteKey = uploadMode
     ? `upload:${workId ?? "new"}`
     : workId
@@ -2718,11 +2792,38 @@ export function StudioPage() {
     draftRouteKey,
     authScopeKey
   );
+  const canonicalStudioHref = studioRoute.valid && !uploadMode
+    ? studioRoute.surface === "dcc"
+      ? studioDccHref({
+          mode: studioRoute.dccMode ?? "model",
+          search: location.search,
+          workId: studioRoute.workId,
+        })
+      : studioCanvasHref({
+          search: location.search,
+          workId: studioRoute.workId,
+        })
+    : null;
+  useEffect(() => {
+    if (!canonicalStudioHref) return;
+    const currentHref = `${location.pathname}${location.search}`;
+    if (canonicalStudioHref === currentHref) return;
+    navigate(canonicalStudioHref, { replace: true, state: location.state });
+  }, [canonicalStudioHref, location.pathname, location.search, location.state, navigate]);
+  if (!studioRoute.valid) {
+    return (
+      <StudioWorkspaceRouteFailure
+        errorCode={studioRoute.errorCode}
+        onOpenStudio={() => navigate("/studio", { replace: true })}
+      />
+    );
+  }
   if (uploadMode) {
     return (
       <Suspense fallback={<StudioRouteLoading label="게시 작업공간을 안전하게 여는 중..." />}>
         <StudioUploadPublish
           key={JSON.stringify(["upload", workId ?? "new", draftIdentityScopeRef.current.epoch])}
+          workId={workId}
         />
       </Suspense>
     );
@@ -2738,8 +2839,48 @@ export function StudioPage() {
   });
   return (
     <Profiler id="studio:editor" onRender={recordStudioRenderProfile}>
-      <StudioCuttoonEditor key={editorScopeKey} />
+      <StudioCuttoonEditor key={editorScopeKey} studioRoute={studioRoute} />
     </Profiler>
+  );
+}
+
+function StudioWorkspaceRouteFailure({
+  errorCode,
+  onOpenStudio,
+}: {
+  readonly errorCode: StudioWorkspaceRouteErrorCode;
+  readonly onOpenStudio: () => void;
+}) {
+  const detail = errorCode === "work-id-conflict"
+    ? "주소의 작품 ID가 서로 달라 다른 문서를 여는 대신 작업을 중단했습니다."
+    : errorCode === "invalid-work-id"
+      ? "작품 ID를 안전하게 읽을 수 없습니다. 원래 작품 링크를 다시 확인해 주세요."
+      : "지원하지 않는 Studio 작업 주소입니다.";
+  return (
+    <section
+      aria-labelledby="studio-workspace-route-error-title"
+      className="grid min-h-dvh place-items-center bg-bg px-5 py-12 text-fg"
+    >
+      <div className="max-w-xl text-center">
+        <p className="text-sm font-semibold text-warn">3D 작업공간을 열지 않았습니다</p>
+        <h1
+          id="studio-workspace-route-error-title"
+          className="mt-2 text-balance text-2xl font-bold tracking-tight sm:text-3xl"
+        >
+          작업 주소를 확인해 주세요
+        </h1>
+        <p className="mx-auto mt-3 max-w-[62ch] text-sm leading-relaxed text-fg-2">
+          {detail}
+        </p>
+        <button
+          type="button"
+          onClick={onOpenStudio}
+          className="mt-6 min-h-11 rounded-lg bg-accent px-5 text-sm font-semibold text-on-accent hover:bg-accent/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        >
+          새 Studio 작업 열기
+        </button>
+      </div>
+    </section>
   );
 }
 
@@ -2872,6 +3013,7 @@ function openStudioToolsCompanionForMenu(input: {
   runtimeRef: { current: StudioToolsCompanionPrimaryRuntime | null };
   windowRef: { current: Window | null };
   announce: (message: string) => void;
+  workId: string | null;
   t: (key: string) => string;
 }): void {
   const localize = (key: string, fallback: string) => {
@@ -2885,6 +3027,7 @@ function openStudioToolsCompanionForMenu(input: {
       binding: ready.binding,
       windowRef: input.windowRef,
       announce: input.announce,
+      workId: input.workId,
       t: input.t,
     });
     return;
@@ -2968,6 +3111,7 @@ function openStudioToolsCompanionForMenu(input: {
       reservation,
       windowRef: input.windowRef,
       announce: input.announce,
+      workId: input.workId,
       t: input.t,
     });
   }).catch(() => {
@@ -3010,13 +3154,23 @@ function closedStudioLayerLiftUiState(): StudioLayerLiftUiState {
   };
 }
 
-function StudioCuttoonEditor() {
+function StudioCuttoonEditor({
+  studioRoute,
+}: {
+  readonly studioRoute: StudioWorkspaceRoute;
+}) {
   const navigate = useNavigate();
+  const location = useLocation();
   const t = useT();
   const [params] = useSearchParams();
   const { data: session, ready: studioAuthReady } = useSession();
-  const workId = params.get("id");
+  const workId = studioRoute.workId;
   const remixId = params.get("remix");
+  const linked3dCloudSaveRecoveryNotice = studioLinked3dCloudSaveRecoveryNotice(
+    location.state,
+    workId,
+  );
+  const linked3dCloudSaveRecoveryNoticeRef = useRef(linked3dCloudSaveRecoveryNotice);
   const creationLinks = studioCreationLinkParams({
     workId,
     titleId: params.get("titleId"),
@@ -5035,7 +5189,29 @@ function StudioCuttoonEditor() {
   const [sceneSnapshotOpen, setSceneSnapshotOpen] = useState(false);
   const [animaticTimelineOpen, setAnimaticTimelineOpen] = useState(false);
   const [productionBibleOpen, setProductionBibleOpen] = useState(false);
-  const [hybridDccOpen, setHybridDccOpen] = useState(false);
+  const hybridDccRouteRequested = studioRoute.surface === "dcc";
+  const hybridDccRouteAccess = resolveStudioDccRouteAccess({
+    collaborationOperationSyncPending,
+    documentReloadRequired,
+    expectsSharedDocument,
+    liveRoom: isRealtimeTeamSession,
+    liveRoomEditAuthorityReady: Boolean(
+      isRealtimeTeamSession
+      && studioLiveParticipant?.role === "editor"
+      && studioCrdtOperationSyncReady
+    ),
+    remixId,
+    sharedDocumentAccess: sharedDocument?.access ?? null,
+    sharedDocumentCanView: Boolean(sharedDocument?.capabilities.view),
+    sharedDocumentStatus: sharedDocument?.status ?? null,
+    studioAuthReady,
+    studioAuthUserId,
+    workHydrated,
+    workHydrationFailed,
+    workHydrationUnsupportedFormat,
+    workId,
+  });
+  const hybridDccOpen = hybridDccRouteRequested && hybridDccRouteAccess === "allowed";
   const [creativeModesOpen, setCreativeModesOpen] = useState(false);
   const creativeModesLabel = localizeStudioText(t, "크리에이티브 모드", "studio.creativeModes.title");
   // 대화상자 자체가 "크리에이티브 모드"로 이름이 붙으므로 닫기 버튼은 앱 공용 키를 그대로 쓴다
@@ -5043,6 +5219,7 @@ function StudioCuttoonEditor() {
   const creativeModesCloseLabel = localizeStudioText(t, "닫기", "common.close");
   const creativeModesPanelRef = useRef<HTMLDivElement | null>(null);
   const creativeModesTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const hybridDccReturnFocusRef = useRef<HTMLElement | null>(null);
   // 크리에이티브 모드 시트는 캔버스와 모바일 도크를 계속 쓸 수 있어야 하므로 모달이 아니다.
   // 대신 Escape·바깥 탭 두 경로를 직접 붙여, 화면보다 큰 뷰포트에서도 탈출로가 사라지지 않게 한다.
   useEffect(() => {
@@ -5138,6 +5315,7 @@ function StudioCuttoonEditor() {
       : "checking";
   const hybridDccPersistenceCurrentScopeRef = useRef(hybridDccWorkspaceScope);
   hybridDccPersistenceCurrentScopeRef.current = hybridDccWorkspaceScope;
+  const hybridDccPersistenceEnabled = hybridDccOpen;
 
   useEffect(() => {
     let cancelled = false;
@@ -5148,6 +5326,12 @@ function StudioCuttoonEditor() {
       scope: hybridDccWorkspaceScope,
       status: authGate.status,
     });
+    if (!hybridDccPersistenceEnabled) {
+      hybridDccPersistenceRef.current = null;
+      return () => {
+        cancelled = true;
+      };
+    }
     if (!authGate.shouldAttemptRecovery) {
       hybridDccPersistenceRef.current = null;
       // Session-only editing is available immediately, so transfer eligibility must become
@@ -5301,6 +5485,7 @@ function StudioCuttoonEditor() {
     hybridDccPersistenceOwnerId,
     hybridDccPersistenceWorkScope,
     hybridDccWorkspaceScope,
+    hybridDccPersistenceEnabled,
     studioAuthReady,
   ]);
 
@@ -5375,6 +5560,98 @@ function StudioCuttoonEditor() {
     : hybridDccScopeTransferRef.current?.toScope === hybridDccWorkspaceScope
       ? hybridDccScopeTransferRef.current.workspace
       : undefined;
+  const closeHybridDccWorkspace = () => {
+    flushHybridDccWorkspacePersistence();
+    const returnHref = studioWorkspaceReturnHref(location.state, studioRoute);
+    if (returnHref) {
+      navigate(-1);
+      return;
+    }
+    navigate(studioCanvasHref({
+      search: location.search,
+      workId: studioRoute.workId,
+    }), { replace: true });
+  };
+  const closeHybridDccFromEffect = useEffectEvent(() => {
+    if (hybridDccRouteRequested) closeHybridDccWorkspace();
+  });
+  const flushHybridDccFromEffect = useEffectEvent(flushHybridDccWorkspacePersistence);
+  const previousHybridDccRouteRequestedRef = useRef(hybridDccRouteRequested);
+  useEffect(() => {
+    const previouslyRequested = previousHybridDccRouteRequestedRef.current;
+    previousHybridDccRouteRequestedRef.current = hybridDccRouteRequested;
+    if (previouslyRequested && !hybridDccRouteRequested) {
+      flushHybridDccFromEffect();
+    }
+  }, [hybridDccRouteRequested]);
+  useEffect(() => {
+    if (!hybridDccRouteRequested) return;
+    const flushBeforeDocumentExit = () => flushHybridDccFromEffect();
+    globalThis.addEventListener("pagehide", flushBeforeDocumentExit);
+    return () => globalThis.removeEventListener("pagehide", flushBeforeDocumentExit);
+  }, [hybridDccRouteRequested]);
+  useEffect(() => {
+    if (!hybridDccRouteRequested || hybridDccRouteAccess !== "denied") return;
+    closeHybridDccFromEffect();
+  }, [hybridDccRouteAccess, hybridDccRouteRequested]);
+
+  const captureHybridDccReturnFocus = () => {
+    if (typeof document === "undefined") return;
+    const active = document.activeElement instanceof HTMLElement
+      && document.activeElement !== document.body
+      && document.activeElement !== document.documentElement
+      ? document.activeElement
+      : null;
+    hybridDccReturnFocusRef.current = active
+      && creativeModesPanelRef.current?.contains(active)
+      ? creativeModesTriggerRef.current ?? document.getElementById("main-content")
+      : active ?? document.getElementById("main-content");
+  };
+  const openHybridDccWorkspace = (mode: StudioDccWorkbenchMode) => {
+    if (hybridDccRouteRequested) return;
+    if (hybridDccRouteAccess !== "allowed") {
+      announceDrawingShortcut(
+        hybridDccRouteAccess === "pending"
+          ? "3D 작업 권한과 원고를 확인하는 중입니다. 잠시 뒤 다시 시도해 주세요."
+          : "이 작품에서는 3D 원본을 편집할 권한이 없습니다.",
+      );
+      return;
+    }
+    captureHybridDccReturnFocus();
+    navigate(studioDccHref({
+      mode,
+      search: location.search,
+      workId: studioRoute.workId,
+    }), {
+      state: createStudioDccNavigationState(studioRoute, {
+        key: location.key,
+        pathname: location.pathname,
+        search: location.search,
+      }),
+    });
+  };
+  const setHybridDccOpen: Dispatch<SetStateAction<boolean>> = (nextValue) => {
+    const shouldOpen = typeof nextValue === "function"
+      ? nextValue(hybridDccRouteRequested)
+      : nextValue;
+    if (shouldOpen === hybridDccRouteRequested) return;
+    if (!shouldOpen) {
+      closeHybridDccWorkspace();
+      return;
+    }
+    openHybridDccWorkspace("model");
+  };
+  const setHybridDccWorkbenchMode = (mode: StudioDccWorkbenchMode) => {
+    if (!hybridDccRouteRequested || mode === studioRoute.dccMode) return;
+    navigate(studioDccHref({
+      mode,
+      search: location.search,
+      workId: studioRoute.workId,
+    }), {
+      replace: true,
+      state: location.state,
+    });
+  };
   const [assetRightsAuditOpen, setAssetRightsAuditOpen] = useState(false);
   const [autoActionsOpen, setAutoActionsOpen] = useState(false);
   const [autoActionSet, setAutoActionSet] = useState<StudioAutoActionSet | null>(null);
@@ -5785,7 +6062,6 @@ function StudioCuttoonEditor() {
     setMasterPanelOpen(false);
     setCharacterBibleOpen(false);
     setProductionBibleOpen(false);
-    setHybridDccOpen(false);
     setWriterRoomOpen(false);
     setPublicationOperationsOpen(false);
     setPublishPreflightOpen(false);
@@ -9201,14 +9477,32 @@ function StudioCuttoonEditor() {
   const [poserInitialDataUrl, setPoserInitialDataUrl] = useState<string | undefined>(undefined);
   const [poserInitialElementId, setPoserInitialElementId] = useState<string | undefined>(undefined);
   const [bg3dOpen, setBg3dOpen] = useState(false);
+  // Route ownership is evaluated during render, before a layout effect can retire stale modal
+  // state restored by browser Forward. Only these admitted booleans may reach a 3D renderer.
+  const interactiveThreeDSurfaceAdmission = resolveStudioInteractiveThreeDSurfaceAdmission({
+    bg3dOpen,
+    dccRouteRequested: hybridDccRouteRequested,
+    mannequinPoserOpen,
+    poserVrmOpen,
+  });
+  const admittedBg3dOpen = interactiveThreeDSurfaceAdmission.bg3dOpen;
+  const admittedMannequinPoserOpen = interactiveThreeDSurfaceAdmission.mannequinPoserOpen;
+  const admittedPoserVrmOpen = interactiveThreeDSurfaceAdmission.poserVrmOpen;
   const bg3dDccSourceRef = useRef<StudioShared3dStageDccSource | null>(null);
+  const bg3dDccShotMappingsRef = useRef<readonly {
+    readonly sourceShotId: string;
+    readonly sceneShotId: string;
+  }[]>([]);
   const [bg3dInitialDataUrl, setBg3dInitialDataUrl] = useState<string | undefined>(undefined);
   const [bg3dInitialScene, setBg3dInitialScene] = useState<StudioBg3dSceneDocument | undefined>(
     undefined
   );
   const [bg3dInitialElementId, setBg3dInitialElementId] = useState<string | undefined>(undefined);
   useEffect(() => {
-    if (!bg3dOpen) bg3dDccSourceRef.current = null;
+    if (!bg3dOpen) {
+      bg3dDccSourceRef.current = null;
+      bg3dDccShotMappingsRef.current = [];
+    }
   }, [bg3dOpen]);
   const bg3dTargetBundleId = useMemo(
     () => masterEditMode
@@ -9622,6 +9916,17 @@ function StudioCuttoonEditor() {
   quickStartDismissedRef.current = quickStartDismissed;
   const [quickStartOpen, setQuickStartOpen] = useState(false);
   const [quickComicOpen, setQuickComicOpen] = useState(false);
+  useLayoutEffect(() => {
+    if (!hybridDccRouteRequested) return;
+    // Route ownership is exclusive: returning to a DCC history entry must retire every other
+    // interactive 3D surface before paint, otherwise two GPU scenes and two focus traps coexist.
+    setBg3dOpen(false);
+    setPoserVrmOpen(false);
+    setMannequinPoserOpen(false);
+    setCreativeModesOpen(false);
+    setQuickStartOpen(false);
+    setQuickComicOpen(false);
+  }, [hybridDccRouteRequested]);
   const [mobileHintDismissed, setMobileHintDismissed] = useState(false);
   const mobileHintDismissedRef = useRef(mobileHintDismissed);
   mobileHintDismissedRef.current = mobileHintDismissed;
@@ -9784,7 +10089,27 @@ function StudioCuttoonEditor() {
     setPublishComplianceState(next);
   };
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(linked3dCloudSaveRecoveryNotice);
+  useEffect(() => {
+    if (!linked3dCloudSaveRecoveryNotice) return;
+    const currentState = typeof location.state === "object"
+      && location.state !== null
+      && !Array.isArray(location.state)
+      ? location.state as Record<string, unknown>
+      : {};
+    const nextState = { ...currentState };
+    delete nextState[STUDIO_LINKED_3D_CLOUD_SAVE_RECOVERY_STATE_KEY];
+    navigate(`${location.pathname}${location.search}`, {
+      replace: true,
+      state: Object.keys(nextState).length > 0 ? nextState : null,
+    });
+  }, [
+    linked3dCloudSaveRecoveryNotice,
+    location.pathname,
+    location.search,
+    location.state,
+    navigate,
+  ]);
   useEffect(() => {
     let cancelled = false;
     const settingsRevisionAtStart = appSettingsUserRevisionRef.current;
@@ -17462,7 +17787,8 @@ function StudioCuttoonEditor() {
     : null;
   const studioFilterDialogImageEditReason =
     studioFilterSession?.target === "image" && studioFilterDialogImage?.type === "image"
-      ? studioWorkAssetDestructiveEditReason(studioFilterDialogImage)
+      ? studioLinked3dPassDestructiveEditReason(studioFilterDialogImage)
+        ?? studioWorkAssetDestructiveEditReason(studioFilterDialogImage)
       : null;
   const studioFilterDialogMutationLockReason = !studioFilterDialogImage ||
     studioFilterDialogImage.type !== "image"
@@ -17495,9 +17821,13 @@ function StudioCuttoonEditor() {
     setStudioFilterSession(null);
     setStudioFilterPreview(null);
   }, [studioFilterDialogImage, studioFilterSession]);
-  const selectedWorkAssetDestructiveEditReason = studioWorkAssetDestructiveEditReason(selected);
+  // Inspector surfaces historically call this the work-asset reason, but the same read-only
+  // contract also protects canonical linked-3D line passes until a static edit copy is requested.
+  const selectedWorkAssetDestructiveEditReason =
+    studioLinked3dPassDestructiveEditReason(selected)
+    ?? studioWorkAssetDestructiveEditReason(selected);
   const selectedContentLockedByGroup = selected !== null && isEffectivelyLocked(selected, groups);
-  const selectedReadableImageSource = selected?.type === "image"
+  const selectedProjectedImageSource = selected?.type === "image"
     ? resolveStudioWorkAssetReadableImageSource(
       selected,
       (reference) => studioWorkAssetHydrator.get(reference)
@@ -18992,8 +19322,9 @@ function StudioCuttoonEditor() {
   function advancedFillTargetUnsupportedReason(target: El | null): string | null {
     if (advancedFillDocumentUnsupportedReason) return advancedFillDocumentUnsupportedReason;
     if (target?.type !== "image") return "래스터 이미지 레이어를 먼저 선택하세요.";
-    const workAssetReason = studioWorkAssetDestructiveEditReason(target);
-    if (workAssetReason) return workAssetReason;
+    const durableRasterReason = studioLinked3dPassDestructiveEditReason(target)
+      ?? studioWorkAssetDestructiveEditReason(target);
+    if (durableRasterReason) return durableRasterReason;
     if (isEffectivelyLocked(target, groups)) return "잠긴 레이어는 채울 수 없어요.";
     if (isEffectivelyHidden(target, groups)) return "숨긴 레이어를 표시한 뒤 채울 수 있어요.";
     if (target.isAnimatedGif || (target.frames?.length ?? 0) > 1) {
@@ -19385,7 +19716,7 @@ const puppetWarpArmed =
     setWorkHydrationUnsupportedFormat(false);
     setSharedDocumentScope(null);
     setLoadedWork(null);
-    setError(null);
+    setError(linked3dCloudSaveRecoveryNoticeRef.current);
     setSharedDocumentNotice(null);
     let alive = true;
     const controller = new AbortController();
@@ -19464,7 +19795,33 @@ const puppetWarpArmed =
         // Optional analytics must not make a document without analytics depend on its chunk, and
         // every async dependency still settles before the single hydration mutation begins.
         if (!alive) return;
-        const hydratedProject = creatorWorkSnapshotToStudioProject(w);
+        const parsedProject = creatorWorkSnapshotToStudioProject(w);
+        const hasLinked3dRender = parsedProject.pagesList.some(
+          (page) => page.linked3dRender !== undefined,
+        );
+        if (remixId && hasLinked3dRender) {
+          setWorkHydrationFailed(true);
+          setError(
+            "연결형 3D 작품은 pass provenance를 새 리믹스에 원자 승계할 수 없어 열지 않았습니다.",
+          );
+          return;
+        }
+        const hydratedProject = hasLinked3dRender
+          ? await import("./studio-linked-3d-pass-cloud-project")
+              .then(({ hydrateStudioLinked3dPassCloudProject }) =>
+                hydrateStudioLinked3dPassCloudProject({
+                  workId: resolvedTargetId,
+                  project: parsedProject,
+                  signal: controller.signal,
+                  // The cloud bridge installs verified OPFS bytes and owner refs before it returns
+                  // this exact canonical object. A route/auth teardown rejects the apply without
+                  // exposing locator-only pages to React.
+                  apply: (candidate) => alive && !controller.signal.aborted
+                    ? candidate
+                    : false,
+                }))
+          : parsedProject;
+        if (!alive || controller.signal.aborted) return;
         // Server hydration is one canonical document replacement. Advance the async mutation
         // barrier once, then use the raw React setters so this route-scoped effect does not depend
         // on render-local guarded setter identities (and cannot re-run on every document render).
@@ -21098,8 +21455,20 @@ const puppetWarpArmed =
       return false;
     }
     setSharedDocumentNotice(null);
-    const resolved = applyBubbleAnchors(nextElements);
+    let resolved = applyBubbleAnchors(nextElements);
     if (masterEditMode) {
+      if (bg3dDccSourceRef.current) {
+        setError("DCC Shot 연결은 일반 페이지에서만 만들 수 있어요. 문서 마스터를 닫고 다시 추가해 주세요.");
+        return false;
+      }
+      const reservedMasterState = validateStudioLinked3dReservedPageState({
+        value: undefined,
+        elements: resolved,
+      });
+      if (!reservedMasterState.ok) {
+        setError("문서 마스터에는 연결형 3D pass locator나 correction을 둘 수 없어요.");
+        return false;
+      }
       setMaster((m) => withMasterElements(m, resolved)); // extraPatch는 마스터엔 개념 없음 — 무시
       return true;
     }
@@ -21132,9 +21501,97 @@ const puppetWarpArmed =
           shared3dStage: visibilityReceiptReconciliation.nextState,
         }
       : extraPatch;
+    const hasExplicitLinked3dRenderPatch = Object.prototype.hasOwnProperty.call(
+      extraPatch ?? {},
+      "linked3dRender",
+    );
+    const effectiveShared3dStage = Object.prototype.hasOwnProperty.call(
+      resolvedExtraPatch ?? {},
+      "shared3dStage",
+    )
+      ? resolvedExtraPatch?.shared3dStage
+      : commitTargetPage?.shared3dStage;
+    const linkedRenderReconciliation = !hasExplicitLinked3dRenderPatch
+      && commitTargetPage?.linked3dRender !== undefined
+      ? reconcileStudioLinked3dRenderDocumentAfterElementMutation({
+          value: commitTargetPage.linked3dRender,
+          elements: resolved,
+          shared3dStage: effectiveShared3dStage,
+        })
+      : undefined;
+    if (
+      !hasExplicitLinked3dRenderPatch
+      && commitTargetPage?.linked3dRender !== undefined
+      && linkedRenderReconciliation === null
+    ) {
+      setError("연결된 3D Shot과 Canvas 레이어가 어긋나 변경을 적용하지 않았어요.");
+      return false;
+    }
+    const reconciledLinked3dRender = linkedRenderReconciliation ?? undefined;
+    if (!hasExplicitLinked3dRenderPatch && commitTargetPage?.linked3dRender !== undefined) {
+      const previousLinkedDocument = parseStudioLinked3dRenderDocument(
+        commitTargetPage.linked3dRender,
+      );
+      if (!previousLinkedDocument) {
+        setError("연결된 3D render receipt가 손상되어 변경을 적용하지 않았어요.");
+        return false;
+      }
+      const retainedBundleIds = new Set(
+        reconciledLinked3dRender?.links.map(({ bundleId }) => bundleId) ?? [],
+      );
+      const retiredBundleIds = previousLinkedDocument.links
+        .map(({ bundleId }) => bundleId)
+        .filter((bundleId) => !retainedBundleIds.has(bundleId));
+      if (retiredBundleIds.length > 0) {
+        const detached = detachStudioLinked3dCorrections(resolved, retiredBundleIds);
+        if (!detached) {
+          setError("분리할 3D artist correction provenance가 손상되어 변경을 적용하지 않았어요.");
+          return false;
+        }
+        resolved = detached;
+      }
+    }
+    const finalExtraPatch = !hasExplicitLinked3dRenderPatch
+      && commitTargetPage?.linked3dRender !== undefined
+      ? {
+          ...(resolvedExtraPatch ?? {}),
+          linked3dRender: reconciledLinked3dRender,
+        }
+      : resolvedExtraPatch;
+    const finalLinked3dRender = Object.prototype.hasOwnProperty.call(
+      finalExtraPatch ?? {},
+      "linked3dRender",
+    )
+      ? finalExtraPatch?.linked3dRender
+      : commitTargetPage?.linked3dRender;
+    const finalShared3dStage = Object.prototype.hasOwnProperty.call(
+      finalExtraPatch ?? {},
+      "shared3dStage",
+    )
+      ? finalExtraPatch?.shared3dStage
+      : commitTargetPage?.shared3dStage;
+    const reservedState = validateStudioLinked3dReservedPageState({
+      value: finalLinked3dRender,
+      elements: resolved,
+    });
+    if (!reservedState.ok) {
+      setError("연결된 3D pass locator나 correction이 receipt와 달라 변경을 적용하지 않았어요.");
+      return false;
+    }
+    if (finalLinked3dRender !== undefined) {
+      const linkedValidation = validateStudioLinked3dRenderDocumentAgainstPage({
+        value: finalLinked3dRender,
+        elements: resolved,
+        shared3dStage: finalShared3dStage,
+      });
+      if (!linkedValidation.ok) {
+        setError("연결된 3D Stage·Shot·Canvas layer가 달라 변경을 적용하지 않았어요.");
+        return false;
+      }
+    }
     coalesceKeyRef.current = null; // 일반 커밋은 합치기 체인을 끊는다.
     const localNextPages = commitBasePages.map((p) =>
-      p.id === commitPageId ? { ...p, ...resolvedExtraPatch, elements: resolved } : p
+      p.id === commitPageId ? { ...p, ...finalExtraPatch, elements: resolved } : p
     );
     if (!publishStudioCrdtSceneTransition(commitBasePages, localNextPages)) return false;
     const nextPages = mergeStudioCrdtFrontier(localNextPages);
@@ -21895,6 +22352,14 @@ const puppetWarpArmed =
     );
     if (workAssetReason) {
       setError(workAssetReason);
+      return false;
+    }
+    const linked3dPassReason = studioLinked3dPassSourceReplacementReason(
+      target,
+      patch as Record<string, unknown>,
+    );
+    if (linked3dPassReason) {
+      setError(linked3dPassReason);
       return false;
     }
     // `filterMaskSurfaceId` names one immutable historical bitmap. Any patch that owns
@@ -22836,12 +23301,24 @@ const puppetWarpArmed =
   }
 
   function shared3dStageMergeConflictReason(removeIds: readonly string[]): string | null {
-    if (removeIds.length === 0 || activePage.shared3dStage === undefined) return null;
+    if (removeIds.length === 0) return null;
+    const removedIds = new Set(removeIds);
+    const removesReservedLinkedPassState = elements.some((element) =>
+      removedIds.has(element.id)
+      && element.type === "image"
+      && (
+        studioLinked3dPassDestructiveEditReason(element) !== null
+        || element.bg3dLtBundleId !== undefined
+      ),
+    );
+    if (removesReservedLinkedPassState) {
+      return "연결된 3D 장면과 선화는 일반 레이어 병합으로 제거하지 않아요. 3D 원본을 유지하는 정적 복사본을 만든 뒤 그 복사본을 병합해 주세요.";
+    }
+    if (activePage.shared3dStage === undefined) return null;
     const sharedStages = studioShared3dStageCollectionEntries(activePage.shared3dStage);
     if (!sharedStages) {
       return "공유 3D 장면 연결 정보가 손상되어 안전하게 병합하지 않았어요. 먼저 3D 배경 연결을 확인해 주세요.";
     }
-    const removedIds = new Set(removeIds);
     const linkedCharacterIds = new Set(sharedStages.flatMap((stage) =>
       stage.characters.map((character) => character.elementId)));
     const linkedBundleIds = new Set(sharedStages.map((stage) =>
@@ -23858,14 +24335,23 @@ const puppetWarpArmed =
       ...elementPatch,
     });
   }
-  function applyBg3dRenderedImage(
+  async function applyBg3dRenderedImage(
     result: StudioBackground3DInsertResult,
     targetElementId?: string
-  ): boolean {
+  ): Promise<boolean> {
     setError(null);
     const anchorLayer = result.layers.at(-1);
     if (!anchorLayer) {
       setError("삽입할 3D LT 레이어가 없습니다.");
+      return false;
+    }
+    // linked3dRender, shared3dStage, the anchor Scene and LT raster bodies do not yet share one
+    // bounded CRDT/CAS receipt. Publishing only the image topology would create a hollow remote
+    // reference, so live-room materialization stays fail-closed until that durable contract ships.
+    if (isRealtimeTeamSession) {
+      setError(
+        "실시간 공동 편집에서는 3D Shot·Stage·Canvas 레이어를 함께 동기화하는 기능을 준비 중이에요. 일반 작업 문서에서 적용해 주세요.",
+      );
       return false;
     }
 
@@ -23915,7 +24401,36 @@ const puppetWarpArmed =
       return true;
     }
 
-    if (targetElementId && result.magicFilterMask) {
+    const targetBundleId = resolveStudioShared3dStageBundleIdForElement(
+      activePage.elements,
+      targetElementId,
+    );
+    const existingDccSource = studioShared3dStageEntryAsDocument(
+      activePage.shared3dStage,
+      targetBundleId,
+    )?.dccSource;
+    const dccLinked = bg3dDccSourceRef.current !== null || existingDccSource !== undefined;
+    const removingLinkedRender = result.sharedStageMutation?.kind === "unlink";
+    const linkedScene = removingLinkedRender
+      ? result.bg3dScene
+      : ensureStudioLinked3dRenderShot(result.bg3dScene, {
+          // A DCC handoff has an explicit sourceShotId↔sceneShotId mapping. Inventing a Canvas Shot
+          // when no mapped Scene shot is active would silently break that provenance chain.
+          allowCreate: !dccLinked,
+        });
+    if (!linkedScene || (!removingLinkedRender && !linkedScene.activeShotId)) {
+      setError(
+        dccLinked
+          ? "DCC에서 전달한 Shot을 먼저 선택하거나 새 Shot을 캡처한 뒤 Canvas에 추가해 주세요."
+          : "현재 3D 뷰를 저장 가능한 Shot으로 확정하지 못해 Canvas를 바꾸지 않았어요.",
+      );
+      return false;
+    }
+    const renderResult = linkedScene === result.bg3dScene
+      ? result
+      : { ...result, bg3dScene: linkedScene };
+
+    if (targetElementId && renderResult.magicFilterMask) {
       setError(
         "매직 레이어 마스크는 기존 3D 배경 업데이트에 합성하지 않아요. 새 3D 배경으로 추가해 주세요.",
       );
@@ -23927,13 +24442,13 @@ const puppetWarpArmed =
       src: anchorLayer.pngDataUrl,
       canvasWidth: CANVAS_W,
       canvasHeight: canvasH,
-      sourceWidth: result.width,
-      sourceHeight: result.height,
+      sourceWidth: renderResult.width,
+      sourceHeight: renderResult.height,
     });
     const plan = planStudioBg3dLtLayers<El, StudioBg3dSceneDocument>({
       elements,
       groups,
-      render: result,
+      render: renderResult,
       targetElementId,
       pageLocked: pageEditLocked,
       allocations: {
@@ -23953,14 +24468,14 @@ const puppetWarpArmed =
       return false;
     }
     const detachEditableComposite =
-      result.materialization?.kind === "detached-editable-composite";
+      renderResult.materialization?.kind === "detached-editable-composite";
     if (
       detachEditableComposite
       && (
         !targetElementId
-        || result.sharedStageMutation?.kind !== "unlink"
-        || result.linkedCharacterCapture !== undefined
-        || result.magicFilterMask !== undefined
+        || renderResult.sharedStageMutation?.kind !== "unlink"
+        || renderResult.linkedCharacterCapture !== undefined
+        || renderResult.magicFilterMask !== undefined
       )
     ) {
       setError("3D 원본을 유지한 한 장 정리는 기존 배경의 캐릭터 연결을 안전하게 해제할 때만 사용할 수 있어요.");
@@ -23969,7 +24484,7 @@ const puppetWarpArmed =
     const detachPlan = detachEditableComposite
       ? planStudioBg3dEditableCompositeDetach<El, StudioBg3dSceneDocument>({
           plan,
-          compositePngDataUrl: result.compositePngDataUrl,
+          compositePngDataUrl: renderResult.compositePngDataUrl,
           pageLocked: pageEditLocked,
           expected: {
             bundleId: plan.bundleId,
@@ -23991,7 +24506,7 @@ const puppetWarpArmed =
         }
       : attachStudioBg3dMagicFilterMaskToLtPlan({
           plan,
-          insertResult: result,
+          insertResult: renderResult,
         });
     if (!magicAttachment.ok) {
       setError(magicAttachment.message);
@@ -23999,12 +24514,12 @@ const puppetWarpArmed =
     }
     const materializedGroups = detachPlan?.ok ? detachPlan.nextGroups : plan.nextGroups;
     const capturedCharacterElementIds =
-      result.linkedCharacterCapture?.kind === "full-fidelity-linked-vrm-capture"
-        ? result.linkedCharacterCapture.elementIds
+      renderResult.linkedCharacterCapture?.kind === "full-fidelity-linked-vrm-capture"
+        ? renderResult.linkedCharacterCapture.elementIds
         : [];
     const capturedCharacterPlacements =
-      result.linkedCharacterCapture?.kind === "full-fidelity-linked-vrm-capture"
-        ? result.linkedCharacterCapture.stagePlacements
+      renderResult.linkedCharacterCapture?.kind === "full-fidelity-linked-vrm-capture"
+        ? renderResult.linkedCharacterCapture.stagePlacements
         : [];
     if (
       capturedCharacterPlacements.length !== capturedCharacterElementIds.length
@@ -24040,7 +24555,7 @@ const puppetWarpArmed =
     let nextElements = [...sharedCharacterVisibility.nextElements];
     const anchor = nextElements.find((element) => element.id === plan.anchorElementId);
     const mappedGuides = anchor?.type === "image"
-      ? mapStudioBg3dPerspectiveGuidesToAnchor(result.perspectiveGuides, anchor)
+      ? mapStudioBg3dPerspectiveGuidesToAnchor(renderResult.perspectiveGuides, anchor)
       : [];
     const drawingAssistState = mappedGuides.length > 0
       ? currentStudioDrawingAssistDocument()
@@ -24067,7 +24582,7 @@ const puppetWarpArmed =
       currentStageCollection,
       plan.bundleId,
     );
-    const sharedStageMutationKind = result.sharedStageMutation?.kind
+    const sharedStageMutationKind = renderResult.sharedStageMutation?.kind
       ?? (priorTargetStage ? "refresh" : "connect");
     const stageMutation = sharedStageMutationKind === "unlink"
       ? priorTargetStage
@@ -24133,15 +24648,131 @@ const puppetWarpArmed =
       return false;
     }
     nextElements = [...stageMutation.nextElements];
-    // The editable LT bundle or its explicitly detached composite, Stage relationship, visibility
-    // receipts and camera-derived ruler are one transition. Undo can never leave a half-detached
-    // background, duplicate character source, or orphaned Magic Layer sidecar behind.
-    if (!commit(nextElements, {
-      groups: materializedGroups,
-      shared3dStage: stageMutation.nextState,
-      ...(nextDrawingAssist ? { drawingAssist: nextDrawingAssist } : {}),
-    })) return false;
-    const magicMask = result.magicFilterMask;
+    const currentLinkedRender = activePage.linked3dRender === undefined
+      ? undefined
+      : parseStudioLinked3dRenderDocument(activePage.linked3dRender);
+    if (activePage.linked3dRender !== undefined && !currentLinkedRender) {
+      setError("연결된 3D Shot 인덱스가 손상되어 기존 링크를 덮어쓰지 않았어요.");
+      return false;
+    }
+    const sourceShotId = bg3dDccShotMappingsRef.current.find(
+      (mapping) => mapping.sceneShotId === linkedScene.activeShotId,
+    )?.sourceShotId;
+    if (sharedStageMutationKind === "unlink") {
+      const detachedElements = detachStudioLinked3dCorrections(nextElements, [plan.bundleId]);
+      if (!detachedElements) {
+        setError("연결 해제할 artist correction provenance가 손상되어 적용하지 않았어요.");
+        return false;
+      }
+      nextElements = detachedElements;
+      const nextLinkedRender = removeStudioLinked3dRenderLinks(
+        currentLinkedRender,
+        [plan.bundleId],
+      );
+      if (nextLinkedRender === null || !commit(nextElements, {
+        groups: materializedGroups,
+        shared3dStage: stageMutation.nextState,
+        linked3dRender: nextLinkedRender,
+        ...(nextDrawingAssist ? { drawingAssist: nextDrawingAssist } : {}),
+      })) return false;
+    } else if (!renderResult.layers.some(({ role }) => role === "main-line")) {
+      // Tone/color-only LT output has no canonical line raster to persist. Preserve the visible
+      // DrawEls, but explicitly detach their retired 3D provenance before removing the sidecar.
+      const detachedElements = detachStudioLinked3dCorrections(nextElements, [plan.bundleId]);
+      if (!detachedElements) {
+        setError("line pass에서 분리할 artist correction provenance가 손상되어 적용하지 않았어요.");
+        return false;
+      }
+      nextElements = detachedElements;
+      const nextLinkedRender = removeStudioLinked3dRenderLinks(
+        currentLinkedRender,
+        [plan.bundleId],
+      );
+      if (nextLinkedRender === null || !commit(nextElements, {
+        groups: materializedGroups,
+        shared3dStage: stageMutation.nextState,
+        linked3dRender: nextLinkedRender,
+        ...(nextDrawingAssist ? { drawingAssist: nextDrawingAssist } : {}),
+      })) return false;
+    } else {
+      const linkedStage = studioShared3dStageEntryAsDocument(
+        stageMutation.nextState,
+        plan.bundleId,
+      );
+      if (!linkedStage) {
+        setError("canonical 3D Stage revision을 찾지 못해 line pass를 저장하지 않았어요.");
+        return false;
+      }
+      try {
+        const { acquireStudioLinked3dPassProductAuthority } = await import(
+          "./studio-linked-3d-pass-product-authority"
+        );
+        const authority = await acquireStudioLinked3dPassProductAuthority();
+        const previousPass = currentLinkedRender?.links.find(
+          ({ bundleId }) => bundleId === plan.bundleId,
+        )?.passRevision;
+        const prepared = await prepareStudioLinked3dLinePass({
+          authority,
+          sourceHash: linkedStage.background.sourceHash,
+          scene: linkedScene,
+          layers: renderResult.layers,
+          previous: previousPass,
+        });
+        const durableElements = materializeStudioLinked3dLinePassLocator(
+          nextElements,
+          plan.bundleId,
+          prepared.descriptor,
+        );
+        if (!durableElements) {
+          setError("canonical line pass를 실제 Canvas main-line 레이어에 결박하지 못했어요.");
+          return false;
+        }
+        const nextLinkedRender = upsertStudioLinked3dRenderLink({
+          value: currentLinkedRender,
+          bundleId: plan.bundleId,
+          shotId: linkedScene.activeShotId!,
+          ...(sourceShotId ? { sourceShotId } : {}),
+          passRevision: prepared.descriptor,
+          elements: durableElements,
+          shared3dStage: stageMutation.nextState!,
+        });
+        if (!nextLinkedRender) {
+          setError("Canvas line pass·3D Shot·artist correction 교차참조를 검증하지 못했어요.");
+          return false;
+        }
+        const accepted = await commitStudioLinked3dPreparedPass({
+          authority,
+          ownerId: `studio-linked-3d-pass:${activePage.id}:${plan.bundleId}`,
+          prepared,
+          apply: () => {
+            const mutationTicket = bg3dMutationTicketRef.current;
+            if (
+              !mutationTicket
+              || !canApplyStudioMutation(mutationTicket)
+              || currentPageIdRef.current !== activePage.id
+            ) return false;
+            // LT layers, Scene/Shot, Stage, correction reapplication/conflict projection, and CAS
+            // receipt enter the existing pagesHistory/CRDT bridge as one undoable transition.
+            return commit(durableElements, {
+              groups: materializedGroups,
+              shared3dStage: stageMutation.nextState,
+              linked3dRender: nextLinkedRender,
+              ...(nextDrawingAssist ? { drawingAssist: nextDrawingAssist } : {}),
+            });
+          },
+        });
+        if (!accepted) return false;
+        nextElements = durableElements;
+      } catch (cause) {
+        setError(
+          cause instanceof Error
+            ? `연결형 3D line pass를 OPFS/CAS에 저장하지 못했습니다: ${cause.message}`
+            : "연결형 3D line pass를 OPFS/CAS에 저장하지 못했습니다.",
+        );
+        return false;
+      }
+    }
+    const magicMask = renderResult.magicFilterMask;
     const magicTarget = magicAttachment.applied
       ? nextElements.find((element) => element.id === magicAttachment.targetElementId)
       : null;
@@ -30623,6 +31254,7 @@ const puppetWarpArmed =
           referenceSrc = renderedReference.dataUrl;
         }
       } else if (rasterTarget && advancedFillSettings.referenceScope !== "current") {
+        const referenceScope = advancedFillSettings.referenceScope;
         const layers = advancedFillRasterLayers.map((layer) =>
           layer.id === rasterTarget.id ? { ...layer, src: workingSrc } : layer
         );
@@ -30659,14 +31291,36 @@ const puppetWarpArmed =
         } else if (!vectorPlan.ok && vectorPlan.code !== "no-visible-vector-draw") {
           throw new Error(vectorPlan.reason);
         }
-        const composed = await composeStudioFillReferenceImageWithPageReferences(
+        const scopedRasterReferences = collectOverlappingStudioFillReferenceLayers(
           layers,
           rasterTarget.id,
-          advancedFillSettings.referenceScope,
-          pageReferences,
-          undefined,
-          controller.signal,
+          referenceScope,
         );
+        const projectedLayerIds = new Set([
+          rasterTarget.id,
+          ...scopedRasterReferences.map(({ id }) => id),
+        ]);
+        const { withStudioRasterSourceProjection } = await import(
+          "./studio-raster-source-projection"
+        );
+        const composed = await withStudioRasterSourceProjection({
+          consumer: "studio-advanced-fill-reference",
+          signal: controller.signal,
+          values: layers.filter(({ id }) => projectedLayerIds.has(id)),
+          run: async (projectedLayers) => {
+            const projectedById = new Map(
+              projectedLayers.map((layer) => [layer.id, layer] as const),
+            );
+            return composeStudioFillReferenceImageWithPageReferences(
+              layers.map((layer) => projectedById.get(layer.id) ?? layer),
+              rasterTarget.id,
+              referenceScope,
+              pageReferences,
+              undefined,
+              controller.signal,
+            );
+          },
+        });
         referenceSrc = composed.dataUrl;
       }
       if (
@@ -32512,6 +33166,7 @@ const puppetWarpArmed =
               && !isEffectivelyHidden(element, groups)
               && !isEffectivelyLocked(element, groups)
               && !studioWorkAssetDestructiveEditReason(element)
+              && !studioLinked3dPassDestructiveEditReason(element)
               && !element.isAnimatedGif
               && (element.frames?.length ?? 0) <= 1,
           ).length;
@@ -32790,6 +33445,13 @@ const puppetWarpArmed =
         stylus,
       } = drawStartPlan;
       let { element: next, strokeOrigin } = drawStartPlan;
+      const linked3dCorrection = !isRealtimeTeamSession && drawMode === "pen"
+        ? createStudioLinked3dCorrectionProvenance(
+            activePage.linked3dRender,
+            selected?.id,
+          )
+        : null;
+      if (linked3dCorrection) next = { ...next, linked3dCorrection };
       // Snap explicit shape origins to neighboring object edges when no directional ruler is
       // active. Freehand coordinates must remain untouched so acquiring a guide cannot kink ink.
       {
@@ -37557,6 +38219,11 @@ const puppetWarpArmed =
     hideStrokeGuide();
     setIsExporting(true);
     let authoritativeCrdtServerSequence: string | null = null;
+    let linkedCloudUploadWorkId: string | null = null;
+    let linkedCloudUploadReceipts: Awaited<ReturnType<
+      typeof import("./studio-linked-3d-pass-cloud-project").ensureStudioLinked3dPassCloudProject
+    >> = [];
+    let linkedCloudSaveCommitted = false;
     try {
       if (collaborationOperationSyncRequired) {
         const authoritativeSaveBarrier = studioCrdtAuthoritativeSaveBarrierRef.current;
@@ -37660,9 +38327,162 @@ const puppetWarpArmed =
       });
       let savedWorkId: string;
       let keepSharedEditorOpen = false;
+      let stagedLinkedNewWork: {
+        readonly outcome: "promoted" | "recovered-existing";
+        readonly revision: number | null;
+        readonly workId: string;
+      } | null = null;
       if (!saveScopeStillCurrent()) return;
       if (!canApplyStudioMutation(saveMutationTicket, { allowDuringSave: true })) return;
-      if (workId && sharedDocument) {
+      if (serverSavePages.some((page) => page.linked3dRender !== undefined)) {
+        const canonicalSaveProject = creatorWorkSnapshotToStudioProject(payload);
+        const { ensureStudioLinked3dPassCloudProject } = await import(
+          "./studio-linked-3d-pass-cloud-project"
+        );
+        if (workId) {
+          linkedCloudUploadReceipts = await ensureStudioLinked3dPassCloudProject({
+            workId,
+            project: canonicalSaveProject,
+            signal: saveController.signal,
+          });
+          linkedCloudUploadWorkId = workId;
+        } else {
+          if (!saveAuthScopeKey) {
+            throw new Error("연결형 3D cloud-save 소유자 범위를 확인하지 못했습니다.");
+          }
+          if (
+            remixId
+            || (payload.remixFromId !== undefined && payload.remixFromId !== null)
+          ) {
+            throw new Error(
+              "연결형 3D 리믹스 신규 저장은 원본 provenance를 원자 승격할 수 없어 지원하지 않습니다.",
+            );
+          }
+          let draftIdentity = draftCollaboration?.identity;
+          if (!draftIdentity) {
+            const { loadOrCreateStudioDraftCollaborationIdentity } = await import(
+              "./studio-draft-collaboration"
+            );
+            draftIdentity = await loadOrCreateStudioDraftCollaborationIdentity({
+              documentScopeKey: autosaveKey,
+              ownerScopeKey: saveAuthScopeKey,
+            });
+          }
+          draftCollaborationProvisionAbortRef.current?.abort();
+          draftCollaborationProvisionAbortRef.current = null;
+          setDraftCollaboration({
+            status: "provisioning",
+            identity: draftIdentity,
+            intent: "cloud-save",
+          });
+          try {
+            const [
+              { saveStudioLinked3dNewWorkThroughCloudRoom },
+              {
+                promoteCreatorDraftCollaborationRoom,
+                provisionCreatorDraftCollaborationRoom,
+              },
+              { getWork, updateWork },
+              { retireStudioDraftCollaborationIdentity },
+            ] = await Promise.all([
+              import("./studio-linked-3d-new-work-cloud-save"),
+              import("./creator-draft-collaboration-client"),
+              import("@/src/infrastructure/creator-client"),
+              import("./studio-draft-collaboration"),
+            ]);
+            const directSavePlan = buildStudioDirectWorkSavePlan({
+              payload,
+              workId: null,
+              baseRevision: undefined,
+            });
+            if (directSavePlan.kind !== "create") {
+              throw new Error("새 작품 cloud-save 계획이 create 경계와 일치하지 않습니다.");
+            }
+            const cloudSaveResult = await saveStudioLinked3dNewWorkThroughCloudRoom({
+              actorAuthScopeKey: saveAuthScopeKey,
+              assertFresh: () => {
+                if (
+                  !saveScopeStillCurrent()
+                  || !canApplyStudioMutation(saveMutationTicket, { allowDuringSave: true })
+                ) {
+                  throw new DOMException("The Studio document changed during cloud save.", "AbortError");
+                }
+              },
+              createPayload: directSavePlan.payload,
+              dependencies: {
+                ensureCloudArtifacts: async (provisionalWorkId, signal) => {
+                  return await ensureStudioLinked3dPassCloudProject({
+                    workId: provisionalWorkId,
+                    project: canonicalSaveProject,
+                    signal,
+                  });
+                },
+                compensateCloudArtifacts: async (provisionalWorkId, receipts) => {
+                  const { compensateStudioLinked3dPassCloudUploads } = await import(
+                    "./studio-linked-3d-pass-cloud-sync"
+                  );
+                  await compensateStudioLinked3dPassCloudUploads({
+                    workId: provisionalWorkId,
+                    receipts,
+                  });
+                },
+                inspectWorkRevision: async (provisionalWorkId, signal) => {
+                  const staged = await getWork(provisionalWorkId, signal);
+                  if (staged.id !== provisionalWorkId) {
+                    throw new Error("임시 cloud-save 작품 조회 영수증의 작품 ID가 다릅니다.");
+                  }
+                  return staged.revision ?? 0;
+                },
+                promote: promoteCreatorDraftCollaborationRoom,
+                provision: provisionCreatorDraftCollaborationRoom,
+                retireIdentity: retireStudioDraftCollaborationIdentity,
+                updateWork: async (provisionalWorkId, stagedPayload, signal) => {
+                  assertStudioApiJsonPayloadSize(stagedPayload);
+                  const staged = await updateWork(provisionalWorkId, stagedPayload, signal);
+                  if (staged.id !== provisionalWorkId) {
+                    throw new Error("임시 cloud-save 작품 저장 영수증의 작품 ID가 다릅니다.");
+                  }
+                  return staged.revision ?? 0;
+                },
+              },
+              finalStatus: status,
+              identity: draftIdentity,
+              initialSnapshotByteLength: new TextEncoder().encode(
+                JSON.stringify(canonicalSaveProject),
+              ).byteLength,
+              signal: saveController.signal,
+            });
+            stagedLinkedNewWork = {
+              outcome: cloudSaveResult.outcome,
+              revision: cloudSaveResult.revision,
+              workId: cloudSaveResult.workId,
+            };
+            setDraftCollaboration({
+              status: "ready",
+              identity: draftIdentity,
+              room: cloudSaveResult.room,
+            });
+          } catch (cause) {
+            if (saveScopeStillCurrent()) {
+              setDraftCollaboration({
+                status: "error",
+                identity: draftIdentity,
+                message: cause instanceof Error
+                  ? cause.message
+                  : "연결형 3D cloud-save 작업실을 준비하지 못했습니다.",
+              });
+            }
+            throw cause;
+          }
+        }
+        // Upload completion is not permission to save an older snapshot. Immutable hash-derived
+        // rows remain reusable, while a stale route/document must stop before either PATCH starts.
+        if (!saveScopeStillCurrent()) return;
+        if (!canApplyStudioMutation(saveMutationTicket, { allowDuringSave: true })) return;
+      }
+      if (stagedLinkedNewWork) {
+        savedWorkId = stagedLinkedNewWork.workId;
+      } else if (workId && sharedDocument) {
         const {
           isStudioSharedDocumentScopeCurrent,
           updateStudioSharedDocument,
@@ -37690,6 +38510,7 @@ const puppetWarpArmed =
           sharedPatch,
           saveController.signal
         );
+        linkedCloudSaveCommitted = true;
         if (
           !saveScopeStillCurrent() ||
           !isStudioSharedDocumentScopeCurrent(
@@ -37754,6 +38575,19 @@ const puppetWarpArmed =
             directSavePlan.payload,
             saveController.signal,
           );
+          const receivedRevision = work.revision;
+          if (
+            work.id !== directSavePlan.workId
+            || !Number.isSafeInteger(receivedRevision)
+            || (receivedRevision ?? 0) < 1
+            || (
+              directSavePlan.payload.baseRevision !== undefined
+              && receivedRevision !== directSavePlan.payload.baseRevision + 1
+            )
+          ) {
+            throw new Error("작품 저장 영수증의 ID·revision이 요청과 일치하지 않습니다.");
+          }
+          linkedCloudSaveCommitted = true;
         } else {
           assertStudioApiJsonPayloadSize(directSavePlan.payload);
           work = await createWork(directSavePlan.payload, saveController.signal);
@@ -37767,6 +38601,19 @@ const puppetWarpArmed =
 
       if (!canApplyStudioMutation(saveMutationTicket, { allowDuringSave: true })) {
         setError("저장 요청 중 원고가 바뀌어 현재 로컬 변경을 유지했습니다. 내용을 확인한 뒤 다시 저장해 주세요.");
+        return;
+      }
+
+      if (stagedLinkedNewWork?.outcome === "recovered-existing") {
+        // The promoted-room receipt identifies a prior successful save, but there is no exact
+        // payload fingerprint proving that it contains this tab's current draft. Keep every local
+        // autosave authority intact and open the existing work with an explicit recovery notice.
+        navigate(`/create/${stagedLinkedNewWork.workId}`, {
+          state: withStudioLinked3dCloudSaveRecoveryState(
+            location.state,
+            stagedLinkedNewWork.workId,
+          ),
+        });
         return;
       }
 
@@ -37841,6 +38688,27 @@ const puppetWarpArmed =
         if (saveScopeStillCurrent()) setError(message);
       }
     } finally {
+      if (
+        !linkedCloudSaveCommitted
+        && linkedCloudUploadWorkId
+        && linkedCloudUploadReceipts.length > 0
+      ) {
+        try {
+          const { compensateStudioLinked3dPassCloudUploads } = await import(
+            "./studio-linked-3d-pass-cloud-sync"
+          );
+          await compensateStudioLinked3dPassCloudUploads({
+            workId: linkedCloudUploadWorkId,
+            receipts: linkedCloudUploadReceipts,
+          });
+        } catch {
+          if (saveScopeStillCurrent()) {
+            setError(
+              "저장은 중단했지만 업로드된 3D pass 정리를 완료하지 못했습니다. 다음 저장에서 같은 영수증으로 다시 확인해 주세요."
+            );
+          }
+        }
+      }
       if (sharedDocumentSaveAbortRef.current === saveController) {
         sharedDocumentSaveAbortRef.current = null;
       }
@@ -38240,6 +39108,7 @@ function clearSelectionForEdit() {
         && !isEffectivelyHidden(element, groups)
         && !isEffectivelyLocked(element, groups)
         && !studioWorkAssetDestructiveEditReason(element)
+        && !studioLinked3dPassDestructiveEditReason(element)
         && !element.isAnimatedGif
         && (element.frames?.length ?? 0) <= 1,
     ).length;
@@ -38269,7 +39138,11 @@ function clearSelectionForEdit() {
     }
     const candidates = elements.filter(
       (el): el is ImageEl =>
-        el.type === "image" && !isEffectivelyHidden(el, groups) && !isEffectivelyLocked(el, groups)
+        el.type === "image"
+        && !isEffectivelyHidden(el, groups)
+        && !isEffectivelyLocked(el, groups)
+        && !studioLinked3dPassDestructiveEditReason(el)
+        && !studioWorkAssetDestructiveEditReason(el)
     );
     if (candidates.length === 1) {
       setMarqueeIds([]);
@@ -38291,7 +39164,11 @@ function clearSelectionForEdit() {
       (selected?.type === "image" && !selectedImageMutationLocked)
       || (selected?.type !== "image"
         && elements.filter(
-          (el) => el.type === "image" && !isEffectivelyHidden(el, groups) && !isEffectivelyLocked(el, groups)
+          (el) => el.type === "image"
+            && !isEffectivelyHidden(el, groups)
+            && !isEffectivelyLocked(el, groups)
+            && !studioLinked3dPassDestructiveEditReason(el)
+            && !studioWorkAssetDestructiveEditReason(el)
         ).length === 1)
     );
   const rasterRetouchTargetAvailable =
@@ -38351,7 +39228,9 @@ function clearSelectionForEdit() {
       (element): element is ImageEl =>
         element.type === "image"
         && !isEffectivelyHidden(element, groups)
-        && !isEffectivelyLocked(element, groups),
+        && !isEffectivelyLocked(element, groups)
+        && !studioLinked3dPassDestructiveEditReason(element)
+        && !studioWorkAssetDestructiveEditReason(element),
     );
     if (selected?.type === "image" || directCandidates.length === 1) {
       return ensurePixelToolTarget(toolLabel);
@@ -39313,6 +40192,7 @@ function clearSelectionForEdit() {
             runtimeRef: companionRuntimeRef,
             windowRef: companionWindowRef,
             announce: studioMainMenuActions.announceDrawingShortcut,
+            workId,
             t,
           }),
           toggleQuickAccessPalette: studioMainMenuActions.toggleStudioQuickAccessPalette,
@@ -39781,14 +40661,21 @@ function clearSelectionForEdit() {
     if (!ensureSharedDocumentAvailableForExport()) {
       throw new Error("공동 문서를 불러온 뒤 SVG로 내보낼 수 있어요.");
     }
-    const { runStudioSvgExportWorker } = await loadStudioSvgExportWorkerClientModule();
+    const [
+      { runStudioSvgExportWorker },
+      { projectStudioLinked3dRasterSourcesForPortableExport },
+    ] = await Promise.all([
+      loadStudioSvgExportWorkerClientModule(),
+      import("./studio-linked-3d-portable-raster-projection"),
+    ]);
+    const portableElements = await projectStudioLinked3dRasterSourcesForPortableExport(elements);
     const { result } = await runStudioSvgExportWorker({
       width: CANVAS_W,
       height: canvasH,
       bg,
       bgGrad,
       transparentBg: exportTransparent,
-      elements: elements as unknown as readonly SvgExportEl[],
+      elements: portableElements as unknown as readonly SvgExportEl[],
       groups,
       theme: webtoonTheme,
     });
@@ -42671,7 +43558,7 @@ function clearSelectionForEdit() {
           onAddStickyNote={insertStudioStickyNote}
           onOpenSculpt={() => {
             setCreativeModesOpen(false);
-            setHybridDccOpen(true);
+            openHybridDccWorkspace("sculpt");
           }}
           onStartEphemeralBoard={(session) => {
             // Ephemeral board: focus canvas and keep share path in session for HUD.
@@ -42683,28 +43570,40 @@ function clearSelectionForEdit() {
       </div>
     </div>
   ) : null}
+  {hybridDccRouteRequested && !hybridDccOpen ? (
+    <StudioHybridDccRouteGate
+      detail={hybridDccRouteAccess === "pending"
+        ? "권한·원고·협업 경계를 확인한 뒤 같은 작품의 3D 작업을 엽니다. 기다리는 동안 캔버스와 로컬 3D 원본은 변경되지 않습니다."
+        : "이 작품의 3D 원본을 편집할 수 없어 안전하게 캔버스로 돌아갑니다."}
+      label={hybridDccRouteAccess === "pending"
+        ? "3D 작업 권한을 확인하는 중입니다."
+        : "3D 편집 권한을 확인하지 못했습니다."}
+      onClose={() => setHybridDccOpen(false)}
+      returnFocus={hybridDccReturnFocusRef.current}
+    />
+  ) : null}
   {hybridDccOpen ? (
       <Suspense
         fallback={(
-          <div
-            className="fixed inset-0 z-[110] grid place-items-center bg-canvas/80 p-4 text-sm font-semibold text-fg"
-            role="status"
-            aria-live="polite"
-          >
-            Hybrid DCC를 여는 중…
-          </div>
+          <StudioHybridDccRouteGate
+            detail="편집 권한과 로컬 복구 범위는 확인됐습니다. 무거운 3D 편집 모듈만 불러오는 중입니다."
+            label="전문 3D 제작 도구를 여는 중입니다."
+            onClose={() => setHybridDccOpen(false)}
+            returnFocus={hybridDccReturnFocusRef.current}
+          />
         )}
       >
         <LazyStudioHybridDccDialog
           key={hybridDccWorkspaceScope}
           loading={hybridDccPersistenceStatus === "checking"}
           open
-          onClose={() => {
-            flushHybridDccWorkspacePersistence();
-            setHybridDccOpen(false);
-          }}
+          onClose={() => setHybridDccOpen(false)}
           initialWorkspace={scopedHybridDccWorkspace}
+          onWorkbenchModeChange={setHybridDccWorkbenchMode}
           persistenceStatus={hybridDccPersistenceStatus}
+          presentation="workspace"
+          returnFocus={hybridDccReturnFocusRef.current}
+          workbenchMode={studioRoute.dccMode ?? "model"}
           workspaceDocumentId={hybridDccWorkspaceDocumentId}
           onWorkspaceChange={(workspace) => {
             setHybridDccWorkspaceState((current) => (
@@ -42723,7 +43622,6 @@ function clearSelectionForEdit() {
                 ? `3D 장면을 열었습니다 · 파생 손실 ${result.losses.length}건은 DCC 원본에 보존됨`
                 : `3D 장면을 열었습니다 · ${result.assets.length}개 메시, ${result.shots.length}개 Shot`,
             );
-            flushHybridDccWorkspacePersistence();
             bg3dDccSourceRef.current = {
               sourceDocumentId: result.sourceDocumentId,
               sourceStateHash: result.sourceStateHash,
@@ -42732,6 +43630,10 @@ function clearSelectionForEdit() {
               sourceCommandCount: result.sourceCommandCount,
               sourceBridgeCommandSequence: result.sourceBridgeCommandSequence,
             };
+            bg3dDccShotMappingsRef.current = result.shots.map((shot) => ({
+              sourceShotId: shot.sourceShotId,
+              sceneShotId: shot.sceneShotId,
+            }));
             setHybridDccOpen(false);
             setBg3dInitialDataUrl(undefined);
             setBg3dInitialElementId(undefined);
@@ -43225,7 +44127,7 @@ function clearSelectionForEdit() {
           assetSortOrder={assetSortOrder}
           assetTab={assetTab}
           bg={bg}
-          bg3dOpen={bg3dOpen}
+          bg3dOpen={admittedBg3dOpen}
           bgGrad={bgGrad}
           bgSceneGenreFilter={bgSceneGenreFilter}
           bgSceneSearchQuery={bgSceneSearchQuery}
@@ -43282,9 +44184,9 @@ function clearSelectionForEdit() {
           panelLayoutPresets={panelLayoutPresets}
           panelLayoutsError={panelLayoutsError}
           panelLayoutsLoading={panelLayoutsLoading}
-          mannequinPoserOpen={mannequinPoserOpen}
+          mannequinPoserOpen={admittedMannequinPoserOpen}
           setMannequinPoserOpen={setMannequinPoserOpen}
-          poserVrmOpen={poserVrmOpen}
+          poserVrmOpen={admittedPoserVrmOpen}
           presentationPanelsHidden={presentationPanelsHidden}
           publishingId={publishingId}
           rasterFavoriteOnly={rasterFavoriteOnly}
@@ -43514,9 +44416,9 @@ function clearSelectionForEdit() {
           quickShapeActive={quickShapeActive}
           railMoreOpen={railMoreOpen}
           referencePanelOpen={referencePanelOpen}
-          mannequinPoserOpen={mannequinPoserOpen}
-          poserVrmOpen={poserVrmOpen}
-          bg3dOpen={bg3dOpen}
+          mannequinPoserOpen={admittedMannequinPoserOpen}
+          poserVrmOpen={admittedPoserVrmOpen}
+          bg3dOpen={admittedBg3dOpen}
           hybridDccOpen={hybridDccOpen}
           selected={selected}
           selectedImageMutationLocked={selectedImageMutationLocked}
@@ -44205,7 +45107,7 @@ function clearSelectionForEdit() {
           selectedBubbleTailGeometry={selectedBubbleTailGeometry}
           selectedContentMutationLocked={selectedContentMutationLocked}
           selectedId={selectedId}
-          selectedReadableImageSource={selectedReadableImageSource}
+          selectedRasterSource={selectedProjectedImageSource}
           selectedWorkAssetDestructiveEditReason={selectedWorkAssetDestructiveEditReason}
           setSelectedId={setSelectedId}
           autoColorScribbleCanvasArmed={autoColorScribbleCanvasArmed}
@@ -44544,7 +45446,7 @@ function clearSelectionForEdit() {
           bg3dTargetBundleId={bg3dTargetBundleId}
           bg3dBatchRecoveryScope={bg3dBatchRecoveryScope}
           validateRecoveryAccess={validateRecoveryAccess}
-          bg3dOpen={bg3dOpen}
+          bg3dOpen={admittedBg3dOpen}
           characterBible={characterBible}
           characterBibleOpen={characterBibleOpen}
           checkpointError={checkpointError}
@@ -44584,10 +45486,10 @@ function clearSelectionForEdit() {
           pages={pages}
           pagesHi={pagesHi}
           pagesHistory={pagesHistory}
-          mannequinPoserOpen={mannequinPoserOpen}
+          mannequinPoserOpen={admittedMannequinPoserOpen}
           poserInitialDataUrl={poserInitialDataUrl}
           poserInitialElementId={poserInitialElementId}
-          poserVrmOpen={poserVrmOpen}
+          poserVrmOpen={admittedPoserVrmOpen}
           productionInsightsOpen={productionInsightsOpen}
           productionInsightsResult={productionInsightsResult}
           publicationAnalytics={publicationAnalytics}

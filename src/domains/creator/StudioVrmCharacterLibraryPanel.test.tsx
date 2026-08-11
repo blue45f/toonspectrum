@@ -42,6 +42,7 @@ function createDefaultProps(): PanelProps {
     onSelect: vi.fn(),
     onDelete: vi.fn(),
     onCollapse: vi.fn(),
+    onRetry: vi.fn(),
   };
 }
 
@@ -72,6 +73,8 @@ describe("StudioVrmCharacterLibraryPanel", () => {
       />,
     );
     expect(screen.getByRole("alert").textContent).toContain("라이브러리를 읽지 못했습니다.");
+    fireEvent.click(screen.getByRole("button", { name: "라이브러리 다시 불러오기" }));
+    expect(view.props.onRetry).toHaveBeenCalledOnce();
 
     view.rerender(
       <StudioVrmCharacterLibraryPanel
@@ -117,6 +120,28 @@ describe("StudioVrmCharacterLibraryPanel", () => {
     });
     expect(screen.getByText("표시 12/14명")).toBeTruthy();
     expect(screen.queryByText("캐릭터 13")).toBeNull();
+  });
+
+  it("requests only the current 12-entry thumbnail window and advances durable metadata pages", () => {
+    const entries = Array.from({ length: 14 }, (_, index) =>
+      createEntry(`paged-${index + 1}`, `페이지 캐릭터 ${index + 1}`, "sqlite-opfs"),
+    );
+    const onVisibleWindowChange = vi.fn();
+    const onLoadMore = vi.fn();
+    renderPanel({
+      entries,
+      hasMoreEntries: true,
+      onLoadMore,
+      onVisibleWindowChange,
+    });
+
+    expect(onVisibleWindowChange).toHaveBeenLastCalledWith(entries.slice(0, 12));
+    fireEvent.click(screen.getByRole("button", { name: /캐릭터 2명 더 보기/ }));
+    expect(onVisibleWindowChange).toHaveBeenLastCalledWith(entries.slice(2, 14));
+    fireEvent.click(screen.getByRole("button", {
+      name: "저장된 캐릭터 다음 페이지 불러오기",
+    }));
+    expect(onLoadMore).toHaveBeenCalledOnce();
   });
 
   it("preserves recent character order and selects a recent entry once", () => {

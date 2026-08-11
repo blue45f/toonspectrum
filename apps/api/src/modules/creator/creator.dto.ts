@@ -7,6 +7,11 @@ import {
   CREATOR_ASSET_PREVIEW_MAX_DATA_URL_CHARACTERS,
 } from "../../../../../lib/creator-asset-contract";
 
+import {
+  CREATOR_DRAFT_COLLABORATION_FINAL_STATUSES,
+  CREATOR_DRAFT_COLLABORATION_PROVISION_INTENTS,
+} from "./creator-draft-collaboration.contract";
+
 const CreatorReferenceIdSchema = z.string().trim().min(1).max(160).nullable();
 const CreatorWorkRevisionSchema = z.number().int().min(1).max(2_147_483_647);
 const CreatorCrdtServerSequenceSchema = z
@@ -262,10 +267,9 @@ const CreatorDraftCollaborationGraphRevisionSchema = z
   .int()
   .min(0)
   .max(2_147_483_647);
-const CreatorDraftCollaborationProvisionIntentSchema = z.enum([
-  "share-link",
-  "invite-member",
-]);
+const CreatorDraftCollaborationProvisionIntentSchema = z.enum(
+  CREATOR_DRAFT_COLLABORATION_PROVISION_INTENTS
+);
 
 export const ProvisionCreatorDraftCollaborationRoomSchema = z
   .object({
@@ -287,6 +291,8 @@ export const PromoteCreatorDraftCollaborationRoomSchema = z
     ownerScopeKey: CreatorCollaborationUserIdSchema,
     targetWorkId: CreatorCollaborationUserIdSchema,
     expectedGraphRevision: CreatorDraftCollaborationGraphRevisionSchema,
+    expectedWorkRevision: CreatorWorkRevisionSchema,
+    finalStatus: z.enum(CREATOR_DRAFT_COLLABORATION_FINAL_STATUSES),
     clientMutationId: CreatorDraftCollaborationMutationIdSchema,
   })
   .strict();

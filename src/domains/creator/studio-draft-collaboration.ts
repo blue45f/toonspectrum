@@ -38,7 +38,19 @@ export const STUDIO_DRAFT_COLLABORATION_POLICY = Object.freeze({
 });
 
 export type StudioDraftCollaborationPersistence = "persistent" | "memory-only";
-export type StudioDraftCollaborationProvisionIntent = "share-link" | "invite-member";
+export const STUDIO_DRAFT_COLLABORATION_PROVISION_INTENTS = [
+  "share-link",
+  "invite-member",
+  "cloud-save",
+] as const;
+export const STUDIO_DRAFT_COLLABORATION_FINAL_STATUSES = [
+  "draft",
+  "published",
+] as const;
+export type StudioDraftCollaborationProvisionIntent =
+  (typeof STUDIO_DRAFT_COLLABORATION_PROVISION_INTENTS)[number];
+export type StudioDraftCollaborationFinalStatus =
+  (typeof STUDIO_DRAFT_COLLABORATION_FINAL_STATUSES)[number];
 
 export interface StudioDraftCollaborationIdentity {
   readonly version: 1;
@@ -104,6 +116,8 @@ export interface StudioDraftCollaborationPromotionRequest {
   readonly ownerScopeKey: string;
   readonly targetWorkId: string;
   readonly expectedGraphRevision: number;
+  readonly expectedWorkRevision: number;
+  readonly finalStatus: StudioDraftCollaborationFinalStatus;
   readonly clientMutationId: string;
   readonly requestedAt: string;
 }
@@ -147,6 +161,8 @@ export interface StudioDraftCollaborationIdentityRepository {
   loadOrCreate(
     input: LoadOrCreateStudioDraftCollaborationInput,
   ): Promise<StudioDraftCollaborationIdentity>;
+  /** Removes only the exact persisted draft identity; a stale caller cannot retire a replacement. */
+  retireExact(identity: StudioDraftCollaborationIdentity): Promise<boolean>;
   flush(): Promise<void>;
 }
 
@@ -319,6 +335,38 @@ function publicIdentity(
   return { version: 1, ...identity, persistence };
 }
 
+function exactRetirementIdentity(
+  identity: StudioDraftCollaborationIdentity,
+): Pick<
+  PersistedDraftCollaborationIdentity,
+  "draftDocumentId" | "documentScopeKey" | "ownerScopeKey"
+> {
+  const documentScopeKey = exactBoundedScope(identity.documentScopeKey);
+  const ownerScopeKey = exactBoundedScope(identity.ownerScopeKey);
+  if (
+    identity.version !== 1
+    || !DRAFT_DOCUMENT_ID_PATTERN.test(identity.draftDocumentId)
+    || !documentScopeKey
+    || !ownerScopeKey
+  ) {
+    throw new Error("retire할 초안 협업 identity가 올바르지 않습니다.");
+  }
+  return {
+    draftDocumentId: identity.draftDocumentId,
+    documentScopeKey,
+    ownerScopeKey,
+  };
+}
+
+function isExactRetirementTarget(
+  persisted: PersistedDraftCollaborationIdentity,
+  target: ReturnType<typeof exactRetirementIdentity>,
+): boolean {
+  return persisted.draftDocumentId === target.draftDocumentId
+    && persisted.documentScopeKey === target.documentScopeKey
+    && persisted.ownerScopeKey === target.ownerScopeKey;
+}
+
 function nextDraftCollaborationIdentity(
   identities: readonly PersistedDraftCollaborationIdentity[],
   input: LoadOrCreateStudioDraftCollaborationInput,
@@ -372,6 +420,12 @@ export function createStudioDraftCollaborationIdentityRepository(
 ): StudioDraftCollaborationIdentityRepository {
   let writeTail: Promise<void> = Promise.resolve();
 
+  const serialize = <T>(run: () => Promise<T>): Promise<T> => {
+    const operation = writeTail.catch(() => undefined).then(run);
+    writeTail = operation.then(() => undefined, () => undefined);
+    return operation;
+  };
+
   return Object.freeze({
     authority: "sqlite-opfs" as const,
     loadOrCreate(input: LoadOrCreateStudioDraftCollaborationInput) {
@@ -380,28 +434,50 @@ export function createStudioDraftCollaborationIdentityRepository(
         return Promise.reject(new Error("초안 협업 소유자 범위가 올바르지 않습니다."));
       }
       const sqliteOwnerKey = studioWorkspaceOwnerScope(ownerScopeKey);
-      const operation = writeTail
-        .catch(() => undefined)
-        .then(async () => {
-          const now = input.now ?? Date.now();
-          const current = parseIdentityEnvelope(await store.get(sqliteOwnerKey), now);
-          if (current.some((identity) => identity.ownerScopeKey !== ownerScopeKey)) {
-            throw new Error("초안 협업 SQLite owner 행이 다른 계정 identity를 포함합니다.");
+      return serialize(async () => {
+        const now = input.now ?? Date.now();
+        const current = parseIdentityEnvelope(await store.get(sqliteOwnerKey), now);
+        if (current.some((identity) => identity.ownerScopeKey !== ownerScopeKey)) {
+          throw new Error("초안 협업 SQLite owner 행이 다른 계정 identity를 포함합니다.");
+        }
+        const next = nextDraftCollaborationIdentity(current, input);
+        const encoded = encodeIdentityEnvelope(next.identities);
+        try {
+          await store.set(sqliteOwnerKey, encoded);
+          if (await store.get(sqliteOwnerKey) !== encoded) {
+            throw new Error("SQLite verification mismatch");
           }
-          const next = nextDraftCollaborationIdentity(current, input);
-          const encoded = encodeIdentityEnvelope(next.identities);
-          try {
-            await store.set(sqliteOwnerKey, encoded);
-            if (await store.get(sqliteOwnerKey) !== encoded) {
-              throw new Error("SQLite verification mismatch");
-            }
-          } catch (cause) {
-            throw new DraftCollaborationIdentityWriteError(next.identity, cause);
+        } catch (cause) {
+          throw new DraftCollaborationIdentityWriteError(next.identity, cause);
+        }
+        return publicIdentity(next.identity, "persistent");
+      });
+    },
+    retireExact(identity: StudioDraftCollaborationIdentity) {
+      const target = exactRetirementIdentity(identity);
+      const sqliteOwnerKey = studioWorkspaceOwnerScope(target.ownerScopeKey);
+      return serialize(async () => {
+        // Retirement must also see expired identities, so parse against the Unix epoch instead of
+        // pruning by today's clock. Only the exact UUID+document+owner tuple may be removed.
+        const current = parseIdentityEnvelope(await store.get(sqliteOwnerKey), 0);
+        const matchingIndex = current.findIndex((candidate) =>
+          isExactRetirementTarget(candidate, target));
+        if (matchingIndex < 0) return false;
+        const remaining = current.filter((_, index) => index !== matchingIndex);
+        if (remaining.length === 0) {
+          await store.delete(sqliteOwnerKey);
+          if (await store.get(sqliteOwnerKey) !== null) {
+            throw new Error("초안 협업 identity retire 삭제를 확인하지 못했습니다.");
           }
-          return publicIdentity(next.identity, "persistent");
-        });
-      writeTail = operation.then(() => undefined, () => undefined);
-      return operation;
+          return true;
+        }
+        const encoded = encodeIdentityEnvelope(remaining);
+        await store.set(sqliteOwnerKey, encoded);
+        if (await store.get(sqliteOwnerKey) !== encoded) {
+          throw new Error("초안 협업 identity retire 쓰기를 확인하지 못했습니다.");
+        }
+        return true;
+      });
     },
     flush() {
       return writeTail;
@@ -452,6 +528,22 @@ export async function loadOrCreateStudioDraftCollaborationIdentity(
   }
 }
 
+/**
+ * Retires a successfully promoted local draft identity without any memory-only fallback. Failure
+ * must remain visible to the save coordinator, otherwise the next new work could reuse its room.
+ */
+export async function retireStudioDraftCollaborationIdentity(
+  identity: StudioDraftCollaborationIdentity,
+  acquireRepository: () => Promise<StudioDraftCollaborationIdentityRepository> =
+    acquireProductStudioDraftCollaborationIdentityRepository,
+): Promise<boolean> {
+  exactRetirementIdentity(identity);
+  // A memory-only identity has no SQLite row to remove. Treat that absence as a completed retire
+  // so a successful server promotion does not become unrecoverable solely because OPFS is blocked.
+  if (identity.persistence === "memory-only") return true;
+  return (await acquireRepository()).retireExact(identity);
+}
+
 function assertCurrentOwnedIdentity(
   identity: StudioDraftCollaborationIdentity,
   actorAuthScopeKey: string,
@@ -473,8 +565,9 @@ function assertCurrentOwnedIdentity(
 }
 
 /**
- * Creates the body for the first share/invite request. The server must repeat every check and
- * provision transactionally; this client check prevents accidental eager or oversized requests.
+ * Creates the body for the first share/invite or explicit cloud-save request. The server must
+ * repeat every check and provision transactionally; this client check prevents accidental eager
+ * or oversized requests.
  */
 export function createStudioDraftCollaborationProvisionRequest(input: {
   readonly identity: StudioDraftCollaborationIdentity;
@@ -486,7 +579,7 @@ export function createStudioDraftCollaborationProvisionRequest(input: {
 }): StudioDraftCollaborationProvisionRequest {
   const now = input.now ?? Date.now();
   assertCurrentOwnedIdentity(input.identity, input.actorAuthScopeKey, now);
-  if (input.intent !== "share-link" && input.intent !== "invite-member") {
+  if (!STUDIO_DRAFT_COLLABORATION_PROVISION_INTENTS.includes(input.intent)) {
     throw new Error("초안 협업 시작 목적이 올바르지 않습니다.");
   }
   if (
@@ -565,6 +658,8 @@ export function createStudioDraftCollaborationPromotionRequest(input: {
   readonly room: StudioDraftCollaborationTemporaryRoom;
   readonly actorAuthScopeKey: string;
   readonly targetWorkId: string;
+  readonly expectedWorkRevision: number;
+  readonly finalStatus: StudioDraftCollaborationFinalStatus;
   readonly now?: number;
   readonly createUuid?: () => string;
 }): StudioDraftCollaborationPromotionRequest {
@@ -583,6 +678,10 @@ export function createStudioDraftCollaborationPromotionRequest(input: {
     targetWorkId !== provisionalWorkId ||
     !Number.isSafeInteger(input.room.graphRevision) ||
     input.room.graphRevision < 0 ||
+    !Number.isSafeInteger(input.expectedWorkRevision) ||
+    input.expectedWorkRevision < 1 ||
+    input.expectedWorkRevision > 2_147_483_647 ||
+    !STUDIO_DRAFT_COLLABORATION_FINAL_STATUSES.includes(input.finalStatus) ||
     roomProvisionedAt === null ||
     roomExpiresAt === null ||
     roomProvisionedAt >= roomExpiresAt ||
@@ -600,6 +699,8 @@ export function createStudioDraftCollaborationPromotionRequest(input: {
     ownerScopeKey: input.identity.ownerScopeKey,
     targetWorkId,
     expectedGraphRevision: input.room.graphRevision,
+    expectedWorkRevision: input.expectedWorkRevision,
+    finalStatus: input.finalStatus,
     clientMutationId: requestedUuid(input.createUuid),
     requestedAt: iso(now),
   };

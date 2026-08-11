@@ -35,6 +35,8 @@ const REQUIRED_PENDING_MIGRATION_IDS = Object.freeze([
   "0022_creator_marketplace_distributed_gate_search",
   "0024_creator_asset_object_storage",
   "0025_auth_lifecycle_contract",
+  "0026_creator_draft_cloud_save_intent",
+  "0027_creator_draft_atomic_publication",
 ]);
 const DRIZZLE_SCHEMA_PATHS = Object.freeze([
   "drizzle.config.ts",
@@ -879,7 +881,7 @@ function printPlan({ assessment, contract, databaseContract, options }) {
       : "  2. Preserve the verified empty public schema",
     "  3. Provision pg_trgm and the current Drizzle base schema",
     "  4. Apply reviewed historical structure through 0019, then prove adoption shape",
-    "  5. Adopt exact 0001-0019 checksums and apply 0020-0022/0024-0025 plus later reviewed forward migrations",
+    "  5. Adopt exact 0001-0019 checksums and apply 0020-0022/0024-0027 plus later reviewed forward migrations",
     "  6. Normalize runtime ACL, rerun apply as an idempotency proof, and verify all production capabilities",
   ];
   if (assessment.nonempty && !assessment.resetAuthorized) {

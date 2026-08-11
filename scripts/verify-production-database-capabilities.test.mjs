@@ -21,6 +21,8 @@ test("loads the runtime health readiness relation and cutover contract", () => {
   expect(contract.migrationIds).toEqual([
     "0017_creator_work_live_lock_revision",
     "0025_auth_lifecycle_contract",
+    "0026_creator_draft_cloud_save_intent",
+    "0027_creator_draft_atomic_publication",
   ]);
 });
 
@@ -54,6 +56,8 @@ test("generated verification covers runtime capabilities and exact migration che
     "0023_production_migration_ledger",
     "0024_creator_asset_object_storage",
     "0025_auth_lifecycle_contract",
+    "0026_creator_draft_cloud_save_intent",
+    "0027_creator_draft_atomic_publication",
     "'adopted'",
     "'executed'",
     "'bootstrap'",

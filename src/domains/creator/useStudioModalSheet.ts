@@ -63,6 +63,10 @@ function canReceiveFocus(element: Element | null): element is HTMLElement {
 function canRestoreFocusLater(element: Element | null): element is HTMLElement {
   if (!element || typeof (element as HTMLElement).focus !== "function") return false;
   const candidate = element as HTMLElement;
+  if (
+    candidate === candidate.ownerDocument.body
+    || candidate === candidate.ownerDocument.documentElement
+  ) return false;
   if (!candidate.isConnected) return false;
   if ("disabled" in candidate && Boolean((candidate as HTMLButtonElement).disabled)) return false;
   // A launcher can become inert in the same React commit that mounts the modal (brush settings →

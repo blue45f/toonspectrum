@@ -1,11 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { openStudioLocalDatabase } from "./studio-local-database";
+import { createStudioOpfsAssetStore } from "./studio-opfs-asset-store";
 import { createStudioOpfsMemoryFileSystem } from "./studio-opfs-filesystem";
 import {
+  STUDIO_VRM_ASSET_CAS_OWNER,
   createStudioVrmAssetSqliteOpfsRepository,
   STUDIO_VRM_ASSET_SQLITE_MANIFEST_KEY,
+  STUDIO_VRM_MODEL_ASSET_LIMITS,
   STUDIO_VRM_MODEL_SQLITE_NAMESPACE,
+  STUDIO_VRM_TEXTURE_ASSET_LIMITS,
   STUDIO_VRM_TEXTURE_SQLITE_NAMESPACE,
   studioVrmAssetCommitPath,
   type SaveStudioVrmModelAssetInput,
@@ -18,7 +22,9 @@ import {
 } from "./studio-vrm-texture-paint-library";
 import {
   getStoredVrmModel,
+  hydrateVrmLibraryThumbnailWindow,
   listVrmLibraryEntries,
+  queryUploadedVrmLibraryEntriesPage,
   saveVerifiedVrmBlob,
 } from "./vrm-library";
 
@@ -172,8 +178,13 @@ describe("VRM asset SQLite/OPFS repository", () => {
       STUDIO_VRM_MODEL_SQLITE_NAMESPACE,
       STUDIO_VRM_ASSET_SQLITE_MANIFEST_KEY,
     );
-    expect(raw).toContain(input.expectedHash);
+    const root = JSON.parse(raw ?? "null") as { pages?: Array<{ key?: string }> } | null;
+    const pageKey = root?.pages?.[0]?.key;
+    expect(pageKey).toBeTruthy();
+    const page = await database.kvGet(STUDIO_VRM_MODEL_SQLITE_NAMESPACE, pageKey!);
+    expect(page).toContain(input.expectedHash);
     expect(raw).not.toContain("base64");
+    expect(page).not.toContain("base64");
     expect(await fileSystem.list("blobs/")).toHaveLength(1);
     expect(await fileSystem.read(studioVrmAssetCommitPath(input.expectedHash))).not.toBeNull();
   });
@@ -196,6 +207,33 @@ describe("VRM asset SQLite/OPFS repository", () => {
     });
   });
 
+  it("promotes a canonical v1 root to paged v2 on the next mutation", async () => {
+    const { database, repository } = await repositoryFixture();
+    await database.kvSet(
+      STUDIO_VRM_MODEL_SQLITE_NAMESPACE,
+      STUDIO_VRM_ASSET_SQLITE_MANIFEST_KEY,
+      JSON.stringify({
+        kind: "toonspectrum.studio-vrm-model-asset-manifest",
+        version: 1,
+        generation: 0,
+        models: [],
+        sampleThumbnails: [],
+      }),
+    );
+    await repository.saveModel(await modelInput("v1-promoted"));
+
+    const rootRaw = await database.kvGet(
+      STUDIO_VRM_MODEL_SQLITE_NAMESPACE,
+      STUDIO_VRM_ASSET_SQLITE_MANIFEST_KEY,
+    );
+    expect(JSON.parse(rootRaw ?? "null")).toMatchObject({
+      version: 2,
+      generation: 1,
+      totalModels: 1,
+      pages: [{ count: 1 }],
+    });
+  });
+
   it("deduplicates exact model bytes without replacing the original display identity", async () => {
     const { repository } = await repositoryFixture();
     const first = await modelInput("model-first", "same");
@@ -208,6 +246,57 @@ describe("VRM asset SQLite/OPFS repository", () => {
     });
     await expect(repository.listModelMetadata()).resolves.toHaveLength(1);
   });
+
+  it("stores and reopens 513 mixed-punctuation ids across canonical metadata pages", async () => {
+    const fixture = await repositoryFixture();
+    const ids = [
+      ...Array.from(
+        { length: STUDIO_VRM_MODEL_ASSET_LIMITS.maxModels - 1 },
+        (_, index) => `x_${index.toString().padStart(3, "0")}`,
+      ),
+      "x~000",
+      "x0000",
+    ];
+    const inputs = await Promise.all(ids.map((id, index) =>
+      modelInput(id, `paged-${index}`, index + 1)));
+    for (const input of inputs) await fixture.repository.saveModel(input);
+
+    await expect(fixture.repository.listModelMetadata()).resolves.toHaveLength(513);
+    const firstPage = await fixture.repository.queryModelMetadataPage();
+    expect(firstPage).toMatchObject({ totalCount: 513 });
+    expect(firstPage?.items).toHaveLength(512);
+    if (!firstPage?.nextCursor) throw new Error("Expected a second VRM model metadata page.");
+    const secondPage = await fixture.repository.queryModelMetadataPage({
+      cursor: firstPage.nextCursor,
+    });
+    expect(secondPage?.items).toHaveLength(1);
+    expect(secondPage?.items[0]?.id).toBe("x~000");
+    expect(secondPage?.nextCursor).toBeNull();
+
+    const rootRaw = await fixture.database.kvGet(
+      STUDIO_VRM_MODEL_SQLITE_NAMESPACE,
+      STUDIO_VRM_ASSET_SQLITE_MANIFEST_KEY,
+    );
+    expect(JSON.parse(rootRaw ?? "null")).toMatchObject({
+      version: 2,
+      totalModels: 513,
+      pages: [{ count: 512 }, { count: 1 }],
+    });
+    const reopened = createStudioVrmAssetSqliteOpfsRepository({
+      acquireDatabase: async () => fixture.database,
+      fileSystem: fixture.fileSystem,
+    });
+    await expect(reopened.getModel("x~000")).resolves.toMatchObject({ id: "x~000" });
+    await expect(reopened.getModel("x0000")).resolves.toMatchObject({ id: "x0000" });
+    await fixture.repository.saveModel(await modelInput("x~001", "paged-513", 514));
+    await expect(fixture.repository.queryModelMetadataPage({
+      cursor: firstPage.cursor,
+    })).resolves.toBeNull();
+    await expect(fixture.database.kvGet(
+      STUDIO_VRM_MODEL_SQLITE_NAMESPACE,
+      firstPage.cursor,
+    )).resolves.toBeNull();
+  }, 60_000);
 
   it("stores uploaded and bundled thumbnails as verified CAS blobs, not SQLite base64", async () => {
     const { database, repository } = await repositoryFixture();
@@ -253,6 +342,64 @@ describe("VRM asset SQLite/OPFS repository", () => {
     expect(raw).not.toContain("iVBOR");
   });
 
+  it("stores 129 texture artifacts across bounded metadata pages", async () => {
+    const { database, fileSystem, repository } = await repositoryFixture();
+    let lastHash = "";
+    for (let index = 0; index < STUDIO_VRM_TEXTURE_ASSET_LIMITS.maxArtifacts + 1; index += 1) {
+      const artifact = await createStudioVrmTexturePaintArtifact({
+        bindingKey: `material:${index}/baseColor`,
+        source: png(index + 1, 1),
+        expectedWidth: index + 1,
+        expectedHeight: 1,
+      });
+      const bytes = new Uint8Array(await artifact.archiveEntry.data.arrayBuffer());
+      await repository.saveTexture({ receipt: artifact.metadata, bytes });
+      lastHash = artifact.metadata.contentHash;
+    }
+
+    const firstPage = await repository.queryTextureMetadataPage();
+    expect(firstPage).toMatchObject({ totalCount: 129 });
+    expect(firstPage?.items).toHaveLength(128);
+    if (!firstPage?.nextCursor) throw new Error("Expected a second VRM texture metadata page.");
+    const secondPage = await repository.queryTextureMetadataPage({
+      cursor: firstPage.nextCursor,
+    });
+    expect(secondPage?.items).toHaveLength(1);
+    expect(secondPage?.nextCursor).toBeNull();
+    await expect(repository.getTexture(lastHash)).resolves.toMatchObject({
+      receipt: { contentHash: lastHash },
+    });
+
+    const reads: Array<{ namespace: string; key: string }> = [];
+    const countingDatabase = new Proxy(database, {
+      get(target, property, receiver) {
+        if (property === "kvGet") {
+          return (namespace: string, key: string) => {
+            reads.push({ namespace, key });
+            return target.kvGet(namespace, key);
+          };
+        }
+        const value = Reflect.get(target, property, receiver) as unknown;
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+    const reopened = createStudioVrmAssetSqliteOpfsRepository({
+      acquireDatabase: async () => countingDatabase,
+      fileSystem,
+    });
+    await expect(reopened.getTexture(lastHash)).resolves.toMatchObject({
+      receipt: { contentHash: lastHash },
+    });
+    expect(reads.filter((read) => read.namespace === STUDIO_VRM_MODEL_SQLITE_NAMESPACE))
+      .toEqual([]);
+    expect(reads.filter((read) => read.namespace === STUDIO_VRM_TEXTURE_SQLITE_NAMESPACE))
+      .toHaveLength(2);
+    expect(reads.filter((read) => (
+      read.namespace === STUDIO_VRM_TEXTURE_SQLITE_NAMESPACE
+      && read.key !== STUDIO_VRM_ASSET_SQLITE_MANIFEST_KEY
+    ))).toHaveLength(1);
+  }, 60_000);
+
   it("drives both public product library facades without touching an available legacy IDB", async () => {
     const { repository } = await repositoryFixture();
     const indexedDbOpen = vi.fn(() => {
@@ -275,6 +422,32 @@ describe("VRM asset SQLite/OPFS repository", () => {
         source: "sqlite-opfs",
       })]),
     );
+    await expect(queryUploadedVrmLibraryEntriesPage({ repository })).resolves.toMatchObject({
+      items: [expect.objectContaining({
+        id: saved.id,
+        source: "sqlite-opfs",
+        thumbnail: null,
+      })],
+      totalCount: 1,
+    });
+    await repository.saveThumbnail(saved.id, {
+      bytes: Uint8Array.from([1, 2, 3, 4]),
+      mimeType: "image/png",
+    }, Date.now());
+    const thumbnailPage = await queryUploadedVrmLibraryEntriesPage({ repository });
+    await expect(hydrateVrmLibraryThumbnailWindow(
+      thumbnailPage?.items ?? [],
+      { repository },
+    )).resolves.toEqual([
+      expect.objectContaining({
+        id: saved.id,
+        thumbnail: "data:image/png;base64,AQIDBA==",
+      }),
+    ]);
+    await expect(hydrateVrmLibraryThumbnailWindow(
+      Array.from({ length: 13 }, () => thumbnailPage!.items[0]!),
+      { repository },
+    )).rejects.toMatchObject({ code: "limit" });
 
     const artifact = await createStudioVrmTexturePaintArtifact({
       bindingKey: "material:facade/baseColor",
@@ -343,7 +516,12 @@ describe("VRM asset SQLite/OPFS repository", () => {
     const fileSystem = createStudioOpfsMemoryFileSystem();
     const failingDatabase = new Proxy(database, {
       get(target, property, receiver) {
-        if (property === "kvSet") return () => Promise.reject(new Error("SQLITE_FULL"));
+        if (property === "kvSet") {
+          return (namespace: string, key: string, value: string) =>
+            key === STUDIO_VRM_ASSET_SQLITE_MANIFEST_KEY
+              ? Promise.reject(new Error("SQLITE_FULL"))
+              : target.kvSet(namespace, key, value);
+        }
         const value = Reflect.get(target, property, receiver) as unknown;
         return typeof value === "function" ? value.bind(target) : value;
       },
@@ -361,6 +539,104 @@ describe("VRM asset SQLite/OPFS repository", () => {
       STUDIO_VRM_MODEL_SQLITE_NAMESPACE,
       STUDIO_VRM_ASSET_SQLITE_MANIFEST_KEY,
     )).resolves.toBeNull();
+    const cleanupRepository = createStudioVrmAssetSqliteOpfsRepository({
+      acquireDatabase: async () => database,
+      fileSystem,
+      orphanGraceMs: 0,
+    });
+    await expect(cleanupRepository.cleanupOrphans({ maxRemovals: 1, graceMs: 0 }))
+      .resolves.toMatchObject({ removedAssets: 1 });
+  });
+
+  it("acknowledges a root that became durable before SQLite surfaced an I/O failure", async () => {
+    const database = await memoryDatabase();
+    const fileSystem = createStudioOpfsMemoryFileSystem();
+    let failAfterDurableRoot = true;
+    const ambiguousDatabase = new Proxy(database, {
+      get(target, property, receiver) {
+        if (property === "kvSet") {
+          return async (namespace: string, key: string, value: string) => {
+            await target.kvSet(namespace, key, value);
+            if (key === STUDIO_VRM_ASSET_SQLITE_MANIFEST_KEY && failAfterDurableRoot) {
+              failAfterDurableRoot = false;
+              throw new Error("SQLITE_IOERR_AFTER_SYNC");
+            }
+          };
+        }
+        const value = Reflect.get(target, property, receiver) as unknown;
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+    const repository = createStudioVrmAssetSqliteOpfsRepository({
+      acquireDatabase: async () => ambiguousDatabase,
+      fileSystem,
+    });
+    const input = await modelInput("durable-root");
+
+    await expect(repository.saveModel(input)).resolves.toMatchObject({
+      metadata: { id: input.id },
+    });
+    await expect(repository.getModel(input.id)).resolves.toMatchObject({
+      id: input.id,
+      contentHash: input.expectedHash,
+    });
+  });
+
+  it("preserves first-generation pages and union refs when root durability cannot be read back", async () => {
+    const database = await memoryDatabase();
+    const fileSystem = createStudioOpfsMemoryFileSystem();
+    let rejectRootReads = false;
+    const ambiguousDatabase = new Proxy(database, {
+      get(target, property, receiver) {
+        if (property === "kvSet") {
+          return async (namespace: string, key: string, value: string) => {
+            await target.kvSet(namespace, key, value);
+            if (key === STUDIO_VRM_ASSET_SQLITE_MANIFEST_KEY) {
+              rejectRootReads = true;
+              throw new Error("SQLITE_IOERR_AFTER_SYNC");
+            }
+          };
+        }
+        if (property === "kvGet") {
+          return (namespace: string, key: string) => {
+            if (key === STUDIO_VRM_ASSET_SQLITE_MANIFEST_KEY && rejectRootReads) {
+              return Promise.reject(new Error("SQLITE_IOERR_READBACK"));
+            }
+            return target.kvGet(namespace, key);
+          };
+        }
+        const value = Reflect.get(target, property, receiver) as unknown;
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+    const repository = createStudioVrmAssetSqliteOpfsRepository({
+      acquireDatabase: async () => ambiguousDatabase,
+      fileSystem,
+    });
+    const input = await modelInput("ambiguous-first-root");
+
+    await expect(repository.saveModel(input)).rejects.toThrow("SQLITE_IOERR_AFTER_SYNC");
+    const rootRaw = await database.kvGet(
+      STUDIO_VRM_MODEL_SQLITE_NAMESPACE,
+      STUDIO_VRM_ASSET_SQLITE_MANIFEST_KEY,
+    );
+    const root = JSON.parse(rootRaw ?? "null") as { pages?: Array<{ key?: string }> } | null;
+    const pageKey = root?.pages?.[0]?.key;
+    expect(pageKey).toBeTruthy();
+    await expect(database.kvGet(STUDIO_VRM_MODEL_SQLITE_NAMESPACE, pageKey!))
+      .resolves.toContain(input.expectedHash);
+    await expect(createStudioOpfsAssetStore({ fs: fileSystem }).ownerRefs(
+      STUDIO_VRM_ASSET_CAS_OWNER,
+    )).resolves.toContain(input.expectedHash);
+
+    const reopened = createStudioVrmAssetSqliteOpfsRepository({
+      acquireDatabase: async () => database,
+      fileSystem,
+    });
+    await expect(reopened.getModel(input.id)).resolves.toMatchObject({
+      id: input.id,
+      contentHash: input.expectedHash,
+    });
   });
 
   it("rejects corrupt, future, unknown-field, and noncanonical SQLite manifests", async () => {
@@ -398,6 +674,100 @@ describe("VRM asset SQLite/OPFS repository", () => {
       );
       await expect(repository.listModelMetadata()).rejects.toMatchObject({ code: "corrupt" });
     }
+  });
+
+  it("rejects a missing or checksum-mismatched v2 metadata page", async () => {
+    const { database, repository } = await repositoryFixture();
+    await repository.saveModel(await modelInput("page-corrupt"));
+    const rootRaw = await database.kvGet(
+      STUDIO_VRM_MODEL_SQLITE_NAMESPACE,
+      STUDIO_VRM_ASSET_SQLITE_MANIFEST_KEY,
+    );
+    const root = JSON.parse(rootRaw ?? "null") as { pages?: Array<{ key?: string }> };
+    const pageKey = root.pages?.[0]?.key;
+    if (!pageKey) throw new Error("Expected a VRM model metadata page.");
+    await database.kvSet(STUDIO_VRM_MODEL_SQLITE_NAMESPACE, pageKey, "{}");
+
+    await expect(repository.listModelMetadata()).rejects.toMatchObject({ code: "corrupt" });
+  });
+
+  it("rejects v2 descriptor aliasing and aggregate metadata overflow before page reads", async () => {
+    const { database, repository } = await repositoryFixture();
+    await repository.saveModel(await modelInput("root-preflight"));
+    const rootRaw = await database.kvGet(
+      STUDIO_VRM_MODEL_SQLITE_NAMESPACE,
+      STUDIO_VRM_ASSET_SQLITE_MANIFEST_KEY,
+    );
+    const root = JSON.parse(rootRaw ?? "null") as {
+      generation: number;
+      pages: Array<{ key: string; checksum: string; byteLength: number }>;
+    };
+    const descriptor = root.pages[0]!;
+    await database.kvSet(
+      STUDIO_VRM_MODEL_SQLITE_NAMESPACE,
+      STUDIO_VRM_ASSET_SQLITE_MANIFEST_KEY,
+      JSON.stringify({
+        ...root,
+        pages: [{
+          ...descriptor,
+          key: `manifest-v2-model-page-${root.generation + 1}-0-${descriptor.checksum}`,
+        }],
+      }),
+    );
+    await expect(repository.queryModelMetadataPage()).rejects.toMatchObject({ code: "corrupt" });
+
+    await database.kvSet(
+      STUDIO_VRM_MODEL_SQLITE_NAMESPACE,
+      STUDIO_VRM_ASSET_SQLITE_MANIFEST_KEY,
+      JSON.stringify({
+        ...root,
+        pages: [{
+          ...descriptor,
+          byteLength: STUDIO_VRM_MODEL_ASSET_LIMITS.maxManifestBytes,
+        }],
+      }),
+    );
+    await expect(repository.queryModelMetadataPage()).rejects.toMatchObject({ code: "corrupt" });
+  });
+
+  it("rejects an over-budget v1 aggregate before a mutation can promote it to v2", async () => {
+    const { database, fileSystem, repository } = await repositoryFixture();
+    const models = Array.from({ length: 129 }, (_, index) => {
+      const contentHash = `sha256:${(index + 1).toString(16).padStart(64, "0")}`;
+      return {
+        id: `oversized-${index.toString().padStart(3, "0")}`,
+        name: `Oversized ${index}`,
+        contentHash,
+        byteSize: STUDIO_VRM_MODEL_ASSET_LIMITS.maxModelBytes,
+        mimeType: "model/gltf-binary",
+        validationVersion: 1,
+        createdAt: 1,
+        updatedAt: 1,
+        blob: {
+          hash: contentHash,
+          byteLength: STUDIO_VRM_MODEL_ASSET_LIMITS.maxModelBytes,
+          mimeType: "model/gltf-binary",
+        },
+        thumbnail: null,
+      };
+    });
+    await database.kvSet(
+      STUDIO_VRM_MODEL_SQLITE_NAMESPACE,
+      STUDIO_VRM_ASSET_SQLITE_MANIFEST_KEY,
+      JSON.stringify({
+        kind: "toonspectrum.studio-vrm-model-asset-manifest",
+        version: 1,
+        generation: 0,
+        models,
+        sampleThumbnails: [],
+      }),
+    );
+
+    await expect(repository.saveThumbnail("oversized-000", {
+      bytes: Uint8Array.from([1]),
+      mimeType: "image/png",
+    }, 2)).rejects.toMatchObject({ code: "corrupt" });
+    expect(await fileSystem.list("blobs/")).toEqual([]);
   });
 
   it("serializes concurrent repository instances and preserves both manifest generations", async () => {
