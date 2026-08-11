@@ -7,10 +7,10 @@ import { lazyRetry } from "@/lib/lazy-retry";
 import { cn } from "@/lib/utils";
 import { ErrorBoundary } from "@/src/components/error-boundary";
 import { loadStudioI18nDictionaries } from "@/src/domains/creator/studio-i18n-loader";
-
-function isStudioRoutePathname(pathname: string): boolean {
-  return pathname === "/studio" || pathname.startsWith("/studio/");
-}
+import {
+  isStudioRoutePathname,
+  studioRouteStageKey,
+} from "@/src/domains/creator/studio-workspace-route";
 
 function readInitialDocumentPathname(): string | null {
   try {
@@ -86,6 +86,7 @@ function useRouteTitle(pathname: string) {
     else if (pathname.startsWith("/community/")) title = t("route.community");
     else if (pathname.startsWith("/admin/")) title = t("route.admin");
     else if (pathname.startsWith("/me")) title = t("route.me");
+    else if (isStudioRoutePathname(pathname)) title = t("route.studio");
     document.title = title ? `${title} · ${t("app.name")}` : t("app.name");
   }, [pathname, t]);
 }
@@ -239,13 +240,15 @@ function RouteFallback() {
 // 되어 자손의 position: fixed를 뷰포트가 아닌 이 요소(라우트 전체 콘텐츠) 기준으로 배치해버린다.
 function RouteStage({ pathname, children }: { pathname: string; children: ReactNode }) {
   const [settled, setSettled] = useState(false);
-  const instantEditorEntry = pathname === "/studio";
+  const instantEditorEntry = isStudioRoutePathname(pathname);
+  const stageKey = studioRouteStageKey(pathname);
   const onAnimationEnd = (e: AnimationEvent<HTMLDivElement>) => {
     if (e.animationName === "route-stage-in") setSettled(true);
   };
   return (
     <div
-      key={pathname}
+      key={stageKey}
+      data-route-stage-key={stageKey}
       className={cn(
         "route-stage",
         (settled || instantEditorEntry) && "route-stage--settled",
@@ -304,8 +307,8 @@ export function AppRouter() {
           <Route path="/create/challenges" element={<CreateChallengesPage />} />
           <Route path="/create/series/:id" element={<CreateSeriesPage />} />
           <Route path="/create/:id" element={<CreateWorkPage />} />
-          <Route path="/studio" element={<StudioPage />} />
           <Route path="/studio/tools-companion" element={<StudioToolsCompanionPage />} />
+          <Route path="/studio/*" element={<StudioPage />} />
           <Route path="/me" element={<AccountPage />} />
           <Route path="/title/:slug" element={<TitleDetailPage />} />
           <Route path="/author/:name" element={<AuthorPage />} />
