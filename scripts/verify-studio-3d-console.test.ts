@@ -299,11 +299,13 @@ describe("3D WebGPU conformance browser boundary", () => {
     expect(formatted?.startsWith(STUDIO_3D_WEBGPU_DIAGNOSTIC_PREFIX)).toBe(true);
   });
 
-  it("pins both Dawn WebGPU and ANGLE WebGL to SwiftShader", () => {
+  it("pins Chromium Vulkan, Dawn WebGPU, and ANGLE WebGL to SwiftShader", () => {
     expect(Object.isFrozen(STUDIO_3D_WEBGPU_SWIFTSHADER_LAUNCH_ARGS)).toBe(true);
     expect(STUDIO_3D_WEBGPU_SWIFTSHADER_LAUNCH_ARGS).toEqual([
       "--no-sandbox",
       "--enable-unsafe-webgpu",
+      "--enable-features=CDPScreenshotNewSurface,Vulkan",
+      "--use-vulkan=swiftshader",
       "--use-webgpu-adapter=swiftshader",
       "--use-gpu-in-tests",
       "--use-gl=angle",

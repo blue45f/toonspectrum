@@ -103,9 +103,13 @@ export function formatStudio3dWebGpuDiagnosticConsoleMessage(
 }
 export type Studio3dWebGpuProofShard =
   (typeof STUDIO_3D_WEBGPU_PROOF_SHARDS)[number];
+// Playwright 1.62 already enables CDPScreenshotNewSurface. Chromium treats duplicate
+// --enable-features switches as last-wins, so preserve that default while adding Vulkan.
 export const STUDIO_3D_WEBGPU_SWIFTSHADER_LAUNCH_ARGS = Object.freeze([
   "--no-sandbox",
   "--enable-unsafe-webgpu",
+  "--enable-features=CDPScreenshotNewSurface,Vulkan",
+  "--use-vulkan=swiftshader",
   "--use-webgpu-adapter=swiftshader",
   "--use-gpu-in-tests",
   "--use-gl=angle",
