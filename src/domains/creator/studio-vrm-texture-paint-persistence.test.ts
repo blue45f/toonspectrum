@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  STUDIO_VRM_SURFACE_PAINT_MAX_TEXTURES,
+} from "./studio-vrm-scene-document";
+import {
   STUDIO_VRM_TEXTURE_PAINT_ARTIFACT_KIND,
   STUDIO_VRM_TEXTURE_PAINT_ARTIFACT_MIME,
   STUDIO_VRM_TEXTURE_PAINT_ARTIFACT_SCHEMA_VERSION,
@@ -114,6 +117,36 @@ describe("studio VRM texture-paint persistence", () => {
       }),
     ]);
     expect(Object.isFrozen(result.textures)).toBe(true);
+  });
+
+  it("rejects 129 bindings before encoding or publishing any artifact", async () => {
+    const deps = dependencies();
+    const runtime = {
+      exportPaintedTargets: vi.fn(() => ({
+        ok: true as const,
+        value: [{
+          id: "target-overflow",
+          width: 1,
+          height: 1,
+          pixels: new Uint8ClampedArray(4),
+          bindings: Array.from(
+            { length: STUDIO_VRM_SURFACE_PAINT_MAX_TEXTURES + 1 },
+            (_, index) => ({
+              bindingKey: `binding-${index}`,
+              materialLocator: `gltf-material:${index}`,
+              textureSlot: "baseColor" as const,
+            }),
+          ),
+        }],
+      })),
+    };
+
+    await expect(persistStudioVrmTexturePaintRuntime(runtime, {
+      dependencies: deps,
+    })).rejects.toMatchObject({ code: "budget-exceeded" });
+    expect(deps.encodePng).not.toHaveBeenCalled();
+    expect(deps.createArtifact).not.toHaveBeenCalled();
+    expect(deps.saveArtifact).not.toHaveBeenCalled();
   });
 
   it("loads and decodes a shared hash once before rehydrating all bindings", async () => {

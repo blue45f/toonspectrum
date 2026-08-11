@@ -5,8 +5,10 @@ import { createStudioShared3dSceneSessionFromElements } from
   "./studio-shared-3d-scene-bridge";
 import {
   createStudioShared3dSceneSessionForStage,
+  createStudioShared3dStageCollectionDocument,
   STUDIO_SHARED_3D_STAGE_COLLECTION_KIND,
   STUDIO_SHARED_3D_STAGE_COLLECTION_MAX_STAGES,
+  STUDIO_SHARED_3D_STAGE_COLLECTION_PAGED_VERSION,
   STUDIO_SHARED_3D_STAGE_COLLECTION_VERSION,
   findStudioShared3dStageEntryByBundleId,
   migrateStudioShared3dStageCollectionDocument,
@@ -14,6 +16,7 @@ import {
   planStudioShared3dStageCharacterPlacementUpdate,
   planStudioShared3dStageCollectionRemoval,
   planStudioShared3dStageCollectionUpsert,
+  queryStudioShared3dStageCollectionPage,
   reconcileStudioShared3dStageVisibilityReceiptsAfterElementMutation,
   remapStudioShared3dStageCollectionElementIds,
   resolveStudioShared3dStageCollectionForBundle,
@@ -90,7 +93,7 @@ function createStage(
   })!;
 }
 
-describe("Studio Shared 3D Stage collection v3", () => {
+describe("Studio Shared 3D Stage collection v3/v4", () => {
   it("strictly migrates one historical v1 Stage and centralizes its visibility receipt", () => {
     const legacy = createStage("bundle-a", "character-a");
     const migrated = migrateStudioShared3dStageCollectionDocument(legacy);
@@ -525,6 +528,91 @@ describe("Studio Shared 3D Stage collection v3", () => {
         }),
       ),
       visibilityReceipts: [],
+    })).toBeNull();
+  });
+
+  it("round-trips 65 stages through two canonical pages without changing page authority", () => {
+    const first = migrateStudioShared3dStageCollectionDocument(
+      createStage("bundle-a", "character-a"),
+    )!;
+    const stages = Array.from({ length: STUDIO_SHARED_3D_STAGE_COLLECTION_MAX_STAGES + 1 },
+      (_, index) => ({
+        ...first.stages[0]!,
+        id: `stage-${index}`,
+        background: {
+          ...first.stages[0]!.background,
+          bundleId: `bundle-${index}`,
+        },
+        characters: [],
+        capturePolicy: "background-only" as const,
+      }));
+    const paged = createStudioShared3dStageCollectionDocument({
+      stages,
+      visibilityReceipts: [],
+    });
+
+    expect(paged?.version).toBe(STUDIO_SHARED_3D_STAGE_COLLECTION_PAGED_VERSION);
+    expect(paged?.stages).toHaveLength(65);
+    if (!paged || paged.version !== STUDIO_SHARED_3D_STAGE_COLLECTION_PAGED_VERSION) {
+      throw new Error("Expected paged shared 3D Stage fixture.");
+    }
+    expect(paged.stagePages.map((page) => page.items.length)).toEqual([64, 1]);
+    expect(Object.keys(paged)).toEqual([
+      "kind",
+      "version",
+      "authority",
+      "stagePages",
+      "visibilityReceiptPages",
+    ]);
+
+    const serialized = serializeStudioShared3dStageCollectionDocument(paged);
+    const reopened = parseStudioShared3dStageCollectionDocument(JSON.parse(serialized!));
+    expect(reopened?.stages.map((stage) => stage.id)).toEqual(stages.map((stage) => stage.id));
+    expect(serializeStudioShared3dStageCollectionDocument(reopened)).toBe(serialized);
+
+    const firstPage = queryStudioShared3dStageCollectionPage(reopened);
+    if (!firstPage?.nextCursor) throw new Error("Expected a second shared 3D Stage page.");
+    const secondPage = queryStudioShared3dStageCollectionPage(reopened, {
+      cursor: firstPage.nextCursor,
+    });
+    expect(firstPage).toMatchObject({ pageIndex: 0, pageCount: 2, totalCount: 65 });
+    expect(firstPage?.items).toHaveLength(64);
+    expect(secondPage).toMatchObject({ pageIndex: 1, pageCount: 2, totalCount: 65 });
+    expect(secondPage?.items).toHaveLength(1);
+    expect(secondPage?.nextCursor).toBeNull();
+
+    const changed = createStudioShared3dStageCollectionDocument({
+      stages: stages.map((stage, index) => index === 0 ? { ...stage, id: "stage-replaced" } : stage),
+      visibilityReceipts: [],
+    });
+    if (!firstPage) throw new Error("Expected a first shared 3D Stage page.");
+    expect(queryStudioShared3dStageCollectionPage(changed, {
+      cursor: firstPage.cursor,
+    })).toBeNull();
+
+    const changedOutsideFirstPage = createStudioShared3dStageCollectionDocument({
+      stages: stages.map((stage, index) => index === 64
+        ? {
+            ...stage,
+            id: "stage-last-page-replaced",
+            background: { ...stage.background, bundleId: "bundle-last-page-replaced" },
+          }
+        : stage),
+      visibilityReceipts: [],
+    });
+    expect(queryStudioShared3dStageCollectionPage(changedOutsideFirstPage, {
+      cursor: firstPage.cursor,
+    })).toBeNull();
+
+    const migratedBelowPagingThreshold = createStudioShared3dStageCollectionDocument({
+      stages: stages.slice(0, 64),
+      visibilityReceipts: [],
+    });
+    expect(migratedBelowPagingThreshold?.version).toBe(
+      STUDIO_SHARED_3D_STAGE_COLLECTION_VERSION,
+    );
+    expect(queryStudioShared3dStageCollectionPage(migratedBelowPagingThreshold, {
+      cursor: firstPage.cursor,
     })).toBeNull();
   });
 

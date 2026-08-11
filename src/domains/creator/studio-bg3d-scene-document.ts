@@ -47,6 +47,35 @@ export const STUDIO_BG3D_SHOT_MAX_NODE_VISIBILITY_OVERRIDES =
 export const STUDIO_BG3D_GLB_MIME = "model/gltf-binary" as const;
 export const STUDIO_BG3D_GLB_MAX_BYTES = 100 * 1024 * 1024;
 
+export type StudioBg3dSceneDocumentBudgetErrorCode =
+  | "input-byte-budget-exceeded"
+  | "attachment-count-budget-exceeded"
+  | "model-byte-budget-exceeded"
+  | "node-count-budget-exceeded"
+  | "shot-count-budget-exceeded"
+  | "shot-visibility-count-budget-exceeded"
+  | "document-byte-budget-exceeded";
+
+/**
+ * Typed fail-closed signal for editor normalization. Strict parse/serialize APIs continue to return
+ * `null`; the lenient editor API throws this error instead of returning a valid-looking prefix.
+ */
+export class StudioBg3dSceneDocumentBudgetError extends Error {
+  readonly code: StudioBg3dSceneDocumentBudgetErrorCode;
+
+  constructor(code: StudioBg3dSceneDocumentBudgetErrorCode) {
+    super(`Studio BG3D scene document budget exceeded: ${code}.`);
+    this.name = "StudioBg3dSceneDocumentBudgetError";
+    this.code = code;
+  }
+}
+
+type BudgetFailureMode = "null" | "throw";
+
+function failBudget(code: StudioBg3dSceneDocumentBudgetErrorCode): never {
+  throw new StudioBg3dSceneDocumentBudgetError(code);
+}
+
 export type StudioBg3dVec3 = readonly [number, number, number];
 export type StudioBg3dQuaternion = readonly [number, number, number, number];
 
@@ -833,10 +862,16 @@ function utf8ByteLength(value: string): number {
   return UTF8_ENCODER.encode(value).byteLength;
 }
 
-function decodeBoundedJson(raw: unknown): unknown | null {
+function decodeBoundedJson(
+  raw: unknown,
+  budgetFailureMode: BudgetFailureMode = "null",
+): unknown | null {
   try {
     if (typeof raw === "string") {
-      if (utf8ByteLength(raw) > STUDIO_BG3D_SCENE_DOCUMENT_MAX_BYTES) return null;
+      if (utf8ByteLength(raw) > STUDIO_BG3D_SCENE_DOCUMENT_MAX_BYTES) {
+        if (budgetFailureMode === "throw") failBudget("input-byte-budget-exceeded");
+        return null;
+      }
       return JSON.parse(raw) as unknown;
     }
     const serialized = JSON.stringify(raw);
@@ -844,11 +879,19 @@ function decodeBoundedJson(raw: unknown): unknown | null {
       typeof serialized !== "string" ||
       utf8ByteLength(serialized) > STUDIO_BG3D_SCENE_DOCUMENT_MAX_BYTES
     ) {
+      if (
+        budgetFailureMode === "throw" &&
+        typeof serialized === "string" &&
+        utf8ByteLength(serialized) > STUDIO_BG3D_SCENE_DOCUMENT_MAX_BYTES
+      ) {
+        failBudget("input-byte-budget-exceeded");
+      }
       return null;
     }
     // Reparse to detach prototypes, accessors, symbols, functions, and non-JSON object identity.
     return JSON.parse(serialized) as unknown;
-  } catch {
+  } catch (cause) {
+    if (cause instanceof StudioBg3dSceneDocumentBudgetError) throw cause;
     return null;
   }
 }
@@ -1633,16 +1676,20 @@ function normalizeAttachments(
     if (
       !attachment ||
       ids.has(attachment.id) ||
-      hashes.has(attachment.hash) ||
-      cumulativeBytes + attachment.byteSize > maxModelBytes
+      hashes.has(attachment.hash)
     ) {
       continue;
+    }
+    if (attachments.length >= STUDIO_BG3D_SCENE_DOCUMENT_MAX_ATTACHMENTS) {
+      failBudget("attachment-count-budget-exceeded");
+    }
+    if (cumulativeBytes + attachment.byteSize > maxModelBytes) {
+      failBudget("model-byte-budget-exceeded");
     }
     attachments.push(attachment);
     ids.add(attachment.id);
     hashes.add(attachment.hash);
     cumulativeBytes += attachment.byteSize;
-    if (attachments.length >= STUDIO_BG3D_SCENE_DOCUMENT_MAX_ATTACHMENTS) break;
   }
   return attachments;
 }
@@ -1884,9 +1931,9 @@ function normalizeNodes(
   for (const candidate of value) {
     const node = normalizeNode(candidate, attachmentIds);
     if (!node || ids.has(node.id)) continue;
+    if (nodes.length >= maxNodes) failBudget("node-count-budget-exceeded");
     nodes.push(node);
     ids.add(node.id);
-    if (nodes.length >= maxNodes) break;
   }
   return normalizeStudioBg3dHierarchyParents(nodes);
 }
@@ -1909,9 +1956,11 @@ function normalizeShotNodeVisibility(
     ) {
       continue;
     }
+    if (overrides.length >= STUDIO_BG3D_SHOT_MAX_NODE_VISIBILITY_OVERRIDES) {
+      failBudget("shot-visibility-count-budget-exceeded");
+    }
     claimedNodeIds.add(nodeId);
     overrides.push({ nodeId, visible: candidate.visible });
-    if (overrides.length >= STUDIO_BG3D_SHOT_MAX_NODE_VISIBILITY_OVERRIDES) break;
   }
   return overrides;
 }
@@ -1958,9 +2007,11 @@ function normalizeShots(
   for (const candidate of value) {
     const shot = normalizeShot(candidate, nodeIds);
     if (!shot || ids.has(shot.id)) continue;
+    if (shots.length >= STUDIO_BG3D_SCENE_DOCUMENT_MAX_SHOTS) {
+      failBudget("shot-count-budget-exceeded");
+    }
     ids.add(shot.id);
     shots.push(shot);
-    if (shots.length >= STUDIO_BG3D_SCENE_DOCUMENT_MAX_SHOTS) break;
   }
   return shots;
 }
@@ -1976,112 +2027,59 @@ function canonicalDocumentByteLength(document: StudioBg3dSceneDocument): number 
   return utf8ByteLength(JSON.stringify(document));
 }
 
-function largestPersistablePrefix(
-  itemCount: number,
-  candidateForCount: (count: number) => StudioBg3dSceneDocument
-): StudioBg3dSceneDocument | null {
-  let lower = 0;
-  let upper = itemCount;
-  let best: StudioBg3dSceneDocument | null = null;
-  while (lower <= upper) {
-    const middle = Math.floor((lower + upper) / 2);
-    const candidate = candidateForCount(middle);
-    if (canonicalDocumentByteLength(candidate) <= STUDIO_BG3D_SCENE_DOCUMENT_MAX_BYTES) {
-      best = candidate;
-      lower = middle + 1;
-    } else {
-      upper = middle - 1;
-    }
-  }
-  return best;
-}
-
-/**
- * Normalization expands sparse nodes with explicit defaults, so a byte-bounded input can produce a
- * larger canonical graph. Keep the longest stable prefix, dropping optional trailing shots before
- * scene nodes and attachments. Removing shots before nodes also guarantees no retained visibility
- * override can reference a node removed by byte-budget fitting.
- */
-function fitNormalizedDocumentToByteBudget(
-  document: StudioBg3dSceneDocument
-): StudioBg3dSceneDocument | null {
-  if (canonicalDocumentByteLength(document) <= STUDIO_BG3D_SCENE_DOCUMENT_MAX_BYTES) {
-    return document;
-  }
-
-  let shotlessDocument = document;
-  if (document.shots !== undefined) {
-    const withoutActive = withoutActiveShot(document);
-    const shotBounded = largestPersistablePrefix(document.shots.length, (count) => {
-      const shots = document.shots?.slice(0, count) ?? [];
-      const keepsActiveShot =
-        document.activeShotId !== undefined &&
-        shots.some((shot) => shot.id === document.activeShotId);
-      return {
-        ...withoutActive,
-        shots,
-        ...(keepsActiveShot ? { activeShotId: document.activeShotId } : {}),
-      };
-    });
-    if (shotBounded) return shotBounded;
-    shotlessDocument = { ...withoutActive, shots: [] };
-  }
-
-  const nodeBounded = largestPersistablePrefix(shotlessDocument.nodes.length, (count) => ({
-    ...shotlessDocument,
-    nodes: document.nodes.slice(0, count),
-  }));
-  if (nodeBounded) return nodeBounded;
-
-  return largestPersistablePrefix(shotlessDocument.attachments.length, (count) => ({
-    ...shotlessDocument,
-    attachments: shotlessDocument.attachments.slice(0, count),
-    nodes: [],
-  }));
-}
 
 function normalizeDecodedCurrentDocument(
   value: unknown,
-  rootMode: "lenient" | "strict" = "lenient"
+  rootMode: "lenient" | "strict" = "lenient",
+  budgetFailureMode: BudgetFailureMode = "null",
 ): StudioBg3dSceneDocument | null {
-  if (
-    !isRecord(value) ||
-    value.kind !== STUDIO_BG3D_SCENE_DOCUMENT_KIND ||
-    value.version !== STUDIO_BG3D_SCENE_DOCUMENT_VERSION ||
-    (rootMode === "strict" && !hasCompleteCurrentRootShape(value))
-  ) {
-    return null;
+  try {
+    if (
+      !isRecord(value) ||
+      value.kind !== STUDIO_BG3D_SCENE_DOCUMENT_KIND ||
+      value.version !== STUDIO_BG3D_SCENE_DOCUMENT_VERSION ||
+      (rootMode === "strict" && !hasCompleteCurrentRootShape(value))
+    ) {
+      return null;
+    }
+    const budgets = normalizeBudgets(value.budgets);
+    const attachments = normalizeAttachments(
+      value.attachments,
+      budgets.complexity.maxModelBytes
+    );
+    const attachmentIds = new Set(attachments.map((attachment) => attachment.id));
+    const nodes = normalizeNodes(value.nodes, attachmentIds, budgets.complexity.maxNodes);
+    const nodeIds = new Set(nodes.map((node) => node.id));
+    const includesShots = hasOwn(value, "shots");
+    const shots = includesShots ? normalizeShots(value.shots, nodeIds) : undefined;
+    const shotIds = new Set(shots?.map((shot) => shot.id) ?? []);
+    const activeShotId = normalizedId(value.activeShotId);
+    const normalized: StudioBg3dSceneDocument = {
+      kind: STUDIO_BG3D_SCENE_DOCUMENT_KIND,
+      version: STUDIO_BG3D_SCENE_DOCUMENT_VERSION,
+      camera: normalizeCamera(value.camera),
+      render: normalizeRender(value.render),
+      background: normalizeBackground(value.background),
+      lighting: normalizeLighting(value.lighting),
+      quality: normalizeQuality(value.quality),
+      output: normalizeOutput(value.output),
+      budgets,
+      attachments,
+      nodes,
+      ...(shots ? { shots } : {}),
+      ...(activeShotId && shotIds.has(activeShotId) ? { activeShotId } : {}),
+    };
+    if (canonicalDocumentByteLength(normalized) > STUDIO_BG3D_SCENE_DOCUMENT_MAX_BYTES) {
+      failBudget("document-byte-budget-exceeded");
+    }
+    if (rootMode === "strict" && !jsonStructuresEqual(value, normalized)) return null;
+    return deepFreeze(normalized);
+  } catch (cause) {
+    if (cause instanceof StudioBg3dSceneDocumentBudgetError && budgetFailureMode === "null") {
+      return null;
+    }
+    throw cause;
   }
-  const budgets = normalizeBudgets(value.budgets);
-  const attachments = normalizeAttachments(
-    value.attachments,
-    budgets.complexity.maxModelBytes
-  );
-  const attachmentIds = new Set(attachments.map((attachment) => attachment.id));
-  const nodes = normalizeNodes(value.nodes, attachmentIds, budgets.complexity.maxNodes);
-  const nodeIds = new Set(nodes.map((node) => node.id));
-  const includesShots = hasOwn(value, "shots");
-  const shots = includesShots ? normalizeShots(value.shots, nodeIds) : undefined;
-  const shotIds = new Set(shots?.map((shot) => shot.id) ?? []);
-  const activeShotId = normalizedId(value.activeShotId);
-  const normalized: StudioBg3dSceneDocument = {
-    kind: STUDIO_BG3D_SCENE_DOCUMENT_KIND,
-    version: STUDIO_BG3D_SCENE_DOCUMENT_VERSION,
-    camera: normalizeCamera(value.camera),
-    render: normalizeRender(value.render),
-    background: normalizeBackground(value.background),
-    lighting: normalizeLighting(value.lighting),
-    quality: normalizeQuality(value.quality),
-    output: normalizeOutput(value.output),
-    budgets,
-    attachments,
-    nodes,
-    ...(shots ? { shots } : {}),
-    ...(activeShotId && shotIds.has(activeShotId) ? { activeShotId } : {}),
-  };
-  const fitted = fitNormalizedDocumentToByteBudget(normalized);
-  if (!fitted || (rootMode === "strict" && !jsonStructuresEqual(value, fitted))) return null;
-  return deepFreeze(fitted);
 }
 
 function legacyPrimitiveNode(value: unknown): Record<string, unknown> | null {
@@ -2370,8 +2368,9 @@ export const DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT = createDefaultStudioBg3dSceneDo
  * reset to a fresh default. Persistence must use the strict parse/serialize APIs below.
  */
 export function normalizeStudioBg3dSceneDocument(raw: unknown): StudioBg3dSceneDocument {
-  const decoded = decodeBoundedJson(raw);
-  return normalizeDecodedCurrentDocument(decoded) ?? createDefaultStudioBg3dSceneDocument();
+  const decoded = decodeBoundedJson(raw, "throw");
+  return normalizeDecodedCurrentDocument(decoded, "lenient", "throw")
+    ?? createDefaultStudioBg3dSceneDocument();
 }
 
 /**

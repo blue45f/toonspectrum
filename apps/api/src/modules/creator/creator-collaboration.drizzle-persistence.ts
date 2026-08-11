@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, lt, lte, ne, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, lt, lte, ne, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import {
@@ -7,6 +7,7 @@ import {
   creatorWorkCollaborators,
   creatorWorkCrdtSnapshots,
   creatorWorkCrdtUpdates,
+  creatorWorkAssets,
   creatorWorkRevisions,
   creatorWorks,
   db,
@@ -745,6 +746,33 @@ export class DrizzleCreatorCollaborationUnitOfWork implements CreatorCollaborati
       workId
     );
     return rows[0] ?? null;
+  }
+
+  async findStudioLinked3dPassAssets(
+    workId: string,
+    assetIds: readonly string[]
+  ) {
+    if (assetIds.length === 0) return [];
+    return this.executor
+      .select({
+        workId: creatorWorkAssets.workId,
+        assetId: creatorWorkAssets.assetId,
+        elementType: creatorWorkAssets.elementType,
+        mimeType: creatorWorkAssets.mimeType,
+        descriptor: creatorWorkAssets.descriptor,
+        byteSize: creatorWorkAssets.byteSize,
+        sha256: creatorWorkAssets.sha256,
+        intrinsicWidth: creatorWorkAssets.intrinsicWidth,
+        intrinsicHeight: creatorWorkAssets.intrinsicHeight,
+        decodedRgbaBytes: creatorWorkAssets.decodedRgbaBytes,
+      })
+      .from(creatorWorkAssets)
+      .where(
+        and(
+          eq(creatorWorkAssets.workId, workId),
+          inArray(creatorWorkAssets.assetId, [...assetIds])
+        )
+      );
   }
 
   async updateAccessibleDocument(

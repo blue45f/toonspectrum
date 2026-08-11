@@ -13,8 +13,10 @@ import {
   type StudioBg3dSceneDocument,
 } from "./studio-bg3d-scene-document";
 import {
+  StudioBg3dRuntimeAdapterError,
   adaptStudioBg3dRuntimeToDocument,
   hydrateStudioBg3dDocumentToRuntime,
+  tryAdaptStudioBg3dRuntimeToDocument,
 } from "./studio-bg3d-scene-runtime";
 
 import type { BgCustomModelInstance } from "./studio-background-3d-model";
@@ -97,6 +99,20 @@ function diagnosticCodes(
   return diagnostics.map((diagnostic) => diagnostic.code);
 }
 
+function expectRuntimeAdapterError(
+  operation: () => unknown,
+  code: StudioBg3dRuntimeAdapterError["code"],
+): void {
+  try {
+    operation();
+  } catch (cause) {
+    expect(cause).toBeInstanceOf(StudioBg3dRuntimeAdapterError);
+    expect((cause as StudioBg3dRuntimeAdapterError).code).toBe(code);
+    return;
+  }
+  throw new Error(`Expected Studio BG3D runtime adapter error: ${code}.`);
+}
+
 describe("Studio BG3D runtime to document adapter", () => {
   it("preserves canonical storyboard shots while refreshing runtime nodes", () => {
     const source = adaptStudioBg3dRuntimeToDocument({
@@ -135,29 +151,37 @@ describe("Studio BG3D runtime to document adapter", () => {
     });
     expect(withShot?.shots?.[0]?.nodeVisibility?.map((entry) => entry.nodeId)).toContain("removed-node");
 
-    const adapted = adaptStudioBg3dRuntimeToDocument({
-      primitives: [primitive("kept-node")],
-      customModels: [],
-      attachmentByStorageModelId: new Map(),
-      baseDocument: withShot ?? undefined,
-    });
-
-    expect(diagnosticCodes(adapted.diagnostics)).toContain("lossy-shot-repair");
-    expect(adapted.document.shots).not.toEqual(withShot?.shots);
+    expectRuntimeAdapterError(
+      () => adaptStudioBg3dRuntimeToDocument({
+        primitives: [primitive("kept-node")],
+        customModels: [],
+        attachmentByStorageModelId: new Map(),
+        baseDocument: withShot ?? undefined,
+      }),
+      "lossy-shot-repair",
+    );
   });
 
-  it("keeps every shot byte-for-byte and drops nodes first when the document budget is tight", () => {
-    const nodes = Array.from({ length: 180 }, (_, index) => ({
-      ...primitive(`budget-node-${index}`, index % 20),
-      name: `표준화확장-${"각".repeat(60)}-${index}`,
-    }));
+  it("fails closed instead of dropping nodes when the persistence byte budget is tight", () => {
+    const base = canonicalDocument({
+      budgets: {
+        ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.budgets,
+        complexity: {
+          ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.budgets.complexity,
+          maxNodes: 512,
+        },
+      },
+    });
+    const nodes = Array.from({ length: 512 }, (_, index) =>
+      primitive(`budget-node-${index}`, index % 20));
     const source = adaptStudioBg3dRuntimeToDocument({
       primitives: nodes,
       customModels: [],
       attachmentByStorageModelId: new Map(),
+      baseDocument: base,
     });
     let withShots = source.document;
-    for (let index = 0; index < 10; index += 1) {
+    for (let index = 0; index < 4; index += 1) {
       const captured = captureStudioBg3dShot(withShots, {
         id: `budget-shot-${index}`,
         name: `예산 컷 ${index}`,
@@ -166,17 +190,19 @@ describe("Studio BG3D runtime to document adapter", () => {
       withShots = captured ?? withShots;
     }
 
-    const refreshed = adaptStudioBg3dRuntimeToDocument({
-      primitives: nodes.map((node) => ({ ...node, visible: true })),
-      customModels: [],
-      attachmentByStorageModelId: new Map(),
-      baseDocument: withShots,
-    });
-
-    if (!diagnosticCodes(refreshed.diagnostics).includes("lossy-shot-repair")) {
-      expect(refreshed.document.shots).toEqual(withShots.shots);
-      expect(refreshed.document.activeShotId).toBe(withShots.activeShotId);
-    }
+    expectRuntimeAdapterError(
+      () => adaptStudioBg3dRuntimeToDocument({
+        primitives: nodes.map((node, index) => ({
+          ...node,
+          name: `표준화확장-${"각".repeat(70)}-${index}`,
+          visible: true,
+        })),
+        customModels: [],
+        attachmentByStorageModelId: new Map(),
+        baseDocument: withShots,
+      }),
+      "persistence-byte-budget-exceeded",
+    );
   });
 
   it("preserves per-instance material edits across runtime/document hydration", () => {
@@ -678,7 +704,7 @@ describe("Studio BG3D runtime to document adapter", () => {
     ]));
   });
 
-  it("honors the canonical node budget and keeps the earliest runtime records", () => {
+  it("honors the canonical node budget without returning the earliest-record prefix", () => {
     const base = canonicalDocument({
       budgets: {
         ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.budgets,
@@ -688,27 +714,48 @@ describe("Studio BG3D runtime to document adapter", () => {
         },
       },
     });
-    const result = adaptStudioBg3dRuntimeToDocument({
-      primitives: [
-        primitive("p-1"),
-        primitive("p-2"),
-        primitive("p-3"),
-        primitive("p-4"),
-      ],
-      customModels: [customModel("m-1", "idb-model")],
-      attachmentByStorageModelId: new Map([["idb-model", attachment("logical", 30)]]),
+    expectRuntimeAdapterError(
+      () => adaptStudioBg3dRuntimeToDocument({
+        primitives: [
+          primitive("p-1"),
+          primitive("p-2"),
+          primitive("p-3"),
+          primitive("p-4"),
+        ],
+        customModels: [customModel("m-1", "idb-model")],
+        attachmentByStorageModelId: new Map([["idb-model", attachment("logical", 30)]]),
+        baseDocument: base,
+      }),
+      "node-budget-exceeded",
+    );
+  });
+
+  it("exposes typed budget rejection to product callers without throwing or returning a prefix", () => {
+    const base = canonicalDocument({
+      budgets: {
+        ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.budgets,
+        complexity: {
+          ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.budgets.complexity,
+          maxNodes: 1,
+        },
+      },
+    });
+    const attempt = tryAdaptStudioBg3dRuntimeToDocument({
+      primitives: [primitive("p-1"), primitive("p-2")],
+      customModels: [],
+      attachmentByStorageModelId: new Map(),
       baseDocument: base,
     });
 
-    expect(result.document.nodes.map((node) => node.id)).toEqual(["p-1", "p-2", "p-3"]);
-    expect(result.document.attachments).toEqual([]);
-    expect(result.counts).toMatchObject({
-      emittedPrimitives: 3,
-      emittedCustomModels: 0,
-      droppedPrimitives: 1,
-      droppedCustomModels: 1,
+    expect(attempt).toMatchObject({
+      ok: false,
+      error: {
+        code: "node-budget-exceeded",
+        source: "primitive",
+        sourceIndex: 1,
+        nodeId: "p-2",
+      },
     });
-    expect(diagnosticCodes(result.diagnostics)).toContain("node-budget-exceeded");
   });
 
   it("falls back to default settings for a hostile base without mutating input arrays", () => {

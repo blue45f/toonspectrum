@@ -322,6 +322,21 @@ describe("planStudioBg3dLtLayers insertion and fallback", () => {
 });
 
 describe("planStudioBg3dLtLayers bundle update", () => {
+  it("accepts the verified OPFS-CAS locator persisted on the canonical main-line layer", () => {
+    const main = bundleImage("main-line", "main-old", {
+      src: `studio-opfs-cas:sha256:${"a".repeat(64)}`,
+    });
+    const result = unwrap(planStudioBg3dLtLayers<TestElement, TestScene>({
+      elements: [bundleImage("tone", "tone-old"), main],
+      groups: [group()],
+      targetElementId: "main-old",
+      render: separated(["tone", "main-line"]),
+    }));
+
+    expect(result.operation).toBe("update");
+    expect((result.nextElements[1] as TestImage).src).toBe(PNG.main);
+  });
+
   it("recreates a missing role, normalizes stacking, and preserves unrelated references", () => {
     const before = other("before");
     const tone = bundleImage("tone", "tone-old", {

@@ -11,6 +11,7 @@ import type {
 export type StudioBg3dModelPlacementAdmissionFailureCode =
   | "cached-record-mismatch"
   | "invalid-placement-budget"
+  | "attachment-budget-exceeded"
   | "model-byte-budget-exceeded"
   | "cumulative-byte-budget-exceeded"
   | NonNullable<ReturnType<typeof checkStudioBg3dThreeBudgets>>["code"];
@@ -23,6 +24,8 @@ const PLACEMENT_FAILURE_MESSAGES: Readonly<
     "캐시된 3D 모델과 현재 라이브러리 원본의 무결성 정보가 달라 배치를 중단했습니다.",
   "invalid-placement-budget":
     "현재 장면의 3D 모델 안전 예산을 확인할 수 없어 배치를 중단했습니다.",
+  "attachment-budget-exceeded":
+    "이 장면의 서로 다른 3D 모델 원본 개수 기준을 초과했습니다. 사용하지 않는 모델을 정리해 주세요.",
   "model-byte-budget-exceeded":
     "이 장면의 3D 모델 용량 기준을 초과했습니다. 더 작은 모델을 사용해 주세요.",
   "cumulative-byte-budget-exceeded":
@@ -113,6 +116,67 @@ export function totalStudioBg3dModelAttachmentBytes(
     total += attachment.byteSize;
   }
   return total;
+}
+
+export interface StudioBg3dModelAttachmentAdmissionInput {
+  readonly models: readonly Pick<BgCustomModelInstance, "modelId">[];
+  readonly attachments: ReadonlyMap<string, StudioBg3dModelAttachment>;
+  readonly candidateAttachments: Iterable<Pick<StudioBg3dModelAttachment, "hash" | "byteSize">>;
+  readonly maximumAttachments: number;
+  readonly maximumCumulativeBytes: number;
+}
+
+/**
+ * Admits distinct immutable model hashes and their aggregate bytes against the authoritative live
+ * scene immediately before a binding map or runtime snapshot advances. Repeated instances and
+ * byte-identical candidates count once. The hash/byte pair must stay immutable across aliases.
+ */
+export function assertStudioBg3dModelAttachmentAdmission(
+  input: StudioBg3dModelAttachmentAdmissionInput,
+): void {
+  if (
+    !Number.isSafeInteger(input.maximumAttachments) || input.maximumAttachments < 1 ||
+    !Number.isSafeInteger(input.maximumCumulativeBytes) || input.maximumCumulativeBytes < 1
+  ) {
+    throw new StudioBg3dModelPlacementAdmissionError("invalid-placement-budget");
+  }
+  const bytesByHash = new Map<string, number>();
+  let cumulativeBytes = 0;
+  const admitAttachment = (
+    attachment: Pick<StudioBg3dModelAttachment, "hash" | "byteSize">,
+  ): void => {
+    if (
+      typeof attachment.hash !== "string" || attachment.hash.length === 0 ||
+      !Number.isSafeInteger(attachment.byteSize) || attachment.byteSize < 1
+    ) {
+      throw new StudioBg3dModelPlacementAdmissionError("invalid-placement-budget");
+    }
+    const existingBytes = bytesByHash.get(attachment.hash);
+    if (existingBytes !== undefined) {
+      if (existingBytes !== attachment.byteSize) {
+        throw new StudioBg3dModelPlacementAdmissionError("invalid-placement-budget");
+      }
+      return;
+    }
+    if (bytesByHash.size >= input.maximumAttachments) {
+      throw new StudioBg3dModelPlacementAdmissionError("attachment-budget-exceeded");
+    }
+    if (attachment.byteSize > input.maximumCumulativeBytes - cumulativeBytes) {
+      throw new StudioBg3dModelPlacementAdmissionError("cumulative-byte-budget-exceeded");
+    }
+    bytesByHash.set(attachment.hash, attachment.byteSize);
+    cumulativeBytes += attachment.byteSize;
+  };
+  for (const model of input.models) {
+    const attachment = input.attachments.get(model.modelId);
+    if (!attachment) {
+      throw new StudioBg3dModelPlacementAdmissionError("invalid-placement-budget");
+    }
+    admitAttachment(attachment);
+  }
+  for (const attachment of input.candidateAttachments) {
+    admitAttachment(attachment);
+  }
 }
 
 /**

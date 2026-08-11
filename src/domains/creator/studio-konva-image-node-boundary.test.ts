@@ -232,6 +232,7 @@ describe("Studio Konva image node boundary", () => {
 
     expect(imageNode.dynamicImports).toEqual([
       "./studio-konva-filters",
+      "./studio-raster-source-lease",
       "./studio-image-filter-worker-client",
       // M1 GPU 필터 경로 — Worker 디스패치 앞에서 시도하는 지연 청크(폴백은 기존 Worker).
       "./studio-gpu-filter-apply",
@@ -278,6 +279,13 @@ describe("Studio Konva image node boundary", () => {
     );
     expect(source).toContain('layer.on("draw.studioRasterPresentation", acknowledgeAfterDraw);');
     expect(source).toContain("node.image() !== rasterPresentationSource");
+    expect(source).toContain(
+      "setLoadedImage((current) => current?.src === src ? undefined : current);"
+    );
+    expect(source).toContain('im.removeAttribute("src");');
+    expect(source.indexOf('im.removeAttribute("src");')).toBeLessThan(
+      source.indexOf("releaseResolvedSource?.();"),
+    );
     expect(source).toContain(
       "node.cache(cachePad > 0 ? { offset: cachePad } : { pixelRatio: filterDensity });"
     );

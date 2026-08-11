@@ -1,7 +1,7 @@
 // 창작 게시판(사용자 제작 웹툰/컷툰) 서버 로직 — feedback.ts 패턴을 따른다.
 // 스키마는 lib/db/schema.ts에 이미 존재(creatorWorks/creatorWorkLikes/creatorWorkComments) — 재정의하지 않는다.
 // 연재 시리즈·챌린지·팔로우(creatorSeries/creatorChallenges/creatorFollows)도 이 파일에서 함께 다룬다.
-import { and, asc, desc, eq, gt, gte, ilike, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, ilike, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
 
 import {
   assertCreatorAssetListResponseBudget,
@@ -19,9 +19,11 @@ import {
   creatorAssetReports,
   creatorAssets,
   creatorChallenges,
+  creatorDraftCollaborationRooms,
   creatorFollows,
   creatorSeries,
   creatorWorkAssetStorageReferences,
+  creatorWorkAssets,
   creatorWorkComments,
   creatorWorkLikes,
   creatorWorkRevisions,
@@ -30,7 +32,11 @@ import {
   dbPool,
   users,
 } from "../db";
-
+import {
+  assertStudioLinked3dPassAssetRows,
+  extractStudioLinked3dPassAssetRequirements,
+  type CreatorWorkLinked3dJsonEnvelope,
+} from "../studio-linked-3d-pass-asset-fence";
 
 import {
   assertCreatorAssetPersistedIntegrity,
@@ -39,6 +45,7 @@ import {
   resolveCreatorAssetPreviewForResponse,
 } from "./creator-asset-image";
 import { toPublicCreatorDoc } from "./creator-doc-visibility";
+import { assertCreatorDraftCollaborationStatusMutationAllowed } from "./creator-provisional-work-status";
 import {
   CREATOR_WORK_REVISION_MAX,
   CREATOR_WORK_REVISION_RETENTION,
@@ -62,6 +69,8 @@ import type {
   CreatorAssetReportReason,
 } from "../creator-asset-contract";
 import type { SQL, SQLWrapper } from "drizzle-orm";
+
+type CreatorCommunityTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 const SORTS = new Set<CreatorWorkSort>(["recent", "likes", "views"]);
 const FORMATS = new Set<CreatorWorkFormat>(["cuttoon", "upload"]);
@@ -245,6 +254,39 @@ function parseTagValue(value: unknown): string[] {
 function cleanPages(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.map((p) => String(p ?? "")).filter((p) => p.length > 0).slice(0, MAX_PAGES);
+}
+
+async function assertCreatorWorkLinked3dPassAssetsInTransaction(
+  transaction: CreatorCommunityTransaction,
+  workId: string,
+  envelope: CreatorWorkLinked3dJsonEnvelope
+): Promise<void> {
+  const requirements = extractStudioLinked3dPassAssetRequirements(envelope);
+  if (requirements.length === 0) return;
+  const rows = await transaction
+    .select({
+      workId: creatorWorkAssets.workId,
+      assetId: creatorWorkAssets.assetId,
+      elementType: creatorWorkAssets.elementType,
+      mimeType: creatorWorkAssets.mimeType,
+      descriptor: creatorWorkAssets.descriptor,
+      byteSize: creatorWorkAssets.byteSize,
+      sha256: creatorWorkAssets.sha256,
+      intrinsicWidth: creatorWorkAssets.intrinsicWidth,
+      intrinsicHeight: creatorWorkAssets.intrinsicHeight,
+      decodedRgbaBytes: creatorWorkAssets.decodedRgbaBytes,
+    })
+    .from(creatorWorkAssets)
+    .where(
+      and(
+        eq(creatorWorkAssets.workId, workId),
+        inArray(
+          creatorWorkAssets.assetId,
+          requirements.map(({ assetId }) => assetId)
+        )
+      )
+    );
+  assertStudioLinked3dPassAssetRows({ workId, requirements, rows });
 }
 
 function parsePages(value: unknown): string[] {
@@ -913,6 +955,21 @@ export async function createWork(userId: string, input: CreatorWorkInput): Promi
   const doc = input.doc ?? {};
   const status = parseStatus(input.status);
 
+  // A brand-new random work ID cannot already own immutable cloud rows. Linked-pass creation must
+  // therefore use the hidden provisional-work flow: provision ID -> upload rows -> locked update.
+  const directCreateRequirements = extractStudioLinked3dPassAssetRequirements({
+    cover,
+    pages,
+    doc,
+  });
+  if (directCreateRequirements.length > 0) {
+    assertStudioLinked3dPassAssetRows({
+      workId: "direct-create-has-no-work-asset-scope",
+      requirements: directCreateRequirements,
+      rows: [],
+    });
+  }
+
   // 시리즈/챌린지 연결(선택) — 미전달이면 기존 플로우 그대로(새 컬럼을 건드리지 않아 push 전 DB와도 호환).
   const seriesId = parseRefId(input.seriesId);
   const challengeId = parseRefId(input.challengeId);
@@ -1079,7 +1136,8 @@ export async function updateWork(
   if (patch.cover !== undefined) fields.cover = String(patch.cover ?? "");
   if (patch.pages !== undefined) fields.pages = cleanPages(patch.pages);
   if (patch.doc !== undefined) fields.doc = patch.doc ?? {};
-  if (patch.status !== undefined) fields.status = parseStatus(patch.status);
+  const requestedStatus = patch.status === undefined ? undefined : parseStatus(patch.status);
+  if (requestedStatus !== undefined) fields.status = requestedStatus;
   if (patch.titleId !== undefined) fields.titleId = parseTitleId(patch.titleId);
 
   // 시리즈/챌린지 연결 변경(선택 필드 — 미전달 시 기존 값 유지).
@@ -1107,6 +1165,49 @@ export async function updateWork(
   }
 
   const updated = await db.transaction(async (tx) => {
+    // This is the same row lock used by immutable work-asset upload/deletion. Keep it ahead of the
+    // asset query so the exact candidate JSON and its rows remain one transaction-scoped fact.
+    const [locked] = await tx
+      .select({
+        ...creatorWorkSnapshotSelection,
+        ownerId: creatorWorks.userId,
+        hidden: creatorWorks.hidden,
+      })
+      .from(creatorWorks)
+      .where(eq(creatorWorks.id, id))
+      .limit(1)
+      .for("update");
+    if (!locked) throw new Error("작품을 찾을 수 없습니다.");
+    if (locked.ownerId !== userId) throw new Error("작성자만 수정할 수 있습니다.");
+    if (baseRevision !== undefined && locked.revision !== baseRevision) {
+      throw new CreatorWorkRevisionConflictError(locked.revision);
+    }
+    if (locked.revision >= CREATOR_WORK_REVISION_MAX) {
+      throw new Error("작품 revision 상한에 도달해 더 저장할 수 없습니다.");
+    }
+    const [draftCollaborationRoom] = requestedStatus === undefined
+      ? []
+      : await tx
+          .select({ status: creatorDraftCollaborationRooms.status })
+          .from(creatorDraftCollaborationRooms)
+          .where(
+            and(
+              eq(creatorDraftCollaborationRooms.workId, id),
+              eq(creatorDraftCollaborationRooms.status, "active")
+            )
+          )
+          .limit(1);
+    assertCreatorDraftCollaborationStatusMutationAllowed({
+      hidden: locked.hidden,
+      draftCollaborationStatus: draftCollaborationRoom?.status,
+      requestedStatus,
+    });
+    await assertCreatorWorkLinked3dPassAssetsInTransaction(tx, id, {
+      cover: Object.hasOwn(fields, "cover") ? fields.cover : locked.cover,
+      pages: Object.hasOwn(fields, "pages") ? fields.pages : locked.pages,
+      doc: Object.hasOwn(fields, "doc") ? fields.doc : locked.doc,
+    });
+
     // `baseRevision`을 생략한 레거시 저장도 동시 요청으로 PostgreSQL integer 상한을 넘지 않게
     // write 조건에서 다시 막는다. 사전 조회는 친절한 오류용이며 안전성은 이 조건이 담당한다.
     const conditions = [
@@ -1266,7 +1367,8 @@ export async function restoreWorkRevision(
       .select({ ownerId: creatorWorks.userId, revision: creatorWorks.revision })
       .from(creatorWorks)
       .where(eq(creatorWorks.id, workId))
-      .limit(1);
+      .limit(1)
+      .for("update");
     if (!current || current.ownerId !== userId) throw new CreatorWorkRevisionNotFoundError();
     if (current.revision !== baseRevision) throw new CreatorWorkRevisionConflictError(current.revision);
     if (current.revision >= CREATOR_WORK_REVISION_MAX) {
@@ -1287,6 +1389,11 @@ export async function restoreWorkRevision(
     const snapshot = createCreatorWorkRevisionSnapshot(
       target.snapshot as CreatorWorkRevisionSnapshotSource
     );
+    await assertCreatorWorkLinked3dPassAssetsInTransaction(tx, workId, {
+      cover: snapshot.cover,
+      pages: snapshot.pages,
+      doc: snapshot.doc,
+    });
 
     const [row] = await tx
       .update(creatorWorks)

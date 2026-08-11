@@ -489,6 +489,8 @@ export const creatorDraftCollaborationRooms = pgTable(
     provisionIntent: text("provisionIntent").notNull(),
     provisionMutationId: text("provisionMutationId").notNull(),
     promotionMutationId: text("promotionMutationId"),
+    promotionExpectedWorkRevision: integer("promotionExpectedWorkRevision"),
+    promotionFinalStatus: text("promotionFinalStatus"),
     createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -534,7 +536,7 @@ export const creatorDraftCollaborationRooms = pgTable(
     ),
     check(
       "creator_draft_collaboration_room_provision_intent_check",
-      sql`${t.provisionIntent} in ('share-link', 'invite-member')`
+      sql`${t.provisionIntent} in ('share-link', 'invite-member', 'cloud-save')`
     ),
     check(
       "creator_draft_collaboration_room_status_check",
@@ -557,13 +559,30 @@ export const creatorDraftCollaborationRooms = pgTable(
       sql`${t.promotionMutationId} is null or ${t.promotionMutationId} ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'`
     ),
     check(
+      "creator_draft_room_promotion_work_revision_check",
+      sql`${t.promotionExpectedWorkRevision} is null or ${t.promotionExpectedWorkRevision} between 1 and 2147483647`
+    ),
+    check(
+      "creator_draft_room_promotion_final_status_check",
+      sql`${t.promotionFinalStatus} is null or ${t.promotionFinalStatus} in ('draft', 'published')`
+    ),
+    check(
       "creator_draft_collaboration_room_time_order_check",
       sql`${t.lastActivityAt} >= ${t.createdAt} and ${t.expiresAt} > ${t.lastActivityAt} and ${t.updatedAt} >= ${t.createdAt}`
     ),
     check(
       "creator_draft_collaboration_room_state_check",
-      sql`(${t.status} = 'active' and ${t.promotedAt} is null and ${t.promotionMutationId} is null)
-        or (${t.status} = 'promoted' and ${t.promotedAt} is not null and ${t.promotionMutationId} is not null and ${t.graphRevision} >= 1)`
+      sql`(${t.status} = 'active'
+          and ${t.promotedAt} is null
+          and ${t.promotionMutationId} is null
+          and ${t.promotionExpectedWorkRevision} is null
+          and ${t.promotionFinalStatus} is null)
+        or (${t.status} = 'promoted'
+          and ${t.promotedAt} is not null
+          and ${t.promotionMutationId} is not null
+          and ${t.graphRevision} >= 1
+          and ((${t.promotionExpectedWorkRevision} is null and ${t.promotionFinalStatus} is null)
+            or (${t.promotionExpectedWorkRevision} is not null and ${t.promotionFinalStatus} is not null)))`
     ),
   ]
 );

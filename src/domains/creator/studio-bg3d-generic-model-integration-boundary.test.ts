@@ -7,13 +7,21 @@ const runtimeHintsSource = readFileSync(
   new URL("./studio-generic-3d-runtime-hints.ts", import.meta.url),
   "utf8",
 );
+const admissionSource = readFileSync(
+  new URL("./studio-bg3d-model-runtime-admission.ts", import.meta.url),
+  "utf8",
+);
 
-function sourceBetween(startNeedle: string, endNeedle: string): string {
-  const start = source.indexOf(startNeedle);
-  const end = source.indexOf(endNeedle, start);
+function sourceBetweenIn(haystack: string, startNeedle: string, endNeedle: string): string {
+  const start = haystack.indexOf(startNeedle);
+  const end = haystack.indexOf(endNeedle, start);
   expect(start).toBeGreaterThanOrEqual(0);
   expect(end).toBeGreaterThan(start);
-  return source.slice(start, end);
+  return haystack.slice(start, end);
+}
+
+function sourceBetween(startNeedle: string, endNeedle: string): string {
+  return sourceBetweenIn(source, startNeedle, endNeedle);
 }
 
 function expectInOrder(haystack: string, needles: readonly string[]): void {
@@ -58,17 +66,18 @@ describe("Studio BG3D generic model mode integration boundary", () => {
       "uploadCommitted = true",
     ]);
     expect(source).toContain('from "./studio-generic-3d-workflow-metadata"');
-    expect(source).toContain("attachStudioGeneric3dWorkflowMetadata");
+    expect(admissionSource).toContain("attachStudioGeneric3dWorkflowMetadata");
     expect(source).toContain("parseStudioGeneric3dWorkflowMetadata");
   });
 
   it("profiles renderer structure once while keeping unsupported child transforms read-only", () => {
-    const admission = sourceBetween(
-      "async function admitAndCacheModel(",
-      "function disposeModelCache(",
+    const admission = sourceBetweenIn(
+      admissionSource,
+      "export async function admitAndCacheStudioBg3dModel(",
+      "export function disposeStudioBg3dModelCache(",
     );
 
-    expect(source).toContain('from "./studio-generic-3d-runtime-hints"');
+    expect(admissionSource).toContain('from "./studio-generic-3d-runtime-hints"');
     expect(runtimeHintsSource).toContain("function inspectStudioGeneric3dRuntimeHints(");
     expect(runtimeHintsSource).toContain("partTransformsSupported: false");
     expect(runtimeHintsSource).toContain("renderable.isSkinnedMesh === true");

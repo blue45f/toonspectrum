@@ -11,6 +11,8 @@ import {
 } from "./studio-character-bible";
 import { createEmptyStudioCommentsDocument } from "./studio-comments";
 import { createDefaultStudioDrawingAssistDocument } from "./studio-drawing-assist-document";
+import { createStudioLinked3dRenderPageFixture } from
+  "./studio-linked-3d-render-test-fixture";
 import { parseStudioProjectFile, serializeStudioProjectFile } from "./studio-project-file";
 import {
   buildStudioProjectFileSnapshot,
@@ -275,6 +277,19 @@ describe("buildStudioProjectFileSnapshot", () => {
       "referenceBoard",
       "publishPack",
     ]));
+  });
+
+  it("preserves the linked Scene Shot authority through archive and checkpoint snapshots", () => {
+    const linkedPage = createStudioLinked3dRenderPageFixture();
+    const built = snapshot((input) => {
+      input.pagesList = [linkedPage];
+      input.currentPageId = linkedPage.id;
+    });
+    const parsed = parseStudioProjectFile(JSON.parse(serializeStudioProjectFile(built, 2)));
+
+    expect(built.pagesList[0]?.linked3dRender).toBe(linkedPage.linked3dRender);
+    expect(parsed.pagesList[0]?.linked3dRender).toEqual(linkedPage.linked3dRender);
+    expect(parsed.pagesList[0]?.shared3dStage).toEqual(linkedPage.shared3dStage);
   });
 });
 

@@ -22,6 +22,33 @@ type StudioProjectArchiveStatus = {
   readonly text: string;
 };
 
+function measureStudioProjectArchiveAttachment(
+  attachment: { readonly data: Blob | Uint8Array | ArrayBuffer },
+): number {
+  const { data } = attachment;
+  let byteSize: number;
+  if (data instanceof Uint8Array || data instanceof ArrayBuffer) byteSize = data.byteLength;
+  else if (typeof Blob !== "undefined" && data instanceof Blob) byteSize = data.size;
+  else throw new Error("portable archive attachment의 byte 크기를 확인할 수 없습니다.");
+  if (!Number.isSafeInteger(byteSize) || byteSize < 0) {
+    throw new Error("portable archive attachment의 byte 크기가 올바르지 않습니다.");
+  }
+  return byteSize;
+}
+
+function summarizeStudioProjectArchiveAttachments(
+  attachments: readonly { readonly data: Blob | Uint8Array | ArrayBuffer }[],
+): { readonly bytes: number; readonly count: number } {
+  let bytes = 0;
+  for (const attachment of attachments) {
+    bytes += measureStudioProjectArchiveAttachment(attachment);
+    if (!Number.isSafeInteger(bytes)) {
+      throw new Error("portable archive attachment byte 합계를 안전하게 계산할 수 없습니다.");
+    }
+  }
+  return Object.freeze({ bytes, count: attachments.length });
+}
+
 export interface StudioProjectArchiveOrchestrationInput {
   readonly workId: string | null;
   readonly remixId: string | null;
@@ -179,8 +206,9 @@ export function createStudioProjectArchiveOrchestration({
     if (projectArchiveBusy) return;
     setProjectArchiveBusy(true);
     setProjectArchiveStatus(null);
-    let filterMaskArchiveController: AbortController | null = null;
+    let archiveExportController: AbortController | null = null;
     try {
+      archiveExportController = new AbortController();
       const exportGeneration = revisionProjectGenerationRef.current;
       const sourceProject = currentStudioProjectSnapshot();
       const [
@@ -195,6 +223,12 @@ export function createStudioProjectArchiveOrchestration({
           hasStudioFilterMaskSurfaceArchiveReferences,
           prepareStudioFilterMaskSurfaceArchiveExport,
         },
+        {
+          hasStudioLinked3dPassProjectArchiveReferences,
+          prepareStudioLinked3dPassProjectArchiveExport,
+        },
+        { acquireStudioLinked3dPassProductAuthority },
+        { parseStudioProjectFile },
         { downloadBlob },
       ] = await Promise.all([
         import("./studio-bg3d-project-library"),
@@ -202,6 +236,9 @@ export function createStudioProjectArchiveOrchestration({
         import("./studio-vrm-project-library"),
         import("./studio-vrm-texture-paint-project-library"),
         import("./studio-filter-mask-surface-archive"),
+        import("./studio-linked-3d-pass-project-archive"),
+        import("./studio-linked-3d-pass-product-authority"),
+        import("./studio-project-file"),
         import("./studio-export"),
       ]);
       let project: unknown = sourceProject;
@@ -211,12 +248,11 @@ export function createStudioProjectArchiveOrchestration({
             "공동 작품의 필터 마스크 원본을 확인할 수 없어 portable archive 내보내기를 중단했습니다."
           );
         }
-        filterMaskArchiveController = new AbortController();
         const filterMaskArchive = await prepareStudioFilterMaskSurfaceArchiveExport({
           project: sourceProject,
           workId,
           generation: exportGeneration,
-          signal: filterMaskArchiveController.signal,
+          signal: archiveExportController.signal,
           limits: isMobile ? MOBILE_PROJECT_ARCHIVE_LIMITS : undefined,
           isCurrent: ({ workId: guardedWorkId, generation }) => (
             guardedWorkId === workId
@@ -237,12 +273,33 @@ export function createStudioProjectArchiveOrchestration({
           canonicalProject: project,
           limits: isMobile ? MOBILE_PROJECT_ARCHIVE_LIMITS : undefined,
         });
+      const preparedAttachments = [
+        ...referenceArchive.attachments,
+        ...vrmArchive.attachments,
+        ...texturePaintAttachments,
+      ];
+      const consumedAttachmentBudget = summarizeStudioProjectArchiveAttachments(
+        preparedAttachments,
+      );
+      const linked3dProject = parseStudioProjectFile(project);
+      const linked3dPassAttachments = hasStudioLinked3dPassProjectArchiveReferences(linked3dProject)
+        ? await prepareStudioLinked3dPassProjectArchiveExport({
+            project: linked3dProject,
+            authority: await acquireStudioLinked3dPassProductAuthority(),
+            limits: isMobile ? MOBILE_PROJECT_ARCHIVE_LIMITS : undefined,
+            consumedAttachmentBytes: consumedAttachmentBudget.bytes,
+            consumedAttachmentCount: consumedAttachmentBudget.count,
+            signal: archiveExportController.signal,
+            isCurrent: () => revisionProjectGenerationRef.current === exportGeneration,
+          })
+        : [];
       const result = await buildStudioProjectArchiveWithVerifiedBg3dModels({
-        project,
+        project: linked3dProject,
         attachments: [
           ...referenceArchive.attachments,
           ...vrmArchive.attachments,
           ...texturePaintAttachments,
+          ...linked3dPassAttachments,
         ],
       }, {
         limits: isMobile ? MOBILE_PROJECT_ARCHIVE_LIMITS : undefined,
@@ -273,7 +330,7 @@ export function createStudioProjectArchiveOrchestration({
       setProjectArchiveStatus({ tone: "bad", text: message });
       setError(message);
     } finally {
-      filterMaskArchiveController?.abort();
+      archiveExportController?.abort();
       setProjectArchiveBusy(false);
     }
   }
@@ -289,14 +346,21 @@ export function createStudioProjectArchiveOrchestration({
         { parseStudioProjectDocument },
         { captureStudioProjectDocumentSession },
         { auditStudioVrmTexturePaintJsonImport },
+        { hasStudioLinked3dPassProjectArchiveReferences },
       ] = await Promise.all([
         import("./studio-project-document"),
         import("./studio-project-document-session"),
         import("./studio-vrm-texture-paint-project-library"),
+        import("./studio-linked-3d-pass-project-archive"),
       ]);
       if (!canApplyStudioMutation(mutationTicket)) return;
       const loaded = await parseStudioProjectDocument(text);
       if (!canApplyStudioMutation(mutationTicket)) return;
+      if (hasStudioLinked3dPassProjectArchiveReferences(loaded.project)) {
+        throw new Error(
+          "연결형 3D pass가 있는 프로젝트 JSON은 PNG 바이트를 포함하지 않아요. self-contained .toonproject.zip archive로 불러와 주세요.",
+        );
+      }
       const texturePaintPresentation =
         await auditStudioVrmTexturePaintJsonImport(loaded.project);
       if (!canApplyStudioMutation(mutationTicket)) return;
@@ -345,6 +409,11 @@ export function createStudioProjectArchiveOrchestration({
           importStudioVrmTexturePaintProjectLibrary,
           presentStudioVrmTexturePaintProjectArchiveImport,
         },
+        {
+          hasStudioLinked3dPassProjectArchiveReferences,
+          restoreStudioLinked3dPassProjectArchiveImport,
+        },
+        { acquireStudioLinked3dPassProductAuthority },
         { normalizeStudioReleaseSchedule },
       ] = await Promise.all([
         import("./studio-project-archive"),
@@ -352,6 +421,8 @@ export function createStudioProjectArchiveOrchestration({
         import("./studio-reference-board-archive"),
         import("./studio-vrm-project-library"),
         import("./studio-vrm-texture-paint-project-library"),
+        import("./studio-linked-3d-pass-project-archive"),
+        import("./studio-linked-3d-pass-product-authority"),
         loadStudioReleaseScheduleRuntime(),
       ]);
       const result = await importStudioProjectArchive(file, {
@@ -385,22 +456,37 @@ export function createStudioProjectArchiveOrchestration({
         );
       if (!canApplyStudioMutation(mutationTicket)) return;
       let projectApplied = false;
-      const installed = await installStudioBg3dProjectArchiveModelsAndApply(
-        portableResult,
-        (project) => {
+      const installAndApply = async (project: StudioProjectFile) => {
+        const importedForApply = { ...portableResult, project };
+        const installed = await installStudioBg3dProjectArchiveModelsAndApply(
+          importedForApply,
+          (preparedProject) => {
           if (!canApplyStudioMutation(mutationTicket)) return;
           projectApplied = applyStudioProjectSnapshotWithPreparedDocuments(
-            project,
+            preparedProject,
             normalizeStudioReleaseSchedule,
             publicationAnalyticsDocument
           );
+          return projectApplied;
         },
         {
           limits: isMobile ? MOBILE_PROJECT_ARCHIVE_LIMITS : undefined,
           verification: { profile: isMobile ? "mobile" : "desktop" },
         }
-      );
-      if (!projectApplied) return;
+        );
+        return installed.applyResult ? installed : false;
+      };
+      const installed = hasStudioLinked3dPassProjectArchiveReferences(portableResult.project)
+        ? await restoreStudioLinked3dPassProjectArchiveImport({
+            archive: {
+              project: portableResult.project,
+              attachments: result.attachments,
+            },
+            authority: await acquireStudioLinked3dPassProductAuthority(),
+            apply: installAndApply,
+          })
+        : await installAndApply(portableResult.project);
+      if (!projectApplied || installed === false) return;
       const warningCount = result.diagnostics.filter(
         (item) => item.severity === "warning"
       ).length;

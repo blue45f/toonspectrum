@@ -57,6 +57,26 @@ export const STUDIO_VRM_SURFACE_PAINT_MAX_TEXTURE_PIXELS =
 export const STUDIO_VRM_SURFACE_PAINT_MAX_DECODED_PIXELS =
   STUDIO_VRM_SURFACE_PAINT_MAX_TEXTURE_PIXELS * 2;
 
+export type StudioVrmSceneDocumentBudgetErrorCode =
+  | "surface-paint-count-budget-exceeded"
+  | "surface-paint-byte-budget-exceeded"
+  | "surface-paint-decoded-pixel-budget-exceeded";
+
+/** Lenient normalization must never disguise a surface-paint budget failure as a valid subset. */
+export class StudioVrmSceneDocumentBudgetError extends Error {
+  readonly code: StudioVrmSceneDocumentBudgetErrorCode;
+
+  constructor(code: StudioVrmSceneDocumentBudgetErrorCode) {
+    super(`Studio VRM scene document budget exceeded: ${code}.`);
+    this.name = "StudioVrmSceneDocumentBudgetError";
+    this.code = code;
+  }
+}
+
+function failSceneBudget(code: StudioVrmSceneDocumentBudgetErrorCode): never {
+  throw new StudioVrmSceneDocumentBudgetError(code);
+}
+
 const MAX_WORLD_COORDINATE = 10_000;
 const MAX_DATA_DEPTH = 8;
 const MAX_DATA_NODES = 1_024;
@@ -1282,8 +1302,10 @@ function normalizeSurfacePaint(value: unknown): StudioVrmSurfacePaintSettings {
       !conflictedIdentities.has(surfacePaintBindingIdentity(texture))
       && !conflictedHashes.has(texture.hash)
     ))
-    .sort(compareSurfacePaintTextures)
-    .slice(0, STUDIO_VRM_SURFACE_PAINT_MAX_TEXTURES);
+    .sort(compareSurfacePaintTextures);
+  if (uniqueBindings.length > STUDIO_VRM_SURFACE_PAINT_MAX_TEXTURES) {
+    failSceneBudget("surface-paint-count-budget-exceeded");
+  }
   const assets = Array.from(new Set(uniqueBindings.map((texture) => texture.hash)))
     .sort(compareCanonicalStrings);
   const acceptedHashes = new Set<string>();
@@ -1293,10 +1315,12 @@ function normalizeSurfacePaint(value: unknown): StudioVrmSurfacePaintSettings {
     const texture = byHash.get(hash);
     if (!texture) continue;
     const decodedPixels = texture.width * texture.height;
-    if (
-      totalBytes + texture.byteSize > STUDIO_VRM_SURFACE_PAINT_TOTAL_MAX_BYTES
-      || totalDecodedPixels + decodedPixels > STUDIO_VRM_SURFACE_PAINT_MAX_DECODED_PIXELS
-    ) continue;
+    if (totalBytes + texture.byteSize > STUDIO_VRM_SURFACE_PAINT_TOTAL_MAX_BYTES) {
+      failSceneBudget("surface-paint-byte-budget-exceeded");
+    }
+    if (totalDecodedPixels + decodedPixels > STUDIO_VRM_SURFACE_PAINT_MAX_DECODED_PIXELS) {
+      failSceneBudget("surface-paint-decoded-pixel-budget-exceeded");
+    }
     acceptedHashes.add(hash);
     totalBytes += texture.byteSize;
     totalDecodedPixels += decodedPixels;
@@ -1394,7 +1418,13 @@ function strictDecodedCurrentDocument(value: unknown): StudioVrmSceneDocument | 
     || !hasStrictIkConstraints(value.pose.ikConstraints)
     || !hasStrictSurfacePaint(value.surfacePaint)
   ) return null;
-  const normalized = normalizeDecodedCurrentDocument(value);
+  let normalized: StudioVrmSceneDocument | null;
+  try {
+    normalized = normalizeDecodedCurrentDocument(value);
+  } catch (cause) {
+    if (cause instanceof StudioVrmSceneDocumentBudgetError) return null;
+    throw cause;
+  }
   if (!normalized || !jsonStructuresEqual(value, normalized)) return null;
   try {
     return utf8ByteLength(JSON.stringify(normalized)) <= STUDIO_VRM_SCENE_DOCUMENT_MAX_BYTES

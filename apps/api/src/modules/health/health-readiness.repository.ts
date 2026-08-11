@@ -88,6 +88,8 @@ export const REQUIRED_DATABASE_RELATIONS = [
 export const REQUIRED_DATABASE_MIGRATIONS = [
   "0017_creator_work_live_lock_revision",
   "0025_auth_lifecycle_contract",
+  "0026_creator_draft_cloud_save_intent",
+  "0027_creator_draft_atomic_publication",
 ] as const;
 
 interface DatabasePingRow {

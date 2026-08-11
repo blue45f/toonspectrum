@@ -23,6 +23,7 @@ import {
   assertStudioWorkAssetSourceStorageObject,
   DrizzleStudioWorkAssetRepository,
   isStudioWorkAssetIdempotentReplay,
+  planStudioLinked3dPassOrphanCleanup,
   planStudioWorkAssetBatchUpsert,
   planStudioWorkAssetOrphanCleanup,
   planStudioWorkAssetDeletion,
@@ -30,6 +31,7 @@ import {
   STUDIO_WORK_ASSET_REPOSITORY,
   STUDIO_WORK_ASSET_MANIFEST_PROJECTION,
   studioCrdtHydrationReferencesWorkAsset,
+  studioLinked3dJsonAuthoritiesReferenceAsset,
   StudioWorkAssetCleanupOwnershipError,
   StudioWorkAssetImmutableConflictError,
   StudioWorkAssetQuotaError,
@@ -46,6 +48,58 @@ function names(values: readonly { name?: string; config?: { name?: string } }[])
     const name = value.name ?? value.config?.name;
     return name ? [name] : [];
   }).sort();
+}
+
+const LINKED_PASS_HASH = "a".repeat(64);
+const LINKED_PASS_ASSET_ID = `linked3d-pass-sha256-${LINKED_PASS_HASH}`;
+const LINKED_PASS_LOCATOR = `studio-opfs-cas:sha256:${LINKED_PASS_HASH}`;
+
+function linkedPassEnvelope() {
+  const sceneHash = `sha256:${"b".repeat(64)}`;
+  return {
+    cover: "",
+    pages: [],
+    doc: {
+      pagesList: [{
+        id: "page-1",
+        elements: [{ id: "line-1", type: "image", src: LINKED_PASS_LOCATOR }],
+        linked3dRender: {
+          kind: "toonspectrum.studio-linked-3d-render",
+          version: 2,
+          authority: "studio-project-linked-3d-pass-index",
+          links: [{
+            bundleId: "bundle-1",
+            shotId: "shot-1",
+            sourceShotId: null,
+            stageSourceHash: sceneHash,
+            layers: [{ elementId: "line-1", role: "main-line" }],
+            passRevision: {
+              revision: 1,
+              sourceHash: sceneHash,
+              sceneHash,
+              cameraHash: sceneHash,
+              baseGeometryHash: sceneHash,
+              topologyHash: sceneHash,
+              objectIdentityHash: sceneHash,
+              objectStableIds: ["obj/room"],
+              passRootHash: sceneHash,
+              artifact: {
+                pass: "line",
+                role: "main-line",
+                contentHash: `sha256:${LINKED_PASS_HASH}`,
+                byteSize: 68,
+                mime: "image/png",
+                width: 64,
+                height: 32,
+                locator: LINKED_PASS_LOCATOR,
+              },
+            },
+            corrections: [],
+          }],
+        },
+      }],
+    },
+  };
 }
 
 function batchWrite(assetId: string, fill: number): StudioWorkAssetWrite {
@@ -425,6 +479,76 @@ describe("studio work-scoped asset persistence contract", () => {
       expectedSha256: "a".repeat(64),
       durablyReferenced: true,
     })).toThrow(StudioWorkAssetReferencedError);
+  });
+
+  it("treats referenced or collaborator-owned linked compensation as a safe no-op", () => {
+    const existing = {
+      elementType: "image",
+      sha256: "a".repeat(64),
+      uploadedBy: "editor-1",
+    };
+    expect(planStudioLinked3dPassOrphanCleanup({
+      existing,
+      actorUserId: "editor-1",
+      elementType: "image",
+      expectedSha256: "a".repeat(64),
+      durablyReferenced: false,
+    })).toBe(true);
+    expect(planStudioLinked3dPassOrphanCleanup({
+      existing,
+      actorUserId: "editor-1",
+      elementType: "image",
+      expectedSha256: "a".repeat(64),
+      durablyReferenced: true,
+    })).toBe(false);
+    expect(planStudioLinked3dPassOrphanCleanup({
+      existing,
+      actorUserId: "editor-2",
+      elementType: "image",
+      expectedSha256: "a".repeat(64),
+      durablyReferenced: false,
+    })).toBe(false);
+  });
+
+  it("retains linked pass uploads referenced by current or retained JSON authority", () => {
+    const empty = { cover: "", pages: [], doc: { pagesList: [] } };
+    expect(studioLinked3dJsonAuthoritiesReferenceAsset({
+      assetId: LINKED_PASS_ASSET_ID,
+      current: linkedPassEnvelope(),
+      revisionSnapshots: [],
+    })).toBe(true);
+    expect(studioLinked3dJsonAuthoritiesReferenceAsset({
+      assetId: LINKED_PASS_ASSET_ID,
+      current: empty,
+      revisionSnapshots: [{
+        ...linkedPassEnvelope(),
+        status: "draft",
+        revision: 1,
+      }],
+    })).toBe(true);
+    expect(studioLinked3dJsonAuthoritiesReferenceAsset({
+      assetId: LINKED_PASS_ASSET_ID,
+      current: empty,
+      revisionSnapshots: [{ ...empty, status: "draft", revision: 1 }],
+    })).toBe(false);
+  });
+
+  it("fails linked pass upload cleanup closed for malformed retained JSON", () => {
+    const empty = { cover: "", pages: [], doc: { pagesList: [] } };
+    expect(studioLinked3dJsonAuthoritiesReferenceAsset({
+      assetId: LINKED_PASS_ASSET_ID,
+      current: empty,
+      revisionSnapshots: [{ cover: "", pages: [] }],
+    })).toBe(true);
+    expect(studioLinked3dJsonAuthoritiesReferenceAsset({
+      assetId: LINKED_PASS_ASSET_ID,
+      current: {
+        cover: "",
+        pages: [],
+        doc: { hidden: LINKED_PASS_LOCATOR },
+      },
+      revisionSnapshots: [],
+    })).toBe(true);
   });
 
   it("retains materialized asset references even after the scene element is deleted", () => {

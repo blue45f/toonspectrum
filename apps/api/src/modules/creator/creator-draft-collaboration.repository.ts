@@ -4,11 +4,24 @@ import { and, count, eq, gt, gte, inArray, lte, sql } from "drizzle-orm";
 
 import {
   creatorDraftCollaborationRooms,
+  creatorWorkAssets,
   creatorWorkRevisions,
   creatorWorks,
   db,
 } from "../../../../../lib/db";
 import { createCreatorWorkRevisionSnapshot } from "../../../../../lib/server/creator-work-revisions";
+import {
+  assertStudioLinked3dPassAssetRows,
+  extractStudioLinked3dPassAssetRequirements,
+  type StudioLinked3dPassAssetRow,
+} from "../../../../../lib/studio-linked-3d-pass-asset-fence";
+
+import {
+  isCreatorDraftCollaborationFinalStatus,
+  isCreatorDraftCollaborationProvisionIntent,
+  type CreatorDraftCollaborationFinalStatus,
+  type CreatorDraftCollaborationProvisionIntent,
+} from "./creator-draft-collaboration.contract";
 
 export const CREATOR_DRAFT_COLLABORATION_REPOSITORY = Symbol(
   "CREATOR_DRAFT_COLLABORATION_REPOSITORY"
@@ -26,7 +39,6 @@ export const CREATOR_DRAFT_COLLABORATION_CLEANUP_BATCH = 32;
 const CREATOR_DRAFT_COLLABORATION_OWNER_LOCK_NAMESPACE =
   "toonspectrum:creator-draft-collaboration-owner:v1:";
 
-export type CreatorDraftCollaborationProvisionIntent = "share-link" | "invite-member";
 export type CreatorDraftCollaborationRoomStatus = "active" | "promoted";
 
 export interface CreatorDraftCollaborationRoomRecord {
@@ -40,6 +52,8 @@ export interface CreatorDraftCollaborationRoomRecord {
   readonly provisionIntent: CreatorDraftCollaborationProvisionIntent;
   readonly provisionMutationId: string;
   readonly promotionMutationId: string | null;
+  readonly promotionExpectedWorkRevision: number | null;
+  readonly promotionFinalStatus: CreatorDraftCollaborationFinalStatus | null;
   readonly createdAt: Date;
   readonly lastActivityAt: Date;
   readonly expiresAt: Date;
@@ -78,6 +92,8 @@ export interface PromoteCreatorDraftCollaborationInput {
   readonly draftDocumentId: string;
   readonly targetWorkId: string;
   readonly expectedGraphRevision: number;
+  readonly expectedWorkRevision: number;
+  readonly finalStatus: CreatorDraftCollaborationFinalStatus;
   readonly clientMutationId: string;
 }
 
@@ -98,8 +114,21 @@ export interface PromoteCreatorDraftCollaborationRoomMutation {
   readonly roomId: string;
   readonly workId: string;
   readonly expectedGraphRevision: number;
+  readonly expectedWorkRevision: number;
+  readonly finalStatus: CreatorDraftCollaborationFinalStatus;
   readonly promotionMutationId: string;
   readonly promotedAt: Date;
+}
+
+export interface CreatorDraftCollaborationProvisionalWorkRecord {
+  readonly workId: string;
+  readonly ownerUserId: string;
+  readonly status: CreatorDraftCollaborationFinalStatus;
+  readonly hidden: boolean;
+  readonly revision: number;
+  readonly cover: unknown;
+  readonly pages: unknown;
+  readonly doc: unknown;
 }
 
 export interface CreatorDraftCollaborationUnitOfWork {
@@ -127,6 +156,14 @@ export interface CreatorDraftCollaborationUnitOfWork {
     roomId: string,
     lock: boolean
   ): Promise<CreatorDraftCollaborationRoomRecord | null>;
+  lockProvisionalWorkForPromotion(
+    ownerUserId: string,
+    workId: string
+  ): Promise<CreatorDraftCollaborationProvisionalWorkRecord | null>;
+  findLinked3dPassAssetRows(
+    workId: string,
+    assetIds: readonly string[]
+  ): Promise<readonly StudioLinked3dPassAssetRow[]>;
   countOwnerRoomsCreatedSince(ownerUserId: string, since: Date): Promise<number>;
   countOwnerActiveRooms(ownerUserId: string, now: Date): Promise<number>;
   createProvisionalRoom(
@@ -203,6 +240,13 @@ export class CreatorDraftCollaborationGraphConflictError extends Error {
   }
 }
 
+export class CreatorDraftCollaborationWorkRevisionConflictError extends Error {
+  constructor(readonly currentWorkRevision: number) {
+    super("creator_draft_collaboration_work_revision_conflict");
+    this.name = "CreatorDraftCollaborationWorkRevisionConflictError";
+  }
+}
+
 export class CreatorDraftCollaborationAlreadyPromotedError extends Error {
   constructor(readonly currentGraphRevision: number) {
     super("creator_draft_collaboration_already_promoted");
@@ -226,6 +270,9 @@ const roomSelection = {
   provisionIntent: creatorDraftCollaborationRooms.provisionIntent,
   provisionMutationId: creatorDraftCollaborationRooms.provisionMutationId,
   promotionMutationId: creatorDraftCollaborationRooms.promotionMutationId,
+  promotionExpectedWorkRevision:
+    creatorDraftCollaborationRooms.promotionExpectedWorkRevision,
+  promotionFinalStatus: creatorDraftCollaborationRooms.promotionFinalStatus,
   createdAt: creatorDraftCollaborationRooms.createdAt,
   lastActivityAt: creatorDraftCollaborationRooms.lastActivityAt,
   expiresAt: creatorDraftCollaborationRooms.expiresAt,
@@ -237,9 +284,20 @@ function normalizeRoomRecord(
   value: typeof creatorDraftCollaborationRooms.$inferSelect | undefined
 ): CreatorDraftCollaborationRoomRecord | null {
   if (!value || (value.status !== "active" && value.status !== "promoted")) return null;
+  if (!isCreatorDraftCollaborationProvisionIntent(value.provisionIntent)) {
+    return null;
+  }
   if (
-    value.provisionIntent !== "share-link" &&
-    value.provisionIntent !== "invite-member"
+    (value.promotionExpectedWorkRevision !== null &&
+      (!Number.isSafeInteger(value.promotionExpectedWorkRevision) ||
+        value.promotionExpectedWorkRevision < 1)) ||
+    (value.promotionFinalStatus !== null &&
+      !isCreatorDraftCollaborationFinalStatus(value.promotionFinalStatus)) ||
+    ((value.promotionExpectedWorkRevision === null) !==
+      (value.promotionFinalStatus === null)) ||
+    (value.status === "active" &&
+      (value.promotionExpectedWorkRevision !== null ||
+        value.promotionFinalStatus !== null))
   ) {
     return null;
   }
@@ -247,6 +305,7 @@ function normalizeRoomRecord(
     ...value,
     status: value.status,
     provisionIntent: value.provisionIntent,
+    promotionFinalStatus: value.promotionFinalStatus,
   };
 }
 
@@ -267,7 +326,10 @@ class DrizzleCreatorDraftCollaborationUnitOfWork
     limit: number
   ): Promise<number> {
     const expired = await this.transaction
-      .select({ workId: creatorDraftCollaborationRooms.workId })
+      .select({
+        roomId: creatorDraftCollaborationRooms.roomId,
+        workId: creatorDraftCollaborationRooms.workId,
+      })
       .from(creatorDraftCollaborationRooms)
       .where(
         and(
@@ -284,18 +346,34 @@ class DrizzleCreatorDraftCollaborationUnitOfWork
       .for("update");
     const workIds = expired.map(({ workId }) => workId);
     if (workIds.length === 0) return 0;
-    const deleted = await this.transaction
+    // An active marker is the authority that the hidden work is provisional. Delete hidden legacy
+    // poison even if an older route changed its status away from draft. If the work is no longer
+    // hidden (or otherwise nondeletable), remove only the expired marker so it cannot occupy every
+    // future bounded cleanup batch; the saved work itself is preserved.
+    await this.transaction
       .delete(creatorWorks)
       .where(
         and(
           eq(creatorWorks.userId, ownerUserId),
-          eq(creatorWorks.status, "draft"),
           eq(creatorWorks.hidden, true),
           inArray(creatorWorks.id, workIds)
         )
       )
       .returning({ id: creatorWorks.id });
-    return deleted.length;
+    await this.transaction
+      .delete(creatorDraftCollaborationRooms)
+      .where(
+        and(
+          eq(creatorDraftCollaborationRooms.ownerUserId, ownerUserId),
+          eq(creatorDraftCollaborationRooms.status, "active"),
+          lte(creatorDraftCollaborationRooms.expiresAt, now),
+          inArray(
+            creatorDraftCollaborationRooms.roomId,
+            expired.map(({ roomId }) => roomId)
+          )
+        )
+      );
+    return expired.length;
   }
 
   async findRoomByOwnerDraft(
@@ -381,6 +459,72 @@ class DrizzleCreatorDraftCollaborationUnitOfWork
     return normalizeRoomRecord(rows[0]);
   }
 
+  async lockProvisionalWorkForPromotion(
+    ownerUserId: string,
+    workId: string
+  ): Promise<CreatorDraftCollaborationProvisionalWorkRecord | null> {
+    const [work] = await this.transaction
+      .select({
+        workId: creatorWorks.id,
+        ownerUserId: creatorWorks.userId,
+        status: creatorWorks.status,
+        hidden: creatorWorks.hidden,
+        revision: creatorWorks.revision,
+        cover: creatorWorks.cover,
+        pages: creatorWorks.pages,
+        doc: creatorWorks.doc,
+      })
+      .from(creatorWorks)
+      .where(
+        and(
+          eq(creatorWorks.id, workId),
+          eq(creatorWorks.userId, ownerUserId)
+        )
+      )
+      .limit(1)
+      .for("update");
+    if (
+      !work ||
+      !isCreatorDraftCollaborationFinalStatus(work.status) ||
+      !Number.isSafeInteger(work.revision) ||
+      work.revision < 1
+    ) {
+      return null;
+    }
+    return {
+      ...work,
+      status: work.status,
+    };
+  }
+
+  async findLinked3dPassAssetRows(
+    workId: string,
+    assetIds: readonly string[]
+  ): Promise<readonly StudioLinked3dPassAssetRow[]> {
+    if (assetIds.length === 0) return [];
+    return this.transaction
+      .select({
+        workId: creatorWorkAssets.workId,
+        assetId: creatorWorkAssets.assetId,
+        elementType: creatorWorkAssets.elementType,
+        mimeType: creatorWorkAssets.mimeType,
+        descriptor: creatorWorkAssets.descriptor,
+        byteSize: creatorWorkAssets.byteSize,
+        sha256: creatorWorkAssets.sha256,
+        intrinsicWidth: creatorWorkAssets.intrinsicWidth,
+        intrinsicHeight: creatorWorkAssets.intrinsicHeight,
+        decodedRgbaBytes: creatorWorkAssets.decodedRgbaBytes,
+      })
+      .from(creatorWorkAssets)
+      .where(
+        and(
+          eq(creatorWorkAssets.workId, workId),
+          inArray(creatorWorkAssets.assetId, [...new Set(assetIds)])
+        )
+      )
+      .orderBy(creatorWorkAssets.assetId);
+  }
+
   async countOwnerRoomsCreatedSince(
     ownerUserId: string,
     since: Date
@@ -450,6 +594,8 @@ class DrizzleCreatorDraftCollaborationUnitOfWork
         provisionIntent: input.provisionIntent,
         provisionMutationId: input.provisionMutationId,
         promotionMutationId: null,
+        promotionExpectedWorkRevision: null,
+        promotionFinalStatus: null,
         createdAt: input.createdAt,
         lastActivityAt: input.createdAt,
         expiresAt: input.expiresAt,
@@ -497,6 +643,8 @@ class DrizzleCreatorDraftCollaborationUnitOfWork
         status: "promoted",
         graphRevision: sql`${creatorDraftCollaborationRooms.graphRevision} + 1`,
         promotionMutationId: input.promotionMutationId,
+        promotionExpectedWorkRevision: input.expectedWorkRevision,
+        promotionFinalStatus: input.finalStatus,
         promotedAt: input.promotedAt,
         lastActivityAt: input.promotedAt,
         updatedAt: input.promotedAt,
@@ -519,18 +667,48 @@ class DrizzleCreatorDraftCollaborationUnitOfWork
     if (!normalized) return null;
     const unhidden = await this.transaction
       .update(creatorWorks)
-      .set({ hidden: false, updatedAt: input.promotedAt })
+      .set({
+        hidden: false,
+        status: input.finalStatus,
+        updatedAt: input.promotedAt,
+      })
       .where(
         and(
           eq(creatorWorks.id, input.workId),
           eq(creatorWorks.userId, input.ownerUserId),
-          eq(creatorWorks.status, "draft"),
-          eq(creatorWorks.hidden, true)
+          eq(creatorWorks.hidden, true),
+          eq(creatorWorks.revision, input.expectedWorkRevision)
         )
       )
       .returning({ id: creatorWorks.id });
     if (unhidden.length !== 1) {
       throw new Error("invalid creator draft collaboration provisional work");
+    }
+    // Staging writes revision rN while the work is intentionally still draft. Promotion keeps rN
+    // as the public revision, so its retained restore authority must receive the same final status
+    // in this transaction; otherwise restoring rN would silently unpublish a published work.
+    const revisionSnapshots = await this.transaction
+      .update(creatorWorkRevisions)
+      .set({
+        snapshot: sql`jsonb_set(
+          ${creatorWorkRevisions.snapshot},
+          '{status}',
+          to_jsonb(${input.finalStatus}::text),
+          true
+        )`,
+      })
+      .where(
+        and(
+          eq(creatorWorkRevisions.workId, input.workId),
+          eq(creatorWorkRevisions.revision, input.expectedWorkRevision)
+        )
+      )
+      .returning({
+        workId: creatorWorkRevisions.workId,
+        revision: creatorWorkRevisions.revision,
+      });
+    if (revisionSnapshots.length !== 1) {
+      throw new Error("invalid creator draft collaboration revision snapshot");
     }
     return normalized;
   }
@@ -545,11 +723,21 @@ class DrizzleCreatorDraftCollaborationUnitOfWork
         and(
           eq(creatorWorks.id, workId),
           eq(creatorWorks.userId, ownerUserId),
-          eq(creatorWorks.status, "draft"),
           eq(creatorWorks.hidden, true)
         )
       )
       .returning({ id: creatorWorks.id });
+    if (deleted.length === 0) {
+      await this.transaction
+        .delete(creatorDraftCollaborationRooms)
+        .where(
+          and(
+            eq(creatorDraftCollaborationRooms.workId, workId),
+            eq(creatorDraftCollaborationRooms.ownerUserId, ownerUserId),
+            eq(creatorDraftCollaborationRooms.status, "active")
+          )
+        );
+    }
     return deleted.length === 1;
   }
 }
@@ -583,6 +771,7 @@ type PromotionOutcome =
   | { readonly kind: "expired" }
   | { readonly kind: "target-mismatch" }
   | { readonly kind: "graph-conflict"; readonly currentGraphRevision: number }
+  | { readonly kind: "work-revision-conflict"; readonly currentWorkRevision: number }
   | { readonly kind: "already-promoted"; readonly currentGraphRevision: number }
   | { readonly kind: "mutation-reused" };
 
@@ -623,6 +812,7 @@ export class CreatorDraftCollaborationRepository {
   ): Promise<CreatorDraftCollaborationRoom> {
     if (
       input.ownerUserId !== input.ownerScopeKey ||
+      !isCreatorDraftCollaborationProvisionIntent(input.intent) ||
       !Number.isSafeInteger(input.initialSnapshotByteLength) ||
       input.initialSnapshotByteLength < 0 ||
       input.initialSnapshotByteLength >
@@ -652,6 +842,14 @@ export class CreatorDraftCollaborationRepository {
           true
         );
         if (existing) {
+          if (
+            existing.provisionMutationId === input.clientMutationId &&
+            (existing.provisionIntent !== input.intent ||
+              existing.initialSnapshotByteLength !==
+                input.initialSnapshotByteLength)
+          ) {
+            return { kind: "mutation-reused" };
+          }
           if (existing.status === "promoted") return { kind: "room", room: existing };
           const renewed = await unit.renewActiveRoom(
             input.ownerUserId,
@@ -718,6 +916,14 @@ export class CreatorDraftCollaborationRepository {
     if (input.ownerUserId !== input.ownerScopeKey) {
       throw new CreatorDraftCollaborationRoomNotFoundError();
     }
+    if (
+      !Number.isSafeInteger(input.expectedWorkRevision) ||
+      input.expectedWorkRevision < 1 ||
+      input.expectedWorkRevision > 2_147_483_647 ||
+      !isCreatorDraftCollaborationFinalStatus(input.finalStatus)
+    ) {
+      throw new CreatorDraftCollaborationTargetMismatchError();
+    }
     const now = this.now();
     const outcome = await this.persistence.transaction<PromotionOutcome>(
       async (unit) => {
@@ -734,7 +940,10 @@ export class CreatorDraftCollaborationRepository {
           return { kind: "target-mismatch" };
         }
         if (room.status === "promoted") {
-          return room.promotionMutationId === input.clientMutationId
+          return room.promotionMutationId === input.clientMutationId &&
+            room.promotionExpectedWorkRevision === input.expectedWorkRevision &&
+            room.promotionFinalStatus === input.finalStatus &&
+            room.graphRevision === input.expectedGraphRevision + 1
             ? { kind: "room", room }
             : {
                 kind: "already-promoted",
@@ -758,11 +967,40 @@ export class CreatorDraftCollaborationRepository {
         if (mutationRoom && mutationRoom.roomId !== room.roomId) {
           return { kind: "mutation-reused" };
         }
+        const work = await unit.lockProvisionalWorkForPromotion(
+          input.ownerUserId,
+          room.workId
+        );
+        if (!work || !work.hidden) {
+          return { kind: "target-mismatch" };
+        }
+        if (work.revision !== input.expectedWorkRevision) {
+          return {
+            kind: "work-revision-conflict",
+            currentWorkRevision: work.revision,
+          };
+        }
+        const requirements = extractStudioLinked3dPassAssetRequirements({
+          cover: work.cover,
+          pages: work.pages,
+          doc: work.doc,
+        });
+        const assetRows = await unit.findLinked3dPassAssetRows(
+          room.workId,
+          requirements.map(({ assetId }) => assetId)
+        );
+        assertStudioLinked3dPassAssetRows({
+          workId: room.workId,
+          requirements,
+          rows: assetRows,
+        });
         const promoted = await unit.promoteRoom({
           ownerUserId: input.ownerUserId,
           roomId: room.roomId,
           workId: room.workId,
           expectedGraphRevision: room.graphRevision,
+          expectedWorkRevision: input.expectedWorkRevision,
+          finalStatus: input.finalStatus,
           promotionMutationId: input.clientMutationId,
           promotedAt: now,
         });
@@ -787,6 +1025,10 @@ export class CreatorDraftCollaborationRepository {
       case "graph-conflict":
         throw new CreatorDraftCollaborationGraphConflictError(
           outcome.currentGraphRevision
+        );
+      case "work-revision-conflict":
+        throw new CreatorDraftCollaborationWorkRevisionConflictError(
+          outcome.currentWorkRevision
         );
       case "already-promoted":
         throw new CreatorDraftCollaborationAlreadyPromotedError(

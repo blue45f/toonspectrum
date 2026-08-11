@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { StudioBg3dModalOperationCoordinator } from "./studio-bg3d-modal-operation-coordinator";
 import {
+  assertStudioBg3dModelAttachmentAdmission,
   assertStudioBg3dModelPlacementAdmission,
   calculateStudioBg3dPlacedModelBytes,
   StudioBg3dModelPlacementAdmissionError,
@@ -91,6 +92,111 @@ function instance(id: string, modelId: string): BgCustomModelInstance {
 }
 
 describe("Studio BG3D cached model placement admission", () => {
+  it("admits duplicate hashes but rejects a 257th distinct live attachment", () => {
+    const attachments = new Map<string, StudioBg3dModelAttachment>();
+    const liveModels = Array.from({ length: 256 }, (_, index) => {
+      const modelId = `model-${index}`;
+      const contentHash = `sha256:${(index + 1).toString(16).padStart(64, "0")}` as const;
+      attachments.set(modelId, attachment(modelId, contentHash, 1));
+      return instance(`instance-${index}`, modelId);
+    });
+
+    expect(() => assertStudioBg3dModelAttachmentAdmission({
+      models: liveModels,
+      attachments,
+      candidateAttachments: [attachments.get("model-0")!],
+      maximumAttachments: 256,
+      maximumCumulativeBytes: 256,
+    })).not.toThrow();
+    expect(() => assertStudioBg3dModelAttachmentAdmission({
+      models: liveModels,
+      attachments,
+      candidateAttachments: [attachment("overflow", `sha256:${"f".repeat(64)}`, 1)],
+      maximumAttachments: 256,
+      maximumCumulativeBytes: 1_000,
+    })).toThrowError(expect.objectContaining({
+      code: "attachment-budget-exceeded",
+    } satisfies Partial<StudioBg3dModelPlacementAdmissionError>));
+  });
+
+  it("re-admits count and aggregate bytes at commit after preview/template interleaving", () => {
+    const attachments = new Map<string, StudioBg3dModelAttachment>();
+    const liveModels = Array.from({ length: 255 }, (_, index) => {
+      const modelId = `model-${index}`;
+      const contentHash = `sha256:${(index + 1).toString(16).padStart(64, "0")}` as const;
+      attachments.set(modelId, attachment(modelId, contentHash, 1));
+      return instance(`instance-${index}`, modelId);
+    });
+    const previewAttachment = attachment("preview", `sha256:${"a".repeat(64)}`, 1);
+    const templateAttachment = attachment("template", `sha256:${"b".repeat(64)}`, 1);
+    attachments.set("preview", previewAttachment);
+    attachments.set("template", templateAttachment);
+
+    expect(() => assertStudioBg3dModelAttachmentAdmission({
+      models: liveModels,
+      attachments,
+      candidateAttachments: [templateAttachment],
+      maximumAttachments: 256,
+      maximumCumulativeBytes: 1_000,
+    })).not.toThrow();
+
+    const authoritativeAfterPreview = [
+      ...liveModels,
+      instance("preview-instance", "preview"),
+    ];
+    const committedModels = [...authoritativeAfterPreview];
+    expect(() => {
+      assertStudioBg3dModelAttachmentAdmission({
+        models: authoritativeAfterPreview,
+        attachments,
+        candidateAttachments: [templateAttachment],
+        maximumAttachments: 256,
+        maximumCumulativeBytes: 1_000,
+      });
+      committedModels.push(instance("template-instance", "template"));
+    }).toThrowError(expect.objectContaining({
+      code: "attachment-budget-exceeded",
+    } satisfies Partial<StudioBg3dModelPlacementAdmissionError>));
+    expect(committedModels).toEqual(authoritativeAfterPreview);
+  });
+
+  it("re-admits aggregate bytes at commit after preview/bulk interleaving", () => {
+    const attachments = new Map<string, StudioBg3dModelAttachment>([
+      ["base", attachment("base", HASH_A, 80)],
+      ["preview", attachment("preview", HASH_B, 15)],
+      ["bulk", attachment("bulk", `sha256:${"c".repeat(64)}`, 15)],
+    ]);
+    const baseline = [instance("base-instance", "base")];
+    const bulkAttachment = attachments.get("bulk")!;
+
+    expect(() => assertStudioBg3dModelAttachmentAdmission({
+      models: baseline,
+      attachments,
+      candidateAttachments: [bulkAttachment],
+      maximumAttachments: 256,
+      maximumCumulativeBytes: 100,
+    })).not.toThrow();
+
+    const authoritativeAfterPreview = [
+      ...baseline,
+      instance("preview-instance", "preview"),
+    ];
+    const committedModels = [...authoritativeAfterPreview];
+    expect(() => {
+      assertStudioBg3dModelAttachmentAdmission({
+        models: authoritativeAfterPreview,
+        attachments,
+        candidateAttachments: [bulkAttachment],
+        maximumAttachments: 256,
+        maximumCumulativeBytes: 100,
+      });
+      committedModels.push(instance("bulk-instance", "bulk"));
+    }).toThrowError(expect.objectContaining({
+      code: "cumulative-byte-budget-exceeded",
+    } satisfies Partial<StudioBg3dModelPlacementAdmissionError>));
+    expect(committedModels).toEqual(authoritativeAfterPreview);
+  });
+
   it("re-admits a deleted then cached model placement without charging duplicate scene bytes", () => {
     const currentRecord = record("model-a", HASH_A, 60);
     const selectedBudgets = budgets(100);

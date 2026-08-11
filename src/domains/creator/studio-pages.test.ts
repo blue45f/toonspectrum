@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { createStudioLinked3dRenderPageFixture } from
+  "./studio-linked-3d-render-test-fixture";
 import {
   appendPageState,
   applyBackgroundToAllPages,
@@ -69,6 +71,29 @@ describe("studio-pages (pure, real exports)", () => {
     // orig intact
     expect(orig.id).toBe("orig");
     expect(orig.elements[0]!.id).toBe("eA");
+  });
+
+  it("duplicate/mirror가 linked3dRender의 전체 LT element receipt를 새 페이지 ID로 remap한다", () => {
+    const source = createStudioLinked3dRenderPageFixture("linked-copy") as PageLike;
+    const linked3dRender = source.linked3dRender;
+
+    resetIds();
+    const duplicate = duplicatePageState(source, makeId);
+    expect(duplicate.linked3dRender).toMatchObject({
+      links: [{
+        bundleId: "linked-copy-bundle",
+        layers: [{ elementId: "p2", role: "main-line" }],
+      }],
+    });
+
+    resetIds();
+    const mirrored = duplicateMirroredPage(source, makeId, CANVAS_W);
+    expect(mirrored.linked3dRender).toMatchObject({
+      links: [{
+        layers: [{ elementId: "p1", role: "main-line" }],
+      }],
+    });
+    expect(source.linked3dRender).toBe(linked3dRender);
   });
 
   it("remaps Shared Stage character links while retaining the page-local LT bundle", () => {
@@ -296,16 +321,18 @@ describe("studio-pages (pure, real exports)", () => {
     expect(movePage([a, b, c], "c", -1).map((p) => p.id)).toEqual(["a", "c", "b"]);
   });
 
-  it("clearPage removes elements and their Shared Stage while keeping unrelated page fields", () => {
+  it("clearPage removes elements, Shared Stage, and linked render receipt while keeping unrelated page fields", () => {
     const a = samplePage({
       id: "a",
       elements: [{ id: "e" }],
       shared3dStage: { sentinel: true },
+      linked3dRender: { sentinel: true },
     });
     const b = samplePage({ id: "b", elements: [{ id: "f" }] });
     const res = clearPage([a, b], "a");
     expect(res[0].elements).toEqual([]);
     expect(res[0].shared3dStage).toBeUndefined();
+    expect(res[0].linked3dRender).toBeUndefined();
     expect(res[1].elements.length).toBe(1);
     expect(res[0].bg).toBe(a.bg);
   });

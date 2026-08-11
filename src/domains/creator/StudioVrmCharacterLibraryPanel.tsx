@@ -11,7 +11,7 @@ import {
   UserRound,
   WandSparkles,
 } from "lucide-react";
-import { useRef, useState, type ChangeEventHandler } from "react";
+import { useEffect, useRef, useState, type ChangeEventHandler } from "react";
 
 import type { VrmLibraryEntry } from "./vrm-library";
 
@@ -34,6 +34,11 @@ type StudioVrmCharacterLibraryPanelProps = {
   onSelect: (entry: VrmLibraryEntry) => void;
   onDelete: (entry: VrmLibraryEntry) => void;
   onCollapse: () => void;
+  onRetry: () => void;
+  hasMoreEntries?: boolean;
+  isLoadingMore?: boolean;
+  onLoadMore?: () => void;
+  onVisibleWindowChange?: (entries: readonly VrmLibraryEntry[]) => void;
 };
 
 function cx(...classes: Array<string | false | null | undefined>) {
@@ -54,6 +59,11 @@ export function StudioVrmCharacterLibraryPanel({
   onSelect,
   onDelete,
   onCollapse,
+  onRetry,
+  hasMoreEntries = false,
+  isLoadingMore = false,
+  onLoadMore,
+  onVisibleWindowChange,
 }: StudioVrmCharacterLibraryPanelProps) {
   const [query, setQuery] = useState("");
   const [visibleCount, setVisibleCount] = useState(LIBRARY_BATCH_SIZE);
@@ -69,8 +79,14 @@ export function StudioVrmCharacterLibraryPanel({
     entry.name.toLocaleLowerCase("ko-KR").includes(normalizedQuery),
   );
   const visibleEntries = filteredEntries.slice(0, visibleCount);
+  const visibleWindowEntries = visibleEntries.slice(-LIBRARY_BATCH_SIZE);
+  const visibleWindowKey = visibleWindowEntries.map((entry) => entry.id).join("\u0000");
   const hiddenEntryCount = Math.max(0, filteredEntries.length - visibleEntries.length);
   const hasUploadedModels = entries.some((entry) => entry.source !== "sample");
+
+  useEffect(() => {
+    if (!hidden) onVisibleWindowChange?.(visibleWindowEntries);
+  }, [hidden, onVisibleWindowChange, visibleWindowEntries, visibleWindowKey]);
 
   return (
     <section
@@ -185,10 +201,21 @@ export function StudioVrmCharacterLibraryPanel({
       </details>
 
       {libraryStatus === "error" && libraryError ? (
-        <p className="mt-2 rounded-xl border border-line bg-card/70 px-3 py-2 text-xs leading-relaxed text-fg-3" role="alert">
-          <AlertTriangle className="mr-1 inline align-[-2px] text-accent" size={14} aria-hidden />
-          {libraryError}
-        </p>
+        <div className="mt-2 rounded-xl border border-line bg-card/70 px-3 py-2 text-xs leading-relaxed text-fg-3" role="alert">
+          <p>
+            <AlertTriangle className="mr-1 inline align-[-2px] text-accent" size={14} aria-hidden />
+            {libraryError}
+          </p>
+          <button
+            type="button"
+            className={cx(CONTROL_BUTTON, "mt-2 w-full border-line bg-card text-fg-2 hover:bg-raised hover:text-fg")}
+            disabled={isLoadingMore}
+            onClick={onRetry}
+          >
+            {isLoadingMore ? <Loader2 className="animate-spin" size={14} aria-hidden /> : null}
+            라이브러리 다시 불러오기
+          </button>
+        </div>
       ) : null}
 
       {!hasUploadedModels ? (
@@ -327,6 +354,16 @@ export function StudioVrmCharacterLibraryPanel({
         >
           캐릭터 {Math.min(LIBRARY_BATCH_SIZE, hiddenEntryCount)}명 더 보기
           <span className="text-fg-3">· {hiddenEntryCount}명 남음</span>
+        </button>
+      ) : hasMoreEntries ? (
+        <button
+          type="button"
+          className={cx(CONTROL_BUTTON, "mt-3 w-full border-line bg-card text-fg-2 hover:bg-raised hover:text-fg")}
+          disabled={isLoadingMore}
+          onClick={onLoadMore}
+        >
+          {isLoadingMore ? <Loader2 className="animate-spin" size={14} aria-hidden /> : null}
+          저장된 캐릭터 다음 페이지 불러오기
         </button>
       ) : filteredEntries.length > LIBRARY_BATCH_SIZE ? (
         <button

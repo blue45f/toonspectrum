@@ -145,7 +145,10 @@ describe("Studio publication analytics lazy boundary", () => {
       /remixId\s+\? createEmptyStudioPublicationAnalyticsSnapshot\(\)\s+: await normalizeStudioPublicationAnalyticsDeferred\(doc\?\.publicationAnalytics\)/,
     );
     expect(studioSource).toMatch(
-      /if \(!alive\) return;\s+const hydratedProject = creatorWorkSnapshotToStudioProject\(w\);/,
+      /if \(!alive\) return;\s+const parsedProject = creatorWorkSnapshotToStudioProject\(w\);\s+const hasLinked3dRender = parsedProject\.pagesList\.some/,
+    );
+    expect(studioSource).toMatch(
+      /if \(remixId && hasLinked3dRender\) \{[\s\S]*?return;\s+\}\s+const hydratedProject = hasLinked3dRender/,
     );
   });
 });

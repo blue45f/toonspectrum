@@ -28,12 +28,17 @@ import {
 export const STUDIO_SHARED_3D_STAGE_COLLECTION_KIND =
   "toonspectrum.studio-shared-3d-stage-collection" as const;
 export const STUDIO_SHARED_3D_STAGE_COLLECTION_VERSION = 3 as const;
+export const STUDIO_SHARED_3D_STAGE_COLLECTION_PAGED_VERSION = 4 as const;
 const STUDIO_SHARED_3D_STAGE_COLLECTION_LEGACY_VERSION = 2 as const;
-/** SHT-001 parity: one page/shot workspace can keep up to 64 independently linked stages. */
-export const STUDIO_SHARED_3D_STAGE_COLLECTION_MAX_STAGES = 64;
+/** v4 page size, retained under the historical export name for source compatibility. */
+export const STUDIO_SHARED_3D_STAGE_COLLECTION_PAGE_SIZE = 64;
+export const STUDIO_SHARED_3D_STAGE_COLLECTION_MAX_STAGES =
+  STUDIO_SHARED_3D_STAGE_COLLECTION_PAGE_SIZE;
 export const STUDIO_SHARED_3D_STAGE_COLLECTION_MAX_BYTES = 1024 * 1024;
 
 const STUDIO_SHARED_3D_STAGE_ENTRY_MAX_BYTES = 12 * 1024;
+const STUDIO_SHARED_3D_STAGE_RECEIPT_PAGE_SIZE = 256;
+const STUDIO_SHARED_3D_STAGE_MAX_PAGE_COUNT = 1_024;
 const SAFE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._~-]{0,127}$/u;
 const MODEL_RUNTIME_KEY_PATTERN =
   /^[A-Za-z0-9][A-Za-z0-9._~-]{0,127}:sha256:[a-f0-9]{64}$/u;
@@ -61,7 +66,7 @@ export interface StudioShared3dStageVisibilityReceipt {
   readonly modelRuntimeKey: string;
 }
 
-export interface StudioShared3dStageCollectionDocument {
+export interface StudioShared3dStageCollectionDocumentV3 {
   readonly kind: typeof STUDIO_SHARED_3D_STAGE_COLLECTION_KIND;
   readonly version: typeof STUDIO_SHARED_3D_STAGE_COLLECTION_VERSION;
   readonly authority: "page-shared-3d-stage-collection";
@@ -69,7 +74,33 @@ export interface StudioShared3dStageCollectionDocument {
   readonly visibilityReceipts: readonly StudioShared3dStageVisibilityReceipt[];
 }
 
-/** Historical singular v1 and plural v2 values remain readable; mutations write canonical v3. */
+export interface StudioShared3dStagePage {
+  readonly id: string;
+  readonly items: readonly StudioShared3dStageEntry[];
+}
+
+export interface StudioShared3dStageVisibilityReceiptPage {
+  readonly id: string;
+  readonly items: readonly StudioShared3dStageVisibilityReceipt[];
+}
+
+export interface StudioShared3dStageCollectionDocumentV4 {
+  readonly kind: typeof STUDIO_SHARED_3D_STAGE_COLLECTION_KIND;
+  readonly version: typeof STUDIO_SHARED_3D_STAGE_COLLECTION_PAGED_VERSION;
+  readonly authority: "page-shared-3d-stage-collection";
+  readonly stagePages: readonly StudioShared3dStagePage[];
+  readonly visibilityReceiptPages: readonly StudioShared3dStageVisibilityReceiptPage[];
+  /** Frozen non-enumerable runtime view; persisted authority remains `stagePages`. */
+  readonly stages: readonly StudioShared3dStageEntry[];
+  /** Frozen non-enumerable runtime view; persisted authority remains `visibilityReceiptPages`. */
+  readonly visibilityReceipts: readonly StudioShared3dStageVisibilityReceipt[];
+}
+
+export type StudioShared3dStageCollectionDocument =
+  | StudioShared3dStageCollectionDocumentV3
+  | StudioShared3dStageCollectionDocumentV4;
+
+/** Historical singular v1 and plural v2 remain readable; mutations write v3 or paged v4 by size. */
 export type StudioShared3dStagePersistedState =
   | StudioShared3dStageDocument
   | StudioShared3dStageCollectionDocument;
@@ -279,81 +310,239 @@ function entryFromV1Document(
   });
 }
 
+interface ParsedStudioShared3dStageCollectionEntries {
+  readonly stages: readonly StudioShared3dStageEntry[];
+  readonly visibilityReceipts: readonly StudioShared3dStageVisibilityReceipt[];
+}
+
+function parseCollectionEntries(
+  stageCandidates: readonly unknown[],
+  receiptCandidates: readonly unknown[],
+): ParsedStudioShared3dStageCollectionEntries | null {
+  if (stageCandidates.length === 0) return null;
+  const stages: StudioShared3dStageEntry[] = [];
+  const stageIds = new Set<string>();
+  const bundleIds = new Set<string>();
+  const characterRuntimeKeys = new Map<string, Set<string>>();
+  for (const candidate of stageCandidates) {
+    const stage = parseStageEntry(candidate);
+    if (
+      !stage
+      || stageIds.has(stage.id)
+      || bundleIds.has(stage.background.bundleId)
+    ) return null;
+    stageIds.add(stage.id);
+    bundleIds.add(stage.background.bundleId);
+    for (const character of stage.characters) {
+      const runtimeKeys = characterRuntimeKeys.get(character.elementId) ?? new Set<string>();
+      runtimeKeys.add(character.modelRuntimeKey);
+      characterRuntimeKeys.set(character.elementId, runtimeKeys);
+    }
+    stages.push(stage);
+  }
+
+  const visibilityReceipts: StudioShared3dStageVisibilityReceipt[] = [];
+  const receiptIds = new Set<string>();
+  for (const candidate of receiptCandidates) {
+    const receipt = parseVisibilityReceipt(candidate);
+    if (
+      !receipt
+      || receiptIds.has(receipt.elementId)
+      || !characterRuntimeKeys.get(receipt.elementId)?.has(receipt.modelRuntimeKey)
+    ) return null;
+    receiptIds.add(receipt.elementId);
+    visibilityReceipts.push(receipt);
+  }
+  return Object.freeze({
+    stages: Object.freeze(stages),
+    visibilityReceipts: Object.freeze(visibilityReceipts),
+  });
+}
+
+function serializedFingerprint(serialized: string): string {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < serialized.length; index += 1) {
+    hash ^= serialized.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+function pageFingerprint(value: unknown): string {
+  return serializedFingerprint(JSON.stringify(value));
+}
+
+function collectionCursorGeneration(
+  collection: StudioShared3dStageCollectionDocument,
+): string {
+  const serialized = JSON.stringify(collection);
+  return `${serialized.length.toString(36)}-${serializedFingerprint(serialized)}`;
+}
+
+function pageId(prefix: "stage" | "receipt", index: number, items: unknown): string {
+  return `${prefix}-page-${index.toString(36).padStart(4, "0")}-${pageFingerprint(items)}`;
+}
+
+function chunkPages<T>(
+  values: readonly T[],
+  pageSize: number,
+  prefix: "stage" | "receipt",
+): readonly Readonly<{ readonly id: string; readonly items: readonly T[] }>[] {
+  const pages: Array<Readonly<{ readonly id: string; readonly items: readonly T[] }>> = [];
+  for (let offset = 0; offset < values.length; offset += pageSize) {
+    const items = Object.freeze(values.slice(offset, offset + pageSize));
+    pages.push(Object.freeze({
+      id: pageId(prefix, pages.length, items),
+      items,
+    }));
+  }
+  return Object.freeze(pages);
+}
+
+function buildPagedCollectionDocument(
+  entries: ParsedStudioShared3dStageCollectionEntries,
+): StudioShared3dStageCollectionDocumentV4 | null {
+  const stagePages = chunkPages(
+    entries.stages,
+    STUDIO_SHARED_3D_STAGE_COLLECTION_PAGE_SIZE,
+    "stage",
+  ) as readonly StudioShared3dStagePage[];
+  const visibilityReceiptPages = chunkPages(
+    entries.visibilityReceipts,
+    STUDIO_SHARED_3D_STAGE_RECEIPT_PAGE_SIZE,
+    "receipt",
+  ) as readonly StudioShared3dStageVisibilityReceiptPage[];
+  if (
+    stagePages.length === 0
+    || stagePages.length > STUDIO_SHARED_3D_STAGE_MAX_PAGE_COUNT
+    || visibilityReceiptPages.length > STUDIO_SHARED_3D_STAGE_MAX_PAGE_COUNT
+  ) return null;
+  const document = {
+    kind: STUDIO_SHARED_3D_STAGE_COLLECTION_KIND,
+    version: STUDIO_SHARED_3D_STAGE_COLLECTION_PAGED_VERSION,
+    authority: "page-shared-3d-stage-collection" as const,
+    stagePages,
+    visibilityReceiptPages,
+  } as StudioShared3dStageCollectionDocumentV4;
+  Object.defineProperties(document, {
+    stages: { enumerable: false, value: entries.stages },
+    visibilityReceipts: { enumerable: false, value: entries.visibilityReceipts },
+  });
+  Object.freeze(document);
+  return TEXT_ENCODER.encode(JSON.stringify(document)).byteLength
+    <= STUDIO_SHARED_3D_STAGE_COLLECTION_MAX_BYTES
+    ? document
+    : null;
+}
+
+function parseFlatCollectionV3(
+  value: Record<string, unknown>,
+): StudioShared3dStageCollectionDocumentV3 | null {
+  if (!hasOnlyKeys(value, [
+    "kind",
+    "version",
+    "authority",
+    "stages",
+    "visibilityReceipts",
+  ])) return null;
+  if (
+    value.kind !== STUDIO_SHARED_3D_STAGE_COLLECTION_KIND
+    || value.version !== STUDIO_SHARED_3D_STAGE_COLLECTION_VERSION
+    || value.authority !== "page-shared-3d-stage-collection"
+  ) return null;
+  const stageCandidates = snapshotArray(
+    value.stages,
+    STUDIO_SHARED_3D_STAGE_COLLECTION_PAGE_SIZE,
+  );
+  const receiptCandidates = snapshotArray(
+    value.visibilityReceipts,
+    STUDIO_SHARED_3D_STAGE_COLLECTION_PAGE_SIZE * 12,
+  );
+  if (!stageCandidates || !receiptCandidates) return null;
+  const entries = parseCollectionEntries(stageCandidates, receiptCandidates);
+  if (!entries) return null;
+  const document: StudioShared3dStageCollectionDocumentV3 = Object.freeze({
+    kind: STUDIO_SHARED_3D_STAGE_COLLECTION_KIND,
+    version: STUDIO_SHARED_3D_STAGE_COLLECTION_VERSION,
+    authority: "page-shared-3d-stage-collection",
+    stages: entries.stages,
+    visibilityReceipts: entries.visibilityReceipts,
+  });
+  return TEXT_ENCODER.encode(JSON.stringify(document)).byteLength
+    <= STUDIO_SHARED_3D_STAGE_COLLECTION_MAX_BYTES
+    ? document
+    : null;
+}
+
+function parsePageItems(
+  value: unknown,
+  maximum: number,
+  prefix: "stage" | "receipt",
+): readonly unknown[] | null {
+  if (!isRecord(value) || !hasOnlyKeys(value, ["id", "items"])) return null;
+  if (typeof value.id !== "string" || !value.id.startsWith(`${prefix}-page-`)) return null;
+  const items = snapshotArray(value.items, maximum);
+  return items && items.length > 0 ? items : null;
+}
+
+function parsePagedCollectionV4(
+  value: Record<string, unknown>,
+): StudioShared3dStageCollectionDocumentV4 | null {
+  if (!hasOnlyKeys(value, [
+    "kind",
+    "version",
+    "authority",
+    "stagePages",
+    "visibilityReceiptPages",
+  ])) return null;
+  if (
+    value.kind !== STUDIO_SHARED_3D_STAGE_COLLECTION_KIND
+    || value.version !== STUDIO_SHARED_3D_STAGE_COLLECTION_PAGED_VERSION
+    || value.authority !== "page-shared-3d-stage-collection"
+  ) return null;
+  const serialized = JSON.stringify(value);
+  if (TEXT_ENCODER.encode(serialized).byteLength > STUDIO_SHARED_3D_STAGE_COLLECTION_MAX_BYTES) {
+    return null;
+  }
+  const rawStagePages = snapshotArray(value.stagePages, STUDIO_SHARED_3D_STAGE_MAX_PAGE_COUNT);
+  const rawReceiptPages = snapshotArray(
+    value.visibilityReceiptPages,
+    STUDIO_SHARED_3D_STAGE_MAX_PAGE_COUNT,
+  );
+  if (!rawStagePages || rawStagePages.length === 0 || !rawReceiptPages) return null;
+  const stageCandidates: unknown[] = [];
+  for (const rawPage of rawStagePages) {
+    const items = parsePageItems(
+      rawPage,
+      STUDIO_SHARED_3D_STAGE_COLLECTION_PAGE_SIZE,
+      "stage",
+    );
+    if (!items) return null;
+    stageCandidates.push(...items);
+  }
+  const receiptCandidates: unknown[] = [];
+  for (const rawPage of rawReceiptPages) {
+    const items = parsePageItems(
+      rawPage,
+      STUDIO_SHARED_3D_STAGE_RECEIPT_PAGE_SIZE,
+      "receipt",
+    );
+    if (!items) return null;
+    receiptCandidates.push(...items);
+  }
+  const entries = parseCollectionEntries(stageCandidates, receiptCandidates);
+  const canonical = entries ? buildPagedCollectionDocument(entries) : null;
+  return canonical && JSON.stringify(canonical) === serialized ? canonical : null;
+}
+
 export function parseStudioShared3dStageCollectionDocument(
   value: unknown,
 ): StudioShared3dStageCollectionDocument | null {
   try {
-    if (!isRecord(value) || !hasOnlyKeys(value, [
-      "kind",
-      "version",
-      "authority",
-      "stages",
-      "visibilityReceipts",
-    ])) return null;
-    const kind = value.kind;
-    const version = value.version;
-    const authority = value.authority;
-    const rawStages = value.stages;
-    const rawReceipts = value.visibilityReceipts;
-    if (
-      kind !== STUDIO_SHARED_3D_STAGE_COLLECTION_KIND
-      || version !== STUDIO_SHARED_3D_STAGE_COLLECTION_VERSION
-      || authority !== "page-shared-3d-stage-collection"
-    ) return null;
-    const stageCandidates = snapshotArray(
-      rawStages,
-      STUDIO_SHARED_3D_STAGE_COLLECTION_MAX_STAGES,
-    );
-    const receiptCandidates = snapshotArray(
-      rawReceipts,
-      STUDIO_SHARED_3D_STAGE_COLLECTION_MAX_STAGES * 12,
-    );
-    if (!stageCandidates || stageCandidates.length === 0 || !receiptCandidates) return null;
-
-    const stages: StudioShared3dStageEntry[] = [];
-    const stageIds = new Set<string>();
-    const bundleIds = new Set<string>();
-    const characterRuntimeKeys = new Map<string, Set<string>>();
-    for (const candidate of stageCandidates) {
-      const stage = parseStageEntry(candidate);
-      if (
-        !stage
-        || stageIds.has(stage.id)
-        || bundleIds.has(stage.background.bundleId)
-      ) return null;
-      stageIds.add(stage.id);
-      bundleIds.add(stage.background.bundleId);
-      for (const character of stage.characters) {
-        const runtimeKeys = characterRuntimeKeys.get(character.elementId) ?? new Set<string>();
-        runtimeKeys.add(character.modelRuntimeKey);
-        characterRuntimeKeys.set(character.elementId, runtimeKeys);
-      }
-      stages.push(stage);
-    }
-
-    const visibilityReceipts: StudioShared3dStageVisibilityReceipt[] = [];
-    const receiptIds = new Set<string>();
-    for (const candidate of receiptCandidates) {
-      const receipt = parseVisibilityReceipt(candidate);
-      if (
-        !receipt
-        || receiptIds.has(receipt.elementId)
-        || !characterRuntimeKeys.get(receipt.elementId)?.has(receipt.modelRuntimeKey)
-      ) return null;
-      receiptIds.add(receipt.elementId);
-      visibilityReceipts.push(receipt);
-    }
-    const document: StudioShared3dStageCollectionDocument = Object.freeze({
-      kind: STUDIO_SHARED_3D_STAGE_COLLECTION_KIND,
-      version: STUDIO_SHARED_3D_STAGE_COLLECTION_VERSION,
-      authority: "page-shared-3d-stage-collection",
-      stages: Object.freeze(stages),
-      visibilityReceipts: Object.freeze(visibilityReceipts),
-    });
-    return TEXT_ENCODER.encode(JSON.stringify(document)).byteLength
-      <= STUDIO_SHARED_3D_STAGE_COLLECTION_MAX_BYTES
-      ? document
-      : null;
+    if (!isRecord(value)) return null;
+    return value.version === STUDIO_SHARED_3D_STAGE_COLLECTION_PAGED_VERSION
+      ? parsePagedCollectionV4(value)
+      : parseFlatCollectionV3(value);
   } catch {
     return null;
   }
@@ -405,6 +594,51 @@ export function studioShared3dStageCollectionEntries(
 ): readonly StudioShared3dStageEntry[] | null {
   if (value === undefined || value === null) return Object.freeze([]);
   return migrateStudioShared3dStageCollectionDocument(value)?.stages ?? null;
+}
+
+export type StudioShared3dStagePageCursor = string & {
+  readonly __studioShared3dStagePageCursor: unique symbol;
+};
+
+export interface StudioShared3dStageCollectionPageResult {
+  readonly items: readonly StudioShared3dStageEntry[];
+  readonly cursor: StudioShared3dStagePageCursor;
+  readonly nextCursor: StudioShared3dStagePageCursor | null;
+  readonly pageIndex: number;
+  readonly pageCount: number;
+  readonly totalCount: number;
+}
+
+/** Reads one canonical metadata page. A cursor from an older collection fails closed. */
+export function queryStudioShared3dStageCollectionPage(
+  value: unknown,
+  options: { readonly cursor?: string | null } = {},
+): StudioShared3dStageCollectionPageResult | null {
+  const collection = migrateStudioShared3dStageCollectionDocument(value);
+  if (!collection) return null;
+  const pages = collection.version === STUDIO_SHARED_3D_STAGE_COLLECTION_PAGED_VERSION
+    ? collection.stagePages
+    : chunkPages(
+        collection.stages,
+        STUDIO_SHARED_3D_STAGE_COLLECTION_PAGE_SIZE,
+        "stage",
+      ) as readonly StudioShared3dStagePage[];
+  const generation = collectionCursorGeneration(collection);
+  const cursorForPage = (page: StudioShared3dStagePage) =>
+    `stage-cursor-${generation}-${page.id}` as StudioShared3dStagePageCursor;
+  const pageIndex = options.cursor === undefined || options.cursor === null
+    ? 0
+    : pages.findIndex((page) => cursorForPage(page) === options.cursor);
+  const page = pages[pageIndex];
+  if (pageIndex < 0 || !page) return null;
+  return Object.freeze({
+    items: page.items,
+    cursor: cursorForPage(page),
+    nextCursor: pages[pageIndex + 1] ? cursorForPage(pages[pageIndex + 1]) : null,
+    pageIndex,
+    pageCount: pages.length,
+    totalCount: collection.stages.length,
+  });
 }
 
 export function findStudioShared3dStageEntryByBundleId(
@@ -634,13 +868,28 @@ function buildCollection(
   stages: readonly StudioShared3dStageEntry[],
   receipts: readonly StudioShared3dStageVisibilityReceipt[],
 ): StudioShared3dStageCollectionDocument | null {
-  return parseStudioShared3dStageCollectionDocument({
+  const flatCandidate = {
     kind: STUDIO_SHARED_3D_STAGE_COLLECTION_KIND,
     version: STUDIO_SHARED_3D_STAGE_COLLECTION_VERSION,
     authority: "page-shared-3d-stage-collection",
     stages,
     visibilityReceipts: receipts,
-  });
+  } as const;
+  if (stages.length <= STUDIO_SHARED_3D_STAGE_COLLECTION_PAGE_SIZE) {
+    return parseStudioShared3dStageCollectionDocument(flatCandidate);
+  }
+  const entries = parseCollectionEntries(stages, receipts);
+  return entries ? buildPagedCollectionDocument(entries) : null;
+}
+
+/**
+ * Validates page-owned Stage metadata and selects flat v3 or paged v4 without changing authority.
+ */
+export function createStudioShared3dStageCollectionDocument(input: {
+  readonly stages: readonly StudioShared3dStageEntry[];
+  readonly visibilityReceipts: readonly StudioShared3dStageVisibilityReceipt[];
+}): StudioShared3dStageCollectionDocument | null {
+  return buildCollection(input.stages, input.visibilityReceipts);
 }
 
 function uniqueElementsById<T extends StudioShared3dStageElementSource>(

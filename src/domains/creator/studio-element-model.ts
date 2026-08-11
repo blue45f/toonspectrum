@@ -42,6 +42,7 @@ import type {
 } from "./studio-layer-navigator";
 import type { Light } from "./studio-light";
 import type { LineArtCleanupOptions } from "./studio-line-cleanup";
+import type { StudioLinked3dCorrectionProvenance } from "./studio-linked-3d-render-document";
 import type { StudioLivingInkDocumentReceipt } from "./studio-living-ink-document";
 import type {
   StudioMaterialMinimumDiameterRatio,
@@ -519,6 +520,12 @@ export interface DrawEl extends StudioBrushCatalogIdentityMetadata, StudioElemen
     centerY: number;
     radialCount?: number;
   };
+  /**
+   * Immutable pointer-down provenance when the artist draws with a canonical linked 3D pass layer
+   * selected. The ordinary DrawEl stays the correction authority; pass refresh only updates the
+   * page sidecar's applied/conflict projection and never rewrites or silently drops this stroke.
+   */
+  linked3dCorrection?: StudioLinked3dCorrectionProvenance;
 }
 
 export interface FocusLinesEl {

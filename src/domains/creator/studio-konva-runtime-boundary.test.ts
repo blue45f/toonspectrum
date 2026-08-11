@@ -126,6 +126,8 @@ describe("studio Konva runtime ownership boundary", () => {
     ).toEqual([]);
     expect(imageNode.dynamicImports).toEqual([
       "./studio-konva-filters",
+      // Linked-pass OPFS/CAS locators are verified only when an image actually needs them.
+      "./studio-raster-source-lease",
       "./studio-image-filter-worker-client",
       // M1 GPU 필터 경로 — Worker 앞에서 시도하는 지연 청크(폴백은 기존 Worker/Konva).
       "./studio-gpu-filter-apply",

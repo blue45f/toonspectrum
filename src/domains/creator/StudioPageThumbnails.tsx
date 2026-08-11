@@ -9,6 +9,8 @@
  * 실제 순서 변경은 호출 측이 studio-pages.reorderPages 순수 함수로 수행한다.
  * 키보드/터치 대체 수단은 기존 이동 버튼(위/아래/맨위/맨아래)을 그대로 유지한다(a11y).
  */
+import { useEffect, useRef, useState, type ReactElement, type RefObject } from "react";
+
 import { CANVAS_W } from "./studio-assets";
 import {
   isDefaultPageGrade,
@@ -22,8 +24,8 @@ import {
   type ThumbNode,
   type ThumbPageLike,
 } from "./studio-page-thumbs";
-
-import type { ReactElement } from "react";
+import { useStudioRasterSourcePresentation } from
+  "./use-studio-raster-source-presentation";
 
 import { parseStudioWorkAssetSourceUri } from "@/lib/studio-work-asset-contract";
 import { cn } from "@/lib/utils";
@@ -31,6 +33,59 @@ import { cn } from "@/lib/utils";
 export type { StudioPageDnd, StudioPageDndItemProps } from "./studio-page-dnd";
 
 // ── 썸네일 ──────────────────────────────────────────────────────────────────────────
+
+type StudioThumbImageNode = Extract<ThumbNode, { readonly kind: "image" }>;
+
+function StudioThumbImage({ node }: { readonly node: StudioThumbImageNode }): ReactElement {
+  const presentation = useStudioRasterSourcePresentation(node.src, {
+    consumer: "studio-page-thumbnail",
+  });
+  const transform = node.transform ?? undefined;
+  if (parseStudioWorkAssetSourceUri(node.src) || presentation.src === null) {
+    return (
+      <g
+        data-raster-source-placeholder="true"
+        data-work-asset-placeholder={parseStudioWorkAssetSourceUri(node.src) ? "true" : undefined}
+        transform={transform}
+        opacity={node.opacity}
+      >
+        <title>검증된 이미지 바이트를 안전하게 불러오는 중</title>
+        <rect
+          x={node.x}
+          y={node.y}
+          width={node.w}
+          height={node.h}
+          rx={10}
+          fill="rgb(99 102 241 / 0.08)"
+          stroke="rgb(99 102 241 / 0.55)"
+          strokeWidth={3}
+          strokeDasharray="12 8"
+        />
+        <path
+          d={`M ${node.x + node.w * 0.2} ${node.y + node.h * 0.62} L ${node.x + node.w * 0.42} ${node.y + node.h * 0.4} L ${node.x + node.w * 0.56} ${node.y + node.h * 0.54} L ${node.x + node.w * 0.78} ${node.y + node.h * 0.3}`}
+          fill="none"
+          stroke="rgb(99 102 241 / 0.7)"
+          strokeWidth={Math.max(3, Math.min(node.w, node.h) * 0.025)}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </g>
+    );
+  }
+  return (
+    <image
+      href={presentation.src}
+      x={node.x}
+      y={node.y}
+      width={node.w}
+      height={node.h}
+      preserveAspectRatio={node.cover ? "xMidYMid slice" : "none"}
+      style={node.filterCss ? { filter: node.filterCss } : undefined}
+      transform={transform}
+      opacity={node.opacity}
+    />
+  );
+}
 
 function renderThumbNode(node: ThumbNode): ReactElement {
   const transform = node.transform ?? undefined;
@@ -110,51 +165,7 @@ function renderThumbNode(node: ThumbNode): ReactElement {
         />
       );
     case "image":
-      if (parseStudioWorkAssetSourceUri(node.src)) {
-        return (
-          <g
-            key={node.key}
-            data-work-asset-placeholder="true"
-            transform={transform}
-            opacity={node.opacity}
-          >
-            <title>팀 에셋을 안전하게 불러오는 중</title>
-            <rect
-              x={node.x}
-              y={node.y}
-              width={node.w}
-              height={node.h}
-              rx={10}
-              fill="rgb(99 102 241 / 0.08)"
-              stroke="rgb(99 102 241 / 0.55)"
-              strokeWidth={3}
-              strokeDasharray="12 8"
-            />
-            <path
-              d={`M ${node.x + node.w * 0.2} ${node.y + node.h * 0.62} L ${node.x + node.w * 0.42} ${node.y + node.h * 0.4} L ${node.x + node.w * 0.56} ${node.y + node.h * 0.54} L ${node.x + node.w * 0.78} ${node.y + node.h * 0.3}`}
-              fill="none"
-              stroke="rgb(99 102 241 / 0.7)"
-              strokeWidth={Math.max(3, Math.min(node.w, node.h) * 0.025)}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </g>
-        );
-      }
-      return (
-        <image
-          key={node.key}
-          href={node.src}
-          x={node.x}
-          y={node.y}
-          width={node.w}
-          height={node.h}
-          preserveAspectRatio={node.cover ? "xMidYMid slice" : "none"}
-          style={node.filterCss ? { filter: node.filterCss } : undefined}
-          transform={transform}
-          opacity={node.opacity}
-        />
-      );
+      return <StudioThumbImage key={node.key} node={node} />;
     case "text":
       return (
         <text
@@ -183,6 +194,28 @@ function renderThumbNode(node: ThumbNode): ReactElement {
   }
 }
 
+function useStudioThumbnailPresentationWindow(): {
+  readonly nearViewport: boolean;
+  readonly rootRef: RefObject<HTMLDivElement | null>;
+} {
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const [nearViewport, setNearViewport] = useState(
+    () => typeof globalThis.IntersectionObserver !== "function",
+  );
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root || typeof globalThis.IntersectionObserver !== "function") {
+      return;
+    }
+    const observer = new globalThis.IntersectionObserver((entries) => {
+      setNearViewport(entries.some((entry) => entry.isIntersecting));
+    }, { rootMargin: "320px 0px" });
+    observer.observe(root);
+    return () => observer.disconnect();
+  }, []);
+  return { nearViewport, rootRef };
+}
+
 /**
  * 페이지 실내용 미니 썸네일 — 요소들을 축소 SVG 프록시로 렌더한다.
  * page 객체 동일성이 유지되면 React Compiler 메모이제이션으로 재렌더를 건너뛴다
@@ -195,6 +228,7 @@ export function StudioPageThumbnail({
   page: ThumbPageLike;
   className?: string;
 }): ReactElement {
+  const { nearViewport, rootRef } = useStudioThumbnailPresentationWindow();
   const { nodes, skipped } = buildThumbNodes(page);
   const grade = normalizePageGrade(page.grade as Partial<PageGrade> | undefined);
   const gradeFilter = pageGradeToCssFilter(grade);
@@ -205,7 +239,10 @@ export function StudioPageThumbnail({
   const gradientId = `studio-page-thumb-grad-${page.id}`;
 
   return (
-    <div className={cn("relative h-24 overflow-hidden rounded border border-line/60 bg-raised/40", className)}>
+    <div
+      ref={rootRef}
+      className={cn("relative h-24 overflow-hidden rounded border border-line/60 bg-raised/40", className)}
+    >
       <svg
         viewBox={`0 0 ${CANVAS_W} ${canvasH}`}
         preserveAspectRatio="xMidYMid meet"
@@ -223,7 +260,9 @@ export function StudioPageThumbnail({
           </defs>
         ) : null}
         <rect x={0} y={0} width={CANVAS_W} height={canvasH} fill={hasGradient ? `url(#${gradientId})` : page.bg} />
-        {nodes.map((node) => renderThumbNode(node))}
+        {nodes.map((node) => node.kind === "image" && !nearViewport
+          ? null
+          : renderThumbNode(node))}
       </svg>
       {hasGrade && grade.vignette > 0 ? (
         <div

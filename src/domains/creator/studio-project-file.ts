@@ -13,6 +13,12 @@ import {
   serializeStudioBg3dSceneDocument,
 } from "./studio-bg3d-scene-document";
 import { parseStudioDrawingAssistDocument } from "./studio-drawing-assist-document";
+import {
+  parseStudioLinked3dRenderDocument,
+  validateStudioLinked3dRenderDocumentAgainstPage,
+  validateStudioLinked3dReservedPageState,
+  type StudioLinked3dRenderElementLike,
+} from "./studio-linked-3d-render-document";
 import { normalizePageReviewState } from "./studio-page-review";
 import { parseStudioReferenceBoardDocument } from "./studio-reference-board";
 import { migrateStudioShared3dStageCollectionDocument } from
@@ -45,6 +51,7 @@ const ProjectPageSchema = z
     bgGrad: z.array(z.string()).nullable(),
     canvasH: z.number().finite().positive().max(STUDIO_PROJECT_MAX_CANVAS_HEIGHT),
     shared3dStage: z.unknown().optional(),
+    linked3dRender: z.unknown().optional(),
   })
   .passthrough();
 
@@ -153,6 +160,7 @@ function canonicalizeBg3dSceneElements(value: unknown): unknown {
 
 function canonicalizeProjectBg3dScenes(project: StudioProjectFile): StudioProjectFile {
   const pagesList = project.pagesList.map((page) => {
+    const elements = page.elements.map(canonicalizeStudio3dSceneElement);
     const review = "review" in page
       ? normalizePageReviewState(page.review)
       : undefined;
@@ -168,16 +176,50 @@ function canonicalizeProjectBg3dScenes(project: StudioProjectFile): StudioProjec
     if (page.shared3dStage !== undefined && !shared3dStage) {
       throw new Error("페이지 공유 3D Stage 연결이 손상되었거나 지원하지 않는 버전입니다.");
     }
+    const linked3dRender = page.linked3dRender === undefined
+      ? undefined
+      : parseStudioLinked3dRenderDocument(page.linked3dRender);
+    if (page.linked3dRender !== undefined && !linked3dRender) {
+      throw new Error("페이지 연결형 3D 렌더 인덱스가 손상되었거나 지원하지 않는 버전입니다.");
+    }
+    const reservedState = validateStudioLinked3dReservedPageState({
+      value: linked3dRender,
+      elements: elements as readonly StudioLinked3dRenderElementLike[],
+    });
+    if (!reservedState.ok) {
+      throw new Error(`페이지 연결형 3D reserved 상태가 Canvas 권위와 다릅니다: ${reservedState.message}`);
+    }
+    if (linked3dRender) {
+      const validation = validateStudioLinked3dRenderDocumentAgainstPage({
+        value: linked3dRender,
+        elements: elements as readonly StudioLinked3dRenderElementLike[],
+        shared3dStage: shared3dStage ?? undefined,
+      });
+      if (!validation.ok) {
+        throw new Error(`페이지 연결형 3D 렌더 인덱스가 Canvas 권위와 다릅니다: ${validation.message}`);
+      }
+    }
     return {
       ...page,
       ...(review === undefined ? {} : { review }),
-      elements: page.elements.map(canonicalizeStudio3dSceneElement),
+      elements,
       ...(drawingAssist ? { drawingAssist } : {}),
       ...(shared3dStage ? { shared3dStage } : {}),
+      ...(linked3dRender ? { linked3dRender } : {}),
     };
   });
   const master = isRecord(project.master) && Array.isArray(project.master.elements)
-    ? { ...project.master, elements: canonicalizeBg3dSceneElements(project.master.elements) }
+    ? (() => {
+        const elements = canonicalizeBg3dSceneElements(project.master.elements);
+        const reservedState = validateStudioLinked3dReservedPageState({
+          value: undefined,
+          elements: elements as readonly StudioLinked3dRenderElementLike[],
+        });
+        if (!reservedState.ok) {
+          throw new Error("문서 마스터에 page-owned 연결형 3D locator나 correction이 있습니다.");
+        }
+        return { ...project.master, elements };
+      })()
     : project.master;
   const referenceBoard = project.referenceBoard === undefined
     ? undefined
