@@ -320,6 +320,12 @@ export function verifyVercelCspContract({ html, vercelConfig, bootstrapCompatSou
   if (connections.includes("https:") || connections.includes("wss:")) {
     throw new Error("connect-src contains an unrestricted network scheme.");
   }
+  const blobConnectionCount = connections.filter((source) => source === "blob:").length;
+  if (!connections.includes("'self'") || blobConnectionCount !== 1) {
+    throw new Error(
+      "connect-src must contain 'self' and exactly one blob: source for verified Studio asset object URLs.",
+    );
+  }
   if (!connections.includes("https://realtime.toonstudio.cloud")
     || !connections.includes("wss://realtime.toonstudio.cloud")) {
     throw new Error("The exact production realtime origins are missing from connect-src.");
