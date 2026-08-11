@@ -18,6 +18,14 @@ type ReleasePlan = {
   skipUpload: boolean;
   skipToolchainCheck: boolean;
   autoDeploy: boolean;
+  deployAutoSetup: boolean;
+  deploySetupBlender: boolean;
+  deploySetupVrmAddon: boolean;
+  deploySetupMcpBridge: boolean;
+  deploySetupVrmAddonSource?: string;
+  deploySetupMcpPackage?: string;
+  deploySetupMcpCommand?: string;
+  deployEnvironment: string;
   deployWorkflow: string;
   deployRef: string;
 };
@@ -91,7 +99,15 @@ function parseReleaseArgs(): {
       "  --skip-upload                     dry-run만 수행",
       "  --skip-toolchain-check            배포 전 체크 건너뛰기",
       "  --auto-deploy                     배포 워크플로우까지 dispatch",
-      "  --deploy-workflow <name>          기본 deploy-vercel.yml",
+      "  --deploy-auto-setup               워크플로우에서 툴체인 설치 시도 (auto_setup=true)",
+      "  --deploy-setup-blender            워크플로우에서 Blender 설치 시도",
+      "  --deploy-setup-vrm-addon          워크플로우에서 VRM Add-on 설치 시도",
+      "  --deploy-setup-mcp-bridge         워크플로우에서 MCP 브릿지 설치 시도",
+      "  --deploy-setup-vrm-addon-source <path|url>  VRM Add-on 소스 (optional)",
+      "  --deploy-setup-mcp-package <package>          MCP 패키지명 (예: blender-mcp)",
+      "  --deploy-setup-mcp-command <command>          MCP 명령(예: blender-mcp)",
+      "  --deploy-workflow <name>          기본 Studio 3D Asset Batch Upload",
+      "  --deploy-environment <production|staging>    실행 환경 (기본 production)",
       "  --deploy-ref <ref>                기본 main",
       "",
       "예시",
@@ -123,7 +139,15 @@ function parseReleaseArgs(): {
     skipUpload: hasFlag(releaseArgs, "--skip-upload"),
     skipToolchainCheck: hasFlag(releaseArgs, "--skip-toolchain-check"),
     autoDeploy: hasFlag(releaseArgs, "--auto-deploy"),
-    deployWorkflow: getOption(releaseArgs, "--deploy-workflow") ?? "deploy-vercel.yml",
+    deployAutoSetup: hasFlag(releaseArgs, "--deploy-auto-setup"),
+    deploySetupBlender: hasFlag(releaseArgs, "--deploy-setup-blender"),
+    deploySetupVrmAddon: hasFlag(releaseArgs, "--deploy-setup-vrm-addon"),
+    deploySetupMcpBridge: hasFlag(releaseArgs, "--deploy-setup-mcp-bridge"),
+    deploySetupVrmAddonSource: getOption(releaseArgs, "--deploy-setup-vrm-addon-source"),
+    deploySetupMcpPackage: getOption(releaseArgs, "--deploy-setup-mcp-package"),
+    deploySetupMcpCommand: getOption(releaseArgs, "--deploy-setup-mcp-command"),
+    deployEnvironment: getOption(releaseArgs, "--deploy-environment") ?? "production",
+    deployWorkflow: getOption(releaseArgs, "--deploy-workflow") ?? "Studio 3D Asset Batch Upload",
     deployRef: getOption(releaseArgs, "--deploy-ref") ?? "main",
   };
 
@@ -144,6 +168,14 @@ function parseReleaseArgs(): {
     "--skip-upload",
     "--skip-toolchain-check",
     "--auto-deploy",
+    "--deploy-auto-setup",
+    "--deploy-setup-blender",
+    "--deploy-setup-vrm-addon",
+    "--deploy-setup-mcp-bridge",
+    "--deploy-setup-vrm-addon-source",
+    "--deploy-setup-mcp-package",
+    "--deploy-setup-mcp-command",
+    "--deploy-environment",
     "--deploy-workflow",
     "--deploy-ref",
   ]);
@@ -178,7 +210,48 @@ function runCommand(command: string, args: string[], label: string): void {
   }
 }
 
-function runGitHubDeploy(workflow: string, ref: string): void {
+function resolveWorkflowRelativePath(root: string, candidate: string, fallbackRelative: string): string {
+  const absolute = path.isAbsolute(candidate) ? candidate : path.resolve(root, candidate);
+  const relative = path.relative(root, absolute);
+  if (relative === "" || relative.startsWith(`..${path.sep}`) || relative === ".." || path.isAbsolute(relative)) {
+    console.log(`[warning] 워크플로우 입력 경로가 레포지토리 외부입니다: ${candidate}. 기본값(${fallbackRelative})으로 대체합니다.`);
+    return fallbackRelative.split(path.sep).join("/");
+  }
+  return relative.split(path.sep).join("/");
+}
+
+function findUploadValue(uploadArgs: string[], keys: string[]): string | undefined {
+  const wanted = keys.map((entry) => (entry.startsWith("--") ? entry : `--${entry}`));
+  for (let index = 0; index < uploadArgs.length; index += 1) {
+    const token = uploadArgs[index];
+    if (!wanted.includes(token)) continue;
+    const value = uploadArgs[index + 1];
+    if (!value || value.startsWith("--")) {
+      return undefined;
+    }
+    return value;
+  }
+  return undefined;
+}
+
+function hasUploadFlag(uploadArgs: string[], flag: string): boolean {
+  const normalized = flag.startsWith("--") ? flag : `--${flag}`;
+  return uploadArgs.includes(normalized);
+}
+
+function appendWorkflowInput(args: string[], name: string, value: string | undefined): void {
+  if (value == null || value.length === 0) return;
+  args.push("-f", `${name}=${value}`);
+}
+
+function appendWorkflowBool(args: string[], name: string, enabled: boolean): void {
+  appendWorkflowInput(args, name, enabled ? "true" : "false");
+}
+
+function runGitHubDeploy(plan: ReleasePlan, uploadArgs: string[], manifestPath: string): void {
+  const workflow = plan.deployWorkflow;
+  const ref = plan.deployRef;
+
   const ghVersion = spawnSync("gh", ["--version"], {
     stdio: ["ignore", "pipe", "pipe"],
     encoding: "utf8",
@@ -186,10 +259,52 @@ function runGitHubDeploy(workflow: string, ref: string): void {
   if (ghVersion.status !== 0) {
     console.log("\nGitHub CLI가 없어 배포 dispatch를 실행할 수 없습니다.");
     console.log("수동 실행:");
-    console.log(`gh workflow run ${workflow} -r ${ref}`);
+    console.log(`gh workflow run "${workflow}" -r ${ref}`);
     return;
   }
-  runCommand("gh", ["workflow", "run", workflow, "-r", ref], "gh workflow run");
+
+  const workflowArgs = [
+    "workflow",
+    "run",
+    workflow,
+    "-r",
+    ref,
+    "-f",
+    `environment=${plan.deployEnvironment}`,
+    "-f",
+    `manifest=${resolveWorkflowRelativePath(ROOT, manifestPath, "batch_generated/manifest.json")}`,
+    "-f",
+    `source_dir=${resolveWorkflowRelativePath(ROOT, plan.sourceDir, "batch_source")}`,
+    "-f",
+    `generate_manifest=false`,
+  ];
+
+  appendWorkflowInput(workflowArgs, "filter_category", findUploadValue(uploadArgs, ["--filter-category"]));
+
+  appendWorkflowInput(workflowArgs, "base_url", findUploadValue(uploadArgs, ["--base-url", "--api-base", "--base"]));
+  appendWorkflowInput(workflowArgs, "start_index", findUploadValue(uploadArgs, ["--start-index", "--start"]));
+  appendWorkflowInput(workflowArgs, "max_items", findUploadValue(uploadArgs, ["--max-items"]));
+  appendWorkflowInput(workflowArgs, "concurrency", findUploadValue(uploadArgs, ["--concurrency"]));
+  appendWorkflowInput(workflowArgs, "asset_type", findUploadValue(uploadArgs, ["--type"]));
+  appendWorkflowBool(workflowArgs, "dry_run", hasUploadFlag(uploadArgs, "--dry-run"));
+  appendWorkflowInput(workflowArgs, "work_id", findUploadValue(uploadArgs, ["--work-id"]));
+  appendWorkflowInput(workflowArgs, "work_title", findUploadValue(uploadArgs, ["--work-title"]));
+  appendWorkflowBool(workflowArgs, "skip_existing", hasUploadFlag(uploadArgs, "--skip-existing"));
+  appendWorkflowBool(workflowArgs, "no_probe_vrm", hasUploadFlag(uploadArgs, "--no-probe-vrm"));
+  appendWorkflowBool(workflowArgs, "auto_demo_login", hasUploadFlag(uploadArgs, "--auto-demo-login"));
+  const autoSetup = plan.deployAutoSetup
+    || plan.deploySetupBlender
+    || plan.deploySetupVrmAddon
+    || plan.deploySetupMcpBridge;
+  appendWorkflowBool(workflowArgs, "auto_setup", autoSetup);
+  appendWorkflowBool(workflowArgs, "setup_blender", plan.deploySetupBlender);
+  appendWorkflowBool(workflowArgs, "setup_vrm_addon", plan.deploySetupVrmAddon);
+  appendWorkflowBool(workflowArgs, "setup_mcp_bridge", plan.deploySetupMcpBridge);
+  appendWorkflowInput(workflowArgs, "setup_vrm_addon_source", plan.deploySetupVrmAddonSource);
+  appendWorkflowInput(workflowArgs, "setup_mcp_package", plan.deploySetupMcpPackage);
+  appendWorkflowInput(workflowArgs, "setup_mcp_command", plan.deploySetupMcpCommand);
+
+  runCommand("gh", workflowArgs, "gh workflow run");
 }
 
 function hasFlagWithValue(args: string[], flag: string): boolean {
@@ -252,7 +367,7 @@ function runAssetRelease(plan: ReleasePlan, uploadArgs: string[]): void {
   }
 
   if (plan.autoDeploy) {
-    runGitHubDeploy(plan.deployWorkflow, plan.deployRef);
+    runGitHubDeploy(plan, uploadArgs, plan.manifest);
   }
 }
 

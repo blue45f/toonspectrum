@@ -14,7 +14,20 @@
 ## 0) Blender/VRM/기타 DCC 생성 지원 범위
 
 짧게 정리하면 이 자동화 레이어는 **업로드 엔진**입니다.  
-즉, 배경·캐릭터 3D 자산 자체의 모델링/리토폴로지/리깅/애니메이션은 Blender(또는 MMD/VRM/SketchUp 같은 외부 DCC)에서 생성하고, 업로드 단계에서 규격화된 파일만 넘깁니다.
+즉, 배경·캐릭터 3D 자산 자체의 모델링/리토폴로지/리깅/애니메이션은 별도 DCC에서 생성하고, 업로드 단계에서 규격화된 파일만 넘깁니다.
+
+질문한 대로 Blender+VRM+MCP 관점으로 결론을 먼저 정리하면:
+
+- `Blender`로 실제 모델을 만들고 `.vrm`/`.glb`/`.gltf`로 내보내는 작업은 가능합니다.  
+- MCP(예: `blender-mcp`)는 이 레포의 내부 생성기가 아니라 `Blender` 실행 환경에서 별도 세팅/호출해서 쓰는 방식입니다.
+- 이 레포는 현재 `생성`이 아니라 `생성된 파일의 검증·분류·업로드·배포 디스패치`를 담당합니다.
+
+운영 관점에서 가장 실용적인 조합은 다음과 같습니다.
+
+1. Blender에서 캐릭터/배경/소품을 만들고 VRM 또는 GLB로 내보내기
+2. `batch_source` 규칙대로 분류해 넣기
+3. `studio:asset:release --auto-deploy`로 manifest 생성, dry-run, 업로드, 운영 배포까지 넘기기
+4. CI에서 `--deploy-auto-setup`으로 Blender/MCP/VRM 설치까지 보조 처리
 
 업로드 기준은 다음 형식/규약입니다.
 
@@ -110,7 +123,7 @@ pnpm run studio:asset:release -- \
 pnpm run studio:asset:release -- \
   --source-dir ./batch_source \
   --auto-deploy \
-  --deploy-workflow deploy-vercel.yml \
+  --deploy-workflow "Studio 3D Asset Batch Upload" \
   --deploy-ref main \
   -- \
   --auto-demo-login \
@@ -244,6 +257,89 @@ skip_existing=true
 ```
 
 로컬에서 `source_dir`에 있는 파일을 업로드할 땐 `generate_manifest=true`를 권장합니다.
+
+## 5-1) 생성 → 검증 → 업로드 → 운영 배포까지 한 번에
+
+이 리포에서는 `studio:asset:release --auto-deploy`로 로컬에서 한 번 실행하면, 실행 경로와 세션 설정을 그대로 반영해 GitHub Actions 배포까지 넘길 수 있습니다.
+
+사전 준비(최초 1회):
+
+```bash
+# GitHub CLI가 로그인돼 있어야 합니다.
+gh auth login
+
+# 선택: 한 번만 실행해 툴체인 체크를 통과하거나 설치
+pnpm run studio:toolchain:setup -- --check
+# 필요하면 다음처럼 설치까지 실행
+# pnpm run studio:toolchain:setup -- --install --install-blender --install-vrm-addon --install-mcp-bridge --mcp-package blender-mcp
+```
+
+로컬 `batch_source`를 기반으로 운영 배포까지:
+
+```bash
+export TOONSTUDIO_HOME="/path/to/toonspectrum"
+pnpm --dir "$TOONSTUDIO_HOME" run studio:asset:release -- \
+  --source-dir "$TOONSTUDIO_HOME/batch_source" \
+  --manifest "$TOONSTUDIO_HOME/batch_generated/manifest.json" \
+  --recursive \
+  --default-category character \
+  --max-depth 6 \
+  --auto-deploy \
+  --deploy-environment production \
+  --deploy-workflow "Studio 3D Asset Batch Upload" \
+  --deploy-ref main \
+  -- \
+  --auto-demo-login \
+  --type auto \
+  --max-items 20 \
+  --work-title "toonbatch-$(date +%Y%m%d)"
+```
+
+동작 포인트:
+
+- dry-run(상위 20건)는 로컬에서 먼저 수행되고 실제 업로드가 이어집니다.
+- 업로드에 사용한 주요 옵션(`--type`, `--max-items`, `--work-title`, `--filter-category` 등)은
+  `gh workflow run` 입력으로 전달되어 다음 운영 실행과 동기화됩니다.
+- `--auto-demo-login` 사용 시 운영 실행에서는 CI Secret으로 관리한 세션 토큰/쿠키가 최우선이며,
+  로컬 실행 인자가 없으면 워크플로우 기본값이 사용됩니다.
+
+만약 GitHub CLI가 없거나 인증이 안 되면, 동일한 조건으로 수동으로 워크플로우를 실행할 수 있습니다.
+
+```bash
+gh workflow run "Studio 3D Asset Batch Upload" -r main \
+  -f environment=production \
+  -f generate_manifest=false \
+  -f manifest=batch_generated/manifest.json \
+  -f source_dir=batch_source
+```
+
+### 로컬에서 생성→검증→업로드→배포까지 “완전 자동” 예시
+
+```bash
+# 툴체인 설치까지 허용(Blender/VRM Add-on/MCP)
+pnpm run studio:asset:release -- \
+  --source-dir ./batch_source \
+  --manifest ./batch_generated/manifest.json \
+  --default-category background \
+  --recursive \
+  --auto-deploy \
+  --deploy-environment production \
+  --deploy-workflow "Studio 3D Asset Batch Upload" \
+  --deploy-ref main \
+  --deploy-auto-setup \
+  --deploy-setup-blender \
+  --deploy-setup-vrm-addon \
+  --deploy-setup-vrm-addon-source ./addons/vrm-exporter.zip \
+  --deploy-setup-mcp-bridge \
+  --deploy-setup-mcp-package blender-mcp \
+  -- \
+  --auto-demo-login \
+  --type auto \
+  --max-items 20 \
+  --work-title "toonbatch-$(date +%Y%m%d)"
+```
+
+워크플로우 입력에는 `auto_setup`, `setup_blender`, `setup_vrm_addon`, `setup_mcp_bridge`, `setup_vrm_addon_source`, `setup_mcp_package`, `setup_mcp_command`가 전달됩니다.
 
 ### 운영 배포 마무리 체크리스트
 

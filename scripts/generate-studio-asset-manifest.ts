@@ -245,7 +245,7 @@ async function main(): Promise<void> {
     options,
     0,
     [],
-    maxDepth,
+    options.maxDepth,
   );
   const manifest: ManifestEntry[] = scan
     .map((item, index) => ({

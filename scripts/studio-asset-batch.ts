@@ -13,16 +13,28 @@ type ScriptArgs = {
   uploadTokens: string[];
 };
 
-function splitArgs(args: string[]): ScriptArgs {
-  const separatorIndex = args.indexOf("--");
-  const generateOnly = args.includes("--generate-only");
-  const uploadOnly = args.includes("--upload-only");
-  const help = args.includes("--help");
+const GENERATE_VALUE_FLAGS = new Set([
+  "--source-dir",
+  "--output",
+  "--manifest",
+  "--default-category",
+  "--max-depth",
+  "--include-images",
+  "--include-vrm",
+  "--include-background3d",
+]);
 
-  const generateTokens = (separatorIndex >= 0 ? args.slice(0, separatorIndex) : args)
+function splitArgs(args: string[]): ScriptArgs {
+  const normalizedArgs = args[0] === "--" ? args.slice(1) : args;
+  const separatorIndex = normalizedArgs.indexOf("--");
+  const generateOnly = normalizedArgs.includes("--generate-only");
+  const uploadOnly = normalizedArgs.includes("--upload-only");
+  const help = normalizedArgs.includes("--help");
+
+  const generateTokens = (separatorIndex >= 0 ? normalizedArgs.slice(0, separatorIndex) : normalizedArgs)
     .filter((arg) => arg !== "--generate-only" && arg !== "--upload-only");
 
-  const uploadTokens = separatorIndex >= 0 ? args.slice(separatorIndex + 1) : [];
+  const uploadTokens = separatorIndex >= 0 ? normalizedArgs.slice(separatorIndex + 1) : [];
 
   return {
     generateOnly,
@@ -56,6 +68,51 @@ function getOption(args: string[], keys: string[]): RawArg | undefined {
     }
   }
   return undefined;
+}
+
+function collectGenerateManifestArgs(optionTokens: string[]): string[] {
+  const result: string[] = [];
+  for (let i = 0; i < optionTokens.length; i += 1) {
+    const token = optionTokens[i];
+    if (token === "--source-dir" || token === "--output" || token === "--manifest") {
+      const value = optionTokens[i + 1];
+      if (value != null && !value.startsWith("--")) {
+        i += 1;
+      }
+      continue;
+    }
+    result.push(token);
+    const next = optionTokens[i + 1];
+    if (GENERATE_VALUE_FLAGS.has(token) && next != null && !next.startsWith("--")) {
+      result.push(next);
+      i += 1;
+    }
+  }
+  return result;
+}
+
+function normalizeGenerateTokens(rawTokens: string[]): {
+  optionTokens: string[];
+  positional: string[];
+} {
+  const optionTokens: string[] = [];
+  const positional: string[] = [];
+  for (let i = 0; i < rawTokens.length; i += 1) {
+    const token = rawTokens[i];
+    if (!token.startsWith("--") || token === "--") {
+      if (token !== "--") {
+        positional.push(token);
+      }
+      continue;
+    }
+    optionTokens.push(token);
+    const next = rawTokens[i + 1];
+    if (GENERATE_VALUE_FLAGS.has(token) && next != null && !next.startsWith("--")) {
+      optionTokens.push(next);
+      i += 1;
+    }
+  }
+  return { optionTokens, positional };
 }
 
 function hasOption(args: string[], key: string): boolean {
@@ -122,13 +179,32 @@ function main(): void {
   }
 
   const defaultManifest = "batch_generated/manifest.json";
-  const generateOutput = getOption(generateTokens, ["--output", "--manifest"])?.value ?? defaultManifest;
+  const { optionTokens: generateFlagTokens, positional: generatePositional } = normalizeGenerateTokens(generateTokens);
+  const explicitOutput = getOption(generateFlagTokens, ["--output", "--manifest"])?.value;
+  const explicitSource = getOption(generateFlagTokens, ["--source-dir"])?.value;
+  const generateOutput =
+    explicitOutput
+    ?? generatePositional.at(1)
+    ?? defaultManifest;
+  const generateSource = explicitSource ?? generatePositional.at(0);
+
   const uploadManifest = getOption(uploadTokens, ["--manifest"])?.value;
 
   const manifestToUse = generateOutput;
+  const manifestArgs = [
+    ...collectGenerateManifestArgs(generateFlagTokens),
+    "--source-dir",
+    generateSource ?? "./batch_source",
+    "--output",
+    generateOutput,
+  ];
 
   if (!uploadOnly) {
-    run("pnpm", ["run", "studio:manifest:generate", "--", ...generateTokens, "--output", manifestToUse], "generate");
+    run(
+      "pnpm",
+      ["run", "studio:manifest:generate", "--", ...manifestArgs],
+      "generate",
+    );
   }
 
   if (!generateOnly) {
