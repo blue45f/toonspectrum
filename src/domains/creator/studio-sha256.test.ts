@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { sha256HexPortable } from "./studio-sha256";
+import {
+  createSha256Portable,
+  sha256HexPortable,
+} from "./studio-sha256";
 
 const TEXT_ENCODER = new TextEncoder();
 
@@ -45,5 +48,58 @@ describe("portable Studio SHA-256", () => {
 
     const native = await subtle.digest("SHA-256", bytes);
     expect(sha256HexPortable(bytes)).toBe(bufferHex(native));
+  });
+
+  it.each([0, 1, 63, 64, 65, 1_048_593])(
+    "matches one-shot hashing for a %i-byte input across arbitrary chunk boundaries",
+    async (byteLength) => {
+      const bytes = Uint8Array.from(
+        { length: byteLength },
+        (_, index) => (index * 197 + 31) & 0xff
+      );
+      const expected = sha256HexPortable(bytes);
+      const subtle = globalThis.crypto?.subtle;
+      expect(subtle).toBeDefined();
+      if (!subtle) return;
+      expect(bufferHex(await subtle.digest("SHA-256", bytes))).toBe(expected);
+
+      const hasher = createSha256Portable();
+      const chunkPattern = [1, 63, 2, 127, 64, 4_093, 17];
+      let offset = 0;
+      let chunkIndex = 0;
+
+      hasher.update(bytes.subarray(0, 0));
+      while (offset < bytes.byteLength) {
+        const nextOffset = Math.min(
+          bytes.byteLength,
+          offset + chunkPattern[chunkIndex % chunkPattern.length]
+        );
+        hasher.update(bytes.subarray(offset, nextOffset));
+        offset = nextOffset;
+        chunkIndex += 1;
+      }
+
+      expect(hasher.finalizeHex()).toBe(expected);
+    }
+  );
+
+  it("copies only an incomplete block instead of retaining a caller chunk", () => {
+    const mutableChunk = Uint8Array.from({ length: 63 }, (_, index) => index);
+    const expected = sha256HexPortable(mutableChunk.slice());
+    const hasher = createSha256Portable().update(mutableChunk);
+
+    mutableChunk.fill(0xff);
+
+    expect(hasher.finalizeHex()).toBe(expected);
+  });
+
+  it("fails closed when update or finalize is called after finalization", () => {
+    const hasher = createSha256Portable().update(TEXT_ENCODER.encode("closed"));
+    expect(hasher.finalizeHex()).toBe(
+      sha256HexPortable(TEXT_ENCODER.encode("closed"))
+    );
+
+    expect(() => hasher.update(new Uint8Array())).toThrow(/already finalized/);
+    expect(() => hasher.finalizeHex()).toThrow(/already finalized/);
   });
 });

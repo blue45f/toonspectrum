@@ -9,9 +9,11 @@
 
 import {
   hashStudioEditableMesh,
+  isIssuedStudioEditableMeshExtrudeRegionReceipt,
   STUDIO_EDITABLE_MESH_LIMITS,
   STUDIO_EDITABLE_MESH_REVISION,
   type StudioEditableFace,
+  type StudioEditableMeshExtrudeRegionReceipt,
   type StudioEditableHalfEdge,
   type StudioEditableMesh,
 } from "./studio-editable-half-edge-mesh";
@@ -102,7 +104,10 @@ export type StudioHybridDccSelectionDiagnosticCode =
   | "source-hash-mismatch"
   | "stale-mesh-revision"
   | "stale-source-hash"
+  | "invalid-topology-receipt"
   | "topology-provenance-refreshed"
+  | "topology-receipt-result-mismatch"
+  | "topology-receipt-source-mismatch"
   | "topology-selection-pruned"
   | "topology-selection-remapped"
   | "unsorted-stable-ids"
@@ -1022,6 +1027,137 @@ export function reconcileStudioHybridDccComponentSelection(
     activeElementId,
     provenance: verified.value.provenance,
   }), diagnostics);
+}
+
+/**
+ * Receipt-bound region-extrude boundary.
+ *
+ * A topology receipt is command evidence, not selection authority. Bind both of its mesh hashes,
+ * require the exact selected-face-to-cap mapping, and only then delegate to the generic stable-ID
+ * reconciler. This prevents a stale/forged receipt from moving the active face onto unrelated
+ * geometry even when the target ID happens to exist in the rebuilt mesh.
+ */
+export function reconcileStudioHybridDccSelectionAfterExtrudeRegion(
+  selection: StudioHybridDccComponentSelection,
+  source: StudioHybridDccMeshSelectionSource,
+  resultSource: StudioHybridDccMeshSelectionSource,
+  receipt: StudioEditableMeshExtrudeRegionReceipt,
+): StudioHybridDccSelectionResult<StudioHybridDccComponentSelection> {
+  if (!isIssuedStudioEditableMeshExtrudeRegionReceipt(receipt)) {
+    return failure(diagnostic(
+      "invalid-topology-receipt",
+      "Region extrude receipt was not issued by the geometry kernel.",
+    ));
+  }
+  const structure = validateStudioHybridDccComponentSelection(selection, source);
+  if (!structure.ok) return structure;
+  if (selection.mode !== "face" || selection.provenance === null) {
+    return failure(diagnostic(
+      "invalid-mode",
+      "Region extrude selection reconciliation requires a canonical face selection.",
+    ));
+  }
+  if (receipt.operation !== "extrude-region"
+    || receipt.sourceFaceIds.length === 0
+    || receipt.sourceFaceIds.length !== receipt.capFaceIds.length
+    || receipt.sourceFaceIds.length !== selection.elementIds.length
+    || receipt.sourceFaceIds.some((faceId, index) => faceId !== selection.elementIds[index])
+    || receipt.sourceFaceIds.length
+      > STUDIO_HYBRID_DCC_COMPONENT_SELECTION_LIMITS.maxSelectedElements
+    || receipt.capFaceIds.length
+      > STUDIO_HYBRID_DCC_COMPONENT_SELECTION_LIMITS.maxSelectedElements) {
+    return failure(diagnostic(
+      "invalid-topology-receipt",
+      "Region extrude receipt has an invalid face mapping shape.",
+    ));
+  }
+  if (selection.provenance.sourceHash !== receipt.sourceMeshHash) {
+    return failure(diagnostic(
+      "topology-receipt-source-mismatch",
+      "Region extrude receipt does not identify the selected source mesh.",
+    ));
+  }
+  if (resultSource.sourceHash !== receipt.resultMeshHash) {
+    return failure(diagnostic(
+      "topology-receipt-result-mismatch",
+      "Region extrude receipt does not identify the current result mesh.",
+    ));
+  }
+  if (resultSource.assetId !== source.assetId
+    || resultSource.meshRevision !== source.meshRevision + 1) {
+    return failure(diagnostic(
+      "invalid-topology-receipt",
+      "Region extrude result revision is not the direct successor of the selected mesh.",
+    ));
+  }
+
+  const verifiedResult = verifySource(resultSource);
+  if (!verifiedResult.ok) return verifiedResult;
+  const sourceFaceIds = new Set(source.mesh.faces.map(({ id }) => id));
+  const fullEntries = receipt.faceRemap.entries;
+  if (fullEntries.length !== sourceFaceIds.size
+    || fullEntries.length > STUDIO_EDITABLE_MESH_LIMITS.maxFaces) {
+    return failure(diagnostic(
+      "invalid-topology-receipt",
+      "Region extrude receipt does not cover every source face exactly once.",
+    ));
+  }
+  const fullFaceRemap = new Map<number, number | null>();
+  const fullTargets = new Set<number>();
+  for (const entry of fullEntries) {
+    if (!Array.isArray(entry) || entry.length !== 2
+      || !isStableId(entry[0]) || !sourceFaceIds.has(entry[0])
+      || (entry[1] !== null && !isStableId(entry[1]))
+      || (entry[1] !== null && !verifiedResult.value.index.faceById.has(entry[1]))
+      || fullFaceRemap.has(entry[0])
+      || (entry[1] !== null && fullTargets.has(entry[1]))) {
+      return failure(diagnostic(
+        "invalid-topology-receipt",
+        "Region extrude receipt contains a non-unique or non-live full face remap.",
+      ));
+    }
+    fullFaceRemap.set(entry[0], entry[1]);
+    if (entry[1] !== null) fullTargets.add(entry[1]);
+  }
+
+  const faceEntries = receipt.selectionRemap.face?.entries;
+  if (!faceEntries || faceEntries.length !== receipt.sourceFaceIds.length) {
+    return failure(diagnostic(
+      "invalid-topology-receipt",
+      "Region extrude receipt is missing its face selection remap.",
+    ));
+  }
+  const faceRemap = new Map<number, number | null>();
+  for (const entry of faceEntries) {
+    if (!Array.isArray(entry) || entry.length !== 2
+      || !isStableId(entry[0]) || (entry[1] !== null && !isStableId(entry[1]))
+      || faceRemap.has(entry[0])) {
+      return failure(diagnostic(
+        "invalid-topology-receipt",
+        "Region extrude receipt contains a malformed face selection remap.",
+      ));
+    }
+    faceRemap.set(entry[0], entry[1]);
+  }
+  for (let index = 0; index < receipt.sourceFaceIds.length; index += 1) {
+    const sourceFaceId = receipt.sourceFaceIds[index]!;
+    const capFaceId = receipt.capFaceIds[index]!;
+    if (!isStableId(sourceFaceId)
+      || !isStableId(capFaceId)
+      || faceRemap.get(sourceFaceId) !== capFaceId
+      || fullFaceRemap.get(sourceFaceId) !== capFaceId) {
+      return failure(diagnostic(
+        "invalid-topology-receipt",
+        "Region extrude receipt does not map every source face to its cap face.",
+      ));
+    }
+  }
+
+  return reconcileStudioHybridDccComponentSelection(
+    selection,
+    resultSource,
+    receipt.selectionRemap,
+  );
 }
 
 export function snapshotStudioHybridDccComponentSelection(

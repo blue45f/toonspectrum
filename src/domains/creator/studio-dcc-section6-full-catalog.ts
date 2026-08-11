@@ -66,7 +66,7 @@ export const STUDIO_DCC_SECTION6_CATALOG: readonly StudioSection6CatalogEntry[] 
   { id: "MOD-001", name: "vertex/edge/face \uc120\ud0dd", priority: "P1", kernelStatus: "kernel-shipped", module: "studio-editable-half-edge-mesh.ts", apis: ["selectStudioMeshElements"] },
   { id: "MOD-002", name: "loop/ring\u00b7shortest path", priority: "P1", kernelStatus: "kernel-shipped", module: "studio-editable-half-edge-mesh.ts", apis: ["selectStudioMeshEdgeLoop", "selectStudioMeshFaceRing"] },
   { id: "MOD-003", name: "move/rotate/scale\u00b7pivot\u00b7orientation", priority: "P1", kernelStatus: "kernel-shipped", module: "studio-editable-half-edge-mesh.ts", apis: ["transformStudioEditableMesh"] },
-  { id: "MOD-004", name: "extrude region/individual", priority: "P1", kernelStatus: "kernel-shipped", module: "studio-editable-half-edge-mesh.ts", apis: ["extrudeStudioEditableMeshFaces"] },
+  { id: "MOD-004", name: "extrude region/individual", priority: "P1", kernelStatus: "kernel-shipped", module: "studio-editable-half-edge-mesh.ts", apis: ["extrudeStudioEditableMeshFacesWithReceipt"] },
   { id: "MOD-005", name: "inset", priority: "P1", kernelStatus: "kernel-shipped", module: "studio-editable-half-edge-mesh.ts", apis: ["insetStudioEditableMeshFaces"] },
   { id: "MOD-006", name: "bevel edge/vertex", priority: "P1", kernelStatus: "kernel-shipped", module: "studio-editable-half-edge-mesh.ts", apis: ["bevelStudioEditableMeshEdges"] },
   { id: "MOD-007", name: "loop cut\u00b7slide", priority: "P1", kernelStatus: "kernel-shipped", module: "studio-editable-half-edge-mesh.ts", apis: ["loopCutStudioEditableMesh"] },

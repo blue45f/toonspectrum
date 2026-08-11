@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   createStudioEditableMeshFromPolygons,
   createStudioUnitCubeMesh,
+  extrudeStudioEditableMeshFacesWithReceipt,
   hashStudioEditableMesh,
   type StudioEditableMesh,
 } from "./studio-editable-half-edge-mesh";
@@ -13,6 +14,7 @@ import {
   mapStudioHybridDccRayFaceIndex,
   mutateStudioHybridDccComponentSelection,
   reconcileStudioHybridDccComponentSelection,
+  reconcileStudioHybridDccSelectionAfterExtrudeRegion,
   resolveStudioHybridDccSelectedOrDefaultFaceIds,
   resolveStudioHybridDccSelectedOrDefaultUndirectedEdgeIds,
   resolveStudioHybridDccUndirectedEdgeId,
@@ -50,6 +52,16 @@ function vertexSelection(
   return expectValue(mutateStudioHybridDccComponentSelection(
     createStudioHybridDccComponentSelection(),
     { mode: "vertex", operation: "replace", ids, source: meshSource },
+  ));
+}
+
+function faceSelection(
+  meshSource: StudioHybridDccMeshSelectionSource,
+  ids: readonly number[],
+): StudioHybridDccComponentSelection {
+  return expectValue(mutateStudioHybridDccComponentSelection(
+    createStudioHybridDccComponentSelection(),
+    { mode: "face", operation: "replace", ids, source: meshSource },
   ));
 }
 
@@ -223,6 +235,71 @@ describe("studio hybrid DCC component selection authority", () => {
       "topology-provenance-refreshed",
       "topology-selection-remapped",
     ]);
+  });
+
+  it("binds an extrude receipt to the exact selected source faces", () => {
+    const before = source();
+    const selection = faceSelection(before, [0]);
+    const otherFaceExtrude = extrudeStudioEditableMeshFacesWithReceipt(before.mesh, [1], 0.25);
+    expect(otherFaceExtrude.ok).toBe(true);
+    if (!otherFaceExtrude.ok) throw new Error(otherFaceExtrude.detail);
+    const after = source(otherFaceExtrude.value.mesh, 2);
+
+    const reconciled = reconcileStudioHybridDccSelectionAfterExtrudeRegion(
+      selection,
+      before,
+      after,
+      otherFaceExtrude.value.receipt,
+    );
+    expect(reconciled.ok).toBe(false);
+    if (!reconciled.ok) {
+      expect(reconciled.diagnostics.map(({ code }) => code)).toContain(
+        "invalid-topology-receipt",
+      );
+    }
+  });
+
+  it("rejects incomplete and non-live full topology face maps", () => {
+    const before = source();
+    const selection = faceSelection(before, [0]);
+    const extruded = extrudeStudioEditableMeshFacesWithReceipt(before.mesh, [0], 0.25);
+    expect(extruded.ok).toBe(true);
+    if (!extruded.ok) throw new Error(extruded.detail);
+    const after = source(extruded.value.mesh, 2);
+
+    const incomplete = reconcileStudioHybridDccSelectionAfterExtrudeRegion(
+      selection,
+      before,
+      after,
+      {
+        ...extruded.value.receipt,
+        faceRemap: {
+          entries: extruded.value.receipt.faceRemap.entries.slice(1),
+        },
+      },
+    );
+    expect(incomplete.ok).toBe(false);
+    if (!incomplete.ok) {
+      expect(incomplete.diagnostics[0]?.code).toBe("invalid-topology-receipt");
+    }
+
+    const [firstEntry, ...remainingEntries] = extruded.value.receipt.faceRemap.entries;
+    if (!firstEntry) throw new Error("expected a full face remap");
+    const nonLive = reconcileStudioHybridDccSelectionAfterExtrudeRegion(
+      selection,
+      before,
+      after,
+      {
+        ...extruded.value.receipt,
+        faceRemap: {
+          entries: [[firstEntry[0], Number.MAX_SAFE_INTEGER], ...remainingEntries],
+        },
+      },
+    );
+    expect(nonLive.ok).toBe(false);
+    if (!nonLive.ok) {
+      expect(nonLive.diagnostics[0]?.code).toBe("invalid-topology-receipt");
+    }
   });
 
   it("round-trips a versioned JSON-safe snapshot with deterministic arrays", () => {

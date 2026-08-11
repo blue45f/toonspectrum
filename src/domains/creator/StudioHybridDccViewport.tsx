@@ -418,7 +418,7 @@ function validateStudioHybridDccRenderCache(
       message: "공유 장면에 화면용 메시의 provenance가 없어 원본 메시로 표시합니다.",
     };
   }
-  if (!/^(?:mesh:[0-9a-f]{8}|sha256:[0-9a-f]{64})$/iu.test(cache.derivedFromHash)
+  if (!/^(?:mesh:[0-9a-f]{8}|mesh:sha256:[0-9a-f]{64}|sha256:[0-9a-f]{64})$/iu.test(cache.derivedFromHash)
     || cache.derivedFromHash !== expectedGeometryHash) {
     return {
       ok: false,

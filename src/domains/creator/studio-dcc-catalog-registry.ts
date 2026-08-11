@@ -79,7 +79,7 @@ const STUDIO_DCC_LEGACY_KERNEL_ROWS: readonly LegacyKernelCoverageEntry[] = [
   { id: "MOD-001", priority: "P1", status: "shipped", module: "studio-editable-half-edge-mesh.ts", apis: ["selectStudioMeshElements"] },
   { id: "MOD-002", priority: "P1", status: "shipped", module: "studio-editable-half-edge-mesh.ts", apis: ["selectStudioMeshEdgeLoop", "selectStudioMeshFaceRing"] },
   { id: "MOD-003", priority: "P1", status: "shipped", module: "studio-editable-half-edge-mesh.ts", apis: ["transformStudioEditableMesh"] },
-  { id: "MOD-004", priority: "P1", status: "shipped", module: "studio-editable-half-edge-mesh.ts", apis: ["extrudeStudioEditableMeshFaces"] },
+  { id: "MOD-004", priority: "P1", status: "shipped", module: "studio-editable-half-edge-mesh.ts", apis: ["extrudeStudioEditableMeshFacesWithReceipt"] },
   { id: "MOD-005", priority: "P1", status: "shipped", module: "studio-editable-half-edge-mesh.ts", apis: ["insetStudioEditableMeshFaces"] },
   { id: "MOD-006", priority: "P1", status: "shipped", module: "studio-editable-half-edge-mesh.ts", apis: ["bevelStudioEditableMeshEdges"] },
   { id: "MOD-007", priority: "P1", status: "shipped", module: "studio-editable-half-edge-mesh.ts", apis: ["loopCutStudioEditableMesh"] },
