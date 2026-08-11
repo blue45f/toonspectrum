@@ -22,6 +22,7 @@ ToonSpectrum 스튜디오(/studio)에 번들된 VRM 캐릭터 모델의 출처�
 | `Eggplant.vrm` | 에그플랜트 (가지) | <https://github.com/ToxSam/open-source-avatars> | Polygonal-Mind의 100Avatars R1 시리즈 모델 — CC0 라이선스 적용 |
 | `CoolBanana.vrm` | 쿨바나나 | <https://github.com/ToxSam/open-source-avatars> | Polygonal-Mind의 100Avatars R1 시리즈 모델 — CC0 라이선스 적용 |
 | `Skull.vrm` | 스컬 (해골) | <https://github.com/ToxSam/open-source-avatars> | Polygonal-Mind의 100Avatars R1 시리즈 모델 — CC0 라이선스 적용 |
+| `cyber_agent_zero.vrm` | 사이버 에이전트 제로 | ToonSpectrum Blender 5.2 | Blender 5.2 절차적 스컬프팅/PBR 생성 자사 캐릭터 — MIT / CC0 적용 |
 
 - VRoid 공식 샘플(구 베타 포함) 모음 출처: <https://github.com/madjin/vrm-samples> (pixiv/VRoid 프로젝트가 배포한 샘플을 모아 둔 저장소).
 - Alicia Solid 원 배포처: <https://3d.nicovideo.jp/works/td14712> — UniVRM 저장소의 VRM 0.51 변환본을 사용.
