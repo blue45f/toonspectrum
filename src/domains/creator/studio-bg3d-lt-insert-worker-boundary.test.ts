@@ -29,7 +29,7 @@ describe("Studio BG3D interactive LT Worker boundary", () => {
     const capture = insert.indexOf("const captured = await captureStudioBg3dRaster(");
     const worker = insert.indexOf("await renderStudioBg3dLtLayersInWorker(");
     const encode = insert.indexOf("const encoded = encodeStudioBg3dLtLayers(rendered.layers)");
-    const publish = insert.indexOf("const accepted = onInsert({");
+    const publish = insert.indexOf("const accepted = await onInsert({");
 
     expect(editorSource).toContain('from "./studio-bg3d-lt-render-worker-client"');
     expect(snapshot).toBeGreaterThanOrEqual(0);
@@ -80,7 +80,7 @@ describe("Studio BG3D interactive LT Worker boundary", () => {
     const capture = insert.indexOf("const captured = await captureStudioBg3dRaster(");
     const worker = insert.indexOf("await renderStudioBg3dLtLayersInWorker(");
     const encode = insert.indexOf("const encoded = encodeStudioBg3dLtLayers(rendered.layers)");
-    const publish = insert.indexOf("const accepted = onInsert({");
+    const publish = insert.indexOf("const accepted = await onInsert({");
     const adapterFence = "if (!isInsertCurrent() || captureAdapterIsStale()) return;";
     const afterCaptureFence = insert.indexOf(adapterFence, capture);
     const afterWorkerFence = insert.indexOf(adapterFence, worker);
@@ -132,7 +132,7 @@ describe("Studio BG3D interactive LT Worker boundary", () => {
       "await encodeStudioBg3dMagicMaskPngDataUrl({",
     );
     const encodeLt = insert.indexOf("const encoded = encodeStudioBg3dLtLayers(rendered.layers)");
-    const publish = insert.indexOf("const accepted = onInsert({");
+    const publish = insert.indexOf("const accepted = await onInsert({");
 
     expect(resolveSelection).toBeGreaterThanOrEqual(0);
     expect(captureFrameCamera).toBeGreaterThan(resolveSelection);

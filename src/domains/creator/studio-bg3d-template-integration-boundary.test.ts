@@ -6,13 +6,21 @@ const editorSource = readFileSync(
   new URL("./StudioBackground3D.tsx", import.meta.url),
   "utf8",
 );
+const admissionSource = readFileSync(
+  new URL("./studio-bg3d-model-runtime-admission.ts", import.meta.url),
+  "utf8",
+);
 
-function sourceBetween(startMarker: string, endMarker: string): string {
-  const start = editorSource.indexOf(startMarker);
-  const end = editorSource.indexOf(endMarker, start);
+function sourceBetweenIn(source: string, startMarker: string, endMarker: string): string {
+  const start = source.indexOf(startMarker);
+  const end = source.indexOf(endMarker, start);
   expect(start).toBeGreaterThanOrEqual(0);
   expect(end).toBeGreaterThan(start);
-  return editorSource.slice(start, end);
+  return source.slice(start, end);
+}
+
+function sourceBetween(startMarker: string, endMarker: string): string {
+  return sourceBetweenIn(editorSource, startMarker, endMarker);
 }
 
 describe("Studio BG3D user-template integration boundary", () => {
@@ -22,7 +30,9 @@ describe("Studio BG3D user-template integration boundary", () => {
       "const handleDeleteTemplate = async",
     );
 
-    expect(save).toContain("adaptStudioBg3dRuntimeToDocument({");
+    expect(save).toContain("tryAdaptStudioBg3dRuntimeToDocument({");
+    expect(save).toContain("if (!adaptation.ok)");
+    expect(save).toContain("const adapted = adaptation.value");
     expect(save).toContain("adapted.diagnostics.length > 0");
     expect(save).toContain("adapted.omittedDiagnosticCount > 0");
     expect(save).toContain("adapted.counts.droppedPrimitives > 0");
@@ -61,9 +71,10 @@ describe("Studio BG3D user-template integration boundary", () => {
   });
 
   it("cleans only cache entries created by this queued template and never live scene entries", () => {
-    const cacheAdmission = sourceBetween(
-      "async function admitAndCacheModel(",
-      "function disposeModelCache(",
+    const cacheAdmission = sourceBetweenIn(
+      admissionSource,
+      "export async function admitAndCacheStudioBg3dModel(",
+      "export function disposeStudioBg3dModelCache(",
     );
     const apply = sourceBetween(
       "async function applyUserTemplate(",

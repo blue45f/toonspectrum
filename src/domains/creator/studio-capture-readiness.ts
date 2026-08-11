@@ -8,6 +8,14 @@
  * data URLs and signed asset URLs can contain private project material.
  */
 
+import {
+  snapshotStudioMountedRasterImagePresentations,
+  waitForStudioRasterImagePresentations,
+  type StudioRasterImagePresentationIdentity,
+} from "./studio-raster-image-presentation";
+
+import type { StudioLinked3dPassCasAuthority } from "./studio-linked-3d-pass-transaction";
+
 export const STUDIO_CAPTURE_READY_DEFAULT_TIMEOUT_MS = 8_000;
 export const STUDIO_CAPTURE_READY_MAX_ASSETS = 512;
 export const STUDIO_CAPTURE_READY_ASSET_CONCURRENCY = 6;
@@ -33,6 +41,17 @@ export interface StudioCaptureStageLike {
   batchDraw(): unknown;
 }
 
+export interface StudioCaptureResolvedRasterSource {
+  readonly src: string;
+  readonly revoke: () => void;
+}
+
+export type StudioCaptureLinked3dPassRasterSourceResolver = (
+  locator: string,
+  authority?: StudioLinked3dPassCasAuthority,
+  signal?: AbortSignal,
+) => Promise<StudioCaptureResolvedRasterSource | null>;
+
 export interface StudioCaptureReadinessOptions<
   TStage extends StudioCaptureStageLike = StudioCaptureStageLike,
 > {
@@ -48,7 +67,19 @@ export interface StudioCaptureReadinessOptions<
   waitForFonts?: () => Promise<void>;
   /** Test seam; the browser default decodes an HTMLImageElement without exposing its URL. */
   preloadImage?: (source: string, signal?: AbortSignal) => Promise<void>;
+  /** Optional authority injection for deterministic OPFS/CAS capture tests and isolated hosts. */
+  linked3dPassAuthority?: StudioLinked3dPassCasAuthority;
+  /** Test/host seam; production lazily imports the canonical linked-3D CAS resolver. */
+  resolveLinked3dPassRasterSource?: StudioCaptureLinked3dPassRasterSourceResolver;
+  /** Exact linked-pass element/source pairs that must complete a concrete Konva layer draw. */
+  rasterPresentationIdentities?: readonly StudioRasterImagePresentationIdentity[];
+  /** Test seam for the product presentation fence. */
+  waitForRasterPresentations?: typeof waitForStudioRasterImagePresentations;
 }
+
+const STUDIO_LINKED_3D_PASS_LOCATOR_NAMESPACE = "studio-opfs-cas:";
+const STUDIO_LINKED_3D_PASS_LOCATOR_PATTERN =
+  /^studio-opfs-cas:sha256:[a-f0-9]{64}$/u;
 
 function captureAborted(): StudioCaptureReadinessError {
   return new StudioCaptureReadinessError("aborted", "페이지 캡처 준비가 취소됐어요.");
@@ -122,9 +153,91 @@ function uniqueAssetSources(values: readonly string[]): string[] {
   return result;
 }
 
+async function defaultResolveLinked3dPassRasterSource(
+  locator: string,
+  authority?: StudioLinked3dPassCasAuthority,
+  signal?: AbortSignal,
+): Promise<StudioCaptureResolvedRasterSource | null> {
+  const { acquireStudioRasterSourceLease } = await import(
+    "./studio-raster-source-lease"
+  );
+  const lease = await acquireStudioRasterSourceLease(locator, {
+    authority,
+    consumer: "studio-capture-readiness",
+    signal,
+  });
+  if (lease.kind !== "linked-3d-cas") {
+    lease.release();
+    return null;
+  }
+  return Object.freeze({ src: lease.src, revoke: lease.release });
+}
+
+function revokeOnce(revoke: () => void): () => void {
+  let revoked = false;
+  return () => {
+    if (revoked) return;
+    revoked = true;
+    try {
+      revoke();
+    } catch {
+      // A host cleanup failure cannot make an otherwise-settled readiness result non-deterministic.
+    }
+  };
+}
+
+function resolvedRasterLease(
+  value: StudioCaptureResolvedRasterSource | null,
+): value is StudioCaptureResolvedRasterSource {
+  return value !== null
+    && typeof value.src === "string"
+    && value.src.startsWith("blob:")
+    && typeof value.revoke === "function";
+}
+
+async function preloadAssetSource(
+  source: string,
+  preloadImage: NonNullable<StudioCaptureReadinessOptions["preloadImage"]>,
+  resolveLinked3dPassRasterSource: StudioCaptureLinked3dPassRasterSourceResolver,
+  linked3dPassAuthority: StudioLinked3dPassCasAuthority | undefined,
+  signal?: AbortSignal,
+): Promise<void> {
+  if (!source.startsWith(STUDIO_LINKED_3D_PASS_LOCATOR_NAMESPACE)) {
+    await preloadImage(source, signal);
+    return;
+  }
+  if (!STUDIO_LINKED_3D_PASS_LOCATOR_PATTERN.test(source)) {
+    throw new Error("invalid-linked-3d-pass-locator");
+  }
+
+  throwIfAborted(signal);
+  const resolved = await resolveLinked3dPassRasterSource(
+    source,
+    linked3dPassAuthority,
+    signal,
+  );
+  const release = resolved && typeof resolved.revoke === "function"
+    ? revokeOnce(resolved.revoke)
+    : () => undefined;
+  const releaseOnAbort = () => release();
+  signal?.addEventListener("abort", releaseOnAbort, { once: true });
+  try {
+    throwIfAborted(signal);
+    if (!resolvedRasterLease(resolved)) {
+      throw new Error("invalid-linked-3d-pass-raster-lease");
+    }
+    await preloadImage(resolved.src, signal);
+  } finally {
+    signal?.removeEventListener("abort", releaseOnAbort);
+    release();
+  }
+}
+
 async function preloadAssets(
   sources: readonly string[],
   preloadImage: NonNullable<StudioCaptureReadinessOptions["preloadImage"]>,
+  resolveLinked3dPassRasterSource: StudioCaptureLinked3dPassRasterSourceResolver,
+  linked3dPassAuthority: StudioLinked3dPassCasAuthority | undefined,
   signal?: AbortSignal
 ): Promise<void> {
   if (sources.length > STUDIO_CAPTURE_READY_MAX_ASSETS) {
@@ -140,7 +253,13 @@ async function preloadAssets(
       const index = cursor;
       cursor += 1;
       try {
-        await preloadImage(sources[index]!, signal);
+        await preloadAssetSource(
+          sources[index]!,
+          preloadImage,
+          resolveLinked3dPassRasterSource,
+          linked3dPassAuthority,
+          signal,
+        );
       } catch (error) {
         if (signal?.aborted || (error instanceof StudioCaptureReadinessError && error.code === "aborted")) {
           throw captureAborted();
@@ -161,31 +280,51 @@ async function preloadAssets(
 }
 
 async function withTimeout<T>(
-  work: Promise<T>,
+  work: (signal: AbortSignal) => Promise<T>,
   timeoutMs: number,
   signal?: AbortSignal
 ): Promise<T> {
+  if (signal?.aborted) return Promise.reject(captureAborted());
   return new Promise<T>((resolve, reject) => {
+    const operationController = new AbortController();
     let settled = false;
+    let timer: ReturnType<typeof globalThis.setTimeout> | null = null;
+    const abortOperation = (reason: unknown) => {
+      if (!operationController.signal.aborted) operationController.abort(reason);
+    };
     const finish = (callback: () => void) => {
       if (settled) return;
       settled = true;
-      globalThis.clearTimeout(timer);
+      if (timer !== null) globalThis.clearTimeout(timer);
       signal?.removeEventListener("abort", onAbort);
       callback();
     };
-    const onAbort = () => finish(() => reject(captureAborted()));
-    const timer = globalThis.setTimeout(
-      () => finish(() => reject(new StudioCaptureReadinessError(
-        "render-timeout",
-        "페이지 렌더링 준비 시간이 초과되어 잘못된 페이지 캡처를 막았어요."
-      ))),
+    const onAbort = () => {
+      const error = captureAborted();
+      abortOperation(error);
+      finish(() => reject(error));
+    };
+    timer = globalThis.setTimeout(
+      () => {
+        const error = new StudioCaptureReadinessError(
+          "render-timeout",
+          "페이지 렌더링 준비 시간이 초과되어 잘못된 페이지 캡처를 막았어요."
+        );
+        abortOperation(error);
+        finish(() => reject(error));
+      },
       timeoutMs
     );
     signal?.addEventListener("abort", onAbort, { once: true });
-    work.then(
+    Promise.resolve().then(() => {
+      throwIfAborted(operationController.signal);
+      return work(operationController.signal);
+    }).then(
       (value) => finish(() => resolve(value)),
-      (error: unknown) => finish(() => reject(error))
+      (error: unknown) => {
+        abortOperation(error);
+        finish(() => reject(error));
+      }
     );
   });
 }
@@ -205,25 +344,36 @@ export async function waitForStudioCaptureReady<TStage extends StudioCaptureStag
   const nextFrame = options.nextFrame ?? defaultNextFrame;
   const waitForFonts = options.waitForFonts ?? defaultWaitForFonts;
   const preloadImage = options.preloadImage ?? defaultPreloadImage;
+  const resolveLinked3dPassRasterSource =
+    options.resolveLinked3dPassRasterSource
+    ?? defaultResolveLinked3dPassRasterSource;
   const sources = uniqueAssetSources(options.assetSources ?? []);
+  const waitForRasterPresentations = options.waitForRasterPresentations
+    ?? waitForStudioRasterImagePresentations;
 
-  const work = (async () => {
-    throwIfAborted(options.signal);
+  return withTimeout(async (operationSignal) => {
+    throwIfAborted(operationSignal);
     while (options.getRenderedPageId() !== pageId || !options.getStage()) {
       await nextFrame();
-      throwIfAborted(options.signal);
+      throwIfAborted(operationSignal);
     }
 
     await Promise.all([
       waitForFonts(),
-      preloadAssets(sources, preloadImage, options.signal),
+      preloadAssets(
+        sources,
+        preloadImage,
+        resolveLinked3dPassRasterSource,
+        options.linked3dPassAuthority,
+        operationSignal,
+      ),
     ]);
 
     // Preloading warms the browser cache; React-Konva image components still need paint frames to
     // receive their own onload state and draw the cached bitmap into the Stage.
     await nextFrame();
     await nextFrame();
-    throwIfAborted(options.signal);
+    throwIfAborted(operationSignal);
     if (options.getRenderedPageId() !== pageId) {
       throw new StudioCaptureReadinessError(
         "stale-page",
@@ -234,7 +384,13 @@ export async function waitForStudioCaptureReady<TStage extends StudioCaptureStag
     if (!stage) {
       throw new StudioCaptureReadinessError("stale-page", "캡처할 캔버스를 찾지 못했어요.");
     }
-    stage.batchDraw();
+    const rasterPresentationIdentities = options.rasterPresentationIdentities
+      ?? snapshotStudioMountedRasterImagePresentations();
+    await waitForRasterPresentations(
+      rasterPresentationIdentities,
+      () => stage.batchDraw(),
+      operationSignal,
+    );
     await nextFrame();
     if (options.getRenderedPageId() !== pageId || options.getStage() !== stage) {
       throw new StudioCaptureReadinessError(
@@ -243,9 +399,7 @@ export async function waitForStudioCaptureReady<TStage extends StudioCaptureStag
       );
     }
     return stage;
-  })();
-
-  return withTimeout(work, timeoutMs, options.signal);
+  }, timeoutMs, options.signal);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

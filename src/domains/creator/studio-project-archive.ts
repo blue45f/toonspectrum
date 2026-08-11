@@ -17,6 +17,10 @@ import {
   type StudioBg3dModelAttachment,
 } from "./studio-bg3d-scene-document";
 import {
+  assertStudioLinked3dPassProjectArchiveEvidence,
+  StudioLinked3dPassProjectArchiveError,
+} from "./studio-linked-3d-pass-project-archive";
+import {
   buildStudioPackageArchiveBlob,
   StudioPackageArchiveError,
   type StudioPackageArchiveProgress,
@@ -152,9 +156,10 @@ export class StudioProjectArchiveError extends Error {
   constructor(
     code: StudioProjectArchiveDiagnosticCode,
     message: string,
-    details: Pick<StudioProjectArchiveDiagnostic, "path" | "pointer"> = {}
+    details: Pick<StudioProjectArchiveDiagnostic, "path" | "pointer"> = {},
+    cause?: unknown,
   ) {
-    super(message);
+    super(message, cause === undefined ? undefined : { cause });
     this.name = "StudioProjectArchiveError";
     this.code = code;
     this.diagnostics = [{ severity: "error", code, message, ...details }];
@@ -1573,10 +1578,11 @@ function probableAssetField(pointer: string): boolean {
 function scanExternalProjectDependencies(
   value: unknown,
   pointer: string,
-  diagnostics: StudioProjectArchiveDiagnostic[]
+  diagnostics: StudioProjectArchiveDiagnostic[],
+  coveredPointers: ReadonlySet<string> = new Set(),
 ): void {
   if (typeof value === "string") {
-    if (isSelfContainedUri(value)) return;
+    if (isSelfContainedUri(value) || coveredPointers.has(pointer)) return;
     const probableAsset = probableAssetField(pointer);
     const hasUriScheme = /^[A-Za-z][A-Za-z0-9+.-]*:/u.test(value);
     if (
@@ -1593,13 +1599,36 @@ function scanExternalProjectDependencies(
     return;
   }
   if (Array.isArray(value)) {
-    value.forEach((item, index) => scanExternalProjectDependencies(item, childPointer(pointer, String(index)), diagnostics));
+    value.forEach((item, index) => scanExternalProjectDependencies(
+      item,
+      childPointer(pointer, String(index)),
+      diagnostics,
+      coveredPointers,
+    ));
     return;
   }
   if (isRecord(value)) {
     for (const [key, item] of Object.entries(value)) {
-      scanExternalProjectDependencies(item, childPointer(pointer, key), diagnostics);
+      scanExternalProjectDependencies(item, childPointer(pointer, key), diagnostics, coveredPointers);
     }
+  }
+}
+
+function linked3dArchiveCoverage(
+  project: StudioProjectFile,
+  evidence: Parameters<typeof assertStudioLinked3dPassProjectArchiveEvidence>[1],
+): ReadonlySet<string> {
+  try {
+    return assertStudioLinked3dPassProjectArchiveEvidence(project, evidence);
+  } catch (cause) {
+    if (!(cause instanceof StudioLinked3dPassProjectArchiveError)) throw cause;
+    if (cause.code === "attachment-missing") {
+      fail("ATTACHMENT_MISSING", cause.message);
+    }
+    if (cause.code === "attachment-mismatch") {
+      fail("DOCUMENT_REFERENCE_MISMATCH", cause.message);
+    }
+    fail("PROJECT_INVALID", cause.message);
   }
 }
 
@@ -2082,8 +2111,13 @@ export async function buildStudioProjectArchive(
   let parsedProject: StudioProjectFile;
   try {
     parsedProject = parseStudioProjectFile(boundedInput);
-  } catch {
-    fail("PROJECT_INVALID", "올바르지 않은 ToonSpectrum 프로젝트라 archive를 만들 수 없습니다.");
+  } catch (cause) {
+    throw new StudioProjectArchiveError(
+      "PROJECT_INVALID",
+      "올바르지 않은 ToonSpectrum 프로젝트라 archive를 만들 수 없습니다.",
+      {},
+      cause,
+    );
   }
   const canonicalProjectValue = canonicalizeProjectValue(parsedProject, "", 0, {
     seen: new WeakSet(),
@@ -2215,6 +2249,10 @@ export async function buildStudioProjectArchive(
   }
 
   const canonicalProject = parseStudioProjectFile(canonicalProjectValue);
+  const linked3dCoveredPointers = linked3dArchiveCoverage(
+    canonicalProject,
+    [...archiveAttachmentEvidence].map(([sha256, evidence]) => ({ sha256, ...evidence })),
+  );
   warnUncoveredReferenceBoardAttachments(
     canonicalProject,
     diagnostics,
@@ -2230,7 +2268,7 @@ export async function buildStudioProjectArchive(
         );
     }
   );
-  scanExternalProjectDependencies(canonicalProject, "", diagnostics);
+  scanExternalProjectDependencies(canonicalProject, "", diagnostics, linked3dCoveredPointers);
   const canonicalProjectJson = canonicalJson(canonicalProjectValue);
   const projectBytes = textEncoder.encode(canonicalProjectJson);
   if (projectBytes.byteLength > limits.maxProjectBytes) {
@@ -2856,6 +2894,7 @@ export async function importStudioProjectArchive(
     attachment.sha256,
     attachment,
   ]));
+  const linked3dCoveredPointers = linked3dArchiveCoverage(canonicalProject, manifest.attachments);
   warnUncoveredReferenceBoardAttachments(
     canonicalProject,
     diagnostics,
@@ -2869,7 +2908,7 @@ export async function importStudioProjectArchive(
         );
     }
   );
-  scanExternalProjectDependencies(rehydratedValue, "", diagnostics);
+  scanExternalProjectDependencies(rehydratedValue, "", diagnostics, linked3dCoveredPointers);
   let project: StudioProjectFile;
   try {
     project = parseStudioProjectFile(rehydratedValue);

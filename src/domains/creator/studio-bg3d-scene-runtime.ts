@@ -9,6 +9,7 @@ import {
   STUDIO_BG3D_PRIMITIVE_KINDS,
   STUDIO_BG3D_SCENE_DOCUMENT_MAX_ATTACHMENTS,
   STUDIO_BG3D_SCENE_DOCUMENT_MAX_NODES,
+  StudioBg3dSceneDocumentBudgetError,
   normalizeStudioBg3dAnimationPlayback,
   normalizeStudioBg3dConstraintLayer,
   normalizeStudioBg3dGlbAttachment,
@@ -72,6 +73,46 @@ export interface StudioBg3dRuntimeAdapterDiagnostic {
   readonly count: number;
 }
 
+/**
+ * Runtime-to-document conversion never returns a persistence-safe prefix when a bounded workload
+ * does not fit. Callers can distinguish the exact fail-closed reason without changing the success
+ * return shape used by the editor.
+ */
+export class StudioBg3dRuntimeAdapterError extends Error {
+  readonly code: StudioBg3dRuntimeAdapterDiagnosticCode;
+  readonly source: StudioBg3dRuntimeAdapterDiagnostic["source"];
+  readonly sourceIndex?: number;
+  readonly nodeId?: string;
+
+  constructor(
+    code: StudioBg3dRuntimeAdapterDiagnosticCode,
+    source: StudioBg3dRuntimeAdapterDiagnostic["source"],
+    details: { readonly sourceIndex?: number; readonly nodeId?: string } = {},
+    options?: ErrorOptions,
+  ) {
+    super(`Studio BG3D runtime adapter failed closed: ${code}.`, options);
+    this.name = "StudioBg3dRuntimeAdapterError";
+    this.code = code;
+    this.source = source;
+    this.sourceIndex = details.sourceIndex;
+    this.nodeId = details.nodeId;
+  }
+}
+
+function failAdapter(
+  code: StudioBg3dRuntimeAdapterDiagnosticCode,
+  source: StudioBg3dRuntimeAdapterDiagnostic["source"],
+  details: { readonly sourceIndex?: number; readonly nodeId?: string } = {},
+  cause?: unknown,
+): never {
+  throw new StudioBg3dRuntimeAdapterError(
+    code,
+    source,
+    details,
+    cause === undefined ? undefined : { cause },
+  );
+}
+
 export interface StudioBg3dRuntimeAdapterCounts {
   readonly inputPrimitives: number;
   readonly inputCustomModels: number;
@@ -97,6 +138,16 @@ export interface StudioBg3dRuntimeToDocumentResult {
   readonly omittedDiagnosticCount: number;
   readonly counts: StudioBg3dRuntimeAdapterCounts;
 }
+
+export type StudioBg3dRuntimeToDocumentAttempt =
+  | {
+      readonly ok: true;
+      readonly value: StudioBg3dRuntimeToDocumentResult;
+    }
+  | {
+      readonly ok: false;
+      readonly error: StudioBg3dRuntimeAdapterError;
+    };
 
 export interface StudioBg3dDocumentToRuntimeInput {
   readonly document: StudioBg3dSceneDocument;
@@ -472,60 +523,6 @@ function shotStateMatches(
     base.activeShotId === document.activeShotId;
 }
 
-function minimumPrefixForShotNodes(
-  base: StudioBg3dSceneDocument,
-  pending: readonly PendingNode[],
-): number | null {
-  const referencedIds = new Set(
-    base.shots?.flatMap((shot) => shot.nodeVisibility?.map((entry) => entry.nodeId) ?? []) ?? [],
-  );
-  if (referencedIds.size === 0) return 0;
-  const indexById = new Map(pending.map((entry, index) => [entry.node.id, index] as const));
-  let minimum = 0;
-  for (const nodeId of referencedIds) {
-    const index = indexById.get(nodeId);
-    if (index === undefined) return null;
-    minimum = Math.max(minimum, index + 1);
-  }
-  return minimum;
-}
-
-function fitPendingNodes(
-  base: StudioBg3dSceneDocument,
-  pending: readonly PendingNode[],
-  orderedAttachments: readonly StudioBg3dModelAttachment[]
-): { readonly roundTrip: StrictRoundTrip; readonly count: number } {
-  const requiredPrefix = minimumPrefixForShotNodes(base, pending);
-  let lower = requiredPrefix ?? pending.length + 1;
-  let upper = pending.length;
-  let best: { readonly roundTrip: StrictRoundTrip; readonly count: number } | null = null;
-  while (lower <= upper) {
-    const count = Math.floor((lower + upper) / 2);
-    const nodes = pending.slice(0, count).map((entry) => entry.node);
-    const referenced = new Set(
-      nodes.flatMap((node) => node.kind === "model" ? [node.attachmentId] : [])
-    );
-    const attachments = orderedAttachments.filter((attachment) => referenced.has(attachment.id));
-    const roundTrip = normalizedRuntimeRoundTrip(settingsOnlyDocument(base, attachments, nodes));
-    if (
-      roundTrip &&
-      nodesMatchPrefix(pending, count, roundTrip.document) &&
-      shotStateMatches(base, roundTrip.document)
-    ) {
-      best = { roundTrip, count };
-      lower = count + 1;
-    } else {
-      upper = count - 1;
-    }
-  }
-  if (best) return best;
-  const empty = normalizedRuntimeRoundTrip(
-    settingsOnlyDocument(DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT, [], [])
-  );
-  if (!empty) throw new Error("Invalid internal Studio BG3D runtime adapter defaults.");
-  return { roundTrip: empty, count: 0 };
-}
-
 /** Converts legacy runtime arrays to a strict, persistence-safe canonical scene document. */
 export function adaptStudioBg3dRuntimeToDocument(
   input: StudioBg3dRuntimeToDocumentInput
@@ -537,6 +534,12 @@ export function adaptStudioBg3dRuntimeToDocument(
   if (!Array.isArray(input.primitives)) diagnostics.add("invalid-runtime-collection", "primitive");
   if (!Array.isArray(input.customModels)) {
     diagnostics.add("invalid-runtime-collection", "custom-model");
+  }
+  if (primitives.length > STUDIO_BG3D_RUNTIME_ADAPTER_MAX_SCAN_ITEMS) {
+    failAdapter("input-scan-limit-exceeded", "primitive");
+  }
+  if (customModels.length > STUDIO_BG3D_RUNTIME_ADAPTER_MAX_SCAN_ITEMS) {
+    failAdapter("input-scan-limit-exceeded", "custom-model");
   }
 
   const pending: PendingNode[] = [];
@@ -550,10 +553,7 @@ export function adaptStudioBg3dRuntimeToDocument(
     base.budgets.complexity.maxNodes
   );
 
-  const primitiveScanCount = Math.min(
-    primitives.length,
-    STUDIO_BG3D_RUNTIME_ADAPTER_MAX_SCAN_ITEMS
-  );
+  const primitiveScanCount = primitives.length;
   for (let index = 0; index < primitiveScanCount; index += 1) {
     const node = primitiveNodeFromRuntime(primitives[index] as BgPrimitive);
     if (!node) {
@@ -568,25 +568,15 @@ export function adaptStudioBg3dRuntimeToDocument(
       continue;
     }
     if (pending.length >= nodeLimit) {
-      diagnostics.add("node-budget-exceeded", "primitive", {
+      failAdapter("node-budget-exceeded", "primitive", {
         sourceIndex: index,
         nodeId: node.id,
       });
-      continue;
     }
     pending.push({ node, source: "primitive", sourceIndex: index });
     nodeIds.add(node.id);
   }
-  if (primitives.length > primitiveScanCount) {
-    diagnostics.add("input-scan-limit-exceeded", "primitive", {
-      count: primitives.length - primitiveScanCount,
-    });
-  }
-
-  const customModelScanCount = Math.min(
-    customModels.length,
-    STUDIO_BG3D_RUNTIME_ADAPTER_MAX_SCAN_ITEMS
-  );
+  const customModelScanCount = customModels.length;
   for (let index = 0; index < customModelScanCount; index += 1) {
     const instance = customModels[index] as BgCustomModelInstance;
     if (
@@ -608,11 +598,10 @@ export function adaptStudioBg3dRuntimeToDocument(
       continue;
     }
     if (pending.length >= nodeLimit) {
-      diagnostics.add("node-budget-exceeded", "custom-model", {
+      failAdapter("node-budget-exceeded", "custom-model", {
         sourceIndex: index,
         nodeId: instance.id,
       });
-      continue;
     }
 
     const rawAttachment = readMapValue(input.attachmentByStorageModelId, instance.modelId);
@@ -658,21 +647,19 @@ export function adaptStudioBg3dRuntimeToDocument(
     }
     if (!existingById) {
       if (attachments.length >= STUDIO_BG3D_SCENE_DOCUMENT_MAX_ATTACHMENTS) {
-        diagnostics.add("attachment-budget-exceeded", "custom-model", {
+        failAdapter("attachment-budget-exceeded", "custom-model", {
           sourceIndex: index,
           nodeId: instance.id,
         });
-        continue;
       }
       if (
         cumulativeModelBytes + attachment.byteSize >
         base.budgets.complexity.maxModelBytes
       ) {
-        diagnostics.add("model-byte-budget-exceeded", "custom-model", {
+        failAdapter("model-byte-budget-exceeded", "custom-model", {
           sourceIndex: index,
           nodeId: instance.id,
         });
-        continue;
       }
       attachments.push(attachment);
       attachmentById.set(attachment.id, { attachment, json });
@@ -691,42 +678,38 @@ export function adaptStudioBg3dRuntimeToDocument(
     pending.push({ node: modelNode.node, source: "custom-model", sourceIndex: index });
     nodeIds.add(modelNode.node.id);
   }
-  if (customModels.length > customModelScanCount) {
-    diagnostics.add("input-scan-limit-exceeded", "custom-model", {
-      count: customModels.length - customModelScanCount,
-    });
+  let roundTrip: StrictRoundTrip | null;
+  const emittedNodes = pending.map((entry) => entry.node);
+  const referencedAttachmentIds = new Set(emittedNodes.flatMap((node) =>
+    node.kind === "model" ? [node.attachmentId] : []));
+  const emittedAttachments = attachments.filter((attachment) =>
+    referencedAttachmentIds.has(attachment.id));
+  try {
+    roundTrip = normalizedRuntimeRoundTrip(
+      settingsOnlyDocument(base, emittedAttachments, emittedNodes),
+    );
+  } catch (cause) {
+    if (cause instanceof StudioBg3dSceneDocumentBudgetError) {
+      failAdapter("persistence-byte-budget-exceeded", "document", {}, cause);
+    }
+    throw cause;
+  }
+  if (!roundTrip) failAdapter("persistence-byte-budget-exceeded", "document");
+  if (!nodesMatchPrefix(pending, pending.length, roundTrip.document)) {
+    failAdapter("persistence-byte-budget-exceeded", "document");
+  }
+  if (!shotStateMatches(base, roundTrip.document)) {
+    failAdapter("lossy-shot-repair", "base");
   }
 
-  const fitted = fitPendingNodes(base, pending, attachments);
-  if (!shotStateMatches(base, fitted.roundTrip.document)) {
-    diagnostics.add("lossy-shot-repair", "base", {
-      count: Math.max(1, base.shots?.length ?? 0),
-    });
-  }
-  if (fitted.count < pending.length) {
-    const tail = pending.slice(fitted.count);
-    const droppedPrimitives = tail.filter((entry) => entry.source === "primitive").length;
-    const droppedModels = tail.length - droppedPrimitives;
-    if (droppedPrimitives > 0) {
-      diagnostics.add("persistence-byte-budget-exceeded", "primitive", {
-        count: droppedPrimitives,
-      });
-    }
-    if (droppedModels > 0) {
-      diagnostics.add("persistence-byte-budget-exceeded", "custom-model", {
-        count: droppedModels,
-      });
-    }
-  }
-
-  const emittedPrimitives = fitted.roundTrip.document.nodes.filter(
+  const emittedPrimitives = roundTrip.document.nodes.filter(
     (node) => node.kind === "primitive"
   ).length;
-  const emittedCustomModels = fitted.roundTrip.document.nodes.length - emittedPrimitives;
+  const emittedCustomModels = roundTrip.document.nodes.length - emittedPrimitives;
   const finished = diagnostics.finish();
   return {
-    document: fitted.roundTrip.document,
-    serialized: fitted.roundTrip.serialized,
+    document: roundTrip.document,
+    serialized: roundTrip.serialized,
     ...finished,
     counts: Object.freeze({
       inputPrimitives: primitives.length,
@@ -737,6 +720,23 @@ export function adaptStudioBg3dRuntimeToDocument(
       droppedCustomModels: customModels.length - emittedCustomModels,
     }),
   };
+}
+
+/**
+ * Product/UI boundary for the throwing adapter. Budget failures are expected admission outcomes,
+ * not render/event-loop exceptions; unexpected programmer errors continue to propagate.
+ */
+export function tryAdaptStudioBg3dRuntimeToDocument(
+  input: StudioBg3dRuntimeToDocumentInput,
+): StudioBg3dRuntimeToDocumentAttempt {
+  try {
+    return { ok: true, value: adaptStudioBg3dRuntimeToDocument(input) };
+  } catch (error) {
+    if (error instanceof StudioBg3dRuntimeAdapterError) {
+      return { ok: false, error };
+    }
+    throw error;
+  }
 }
 
 /** Hydrates a strict canonical document into fresh legacy runtime arrays using explicit bindings. */

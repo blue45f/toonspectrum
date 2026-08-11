@@ -26,6 +26,8 @@ const MAX_VRM_JSON_CHUNK_BYTES = 8 * 1024 * 1024;
  */
 export const MAX_VRM_UPLOAD_BYTES = 128 * 1024 * 1024;
 export const VRM_VALIDATION_VERSION = 1;
+export const VRM_LIBRARY_THUMBNAIL_WINDOW_MAX_ITEMS = 12;
+export const VRM_LIBRARY_THUMBNAIL_WINDOW_MAX_BYTES = 24 * 1024 * 1024;
 
 export type VrmContentHash = `sha256:${string}`;
 
@@ -70,6 +72,15 @@ export interface VrmLibraryStorageOptions {
   readonly repository?: StudioVrmAssetSqliteOpfsRepository;
   /** Explicit pre-V12 test/embed seam. Product code never supplies or probes this value. */
   readonly legacyIndexedDb?: IDBFactory | null;
+}
+
+export interface VrmUploadedLibraryEntryPage {
+  readonly items: readonly VrmLibraryEntry[];
+  readonly cursor: string;
+  readonly nextCursor: string | null;
+  readonly totalCount: number;
+  readonly totalBytes: number;
+  readonly generation: number;
 }
 
 export type SampleVrm = {
@@ -835,6 +846,31 @@ function libraryEntryFromMetadata(
   };
 }
 
+function libraryEntryFromLegacyRecord(model: VrmStoredModelRecord): VrmLibraryEntry {
+  const contentHash = canonicalizeVrmContentHash(model.contentHash);
+  return {
+    id: model.id,
+    name: model.name,
+    source: "sqlite-opfs",
+    thumbnail: model.thumbnail ?? null,
+    createdAt: model.createdAt,
+    updatedAt: model.updatedAt,
+    ...(contentHash ? { contentHash } : {}),
+    ...(Number.isSafeInteger(model.byteSize) && (model.byteSize ?? 0) > 0
+      ? { byteSize: model.byteSize }
+      : {}),
+    ...(typeof model.mimeType === "string" && model.mimeType
+      ? { mimeType: model.mimeType }
+      : {}),
+  };
+}
+
+export function durableVrmLibraryEntry(
+  model: VrmStoredModelRecord,
+): VrmLibraryEntry {
+  return libraryEntryFromLegacyRecord(model);
+}
+
 export function memoryVrmLibraryEntry(
   record: VrmStoredModelWithContentIdentity,
 ): VrmLibraryEntry {
@@ -906,6 +942,10 @@ export async function getCachedVrmThumbnail(
   return thumbnail ? thumbnailToDataUrl(thumbnail) : null;
 }
 
+/**
+ * Compatibility-only all-metadata facade. It never hydrates SQLite/OPFS thumbnails; product UI
+ * must use queryUploadedVrmLibraryEntriesPage plus hydrateVrmLibraryThumbnailWindow.
+ */
 export async function listVrmLibraryEntries(
   options: VrmLibraryStorageOptions = {},
 ): Promise<VrmLibraryEntry[]> {
@@ -921,28 +961,109 @@ export async function listVrmLibraryEntries(
     return withDefaultVrmEntry(storedModels, Object.fromEntries(cachedSampleThumbnails));
   }
   const repository = productRepository(options);
-  const [metadata, sampleThumbnails] = await Promise.all([
-    repository.listModelMetadata(),
-    Promise.all(SAMPLE_VRM_ENTRIES.map(async (entry) => [
-      entry.id,
-      await repository.getThumbnail(entry.id),
-    ] as const)),
-  ]);
-  const uploaded: VrmLibraryEntry[] = [];
-  for (const entry of metadata) {
-    const thumbnail = entry.hasThumbnail
-      ? await repository.getThumbnail(entry.id)
-      : null;
-    uploaded.push(libraryEntryFromMetadata(
-      entry,
-      thumbnail ? thumbnailToDataUrl(thumbnail) : null,
-    ));
+  const metadata = await repository.listModelMetadata();
+  return [
+    ...SAMPLE_VRM_ENTRIES,
+    ...metadata.map((entry) => libraryEntryFromMetadata(entry, null)),
+  ];
+}
+
+/**
+ * Loads one durable upload metadata page. Thumbnails are deliberately hydrated through the
+ * separate byte-bounded window below, and model GLB bytes stay in OPFS until exact selection.
+ */
+export async function queryUploadedVrmLibraryEntriesPage(
+  options: VrmLibraryStorageOptions & {
+    readonly cursor?: string | null;
+    readonly signal?: AbortSignal;
+  } = {},
+): Promise<VrmUploadedLibraryEntryPage | null> {
+  if (usesLegacyIndexedDb(options)) {
+    const records = await listLegacyStoredVrmModels(legacyIndexedDb(options));
+    if (records.length === 0) return null;
+    const cursor = "legacy-upload-page-0";
+    if (options.cursor !== undefined && options.cursor !== null && options.cursor !== cursor) {
+      return null;
+    }
+    return Object.freeze({
+      items: Object.freeze(records.map(libraryEntryFromLegacyRecord)),
+      cursor,
+      nextCursor: null,
+      totalCount: records.length,
+      totalBytes: records.reduce((sum, record) => sum + (record.byteSize ?? record.blob.size), 0),
+      generation: 0,
+    });
   }
-  const samples = SAMPLE_VRM_ENTRIES.map((entry) => {
-    const thumbnail = sampleThumbnails.find(([id]) => id === entry.id)?.[1] ?? null;
-    return { ...entry, thumbnail: thumbnail ? thumbnailToDataUrl(thumbnail) : null };
+  const repository = productRepository(options);
+  const page = await repository.queryModelMetadataPage({
+    ...(options.cursor === undefined ? {} : { cursor: options.cursor }),
+    ...(options.signal === undefined ? {} : { signal: options.signal }),
   });
-  return [...samples, ...uploaded];
+  if (!page) return null;
+  return Object.freeze({
+    items: Object.freeze(page.items.map((entry) => libraryEntryFromMetadata(entry, null))),
+    cursor: page.cursor,
+    nextCursor: page.nextCursor,
+    totalCount: page.totalCount,
+    totalBytes: page.totalBytes,
+    generation: page.generation,
+  });
+}
+
+/**
+ * Hydrates at most one visible catalog window. Raw image bytes are accounted before conversion to
+ * data URLs so a caller can never accidentally materialize an entire 513+ thumbnail library.
+ */
+export async function hydrateVrmLibraryThumbnailWindow(
+  entries: readonly VrmLibraryEntry[],
+  options: VrmLibraryStorageOptions & { readonly signal?: AbortSignal } = {},
+): Promise<readonly VrmLibraryEntry[]> {
+  if (entries.length > VRM_LIBRARY_THUMBNAIL_WINDOW_MAX_ITEMS) {
+    throw new StudioVrmAssetRepositoryError(
+      "limit",
+      "VRM thumbnail window exceeds its item limit.",
+    );
+  }
+  const repository = usesLegacyIndexedDb(options) ? null : productRepository(options);
+  let totalBytes = 0;
+  const hydrated: VrmLibraryEntry[] = [];
+  for (const entry of entries) {
+    if (options.signal?.aborted) {
+      throw new StudioVrmAssetRepositoryError("aborted", "VRM thumbnail hydration was aborted.");
+    }
+    if (entry.thumbnail || entry.source === "memory") {
+      hydrated.push(entry);
+      continue;
+    }
+    let thumbnail: string | null = null;
+    if (repository) {
+      const asset = await repository.getThumbnail(entry.id, options.signal);
+      if (asset) {
+        if (asset.bytes.byteLength > VRM_LIBRARY_THUMBNAIL_WINDOW_MAX_BYTES - totalBytes) {
+          throw new StudioVrmAssetRepositoryError(
+            "limit",
+            "VRM thumbnail window exceeds its aggregate byte limit.",
+          );
+        }
+        totalBytes += asset.bytes.byteLength;
+        thumbnail = thumbnailToDataUrl(asset);
+      }
+    } else {
+      thumbnail = await getLegacyCachedVrmThumbnail(entry.id, legacyIndexedDb(options));
+      if (thumbnail) {
+        const estimatedBytes = Math.ceil(thumbnail.length * 3 / 4);
+        if (estimatedBytes > VRM_LIBRARY_THUMBNAIL_WINDOW_MAX_BYTES - totalBytes) {
+          throw new StudioVrmAssetRepositoryError(
+            "limit",
+            "VRM thumbnail window exceeds its aggregate byte limit.",
+          );
+        }
+        totalBytes += estimatedBytes;
+      }
+    }
+    hydrated.push(thumbnail ? { ...entry, thumbnail } : entry);
+  }
+  return Object.freeze(hydrated);
 }
 
 let saveWorkTail: Promise<void> = Promise.resolve();

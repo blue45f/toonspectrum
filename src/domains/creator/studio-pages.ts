@@ -12,6 +12,10 @@ import {
   parseStudioDrawingAssistDocument,
 } from "./studio-drawing-assist-document";
 import {
+  remapStudioLinked3dRenderDocumentElementIds,
+  studioLinked3dRenderElementIds,
+} from "./studio-linked-3d-render-document";
+import {
   remapStudioShared3dStageCollectionElementIds,
   studioShared3dStageLinkedCharacterElementIds,
 } from "./studio-shared-3d-stage-collection";
@@ -41,6 +45,7 @@ export interface PageLike {
   groups?: Array<{ id: string }>;
   drawingAssist?: unknown;
   shared3dStage?: unknown;
+  linked3dRender?: unknown;
 }
 
 export const DEFAULT_CANVAS_H = 1080;
@@ -92,6 +97,19 @@ export function duplicatePageState<P extends PageLike>(page: P, makeId: () => st
     );
     if (remapped) duplicated.shared3dStage = remapped;
     else delete duplicated.shared3dStage;
+  }
+  if (page.linked3dRender !== undefined) {
+    const linkedIds = studioLinked3dRenderElementIds(page.linked3dRender);
+    if (!linkedIds) {
+      delete duplicated.linked3dRender;
+    } else {
+      const remapped = remapStudioLinked3dRenderDocumentElementIds(
+        page.linked3dRender,
+        elementIdMap,
+      );
+      if (remapped) duplicated.linked3dRender = remapped;
+      else delete duplicated.linked3dRender;
+    }
   }
   return duplicated;
 }
@@ -151,7 +169,7 @@ export function movePage<P extends PageLike>(pages: readonly P[], pageId: string
 export function clearPage<P extends PageLike>(pages: readonly P[], pageId: string): P[] {
   return pages.map((p) =>
     p.id === pageId
-      ? ({ ...p, elements: [], shared3dStage: undefined } as P)
+      ? ({ ...p, elements: [], shared3dStage: undefined, linked3dRender: undefined } as P)
       : p
   );
 }
@@ -246,6 +264,19 @@ export function duplicateMirroredPage<P extends PageLike>(
     );
     if (remapped) mirrored.shared3dStage = remapped;
     else delete mirrored.shared3dStage;
+  }
+  if (page.linked3dRender !== undefined) {
+    const linkedIds = studioLinked3dRenderElementIds(page.linked3dRender);
+    if (!linkedIds) {
+      delete mirrored.linked3dRender;
+    } else {
+      const remapped = remapStudioLinked3dRenderDocumentElementIds(
+        page.linked3dRender,
+        elementIdMap,
+      );
+      if (remapped) mirrored.linked3dRender = remapped;
+      else delete mirrored.linked3dRender;
+    }
   }
   return mirrored;
 }

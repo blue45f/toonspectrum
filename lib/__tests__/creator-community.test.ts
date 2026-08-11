@@ -1,11 +1,12 @@
 // 창작 커뮤니티(연재 시리즈·챌린지·팔로우) 테스트 — community.test.ts 패턴.
 // 순수 검증 테스트는 항상 실행되고, DB가 있는 환경에서만 통합 테스트가 돈다.
-import { inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import {
   creatorFollows,
   creatorSeries,
+  creatorWorkAssets,
   creatorWorkRevisions,
   creatorWorks,
   db,
@@ -44,6 +45,7 @@ import {
   CreatorWorkRevisionConflictError,
   CreatorWorkRevisionNotFoundError,
 } from "../server/creator-work-revisions";
+import { StudioLinked3dPassAssetFenceError } from "../studio-linked-3d-pass-asset-fence";
 
 import { retryOnDeadlock } from "./db-test-utils";
 
@@ -107,6 +109,61 @@ async function createCreatorTestUser(name = "테스트 창작자", idPrefix = "t
 }
 
 let dbAvailable = false;
+
+const LINKED_PASS_HASH = "a".repeat(64);
+const LINKED_PASS_SOURCE_HASH = `sha256:${"b".repeat(64)}`;
+const LINKED_PASS_ASSET_ID = `linked3d-pass-sha256-${LINKED_PASS_HASH}`;
+const LINKED_PASS_LOCATOR = `studio-opfs-cas:sha256:${LINKED_PASS_HASH}`;
+
+function linkedPassCreatorDoc(linkCount = 1): Record<string, unknown> {
+  const elements = Array.from({ length: linkCount }, (_, index) => ({
+    id: `line-linked-${index}`,
+    type: "image",
+    src: LINKED_PASS_LOCATOR,
+  }));
+  const links = Array.from({ length: linkCount }, (_, index) => ({
+    bundleId: `bundle-linked-${index}`,
+    shotId: `shot-linked-${index}`,
+    sourceShotId: null,
+    stageSourceHash: LINKED_PASS_SOURCE_HASH,
+    layers: [{ elementId: `line-linked-${index}`, role: "main-line" }],
+    passRevision: {
+      revision: 1,
+      sourceHash: LINKED_PASS_SOURCE_HASH,
+      sceneHash: LINKED_PASS_SOURCE_HASH,
+      cameraHash: LINKED_PASS_SOURCE_HASH,
+      baseGeometryHash: LINKED_PASS_SOURCE_HASH,
+      topologyHash: LINKED_PASS_SOURCE_HASH,
+      objectIdentityHash: LINKED_PASS_SOURCE_HASH,
+      objectStableIds: ["obj/room"],
+      passRootHash: LINKED_PASS_SOURCE_HASH,
+      artifact: {
+        pass: "line",
+        role: "main-line",
+        contentHash: `sha256:${LINKED_PASS_HASH}`,
+        byteSize: 68,
+        mime: "image/png",
+        width: 64,
+        height: 32,
+        locator: LINKED_PASS_LOCATOR,
+      },
+    },
+    corrections: [],
+  }));
+  return {
+    pagesList: [{
+      id: "page-linked",
+      elements,
+      linked3dRender: {
+        kind: "toonspectrum.studio-linked-3d-render",
+        version: 2,
+        authority: "studio-project-linked-3d-pass-index",
+        links,
+      },
+    }],
+  };
+}
+
 beforeAll(async () => {
   try {
     await dbClient.execute("SELECT 1");
@@ -284,6 +341,83 @@ describe("creator community (DB)", { timeout: 90000 }, () => {
       { revision: 2, restoredFromRevision: null },
       { revision: 1, restoredFromRevision: null },
     ]);
+  }, 90000);
+
+  it("linked 3D JSON은 같은 work의 exact immutable PNG가 있어야 저장·복원된다", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    const owner = await createCreatorTestUser("linked pass 소유자", "linked-pass-owner-");
+    const created = await createWork(owner, { title: "linked pass 원고", status: "draft" });
+    createdWorkIds.add(created.id);
+    const linkedDoc = linkedPassCreatorDoc(65);
+
+    const missing = await updateWork(owner, created.id, {
+      doc: linkedDoc,
+      baseRevision: 1,
+    }).catch((error: unknown) => error);
+    expect(missing).toBeInstanceOf(StudioLinked3dPassAssetFenceError);
+    expect((missing as StudioLinked3dPassAssetFenceError).code).toBe("asset-missing");
+    await expect(getWork(created.id, owner)).resolves.toMatchObject({ revision: 1, doc: {} });
+    await expect(listWorkRevisions(owner, created.id)).resolves.toHaveLength(1);
+
+    await db.insert(creatorWorkAssets).values({
+      workId: created.id,
+      assetId: LINKED_PASS_ASSET_ID,
+      elementType: "image",
+      mimeType: "image/png",
+      descriptor: {
+        version: 1,
+        element: {
+          id: LINKED_PASS_ASSET_ID,
+          type: "image",
+          x: 0,
+          y: 0,
+          width: 64,
+          height: 32,
+          rotation: 0,
+        },
+      },
+      payload: new Uint8Array(68),
+      byteSize: 68,
+      sha256: LINKED_PASS_HASH,
+      intrinsicWidth: 64,
+      intrinsicHeight: 32,
+      decodedRgbaBytes: 64 * 32 * 4,
+      uploadedBy: owner,
+    });
+
+    const linked = await updateWork(owner, created.id, {
+      doc: linkedDoc,
+      baseRevision: 1,
+    });
+    expect(linked.revision).toBe(2);
+    const detached = await updateWork(owner, created.id, {
+      doc: { pagesList: [{ id: "plain-page" }] },
+      baseRevision: 2,
+    });
+    expect(detached.revision).toBe(3);
+    await expect(restoreWorkRevision(owner, created.id, 2, 3)).resolves.toMatchObject({
+      revision: 4,
+    });
+
+    await db
+      .delete(creatorWorkAssets)
+      .where(
+        and(
+          eq(creatorWorkAssets.workId, created.id),
+          eq(creatorWorkAssets.assetId, LINKED_PASS_ASSET_ID)
+        )
+      );
+    const restoreWithoutAsset = await restoreWorkRevision(owner, created.id, 2, 4)
+      .catch((error: unknown) => error);
+    expect(restoreWithoutAsset).toBeInstanceOf(StudioLinked3dPassAssetFenceError);
+    expect((restoreWithoutAsset as StudioLinked3dPassAssetFenceError).code).toBe("asset-missing");
+    await expect(getWork(created.id, owner)).resolves.toMatchObject({ revision: 4 });
+
+    await expect(createWork(owner, {
+      title: "direct linked create",
+      status: "draft",
+      doc: linkedDoc,
+    })).rejects.toMatchObject({ code: "asset-missing" });
   }, 90000);
 
   it("작품별 snapshot은 성공한 저장과 같은 transaction에서 최신 보존 상한까지만 유지한다", async (ctx) => {

@@ -9,6 +9,7 @@ import {
   creatorWorkAssets,
   creatorWorkAssetTombstones,
   creatorWorkCollaborators,
+  creatorWorkRevisions,
   creatorWorks,
   db,
 } from "../../../../../lib/db";
@@ -16,6 +17,11 @@ import {
   normalizeStudioBrushR8TextureGrainSource,
   serializeStudioBrushR8TextureGrainSourceCanonical,
 } from "../../../../../lib/studio-brush-r8-grain-asset-contract";
+import {
+  extractStudioLinked3dPassAssetRequirements,
+  isStudioLinked3dPassServerAssetId,
+  type CreatorWorkLinked3dJsonEnvelope,
+} from "../../../../../lib/studio-linked-3d-pass-asset-fence";
 import {
   STUDIO_WORK_ASSET_CONTRACT_VERSION,
   STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK,
@@ -273,6 +279,27 @@ export function planStudioWorkAssetOrphanCleanup(input: {
   return true;
 }
 
+/**
+ * Linked-pass compensation is routinely replayed after an ambiguous save response. An exact row
+ * owned by another collaborator or already present in any durable authority is a successful safe
+ * no-op, not an authorization/reference error shown to the editor.
+ */
+export function planStudioLinked3dPassOrphanCleanup(input: {
+  existing: StudioWorkAssetCleanupCandidate | null;
+  actorUserId: string;
+  elementType: StudioWorkAssetType;
+  expectedSha256: string;
+  durablyReferenced: boolean;
+}): boolean {
+  return Boolean(
+    input.existing
+    && input.existing.elementType === input.elementType
+    && input.existing.sha256 === input.expectedSha256
+    && input.existing.uploadedBy === input.actorUserId
+    && !input.durablyReferenced
+  );
+}
+
 function isPlainR8CleanupRecord(value: unknown): value is Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
   try {
@@ -354,6 +381,60 @@ export function studioCrdtHydrationReferencesWorkAsset(
   } finally {
     document.destroy();
   }
+}
+
+function isPlainJsonRecord(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  try {
+    const prototype = Object.getPrototypeOf(value);
+    return prototype === Object.prototype || prototype === null;
+  } catch {
+    return false;
+  }
+}
+
+function revisionLinked3dEnvelope(
+  value: unknown,
+): CreatorWorkLinked3dJsonEnvelope | null {
+  if (
+    !isPlainJsonRecord(value)
+    || !Object.prototype.hasOwnProperty.call(value, "cover")
+    || !Object.prototype.hasOwnProperty.call(value, "pages")
+    || !Object.prototype.hasOwnProperty.call(value, "doc")
+  ) return null;
+  return {
+    cover: value.cover,
+    pages: value.pages,
+    doc: value.doc,
+  };
+}
+
+/**
+ * Proves that an immutable linked-pass upload is absent from every current/retained JSON
+ * authority. Any malformed envelope fails closed because deleting a content-addressed row is
+ * irreversible while an older revision may still restore its locator.
+ */
+export function studioLinked3dJsonAuthoritiesReferenceAsset(input: {
+  readonly assetId: string;
+  readonly current: CreatorWorkLinked3dJsonEnvelope;
+  readonly revisionSnapshots: readonly unknown[];
+}): boolean {
+  const authorities: Array<CreatorWorkLinked3dJsonEnvelope | null> = [input.current];
+  for (const snapshot of input.revisionSnapshots) {
+    authorities.push(revisionLinked3dEnvelope(snapshot));
+  }
+  for (const authority of authorities) {
+    if (!authority) return true;
+    try {
+      if (
+        extractStudioLinked3dPassAssetRequirements(authority)
+          .some((requirement) => requirement.assetId === input.assetId)
+      ) return true;
+    } catch {
+      return true;
+    }
+  }
+  return false;
 }
 
 export function isStudioWorkAssetIdempotentReplay(
@@ -1636,13 +1717,45 @@ export class DrizzleStudioWorkAssetRepository implements StudioWorkAssetReposito
         ) return false;
 
         const durable = await loadStudioCrdtDocumentInTransaction(transaction, workId);
-        if (!planStudioWorkAssetOrphanCleanup({
-          existing,
-          actorUserId,
-          elementType,
-          expectedSha256,
-          durablyReferenced: studioCrdtHydrationReferencesWorkAsset(durable, assetId),
-        })) return false;
+        let jsonReferenced = false;
+        if (isStudioLinked3dPassServerAssetId(assetId)) {
+          const [current] = await transaction
+            .select({
+              cover: creatorWorks.cover,
+              pages: creatorWorks.pages,
+              doc: creatorWorks.doc,
+            })
+            .from(creatorWorks)
+            .where(eq(creatorWorks.id, workId))
+            .limit(1);
+          const revisions = await transaction
+            .select({ snapshot: creatorWorkRevisions.snapshot })
+            .from(creatorWorkRevisions)
+            .where(eq(creatorWorkRevisions.workId, workId));
+          jsonReferenced = !current || studioLinked3dJsonAuthoritiesReferenceAsset({
+            assetId,
+            current,
+            revisionSnapshots: revisions.map((revision) => revision.snapshot),
+          });
+        }
+        const durablyReferenced = jsonReferenced
+          || studioCrdtHydrationReferencesWorkAsset(durable, assetId);
+        const cleanupAllowed = isStudioLinked3dPassServerAssetId(assetId)
+          ? planStudioLinked3dPassOrphanCleanup({
+              existing,
+              actorUserId,
+              elementType,
+              expectedSha256,
+              durablyReferenced,
+            })
+          : planStudioWorkAssetOrphanCleanup({
+              existing,
+              actorUserId,
+              elementType,
+              expectedSha256,
+              durablyReferenced,
+            });
+        if (!cleanupAllowed) return false;
 
         const [generatedReference] = await transaction
           .select({ referenceId: creatorWorkAssetStorageReferences.referenceId })
@@ -1658,6 +1771,7 @@ export class DrizzleStudioWorkAssetRepository implements StudioWorkAssetReposito
         if (generatedReference) {
           // The source row owns every generated reference through its composite foreign key.
           // Cascading it here would bypass the generated-object delete state machine.
+          if (isStudioLinked3dPassServerAssetId(assetId)) return false;
           throw new StudioWorkAssetReferencedError();
         }
 
@@ -1693,6 +1807,7 @@ export class DrizzleStudioWorkAssetRepository implements StudioWorkAssetReposito
   ): Promise<boolean> {
     return db.transaction(async (transaction) => {
       await requireAccess(transaction, actorUserId, workId, "edit", true);
+      if (isStudioLinked3dPassServerAssetId(assetId)) return false;
       const [existing] = await transaction
         .select({
           assetId: creatorWorkAssets.assetId,

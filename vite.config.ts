@@ -299,13 +299,16 @@ export default defineConfig(({ mode }) => ({
             || id.endsWith("/src/domains/creator/studio-mobile-sheet-snap.ts")
             || id.endsWith("/src/domains/creator/studio-similar-style.ts")
             || id.endsWith("/src/domains/creator/studio-story-beats.ts")
+            || id.endsWith("/src/domains/creator/studio-element-model.ts")
+            || id.endsWith("/src/domains/creator/studio-raster-image-presentation.ts")
           ) {
             // These lightweight contracts are shared by several Studio lazy entries. Similar-style
             // and story-beat helpers are also synchronously needed by StudioPage, so leaving their
-            // 273/313-byte bodies as separate shared chunks costs two launch requests without
-            // preserving any lazy bytes. Keeping them together avoids those micro-requests. The procedural
-            // descriptor index is deliberately excluded so its 160 labels/previews stay behind
-            // the full-library and saved-pro-brush dynamic boundaries.
+            // tiny bodies as separate shared chunks costs launch requests without preserving lazy
+            // bytes. Element-model and raster-presentation are dependency-free linked-surface
+            // contracts, so co-locating them also avoids recursive 3D dependency capture. The
+            // procedural descriptor index is deliberately excluded so its 160 labels/previews stay
+            // behind the full-library and saved-pro-brush dynamic boundaries.
             return "studio-core-micro-contracts";
           }
           if (

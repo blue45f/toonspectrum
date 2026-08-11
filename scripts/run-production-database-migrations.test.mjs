@@ -21,14 +21,16 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(25);
+  expect(manifest).toHaveLength(27);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
-  expect(manifest.at(-1).id).toBe("0025_auth_lifecycle_contract");
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(25);
+  expect(manifest.at(-1).id).toBe("0027_creator_draft_atomic_publication");
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(27);
 });
 
 test("auth lifecycle migration owns schema repair and a durable readiness marker", () => {
-  const migration = loadMigrationManifest().at(-1);
+  const migration = loadMigrationManifest().find(
+    ({ id }) => id === "0025_auth_lifecycle_contract",
+  );
   expect(migration?.id).toBe("0025_auth_lifecycle_contract");
   const sql = migration?.contents ?? "";
 
@@ -55,6 +57,42 @@ test("auth lifecycle migration owns schema repair and a durable readiness marker
   expect(drizzleSchema).toContain(
     'index("idx_user_status_created").on(u.status, u.createdAt)',
   );
+});
+
+test("cloud-save intent migration widens and validates the existing room check", () => {
+  const migration = loadMigrationManifest().find(
+    ({ id }) => id === "0026_creator_draft_cloud_save_intent",
+  );
+  expect(migration?.id).toBe("0026_creator_draft_cloud_save_intent");
+  const sql = migration?.contents ?? "";
+
+  expect(sql).toContain(
+    'DROP CONSTRAINT IF EXISTS "creator_draft_collaboration_room_provision_intent_check"',
+  );
+  expect(sql).toContain(
+    "CHECK (\"provisionIntent\" IN ('share-link', 'invite-member', 'cloud-save'))",
+  );
+  expect(sql).toContain(
+    'VALIDATE CONSTRAINT "creator_draft_collaboration_room_provision_intent_check"',
+  );
+  expect(sql).toContain("0026_creator_draft_cloud_save_intent");
+  expect(sql).toContain('INSERT INTO "toonspectrum_schema_migration"');
+});
+
+test("atomic publication migration records an exact revision and final-status receipt", () => {
+  const migration = loadMigrationManifest().at(-1);
+  expect(migration?.id).toBe("0027_creator_draft_atomic_publication");
+  const sql = migration?.contents ?? "";
+
+  expect(sql).toContain('ADD COLUMN IF NOT EXISTS "promotionExpectedWorkRevision" integer');
+  expect(sql).toContain('ADD COLUMN IF NOT EXISTS "promotionFinalStatus" text');
+  expect(sql).toContain("'draft', 'published'");
+  expect(sql).toContain(
+    'VALIDATE CONSTRAINT "creator_draft_collaboration_room_state_check"',
+  );
+  expect(sql).toContain("0027_creator_draft_atomic_publication");
+  expect(sql).toContain('INSERT INTO "toonspectrum_schema_migration"');
+  expect(sql).not.toMatch(/UPDATE\s+"creator_draft_collaboration_room"/u);
 });
 
 test("manifest sequence continuity rejects a missing middle number", () => {

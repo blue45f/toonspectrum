@@ -506,6 +506,10 @@ describe("studio project canonical document boundary", () => {
     expect(canonicalImport).toContain(
       'loaded.source === "canonical-envelope"'
     );
+    expect(canonicalImport).toContain(
+      "hasStudioLinked3dPassProjectArchiveReferences(loaded.project)"
+    );
+    expect(canonicalImport).toContain("self-contained .toonproject.zip archive");
     expect(canonicalImport).toContain(": null;");
     expect(canonicalImport).not.toContain("console.error(err)");
     const archiveImport = projectArchiveSource.slice(

@@ -3,6 +3,8 @@ import type { DialogueLocaleMap } from "./studio-dialogue-translate";
 import type { StudioDrawingAssistDocument } from "./studio-drawing-assist-document";
 import type { El } from "./studio-element-model";
 import type { LayerGroup } from "./studio-layers";
+import type { StudioLinked3dRenderDocument } from
+  "./studio-linked-3d-render-document";
 import type { PageGrade } from "./studio-page-grade";
 import type { PageReviewState } from "./studio-page-review";
 import type { StudioShared3dStagePersistedState } from
@@ -28,4 +30,6 @@ export interface PageState {
   drawingAssist?: StudioDrawingAssistDocument;
   /** 여러 BG3D 원본과 각 장면의 canonical VRM 원본을 잇는 엄격한 참조 컬렉션. */
   shared3dStage?: StudioShared3dStagePersistedState;
+  /** 실제 Canvas LT 레이어를 canonical Scene Shot에 잇는 ref-only 교차참조 영수증. */
+  linked3dRender?: StudioLinked3dRenderDocument;
 }

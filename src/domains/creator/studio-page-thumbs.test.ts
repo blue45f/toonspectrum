@@ -483,6 +483,22 @@ describe("studio-page-thumbs — buildThumbNodes(요소 프록시)", () => {
     expect(html).toContain("radial-gradient"); // 비네트 오버레이
   });
 
+  it("연결형 OPFS raster는 검증 lease 전 raw locator를 SVG href로 노출하지 않는다", async () => {
+    const [{ renderToStaticMarkup }, { createElement }, { StudioPageThumbnail }] = await Promise.all([
+      import("react-dom/server"),
+      import("react"),
+      import("./StudioPageThumbnails"),
+    ]);
+    const locator = `studio-opfs-cas:sha256:${"a".repeat(64)}`;
+    const page = pageWith([
+      { id: "linked", type: "image", src: locator, x: 40, y: 40, width: 200, height: 150 },
+    ]);
+
+    const html = renderToStaticMarkup(createElement(StudioPageThumbnail, { page }));
+    expect(html).toContain('data-raster-source-placeholder="true"');
+    expect(html).not.toContain(`href="${locator}"`);
+  });
+
   it("알 수 없는 요소 타입은 무시(노드 없음)하고, 결과는 결정적이다", () => {
     const page = pageWith([
       { id: "u1", type: "hologram" },

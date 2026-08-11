@@ -392,7 +392,7 @@ describe("creator draft collaboration zod contracts", () => {
     const valid = {
       draftDocumentId: DRAFT_ID,
       ownerScopeKey: "owner-a",
-      intent: "share-link",
+      intent: "cloud-save",
       clientMutationId: MUTATION_ID,
       initialSnapshotByteLength: 16 * 1_024 * 1_024,
     };
@@ -429,6 +429,8 @@ describe("creator draft collaboration zod contracts", () => {
       ownerScopeKey: "owner-a",
       targetWorkId: "work-a",
       expectedGraphRevision: 0,
+      expectedWorkRevision: 3,
+      finalStatus: "published",
       clientMutationId: MUTATION_ID,
     };
     expect(CreatorDraftCollaborationRoomParamsSchema.parse({ roomId: ROOM_ID })).toEqual({
@@ -439,6 +441,18 @@ describe("creator draft collaboration zod contracts", () => {
       PromoteCreatorDraftCollaborationRoomSchema.safeParse({
         ...valid,
         expectedGraphRevision: -1,
+      }).success
+    ).toBe(false);
+    expect(
+      PromoteCreatorDraftCollaborationRoomSchema.safeParse({
+        ...valid,
+        expectedWorkRevision: 0,
+      }).success
+    ).toBe(false);
+    expect(
+      PromoteCreatorDraftCollaborationRoomSchema.safeParse({
+        ...valid,
+        finalStatus: "hidden",
       }).success
     ).toBe(false);
     expect(
@@ -464,7 +478,7 @@ describe("creator draft collaboration zod contracts", () => {
       status: "active",
       graphRevision: 0,
       initialSnapshotByteLength: 1_024,
-      provisionIntent: "invite-member",
+      provisionIntent: "cloud-save",
       provisionedAt: "2026-07-26T00:00:00.000Z",
       expiresAt: "2026-08-02T00:00:00.000Z",
       promotedAt: null,

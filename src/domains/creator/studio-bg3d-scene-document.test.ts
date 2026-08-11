@@ -14,6 +14,7 @@ import {
   STUDIO_BG3D_SHOT_ID_MAX_LENGTH,
   STUDIO_BG3D_SHOT_MAX_NODE_VISIBILITY_OVERRIDES,
   STUDIO_BG3D_SHOT_NAME_MAX_LENGTH,
+  StudioBg3dSceneDocumentBudgetError,
   applyStudioBg3dShot,
   captureStudioBg3dShot,
   createDefaultStudioBg3dSceneDocument,
@@ -78,6 +79,20 @@ function currentDocument(overrides: Record<string, unknown> = {}): Record<string
     ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
     ...overrides,
   };
+}
+
+function expectSceneBudgetError(
+  operation: () => unknown,
+  code: StudioBg3dSceneDocumentBudgetError["code"],
+): void {
+  try {
+    operation();
+  } catch (cause) {
+    expect(cause).toBeInstanceOf(StudioBg3dSceneDocumentBudgetError);
+    expect((cause as StudioBg3dSceneDocumentBudgetError).code).toBe(code);
+    return;
+  }
+  throw new Error(`Expected Studio BG3D scene budget error: ${code}.`);
 }
 
 function schemaV1Budgets(): Record<string, unknown> {
@@ -883,7 +898,7 @@ describe("Studio BG3D scene document normalization", () => {
     );
     const unknownVersion = JSON.stringify(currentDocument({ version: 999 }));
 
-    for (const raw of ["{bad json", cyclic, accessor, oversized, unknownVersion]) {
+    for (const raw of ["{bad json", cyclic, accessor, unknownVersion]) {
       expect(
         typeof raw === "string" ? parseStudioBg3dSceneDocument(raw) : migrateStudioBg3dSceneDocument(raw)
       ).toBeNull();
@@ -891,6 +906,11 @@ describe("Studio BG3D scene document normalization", () => {
         DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT
       );
     }
+    expect(parseStudioBg3dSceneDocument(oversized)).toBeNull();
+    expectSceneBudgetError(
+      () => normalizeStudioBg3dSceneDocument(oversized),
+      "input-byte-budget-exceeded",
+    );
   });
 
   it("requires every current persistence root while keeping the interactive normalizer lenient", () => {
@@ -931,7 +951,7 @@ describe("Studio BG3D scene document normalization", () => {
     });
   });
 
-  it("bounds lenient normalization for 512 sparse model nodes without letting strict persistence truncate", () => {
+  it("fails closed instead of byte-fitting a prefix of 512 sparse model nodes", () => {
     const nodes = Array.from({ length: STUDIO_BG3D_SCENE_DOCUMENT_MAX_NODES }, (_, index) => ({
       id: `emoji-${index}`,
       name: "😀".repeat(80),
@@ -953,19 +973,14 @@ describe("Studio BG3D scene document normalization", () => {
         nodes,
       })
     );
-    const normalized = normalizeStudioBg3dSceneDocument(raw);
-    const serialized = serializeStudioBg3dSceneDocument(normalized);
-
     expect(new TextEncoder().encode(raw).byteLength).toBeLessThanOrEqual(
       STUDIO_BG3D_SCENE_DOCUMENT_MAX_BYTES
     );
-    expect(parseStudioBg3dSceneDocument(raw)).toBeNull();
-    expect(normalized.nodes.length).toBeLessThan(STUDIO_BG3D_SCENE_DOCUMENT_MAX_NODES);
-    expect(serialized).not.toBeNull();
-    expect(new TextEncoder().encode(serialized ?? "").byteLength).toBeLessThanOrEqual(
-      STUDIO_BG3D_SCENE_DOCUMENT_MAX_BYTES
+    expectSceneBudgetError(
+      () => normalizeStudioBg3dSceneDocument(raw),
+      "document-byte-budget-exceeded",
     );
-    expect(parseStudioBg3dSceneDocument(serialized ?? "")).toEqual(normalized);
+    expect(parseStudioBg3dSceneDocument(raw)).toBeNull();
   });
 
   it("rejects every lossy nested rewrite at the strict persistence boundary", () => {
@@ -1154,7 +1169,7 @@ describe("Studio BG3D GLB attachment contract", () => {
     expect(serialized).not.toContain("private-credential-value");
   });
 
-  it("forces unknown rights to non-commercial and bounds attachment count, ids, hashes, and total bytes", () => {
+  it("forces unknown rights to non-commercial and fails closed on attachment count or total bytes", () => {
     const unknown = normalizeStudioBg3dGlbAttachment(
       attachment(1, {
         rights: {
@@ -1165,12 +1180,11 @@ describe("Studio BG3D GLB attachment contract", () => {
       })
     );
     const many = Array.from(
-      { length: STUDIO_BG3D_SCENE_DOCUMENT_MAX_ATTACHMENTS + 10 },
+      { length: STUDIO_BG3D_SCENE_DOCUMENT_MAX_ATTACHMENTS + 1 },
       (_, index) => attachment(index + 1, { byteSize: 1 })
     );
     many.splice(2, 0, attachment(1, { id: "duplicate-id", byteSize: 1 }));
-    const bounded = normalizeStudioBg3dSceneDocument(
-      currentDocument({
+    const aggregateOverflow = currentDocument({
         budgets: {
           ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.budgets,
           complexity: {
@@ -1181,24 +1195,30 @@ describe("Studio BG3D GLB attachment contract", () => {
         attachments: [
           attachment(1, { byteSize: 600_000 }),
           attachment(2, { byteSize: 600_000 }),
-          ...many,
         ],
-      })
-    );
+      });
+    const countOverflow = currentDocument({
+      budgets: {
+        ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.budgets,
+        complexity: {
+          ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.budgets.complexity,
+          maxModelBytes: 512 * 1024 * 1024,
+        },
+      },
+      attachments: many,
+    });
 
     expect(unknown?.rights.commercialUse).toBe(false);
-    expect(bounded.attachments.length).toBeLessThanOrEqual(
-      STUDIO_BG3D_SCENE_DOCUMENT_MAX_ATTACHMENTS
+    expectSceneBudgetError(
+      () => normalizeStudioBg3dSceneDocument(aggregateOverflow),
+      "model-byte-budget-exceeded",
     );
-    expect(
-      bounded.attachments.reduce((total, item) => total + item.byteSize, 0)
-    ).toBeLessThanOrEqual(1 * 1024 * 1024);
-    expect(new Set(bounded.attachments.map((item) => item.id)).size).toBe(
-      bounded.attachments.length
+    expectSceneBudgetError(
+      () => normalizeStudioBg3dSceneDocument(countOverflow),
+      "attachment-count-budget-exceeded",
     );
-    expect(new Set(bounded.attachments.map((item) => item.hash)).size).toBe(
-      bounded.attachments.length
-    );
+    expect(serializeStudioBg3dSceneDocument(aggregateOverflow)).toBeNull();
+    expect(serializeStudioBg3dSceneDocument(countOverflow)).toBeNull();
   });
 });
 
@@ -1259,11 +1279,10 @@ describe("Studio BG3D scene nodes and budgets", () => {
     });
   });
 
-  it("deduplicates node ids and truncates after the normalized document budget", () => {
+  it("deduplicates node ids but fails closed instead of truncating at the node budget", () => {
     const nodes = Array.from({ length: 20 }, (_, index) => primitiveNode(index + 1));
     nodes.splice(1, 0, primitiveNode(1));
-    const normalized = normalizeStudioBg3dSceneDocument(
-      currentDocument({
+    const candidate = currentDocument({
         budgets: {
           ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.budgets,
           complexity: {
@@ -1272,10 +1291,13 @@ describe("Studio BG3D scene nodes and budgets", () => {
           },
         },
         nodes,
-      })
-    );
+      });
 
-    expect(normalized.nodes.map((node) => node.id)).toEqual(["node-1", "node-2", "node-3"]);
+    expectSceneBudgetError(
+      () => normalizeStudioBg3dSceneDocument(candidate),
+      "node-count-budget-exceeded",
+    );
+    expect(serializeStudioBg3dSceneDocument(candidate)).toBeNull();
   });
 
   it("repairs orphan/self/cyclic parents leniently and rejects them at the strict boundary", () => {
@@ -1296,9 +1318,9 @@ describe("Studio BG3D scene nodes and budgets", () => {
     expect(parseStudioBg3dSceneDocument(JSON.stringify(candidate))).toBeNull();
   });
 
-  it("hard-caps a large but byte-bounded scene at 512 nodes", () => {
+  it("fails closed for exactly 513 valid nodes instead of returning a 512-node prefix", () => {
     const nodes = Array.from(
-      { length: STUDIO_BG3D_SCENE_DOCUMENT_MAX_NODES + 60 },
+      { length: STUDIO_BG3D_SCENE_DOCUMENT_MAX_NODES + 1 },
       (_, index) => ({
         id: `n-${index}`,
         name: "n",
@@ -1306,8 +1328,7 @@ describe("Studio BG3D scene nodes and budgets", () => {
         primitiveKind: "box",
       })
     );
-    const normalized = normalizeStudioBg3dSceneDocument(
-      currentDocument({
+    const candidate = currentDocument({
         budgets: {
           ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.budgets,
           complexity: {
@@ -1316,10 +1337,13 @@ describe("Studio BG3D scene nodes and budgets", () => {
           },
         },
         nodes,
-      })
-    );
+      });
 
-    expect(normalized.nodes).toHaveLength(STUDIO_BG3D_SCENE_DOCUMENT_MAX_NODES);
+    expectSceneBudgetError(
+      () => normalizeStudioBg3dSceneDocument(candidate),
+      "node-count-budget-exceeded",
+    );
+    expect(parseStudioBg3dSceneDocument(JSON.stringify(candidate))).toBeNull();
   });
 });
 
@@ -1539,7 +1563,7 @@ describe("Studio BG3D bounded storyboard shots", () => {
     expect(removeStudioBg3dShot(original, "missing")).toBeNull();
   });
 
-  it("caps shots and node visibility overrides while strict persistence rejects truncation", () => {
+  it("fails closed for 65 shots and rejects duplicate visibility rewrites strictly", () => {
     const tooManyShots = currentDocument({
       shots: Array.from(
         { length: STUDIO_BG3D_SCENE_DOCUMENT_MAX_SHOTS + 1 },
@@ -1569,10 +1593,16 @@ describe("Studio BG3D bounded storyboard shots", () => {
       }],
     });
 
-    expect(normalizeStudioBg3dSceneDocument(tooManyShots).shots).toHaveLength(
-      STUDIO_BG3D_SCENE_DOCUMENT_MAX_SHOTS,
+    expectSceneBudgetError(
+      () => normalizeStudioBg3dSceneDocument(tooManyShots),
+      "shot-count-budget-exceeded",
     );
-    const boundedShots = normalizeStudioBg3dSceneDocument(tooManyShots);
+    const boundedShots = normalizeStudioBg3dSceneDocument(currentDocument({
+      shots: Array.from(
+        { length: STUDIO_BG3D_SCENE_DOCUMENT_MAX_SHOTS },
+        (_, index) => ({ id: `shot-${index}`, name: `컷 ${index}` }),
+      ),
+    }));
     expect(captureStudioBg3dShot(boundedShots, {
       id: "shot-over-cap",
       name: "초과 컷",
@@ -1679,8 +1709,9 @@ describe("Studio BG3D bounded storyboard shots", () => {
       STUDIO_BG3D_SCENE_DOCUMENT_MAX_BYTES,
     );
     expect(parseStudioBg3dSceneDocument(oversized)).toBeNull();
-    expect(normalizeStudioBg3dSceneDocument(oversized)).toEqual(
-      createDefaultStudioBg3dSceneDocument(),
+    expectSceneBudgetError(
+      () => normalizeStudioBg3dSceneDocument(oversized),
+      "input-byte-budget-exceeded",
     );
   });
 });

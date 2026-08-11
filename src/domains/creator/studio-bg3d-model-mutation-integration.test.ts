@@ -3,13 +3,21 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const source = readFileSync(new URL("./StudioBackground3D.tsx", import.meta.url), "utf8");
+const admissionSource = readFileSync(
+  new URL("./studio-bg3d-model-runtime-admission.ts", import.meta.url),
+  "utf8",
+);
 
-function sourceBetween(startNeedle: string, endNeedle: string): string {
-  const start = source.indexOf(startNeedle);
-  const end = source.indexOf(endNeedle, start);
+function sourceBetweenIn(haystack: string, startNeedle: string, endNeedle: string): string {
+  const start = haystack.indexOf(startNeedle);
+  const end = haystack.indexOf(endNeedle, start);
   expect(start).toBeGreaterThanOrEqual(0);
   expect(end).toBeGreaterThan(start);
-  return source.slice(start, end);
+  return haystack.slice(start, end);
+}
+
+function sourceBetween(startNeedle: string, endNeedle: string): string {
+  return sourceBetweenIn(source, startNeedle, endNeedle);
 }
 
 function expectInOrder(haystack: string, needles: readonly string[]): void {
@@ -22,10 +30,27 @@ function expectInOrder(haystack: string, needles: readonly string[]): void {
 }
 
 describe("Studio BG3D model placement and persistent deletion integration", () => {
+  it("admits additive UI mutations before advancing the authoritative live scene", () => {
+    const additive = sourceBetween(
+      "const canAdmitSceneNodes = (",
+      "const applyMultiSelectDelta = (",
+    );
+    expect(additive).toContain("live.primitives.length + live.customModels.length > nodeLimit - additionalNodeCount");
+    expect(additive).toContain("if (!canAdmitSceneNodes(1)) return");
+    expect(additive).toContain("if (parts.length === 0 || !canAdmitSceneNodes(parts.length)) return");
+    expectInOrder(additive, [
+      "if (!canAdmitSceneNodes(newPrimitives.length + newModels.length)) return",
+      "physicsRuntimeSourceRef.current = {",
+      "setPrimitives(nextPrimitives)",
+      "setCustomModels(nextCustomModels)",
+    ]);
+  });
+
   it("threads revocable leases through decode, cache ownership, and destructive persistence", () => {
-    const admission = sourceBetween(
-      "async function admitAndCacheModel(",
-      "function disposeModelCache(",
+    const admission = sourceBetweenIn(
+      admissionSource,
+      "export async function admitAndCacheStudioBg3dModel(",
+      "export function disposeStudioBg3dModelCache(",
     );
     const add = sourceBetween(
       "async function ensureModelRootCached(",
@@ -37,7 +62,8 @@ describe("Studio BG3D model placement and persistent deletion integration", () =
     );
 
     expectInOrder(admission, [
-      "studioBg3dGlobalAssetLoadGate.run(async (lease)",
+      "const task = studioBg3dGlobalAssetLoadGate.run(",
+      "async (lease)",
       "lease.throwIfRevoked()",
       "const combinedSignal = combineStudioBg3dAbortSignals(",
       "signal: combinedSignal.signal",
@@ -59,7 +85,8 @@ describe("Studio BG3D model placement and persistent deletion integration", () =
   });
 
   it("runs cheap live-scene admission on every cache hit while caching only profile attestation", () => {
-    const cachedBranch = sourceBetween(
+    const cachedBranch = sourceBetweenIn(
+      admissionSource,
       "const cached = args.cache.get(args.record.id);",
       "const pending = args.pending.get(args.record.id);",
     );
@@ -84,6 +111,60 @@ describe("Studio BG3D model placement and persistent deletion integration", () =
       "document: live.document",
     ]);
     expect(ensure).not.toContain("calculateStudioBg3dPlacedModelBytes(\n      customModels");
+  });
+
+  it("re-admits distinct attachments and bytes before single, template, and bulk authority advances", () => {
+    const ensure = sourceBetween(
+      "async function ensureModelRootCached(",
+      "function publishPlacementSession(",
+    );
+    const commit = sourceBetween(
+      "function commitCustomModelPlacement(",
+      "async function addCustomModelToScene(",
+    );
+    const upload = sourceBetween(
+      "async function handleUploadModelFiles(",
+      "async function handleDeleteModelFromLibrary(",
+    );
+    const template = sourceBetween(
+      "async function applyUserTemplate(",
+      "async function handleUploadModelFiles(",
+    );
+    expectInOrder(ensure, [
+      "const live = physicsRuntimeSourceRef.current",
+      "assertStudioBg3dModelAttachmentAdmission({",
+      "await admitAndCacheModel({",
+      "if (!bindModelAttachment({",
+    ]);
+    expectInOrder(commit, [
+      "assertStudioBg3dModelAttachmentAdmission({",
+      "maximumCumulativeBytes: runtime.document.budgets.complexity.maxModelBytes",
+      "commitImmediateHistoryTransition(",
+      "physicsRuntimeSourceRef.current =",
+    ]);
+    const templateCommit = template.lastIndexOf("assertStudioBg3dModelAttachmentAdmission({");
+    expect(templateCommit).toBeGreaterThan(-1);
+    expectInOrder(template.slice(templateCommit), [
+      "models: current.customModels",
+      "candidateAttachments: preparedAttachments",
+      "maximumCumulativeBytes: current.document.budgets.complexity.maxModelBytes",
+      "attachmentByStorageModelIdRef.current.clear()",
+      "physicsRuntimeSourceRef.current =",
+    ]);
+    expectInOrder(upload, [
+      "assertStudioBg3dModelAttachmentAdmission({",
+      "const stagedAttachments = new Map",
+      "const nextAttachmentByStorageId = new Map",
+    ]);
+    const uploadCommit = upload.lastIndexOf("assertStudioBg3dModelAttachmentAdmission({");
+    expect(uploadCommit).toBeGreaterThan(-1);
+    expectInOrder(upload.slice(uploadCommit), [
+      "models: current.customModels",
+      "candidateAttachments",
+      "maximumCumulativeBytes: current.document.budgets.complexity.maxModelBytes",
+      "attachmentByStorageModelIdRef.current.clear()",
+      "physicsRuntimeSourceRef.current =",
+    ]);
   });
 
   it("preflights detachment before IndexedDB delete and advances one snapshot before React state", () => {

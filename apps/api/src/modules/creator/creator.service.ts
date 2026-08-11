@@ -52,9 +52,14 @@ import {
   updateWork,
 } from "../../../../../lib/server/creator";
 import {
+  CREATOR_DRAFT_COLLABORATION_STATUS_LOCKED_CODE,
+  CreatorDraftCollaborationStatusLockedError,
+} from "../../../../../lib/server/creator-provisional-work-status";
+import {
   CreatorWorkRevisionConflictError,
   CreatorWorkRevisionNotFoundError,
 } from "../../../../../lib/server/creator-work-revisions";
+import { StudioLinked3dPassAssetFenceError } from "../../../../../lib/studio-linked-3d-pass-asset-fence";
 import { StudioRealtimeRevocationService } from "../../infrastructure/studio-realtime-revocation/studio-realtime-revocation.client";
 
 import {
@@ -77,6 +82,7 @@ import {
   CreatorDraftCollaborationRoomLimitError,
   CreatorDraftCollaborationRoomNotFoundError,
   CreatorDraftCollaborationTargetMismatchError,
+  CreatorDraftCollaborationWorkRevisionConflictError,
 } from "./creator-draft-collaboration.repository";
 import {
   CreatorDraftCollaborationRoomResponseSchema,
@@ -115,6 +121,23 @@ interface ListQuery {
   tag?: string | null;
   seriesId?: string | null;
   challengeId?: string | null;
+}
+
+function creatorLinked3dPassAssetFenceConflict(
+  error: StudioLinked3dPassAssetFenceError
+): ConflictException {
+  return new ConflictException({
+    code: "creator_linked_3d_pass_asset_fence_failed",
+    message: "연결된 3D 패스와 작품의 immutable PNG 자산이 일치하지 않습니다.",
+    assetFenceCode: error.code,
+  });
+}
+
+function creatorDraftCollaborationStatusLockedConflict(): ConflictException {
+  return new ConflictException({
+    code: CREATOR_DRAFT_COLLABORATION_STATUS_LOCKED_CODE,
+    message: "임시 작업실의 게시 상태는 저장 승격 단계에서만 변경할 수 있습니다.",
+  });
 }
 
 @Injectable()
@@ -158,6 +181,9 @@ export class CreatorService {
       // 페이지/문서가 클 수 있으나 다른 모듈과 동일하게 별도 크기 제한은 두지 않는다.
       return await createWork(userId, body);
     } catch (error) {
+      if (error instanceof StudioLinked3dPassAssetFenceError) {
+        throw creatorLinked3dPassAssetFenceConflict(error);
+      }
       throw new BadRequestException(error instanceof Error ? error.message : "작품을 저장할 수 없습니다.");
     }
   }
@@ -172,6 +198,12 @@ export class CreatorService {
           message: "다른 저장이 먼저 반영되었습니다. 작품을 다시 불러온 뒤 변경 내용을 확인해 주세요.",
           currentRevision: error.currentRevision,
         });
+      }
+      if (error instanceof CreatorDraftCollaborationStatusLockedError) {
+        throw creatorDraftCollaborationStatusLockedConflict();
+      }
+      if (error instanceof StudioLinked3dPassAssetFenceError) {
+        throw creatorLinked3dPassAssetFenceConflict(error);
       }
       throw new BadRequestException(error instanceof Error ? error.message : "작품을 수정할 수 없습니다.");
     }
@@ -225,6 +257,9 @@ export class CreatorService {
       }
       if (error instanceof CreatorWorkRevisionNotFoundError) {
         throw new NotFoundException("작품 revision을 찾을 수 없습니다.");
+      }
+      if (error instanceof StudioLinked3dPassAssetFenceError) {
+        throw creatorLinked3dPassAssetFenceConflict(error);
       }
       throw new BadRequestException("작품 revision을 복원할 수 없습니다.");
     }
@@ -281,6 +316,8 @@ export class CreatorService {
           draftDocumentId: validated.draftDocumentId,
           targetWorkId: validated.targetWorkId,
           expectedGraphRevision: validated.expectedGraphRevision,
+          expectedWorkRevision: validated.expectedWorkRevision,
+          finalStatus: validated.finalStatus,
           clientMutationId: validated.clientMutationId,
         })
       );
@@ -710,6 +747,20 @@ export class CreatorService {
         currentGraphRevision: error.currentGraphRevision,
       });
     }
+    if (error instanceof CreatorDraftCollaborationWorkRevisionConflictError) {
+      throw new ConflictException({
+        code: "creator_draft_collaboration_work_revision_conflict",
+        message: "저장할 작품이 먼저 변경되었습니다. 최신 revision으로 다시 시도해 주세요.",
+        currentWorkRevision: error.currentWorkRevision,
+      });
+    }
+    if (error instanceof StudioLinked3dPassAssetFenceError) {
+      throw new ConflictException({
+        code: "creator_draft_collaboration_asset_fence_failed",
+        message: "연결된 3D 패스와 업로드된 원본 자산이 일치하지 않습니다.",
+        assetFenceCode: error.code,
+      });
+    }
     if (error instanceof CreatorDraftCollaborationAlreadyPromotedError) {
       throw new ConflictException({
         code: "creator_draft_collaboration_already_promoted",
@@ -772,6 +823,12 @@ export class CreatorService {
             "동기화 확인 후 다른 팀 편집이 먼저 저장됐습니다. 최신 원고를 맞춘 뒤 다시 저장해 주세요.",
           currentCrdtServerSequence: error.currentServerSequence.toString(),
         });
+      }
+      if (error instanceof CreatorDraftCollaborationStatusLockedError) {
+        throw creatorDraftCollaborationStatusLockedConflict();
+      }
+      if (error instanceof StudioLinked3dPassAssetFenceError) {
+        throw creatorLinked3dPassAssetFenceConflict(error);
       }
       if (error instanceof CreatorCollaborationConflictError) {
         const messages: Record<typeof error.code, string> = {

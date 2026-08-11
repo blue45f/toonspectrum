@@ -84,7 +84,8 @@ describe("Studio inspector canvas-controls boundary", () => {
     // 의도적 변경(2026-08-07): 선택 디자인(X/Y/W/H·반전·선택 확대) 패널 배선(4_050 → 4_070).
     // 의도적 변경(2026-08-08): Wave D 점진적 노출 — Advanced 섹션 15개 래핑 + 통합 검색 호스트(4_070 → 4_130).
     // 의도적 변경(2026-08-10): V12 제품 SQLite quick-slot 권위 배선 7줄(4_130 → 4_137).
-    expect(inspector.split("\n").length).toBeLessThanOrEqual(4_137);
+    // 의도적 변경(2026-08-11): linked-pass raster lease/read-only projection 배선 8줄.
+    expect(inspector.split("\n").length).toBeLessThanOrEqual(4_145);
     expect(leaf).not.toContain('"use no memo"');
     expect(leaf).not.toMatch(/\b(?:memo|useCallback|useMemo)\s*\(/u);
     expect(leaf).toContain("export function StudioInspectorCanvasControls(");

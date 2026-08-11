@@ -10,13 +10,61 @@ function source(fileName: string): string {
 describe("VRM asset SQLite/OPFS product boundary", () => {
   it("routes the poser catalog, model load, upload, thumbnail, and delete through vrm-library defaults", () => {
     const poser = source("StudioVrmPoser.tsx");
-    expect(poser).toContain("listVrmLibraryEntries()");
+    expect(poser).toContain("queryUploadedVrmLibraryEntriesPage({");
+    expect(poser).toContain("hydrateVrmLibraryThumbnailWindow(windowEntries");
+    expect(poser).not.toContain("listVrmLibraryEntries()");
     expect(poser).toContain("await getStoredVrmModel(entry.id)");
     expect(poser).toContain("await saveUploadedVrm(file)");
     expect(poser).toContain("saveVrmThumbnail(activeLibraryEntry.id, thumbnail)");
     expect(poser).toContain("await deleteStoredVrmModel(entry.id)");
     expect(poser).not.toContain("legacyIndexedDb");
     expect(poser).not.toContain("globalThis.indexedDB");
+  });
+
+  it("preserves the catalog and cursor when a post-mutation first-page refresh fails", () => {
+    const poser = source("StudioVrmPoser.tsx");
+    const uploadStart = poser.indexOf("async function handleFileChange(");
+    const deleteStart = poser.indexOf("async function handleDeleteEntry(", uploadStart);
+    const upload = poser.slice(uploadStart, deleteStart);
+    const deleteEnd = poser.indexOf("function handlePoseSelect(", deleteStart);
+    const deletion = poser.slice(deleteStart, deleteEnd);
+    expect(uploadStart).toBeGreaterThan(-1);
+    expect(deleteStart).toBeGreaterThan(uploadStart);
+    expect(deleteEnd).toBeGreaterThan(deleteStart);
+    expect(upload).not.toContain("queryUploadedVrmLibraryEntriesPage().catch(() => null)");
+    expect(upload).toContain("let refreshSucceeded = false");
+    expect(upload).toContain(": [...libraryEntries]");
+    expect(upload).toContain("if (refreshSucceeded) {");
+    expect(upload).toContain("setLibraryNextCursor(firstPage?.nextCursor ?? null)");
+    expect(deletion).not.toContain("queryUploadedVrmLibraryEntriesPage().catch(() => null)");
+    expect(deletion).toContain("libraryEntries.filter((candidate) => candidate.id !== entry.id)");
+    expect(deletion).toContain("if (refreshSucceeded) {");
+    expect(deletion).toContain("setLibraryStatus(\"error\")");
+    expect(poser).toContain("async function handleRetryVrmLibraryRefresh()");
+    expect(poser).toContain("onRetry={handleRetryVrmLibraryRefresh}");
+  });
+
+  it("aborts the bounded thumbnail window on conditional unmount and fences late results", () => {
+    const poser = source("StudioVrmPoser.tsx");
+    const disposeStart = poser.indexOf("const disposeVrmOnUnmount = useEffectEvent(() => {");
+    const disposeEnd = poser.indexOf("const clearCurrentVrmOnClose", disposeStart);
+    const dispose = poser.slice(disposeStart, disposeEnd);
+    const hydrateStart = poser.indexOf("void hydrateVrmLibraryThumbnailWindow(windowEntries");
+    const hydrateEnd = poser.indexOf("useEffect(() => {", hydrateStart);
+    const hydrate = poser.slice(hydrateStart, hydrateEnd);
+    expect(disposeStart).toBeGreaterThan(-1);
+    expect(disposeEnd).toBeGreaterThan(disposeStart);
+    expect(dispose).toContain("thumbnailRequestRef.current += 1");
+    expect(dispose).toContain("thumbnailWindowAbortRef.current?.abort()");
+    expect(dispose).toContain("thumbnailWindowAbortRef.current = null");
+    expect(dispose).toContain('thumbnailWindowKeyRef.current = ""');
+    expect(dispose).toContain("return () => disposeVrmOnUnmount()");
+    expect(hydrate.match(
+      /controller\.signal\.aborted \|\| thumbnailWindowAbortRef\.current !== controller/gu,
+    )).toHaveLength(2);
+    expect(hydrate.indexOf("controller.signal.aborted")).toBeLessThan(
+      hydrate.indexOf("setLibraryEntries("),
+    );
   });
 
   it("makes shared SQLite/OPFS the no-options authority while keeping IDB explicit-only", () => {
@@ -46,12 +94,17 @@ describe("VRM asset SQLite/OPFS product boundary", () => {
     const repository = source("studio-vrm-asset-sqlite-opfs-repository.ts");
     const blobWrite = repository.indexOf("assets().put");
     const markerWrite = repository.indexOf("fs().write(markerPath");
-    const ownerCommit = repository.indexOf("assets().setOwnerRefs");
-    const sqliteCommit = repository.indexOf("databaseHandle.kvSet");
+    const modelCommit = repository.indexOf("async function commitModelManifest");
+    const ownerCommit = repository.indexOf("assets().setOwnerRefs", modelCommit);
+    const sqliteCommit = repository.indexOf("prepared.raw", ownerCommit);
+    const exactOwnerCommit = repository.indexOf("assets().setOwnerRefs", sqliteCommit);
     expect(blobWrite).toBeGreaterThan(-1);
     expect(markerWrite).toBeGreaterThan(blobWrite);
     expect(ownerCommit).toBeGreaterThan(markerWrite);
     expect(sqliteCommit).toBeGreaterThan(ownerCommit);
+    expect(exactOwnerCommit).toBeGreaterThan(sqliteCommit);
+    expect(repository.slice(ownerCommit, sqliteCommit)).toContain("unionLiveHashes");
+    expect(repository).toContain("page.descriptor.key");
     expect(repository).not.toContain("base64");
     expect(repository).not.toContain("THREE.");
     expect(repository).not.toContain("WebGLRenderer");

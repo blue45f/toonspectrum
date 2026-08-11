@@ -103,4 +103,14 @@ describe("Studio advanced fill entry boundary", () => {
     expect(quickAction).toContain('else if (action === "advanced-fill") toggleAdvancedFill()');
     expect(disabledPolicy).not.toContain('disabled.add("advanced-fill")');
   });
+
+  it("projects linked pass references through bounded verified leases before browser composition", () => {
+    const editor = nestedFunction("StudioCuttoonEditor");
+
+    expect(editor).toContain('"./studio-raster-source-projection"');
+    expect(editor).toContain("withStudioRasterSourceProjection({");
+    expect(editor).toContain('consumer: "studio-advanced-fill-reference"');
+    expect(editor).toContain("collectOverlappingStudioFillReferenceLayers(");
+    expect(editor).toContain("projectedById.get(layer.id) ?? layer");
+  });
 });

@@ -34,7 +34,9 @@ import {
 } from "./studio-raster-edit-surface-cache";
 import {
   acknowledgeStudioRasterImagePresentation,
+  acknowledgeStudioRasterImagePresentationDraw,
   expectedStudioRasterImagePresentation,
+  registerStudioMountedRasterImagePresentation,
   type StudioRasterImagePresentationExpectation,
 } from "./studio-raster-image-presentation";
 import { sha256HexPortable } from "./studio-sha256";
@@ -504,10 +506,19 @@ export function StudioKonvaImageNode({
   const elRef = useRef(el);
   elRef.current = el;
 
+  useLayoutEffect(() => {
+    if (
+      !rasterPresentationEligible
+      || !el.src.startsWith("studio-opfs-cas:sha256:")
+    ) return;
+    return registerStudioMountedRasterImagePresentation({ elementId: el.id, src: el.src });
+  }, [el.id, el.src, rasterPresentationEligible]);
+
   useEffect(() => {
     const src = el.src;
     const im = new globalThis.Image();
     let active = true;
+    let releaseResolvedSource: (() => void) | null = null;
     im.onload = () => {
       if (active) setLoadedImage({ image: im, src });
     };
@@ -517,12 +528,46 @@ export function StudioKonvaImageNode({
       // 성공한 뒤 도착한 오래된 error는 그 상태를 지우지 않는다.
       setLoadedImage((current) => current?.src === src ? undefined : current);
     };
-    // 캐시된 data/blob URL은 대입과 같은 tick에 완료될 수 있으므로 handler를 먼저 연결한다.
-    im.src = src;
+    // Canonical linked-3D pass bytes stay in OPFS/CAS. Acquire the shared, verified presentation
+    // lease only for decode/presentation; ordinary sources retain their synchronous assignment
+    // path. The lease owns both the bounded CAS read and the ref-counted Blob URL lifetime.
+    if (src.startsWith("studio-opfs-cas:sha256:")) {
+      void import("./studio-raster-source-lease")
+        .then(({ acquireStudioRasterSourceLease }) =>
+          acquireStudioRasterSourceLease(src, {
+            consumer: "studio-konva-image-node",
+          }))
+        .then((lease) => {
+          if (!active) {
+            lease.release();
+            return;
+          }
+          if (lease.kind !== "linked-3d-cas") {
+            lease.release();
+            im.onerror?.(new Event("error"));
+            return;
+          }
+          releaseResolvedSource = lease.release;
+          im.src = lease.src;
+        })
+        .catch(() => {
+          if (active) im.onerror?.(new Event("error"));
+        });
+    } else {
+      // Cached data/blob URLs can complete in the assignment tick, so handlers are attached first.
+      im.src = src;
+    }
     return () => {
       active = false;
       im.onload = null;
       im.onerror = null;
+      setLoadedImage((current) => current?.src === src ? undefined : current);
+      try {
+        im.removeAttribute("src");
+      } catch {
+        // A non-DOM Image shim may not expose attributes; dropping handlers and state still fences it.
+      }
+      releaseResolvedSource?.();
     };
   }, [el.src]);
 
@@ -1837,13 +1882,18 @@ export function StudioKonvaImageNode({
 
   useLayoutEffect(() => {
     if (!rasterPresentationSource || !rasterPresentationEligible) return;
-    const expected = expectedStudioRasterImagePresentation({
+    const identity = {
       elementId: el.id,
       src: el.src,
-    });
+    } as const;
+    const expected = expectedStudioRasterImagePresentation(identity);
+    const linkedPassPresentation = el.src.startsWith("studio-opfs-cas:sha256:");
     // The verifier installs a fresh probe for each cold/warm operation, so its numeric epoch may
     // restart at 1. Dedupe by the expectation object owned by that probe, not by epoch alone.
-    if (!expected || rasterImagePresentationReceiptRef.current === expected) return;
+    if (
+      !linkedPassPresentation
+      && (!expected || rasterImagePresentationReceiptRef.current === expected)
+    ) return;
     const node = imageRef.current;
     const layer = node?.getLayer();
     if (!node || !layer) return;
@@ -1859,13 +1909,16 @@ export function StudioKonvaImageNode({
         || node.getLayer() !== layer
         || !node.isVisible()
         || node.image() !== rasterPresentationSource
-        || elRef.current.id !== expected.elementId
-        || elRef.current.src !== expected.src
+        || elRef.current.id !== identity.elementId
+        || elRef.current.src !== identity.src
       ) return;
-      const receipt = acknowledgeStudioRasterImagePresentation(expected);
+      if (linkedPassPresentation) acknowledgeStudioRasterImagePresentationDraw(identity);
+      const currentExpected = expectedStudioRasterImagePresentation(identity);
+      const receipt = currentExpected
+        ? acknowledgeStudioRasterImagePresentation(currentExpected)
+        : null;
       if (receipt) {
-        layer.off("draw.studioRasterPresentation", acknowledgeAfterDraw);
-        rasterImagePresentationReceiptRef.current = expected;
+        rasterImagePresentationReceiptRef.current = currentExpected;
       }
     };
     layer.on("draw.studioRasterPresentation", acknowledgeAfterDraw);

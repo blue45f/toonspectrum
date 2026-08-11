@@ -67,6 +67,14 @@ describe("Studio JSON VRM surface-paint availability boundary", () => {
     expect(jsonImportSource).toContain(
       "await auditStudioVrmTexturePaintJsonImport(loaded.project)",
     );
+    expect(jsonImportSource).toContain(
+      "hasStudioLinked3dPassProjectArchiveReferences(loaded.project)",
+    );
+    expect(jsonImportSource.indexOf(
+      "hasStudioLinked3dPassProjectArchiveReferences(loaded.project)",
+    )).toBeLessThan(jsonImportSource.indexOf(
+      "await auditStudioVrmTexturePaintJsonImport(loaded.project)",
+    ));
     expect(jsonImportSource).not.toContain(
       "await exportStudioVrmTexturePaintProjectLibrary({",
     );

@@ -361,10 +361,12 @@ import {
   canonicalizeVrmContentHash,
   createUploadedVrmRecord,
   deleteStoredVrmModel,
+  durableVrmLibraryEntry,
   ensureStoredVrmContentIdentity,
   getStoredVrmModel,
-  listVrmLibraryEntries,
+  hydrateVrmLibraryThumbnailWindow,
   memoryVrmLibraryEntry,
+  queryUploadedVrmLibraryEntriesPage,
   SAMPLE_VRM_ID,
   SAMPLE_VRM_ENTRIES,
   isBundledVrmRightsBlocked,
@@ -3075,7 +3077,11 @@ export function StudioVrmPoser({
   const [isCapturing, setIsCapturing] = useState(false);
   const [isThumbnailCapturing, setIsThumbnailCapturing] = useState(false);
   const [libraryEntries, setLibraryEntries] = useState<VrmLibraryEntry[]>(SAMPLE_VRM_ENTRIES);
+  const [libraryNextCursor, setLibraryNextCursor] = useState<string | null>(null);
+  const [isLoadingLibraryPage, setIsLoadingLibraryPage] = useState(false);
   const memoryVrmModelsRef = useRef(new Map<string, VrmStoredModelWithContentIdentity>());
+  const thumbnailWindowKeyRef = useRef("");
+  const thumbnailWindowAbortRef = useRef<AbortController | null>(null);
   const [libraryStatus, setLibraryStatus] = useState<LibraryStatus>("loading");
   const [libraryError, setLibraryError] = useState("");
   const [activeModelId, setActiveModelId] = useState(SAMPLE_VRM_ID);
@@ -6661,6 +6667,10 @@ export function StudioVrmPoser({
     cancelPendingPoseShare();
     cancelPendingSharedPoseCatalog();
     cancelPendingSharedPoseSelection();
+    thumbnailRequestRef.current += 1;
+    thumbnailWindowAbortRef.current?.abort();
+    thumbnailWindowAbortRef.current = null;
+    thumbnailWindowKeyRef.current = "";
     jointIkTransactionRef.current = null;
     loadRequestRef.current += 1;
     modelLoadTargetIdRef.current = null;
@@ -6695,6 +6705,9 @@ export function StudioVrmPoser({
     jointIkTransactionRef.current = null;
     loadRequestRef.current += 1;
     thumbnailRequestRef.current += 1;
+    thumbnailWindowAbortRef.current?.abort();
+    thumbnailWindowAbortRef.current = null;
+    thumbnailWindowKeyRef.current = "";
     captureHelperLeaseCountRef.current = 0;
     modelLoadTargetIdRef.current = null;
     if (groundShadowRef.current) groundShadowRef.current.visible = true;
@@ -6751,6 +6764,7 @@ export function StudioVrmPoser({
     if (!open) return;
 
     let cancelled = false;
+    const controller = new AbortController();
     setLibraryStatus("loading");
     setLibraryError("");
 
@@ -6794,28 +6808,204 @@ export function StudioVrmPoser({
       loadModelRef.current(SAMPLE_VRM_ENTRIES[0]);
     }
 
-    listVrmLibraryEntries()
-      .then((entries) => {
+    void (async () => {
+      try {
+        const firstPage = await queryUploadedVrmLibraryEntriesPage({
+          signal: controller.signal,
+        });
+        const entries: VrmLibraryEntry[] = [...SAMPLE_VRM_ENTRIES];
+        const appendUnique = (entry: VrmLibraryEntry) => {
+          if (entries.some((candidate) => (
+            candidate.id === entry.id ||
+            (candidate.contentHash && candidate.contentHash === entry.contentHash)
+          ))) return;
+          entries.push(entry);
+        };
+        for (const entry of firstPage?.items ?? []) appendUnique(entry);
+        for (const record of memoryVrmModelsRef.current.values()) {
+          appendUnique(memoryVrmLibraryEntry(record));
+        }
+
+        const pending = pendingPoseDataRef.current;
+        const findRequestedEntry = (candidates: readonly VrmLibraryEntry[]) => {
+          if (pending?.modelHash) {
+            return candidates.find((entry) => entry.contentHash === pending.modelHash) ?? null;
+          }
+          if (pending?.modelId) {
+            return candidates.find((entry) => entry.id === pending.modelId) ?? null;
+          }
+          if (pending?.modelName) {
+            return candidates.find((entry) => entry.name === pending.modelName) ?? null;
+          }
+          return candidates.find((entry) => entry.id === activeModelIdRef.current) ?? null;
+        };
+        let targetEntry = findRequestedEntry(entries);
+        let cursor = firstPage?.nextCursor ?? null;
+        const seenCursors = new Set<string>();
+        while (!targetEntry && cursor && !seenCursors.has(cursor)) {
+          seenCursors.add(cursor);
+          const page = await queryUploadedVrmLibraryEntriesPage({
+            cursor,
+            signal: controller.signal,
+          });
+          if (!page) break;
+          targetEntry = findRequestedEntry(page.items);
+          if (targetEntry && !entries.some((entry) => entry.id === targetEntry!.id)) {
+            appendUnique(targetEntry);
+          }
+          cursor = page.nextCursor;
+        }
+
         if (cancelled) return;
         setLibraryEntries(entries);
+        setLibraryNextCursor(firstPage?.nextCursor ?? null);
         setLibraryStatus("ready");
         loadResolvedEntry(entries);
-      })
-      .catch((caughtError: unknown) => {
+      } catch (caughtError: unknown) {
         if (cancelled) return;
         setLibraryEntries(SAMPLE_VRM_ENTRIES);
+        setLibraryNextCursor(null);
         setLibraryStatus("error");
         setLibraryError(getErrorMessage(caughtError, "저장된 VRM 라이브러리를 불러오지 못했습니다."));
         loadResolvedEntry(SAMPLE_VRM_ENTRIES);
-      });
+      }
+    })();
 
     return () => {
       cancelled = true;
+      controller.abort();
       // Let the next pass start a fresh load after a Strict Mode remount.
       loadRequestRef.current += 1;
       modelLoadTargetIdRef.current = null;
     };
   }, [initialSceneModelIdentity, open]);
+
+  const handleLoadMoreVrmLibrary = useCallback(async () => {
+    if (!open || !libraryNextCursor || isLoadingLibraryPage) return;
+    setIsLoadingLibraryPage(true);
+    setLibraryError("");
+    try {
+      const page = await queryUploadedVrmLibraryEntriesPage({
+        cursor: libraryNextCursor,
+      });
+      if (!page) {
+        const refreshed = await queryUploadedVrmLibraryEntriesPage();
+        const memoryEntries = [...memoryVrmModelsRef.current.values()].map(
+          memoryVrmLibraryEntry,
+        );
+        setLibraryEntries((current) => {
+          const next = [...SAMPLE_VRM_ENTRIES, ...(refreshed?.items ?? [])];
+          const retainedActive = current.find(
+            (entry) => entry.id === activeModelIdRef.current,
+          );
+          for (const entry of [...(retainedActive ? [retainedActive] : []), ...memoryEntries]) {
+            if (next.some((candidate) => (
+              candidate.id === entry.id ||
+              (candidate.contentHash && candidate.contentHash === entry.contentHash)
+            ))) continue;
+            next.push(entry);
+          }
+          return next;
+        });
+        setLibraryNextCursor(refreshed?.nextCursor ?? null);
+        setLibraryStatus("error");
+        setLibraryError("다른 작업에서 VRM 라이브러리가 변경되어 첫 페이지부터 안전하게 다시 불러왔습니다.");
+        return;
+      }
+      setLibraryEntries((current) => {
+        const next = [...current];
+        for (const entry of page.items) {
+          if (next.some((candidate) => (
+            candidate.id === entry.id ||
+            (candidate.contentHash && candidate.contentHash === entry.contentHash)
+          ))) continue;
+          next.push(entry);
+        }
+        return next;
+      });
+      setLibraryNextCursor(page.nextCursor);
+      setLibraryStatus("ready");
+    } catch (caughtError: unknown) {
+      setLibraryStatus("error");
+      setLibraryError(getErrorMessage(caughtError, "저장된 VRM 다음 페이지를 불러오지 못했습니다."));
+    } finally {
+      setIsLoadingLibraryPage(false);
+    }
+  }, [isLoadingLibraryPage, libraryNextCursor, open]);
+
+  async function handleRetryVrmLibraryRefresh() {
+    if (!open || isLoadingLibraryPage) return;
+    setIsLoadingLibraryPage(true);
+    setLibraryStatus("loading");
+    setLibraryError("");
+    try {
+      const firstPage = await queryUploadedVrmLibraryEntriesPage();
+      const next = [...SAMPLE_VRM_ENTRIES, ...(firstPage?.items ?? [])];
+      const retainedActive = libraryEntries.find(
+        (entry) => entry.id === activeModelIdRef.current,
+      );
+      const memoryEntries = [...memoryVrmModelsRef.current.values()].map(
+        memoryVrmLibraryEntry,
+      );
+      for (const entry of [...(retainedActive ? [retainedActive] : []), ...memoryEntries]) {
+        if (next.some((candidate) => (
+          candidate.id === entry.id
+          || (candidate.contentHash && candidate.contentHash === entry.contentHash)
+        ))) continue;
+        next.push(entry);
+      }
+      setLibraryEntries(next);
+      setLibraryNextCursor(firstPage?.nextCursor ?? null);
+      setLibraryStatus("ready");
+    } catch (caughtError: unknown) {
+      // Keep both the current catalog and cursor authoritative until a first-page read succeeds.
+      setLibraryStatus("error");
+      setLibraryError(getErrorMessage(
+        caughtError,
+        "VRM 라이브러리를 다시 불러오지 못했습니다. 현재 목록을 유지하고 있습니다.",
+      ));
+    } finally {
+      setIsLoadingLibraryPage(false);
+    }
+  }
+
+  const handleVisibleVrmThumbnailWindow = useCallback(
+    (visibleEntries: readonly VrmLibraryEntry[]) => {
+      const windowEntries = visibleEntries.slice(-12);
+      const windowKey = windowEntries
+        .map((entry) => `${entry.id}:${entry.updatedAt}`)
+        .join("\u0000");
+      if (thumbnailWindowKeyRef.current === windowKey) return;
+      thumbnailWindowKeyRef.current = windowKey;
+      thumbnailWindowAbortRef.current?.abort();
+      const controller = new AbortController();
+      thumbnailWindowAbortRef.current = controller;
+
+      void hydrateVrmLibraryThumbnailWindow(windowEntries, {
+        signal: controller.signal,
+      }).then((hydrated) => {
+        if (controller.signal.aborted || thumbnailWindowAbortRef.current !== controller) return;
+        const hydratedById = new Map(hydrated.map((entry) => [entry.id, entry] as const));
+        setLibraryEntries((current) => current.map((entry) => {
+          const visible = hydratedById.get(entry.id);
+          if (visible) {
+            return visible.thumbnail === entry.thumbnail ? entry : visible;
+          }
+          if (
+            entry.source === "memory" ||
+            entry.id === activeModelIdRef.current ||
+            entry.thumbnail === null
+          ) return entry;
+          return { ...entry, thumbnail: null };
+        }));
+      }).catch((caughtError: unknown) => {
+        if (controller.signal.aborted || thumbnailWindowAbortRef.current !== controller) return;
+        setLibraryStatus("error");
+        setLibraryError(getErrorMessage(caughtError, "표시 중인 VRM 썸네일을 불러오지 못했습니다."));
+      });
+    },
+    [],
+  );
 
   useEffect(() => {
     if (
@@ -7378,22 +7568,57 @@ export function StudioVrmPoser({
           savedModels.push(validated);
         }
       }
-      const durableEntries = await listVrmLibraryEntries().catch(() => SAMPLE_VRM_ENTRIES);
+      let firstPage: Awaited<ReturnType<typeof queryUploadedVrmLibraryEntriesPage>> = null;
+      let refreshSucceeded = false;
+      let refreshFailure: unknown;
+      try {
+        firstPage = await queryUploadedVrmLibraryEntriesPage();
+        refreshSucceeded = true;
+      } catch (caughtError: unknown) {
+        refreshFailure = caughtError;
+      }
+      const durableEntries = refreshSucceeded
+        ? [...SAMPLE_VRM_ENTRIES, ...(firstPage?.items ?? [])]
+        : [...libraryEntries];
       const memoryEntries = [...memoryVrmModelsRef.current.values()]
         .sort((left, right) => right.updatedAt - left.updatedAt)
         .map(memoryVrmLibraryEntry);
-      const nextEntries = [
-        ...durableEntries,
-        ...memoryEntries.filter((memoryEntry) => (
-          !durableEntries.some((entry) => entry.contentHash === memoryEntry.contentHash)
-        )),
-      ];
+      const savedEntries = savedModels.map((record) => (
+        memoryVrmModelsRef.current.has(record.id)
+          ? memoryVrmLibraryEntry(record)
+          : durableVrmLibraryEntry(record)
+      ));
+      const nextEntries = [...durableEntries];
+      const retainedActive = libraryEntries.find(
+        (entry) => entry.id === activeModelIdRef.current,
+      );
+      for (const entry of [
+        ...(retainedActive ? [retainedActive] : []),
+        ...savedEntries,
+        ...memoryEntries,
+      ]) {
+        if (nextEntries.some((candidate) => (
+          candidate.id === entry.id ||
+          (candidate.contentHash && candidate.contentHash === entry.contentHash)
+        ))) continue;
+        nextEntries.push(entry);
+      }
       setLibraryEntries(nextEntries);
-      setLibraryStatus(memoryOnly ? "error" : "ready");
+      if (refreshSucceeded) {
+        setLibraryNextCursor(firstPage?.nextCursor ?? null);
+      }
+      setLibraryStatus(memoryOnly || !refreshSucceeded ? "error" : "ready");
       if (memoryOnly) {
         setLibraryError(
-          "SQLite/OPFS 저장에 실패해 선택한 VRM을 현재 탭 메모리에만 유지합니다. 새로고침하면 사라지며 프로젝트 삽입은 durable 저장 전까지 차단됩니다.",
+          refreshSucceeded
+            ? "SQLite/OPFS 저장에 실패해 선택한 VRM을 현재 탭 메모리에만 유지합니다. 새로고침하면 사라지며 프로젝트 삽입은 durable 저장 전까지 차단됩니다."
+            : "일부 VRM은 현재 탭 메모리에만 유지되며, 저장된 라이브러리 새로고침에도 실패했습니다. 현재 목록과 페이지 위치를 보존했습니다. 다시 불러오기를 시도해 주세요.",
         );
+      } else if (!refreshSucceeded) {
+        setLibraryError(getErrorMessage(
+          refreshFailure,
+          "VRM 저장은 완료했지만 라이브러리 새로고침에 실패했습니다. 현재 목록과 페이지 위치를 보존했습니다.",
+        ));
       }
 
       const firstUploadedEntry = nextEntries.find((entry) => entry.id === savedModels[0]?.id);
@@ -7421,13 +7646,46 @@ export function StudioVrmPoser({
     try {
       if (entry.source === "memory") memoryVrmModelsRef.current.delete(entry.id);
       else await deleteStoredVrmModel(entry.id);
-      const durableEntries = await listVrmLibraryEntries().catch(() => SAMPLE_VRM_ENTRIES);
-      const nextEntries = [
-        ...durableEntries,
-        ...[...memoryVrmModelsRef.current.values()].map(memoryVrmLibraryEntry),
-      ];
+      let firstPage: Awaited<ReturnType<typeof queryUploadedVrmLibraryEntriesPage>> = null;
+      let refreshSucceeded = false;
+      let refreshFailure: unknown;
+      try {
+        firstPage = await queryUploadedVrmLibraryEntriesPage();
+        refreshSucceeded = true;
+      } catch (caughtError: unknown) {
+        refreshFailure = caughtError;
+      }
+      const durableEntries = refreshSucceeded
+        ? [...SAMPLE_VRM_ENTRIES, ...(firstPage?.items ?? [])]
+        : libraryEntries.filter((candidate) => candidate.id !== entry.id);
+      const nextEntries = [...durableEntries];
+      const retainedActive = libraryEntries.find((candidate) => (
+        candidate.id === activeModelIdRef.current && candidate.id !== entry.id
+      ));
+      const memoryEntries = [...memoryVrmModelsRef.current.values()].map(
+        memoryVrmLibraryEntry,
+      );
+      for (const candidate of [
+        ...(retainedActive ? [retainedActive] : []),
+        ...memoryEntries,
+      ]) {
+        if (nextEntries.some((current) => (
+          current.id === candidate.id ||
+          (current.contentHash && current.contentHash === candidate.contentHash)
+        ))) continue;
+        nextEntries.push(candidate);
+      }
       setLibraryEntries(nextEntries);
-      setLibraryStatus("ready");
+      if (refreshSucceeded) {
+        setLibraryNextCursor(firstPage?.nextCursor ?? null);
+        setLibraryStatus("ready");
+      } else {
+        setLibraryStatus("error");
+        setLibraryError(getErrorMessage(
+          refreshFailure,
+          "VRM 삭제는 완료했지만 라이브러리 새로고침에 실패했습니다. 삭제 항목만 제거하고 현재 목록과 페이지 위치를 보존했습니다.",
+        ));
+      }
       if (activeModelId === entry.id) {
         loadModelFromLibraryEntry(SAMPLE_VRM_ENTRIES[0]);
       }
@@ -9390,9 +9648,14 @@ export function StudioVrmPoser({
                 deletingModelId={deletingModelId}
                 modelStatus={status}
                 isUploading={isUploading}
+                hasMoreEntries={libraryNextCursor !== null}
+                isLoadingMore={isLoadingLibraryPage}
                 onFileChange={handleFileChange}
+                onLoadMore={handleLoadMoreVrmLibrary}
+                onRetry={handleRetryVrmLibraryRefresh}
                 onSelect={loadModelFromLibraryEntry}
                 onDelete={handleDeleteEntry}
+                onVisibleWindowChange={handleVisibleVrmThumbnailWindow}
                 onCollapse={() => {
                   panelScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
                 }}

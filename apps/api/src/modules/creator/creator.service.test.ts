@@ -9,10 +9,13 @@ import {
 } from "@nestjs/common";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { CreatorDraftCollaborationStatusLockedError } from "../../../../../lib/server/creator-provisional-work-status";
 import {
   CreatorWorkRevisionConflictError,
   CreatorWorkRevisionNotFoundError,
 } from "../../../../../lib/server/creator-work-revisions";
+import { StudioLinked3dPassAssetFenceError } from
+  "../../../../../lib/studio-linked-3d-pass-asset-fence";
 
 import {
   CreatorCollaborationCrdtSequenceConflictError,
@@ -28,6 +31,7 @@ import {
   CreatorDraftCollaborationRateLimitError,
   CreatorDraftCollaborationRepository,
   CreatorDraftCollaborationRoomExpiredError,
+  CreatorDraftCollaborationWorkRevisionConflictError,
 } from "./creator-draft-collaboration.repository";
 import { CreatorService } from "./creator.service";
 
@@ -40,6 +44,7 @@ const PROVISION_MUTATION_ID = "33333333-3333-4333-8333-333333333333";
 const PROMOTION_MUTATION_ID = "44444444-4444-4444-8444-444444444444";
 
 const {
+  createWork,
   getWork,
   getWorkRevisionComparison,
   getWorkRevision,
@@ -53,6 +58,7 @@ const {
   getSharedAssetContent,
   listSharedAssets,
 } = vi.hoisted(() => ({
+  createWork: vi.fn(),
   getWork: vi.fn(),
   getWorkRevisionComparison: vi.fn(),
   getWorkRevision: vi.fn(),
@@ -72,7 +78,7 @@ vi.mock("../../../../../lib/server/creator", () => ({
   bumpAssetDownloads,
   bumpViews,
   createSeries: vi.fn(),
-  createWork: vi.fn(),
+  createWork,
   deleteSeries: vi.fn(),
   deleteSharedAsset: vi.fn(),
   deleteWork,
@@ -135,6 +141,7 @@ function createService(): CreatorService {
 
 describe("CreatorService safety gates", () => {
   beforeEach(() => {
+    createWork.mockReset();
     getWork.mockReset();
     getWorkRevisionComparison.mockReset();
     getWorkRevision.mockReset();
@@ -291,6 +298,34 @@ describe("CreatorService safety gates", () => {
     expect(JSON.stringify((error as ConflictException).getResponse())).not.toContain("snapshot");
   });
 
+  it("direct/shared provisional status guard를 동일한 안정된 409로 변환한다", async () => {
+    const service = createService();
+    updateWork.mockRejectedValueOnce(new CreatorDraftCollaborationStatusLockedError());
+    collaborationRepository.saveSharedDocument.mockRejectedValueOnce(
+      new CreatorDraftCollaborationStatusLockedError()
+    );
+
+    const directError = await service
+      .updateWork("owner", "work-provisional", { status: "published" })
+      .catch((cause: unknown) => cause);
+    const sharedError = await service
+      .saveSharedWorkDocument("owner", "work-provisional", {
+        baseRevision: 1,
+        crdtServerSequence: "0",
+        status: "published",
+      })
+      .catch((cause: unknown) => cause);
+
+    for (const error of [directError, sharedError]) {
+      expect(error).toBeInstanceOf(ConflictException);
+      expect((error as ConflictException).getStatus()).toBe(409);
+      expect((error as ConflictException).getResponse()).toEqual({
+        code: "creator_draft_collaboration_status_locked",
+        message: "임시 작업실의 게시 상태는 저장 승격 단계에서만 변경할 수 있습니다.",
+      });
+    }
+  });
+
   it("owner-only revision 조회는 작품 없음과 타인 작품을 구분하지 않는 404로 변환한다", async () => {
     getWorkRevision.mockRejectedValue(new CreatorWorkRevisionNotFoundError());
     await expect(createService().getWorkRevision("reader", "private-work", 1)).rejects.toBeInstanceOf(
@@ -344,6 +379,43 @@ describe("CreatorService safety gates", () => {
     });
   });
 
+  it("direct create/update/restore의 linked-pass fence 오류를 bounded 409로 변환한다", async () => {
+    const cases = [
+      {
+        code: "asset-missing" as const,
+        mock: createWork,
+        run: () => createService().createWork("owner", { title: "linked" }),
+      },
+      {
+        code: "asset-mismatch" as const,
+        mock: updateWork,
+        run: () => createService().updateWork("owner", "work-1", { title: "linked" }),
+      },
+      {
+        code: "receipt-mismatch" as const,
+        mock: restoreWorkRevision,
+        run: () => createService().restoreWorkRevision("owner", "work-1", 1, 2),
+      },
+    ];
+    for (const testCase of cases) {
+      testCase.mock.mockRejectedValueOnce(new StudioLinked3dPassAssetFenceError(
+        testCase.code,
+        `private locator ${"a".repeat(64)}`,
+      ));
+      const error = await testCase.run().catch((cause: unknown) => cause);
+      expect(error).toBeInstanceOf(ConflictException);
+      expect((error as ConflictException).getStatus()).toBe(409);
+      expect((error as ConflictException).getResponse()).toEqual({
+        code: "creator_linked_3d_pass_asset_fence_failed",
+        message: "연결된 3D 패스와 작품의 immutable PNG 자산이 일치하지 않습니다.",
+        assetFenceCode: testCase.code,
+      });
+      expect(JSON.stringify((error as ConflictException).getResponse())).not.toContain(
+        "a".repeat(64)
+      );
+    }
+  });
+
   it("임시 협업 작업실 provision과 promotion을 인증 소유자 범위로만 위임한다", async () => {
     const activeRoom = {
       version: 1 as const,
@@ -354,7 +426,7 @@ describe("CreatorService safety gates", () => {
       status: "active" as const,
       graphRevision: 0,
       initialSnapshotByteLength: 2_048,
-      provisionIntent: "share-link" as const,
+      provisionIntent: "cloud-save" as const,
       provisionedAt: "2026-07-26T00:00:00.000Z",
       expiresAt: "2026-08-02T00:00:00.000Z",
       promotedAt: null,
@@ -373,7 +445,7 @@ describe("CreatorService safety gates", () => {
       service.provisionDraftCollaborationRoom("owner", {
         draftDocumentId: DRAFT_ID,
         ownerScopeKey: "owner",
-        intent: "share-link",
+        intent: "cloud-save",
         clientMutationId: PROVISION_MUTATION_ID,
         initialSnapshotByteLength: 2_048,
       })
@@ -384,6 +456,8 @@ describe("CreatorService safety gates", () => {
         ownerScopeKey: "owner",
         targetWorkId: "work-provisional",
         expectedGraphRevision: 0,
+        expectedWorkRevision: 2,
+        finalStatus: "published",
         clientMutationId: PROMOTION_MUTATION_ID,
       })
     ).resolves.toEqual(promotedRoom);
@@ -392,7 +466,7 @@ describe("CreatorService safety gates", () => {
       ownerUserId: "owner",
       ownerScopeKey: "owner",
       draftDocumentId: DRAFT_ID,
-      intent: "share-link",
+      intent: "cloud-save",
       clientMutationId: PROVISION_MUTATION_ID,
       initialSnapshotByteLength: 2_048,
     });
@@ -403,6 +477,8 @@ describe("CreatorService safety gates", () => {
       draftDocumentId: DRAFT_ID,
       targetWorkId: "work-provisional",
       expectedGraphRevision: 0,
+      expectedWorkRevision: 2,
+      finalStatus: "published",
       clientMutationId: PROMOTION_MUTATION_ID,
     });
   });
@@ -424,6 +500,8 @@ describe("CreatorService safety gates", () => {
         ownerScopeKey: "other-owner",
         targetWorkId: "work-provisional",
         expectedGraphRevision: 0,
+        expectedWorkRevision: 2,
+        finalStatus: "draft",
         clientMutationId: PROMOTION_MUTATION_ID,
       })
     ).rejects.toBeInstanceOf(NotFoundException);
@@ -451,6 +529,8 @@ describe("CreatorService safety gates", () => {
       ownerScopeKey: "owner",
       targetWorkId: "work-provisional",
       expectedGraphRevision: 0,
+      expectedWorkRevision: 2,
+      finalStatus: "draft" as const,
       clientMutationId: PROMOTION_MUTATION_ID,
     };
 
@@ -482,6 +562,47 @@ describe("CreatorService safety gates", () => {
     expect(JSON.stringify((expired as HttpException).getResponse())).not.toContain(
       "work-provisional"
     );
+  });
+
+  it("임시 cloud-save promotion의 work revision·asset fence를 bounded 409로 변환한다", async () => {
+    draftCollaborationRepository.promote
+      .mockRejectedValueOnce(new CreatorDraftCollaborationWorkRevisionConflictError(12))
+      .mockRejectedValueOnce(new StudioLinked3dPassAssetFenceError(
+        "asset-missing",
+        `private linked pass ${"a".repeat(64)}`,
+      ));
+    const service = createService();
+    const promotionBody = {
+      draftDocumentId: DRAFT_ID,
+      ownerScopeKey: "owner",
+      targetWorkId: "work-provisional",
+      expectedGraphRevision: 0,
+      expectedWorkRevision: 2,
+      finalStatus: "draft" as const,
+      clientMutationId: PROMOTION_MUTATION_ID,
+    };
+
+    const workRevisionConflict = await service
+      .promoteDraftCollaborationRoom("owner", ROOM_ID, promotionBody)
+      .catch((cause: unknown) => cause);
+    const assetFenceConflict = await service
+      .promoteDraftCollaborationRoom("owner", ROOM_ID, promotionBody)
+      .catch((cause: unknown) => cause);
+
+    expect(workRevisionConflict).toBeInstanceOf(ConflictException);
+    expect((workRevisionConflict as ConflictException).getResponse()).toEqual({
+      code: "creator_draft_collaboration_work_revision_conflict",
+      message: "저장할 작품이 먼저 변경되었습니다. 최신 revision으로 다시 시도해 주세요.",
+      currentWorkRevision: 12,
+    });
+    expect(assetFenceConflict).toBeInstanceOf(ConflictException);
+    expect((assetFenceConflict as ConflictException).getResponse()).toEqual({
+      code: "creator_draft_collaboration_asset_fence_failed",
+      message: "연결된 3D 패스와 업로드된 원본 자산이 일치하지 않습니다.",
+      assetFenceCode: "asset-missing",
+    });
+    expect(JSON.stringify((assetFenceConflict as ConflictException).getResponse()))
+      .not.toContain("a".repeat(64));
   });
 
   it("팀 조회와 변경 요청을 repository에 사용자·작품 범위 그대로 위임한다", async () => {
@@ -707,6 +828,30 @@ describe("CreatorService safety gates", () => {
       currentCrdtServerSequence: "28",
     });
     expect(JSON.stringify((error as ConflictException).getResponse())).not.toContain("requested");
+  });
+
+  it("공유 저장 linked-pass asset fence도 원문 경로 없이 안정된 409로 변환한다", async () => {
+    collaborationRepository.saveSharedDocument.mockRejectedValue(
+      new StudioLinked3dPassAssetFenceError(
+        "invalid-reserved-locator",
+        "/doc/pagesList/0/elements/0/maskSrc",
+      )
+    );
+    const error = await createService()
+      .saveSharedWorkDocument("editor", "work-1", {
+        baseRevision: 10,
+        crdtServerSequence: "27",
+        doc: {},
+      })
+      .catch((cause: unknown) => cause);
+
+    expect(error).toBeInstanceOf(ConflictException);
+    expect((error as ConflictException).getResponse()).toEqual({
+      code: "creator_linked_3d_pass_asset_fence_failed",
+      message: "연결된 3D 패스와 작품의 immutable PNG 자산이 일치하지 않습니다.",
+      assetFenceCode: "invalid-reserved-locator",
+    });
+    expect(JSON.stringify((error as ConflictException).getResponse())).not.toContain("maskSrc");
   });
 
   it("raw shared format 전환은 repository mutation 전에 strict 거부한다", async () => {
