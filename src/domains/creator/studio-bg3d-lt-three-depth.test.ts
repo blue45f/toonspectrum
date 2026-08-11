@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { registerStudioBg3dDepthExcludedObject } from "./studio-bg3d-capture-exclusion";
 import { captureStudioBg3dThreeDepth } from "./studio-bg3d-lt-three-depth";
 
 function deferred<T>() {
@@ -143,15 +144,53 @@ describe("captureStudioBg3dThreeDepth", () => {
     expect(materialDispose).toHaveBeenCalledOnce();
   });
 
+  it("hides beauty-only contact geometry only for depth submission and restores it before readback", async () => {
+    const readback = deferred<THREE.TypedArray>();
+    const fixture = rendererFixture(readback.promise);
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera();
+    const visibleContactShadow = new THREE.Mesh();
+    const alreadyHiddenContactShadow = new THREE.Mesh();
+    alreadyHiddenContactShadow.visible = false;
+    const importedLookingObject = new THREE.Mesh();
+    importedLookingObject.userData.studioBg3dDepthExcluded = true;
+    registerStudioBg3dDepthExcludedObject(visibleContactShadow);
+    registerStudioBg3dDepthExcludedObject(alreadyHiddenContactShadow);
+    scene.add(visibleContactShadow, alreadyHiddenContactShadow, importedLookingObject);
+    vi.mocked(fixture.renderer.render).mockImplementation(() => {
+      expect(visibleContactShadow.visible).toBe(false);
+      expect(alreadyHiddenContactShadow.visible).toBe(false);
+      expect(importedLookingObject.visible).toBe(true);
+    });
+
+    const pending = captureStudioBg3dThreeDepth({
+      renderer: fixture.renderer,
+      scene,
+      camera,
+      width: 2,
+      height: 2,
+    });
+
+    expect(visibleContactShadow.visible).toBe(true);
+    expect(alreadyHiddenContactShadow.visible).toBe(false);
+    expect(importedLookingObject.visible).toBe(true);
+    readback.resolve(new Uint8Array(16));
+    await expect(pending).resolves.toBeInstanceOf(Float32Array);
+  });
+
   it("restores and disposes when rendering fails before readback submission", async () => {
     const fixture = rendererFixture(Promise.resolve(new Uint8Array(4)));
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera();
     const failure = new Error("render failed");
     const originalBackground = new THREE.DataTexture();
+    const contactShadow = new THREE.Mesh();
+    registerStudioBg3dDepthExcludedObject(contactShadow);
+    scene.add(contactShadow);
     scene.background = originalBackground;
     vi.mocked(fixture.renderer.render).mockImplementation(() => {
       expect(scene.background).toBeNull();
+      expect(contactShadow.visible).toBe(false);
       throw failure;
     });
     const targetDispose = vi.spyOn(THREE.WebGLRenderTarget.prototype, "dispose");
@@ -169,6 +208,7 @@ describe("captureStudioBg3dThreeDepth", () => {
 
     expect(scene.overrideMaterial).toBeNull();
     expect(scene.background).toBe(originalBackground);
+    expect(contactShadow.visible).toBe(true);
     expect(fixture.renderer.autoClear).toBe(false);
     expect(fixture.renderer.xr.enabled).toBe(true);
     expect(fixture.current().renderTarget).toBeNull();

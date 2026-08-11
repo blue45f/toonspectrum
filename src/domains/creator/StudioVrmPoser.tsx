@@ -1,10 +1,9 @@
 import { OrbitControls } from "@react-three/drei/core/OrbitControls.js";
-import { Canvas, useFrame, useThree, createPortal, type ThreeEvent } from "@react-three/fiber";
+import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { AlertTriangle, Camera, ChevronDown, Clapperboard, FlipHorizontal2, ImagePlus, Loader2, Maximize2, Paintbrush, PersonStanding, Redo2, RotateCcw, RotateCw, Search, Shirt, Sliders, Smile, Sparkles, Swords, Trash2, Undo2, Upload, UserRound, WandSparkles, X, Webcam, ZoomIn, ZoomOut } from "lucide-react";
 import { useCallback, useEffect, useEffectEvent, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ChangeEvent, type MouseEvent } from "react";
 import { createPortal as createDomPortal } from "react-dom";
 import * as THREE from "three";
-import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 
 import { planStudio3dInsertCaptureSize } from "./studio-3d-insert-capture-plan";
 import { STUDIO_STAMP_BRUSH_DEFAULTS } from "./studio-brush-stamp-engine";
@@ -38,19 +37,25 @@ import {
   serializeAvatarForgeState,
   type AvatarForgeState,
 } from "./studio-vrm-avatar-forge";
+import {
+  createStudioVrmAvatarForgeFaceController,
+  deriveStudioVrmAvatarForgeFaceScale,
+} from "./studio-vrm-avatar-forge-face-controller";
 import { BlinkStabilizer } from "./studio-vrm-blink-stabilizer";
 import { HEAD_BONE_SMOOTHER, VrmBoneSmoother } from "./studio-vrm-bone-smoother";
 import {
-  classifyMeshName,
   COSTUME_SLOT_LABELS,
   COSTUME_PALETTES,
   parseCostumeState,
-  resolveCostumeMaterialBaseHex,
   serializeCostume,
-  tintColor,
   type CostumeState,
   type CostumeSlot,
 } from "./studio-vrm-costume";
+import {
+  applyStudioVrmCostumeState,
+  collectStudioVrmCostumeMeshes,
+  type StudioVrmCostumeMeshEntry,
+} from "./studio-vrm-costume-runtime";
 import {
   createStudioVrmCreativeSqliteRepository,
   parseStudioVrmCustomPoseImport,
@@ -96,7 +101,6 @@ import {
   applyVrmSpringBonePhysics,
   settleVrmPhysics,
   countSpringBoneJoints,
-  PHYSICS_PREVIEW_MAX_DELTA,
   type VrmPhysicsSettings,
 } from "./studio-vrm-physics";
 import { createStudioVrmPoseApplyPlan } from "./studio-vrm-pose-apply";
@@ -180,24 +184,32 @@ import {
 } from "./studio-vrm-procedural-scene-props";
 import {
   applyVrmTwoBoneGrip,
-  createVrmTwoBoneGripState,
-  releaseVrmTwoBoneGripState,
 } from "./studio-vrm-prop-ik";
 import {
   createAutoGripFingerOverrides,
   DEFAULT_VRM_PROP_RIG_METRICS,
-  measureVrmPropRigMetrics,
-  resolvePropAttachment,
-  resolveSecondaryHandConstraint,
-  resolveSecondaryPropTarget,
   scaleVrmPropRigMetrics,
   type VrmPropRigMetrics,
 } from "./studio-vrm-prop-rig";
 import {
+  formatStudioVrmHeadUnits,
+  NEUTRAL_STUDIO_VRM_PROPORTIONS,
+} from "./studio-vrm-proportion-core";
+import { createStudioVrmProportionFitTransaction } from "./studio-vrm-proportion-fit-transaction";
+import {
+  createStudioVrmProportionRigRuntime,
+  type StudioVrmProportionRigReceipt,
+  type StudioVrmProportionRigRuntime,
+} from "./studio-vrm-proportion-rig-runtime";
+import {
+  createStudioVrmProportionVrmAdapter,
+  measureStudioVrmProportionHeadLength,
+  type StudioVrmProportionHeadMeasurementReceipt,
+} from "./studio-vrm-proportion-vrm-adapter";
+import {
   createPropInstance,
   parseVrmProps,
   serializeVrmProps,
-  buildPropObject,
   propDefById,
   type PropInstance,
 } from "./studio-vrm-props";
@@ -220,6 +232,7 @@ import {
   serializeStudioVrmSceneDocument,
   type StudioVrmCameraSettings,
   type StudioVrmIkConstraint,
+  type StudioVrmLightingTone,
   type StudioVrmPoseBoneMap,
   type StudioVrmPoseTranslations,
   type StudioVrmSceneDocument,
@@ -235,12 +248,6 @@ import {
   selectSharedPoseAssets,
   shouldLoadSharedPoseLibrary,
 } from "./studio-vrm-shared-pose-library";
-import {
-  buildStudioVrmGarmentGeometry,
-  buildStudioVrmSkinnedGarment,
-  type StudioVrmGarmentSkinBone,
-  type StudioVrmSkinnedGarmentReceipt,
-} from "./studio-vrm-skinned-garment";
 import {
   appendStudioVrmFullStateHistory,
   commitStudioVrmFullStateHistoryTransaction,
@@ -289,18 +296,12 @@ import {
   WARDROBE_FIT_MAX,
   selectableWardrobeItemsBySlot,
   wardrobeItemById,
-  wardrobeFabricById,
   selectableWardrobeSetById,
   applyWardrobeSet,
   createWardrobeEquip,
-  buildGarmentParts,
   mergeWardrobeCostumeVisibility,
   parseWardrobeDocument,
   serializeWardrobe,
-  sanitizeWardrobeMetrics,
-  type GarmentPart,
-  type LimbMetric,
-  type WardrobeBone,
   type WardrobeEquip,
   type WardrobeMetrics,
   type WardrobeSlot,
@@ -349,6 +350,13 @@ import {
   StudioVrmTexturePaintPanel,
   type StudioVrmTexturePaintPanelSettings,
 } from "./StudioVrmTexturePaintPanel";
+import {
+  StudioVrmPropAttachment,
+  StudioVrmRuntimeCommit,
+  StudioVrmWardrobeAttachment,
+  type StudioVrmWardrobeCaptureSync,
+  type StudioVrmWardrobeSurfaceReceipt,
+} from "./StudioVrmWardrobePropsProjection";
 import {
   canonicalizeVrmContentHash,
   createUploadedVrmRecord,
@@ -1170,146 +1178,6 @@ function findCameraPreset(id: string) {
   return CAMERA_PRESETS.find((preset) => preset.id === id) ?? CAMERA_PRESETS[0];
 }
 
-/* ── 의상(costume) 메시 수집·리컬러·토글 ─────────────────────────────── */
-
-type CostumeMeshEntry = {
-  /** 직렬화·식별 키(노드 이름 우선, 비면 머티리얼 이름). */
-  key: string;
-  /** 표시용 이름. */
-  label: string;
-  slot: CostumeSlot;
-  mesh: THREE.Mesh;
-};
-
-// 원본 머티리얼 색(hex)을 메시별로 1회 캡처해 둔다(틴트는 항상 원본 기준 — 중첩 누적 방지).
-// Mannequin clay / near-black×map 은 cacheable=false 로 거부해 옷이 검정으로 굳는 걸 막는다.
-const costumeBaseColorCache = new WeakMap<THREE.Material, string>();
-const isolatedCostumeMaterialMeshes = new WeakSet<THREE.Mesh>();
-
-function materialBaseHex(mat: THREE.Material): string {
-  const cached = costumeBaseColorCache.get(mat);
-  if (cached) return cached;
-  const colored = mat as THREE.Material & { color?: THREE.Color; map?: THREE.Texture | null };
-  const currentHex = colored.color ? `#${colored.color.getHexString()}` : "#cccccc";
-  const resolved = resolveCostumeMaterialBaseHex(currentHex, {
-    hasMap: Boolean(colored.map),
-    cached: null,
-  });
-  if (resolved.cacheable) {
-    costumeBaseColorCache.set(mat, resolved.hex);
-  }
-  return resolved.hex;
-}
-
-/**
- * Clone costume materials only when we are about to recolor — never on load.
- * Eager clone on collect caused a flash of native textures then broken/black clothes
- * (MToon outline / shared texture races on multi-material VRoid Body meshes).
- */
-function isolateCostumeMaterialsForRecolor(mesh: THREE.Mesh): THREE.Material[] {
-  let materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-  if (isolatedCostumeMaterialMeshes.has(mesh)) {
-    return materials.filter((material): material is THREE.Material => Boolean(material));
-  }
-  const mannequinPoisoned = materials.some((material) => {
-    const candidate = material as THREE.Material & { userData?: Record<string, unknown> };
-    return candidate?.userData?.__vrmMannequinActive === true;
-  });
-  if (mannequinPoisoned) {
-    return materials.filter((material): material is THREE.Material => Boolean(material));
-  }
-  materials = materials.map((material) => material.clone());
-  mesh.material = Array.isArray(mesh.material) ? materials : materials[0]!;
-  isolatedCostumeMaterialMeshes.add(mesh);
-  return materials;
-}
-
-/** 씬그래프를 순회해 의상 슬롯에 해당하는 메시를 수집한다(피부·얼굴·눈·머리 제외). */
-function collectCostumeMeshes(vrm: VRM): CostumeMeshEntry[] {
-  const entries: CostumeMeshEntry[] = [];
-  const seenKeys = new Set<string>();
-  vrm.scene.traverse((obj) => {
-    if (!(obj as THREE.Mesh).isMesh) return;
-    const mesh = obj as THREE.Mesh;
-    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-    const matNames = materials.map((m) => (m as THREE.Material | undefined)?.name).filter(Boolean) as string[];
-    const materialClasses = matNames.map((name) => classifyMeshName(name));
-    const explicitMaterialSlot = materialClasses.find((entry) => entry.slot !== null && entry.protected === null)?.slot ?? null;
-    const hasProtectedMaterial = materialClasses.some((entry) => entry.protected !== null);
-    // Exporters sometimes name every primitive simply "Body". An explicit clothing material is
-    // stronger evidence than that generic node name, but a truly mixed skin+cloth material array
-    // remains protected because mesh-level visibility would hide skin with the outfit.
-    const cls = explicitMaterialSlot && !hasProtectedMaterial
-      ? { slot: explicitMaterialSlot, protected: null }
-      : classifyMeshName(mesh.name, ...matNames);
-    if (cls.slot === null || cls.protected !== null) return;
-    const baseKey = mesh.name || matNames[0] || `mesh-${entries.length}`;
-    let key = baseKey;
-    let duplicateIndex = 2;
-    while (seenKeys.has(key)) {
-      key = `${baseKey}#${duplicateIndex}`;
-      duplicateIndex += 1;
-    }
-    seenKeys.add(key);
-    // Do NOT clone materials here — load must keep native albedo/maps intact.
-    entries.push({ key, label: mesh.name || matNames[0] || "메시", slot: cls.slot, mesh });
-  });
-  return entries;
-}
-
-/** 수집된 의상 메시에 표시/숨김·리컬러 상태를 적용한다. */
-function applyCostumeState(entries: CostumeMeshEntry[], state: CostumeState) {
-  for (const entry of entries) {
-    entry.mesh.visible = !state.hidden.includes(entry.key);
-    const target = state.recolor[entry.key];
-    // Visibility-only updates must not touch materials (avoids load-time black clothes).
-    if (!target && !isolatedCostumeMaterialMeshes.has(entry.mesh)) {
-      // Still clear recolor flag on native materials if present (no isolation yet).
-      const nativeMaterials = Array.isArray(entry.mesh.material)
-        ? entry.mesh.material
-        : [entry.mesh.material];
-      for (const m of nativeMaterials) {
-        const mat = m as (THREE.Material & { userData?: Record<string, unknown> }) | undefined;
-        if (mat?.userData?.__vrmCostumeRecolorApplied === true) {
-          mat.userData.__vrmCostumeRecolorApplied = false;
-        }
-      }
-      continue;
-    }
-
-    const materials = target
-      ? isolateCostumeMaterialsForRecolor(entry.mesh)
-      : (Array.isArray(entry.mesh.material) ? entry.mesh.material : [entry.mesh.material]);
-
-    materials.forEach((m) => {
-      const mat = m as (THREE.Material & {
-        color?: THREE.Color;
-        userData: Record<string, unknown>;
-      }) | undefined;
-      if (!mat || !mat.color) return;
-      // Mannequin paint owns the lit factor while active — never fight it with costume base.
-      if (mat.userData.__vrmMannequinActive === true) return;
-
-      if (target) {
-        const base = materialBaseHex(mat);
-        mat.color.set(tintColor(base, target));
-        mat.userData.__vrmCostumeRecolorApplied = true;
-        mat.needsUpdate = true;
-        return;
-      }
-
-      // Only restore when we previously applied a costume recolor. Always writing `base`
-      // re-applied near-black/mannequin caches and turned textured clothes pure black.
-      if (mat.userData.__vrmCostumeRecolorApplied === true) {
-        const base = materialBaseHex(mat);
-        mat.color.set(base);
-        mat.userData.__vrmCostumeRecolorApplied = false;
-        mat.needsUpdate = true;
-      }
-    });
-  }
-}
-
 function getExpressionTone(name: string, vrm: VRM) {
   const expressionManager = vrm.expressionManager;
   if (!expressionManager) return "표정";
@@ -1568,642 +1436,56 @@ function CameraDirector({ presetId, resetNonce }: { presetId: string; resetNonce
   return null;
 }
 
-const pendingPropDisposals = new WeakMap<THREE.Object3D, object>();
-
-function disposePropObject(object: THREE.Object3D) {
-  const geometries = new Set<THREE.BufferGeometry>();
-  const materials = new Set<THREE.Material>();
-  object.traverse((child) => {
-    const mesh = child as THREE.Mesh;
-    if (mesh.geometry) geometries.add(mesh.geometry);
-    const meshMaterials = Array.isArray(mesh.material) ? mesh.material : mesh.material ? [mesh.material] : [];
-    meshMaterials.forEach((material) => materials.add(material));
-  });
-  geometries.forEach((geometry) => geometry.dispose());
-  materials.forEach((material) => material.dispose());
-}
-
-/** StrictMode의 setup→cleanup→setup 재생에서는 두 번째 setup이 같은 object의 폐기를 취소한다. */
-function cancelScheduledPropDisposal(object: THREE.Object3D) {
-  pendingPropDisposals.delete(object);
-}
-
-function schedulePropDisposal(object: THREE.Object3D) {
-  const token = {};
-  pendingPropDisposals.set(object, token);
-  queueMicrotask(() => {
-    if (pendingPropDisposals.get(object) !== token) return;
-    pendingPropDisposals.delete(object);
-    disposePropObject(object);
-  });
-}
-
 const VRM_FRAME_BASE_PRIORITY = -3;
-const VRM_FRAME_PROP_PRIORITY = -2;
-const VRM_FRAME_COMMIT_PRIORITY = -1;
-const STUDIO_VRM_PROP_GEOMETRY_QUALITY = Object.freeze({
-  roundedBox: (width: number, height: number, depth: number, radius: number) => (
-    new RoundedBoxGeometry(width, height, depth, 3, radius)
-  ),
-});
-
-/**
- * V1은 기존 본 포털 좌표를 그대로 보존한다. V2는 본의 world 위치·회전만 추종하는 rigid follower로
- * 렌더해 body/head 비균일 스케일의 shear를 피하고, 실제 geometry anchor를 측정된 소켓에 맞춘다.
- */
-function VrmPropAttachment({
-  vrm,
-  instance,
-  metrics,
-}: {
-  vrm: VRM;
-  instance: PropInstance;
-  metrics: VrmPropRigMetrics;
-}) {
-  const [boneNode, setBoneNode] = useState<THREE.Object3D | null>(null);
-  const smartGroupRef = useRef<THREE.Group | null>(null);
-  const localPositionRef = useRef(new THREE.Vector3());
-  const boneWorldQuaternionRef = useRef(new THREE.Quaternion());
-  const localQuaternionRef = useRef(new THREE.Quaternion());
-  const anchorWorldOffsetRef = useRef(new THREE.Vector3());
-  const secondaryWorldTargetRef = useRef(new THREE.Vector3());
-  const secondaryTargetQuaternionRef = useRef(new THREE.Quaternion());
-  const groupWorldPositionRef = useRef(new THREE.Vector3());
-  const groupWorldQuaternionRef = useRef(new THREE.Quaternion());
-  const groupWorldScaleRef = useRef(new THREE.Vector3());
-  const handWorldScaleRef = useRef(new THREE.Vector3());
-  const [secondaryGripState] = useState(createVrmTwoBoneGripState);
-
-  useEffect(() => {
-    const node = vrm.humanoid?.getNormalizedBoneNode(instance.bone) ?? null;
-    setBoneNode(node);
-  }, [vrm, instance.bone]);
-
-  const object = useMemo(() => {
-    const def = propDefById(instance.propId);
-    if (!def) return null;
-    return buildPropObject(
-      THREE as unknown as Parameters<typeof buildPropObject>[0],
-      def,
-      instance.color,
-      STUDIO_VRM_PROP_GEOMETRY_QUALITY,
-    ) as unknown as THREE.Object3D;
-  }, [instance.color, instance.propId]);
-  const definition = propDefById(instance.propId);
-  const resolved = definition ? resolvePropAttachment(definition, instance, metrics) : null;
-  const secondary = definition ? resolveSecondaryPropTarget(definition, instance) : null;
-  const secondaryActive = Boolean(secondary && secondary.influence > 0);
-  const secondaryBone = secondary?.bone ?? null;
-
-  useEffect(() => {
-    if (!secondaryActive) {
-      releaseVrmTwoBoneGripState(secondaryGripState);
-      return;
-    }
-    return () => {
-      releaseVrmTwoBoneGripState(secondaryGripState);
-      vrm.scene.updateMatrixWorld(true);
-    };
-  }, [secondaryActive, secondaryBone, secondaryGripState, vrm]);
-
-  useEffect(() => {
-    if (!object) return;
-    if (instance.rig) {
-      object.position.set(0, 0, 0);
-      object.rotation.set(0, 0, 0);
-      object.scale.setScalar(1);
-    } else {
-      object.position.set(instance.position[0], instance.position[1], instance.position[2]);
-      object.rotation.set(
-        THREE.MathUtils.degToRad(instance.rotationDeg[0]),
-        THREE.MathUtils.degToRad(instance.rotationDeg[1]),
-        THREE.MathUtils.degToRad(instance.rotationDeg[2])
-      );
-      object.scale.setScalar(instance.scale);
-    }
-  }, [object, instance.position, instance.rig, instance.rotationDeg, instance.scale]);
-
-  useEffect(() => {
-    if (!object) return;
-    cancelScheduledPropDisposal(object);
-    return () => schedulePropDisposal(object);
-  }, [object]);
-
-  useFrame(() => {
-    const group = smartGroupRef.current;
-    if (!group || !boneNode || !resolved?.usesSmartRig) return;
-
-    boneNode.updateWorldMatrix(true, false);
-    // socket만 bone matrix로 world 변환하고, geometry anchor 보정은 scale이 제거된 rigid world
-    // quaternion으로 계산한다. 부모의 비균일 body/head scale이 소품을 찌그러뜨리거나 접점을
-    // 밀어내지 않으면서도 손바닥 위치 자체는 체형 변화를 정확히 따라간다.
-    const socketWorldPosition = localPositionRef.current.set(...resolved.socketPosition);
-    boneNode.localToWorld(socketWorldPosition);
-    const boneWorldQuaternion = boneNode.getWorldQuaternion(boneWorldQuaternionRef.current);
-    const localQuaternion = localQuaternionRef.current.setFromEuler(new THREE.Euler(
-      THREE.MathUtils.degToRad(resolved.rotationDeg[0]),
-      THREE.MathUtils.degToRad(resolved.rotationDeg[1]),
-      THREE.MathUtils.degToRad(resolved.rotationDeg[2]),
-      "XYZ"
-    ));
-    group.quaternion.copy(boneWorldQuaternion).multiply(localQuaternion).normalize();
-    group.scale.setScalar(resolved.scale);
-    const anchorWorldOffset = anchorWorldOffsetRef.current
-      .set(...resolved.anchor.position)
-      .multiplyScalar(resolved.scale)
-      .applyQuaternion(group.quaternion);
-    group.position.copy(socketWorldPosition).sub(anchorWorldOffset);
-    group.updateMatrixWorld(true);
-
-    if (secondary && secondary.influence > 0) {
-      const secondaryHandNode = vrm.humanoid?.getNormalizedBoneNode(secondary.bone) ?? null;
-      if (!secondaryHandNode) {
-        releaseVrmTwoBoneGripState(secondaryGripState);
-        return;
-      }
-      secondaryHandNode.updateWorldMatrix(true, false);
-      const groupWorldPosition = group.getWorldPosition(groupWorldPositionRef.current);
-      const groupWorldQuaternion = group.getWorldQuaternion(groupWorldQuaternionRef.current);
-      const groupWorldScale = group.getWorldScale(groupWorldScaleRef.current);
-      const handWorldScale = secondaryHandNode.getWorldScale(handWorldScaleRef.current);
-      const constraint = resolveSecondaryHandConstraint(
-        secondary.anchor,
-        [groupWorldPosition.x, groupWorldPosition.y, groupWorldPosition.z],
-        [groupWorldQuaternion.x, groupWorldQuaternion.y, groupWorldQuaternion.z, groupWorldQuaternion.w],
-        groupWorldScale.x,
-        metrics.handSockets[secondary.bone],
-        [handWorldScale.x, handWorldScale.y, handWorldScale.z]
-      );
-      if (!constraint) {
-        releaseVrmTwoBoneGripState(secondaryGripState);
-        return;
-      }
-      const target = secondaryWorldTargetRef.current.set(...constraint.wristWorldPosition);
-      const targetQuaternion = secondaryTargetQuaternionRef.current.set(...constraint.targetHandWorldQuaternion);
-      applyVrmTwoBoneGrip(
-        vrm,
-        secondary.bone === "leftHand" ? "left" : "right",
-        target,
-        secondary.influence,
-        secondary.elbowHint,
-        { targetQuaternion, state: secondaryGripState }
-      );
-    }
-  }, VRM_FRAME_PROP_PRIORITY);
-
-  if (!boneNode || !object) return null;
-  if (resolved?.usesSmartRig) {
-    return (
-      <group ref={smartGroupRef}>
-        <primitive object={object} />
-      </group>
-    );
-  }
-  return createPortal(<primitive object={object} />, boneNode);
-}
-
-/* ── 실장착 워드로브(studio-vrm-wardrobe) — 측정·조립·본 부착 ────────── */
-
-/**
- * 실제 스킨을 움직이는 raw 휴머노이드에서 본 로컬 치수를 잰다.
- * Avatar Forge가 raw 체형을 바꾼 뒤에도 같은 좌표계를 사용하므로 의상과 몸이 갈라지지 않는다.
- */
-function measureVrmWardrobeMetrics(vrm: VRM): WardrobeMetrics {
-  const humanoid = vrm.humanoid;
-  const fallback = sanitizeWardrobeMetrics(null);
-  if (!humanoid) return fallback;
-  vrm.scene.updateMatrixWorld(true);
-
-  const node = (name: VRMHumanBoneName) => humanoid.getRawBoneNode(name);
-  const world = (name: VRMHumanBoneName): THREE.Vector3 | null => {
-    const n = node(name);
-    return n ? n.getWorldPosition(new THREE.Vector3()) : null;
-  };
-  // 부착 본의 로컬 공간에서 목표 관절까지의 벡터. raw 본 스케일을 다시 곱하지 않도록
-  // world 길이가 아니라 이 로컬 길이로 geometry를 만든다.
-  const localVector = (from: VRMHumanBoneName, toWorld: THREE.Vector3): THREE.Vector3 | null => {
-    const n = node(from);
-    if (!n) return null;
-    const vector = n.worldToLocal(toWorld.clone());
-    return Number.isFinite(vector.x) && vector.lengthSq() > 1e-8 ? vector : null;
-  };
-  const toVec3 = (v: THREE.Vector3 | null): [number, number, number] | null => (v ? [v.x, v.y, v.z] : null);
-  const localDistanceBetween = (
-    anchor: VRMHumanBoneName,
-    a: THREE.Vector3 | null,
-    b: THREE.Vector3 | null,
-  ): number | undefined => {
-    const anchorNode = node(anchor);
-    if (!anchorNode || !a || !b) return undefined;
-    return anchorNode.worldToLocal(a.clone()).distanceTo(anchorNode.worldToLocal(b.clone()));
-  };
-
-  const hips = world("hips");
-  const spine = world("spine");
-  const neckW = world("neck") ?? world("head");
-  const limb = (from: VRMHumanBoneName, to: VRMHumanBoneName, fb: LimbMetric): LimbMetric => {
-    const b = world(to);
-    const vector = b ? localVector(from, b) : null;
-    if (!vector) return fb;
-    const len = vector.length();
-    const axis = vector.normalize();
-    return { len, axis: toVec3(axis) ?? fb.axis };
-  };
-
-  const lUpArm = world("leftUpperArm");
-  const rUpArm = world("rightUpperArm");
-  const lUpLeg = world("leftUpperLeg");
-  const rUpLeg = world("rightUpperLeg");
-  const lFoot = world("leftFoot");
-  const rFoot = world("rightFoot");
-  const rigSource: WardrobeMetrics["source"] = ([
-    "hips", "spine", "leftUpperArm", "rightUpperArm", "leftLowerArm", "rightLowerArm",
-    "leftHand", "rightHand", "leftUpperLeg", "rightUpperLeg", "leftLowerLeg", "rightLowerLeg",
-    "leftFoot", "rightFoot",
-  ] as const).every((boneName) => node(boneName)) && neckW
-    ? "raw-rig"
-    : "partial-rig";
-
-  // 몸통 위 방향(spine 로컬) + 발 앞 방향(해부학: 왼쪽×위 = 앞).
-  const upVector = spine && neckW ? localVector("spine", neckW) : null;
-  const upLocal = upVector?.normalize() ?? null;
-  let footForward = fallback.footForward;
-  if (lUpLeg && rUpLeg && hips && neckW && lFoot && rFoot) {
-    const leftWorld = lUpLeg.clone().sub(rUpLeg).normalize();
-    const upWorld = neckW.clone().sub(hips).normalize();
-    const fwdWorld = leftWorld.clone().cross(upWorld).normalize();
-    const footLocalDir = (name: VRMHumanBoneName, at: THREE.Vector3): [number, number, number] | null => {
-      const n = node(name);
-      if (!n) return null;
-      const origin = n.worldToLocal(at.clone());
-      const tip = n.worldToLocal(at.clone().add(fwdWorld));
-      const dir = tip.sub(origin).normalize();
-      return Number.isFinite(dir.x) && dir.lengthSq() > 1e-8 ? [dir.x, dir.y, dir.z] : null;
-    };
-    footForward = {
-      left: footLocalDir("leftFoot", lFoot) ?? fallback.footForward.left,
-      right: footLocalDir("rightFoot", rFoot) ?? fallback.footForward.right,
-    };
-  }
-
-  return sanitizeWardrobeMetrics({
-    source: rigSource,
-    shoulderW: localDistanceBetween("spine", lUpArm, rUpArm),
-    hipW: localDistanceBetween("hips", lUpLeg, rUpLeg),
-    hipsToSpine: spine ? localVector("hips", spine)?.length() : undefined,
-    spineToNeck: neckW ? localVector("spine", neckW)?.length() : undefined,
-    // Ground height is not represented by a humanoid bone. A lower-leg-relative value remains
-    // stable under overall character scale and avoids measuring posed world Y as local geometry.
-    ankleH: Math.max(
-      0.02,
-      (limb("leftLowerLeg", "leftFoot", fallback.lowerLeg.left).len
-        + limb("rightLowerLeg", "rightFoot", fallback.lowerLeg.right).len) * 0.1,
-    ),
-    up: upLocal ? (toVec3(upLocal) ?? undefined) : undefined,
-    footForward,
-    upperArm: {
-      left: limb("leftUpperArm", "leftLowerArm", fallback.upperArm.left),
-      right: limb("rightUpperArm", "rightLowerArm", fallback.upperArm.right),
-    },
-    lowerArm: {
-      left: limb("leftLowerArm", "leftHand", fallback.lowerArm.left),
-      right: limb("rightLowerArm", "rightHand", fallback.lowerArm.right),
-    },
-    upperLeg: {
-      left: limb("leftUpperLeg", "leftLowerLeg", fallback.upperLeg.left),
-      right: limb("rightUpperLeg", "rightLowerLeg", fallback.upperLeg.right),
-    },
-    lowerLeg: {
-      left: limb("leftLowerLeg", "leftFoot", fallback.lowerLeg.left),
-      right: limb("rightLowerLeg", "rightFoot", fallback.lowerLeg.right),
-    },
-  });
-}
-
-const GARMENT_Y = new THREE.Vector3(0, 1, 0);
-const GARMENT_Z = new THREE.Vector3(0, 0, 1);
-
-function createGarmentWeaveTexture(fabricId: WardrobeEquip["fabricId"]): THREE.DataTexture | null {
-  const fabric = wardrobeFabricById(fabricId);
-  if (!fabric || fabric.weaveStrength <= 0) return null;
-  const size = 48;
-  const data = new Uint8Array(size * size);
-  for (let y = 0; y < size; y += 1) {
-    for (let x = 0; x < size; x += 1) {
-      const u = x / size;
-      const v = y / size;
-      const warp = Math.sin(u * Math.PI * 2 * fabric.weaveFrequency);
-      const weft = Math.sin(v * Math.PI * 2 * fabric.weaveFrequency * 0.92);
-      const diagonal = fabricId === "denim"
-        ? Math.sin((u + v) * Math.PI * fabric.weaveFrequency * 1.35) * 0.55
-        : 0;
-      const knit = fabricId === "knit"
-        ? Math.cos((u - v) * Math.PI * fabric.weaveFrequency) * 0.38
-        : 0;
-      data[y * size + x] = Math.round(THREE.MathUtils.clamp(
-        128 + warp * 34 + weft * 26 + diagonal * 28 + knit * 28,
-        0,
-        255,
-      ));
-    }
-  }
-  const texture = new THREE.DataTexture(data, size, size, THREE.RedFormat, THREE.UnsignedByteType);
-  texture.name = `wardrobe-weave:${fabricId}`;
-  texture.wrapS = THREE.RepeatWrapping;
-  texture.wrapT = THREE.RepeatWrapping;
-  texture.minFilter = THREE.LinearMipmapLinearFilter;
-  texture.magFilter = THREE.LinearFilter;
-  texture.generateMipmaps = true;
-  texture.needsUpdate = true;
-  return texture;
-}
-
-function createGarmentMaterial(
-  part: GarmentPart,
-  itemColor: string,
-  fabricId: WardrobeEquip["fabricId"],
-  weaveTexture: THREE.DataTexture | null,
-): THREE.MeshPhysicalMaterial {
-  const material = new THREE.MeshPhysicalMaterial({ side: THREE.DoubleSide });
-  applyGarmentMaterialStyle(material, part, itemColor, fabricId, weaveTexture);
-  return material;
-}
-
-function applyGarmentMaterialStyle(
-  material: THREE.MeshPhysicalMaterial,
-  part: GarmentPart,
-  itemColor: string,
-  fabricId: WardrobeEquip["fabricId"],
-  weaveTexture: THREE.DataTexture | null,
-) {
-  const fabric = wardrobeFabricById(fabricId) ?? WARDROBE_FABRICS[0];
-  const color = new THREE.Color(part.color ?? itemColor);
-  const roughness = part.metalness !== undefined && part.metalness > 0.35
-    ? part.roughness ?? fabric.roughness
-    : fabric.roughness;
-  const metalness = part.metalness ?? fabric.metalness;
-  const fabricSurface = metalness < 0.35;
-  material.color.copy(color);
-  material.roughness = roughness;
-  material.metalness = metalness;
-  material.sheen = fabricSurface ? fabric.sheen : 0;
-  material.sheenRoughness = fabricSurface ? fabric.sheenRoughness : 1;
-  material.sheenColor.copy(color).lerp(new THREE.Color("#ffffff"), 0.12);
-  material.clearcoat = fabric.clearcoat;
-  material.clearcoatRoughness = fabric.clearcoatRoughness;
-  material.bumpMap = fabricSurface ? weaveTexture : null;
-  material.bumpScale = fabricSurface ? fabric.weaveStrength : 0;
-  material.userData.studioVrmGarmentPart = part;
-  material.userData.studioVrmGarmentFabricId = fabricId;
-  material.needsUpdate = true;
-}
-
-function disposeGarmentMaterials(materials: readonly THREE.Material[]) {
-  const textures = new Set<THREE.Texture>();
-  for (const material of materials) {
-    const physical = material as THREE.MeshPhysicalMaterial;
-    if (physical.bumpMap) textures.add(physical.bumpMap);
-    material.dispose();
-  }
-  textures.forEach((texture) => texture.dispose());
-}
-
-/** 파츠 스펙 목록을 본별 three 그룹으로 조립한다. */
-function assembleGarmentGroups(
-  parts: GarmentPart[],
-  itemColor: string,
-  fabricId: WardrobeEquip["fabricId"],
-  name: string,
-): Map<WardrobeBone, THREE.Group> {
-  const groups = new Map<WardrobeBone, THREE.Group>();
-  const weaveTexture = createGarmentWeaveTexture(fabricId);
-  for (const part of parts) {
-    let group = groups.get(part.bone);
-    if (!group) {
-      group = new THREE.Group();
-      group.name = `${name}:${part.bone}`;
-      groups.set(part.bone, group);
-    }
-    const material = createGarmentMaterial(part, itemColor, fabricId, weaveTexture);
-    const geometry = buildStudioVrmGarmentGeometry(part.shape);
-    geometry.computeVertexNormals();
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    mesh.position.set(part.offset[0], part.offset[1], part.offset[2]);
-    if (part.align) {
-      // 실린더/박스/구는 +Y, 토러스는 링 축(+Z)을 목표 방향으로 정렬.
-      const source = part.shape.kind === "torus" ? GARMENT_Z : GARMENT_Y;
-      const target = new THREE.Vector3(part.align[0], part.align[1], part.align[2]).normalize();
-      if (target.lengthSq() > 1e-8) mesh.quaternion.setFromUnitVectors(source, target);
-    }
-    if (part.squash) mesh.scale.set(part.squash[0], part.squash[1], part.squash[2]);
-    group.add(mesh);
-  }
-  return groups;
-}
-
-function collectVrmSourceSkeletonBones(vrm: VRM): Set<THREE.Bone> {
-  const bones = new Set<THREE.Bone>();
-  vrm.scene.traverse((object) => {
-    const skinned = object as THREE.SkinnedMesh;
-    if (!skinned.isSkinnedMesh) return;
-    skinned.skeleton.bones.forEach((bone) => bones.add(bone));
-  });
-  return bones;
-}
-
-function assembleSkinnedGarment(
-  vrm: VRM,
-  parts: readonly GarmentPart[],
-  itemColor: string,
-  fabricId: WardrobeEquip["fabricId"],
-  name: string,
-) {
-  const weaveTexture = createGarmentWeaveTexture(fabricId);
-  const materials = parts.map((part) => createGarmentMaterial(part, itemColor, fabricId, weaveTexture));
-  const sourceBones = collectVrmSourceSkeletonBones(vrm);
-  const built = buildStudioVrmSkinnedGarment({
-    name,
-    root: vrm.scene,
-    parts,
-    materials,
-    resolveBone: (boneName: StudioVrmGarmentSkinBone) => {
-      const node = vrm.humanoid?.getRawBoneNode(boneName as VRMHumanBoneName) ?? null;
-      return node && sourceBones.has(node as THREE.Bone) ? node : null;
-    },
-  });
-  if (!built.surface) disposeGarmentMaterials(materials);
-  return built;
-}
-
-function disposeGarmentObject(group: THREE.Object3D) {
-  const textures = new Set<THREE.Texture>();
-  group.traverse((obj) => {
-    const mesh = obj as THREE.Mesh;
-    if (!mesh.isMesh) return;
-    if ((mesh as THREE.SkinnedMesh).isSkinnedMesh) {
-      (mesh as THREE.SkinnedMesh).skeleton.dispose();
-    }
-    mesh.geometry?.dispose();
-    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-    materials.forEach((m) => {
-      const physical = m as THREE.MeshPhysicalMaterial | undefined;
-      if (physical?.bumpMap) textures.add(physical.bumpMap);
-      m?.dispose();
-    });
-  });
-  textures.forEach((texture) => texture.dispose());
-}
-
-const pendingGarmentDisposals = new WeakMap<THREE.Object3D, object>();
-
-function cancelScheduledGarmentDisposal(group: THREE.Object3D) {
-  pendingGarmentDisposals.delete(group);
-}
-
-function scheduleGarmentDisposal(group: THREE.Object3D) {
-  const token = {};
-  pendingGarmentDisposals.set(group, token);
-  queueMicrotask(() => {
-    if (pendingGarmentDisposals.get(group) !== token) return;
-    pendingGarmentDisposals.delete(group);
-    disposeGarmentObject(group);
-  });
-}
-
-/** 워드로브 한 슬롯 장착분을 humanoid 본들에 포털로 부착한다(파츠가 본을 따라 포즈 추종). */
-function VrmWardrobeAttachment({
-  vrm,
-  slot,
-  equip,
-  metrics,
-  effectiveFit,
-  onSurfaceReceipt,
-}: {
-  vrm: VRM;
-  slot: WardrobeSlot;
-  equip: WardrobeEquip;
-  metrics: WardrobeMetrics;
-  effectiveFit: number;
-  onSurfaceReceipt: (slot: WardrobeSlot, receipt: StudioVrmSkinnedGarmentReceipt | null) => void;
-}) {
-  const renderable = useMemo(() => {
-    const def = wardrobeItemById(equip.itemId);
-    if (!def) return { entries: [], receipt: null };
-    const parts = buildGarmentParts(equip.itemId, metrics, effectiveFit);
-    const name = `wardrobe:${def.slot}:${def.id}`;
-    if (def.geometrySource === "skinned-procedural-v1") {
-      const built = assembleSkinnedGarment(
-        vrm,
-        parts,
-        def.defaultColor,
-        def.defaultFabricId,
-        name,
-      );
-      if (built.surface) {
-        return {
-          entries: [{
-            key: `${equip.itemId}:skinned`,
-            node: vrm.scene as THREE.Object3D,
-            object: built.surface.mesh as THREE.Object3D,
-          }],
-          receipt: built.receipt,
-        };
-      }
-      const groups = assembleGarmentGroups(
-        parts,
-        def.defaultColor,
-        def.defaultFabricId,
-        name,
-      );
-      const entries: { key: string; node: THREE.Object3D; object: THREE.Object3D }[] = [];
-      for (const [bone, object] of groups) {
-        const boneNode = vrm.humanoid?.getRawBoneNode(bone as VRMHumanBoneName) ?? null;
-        if (boneNode) entries.push({ key: `${equip.itemId}:${bone}`, node: boneNode, object });
-      }
-      return { entries, receipt: built.receipt };
-    }
-
-    const groups = assembleGarmentGroups(
-      parts,
-      def.defaultColor,
-      def.defaultFabricId,
-      `wardrobe:${def.slot}:${def.id}`,
-    );
-    const entries: { key: string; node: THREE.Object3D; object: THREE.Object3D }[] = [];
-    for (const [bone, object] of groups) {
-      const boneNode = vrm.humanoid?.getRawBoneNode(bone as VRMHumanBoneName) ?? null;
-      if (boneNode) entries.push({ key: `${equip.itemId}:${bone}`, node: boneNode, object });
-    }
-    return { entries, receipt: null };
-  }, [vrm, equip.itemId, effectiveFit, metrics]);
-
-  const entries = renderable.entries;
-
-  // 색상·원단만 바뀔 때 geometry/Skeleton을 다시 만들면 현재 포즈가 새 bind pose가 된다.
-  // 재질만 제자리에서 갱신해 포즈·핏·스키닝 표면을 그대로 유지한다.
-  useLayoutEffect(() => {
-    const materials = new Set<THREE.MeshPhysicalMaterial>();
-    for (const entry of entries) {
-      entry.object.traverse((object) => {
-        const mesh = object as THREE.Mesh;
-        if (!mesh.isMesh) return;
-        const meshMaterials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-        for (const material of meshMaterials) {
-          if ((material as THREE.MeshPhysicalMaterial).isMeshPhysicalMaterial) {
-            materials.add(material as THREE.MeshPhysicalMaterial);
-          }
-        }
-      });
-    }
-    if (materials.size === 0) return;
-
-    const fabricChanged = [...materials].some(
-      (material) => material.userData.studioVrmGarmentFabricId !== equip.fabricId,
-    );
-    const replacementWeave = fabricChanged ? createGarmentWeaveTexture(equip.fabricId) : null;
-    const retiredTextures = new Set<THREE.Texture>();
-    let replacementUsed = false;
-
-    for (const material of materials) {
-      const part = material.userData.studioVrmGarmentPart as GarmentPart | undefined;
-      if (!part) continue;
-      const previousBump = material.bumpMap;
-      const nextWeave = fabricChanged ? replacementWeave : previousBump as THREE.DataTexture | null;
-      applyGarmentMaterialStyle(material, part, equip.color, equip.fabricId, nextWeave);
-      if (replacementWeave && material.bumpMap === replacementWeave) replacementUsed = true;
-      if (previousBump && previousBump !== material.bumpMap) retiredTextures.add(previousBump);
-    }
-
-    retiredTextures.forEach((texture) => texture.dispose());
-    if (replacementWeave && !replacementUsed) replacementWeave.dispose();
-  }, [entries, equip.color, equip.fabricId]);
-
-  // GPU 버퍼 정리 — StrictMode의 setup→cleanup→setup에서는 같은 object 폐기를 취소하고,
-  // 실제 아이템/색/핏 교체나 언마운트에서만 다음 microtask에 해제한다.
-  useEffect(() => {
-    entries.forEach((entry) => cancelScheduledGarmentDisposal(entry.object));
-    return () => entries.forEach((entry) => scheduleGarmentDisposal(entry.object));
-  }, [entries]);
-
-  useEffect(() => {
-    onSurfaceReceipt(slot, renderable.receipt);
-  }, [onSurfaceReceipt, renderable.receipt, slot]);
-
-  return (
-    <>
-      {entries.map((entry) => (
-        <group key={entry.key}>{createPortal(<primitive object={entry.object} />, entry.node)}</group>
-      ))}
-    </>
-  );
-}
 
 function applyRotationToVrm(vrm: VRM, bodyRotation: number) {
   const baseRotationY = typeof vrm.scene.userData[BASE_ROTATION_Y_KEY] === "number" ? vrm.scene.userData[BASE_ROTATION_Y_KEY] : 0;
   vrm.scene.rotation.y = baseRotationY + bodyRotation;
   vrm.scene.updateMatrixWorld(true);
+}
+
+type StudioVrmProportionPoseTransactionInput = {
+  readonly bones: PoseBoneMap;
+  readonly yOffset: number;
+  readonly poseTranslations: StudioVrmPoseTranslations;
+  readonly fingerEdits: FingerRotationMap;
+  readonly bodyScale: BodyScale;
+  readonly bodyRotation: number;
+  readonly expressionWeights: Record<string, number>;
+};
+
+/**
+ * Buffers fit measurements until the proportion runtime commits. The lifecycle invokes reapply
+ * both for a requested rig and for transactional recovery, so callers publish the buffer only
+ * after receiving a successful runtime receipt.
+ */
+function createStudioVrmProportionPoseTransaction(
+  vrm: VRM,
+  input: StudioVrmProportionPoseTransactionInput,
+) {
+  return createStudioVrmProportionFitTransaction(vrm, () => {
+      applyPoserVisualState(vrm, {
+        bones: input.bones,
+        yOffset: input.yOffset,
+        poseTranslations: input.poseTranslations,
+        fingerEdits: input.fingerEdits,
+        bodyScale: input.bodyScale,
+      });
+      applyRotationToVrm(vrm, input.bodyRotation);
+      applyExpressionWeightsToVrm(vrm, input.expressionWeights);
+      vrm.scene.updateMatrixWorld(true);
+      return true;
+  });
+}
+
+function studioVrmProportionValuesRequireRuntime(
+  proportions: AvatarForgeState["proportions"],
+) {
+  return JSON.stringify(proportions) !== JSON.stringify(NEUTRAL_STUDIO_VRM_PROPORTIONS);
+}
+
+function studioVrmProportionsRequireRuntime(state: AvatarForgeState) {
+  return studioVrmProportionValuesRequireRuntime(state.proportions);
 }
 
 type MannequinMaterial = THREE.Material & {
@@ -2497,6 +1779,7 @@ function VrmActor({
   idleAnimation,
   fingerEdits,
   bodyScale,
+  rigRevision,
   texturePaintEnabled,
   texturePaintMutationBlockedRef,
   texturePaintRuntime,
@@ -2519,6 +1802,7 @@ function VrmActor({
   idleAnimation: boolean;
   fingerEdits: FingerRotationMap;
   bodyScale: BodyScale;
+  rigRevision: number;
   texturePaintEnabled: boolean;
   texturePaintMutationBlockedRef: React.RefObject<boolean>;
   texturePaintRuntime: StudioVrmTexturePaintRuntime | null;
@@ -2905,7 +2189,7 @@ function VrmActor({
       bodyScale,
     });
     applyExpressionWeightsToVrm(vrm, expressionWeights);
-  }, [customBones, customYOffset, poseTranslations, expressionWeights, fingerEdits, bodyScale, vrm, webcamActive, idleAnimation]);
+  }, [customBones, customYOffset, poseTranslations, expressionWeights, fingerEdits, bodyScale, rigRevision, vrm, webcamActive, idleAnimation]);
 
   useEffect(() => {
     applyRotationToVrm(vrm, bodyRotation);
@@ -3543,27 +2827,12 @@ function VrmPoseBoneOverlay({
   );
 }
 
-/** base pose/tracking과 모든 소품 IK가 끝난 뒤 normalized pose를 raw VRM에 한 번만 전달한다. */
-function VrmRuntimeCommit({
-  vrm,
-  physicsPreview,
-  webcamActive,
-}: {
-  vrm: VRM;
-  physicsPreview: boolean;
-  webcamActive: boolean;
-}) {
-  useFrame((_, delta) => {
-    // 흔들림 미리보기·웹캠 트래킹 중에만 스프링본을 전진시키고, 탭 복귀 폭주는 상한 처리한다.
-    const springDelta = webcamActive || physicsPreview
-      ? Math.min(delta, PHYSICS_PREVIEW_MAX_DELTA)
-      : 0;
-    vrm.update(springDelta);
-  }, VRM_FRAME_COMMIT_PRIORITY);
-  return null;
-}
+type LightingTone = StudioVrmLightingTone;
 
-type LightingTone = "morning" | "sunset" | "night" | "studio";
+type StudioVrmCaptureVisualAuthority = Readonly<{
+  identity: string;
+  fullState: FullVrmState;
+}>;
 
 function VrmLighting({
   tone,
@@ -3820,6 +3089,16 @@ export function StudioVrmPoser({
   // early decl for new features used in effects
   const [bodyScale, setBodyScale] = useState<BodyScale>({ height: 1, width: 1 });
   const [avatarForgeState, setAvatarForgeState] = useState<AvatarForgeState>(() => createAvatarForgeState());
+  const [avatarForgeFaceController] = useState(createStudioVrmAvatarForgeFaceController);
+  const [proportionRigStatus, setProportionRigStatus] = useState<
+    "empty" | "ready" | "applying" | "unavailable" | "reload-required"
+  >("empty");
+  const [proportionRigMessage, setProportionRigMessage] = useState("");
+  const [proportionRigReceipt, setProportionRigReceipt] =
+    useState<StudioVrmProportionRigReceipt | null>(null);
+  const [proportionRigRevision, setProportionRigRevision] = useState(0);
+  const [proportionHeadMeasurement, setProportionHeadMeasurement] =
+    useState<StudioVrmProportionHeadMeasurementReceipt | null>(null);
   const detectedOriginalHairCount = useMemo(() => countDetectedVrmHairMeshes(vrm), [vrm]);
   const [fingerEdits, setFingerEdits] = useState<FingerRotationMap>({});
   const [lighting, setLighting] = useState<LightingParams>({ intensity: 1.2, colorTemp: 0.5, directionDeg: 45 });
@@ -3870,13 +3149,13 @@ export function StudioVrmPoser({
   const [selectedVrmPropUid, setSelectedVrmPropUid] = useState<string | null>(null);
   // 의상(studio-vrm-costume) — 토글/리컬러 상태 + 수집된 메시 목록.
   const [costumeState, setCostumeState] = useState<CostumeState>({ hidden: [], recolor: {} });
-  const [costumeMeshes, setCostumeMeshes] = useState<CostumeMeshEntry[]>([]);
+  const [costumeMeshes, setCostumeMeshes] = useState<StudioVrmCostumeMeshEntry[]>([]);
   const [selectedCostumeKey, setSelectedCostumeKey] = useState<string | null>(null);
   // 실장착 워드로브(studio-vrm-wardrobe) — 슬롯별 장착 + 모델 실측 치수.
   const [wardrobeState, setWardrobeState] = useState<WardrobeState>({});
   const [wardrobeMetrics, setWardrobeMetrics] = useState<WardrobeMetrics | null>(null);
   const [wardrobeSurfaceReceipts, setWardrobeSurfaceReceipts] =
-    useState<Partial<Record<WardrobeSlot, StudioVrmSkinnedGarmentReceipt>>>({});
+    useState<Partial<Record<WardrobeSlot, StudioVrmWardrobeSurfaceReceipt>>>({});
   const [propRigMetrics, setPropRigMetrics] = useState<VrmPropRigMetrics>(DEFAULT_VRM_PROP_RIG_METRICS);
   const effectivePropRigMetrics = scaleVrmPropRigMetrics(propRigMetrics, bodyScale);
   const [wardrobeAutoHide, setWardrobeAutoHide] = useState(true);
@@ -3886,16 +3165,9 @@ export function StudioVrmPoser({
   );
   const wardrobeInteractionLocked = isCapturing;
 
-  // Avatar Forge applies body proportions to the raw/skinned rig in its passive effect. Measure
-  // on the following animation frame so the wardrobe shares the exact same body authority.
-  useEffect(() => {
-    if (!vrm) return;
-    const frame = requestAnimationFrame(() => {
-      if (vrmRef.current !== vrm) return;
-      setWardrobeMetrics(measureVrmWardrobeMetrics(vrm));
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [avatarForgeState.body, vrm]);
+  // Wardrobe/prop measurements are committed by the proportion-rig lifecycle while the rebuilt
+  // humanoid is in rest pose. Measuring one animation frame after a React effect can mix two rig
+  // generations and is therefore intentionally not used here.
   // 물리(studio-vrm-physics) — 스프링본 설정 + 미리보기/조인트 수.
   const [vrmPhysics, setVrmPhysics] = useState<VrmPhysicsSettings>(DEFAULT_VRM_PHYSICS);
   const [physicsPreview, setPhysicsPreview] = useState(false);
@@ -3906,6 +3178,7 @@ export function StudioVrmPoser({
   const [webcamActive, setWebcamActive] = useState(false);
   const [webcamLoading, setWebcamLoading] = useState(false);
   const [webcamError, setWebcamError] = useState<string | null>(null);
+  const [webcamErrorStage, setWebcamErrorStage] = useState<"camera" | "engine" | null>(null);
   const [showConsent, setShowConsent] = useState(false);
   const [webcamConsentGranted, setWebcamConsentGranted] = useState(false);
   const [faceDetected, setFaceDetected] = useState(false);
@@ -3948,6 +3221,25 @@ export function StudioVrmPoser({
   const dynamicPoseStateRef = useRef({ webcamActive: false, idleAnimation: false });
   const trackingDataRef = useRef<VrmTrackingData | null>(null);
   const vrmRef = useRef<VRM | null>(null);
+  const vrmInstallGenerationRef = useRef(0);
+  const proportionRigRuntimeRef = useRef<StudioVrmProportionRigRuntime | null>(null);
+  const proportionRigReceiptRef = useRef<StudioVrmProportionRigReceipt | null>(null);
+  const proportionHeadMeasurementRef =
+    useRef<StudioVrmProportionHeadMeasurementReceipt | null>(null);
+  const proportionPoseReapplyRef = useRef<(() => boolean | void) | null>(null);
+  const avatarForgeCommittedStateRef = useRef(avatarForgeState);
+  const avatarForgeAuthorityIdentityRef = useRef(
+    JSON.stringify(serializeAvatarForgeState(avatarForgeState)),
+  );
+  const proportionRigRevisionRef = useRef(proportionRigRevision);
+  const captureVisualAuthorityRef = useRef<StudioVrmCaptureVisualAuthority | null>(null);
+  useLayoutEffect(() => {
+    avatarForgeCommittedStateRef.current = avatarForgeState;
+    avatarForgeAuthorityIdentityRef.current = JSON.stringify(
+      serializeAvatarForgeState(avatarForgeState),
+    );
+    proportionRigRevisionRef.current = proportionRigRevision;
+  }, [avatarForgeState, proportionRigRevision]);
   const texturePaintRuntimeRef = useRef<StudioVrmTexturePaintRuntime | null>(null);
   const texturePaintSnapshotRef = useRef<StudioVrmTexturePaintRuntimeSnapshot | null>(null);
   const texturePaintInvalidateRef = useRef<(() => void) | null>(null);
@@ -3956,12 +3248,15 @@ export function StudioVrmPoser({
   const texturePaintMutationBlockedRef = useRef(false);
   const wardrobeMutationBlockedRef = useRef(false);
   const wardrobeAuthoredIdentityRef = useRef(wardrobeAuthoredIdentity);
+  const wardrobeXpbdCaptureSyncRef =
+    useRef(new Map<WardrobeSlot, StudioVrmWardrobeCaptureSync>());
   const loadRequestRef = useRef(0);
   const thumbnailRequestRef = useRef(0);
   const insertCaptureGenerationRef = useRef(0);
   const insertCaptureFrameRef = useRef<number | null>(null);
   const insertCaptureAbortRef = useRef<AbortController | null>(null);
   const sharePoseAbortRef = useRef<AbortController | null>(null);
+  const captureOperationRef = useRef<"insert" | "thumbnail" | "share" | null>(null);
   const sharedPoseListRequestRef = useRef(0);
   const sharedPoseSelectionRequestRef = useRef(0);
   const sharedPoseCatalogAbortRef = useRef<AbortController | null>(null);
@@ -3969,6 +3264,7 @@ export function StudioVrmPoser({
   const captureRef = useRef<CaptureState>({ camera: null, gl: null, scene: null });
   const captureRequestRef = useRef(0);
   const pendingCameraRestoreRef = useRef<StudioVrmCameraSettings | null>(null);
+  const pendingCameraRestoreFrameRef = useRef<number | null>(null);
   const panelScrollRef = useRef<HTMLDivElement>(null);
   const manualPoseDetailsRef = useRef<HTMLDetailsElement>(null);
   const jointIkTransactionRef = useRef<StudioVrmIkTransaction | null>(null);
@@ -3987,6 +3283,27 @@ export function StudioVrmPoser({
   const groundShadowRef = useRef<THREE.Mesh>(null);
   const envRootRef = useRef<THREE.Group | null>(null);
   const captureHelperLeaseCountRef = useRef(0);
+
+  const acquireVrmCaptureOperation = useCallback((
+    operation: "insert" | "thumbnail" | "share",
+  ): boolean => {
+    if (captureOperationRef.current !== null) return false;
+    captureOperationRef.current = operation;
+    return true;
+  }, []);
+
+  const releaseVrmCaptureOperation = useCallback((
+    operation: "insert" | "thumbnail" | "share",
+  ): void => {
+    if (captureOperationRef.current === operation) {
+      captureOperationRef.current = null;
+    }
+  }, []);
+
+  const readVrmCaptureCameraIdentity = useCallback((): string | null => {
+    const camera = viewportApiRef.current?.readCamera() ?? null;
+    return camera ? JSON.stringify(camera) : null;
+  }, []);
 
   const acquireVrmCaptureHelperLease = useCallback((options?: {
     readonly subjectOnly?: boolean;
@@ -4146,7 +3463,8 @@ export function StudioVrmPoser({
       cancelAnimationFrame(insertCaptureFrameRef.current);
       insertCaptureFrameRef.current = null;
     }
-  }, []);
+    releaseVrmCaptureOperation("insert");
+  }, [releaseVrmCaptureOperation]);
 
   const cancelPendingPoseShare = useCallback((): void => {
     const controller = sharePoseAbortRef.current;
@@ -4400,18 +3718,20 @@ export function StudioVrmPoser({
   }, []);
 
   const zoomViewport = useCallback((factor: number) => {
+    if (captureOperationRef.current !== null) return;
     viewportApiRef.current?.zoomBy(factor);
     setViewportHinted(true);
   }, []);
 
   const handleViewReset = useCallback(() => {
+    if (captureOperationRef.current !== null) return;
     setViewResetNonce((n) => n + 1);
     setViewportHinted(true);
   }, []);
 
   const currentPersistentIkSignature = useCallback((overrides: Partial<Pick<
     StudioVrmPersistentIkSignatureInput,
-    "bones" | "fingerEdits" | "yOffset" | "translations" | "constraints"
+    "bones" | "fingerEdits" | "yOffset" | "translations" | "constraints" | "proportions"
   >> = {}): string => {
     return buildStudioVrmPersistentIkSignature({
       modelId: activeModelId,
@@ -4421,6 +3741,7 @@ export function StudioVrmPoser({
       translations: overrides.translations ?? poseTranslations,
       bodyRotation,
       bodyScale,
+      proportions: overrides.proportions ?? avatarForgeState.proportions,
       constraints: overrides.constraints ?? ikConstraints,
       lockedPoseBones,
       jointProfile: rigJointProfile,
@@ -4430,6 +3751,7 @@ export function StudioVrmPoser({
     });
   }, [
     activeModelId,
+    avatarForgeState.proportions,
     bodyRotation,
     bodyScale,
     customBones,
@@ -4482,6 +3804,27 @@ export function StudioVrmPoser({
     return !hasLockedConstraint
       || persistentIkResolvedSignatureRef.current === currentPersistentIkSignature();
   }, [currentPersistentIkSignature, ikConstraints]);
+
+  const proportionRigCaptureIsReady = useCallback((): boolean => {
+    if (proportionRigStatus === "reload-required" || proportionRigStatus === "applying") {
+      return false;
+    }
+    return !studioVrmProportionsRequireRuntime(avatarForgeState)
+      || (proportionRigStatus === "ready" && proportionRigReceiptRef.current !== null);
+  }, [avatarForgeState, proportionRigStatus]);
+
+  const avatarForgeFaceCaptureIsReady = useCallback((): boolean => {
+    const snapshot = avatarForgeFaceController.getSnapshot();
+    const expectedScale = deriveStudioVrmAvatarForgeFaceScale(
+      avatarForgeCommittedStateRef.current.face,
+    );
+    return snapshot.status === "applied"
+      && snapshot.failure === null
+      && snapshot.rigRevision === proportionRigRevisionRef.current
+      && snapshot.nodeCount > 0
+      && snapshot.scale !== null
+      && snapshot.scale.every((value, index) => value === expectedScale[index]);
+  }, [avatarForgeFaceController]);
 
   function handleJointHandleSelect(bone: StudioVrmJointHandleBone) {
     setSelectedIkPole(null);
@@ -4965,14 +4308,32 @@ export function StudioVrmPoser({
         physics: vrmPhysics,
         bodyScale,
         lighting,
+        lightingTone,
         env: envVariant,
         fingerOverrides: fingerEdits,
         customColors,
         materialFx,
         avatarForge: serializeAvatarForgeState(avatarForgeState),
       }),
-    [activeModelId, activePoseId, activeExpressionId, customBones, customYOffset, poseTranslations, ikConstraints, bodyRotation, expressionWeights, costumeState, wardrobeState, wardrobeAutoHide, vrmPropItems, activeProps, propAttachments, vrmPhysics, bodyScale, lighting, envVariant, fingerEdits, customColors, materialFx, avatarForgeState]
+    [activeModelId, activePoseId, activeExpressionId, customBones, customYOffset, poseTranslations, ikConstraints, bodyRotation, expressionWeights, costumeState, wardrobeState, wardrobeAutoHide, vrmPropItems, activeProps, propAttachments, vrmPhysics, bodyScale, lighting, lightingTone, envVariant, fingerEdits, customColors, materialFx, avatarForgeState]
   );
+  const captureVisualAuthorityIdentity = JSON.stringify({
+    fullState: captureFullState(),
+    lightingTone,
+    mannequinMode,
+    rigJointProfile,
+    fullBodyIkEnabled,
+    footPlantEnabled,
+    rigFloorHeight,
+    transparentBackground,
+    insertBackgroundColor,
+  });
+  useLayoutEffect(() => {
+    captureVisualAuthorityRef.current = Object.freeze({
+      identity: captureVisualAuthorityIdentity,
+      fullState: captureFullState(),
+    });
+  }, [captureFullState, captureVisualAuthorityIdentity]);
 
   // A pointer transaction owns the exact React-side pose/config it started from. Any preset,
   // restore, root/body edit, pin toggle, or lock change invalidates that ownership before a late
@@ -4988,6 +4349,7 @@ export function StudioVrmPoser({
       translations: poseTranslations,
       bodyRotation,
       bodyScale,
+      proportions: avatarForgeState.proportions,
       constraints: ikConstraints,
       lockedPoseBones,
       jointProfile: rigJointProfile,
@@ -5006,6 +4368,7 @@ export function StudioVrmPoser({
     setJointHandleStatus("다른 포즈·리그 변경을 우선 적용하고 진행 중이던 IK 이동을 취소했습니다.");
   }, [
     activeModelId,
+    avatarForgeState.proportions,
     bodyRotation,
     bodyScale,
     customBones,
@@ -5034,6 +4397,7 @@ export function StudioVrmPoser({
       translations: poseTranslations,
       bodyRotation,
       bodyScale,
+      proportions: avatarForgeState.proportions,
       constraints: ikConstraints,
       lockedPoseBones,
       jointProfile: rigJointProfile,
@@ -5085,6 +4449,7 @@ export function StudioVrmPoser({
         translations: rollbackTranslations,
         bodyRotation: pending.before.bodyRotation,
         bodyScale: pending.before.bodyScale ?? bodyScale,
+        proportions: parseAvatarForgeState(pending.before.avatarForge).proportions,
         constraints: rollbackConstraints,
         lockedPoseBones,
         jointProfile: rigJointProfile,
@@ -5233,6 +4598,7 @@ export function StudioVrmPoser({
         translations: nextTranslations,
         bodyRotation,
         bodyScale,
+        proportions: avatarForgeState.proportions,
         constraints: ikConstraints,
         lockedPoseBones,
         jointProfile: rigJointProfile,
@@ -5265,6 +4631,7 @@ export function StudioVrmPoser({
     };
   }, [
     activeModelId,
+    avatarForgeState.proportions,
     bodyRotation,
     bodyScale,
     captureSceneGeneration,
@@ -5380,6 +4747,8 @@ export function StudioVrmPoser({
   const viewportCanRedo =
     !texturePaintStrokeActive
     && (canRedo || (texturePaintModeSelected && (texturePaintSnapshot?.history.redoCount ?? 0) > 0));
+  const viewportCameraInteractionLocked =
+    isCapturing || isSharingPose || isThumbnailCapturing;
 
   const restoreHistoryStep = (direction: -1 | 1) => {
     if (
@@ -5405,15 +4774,25 @@ export function StudioVrmPoser({
       direction,
       activeModelId,
     );
-    fullStateHistoryRef.current = transition.history;
     const snap = transition.snapshot;
     if (!snap) {
+      fullStateHistoryRef.current = transition.history;
       setCanUndo(transition.history.index > 0);
       setCanRedo(transition.history.index < transition.history.entries.length - 1);
       return;
     }
     isRestoringRef.current = true;
-    commitFullStateRestore(snap, currentVrm, { trustPersistentIkPose: true });
+    const restored = commitFullStateRestore(snap, currentVrm, {
+      trustPersistentIkPose: true,
+    });
+    if (!restored) {
+      // The proportion transaction kept the previous viewport authoritative. Keep the history
+      // cursor there too, and let the next real edit be recorded instead of consuming it as a
+      // successful restore render.
+      isRestoringRef.current = false;
+      return;
+    }
+    fullStateHistoryRef.current = transition.history;
     setCanUndo(transition.history.index > 0);
     setCanRedo(transition.history.index < transition.history.entries.length - 1);
   };
@@ -5519,6 +4898,7 @@ export function StudioVrmPoser({
       translations: after.poseTranslations,
       bodyRotation: after.bodyRotation,
       bodyScale: after.bodyScale ?? bodyScale,
+      proportions: parseAvatarForgeState(after.avatarForge).proportions,
       constraints: after.ikConstraints,
       lockedPoseBones,
       jointProfile: rigJointProfile,
@@ -5717,6 +5097,91 @@ export function StudioVrmPoser({
     createAutoGripFingerOverrides(vrmPropItems, propDefById, effectivePropRigMetrics),
   );
 
+  function handleAvatarForgeChange(rawState: AvatarForgeState) {
+    if (
+      isCapturing
+      || isSharingPose
+      || isThumbnailCapturing
+      || proportionRigStatus === "applying"
+      || proportionRigStatus === "reload-required"
+    ) return;
+    const nextState = parseAvatarForgeState(rawState);
+    const proportionsChanged = JSON.stringify(nextState.proportions)
+      !== JSON.stringify(avatarForgeState.proportions);
+    if (!proportionsChanged) {
+      setAvatarForgeState(nextState);
+      return;
+    }
+
+    const currentVrm = vrmRef.current;
+    const runtime = proportionRigRuntimeRef.current;
+    if (!currentVrm || !runtime) {
+      setAvatarForgeState({
+        ...nextState,
+        body: avatarForgeState.body,
+        proportions: avatarForgeState.proportions,
+        ...(avatarForgeState.legacyHipWidth === undefined
+          ? { legacyHipWidth: undefined }
+          : { legacyHipWidth: avatarForgeState.legacyHipWidth }),
+      });
+      setError("이 VRM은 안전한 관절 비율 편집을 지원하지 않습니다. 헤어와 얼굴 편집은 계속 사용할 수 있습니다.");
+      return;
+    }
+    cancelJointIkTransaction({
+      forceInvalidate: true,
+      restoreBaseline: false,
+      status: jointHandleInteracting || jointIkTransactionRef.current
+        ? "체형이 바뀌어 진행 중인 IK 이동을 취소했습니다."
+        : undefined,
+    });
+    pendingPersistentIkCommandRef.current = null;
+    persistentIkReconcileRevisionRef.current += 1;
+    persistentIkResolvedSignatureRef.current = "";
+    setPersistentIkReconciling(true);
+    const identityBodyScale: BodyScale = { height: 1, width: 1 };
+    const transaction = createStudioVrmProportionPoseTransaction(currentVrm, {
+      bones: customBones,
+      yOffset: customYOffset,
+      poseTranslations,
+      fingerEdits: effectiveFingerEdits,
+      bodyScale: identityBodyScale,
+      bodyRotation,
+      expressionWeights,
+    });
+    const outcome = applyProportionRigState(currentVrm, nextState.proportions, transaction);
+    if (outcome === "committed") {
+      setBodyScale(identityBodyScale);
+      setAvatarForgeState(nextState);
+      setPersistentIkReconciling(false);
+      setJointHandleStatus("새 체형에 맞춰 관절·의상·소품 기준을 다시 계산했습니다.");
+      setError("");
+      return;
+    }
+
+    if (outcome === "recovered") {
+      const recovery = createStudioVrmProportionPoseTransaction(currentVrm, {
+        bones: customBones,
+        yOffset: customYOffset,
+        poseTranslations,
+        fingerEdits: effectiveFingerEdits,
+        bodyScale,
+        bodyRotation,
+        expressionWeights,
+      });
+      proportionPoseReapplyRef.current = recovery.reapply;
+      recovery.reapply();
+      const measurements = recovery.measurements();
+      if (measurements.wardrobe) setWardrobeMetrics(measurements.wardrobe);
+      if (measurements.props) setPropRigMetrics(measurements.props);
+    }
+    setPersistentIkReconciling(false);
+    setError(
+      outcome === "reload-required"
+        ? "체형 리그를 안전하게 복구하지 못했습니다. 캐릭터를 다시 불러와 주세요."
+        : "새 체형을 적용하지 못해 직전 체형을 유지했습니다.",
+    );
+  }
+
   const onCaptureUpdate = useCallback((state: CaptureState, cleanupGl?: THREE.WebGLRenderer | null) => {
     if (cleanupGl) {
       if (captureRef.current.gl === cleanupGl) {
@@ -5790,6 +5255,7 @@ export function StudioVrmPoser({
     bodyScale?: BodyScale;
     fingerOverrides?: FingerRotationMap;
     lighting?: LightingParams;
+    lightingTone?: LightingTone;
     env?: EnvVariant;
     avatarForge?: unknown;
     camera?: StudioVrmCameraSettings;
@@ -5843,6 +5309,7 @@ export function StudioVrmPoser({
         bodyScale: { ...initialScene.appearance.bodyScale },
         fingerOverrides,
         lighting: { ...initialScene.lighting },
+        lightingTone: initialScene.lightingTone,
         env: initialScene.env,
         avatarForge: initialScene.appearance.avatarForge,
         camera: initialScene.camera,
@@ -5879,6 +5346,7 @@ export function StudioVrmPoser({
           bodyScale: full.bodyScale,
           fingerOverrides: full.fingerOverrides,
           lighting: full.lighting,
+          lightingTone: full.lightingTone,
           env: full.env,
           avatarForge: full.avatarForge,
         };
@@ -6066,7 +5534,28 @@ export function StudioVrmPoser({
     const startCamera = async () => {
       setWebcamLoading(true);
       setWebcamError(null);
+      setWebcamErrorStage(null);
+      let failureStage: "camera" | "engine" = "engine";
       try {
+        // MediaPipe must settle before asking for a privacy-sensitive camera grant. If engine
+        // initialization fails, the browser never lights the camera or leaves a stream to clean up.
+        let landmarker;
+        let poseLandmarker;
+        try {
+          [landmarker, poseLandmarker] = await Promise.all([
+            initFaceLandmarker(),
+            initPoseLandmarker(),
+          ]);
+        } catch (modelErr) {
+          console.error("Tracking AI models initialization failed:", modelErr);
+          throw new Error(
+            "얼굴 및 전신 동작 인식 엔진을 준비하지 못했습니다. 네트워크를 확인한 뒤 다시 시도하고, 계속되면 페이지를 새로고침해 주세요.",
+            { cause: modelErr },
+          );
+        }
+        if (!active) return;
+
+        failureStage = "camera";
         let stream: MediaStream;
         try {
           if (typeof navigator === "undefined" || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -6121,18 +5610,6 @@ export function StudioVrmPoser({
           } catch (e) {
             console.error("Video play failed:", e);
           }
-        }
-
-        let landmarker;
-        let poseLandmarker;
-        try {
-          [landmarker, poseLandmarker] = await Promise.all([
-            initFaceLandmarker(),
-            initPoseLandmarker(),
-          ]);
-        } catch (modelErr) {
-          console.error("Tracking AI models initialization failed:", modelErr);
-          throw new Error("얼굴 및 전신 인식 AI 모델(MediaPipe)을 초기화하지 못했습니다. 인터넷 연결 상태를 확인하고 페이지를 새로고침해 주세요.", { cause: modelErr });
         }
 
         if (!active) return;
@@ -6305,6 +5782,7 @@ export function StudioVrmPoser({
       } catch (err) {
         console.error("Webcam start failed:", err);
         const errMsg = err instanceof Error ? err.message : "카메라 권한 접근에 실패했거나 트래킹 로드 오류가 발생했습니다.";
+        setWebcamErrorStage(failureStage);
         setWebcamError(errMsg);
         setWebcamActive(false);
         setWebcamLoading(false);
@@ -6621,8 +6099,10 @@ export function StudioVrmPoser({
       let json = ""; try { json = await navigator.clipboard.readText(); } catch { json = sessionStorage.getItem("studio_vrm_full_clip") || ""; }
       if (!json) return alert("전체 상태 데이터 없음");
       const s = JSON.parse(json) as FullVrmStateInput;
-      loadHandlers.handlePasteFullStateFromParsed(s);
-      if (s && (s.version === 2 || s.version === 3)) alert("전체 상태 붙여넣기 OK");
+      const restored = loadHandlers.handlePasteFullStateFromParsed(s);
+      if (restored && s && (s.version === 2 || s.version === 3)) {
+        alert("전체 상태 붙여넣기 OK");
+      }
     } catch { alert("붙여넣기 실패"); }
   }
   function handleSaveFullLocal() {
@@ -6668,7 +6148,7 @@ export function StudioVrmPoser({
   function commitFullStateRestore(
     s: FullVrmState,
     vrm: VRM | null,
-    options: { trustPersistentIkPose?: boolean } = {},
+    options: { trustPersistentIkPose?: boolean; installingModel?: boolean } = {},
   ) {
     cancelJointIkTransaction({
       forceInvalidate: true,
@@ -6685,6 +6165,72 @@ export function StudioVrmPoser({
     const restoredWardrobe = restoredWardrobeDocument.slots;
     const restoredWardrobeAutoHide = restoredWardrobeDocument.options.autoHideOriginal;
     const restoredPhysics = parseVrmPhysicsSettings(plan.physics);
+    const restoredAvatarForge = parseAvatarForgeState(plan.avatarForge);
+    const restoredBodyScale = plan.bodyScale ?? (
+      options.installingModel ? { height: 1, width: 1 } : bodyScale
+    );
+    if (vrm) {
+      const hadProportionRuntime = proportionRigRuntimeRef.current !== null;
+      const requiresProportionRuntime = studioVrmProportionsRequireRuntime(
+        restoredAvatarForge,
+      );
+      const rollbackTransaction = options.installingModel
+        ? null
+        : createStudioVrmProportionPoseTransaction(vrm, {
+            bones: customBones,
+            yOffset: customYOffset,
+            poseTranslations,
+            fingerEdits: effectiveFingerEdits,
+            bodyScale,
+            bodyRotation,
+            expressionWeights,
+          });
+      const proportionTransaction = createStudioVrmProportionPoseTransaction(vrm, {
+        bones: plan.strippedBones,
+        yOffset: plan.yOffset,
+        poseTranslations: plan.poseTranslations,
+        fingerEdits: plan.fingerOverrides ?? {},
+        bodyScale: restoredBodyScale,
+        bodyRotation: plan.bodyRotation,
+        expressionWeights: plan.expressionWeights,
+      });
+      const proportionOutcome = applyProportionRigState(
+        vrm,
+        restoredAvatarForge.proportions,
+        proportionTransaction,
+      );
+      if (
+        proportionOutcome !== "committed"
+        && (hadProportionRuntime || requiresProportionRuntime)
+      ) {
+        if (proportionOutcome === "recovered" && rollbackTransaction) {
+          proportionPoseReapplyRef.current = rollbackTransaction.reapply;
+          const reapplied = rollbackTransaction.reapply();
+          const measurements = rollbackTransaction.measurements();
+          if (
+            reapplied === false
+            || !measurements.wardrobe
+            || !measurements.props
+          ) {
+            setProportionRigStatus("reload-required");
+            setProportionRigMessage(
+              "직전 포즈와 의상 기준을 안전하게 복구하지 못했습니다. 캐릭터를 다시 불러와 주세요.",
+            );
+            setError("체형 복원 중 직전 화면 상태까지 되돌리지 못했습니다. 캐릭터를 다시 불러와 주세요.");
+            return false;
+          }
+          setWardrobeMetrics(measurements.wardrobe);
+          setPropRigMetrics(measurements.props);
+          setWardrobeSurfaceReceipts({});
+        }
+        setError(
+          requiresProportionRuntime && !hadProportionRuntime
+            ? "이 VRM에서는 저장된 관절 비율을 안전하게 재생할 수 없어 복원을 중단했습니다."
+            : "저장된 체형을 안전하게 복원하지 못해 직전 상태를 유지했습니다.",
+        );
+        return false;
+      }
+    }
     setCustomBones(plan.strippedBones);
     setCustomYOffset(plan.yOffset);
     setPoseTranslations(cloneStudioVrmPoseTranslations(plan.poseTranslations));
@@ -6693,9 +6239,18 @@ export function StudioVrmPoser({
     setActivePoseId(s.poseId ?? "default");
     setActiveExpressionId(s.expressionId ?? "neutral");
     setExpressionWeights(plan.expressionWeights);
-    if (plan.bodyScale) setBodyScale(plan.bodyScale);
-    if (plan.lighting) setLighting(plan.lighting);
-    if (plan.env) setEnvVariant(plan.env);
+    if (plan.bodyScale || options.installingModel) setBodyScale(restoredBodyScale);
+    if (plan.lighting) {
+      setLighting(plan.lighting);
+    } else if (options.installingModel) {
+      setLighting({ intensity: 1.2, colorTemp: 0.5, directionDeg: 45 });
+    }
+    setLightingTone(plan.lightingTone);
+    if (plan.env) {
+      setEnvVariant(plan.env);
+    } else if (options.installingModel) {
+      setEnvVariant("none");
+    }
     setFingerEdits(plan.fingerOverrides ?? {});
     // 의상·워드로브는 무조건 반영 — undo/redo에서 장착/숨김 변화도 되돌리고 이전 값이
     // 눌어붙지 않게 한다. 새 VRM 메시를 알아야 하는 자동 숨김은 아래 vrm 분기에서 합성한다.
@@ -6713,7 +6268,7 @@ export function StudioVrmPoser({
     // 눌어붙지 않게 한다).
     setMaterialFx(plan.materialFx ?? DEFAULT_VRM_MATERIAL_FX);
     setCustomColors({ ...restoredColors });
-    setAvatarForgeState(parseAvatarForgeState(plan.avatarForge));
+    setAvatarForgeState(restoredAvatarForge);
 
     persistentIkReconcileRevisionRef.current += 1;
     setPersistentIkReconciling(false);
@@ -6725,7 +6280,8 @@ export function StudioVrmPoser({
           yOffset: plan.yOffset,
           translations: plan.poseTranslations,
           bodyRotation: plan.bodyRotation,
-          bodyScale: plan.bodyScale ?? bodyScale,
+          bodyScale: restoredBodyScale,
+          proportions: restoredAvatarForge.proportions,
           constraints: plan.ikConstraints,
           lockedPoseBones,
           jointProfile: rigJointProfile,
@@ -6736,7 +6292,7 @@ export function StudioVrmPoser({
       : "";
 
     if (vrm) {
-      const meshes = collectCostumeMeshes(vrm);
+      const meshes = collectStudioVrmCostumeMeshes(vrm);
       // costume은 사용자의 수동 편집만 소유하고, 워드로브 자동 숨김은 현재 전체 슬롯에서 매번
       // 파생한다. 이 둘을 state에 섞지 않아 equip/unequip가 수동 숨김을 되살리지 않는다.
       const effectiveCostume = mergeWardrobeCostumeVisibility(
@@ -6748,7 +6304,7 @@ export function StudioVrmPoser({
       setCostumeMeshes(meshes);
       setCostumeState(restoredCostume);
       setSelectedCostumeKey(null);
-      applyCostumeState(meshes, effectiveCostume);
+      applyStudioVrmCostumeState(meshes, effectiveCostume);
       applyFullState(vrm, s, {
         applyPose: (b, y, translations) => applyPoseToVrm(vrm, b, y, translations),
         applyExpr: (w) => applyExpressionWeightsToVrm(vrm, w),
@@ -6771,6 +6327,7 @@ export function StudioVrmPoser({
       setCostumeState(restoredCostume);
       setSelectedCostumeKey(null);
     }
+    return true;
   }
 
   // Use the exact same factory the tests use so handlers execute shipped code
@@ -6886,6 +6443,10 @@ export function StudioVrmPoser({
       cancelPendingPoseShare();
       return;
     }
+    if (isCapturing || isThumbnailCapturing) {
+      alert("진행 중인 캡처가 끝난 뒤 포즈를 공유해 주세요.");
+      return;
+    }
 
     const currentCapture = captureRef.current;
     const currentVrm = vrmRef.current;
@@ -6898,11 +6459,16 @@ export function StudioVrmPoser({
       setJointHandleStatus("손·발 고정점을 현재 포즈에 맞추는 중입니다. 완료 후 다시 공유해 주세요.");
       return;
     }
-    const hasLockedConstraint = ikConstraints.some((constraint) => (
-      constraint.enabled && constraint.locked
-    ));
-    if (hasLockedConstraint && (webcamActive || idleAnimation)) {
-      setJointHandleStatus("실시간 추적·대기 애니메이션을 끈 뒤 고정점이 있는 포즈를 공유해 주세요.");
+    if (!proportionRigCaptureIsReady()) {
+      setError("현재 체형의 관절·의상·소품 계산이 끝난 뒤 다시 공유해 주세요.");
+      return;
+    }
+    if (!avatarForgeFaceCaptureIsReady()) {
+      setError("얼굴 조형이 현재 리그에 안전하게 반영된 뒤 다시 공유해 주세요.");
+      return;
+    }
+    if (webcamActive || idleAnimation) {
+      setJointHandleStatus("실시간 추적·대기 애니메이션을 끈 뒤 현재 포즈를 공유해 주세요.");
       return;
     }
 
@@ -6915,9 +6481,56 @@ export function StudioVrmPoser({
     }
     if (!(await confirmStudioDestructiveAction(studioSharePoseConsentRequest(title)))) return;
 
+    const shareVisualAuthority = captureVisualAuthorityRef.current;
+    const shareCameraIdentity = readVrmCaptureCameraIdentity();
+    if (!shareVisualAuthority || !shareCameraIdentity) {
+      alert("공유할 3D 화면과 카메라가 아직 준비되지 않았습니다.");
+      return;
+    }
     const name = `[3D_POSE] ${title}`;
-    const sharePoseSignature = currentPersistentIkSignature();
+    const shareFullState = shareVisualAuthority.fullState;
+    const sharePoseSignature = persistentIkCurrentSignatureRef.current;
+    const shareHasLockedConstraint = shareFullState.ikConstraints?.some((constraint) => (
+      constraint.enabled && constraint.locked
+    )) ?? false;
     const shareDynamicPoseGeneration = dynamicPoseGenerationRef.current;
+    const shareProportionRigReceipt = proportionRigReceiptRef.current;
+    const shareAvatarForgeIdentity = avatarForgeAuthorityIdentityRef.current;
+    const shareFaceControllerSnapshot = avatarForgeFaceController.getSnapshot();
+    const shareWardrobeState = parseWardrobeDocument(shareFullState.wardrobe).slots;
+    const shareXpbdSkirtSlots = WARDROBE_SLOTS.filter((slot) => {
+      const equip = shareWardrobeState[slot];
+      return equip && wardrobeItemById(equip.itemId)?.geometrySource === "xpbd-skirt-v1";
+    });
+    const shareXpbdSkirtSyncEntries = shareXpbdSkirtSlots.flatMap((slot) => {
+      const sync = wardrobeXpbdCaptureSyncRef.current.get(slot);
+      return sync ? [{ slot, sync }] : [];
+    });
+    if (shareXpbdSkirtSyncEntries.length !== shareXpbdSkirtSlots.length) {
+      setError("천 물리 스커트의 최신 포즈 계산이 준비된 뒤 다시 공유해 주세요.");
+      return;
+    }
+    const shareVisualAuthorityIsCurrent = (): boolean => (
+      captureVisualAuthorityRef.current?.identity === shareVisualAuthority.identity
+      && readVrmCaptureCameraIdentity() === shareCameraIdentity
+    );
+    const shareXpbdSkirtAuthorityIsCurrent = (): boolean => (
+      shareXpbdSkirtSyncEntries.every(({ slot, sync }) => (
+        wardrobeXpbdCaptureSyncRef.current.get(slot) === sync
+      ))
+    );
+    if (!avatarForgeFaceCaptureIsReady()) {
+      setError("확인하는 동안 얼굴 조형 상태가 바뀌었습니다. 현재 화면에서 다시 공유해 주세요.");
+      return;
+    }
+    if (webcamActiveRef.current || idleAnimationRef.current) {
+      setJointHandleStatus("확인하는 동안 실시간 포즈가 바뀌었습니다. 추적·대기 애니메이션을 끄고 다시 공유해 주세요.");
+      return;
+    }
+    if (!acquireVrmCaptureOperation("share")) {
+      alert("다른 3D 캡처가 진행 중입니다. 완료된 뒤 다시 공유해 주세요.");
+      return;
+    }
 
     cancelPendingPoseShare();
     const controller = new AbortController();
@@ -6947,27 +6560,41 @@ export function StudioVrmPoser({
         persistentIkCurrentSignatureRef.current !== sharePoseSignature ||
         pendingPersistentIkCommandRef.current !== null ||
         dynamicPoseGenerationRef.current !== shareDynamicPoseGeneration ||
-        (hasLockedConstraint
-          && (
-            persistentIkResolvedSignatureRef.current !== sharePoseSignature
-            || webcamActiveRef.current
-            || idleAnimationRef.current
-          ))
+        proportionRigReceiptRef.current !== shareProportionRigReceipt ||
+        avatarForgeAuthorityIdentityRef.current !== shareAvatarForgeIdentity ||
+        avatarForgeFaceController.getSnapshot() !== shareFaceControllerSnapshot ||
+        !shareVisualAuthorityIsCurrent() ||
+        !shareXpbdSkirtAuthorityIsCurrent() ||
+        webcamActiveRef.current ||
+        idleAnimationRef.current ||
+        (shareHasLockedConstraint
+          && persistentIkResolvedSignatureRef.current !== sharePoseSignature)
       ) {
         throw new Error("공유 캡처 장면이 변경되었습니다.");
       }
-      if (!physicsPreview && countSpringBoneJoints(currentVrm) > 0) {
+      if (countSpringBoneJoints(currentVrm) > 0) {
         settleVrmPhysics(currentVrm);
       }
       currentVrm.update(0);
+      for (const { slot, sync } of shareXpbdSkirtSyncEntries) {
+        const result = sync();
+        if (!result.ok) {
+          throw new Error(
+            `${WARDROBE_SLOT_LABELS[slot]} 천 물리를 최신 포즈에 맞추지 못했습니다. 다시 시도해 주세요.`,
+          );
+        }
+      }
       const { width, height } = roundExportSize(gl.domElement);
       const bakedPose = bakeStudioVrmRuntimePose(currentVrm);
       if (!bakedPose) throw new Error("공유할 VRM 자세를 회전 기반 데이터로 변환하지 못했습니다.");
       const poseMetadata = buildVrmPoseDataUrlMetadata({
-        ...captureFullState(),
+        ...shareFullState,
         bones: stripFingerBones(bakedPose.bones),
         yOffset: bakedPose.yOffset,
       }, modelName);
+      if (!shareVisualAuthorityIsCurrent() || !shareXpbdSkirtAuthorityIsCurrent()) {
+        throw new Error("공유 캡처 장면이 변경되었습니다.");
+      }
       const rgba = captureStudioVrmRgba(gl, scene, camera, { width, height });
       const hashPayload = encodeURIComponent(JSON.stringify(poseMetadata));
       // Raw GPU readback is complete. Restore capture-only helpers before Worker compression or
@@ -6985,6 +6612,10 @@ export function StudioVrmPoser({
         || persistentIkCurrentSignatureRef.current !== sharePoseSignature
         || pendingPersistentIkCommandRef.current !== null
         || dynamicPoseGenerationRef.current !== shareDynamicPoseGeneration
+        || webcamActiveRef.current
+        || idleAnimationRef.current
+        || !shareVisualAuthorityIsCurrent()
+        || !shareXpbdSkirtAuthorityIsCurrent()
       ) return;
       await publishAsset({
         name,
@@ -7017,6 +6648,7 @@ export function StudioVrmPoser({
         sharePoseAbortRef.current = null;
         setIsSharingPose(false);
       }
+      releaseVrmCaptureOperation("share");
     }
   }
 
@@ -7032,6 +6664,13 @@ export function StudioVrmPoser({
     jointIkTransactionRef.current = null;
     loadRequestRef.current += 1;
     modelLoadTargetIdRef.current = null;
+    avatarForgeFaceController.release();
+    const proportionRuntime = proportionRigRuntimeRef.current;
+    if (proportionRuntime && !proportionRuntime.disposed) proportionRuntime.dispose();
+    proportionRigRuntimeRef.current = null;
+    proportionRigReceiptRef.current = null;
+    proportionPoseReapplyRef.current = null;
+    vrmInstallGenerationRef.current += 1;
     if (vrmRef.current) {
       disposeVrm(vrmRef.current);
       vrmRef.current = null;
@@ -7041,6 +6680,10 @@ export function StudioVrmPoser({
   useEffect(() => {
     return () => disposeVrmOnUnmount();
   }, []);
+
+  const clearCurrentVrmOnClose = useEffectEvent(() => {
+    clearCurrentVrm();
+  });
 
   useEffect(() => {
     if (open) return;
@@ -7056,13 +6699,14 @@ export function StudioVrmPoser({
     modelLoadTargetIdRef.current = null;
     if (groundShadowRef.current) groundShadowRef.current.visible = true;
     if (envRootRef.current) envRootRef.current.visible = true;
-    clearCurrentVrm();
+    clearCurrentVrmOnClose();
     captureRef.current = { camera: null, gl: null, scene: null };
     setStatus("empty");
     setError("");
     setIsCapturing(false);
     setIsThumbnailCapturing(false);
     setIsSharingPose(false);
+    captureOperationRef.current = null;
     setTexturePaintEyedropperActive(false);
     setIsViewportHandIkDragging(false);
     setJointHandleInteracting(false);
@@ -7181,6 +6825,10 @@ export function StudioVrmPoser({
       || !vrm
       || !activeLibraryEntry
       || activeLibraryEntry.thumbnail
+      || !proportionRigCaptureIsReady()
+      || !avatarForgeFaceCaptureIsReady()
+      || isCapturing
+      || isSharingPose
     ) return;
     const hasLockedConstraint = ikConstraints.some((constraint) => (
       constraint.enabled && constraint.locked
@@ -7193,6 +6841,7 @@ export function StudioVrmPoser({
       translations: poseTranslations,
       bodyRotation,
       bodyScale,
+      proportions: avatarForgeState.proportions,
       constraints: ikConstraints,
       lockedPoseBones,
       jointProfile: rigJointProfile,
@@ -7207,6 +6856,12 @@ export function StudioVrmPoser({
 
     const requestId = thumbnailRequestRef.current + 1;
     thumbnailRequestRef.current = requestId;
+    const thumbnailProportionRigReceipt = proportionRigReceiptRef.current;
+    const thumbnailAvatarForgeIdentity = avatarForgeAuthorityIdentityRef.current;
+    const thumbnailFaceControllerSnapshot = avatarForgeFaceController.getSnapshot();
+    const thumbnailVisualAuthority = captureVisualAuthorityRef.current;
+    if (!thumbnailVisualAuthority) return;
+    if (!acquireVrmCaptureOperation("thumbnail")) return;
     const releaseCaptureHelpers = acquireVrmCaptureHelperLease();
     let finished = false;
     let secondFrame: number | null = null;
@@ -7215,12 +6870,19 @@ export function StudioVrmPoser({
       if (finished) return;
       finished = true;
       releaseCaptureHelpers();
+      releaseVrmCaptureOperation("thumbnail");
       setIsThumbnailCapturing(false);
     };
     const firstFrame = requestAnimationFrame(() => {
       secondFrame = requestAnimationFrame(() => {
         try {
-          if (requestId !== thumbnailRequestRef.current) return;
+          if (
+            requestId !== thumbnailRequestRef.current
+            || proportionRigReceiptRef.current !== thumbnailProportionRigReceipt
+            || avatarForgeAuthorityIdentityRef.current !== thumbnailAvatarForgeIdentity
+            || avatarForgeFaceController.getSnapshot() !== thumbnailFaceControllerSnapshot
+            || captureVisualAuthorityRef.current?.identity !== thumbnailVisualAuthority.identity
+          ) return;
 
           const currentCapture = captureRef.current;
           if (!currentCapture.gl || !currentCapture.scene || !currentCapture.camera) return;
@@ -7269,18 +6931,27 @@ export function StudioVrmPoser({
     activeModelId,
     activeLibraryEntry,
     acquireVrmCaptureHelperLease,
+    acquireVrmCaptureOperation,
+    avatarForgeFaceCaptureIsReady,
+    avatarForgeFaceController,
+    avatarForgeState.proportions,
     bodyRotation,
     bodyScale,
+    captureVisualAuthorityIdentity,
     customBones,
     customYOffset,
     fingerEdits,
     footPlantEnabled,
     fullBodyIkEnabled,
     ikConstraints,
+    isCapturing,
+    isSharingPose,
     lockedPoseBones,
     open,
     persistentIkReconciling,
     poseTranslations,
+    proportionRigCaptureIsReady,
+    releaseVrmCaptureOperation,
     rigFloorHeight,
     rigJointProfile,
     status,
@@ -7288,7 +6959,117 @@ export function StudioVrmPoser({
     vrm,
   ]);
 
+  function initializeProportionRigRuntime(nextVrm: VRM) {
+    const measurement = measureStudioVrmProportionHeadLength(nextVrm);
+    proportionHeadMeasurementRef.current = measurement;
+    setProportionHeadMeasurement(measurement);
+    proportionRigReceiptRef.current = null;
+    setProportionRigReceipt(null);
+    if (!measurement) {
+      proportionRigRuntimeRef.current = null;
+      setProportionRigStatus("unavailable");
+      setProportionRigMessage("머리와 신체의 기준 길이를 안전하게 계산하지 못했습니다.");
+      return null;
+    }
+
+    const generation = vrmInstallGenerationRef.current;
+    const created = createStudioVrmProportionRigRuntime(
+      createStudioVrmProportionVrmAdapter({
+        vrm: nextVrm,
+        getCurrentModelGeneration: () => vrmInstallGenerationRef.current,
+        reapplyAuthoredPose: () => proportionPoseReapplyRef.current?.() ?? false,
+      }),
+      {
+        headLength: measurement.value,
+        headMeasurement: {
+          version: measurement.version,
+          source: measurement.source,
+          reliable: measurement.reliable,
+        },
+      },
+    );
+    if (!created.ok || generation !== vrmInstallGenerationRef.current) {
+      proportionRigRuntimeRef.current = null;
+      setProportionRigStatus("unavailable");
+      setProportionRigMessage(
+        created.ok
+          ? "캐릭터가 교체되어 체형 리그 준비를 취소했습니다."
+          : created.message,
+      );
+      return null;
+    }
+    proportionRigRuntimeRef.current = created.runtime;
+    setProportionRigStatus("applying");
+    setProportionRigMessage("");
+    return created.runtime;
+  }
+
+  function applyProportionRigState(
+    nextVrm: VRM,
+    proportions: AvatarForgeState["proportions"],
+    transaction: ReturnType<typeof createStudioVrmProportionPoseTransaction>,
+  ) {
+    const runtime = proportionRigRuntimeRef.current;
+    if (!runtime) {
+      // A neutral document can still use the ordinary pose renderer when this model cannot expose
+      // a safe editable rig. A non-neutral document must remain untouched: replaying only its pose
+      // here would present a different silhouette as though the restore had succeeded.
+      if (!studioVrmProportionValuesRequireRuntime(proportions)) {
+        transaction.reapply();
+        const measurements = transaction.measurements();
+        setWardrobeMetrics(measurements.wardrobe);
+        setPropRigMetrics(measurements.props ?? DEFAULT_VRM_PROP_RIG_METRICS);
+        setWardrobeSurfaceReceipts({});
+      }
+      return "unavailable" as const;
+    }
+    proportionPoseReapplyRef.current = transaction.reapply;
+    avatarForgeFaceController.release();
+    setProportionRigStatus("applying");
+    const result = runtime.apply(proportions);
+    if (!result.ok) {
+      const reloadRequired = result.recovery === "reload-required";
+      if (!reloadRequired) {
+        // The face lease was released before every runtime attempt. Even a pre-mutation
+        // `not-needed` rejection must publish a new rig/view generation so Avatar Forge rebinds
+        // the previous face scale and persistent IK gets another reconciliation pass.
+        setProportionRigRevision((revision) => revision + 1);
+        setJointHandleSessionGeneration((generation) => generation + 1);
+        setCaptureSceneGeneration((generation) => generation + 1);
+      }
+      setProportionRigStatus(reloadRequired ? "reload-required" : "ready");
+      setProportionRigMessage(
+        reloadRequired
+          ? "리그를 안전한 상태로 되돌리지 못했습니다. 캐릭터를 다시 불러와 주세요."
+          : "새 체형을 적용하지 못해 직전의 안전한 체형으로 되돌렸습니다.",
+      );
+      return reloadRequired ? "reload-required" as const : "recovered" as const;
+    }
+    if (vrmRef.current && vrmRef.current !== nextVrm) return "stale" as const;
+    const measurements = transaction.measurements();
+    if (!measurements.wardrobe || !measurements.props) {
+      setProportionRigStatus("reload-required");
+      setProportionRigMessage("새 리그의 의상·소품 맞춤 치수를 확인하지 못했습니다. 캐릭터를 다시 불러와 주세요.");
+      return "reload-required" as const;
+    }
+    proportionRigReceiptRef.current = result;
+    setProportionRigReceipt(result);
+    setWardrobeMetrics(measurements.wardrobe);
+    setPropRigMetrics(measurements.props);
+    setWardrobeSurfaceReceipts({});
+    setProportionRigRevision((revision) => revision + 1);
+    setJointHandleSessionGeneration((generation) => generation + 1);
+    setCaptureSceneGeneration((generation) => generation + 1);
+    setProportionRigStatus("ready");
+    setProportionRigMessage("");
+    return "committed" as const;
+  }
+
   function clearCurrentVrm() {
+    if (pendingCameraRestoreFrameRef.current !== null) {
+      cancelAnimationFrame(pendingCameraRestoreFrameRef.current);
+      pendingCameraRestoreFrameRef.current = null;
+    }
     setIsViewportHandIkDragging(false);
     jointIkRevisionRef.current += 1;
     jointIkTransactionRef.current = null;
@@ -7299,6 +7080,22 @@ export function StudioVrmPoser({
     setIkConstraints([]);
     setJointHandleInteracting(false);
     setJointHandleSessionGeneration((generation) => generation + 1);
+    avatarForgeFaceController.release();
+    const proportionRuntime = proportionRigRuntimeRef.current;
+    if (proportionRuntime && !proportionRuntime.disposed) proportionRuntime.dispose();
+    proportionRigRuntimeRef.current = null;
+    proportionRigReceiptRef.current = null;
+    proportionHeadMeasurementRef.current = null;
+    proportionPoseReapplyRef.current = null;
+    vrmInstallGenerationRef.current += 1;
+    setProportionRigStatus("empty");
+    setProportionRigMessage("");
+    setProportionRigReceipt(null);
+    setProportionHeadMeasurement(null);
+    setWardrobeMetrics(null);
+    setPropRigMetrics(DEFAULT_VRM_PROP_RIG_METRICS);
+    setWardrobeSurfaceReceipts({});
+    wardrobeXpbdCaptureSyncRef.current.clear();
     if (vrmRef.current) {
       disposeVrm(vrmRef.current);
       vrmRef.current = null;
@@ -7309,113 +7106,159 @@ export function StudioVrmPoser({
   }
 
   function installVrm(nextVrm: VRM, nextModelName: string, nextModelId: string) {
-    resetFullStateHistory();
-    clearCurrentVrm();
-    vrmRef.current = nextVrm;
-    setVrm(nextVrm);
-    setModelName(nextModelName);
-    setActiveModelId(nextModelId);
-    setInstalledModelId(nextModelId);
-    modelLoadTargetIdRef.current = nextModelId;
-    // 워드로브 실측 — 반드시 포즈 적용 전(정규화 rest)에 측정해 모델별 자동 핏의 기준으로 삼는다.
-    setWardrobeMetrics(measureVrmWardrobeMetrics(nextVrm));
-    setPropRigMetrics(measureVrmPropRigMetrics(nextVrm));
+    let cameraToRestore: StudioVrmCameraSettings | null = null;
+    try {
+      resetFullStateHistory();
+      clearCurrentVrm();
+      initializeProportionRigRuntime(nextVrm);
+      const pending = pendingPoseDataRef.current;
+      vrmRef.current = nextVrm;
+      setVrm(nextVrm);
+      setModelName(nextModelName);
+      setActiveModelId(nextModelId);
+      setInstalledModelId(nextModelId);
+      modelLoadTargetIdRef.current = nextModelId;
+      if (pending) {
 
-    const pending = pendingPoseDataRef.current;
-    if (pending) {
-      pendingPoseDataRef.current = null;
+        const bones = pending.bones || {};
+        const yOffset = typeof pending.yOffset === "number" ? pending.yOffset : 0;
+        const expressionWeights = pending.expressionWeights || {};
 
-      const bones = pending.bones || {};
-      const yOffset = typeof pending.yOffset === "number" ? pending.yOffset : 0;
-      const expressionWeights = pending.expressionWeights || {};
-
-      const pendingFull = serializeFullVrmState({
-        modelId: nextModelId,
-        poseId: pending.poseId,
-        bones: bones,
-        yOffset,
-        poseTranslations: pending.poseTranslations,
-        ikConstraints: pending.ikConstraints,
-        bodyRotation: pending.bodyRotation,
-        expressionId: pending.expressionId,
-        expressionWeights,
-        bodyScale: pending.bodyScale,
-        fingerOverrides: pending.fingerOverrides,
-        lighting: pending.lighting,
-        env: pending.env,
-        costume: pending.costume,
-        wardrobe: pending.wardrobe,
-        props: pending.vrmProps,
-        sceneProps: pending.sceneProps,
-        physics: pending.physics,
-        materialFx: pending.materialFx,
-        avatarForge: pending.avatarForge,
-        customColors: pending.customColors,
-      });
-      commitFullStateRestore(pendingFull, nextVrm);
-      setMannequinMode(pending.mannequin ?? false);
-      const cameraToRestore = pending.camera ?? pendingCameraRestoreRef.current;
+        const pendingFull = serializeFullVrmState({
+          modelId: nextModelId,
+          poseId: pending.poseId,
+          bones: bones,
+          yOffset,
+          poseTranslations: pending.poseTranslations,
+          ikConstraints: pending.ikConstraints,
+          bodyRotation: pending.bodyRotation,
+          expressionId: pending.expressionId,
+          expressionWeights,
+          bodyScale: pending.bodyScale,
+          fingerOverrides: pending.fingerOverrides,
+          lighting: pending.lighting,
+          lightingTone: pending.lightingTone,
+          env: pending.env,
+          costume: pending.costume,
+          wardrobe: pending.wardrobe,
+          props: pending.vrmProps,
+          sceneProps: pending.sceneProps,
+          physics: pending.physics,
+          materialFx: pending.materialFx,
+          avatarForge: pending.avatarForge,
+          customColors: pending.customColors,
+        });
+        const restored = commitFullStateRestore(pendingFull, nextVrm, {
+          installingModel: true,
+        });
+        if (!restored) {
+          clearCurrentVrm();
+          setStatus("error");
+          return false;
+        }
+        setMannequinMode(pending.mannequin ?? false);
+        cameraToRestore = pending.camera ?? pendingCameraRestoreRef.current;
+      } else {
+        // 스폰 기본 포즈: T-포즈 대신 캐릭터 id로 결정되는 자연 아이들 포즈를 적용한다.
+        const spawnPose = pickNaturalIdlePose(nextModelId);
+        const strippedSpawn = stripFingerBones(spawnPose.bones);
+        const spawnFingers = extractStudioVrmFingerRotations(spawnPose.bones);
+        setActivePoseId(spawnPose.id);
+        setCustomBones(strippedSpawn);
+        setFingerEdits(spawnFingers);
+        setCustomYOffset(spawnPose.yOffset ?? 0);
+        setPoseTranslations(cloneStudioVrmPoseTranslations(EMPTY_STUDIO_VRM_POSE_TRANSLATIONS));
+        setActiveExpressionId("neutral");
+        setExpressionWeights({});
+        setBodyRotation(0);
+        applyRotationToVrm(nextVrm, 0);
+        const freshBodyScale: BodyScale = { height: 1, width: 1 };
+        setBodyScale(freshBodyScale);
+        setMannequinMode(false);
+        setCustomColors({ ...DEFAULT_VRM_CUSTOM_COLORS });
+        setMaterialFx(DEFAULT_VRM_MATERIAL_FX);
+        setLightingTone("morning");
+        const freshAvatarForge = createAvatarForgeState();
+        setAvatarForgeState(freshAvatarForge);
+        const proportionTransaction = createStudioVrmProportionPoseTransaction(nextVrm, {
+          bones: strippedSpawn,
+          yOffset: spawnPose.yOffset ?? 0,
+          poseTranslations: EMPTY_STUDIO_VRM_POSE_TRANSLATIONS,
+          fingerEdits: spawnFingers,
+          bodyScale: freshBodyScale,
+          bodyRotation: 0,
+          expressionWeights: {},
+        });
+        const freshProportionOutcome = applyProportionRigState(
+          nextVrm,
+          freshAvatarForge.proportions,
+          proportionTransaction,
+        );
+        if (
+          freshProportionOutcome !== "committed"
+          && freshProportionOutcome !== "unavailable"
+        ) {
+          clearCurrentVrm();
+          setError(
+            freshProportionOutcome === "reload-required"
+              ? "새 캐릭터의 체형 리그를 안전하게 초기화하지 못했습니다. 모델을 다시 불러와 주세요."
+              : "새 캐릭터의 관절·의상 기준을 확인하지 못해 불러오기를 중단했습니다.",
+          );
+          setStatus("error");
+          return false;
+        }
+        applyVrmCustomColors(nextVrm, DEFAULT_VRM_CUSTOM_COLORS);
+        applyVrmMaterialFx(nextVrm, DEFAULT_VRM_MATERIAL_FX);
+        // Heal any load-race near-black lit×map collapses before the first ready frame.
+        repairVrmTexturedNearBlackLitFactors(nextVrm);
+        // 본 부착 소품·워드로브 초기화.
+        setVrmPropItems([]);
+        setSelectedVrmPropUid(null);
+        setWardrobeState({});
+        setWardrobeAutoHide(true);
+        // 의상 메시 수집 + 상태 초기화 (머티리얼 clone 없이 목록만 — 원본 알베도 유지).
+        const meshes = collectStudioVrmCostumeMeshes(nextVrm);
+        setCostumeMeshes(meshes);
+        const freshCostume: CostumeState = { hidden: [], recolor: {} };
+        setCostumeState(freshCostume);
+        setSelectedCostumeKey(null);
+        applyStudioVrmCostumeState(meshes, freshCostume);
+        // 물리 초기화 + 정착(머리카락/치마 자연 정착).
+        setVrmPhysics(DEFAULT_VRM_PHYSICS);
+        setPhysicsPreview(false);
+        const joints = countSpringBoneJoints(nextVrm);
+        setSpringJointCount(joints);
+        if (joints > 0) {
+          applyVrmSpringBonePhysics(nextVrm, DEFAULT_VRM_PHYSICS);
+          settleVrmPhysics(nextVrm);
+        }
+      }
+      // Final safety pass after any pending full-state restore path as well.
+      repairVrmTexturedNearBlackLitFactors(nextVrm);
+      if (pending) pendingPoseDataRef.current = null;
       pendingCameraRestoreRef.current = null;
       if (cameraToRestore) {
-        requestAnimationFrame(() => {
-          viewportApiRef.current?.restoreCamera(cameraToRestore);
+        const committedCamera = cameraToRestore;
+        const committedVrmGeneration = vrmInstallGenerationRef.current;
+        const frame = requestAnimationFrame(() => {
+          if (pendingCameraRestoreFrameRef.current !== frame) return;
+          pendingCameraRestoreFrameRef.current = null;
+          if (
+            vrmRef.current !== nextVrm
+            || vrmInstallGenerationRef.current !== committedVrmGeneration
+          ) return;
+          viewportApiRef.current?.restoreCamera(committedCamera);
         });
+        pendingCameraRestoreFrameRef.current = frame;
       }
-    } else {
-      // 스폰 기본 포즈: T-포즈 대신 캐릭터 id로 결정되는 자연 아이들 포즈를 적용한다.
-      const spawnPose = pickNaturalIdlePose(nextModelId);
-      const strippedSpawn = stripFingerBones(spawnPose.bones);
-      const spawnFingers = extractStudioVrmFingerRotations(spawnPose.bones);
-      setActivePoseId(spawnPose.id);
-      setCustomBones(strippedSpawn);
-      setFingerEdits(spawnFingers);
-      setCustomYOffset(spawnPose.yOffset ?? 0);
-      setPoseTranslations(cloneStudioVrmPoseTranslations(EMPTY_STUDIO_VRM_POSE_TRANSLATIONS));
-      setActiveExpressionId("neutral");
-      setExpressionWeights({});
-      setBodyRotation(0);
-      applyRotationToVrm(nextVrm, 0);
-      setMannequinMode(false);
-      setCustomColors({ ...DEFAULT_VRM_CUSTOM_COLORS });
-      setMaterialFx(DEFAULT_VRM_MATERIAL_FX);
-      setAvatarForgeState(createAvatarForgeState());
-      applyPoserVisualState(nextVrm, {
-        bones: strippedSpawn,
-        yOffset: spawnPose.yOffset ?? 0,
-        poseTranslations: EMPTY_STUDIO_VRM_POSE_TRANSLATIONS,
-        fingerEdits: spawnFingers,
-        bodyScale,
-      });
-      applyExpressionWeightsToVrm(nextVrm, {});
-      applyVrmCustomColors(nextVrm, DEFAULT_VRM_CUSTOM_COLORS);
-      applyVrmMaterialFx(nextVrm, DEFAULT_VRM_MATERIAL_FX);
-      // Heal any load-race near-black lit×map collapses before the first ready frame.
-      repairVrmTexturedNearBlackLitFactors(nextVrm);
-      // 본 부착 소품·워드로브 초기화.
-      setVrmPropItems([]);
-      setSelectedVrmPropUid(null);
-      setWardrobeState({});
-      setWardrobeAutoHide(true);
-      // 의상 메시 수집 + 상태 초기화 (머티리얼 clone 없이 목록만 — 원본 알베도 유지).
-      const meshes = collectCostumeMeshes(nextVrm);
-      setCostumeMeshes(meshes);
-      const freshCostume: CostumeState = { hidden: [], recolor: {} };
-      setCostumeState(freshCostume);
-      setSelectedCostumeKey(null);
-      applyCostumeState(meshes, freshCostume);
-      // 물리 초기화 + 정착(머리카락/치마 자연 정착).
-      setVrmPhysics(DEFAULT_VRM_PHYSICS);
-      setPhysicsPreview(false);
-      const joints = countSpringBoneJoints(nextVrm);
-      setSpringJointCount(joints);
-      if (joints > 0) {
-        applyVrmSpringBonePhysics(nextVrm, DEFAULT_VRM_PHYSICS);
-        settleVrmPhysics(nextVrm);
-      }
+      setStatus("ready");
+      return true;
+    } catch (installError: unknown) {
+      const wasPublished = vrmRef.current === nextVrm;
+      clearCurrentVrm();
+      if (!wasPublished) disposeVrm(nextVrm);
+      throw installError;
     }
-    // Final safety pass after any pending full-state restore path as well.
-    repairVrmTexturedNearBlackLitFactors(nextVrm);
-    setStatus("ready");
   }
 
   function beginModelLoad(nextModelId: string) {
@@ -7450,8 +7293,6 @@ export function StudioVrmPoser({
         try {
           installVrm(loadedVrm, nextModelName, nextModelId);
         } catch (installError: unknown) {
-          // An install throw would otherwise leak the loaded scene and leave status on "loading".
-          disposeVrm(loadedVrm);
           handleLoadFailure(requestId, installError);
         }
       })
@@ -7742,6 +7583,7 @@ export function StudioVrmPoser({
       translations: after.poseTranslations,
       bodyRotation: after.bodyRotation,
       bodyScale: after.bodyScale ?? bodyScale,
+      proportions: parseAvatarForgeState(after.avatarForge).proportions,
       constraints: after.ikConstraints,
       lockedPoseBones,
       jointProfile: rigJointProfile,
@@ -7891,6 +7733,7 @@ export function StudioVrmPoser({
       translations: before.poseTranslations,
       bodyRotation: before.bodyRotation,
       bodyScale: before.bodyScale ?? bodyScale,
+      proportions: parseAvatarForgeState(before.avatarForge).proportions,
       constraints: canonical,
       lockedPoseBones,
       jointProfile: rigJointProfile,
@@ -8301,7 +8144,7 @@ export function StudioVrmPoser({
 
   /* ── 의상 토글/리컬러 핸들러 ─────────────────────────────────────── */
   useEffect(() => {
-    applyCostumeState(
+    applyStudioVrmCostumeState(
       costumeMeshes,
       mergeWardrobeCostumeVisibility(
         costumeState,
@@ -8314,7 +8157,7 @@ export function StudioVrmPoser({
 
   function updateCostume(next: CostumeState) {
     setCostumeState(next);
-    applyCostumeState(
+    applyStudioVrmCostumeState(
       costumeMeshes,
       mergeWardrobeCostumeVisibility(next, wardrobeState, costumeMeshes, wardrobeAutoHide),
     );
@@ -8384,7 +8227,7 @@ export function StudioVrmPoser({
 
   function handleWardrobeSurfaceReceipt(
     slot: WardrobeSlot,
-    receipt: StudioVrmSkinnedGarmentReceipt | null,
+    receipt: StudioVrmWardrobeSurfaceReceipt | null,
   ) {
     setWardrobeSurfaceReceipts((current) => {
       if (!receipt) {
@@ -8397,6 +8240,17 @@ export function StudioVrmPoser({
       if (previous?.signature === receipt.signature && previous.mode === receipt.mode) return current;
       return { ...current, [slot]: receipt };
     });
+  }
+
+  function handleWardrobeXpbdCaptureSyncChange(
+    slot: WardrobeSlot,
+    sync: StudioVrmWardrobeCaptureSync,
+    active: boolean,
+  ) {
+    if (active) wardrobeXpbdCaptureSyncRef.current.set(slot, sync);
+    else if (wardrobeXpbdCaptureSyncRef.current.get(slot) === sync) {
+      wardrobeXpbdCaptureSyncRef.current.delete(slot);
+    }
   }
 
   function equipWardrobeSetById(setId: string) {
@@ -8556,6 +8410,7 @@ export function StudioVrmPoser({
       props: serializeVrmProps(vrmPropItems) ?? null,
       sceneProps: serializeSceneProps(activeProps, propAttachments) ?? null,
       lighting,
+      lightingTone,
       physics: vrmPhysics,
       env: envVariant,
       render: {
@@ -8572,6 +8427,21 @@ export function StudioVrmPoser({
 
   function handleInsert() {
     if (isCapturing || isSharingPose || isThumbnailCapturing) return;
+    if (
+      proportionRigStatus === "reload-required"
+      || (
+        studioVrmProportionsRequireRuntime(avatarForgeState)
+        && (proportionRigStatus !== "ready" || !proportionRigReceiptRef.current)
+      )
+    ) {
+      setError(
+        proportionRigStatus === "reload-required"
+          ? "체형 리그를 안전하게 확인할 수 없습니다. 캐릭터를 다시 불러온 뒤 추가해 주세요."
+          : "현재 체형의 관절·의상·소품 계산이 끝난 뒤 다시 추가해 주세요.",
+      );
+      setStatus("ready");
+      return;
+    }
     const insertLibraryEntry = libraryEntries.find((entry) => entry.id === activeModelId);
     if (insertLibraryEntry?.source === "memory") {
       setError(
@@ -8630,26 +8500,59 @@ export function StudioVrmPoser({
       setStatus(vrmRef.current ? "ready" : "error");
       return;
     }
+    const captureXpbdSkirtSlots = WARDROBE_SLOTS.filter((slot) => {
+      const equip = wardrobeState[slot];
+      return equip && wardrobeItemById(equip.itemId)?.geometrySource === "xpbd-skirt-v1";
+    });
+    const captureXpbdSkirtSyncEntries = captureXpbdSkirtSlots.flatMap((slot) => {
+      const sync = wardrobeXpbdCaptureSyncRef.current.get(slot);
+      return sync ? [{ slot, sync }] : [];
+    });
+    if (captureXpbdSkirtSyncEntries.length !== captureXpbdSkirtSlots.length) {
+      setError("천 물리 스커트의 최신 포즈 계산이 준비된 뒤 다시 추가해 주세요.");
+      setStatus("ready");
+      return;
+    }
     if (!persistentIkCaptureIsReady()) {
       setError("손·발 고정점을 현재 포즈에 맞추는 중입니다. 보정 완료 후 다시 추가해 주세요.");
+      setStatus("ready");
+      return;
+    }
+    if (!avatarForgeFaceCaptureIsReady()) {
+      setError("얼굴 조형이 현재 리그에 안전하게 반영된 뒤 다시 추가해 주세요.");
       setStatus("ready");
       return;
     }
     const hasLockedConstraint = ikConstraints.some((constraint) => (
       constraint.enabled && constraint.locked
     ));
-    if (hasLockedConstraint && (webcamActive || idleAnimation)) {
-      setError("실시간 추적·대기 애니메이션을 끈 뒤 고정점이 있는 포즈를 추가해 주세요.");
+    if (webcamActive || idleAnimation) {
+      setError("실시간 추적·대기 애니메이션을 끈 뒤 현재 포즈를 추가해 주세요.");
       setStatus("ready");
       return;
     }
 
-    if (isCapturing) return;
+    if (!acquireVrmCaptureOperation("insert")) {
+      setError("다른 3D 캡처가 진행 중입니다. 완료된 뒤 다시 추가해 주세요.");
+      setStatus("ready");
+      return;
+    }
+    const captureVisualAuthority = captureVisualAuthorityRef.current;
+    const captureCameraIdentity = readVrmCaptureCameraIdentity();
+    if (!captureVisualAuthority || !captureCameraIdentity) {
+      releaseVrmCaptureOperation("insert");
+      setError("추가할 3D 화면과 카메라가 아직 준비되지 않았습니다.");
+      setStatus("ready");
+      return;
+    }
     const capturePoseSignature = currentPersistentIkSignature();
     const captureDynamicPoseGeneration = dynamicPoseGenerationRef.current;
     const captureWardrobeAuthoredIdentity = wardrobeAuthoredIdentityRef.current;
     const captureGarmentEvaluationGeneration = garmentEvaluationGenerationRef.current;
     const captureGarmentEvaluationReceipt = garmentEvaluationReceiptRef.current;
+    const captureProportionRigReceipt = proportionRigReceiptRef.current;
+    const captureAvatarForgeIdentity = avatarForgeAuthorityIdentityRef.current;
+    const captureFaceControllerSnapshot = avatarForgeFaceController.getSnapshot();
     const captureRequest = captureRequestRef.current + 1;
     captureRequestRef.current = captureRequest;
     const { camera, gl, scene } = currentCapture;
@@ -8667,6 +8570,11 @@ export function StudioVrmPoser({
         || captureGarmentEvaluationReceipt.generation === captureGarmentEvaluationGeneration
       )
     );
+    const xpbdSkirtCaptureAuthorityIsCurrent = (): boolean => (
+      captureXpbdSkirtSyncEntries.every(({ slot, sync }) => (
+        wardrobeXpbdCaptureSyncRef.current.get(slot) === sync
+      ))
+    );
     const capturePreconditionsAreCurrent = (): boolean => (
       captureGeneration === insertCaptureGenerationRef.current
       && captureRequest === captureRequestRef.current
@@ -8680,12 +8588,18 @@ export function StudioVrmPoser({
       && persistentIkCurrentSignatureRef.current === capturePoseSignature
       && pendingPersistentIkCommandRef.current === null
       && dynamicPoseGenerationRef.current === captureDynamicPoseGeneration
+      && proportionRigReceiptRef.current === captureProportionRigReceipt
+      && avatarForgeAuthorityIdentityRef.current === captureAvatarForgeIdentity
+      && avatarForgeFaceController.getSnapshot() === captureFaceControllerSnapshot
+      && captureVisualAuthorityRef.current?.identity === captureVisualAuthority.identity
+      && readVrmCaptureCameraIdentity() === captureCameraIdentity
       && wardrobeCaptureAuthorityIsCurrent()
+      && xpbdSkirtCaptureAuthorityIsCurrent()
+      && !webcamActiveRef.current
+      && !idleAnimationRef.current
       && (!hasLockedConstraint
         || (
           persistentIkResolvedSignatureRef.current === capturePoseSignature
-          && !webcamActiveRef.current
-          && !idleAnimationRef.current
         ))
     );
     const reportWardrobeCaptureAuthorityMismatch = () => {
@@ -8723,6 +8637,7 @@ export function StudioVrmPoser({
           && captureRequest === captureRequestRef.current
         ) {
           releaseCaptureMutationLocks();
+          releaseVrmCaptureOperation("insert");
           setIsCapturing(false);
         }
         return;
@@ -8761,6 +8676,16 @@ export function StudioVrmPoser({
             settleVrmPhysics(currentVrm);
           }
           currentVrm.update(0);
+          // The capture owns one synchronous exact solve after the final raw-bone commit. The
+          // returned receipt proves that the pixels below use this mounted viewport BufferGeometry.
+          for (const { slot, sync } of captureXpbdSkirtSyncEntries) {
+            const result = sync();
+            if (!result.ok) {
+              throw new Error(
+                `${WARDROBE_SLOT_LABELS[slot]} 천 물리를 최신 포즈에 맞추지 못했습니다. 다시 시도해 주세요.`,
+              );
+            }
+          }
           // Display size = the legacy logical export size (stable placement on the document);
           // the raster renders denser so the insert stays crisp at 100% zoom on HiDPI and
           // survives a moderate scale-up. Budget failures fall back to display-density capture.
@@ -8777,7 +8702,7 @@ export function StudioVrmPoser({
             throw new Error("삽입할 VRM 자세를 회전 기반 데이터로 변환하지 못했습니다.");
           }
           const poseMetadata = buildVrmPoseDataUrlMetadata({
-            ...captureFullState(),
+            ...captureVisualAuthority.fullState,
             bones: stripFingerBones(bakedPose.bones),
             yOffset: bakedPose.yOffset,
           }, modelName);
@@ -8854,6 +8779,7 @@ export function StudioVrmPoser({
             && captureRequest === captureRequestRef.current
           ) {
             releaseCaptureMutationLocks();
+            releaseVrmCaptureOperation("insert");
             setIsCapturing(false);
           }
         }
@@ -9057,6 +8983,7 @@ export function StudioVrmPoser({
                       idleAnimation={idleAnimation}
                       fingerEdits={effectiveFingerEdits}
                       bodyScale={bodyScale}
+                      rigRevision={proportionRigRevision}
                       texturePaintEnabled={texturePaintInteractionEnabled}
                       texturePaintMutationBlockedRef={texturePaintMutationBlockedRef}
                       texturePaintRuntime={texturePaintRuntime}
@@ -9078,7 +9005,14 @@ export function StudioVrmPoser({
                       onDrag={handleViewportHandIkDrag}
                     />
                   ) : null}
-                  {vrm ? <StudioVrmAvatarForge vrm={vrm} state={avatarForgeState} /> : null}
+                  {vrm ? (
+                    <StudioVrmAvatarForge
+                      vrm={vrm}
+                      state={avatarForgeState}
+                      rigRevision={proportionRigRevision}
+                      faceController={avatarForgeFaceController}
+                    />
+                  ) : null}
                   {vrm ? (
                     <StudioVrmMannequinMaterial
                       vrm={vrm}
@@ -9089,7 +9023,7 @@ export function StudioVrmPoser({
                   ) : null}
                   {vrm ? (
                     <StudioVrmJointHandles
-                      key={jointHandleSessionGeneration}
+                      key={`${jointHandleSessionGeneration}:${proportionRigRevision}`}
                       vrm={vrm}
                       visible={
                         jointHandlesVisible
@@ -9119,11 +9053,17 @@ export function StudioVrmPoser({
                   ) : null}
                   {vrm
                     ? vrmPropItems.map((item) => (
-                        <VrmPropAttachment key={item.uid} vrm={vrm} instance={item} metrics={effectivePropRigMetrics} />
+                        <StudioVrmPropAttachment
+                          key={`${proportionRigRevision}:${item.uid}`}
+                          vrm={vrm}
+                          instance={item}
+                          metrics={effectivePropRigMetrics}
+                          rigRevision={proportionRigRevision}
+                        />
                       ))
                     : null}
                   {vrm ? (
-                    <VrmRuntimeCommit
+                    <StudioVrmRuntimeCommit
                       vrm={vrm}
                       physicsPreview={physicsPreview}
                       webcamActive={webcamActive}
@@ -9134,14 +9074,16 @@ export function StudioVrmPoser({
                         const equip = wardrobeState[slot];
                         const fit = wardrobeFitReport.slots[slot];
                         return equip ? (
-                          <VrmWardrobeAttachment
-                            key={slot}
+                          <StudioVrmWardrobeAttachment
+                            key={`${proportionRigRevision}:${slot}`}
                             vrm={vrm}
                             slot={slot}
                             equip={equip}
                             metrics={wardrobeMetrics}
                             effectiveFit={fit?.effectiveFit ?? equip.fit}
+                            rigRevision={proportionRigRevision}
                             onSurfaceReceipt={handleWardrobeSurfaceReceipt}
+                            onXpbdCaptureSyncChange={handleWardrobeXpbdCaptureSyncChange}
                           />
                         ) : null;
                       })
@@ -9170,6 +9112,7 @@ export function StudioVrmPoser({
                       !isViewportHandIkDragging
                       && !jointHandleInteracting
                       && !texturePaintStrokeActive
+                      && !viewportCameraInteractionLocked
                     }
                     enableRotate={!texturePaintInteractionEnabled}
                     enableDamping
@@ -9180,6 +9123,7 @@ export function StudioVrmPoser({
                       && !texturePaintModeSelected
                       && !jointHandleInteracting
                       && !isViewportHandIkDragging
+                      && !viewportCameraInteractionLocked
                     }
                     autoRotateSpeed={1.6}
                     minDistance={1.3}
@@ -9238,26 +9182,43 @@ export function StudioVrmPoser({
                       </StudioToolHintTarget>
                     </div>
                     <div className="absolute right-2.5 top-2.5 z-10 flex flex-col gap-1.5">
-                      <StudioToolHintTarget hint={VRM_VIEWPORT_HINTS.zoomIn} preferredSide="left">
-                        <button type="button" aria-label="확대" className={VIEWPORT_BTN} onClick={() => zoomViewport(0.82)}>
+                      <StudioToolHintTarget
+                        hint={VRM_VIEWPORT_HINTS.zoomIn}
+                        disabled={viewportCameraInteractionLocked}
+                        unavailableReason={viewportCameraInteractionLocked ? "3D 캡처 중에는 카메라를 고정합니다." : undefined}
+                        preferredSide="left"
+                      >
+                        <button type="button" aria-label="확대" disabled={viewportCameraInteractionLocked} className={VIEWPORT_BTN} onClick={() => zoomViewport(0.82)}>
                           <ZoomIn size={16} aria-hidden />
                         </button>
                       </StudioToolHintTarget>
-                      <StudioToolHintTarget hint={VRM_VIEWPORT_HINTS.zoomOut} preferredSide="left">
-                        <button type="button" aria-label="축소" className={VIEWPORT_BTN} onClick={() => zoomViewport(1.22)}>
+                      <StudioToolHintTarget
+                        hint={VRM_VIEWPORT_HINTS.zoomOut}
+                        disabled={viewportCameraInteractionLocked}
+                        unavailableReason={viewportCameraInteractionLocked ? "3D 캡처 중에는 카메라를 고정합니다." : undefined}
+                        preferredSide="left"
+                      >
+                        <button type="button" aria-label="축소" disabled={viewportCameraInteractionLocked} className={VIEWPORT_BTN} onClick={() => zoomViewport(1.22)}>
                           <ZoomOut size={16} aria-hidden />
                         </button>
                       </StudioToolHintTarget>
-                      <StudioToolHintTarget hint={VRM_VIEWPORT_HINTS.resetView} preferredSide="left">
-                        <button type="button" aria-label="시점 초기화" className={VIEWPORT_BTN} onClick={handleViewReset}>
+                      <StudioToolHintTarget
+                        hint={VRM_VIEWPORT_HINTS.resetView}
+                        disabled={viewportCameraInteractionLocked}
+                        unavailableReason={viewportCameraInteractionLocked ? "3D 캡처 중에는 카메라를 고정합니다." : undefined}
+                        preferredSide="left"
+                      >
+                        <button type="button" aria-label="시점 초기화" disabled={viewportCameraInteractionLocked} className={VIEWPORT_BTN} onClick={handleViewReset}>
                           <Maximize2 size={16} aria-hidden />
                         </button>
                       </StudioToolHintTarget>
                       <StudioToolHintTarget
                         hint={turntableHint}
-                        disabled={texturePaintModeSelected}
+                        disabled={texturePaintModeSelected || viewportCameraInteractionLocked}
                         unavailableReason={
-                          texturePaintModeSelected
+                          viewportCameraInteractionLocked
+                            ? "3D 캡처 중에는 카메라를 고정합니다."
+                          : texturePaintModeSelected
                             ? "표면 페인트 중에는 캐릭터가 움직이지 않도록 턴테이블을 잠급니다."
                             : undefined
                         }
@@ -9267,7 +9228,7 @@ export function StudioVrmPoser({
                           type="button"
                           aria-label={turntable ? "턴테이블 회전 중지" : "턴테이블 회전 시작"}
                           aria-pressed={turntable}
-                          disabled={texturePaintModeSelected}
+                          disabled={texturePaintModeSelected || viewportCameraInteractionLocked}
                           className={cx(
                             VIEWPORT_BTN,
                             turntable && "border-accent/60 bg-accent text-on-accent hover:bg-accent/90 hover:text-on-accent",
@@ -9445,9 +9406,35 @@ export function StudioVrmPoser({
               >
                 <StudioVrmAvatarForgePanel
                   state={avatarForgeState}
-                  disabled={!vrm}
+                  disabled={
+                    !vrm
+                    || isCapturing
+                    || isSharingPose
+                    || isThumbnailCapturing
+                    || proportionRigStatus === "applying"
+                    || proportionRigStatus === "reload-required"
+                  }
                   detectedOriginalHairCount={detectedOriginalHairCount}
-                  onChange={setAvatarForgeState}
+                  proportionMetrics={proportionRigReceipt?.metrics ?? null}
+                  proportionMetricsLabel={
+                    (
+                      proportionRigReceipt?.headMeasurement?.source
+                      ?? proportionHeadMeasurement?.source
+                    ) === "eye-landmarks"
+                      ? "눈 랜드마크 기반 모델 추정"
+                      : "모델 경계 기반 추정"
+                  }
+                  proportionPresetNote={
+                    proportionRigReceipt?.presetResolution?.clamped
+                      ? `${proportionRigReceipt.presetResolution.targetHeadUnits}두신 목표를 이 모델의 안전 범위에서 ${formatStudioVrmHeadUnits(proportionRigReceipt.presetResolution.achievedHeadUnits)}까지 적용했습니다.`
+                      : null
+                  }
+                  proportionUnavailableReason={
+                    proportionRigStatus === "unavailable" || proportionRigStatus === "reload-required"
+                      ? proportionRigMessage || "리그 준비 상태를 확인할 수 없습니다."
+                      : null
+                  }
+                  onChange={handleAvatarForgeChange}
                 />
               </section>
 
@@ -10110,7 +10097,16 @@ export function StudioVrmPoser({
                 <div className="mb-2 flex justify-end">
                   <button
                     type="button"
-                    disabled={!vrm || persistentIkReconciling}
+                    disabled={
+                      !vrm
+                      || (!isSharingPose && (
+                        persistentIkReconciling
+                        || webcamActive
+                        || idleAnimation
+                        || isCapturing
+                        || isThumbnailCapturing
+                      ))
+                    }
                     onClick={() => void handleSharePoseToServer()}
                     className="inline-flex items-center gap-1 rounded-lg border border-accent/30 bg-accent-soft/40 px-2 py-1 text-[0.68rem] font-bold text-accent hover:bg-accent-soft disabled:opacity-45"
                   >
@@ -10305,13 +10301,21 @@ export function StudioVrmPoser({
                                   "rounded-full px-1.5 py-0.5 text-[0.58rem] font-bold",
                                   surfaceReceipt.mode === "skinned-shell-v1"
                                     ? "bg-good/12 text-good"
-                                    : "bg-warn/12 text-warn",
+                                    : surfaceReceipt.mode === "xpbd-skirt-v1"
+                                      ? "bg-accent/12 text-accent"
+                                      : "bg-warn/12 text-warn",
                                 )}
-                                title={surfaceReceipt.mode === "skinned-shell-v1"
-                                  ? `${surfaceReceipt.boneCount}개 관절 · 혼합 정점 ${surfaceReceipt.blendedVertexCount.toLocaleString("ko-KR")}개`
-                                  : "이 VRM의 골격 구조에서는 안정적인 기존 부착 방식으로 표시합니다."}
+                                title={surfaceReceipt.mode === "xpbd-skirt-v1"
+                                  ? `신체 캡슐 충돌 · 정점 ${surfaceReceipt.vertexCount.toLocaleString("ko-KR")}개 · 자기 충돌은 아직 지원하지 않습니다.`
+                                  : surfaceReceipt.mode === "skinned-shell-v1"
+                                    ? `${surfaceReceipt.boneCount}개 관절 · 혼합 정점 ${surfaceReceipt.blendedVertexCount.toLocaleString("ko-KR")}개`
+                                    : "이 VRM의 골격 구조에서는 안정적인 기존 부착 방식으로 표시합니다."}
                               >
-                                {surfaceReceipt.mode === "skinned-shell-v1" ? "관절 스키닝" : "호환 장착"}
+                                {surfaceReceipt.mode === "xpbd-skirt-v1"
+                                  ? "천 물리 · 자기충돌 X"
+                                  : surfaceReceipt.mode === "skinned-shell-v1"
+                                    ? "관절 스키닝"
+                                    : "호환 장착"}
                               </span>
                             ) : null}
                           </p>
@@ -10491,57 +10495,25 @@ export function StudioVrmPoser({
                     </button>
                   </div>
                 </div>
-                <div className="mb-4 border-b border-line/45 pb-4">
-                  <div className="mb-2 flex items-center justify-between gap-2">
+                {bodyScale.height !== 1 || bodyScale.width !== 1 ? (
+                  <div className="mb-4 rounded-xl border border-warning/35 bg-warning/10 p-3">
                     <h3 className="flex items-center gap-1.5 text-xs font-bold text-fg">
-                      <UserRound size={14} className="text-accent" aria-hidden />
-                      체형 비율
+                      <UserRound size={14} className="text-warning" aria-hidden />
+                      이전 문서의 장면 배율
                     </h3>
+                    <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
+                      이 문서는 예전 키 {bodyScale.height.toFixed(2)}× · 체격 {bodyScale.width.toFixed(2)}× 값을 그대로 재생합니다. 새 문서의 체형은 아바타 조형 &gt; 체형에서 관절 비율 하나로 편집합니다.
+                    </p>
                     <button
                       type="button"
-                      disabled={!vrm}
-                      className="min-h-9 rounded-lg border border-line bg-card px-2 text-[0.64rem] font-semibold text-fg-2 hover:bg-raised disabled:opacity-45 pointer-coarse:min-h-11"
+                      disabled={!vrm || isCapturing}
+                      className="mt-2 min-h-9 rounded-lg border border-warning/45 bg-card px-2.5 text-[0.64rem] font-bold text-fg-2 hover:bg-raised disabled:opacity-45 pointer-coarse:min-h-11"
                       onClick={() => setBodyScale({ height: 1, width: 1 })}
                     >
-                      기본 비율
+                      새 체형 편집으로 전환
                     </button>
                   </div>
-                  <p className="mb-3 text-[0.68rem] leading-relaxed text-fg-3">
-                    어린이·청소년·성인·노년 실루엣의 시작 비율을 유지하거나, 키와 체격을 직접 조정하세요.
-                  </p>
-                  <div className="space-y-3">
-                    <label className="flex items-center gap-2 text-xs text-fg-2">
-                      <span className="w-10 shrink-0 font-medium">키</span>
-                      <input
-                        type="range"
-                        min="0.7"
-                        max="1.4"
-                        step="0.01"
-                        value={bodyScale.height}
-                        disabled={!vrm}
-                        onChange={(event) => setBodyScale((current) => ({ ...current, height: Number(event.target.value) }))}
-                        className="h-2 flex-1 accent-accent"
-                        aria-label="캐릭터 키 비율"
-                      />
-                      <span className="w-11 shrink-0 text-right tabular-nums text-fg-3">{bodyScale.height.toFixed(2)}×</span>
-                    </label>
-                    <label className="flex items-center gap-2 text-xs text-fg-2">
-                      <span className="w-10 shrink-0 font-medium">체격</span>
-                      <input
-                        type="range"
-                        min="0.7"
-                        max="1.3"
-                        step="0.01"
-                        value={bodyScale.width}
-                        disabled={!vrm}
-                        onChange={(event) => setBodyScale((current) => ({ ...current, width: Number(event.target.value) }))}
-                        className="h-2 flex-1 accent-accent"
-                        aria-label="캐릭터 체격 비율"
-                      />
-                      <span className="w-11 shrink-0 text-right tabular-nums text-fg-3">{bodyScale.width.toFixed(2)}×</span>
-                    </label>
-                  </div>
-                </div>
+                ) : null}
 
                 <h3 className="mb-2.5 flex items-center gap-1.5 text-xs font-bold text-fg">
                   <Sliders size={14} className="text-accent" aria-hidden />
@@ -11601,7 +11573,11 @@ export function StudioVrmPoser({
                         <div className="flex items-start gap-2">
                           <AlertTriangle className="shrink-0 mt-0.5" size={14} />
                           <div>
-                            <p className="font-semibold mb-1 text-[0.72rem]">카메라 권한 및 연결 오류</p>
+                            <p className="font-semibold mb-1 text-[0.72rem]">
+                              {webcamErrorStage === "engine"
+                                ? "동작 인식 엔진 오류"
+                                : "카메라 권한 및 연결 오류"}
+                            </p>
                             <p className="whitespace-pre-line text-[0.65rem] opacity-90">{webcamError}</p>
                           </div>
                         </div>
@@ -11611,22 +11587,26 @@ export function StudioVrmPoser({
                             className="rounded border border-red-500/40 px-2.5 py-1 text-[0.65rem] hover:bg-red-500/10"
                             onClick={() => {
                               setWebcamError(null);
+                              setWebcamErrorStage(null);
                               setWebcamActive(true);
                             }}
                           >
                             다시 시도
                           </button>
-                          <button
-                            type="button"
-                            className="rounded border border-red-500/40 px-2.5 py-1 text-[0.65rem] hover:bg-red-500/10"
-                            onClick={() => {
-                              // Re-check permission state
-                              setBrowserPermissionState("prompt");
-                              setWebcamError(null);
-                            }}
-                          >
-                            권한 상태 재확인
-                          </button>
+                          {webcamErrorStage !== "engine" ? (
+                            <button
+                              type="button"
+                              className="rounded border border-red-500/40 px-2.5 py-1 text-[0.65rem] hover:bg-red-500/10"
+                              onClick={() => {
+                                // Re-check permission state
+                                setBrowserPermissionState("prompt");
+                                setWebcamError(null);
+                                setWebcamErrorStage(null);
+                              }}
+                            >
+                              권한 상태 재확인
+                            </button>
+                          ) : null}
                           <button
                             type="button"
                             className="rounded border border-line bg-card px-2.5 py-1 text-[0.65rem] text-fg-2 hover:bg-raised hover:text-fg"
@@ -12119,7 +12099,23 @@ export function StudioVrmPoser({
               <button
                 type="button"
                 className={cx(CONTROL_BUTTON, "min-w-36 border-accent/60 bg-accent text-on-accent hover:bg-accent/90")}
-                disabled={!vrm || status === "loading" || isCapturing || isSharingPose || isThumbnailCapturing || persistentIkReconciling || texturePaintStrokeActive}
+                disabled={
+                  !vrm
+                  || status === "loading"
+                  || isCapturing
+                  || isSharingPose
+                  || isThumbnailCapturing
+                  || webcamActive
+                  || idleAnimation
+                  || persistentIkReconciling
+                  || texturePaintStrokeActive
+                  || proportionRigStatus === "applying"
+                  || proportionRigStatus === "reload-required"
+                  || (
+                    studioVrmProportionsRequireRuntime(avatarForgeState)
+                    && (proportionRigStatus !== "ready" || !proportionRigReceipt)
+                  )
+                }
                 onClick={handleInsert}
               >
                 {isCapturing ? <Loader2 className="animate-spin" size={14} aria-hidden /> : <ImagePlus size={14} aria-hidden />}

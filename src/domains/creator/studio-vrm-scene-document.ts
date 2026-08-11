@@ -14,11 +14,12 @@ import {
  */
 
 export const STUDIO_VRM_SCENE_DOCUMENT_KIND = "studio-vrm-scene" as const;
-export const STUDIO_VRM_SCENE_DOCUMENT_VERSION = 5 as const;
+export const STUDIO_VRM_SCENE_DOCUMENT_VERSION = 6 as const;
 export const STUDIO_VRM_SCENE_DOCUMENT_LEGACY_VERSION = 1 as const;
 export const STUDIO_VRM_SCENE_DOCUMENT_VERSION_TWO = 2 as const;
 export const STUDIO_VRM_SCENE_DOCUMENT_VERSION_THREE = 3 as const;
-export const STUDIO_VRM_SCENE_DOCUMENT_PREVIOUS_VERSION = 4 as const;
+export const STUDIO_VRM_SCENE_DOCUMENT_VERSION_FOUR = 4 as const;
+export const STUDIO_VRM_SCENE_DOCUMENT_PREVIOUS_VERSION = 5 as const;
 export const STUDIO_VRM_SCENE_DOCUMENT_V1_MAX_BYTES = 128 * 1024;
 export const STUDIO_VRM_SCENE_DOCUMENT_V2_MAX_BYTES =
   STUDIO_VRM_SCENE_DOCUMENT_V1_MAX_BYTES + 512;
@@ -32,8 +33,11 @@ export const STUDIO_VRM_SCENE_DOCUMENT_V3_MAX_BYTES =
 export const STUDIO_VRM_SCENE_DOCUMENT_V4_MAX_BYTES =
   STUDIO_VRM_SCENE_DOCUMENT_V3_MAX_BYTES + 2 * 1024;
 /** v5 reserves bounded metadata headroom for deterministic surface-paint texture bindings. */
-export const STUDIO_VRM_SCENE_DOCUMENT_MAX_BYTES =
+export const STUDIO_VRM_SCENE_DOCUMENT_V5_MAX_BYTES =
   STUDIO_VRM_SCENE_DOCUMENT_V4_MAX_BYTES + 128 * 1024;
+/** v6 reserves bounded headroom so every maximum-size v5 scene can add `lightingTone` losslessly. */
+export const STUDIO_VRM_SCENE_DOCUMENT_MAX_BYTES =
+  STUDIO_VRM_SCENE_DOCUMENT_V5_MAX_BYTES + 512;
 /** Matches the default project-archive per-attachment ceiling so every accepted scene is portable. */
 export const STUDIO_VRM_MODEL_MAX_BYTES = 96 * 1024 * 1024;
 export const STUDIO_VRM_MAX_POSE_BONES = 64;
@@ -272,6 +276,17 @@ export interface StudioVrmLightingSettings {
   readonly directionDeg: number;
 }
 
+export const STUDIO_VRM_LIGHTING_TONES = [
+  "morning",
+  "sunset",
+  "night",
+  "studio",
+] as const;
+
+export type StudioVrmLightingTone = (typeof STUDIO_VRM_LIGHTING_TONES)[number];
+
+export const DEFAULT_STUDIO_VRM_LIGHTING_TONE: StudioVrmLightingTone = "morning";
+
 export interface StudioVrmPhysicsSettings {
   readonly version: 1;
   readonly stiffnessScale: number;
@@ -333,6 +348,7 @@ export interface StudioVrmSceneDocument {
   readonly props: StudioVrmCanonicalData;
   readonly sceneProps: StudioVrmCanonicalData;
   readonly lighting: StudioVrmLightingSettings;
+  readonly lightingTone: StudioVrmLightingTone;
   readonly physics: StudioVrmPhysicsSettings;
   readonly env: StudioVrmEnvironment;
   readonly render: StudioVrmRenderSettings;
@@ -375,6 +391,7 @@ const HUMANOID_BONE_SET = new Set<string>(STUDIO_VRM_HUMANOID_BONES);
 const FINGER_BONE_SET = new Set<string>(STUDIO_VRM_FINGER_BONES);
 const IK_EFFECTOR_SET = new Set<string>(STUDIO_VRM_IK_EFFECTORS);
 const ENVIRONMENT_SET = new Set<string>(["none", "floor", "wall", "room", "outdoor"]);
+const LIGHTING_TONE_SET = new Set<string>(STUDIO_VRM_LIGHTING_TONES);
 
 function isStudioVrmHumanoidBoneName(value: string): value is StudioVrmHumanoidBoneName {
   return HUMANOID_BONE_SET.has(value);
@@ -390,6 +407,10 @@ function isStudioVrmIkEffector(value: unknown): value is StudioVrmIkEffector {
 
 function isStudioVrmEnvironment(value: unknown): value is StudioVrmEnvironment {
   return typeof value === "string" && ENVIRONMENT_SET.has(value);
+}
+
+function isStudioVrmLightingTone(value: unknown): value is StudioVrmLightingTone {
+  return typeof value === "string" && LIGHTING_TONE_SET.has(value);
 }
 
 const DEFAULT_RAW_DOCUMENT: StudioVrmSceneDocument = {
@@ -449,6 +470,7 @@ const DEFAULT_RAW_DOCUMENT: StudioVrmSceneDocument = {
   props: null,
   sceneProps: null,
   lighting: { intensity: 1, colorTemp: 0.5, directionDeg: 45 },
+  lightingTone: DEFAULT_STUDIO_VRM_LIGHTING_TONE,
   physics: {
     version: 1,
     stiffnessScale: 1,
@@ -489,9 +511,13 @@ const VERSION_TWO_TO_FOUR_ROOT_KEYS = new Set([
   ...VERSION_ONE_ROOT_KEYS,
   "rig",
 ]);
-const CURRENT_ROOT_KEYS = new Set([
+const VERSION_FIVE_ROOT_KEYS = new Set([
   ...VERSION_TWO_TO_FOUR_ROOT_KEYS,
   "surfacePaint",
+]);
+const CURRENT_ROOT_KEYS = new Set([
+  ...VERSION_FIVE_ROOT_KEYS,
+  "lightingTone",
 ]);
 
 const VERSION_ONE_POSE_KEYS = new Set([
@@ -545,6 +571,7 @@ const LEGACY_ROOT_KEYS = new Set([
   "bodyScale",
   "fingerOverrides",
   "lighting",
+  "lightingTone",
   "env",
   "avatarForge",
   "vrmProps",
@@ -577,6 +604,7 @@ const FULL_STATE_V2_FRAGMENT_KEYS = new Set([
   "physics",
   "bodyScale",
   "lighting",
+  "lightingTone",
   "env",
   "fingerOverrides",
   "materialFx",
@@ -707,8 +735,11 @@ function exceedsHistoricalSourceLimit(raw: unknown, decoded: unknown): boolean {
   if (decoded.version === STUDIO_VRM_SCENE_DOCUMENT_VERSION_THREE) {
     return utf8ByteLength(raw) > STUDIO_VRM_SCENE_DOCUMENT_V3_MAX_BYTES;
   }
+  if (decoded.version === STUDIO_VRM_SCENE_DOCUMENT_VERSION_FOUR) {
+    return utf8ByteLength(raw) > STUDIO_VRM_SCENE_DOCUMENT_V4_MAX_BYTES;
+  }
   return decoded.version === STUDIO_VRM_SCENE_DOCUMENT_PREVIOUS_VERSION
-    && utf8ByteLength(raw) > STUDIO_VRM_SCENE_DOCUMENT_V4_MAX_BYTES;
+    && utf8ByteLength(raw) > STUDIO_VRM_SCENE_DOCUMENT_V5_MAX_BYTES;
 }
 
 function deepFreeze<T>(value: T): T {
@@ -1080,6 +1111,10 @@ function normalizeLighting(value: unknown): StudioVrmLightingSettings {
   };
 }
 
+function normalizeLightingTone(value: unknown): StudioVrmLightingTone {
+  return isStudioVrmLightingTone(value) ? value : DEFAULT_STUDIO_VRM_LIGHTING_TONE;
+}
+
 function normalizePhysics(value: unknown): StudioVrmPhysicsSettings {
   const candidate = isRecord(value) ? value : {};
   return {
@@ -1286,6 +1321,7 @@ function normalizeDecodedDocumentFields(value: Record<string, unknown>): StudioV
     props: normalizedDataOrNull(value.props),
     sceneProps: normalizedDataOrNull(value.sceneProps),
     lighting: normalizeLighting(value.lighting),
+    lightingTone: normalizeLightingTone(value.lightingTone),
     physics: normalizePhysics(value.physics),
     env: isStudioVrmEnvironment(value.env) ? value.env : "none",
     render: normalizeRender(value.render),
@@ -1369,6 +1405,46 @@ function strictDecodedCurrentDocument(value: unknown): StudioVrmSceneDocument | 
   }
 }
 
+function versionFiveProjection(document: StudioVrmSceneDocument): Record<string, unknown> {
+  const { lightingTone: _lightingTone, ...projection } = document;
+  return {
+    ...projection,
+    version: STUDIO_VRM_SCENE_DOCUMENT_PREVIOUS_VERSION,
+  };
+}
+
+/**
+ * Strict reader for v5 documents written before `lightingTone` became persistent. The historical
+ * root vocabulary remains exact; the only authored addition is the deterministic morning tone.
+ */
+function migrateStrictDecodedVersionFiveDocument(
+  value: unknown,
+): StudioVrmSceneDocument | null {
+  if (
+    !isRecord(value)
+    || value.kind !== STUDIO_VRM_SCENE_DOCUMENT_KIND
+    || value.version !== STUDIO_VRM_SCENE_DOCUMENT_PREVIOUS_VERSION
+  ) return null;
+  const keys = Object.keys(value);
+  if (
+    keys.length !== VERSION_FIVE_ROOT_KEYS.size
+    || keys.some((key) => !VERSION_FIVE_ROOT_KEYS.has(key))
+  ) return null;
+  const migrated = strictDecodedCurrentDocument({
+    ...value,
+    version: STUDIO_VRM_SCENE_DOCUMENT_VERSION,
+    lightingTone: DEFAULT_STUDIO_VRM_LIGHTING_TONE,
+  });
+  if (!migrated || !jsonStructuresEqual(value, versionFiveProjection(migrated))) return null;
+  try {
+    return utf8ByteLength(JSON.stringify(value)) <= STUDIO_VRM_SCENE_DOCUMENT_V5_MAX_BYTES
+      ? migrated
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 function versionOneProjection(document: StudioVrmSceneDocument): Record<string, unknown> {
   const {
     translations: _translations,
@@ -1439,7 +1515,7 @@ function versionThreeProjection(document: StudioVrmSceneDocument): Record<string
 function versionFourProjection(document: StudioVrmSceneDocument): Record<string, unknown> {
   return {
     kind: document.kind,
-    version: STUDIO_VRM_SCENE_DOCUMENT_PREVIOUS_VERSION,
+    version: STUDIO_VRM_SCENE_DOCUMENT_VERSION_FOUR,
     model: document.model,
     pose: document.pose,
     expressions: document.expressions,
@@ -1578,7 +1654,7 @@ function migrateStrictDecodedVersionFourDocument(value: unknown): StudioVrmScene
   if (
     !isRecord(value)
     || value.kind !== STUDIO_VRM_SCENE_DOCUMENT_KIND
-    || value.version !== STUDIO_VRM_SCENE_DOCUMENT_PREVIOUS_VERSION
+    || value.version !== STUDIO_VRM_SCENE_DOCUMENT_VERSION_FOUR
   ) return null;
   const keys = Object.keys(value);
   if (
@@ -1638,6 +1714,7 @@ export function normalizeStudioVrmSceneDocument(raw: unknown): StudioVrmSceneDoc
   const decoded = decodeBoundedDataGraph(raw);
   if (exceedsHistoricalSourceLimit(raw, decoded)) return createDefaultStudioVrmSceneDocument();
   return normalizeDecodedCurrentDocument(decoded)
+    ?? migrateStrictDecodedVersionFiveDocument(decoded)
     ?? migrateStrictDecodedVersionFourDocument(decoded)
     ?? migrateStrictDecodedVersionThreeDocument(decoded)
     ?? migrateStrictDecodedVersionTwoDocument(decoded)
@@ -1645,18 +1722,19 @@ export function normalizeStudioVrmSceneDocument(raw: unknown): StudioVrmSceneDoc
     ?? createDefaultStudioVrmSceneDocument();
 }
 
-/** Parses canonical v5 and losslessly promotes complete canonical v1/v2/v3/v4 documents. */
+/** Parses canonical v6 and losslessly promotes complete canonical v1-v5 documents. */
 export function parseStudioVrmSceneDocument(raw: string): StudioVrmSceneDocument | null {
   const decoded = decodeBoundedDataGraph(raw);
   if (exceedsHistoricalSourceLimit(raw, decoded)) return null;
   return strictDecodedCurrentDocument(decoded)
+    ?? migrateStrictDecodedVersionFiveDocument(decoded)
     ?? migrateStrictDecodedVersionFourDocument(decoded)
     ?? migrateStrictDecodedVersionThreeDocument(decoded)
     ?? migrateStrictDecodedVersionTwoDocument(decoded)
     ?? migrateStrictDecodedVersionOneDocument(decoded);
 }
 
-/** Serializes only complete, losslessly canonical version-5 documents. */
+/** Serializes only complete, losslessly canonical version-6 documents. */
 export function serializeStudioVrmSceneDocument(raw: unknown): string | null {
   const document = strictDecodedCurrentDocument(decodeBoundedDataGraph(raw));
   if (!document) return null;
@@ -1725,6 +1803,7 @@ function migrateDecodedFullStateMetadata(
     || !hasOwn(value, "bodyRotation")
     || (value.version === 3 && !hasOwn(value, "ikConstraints"))
     || (value.version === 3 && !hasOwn(value, "poseTranslations"))
+    || (hasOwn(value, "lightingTone") && !isStudioVrmLightingTone(value.lightingTone))
   ) return null;
 
   const translations = strictFullStateV2Translations(value);
@@ -1784,6 +1863,7 @@ function migrateDecodedFullStateMetadata(
     props: normalizedDataOrNull(value.vrmProps),
     sceneProps: normalizedDataOrNull(value.sceneProps),
     lighting: normalizeLighting(value.lighting),
+    lightingTone: normalizeLightingTone(value.lightingTone),
     physics: normalizePhysics(value.physics),
     env: isStudioVrmEnvironment(value.env) ? value.env : "none",
   };
@@ -1801,7 +1881,8 @@ function migrateDecodedLegacyMetadata(
     !hasOnlyKeys(value, LEGACY_ROOT_KEYS) ||
     (hasOwn(value, "tool") && value.tool !== "vrm-poser") ||
     hasOwn(value, "kind") ||
-    hasOwn(value, "version")
+    hasOwn(value, "version") ||
+    (hasOwn(value, "lightingTone") && !isStudioVrmLightingTone(value.lightingTone))
   ) return null;
   const bundledModel = readLegacyBundledModel(value, options);
   if (!bundledModel) {
@@ -1836,6 +1917,7 @@ function migrateDecodedLegacyMetadata(
     props: normalizedDataOrNull(vrmProps),
     sceneProps: normalizedDataOrNull(value.sceneProps),
     lighting: normalizeLighting(value.lighting),
+    lightingTone: normalizeLightingTone(value.lightingTone),
     physics: normalizePhysics(value.physics),
     env: isStudioVrmEnvironment(value.env) ? value.env : "none",
     render: normalizeRender({
@@ -1862,6 +1944,8 @@ export function migrateStudioVrmSceneDocument(
   if (exceedsHistoricalSourceLimit(raw, decoded)) return null;
   const current = strictDecodedCurrentDocument(decoded);
   if (current) return current;
+  const versionFive = migrateStrictDecodedVersionFiveDocument(decoded);
+  if (versionFive) return versionFive;
   const versionFour = migrateStrictDecodedVersionFourDocument(decoded);
   if (versionFour) return versionFour;
   const versionThree = migrateStrictDecodedVersionThreeDocument(decoded);

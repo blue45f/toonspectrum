@@ -19,6 +19,7 @@ import {
   type StudioCustomFont,
   type StudioCustomFontFormat,
 } from "./studio-custom-fonts";
+import { isStudioLocalDatabaseCommitOutcomeUnknownError } from "./studio-local-database-commit-outcome";
 import { acquireStudioLocalDatabase } from "./studio-local-database-runtime";
 
 import type { StudioLocalDatabase } from "./studio-local-database";
@@ -462,7 +463,9 @@ export function createStudioCustomFontSqliteOpfsRepository(
         serializeStudioCustomFontManifest(next.entries),
       );
     } catch (error) {
-      await store.setOwnerRefs(STUDIO_CUSTOM_FONT_CAS_OWNER, oldHashes).catch(() => []);
+      if (!isStudioLocalDatabaseCommitOutcomeUnknownError(error)) {
+        await store.setOwnerRefs(STUDIO_CUSTOM_FONT_CAS_OWNER, oldHashes).catch(() => []);
+      }
       throw repositoryError(error, "manifest 커밋");
     }
     // Manifest is now authoritative. Owner contraction/orphan cleanup is recoverable bookkeeping.

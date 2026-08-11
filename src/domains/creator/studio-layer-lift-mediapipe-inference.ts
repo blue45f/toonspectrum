@@ -3,12 +3,7 @@
  * on-device MediaPipe foreground segmenter. Source pixels stay inside the
  * browser; only the versioned model and WASM runtime are downloaded.
  */
-import {
-  getStudioLocalForegroundSegmenterRuntime,
-  segmentStudioLocalForegroundRasterSource,
-  type StudioLocalForegroundSegmenterRuntime,
-} from "./studio-bg-remove";
-
+import type { StudioLocalForegroundSegmenterRuntime } from "./studio-bg-remove";
 import type {
   StudioLayerLiftLocalForegroundInferenceEngine,
   StudioLayerLiftLocalForegroundInferenceInput,
@@ -102,6 +97,7 @@ function modelIdentity(
 function createInferenceEngine(
   runtime: StudioLocalForegroundSegmenterRuntime,
   createRaster: StudioLayerLiftMediaPipeRasterFactory,
+  segmentRaster: typeof import("./studio-bg-remove")["segmentStudioLocalForegroundRasterSource"],
 ): StudioLayerLiftLocalForegroundInferenceEngine {
   return Object.freeze({
     model: modelIdentity(runtime),
@@ -110,7 +106,7 @@ function createInferenceEngine(
       const raster = createRaster(input);
       try {
         throwIfAborted(input.signal);
-        const result = segmentStudioLocalForegroundRasterSource(
+        const result = segmentRaster(
           raster.source,
           input.width,
           input.height,
@@ -137,15 +133,22 @@ function createInferenceEngine(
 export function createStudioLayerLiftMediaPipeInferenceLoader(
   options: CreateStudioLayerLiftMediaPipeInferenceLoaderOptions = {},
 ): StudioLayerLiftLocalForegroundInferenceLoader {
-  const loadRuntime =
-    options.loadRuntime ?? getStudioLocalForegroundSegmenterRuntime;
   const createRaster = options.createRaster ?? createBrowserRaster;
 
   return async (signal) => {
     throwIfAborted(signal);
+    // Layer Lift is explicit user work. Importing the segmenter here keeps the MediaPipe
+    // arbiter, WASM resolver, and foreground compositor outside the Studio startup graph.
+    const foreground = await import("./studio-bg-remove");
+    const loadRuntime =
+      options.loadRuntime ?? foreground.getStudioLocalForegroundSegmenterRuntime;
     const runtime = await loadRuntime();
     throwIfAborted(signal);
-    return createInferenceEngine(runtime, createRaster);
+    return createInferenceEngine(
+      runtime,
+      createRaster,
+      foreground.segmentStudioLocalForegroundRasterSource,
+    );
   };
 }
 

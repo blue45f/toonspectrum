@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 
 import { STUDIO_HUMANOID_BONE_NAMES } from "./studio-humanoid-bones";
+import { createAvatarForgeState } from "./studio-vrm-avatar-forge";
 import {
   STUDIO_VRM_APPLIED_HUMANOID_BONES,
   applyPoseToVrm,
@@ -33,6 +34,10 @@ import {
   type FullVrmState,
   type VrmMaterialFx,
 } from "./studio-vrm-poser-utils";
+import {
+  DEFAULT_STUDIO_VRM_LIGHTING_TONE,
+  STUDIO_VRM_LIGHTING_TONES,
+} from "./studio-vrm-scene-document";
 
 import type { VRM, VRMHumanBoneName } from "@pixiv/three-vrm";
 
@@ -185,6 +190,51 @@ describe("studio-vrm-poser-utils unified pipeline", () => {
     expect(canRestoreFullVrmHistoryState(owned, "model-b")).toBe(false);
     expect(canRestoreFullVrmHistoryState(legacy, "model-a")).toBe(false);
     expect(canRestoreFullVrmHistoryState(owned, "")).toBe(false);
+  });
+
+  it("round-trips exact lighting tones and defaults historical full-state payloads to morning", () => {
+    for (const lightingTone of STUDIO_VRM_LIGHTING_TONES) {
+      const state = serializeFullVrmState({ lightingTone });
+      expect(state.lightingTone).toBe(lightingTone);
+      expect(deserializeFullVrmState(JSON.parse(JSON.stringify(state)))?.lightingTone)
+        .toBe(lightingTone);
+      expect(planFullStateRestore(state).lightingTone).toBe(lightingTone);
+
+      const metadata = buildVrmPoseDataUrlMetadata(state, "Lighting model");
+      expect(metadata.lightingTone).toBe(lightingTone);
+      expect(buildFullVrmStateFromSharedDataUrl(
+        `data:image/png;base64,AA#${encodeURIComponent(JSON.stringify(metadata))}`,
+      )?.lightingTone).toBe(lightingTone);
+    }
+
+    const current = serializeFullVrmState({ lightingTone: "night" });
+    const historicalV3 = { ...current } as Record<string, unknown>;
+    delete historicalV3.lightingTone;
+    expect(deserializeFullVrmState(historicalV3)?.lightingTone)
+      .toBe(DEFAULT_STUDIO_VRM_LIGHTING_TONE);
+    expect(deserializeFullVrmState({
+      version: 2,
+      bones: {},
+      yOffset: 0,
+      bodyRotation: 0,
+    })?.lightingTone).toBe(DEFAULT_STUDIO_VRM_LIGHTING_TONE);
+
+    const metadata = buildVrmPoseDataUrlMetadata(current, "Pre-tone model");
+    const historicalFragment = { ...metadata } as Record<string, unknown>;
+    delete historicalFragment.lightingTone;
+    expect(buildFullVrmStateFromSharedDataUrl(
+      `data:image/png;base64,AA#${encodeURIComponent(JSON.stringify(historicalFragment))}`,
+    )?.lightingTone).toBe(DEFAULT_STUDIO_VRM_LIGHTING_TONE);
+
+    for (const lightingTone of ["day", "Morning", "", null, 1]) {
+      expect(deserializeFullVrmState({ ...current, lightingTone })).toBeNull();
+      expect(buildFullVrmStateFromSharedDataUrl(
+        `data:image/png;base64,AA#${encodeURIComponent(JSON.stringify({
+          ...metadata,
+          lightingTone,
+        }))}`,
+      )).toBeNull();
+    }
   });
 
   it("builds one canonical PNG metadata payload for share and re-edit", () => {
@@ -358,12 +408,35 @@ describe("studio-vrm-poser-utils unified pipeline", () => {
     const committed: FullVrmState[] = [];
     const handlers = createFullStateLoadHandlers({
       savedFullStates: { saved },
-      commitFullStateRestore: (state) => committed.push(state),
+      commitFullStateRestore: (state) => {
+        committed.push(state);
+      },
       vrmRef: { current: null },
     });
 
-    handlers.handleLoadFullLocal("saved");
+    expect(handlers.handleLoadFullLocal("saved")).toBe(true);
     expect(committed).toEqual([saved]);
+  });
+
+  it("does not report or decorate a full-state load whose rig restore was rejected", () => {
+    const saved = serializeFullVrmState({
+      modelId: "source-model",
+      customColors: { Head: "#abcdef" },
+    });
+    const customColors: Record<string, string>[] = [];
+    const handlers = createFullStateLoadHandlers({
+      savedFullStates: { saved },
+      commitFullStateRestore: () => false,
+      vrmRef: { current: null },
+      setCustomColors: (colors) => customColors.push(colors),
+    });
+    const metadata = buildVrmPoseDataUrlMetadata(saved, "Rejected pose");
+    const sharedDataUrl = `data:image/png;base64,AA#${encodeURIComponent(JSON.stringify(metadata))}`;
+
+    expect(handlers.handleLoadFullLocal("saved")).toBe(false);
+    expect(handlers.handlePasteFullStateFromParsed(saved)).toBe(false);
+    expect(handlers.handleSelectSharedPose({ dataUrl: sharedDataUrl })).toBe(false);
+    expect(customColors).toEqual([]);
   });
 
   it("stripFingerBones removes finger entries", () => {
@@ -456,6 +529,32 @@ describe("studio-vrm-poser-utils unified pipeline", () => {
     expect(restored?.poseTranslations).toEqual(state.poseTranslations);
   });
 
+  it("round-trips canonical Avatar Forge v4 proportions without changing the outer state version", () => {
+    const avatarForge = createAvatarForgeState("wave-diva");
+    avatarForge.proportions = {
+      ...avatarForge.proportions,
+      presetId: "sd-chibi-3",
+      headBodyRatio: 2.4,
+      legLength: 0.73,
+      shoulderWidth: 1.08,
+    };
+    avatarForge.legacyHipWidth = 1.12;
+    const state = serializeFullVrmState({ avatarForge });
+
+    expect(state.version).toBe(3);
+    expect(deserializeFullVrmState(JSON.parse(JSON.stringify(state)))?.avatarForge).toEqual(
+      avatarForge,
+    );
+    expect(planFullStateRestore(state).avatarForge).toEqual(avatarForge);
+
+    const metadata = buildVrmPoseDataUrlMetadata(state, "Forge v4");
+    const restored = buildFullVrmStateFromSharedDataUrl(
+      `data:image/png;base64,AA#${encodeURIComponent(JSON.stringify(metadata))}`,
+    );
+    expect(restored?.version).toBe(3);
+    expect(restored?.avatarForge).toEqual(avatarForge);
+  });
+
   it("applyFullState invokes costume/props/physics delegates when present", () => {
     const { vrm } = createMinimalVrm();
 
@@ -511,6 +610,7 @@ describe("studio-vrm-poser-utils unified pipeline", () => {
       expressionWeights: { happy: 0.8 },
       bodyScale: { height: 1.2, width: 0.95 },
       lighting: { intensity: 1.5, colorTemp: 0.7, directionDeg: 45 },
+      lightingTone: "studio",
       env: "floor",
       fingerOverrides: { leftIndexProximal: [0, 0, 0.3] },
       costume: { hidden: ["x"] },
@@ -546,6 +646,7 @@ describe("studio-vrm-poser-utils unified pipeline", () => {
     expect(plan.expressionWeights.happy).toBe(0.8);
     expect(plan.bodyScale?.height).toBe(1.2);
     expect(plan.lighting?.intensity).toBe(1.5);
+    expect(plan.lightingTone).toBe("studio");
     expect(plan.env).toBe("floor");
     expect(plan.fingerOverrides?.leftIndexProximal?.[2]).toBeCloseTo(0.3);
     expect((plan.costume as any)?.hidden).toContain("x");

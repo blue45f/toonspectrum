@@ -92,6 +92,8 @@ describe("Studio BG3D shot UI integration boundary", () => {
 
     // Runtime code splitting must not leave the editor mutable while the async chunk is loading.
     expectInOrder(handler, [
+      "const sharedCharacterAuthorityResult = acquireSharedCharacterCaptureAuthority()",
+      "const sharedCharacterAuthorityLease = sharedCharacterAuthorityResult.lease",
       "const controller = new AbortController()",
       "shotBatchAbortRef.current = controller",
       "shotBatchRecoveryScopeRef.current = { controller, scope: recoveryScope }",
@@ -111,10 +113,11 @@ describe("Studio BG3D shot UI integration boundary", () => {
     expect(runtimeInitialization).toContain("} catch (cause) {");
     expect(runtimeInitialization).toContain("finishShotBatchBeforeSession(");
 
-    // Quad view is collapsed before the adapter and its render identity are frozen into Plan v2.
+    // Capture keeps the stable main View alive; the planning adapter/API must therefore be reused
+    // instead of waiting for a replacement that would restart linked character generations.
     expectInOrder(handler, [
       "const transitionedViewport = await applyStudioBg3dViewportAfterTransition({",
-      "requireReplacement: isQuadView",
+      "requireReplacement: false",
       "const planningAdapter = await acquireStudioBg3dCaptureAdapterAfterViewTransition({",
       "const sourceSize = await getStudioBg3dCaptureSourceSize(planningAdapter)",
       "const captureSpecs:",
@@ -181,11 +184,13 @@ describe("Studio BG3D shot UI integration boundary", () => {
       "sourceSize.width === batchPlan.captureOwner.sourceWidth",
       "sourceSize.height === batchPlan.captureOwner.sourceHeight",
       "if (captureOwnerMismatches.length > 0)",
+      'verifySharedCharacterCaptureAuthority(\n              sharedCharacterAuthorityLease,\n              "raster"',
       "captured = await captureStudioBg3dRaster(",
       "width: shot.capture.width",
       "height: shot.capture.height",
       "background: shot.capture.background",
       "includeDepth: shot.capture.includeDepth",
+      'verifySharedCharacterCaptureAuthority(\n          sharedCharacterAuthorityLease,\n          "receipt"',
       "const shotArtifacts = await buildStudioBg3dShotArtifacts({",
       "captured,",
       "passes: batchPlan.passes",
@@ -195,6 +200,7 @@ describe("Studio BG3D shot UI integration boundary", () => {
     expect(handler).toContain("previousApi: previousViewportApi");
     expect(handler).toContain("requireReplacement: projectionChanged");
     expect(handler).not.toContain("firstShotRequiresViewportReplacement");
+    expect(handler).not.toContain("pendingInitialCameraRef.current = isQuadView");
     expect(handler).toContain("signal: controller.signal");
     expect(handler).toContain("timeoutMs: 30_000");
     expect(handler).not.toContain("renderStudioBg3dLtLayersInWorker(");
@@ -283,7 +289,7 @@ describe("Studio BG3D shot UI integration boundary", () => {
       "setIsCapturing(false)",
     ]);
     expect(handler).toContain(
-      "pendingInitialCameraRef.current = restoreFailed || isQuadView ? originalLiveView : null",
+      "pendingInitialCameraRef.current = restoreFailed ? originalLiveView : null",
     );
     expect(source).toContain("if (isRestoringScene || isBatchRenderingShots) return;");
     expect(source).toContain("onClick={() => shotBatchAbortRef.current?.abort()}");

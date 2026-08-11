@@ -17,10 +17,14 @@ import {
   createBabylonStableIdParityRequests,
   classifyStudio3dWebGpuRetryableFailure,
   collectStudioVrmMannequinChromaFailures,
+  formatStudio3dWebGpuDiagnosticConsoleMessage,
   isExpectedStaticPreviewSocketIoHandshakeClose,
   runStudio3dWebGpuConformanceWithFreshBrowserRetry,
   runStudio3dWebGpuProofShardsWithFreshBrowserRetry,
   runStudio3dWebGpuShardWithCleanup,
+  STUDIO_3D_WEBGPU_BROWSER_CHANNEL,
+  STUDIO_3D_WEBGPU_DIAGNOSTIC_MAX_LOG_LENGTH,
+  STUDIO_3D_WEBGPU_DIAGNOSTIC_PREFIX,
   STUDIO_3D_WEBGPU_MAX_BROWSER_ATTEMPTS,
   STUDIO_3D_WEBGPU_PROOF_SHARDS,
   STUDIO_3D_WEBGPU_SWIFTSHADER_LAUNCH_ARGS,
@@ -183,14 +187,125 @@ describe("3D character production-preview color boundary", () => {
     expect(toggleOff).toBeGreaterThan(mannequin);
     expect(restored).toBeGreaterThan(toggleOff);
   });
+
+  it("dismisses the SQLite-hydrated first-use coach before opening 3D menus", () => {
+    const dismissQuickStart = sourceBetween(
+      "async function dismissHydratedQuickStart(page: Page): Promise<void>",
+      "async function openThreeDMenu(page: Page): Promise<Locator>",
+    );
+    const productionPreview = sourceBetween(
+      "async function run(page: Page, studioUrl: string): Promise<void>",
+      "async function runBabylonStableIdOrientationParityProof(",
+    );
+    const dismissIndex = productionPreview.indexOf(
+      "await dismissHydratedQuickStart(page);",
+    );
+    const openMenuIndex = productionPreview.indexOf(
+      "const characterMenu = await openThreeDMenu(page);",
+    );
+
+    expect(dismissQuickStart).toContain(
+      "data-studio-creative-starter=\"true\"",
+    );
+    expect(dismissQuickStart).toContain(
+      "data-studio-quickstart-dismiss=\"true\"",
+    );
+    expect(dismissQuickStart).toContain('state: "detached"');
+    expect(dismissIndex).toBeGreaterThanOrEqual(0);
+    expect(openMenuIndex).toBeGreaterThan(dismissIndex);
+  });
 });
 
 describe("3D WebGPU conformance browser boundary", () => {
-  it("pins both Dawn WebGPU and ANGLE WebGL to SwiftShader", () => {
+  it("uses regular headed Chromium for the high-fidelity WebGPU proof", () => {
+    const webGpuAttempt = sourceBetween(
+      "async function runStudio3dWebGpuConformanceBrowserAttempt(",
+      "async function main(): Promise<void>",
+    );
+    expect(STUDIO_3D_WEBGPU_BROWSER_CHANNEL).toBe("chromium");
+    expect(webGpuAttempt).toContain(
+      "channel: STUDIO_3D_WEBGPU_BROWSER_CHANNEL",
+    );
+    expect(webGpuAttempt).toContain("headless: false");
+    expect(webGpuAttempt).not.toContain("headless: true");
+    expect(webGpuAttempt).toContain(
+      "mode=headed channel=${STUDIO_3D_WEBGPU_BROWSER_CHANNEL}",
+    );
+    expect(webGpuAttempt).toContain(
+      "version=${webGpuBrowser.version()}",
+    );
+  });
+
+  it("relays bounded production device diagnostics outside the retry cause chain", () => {
+    const babylonProof = sourceBetween(
+      "async function runBabylonStableIdOrientationParityProof(",
+      "async function runMagicLayerProductionAlignmentProof(",
+    );
+    const webGpuAttempt = sourceBetween(
+      "async function runStudio3dWebGpuConformanceBrowserAttempt(",
+      "async function main(): Promise<void>",
+    );
+    const magicProof = sourceBetween(
+      "async function runMagicLayerProductionAlignmentProof(",
+      "async function runStudio3dWebGpuConformanceBrowserAttempt(",
+    );
+    const listenerIndex = webGpuAttempt.indexOf('webGpuPage.on("console"');
+    const proofIndex = webGpuAttempt.indexOf(
+      "await runBabylonStableIdOrientationParityProof(webGpuPage, rootUrl);",
+    );
+
+    expect(STUDIO_3D_WEBGPU_DIAGNOSTIC_PREFIX).toBe(
+      "[verify-studio-3d-console:webgpu-diagnostic]",
+    );
+    expect(babylonProof).toContain('readonly onDiagnostic?: (diagnostic: unknown) => void;');
+    expect(babylonProof).toContain('onDiagnostic: backend === "webgpu"');
+    expect(babylonProof).toContain(
+      "console.warn(`${webGpuDiagnosticPrefix}${JSON.stringify(diagnostic)}`);",
+    );
+    expect(magicProof).toContain('onDiagnostic: backend === "webgpu"');
+    expect(magicProof).toContain(
+      "`${webGpuDiagnosticPrefix}${JSON.stringify(diagnostic)}`",
+    );
+    expect(magicProof).toContain(
+      "product Magic object-ID capture failed: ${errorChain(cause)}",
+    );
+    expect(magicProof).toContain("Object.getOwnPropertyDescriptor(value, key)");
+    expect(magicProof).toContain("return Reflect.get(value, key);");
+    expect(magicProof).toContain('safeDisplayValue(current, "name")');
+    expect(magicProof).toContain('safeDisplayValue(current, "message")');
+    expect(magicProof).toContain('const attemptsValue = ownDataValue(value, "attempts");');
+    expect(magicProof).toContain("const attemptCount = Math.min(lengthValue, 4);");
+    expect(magicProof).toContain("JSON.stringify({ runtimeId, outcome, errorCode })");
+    expect(magicProof).toContain('entries.push("[circular cause]")');
+    expect(magicProof).toContain('entries.join(" <- ").slice(0, 4_096)');
+    expect(magicProof).toContain(
+      "[${webGpuAttempt.errorCode}] before WebGL2 fallback",
+    );
+    expect(listenerIndex).toBeGreaterThanOrEqual(0);
+    expect(proofIndex).toBeGreaterThan(listenerIndex);
+    expect(webGpuAttempt).toContain(
+      "formatStudio3dWebGpuDiagnosticConsoleMessage(message.text())",
+    );
+    expect(webGpuAttempt).not.toContain(
+      "classifyStudio3dWebGpuRetryableFailure(value)",
+    );
+  });
+
+  it("admits only prefixed WebGPU diagnostics and bounds their CI log line", () => {
+    expect(formatStudio3dWebGpuDiagnosticConsoleMessage("ordinary warning")).toBeNull();
+    const oversized = `${STUDIO_3D_WEBGPU_DIAGNOSTIC_PREFIX}${"x".repeat(8_192)}`;
+    const formatted = formatStudio3dWebGpuDiagnosticConsoleMessage(oversized);
+    expect(formatted).toHaveLength(STUDIO_3D_WEBGPU_DIAGNOSTIC_MAX_LOG_LENGTH);
+    expect(formatted?.startsWith(STUDIO_3D_WEBGPU_DIAGNOSTIC_PREFIX)).toBe(true);
+  });
+
+  it("pins Chromium Vulkan, Dawn WebGPU, and ANGLE WebGL to SwiftShader", () => {
     expect(Object.isFrozen(STUDIO_3D_WEBGPU_SWIFTSHADER_LAUNCH_ARGS)).toBe(true);
     expect(STUDIO_3D_WEBGPU_SWIFTSHADER_LAUNCH_ARGS).toEqual([
       "--no-sandbox",
       "--enable-unsafe-webgpu",
+      "--enable-features=CDPScreenshotNewSurface,Vulkan",
+      "--use-vulkan=swiftshader",
       "--use-webgpu-adapter=swiftshader",
       "--use-gpu-in-tests",
       "--use-gl=angle",
@@ -247,6 +362,14 @@ describe("3D WebGPU conformance browser boundary", () => {
       "context-or-device-lost",
     ],
     [
+      "Playwright-transported Magic device loss",
+      new Error(
+        "page.evaluate: product Magic object-ID capture failed: " +
+          "StudioBg3dBabylonSpecialistError[device-lost]: GPU watchdog timeout",
+      ),
+      "context-or-device-lost",
+    ],
+    [
       "exact Chromium external-instance readback abort",
       new DOMException(
         "Failed to execute 'mapAsync' on 'GPUBuffer': " +
@@ -265,6 +388,78 @@ describe("3D WebGPU conformance browser boundary", () => {
     ],
   ] as const)("classifies only retryable GPU lifetime failure: %s", (_label, error, reason) => {
     expect(classifyStudio3dWebGpuRetryableFailure(error)).toBe(reason);
+  });
+
+  it("keeps an outer verifier timeout authoritative over an inner cleanup loss", () => {
+    const loss = Object.assign(new Error("GPU queue timeout after the device was lost"), {
+      code: "device-lost",
+    });
+    const deadline = new Error("TimeoutError: Magic proof timed out", { cause: loss });
+
+    expect(classifyStudio3dWebGpuRetryableFailure(loss)).toBe(
+      "context-or-device-lost",
+    );
+    expect(classifyStudio3dWebGpuRetryableFailure(deadline)).toBeNull();
+  });
+
+  it("orders plain device-loss and watchdog-timeout evidence within one transported message", () => {
+    expect(classifyStudio3dWebGpuRetryableFailure(
+      new Error("WebGPU device was lost after watchdog timeout."),
+    )).toBe("context-or-device-lost");
+    expect(classifyStudio3dWebGpuRetryableFailure(
+      new Error("GPU watchdog timeout; WebGPU device was lost."),
+    )).toBeNull();
+  });
+
+  it("classifies transported atomic attempts only when a candidate receipt records loss", () => {
+    const deviceLossAttempts = JSON.stringify([
+      {
+        runtimeId: "babylon-webgpu-lab",
+        outcome: "failed",
+        errorCode: "device-lost",
+      },
+      {
+        runtimeId: "babylon-webgl-lab",
+        outcome: "failed",
+        errorCode: "engine-init-failed",
+      },
+    ]);
+    const ordinaryFailureAttempts = JSON.stringify([
+      {
+        runtimeId: "babylon-webgpu-lab",
+        outcome: "failed",
+        errorCode: "engine-init-failed",
+      },
+      {
+        runtimeId: "babylon-webgl-lab",
+        outcome: "failed",
+        errorCode: "renderer-unavailable",
+      },
+    ]);
+
+    expect(classifyStudio3dWebGpuRetryableFailure(new Error(
+      "page.evaluate: StudioBg3dAtomicSpecialistError[all-candidates-failed]: " +
+        `atomic capture failed attempts=${deviceLossAttempts}`,
+    ))).toBe("context-or-device-lost");
+    expect(classifyStudio3dWebGpuRetryableFailure(new Error(
+      "page.evaluate: StudioBg3dAtomicSpecialistError[all-candidates-failed]: " +
+        `atomic capture failed attempts=${ordinaryFailureAttempts}`,
+    ))).toBeNull();
+  });
+
+  it("preserves a real DOMException display marker across a Playwright-style message", () => {
+    const browserCause = new DOMException(
+      "Failed to execute 'mapAsync' on 'GPUBuffer': " +
+        "A valid external Instance reference no longer exists.",
+      "AbortError",
+    );
+    const transported = new Error(
+      `page.evaluate: ${browserCause.name}: ${browserCause.message}`,
+    );
+
+    expect(classifyStudio3dWebGpuRetryableFailure(transported)).toBe(
+      "external-instance-map-readback",
+    );
   });
 
   it.each([
@@ -296,7 +491,7 @@ describe("3D WebGPU conformance browser boundary", () => {
     expect(classifyStudio3dWebGpuRetryableFailure(error)).toBeNull();
   });
 
-  it("restarts exactly one fresh attempt after a classified loss", async () => {
+  it("restarts a fresh attempt after a classified loss", async () => {
     const attempts: number[] = [];
     const retryReasons: string[] = [];
 
@@ -314,7 +509,7 @@ describe("3D WebGPU conformance browser boundary", () => {
       },
     );
 
-    expect(STUDIO_3D_WEBGPU_MAX_BROWSER_ATTEMPTS).toBe(2);
+    expect(STUDIO_3D_WEBGPU_MAX_BROWSER_ATTEMPTS).toBe(3);
     expect(attempts).toEqual([1, 2]);
     expect(retryReasons).toEqual(["context-or-device-lost"]);
   });
@@ -332,7 +527,55 @@ describe("3D WebGPU conformance browser boundary", () => {
     expect(attempts).toEqual([1]);
   });
 
-  it("hard-fails the second classified loss without a third attempt", async () => {
+  it("allows two fresh attempts for consecutive classified losses", async () => {
+    const attempts: number[] = [];
+    const retries: number[] = [];
+
+    await runStudio3dWebGpuConformanceWithFreshBrowserRetry(
+      async (attempt) => {
+        attempts.push(attempt);
+        if (attempt < STUDIO_3D_WEBGPU_MAX_BROWSER_ATTEMPTS) {
+          throw Object.assign(new Error("WebGPU context was lost."), {
+            code: "context-lost",
+          });
+        }
+      },
+      ({ attempt }) => {
+        retries.push(attempt);
+      },
+    );
+
+    expect(attempts).toEqual([1, 2, 3]);
+    expect(retries).toEqual([1, 2]);
+  });
+
+  it("does not hide a semantic failure after a classified retry", async () => {
+    const semanticFailure = new Error("WebGPU/WebGL2 normal spatial parity failed");
+    const attempts: number[] = [];
+    const retries: number[] = [];
+
+    await expect(
+      runStudio3dWebGpuConformanceWithFreshBrowserRetry(
+        async (attempt) => {
+          attempts.push(attempt);
+          if (attempt === 1) {
+            throw Object.assign(new Error("WebGPU context was lost."), {
+              code: "context-lost",
+            });
+          }
+          throw semanticFailure;
+        },
+        ({ attempt }) => {
+          retries.push(attempt);
+        },
+      ),
+    ).rejects.toBe(semanticFailure);
+
+    expect(attempts).toEqual([1, 2]);
+    expect(retries).toEqual([1]);
+  });
+
+  it("hard-fails the third classified loss without a fourth attempt", async () => {
     const failure = Object.assign(new Error("WebGPU context was lost."), {
       code: "context-lost",
     });
@@ -350,8 +593,8 @@ describe("3D WebGPU conformance browser boundary", () => {
         },
       ),
     ).rejects.toBe(failure);
-    expect(attempts).toEqual([1, 2]);
-    expect(retries).toEqual([1]);
+    expect(attempts).toEqual([1, 2, 3]);
+    expect(retries).toEqual([1, 2]);
   });
 
   it("isolates heavyweight proofs in ordered fresh-browser shards", async () => {

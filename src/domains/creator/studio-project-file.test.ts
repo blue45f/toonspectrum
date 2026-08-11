@@ -380,10 +380,12 @@ describe("studio project file", () => {
     const {
       rig: _rig,
       surfacePaint: _surfacePaint,
+      lightingTone: _lightingTone,
       ...versionOne
     } = JSON.parse(JSON.stringify(current)) as Record<string, unknown> & {
       rig: unknown;
       surfacePaint: unknown;
+      lightingTone: unknown;
     };
     delete ((versionOne.pose as Record<string, unknown>).translations);
     delete ((versionOne.pose as Record<string, unknown>).ikConstraints);
@@ -411,6 +413,7 @@ describe("studio project file", () => {
       expect(scene.pose).toEqual(current.pose);
       expect(scene.expressions).toEqual(current.expressions);
       expect(scene.props).toEqual(current.props);
+      expect(scene.lightingTone).toBe("morning");
       expect(scene.rig).toMatchObject({
         version: 1,
         jointProfile: { version: 1, id: "neutral" },

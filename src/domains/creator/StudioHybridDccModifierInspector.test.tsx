@@ -173,9 +173,9 @@ describe("StudioHybridDccModifierInspector", () => {
     fireEvent.click(screen.getByRole("switch", {
       name: "4단계 두께 만들기 열린 가장자리 막기",
     }));
-    fireEvent.change(screen.getByRole("spinbutton", { name: "5단계 모서리 다듬기 분할 수" }), {
-      target: { value: "6" },
-    });
+    const bevelSegments = screen.getByRole("spinbutton", {
+      name: "5단계 모서리 다듬기 분할 수",
+    }) as HTMLInputElement;
     fireEvent.change(screen.getByRole("spinbutton", { name: "5단계 모서리 다듬기 적용 각도" }), {
       target: { value: "45" },
     });
@@ -195,7 +195,12 @@ describe("StudioHybridDccModifierInspector", () => {
     });
     expect(props.onPatch).toHaveBeenCalledWith("solidify-1", { thickness: 0.12 });
     expect(props.onPatch).toHaveBeenCalledWith("solidify-1", { rim: false });
-    expect(props.onPatch).toHaveBeenCalledWith("bevel-1", { segments: 6 });
+    expect(bevelSegments.min).toBe("1");
+    expect(bevelSegments.max).toBe("1");
+    expect(bevelSegments.disabled).toBe(true);
+    expect(props.onPatch).not.toHaveBeenCalledWith("bevel-1", expect.objectContaining({
+      segments: expect.anything(),
+    }));
     expect(props.onPatch).toHaveBeenCalledWith("bevel-1", {
       angleLimitRad: Math.PI / 4,
     });

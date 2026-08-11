@@ -2,7 +2,9 @@
 //
 // v2에서 헤어 스타일 7종 → 14종, 앞머리 형태(bangStyle)·웨이브(wave)·삐침머리(ahoge)·
 // 묶음 높이(tailHeight) 파라미터가 추가됐다. v3에서는 기존 VRM 리그를 유지하는 안전 범위의
-// 체형 실루엣과 결정론적 체형 프리셋을 추가했다.
+// 체형 실루엣과 결정론적 체형 프리셋을 추가했다. v4에서는 체형의 단일 권위를
+// studio-vrm-proportion-core의 관절 이동 기반 비율로 승격한다. 기존 body는 UI/저장본 호환 뷰로
+// 유지하지만, 새 런타임은 반드시 proportions를 사용해야 한다.
 //
 // ⚠ 하위호환 계약(회귀 금지)
 //   v1로 저장된 AvatarForgeState는 buildAvatarForgeHairParts에서 **바이트 단위로 동일한**
@@ -13,7 +15,14 @@
 //     3) 파츠에 붙는 신규 필드(wave/waveFrequency)는 값이 0일 때 **키 자체를 만들지 않는다**
 //        (JSON.stringify 결과가 v1과 문자 단위로 같아야 하므로).
 //   studio-vrm-avatar-forge.test.ts의 V1_GEOMETRY_DIGESTS가 이 계약을 SHA-256으로 잠근다.
-export const AVATAR_FORGE_VERSION = 3 as const;
+
+import {
+  NEUTRAL_STUDIO_VRM_PROPORTIONS,
+  sanitizeStudioVrmProportions,
+  type StudioVrmProportions,
+} from "./studio-vrm-proportion-core";
+
+export const AVATAR_FORGE_VERSION = 4 as const;
 
 /** v1 문서를 현재 스키마로 승격할 때 강제되는 "v1과 동일한 렌더" 파라미터. */
 const V1_EQUIVALENT_HAIR = {
@@ -56,6 +65,10 @@ export type AvatarForgeFaceParams = {
 export type AvatarForgeBodyParams = {
   shoulderWidth: number;
   torsoLength: number;
+  /**
+   * @deprecated v3 호환 메타데이터. proportion core에는 골반 폭 파라미터가 없으며,
+   * 이 값을 메시 볼륨/비균등 스케일로 해석하면 안 된다.
+   */
   hipWidth: number;
   armLength: number;
   legLength: number;
@@ -101,7 +114,19 @@ export type AvatarForgeState = {
   presetId?: string;
   bodyPresetId?: AvatarForgeBodyPresetId;
   face: AvatarForgeFaceParams;
+  /**
+   * v4 체형의 단일 권위. 관절을 이동하고 말단만 균등 스케일하는 안전한 비율 코어 상태다.
+   */
+  proportions: StudioVrmProportions;
+  /**
+   * @deprecated v3 UI/런타임 호환 뷰. v4에서는 proportions에서 결정적으로 투영된다.
+   */
   body: AvatarForgeBodyParams;
+  /**
+   * v3 hipWidth의 손실 없는 보존값. proportion core가 골반 관절 간격 파라미터를 지원하기 전까지
+   * 렌더 비율로 해석하지 않는 저장 메타데이터다. 중립값(1)은 생략한다.
+   */
+  legacyHipWidth?: number;
   hair: AvatarForgeHairParams;
   faceAccents?: AvatarForgeFaceAccent[];
 };
@@ -314,6 +339,7 @@ export const DEFAULT_AVATAR_FORGE_STATE: AvatarForgeState = {
   version: AVATAR_FORGE_VERSION,
   bodyPresetId: "balanced",
   face: { ...DEFAULT_FACE },
+  proportions: sanitizeStudioVrmProportions(NEUTRAL_STUDIO_VRM_PROPORTIONS),
   body: { ...DEFAULT_BODY },
   hair: { ...DEFAULT_HAIR },
   faceAccents: DEFAULT_ACCENTS.map((accent) => ({ ...accent })),
@@ -339,6 +365,7 @@ function preset(
       presetId: id,
       bodyPresetId: "balanced",
       face: { ...DEFAULT_FACE, ...face },
+      proportions: sanitizeStudioVrmProportions(NEUTRAL_STUDIO_VRM_PROPORTIONS),
       body: { ...DEFAULT_BODY },
       hair: { ...DEFAULT_HAIR, ...hair },
       faceAccents,
@@ -395,6 +422,74 @@ function record(value: unknown): Record<string, unknown> {
     : {};
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function sanitizeLegacyAvatarForgeBody(raw: unknown): AvatarForgeBodyParams {
+  const body = record(raw);
+  return {
+    shoulderWidth: clampNumber(
+      body.shoulderWidth,
+      AVATAR_FORGE_BODY_LIMITS.shoulderWidth,
+      DEFAULT_BODY.shoulderWidth,
+    ),
+    torsoLength: clampNumber(
+      body.torsoLength,
+      AVATAR_FORGE_BODY_LIMITS.torsoLength,
+      DEFAULT_BODY.torsoLength,
+    ),
+    hipWidth: clampNumber(
+      body.hipWidth,
+      AVATAR_FORGE_BODY_LIMITS.hipWidth,
+      DEFAULT_BODY.hipWidth,
+    ),
+    armLength: clampNumber(
+      body.armLength,
+      AVATAR_FORGE_BODY_LIMITS.armLength,
+      DEFAULT_BODY.armLength,
+    ),
+    legLength: clampNumber(
+      body.legLength,
+      AVATAR_FORGE_BODY_LIMITS.legLength,
+      DEFAULT_BODY.legLength,
+    ),
+  };
+}
+
+/**
+ * v3 body를 v4 관절 비율로 승격한다. 네 길이/간격 컨트롤만 의미가 정확히 대응한다.
+ * hipWidth는 proportion core에 대응 파라미터가 없으므로 의도적으로 읽지 않는다.
+ */
+export function migrateAvatarForgeBodyToStudioVrmProportions(
+  body: unknown,
+  base: unknown = NEUTRAL_STUDIO_VRM_PROPORTIONS,
+): StudioVrmProportions {
+  const legacy = sanitizeLegacyAvatarForgeBody(body);
+  const canonicalBase = sanitizeStudioVrmProportions(base);
+  return sanitizeStudioVrmProportions({
+    ...canonicalBase,
+    presetId: undefined,
+    shoulderWidth: legacy.shoulderWidth,
+    torsoLength: legacy.torsoLength,
+    armLength: legacy.armLength,
+    legLength: legacy.legLength,
+  });
+}
+
+function projectStudioVrmProportionsToLegacyBody(
+  proportions: StudioVrmProportions,
+  legacyHipWidth: number,
+): AvatarForgeBodyParams {
+  return sanitizeLegacyAvatarForgeBody({
+    shoulderWidth: proportions.shoulderWidth,
+    torsoLength: proportions.torsoLength,
+    hipWidth: legacyHipWidth,
+    armLength: proportions.armLength,
+    legLength: proportions.legLength,
+  });
+}
+
 /**
  * 문서에 적힌 스키마 버전. 숫자가 아니거나 비어 있으면 0(= v1 이전)으로 본다.
  * v2 전용 필드는 이 값이 2 미만이면 **문서에 무엇이 적혀 있든 무시**하고 v1 등가값으로 고정한다
@@ -408,11 +503,31 @@ function documentVersion(raw: unknown): number {
 export function sanitizeAvatarForgeState(raw: unknown): AvatarForgeState {
   const source = record(raw);
   const face = record(source.face);
-  const body = record(source.body);
   const hair = record(source.hair);
   const sourceVersion = documentVersion(source.version);
   const legacy = sourceVersion < 2;
-  const legacyBody = sourceVersion < 3;
+  const preBodySchema = sourceVersion < 3;
+  const legacyBody = preBodySchema
+    ? { ...DEFAULT_BODY }
+    : sanitizeLegacyAvatarForgeBody(source.body);
+  const hasCanonicalProportions = sourceVersion >= 4 && isRecord(source.proportions);
+  const proportions = hasCanonicalProportions
+    ? sanitizeStudioVrmProportions(source.proportions)
+    : sourceVersion >= 3
+      ? migrateAvatarForgeBodyToStudioVrmProportions(legacyBody)
+      : sanitizeStudioVrmProportions(NEUTRAL_STUDIO_VRM_PROPORTIONS);
+  const legacyHipWidth = sourceVersion >= 3
+    ? clampNumber(
+        sourceVersion >= 4 && source.legacyHipWidth !== undefined
+          ? source.legacyHipWidth
+          : legacyBody.hipWidth,
+        AVATAR_FORGE_BODY_LIMITS.hipWidth,
+        DEFAULT_BODY.hipWidth,
+      )
+    : DEFAULT_BODY.hipWidth;
+  const resolvedBody = hasCanonicalProportions
+    ? projectStudioVrmProportionsToLegacyBody(proportions, legacyHipWidth)
+    : legacyBody;
   const style = HAIR_STYLE_IDS.has(hair.style as AvatarForgeHairStyle)
     ? (hair.style as AvatarForgeHairStyle)
     : DEFAULT_HAIR.style;
@@ -435,7 +550,7 @@ export function sanitizeAvatarForgeState(raw: unknown): AvatarForgeState {
     ...(typeof source.presetId === "string" && source.presetId.trim()
       ? { presetId: source.presetId.trim().slice(0, 64) }
       : {}),
-    ...(!legacyBody && BODY_PRESET_IDS.has(source.bodyPresetId as AvatarForgeBodyPresetId)
+    ...(!preBodySchema && BODY_PRESET_IDS.has(source.bodyPresetId as AvatarForgeBodyPresetId)
       ? { bodyPresetId: source.bodyPresetId as AvatarForgeBodyPresetId }
       : {}),
     face: {
@@ -445,23 +560,9 @@ export function sanitizeAvatarForgeState(raw: unknown): AvatarForgeState {
       cheekVolume: clampNumber(face.cheekVolume, AVATAR_FORGE_FACE_LIMITS.cheekVolume, DEFAULT_FACE.cheekVolume),
       chinLength: clampNumber(face.chinLength, AVATAR_FORGE_FACE_LIMITS.chinLength, DEFAULT_FACE.chinLength),
     },
-    body: {
-      shoulderWidth: legacyBody
-        ? DEFAULT_BODY.shoulderWidth
-        : clampNumber(body.shoulderWidth, AVATAR_FORGE_BODY_LIMITS.shoulderWidth, DEFAULT_BODY.shoulderWidth),
-      torsoLength: legacyBody
-        ? DEFAULT_BODY.torsoLength
-        : clampNumber(body.torsoLength, AVATAR_FORGE_BODY_LIMITS.torsoLength, DEFAULT_BODY.torsoLength),
-      hipWidth: legacyBody
-        ? DEFAULT_BODY.hipWidth
-        : clampNumber(body.hipWidth, AVATAR_FORGE_BODY_LIMITS.hipWidth, DEFAULT_BODY.hipWidth),
-      armLength: legacyBody
-        ? DEFAULT_BODY.armLength
-        : clampNumber(body.armLength, AVATAR_FORGE_BODY_LIMITS.armLength, DEFAULT_BODY.armLength),
-      legLength: legacyBody
-        ? DEFAULT_BODY.legLength
-        : clampNumber(body.legLength, AVATAR_FORGE_BODY_LIMITS.legLength, DEFAULT_BODY.legLength),
-    },
+    proportions,
+    body: resolvedBody,
+    ...(legacyHipWidth !== DEFAULT_BODY.hipWidth ? { legacyHipWidth } : {}),
     hair: {
       style,
       replaceOriginal: hair.replaceOriginal === true,
@@ -531,11 +632,17 @@ export function applyAvatarForgeBodyPreset(
 ): AvatarForgeState {
   const selected = AVATAR_FORGE_BODY_PRESETS.find((item) => item.id === presetId);
   if (!selected) return sanitizeAvatarForgeState(state);
+  const current = sanitizeAvatarForgeState(state);
   return sanitizeAvatarForgeState({
-    ...state,
+    ...current,
     presetId: undefined,
     bodyPresetId: selected.id,
     body: { ...selected.body },
+    legacyHipWidth: selected.body.hipWidth,
+    proportions: migrateAvatarForgeBodyToStudioVrmProportions(
+      selected.body,
+      current.proportions,
+    ),
   });
 }
 

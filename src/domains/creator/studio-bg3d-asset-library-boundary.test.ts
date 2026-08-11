@@ -107,6 +107,20 @@ describe("Studio BG3D asset-library ownership boundary", () => {
     expect(editorSource).toContain('if (tab === "lt") setLtPresetPanelActivated(true)');
   });
 
+  it("keeps the editor operation lifecycle active before the optional Models surface opens", () => {
+    const editorSource = moduleSource("./StudioBackground3D.tsx");
+    const activeAssignment = editorSource.indexOf("componentActiveRef.current = true;");
+    const lifecycleStart = editorSource.lastIndexOf("useEffect(() => {", activeAssignment);
+    const lifecycleEnd = editorSource.indexOf("}, [", activeAssignment);
+    const lifecycleSource = editorSource.slice(lifecycleStart, lifecycleEnd);
+
+    expect(activeAssignment).toBeGreaterThanOrEqual(0);
+    expect(lifecycleStart).toBeGreaterThanOrEqual(0);
+    expect(lifecycleEnd).toBeGreaterThan(activeAssignment);
+    expect(lifecycleSource).toContain("if (!open) return;");
+    expect(lifecycleSource).not.toContain("modelsPanelActivated");
+  });
+
   it("preserves the single analyzable lazy editor boundary", () => {
     const loaderImports = moduleImports("./studio-background-3d-loader.ts");
 

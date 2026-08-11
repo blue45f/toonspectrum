@@ -1,0 +1,32 @@
+import { describe, expect, it } from "vitest";
+
+import backgroundRemovalSource from "./studio-bg-remove.ts?raw";
+import mannequinTrackingSource from "./studio-mannequin-webcam-tracking.ts?raw";
+import vrmTrackingSource from "./studio-vrm-webcam-tracking.ts?raw";
+
+const sources = [
+  ["VRM live/photo tracking", vrmTrackingSource],
+  ["mannequin tracking", mannequinTrackingSource],
+  ["foreground segmentation", backgroundRemovalSource],
+] as const;
+
+describe("MediaPipe Vision global initialization boundary", () => {
+  it.each(sources)("routes every %s Task factory through the shared arbiter", (_label, source) => {
+    const factoryCalls = source.match(/\.createFromOptions\(/gu) ?? [];
+    const guardedCalls = source.match(/runStudioMediaPipeVisionTaskCreation\(\{/gu) ?? [];
+    expect(factoryCalls.length).toBeGreaterThan(0);
+    expect(guardedCalls).toHaveLength(factoryCalls.length);
+    expect(source).toContain("loadStudioMediaPipeVisionModule");
+    expect(source).not.toMatch(/await import\([\s\n]*["']@mediapipe\/tasks-vision["']/u);
+  });
+
+  it("fences every live VRM singleton against dispose-during-initialization resurrection", () => {
+    expect(vrmTrackingSource).toContain("faceLandmarkerGeneration += 1");
+    expect(vrmTrackingSource).toContain("livePoseLandmarkerGeneration += 1");
+    expect(vrmTrackingSource).toContain("liveHandLandmarkerGeneration += 1");
+    expect(vrmTrackingSource.match(/safelyCloseLiveLandmarker\(landmarker\)/gu)).toHaveLength(3);
+    expect(vrmTrackingSource.match(/initPromiseGeneration/gu)?.length ?? 0).toBeGreaterThan(2);
+    expect(vrmTrackingSource.match(/initPosePromiseGeneration/gu)?.length ?? 0).toBeGreaterThan(2);
+    expect(vrmTrackingSource.match(/initHandPromiseGeneration/gu)?.length ?? 0).toBeGreaterThan(2);
+  });
+});

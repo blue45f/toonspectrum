@@ -19,6 +19,23 @@ import {
 } from "./studio-hybrid-dcc-workspace";
 
 describe("Hybrid DCC non-destructive modifier workspace", () => {
+  it("adds an evaluator-supported bevel and clamps unavailable multi-segment patches", async () => {
+    let workspace = workspaceAddUnitCube(
+      createStudioHybridDccWorkspace("modifier-bevel-default"),
+      "beveled-cube",
+    );
+
+    workspace = await workspaceAddActiveModifier(workspace, "bevel");
+    const added = workspace.session.state.geometry.records["beveled-cube"]!;
+    const modifier = added.modifierStack.modifiers[0]!;
+    expect(modifier).toMatchObject({ kind: "bevel", segments: 1 });
+    expect(added.renderCache).not.toBeNull();
+
+    workspace = await workspacePatchActiveModifier(workspace, modifier.id, { segments: 8 });
+    expect(workspace.session.state.geometry.records["beveled-cube"]!
+      .modifierStack.modifiers[0]).toMatchObject({ kind: "bevel", segments: 1 });
+  });
+
   it("keeps the source mesh authoritative while previewing and undoing a stack edit", async () => {
     let workspace = workspaceAddUnitCube(
       createStudioHybridDccWorkspace("modifier-preview"),

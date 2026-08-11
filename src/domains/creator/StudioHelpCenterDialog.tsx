@@ -153,8 +153,8 @@ function useStudioDiagnostics(active: boolean) {
         probeStudioCapabilitySnapshot(studioCapabilityProbeInputFromGlobals()).catch(
           () => null,
         ),
-        import("./studio-local-database")
-          .then((module) => module.probeSqliteSupport())
+        import("./studio-local-database-runtime")
+          .then((module) => module.probeStudioLocalDatabaseRuntime())
           .catch(() => null),
         import("./studio-opfs-asset-store")
           .then((module) =>

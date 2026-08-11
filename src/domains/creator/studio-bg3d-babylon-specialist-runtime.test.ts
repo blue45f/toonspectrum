@@ -8,10 +8,15 @@ import {
   STUDIO_BG3D_DEPTH_FLOAT32_PROFILE,
 } from "./studio-bg3d-artifact-capture-v2";
 import {
+  STUDIO_BG3D_BABYLON_ADAPTER_DIAGNOSTIC,
   STUDIO_BG3D_BABYLON_DEVICE_LOSS_SIGNAL,
+  StudioBg3dBabylonDeviceLostError,
   StudioBg3dBabylonSpecialistError,
   createStudioBg3dBabylonSpecialistRuntime,
+  sanitizeStudioBg3dBabylonAdapterDiagnostic,
+  sanitizeStudioBg3dBabylonDeviceLossDiagnostic,
   sanitizeStudioBg3dBabylonSpecialistResult,
+  type StudioBg3dBabylonDiagnostic,
   type StudioBg3dBabylonEngineHandle,
   type StudioBg3dBabylonObservableLike,
   type StudioBg3dBabylonRuntimeBindings,
@@ -47,6 +52,13 @@ class FakeObservable implements StudioBg3dBabylonObservableLike {
 }
 
 class FakeEngine implements StudioBg3dBabylonEngineHandle {
+  readonly [STUDIO_BG3D_BABYLON_ADAPTER_DIAGNOSTIC] = Object.freeze({
+    architecture: "swiftshader",
+    description: "Chromium test adapter",
+    device: "0xffff",
+    isFallbackAdapter: true,
+    vendor: "Google",
+  });
   readonly deviceLoss = deferred<unknown>();
   readonly [STUDIO_BG3D_BABYLON_DEVICE_LOSS_SIGNAL] = this.deviceLoss.promise;
   readonly onContextLostObservable = new FakeObservable();
@@ -385,10 +397,12 @@ describe("Studio Babylon isolated specialist runtime", () => {
   it("blocks WebGL work after canvas loss, disposes the invalid engine, and recreates after restore", async () => {
     const canvas = new FakeCanvas();
     const harness = bindingHarness();
+    const diagnostics: StudioBg3dBabylonDiagnostic[] = [];
     const started = deferred<void>();
     const runtime = createStudioBg3dBabylonSpecialistRuntime({
       canvas: canvas as unknown as HTMLCanvasElement,
       loadBindings: async () => harness.bindings,
+      onDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
       execute(context) {
         if (context.job.id === "after-restore") {
           return { kind: "metrics", values: { restored: true } };
@@ -425,11 +439,14 @@ describe("Studio Babylon isolated specialist runtime", () => {
       values: { restored: true },
     });
     expect(harness.webGl).toHaveBeenCalledTimes(2);
+    expect(diagnostics).toEqual([]);
     await runtime.dispose();
   });
 
-  it("defers lost WebGPU disposal until active work settles and recreates exactly once", async () => {
+  it("uses direct WebGPU loss exactly once and preserves its payload across observable races", async () => {
     const harness = bindingHarness();
+    const diagnostics: StudioBg3dBabylonDiagnostic[] = [];
+    const events: string[] = [];
     const started = deferred<void>();
     const observedAbort = deferred<void>();
     const releaseAfterLoss = deferred<void>();
@@ -437,12 +454,19 @@ describe("Studio Babylon isolated specialist runtime", () => {
       backend: "webgpu",
       canvas: new FakeCanvas() as unknown as HTMLCanvasElement,
       loadBindings: async () => harness.bindings,
+      onDiagnostic: (diagnostic) => {
+        diagnostics.push(diagnostic);
+        events.push(`diagnostic:${diagnostic.kind}`);
+      },
       async execute(context) {
         if (context.job.id === "retry") {
           return { kind: "metrics", values: { retried: true } };
         }
         started.resolve();
-        context.signal.addEventListener("abort", () => observedAbort.resolve(), { once: true });
+        context.signal.addEventListener("abort", () => {
+          events.push("signal:abort");
+          observedAbort.resolve();
+        }, { once: true });
         await releaseAfterLoss.promise;
         throw new DOMException("device lost", "AbortError");
       },
@@ -450,8 +474,26 @@ describe("Studio Babylon isolated specialist runtime", () => {
 
     const first = runtime.runIsolated(job("device-loss"));
     await started.promise;
-    harness.engines[0]?.deviceLoss.resolve({ reason: "unknown" });
+    expect(diagnostics.map(({ kind }) => kind)).toEqual(["adapter-ready"]);
+    harness.engines[0]?.onContextLostObservable.emit();
+    expect(runtime.getState()).toMatchObject({
+      activeJobId: "device-loss",
+      contextLost: false,
+      engineInitialized: true,
+      status: "running",
+    });
+    expect(diagnostics.map(({ kind }) => kind)).toEqual(["adapter-ready"]);
+
+    harness.engines[0]?.deviceLoss.resolve({
+      message: "GPU process reset at command buffer 7",
+      reason: "unknown",
+    });
     await observedAbort.promise;
+    expect(events).toEqual([
+      "diagnostic:adapter-ready",
+      "diagnostic:device-lost",
+      "signal:abort",
+    ]);
     const stateAtLoss = runtime.getState();
     expect(stateAtLoss).toMatchObject({
       activeJobId: "device-loss",
@@ -462,9 +504,63 @@ describe("Studio Babylon isolated specialist runtime", () => {
     expect(harness.engines[0]?.dispose).not.toHaveBeenCalled();
     harness.engines[0]?.onContextLostObservable.emit();
     expect(runtime.getState().epoch).toBe(stateAtLoss.epoch);
+    expect(diagnostics.map(({ kind }) => kind)).toEqual([
+      "adapter-ready",
+      "device-lost",
+    ]);
+
+    const adapterDiagnostic = diagnostics[0];
+    const lossDiagnostic = diagnostics[1];
+    expect(adapterDiagnostic).toMatchObject({
+      adapter: {
+        architecture: "swiftshader",
+        description: "Chromium test adapter",
+        device: "0xffff",
+        isFallbackAdapter: true,
+        vendor: "Google",
+      },
+      backend: "webgpu",
+      epoch: 1,
+      kind: "adapter-ready",
+      runtimeId: "babylon-webgpu-lab",
+      version: 1,
+    });
+    expect(lossDiagnostic).toMatchObject({
+      activeJobId: "device-loss",
+      adapter: adapterDiagnostic?.adapter,
+      backend: "webgpu",
+      kind: "device-lost",
+      loss: {
+        message: "GPU process reset at command buffer 7",
+        reason: "unknown",
+      },
+      runtimeId: "babylon-webgpu-lab",
+      version: 1,
+    });
+    expect(Object.isFrozen(adapterDiagnostic)).toBe(true);
+    expect(Object.isFrozen(adapterDiagnostic?.adapter)).toBe(true);
+    expect(Object.isFrozen(lossDiagnostic)).toBe(true);
+    expect(Object.isFrozen(lossDiagnostic?.adapter)).toBe(true);
+    expect(lossDiagnostic?.kind === "device-lost" && Object.isFrozen(lossDiagnostic.loss))
+      .toBe(true);
+    expect(structuredClone(adapterDiagnostic)).toEqual(adapterDiagnostic);
+    expect(structuredClone(lossDiagnostic)).toEqual(lossDiagnostic);
 
     releaseAfterLoss.resolve();
-    await expect(first).rejects.toMatchObject({ code: "context-lost" });
+    const failure = await first.catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(StudioBg3dBabylonSpecialistError);
+    expect(failure).toMatchObject({
+      cause: {
+        code: "device-lost",
+        diagnostic: lossDiagnostic,
+        message:
+          "Babylon WebGPU device lost (reason: unknown): " +
+          "GPU process reset at command buffer 7",
+      },
+      code: "device-lost",
+    });
+    expect((failure as { readonly cause?: unknown }).cause)
+      .toBeInstanceOf(StudioBg3dBabylonDeviceLostError);
     expect(harness.engines[0]?.dispose).toHaveBeenCalledOnce();
     expect(runtime.getState()).toMatchObject({
       contextLost: false,
@@ -476,12 +572,20 @@ describe("Studio Babylon isolated specialist runtime", () => {
       values: { retried: true },
     });
     expect(harness.webGpu).toHaveBeenCalledTimes(2);
+    expect(diagnostics.map(({ kind }) => kind)).toEqual([
+      "adapter-ready",
+      "device-lost",
+      "adapter-ready",
+    ]);
     await runtime.dispose();
     expect(harness.engines[0]?.dispose).toHaveBeenCalledOnce();
     expect(harness.engines[1]?.dispose).toHaveBeenCalledOnce();
 
     const epochAfterDispose = runtime.getState().epoch;
-    harness.engines[1]?.deviceLoss.resolve({ reason: "destroyed" });
+    harness.engines[1]?.deviceLoss.resolve({
+      message: "destroyed by expected runtime disposal",
+      reason: "destroyed",
+    });
     await Promise.resolve();
     expect(runtime.getState()).toMatchObject({
       disposed: true,
@@ -489,6 +593,133 @@ describe("Studio Babylon isolated specialist runtime", () => {
       status: "disposed",
     });
     expect(harness.engines[1]?.dispose).toHaveBeenCalledOnce();
+    expect(diagnostics.map(({ kind }) => kind)).toEqual([
+      "adapter-ready",
+      "device-lost",
+      "adapter-ready",
+    ]);
+  });
+
+  it("keeps diagnostic listener failures non-authoritative during adapter and loss events", async () => {
+    const harness = bindingHarness();
+    const started = deferred<void>();
+    const listener = vi.fn(() => {
+      throw new Error("diagnostic sink unavailable");
+    });
+    const runtime = createStudioBg3dBabylonSpecialistRuntime({
+      backend: "webgpu",
+      canvas: new FakeCanvas() as unknown as HTMLCanvasElement,
+      loadBindings: async () => harness.bindings,
+      onDiagnostic: listener,
+      execute(context) {
+        started.resolve();
+        return new Promise((_resolve, reject) => {
+          context.signal.addEventListener(
+            "abort",
+            () => reject(new DOMException("device lost", "AbortError")),
+            { once: true },
+          );
+        });
+      },
+    });
+
+    const pending = runtime.runIsolated(job("throw-safe-diagnostic"));
+    await started.promise;
+    expect(listener).toHaveBeenCalledOnce();
+    harness.engines[0]?.deviceLoss.resolve({
+      message: "device removed",
+      reason: "unknown",
+    });
+
+    await expect(pending).rejects.toMatchObject({
+      cause: { message: "Babylon WebGPU device lost (reason: unknown): device removed" },
+      code: "device-lost",
+    });
+    expect(listener).toHaveBeenCalledTimes(2);
+    await runtime.dispose();
+  });
+
+  it("keeps the authoritative device-loss cause when a diagnostic listener re-enters disposal", async () => {
+    const harness = bindingHarness();
+    const started = deferred<void>();
+    const diagnostics: StudioBg3dBabylonDiagnostic[] = [];
+    const runtime = createStudioBg3dBabylonSpecialistRuntime({
+      backend: "webgpu",
+      canvas: new FakeCanvas() as unknown as HTMLCanvasElement,
+      loadBindings: async () => harness.bindings,
+      onDiagnostic(diagnostic) {
+        diagnostics.push(diagnostic);
+        if (diagnostic.kind === "device-lost") void runtime.dispose();
+      },
+      execute(context) {
+        started.resolve();
+        return new Promise((_resolve, reject) => {
+          context.signal.addEventListener(
+            "abort",
+            () => reject(new DOMException("device lost", "AbortError")),
+            { once: true },
+          );
+        });
+      },
+    });
+
+    const pending = runtime.runIsolated(job("reentrant-device-loss"));
+    await started.promise;
+    harness.engines[0]?.deviceLoss.resolve({
+      message: "Dawn reset during readback",
+      reason: "unknown",
+    });
+
+    await expect(pending).rejects.toMatchObject({
+      cause: {
+        code: "device-lost",
+        message:
+          "Babylon WebGPU device lost (reason: unknown): Dawn reset during readback",
+      },
+      code: "device-lost",
+    });
+    await runtime.dispose();
+    expect(diagnostics.map(({ kind }) => kind)).toEqual([
+      "adapter-ready",
+      "device-lost",
+    ]);
+    expect(runtime.getState()).toMatchObject({ disposed: true, status: "disposed" });
+    expect(harness.engines[0]?.dispose).toHaveBeenCalledOnce();
+  });
+
+  it("ignores a late direct-loss signal from a retired WebGPU engine", async () => {
+    const canvas = new FakeCanvas();
+    const harness = bindingHarness();
+    const diagnostics: StudioBg3dBabylonDiagnostic[] = [];
+    const runtime = createStudioBg3dBabylonSpecialistRuntime({
+      backend: "webgpu",
+      canvas: canvas as unknown as HTMLCanvasElement,
+      loadBindings: async () => harness.bindings,
+      onDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
+    });
+
+    await runtime.runIsolated(job("first-engine"));
+    const firstEngine = harness.engines[0];
+    canvas.dispatchEvent(new Event("webglcontextlost", { cancelable: true }));
+    canvas.dispatchEvent(new Event("webglcontextrestored"));
+    await runtime.runIsolated(job("replacement-engine"));
+    expect(harness.webGpu).toHaveBeenCalledTimes(2);
+
+    firstEngine?.deviceLoss.resolve({
+      message: "stale engine loss",
+      reason: "unknown",
+    });
+    await Promise.resolve();
+    expect(runtime.getState()).toMatchObject({
+      contextLost: false,
+      engineInitialized: true,
+      status: "idle",
+    });
+    expect(diagnostics.map(({ kind }) => kind)).toEqual([
+      "adapter-ready",
+      "adapter-ready",
+    ]);
+    await runtime.dispose();
   });
 
   it("aborts active work on idempotent disposal and rejects every later job", async () => {
@@ -520,6 +751,78 @@ describe("Studio Babylon isolated specialist runtime", () => {
     expect(harness.scenes[0]?.dispose).toHaveBeenCalledOnce();
     expect(harness.engines[0]?.dispose).toHaveBeenCalledOnce();
     await expect(runtime.runIsolated(job("late"))).rejects.toMatchObject({ code: "disposed" });
+  });
+});
+
+describe("Studio Babylon WebGPU diagnostics sanitizer", () => {
+  it("copies, bounds, freezes, and makes adapter/loss values structured-clone safe", () => {
+    const adapterSource = {
+      architecture: `swift\n${"a".repeat(300)}`,
+      description: "software adapter",
+      device: "0xffff",
+      isFallbackAdapter: true,
+      vendor: "Google",
+    };
+    const lossSource = {
+      message: `fatal\r${"m".repeat(3_000)}`,
+      reason: "future-reason",
+    };
+    const adapter = sanitizeStudioBg3dBabylonAdapterDiagnostic(adapterSource);
+    const loss = sanitizeStudioBg3dBabylonDeviceLossDiagnostic(lossSource);
+    adapterSource.vendor = "mutated";
+    lossSource.message = "mutated";
+
+    expect(adapter).toMatchObject({
+      description: "software adapter",
+      device: "0xffff",
+      isFallbackAdapter: true,
+      vendor: "Google",
+    });
+    expect(adapter.architecture).not.toContain("\n");
+    expect(adapter.architecture).toHaveLength(256);
+    expect(loss.message).not.toContain("\r");
+    expect(loss.message).toHaveLength(512);
+    expect(loss.reason).toBe("unknown");
+    expect(Object.isFrozen(adapter)).toBe(true);
+    expect(Object.isFrozen(loss)).toBe(true);
+    expect(structuredClone(adapter)).toEqual(adapter);
+    expect(structuredClone(loss)).toEqual(loss);
+  });
+
+  it("preserves only the WebGPU device-loss reason enum and explicit fallback receipt", () => {
+    expect(sanitizeStudioBg3dBabylonDeviceLossDiagnostic({ reason: "destroyed" })).toEqual({
+      message: "",
+      reason: "destroyed",
+    });
+    expect(sanitizeStudioBg3dBabylonDeviceLossDiagnostic({ reason: "vendor-extension" })).toEqual({
+      message: "",
+      reason: "unknown",
+    });
+    expect(sanitizeStudioBg3dBabylonAdapterDiagnostic(
+      { isFallbackAdapter: false },
+      true,
+    ).isFallbackAdapter).toBe(true);
+  });
+
+  it("contains hostile accessors and returns portable fallback fields", () => {
+    const hostile = Object.defineProperties({}, {
+      architecture: { get: () => { throw new Error("blocked"); } },
+      message: { get: () => { throw new Error("blocked"); } },
+      reason: { get: () => { throw new Error("blocked"); } },
+      vendor: { get: () => { throw new Error("blocked"); } },
+    });
+
+    expect(sanitizeStudioBg3dBabylonAdapterDiagnostic(hostile)).toEqual({
+      architecture: "unknown",
+      description: "unknown",
+      device: "unknown",
+      isFallbackAdapter: null,
+      vendor: "unknown",
+    });
+    expect(sanitizeStudioBg3dBabylonDeviceLossDiagnostic(hostile)).toEqual({
+      message: "",
+      reason: "unknown",
+    });
   });
 });
 

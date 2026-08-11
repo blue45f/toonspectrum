@@ -1,6 +1,10 @@
 // AI 배경 제거 — 이미지 픽셀은 브라우저 안에서만 MediaPipe에 전달한다.
 // 모델은 지연 로드하고 WASM은 Studio와 같은 출처의 Vite hashed 자산을 사용한다.
 import { resolveStudioMediaPipeVisionWasmFileset } from "./studio-mediapipe-vision-assets";
+import {
+  loadStudioMediaPipeVisionModule,
+  runStudioMediaPipeVisionTaskCreation,
+} from "./studio-mediapipe-vision-init-arbiter";
 
 const SELFIE_MODEL_URL =
   "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite";
@@ -235,20 +239,22 @@ function modelReceipt(
 }
 
 async function loadMediaPipeRuntime(): Promise<StudioLocalForegroundSegmenterRuntime> {
-  const { FilesetResolver, ImageSegmenter } =
-    await import("@mediapipe/tasks-vision");
+  const { FilesetResolver, ImageSegmenter } = await loadStudioMediaPipeVisionModule();
   const { fileset: vision } = await resolveStudioMediaPipeVisionWasmFileset({
     isSimdSupported: () => FilesetResolver.isSimdSupported(false),
   });
   const create = (delegate: StudioLocalForegroundDelegate) =>
-    ImageSegmenter.createFromOptions(vision, {
-      baseOptions: {
-        modelAssetPath: SELFIE_MODEL_URL,
-        delegate,
-      },
-      runningMode: "IMAGE",
-      outputCategoryMask: false,
-      outputConfidenceMasks: true,
+    runStudioMediaPipeVisionTaskCreation({
+      owner: "foreground-image-segmenter",
+      create: () => ImageSegmenter.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath: SELFIE_MODEL_URL,
+          delegate,
+        },
+        runningMode: "IMAGE",
+        outputCategoryMask: false,
+        outputConfidenceMasks: true,
+      }),
     });
 
   try {

@@ -2,12 +2,10 @@ import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 
 import {
-  applyAvatarForgeBodyPreset,
   buildAvatarForgeHairParts,
   createAvatarForgeState,
 } from "./studio-vrm-avatar-forge";
 import {
-  applyAvatarForgeBodyProportions,
   countDetectedVrmHairMeshes,
   createAvatarForgeHairGeometry,
 } from "./StudioVrmAvatarForge";
@@ -63,121 +61,6 @@ describe("countDetectedVrmHairMeshes", () => {
     forge.add(mesh("ToonSpectrumAvatarForgeHair_bang", material("Hair_Bang")));
 
     expect(countDetectedVrmHairMeshes(vrmWith(forge))).toBe(0);
-  });
-});
-
-describe("applyAvatarForgeBodyProportions", () => {
-  type TransformSnapshot = {
-    readonly position: THREE.Vector3;
-    readonly quaternion: THREE.Quaternion;
-    readonly scale: THREE.Vector3;
-  };
-
-  function bone(position: readonly [number, number, number]) {
-    const node = new THREE.Object3D();
-    node.position.set(...position);
-    node.quaternion.setFromEuler(new THREE.Euler(0.1, -0.2, 0.3));
-    node.scale.set(1.2, 0.9, 1.1);
-    return node;
-  }
-
-  function snapshot(node: THREE.Object3D): TransformSnapshot {
-    return {
-      position: node.position.clone(),
-      quaternion: node.quaternion.clone(),
-      scale: node.scale.clone(),
-    };
-  }
-
-  function expectTransform(node: THREE.Object3D, expected: TransformSnapshot) {
-    expect(node.position).toEqual(expected.position);
-    expect(node.quaternion.toArray()).toEqual(expected.quaternion.toArray());
-    expect(node.scale).toEqual(expected.scale);
-  }
-
-  function riggedVrm() {
-    const scene = new THREE.Group();
-    const raw = new Map<string, THREE.Object3D>();
-    const normalized = new Map<string, THREE.Object3D>();
-    for (const name of ["hips", "chest", "leftLowerArm", "leftHand", "leftLowerLeg", "leftFoot"]) {
-      const rawNode = bone([0.2, 0.4, 0.1]);
-      const normalizedNode = bone([0.25, 0.5, 0.125]);
-      raw.set(name, rawNode);
-      normalized.set(name, normalizedNode);
-      scene.add(rawNode, normalizedNode);
-    }
-    return {
-      vrm: {
-        scene,
-        humanoid: {
-          getRawBoneNode: (name: string) => raw.get(name) ?? null,
-          getNormalizedBoneNode: (name: string) => normalized.get(name) ?? null,
-        },
-      } as unknown as VRM,
-      normalized,
-      raw,
-    };
-  }
-
-  it("uses only the raw/skinned rig as dimension authority and leaves normalized pose controls intact", () => {
-    const { vrm, normalized, raw } = riggedVrm();
-    const hero = applyAvatarForgeBodyPreset(createAvatarForgeState(), "hero").body;
-    const rawChest = raw.get("chest")!;
-    const normalizedHand = normalized.get("leftHand")!;
-    const chestBefore = snapshot(rawChest);
-    const normalizedBefore = snapshot(normalizedHand);
-
-    const restore = applyAvatarForgeBodyProportions(vrm, hero);
-
-    expect(rawChest.scale.x).toBeCloseTo(chestBefore.scale.x * hero.shoulderWidth, 10);
-    expect(rawChest.scale.y).toBe(chestBefore.scale.y);
-    expect(rawChest.quaternion.toArray()).toEqual(chestBefore.quaternion.toArray());
-    expectTransform(normalizedHand, normalizedBefore);
-    expect(vrm.scene.children.every((node) => !(node as THREE.Mesh).isMesh)).toBe(true);
-
-    restore();
-
-    expectTransform(rawChest, chestBefore);
-    expectTransform(normalizedHand, normalizedBefore);
-  });
-
-  it("restores exact TRS before each sequential preset reapply without accumulating drift", () => {
-    const { vrm, normalized, raw } = riggedVrm();
-    const originalRaw = new Map([...raw].map(([name, node]) => [name, snapshot(node)]));
-    const originalNormalized = new Map(
-      [...normalized].map(([name, node]) => [name, snapshot(node)]),
-    );
-
-    for (const presetId of ["hero", "compact", "long-line"] as const) {
-      const body = applyAvatarForgeBodyPreset(createAvatarForgeState(), presetId).body;
-      const restore = applyAvatarForgeBodyProportions(vrm, body);
-      const rawHand = raw.get("leftHand")!;
-      expect(rawHand.position.x).toBeCloseTo(
-        originalRaw.get("leftHand")!.position.x * body.armLength,
-        10,
-      );
-      restore();
-
-      for (const [name, node] of raw) expectTransform(node, originalRaw.get(name)!);
-      for (const [name, node] of normalized) {
-        expectTransform(node, originalNormalized.get(name)!);
-      }
-    }
-  });
-
-  it("ignores missing optional humanoid bones and returns an idempotent restore", () => {
-    const scene = new THREE.Group();
-    const vrm = {
-      scene,
-      humanoid: {
-        getRawBoneNode: () => null,
-        getNormalizedBoneNode: () => null,
-      },
-    } as unknown as VRM;
-
-    const restore = applyAvatarForgeBodyProportions(vrm, createAvatarForgeState().body);
-    expect(() => restore()).not.toThrow();
-    expect(() => restore()).not.toThrow();
   });
 });
 

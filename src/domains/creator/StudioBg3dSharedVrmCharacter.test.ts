@@ -4,6 +4,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createStudioShared3dSceneSession,
 } from "./studio-shared-3d-scene-bridge";
+import {
+  DEFAULT_VRM_PROP_RIG_METRICS,
+  type VrmPropMetricBone,
+  type VrmPropRigMetrics,
+} from "./studio-vrm-prop-rig";
+import { createPropInstance, serializeVrmProps } from "./studio-vrm-props";
 import { createStudioVrmSceneDocument, normalizeStudioVrmSceneDocument } from "./studio-vrm-scene-document";
 
 const loadStudioVrmAsset = vi.fn();
@@ -38,9 +44,11 @@ const {
   applyStudioBg3dLinkedCharacterState,
   loadStudioBg3dLinkedVrm,
 } = await import("./studio-bg3d-shared-vrm-runtime");
-const { raycastStudioBg3dSharedCharacterGroundSurface } = await import(
-  "./StudioBg3dSharedVrmCharacter"
-);
+const {
+  measureStudioBg3dSharedCharacterGroundAnchors,
+  raycastStudioBg3dSharedCharacterGroundSurface,
+  selectStudioBg3dSharedCharacterSupportPoint,
+} = await import("./StudioBg3dSharedVrmCharacter");
 
 function groundPlane(
   entityId: string,
@@ -59,6 +67,92 @@ function groundPlane(
   mesh.rotation.x = -Math.PI / 2;
   mesh.userData.studioBg3dEntityId = entityId;
   return mesh;
+}
+
+function completeRightHandMetrics(): VrmPropRigMetrics {
+  const boneWorldPositions: Partial<Record<VrmPropMetricBone, readonly [number, number, number]>> = {
+    rightLowerArm: [-0.2, 1.1, 0],
+    rightHand: [0, 1.1, 0],
+  };
+  const fingers = ["Index", "Middle", "Ring", "Little"] as const;
+  for (const [fingerIndex, finger] of fingers.entries()) {
+    const y = 1.08 - fingerIndex * 0.012;
+    boneWorldPositions[`right${finger}Proximal`] = [0.015, y, 0];
+    boneWorldPositions[`right${finger}Intermediate`] = [0.045, y, 0];
+    boneWorldPositions[`right${finger}Distal`] = [0.07, y, 0];
+  }
+  boneWorldPositions.rightThumbMetacarpal = [0.005, 1.075, 0.005];
+  boneWorldPositions.rightThumbProximal = [0.03, 1.055, 0.01];
+  boneWorldPositions.rightThumbDistal = [0.055, 1.04, 0.012];
+  return {
+    ...DEFAULT_VRM_PROP_RIG_METRICS,
+    handSockets: {
+      ...DEFAULT_VRM_PROP_RIG_METRICS.handSockets,
+      rightHand: {
+        ...DEFAULT_VRM_PROP_RIG_METRICS.handSockets.rightHand,
+        source: "measured",
+      },
+    },
+    boneWorldPositions,
+    missingBones: [],
+  };
+}
+
+function createShoeGroundingVrm({
+  leftFootY,
+  rightFootY,
+}: {
+  leftFootY: number;
+  rightFootY: number;
+}) {
+  const root = new THREE.Group();
+  const leftFoot = new THREE.Bone();
+  const rightFoot = new THREE.Bone();
+  leftFoot.name = "leftFoot";
+  rightFoot.name = "rightFoot";
+  leftFoot.position.set(-0.4, leftFootY, 0.1);
+  rightFoot.position.set(0.45, rightFootY, -0.1);
+  root.add(leftFoot, rightFoot);
+
+  const addSole = (
+    foot: THREE.Bone,
+    side: "left" | "right",
+    position: readonly [number, number, number],
+  ) => {
+    const group = new THREE.Group();
+    group.name = `wardrobe:shoes:heels:${side}Foot`;
+    const mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(0.2, 0.1, 0.4),
+      new THREE.MeshBasicMaterial(),
+    );
+    mesh.position.set(...position);
+    group.add(mesh);
+    foot.add(group);
+  };
+  addSole(leftFoot, "left", [0.05, -0.2, 0.15]);
+  addSole(rightFoot, "right", [-0.03, -0.25, -0.12]);
+
+  // Boot shafts use lower-leg roots. Even a pathological shaft bound must never become a sole.
+  const leftShaft = new THREE.Group();
+  leftShaft.name = "wardrobe:shoes:heels:leftLowerLeg";
+  const shaftMesh = new THREE.Mesh(
+    new THREE.BoxGeometry(0.4, 4, 0.4),
+    new THREE.MeshBasicMaterial(),
+  );
+  shaftMesh.position.y = -4;
+  leftShaft.add(shaftMesh);
+  root.add(leftShaft);
+
+  return {
+    scene: root,
+    humanoid: {
+      getRawBoneNode: (name: string) => {
+        if (name === "leftFoot") return leftFoot;
+        if (name === "rightFoot") return rightFoot;
+        return null;
+      },
+    },
+  } as never;
 }
 
 describe("Studio BG3D linked VRM runtime", () => {
@@ -186,6 +280,82 @@ describe("Studio BG3D linked VRM runtime", () => {
     expect(scene.pose.yOffset).toBe(0.1);
     expect(scene.pose.bodyRotationY).toBe(0.25);
   });
+
+  it("gives a measured automatic grip final authority while preserving the opposite authored hand", () => {
+    const base = createStudioVrmSceneDocument();
+    const mug = createPropInstance("mug", "shared-auto-grip")!;
+    const scene = normalizeStudioVrmSceneDocument({
+      ...base,
+      pose: {
+        ...base.pose,
+        fingerOverrides: {
+          leftIndexProximal: [0.11, 0.22, 0.33],
+          rightIndexProximal: [0, 0, 0],
+        },
+      },
+      props: serializeVrmProps([mug]),
+    });
+    const source = createStudioShared3dSceneSession([{
+      elementId: "character-grip",
+      scene,
+    }]).characters[0]!;
+    const vrm = { scene: new THREE.Group(), update: vi.fn() } as never;
+
+    expect(applyStudioBg3dLinkedCharacterState(vrm, source, {
+      propRigMetrics: completeRightHandMetrics(),
+    })).toBe(true);
+    const appliedFingers = applyFingerRotations.mock.calls.at(-1)?.[1] as Record<
+      string,
+      readonly [number, number, number]
+    >;
+    expect(appliedFingers.leftIndexProximal).toEqual([0.11, 0.22, 0.33]);
+    expect(appliedFingers.rightIndexProximal).not.toEqual([0, 0, 0]);
+    expect(Object.keys(appliedFingers).filter((bone) => bone.startsWith("right"))).toHaveLength(15);
+  });
+
+  it("fails closed instead of showing an enabled automatic grip on an incomplete hand rig", () => {
+    const base = createStudioVrmSceneDocument();
+    const scene = normalizeStudioVrmSceneDocument({
+      ...base,
+      props: serializeVrmProps([createPropInstance("mug", "missing-grip-rig")!]),
+    });
+    const source = createStudioShared3dSceneSession([{
+      elementId: "character-incomplete-grip",
+      scene,
+    }]).characters[0]!;
+    const vrm = { scene: new THREE.Group(), update: vi.fn() } as never;
+    applyFingerRotations.mockClear();
+
+    expect(applyStudioBg3dLinkedCharacterState(vrm, source, {
+      propRigMetrics: DEFAULT_VRM_PROP_RIG_METRICS,
+    })).toBe(false);
+    expect(applyFingerRotations).not.toHaveBeenCalled();
+  });
+});
+
+describe("Studio BG3D shared character shoe grounding", () => {
+  it("keeps each projected shoe sole's Y and XZ bound to its own foot", () => {
+    const vrm = createShoeGroundingVrm({ leftFootY: 0.5, rightFootY: 0.9 });
+    const anchors = measureStudioBg3dSharedCharacterGroundAnchors(vrm, true);
+    const left = anchors.find(({ kind }) => kind === "left-foot");
+    const right = anchors.find(({ kind }) => kind === "right-foot");
+
+    expect(left?.point[0]).toBeCloseTo(-0.35, 7);
+    expect(left?.point[1]).toBeCloseTo(0.25, 7);
+    expect(left?.point[2]).toBeCloseTo(0.25, 7);
+    expect(right?.point[0]).toBeCloseTo(0.42, 7);
+    expect(right?.point[1]).toBeCloseTo(0.6, 7);
+    expect(right?.point[2]).toBeCloseTo(-0.22, 7);
+  });
+
+  it("selects the actually lower shoe instead of manufacturing a left-foot tie", () => {
+    const vrm = createShoeGroundingVrm({ leftFootY: 0.8, rightFootY: 0.35 });
+    const anchors = measureStudioBg3dSharedCharacterGroundAnchors(vrm, true);
+    const right = anchors.find(({ kind }) => kind === "right-foot");
+
+    expect(right).toBeDefined();
+    expect(selectStudioBg3dSharedCharacterSupportPoint(anchors)).toEqual(right?.point);
+  });
 });
 
 describe("Studio BG3D shared character surface raycast", () => {
@@ -288,6 +458,24 @@ describe("Studio BG3D shared character surface raycast", () => {
     ).toMatchObject({
       source: "background-surface",
       targetEntityId: "visible-floor",
+    });
+  });
+
+  it("never lets renderer-only contact overlays become a grounding surface", () => {
+    const scene = new THREE.Scene();
+    const overlay = groundPlane("contact-overlay", 0.1, new THREE.MeshBasicMaterial());
+    overlay.userData.studioBg3dRendererOverlay = true;
+    scene.add(
+      overlay,
+      groundPlane("authored-floor", -0.04, new THREE.MeshBasicMaterial()),
+    );
+
+    expect(
+      raycastStudioBg3dSharedCharacterGroundSurface(scene, [0, 0, 0]),
+    ).toMatchObject({
+      source: "background-surface",
+      targetEntityId: "authored-floor",
+      point: [0, -0.04, 0],
     });
   });
 

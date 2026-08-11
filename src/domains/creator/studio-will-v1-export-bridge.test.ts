@@ -71,6 +71,23 @@ describe("Studio WILL v1 page export bridge", () => {
     );
   });
 
+  it("loads OPC and its Worker client only after an explicit export request", () => {
+    const bridgeSource = readFileSync(
+      new URL("./studio-will-v1-export-bridge.ts", import.meta.url),
+      "utf8",
+    );
+
+    expect(bridgeSource).not.toMatch(
+      /import\s+\{[^}]*\}\s+from\s+["']\.\/studio-will-v1-opc-(?:interchange|worker-client)["']/u,
+    );
+    expect(bridgeSource).toContain(
+      'import("./studio-will-v1-opc-worker-client")',
+    );
+    expect(bridgeSource).toContain(
+      'import("./studio-will-v1-opc-interchange")',
+    );
+  });
+
   it("maps visible pressure freehand into the bounded Worker profile", async () => {
     const result = await exportStudioPageToWillV1({
       width: 800,

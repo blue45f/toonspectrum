@@ -1,6 +1,22 @@
 import { isEffectivelyHidden, type LayerGroup } from "./studio-layers";
 import { sha256HexPortable } from "./studio-sha256";
-import { createAvatarForgeState } from "./studio-vrm-avatar-forge";
+import {
+  STUDIO_SHARED_3D_CHARACTER_TRANSFORM_RECEIPT_KIND,
+  STUDIO_SHARED_3D_CHARACTER_TRANSFORM_RECEIPT_VERSION,
+  parseStudioShared3dCharacterStageTransform,
+  studioShared3dCharacterStageTransformHash,
+  studioShared3dCharacterWorldTransform,
+} from "./studio-shared-3d-scene-runtime";
+import {
+  AVATAR_FORGE_VERSION,
+  createAvatarForgeState,
+  parseAvatarForgeState,
+} from "./studio-vrm-avatar-forge";
+import {
+  createStudioVrmLinkedAppearanceProjectionPlan,
+  type StudioVrmLinkedAppearanceProjectionPlan,
+} from "./studio-vrm-linked-appearance-projection-plan";
+import { STUDIO_VRM_PROPORTION_KEYS } from "./studio-vrm-proportion-core";
 import {
   parseStudioVrmSceneDocument,
   serializeStudioVrmSceneDocument,
@@ -18,9 +34,17 @@ export const STUDIO_SHARED_3D_MAX_CHARACTERS = 12;
 export const STUDIO_SHARED_3D_SCENE_SESSION_KIND =
   "toonspectrum.shared-3d-scene-session" as const;
 export const STUDIO_SHARED_3D_SCENE_SESSION_VERSION = 2 as const;
-export const STUDIO_SHARED_3D_CHARACTER_TRANSFORM_RECEIPT_KIND =
-  "toonspectrum.shared-3d-character-transform-receipt" as const;
-export const STUDIO_SHARED_3D_CHARACTER_TRANSFORM_RECEIPT_VERSION = 1 as const;
+
+export {
+  STUDIO_SHARED_3D_CHARACTER_SHADOW_LOCAL_BOUNDS,
+  STUDIO_SHARED_3D_CHARACTER_TRANSFORM_RECEIPT_KIND,
+  STUDIO_SHARED_3D_CHARACTER_TRANSFORM_RECEIPT_VERSION,
+  createStudioShared3dCharacterShadowEntity,
+  inspectStudioShared3dCaptureReadiness,
+  parseStudioShared3dCharacterStageTransform,
+  studioShared3dCharacterStageTransformHash,
+  studioShared3dCharacterWorldTransform,
+} from "./studio-shared-3d-scene-runtime";
 
 export interface StudioShared3dCharacterInput {
   readonly elementId: string;
@@ -58,6 +82,8 @@ export interface StudioShared3dCharacterCompatibility {
   /** Character documents are linked, never converted into the background schema. */
   readonly roundTrip: "source-authority-preserved";
   readonly supportedPreview: readonly string[];
+  /** Pure exact-projection requirements; runtime support remains gated by previewOmissions. */
+  readonly appearanceProjection: StudioVrmLinkedAppearanceProjectionPlan;
   /** These fields remain byte-safe in the source VRM document but are not rendered by this slice. */
   readonly previewOmissions: readonly StudioShared3dPreviewOmission[];
 }
@@ -84,30 +110,6 @@ export type StudioShared3dCharacterRuntimeStatus =
   | "loading"
   | "ready"
   | "unavailable";
-
-/** Conservative VRM rest/pose envelope used only to fit a shared background shadow camera. */
-export const STUDIO_SHARED_3D_CHARACTER_SHADOW_LOCAL_BOUNDS = Object.freeze({
-  min: Object.freeze([-0.72, -0.08, -0.48] as const),
-  max: Object.freeze([0.72, 2.35, 0.48] as const),
-});
-
-/** Renderer-neutral shadow entity for one linked character. */
-export function createStudioShared3dCharacterShadowEntity(
-  character: StudioShared3dCharacterSource,
-) {
-  const transform = studioShared3dCharacterWorldTransform(
-    character.scene,
-    character.stageTransform,
-  );
-  return Object.freeze({
-    id: `shared-vrm-${character.elementId}`,
-    position: transform.position,
-    rotation: transform.rotation,
-    scale: transform.scale,
-    visible: true,
-    localBounds: STUDIO_SHARED_3D_CHARACTER_SHADOW_LOCAL_BOUNDS,
-  });
-}
 
 export interface StudioShared3dCaptureReadiness {
   readonly phase: "loading" | "ready" | "unavailable";
@@ -221,6 +223,7 @@ const PREVIEW_SUPPORTED = Object.freeze([
   "루트 위치·회전",
   "표정",
   "체형 배율",
+  "두신·골격 비율",
   "기본 색·MToon 재질 효과",
 ] as const);
 
@@ -258,62 +261,6 @@ function sha256Text(value: string): `sha256:${string}` {
   return `sha256:${sha256HexPortable(new TextEncoder().encode(value))}`;
 }
 
-export function parseStudioShared3dCharacterStageTransform(
-  value: unknown,
-): StudioShared3dCharacterStageTransform | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  try {
-    const candidate = value as Record<string, unknown>;
-    const keys = Object.keys(candidate);
-    if (
-      keys.length !== 2
-      || !Object.hasOwn(candidate, "position")
-      || !Object.hasOwn(candidate, "rotationY")
-      || keys.some((key) => key !== "position" && key !== "rotationY")
-    ) return null;
-    const rawPosition = candidate.position;
-    const rawRotationY = candidate.rotationY;
-    if (!Array.isArray(rawPosition)) return null;
-    const length = rawPosition.length;
-    if (length !== 3) return null;
-    const position = [rawPosition[0], rawPosition[1], rawPosition[2]];
-    if (
-      rawPosition.length !== length
-      || Object.keys(rawPosition).some((key) => key !== "0" && key !== "1" && key !== "2")
-      || typeof rawRotationY !== "number"
-    ) {
-      return null;
-    }
-    const [x, y, z] = position;
-    const rotationY = rawRotationY;
-    if (
-      !position.every((component) => typeof component === "number" && Number.isFinite(component))
-      || !Number.isFinite(rotationY)
-      || x! < -10 || x! > 10
-      || y! < -10 || y! > 10
-      || z! < -10 || z! > 10
-      || rotationY < -Math.PI || rotationY > Math.PI
-    ) return null;
-    return Object.freeze({
-      position: Object.freeze(position.map((component) => Object.is(component, -0)
-        ? 0
-        : component)) as StudioVrmVec3,
-      rotationY: Object.is(rotationY, -0) ? 0 : rotationY,
-    });
-  } catch {
-    return null;
-  }
-}
-
-export function studioShared3dCharacterStageTransformHash(
-  value: StudioShared3dCharacterStageTransform,
-): `sha256:${string}` {
-  return sha256Text(JSON.stringify({
-    position: value.position,
-    rotationY: value.rotationY,
-  }));
-}
-
 function hasCanonicalContent(value: StudioVrmCanonicalData): boolean {
   if (value === null || value === false || value === "" || value === 0) return false;
   if (Array.isArray(value)) return value.some(hasCanonicalContent);
@@ -334,12 +281,156 @@ function canonicalDataText(value: unknown): string | null {
   return typeof serialized === "string" ? serialized : null;
 }
 
-const NEUTRAL_AVATAR_FORGE_TEXT = canonicalDataText(createAvatarForgeState());
+const AVATAR_FORGE_TOP_LEVEL_KEYS = new Set([
+  "version",
+  "presetId",
+  "bodyPresetId",
+  "face",
+  "proportions",
+  "body",
+  "legacyHipWidth",
+  "hair",
+  "faceAccents",
+]);
+const AVATAR_FORGE_FACE_KEYS = new Set([
+  "headWidth",
+  "headHeight",
+  "headDepth",
+  "cheekVolume",
+  "chinLength",
+]);
+const AVATAR_FORGE_BODY_KEYS = new Set([
+  "shoulderWidth",
+  "torsoLength",
+  "hipWidth",
+  "armLength",
+  "legLength",
+]);
+const AVATAR_FORGE_HAIR_KEYS = new Set([
+  "style",
+  "replaceOriginal",
+  "volume",
+  "length",
+  "strandWidth",
+  "fringe",
+  "curl",
+  "shine",
+  "baseColor",
+  "tipColor",
+  "bangStyle",
+  "wave",
+  "ahoge",
+  "tailHeight",
+]);
+const AVATAR_FORGE_ACCENT_KEYS = new Set([
+  "id",
+  "enabled",
+  "color",
+  "intensity",
+]);
+const AVATAR_FORGE_ACCENT_IDS = new Set([
+  "blush",
+  "freckles",
+  "beauty-mark",
+]);
+const AVATAR_FORGE_PROPORTION_KEYS = new Set([
+  "version",
+  "presetId",
+  ...STUDIO_VRM_PROPORTION_KEYS,
+]);
 
-function hasNonNeutralAvatarForge(value: StudioVrmCanonicalData): boolean {
-  if (!hasCanonicalContent(value)) return false;
-  const serialized = canonicalDataText(value);
-  return serialized === null || serialized !== NEUTRAL_AVATAR_FORGE_TEXT;
+const NEUTRAL_AVATAR_FORGE = createAvatarForgeState();
+const NEUTRAL_AVATAR_FORGE_FACE_TEXT = canonicalDataText(NEUTRAL_AVATAR_FORGE.face);
+const NEUTRAL_AVATAR_FORGE_HAIR_TEXT = canonicalDataText(NEUTRAL_AVATAR_FORGE.hair);
+const NEUTRAL_AVATAR_FORGE_ACCENTS_TEXT = canonicalDataText(
+  NEUTRAL_AVATAR_FORGE.faceAccents ?? [],
+);
+
+type AvatarForgePreviewOmissionReason =
+  | "face-or-hair"
+  | "legacy-hip-width"
+  | "unsupported-envelope";
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function hasOnlyKeys(value: Record<string, unknown>, allowed: ReadonlySet<string>): boolean {
+  return Object.keys(value).every((key) => allowed.has(key));
+}
+
+function hasKnownOptionalRecord(
+  envelope: Record<string, unknown>,
+  key: string,
+  allowed: ReadonlySet<string>,
+): boolean {
+  if (!Object.hasOwn(envelope, key) || envelope[key] === null) return true;
+  const value = envelope[key];
+  return isPlainRecord(value) && hasOnlyKeys(value, allowed);
+}
+
+function parseAvatarForgeEnvelope(value: StudioVrmCanonicalData): Record<string, unknown> | null {
+  if (isPlainRecord(value)) return value;
+  if (typeof value !== "string") return null;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return isPlainRecord(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The shared runtime applies canonical v4 proportions, not the deprecated v3 body envelope.
+ * Known v1-v3 documents are therefore migrated through the same canonical parser before the
+ * visual-only fields are compared. Unknown/future fields remain fail-closed: silently dropping
+ * them here would make a preview look capturable without proving visual parity.
+ */
+function inspectAvatarForgePreviewOmission(
+  value: StudioVrmCanonicalData,
+): AvatarForgePreviewOmissionReason | null {
+  if (!hasCanonicalContent(value)) return null;
+  const envelope = parseAvatarForgeEnvelope(value);
+  if (!envelope || !hasOnlyKeys(envelope, AVATAR_FORGE_TOP_LEVEL_KEYS)) {
+    return "unsupported-envelope";
+  }
+
+  const rawVersion = Object.hasOwn(envelope, "version") ? Number(envelope.version) : 0;
+  if (
+    !Number.isInteger(rawVersion)
+    || rawVersion < 0
+    || rawVersion > AVATAR_FORGE_VERSION
+    || !hasKnownOptionalRecord(envelope, "face", AVATAR_FORGE_FACE_KEYS)
+    || !hasKnownOptionalRecord(envelope, "body", AVATAR_FORGE_BODY_KEYS)
+    || !hasKnownOptionalRecord(envelope, "hair", AVATAR_FORGE_HAIR_KEYS)
+    || !hasKnownOptionalRecord(envelope, "proportions", AVATAR_FORGE_PROPORTION_KEYS)
+  ) {
+    return "unsupported-envelope";
+  }
+
+  if (Object.hasOwn(envelope, "faceAccents") && envelope.faceAccents !== null) {
+    if (
+      !Array.isArray(envelope.faceAccents)
+      || envelope.faceAccents.some((entry) =>
+        !isPlainRecord(entry)
+        || !hasOnlyKeys(entry, AVATAR_FORGE_ACCENT_KEYS)
+        || !AVATAR_FORGE_ACCENT_IDS.has(String(entry.id)),
+      )
+    ) {
+      return "unsupported-envelope";
+    }
+  }
+
+  const canonical = parseAvatarForgeState(value);
+  if (
+    canonicalDataText(canonical.face) !== NEUTRAL_AVATAR_FORGE_FACE_TEXT
+    || canonicalDataText(canonical.hair) !== NEUTRAL_AVATAR_FORGE_HAIR_TEXT
+    || canonicalDataText(canonical.faceAccents ?? []) !== NEUTRAL_AVATAR_FORGE_ACCENTS_TEXT
+  ) {
+    return "face-or-hair";
+  }
+  if ((canonical.legacyHipWidth ?? 1) !== 1) return "legacy-hip-width";
+  return null;
 }
 
 function hasNonDefaultPhysics(scene: StudioVrmSceneDocument): boolean {
@@ -351,9 +442,20 @@ function hasNonDefaultPhysics(scene: StudioVrmSceneDocument): boolean {
 export function inspectStudioShared3dCharacterCompatibility(
   scene: StudioVrmSceneDocument,
 ): StudioShared3dCharacterCompatibility {
+  const appearanceProjection = createStudioVrmLinkedAppearanceProjectionPlan(scene);
   const omissions: StudioShared3dPreviewOmission[] = [];
-  if (hasNonNeutralAvatarForge(scene.appearance.avatarForge)) {
-    omissions.push({ code: "avatar-forge", label: "아바타 포지 체형 세부값" });
+  const avatarForgeOmission = inspectAvatarForgePreviewOmission(
+    scene.appearance.avatarForge,
+  );
+  if (avatarForgeOmission) {
+    omissions.push({
+      code: "avatar-forge",
+      label: avatarForgeOmission === "face-or-hair"
+        ? "헤어·얼굴 조형"
+        : avatarForgeOmission === "legacy-hip-width"
+          ? "기존 골반 너비 조형"
+          : "지원하지 않는 아바타 포지 조형",
+    });
   }
   if (hasCanonicalContent(scene.appearance.costume)) {
     omissions.push({ code: "costume", label: "의상 조립 상태" });
@@ -364,7 +466,9 @@ export function inspectStudioShared3dCharacterCompatibility(
   if (hasNonDefaultPhysics(scene)) {
     omissions.push({ code: "physics", label: "머리카락·의상 물리 미리보기" });
   }
-  if (hasCanonicalContent(scene.props)) {
+  // A structurally exact plan is not capture authority. Keep the omission until the shared
+  // runtime produces matching attachment/commit/post-commit receipts for this signature.
+  if (appearanceProjection.handProps.status !== "empty") {
     omissions.push({ code: "props", label: "손에 든 소품" });
   }
   if (scene.pose.ikConstraints.length > 0) {
@@ -376,12 +480,13 @@ export function inspectStudioShared3dCharacterCompatibility(
   if (scene.surfacePaint.textures.length > 0) {
     omissions.push({ code: "surface-paint", label: "표면 페인트 텍스처" });
   }
-  if (hasCanonicalContent(scene.appearance.wardrobe)) {
+  if (appearanceProjection.wardrobe.status !== "empty") {
     omissions.push({ code: "wardrobe", label: "옷장 레이어 상태" });
   }
   return Object.freeze({
     roundTrip: "source-authority-preserved" as const,
     supportedPreview: PREVIEW_SUPPORTED,
+    appearanceProjection,
     previewOmissions: Object.freeze(omissions),
   });
 }
@@ -481,37 +586,6 @@ export function selectStudioShared3dVisibleSceneElements<
   T extends StudioShared3dElementSource,
 >(elements: readonly T[], groups: LayerGroup[]): readonly T[] {
   return elements.filter((element) => !isEffectivelyHidden(element, groups));
-}
-
-export function inspectStudioShared3dCaptureReadiness(
-  session: StudioShared3dSceneSession | undefined,
-  statuses: Readonly<Record<string, StudioShared3dCharacterRuntimeStatus | undefined>>,
-): StudioShared3dCaptureReadiness {
-  let hasLoading = false;
-  let hasUnavailable = false;
-  const capturableElementIds: string[] = [];
-  const previewOnlyElementIds: string[] = [];
-  for (const character of session?.characters ?? []) {
-    const status = statuses[character.runtimeKey];
-    if (status === "unavailable") {
-      hasUnavailable = true;
-      continue;
-    }
-    if (status !== "ready") {
-      hasLoading = true;
-      continue;
-    }
-    if (character.compatibility.previewOmissions.length > 0) {
-      previewOnlyElementIds.push(character.elementId);
-    } else {
-      capturableElementIds.push(character.elementId);
-    }
-  }
-  return Object.freeze({
-    phase: hasUnavailable ? "unavailable" : hasLoading ? "loading" : "ready",
-    capturableElementIds: Object.freeze(capturableElementIds),
-    previewOnlyElementIds: Object.freeze(previewOnlyElementIds),
-  });
 }
 
 /**
@@ -735,25 +809,5 @@ export function planStudioShared3dCharacterTransformUpdate<
     changed: true,
     nextElements: Object.freeze(nextElements),
     receipt,
-  });
-}
-
-/** World-space approximation shared by the renderer and shadow-frustum planner. */
-export function studioShared3dCharacterWorldTransform(
-  scene: StudioVrmSceneDocument,
-  stageTransform?: StudioShared3dCharacterStageTransform,
-): StudioShared3dCharacterWorldTransform {
-  const root = scene.pose.translations.root;
-  const width = scene.appearance.bodyScale.width;
-  const height = scene.appearance.bodyScale.height;
-  return Object.freeze({
-    position: stageTransform?.position
-      ?? Object.freeze([root[0], scene.pose.yOffset, root[2]]) as StudioVrmVec3,
-    rotation: Object.freeze([
-      0,
-      stageTransform?.rotationY ?? scene.pose.bodyRotationY,
-      0,
-    ]) as StudioVrmVec3,
-    scale: Object.freeze([width, height, width]) as StudioVrmVec3,
   });
 }

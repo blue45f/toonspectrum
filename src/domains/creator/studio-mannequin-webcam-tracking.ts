@@ -10,6 +10,10 @@ import {
   resolveStudioMediaPipeVisionWasmFileset,
   type StudioMediaPipeVisionWasmSelection,
 } from "./studio-mediapipe-vision-assets";
+import {
+  loadStudioMediaPipeVisionModule,
+  runStudioMediaPipeVisionTaskCreation,
+} from "./studio-mediapipe-vision-init-arbiter";
 import { solvePoseToVrmBones, type PoseLandmark } from "./studio-vrm-pose-solver";
 
 import type { StudioMannequinJointId } from "./studio-mannequin-model";
@@ -298,7 +302,7 @@ async function createStudioMannequinPoseLandmarker(
 ): Promise<StudioMannequinPoseLandmarker> {
   if (signal?.aborted) throw createDisposedError();
 
-  const { FilesetResolver, PoseLandmarker } = await import("@mediapipe/tasks-vision");
+  const { FilesetResolver, PoseLandmarker } = await loadStudioMediaPipeVisionModule();
   const [visionSelection, modelAssetBuffer] = await Promise.all([
     resolveLocalVisionWasmFileset(() => FilesetResolver.isSimdSupported(false)),
     fetchPoseModelBuffer(signal),
@@ -316,9 +320,13 @@ async function createStudioMannequinPoseLandmarker(
 
   const failures: unknown[] = [];
   try {
-    return await PoseLandmarker.createFromOptions(visionSelection.fileset, {
-      baseOptions: { modelAssetBuffer: modelAssetBuffer.slice(), delegate: "GPU" },
-      ...poseOptions,
+    return await runStudioMediaPipeVisionTaskCreation({
+      owner: "mannequin-video-pose",
+      signal,
+      create: () => PoseLandmarker.createFromOptions(visionSelection.fileset, {
+        baseOptions: { modelAssetBuffer: modelAssetBuffer.slice(), delegate: "GPU" },
+        ...poseOptions,
+      }),
     });
   } catch (gpuError) {
     failures.push(gpuError);
@@ -328,9 +336,13 @@ async function createStudioMannequinPoseLandmarker(
       gpuError,
     );
     try {
-      return await PoseLandmarker.createFromOptions(visionSelection.fileset, {
-        baseOptions: { modelAssetBuffer: modelAssetBuffer.slice(), delegate: "CPU" },
-        ...poseOptions,
+      return await runStudioMediaPipeVisionTaskCreation({
+        owner: "mannequin-video-pose",
+        signal,
+        create: () => PoseLandmarker.createFromOptions(visionSelection.fileset, {
+          baseOptions: { modelAssetBuffer: modelAssetBuffer.slice(), delegate: "CPU" },
+          ...poseOptions,
+        }),
       });
     } catch (cpuError) {
       failures.push(cpuError);
@@ -343,9 +355,13 @@ async function createStudioMannequinPoseLandmarker(
   if (visionSelection.variant === "simd") {
     try {
       const compatibilityVision = await resolveLocalVisionWasmFileset(async () => false);
-      return await PoseLandmarker.createFromOptions(compatibilityVision.fileset, {
-        baseOptions: { modelAssetBuffer: modelAssetBuffer.slice(), delegate: "CPU" },
-        ...poseOptions,
+      return await runStudioMediaPipeVisionTaskCreation({
+        owner: "mannequin-video-pose",
+        signal,
+        create: () => PoseLandmarker.createFromOptions(compatibilityVision.fileset, {
+          baseOptions: { modelAssetBuffer: modelAssetBuffer.slice(), delegate: "CPU" },
+          ...poseOptions,
+        }),
       });
     } catch (compatibilityError) {
       failures.push(compatibilityError);

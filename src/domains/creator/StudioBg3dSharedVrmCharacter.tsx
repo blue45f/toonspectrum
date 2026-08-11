@@ -1,5 +1,5 @@
 import { useThree } from "@react-three/fiber";
-import { useEffect, useEffectEvent, useLayoutEffect, useState } from "react";
+import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
 import { registerStudioBg3dCaptureExcludedObject } from "./studio-bg3d-capture-exclusion";
@@ -10,11 +10,18 @@ import {
   type StudioBg3dSharedCharacterSurfaceHit,
 } from "./studio-bg3d-shared-character-grounding";
 import {
-  applyStudioBg3dLinkedCharacterState,
+  createStudioBg3dLinkedVrmRuntimeOwner,
   loadStudioBg3dLinkedVrm,
+  type StudioBg3dLinkedVrmRuntimeOwner,
 } from "./studio-bg3d-shared-vrm-runtime";
 import { studioShared3dCharacterWorldTransform } from "./studio-shared-3d-scene-bridge";
 import { disposeStudioVrmAsset } from "./studio-vrm-asset-runtime";
+import {
+  collectStudioVrmCostumeMeshes,
+  type StudioVrmCostumeMeshEntry,
+} from "./studio-vrm-costume-runtime";
+import { StudioBg3dSharedVrmAppearanceRuntime } from
+  "./StudioBg3dSharedVrmAppearanceRuntime";
 
 import type {
   StudioShared3dCharacterRuntimeStatus,
@@ -47,11 +54,50 @@ const WORLD_POINT = new THREE.Vector3();
 const MAX_SURFACE_ABOVE_SUPPORT_METERS = 0.15;
 const GROUND_RAY_DISTANCE_METERS = 1.4;
 
+interface StudioBg3dSharedVrmAsset {
+  readonly vrm: VRM;
+  readonly runtimeOwner: StudioBg3dLinkedVrmRuntimeOwner;
+  readonly costumeMeshes: StudioVrmCostumeMeshEntry[];
+}
+
 function finiteVector(point: THREE.Vector3): boolean {
   return Number.isFinite(point.x) && Number.isFinite(point.y) && Number.isFinite(point.z);
 }
 
-function measuredGroundAnchors(vrm: VRM): StudioBg3dSharedCharacterGroundAnchor[] {
+function measuredWardrobeSolePoint(
+  vrm: VRM,
+  side: "left" | "right",
+): THREE.Vector3 | null {
+  const bounds = new THREE.Box3();
+  const candidateBounds = new THREE.Box3();
+  let found = false;
+  vrm.scene.traverse((object) => {
+    if (!object.name.startsWith("wardrobe:shoes:")) return;
+    if (object.parent?.name.startsWith("wardrobe:shoes:")) return;
+    // Every rigid shoe catalog item owns one sole-bearing root per foot. Boot shafts live on the
+    // lower-leg roots and must not influence the sole center or mix the two feet together.
+    if (!object.name.endsWith(`:${side}Foot`)) return;
+    candidateBounds.setFromObject(object, true);
+    if (
+      candidateBounds.isEmpty()
+      || !finiteVector(candidateBounds.min)
+      || !finiteVector(candidateBounds.max)
+    ) return;
+    if (!found) bounds.copy(candidateBounds);
+    else bounds.union(candidateBounds);
+    found = true;
+  });
+  if (!found || !Number.isFinite(bounds.min.y)) return null;
+  const center = bounds.getCenter(new THREE.Vector3());
+  center.y = bounds.min.y;
+  return finiteVector(center) ? center : null;
+}
+
+// eslint-disable-next-line react-refresh/only-export-components -- pure grounding geometry shares the runtime's exact shoe-root contract with tests.
+export function measureStudioBg3dSharedCharacterGroundAnchors(
+  vrm: VRM,
+  includeProjectedShoes: boolean,
+): StudioBg3dSharedCharacterGroundAnchor[] {
   vrm.scene.updateMatrixWorld(true);
   const bounds = new THREE.Box3().setFromObject(vrm.scene, true);
   const boundsValid = !bounds.isEmpty() && finiteVector(bounds.min) && finiteVector(bounds.max);
@@ -73,9 +119,14 @@ function measuredGroundAnchors(vrm: VRM): StudioBg3dSharedCharacterGroundAnchor[
     const soleOffset = toesPoint
       ? THREE.MathUtils.clamp(characterHeight * 0.008, 0.006, 0.025)
       : THREE.MathUtils.clamp(characterHeight * 0.028, 0.02, 0.065);
+    const wardrobeSolePoint = includeProjectedShoes
+      ? measuredWardrobeSolePoint(vrm, side)
+      : null;
     anchors.push({
       kind: `${side}-foot`,
-      point: [supportPoint.x, supportPoint.y - soleOffset, supportPoint.z],
+      point: wardrobeSolePoint
+        ? [wardrobeSolePoint.x, wardrobeSolePoint.y, wardrobeSolePoint.z]
+        : [supportPoint.x, supportPoint.y - soleOffset, supportPoint.z],
     });
   };
 
@@ -98,7 +149,8 @@ function measuredGroundAnchors(vrm: VRM): StudioBg3dSharedCharacterGroundAnchor[
   return anchors;
 }
 
-function selectedSupportPoint(
+// eslint-disable-next-line react-refresh/only-export-components -- deterministic support selection is part of the capture grounding contract.
+export function selectStudioBg3dSharedCharacterSupportPoint(
   anchors: readonly StudioBg3dSharedCharacterGroundAnchor[],
 ): StudioBg3dSharedCharacterGroundAnchor["point"] {
   const feet = anchors.filter(({ kind }) => kind !== "lower-bound");
@@ -122,7 +174,10 @@ function surfaceIdentity(object: THREE.Object3D, instanceId?: number):
     // THREE.Raycaster also reports objects hidden by an ancestor. Hidden background layers must
     // never become an invisible floor for a shared character.
     if (!current.visible) return null;
-    if (current.userData.studioBg3dSharedCharacterSelection === true) return null;
+    if (
+      current.userData.studioBg3dSharedCharacterSelection === true
+      || current.userData.studioBg3dRendererOverlay === true
+    ) return null;
     if (!identity) {
       const resolveInstanceId = current.userData.studioBg3dResolveInstanceId;
       if (typeof resolveInstanceId === "function" && Number.isSafeInteger(instanceId)) {
@@ -208,6 +263,35 @@ export function raycastStudioBg3dSharedCharacterGroundSurface(
   };
 }
 
+function resolveCurrentAppearanceGrounding(
+  currentAsset: StudioBg3dSharedVrmAsset,
+  source: StudioShared3dCharacterSource,
+  threeScene: THREE.Scene,
+): StudioBg3dSharedCharacterGroundingResult {
+  const wardrobe = source.compatibility.appearanceProjection.wardrobe;
+  const includesProjectedShoes = wardrobe.status === "supported"
+    && wardrobe.slots.some((slot) => slot.slot === "shoes");
+  const anchors = measureStudioBg3dSharedCharacterGroundAnchors(
+    currentAsset.vrm,
+    includesProjectedShoes,
+  );
+  return resolveStudioBg3dSharedCharacterGrounding({
+    identity: {
+      ...(source.stageId ? { stageId: source.stageId } : {}),
+      elementId: source.elementId,
+      modelRuntimeKey: source.modelRuntimeKey,
+      placementHash: source.placementHash,
+    },
+    placementY: source.stageTransform.position[1],
+    anchors,
+    surfaceHit: raycastStudioBg3dSharedCharacterGroundSurface(
+      threeScene,
+      selectStudioBg3dSharedCharacterSupportPoint(anchors),
+    ),
+    options: { soleClearanceMeters: 0.006 },
+  });
+}
+
 /**
  * Runtime projection of one canonical VRM source into the BG3D R3F scene. The component owns only
  * its loaded runtime clone. Stage placement is an override owned by the page Stage while model,
@@ -222,7 +306,8 @@ export default function StudioBg3dSharedVrmCharacter({
   onGrounding,
 }: StudioBg3dSharedVrmCharacterProps) {
   const threeScene = useThree((state) => state.scene);
-  const [vrm, setVrm] = useState<VRM | null>(null);
+  const [asset, setAsset] = useState<StudioBg3dSharedVrmAsset | null>(null);
+  const appearanceReadyIdentityRef = useRef<string | null>(null);
   const reportCurrentStatus = useEffectEvent(
     (status: StudioShared3dCharacterRuntimeStatus) =>
       onStatus(source.runtimeKey, status),
@@ -236,7 +321,9 @@ export default function StudioBg3dSharedVrmCharacter({
   useEffect(() => {
     let cancelled = false;
     let ownedVrm: VRM | null = null;
-    setVrm(null);
+    let ownedRuntime: StudioBg3dLinkedVrmRuntimeOwner | null = null;
+    setAsset(null);
+    appearanceReadyIdentityRef.current = null;
     reportCurrentStatus("loading");
     reportCurrentGrounding(null);
 
@@ -247,14 +334,43 @@ export default function StudioBg3dSharedVrmCharacter({
         ownedVrm = null;
         return;
       }
-      setVrm(loaded);
+      // Capture the model-owned rest hierarchy before any pose, root transform, legacy bodyScale,
+      // material state, or procedural attachment becomes externally addressable.
+      const runtimeResult = createStudioBg3dLinkedVrmRuntimeOwner(
+        loaded,
+        source.modelRuntimeKey,
+      );
+      if (!runtimeResult.ok) {
+        disposeStudioVrmAsset(loaded);
+        ownedVrm = null;
+        reportCurrentStatus("unavailable");
+        return;
+      }
+      ownedRuntime = runtimeResult.owner;
+      const costumeMeshes = collectStudioVrmCostumeMeshes(loaded);
+      setAsset({ vrm: loaded, runtimeOwner: runtimeResult.owner, costumeMeshes });
     }).catch(() => {
-      if (!cancelled) reportCurrentStatus("unavailable");
+      if (!cancelled) {
+        if (ownedRuntime) {
+          ownedRuntime.dispose();
+          ownedRuntime = null;
+        }
+        if (ownedVrm) disposeStudioVrmAsset(ownedVrm);
+        ownedVrm = null;
+        reportCurrentStatus("unavailable");
+      }
     });
 
     return () => {
       cancelled = true;
-      setVrm(null);
+      setAsset(null);
+      appearanceReadyIdentityRef.current = null;
+      if (ownedRuntime) {
+        // Dispose restores the cached neutral rig while this exact generation is still current.
+        // The owner invalidates its generation immediately afterwards, before the VRM is released.
+        ownedRuntime.dispose();
+        ownedRuntime = null;
+      }
       if (ownedVrm) {
         disposeStudioVrmAsset(ownedVrm);
         ownedVrm = null;
@@ -263,37 +379,41 @@ export default function StudioBg3dSharedVrmCharacter({
     };
   }, [source.elementId, source.modelRuntimeKey]);
 
-  // Pose, expression and stage placement changes reapply to the owned clone without downloading
-  // or reparsing the same VRM model. Readiness is announced only after the updated primitive has
-  // committed, preventing capture in the small document→scene gap.
-  useLayoutEffect(() => {
-    if (!vrm) return;
-    if (!applyStudioBg3dLinkedCharacterState(vrm, source)) {
-      reportCurrentGrounding(null);
-      reportCurrentStatus("unavailable");
+  const appearanceIdentityKey = JSON.stringify([
+    source.runtimeKey,
+    source.placementHash,
+    source.compatibility.appearanceProjection.signature,
+  ]);
+
+  function handleAppearanceStatus(
+    identityKey: string,
+    status: StudioShared3dCharacterRuntimeStatus,
+  ) {
+    if (identityKey !== appearanceIdentityKey) return;
+    if (status !== "ready") {
+      appearanceReadyIdentityRef.current = null;
+      onGrounding?.(source.runtimeKey, null);
+      onStatus(source.runtimeKey, status);
       return;
     }
-    const anchors = measuredGroundAnchors(vrm);
-    const grounding = resolveStudioBg3dSharedCharacterGrounding({
-      identity: {
-        ...(source.stageId ? { stageId: source.stageId } : {}),
-        elementId: source.elementId,
-        modelRuntimeKey: source.modelRuntimeKey,
-        placementHash: source.placementHash,
-      },
-      placementY: source.stageTransform.position[1],
-      anchors,
-      surfaceHit: raycastStudioBg3dSharedCharacterGroundSurface(
-        threeScene,
-        selectedSupportPoint(anchors),
-      ),
-      options: { soleClearanceMeters: 0.006 },
-    });
-    reportCurrentGrounding(grounding);
-    reportCurrentStatus("ready");
-  }, [source, surfaceRevision, threeScene, vrm]);
+    if (!asset) return;
+    appearanceReadyIdentityRef.current = identityKey;
+    onGrounding?.(
+      source.runtimeKey,
+      resolveCurrentAppearanceGrounding(asset, source, threeScene),
+    );
+    onStatus(source.runtimeKey, "ready");
+  }
 
-  if (!vrm) return null;
+  // Background transforms may change without restarting the exact appearance generation. Only
+  // grounding is recomputed; attachment receipts are generation-bound and never replayed.
+  useLayoutEffect(() => {
+    if (!asset || appearanceReadyIdentityRef.current !== appearanceIdentityKey) return;
+    reportCurrentGrounding(resolveCurrentAppearanceGrounding(asset, source, threeScene));
+  }, [appearanceIdentityKey, asset, source, surfaceRevision, threeScene]);
+
+  if (!asset) return null;
+  const { vrm } = asset;
   const transform = studioShared3dCharacterWorldTransform(
     source.scene,
     source.stageTransform,
@@ -312,6 +432,18 @@ export default function StudioBg3dSharedVrmCharacter({
   return (
     <group>
       <primitive object={vrm.scene} dispose={null} />
+      <StudioBg3dSharedVrmAppearanceRuntime
+        key={JSON.stringify([
+          source.runtimeKey,
+          source.placementHash,
+          source.compatibility.appearanceProjection.signature,
+        ])}
+        vrm={vrm}
+        source={source}
+        runtimeOwner={asset.runtimeOwner}
+        costumeMeshes={asset.costumeMeshes}
+        onStatus={handleAppearanceStatus}
+      />
       {onSelect ? (
         <mesh
           ref={registerStudioBg3dCaptureExcludedObject}

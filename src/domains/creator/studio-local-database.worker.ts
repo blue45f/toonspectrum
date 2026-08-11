@@ -1,135 +1,96 @@
 /// <reference lib="webworker" />
 
-import { openStudioLocalDatabase } from "./studio-local-database";
+import { attachStudioLocalDatabaseWorkerHost } from "./studio-local-database-worker-host";
 import {
-  STUDIO_LOCAL_DATABASE_WORKER_PROTOCOL_VERSION,
-  isStudioLocalDatabaseWorkerRequest,
-  type StudioLocalDatabaseWorkerRequest,
-  type StudioLocalDatabaseWorkerResponse,
-  type StudioLocalDatabaseWorkerSerializedError,
-} from "./studio-local-database-worker-protocol";
+  acquireStudioLocalDatabaseWorkerLock,
+  type StudioLocalDatabaseWorkerLockLease,
+  type StudioLocalDatabaseWorkerLockManagerLike,
+} from "./studio-local-database-worker-lock";
+import { loadStudioLocalDatabaseWorkerSqlite } from "./studio-local-database-worker-sqlite-loader";
 
-import type { StudioLocalDatabase } from "./studio-local-database";
+import type { StudioLocalDatabaseWorkerDatabase } from "./studio-local-database-worker-database";
 
-const workerScope = self as DedicatedWorkerGlobalScope;
+const scope: DedicatedWorkerGlobalScope = self as unknown as DedicatedWorkerGlobalScope;
 
-function finiteNumberProperty(
-  source: Record<string, unknown>,
-  key: "entryCount" | "rowCount" | "totalBytes",
-): number | undefined {
-  const value = source[key];
-  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
-}
-
-function serializeError(cause: unknown): StudioLocalDatabaseWorkerSerializedError {
-  if (!(cause instanceof Error)) {
-    return { name: "Error", message: String(cause) };
-  }
-  const details = cause as Error & Record<string, unknown>;
-  const reason = typeof details.reason === "string" ? details.reason : undefined;
-  const entryCount = finiteNumberProperty(details, "entryCount");
-  const rowCount = finiteNumberProperty(details, "rowCount");
-  const totalBytes = finiteNumberProperty(details, "totalBytes");
+function workerLockManager(): StudioLocalDatabaseWorkerLockManagerLike | null {
+  if (!navigator.locks) return null;
   return {
-    name: cause.name || "Error",
-    message: cause.message,
-    ...(cause.stack === undefined ? {} : { stack: cause.stack }),
-    ...(reason === undefined ? {} : { reason }),
-    ...(entryCount === undefined ? {} : { entryCount }),
-    ...(rowCount === undefined ? {} : { rowCount }),
-    ...(totalBytes === undefined ? {} : { totalBytes }),
+    request: (name, options, callback) =>
+      navigator.locks.request(name, options, (lock) => callback(lock)),
   };
 }
 
-function post(response: StudioLocalDatabaseWorkerResponse): void {
-  workerScope.postMessage(response);
-}
-
-// sqlite-wasm otherwise auto-installs its SharedArrayBuffer proxy VFSes (`opfs`
-// and `opfs-wl`) during module init. Studio deliberately owns one SAH-pool VFS,
-// which needs neither proxy and remains available without COOP/COEP. Disable
-// only those automatic alternatives before the dynamic sqlite-wasm import.
-const sqliteApiConfigScope = globalThis as typeof globalThis & {
-  sqlite3ApiConfig?: {
-    disable?: { vfs?: Record<string, boolean> };
-  };
-};
-const existingSqliteApiConfig = sqliteApiConfigScope.sqlite3ApiConfig ?? {};
-const existingDisable = existingSqliteApiConfig.disable ?? {};
-sqliteApiConfigScope.sqlite3ApiConfig = {
-  ...existingSqliteApiConfig,
-  disable: {
-    ...existingDisable,
-    vfs: {
-      ...existingDisable.vfs,
-      opfs: true,
-      "opfs-wl": true,
-    },
-  },
-};
-
-const databasePromise = openStudioLocalDatabase({ vfs: "opfs" });
-
-void databasePromise.then(
-  () => {
-    post({
-      version: STUDIO_LOCAL_DATABASE_WORKER_PROTOCOL_VERSION,
-      kind: "ready",
-    });
-  },
-  (cause: unknown) => {
-    post({
-      version: STUDIO_LOCAL_DATABASE_WORKER_PROTOCOL_VERSION,
-      kind: "fatal",
-      error: serializeError(cause),
-    });
-  },
-);
-
-type CallableDatabase = StudioLocalDatabase & Record<
-  string,
-  (...args: readonly unknown[]) => Promise<unknown>
->;
-
-async function executeRequest(request: StudioLocalDatabaseWorkerRequest): Promise<void> {
-  try {
-    const database = await databasePromise;
-    let value: unknown;
-    if (request.method === "close") {
+function leaseDatabase(
+  database: StudioLocalDatabaseWorkerDatabase,
+  lease: StudioLocalDatabaseWorkerLockLease,
+): StudioLocalDatabaseWorkerDatabase {
+  let closed = false;
+  const close = async (): Promise<void> => {
+    if (closed) return;
+    closed = true;
+    let databaseError: unknown;
+    try {
       await database.close();
-      value = undefined;
-    } else {
-      const method = (database as CallableDatabase)[request.method];
-      value = await Reflect.apply(method, database, request.args);
+    } catch (error) {
+      databaseError = error;
     }
-    post({
-      version: STUDIO_LOCAL_DATABASE_WORKER_PROTOCOL_VERSION,
-      kind: "response",
-      requestId: request.requestId,
-      ok: true,
-      value,
+    try {
+      await lease.release();
+    } catch (lockError) {
+      if (databaseError !== undefined) {
+        throw new AggregateError(
+          [databaseError, lockError],
+          "Studio local database and its Worker ownership lock both failed to close",
+          { cause: lockError },
+        );
+      }
+      throw lockError;
+    }
+    if (databaseError !== undefined) throw databaseError;
+  };
+
+  return new Proxy(database, {
+    get(target, property, receiver): unknown {
+      if (property === "close") return close;
+      const value: unknown = Reflect.get(target, property, receiver);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+}
+
+async function openWorkerOwnedDatabase(): Promise<StudioLocalDatabaseWorkerDatabase> {
+  let lease: StudioLocalDatabaseWorkerLockLease;
+  try {
+    lease = await acquireStudioLocalDatabaseWorkerLock(workerLockManager());
+  } catch (error) {
+    const { SqliteUnavailableError } = await import("./studio-local-database");
+    const reason =
+      error instanceof Error
+        ? `DedicatedWorker ownership lock failed: ${error.message}`
+        : "DedicatedWorker ownership lock failed";
+    throw new SqliteUnavailableError(reason, { cause: error });
+  }
+  try {
+    // Keep both the application DB module and sqlite-wasm out of the page/main bundle and cold
+    // Worker path. openStudioLocalDatabase performs its own dynamic sqlite-wasm initialization.
+    const { openStudioLocalDatabase } = await import("./studio-local-database");
+    const database = await openStudioLocalDatabase({
+      vfs: "opfs",
+      loadSqlite: loadStudioLocalDatabaseWorkerSqlite,
     });
-  } catch (cause) {
-    post({
-      version: STUDIO_LOCAL_DATABASE_WORKER_PROTOCOL_VERSION,
-      kind: "response",
-      requestId: request.requestId,
-      ok: false,
-      error: serializeError(cause),
-    });
+    return leaseDatabase(database as StudioLocalDatabaseWorkerDatabase, lease);
+  } catch (error) {
+    try {
+      await lease.release();
+    } catch {
+      // The database/open error is the primary initialization failure.
+    }
+    throw error;
   }
 }
 
-// Preserve request order even if a future database method gains an await point.
-let operationQueue: Promise<void> = Promise.resolve();
-
-workerScope.addEventListener("message", (event: MessageEvent<unknown>) => {
-  if (!isStudioLocalDatabaseWorkerRequest(event.data)) return;
-  const request = event.data;
-  operationQueue = operationQueue.then(
-    () => executeRequest(request),
-    () => executeRequest(request),
-  );
+attachStudioLocalDatabaseWorkerHost(scope, {
+  openDatabase: openWorkerOwnedDatabase,
 });
 
 export {};

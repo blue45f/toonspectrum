@@ -1,8 +1,6 @@
 import { Layers3, Loader2, Scissors, ShieldCheck } from "lucide-react";
 import { useId, useState } from "react";
 
-import { removeBackground } from "./studio-bg-remove";
-
 import { cn } from "@/lib/utils";
 
 interface StudioBgRemoveButtonProps {
@@ -32,6 +30,9 @@ export function StudioBgRemoveButton({
     setBusy(true);
     setError(null);
     try {
+      // Foreground segmentation is an explicit secondary action. Keep its validation,
+      // MediaPipe arbiter, WASM asset resolver, and pixel compositor out of Studio startup.
+      const { removeBackground } = await import("./studio-bg-remove");
       const result = await removeBackground(src);
       onResult(result);
     } catch (e) {

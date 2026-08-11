@@ -1,15 +1,19 @@
 import { describe, expect, it } from "vitest";
 
+import { createAvatarForgeState } from "./studio-vrm-avatar-forge";
 import { buildVrmPoseDataUrlMetadata } from "./studio-vrm-poser-utils";
 import { STUDIO_VRM_RIG_PROFILE_PURPOSE } from "./studio-vrm-rig-profile";
 import {
   DEFAULT_STUDIO_VRM_SCENE_DOCUMENT,
+  DEFAULT_STUDIO_VRM_LIGHTING_TONE,
+  STUDIO_VRM_LIGHTING_TONES,
   STUDIO_VRM_SCENE_DOCUMENT_KIND,
   STUDIO_VRM_SCENE_DOCUMENT_MAX_BYTES,
   STUDIO_VRM_SCENE_DOCUMENT_V1_MAX_BYTES,
   STUDIO_VRM_SCENE_DOCUMENT_V2_MAX_BYTES,
   STUDIO_VRM_SCENE_DOCUMENT_V3_MAX_BYTES,
   STUDIO_VRM_SCENE_DOCUMENT_V4_MAX_BYTES,
+  STUDIO_VRM_SCENE_DOCUMENT_V5_MAX_BYTES,
   STUDIO_VRM_SCENE_DOCUMENT_VERSION,
   STUDIO_VRM_SURFACE_PAINT_MAX_DECODED_PIXELS,
   STUDIO_VRM_SURFACE_PAINT_MAX_DIMENSION,
@@ -45,6 +49,7 @@ function canonicalVersionOne(
   const cloned = JSON.parse(JSON.stringify(scene)) as Record<string, unknown> & {
     pose: Record<string, unknown>;
     rig: unknown;
+    lightingTone: unknown;
     surfacePaint: unknown;
   };
   const {
@@ -52,7 +57,12 @@ function canonicalVersionOne(
     ikConstraints: _ikConstraints,
     ...legacyPose
   } = cloned.pose;
-  const { rig: _rig, surfacePaint: _surfacePaint, ...versionOne } = cloned;
+  const {
+    rig: _rig,
+    lightingTone: _lightingTone,
+    surfacePaint: _surfacePaint,
+    ...versionOne
+  } = cloned;
   return { ...versionOne, version: 1, pose: legacyPose };
 }
 
@@ -61,6 +71,7 @@ function canonicalVersionTwo(
 ): Record<string, unknown> {
   const cloned = JSON.parse(JSON.stringify(scene)) as Record<string, unknown> & {
     pose: Record<string, unknown>;
+    lightingTone: unknown;
     surfacePaint: unknown;
   };
   const {
@@ -68,7 +79,11 @@ function canonicalVersionTwo(
     ikConstraints: _ikConstraints,
     ...versionTwoPose
   } = cloned.pose;
-  const { surfacePaint: _surfacePaint, ...versionTwo } = cloned;
+  const {
+    lightingTone: _lightingTone,
+    surfacePaint: _surfacePaint,
+    ...versionTwo
+  } = cloned;
   return { ...versionTwo, version: 2, pose: versionTwoPose };
 }
 
@@ -77,10 +92,15 @@ function canonicalVersionThree(
 ): Record<string, unknown> {
   const cloned = JSON.parse(JSON.stringify(scene)) as Record<string, unknown> & {
     pose: Record<string, unknown>;
+    lightingTone: unknown;
     surfacePaint: unknown;
   };
   const { ikConstraints: _ikConstraints, ...versionThreePose } = cloned.pose;
-  const { surfacePaint: _surfacePaint, ...versionThree } = cloned;
+  const {
+    lightingTone: _lightingTone,
+    surfacePaint: _surfacePaint,
+    ...versionThree
+  } = cloned;
   return { ...versionThree, version: 3, pose: versionThreePose };
 }
 
@@ -88,13 +108,86 @@ function canonicalVersionFour(
   scene: StudioVrmSceneDocument = createDefaultStudioVrmSceneDocument(),
 ): Record<string, unknown> {
   const cloned = JSON.parse(JSON.stringify(scene)) as Record<string, unknown> & {
+    lightingTone: unknown;
     surfacePaint: unknown;
   };
-  const { surfacePaint: _surfacePaint, ...versionFour } = cloned;
+  const {
+    lightingTone: _lightingTone,
+    surfacePaint: _surfacePaint,
+    ...versionFour
+  } = cloned;
   return { ...versionFour, version: 4 };
 }
 
+function canonicalVersionFive(
+  scene: StudioVrmSceneDocument = createDefaultStudioVrmSceneDocument(),
+): Record<string, unknown> {
+  const cloned = JSON.parse(JSON.stringify(scene)) as Record<string, unknown> & {
+    lightingTone: unknown;
+  };
+  const { lightingTone: _lightingTone, ...preLightingTone } = cloned;
+  return { ...preLightingTone, version: 5 };
+}
+
 describe("studio-vrm-scene-document", () => {
+  it("round-trips exact lighting tones and strictly promotes pre-tone v5 to morning", () => {
+    expect(createDefaultStudioVrmSceneDocument().lightingTone)
+      .toBe(DEFAULT_STUDIO_VRM_LIGHTING_TONE);
+
+    for (const lightingTone of STUDIO_VRM_LIGHTING_TONES) {
+      const scene = canonicalScene({ lightingTone });
+      const serialized = serializeStudioVrmSceneDocument(scene);
+      expect(serialized).not.toBeNull();
+      expect(parseStudioVrmSceneDocument(serialized!)?.lightingTone).toBe(lightingTone);
+    }
+
+    const versionFive = canonicalVersionFive(canonicalScene({ lightingTone: "night" }));
+    const migrated = parseStudioVrmSceneDocument(JSON.stringify(versionFive));
+    expect(migrated).toMatchObject({
+      version: STUDIO_VRM_SCENE_DOCUMENT_VERSION,
+      lightingTone: DEFAULT_STUDIO_VRM_LIGHTING_TONE,
+    });
+    expect(migrateStudioVrmSceneDocument(versionFive)).toEqual(migrated);
+    expect(serializeStudioVrmSceneDocument(versionFive)).toBeNull();
+
+    const missingCurrentTone = mutableDefault();
+    delete missingCurrentTone.lightingTone;
+    expect(parseStudioVrmSceneDocument(JSON.stringify(missingCurrentTone))).toBeNull();
+    expect(serializeStudioVrmSceneDocument(missingCurrentTone)).toBeNull();
+
+    for (const lightingTone of ["day", "Morning", "", null, 1]) {
+      const malformed = { ...mutableDefault(), lightingTone };
+      expect(parseStudioVrmSceneDocument(JSON.stringify(malformed))).toBeNull();
+      expect(serializeStudioVrmSceneDocument(malformed)).toBeNull();
+      expect(normalizeStudioVrmSceneDocument(malformed).lightingTone)
+        .toBe(DEFAULT_STUDIO_VRM_LIGHTING_TONE);
+    }
+  });
+
+  it("preserves canonical Avatar Forge v4 proportions inside the existing scene envelope", () => {
+    const avatarForge = createAvatarForgeState("wave-diva");
+    avatarForge.proportions = {
+      ...avatarForge.proportions,
+      presetId: "webtoon-7",
+      overallHeight: 1.08,
+      armLength: 1.12,
+      torsoLength: 0.94,
+    };
+    const scene = canonicalScene({
+      appearance: {
+        ...createDefaultStudioVrmSceneDocument().appearance,
+        avatarForge,
+      },
+    });
+    const serialized = serializeStudioVrmSceneDocument(scene);
+
+    expect(scene.version).toBe(STUDIO_VRM_SCENE_DOCUMENT_VERSION);
+    expect(serialized).not.toBeNull();
+    expect(parseStudioVrmSceneDocument(serialized!)?.appearance.avatarForge).toEqual(
+      avatarForge,
+    );
+  });
+
   it("round-trips a canonical attachment scene without camera or rotation drift", () => {
     const hash = `sha256:${"a1".repeat(32)}`;
     const scene = canonicalScene({
@@ -350,7 +443,7 @@ describe("studio-vrm-scene-document", () => {
     expect(migrateStudioVrmSceneDocument(future)).toBeNull();
   });
 
-  it("losslessly promotes strict v1/v2/v3/v4 scenes to v5 with neutral additions", () => {
+  it("losslessly promotes strict v1/v2/v3/v4/v5 scenes to v6 with neutral additions", () => {
     const current = canonicalScene({
       pose: {
         bones: {
@@ -386,17 +479,20 @@ describe("studio-vrm-scene-document", () => {
     const versionTwo = canonicalVersionTwo(current);
     const versionThree = canonicalVersionThree(current);
     const versionFour = canonicalVersionFour(current);
+    const versionFive = canonicalVersionFive(current);
 
     const parsed = parseStudioVrmSceneDocument(JSON.stringify(versionOne));
     const migrated = migrateStudioVrmSceneDocument(versionOne);
     const migratedVersionTwo = parseStudioVrmSceneDocument(JSON.stringify(versionTwo));
     const migratedVersionThree = parseStudioVrmSceneDocument(JSON.stringify(versionThree));
     const migratedVersionFour = parseStudioVrmSceneDocument(JSON.stringify(versionFour));
+    const migratedVersionFive = parseStudioVrmSceneDocument(JSON.stringify(versionFive));
 
     expect(parsed).toEqual(migrated);
     expect(migratedVersionTwo).toEqual(parsed);
     expect(migratedVersionThree).toEqual(parsed);
     expect(migratedVersionFour).toEqual(parsed);
+    expect(migratedVersionFive).toEqual(parsed);
     expect(parsed).toMatchObject({
       kind: STUDIO_VRM_SCENE_DOCUMENT_KIND,
       version: STUDIO_VRM_SCENE_DOCUMENT_VERSION,
@@ -415,6 +511,7 @@ describe("studio-vrm-scene-document", () => {
         floorHeight: 0,
       },
       surfacePaint: { version: 1, textures: [] },
+      lightingTone: DEFAULT_STUDIO_VRM_LIGHTING_TONE,
     });
     expect(parsed?.pose.bones.leftUpperArm).toEqual(current.pose.bones.leftUpperArm);
     expect(parsed?.pose.bones.rightUpperArm).toEqual(current.pose.bones.rightUpperArm);
@@ -480,7 +577,7 @@ describe("studio-vrm-scene-document", () => {
     ]))).toBeNull();
   });
 
-  it("preserves authored v4 IK data while adding only an empty v5 surface-paint block", () => {
+  it("preserves authored v4 IK data while promoting through the v5 surface-paint schema", () => {
     const current = canonicalScene({
       pose: {
         ...createDefaultStudioVrmSceneDocument().pose,
@@ -763,7 +860,7 @@ describe("studio-vrm-scene-document", () => {
     });
   });
 
-  it("rejects unknown v1/v2/v3/v4 root, translation, rig, or surface keys", () => {
+  it("rejects unknown v1/v2/v3/v4/v5 root, translation, rig, or surface keys", () => {
     const current = mutableDefault();
     expect(parseStudioVrmSceneDocument(JSON.stringify({ ...current, futureRoot: true }))).toBeNull();
     expect(serializeStudioVrmSceneDocument({ ...current, futureRoot: true })).toBeNull();
@@ -775,10 +872,16 @@ describe("studio-vrm-scene-document", () => {
     const versionOne = canonicalVersionOne();
     const versionTwo = canonicalVersionTwo();
     const versionFour = canonicalVersionFour();
+    const versionFive = canonicalVersionFive();
     expect(parseStudioVrmSceneDocument(JSON.stringify({ ...versionOne, rig: {} }))).toBeNull();
     expect(migrateStudioVrmSceneDocument({ ...versionOne, unknown: true })).toBeNull();
     expect(migrateStudioVrmSceneDocument({ ...versionTwo, unknown: true })).toBeNull();
     expect(migrateStudioVrmSceneDocument({ ...versionFour, unknown: true })).toBeNull();
+    expect(migrateStudioVrmSceneDocument({ ...versionFive, unknown: true })).toBeNull();
+    expect(migrateStudioVrmSceneDocument({
+      ...versionFive,
+      lightingTone: "morning",
+    })).toBeNull();
     expect(migrateStudioVrmSceneDocument({
       ...versionFour,
       surfacePaint: { version: 1, textures: [] },
@@ -837,7 +940,7 @@ describe("studio-vrm-scene-document", () => {
     expect(migrateStudioVrmSceneDocument(paddedVersionOne)).toBeNull();
   });
 
-  it("honors historical v2/v3/v4 byte ceilings while reserving v5 migration headroom", () => {
+  it("honors historical v2/v3/v4/v5 byte ceilings while reserving v6 migration headroom", () => {
     const compactVersionTwo = JSON.stringify(canonicalVersionTwo());
     const compactBytes = new TextEncoder().encode(compactVersionTwo).byteLength;
     const atCeiling = `${compactVersionTwo}${" ".repeat(
@@ -870,6 +973,19 @@ describe("studio-vrm-scene-document", () => {
     expect(parseStudioVrmSceneDocument(versionFourAtCeiling)?.version)
       .toBe(STUDIO_VRM_SCENE_DOCUMENT_VERSION);
     expect(parseStudioVrmSceneDocument(`${versionFourAtCeiling} `)).toBeNull();
+
+    const compactVersionFive = JSON.stringify(canonicalVersionFive());
+    const compactVersionFiveBytes = new TextEncoder().encode(compactVersionFive).byteLength;
+    const versionFiveAtCeiling = `${compactVersionFive}${" ".repeat(
+      STUDIO_VRM_SCENE_DOCUMENT_V5_MAX_BYTES - compactVersionFiveBytes,
+    )}`;
+    expect(new TextEncoder().encode(versionFiveAtCeiling).byteLength)
+      .toBe(STUDIO_VRM_SCENE_DOCUMENT_V5_MAX_BYTES);
+    expect(parseStudioVrmSceneDocument(versionFiveAtCeiling)).toMatchObject({
+      version: STUDIO_VRM_SCENE_DOCUMENT_VERSION,
+      lightingTone: DEFAULT_STUDIO_VRM_LIGHTING_TONE,
+    });
+    expect(parseStudioVrmSceneDocument(`${versionFiveAtCeiling} `)).toBeNull();
   });
 
   it("never invokes accessors while parsing, serializing, or normalizing", () => {
@@ -916,6 +1032,7 @@ describe("studio-vrm-scene-document", () => {
       customColors: { hair: "#ABCDEF" },
       bodyScale: { height: 1.1, width: 0.9 },
       lighting: { intensity: 1.2, colorTemp: 0.4, directionDeg: 30 },
+      lightingTone: "night",
       physics: {
         version: 1,
         stiffnessScale: 1.2,
@@ -939,6 +1056,7 @@ describe("studio-vrm-scene-document", () => {
         model: { source: "bundled", id: "avatar-a", name: "하린" },
         pose: { yOffset: -0.2, bodyRotationY: 0.65 },
         expressions: { happy: 0.75 },
+        lightingTone: "night",
         env: "floor",
       },
     });
@@ -974,6 +1092,7 @@ describe("studio-vrm-scene-document", () => {
         pole: [-0.7, 1.05, 0.3],
       }],
       expressionWeights: { happy: 0.7 },
+      lightingTone: "studio",
       props: { version: 1, items: [] },
     }, "하린");
     const decodedMetadata = JSON.parse(JSON.stringify(metadata)) as typeof metadata;
@@ -995,6 +1114,7 @@ describe("studio-vrm-scene-document", () => {
           bodyRotationY: 0.45,
         },
         expressions: { happy: 0.7 },
+        lightingTone: "studio",
         props: { version: 1, items: [] },
       },
     });
@@ -1007,6 +1127,18 @@ describe("studio-vrm-scene-document", () => {
       ...decodedMetadata,
       runtimeUrl: "blob:hostile",
     }, { bundledModels: registry })).toBeNull();
+    expect(migrateStudioVrmLegacyMetadata({
+      ...decodedMetadata,
+      lightingTone: "day",
+    }, { bundledModels: registry })).toBeNull();
+    const { lightingTone: _lightingTone, ...preToneMetadata } = decodedMetadata;
+    expect(migrateStudioVrmLegacyMetadata(
+      preToneMetadata,
+      { bundledModels: registry },
+    )).toMatchObject({
+      status: "resolved",
+      document: { lightingTone: DEFAULT_STUDIO_VRM_LIGHTING_TONE },
+    });
     const { ikConstraints: _ikConstraints, ...historicalVersionTwo } = decodedMetadata;
     expect(migrateStudioVrmLegacyMetadata({
       ...historicalVersionTwo,

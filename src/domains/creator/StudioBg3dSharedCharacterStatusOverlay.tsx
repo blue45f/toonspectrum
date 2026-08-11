@@ -62,7 +62,8 @@ export function StudioBg3dSharedCharacterStatusOverlay({
       </p>
       {includeInCapture && previewOmissionCount > 0 ? (
         <p className="mt-0.5 text-warning">
-          고급 상태 {previewOmissionCount}개가 있는 캐릭터는 원본 보존을 위해 결과 캡처에서 제외돼요.
+          현재 배경 캡처에서 지원하지 않는 캐릭터 설정이 {previewOmissionCount}개 있어요.
+          이 설정이 있는 캐릭터는 원본을 지키기 위해 결과에서 제외돼요.
         </p>
       ) : null}
       {capacityOmissionCount > 0 ? (

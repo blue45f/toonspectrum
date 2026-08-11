@@ -13,11 +13,13 @@ import {
   studioShared3dCharacterWorldTransform,
 } from "./studio-shared-3d-scene-bridge";
 import { createAvatarForgeState } from "./studio-vrm-avatar-forge";
+import { createPropInstance, serializeVrmProps } from "./studio-vrm-props";
 import {
   createStudioVrmSceneDocument,
   normalizeStudioVrmSceneDocument,
   serializeStudioVrmSceneDocument,
 } from "./studio-vrm-scene-document";
+import { createWardrobeEquip, serializeWardrobe } from "./studio-vrm-wardrobe";
 
 describe("studio shared 3D scene bridge", () => {
   it("links canonical VRM authorities without projecting them into the background schema", () => {
@@ -49,6 +51,12 @@ describe("studio shared 3D scene bridge", () => {
     expect(session.characters[0]?.compatibility.roundTrip).toBe(
       "source-authority-preserved",
     );
+    expect(session.characters[0]?.compatibility.appearanceProjection).toMatchObject({
+      kind: "studio-vrm-linked-appearance-projection-plan",
+      version: 1,
+      wardrobe: { status: "empty" },
+      handProps: { status: "empty" },
+    });
     expect(session.characters[0]?.sourceHash).toMatch(/^sha256:[0-9a-f]{64}$/u);
     expect(session.characters[0]?.runtimeKey).toContain(
       session.characters[0]?.sourceHash ?? "missing",
@@ -99,7 +107,92 @@ describe("studio shared 3D scene bridge", () => {
     expect(serializeStudioVrmSceneDocument(scene)).toBe(before);
   });
 
-  it("keeps the neutral Avatar Forge state capturable while flagging real forge edits", () => {
+  it("plans known wardrobe and hand props exactly but keeps capture fail-closed until runtime receipts exist", () => {
+    const exact = createStudioVrmSceneDocument();
+    const scene = normalizeStudioVrmSceneDocument({
+      ...exact,
+      appearance: {
+        ...exact.appearance,
+        wardrobe: serializeWardrobe({
+          top: createWardrobeEquip("shirt")!,
+          shoes: createWardrobeEquip("boots")!,
+        }),
+      },
+      props: serializeVrmProps([createPropInstance("mug", "shared-mug")!]),
+    });
+    const before = serializeStudioVrmSceneDocument(scene);
+    const report = inspectStudioShared3dCharacterCompatibility(scene);
+
+    expect(report.appearanceProjection.wardrobe).toMatchObject({
+      status: "supported",
+      slots: [
+        { slot: "top", itemId: "shirt" },
+        { slot: "shoes", itemId: "boots" },
+      ],
+    });
+    expect(report.appearanceProjection.handProps).toMatchObject({
+      status: "supported",
+      props: [{
+        uid: "shared-mug",
+        propId: "mug",
+        autoGripHand: "rightHand",
+      }],
+    });
+    expect(report.previewOmissions.map(({ code }) => code)).toEqual([
+      "props",
+      "wardrobe",
+    ]);
+    expect(serializeStudioVrmSceneDocument(scene)).toBe(before);
+  });
+
+  it("exposes fail-closed reasons for future or partial appearance documents", () => {
+    const exact = createStudioVrmSceneDocument();
+    const scene = normalizeStudioVrmSceneDocument({
+      ...exact,
+      appearance: {
+        ...exact.appearance,
+        wardrobe: {
+          version: 999,
+          slots: { top: { itemId: "shirt" } },
+        },
+      },
+      props: {
+        version: 2,
+        items: [{ uid: "future", propId: "future-prop", bone: "rightHand" }],
+      },
+    });
+    const report = inspectStudioShared3dCharacterCompatibility(scene);
+
+    expect(report.appearanceProjection.wardrobe).toMatchObject({
+      status: "unsupported",
+      reasons: [expect.objectContaining({ code: "unsupported-version" })],
+    });
+    expect(report.appearanceProjection.handProps).toMatchObject({
+      status: "unsupported",
+      reasons: expect.arrayContaining([expect.objectContaining({ code: "unknown-prop" })]),
+    });
+    expect(report.previewOmissions.map(({ code }) => code)).toEqual(["props", "wardrobe"]);
+  });
+
+  it.each([
+    ["missing V2 slots", { version: 2 }],
+    ["hybrid V2 direct slot", { version: 2, top: { itemId: "shirt" } }],
+    ["explicit null V2 slot", { version: 2, slots: { top: null } }],
+  ])("keeps the source visible for a %s wardrobe envelope", (_label, wardrobe) => {
+    const exact = createStudioVrmSceneDocument();
+    const scene = normalizeStudioVrmSceneDocument({
+      ...exact,
+      appearance: { ...exact.appearance, wardrobe },
+    });
+    const report = inspectStudioShared3dCharacterCompatibility(scene);
+
+    expect(report.appearanceProjection.wardrobe).toMatchObject({ status: "unsupported" });
+    expect(report.previewOmissions).toContainEqual(
+      expect.objectContaining({ code: "wardrobe" }),
+    );
+  });
+
+  it("keeps neutral and proportion-only Avatar Forge v4 states capturable", () => {
     const exact = createStudioVrmSceneDocument();
     const neutralForge = createAvatarForgeState();
     const neutral = normalizeStudioVrmSceneDocument({
@@ -109,29 +202,146 @@ describe("studio shared 3D scene bridge", () => {
         avatarForge: neutralForge,
       },
     });
-    const customized = normalizeStudioVrmSceneDocument({
+    const proportionOnly = normalizeStudioVrmSceneDocument({
       ...neutral,
       appearance: {
         ...neutral.appearance,
         avatarForge: {
           ...neutralForge,
-          hair: {
-            ...neutralForge.hair,
-            style: "bob",
-            curl: 0.48,
+          bodyPresetId: "hero",
+          proportions: {
+            ...neutralForge.proportions,
+            presetId: "7-heads",
+            headBodyRatio: 1.18,
+            shoulderWidth: 1.1,
+            legLength: 1.08,
           },
+          // v4 proportions are authoritative. A stale deprecated body view is projected from
+          // proportions by the canonical parser instead of becoming a second runtime authority.
+          body: { ...neutralForge.body, shoulderWidth: 0.9, legLength: 0.94 },
         },
       },
     });
 
     expect(neutral.appearance.avatarForge).not.toBeNull();
-    expect(inspectStudioShared3dCharacterCompatibility(neutral).previewOmissions)
+    const neutralReport = inspectStudioShared3dCharacterCompatibility(neutral);
+    const proportionReport = inspectStudioShared3dCharacterCompatibility(proportionOnly);
+    expect(neutralReport.previewOmissions)
       .not.toContainEqual(expect.objectContaining({ code: "avatar-forge" }));
-    expect(customized.appearance.avatarForge).toMatchObject({
-      hair: { style: "bob", curl: 0.48 },
+    expect(proportionReport.supportedPreview).toContain("두신·골격 비율");
+    expect(proportionReport.previewOmissions)
+      .not.toContainEqual(expect.objectContaining({ code: "avatar-forge" }));
+
+    const session = createStudioShared3dSceneSession([
+      { elementId: "proportion-only", scene: proportionOnly },
+    ]);
+    expect(inspectStudioShared3dCaptureReadiness(session, {
+      [session.characters[0]!.runtimeKey]: "ready",
+    })).toEqual({
+      phase: "ready",
+      capturableElementIds: ["proportion-only"],
+      previewOnlyElementIds: [],
     });
-    expect(inspectStudioShared3dCharacterCompatibility(customized).previewOmissions)
-      .toContainEqual(expect.objectContaining({ code: "avatar-forge" }));
+  });
+
+  it("uses canonical v4 migration before admitting a legacy v3 body-only edit", () => {
+    const exact = createStudioVrmSceneDocument();
+    const legacyV3 = normalizeStudioVrmSceneDocument({
+      ...exact,
+      appearance: {
+        ...exact.appearance,
+        avatarForge: {
+          version: 3,
+          bodyPresetId: "hero",
+          body: {
+            shoulderWidth: 1.1,
+            torsoLength: 1.03,
+            hipWidth: 1,
+            armLength: 1.04,
+            legLength: 1.06,
+          },
+        },
+      },
+    });
+
+    expect(inspectStudioShared3dCharacterCompatibility(legacyV3).previewOmissions)
+      .not.toContainEqual(expect.objectContaining({ code: "avatar-forge" }));
+  });
+
+  it.each([
+    ["face proportions", (neutral: ReturnType<typeof createAvatarForgeState>) => ({
+      ...neutral,
+      face: { ...neutral.face, headWidth: 1.08 },
+    }), "헤어·얼굴 조형"],
+    ["procedural hair", (neutral: ReturnType<typeof createAvatarForgeState>) => ({
+      ...neutral,
+      hair: { ...neutral.hair, style: "bob" as const },
+    }), "헤어·얼굴 조형"],
+    ["original-hair replacement", (neutral: ReturnType<typeof createAvatarForgeState>) => ({
+      ...neutral,
+      hair: { ...neutral.hair, replaceOriginal: true },
+    }), "헤어·얼굴 조형"],
+    ["face accents", (neutral: ReturnType<typeof createAvatarForgeState>) => ({
+      ...neutral,
+      faceAccents: neutral.faceAccents?.map((accent) =>
+        accent.id === "blush" ? { ...accent, enabled: true } : accent,
+      ),
+    }), "헤어·얼굴 조형"],
+    ["legacy hip width", (neutral: ReturnType<typeof createAvatarForgeState>) => ({
+      ...neutral,
+      legacyHipWidth: 1.08,
+      body: { ...neutral.body, hipWidth: 1.08 },
+    }), "기존 골반 너비 조형"],
+  ])("keeps %s fail-closed and preview-only", (_label, customize, omissionLabel) => {
+    const exact = createStudioVrmSceneDocument();
+    const scene = normalizeStudioVrmSceneDocument({
+      ...exact,
+      appearance: {
+        ...exact.appearance,
+        avatarForge: customize(createAvatarForgeState()),
+      },
+    });
+    const session = createStudioShared3dSceneSession([
+      { elementId: "unsupported-forge", scene },
+    ]);
+
+    expect(session.characters[0]?.compatibility.previewOmissions).toContainEqual({
+      code: "avatar-forge",
+      label: omissionLabel,
+    });
+    expect(inspectStudioShared3dCaptureReadiness(session, {
+      [session.characters[0]!.runtimeKey]: "ready",
+    })).toEqual({
+      phase: "ready",
+      capturableElementIds: [],
+      previewOnlyElementIds: ["unsupported-forge"],
+    });
+  });
+
+  it("fails closed for future or unknown Avatar Forge envelopes", () => {
+    const exact = createStudioVrmSceneDocument();
+    const future = normalizeStudioVrmSceneDocument({
+      ...exact,
+      appearance: {
+        ...exact.appearance,
+        avatarForge: { ...createAvatarForgeState(), version: 999 },
+      },
+    });
+    const unknown = normalizeStudioVrmSceneDocument({
+      ...exact,
+      appearance: {
+        ...exact.appearance,
+        avatarForge: { version: 4, futureSculpt: { jaw: 0.7 } },
+      },
+    });
+
+    for (const scene of [future, unknown]) {
+      expect(inspectStudioShared3dCharacterCompatibility(scene).previewOmissions)
+        .toContainEqual({
+          code: "avatar-forge",
+          label: "지원하지 않는 아바타 포지 조형",
+        });
+    }
   });
 
   it("deduplicates unsafe sources and applies a deterministic GPU admission bound", () => {

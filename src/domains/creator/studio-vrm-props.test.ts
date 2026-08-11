@@ -6,11 +6,13 @@ import {
   VRM_PROPS,
   buildPropObject,
   createPropInstance,
+  inspectVrmPropsDocumentForProjection,
   parseVrmProps,
   propDefById,
   propsByCategory,
   serializeVrmProps,
   type PropDef,
+  type PropInstance,
   type ThreeLike,
   type ThreeObject,
 } from "./studio-vrm-props";
@@ -395,6 +397,366 @@ describe("부착 인스턴스 생성·직렬화", () => {
     expect(parsed.items[0].rig).toBeUndefined();
     expect(parsed.items[1].rig).toBeDefined();
     expect(parsed.items[1].rig!.secondary).toBeUndefined();
+  });
+});
+
+function legacyProjectionItem(propId: string, uid: string): PropInstance {
+  const item = createPropInstance(propId, uid)!;
+  const { rig: _rig, ...legacy } = item;
+  return legacy;
+}
+
+function freezeTestValue<T>(value: T): T {
+  if (!value || typeof value !== "object" || Object.isFrozen(value)) return value;
+  for (const child of Object.values(value as Record<string, unknown>)) freezeTestValue(child);
+  return Object.freeze(value);
+}
+
+function expectDeeplyFrozen(value: unknown, seen = new WeakSet<object>()): void {
+  if (!value || typeof value !== "object" || seen.has(value)) return;
+  seen.add(value);
+  expect(Object.isFrozen(value)).toBe(true);
+  for (const child of Object.values(value)) expectDeeplyFrozen(child, seen);
+}
+
+describe("Shared Stage 소품 문서 엄격 검사", () => {
+  it("absent·legacy·V1·V2를 기존 스키마 의미에 맞게 구분한다", () => {
+    const legacyItem = legacyProjectionItem("mug", "legacy-mug");
+    const v2Item = createPropInstance("smartphone", "v2-phone")!;
+
+    expect(inspectVrmPropsDocumentForProjection(undefined)).toEqual({
+      status: "ready",
+      sourceVersion: "absent",
+      document: { version: 2, items: [] },
+    });
+    expect(inspectVrmPropsDocumentForProjection({ items: [legacyItem] })).toMatchObject({
+      status: "ready",
+      sourceVersion: "legacy",
+      document: { items: [{ uid: "legacy-mug", propId: "mug" }] },
+    });
+    expect(inspectVrmPropsDocumentForProjection({ version: 1, items: [legacyItem] })).toMatchObject({
+      status: "ready",
+      sourceVersion: 1,
+      document: { items: [{ uid: "legacy-mug", propId: "mug" }] },
+    });
+    expect(inspectVrmPropsDocumentForProjection({ version: 2, items: [v2Item] })).toMatchObject({
+      status: "ready",
+      sourceVersion: 2,
+      document: { items: [{ uid: "v2-phone", propId: "smartphone", rig: { version: 2 } }] },
+    });
+  });
+
+  it("시간·난수·crypto 없이 결정적으로 검사하고 입력을 변경하지 않는다", () => {
+    const input = {
+      version: 2,
+      items: [createPropInstance("book", "deterministic-book")!],
+    };
+    const before = structuredClone(input);
+    freezeTestValue(input);
+    const random = vi.spyOn(Math, "random");
+    const now = vi.spyOn(Date, "now");
+    const randomUUID = vi.fn(() => "inspector-must-not-request-a-uuid");
+    vi.stubGlobal("crypto", { randomUUID });
+
+    try {
+      const first = inspectVrmPropsDocumentForProjection(input);
+      const second = inspectVrmPropsDocumentForProjection(input);
+
+      expect(first).toEqual(second);
+      expect(input).toEqual(before);
+      expect(random).not.toHaveBeenCalled();
+      expect(now).not.toHaveBeenCalled();
+      expect(randomUUID).not.toHaveBeenCalled();
+      expectDeeplyFrozen(first);
+      if (first.status === "ready") {
+        expect(first.document.items[0]).not.toBe(input.items[0]);
+        expect(first.document.items[0].rig).not.toBe(input.items[0].rig);
+      }
+    } finally {
+      random.mockRestore();
+      now.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("검사가 전역 UID 카운터나 발급 레지스트리를 예약하지 않는다", async () => {
+    vi.stubGlobal("crypto", { randomUUID: () => "projection-registry" });
+
+    try {
+      vi.resetModules();
+      const baseline = await import("./studio-vrm-props");
+      const expectedNextUid = baseline.nextPropUid("mug");
+
+      vi.resetModules();
+      const inspected = await import("./studio-vrm-props");
+      const def = inspected.propDefById("mug")!;
+      const result = inspected.inspectVrmPropsDocumentForProjection({
+        version: 2,
+        items: [{
+          uid: expectedNextUid,
+          propId: def.id,
+          bone: def.defaultBone,
+          position: def.defaultPosition,
+          rotationDeg: def.defaultRotationDeg,
+          scale: def.defaultScale,
+          color: def.defaultColor,
+          rig: {
+            version: 2,
+            mode: "auto",
+            anchorId: "primary",
+            autoScale: true,
+            autoFingerPose: true,
+            gripFit: 1,
+            deltaPosition: [0, 0, 0],
+            deltaRotationDeg: [0, 0, 0],
+            deltaScale: 1,
+          },
+        }],
+      });
+
+      expect(result.status).toBe("ready");
+      expect(inspected.nextPropUid("mug")).toBe(expectedNextUid);
+    } finally {
+      vi.resetModules();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("미래·알 수 없는 문서 버전을 명시적으로 전체 거부한다", () => {
+    const result = inspectVrmPropsDocumentForProjection({
+      version: VRM_PROPS_VERSION + 1,
+      items: [legacyProjectionItem("mug", "future-mug")],
+    });
+
+    expect(result).toEqual({
+      status: "rejected",
+      sourceVersion: "unknown",
+      issues: [{ reason: "unsupported-version", path: "version" }],
+    });
+    expectDeeplyFrozen(result);
+  });
+
+  it("알 수 없는 루트·항목 필드를 조용히 무시하지 않고 정확한 경로로 거부한다", () => {
+    const rootResult = inspectVrmPropsDocumentForProjection({
+      version: 2,
+      items: [],
+      futureRuntime: { enabled: true },
+    });
+    expect(rootResult).toEqual({
+      status: "rejected",
+      sourceVersion: 2,
+      issues: [{ reason: "unsupported-document-field", path: "futureRuntime" }],
+    });
+
+    const itemResult = inspectVrmPropsDocumentForProjection({
+      version: 1,
+      items: [{ ...legacyProjectionItem("mug", "future-item"), futureSocket: "tail" }],
+    });
+    expect(itemResult).toEqual({
+      status: "rejected",
+      sourceVersion: 1,
+      issues: [{
+        reason: "unsupported-item-field",
+        path: "items[0].futureSocket",
+        itemIndex: 0,
+        uid: "future-item",
+        propId: "mug",
+      }],
+    });
+  });
+
+  it("알 수 없는 propId를 조용히 제거하지 않고 정확한 항목으로 거부한다", () => {
+    const result = inspectVrmPropsDocumentForProjection({
+      version: 1,
+      items: [{
+        uid: "unknown-prop",
+        propId: "future-laser-sword",
+        bone: "rightHand",
+        position: [0, 0, 0],
+        rotationDeg: [0, 0, 0],
+        scale: 1,
+        color: "#ffffff",
+      }],
+    });
+
+    expect(result).toEqual({
+      status: "rejected",
+      sourceVersion: 1,
+      issues: [{
+        reason: "unknown-prop-id",
+        path: "items[0].propId",
+        itemIndex: 0,
+        uid: "unknown-prop",
+        propId: "future-laser-sword",
+      }],
+    });
+  });
+
+  it("중복·누락·빈 UID를 재발급하지 않고 항목별로 모두 보고한다", () => {
+    const first = legacyProjectionItem("mug", "duplicate");
+    const missing = { ...legacyProjectionItem("book", "remove-me") } as Partial<PropInstance>;
+    delete missing.uid;
+    const invalid = { ...legacyProjectionItem("sword", "") };
+    const duplicate = legacyProjectionItem("cap", "duplicate");
+
+    const result = inspectVrmPropsDocumentForProjection({
+      version: 1,
+      items: [first, missing, invalid, duplicate],
+    });
+    expect(result).toMatchObject({
+      status: "rejected",
+      sourceVersion: 1,
+      issues: [
+        { reason: "missing-uid", path: "items[1].uid", itemIndex: 1, propId: "book" },
+        { reason: "invalid-uid", path: "items[2].uid", itemIndex: 2, uid: "", propId: "sword" },
+        { reason: "duplicate-uid", path: "items[3].uid", itemIndex: 3, uid: "duplicate", propId: "cap" },
+      ],
+    });
+  });
+
+  it("지원하지 않는 본과 손상·미지원 rig 필드를 정확한 경로로 거부한다", () => {
+    const invalidBone = { ...legacyProjectionItem("cap", "bad-bone"), bone: "tail" };
+    const book = createPropInstance("book", "bad-rig")!;
+    book.rig = {
+      ...book.rig!,
+      anchorId: "missing-primary",
+      gripFit: 99,
+      secondary: {
+        enabled: true,
+        anchorId: "secondary",
+        bone: "leftHand",
+        influence: 2,
+      },
+    };
+    const rigWithUnknownField = { ...book.rig, futureConstraint: true };
+
+    const result = inspectVrmPropsDocumentForProjection({
+      version: 2,
+      items: [invalidBone, { ...book, rig: rigWithUnknownField }],
+    });
+    expect(result).toMatchObject({ status: "rejected", sourceVersion: 2 });
+    if (result.status !== "rejected") throw new Error("손상된 본/rig 문서가 승인되었습니다.");
+    expect(result.issues).toEqual([
+      {
+        reason: "invalid-bone",
+        path: "items[0].bone",
+        itemIndex: 0,
+        uid: "bad-bone",
+        propId: "cap",
+      },
+      {
+        reason: "unsupported-rig-field",
+        path: "items[1].rig.futureConstraint",
+        itemIndex: 1,
+        uid: "bad-rig",
+        propId: "book",
+      },
+      {
+        reason: "invalid-rig-anchor",
+        path: "items[1].rig.anchorId",
+        itemIndex: 1,
+        uid: "bad-rig",
+        propId: "book",
+      },
+      {
+        reason: "invalid-rig-grip-fit",
+        path: "items[1].rig.gripFit",
+        itemIndex: 1,
+        uid: "bad-rig",
+        propId: "book",
+      },
+      {
+        reason: "invalid-secondary-bone",
+        path: "items[1].rig.secondary.bone",
+        itemIndex: 1,
+        uid: "bad-rig",
+        propId: "book",
+      },
+      {
+        reason: "invalid-secondary-influence",
+        path: "items[1].rig.secondary.influence",
+        itemIndex: 1,
+        uid: "bad-rig",
+        propId: "book",
+      },
+    ]);
+    expectDeeplyFrozen(result);
+  });
+
+  it("기존 V2의 누락 gripFit·보조 손 influence만 결정적 기본값으로 승격한다", () => {
+    const book = createPropInstance("book", "legacy-v2-rig-defaults")!;
+    const legacyRig = {
+      ...book.rig!,
+      secondary: {
+        enabled: true,
+        anchorId: "secondary",
+        bone: "rightHand",
+      },
+    } as Record<string, unknown>;
+    delete legacyRig.gripFit;
+
+    const result = inspectVrmPropsDocumentForProjection({
+      version: 2,
+      items: [{ ...book, rig: legacyRig }],
+    });
+
+    expect(result).toMatchObject({
+      status: "ready",
+      sourceVersion: 2,
+      document: {
+        items: [{
+          uid: "legacy-v2-rig-defaults",
+          rig: { gripFit: 1, secondary: { influence: 0.65 } },
+        }],
+      },
+    });
+    expectDeeplyFrozen(result);
+  });
+
+  it("유효한 한손·양손 소품을 원문과 분리된 깊은 불변 V2 문서로 승인한다", () => {
+    const mug = createPropInstance("mug", "hand-mug")!;
+    const book = createPropInstance("book", "two-hand-book")!;
+    book.rig = {
+      ...book.rig!,
+      secondary: {
+        enabled: true,
+        anchorId: "secondary",
+        bone: "rightHand",
+        influence: 0.65,
+        elbowHint: [0.1, 0.2, -0.1],
+      },
+    };
+    const input = { version: 2, items: [mug, book] };
+
+    const result = inspectVrmPropsDocumentForProjection(input);
+
+    expect(result).toEqual({
+      status: "ready",
+      sourceVersion: 2,
+      document: { version: 2, items: [mug, book] },
+    });
+    expectDeeplyFrozen(result);
+    if (result.status === "ready") {
+      expect(result.document.items[0]).not.toBe(mug);
+      expect(result.document.items[1].rig?.secondary).not.toBe(book.rig?.secondary);
+    }
+  });
+
+  it("legacy/V1에 섞인 rig를 새 의미로 해석하거나 조용히 제거하지 않는다", () => {
+    const item = createPropInstance("mug", "legacy-rig")!;
+    const result = inspectVrmPropsDocumentForProjection({ version: 1, items: [item] });
+
+    expect(result).toMatchObject({
+      status: "rejected",
+      sourceVersion: 1,
+      issues: [{
+        reason: "rig-not-supported-for-source-version",
+        path: "items[0].rig",
+        itemIndex: 0,
+        uid: "legacy-rig",
+        propId: "mug",
+      }],
+    });
   });
 });
 

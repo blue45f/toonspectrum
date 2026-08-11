@@ -18,6 +18,7 @@ import {
   STUDIO_ASSET_CONTENT_IDENTITY_MAX_RETURN_DATA_URL_CHARS,
   STUDIO_ASSET_DATA_URL_MAX_CHARS,
 } from "./studio-asset-library";
+import { isStudioLocalDatabaseCommitOutcomeUnknownError } from "./studio-local-database-commit-outcome";
 import { acquireStudioLocalDatabase } from "./studio-local-database-runtime";
 import {
   createStudioOpfsAssetStore,
@@ -648,7 +649,9 @@ export function createStudioAssetLibrarySqliteOpfsRepository(
         serializeStudioAssetManifest(next.entries),
       );
     } catch (error) {
-      await store.setOwnerRefs(STUDIO_ASSET_LIBRARY_CAS_OWNER, oldHashes).catch(() => []);
+      if (!isStudioLocalDatabaseCommitOutcomeUnknownError(error)) {
+        await store.setOwnerRefs(STUDIO_ASSET_LIBRARY_CAS_OWNER, oldHashes).catch(() => []);
+      }
       throw asRepositoryError(error, "manifest 커밋");
     }
     // Manifest is now authoritative. Cleanup is recoverable bookkeeping and cannot roll it back.

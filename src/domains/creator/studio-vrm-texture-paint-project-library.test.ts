@@ -290,11 +290,12 @@ describe("studio VRM texture-paint project library bridge", () => {
     });
   });
 
-  it("requires strict v5 scenes and matching full-scene fingerprints", async () => {
+  it("requires strict v6 scenes and matching full-scene fingerprints", async () => {
     const value = await artifact("strict", 2, 2);
     const currentScene = scene([texture(value, "strict", "gltf-material:0")]);
     const legacy = JSON.parse(JSON.stringify(currentScene)) as Record<string, unknown>;
     delete legacy.surfacePaint;
+    delete legacy.lightingTone;
     legacy.version = 4;
     const legacyProject = project([image("legacy", legacy)]);
     await expect(collectStudioVrmTexturePaintProjectPlan(legacyProject)).rejects.toMatchObject({

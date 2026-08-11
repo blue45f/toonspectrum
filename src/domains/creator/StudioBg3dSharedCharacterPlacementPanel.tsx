@@ -3,14 +3,16 @@ import { useState, type KeyboardEvent } from "react";
 
 import {
   studioShared3dCharacterWorldTransform,
-  type StudioShared3dCharacterRuntimeStatus,
-  type StudioShared3dCharacterSource,
-  type StudioShared3dCharacterStageTransform,
-  type StudioShared3dCharacterTransformCommitHandler,
-} from "./studio-shared-3d-scene-bridge";
+} from "./studio-shared-3d-scene-runtime";
 
 import type { StudioBg3dSharedCharacterGroundingResult } from
   "./studio-bg3d-shared-character-grounding";
+import type {
+  StudioShared3dCharacterRuntimeStatus,
+  StudioShared3dCharacterSource,
+  StudioShared3dCharacterStageTransform,
+  StudioShared3dCharacterTransformCommitHandler,
+} from "./studio-shared-3d-scene-bridge";
 
 import { cn } from "@/lib/utils";
 

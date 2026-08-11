@@ -313,8 +313,8 @@ export interface WardrobeItemDef {
   catalogStatus: "selectable" | "legacy-only";
   /** 신규 선택 시 제안할 같은 슬롯의 대체 아이템. */
   replacementId: string | null;
-  /** Runtime deformation authority. Shoes stay rigid; body garments share the avatar skeleton. */
-  geometrySource: "skinned-procedural-v1" | "rigid-procedural";
+  /** Runtime deformation authority. Dynamic skirts use bounded XPBD with a rigid preview fallback. */
+  geometrySource: "xpbd-skirt-v1" | "skinned-procedural-v1" | "rigid-procedural";
   defaultFabricId: WardrobeFabricId;
   fitProfile: WardrobeFitProfile;
 }
@@ -342,8 +342,8 @@ const WARDROBE_ITEM_BASES: readonly WardrobeItemBase[] = [
   { id: "dress", label: "원피스", slot: "top", emoji: "👗", defaultColor: "#e8a6bd", hint: "상의+스커트 일체형. 하의 없이 단독 착용 추천." },
   { id: "scrubs", label: "의료 스크럽 상의", slot: "top", emoji: "🩺", defaultColor: "#0f766e", hint: "의사·간호사·응급구조사 컷. 반소매 V넥 작업복입니다." },
   // 하의
-  { id: "pleated", label: "플리츠 스커트", slot: "bottom", emoji: "🩳", defaultColor: "#1e293b", hint: "교복 컷 단골. 물리 스커트와 달리 절대 뚫리지 않아요." },
-  { id: "longskirt", label: "롱스커트", slot: "bottom", emoji: "👗", defaultColor: "#6e2434", hint: "우아한 컷. 발목까지 내려와요." },
+  { id: "pleated", label: "플리츠 스커트", slot: "bottom", emoji: "🩳", defaultColor: "#1e293b", hint: "신체 충돌을 계산하는 가벼운 천 물리 스커트예요. 천끼리의 자기 충돌은 아직 지원하지 않습니다." },
+  { id: "longskirt", label: "롱스커트", slot: "bottom", emoji: "👗", defaultColor: "#6e2434", hint: "신체의 허벅지와 종아리를 따라 움직이는 천 물리 롱스커트예요. 천끼리의 자기 충돌은 아직 지원하지 않습니다." },
   { id: "shorts", label: "반바지", slot: "bottom", emoji: "🩳", defaultColor: "#334155", hint: "여름·활동 컷." },
   { id: "pants", label: "슬림 팬츠", slot: "bottom", emoji: "👖", defaultColor: "#1c1c22", hint: "정장·데일리 컷." },
   { id: "wide", label: "와이드 팬츠", slot: "bottom", emoji: "👖", defaultColor: "#4b5563", hint: "밑단이 넓게 퍼지는 실루엣." },
@@ -389,7 +389,11 @@ export const WARDROBE_ITEMS: readonly WardrobeItemDef[] = WARDROBE_ITEM_BASES.ma
         : "standard-procedural",
       catalogStatus: replacementId ? "legacy-only" : "selectable",
       replacementId,
-      geometrySource: item.slot === "shoes" ? "rigid-procedural" : "skinned-procedural-v1",
+      geometrySource: item.id === "pleated" || item.id === "longskirt"
+        ? "xpbd-skirt-v1"
+        : item.slot === "shoes"
+          ? "rigid-procedural"
+          : "skinned-procedural-v1",
       defaultFabricId: defaultWardrobeFabric(item.id, item.slot),
       fitProfile: wardrobeFitProfile(item.id, item.slot),
     };

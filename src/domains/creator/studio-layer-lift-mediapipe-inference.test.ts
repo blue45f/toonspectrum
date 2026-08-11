@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -41,6 +43,18 @@ function input(signal: AbortSignal) {
 }
 
 describe("Studio Layer Lift MediaPipe inference bridge", () => {
+  it("keeps the foreground implementation out of the eager inference bridge", () => {
+    const source = readFileSync(
+      new URL("./studio-layer-lift-mediapipe-inference.ts", import.meta.url),
+      "utf8",
+    );
+
+    expect(source).not.toMatch(
+      /import\s+\{[^}]*getStudioLocalForegroundSegmenterRuntime[^}]*\}\s+from\s+["']\.\/studio-bg-remove["']/u,
+    );
+    expect(source).toContain('await import("./studio-bg-remove")');
+  });
+
   it("keeps raw RGBA local, returns a defensive mask, and disposes resources", async () => {
     const foreground = mask([0.25, 0.9]);
     const resultClose = vi.fn();

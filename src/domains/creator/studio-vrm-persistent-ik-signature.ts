@@ -1,5 +1,6 @@
 
 import type { BodyScale, FingerRotationMap, PoseBoneMap } from "./studio-vrm-poser-utils";
+import type { StudioVrmProportions } from "./studio-vrm-proportion-core";
 import type { StudioVrmRigProfileId } from "./studio-vrm-rig-profile";
 import type {
   StudioVrmIkConstraint,
@@ -15,6 +16,7 @@ export type StudioVrmPersistentIkSignatureInput = {
   translations: StudioVrmPoseTranslations;
   bodyRotation: number;
   bodyScale: BodyScale;
+  proportions: StudioVrmProportions;
   constraints: readonly StudioVrmIkConstraint[];
   lockedPoseBones: readonly VRMHumanBoneName[];
   jointProfile: StudioVrmRigProfileId;
@@ -39,6 +41,7 @@ export function buildStudioVrmPersistentIkSignature(
     translations: input.translations,
     bodyRotation: input.bodyRotation,
     bodyScale: input.bodyScale,
+    proportions: input.proportions,
     constraints: input.constraints,
     lockedPoseBones: [...input.lockedPoseBones].sort(),
     jointProfile: input.jointProfile,

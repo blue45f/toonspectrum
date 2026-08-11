@@ -3,304 +3,628 @@ import {
   StudioCrdtOutboxSqlCapacityError,
   StudioCrdtRecoverySqlCapacityError,
 } from "./studio-local-database";
+import { StudioLocalDatabaseCommitOutcomeUnknownError } from "./studio-local-database-commit-outcome";
 import {
-  STUDIO_LOCAL_DATABASE_RPC_METHODS,
   STUDIO_LOCAL_DATABASE_WORKER_PROTOCOL_VERSION,
+  isStudioLocalDatabaseWorkerMethod,
+  isStudioLocalDatabaseWorkerMutationMethod,
   isStudioLocalDatabaseWorkerResponse,
-  type StudioLocalDatabaseRpcMethod,
+  type StudioLocalDatabaseWorkerErrorDetail,
+  type StudioLocalDatabaseWorkerMethod,
   type StudioLocalDatabaseWorkerRequest,
+  type StudioLocalDatabaseWorkerResponse,
   type StudioLocalDatabaseWorkerSerializedError,
 } from "./studio-local-database-worker-protocol";
 
-import type {
-  StudioAsyncKeyValueStore,
-  StudioBrushLibraryDatabase,
-  StudioCrdtOutboxDatabase,
-  StudioCrdtRecoveryDatabase,
-  StudioFilterLibraryDatabase,
-  StudioLocalDatabase,
-} from "./studio-local-database";
+import type { StudioLocalDatabaseWorkerDatabase } from "./studio-local-database-worker-database";
 
-const DEFAULT_READY_TIMEOUT_MS = 15_000;
-
-type StudioLocalDatabaseWorkerProxy = StudioBrushLibraryDatabase
-  & StudioFilterLibraryDatabase
-  & StudioCrdtOutboxDatabase
-  & StudioCrdtRecoveryDatabase;
-
-interface PendingRequest {
-  readonly resolve: (value: unknown) => void;
-  readonly reject: (reason: unknown) => void;
+interface StudioLocalDatabaseWorkerMessageEvent {
+  readonly data: unknown;
 }
 
-export interface OpenStudioLocalDatabaseWorkerOptions {
-  /** Test seam. Product code always creates the Vite-emitted same-origin module Worker. */
-  readonly createWorker?: () => Worker;
-  readonly readyTimeoutMs?: number;
+interface StudioLocalDatabaseWorkerErrorEvent {
+  readonly error?: unknown;
+  readonly message?: string;
+  preventDefault?(): void;
 }
 
-function deserializeError(remote: StudioLocalDatabaseWorkerSerializedError): Error {
-  let error: Error;
-  if (remote.name === "SqliteUnavailableError") {
-    error = new SqliteUnavailableError(remote.reason ?? remote.message);
-  } else if (
-    remote.name === "StudioCrdtOutboxSqlCapacityError"
-    && remote.entryCount !== undefined
-    && remote.totalBytes !== undefined
+export interface StudioLocalDatabaseWorkerLike {
+  onmessage: ((event: StudioLocalDatabaseWorkerMessageEvent) => void) | null;
+  onerror: ((event: StudioLocalDatabaseWorkerErrorEvent) => void) | null;
+  onmessageerror: ((event: StudioLocalDatabaseWorkerMessageEvent) => void) | null;
+  postMessage(message: StudioLocalDatabaseWorkerRequest): void;
+  terminate(): void;
+}
+
+export type StudioLocalDatabaseWorkerFactory = () => StudioLocalDatabaseWorkerLike;
+
+export interface StudioLocalDatabaseWorkerClientOptions {
+  /** Deterministic test seam. Product code must use the default DedicatedWorker factory. */
+  readonly workerFactory?: StudioLocalDatabaseWorkerFactory;
+  /** Transport watchdog; timed-out mutations remain explicitly commit-outcome-unknown. */
+  readonly requestTimeoutMs?: number;
+}
+
+export const STUDIO_LOCAL_DATABASE_WORKER_REQUEST_TIMEOUT_MS = 120_000;
+
+export type StudioLocalDatabaseWorkerClientErrorCode =
+  | "worker-closed"
+  | "worker-construction-failed"
+  | "worker-error"
+  | "worker-message-error"
+  | "worker-post-failed"
+  | "worker-protocol"
+  | "worker-request-timeout"
+  | "request-id-exhausted";
+
+export class StudioLocalDatabaseWorkerClientError extends Error {
+  readonly code: StudioLocalDatabaseWorkerClientErrorCode;
+
+  constructor(
+    code: StudioLocalDatabaseWorkerClientErrorCode,
+    message: string,
+    options?: { readonly cause?: unknown },
   ) {
-    error = new StudioCrdtOutboxSqlCapacityError(remote.entryCount, remote.totalBytes);
-  } else if (
-    remote.name === "StudioCrdtRecoverySqlCapacityError"
-    && remote.rowCount !== undefined
-    && remote.totalBytes !== undefined
-  ) {
-    error = new StudioCrdtRecoverySqlCapacityError(remote.rowCount, remote.totalBytes);
-  } else {
-    error = new Error(remote.message);
-    error.name = remote.name;
+    super(message, options);
+    this.name = "StudioLocalDatabaseWorkerClientError";
+    this.code = code;
   }
-  if (remote.stack !== undefined) {
-    error.stack = `${error.stack ?? `${error.name}: ${error.message}`}\nWorker stack:\n${remote.stack}`;
+}
+
+export {
+  StudioLocalDatabaseCommitOutcomeUnknownError,
+  isStudioLocalDatabaseCommitOutcomeUnknownError,
+} from "./studio-local-database-commit-outcome";
+
+export class StudioLocalDatabaseWorkerRemoteError extends Error {
+  readonly remoteName: string;
+  readonly details: Readonly<Record<string, StudioLocalDatabaseWorkerErrorDetail>>;
+  readonly code: StudioLocalDatabaseWorkerErrorDetail | undefined;
+  readonly reason: StudioLocalDatabaseWorkerErrorDetail | undefined;
+  declare readonly cause: StudioLocalDatabaseWorkerRemoteError | undefined;
+
+  constructor(serialized: StudioLocalDatabaseWorkerSerializedError) {
+    super(serialized.message);
+    this.name = "StudioLocalDatabaseWorkerRemoteError";
+    this.remoteName = serialized.name;
+    this.details = serialized.details ?? Object.freeze({});
+    this.code = this.details.code;
+    this.reason = this.details.reason;
+    if (serialized.stack) {
+      Object.defineProperty(this, "stack", {
+        value: serialized.stack,
+        configurable: true,
+      });
+    }
+    if (serialized.cause) {
+      Object.defineProperty(this, "cause", {
+        value: new StudioLocalDatabaseWorkerRemoteError(serialized.cause),
+        configurable: true,
+      });
+    }
+  }
+}
+
+function errorDetailNumber(
+  serialized: StudioLocalDatabaseWorkerSerializedError,
+  key: "entryCount" | "rowCount" | "totalBytes",
+): number | null {
+  const value = serialized.details?.[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function applyRemoteErrorEnvelope<T extends Error>(
+  error: T,
+  serialized: StudioLocalDatabaseWorkerSerializedError,
+  cause: Error | undefined,
+): T {
+  if (serialized.stack) {
+    Object.defineProperty(error, "stack", {
+      value: serialized.stack,
+      configurable: true,
+    });
+  }
+  if (cause) {
+    Object.defineProperty(error, "cause", { value: cause, configurable: true });
   }
   return error;
 }
 
-function workerEventError(event: ErrorEvent): SqliteUnavailableError {
-  const detail = event.message.length > 0 ? event.message : "unknown Worker startup error";
-  return new SqliteUnavailableError(`SQLite Dedicated Worker failed: ${detail}`);
+function deserializeRemoteError(
+  serialized: StudioLocalDatabaseWorkerSerializedError,
+): Error {
+  const cause = serialized.cause ? deserializeRemoteError(serialized.cause) : undefined;
+  const commitMethod = serialized.details?.method;
+  if (
+    serialized.details?.code === "commit-outcome-unknown"
+    && isStudioLocalDatabaseWorkerMethod(commitMethod)
+  ) {
+    return applyRemoteErrorEnvelope(
+      new StudioLocalDatabaseCommitOutcomeUnknownError(
+        commitMethod,
+        cause ?? new Error(serialized.message),
+      ),
+      serialized,
+      cause,
+    );
+  }
+  if (serialized.name === "SqliteUnavailableError") {
+    const reason = serialized.details?.reason;
+    return applyRemoteErrorEnvelope(
+      new SqliteUnavailableError(
+        typeof reason === "string" ? reason : serialized.message,
+        cause ? { cause } : undefined,
+      ),
+      serialized,
+      cause,
+    );
+  }
+  if (serialized.name === "StudioCrdtOutboxSqlCapacityError") {
+    const entryCount = errorDetailNumber(serialized, "entryCount");
+    const totalBytes = errorDetailNumber(serialized, "totalBytes");
+    if (entryCount !== null && totalBytes !== null) {
+      return applyRemoteErrorEnvelope(
+        new StudioCrdtOutboxSqlCapacityError(entryCount, totalBytes),
+        serialized,
+        cause,
+      );
+    }
+  }
+  if (serialized.name === "StudioCrdtRecoverySqlCapacityError") {
+    const rowCount = errorDetailNumber(serialized, "rowCount");
+    const totalBytes = errorDetailNumber(serialized, "totalBytes");
+    if (rowCount !== null && totalBytes !== null) {
+      return applyRemoteErrorEnvelope(
+        new StudioCrdtRecoverySqlCapacityError(rowCount, totalBytes),
+        serialized,
+        cause,
+      );
+    }
+  }
+  return new StudioLocalDatabaseWorkerRemoteError(serialized);
 }
 
-class StudioLocalDatabaseWorkerRpcClient {
-  readonly database: StudioLocalDatabaseWorkerProxy;
+type SessionPhase = "cold" | "opening" | "ready" | "closing" | "closed" | "failed";
 
-  private readonly pending = new Map<number, PendingRequest>();
-  private readonly readyPromise: Promise<void>;
-  private readyResolve!: () => void;
-  private readyReject!: (reason: unknown) => void;
-  private readySettled = false;
-  private closing = false;
-  private closed = false;
-  private closePromise: Promise<void> | null = null;
-  private terminated = false;
-  private nextRequestId = 1;
-  private readyTimer: ReturnType<typeof setTimeout> | null = null;
+interface PendingRequest {
+  readonly request: StudioLocalDatabaseWorkerRequest;
+  readonly resolve: (value: unknown) => void;
+  readonly reject: (error: unknown) => void;
+  readonly timeoutId: ReturnType<typeof setTimeout>;
+}
 
-  constructor(
-    private readonly worker: Worker,
-    readyTimeoutMs: number,
-  ) {
-    this.readyPromise = new Promise<void>((resolve, reject) => {
-      this.readyResolve = resolve;
-      this.readyReject = reject;
-    });
-    this.worker.addEventListener("message", this.handleMessage);
-    this.worker.addEventListener("error", this.handleError);
-    this.worker.addEventListener("messageerror", this.handleMessageError);
-    this.readyTimer = setTimeout(() => {
-      this.fail(
-        new SqliteUnavailableError(
-          `SQLite Dedicated Worker did not become ready within ${readyTimeoutMs}ms`,
-        ),
-      );
-    }, readyTimeoutMs);
+type MethodArguments<Method extends StudioLocalDatabaseWorkerMethod> =
+  StudioLocalDatabaseWorkerDatabase[Method] extends (...args: infer Arguments) => Promise<unknown>
+    ? Arguments
+    : never;
+type MethodReturn<Method extends StudioLocalDatabaseWorkerMethod> =
+  StudioLocalDatabaseWorkerDatabase[Method] extends (...args: never[]) => infer Result
+    ? Result
+    : never;
 
-    const methods = Object.fromEntries(
-      STUDIO_LOCAL_DATABASE_RPC_METHODS.map((method) => [
-        method,
-        (...args: readonly unknown[]) => this.call(method, args),
-      ]),
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "unknown Worker failure";
+}
+
+function defaultWorkerFactory(): StudioLocalDatabaseWorkerLike {
+  if (typeof Worker !== "function") {
+    throw new StudioLocalDatabaseWorkerClientError(
+      "worker-construction-failed",
+      "DedicatedWorker is unavailable; Studio SQLite will not fall back to main-thread memory",
     );
-    this.database = Object.assign(methods, {
-      asAsyncKeyValueStore: (namespace: string): StudioAsyncKeyValueStore => ({
-        get: (key) => this.call("kvGet", [namespace, key]) as Promise<string | null>,
-        set: (key, value) => this.call("kvSet", [namespace, key, value]) as Promise<void>,
-        delete: (key) => this.call("kvDelete", [namespace, key]) as Promise<void>,
-      }),
-      close: () => this.close(),
-    }) as unknown as StudioLocalDatabaseWorkerProxy;
+  }
+  return new Worker(new URL("./studio-local-database.worker.ts", import.meta.url), {
+    type: "module",
+    name: "toonspectrum-studio-local-database",
+  }) as unknown as StudioLocalDatabaseWorkerLike;
+}
+
+class StudioLocalDatabaseWorkerSession {
+  private readonly workerFactory: StudioLocalDatabaseWorkerFactory;
+  private readonly requestTimeoutMs: number;
+  private readonly pending = new Map<number, PendingRequest>();
+  private readonly activeCalls = new Set<Promise<unknown>>();
+  private worker: StudioLocalDatabaseWorkerLike | null = null;
+  private phase: SessionPhase = "cold";
+  private nextRequestId = 1;
+  private initialization: Promise<void> | null = null;
+  private closing: Promise<void> | null = null;
+  private terminalError: StudioLocalDatabaseWorkerClientError | null = null;
+
+  constructor(options: StudioLocalDatabaseWorkerClientOptions) {
+    this.workerFactory = options.workerFactory ?? defaultWorkerFactory;
+    const requestedTimeout = options.requestTimeoutMs
+      ?? STUDIO_LOCAL_DATABASE_WORKER_REQUEST_TIMEOUT_MS;
+    this.requestTimeoutMs = Number.isSafeInteger(requestedTimeout) && requestedTimeout > 0
+      ? requestedTimeout
+      : STUDIO_LOCAL_DATABASE_WORKER_REQUEST_TIMEOUT_MS;
   }
 
-  async ready(): Promise<void> {
-    return this.readyPromise;
+  private closedError(): StudioLocalDatabaseWorkerClientError {
+    return new StudioLocalDatabaseWorkerClientError(
+      "worker-closed",
+      "Studio local database Worker is closed",
+    );
   }
 
-  private settleReady(resolve: boolean, reason?: unknown): void {
-    if (this.readySettled) return;
-    this.readySettled = true;
-    if (this.readyTimer !== null) {
-      clearTimeout(this.readyTimer);
-      this.readyTimer = null;
+  private assertCanCall(): void {
+    if (this.phase === "closing" || this.phase === "closed") throw this.closedError();
+    if (this.phase === "failed") throw this.terminalError ?? this.closedError();
+  }
+
+  private ensureWorker(): StudioLocalDatabaseWorkerLike {
+    if (this.worker) return this.worker;
+    this.assertCanCall();
+    try {
+      const worker = this.workerFactory();
+      worker.onmessage = this.onMessage;
+      worker.onerror = this.onError;
+      worker.onmessageerror = this.onMessageError;
+      this.worker = worker;
+      return worker;
+    } catch (error) {
+      const failure =
+        error instanceof StudioLocalDatabaseWorkerClientError
+          ? error
+          : new StudioLocalDatabaseWorkerClientError(
+              "worker-construction-failed",
+              `Studio local database Worker construction failed: ${errorMessage(error)}`,
+              { cause: error },
+            );
+      this.phase = "failed";
+      this.terminalError = failure;
+      throw failure;
     }
-    if (resolve) this.readyResolve();
-    else this.readyReject(reason);
   }
 
-  private readonly handleMessage = (event: MessageEvent<unknown>): void => {
-    if (!isStudioLocalDatabaseWorkerResponse(event.data)) {
-      this.fail(new Error("SQLite Dedicated Worker sent an invalid protocol message"));
-      return;
-    }
-    const response = event.data;
-    if (response.kind === "ready") {
-      this.settleReady(true);
-      return;
-    }
-    if (response.kind === "fatal") {
-      this.fail(deserializeError(response.error));
-      return;
-    }
-    const pending = this.pending.get(response.requestId);
-    if (pending === undefined) return;
-    this.pending.delete(response.requestId);
-    if (response.ok) pending.resolve(response.value);
-    else pending.reject(deserializeError(response.error));
-  };
-
-  private readonly handleError = (event: ErrorEvent): void => {
-    event.preventDefault();
-    this.fail(workerEventError(event));
-  };
-
-  private readonly handleMessageError = (): void => {
-    this.fail(new Error("SQLite Dedicated Worker message could not be deserialized"));
-  };
-
-  private detach(): void {
-    this.worker.removeEventListener("message", this.handleMessage);
-    this.worker.removeEventListener("error", this.handleError);
-    this.worker.removeEventListener("messageerror", this.handleMessageError);
-  }
-
-  private terminateOnce(): void {
-    if (this.terminated) return;
-    this.terminated = true;
-    this.detach();
-    this.worker.terminate();
-  }
-
-  private rejectPending(reason: unknown): void {
-    for (const request of this.pending.values()) request.reject(reason);
-    this.pending.clear();
-  }
-
-  private fail(reason: unknown): void {
-    if (this.closed) return;
-    this.closing = true;
-    this.closed = true;
-    this.settleReady(false, reason);
-    this.rejectPending(reason);
-    this.terminateOnce();
-  }
-
-  private async call(method: StudioLocalDatabaseRpcMethod, args: readonly unknown[]) {
-    if (this.closing || this.closed) {
-      throw new Error("studio local database Worker is closing or closed");
-    }
-    await this.readyPromise;
-    if (this.closing || this.closed) {
-      throw new Error("studio local database Worker is closing or closed");
+  private allocateRequestId(): number {
+    if (!Number.isSafeInteger(this.nextRequestId) || this.nextRequestId > Number.MAX_SAFE_INTEGER) {
+      throw new StudioLocalDatabaseWorkerClientError(
+        "request-id-exhausted",
+        "Studio local database Worker exhausted its monotonic request ID space",
+      );
     }
     const requestId = this.nextRequestId;
     this.nextRequestId += 1;
-    const request: StudioLocalDatabaseWorkerRequest = {
+    return requestId;
+  }
+
+  private send(
+    payload:
+      | { readonly kind: "initialize" }
+      | {
+          readonly kind: "call";
+          readonly method: StudioLocalDatabaseWorkerMethod;
+          readonly args: readonly unknown[];
+        }
+      | { readonly kind: "close" },
+  ): Promise<unknown> {
+    const worker = this.ensureWorker();
+    const requestId = this.allocateRequestId();
+    const request = {
       version: STUDIO_LOCAL_DATABASE_WORKER_PROTOCOL_VERSION,
-      kind: "request",
       requestId,
-      method,
-      args,
-    };
+      ...payload,
+    } as StudioLocalDatabaseWorkerRequest;
     return new Promise<unknown>((resolve, reject) => {
-      this.pending.set(requestId, { resolve, reject });
+      const timeoutId = setTimeout(() => {
+        if (!this.pending.has(requestId)) return;
+        this.failTerminal(
+          new StudioLocalDatabaseWorkerClientError(
+            "worker-request-timeout",
+            `Studio local database Worker request ${requestId} did not settle within ${this.requestTimeoutMs}ms`,
+          ),
+        );
+      }, this.requestTimeoutMs);
+      this.pending.set(requestId, { request, resolve, reject, timeoutId });
       try {
-        this.worker.postMessage(request);
-      } catch (cause) {
+        worker.postMessage(request);
+      } catch (error) {
+        const pending = this.pending.get(requestId);
+        if (pending) clearTimeout(pending.timeoutId);
         this.pending.delete(requestId);
-        reject(cause);
+        reject(
+          new StudioLocalDatabaseWorkerClientError(
+            "worker-post-failed",
+            `Studio local database Worker request was not delivered: ${errorMessage(error)}`,
+            { cause: error },
+          ),
+        );
       }
     });
   }
 
-  private close(): Promise<void> {
-    if (this.closePromise !== null) return this.closePromise;
-    if (this.closed) {
-      this.closePromise = Promise.resolve();
-      return this.closePromise;
-    }
-
-    // Close is an admission barrier, not merely another RPC. Flip it synchronously so calls made
-    // in the same tick cannot slip behind the close request, and settle already-posted requests
-    // explicitly rather than leaving their callers waiting for responses we will ignore.
-    this.closing = true;
-    this.rejectPending(new Error("studio local database Worker is closing"));
-    this.closePromise = this.performClose();
-    return this.closePromise;
+  private cleanupWorker(): void {
+    const worker = this.worker;
+    this.worker = null;
+    if (!worker) return;
+    worker.onmessage = null;
+    worker.onerror = null;
+    worker.onmessageerror = null;
+    worker.terminate();
   }
 
-  private async performClose(): Promise<void> {
-    await this.readyPromise;
-    if (this.closed) return;
-    const requestId = this.nextRequestId;
-    this.nextRequestId += 1;
-    const request: StudioLocalDatabaseWorkerRequest = {
-      version: STUDIO_LOCAL_DATABASE_WORKER_PROTOCOL_VERSION,
-      kind: "request",
-      requestId,
-      method: "close",
-      args: [],
-    };
+  private failTerminal(error: StudioLocalDatabaseWorkerClientError): void {
+    if (this.phase === "closed" || this.phase === "failed") return;
+    this.phase = "failed";
+    this.terminalError = error;
+    this.cleanupWorker();
+    for (const pending of this.pending.values()) {
+      clearTimeout(pending.timeoutId);
+      if (
+        pending.request.kind === "call" &&
+        isStudioLocalDatabaseWorkerMutationMethod(pending.request.method)
+      ) {
+        pending.reject(
+          new StudioLocalDatabaseCommitOutcomeUnknownError(pending.request.method, error),
+        );
+      } else {
+        pending.reject(error);
+      }
+    }
+    this.pending.clear();
+  }
+
+  private readonly onMessage = (event: StudioLocalDatabaseWorkerMessageEvent): void => {
+    if (!isStudioLocalDatabaseWorkerResponse(event.data)) {
+      this.failTerminal(
+        new StudioLocalDatabaseWorkerClientError(
+          "worker-protocol",
+          "Studio local database Worker returned an invalid RPC response",
+        ),
+      );
+      return;
+    }
+    const response: StudioLocalDatabaseWorkerResponse = event.data;
+    const pending = this.pending.get(response.requestId);
+    if (!pending) {
+      this.failTerminal(
+        new StudioLocalDatabaseWorkerClientError(
+          "worker-protocol",
+          `Studio local database Worker returned unknown request ID ${response.requestId}`,
+        ),
+      );
+      return;
+    }
+    clearTimeout(pending.timeoutId);
+    this.pending.delete(response.requestId);
+    if (response.kind === "failure") {
+      pending.reject(deserializeRemoteError(response.error));
+    } else {
+      pending.resolve(response.value);
+    }
+  };
+
+  private readonly onError = (event: StudioLocalDatabaseWorkerErrorEvent): void => {
+    event.preventDefault?.();
+    const cause = event.error;
+    this.failTerminal(
+      new StudioLocalDatabaseWorkerClientError(
+        "worker-error",
+        `Studio local database Worker crashed: ${event.message ?? errorMessage(cause)}`,
+        { cause },
+      ),
+    );
+  };
+
+  private readonly onMessageError = (): void => {
+    this.failTerminal(
+      new StudioLocalDatabaseWorkerClientError(
+        "worker-message-error",
+        "Studio local database Worker response could not be deserialized",
+      ),
+    );
+  };
+
+  initialize(): Promise<void> {
+    this.assertCanCall();
+    if (this.phase === "ready") return Promise.resolve();
+    if (this.initialization) return this.initialization;
+    this.phase = "opening";
+    const initialization = this.send({ kind: "initialize" }).then(
+      () => {
+        if (this.phase === "opening") this.phase = "ready";
+      },
+      (error: unknown) => {
+        if (this.phase === "opening") this.phase = "cold";
+        throw error;
+      },
+    );
+    this.initialization = initialization;
+    void initialization.finally(() => {
+      if (this.initialization === initialization) this.initialization = null;
+    }).catch(() => {
+      // The original initialization promise carries the rejection to every awaiting caller.
+    });
+    return initialization;
+  }
+
+  call<Method extends StudioLocalDatabaseWorkerMethod>(
+    method: Method,
+    ...args: MethodArguments<Method>
+  ): MethodReturn<Method> {
+    let initialization: Promise<void>;
     try {
-      await new Promise<void>((resolve, reject) => {
-        this.pending.set(requestId, { resolve: () => resolve(), reject });
-        try {
-          this.worker.postMessage(request);
-        } catch (cause) {
-          this.pending.delete(requestId);
-          reject(cause);
-        }
-      });
-    } finally {
-      this.closed = true;
-      this.rejectPending(new Error("studio local database Worker is closed"));
-      this.terminateOnce();
+      this.assertCanCall();
+      initialization = this.initialize();
+    } catch (error) {
+      return Promise.reject(error) as MethodReturn<Method>;
     }
+    // Register the call synchronously. close() then waits for every earlier invocation, including
+    // calls still waiting on initialization, so its close envelope can never overtake a write.
+    const result = initialization.then(() =>
+      this.send({ kind: "call", method, args }));
+    this.activeCalls.add(result);
+    void result.finally(() => this.activeCalls.delete(result)).catch(() => {
+      // The returned result remains the sole rejection authority for the caller.
+    });
+    return result as MethodReturn<Method>;
+  }
+
+  close(): Promise<void> {
+    if (this.closing) return this.closing;
+    if (this.phase === "closed") return Promise.resolve();
+    if (this.phase === "cold" && !this.worker) {
+      this.phase = "closed";
+      return Promise.resolve();
+    }
+    if (this.phase === "failed") {
+      this.cleanupWorker();
+      this.phase = "closed";
+      return Promise.resolve();
+    }
+
+    this.phase = "closing";
+    const priorCalls = [...this.activeCalls];
+    const closing = Promise.allSettled(priorCalls).then(() =>
+      this.send({ kind: "close" })).then(
+      () => {
+        this.cleanupWorker();
+        this.phase = "closed";
+      },
+      (error: unknown) => {
+        this.cleanupWorker();
+        this.phase = "closed";
+        throw error;
+      },
+    );
+    this.closing = closing;
+    return closing;
   }
 }
 
-function createProductWorker(): Worker {
-  if (typeof Worker !== "function") {
-    throw new SqliteUnavailableError("Dedicated Worker is unavailable in this environment");
-  }
-  return new Worker(new URL("./studio-local-database.worker.ts", import.meta.url), {
-    type: "module",
-    name: "toonspectrum-studio-sqlite",
-  });
+interface StudioLocalDatabaseWorkerClientPair {
+  readonly database: StudioLocalDatabaseWorkerDatabase;
+  readonly session: StudioLocalDatabaseWorkerSession;
 }
+
+function createClientPair(
+  options: StudioLocalDatabaseWorkerClientOptions,
+): StudioLocalDatabaseWorkerClientPair {
+  const session = new StudioLocalDatabaseWorkerSession(options);
+  const database = {
+    kvGet: (namespace, key) => session.call("kvGet", namespace, key),
+    kvSet: (namespace, key, value) => session.call("kvSet", namespace, key, value),
+    kvDelete: (namespace, key) => session.call("kvDelete", namespace, key),
+    putTournamentWinner: (winner) => session.call("putTournamentWinner", winner),
+    getTournamentWinner: (bucket, deviceHash) =>
+      session.call("getTournamentWinner", bucket, deviceHash),
+    listTournamentWinners: () => session.call("listTournamentWinners"),
+    listTournamentWinnerCandidates: () =>
+      session.call("listTournamentWinnerCandidates"),
+    replaceTournamentWinners: (winners) =>
+      session.call("replaceTournamentWinners", winners),
+    evictTournamentProvider: (providerId) =>
+      session.call("evictTournamentProvider", providerId),
+    recordCostSample: (providerId, bucket, kind, ms) =>
+      session.call("recordCostSample", providerId, bucket, kind, ms),
+    listCostSamples: (providerId, bucket, limit) =>
+      session.call("listCostSamples", providerId, bucket, limit),
+    appendJournalEntry: (projectId, entry) =>
+      session.call("appendJournalEntry", projectId, entry),
+    listJournalEntries: (projectId) => session.call("listJournalEntries", projectId),
+    deleteJournalEntriesBefore: (projectId, seq) =>
+      session.call("deleteJournalEntriesBefore", projectId, seq),
+    putJournalSnapshot: (projectId, snapshot) =>
+      session.call("putJournalSnapshot", projectId, snapshot),
+    listJournalSnapshots: (projectId) => session.call("listJournalSnapshots", projectId),
+    asAsyncKeyValueStore: (namespace) => ({
+      get: (key) => session.call("kvGet", namespace, key),
+      set: (key, value) => session.call("kvSet", namespace, key, value),
+      delete: (key) => session.call("kvDelete", namespace, key),
+    }),
+    queryBrushLibraryRecords: (query) =>
+      session.call("queryBrushLibraryRecords", query),
+    getBrushLibraryRecord: (id) => session.call("getBrushLibraryRecord", id),
+    putBrushLibraryRecord: (record) => session.call("putBrushLibraryRecord", record),
+    putBrushLibraryRecords: (records) =>
+      session.call("putBrushLibraryRecords", records),
+    insertMissingBrushLibraryRecords: (records) =>
+      session.call("insertMissingBrushLibraryRecords", records),
+    deleteBrushLibraryRecord: (id) => session.call("deleteBrushLibraryRecord", id),
+    listBrushLibraryNames: () => session.call("listBrushLibraryNames"),
+    queryFilterLibraryRecords: (query) =>
+      session.call("queryFilterLibraryRecords", query),
+    getFilterLibraryRecord: (id) => session.call("getFilterLibraryRecord", id),
+    putFilterLibraryRecord: (record) => session.call("putFilterLibraryRecord", record),
+    putFilterLibraryRecords: (records) =>
+      session.call("putFilterLibraryRecords", records),
+    insertMissingFilterLibraryRecords: (records) =>
+      session.call("insertMissingFilterLibraryRecords", records),
+    deleteFilterLibraryRecord: (id) => session.call("deleteFilterLibraryRecord", id),
+    deleteFilterLibraryRecords: (ids) => session.call("deleteFilterLibraryRecords", ids),
+    listCrdtOutboxCandidates: (scope, workId) =>
+      session.call("listCrdtOutboxCandidates", scope, workId),
+    enqueueCrdtOutboxRecord: (record, limits) =>
+      session.call("enqueueCrdtOutboxRecord", record, limits),
+    acknowledgeCrdtOutboxRecord: (scope, workId, updateId, acknowledgedAt) =>
+      session.call(
+        "acknowledgeCrdtOutboxRecord",
+        scope,
+        workId,
+        updateId,
+        acknowledgedAt,
+      ),
+    recordCrdtOutboxRetry: (scope, workId, updateId, metadata) =>
+      session.call("recordCrdtOutboxRetry", scope, workId, updateId, metadata),
+    listCrdtRecoveryCandidates: (scope, workId) =>
+      session.call("listCrdtRecoveryCandidates", scope, workId),
+    getCrdtRecoveryCandidate: (scope, workId, rowKey) =>
+      session.call("getCrdtRecoveryCandidate", scope, workId, rowKey),
+    putCrdtRecoveryRecord: (record, limits) =>
+      session.call("putCrdtRecoveryRecord", record, limits),
+    close: () => session.close(),
+  } satisfies StudioLocalDatabaseWorkerDatabase;
+  return Object.freeze({ database, session });
+}
+
+/** Low-level lazy proxy/test seam. Product runtime should use the page singleton below. */
+export function createStudioLocalDatabaseWorkerProxy(
+  options: StudioLocalDatabaseWorkerClientOptions = {},
+): StudioLocalDatabaseWorkerDatabase {
+  return createClientPair(options).database;
+}
+
+let sharedDatabase: Promise<StudioLocalDatabaseWorkerDatabase> | null = null;
+let sharedClosing: Promise<void> | null = null;
 
 /**
- * Opens the product SQLite authority in a Dedicated Worker. The returned proxy
- * preserves every async repository method while keeping sqlite-wasm, SQL work,
- * and OPFS SyncAccessHandles off the UI thread.
+ * Opens one page-lifetime DedicatedWorker/OPFS authority. Concurrent callers share initialization;
+ * the Worker then holds the origin-wide exclusive lock until closeStudioLocalDatabaseWorker().
  */
-export async function openStudioLocalDatabaseWorker(
-  options: OpenStudioLocalDatabaseWorkerOptions = {},
-): Promise<StudioLocalDatabase> {
-  const readyTimeoutMs = options.readyTimeoutMs ?? DEFAULT_READY_TIMEOUT_MS;
-  if (!Number.isFinite(readyTimeoutMs) || readyTimeoutMs <= 0) {
-    throw new RangeError(`readyTimeoutMs must be positive, got ${readyTimeoutMs}`);
+export function acquireStudioLocalDatabaseWorker(
+  options: StudioLocalDatabaseWorkerClientOptions = {},
+): Promise<StudioLocalDatabaseWorkerDatabase> {
+  if (sharedDatabase) return sharedDatabase;
+  if (sharedClosing) {
+    return sharedClosing.then(() => acquireStudioLocalDatabaseWorker(options));
   }
-  let worker: Worker;
-  try {
-    worker = (options.createWorker ?? createProductWorker)();
-  } catch (cause) {
-    if (cause instanceof SqliteUnavailableError) throw cause;
-    throw new SqliteUnavailableError(
-      `SQLite Dedicated Worker could not be created: ${
-        cause instanceof Error ? cause.message : String(cause)
-      }`,
-      { cause },
-    );
-  }
-  const client = new StudioLocalDatabaseWorkerRpcClient(worker, readyTimeoutMs);
-  await client.ready();
-  return client.database;
+  const pair = createClientPair(options);
+  const opening = Promise.resolve()
+    .then(() => pair.session.initialize())
+    .then(() => pair.database);
+  sharedDatabase = opening;
+  void opening.catch(() => {
+    if (sharedDatabase === opening) sharedDatabase = null;
+    void pair.database.close().catch(() => {
+      // The original initialization error is authoritative; failed-open cleanup is best effort.
+    });
+  });
+  return opening;
+}
+
+/** Idempotent page/session shutdown seam. Product code normally keeps the Worker for app lifetime. */
+export function closeStudioLocalDatabaseWorker(): Promise<void> {
+  if (sharedClosing) return sharedClosing;
+  const database = sharedDatabase;
+  sharedDatabase = null;
+  if (!database) return Promise.resolve();
+  const closing = database.then(
+    (opened) => opened.close(),
+    () => undefined,
+  ).finally(() => {
+    if (sharedClosing === closing) sharedClosing = null;
+  });
+  sharedClosing = closing;
+  return closing;
 }

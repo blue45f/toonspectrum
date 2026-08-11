@@ -1,343 +1,350 @@
-import { readFileSync } from "node:fs";
-
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   SqliteUnavailableError,
   StudioCrdtOutboxSqlCapacityError,
+  StudioCrdtRecoverySqlCapacityError,
 } from "./studio-local-database";
 import {
-  openStudioLocalDatabaseWorker,
+  StudioLocalDatabaseCommitOutcomeUnknownError,
+  StudioLocalDatabaseWorkerClientError,
+  StudioLocalDatabaseWorkerRemoteError,
+  acquireStudioLocalDatabaseWorker,
+  closeStudioLocalDatabaseWorker,
+  createStudioLocalDatabaseWorkerProxy,
+  type StudioLocalDatabaseWorkerLike,
 } from "./studio-local-database-worker-client";
 import {
-  STUDIO_LOCAL_DATABASE_RPC_METHODS,
   STUDIO_LOCAL_DATABASE_WORKER_PROTOCOL_VERSION,
-  isStudioLocalDatabaseWorkerRequest,
-  isStudioLocalDatabaseWorkerResponse,
+  serializeStudioLocalDatabaseWorkerError,
   type StudioLocalDatabaseWorkerRequest,
   type StudioLocalDatabaseWorkerResponse,
 } from "./studio-local-database-worker-protocol";
 
-type FakeEventType = "message" | "error" | "messageerror";
-
-class FakeWorker {
+class FakeWorker implements StudioLocalDatabaseWorkerLike {
+  onmessage: StudioLocalDatabaseWorkerLike["onmessage"] = null;
+  onerror: StudioLocalDatabaseWorkerLike["onerror"] = null;
+  onmessageerror: StudioLocalDatabaseWorkerLike["onmessageerror"] = null;
   readonly posted: StudioLocalDatabaseWorkerRequest[] = [];
   readonly terminate = vi.fn();
-  onPost: ((request: StudioLocalDatabaseWorkerRequest) => void) | null = null;
+  autoRespond = false;
 
-  private readonly listeners = new Map<FakeEventType, Set<(event: unknown) => void>>();
-
-  addEventListener(type: FakeEventType, listener: (event: unknown) => void): void {
-    const listeners = this.listeners.get(type) ?? new Set();
-    listeners.add(listener);
-    this.listeners.set(type, listeners);
-  }
-
-  removeEventListener(type: FakeEventType, listener: (event: unknown) => void): void {
-    this.listeners.get(type)?.delete(listener);
-  }
-
-  postMessage(value: unknown): void {
-    if (!isStudioLocalDatabaseWorkerRequest(value)) {
-      throw new Error("test received an invalid request");
+  postMessage(message: StudioLocalDatabaseWorkerRequest): void {
+    this.posted.push(message);
+    if (this.autoRespond) {
+      queueMicrotask(() => this.succeed(message.requestId, undefined));
     }
-    this.posted.push(value);
-    this.onPost?.(value);
   }
 
-  emitMessage(value: unknown): void {
-    this.emit("message", { data: value });
+  succeed(requestId: number, value: unknown): void {
+    this.emit({
+      version: STUDIO_LOCAL_DATABASE_WORKER_PROTOCOL_VERSION,
+      kind: "success",
+      requestId,
+      value,
+    });
   }
 
-  emitError(message: string): void {
-    this.emit("error", { message, preventDefault: vi.fn() });
+  fail(requestId: number, error: unknown): void {
+    this.emit({
+      version: STUDIO_LOCAL_DATABASE_WORKER_PROTOCOL_VERSION,
+      kind: "failure",
+      requestId,
+      error: serializeStudioLocalDatabaseWorkerError(error),
+    });
   }
 
-  private emit(type: FakeEventType, event: unknown): void {
-    for (const listener of this.listeners.get(type) ?? []) listener(event);
+  emit(response: StudioLocalDatabaseWorkerResponse): void {
+    this.onmessage?.({ data: response });
+  }
+
+  crash(message = "worker crashed"): void {
+    this.onerror?.({ message, error: new Error(message), preventDefault: vi.fn() });
+  }
+
+  messageError(): void {
+    this.onmessageerror?.({ data: null });
   }
 }
 
-const version = STUDIO_LOCAL_DATABASE_WORKER_PROTOCOL_VERSION;
-
-function asWorker(worker: FakeWorker): Worker {
-  return worker as unknown as Worker;
+async function flushMicrotasks(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
 }
 
-function ready(worker: FakeWorker): void {
-  const response: StudioLocalDatabaseWorkerResponse = { version, kind: "ready" };
-  worker.emitMessage(response);
-}
-
-function respond(
-  worker: FakeWorker,
-  request: StudioLocalDatabaseWorkerRequest,
-  value: unknown,
-): void {
-  worker.emitMessage({
-    version,
-    kind: "response",
-    requestId: request.requestId,
-    ok: true,
-    value,
-  } satisfies StudioLocalDatabaseWorkerResponse);
-}
-
-async function openFake(worker: FakeWorker) {
-  const opening = openStudioLocalDatabaseWorker({
-    createWorker: () => asWorker(worker),
-    readyTimeoutMs: 1_000,
-  });
-  ready(worker);
-  return opening;
-}
-
-describe("studio local database Worker protocol", () => {
-  it("pins an allowlist for every concrete async SQLite method", () => {
-    expect(STUDIO_LOCAL_DATABASE_RPC_METHODS).toHaveLength(37);
-    expect(new Set(STUDIO_LOCAL_DATABASE_RPC_METHODS).size).toBe(37);
-    expect(STUDIO_LOCAL_DATABASE_RPC_METHODS).toContain("putCrdtRecoveryRecord");
-    expect(STUDIO_LOCAL_DATABASE_RPC_METHODS).not.toContain("asAsyncKeyValueStore");
-  });
-
-  it("rejects malformed, unknown-method, and zero-id requests", () => {
-    expect(isStudioLocalDatabaseWorkerRequest(null)).toBe(false);
-    expect(isStudioLocalDatabaseWorkerRequest({
-      version,
-      kind: "request",
-      requestId: 0,
-      method: "kvGet",
-      args: [],
-    })).toBe(false);
-    expect(isStudioLocalDatabaseWorkerRequest({
-      version,
-      kind: "request",
-      requestId: 1,
-      method: "dropEverything",
-      args: [],
-    })).toBe(false);
-  });
-
-  it("requires a value property even when a successful result is undefined", () => {
-    expect(isStudioLocalDatabaseWorkerResponse({
-      version,
-      kind: "response",
-      requestId: 1,
-      ok: true,
-    })).toBe(false);
-    expect(isStudioLocalDatabaseWorkerResponse({
-      version,
-      kind: "response",
-      requestId: 1,
-      ok: true,
-      value: undefined,
-    })).toBe(true);
-  });
+afterEach(async () => {
+  await closeStudioLocalDatabaseWorker();
 });
 
-describe("openStudioLocalDatabaseWorker", () => {
-  it("waits for Worker SQLite readiness and round-trips a repository call", async () => {
+describe("Studio local database Worker client", () => {
+  it("is lazy, deduplicates initialization, and correlates concurrent requests", async () => {
     const worker = new FakeWorker();
-    worker.onPost = (request) => respond(worker, request, "stored-value");
-    const opening = openStudioLocalDatabaseWorker({
-      createWorker: () => asWorker(worker),
-      readyTimeoutMs: 1_000,
-    });
-    let settled = false;
-    void opening.then(() => {
-      settled = true;
-    });
-    await Promise.resolve();
-    expect(settled).toBe(false);
-    ready(worker);
-    const database = await opening;
-    await expect(database.kvGet("brush-slots", "current")).resolves.toBe("stored-value");
-    expect(worker.posted[0]).toMatchObject({
-      method: "kvGet",
-      args: ["brush-slots", "current"],
-    });
-  });
+    const factory = vi.fn(() => worker);
+    const database = createStudioLocalDatabaseWorkerProxy({ workerFactory: factory });
 
-  it("exposes every extension method required by brush/filter/CRDT repositories", async () => {
-    const worker = new FakeWorker();
-    const database = await openFake(worker);
-    for (const method of STUDIO_LOCAL_DATABASE_RPC_METHODS) {
-      expect(typeof (database as unknown as Record<string, unknown>)[method]).toBe("function");
-    }
-  });
+    expect(factory).not.toHaveBeenCalled();
+    const get = database.kvGet("models", "hero");
+    const list = database.listJournalEntries("project-a");
 
-  it("implements the local async KV adapter without crossing a non-cloneable object", async () => {
-    const worker = new FakeWorker();
-    worker.onPost = (request) => respond(worker, request, request.method === "kvGet" ? "v" : undefined);
-    const database = await openFake(worker);
-    const store = database.asAsyncKeyValueStore("tournament");
-    await expect(store.get("winner")).resolves.toBe("v");
-    await store.set("winner", "vello-gpu");
-    await store.delete("winner");
-    expect(worker.posted.map(({ method, args }) => ({ method, args }))).toEqual([
-      { method: "kvGet", args: ["tournament", "winner"] },
-      { method: "kvSet", args: ["tournament", "winner", "vello-gpu"] },
-      { method: "kvDelete", args: ["tournament", "winner"] },
-    ]);
-  });
-
-  it("correlates concurrent responses even when the Worker completes them out of order", async () => {
-    const worker = new FakeWorker();
-    const database = await openFake(worker);
-    const first = database.kvGet("n", "first");
-    const second = database.kvGet("n", "second");
-    await vi.waitFor(() => expect(worker.posted).toHaveLength(2));
-    respond(worker, worker.posted[1]!, "second-value");
-    respond(worker, worker.posted[0]!, "first-value");
-    await expect(Promise.all([first, second])).resolves.toEqual([
-      "first-value",
-      "second-value",
-    ]);
-  });
-
-  it("rehydrates SQLite availability errors for existing product fallback policy", async () => {
-    const worker = new FakeWorker();
-    const opening = openStudioLocalDatabaseWorker({
-      createWorker: () => asWorker(worker),
-      readyTimeoutMs: 1_000,
-    });
-    worker.emitMessage({
-      version,
-      kind: "fatal",
-      error: {
-        name: "SqliteUnavailableError",
-        message: "studio local sqlite unavailable: no OPFS",
-        reason: "no OPFS",
-      },
-    } satisfies StudioLocalDatabaseWorkerResponse);
-    await expect(opening).rejects.toBeInstanceOf(SqliteUnavailableError);
-    await expect(opening).rejects.toMatchObject({ reason: "no OPFS" });
-    expect(worker.terminate).toHaveBeenCalledOnce();
-  });
-
-  it("rehydrates CRDT capacity errors so fail-closed handling remains intact", async () => {
-    const worker = new FakeWorker();
-    worker.onPost = (request) => {
-      worker.emitMessage({
-        version,
-        kind: "response",
-        requestId: request.requestId,
-        ok: false,
-        error: {
-          name: "StudioCrdtOutboxSqlCapacityError",
-          message: "capacity",
-          entryCount: 101,
-          totalBytes: 4096,
-        },
-      } satisfies StudioLocalDatabaseWorkerResponse);
-    };
-    const database = await openFake(worker);
-    const call = (database as unknown as {
-      enqueueCrdtOutboxRecord(...args: unknown[]): Promise<unknown>;
-    }).enqueueCrdtOutboxRecord({}, {});
-    await expect(call).rejects.toBeInstanceOf(StudioCrdtOutboxSqlCapacityError);
-    await expect(call).rejects.toMatchObject({ entryCount: 101, totalBytes: 4096 });
-  });
-
-  it("fails closed and terminates on invalid inbound protocol data", async () => {
-    const worker = new FakeWorker();
-    const opening = openStudioLocalDatabaseWorker({
-      createWorker: () => asWorker(worker),
-      readyTimeoutMs: 1_000,
-    });
-    worker.emitMessage({ surprise: "not-versioned" });
-    await expect(opening).rejects.toThrow(/invalid protocol message/);
-    expect(worker.terminate).toHaveBeenCalledOnce();
-  });
-
-  it("surfaces Worker startup errors as explicit SQLite unavailability", async () => {
-    const worker = new FakeWorker();
-    const opening = openStudioLocalDatabaseWorker({
-      createWorker: () => asWorker(worker),
-      readyTimeoutMs: 1_000,
-    });
-    worker.emitError("module load failed");
-    await expect(opening).rejects.toBeInstanceOf(SqliteUnavailableError);
-    await expect(opening).rejects.toThrow(/module load failed/);
-  });
-
-  it("times out a Worker that never reports SQLite readiness", async () => {
-    const worker = new FakeWorker();
-    await expect(openStudioLocalDatabaseWorker({
-      createWorker: () => asWorker(worker),
-      readyTimeoutMs: 5,
-    })).rejects.toThrow(/did not become ready/);
-    expect(worker.terminate).toHaveBeenCalledOnce();
-  });
-
-  it("shares one atomic close promise and sends exactly one close RPC", async () => {
-    const worker = new FakeWorker();
-    const database = await openFake(worker);
-    const firstClose = database.close();
-    const secondClose = database.close();
-
-    expect(firstClose).toBe(secondClose);
-    await vi.waitFor(() => expect(worker.posted).toHaveLength(1));
-    expect(worker.posted[0]?.method).toBe("close");
-    respond(worker, worker.posted[0]!, undefined);
-    await expect(Promise.all([firstClose, secondClose])).resolves.toEqual([
-      undefined,
-      undefined,
-    ]);
-    await database.close();
+    expect(factory).toHaveBeenCalledTimes(1);
     expect(worker.posted).toHaveLength(1);
-    expect(worker.terminate).toHaveBeenCalledOnce();
+    expect(worker.posted[0]).toMatchObject({ kind: "initialize", requestId: 1 });
+
+    worker.succeed(1, undefined);
+    await flushMicrotasks();
+    expect(worker.posted.slice(1)).toMatchObject([
+      { kind: "call", requestId: 2, method: "kvGet", args: ["models", "hero"] },
+      { kind: "call", requestId: 3, method: "listJournalEntries", args: ["project-a"] },
+    ]);
+
+    worker.succeed(3, [{ seq: 1, payload: "{}", crc32: 42 }]);
+    worker.succeed(2, "hero-json");
+    await expect(get).resolves.toBe("hero-json");
+    await expect(list).resolves.toEqual([{ seq: 1, payload: "{}", crc32: 42 }]);
   });
 
-  it("rejects in-flight and new RPCs once close starts, then settles close", async () => {
+  it("reconstructs the synchronous KV adapter over the same RPC authority", async () => {
     const worker = new FakeWorker();
-    const database = await openFake(worker);
-    const inFlight = database.kvGet("brush-slots", "active");
-    await vi.waitFor(() => expect(worker.posted).toHaveLength(1));
-    const staleRequest = worker.posted[0]!;
+    const database = createStudioLocalDatabaseWorkerProxy({ workerFactory: () => worker });
+    const store = database.asAsyncKeyValueStore("settings");
+    const write = store.set("theme", "ink");
+    worker.succeed(1, undefined);
+    await flushMicrotasks();
 
+    expect(worker.posted[1]).toMatchObject({
+      kind: "call",
+      method: "kvSet",
+      args: ["settings", "theme", "ink"],
+    });
+    worker.succeed(2, undefined);
+    await expect(write).resolves.toBeUndefined();
+  });
+
+  it("marks only in-flight mutations unknown when the Worker crashes", async () => {
+    const worker = new FakeWorker();
+    const database = createStudioLocalDatabaseWorkerProxy({ workerFactory: () => worker });
+    const initialization = database.kvGet("probe", "ready");
+    worker.succeed(1, undefined);
+    await flushMicrotasks();
+    worker.succeed(2, null);
+    await initialization;
+
+    const mutation = database.kvSet("models", "hero", "new-value");
+    const read = database.kvGet("models", "hero");
+    await flushMicrotasks();
+    worker.crash();
+
+    await expect(mutation).rejects.toMatchObject({
+      name: "StudioLocalDatabaseCommitOutcomeUnknownError",
+      code: "commit-outcome-unknown",
+      method: "kvSet",
+    } satisfies Partial<StudioLocalDatabaseCommitOutcomeUnknownError>);
+    await expect(read).rejects.toBeInstanceOf(StudioLocalDatabaseWorkerClientError);
+    expect(worker.terminate).toHaveBeenCalledTimes(1);
+  });
+
+  it("also preserves mutation ambiguity on response deserialization failure", async () => {
+    const worker = new FakeWorker();
+    const database = createStudioLocalDatabaseWorkerProxy({ workerFactory: () => worker });
+    const mutation = database.putBrushLibraryRecords([]);
+    worker.succeed(1, undefined);
+    await flushMicrotasks();
+    worker.messageError();
+
+    await expect(mutation).rejects.toBeInstanceOf(
+      StudioLocalDatabaseCommitOutcomeUnknownError,
+    );
+  });
+
+  it("times out an unresponsive mutation as unknown and terminates the session", async () => {
+    vi.useFakeTimers();
+    try {
+      const worker = new FakeWorker();
+      const database = createStudioLocalDatabaseWorkerProxy({
+        workerFactory: () => worker,
+        requestTimeoutMs: 25,
+      });
+      const mutation = database.kvSet("models", "hero", "v3");
+      worker.succeed(1, undefined);
+      await flushMicrotasks();
+
+      await vi.advanceTimersByTimeAsync(25);
+
+      await expect(mutation).rejects.toMatchObject({
+        code: "commit-outcome-unknown",
+        method: "kvSet",
+      });
+      expect(worker.terminate).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("treats a normal mutation failure response as definitive", async () => {
+    const worker = new FakeWorker();
+    const database = createStudioLocalDatabaseWorkerProxy({ workerFactory: () => worker });
+    const mutation = database.kvDelete("models", "missing");
+    worker.succeed(1, undefined);
+    await flushMicrotasks();
+    const remote = new Error("constraint failed");
+    remote.name = "SqliteConstraintError";
+    worker.fail(2, remote);
+
+    await expect(mutation).rejects.toMatchObject({
+      remoteName: "SqliteConstraintError",
+      message: "constraint failed",
+    } satisfies Partial<StudioLocalDatabaseWorkerRemoteError>);
+    await expect(mutation).rejects.not.toBeInstanceOf(
+      StudioLocalDatabaseCommitOutcomeUnknownError,
+    );
+  });
+
+  it("rehydrates a committed mutation whose success response could not be posted", async () => {
+    const worker = new FakeWorker();
+    const database = createStudioLocalDatabaseWorkerProxy({ workerFactory: () => worker });
+    const mutation = database.kvSet("models", "hero", "committed-value");
+    worker.succeed(1, undefined);
+    await flushMicrotasks();
+    worker.fail(
+      2,
+      new StudioLocalDatabaseCommitOutcomeUnknownError(
+        "kvSet",
+        new Error("success-response-post-failed"),
+      ),
+    );
+
+    await expect(mutation).rejects.toMatchObject({
+      name: "StudioLocalDatabaseCommitOutcomeUnknownError",
+      code: "commit-outcome-unknown",
+      method: "kvSet",
+    });
+    await expect(mutation).rejects.toBeInstanceOf(
+      StudioLocalDatabaseCommitOutcomeUnknownError,
+    );
+  });
+
+  it("rehydrates the existing SQLite unavailable error contract", async () => {
+    const worker = new FakeWorker();
+    const database = createStudioLocalDatabaseWorkerProxy({ workerFactory: () => worker });
+    const opening = database.kvGet("models", "hero");
+    worker.fail(
+      1,
+      new SqliteUnavailableError("another page owns the OPFS Worker lock"),
+    );
+
+    await expect(opening).rejects.toBeInstanceOf(SqliteUnavailableError);
+    await expect(opening).rejects.toMatchObject({
+      reason: "another page owns the OPFS Worker lock",
+    });
+  });
+
+  it("rehydrates both existing CRDT capacity error contracts", async () => {
+    const worker = new FakeWorker();
+    const database = createStudioLocalDatabaseWorkerProxy({ workerFactory: () => worker });
+    const probe = database.kvGet("probe", "ready");
+    worker.succeed(1, undefined);
+    await flushMicrotasks();
+    worker.succeed(2, null);
+    await probe;
+
+    const outbox = database.listCrdtOutboxCandidates("studio", "work-a");
+    const recovery = database.listCrdtRecoveryCandidates("studio", "work-a");
+    await flushMicrotasks();
+    worker.fail(3, new StudioCrdtOutboxSqlCapacityError(101, 4_096));
+    worker.fail(4, new StudioCrdtRecoverySqlCapacityError(51, 8_192));
+
+    await expect(outbox).rejects.toBeInstanceOf(StudioCrdtOutboxSqlCapacityError);
+    await expect(outbox).rejects.toMatchObject({ entryCount: 101, totalBytes: 4_096 });
+    await expect(recovery).rejects.toBeInstanceOf(StudioCrdtRecoverySqlCapacityError);
+    await expect(recovery).rejects.toMatchObject({ rowCount: 51, totalBytes: 8_192 });
+  });
+
+  it("closes a cold proxy without constructing a Worker and rejects later use", async () => {
+    const factory = vi.fn(() => new FakeWorker());
+    const database = createStudioLocalDatabaseWorkerProxy({ workerFactory: factory });
+
+    await database.close();
+    await database.close();
+
+    expect(factory).not.toHaveBeenCalled();
+    await expect(database.kvGet("models", "hero")).rejects.toMatchObject({
+      code: "worker-closed",
+    });
+  });
+
+  it("posts a call made during initialization before a following close", async () => {
+    const worker = new FakeWorker();
+    const database = createStudioLocalDatabaseWorkerProxy({ workerFactory: () => worker });
+    const mutation = database.kvSet("models", "hero", "v4");
     const closing = database.close();
-    const afterClose = database.kvGet("brush-slots", "late");
-    await expect(inFlight).rejects.toThrow(/Worker is closing/);
-    await expect(afterClose).rejects.toThrow(/closing or closed/);
-    await vi.waitFor(() => expect(worker.posted).toHaveLength(2));
-    const closeRequest = worker.posted[1]!;
-    expect(closeRequest.method).toBe("close");
 
-    // A late result for a request rejected by the admission barrier is ignored safely.
-    respond(worker, staleRequest, "stale");
-    respond(worker, closeRequest, undefined);
+    expect(worker.posted).toMatchObject([{ kind: "initialize", requestId: 1 }]);
+    worker.succeed(1, undefined);
+    await flushMicrotasks();
+    expect(worker.posted).toMatchObject([
+      { kind: "initialize", requestId: 1 },
+      { kind: "call", requestId: 2, method: "kvSet" },
+    ]);
+
+    worker.succeed(2, undefined);
+    await expect(mutation).resolves.toBeUndefined();
+    await flushMicrotasks();
+    expect(worker.posted[2]).toMatchObject({ kind: "close", requestId: 3 });
+    worker.succeed(3, undefined);
     await expect(closing).resolves.toBeUndefined();
-    expect(worker.posted).toHaveLength(2);
-    expect(worker.terminate).toHaveBeenCalledOnce();
   });
 
-  it("rejects an invalid readiness timeout before constructing a Worker", async () => {
-    const createWorker = vi.fn(() => asWorker(new FakeWorker()));
-    await expect(openStudioLocalDatabaseWorker({
-      createWorker,
-      readyTimeoutMs: 0,
-    })).rejects.toBeInstanceOf(RangeError);
-    expect(createWorker).not.toHaveBeenCalled();
-  });
-});
+  it("waits for an already-ready write before posting close", async () => {
+    const worker = new FakeWorker();
+    const database = createStudioLocalDatabaseWorkerProxy({ workerFactory: () => worker });
+    const ready = database.kvGet("probe", "ready");
+    worker.succeed(1, undefined);
+    await flushMicrotasks();
+    worker.succeed(2, null);
+    await ready;
 
-describe("product Worker boundary", () => {
-  it("owns OPFS SQLite in the Dedicated Worker and never silently selects memory", () => {
-    const workerSource = readFileSync(
-      new URL("./studio-local-database.worker.ts", import.meta.url),
-      "utf8",
-    );
-    const runtimeSource = readFileSync(
-      new URL("./studio-local-database-runtime.ts", import.meta.url),
-      "utf8",
-    );
-    expect(workerSource).toContain('openStudioLocalDatabase({ vfs: "opfs" })');
-    expect(workerSource).toContain('"opfs-wl": true');
-    expect(workerSource).toContain("opfs: true");
-    expect(workerSource).not.toContain('vfs: "memory"');
-    expect(runtimeSource).toContain("openStudioLocalDatabaseWorker");
-    expect(runtimeSource).not.toContain('@sqlite.org/sqlite-wasm');
-    expect(runtimeSource).not.toContain("localStorage");
+    const mutation = database.kvSet("models", "hero", "v5");
+    const closing = database.close();
+    await flushMicrotasks();
+    expect(worker.posted.at(-1)).toMatchObject({ kind: "call", method: "kvSet" });
+
+    worker.succeed(3, undefined);
+    await mutation;
+    await flushMicrotasks();
+    expect(worker.posted.at(-1)).toMatchObject({ kind: "close", requestId: 4 });
+    worker.succeed(4, undefined);
+    await closing;
+  });
+
+  it("reports page-singleton construction failure as an async rejection", async () => {
+    let opening: Promise<unknown> | null = null;
+
+    expect(() => {
+      opening = acquireStudioLocalDatabaseWorker({
+        workerFactory: () => {
+          throw new Error("Worker constructor blocked");
+        },
+      });
+    }).not.toThrow();
+    await expect(opening).rejects.toMatchObject({
+      code: "worker-construction-failed",
+    });
+  });
+
+  it("provides one initialized page singleton and releases it through close", async () => {
+    const worker = new FakeWorker();
+    worker.autoRespond = true;
+    const factory = vi.fn(() => worker);
+
+    const first = acquireStudioLocalDatabaseWorker({ workerFactory: factory });
+    const second = acquireStudioLocalDatabaseWorker({ workerFactory: factory });
+
+    await expect(first).resolves.toBe(await second);
+    expect(factory).toHaveBeenCalledTimes(1);
+    expect(worker.posted.filter((request) => request.kind === "initialize")).toHaveLength(1);
+
+    await closeStudioLocalDatabaseWorker();
+    expect(worker.posted.at(-1)).toMatchObject({ kind: "close" });
+    expect(worker.terminate).toHaveBeenCalledTimes(1);
   });
 });

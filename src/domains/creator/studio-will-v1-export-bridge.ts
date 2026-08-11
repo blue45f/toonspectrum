@@ -2,10 +2,10 @@
  * UI-facing bridge from retained Studio freehand elements to the bounded,
  * clean-room WILL v1 Annex B document Worker.
  *
- * This bridge and its Worker client are part of Studio's stable module graph. Keeping the click
- * path free of an unbounded dynamic chunk request is intentional: the expensive OPC/ZIP work still
- * runs only inside the dedicated Worker. This is a ToonSpectrum-owned public-specification profile,
- * not Wacom SDK output, vendor certification, or trademark authorization.
+ * The small path-preparation bridge stays in Studio's stable graph. The OPC/ZIP protocol and its
+ * Worker client load only after an explicit export request; none of that optional interchange
+ * graph is needed to open or draw in Studio. This is a ToonSpectrum-owned public-specification
+ * profile, not Wacom SDK output, vendor certification, or trademark authorization.
  */
 
 import {
@@ -13,11 +13,6 @@ import {
   studioInkPressureDiameter,
 } from "./studio-ink-pressure-model";
 import { parseStudioGpuColor } from "./studio-webgpu-color";
-import {
-  STUDIO_WILL_V1_OPC_EXTENSION,
-  STUDIO_WILL_V1_OPC_MEDIA_TYPE,
-} from "./studio-will-v1-opc-interchange";
-import { buildStudioWillV1OpcBytesInWorker } from "./studio-will-v1-opc-worker-client";
 
 import type { DrawEl } from "./studio-element-model";
 import type {
@@ -271,6 +266,15 @@ export async function exportStudioPageToWillV1(
   const timeoutMs = exportDeadlineMs(input.workerOptions?.timeoutMs);
   const result = await runBoundedWillV1Export(
     async (signal) => {
+      const [workerRuntime, interchange] = await Promise.all([
+        import("./studio-will-v1-opc-worker-client"),
+        import("./studio-will-v1-opc-interchange"),
+      ]);
+      const { buildStudioWillV1OpcBytesInWorker } = workerRuntime;
+      const {
+        STUDIO_WILL_V1_OPC_EXTENSION,
+        STUDIO_WILL_V1_OPC_MEDIA_TYPE,
+      } = interchange;
       const built = await buildStudioWillV1OpcBytesInWorker(
         {
           width: input.width,

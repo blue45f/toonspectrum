@@ -65,8 +65,22 @@ describe("워드로브 카탈로그", () => {
       expect(item.fitProfile.version).toBe(1);
       expect(item.fitProfile.regions.length).toBeGreaterThan(0);
       expect(item.geometrySource).toBe(
-        item.slot === "shoes" ? "rigid-procedural" : "skinned-procedural-v1",
+        item.id === "pleated" || item.id === "longskirt"
+          ? "xpbd-skirt-v1"
+          : item.slot === "shoes"
+            ? "rigid-procedural"
+            : "skinned-procedural-v1",
       );
+    }
+  });
+
+  it("플리츠·롱스커트의 XPBD 범위와 자기 충돌 미지원을 과장 없이 안내한다", () => {
+    for (const itemId of ["pleated", "longskirt"] as const) {
+      const item = wardrobeItemById(itemId);
+      expect(item?.geometrySource).toBe("xpbd-skirt-v1");
+      expect(item?.hint).toContain("신체");
+      expect(item?.hint).toContain("자기 충돌은 아직 지원하지 않습니다");
+      expect(item?.hint).not.toContain("절대 뚫리지 않");
     }
   });
 

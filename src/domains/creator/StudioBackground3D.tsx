@@ -461,6 +461,12 @@ import {
   readStudioBg3dShadowModelLocalBounds,
 } from "./studio-bg3d-shadow-frustum";
 import {
+  acquireStudioBg3dSharedCharacterCaptureAuthorityLease,
+  verifyStudioBg3dSharedCharacterCaptureAuthorityLease,
+  type StudioBg3dSharedCharacterCaptureAuthorityInput,
+  type StudioBg3dSharedCharacterCaptureAuthorityLease,
+} from "./studio-bg3d-shared-character-capture-authority";
+import {
   createStudioBg3dLinkedCharacterCapture,
   createStudioBg3dSharedCharacterGroundSurfaceRevision,
   resolveStudioBg3dSharedStageMutationBlockedReason,
@@ -475,6 +481,14 @@ import {
   freezeStudioBg3dShotAnimationsForBatch,
   projectStudioBg3dShotVisibilityToRuntime,
 } from "./studio-bg3d-shot-runtime";
+import {
+  createStudioBg3dBabylonDiagnosticDocument,
+  hasStudioBg3dBabylonDiagnosticBeautyVariation,
+  hasStudioBg3dBabylonDiagnosticDepthVariation,
+  hasStudioBg3dBabylonDiagnosticNormalVariation,
+  hasStudioBg3dBabylonDiagnosticStableIds,
+  studioBg3dBabylonDiagnosticErrorMessage,
+} from "./studio-bg3d-specialist-diagnostic-support";
 import {
   DEFAULT_STUDIO_BG3D_SUN_RIG_CONFIG,
   STUDIO_BG3D_SUN_TIME_PRESETS,
@@ -527,7 +541,7 @@ import {
 import { createTwoBoneDefaultPoleTarget } from "./studio-rig-two-bone-ik";
 import {
   createStudioShared3dCharacterShadowEntity,
-} from "./studio-shared-3d-scene-bridge";
+} from "./studio-shared-3d-scene-runtime";
 import { StudioBg3dActionFooter } from "./StudioBg3dActionFooter";
 import { StudioBg3dDirectionalShadowLight } from "./StudioBg3dDirectionalShadowLight";
 import { StudioBg3dLtPanel } from "./StudioBg3dLtPanel";
@@ -659,6 +673,9 @@ type CaptureState = {
   adapter: StudioBg3dCaptureAdapter | null;
   camera: THREE.Camera | null;
 };
+
+const SHARED_CHARACTER_CAPTURE_AUTHORITY_ERROR_MESSAGE =
+  "연결된 3D 캐릭터의 모델·의상·소품이 같은 캡처 프레임에서 완전히 준비됐는지 확인할 수 없어 출력을 중단했어요. 준비 표시를 확인한 뒤 다시 시도해 주세요.";
 
 const STUDIO_BG3D_SHOT_CONTACT_SHEET_PASS_PRIORITY: readonly StudioBg3dShotBatchPass[] = [
   "lt-composite",
@@ -1543,150 +1560,6 @@ function loadStudioBg3dBabylonSpecialistEntry():
   return pending;
 }
 
-function createStudioBg3dBabylonDiagnosticDocument(): StudioBg3dSceneDocument {
-  return normalizeStudioBg3dSceneDocument({
-    ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
-    background: {
-      ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.background,
-      mode: "color",
-      color: "#f8fafc",
-    },
-    nodes: [{
-      id: "babylon-diagnostic-box",
-      name: "Babylon diagnostic box",
-      kind: "primitive",
-      primitiveKind: "box",
-      color: "#4f46e5",
-      transform: {
-        position: [0, 0, 0],
-        rotation: [0.2, 0.35, 0],
-        scale: [1.6, 1.6, 1.6],
-      },
-      parentId: null,
-      visible: true,
-      locked: false,
-      castsShadow: true,
-      receivesShadow: true,
-    }],
-  });
-}
-
-function hasStudioBg3dBabylonDiagnosticBeautyVariation(
-  rgba: Uint8Array,
-): boolean {
-  let referencePixel = -1;
-  for (let pixel = 0; pixel < rgba.length / 4; pixel += 1) {
-    if (rgba[pixel * 4 + 3]! > 0) {
-      referencePixel = pixel;
-      break;
-    }
-  }
-  if (referencePixel < 0) return false;
-  const referenceOffset = referencePixel * 4;
-  for (let pixel = referencePixel + 1; pixel < rgba.length / 4; pixel += 1) {
-    const offset = pixel * 4;
-    if (rgba[offset + 3]! <= 0) continue;
-    const difference =
-      Math.abs(rgba[offset]! - rgba[referenceOffset]!) +
-      Math.abs(rgba[offset + 1]! - rgba[referenceOffset + 1]!) +
-      Math.abs(rgba[offset + 2]! - rgba[referenceOffset + 2]!);
-    if (difference >= 12) return true;
-  }
-  return false;
-}
-
-function hasStudioBg3dBabylonDiagnosticDepthVariation(
-  depth: Float32Array,
-): boolean {
-  let minimum = 1;
-  let maximum = 0;
-  for (const value of depth) {
-    if (!Number.isFinite(value) || value < 0 || value > 1) return false;
-    minimum = Math.min(minimum, value);
-    maximum = Math.max(maximum, value);
-  }
-  return minimum < 0.999 && maximum >= 0.999 && maximum - minimum >= 0.01;
-}
-
-function hasStudioBg3dBabylonDiagnosticNormalVariation(
-  normal: Uint8Array,
-  depth: Float32Array,
-): boolean {
-  if (normal.length !== depth.length * 2) return false;
-  let minimumRed = 255;
-  let maximumRed = 0;
-  let minimumGreen = 255;
-  let maximumGreen = 0;
-  let geometryPixels = 0;
-  for (let pixel = 0; pixel < depth.length; pixel += 1) {
-    if (depth[pixel]! >= 0.999) continue;
-    geometryPixels += 1;
-    const offset = pixel * 2;
-    minimumRed = Math.min(minimumRed, normal[offset]!);
-    maximumRed = Math.max(maximumRed, normal[offset]!);
-    minimumGreen = Math.min(minimumGreen, normal[offset + 1]!);
-    maximumGreen = Math.max(maximumGreen, normal[offset + 1]!);
-  }
-  return (
-    geometryPixels > 0 &&
-    Math.max(maximumRed - minimumRed, maximumGreen - minimumGreen) >= 8
-  );
-}
-
-function hasStudioBg3dBabylonDiagnosticStableIds(
-  data: Uint32Array,
-  legend: readonly {
-    readonly id: number;
-    readonly label: string;
-    readonly stableId: string;
-  }[],
-  expectedStableId: string,
-  expectedLabel: string,
-): boolean {
-  if (
-    legend.length !== 1 ||
-    legend[0]?.id !== 1 ||
-    legend[0].stableId !== expectedStableId ||
-    legend[0].label !== expectedLabel
-  ) {
-    return false;
-  }
-  let hasBackground = false;
-  let hasGeometry = false;
-  for (const id of data) {
-    if (id === 0) {
-      hasBackground = true;
-    } else if (id === 1) {
-      hasGeometry = true;
-    } else {
-      return false;
-    }
-  }
-  return hasBackground && hasGeometry;
-}
-
-function studioBg3dBabylonDiagnosticErrorMessage(
-  backend: StudioBg3dBabylonDiagnosticBackend,
-  error: unknown,
-): string {
-  const label = backend === "webgpu" ? "WebGPU" : "WebGL2";
-  const code =
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    typeof error.code === "string"
-      ? error.code
-      : null;
-  if (code === "context-lost") {
-    return `Babylon ${label} 컨텍스트가 진단 중 종료되었습니다. 다른 GPU 작업을 닫은 뒤 다시 시도해 주세요. 다른 백엔드는 자동 실행하지 않았습니다.`;
-  }
-  if (backend === "webgpu" && typeof navigator !== "undefined" && !("gpu" in navigator)) {
-    return "이 브라우저에서 WebGPU를 사용할 수 없어 Babylon WebGPU 진단을 완료하지 못했습니다. WebGL2 진단은 자동 실행하지 않았습니다.";
-  }
-  const supportCode = code ? ` · 지원 코드 ${code}` : "";
-  return `Babylon ${label} 엔진 또는 beauty/depth/normal/object ID/material ID 패스를 분리 캔버스에서 검증하지 못했습니다${supportCode}. 현재 3D 편집기에는 영향을 주지 않았고, 다른 백엔드는 자동 실행하지 않았습니다.`;
-}
-
 /* ── R3F Canvas 내부에서 렌더러/씬/카메라를 꺼내 캡처용 ref에 흘려보내는 다리.
    VRM 포저의 CaptureBridge와 동일한 패턴 — ref-not-state라 마운트마다 리렌더를 유발하지 않는다. */
 function CaptureBridge({
@@ -2559,6 +2432,100 @@ export function StudioBackground3D({
     sceneSession: sharedSceneSession,
     stageResolution: sharedStageResolution,
   });
+  const sharedCharacterCaptureAuthorityDraft = {
+    includeCharactersInCapture: includeSharedCharactersInCapture,
+    readinessPhase: sharedCharacterCaptureReadiness.phase,
+    expectedCharacters: sharedCharacters.map((character) => ({
+      elementId: character.elementId,
+      runtimeKey: character.runtimeKey,
+      modelRuntimeKey: character.modelRuntimeKey,
+      placementHash: character.placementHash,
+      sourceHash: character.sourceHash,
+    })),
+    capturableElementIds: sharedCharacterCaptureReadiness.capturableElementIds,
+    previewOnlyElementIds: sharedCharacterCaptureReadiness.previewOnlyElementIds,
+    pendingElementIds: sharedCharacters.flatMap((character) =>
+      sharedCharacterStatuses[character.runtimeKey] === "ready"
+        ? []
+        : sharedCharacterStatuses[character.runtimeKey] === "unavailable"
+          ? []
+          : [character.elementId],
+    ),
+    unavailableElementIds: sharedCharacters.flatMap((character) =>
+      sharedCharacterStatuses[character.runtimeKey] === "unavailable"
+        ? [character.elementId]
+        : [],
+    ),
+  } as const;
+  const sharedCharacterCaptureAuthorityPayloadKey = JSON.stringify(
+    sharedCharacterCaptureAuthorityDraft,
+  );
+  const readSharedCharacterCaptureAuthorityDraft = useEffectEvent(
+    () => sharedCharacterCaptureAuthorityDraft,
+  );
+  const sharedCharacterCaptureAuthorityRef =
+    useRef<StudioBg3dSharedCharacterCaptureAuthorityInput | null>(null);
+  const sharedCharacterCaptureAuthorityPayloadKeyRef = useRef<string | null>(null);
+  const sharedCharacterCaptureAuthorityRevisionRef = useRef(0);
+  const sharedCharacterCaptureStatusFenceRef = useRef(sharedCharacterStatuses);
+
+  useLayoutEffect(() => {
+    sharedCharacterCaptureStatusFenceRef.current = sharedCharacterStatuses;
+    if (
+      sharedCharacterCaptureAuthorityRef.current
+      && sharedCharacterCaptureAuthorityPayloadKeyRef.current
+        === sharedCharacterCaptureAuthorityPayloadKey
+    ) return;
+    if (sharedCharacterCaptureAuthorityRevisionRef.current < 1) {
+      sharedCharacterCaptureAuthorityRevisionRef.current = 1;
+    } else if (sharedCharacterCaptureAuthorityRef.current) {
+      sharedCharacterCaptureAuthorityRevisionRef.current += 1;
+    }
+    sharedCharacterCaptureAuthorityPayloadKeyRef.current =
+      sharedCharacterCaptureAuthorityPayloadKey;
+    sharedCharacterCaptureAuthorityRef.current = {
+      revision: sharedCharacterCaptureAuthorityRevisionRef.current,
+      ...readSharedCharacterCaptureAuthorityDraft(),
+    };
+  }, [
+    sharedCharacterCaptureAuthorityPayloadKey,
+    sharedCharacterStatuses,
+  ]);
+
+  const updateSharedCharacterStatusWithCaptureFence = (
+    ...args: Parameters<typeof updateSharedCharacterStatus>
+  ) => {
+    const [runtimeKey, status] = args;
+    if (sharedCharacterCaptureStatusFenceRef.current[runtimeKey] !== status) {
+      sharedCharacterCaptureStatusFenceRef.current = {
+        ...sharedCharacterCaptureStatusFenceRef.current,
+        [runtimeKey]: status,
+      };
+      sharedCharacterCaptureAuthorityRevisionRef.current = Math.max(
+        1,
+        sharedCharacterCaptureAuthorityRevisionRef.current + 1,
+      );
+      sharedCharacterCaptureAuthorityPayloadKeyRef.current = null;
+      sharedCharacterCaptureAuthorityRef.current = null;
+    }
+    updateSharedCharacterStatus(...args);
+  };
+
+  const acquireSharedCharacterCaptureAuthority = () => {
+    const current = sharedCharacterCaptureAuthorityRef.current;
+    return current
+      ? acquireStudioBg3dSharedCharacterCaptureAuthorityLease(current)
+      : null;
+  };
+  const verifySharedCharacterCaptureAuthority = (
+    lease: StudioBg3dSharedCharacterCaptureAuthorityLease,
+    checkpoint: "raster" | "receipt",
+  ) => {
+    const current = sharedCharacterCaptureAuthorityRef.current;
+    return current
+      ? verifyStudioBg3dSharedCharacterCaptureAuthorityLease(lease, current, checkpoint)
+      : null;
+  };
   const [primitives, setPrimitives] = useState<BgPrimitive[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [transformMode, setTransformMode] = useState<TransformModeId>("translate");
@@ -3341,7 +3308,10 @@ export function StudioBackground3D({
 
   // The cache owns only verified-loader snapshots and disposes each shared resource once.
   useEffect(() => {
-    if (!open || !modelsPanelActivated) return;
+    // `componentActiveRef` fences every async editor operation, not only the model library.
+    // Gating this lifecycle behind the Models tab leaves diagnostics, capture, physics, and
+    // restore work permanently unable to publish while the dialog is otherwise fully active.
+    if (!open) return;
     componentActiveRef.current = true;
     const cache = modelRootCacheRef.current;
     const pending = modelLoadPendingRef.current;
@@ -3356,7 +3326,7 @@ export function StudioBackground3D({
       attachmentByStorageId.clear();
       storageIdByAttachment.clear();
     };
-  }, [modelsPanelActivated, open, setTemplateLibrary, setTemplateLibraryStatus]);
+  }, [open, setTemplateLibrary, setTemplateLibraryStatus]);
 
   // LT presets use fail-closed SQLite/OPFS authority with an explicit tab-memory fallback.
   useEffect(() => {
@@ -6110,6 +6080,12 @@ export function StudioBackground3D({
       setError("컷을 렌더할 3D 뷰포트가 아직 준비되지 않았습니다.");
       return;
     }
+    const sharedCharacterAuthorityResult = acquireSharedCharacterCaptureAuthority();
+    if (!sharedCharacterAuthorityResult?.ok) {
+      setError(SHARED_CHARACTER_CAPTURE_AUTHORITY_ERROR_MESSAGE);
+      return;
+    }
+    const sharedCharacterAuthorityLease = sharedCharacterAuthorityResult.lease;
     shotBatchAbortRef.current?.abort();
     const controller = new AbortController();
     shotBatchAuthorizationEpochRef.current += 1;
@@ -6134,7 +6110,7 @@ export function StudioBackground3D({
         shotBatchRecoveryScopeRef.current = null;
       }
       if (!componentActiveRef.current) return;
-      pendingInitialCameraRef.current = isQuadView ? originalLiveView : null;
+      pendingInitialCameraRef.current = null;
       flushSync(() => {
         setIsCapturing(false);
         setShotBatchProgress(null);
@@ -6233,7 +6209,7 @@ export function StudioBackground3D({
       const transitionedViewport = await applyStudioBg3dViewportAfterTransition({
         view: originalLiveView,
         previousApi: originalViewportApi,
-        requireReplacement: isQuadView,
+        requireReplacement: false,
         readApi: () => viewportApiRef.current,
         isActive: () => componentActiveRef.current && !controller.signal.aborted,
         waitForPaintFrame: waitForStudioBg3dPaintFrame,
@@ -6538,6 +6514,13 @@ export function StudioBackground3D({
                 `3D 캡처 소유자가 동결된 컷 계획과 달라졌습니다: ${captureOwnerMismatches.join(", ")}.`,
               );
             }
+            const rasterAuthority = verifySharedCharacterCaptureAuthority(
+              sharedCharacterAuthorityLease,
+              "raster",
+            );
+            if (!rasterAuthority?.ok) {
+              throw new Error(SHARED_CHARACTER_CAPTURE_AUTHORITY_ERROR_MESSAGE);
+            }
             captured = await captureStudioBg3dRaster(
               captureAdapter,
               {
@@ -6560,6 +6543,13 @@ export function StudioBackground3D({
           }
         }
         if (controller.signal.aborted) throw Object.assign(new Error("취소됨"), { name: "AbortError" });
+        const receiptAuthority = verifySharedCharacterCaptureAuthority(
+          sharedCharacterAuthorityLease,
+          "receipt",
+        );
+        if (!receiptAuthority?.ok) {
+          throw new Error(SHARED_CHARACTER_CAPTURE_AUTHORITY_ERROR_MESSAGE);
+        }
         const shotArtifacts = await buildStudioBg3dShotArtifacts({
           shot,
           captured,
@@ -6845,8 +6835,9 @@ export function StudioBackground3D({
         } catch {
           restoreFailed = true;
         }
-        // Preserve the live composition through a quad-view remount instead of accepting stale props.
-        pendingInitialCameraRef.current = restoreFailed || isQuadView ? originalLiveView : null;
+        // The main View remains mounted while capture starts and ends. Only a failed camera
+        // restoration needs a deferred retry; returning to quad no longer replaces its authority.
+        pendingInitialCameraRef.current = restoreFailed ? originalLiveView : null;
       }
       const recoveryRelease = shotBatchRecoveryStore.release(recoverySession);
       let releaseTimeoutId: number | null = null;
@@ -7072,6 +7063,12 @@ export function StudioBackground3D({
       setError("장면 원본을 손실 없이 저장할 수 없어 소재 저장을 중단했습니다. 문제가 있는 도형이나 모델을 확인해 주세요.");
       return;
     }
+    const sharedCharacterAuthorityResult = acquireSharedCharacterCaptureAuthority();
+    if (!sharedCharacterAuthorityResult?.ok) {
+      setError(SHARED_CHARACTER_CAPTURE_AUTHORITY_ERROR_MESSAGE);
+      return;
+    }
+    const sharedCharacterAuthorityLease = sharedCharacterAuthorityResult.lease;
 
     const previousLineArtPreview = lineArtPreview;
     captureInFlightRef.current = true;
@@ -7092,6 +7089,14 @@ export function StudioBackground3D({
         }
         return;
       }
+      const rasterAuthority = verifySharedCharacterCaptureAuthority(
+        sharedCharacterAuthorityLease,
+        "raster",
+      );
+      if (!rasterAuthority?.ok) {
+        setError(SHARED_CHARACTER_CAPTURE_AUTHORITY_ERROR_MESSAGE);
+        return;
+      }
 
       const captured = await captureStudioBg3dRaster(captureAdapter, {
         width: 320,
@@ -7110,6 +7115,14 @@ export function StudioBackground3D({
       ctx.putImageData(idata, 0, 0);
       const dataUrl = canvas.toDataURL("image/png");
       const hashUrl = `${dataUrl}#${encodeURIComponent(adapted.serialized)}`;
+      const receiptAuthority = verifySharedCharacterCaptureAuthority(
+        sharedCharacterAuthorityLease,
+        "receipt",
+      );
+      if (!receiptAuthority?.ok) {
+        setError(SHARED_CHARACTER_CAPTURE_AUTHORITY_ERROR_MESSAGE);
+        return;
+      }
 
       await saveAsset({
         name: "내 3D 장면",
@@ -7184,6 +7197,12 @@ export function StudioBackground3D({
       );
       return;
     }
+    const sharedCharacterAuthorityResult = acquireSharedCharacterCaptureAuthority();
+    if (!sharedCharacterAuthorityResult?.ok) {
+      setError(SHARED_CHARACTER_CAPTURE_AUTHORITY_ERROR_MESSAGE);
+      return;
+    }
+    const sharedCharacterAuthorityLease = sharedCharacterAuthorityResult.lease;
 
     aiMethodReferenceAbortRef.current?.abort();
     const controller = new AbortController();
@@ -7237,6 +7256,14 @@ export function StudioBackground3D({
         maxPixels: Math.min(deviceQuality.maxRenderPixels, 2_000_000),
       });
       if (!captureSize) throw new Error("AI reference capture size admission failed.");
+      const rasterAuthority = verifySharedCharacterCaptureAuthority(
+        sharedCharacterAuthorityLease,
+        "raster",
+      );
+      if (!rasterAuthority?.ok) {
+        setError(SHARED_CHARACTER_CAPTURE_AUTHORITY_ERROR_MESSAGE);
+        return;
+      }
 
       const releaseCaptureFrameViewOffset = applyStudioBg3dCaptureFrameViewOffset(
         captureRef.current.adapter === captureAdapter ? captureRef.current.camera : null,
@@ -7268,6 +7295,14 @@ export function StudioBackground3D({
       const imageData = context.createImageData(captured.width, captured.height);
       imageData.data.set(captured.rgba);
       context.putImageData(imageData, 0, 0);
+      const receiptAuthority = verifySharedCharacterCaptureAuthority(
+        sharedCharacterAuthorityLease,
+        "receipt",
+      );
+      if (!receiptAuthority?.ok) {
+        setError(SHARED_CHARACTER_CAPTURE_AUTHORITY_ERROR_MESSAGE);
+        return;
+      }
 
       const handoff = createStudioBg3dAiMethodReferenceCapture({
         dataUrl: canvas.toDataURL("image/png").split("#", 1)[0],
@@ -7376,6 +7411,12 @@ export function StudioBackground3D({
       setError("장면 원본을 손실 없이 저장할 수 없어 추가를 중단했습니다. 문제가 있는 도형이나 모델을 확인해 주세요.");
       return;
     }
+    const sharedCharacterAuthorityResult = acquireSharedCharacterCaptureAuthority();
+    if (!sharedCharacterAuthorityResult?.ok) {
+      setError(SHARED_CHARACTER_CAPTURE_AUTHORITY_ERROR_MESSAGE);
+      return;
+    }
+    const sharedCharacterAuthorityLease = sharedCharacterAuthorityResult.lease;
 
     let magicSelectionSnapshot: StudioBg3dMagicSelectionSnapshot | null = null;
     if (magicLayerEnabled) {
@@ -7477,6 +7518,14 @@ export function StudioBackground3D({
       });
       if (!captureSize) {
         throw new Error("LT capture size admission failed.");
+      }
+      const rasterAuthority = verifySharedCharacterCaptureAuthority(
+        sharedCharacterAuthorityLease,
+        "raster",
+      );
+      if (!rasterAuthority?.ok) {
+        setError(SHARED_CHARACTER_CAPTURE_AUTHORITY_ERROR_MESSAGE);
+        return;
       }
       const captureFrameCameraSettings =
         resolveStudioBg3dCaptureFrameCameraSettings(
@@ -7629,10 +7678,18 @@ export function StudioBackground3D({
         y: point.y / rendered.height,
       }));
       if (!isInsertCurrent() || captureAdapterIsStale()) return;
+      const receiptAuthority = verifySharedCharacterCaptureAuthority(
+        sharedCharacterAuthorityLease,
+        "receipt",
+      );
+      if (!receiptAuthority?.ok) {
+        setError(SHARED_CHARACTER_CAPTURE_AUTHORITY_ERROR_MESSAGE);
+        return;
+      }
       insertPhase = "commit";
       setSceneBaseDocument(adapted.document);
       const linkedCharacterCapture = createStudioBg3dLinkedCharacterCapture(
-        sharedCharacterCaptureElementIds,
+        receiptAuthority.captureElementIds,
         sharedCharacters,
       );
       const accepted = onInsert({
@@ -9156,7 +9213,11 @@ export function StudioBackground3D({
 
   const placementActive =
     placementSession.phase === "preview" && placementPreviewAsset !== null;
-  const effectiveIsQuadView = isQuadView && !isCapturing && !physicsInteractionLocked && !placementActive;
+  // Capture renders the main View's virtual Scene/Camera into an offscreen target, so the quad
+  // topology can remain intact. Keeping this View mounted prevents linked VRMs, wardrobe, props,
+  // auto-grip, and their post-commit readiness generation from restarting during capture.
+  const effectiveIsQuadView = isQuadView && !physicsInteractionLocked && !placementActive;
+  const mainViewTrackRef = effectiveIsQuadView ? viewPerspRef : viewportHostRef;
   const bg3dFrameLoop = resolveStudioBg3dFrameLoop({
     modelAnimationPlaying: customModels.some((model) => model.animation?.playing === true),
     physicsPlaying: physicsPhase === "running",
@@ -9326,6 +9387,7 @@ export function StudioBackground3D({
     <StudioBg3dSharedCharacterSceneContent
       characters={sharedCharacters}
       includeInCapture={includeSharedCharactersInCapture}
+      groundingResults={sharedCharacterGroundings}
       surfaceRevision={sharedCharacterGroundSurfaceRevision}
       selectedElementId={effectiveSelectedSharedCharacterElementId}
       onSelect={(elementId) => {
@@ -9333,7 +9395,7 @@ export function StudioBackground3D({
         setSelectedIds(new Set());
         setActivePanelTab("layers");
       }}
-      onStatus={updateSharedCharacterStatus}
+      onStatus={updateSharedCharacterStatusWithCaptureFence}
       onGrounding={updateSharedCharacterGrounding}
     />
   );
@@ -9383,11 +9445,7 @@ export function StudioBackground3D({
   
   const sceneContent = (
     <Fragment>
-      <CaptureBridge onCaptureUpdate={onCaptureUpdate} />
       <StudioBg3dWebglRenderSettingsController render={sceneBaseDocument.render} />
-      <BgViewportController
-        onReady={handleViewportReady}
-      />
       <SkyClearColorController clearColor={getSkyPreset(renderedSkyPresetId).clearColor} />
       <StudioBg3dScenePanorama
         presetId={renderedSkyPresetId}
@@ -9698,21 +9756,19 @@ export function StudioBackground3D({
                         {sceneContent}
                         <OrbitControls makeDefault enableRotate={false} enableDamping dampingFactor={0.08} enablePan enabled={!isTransforming && !isCapturing && !placementActive && !measurementActive} />
                       </View>
-                      <View track={viewPerspRef as unknown as React.RefObject<HTMLElement>}>
-                        {mainCameraNode}
-                        {sceneContent}
-                        {sharedCharacterSceneContent}
-                        {commonOrbitControls}
-                      </View>
                     </Fragment>
-                  ) : (
-                    <Fragment>
-                      {mainCameraNode}
-                      {sceneContent}
-                      {sharedCharacterSceneContent}
-                      {commonOrbitControls}
-                    </Fragment>
-                  )}
+                  ) : null}
+                  <View
+                    key="studio-bg3d-main-view"
+                    track={mainViewTrackRef as unknown as React.RefObject<HTMLElement>}
+                  >
+                    {mainCameraNode}
+                    <CaptureBridge onCaptureUpdate={onCaptureUpdate} />
+                    <BgViewportController onReady={handleViewportReady} />
+                    {sceneContent}
+                    {sharedCharacterSceneContent}
+                    {commonOrbitControls}
+                  </View>
                 </Canvas>
 
                 {!isCapturing ? (

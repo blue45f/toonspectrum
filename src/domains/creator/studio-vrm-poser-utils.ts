@@ -19,12 +19,15 @@ import {
   normalizeStudioVrmPoseTranslations,
 } from "./studio-vrm-pose-translations";
 import { parseVrmProps, type PropInstance } from "./studio-vrm-props";
+import {
+  DEFAULT_STUDIO_VRM_LIGHTING_TONE,
+  STUDIO_VRM_LIGHTING_TONES,
+  type StudioVrmIkConstraint,
+  type StudioVrmLightingTone,
+  type StudioVrmPoseTranslations,
+} from "./studio-vrm-scene-document";
 import { parseSceneProps, type SerializedSceneProps } from "./studio-vrm-scene-props";
 
-import type {
-  StudioVrmIkConstraint,
-  StudioVrmPoseTranslations,
-} from "./studio-vrm-scene-document";
 import type { VRM, VRMHumanBoneName } from "@pixiv/three-vrm";
 
 export type Vec3 = readonly [number, number, number];
@@ -2037,6 +2040,8 @@ export type FullVrmState = {
   physics?: unknown;
   bodyScale?: BodyScale;
   lighting?: LightingParams;
+  /** 카메라와 별개인 장면 조명 프리셋. 구버전 저장본은 morning으로 이행한다. */
+  lightingTone?: StudioVrmLightingTone;
   env?: EnvVariant;
   fingerOverrides?: FingerRotationMap;
   materialFx?: VrmMaterialFx;
@@ -2064,6 +2069,7 @@ const SAFE_VRM_RUNTIME_KEY_PATTERN = /^[\p{L}\p{N}_. :/@+-]{1,64}$/u;
 const CSS_HEX_COLOR_PATTERN = /^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 const FORBIDDEN_VRM_RUNTIME_KEYS = new Set(["__proto__", "prototype", "constructor"]);
 const FINGER_BONE_SET = new Set<string>(POSER_FINGER_BONES);
+const FULL_VRM_LIGHTING_TONE_SET = new Set<string>(STUDIO_VRM_LIGHTING_TONES);
 const FULL_VRM_STATE_KEYS = new Set([
   "version",
   "modelId",
@@ -2082,6 +2088,7 @@ const FULL_VRM_STATE_KEYS = new Set([
   "physics",
   "bodyScale",
   "lighting",
+  "lightingTone",
   "env",
   "fingerOverrides",
   "materialFx",
@@ -2217,6 +2224,10 @@ function isStrictFullVrmLighting(value: unknown): value is LightingParams {
     && isFiniteFullVrmNumber(value.directionDeg, -180, 180);
 }
 
+function isStrictFullVrmLightingTone(value: unknown): value is StudioVrmLightingTone {
+  return typeof value === "string" && FULL_VRM_LIGHTING_TONE_SET.has(value);
+}
+
 function isStrictFullVrmPhysics(value: unknown): value is VrmPhysicsSettings {
   if (!isFullVrmStateRecord(value)) return false;
   const keys = new Set([
@@ -2281,6 +2292,9 @@ function hasStrictFullVrmRuntimeFields(value: Record<string, unknown>): boolean 
   if (value.customColors !== undefined && !isStrictFullVrmCustomColors(value.customColors)) return false;
   if (value.materialFx !== undefined && !isStrictFullVrmMaterialFx(value.materialFx)) return false;
   if (value.lighting !== undefined && !isStrictFullVrmLighting(value.lighting)) return false;
+  if (value.lightingTone !== undefined && !isStrictFullVrmLightingTone(value.lightingTone)) {
+    return false;
+  }
   if (value.physics !== undefined && !isStrictFullVrmPhysics(value.physics)) return false;
   if (value.env !== undefined && !["none", "floor", "wall", "room", "outdoor"].includes(String(value.env))) {
     return false;
@@ -2353,6 +2367,9 @@ export function serializeFullVrmState(
     physics: state.physics,
     bodyScale: state.bodyScale,
     lighting: state.lighting,
+    lightingTone: isStrictFullVrmLightingTone(state.lightingTone)
+      ? state.lightingTone
+      : DEFAULT_STUDIO_VRM_LIGHTING_TONE,
     env: state.env,
     fingerOverrides: state.fingerOverrides,
     materialFx: state.materialFx,
@@ -2492,6 +2509,7 @@ export function planFullStateRestore(state: FullVrmStateInput): {
   expressionWeights: Record<string, number>;
   bodyScale?: BodyScale;
   lighting?: LightingParams;
+  lightingTone: StudioVrmLightingTone;
   env?: EnvVariant;
   fingerOverrides?: FingerRotationMap;
   costume?: unknown;
@@ -2517,6 +2535,9 @@ export function planFullStateRestore(state: FullVrmStateInput): {
     expressionWeights: state.expressionWeights || {},
     bodyScale: state.bodyScale,
     lighting: state.lighting,
+    lightingTone: isStrictFullVrmLightingTone(state.lightingTone)
+      ? state.lightingTone
+      : DEFAULT_STUDIO_VRM_LIGHTING_TONE,
     env: state.env,
     fingerOverrides: state.fingerOverrides,
     costume: state.costume,
@@ -2587,6 +2608,7 @@ export function buildFullVrmStateFromSharedDataUrl(dataUrl: string): FullVrmStat
       bodyScale: poseData.bodyScale,
       fingerOverrides: poseData.fingerOverrides,
       lighting: poseData.lighting,
+      lightingTone: poseData.lightingTone,
       env: poseData.env,
       costume: poseData.costume,
       wardrobe: poseData.wardrobe,
@@ -2618,7 +2640,7 @@ export function buildFullVrmStateFromSharedDataUrl(dataUrl: string): FullVrmStat
  */
 export function createFullStateLoadHandlers(deps: {
   savedFullStates: Record<string, FullVrmState>;
-  commitFullStateRestore: (s: FullVrmState, vrm: VRM | null) => void;
+  commitFullStateRestore: (s: FullVrmState, vrm: VRM | null) => boolean | void;
   vrmRef: { current: VRM | null };
   setActivePoseId?: (id: string) => void;
   setCustomColors?: (c: Record<string, string>) => void;
@@ -2627,13 +2649,13 @@ export function createFullStateLoadHandlers(deps: {
   return {
     handleLoadFullLocal(name: string) {
       const s = deps.savedFullStates[name];
-      if (!s) return;
-      deps.commitFullStateRestore(s, deps.vrmRef.current);
+      if (!s) return false;
+      return deps.commitFullStateRestore(s, deps.vrmRef.current) !== false;
     },
     handlePasteFullStateFromParsed(s: FullVrmStateInput | null) {
       const full = deserializeFullVrmState(s);
-      if (!full) return;
-      deps.commitFullStateRestore(full, deps.vrmRef.current);
+      if (!full) return false;
+      return deps.commitFullStateRestore(full, deps.vrmRef.current) !== false;
     },
     handleSelectSharedPose(asset: { dataUrl: string }) {
       const full = buildFullVrmStateFromSharedDataUrl(asset.dataUrl);
@@ -2641,7 +2663,9 @@ export function createFullStateLoadHandlers(deps: {
         deps.alertFn?.("이 포즈 에셋에는 3D 설정 정보가 포함되어 있지 않습니다.");
         return false;
       }
-      deps.commitFullStateRestore(full, deps.vrmRef.current);
+      if (deps.commitFullStateRestore(full, deps.vrmRef.current) === false) {
+        return false;
+      }
 
       try {
         const hashIndex = asset.dataUrl.indexOf("#");

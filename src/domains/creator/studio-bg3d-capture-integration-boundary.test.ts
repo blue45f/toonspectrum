@@ -26,7 +26,7 @@ describe("Studio 3D asynchronous capture integration boundary", () => {
     expect(bridge).not.toContain("[camera, gl, scene, onCaptureUpdate]");
   });
 
-  it("rebinds the adapter after the quad-to-single View transition, then guards that identity", () => {
+  it("keeps the stable main adapter and fences every raster with exact character authority", () => {
     const saveStart = background3dSource.indexOf("async function handleSaveToLibrary()");
     const aiReferenceStart = background3dSource.indexOf(
       "async function handleUseAsAiMethodReference()",
@@ -46,14 +46,28 @@ describe("Studio 3D asynchronous capture integration boundary", () => {
     expect(insertStart).toBeGreaterThan(aiReferenceStart);
     expect(handleEnd).toBeGreaterThan(insertStart);
     for (const handler of handlers) {
+      const authorityAcquire = handler.indexOf(
+        "acquireSharedCharacterCaptureAuthority()",
+      );
       const transitionStart = handler.indexOf("setIsCapturing(true)");
       const adapterAcquire = handler.indexOf(
         "await acquireStudioBg3dCaptureAdapterAfterViewTransition"
       );
+      const rasterAuthority = handler.indexOf(
+        'verifySharedCharacterCaptureAuthority(\n        sharedCharacterAuthorityLease,\n        "raster"',
+      );
       const rasterCapture = handler.indexOf("await captureStudioBg3dRaster(captureAdapter");
+      const receiptAuthority = handler.indexOf(
+        'verifySharedCharacterCaptureAuthority(\n        sharedCharacterAuthorityLease,\n        "receipt"',
+      );
+      expect(authorityAcquire).toBeGreaterThanOrEqual(0);
       expect(transitionStart).toBeGreaterThanOrEqual(0);
+      expect(transitionStart).toBeGreaterThan(authorityAcquire);
       expect(adapterAcquire).toBeGreaterThan(transitionStart);
+      expect(rasterAuthority).toBeGreaterThan(adapterAcquire);
       expect(rasterCapture).toBeGreaterThan(adapterAcquire);
+      expect(rasterCapture).toBeGreaterThan(rasterAuthority);
+      expect(receiptAuthority).toBeGreaterThan(rasterCapture);
       expect(handler.split(staleGuard)).toHaveLength(2);
     }
   });

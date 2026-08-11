@@ -24,16 +24,22 @@
  * flipX/flipY를 반영해 원본(비반전) 픽셀 좌표로 마스크를 구운 상태로 넘어온다는 전제다(heal-clone의
  * dab 좌표, layer-mask의 브러시 좌표와 동일한 "호출부가 되반전해서 넘긴다" 규약).
  */
+import {
+  CONTENT_AWARE_FILL_TILE_PX_DEFAULT,
+  CONTENT_AWARE_FILL_TILE_PX_RANGE,
+} from "./studio-content-aware-fill-contract";
+
 import type { StudioImageDataLike } from "./studio-filters";
 import type { MaskCanvasLike, MaskCtx2DLike, MaskImageSource } from "./studio-selection-tools";
+
+export {
+  CONTENT_AWARE_FILL_TILE_PX_DEFAULT,
+  CONTENT_AWARE_FILL_TILE_PX_RANGE,
+} from "./studio-content-aware-fill-contract";
 
 // ---------------------------------------------------------------------------
 // 상수
 // ---------------------------------------------------------------------------
-
-/** 타일 크기 슬라이더 범위(원본 자연 px 기준) — 작을수록 이음매가 덜 보이지만 후보 탐색 비용이 는다. */
-export const CONTENT_AWARE_FILL_TILE_PX_RANGE = { min: 8, max: 16, step: 1 } as const;
-export const CONTENT_AWARE_FILL_TILE_PX_DEFAULT = 12;
 
 /** 사실상 선택되지 않은 것으로 볼 알파 문턱(0..1 스케일, 1/255 미만은 반올림 잡음 취급). */
 const MASK_ALPHA_EPS = 1 / 255;
