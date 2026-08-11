@@ -214,9 +214,12 @@ pnpm build && pnpm start   # 프로덕션 프리뷰
 `toonstudio` 쪽 3D 배경/캐릭터/소품을 `manifest`로 묶어 운영 API에 업로드하려면
 [`docs/studio-asset-upload-automation.md`](docs/studio-asset-upload-automation.md)를 그대로 따라오면 됩니다.
 
-- 로컬: `pnpm run studio:batch` 또는 `pnpm run studio:upload-assets`로 dry-run → 업로드 순으로 처리
-- 실행 전 `pnpm run studio:toolchain:setup -- --check`로 Blender/VRM/MCP 연동 전제 조건을 확인
-- 운영: GitHub Actions `Studio 3D Asset Batch Upload` 워크플로우에서 `generate_manifest`/`source_dir` 입력으로 전 과정을 자동화
+권장 로컬 원샷 플로우:
+1. `pnpm run studio:toolchain:setup -- --check`로 준비상태 점검
+2. `pnpm run studio:asset:release -- --auto-deploy -- --auto-demo-login --type auto --max-items 20`
+- `--auto-deploy`는 GitHub Actions `Studio 3D Asset Batch Upload`를 `main` 브랜치 기준으로 dispatch 합니다.
+- 운영에서 `studio:batch`/`studio:upload-assets`는 여전히 사용 가능하며, 단일 명령으로 관리하려면 `studio:asset:release` 권장.
+- `TOONSTUDIO_HOME`을 고정하면 다른 경로에서도 동일하게 실행 가능합니다.
 - 운영 배포 체크리스트와 토큰 관리(Secret) 규칙은 위 문서의 “운영 배포 마무리 체크리스트” 참조
 
 ```bash
@@ -224,6 +227,18 @@ pnpm run studio:manifest:generate -- --source-dir ./batch_source --output batch_
 pnpm run studio:batch -- --source-dir ./batch_source --output batch_generated/manifest.json -- --dry-run --max-items 20
 pnpm run studio:toolchain:setup -- --check
 pnpm run studio:upload-assets:dry-run -- --manifest batch_generated/manifest.json --max-items 20
+TOONSTUDIO_HOME="/path/to/toonspectrum"
+pnpm --dir "$TOONSTUDIO_HOME" run studio:asset:release -- \
+  --source-dir "$TOONSTUDIO_HOME/batch_source" \
+  --manifest "$TOONSTUDIO_HOME/batch_generated/manifest.json" \
+  --auto-deploy \
+  --deploy-ref main \
+  --deploy-environment production \
+  -- \
+  --auto-demo-login \
+  --type auto \
+  --work-title "toonbatch-$(date +%Y%m%d)" \
+  --max-items 20
 ```
 
 ### DB 준비 (PostgreSQL / Neon)
