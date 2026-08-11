@@ -74,6 +74,13 @@ export type StudioPagesHistoryAppendResult<Page> = {
   historyIndex: number;
 };
 
+/**
+ * Durable undo history must stay bounded in long sessions to avoid runaway allocation growth.
+ * Keeping only the most recent snapshots is an explicit quality/performance trade-off that protects
+ * responsiveness for very long stroke sessions and keeps emergency restore semantics intact.
+ */
+const STUDIO_PAGES_HISTORY_MAX_ENTRIES = 200;
+
 function nonEmptyId(value: unknown): string | null {
   return typeof value === "string" && value.trim().length > 0 ? value : null;
 }
@@ -221,6 +228,11 @@ export function appendStudioPagesHistorySnapshot<Page>(
     .slice(0, boundedIndex + 1)
     .map((snapshot) => snapshot as Page[]);
   nextHistory.push(nextPages as Page[]);
+
+  if (nextHistory.length > STUDIO_PAGES_HISTORY_MAX_ENTRIES) {
+    nextHistory.splice(0, nextHistory.length - STUDIO_PAGES_HISTORY_MAX_ENTRIES);
+  }
+
   return { history: nextHistory, historyIndex: nextHistory.length - 1 };
 }
 

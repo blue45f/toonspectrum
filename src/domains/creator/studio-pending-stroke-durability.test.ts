@@ -115,6 +115,21 @@ describe("pending stroke durability", () => {
     expect(second.historyIndex).toBe(2);
   });
 
+  it("긴 편집 세션에서 undo 히스토리는 최대 200개로 제한된다", () => {
+    const baseSnapshot = [{ id: "page", elements: [{ id: "seed" }] }];
+    let result = appendStudioPagesHistorySnapshot([], -1, baseSnapshot);
+
+    for (let i = 0; i < 205; i += 1) {
+      const pages = [{ id: `page-${i + 1}`, elements: [{ id: `stroke-${i}` }] }];
+      result = appendStudioPagesHistorySnapshot(result.history, result.historyIndex, pages);
+    }
+
+    expect(result.history).toHaveLength(200);
+    expect(result.history[0]?.[0]?.elements[0]).toEqual({ id: "stroke-5" });
+    expect(result.history[199]?.[0]?.elements[0]).toEqual({ id: "stroke-204" });
+    expect(result.historyIndex).toBe(199);
+  });
+
   it("undo 뒤 새 커밋은 redo 분기를 잘라내고 현재 snapshot 뒤에만 추가한다", () => {
     const history = [
       [{ id: "p", elements: [{ id: "0" }] }],

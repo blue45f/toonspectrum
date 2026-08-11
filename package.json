@@ -109,7 +109,14 @@
     "verify:studio-mobile-top": "tsx scripts/verify-studio-mobile-top.mts",
     "verify:studio-icons": "tsx scripts/verify-studio-icons.mts",
     "verify:studio-companion": "tsx scripts/verify-studio-companion.mts",
-    "verify:creator-logic": "tsx scripts/verify-creator-logic.mts"
+    "verify:creator-logic": "tsx scripts/verify-creator-logic.mts",
+    "studio:manifest:generate": "tsx scripts/generate-studio-asset-manifest.ts",
+    "studio:batch": "tsx scripts/studio-asset-batch.ts",
+    "studio:upload-assets": "tsx scripts/upload-toonstudio-3d-assets.mts",
+    "studio:upload-assets:dry-run": "tsx scripts/upload-toonstudio-3d-assets.mts --dry-run",
+    "studio:toolchain:check": "tsx scripts/studio-toolchain-check.ts",
+    "studio:toolchain:setup": "tsx scripts/studio-toolchain-setup.ts",
+    "studio:asset:release": "tsx scripts/studio-asset-release.ts"
   },
   "dependencies": {
     "@babylonjs/core": "9.19.0",

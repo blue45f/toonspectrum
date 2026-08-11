@@ -1,0 +1,249 @@
+name: Studio 3D Asset Batch Upload
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "실행 대상 환경 (production/staging)"
+        required: false
+        default: "production"
+      base_url:
+        description: "API 베이스 URL"
+        required: false
+        default: "https://www.toonstudio.cloud"
+      manifest:
+        description: "Manifest JSON 경로 (운영 워크플로우에서 접근 가능한 경로)"
+        required: false
+        default: "batch_generated/manifest.json"
+      source_dir:
+        description: "manifest 미생성 시 자동 생성할 에셋 폴더"
+        required: false
+        default: "batch_source"
+      generate_manifest:
+        description: "manifest 자동 생성 사용 (true/false)"
+        required: false
+        default: "false"
+      filter_category:
+        description: "카테고리 필터 (예: character,background,prop). 비워두면 전체."
+        required: false
+        default: ""
+      start_index:
+        description: "시작 인덱스 (0-base)"
+        required: false
+        default: "0"
+      max_items:
+        description: "최대 업로드 개수"
+        required: false
+        default: ""
+      concurrency:
+        description: "동시 업로드 개수"
+        required: false
+        default: "2"
+      asset_type:
+        description: "auto | image | vrm | background3d"
+        required: false
+        default: "auto"
+      dry_run:
+        description: "API 호출 없이 드라이런 실행 (true/false)"
+        required: false
+        default: "false"
+      work_id:
+        description: "기존 작품 ID (비우면 새 작품 생성)"
+        required: false
+        default: ""
+      work_title:
+        description: "새 작품 제목 (work-id를 비웠을 때 사용)"
+        required: false
+        default: "toonspectrum-batch-upload"
+      skip_existing:
+        description: "이미 존재하면 건너뛰기 (true/false)"
+        required: false
+        default: "true"
+      no_probe_vrm:
+        description: "VRM marker 검사 생략 (true/false)"
+        required: false
+        default: "false"
+      auto_demo_login:
+        description: "인증이 없을 때 demo login 사용 (true/false)"
+        required: false
+        default: "false"
+      auto_setup:
+        description: "툴체인 부족 시 설치 시도 (true/false)"
+        required: false
+        default: "false"
+      setup_blender:
+        description: "Blender 설치 시도 (auto_setup=true일 때 유효)"
+        required: false
+        default: "false"
+      setup_vrm_addon:
+        description: "VRM 애드온 설치 시도 (auto_setup=true일 때 유효)"
+        required: false
+        default: "false"
+      setup_mcp_bridge:
+        description: "MCP 브릿지 설치 시도 (auto_setup=true일 때 유효)"
+        required: false
+        default: "false"
+      setup_vrm_addon_source:
+        description: "VRM 애드온 소스(path/url; setup_vrm_addon 활성 시 사용)"
+        required: false
+        default: ""
+      setup_mcp_package:
+        description: "MCP 패키지명 (setup_mcp_bridge 활성 시 사용)"
+        required: false
+        default: ""
+      setup_mcp_command:
+        description: "MCP 명령(예: blender-mcp)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  upload-assets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      STUDIO_BASE_URL: ${{ github.event.inputs.base_url }}
+      STUDIO_MANIFEST: ${{ github.event.inputs.manifest }}
+      STUDIO_FILTER_CATEGORY: ${{ github.event.inputs.filter_category }}
+      STUDIO_START_INDEX: ${{ github.event.inputs.start_index }}
+      STUDIO_MAX_ITEMS: ${{ github.event.inputs.max_items }}
+      STUDIO_CONCURRENCY: ${{ github.event.inputs.concurrency }}
+      STUDIO_WORK_TITLE: ${{ github.event.inputs.work_title }}
+      STUDIO_AUTO_DEMO_LOGIN: ${{ github.event.inputs.auto_demo_login }}
+      STUDIO_DRY_RUN: ${{ github.event.inputs.dry_run }}
+      STUDIO_SKIP_EXISTING: ${{ github.event.inputs.skip_existing }}
+      STUDIO_NO_PROBE_VRM: ${{ github.event.inputs.no_probe_vrm }}
+      STUDIO_SOURCE_DIR: ${{ github.event.inputs.source_dir }}
+      STUDIO_GENERATE_MANIFEST: ${{ github.event.inputs.generate_manifest }}
+      STUDIO_AUTO_SETUP: ${{ github.event.inputs.auto_setup }}
+      STUDIO_SETUP_BLENDER: ${{ github.event.inputs.setup_blender }}
+      STUDIO_SETUP_VRM_ADDON: ${{ github.event.inputs.setup_vrm_addon }}
+      STUDIO_SETUP_MCP_BRIDGE: ${{ github.event.inputs.setup_mcp_bridge }}
+      STUDIO_SETUP_VRM_ADDON_SOURCE: ${{ github.event.inputs.setup_vrm_addon_source }}
+      STUDIO_SETUP_MCP_PACKAGE: ${{ github.event.inputs.setup_mcp_package }}
+      STUDIO_SETUP_MCP_COMMAND: ${{ github.event.inputs.setup_mcp_command }}
+      STUDIO_SESSION_TOKEN: ${{ secrets.TOONSTUDIO_SESSION_TOKEN }}
+      STUDIO_SESSION_COOKIE: ${{ secrets.TOONSTUDIO_SESSION_COOKIE }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Validate toolchain readiness
+        run: |
+          set -euo pipefail
+          echo "[toolchain] 준비 상태 점검/설치"
+          if [ "${STUDIO_AUTO_SETUP:-false}" = "true" ] || [ "${STUDIO_AUTO_SETUP:-false}" = "1" ]; then
+            if [ "${STUDIO_SETUP_MCP_BRIDGE}" = "true" ] || [ "${STUDIO_SETUP_MCP_BRIDGE}" = "1" ]; then
+              if [ -z "${STUDIO_SETUP_MCP_PACKAGE}" ] && [ -z "${STUDIO_SETUP_MCP_COMMAND}" ]; then
+                echo "::error::setup_mcp_bridge=true 이면 setup_mcp_package 또는 setup_mcp_command 중 최소 1개가 필요합니다."
+                exit 1
+              fi
+            fi
+            setup_args=("--install")
+            if [ "${STUDIO_SETUP_BLENDER}" = "true" ] || [ "${STUDIO_SETUP_BLENDER}" = "1" ]; then
+              setup_args+=(--install-blender)
+            fi
+            if [ "${STUDIO_SETUP_VRM_ADDON}" = "true" ] || [ "${STUDIO_SETUP_VRM_ADDON}" = "1" ]; then
+              setup_args+=(--install-vrm-addon)
+              if [ -n "${STUDIO_SETUP_VRM_ADDON_SOURCE}" ]; then
+                setup_args+=(--vrm-addon-source "${STUDIO_SETUP_VRM_ADDON_SOURCE}")
+              fi
+            fi
+            if [ "${STUDIO_SETUP_MCP_BRIDGE}" = "true" ] || [ "${STUDIO_SETUP_MCP_BRIDGE}" = "1" ]; then
+              setup_args+=(--install-mcp-bridge)
+            fi
+            if [ -n "${STUDIO_SETUP_MCP_PACKAGE}" ]; then
+              setup_args+=(--mcp-package "${STUDIO_SETUP_MCP_PACKAGE}")
+            fi
+            if [ -n "${STUDIO_SETUP_MCP_COMMAND}" ]; then
+              setup_args+=(--mcp-command "${STUDIO_SETUP_MCP_COMMAND}")
+            fi
+            pnpm run studio:toolchain:setup -- "${setup_args[@]}"
+          else
+            pnpm run studio:toolchain:setup -- --check
+          fi
+      - name: Validate manifest path
+        if: ${{ github.event.inputs.generate_manifest != 'true' && github.event.inputs.generate_manifest != '1' }}
+        run: |
+          set -euo pipefail
+          if [ -z "${STUDIO_MANIFEST:-}" ]; then
+            echo "::error::manifest 입력이 비어 있습니다."
+            exit 1
+          fi
+          if [ ! -f "${STUDIO_MANIFEST}" ]; then
+            echo "::error::manifest 파일을 찾을 수 없습니다: ${STUDIO_MANIFEST}"
+            echo "워크플로우 실행 전 Runner에서 접근 가능한 경로로 배치하세요."
+            exit 1
+          fi
+          echo "manifest 경로 확인: ${STUDIO_MANIFEST}"
+          echo "manifest 파일 크기: $(wc -c < "${STUDIO_MANIFEST}") bytes"
+      - name: Generate manifest (optional)
+        if: ${{ github.event.inputs.generate_manifest == 'true' || github.event.inputs.generate_manifest == '1' }}
+        run: |
+          set -euo pipefail
+          if [ -z "${STUDIO_SOURCE_DIR:-}" ]; then
+            echo "::error::source_dir 입력이 비어 있습니다."
+            exit 1
+          fi
+          if [ -z "${STUDIO_MANIFEST:-}" ]; then
+            echo "::error::manifest 입력이 비어 있습니다."
+            exit 1
+          fi
+          pnpm run studio:manifest:generate -- --source-dir "${STUDIO_SOURCE_DIR}" --output "${STUDIO_MANIFEST}" --recursive true
+          echo "manifest 생성 완료: ${STUDIO_MANIFEST}"
+          echo "manifest 파일 크기: $(wc -c < "${STUDIO_MANIFEST}") bytes"
+      - name: Validate authentication inputs
+        run: |
+          if [ "${STUDIO_AUTO_DEMO_LOGIN}" != "true" ] && [ "${STUDIO_AUTO_DEMO_LOGIN}" != "1" ] && [ -z "${STUDIO_SESSION_TOKEN:-}" ] && [ -z "${STUDIO_SESSION_COOKIE:-}" ]; then
+            echo "::error::TOONSTUDIO_SESSION_TOKEN 또는 TOONSTUDIO_SESSION_COOKIE 시크릿이 필요합니다."
+            exit 1
+          fi
+      - name: Upload 3D assets
+        run: |
+          set -euo pipefail
+          ARGS=()
+          if [ -n "${STUDIO_FILTER_CATEGORY:-}" ]; then
+            ARGS+=(--filter-category "${STUDIO_FILTER_CATEGORY}")
+          fi
+          if [ -n "${STUDIO_START_INDEX:-}" ]; then
+            ARGS+=(--start-index "${STUDIO_START_INDEX}")
+          fi
+          if [ -n "${STUDIO_MAX_ITEMS:-}" ]; then
+            ARGS+=(--max-items "${STUDIO_MAX_ITEMS}")
+          fi
+          if [ -n "${STUDIO_CONCURRENCY:-}" ]; then
+            ARGS+=(--concurrency "${STUDIO_CONCURRENCY}")
+          fi
+          if [ "${STUDIO_DRY_RUN:-false}" = "true" ] || [ "${STUDIO_DRY_RUN:-false}" = "1" ]; then
+            ARGS+=(--dry-run)
+          fi
+          if [ "${STUDIO_SKIP_EXISTING:-true}" = "true" ] || [ "${STUDIO_SKIP_EXISTING:-true}" = "1" ]; then
+            ARGS+=(--skip-existing)
+          fi
+          if [ "${STUDIO_NO_PROBE_VRM:-false}" = "true" ] || [ "${STUDIO_NO_PROBE_VRM:-false}" = "1" ]; then
+            ARGS+=(--no-probe-vrm)
+          fi
+          if [ "${{ github.event.inputs.auto_demo_login }}" = "true" ] || [ "${{ github.event.inputs.auto_demo_login }}" = "1" ]; then
+            ARGS+=(--auto-demo-login)
+          fi
+          if [ "${{ github.event.inputs.asset_type }}" != "auto" ]; then
+            ARGS+=(--type "${{ github.event.inputs.asset_type }}")
+          fi
+          if [ -n "${{ github.event.inputs.work_id }}" ]; then
+            ARGS+=(--work-id "${{ github.event.inputs.work_id }}")
+          elif [ -n "${STUDIO_WORK_TITLE:-}" ]; then
+            ARGS+=(--work-title "${STUDIO_WORK_TITLE}")
+          fi
+          pnpm run studio:upload-assets -- "${ARGS[@]}"
+          if [ "${{ github.event.inputs.environment }}" = "production" ]; then
+            echo "프로덕션 배치 업로드가 완료되었습니다."
+          else
+            echo "${{ github.event.inputs.environment }} 배치 업로드가 완료되었습니다."
+          fi

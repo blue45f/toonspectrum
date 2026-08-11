@@ -209,6 +209,23 @@ pnpm dev:all     # 권장: 웹앱(:5173) + Nest API(:4001) 한 번에 실행
 pnpm build && pnpm start   # 프로덕션 프리뷰
 ```
 
+### Studio 3D 에셋 배치 업로드
+
+`toonstudio` 쪽 3D 배경/캐릭터/소품을 `manifest`로 묶어 운영 API에 업로드하려면
+[`docs/studio-asset-upload-automation.md`](docs/studio-asset-upload-automation.md)를 그대로 따라오면 됩니다.
+
+- 로컬: `pnpm run studio:batch` 또는 `pnpm run studio:upload-assets`로 dry-run → 업로드 순으로 처리
+- 실행 전 `pnpm run studio:toolchain:setup -- --check`로 Blender/VRM/MCP 연동 전제 조건을 확인
+- 운영: GitHub Actions `Studio 3D Asset Batch Upload` 워크플로우에서 `generate_manifest`/`source_dir` 입력으로 전 과정을 자동화
+- 운영 배포 체크리스트와 토큰 관리(Secret) 규칙은 위 문서의 “운영 배포 마무리 체크리스트” 참조
+
+```bash
+pnpm run studio:manifest:generate -- --source-dir ./batch_source --output batch_generated/manifest.json
+pnpm run studio:batch -- --source-dir ./batch_source --output batch_generated/manifest.json -- --dry-run --max-items 20
+pnpm run studio:toolchain:setup -- --check
+pnpm run studio:upload-assets:dry-run -- --manifest batch_generated/manifest.json --max-items 20
+```
+
 ### DB 준비 (PostgreSQL / Neon)
 
 DB는 **PostgreSQL**입니다 — 로컬은 docker, 원격·배포는 **Neon**(서버리스 Postgres). `DATABASE_URL`은 필수이며, Studio 다중 인스턴스와 SQL migration에는 transaction pooler가 아닌 `STUDIO_LIVE_POSTGRES_URL` direct endpoint도 필요합니다. 개발/빈 DB는 스키마를 push한 뒤 historical SQL(0001~0019)을 한 번 적용하고, 구조 증명에 성공한 history를 checksum 원장에 채택하면서 genuine pending(0020~0022, 0024~0025)을 적용한 다음 카탈로그를 적재하세요. `0023`부터 배포 원장은 이미 적용한 migration을 다시 실행하지 않으며, 파일 변경·중단 상태·중간 번호 누락을 fail-closed로 처리합니다. 필요한 capability가 빠진 프로세스는 요청 중 DDL을 실행하지 않고 readiness/부팅 단계에서 실패합니다.
