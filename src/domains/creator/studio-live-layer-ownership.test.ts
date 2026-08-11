@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildStudioLiveLayerOwnershipByItemId,
+  fingerprintStudioLiveLocks,
   FREE_STUDIO_LIVE_LAYER_OWNERSHIP,
   listStudioLiveLayerOwnershipLocksOnPage,
   resolveStudioLiveLayerOwnership,
+  reuseOrBuildStudioLiveLayerOwnershipByItemId,
+  summarizeStudioLiveSelectionOwnership,
 } from "./studio-live-layer-ownership";
 import {
   studioLiveElementResource,
@@ -134,5 +137,81 @@ describe("studio live layer ownership", () => {
     );
     expect(locks).toHaveLength(1);
     expect(locks[0]!.resource).toBe(studioLiveElementResource(pageId, layerA));
+  });
+
+  it("summarizes selection ownership for banners with blocked vs free contrast", () => {
+    const ownershipByItemId = buildStudioLiveLayerOwnershipByItemId({
+      pageId,
+      elementIds: [layerA, layerB],
+      locks: [
+        lock(studioLiveElementResource(pageId, layerA), "peer", "민수"),
+      ],
+      selfSessionId: "me",
+      now,
+    });
+    const blocked = summarizeStudioLiveSelectionOwnership({
+      selectedIds: [layerA, layerB],
+      ownershipByItemId,
+    });
+    expect(blocked.selectedCount).toBe(2);
+    expect(blocked.blockedCount).toBe(1);
+    expect(blocked.freeCount).toBe(1);
+    expect(blocked.blocksLocalEdit).toBe(true);
+    expect(blocked.primaryPeerName).toBe("민수");
+    expect(blocked.bannerLabel).toContain("민수");
+    expect(blocked.bannerLabel).toMatch(/1\/2/);
+
+    const free = summarizeStudioLiveSelectionOwnership({
+      selectedIds: [layerB],
+      ownershipByItemId,
+    });
+    expect(free.blocksLocalEdit).toBe(false);
+    expect(free.bannerLabel).toBeNull();
+    expect(free.freeCount).toBe(1);
+  });
+
+  it("reuses the dense ownership map when lock fingerprint is unchanged", () => {
+    const locks = [
+      lock(studioLiveElementResource(pageId, layerA), "peer", "민수"),
+    ];
+    const first = reuseOrBuildStudioLiveLayerOwnershipByItemId({
+      pageId,
+      elementIds: [layerA, layerB],
+      locks,
+      selfSessionId: "me",
+      now,
+      previous: null,
+    });
+    expect(first.reused).toBe(false);
+    expect(first.map.get(layerA)?.kind).toBe("peer");
+
+    const second = reuseOrBuildStudioLiveLayerOwnershipByItemId({
+      pageId,
+      elementIds: [layerA, layerB],
+      // New array identity, same leases.
+      locks: locks.map((entry) => ({ ...entry, owner: { ...entry.owner } })),
+      selfSessionId: "me",
+      now,
+      previous: first,
+    });
+    expect(second.reused).toBe(true);
+    expect(second.map).toBe(first.map);
+    expect(second.fingerprint).toBe(first.fingerprint);
+    expect(second.fingerprint).toBe(fingerprintStudioLiveLocks(locks));
+    expect(second.fingerprint.length).toBeGreaterThan(0);
+
+    const third = reuseOrBuildStudioLiveLayerOwnershipByItemId({
+      pageId,
+      elementIds: [layerA, layerB],
+      locks: [
+        lock(studioLiveElementResource(pageId, layerB), "peer2", "지민"),
+      ],
+      selfSessionId: "me",
+      now,
+      previous: second,
+    });
+    expect(third.reused).toBe(false);
+    expect(third.map).not.toBe(first.map);
+    expect(third.map.get(layerB)?.ownerDisplayName).toBe("지민");
   });
 });

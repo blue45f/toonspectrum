@@ -50,6 +50,94 @@ export function isStudioWebDrawingBrushId(
     && (STUDIO_WEB_DRAWING_ALL_BRUSH_IDS as readonly string[]).includes(value);
 }
 
+export type StudioWebDrawingBrushFamily =
+  | "competitive"
+  | "coloring"
+  | "assist"
+  | "none";
+
+/** Classify a brush id into the clean-room kit family that owns its samples. */
+export function classifyStudioWebDrawingBrushFamily(
+  brushId: unknown,
+): StudioWebDrawingBrushFamily {
+  if (typeof brushId !== "string") return "none";
+  if (isStudioWebCompetitiveBrushId(brushId)) return "competitive";
+  if (isStudioWebColoringBrushId(brushId)) return "coloring";
+  if (isStudioWebAssistBrushId(brushId)) return "assist";
+  return "none";
+}
+
+export interface StudioWebDrawingBridgePlanAudit {
+  readonly family: StudioWebDrawingBrushFamily;
+  readonly pathPointCount: number;
+  readonly sampleCount: number;
+  readonly dabCount: number;
+  readonly maxDabs: number;
+  readonly stride: number;
+  /** True when sample stations were decimated to fit maxDabs. */
+  readonly budgetLimited: boolean;
+  /** True when kit path was empty or brush is not a web kit. */
+  readonly empty: boolean;
+}
+
+/**
+ * Inspect the kit → dab conversion without allocating full dab objects when empty.
+ * Live and commit planners share the same sample/stride arithmetic so audits match paint.
+ */
+export function auditStudioWebDrawingBridgePlan(
+  input: StudioWebDrawingBridgeInput,
+): StudioWebDrawingBridgePlanAudit {
+  const family = classifyStudioWebDrawingBrushFamily(input.brushId);
+  const path = pathFromFlat(input.points, input.pressures);
+  const maxDabs = Math.max(
+    1,
+    Math.min(65_536, Math.round(finite(input.maxDabs, 8_192))),
+  );
+  if (family === "none" || path.length === 0) {
+    return Object.freeze({
+      family,
+      pathPointCount: path.length,
+      sampleCount: 0,
+      dabCount: 0,
+      maxDabs,
+      stride: 1,
+      budgetLimited: false,
+      empty: true,
+    });
+  }
+  const samples = planSamples(input.brushId as string, path, {
+    baseSize: clamp(finite(input.baseWidth, 8), 0.5, 256),
+    seed: input.seed,
+    centerX: input.centerX,
+    centerY: input.centerY,
+  });
+  const sampleCount = samples.length;
+  if (sampleCount === 0) {
+    return Object.freeze({
+      family,
+      pathPointCount: path.length,
+      sampleCount: 0,
+      dabCount: 0,
+      maxDabs,
+      stride: 1,
+      budgetLimited: false,
+      empty: true,
+    });
+  }
+  const stride = sampleCount > maxDabs ? Math.ceil(sampleCount / maxDabs) : 1;
+  const dabCount = Math.min(maxDabs, Math.ceil(sampleCount / stride));
+  return Object.freeze({
+    family,
+    pathPointCount: path.length,
+    sampleCount,
+    dabCount,
+    maxDabs,
+    stride,
+    budgetLimited: stride > 1 || dabCount < sampleCount,
+    empty: false,
+  });
+}
+
 export interface StudioWebDrawingBridgeInput {
   readonly brushId: unknown;
   readonly points: readonly number[];

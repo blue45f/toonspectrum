@@ -5,6 +5,8 @@ import {
   studioBrushDynamicsSettingsForBrushId,
 } from "./studio-brush-dynamics";
 import {
+  auditStudioWebDrawingBridgePlan,
+  classifyStudioWebDrawingBrushFamily,
   isStudioWebDrawingBrushId,
   planStudioWebAwareDynamicBrushDabs,
   planStudioWebDrawingDynamicDabs,
@@ -83,5 +85,68 @@ describe("studio web drawing stroke bridge", () => {
     );
     expect(dabs).not.toBeNull();
     expect(dabs!.length).toBeLessThanOrEqual(12);
+  });
+
+  it("classifies kit families and audits sample→dab budget arithmetic", () => {
+    expect(classifyStudioWebDrawingBrushFamily("web-multi-agent")).toBe(
+      "competitive",
+    );
+    expect(classifyStudioWebDrawingBrushFamily("web-hatch-color")).toBe(
+      "coloring",
+    );
+    expect(classifyStudioWebDrawingBrushFamily("web-kaleido-ink")).toBe(
+      "assist",
+    );
+    expect(classifyStudioWebDrawingBrushFamily("pen")).toBe("none");
+
+    const full = auditStudioWebDrawingBridgePlan({
+      brushId: "web-multi-agent",
+      points: POINTS,
+      pressures: PRESSURES,
+      baseWidth: 8,
+      seed: 3,
+      maxDabs: 8_192,
+    });
+    expect(full.family).toBe("competitive");
+    expect(full.empty).toBe(false);
+    expect(full.sampleCount).toBeGreaterThan(0);
+    expect(full.dabCount).toBe(full.sampleCount);
+    expect(full.budgetLimited).toBe(false);
+    expect(full.stride).toBe(1);
+
+    const limited = auditStudioWebDrawingBridgePlan({
+      brushId: "web-multi-agent",
+      points: POINTS,
+      pressures: PRESSURES,
+      baseWidth: 8,
+      seed: 3,
+      maxDabs: 12,
+    });
+    expect(limited.family).toBe("competitive");
+    expect(limited.dabCount).toBeLessThanOrEqual(12);
+    expect(limited.budgetLimited).toBe(true);
+    expect(limited.stride).toBeGreaterThanOrEqual(1);
+    // Audit dab count must match the planner's emitted length for the same input.
+    const settings = studioBrushDynamicsSettingsForBrushId("web-multi-agent")!;
+    const dabs = planStudioWebDrawingDynamicDabs(
+      {
+        brushId: "web-multi-agent",
+        points: POINTS,
+        pressures: PRESSURES,
+        baseWidth: 8,
+        seed: 3,
+        maxDabs: 12,
+      },
+      settings,
+    );
+    expect(dabs!.length).toBe(limited.dabCount);
+
+    const nonWeb = auditStudioWebDrawingBridgePlan({
+      brushId: "pen",
+      points: POINTS,
+    });
+    expect(nonWeb.family).toBe("none");
+    expect(nonWeb.empty).toBe(true);
+    expect(nonWeb.dabCount).toBe(0);
   });
 });

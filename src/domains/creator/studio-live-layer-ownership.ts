@@ -184,3 +184,181 @@ export function listStudioLiveLayerOwnershipLocksOnPage(
   }
   return Object.freeze(out);
 }
+
+/**
+ * Deterministic lock-set fingerprint so UI can skip ownership map rebuilds when
+ * the room re-emits an equal lease snapshot under a new array identity.
+ */
+export function fingerprintStudioLiveLocks(
+  locks: readonly StudioLiveLockLike[],
+): string {
+  if (locks.length === 0) return "";
+  const parts: string[] = [];
+  for (const lock of locks) {
+    const session = lock.owner?.sessionId ?? "";
+    parts.push(`${lock.resource}\0${session}\0${lock.leaseUntil}`);
+  }
+  parts.sort();
+  return parts.join("\n");
+}
+
+export interface StudioLiveSelectionOwnershipSummary {
+  readonly selectedCount: number;
+  readonly blockedCount: number;
+  readonly selfCount: number;
+  readonly freeCount: number;
+  readonly blocksLocalEdit: boolean;
+  /** Null when nothing is selected or every selected layer is free. */
+  readonly bannerLabel: string | null;
+  readonly primaryPeerName: string | null;
+  readonly primaryKind: StudioLiveLayerOwnershipKind | null;
+}
+
+/**
+ * Project dense ownership onto the current selection for inspector/navigator banners.
+ * Free layers are counted even when absent from the dense map.
+ */
+export function summarizeStudioLiveSelectionOwnership(input: {
+  readonly selectedIds: readonly string[];
+  readonly ownershipByItemId: ReadonlyMap<string, StudioLiveLayerOwnership>;
+}): StudioLiveSelectionOwnershipSummary {
+  const selected = input.selectedIds.filter(
+    (id) => typeof id === "string" && id.trim().length > 0,
+  );
+  if (selected.length === 0) {
+    return Object.freeze({
+      selectedCount: 0,
+      blockedCount: 0,
+      selfCount: 0,
+      freeCount: 0,
+      blocksLocalEdit: false,
+      bannerLabel: null,
+      primaryPeerName: null,
+      primaryKind: null,
+    });
+  }
+
+  let blockedCount = 0;
+  let selfCount = 0;
+  let freeCount = 0;
+  let primaryPeerName: string | null = null;
+  let primaryKind: StudioLiveLayerOwnershipKind | null = null;
+
+  for (const id of selected) {
+    const ownership = input.ownershipByItemId.get(id);
+    if (!ownership || ownership.kind === "free") {
+      freeCount += 1;
+      continue;
+    }
+    if (ownership.kind === "self") {
+      selfCount += 1;
+      if (!primaryKind) primaryKind = "self";
+      continue;
+    }
+    blockedCount += 1;
+    if (ownership.blocksLocalEdit) {
+      if (!primaryPeerName && ownership.ownerDisplayName) {
+        primaryPeerName = ownership.ownerDisplayName;
+      }
+      if (!primaryKind || primaryKind === "self") {
+        primaryKind = ownership.kind;
+      }
+    }
+  }
+
+  const blocksLocalEdit = blockedCount > 0;
+  let bannerLabel: string | null = null;
+  if (blocksLocalEdit) {
+    if (blockedCount === selected.length && primaryPeerName) {
+      bannerLabel =
+        blockedCount === 1
+          ? `${primaryPeerName} · 편집 중`
+          : `${primaryPeerName} 외 ${blockedCount - 1}개 · 편집 중`;
+    } else if (primaryPeerName) {
+      bannerLabel = `선택 ${blockedCount}/${selected.length} · ${primaryPeerName} 편집 중`;
+    } else {
+      bannerLabel = `선택 ${blockedCount}/${selected.length} · 다른 참가자 편집 중`;
+    }
+  } else if (selfCount > 0) {
+    bannerLabel =
+      selfCount === selected.length
+        ? "내가 편집 중"
+        : `선택 ${selfCount}/${selected.length} · 내가 편집 중`;
+  }
+
+  return Object.freeze({
+    selectedCount: selected.length,
+    blockedCount,
+    selfCount,
+    freeCount,
+    blocksLocalEdit,
+    bannerLabel,
+    primaryPeerName,
+    primaryKind,
+  });
+}
+
+/**
+ * Rebuild ownership only when lock fingerprint or element set changes.
+ * Returns the previous map reference when nothing material changed.
+ */
+export function reuseOrBuildStudioLiveLayerOwnershipByItemId(input: {
+  readonly pageId: string;
+  readonly elementIds: readonly string[];
+  readonly locks: readonly StudioLiveLockLike[];
+  readonly selfSessionId: string;
+  readonly now?: number;
+  readonly previous:
+    | {
+        readonly fingerprint: string;
+        readonly pageId: string;
+        readonly selfSessionId: string;
+        readonly elementKey: string;
+        readonly map: ReadonlyMap<string, StudioLiveLayerOwnership>;
+      }
+    | null;
+}): {
+  readonly fingerprint: string;
+  readonly pageId: string;
+  readonly selfSessionId: string;
+  readonly elementKey: string;
+  readonly map: ReadonlyMap<string, StudioLiveLayerOwnership>;
+  readonly reused: boolean;
+} {
+  const pageId = typeof input.pageId === "string" ? input.pageId.trim() : "";
+  const self =
+    typeof input.selfSessionId === "string" ? input.selfSessionId.trim() : "";
+  const fingerprint = fingerprintStudioLiveLocks(input.locks);
+  const elementKey = input.elementIds.join("\0");
+  if (
+    input.previous
+    && input.previous.fingerprint === fingerprint
+    && input.previous.pageId === pageId
+    && input.previous.selfSessionId === self
+    && input.previous.elementKey === elementKey
+  ) {
+    return {
+      fingerprint,
+      pageId,
+      selfSessionId: self,
+      elementKey,
+      map: input.previous.map,
+      reused: true,
+    };
+  }
+  const map = buildStudioLiveLayerOwnershipByItemId({
+    pageId,
+    elementIds: input.elementIds,
+    locks: input.locks,
+    selfSessionId: self,
+    now: input.now,
+  });
+  return {
+    fingerprint,
+    pageId,
+    selfSessionId: self,
+    elementKey,
+    map,
+    reused: false,
+  };
+}

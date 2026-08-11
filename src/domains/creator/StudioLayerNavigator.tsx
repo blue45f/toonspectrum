@@ -69,7 +69,8 @@ import {
 } from "./studio-layer-navigator-row-ui";
 import { useStudioLiveCollaboration } from "./studio-live-collaboration-context";
 import {
-  buildStudioLiveLayerOwnershipByItemId,
+  reuseOrBuildStudioLiveLayerOwnershipByItemId,
+  summarizeStudioLiveSelectionOwnership,
   type StudioLiveLayerOwnership,
 } from "./studio-live-layer-ownership";
 import { useStudioStableHandlers } from "./studio-stable-handlers";
@@ -88,6 +89,13 @@ const EMPTY_LIVE_LAYER_OWNERSHIP_BY_ITEM_ID: ReadonlyMap<
   StudioLiveLayerOwnership
 > = new Map();
 
+type LiveOwnershipCache = {
+  fingerprint: string;
+  pageId: string;
+  selfSessionId: string;
+  elementKey: string;
+  map: ReadonlyMap<string, StudioLiveLayerOwnership>;
+};
 export type StudioLayerNavigatorItemFlag = "alphaLocked" | "fillReference" | "maskEnabled";
 
 export type StudioLayerNavigatorAction =
@@ -245,17 +253,32 @@ export function StudioLayerNavigator({
   onAction,
 }: StudioLayerNavigatorProps) {
   const live = useStudioLiveCollaboration();
-  const liveOwnershipByItemId =
-    live.room && livePageId
-      ? buildStudioLiveLayerOwnershipByItemId({
-          pageId: livePageId,
-          elementIds: items.map((item) => item.id),
-          locks: live.locks,
-          selfSessionId: live.room.participant.sessionId,
-        })
-      : EMPTY_LIVE_LAYER_OWNERSHIP_BY_ITEM_ID;
-  const filterPanelId = useId();
-  const actionPopoverId = useId();
+  const liveOwnershipCacheRef = useRef<LiveOwnershipCache | null>(null);
+  let liveOwnershipByItemId = EMPTY_LIVE_LAYER_OWNERSHIP_BY_ITEM_ID;
+  if (live.room && livePageId) {
+    const next = reuseOrBuildStudioLiveLayerOwnershipByItemId({
+      pageId: livePageId,
+      elementIds: items.map((item) => item.id),
+      locks: live.locks,
+      selfSessionId: live.room.participant.sessionId,
+      previous: liveOwnershipCacheRef.current,
+    });
+    liveOwnershipCacheRef.current = {
+      fingerprint: next.fingerprint,
+      pageId: next.pageId,
+      selfSessionId: next.selfSessionId,
+      elementKey: next.elementKey,
+      map: next.map,
+    };
+    liveOwnershipByItemId = next.map;
+  } else {
+    liveOwnershipCacheRef.current = null;
+  }
+  const selectionOwnership = summarizeStudioLiveSelectionOwnership({
+    selectedIds,
+    ownershipByItemId: liveOwnershipByItemId,
+  });
+  const filterPanelId = useId();  const actionPopoverId = useId();
   const resultStatusId = useId();
   const mergeFallbackNoteId = useId();
   const flattenFallbackNoteId = useId();
@@ -882,6 +905,27 @@ export function StudioLayerNavigator({
             <span className="hidden min-[390px]:inline">그룹</span>
           </button>
         </div>
+
+        {selectionOwnership.bannerLabel ? (
+          <p
+            role="status"
+            data-studio-live-selection-ownership={
+              selectionOwnership.primaryKind ?? "free"
+            }
+            data-studio-live-selection-blocked={
+              selectionOwnership.blocksLocalEdit ? "true" : "false"
+            }
+            className={cn(
+              "mt-2 truncate rounded-md border px-2 py-1 text-[0.62rem] font-semibold",
+              selectionOwnership.blocksLocalEdit
+                ? "border-bad/35 bg-bad/10 text-bad"
+                : "border-good/30 bg-good/10 text-good"
+            )}
+            title={selectionOwnership.bannerLabel}
+          >
+            {selectionOwnership.bannerLabel}
+          </p>
+        ) : null}
 
         <div className="mt-2 flex items-center gap-1.5">
           <label className="relative min-w-0 flex-1">
