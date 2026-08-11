@@ -4,6 +4,8 @@ import { SFX_LIBRARY } from "./studio-sfx-presets";
 import {
   acceptStudioWriterRoomSuggestion,
   acceptStudioWriterRoomSuggestions,
+  admitStudioWriterRoomDocument,
+  admitStudioWriterRoomStage,
   addStudioWriterRoomSuggestion,
   computeStudioWriterRoomProgress,
   createEmptyStudioWriterRoomDocument,
@@ -18,6 +20,8 @@ import {
   studioWriterRoomHasContent,
   STUDIO_WRITER_ROOM_LIMITS,
   STUDIO_WRITER_ROOM_STAGES,
+  StudioWriterRoomAdmissionError,
+  StudioWriterRoomCapacityError,
   StudioWriterRoomDocumentSchema,
   undoLastStudioWriterRoomDecision,
   type StudioWriterRoomDocument,
@@ -135,13 +139,14 @@ describe("studio-writer-room", () => {
     expect(document.completion.beats).toBe(true);
   });
 
-  it("손상 JSON·미래 버전·순환 객체는 빈 문서로 격리한다", () => {
+  it("손상 JSON·미래 버전은 빈 문서로 격리하되 순환 authority는 typed fail-closed한다", () => {
     expect(normalizeStudioWriterRoomDocument("{broken")).toEqual(createEmptyStudioWriterRoomDocument());
     expect(normalizeStudioWriterRoomDocument({ version: 99, stages: {} }))
       .toEqual(createEmptyStudioWriterRoomDocument());
     const cyclic: Record<string, unknown> = {};
     cyclic.self = cyclic;
-    expect(normalizeStudioWriterRoomDocument(cyclic)).toEqual(createEmptyStudioWriterRoomDocument());
+    expect(() => normalizeStudioWriterRoomDocument(cyclic))
+      .toThrow(StudioWriterRoomAdmissionError);
   });
 
   it("prototype pollution과 허용 목록 밖 경로를 거부한다", () => {
@@ -344,16 +349,153 @@ describe("studio-writer-room", () => {
     expect(merged.suggestions.map(({ id }) => id)).toEqual(["a", "z"]);
   });
 
-  it("stage item 한도와 문자열 한도를 정규화에서 적용한다", () => {
-    const beats = Array.from({ length: STUDIO_WRITER_ROOM_LIMITS.maxStageItems + 20 }, (_, index) => ({
+  it("제품 count authority를 제거하고 문자열 integrity 한도만 유지한다", () => {
+    const beats = Array.from({ length: 520 }, (_, index) => ({
       id: `beat-${index}`,
       order: index,
       title: "t".repeat(STUDIO_WRITER_ROOM_LIMITS.maxShortTextLength + 20),
       summary: "s",
     }));
     const document = normalizeStudioWriterRoomDocument({ beats });
-    expect(document.stages.beats.items).toHaveLength(STUDIO_WRITER_ROOM_LIMITS.maxStageItems);
+    expect(document.stages.beats.items).toHaveLength(520);
     expect(document.stages.beats.items[0]?.title).toHaveLength(STUDIO_WRITER_ROOM_LIMITS.maxShortTextLength);
+    expect(STUDIO_WRITER_ROOM_LIMITS).toMatchObject({
+      maxStageItems: Number.POSITIVE_INFINITY,
+      maxDialogues: Number.POSITIVE_INFINITY,
+      maxSfx: Number.POSITIVE_INFINITY,
+      maxSuggestions: Number.POSITIVE_INFINITY,
+      maxCharacterRefs: Number.POSITIVE_INFINITY,
+      maxReferenceIds: Number.POSITIVE_INFINITY,
+      maxDecisionBatch: 100,
+    });
+  });
+
+  it("byte budget 안의 1001+ 대사·효과음·제안과 128/256 초과 참조를 모두 보존한다", () => {
+    const characterIds = Array.from({ length: 140 }, (_, index) => `character-${index}`);
+    const beatIds = Array.from({ length: 300 }, (_, index) => `beat-${index}`);
+    const dialogue = Array.from({ length: 1_005 }, (_, index) => ({
+      id: `dialogue-${index}`,
+      order: index,
+      panelId: "panel-1",
+      characterId: null,
+      text: `line-${index}`,
+    }));
+    const sfx = Array.from({ length: 1_005 }, (_, index) => ({
+      id: `sfx-${index}`,
+      order: index,
+      panelId: "panel-1",
+      presetId: null,
+      customText: `fx-${index}`,
+      style: { emphasis: "normal", scale: "medium" },
+    }));
+    const suggestions = Array.from({ length: 1_005 }, (_, index) => ({
+      id: `suggestion-${index}`,
+      targetPath: "stages.premise.text",
+      proposedValue: `premise-${index}`,
+      rationale: "",
+      status: "pending",
+      createdAt: CREATED_AT,
+    }));
+
+    const document = normalizeStudioWriterRoomDocument({
+      premise: { text: "current", characterIds },
+      scenes: [{
+        id: "scene-many-refs",
+        order: 0,
+        beatIds,
+        heading: "refs",
+        summary: "",
+        location: "",
+        time: "",
+        characterIds,
+      }],
+      dialogues: dialogue,
+      sfx,
+      suggestions,
+    });
+
+    expect(document.stages.premise.characterIds).toHaveLength(140);
+    expect(document.stages.scenes.items[0]?.beatIds).toHaveLength(300);
+    expect(document.stages.scenes.items[0]?.characterIds).toHaveLength(140);
+    expect(document.stages["dialogue-sfx"].dialogue).toHaveLength(1_005);
+    expect(document.stages["dialogue-sfx"].sfx).toHaveLength(1_005);
+    expect(document.suggestions).toHaveLength(1_005);
+    expect(new TextEncoder().encode(serializeStudioWriterRoomDocument(document)).byteLength)
+      .toBeLessThanOrEqual(STUDIO_WRITER_ROOM_LIMITS.maxSerializedBytes);
+  });
+
+  it("getter를 호출하지 않고 sparse·cycle 입력을 거부하며 기존 authority receipt를 유지한다", () => {
+    let getterReads = 0;
+    const hostile = Object.defineProperty({ version: 1 }, "stages", {
+      enumerable: true,
+      get() {
+        getterReads += 1;
+        return {};
+      },
+    });
+    expect(() => normalizeStudioWriterRoomDocument(hostile))
+      .toThrow(StudioWriterRoomAdmissionError);
+    expect(getterReads).toBe(0);
+
+    const sparse: unknown[] = [];
+    sparse.length = 3;
+    sparse[2] = { id: "beat-2" };
+    expect(() => normalizeStudioWriterRoomDocument({ beats: sparse }))
+      .toThrow(StudioWriterRoomAdmissionError);
+
+    const cyclic: Record<string, unknown> = {};
+    cyclic.self = cyclic;
+    expect(() => normalizeStudioWriterRoomDocument(cyclic))
+      .toThrow(StudioWriterRoomAdmissionError);
+
+    const existing = populatedDocument();
+    const receipt = admitStudioWriterRoomDocument(hostile, existing);
+    expect(receipt).toMatchObject({
+      kind: "rejected",
+      reason: "unsafe-or-unbounded-input",
+      document: existing,
+    });
+    expect(receipt.document).toBe(existing);
+    expect(getterReads).toBe(0);
+  });
+
+  it("byte overflow를 빈 문서로 바꾸지 않고 typed receipt에서 기존 identity로 원자 거부한다", () => {
+    const existing = populatedDocument();
+    const oversizedStage = {
+      items: Array.from({ length: 70 }, (_, index) => ({
+        id: `large-beat-${index}`,
+        order: index,
+        title: "large",
+        summary: "가".repeat(STUDIO_WRITER_ROOM_LIMITS.maxTextLength),
+        characterIds: [],
+      })),
+    };
+    const receipt = admitStudioWriterRoomStage(existing, "beats", oversizedStage);
+    expect(receipt).toMatchObject({
+      kind: "rejected",
+      reason: "byte-budget-exceeded",
+      document: existing,
+    });
+    expect(receipt.document).toBe(existing);
+    expect(existing.stages.beats.items.map(({ id }) => id)).toEqual(["beat-1", "beat-2"]);
+
+    const oversizedTolerantSource = { premise: "가".repeat(700_000) };
+    expect(() => normalizeStudioWriterRoomDocument(oversizedTolerantSource))
+      .toThrow(StudioWriterRoomCapacityError);
+    const documentReceipt = admitStudioWriterRoomDocument(oversizedTolerantSource, existing);
+    expect(documentReceipt.document).toBe(existing);
+    expect(documentReceipt).toMatchObject({
+      kind: "rejected",
+      reason: "byte-budget-exceeded",
+    });
+  });
+
+  it("decision batch 100은 문서 총량이 아니라 한 요청 backpressure로 유지한다", () => {
+    const ids = Array.from({ length: STUDIO_WRITER_ROOM_LIMITS.maxDecisionBatch + 1 }, (_, index) =>
+      `suggestion-${index}`
+    );
+    expect(() => rejectStudioWriterRoomSuggestions(populatedDocument(), ids, DECIDED_AT))
+      .toThrow("한 번에 최대 100개");
   });
 
   it("직렬화는 결정적이고 다시 정규화해도 동일하다", () => {

@@ -26,18 +26,25 @@ export type StudioWriterRoomStage = (typeof STUDIO_WRITER_ROOM_STAGES)[number];
 export const STUDIO_WRITER_ROOM_LIMITS = {
   maxSerializedBytes: 2_000_000,
   maxIdLength: 120,
-  maxCharacterRefs: 128,
-  maxReferenceIds: 256,
+  /** @deprecated Reference totals are governed by canonical UTF-8 bytes. */
+  maxCharacterRefs: Number.POSITIVE_INFINITY,
+  /** @deprecated Reference totals are governed by canonical UTF-8 bytes. */
+  maxReferenceIds: Number.POSITIVE_INFINITY,
   maxShortTextLength: 500,
   maxTextLength: 12_000,
   maxDialogueLength: 4_000,
   maxSfxTextLength: 160,
   maxRationaleLength: 4_000,
   maxProvenanceRefLength: 240,
-  maxStageItems: 500,
-  maxDialogues: 1_000,
-  maxSfx: 1_000,
-  maxSuggestions: 1_000,
+  /** @deprecated Stage totals are governed by canonical UTF-8 bytes. */
+  maxStageItems: Number.POSITIVE_INFINITY,
+  /** @deprecated Dialogue totals are governed by canonical UTF-8 bytes. */
+  maxDialogues: Number.POSITIVE_INFINITY,
+  /** @deprecated SFX totals are governed by canonical UTF-8 bytes. */
+  maxSfx: Number.POSITIVE_INFINITY,
+  /** @deprecated Suggestion totals are governed by canonical UTF-8 bytes. */
+  maxSuggestions: Number.POSITIVE_INFINITY,
+  /** One explicit decision request is bounded independently from document authority. */
   maxDecisionBatch: 100,
   maxOrder: 1_000_000,
 } as const;
@@ -55,12 +62,8 @@ const SafeIdSchema = z
   .max(STUDIO_WRITER_ROOM_LIMITS.maxIdLength)
   .regex(SAFE_SEGMENT_PATTERN);
 const CharacterIdSchema = z.string().min(1).max(STUDIO_CHARACTER_BIBLE_MAX_ID_LENGTH);
-const CharacterIdsSchema = z
-  .array(CharacterIdSchema)
-  .max(STUDIO_WRITER_ROOM_LIMITS.maxCharacterRefs);
-const ReferenceIdsSchema = z
-  .array(SafeIdSchema)
-  .max(STUDIO_WRITER_ROOM_LIMITS.maxReferenceIds);
+const CharacterIdsSchema = z.array(CharacterIdSchema);
+const ReferenceIdsSchema = z.array(SafeIdSchema);
 const ShortTextSchema = z.string().max(STUDIO_WRITER_ROOM_LIMITS.maxShortTextLength);
 const LongTextSchema = z.string().max(STUDIO_WRITER_ROOM_LIMITS.maxTextLength);
 const OrderSchema = z
@@ -151,25 +154,23 @@ export const StudioWriterRoomStagesSchema = z
     "episode-outline": StudioWriterRoomEpisodeOutlineSchema,
     beats: z
       .object({
-        items: z.array(StudioWriterRoomBeatSchema).max(STUDIO_WRITER_ROOM_LIMITS.maxStageItems),
+        items: z.array(StudioWriterRoomBeatSchema),
       })
       .strict(),
     scenes: z
       .object({
-        items: z.array(StudioWriterRoomSceneSchema).max(STUDIO_WRITER_ROOM_LIMITS.maxStageItems),
+        items: z.array(StudioWriterRoomSceneSchema),
       })
       .strict(),
     "panel-plan": z
       .object({
-        items: z.array(StudioWriterRoomPanelSchema).max(STUDIO_WRITER_ROOM_LIMITS.maxStageItems),
+        items: z.array(StudioWriterRoomPanelSchema),
       })
       .strict(),
     "dialogue-sfx": z
       .object({
-        dialogue: z
-          .array(StudioWriterRoomDialogueSchema)
-          .max(STUDIO_WRITER_ROOM_LIMITS.maxDialogues),
-        sfx: z.array(StudioWriterRoomSfxSchema).max(STUDIO_WRITER_ROOM_LIMITS.maxSfx),
+        dialogue: z.array(StudioWriterRoomDialogueSchema),
+        sfx: z.array(StudioWriterRoomSfxSchema),
       })
       .strict(),
   })
@@ -200,7 +201,7 @@ export const StudioWriterRoomSuggestionValueSchema = z.union([
   OrderSchema,
   z.boolean(),
   z.null(),
-  z.array(CharacterIdSchema).max(STUDIO_WRITER_ROOM_LIMITS.maxReferenceIds),
+  z.array(CharacterIdSchema),
 ]);
 
 export const StudioWriterRoomSuggestionSchema = z
@@ -253,9 +254,7 @@ export const StudioWriterRoomDocumentSchema = z
     version: z.literal(STUDIO_WRITER_ROOM_VERSION),
     stages: StudioWriterRoomStagesSchema,
     completion: StudioWriterRoomCompletionSchema,
-    suggestions: z
-      .array(StudioWriterRoomSuggestionSchema)
-      .max(STUDIO_WRITER_ROOM_LIMITS.maxSuggestions),
+    suggestions: z.array(StudioWriterRoomSuggestionSchema),
     lastDecision: StudioWriterRoomDecisionSchema.optional(),
   })
   .strict();
@@ -278,6 +277,49 @@ export type StudioWriterRoomSuggestionValue = z.infer<
 export type StudioWriterRoomSuggestion = z.infer<typeof StudioWriterRoomSuggestionSchema>;
 export type StudioWriterRoomDecision = z.infer<typeof StudioWriterRoomDecisionSchema>;
 export type StudioWriterRoomDocument = z.infer<typeof StudioWriterRoomDocumentSchema>;
+
+export type StudioWriterRoomAdmissionFailureReason =
+  | "unsafe-or-unbounded-input"
+  | "byte-budget-exceeded"
+  | "invalid-document";
+
+/**
+ * Atomic admission result for a canonical Writer Room document. A rejected receipt always returns
+ * the caller-supplied committed document by identity; no normalized prefix becomes authority.
+ */
+export type StudioWriterRoomDocumentAdmissionReceipt =
+  | Readonly<{
+      kind: "accepted";
+      document: StudioWriterRoomDocument;
+      serialized: string;
+      serializedBytes: number;
+      maximumSerializedBytes: typeof STUDIO_WRITER_ROOM_LIMITS.maxSerializedBytes;
+    }>
+  | Readonly<{
+      kind: "rejected";
+      reason: StudioWriterRoomAdmissionFailureReason;
+      document: StudioWriterRoomDocument;
+      serializedBytes: number | null;
+      maximumSerializedBytes: typeof STUDIO_WRITER_ROOM_LIMITS.maxSerializedBytes;
+    }>;
+
+export class StudioWriterRoomCapacityError extends Error {
+  readonly name = "StudioWriterRoomCapacityError";
+  readonly code = "STUDIO_WRITER_ROOM_BYTE_BUDGET_EXCEEDED" as const;
+
+  constructor() {
+    super("Writer Room 문서가 canonical UTF-8 2,000,000바이트 저장 예산을 초과했어요.");
+  }
+}
+
+export class StudioWriterRoomAdmissionError extends Error {
+  readonly name = "StudioWriterRoomAdmissionError";
+  readonly code = "STUDIO_WRITER_ROOM_UNSAFE_INPUT" as const;
+
+  constructor() {
+    super("Writer Room 입력에 접근자, sparse 배열, 순환 참조 또는 지원하지 않는 객체가 있어 안전하게 읽지 않았어요.");
+  }
+}
 
 export interface StudioWriterRoomSuggestionInput {
   id: string;
@@ -354,6 +396,184 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+const ARRAY_INDEX_PATTERN = /^(?:0|[1-9][0-9]*)$/u;
+
+/**
+ * Produces a getter-free JSON-data clone before tolerant migration reads a single caller-owned
+ * property. Dense arrays, plain/null-prototype records and data properties are the only admitted
+ * containers. The traversal budget is derived from the serialized byte authority rather than a
+ * product item count.
+ */
+function cloneInspectableSource(root: unknown): unknown {
+  const clones = new Map<object, unknown>();
+  const ancestors = new Set<object>();
+  let visitedContainers = 0;
+  let visitedProperties = 0;
+
+  const visit = (value: unknown): unknown => {
+    if (
+      value === null
+      || value === undefined
+      || typeof value === "string"
+      || typeof value === "number"
+      || typeof value === "boolean"
+    ) {
+      return value;
+    }
+    if (
+      typeof value === "bigint"
+      || typeof value === "function"
+      || typeof value === "symbol"
+    ) {
+      throw new StudioWriterRoomAdmissionError();
+    }
+
+    const object = value as object;
+    if (ancestors.has(object)) throw new StudioWriterRoomAdmissionError();
+    const existing = clones.get(object);
+    if (existing !== undefined) return existing;
+
+    let array: boolean;
+    let prototype: object | null;
+    let ownKeys: readonly PropertyKey[];
+    try {
+      array = Array.isArray(object);
+      prototype = Object.getPrototypeOf(object) as object | null;
+      ownKeys = Reflect.ownKeys(object);
+    } catch {
+      throw new StudioWriterRoomAdmissionError();
+    }
+
+    visitedContainers += 1;
+    visitedProperties += ownKeys.length;
+    if (
+      visitedContainers > STUDIO_WRITER_ROOM_LIMITS.maxSerializedBytes
+      || visitedProperties > STUDIO_WRITER_ROOM_LIMITS.maxSerializedBytes
+    ) {
+      throw new StudioWriterRoomCapacityError();
+    }
+
+    if (array) {
+      if (prototype !== Array.prototype) throw new StudioWriterRoomAdmissionError();
+      let lengthDescriptor: PropertyDescriptor | undefined;
+      try {
+        lengthDescriptor = Object.getOwnPropertyDescriptor(object, "length");
+      } catch {
+        throw new StudioWriterRoomAdmissionError();
+      }
+      if (
+        !lengthDescriptor
+        || !("value" in lengthDescriptor)
+        || !Number.isSafeInteger(lengthDescriptor.value)
+        || lengthDescriptor.value < 0
+      ) {
+        throw new StudioWriterRoomAdmissionError();
+      }
+      const length = lengthDescriptor.value as number;
+      const minimumJsonBytes = length === 0 ? 2 : length * 2 + 1;
+      if (minimumJsonBytes > STUDIO_WRITER_ROOM_LIMITS.maxSerializedBytes) {
+        throw new StudioWriterRoomCapacityError();
+      }
+      if (
+        ownKeys.length !== length + 1
+        || ownKeys.some((key) => {
+          if (key === "length") return false;
+          if (typeof key !== "string" || !ARRAY_INDEX_PATTERN.test(key)) return true;
+          const index = Number(key);
+          return !Number.isSafeInteger(index) || index < 0 || index >= length;
+        })
+      ) {
+        throw new StudioWriterRoomAdmissionError();
+      }
+
+      const result: unknown[] = [];
+      clones.set(object, result);
+      ancestors.add(object);
+      try {
+        for (let index = 0; index < length; index += 1) {
+          let descriptor: PropertyDescriptor | undefined;
+          try {
+            descriptor = Object.getOwnPropertyDescriptor(object, String(index));
+          } catch {
+            throw new StudioWriterRoomAdmissionError();
+          }
+          if (!descriptor || !("value" in descriptor) || descriptor.enumerable !== true) {
+            throw new StudioWriterRoomAdmissionError();
+          }
+          result.push(visit(descriptor.value as unknown));
+        }
+      } finally {
+        ancestors.delete(object);
+      }
+      return result;
+    }
+
+    if (prototype !== Object.prototype && prototype !== null) {
+      throw new StudioWriterRoomAdmissionError();
+    }
+    const result: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
+    clones.set(object, result);
+    ancestors.add(object);
+    try {
+      for (const key of ownKeys) {
+        if (typeof key !== "string" || BLOCKED_PATH_SEGMENTS.has(key)) {
+          throw new StudioWriterRoomAdmissionError();
+        }
+        let descriptor: PropertyDescriptor | undefined;
+        try {
+          descriptor = Object.getOwnPropertyDescriptor(object, key);
+        } catch {
+          throw new StudioWriterRoomAdmissionError();
+        }
+        if (!descriptor || !("value" in descriptor) || descriptor.enumerable !== true) {
+          throw new StudioWriterRoomAdmissionError();
+        }
+        Object.defineProperty(result, key, {
+          configurable: true,
+          enumerable: true,
+          writable: true,
+          value: visit(descriptor.value as unknown),
+        });
+      }
+    } finally {
+      ancestors.delete(object);
+    }
+    return result;
+  };
+
+  try {
+    return visit(root);
+  } catch (cause) {
+    if (
+      cause instanceof StudioWriterRoomAdmissionError
+      || cause instanceof StudioWriterRoomCapacityError
+    ) {
+      throw cause;
+    }
+    throw new StudioWriterRoomAdmissionError();
+  }
+}
+
+function utf8Serialized(value: unknown): { serialized: string; bytes: number } {
+  let serialized: string | undefined;
+  try {
+    serialized = JSON.stringify(value);
+  } catch {
+    throw new StudioWriterRoomAdmissionError();
+  }
+  const canonical = serialized ?? "null";
+  return { serialized: canonical, bytes: TEXT_ENCODER.encode(canonical).byteLength };
+}
+
+function inspectSourceWithinByteBudget(value: unknown): unknown {
+  const inspected = cloneInspectableSource(value);
+  const { bytes } = utf8Serialized(inspected);
+  if (bytes > STUDIO_WRITER_ROOM_LIMITS.maxSerializedBytes) {
+    throw new StudioWriterRoomCapacityError();
+  }
+  return inspected;
+}
+
 function stripUnsafeControls(value: string): string {
   let result = "";
   for (const character of value) {
@@ -394,7 +614,6 @@ function normalizeOrder(value: unknown): number {
 
 function normalizeUniqueStrings(
   value: unknown,
-  maxItems: number,
   normalizeItem: (candidate: unknown) => string | null
 ): string[] {
   const candidates = Array.isArray(value) ? value : [];
@@ -402,25 +621,16 @@ function normalizeUniqueStrings(
   for (const candidate of candidates) {
     const item = normalizeItem(candidate);
     if (item) result.add(item);
-    if (result.size >= maxItems) break;
   }
   return [...result].sort();
 }
 
 function normalizeCharacterIds(value: unknown): string[] {
-  return normalizeUniqueStrings(
-    value,
-    STUDIO_WRITER_ROOM_LIMITS.maxCharacterRefs,
-    normalizeCharacterId
-  );
+  return normalizeUniqueStrings(value, normalizeCharacterId);
 }
 
 function normalizeReferenceIds(value: unknown): string[] {
-  return normalizeUniqueStrings(
-    value,
-    STUDIO_WRITER_ROOM_LIMITS.maxReferenceIds,
-    normalizeSafeId
-  );
+  return normalizeUniqueStrings(value, normalizeSafeId);
 }
 
 function normalizeTimestamp(value: unknown, fallback = LEGACY_TIMESTAMP): string {
@@ -444,26 +654,18 @@ function normalizeProvenanceRef(value: unknown): string | undefined {
   return normalized;
 }
 
-function sourceWithinSizeLimit(value: unknown): boolean {
-  try {
-    const serialized = typeof value === "string" ? value : JSON.stringify(value);
-    return (
-      typeof serialized === "string" &&
-      TEXT_ENCODER.encode(serialized).length <= STUDIO_WRITER_ROOM_LIMITS.maxSerializedBytes
-    );
-  } catch {
-    return false;
-  }
-}
-
 function decodeSource(value: unknown): unknown | null {
-  if (!sourceWithinSizeLimit(value)) return null;
-  if (typeof value !== "string") return value;
+  if (typeof value !== "string") return inspectSourceWithinByteBudget(value);
+  if (TEXT_ENCODER.encode(value).byteLength > STUDIO_WRITER_ROOM_LIMITS.maxSerializedBytes) {
+    throw new StudioWriterRoomCapacityError();
+  }
+  let parsed: unknown;
   try {
-    return JSON.parse(value) as unknown;
+    parsed = JSON.parse(value) as unknown;
   } catch {
     return null;
   }
+  return inspectSourceWithinByteBudget(parsed);
 }
 
 function sortByOrderAndId<T extends { id: string; order: number }>(items: T[]): T[] {
@@ -472,7 +674,6 @@ function sortByOrderAndId<T extends { id: string; order: number }>(items: T[]): 
 
 function normalizeItemArray<T>(
   value: unknown,
-  maximum: number,
   normalizeItem: (candidate: unknown) => T | null,
   idOf: (item: T) => string,
   sort: (items: T[]) => T[]
@@ -485,7 +686,6 @@ function normalizeItemArray<T>(
     if (!item || ids.has(idOf(item))) continue;
     ids.add(idOf(item));
     result.push(item);
-    if (result.length >= maximum) break;
   }
   return sort(result);
 }
@@ -631,7 +831,6 @@ function normalizeStages(value: unknown): StudioWriterRoomStages {
     beats: {
       items: normalizeItemArray(
         beats,
-        STUDIO_WRITER_ROOM_LIMITS.maxStageItems,
         normalizeBeat,
         ({ id }) => id,
         sortByOrderAndId
@@ -640,7 +839,6 @@ function normalizeStages(value: unknown): StudioWriterRoomStages {
     scenes: {
       items: normalizeItemArray(
         scenes,
-        STUDIO_WRITER_ROOM_LIMITS.maxStageItems,
         normalizeScene,
         ({ id }) => id,
         sortByOrderAndId
@@ -649,7 +847,6 @@ function normalizeStages(value: unknown): StudioWriterRoomStages {
     "panel-plan": {
       items: normalizeItemArray(
         panels,
-        STUDIO_WRITER_ROOM_LIMITS.maxStageItems,
         normalizePanel,
         ({ id }) => id,
         sortByOrderAndId
@@ -658,14 +855,12 @@ function normalizeStages(value: unknown): StudioWriterRoomStages {
     "dialogue-sfx": {
       dialogue: normalizeItemArray(
         dialogue,
-        STUDIO_WRITER_ROOM_LIMITS.maxDialogues,
         normalizeDialogue,
         ({ id }) => id,
         sortByOrderAndId
       ),
       sfx: normalizeItemArray(
         sfx,
-        STUDIO_WRITER_ROOM_LIMITS.maxSfx,
         normalizeSfx,
         ({ id }) => id,
         sortByOrderAndId
@@ -1032,7 +1227,6 @@ function normalizeSuggestions(
     if (!suggestion || ids.has(suggestion.id)) continue;
     ids.add(suggestion.id);
     result.push(suggestion);
-    if (result.length >= STUDIO_WRITER_ROOM_LIMITS.maxSuggestions) break;
   }
   return result.sort(
     (left, right) => left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id)
@@ -1047,9 +1241,12 @@ function normalizeDecision(
   const decidedAt = normalizeTimestamp(value.decidedAt);
   const knownSuggestions = new Map(document.suggestions.map((suggestion) => [suggestion.id, suggestion]));
   const stateCandidates = Array.isArray(value.suggestionStates) ? value.suggestionStates : [];
+  if (stateCandidates.length > STUDIO_WRITER_ROOM_LIMITS.maxDecisionBatch) {
+    throw new StudioWriterRoomAdmissionError();
+  }
   const stateIds = new Set<string>();
   const suggestionStates: StudioWriterRoomDecision["suggestionStates"] = [];
-  for (const candidate of stateCandidates.slice(0, STUDIO_WRITER_ROOM_LIMITS.maxDecisionBatch)) {
+  for (const candidate of stateCandidates) {
     if (!isRecord(candidate)) continue;
     const id = normalizeSafeId(candidate.id);
     if (!id || !knownSuggestions.has(id) || stateIds.has(id)) continue;
@@ -1066,9 +1263,12 @@ function normalizeDecision(
   }
   if (suggestionStates.length === 0) return undefined;
   const targetCandidates = Array.isArray(value.targetValues) ? value.targetValues : [];
+  if (targetCandidates.length > STUDIO_WRITER_ROOM_LIMITS.maxDecisionBatch) {
+    throw new StudioWriterRoomAdmissionError();
+  }
   const targetPaths = new Set<string>();
   const targetValues: StudioWriterRoomDecision["targetValues"] = [];
-  for (const candidate of targetCandidates.slice(0, STUDIO_WRITER_ROOM_LIMITS.maxDecisionBatch)) {
+  for (const candidate of targetCandidates) {
     if (!isRecord(candidate)) continue;
     const targetPath = normalizeText(candidate.targetPath, 500);
     const target = parseTargetPath(targetPath);
@@ -1089,11 +1289,39 @@ function normalizeDecision(
 
 function finalized(document: StudioWriterRoomDocument): StudioWriterRoomDocument {
   const parsed = StudioWriterRoomDocumentSchema.parse(document);
-  const serialized = JSON.stringify(parsed);
-  if (TEXT_ENCODER.encode(serialized).length > STUDIO_WRITER_ROOM_LIMITS.maxSerializedBytes) {
-    throw new Error("Writer Room 문서가 저장 가능한 크기를 초과했어요.");
+  const { bytes } = utf8Serialized(parsed);
+  if (bytes > STUDIO_WRITER_ROOM_LIMITS.maxSerializedBytes) {
+    throw new StudioWriterRoomCapacityError();
   }
   return parsed;
+}
+
+function retainedDocumentSerializedBytes(document: StudioWriterRoomDocument): number | null {
+  try {
+    const inspected = inspectSourceWithinByteBudget(document);
+    const parsed = StudioWriterRoomDocumentSchema.safeParse(inspected);
+    return parsed.success ? utf8Serialized(parsed.data).bytes : null;
+  } catch {
+    return null;
+  }
+}
+
+function rejectedDocumentReceipt(
+  document: StudioWriterRoomDocument,
+  cause: unknown
+): StudioWriterRoomDocumentAdmissionReceipt {
+  const reason: StudioWriterRoomAdmissionFailureReason = cause instanceof StudioWriterRoomCapacityError
+    ? "byte-budget-exceeded"
+    : cause instanceof StudioWriterRoomAdmissionError
+      ? "unsafe-or-unbounded-input"
+      : "invalid-document";
+  return Object.freeze({
+    kind: "rejected",
+    reason,
+    document,
+    serializedBytes: retainedDocumentSerializedBytes(document),
+    maximumSerializedBytes: STUDIO_WRITER_ROOM_LIMITS.maxSerializedBytes,
+  });
 }
 
 export function createEmptyStudioWriterRoomDocument(): StudioWriterRoomDocument {
@@ -1115,8 +1343,10 @@ export function createEmptyStudioWriterRoomDocument(): StudioWriterRoomDocument 
 }
 
 /**
- * Migrates current v1 and conservative unversioned aliases. Explicit future versions, malformed
- * JSON, cyclic values, and over-size sources are rejected to an empty document rather than guessed.
+ * Migrates current v1 and conservative unversioned aliases. Ordinary malformed JSON and explicit
+ * future versions retain the legacy empty-document fallback. Unscannable, cyclic, sparse or
+ * over-budget inputs throw typed errors so callers cannot mistake an empty/truncated value for
+ * committed document authority.
  */
 export function normalizeStudioWriterRoomDocument(value: unknown): StudioWriterRoomDocument {
   const decoded = decodeSource(value);
@@ -1135,37 +1365,76 @@ export function normalizeStudioWriterRoomDocument(value: unknown): StudioWriterR
   const withSuggestions: StudioWriterRoomDocument = { ...base, suggestions };
   const lastDecision = normalizeDecision(decoded.lastDecision, withSuggestions);
   const result = lastDecision ? { ...withSuggestions, lastDecision } : withSuggestions;
+  return finalized(result);
+}
+
+/**
+ * Atomically admits one complete Writer Room authority document by canonical UTF-8 bytes.
+ * Rejection returns `retainedDocument` unchanged by identity and never exposes a normalized prefix.
+ */
+export function admitStudioWriterRoomDocument(
+  value: unknown,
+  retainedDocument: StudioWriterRoomDocument = createEmptyStudioWriterRoomDocument()
+): StudioWriterRoomDocumentAdmissionReceipt {
   try {
-    return finalized(result);
-  } catch {
-    return createEmptyStudioWriterRoomDocument();
+    const document = normalizeStudioWriterRoomDocument(value);
+    const { serialized, bytes: serializedBytes } = utf8Serialized(document);
+    return Object.freeze({
+      kind: "accepted",
+      document,
+      serialized,
+      serializedBytes,
+      maximumSerializedBytes: STUDIO_WRITER_ROOM_LIMITS.maxSerializedBytes,
+    });
+  } catch (cause) {
+    return rejectedDocumentReceipt(retainedDocument, cause);
   }
 }
 
 export function serializeStudioWriterRoomDocument(value: unknown): string {
-  if (!sourceWithinSizeLimit(value)) {
-    throw new Error("Writer Room 문서가 저장 가능한 크기를 초과했어요.");
-  }
-  const serialized = JSON.stringify(normalizeStudioWriterRoomDocument(value));
-  if (TEXT_ENCODER.encode(serialized).length > STUDIO_WRITER_ROOM_LIMITS.maxSerializedBytes) {
-    throw new Error("Writer Room 문서가 저장 가능한 크기를 초과했어요.");
-  }
-  return serialized;
+  return utf8Serialized(normalizeStudioWriterRoomDocument(value)).serialized;
 }
 
-/** Replaces one stage immutably and clears a stale one-level undo snapshot. */
+/**
+ * Atomically admits one stage edit. Byte/structure rejection retains the exact committed document
+ * object so UI callers can report pressure without accidentally publishing a truncated draft.
+ */
+export function admitStudioWriterRoomStage(
+  document: StudioWriterRoomDocument,
+  stage: StudioWriterRoomStage,
+  stageContent: unknown
+): StudioWriterRoomDocumentAdmissionReceipt {
+  if (!STUDIO_WRITER_ROOM_STAGES.includes(stage)) {
+    return rejectedDocumentReceipt(document, new StudioWriterRoomAdmissionError());
+  }
+  const currentReceipt = admitStudioWriterRoomDocument(document, document);
+  if (currentReceipt.kind === "rejected") return currentReceipt;
+  try {
+    const inspectedStageContent = inspectSourceWithinByteBudget(stageContent);
+    const stages = normalizeStages({
+      stages: { ...currentReceipt.document.stages, [stage]: inspectedStageContent },
+    });
+    return admitStudioWriterRoomDocument({
+      ...currentReceipt.document,
+      stages,
+      lastDecision: undefined,
+    }, document);
+  } catch (cause) {
+    return rejectedDocumentReceipt(document, cause);
+  }
+}
+
+/**
+ * @deprecated Compatibility-only document return. Product callers must consume
+ * `admitStudioWriterRoomStage` so a rejected receipt and retained identity remain observable.
+ */
 export function replaceStudioWriterRoomStage(
   value: unknown,
   stage: StudioWriterRoomStage,
   stageContent: unknown
 ): StudioWriterRoomDocument {
   const document = normalizeStudioWriterRoomDocument(value);
-  const stages = normalizeStages({ stages: { ...document.stages, [stage]: stageContent } });
-  return normalizeStudioWriterRoomDocument({
-    ...document,
-    stages,
-    lastDecision: undefined,
-  });
+  return admitStudioWriterRoomStage(document, stage, stageContent).document;
 }
 
 export function setStudioWriterRoomStageCompleted(
@@ -1220,25 +1489,27 @@ export function addStudioWriterRoomSuggestion(
   input: StudioWriterRoomSuggestionInput
 ): StudioWriterRoomDocument {
   const document = normalizeStudioWriterRoomDocument(value);
-  if (document.suggestions.length >= STUDIO_WRITER_ROOM_LIMITS.maxSuggestions) {
-    throw new Error(`제안은 최대 ${STUDIO_WRITER_ROOM_LIMITS.maxSuggestions}개까지 저장할 수 있어요.`);
-  }
-  const id = normalizeSafeId(input.id);
+  const inspectedInput = inspectSourceWithinByteBudget(input);
+  if (!isRecord(inspectedInput)) throw new StudioWriterRoomAdmissionError();
+  const id = normalizeSafeId(inspectedInput.id);
   if (!id) throw new Error("제안 ID 형식이 올바르지 않아요.");
   if (document.suggestions.some((suggestion) => suggestion.id === id)) return document;
-  const targetPath = normalizeText(input.targetPath, 500);
+  const targetPath = normalizeText(inspectedInput.targetPath, 500);
   const target = parseTargetPath(targetPath);
   if (!target) throw new Error("제안 대상 경로가 허용 목록에 없어요.");
   const currentValue = findTargetValue(document, target);
   if (currentValue === undefined) throw new Error("제안 대상이 현재 Writer Room 문서에 없어요.");
-  const proposedValue = coerceTargetValue(target, input.proposedValue);
+  const proposedValue = coerceTargetValue(target, inspectedInput.proposedValue);
   if (proposedValue === undefined) throw new Error("제안 값이 대상 필드 형식과 맞지 않아요.");
   if (valuesEqual(currentValue, proposedValue)) throw new Error("현재 값과 다른 제안 값이 필요해요.");
-  const rationale = normalizeText(input.rationale, STUDIO_WRITER_ROOM_LIMITS.maxRationaleLength);
-  const provenanceRef = input.provenanceRef === undefined
+  const rationale = normalizeText(
+    inspectedInput.rationale,
+    STUDIO_WRITER_ROOM_LIMITS.maxRationaleLength
+  );
+  const provenanceRef = inspectedInput.provenanceRef === undefined
     ? undefined
-    : normalizeProvenanceRef(input.provenanceRef);
-  if (input.provenanceRef !== undefined && !provenanceRef) {
+    : normalizeProvenanceRef(inspectedInput.provenanceRef);
+  if (inspectedInput.provenanceRef !== undefined && !provenanceRef) {
     throw new Error("출처 참조 형식이 올바르지 않아요.");
   }
   const suggestion: StudioWriterRoomSuggestion = {
@@ -1249,7 +1520,9 @@ export function addStudioWriterRoomSuggestion(
     rationale,
     status: "pending",
     ...(provenanceRef ? { provenanceRef } : {}),
-    createdAt: operationTimestamp(input.createdAt),
+    createdAt: operationTimestamp(
+      typeof inspectedInput.createdAt === "string" ? inspectedInput.createdAt : ""
+    ),
   };
   return finalized({
     ...document,
@@ -1270,7 +1543,6 @@ export function mergeStudioWriterRoomSuggestions(
   const ids = new Set(document.suggestions.map(({ id }) => id));
   const suggestions = document.suggestions.slice();
   for (const candidate of suggestionCandidates(decoded)) {
-    if (suggestions.length >= STUDIO_WRITER_ROOM_LIMITS.maxSuggestions) break;
     const normalized = normalizeSuggestion(candidate, document);
     if (!normalized || ids.has(normalized.id)) continue;
     ids.add(normalized.id);
@@ -1288,12 +1560,18 @@ function decideSuggestions(
   kind: "accept" | "reject",
   decidedAtInput: string
 ): StudioWriterRoomDocument {
-  if (suggestionIds.length > STUDIO_WRITER_ROOM_LIMITS.maxDecisionBatch) {
+  const inspectedSuggestionIds = inspectSourceWithinByteBudget(suggestionIds);
+  if (!Array.isArray(inspectedSuggestionIds)) throw new StudioWriterRoomAdmissionError();
+  if (inspectedSuggestionIds.length > STUDIO_WRITER_ROOM_LIMITS.maxDecisionBatch) {
     throw new Error(`한 번에 최대 ${STUDIO_WRITER_ROOM_LIMITS.maxDecisionBatch}개 제안만 결정할 수 있어요.`);
   }
   const document = normalizeStudioWriterRoomDocument(value);
   const decidedAt = operationTimestamp(decidedAtInput);
-  const requestedIds = new Set(suggestionIds.map(normalizeSafeId).filter(Boolean));
+  const requestedIds = new Set<string>();
+  for (const candidate of inspectedSuggestionIds) {
+    const id = normalizeSafeId(candidate);
+    if (id) requestedIds.add(id);
+  }
   const selected = document.suggestions.filter(
     (suggestion) => requestedIds.has(suggestion.id) && suggestion.status === "pending"
   );

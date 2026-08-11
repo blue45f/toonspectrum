@@ -17,7 +17,6 @@ import {
 } from "./studio-scenario-layout";
 import { SFX_LIBRARY, type SfxCategory } from "./studio-sfx-presets";
 import {
-  STUDIO_WRITER_ROOM_LIMITS,
   normalizeStudioWriterRoomDocument,
   type StudioWriterRoomDialogue,
   type StudioWriterRoomDocument,
@@ -27,6 +26,16 @@ import {
 } from "./studio-writer-room";
 
 export const STUDIO_WRITER_ROOM_CANVAS_PROJECTION_VERSION = 1 as const;
+
+/**
+ * Per hand-off/render batch backpressure. These are not Writer Room document-total authority:
+ * omitted IDs are returned in a typed limited receipt so a caller can continue explicitly.
+ */
+export const STUDIO_WRITER_ROOM_CANVAS_HANDOFF_LIMITS = {
+  maxProjectedPanelsPerBatch: 500,
+  maxDialogueLinesPerPanelPerBatch: 1_000,
+  maxSfxLabelsPerPanelPerBatch: 1_000,
+} as const;
 
 export const STUDIO_WRITER_ROOM_CANVAS_PROJECTION_LIMITS = {
   defaultCanvasWidth: 720,
@@ -40,9 +49,11 @@ export const STUDIO_WRITER_ROOM_CANVAS_PROJECTION_LIMITS = {
   maxTargetPageHeight: 30_000,
   defaultMaxPanelsPerPage: 12,
   maxPanelsPerPage: 100,
-  maxProjectedPanels: STUDIO_WRITER_ROOM_LIMITS.maxStageItems,
-  maxDialogueLinesPerPanel: STUDIO_WRITER_ROOM_LIMITS.maxDialogues,
-  maxSfxLabelsPerPanel: STUDIO_WRITER_ROOM_LIMITS.maxSfx,
+  maxProjectedPanels: STUDIO_WRITER_ROOM_CANVAS_HANDOFF_LIMITS.maxProjectedPanelsPerBatch,
+  maxDialogueLinesPerPanel:
+    STUDIO_WRITER_ROOM_CANVAS_HANDOFF_LIMITS.maxDialogueLinesPerPanelPerBatch,
+  maxSfxLabelsPerPanel:
+    STUDIO_WRITER_ROOM_CANVAS_HANDOFF_LIMITS.maxSfxLabelsPerPanelPerBatch,
   maxDiagnostics: 500,
 } as const;
 
@@ -207,6 +218,24 @@ export interface StudioWriterRoomCanvasApplyReadiness {
   warningCount: number;
 }
 
+export interface StudioWriterRoomCanvasHandoffContinuation {
+  panelIds: readonly string[];
+  dialogueIds: readonly string[];
+  sfxIds: readonly string[];
+}
+
+export type StudioWriterRoomCanvasHandoffReceipt =
+  | Readonly<{
+      status: "complete";
+      limitedBy: readonly [];
+      continuation: null;
+    }>
+  | Readonly<{
+      status: "limited";
+      limitedBy: readonly ("panels" | "dialogue-per-panel" | "sfx-per-panel")[];
+      continuation: StudioWriterRoomCanvasHandoffContinuation;
+    }>;
+
 export interface StudioWriterRoomCanvasProjectionResult {
   version: typeof STUDIO_WRITER_ROOM_CANVAS_PROJECTION_VERSION;
   settings: StudioWriterRoomCanvasProjectionSettings;
@@ -217,6 +246,8 @@ export interface StudioWriterRoomCanvasProjectionResult {
   diagnostics: readonly StudioWriterRoomCanvasDiagnostic[];
   diagnosticsTruncated: boolean;
   applyReadiness: StudioWriterRoomCanvasApplyReadiness;
+  /** Explicit receipt for the bounded hand-off; `limited` always carries every deferred ID. */
+  handoffReceipt: StudioWriterRoomCanvasHandoffReceipt;
   omitted: {
     panelIds: readonly string[];
     dialogueIds: readonly string[];
@@ -885,6 +916,8 @@ export function projectStudioWriterRoomToCanvasPlan(
   const omittedSfxIds = document.stages["dialogue-sfx"].sfx
     .filter(({ panelId }) => omittedPanelIdSet.has(panelId))
     .map(({ id }) => id);
+  let dialoguePerPanelLimited = false;
+  let sfxPerPanelLimited = false;
   const panels: StudioWriterRoomCanvasPanelProjection[] = projectedSourcePanels.map(
     (panel, panelIndex) => {
       const scene = scenesById.get(panel.sceneId);
@@ -925,6 +958,7 @@ export function projectStudioWriterRoomToCanvasPlan(
       const dialogue = allDialogue.slice(0, settings.maxDialogueLinesPerPanel);
       const omittedDialogue = allDialogue.slice(settings.maxDialogueLinesPerPanel);
       if (omittedDialogue.length > 0) {
+        dialoguePerPanelLimited = true;
         omittedDialogueIds.push(...omittedDialogue.map(({ id }) => id));
         addDiagnostic(collector, {
           severity: "error",
@@ -962,6 +996,7 @@ export function projectStudioWriterRoomToCanvasPlan(
       const sfx = allSfx.slice(0, settings.maxSfxLabelsPerPanel);
       const omittedSfx = allSfx.slice(settings.maxSfxLabelsPerPanel);
       if (omittedSfx.length > 0) {
+        sfxPerPanelLimited = true;
         omittedSfxIds.push(...omittedSfx.map(({ id }) => id));
         addDiagnostic(collector, {
           severity: "error",
@@ -1050,6 +1085,26 @@ export function projectStudioWriterRoomToCanvasPlan(
   const pageGrouping = groupPages(panels, settings, collector);
   const blockingDiagnosticCodes = [...collector.blockingCodes];
   const canApply = blockingDiagnosticCodes.length === 0;
+  const omitted = Object.freeze({
+    panelIds: Object.freeze(sortedUnique(omittedPanelIds)),
+    dialogueIds: Object.freeze(sortedUnique(omittedDialogueIds)),
+    sfxIds: Object.freeze(sortedUnique(omittedSfxIds)),
+  });
+  const limitedBy: ("panels" | "dialogue-per-panel" | "sfx-per-panel")[] = [];
+  if (omitted.panelIds.length > 0) limitedBy.push("panels");
+  if (dialoguePerPanelLimited) limitedBy.push("dialogue-per-panel");
+  if (sfxPerPanelLimited) limitedBy.push("sfx-per-panel");
+  const handoffReceipt: StudioWriterRoomCanvasHandoffReceipt = limitedBy.length === 0
+    ? Object.freeze({
+        status: "complete",
+        limitedBy: Object.freeze([]) as readonly [],
+        continuation: null,
+      })
+    : Object.freeze({
+        status: "limited",
+        limitedBy: Object.freeze(limitedBy.slice()),
+        continuation: omitted,
+      });
   return {
     version: STUDIO_WRITER_ROOM_CANVAS_PROJECTION_VERSION,
     settings,
@@ -1065,11 +1120,8 @@ export function projectStudioWriterRoomToCanvasPlan(
       errorCount: collector.errorCount,
       warningCount: collector.warningCount,
     },
-    omitted: {
-      panelIds: sortedUnique(omittedPanelIds),
-      dialogueIds: sortedUnique(omittedDialogueIds),
-      sfxIds: sortedUnique(omittedSfxIds),
-    },
+    handoffReceipt,
+    omitted,
     orphans: {
       dialogueIds: sortedUnique(orphanDialogueIds),
       sfxIds: sortedUnique(orphanSfxIds),

@@ -13,6 +13,7 @@ import {
   type StudioWriterRoomSfx,
 } from "./studio-writer-room";
 import {
+  STUDIO_WRITER_ROOM_CANVAS_HANDOFF_LIMITS,
   STUDIO_WRITER_ROOM_CANVAS_PROJECTION_LIMITS,
   projectStudioWriterRoomToCanvasPlan,
   type StudioWriterRoomCanvasDiagnosticCode,
@@ -375,12 +376,37 @@ describe("projectStudioWriterRoomToCanvasPlan", () => {
       dialogueIds: ["dialogue-2", "dialogue-3"],
       sfxIds: ["sfx-2", "sfx-3"],
     });
+    expect(result.handoffReceipt).toEqual({
+      status: "limited",
+      limitedBy: ["panels", "dialogue-per-panel", "sfx-per-panel"],
+      continuation: result.omitted,
+    });
+    expect(Object.isFrozen(result.handoffReceipt)).toBe(true);
+    expect(Object.isFrozen(result.handoffReceipt.continuation)).toBe(true);
+    expect(Object.isFrozen(result.omitted.panelIds)).toBe(true);
+    expect(Object.isFrozen(result.omitted.dialogueIds)).toBe(true);
+    expect(Object.isFrozen(result.omitted.sfxIds)).toBe(true);
     expect(diagnosticCodes(result)).toEqual(expect.arrayContaining([
       "PANEL_PROJECTION_LIMIT_EXCEEDED",
       "PANEL_DIALOGUE_LIMIT_EXCEEDED",
       "PANEL_SFX_LIMIT_EXCEEDED",
     ]));
     expect(result.applyReadiness.canApply).toBe(false);
+  });
+
+  it("keeps document totals separate from explicit canvas hand-off backpressure", () => {
+    expect(STUDIO_WRITER_ROOM_CANVAS_HANDOFF_LIMITS).toEqual({
+      maxProjectedPanelsPerBatch: 500,
+      maxDialogueLinesPerPanelPerBatch: 1_000,
+      maxSfxLabelsPerPanelPerBatch: 1_000,
+    });
+    const result = projectStudioWriterRoomToCanvasPlan(writerRoomDocument());
+    expect(result.handoffReceipt).toEqual({
+      status: "complete",
+      limitedBy: [],
+      continuation: null,
+    });
+    expect(Object.isFrozen(result.handoffReceipt)).toBe(true);
   });
 
   it("prefers scene boundaries when grouping a long vertical flow", () => {

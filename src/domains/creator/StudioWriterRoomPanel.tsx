@@ -19,6 +19,7 @@ import { confirmStudioDestructiveAction } from "./studio-destructive-action-prev
 import { studioDeleteWriterRoomItemRequest } from "./studio-destructive-command-catalog";
 import { SFX_CATEGORIES, SFX_LIBRARY } from "./studio-sfx-presets";
 import {
+  admitStudioWriterRoomStage,
   setStudioWriterRoomStageCompleted,
   STUDIO_WRITER_ROOM_LIMITS,
   STUDIO_WRITER_ROOM_SFX_EMPHASIS,
@@ -104,19 +105,6 @@ function createWriterRoomId(prefix: string, existingIds: readonly string[]): str
     0,
     STUDIO_WRITER_ROOM_LIMITS.maxIdLength
   );
-}
-
-function replaceStageDraft<Stage extends StudioWriterRoomStage>(
-  document: StudioWriterRoomDocument,
-  stage: Stage,
-  content: StudioWriterRoomStages[Stage]
-): StudioWriterRoomDocument {
-  return {
-    version: document.version,
-    stages: { ...document.stages, [stage]: content },
-    completion: document.completion,
-    suggestions: document.suggestions,
-  };
 }
 
 function orderedItems<Item extends { id: string; order: number }>(items: readonly Item[]): Item[] {
@@ -533,16 +521,14 @@ interface CollectionHeaderProps {
   title: string;
   description: string;
   count: number;
-  maximum: number;
   onAdd: () => void;
   addLabel: string;
 }
 
-function CollectionHeader({
+export function StudioWriterRoomCollectionHeader({
   title,
   description,
   count,
-  maximum,
   onAdd,
   addLabel,
 }: CollectionHeaderProps) {
@@ -555,13 +541,12 @@ function CollectionHeader({
       <button
         type="button"
         onClick={onAdd}
-        disabled={count >= maximum}
         className={`${BUTTON_CLASS} bg-accent text-on-accent hover:border-accent hover:bg-accent-hover hover:text-on-accent`}
       >
         <Plus size={14} aria-hidden /> {addLabel}
       </button>
       <span className="w-full text-right text-[0.65rem] tabular-nums text-fg-3 sm:w-auto sm:self-center">
-        {count}/{maximum}
+        {count.toLocaleString("ko-KR")}개
       </span>
     </div>
   );
@@ -688,11 +673,10 @@ function BeatsEditor({ items, characters, onChange, onOpenCharacterBible }: Beat
   };
   return (
     <section className="mx-auto my-4 max-w-5xl overflow-hidden rounded-xl border border-line bg-card/20">
-      <CollectionHeader
+      <StudioWriterRoomCollectionHeader
         title="감정과 사건의 비트"
         description="한 비트에는 독자의 기대나 감정이 한 번 변하는 사건 하나만 둡니다."
         count={items.length}
-        maximum={STUDIO_WRITER_ROOM_LIMITS.maxStageItems}
         onAdd={add}
         addLabel="비트 추가"
       />
@@ -788,11 +772,10 @@ function ScenesEditor({
   };
   return (
     <section className="mx-auto my-4 max-w-5xl overflow-hidden rounded-xl border border-line bg-card/20">
-      <CollectionHeader
+      <StudioWriterRoomCollectionHeader
         title="장면 설계"
         description="같은 장소와 시간 안에서 이어지는 행동을 한 장면으로 묶습니다."
         count={items.length}
-        maximum={STUDIO_WRITER_ROOM_LIMITS.maxStageItems}
         onAdd={add}
         addLabel="장면 추가"
       />
@@ -912,11 +895,10 @@ function PanelsEditor({
   };
   return (
     <section className="mx-auto my-4 max-w-5xl overflow-hidden rounded-xl border border-line bg-card/20">
-      <CollectionHeader
+      <StudioWriterRoomCollectionHeader
         title="세로 스크롤 컷 플랜"
         description="한 컷에는 독자가 한눈에 읽을 수 있는 핵심 행동 하나만 둡니다."
         count={items.length}
-        maximum={STUDIO_WRITER_ROOM_LIMITS.maxStageItems}
         onAdd={add}
         addLabel="컷 추가"
       />
@@ -1012,11 +994,10 @@ function DialogueEditor({ items, panels, characters, onChange }: DialogueEditorP
   };
   return (
     <section className="overflow-hidden rounded-xl border border-line bg-card/20">
-      <CollectionHeader
+      <StudioWriterRoomCollectionHeader
         title="컷별 대사"
         description="말풍선 하나에 한 호흡을 두고, 화자의 바이블 말투와 대조해 검토합니다."
         count={items.length}
-        maximum={STUDIO_WRITER_ROOM_LIMITS.maxDialogues}
         onAdd={add}
         addLabel="대사 추가"
       />
@@ -1131,11 +1112,10 @@ function SfxEditor({ items, panels, onChange }: SfxEditorProps) {
   };
   return (
     <section className="overflow-hidden rounded-xl border border-line bg-card/20">
-      <CollectionHeader
+      <StudioWriterRoomCollectionHeader
         title="효과음 레터링"
         description="프리셋을 고르거나 직접 입력하고, 장면의 강도에 맞춰 크기와 강조를 지정합니다."
         count={items.length}
-        maximum={STUDIO_WRITER_ROOM_LIMITS.maxSfx}
         onAdd={add}
         addLabel="효과음 추가"
       />
@@ -1401,7 +1381,16 @@ export function StudioWriterRoomPanel({
     content: StudioWriterRoomStages[Stage]
   ) => {
     try {
-      onChange(replaceStageDraft(document, stage, content));
+      const receipt = admitStudioWriterRoomStage(document, stage, content);
+      if (receipt.kind === "rejected") {
+        setActionError(
+          receipt.reason === "byte-budget-exceeded"
+            ? "Writer Room 문서가 2,000,000바이트 저장 예산을 초과해 변경하지 않았어요."
+            : "Writer Room 변경을 안전하게 읽을 수 없어 기존 문서를 유지했어요."
+        );
+        return;
+      }
+      onChange(receipt.document);
       setActionError(null);
     } catch (cause) {
       setActionError(cause instanceof Error ? cause.message : "Writer Room 변경을 저장하지 못했어요.");
