@@ -16,6 +16,7 @@ export const STUDIO_DRY_MEDIA_UNION_CAS_ROOT_NAME =
 const MAX_BLOB_BYTES = 8 * 1024 * 1024;
 const MAX_STAGING_BYTES = 1024 * 1024;
 const SHA256_HEX = /^[a-f0-9]{64}$/u;
+const PENDING_FILE = /^([a-f0-9]{64})\.pending$/u;
 const SAFE_STROKE_ID = /^[a-zA-Z0-9._-]{1,192}$/u;
 
 interface SyncHandle extends StudioOpfsSyncAccessHandleLike {
@@ -111,6 +112,256 @@ function bytesEqual(left: Uint8Array, right: Uint8Array): boolean {
   return mismatch === 0;
 }
 
+type DigestFileState =
+  | { readonly status: "missing" | "empty" | "corrupt" }
+  | { readonly status: "valid"; readonly bytes: Uint8Array };
+
+function isNotFoundError(error: unknown): boolean {
+  return (
+    typeof error === "object"
+    && error !== null
+    && "name" in error
+    && (error as { readonly name?: unknown }).name === "NotFoundError"
+  );
+}
+
+function pendingFileName(digest: string): string {
+  return `${digest}.pending`;
+}
+
+function finalFileName(digest: string): string {
+  return `${digest}.bin`;
+}
+
+function flush(handle: SyncHandle, label: string): void {
+  try {
+    handle.flush();
+  } catch (error) {
+    throw new StudioOpfsSyncAccessError(
+      "FLUSH_FAILED",
+      `Dry-media CAS ${label} flush failed.`,
+      error,
+    );
+  }
+}
+
+async function inspectDigestFile(
+  directory: StudioOpfsSyncDirectoryHandleLike,
+  name: string,
+  digest: string,
+): Promise<DigestFileState> {
+  const handle = await openHandle(directory, name, false);
+  if (!handle) return { status: "missing" };
+  try {
+    const size = handle.getSize();
+    if (size === 0) return { status: "empty" };
+    if (!Number.isSafeInteger(size) || size < 0 || size > MAX_BLOB_BYTES) {
+      return { status: "corrupt" };
+    }
+    const bytes = readAll(handle, size);
+    return sha256HexPortable(bytes) === digest
+      ? { status: "valid", bytes }
+      : { status: "corrupt" };
+  } finally {
+    handle.close();
+  }
+}
+
+async function removeIfPresent(
+  directory: StudioOpfsSyncDirectoryHandleLike,
+  name: string,
+): Promise<void> {
+  try {
+    await directory.removeEntry(name);
+  } catch (error) {
+    if (isNotFoundError(error)) return;
+    throw new StudioOpfsSyncAccessError(
+      "WRITE_FAILED",
+      "Dry-media CAS temporary-file cleanup failed.",
+      error,
+    );
+  }
+}
+
+async function writeVerifiedFile(
+  directory: StudioOpfsSyncDirectoryHandleLike,
+  name: string,
+  digest: string,
+  bytes: Uint8Array,
+  label: "staging" | "final",
+): Promise<void> {
+  const handle = await openHandle(directory, name, true);
+  if (!handle) throw new Error("unreachable dry-media CAS create");
+  try {
+    handle.truncate(0);
+    writeAll(handle, bytes, 0);
+    handle.truncate(bytes.byteLength);
+    flush(handle, label);
+    const size = handle.getSize();
+    if (
+      size !== bytes.byteLength
+      || !bytesEqual(readAll(handle, size), bytes)
+      || sha256HexPortable(bytes) !== digest
+    ) {
+      throw new StudioOpfsSyncAccessError(
+        "WRITE_FAILED",
+        `Dry-media CAS ${label} verification failed.`,
+      );
+    }
+  } finally {
+    handle.close();
+  }
+}
+
+async function flushVerifiedFile(
+  directory: StudioOpfsSyncDirectoryHandleLike,
+  name: string,
+  digest: string,
+  label: "staging" | "final",
+): Promise<Uint8Array> {
+  const handle = await openHandle(directory, name, false);
+  if (!handle) {
+    throw new StudioOpfsSyncAccessError(
+      "WRITE_FAILED",
+      `Dry-media CAS ${label} disappeared before verification.`,
+    );
+  }
+  try {
+    const size = handle.getSize();
+    if (!Number.isSafeInteger(size) || size <= 0 || size > MAX_BLOB_BYTES) {
+      throw new StudioOpfsSyncAccessError(
+        "WRITE_FAILED",
+        `Dry-media CAS ${label} size failed verification.`,
+      );
+    }
+    const before = readAll(handle, size);
+    if (sha256HexPortable(before) !== digest) {
+      throw new StudioOpfsSyncAccessError(
+        "WRITE_FAILED",
+        `Dry-media CAS ${label} digest failed verification.`,
+      );
+    }
+    flush(handle, label);
+    const afterSize = handle.getSize();
+    if (
+      afterSize !== size
+      || !bytesEqual(readAll(handle, afterSize), before)
+    ) {
+      throw new StudioOpfsSyncAccessError(
+        "WRITE_FAILED",
+        `Dry-media CAS ${label} changed while becoming durable.`,
+      );
+    }
+    return before;
+  } finally {
+    handle.close();
+  }
+}
+
+async function ensureVerifiedPending(
+  directory: StudioOpfsSyncDirectoryHandleLike,
+  digest: string,
+  bytes: Uint8Array,
+): Promise<Uint8Array> {
+  const name = pendingFileName(digest);
+  const current = await inspectDigestFile(directory, name, digest);
+  if (current.status === "valid") {
+    if (!bytesEqual(current.bytes, bytes)) {
+      throw new StudioOpfsSyncAccessError(
+        "WRITE_FAILED",
+        "Dry-media CAS staging digest collision.",
+      );
+    }
+    return flushVerifiedFile(directory, name, digest, "staging");
+  }
+  await writeVerifiedFile(directory, name, digest, bytes, "staging");
+  const verified = await inspectDigestFile(directory, name, digest);
+  if (verified.status !== "valid" || !bytesEqual(verified.bytes, bytes)) {
+    throw new StudioOpfsSyncAccessError(
+      "WRITE_FAILED",
+      "Dry-media CAS staging did not survive verification.",
+    );
+  }
+  return verified.bytes;
+}
+
+async function promoteVerifiedPending(
+  directory: StudioOpfsSyncDirectoryHandleLike,
+  digest: string,
+  pendingBytes: Uint8Array,
+): Promise<void> {
+  const finalName = finalFileName(digest);
+  const current = await inspectDigestFile(directory, finalName, digest);
+  if (current.status === "valid") {
+    if (!bytesEqual(current.bytes, pendingBytes)) {
+      throw new StudioOpfsSyncAccessError(
+        "WRITE_FAILED",
+        "Dry-media CAS immutable digest collision.",
+      );
+    }
+    await flushVerifiedFile(directory, finalName, digest, "final");
+    return;
+  }
+  await writeVerifiedFile(directory, finalName, digest, pendingBytes, "final");
+  const verified = await inspectDigestFile(directory, finalName, digest);
+  if (verified.status !== "valid" || !bytesEqual(verified.bytes, pendingBytes)) {
+    throw new StudioOpfsSyncAccessError(
+      "WRITE_FAILED",
+      "Dry-media CAS final promotion did not survive verification.",
+    );
+  }
+}
+
+async function recoverDigest(
+  directory: StudioOpfsSyncDirectoryHandleLike,
+  digest: string,
+): Promise<DigestFileState> {
+  const finalName = finalFileName(digest);
+  const pendingName = pendingFileName(digest);
+  const final = await inspectDigestFile(directory, finalName, digest);
+  if (final.status === "valid") {
+    const pending = await inspectDigestFile(directory, pendingName, digest);
+    if (pending.status === "valid") {
+      if (!bytesEqual(final.bytes, pending.bytes)) {
+        throw new StudioOpfsSyncAccessError(
+          "WRITE_FAILED",
+          "Dry-media CAS immutable digest collision.",
+        );
+      }
+      await flushVerifiedFile(directory, pendingName, digest, "staging");
+      await promoteVerifiedPending(directory, digest, pending.bytes);
+    }
+    if (pending.status !== "missing") await removeIfPresent(directory, pendingName);
+    return final;
+  }
+
+  const pending = await inspectDigestFile(directory, pendingName, digest);
+  if (pending.status !== "valid") {
+    if (pending.status !== "missing") await removeIfPresent(directory, pendingName);
+    return final;
+  }
+
+  const durablePending = await flushVerifiedFile(
+    directory,
+    pendingName,
+    digest,
+    "staging",
+  );
+  await promoteVerifiedPending(directory, digest, durablePending);
+  await removeIfPresent(directory, pendingName);
+  return { status: "valid", bytes: durablePending };
+}
+
+async function recoverDirectory(
+  directory: StudioOpfsSyncDirectoryHandleLike,
+): Promise<void> {
+  for await (const name of directory.keys()) {
+    const match = PENDING_FILE.exec(name);
+    if (!match?.[1]) continue;
+    await recoverDigest(directory, match[1]);
+  }
+}
+
 class StudioDryMediaUnionOpfsCasStore implements StudioFreehandInputBinaryCasStore {
   readonly kind = "opfs-sync-cas" as const;
   readonly #directories: Readonly<Record<StudioFreehandInputCasBlobKind, StudioOpfsSyncDirectoryHandleLike>>;
@@ -135,29 +386,50 @@ class StudioDryMediaUnionOpfsCasStore implements StudioFreehandInputBinaryCasSto
     const ownedBytes = bytes.slice();
     validateDigest(digest, ownedBytes);
     return this.#enqueue(async () => {
-      const handle = await openHandle(this.#directories[kind], `${digest}.bin`, true);
-      if (!handle) throw new Error("unreachable dry-media CAS create");
-      try {
-        const size = handle.getSize();
-        if (size > 0) {
-          if (
-            size !== ownedBytes.byteLength
-            || !bytesEqual(readAll(handle, size), ownedBytes)
-          ) {
-            throw new StudioOpfsSyncAccessError(
-              "WRITE_FAILED",
-              "Dry-media CAS immutable digest collision.",
-            );
-          }
-          return;
+      const directory = this.#directories[kind];
+      const final = await inspectDigestFile(directory, finalFileName(digest), digest);
+      if (final.status === "valid") {
+        if (!bytesEqual(final.bytes, ownedBytes)) {
+          throw new StudioOpfsSyncAccessError(
+            "WRITE_FAILED",
+            "Dry-media CAS immutable digest collision.",
+          );
         }
-        handle.truncate(0);
-        writeAll(handle, ownedBytes, 0);
-        handle.truncate(ownedBytes.byteLength);
-        handle.flush();
-      } finally {
-        handle.close();
+        await recoverDigest(directory, digest);
+        return;
       }
+
+      const existingPending = await inspectDigestFile(
+        directory,
+        pendingFileName(digest),
+        digest,
+      );
+      if (final.status === "corrupt" && existingPending.status !== "valid") {
+        if (existingPending.status !== "missing") {
+          await removeIfPresent(directory, pendingFileName(digest));
+        }
+        throw new StudioOpfsSyncAccessError(
+          "WRITE_FAILED",
+          "Dry-media CAS found an unproven immutable final blob.",
+        );
+      }
+
+      const pendingBytes = existingPending.status === "valid"
+        ? await flushVerifiedFile(
+            directory,
+            pendingFileName(digest),
+            digest,
+            "staging",
+          )
+        : await ensureVerifiedPending(directory, digest, ownedBytes);
+      if (!bytesEqual(pendingBytes, ownedBytes)) {
+        throw new StudioOpfsSyncAccessError(
+          "WRITE_FAILED",
+          "Dry-media CAS staging digest collision.",
+        );
+      }
+      await promoteVerifiedPending(directory, digest, pendingBytes);
+      await removeIfPresent(directory, pendingFileName(digest));
     });
   }
 
@@ -167,19 +439,15 @@ class StudioDryMediaUnionOpfsCasStore implements StudioFreehandInputBinaryCasSto
   ): Promise<Uint8Array | null> {
     validateDigest(digest);
     return this.#enqueue(async () => {
-      const handle = await openHandle(this.#directories[kind], `${digest}.bin`, false);
-      if (!handle) return null;
-      try {
-        const size = handle.getSize();
-        if (!Number.isSafeInteger(size) || size <= 0 || size > MAX_BLOB_BYTES) {
-          throw new StudioOpfsSyncAccessError("READ_FAILED", "Dry-media CAS size is invalid.");
-        }
-        const bytes = readAll(handle, size);
-        validateDigest(digest, bytes);
-        return bytes;
-      } finally {
-        handle.close();
+      const recovered = await recoverDigest(this.#directories[kind], digest);
+      if (recovered.status === "valid") return recovered.bytes;
+      if (recovered.status === "corrupt") {
+        throw new StudioOpfsSyncAccessError(
+          "READ_FAILED",
+          "Dry-media CAS immutable final blob failed verification.",
+        );
       }
+      return null;
     });
   }
 
@@ -271,6 +539,12 @@ export async function createStudioDryMediaUnionContinuationOpfsCasStore(
     root.getDirectoryHandle("metadata", { create: true }),
     root.getDirectoryHandle("roots", { create: true }),
     root.getDirectoryHandle("staging", { create: true }),
+  ]);
+  await Promise.all([
+    recoverDirectory(page),
+    recoverDirectory(index),
+    recoverDirectory(metadata),
+    recoverDirectory(roots),
   ]);
   return new StudioDryMediaUnionOpfsCasStore({
     directories: { page, index, metadata, root: roots },
