@@ -203,6 +203,7 @@ interface PendingPresentation {
   readonly job: AppendJob;
   readonly frame: StudioDryMediaUnionContinuationFrameReceipt;
   readonly timer: ReturnType<typeof setTimeout>;
+  abort: (error: Error) => void;
   frameOwned: boolean;
 }
 
@@ -897,13 +898,17 @@ export function createStudioDryMediaUnionContinuationWorkerClient(
     job.completion.reject(error);
   };
 
-  const releasePresentation = (): void => {
+  const releasePresentation = (aborted: boolean, abortError: Error | null = null): void => {
     const lease = presenting;
     if (!lease) return;
     clearTimeout(lease.timer);
     if (lease.frameOwned) {
       lease.frameOwned = false;
       closeFrame(lease.frame);
+    }
+    if (aborted && abortError) {
+      lease.abort(abortError);
+      lease.abort = () => undefined;
     }
     presenting = null;
   };
@@ -928,7 +933,7 @@ export function createStudioDryMediaUnionContinuationWorkerClient(
       cancelling.deferred.reject(error);
       cancelling = null;
     }
-    releasePresentation();
+    releasePresentation(true, error);
     rejectAppend(inflight, error);
     rejectAppend(queued, error);
     inflight = null;
@@ -984,7 +989,11 @@ export function createStudioDryMediaUnionContinuationWorkerClient(
     ]);
     transferCount += transfer.length;
     job.timer = timeout("studio-dry-media-continuation-append-timeout");
-    if (post(request, transfer)) job.pages = null;
+    if (!post(request, transfer)) {
+      poison("studio-dry-media-union-continuation-append-post-failed");
+      return;
+    }
+    job.pages = null;
   };
 
   const handleReady = (response: Record<string, unknown>): void => {
@@ -1067,7 +1076,7 @@ export function createStudioDryMediaUnionContinuationWorkerClient(
       || exact.inflightByteLength !== 0
     ) {
       closePotentialFrame(response);
-      poison("studio-dry-media-continuation-append-mismatch");
+      poison("studio-dry-media-union-continuation-append-mismatch");
       return;
     }
     const frame = snapshotFrame(exact.frame, {
@@ -1081,7 +1090,7 @@ export function createStudioDryMediaUnionContinuationWorkerClient(
     });
     if (!frame) {
       closePotentialFrame(response);
-      poison("studio-dry-media-continuation-frame-mismatch");
+      poison("studio-dry-media-union-continuation-frame-mismatch");
       return;
     }
     if (job.timer) clearTimeout(job.timer);
@@ -1089,29 +1098,65 @@ export function createStudioDryMediaUnionContinuationWorkerClient(
     admittedSequence = job.sequence;
     admittedGroupCount = job.firstGroupIndex + job.groupCount;
     admittedPageCount = job.firstPageIndex + job.pageCount;
-    presenting = {
+    let rejectPresentation: (error: Error) => void = () => undefined;
+    const timer = setTimeout(() => {
+      rejectPresentation(new Error("studio-dry-media-union-continuation-presentation-timeout"));
+    }, safeTimeoutMilliseconds);
+    const presentationLease: PendingPresentation = {
       job,
       frame,
       frameOwned: true,
-      timer: timeout("studio-dry-media-continuation-presentation-timeout"),
+      timer,
+      abort: (error) => {
+        rejectPresentation(error);
+      },
     };
+    presenting = presentationLease;
+    const presentation = new Promise<StudioDryMediaUnionContinuationPresentationAck>((resolve, reject) => {
+      rejectPresentation = reject;
+      onFrame(frame).then(
+        (ack) => {
+          clearTimeout(timer);
+          resolve(ack);
+        },
+        (error) => {
+          clearTimeout(timer);
+          reject(error instanceof Error
+            ? error
+            : new Error("studio-dry-media-union-continuation-frame-observer-failed"));
+        },
+      );
+    });
     let acknowledgementCandidate: unknown;
     try {
-      acknowledgementCandidate = await onFrame(frame);
+      acknowledgementCandidate = await presentation;
     } catch (error) {
+      releasePresentation(true, error instanceof Error
+        ? error
+        : new Error("studio-dry-media-union-continuation-frame-observer-failed"));
       poison(error instanceof Error
         ? error.message
-        : "studio-dry-media-continuation-frame-observer-failed");
+        : "studio-dry-media-union-continuation-frame-observer-failed");
       return;
     }
     if (state !== "ready" || inflight !== job || presenting?.job !== job) {
-      releasePresentation();
+      const error = new Error("studio-dry-media-continuation-frame-state-race");
+      queuePhysicalPageByteLength = Math.max(
+        0,
+        queuePhysicalPageByteLength - job.physicalPageByteLength,
+      );
+      releasePresentation(true, error);
+      if (inflight === job) {
+        inflight = null;
+        rejectAppend(job, error);
+      }
+      pump();
       return;
     }
     const presentationAck = snapshotPresentationAck(acknowledgementCandidate, frame);
     if (!presentationAck) {
-      releasePresentation();
-      poison("studio-dry-media-continuation-frame-not-presented");
+      releasePresentation(true, new Error("studio-dry-media-continuation-frame-not-presented"));
+      poison("studio-dry-media-union-continuation-frame-not-presented");
       return;
     }
     presentedSequence = job.sequence;
@@ -1121,9 +1166,7 @@ export function createStudioDryMediaUnionContinuationWorkerClient(
       0,
       queuePhysicalPageByteLength - job.physicalPageByteLength,
     );
-    clearTimeout(presenting.timer);
-    presenting.frameOwned = false;
-    presenting = null;
+    releasePresentation(false);
     inflight = null;
     job.completion.resolve(undefined);
     pump();
@@ -1347,7 +1390,11 @@ export function createStudioDryMediaUnionContinuationWorkerClient(
         color: input.color,
         scratchReservation: token,
       };
-      post(request);
+      if (!post(request)) {
+        const error = new Error("studio-dry-media-union-continuation-begin-post-failed");
+        poison(error.message);
+        return pending.promise;
+      }
       return pending.promise;
     },
     tryAppend(marks, cursorCandidate) {
@@ -1489,14 +1536,18 @@ export function createStudioDryMediaUnionContinuationWorkerClient(
         deferred: pending,
         timer: timeout("studio-dry-media-continuation-seal-timeout"),
       };
-      post({
+      if (!post({
         type: "studio-dry-media-union/seal",
         version: STUDIO_DRY_MEDIA_UNION_CONTINUATION_PROTOCOL_VERSION,
         workerGeneration: generation,
         requestId,
         strokeId: strokeId!,
         sequence: presentedSequence,
-      });
+      })) {
+        const error = new Error("studio-dry-media-union-continuation-seal-post-failed");
+        poison(error.message);
+        return pending.promise;
+      }
       return pending.promise;
     },
     cancel() {
@@ -1512,7 +1563,10 @@ export function createStudioDryMediaUnionContinuationWorkerClient(
           beginning.deferred.reject(new Error(terminalReason));
           beginning = null;
         }
-        releasePresentation();
+        releasePresentation(
+          true,
+          new Error(terminalReason ?? "studio-dry-media-continuation-cancelled"),
+        );
         rejectAppend(inflight, new Error(terminalReason));
         rejectAppend(queued, new Error(terminalReason));
         inflight = null;
@@ -1540,13 +1594,17 @@ export function createStudioDryMediaUnionContinuationWorkerClient(
         deferred: pending,
         timer: timeout("studio-dry-media-continuation-cancel-timeout"),
       };
-      post({
+      if (!post({
         type: "studio-dry-media-union/cancel",
         version: STUDIO_DRY_MEDIA_UNION_CONTINUATION_PROTOCOL_VERSION,
         workerGeneration: generation,
         requestId,
         strokeId: strokeId!,
-      });
+      })) {
+        const error = new Error("studio-dry-media-union-continuation-cancel-post-failed");
+        poison(error.message);
+        return pending.promise;
+      }
       return pending.promise;
     },
     dispose() {
@@ -1568,7 +1626,7 @@ export function createStudioDryMediaUnionContinuationWorkerClient(
         cancelling.deferred.reject(error);
         cancelling = null;
       }
-      releasePresentation();
+      releasePresentation(true, new Error("studio-dry-media-continuation-disposed"));
       rejectAppend(inflight, error);
       rejectAppend(queued, error);
       inflight = null;
