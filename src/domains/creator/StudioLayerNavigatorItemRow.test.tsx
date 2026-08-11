@@ -85,6 +85,41 @@ function renderRow(props: StudioLayerNavigatorItemRowProps) {
 afterEach(cleanup);
 
 describe("StudioLayerNavigatorItemRow", () => {
+  it("renders a live ownership badge and blocks peer-held controls", () => {
+    renderRow(
+      rowProps({
+        liveOwnership: {
+          kind: "peer",
+          resource: "element:page-1:line-art",
+          ownerSessionId: "peer-1",
+          ownerDisplayName: "민수",
+          ownerColor: "#4f8cff",
+          statusLabel: "민수 · 편집 중",
+          blocksLocalEdit: true,
+        },
+      })
+    );
+
+    const treeItem = screen.getByRole("treeitem");
+    expect(treeItem.getAttribute("data-studio-live-ownership")).toBe("peer");
+    expect(treeItem.getAttribute("data-studio-live-ownership-blocked")).toBe(
+      "true"
+    );
+    expect(treeItem.getAttribute("aria-label") ?? "").toMatch(/민수 · 편집 중/);
+
+    const badge = document.querySelector(
+      '[data-studio-live-ownership-badge="peer"]'
+    );
+    expect(badge).not.toBeNull();
+    expect(badge?.getAttribute("title")).toBe("민수 · 편집 중");
+    expect(badge?.textContent).toContain("민");
+
+    const lockButton = screen.getByRole("button", {
+      name: /민수 · 편집 중|다른 참가자가 편집 중/,
+    });
+    expect((lockButton as HTMLButtonElement).disabled).toBe(true);
+  });
+
   it("renders selected, read-only, group/local-hidden, metadata, mask, and rename state", () => {
     const statusLabel = studioLayerNavigatorItemStatusLabel({
       item: ITEM,

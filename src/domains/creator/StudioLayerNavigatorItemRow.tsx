@@ -45,6 +45,8 @@ import {
 } from "./studio-layer-palette-visual";
 import { StudioInlineScrubber } from "./StudioInlineScrubber";
 
+import type { StudioLiveLayerOwnership } from "./studio-live-layer-ownership";
+
 import { cn } from "@/lib/utils";
 
 const COLOR_DOT_CLASS: Record<StudioLayerColor, string> = {
@@ -124,6 +126,11 @@ export interface StudioLayerNavigatorItemRowProps {
   actionOpen: boolean;
   actionPopoverId: string;
   stableHandlers: LayerNavigatorRowHandlers;
+  /**
+   * Live collaboration ownership for this layer. Null/undefined when free or offline.
+   * Peer ownership blocks local opacity/lock controls until the lease ends.
+   */
+  liveOwnership?: StudioLiveLayerOwnership | null;
 }
 
 /**
@@ -154,10 +161,17 @@ export const StudioLayerNavigatorItemRow = memo(
     actionOpen,
     actionPopoverId,
     stableHandlers,
+    liveOwnership = null,
   }: StudioLayerNavigatorItemRowProps) {
     const Icon = STUDIO_LAYER_NAVIGATOR_KIND_ICONS[kind];
+    const peerBlocked = liveOwnership?.blocksLocalEdit === true;
+    const liveStatusLabel =
+      liveOwnership && liveOwnership.kind !== "free"
+        ? liveOwnership.statusLabel
+        : null;
     const displayedStatusLabel = [
       statusLabel || null,
+      liveStatusLabel,
       locallyHidden ? "나만 숨김" : null,
     ]
       .filter(Boolean)
@@ -179,7 +193,7 @@ export const StudioLayerNavigatorItemRow = memo(
     const statuses = buildStudioLayerPaletteStatuses({
       effectivelyHidden,
       locallyHidden,
-      effectivelyLocked,
+      effectivelyLocked: effectivelyLocked || peerBlocked,
       fillReference: item.fillReference,
       masked: item.masked,
       maskEnabled: item.maskEnabled,
@@ -189,10 +203,20 @@ export const StudioLayerNavigatorItemRow = memo(
       animated: item.animated,
     });
     const visibleStatuses = visibleStudioLayerPaletteStatuses(statuses);
-    const statusSummary = statuses.map((status) => status.label).join(", ");
+    const statusSummary = [
+      ...statuses.map((status) => status.label),
+      liveStatusLabel,
+    ]
+      .filter(Boolean)
+      .join(", ");
     const committedOpacityPercent = Math.round(
       Math.min(1, Math.max(0, item.opacity ?? 1)) * 100
     );
+    const liveOwnerInitial =
+      liveOwnership?.ownerDisplayName?.trim().charAt(0) ||
+      (liveOwnership?.kind === "self" ? "나" : "·");
+    const showLiveOwnershipBadge =
+      liveOwnership != null && liveOwnership.kind !== "free";
     // One scrub gesture must be one undo step. The scrubber previews into this draft while the
     // pointer is down (or an arrow run is still going) and hands the settled value to the
     // document exactly once, so the history stack gets one entry instead of one per 1%.
@@ -230,6 +254,10 @@ export const StudioLayerNavigatorItemRow = memo(
           data-studio-layer-selected={selected ? "true" : "false"}
           data-studio-layer-selection-state={selectionState}
           data-studio-layer-local-hidden={locallyHidden ? "true" : "false"}
+          data-studio-live-ownership={
+            showLiveOwnershipBadge ? liveOwnership!.kind : "free"
+          }
+          data-studio-live-ownership-blocked={peerBlocked ? "true" : "false"}
         >
           <span
             aria-hidden
@@ -307,6 +335,24 @@ export const StudioLayerNavigatorItemRow = memo(
               </span>
             </span>
           </span>
+          {showLiveOwnershipBadge ? (
+            <span
+              data-studio-live-ownership-badge={liveOwnership!.kind}
+              title={liveStatusLabel ?? undefined}
+              aria-label={liveStatusLabel ?? "협업 편집 상태"}
+              className={cn(
+                "grid size-5 shrink-0 place-items-center rounded-full border text-[0.58rem] font-bold leading-none text-white shadow-sm",
+                peerBlocked
+                  ? "border-white/25 ring-1 ring-bad/40"
+                  : "border-white/20 ring-1 ring-good/35"
+              )}
+              style={{
+                backgroundColor: liveOwnership!.ownerColor ?? "oklch(0.45 0.04 260)",
+              }}
+            >
+              <span aria-hidden>{liveOwnerInitial}</span>
+            </span>
+          ) : null}
           {visibleStatuses.visible.length > 0 ? (
             <span
               data-studio-layer-status-strip="true"
@@ -384,28 +430,36 @@ export const StudioLayerNavigatorItemRow = memo(
               event.stopPropagation();
               stableHandlers.onToggleItemLocked(item.id, !item.locked);
             }}
-            disabled={readOnly || lockedByGroup}
-            aria-pressed={effectivelyLocked}
+            disabled={readOnly || lockedByGroup || peerBlocked}
+            aria-pressed={effectivelyLocked || peerBlocked}
             className={cn(
               "grid size-7 shrink-0 place-items-center rounded transition-colors hover:bg-raised hover:text-fg disabled:opacity-35",
-              effectivelyLocked ? "text-accent" : "text-fg-3",
+              effectivelyLocked || peerBlocked ? "text-accent" : "text-fg-3",
               STUDIO_LAYER_NAVIGATOR_COARSE_TARGET,
               STUDIO_LAYER_NAVIGATOR_FOCUS_RING
             )}
             aria-label={
-              lockedByGroup
-                ? `${item.label}, 그룹에서 잠김`
-                : item.locked
-                  ? `${item.label} 잠금 해제`
-                  : `${item.label} 잠금`
+              peerBlocked
+                ? `${item.label}, ${liveStatusLabel ?? "다른 참가자가 편집 중"}`
+                : lockedByGroup
+                  ? `${item.label}, 그룹에서 잠김`
+                  : item.locked
+                    ? `${item.label} 잠금 해제`
+                    : `${item.label} 잠금`
             }
             title={
-              lockedByGroup
-                ? "상위 그룹이 잠겨 있어 그룹 잠금을 먼저 해제해야 해요"
-                : undefined
+              peerBlocked
+                ? (liveStatusLabel ?? "다른 참가자가 편집 중이에요")
+                : lockedByGroup
+                  ? "상위 그룹이 잠겨 있어 그룹 잠금을 먼저 해제해야 해요"
+                  : undefined
             }
           >
-            {effectivelyLocked ? <Lock size={13} /> : <LockOpen size={13} />}
+            {effectivelyLocked || peerBlocked ? (
+              <Lock size={13} />
+            ) : (
+              <LockOpen size={13} />
+            )}
           </button>
           <StudioInlineScrubber
             surface="layer-opacity"
@@ -417,7 +471,7 @@ export const StudioLayerNavigatorItemRow = memo(
             max={100}
             step={1}
             valueText={`${opacityPercent}%`}
-            disabled={readOnly || effectivelyLocked}
+            disabled={readOnly || effectivelyLocked || peerBlocked}
             onChange={setOpacityDraft}
             onCommit={(next) => {
               // Clearing the draft in the same batch as the mutation means a rejected commit

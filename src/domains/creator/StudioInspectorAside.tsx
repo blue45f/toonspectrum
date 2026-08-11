@@ -4045,6 +4045,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                   groups={masterEditMode ? [] : groups}
                   selectedIds={marqueeIds.length > 0 ? marqueeIds : selectedId ? [selectedId] : []}
                   pageKey={`${masterEditMode ? "master" : currentPageId}:${inspectorLayout.primary}`}
+                  livePageId={masterEditMode ? null : currentPageId}
                   readOnly={inspectorInteractionPolicy.global.disabled}
                   groupingDisabled={masterEditMode}
                   localHiddenIds={localHiddenElementIds}

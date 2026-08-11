@@ -69,11 +69,13 @@ const EPSILON = 1e-8;
  * - screentone/crosshatch are canvas-global pattern masks. Pressure-dependent dots would move or
  *   resize the lattice and make overlapping strokes visibly break the tone.
  * - milli-pen-uniform explicitly promises an even technical-liner width in its catalogue hint.
+ * - web-pressure-flat is the assist-kit flat-pressure control brush (no pressure mappings).
  */
 const INTENTIONAL_FIXED_PRESSURE_BRUSH_IDS = new Set([
   "screentone",
   "crosshatch",
   "milli-pen-uniform",
+  "web-pressure-flat",
 ]);
 
 interface PressureProbe {
@@ -391,7 +393,7 @@ describe("complete-catalogue hardware-pressure planner proxy", () => {
     expect(responsiveIds).toHaveLength(expectedResponsiveIds.length);
   });
 
-  it("proves the three intentional fixed-pressure exceptions rather than silently ignoring input", () => {
+  it("proves the intentional fixed-pressure exceptions rather than silently ignoring input", () => {
     const probes = new Map(allPressureProbes().map((probe) => [probe.id, probe]));
     const screenToneContract = resolveStudioBrushRuntimeContract("screentone");
     const crosshatchContract = resolveStudioBrushRuntimeContract("crosshatch");
@@ -424,7 +426,7 @@ describe("complete-catalogue hardware-pressure planner proxy", () => {
     }
   });
 
-  it("detects no accidental planner-proxy invariant outside the three intentional exceptions", () => {
+  it("detects no accidental planner-proxy invariant outside the intentional exceptions", () => {
     const observed = allPressureProbes()
       .filter(({ id, low, high }) => (
         !INTENTIONAL_FIXED_PRESSURE_BRUSH_IDS.has(id)

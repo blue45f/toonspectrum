@@ -67,6 +67,11 @@ import {
   STUDIO_LAYER_NAVIGATOR_KIND_ICONS as KIND_ICONS,
   studioLayerNavigatorItemStatusLabel as itemStatusLabel,
 } from "./studio-layer-navigator-row-ui";
+import { useStudioLiveCollaboration } from "./studio-live-collaboration-context";
+import {
+  buildStudioLiveLayerOwnershipByItemId,
+  type StudioLiveLayerOwnership,
+} from "./studio-live-layer-ownership";
 import { useStudioStableHandlers } from "./studio-stable-handlers";
 import {
   StudioLayerNavigatorItemRow as LayerNavigatorItemRow,
@@ -77,6 +82,11 @@ import { StudioToolHintTarget } from "./StudioToolHint";
 import type { LayerGroup } from "./studio-layers";
 
 import { cn } from "@/lib/utils";
+
+const EMPTY_LIVE_LAYER_OWNERSHIP_BY_ITEM_ID: ReadonlyMap<
+  string,
+  StudioLiveLayerOwnership
+> = new Map();
 
 export type StudioLayerNavigatorItemFlag = "alphaLocked" | "fillReference" | "maskEnabled";
 
@@ -126,6 +136,11 @@ export interface StudioLayerNavigatorProps {
   selectedIds: readonly string[];
   /** 페이지가 바뀔 때 포커스·범위 anchor·임시 편집만 초기화한다. 검색 필터는 작업공간 상태로 유지한다. */
   pageKey: string;
+  /**
+   * Active page id for live collaboration lock projection. When omitted (or room idle),
+   * ownership badges stay off so solo editing stays allocation-light.
+   */
+  livePageId?: string | null;
   readOnly?: boolean;
   /** 마스터 레이어처럼 그룹 데이터 모델을 지원하지 않는 작업면에서 그룹 생성·배정·해제·이동만 잠근다. */
   groupingDisabled?: boolean;
@@ -219,6 +234,7 @@ export function StudioLayerNavigator({
   groups,
   selectedIds,
   pageKey,
+  livePageId = null,
   readOnly = false,
   groupingDisabled = false,
   localHiddenIds,
@@ -228,6 +244,16 @@ export function StudioLayerNavigator({
   onSelectionChange,
   onAction,
 }: StudioLayerNavigatorProps) {
+  const live = useStudioLiveCollaboration();
+  const liveOwnershipByItemId =
+    live.room && livePageId
+      ? buildStudioLiveLayerOwnershipByItemId({
+          pageId: livePageId,
+          elementIds: items.map((item) => item.id),
+          locks: live.locks,
+          selfSessionId: live.room.participant.sessionId,
+        })
+      : EMPTY_LIVE_LAYER_OWNERSHIP_BY_ITEM_ID;
   const filterPanelId = useId();
   const actionPopoverId = useId();
   const resultStatusId = useId();
@@ -769,6 +795,7 @@ export function StudioLayerNavigator({
   function renderItemRow(entry: StudioLayerNavigatorResult, key: string, level: number) {
     const item = entry.item;
     const editing = renameTarget?.kind === "item" && renameTarget.id === item.id;
+    const liveOwnership = liveOwnershipByItemId.get(item.id) ?? null;
     return (
       <LayerNavigatorItemRow
         key={key}
@@ -793,6 +820,7 @@ export function StudioLayerNavigator({
         actionOpen={actionTarget?.kind === "item" && actionTarget.id === item.id}
         actionPopoverId={actionPopoverId}
         stableHandlers={rowHandlers}
+        liveOwnership={liveOwnership}
       />
     );
   }
