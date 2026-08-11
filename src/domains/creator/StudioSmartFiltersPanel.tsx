@@ -14,7 +14,7 @@ import { useId, useState } from "react";
 import {
   STUDIO_ADJUSTMENT_ADDABLE_ENGINE_IDS,
   STUDIO_ADJUSTMENT_ENGINE_IDS,
-  STUDIO_ADJUSTMENT_STACK_MAX_ENTRIES,
+  admitStudioAdjustmentStack,
   appendStudioAdjustmentEntry,
   normalizeStudioAdjustmentStack,
   removeStudioAdjustmentEntry,
@@ -624,14 +624,14 @@ export function StudioSmartFiltersPanel({
   const [query, setQuery] = useState("");
   const current = normalizeStudioAdjustmentStack(stack);
   const visibleCatalog = searchStudioFilterCatalog(query, STUDIO_ADJUSTMENT_ADDABLE_ENGINE_IDS);
-  const stackFull = current.entries.length >= STUDIO_ADJUSTMENT_STACK_MAX_ENTRIES;
 
   function patch(next: StudioAdjustmentStack) {
-    onChange(normalizeStudioAdjustmentStack(next));
+    const receipt = admitStudioAdjustmentStack(next, current);
+    onChange(receipt.stack);
   }
 
   function addEngine(engine: StudioAdjustmentEngineId) {
-    if (!STUDIO_ADJUSTMENT_ENGINE_IDS.includes(engine) || stackFull) return;
+    if (!STUDIO_ADJUSTMENT_ENGINE_IDS.includes(engine)) return;
     patch(appendStudioAdjustmentEntry(current, {
       engine,
       params: studioAdjustmentDefaultParams(engine),
@@ -656,7 +656,7 @@ export function StudioSmartFiltersPanel({
           </p>
         </div>
         <span className="shrink-0 rounded-lg border border-line bg-card px-2 py-1 text-[0.6rem] tabular-nums text-fg-3">
-          {current.entries.length}/{STUDIO_ADJUSTMENT_STACK_MAX_ENTRIES}
+          {current.entries.length}개
         </span>
       </div>
 
@@ -686,7 +686,6 @@ export function StudioSmartFiltersPanel({
 
         <p className="mt-2 text-[0.58rem] text-fg-3" role="status" aria-live="polite">
           {query ? `검색 결과 ${visibleCatalog.length}개` : `사용 가능한 필터 ${visibleCatalog.length}개`}
-          {stackFull ? " · 스택이 가득 찼습니다" : ""}
         </p>
 
         <div className="mt-2 max-h-72 space-y-2.5 overflow-y-auto overscroll-contain pr-0.5 [scrollbar-width:thin]">
@@ -712,7 +711,6 @@ export function StudioSmartFiltersPanel({
                     >
                       <button
                         type="button"
-                        disabled={stackFull}
                         onClick={() => addEngine(entry.engine as StudioAdjustmentEngineId)}
                         className={cn(
                           "inline-flex min-h-10 items-center gap-1 rounded-lg border border-line/70 bg-canvas/50 px-2.5 text-[0.62rem] font-bold text-fg-2 pointer-coarse:min-h-11",

@@ -43,6 +43,26 @@ describe("StudioSmartFiltersPanel", () => {
     expect(html).toContain("색상 투명화");
   });
 
+  it("keeps the catalog available after more than 100 stack entries", () => {
+    const html = renderToStaticMarkup(
+      <StudioSmartFiltersPanel
+        stack={{
+          version: 1,
+          entries: Array.from({ length: 101 }, (_, index) => ({
+            id: `invert-${index}`,
+            engine: "invert" as const,
+            enabled: true,
+            params: {},
+          })),
+        }}
+        onChange={vi.fn()}
+      />,
+    );
+    expect(html).toContain("101개");
+    expect(html).not.toContain("스택이 가득 찼습니다");
+    expect(html).toContain("사용 가능한 필터 60개");
+  });
+
   it("renders bounded controls for all advanced blur engines", () => {
     const html = renderToStaticMarkup(
       <StudioSmartFiltersPanel

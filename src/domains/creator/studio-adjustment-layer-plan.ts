@@ -1,9 +1,10 @@
 import {
   STUDIO_ADJUSTMENT_ENGINE_IDS,
-  STUDIO_ADJUSTMENT_STACK_MAX_ENTRIES,
+  STUDIO_ADJUSTMENT_STACK_MAX_SERIALIZED_BYTES,
   STUDIO_ADJUSTMENT_STACK_VERSION,
   listEnabledStudioAdjustmentOperations,
   normalizeStudioAdjustmentStack,
+  studioAdjustmentStackSerializedByteLength,
   type StudioAdjustmentFilterOperation,
   type StudioAdjustmentStack,
 } from "./studio-adjustment-stack";
@@ -259,11 +260,11 @@ function requireDynamicRecord(
 
 function requireArray(
   value: unknown,
-  maxLength: number,
+  maxLength: number | null,
   path: string,
   code: StudioAdjustmentLayerErrorCode = "LIMIT_EXCEEDED",
 ): readonly unknown[] {
-  if (!Array.isArray(value) || value.length > maxLength) {
+  if (!Array.isArray(value) || (maxLength !== null && value.length > maxLength)) {
     fail(code, "Array is invalid or exceeds its budget.", path);
   }
   for (const key of Reflect.ownKeys(value)) {
@@ -364,10 +365,15 @@ function normalizeStack(value: unknown, path: string): StudioAdjustmentStack {
   }
   const rawEntries = requireArray(
     stack.entries,
-    STUDIO_ADJUSTMENT_STACK_MAX_ENTRIES,
+    null,
     `${path}.entries`,
     "INVALID_STACK",
   );
+  // A canonical valid entry cannot serialize below 32 bytes. This byte-derived lower-bound check
+  // rejects hostile arrays before allocating/map traversal without reintroducing a product count.
+  if (rawEntries.length * 32 > STUDIO_ADJUSTMENT_STACK_MAX_SERIALIZED_BYTES) {
+    fail("LIMIT_EXCEEDED", "Adjustment stack serialized-byte budget exceeded.", `${path}.entries`);
+  }
   const ids = new Set<string>();
   const entries = rawEntries.map((rawEntry, index) => {
     const entryPath = `${path}.entries[${index}]`;
@@ -393,10 +399,17 @@ function normalizeStack(value: unknown, path: string): StudioAdjustmentStack {
       params: normalizeParams(entry.params, `${entryPath}.params`),
     });
   });
-  return Object.freeze({
+  const normalized = Object.freeze({
     version: STUDIO_ADJUSTMENT_STACK_VERSION,
     entries: Object.freeze(entries),
   }) as StudioAdjustmentStack;
+  if (
+    studioAdjustmentStackSerializedByteLength(normalized)
+    > STUDIO_ADJUSTMENT_STACK_MAX_SERIALIZED_BYTES
+  ) {
+    fail("LIMIT_EXCEEDED", "Adjustment stack serialized-byte budget exceeded.", path);
+  }
+  return normalized;
 }
 
 function normalizeGroup(value: unknown, path: string): StudioAdjustmentLayerGroup {

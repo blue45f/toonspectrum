@@ -16,7 +16,6 @@ import {
   type StudioAdjustmentLayerRenderKind,
 } from "./studio-adjustment-layer-plan";
 import {
-  STUDIO_ADJUSTMENT_STACK_MAX_ENTRIES,
   type StudioAdjustmentEngineId,
   type StudioAdjustmentStack,
 } from "./studio-adjustment-stack";
@@ -392,20 +391,15 @@ describe("studio adjustment-layer compositor plan", () => {
       }),
       "INVALID_STACK",
     );
-    expectLayerError(
-      () => documentWith([
-        adjustment("too.many", 0, {
-          stack: stack(Array.from(
-            { length: STUDIO_ADJUSTMENT_STACK_MAX_ENTRIES + 1 },
-            (_, index) => ({
-              id: `entry.${index}`,
-              engine: "invert",
-            }),
-          )),
-        }),
-      ]),
-      "INVALID_STACK",
-    );
+    const many = documentWith([
+      adjustment("many.entries", 0, {
+        stack: stack(Array.from({ length: 101 }, (_, index) => ({
+          id: `entry.${index}`,
+          engine: "invert",
+        }))),
+      }),
+    ]);
+    expect((many.layers[0] as StudioAdjustmentEffectLayer).stack.entries).toHaveLength(101);
   });
 
   it("rejects accessors and oversized parameter maps instead of silently coercing them", () => {
@@ -432,6 +426,23 @@ describe("studio adjustment-layer compositor plan", () => {
         }],
       }),
       "INVALID_STACK",
+    );
+
+    const heavyParams = Object.fromEntries(Array.from({ length: 64 }, (_, index) => [
+      `field.${index}`,
+      "가".repeat(512),
+    ]));
+    expectLayerError(
+      () => documentWith([
+        adjustment("byte.budget", 0, {
+          stack: stack(Array.from({ length: 20 }, (_, index) => ({
+            id: `heavy.${index}`,
+            engine: "curves",
+            params: heavyParams,
+          }))),
+        }),
+      ]),
+      "LIMIT_EXCEEDED",
     );
 
     const tooManyParams = Object.fromEntries(Array.from(

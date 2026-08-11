@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   STUDIO_ADJUSTMENT_ADDABLE_ENGINE_IDS,
   STUDIO_ADJUSTMENT_ENGINE_IDS,
+  STUDIO_ADJUSTMENT_STACK_MAX_SERIALIZED_BYTES,
+  admitStudioAdjustmentStack,
   appendStudioAdjustmentEntry,
   createEmptyStudioAdjustmentStack,
   listEnabledStudioAdjustmentEngines,
@@ -10,10 +12,12 @@ import {
   removeStudioAdjustmentEntry,
   reorderStudioAdjustmentEntry,
   setStudioAdjustmentEntryEnabled,
+  serializeStudioAdjustmentStack,
   studioAdjustmentDefaultParams,
   studioAdjustmentEngineHasLivePreview,
   studioAdjustmentOperationToFilterFields,
   studioAdjustmentStackHasLivePreview,
+  studioAdjustmentStackSerializedByteLength,
   studioAdjustmentStackToFilterFields,
 } from "./studio-adjustment-stack";
 
@@ -47,6 +51,57 @@ describe("studio adjustment stack", () => {
 
     stack = removeStudioAdjustmentEntry(stack, blurId);
     expect(stack.entries.map((e) => e.engine)).toEqual(["levels"]);
+  });
+
+  it("retains more than 100 entries without a count-based cutoff", () => {
+    let stack = createEmptyStudioAdjustmentStack();
+    for (let index = 0; index < 101; index += 1) {
+      stack = appendStudioAdjustmentEntry(stack, {
+        id: `invert-${index}`,
+        engine: "invert",
+        params: {},
+      });
+    }
+
+    expect(stack.entries).toHaveLength(101);
+    expect(stack.entries.at(-1)?.id).toBe("invert-100");
+    expect(studioAdjustmentStackSerializedByteLength(stack)).toBe(
+      new TextEncoder().encode(serializeStudioAdjustmentStack(stack)).byteLength
+    );
+  });
+
+  it("rejects byte-budget overflow atomically and never invokes accessors", () => {
+    const params = Object.fromEntries(Array.from({ length: 64 }, (_, index) => [
+      `field-${index}`,
+      "가".repeat(128),
+    ]));
+    const oversized = {
+      version: 1,
+      entries: Array.from({ length: 50 }, (_, index) => ({
+        id: `heavy-${index}`,
+        engine: "curves",
+        enabled: true,
+        params,
+      })),
+    };
+    const fallback = createEmptyStudioAdjustmentStack();
+    const receipt = admitStudioAdjustmentStack(oversized, fallback);
+    expect(receipt.status).toBe("serialized-byte-budget-exceeded");
+    expect(receipt.stack).toBe(fallback);
+    expect(receipt.serializedBytes).toBeLessThanOrEqual(STUDIO_ADJUSTMENT_STACK_MAX_SERIALIZED_BYTES);
+
+    let getterCalls = 0;
+    const hostile = Object.defineProperty({ version: 1 }, "entries", {
+      enumerable: true,
+      get() {
+        getterCalls += 1;
+        return [];
+      },
+    });
+    const hostileReceipt = admitStudioAdjustmentStack(hostile, fallback);
+    expect(hostileReceipt.status).toBe("invalid-structure");
+    expect(hostileReceipt.stack).toBe(fallback);
+    expect(getterCalls).toBe(0);
   });
 
   it("projects enabled entries as an ordered program instead of flattening their fields", () => {

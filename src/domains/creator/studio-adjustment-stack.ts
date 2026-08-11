@@ -45,7 +45,15 @@ import type {
 } from "./studio-tone-artifact-filter-kernels";
 
 export const STUDIO_ADJUSTMENT_STACK_VERSION = 1 as const;
-export const STUDIO_ADJUSTMENT_STACK_MAX_ENTRIES = 24;
+/** Canonical metadata budget; filter pixels and other heavy payloads never enter this document. */
+export const STUDIO_ADJUSTMENT_STACK_MAX_SERIALIZED_BYTES = 1 * 1_024 * 1_024;
+
+const TEXT_ENCODER = new TextEncoder();
+const DANGEROUS_KEYS = new Set(["__proto__", "prototype", "constructor"]);
+const SERIALIZED_STACK_PREFIX_BYTES = TEXT_ENCODER.encode("{\"entries\":[").byteLength;
+const SERIALIZED_STACK_SUFFIX_BYTES = TEXT_ENCODER.encode(
+  `],"version":${STUDIO_ADJUSTMENT_STACK_VERSION}}`
+).byteLength;
 
 export const STUDIO_ADJUSTMENT_ENGINE_IDS = [
   "curves",
@@ -291,12 +299,65 @@ export interface StudioAdjustmentStack {
   entries: readonly StudioAdjustmentEntry[];
 }
 
+export type StudioAdjustmentStackAdmissionReceipt = Readonly<{
+  status: "accepted" | "invalid-structure" | "serialized-byte-budget-exceeded";
+  stack: StudioAdjustmentStack;
+  serializedBytes: number;
+  maximumSerializedBytes: number;
+  rejectedIndex: number | null;
+}>;
+
 const ENGINE_SET = new Set<string>(STUDIO_ADJUSTMENT_ENGINE_IDS);
 
 function asRecord(value: unknown): Record<string, unknown> | null {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
+  try {
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && prototype !== null) return null;
+    for (const key of Reflect.ownKeys(value)) {
+      if (typeof key !== "string" || DANGEROUS_KEYS.has(key)) return null;
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (!descriptor || !descriptor.enumerable || !("value" in descriptor)) return null;
+    }
+    return value as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+type DenseDataArrayResult =
+  | Readonly<{ status: "accepted"; values: readonly unknown[] }>
+  | Readonly<{ status: "invalid-structure" | "serialized-byte-budget-exceeded" }>;
+
+function denseDataArray(value: unknown): DenseDataArrayResult {
+  if (!Array.isArray(value)) return { status: "invalid-structure" };
+  const values: unknown[] = [];
+  try {
+    const minimumSerializedBytes = value.length === 0 ? 2 : value.length * 2 + 1;
+    if (minimumSerializedBytes > STUDIO_ADJUSTMENT_STACK_MAX_SERIALIZED_BYTES) {
+      return { status: "serialized-byte-budget-exceeded" };
+    }
+    for (const key of Reflect.ownKeys(value)) {
+      if (key === "length") continue;
+      if (typeof key !== "string" || !/^(?:0|[1-9]\d*)$/u.test(key) || Number(key) >= value.length) {
+        return { status: "invalid-structure" };
+      }
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (!descriptor || !descriptor.enumerable || !("value" in descriptor)) {
+        return { status: "invalid-structure" };
+      }
+    }
+    for (let index = 0; index < value.length; index += 1) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+      if (!descriptor || !descriptor.enumerable || !("value" in descriptor)) {
+        return { status: "invalid-structure" };
+      }
+      values.push(descriptor.value);
+    }
+  } catch {
+    return { status: "invalid-structure" };
+  }
+  return { status: "accepted", values };
 }
 
 function finiteNumber(value: unknown, fallback: number): number {
@@ -307,7 +368,8 @@ function normalizeParams(value: unknown): Record<string, number | string | boole
   const source = asRecord(value);
   if (!source) return {};
   const out: Record<string, number | string | boolean> = {};
-  for (const [key, raw] of Object.entries(source)) {
+  for (const key of Object.keys(source).sort()) {
+    const raw = source[key];
     if (key.length > 48) continue;
     if (typeof raw === "number" && Number.isFinite(raw)) out[key] = raw;
     else if (typeof raw === "boolean") out[key] = raw;
@@ -334,30 +396,110 @@ function normalizeEntry(value: unknown, index: number): StudioAdjustmentEntry | 
   };
 }
 
+function serializeCanonicalParams(params: Readonly<Record<string, number | string | boolean>>): string {
+  return `{${Object.keys(params)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${JSON.stringify(params[key])}`)
+    .join(",")}}`;
+}
+
+function serializeCanonicalEntry(entry: StudioAdjustmentEntry): string {
+  return `{"enabled":${entry.enabled},"engine":${JSON.stringify(entry.engine)},"id":${JSON.stringify(entry.id)},"params":${serializeCanonicalParams(entry.params)}}`;
+}
+
+/** Stable-key-order JSON used by byte admission and equality checks. */
+export function serializeStudioAdjustmentStack(stack: StudioAdjustmentStack): string {
+  return `{"entries":[${stack.entries.map(serializeCanonicalEntry).join(",")}],"version":${STUDIO_ADJUSTMENT_STACK_VERSION}}`;
+}
+
+export function studioAdjustmentStackSerializedByteLength(stack: StudioAdjustmentStack): number {
+  return TEXT_ENCODER.encode(serializeStudioAdjustmentStack(stack)).byteLength;
+}
+
+function serializedStackBytesFromEntries(entryBytes: number, entryCount: number): number {
+  return SERIALIZED_STACK_PREFIX_BYTES
+    + entryBytes
+    + Math.max(0, entryCount - 1)
+    + SERIALIZED_STACK_SUFFIX_BYTES;
+}
+
 export function createEmptyStudioAdjustmentStack(): StudioAdjustmentStack {
   return { version: STUDIO_ADJUSTMENT_STACK_VERSION, entries: [] };
 }
 
-export function normalizeStudioAdjustmentStack(value?: unknown): StudioAdjustmentStack {
+/**
+ * Iteratively admits normalized entries against the canonical UTF-8 budget. On failure, callers
+ * receive their supplied fallback unchanged; no count-based prefix is silently persisted.
+ */
+export function admitStudioAdjustmentStack(
+  value: unknown,
+  fallback: StudioAdjustmentStack = createEmptyStudioAdjustmentStack()
+): StudioAdjustmentStackAdmissionReceipt {
   const source = asRecord(value);
-  if (!source) return createEmptyStudioAdjustmentStack();
-  const list = Array.isArray(source.entries) ? source.entries : Array.isArray(value) ? value : [];
+  if (!source) {
+    const stack = value === null || value === undefined ? createEmptyStudioAdjustmentStack() : fallback;
+    return {
+      status: value === null || value === undefined ? "accepted" : "invalid-structure",
+      stack,
+      serializedBytes: studioAdjustmentStackSerializedByteLength(stack),
+      maximumSerializedBytes: STUDIO_ADJUSTMENT_STACK_MAX_SERIALIZED_BYTES,
+      rejectedIndex: null,
+    };
+  }
+  const entriesValue = Object.hasOwn(source, "entries") ? source.entries : [];
+  const arrayReceipt = denseDataArray(entriesValue);
+  if (arrayReceipt.status !== "accepted") {
+    return {
+      status: arrayReceipt.status,
+      stack: fallback,
+      serializedBytes: studioAdjustmentStackSerializedByteLength(fallback),
+      maximumSerializedBytes: STUDIO_ADJUSTMENT_STACK_MAX_SERIALIZED_BYTES,
+      rejectedIndex: null,
+    };
+  }
+  const list = arrayReceipt.values;
   const entries: StudioAdjustmentEntry[] = [];
   const seen = new Set<string>();
-  for (let index = 0; index < list.length && entries.length < STUDIO_ADJUSTMENT_STACK_MAX_ENTRIES; index += 1) {
+  let entryBytes = 0;
+  for (let index = 0; index < list.length; index += 1) {
     const entry = normalizeEntry(list[index], index);
     if (!entry) continue;
     let id = entry.id;
     if (seen.has(id)) id = `${id}-${index}`;
+    const admittedEntry = { ...entry, id };
+    const nextEntryBytes = entryBytes
+      + TEXT_ENCODER.encode(serializeCanonicalEntry(admittedEntry)).byteLength;
+    const nextSerializedBytes = serializedStackBytesFromEntries(nextEntryBytes, entries.length + 1);
+    if (nextSerializedBytes > STUDIO_ADJUSTMENT_STACK_MAX_SERIALIZED_BYTES) {
+      return {
+        status: "serialized-byte-budget-exceeded",
+        stack: fallback,
+        serializedBytes: studioAdjustmentStackSerializedByteLength(fallback),
+        maximumSerializedBytes: STUDIO_ADJUSTMENT_STACK_MAX_SERIALIZED_BYTES,
+        rejectedIndex: index,
+      };
+    }
     seen.add(id);
-    entries.push({ ...entry, id });
+    entries.push(admittedEntry);
+    entryBytes = nextEntryBytes;
   }
-  return { version: STUDIO_ADJUSTMENT_STACK_VERSION, entries };
+  const stack = { version: STUDIO_ADJUSTMENT_STACK_VERSION, entries } as const;
+  return {
+    status: "accepted",
+    stack,
+    serializedBytes: serializedStackBytesFromEntries(entryBytes, entries.length),
+    maximumSerializedBytes: STUDIO_ADJUSTMENT_STACK_MAX_SERIALIZED_BYTES,
+    rejectedIndex: null,
+  };
+}
+
+export function normalizeStudioAdjustmentStack(value?: unknown): StudioAdjustmentStack {
+  return admitStudioAdjustmentStack(value).stack;
 }
 
 export function studioAdjustmentStackEqual(left?: unknown, right?: unknown): boolean {
-  return JSON.stringify(normalizeStudioAdjustmentStack(left))
-    === JSON.stringify(normalizeStudioAdjustmentStack(right));
+  return serializeStudioAdjustmentStack(normalizeStudioAdjustmentStack(left))
+    === serializeStudioAdjustmentStack(normalizeStudioAdjustmentStack(right));
 }
 
 export function appendStudioAdjustmentEntry(
@@ -365,7 +507,6 @@ export function appendStudioAdjustmentEntry(
   entry: Partial<StudioAdjustmentEntry> & { engine: StudioAdjustmentEngineId }
 ): StudioAdjustmentStack {
   const current = normalizeStudioAdjustmentStack(stack);
-  if (current.entries.length >= STUDIO_ADJUSTMENT_STACK_MAX_ENTRIES) return current;
   const next = normalizeEntry(
     {
       id: entry.id,
@@ -376,9 +517,9 @@ export function appendStudioAdjustmentEntry(
     current.entries.length
   );
   if (!next) return current;
-  return normalizeStudioAdjustmentStack({
+  return admitStudioAdjustmentStack({
     entries: [...current.entries, next],
-  });
+  }, current).stack;
 }
 
 export function reorderStudioAdjustmentEntry(
