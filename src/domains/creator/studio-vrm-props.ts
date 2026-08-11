@@ -195,6 +195,10 @@ const VRM_PROP_BASES = [
   { id: "blender_holo_tablet", label: "블렌더 홀로 태블릿", category: "hand", defaultBone: "leftHand", defaultPosition: [0, 0.02, 0.02], defaultRotationDeg: [45, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 발광 홀로그램 태블릿." },
   { id: "blender_rune_shield", label: "블렌더 룬 방패", category: "hand", defaultBone: "leftHand", defaultPosition: [0.05, 0, 0], defaultRotationDeg: [0, 90, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 룬문자 마법 방패." },
   { id: "blender_arcade_cabinet", label: "블렌더 아케이드 게임기", category: "body", defaultBone: "hips", defaultPosition: [0, -0.85, -0.2], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 레트로 아케이드 캐비닛." },
+  { id: "blender_medieval_greatsword", label: "블렌더 중세 룬 그레이트소드", category: "hand", defaultBone: "rightHand", defaultPosition: [0, 0, 0], defaultRotationDeg: [0, 0, -90], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 룬 대검." },
+  { id: "blender_cyber_hoverbike", label: "블렌더 SF 호버바이크", category: "body", defaultBone: "hips", defaultPosition: [0, -0.5, 0], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 사이버 호버바이크." },
+  { id: "blender_magic_chest", label: "블렌더 마법 보물상자", category: "body", defaultBone: "hips", defaultPosition: [0, -0.7, 0.3], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 발광 보물상자." },
+  { id: "blender_modern_smartphone", label: "블렌더 모던 스마트폰", category: "hand", defaultBone: "rightHand", defaultPosition: [0, 0.01, 0.01], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 슬림 스마트폰." },
 ] as const satisfies readonly LegacyPropDef[];
 
 export type VrmPropId = (typeof VRM_PROP_BASES)[number]["id"];
@@ -466,6 +470,24 @@ const PROP_PROFILES: Record<VrmPropId, PropProfile> = {
   blender_arcade_cabinet: {
     anchors: [anchor("surface", "surface", [0, 0.85, 0])],
     fit: fit("avatarHeight", 1.65, 0.7, 1.5),
+  },
+  blender_medieval_greatsword: {
+    anchors: [handAnchor("primary", "primary", [0, 0.15, 0], 0.015)],
+    grip: grip("cylinder", 0.015, 82, 60),
+    fit: fit("avatarHeight", 1.65, 0.8, 1.4),
+  },
+  blender_cyber_hoverbike: {
+    anchors: [anchor("seat", "surface", [0, 0.45, 0])],
+    fit: fit("avatarHeight", 1.65, 0.8, 1.5),
+  },
+  blender_magic_chest: {
+    anchors: [anchor("surface", "surface", [0, 0.35, 0])],
+    fit: fit("avatarHeight", 1.65, 0.7, 1.4),
+  },
+  blender_modern_smartphone: {
+    anchors: [handAnchor("primary", "primary", [0, 0, 0], 0.009)],
+    grip: grip("flat", 0.009, 38, 34),
+    fit: fit("hand", 0.075, 0.72, 1.4),
   },
 };
 

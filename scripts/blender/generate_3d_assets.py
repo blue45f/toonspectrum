@@ -368,6 +368,89 @@ def build_outfit_shorts():
         apply_subsurf(leg, 2)
     export_outfit_glb("outfit_shorts.glb")
 
+# 4 New Props
+def build_medieval_greatsword():
+    reset_scene()
+    mat_metal = create_material("SteelSteel", base_color=(0.7, 0.72, 0.75, 1.0), metallic=0.9, roughness=0.2)
+    mat_rune = create_material("RuneGlow", base_color=(1.0, 0.4, 0.0, 1.0), emission_color=(1.0, 0.5, 0.0, 1.0), emission_strength=5.0)
+    bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0, 0.6, 0))
+    blade = bpy.context.active_object
+    blade.scale = (0.02, 1.1, 0.08)
+    blade.data.materials.append(mat_metal)
+    bpy.ops.mesh.primitive_cylinder_add(radius=0.015, depth=0.9, location=(0, 0.6, 0))
+    rune = bpy.context.active_object
+    rune.data.materials.append(mat_rune)
+    export_glb("medieval_greatsword.glb")
+
+def build_cyber_hoverbike():
+    reset_scene()
+    mat_body = create_material("HoverBody", base_color=(0.1, 0.1, 0.15, 1.0), metallic=0.85, roughness=0.2)
+    mat_thruster = create_material("ThrusterGlow", base_color=(0.0, 0.8, 1.0, 1.0), emission_color=(0.0, 0.9, 1.0, 1.0), emission_strength=6.0)
+    bpy.ops.mesh.primitive_cylinder_add(radius=0.35, depth=1.6, location=(0, 0.45, 0))
+    body = bpy.context.active_object
+    body.rotation_euler = (math.radians(90), 0, 0)
+    body.data.materials.append(mat_body)
+    apply_subsurf(body, 2)
+    export_glb("cyberpunk_hoverbike.glb")
+
+def build_magic_chest():
+    reset_scene()
+    mat_wood = create_material("ChestWood", base_color=(0.35, 0.22, 0.12, 1.0), roughness=0.7)
+    mat_gold = create_material("ChestGold", base_color=(0.95, 0.78, 0.25, 1.0), metallic=0.9, roughness=0.2)
+    bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0, 0.35, 0))
+    box = bpy.context.active_object
+    box.scale = (0.7, 0.5, 0.45)
+    box.data.materials.append(mat_wood)
+    export_glb("fantasy_magic_chest.glb")
+
+def build_modern_smartphone():
+    reset_scene()
+    mat_body = create_material("PhoneBody", base_color=(0.12, 0.12, 0.14, 1.0), metallic=0.9, roughness=0.15)
+    mat_screen = create_material("PhoneScreen", base_color=(0.05, 0.35, 0.65, 1.0), roughness=0.1, emission_color=(0.1, 0.4, 0.8, 1.0), emission_strength=2.0)
+    bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0, 0, 0))
+    phone = bpy.context.active_object
+    phone.scale = (0.075, 0.008, 0.15)
+    phone.data.materials.append(mat_body)
+    export_glb("modern_smartphone_prop.glb")
+
+# 4 New High-Poly Outfits
+def build_outfit_hanbok_modern():
+    reset_scene()
+    mat = create_material("HanbokFabric", base_color=(0.85, 0.2, 0.3, 1.0), roughness=0.5, sheen=0.6)
+    bpy.ops.mesh.primitive_cylinder_add(radius=0.28, depth=1.1, location=(0, 0, 0.7))
+    robe = bpy.context.active_object
+    robe.data.materials.append(mat)
+    apply_subsurf(robe, 2)
+    export_outfit_glb("outfit_hanbok_modern.glb")
+
+def build_outfit_trenchcoat():
+    reset_scene()
+    mat = create_material("CoatLeather", base_color=(0.18, 0.12, 0.08, 1.0), metallic=0.1, roughness=0.35)
+    bpy.ops.mesh.primitive_cylinder_add(radius=0.26, depth=1.15, location=(0, 0, 0.72))
+    coat = bpy.context.active_object
+    coat.data.materials.append(mat)
+    apply_subsurf(coat, 2)
+    export_outfit_glb("outfit_trenchcoat.glb")
+
+def build_outfit_tactical_vest():
+    reset_scene()
+    mat = create_material("TacticalKevlar", base_color=(0.12, 0.15, 0.14, 1.0), roughness=0.6)
+    bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0, 0, 1.05))
+    vest = bpy.context.active_object
+    vest.scale = (0.44, 0.25, 0.55)
+    vest.data.materials.append(mat)
+    apply_subsurf(vest, 2)
+    export_outfit_glb("outfit_tactical_vest.glb")
+
+def build_outfit_cyberpunk_suit():
+    reset_scene()
+    mat = create_material("CyberSuitPolymer", base_color=(0.08, 0.1, 0.15, 1.0), metallic=0.6, roughness=0.2)
+    bpy.ops.mesh.primitive_cylinder_add(radius=0.22, depth=1.2, location=(0, 0, 0.65))
+    suit = bpy.context.active_object
+    suit.data.materials.append(mat)
+    apply_subsurf(suit, 2)
+    export_outfit_glb("outfit_cyberpunk_suit.glb")
+
 if __name__ == "__main__":
     print("🚀 Starting Blender 5.2 3D Asset & Outfit Generation...")
     build_cyber_katana()
@@ -379,7 +462,13 @@ if __name__ == "__main__":
     build_rune_shield()
     build_arcade_cabinet()
     
-    # Generate 10 High-Poly Outfits
+    # 4 New Props
+    build_medieval_greatsword()
+    build_cyber_hoverbike()
+    build_magic_chest()
+    build_modern_smartphone()
+    
+    # Generate 14 High-Poly Outfits
     build_outfit_tshirt()
     build_outfit_tank()
     build_outfit_cardigan()
@@ -391,4 +480,10 @@ if __name__ == "__main__":
     build_outfit_scrubpants()
     build_outfit_shorts()
     
-    print("✨ All 18 3D Assets & High-Poly Outfits Generated Successfully!")
+    # 4 New Outfits
+    build_outfit_hanbok_modern()
+    build_outfit_trenchcoat()
+    build_outfit_tactical_vest()
+    build_outfit_cyberpunk_suit()
+    
+    print("✨ All 26 3D Assets & High-Poly Outfits Generated Successfully!")
