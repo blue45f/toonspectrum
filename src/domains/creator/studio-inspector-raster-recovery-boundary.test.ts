@@ -137,6 +137,38 @@ describe("Studio inspector raster recovery boundary", () => {
       .toBeLessThan(nodeInteractionBegin.indexOf("canvasInteractionUnitIds(elementId)"));
   });
 
+  it("cancels raster preparation before tool disarm or Escape can expose stale replay authority", () => {
+    const cancellation = functionBody(pageSource, "cancelStudioRasterPreparation");
+    const disarm = functionBody(pageSource, "disarmAllPixelTools");
+    const preparation = functionBody(pageSource, "createEditableRasterCopyForInspector");
+    const escapeStart = pageSource.indexOf('} else if (e.key === "Escape") {');
+    const escapeEnd = pageSource.indexOf('\n      } else if (', escapeStart + 1);
+    const escapeBranch = pageSource.slice(escapeStart, escapeEnd);
+
+    expect(cancellation).toContain("studioFilterPreparationRunIdRef.current += 1");
+    expect(cancellation).toContain("studioFilterPreparationAbortRef.current?.abort()");
+    expect(cancellation).toContain("pendingRasterRetouchCaptureTargetRef.current !== null");
+    expect(cancellation).toContain("studioRasterRetouchPreparationRef.current = null");
+    expect(cancellation).toContain("queuedRasterRetouchReplayRef.current = null");
+    expect(cancellation).toContain("clearPendingRasterRetouchGesture()");
+    expect(cancellation).toContain("setStudioFilterPreparationBusy(false)");
+    expect(disarm.indexOf("cancelStudioRasterPreparation()"))
+      .toBeLessThan(disarm.indexOf("cancelLiquifyPointerSession()"));
+    expect(escapeBranch).toContain("if (cancelStudioRasterPreparation())");
+    expect(escapeBranch.indexOf("cancelStudioRasterPreparation()"))
+      .toBeLessThan(escapeBranch.indexOf("groupResizeRef.current"));
+    expect(escapeBranch).toContain("편집용 래스터 준비를 취소했습니다");
+
+    const flushStart = preparation.indexOf("flushSync(() => {");
+    const finalPreCommitAuthorityGuard = preparation.slice(0, flushStart).lastIndexOf(
+      "runId !== studioFilterPreparationRunIdRef.current",
+    );
+    expect(finalPreCommitAuthorityGuard).toBeGreaterThanOrEqual(0);
+    expect(flushStart).toBeGreaterThan(finalPreCommitAuthorityGuard);
+    expect(preparation.indexOf("attachPendingRasterRetouchTarget"))
+      .toBeGreaterThan(flushStart);
+  });
+
   it.each([
     ["toggleSmudgeTool", "smudgeActive", "smudge"],
     ["toggleLiquifyTool", "liquifyActive", "liquify"],

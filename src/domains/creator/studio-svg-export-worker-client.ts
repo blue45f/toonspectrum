@@ -30,12 +30,27 @@ export interface StudioSvgExportWorkerClientOptions {
   signal?: AbortSignal;
   /** `null` explicitly selects the synchronous fallback; omitted uses the Vite module worker. */
   workerFactory?: StudioSvgExportWorkerFactory | null;
+  /** Product default is 30 seconds; injectable only to keep timeout tests deterministic. */
+  runTimeoutMs?: number;
 }
 
 export interface StudioSvgExportWorkerClientResult {
   execution: "worker" | "direct";
   result: SvgExportResult;
 }
+
+const STUDIO_SVG_EXPORT_PREWARM_IDLE_MS = 45_000;
+const STUDIO_SVG_EXPORT_READY_TIMEOUT_MS = 3_000;
+const STUDIO_SVG_EXPORT_RUN_TIMEOUT_MS = 30_000;
+
+interface StudioSvgExportPrewarmedWorker {
+  readonly worker: StudioSvgExportWorkerLike;
+  ready: boolean;
+  readyTimer: ReturnType<typeof setTimeout> | null;
+  idleTimer: ReturnType<typeof setTimeout> | null;
+}
+
+let prewarmedStudioSvgExportWorker: StudioSvgExportPrewarmedWorker | null = null;
 
 export interface StudioSvgExportWorkerR8Transfer {
   readonly entries: readonly Readonly<StudioSvgExportWorkerR8GrainEntry>[];
@@ -138,6 +153,165 @@ export function createStudioSvgExportModuleWorker(): StudioSvgExportWorkerLike |
   }) as unknown as StudioSvgExportWorkerLike;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((entry) => typeof entry === "string");
+}
+
+function isStudioSvgExportWorkerResponseMessage(
+  value: unknown,
+): value is StudioSvgExportWorkerResponseMessage {
+  if (
+    !isRecord(value)
+    || value.version !== STUDIO_SVG_EXPORT_WORKER_PROTOCOL_VERSION
+    || typeof value.type !== "string"
+  ) return false;
+  if (value.type === "studio-svg-export/ready") return true;
+  if (value.type === "studio-svg-export/failure") {
+    return isRecord(value.error)
+      && typeof value.error.name === "string"
+      && typeof value.error.message === "string";
+  }
+  if (value.type !== "studio-svg-export/success" || !isRecord(value.result)) return false;
+  const result = value.result;
+  return (
+    typeof result.svg === "string"
+    && Array.isArray(result.skipped)
+    && result.skipped.every((entry) =>
+      isRecord(entry)
+      && typeof entry.id === "string"
+      && typeof entry.type === "string"
+      && (entry.mode === "skipped" || entry.mode === "approximated")
+      && typeof entry.label === "string"
+    )
+    && isStringArray(result.fontFamilies)
+    && isStringArray(result.caveats)
+    && Number.isSafeInteger(result.elementCount)
+    && Number(result.elementCount) >= 0
+  );
+}
+
+function boundedStudioSvgExportRunTimeout(value: number | undefined): number {
+  if (!Number.isFinite(value)) return STUDIO_SVG_EXPORT_RUN_TIMEOUT_MS;
+  return Math.max(100, Math.min(120_000, Math.floor(value as number)));
+}
+
+function clearStudioSvgExportPrewarmIdleTimer(
+  entry: StudioSvgExportPrewarmedWorker,
+): void {
+  if (entry.idleTimer === null) return;
+  clearTimeout(entry.idleTimer);
+  entry.idleTimer = null;
+}
+
+function clearStudioSvgExportPrewarmReadyTimer(
+  entry: StudioSvgExportPrewarmedWorker,
+): void {
+  if (entry.readyTimer === null) return;
+  clearTimeout(entry.readyTimer);
+  entry.readyTimer = null;
+}
+
+function releaseStudioSvgExportPrewarmedWorker(
+  entry = prewarmedStudioSvgExportWorker,
+): void {
+  if (!entry) return;
+  if (prewarmedStudioSvgExportWorker === entry) {
+    prewarmedStudioSvgExportWorker = null;
+  }
+  clearStudioSvgExportPrewarmReadyTimer(entry);
+  clearStudioSvgExportPrewarmIdleTimer(entry);
+  entry.worker.onmessage = null;
+  entry.worker.onerror = null;
+  entry.worker.terminate();
+}
+
+/** Releases an unused intent-warmed Worker on route/HMR teardown and in deterministic tests. */
+export function disposeStudioSvgExportPrewarmedWorker(): void {
+  releaseStudioSvgExportPrewarmedWorker();
+}
+
+/**
+ * Starts the exact production SVG Worker without sending document data.
+ *
+ * The Worker announces readiness only after its outline engine has loaded, so a hover/focus hint
+ * can hide module startup while keeping the first real export byte-identical. The lease is
+ * one-shot: the next production run takes ownership and retains the existing terminate-on-settle
+ * lifecycle; an unused worker is released after a short idle window.
+ */
+export function preloadStudioSvgExportWorker(
+  workerFactory: StudioSvgExportWorkerFactory = createStudioSvgExportModuleWorker,
+): boolean {
+  if (prewarmedStudioSvgExportWorker) {
+    const entry = prewarmedStudioSvgExportWorker;
+    clearStudioSvgExportPrewarmIdleTimer(entry);
+    entry.idleTimer = setTimeout(() => {
+      releaseStudioSvgExportPrewarmedWorker(entry);
+    }, STUDIO_SVG_EXPORT_PREWARM_IDLE_MS);
+    return true;
+  }
+  let worker: StudioSvgExportWorkerLike | null;
+  try {
+    worker = workerFactory();
+  } catch {
+    return false;
+  }
+  if (!worker) return false;
+
+  const entry: StudioSvgExportPrewarmedWorker = {
+    worker,
+    ready: false,
+    readyTimer: null,
+    idleTimer: null,
+  };
+  prewarmedStudioSvgExportWorker = entry;
+  worker.onmessage = (event) => {
+    if (prewarmedStudioSvgExportWorker !== entry) return;
+    const response = event.data;
+    if (
+      !isStudioSvgExportWorkerResponseMessage(response)
+      || response.type !== "studio-svg-export/ready"
+    ) {
+      releaseStudioSvgExportPrewarmedWorker(entry);
+      return;
+    }
+    clearStudioSvgExportPrewarmReadyTimer(entry);
+    entry.ready = true;
+  };
+  worker.onerror = (event) => {
+    event.preventDefault?.();
+    releaseStudioSvgExportPrewarmedWorker(entry);
+  };
+  entry.idleTimer = setTimeout(() => {
+    releaseStudioSvgExportPrewarmedWorker(entry);
+  }, STUDIO_SVG_EXPORT_PREWARM_IDLE_MS);
+  entry.readyTimer = setTimeout(() => {
+    releaseStudioSvgExportPrewarmedWorker(entry);
+  }, STUDIO_SVG_EXPORT_READY_TIMEOUT_MS);
+  return true;
+}
+
+function takeStudioSvgExportPrewarmedWorker(): {
+  readonly worker: StudioSvgExportWorkerLike;
+  readonly ready: boolean;
+} | null {
+  const entry = prewarmedStudioSvgExportWorker;
+  if (!entry) return null;
+  prewarmedStudioSvgExportWorker = null;
+  clearStudioSvgExportPrewarmReadyTimer(entry);
+  clearStudioSvgExportPrewarmIdleTimer(entry);
+  entry.worker.onmessage = null;
+  entry.worker.onerror = null;
+  return { worker: entry.worker, ready: entry.ready };
+}
+
+if (import.meta.hot) {
+  import.meta.hot.dispose(disposeStudioSvgExportPrewarmedWorker);
+}
+
 function createAbortError(): Error {
   if (typeof DOMException === "function") {
     return new DOMException("SVG 내보내기를 취소했습니다.", "AbortError");
@@ -177,11 +351,14 @@ function runSvgExportWithWorker(
   input: SvgExportPageInput,
   signal: AbortSignal | undefined,
   r8Transfer: StudioSvgExportWorkerR8Transfer,
+  workerAlreadyReady = false,
+  runTimeoutMs = STUDIO_SVG_EXPORT_RUN_TIMEOUT_MS,
 ): Promise<StudioSvgExportWorkerClientResult> {
   return new Promise((resolve, reject) => {
     let settled = false;
     let requestPosted = false;
     let readyTimer: ReturnType<typeof setTimeout> | null = null;
+    let runTimer: ReturnType<typeof setTimeout> | null = null;
     const message: StudioSvgExportWorkerRunMessage = {
       type: "studio-svg-export/run",
       version: STUDIO_SVG_EXPORT_WORKER_PROTOCOL_VERSION,
@@ -191,6 +368,7 @@ function runSvgExportWithWorker(
 
     const cleanup = () => {
       if (readyTimer !== null) clearTimeout(readyTimer);
+      if (runTimer !== null) clearTimeout(runTimer);
       signal?.removeEventListener("abort", onAbort);
       worker.onmessage = null;
       worker.onerror = null;
@@ -207,10 +385,22 @@ function runSvgExportWithWorker(
     const resolveDirectFallback = () => finish(() => {
       void runSvgExportDirect(input, signal).then(resolve, reject);
     });
+    const postRequest = () => {
+      requestPosted = true;
+      runTimer = setTimeout(() => {
+        finish(() => reject(new Error("SVG 내보내기 Worker 계산 시간이 초과되었습니다.")));
+      }, runTimeoutMs);
+      try {
+        worker.postMessage(message, r8Transfer.buffers);
+      } catch {
+        requestPosted = false;
+        resolveDirectFallback();
+      }
+    };
 
     worker.onmessage = (event) => {
       const response = event.data;
-      if (response.version !== STUDIO_SVG_EXPORT_WORKER_PROTOCOL_VERSION) {
+      if (!isStudioSvgExportWorkerResponseMessage(response)) {
         finish(() => reject(new Error("SVG 내보내기 Worker가 알 수 없는 응답을 반환했습니다.")));
         return;
       }
@@ -220,12 +410,7 @@ function runSvgExportWithWorker(
           clearTimeout(readyTimer);
           readyTimer = null;
         }
-        try {
-          worker.postMessage(message, r8Transfer.buffers);
-          requestPosted = true;
-        } catch {
-          resolveDirectFallback();
-        }
+        postRequest();
         return;
       }
       if (!requestPosted) {
@@ -256,7 +441,11 @@ function runSvgExportWithWorker(
       onAbort();
       return;
     }
-    readyTimer = setTimeout(resolveDirectFallback, 3_000);
+    if (workerAlreadyReady) {
+      postRequest();
+    } else {
+      readyTimer = setTimeout(resolveDirectFallback, STUDIO_SVG_EXPORT_READY_TIMEOUT_MS);
+    }
   });
 }
 
@@ -270,15 +459,22 @@ export async function runStudioSvgExportWorker(
   options: StudioSvgExportWorkerClientOptions = {},
 ): Promise<StudioSvgExportWorkerClientResult> {
   throwIfAborted(options.signal);
+  const prewarmed = options.workerFactory === undefined
+    ? takeStudioSvgExportPrewarmedWorker()
+    : null;
   const factory =
     options.workerFactory === undefined ? createStudioSvgExportModuleWorker : options.workerFactory;
-  if (!factory) return runSvgExportDirect(input, options.signal);
+  if (!factory && !prewarmed) return runSvgExportDirect(input, options.signal);
 
   let worker: StudioSvgExportWorkerLike | null;
-  try {
-    worker = factory();
-  } catch {
-    return runSvgExportDirect(input, options.signal);
+  if (prewarmed) {
+    worker = prewarmed.worker;
+  } else {
+    try {
+      worker = factory?.() ?? null;
+    } catch {
+      return runSvgExportDirect(input, options.signal);
+    }
   }
   if (!worker) return runSvgExportDirect(input, options.signal);
   let r8Transfer: StudioSvgExportWorkerR8Transfer;
@@ -288,5 +484,12 @@ export async function runStudioSvgExportWorker(
     worker.terminate();
     return runSvgExportDirect(input, options.signal);
   }
-  return runSvgExportWithWorker(worker, input, options.signal, r8Transfer);
+  return runSvgExportWithWorker(
+    worker,
+    input,
+    options.signal,
+    r8Transfer,
+    prewarmed?.ready ?? false,
+    boundedStudioSvgExportRunTimeout(options.runTimeoutMs),
+  );
 }

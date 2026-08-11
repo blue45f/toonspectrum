@@ -13,6 +13,12 @@ import {
 import type { LucideIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 
+const preloadRasterRetouchRuntime = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+
+vi.mock("./studio-raster-retouch-preload", () => ({
+  preloadStudioRasterRetouchRuntime: preloadRasterRetouchRuntime,
+}));
+
 interface MockRailButtonProps {
   readonly "aria-controls"?: string;
   readonly "aria-expanded"?: boolean;
@@ -28,6 +34,9 @@ interface MockRailButtonProps {
   readonly icon?: LucideIcon;
   readonly label: string;
   readonly onClick?: () => void;
+  readonly onFocus?: () => void;
+  readonly onPointerDown?: () => void;
+  readonly onPointerEnter?: () => void;
   readonly unavailableReason?: string;
 }
 
@@ -54,6 +63,9 @@ vi.mock("./studio-chrome-ui", () => ({
     icon: Icon,
     label,
     onClick,
+    onFocus,
+    onPointerDown,
+    onPointerEnter,
     unavailableReason,
   }: MockRailButtonProps) => (
     <button
@@ -72,6 +84,9 @@ vi.mock("./studio-chrome-ui", () => ({
       data-unavailable-reason={unavailableReason}
       disabled={disabled}
       onClick={onClick}
+      onFocus={onFocus}
+      onPointerDown={onPointerDown}
+      onPointerEnter={onPointerEnter}
     >
       {Icon ? <Icon aria-hidden /> : null}
       {label}
@@ -476,6 +491,23 @@ describe("StudioLeftToolRail", () => {
       expect(testCase.handler(props)).toHaveBeenCalledOnce();
       view.unmount();
     }
+  });
+
+  it("prewarms raster workers from pointer, touch and keyboard intent", () => {
+    render(<StudioLeftToolRail {...createProps()} />);
+    const smudge = screen.getByRole("button", { name: "색 밀어 섞기 · 스머지 (N)" });
+    const liquify = screen.getByRole("button", { name: "형태 밀어 변형 · 리퀴파이 (J)" });
+
+    fireEvent.pointerEnter(smudge);
+    fireEvent.pointerDown(smudge);
+    fireEvent.focus(smudge);
+    fireEvent.pointerEnter(liquify);
+
+    expect(preloadRasterRetouchRuntime).toHaveBeenCalledTimes(4);
+    expect(preloadRasterRetouchRuntime).toHaveBeenNthCalledWith(1);
+    expect(preloadRasterRetouchRuntime).toHaveBeenNthCalledWith(2);
+    expect(preloadRasterRetouchRuntime).toHaveBeenNthCalledWith(3);
+    expect(preloadRasterRetouchRuntime).toHaveBeenNthCalledWith(4, { liquify: true });
   });
 
   it("shows one primary pointer tool while selection and draw subtools are armed", () => {

@@ -15950,6 +15950,27 @@ function StudioCuttoonEditor() {
     pendingRasterRetouchTargetRef.current = null;
     releasePendingRasterRetouchGestureCapture(pending);
   }
+  function cancelStudioRasterPreparation(): boolean {
+    const hadActivePreparation =
+      studioFilterPreparationAbortRef.current !== null
+      || studioRasterRetouchPreparationRef.current !== null
+      || pendingRasterRetouchGestureRef.current !== null
+      || pendingRasterRetouchCaptureTargetRef.current !== null
+      || pendingRasterRetouchTargetRef.current !== null
+      || queuedRasterRetouchReplayRef.current !== null;
+    if (!hadActivePreparation) return false;
+
+    // Invalidate authority before aborting: a runtime that resolves in the same task must fail the
+    // run-id guards even if it cannot observe AbortSignal until after its current synchronous work.
+    studioFilterPreparationRunIdRef.current += 1;
+    studioFilterPreparationAbortRef.current?.abort();
+    studioFilterPreparationAbortRef.current = null;
+    studioRasterRetouchPreparationRef.current = null;
+    queuedRasterRetouchReplayRef.current = null;
+    clearPendingRasterRetouchGesture();
+    setStudioFilterPreparationBusy(false);
+    return true;
+  }
   function queuePendingRasterRetouchGesture(
     gesture: StudioPendingRasterRetouchGesture,
     target: { frame: SelectionFrame; id: string },
@@ -21919,6 +21940,7 @@ const puppetWarpArmed =
   // 된다 — 개별 상호배제 누락이 이 세션에서 실제 버그로 여러 번 재발했다(예: eyedropper/
   // bubbleAnchorPick/quickShape 토글이 다른 armed 도구를 안 껐고, pixelTool도 crop을 안 껐음).
   function disarmAllPixelTools() {
+    cancelStudioRasterPreparation();
     cancelLiquifyPointerSession();
     smudgeAbortRef.current?.abort();
     smudgeAbortRef.current = null;
@@ -26209,7 +26231,10 @@ const puppetWarpArmed =
         setShortcutsOpen((v) => !v);
       } else if (e.key === "Escape") {
         // Quick Start dismisses itself via capture-phase Esc on StudioQuickStartPanel.
-        if (groupResizeRef.current) {
+        if (cancelStudioRasterPreparation()) {
+          e.preventDefault();
+          announceDrawingShortcut("편집용 래스터 준비를 취소했습니다");
+        } else if (groupResizeRef.current) {
           e.preventDefault();
           cancelCanvasSelectionResize();
           announceDrawingShortcut("그룹 크기 조절을 취소했습니다");

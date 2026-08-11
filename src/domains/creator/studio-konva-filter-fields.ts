@@ -199,6 +199,164 @@ function candidateFinite(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
+function candidateNumberField(value: unknown, key: string, fallback = 0): number | null {
+  if (!value) return null;
+  const source = candidateRecord(value);
+  const raw = source?.[key];
+  return candidateFinite(raw) ? raw : fallback;
+}
+
+function hasActivePositiveFieldCandidate(value: unknown, key: string): boolean {
+  const amount = candidateNumberField(value, key);
+  return amount !== null && amount > 0;
+}
+
+function hasActiveSignedFieldCandidate(value: unknown, key: string): boolean {
+  const amount = candidateNumberField(value, key);
+  return amount !== null && amount !== 0;
+}
+
+function normalizedLevelCandidate(
+  source: Record<string, unknown> | null,
+  key: string,
+  minimum: number,
+  maximum: number,
+  fallback: number,
+): number {
+  const raw = source?.[key];
+  return candidateFinite(raw) ? Math.min(maximum, Math.max(minimum, raw)) : fallback;
+}
+
+function hasActiveLevelsObjectCandidate(value: unknown): boolean {
+  const source = candidateRecord(value);
+  let blackPoint = normalizedLevelCandidate(source, "blackPoint", 0, 254, 0);
+  let whitePoint = normalizedLevelCandidate(source, "whitePoint", 1, 255, 255);
+  if (whitePoint <= blackPoint) {
+    blackPoint = 0;
+    whitePoint = 255;
+  }
+  return blackPoint !== 0
+    || whitePoint !== 255
+    || normalizedLevelCandidate(source, "gamma", 0.1, 9.9, 1) !== 1
+    || normalizedLevelCandidate(source, "outBlack", 0, 255, 0) !== 0
+    || normalizedLevelCandidate(source, "outWhite", 0, 255, 255) !== 255;
+}
+
+function hasActiveLevelsChannelsCandidate(value: unknown): boolean {
+  if (!value) return false;
+  const source = candidateRecord(value);
+  return hasActiveLevelsObjectCandidate(source?.r)
+    || hasActiveLevelsObjectCandidate(source?.g)
+    || hasActiveLevelsObjectCandidate(source?.b);
+}
+
+function hasActiveCurveCandidate(value: unknown): boolean {
+  if (!Array.isArray(value)) return false;
+  const points: Array<{ x: number; y: number }> = [];
+  for (const raw of value) {
+    if (!raw || typeof raw !== "object") continue;
+    const point = raw as { x?: unknown; y?: unknown };
+    if (!candidateFinite(point.x) || !candidateFinite(point.y)) continue;
+    points.push({
+      x: Math.round(Math.min(255, Math.max(0, point.x))),
+      y: Math.round(Math.min(255, Math.max(0, point.y))),
+    });
+  }
+  if (points.length === 0) return false;
+  points.sort((left, right) => left.x - right.x);
+  const normalized: Array<{ x: number; y: number }> = [];
+  for (const point of points) {
+    const previous = normalized[normalized.length - 1];
+    if (previous?.x === point.x) previous.y = point.y;
+    else normalized.push(point);
+  }
+  if (normalized[0]!.x !== 0) normalized.unshift({ x: 0, y: normalized[0]!.y });
+  const tail = normalized[normalized.length - 1]!;
+  if (tail.x !== 255) normalized.push({ x: 255, y: tail.y });
+
+  const lut = new Uint8ClampedArray(256);
+  let segment = 0;
+  for (let input = 0; input < 256; input += 1) {
+    while (segment < normalized.length - 2 && input > normalized[segment + 1]!.x) {
+      segment += 1;
+    }
+    const left = normalized[segment]!;
+    const right = normalized[segment + 1]!;
+    lut[input] = input <= left.x
+      ? left.y
+      : input >= right.x
+        ? right.y
+        : left.y + ((right.y - left.y) * (input - left.x)) / (right.x - left.x);
+    if (lut[input] !== input) return true;
+  }
+  return false;
+}
+
+function hasActiveCurveChannelsCandidate(value: unknown): boolean {
+  if (!value) return false;
+  const source = candidateRecord(value);
+  return hasActiveCurveCandidate(source?.r)
+    || hasActiveCurveCandidate(source?.g)
+    || hasActiveCurveCandidate(source?.b);
+}
+
+const COLOR_BALANCE_ZONES = ["shadows", "midtones", "highlights"] as const;
+
+function hasActiveColorBalanceCandidate(value: unknown): boolean {
+  if (!value) return false;
+  const source = candidateRecord(value);
+  return COLOR_BALANCE_ZONES.some((zone) => {
+    const shift = source?.[zone];
+    return Array.isArray(shift)
+      && shift.slice(0, 3).some((channel) => candidateFinite(channel) && channel !== 0);
+  });
+}
+
+const CHANNEL_MIXER_DEFAULTS = {
+  red: [1, 0, 0, 0],
+  green: [0, 1, 0, 0],
+  blue: [0, 0, 1, 0],
+} as const;
+
+function hasActiveChannelMixerCandidate(value: unknown): boolean {
+  if (!value) return false;
+  const source = candidateRecord(value);
+  if (source?.monochrome === true) return true;
+  return (Object.keys(CHANNEL_MIXER_DEFAULTS) as Array<keyof typeof CHANNEL_MIXER_DEFAULTS>)
+    .some((channel) => {
+      const row = candidateRecord(source?.[channel]);
+      return (["r", "g", "b", "constant"] as const).some((key, index) => {
+        const raw = row?.[key];
+        return candidateFinite(raw) && raw !== CHANNEL_MIXER_DEFAULTS[channel][index];
+      });
+    });
+}
+
+const SELECTIVE_HSL_BANDS = [
+  "red", "orange", "yellow", "green", "aqua", "blue", "purple", "magenta",
+] as const;
+
+function hasActiveSelectiveHslCandidate(value: unknown): boolean {
+  if (!value) return false;
+  const source = candidateRecord(value);
+  return SELECTIVE_HSL_BANDS.some((band) => {
+    const adjustment = candidateRecord(source?.[band]);
+    return [adjustment?.hue, adjustment?.sat, adjustment?.lum]
+      .some((channel) => candidateFinite(channel) && channel !== 0);
+  });
+}
+
+function hasActiveVibranceCandidate(value: unknown): boolean {
+  return hasActiveSignedFieldCandidate(value, "vibrance")
+    || hasActiveSignedFieldCandidate(value, "saturation");
+}
+
+function hasActiveShadowHighlightCandidate(value: unknown): boolean {
+  return hasActivePositiveFieldCandidate(value, "shadows")
+    || hasActivePositiveFieldCandidate(value, "highlights")
+    || hasActiveSignedFieldCandidate(value, "midtoneContrast");
+}
+
 function hasActiveExposureCandidate(value: unknown): boolean {
   const source = candidateRecord(value);
   if (!source) return false;
@@ -220,6 +378,34 @@ function hasActiveSignedAmountCandidate(value: unknown): boolean {
 function hasActiveIntensityCandidate(value: unknown): boolean {
   const source = candidateRecord(value);
   return !!source && candidateFinite(source.intensity) && source.intensity > 0;
+}
+
+function hasActiveClarityCandidate(value: unknown): boolean {
+  const source = candidateRecord(value);
+  if (!source) return false;
+  return (candidateFinite(source.clarity) && source.clarity !== 0)
+    || (candidateFinite(source.dehaze) && source.dehaze > 0);
+}
+
+function hasActiveOutlineCandidate(value: unknown): boolean {
+  const source = candidateRecord(value);
+  if (!source) return false;
+  const hasWidth = (candidateFinite(source.width) && source.width > 0)
+    || (candidateFinite(source.secondWidth) && source.secondWidth > 0);
+  if (!hasWidth) return false;
+  // normalizeOutline defaults a missing/non-finite opacity to 100 and clamps finite values to 0..100.
+  return !candidateFinite(source.opacity) || source.opacity > 0;
+}
+
+const ACTIVE_AUTO_ADJUST_MODES = new Set(["contrast", "tone", "color", "whiteBalance"]);
+
+function hasActiveAutoAdjustCandidate(value: unknown): boolean {
+  const source = candidateRecord(value);
+  if (!source || typeof source.mode !== "string" || !ACTIVE_AUTO_ADJUST_MODES.has(source.mode)) {
+    return false;
+  }
+  // normalizeAutoAdjust defaults a missing/non-finite strength to 100 and clamps finite values.
+  return !candidateFinite(source.strength) || source.strength > 0;
 }
 
 function hasActiveDarknessCandidate(value: unknown): boolean {
@@ -348,7 +534,7 @@ function lightweightSmartFilterProgram(value: unknown): readonly StudioAdjustmen
       : [];
   const entries: StudioAdjustmentFilterOperation[] = [];
   const seen = new Set<string>();
-  for (let index = 0; index < list.length && entries.length < 24; index += 1) {
+  for (let index = 0; index < list.length; index += 1) {
     const candidate = candidateRecord(list[index]);
     if (!candidate || typeof candidate.engine !== "string") continue;
     if (!LIGHTWEIGHT_ADJUSTMENT_ENGINES.has(candidate.engine as StudioAdjustmentEngineId)) continue;
@@ -382,29 +568,29 @@ export function hasActiveImageFilters(el: ImageFilterFields): boolean {
     el.grayscale ||
     el.sepia ||
     isNonDefaultLevelFields(el) ||
-    hasObjectFilter(el.levelsCh) ||
-    hasObjectFilter(el.curve) ||
-    hasObjectFilter(el.curveCh) ||
-    hasObjectFilter(el.colorBalance) ||
-    hasObjectFilter(el.channelMixer) ||
-    hasObjectFilter(el.selectiveHsl) ||
-    hasObjectFilter(el.vibrance) ||
+    hasActiveLevelsChannelsCandidate(el.levelsCh) ||
+    hasActiveCurveCandidate(el.curve) ||
+    hasActiveCurveChannelsCandidate(el.curveCh) ||
+    hasActiveColorBalanceCandidate(el.colorBalance) ||
+    hasActiveChannelMixerCandidate(el.channelMixer) ||
+    hasActiveSelectiveHslCandidate(el.selectiveHsl) ||
+    hasActiveVibranceCandidate(el.vibrance) ||
     hasObjectFilter(el.gradientMap) ||
-    hasObjectFilter(el.photoFilter) ||
-    hasObjectFilter(el.autoAdjust) ||
-    hasObjectFilter(el.clarity) ||
-    hasObjectFilter(el.shadowHighlight) ||
-    hasObjectFilter(el.outline) ||
-    hasObjectFilter(el.glow) ||
-    hasObjectFilter(el.halftone) ||
-    hasObjectFilter(el.grain) ||
+    hasActivePositiveFieldCandidate(el.photoFilter, "density") ||
+    hasActiveAutoAdjustCandidate(el.autoAdjust) ||
+    hasActiveClarityCandidate(el.clarity) ||
+    hasActiveShadowHighlightCandidate(el.shadowHighlight) ||
+    hasActiveOutlineCandidate(el.outline) ||
+    hasActiveStrengthCandidate(el.glow) ||
+    hasActiveStrengthCandidate(el.halftone) ||
+    hasActiveAmountCandidate(el.grain) ||
     hasActiveInkWashCandidate(el.inkWash) ||
-    hasObjectFilter(el.blurFx) ||
-    hasObjectFilter(el.distort) ||
-    hasObjectFilter(el.stylize) ||
-    hasObjectFilter(el.light) ||
-    hasObjectFilter(el.sketch) ||
-    hasObjectFilter(el.detail) ||
+    hasActiveStrengthCandidate(el.blurFx) ||
+    hasActiveSignedAmountCandidate(el.distort) ||
+    hasActiveStrengthCandidate(el.stylize) ||
+    hasActiveIntensityCandidate(el.light) ||
+    hasActiveStrengthCandidate(el.sketch) ||
+    hasActiveAmountCandidate(el.detail) ||
     hasActiveExposureCandidate(el.exposureAdjustment) ||
     hasActiveAmountCandidate(el.unsharpMask) ||
     hasActiveRadiusCandidate(el.morphology) ||

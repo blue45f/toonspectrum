@@ -828,6 +828,158 @@ describe("hasActiveImageFilters", () => {
       },
     })).toBe(true);
   });
+
+  it("첫 24개가 비활성이어도 25번째 활성 스마트 필터를 렌더 계획에 포함한다", () => {
+    const disabledPrefix: NonNullable<ImageFilterFields["smartFilterOperations"]> = Array.from(
+      { length: 24 },
+      (_, index) => ({
+        id: `disabled-${index}`,
+        engine: "invert" as const,
+        enabled: false,
+        params: {},
+      }),
+    );
+    const fields: ImageFilterFields = {
+      smartFilterOperations: [
+        ...disabledPrefix,
+        { id: "tail", engine: "blur", enabled: true, params: { radius: 2 } },
+      ],
+    };
+
+    expect(hasLightweightActiveImageFilters(fields)).toBe(true);
+    expect(hasActiveImageFilters(fields)).toBe(true);
+    const konva = fakeKonva();
+    registerStudioKonvaFilters(konva);
+    expect(buildImageFilters(fields, konva).filters).toHaveLength(1);
+  });
+
+  it.each([
+    [
+      "blurFx",
+      { blurFx: { type: "gaussian", strength: 0, radius: 8, angle: 0 } },
+      { blurFx: { type: "gaussian", strength: 1, radius: 8, angle: 0 } },
+    ],
+    [
+      "clarity",
+      { clarity: { clarity: 0, dehaze: 0 } },
+      { clarity: { clarity: 0, dehaze: 1 } },
+    ],
+    [
+      "outline",
+      { outline: { color: "#ffffff", width: 0, opacity: 100 } },
+      { outline: { color: "#ffffff", width: 0, opacity: 100, secondWidth: 1 } },
+    ],
+    [
+      "glow",
+      { glow: { strength: 0, size: 12, threshold: 60, color: "auto" } },
+      { glow: { strength: 1, size: 12, threshold: 60, color: "auto" } },
+    ],
+    [
+      "autoAdjust",
+      { autoAdjust: { mode: "none", strength: 100 } },
+      { autoAdjust: { mode: "contrast", strength: 100 } },
+    ],
+  ] as const)("%s의 경량 항등 판정이 정규화 엔진과 같다", (_name, identity, active) => {
+    expect(hasLightweightActiveImageFilters(identity as ImageFilterFields)).toBe(false);
+    expect(hasActiveImageFilters(identity as ImageFilterFields)).toBe(false);
+    expect(hasLightweightActiveImageFilters(active as ImageFilterFields)).toBe(true);
+    expect(hasActiveImageFilters(active as ImageFilterFields)).toBe(true);
+  });
+
+  const identityCurve = [{ x: 0, y: 0 }, { x: 128, y: 128 }, { x: 255, y: 255 }];
+  const identityLevels = { blackPoint: 0, whitePoint: 255, gamma: 1, outBlack: 0, outWhite: 255 };
+  const identityMixer = {
+    red: { r: 1, g: 0, b: 0, constant: 0 },
+    green: { r: 0, g: 1, b: 0, constant: 0 },
+    blue: { r: 0, g: 0, b: 1, constant: 0 },
+    monochrome: false,
+  };
+  const identitySelectiveHsl = {
+    red: { hue: 0, sat: 0, lum: 0 },
+    orange: { hue: 0, sat: 0, lum: 0 },
+    yellow: { hue: 0, sat: 0, lum: 0 },
+    green: { hue: 0, sat: 0, lum: 0 },
+    aqua: { hue: 0, sat: 0, lum: 0 },
+    blue: { hue: 0, sat: 0, lum: 0 },
+    purple: { hue: 0, sat: 0, lum: 0 },
+    magenta: { hue: 0, sat: 0, lum: 0 },
+  };
+
+  it.each([
+    ["levelsCh", { levelsCh: { r: identityLevels, g: identityLevels, b: identityLevels } }, { levelsCh: { r: { ...identityLevels, gamma: 1.2 } } }],
+    ["curve", { curve: identityCurve }, { curve: [{ x: 0, y: 0 }, { x: 128, y: 155 }, { x: 255, y: 255 }] }],
+    ["curveCh", { curveCh: { r: identityCurve, g: identityCurve, b: identityCurve } }, { curveCh: { b: [{ x: 0, y: 20 }, { x: 255, y: 255 }] } }],
+    ["colorBalance", { colorBalance: { shadows: [0, 0, 0], midtones: [0, 0, 0], highlights: [0, 0, 0] } }, { colorBalance: { shadows: [0, 0, 0], midtones: [0, -1, 0], highlights: [0, 0, 0] } }],
+    ["channelMixer", { channelMixer: identityMixer }, { channelMixer: { ...identityMixer, monochrome: true } }],
+    ["selectiveHsl", { selectiveHsl: identitySelectiveHsl }, { selectiveHsl: { ...identitySelectiveHsl, blue: { hue: 0, sat: 1, lum: 0 } } }],
+    ["vibrance", { vibrance: { vibrance: 0, saturation: 0 } }, { vibrance: { vibrance: -1, saturation: 0 } }],
+    ["photoFilter", { photoFilter: { color: "#ec8a00", density: 0, preserveLuminosity: true } }, { photoFilter: { color: "#ec8a00", density: 1, preserveLuminosity: true } }],
+    ["shadowHighlight", { shadowHighlight: { shadows: 0, shadowsWidth: 50, highlights: 0, highlightsWidth: 50, midtoneContrast: 0 } }, { shadowHighlight: { shadows: 0, shadowsWidth: 50, highlights: 0, highlightsWidth: 50, midtoneContrast: -1 } }],
+    ["halftone", { halftone: { dotSize: 4, angle: 15, mode: "cmyk", strength: 0 } }, { halftone: { dotSize: 4, angle: 15, mode: "cmyk", strength: 1 } }],
+    ["grain", { grain: { type: "film", amount: 0, size: 1, seed: 1 } }, { grain: { type: "film", amount: 1, size: 1, seed: 1 } }],
+    ["distort", { distort: { type: "twirl", amount: 0, scale: 50 } }, { distort: { type: "twirl", amount: -1, scale: 50 } }],
+    ["stylize", { stylize: { type: "emboss", strength: 0, detail: 3 } }, { stylize: { type: "emboss", strength: 1, detail: 3 } }],
+    ["light", { light: { type: "lensFlare", intensity: 0, x: 30, y: 30, hue: 45 } }, { light: { type: "lensFlare", intensity: 1, x: 30, y: 30, hue: 45 } }],
+    ["sketch", { sketch: { type: "photocopy", strength: 0, detail: 3 } }, { sketch: { type: "photocopy", strength: 1, detail: 3 } }],
+    ["detail", { detail: { type: "smartSharpen", amount: 0, radius: 2 } }, { detail: { type: "smartSharpen", amount: 1, radius: 2 } }],
+  ] as const)("%s reset/default 객체는 Worker 후보가 아니고 활성값은 보존한다", (_name, identity, active) => {
+    expect(hasLightweightActiveImageFilters(identity as ImageFilterFields)).toBe(false);
+    expect(hasActiveImageFilters(identity as ImageFilterFields)).toBe(false);
+    expect(hasLightweightActiveImageFilters(active as ImageFilterFields)).toBe(true);
+    expect(hasActiveImageFilters(active as ImageFilterFields)).toBe(true);
+  });
+
+  it.each([
+    ["gradientMap", { gradientMap: { stops: [{ pos: 0, color: "#000000" }, { pos: 1, color: "#ffffff" }] } }],
+    ["lineCleanup", { lineCleanup: { threshold: 0.62, strength: 0.45 } }],
+    ["lensBlur", { lensBlur: { radius: 4, sampleCount: 21, apertureBlades: 6, apertureRotationRadians: 0 } }],
+    ["fieldIrisBlur", { fieldIrisBlur: { focusCenterX: 0.5, focusCenterY: 0.5, focusRadius: 0.2, feather: 0.2, maximumBlurRadius: 4, sampleCount: 21, apertureBlades: 6 } }],
+    ["tiltShiftBlur", { tiltShiftBlur: { axisRadians: 0, focusWidth: 0.2, feather: 0.2, maximumBlurRadius: 4, sampleCount: 21 } }],
+    ["selectiveGaussianBlur", { selectiveGaussianBlur: { radius: 3, spatialSigma: 2, edgeThreshold: 20, edgeSoftness: 0.35 } }],
+  ] as const)("%s는 설정 존재 자체가 canonical 활성 조건이다", (_name, fields) => {
+    expect(hasLightweightActiveImageFilters(fields as ImageFilterFields)).toBe(true);
+    expect(hasActiveImageFilters(fields as ImageFilterFields)).toBe(true);
+  });
+
+  it("seeded object-field corpus에서 lightweight와 canonical 판정이 일치한다", () => {
+    let state = 0x5eeda11;
+    const random = () => {
+      state = (Math.imul(state, 1_664_525) + 1_013_904_223) >>> 0;
+      return state / 0x1_0000_0000;
+    };
+    const signed = (iteration: number) => iteration % 7 === 0 ? 0 : (random() * 300) - 150;
+
+    for (let iteration = 0; iteration < 96; iteration += 1) {
+      const amount = signed(iteration);
+      const curve = iteration % 5 === 0
+        ? identityCurve
+        : [{ x: 0, y: 0 }, { x: 128, y: Math.round(random() * 255) }, { x: 255, y: 255 }];
+      const cases: Array<[string, ImageFilterFields]> = [
+        ["levelsCh", { levelsCh: { r: { ...identityLevels, gamma: iteration % 6 === 0 ? 1 : Math.max(0.1, random() * 10) } } }],
+        ["curve", { curve }],
+        ["curveCh", { curveCh: { g: curve } }],
+        ["colorBalance", { colorBalance: { shadows: [amount, 0, 0], midtones: [0, 0, 0], highlights: [0, 0, 0] } }],
+        ["channelMixer", { channelMixer: { ...identityMixer, red: { ...identityMixer.red, g: amount / 100 } } }],
+        ["selectiveHsl", { selectiveHsl: { ...identitySelectiveHsl, red: { hue: amount, sat: 0, lum: 0 } } }],
+        ["vibrance", { vibrance: { vibrance: amount, saturation: 0 } }],
+        ["photoFilter", { photoFilter: { color: "#ec8a00", density: amount, preserveLuminosity: true } }],
+        ["shadowHighlight", { shadowHighlight: { shadows: amount, shadowsWidth: 50, highlights: 0, highlightsWidth: 50, midtoneContrast: 0 } }],
+        ["halftone", { halftone: { dotSize: 4, angle: 15, mode: "cmyk", strength: amount } }],
+        ["grain", { grain: { type: "film", amount, size: 1, seed: iteration } }],
+        ["distort", { distort: { type: "twirl", amount, scale: 50 } }],
+        ["stylize", { stylize: { type: "emboss", strength: amount, detail: 3 } }],
+        ["light", { light: { type: "lensFlare", intensity: amount, x: 30, y: 30, hue: 45 } }],
+        ["sketch", { sketch: { type: "photocopy", strength: amount, detail: 3 } }],
+        ["detail", { detail: { type: "smartSharpen", amount, radius: 2 } }],
+      ];
+      for (const [name, fields] of cases) {
+        expect(
+          hasLightweightActiveImageFilters(fields),
+          `${name} iteration ${iteration}`,
+        ).toBe(hasActiveImageFilters(fields));
+      }
+    }
+  });
 });
 
 describe("imageFilterCacheKey", () => {
@@ -888,6 +1040,26 @@ describe("imageFilterCacheKey", () => {
 
   it("빈 객체와 명시적 undefined는 동일한 키", () => {
     expect(imageFilterCacheKey({})).toBe(imageFilterCacheKey({ blur: undefined, hue: undefined }));
+  });
+
+  it("25번째 스마트 필터 파라미터가 바뀌면 캐시 키도 바뀐다", () => {
+    const disabledPrefix: NonNullable<ImageFilterFields["smartFilterOperations"]> = Array.from(
+      { length: 24 },
+      (_, index) => ({
+        id: `disabled-${index}`,
+        engine: "invert" as const,
+        enabled: false,
+        params: {},
+      }),
+    );
+    const withTailRadius = (radius: number): ImageFilterFields => ({
+      smartFilterOperations: [
+        ...disabledPrefix,
+        { id: "tail", engine: "blur", enabled: true, params: { radius } },
+      ],
+    });
+
+    expect(imageFilterCacheKey(withTailRadius(1))).not.toBe(imageFilterCacheKey(withTailRadius(2)));
   });
 
   // 의도적 변경(2026-07-24): grain 객체 전체가 직렬화되므로 새 chroma 필드도

@@ -61,6 +61,7 @@ import {
   type StudioRailMoreViewport,
 } from "./studio-left-tool-rail-position";
 import { preloadStudioReferencePanel } from "./studio-page-lazy-ui";
+import { preloadStudioRasterRetouchRuntime } from "./studio-raster-retouch-preload";
 import {
   STUDIO_RETOUCH_EDITABLE_COPY_NOTE,
   studioRetouchToolHelp,
@@ -91,6 +92,14 @@ type PositionedStudioRailMore = StudioRailMorePosition & { readonly maxHeight: n
 
 function labelWithShortcut(label: string, shortcut: string | undefined): string {
   return shortcut ? `${label} (${formatStudioShortcutChord(shortcut)})` : label;
+}
+
+function preloadRasterRetouchIntent(): void {
+  void preloadStudioRasterRetouchRuntime().catch(() => undefined);
+}
+
+function preloadLiquifyIntent(): void {
+  void preloadStudioRasterRetouchRuntime({ liquify: true }).catch(() => undefined);
 }
 
 function currentStudioRailMoreViewport(): StudioRailMoreViewport {
@@ -713,6 +722,9 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               active={smudgeActive}
               disabled={!smudgeActive && !rasterRetouchCanStart}
               unavailableReason={rasterRetouchUnavailableReason(smudgeActive)}
+              onPointerEnter={preloadRasterRetouchIntent}
+              onPointerDown={preloadRasterRetouchIntent}
+              onFocus={preloadRasterRetouchIntent}
               onClick={toggleSmudgeTool}
             />
             ) : null}
@@ -726,6 +738,9 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               active={wetMixActive}
               disabled={!wetMixActive && !rasterRetouchCanStart}
               unavailableReason={rasterRetouchUnavailableReason(wetMixActive)}
+              onPointerEnter={preloadRasterRetouchIntent}
+              onPointerDown={preloadRasterRetouchIntent}
+              onFocus={preloadRasterRetouchIntent}
               onClick={toggleWetMixTool}
             />
             ) : null}
@@ -739,6 +754,9 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               active={dodgeBurnActive}
               disabled={!dodgeBurnActive && !rasterRetouchCanStart}
               unavailableReason={rasterRetouchUnavailableReason(dodgeBurnActive)}
+              onPointerEnter={preloadRasterRetouchIntent}
+              onPointerDown={preloadRasterRetouchIntent}
+              onFocus={preloadRasterRetouchIntent}
               onClick={toggleDodgeBurnTool}
             />
             ) : null}
@@ -752,6 +770,9 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               active={liquifyActive}
               disabled={!liquifyActive && !rasterRetouchCanStart}
               unavailableReason={rasterRetouchUnavailableReason(liquifyActive)}
+              onPointerEnter={preloadLiquifyIntent}
+              onPointerDown={preloadLiquifyIntent}
+              onFocus={preloadLiquifyIntent}
               onClick={toggleLiquifyTool}
             />
             ) : null}

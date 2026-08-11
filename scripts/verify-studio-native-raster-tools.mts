@@ -52,8 +52,10 @@ import {
 type Point = { x: number; y: number };
 type Tier = "quick" | "deep";
 type RetouchScenarioId = "smudge" | "wet-mix" | "dodge-burn" | "liquify";
+type RasterPreparationCancellationAction = "escape" | "tool-switch";
 
 const AUTOSAVE_PREFIX = "toonspectrum-studio-autosave";
+const AUTOSAVE_KEY = `${AUTOSAVE_PREFIX}:v12:guest:new`;
 const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
 const MOBILE_HINT_KEY = "toonspectrum-studio-mobile-hint-dismissed";
 const CANVAS_HEIGHT_ENV = "TOONSPECTRUM_NATIVE_RASTER_CANVAS_HEIGHT";
@@ -219,6 +221,25 @@ interface MatrixReport {
   limitations: string[];
 }
 
+interface RasterPreparationCancellationEvidence {
+  action: RasterPreparationCancellationAction;
+  status: "passed" | "failed";
+  delayedSvgWorkerRequests: number;
+  abortCalls: number;
+  allAbortCalls: number;
+  retouchReplayPosts: number;
+  workerPostTypes: string[];
+  imageCount: number;
+  hiddenDrawCount: number;
+  visibleDrawCount: number;
+  drawCount: number;
+  staleCompletionNoOp: boolean;
+  browserErrors: string[];
+  failedResponses: string[];
+  screenshot: string;
+  failure?: string;
+}
+
 const SCENARIOS: readonly ScenarioDefinition[] = STUDIO_NATIVE_RASTER_REQUIRED_SCENARIOS.map(
   (id): ScenarioDefinition => ({
     id,
@@ -244,6 +265,19 @@ const focusedScenarioArgument = process.argv
   .slice(2)
   .find((argument) => argument.startsWith("--scenario="));
 const focusedScenario = focusedScenarioArgument?.slice("--scenario=".length) ?? null;
+const cancellationRaceArgument = process.argv
+  .slice(2)
+  .find((argument) => argument.startsWith("--cancellation-race="));
+const cancellationRaceValue =
+  cancellationRaceArgument?.slice("--cancellation-race=".length) ?? null;
+const cancellationRaceActions: readonly RasterPreparationCancellationAction[] | null =
+  cancellationRaceValue === null
+    ? null
+    : cancellationRaceValue === "all"
+      ? ["escape", "tool-switch"]
+      : cancellationRaceValue === "escape" || cancellationRaceValue === "tool-switch"
+        ? [cancellationRaceValue]
+        : [];
 const scratchRoot = process.env.TOONSPECTRUM_NATIVE_RASTER_VERIFY_DIR?.trim();
 const SCRATCH = scratchRoot
   ? scratchRoot
@@ -919,12 +953,32 @@ async function readTrustedPointerAudit(page: Page): Promise<FixtureEvidence["poi
 }
 
 async function readDocumentSnapshot(page: Page): Promise<DocumentSnapshot | null> {
-  return page.evaluate((prefix) => {
+  return page.evaluate(async ({ prefix, autosaveKey }) => {
     type RawPage = { id?: unknown; elements?: unknown[] };
     type RawPayload = {
       savedAt?: unknown;
       currentPageId?: unknown;
       pagesList?: RawPage[];
+    };
+    type BrowserAutosaveReadResult =
+      | { state: "snapshot"; savedAt: string; payload: RawPayload }
+      | { state: "cleared"; savedAt: string }
+      | null;
+    type BrowserAutosaveSession = {
+      readLatest: () => Promise<BrowserAutosaveReadResult>;
+    };
+    type BrowserAutosaveRuntime = {
+      createStudioAutosaveOpfsSession: (
+        key: string,
+      ) => Promise<BrowserAutosaveSession | null>;
+    };
+    type NativeRasterAutosaveReader = {
+      key: string;
+      session: BrowserAutosaveSession;
+    };
+    const browserWindow = window as typeof window & {
+      __studioNativeRasterAutosaveReader?: NativeRasterAutosaveReader;
+      __studioNativeRasterAutosaveReadError?: string;
     };
     let latest: { key: string; payload: RawPayload } | null = null;
     for (let index = 0; index < window.localStorage.length; index += 1) {
@@ -942,6 +996,63 @@ async function readDocumentSnapshot(page: Page): Promise<DocumentSnapshot | null
       } catch {
         // Ignore unrelated storage records.
       }
+    }
+    try {
+      let reader = browserWindow.__studioNativeRasterAutosaveReader;
+      if (!reader || reader.key !== autosaveKey) {
+        const resourceUrls = performance.getEntriesByType("resource")
+          .map((entry) => entry.name)
+          .filter((url) => url.startsWith(window.location.origin));
+        let moduleUrl = resourceUrls.find((url) =>
+          /\/assets\/studio-autosave-opfs-session-[A-Za-z0-9_-]+\.js(?:\?.*)?$/u.test(url)
+        ) ?? resourceUrls.find((url) =>
+          /\/src\/domains\/creator\/studio-autosave-opfs-session\.ts(?:\?.*)?$/u.test(url)
+        ) ?? null;
+        if (!moduleUrl && resourceUrls.some((url) => url.includes("/@vite/client"))) {
+          moduleUrl = new URL(
+            "/src/domains/creator/studio-autosave-opfs-session.ts",
+            window.location.origin,
+          ).href;
+        }
+        if (!moduleUrl) {
+          const studioPageUrl = resourceUrls.find((url) =>
+            /\/assets\/StudioPage-[A-Za-z0-9_-]+\.js(?:\?.*)?$/u.test(url)
+          );
+          if (studioPageUrl) {
+            const source = await fetch(studioPageUrl).then((response) => response.text());
+            const match = source.match(
+              /\.\/studio-autosave-opfs-session-[A-Za-z0-9_-]+\.js/u,
+            );
+            if (match) moduleUrl = new URL(match[0], studioPageUrl).href;
+          }
+        }
+        if (moduleUrl) {
+          const runtime = await import(moduleUrl) as BrowserAutosaveRuntime;
+          const session = await runtime.createStudioAutosaveOpfsSession(autosaveKey);
+          if (session) {
+            reader = { key: autosaveKey, session };
+            browserWindow.__studioNativeRasterAutosaveReader = reader;
+          }
+        }
+      }
+      const durable = await reader?.session.readLatest() ?? null;
+      if (
+        durable?.state === "snapshot"
+        && Array.isArray(durable.payload.pagesList)
+        && (
+          !latest
+          || String(durable.payload.savedAt ?? durable.savedAt)
+            >= String(latest.payload.savedAt ?? "")
+        )
+      ) {
+        latest = { key: autosaveKey, payload: durable.payload };
+      }
+      browserWindow.__studioNativeRasterAutosaveReadError = undefined;
+    } catch (error) {
+      // A writer may be publishing the next immutable head while this advisory reader polls.
+      // Keep the last compatibility candidate and retry; preserve the exact failure for timeout
+      // diagnostics without introducing a product-only test hook.
+      browserWindow.__studioNativeRasterAutosaveReadError = String(error);
     }
     if (!latest?.payload.pagesList) return null;
     const currentPageId = typeof latest.payload.currentPageId === "string"
@@ -1047,7 +1158,7 @@ async function readDocumentSnapshot(page: Page): Promise<DocumentSnapshot | null
         element.type === "draw" && !element.hidden
       ).length,
     };
-  }, AUTOSAVE_PREFIX);
+  }, { prefix: AUTOSAVE_PREFIX, autosaveKey: AUTOSAVE_KEY });
 }
 
 async function waitForDocumentSnapshot(
@@ -1063,7 +1174,14 @@ async function waitForDocumentSnapshot(
     if (latest && predicate(latest)) return latest;
     await page.waitForTimeout(120);
   }
-  throw new Error(`${description}; latest=${JSON.stringify(latest)}`);
+  const durableReadError = await page.evaluate(() =>
+    (window as typeof window & {
+      __studioNativeRasterAutosaveReadError?: string;
+    }).__studioNativeRasterAutosaveReadError ?? null
+  );
+  throw new Error(
+    `${description}; latest=${JSON.stringify(latest)}; durableReadError=${JSON.stringify(durableReadError)}`,
+  );
 }
 
 async function waitForRasterOperationSettled(
@@ -2282,7 +2400,10 @@ async function performPixelTransform(
   selectionSnapshot: DocumentSnapshot;
   selectionBaseline: Buffer;
 }> {
-  const recovery = await toolButton(page, /^(?:변형 \(⇧T\)|선택 시작하기)$/u);
+  const recovery = await toolButton(
+    page,
+    /^(?:변형 \(⇧T\)|선택 시작하기|선택 후 변형)$/u,
+  );
   const inactiveBefore = await recovery.getAttribute("aria-pressed") !== "true";
   const selection = await performRectLikeSelection(page, "rect");
   const selectionBaseline = await captureClip(page);
@@ -2349,6 +2470,233 @@ function emptyScenarioEvidence(definition: ScenarioDefinition): StudioNativeRast
     browserErrors: [],
     failedResponses: [],
   };
+}
+
+async function installRasterPreparationCancellationProbe(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    type CancellationProbe = {
+      abortCalls: number;
+      allAbortCalls: number;
+      retouchReplayPosts: number;
+      workerPostTypes: string[];
+    };
+    type ProbeWindow = typeof window & {
+      __studioRasterPreparationCancellationProbe?: CancellationProbe;
+    };
+    const probe: CancellationProbe = {
+      abortCalls: 0,
+      allAbortCalls: 0,
+      retouchReplayPosts: 0,
+      workerPostTypes: [],
+    };
+    (window as ProbeWindow).__studioRasterPreparationCancellationProbe = probe;
+
+    const abortPrototype = AbortController.prototype as unknown as {
+      abort: (this: AbortController, reason?: unknown) => void;
+    };
+    const originalAbort = abortPrototype.abort;
+    abortPrototype.abort = function abort(reason?: unknown): void {
+      probe.allAbortCalls += 1;
+      if (new Error().stack?.includes("cancelStudioRasterPreparation")) {
+        probe.abortCalls += 1;
+      }
+      originalAbort.call(this, reason);
+    };
+
+    const workerPrototype = Worker.prototype as unknown as {
+      postMessage: (this: Worker, ...args: unknown[]) => void;
+    };
+    const originalPostMessage = workerPrototype.postMessage;
+    workerPrototype.postMessage = function postMessage(...messageArgs: unknown[]): void {
+      const payload = messageArgs[0];
+      const type = payload && typeof payload === "object" && "type" in payload
+        ? String((payload as { type?: unknown }).type ?? "")
+        : "";
+      if (type) probe.workerPostTypes.push(type);
+      if (
+        type === "studio-smudge/run"
+        || type === "studio-retouch/run"
+        || type === "studio-liquify/run"
+      ) {
+        probe.retouchReplayPosts += 1;
+      }
+      Reflect.apply(originalPostMessage, this, messageArgs);
+    };
+  });
+}
+
+async function readRasterPreparationCancellationProbe(page: Page): Promise<{
+  abortCalls: number;
+  allAbortCalls: number;
+  retouchReplayPosts: number;
+  workerPostTypes: string[];
+}> {
+  return page.evaluate(() => {
+    const probe = (window as typeof window & {
+      __studioRasterPreparationCancellationProbe?: {
+        abortCalls: number;
+        allAbortCalls: number;
+        retouchReplayPosts: number;
+        workerPostTypes: string[];
+      };
+    }).__studioRasterPreparationCancellationProbe;
+    return {
+      abortCalls: probe?.abortCalls ?? -1,
+      allAbortCalls: probe?.allAbortCalls ?? -1,
+      retouchReplayPosts: probe?.retouchReplayPosts ?? -1,
+      workerPostTypes: [...(probe?.workerPostTypes ?? [])],
+    };
+  });
+}
+
+async function runRasterPreparationCancellationScenario(
+  browser: Browser,
+  studioUrl: string,
+  action: RasterPreparationCancellationAction,
+  configuredCanvasHeight: number | null,
+): Promise<RasterPreparationCancellationEvidence> {
+  const directory = join(SCRATCH, `cancellation-${action}`);
+  mkdirSync(directory, { recursive: true });
+  const screenshot = join(directory, "after-stale-worker-settle.png");
+  const context = await browser.newContext({
+    viewport: { width: 1600, height: 1050 },
+    reducedMotion: "reduce",
+  });
+  const page = await context.newPage();
+  const errors = collectBrowserErrors(page, `cancellation-${action}`, studioUrl);
+  let delayedSvgWorkerRequests = 0;
+  let finalSnapshot: DocumentSnapshot | null = null;
+  let probe = {
+    abortCalls: -1,
+    allAbortCalls: -1,
+    retouchReplayPosts: -1,
+    workerPostTypes: [] as string[],
+  };
+
+  try {
+    await prepareStudio(page, studioUrl, configuredCanvasHeight);
+    const fixture = await drawNativeFixture(page, null);
+    invariant(
+      fixture.snapshot.imageCount === 0
+      && fixture.snapshot.drawCount === 2
+      && fixture.snapshot.hiddenDrawCount === 0,
+      `${action}: cancellation fixture did not start as two visible native draws`,
+    );
+    await installRasterPreparationCancellationProbe(page);
+    await page.route("**/*studio-svg-export.worker*", async (route) => {
+      delayedSvgWorkerRequests += 1;
+      await new Promise((resolve) => setTimeout(resolve, 3_200));
+      await route.continue().catch(() => undefined);
+    });
+
+    const smudge = await toolButton(page, RETOUCH_TOOL_LABELS.smudge);
+    await smudge.click();
+    await page.waitForFunction(() =>
+      document.querySelector<HTMLButtonElement>('[data-studio-rail-tool-id="blend"]')?.disabled
+        === true
+    , undefined, { timeout: 5_000 });
+    const routeWaitStartedAt = Date.now();
+    while (delayedSvgWorkerRequests === 0 && Date.now() - routeWaitStartedAt < 5_000) {
+      await page.waitForTimeout(25);
+    }
+    invariant(delayedSvgWorkerRequests > 0, `${action}: SVG Worker delay seam was not exercised`);
+    const probeBeforeCancellation = await readRasterPreparationCancellationProbe(page);
+
+    if (action === "escape") {
+      await page.keyboard.press("Escape");
+    } else {
+      const select = page.locator('[data-studio-rail-tool-id="select"]');
+      await select.click();
+      await page.waitForFunction(() =>
+        document.querySelector('[data-studio-rail-tool-id="select"]')
+          ?.getAttribute("aria-pressed") === "true"
+      );
+    }
+
+    // Exercise the exact stale-pointer boundary after cancellation. A leaked preparation owner
+    // would journal this trusted click and later replay it into the delayed editable copy.
+    const [canvasPoint] = await documentPointsToScreen(page, [{ x: 360, y: 500 }]);
+    invariant(canvasPoint, `${action}: could not resolve the stale-pointer probe coordinate`);
+    await page.mouse.click(canvasPoint.x, canvasPoint.y);
+    await page.mouse.move(4, 4);
+
+    // Wait past the delayed Worker response, then read durable document state. This distinguishes
+    // immediate UI cancellation from a stale completion that commits after the visible busy state.
+    await page.waitForTimeout(4_200);
+    finalSnapshot = await readDocumentSnapshot(page);
+    invariant(finalSnapshot, `${action}: no persisted document snapshot after cancellation`);
+    const probeAfterCancellation = await readRasterPreparationCancellationProbe(page);
+    probe = {
+      abortCalls: probeAfterCancellation.abortCalls - probeBeforeCancellation.abortCalls,
+      allAbortCalls:
+        probeAfterCancellation.allAbortCalls - probeBeforeCancellation.allAbortCalls,
+      retouchReplayPosts:
+        probeAfterCancellation.retouchReplayPosts - probeBeforeCancellation.retouchReplayPosts,
+      workerPostTypes: probeAfterCancellation.workerPostTypes.slice(
+        probeBeforeCancellation.workerPostTypes.length,
+      ),
+    };
+    await page.screenshot({ path: screenshot, fullPage: true, animations: "disabled" });
+
+    const staleCompletionNoOp =
+      finalSnapshot.imageCount === 0
+      && finalSnapshot.hiddenDrawCount === 0
+      && finalSnapshot.visibleDrawCount === 2
+      && finalSnapshot.drawCount === 2;
+    invariant(probe.abortCalls === 1, `${action}: expected one preparation abort, got ${probe.abortCalls}`);
+    invariant(
+      probe.retouchReplayPosts === 0,
+      `${action}: stale gesture posted ${probe.retouchReplayPosts} retouch Worker run(s)`,
+    );
+    invariant(staleCompletionNoOp, `${action}: delayed completion changed image/hidden-draw state`);
+    invariant(errors.messages.length === 0, `unexpected browser errors: ${errors.messages.join(" | ")}`);
+    invariant(
+      errors.failedResponses.length === 0,
+      `unexpected 5xx responses: ${errors.failedResponses.join(" | ")}`,
+    );
+    log(
+      `cancellation-${action}: PASS image=0 hiddenDraw=0 replay=0 abort=1 `
+      + `delayedSvgWorkerRequests=${delayedSvgWorkerRequests}`,
+    );
+    return {
+      action,
+      status: "passed",
+      delayedSvgWorkerRequests,
+      ...probe,
+      imageCount: finalSnapshot.imageCount,
+      hiddenDrawCount: finalSnapshot.hiddenDrawCount,
+      visibleDrawCount: finalSnapshot.visibleDrawCount,
+      drawCount: finalSnapshot.drawCount,
+      staleCompletionNoOp,
+      browserErrors: [...errors.messages],
+      failedResponses: [...errors.failedResponses],
+      screenshot,
+    };
+  } catch (error) {
+    const failure = error instanceof Error ? error.stack ?? error.message : String(error);
+    await page.screenshot({ path: screenshot, fullPage: true, animations: "disabled" })
+      .catch(() => undefined);
+    finalSnapshot ??= await readDocumentSnapshot(page).catch(() => null);
+    probe = await readRasterPreparationCancellationProbe(page).catch(() => probe);
+    log(`cancellation-${action}: FAIL ${failure}`);
+    return {
+      action,
+      status: "failed",
+      delayedSvgWorkerRequests,
+      ...probe,
+      imageCount: finalSnapshot?.imageCount ?? -1,
+      hiddenDrawCount: finalSnapshot?.hiddenDrawCount ?? -1,
+      visibleDrawCount: finalSnapshot?.visibleDrawCount ?? -1,
+      drawCount: finalSnapshot?.drawCount ?? -1,
+      staleCompletionNoOp: false,
+      browserErrors: [...errors.messages],
+      failedResponses: [...errors.failedResponses],
+      screenshot,
+      failure,
+    };
+  } finally {
+    await context.close().catch(() => undefined);
+  }
 }
 
 async function runScenario(
@@ -2700,6 +3048,14 @@ async function main(): Promise<void> {
   const startedAtDate = new Date();
   const startedAt = performance.now();
   const configuredCanvasHeight = configuredCanvasHeightFromEnvironment();
+  invariant(
+    cancellationRaceActions === null || cancellationRaceActions.length > 0,
+    "--cancellation-race must be escape, tool-switch, or all",
+  );
+  invariant(
+    !(focusedScenario && cancellationRaceActions),
+    "--scenario and --cancellation-race cannot be combined",
+  );
   const definitions = focusedScenario
     ? SCENARIOS.filter((definition) => definition.id === focusedScenario)
     : [...SCENARIOS];
@@ -2739,6 +3095,43 @@ async function main(): Promise<void> {
   try {
     await waitForServer(origin);
     browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
+    if (cancellationRaceActions) {
+      log(
+        `running ${cancellationRaceActions.length} raster-preparation cancellation scenario(s) `
+        + `against ${studioUrl}`,
+      );
+      const cancellationScenarios = await runWithConcurrency(
+        cancellationRaceActions,
+        1,
+        (action) => runRasterPreparationCancellationScenario(
+          browser!,
+          studioUrl,
+          action,
+          configuredCanvasHeight,
+        ),
+      );
+      const cancellationReport = {
+        ok: cancellationScenarios.every(({ status }) => status === "passed"),
+        kind: "studio-raster-preparation-cancellation",
+        origin,
+        externalPreview: Boolean(externalOrigin),
+        configuredCanvasHeight,
+        startedAt: startedAtDate.toISOString(),
+        completedAt: new Date().toISOString(),
+        durationMs: performance.now() - startedAt,
+        scenarios: cancellationScenarios,
+        artifacts: { directory: SCRATCH, report: REPORT_PATH, log: LOG_PATH },
+      };
+      writeFileSync(REPORT_PATH, `${JSON.stringify(cancellationReport, null, 2)}\n`);
+      log(
+        cancellationReport.ok
+          ? `PASS ${cancellationScenarios.length}/${cancellationScenarios.length}; report=${REPORT_PATH}`
+          : `FAIL cancellation scenario; report=${REPORT_PATH}`,
+      );
+      console.log(JSON.stringify(cancellationReport, null, 2));
+      if (!cancellationReport.ok) process.exitCode = 1;
+      return;
+    }
     log(
       `running ${definitions.length} ${tier} scenario(s) with concurrency=${concurrency} `
       + `against ${studioUrl}`

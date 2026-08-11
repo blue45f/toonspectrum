@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { rasterizeStudioVectorReferenceOffscreen } from "./studio-vector-fill-reference";
+import {
+  disposeStudioVectorReferenceRasterizer,
+  preloadStudioVectorReferenceRasterizer,
+  rasterizeStudioVectorReferenceOffscreen,
+} from "./studio-vector-fill-reference";
 
 import type {
   StudioOffscreenRasterRunInput,
@@ -24,6 +28,7 @@ class FakeFileReader {
 }
 
 afterEach(() => {
+  disposeStudioVectorReferenceRasterizer();
   vi.unstubAllGlobals();
 });
 
@@ -46,6 +51,7 @@ describe("Studio vector reference OffscreenCanvas rasterizer", () => {
     const dispose = vi.fn();
     let captured: StudioOffscreenRasterRunInput | null = null;
     const session: StudioOffscreenRasterSession = {
+      warm: vi.fn(() => true),
       run: vi.fn(async (_jobKey, input) => {
         captured = input;
         return {
@@ -103,6 +109,7 @@ describe("Studio vector reference OffscreenCanvas rasterizer", () => {
     vi.stubGlobal("Worker", class Worker {});
     const close = vi.fn();
     const session: StudioOffscreenRasterSession = {
+      warm: vi.fn(() => true),
       run: vi.fn(async () => ({
         ok: true as const,
         runId: 1,
@@ -140,5 +147,140 @@ describe("Studio vector reference OffscreenCanvas rasterizer", () => {
       { createBitmap },
     )).rejects.toMatchObject({ name: "AbortError", code: "aborted" });
     expect(createBitmap).not.toHaveBeenCalled();
+  });
+
+  it("reuses an intent-warmed session and releases it only after the idle lease", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.stubGlobal("Worker", class Worker {});
+      vi.stubGlobal("FileReader", FakeFileReader);
+      const close = vi.fn();
+      const warm = vi.fn(() => true);
+      const dispose = vi.fn();
+      const session: StudioOffscreenRasterSession = {
+        warm,
+        run: vi.fn(async () => ({
+          ok: true as const,
+          runId: 1,
+          width: 320,
+          height: 240,
+          payload: {
+            kind: "encoded" as const,
+            mime: "image/png" as const,
+            blob: new Blob([new Uint8Array(24)], { type: "image/png" }),
+          },
+        })),
+        dispose,
+      };
+
+      expect(preloadStudioVectorReferenceRasterizer(() => session)).toBe(true);
+      expect(warm).toHaveBeenCalledOnce();
+      expect(session.run).not.toHaveBeenCalled();
+
+      await rasterizeStudioVectorReferenceOffscreen(request(), {
+        createBitmap: async () => ({ width: 320, height: 240, close }) as unknown as ImageBitmap,
+      });
+      await rasterizeStudioVectorReferenceOffscreen(request({ svg: "<svg data-document='second'/>" }), {
+        createBitmap: async () => ({ width: 320, height: 240, close }) as unknown as ImageBitmap,
+      });
+
+      expect(session.run).toHaveBeenCalledTimes(2);
+      expect(vi.mocked(session.run).mock.calls[0]?.[0])
+        .not.toBe(vi.mocked(session.run).mock.calls[1]?.[0]);
+      expect(dispose).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(45_000);
+      expect(dispose).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("discards a fatal shared session before the next intent warmup", async () => {
+    vi.stubGlobal("Worker", class Worker {});
+    vi.stubGlobal("FileReader", FakeFileReader);
+    const firstDispose = vi.fn();
+    const first: StudioOffscreenRasterSession = {
+      warm: vi.fn(() => true),
+      run: vi.fn(async () => ({
+        ok: false as const,
+        runId: 1,
+        code: "worker-failed" as const,
+        message: "worker crashed",
+      })),
+      dispose: firstDispose,
+    };
+    const second: StudioOffscreenRasterSession = {
+      warm: vi.fn(() => true),
+      run: vi.fn(async () => ({
+        ok: true as const,
+        runId: 2,
+        width: 320,
+        height: 240,
+        payload: {
+          kind: "encoded" as const,
+          mime: "image/png" as const,
+          blob: new Blob([new Uint8Array(24)], { type: "image/png" }),
+        },
+      })),
+      dispose: vi.fn(),
+    };
+    const createBitmap = async () => ({
+      width: 320,
+      height: 240,
+      close: vi.fn(),
+    }) as unknown as ImageBitmap;
+
+    expect(preloadStudioVectorReferenceRasterizer(() => first)).toBe(true);
+    await expect(rasterizeStudioVectorReferenceOffscreen(
+      request(),
+      { createBitmap },
+    )).resolves.toBeNull();
+    expect(firstDispose).toHaveBeenCalledOnce();
+
+    expect(preloadStudioVectorReferenceRasterizer(() => second)).toBe(true);
+    await expect(rasterizeStudioVectorReferenceOffscreen(
+      request(),
+      { createBitmap },
+    )).resolves.toEqual({ dataUrl: PNG_DATA_URL, width: 320, height: 240 });
+    expect(second.run).toHaveBeenCalledOnce();
+  });
+
+  it("fails a throwing intent handshake closed without retaining the session", () => {
+    vi.stubGlobal("Worker", class Worker {});
+    const dispose = vi.fn();
+    const broken: StudioOffscreenRasterSession = {
+      warm: () => { throw new Error("startup failed"); },
+      run: vi.fn(),
+      dispose,
+    };
+
+    expect(preloadStudioVectorReferenceRasterizer(() => broken)).toBe(false);
+    expect(dispose).toHaveBeenCalledOnce();
+  });
+
+  it("drops an unavailable warm session so the next intent can create a healthy one", () => {
+    vi.stubGlobal("Worker", class Worker {});
+    const unavailableDispose = vi.fn();
+    const unavailable: StudioOffscreenRasterSession = {
+      warm: vi.fn()
+        .mockReturnValueOnce(true)
+        .mockReturnValue(false),
+      run: vi.fn(),
+      dispose: unavailableDispose,
+    };
+    const healthy: StudioOffscreenRasterSession = {
+      warm: vi.fn(() => true),
+      run: vi.fn(),
+      dispose: vi.fn(),
+    };
+    const createHealthy = vi.fn(() => healthy);
+
+    expect(preloadStudioVectorReferenceRasterizer(() => unavailable)).toBe(true);
+    expect(preloadStudioVectorReferenceRasterizer(createHealthy)).toBe(false);
+    expect(unavailableDispose).toHaveBeenCalledOnce();
+    expect(createHealthy).not.toHaveBeenCalled();
+    expect(preloadStudioVectorReferenceRasterizer(createHealthy)).toBe(true);
+    expect(createHealthy).toHaveBeenCalledOnce();
+    expect(healthy.warm).toHaveBeenCalledOnce();
   });
 });

@@ -1759,6 +1759,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                 <div className="mb-3">
                   <StudioRasterToolRecoveryPanel
                     entries={rasterAvailabilityForTab(activeImageInspectorTab)}
+                    busy={studioFilterPreparationBusy}
                     onRecover={handleRasterRecovery}
                   />
                 </div>
@@ -3100,6 +3101,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                               rasterAvailability("liquify", liquifyBusy),
                               rasterAvailability("heal", healCloneBusy),
                             ]}
+                            busy={studioFilterPreparationBusy}
                             onRecover={handleRasterRecovery}
                           />
                         </>
@@ -3239,6 +3241,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                             rasterAvailability("pixel-transform", pixelBusy),
                             rasterAvailability("puppet-warp", puppetWarpBusy),
                           ]}
+                          busy={studioFilterPreparationBusy}
                           onRecover={handleRasterRecovery}
                         />
                       )}
@@ -3950,6 +3953,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                       rasterAvailability("liquify", liquifyBusy),
                       rasterAvailability("heal", healCloneBusy),
                     ]}
+                    busy={studioFilterPreparationBusy}
                     onRecover={handleRasterRecovery}
                   />
                 </div>
@@ -3972,6 +3976,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                       rasterAvailability("pixel-transform", pixelBusy),
                       rasterAvailability("puppet-warp", puppetWarpBusy),
                     ]}
+                    busy={studioFilterPreparationBusy}
                     onRecover={handleRasterRecovery}
                   />
                 </div>

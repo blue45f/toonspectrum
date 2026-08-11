@@ -1,6 +1,6 @@
 // @vitest-environment node
 
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import {
   normalizeStudioBrushDynamicsSettings,
@@ -15,7 +15,9 @@ import {
 import { sha256HexPortable } from "./studio-sha256";
 import { exportPageToSvg } from "./studio-svg-export";
 import {
+  disposeStudioSvgExportPrewarmedWorker,
   prepareStudioSvgExportWorkerR8Transfer,
+  preloadStudioSvgExportWorker,
   runStudioSvgExportWorker,
   type StudioSvgExportWorkerLike,
 } from "./studio-svg-export-worker-client";
@@ -191,9 +193,157 @@ class ReadySvgWorker implements StudioSvgExportWorkerLike {
   }
 }
 
+class HangingSvgWorker implements StudioSvgExportWorkerLike {
+  onmessage: StudioSvgExportWorkerLike["onmessage"] = null;
+  onerror: StudioSvgExportWorkerLike["onerror"] = null;
+  posted: StudioSvgExportWorkerRunMessage | null = null;
+  terminated = false;
+
+  constructor(private readonly responseAfterPost?: unknown) {
+    queueMicrotask(() => {
+      this.onmessage?.({
+        data: {
+          type: "studio-svg-export/ready",
+          version: STUDIO_SVG_EXPORT_WORKER_PROTOCOL_VERSION,
+        },
+      } as MessageEvent<StudioSvgExportWorkerResponseMessage>);
+    });
+  }
+
+  postMessage(message: StudioSvgExportWorkerRunMessage): void {
+    this.posted = message;
+    if (this.responseAfterPost === undefined) return;
+    queueMicrotask(() => {
+      this.onmessage?.({ data: this.responseAfterPost } as MessageEvent<
+        StudioSvgExportWorkerResponseMessage
+      >);
+    });
+  }
+
+  terminate(): void {
+    this.terminated = true;
+  }
+}
+
 describe("SVG export Worker R8 transfer protocol", () => {
   afterEach(() => {
+    disposeStudioSvgExportPrewarmedWorker();
     resetStudioBrushR8GrainRegistry();
+  });
+
+  it("warms without document data and hands the ready Worker to the first production run", async () => {
+    const worker = new ReadySvgWorker();
+
+    expect(preloadStudioSvgExportWorker(() => worker)).toBe(true);
+    expect(worker.posted).toBeNull();
+    await Promise.resolve();
+
+    const result = await runStudioSvgExportWorker({
+      width: 32,
+      height: 24,
+      transparentBg: true,
+      elements: [],
+    });
+
+    expect(result.execution).toBe("worker");
+    expect(worker.posted?.input).toMatchObject({ width: 32, height: 24 });
+    expect(worker.terminated).toBe(true);
+  });
+
+  it("terminates an unused prewarmed Worker when its intent lease expires", async () => {
+    vi.useFakeTimers();
+    try {
+      const worker = new ReadySvgWorker();
+
+      expect(preloadStudioSvgExportWorker(() => worker)).toBe(true);
+      await Promise.resolve();
+      expect(worker.posted).toBeNull();
+      expect(worker.terminated).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(45_000);
+      expect(worker.terminated).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("releases a prewarmed Worker that never completes its ready handshake", async () => {
+    vi.useFakeTimers();
+    try {
+      const terminateFirst = vi.fn();
+      const first: StudioSvgExportWorkerLike = {
+        onmessage: null,
+        onerror: null,
+        postMessage: vi.fn(),
+        terminate: terminateFirst,
+      };
+
+      expect(preloadStudioSvgExportWorker(() => first)).toBe(true);
+      await vi.advanceTimersByTimeAsync(3_000);
+      expect(terminateFirst).toHaveBeenCalledOnce();
+
+      const replacement = new ReadySvgWorker();
+      expect(preloadStudioSvgExportWorker(() => replacement)).toBe(true);
+      await Promise.resolve();
+      expect(replacement.terminated).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("renews an existing prewarmed Worker lease on repeated intent", async () => {
+    vi.useFakeTimers();
+    try {
+      const worker = new ReadySvgWorker();
+
+      expect(preloadStudioSvgExportWorker(() => worker)).toBe(true);
+      await vi.advanceTimersByTimeAsync(44_000);
+      expect(preloadStudioSvgExportWorker(() => worker)).toBe(true);
+
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(worker.terminated).toBe(false);
+      await vi.advanceTimersByTimeAsync(44_000);
+      expect(worker.terminated).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("terminates and zeroizes a posted transfer when the Worker run times out", async () => {
+    vi.useFakeTimers();
+    try {
+      const source = r8Source();
+      expect(hydrateStudioBrushR8GrainAsset(source, decodedBytes).status).toBe("ready");
+      const worker = new HangingSvgWorker();
+      const pending = runStudioSvgExportWorker(r8ExportInput(source), {
+        workerFactory: () => worker,
+        runTimeoutMs: 100,
+      });
+      await Promise.resolve();
+      expect(worker.posted).not.toBeNull();
+      const rejection = pending.catch((error: unknown) => error);
+
+      await vi.advanceTimersByTimeAsync(100);
+      await expect(rejection).resolves.toMatchObject({
+        message: expect.stringContaining("계산 시간이 초과되었습니다"),
+      });
+      expect(worker.terminated).toBe(true);
+      expect([...worker.posted!.r8GrainAssets[0]!.decodedBytes]).toEqual([0, 0, 0, 0]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("rejects a malformed runtime response instead of leaving the export pending", async () => {
+    const worker = new HangingSvgWorker(null);
+
+    await expect(runStudioSvgExportWorker({
+      width: 32,
+      height: 24,
+      transparentBg: true,
+      elements: [],
+    }, { workerFactory: () => worker })).rejects.toThrow("알 수 없는 응답");
+    expect(worker.terminated).toBe(true);
   });
 
   it("collects only canonical draw references and deduplicates identical sources", () => {

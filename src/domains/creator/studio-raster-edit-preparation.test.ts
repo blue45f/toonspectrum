@@ -766,6 +766,42 @@ describe("editable raster copy planning", () => {
 });
 
 describe("Worker-fused editable raster preparation", () => {
+  it("reuses the exact preflight source-byte receipt instead of serializing the source twice", async () => {
+    const source = line("receipt-cjk", { name: "긴 한글 크레용 획" });
+    const stringify = vi.spyOn(JSON, "stringify");
+    let preparedElements: readonly unknown[] | null = null;
+
+    const result = await prepareAndRenderStudioEditableRasterCopy(
+      {
+        pageId: "page-receipt",
+        width: 320,
+        height: 480,
+        elements: [source],
+        includeBackground: false,
+      },
+      async (input, options) => {
+        preparedElements = input.elements;
+        return prepareStudioVectorReferenceExport(input, options);
+      },
+      renderPreparedStudioVectorReference,
+      {
+        workerFactory: null,
+        rasterize: async (request) => ({
+          dataUrl: PNG,
+          width: request.width,
+          height: request.height,
+        }),
+      },
+    );
+    const preparedSourceSerializations = stringify.mock.calls.filter(
+      ([value]) => value === preparedElements,
+    );
+    stringify.mockRestore();
+
+    expect(result.ok).toBe(true);
+    expect(preparedSourceSerializations).toHaveLength(1);
+  });
+
   it("reuses one prepared SVG object for fidelity planning and rasterization", async () => {
     const prepared = preparedVectorExport({ elementCount: 2 });
     const prepare = vi.fn(async () => prepared);

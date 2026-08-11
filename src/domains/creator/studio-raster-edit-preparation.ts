@@ -12,6 +12,7 @@ import { isEffectivelyHidden, isEffectivelyLocked } from "./studio-layers";
 import {
   exportPageToSvg,
 } from "./studio-svg-export";
+import { createStudioVectorReferenceSourceBudgetReceipt } from "./studio-vector-reference-source-budget-receipt";
 
 import type { El, ImageEl } from "./studio-element-model";
 import type { LayerGroup } from "./studio-layers";
@@ -23,6 +24,7 @@ import type {
   StudioVectorReferenceRenderOptions,
   StudioVectorReferenceResult,
 } from "./studio-vector-fill-reference";
+import type { StudioVectorReferenceSourceBudgetReceipt } from "./studio-vector-reference-source-budget-receipt";
 
 const EDITABLE_RASTER_COPY_NAMESPACE = "editable-raster-copy-v1";
 const PNG_BASE64_PREFIX = "data:image/png;base64,";
@@ -961,6 +963,7 @@ interface StudioEditableRasterCopyCandidate {
   readonly sourceDisposition: "preserve-visible" | "hide-originals";
   readonly sourceDispositionIds: readonly string[];
   readonly sourceFingerprint: string;
+  readonly sourceBudgetReceipt: StudioVectorReferenceSourceBudgetReceipt;
   readonly budgets?: StudioVectorReferenceBudgets;
 }
 
@@ -1057,10 +1060,16 @@ function preflightStudioEditableRasterCopy(
       };
     }
   }
-  let serializedSource: string;
+  const maxSourceBytes = boundedByteBudget(
+    input.budgets?.maxSourceBytes,
+    EDITABLE_RASTER_COPY_MAX_SOURCE_BYTES,
+  );
+  let sourceBudgetReceipt: StudioVectorReferenceSourceBudgetReceipt;
+  let sourceByteLength: number;
   let sourceFingerprint: string;
   try {
-    serializedSource = JSON.stringify(sourceElements);
+    ({ receipt: sourceBudgetReceipt, sourceByteLength } =
+      createStudioVectorReferenceSourceBudgetReceipt(sourceElements, maxSourceBytes));
     sourceFingerprint = fingerprintEditableRasterCopySource({
       width: input.width,
       height: input.height,
@@ -1077,10 +1086,7 @@ function preflightStudioEditableRasterCopy(
       reason: "표시 레이어 데이터를 안전하게 읽지 못해 편집용 복사본을 만들지 않았습니다.",
     };
   }
-  if (utf8ByteLength(serializedSource) > boundedByteBudget(
-    input.budgets?.maxSourceBytes,
-    EDITABLE_RASTER_COPY_MAX_SOURCE_BYTES,
-  )) {
+  if (sourceByteLength > maxSourceBytes) {
     return {
       ok: false,
       code: "source-budget-exceeded",
@@ -1104,6 +1110,7 @@ function preflightStudioEditableRasterCopy(
       sourceDisposition,
       sourceDispositionIds,
       sourceFingerprint,
+      sourceBudgetReceipt,
       budgets: input.budgets ? { ...input.budgets } : undefined,
     },
   };
@@ -1209,6 +1216,7 @@ function editableRasterCopyVectorInput(
     bgGrad: candidate.bgGrad,
     fingerprintNamespace: EDITABLE_RASTER_COPY_NAMESPACE,
     budgets: candidate.budgets,
+    sourceBudgetReceipt: candidate.sourceBudgetReceipt,
   };
 }
 

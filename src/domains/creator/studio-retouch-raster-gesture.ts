@@ -92,10 +92,16 @@ export function appendStudioPendingRasterRetouchGesturePoint(
   if (last && Math.hypot(next.x - last.x, next.y - last.y) < minimumDistance) {
     return gesture;
   }
-  const points = gesture.points.length < STUDIO_PENDING_RETOUCH_MAX_POINTS
-    ? [...gesture.points, next]
-    : [...gesture.points.slice(0, STUDIO_PENDING_RETOUCH_MAX_POINTS - 1), next];
-  return { ...gesture, points };
+  // Preparation owns this journal through one ref until release. Mutating that private array keeps
+  // pointermove O(1) instead of copying the complete gesture prefix for every sample. Once the cap
+  // is reached, replacing only the tail preserves the established first-8191 + latest contract.
+  const points = gesture.points as StudioRasterRetouchGesturePoint[];
+  if (points.length < STUDIO_PENDING_RETOUCH_MAX_POINTS) points.push(next);
+  else {
+    points.length = STUDIO_PENDING_RETOUCH_MAX_POINTS;
+    points[STUDIO_PENDING_RETOUCH_MAX_POINTS - 1] = next;
+  }
+  return gesture;
 }
 
 export function endStudioPendingRasterRetouchGesture(
@@ -118,6 +124,9 @@ export function endStudioPendingRasterRetouchGesture(
   return {
     ...withRelease,
     cancelled: options.cancelled,
+    // Detach the finalized value from the still-owned mutable journal. A late delivery holding the
+    // active owner can therefore never rewrite points already queued for normalized replay.
+    points: [...withRelease.points],
     released: true,
   };
 }

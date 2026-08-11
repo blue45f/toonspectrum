@@ -12,7 +12,18 @@ import {
   type StudioInspectorPixelSelectionToolId,
 } from "./StudioRasterToolRecoveryPanel";
 
-afterEach(cleanup);
+const preloadRasterRetouchRuntime = vi.hoisted(() =>
+  vi.fn(() => Promise.resolve()),
+);
+
+vi.mock("./studio-raster-retouch-preload", () => ({
+  preloadStudioRasterRetouchRuntime: preloadRasterRetouchRuntime,
+}));
+
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
 
 describe("StudioRasterToolRecoveryPanel", () => {
   it("offers the canonical non-destructive recovery for vector retouch targets", () => {
@@ -31,6 +42,70 @@ describe("StudioRasterToolRecoveryPanel", () => {
       toolId: "liquify",
       action: entry.entry.action,
     });
+  });
+
+  it("exposes shared raster preparation as a cancellable busy recovery", () => {
+    const onRecover = vi.fn();
+    const entry = resolveStudioRasterToolAvailability("liquify", {
+      selectedType: "draw",
+      visibleVectorDrawCount: 1,
+      exactRenderableVisibleCount: 1,
+    });
+
+    render(
+      <StudioRasterToolRecoveryPanel
+        entries={[entry]}
+        busy
+        onRecover={onRecover}
+      />,
+    );
+
+    expect(
+      screen.getByRole("region", { name: "픽셀 편집 준비" }).getAttribute("aria-busy"),
+    ).toBe("true");
+    expect(
+      screen.getByText(/Esc를 누르면 준비를 취소/u).getAttribute("role"),
+    ).toBe("status");
+    const recovery = screen.getByRole<HTMLButtonElement>("button", {
+      name: "페이지 합성본 준비 후 실행",
+    });
+    expect(recovery.disabled).toBe(true);
+    fireEvent.click(recovery);
+    expect(onRecover).not.toHaveBeenCalled();
+  });
+
+  it("prewarms vector-to-raster retouch and transform recovery intent without recovering", () => {
+    const onRecover = vi.fn();
+    const context = {
+      selectedType: "draw",
+      visibleVectorDrawCount: 1,
+      exactRenderableVisibleCount: 1,
+    } as const;
+    const entries = [
+      resolveStudioRasterToolAvailability("liquify", context),
+      resolveStudioRasterToolAvailability("crop", context),
+    ];
+
+    render(<StudioRasterToolRecoveryPanel entries={entries} onRecover={onRecover} />);
+
+    const recoveryButtons = screen.getAllByRole("button", {
+      name: "페이지 합성본 준비 후 실행",
+    });
+    fireEvent.pointerEnter(recoveryButtons[0]!);
+    fireEvent.pointerDown(recoveryButtons[0]!);
+    fireEvent.focus(recoveryButtons[0]!);
+    fireEvent.pointerEnter(recoveryButtons[1]!);
+    fireEvent.pointerDown(recoveryButtons[1]!);
+    fireEvent.focus(recoveryButtons[1]!);
+
+    expect(preloadRasterRetouchRuntime).toHaveBeenCalledTimes(6);
+    expect(preloadRasterRetouchRuntime).toHaveBeenNthCalledWith(1, { liquify: true });
+    expect(preloadRasterRetouchRuntime).toHaveBeenNthCalledWith(2, { liquify: true });
+    expect(preloadRasterRetouchRuntime).toHaveBeenNthCalledWith(3, { liquify: true });
+    expect(preloadRasterRetouchRuntime).toHaveBeenNthCalledWith(4);
+    expect(preloadRasterRetouchRuntime).toHaveBeenNthCalledWith(5);
+    expect(preloadRasterRetouchRuntime).toHaveBeenNthCalledWith(6);
+    expect(onRecover).not.toHaveBeenCalled();
   });
 
   it("launches every registered filter against a page composite without an image selection", () => {

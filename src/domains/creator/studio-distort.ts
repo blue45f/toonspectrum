@@ -139,11 +139,11 @@ function sampleBilinear(
  * 왜곡 제자리 적용 — 항등(amount 0)이면 no-op. 원본 스냅샷을 한 번 떠 두고
  * 목적지 픽셀마다 역매핑으로 원본 좌표를 구해 이중선형 샘플링한다(가장자리 클램프).
  *
- *   center=(w/2,h/2), maxR=min(w,h)/2, a=amount/100.
- *   twirl:  반지름 r의 감쇠 f=max(0,1-r/maxR)로 회전각 오프셋 a·π·f를 만든다.
+ *   center=(w/2,h/2), effectR=min(min(w,h)/2, scale), a=amount/100.
+ *   twirl:  반지름 r의 감쇠 f=max(0,1-r/effectR)로 회전각 오프셋 a·π·f를 만든다.
  *           원본 각도 = 목적지 각도 - 오프셋 → 중심·가장자리는 고정, 중간만 비틀린다.
  *   ripple: 같은 각도에서 srcR = r + sin(r/scale)·a·scale 만큼 반지름을 진동시킨다.
- *   pinch:  srcR = r·(1 + a·(1 - r/maxR)). a>0이면 안으로 빨려들고(핀치),
+ *   pinch:  srcR = r·(1 + a·(1 - r/effectR)). a>0이면 안으로 빨려들고(핀치),
  *           a<0이면 밖으로 부푼다(어안/구체화). srcR>=0으로 클램프.
  *   wave:   srcX = x + sin(y/scale)·a·scale, srcY = y + sin(x/scale)·a·scale.
  *
@@ -177,7 +177,7 @@ export function applyDistort(img: StudioImageDataLike, d: Distort): void {
  * 중심 기준 역매핑 공통 루프 — 목적지 픽셀마다 중심 오프셋(dx,dy)·반지름 r을 구해
  * mapSrc(x,y,dx,dy,r)에 위임한다. mapSrc가 [sx,sy]를 주면 그 좌표를, null이면
  * 변위 없음(원본 x,y)을 이중선형 샘플링한다. 중심·항등 분기는 각 mapSrc가 null로 표현해
- * 종류별 가드(r===0 / r>=maxR 등)를 그대로 보존한다. 알파 포함 4채널 보간.
+ * 종류별 가드(r===0 / r>=effectR 등)를 그대로 보존한다. 알파 포함 4채널 보간.
  */
 function remapAroundCenter(
   src: Uint8ClampedArray,
@@ -205,8 +205,26 @@ function remapAroundCenter(
 }
 
 /**
- * 비틀기(twirl) — 중심을 축으로 소용돌이. 반지름 r의 감쇠 f=max(0,1-r/maxR)로
- * 회전각 오프셋 angleOffset = a·π·f 를 만든다(중심 r=0과 가장자리 r=maxR에서 f=0 → 고정).
+ * 비틀기/핀치의 픽셀 단위 영향 반경. UI의 scale(1..50)이 실제 결과를 제어하도록 하고,
+ * 짧은 변을 넘어선 영역에서는 방사형 감쇠가 음수로 뒤집히지 않게 내접 반경으로 제한한다.
+ * 직접 호출의 비정상 scale도 normalizeDistort와 같은 범위/기본값으로 fail-safe 처리한다.
+ */
+function radialInfluenceRadius(width: number, height: number, scale: number): number {
+  const imageRadius = Math.min(width, height) / 2;
+  if (!(imageRadius > 0)) return 0;
+  const safeScale = clampTo(
+    scale,
+    DISTORT_SCALE_RANGE.min,
+    DISTORT_SCALE_RANGE.max,
+    DEFAULT_DISTORT.scale
+  );
+  return Math.min(imageRadius, safeScale);
+}
+
+/**
+ * 비틀기(twirl) — 중심을 축으로 소용돌이. scale을 픽셀 단위 영향 반경으로 삼고,
+ * 반지름 r의 감쇠 f=max(0,1-r/effectR)로
+ * 회전각 오프셋 angleOffset = a·π·f 를 만든다(중심 r=0은 변위가 없고, r=effectR은 f=0 → 고정).
  * 원본 각도 srcAngle = destAngle - angleOffset. 부호로 CW/CCW가 갈린다.
  */
 function distortTwirl(
@@ -218,12 +236,12 @@ function distortTwirl(
 ): void {
   const cx = width / 2;
   const cy = height / 2;
-  const maxR = Math.min(width, height) / 2;
+  const effectR = radialInfluenceRadius(width, height, d.scale);
   const a = d.amount / 100;
-  remapAroundCenter(src, data, width, height, cx, cy, (x, y, dx, dy, r) => {
-    // maxR 밖(또는 0)은 회전 없음 → 원본 좌표 그대로.
-    if (maxR <= 0 || r >= maxR) return null;
-    const f = 1 - r / maxR; // 중심 1, 가장자리 0
+  remapAroundCenter(src, data, width, height, cx, cy, (_x, _y, dx, dy, r) => {
+    // 영향 반경 밖(또는 0)은 회전 없음 → 원본 좌표 그대로.
+    if (effectR <= 0 || r >= effectR) return null;
+    const f = 1 - r / effectR; // 중심 1, 영향 반경 경계 0
     const angleOffset = a * Math.PI * f;
     const destAngle = Math.atan2(dy, dx);
     const srcAngle = destAngle - angleOffset;
@@ -256,8 +274,9 @@ function distortRipple(
 }
 
 /**
- * 핀치(pinch) — 반지름을 안/밖으로 당긴다. srcR = r·(1 + a·(1 - r/maxR)).
- * a>0이면 중심으로 빨려들고(핀치), a<0이면 부푼다(어안/구체화). 감쇠로 가장자리는 덜 변한다.
+ * 핀치(pinch) — scale을 픽셀 단위 영향 반경으로 삼아 안/밖으로 당긴다.
+ * srcR = r·(1 + a·(1 - r/effectR)). a>0이면 중심으로 빨려들고(핀치),
+ * a<0이면 부푼다(어안/구체화). 영향 반경 경계와 그 밖은 정확히 원본을 유지한다.
  */
 function distortPinch(
   src: Uint8ClampedArray,
@@ -268,12 +287,12 @@ function distortPinch(
 ): void {
   const cx = width / 2;
   const cy = height / 2;
-  const maxR = Math.min(width, height) / 2;
+  const effectR = radialInfluenceRadius(width, height, d.scale);
   const a = d.amount / 100;
   remapAroundCenter(src, data, width, height, cx, cy, (_x, _y, dx, dy, r) => {
-    // 중심은 변위 0 → 그대로.
-    if (r === 0 || maxR <= 0) return null;
-    const falloff = 1 - r / maxR; // 중심 1, 가장자리 0(가장자리는 덜 변형)
+    // 중심 및 영향 반경 경계/밖은 변위 0 → 그대로. 이 가드가 음수 falloff를 차단한다.
+    if (r === 0 || effectR <= 0 || r >= effectR) return null;
+    const falloff = Math.max(0, 1 - r / effectR); // 중심 1, 영향 반경 경계 0
     let srcR = r * (1 + a * falloff);
     if (srcR < 0) srcR = 0; // 반지름 음수 방지
     const ratio = srcR / r;

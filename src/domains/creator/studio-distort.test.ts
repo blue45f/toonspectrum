@@ -205,6 +205,19 @@ describe("applyDistort — twirl(비틀기)", () => {
       expect(pixelAt(img, i)[3]).toBe(255);
     }
   });
+
+  it("scale은 픽셀 단위 영향 반경이라 값에 따라 실제 결과가 달라진다", () => {
+    const smallRadius = makePattern(64, 64);
+    const largeRadius = makePattern(64, 64);
+    const before = makePattern(64, 64);
+    applyDistort(smallRadius, { type: "twirl", amount: 80, scale: 8 });
+    applyDistort(largeRadius, { type: "twirl", amount: 80, scale: 24 });
+
+    const betweenRadii = 32 * 64 + 44; // center=(32,32), r=12
+    expect(pixelAt(smallRadius, betweenRadii)).toEqual(pixelAt(before, betweenRadii));
+    expect(pixelAt(largeRadius, betweenRadii)).not.toEqual(pixelAt(before, betweenRadii));
+    expect(dataEqual(smallRadius, largeRadius)).toBe(false);
+  });
 });
 
 describe("applyDistort — ripple(물결)", () => {
@@ -277,6 +290,46 @@ describe("applyDistort — pinch(핀치/어안)", () => {
     for (let i = 0; i < img.width * img.height; i++) {
       expect(pixelAt(img, i)[3]).toBe(123);
     }
+  });
+
+  it("scale은 픽셀 단위 영향 반경이라 값에 따라 실제 결과가 달라진다", () => {
+    const smallRadius = makePattern(64, 64);
+    const largeRadius = makePattern(64, 64);
+    const before = makePattern(64, 64);
+    applyDistort(smallRadius, { type: "pinch", amount: 80, scale: 8 });
+    applyDistort(largeRadius, { type: "pinch", amount: 80, scale: 24 });
+
+    const betweenRadii = 32 * 64 + 44; // center=(32,32), r=12
+    expect(pixelAt(smallRadius, betweenRadii)).toEqual(pixelAt(before, betweenRadii));
+    expect(pixelAt(largeRadius, betweenRadii)).not.toEqual(pixelAt(before, betweenRadii));
+    expect(dataEqual(smallRadius, largeRadius)).toBe(false);
+  });
+
+  it("영향 반경 경계와 바깥은 정확한 no-op이라 음수 falloff/방향 반전이 없다", () => {
+    const width = 20;
+    const height = 12;
+    const effectR = Math.min(width, height) / 2;
+    const img = makePattern(width, height);
+    const before = makePattern(width, height);
+    applyDistort(img, { type: "pinch", amount: 100, scale: 50 });
+
+    const cx = width / 2;
+    const cy = height / 2;
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const index = y * width + x;
+        if (Math.hypot(x - cx, y - cy) >= effectR) {
+          expect(pixelAt(img, index)).toEqual(pixelAt(before, index));
+        }
+      }
+    }
+
+    const justInside = 6 * width + 15; // r=5
+    const boundary = 6 * width + 16; // r=6
+    const justOutside = 6 * width + 17; // r=7
+    expect(pixelAt(img, justInside)).not.toEqual(pixelAt(before, justInside));
+    expect(pixelAt(img, boundary)).toEqual(pixelAt(before, boundary));
+    expect(pixelAt(img, justOutside)).toEqual(pixelAt(before, justOutside));
   });
 });
 

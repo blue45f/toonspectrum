@@ -94,6 +94,8 @@ export type StudioOffscreenRasterRunResult =
     };
 
 export interface StudioOffscreenRasterSession {
+  /** Starts the module Worker handshake without allocating or transferring any raster source. */
+  warm(): boolean;
   run(
     jobKey: string,
     input: StudioOffscreenRasterRunInput,
@@ -257,6 +259,7 @@ export function createStudioOffscreenRasterSession(
       const abandoned = scheduler.abandonInFlight();
       closeWorker();
       if (abandoned) {
+        scheduler.settle(abandoned.runId);
         finish(abandoned.payload, failure(abandoned.runId, "timeout", "래스터 계산 시간이 초과되었습니다."));
       }
       // 남은 큐는 새 Worker 로 이어간다.
@@ -268,6 +271,7 @@ export function createStudioOffscreenRasterSession(
     const response = event.data;
     if (!isStudioOffscreenRasterResponseMessage(response)) {
       closeWorker();
+      unavailableCode = "protocol";
       failEverything("protocol", "래스터 Worker가 알 수 없는 응답을 반환했습니다.");
       return;
     }
@@ -313,11 +317,13 @@ export function createStudioOffscreenRasterSession(
   function onWorkerError(event: ErrorEventLike): void {
     event.preventDefault?.();
     closeWorker();
+    unavailableCode = "worker-failed";
     failEverything("worker-failed", "래스터 Worker 실행 중 오류가 발생했습니다.");
   }
 
-  function ensureWorker(): void {
-    if (disposed || worker || unavailableCode !== null || !factory) return;
+  function ensureWorker(): boolean {
+    if (disposed || unavailableCode !== null || !factory) return false;
+    if (worker) return true;
     let created: StudioOffscreenRasterWorkerLike | null;
     try {
       created = factory();
@@ -327,7 +333,7 @@ export function createStudioOffscreenRasterSession(
     if (!created) {
       unavailableCode = "worker-failed";
       failEverything("worker-failed", "래스터 Worker를 만들 수 없습니다.");
-      return;
+      return false;
     }
     worker = created;
     ready = false;
@@ -340,9 +346,13 @@ export function createStudioOffscreenRasterSession(
       unavailableCode = "timeout";
       failEverything("timeout", "래스터 Worker가 준비되지 않았습니다.");
     }, startupTimeoutMs);
+    return worker !== null;
   }
 
   return {
+    warm() {
+      return ensureWorker();
+    },
     run(jobKey, input, runOptions = {}) {
       if (disposed) {
         return Promise.resolve(failure(0, "cancelled", "래스터 세션이 종료되었습니다."));
@@ -383,10 +393,21 @@ export function createStudioOffscreenRasterSession(
           if (wasInFlight) {
             scheduler.abandonInFlight();
             clearRunTimer();
-            postCancel(task.runId);
+            // The Worker protocol has one serial execution slot. Posting the next run immediately
+            // after an in-flight abort can reach the same Worker while the abandoned job is still
+            // encoding, which the Worker correctly rejects as a concurrent protocol violation.
+            // Termination is the only prompt cancellation fence that also makes the transferred
+            // source buffers unreachable; resume queued work only after a fresh ready handshake.
+            closeWorker();
+            scheduler.settle(task.runId);
+          } else {
+            // A queued task was never posted, so no Worker response will arrive to clear its
+            // cancellation tombstone. Settle it locally to keep a long-lived warm session bounded.
+            scheduler.settle(task.runId);
           }
           finish(task, failure(task.runId, "cancelled", "래스터 요청이 취소되었습니다."));
-          pump();
+          if (wasInFlight) ensureWorker();
+          else pump();
         };
         task.detachAbort = () => {
           runOptions.signal?.removeEventListener("abort", onAbort);
@@ -412,6 +433,7 @@ export function createStudioOffscreenRasterSession(
 
         if (!isStudioOffscreenRasterRunMessage(task.message)) {
           scheduler.cancel(task.runId);
+          scheduler.settle(task.runId);
           finish(task, failure(task.runId, "protocol", "래스터 요청 형식이 올바르지 않습니다."));
           return;
         }

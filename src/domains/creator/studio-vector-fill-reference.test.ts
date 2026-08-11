@@ -13,6 +13,7 @@ import {
   type StudioAdvancedFillVectorTargetInput,
   type StudioVectorReferenceRasterizer,
 } from "./studio-vector-fill-reference";
+import { createStudioVectorReferenceSourceBudgetReceipt } from "./studio-vector-reference-source-budget-receipt";
 
 import type { El } from "./studio-element-model";
 
@@ -350,16 +351,41 @@ describe("renderStudioVectorReference generic seam", () => {
       fingerprintNamespace: "prepared-vector-v1",
     }, { workerFactory: null });
     const rasterize = vi.fn(rasterizer());
+    const expectedFingerprint = fingerprintStudioVectorReference(
+      prepared.result.svg,
+      "prepared-vector-v1",
+    );
+    const encode = vi.spyOn(TextEncoder.prototype, "encode");
 
     const result = await renderPreparedStudioVectorReference(prepared, { rasterize });
 
+    expect(encode).toHaveBeenCalledOnce();
+    encode.mockRestore();
     expect(rasterize).toHaveBeenCalledOnce();
     expect(rasterize.mock.calls[0]?.[0].svg).toBe(prepared.result.svg);
     expect(prepared.result.svg).toContain("한 번만 직렬화");
-    expect(result.fingerprint).toBe(
-      fingerprintStudioVectorReference(prepared.result.svg, "prepared-vector-v1"),
-    );
+    expect(result.fingerprint).toBe(expectedFingerprint);
     expect(result.execution).toBe(prepared.execution);
+  });
+
+  it("falls back to canonical source bytes when nested input mutates after a receipt", async () => {
+    const source = draw("receipt-mutation");
+    const elements = [source];
+    const maxSourceBytes = 512;
+    const { receipt } = createStudioVectorReferenceSourceBudgetReceipt(
+      elements,
+      maxSourceBytes,
+    );
+    source.stroke = "x".repeat(2_048);
+    await Promise.resolve();
+
+    await expect(prepareStudioVectorReferenceExport({
+      width: 320,
+      height: 240,
+      elements,
+      budgets: { maxSourceBytes },
+      sourceBudgetReceipt: receipt,
+    }, { workerFactory: null })).rejects.toMatchObject({ code: "source-budget-exceeded" });
   });
 
   it("can abort between prepared export and rasterization without touching the rasterizer", async () => {

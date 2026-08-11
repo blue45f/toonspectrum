@@ -149,6 +149,34 @@ function createSession(worker: FakeWorker | null, overrides: StudioOffscreenRast
 }
 
 describe("studio offscreen raster client — 핸드셰이크와 전송", () => {
+  it("warms the Worker handshake without posting a raster job", () => {
+    const worker = new FakeWorker();
+    const { session } = createSession(worker);
+
+    expect(session.warm()).toBe(true);
+
+    expect(worker.runMessages).toHaveLength(0);
+    worker.emitReady();
+    expect(worker.runMessages).toHaveLength(0);
+    session.dispose();
+    expect(worker.terminateCalls).toBe(1);
+  });
+
+  it("reports a warm handshake unavailable after startup failure or disposal", () => {
+    const worker = new FakeWorker();
+    const harness = createSession(worker);
+
+    expect(harness.session.warm()).toBe(true);
+    expect(harness.fireOldestTimer()).toBe(true);
+    expect(worker.terminateCalls).toBe(1);
+    expect(harness.session.warm()).toBe(false);
+
+    harness.session.dispose();
+    expect(harness.session.warm()).toBe(false);
+    expect(createSession(null).session.warm()).toBe(false);
+    expect(createStudioOffscreenRasterSession({ workerFactory: null }).warm()).toBe(false);
+  });
+
   it("ready 이전에는 post 하지 않고, ready 직후 하나만 보낸다", async () => {
     const worker = new FakeWorker();
     const { session } = createSession(worker);
@@ -349,21 +377,29 @@ describe("studio offscreen raster client — 취소와 오류", () => {
     session.dispose();
   });
 
-  it("비행 중 abort 는 Worker 에 cancel 을 보내고 다음 잡을 진행시킨다", async () => {
-    const worker = new FakeWorker();
-    const { session } = createSession(worker, { policy: "queue-all" });
+  it("비행 중 abort 는 busy Worker 를 닫고 새 ready Worker 에서 다음 잡을 진행시킨다", async () => {
+    const firstWorker = new FakeWorker();
+    const replacementWorker = new FakeWorker();
+    const workers = [firstWorker, replacementWorker];
+    const { session } = createSession(firstWorker, {
+      policy: "queue-all",
+      workerFactory: () => workers.shift() ?? null,
+    });
     const controller = new AbortController();
     const first = session.run("a", input(), { signal: controller.signal });
-    worker.emitReady();
-    const firstRunId = worker.runMessages[0].runId;
+    firstWorker.emitReady();
     const second = session.run("b", input());
 
     controller.abort();
-    expect(worker.cancelledRunIds).toEqual([firstRunId]);
+    expect(firstWorker.cancelledRunIds).toEqual([]);
+    expect(firstWorker.terminateCalls).toBe(1);
+    expect(replacementWorker.runMessages).toHaveLength(0);
     await expect(first).resolves.toMatchObject({ ok: false, code: "cancelled" });
 
-    const secondRunId = worker.runMessages[1].runId;
-    worker.emit(resultFor(secondRunId));
+    replacementWorker.emitReady();
+    expect(replacementWorker.runMessages).toHaveLength(1);
+    const secondRunId = replacementWorker.runMessages[0].runId;
+    replacementWorker.emit(resultFor(secondRunId));
     await expect(second).resolves.toMatchObject({ ok: true, runId: secondRunId });
     session.dispose();
   });
@@ -399,6 +435,11 @@ describe("studio offscreen raster client — 취소와 오류", () => {
 
     await expect(pending).resolves.toMatchObject({ ok: false, code: "protocol" });
     expect(worker.terminateCalls).toBe(1);
+    expect(session.warm()).toBe(false);
+    await expect(session.run("after-protocol", input())).resolves.toMatchObject({
+      ok: false,
+      code: "protocol",
+    });
     session.dispose();
   });
 
@@ -410,6 +451,11 @@ describe("studio offscreen raster client — 취소와 오류", () => {
     worker.emitError();
 
     await expect(pending).resolves.toMatchObject({ ok: false, code: "worker-failed" });
+    expect(session.warm()).toBe(false);
+    await expect(session.run("after-error", input())).resolves.toMatchObject({
+      ok: false,
+      code: "worker-failed",
+    });
     session.dispose();
   });
 

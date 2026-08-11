@@ -370,6 +370,13 @@ describe("Studio native-raster browser gate policy", () => {
     expect(source).toContain("readExactRasterImagePresentation");
     expect(source).toContain("__studioRasterImagePresentationProbe");
     expect(source).toContain("waitForRasterDurableAutosaveAfterOperation");
+    expect(source).toContain("createStudioAutosaveOpfsSession");
+    expect(source).toContain("readLatest");
+    expect(source).toContain("studio-autosave-opfs-session-");
+    expect(source).toContain("studio-autosave-opfs-session\\.ts");
+    expect(source).toContain('url.includes("/@vite/client")');
+    expect(source).toContain("__studioNativeRasterAutosaveReadError");
+    expect(source).toContain("선택 후 변형");
     expect(source).toContain("markRasterOperationSettled");
     expect(source).toContain('computeSettleFence: "tool-busy-control-enabled"');
     expect(source).toContain('operationSettleFence: "exact-raster-src-konva-layer-draw"');
@@ -395,6 +402,14 @@ describe("Studio native-raster browser gate policy", () => {
     expect(source).toContain('[data-studio-background-panel="true"]');
     expect(source).toContain('resizer.locator("#studio-canvas-h-input")');
     expect(source).toContain("process.env.TOONSPECTRUM_NATIVE_RASTER_CONCURRENCY ?? 1");
+    expect(source).toContain("--cancellation-race=");
+    expect(source).toContain("installRasterPreparationCancellationProbe");
+    expect(source).toContain("__studioRasterPreparationCancellationProbe");
+    expect(source).toContain("delayedSvgWorkerRequests");
+    expect(source).toContain("probe.abortCalls === 1");
+    expect(source).toContain("probe.retouchReplayPosts === 0");
+    expect(source).toContain("finalSnapshot.imageCount === 0");
+    expect(source).toContain("finalSnapshot.hiddenDrawCount === 0");
     expect(source).not.toContain("@playwright/test");
     expect(source).not.toContain("setInputFiles");
     expect(source).not.toContain("createFixturePng");

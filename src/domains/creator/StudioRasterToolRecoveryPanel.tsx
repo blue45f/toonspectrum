@@ -24,6 +24,7 @@ import {
   type StudioInspectorRasterToolPolicy,
 } from "./studio-inspector-raster-tool-policy";
 import { STUDIO_EASE, STUDIO_FOCUS_RING, StudioContextPill } from "./studio-panel-ui";
+import { preloadStudioRasterRetouchRuntime } from "./studio-raster-retouch-preload";
 import {
   type StudioRasterRecoveryAction,
   type StudioRasterToolAvailability,
@@ -64,6 +65,28 @@ function recoveryButtonLabel(
     return policy.actionLabel;
   }
   return entry.entry.action?.label ?? policy.actionLabel;
+}
+
+function prewarmStudioRasterRecoveryIntent(
+  request: StudioRasterRecoveryRequest,
+): void {
+  if (request.action.id !== "create-editable-raster-copy") return;
+  switch (request.toolId) {
+    case "smudge":
+    case "dodge-burn":
+    case "wet-mix":
+    case "heal":
+    case "crop":
+    case "pixel-transform":
+    case "puppet-warp":
+      void preloadStudioRasterRetouchRuntime().catch(() => undefined);
+      return;
+    case "liquify":
+      void preloadStudioRasterRetouchRuntime({ liquify: true }).catch(() => undefined);
+      return;
+    default:
+      return;
+  }
 }
 
 /**
@@ -107,8 +130,14 @@ export function StudioRasterToolRecoveryPanel({
           <span className="block text-xs font-semibold tracking-tight text-fg">
             픽셀 편집 대상
           </span>
-          <span className="mt-0.5 block text-[0.68rem] leading-relaxed text-fg-3">
-            원본 레이어를 유지하면서 필요한 대상만 안전하게 준비합니다.
+          <span
+            role="status"
+            aria-live="polite"
+            className="mt-0.5 block text-[0.68rem] leading-relaxed text-fg-3"
+          >
+            {busy
+              ? "편집용 래스터 복사본을 준비 중입니다. Esc를 누르면 준비를 취소할 수 있습니다."
+              : "원본 레이어를 유지하면서 필요한 대상만 안전하게 준비합니다."}
           </span>
         </span>
       </header>
@@ -156,6 +185,24 @@ export function StudioRasterToolRecoveryPanel({
                   disabled={busy}
                   aria-describedby={entry.entry.reason ? reasonId : undefined}
                   title={policy.unavailableReason ?? undefined}
+                  onPointerEnter={() =>
+                    prewarmStudioRasterRecoveryIntent({
+                      toolId: entry.tool.id,
+                      action: recovery,
+                    })
+                  }
+                  onPointerDown={() =>
+                    prewarmStudioRasterRecoveryIntent({
+                      toolId: entry.tool.id,
+                      action: recovery,
+                    })
+                  }
+                  onFocus={() =>
+                    prewarmStudioRasterRecoveryIntent({
+                      toolId: entry.tool.id,
+                      action: recovery,
+                    })
+                  }
                   onClick={() => onRecover({ toolId: entry.tool.id, action: recovery })}
                   className={buttonClass({
                     size: "sm",
@@ -176,6 +223,24 @@ export function StudioRasterToolRecoveryPanel({
           <button
             type="button"
             disabled={busy}
+            onPointerEnter={() =>
+              prewarmStudioRasterRecoveryIntent({
+                toolId: entries[0]!.tool.id,
+                action: sharedRecovery,
+              })
+            }
+            onPointerDown={() =>
+              prewarmStudioRasterRecoveryIntent({
+                toolId: entries[0]!.tool.id,
+                action: sharedRecovery,
+              })
+            }
+            onFocus={() =>
+              prewarmStudioRasterRecoveryIntent({
+                toolId: entries[0]!.tool.id,
+                action: sharedRecovery,
+              })
+            }
             onClick={() =>
               onRecover({
                 toolId: entries[0]!.tool.id,

@@ -28,6 +28,7 @@ describe("Studio vector-only retouch gesture journal", () => {
       { pointerId: 7, pointerType: "pen", pressure: 0.8 },
       { x: 60, y: 120 },
     );
+    expect(moved).toBe(started);
     const released = endStudioPendingRasterRetouchGesture(
       moved,
       { pointerId: 7, pointerType: "pen", pressure: 0.6 },
@@ -41,6 +42,41 @@ describe("Studio vector-only retouch gesture journal", () => {
       { x: 0.8, y: 0.8, pressure: 0.6 },
     ]);
     expect(canApplyStudioPendingRasterRetouchGesture(released, points)).toBe(true);
+  });
+
+  it("detaches a finalized point snapshot from its single-owner mutable journal", () => {
+    const started = beginStudioPendingRasterRetouchGesture({
+      liquifyMode: "push",
+      pageId: "page-1",
+      point: { x: 10, y: 20 },
+      pointer: { pointerId: 5, pointerType: "pen", pressure: 0.25 },
+      runId: 8,
+      tool: "smudge",
+    });
+    expect(started).not.toBeNull();
+    if (!started) return;
+    appendStudioPendingRasterRetouchGesturePoint(
+      started,
+      { pointerId: 5, pointerType: "pen", pressure: 0.5 },
+      { x: 30, y: 40 },
+    );
+    const finalized = endStudioPendingRasterRetouchGesture(
+      started,
+      { pointerId: 5, pointerType: "pen", pressure: 0.75 },
+      { cancelled: false, releasePoint: { x: 50, y: 60 } },
+    );
+    const finalizedPoints = finalized.points.map((point) => ({ ...point }));
+
+    expect(finalized.points).not.toBe(started.points);
+    appendStudioPendingRasterRetouchGesturePoint(
+      started,
+      { pointerId: 5, pointerType: "pen", pressure: 1 },
+      { x: 70, y: 80 },
+    );
+
+    expect(started.points.at(-1)).toEqual({ x: 70, y: 80, pressure: 1 });
+    expect(finalized.points).toEqual(finalizedPoints);
+    expect(finalized).toMatchObject({ cancelled: false, released: true });
   });
 
   it("ignores foreign pointers and fails closed on cancellation or underspecified push strokes", () => {
@@ -98,6 +134,7 @@ describe("Studio vector-only retouch gesture journal", () => {
       );
     }
     expect(gesture.points).toHaveLength(STUDIO_PENDING_RETOUCH_MAX_POINTS);
+    expect(gesture.points.at(-2)).toMatchObject({ x: STUDIO_PENDING_RETOUCH_MAX_POINTS - 2 });
     expect(gesture.points.at(-1)).toMatchObject({
       x: STUDIO_PENDING_RETOUCH_MAX_POINTS + 3,
     });

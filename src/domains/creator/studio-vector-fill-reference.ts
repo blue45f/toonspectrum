@@ -24,6 +24,7 @@ import {
   type StudioOffscreenRasterSession,
 } from "./studio-offscreen-raster-worker-client";
 import { adoptStudioOffscreenBitmap } from "./studio-offscreen-raster-worker-protocol";
+import { readStudioVectorReferenceSourceBudgetReceipt } from "./studio-vector-reference-source-budget-receipt";
 
 import type { El } from "./studio-element-model";
 import type { SelectionFrame } from "./studio-selection-tools";
@@ -34,6 +35,7 @@ import type {
   SvgExportTheme,
 } from "./studio-svg-export";
 import type { StudioSvgExportWorkerFactory } from "./studio-svg-export-worker-client";
+import type { StudioVectorReferenceSourceBudgetReceipt } from "./studio-vector-reference-source-budget-receipt";
 
 export const STUDIO_VECTOR_REFERENCE_MAX_SOURCE_BYTES = 16 * 1024 * 1024;
 export const STUDIO_VECTOR_REFERENCE_MAX_SVG_BYTES = 16 * 1024 * 1024;
@@ -62,6 +64,8 @@ export interface StudioVectorReferenceInput {
   readonly bgGrad?: readonly string[] | null;
   readonly fingerprintNamespace?: string;
   readonly budgets?: StudioVectorReferenceBudgets;
+  /** Internal fast-path proof; invalid identity or budget automatically falls back to validation. */
+  readonly sourceBudgetReceipt?: StudioVectorReferenceSourceBudgetReceipt;
 }
 
 export interface StudioVectorReferenceRasterRequest {
@@ -111,8 +115,119 @@ export interface StudioVectorReferencePreparedExport {
 export interface StudioVectorReferenceOffscreenOptions {
   /** Test/platform seam. Production uses the browser's asynchronous SVG ImageBitmap decoder. */
   readonly createBitmap?: (source: Blob) => Promise<ImageBitmap>;
-  /** Test/platform seam. Production creates one isolated one-shot OffscreenCanvas session. */
+  /** Test/platform seam; injected sessions stay one-shot, while production uses a short shared lease. */
   readonly createSession?: () => StudioOffscreenRasterSession;
+}
+
+const STUDIO_VECTOR_REFERENCE_RASTER_IDLE_MS = 45_000;
+let sharedStudioVectorReferenceRasterSession: StudioOffscreenRasterSession | null = null;
+let sharedStudioVectorReferenceRasterIdleTimer: ReturnType<typeof setTimeout> | null = null;
+let sharedStudioVectorReferenceRasterActiveRuns = 0;
+let sharedStudioVectorReferenceRasterRunId = 0;
+
+function clearStudioVectorReferenceRasterIdleTimer(): void {
+  if (sharedStudioVectorReferenceRasterIdleTimer === null) return;
+  clearTimeout(sharedStudioVectorReferenceRasterIdleTimer);
+  sharedStudioVectorReferenceRasterIdleTimer = null;
+}
+
+function scheduleStudioVectorReferenceRasterIdleDisposal(): void {
+  clearStudioVectorReferenceRasterIdleTimer();
+  if (!sharedStudioVectorReferenceRasterSession) return;
+  sharedStudioVectorReferenceRasterIdleTimer = setTimeout(() => {
+    sharedStudioVectorReferenceRasterIdleTimer = null;
+    if (sharedStudioVectorReferenceRasterActiveRuns > 0) {
+      scheduleStudioVectorReferenceRasterIdleDisposal();
+      return;
+    }
+    const session = sharedStudioVectorReferenceRasterSession;
+    sharedStudioVectorReferenceRasterSession = null;
+    session?.dispose();
+  }, STUDIO_VECTOR_REFERENCE_RASTER_IDLE_MS);
+}
+
+/** Releases the leased production raster Worker on route/HMR teardown and in deterministic tests. */
+export function disposeStudioVectorReferenceRasterizer(): void {
+  clearStudioVectorReferenceRasterIdleTimer();
+  const session = sharedStudioVectorReferenceRasterSession;
+  sharedStudioVectorReferenceRasterSession = null;
+  sharedStudioVectorReferenceRasterActiveRuns = 0;
+  session?.dispose();
+}
+
+/**
+ * Starts only the OffscreenCanvas Worker handshake. No SVG, bitmap, pixel buffer, or document
+ * metadata crosses the boundary until a real raster request acquires this short idle lease.
+ */
+export function preloadStudioVectorReferenceRasterizer(
+  createSession: () => StudioOffscreenRasterSession = () => createStudioOffscreenRasterSession({
+    policy: "queue-all",
+    maxQueued: 8,
+  }),
+): boolean {
+  if (typeof Worker !== "function") return false;
+  if (!sharedStudioVectorReferenceRasterSession) {
+    try {
+      sharedStudioVectorReferenceRasterSession = createSession();
+    } catch {
+      sharedStudioVectorReferenceRasterSession = null;
+    }
+  }
+  const session = sharedStudioVectorReferenceRasterSession;
+  if (!session) return false;
+  const discardUnavailableSession = (): void => {
+    if (sharedStudioVectorReferenceRasterSession !== session) return;
+    clearStudioVectorReferenceRasterIdleTimer();
+    sharedStudioVectorReferenceRasterSession = null;
+    session.dispose();
+  };
+  try {
+    if (!session.warm()) {
+      discardUnavailableSession();
+      return false;
+    }
+  } catch {
+    discardUnavailableSession();
+    return false;
+  }
+  if (sharedStudioVectorReferenceRasterActiveRuns === 0) {
+    scheduleStudioVectorReferenceRasterIdleDisposal();
+  }
+  return true;
+}
+
+function acquireStudioVectorReferenceRasterSession(): StudioOffscreenRasterSession | null {
+  clearStudioVectorReferenceRasterIdleTimer();
+  if (!sharedStudioVectorReferenceRasterSession) {
+    preloadStudioVectorReferenceRasterizer();
+  }
+  const session = sharedStudioVectorReferenceRasterSession;
+  if (!session) return null;
+  sharedStudioVectorReferenceRasterActiveRuns += 1;
+  return session;
+}
+
+function releaseStudioVectorReferenceRasterSession(): void {
+  sharedStudioVectorReferenceRasterActiveRuns = Math.max(
+    0,
+    sharedStudioVectorReferenceRasterActiveRuns - 1,
+  );
+  if (sharedStudioVectorReferenceRasterActiveRuns === 0) {
+    scheduleStudioVectorReferenceRasterIdleDisposal();
+  }
+}
+
+function invalidateStudioVectorReferenceRasterSession(
+  session: StudioOffscreenRasterSession,
+): void {
+  if (sharedStudioVectorReferenceRasterSession !== session) return;
+  clearStudioVectorReferenceRasterIdleTimer();
+  sharedStudioVectorReferenceRasterSession = null;
+  session.dispose();
+}
+
+if (import.meta.hot) {
+  import.meta.hot.dispose(disposeStudioVectorReferenceRasterizer);
 }
 
 export interface StudioVectorReferenceResult {
@@ -242,9 +357,7 @@ function utf8ByteLength(value: string): number {
   return UTF8_ENCODER.encode(value).byteLength;
 }
 
-/** Non-cryptographic content fingerprint for cache/stale-result ownership, not trust decisions. */
-export function fingerprintStudioVectorReference(svg: string, namespace = "vector-reference-v1"): string {
-  const bytes = UTF8_ENCODER.encode(svg);
+function fingerprintStudioVectorReferenceBytes(bytes: Uint8Array, namespace: string): string {
   let first = 0x811c9dc5;
   let second = 0x9e3779b9;
   for (const byte of bytes) {
@@ -253,6 +366,11 @@ export function fingerprintStudioVectorReference(svg: string, namespace = "vecto
     second = (second ^ (second >>> 13)) >>> 0;
   }
   return `${namespace}:${first.toString(16).padStart(8, "0")}${second.toString(16).padStart(8, "0")}`;
+}
+
+/** Non-cryptographic content fingerprint for cache/stale-result ownership, not trust decisions. */
+export function fingerprintStudioVectorReference(svg: string, namespace = "vector-reference-v1"): string {
+  return fingerprintStudioVectorReferenceBytes(UTF8_ENCODER.encode(svg), namespace);
 }
 
 function stableIdHash(value: string): string {
@@ -309,8 +427,15 @@ function validateVectorDimensions(
 function assertSourceBudget(
   elements: readonly SvgExportEl[],
   budgets: NormalizedStudioVectorReferenceBudgets,
+  receipt?: StudioVectorReferenceSourceBudgetReceipt,
 ): void {
-  if (sourceSerializedByteLength(elements) > budgets.maxSourceBytes) {
+  const receivedByteLength = readStudioVectorReferenceSourceBudgetReceipt(
+    receipt,
+    elements,
+    budgets.maxSourceBytes,
+  );
+  const sourceByteLength = receivedByteLength ?? sourceSerializedByteLength(elements);
+  if (sourceByteLength > budgets.maxSourceBytes) {
     throw new StudioVectorReferenceError(
       "source-budget-exceeded",
       "벡터 선화 데이터가 안전 처리 한도를 넘었습니다. 페이지를 나누거나 일부 획을 병합한 뒤 다시 시도해 주세요.",
@@ -321,21 +446,26 @@ function assertSourceBudget(
 function assertSvgResult(
   result: SvgExportResult,
   maxSvgBytes: number,
-): number {
+  fingerprintNamespace: string,
+): { readonly fingerprint: string; readonly svgByteLength: number } {
   if (result.skipped.length > 0) {
     throw new StudioVectorReferenceError(
       "unsupported-vector-fidelity",
       "일부 벡터 획을 원본과 같게 참조 이미지로 만들 수 없습니다. 지우개 획이나 지원되지 않는 합성을 병합한 뒤 다시 시도해 주세요.",
     );
   }
-  const svgByteLength = utf8ByteLength(result.svg);
+  const svgBytes = UTF8_ENCODER.encode(result.svg);
+  const svgByteLength = svgBytes.byteLength;
   if (svgByteLength > maxSvgBytes) {
     throw new StudioVectorReferenceError(
       "svg-budget-exceeded",
       "벡터 선화의 렌더 데이터가 안전 처리 한도를 넘었습니다. 페이지를 나누거나 일부 획을 병합한 뒤 다시 시도해 주세요.",
     );
   }
-  return svgByteLength;
+  return {
+    fingerprint: fingerprintStudioVectorReferenceBytes(svgBytes, fingerprintNamespace),
+    svgByteLength,
+  };
 }
 
 function pngDataUrlByteLength(dataUrl: string): number | null {
@@ -519,14 +649,22 @@ export async function rasterizeStudioVectorReferenceOffscreen(
 
   let bitmap: ImageBitmap | null = null;
   let session: StudioOffscreenRasterSession | null = null;
+  let leasedSession = false;
   try {
     bitmap = await createBitmap(new Blob([request.svg], { type: SVG_EXPORT_MIME }));
     throwIfAborted(request.signal);
     if (bitmap.width <= 0 || bitmap.height <= 0) return null;
 
-    session = (options.createSession ?? createStudioOffscreenRasterSession)();
+    if (options.createSession) {
+      session = options.createSession();
+    } else {
+      session = acquireStudioVectorReferenceRasterSession();
+      leasedSession = session !== null;
+    }
+    if (!session) return null;
+    sharedStudioVectorReferenceRasterRunId += 1;
     const result = await session.run(
-      `vector-reference:${request.width}x${request.height}`,
+      `vector-reference:${sharedStudioVectorReferenceRasterRunId}`,
       {
         target: {
           width: request.width,
@@ -554,11 +692,26 @@ export async function rasterizeStudioVectorReferenceOffscreen(
     throwIfAborted(request.signal);
     if (
       !result.ok
+      && leasedSession
+      && (
+        result.code === "worker-failed"
+        || result.code === "protocol"
+        || result.code === "timeout"
+        || result.code === "unsupported"
+      )
+    ) {
+      invalidateStudioVectorReferenceRasterSession(session);
+    }
+    if (
+      !result.ok
       || result.width !== request.width
       || result.height !== request.height
       || result.payload.kind !== "encoded"
       || result.payload.mime !== "image/png"
-    ) return null;
+    ) {
+      if (result.ok && leasedSession) invalidateStudioVectorReferenceRasterSession(session);
+      return null;
+    }
     if (result.payload.blob.size > request.maxOutputBytes) {
       throw new StudioVectorReferenceError(
         "png-budget-exceeded",
@@ -577,9 +730,11 @@ export async function rasterizeStudioVectorReferenceOffscreen(
     if (error instanceof StudioVectorReferenceError && error.code === "png-budget-exceeded") {
       throw error;
     }
+    if (leasedSession && session) invalidateStudioVectorReferenceRasterSession(session);
     return null;
   } finally {
-    session?.dispose();
+    if (leasedSession) releaseStudioVectorReferenceRasterSession();
+    else session?.dispose();
     try {
       bitmap?.close();
     } catch {
@@ -619,7 +774,7 @@ export async function prepareStudioVectorReferenceExport(
   throwIfAborted(options.signal);
   const budgets = normalizeBudgets(input.budgets);
   const dimensions = validateVectorDimensions(input.width, input.height, budgets);
-  assertSourceBudget(input.elements, budgets);
+  assertSourceBudget(input.elements, budgets, input.sourceBudgetReceipt);
   const exportInput: SvgExportPageInput = {
     width: dimensions.width,
     height: dimensions.height,
@@ -654,9 +809,9 @@ export async function renderPreparedStudioVectorReference(
   options: Pick<StudioVectorReferenceRenderOptions, "signal" | "rasterize"> = {},
 ): Promise<StudioVectorReferenceResult> {
   throwIfAborted(options.signal);
-  const svgByteLength = assertSvgResult(prepared.result, prepared.maxSvgBytes);
-  const fingerprint = fingerprintStudioVectorReference(
-    prepared.result.svg,
+  const { fingerprint, svgByteLength } = assertSvgResult(
+    prepared.result,
+    prepared.maxSvgBytes,
     prepared.fingerprintNamespace,
   );
   const rasterized = await (options.rasterize ?? rasterizeStudioVectorReferenceHybrid)({
