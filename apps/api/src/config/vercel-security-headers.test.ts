@@ -55,8 +55,11 @@ describe("Vercel static security headers", () => {
     expect(scripts).toContain(inlineJsonLdHash());
 
     const connections = directive(csp ?? "", "connect-src");
-    expect(connections.split(/\s+/)).not.toContain("https:");
-    expect(connections.split(/\s+/)).not.toContain("wss:");
+    const connectionTokens = connections.split(/\s+/);
+    expect(connectionTokens).toContain("blob:");
+    expect(connectionTokens.filter((token) => token === "blob:")).toHaveLength(1);
+    expect(connectionTokens).not.toContain("https:");
+    expect(connectionTokens).not.toContain("wss:");
     expect(connections).toContain("https://www.googleapis.com");
     expect(connections).toContain("https://graph.microsoft.com");
     expect(connections).toContain("https://api.unsplash.com");

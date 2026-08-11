@@ -262,6 +262,28 @@ describe("Vercel CSP build contract", () => {
     })).toThrow("unrestricted network scheme");
   });
 
+  it("requires the Blob fetch boundary used by verified Studio 3D asset textures", () => {
+    const current = fixture();
+    for (const replacement of [
+      "connect-src 'self'",
+      "connect-src 'self' blob: blob:",
+    ]) {
+      const changed = JSON.parse(JSON.stringify(current.vercelConfig));
+      const cspHeader = changed.headers[0].headers.find(
+        (header) => header.key === "Content-Security-Policy",
+      );
+      cspHeader.value = cspHeader.value.replace(
+        "connect-src 'self' blob:",
+        replacement,
+      );
+      expect(() => verifyVercelCspContract({
+        html: current.html,
+        vercelConfig: changed,
+        bootstrapCompatSource: current.bootstrapCompatSource,
+      }), replacement).toThrow("exactly one blob: source");
+    }
+  });
+
   it("rejects JavaScript eval permission without confusing wasm-unsafe-eval", () => {
     const current = fixture();
     expect(() => verifyVercelCspContract(current)).not.toThrow();
