@@ -35,10 +35,12 @@ export type StudioWorkspaceRouteResolution =
   | StudioWorkspaceRoute
   | InvalidStudioWorkspaceRoute;
 
-interface StudioWorkspaceLocationInput {
+export interface StudioWorkspaceLocationInput {
   readonly pathname: string;
   readonly search?: string | URLSearchParams;
 }
+
+type StudioWorkspaceLocationLike = StudioWorkspaceLocationInput | string;
 
 interface StudioWorkspaceHrefInput {
   readonly search?: string | URLSearchParams;
@@ -126,22 +128,71 @@ export function isStudioRoutePathname(pathname: string): boolean {
   return pathname === "/studio" || pathname.startsWith("/studio/");
 }
 
-export function studioRouteStageKey(pathname: string): string {
-  return isStudioRoutePathname(pathname) ? "/studio" : pathname;
+function studioWorkspaceLocation(
+  location: StudioWorkspaceLocationLike,
+): StudioWorkspaceLocationInput {
+  return typeof location === "string" ? { pathname: location } : location;
+}
+
+function isStudioUploadWorkspaceLocation(
+  location: StudioWorkspaceLocationInput,
+): boolean {
+  const modes = queryParams(location.search).getAll("mode");
+  return modes.length === 1 && modes[0] === "upload";
+}
+
+/** True only for paths owned by the canvas/DCC Studio workspace route. */
+export function isStudioWorkspaceRoutePathname(pathname: string): boolean {
+  return parseStudioWorkspaceRoute({ pathname }).valid;
+}
+
+/** Full location predicate, including query identity conflicts and duplicate IDs. */
+export function isStudioWorkspaceLocation(
+  location: StudioWorkspaceLocationInput,
+): boolean {
+  return parseStudioWorkspaceRoute(location).valid;
+}
+
+export function studioRouteStageKey(locationLike: StudioWorkspaceLocationLike): string {
+  const location = studioWorkspaceLocation(locationLike);
+  const route = parseStudioWorkspaceRoute(location);
+  if (!route.valid) {
+    const search = queryParams(location.search).toString();
+    return isStudioRoutePathname(location.pathname) && search.length > 0
+      ? `${location.pathname}?${search}`
+      : location.pathname;
+  }
+  const identity = route.workId === null
+    ? "draft"
+    : `work:${encodeURIComponent(route.workId)}`;
+  const presentation = isStudioUploadWorkspaceLocation(location) ? "upload" : "editor";
+  return `/studio/${identity}/${presentation}`;
 }
 
 export function shouldPreserveStudioRouteLifecycle(
-  previousPathname: string,
-  nextPathname: string,
+  previousLocationLike: StudioWorkspaceLocationLike,
+  nextLocationLike: StudioWorkspaceLocationLike,
 ): boolean {
-  return isStudioRoutePathname(previousPathname)
-    && isStudioRoutePathname(nextPathname);
+  const previousLocation = studioWorkspaceLocation(previousLocationLike);
+  const nextLocation = studioWorkspaceLocation(nextLocationLike);
+  const previousRoute = parseStudioWorkspaceRoute(previousLocation);
+  const nextRoute = parseStudioWorkspaceRoute(nextLocation);
+  if (!previousRoute.valid || !nextRoute.valid) return false;
+  if (
+    isStudioUploadWorkspaceLocation(previousLocation)
+    || isStudioUploadWorkspaceLocation(nextLocation)
+  ) return false;
+  return previousRoute.workId === nextRoute.workId;
 }
 
 export function isStudioDccWorkbenchMode(
   value: string,
 ): value is StudioDccWorkbenchMode {
   return (STUDIO_DCC_WORKBENCH_MODES as readonly string[]).includes(value);
+}
+
+export function isValidStudioWorkspaceWorkId(value: unknown): value is string {
+  return typeof value === "string" && normalizeQueryWorkId(value) === value;
 }
 
 export function studioCanvasPathname(workId: string | null): string {
@@ -191,7 +242,13 @@ export function parseStudioWorkspaceRoute({
     return invalidStudioWorkspaceRoute("invalid-path");
   }
 
-  const segments = pathname.split("/").filter(Boolean);
+  const rawSegments = pathname.split("/");
+  if (rawSegments[0] !== "") return invalidStudioWorkspaceRoute("invalid-path");
+  const segments = rawSegments.slice(1);
+  if (segments.at(-1) === "") segments.pop();
+  if (segments.some((segment) => segment.length === 0)) {
+    return invalidStudioWorkspaceRoute("invalid-path");
+  }
   if (segments[0] !== "studio") {
     return invalidStudioWorkspaceRoute("invalid-path");
   }
@@ -244,7 +301,12 @@ export function parseStudioWorkspaceRoute({
     return invalidStudioWorkspaceRoute("invalid-path");
   }
 
-  const rawQueryWorkId = queryParams(search).get("id");
+  const params = queryParams(search);
+  const queryWorkIds = params.getAll("id");
+  if (queryWorkIds.length > 1) {
+    return invalidStudioWorkspaceRoute("invalid-work-id");
+  }
+  const rawQueryWorkId = queryWorkIds[0] ?? null;
   const queryWorkId = normalizeQueryWorkId(rawQueryWorkId);
   if (queryWorkId === undefined) {
     return invalidStudioWorkspaceRoute("invalid-work-id");

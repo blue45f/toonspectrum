@@ -56,6 +56,7 @@ import {
   isStudioCompanionMessageFresh,
   isStudioToolsCompanionWindowReusable,
   openStudioCompanionSurfaceWindow,
+  parseStudioCompanionDocumentScope,
   parseStudioCompanionMessage,
   parseStudioCompanionSessionId,
   parseStudioCompanionSurface,
@@ -200,6 +201,15 @@ export function StudioToolsCompanionPage() {
   const t = useT();
   const sessionId = parseStudioCompanionSessionId(location.search);
   const surface = parseStudioCompanionSurface(location.search);
+  const documentScope = parseStudioCompanionDocumentScope(location.search);
+  const companionWorkId = documentScope?.workId ?? null;
+  const companionDocumentScopeKey = documentScope
+    ? documentScope.workId !== null
+      ? `work:${documentScope.workId}`
+      : documentScope.remixId !== null
+        ? `remix:${documentScope.remixId}`
+        : "draft"
+    : null;
   const effectiveSurface: StudioCompanionSurface = surface ?? "workspace";
   const channelRef = useRef<ReturnType<typeof createStudioCompanionChannel>>(null);
   const companionIdentityRef = useRef<{ scope: string; instanceId: string } | null>(null);
@@ -236,8 +246,14 @@ export function StudioToolsCompanionPage() {
     review: null,
     reference: null,
   });
-  const dedicatedWindowOwnerSessionRef = useRef<string | null>(
-    surface === "workspace" ? sessionId : null
+  const dedicatedWindowOwnerRef = useRef<{
+    readonly sessionId: string;
+    readonly scopeKey: string;
+    readonly workId: string | null;
+  } | null>(
+    surface === "workspace" && sessionId && companionDocumentScopeKey
+      ? { sessionId, scopeKey: companionDocumentScopeKey, workId: companionWorkId }
+      : null,
   );
 
   const [connected, setConnected] = useState(false);
@@ -532,15 +548,22 @@ export function StudioToolsCompanionPage() {
 
   useEffect(() => {
     if (surface !== "workspace") return;
-    const previousSessionId = dedicatedWindowOwnerSessionRef.current;
-    if (previousSessionId === sessionId) return;
-    if (previousSessionId) {
+    const previousOwner = dedicatedWindowOwnerRef.current;
+    const nextOwner = sessionId && companionDocumentScopeKey
+      ? { sessionId, scopeKey: companionDocumentScopeKey, workId: companionWorkId }
+      : null;
+    if (
+      previousOwner?.sessionId === nextOwner?.sessionId
+      && previousOwner?.scopeKey === nextOwner?.scopeKey
+    ) return;
+    if (previousOwner) {
       for (const dedicatedSurface of ["navigator", "review", "reference"] as const) {
         const companionWindow = dedicatedWindowRefs.current[dedicatedSurface];
         if (!isStudioToolsCompanionWindowReusable(
-          previousSessionId,
+          previousOwner.sessionId,
           companionWindow,
-          dedicatedSurface
+          dedicatedSurface,
+          previousOwner.workId,
         )) continue;
         try {
           companionWindow.close();
@@ -551,8 +574,8 @@ export function StudioToolsCompanionPage() {
         }
       }
     }
-    dedicatedWindowOwnerSessionRef.current = sessionId;
-  }, [sessionId, surface]);
+    dedicatedWindowOwnerRef.current = nextOwner;
+  }, [companionDocumentScopeKey, companionWorkId, sessionId, surface]);
 
   useEffect(() => () => {
     screenPlacementEpochRef.current += 1;
@@ -593,8 +616,15 @@ export function StudioToolsCompanionPage() {
       ));
       return;
     }
+    if (companionDocumentScopeKey === null) {
+      companionInstanceIdRef.current = null;
+      setLastError(
+        "유효한 작품 범위가 없습니다. 기본 스튜디오에서 도구 창을 다시 열어 주세요.",
+      );
+      return;
+    }
 
-    const companionScope = `${sessionId}:${surface}`;
+    const companionScope = `${sessionId}:${surface}:${companionDocumentScopeKey}`;
     let companionIdentity = companionIdentityRef.current;
     if (!companionIdentity || companionIdentity.scope !== companionScope) {
       companionIdentity = {
@@ -1035,6 +1065,7 @@ export function StudioToolsCompanionPage() {
     clearPendingBrushControl,
     clearPendingNavigatorControl,
     clearReviewState,
+    companionDocumentScopeKey,
     sessionId,
     surface,
     t,
@@ -1165,12 +1196,14 @@ export function StudioToolsCompanionPage() {
   }
 
   function openDedicatedSurface(nextSurface: DedicatedCompanionSurface): boolean {
-    if (!sessionId || surface !== "workspace") return false;
+    if (!sessionId || companionDocumentScopeKey === null || surface !== "workspace") return false;
     // This must remain synchronous so the user activation reaches window.open before it expires.
     const companionWindow = openStudioCompanionSurfaceWindow(
       sessionId,
       nextSurface,
-      dedicatedWindowRefs.current[nextSurface]
+      dedicatedWindowRefs.current[nextSurface],
+      undefined,
+      companionWorkId,
     );
     if (!companionWindow) return false;
     dedicatedWindowRefs.current[nextSurface] = companionWindow;

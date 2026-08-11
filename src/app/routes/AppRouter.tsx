@@ -1,6 +1,8 @@
 import { Suspense, useEffect, useState, type AnimationEvent, type ReactNode } from "react";
 import { Route, Routes, useLocation } from "react-router-dom";
 
+import { shouldAppRouterOwnDocumentTitle } from "./app-route-title-ownership";
+
 import { LoadingState } from "@/components/LoadingState";
 import { useT } from "@/lib/i18n";
 import { lazyRetry } from "@/lib/lazy-retry";
@@ -9,6 +11,7 @@ import { ErrorBoundary } from "@/src/components/error-boundary";
 import { loadStudioI18nDictionaries } from "@/src/domains/creator/studio-i18n-loader";
 import {
   isStudioRoutePathname,
+  isStudioWorkspaceLocation,
   studioRouteStageKey,
 } from "@/src/domains/creator/studio-workspace-route";
 
@@ -67,14 +70,10 @@ const STATIC_TITLES: Record<string, string> = {
   "/play": "route.play",
 };
 
-function useRouteTitle(pathname: string) {
+function useRouteTitle(pathname: string, search: string) {
   const t = useT();
   useEffect(() => {
-    if (pathname.startsWith("/title/")) return; // 작품 상세는 페이지가 직접 설정
-    if (pathname.startsWith("/create/")) return; // 창작물 상세는 페이지가 직접 설정
-    if (pathname.startsWith("/u/")) return; // 회원 프로필은 페이지가 직접 설정
-    if (pathname.startsWith("/community/cafes/")) return; // 카페 상세는 페이지가 직접 설정
-    if (pathname.startsWith("/community/post/")) return; // 토론 스레드는 페이지가 직접 설정
+    if (!shouldAppRouterOwnDocumentTitle({ pathname, search })) return;
     let title: string | undefined;
     if (pathname in STATIC_TITLES) {
       const titleKey = STATIC_TITLES[pathname];
@@ -88,7 +87,7 @@ function useRouteTitle(pathname: string) {
     else if (pathname.startsWith("/me")) title = t("route.me");
     else if (isStudioRoutePathname(pathname)) title = t("route.studio");
     document.title = title ? `${title} · ${t("app.name")}` : t("app.name");
-  }, [pathname, t]);
+  }, [pathname, search, t]);
 }
 
 // 라우트별 코드 분할 — 404만 eager, 나머지는 lazy로 초기 번들에서 분리.
@@ -238,10 +237,19 @@ function RouteFallback() {
 // both가 keyframe의 종료값을 계속 유지하는데, 그 값이 identity transform/filter라도 리터럴 none이
 // 아닌 한(Chrome은 이걸 matrix(1,0,0,1,0,0) 등으로 정규화해 반환) 이 요소가 새 containing block이
 // 되어 자손의 position: fixed를 뷰포트가 아닌 이 요소(라우트 전체 콘텐츠) 기준으로 배치해버린다.
-function RouteStage({ pathname, children }: { pathname: string; children: ReactNode }) {
+function RouteStage({
+  pathname,
+  search,
+  children,
+}: {
+  pathname: string;
+  search: string;
+  children: ReactNode;
+}) {
   const [settled, setSettled] = useState(false);
-  const instantEditorEntry = isStudioRoutePathname(pathname);
-  const stageKey = studioRouteStageKey(pathname);
+  const location = { pathname, search };
+  const instantEditorEntry = isStudioWorkspaceLocation(location);
+  const stageKey = studioRouteStageKey(location);
   const onAnimationEnd = (e: AnimationEvent<HTMLDivElement>) => {
     if (e.animationName === "route-stage-in") setSettled(true);
   };
@@ -262,13 +270,13 @@ function RouteStage({ pathname, children }: { pathname: string; children: ReactN
 }
 
 export function AppRouter() {
-  const { pathname } = useLocation();
-  useRouteTitle(pathname);
+  const { pathname, search } = useLocation();
+  useRouteTitle(pathname, search);
   const documentWasStudio = isStudioRoutePathname(
     INITIAL_DOCUMENT_PATHNAME ?? pathname,
   );
   const routeTree = (
-    <RouteStage pathname={pathname}>
+    <RouteStage pathname={pathname} search={search}>
       <ErrorBoundary resetKey={pathname}>
         <Suspense fallback={<RouteFallback />}>
           <Routes>

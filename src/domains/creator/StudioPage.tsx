@@ -7,9 +7,9 @@ import {
   SlidersHorizontal,
   Undo2,
 } from "lucide-react";
-import { Profiler, Suspense, lazy, useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type ChangeEvent, type ComponentProps, type ReactNode, type SetStateAction } from "react";
+import { Profiler, Suspense, lazy, useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type ChangeEvent, type ComponentProps, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { flushSync } from "react-dom";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 import { studioCreationLinkParams } from "./creator-studio-links";
 import { applyStudioBg3dAiMethodReference } from "./studio-3d-ai-reference-application";
@@ -410,6 +410,7 @@ import {
   smoothPointsAroundIndex,
   updateSmoothStrengthDrag,
 } from "./studio-curve-smoothing";
+import { resolveStudioDccRouteAccess } from "./studio-dcc-route-access";
 import {
   STUDIO_DEFERRED_STROKE_POSTPROCESS_TIMEOUT_MS,
   planStudioDeferredStrokePostprocess,
@@ -668,6 +669,7 @@ import {
   type StudioInspectorLayout,
   type StudioInspectorRoute,
 } from "./studio-inspector-layout";
+import { resolveStudioInteractiveThreeDSurfaceAdmission } from "./studio-interactive-3d-surface";
 import {
   clampIsometricAngleDeg,
   clampIsometricCellSize,
@@ -1505,6 +1507,16 @@ import {
 } from "./studio-work-asset-render-projection";
 import { readStudioWorkspaceDeviceSignalsFromGlobals } from "./studio-workspace-device-signals";
 import {
+  createStudioDccNavigationState,
+  parseStudioWorkspaceRoute,
+  studioCanvasHref,
+  studioDccHref,
+  studioWorkspaceReturnHref,
+  type StudioDccWorkbenchMode,
+  type StudioWorkspaceRoute,
+  type StudioWorkspaceRouteErrorCode,
+} from "./studio-workspace-route";
+import {
   STUDIO_WORKSPACE_LEFT_PANEL_WIDTH,
   STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH,
   areStudioWorkspaceLayoutsEqual,
@@ -1550,6 +1562,7 @@ import {
 } from "./StudioColorBlindPreview";
 import { StudioDestructiveConfirmHost } from "./StudioDestructiveConfirmHost";
 import { StudioHelpCenterHost } from "./StudioHelpCenterHost";
+import { StudioHybridDccRouteGate } from "./StudioHybridDccRouteGate";
 import {
   StudioLazyPanelStack,
   type StudioLazyPanelStackHandlers,
@@ -2697,12 +2710,20 @@ function isStudioAiReferenceCompatibleAsset(asset: Pick<StudioAsset, "dataUrl">)
 }
 
 export function StudioPage() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [params] = useSearchParams();
   const { data: session } = useSession();
-  const workId = params.get("id");
+  const studioRoute = parseStudioWorkspaceRoute({
+    pathname: location.pathname,
+    search: location.search,
+  });
+  const workId = studioRoute.valid ? studioRoute.workId : null;
   const remixId = params.get("remix");
   const authScopeKey = session?.user?.id ?? null;
-  const uploadMode = params.get("mode") === "upload";
+  const uploadMode = studioRoute.valid
+    && studioRoute.surface === "canvas"
+    && params.get("mode") === "upload";
   const draftRouteKey = uploadMode
     ? `upload:${workId ?? "new"}`
     : workId
@@ -2718,11 +2739,38 @@ export function StudioPage() {
     draftRouteKey,
     authScopeKey
   );
+  const canonicalStudioHref = studioRoute.valid && !uploadMode
+    ? studioRoute.surface === "dcc"
+      ? studioDccHref({
+          mode: studioRoute.dccMode ?? "model",
+          search: location.search,
+          workId: studioRoute.workId,
+        })
+      : studioCanvasHref({
+          search: location.search,
+          workId: studioRoute.workId,
+        })
+    : null;
+  useEffect(() => {
+    if (!canonicalStudioHref) return;
+    const currentHref = `${location.pathname}${location.search}`;
+    if (canonicalStudioHref === currentHref) return;
+    navigate(canonicalStudioHref, { replace: true, state: location.state });
+  }, [canonicalStudioHref, location.pathname, location.search, location.state, navigate]);
+  if (!studioRoute.valid) {
+    return (
+      <StudioWorkspaceRouteFailure
+        errorCode={studioRoute.errorCode}
+        onOpenStudio={() => navigate("/studio", { replace: true })}
+      />
+    );
+  }
   if (uploadMode) {
     return (
       <Suspense fallback={<StudioRouteLoading label="게시 작업공간을 안전하게 여는 중..." />}>
         <StudioUploadPublish
           key={JSON.stringify(["upload", workId ?? "new", draftIdentityScopeRef.current.epoch])}
+          workId={workId}
         />
       </Suspense>
     );
@@ -2738,8 +2786,48 @@ export function StudioPage() {
   });
   return (
     <Profiler id="studio:editor" onRender={recordStudioRenderProfile}>
-      <StudioCuttoonEditor key={editorScopeKey} />
+      <StudioCuttoonEditor key={editorScopeKey} studioRoute={studioRoute} />
     </Profiler>
+  );
+}
+
+function StudioWorkspaceRouteFailure({
+  errorCode,
+  onOpenStudio,
+}: {
+  readonly errorCode: StudioWorkspaceRouteErrorCode;
+  readonly onOpenStudio: () => void;
+}) {
+  const detail = errorCode === "work-id-conflict"
+    ? "주소의 작품 ID가 서로 달라 다른 문서를 여는 대신 작업을 중단했습니다."
+    : errorCode === "invalid-work-id"
+      ? "작품 ID를 안전하게 읽을 수 없습니다. 원래 작품 링크를 다시 확인해 주세요."
+      : "지원하지 않는 Studio 작업 주소입니다.";
+  return (
+    <section
+      aria-labelledby="studio-workspace-route-error-title"
+      className="grid min-h-dvh place-items-center bg-bg px-5 py-12 text-fg"
+    >
+      <div className="max-w-xl text-center">
+        <p className="text-sm font-semibold text-warn">3D 작업공간을 열지 않았습니다</p>
+        <h1
+          id="studio-workspace-route-error-title"
+          className="mt-2 text-balance text-2xl font-bold tracking-tight sm:text-3xl"
+        >
+          작업 주소를 확인해 주세요
+        </h1>
+        <p className="mx-auto mt-3 max-w-[62ch] text-sm leading-relaxed text-fg-2">
+          {detail}
+        </p>
+        <button
+          type="button"
+          onClick={onOpenStudio}
+          className="mt-6 min-h-11 rounded-lg bg-accent px-5 text-sm font-semibold text-on-accent hover:bg-accent/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        >
+          새 Studio 작업 열기
+        </button>
+      </div>
+    </section>
   );
 }
 
@@ -2872,6 +2960,7 @@ function openStudioToolsCompanionForMenu(input: {
   runtimeRef: { current: StudioToolsCompanionPrimaryRuntime | null };
   windowRef: { current: Window | null };
   announce: (message: string) => void;
+  workId: string | null;
   t: (key: string) => string;
 }): void {
   const localize = (key: string, fallback: string) => {
@@ -2885,6 +2974,7 @@ function openStudioToolsCompanionForMenu(input: {
       binding: ready.binding,
       windowRef: input.windowRef,
       announce: input.announce,
+      workId: input.workId,
       t: input.t,
     });
     return;
@@ -2968,6 +3058,7 @@ function openStudioToolsCompanionForMenu(input: {
       reservation,
       windowRef: input.windowRef,
       announce: input.announce,
+      workId: input.workId,
       t: input.t,
     });
   }).catch(() => {
@@ -3010,12 +3101,17 @@ function closedStudioLayerLiftUiState(): StudioLayerLiftUiState {
   };
 }
 
-function StudioCuttoonEditor() {
+function StudioCuttoonEditor({
+  studioRoute,
+}: {
+  readonly studioRoute: StudioWorkspaceRoute;
+}) {
   const navigate = useNavigate();
+  const location = useLocation();
   const t = useT();
   const [params] = useSearchParams();
   const { data: session, ready: studioAuthReady } = useSession();
-  const workId = params.get("id");
+  const workId = studioRoute.workId;
   const remixId = params.get("remix");
   const creationLinks = studioCreationLinkParams({
     workId,
@@ -5035,7 +5131,29 @@ function StudioCuttoonEditor() {
   const [sceneSnapshotOpen, setSceneSnapshotOpen] = useState(false);
   const [animaticTimelineOpen, setAnimaticTimelineOpen] = useState(false);
   const [productionBibleOpen, setProductionBibleOpen] = useState(false);
-  const [hybridDccOpen, setHybridDccOpen] = useState(false);
+  const hybridDccRouteRequested = studioRoute.surface === "dcc";
+  const hybridDccRouteAccess = resolveStudioDccRouteAccess({
+    collaborationOperationSyncPending,
+    documentReloadRequired,
+    expectsSharedDocument,
+    liveRoom: isRealtimeTeamSession,
+    liveRoomEditAuthorityReady: Boolean(
+      isRealtimeTeamSession
+      && studioLiveParticipant?.role === "editor"
+      && studioCrdtOperationSyncReady
+    ),
+    remixId,
+    sharedDocumentAccess: sharedDocument?.access ?? null,
+    sharedDocumentCanView: Boolean(sharedDocument?.capabilities.view),
+    sharedDocumentStatus: sharedDocument?.status ?? null,
+    studioAuthReady,
+    studioAuthUserId,
+    workHydrated,
+    workHydrationFailed,
+    workHydrationUnsupportedFormat,
+    workId,
+  });
+  const hybridDccOpen = hybridDccRouteRequested && hybridDccRouteAccess === "allowed";
   const [creativeModesOpen, setCreativeModesOpen] = useState(false);
   const creativeModesLabel = localizeStudioText(t, "크리에이티브 모드", "studio.creativeModes.title");
   // 대화상자 자체가 "크리에이티브 모드"로 이름이 붙으므로 닫기 버튼은 앱 공용 키를 그대로 쓴다
@@ -5043,6 +5161,7 @@ function StudioCuttoonEditor() {
   const creativeModesCloseLabel = localizeStudioText(t, "닫기", "common.close");
   const creativeModesPanelRef = useRef<HTMLDivElement | null>(null);
   const creativeModesTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const hybridDccReturnFocusRef = useRef<HTMLElement | null>(null);
   // 크리에이티브 모드 시트는 캔버스와 모바일 도크를 계속 쓸 수 있어야 하므로 모달이 아니다.
   // 대신 Escape·바깥 탭 두 경로를 직접 붙여, 화면보다 큰 뷰포트에서도 탈출로가 사라지지 않게 한다.
   useEffect(() => {
@@ -5138,6 +5257,7 @@ function StudioCuttoonEditor() {
       : "checking";
   const hybridDccPersistenceCurrentScopeRef = useRef(hybridDccWorkspaceScope);
   hybridDccPersistenceCurrentScopeRef.current = hybridDccWorkspaceScope;
+  const hybridDccPersistenceEnabled = hybridDccOpen;
 
   useEffect(() => {
     let cancelled = false;
@@ -5148,6 +5268,12 @@ function StudioCuttoonEditor() {
       scope: hybridDccWorkspaceScope,
       status: authGate.status,
     });
+    if (!hybridDccPersistenceEnabled) {
+      hybridDccPersistenceRef.current = null;
+      return () => {
+        cancelled = true;
+      };
+    }
     if (!authGate.shouldAttemptRecovery) {
       hybridDccPersistenceRef.current = null;
       // Session-only editing is available immediately, so transfer eligibility must become
@@ -5301,6 +5427,7 @@ function StudioCuttoonEditor() {
     hybridDccPersistenceOwnerId,
     hybridDccPersistenceWorkScope,
     hybridDccWorkspaceScope,
+    hybridDccPersistenceEnabled,
     studioAuthReady,
   ]);
 
@@ -5375,6 +5502,98 @@ function StudioCuttoonEditor() {
     : hybridDccScopeTransferRef.current?.toScope === hybridDccWorkspaceScope
       ? hybridDccScopeTransferRef.current.workspace
       : undefined;
+  const closeHybridDccWorkspace = () => {
+    flushHybridDccWorkspacePersistence();
+    const returnHref = studioWorkspaceReturnHref(location.state, studioRoute);
+    if (returnHref) {
+      navigate(-1);
+      return;
+    }
+    navigate(studioCanvasHref({
+      search: location.search,
+      workId: studioRoute.workId,
+    }), { replace: true });
+  };
+  const closeHybridDccFromEffect = useEffectEvent(() => {
+    if (hybridDccRouteRequested) closeHybridDccWorkspace();
+  });
+  const flushHybridDccFromEffect = useEffectEvent(flushHybridDccWorkspacePersistence);
+  const previousHybridDccRouteRequestedRef = useRef(hybridDccRouteRequested);
+  useEffect(() => {
+    const previouslyRequested = previousHybridDccRouteRequestedRef.current;
+    previousHybridDccRouteRequestedRef.current = hybridDccRouteRequested;
+    if (previouslyRequested && !hybridDccRouteRequested) {
+      flushHybridDccFromEffect();
+    }
+  }, [hybridDccRouteRequested]);
+  useEffect(() => {
+    if (!hybridDccRouteRequested) return;
+    const flushBeforeDocumentExit = () => flushHybridDccFromEffect();
+    globalThis.addEventListener("pagehide", flushBeforeDocumentExit);
+    return () => globalThis.removeEventListener("pagehide", flushBeforeDocumentExit);
+  }, [hybridDccRouteRequested]);
+  useEffect(() => {
+    if (!hybridDccRouteRequested || hybridDccRouteAccess !== "denied") return;
+    closeHybridDccFromEffect();
+  }, [hybridDccRouteAccess, hybridDccRouteRequested]);
+
+  const captureHybridDccReturnFocus = () => {
+    if (typeof document === "undefined") return;
+    const active = document.activeElement instanceof HTMLElement
+      && document.activeElement !== document.body
+      && document.activeElement !== document.documentElement
+      ? document.activeElement
+      : null;
+    hybridDccReturnFocusRef.current = active
+      && creativeModesPanelRef.current?.contains(active)
+      ? creativeModesTriggerRef.current ?? document.getElementById("main-content")
+      : active ?? document.getElementById("main-content");
+  };
+  const openHybridDccWorkspace = (mode: StudioDccWorkbenchMode) => {
+    if (hybridDccRouteRequested) return;
+    if (hybridDccRouteAccess !== "allowed") {
+      announceDrawingShortcut(
+        hybridDccRouteAccess === "pending"
+          ? "3D 작업 권한과 원고를 확인하는 중입니다. 잠시 뒤 다시 시도해 주세요."
+          : "이 작품에서는 3D 원본을 편집할 권한이 없습니다.",
+      );
+      return;
+    }
+    captureHybridDccReturnFocus();
+    navigate(studioDccHref({
+      mode,
+      search: location.search,
+      workId: studioRoute.workId,
+    }), {
+      state: createStudioDccNavigationState(studioRoute, {
+        key: location.key,
+        pathname: location.pathname,
+        search: location.search,
+      }),
+    });
+  };
+  const setHybridDccOpen: Dispatch<SetStateAction<boolean>> = (nextValue) => {
+    const shouldOpen = typeof nextValue === "function"
+      ? nextValue(hybridDccRouteRequested)
+      : nextValue;
+    if (shouldOpen === hybridDccRouteRequested) return;
+    if (!shouldOpen) {
+      closeHybridDccWorkspace();
+      return;
+    }
+    openHybridDccWorkspace("model");
+  };
+  const setHybridDccWorkbenchMode = (mode: StudioDccWorkbenchMode) => {
+    if (!hybridDccRouteRequested || mode === studioRoute.dccMode) return;
+    navigate(studioDccHref({
+      mode,
+      search: location.search,
+      workId: studioRoute.workId,
+    }), {
+      replace: true,
+      state: location.state,
+    });
+  };
   const [assetRightsAuditOpen, setAssetRightsAuditOpen] = useState(false);
   const [autoActionsOpen, setAutoActionsOpen] = useState(false);
   const [autoActionSet, setAutoActionSet] = useState<StudioAutoActionSet | null>(null);
@@ -5785,7 +6004,6 @@ function StudioCuttoonEditor() {
     setMasterPanelOpen(false);
     setCharacterBibleOpen(false);
     setProductionBibleOpen(false);
-    setHybridDccOpen(false);
     setWriterRoomOpen(false);
     setPublicationOperationsOpen(false);
     setPublishPreflightOpen(false);
@@ -9201,6 +9419,17 @@ function StudioCuttoonEditor() {
   const [poserInitialDataUrl, setPoserInitialDataUrl] = useState<string | undefined>(undefined);
   const [poserInitialElementId, setPoserInitialElementId] = useState<string | undefined>(undefined);
   const [bg3dOpen, setBg3dOpen] = useState(false);
+  // Route ownership is evaluated during render, before a layout effect can retire stale modal
+  // state restored by browser Forward. Only these admitted booleans may reach a 3D renderer.
+  const interactiveThreeDSurfaceAdmission = resolveStudioInteractiveThreeDSurfaceAdmission({
+    bg3dOpen,
+    dccRouteRequested: hybridDccRouteRequested,
+    mannequinPoserOpen,
+    poserVrmOpen,
+  });
+  const admittedBg3dOpen = interactiveThreeDSurfaceAdmission.bg3dOpen;
+  const admittedMannequinPoserOpen = interactiveThreeDSurfaceAdmission.mannequinPoserOpen;
+  const admittedPoserVrmOpen = interactiveThreeDSurfaceAdmission.poserVrmOpen;
   const bg3dDccSourceRef = useRef<StudioShared3dStageDccSource | null>(null);
   const [bg3dInitialDataUrl, setBg3dInitialDataUrl] = useState<string | undefined>(undefined);
   const [bg3dInitialScene, setBg3dInitialScene] = useState<StudioBg3dSceneDocument | undefined>(
@@ -9622,6 +9851,17 @@ function StudioCuttoonEditor() {
   quickStartDismissedRef.current = quickStartDismissed;
   const [quickStartOpen, setQuickStartOpen] = useState(false);
   const [quickComicOpen, setQuickComicOpen] = useState(false);
+  useLayoutEffect(() => {
+    if (!hybridDccRouteRequested) return;
+    // Route ownership is exclusive: returning to a DCC history entry must retire every other
+    // interactive 3D surface before paint, otherwise two GPU scenes and two focus traps coexist.
+    setBg3dOpen(false);
+    setPoserVrmOpen(false);
+    setMannequinPoserOpen(false);
+    setCreativeModesOpen(false);
+    setQuickStartOpen(false);
+    setQuickComicOpen(false);
+  }, [hybridDccRouteRequested]);
   const [mobileHintDismissed, setMobileHintDismissed] = useState(false);
   const mobileHintDismissedRef = useRef(mobileHintDismissed);
   mobileHintDismissedRef.current = mobileHintDismissed;
@@ -39313,6 +39553,7 @@ function clearSelectionForEdit() {
             runtimeRef: companionRuntimeRef,
             windowRef: companionWindowRef,
             announce: studioMainMenuActions.announceDrawingShortcut,
+            workId,
             t,
           }),
           toggleQuickAccessPalette: studioMainMenuActions.toggleStudioQuickAccessPalette,
@@ -42671,7 +42912,7 @@ function clearSelectionForEdit() {
           onAddStickyNote={insertStudioStickyNote}
           onOpenSculpt={() => {
             setCreativeModesOpen(false);
-            setHybridDccOpen(true);
+            openHybridDccWorkspace("sculpt");
           }}
           onStartEphemeralBoard={(session) => {
             // Ephemeral board: focus canvas and keep share path in session for HUD.
@@ -42683,28 +42924,40 @@ function clearSelectionForEdit() {
       </div>
     </div>
   ) : null}
+  {hybridDccRouteRequested && !hybridDccOpen ? (
+    <StudioHybridDccRouteGate
+      detail={hybridDccRouteAccess === "pending"
+        ? "권한·원고·협업 경계를 확인한 뒤 같은 작품의 3D 작업을 엽니다. 기다리는 동안 캔버스와 로컬 3D 원본은 변경되지 않습니다."
+        : "이 작품의 3D 원본을 편집할 수 없어 안전하게 캔버스로 돌아갑니다."}
+      label={hybridDccRouteAccess === "pending"
+        ? "3D 작업 권한을 확인하는 중입니다."
+        : "3D 편집 권한을 확인하지 못했습니다."}
+      onClose={() => setHybridDccOpen(false)}
+      returnFocus={hybridDccReturnFocusRef.current}
+    />
+  ) : null}
   {hybridDccOpen ? (
       <Suspense
         fallback={(
-          <div
-            className="fixed inset-0 z-[110] grid place-items-center bg-canvas/80 p-4 text-sm font-semibold text-fg"
-            role="status"
-            aria-live="polite"
-          >
-            Hybrid DCC를 여는 중…
-          </div>
+          <StudioHybridDccRouteGate
+            detail="편집 권한과 로컬 복구 범위는 확인됐습니다. 무거운 3D 편집 모듈만 불러오는 중입니다."
+            label="전문 3D 제작 도구를 여는 중입니다."
+            onClose={() => setHybridDccOpen(false)}
+            returnFocus={hybridDccReturnFocusRef.current}
+          />
         )}
       >
         <LazyStudioHybridDccDialog
           key={hybridDccWorkspaceScope}
           loading={hybridDccPersistenceStatus === "checking"}
           open
-          onClose={() => {
-            flushHybridDccWorkspacePersistence();
-            setHybridDccOpen(false);
-          }}
+          onClose={() => setHybridDccOpen(false)}
           initialWorkspace={scopedHybridDccWorkspace}
+          onWorkbenchModeChange={setHybridDccWorkbenchMode}
           persistenceStatus={hybridDccPersistenceStatus}
+          presentation="workspace"
+          returnFocus={hybridDccReturnFocusRef.current}
+          workbenchMode={studioRoute.dccMode ?? "model"}
           workspaceDocumentId={hybridDccWorkspaceDocumentId}
           onWorkspaceChange={(workspace) => {
             setHybridDccWorkspaceState((current) => (
@@ -42723,7 +42976,6 @@ function clearSelectionForEdit() {
                 ? `3D 장면을 열었습니다 · 파생 손실 ${result.losses.length}건은 DCC 원본에 보존됨`
                 : `3D 장면을 열었습니다 · ${result.assets.length}개 메시, ${result.shots.length}개 Shot`,
             );
-            flushHybridDccWorkspacePersistence();
             bg3dDccSourceRef.current = {
               sourceDocumentId: result.sourceDocumentId,
               sourceStateHash: result.sourceStateHash,
@@ -43225,7 +43477,7 @@ function clearSelectionForEdit() {
           assetSortOrder={assetSortOrder}
           assetTab={assetTab}
           bg={bg}
-          bg3dOpen={bg3dOpen}
+          bg3dOpen={admittedBg3dOpen}
           bgGrad={bgGrad}
           bgSceneGenreFilter={bgSceneGenreFilter}
           bgSceneSearchQuery={bgSceneSearchQuery}
@@ -43282,9 +43534,9 @@ function clearSelectionForEdit() {
           panelLayoutPresets={panelLayoutPresets}
           panelLayoutsError={panelLayoutsError}
           panelLayoutsLoading={panelLayoutsLoading}
-          mannequinPoserOpen={mannequinPoserOpen}
+          mannequinPoserOpen={admittedMannequinPoserOpen}
           setMannequinPoserOpen={setMannequinPoserOpen}
-          poserVrmOpen={poserVrmOpen}
+          poserVrmOpen={admittedPoserVrmOpen}
           presentationPanelsHidden={presentationPanelsHidden}
           publishingId={publishingId}
           rasterFavoriteOnly={rasterFavoriteOnly}
@@ -43514,9 +43766,9 @@ function clearSelectionForEdit() {
           quickShapeActive={quickShapeActive}
           railMoreOpen={railMoreOpen}
           referencePanelOpen={referencePanelOpen}
-          mannequinPoserOpen={mannequinPoserOpen}
-          poserVrmOpen={poserVrmOpen}
-          bg3dOpen={bg3dOpen}
+          mannequinPoserOpen={admittedMannequinPoserOpen}
+          poserVrmOpen={admittedPoserVrmOpen}
+          bg3dOpen={admittedBg3dOpen}
           hybridDccOpen={hybridDccOpen}
           selected={selected}
           selectedImageMutationLocked={selectedImageMutationLocked}
@@ -44544,7 +44796,7 @@ function clearSelectionForEdit() {
           bg3dTargetBundleId={bg3dTargetBundleId}
           bg3dBatchRecoveryScope={bg3dBatchRecoveryScope}
           validateRecoveryAccess={validateRecoveryAccess}
-          bg3dOpen={bg3dOpen}
+          bg3dOpen={admittedBg3dOpen}
           characterBible={characterBible}
           characterBibleOpen={characterBibleOpen}
           checkpointError={checkpointError}
@@ -44584,10 +44836,10 @@ function clearSelectionForEdit() {
           pages={pages}
           pagesHi={pagesHi}
           pagesHistory={pagesHistory}
-          mannequinPoserOpen={mannequinPoserOpen}
+          mannequinPoserOpen={admittedMannequinPoserOpen}
           poserInitialDataUrl={poserInitialDataUrl}
           poserInitialElementId={poserInitialElementId}
-          poserVrmOpen={poserVrmOpen}
+          poserVrmOpen={admittedPoserVrmOpen}
           productionInsightsOpen={productionInsightsOpen}
           productionInsightsResult={productionInsightsResult}
           publicationAnalytics={publicationAnalytics}

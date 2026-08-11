@@ -1116,6 +1116,40 @@ describe("StudioToolsCompanionPage", () => {
     expect(document.getElementById("companion-mode-panel-navigator")?.hidden).toBe(false);
   });
 
+  it("keeps a canonical-path work scope in reconnect and dedicated popup URLs", () => {
+    const open = vi.spyOn(window, "open").mockImplementation((url) => ({
+      closed: false,
+      close: vi.fn(),
+      focus: vi.fn(),
+      location: { href: String(url) },
+    }) as unknown as Window);
+    renderCompanion(
+      `/studio/tools-companion?session=${sessionId}&id=work%2F%ED%95%9C%EA%B8%80`,
+    );
+
+    expect(screen.getByRole("link", { name: "스튜디오 다시 연결" }).getAttribute("href")).toBe(
+      `http://localhost:3000/studio/work/work%2F%ED%95%9C%EA%B8%80/canvas?session=${sessionId}`,
+    );
+    fireEvent.click(screen.getByRole("button", {
+      name: "Navigator 전용 창 열기 또는 앞으로 가져오기",
+    }));
+    expect(open).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /\/studio\/tools-companion\?session=primary-a-1234&id=work%2F%ED%95%9C%EA%B8%80&view=navigator/u,
+      ),
+      "toonspectrum-studio-tools-primary-a-1234-navigator",
+      expect.any(String),
+    );
+  });
+
+  it("rejects duplicate work scopes without joining the primary channel", () => {
+    renderCompanion(
+      `/studio/tools-companion?session=${sessionId}&id=work-1&id=work-1`,
+    );
+    expect(screen.getByRole("alert").textContent).toContain("유효한 작품 범위가 없습니다");
+    expect(FakeBroadcastChannel.instances).toHaveLength(0);
+  });
+
   it("rejects an invalid or duplicated surface without opening a channel", () => {
     renderCompanion(`/studio/tools-companion?session=${sessionId}&view=navigator&view=review`);
 

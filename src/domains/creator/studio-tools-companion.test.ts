@@ -27,6 +27,7 @@ import {
   openReadyStudioToolsCompanionForMenu,
   openStudioCompanionSurfaceWindow,
   openStudioToolsCompanionWindow,
+  parseStudioCompanionDocumentScope,
   parseStudioCompanionSurface,
   parseStudioCompanionSessionId,
   parseStudioCompanionMessage,
@@ -680,7 +681,7 @@ describe("studio-tools-companion protocol", () => {
       "https://example.com",
       "?session=primary-a-1234&id=work-123&remix=source-456"
     )).toBe(
-      "https://example.com/studio?session=primary-a-1234&id=work-123"
+      "https://example.com/studio/work/work-123/canvas?session=primary-a-1234"
     );
     expect(studioCompanionPrimaryUrl(
       sessionA,
@@ -691,7 +692,61 @@ describe("studio-tools-companion protocol", () => {
       sessionA,
       "https://example.com",
       "?return=https%3A%2F%2Fevil.example%2Fsteal&id=https%3A%2F%2Fevil.example"
-    )).toBe("https://example.com/studio?session=primary-a-1234");
+    )).toBe(
+      "https://example.com/studio/work/https%3A%2F%2Fevil.example/canvas?session=primary-a-1234",
+    );
+    expect(studioCompanionPrimaryUrl(
+      sessionA,
+      "https://example.com/path-that-must-not-be-used",
+      "?id=work%2F%ED%95%9C%EA%B8%80",
+    )).toBe(
+      "https://example.com/studio/work/work%2F%ED%95%9C%EA%B8%80/canvas?session=primary-a-1234",
+    );
+    expect(studioCompanionPrimaryUrl(
+      sessionA,
+      "javascript:alert(1)",
+      "?id=work-123",
+    )).toBe("/studio/work/work-123/canvas?session=primary-a-1234");
+    expect(studioCompanionPrimaryUrl(
+      sessionA,
+      "https://example.com",
+      "?id=work-123&id=work-123",
+    )).toBe("https://example.com/studio");
+  });
+
+  it("carries an explicit canonical-path work scope through popup URLs and parsing", () => {
+    const popupUrl = studioCompanionUrl(
+      primaryA,
+      "https://example.com",
+      "?room=team-1",
+      "workspace",
+      "work/한글",
+    );
+    expect(popupUrl).toBe(
+      "https://example.com/studio/tools-companion?session=primary-a-1234&id=work%2F%ED%95%9C%EA%B8%80",
+    );
+    const popupSearch = new URL(popupUrl).search;
+    expect(parseStudioCompanionDocumentScope(popupSearch)).toEqual({
+      workId: "work/한글",
+      remixId: null,
+    });
+    expect(studioCompanionPrimaryUrl(primaryA, "https://example.com", popupSearch)).toBe(
+      "https://example.com/studio/work/work%2F%ED%95%9C%EA%B8%80/canvas?session=primary-a-1234",
+    );
+    expect(() => studioCompanionUrl(
+      primaryA,
+      "https://example.com",
+      "?id=another-work",
+      "workspace",
+      "work/한글",
+    )).toThrow("Invalid Studio tools companion document scope");
+    expect(() => studioCompanionUrl(
+      primaryA,
+      "https://example.com",
+      "?id=work%2F%ED%95%9C%EA%B8%80",
+      "workspace",
+      null,
+    )).toThrow("Invalid Studio tools companion document scope");
   });
 
   it("opens or refocuses a session-specific popup and survives blocked/failing focus", () => {
@@ -731,6 +786,39 @@ describe("studio-tools-companion protocol", () => {
     } as unknown as Window;
     expect(openStudioToolsCompanionWindow(session, focusThrows, open)).toBe(focusThrows);
     expect(open).toHaveBeenCalledOnce();
+  });
+
+  it("reuses a popup only for the explicit canonical-path work scope", () => {
+    const session = "primary-a-1234";
+    const popup = {
+      focus: vi.fn(),
+      closed: false,
+      location: {
+        href: "http://localhost/studio/tools-companion?session=primary-a-1234&id=work-1",
+      },
+    } as unknown as Window;
+    const recovered = {
+      focus: vi.fn(),
+      closed: false,
+      location: {
+        href: "http://localhost/studio/tools-companion?session=primary-a-1234&id=work-2",
+      },
+    } as unknown as Window;
+    const open = vi.fn(() => recovered);
+
+    expect(isStudioToolsCompanionWindowReusable(session, popup, "workspace", "work-1"))
+      .toBe(true);
+    expect(openStudioToolsCompanionWindow(session, popup, open, "work-1")).toBe(popup);
+    expect(open).not.toHaveBeenCalled();
+
+    expect(isStudioToolsCompanionWindowReusable(session, popup, "workspace", "work-2"))
+      .toBe(false);
+    expect(openStudioToolsCompanionWindow(session, popup, open, "work-2")).toBe(recovered);
+    expect(open).toHaveBeenCalledWith(
+      expect.stringContaining("id=work-2"),
+      "toonspectrum-studio-tools-primary-a-1234",
+      expect.any(String),
+    );
   });
 
   it("isolates workspace, Navigator, Review and Reference popup URLs, names and reuse", () => {
@@ -798,7 +886,9 @@ describe("studio-tools-companion protocol", () => {
     const recoveredWindow = {
       closed: false,
       focus: vi.fn(),
-      location: { href: "http://localhost/studio/tools-companion?session=primary-a-1234" },
+      location: {
+        href: "http://localhost/studio/tools-companion?session=primary-a-1234&id=work-1",
+      },
     } as unknown as Window;
     const open = vi.fn(() => recoveredWindow);
     vi.stubGlobal("window", { open });
@@ -815,6 +905,7 @@ describe("studio-tools-companion protocol", () => {
 
     openReadyStudioToolsCompanionForMenu({
       sessionId: primaryA,
+      workId: "work-1",
       windowRef,
       binding,
       announce,
@@ -837,6 +928,7 @@ describe("studio-tools-companion protocol", () => {
     windowRef.current = reservation;
     completeReservedStudioToolsCompanionWindow({
       sessionId: primaryA,
+      workId: "work-1",
       reservation,
       windowRef,
       announce,
@@ -845,7 +937,7 @@ describe("studio-tools-companion protocol", () => {
     expect(reservation.name).toBe("toonspectrum-studio-tools-primary-a-1234");
     expect(reservation.opener).toBeNull();
     expect(replace).toHaveBeenCalledWith(expect.stringContaining(
-      "/studio/tools-companion?session=primary-a-1234"
+      "/studio/tools-companion?session=primary-a-1234&id=work-1"
     ));
     expect(reservation.close).not.toHaveBeenCalled();
     expect(announce).toHaveBeenLastCalledWith(expect.stringContaining("열었습니다"));

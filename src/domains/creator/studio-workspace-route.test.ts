@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   createStudioDccNavigationState,
+  isStudioWorkspaceLocation,
+  isStudioWorkspaceRoutePathname,
   parseStudioWorkspaceRoute,
   shouldPreserveStudioRouteLifecycle,
   studioCanvasHref,
@@ -37,10 +39,15 @@ describe("studio workspace routes", () => {
 
   it.each([
     ["/studio/work", "", "invalid-work-id"],
+    ["/studio//3d/dcc/model", "", "invalid-path"],
+    ["/studio/work//canvas", "", "invalid-path"],
+    ["/studio/work/work-1//3d/dcc/model", "", "invalid-path"],
     ["/studio/work/%5C/canvas", "", "invalid-work-id"],
     ["/studio/work/work-1/3d/dcc/unknown", "", "invalid-path"],
     ["/studio/avatar", "", "invalid-path"],
     ["/studio/work/work-1/canvas", "?id=work-2", "work-id-conflict"],
+    ["/studio/work/work-1/canvas", "?id=work-1&id=work-1", "invalid-work-id"],
+    ["/studio", "?id=work-1&id=work-2", "invalid-work-id"],
     ["/studio", "?id=..", "invalid-work-id"],
   ] as const)("fails closed for %s", (pathname, search, errorCode) => {
     expect(parseStudioWorkspaceRoute({ pathname, search })).toEqual({
@@ -62,15 +69,73 @@ describe("studio workspace routes", () => {
     })).toMatchObject({ valid: true, workId: "work/한글" });
   });
 
-  it("keeps one route-stage lifecycle across Studio canvas and DCC paths", () => {
-    expect(studioRouteStageKey("/studio")).toBe("/studio");
-    expect(studioRouteStageKey("/studio/work/work-1/3d/dcc/model")).toBe("/studio");
+  it("keeps one route-stage lifecycle only within the same Studio document", () => {
+    expect(studioRouteStageKey("/studio")).toBe("/studio/draft/editor");
+    expect(studioRouteStageKey("/studio/work/work-1/3d/dcc/model")).toBe(
+      "/studio/work:work-1/editor",
+    );
+    expect(studioRouteStageKey({
+      pathname: "/studio",
+      search: "?id=work-1",
+    })).toBe("/studio/work:work-1/editor");
+    expect(studioRouteStageKey({
+      pathname: "/studio/work/work-1/canvas",
+      search: "?mode=upload",
+    })).toBe("/studio/work:work-1/upload");
+    expect(studioRouteStageKey({
+      pathname: "/studio/tools-companion",
+      search: "?session=primary-a-1234",
+    })).toBe("/studio/tools-companion?session=primary-a-1234");
+    expect(studioRouteStageKey({
+      pathname: "/studio/work/work-1/canvas",
+      search: "?id=work-2",
+    })).toBe("/studio/work/work-1/canvas?id=work-2");
     expect(studioRouteStageKey("/ranking")).toBe("/ranking");
     expect(shouldPreserveStudioRouteLifecycle(
       "/studio/work/work-1/canvas",
       "/studio/work/work-1/3d/dcc/model",
     )).toBe(true);
+    expect(shouldPreserveStudioRouteLifecycle(
+      "/studio/work/work-1/3d/dcc/model",
+      "/studio/work/work-1/3d/dcc/shot",
+    )).toBe(true);
+    expect(shouldPreserveStudioRouteLifecycle(
+      "/studio/work/work-1/canvas",
+      "/studio/work/work-2/3d/dcc/model",
+    )).toBe(false);
+    expect(shouldPreserveStudioRouteLifecycle(
+      "/studio",
+      "/studio/work/work-1/canvas",
+    )).toBe(false);
+    expect(shouldPreserveStudioRouteLifecycle(
+      { pathname: "/studio", search: "?id=work-1" },
+      { pathname: "/studio/work/work-1/canvas", search: "" },
+    )).toBe(true);
+    expect(shouldPreserveStudioRouteLifecycle(
+      "/studio/work/work-1/canvas",
+      "/studio/tools-companion",
+    )).toBe(false);
+    expect(shouldPreserveStudioRouteLifecycle(
+      "/studio/work/work-1/canvas",
+      "/studio/avatar",
+    )).toBe(false);
+    expect(shouldPreserveStudioRouteLifecycle(
+      { pathname: "/studio/work/work-1/canvas", search: "" },
+      { pathname: "/studio/work/work-1/canvas", search: "?mode=upload" },
+    )).toBe(false);
     expect(shouldPreserveStudioRouteLifecycle("/studio", "/ranking")).toBe(false);
+  });
+
+  it("distinguishes Studio delivery paths from actual workspace routes", () => {
+    expect(isStudioWorkspaceRoutePathname("/studio")).toBe(true);
+    expect(isStudioWorkspaceRoutePathname("/studio/work/work-1/3d/dcc/cad")).toBe(true);
+    expect(isStudioWorkspaceRoutePathname("/studio/tools-companion")).toBe(false);
+    expect(isStudioWorkspaceRoutePathname("/studio//3d/dcc/model")).toBe(false);
+    expect(isStudioWorkspaceRoutePathname("/studio/avatar")).toBe(false);
+    expect(isStudioWorkspaceLocation({
+      pathname: "/studio/work/work-1/canvas",
+      search: "?id=work-2",
+    })).toBe(false);
   });
 
   it("accepts only same-document canvas return receipts", () => {

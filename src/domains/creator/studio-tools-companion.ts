@@ -32,6 +32,10 @@ import {
   type StudioCompanionReviewProjection,
   type StudioCompanionReviewProjectionSourceInput,
 } from "./studio-companion-review-projection";
+import {
+  isValidStudioWorkspaceWorkId,
+  studioCanvasPathname,
+} from "./studio-workspace-route";
 
 export {
   captureStudioCompanionNavigatorFrame,
@@ -453,31 +457,63 @@ export function studioCompanionWindowName(
   return `${STUDIO_TOOLS_COMPANION_WINDOW_NAME}-${requireStudioCompanionSessionId(sessionId)}${suffix}`;
 }
 
-function studioCompanionPrimaryScope(search: string): { id?: string; remix?: string } {
+type StudioCompanionPrimaryScope = { id?: string; remix?: string };
+
+export interface StudioCompanionDocumentScope {
+  readonly workId: string | null;
+  readonly remixId: string | null;
+}
+
+function studioCompanionPrimaryScope(
+  search: string,
+  routeWorkId?: string | null,
+): StudioCompanionPrimaryScope | null {
   try {
     const params = new URLSearchParams(search);
-    const scope: { id?: string; remix?: string } = {};
     const ids = params.getAll("id");
     const remixes = params.getAll("remix");
-    if (ids.length === 1 && STUDIO_COMPANION_SCOPE_PATTERN.test(ids[0] ?? "")) scope.id = ids[0];
-    if (
-      !scope.id
-      && remixes.length === 1
-      && STUDIO_COMPANION_SCOPE_PATTERN.test(remixes[0] ?? "")
-    ) {
-      scope.remix = remixes[0];
+
+    if (ids.length > 1 || remixes.length > 1) return null;
+    const queryWorkId = ids[0];
+    const remixId = remixes[0];
+    if (queryWorkId !== undefined && !isValidStudioWorkspaceWorkId(queryWorkId)) return null;
+    if (remixId !== undefined && !STUDIO_COMPANION_SCOPE_PATTERN.test(remixId)) return null;
+
+    if (routeWorkId !== undefined) {
+      if (routeWorkId !== null && !isValidStudioWorkspaceWorkId(routeWorkId)) return null;
+      if (queryWorkId !== undefined && queryWorkId !== routeWorkId) return null;
+      if (routeWorkId !== null) return { id: routeWorkId };
+      if (queryWorkId !== undefined) return null;
     }
-    return scope;
+
+    if (queryWorkId !== undefined) return { id: queryWorkId };
+    return remixId === undefined ? {} : { remix: remixId };
   } catch {
-    return {};
+    return null;
   }
 }
 
-function studioCompanionScopedParams(sessionId: string, primarySearch: string): URLSearchParams {
+export function parseStudioCompanionDocumentScope(
+  search: string,
+): StudioCompanionDocumentScope | null {
+  const scope = studioCompanionPrimaryScope(search);
+  if (!scope) return null;
+  return Object.freeze({
+    workId: scope.id ?? null,
+    remixId: scope.remix ?? null,
+  });
+}
+
+function studioCompanionScopedParams(
+  sessionId: string,
+  primarySearch: string,
+  routeWorkId?: string | null,
+): URLSearchParams {
   const params = new URLSearchParams({
     [STUDIO_COMPANION_SESSION_QUERY]: requireStudioCompanionSessionId(sessionId),
   });
-  const scope = studioCompanionPrimaryScope(primarySearch);
+  const scope = studioCompanionPrimaryScope(primarySearch, routeWorkId);
+  if (!scope) throw new TypeError("Invalid Studio tools companion document scope");
   if (scope.id) params.set("id", scope.id);
   if (scope.remix) params.set("remix", scope.remix);
   return params;
@@ -1757,10 +1793,11 @@ export function studioCompanionUrl(
   sessionId: string,
   origin: string = typeof location !== "undefined" ? location.origin : "",
   primarySearch: string = typeof location !== "undefined" ? location.search : "",
-  surface: StudioCompanionSurface = "workspace"
+  surface: StudioCompanionSurface = "workspace",
+  routeWorkId?: string | null,
 ): string {
-  const base = origin.replace(/\/$/, "");
-  const params = studioCompanionScopedParams(sessionId, primarySearch);
+  const base = studioCompanionOriginBase(origin);
+  const params = studioCompanionScopedParams(sessionId, primarySearch, routeWorkId);
   if (surface !== "workspace") params.set(STUDIO_COMPANION_VIEW_QUERY, surface);
   return `${base}${STUDIO_TOOLS_COMPANION_PATH}?${params.toString()}`;
 }
@@ -1770,8 +1807,24 @@ export function studioCompanionPrimaryUrl(
   origin: string = typeof location !== "undefined" ? location.origin : "",
   companionSearch: string = typeof location !== "undefined" ? location.search : ""
 ): string {
-  const base = origin.replace(/\/$/, "");
-  return `${base}/studio?${studioCompanionScopedParams(sessionId, companionSearch).toString()}`;
+  const base = studioCompanionOriginBase(origin);
+  const scope = studioCompanionPrimaryScope(companionSearch);
+  if (!scope) return `${base}/studio`;
+  const params = new URLSearchParams({
+    [STUDIO_COMPANION_SESSION_QUERY]: requireStudioCompanionSessionId(sessionId),
+  });
+  if (scope.remix) params.set("remix", scope.remix);
+  return `${base}${studioCanvasPathname(scope.id ?? null)}?${params.toString()}`;
+}
+
+function studioCompanionOriginBase(origin: string): string {
+  if (!origin) return "";
+  try {
+    const parsed = new URL(origin);
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.origin : "";
+  } catch {
+    return "";
+  }
 }
 
 function isMatchingStudioToolsCompanionWindow(
@@ -1792,6 +1845,8 @@ function isMatchingStudioToolsCompanionWindow(
     return currentUrl.origin === expected.origin
       && currentUrl.pathname === STUDIO_TOOLS_COMPANION_PATH
       && parseStudioCompanionSessionId(currentUrl.search) === sessionId
+      && currentScope !== null
+      && expectedScope !== null
       && currentSurface !== null
       && currentSurface === expectedSurface
       && currentScope.id === expectedScope.id
@@ -1804,14 +1859,15 @@ function isMatchingStudioToolsCompanionWindow(
 export function isStudioToolsCompanionWindowReusable(
   sessionId: string,
   candidate: Window | null,
-  surface: StudioCompanionSurface = "workspace"
+  surface: StudioCompanionSurface = "workspace",
+  routeWorkId?: string | null,
 ): candidate is Window {
   if (!candidate || !isStudioCompanionSessionId(sessionId)) return false;
   try {
     return !candidate.closed
       && isMatchingStudioToolsCompanionWindow(
         candidate,
-        studioCompanionUrl(sessionId, undefined, undefined, surface),
+        studioCompanionUrl(sessionId, undefined, undefined, surface, routeWorkId),
         sessionId
       );
   } catch {
@@ -1838,11 +1894,17 @@ export function openStudioCompanionSurfaceWindow(
   surface: StudioCompanionSurface,
   existingWindow: Window | null = null,
   openWindow: (url: string, name: string, features: string) => Window | null = (url, name, features) =>
-    typeof window !== "undefined" ? window.open(url, name, features) : null
+    typeof window !== "undefined" ? window.open(url, name, features) : null,
+  routeWorkId?: string | null,
 ): Window | null {
   if (!isStudioCompanionSessionId(sessionId)) return null;
-  const expectedUrl = studioCompanionUrl(sessionId, undefined, undefined, surface);
-  if (isStudioToolsCompanionWindowReusable(sessionId, existingWindow, surface)) {
+  let expectedUrl: string;
+  try {
+    expectedUrl = studioCompanionUrl(sessionId, undefined, undefined, surface, routeWorkId);
+  } catch {
+    return null;
+  }
+  if (isStudioToolsCompanionWindowReusable(sessionId, existingWindow, surface, routeWorkId)) {
     severStudioCompanionOpener(existingWindow);
     try {
       existingWindow.focus?.();
@@ -1873,13 +1935,15 @@ export function openStudioCompanionSurfaceWindow(
 export function openStudioToolsCompanionWindow(
   sessionId: string,
   existingWindow: Window | null = null,
-  openWindow?: (url: string, name: string, features: string) => Window | null
+  openWindow?: (url: string, name: string, features: string) => Window | null,
+  routeWorkId?: string | null,
 ): Window | null {
   return openStudioCompanionSurfaceWindow(
     sessionId,
     "workspace",
     existingWindow,
-    openWindow
+    openWindow,
+    routeWorkId,
   );
 }
 
@@ -1893,6 +1957,7 @@ export function openReadyStudioToolsCompanionForMenu(input: {
   windowRef: StudioCompanionWindowRef;
   binding: StudioCompanionPrimaryBinding;
   announce: StudioCompanionAnnounce;
+  workId?: string | null;
   t?: StudioCompanionI18n;
 }): void {
   const surface = input.surface ?? "workspace";
@@ -1900,7 +1965,8 @@ export function openReadyStudioToolsCompanionForMenu(input: {
   const reusedExistingWindow = isStudioToolsCompanionWindowReusable(
     input.sessionId,
     cachedWindow,
-    surface
+    surface,
+    input.workId,
   );
   if (!reusedExistingWindow) {
     input.binding.release(surface);
@@ -1909,7 +1975,9 @@ export function openReadyStudioToolsCompanionForMenu(input: {
   const companionWindow = openStudioCompanionSurfaceWindow(
     input.sessionId,
     surface,
-    reusedExistingWindow ? cachedWindow : null
+    reusedExistingWindow ? cachedWindow : null,
+    undefined,
+    input.workId,
   );
   if (!companionWindow) {
     input.announce(localizeCompanionText(
@@ -1948,6 +2016,7 @@ export function completeReservedStudioToolsCompanionWindow(input: {
   reservation: Window;
   windowRef: StudioCompanionWindowRef;
   announce: StudioCompanionAnnounce;
+  workId?: string | null;
   t?: StudioCompanionI18n;
 }): void {
   if (input.windowRef.current !== input.reservation) {
@@ -1966,7 +2035,8 @@ export function completeReservedStudioToolsCompanionWindow(input: {
       input.sessionId,
       undefined,
       undefined,
-      surface
+      surface,
+      input.workId,
     ));
   } catch {
     input.windowRef.current = null;
