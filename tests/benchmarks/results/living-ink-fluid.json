@@ -83,67 +83,67 @@
           {
             "iterations": 0,
             "reduction": 0,
-            "milliseconds": 8.458666999999878
+            "milliseconds": 7.464709000000084
           },
           {
             "iterations": 1,
             "reduction": 0.09157809105755532,
-            "milliseconds": 33.684208000000126
+            "milliseconds": 3.377334000000019
           },
           {
             "iterations": 2,
             "reduction": 0.1710620993891092,
-            "milliseconds": 27.192833000000064
+            "milliseconds": 8.938709000000017
           },
           {
             "iterations": 4,
             "reduction": 0.30219825390513855,
-            "milliseconds": 4.7127919999998085
+            "milliseconds": 5.4623750000000655
           },
           {
             "iterations": 6,
             "reduction": 0.40425424418057165,
-            "milliseconds": 66.1892499999999
+            "milliseconds": 9.3979589999999
           },
           {
             "iterations": 8,
             "reduction": 0.4843866060113574,
-            "milliseconds": 0.7297089999997297
+            "milliseconds": 0.7529999999999291
           },
           {
             "iterations": 10,
             "reduction": 0.5477456922481041,
-            "milliseconds": 0.8087500000001455
+            "milliseconds": 0.7979580000001079
           },
           {
             "iterations": 12,
             "reduction": 0.5981555168352946,
-            "milliseconds": 0.8976670000001832
+            "milliseconds": 0.9346659999998792
           },
           {
             "iterations": 16,
             "reduction": 0.671024677911479,
-            "milliseconds": 1.0822499999999309
+            "milliseconds": 1.1652079999998932
           },
           {
             "iterations": 22,
             "reduction": 0.7367943246945253,
-            "milliseconds": 1.3411250000003747
+            "milliseconds": 2.6501670000000104
           },
           {
             "iterations": 32,
             "reduction": 0.7915652504810287,
-            "milliseconds": 1.7770409999998265
+            "milliseconds": 1.7998750000001564
           },
           {
             "iterations": 48,
             "reduction": 0.8296844726518429,
-            "milliseconds": 2.537249999999858
+            "milliseconds": 2.4912500000000364
           },
           {
             "iterations": 64,
             "reduction": 0.8486755997786537,
-            "milliseconds": 3.241791999999805
+            "milliseconds": 3.178416999999854
           }
         ]
       },
@@ -153,67 +153,67 @@
           {
             "iterations": 0,
             "reduction": 0,
-            "milliseconds": 0.3573330000003807
+            "milliseconds": 0.3565410000001066
           },
           {
             "iterations": 1,
             "reduction": 0.30563398215041204,
-            "milliseconds": 0.4118749999997817
+            "milliseconds": 0.4026249999999436
           },
           {
             "iterations": 2,
             "reduction": 0.2962978357841195,
-            "milliseconds": 1.2054580000003625
+            "milliseconds": 0.44508300000006784
           },
           {
             "iterations": 4,
             "reduction": 0.3355845897673906,
-            "milliseconds": 1.3937910000004194
+            "milliseconds": 0.5223750000000109
           },
           {
             "iterations": 6,
             "reduction": 0.34731879499911156,
-            "milliseconds": 0.6367089999994278
+            "milliseconds": 0.6227089999999862
           },
           {
             "iterations": 8,
             "reduction": 0.35215282069056286,
-            "milliseconds": 0.7319160000006377
+            "milliseconds": 0.7032500000000255
           },
           {
             "iterations": 10,
             "reduction": 0.3545482622428314,
-            "milliseconds": 0.8056249999999636
+            "milliseconds": 0.794791000000032
           },
           {
             "iterations": 12,
             "reduction": 0.3558880952814777,
-            "milliseconds": 0.9102499999999054
+            "milliseconds": 0.8820419999999558
           },
           {
             "iterations": 16,
             "reduction": 0.35723549964096657,
-            "milliseconds": 1.0927500000007058
+            "milliseconds": 1.0635830000001079
           },
           {
             "iterations": 22,
             "reduction": 0.35804519083805164,
-            "milliseconds": 2.506333000000268
+            "milliseconds": 1.4651249999999436
           },
           {
             "iterations": 32,
             "reduction": 0.3585113316963854,
-            "milliseconds": 4.8391249999995125
+            "milliseconds": 1.7627500000000964
           },
           {
             "iterations": 48,
             "reduction": 0.3587356221652306,
-            "milliseconds": 2.519290999999612
+            "milliseconds": 5.533625000000029
           },
           {
             "iterations": 64,
             "reduction": 0.3588133146187308,
-            "milliseconds": 3.2187080000003334
+            "milliseconds": 3.1759170000000267
           }
         ]
       }
