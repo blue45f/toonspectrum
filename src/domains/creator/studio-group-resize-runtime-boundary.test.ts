@@ -181,7 +181,7 @@ describe("Studio group uniform-resize runtime boundary", () => {
       '} else if (e.key === "Escape") {',
     );
     const escapeEnd = pageSource.indexOf(
-      "} else if (",
+      "\n      } else if (",
       escapeStart + '} else if (e.key === "Escape") {'.length,
     );
     expect(escapeStart).toBeGreaterThanOrEqual(0);
