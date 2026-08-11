@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { createStudioUnitCubeMesh } from "./studio-editable-half-edge-mesh";
+import {
+  createStudioUnitCubeMesh,
+  type StudioEditableMesh,
+} from "./studio-editable-half-edge-mesh";
 import {
   applyStudioGeometryAuthorityModifierStack,
   assertRenderCacheIsNotAuthority,
@@ -70,6 +73,105 @@ describe("Geometry Authority disposable render-cache integrity", () => {
       ok: false,
       code: "coordinate-out-of-range",
     });
+  });
+
+  it("rejects noncanonical or unserializable meshes at register and commit boundaries", () => {
+    const cube = createStudioUnitCubeMesh();
+    const alternateOutgoing = cube.halfEdges.find((halfEdge) => (
+      cube.halfEdges[halfEdge.prev]!.vertex === 0
+      && halfEdge.id !== cube.vertices[0]!.he
+    ));
+    if (!alternateOutgoing) throw new Error("cube must provide an alternate incident half-edge");
+    const variants: readonly (readonly [string, StudioEditableMesh, string])[] = [
+      [
+        "alternate vertex anchor",
+        {
+          ...cube,
+          vertices: cube.vertices.map((vertex) => (
+            vertex.id === 0 ? { ...vertex, he: alternateOutgoing.id } : vertex
+          )),
+        },
+        "canonical first outgoing half-edge",
+      ],
+      [
+        "rotated face anchor",
+        {
+          ...cube,
+          faces: cube.faces.map((face) => (
+            face.id === 0 ? { ...face, he: cube.halfEdges[face.he]!.next } : face
+          )),
+        },
+        "canonical first half-edge",
+      ],
+      [
+        "high counters",
+        { ...cube, nextHalfEdgeId: cube.nextHalfEdgeId + 1 },
+        "canonical dense-ID authority invariant",
+      ],
+      [
+        "invalid vertex crease",
+        {
+          ...cube,
+          vertices: cube.vertices.map((vertex) => (
+            vertex.id === 0 ? { ...vertex, crease: -0.01 } : vertex
+          )),
+        },
+        "vertex 0 crease must be finite in [0,1]",
+      ],
+      [
+        "invalid half-edge crease",
+        {
+          ...cube,
+          halfEdges: cube.halfEdges.map((halfEdge) => (
+            halfEdge.id === 0 ? { ...halfEdge, crease: Number.POSITIVE_INFINITY } : halfEdge
+          )),
+        },
+        "half-edge 0 crease must be finite in [0,1]",
+      ],
+      [
+        "invalid material slot",
+        {
+          ...cube,
+          faces: cube.faces.map((face) => (
+            face.id === 0 ? { ...face, materialSlot: 0.5 } : face
+          )),
+        },
+        "face 0 material slot must be a non-negative safe integer",
+      ],
+      [
+        "invalid smooth flag",
+        {
+          ...cube,
+          faces: cube.faces.map((face) => (
+            face.id === 0
+              ? { ...face, smooth: "false" as unknown as boolean }
+              : face
+          )),
+        },
+        "face 0 smooth flag must be boolean",
+      ],
+    ];
+
+    const registered = registeredCube();
+    for (const [index, [label, mesh, detail]] of variants.entries()) {
+      expect(registerStudioGeometryAuthority(
+        createStudioGeometryAuthorityRegistry(),
+        `invalid-${index}`,
+        mesh,
+      ), `register: ${label}`).toMatchObject({
+        ok: false,
+        code: "invalid-mesh",
+        detail: expect.stringContaining(detail),
+      });
+      expect(
+        commitStudioGeometryAuthorityMesh(registered, "cube", mesh),
+        `commit: ${label}`,
+      ).toMatchObject({
+        ok: false,
+        code: "invalid-mesh",
+        detail: expect.stringContaining(detail),
+      });
+    }
   });
 
   it("materializes a deterministic projection without advancing authority revision", async () => {

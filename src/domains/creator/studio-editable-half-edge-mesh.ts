@@ -8,6 +8,8 @@
  * merge/weld/dissolve, normals/crease, non-manifold diagnostics. Knife/bridge/subdiv are out.
  */
 
+import { hashStudioEditableMeshAuthority } from "./studio-editable-mesh-authority-digest";
+
 export const STUDIO_EDITABLE_MESH_REVISION = 1 as const;
 
 export const STUDIO_EDITABLE_MESH_LIMITS = Object.freeze({
@@ -95,6 +97,96 @@ export type StudioEditableMeshResult<T> =
       readonly detail: string;
     };
 
+/**
+ * Selection-facing stable-ID remap emitted by a topology mutation.
+ *
+ * The shape intentionally matches the Hybrid DCC component-selection remap contract without
+ * importing UI/document authority into this geometry kernel. Missing entries mean identity and a
+ * null target means deletion.
+ */
+export interface StudioEditableMeshTopologyIdRemap {
+  /** Missing entries preserve identity; a null target explicitly records deletion. */
+  readonly entries: readonly (readonly [number, number | null])[];
+}
+
+export interface StudioEditableMeshTopologySelectionRemap {
+  readonly vertex?: StudioEditableMeshTopologyIdRemap;
+  readonly edge?: StudioEditableMeshTopologyIdRemap;
+  readonly face?: StudioEditableMeshTopologyIdRemap;
+}
+
+export interface StudioEditableMeshExtrudeRegionReceipt {
+  readonly operation: "extrude-region";
+  readonly sourceMeshHash: string;
+  readonly resultMeshHash: string;
+  /** Canonical input order used by capFaceIds and the face remap. */
+  readonly sourceFaceIds: readonly number[];
+  /** One cap per source face, in sourceFaceIds order. */
+  readonly capFaceIds: readonly number[];
+  /** New side faces; only selected-region boundary edges create these. */
+  readonly sideFaceIds: readonly number[];
+  /** Source half-edge IDs forming the selected-region boundary. */
+  readonly boundaryHalfEdgeIds: readonly number[];
+  readonly connectedRegionCount: number;
+  /** Complete source-revision face → result-revision face mapping, bounded by maxFaces. */
+  readonly faceRemap: StudioEditableMeshTopologyIdRemap;
+  /** Selected source faces only, bounded by maxSelection for component-selection reconciliation. */
+  readonly selectionRemap: StudioEditableMeshTopologySelectionRemap;
+}
+
+export interface StudioEditableMeshExtrudeRegionMutation {
+  readonly mesh: StudioEditableMesh;
+  readonly receipt: StudioEditableMeshExtrudeRegionReceipt;
+}
+
+const issuedStudioEditableMeshExtrudeRegionReceipts =
+  new WeakSet<StudioEditableMeshExtrudeRegionReceipt>();
+
+/** Identity check for receipts issued by this module; structural lookalikes are not authoritative. */
+export function isIssuedStudioEditableMeshExtrudeRegionReceipt(
+  receipt: unknown,
+): receipt is StudioEditableMeshExtrudeRegionReceipt {
+  return typeof receipt === "object"
+    && receipt !== null
+    && issuedStudioEditableMeshExtrudeRegionReceipts.has(
+      receipt as StudioEditableMeshExtrudeRegionReceipt,
+    );
+}
+
+function freezeStudioEditableMeshTopologyIdRemap(
+  remap: StudioEditableMeshTopologyIdRemap,
+): StudioEditableMeshTopologyIdRemap {
+  const entries = remap.entries.map((entry) => Object.freeze([entry[0], entry[1]] as const));
+  return Object.freeze({ entries: Object.freeze(entries) });
+}
+
+function issueStudioEditableMeshExtrudeRegionReceipt(
+  receipt: StudioEditableMeshExtrudeRegionReceipt,
+): StudioEditableMeshExtrudeRegionReceipt {
+  const selectionRemap = Object.freeze({
+    ...(receipt.selectionRemap.vertex
+      ? { vertex: freezeStudioEditableMeshTopologyIdRemap(receipt.selectionRemap.vertex) }
+      : {}),
+    ...(receipt.selectionRemap.edge
+      ? { edge: freezeStudioEditableMeshTopologyIdRemap(receipt.selectionRemap.edge) }
+      : {}),
+    ...(receipt.selectionRemap.face
+      ? { face: freezeStudioEditableMeshTopologyIdRemap(receipt.selectionRemap.face) }
+      : {}),
+  });
+  const issued = Object.freeze({
+    ...receipt,
+    sourceFaceIds: Object.freeze([...receipt.sourceFaceIds]),
+    capFaceIds: Object.freeze([...receipt.capFaceIds]),
+    sideFaceIds: Object.freeze([...receipt.sideFaceIds]),
+    boundaryHalfEdgeIds: Object.freeze([...receipt.boundaryHalfEdgeIds]),
+    faceRemap: freezeStudioEditableMeshTopologyIdRemap(receipt.faceRemap),
+    selectionRemap,
+  });
+  issuedStudioEditableMeshExtrudeRegionReceipts.add(issued);
+  return issued;
+}
+
 export interface StudioMeshDiagnostic {
   readonly code:
     | "boundary-edge"
@@ -161,6 +253,49 @@ function finiteVec(v: StudioMeshVec3): boolean {
   return Number.isFinite(v.x) && Number.isFinite(v.y) && Number.isFinite(v.z);
 }
 
+function admittedArrayLength(value: unknown, limit: number, label: string): number {
+  if (!Array.isArray(value)) throw new Error(`${label} source must be an array`);
+  const count = value.length;
+  if (!Number.isSafeInteger(count) || count < 0) {
+    throw new Error(`${label} count must be a non-negative safe integer`);
+  }
+  if (count > limit) throw new Error(`${label} budget exceeded`);
+  return count;
+}
+
+/** Validates all polygon/corner counts and indices before any authority arrays are allocated. */
+function preflightStudioEditableMeshPolygonSource(
+  positionCount: number,
+  faces: readonly (readonly number[])[],
+): number {
+  const faceCount = admittedArrayLength(faces, STUDIO_EDITABLE_MESH_LIMITS.maxFaces, "face");
+  let cornerCount = 0;
+  for (let faceIndex = 0; faceIndex < faceCount; faceIndex += 1) {
+    const loop = faces[faceIndex];
+    const loopLength = admittedArrayLength(
+      loop,
+      STUDIO_EDITABLE_MESH_LIMITS.maxEdges,
+      "half-edge",
+    );
+    if (loopLength < 3) throw new Error(`face ${faceIndex} needs ≥3 verts`);
+    const nextCornerCount = cornerCount + loopLength;
+    if (!Number.isSafeInteger(nextCornerCount)
+      || nextCornerCount > STUDIO_EDITABLE_MESH_LIMITS.maxEdges) {
+      throw new Error("half-edge budget exceeded");
+    }
+    cornerCount = nextCornerCount;
+    for (let cornerIndex = 0; cornerIndex < loopLength; cornerIndex += 1) {
+      const vertexIndex = loop![cornerIndex];
+      if (!Number.isSafeInteger(vertexIndex)
+        || vertexIndex! < 0
+        || vertexIndex! >= positionCount) {
+        throw new Error(`face ${faceIndex} index out of range`);
+      }
+    }
+  }
+  return cornerCount;
+}
+
 /** Unit cube centered at origin — 8 verts, 12 triangles as quads split? Use 6 quads via 2 tris each. */
 export function createStudioUnitCubeMesh(): StudioEditableMesh {
   const positions: StudioMeshVec3[] = [
@@ -196,14 +331,17 @@ export function createStudioEditableMeshFromPolygons(
   positions: readonly StudioMeshVec3[],
   faces: readonly (readonly number[])[],
 ): StudioEditableMesh {
-  if (positions.length > STUDIO_EDITABLE_MESH_LIMITS.maxVertices) {
-    throw new Error("vertex budget exceeded");
-  }
-  if (faces.length > STUDIO_EDITABLE_MESH_LIMITS.maxFaces) {
-    throw new Error("face budget exceeded");
-  }
-  for (const p of positions) {
-    if (!finiteVec(p)) throw new Error("non-finite position");
+  const positionCount = admittedArrayLength(
+    positions,
+    STUDIO_EDITABLE_MESH_LIMITS.maxVertices,
+    "vertex",
+  );
+  preflightStudioEditableMeshPolygonSource(positionCount, faces);
+  for (let positionIndex = 0; positionIndex < positionCount; positionIndex += 1) {
+    const position = positions[positionIndex];
+    if (!position || typeof position !== "object" || !finiteVec(position)) {
+      throw new Error("non-finite position");
+    }
   }
 
   const vertices: StudioEditableVertex[] = positions.map((position, id) => ({
@@ -616,62 +754,791 @@ export function transformStudioEditableMesh(
   return ok({ ...mesh, vertices });
 }
 
-/** Extrude selected faces along average normal by distance (region extrude). */
+interface StudioEditableMeshExtrudeComponentPlan {
+  readonly faceIds: readonly number[];
+  readonly vertexIds: ReadonlySet<number>;
+  readonly boundaryHalfEdgeIds: readonly number[];
+  readonly offset: StudioMeshVec3;
+}
+
+interface StudioEditableMeshSourceCounts {
+  readonly vertices: number;
+  readonly halfEdges: number;
+  readonly faces: number;
+}
+
+function checkedTopologyCount(value: number, limit: number, label: string): StudioEditableMeshResult<number> {
+  if (!Number.isSafeInteger(value) || value < 0 || value > limit) {
+    return fail("budget-exceeded", `${label} budget`);
+  }
+  return ok(value);
+}
+
+function preflightStudioEditableMeshSourceCounts(
+  mesh: StudioEditableMesh,
+): StudioEditableMeshResult<StudioEditableMeshSourceCounts> {
+  try {
+    const vertices = admittedArrayLength(
+      mesh.vertices,
+      STUDIO_EDITABLE_MESH_LIMITS.maxVertices,
+      "vertex",
+    );
+    const halfEdges = admittedArrayLength(
+      mesh.halfEdges,
+      STUDIO_EDITABLE_MESH_LIMITS.maxEdges,
+      "half-edge",
+    );
+    const faces = admittedArrayLength(
+      mesh.faces,
+      STUDIO_EDITABLE_MESH_LIMITS.maxFaces,
+      "face",
+    );
+    const counters = [
+      [mesh.nextVertexId, vertices, "nextVertexId"],
+      [mesh.nextHalfEdgeId, halfEdges, "nextHalfEdgeId"],
+      [mesh.nextFaceId, faces, "nextFaceId"],
+    ] as const;
+    for (const [counter, minimum, label] of counters) {
+      if (!Number.isSafeInteger(counter) || counter !== minimum) {
+        return fail("invalid-mesh", `${label} violates the canonical dense-ID authority invariant`);
+      }
+    }
+    return ok({ vertices, halfEdges, faces });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : "invalid mesh source counts";
+    return fail(detail.includes("budget exceeded") ? "budget-exceeded" : "invalid-mesh", detail);
+  }
+}
+
+/**
+ * Admits only the exact dense representation emitted by createStudioEditableMeshFromPolygons.
+ *
+ * Snapshots persist polygon soup and rebuild these topology anchors on restore, while the exact
+ * authority digest binds the anchors and array order. Accepting a merely incident alternative
+ * vertex.he, rotated face.he, or reordered loop would therefore make save/reopen change the hash.
+ * This bounded O(V + HE + F) pass mirrors the builder without allocating another mesh or JSON.
+ */
+function preflightStudioEditableMeshCanonicalAuthority(
+  mesh: StudioEditableMesh,
+): StudioEditableMeshResult<StudioEditableMeshSourceCounts> {
+  if (mesh.revision !== STUDIO_EDITABLE_MESH_REVISION) {
+    return fail("invalid-mesh", "editable mesh revision is not supported");
+  }
+  const counts = preflightStudioEditableMeshSourceCounts(mesh);
+  if (!counts.ok) return counts;
+
+  for (let vertexIndex = 0; vertexIndex < counts.value.vertices; vertexIndex += 1) {
+    const vertex = mesh.vertices[vertexIndex];
+    if (!vertex
+      || vertex.id !== vertexIndex
+      || !vertex.position
+      || typeof vertex.position !== "object"
+      || !finiteVec(vertex.position)) {
+      return fail("invalid-mesh", `vertex ${vertexIndex} is malformed`);
+    }
+    if (!Number.isFinite(vertex.crease) || vertex.crease < 0 || vertex.crease > 1) {
+      return fail("invalid-mesh", `vertex ${vertexIndex} crease must be finite in [0,1]`);
+    }
+    if (!Number.isSafeInteger(vertex.he)
+      || vertex.he < -1
+      || vertex.he >= counts.value.halfEdges) {
+      return fail("invalid-mesh", `vertex ${vertexIndex} has an invalid outgoing half-edge`);
+    }
+  }
+
+  let firstHalfEdgeId = 0;
+  for (let faceIndex = 0; faceIndex < counts.value.faces; faceIndex += 1) {
+    const face = mesh.faces[faceIndex];
+    if (!face || face.id !== faceIndex || !Number.isSafeInteger(face.he) || face.he < 0) {
+      return fail("invalid-mesh", `face ${faceIndex} is malformed`);
+    }
+    if (!Number.isSafeInteger(face.materialSlot) || face.materialSlot < 0) {
+      return fail(
+        "invalid-mesh",
+        `face ${faceIndex} material slot must be a non-negative safe integer`,
+      );
+    }
+    if (typeof face.smooth !== "boolean") {
+      return fail("invalid-mesh", `face ${faceIndex} smooth flag must be boolean`);
+    }
+    if (face.he !== firstHalfEdgeId) {
+      return fail(
+        "invalid-mesh",
+        `face ${faceIndex} does not use its canonical first half-edge`,
+      );
+    }
+
+    let nextFaceHalfEdgeId = firstHalfEdgeId;
+    while (nextFaceHalfEdgeId < counts.value.halfEdges
+      && mesh.halfEdges[nextFaceHalfEdgeId]?.face === faceIndex) {
+      nextFaceHalfEdgeId += 1;
+    }
+    const faceCornerCount = nextFaceHalfEdgeId - firstHalfEdgeId;
+    if (faceCornerCount < 3) {
+      return fail(
+        "invalid-mesh",
+        `face ${faceIndex} half-edges are not stored in canonical contiguous order`,
+      );
+    }
+    for (let halfEdgeId = firstHalfEdgeId;
+      halfEdgeId < nextFaceHalfEdgeId;
+      halfEdgeId += 1) {
+      const halfEdge = mesh.halfEdges[halfEdgeId];
+      const offset = halfEdgeId - firstHalfEdgeId;
+      const expectedNext = firstHalfEdgeId + ((offset + 1) % faceCornerCount);
+      const expectedPrevious = firstHalfEdgeId
+        + ((offset + faceCornerCount - 1) % faceCornerCount);
+      if (!halfEdge || halfEdge.id !== halfEdgeId || halfEdge.face !== faceIndex) {
+        return fail("invalid-mesh", `half-edge ${halfEdgeId} is malformed`);
+      }
+      if (halfEdge.next !== expectedNext || halfEdge.prev !== expectedPrevious) {
+        return fail(
+          "invalid-mesh",
+          `half-edge ${halfEdgeId} violates canonical next/prev reciprocity`,
+        );
+      }
+      if (!Number.isSafeInteger(halfEdge.vertex)
+        || halfEdge.vertex < 0
+        || halfEdge.vertex >= counts.value.vertices) {
+        return fail("invalid-mesh", `half-edge ${halfEdgeId} references an invalid vertex`);
+      }
+      if (!Number.isSafeInteger(halfEdge.twin)
+        || halfEdge.twin < -1
+        || halfEdge.twin >= counts.value.halfEdges) {
+        return fail("invalid-mesh", `half-edge ${halfEdgeId} has an invalid twin link`);
+      }
+      if (!Number.isFinite(halfEdge.crease)
+        || halfEdge.crease < 0
+        || halfEdge.crease > 1) {
+        return fail(
+          "invalid-mesh",
+          `half-edge ${halfEdgeId} crease must be finite in [0,1]`,
+        );
+      }
+    }
+    firstHalfEdgeId = nextFaceHalfEdgeId;
+  }
+  if (firstHalfEdgeId !== counts.value.halfEdges) {
+    return fail("invalid-mesh", "source contains noncanonical or unowned half-edges");
+  }
+
+  const firstOutgoingHalfEdgeIds = new Int32Array(counts.value.vertices);
+  firstOutgoingHalfEdgeIds.fill(-1);
+  const directedEdgeToHalfEdgeId = new Map<string, number>();
+  for (let halfEdgeId = 0; halfEdgeId < counts.value.halfEdges; halfEdgeId += 1) {
+    const halfEdge = mesh.halfEdges[halfEdgeId]!;
+    const origin = mesh.halfEdges[halfEdge.prev]!.vertex;
+    if (firstOutgoingHalfEdgeIds[origin] === -1) {
+      firstOutgoingHalfEdgeIds[origin] = halfEdgeId;
+    }
+    directedEdgeToHalfEdgeId.set(`${origin}|${halfEdge.vertex}`, halfEdgeId);
+  }
+  for (let vertexIndex = 0; vertexIndex < counts.value.vertices; vertexIndex += 1) {
+    const vertex = mesh.vertices[vertexIndex]!;
+    const expectedOutgoing = firstOutgoingHalfEdgeIds[vertexIndex]!;
+    if (vertex.he === -1 && expectedOutgoing !== -1) {
+      return fail("invalid-mesh", `used vertex ${vertexIndex} is missing its outgoing half-edge`);
+    }
+    if (vertex.he >= 0) {
+      const outgoing = mesh.halfEdges[vertex.he]!;
+      const origin = mesh.halfEdges[outgoing.prev]!.vertex;
+      if (origin !== vertexIndex) {
+        return fail(
+          "invalid-mesh",
+          `vertex ${vertexIndex} outgoing half-edge is not incident`,
+        );
+      }
+      if (vertex.he !== expectedOutgoing) {
+        return fail(
+          "invalid-mesh",
+          `vertex ${vertexIndex} does not use its canonical first outgoing half-edge`,
+        );
+      }
+    }
+  }
+
+  // Mirror the builder's deterministic twin pass, including its first-unpaired traversal order.
+  const expectedTwins = new Int32Array(counts.value.halfEdges);
+  expectedTwins.fill(-1);
+  for (let halfEdgeId = 0; halfEdgeId < counts.value.halfEdges; halfEdgeId += 1) {
+    if (expectedTwins[halfEdgeId]! >= 0) continue;
+    const halfEdge = mesh.halfEdges[halfEdgeId]!;
+    const origin = mesh.halfEdges[halfEdge.prev]!.vertex;
+    const twinId = directedEdgeToHalfEdgeId.get(`${halfEdge.vertex}|${origin}`);
+    if (twinId === undefined) continue;
+    expectedTwins[halfEdgeId] = twinId;
+    expectedTwins[twinId] = halfEdgeId;
+  }
+  for (let halfEdgeId = 0; halfEdgeId < counts.value.halfEdges; halfEdgeId += 1) {
+    const expectedTwin = expectedTwins[halfEdgeId]!;
+    const actualTwin = mesh.halfEdges[halfEdgeId]!.twin;
+    if (actualTwin === expectedTwin) continue;
+    return fail(
+      "invalid-mesh",
+      expectedTwin >= 0 && actualTwin < 0
+        ? `half-edge ${halfEdgeId} has a missing reciprocal twin`
+        : `half-edge ${halfEdgeId} does not use canonical builder twin wiring`,
+    );
+  }
+  return counts;
+}
+
+/** Shared admission for public authority registration and polygon-soup persistence. */
+export function validateStudioEditableMeshSerializableAuthority(
+  mesh: StudioEditableMesh,
+): StudioEditableMeshResult<StudioEditableMesh> {
+  const preflight = preflightStudioEditableMeshCanonicalAuthority(mesh);
+  return preflight.ok ? ok(mesh) : preflight;
+}
+
+function preflightStudioEditableMeshEdgeManifold(
+  mesh: StudioEditableMesh,
+): StudioEditableMeshResult<undefined> {
+  const outgoingHalfEdgeIdsByVertex = new Map<number, number[]>();
+  const usageByUndirectedEdge = new Map<string, {
+    readonly directions: Set<string>;
+    readonly halfEdgeIds: number[];
+    count: number;
+  }>();
+  for (let halfEdgeIndex = 0; halfEdgeIndex < mesh.halfEdges.length; halfEdgeIndex += 1) {
+    const halfEdge = mesh.halfEdges[halfEdgeIndex];
+    if (!halfEdge || halfEdge.id !== halfEdgeIndex) {
+      return fail("invalid-mesh", `half-edge ${halfEdgeIndex} has an invalid stable ID`);
+    }
+    const previous = mesh.halfEdges[halfEdge.prev];
+    if (!previous) return fail("invalid-mesh", `half-edge ${halfEdge.id} has an invalid prev link`);
+    const origin = previous.vertex;
+    const destination = halfEdge.vertex;
+    if (!Number.isSafeInteger(origin)
+      || !Number.isSafeInteger(destination)
+      || origin < 0
+      || destination < 0
+      || mesh.vertices[origin]?.id !== origin
+      || mesh.vertices[destination]?.id !== destination) {
+      return fail("invalid-mesh", `half-edge ${halfEdge.id} references an invalid vertex`);
+    }
+    const outgoingIds = outgoingHalfEdgeIdsByVertex.get(origin) ?? [];
+    outgoingIds.push(halfEdge.id);
+    outgoingHalfEdgeIdsByVertex.set(origin, outgoingIds);
+    const undirectedKey = origin < destination
+      ? `${origin}|${destination}`
+      : `${destination}|${origin}`;
+    const direction = `${origin}|${destination}`;
+    const usage = usageByUndirectedEdge.get(undirectedKey) ?? {
+      directions: new Set<string>(),
+      halfEdgeIds: [],
+      count: 0,
+    };
+    if (usage.directions.has(direction)) {
+      return fail(
+        "non-manifold",
+        `edge ${undirectedKey} has a same-direction orientation conflict`,
+      );
+    }
+    usage.directions.add(direction);
+    usage.halfEdgeIds.push(halfEdge.id);
+    usage.count += 1;
+    if (usage.count > 2) {
+      return fail("non-manifold", `edge ${undirectedKey} is used by more than two faces`);
+    }
+    usageByUndirectedEdge.set(undirectedKey, usage);
+  }
+  for (const vertex of mesh.vertices) {
+    if (!Number.isSafeInteger(vertex.he) || vertex.he < -1) {
+      return fail("invalid-mesh", `vertex ${vertex.id} has an invalid outgoing half-edge`);
+    }
+    if (vertex.he === -1) {
+      if (outgoingHalfEdgeIdsByVertex.has(vertex.id)) {
+        return fail("invalid-mesh", `used vertex ${vertex.id} is missing its outgoing half-edge`);
+      }
+      continue;
+    }
+    const outgoing = mesh.halfEdges[vertex.he];
+    const previous = outgoing ? mesh.halfEdges[outgoing.prev] : undefined;
+    if (!outgoing || !previous) {
+      return fail("invalid-mesh", `vertex ${vertex.id} has an invalid outgoing half-edge`);
+    }
+    if (previous.vertex !== vertex.id) {
+      return fail("invalid-mesh", `vertex ${vertex.id} outgoing half-edge is not incident`);
+    }
+  }
+  for (const halfEdge of mesh.halfEdges) {
+    if (!Number.isSafeInteger(halfEdge.twin) || halfEdge.twin < -1) {
+      return fail("invalid-mesh", `half-edge ${halfEdge.id} has an invalid twin link`);
+    }
+    if (halfEdge.twin >= 0) {
+      const previous = mesh.halfEdges[halfEdge.prev]!;
+      const origin = previous.vertex;
+      const destination = halfEdge.vertex;
+      const twin = mesh.halfEdges[halfEdge.twin];
+      if (!twin || twin.twin !== halfEdge.id) {
+        return fail("invalid-mesh", `half-edge ${halfEdge.id} violates twin reciprocity`);
+      }
+      const twinPrevious = mesh.halfEdges[twin.prev];
+      if (!twinPrevious
+        || origin !== twin.vertex
+        || destination !== twinPrevious.vertex) {
+        return fail("invalid-mesh", `half-edge ${halfEdge.id} twin has inconsistent edge direction`);
+      }
+    }
+  }
+  for (const [undirectedKey, usage] of usageByUndirectedEdge) {
+    if (usage.count !== 2) continue;
+    const first = mesh.halfEdges[usage.halfEdgeIds[0]!]!;
+    const second = mesh.halfEdges[usage.halfEdgeIds[1]!]!;
+    if (first.twin !== second.id || second.twin !== first.id) {
+      return fail("invalid-mesh", `edge ${undirectedKey} has a missing reciprocal twin`);
+    }
+  }
+  // Each half-edge enters exactly one vertex bucket, and every incident face is visited at most
+  // once. The total fan admission therefore stays O(halfEdges) and within the source edge budget.
+  for (const [vertexId, outgoingHalfEdgeIds] of outgoingHalfEdgeIdsByVertex) {
+    if (outgoingHalfEdgeIds.length <= 1) continue;
+    const outgoingByFaceId = new Map<number, StudioEditableHalfEdge>();
+    for (const halfEdgeId of outgoingHalfEdgeIds) {
+      const halfEdge = mesh.halfEdges[halfEdgeId]!;
+      if (outgoingByFaceId.has(halfEdge.face)) {
+        return fail("non-manifold", `face ${halfEdge.face} repeats vertex ${vertexId}`);
+      }
+      outgoingByFaceId.set(halfEdge.face, halfEdge);
+    }
+    const firstFaceId = outgoingByFaceId.keys().next().value as number;
+    const queue = [firstFaceId];
+    const queuedFaceIds = new Set(queue);
+    const visitedFaceIds = new Set<number>();
+    for (let queueIndex = 0; queueIndex < queue.length; queueIndex += 1) {
+      const faceId = queue[queueIndex]!;
+      visitedFaceIds.add(faceId);
+      const outgoing = outgoingByFaceId.get(faceId)!;
+      const previous = mesh.halfEdges[outgoing.prev]!;
+      const adjacentFaceIds = [
+        outgoing.twin >= 0 ? mesh.halfEdges[outgoing.twin]!.face : -1,
+        previous.twin >= 0 ? mesh.halfEdges[previous.twin]!.face : -1,
+      ];
+      for (const adjacentFaceId of adjacentFaceIds) {
+        if (adjacentFaceId < 0) continue;
+        if (!outgoingByFaceId.has(adjacentFaceId)) {
+          return fail(
+            "invalid-mesh",
+            `vertex ${vertexId} has inconsistent incident-face adjacency`,
+          );
+        }
+        if (queuedFaceIds.has(adjacentFaceId)) continue;
+        queuedFaceIds.add(adjacentFaceId);
+        queue.push(adjacentFaceId);
+      }
+    }
+    if (visitedFaceIds.size !== outgoingByFaceId.size) {
+      return fail(
+        "non-manifold",
+        `vertex ${vertexId} has disconnected incident-face fans (bow-tie)`,
+      );
+    }
+  }
+  return ok(undefined);
+}
+
+function faceLoopHalfEdgeIds(mesh: StudioEditableMesh, faceId: number): readonly number[] {
+  const face = indexedFace(mesh, faceId);
+  if (!face) throw new Error(`face ${faceId} not found`);
+  const ids: number[] = [];
+  const seen = new Set<number>();
+  let halfEdgeId = face.he;
+  for (let guard = 0; guard <= mesh.halfEdges.length; guard += 1) {
+    if (seen.has(halfEdgeId)) {
+      if (halfEdgeId !== face.he) throw new Error(`face ${faceId} has a broken half-edge cycle`);
+      return ids;
+    }
+    const halfEdge = mesh.halfEdges[halfEdgeId];
+    if (!halfEdge || halfEdge.id !== halfEdgeId || halfEdge.face !== faceId) {
+      throw new Error(`face ${faceId} references an invalid half-edge`);
+    }
+    if (!Number.isSafeInteger(halfEdge.next)
+      || !Number.isSafeInteger(halfEdge.prev)
+      || halfEdge.next < 0
+      || halfEdge.prev < 0) {
+      throw new Error(`half-edge ${halfEdge.id} has unsafe next/prev links`);
+    }
+    const next = mesh.halfEdges[halfEdge.next];
+    const previous = mesh.halfEdges[halfEdge.prev];
+    if (!next || !previous || next.prev !== halfEdge.id || previous.next !== halfEdge.id) {
+      throw new Error(`half-edge ${halfEdge.id} violates next/prev reciprocity`);
+    }
+    seen.add(halfEdgeId);
+    ids.push(halfEdgeId);
+    halfEdgeId = halfEdge.next;
+  }
+  throw new Error(`face ${faceId} half-edge cycle exceeds the topology budget`);
+}
+
+function accumulatedFaceNormal(
+  mesh: StudioEditableMesh,
+  faceId: number,
+  vertexById: ReadonlyMap<number, StudioEditableVertex>,
+): StudioMeshVec3 {
+  const vertexIds = faceLoopVertexIds(mesh, faceId);
+  const origin = vertexById.get(vertexIds[0] ?? -1)?.position;
+  if (!origin || vertexIds.length < 3) return vec(0, 0, 0);
+  let accumulated = vec(0, 0, 0);
+  for (let index = 1; index + 1 < vertexIds.length; index += 1) {
+    const first = vertexById.get(vertexIds[index]!)?.position;
+    const second = vertexById.get(vertexIds[index + 1]!)?.position;
+    if (!first || !second) throw new Error(`face ${faceId} references a missing vertex`);
+    accumulated = add(accumulated, cross(sub(first, origin), sub(second, origin)));
+  }
+  return accumulated;
+}
+
+/**
+ * Extrude selected faces as connected regions and return the selection remap for the new caps.
+ * Adjacent selected faces share their duplicated vertices and never create an internal side wall.
+ */
+export function extrudeStudioEditableMeshFacesWithReceipt(
+  mesh: StudioEditableMesh,
+  faceIds: readonly number[],
+  distance: number,
+): StudioEditableMeshResult<StudioEditableMeshExtrudeRegionMutation> {
+  if (!Number.isFinite(distance)) {
+    return fail("invalid-parameter", "distance must be finite");
+  }
+  if (Math.abs(distance) <= STUDIO_EDITABLE_MESH_LIMITS.areaEpsilon) {
+    return fail("invalid-parameter", "distance magnitude must exceed the geometry epsilon");
+  }
+  if (faceIds.length === 0) return fail("empty-selection", "no faces");
+  if (faceIds.length > STUDIO_EDITABLE_MESH_LIMITS.maxSelection) {
+    return fail("budget-exceeded", "selection too large");
+  }
+
+  for (const faceId of faceIds) {
+    if (!Number.isSafeInteger(faceId) || faceId < 0) {
+      return fail("invalid-parameter", "face IDs must be non-negative safe integers");
+    }
+  }
+  const sourceCounts = preflightStudioEditableMeshCanonicalAuthority(mesh);
+  if (!sourceCounts.ok) return sourceCounts;
+  const sourceFaceIds = [...new Set(faceIds)].sort((left, right) => left - right);
+  const selectedFaceIds = new Set(sourceFaceIds);
+  const faceById = new Map(mesh.faces.map((face) => [face.id, face] as const));
+  const vertexById = new Map(mesh.vertices.map((vertex) => [vertex.id, vertex] as const));
+  for (const faceId of sourceFaceIds) {
+    if (!faceById.has(faceId)) return fail("not-found", `face ${faceId}`);
+  }
+
+  try {
+    const halfEdgeLoops = new Map<number, readonly number[]>();
+    const vertexLoops = new Map<number, readonly number[]>();
+    for (const face of mesh.faces) {
+      const halfEdges = faceLoopHalfEdgeIds(mesh, face.id);
+      const vertices = faceLoopVertexIds(mesh, face.id);
+      if (halfEdges.length < 3 || halfEdges.length !== vertices.length) {
+        return fail("invalid-mesh", `face ${face.id} has an invalid polygon loop`);
+      }
+      halfEdgeLoops.set(face.id, halfEdges);
+      vertexLoops.set(face.id, vertices);
+    }
+    const manifold = preflightStudioEditableMeshEdgeManifold(mesh);
+    if (!manifold.ok) return manifold;
+
+    const componentPlans: StudioEditableMeshExtrudeComponentPlan[] = [];
+    const componentByFaceId = new Map<number, number>();
+    const unvisited = new Set(sourceFaceIds);
+    for (const seedFaceId of sourceFaceIds) {
+      if (!unvisited.has(seedFaceId)) continue;
+      const stack = [seedFaceId];
+      const componentFaceIds: number[] = [];
+      unvisited.delete(seedFaceId);
+      while (stack.length > 0) {
+        const faceId = stack.pop()!;
+        componentFaceIds.push(faceId);
+        for (const halfEdgeId of halfEdgeLoops.get(faceId)!) {
+          const halfEdge = mesh.halfEdges[halfEdgeId]!;
+          if (halfEdge.twin < 0) continue;
+          const twin = mesh.halfEdges[halfEdge.twin];
+          if (!twin || !selectedFaceIds.has(twin.face) || !unvisited.has(twin.face)) continue;
+          unvisited.delete(twin.face);
+          stack.push(twin.face);
+        }
+      }
+      componentFaceIds.sort((left, right) => left - right);
+
+      const componentVertexIds = new Set<number>();
+      const boundaryHalfEdgeIds: number[] = [];
+      let normalSum = vec(0, 0, 0);
+      for (const faceId of componentFaceIds) {
+        for (const vertexId of vertexLoops.get(faceId)!) componentVertexIds.add(vertexId);
+        normalSum = add(normalSum, accumulatedFaceNormal(mesh, faceId, vertexById));
+        for (const halfEdgeId of halfEdgeLoops.get(faceId)!) {
+          const halfEdge = mesh.halfEdges[halfEdgeId]!;
+          const twinFaceId = halfEdge.twin < 0
+            ? -1
+            : mesh.halfEdges[halfEdge.twin]?.face ?? -1;
+          if (!selectedFaceIds.has(twinFaceId)) boundaryHalfEdgeIds.push(halfEdgeId);
+        }
+      }
+      if (length(normalSum) <= STUDIO_EDITABLE_MESH_LIMITS.areaEpsilon) {
+        return fail("topology-failed", "selected region has no stable extrusion normal");
+      }
+      boundaryHalfEdgeIds.sort((left, right) => left - right);
+      const componentIndex = componentPlans.length;
+      for (const faceId of componentFaceIds) componentByFaceId.set(faceId, componentIndex);
+      componentPlans.push({
+        faceIds: componentFaceIds,
+        vertexIds: componentVertexIds,
+        boundaryHalfEdgeIds,
+        offset: scale(normalize(normalSum), distance),
+      });
+    }
+
+    const boundaryHalfEdgeIds = componentPlans
+      .flatMap((component) => component.boundaryHalfEdgeIds)
+      .sort((left, right) => left - right);
+    const outputFaceCount = mesh.faces.length + boundaryHalfEdgeIds.length;
+    const faceBudget = checkedTopologyCount(
+      outputFaceCount,
+      STUDIO_EDITABLE_MESH_LIMITS.maxFaces,
+      "face",
+    );
+    if (!faceBudget.ok) return faceBudget;
+    const outputHalfEdgeCount = mesh.halfEdges.length + boundaryHalfEdgeIds.length * 4;
+    const halfEdgeBudget = checkedTopologyCount(
+      outputHalfEdgeCount,
+      STUDIO_EDITABLE_MESH_LIMITS.maxEdges,
+      "half-edge",
+    );
+    if (!halfEdgeBudget.ok) return halfEdgeBudget;
+
+    const selectedVertexIds = new Set(
+      componentPlans.flatMap((component) => [...component.vertexIds]),
+    );
+    // Preserve every unrelated original vertex, plus selected-region vertices that remain used by
+    // an unselected face or a boundary side. Interior source vertices are replaced by their cap
+    // copies instead of becoming silent isolated debris.
+    const baseVertexIds = new Set(
+      mesh.vertices
+        .filter(({ id }) => !selectedVertexIds.has(id))
+        .map(({ id }) => id),
+    );
+    for (const face of mesh.faces) {
+      if (selectedFaceIds.has(face.id)) continue;
+      for (const vertexId of vertexLoops.get(face.id)!) baseVertexIds.add(vertexId);
+    }
+    for (const halfEdgeId of boundaryHalfEdgeIds) {
+      const halfEdge = mesh.halfEdges[halfEdgeId]!;
+      const previous = mesh.halfEdges[halfEdge.prev];
+      if (!previous) return fail("invalid-mesh", `half-edge ${halfEdgeId} has an invalid prev link`);
+      baseVertexIds.add(previous.vertex);
+      baseVertexIds.add(halfEdge.vertex);
+    }
+    const duplicatedVertexCount = componentPlans.reduce(
+      (count, component) => count + component.vertexIds.size,
+      0,
+    );
+    const outputVertexCount = baseVertexIds.size + duplicatedVertexCount;
+    const vertexBudget = checkedTopologyCount(
+      outputVertexCount,
+      STUDIO_EDITABLE_MESH_LIMITS.maxVertices,
+      "vertex",
+    );
+    if (!vertexBudget.ok) return vertexBudget;
+    const positions: StudioMeshVec3[] = [];
+    const vertexCreases: number[] = [];
+    const baseIndexByVertexId = new Map<number, number>();
+    for (const vertex of mesh.vertices) {
+      if (!baseVertexIds.has(vertex.id)) continue;
+      baseIndexByVertexId.set(vertex.id, positions.length);
+      positions.push(vertex.position);
+      vertexCreases.push(vertex.crease);
+    }
+    if (baseIndexByVertexId.size !== baseVertexIds.size) {
+      return fail("invalid-mesh", "selected region references a missing base vertex");
+    }
+
+    const topIndexByComponent = componentPlans.map((component) => {
+      const result = new Map<number, number>();
+      const orderedVertexIds = [...component.vertexIds].sort((left, right) => left - right);
+      for (const vertexId of orderedVertexIds) {
+        const source = vertexById.get(vertexId);
+        if (!source) throw new Error(`selected region references missing vertex ${vertexId}`);
+        result.set(vertexId, positions.length);
+        positions.push(add(source.position, component.offset));
+        vertexCreases.push(source.crease);
+      }
+      return result;
+    });
+
+    interface OutputFaceAttributes {
+      readonly materialSlot: number;
+      readonly smooth: boolean;
+      readonly halfEdgeCreases: readonly number[];
+    }
+    const polygons: number[][] = [];
+    const faceAttributes: OutputFaceAttributes[] = [];
+    const pushPolygon = (
+      polygon: readonly number[],
+      sourceFace: StudioEditableFace,
+      halfEdgeCreases: readonly number[],
+    ): number => {
+      const faceId = polygons.length;
+      polygons.push([...polygon]);
+      faceAttributes.push({
+        materialSlot: sourceFace.materialSlot,
+        smooth: sourceFace.smooth,
+        halfEdgeCreases,
+      });
+      return faceId;
+    };
+
+    const outputFaceIdBySourceFaceId = new Map<number, number>();
+    for (const face of mesh.faces) {
+      if (selectedFaceIds.has(face.id)) continue;
+      const polygon = vertexLoops.get(face.id)!.map((vertexId) => {
+        const outputIndex = baseIndexByVertexId.get(vertexId);
+        if (outputIndex === undefined) throw new Error(`missing base vertex ${vertexId}`);
+        return outputIndex;
+      });
+      outputFaceIdBySourceFaceId.set(face.id, pushPolygon(
+        polygon,
+        face,
+        halfEdgeLoops.get(face.id)!.map((halfEdgeId) => mesh.halfEdges[halfEdgeId]!.crease),
+      ));
+    }
+
+    const capFaceIdBySourceFaceId = new Map<number, number>();
+    for (const faceId of sourceFaceIds) {
+      const componentIndex = componentByFaceId.get(faceId);
+      const sourceFace = faceById.get(faceId);
+      if (componentIndex === undefined || !sourceFace) {
+        throw new Error(`selected face ${faceId} has no component plan`);
+      }
+      const topIndex = topIndexByComponent[componentIndex]!;
+      const polygon = vertexLoops.get(faceId)!.map((vertexId) => {
+        const outputIndex = topIndex.get(vertexId);
+        if (outputIndex === undefined) throw new Error(`missing cap vertex ${vertexId}`);
+        return outputIndex;
+      });
+      const capFaceId = pushPolygon(
+        polygon,
+        sourceFace,
+        halfEdgeLoops.get(faceId)!.map((halfEdgeId) => mesh.halfEdges[halfEdgeId]!.crease),
+      );
+      capFaceIdBySourceFaceId.set(faceId, capFaceId);
+      outputFaceIdBySourceFaceId.set(faceId, capFaceId);
+    }
+
+    const sideFaceIds: number[] = [];
+    for (const halfEdgeId of boundaryHalfEdgeIds) {
+      const halfEdge = mesh.halfEdges[halfEdgeId]!;
+      const previous = mesh.halfEdges[halfEdge.prev]!;
+      const componentIndex = componentByFaceId.get(halfEdge.face);
+      const sourceFace = faceById.get(halfEdge.face);
+      if (componentIndex === undefined || !sourceFace) {
+        throw new Error(`boundary half-edge ${halfEdgeId} has no selected face`);
+      }
+      const baseOrigin = baseIndexByVertexId.get(previous.vertex);
+      const baseDestination = baseIndexByVertexId.get(halfEdge.vertex);
+      const topIndex = topIndexByComponent[componentIndex]!;
+      const topOrigin = topIndex.get(previous.vertex);
+      const topDestination = topIndex.get(halfEdge.vertex);
+      if (
+        baseOrigin === undefined
+        || baseDestination === undefined
+        || topOrigin === undefined
+        || topDestination === undefined
+      ) {
+        throw new Error(`boundary half-edge ${halfEdgeId} references an unavailable vertex`);
+      }
+      sideFaceIds.push(pushPolygon(
+        [baseOrigin, baseDestination, topDestination, topOrigin],
+        sourceFace,
+        [halfEdge.crease, 0, halfEdge.crease, 0],
+      ));
+    }
+
+    let rebuilt: StudioEditableMesh;
+    try {
+      rebuilt = createStudioEditableMeshFromPolygons(positions, polygons);
+    } catch (error) {
+      return fail(
+        "topology-failed",
+        error instanceof Error ? error.message : "extrude rebuild failed",
+      );
+    }
+    const resultHalfEdges = rebuilt.halfEdges.map((halfEdge) => halfEdge);
+    rebuilt.faces.forEach((face, faceIndex) => {
+      const creases = faceAttributes[faceIndex]?.halfEdgeCreases ?? [];
+      let halfEdgeId = face.he;
+      for (let edgeIndex = 0; edgeIndex < creases.length; edgeIndex += 1) {
+        const halfEdge = resultHalfEdges[halfEdgeId];
+        if (!halfEdge) throw new Error(`rebuilt face ${face.id} has an invalid half-edge`);
+        resultHalfEdges[halfEdgeId] = {
+          ...halfEdge,
+          crease: creases[edgeIndex] ?? 0,
+        };
+        halfEdgeId = halfEdge.next;
+      }
+    });
+    const resultMesh: StudioEditableMesh = {
+      ...rebuilt,
+      vertices: rebuilt.vertices.map((vertex, index) => ({
+        ...vertex,
+        crease: vertexCreases[index] ?? 0,
+      })),
+      halfEdges: resultHalfEdges,
+      faces: rebuilt.faces.map((face, index) => ({
+        ...face,
+        materialSlot: faceAttributes[index]?.materialSlot ?? 0,
+        smooth: faceAttributes[index]?.smooth ?? true,
+      })),
+    };
+    const resultErrors = diagnoseStudioEditableMesh(resultMesh)
+      .filter(({ severity }) => severity === "error");
+    if (resultErrors.length > 0) {
+      return fail(
+        "topology-failed",
+        `extrude produced invalid topology: ${resultErrors.map(({ code }) => code).join(",")}`,
+      );
+    }
+    const capFaceIds = sourceFaceIds.map((faceId) => capFaceIdBySourceFaceId.get(faceId)!);
+    const faceRemapEntries = [...mesh.faces]
+      .sort((left, right) => left.id - right.id)
+      .map((face) => [face.id, outputFaceIdBySourceFaceId.get(face.id) ?? null] as const);
+    const selectionRemapEntries = sourceFaceIds.map(
+      (faceId, index) => [faceId, capFaceIds[index]!] as const,
+    );
+    return ok({
+      mesh: resultMesh,
+      receipt: issueStudioEditableMeshExtrudeRegionReceipt({
+        operation: "extrude-region",
+        sourceMeshHash: hashStudioEditableMesh(mesh),
+        resultMeshHash: hashStudioEditableMesh(resultMesh),
+        sourceFaceIds,
+        capFaceIds,
+        sideFaceIds,
+        boundaryHalfEdgeIds,
+        connectedRegionCount: componentPlans.length,
+        faceRemap: { entries: faceRemapEntries },
+        selectionRemap: {
+          face: { entries: selectionRemapEntries },
+        },
+      }),
+    });
+  } catch (error) {
+    return fail(
+      "invalid-mesh",
+      error instanceof Error ? error.message : "invalid selected-region topology",
+    );
+  }
+}
+
+/** Backward-compatible mesh-only wrapper used by existing workspace and catalog callsites. */
 export function extrudeStudioEditableMeshFaces(
   mesh: StudioEditableMesh,
   faceIds: readonly number[],
   distance: number,
 ): StudioEditableMeshResult<StudioEditableMesh> {
-  if (!Number.isFinite(distance)) {
-    return fail("invalid-parameter", "distance must be finite");
-  }
-  if (faceIds.length === 0) return fail("empty-selection", "no faces");
-  if (mesh.faces.length + faceIds.length > STUDIO_EDITABLE_MESH_LIMITS.maxFaces) {
-    return fail("budget-exceeded", "face budget");
-  }
-
-  // Convert to triangle soup with duplicated extruded region, rebuild half-edge.
-  const polygons: number[][] = [];
-  const positions: StudioMeshVec3[] = mesh.vertices.map((v) => v.position);
-  const idMap = new Map(mesh.vertices.map((v, i) => [v.id, i] as const));
-
-  for (const face of mesh.faces) {
-    if (faceIds.includes(face.id)) continue;
-    const loop = faceLoopVertexIds(mesh, face.id).map((id) => idMap.get(id)!);
-    polygons.push(loop);
-  }
-
-  for (const fid of faceIds) {
-    const face = mesh.faces.find((f) => f.id === fid);
-    if (!face) return fail("not-found", `face ${fid}`);
-    const n = faceNormalStudioEditableMesh(mesh, fid);
-    const offset = scale(n, distance);
-    const oldLoop = faceLoopVertexIds(mesh, fid);
-    const newLoop: number[] = [];
-    for (const vid of oldLoop) {
-      const p = mesh.vertices.find((v) => v.id === vid)!.position;
-      newLoop.push(positions.length);
-      positions.push(add(p, offset));
-    }
-    polygons.push(newLoop);
-    // side walls
-    for (let i = 0; i < oldLoop.length; i += 1) {
-      const a = idMap.get(oldLoop[i]!)!;
-      const b = idMap.get(oldLoop[(i + 1) % oldLoop.length]!)!;
-      const c = newLoop[(i + 1) % newLoop.length]!;
-      const d = newLoop[i]!;
-      polygons.push([a, b, c, d]);
-    }
-  }
-
-  try {
-    return ok(createStudioEditableMeshFromPolygons(positions, polygons));
-  } catch (error) {
-    return fail(
-      "topology-failed",
-      error instanceof Error ? error.message : "extrude rebuild failed",
-    );
-  }
+  const mutation = extrudeStudioEditableMeshFacesWithReceipt(mesh, faceIds, distance);
+  if (!mutation.ok) return mutation;
+  return ok(mutation.value.mesh);
 }
 
 /** Inset selected faces by factor in [0, 0.49]. */
@@ -924,11 +1791,19 @@ export interface StudioEditableMeshSnapshot {
     readonly edgeIndex: number;
     readonly crease: number;
   }[];
+  /** Revision-scoped dense next IDs; omitted only by legacy snapshots. */
+  readonly authorityCounters?: {
+    readonly nextVertexId: number;
+    readonly nextHalfEdgeId: number;
+    readonly nextFaceId: number;
+  };
 }
 
 export function serializeStudioEditableMesh(
   mesh: StudioEditableMesh,
 ): StudioEditableMeshSnapshot {
+  const serializable = validateStudioEditableMeshSerializableAuthority(mesh);
+  if (!serializable.ok) throw new Error(serializable.detail);
   const idMap = new Map(mesh.vertices.map((v, i) => [v.id, i] as const));
   const positions = mesh.vertices.map(
     (v) => [v.position.x, v.position.y, v.position.z] as const,
@@ -966,22 +1841,101 @@ export function serializeStudioEditableMesh(
       vertex.crease === 0 ? [] : [{ vertexIndex, crease: vertex.crease }]
     )),
     halfEdgeCreases,
+    authorityCounters: {
+      nextVertexId: mesh.nextVertexId,
+      nextHalfEdgeId: mesh.nextHalfEdgeId,
+      nextFaceId: mesh.nextFaceId,
+    },
   };
 }
 
 export function deserializeStudioEditableMesh(
   snapshot: StudioEditableMeshSnapshot,
 ): StudioEditableMesh {
+  if (!snapshot || typeof snapshot !== "object"
+    || snapshot.revision !== STUDIO_EDITABLE_MESH_REVISION) {
+    throw new Error("invalid editable mesh snapshot revision");
+  }
+  const positionCount = admittedArrayLength(
+    snapshot.positions,
+    STUDIO_EDITABLE_MESH_LIMITS.maxVertices,
+    "vertex",
+  );
+  const cornerCount = preflightStudioEditableMeshPolygonSource(positionCount, snapshot.faces);
+  for (let positionIndex = 0; positionIndex < positionCount; positionIndex += 1) {
+    const position = snapshot.positions[positionIndex];
+    if (!Array.isArray(position)
+      || position.length !== 3
+      || !Number.isFinite(position[0])
+      || !Number.isFinite(position[1])
+      || !Number.isFinite(position[2])) {
+      throw new Error(`snapshot vertex ${positionIndex} is malformed`);
+    }
+  }
+  const vertexCreaseEntries = snapshot.vertexCreases ?? [];
+  const faceAttributeEntries = snapshot.faceAttributes ?? [];
+  const halfEdgeCreaseEntries = snapshot.halfEdgeCreases ?? [];
+  const counters = snapshot.authorityCounters;
+  admittedArrayLength(vertexCreaseEntries, positionCount, "vertex crease");
+  admittedArrayLength(faceAttributeEntries, snapshot.faces.length, "face attribute");
+  admittedArrayLength(halfEdgeCreaseEntries, cornerCount, "half-edge crease");
+  for (const entry of vertexCreaseEntries) {
+    if (!entry
+      || !Number.isSafeInteger(entry.vertexIndex)
+      || entry.vertexIndex < 0
+      || entry.vertexIndex >= positionCount
+      || !Number.isFinite(entry.crease)
+      || entry.crease < 0
+      || entry.crease > 1) {
+      throw new Error("snapshot vertex crease is malformed");
+    }
+  }
+  for (const entry of faceAttributeEntries) {
+    if (!entry
+      || !Number.isSafeInteger(entry.faceIndex)
+      || entry.faceIndex < 0
+      || entry.faceIndex >= snapshot.faces.length
+      || !Number.isSafeInteger(entry.materialSlot)
+      || entry.materialSlot < 0
+      || typeof entry.smooth !== "boolean") {
+      throw new Error("snapshot face attribute is malformed");
+    }
+  }
+  for (const entry of halfEdgeCreaseEntries) {
+    const face = snapshot.faces[entry?.faceIndex ?? -1];
+    if (!entry
+      || !Number.isSafeInteger(entry.faceIndex)
+      || entry.faceIndex < 0
+      || !face
+      || !Number.isSafeInteger(entry.edgeIndex)
+      || entry.edgeIndex < 0
+      || entry.edgeIndex >= face.length
+      || !Number.isFinite(entry.crease)
+      || entry.crease < 0
+      || entry.crease > 1) {
+      throw new Error("snapshot half-edge crease is malformed");
+    }
+  }
+  if (counters !== undefined && (
+    !Number.isSafeInteger(counters.nextVertexId)
+    || counters.nextVertexId !== positionCount
+    || !Number.isSafeInteger(counters.nextHalfEdgeId)
+    || counters.nextHalfEdgeId !== cornerCount
+    || !Number.isSafeInteger(counters.nextFaceId)
+    || counters.nextFaceId !== snapshot.faces.length
+  )) {
+    throw new Error("snapshot authority counters are malformed");
+  }
   const positions = snapshot.positions.map(([x, y, z]) => vec(x, y, z));
   const base = createStudioEditableMeshFromPolygons(positions, snapshot.faces);
   const vertexCreases = new Map(
-    (snapshot.vertexCreases ?? []).map((entry) => [entry.vertexIndex, entry.crease] as const),
+    vertexCreaseEntries.map((entry) => [entry.vertexIndex, entry.crease] as const),
   );
   const faceAttributes = new Map(
-    (snapshot.faceAttributes ?? []).map((entry) => [entry.faceIndex, entry] as const),
+    faceAttributeEntries.map((entry) => [entry.faceIndex, entry] as const),
   );
   const halfEdgeCreases = new Map<string, number>(
-    (snapshot.halfEdgeCreases ?? []).map((entry) => (
+    halfEdgeCreaseEntries.map((entry) => (
       [`${entry.faceIndex}:${entry.edgeIndex}`, entry.crease] as const
     )),
   );
@@ -995,7 +1949,7 @@ export function deserializeStudioEditableMesh(
       edgeIndex += 1;
     } while (halfEdgeId !== face.he && edgeIndex <= base.halfEdges.length);
   });
-  return {
+  const restored: StudioEditableMesh = {
     ...base,
     vertices: base.vertices.map((vertex, vertexIndex) => ({
       ...vertex,
@@ -1013,6 +1967,12 @@ export function deserializeStudioEditableMesh(
         smooth: attributes.smooth,
       } : face;
     }),
+  };
+  return counters === undefined ? restored : {
+    ...restored,
+    nextVertexId: counters.nextVertexId,
+    nextHalfEdgeId: counters.nextHalfEdgeId,
+    nextFaceId: counters.nextFaceId,
   };
 }
 
@@ -1308,9 +2268,13 @@ export function studioEditableMeshToTriangleSoup(mesh: StudioEditableMesh): {
   return { positions, indices: new Uint32Array(tris) };
 }
 
-export function hashStudioEditableMesh(mesh: StudioEditableMesh): string {
-  // Structural fingerprint for undo/recovery tests (not crypto).
-  const parts: string[] = [`v${mesh.vertices.length}`, `f${mesh.faces.length}`, `h${mesh.halfEdges.length}`];
+/** Byte-for-byte structural fingerprint minted by pre-slice HEAD 7b039bbc. */
+function hashStudioEditableMeshPreSliceLegacy(mesh: StudioEditableMesh): string {
+  const parts: string[] = [
+    `v${mesh.vertices.length}`,
+    `f${mesh.faces.length}`,
+    `h${mesh.halfEdges.length}`,
+  ];
   for (const v of mesh.vertices) {
     parts.push(
       `${v.id}:${v.position.x.toFixed(5)},${v.position.y.toFixed(5)},${v.position.z.toFixed(5)}:${v.crease}`,
@@ -1326,4 +2290,23 @@ export function hashStudioEditableMesh(mesh: StudioEditableMesh): string {
     h = Math.imul(h, 16777619);
   }
   return `mesh:${(h >>> 0).toString(16).padStart(8, "0")}`;
+}
+
+/** Exact streaming authority digest; never materializes a whole-mesh JSON or byte buffer. */
+export function hashStudioEditableMesh(mesh: StudioEditableMesh): string {
+  return hashStudioEditableMeshAuthority(mesh);
+}
+
+/**
+ * Migration-only matcher for snapshots written before the SHA-256 authority digest shipped.
+ * Legacy 32-bit fingerprints are never minted for new authority records.
+ */
+export function matchesStudioEditableMeshPersistedHash(
+  mesh: StudioEditableMesh,
+  persistedHash: string,
+): boolean {
+  const current = hashStudioEditableMeshAuthority(mesh);
+  if (persistedHash === current) return true;
+  return /^mesh:[0-9a-f]{8}$/u.test(persistedHash)
+    && persistedHash === hashStudioEditableMeshPreSliceLegacy(mesh);
 }

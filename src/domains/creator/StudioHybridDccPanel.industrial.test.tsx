@@ -153,7 +153,8 @@ describe("StudioHybridDccPanel industrial wiring", () => {
     });
 
     fireEvent.click(screen.getByRole("button", { name: "조형 작업 모드" }));
-    expect(screen.getByText("점토처럼 조형하고 메시 정리")).toBeTruthy();
+    expect(screen.getByText("조형 실험실 · voxel-lite")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /표면 조형 \(실험\)/u })).toBeTruthy();
     expect(screen.getByRole("button", { name: /복셀 리메시/u })).toBeTruthy();
   });
 
@@ -261,7 +262,7 @@ describe("StudioHybridDccPanel industrial wiring", () => {
         /CAD revolve 완료/u,
       );
     });
-    fireEvent.click(screen.getByRole("button", { name: "Sculpt" }));
+    fireEvent.click(screen.getByRole("button", { name: /Sculpt · voxel-lite 실험/u }));
     await waitFor(() => {
       expect(document.querySelector("[data-studio-hybrid-dcc-log]")?.textContent).toMatch(
         /Sculpt 완료/u,

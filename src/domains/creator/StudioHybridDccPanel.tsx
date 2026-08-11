@@ -51,6 +51,7 @@ import {
   workspaceExportActiveMesh,
   workspaceExportToon3d,
   workspaceExtrudeActive,
+  workspaceExtrudeRegionActive,
   workspaceImportBytes,
   workspaceInsetActive,
   workspaceKnifeActive,
@@ -80,6 +81,7 @@ import {
   workspaceOcctWedge,
   workspaceOpenNurbsSphere,
   workspaceRebuildBom,
+  workspaceReconcileSelectionAfterHistory,
   workspaceRedo,
   workspaceRepairActive,
   workspaceRetopoActive,
@@ -137,8 +139,8 @@ const STUDIO_HYBRID_DCC_MODE_GUIDE: Record<
     description: "구멍, 라운드, 쉘, 파이프 같은 정밀 형상을 안정적인 CAD 커널로 계산합니다.",
   },
   sculpt: {
-    title: "점토처럼 조형하고 메시 정리",
-    description: "표면을 밀고 당긴 뒤 리메시·리토폴로지로 편집하기 좋은 구조를 만듭니다.",
+    title: "조형 실험실 · voxel-lite",
+    description: "검증된 전문 Sculpt provider가 연결되기 전, 제한된 표면 변형과 메시 정리만 실험적으로 제공합니다.",
   },
   material: {
     title: "표면 방향과 UV 준비",
@@ -158,6 +160,17 @@ interface StudioHybridDccQuickTool {
   readonly disabled?: boolean;
   readonly primary?: boolean;
   readonly onClick: () => void;
+}
+
+interface StudioHybridDccPanelRunResult {
+  readonly workspace: StudioHybridDccWorkspace;
+  readonly selection?: StudioHybridDccComponentSelection;
+}
+
+function isStudioHybridDccPanelRunResult(
+  value: StudioHybridDccWorkspace | StudioHybridDccPanelRunResult,
+): value is StudioHybridDccPanelRunResult {
+  return Object.hasOwn(value, "workspace");
 }
 
 function hybridDccSelectionSource(
@@ -324,16 +337,26 @@ export function StudioHybridDccPanel({
 
   const run = async (
     label: string,
-    fn: () => StudioHybridDccWorkspace | Promise<StudioHybridDccWorkspace>,
+    fn: () =>
+      | StudioHybridDccWorkspace
+      | StudioHybridDccPanelRunResult
+      | Promise<StudioHybridDccWorkspace | StudioHybridDccPanelRunResult>,
   ) => {
     const generation = ++runGenerationRef.current;
     setBusy(true);
     try {
-      const raw = await fn();
+      const result = await fn();
+      const raw = isStudioHybridDccPanelRunResult(result) ? result.workspace : result;
+      const requestedSelection = isStudioHybridDccPanelRunResult(result)
+        ? result.selection
+        : undefined;
       const next = await workspaceRefreshModifierPreviews(raw);
       if (!mountedRef.current || generation !== runGenerationRef.current) return;
       setWs(next);
-      setComponentSelection((current) => alignHybridDccSelectionToWorkspace(current, next));
+      setComponentSelection((current) => alignHybridDccSelectionToWorkspace(
+        requestedSelection ?? current,
+        next,
+      ));
       setLog(
         `${label} 완료 · 오브젝트 ${Object.keys(next.session.state.geometry.records).length}개 · 컷 ${next.bridge.shots.length}개 · UV ${next.lastUvMap?.mode ?? "없음"} · 오류 ${workspaceDiagnostics(next).errorCount}개`,
       );
@@ -627,7 +650,12 @@ export function StudioHybridDccPanel({
       description: "선택한 면을 바깥으로 뽑아 형태를 늘립니다. 오브젝트 모드에서는 첫 면으로 빠르게 시작합니다.",
       requiresAsset: true,
       onClick: () => {
-        void run("면 밀어내기", () => workspaceExtrudeActive(ws, 0.25, resolveSelectedFaces()));
+        void run("면 밀어내기", () => {
+          const faceIds = resolveSelectedFaces();
+          return componentSelection.mode === "face"
+            ? workspaceExtrudeRegionActive(ws, componentSelection, 0.25)
+            : workspaceExtrudeActive(ws, 0.25, faceIds);
+        });
       },
     },
     {
@@ -773,9 +801,9 @@ export function StudioHybridDccPanel({
     },
   ] : workbenchMode === "sculpt" ? [
     {
-      label: "표면 조형",
-      technical: "Sculpt",
-      description: "브러시 스트로크로 표면을 밀고 당겨 큰 형태를 잡습니다.",
+      label: "표면 조형 (실험)",
+      technical: "Voxel-lite Sculpt · experimental",
+      description: "전문 Sculpt 엔진이 아닌 제한된 voxel-lite 커널로 큰 형태만 시험합니다.",
       requiresAsset: true,
       onClick: () => { void run("표면 조형", () => workspaceSculptActive(ws)); },
     },
@@ -944,7 +972,18 @@ export function StudioHybridDccPanel({
             className="min-h-11 rounded-lg border border-line bg-card px-3 font-semibold text-fg-2 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
             disabled={busy || ws.session.undoStack.length === 0}
             aria-label="마지막 3D 편집 되돌리기"
-            onClick={() => { void run("되돌리기", () => workspaceUndo(ws)); }}
+            onClick={() => {
+              void run("되돌리기", () => {
+                const workspace = workspaceUndo(ws);
+                return {
+                  workspace,
+                  selection: workspaceReconcileSelectionAfterHistory(
+                    workspace,
+                    componentSelection,
+                  ),
+                };
+              });
+            }}
           >
             ↶ 되돌리기
           </button>
@@ -953,7 +992,18 @@ export function StudioHybridDccPanel({
             className="min-h-11 rounded-lg border border-line bg-card px-3 font-semibold text-fg-2 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
             disabled={busy || ws.session.redoStack.length === 0}
             aria-label="되돌린 3D 편집 다시 실행"
-            onClick={() => { void run("다시 실행", () => workspaceRedo(ws)); }}
+            onClick={() => {
+              void run("다시 실행", () => {
+                const workspace = workspaceRedo(ws);
+                return {
+                  workspace,
+                  selection: workspaceReconcileSelectionAfterHistory(
+                    workspace,
+                    componentSelection,
+                  ),
+                };
+              });
+            }}
           >
             ↷ 다시 실행
           </button>
@@ -1624,7 +1674,12 @@ export function StudioHybridDccPanel({
           type="button"
           className="rounded border px-2 py-1"
           disabled={busy || !ws.activeAssetId}
-          onClick={() => run("Extrude", () => workspaceExtrudeActive(ws, 0.25))}
+          onClick={() => run("Extrude", () => {
+            const faceIds = resolveSelectedFaces();
+            return componentSelection.mode === "face"
+              ? workspaceExtrudeRegionActive(ws, componentSelection, 0.25)
+              : workspaceExtrudeActive(ws, 0.25, faceIds);
+          })}
         >
           Extrude
         </button>
@@ -1688,9 +1743,10 @@ export function StudioHybridDccPanel({
           type="button"
           className="rounded border px-2 py-1"
           disabled={busy || !ws.activeAssetId}
+          title="검증된 전문 Sculpt provider 연결 전의 voxel-lite 실험 기능"
           onClick={() => run("Sculpt", () => workspaceSculptActive(ws))}
         >
-          Sculpt
+          Sculpt · voxel-lite 실험
         </button>
         <button
           type="button"

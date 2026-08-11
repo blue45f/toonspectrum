@@ -14,10 +14,14 @@ import {
   type StudioCommandJsonValue,
 } from "./studio-command-journal";
 import {
+  STUDIO_EDITABLE_MESH_LIMITS,
   deserializeStudioEditableMesh,
   hashStudioEditableMesh,
+  isIssuedStudioEditableMeshExtrudeRegionReceipt,
+  matchesStudioEditableMeshPersistedHash,
   serializeStudioEditableMesh,
   type StudioEditableMesh,
+  type StudioEditableMeshExtrudeRegionReceipt,
   type StudioEditableMeshSnapshot,
 } from "./studio-editable-half-edge-mesh";
 import {
@@ -327,8 +331,8 @@ export function restoreStudioHybridDccStateFromSnapshot(
     if (!registered.ok) throw new Error(registered.detail);
     geometry = registered.value;
     const current = geometry.records[asset.assetId]!;
-    if (current.meshHash !== asset.meshHash) {
-      // hash is derived from mesh content; mismatch means serialize round-trip bug
+    if (!matchesStudioEditableMeshPersistedHash(mesh, asset.meshHash)) {
+      // Exact SHA-256 is current authority. A genuine legacy v2 fingerprint is migration-only.
       throw new Error(
         `mesh hash mismatch for ${asset.assetId}: ${current.meshHash} vs ${asset.meshHash}`,
       );
@@ -355,7 +359,12 @@ export function restoreStudioHybridDccStateFromSnapshot(
     documentId: snapshot.documentId,
     geometry,
     objectTransforms,
-    rightsBom: [...snapshot.rightsBom],
+    rightsBom: snapshot.rightsBom.map((record) => {
+      const restored = geometry.records[record.assetId];
+      return restored
+        ? { ...record, contentHash: contentHashForMeshHash(restored.meshHash) }
+        : record;
+    }),
     dependencies: [...snapshot.dependencies],
     dirtyNodeIds: [...snapshot.dirtyNodeIds],
     milestoneLabel: snapshot.milestoneLabel,
@@ -693,10 +702,14 @@ export function hybridDccRemoveAsset(
   );
 }
 
-export function hybridDccCommitGeometry(
+function hybridDccCommitGeometryCommand(
   session: StudioHybridDccSession,
   assetId: string,
   mesh: StudioEditableMesh,
+  command: {
+    readonly kind: "geometry.commit" | "geometry.extrude-region";
+    readonly receipt?: unknown;
+  },
 ): StudioHybridDccSession {
   const prev = session.state.geometry.records[assetId];
   if (!prev) throw new Error(`asset ${assetId} not found`);
@@ -707,12 +720,17 @@ export function hybridDccCommitGeometry(
     .filter((d) => d.fromId === assetId)
     .map((d) => d.toId);
   const dirtyNodeIds = [...new Set([...session.state.dirtyNodeIds, assetId, ...dependents])];
+  const committedMeshHash = reg.value.records[assetId]!.meshHash;
+  const rightsBom = session.state.rightsBom.map((record) => record.assetId === assetId
+    ? { ...record, contentHash: contentHashForMeshHash(committedMeshHash) }
+    : record);
   // Journal payloads must be plain JSON; mesh snapshots are stored as nested plain objects.
   const forwardPayload = JSON.parse(
     JSON.stringify({
       assetId,
       meshHash: hashStudioEditableMesh(mesh),
       mesh: serializeStudioEditableMesh(mesh),
+      ...(command.receipt === undefined ? {} : { receipt: command.receipt }),
     }),
   ) as StudioCommandJsonValue;
   const inversePayload = JSON.parse(
@@ -724,18 +742,236 @@ export function hybridDccCommitGeometry(
   ) as StudioCommandJsonValue;
   return appendCommand(
     session,
-    "geometry.commit",
+    command.kind,
     forwardPayload,
     inversePayload,
     {
       geometry: reg.value,
       objectTransforms: session.state.objectTransforms,
-      rightsBom: session.state.rightsBom,
+      rightsBom,
       dependencies: session.state.dependencies,
       dirtyNodeIds,
       milestoneLabel: session.state.milestoneLabel,
     },
   );
+}
+
+export function hybridDccCommitGeometry(
+  session: StudioHybridDccSession,
+  assetId: string,
+  mesh: StudioEditableMesh,
+): StudioHybridDccSession {
+  return hybridDccCommitGeometryCommand(session, assetId, mesh, {
+    kind: "geometry.commit",
+  });
+}
+
+function isStudioTopologyId(value: unknown): value is number {
+  return Number.isSafeInteger(value) && (value as number) >= 0;
+}
+
+function isCanonicalStudioTopologyIdList(
+  value: readonly number[],
+  maximum: number,
+  allowEmpty = true,
+): boolean {
+  if (!Array.isArray(value) || value.length > maximum || (!allowEmpty && value.length === 0)) {
+    return false;
+  }
+  let previous = -1;
+  for (const id of value) {
+    if (!isStudioTopologyId(id) || id <= previous) return false;
+    previous = id;
+  }
+  return true;
+}
+
+function equalStudioTopologyIdLists(
+  left: readonly number[],
+  right: readonly number[],
+): boolean {
+  return left.length === right.length && left.every((id, index) => id === right[index]);
+}
+
+/**
+ * Verifies the complete topology classification carried by a Region Extrude receipt.
+ *
+ * Hashes bind the source and result snapshots; this structural audit additionally prevents a
+ * caller from journaling forged cap, boundary, side, region-count, or remap evidence for those
+ * otherwise-valid snapshots.
+ */
+function assertStudioExtrudeRegionReceipt(
+  source: StudioEditableMesh,
+  result: StudioEditableMesh,
+  receipt: StudioEditableMeshExtrudeRegionReceipt,
+): void {
+  if (!isCanonicalStudioTopologyIdList(
+    receipt.sourceFaceIds,
+    STUDIO_EDITABLE_MESH_LIMITS.maxSelection,
+    false,
+  ) || !isCanonicalStudioTopologyIdList(
+    receipt.capFaceIds,
+    STUDIO_EDITABLE_MESH_LIMITS.maxSelection,
+    false,
+  ) || receipt.sourceFaceIds.length !== receipt.capFaceIds.length) {
+    throw new Error("topology mutation receipt has an invalid source-to-cap mapping");
+  }
+  if (!isCanonicalStudioTopologyIdList(
+    receipt.sideFaceIds,
+    STUDIO_EDITABLE_MESH_LIMITS.maxFaces,
+  ) || !isCanonicalStudioTopologyIdList(
+    receipt.boundaryHalfEdgeIds,
+    STUDIO_EDITABLE_MESH_LIMITS.maxEdges,
+  ) || receipt.sideFaceIds.length !== receipt.boundaryHalfEdgeIds.length) {
+    throw new Error("topology mutation receipt has an invalid boundary-to-side mapping");
+  }
+  if (!Number.isSafeInteger(receipt.connectedRegionCount)
+    || receipt.connectedRegionCount < 1
+    || receipt.connectedRegionCount > receipt.sourceFaceIds.length) {
+    throw new Error("topology mutation receipt has an invalid connected-region count");
+  }
+
+  const sourceFaceIds = [...source.faces].map(({ id }) => id).sort((a, b) => a - b);
+  const sourceFaceSet = new Set(sourceFaceIds);
+  const resultFaceIds = [...result.faces].map(({ id }) => id).sort((a, b) => a - b);
+  const resultFaceSet = new Set(resultFaceIds);
+  const selectedFaceSet = new Set(receipt.sourceFaceIds);
+  if (receipt.sourceFaceIds.some((id) => !sourceFaceSet.has(id))
+    || receipt.capFaceIds.some((id) => !resultFaceSet.has(id))
+    || receipt.sideFaceIds.some((id) => !resultFaceSet.has(id))) {
+    throw new Error("topology mutation receipt references a non-live face");
+  }
+  if (result.faces.length !== source.faces.length + receipt.sideFaceIds.length) {
+    throw new Error("topology mutation receipt does not account for the result face count");
+  }
+
+  const fullEntries = receipt.faceRemap.entries;
+  if (!Array.isArray(fullEntries)
+    || fullEntries.length !== sourceFaceIds.length
+    || fullEntries.length > STUDIO_EDITABLE_MESH_LIMITS.maxFaces) {
+    throw new Error("topology mutation receipt does not cover every source face");
+  }
+  const fullTargets = new Set<number>();
+  const fullFaceRemap = new Map<number, number>();
+  for (let index = 0; index < fullEntries.length; index += 1) {
+    const entry = fullEntries[index];
+    const expectedSourceId = sourceFaceIds[index];
+    if (!Array.isArray(entry)
+      || entry.length !== 2
+      || entry[0] !== expectedSourceId
+      || !isStudioTopologyId(entry[1])
+      || !resultFaceSet.has(entry[1])
+      || fullTargets.has(entry[1])) {
+      throw new Error("topology mutation receipt has a malformed full face remap");
+    }
+    fullTargets.add(entry[1]);
+    fullFaceRemap.set(entry[0], entry[1]);
+  }
+
+  const selectedEntries = receipt.selectionRemap.face?.entries;
+  if (receipt.selectionRemap.vertex !== undefined
+    || receipt.selectionRemap.edge !== undefined
+    || !Array.isArray(selectedEntries)
+    || selectedEntries.length !== receipt.sourceFaceIds.length) {
+    throw new Error("topology mutation receipt has a malformed selection remap");
+  }
+  for (let index = 0; index < selectedEntries.length; index += 1) {
+    const entry = selectedEntries[index];
+    const sourceFaceId = receipt.sourceFaceIds[index];
+    const capFaceId = receipt.capFaceIds[index];
+    if (!Array.isArray(entry)
+      || entry.length !== 2
+      || entry[0] !== sourceFaceId
+      || entry[1] !== capFaceId
+      || fullFaceRemap.get(sourceFaceId) !== capFaceId) {
+      throw new Error("topology mutation receipt does not map selected faces to their caps");
+    }
+  }
+
+  const sideFaceSet = new Set(receipt.sideFaceIds);
+  if (receipt.capFaceIds.some((id) => sideFaceSet.has(id))) {
+    throw new Error("topology mutation receipt aliases cap and side faces");
+  }
+  const classifiedResultIds = [...fullTargets, ...sideFaceSet].sort((a, b) => a - b);
+  if (!equalStudioTopologyIdLists(classifiedResultIds, resultFaceIds)) {
+    throw new Error("topology mutation receipt does not classify every result face");
+  }
+
+  const sourceHalfEdgeById = new Map(source.halfEdges.map((edge) => [edge.id, edge] as const));
+  const computedBoundaryIds = source.halfEdges
+    .filter((edge) => {
+      if (!selectedFaceSet.has(edge.face)) return false;
+      if (edge.twin < 0) return true;
+      const twin = sourceHalfEdgeById.get(edge.twin);
+      return twin === undefined || !selectedFaceSet.has(twin.face);
+    })
+    .map(({ id }) => id)
+    .sort((a, b) => a - b);
+  if (!equalStudioTopologyIdLists(computedBoundaryIds, receipt.boundaryHalfEdgeIds)) {
+    throw new Error("topology mutation receipt does not identify the exact region boundary");
+  }
+
+  const selectedAdjacency = new Map<number, Set<number>>(
+    receipt.sourceFaceIds.map((faceId) => [faceId, new Set<number>()]),
+  );
+  for (const edge of source.halfEdges) {
+    if (!selectedFaceSet.has(edge.face) || edge.twin < 0) continue;
+    const twinFaceId = sourceHalfEdgeById.get(edge.twin)?.face;
+    if (twinFaceId !== undefined && selectedFaceSet.has(twinFaceId)) {
+      selectedAdjacency.get(edge.face)?.add(twinFaceId);
+    }
+  }
+  const pending = new Set(receipt.sourceFaceIds);
+  let connectedRegionCount = 0;
+  for (const seed of receipt.sourceFaceIds) {
+    if (!pending.delete(seed)) continue;
+    connectedRegionCount += 1;
+    const stack = [seed];
+    while (stack.length > 0) {
+      const faceId = stack.pop()!;
+      for (const adjacentFaceId of selectedAdjacency.get(faceId) ?? []) {
+        if (pending.delete(adjacentFaceId)) stack.push(adjacentFaceId);
+      }
+    }
+  }
+  if (connectedRegionCount !== receipt.connectedRegionCount) {
+    throw new Error("topology mutation receipt has an incorrect connected-region count");
+  }
+}
+
+/**
+ * Commits one topology mutation as a distinct, undoable document command.
+ *
+ * The receipt is command evidence only. Geometry authority remains the immutable editable-mesh
+ * snapshot, so OPFS recovery and undo/redo do not depend on replaying procedural topology code.
+ */
+export function hybridDccCommitTopologyMutation(
+  session: StudioHybridDccSession,
+  assetId: string,
+  mesh: StudioEditableMesh,
+  input: {
+    readonly kind: "geometry.extrude-region";
+    readonly receipt: StudioEditableMeshExtrudeRegionReceipt;
+  },
+): StudioHybridDccSession {
+  if (input.kind !== "geometry.extrude-region"
+    || input.receipt.operation !== "extrude-region") {
+    throw new Error("unsupported topology mutation receipt");
+  }
+  const previous = session.state.geometry.records[assetId];
+  if (!previous) throw new Error(`asset ${assetId} not found`);
+  if (input.receipt.sourceMeshHash !== previous.meshHash) {
+    throw new Error("topology mutation receipt does not match the source mesh");
+  }
+  const resultMeshHash = hashStudioEditableMesh(mesh);
+  if (input.receipt.resultMeshHash !== resultMeshHash) {
+    throw new Error("topology mutation receipt does not match the result mesh");
+  }
+  if (!isIssuedStudioEditableMeshExtrudeRegionReceipt(input.receipt)) {
+    throw new Error("topology mutation receipt was not issued by the geometry kernel");
+  }
+  assertStudioExtrudeRegionReceipt(previous.mesh, mesh, input.receipt);
+  return hybridDccCommitGeometryCommand(session, assetId, mesh, input);
 }
 
 /** Replace one asset's non-destructive stack as one undoable canonical command. */
@@ -853,7 +1089,7 @@ export function hybridDccApplyModifierStack(
       || receipt.objectTransformHash !== hashStudioHybridDccObjectTransform(cutterTransform)) {
       throw new Error(`modifier evaluation Boolean operand is stale for ${modifier.id}`);
     }
-    if (!/^mesh:[0-9a-f]{8}$/u.test(receipt.evaluatedMeshHash)
+    if (!/^(?:mesh:[0-9a-f]{8}|mesh:sha256:[0-9a-f]{64})$/u.test(receipt.evaluatedMeshHash)
       || !/^sha256:[0-9a-f]{64}$/u.test(receipt.resolvedOperandHash)) {
       throw new Error(`modifier evaluation Boolean hashes are invalid for ${modifier.id}`);
     }

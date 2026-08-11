@@ -7,6 +7,7 @@ import {
   hashStudioEditableMesh,
   STUDIO_EDITABLE_MESH_LIMITS,
   studioEditableMeshToTriangleSoup,
+  validateStudioEditableMeshSerializableAuthority,
   type StudioEditableMesh,
 } from "./studio-editable-half-edge-mesh";
 import {
@@ -103,6 +104,16 @@ function validateStudioGeometryAuthorityCoordinates(
   return { ok: true, value: mesh };
 }
 
+function validateStudioGeometryAuthorityMesh(
+  mesh: StudioEditableMesh,
+): StudioGeometryAuthorityResult<StudioEditableMesh> {
+  const serializable = validateStudioEditableMeshSerializableAuthority(mesh);
+  if (!serializable.ok) {
+    return { ok: false, code: serializable.code, detail: serializable.detail };
+  }
+  return validateStudioGeometryAuthorityCoordinates(mesh);
+}
+
 function validateStudioGeometryRenderPositions(
   positions: Float32Array,
 ): StudioGeometryAuthorityResult<Float32Array> {
@@ -170,7 +181,7 @@ export function registerStudioGeometryAuthority(
     && (!Number.isSafeInteger(options.recordRevision) || options.recordRevision < 1)) {
     return { ok: false, code: "invalid-revision", detail: "record revision must be >= 1" };
   }
-  const coordinates = validateStudioGeometryAuthorityCoordinates(mesh);
+  const coordinates = validateStudioGeometryAuthorityMesh(mesh);
   if (!coordinates.ok) return coordinates;
   const normalized = options.modifierStack
     ? normalizeAuthorityModifierStack(mesh, options.modifierStack)
@@ -209,7 +220,7 @@ export function commitStudioGeometryAuthorityMesh(
 ): StudioGeometryAuthorityResult<StudioGeometryAuthorityRegistry> {
   const prev = registry.records[assetId];
   if (!prev) return { ok: false, code: "not-found", detail: assetId };
-  const coordinates = validateStudioGeometryAuthorityCoordinates(mesh);
+  const coordinates = validateStudioGeometryAuthorityMesh(mesh);
   if (!coordinates.ok) return coordinates;
   const stack = createStudioMeshModifierStack(mesh, prev.modifierStack.modifiers);
   const record: StudioGeometryAuthorityRecord = {
@@ -236,7 +247,7 @@ export function setStudioGeometryAuthorityModifierStack(
 ): StudioGeometryAuthorityResult<StudioGeometryAuthorityRegistry> {
   const prev = registry.records[assetId];
   if (!prev) return { ok: false, code: "not-found", detail: assetId };
-  const coordinates = validateStudioGeometryAuthorityCoordinates(prev.mesh);
+  const coordinates = validateStudioGeometryAuthorityMesh(prev.mesh);
   if (!coordinates.ok) return coordinates;
   const normalized = normalizeAuthorityModifierStack(prev.mesh, stack);
   if (!normalized.ok) return normalized;
@@ -280,7 +291,7 @@ export function applyStudioGeometryAuthorityModifierStack(
       detail: "modifier stack source diverged from the authority mesh",
     };
   }
-  const coordinates = validateStudioGeometryAuthorityCoordinates(evaluatedMesh);
+  const coordinates = validateStudioGeometryAuthorityMesh(evaluatedMesh);
   if (!coordinates.ok) return coordinates;
   const meshHash = hashStudioEditableMesh(evaluatedMesh);
   const record: StudioGeometryAuthorityRecord = {
@@ -311,7 +322,7 @@ export async function materializeStudioGeometryRenderCache(
 }>> {
   const prev = registry.records[assetId];
   if (!prev) return { ok: false, code: "not-found", detail: assetId };
-  const sourceCoordinates = validateStudioGeometryAuthorityCoordinates(prev.mesh);
+  const sourceCoordinates = validateStudioGeometryAuthorityMesh(prev.mesh);
   if (!sourceCoordinates.ok) return sourceCoordinates;
   const evaluated = await evaluateStudioMeshModifierStack(prev.modifierStack, {
     booleanBackend: options.booleanBackend,
@@ -319,7 +330,7 @@ export async function materializeStudioGeometryRenderCache(
   if (!evaluated.ok) {
     return { ok: false, code: evaluated.code, detail: evaluated.detail };
   }
-  const evaluatedCoordinates = validateStudioGeometryAuthorityCoordinates(evaluated.value.mesh);
+  const evaluatedCoordinates = validateStudioGeometryAuthorityMesh(evaluated.value.mesh);
   if (!evaluatedCoordinates.ok) return evaluatedCoordinates;
   const soup = studioEditableMeshToTriangleSoup(evaluated.value.mesh);
   const projectedCoordinates = validateStudioGeometryRenderPositions(soup.positions);
@@ -379,7 +390,7 @@ export function assertRenderCacheIsNotAuthority(
     || cache.sourceMeshHash !== record.meshHash
     || cache.sourceModifierStackHash !== modifierStackHash
     || !/^sha256:[0-9a-f]{64}$/u.test(cache.contentHash)
-    || !/^mesh:[0-9a-f]{8}$/u.test(cache.derivedFromHash)
+    || !/^(?:mesh:[0-9a-f]{8}|mesh:sha256:[0-9a-f]{64})$/u.test(cache.derivedFromHash)
     || !Number.isFinite(cache.generatedAt)
     || cache.generatedAt < 0) {
     return false;
