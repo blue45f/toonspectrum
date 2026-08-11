@@ -38,6 +38,32 @@ import {
 } from "./studio-brush-tip-stamp";
 
 export const STUDIO_BRUSH_DYNAMICS_SETTINGS_VERSION = 1 as const;
+export const STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_VERSION =
+  "dry-media-union-causal-group-alpha-max-v3" as const;
+export const STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_DIGEST =
+  "c5279091049bbf27c8303439b2083ff861d562fddc81deea37032d4e5aac8f96" as const;
+
+export interface StudioDryMediaUnionProgramPin {
+  readonly version: typeof STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_VERSION;
+  readonly programDigest: typeof STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_DIGEST;
+}
+
+export function studioDryMediaUnionComposableProgramPin(): StudioDryMediaUnionProgramPin {
+  return Object.freeze({
+    version: STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_VERSION,
+    programDigest: STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_DIGEST,
+  });
+}
+
+export function isStudioDryMediaUnionComposableProgramPin(
+  value: unknown,
+): value is StudioDryMediaUnionProgramPin {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const candidate = value as Record<string, unknown>;
+  return candidate.version === STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_VERSION
+    && candidate.programDigest === STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_DIGEST
+    && Object.keys(candidate).every((key) => key === "version" || key === "programDigest");
+}
 export const STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2 =
   "causal-deposit-v2" as const;
 /**
@@ -202,6 +228,8 @@ export interface StudioBrushDynamicsSettings {
    * progress/taper resampler and therefore preserve existing document pixels.
    */
   depositPipeline?: StudioDynamicBrushDepositPipeline;
+  /** Absent snapshots are immutable legacy v2; only an exact supported pin enables v3. */
+  dryMediaUnionProgram?: StudioDryMediaUnionProgramPin;
   seed?: number;
   fallbackPressure?: number;
   /** CSS px/ms at which the normalized speed source reaches 1. */
@@ -383,6 +411,8 @@ export interface NormalizedStudioBrushDynamicsSettings {
   version: typeof STUDIO_BRUSH_DYNAMICS_SETTINGS_VERSION;
   /** Omitted for legacy snapshots so their canonical serialization remains byte-stable. */
   depositPipeline?: StudioDynamicBrushDepositPipeline;
+  /** Omitted for legacy v2 snapshots; malformed explicit pins fail normalization closed. */
+  dryMediaUnionProgram?: StudioDryMediaUnionProgramPin;
   seed: number;
   fallbackPressure: number;
   maxSpeed: number;
@@ -863,6 +893,9 @@ function cloneNormalizedSettings(
     ...(settings.depositPipeline
       ? { depositPipeline: settings.depositPipeline }
       : {}),
+    ...(settings.dryMediaUnionProgram
+      ? { dryMediaUnionProgram: { ...settings.dryMediaUnionProgram } }
+      : {}),
     seed: settings.seed,
     fallbackPressure: settings.fallbackPressure,
     maxSpeed: settings.maxSpeed,
@@ -1065,11 +1098,19 @@ export function normalizeStudioBrushDynamicsSettings(value?: unknown): Normalize
   const scatter = normalizeProperty(source.scatter, INTERNAL_DEFAULT_SETTINGS.scatter, "scatter");
   const tip = normalizeStudioBrushTipSettings(source.tip);
   const dualBrush = normalizeStudioBrushDualBrushSettings(source.dualBrush, tip);
+  let dryMediaUnionProgram: StudioDryMediaUnionProgramPin | undefined;
+  if (source.dryMediaUnionProgram !== undefined) {
+    if (!isStudioDryMediaUnionComposableProgramPin(source.dryMediaUnionProgram)) {
+      throw new TypeError("Unsupported dry-media union program pin.");
+    }
+    dryMediaUnionProgram = { ...source.dryMediaUnionProgram };
+  }
   return {
     version: STUDIO_BRUSH_DYNAMICS_SETTINGS_VERSION,
     ...(isStudioDynamicBrushCausalDepositPipeline(source.depositPipeline)
       ? { depositPipeline: source.depositPipeline }
       : {}),
+    ...(dryMediaUnionProgram ? { dryMediaUnionProgram } : {}),
     seed: uint32(source.seed, INTERNAL_DEFAULT_SETTINGS.seed),
     fallbackPressure: clamp01(finiteNumber(source.fallbackPressure, INTERNAL_DEFAULT_SETTINGS.fallbackPressure)),
     maxSpeed: clamp(finiteNumber(source.maxSpeed, INTERNAL_DEFAULT_SETTINGS.maxSpeed), 0.01, MAX_POINTER_SPEED),

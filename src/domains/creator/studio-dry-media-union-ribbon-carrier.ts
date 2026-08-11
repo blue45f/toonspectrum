@@ -10,19 +10,33 @@
  */
 
 import {
+  isStudioDryMediaUnionComposableProgramPin,
+  STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_DIGEST,
+  STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_VERSION,
+  type NormalizedStudioBrushDynamicsSettings,
+  type StudioDynamicBrushDab,
+  type StudioDynamicBrushSegmentStartFrame,
+} from "./studio-brush-dynamics";
+import {
   studioDryMediaDynamicBridgeMarkMultiplier,
   type StudioDynamicBrushMaterialIdentity,
 } from "./studio-dry-media-dynamic-bridge";
 
-import type {
-  NormalizedStudioBrushDynamicsSettings,
-  StudioDynamicBrushDab,
-  StudioDynamicBrushSegmentStartFrame,
-} from "./studio-brush-dynamics";
 import type { StudioBrushTipAlphaMap } from "./studio-brush-tip-stamp";
 
 export const STUDIO_DRY_MEDIA_UNION_RIBBON_CARRIER_VERSION =
   "dry-media-union-ribbon-carrier-v1" as const;
+export {
+  STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_DIGEST,
+  STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_VERSION,
+} from "./studio-brush-dynamics";
+
+export interface StudioDryMediaUnionComposableGroup {
+  /** Immutable global causal station, independent from pointer delivery chunking. */
+  readonly stationIndex: number;
+  /** Positive carrier bodies and only the pores physically authored inside those bodies. */
+  readonly polygons: readonly (readonly number[])[];
+}
 export const STUDIO_DRY_MEDIA_UNION_RIBBON_MAX_MARKS = 524_288;
 
 export interface StudioDryMediaUnionRibbonPolygon {
@@ -35,6 +49,56 @@ export interface StudioDryMediaUnionRibbonPolygon {
    * painting the background colour or source-over stacking transparent stamps.
    */
   readonly polygons: readonly (readonly number[])[];
+  /**
+   * New strokes use fixed causal-station groups. Each group is rasterized with one nonzero Path,
+   * then alpha-max-unioned into the stroke-local coverage bitmap. A later pore therefore reveals
+   * only its own wax carrier and never erases pigment already laid by an earlier station.
+   */
+  readonly compositing?: Readonly<{
+    readonly kind: "causal-group-alpha-max";
+    readonly version: typeof STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_VERSION;
+    readonly programDigest: typeof STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_DIGEST;
+    readonly groups: readonly StudioDryMediaUnionComposableGroup[];
+  }>;
+}
+
+export const STUDIO_DRY_MEDIA_UNION_CHUNKED_RIBBON_VERSION =
+  "dry-media-union-ribbon-chunks-v2" as const;
+/**
+ * Admission bound for one immutable host -> Worker page. This is deliberately not a stroke
+ * geometry ceiling: older pages can be sealed into the dry-media CAS while a stroke continues.
+ */
+export const STUDIO_DRY_MEDIA_UNION_CHUNK_PAGE_BYTE_BUDGET = 1024 * 1024;
+export const STUDIO_DRY_MEDIA_UNION_CHUNK_DOCUMENT_TILE_SIZE = 64;
+
+/**
+ * Getter-free opaque authority for live dry-media geometry. Coordinate buffers remain in this
+ * module's private WeakMap, so retained-plan consumers cannot mutate a typed backing store.
+ */
+export interface StudioDryMediaUnionChunkAuthorityReceipt {
+  readonly contract: "studio-dry-media-union-chunk-authority-v1";
+  readonly version: 1;
+  readonly generation: number;
+  readonly entryCount: number;
+  readonly contourCount: number;
+  readonly coordinateCount: number;
+  readonly tileReferenceCount: number;
+  /** Conservative resident charge, including typed capacities and JS index/container overhead. */
+  readonly residentByteLength: number;
+  /** Compatibility alias for retained-plan accounting. Equal to `residentByteLength`. */
+  readonly estimatedByteLength: number;
+  /** Ephemeral in-process fingerprint only; never used as a durable content authority. */
+  readonly geometryDigest: string;
+}
+
+export interface StudioDryMediaUnionChunkedRibbonPolygon {
+  readonly kind: "dry-media-union-ribbon-chunks-v2";
+  readonly version: typeof STUDIO_DRY_MEDIA_UNION_CHUNKED_RIBBON_VERSION;
+  readonly role: "stroke-union";
+  readonly authority: StudioDryMediaUnionChunkAuthorityReceipt;
+  readonly entryIndex: number;
+  /** Compatibility sentinel; opaque coordinates are never materialized through this property. */
+  readonly polygons: readonly [];
 }
 
 export interface StudioDryMediaUnionRibbonSourceMark {
@@ -58,6 +122,11 @@ export interface StudioDryMediaUnionRibbonSourceMark {
 export interface StudioDryMediaUnionRibbonCoverageMark
   extends Omit<StudioDryMediaUnionRibbonSourceMark, "falloff" | "texture"> {
   readonly ribbon: StudioDryMediaUnionRibbonPolygon;
+}
+
+export interface StudioDryMediaUnionChunkedRibbonCoverageMark
+  extends Omit<StudioDryMediaUnionRibbonSourceMark, "falloff" | "texture"> {
+  readonly ribbon: StudioDryMediaUnionChunkedRibbonPolygon;
 }
 
 export type StudioDryMediaUnionRibbonPlanResult =
@@ -620,6 +689,25 @@ export function planStudioDryMediaUnionRibbonCarrier(
   }
 
   const polygons: Array<readonly number[]> = [];
+  const composableGroups: Array<{
+    stationIndex: number;
+    polygons: Array<readonly number[]>;
+  }> = [];
+  let currentComposableGroup: {
+    stationIndex: number;
+    polygons: Array<readonly number[]>;
+  } | null = null;
+  const appendComposablePolygon = (
+    stationIndex: number,
+    polygon: readonly number[],
+  ): void => {
+    if (!currentComposableGroup || currentComposableGroup.stationIndex !== stationIndex) {
+      currentComposableGroup = { stationIndex, polygons: [] };
+      composableGroups.push(currentComposableGroup);
+    }
+    currentComposableGroup.polygons.push(polygon);
+    polygons.push(polygon);
+  };
   const brushId = input.materialIdentity?.brushId as CoreDryMediaId;
   const grainPolicy = DRY_MEDIA_NEGATIVE_GRAIN_POLICY[brushId];
   const grainSeed = Math.trunc(finite(input.dynamics.seed, 0)) >>> 0;
@@ -632,6 +720,10 @@ export function planStudioDryMediaUnionRibbonCarrier(
     const mark = input.marks[index]!;
     const travel = Math.max(0, finite(dab.distanceFromPrevious, 0));
     const frame = dab.segmentStartFrame;
+    // The anisotropic bridge expands one source station into several physical lanes and assigns
+    // each lane an independent sampling index. Those expanded indices are texture identities,
+    // not causal station identities: every initial lane belongs to source station zero.
+    const stationIndex = frame ? frame.index + 1 : 0;
     if (travel > EPSILON) {
       if (!validFrame(frame)) {
         return Object.freeze({
@@ -662,7 +754,7 @@ export function planStudioDryMediaUnionRibbonCarrier(
           marks: input.marks,
         });
       }
-      polygons.push(segment);
+      appendComposablePolygon(stationIndex, segment);
       const grain = negativeGrainSlitPolygon({
         startX: start.x,
         startY: start.y,
@@ -679,9 +771,9 @@ export function planStudioDryMediaUnionRibbonCarrier(
         laneIndex: index % laneCount,
         policy: grainPolicy,
       });
-      if (grain) polygons.push(grain);
+      if (grain) appendComposablePolygon(stationIndex, grain);
     } else {
-      polygons.push(ellipsePolygon(
+      appendComposablePolygon(stationIndex, ellipsePolygon(
         mark.x,
         mark.y,
         Math.max(
@@ -696,7 +788,7 @@ export function planStudioDryMediaUnionRibbonCarrier(
     // Only immutable document endpoints receive caps. A moving live suffix never leaves a
     // temporary circular stamp behind, while retained/SVG endpoints stay softly rounded.
     if (dab.progress >= 1 - EPSILON) {
-      polygons.push(ellipsePolygon(
+      appendComposablePolygon(stationIndex, ellipsePolygon(
         mark.x,
         mark.y,
         Math.max(
@@ -730,8 +822,803 @@ export function planStudioDryMediaUnionRibbonCarrier(
           version: STUDIO_DRY_MEDIA_UNION_RIBBON_CARRIER_VERSION,
           role: "stroke-union",
           polygons: Object.freeze(polygons),
+          ...(isStudioDryMediaUnionComposableProgramPin(
+            input.dynamics.dryMediaUnionProgram,
+          )
+            ? {
+                compositing: Object.freeze({
+                  kind: "causal-group-alpha-max" as const,
+                  version: STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_VERSION,
+                  programDigest: STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_DIGEST,
+                  groups: Object.freeze(composableGroups.map((group) => Object.freeze({
+                    stationIndex: group.stationIndex,
+                    polygons: Object.freeze(group.polygons),
+                  }))),
+                }),
+              }
+            : {}),
         }),
       }),
     ]),
   });
+}
+
+interface ChunkedUnionEntry {
+  readonly color: string;
+  readonly ribbonVersion: typeof STUDIO_DRY_MEDIA_UNION_RIBBON_CARRIER_VERSION;
+  minimumX: number;
+  minimumY: number;
+  maximumX: number;
+  maximumY: number;
+}
+
+interface ChunkedUnionBatch {
+  readonly firstContourId: number;
+  readonly coordinates: Float64Array;
+  readonly offsets: Uint32Array;
+  readonly lengths: Uint32Array;
+  readonly entryIndexes: Uint32Array;
+  readonly bounds: Float64Array;
+  readonly visitStamps: Uint32Array;
+}
+
+interface ChunkedTileIndex {
+  readonly blocks: Uint32Array[];
+  length: number;
+}
+
+interface ChunkedUnionAuthorityData {
+  entries: ChunkedUnionEntry[];
+  readonly batches: ChunkedUnionBatch[];
+  readonly tileIndex: Map<number, ChunkedTileIndex>;
+  contourCount: number;
+  coordinateCount: number;
+  tileReferenceCount: number;
+  residentByteLength: number;
+  hashA: number;
+  hashB: number;
+  hashC: number;
+  hashD: number;
+  visitGeneration: number;
+  latestAuthority: StudioDryMediaUnionChunkAuthorityReceipt | null;
+  pendingCandidate: StudioDryMediaUnionChunkAuthorityReceipt | null;
+}
+
+interface ChunkedUnionAuthorityView {
+  readonly storage: ChunkedUnionAuthorityData;
+  readonly entries: readonly ChunkedUnionEntry[];
+  readonly contourCount: number;
+  readonly coordinateCount: number;
+  readonly tileReferenceCount: number;
+  readonly residentByteLength: number;
+  readonly hashA: number;
+  readonly hashB: number;
+  readonly hashC: number;
+  readonly hashD: number;
+}
+
+interface ChunkedUnionPendingAppend {
+  readonly previous: StudioDryMediaUnionChunkAuthorityReceipt;
+  readonly candidate: StudioDryMediaUnionChunkAuthorityReceipt;
+  readonly prepared: PreparedChunkedUnionBatch;
+  readonly previousTileLengths: ReadonlyMap<number, number>;
+}
+
+interface PreparedChunkedUnionBatch {
+  readonly batch: ChunkedUnionBatch;
+  readonly tileAssignments: ReadonlyMap<number, readonly number[]>;
+  readonly tileReferenceCount: number;
+  readonly residentByteLength: number;
+  readonly hashA: number;
+  readonly hashB: number;
+  readonly hashC: number;
+  readonly hashD: number;
+}
+
+export interface StudioDryMediaUnionChunkedPathTarget {
+  moveTo(x: number, y: number): void;
+  lineTo(x: number, y: number): void;
+  closePath(): void;
+}
+
+export interface StudioDryMediaUnionChunkedBounds {
+  readonly minimumX: number;
+  readonly minimumY: number;
+  readonly maximumX: number;
+  readonly maximumY: number;
+}
+
+export type StudioDryMediaUnionChunkedPathResult = Readonly<{
+  status: "appended";
+  contourCount: number;
+}> | Readonly<{
+  status: "rejected";
+  reason: "stale-authority" | "invalid-entry" | "contour-work-budget";
+  contourCount: number;
+}>;
+
+const CHUNK_AUTHORITY_CONTRACT =
+  "studio-dry-media-union-chunk-authority-v1" as const;
+const CHUNK_AUTHORITY_VERSION = 1 as const;
+const CHUNK_TILE_INDEX_BLOCK_LENGTH = 256;
+const CHUNK_TILE_COORDINATE_BIAS = 0x0100_0000;
+const CHUNK_TILE_COORDINATE_SPAN = 0x0200_0000;
+const CHUNK_BATCH_CONTAINER_BYTE_CHARGE = 128;
+const CHUNK_TILE_MAP_ENTRY_BYTE_CHARGE = 64;
+const CHUNK_ENTRY_BYTE_CHARGE = 96;
+const chunkAuthorityData = new WeakMap<
+  StudioDryMediaUnionChunkAuthorityReceipt,
+  ChunkedUnionAuthorityView
+>();
+const chunkAuthorityPending = new WeakMap<
+  StudioDryMediaUnionChunkAuthorityReceipt,
+  ChunkedUnionPendingAppend
+>();
+let chunkAuthorityGeneration = 0;
+
+function chunkTileKey(tileX: number, tileY: number): number | null {
+  const biasedX = tileX + CHUNK_TILE_COORDINATE_BIAS;
+  const biasedY = tileY + CHUNK_TILE_COORDINATE_BIAS;
+  if (
+    !Number.isSafeInteger(biasedX)
+    || !Number.isSafeInteger(biasedY)
+    || biasedX < 0
+    || biasedX >= CHUNK_TILE_COORDINATE_SPAN
+    || biasedY < 0
+    || biasedY >= CHUNK_TILE_COORDINATE_SPAN
+  ) return null;
+  return biasedX * CHUNK_TILE_COORDINATE_SPAN + biasedY;
+}
+
+function quantizedHashPart(value: number): readonly [number, number] {
+  const quantized = Math.round(value * QUANTIZATION);
+  const low = quantized >>> 0;
+  const high = Math.floor(quantized / 0x1_0000_0000) >>> 0;
+  return [low, high];
+}
+
+function appendChunkHash(
+  state: readonly [number, number, number, number],
+  value: number,
+): readonly [number, number, number, number] {
+  const [low, high] = quantizedHashPart(value);
+  return [
+    Math.imul(state[0] ^ low, 0x85eb_ca6b) >>> 0,
+    Math.imul(state[1] ^ high, 0xc2b2_ae35) >>> 0,
+    Math.imul(state[2] ^ (low + high), 0x27d4_eb2f) >>> 0,
+    Math.imul(state[3] ^ (low ^ high), 0x1656_67b1) >>> 0,
+  ];
+}
+
+function chunkGeometryDigest(data: Pick<
+  ChunkedUnionAuthorityData,
+  "hashA" | "hashB" | "hashC" | "hashD"
+>): string {
+  return [data.hashA, data.hashB, data.hashC, data.hashD]
+    .map((value) => value.toString(16).padStart(8, "0"))
+    .join("");
+}
+
+function chunkAuthorityReceipt(
+  data: Pick<ChunkedUnionAuthorityView,
+    | "entries"
+    | "contourCount"
+    | "coordinateCount"
+    | "tileReferenceCount"
+    | "residentByteLength"
+    | "hashA"
+    | "hashB"
+    | "hashC"
+    | "hashD"
+  >,
+): StudioDryMediaUnionChunkAuthorityReceipt {
+  chunkAuthorityGeneration = chunkAuthorityGeneration >= Number.MAX_SAFE_INTEGER
+    ? 1
+    : chunkAuthorityGeneration + 1;
+  return Object.freeze({
+    contract: CHUNK_AUTHORITY_CONTRACT,
+    version: CHUNK_AUTHORITY_VERSION,
+    generation: chunkAuthorityGeneration,
+    entryCount: data.entries.length,
+    contourCount: data.contourCount,
+    coordinateCount: data.coordinateCount,
+    tileReferenceCount: data.tileReferenceCount,
+    residentByteLength: data.residentByteLength,
+    estimatedByteLength: data.residentByteLength,
+    geometryDigest: chunkGeometryDigest(data),
+  });
+}
+
+function snapshotChunkEntries(
+  entries: readonly ChunkedUnionEntry[],
+): readonly ChunkedUnionEntry[] {
+  return entries.map((entry) => ({ ...entry }));
+}
+
+function chunkAuthorityView(
+  storage: ChunkedUnionAuthorityData,
+): ChunkedUnionAuthorityView {
+  return {
+    storage,
+    entries: snapshotChunkEntries(storage.entries),
+    contourCount: storage.contourCount,
+    coordinateCount: storage.coordinateCount,
+    tileReferenceCount: storage.tileReferenceCount,
+    residentByteLength: storage.residentByteLength,
+    hashA: storage.hashA,
+    hashB: storage.hashB,
+    hashC: storage.hashC,
+    hashD: storage.hashD,
+  };
+}
+
+function prepareChunkedUnionBatch(
+  marks: readonly StudioDryMediaUnionRibbonCoverageMark[],
+  firstContourId: number,
+  initialHash: readonly [number, number, number, number],
+): PreparedChunkedUnionBatch | null {
+  let contourCount = 0;
+  let coordinateCount = 0;
+  for (const mark of marks) {
+    if (
+      mark.ribbon.kind !== "dry-media-union-ribbon-polygon"
+      || mark.ribbon.role !== "stroke-union"
+      || mark.alpha !== 1
+    ) return null;
+    contourCount += mark.ribbon.polygons.length;
+    for (const polygon of mark.ribbon.polygons) coordinateCount += polygon.length;
+  }
+  if (contourCount <= 0 || coordinateCount <= 0) return null;
+  const typedPayloadBytes = coordinateCount * Float64Array.BYTES_PER_ELEMENT
+    + contourCount * (
+      Uint32Array.BYTES_PER_ELEMENT * 4
+      + Float64Array.BYTES_PER_ELEMENT * 4
+    );
+  if (
+    !Number.isSafeInteger(typedPayloadBytes)
+    || typedPayloadBytes > STUDIO_DRY_MEDIA_UNION_CHUNK_PAGE_BYTE_BUDGET
+  ) return null;
+
+  const coordinates = new Float64Array(coordinateCount);
+  const offsets = new Uint32Array(contourCount);
+  const lengths = new Uint32Array(contourCount);
+  const entryIndexes = new Uint32Array(contourCount);
+  const bounds = new Float64Array(contourCount * 4);
+  const tileAssignments = new Map<number, number[]>();
+  let coordinateOffset = 0;
+  let contourIndex = 0;
+  let tileReferenceCount = 0;
+  let hashState = initialHash;
+  for (const [entryIndex, mark] of marks.entries()) {
+    for (const polygon of mark.ribbon.polygons) {
+      const contourBounds = polygonBounds([polygon]);
+      if (!contourBounds || polygon.length > 0xffff_ffff) return null;
+      offsets[contourIndex] = coordinateOffset;
+      lengths[contourIndex] = polygon.length;
+      entryIndexes[contourIndex] = entryIndex;
+      bounds[contourIndex * 4] = contourBounds.x - contourBounds.radiusX;
+      bounds[contourIndex * 4 + 1] = contourBounds.y - contourBounds.radiusY;
+      bounds[contourIndex * 4 + 2] = contourBounds.x + contourBounds.radiusX;
+      bounds[contourIndex * 4 + 3] = contourBounds.y + contourBounds.radiusY;
+      for (const value of polygon) {
+        coordinates[coordinateOffset++] = value;
+        hashState = appendChunkHash(hashState, value);
+      }
+      const minimumTileX = Math.floor(
+        bounds[contourIndex * 4]! / STUDIO_DRY_MEDIA_UNION_CHUNK_DOCUMENT_TILE_SIZE,
+      );
+      const minimumTileY = Math.floor(
+        bounds[contourIndex * 4 + 1]! / STUDIO_DRY_MEDIA_UNION_CHUNK_DOCUMENT_TILE_SIZE,
+      );
+      const maximumTileX = Math.floor(
+        bounds[contourIndex * 4 + 2]! / STUDIO_DRY_MEDIA_UNION_CHUNK_DOCUMENT_TILE_SIZE,
+      );
+      const maximumTileY = Math.floor(
+        bounds[contourIndex * 4 + 3]! / STUDIO_DRY_MEDIA_UNION_CHUNK_DOCUMENT_TILE_SIZE,
+      );
+      const referenceColumns = maximumTileX - minimumTileX + 1;
+      const referenceRows = maximumTileY - minimumTileY + 1;
+      if (
+        !Number.isSafeInteger(referenceColumns)
+        || !Number.isSafeInteger(referenceRows)
+        || referenceColumns <= 0
+        || referenceRows <= 0
+        || !Number.isSafeInteger(referenceColumns * referenceRows)
+      ) return null;
+      const globalContourId = firstContourId + contourIndex;
+      for (let tileY = minimumTileY; tileY <= maximumTileY; tileY += 1) {
+        for (let tileX = minimumTileX; tileX <= maximumTileX; tileX += 1) {
+          const key = chunkTileKey(tileX, tileY);
+          if (key === null) return null;
+          const assigned = tileAssignments.get(key) ?? [];
+          assigned.push(globalContourId);
+          tileAssignments.set(key, assigned);
+          tileReferenceCount += 1;
+        }
+      }
+      contourIndex += 1;
+    }
+  }
+  const allocatedTileBlockCount = [...tileAssignments.values()].reduce(
+    (count, contourIds) => count
+      + Math.ceil(contourIds.length / CHUNK_TILE_INDEX_BLOCK_LENGTH),
+    0,
+  );
+  const residentByteLength = typedPayloadBytes
+    + CHUNK_BATCH_CONTAINER_BYTE_CHARGE
+    + allocatedTileBlockCount
+      * CHUNK_TILE_INDEX_BLOCK_LENGTH * Uint32Array.BYTES_PER_ELEMENT
+    + tileAssignments.size * CHUNK_TILE_MAP_ENTRY_BYTE_CHARGE;
+  if (
+    !Number.isSafeInteger(residentByteLength)
+    || residentByteLength > STUDIO_DRY_MEDIA_UNION_CHUNK_PAGE_BYTE_BUDGET
+  ) return null;
+  return {
+    batch: {
+      firstContourId,
+      coordinates,
+      offsets,
+      lengths,
+      entryIndexes,
+      bounds,
+      visitStamps: new Uint32Array(contourCount),
+    },
+    tileAssignments,
+    tileReferenceCount,
+    residentByteLength,
+    hashA: hashState[0],
+    hashB: hashState[1],
+    hashC: hashState[2],
+    hashD: hashState[3],
+  };
+}
+
+function appendTileIndexReference(index: ChunkedTileIndex, contourId: number): void {
+  const blockIndex = Math.floor(index.length / CHUNK_TILE_INDEX_BLOCK_LENGTH);
+  const offset = index.length % CHUNK_TILE_INDEX_BLOCK_LENGTH;
+  let block = index.blocks[blockIndex];
+  if (!block) {
+    block = new Uint32Array(CHUNK_TILE_INDEX_BLOCK_LENGTH);
+    index.blocks.push(block);
+  }
+  block[offset] = contourId;
+  index.length += 1;
+}
+
+function applyPreparedChunkedBatch(
+  data: ChunkedUnionAuthorityData,
+  prepared: PreparedChunkedUnionBatch,
+): boolean {
+  const batchBytes = prepared.batch.coordinates.byteLength
+    + prepared.batch.offsets.byteLength
+    + prepared.batch.lengths.byteLength
+    + prepared.batch.entryIndexes.byteLength
+    + prepared.batch.bounds.byteLength
+    + prepared.batch.visitStamps.byteLength;
+  if (!Number.isSafeInteger(data.contourCount + prepared.batch.offsets.length)) {
+    return false;
+  }
+  data.batches.push(prepared.batch);
+  let newTileBlocks = 0;
+  let newTileKeys = 0;
+  for (const [key, contourIds] of prepared.tileAssignments) {
+    let index = data.tileIndex.get(key);
+    if (!index) {
+      index = { blocks: [], length: 0 };
+      newTileKeys += 1;
+    }
+    const previousBlockCount = index.blocks.length;
+    for (const contourId of contourIds) appendTileIndexReference(index, contourId);
+    newTileBlocks += index.blocks.length - previousBlockCount;
+    data.tileIndex.set(key, index);
+  }
+  data.contourCount += prepared.batch.offsets.length;
+  data.coordinateCount += prepared.batch.coordinates.length;
+  data.tileReferenceCount += prepared.tileReferenceCount;
+  data.residentByteLength += batchBytes
+    + CHUNK_BATCH_CONTAINER_BYTE_CHARGE
+    + newTileBlocks
+      * CHUNK_TILE_INDEX_BLOCK_LENGTH * Uint32Array.BYTES_PER_ELEMENT
+    + newTileKeys * CHUNK_TILE_MAP_ENTRY_BYTE_CHARGE;
+  data.hashA = prepared.hashA;
+  data.hashB = prepared.hashB;
+  data.hashC = prepared.hashC;
+  data.hashD = prepared.hashD;
+  return true;
+}
+
+function chunkEntriesFromMarks(
+  marks: readonly StudioDryMediaUnionRibbonCoverageMark[],
+): ChunkedUnionEntry[] | null {
+  const entries: ChunkedUnionEntry[] = [];
+  for (const mark of marks) {
+    const bounds = polygonBounds(mark.ribbon.polygons);
+    if (!bounds || mark.alpha !== 1 || typeof mark.color !== "string") return null;
+    entries.push({
+      color: mark.color,
+      ribbonVersion: mark.ribbon.version,
+      minimumX: bounds.x - bounds.radiusX,
+      minimumY: bounds.y - bounds.radiusY,
+      maximumX: bounds.x + bounds.radiusX,
+      maximumY: bounds.y + bounds.radiusY,
+    });
+  }
+  return entries.length > 0 ? entries : null;
+}
+
+export function createStudioDryMediaUnionChunkAuthority(
+  marks: readonly StudioDryMediaUnionRibbonCoverageMark[],
+): StudioDryMediaUnionChunkAuthorityReceipt | null {
+  const entries = chunkEntriesFromMarks(marks);
+  if (!entries) return null;
+  const data: ChunkedUnionAuthorityData = {
+    entries,
+    batches: [],
+    tileIndex: new Map(),
+    contourCount: 0,
+    coordinateCount: 0,
+    tileReferenceCount: 0,
+    residentByteLength: entries.length * CHUNK_ENTRY_BYTE_CHARGE,
+    hashA: 0x811c_9dc5,
+    hashB: 0x9e37_79b9,
+    hashC: 0x85eb_ca6b,
+    hashD: 0xc2b2_ae35,
+    visitGeneration: 0,
+    latestAuthority: null,
+    pendingCandidate: null,
+  };
+  const prepared = prepareChunkedUnionBatch(
+    marks,
+    0,
+    [data.hashA, data.hashB, data.hashC, data.hashD],
+  );
+  if (!prepared || !applyPreparedChunkedBatch(data, prepared)) return null;
+  const view = chunkAuthorityView(data);
+  const receipt = chunkAuthorityReceipt(view);
+  data.latestAuthority = receipt;
+  chunkAuthorityData.set(receipt, view);
+  return receipt;
+}
+
+export function appendStudioDryMediaUnionChunkAuthority(
+  receipt: StudioDryMediaUnionChunkAuthorityReceipt,
+  suffixMarks: readonly StudioDryMediaUnionRibbonCoverageMark[],
+): StudioDryMediaUnionChunkAuthorityReceipt | null {
+  const candidate = prepareStudioDryMediaUnionChunkAuthorityAppend(
+    receipt,
+    suffixMarks,
+  );
+  return candidate
+    ? commitStudioDryMediaUnionChunkAuthorityAppend(candidate)
+    : null;
+}
+
+/**
+ * Builds an append candidate without advancing the committed tail. The renderer may inspect and
+ * raster this receipt, then either commit it or abort it; a failed surface update therefore never
+ * makes a retry append the same suffix twice.
+ */
+export function prepareStudioDryMediaUnionChunkAuthorityAppend(
+  receipt: StudioDryMediaUnionChunkAuthorityReceipt,
+  suffixMarks: readonly StudioDryMediaUnionRibbonCoverageMark[],
+): StudioDryMediaUnionChunkAuthorityReceipt | null {
+  const previous = chunkAuthorityData.get(receipt);
+  const data = previous?.storage;
+  if (
+    !previous
+    || !data
+    || data.pendingCandidate !== null
+    || data.latestAuthority !== receipt
+    || suffixMarks.length !== previous.entries.length
+  ) return null;
+  for (const [entryIndex, mark] of suffixMarks.entries()) {
+    const entry = previous.entries[entryIndex];
+    if (
+      !entry
+      || mark.color !== entry.color
+      || mark.alpha !== 1
+      || mark.ribbon.version !== entry.ribbonVersion
+    ) return null;
+  }
+  const prepared = prepareChunkedUnionBatch(
+    suffixMarks,
+    previous.contourCount,
+    [previous.hashA, previous.hashB, previous.hashC, previous.hashD],
+  );
+  if (!prepared) return null;
+  const previousTileLengths = new Map<number, number>();
+  for (const key of prepared.tileAssignments.keys()) {
+    previousTileLengths.set(key, data.tileIndex.get(key)?.length ?? 0);
+  }
+  if (!applyPreparedChunkedBatch(data, prepared)) return null;
+  for (const [entryIndex, mark] of suffixMarks.entries()) {
+    const bounds = polygonBounds(mark.ribbon.polygons)!;
+    const entry = data.entries[entryIndex]!;
+    entry.minimumX = Math.min(entry.minimumX, bounds.x - bounds.radiusX);
+    entry.minimumY = Math.min(entry.minimumY, bounds.y - bounds.radiusY);
+    entry.maximumX = Math.max(entry.maximumX, bounds.x + bounds.radiusX);
+    entry.maximumY = Math.max(entry.maximumY, bounds.y + bounds.radiusY);
+  }
+  const candidateView = chunkAuthorityView(data);
+  const candidate = chunkAuthorityReceipt(candidateView);
+  data.pendingCandidate = candidate;
+  chunkAuthorityData.set(candidate, candidateView);
+  chunkAuthorityPending.set(candidate, {
+    previous: receipt,
+    candidate,
+    prepared,
+    previousTileLengths,
+  });
+  return candidate;
+}
+
+export function commitStudioDryMediaUnionChunkAuthorityAppend(
+  candidate: StudioDryMediaUnionChunkAuthorityReceipt,
+): StudioDryMediaUnionChunkAuthorityReceipt | null {
+  const pending = chunkAuthorityPending.get(candidate);
+  const view = chunkAuthorityData.get(candidate);
+  const data = view?.storage;
+  if (!pending || !view || !data || data.pendingCandidate !== candidate) return null;
+  data.pendingCandidate = null;
+  data.latestAuthority = candidate;
+  chunkAuthorityPending.delete(candidate);
+  return candidate;
+}
+
+export function abortStudioDryMediaUnionChunkAuthorityAppend(
+  candidate: StudioDryMediaUnionChunkAuthorityReceipt,
+): boolean {
+  const pending = chunkAuthorityPending.get(candidate);
+  const candidateView = chunkAuthorityData.get(candidate);
+  const previousView = pending
+    ? chunkAuthorityData.get(pending.previous)
+    : null;
+  const data = candidateView?.storage;
+  if (
+    !pending
+    || !candidateView
+    || !previousView
+    || !data
+    || data.pendingCandidate !== candidate
+    || data.batches.at(-1) !== pending.prepared.batch
+  ) return false;
+  data.batches.pop();
+  for (const [key, previousLength] of pending.previousTileLengths) {
+    const index = data.tileIndex.get(key);
+    if (!index || index.length < previousLength) return false;
+    if (previousLength === 0) {
+      data.tileIndex.delete(key);
+      continue;
+    }
+    index.length = previousLength;
+    index.blocks.length = Math.ceil(previousLength / CHUNK_TILE_INDEX_BLOCK_LENGTH);
+  }
+  data.entries = snapshotChunkEntries(previousView.entries) as ChunkedUnionEntry[];
+  data.contourCount = previousView.contourCount;
+  data.coordinateCount = previousView.coordinateCount;
+  data.tileReferenceCount = previousView.tileReferenceCount;
+  data.residentByteLength = previousView.residentByteLength;
+  data.hashA = previousView.hashA;
+  data.hashB = previousView.hashB;
+  data.hashC = previousView.hashC;
+  data.hashD = previousView.hashD;
+  data.pendingCandidate = null;
+  chunkAuthorityPending.delete(candidate);
+  chunkAuthorityData.delete(candidate);
+  return true;
+}
+
+export function snapshotStudioDryMediaUnionChunkAuthority(
+  receipt: StudioDryMediaUnionChunkAuthorityReceipt,
+): readonly StudioDryMediaUnionChunkedRibbonCoverageMark[] | null {
+  const view = chunkAuthorityData.get(receipt);
+  if (!view) return null;
+  return Object.freeze(view.entries.map((entry, entryIndex) => Object.freeze({
+    x: quantize((entry.minimumX + entry.maximumX) / 2),
+    y: quantize((entry.minimumY + entry.maximumY) / 2),
+    radiusX: quantize(Math.max(0.25, (entry.maximumX - entry.minimumX) / 2)),
+    radiusY: quantize(Math.max(0.25, (entry.maximumY - entry.minimumY) / 2)),
+    angleRadians: 0,
+    alpha: 1,
+    color: entry.color,
+    ribbon: Object.freeze({
+      kind: "dry-media-union-ribbon-chunks-v2" as const,
+      version: STUDIO_DRY_MEDIA_UNION_CHUNKED_RIBBON_VERSION,
+      role: "stroke-union" as const,
+      authority: receipt,
+      entryIndex,
+      polygons: Object.freeze([]) as readonly [],
+    }),
+  })));
+}
+
+function locateChunkedContour(
+  data: Pick<ChunkedUnionAuthorityData, "batches">,
+  contourId: number,
+): Readonly<{ batch: ChunkedUnionBatch; localIndex: number }> | null {
+  let minimum = 0;
+  let maximum = data.batches.length - 1;
+  while (minimum <= maximum) {
+    const middle = (minimum + maximum) >>> 1;
+    const batch = data.batches[middle]!;
+    if (contourId < batch.firstContourId) {
+      maximum = middle - 1;
+    } else if (contourId >= batch.firstContourId + batch.offsets.length) {
+      minimum = middle + 1;
+    } else {
+      return { batch, localIndex: contourId - batch.firstContourId };
+    }
+  }
+  return null;
+}
+
+function chunkBoundsIntersect(
+  batch: ChunkedUnionBatch,
+  localIndex: number,
+  bounds: StudioDryMediaUnionChunkedBounds,
+): boolean {
+  const offset = localIndex * 4;
+  return batch.bounds[offset]! <= bounds.maximumX
+    && batch.bounds[offset + 1]! <= bounds.maximumY
+    && batch.bounds[offset + 2]! >= bounds.minimumX
+    && batch.bounds[offset + 3]! >= bounds.minimumY;
+}
+
+function appendChunkedContourToPath(
+  target: StudioDryMediaUnionChunkedPathTarget,
+  batch: ChunkedUnionBatch,
+  localIndex: number,
+): void {
+  const offset = batch.offsets[localIndex]!;
+  const length = batch.lengths[localIndex]!;
+  target.moveTo(batch.coordinates[offset]!, batch.coordinates[offset + 1]!);
+  for (let index = 2; index < length; index += 2) {
+    target.lineTo(
+      batch.coordinates[offset + index]!,
+      batch.coordinates[offset + index + 1]!,
+    );
+  }
+  target.closePath();
+}
+
+export function appendStudioDryMediaUnionChunkedPath(
+  target: StudioDryMediaUnionChunkedPathTarget,
+  ribbon: StudioDryMediaUnionChunkedRibbonPolygon,
+  options: Readonly<{
+    bounds?: StudioDryMediaUnionChunkedBounds;
+    maximumContours?: number;
+  }> = {},
+): StudioDryMediaUnionChunkedPathResult {
+  const view = chunkAuthorityData.get(ribbon.authority);
+  if (!view) {
+    return Object.freeze({
+      status: "rejected",
+      reason: "stale-authority",
+      contourCount: 0,
+    });
+  }
+  if (
+    !Number.isSafeInteger(ribbon.entryIndex)
+    || ribbon.entryIndex < 0
+    || ribbon.entryIndex >= view.entries.length
+  ) {
+    return Object.freeze({
+      status: "rejected",
+      reason: "invalid-entry",
+      contourCount: 0,
+    });
+  }
+  const maximumContours = Number.isFinite(options.maximumContours)
+    ? Math.max(0, Math.floor(options.maximumContours!))
+    : Number.POSITIVE_INFINITY;
+  let contourCount = 0;
+  const appendLocated = (batch: ChunkedUnionBatch, localIndex: number): boolean => {
+    if (
+      batch.entryIndexes[localIndex] !== ribbon.entryIndex
+      || (options.bounds && !chunkBoundsIntersect(batch, localIndex, options.bounds))
+    ) return true;
+    contourCount += 1;
+    if (contourCount > maximumContours) return false;
+    appendChunkedContourToPath(target, batch, localIndex);
+    return true;
+  };
+
+  if (!options.bounds) {
+    for (const batch of view.storage.batches) {
+      for (let localIndex = 0; localIndex < batch.offsets.length; localIndex += 1) {
+        if (batch.firstContourId + localIndex >= view.contourCount) break;
+        if (!appendLocated(batch, localIndex)) {
+          return Object.freeze({
+            status: "rejected",
+            reason: "contour-work-budget",
+            contourCount,
+          });
+        }
+      }
+    }
+    return Object.freeze({ status: "appended", contourCount });
+  }
+
+  const data = view.storage;
+  data.visitGeneration = data.visitGeneration >= 0xffff_fffe
+    ? 1
+    : data.visitGeneration + 1;
+  if (data.visitGeneration === 1) {
+    for (const batch of data.batches) batch.visitStamps.fill(0);
+  }
+  const generation = data.visitGeneration;
+  const candidateIds: number[] = [];
+  const minimumTileX = Math.floor(
+    options.bounds.minimumX / STUDIO_DRY_MEDIA_UNION_CHUNK_DOCUMENT_TILE_SIZE,
+  );
+  const minimumTileY = Math.floor(
+    options.bounds.minimumY / STUDIO_DRY_MEDIA_UNION_CHUNK_DOCUMENT_TILE_SIZE,
+  );
+  const maximumTileX = Math.floor(
+    options.bounds.maximumX / STUDIO_DRY_MEDIA_UNION_CHUNK_DOCUMENT_TILE_SIZE,
+  );
+  const maximumTileY = Math.floor(
+    options.bounds.maximumY / STUDIO_DRY_MEDIA_UNION_CHUNK_DOCUMENT_TILE_SIZE,
+  );
+  for (let tileY = minimumTileY; tileY <= maximumTileY; tileY += 1) {
+    for (let tileX = minimumTileX; tileX <= maximumTileX; tileX += 1) {
+      const key = chunkTileKey(tileX, tileY);
+      if (key === null) continue;
+      const index = data.tileIndex.get(key);
+      if (!index) continue;
+      for (let reference = 0; reference < index.length; reference += 1) {
+        const block = index.blocks[
+          Math.floor(reference / CHUNK_TILE_INDEX_BLOCK_LENGTH)
+        ]!;
+        const contourId = block[reference % CHUNK_TILE_INDEX_BLOCK_LENGTH]!;
+        if (contourId >= view.contourCount) continue;
+        const located = locateChunkedContour(data, contourId);
+        if (!located) continue;
+        if (located.batch.visitStamps[located.localIndex] === generation) continue;
+        located.batch.visitStamps[located.localIndex] = generation;
+        if (
+          located.batch.entryIndexes[located.localIndex] !== ribbon.entryIndex
+          || !chunkBoundsIntersect(located.batch, located.localIndex, options.bounds)
+        ) continue;
+        candidateIds.push(contourId);
+        if (candidateIds.length > maximumContours) {
+          return Object.freeze({
+            status: "rejected",
+            reason: "contour-work-budget",
+            contourCount: candidateIds.length,
+          });
+        }
+      }
+    }
+  }
+  candidateIds.sort((left, right) => left - right);
+  for (const contourId of candidateIds) {
+    const located = locateChunkedContour(data, contourId);
+    if (!located || !appendLocated(located.batch, located.localIndex)) {
+      return Object.freeze({
+        status: "rejected",
+        reason: "contour-work-budget",
+        contourCount,
+      });
+    }
+  }
+  return Object.freeze({ status: "appended", contourCount });
+}
+
+export function inspectStudioDryMediaUnionChunkAuthority(
+  receipt: StudioDryMediaUnionChunkAuthorityReceipt,
+): StudioDryMediaUnionChunkAuthorityReceipt | null {
+  const data = chunkAuthorityData.get(receipt);
+  if (!data) return null;
+  return receipt.contract === CHUNK_AUTHORITY_CONTRACT
+      && receipt.version === CHUNK_AUTHORITY_VERSION
+      && receipt.entryCount === data.entries.length
+      && receipt.contourCount === data.contourCount
+      && receipt.coordinateCount === data.coordinateCount
+      && receipt.tileReferenceCount === data.tileReferenceCount
+      && receipt.residentByteLength === data.residentByteLength
+      && receipt.estimatedByteLength === data.residentByteLength
+      && receipt.geometryDigest === chunkGeometryDigest(data)
+    ? receipt
+    : null;
 }

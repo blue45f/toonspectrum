@@ -5,6 +5,8 @@ import {
   STUDIO_BRUSH_DYNAMICS_PRESETS,
   STUDIO_BRUSH_DYNAMICS_PROPERTY_LIMITS,
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
+  STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_DIGEST,
+  STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_VERSION,
   normalizeStudioBrushDynamicsSample,
   normalizeStudioBrushDynamicsSettings,
   planNormalizedStudioDynamicBrushDabs,
@@ -15,6 +17,7 @@ import {
   studioBrushDynamicsPresetSettings,
   studioBrushDynamicsSettingsForBrushId,
   studioBrushDynamicsSettingsEqual,
+  studioDryMediaUnionComposableProgramPin,
   studioBrushTaperFactors,
   type StudioBrushDynamicsRecipe,
   type StudioBrushDynamicsSettings,
@@ -1121,6 +1124,34 @@ describe("studio dynamic brush arc-length dab planner", () => {
       ...legacy,
       depositPipeline: "future-or-corrupt-pipeline",
     })).toBe(canonical);
+  });
+
+  it("pins v3 dry-media compositing explicitly while absent snapshots remain legacy v2", () => {
+    const legacy = normalizeStudioBrushDynamicsSettings({ seed: 17 });
+    expect(legacy.dryMediaUnionProgram).toBeUndefined();
+    expect(serializeStudioBrushDynamicsSettingsCanonical(legacy))
+      .not.toContain("dryMediaUnionProgram");
+
+    const pin = studioDryMediaUnionComposableProgramPin();
+    const pinned = normalizeStudioBrushDynamicsSettings({
+      seed: 17,
+      dryMediaUnionProgram: pin,
+    });
+    expect(pinned.dryMediaUnionProgram).toEqual({
+      version: STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_VERSION,
+      programDigest: STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_DIGEST,
+    });
+    expect(JSON.parse(serializeStudioBrushDynamicsSettingsCanonical(pinned)))
+      .toMatchObject({ dryMediaUnionProgram: pin });
+    expect(() => normalizeStudioBrushDynamicsSettings({
+      dryMediaUnionProgram: {
+        version: STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_VERSION,
+        programDigest: "0".repeat(64),
+      },
+    })).toThrow(/Unsupported dry-media union program pin/u);
+    expect(() => normalizeStudioBrushDynamicsSettings({
+      dryMediaUnionProgram: { ...pin, extra: true },
+    })).toThrow(/Unsupported dry-media union program pin/u);
   });
 
   it("round-trips enabled dual brush fields through normalization, JSON and the planner", () => {
