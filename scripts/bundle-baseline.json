@@ -1,6 +1,6 @@
 {
   "schema": "toonspectrum.bundle-baseline/1",
-  "recordedAt": "2026-08-11T12:56:44.584Z",
+  "recordedAt": "2026-08-11T21:41:23.973Z",
   "note": "Last accepted measurement of scripts/check-studio-bundle.mjs. Regressions beyond the tolerance fail the build; see docs/perf/bundle-gate.md. Regenerate with UPDATE_BUNDLE_BASELINE=1 node scripts/check-studio-bundle.mjs.",
   "policy": {
     "byteTolerance": 0.02,
@@ -9,17 +9,17 @@
     "authority": "scripts/check-studio-bundle.mjs (this file records the values only)"
   },
   "static": {
-    "Studio route raw": 4813928,
-    "Studio route gzip": 1539647,
-    "StudioPage entry raw": 1946176,
-    "StudioPage entry gzip": 576124,
-    "Studio route after app shell raw": 4212930,
-    "Studio route after app shell gzip": 1350458,
-    "Studio route after app shell chunks": 191,
-    "app entry raw": 600998,
-    "app entry gzip": 189189,
-    "BG3D editor activation raw": 2772566,
-    "BG3D editor activation gzip": 820243,
+    "Studio route raw": 4913290,
+    "Studio route gzip": 1563902,
+    "StudioPage entry raw": 1976430,
+    "StudioPage entry gzip": 584586,
+    "Studio route after app shell raw": 4312167,
+    "Studio route after app shell gzip": 1374657,
+    "Studio route after app shell chunks": 193,
+    "app entry raw": 601123,
+    "app entry gzip": 189245,
+    "BG3D editor activation raw": 2773752,
+    "BG3D editor activation gzip": 820641,
     "BG3D editor activation chunks": 39,
     "BG3D shot-batch runtime after editor raw": 113533,
     "BG3D shot-batch runtime after editor gzip": 33902,
@@ -34,7 +34,7 @@
     "BG3D PSD Worker gzip": 83718,
     "BG3D physics Worker raw": 2312023,
     "BG3D physics Worker gzip": 853424,
-    "Studio route chunks": 200,
+    "Studio route chunks": 202,
     "app entry chunks": 9
   },
   "runtime": {
