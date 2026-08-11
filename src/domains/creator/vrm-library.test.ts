@@ -123,15 +123,15 @@ describe("VRM library helpers", () => {
     expect(names.join(" ")).not.toMatch(/샘플|아바타|Avatar|VRoid/i);
   });
 
-  it("bundles 88 selectable sample characters with unique ids and local /vrm/ urls", () => {
-    expect(SAMPLE_VRMS).toHaveLength(88);
+  it("bundles 89 selectable sample characters with unique ids and local /vrm/ urls", () => {
+    expect(SAMPLE_VRMS).toHaveLength(89);
 
     const ids = SAMPLE_VRMS.map((sample) => sample.id);
     expect(new Set(ids).size).toBe(ids.length);
 
     for (const sample of SAMPLE_VRMS) {
       expect(sample.url, `${sample.id} url`).toMatch(/^\/vrm\/[A-Za-z0-9_.-]+\.vrm$/);
-      expect(sample.id, `${sample.id} id format`).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/);
+      expect(sample.id, `${sample.id} id format`).toMatch(/^[a-z0-9]+([_.-][a-z0-9]+)*$/);
     }
 
     const urls = SAMPLE_VRMS.map((sample) => sample.url);

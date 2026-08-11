@@ -228,6 +228,7 @@ export const SAMPLE_VRMS: SampleVrm[] = [
   { id: "cosmic-bot", name: "코스믹봇 (로봇)", url: "/vrm/CosmicBot.vrm" },
   { id: "old-moustache", name: "올드무스타치 (할아버지)", url: "/vrm/OldMoustache.vrm" },
   { id: "eugenia", name: "유제니아 (할머니)", url: "/vrm/Eugenia.vrm" },
+  { id: "cyber_agent_zero", name: "사이버 에이전트 제로 (블렌더)", url: "/vrm/cyber_agent_zero.vrm" },
 ];
 export const SAMPLE_VRM_ENTRIES: VrmLibraryEntry[] = SAMPLE_VRMS.map((s) => ({
   id: s.id,

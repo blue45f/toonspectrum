@@ -97,7 +97,7 @@ describe("studio-background-3d-scene-templates", () => {
     for (const t of BG_SCENE_TEMPLATES) {
       for (const placement of t.placements) {
         if (placement.type !== "composite") continue;
-        expect(VALID_PRESET_IDS.has(placement.presetId)).toBe(true);
+        expect(VALID_PRESET_IDS.has(placement.presetId), `${t.id} has invalid presetId: ${placement.presetId}`).toBe(true);
         expect(isFiniteTriple(placement.anchor)).toBe(true);
         if (placement.yaw !== undefined) expect(Number.isFinite(placement.yaw)).toBe(true);
       }
