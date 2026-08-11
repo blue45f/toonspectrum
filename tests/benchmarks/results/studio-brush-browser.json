@@ -4,16 +4,16 @@
   "command": "pnpm run verify:studio-brushes",
   "status": "pass",
   "catalog": {
-    "total": 247,
-    "core": 87,
+    "total": 253,
+    "core": 93,
     "pro": 160,
-    "paint": 245,
+    "paint": 251,
     "erase": 2
   },
   "desktop": {
-    "selectedAndRendered": 247,
-    "undoPassed": 247,
-    "redoPassed": 247,
+    "selectedAndRendered": 253,
+    "undoPassed": 253,
+    "redoPassed": 253,
     "errorCount": 0,
     "erasers": {
       "standard-eraser": {
@@ -29,15 +29,15 @@
     }
   },
   "longRouteCore": {
-    "passed": 87,
-    "total": 87,
+    "passed": 93,
+    "total": 93,
     "visibleSegmentsPerTool": 6,
     "totalSegmentsPerTool": 6,
     "representativePersistedPathDistancePx": 392.7396173371252,
-    "undoPassed": 87,
+    "undoPassed": 93,
     "continuousPolicyFailures": 0,
     "qualityPolicyCounts": {
-      "strict-continuous": 67,
+      "strict-continuous": 73,
       "soft-wet-continuous": 12,
       "record-only-discrete": 8
     },
@@ -50,7 +50,7 @@
     "errorCount": 0
   },
   "mobile": {
-    "paintSelections": 245,
+    "paintSelections": 251,
     "eraserSelections": 2,
     "interactiveTargets": 506,
     "minimumTargetWidthPx": 44,

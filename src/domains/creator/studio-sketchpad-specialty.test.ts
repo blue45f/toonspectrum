@@ -44,9 +44,9 @@ describe("sketchpad specialty planners", () => {
       expect(classified.status, id).toBe("classified");
     }
     expect(STUDIO_BRUSH_CATALOG_COUNTS).toEqual({
-      core: 87,
+      core: 93,
       pro: 160,
-      total: 247,
+      total: 253,
     });
   });
 

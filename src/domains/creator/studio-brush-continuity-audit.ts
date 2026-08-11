@@ -120,6 +120,12 @@ const INTENTIONALLY_DISCONTINUOUS_CATALOG_IDS = new Set([
   "web-hatch-color",
   "web-dot-tone",
   "web-gravity-drip",
+  "web-kaleido-ink",
+  "web-fur-strand",
+  "web-contour-double",
+  "web-radial-burst",
+  "web-mirror-ink",
+  "web-grid-ink",
 ]);
 
 const INTERIOR_START = 0.08;

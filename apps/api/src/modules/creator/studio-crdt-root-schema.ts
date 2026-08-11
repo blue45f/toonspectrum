@@ -190,6 +190,9 @@ const STUDIO_CRDT_KNOWN_INCOMPATIBLE_LAYERED_FLOW_BRUSH_IDS = new Set([
   "web-scatter-stamp",
   "web-blend-softener",
   "web-dot-tone",
+  "web-kaleido-ink",
+  "web-fur-strand",
+  "web-radial-burst",
 ]);
 const STUDIO_CRDT_BOUNDED_FLOW_DYNAMIC_BRUSH_IDS = new Set([
   "ink-particle",
@@ -223,6 +226,12 @@ const STUDIO_CRDT_BOUNDED_FLOW_DYNAMIC_BRUSH_IDS = new Set([
   "web-cel-flat",
   "web-blend-softener",
   "web-dot-tone",
+  "web-kaleido-ink",
+  "web-fur-strand",
+  "web-contour-double",
+  "web-radial-burst",
+  "web-mirror-ink",
+  "web-grid-ink",
 ]);
 const STUDIO_CRDT_SCENE_INDEX_ROOT = "scene-elements";
 const STUDIO_CRDT_PAGE_INDEX_ROOT = "studio-pages";
