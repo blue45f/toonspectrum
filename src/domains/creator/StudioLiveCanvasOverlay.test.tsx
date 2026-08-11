@@ -1078,6 +1078,35 @@ describe("StudioLiveCanvasOverlay", () => {
     expect(html).toContain('aria-pressed="true"');
   });
 
+  it("shows an active lock chip only when edit leases are present", () => {
+    const withLocks = renderToStaticMarkup(
+      <StudioLivePresenceDock
+        connected
+        alwaysOn
+        peers={[]}
+        activeLockCount={3}
+        followingSessionId={null}
+        onOpenTeam={noop}
+        onToggleFollow={noop}
+      />
+    );
+    expect(withLocks).toContain('data-studio-presence-lock-count="3"');
+    expect(withLocks).toContain("활성 편집 잠금 3개");
+
+    const withoutLocks = renderToStaticMarkup(
+      <StudioLivePresenceDock
+        connected
+        alwaysOn
+        peers={[]}
+        activeLockCount={0}
+        followingSessionId={null}
+        onOpenTeam={noop}
+        onToggleFollow={noop}
+      />
+    );
+    expect(withoutLocks).not.toContain("data-studio-presence-lock-count");
+  });
+
   it("renders always-on presence dock while connecting with zero peers", () => {
     const html = renderToStaticMarkup(
       <StudioLivePresenceDock

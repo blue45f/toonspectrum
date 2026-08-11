@@ -104,6 +104,11 @@ export interface StudioLivePresenceDockProps {
   /** Always-on collab: show while connecting/ready even with zero peers. */
   alwaysOn?: boolean;
   peers: readonly StudioLivePeer[];
+  /**
+   * Active page/element edit leases currently held in the room.
+   * Zero hides the lock chip so solo sessions stay quiet.
+   */
+  activeLockCount?: number;
   followingSessionId: string | null;
   onOpenTeam: () => void;
   onToggleFollow: (sessionId: string) => void;
@@ -1187,6 +1192,7 @@ export function StudioLivePresenceDock({
   operationSyncReady = false,
   alwaysOn = false,
   peers,
+  activeLockCount = 0,
   followingSessionId,
   onOpenTeam,
   onToggleFollow,
@@ -1195,6 +1201,10 @@ export function StudioLivePresenceDock({
 }: StudioLivePresenceDockProps) {
   // Always-on collab chrome: parent passes alwaysOn while connecting/ready (presence strip).
   if (!alwaysOn && !connected && peers.length === 0) return null;
+  const lockCount =
+    Number.isFinite(activeLockCount) && activeLockCount > 0
+      ? Math.floor(activeLockCount)
+      : 0;
   const visibleCount = studioPresenceVisiblePeerCount(peers.length, 5);
   const visiblePeers = peers.slice(0, visibleCount);
   const mobileHiddenPeerCount = Math.max(0, peers.length - 2);
@@ -1263,6 +1273,20 @@ export function StudioLivePresenceDock({
       </button>
 
       {voiceControls}
+
+      {lockCount > 0 ? (
+        <button
+          type="button"
+          data-studio-presence-lock-count={lockCount}
+          aria-label={`활성 편집 잠금 ${lockCount}개, 팀 작업 공간 열기`}
+          title={`활성 편집 잠금 ${lockCount}개 · 레이어 소유권은 네비게이터 배지로 표시됩니다`}
+          className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1 rounded-full border border-accent/35 bg-accent-soft px-2.5 text-[0.68rem] font-bold tabular-nums text-accent transition-colors hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          onClick={onOpenTeam}
+        >
+          <ShieldCheck size={14} strokeWidth={2} aria-hidden />
+          <span className="max-[411px]:hidden">{lockCount}</span>
+        </button>
+      ) : null}
 
       <div
         className="flex items-center -space-x-1.5 pl-0.5 max-[411px]:hidden"
@@ -1357,9 +1381,11 @@ export function StudioLivePresenceDockConnected({
   onFollowPage,
 }: StudioLivePresenceDockConnectedProps) {
   const live = useStudioLiveCollaboration();
-  const { availability, peers, sync } = live;
+  const { availability, peers, locks, sync } = live;
   const followedPeer = peers.find((peer) => peer.sessionId === followingSessionId) ?? null;
   const alwaysOn = studioLivePresenceAlwaysVisible(availability, peers.length);
+  // Room lock snapshots are already lease-pruned; avoid Date.now() during render (React purity).
+  const activeLockCount = locks.length;
 
   useEffect(() => {
     if (followedPeer?.pageId) onFollowPage(followedPeer.pageId);
@@ -1377,6 +1403,7 @@ export function StudioLivePresenceDockConnected({
       operationSyncReady={operationSyncReady}
       alwaysOn
       peers={peers}
+      activeLockCount={activeLockCount}
       followingSessionId={followingSessionId}
       onOpenTeam={onOpenTeam}
       onToggleFollow={onToggleFollow}
