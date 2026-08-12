@@ -7,6 +7,7 @@ import {
   BUNDLED_VRM_RIGHTS_BLOCKS,
   bundledVrmRightsBlockById,
   createUploadedVrmRecord,
+  extractEmbeddedVrmThumbnailBytes,
   getDeletableModelIds,
   isBundledVrmRightsBlocked,
   SAMPLE_VRM_ENTRIES,
@@ -266,5 +267,16 @@ describe("VRM library helpers", () => {
     ]);
 
     expect(deletableIds).toEqual(["upload-1"]);
+  });
+
+  it("extracts embedded PNG/JPEG thumbnails or main texture bytes from sample VRM GLB files", () => {
+    const filePath = join(process.cwd(), "public/vrm/AvatarSample_A.vrm");
+    if (!existsSync(filePath)) return;
+    const buffer = readFileSync(filePath);
+    const result = extractEmbeddedVrmThumbnailBytes(buffer);
+
+    expect(result).not.toBeNull();
+    expect(result?.mimeType).toMatch(/^image\/(png|jpeg|webp)$/);
+    expect(result?.bytes.byteLength).toBeGreaterThan(100);
   });
 });

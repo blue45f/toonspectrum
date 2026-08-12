@@ -368,6 +368,92 @@ export function validateVrmGlbBytes(input: ArrayBuffer | Uint8Array): ValidatedV
   throw new TypeError("GLB에 VRM 확장(VRM 또는 VRMC_vrm)이 없습니다.");
 }
 
+/**
+ * VRM GLB 파일 헤더 및 JSON/BIN 청크에서 내장 썸네일 이미지(PNG/JPEG/WebP) 또는
+ * 메인 텍스처 패스 바이트를 파싱하여 추출한다.
+ */
+export function extractEmbeddedVrmThumbnailBytes(
+  input: ArrayBuffer | Uint8Array,
+): StudioVrmThumbnailAsset | null {
+  try {
+    const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
+    if (bytes.byteLength < GLB_HEADER_BYTES + GLB_CHUNK_HEADER_BYTES) return null;
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    if (
+      view.getUint32(0, true) !== GLB_MAGIC ||
+      view.getUint32(4, true) !== GLB_VERSION
+    ) return null;
+
+    const offset = GLB_HEADER_BYTES;
+    const jsonLength = view.getUint32(offset, true);
+    const jsonType = view.getUint32(offset + 4, true);
+    if (
+      jsonType !== GLB_JSON_CHUNK_TYPE ||
+      jsonLength === 0 ||
+      jsonLength > MAX_VRM_JSON_CHUNK_BYTES
+    ) return null;
+
+    const payloadStart = offset + GLB_CHUNK_HEADER_BYTES;
+    const payloadEnd = payloadStart + jsonLength;
+    if (payloadEnd > bytes.byteLength) return null;
+
+    const jsonText = new TextDecoder("utf-8").decode(bytes.subarray(payloadStart, payloadEnd));
+    const json = JSON.parse(jsonText.trim());
+    if (!json || typeof json !== "object" || Array.isArray(json)) return null;
+
+    const binPayloadStart = payloadEnd + GLB_CHUNK_HEADER_BYTES;
+    if (binPayloadStart > bytes.byteLength) return null;
+    const binPayload = bytes.subarray(binPayloadStart);
+
+    let imageIndex: number | null = null;
+    const extensions = (json as { extensions?: Record<string, unknown> }).extensions;
+    if (extensions && typeof extensions === "object") {
+      const vrm1Meta = (extensions.VRMC_vrm as { meta?: { thumbnailImage?: unknown } } | undefined)?.meta;
+      if (typeof vrm1Meta?.thumbnailImage === "number") {
+        imageIndex = vrm1Meta.thumbnailImage;
+      } else {
+        const vrm0Meta = (extensions.VRM as { meta?: { texture?: unknown } } | undefined)?.meta;
+        if (typeof vrm0Meta?.texture === "number" && Array.isArray((json as { textures?: unknown[] }).textures)) {
+          const textures = (json as { textures: Array<{ source?: unknown }> }).textures;
+          const source = textures[vrm0Meta.texture]?.source;
+          if (typeof source === "number") imageIndex = source;
+        }
+      }
+    }
+
+    const images = (json as { images?: Array<{ mimeType?: unknown; bufferView?: unknown }> }).images;
+    if (imageIndex === null && Array.isArray(images) && images.length > 0) {
+      // 내장 VRM 메타 썸네일 링크가 없는 모델은 GLB 내의 첫 메인 텍스처 이미지를 미리보기로 사용한다.
+      imageIndex = 0;
+    }
+
+    if (imageIndex === null || !Array.isArray(images)) return null;
+    const imageInfo = images[imageIndex];
+    if (!imageInfo || typeof imageInfo.bufferView !== "number") return null;
+
+    const bufferViews = (json as { bufferViews?: Array<{ byteOffset?: unknown; byteLength?: unknown }> }).bufferViews;
+    if (!Array.isArray(bufferViews)) return null;
+    const bufferView = bufferViews[imageInfo.bufferView];
+    if (!bufferView || typeof bufferView.byteLength !== "number") return null;
+
+    const byteOffset = typeof bufferView.byteOffset === "number" ? bufferView.byteOffset : 0;
+    const byteLength = bufferView.byteLength;
+    if (byteOffset + byteLength > binPayload.byteLength) return null;
+
+    const imgBytes = binPayload.subarray(byteOffset, byteOffset + byteLength);
+    const rawMime = typeof imageInfo.mimeType === "string" ? imageInfo.mimeType.toLowerCase() : "image/png";
+    const mimeType: StudioVrmThumbnailAsset["mimeType"] = rawMime.includes("jpeg") || rawMime.includes("jpg")
+      ? "image/jpeg"
+      : rawMime.includes("webp")
+        ? "image/webp"
+        : "image/png";
+
+    return { mimeType, bytes: imgBytes };
+  } catch {
+    return null;
+  }
+}
+
 let blobWorkTail: Promise<void> = Promise.resolve();
 
 function runSerializedBlobWork<T>(work: () => Promise<T>): Promise<T> {
@@ -1048,11 +1134,31 @@ export async function hydrateVrmLibraryThumbnailWindow(
         }
         totalBytes += asset.bytes.byteLength;
         thumbnail = thumbnailToDataUrl(asset);
+      } else if (entry.source === "sample") {
+        const url = sampleVrmUrl(entry.id);
+        if (url && typeof fetch === "function") {
+          try {
+            const response = await fetch(url, { signal: options.signal });
+            if (response.ok) {
+              const buffer = await response.arrayBuffer();
+              const extracted = extractEmbeddedVrmThumbnailBytes(buffer);
+              if (extracted) {
+                if (extracted.bytes.byteLength <= VRM_LIBRARY_THUMBNAIL_WINDOW_MAX_BYTES - totalBytes) {
+                  totalBytes += extracted.bytes.byteLength;
+                  thumbnail = thumbnailToDataUrl(extracted);
+                  void repository.saveThumbnail(entry.id, extracted, Date.now(), options.signal).catch(() => {});
+                }
+              }
+            }
+          } catch {
+            // Ignore network errors during sample thumbnail fetch
+          }
+        }
       }
     } else {
       thumbnail = await getLegacyCachedVrmThumbnail(entry.id, legacyIndexedDb(options));
       if (thumbnail) {
-        const estimatedBytes = Math.ceil(thumbnail.length * 3 / 4);
+        const estimatedBytes = Math.ceil((thumbnail.length * 3) / 4);
         if (estimatedBytes > VRM_LIBRARY_THUMBNAIL_WINDOW_MAX_BYTES - totalBytes) {
           throw new StudioVrmAssetRepositoryError(
             "limit",
