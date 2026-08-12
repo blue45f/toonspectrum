@@ -93,4 +93,23 @@ describe("StudioPage brush quick slots SQLite product boundary", () => {
       "현재 슬롯은 이 화면에만 유지되며 저장 완료로 처리하지 않았어요.",
     );
   });
+
+  it("soft-degrades multi-tab OPFS ownership without dumping Worker lock text to setError", () => {
+    expect(studioPage).toContain("isStudioLocalDatabaseOwnershipBusyError(cause)");
+    expect(studioPage).toContain("STUDIO_BRUSH_QUICK_SLOTS_OWNERSHIP_BUSY_HINT");
+    expect(studioPage).toContain("brushSlotsOwnershipBusyAnnouncedRef");
+    const hydrateCatch = studioPage.slice(
+      studioPage.indexOf(".catch((cause) => {", studioPage.indexOf("getProductStudioBrushQuickSlotsSqliteRepository().load(")),
+      studioPage.indexOf("function commitStudioBrushSlotsMutation("),
+    );
+    expect(hydrateCatch).toContain("isStudioLocalDatabaseOwnershipBusyError(cause)");
+    expect(hydrateCatch).toContain(
+      "announceDrawingShortcutRef.current(STUDIO_BRUSH_QUICK_SLOTS_OWNERSHIP_BUSY_HINT)",
+    );
+    // Ownership busy must return before the generic setError that embeds cause.message.
+    const ownershipGuard = hydrateCatch.indexOf("isStudioLocalDatabaseOwnershipBusyError(cause)");
+    const hardError = hydrateCatch.indexOf("브러시 퀵 슬롯을 불러오지 못했어요:");
+    expect(ownershipGuard).toBeGreaterThan(0);
+    expect(hardError).toBeGreaterThan(ownershipGuard);
+  });
 });

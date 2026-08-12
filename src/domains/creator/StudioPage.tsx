@@ -867,6 +867,10 @@ import {
   type StudioLivingInkStudioState,
 } from "./studio-living-ink-studio-coordinator";
 import { studioLivingInkVectorShadowElement } from "./studio-living-ink-vector-shadow";
+import {
+  isStudioLocalDatabaseOwnershipBusyError,
+  STUDIO_BRUSH_QUICK_SLOTS_OWNERSHIP_BUSY_HINT,
+} from "./studio-local-database-ownership";
 import { localizeStudioText } from "./studio-localize-text";
 import {
   createStudioMacroSession,
@@ -8359,6 +8363,8 @@ function StudioCuttoonEditor({
   const brushSlotsMutationGenerationRef = useRef(0);
   const brushSlotsMutationTailRef = useRef<Promise<void>>(Promise.resolve());
   const brushSlotsDirtyGenerationsByScopeRef = useRef(new Map<string, number[]>());
+  /** Multi-tab OPFS ownership: announce once per mount, never dump Worker lock text to setError. */
+  const brushSlotsOwnershipBusyAnnouncedRef = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -8401,6 +8407,14 @@ function StudioCuttoonEditor({
           || brushSlotsMutationGenerationRef.current !== mutationGeneration
           || brushSlotsScopeRef.current.key !== request.key
         ) {
+          return;
+        }
+        // Two Studio tabs share one origin OPFS SAH lock. Secondary tab keeps empty/session slots.
+        if (isStudioLocalDatabaseOwnershipBusyError(cause)) {
+          if (!brushSlotsOwnershipBusyAnnouncedRef.current) {
+            brushSlotsOwnershipBusyAnnouncedRef.current = true;
+            announceDrawingShortcutRef.current(STUDIO_BRUSH_QUICK_SLOTS_OWNERSHIP_BUSY_HINT);
+          }
           return;
         }
         setError(
@@ -8532,6 +8546,14 @@ function StudioCuttoonEditor({
     );
     void operation.catch((cause) => {
       if (!editorMountedRef.current || brushSlotsScopeRef.current.key !== request.key) return;
+      if (isStudioLocalDatabaseOwnershipBusyError(cause)) {
+        // Optimistic UI already updated; secondary tab cannot write OPFS — no red banner.
+        if (!brushSlotsOwnershipBusyAnnouncedRef.current) {
+          brushSlotsOwnershipBusyAnnouncedRef.current = true;
+          announceDrawingShortcut(STUDIO_BRUSH_QUICK_SLOTS_OWNERSHIP_BUSY_HINT);
+        }
+        return;
+      }
       const message = cause && typeof cause === "object" && "code" in cause
         && cause.code === "conflict"
         ? "다른 탭에서 브러시 슬롯이 다시 변경되어 현재 슬롯은 안전하게 유지했지만 저장하지 못했어요. 다시 시도해주세요."
