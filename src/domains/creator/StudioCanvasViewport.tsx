@@ -1,7 +1,7 @@
 import { BookOpen, CircleHelp, Clapperboard, Eraser, FlipHorizontal2, Grid3X3, ImagePlus, Keyboard, Lock, Maximize2, MessageSquare, Minimize2, Minus, Mouse, MousePointer2, PaintBucket, Pencil, PenTool, Plus, Shapes, Sparkles, Square, Unlock, Wind } from "lucide-react";
 import { Fragment, Profiler, Suspense, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type SetStateAction } from "react";
 import { createPortal } from "react-dom";
-import { Stage, Layer, Rect, Group, Circle as KCircle, Transformer, Shape, Text } from "react-konva/lib/ReactKonvaCore";
+import { Stage, Layer, Rect, Group, Circle as KCircle, Line, Transformer, Shape, Text } from "react-konva/lib/ReactKonvaCore";
 // Image is not required — paper grain uses fillPatternImage on Rect.
 
 import { ClipMaskGroup } from "./ClipMaskGroup";
@@ -808,6 +808,8 @@ export interface StudioCanvasViewportProps {
   liquifyArmed: boolean;
   liquifyRadius: number;
   smudgeCursorRef: import("react").RefObject<import("konva/lib/shapes/Circle").Circle | null>;
+  /** Live paint-retouch stroke trail (smudge / dodge-burn / wet-mix); mutated outside React. */
+  paintRetouchStrokeLineRef: import("react").RefObject<import("konva/lib/shapes/Line").Line | null>;
   smudgeRadius: number;
   sourceHydrationPending: boolean;
   stabilizer: number;
@@ -1104,6 +1106,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
   liquifyArmed,
   liquifyRadius,
   smudgeCursorRef,
+  paintRetouchStrokeLineRef,
   smudgeRadius,
   sourceHydrationPending,
   stabilizer,
@@ -3727,6 +3730,22 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
               ) : null}
             {!isExporting && (smudgeArmed || liquifyArmed || dodgeBurnArmed || wetMixArmed) && (
               <Layer listening={false}>
+                <Line
+                  ref={paintRetouchStrokeLineRef}
+                  visible={false}
+                  stroke={
+                    wetMixArmed
+                      ? "rgba(45, 212, 191, 0.42)"
+                      : dodgeBurnArmed
+                        ? "rgba(234, 179, 8, 0.42)"
+                        : liquifyArmed
+                          ? "rgba(251, 146, 60, 0.42)"
+                          : "rgba(124, 92, 255, 0.42)"
+                  }
+                  lineCap="round"
+                  lineJoin="round"
+                  listening={false}
+                />
                 <KCircle
                   ref={smudgeCursorRef}
                   visible={false}

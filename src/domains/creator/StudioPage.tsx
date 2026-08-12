@@ -1223,6 +1223,10 @@ import {
   projectStudioRasterOverlayElements,
   resolveStudioRasterHandoffProjection,
 } from "./studio-raster-publication-projection";
+import {
+  appendStudioRasterRetouchDragPoint,
+  thinStudioRasterRetouchPointsForApply,
+} from "./studio-raster-retouch-stroke-sampling";
 import { resolveStudioRasterToolResumePlan } from "./studio-raster-tool-resume-plan";
 import { studioRasterVisibleDocumentRectFromViewport } from "./studio-raster-visible-rect";
 import {
@@ -16193,8 +16197,62 @@ function StudioCuttoonEditor({
   const [smudgeStrength, setSmudgeStrength] = useState(SMUDGE_STRENGTH_DEFAULT); // %
   const [smudgeBusy, setSmudgeBusy] = useState(false);
   const smudgeAbortRef = useRef<AbortController | null>(null);
-  const smudgeDragRef = useRef<{ elId: string; frame: SelectionFrame; points: SelPoint[] } | null>(null);
+  const smudgeDragRef = useRef<{
+    elId: string;
+    frame: SelectionFrame;
+    points: SelPoint[];
+    radiusNorm: number;
+  } | null>(null);
   const smudgeCursorRef = useRef<Konva.Circle>(null);
+  /** Shared live stroke trail for smudge / dodge-burn / wet-mix (ref-mutated, no React re-render). */
+  const paintRetouchStrokeLineRef = useRef<Konva.Line>(null);
+  const paintRetouchStrokeRafRef = useRef<number | null>(null);
+  const pendingPaintRetouchStrokePreviewRef = useRef<{
+    frame: SelectionFrame;
+    radiusNorm: number;
+    points: SelPoint[];
+  } | null>(null);
+  const schedulePaintRetouchStrokePreview = (session: {
+    frame: SelectionFrame;
+    radiusNorm: number;
+    points: SelPoint[];
+  }) => {
+    pendingPaintRetouchStrokePreviewRef.current = session;
+    if (paintRetouchStrokeRafRef.current !== null) return;
+    paintRetouchStrokeRafRef.current = globalThis.requestAnimationFrame(() => {
+      paintRetouchStrokeRafRef.current = null;
+      const pending = pendingPaintRetouchStrokePreviewRef.current;
+      const line = paintRetouchStrokeLineRef.current;
+      if (!pending || !line) return;
+      const tailStart = Math.max(0, pending.points.length - 64);
+      const flat: number[] = [];
+      for (let index = tailStart; index < pending.points.length; index += 1) {
+        const point = pending.points[index]!;
+        flat.push(
+          pending.frame.x + point.x * pending.frame.width,
+          pending.frame.y + point.y * pending.frame.height,
+        );
+      }
+      if (flat.length === 2) flat.push(flat[0]!, flat[1]!);
+      line.points(flat);
+      line.strokeWidth(2 * pending.radiusNorm * pending.frame.width);
+      line.visible(flat.length > 0);
+      line.getLayer()?.batchDraw();
+    });
+  };
+  const clearPaintRetouchStrokePreview = () => {
+    pendingPaintRetouchStrokePreviewRef.current = null;
+    if (paintRetouchStrokeRafRef.current !== null) {
+      globalThis.cancelAnimationFrame(paintRetouchStrokeRafRef.current);
+      paintRetouchStrokeRafRef.current = null;
+    }
+    const line = paintRetouchStrokeLineRef.current;
+    if (line) {
+      line.points([]);
+      line.visible(false);
+      line.getLayer()?.batchDraw();
+    }
+  };
   // 닷지/번/스펀지 브러시 — 스머지와 동일한 armed 픽셀 툴 패턴(설정값은 disarm 후에도 유지).
   const [dodgeBurnActive, setDodgeBurnActive] = useState(false);
   const [dodgeBurnMode, setDodgeBurnMode] = useState<DodgeBurnMode>("dodge");
@@ -16205,7 +16263,12 @@ function StudioCuttoonEditor({
   const [dodgeBurnExposure, setDodgeBurnExposure] = useState(DODGE_BURN_EXPOSURE_DEFAULT); // %
   const [dodgeBurnBusy, setDodgeBurnBusy] = useState(false);
   const dodgeBurnAbortRef = useRef<AbortController | null>(null);
-  const dodgeBurnDragRef = useRef<{ elId: string; frame: SelectionFrame; points: SelPoint[] } | null>(null);
+  const dodgeBurnDragRef = useRef<{
+    elId: string;
+    frame: SelectionFrame;
+    points: SelPoint[];
+    radiusNorm: number;
+  } | null>(null);
   // 혼색 브러시(CSP 색혼합) — 바닥색을 묻혀가며 안료를 얹는 armed 픽셀 툴(설정값은 disarm 후 유지).
   const [wetMixActive, setWetMixActive] = useState(false);
   const [wetMixRadius, setWetMixRadius] = useState(WET_MIX_RADIUS_DEFAULT);
@@ -16215,7 +16278,12 @@ function StudioCuttoonEditor({
   const [wetMixHardness, setWetMixHardness] = useState(WET_MIX_HARDNESS_DEFAULT); // 0..1
   const [wetMixBusy, setWetMixBusy] = useState(false);
   const wetMixAbortRef = useRef<AbortController | null>(null);
-  const wetMixDragRef = useRef<{ elId: string; frame: SelectionFrame; points: SelPoint[] } | null>(null);
+  const wetMixDragRef = useRef<{
+    elId: string;
+    frame: SelectionFrame;
+    points: SelPoint[];
+    radiusNorm: number;
+  } | null>(null);
   useEffect(() => () => {
     smudgeAbortRef.current?.abort();
     smudgeAbortRef.current = null;
@@ -22550,6 +22618,10 @@ const puppetWarpArmed =
     setWetMixBusy(false);
     setLiquifyBusy(false);
     setHealCloneBusy(false);
+    smudgeDragRef.current = null;
+    dodgeBurnDragRef.current = null;
+    wetMixDragRef.current = null;
+    clearPaintRetouchStrokePreview();
     cancelPixelSelectionPointerSession();
     clearPendingPixelSelectionRasterGesture();
     pixelMarqueeRasterPreparationRunIdRef.current += 1;
@@ -27055,12 +27127,16 @@ const puppetWarpArmed =
           clearHistoryBrushDragPreview();
         } else if (smudgeActive) {
           setSmudgeActive(false);
+          smudgeDragRef.current = null;
+          clearPaintRetouchStrokePreview();
         } else if (dodgeBurnActive) {
           setDodgeBurnActive(false);
           dodgeBurnDragRef.current = null;
+          clearPaintRetouchStrokePreview();
         } else if (wetMixActive) {
           setWetMixActive(false);
           wetMixDragRef.current = null;
+          clearPaintRetouchStrokePreview();
         } else if (liquifyActive) {
           setLiquifyActive(false);
           cancelLiquifyPointerSession();
@@ -33059,7 +33135,15 @@ const puppetWarpArmed =
         height: selected.height,
         rotation: selected.rotation,
       };
-      smudgeDragRef.current = { elId: selected.id, frame, points: [canvasPointToNormalized(pos.x, pos.y, frame)] };
+      const first = canvasPointToNormalized(pos.x, pos.y, frame);
+      const radiusNorm = smudgeRadius / Math.max(1, frame.width);
+      smudgeDragRef.current = {
+        elId: selected.id,
+        frame,
+        points: [first],
+        radiusNorm,
+      };
+      schedulePaintRetouchStrokePreview(smudgeDragRef.current);
       return;
     }
     // 닷지/번 무장 중: 스테이지 드래그를 보정 스트로크 좌표 누적으로 가로챈다.
@@ -33078,7 +33162,15 @@ const puppetWarpArmed =
         height: selected.height,
         rotation: selected.rotation,
       };
-      dodgeBurnDragRef.current = { elId: selected.id, frame, points: [canvasPointToNormalized(pos.x, pos.y, frame)] };
+      const first = canvasPointToNormalized(pos.x, pos.y, frame);
+      const radiusNorm = dodgeBurnRadius / Math.max(1, frame.width);
+      dodgeBurnDragRef.current = {
+        elId: selected.id,
+        frame,
+        points: [first],
+        radiusNorm,
+      };
+      schedulePaintRetouchStrokePreview(dodgeBurnDragRef.current);
       return;
     }
     // 혼색 브러시 무장 중: 스테이지 드래그를 혼색 스트로크 좌표 누적으로 가로챈다.
@@ -33097,7 +33189,15 @@ const puppetWarpArmed =
         height: selected.height,
         rotation: selected.rotation,
       };
-      wetMixDragRef.current = { elId: selected.id, frame, points: [canvasPointToNormalized(pos.x, pos.y, frame)] };
+      const first = canvasPointToNormalized(pos.x, pos.y, frame);
+      const radiusNorm = wetMixRadius / Math.max(1, frame.width);
+      wetMixDragRef.current = {
+        elId: selected.id,
+        frame,
+        points: [first],
+        radiusNorm,
+      };
+      schedulePaintRetouchStrokePreview(wetMixDragRef.current);
       return;
     }
     // 리퀴파이 — 이미지를 드래그하면 픽셀을 밀어 왜곡한다.
@@ -34345,36 +34445,39 @@ const puppetWarpArmed =
       }
       return;
     }
-    // 문지르기 드래그 중이면 좌표를 누적한다(최소 간격 미만은 스킵 — 과밀 포인트 방지).
+    // 문지르기 드래그 — 반경 기반 O(1) 샘플링 + rAF 미리보기(heal/clone과 동일 핫패스).
     if (smudgeDragRef.current) {
       const pos = e.target.getStage()?.getRelativePointerPosition();
       if (pos) {
         const session = smudgeDragRef.current;
         const next = canvasPointToNormalized(pos.x, pos.y, session.frame);
-        const last = session.points[session.points.length - 1];
-        if (!last || Math.hypot(next.x - last.x, next.y - last.y) >= 0.002) session.points.push(next);
+        if (appendStudioRasterRetouchDragPoint(session.points, next, session.radiusNorm)) {
+          schedulePaintRetouchStrokePreview(session);
+        }
       }
       return;
     }
-    // 닷지/번 드래그 중이면 좌표를 누적한다(스머지와 동일한 최소 간격 필터).
+    // 닷지/번 드래그 — 동일 샘플링/미리보기 핫패스.
     if (dodgeBurnDragRef.current) {
       const pos = e.target.getStage()?.getRelativePointerPosition();
       if (pos) {
         const session = dodgeBurnDragRef.current;
         const next = canvasPointToNormalized(pos.x, pos.y, session.frame);
-        const last = session.points[session.points.length - 1];
-        if (!last || Math.hypot(next.x - last.x, next.y - last.y) >= 0.002) session.points.push(next);
+        if (appendStudioRasterRetouchDragPoint(session.points, next, session.radiusNorm)) {
+          schedulePaintRetouchStrokePreview(session);
+        }
       }
       return;
     }
-    // 혼색 브러시 드래그 중이면 좌표를 누적한다(동일한 최소 간격 필터).
+    // 혼색 브러시 드래그 — 동일 샘플링/미리보기 핫패스.
     if (wetMixDragRef.current) {
       const pos = e.target.getStage()?.getRelativePointerPosition();
       if (pos) {
         const session = wetMixDragRef.current;
         const next = canvasPointToNormalized(pos.x, pos.y, session.frame);
-        const last = session.points[session.points.length - 1];
-        if (!last || Math.hypot(next.x - last.x, next.y - last.y) >= 0.002) session.points.push(next);
+        if (appendStudioRasterRetouchDragPoint(session.points, next, session.radiusNorm)) {
+          schedulePaintRetouchStrokePreview(session);
+        }
       }
       return;
     }
@@ -37401,21 +37504,39 @@ const puppetWarpArmed =
     if (smudgeDragRef.current) {
       const session = smudgeDragRef.current;
       smudgeDragRef.current = null;
-      if (session.points.length >= 2) void applySmudgeStroke(session.elId, session.points);
+      clearPaintRetouchStrokePreview();
+      if (session.points.length >= 2) {
+        void applySmudgeStroke(
+          session.elId,
+          thinStudioRasterRetouchPointsForApply(session.points),
+        );
+      }
       return;
     }
     // 닷지/번 드래그 종료 — 누적된 좌표로 실제 픽셀 보정을 적용한다(탭 1점도 도장 1개로 유효).
     if (dodgeBurnDragRef.current) {
       const session = dodgeBurnDragRef.current;
       dodgeBurnDragRef.current = null;
-      if (session.points.length >= 1) void applyDodgeBurnStroke(session.elId, session.points);
+      clearPaintRetouchStrokePreview();
+      if (session.points.length >= 1) {
+        void applyDodgeBurnStroke(
+          session.elId,
+          thinStudioRasterRetouchPointsForApply(session.points),
+        );
+      }
       return;
     }
     // 혼색 브러시 드래그 종료 — 누적된 좌표로 혼색 스트로크를 적용한다(탭 1점도 도장 1개).
     if (wetMixDragRef.current) {
       const session = wetMixDragRef.current;
       wetMixDragRef.current = null;
-      if (session.points.length >= 1) void applyWetMixStroke(session.elId, session.points);
+      clearPaintRetouchStrokePreview();
+      if (session.points.length >= 1) {
+        void applyWetMixStroke(
+          session.elId,
+          thinStudioRasterRetouchPointsForApply(session.points),
+        );
+      }
       return;
     }
     // 퀵 마스크 드래그 종료 — 스트로크당 1회만 마스크에 굽고 틴트 캔버스를 교체(핫패스 계약).
@@ -44938,6 +45059,7 @@ function clearSelectionForEdit() {
           liquifyArmed={liquifyArmed}
           liquifyRadius={liquifyRadius}
           smudgeCursorRef={smudgeCursorRef}
+          paintRetouchStrokeLineRef={paintRetouchStrokeLineRef}
           smudgeRadius={smudgeRadius}
           sourceHydrationPending={sourceHydrationPending}
           stabilizer={stabilizer}
@@ -45417,6 +45539,7 @@ function clearSelectionForEdit() {
           setQuickShapeActive={setQuickShapeActive}
           setRightPanelOpen={setRightPanelOpenWithOverride}
           setSavedBrushes={commitSavedBrushProjection}
+          openBrushLibraryRepository={productBrushRepository}
           setShapeFill={setShapeFill}
           setSharedDocumentNotice={setSharedDocumentNotice}
           setShowGrid={setShowGrid}
@@ -45603,6 +45726,7 @@ function clearSelectionForEdit() {
           setPressureMinSize={setPressureMinSize}
           setQuickStartOpen={setQuickStartOpen}
           setSavedBrushes={commitSavedBrushProjection}
+          openBrushLibraryRepository={productBrushRepository}
           setSelectedId={setSelectedId}
           setShapeFill={setShapeFill}
           setStampTuning={setStampTuning}
