@@ -16,6 +16,19 @@ describe("Studio asset placement UI boundary", () => {
     expect(elementPanel).not.toContain("고급 도형·컷 패널·말풍선");
   });
 
+  it("routes 3D object picks into production BG3D / VRM tools", () => {
+    const assetMenu = read("./StudioAssetToolPopoverBody.tsx");
+    const elementPanel = read("./StudioElementsPanel.tsx");
+
+    expect(elementPanel).toContain("onOpenObjectInsert");
+    expect(elementPanel).toContain("filterStudioObjectInsertItems");
+    expect(elementPanel).toContain("planStudioObjectInsertPlacement");
+    expect(elementPanel).toContain("3D 오브젝트");
+    expect(assetMenu).toContain("onOpenObjectInsert=");
+    expect(assetMenu).toContain("setPoserVrmOpen(true)");
+    expect(assetMenu).toContain("setBg3dOpen(true)");
+  });
+
   it("uses one drag writer for image-backed elements and native insertions", () => {
     const elementPanel = read("./StudioElementsPanel.tsx");
     const bubbleMenu = read("./StudioBubbleToolPopoverBody.tsx");

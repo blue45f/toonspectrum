@@ -99,6 +99,51 @@ describe("StudioElementsPanel expanded catalog UX", () => {
     expect(onOpenBubbles).toHaveBeenCalledOnce();
   });
 
+  it("exposes a 3D object rail that plans placement and openTarget for the host", () => {
+    const onOpenObjectInsert = vi.fn();
+    render(
+      <StudioElementsPanel
+        onAdd={vi.fn()}
+        onOpenObjectInsert={onOpenObjectInsert}
+        canvasWidth={800}
+        canvasHeight={1200}
+        acquireUiPreferences={stablePreferences.acquire}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: /3D 오브젝트/u }));
+    expect(screen.getByText("요소 · 3D 오브젝트")).toBeTruthy();
+    expect(screen.getByRole("searchbox", { name: "3D 오브젝트 검색" })).toBeTruthy();
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "3D 오브젝트 검색" }), {
+      target: { value: "검" },
+    });
+    const sword = screen.getByRole("button", { name: /검,/u });
+    expect(sword.getAttribute("data-studio-object-open-target")).toBe("vrm-poser");
+    fireEvent.click(sword);
+
+    expect(onOpenObjectInsert).toHaveBeenCalledOnce();
+    const request = onOpenObjectInsert.mock.calls[0]?.[0];
+    expect(request?.item.sourceId).toBe("sword");
+    expect(request?.plan.openTarget).toBe("vrm-poser");
+    expect(request?.plan.width).toBeGreaterThan(0);
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "3D 오브젝트 검색" }), {
+      target: { value: "classroom" },
+    });
+    const classroom = document.querySelector(
+      '[data-studio-object-insert="obj-scene-classroom"]',
+    );
+    expect(classroom).not.toBeNull();
+    fireEvent.click(classroom!);
+    expect(onOpenObjectInsert.mock.calls.at(-1)?.[0]?.plan.openTarget).toBe(
+      "bg3d-templates",
+    );
+    expect(onOpenObjectInsert.mock.calls.at(-1)?.[0]?.item.sourceId).toBe(
+      "classroom",
+    );
+  });
+
   it("exports element tiles through the shared image-backed drag contract", () => {
     render(<StudioElementsPanel onAdd={vi.fn()} acquireUiPreferences={stablePreferences.acquire} />);
     const tile = screen.getByTitle("슈퍼타원");
