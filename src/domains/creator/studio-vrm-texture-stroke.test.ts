@@ -202,7 +202,7 @@ describe("studio-vrm-texture-stroke guards", () => {
   it("mirrors the 2D engine's per-kind defaults", () => {
     expect(resolveStudioVrmTextureStrokeBrush(INK).hardness).toBe(1);
     expect(resolveStudioVrmTextureStrokeBrush({ ...INK, kind: "airbrush" }).hardness).toBeCloseTo(
-      0.12,
+      0.06,
       6,
     );
     expect(

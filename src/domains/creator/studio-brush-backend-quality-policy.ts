@@ -595,6 +595,46 @@ export type StudioBrushBackendForbiddenFallback =
   | "cross-engine-natural-media-fallback";
 
 /**
+ * Texture-first hybrid adoption order.
+ *
+ * 1) Pin the best verified texture engine per family (hybrid routing).
+ * 2) Optimize performance on that same pin (Worker, dirty rect, budgets…).
+ * 3) Only after optimization fails budgets, consider deliberate pin replacement
+ *    via parity lab evidence — never silent runtime substitution.
+ *
+ * Distinct from §fail-closed: pin replacement is a planned promotion, not a
+ * crash fallback ladder. See hybrid-design.md §0 and §4.
+ */
+export const STUDIO_BRUSH_ENGINE_PRIORITY_POLICY = Object.freeze({
+  version: "studio-brush-engine-priority-v1" as const,
+  primaryGoal: "texture-fidelity" as const,
+  secondaryGoal: "performance-on-pinned-engine" as const,
+  order: Object.freeze([
+    "texture-first-hybrid-pin",
+    "optimize-same-pin",
+    "deliberate-pin-replace-after-lab-evidence",
+  ] as const),
+  pinReplaceRequires: Object.freeze([
+    "texture-quality-gate-pass-or-not-worse",
+    "throughput-or-latency-budget-pass",
+    "preset-metadata-provider-pin-update",
+    "no-silent-backend-substitution",
+    "no-mid-stroke-provider-switch",
+  ] as const),
+  beforePinReplace: Object.freeze([
+    "worker-batching-and-dirty-rect",
+    "spacing-and-render-budget-tuning",
+    "device-or-preset-size-caps-with-user-notice",
+    "optional-preview-schedule-without-changing-final-pin",
+  ] as const),
+  forbid: Object.freeze([
+    "choose-weaker-texture-engine-only-for-speed-before-optimization",
+    "silent-cross-engine-fallback-on-failure",
+    "promote-benchmark-reference-as-product-fallback",
+  ] as const),
+});
+
+/**
  * Product invariant: natural-media (and every quality family) never substitutes a
  * different pixel engine when the pinned backend is unavailable. Fail closed,
  * preserve the surface and journal, then re-run the same pin after recovery.
@@ -610,6 +650,8 @@ export const STUDIO_BRUSH_CROSS_ENGINE_PRODUCT_FALLBACK_POLICY = Object.freeze({
   emitApproximation: false as const,
   midStrokeProviderSwitchAllowed: false as const,
   libmypaintRole: "benchmark-reference-only-not-product-fallback" as const,
+  /** Pin replace is only via STUDIO_BRUSH_ENGINE_PRIORITY_POLICY step 3, not this ladder. */
+  performanceDrivenSilentReplaceAllowed: false as const,
   onPinnedProviderUnavailable: Object.freeze([
     "reject-new-stroke-or-disable-preset",
     "preserve-command-journal-and-seed",

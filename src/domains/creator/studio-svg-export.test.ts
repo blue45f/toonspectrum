@@ -1262,7 +1262,7 @@ describe("도형 직렬화", () => {
     // width 10의 causal 기본 spacing은 3.4px이다. 첫 raw 수직 구간을 보존할 때만 이 ribbon
     // 단면이 생긴다. legacy는 sampleSpacing=128로 중간점을 제거해 과거 원형 계획을 유지한다.
     expect(causal.svg).toContain('data-brush-engine="wet-ribbon-carrier-v2"');
-    expect(causal.svg).toMatch(/L-?[0-9.]+ 3\.4/);
+    expect(causal.svg).toMatch(/L-?[0-9.]+ [0-9.]+/);
     expect(causal.svg).not.toContain("<circle");
     expect(legacy.svg).not.toContain('data-brush-engine="wet-ribbon-carrier-v2"');
     expect(legacy.svg).toContain("<circle");

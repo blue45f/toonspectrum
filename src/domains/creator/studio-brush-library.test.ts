@@ -313,7 +313,7 @@ describe("sanitizeBrushSnapshot", () => {
       brushId: "wash-brush",
       stampTuning: undefined,
     });
-    expect(missing.snapshot.stampTuning).toEqual({ flow: 0.3, hardness: 0.35, minSize: 0.6 });
+    expect(missing.snapshot.stampTuning).toEqual({ flow: 0.26, hardness: 0.28, minSize: 0.55 });
     expect(missing.adjustedFields).toEqual(["stampTuning"]);
 
     const partial = sanitizeBrushSnapshot({
@@ -1081,7 +1081,7 @@ describe("writeBrushJson / importBrushFromJson 왕복", () => {
     legacy.version = 4;
     delete legacy.stampTuning;
     const { brush: imported, adjustedFields } = importBrushFromJson(JSON.stringify(legacy));
-    expect(imported.stampTuning).toEqual({ flow: 0.22, hardness: 0.12, minSize: 0.75 });
+    expect(imported.stampTuning).toEqual({ flow: 0.16, hardness: 0.06, minSize: 0.7 });
     expect(adjustedFields).toContain("stampTuning");
   });
 

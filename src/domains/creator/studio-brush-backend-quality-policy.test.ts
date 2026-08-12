@@ -9,6 +9,7 @@ import {
   STUDIO_BRUSH_BACKEND_QUALITY_POLICY_VERSION,
   STUDIO_BRUSH_BACKEND_ROUTE_CANDIDATES,
   STUDIO_BRUSH_CROSS_ENGINE_PRODUCT_FALLBACK_POLICY,
+  STUDIO_BRUSH_ENGINE_PRIORITY_POLICY,
   STUDIO_CORE_BRUSH_BACKEND_ROUTE_PROFILES,
   STUDIO_HOKUSAI_FULLSIZE_PROMOTION_GATE,
   STUDIO_HOKUSAI_MYB_PROVIDER_POLICY,
@@ -450,6 +451,7 @@ describe("Hokusai .myb provider admission", () => {
       unavailableBehavior: "fail-closed",
       emitApproximation: false,
       midStrokeProviderSwitchAllowed: false,
+      performanceDrivenSilentReplaceAllowed: false,
       libmypaintRole: "benchmark-reference-only-not-product-fallback",
     });
     expect(STUDIO_BRUSH_CROSS_ENGINE_PRODUCT_FALLBACK_POLICY.forbidden)
@@ -472,6 +474,27 @@ describe("Hokusai .myb provider admission", () => {
       expect(policy.forbiddenFallbacks)
         .toContain("silent-backend-substitution");
     }
+  });
+
+  it("adopts engines texture-first, then optimize, then deliberate pin replace", () => {
+    expect(STUDIO_BRUSH_ENGINE_PRIORITY_POLICY.primaryGoal).toBe("texture-fidelity");
+    expect(STUDIO_BRUSH_ENGINE_PRIORITY_POLICY.secondaryGoal)
+      .toBe("performance-on-pinned-engine");
+    expect([...STUDIO_BRUSH_ENGINE_PRIORITY_POLICY.order]).toEqual([
+      "texture-first-hybrid-pin",
+      "optimize-same-pin",
+      "deliberate-pin-replace-after-lab-evidence",
+    ]);
+    expect(STUDIO_BRUSH_ENGINE_PRIORITY_POLICY.pinReplaceRequires)
+      .toContain("texture-quality-gate-pass-or-not-worse");
+    expect(STUDIO_BRUSH_ENGINE_PRIORITY_POLICY.pinReplaceRequires)
+      .toContain("no-silent-backend-substitution");
+    expect(STUDIO_BRUSH_ENGINE_PRIORITY_POLICY.forbid).toContain(
+      "choose-weaker-texture-engine-only-for-speed-before-optimization",
+    );
+    expect(STUDIO_BRUSH_ENGINE_PRIORITY_POLICY.forbid).toContain(
+      "silent-cross-engine-fallback-on-failure",
+    );
   });
 
   it("admits Hokusai only when the caller carries an explicit experimental choice", () => {

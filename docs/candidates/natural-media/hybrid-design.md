@@ -2,11 +2,43 @@
 
 - 기준일: 2026-08-07
 - 개정: 2026-08-12 — §4 다단 엔진 폴백 폐기 → fail-closed 단일 권위 (질감 이질 방지)
+- 개정: 2026-08-12 — §0 질감 우선 하이브리드 채택 순서 (성능 최적화 후 pin 교체)
 - 관련 매트릭스 행: E11 (libmypaint), E12 (Hokusai), E28 (ToonWet/wgpu)
 - 결합 유형: V11 §1.2의 **5. 동역학/재질 분리** + **8. 교차 검증** + **9. 선택적 자체 구현**
 - 제품 정책 거울: `src/domains/creator/studio-brush-backend-quality-policy.ts`  
-  (`emitApproximation: false`, `benchmarkReferenceIsProductFallback: false`,  
-  `silent-backend-substitution` 금지)
+  (`STUDIO_BRUSH_ENGINE_PRIORITY_POLICY`, `STUDIO_BRUSH_CROSS_ENGINE_PRODUCT_FALLBACK_POLICY`)
+
+## 0. 채택 우선순위 — 질감 우선 (Texture-first hybrid)
+
+자연매체·드라이·스프레이에서 **질감이 1순위**다. 성능은 같은 pin 위에서 최적화하고,  
+그래도 예산 미달일 때만 **의도적 pin 교체**(parity lab 증거)를 검토한다.  
+런타임 장애 시 다른 엔진으로 “대충 그리기” 폴백과는 별개다(§4).
+
+```text
+1. 질감 우선 하이브리드 구성
+   패밀리마다 검증된 주력 엔진·OSS 커널을 pin
+   (oil ribbon / Hokusai oil, dry anisotropic, Klecks spray tip, wet-field …)
+        │
+        ▼
+2. 동일 pin 위에서 성능 최적화
+   Worker 배치, dirty rect, spacing/budget, GPU pass, 메모리 회수
+   — 픽셀 계약(seed·receipt·parity)을 깨지 않는 범위만
+        │
+        ▼
+3. 예산 미달 시에만 엔진 pin 교체 검토
+   parity lab: 후보가 질감 게이트 동급 이상 + 처리량 게이트 통과
+   → preset metadata에 새 pin 기록 (버전·seed 재실행 계약)
+   → 자동 silent substitution 금지
+```
+
+| 단계 | 하는 일 | 하지 않는 일 |
+| --- | --- | --- |
+| 1 질감 pin | 사이트/OSS 분석 기반 주력 선택, 하이브리드 라우팅 | 성능 때문에 처음부터 저질 근사 엔진 선택 |
+| 2 성능 | 동일 엔진 내 최적화, 프레임 예산 프로파일 | 최적화 전에 pin 교체 |
+| 3 pin 교체 | lab 증거 + 명시 승격 후에만 | 장애 시 계단형 폴백, mid-stroke 교체 |
+
+**성능 미달의 제품 응답 (pin 교체 전):** 프리셋/장치 상한, preview 스케줄(Final은 동일 pin 원칙),  
+해당 프리셋 비활성·고지 — **다른 질감으로 위장 그리기 금지**.
 
 ## 1. 단계별 파이프라인 (입력 → 처리 → 렌더 → 출력)
 
