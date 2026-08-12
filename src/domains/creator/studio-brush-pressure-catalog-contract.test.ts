@@ -76,6 +76,12 @@ const INTENTIONAL_FIXED_PRESSURE_BRUSH_IDS = new Set([
   "crosshatch",
   "milli-pen-uniform",
   "web-pressure-flat",
+  // Engine-lane grids / perfect outlines / side-shade paths that intentionally ignore
+  // hardware pressure at the planner-proxy surface (same contract as their base media).
+  "screentone--sparse-grid",
+  "pen--perfect-taper",
+  "calligraphy--perfect-chisel",
+  "pencil--side-shade",
 ]);
 
 interface PressureProbe {

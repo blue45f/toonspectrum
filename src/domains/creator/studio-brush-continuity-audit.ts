@@ -111,6 +111,12 @@ const INTENTIONALLY_DISCONTINUOUS_PREVIEWS = new Set([
 const INTENTIONALLY_DISCONTINUOUS_CATALOG_IDS = new Set([
   "spray",
   "splatter",
+  // Engine-lane scatter / burst variants intentionally deposit sparse carriers
+  // (same product promise as base spray/splatter particle media).
+  "spray--equal-area",
+  "splatter--burst-cloud",
+  "ink-particle--scatter-cloud",
+  "glitter--star-field",
   // Sketchpad lattice + clean-room web kits intentionally deposit sparse/stationed
   // marks (tile grids, multi-agent swarms, dash stitches, scatter stamps, hatch lattices).
   "sketchpad-tile",
