@@ -341,6 +341,39 @@ describe("StudioLiveSocketTransport", () => {
     expect(localFactory).toHaveBeenCalledOnce();
   });
 
+  it("does not treat the Cloudflare realtime origin as a Socket.IO host", () => {
+    // Presence/comment/screen-share DO origin is purpose-routed separately; Engine.IO must not
+    // open wss://…workers.dev/socket.io when only VITE_STUDIO_REALTIME_ORIGIN is set.
+    vi.stubEnv("VITE_STUDIO_LIVE_ORIGIN", "");
+    vi.stubEnv(
+      "VITE_STUDIO_REALTIME_ORIGIN",
+      "https://toonspectrum-realtime.toonstudio-realtime.workers.dev",
+    );
+    vi.stubEnv("VITE_STUDIO_REALTIME_PROVIDER_ID", "cloudflare-realtime-v1");
+    vi.stubEnv("VITE_API_BASE", "");
+    vi.stubEnv("VITE_STUDIO_LIVE_DEV_PROXY_ENABLED", "");
+
+    const localTransport: StudioLiveTransport = {
+      mode: "local",
+      ready: true,
+      connect: () => Promise.resolve(),
+      send: () => false,
+      subscribe: () => () => undefined,
+      close: () => undefined,
+    };
+    const localFactory = vi.fn(() => localTransport);
+
+    const transport = createStudioServerLiveTransportFactory(TOKEN, {
+      createLocalTransport: localFactory,
+    })(context());
+
+    // No VITE_STUDIO_LIVE_ORIGIN → no Engine.IO probe; local collaboration only.
+    // Purpose routing keeps mode "local" and does not invent a Socket.IO host.
+    expect(transport).toBe(localTransport);
+    expect(transport.mode).toBe("local");
+    expect(localFactory).toHaveBeenCalledOnce();
+  });
+
   it("admits only an exact absolute realtime origin", () => {
     expect(
       resolveStudioLiveSocketRuntimeEndpoint({

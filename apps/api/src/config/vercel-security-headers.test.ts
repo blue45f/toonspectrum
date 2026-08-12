@@ -68,6 +68,8 @@ describe("Vercel static security headers", () => {
       "https://ybsgfhofuvkhywbpytnl.supabase.co",
     );
     expect(connections).not.toContain("https://*.supabase.co");
+    // Pretendard CSS ships a sourceMappingURL on jsDelivr; DevTools fetches it via connect-src.
+    expect(connections).toContain("https://cdn.jsdelivr.net");
     expect(connections).toContain(
       "wss://toonspectrum-realtime.toonstudio-realtime.workers.dev",
     );

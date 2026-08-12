@@ -302,10 +302,13 @@ export function resolveStudioLiveSocketRuntimeEndpoint(
 }
 
 function runtimeSocketEndpoint(): string | null {
+  // Socket.IO is only for a long-running Nest CRDT/lock host (`VITE_STUDIO_LIVE_ORIGIN`).
+  // `VITE_STUDIO_REALTIME_ORIGIN` is the Cloudflare Durable Object data plane for presence,
+  // comment invalidation, and screen-share signaling — it speaks a custom WS protocol, not
+  // Engine.IO. Falling back to it here produced endless
+  // `wss://…workers.dev/socket.io/?EIO=4&transport=websocket` failures in production.
   return resolveStudioLiveSocketRuntimeEndpoint({
-    explicitOrigin:
-      import.meta.env.VITE_STUDIO_LIVE_ORIGIN ||
-      import.meta.env.VITE_STUDIO_REALTIME_ORIGIN,
+    explicitOrigin: import.meta.env.VITE_STUDIO_LIVE_ORIGIN,
     locationOrigin: globalThis.location?.origin,
     development: import.meta.env.DEV,
     devProxyEnabled:
