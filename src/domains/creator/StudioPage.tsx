@@ -772,7 +772,10 @@ import {
   validateStudioLinked3dReservedPageState,
 } from "./studio-linked-3d-render-document";
 import { type StudioLiquifyMode } from "./studio-liquify-contract";
-import { planStudioLiquifyLivePreview } from "./studio-liquify-live-preview";
+import {
+  mapLiquifyRoiToDocumentFrame,
+  planStudioLiquifyLivePreview,
+} from "./studio-liquify-live-preview";
 import {
   appendStudioLiquifyPointerPoint,
   beginStudioLiquifyPointerSession,
@@ -30320,7 +30323,7 @@ const puppetWarpArmed =
         liquifyPreviewTokenRef.current = token;
         try {
           const [
-            { bakeLiquifyStrokeToCanvas },
+            { bakeLiquifyStrokeToCanvas, bakeLiquifyStrokeRoiPreview },
             { loadStudioRetouchSourceImage, studioRetouchSourceDimensions },
           ] = await Promise.all([
             loadStudioLiquifyBrowserRuntime(),
@@ -30345,40 +30348,84 @@ const puppetWarpArmed =
             radiusCanvasPx: liquifyRadius,
           });
           if (!plan) continue;
-          const out = await bakeLiquifyStrokeToCanvas(
-            source.image as never,
-            plan.width,
-            plan.height,
-            plan.points,
-            plan.radiusDevice,
-            liquifyStrength / 100,
-            createStudioPixelEditCanvas,
-            {
-              flipX: target.flipped ?? false,
-              flipY: target.flippedY ?? false,
-              mode: session.mode,
-              stabilizer: 0.12,
-              spacingRatio: 0.45,
-            },
-          );
-          if (token !== liquifyPreviewTokenRef.current || !liquifyDragRef.current || !out) {
-            continue;
-          }
+          const dynamics = {
+            flipX: target.flipped ?? false,
+            flipY: target.flippedY ?? false,
+            mode: session.mode,
+            stabilizer: 0.12,
+            spacingRatio: 0.45,
+          } as const;
           const node = liquifyPreviewImageRef.current;
           if (!node) continue;
           const frame = session.frame;
-          const flipX = target.flipped ? -1 : 1;
-          const flipY = target.flippedY ? -1 : 1;
-          node.image(out as HTMLCanvasElement);
-          node.x(frame.x + (flipX < 0 ? frame.width : 0));
-          node.y(frame.y + (flipY < 0 ? frame.height : 0));
-          node.width(frame.width);
-          node.height(frame.height);
-          node.scaleX(flipX);
-          node.scaleY(flipY);
-          node.rotation(frame.rotation);
-          node.visible(true);
-          node.getLayer()?.batchDraw();
+
+          if (plan.mode === "roi-full-res") {
+            // Full native density inside the stroke dirty rect only — no whole-image downscale.
+            const roi = await bakeLiquifyStrokeRoiPreview(
+              source.image as never,
+              plan.width,
+              plan.height,
+              plan.points,
+              plan.radiusDevice,
+              liquifyStrength / 100,
+              createStudioPixelEditCanvas,
+              dynamics,
+            );
+            if (token !== liquifyPreviewTokenRef.current || !liquifyDragRef.current || !roi) {
+              continue;
+            }
+            const place = mapLiquifyRoiToDocumentFrame(
+              roi.region,
+              roi.sourceWidth,
+              roi.sourceHeight,
+              {
+                x: frame.x,
+                y: frame.y,
+                width: frame.width,
+                height: frame.height,
+                rotation: frame.rotation ?? 0,
+              },
+              Boolean(target.flipped),
+              Boolean(target.flippedY),
+            );
+            node.image(roi.canvas as HTMLCanvasElement);
+            node.x(place.x);
+            node.y(place.y);
+            node.width(place.width);
+            node.height(place.height);
+            node.scaleX(place.scaleX);
+            node.scaleY(place.scaleY);
+            node.rotation(place.rotation);
+            node.visible(true);
+            node.getLayer()?.batchDraw();
+          } else {
+            // Fallback: whole-frame downscale when the dirty ROI itself is huge.
+            const out = await bakeLiquifyStrokeToCanvas(
+              source.image as never,
+              plan.width,
+              plan.height,
+              plan.points,
+              plan.radiusDevice,
+              liquifyStrength / 100,
+              createStudioPixelEditCanvas,
+              dynamics,
+            );
+            if (token !== liquifyPreviewTokenRef.current || !liquifyDragRef.current || !out) {
+              continue;
+            }
+            const flipX = target.flipped ? -1 : 1;
+            const flipY = target.flippedY ? -1 : 1;
+            node.image(out as HTMLCanvasElement);
+            node.x(frame.x + (flipX < 0 ? frame.width : 0));
+            node.y(frame.y + (flipY < 0 ? frame.height : 0));
+            node.width(frame.width);
+            node.height(frame.height);
+            node.scaleX(flipX);
+            node.scaleY(flipY);
+            node.rotation(frame.rotation);
+            node.visible(true);
+            node.getLayer()?.batchDraw();
+          }
         } catch (cause) {
           if (cause instanceof Error && cause.name === "AbortError") continue;
           // Preview is best-effort; keep the trail and full bake path authoritative.

@@ -40,10 +40,14 @@ describe("studio liquify performance boundaries", () => {
   it("keeps a drop-frame live warp preview path during drag", () => {
     const page = source("./StudioPage.tsx");
     const preview = source("./studio-liquify-live-preview.ts");
+    const browser = source("./studio-liquify-browser.ts");
     const viewport = source("./StudioCanvasViewport.tsx");
 
     expect(preview).toContain("planStudioLiquifyLivePreview");
+    expect(preview).toContain("roi-full-res");
+    expect(browser).toContain("bakeLiquifyStrokeRoiPreview");
     expect(page).toContain("scheduleLiquifyLivePreview");
+    expect(page).toContain("bakeLiquifyStrokeRoiPreview");
     expect(page).toContain("pumpLiquifyLivePreview");
     expect(viewport).toContain("liquifyPreviewImageRef");
   });

@@ -279,23 +279,25 @@ async function bakeLiquifyRequestToCanvas(
  * 모두 무거우므로 points+settings만 넘겨 Worker 안에서 연속 실행한다(Worker를 못 만드는 환경에선
  * 클라이언트 내부에서 동일 엔진으로 동기 폴백).
  */
-export async function bakeLiquifyStrokeToCanvas(
-  source: MaskImageSource,
+function prepareLiquifyStrokePoints(
+  points: readonly LiquifyPixelPoint[],
   width: number,
   height: number,
-  points: readonly LiquifyPixelPoint[],
   radiusPx: number,
   strength: number,
-  createCanvas: LiquifyCanvasFactory,
   opts?: StudioLiquifyBrushDynamics & {
     flipX?: boolean;
     flipY?: boolean;
-    /** 생략하면 기존과 동일한 Push 모드. */
     mode?: StudioLiquifyMode;
-    /** 필드 생성과 Worker 실행을 모두 취소한다. */
     signal?: AbortSignal;
-  }
-): Promise<(MaskCanvasLike & MaskImageSource) | null> {
+  },
+): {
+  readonly w: number;
+  readonly h: number;
+  readonly mode: StudioLiquifyMode;
+  readonly sourcePoints: readonly LiquifyPixelPoint[];
+  readonly stroke: StudioLiquifyWorkerStrokePlan;
+} | null {
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return null;
   const w = Math.max(1, Math.round(width));
   const h = Math.max(1, Math.round(height));
@@ -303,7 +305,6 @@ export async function bakeLiquifyStrokeToCanvas(
 
   const mode = normalizeStudioLiquifyMode(opts?.mode);
   const minimumPointCount = mode === "push" ? 2 : 1;
-  // buildLiquifyDisplacementField의 값싼 no-op 가드만 미리 수행한다. 실제 dab/field 계획은 Worker가 한다.
   if (
     points.length < minimumPointCount
     || !Number.isFinite(radiusPx)
@@ -328,7 +329,11 @@ export async function bakeLiquifyStrokeToCanvas(
         })
       : points;
 
-  return bakeLiquifyRequestToCanvas(source, w, h, {
+  return {
+    w,
+    h,
+    mode,
+    sourcePoints,
     stroke: {
       points: sourcePoints,
       radiusPx,
@@ -343,5 +348,130 @@ export async function bakeLiquifyStrokeToCanvas(
         spacingRatio: opts?.spacingRatio,
       },
     },
+  };
+}
+
+export async function bakeLiquifyStrokeToCanvas(
+  source: MaskImageSource,
+  width: number,
+  height: number,
+  points: readonly LiquifyPixelPoint[],
+  radiusPx: number,
+  strength: number,
+  createCanvas: LiquifyCanvasFactory,
+  opts?: StudioLiquifyBrushDynamics & {
+    flipX?: boolean;
+    flipY?: boolean;
+    /** 생략하면 기존과 동일한 Push 모드. */
+    mode?: StudioLiquifyMode;
+    /** 필드 생성과 Worker 실행을 모두 취소한다. */
+    signal?: AbortSignal;
+  }
+): Promise<(MaskCanvasLike & MaskImageSource) | null> {
+  const prepared = prepareLiquifyStrokePoints(points, width, height, radiusPx, strength, opts);
+  if (!prepared) return null;
+
+  return bakeLiquifyRequestToCanvas(source, prepared.w, prepared.h, {
+    stroke: prepared.stroke,
   }, createCanvas, opts?.signal);
+}
+
+/**
+ * Live-preview bake: full native pixel density inside the stroke dirty ROI only.
+ * Avoids allocating/drawing a full-frame work canvas on every pointer sample.
+ * Returns the ROI canvas plus its origin in source-pixel space for Konva placement.
+ */
+export async function bakeLiquifyStrokeRoiPreview(
+  source: MaskImageSource,
+  width: number,
+  height: number,
+  points: readonly LiquifyPixelPoint[],
+  radiusPx: number,
+  strength: number,
+  createCanvas: LiquifyCanvasFactory,
+  opts?: StudioLiquifyBrushDynamics & {
+    flipX?: boolean;
+    flipY?: boolean;
+    mode?: StudioLiquifyMode;
+    signal?: AbortSignal;
+    /** Soft cap on ROI pixels; oversized ROIs are rejected so the caller can fall back. */
+    maxRoiPixels?: number;
+  },
+): Promise<{
+  readonly canvas: MaskCanvasLike & MaskImageSource;
+  readonly region: LiquifyRasterRegion;
+  readonly sourceWidth: number;
+  readonly sourceHeight: number;
+} | null> {
+  const prepared = prepareLiquifyStrokePoints(points, width, height, radiusPx, strength, opts);
+  if (!prepared) return null;
+  throwIfLiquifyAborted(opts?.signal);
+
+  const region = planLiquifyStrokeRasterRegion(
+    prepared.sourcePoints,
+    prepared.stroke.radiusPx,
+    prepared.w,
+    prepared.h,
+  );
+  const roiPixels = region.width * region.height;
+  const maxRoiPixels = opts?.maxRoiPixels ?? 1_500_000;
+  if (!Number.isSafeInteger(roiPixels) || roiPixels <= 0 || roiPixels > maxRoiPixels) {
+    return null;
+  }
+
+  const work = createCanvas(region.width, region.height);
+  if (!work) return null;
+  // Copy only the dirty source patch into a ROI-sized work surface.
+  // MaskCtx2DLike only types the 3-arg drawImage form; real 2d contexts accept the crop form.
+  const ctx2d = work.ctx as LiquifyCtx2DLike & {
+    drawImage(
+      image: CanvasImageSource,
+      sx: number,
+      sy: number,
+      sw: number,
+      sh: number,
+      dx: number,
+      dy: number,
+      dw: number,
+      dh: number,
+    ): void;
+  };
+  ctx2d.drawImage(
+    source as CanvasImageSource,
+    region.x,
+    region.y,
+    region.width,
+    region.height,
+    0,
+    0,
+    region.width,
+    region.height,
+  );
+
+  const frozenData = work.ctx.getImageData(0, 0, region.width, region.height);
+  const workData: StudioImageDataLike = {
+    data: new Uint8ClampedArray(frozenData.data),
+    width: frozenData.width,
+    height: frozenData.height,
+  };
+  const request: StudioLiquifyWorkerRunRequest = {
+    src: frozenData,
+    dst: workData,
+    region: {
+      originX: region.x,
+      originY: region.y,
+      canvasWidth: prepared.w,
+      canvasHeight: prepared.h,
+    },
+    stroke: prepared.stroke,
+  };
+  const { applied, dst } = await runStudioLiquifyWorker(request, { signal: opts?.signal });
+  if (!applied) return null;
+  work.ctx.putImageData(restoreCanvasImageData(dst), 0, 0);
+  return {
+    canvas: work.canvas,
+    region,
+    sourceWidth: prepared.w,
+    sourceHeight: prepared.h,
+  };
 }
