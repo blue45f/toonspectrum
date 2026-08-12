@@ -504,6 +504,123 @@ def build_cyberpunk_motorcycle():
     body.data.materials.append(mat_frame)
     export_glb("cyberpunk_motorcycle.glb")
 
+# 10 New Diverse Round-4 3D Assets & Props
+def build_scifi_laser_gun():
+    reset_scene()
+    mat_metal = create_material("LaserMetal", base_color=(0.12, 0.15, 0.2, 1.0), metallic=0.9, roughness=0.2)
+    mat_glow = create_material("LaserGlow", base_color=(0.0, 0.9, 1.0, 1.0), emission_color=(0.0, 1.0, 1.0, 1.0), emission_strength=5.0)
+    bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0, 0.2, 0.05))
+    barrel = bpy.context.active_object
+    barrel.scale = (0.04, 0.45, 0.06)
+    barrel.data.materials.append(mat_metal)
+    bpy.ops.mesh.primitive_cylinder_add(radius=0.015, depth=0.35, location=(0, 0.25, 0.05))
+    core = bpy.context.active_object
+    core.rotation_euler = (math.radians(90), 0, 0)
+    core.data.materials.append(mat_glow)
+    export_glb("scifi_laser_gun.glb")
+
+def build_magic_grimoire():
+    reset_scene()
+    mat_leather = create_material("BookLeather", base_color=(0.35, 0.1, 0.15, 1.0), roughness=0.6)
+    mat_gold = create_material("BookRune", base_color=(0.95, 0.8, 0.2, 1.0), metallic=0.95, roughness=0.2, emission_color=(1.0, 0.8, 0.2, 1.0), emission_strength=3.0)
+    bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0, 0, 0))
+    cover = bpy.context.active_object
+    cover.scale = (0.18, 0.26, 0.05)
+    cover.data.materials.append(mat_leather)
+    bpy.ops.mesh.primitive_torus_add(major_radius=0.04, minor_radius=0.008, location=(0, 0, 0.028))
+    rune = bpy.context.active_object
+    rune.data.materials.append(mat_gold)
+    export_glb("magic_grimoire.glb")
+
+def build_cyber_glasses():
+    reset_scene()
+    mat_frame = create_material("GlassFrame", base_color=(0.05, 0.05, 0.08, 1.0), metallic=0.7, roughness=0.3)
+    mat_visor = create_material("GlassVisor", base_color=(0.0, 0.7, 0.9, 0.8), emission_color=(0.0, 0.8, 1.0, 1.0), emission_strength=2.5)
+    bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0, 0.04, 0))
+    frame = bpy.context.active_object
+    frame.scale = (0.15, 0.03, 0.04)
+    frame.data.materials.append(mat_visor)
+    export_glb("cyber_glasses.glb")
+
+def build_medieval_shield():
+    reset_scene()
+    mat_iron = create_material("ShieldIron", base_color=(0.7, 0.75, 0.8, 1.0), metallic=0.9, roughness=0.3)
+    mat_crest = create_material("ShieldCrest", base_color=(0.8, 0.15, 0.15, 1.0), roughness=0.4)
+    bpy.ops.mesh.primitive_cylinder_add(radius=0.35, depth=0.04, location=(0, 0, 0))
+    shield = bpy.context.active_object
+    shield.scale = (1.0, 0.1, 1.4)
+    shield.rotation_euler = (math.radians(90), 0, 0)
+    shield.data.materials.append(mat_iron)
+    export_glb("medieval_shield.glb")
+
+def build_street_lamp():
+    reset_scene()
+    mat_pole = create_material("LampPole", base_color=(0.1, 0.12, 0.15, 1.0), metallic=0.85, roughness=0.4)
+    mat_light = create_material("LampLight", base_color=(1.0, 0.9, 0.6, 1.0), emission_color=(1.0, 0.9, 0.6, 1.0), emission_strength=6.0)
+    bpy.ops.mesh.primitive_cylinder_add(radius=0.05, depth=3.2, location=(0, 0, 1.6))
+    pole = bpy.context.active_object
+    pole.data.materials.append(mat_pole)
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.25, location=(0, 0.3, 3.1))
+    bulb = bpy.context.active_object
+    bulb.data.materials.append(mat_light)
+    export_glb("street_lamp.glb")
+
+def build_vending_machine():
+    reset_scene()
+    mat_body = create_material("VendingBody", base_color=(0.15, 0.25, 0.45, 1.0), roughness=0.35)
+    mat_glass = create_material("VendingGlass", base_color=(0.8, 0.95, 1.0, 1.0), emission_color=(0.7, 0.9, 1.0, 1.0), emission_strength=2.0)
+    bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0, 0, 0.95))
+    machine = bpy.context.active_object
+    machine.scale = (0.85, 0.75, 1.9)
+    machine.data.materials.append(mat_body)
+    export_glb("vending_machine.glb")
+
+def build_throne():
+    reset_scene()
+    mat_gold = create_material("ThroneGold", base_color=(0.95, 0.75, 0.2, 1.0), metallic=0.9, roughness=0.2)
+    mat_velvet = create_material("ThroneVelvet", base_color=(0.6, 0.05, 0.1, 1.0), roughness=0.8, sheen=0.9)
+    bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0, 0, 0.4))
+    seat = bpy.context.active_object
+    seat.scale = (0.8, 0.8, 0.8)
+    seat.data.materials.append(mat_velvet)
+    bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0, -0.38, 1.1))
+    back = bpy.context.active_object
+    back.scale = (0.85, 0.12, 1.4)
+    back.data.materials.append(mat_gold)
+    export_glb("royal_throne.glb")
+
+def build_crystal_orb():
+    reset_scene()
+    mat_glass = create_material("OrbGlass", base_color=(0.3, 0.7, 1.0, 1.0), metallic=0.1, roughness=0.05, emission_color=(0.4, 0.8, 1.0, 1.0), emission_strength=4.5)
+    mat_base = create_material("OrbBase", base_color=(0.15, 0.1, 0.2, 1.0), metallic=0.8, roughness=0.3)
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.18, location=(0, 0, 0.28))
+    orb = bpy.context.active_object
+    orb.data.materials.append(mat_glass)
+    bpy.ops.mesh.primitive_cylinder_add(radius=0.14, depth=0.1, location=(0, 0, 0.05))
+    stand = bpy.context.active_object
+    stand.data.materials.append(mat_base)
+    export_glb("crystal_orb.glb")
+
+def build_tactical_helmet():
+    reset_scene()
+    mat_helmet = create_material("HelmetArmor", base_color=(0.1, 0.12, 0.14, 1.0), metallic=0.7, roughness=0.4)
+    mat_visor = create_material("HelmetVisor", base_color=(1.0, 0.4, 0.0, 1.0), emission_color=(1.0, 0.5, 0.0, 1.0), emission_strength=3.5)
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.16, location=(0, 0, 0.16))
+    helmet = bpy.context.active_object
+    helmet.scale = (1.0, 1.05, 0.95)
+    helmet.data.materials.append(mat_helmet)
+    export_glb("tactical_helmet.glb")
+
+def build_school_desk():
+    reset_scene()
+    mat_wood = create_material("DeskWood", base_color=(0.7, 0.48, 0.28, 1.0), roughness=0.6)
+    mat_steel = create_material("DeskSteel", base_color=(0.3, 0.35, 0.4, 1.0), metallic=0.85, roughness=0.35)
+    bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0, 0, 0.72))
+    top = bpy.context.active_object
+    top.scale = (0.7, 0.5, 0.04)
+    top.data.materials.append(mat_wood)
+    export_glb("school_desk.glb")
+
 # 4 New Round-3 Outfits
 def build_outfit_exosuit():
     reset_scene()
@@ -563,6 +680,18 @@ if __name__ == "__main__":
     build_magic_wand_staff()
     build_steampunk_airship()
     build_cyberpunk_motorcycle()
+
+    # 10 Round-4 Props
+    build_scifi_laser_gun()
+    build_magic_grimoire()
+    build_cyber_glasses()
+    build_medieval_shield()
+    build_street_lamp()
+    build_vending_machine()
+    build_throne()
+    build_crystal_orb()
+    build_tactical_helmet()
+    build_school_desk()
     
     # Generate 18 High-Poly Outfits
     build_outfit_tshirt()
@@ -586,4 +715,4 @@ if __name__ == "__main__":
     build_outfit_spacesuit()
     build_outfit_punk_jacket()
     
-    print("✨ All 34 3D Assets & High-Poly Outfits Generated Successfully!")
+    print("✨ All 44 3D Assets & High-Poly Outfits Generated Successfully!")

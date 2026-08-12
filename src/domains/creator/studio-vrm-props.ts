@@ -203,6 +203,16 @@ const VRM_PROP_BASES = [
   { id: "blender_magic_wand_staff", label: "블렌더 요술봉 지팡이", category: "hand", defaultBone: "rightHand", defaultPosition: [0, -0.1, 0], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 별/달 발광 요술봉." },
   { id: "blender_steampunk_airship", label: "블렌더 스팀펑크 비행선", category: "body", defaultBone: "hips", defaultPosition: [0, 0.8, 0], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 스팀펑크 비행선." },
   { id: "blender_cyberpunk_motorcycle", label: "블렌더 사이버 바이크", category: "body", defaultBone: "hips", defaultPosition: [0, -0.5, 0], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 사이버펑크 바이크." },
+  { id: "blender_scifi_laser_gun", label: "블렌더 SF 레이저 건", category: "hand", defaultBone: "rightHand", defaultPosition: [0, 0, 0], defaultRotationDeg: [0, 0, -90], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 SF 레이저 총." },
+  { id: "blender_magic_grimoire", label: "블렌더 마법 마도서", category: "hand", defaultBone: "leftHand", defaultPosition: [0, 0.02, 0.02], defaultRotationDeg: [45, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 발광 룬 마도서." },
+  { id: "blender_cyber_glasses", label: "블렌더 사이버 고글 안경", category: "head", defaultBone: "head", defaultPosition: [0, 0.02, 0.07], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 사이버 고글 안경." },
+  { id: "blender_medieval_shield", label: "블렌더 중세 룬 방패", category: "hand", defaultBone: "leftHand", defaultPosition: [0.05, 0, 0], defaultRotationDeg: [0, 90, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 중세 룬 방패." },
+  { id: "blender_street_lamp", label: "블렌더 도시 네온 가로등", category: "body", defaultBone: "hips", defaultPosition: [0.8, -0.9, 0], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 네온 가로등." },
+  { id: "blender_vending_machine", label: "블렌더 편의점 자판기", category: "body", defaultBone: "hips", defaultPosition: [-0.8, -0.85, 0], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 레트로 자판기." },
+  { id: "blender_royal_throne", label: "블렌더 황실 왕좌", category: "body", defaultBone: "hips", defaultPosition: [0, -0.6, -0.2], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 황실 왕좌 의자." },
+  { id: "blender_crystal_orb", label: "블렌더 마법 수정구", category: "hand", defaultBone: "rightHand", defaultPosition: [0, 0.02, 0.02], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 발광 마법 수정구." },
+  { id: "blender_tactical_helmet", label: "블렌더 택티컬 헬멧", category: "head", defaultBone: "head", defaultPosition: [0, 0.05, 0.01], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 SF 택티컬 헬멧." },
+  { id: "blender_school_desk", label: "블렌더 학교 책상", category: "body", defaultBone: "hips", defaultPosition: [0, -0.7, 0.3], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 학교/오피스 책상." },
 ] as const satisfies readonly LegacyPropDef[];
 
 export type VrmPropId = (typeof VRM_PROP_BASES)[number]["id"];
@@ -510,6 +520,50 @@ const PROP_PROFILES: Record<VrmPropId, PropProfile> = {
   blender_cyberpunk_motorcycle: {
     anchors: [anchor("seat", "surface", [0, 0.35, 0])],
     fit: fit("avatarHeight", 1.65, 0.8, 1.6),
+  },
+  blender_scifi_laser_gun: {
+    anchors: [handAnchor("primary", "primary", [0, 0.05, 0], 0.016)],
+    grip: grip("handle", 0.016, 75, 55),
+    fit: fit("avatarHeight", 1.65, 0.8, 1.5),
+  },
+  blender_magic_grimoire: {
+    anchors: [handAnchor("primary", "primary", [0, 0, 0], 0.02)],
+    grip: grip("flat", 0.02, 45, 30),
+    fit: fit("hand", 0.075, 0.7, 1.4),
+  },
+  blender_cyber_glasses: {
+    anchors: [anchor("center", "surface", [0, 0, 0])],
+    fit: fit("head", 0.16, 0.8, 1.3),
+  },
+  blender_medieval_shield: {
+    anchors: [handAnchor("primary", "primary", [0, 0, 0], 0.015)],
+    grip: grip("handle", 0.015, 60, 40),
+    fit: fit("avatarHeight", 1.65, 0.8, 1.5),
+  },
+  blender_street_lamp: {
+    anchors: [anchor("base", "surface", [0, 0, 0])],
+    fit: fit("avatarHeight", 1.65, 0.8, 1.6),
+  },
+  blender_vending_machine: {
+    anchors: [anchor("front", "surface", [0, 0, 0])],
+    fit: fit("avatarHeight", 1.65, 0.8, 1.5),
+  },
+  blender_royal_throne: {
+    anchors: [anchor("seat", "surface", [0, 0.4, 0])],
+    fit: fit("avatarHeight", 1.65, 0.8, 1.5),
+  },
+  blender_crystal_orb: {
+    anchors: [handAnchor("primary", "primary", [0, 0.1, 0], 0.02)],
+    grip: grip("pinch", 0.02, 50, 40),
+    fit: fit("hand", 0.075, 0.7, 1.4),
+  },
+  blender_tactical_helmet: {
+    anchors: [anchor("center", "surface", [0, 0, 0])],
+    fit: fit("head", 0.16, 0.8, 1.3),
+  },
+  blender_school_desk: {
+    anchors: [anchor("top", "surface", [0, 0.72, 0])],
+    fit: fit("avatarHeight", 1.65, 0.8, 1.5),
   },
 };
 
