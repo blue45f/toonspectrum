@@ -1251,6 +1251,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
           tiltYs: Array.from({ length: count }, () => -6),
         });
       };
+      expect(live.renderer.begin(elementAt(1)).status).toBe("started");
       for (const count of [12, 37, 68, 96]) {
         const prefix = elementAt(count);
         const presentationClearsBefore = live.presentationCanvas.clearCount();
