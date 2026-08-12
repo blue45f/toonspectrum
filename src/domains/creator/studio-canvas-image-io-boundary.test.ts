@@ -118,10 +118,11 @@ describe("Studio canvas image I/O module boundary", () => {
     // 의도적 변경(2026-08-09): liquify/dodge/wet-mix/heal-clone은 취소 가능한 retouch loader로
     // 이동했다. 네 호출은 유지하되 일반 pixel-edit loader 소유권에서는 제외한다(26 → 22).
     // 의도적 변경(2026-08-12): liquify live warp preview caches the source via the same
-    // retouch loader (4 → 5) so drop-frame previews do not invent a second image path.
+    // retouch loader (4 → 5) and reuses createStudioPixelEditCanvas for the downscaled bake
+    // (30 → 31) so drop-frame previews stay on the shared pixel-edit factory.
     expect(callCount(page.sourceFile, "loadStudioPixelEditImage")).toBe(22);
     expect(callCount(page.sourceFile, "loadStudioRetouchSourceImage")).toBe(5);
-    expect(page.source.match(/\bcreateStudioPixelEditCanvas\b/gu)).toHaveLength(30);
+    expect(page.source.match(/\bcreateStudioPixelEditCanvas\b/gu)).toHaveLength(31);
     expect(page.source).not.toContain('from "./studio-gif-element"');
     expect(page.source).not.toContain('from "./studio-upload-image-safety"');
   });
