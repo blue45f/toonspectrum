@@ -11,6 +11,10 @@ import {
   studioBrushCatalogKindLabel,
 } from "./studio-brush-catalog-core";
 import { loadStudioFullBrushCatalogItems } from "./studio-brush-catalog-loader";
+import {
+  resolveStudioBrushEngineLaneLabelKo,
+  studioBrushEngineLaneRowById,
+} from "./studio-brush-engine-lane-catalog";
 import { isStudioBrushPackCatalogId } from "./studio-brush-pack-id";
 import {
   studioBrushChipSurface,
@@ -289,6 +293,8 @@ export function StudioBrushTray({
           const surface = studioBrushChipSurface(item.mediaGroup);
           const sourceLabel = QUICK_SOURCE_LABEL[item.quickSource];
           const kindLabel = studioBrushCatalogKindLabel(item);
+          const engineLaneLabel = resolveStudioBrushEngineLaneLabelKo(item.id);
+          const engineLane = studioBrushEngineLaneRowById(item.id);
           return (
             <button
               key={item.id}
@@ -296,14 +302,15 @@ export function StudioBrushTray({
               role="option"
               aria-selected={active}
               tabIndex={item.id === rovingBrushId ? 0 : -1}
-              aria-label={`${sourceLabel} 브러시 ${item.name} · ${kindLabel} — ${item.hint}`}
-              title={`${sourceLabel} · ${kindLabel} · ${item.name} — ${item.hint}`}
+              aria-label={`${sourceLabel} 브러시 ${item.name} · ${engineLaneLabel ? `${engineLaneLabel} · ` : ""}${kindLabel} — ${item.hint}`}
+              title={`${sourceLabel} · ${engineLaneLabel ? `${engineLaneLabel} · ` : ""}${kindLabel} · ${item.name} — ${item.hint}`}
               onClick={() => onSelect(item)}
               onFocus={() => setFocusedBrushId(item.id)}
               onKeyDown={(event) => onBrushKeyDown(event, itemIndex)}
               data-studio-brush-chip={item.id}
               data-studio-brush-media={item.mediaGroup}
               data-studio-brush-kind={kindLabel}
+              data-studio-brush-engine-lane={engineLane?.lane}
               data-studio-quick-source={item.quickSource}
               className={cn(
                 // Icon + stroke preview tile (Ibis/Picsart/CSP)
@@ -332,6 +339,21 @@ export function StudioBrushTray({
                 <StudioBrushPresetIcon brushId={item.id} size={10} strokeWidth={2} />
               </span>
               <BrushPreviewGlyph item={item} active={active} />
+              {engineLaneLabel ? (
+                <span
+                  aria-hidden
+                  data-studio-brush-engine-chip={engineLane?.lane}
+                  title={`엔진: ${engineLaneLabel}`}
+                  className={cn(
+                    "absolute bottom-0.5 left-0.5 max-w-[2.4rem] truncate rounded px-0.5 text-[0.42rem] font-black leading-tight",
+                    active
+                      ? "bg-on-accent/20 text-on-accent"
+                      : "bg-accent/20 text-accent"
+                  )}
+                >
+                  {engineLaneLabel.replace(" ", "")}
+                </span>
+              ) : null}
               {item.quickSource !== "starter" ? (
                 <span
                   aria-hidden

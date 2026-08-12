@@ -30,6 +30,10 @@ import {
   studioBrushCatalogItemById,
   studioBrushCatalogKindLabel,
 } from "./studio-brush-catalog";
+import {
+  resolveStudioBrushEngineLaneLabelKo,
+  studioBrushEngineLaneRowById,
+} from "./studio-brush-engine-lane-catalog";
 import { isStudioBrushPackCatalogId } from "./studio-brush-pack-id";
 import {
   materializeStudioBrushCatalogSelection,
@@ -1324,11 +1328,14 @@ export function StudioBrushLibrarySheet({
               const active = item.id === activeBrushId;
               const fav = favoriteIds.includes(item.id);
               const kindLabel = studioBrushCatalogKindLabel(item);
+              const engineLaneLabel = resolveStudioBrushEngineLaneLabelKo(item.id);
+              const engineLane = studioBrushEngineLaneRowById(item.id);
               return (
                 <div
                   key={item.id}
                   data-studio-brush-source={item.source}
                   data-studio-brush-kind={item.mediaGroup}
+                  data-studio-brush-engine-lane={engineLane?.lane}
                   className={cn(
                     "group relative flex border [content-visibility:auto]",
                     STUDIO_EASE,
@@ -1414,7 +1421,7 @@ export function StudioBrushLibrarySheet({
                               active ? "text-on-accent/75" : "text-fg-3"
                             )}
                           >
-                            {kindLabel} · {item.defaultWidth}px ·{" "}
+                            {engineLaneLabel ? `${engineLaneLabel} · ` : ""}{kindLabel} · {item.defaultWidth}px ·{" "}
                             {Math.round(item.defaultOpacity * 100)}%
                           </span>
                         ) : null}
@@ -1440,14 +1447,30 @@ export function StudioBrushLibrarySheet({
                         <span className="truncate">
                           {item.defaultWidth}px · {Math.round(item.defaultOpacity * 100)}%
                         </span>
-                        <span
-                          data-studio-brush-kind-badge={item.mediaGroup}
-                          className={cn(
-                            "shrink-0 rounded-full px-1.5 py-0.5 font-bold",
-                            active ? "bg-on-accent/15 text-on-accent" : "bg-raised text-fg-2"
-                          )}
-                        >
-                          {kindLabel}
+                        <span className="flex shrink-0 items-center gap-1">
+                          {engineLaneLabel ? (
+                            <span
+                              data-studio-brush-engine-chip={engineLane?.lane}
+                              className={cn(
+                                "rounded-full px-1.5 py-0.5 font-bold",
+                                active
+                                  ? "bg-on-accent/20 text-on-accent"
+                                  : "bg-accent/12 text-accent"
+                              )}
+                              title={`엔진: ${engineLaneLabel}`}
+                            >
+                              {engineLaneLabel}
+                            </span>
+                          ) : null}
+                          <span
+                            data-studio-brush-kind-badge={item.mediaGroup}
+                            className={cn(
+                              "rounded-full px-1.5 py-0.5 font-bold",
+                              active ? "bg-on-accent/15 text-on-accent" : "bg-raised text-fg-2"
+                            )}
+                          >
+                            {kindLabel}
+                          </span>
                         </span>
                       </span>
                     ) : null}

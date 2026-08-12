@@ -375,9 +375,10 @@ describe("StudioBrushLibrarySheet", () => {
     expect(html).toContain('role="dialog"');
     expect(html).not.toContain('aria-modal="true"');
     expect(html).toContain('role="tablist"');
-    expect(html.match(/role="tab"/g)).toHaveLength(10);
+    // favorites/recent/beginner/pro/engines + line/marker/paint/fx/texture/all
+    expect(html.match(/role="tab"/g)).toHaveLength(11);
     expect(html.match(/role="tab"[^>]*tabindex="0"/g)).toHaveLength(1);
-    expect(html.match(/role="tab"[^>]*tabindex="-1"/g)).toHaveLength(9);
+    expect(html.match(/role="tab"[^>]*tabindex="-1"/g)).toHaveLength(10);
     expect(html).toMatch(/role="tabpanel" aria-labelledby="[^"]+" tabindex="0"/);
     expect(html).toMatch(/aria-label="전체 브러시 검색" aria-controls="[^"]+"/);
     expect(html).toContain('data-studio-brush-search-scope="all"');

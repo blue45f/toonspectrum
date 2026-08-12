@@ -4,6 +4,7 @@
  */
 
 import { BRUSH_PRESETS, type BrushPreset } from "./studio-brush";
+import { isStudioBrushEngineLaneId } from "./studio-brush-engine-lane-catalog";
 import {
   isStudioBrushPackCatalogId,
   STUDIO_BRUSH_PACK_CATALOG_IDS,
@@ -69,6 +70,8 @@ export function filterStudioBrushLibraryItems(options: {
     items = recentIds.map((id) => byId.get(id)).filter((item): item is StudioBrushTrayItem => Boolean(item));
   } else if (category === "pro") {
     items = allItems.filter((item) => isStudioBrushPackCatalogId(item.id));
+  } else if (category === "engines") {
+    items = allItems.filter((item) => isStudioBrushEngineLaneId(item.id));
   } else if (category === "all" || category === "expressive") {
     items = category === "all"
       ? allItems
@@ -111,6 +114,11 @@ export const STUDIO_BRUSH_LIBRARY_TABS: readonly {
     id: "pro",
     label: `프로 ${STUDIO_BRUSH_PACK_CATALOG_IDS.length}`,
     title: `프로시저럴 확장 브러시 ${STUDIO_BRUSH_PACK_CATALOG_IDS.length}종`,
+  },
+  {
+    id: "engines",
+    label: "엔진",
+    title: "엔진 레인 브러시 — 같은 재료·다른 엔진",
   },
   { id: "line", label: "선", title: "펜·연필·G펜" },
   { id: "marker", label: "마커", title: "마커·형광·네온" },

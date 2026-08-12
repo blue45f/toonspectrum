@@ -32783,7 +32783,8 @@ const puppetWarpArmed =
               size: Math.max(1, next.strokeWidth),
               opacity: next.opacity ?? 1,
             },
-            next.stamp
+            next.stamp,
+            next.brush,
           ),
           next.points[0] ?? strokeOrigin.x,
           next.points[1] ?? strokeOrigin.y,

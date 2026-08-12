@@ -12,13 +12,17 @@
  */
 
 import {
+  resolveStudioBrushEngineLaneBaseId,
+  studioBrushEngineLaneRowById,
+} from "./studio-brush-engine-lane-catalog";
+import {
   STUDIO_OSS_BRUSH_KERNELS_VERSION,
   STUDIO_OSS_BRUSH_PROVENANCE,
   type StudioOssBrushProvenanceId,
 } from "./studio-oss-brush-kernels";
 
 export const STUDIO_OSS_BRUSH_HYBRID_REGISTRY_VERSION =
-  "studio-oss-brush-hybrid-registry-v2" as const;
+  "studio-oss-brush-hybrid-registry-v3" as const;
 
 /**
  * Texture kinds — finer than quality-policy families so oil ≠ gouache ≠ watercolor.
@@ -573,6 +577,13 @@ export function resolveStudioBrushTextureKind(
   const exact = CORE_BRUSH_TEXTURE_KIND[id];
   if (exact) return exact;
 
+  const laneBase = resolveStudioBrushEngineLaneBaseId(id);
+  if (laneBase) {
+    const baseExact = CORE_BRUSH_TEXTURE_KIND[laneBase];
+    if (baseExact) return baseExact;
+    return resolveStudioBrushTextureKind(laneBase);
+  }
+
   if (/(?:eraser|kneaded)/u.test(id)) return "eraser";
   if (/(?:screentone|crosshatch|hatch-tone)/u.test(id)) return "stamp-tone";
   if (/(?:glitter|glow|sparkle|star-dust|neon|particle)/u.test(id)) {
@@ -679,10 +690,21 @@ export function describeStudioOssBrushHybridStack(
   provenanceNotes: readonly string[];
   crossEngineProductFallbackAllowed: false;
   textureFirst: true;
+  /** Present when brush id is an engine-lane shelf variant (`oil--filbert-ribbon`). */
+  engineLane: Readonly<{
+    id: string;
+    lane: string;
+    baseId: string;
+    runtimeEngine: string;
+    runtimeVariant: string;
+  }> | null;
 }> {
   const kind = resolveStudioBrushTextureKind(brushId);
   const matchResult = STUDIO_BRUSH_TEXTURE_ENGINE_MATCHES[kind];
   const family = studioBrushTextureKindToLegacyFamily(kind);
+  const laneRow = studioBrushEngineLaneRowById(
+    typeof brushId === "string" ? brushId : null,
+  );
   return Object.freeze({
     version: STUDIO_OSS_BRUSH_HYBRID_REGISTRY_VERSION,
     kernelsVersion: STUDIO_OSS_BRUSH_KERNELS_VERSION,
@@ -697,6 +719,15 @@ export function describeStudioOssBrushHybridStack(
     ),
     crossEngineProductFallbackAllowed: false,
     textureFirst: true,
+    engineLane: laneRow
+      ? Object.freeze({
+          id: laneRow.id,
+          lane: laneRow.lane,
+          baseId: laneRow.baseId,
+          runtimeEngine: laneRow.engine,
+          runtimeVariant: laneRow.engineVariant,
+        })
+      : null,
   });
 }
 

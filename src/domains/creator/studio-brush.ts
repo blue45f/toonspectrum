@@ -5,6 +5,10 @@
  * 전부 순수 함수 — StudioPage 캔버스 로직과 단위 테스트가 공유한다.
  */
 
+import {
+  STUDIO_BRUSH_ENGINE_LANE_CATALOG_ROWS,
+  listStudioBrushEngineLanePresets,
+} from "./studio-brush-engine-lane-catalog";
 import { STUDIO_PIXEL_PENCIL_RENDER_MODE } from "./studio-pixel-pencil";
 
 /** Artist-facing operation. Render families may be shared, but paint and erase never are. */
@@ -164,12 +168,23 @@ export const STUDIO_BRUSH_RENDER_FAMILY: Readonly<Record<string, StudioBrushRend
   "colored-pencil": "pencil",
   screentone: "screentone",
   crosshatch: "screentone",
+  ...Object.fromEntries(
+    STUDIO_BRUSH_ENGINE_LANE_CATALOG_ROWS.map((row) => [
+      row.id,
+      row.family as StudioBrushRenderFamily,
+    ]),
+  ),
 };
 
 export function resolveStudioBrushRenderFamily(brushId: unknown): StudioBrushRenderFamily {
   if (typeof brushId !== "string" || !brushId) return "pen";
   const mapped = STUDIO_BRUSH_RENDER_FAMILY[brushId];
   if (mapped) return mapped;
+  const laneBase = brushId.includes("--") ? brushId.split("--", 1)[0]! : null;
+  if (laneBase) {
+    const baseFamily = STUDIO_BRUSH_RENDER_FAMILY[laneBase];
+    if (baseFamily) return baseFamily;
+  }
   // Pack-expansion / alias ids keep one presentation family so wash/air/dry share UI chrome.
   const id = brushId.toLowerCase();
   if (/(?:watercolor|ink-?wash|inkwash|sumi|gouache|bleed-wash|wet-wash|flat-wash)/u.test(id)) {
@@ -751,6 +766,7 @@ export const BRUSH_PRESETS: BrushPreset[] = defineBrushPresets([
   },
   { id: "screentone", name: "스크린톤(도트)", defaultWidth: 22, defaultOpacity: 1.0 },
   { id: "crosshatch", name: "크로스 해치(사선)", defaultWidth: 20, defaultOpacity: 0.9 },
+  ...listStudioBrushEngineLanePresets(),
 ]);
 
 export function resolveStudioBrushPresetOperation(

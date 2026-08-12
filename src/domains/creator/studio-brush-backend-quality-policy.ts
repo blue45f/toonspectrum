@@ -11,6 +11,10 @@
  */
 
 import {
+  STUDIO_BRUSH_ENGINE_LANE_CATALOG_ROWS,
+  resolveStudioBrushEngineLaneBaseId,
+} from "./studio-brush-engine-lane-catalog";
+import {
   studioBrushPackDescriptorById,
   type StudioBrushPackCategory,
 } from "./studio-brush-pack-index";
@@ -1038,7 +1042,7 @@ Readonly<Record<StudioBrushBackendRouteProfile, readonly StudioBrushBackendRoute
     }),
   });
 
-const CORE_ROUTE_PROFILE_BY_ID = Object.freeze({
+const CORE_ROUTE_PROFILE_BY_ID_BASE = Object.freeze({
   pen: "continuous-analytic",
   fineliner: "continuous-analytic",
   ballpoint: "continuous-analytic",
@@ -1139,9 +1143,27 @@ const CORE_ROUTE_PROFILE_BY_ID = Object.freeze({
   screentone: "stamp-specialist",
   crosshatch: "stamp-specialist",
 } as const satisfies Readonly<Record<
-  StudioBrushRuntimePresetId,
+  string,
   StudioBrushBackendRouteProfile
 >>);
+
+const CORE_ROUTE_PROFILE_BY_ID = Object.freeze({
+  ...CORE_ROUTE_PROFILE_BY_ID_BASE,
+  ...Object.fromEntries(
+    STUDIO_BRUSH_ENGINE_LANE_CATALOG_ROWS.map((row) => {
+      const baseProfile =
+        CORE_ROUTE_PROFILE_BY_ID_BASE[
+          row.baseId as keyof typeof CORE_ROUTE_PROFILE_BY_ID_BASE
+        ];
+      if (!baseProfile) {
+        throw new Error(
+          `Engine-lane base ${row.baseId} missing CORE_ROUTE_PROFILE_BY_ID entry`,
+        );
+      }
+      return [row.id, baseProfile] as const;
+    }),
+  ),
+}) as Readonly<Record<StudioBrushRuntimePresetId, StudioBrushBackendRouteProfile>>;
 
 export const STUDIO_CORE_BRUSH_BACKEND_ROUTE_PROFILES:
 Readonly<Record<StudioBrushRuntimePresetId, StudioBrushBackendRouteProfile>> =
@@ -1285,24 +1307,55 @@ export function classifyStudioBrushBackendQuality(
     });
   }
 
-  const resolvedCoreId =
+  // Engine-lane ids (`oil--filbert-ribbon`) share the base medium's route profile.
+  const catalogRouteKey =
     catalogId && catalogId in CORE_ROUTE_PROFILE_BY_ID
-      ? catalogId as StudioBrushRuntimePresetId
-      : brushId && brushId in CORE_ROUTE_PROFILE_BY_ID
-        ? brushId as StudioBrushRuntimePresetId
+      ? catalogId
+      : catalogId
+        ? resolveStudioBrushEngineLaneBaseId(catalogId)
+        : null;
+  const brushRouteKey =
+    brushId && brushId in CORE_ROUTE_PROFILE_BY_ID
+      ? brushId
+      : brushId
+        ? resolveStudioBrushEngineLaneBaseId(brushId)
+        : null;
+  const resolvedCoreId =
+    catalogRouteKey && catalogRouteKey in CORE_ROUTE_PROFILE_BY_ID
+      ? catalogRouteKey as keyof typeof CORE_ROUTE_PROFILE_BY_ID
+      : brushRouteKey && brushRouteKey in CORE_ROUTE_PROFILE_BY_ID
+        ? brushRouteKey as keyof typeof CORE_ROUTE_PROFILE_BY_ID
         : null;
   if (resolvedCoreId) {
+    // Identity: lane brushes may pair catalogId/brushId as the same lane id, or match base.
+    const catalogBase = catalogId
+      ? (catalogId in CORE_ROUTE_PROFILE_BY_ID
+        ? catalogId
+        : resolveStudioBrushEngineLaneBaseId(catalogId))
+      : null;
+    const brushBase = brushId
+      ? (brushId in CORE_ROUTE_PROFILE_BY_ID
+        ? brushId
+        : resolveStudioBrushEngineLaneBaseId(brushId))
+      : null;
     if (
-      (catalogId !== null && catalogId !== resolvedCoreId)
-      || (brushId !== null && brushId !== resolvedCoreId)
+      catalogId !== null
+      && brushId !== null
+      && catalogId !== brushId
+      && catalogBase !== brushBase
     ) {
       return { status: "rejected", reason: "identity-mismatch" };
     }
     const routeProfile = CORE_ROUTE_PROFILE_BY_ID[resolvedCoreId];
+    const runtimeBrushId = (brushId && brushId in CORE_ROUTE_PROFILE_BY_ID
+      ? brushId
+      : catalogId && catalogId in CORE_ROUTE_PROFILE_BY_ID
+        ? catalogId
+        : resolvedCoreId) as StudioBrushRuntimePresetId;
     return classified({
       source: "core",
-      catalogId: resolvedCoreId,
-      runtimeBrushId: resolvedCoreId,
+      catalogId: (catalogId ?? brushId ?? resolvedCoreId) as StudioBrushRuntimePresetId,
+      runtimeBrushId,
       family: familyForProfile(routeProfile),
       routeProfile,
     });

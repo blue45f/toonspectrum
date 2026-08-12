@@ -168,7 +168,8 @@ describe("studio brush backend quality classification", () => {
     const routeIds = Object.keys(STUDIO_CORE_BRUSH_BACKEND_ROUTE_PROFILES).sort();
     const runtimeIds = STUDIO_BRUSH_RUNTIME_CONTRACT.map(({ id }) => id).sort();
 
-    expect(presetIds).toHaveLength(99);
+    expect(presetIds).toHaveLength(BRUSH_PRESETS.length);
+    expect(presetIds.length).toBeGreaterThan(99);
     expect(routeIds).toEqual(presetIds);
     expect(runtimeIds).toEqual(presetIds);
 

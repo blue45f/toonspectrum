@@ -76,12 +76,17 @@ describe(`${CORE_BRUSH_CATALOG_COUNT}-preset brush catalog contract`, () => {
     expect(STUDIO_BRUSH_RUNTIME_CONTRACT.map((contract) => contract.id)).toEqual(presetIds);
   });
 
-  it("keeps all 259 identities behind one searchable quick/full catalogue source", () => {
-    expect(STUDIO_BRUSH_CATALOG_COUNTS).toEqual({ core: 99, pro: 160, total: 259, erase: 2, paint: 257 });
-    expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(259);
+  it("keeps all identities behind one searchable quick/full catalogue source", () => {
+    const counts = STUDIO_BRUSH_CATALOG_COUNTS;
+    expect(counts.core).toBe(BRUSH_PRESETS.length);
+    expect(counts.pro).toBe(160);
+    expect(counts.total).toBe(counts.core + counts.pro);
+    expect(counts.erase).toBe(2);
+    expect(counts.paint).toBe(counts.total - counts.erase);
+    expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(counts.total);
     expect(new Set(STUDIO_ALL_BRUSH_CATALOG_ITEMS.map((item) => item.id))).toHaveProperty(
       "size",
-      259
+      counts.total
     );
 
     for (const item of STUDIO_ALL_BRUSH_CATALOG_ITEMS) {
@@ -118,7 +123,7 @@ describe(`${CORE_BRUSH_CATALOG_COUNT}-preset brush catalog contract`, () => {
     expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS.every(
       (item) => item.operation === "paint" || item.operation === "erase"
     )).toBe(true);
-    expect(STUDIO_PAINT_BRUSH_CATALOG_ITEMS).toHaveLength(257);
+    expect(STUDIO_PAINT_BRUSH_CATALOG_ITEMS).toHaveLength(STUDIO_BRUSH_CATALOG_COUNTS.paint);
     expect(STUDIO_ERASER_BRUSH_CATALOG_ITEMS.map((item) => item.id)).toEqual([
       "standard-eraser",
       "kneaded-eraser",

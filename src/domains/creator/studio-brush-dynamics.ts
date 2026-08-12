@@ -14,6 +14,7 @@
  * collaboration replay and export all reproduce the same stroke.
  */
 
+import { resolveStudioBrushEngineLaneDynamicsPresetId } from "./studio-brush-engine-lane-catalog";
 import {
   normalizeStudioBrushColorDynamicsSettings,
   normalizeStudioBrushGrainSettings,
@@ -331,6 +332,8 @@ export function resolveStudioBrushDynamicsPresetId(
 ): StudioBrushDynamicsPresetId | null {
   if (isStudioBrushDynamicsPresetId(brushId)) return brushId;
   if (typeof brushId !== "string") return null;
+  const engineLaneDynamics = resolveStudioBrushEngineLaneDynamicsPresetId(brushId);
+  if (engineLaneDynamics) return engineLaneDynamics;
   if (brushId === "spray" || brushId === "soft-brush" || brushId === "splatter") return "airbrush";
   if (
     brushId === "hard-airbrush"
@@ -3217,6 +3220,127 @@ const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamic
       },
     },
   },
+  "airbrush--klecks-grit": {
+    presetId: "airbrush",
+    overrides: {
+      seed: 9011,
+      tip: { shape: "soft", softness: 0.42 },
+      spacingRatio: 0.09,
+      scatterRatio: 0.22,
+      grain: { space: "canvas-fixed", amount: 0.55, scale: 5.5, contrast: 0.72, seed: 9011 },
+      flow: { base: 0.48, mappings: [{ source: "pressure", from: 0.4, to: 1 }], jitter: { mode: "multiply", amount: 0.12 } },
+    },
+  },
+  "airbrush--hard-envelope": {
+    presetId: "ink-particle",
+    overrides: {
+      seed: 9023,
+      tip: { shape: "hard", softness: 0.02 },
+      spacingRatio: 0.07,
+      scatterRatio: 0.02,
+      grain: { amount: 0 },
+      width: { base: 30, mappings: [{ source: "pressure", from: 0.5, to: 1.3, curve: 0.8 }], jitter: null },
+      flow: { base: 0.78, mappings: [{ source: "pressure", from: 0.6, to: 1 }], jitter: null },
+    },
+  },
+  "spray--equal-area": {
+    presetId: "airbrush",
+    overrides: {
+      seed: 9037,
+      tip: { shape: "flake", softness: 0.2 },
+      spacingRatio: 0.14,
+      scatterRatio: 0.55,
+      grain: { space: "canvas-fixed", amount: 0.4, scale: 3.2, contrast: 0.8, seed: 9037 },
+    },
+  },
+  "splatter--burst-cloud": {
+    presetId: "airbrush",
+    overrides: {
+      seed: 9043,
+      tip: { shape: "flake", softness: 0.12 },
+      spacingRatio: 0.2,
+      scatterRatio: 0.75,
+      grain: { space: "canvas-fixed", amount: 0.5, scale: 4.1, contrast: 0.85, seed: 9043 },
+    },
+  },
+  "oil--tube-extrude": {
+    presetId: "ink-particle",
+    overrides: {
+      seed: 9051,
+      tip: { shape: "hard", softness: 0.05 },
+      spacingRatio: 0.08,
+      scatterRatio: 0.03,
+      grain: { amount: 0.15, scale: 6, contrast: 0.5, seed: 9051 },
+    },
+  },
+  "oil--knife-edge": {
+    presetId: "ink-particle",
+    overrides: {
+      seed: 9059,
+      tip: { shape: "hard", softness: 0.01 },
+      spacingRatio: 0.05,
+      scatterRatio: 0.01,
+      grain: { amount: 0 },
+      width: { base: 34, mappings: [{ source: "pressure", from: 0.4, to: 1.5 }], jitter: null },
+    },
+  },
+  "acrylic--polymer-flat": {
+    presetId: "ink-particle",
+    overrides: { seed: 9067, tip: { shape: "hard", softness: 0.08 }, spacingRatio: 0.1, scatterRatio: 0.02 },
+  },
+  "charcoal--vine-soft": {
+    presetId: "dry-media",
+    overrides: {
+      seed: 9071, tip: { shape: "sponge", softness: 0.7 }, spacingRatio: 0.16, scatterRatio: 0.12,
+      grain: { space: "canvas-fixed", amount: 0.45, scale: 9, contrast: 0.55, seed: 9071 },
+    },
+  },
+  "charcoal--compressed-edge": {
+    presetId: "dry-media",
+    overrides: {
+      seed: 9079, tip: { shape: "hard", softness: 0.15 }, spacingRatio: 0.11, scatterRatio: 0.06,
+      grain: { space: "canvas-fixed", amount: 0.35, scale: 6, contrast: 0.7, seed: 9079 },
+    },
+  },
+  "crayon--wax-scrape": {
+    presetId: "dry-media",
+    overrides: {
+      seed: 9083, tip: { shape: "hard", softness: 0.12 }, spacingRatio: 0.13, scatterRatio: 0.05,
+      grain: { space: "canvas-fixed", amount: 0.5, scale: 7, contrast: 0.65, seed: 9083 },
+    },
+  },
+  "chalk--klecks-powder": {
+    presetId: "dry-media",
+    overrides: {
+      seed: 9091, tip: { shape: "sponge", softness: 0.55 }, spacingRatio: 0.15, scatterRatio: 0.18,
+      grain: { space: "canvas-fixed", amount: 0.6, scale: 4.5, contrast: 0.75, seed: 9091 },
+    },
+  },
+  "pastel--cake-soft": {
+    presetId: "dry-media",
+    overrides: { seed: 9103, tip: { shape: "sponge", softness: 0.68 }, spacingRatio: 0.12, scatterRatio: 0.08 },
+  },
+  "oil-pastel--waxy-film": {
+    presetId: "dry-media",
+    overrides: { seed: 9109, tip: { shape: "bristle", softness: 0.35 }, spacingRatio: 0.1, scatterRatio: 0.04 },
+  },
+  "brush--dry-rake": {
+    presetId: "dry-media",
+    overrides: { seed: 9113, tip: { shape: "bristle", softness: 0.25 }, spacingRatio: 0.14, scatterRatio: 0.2 },
+  },
+  "ink-particle--scatter-cloud": {
+    presetId: "ink-particle",
+    overrides: { seed: 9121, tip: { shape: "flake", softness: 0.3 }, spacingRatio: 0.18, scatterRatio: 0.45 },
+  },
+  "marker--soft-dynamic": {
+    presetId: "airbrush",
+    overrides: { seed: 9127, tip: { shape: "soft", softness: 0.55 }, spacingRatio: 0.11, scatterRatio: 0.06 },
+  },
+  "pencil--erodible-wear": {
+    presetId: "ink-particle",
+    overrides: { seed: 9131, tip: { shape: "grain", softness: 0.2 }, spacingRatio: 0.09, scatterRatio: 0.03 },
+  },
+
 };
 
 function mergeStudioBrushDynamicsVariant(

@@ -113,6 +113,7 @@ export type StudioBrushTrayCategory =
   | "beginner"
   | "expressive"
   | "pro"
+  | "engines"
   | "line"
   | "marker"
   | "paint"

@@ -36,7 +36,8 @@ export function StudioStampDrawShape({
   const stampStyle = resolveStudioStampBrushStyle(
     stampKind,
     { color: stroke, size: Math.max(1, strokeWidth), opacity },
-    el.stamp
+    el.stamp,
+    el.brush,
   );
   // v2 stores the already accepted/stabilized point stream as its rendering contract.
   // Re-smoothing a growing prefix would move or delete dabs that were already visible.

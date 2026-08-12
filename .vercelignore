@@ -12,6 +12,14 @@ docs/third-party/*
 # Local QA captures and repository automation metadata.
 artifacts/
 .github/
+.grok/
+tmp/
+scratch/
+.playwright-mcp/
+
+# Cargo build trees and local rust targets are never Vercel build inputs;
+# only sealed pkg/pkg-gpu WASM outputs under crates/ are required.
+crates/**/target/
 
 # These stacks are deployed independently from the Vercel application.
 # The shared realtime protocol/ticket sources remain build inputs for the
@@ -32,3 +40,4 @@ deploy/oci/
 **/spec/
 **/specs/
 e2e/
+tests/benchmarks/

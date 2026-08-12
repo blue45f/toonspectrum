@@ -12,6 +12,8 @@
  * have per-dab/per-pass pigment multipliers because those are part of the brush material itself.
  */
 
+import { resolveStudioBrushEngineLaneWatercolorMaterial } from "./studio-brush-engine-lane-catalog";
+
 export const STUDIO_BRUSH_ALIAS_PROFILE_VERSION = "brush-alias-profile-v1" as const;
 
 export type StudioBrushAliasProfileVersion =
@@ -618,7 +620,15 @@ export function studioBrushAliasEffectiveDiameter(
     MIN_EFFECTIVE_DIAMETER,
     MAX_EFFECTIVE_DIAMETER
   );
-  const scale = resolveStudioBrushAliasProfile(brushId)?.diameterScale ?? 1;
+  let scale = resolveStudioBrushAliasProfile(brushId)?.diameterScale ?? 1;
+  if (typeof brushId === "string" && brushId.includes("--")) {
+    let hash = 2166136261;
+    for (let i = 0; i < brushId.length; i++) {
+      hash ^= brushId.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    scale *= 0.84 + (((hash >>> 0) % 10_000) / 10_000) * 0.52;
+  }
   return clamp(
     diameter * scale,
     MIN_EFFECTIVE_DIAMETER,
@@ -673,11 +683,16 @@ export function resolveStudioBrushAliasWatercolorPlanSettings(
   selectedDiameter: unknown
 ): StudioBrushAliasWatercolorPlanSettings | null {
   const profile = resolveStudioBrushAliasProfile(brushId);
-  if (!profile?.watercolor) return null;
+  const laneMaterial =
+    typeof brushId === "string"
+      ? resolveStudioBrushEngineLaneWatercolorMaterial(brushId)
+      : null;
+  const watercolor = profile?.watercolor ?? laneMaterial;
+  if (!watercolor) return null;
   const baseWidth = studioBrushAliasEffectiveDiameter(brushId, selectedDiameter);
   return {
     baseWidth,
-    spacing: Math.max(0.25, baseWidth * profile.watercolor.spacingRatio),
+    spacing: Math.max(0.25, baseWidth * watercolor.spacingRatio),
   };
 }
 
@@ -694,7 +709,10 @@ export function applyStudioBrushAliasWatercolorMaterial(
   brushId: unknown,
   dabs: readonly StudioBrushAliasWatercolorDab[]
 ): readonly StudioBrushAliasWatercolorDab[] {
-  const material = resolveStudioBrushAliasProfile(brushId)?.watercolor;
+  const material = resolveStudioBrushAliasProfile(brushId)?.watercolor
+    ?? (typeof brushId === "string"
+      ? resolveStudioBrushEngineLaneWatercolorMaterial(brushId)
+      : null);
   if (!material) return dabs;
   return dabs.map((dab) => {
     const core = dab.role === "core";

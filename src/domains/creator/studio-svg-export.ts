@@ -2310,7 +2310,8 @@ function serializeFreehand(
     const style = resolveStudioStampBrushStyle(
       stampKind,
       { color: stroke, size: strokeWidth, opacity: strokeOpacity },
-      el.stamp
+      el.stamp,
+      brush,
     );
     // v2는 이미 수락·안정화된 append-only 입력이다. legacy만 과거 평활화/압력 재표본을 유지한다.
     const causal = el.stampPipeline === "causal-walker-v2";

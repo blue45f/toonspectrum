@@ -17,6 +17,7 @@ import {
   type StudioBrushRenderFamily,
   type StudioToolOperation,
 } from "./studio-brush";
+import { STUDIO_BRUSH_ENGINE_LANE_CATALOG_ROWS } from "./studio-brush-engine-lane-catalog";
 
 import type { StudioBrushPreviewStyle } from "./studio-brush-visual";
 
@@ -211,6 +212,18 @@ export const STUDIO_BRUSH_RUNTIME_CONTRACT = [
   { id: "web-cross-hatch-pen", family: "pen", engine: "dynamic-dabs", engineVariant: "web-cross-hatch-pen-x", canonicalId: "web-cross-hatch-pen", preview: "solid", tip: "hard", texture: "none", dynamics: "mapped-dabs", distinctness: "unique" },
   { id: "screentone", family: "screentone", engine: "screentone-dots", engineVariant: "global-grid", canonicalId: "screentone", preview: "tone", tip: "tone-dot", texture: "tone-grid", dynamics: "global-grid", distinctness: "unique" },
   { id: "crosshatch", family: "screentone", engine: "screentone-dots", engineVariant: "global-grid", canonicalId: "screentone", preview: "tone", tip: "tone-dot", texture: "tone-grid", dynamics: "global-grid", distinctness: "profile-variant" },
+  ...STUDIO_BRUSH_ENGINE_LANE_CATALOG_ROWS.map((row) => ({
+    id: row.id,
+    family: row.family as StudioBrushRenderFamily,
+    engine: row.engine as StudioBrushRuntimeEngine,
+    engineVariant: row.engineVariant,
+    canonicalId: row.canonicalId,
+    preview: row.preview as StudioBrushPreviewStyle,
+    tip: row.tip as StudioBrushRuntimeTip,
+    texture: row.texture as StudioBrushRuntimeTexture,
+    dynamics: row.dynamics as StudioBrushRuntimeDynamics,
+    distinctness: row.distinctness,
+  })),
 ] as const satisfies readonly StudioBrushRuntimeContract[];
 
 export type StudioBrushRuntimePresetId = (typeof STUDIO_BRUSH_RUNTIME_CONTRACT)[number]["id"];
@@ -275,9 +288,18 @@ const STUDIO_BRUSH_ENGINE_CAPABILITIES: Readonly<
   },
   "watercolor-dabs": {
     diffuse: { families: ["watercolor"], previews: ["soft"], tip: "soft-diffuse", texture: "wet-edge", dynamics: "watercolor-pressure" },
+    granular: { families: ["watercolor"], previews: ["soft"], tip: "sponge", texture: "procedural-grain", dynamics: "watercolor-pressure" },
+    "dense-core": { families: ["watercolor"], previews: ["soft"], tip: "bristle", texture: "wet-edge", dynamics: "watercolor-pressure" },
+    "sumi-dense": { families: ["watercolor"], previews: ["soft"], tip: "bristle", texture: "wet-edge", dynamics: "watercolor-pressure" },
+    "bleed-halo": { families: ["watercolor"], previews: ["soft"], tip: "soft-diffuse", texture: "soft-gradient", dynamics: "watercolor-pressure" },
+    "matte-body": { families: ["watercolor"], previews: ["soft"], tip: "hard", texture: "none", dynamics: "watercolor-pressure" },
   },
   "oil-ribbon": {
     "bristle-lanes": { families: ["oil"], previews: ["oil"], tip: "bristle", texture: "procedural-bristle", dynamics: "bristle-pressure" },
+    "filbert-lanes": { families: ["oil"], previews: ["oil"], tip: "bristle", texture: "procedural-bristle", dynamics: "bristle-pressure" },
+    "flat-lanes": { families: ["oil"], previews: ["oil"], tip: "hard", texture: "procedural-bristle", dynamics: "bristle-pressure" },
+    "impasto-lanes": { families: ["oil"], previews: ["oil"], tip: "bristle", texture: "procedural-bristle", dynamics: "bristle-pressure" },
+    "acrylic-stiff-lanes": { families: ["oil"], previews: ["oil"], tip: "hard", texture: "procedural-bristle", dynamics: "bristle-pressure" },
   },
   "dynamic-dabs": {
     airbrush: { families: ["airbrush"], previews: ["soft"], tip: "soft-particle", texture: "custom-alpha-capable", dynamics: "mapped-dabs" },
@@ -294,6 +316,19 @@ const STUDIO_BRUSH_ENGINE_CAPABILITIES: Readonly<
     "connected-hard-envelope": { families: ["airbrush"], previews: ["solid"], tip: "hard", texture: "none", dynamics: "mapped-dabs" },
     "progressive-wear-ribbon": { families: ["pencil"], previews: ["texture"], tip: "grain", texture: "procedural-grain", dynamics: "mapped-dabs" },
     "extruded-bead-ribbon": { families: ["oil"], previews: ["oil"], tip: "hard", texture: "procedural-bristle", dynamics: "mapped-dabs" },
+    "palette-knife-blade": { families: ["oil"], previews: ["oil"], tip: "hard", texture: "none", dynamics: "mapped-dabs" },
+    "acrylic-polymer-flat": { families: ["oil"], previews: ["oil"], tip: "hard", texture: "none", dynamics: "mapped-dabs" },
+    "charcoal-vine": { families: ["dry-media"], previews: ["texture"], tip: "sponge", texture: "custom-alpha-capable", dynamics: "mapped-dabs" },
+    "charcoal-compressed": { families: ["dry-media"], previews: ["texture"], tip: "hard", texture: "custom-alpha-capable", dynamics: "mapped-dabs" },
+    "crayon-wax-scrape": { families: ["dry-media"], previews: ["texture"], tip: "hard", texture: "custom-alpha-capable", dynamics: "mapped-dabs" },
+    "chalk-klecks": { families: ["dry-media"], previews: ["texture"], tip: "sponge", texture: "custom-alpha-capable", dynamics: "mapped-dabs" },
+    "pastel-cake": { families: ["pastel"], previews: ["soft"], tip: "sponge", texture: "custom-alpha-capable", dynamics: "mapped-dabs" },
+    "oil-pastel-film": { families: ["pastel"], previews: ["soft"], tip: "bristle", texture: "custom-alpha-capable", dynamics: "mapped-dabs" },
+    "airbrush-klecks-grit": { families: ["airbrush"], previews: ["soft"], tip: "soft-particle", texture: "custom-alpha-capable", dynamics: "mapped-dabs" },
+    "spray-equal-area": { families: ["airbrush"], previews: ["dots"], tip: "flake", texture: "custom-alpha-capable", dynamics: "mapped-dabs" },
+    "splatter-burst": { families: ["airbrush"], previews: ["dots"], tip: "flake", texture: "custom-alpha-capable", dynamics: "mapped-dabs" },
+    "brush-dry-rake": { families: ["dry-media"], previews: ["texture"], tip: "bristle", texture: "custom-alpha-capable", dynamics: "mapped-dabs" },
+    "ink-scatter-cloud": { families: ["ink-particle"], previews: ["dots"], tip: "flake", texture: "custom-alpha-capable", dynamics: "mapped-dabs" },
     "direction-encoded-ribbon": { families: ["ink-particle"], previews: ["calligraphy"], tip: "hard", texture: "none", dynamics: "mapped-dabs" },
     "sketchpad-tile-lattice": { families: ["ink-particle"], previews: ["dots"], tip: "hard", texture: "procedural-grain", dynamics: "mapped-dabs" },
     "sketchpad-mirror-pair": { families: ["pen"], previews: ["solid"], tip: "hard", texture: "none", dynamics: "mapped-dabs" },
@@ -326,12 +361,14 @@ const STUDIO_BRUSH_ENGINE_CAPABILITIES: Readonly<
   },
   "pencil-path": {
     jitter: { families: ["pencil"], previews: ["dashed"], tip: "grain", texture: "procedural-grain", dynamics: "grain-jitter" },
+    "side-shade": { families: ["pencil"], previews: ["dashed"], tip: "grain", texture: "procedural-grain", dynamics: "grain-jitter" },
   },
   "pastel-dabs": {
     "soft-grain": { families: ["pastel"], previews: ["soft"], tip: "grain", texture: "procedural-grain", dynamics: "pastel-pressure" },
   },
   "screentone-dots": {
     "global-grid": { families: ["screentone"], previews: ["tone"], tip: "tone-dot", texture: "tone-grid", dynamics: "global-grid" },
+    "sparse-grid": { families: ["screentone"], previews: ["tone"], tip: "tone-dot", texture: "tone-grid", dynamics: "global-grid" },
   },
 };
 

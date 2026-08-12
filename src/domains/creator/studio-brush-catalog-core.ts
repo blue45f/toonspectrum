@@ -42,9 +42,10 @@ const STUDIO_CORE_ERASE_BRUSH_COUNT = STUDIO_CORE_BRUSH_CATALOG_ITEMS.filter(
 
 /**
  * Single source of truth for product-facing brush totals.
- * - `total` = paint + erase (currently 259)
- * - `paint` = every selectable pen/tool in the paint library (currently 257)
+ * - `total` = paint + erase (core + pro; grows with engine-lane shelf)
+ * - `paint` = every selectable pen/tool in the paint library
  * - historical "229 paint" was core 71 − 2 erase + pro 160 before web-kit core expansion
+ * - historical core 99 grew with engine-lane variants (`oil--filbert-ribbon`, …)
  */
 export const STUDIO_BRUSH_CATALOG_COUNTS = Object.freeze({
   core: STUDIO_CORE_BRUSH_CATALOG_ITEMS.length,

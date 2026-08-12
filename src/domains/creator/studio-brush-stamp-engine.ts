@@ -13,6 +13,7 @@
  * (Klecks multi-octave spray/chalk DNA + equal-area scatter), not pure CSS gradients.
  */
 
+import { resolveStudioBrushEngineLaneStampTuning } from "./studio-brush-engine-lane-catalog";
 import {
   studioOssSprayTipCoverage,
   studioOssWatercolorTipCoverage,
@@ -53,6 +54,14 @@ export function resolveStudioStampBrushKind(
     case "krita-auto-soft":
     case "krita-dual-pattern":
       return "krita-auto";
+    case "gouache--flat-stamp":
+      return "ink";
+    case "watercolor--edge-stamp":
+      return "watercolor";
+    case "airbrush--stamp-soft":
+      return "airbrush";
+    case "pencil--stamp-grain":
+      return "pencil";
     default:
       return null;
   }
@@ -71,6 +80,11 @@ export interface StudioStampBrushStyle {
   readonly hardness: number;
   /** 필압 0에서의 크기 비율(0..1) — Min size. */
   readonly minSizeRatio: number;
+  /**
+   * dab 지름 대비 스탬프 간격 비율.
+   * 생략 시 kind 기본값(STAMP_SPACING_RATIO)을 사용한다.
+   */
+  readonly spacingRatio?: number;
 }
 
 /** dab 지름 대비 스탬프 간격 비율 — 종류별 질감을 만드는 1차 변수. */
@@ -174,22 +188,25 @@ export interface StudioStampBrushTuning {
 export function resolveStudioStampBrushStyle(
   kind: StudioStampBrushKind,
   base: { color: string; size: number; opacity: number },
-  tuning?: StudioStampBrushTuning | null
+  tuning?: StudioStampBrushTuning | null,
+  brushId?: string | null,
 ): StudioStampBrushStyle {
   const defaults = STUDIO_STAMP_BRUSH_DEFAULTS[kind];
+  const lane = resolveStudioBrushEngineLaneStampTuning(brushId);
   const pick = (value: number | undefined, fallback: number): number =>
     typeof value === "number" && Number.isFinite(value)
       ? Math.min(1, Math.max(0, value))
       : fallback;
+  const sizeScale = lane?.sizeScale ?? 1;
   return {
     kind,
     color: base.color,
-    size: Math.max(1, base.size),
+    size: Math.max(1, base.size * sizeScale),
     opacity: Math.min(1, Math.max(0, base.opacity)),
-    // flow 0 은 아무것도 안 그려진다 — 슬라이더 최솟값에서도 희미하게는 남게 바닥을 둔다.
-    flow: Math.max(0.03, pick(tuning?.flow, defaults.flow)),
-    hardness: pick(tuning?.hardness, defaults.hardness),
-    minSizeRatio: pick(tuning?.minSize, defaults.minSizeRatio),
+    flow: Math.max(0.03, pick(tuning?.flow, lane?.flow ?? defaults.flow)),
+    hardness: pick(tuning?.hardness, lane?.hardness ?? defaults.hardness),
+    minSizeRatio: pick(tuning?.minSize, lane?.minSizeRatio ?? defaults.minSizeRatio),
+    spacingRatio: Math.max(0.03, Math.min(1, lane?.spacingRatio ?? STAMP_SPACING_RATIO[kind])),
   };
 }
 
@@ -532,7 +549,7 @@ function walkStampSegmentPlan(
   const baseAlpha = clamp01(style.flow) * clamp01(style.opacity);
   let travelled = state.residual;
   const spacingOf = (p: number): number =>
-    Math.max(0.5, pressureRadius(style, p) * 2 * STAMP_SPACING_RATIO[style.kind]);
+    Math.max(0.5, pressureRadius(style, p) * 2 * (style.spacingRatio ?? STAMP_SPACING_RATIO[style.kind]));
   // 의도적 변경(2026-07-23 스트로크 렌더 품질 감사): 시작 도트(index 0)를 이미 소비한 fresh
   // walker(stampIndex > 0, residual 0)는 t=0에서 시작점 위에 dab을 한 번 더 찍지 않는다.
   // 기존에는 도트와 같은 좌표에 중복 dab이 얹혀 반투명 브러시(airbrush/watercolor/저불투명
