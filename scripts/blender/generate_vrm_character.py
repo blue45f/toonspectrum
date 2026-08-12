@@ -114,7 +114,77 @@ def build_vrm_character():
     final_path = os.path.join(VRM_OUT_DIR, "cyber_agent_zero.vrm")
     if os.path.exists(vrm_path) and vrm_path != final_path:
         os.rename(vrm_path, final_path)
+
+    # Inject VRMC_vrm extension header
+    inject_vrmc_extension(final_path, "사이버 에이전트 제로")
     print(f"🤖 Exported Cyber Agent Zero VRM: {final_path} ({os.path.getsize(final_path)} bytes)")
+
+def inject_vrmc_extension(vrm_path, name):
+    import json, struct
+    with open(vrm_path, 'rb') as f:
+        data = f.read()
+    if len(data) < 20: return
+    magic, version, length = struct.unpack_from('<III', data, 0)
+    if magic != 0x46546c67: return
+    json_len, json_type = struct.unpack_from('<II', data, 12)
+    json_bytes = data[20:20 + json_len]
+    gltf = json.loads(json_bytes.decode('utf-8'))
+    
+    nodes = gltf.get("nodes", [])
+    def find_node(bname):
+        for idx, n in enumerate(nodes):
+            if n.get("name") == bname:
+                return {"node": idx}
+        return None
+
+    gltf.setdefault("extensionsUsed", [])
+    if "VRMC_vrm" not in gltf["extensionsUsed"]:
+        gltf["extensionsUsed"].append("VRMC_vrm")
+    
+    gltf.setdefault("extensions", {})
+    gltf["extensions"]["VRMC_vrm"] = {
+        "specVersion": "1.0",
+        "meta": {
+            "name": name,
+            "authors": ["ToonSpectrum 3D Engine"],
+            "version": "1.0.0",
+            "avatarPermission": "everyone",
+            "allowCommercialUsage": "corporation",
+            "creditNotation": "unnecessary",
+            "modification": "allowModification"
+        },
+        "humanoid": {
+            "humanBones": {
+                "hips": find_node("hips") or {"node": 0},
+                "spine": find_node("spine") or {"node": 1},
+                "chest": find_node("chest") or {"node": 2},
+                "neck": find_node("neck") or {"node": 3},
+                "head": find_node("head") or {"node": 4},
+                "leftUpperArm": find_node("leftUpperArm") or {"node": 5},
+                "rightUpperArm": find_node("rightUpperArm") or {"node": 6},
+                "leftUpperLeg": find_node("leftUpperLeg") or {"node": 7},
+                "rightUpperLeg": find_node("rightUpperLeg") or {"node": 8}
+            }
+        }
+    }
+
+    new_json_str = json.dumps(gltf)
+    new_json_bytes = new_json_str.encode('utf-8')
+    pad = (4 - (len(new_json_bytes) % 4)) % 4
+    if pad > 0:
+        new_json_bytes += b' ' * pad
+
+    bin_bytes = data[20 + json_len:]
+    new_total_len = 12 + 8 + len(new_json_bytes) + len(bin_bytes)
+
+    header = struct.pack('<III', 0x46546c67, 2, new_total_len)
+    chunk0_hdr = struct.pack('<II', len(new_json_bytes), 0x4e4f534a)
+
+    with open(vrm_path, 'wb') as f:
+        f.write(header)
+        f.write(chunk0_hdr)
+        f.write(new_json_bytes)
+        f.write(bin_bytes)
 
 if __name__ == "__main__":
     print("🚀 Generating 3D VRM Cyber Agent Zero Character...")
