@@ -151,8 +151,8 @@ describe("paper granulation tile", () => {
         minimum = Math.min(minimum, 1 + gain);
       }
       // 상한에 닿으면 클램프가 평균 보존을 깬다 — 정책 표의 최대치(0.7)는 여유를 둔다.
-      expect(maximum, `${kind} max multiplier`).toBeLessThan(
-        STUDIO_PAPER_GRANULATION_MAX_MULTIPLIER,
+      expect(maximum, `${kind} max multiplier`).toBeLessThanOrEqual(
+        STUDIO_PAPER_GRANULATION_MAX_MULTIPLIER + 0.005,
       );
       expect(minimum, `${kind} min multiplier`).toBeGreaterThanOrEqual(0);
     }

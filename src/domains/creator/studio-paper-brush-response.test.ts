@@ -3,11 +3,15 @@ import { describe, expect, it } from "vitest";
 import { STUDIO_BRUSH_RENDER_FAMILY } from "./studio-brush";
 import {
   STUDIO_PAPER_BRUSH_RESPONSE,
+  applyStudioPaperPhysicsToBrushResponse,
+  resolveStudioPaperBrushEffectiveGranulation,
   resolveStudioPaperBrushResponse,
 } from "./studio-paper-brush-response";
 import {
   STUDIO_PAPER_GRANULATION_IDENTITY,
   normalizeStudioPaperGranulationSettings,
+  resetStudioDocumentPaperSurface,
+  setStudioDocumentPaperSurface,
   studioPaperGranulationEffectiveStrength,
   studioPaperGranulationIsActive,
 } from "./studio-paper-granulation-runtime";
@@ -50,7 +54,9 @@ describe("paper response policy", () => {
 
   it("ranks natural media by how much the paper actually shows", () => {
     const strength = (brushId: string) =>
-      studioPaperGranulationEffectiveStrength(resolveStudioPaperBrushResponse(brushId));
+      studioPaperGranulationEffectiveStrength(
+        resolveStudioPaperBrushResponse(brushId, "cold-press"),
+      );
     // 목탄 가루 > 파스텔 > 흑연 ≳ 수채 > 회화 붓 > 유성 > 에어브러시 > 잉크.
     expect(strength("charcoal")).toBeGreaterThan(strength("pastel"));
     expect(strength("pastel")).toBeGreaterThan(strength("pencil"));
@@ -87,16 +93,25 @@ describe("paper response policy", () => {
         "inkwash-bleed-wash",
         "inkwash-white-ink",
       ].includes(brushId)) continue;
-      expect(resolveStudioPaperBrushResponse(brushId), brushId).toBe(
+      const expected = applyStudioPaperPhysicsToBrushResponse(
         STUDIO_PAPER_BRUSH_RESPONSE[family],
+        "cold-press",
+      );
+      expect(resolveStudioPaperBrushResponse(brushId, "cold-press"), brushId).toEqual(
+        expected,
       );
     }
-    // 별칭 규칙(정규식 폴백)도 같은 매체로 떨어진다.
-    expect(resolveStudioPaperBrushResponse("studio-charcoal-soft")).toBe(
-      STUDIO_PAPER_BRUSH_RESPONSE["dry-media"],
+    expect(resolveStudioPaperBrushResponse("studio-charcoal-soft", "cold-press")).toEqual(
+      applyStudioPaperPhysicsToBrushResponse(
+        STUDIO_PAPER_BRUSH_RESPONSE["dry-media"],
+        "cold-press",
+      ),
     );
-    expect(resolveStudioPaperBrushResponse("wet-wash-broad")).toBe(
-      STUDIO_PAPER_BRUSH_RESPONSE.watercolor,
+    expect(resolveStudioPaperBrushResponse("wet-wash-broad", "cold-press")).toEqual(
+      applyStudioPaperPhysicsToBrushResponse(
+        STUDIO_PAPER_BRUSH_RESPONSE.watercolor,
+        "cold-press",
+      ),
     );
   });
 
@@ -113,8 +128,26 @@ describe("paper response policy", () => {
         STUDIO_PAPER_GRANULATION_IDENTITY,
       );
     }
-    expect(resolveStudioPaperBrushResponse("dry-media")).toBe(
-      STUDIO_PAPER_BRUSH_RESPONSE["dry-media"],
+    expect(resolveStudioPaperBrushResponse("dry-media", "cold-press")).toEqual(
+      applyStudioPaperPhysicsToBrushResponse(
+        STUDIO_PAPER_BRUSH_RESPONSE["dry-media"],
+        "cold-press",
+      ),
     );
+  });
+
+  it("amplifies dry media on sanded/charcoal paper vs marker pad", () => {
+    resetStudioDocumentPaperSurface();
+    const onSanded = resolveStudioPaperBrushEffectiveGranulation("charcoal", "sanded-pastel");
+    const onMarker = resolveStudioPaperBrushEffectiveGranulation("charcoal", "marker-pad");
+    const onCanvas = resolveStudioPaperBrushEffectiveGranulation("oil", "canvas");
+    const onBristol = resolveStudioPaperBrushEffectiveGranulation("oil", "bristol");
+    expect(onSanded).toBeGreaterThan(onMarker * 1.8);
+    expect(onCanvas).toBeGreaterThan(onBristol);
+    setStudioDocumentPaperSurface({ kind: "sanded-pastel", seed: 3 });
+    expect(resolveStudioPaperBrushEffectiveGranulation("pastel")).toBeGreaterThan(
+      resolveStudioPaperBrushEffectiveGranulation("pastel", "bristol"),
+    );
+    resetStudioDocumentPaperSurface();
   });
 });

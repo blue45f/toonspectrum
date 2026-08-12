@@ -44,18 +44,13 @@ describe("종이 종류 정규화", () => {
   });
 
   it("수채 3종은 결의 굵기·진폭이 단조롭게 커지고, 확장 카탈로그도 프리셋을 갖는다", () => {
-    expect(PAPER_GRAIN_KINDS).toEqual([
-      "hot-press",
-      "cold-press",
-      "rough",
-      "bristol",
-      "washi",
-      "kraft",
-      "canvas",
-      "charcoal",
-      "newsprint",
-      "pastel-board",
-    ]);
+    expect(PAPER_GRAIN_KINDS).toContain("hot-press");
+    expect(PAPER_GRAIN_KINDS).toContain("cold-press");
+    expect(PAPER_GRAIN_KINDS).toContain("rough");
+    expect(PAPER_GRAIN_KINDS).toContain("sanded-pastel");
+    expect(PAPER_GRAIN_KINDS).toContain("linen-canvas");
+    expect(PAPER_GRAIN_KINDS).toContain("rice-paper");
+    expect(PAPER_GRAIN_KINDS.length).toBeGreaterThanOrEqual(18);
     const hot = PAPER_TEXTURE_PRESETS["hot-press"];
     const cold = PAPER_TEXTURE_PRESETS["cold-press"];
     const rough = PAPER_TEXTURE_PRESETS.rough;

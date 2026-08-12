@@ -50,7 +50,7 @@
     "sonar": "sonar-scanner",
     "lint:strict": "NODE_OPTIONS='--max-old-space-size=8192' eslint --max-warnings=0 --cache --cache-strategy content --cache-location node_modules/.cache/eslint/full/",
     "lint:ci": "pnpm run lint:strict",
-    "audit:security": "node scripts/verify-security-advisory-exceptions.mjs && pnpm audit --audit-level high",
+    "audit:security": "node scripts/verify-security-advisory-exceptions.mjs && pnpm audit --prod --audit-level high",
     "audit:licenses": "node scripts/generate-third-party-notices.mjs --check",
     "lint:security": "pnpm run lint:strict && pnpm run audit:security",
     "sonar:ci": "sonar-scanner -Dsonar.qualitygate.wait=true",
@@ -251,5 +251,9 @@
     "*.{ts,tsx}": [
       "eslint --max-warnings=0 --no-warn-ignored --fix --cache --cache-strategy content --cache-location node_modules/.cache/eslint/staged/"
     ]
+  },
+  "overrides": {
+    "tar": "^7.5.18",
+    "minimatch": "^10.0.3"
   }
 }

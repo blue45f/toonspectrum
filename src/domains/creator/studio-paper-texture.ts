@@ -48,6 +48,18 @@ export const PAPER_GRAIN_KINDS = [
   "charcoal",
   "newsprint",
   "pastel-board",
+  // Extended catalog — texture-first media sheets
+  "cotton-rag",
+  "watercolor-block",
+  "linen-canvas",
+  "marker-pad",
+  "manga-paper",
+  "toned-tan",
+  "toned-gray",
+  "sanded-pastel",
+  "rice-paper",
+  "mulberry",
+  "vellum",
 ] as const;
 
 /** 절차적 종이 표면 종류. */
@@ -96,6 +108,16 @@ export const PAPER_REFERENCE_TILE = 128;
  * - **charcoal(목탄지)**: 매우 거친 이빨. 목탄·콩테가 골에 잘 남는다.
  * - **newsprint(신문지)**: 미세·조밀한 저진폭 결. 빠른 스케치용.
  * - **pastel-board(파스텔지)**: 건성 매체용 중간 이빨 + 높은 toothBias.
+ * - **cotton-rag(면 수채지)**: 면 섬유 덩어리 + 중간 요철. cold-press보다 흡수·이빨 균형.
+ * - **watercolor-block(수채 블록)**: cold-press 계열 + 높은 사이징 느낌(미세 균일 표면).
+ * - **linen-canvas(린넨 캔버스)**: canvas보다 촘촘한 직조.
+ * - **marker-pad(마커지)**: 블리드프루프에 가까운 저진폭 평활면.
+ * - **manga-paper(만화 원고지)**: 세필·G펜용 미세 결.
+ * - **toned-tan / toned-gray**: 톤 스케치 바탕 결.
+ * - **sanded-pastel**: 사포형 강 이빨(파스텔·목탄 고정).
+ * - **rice-paper(선화지)**: 얇고 긴 섬유, washi보다 가늘고 흡수 빠름.
+ * - **mulberry(닥 두꺼운 한지)**: washi보다 성긴 장섬유·깊은 골.
+ * - **vellum(벨럼)**: 반투명 느낌의 고른 미세 결.
  */
 export const PAPER_TEXTURE_PRESETS: Readonly<Record<PaperGrainKind, PaperTextureParams>> = {
   "hot-press": {
@@ -187,6 +209,105 @@ export const PAPER_TEXTURE_PRESETS: Readonly<Record<PaperGrainKind, PaperTexture
     fibreAnisotropy: 1.25,
     amplitude: 0.62,
     toothBias: 1.28,
+  },
+  "cotton-rag": {
+    octaves: 4,
+    baseCells: 14,
+    lacunarity: 2,
+    persistence: 0.56,
+    fibreAnisotropy: 1.4,
+    amplitude: 0.52,
+    toothBias: 1.2,
+  },
+  "watercolor-block": {
+    octaves: 4,
+    baseCells: 17,
+    lacunarity: 2,
+    persistence: 0.52,
+    fibreAnisotropy: 1.45,
+    amplitude: 0.44,
+    toothBias: 1.12,
+  },
+  "linen-canvas": {
+    octaves: 4,
+    baseCells: 16,
+    lacunarity: 2,
+    persistence: 0.5,
+    fibreAnisotropy: 0.92,
+    amplitude: 0.5,
+    toothBias: 1.02,
+  },
+  "marker-pad": {
+    octaves: 2,
+    baseCells: 48,
+    lacunarity: 2,
+    persistence: 0.32,
+    fibreAnisotropy: 1,
+    amplitude: 0.08,
+    toothBias: 0.85,
+  },
+  "manga-paper": {
+    octaves: 3,
+    baseCells: 38,
+    lacunarity: 2,
+    persistence: 0.4,
+    fibreAnisotropy: 1.08,
+    amplitude: 0.16,
+    toothBias: 0.9,
+  },
+  "toned-tan": {
+    octaves: 3,
+    baseCells: 20,
+    lacunarity: 2,
+    persistence: 0.5,
+    fibreAnisotropy: 1.3,
+    amplitude: 0.36,
+    toothBias: 1.1,
+  },
+  "toned-gray": {
+    octaves: 3,
+    baseCells: 22,
+    lacunarity: 2,
+    persistence: 0.48,
+    fibreAnisotropy: 1.25,
+    amplitude: 0.34,
+    toothBias: 1.08,
+  },
+  "sanded-pastel": {
+    octaves: 5,
+    baseCells: 9,
+    lacunarity: 2,
+    persistence: 0.66,
+    fibreAnisotropy: 1.1,
+    amplitude: 0.92,
+    toothBias: 1.45,
+  },
+  "rice-paper": {
+    octaves: 4,
+    baseCells: 10,
+    lacunarity: 2,
+    persistence: 0.6,
+    fibreAnisotropy: 2.6,
+    amplitude: 0.36,
+    toothBias: 1.22,
+  },
+  mulberry: {
+    octaves: 5,
+    baseCells: 9,
+    lacunarity: 2,
+    persistence: 0.64,
+    fibreAnisotropy: 2.15,
+    amplitude: 0.58,
+    toothBias: 1.32,
+  },
+  vellum: {
+    octaves: 3,
+    baseCells: 34,
+    lacunarity: 2,
+    persistence: 0.4,
+    fibreAnisotropy: 1.05,
+    amplitude: 0.18,
+    toothBias: 0.94,
   },
 };
 
@@ -339,6 +460,13 @@ function specialtyMicrostructure(
       const crossing = warp * weft;
       return 0.5 + 0.28 * crossing + 0.12 * yarn + 0.08 * (warp * 0.5 + weft * 0.5);
     }
+    case "linen-canvas": {
+      // Tighter linen weave than cotton canvas.
+      const warp = Math.sin(u * Math.PI * 2 * 26 + seed * 0.009);
+      const weft = Math.sin(v * Math.PI * 2 * 26 + seed * 0.011);
+      const yarn = periodicValueNoise(u, v, 48, 48, seed + 19);
+      return 0.5 + 0.24 * warp * weft + 0.1 * yarn + 0.06 * (warp + weft) * 0.5;
+    }
     case "washi": {
       // Long kozo-like fibres: anisotropic streaks + sparse nodes where fibres cross.
       const fibreA = periodicValueNoise(u, v, 6, 48, seed + 3);
@@ -347,12 +475,35 @@ function specialtyMicrostructure(
       const ridge = Math.max(0, fibreA - 0.55) * 1.4 + Math.max(0, fibreB - 0.58) * 1.2;
       return clampUnit(0.42 + ridge * 0.55 + (node - 0.5) * 0.12);
     }
+    case "rice-paper": {
+      // Finer long fibres than washi — thin oriental calligraphy sheet.
+      const fibreA = periodicValueNoise(u, v, 5, 56, seed + 4);
+      const fibreB = periodicValueNoise(u + 0.11, v, 4, 60, seed + 12);
+      const veil = periodicValueNoise(u, v, 22, 22, seed + 28);
+      const ridge = Math.max(0, fibreA - 0.52) * 1.5 + Math.max(0, fibreB - 0.54) * 1.3;
+      return clampUnit(0.4 + ridge * 0.5 + (veil - 0.5) * 0.1);
+    }
+    case "mulberry": {
+      // Thicker, more open bast fibres than washi.
+      const fibreA = periodicValueNoise(u, v, 7, 40, seed + 6);
+      const fibreB = periodicValueNoise(u + 0.2, v, 6, 44, seed + 14);
+      const clump = periodicValueNoise(u, v, 11, 11, seed + 30);
+      const ridge = Math.max(0, fibreA - 0.48) * 1.55 + Math.max(0, fibreB - 0.5) * 1.35;
+      return clampUnit(0.38 + ridge * 0.58 + Math.max(0, clump - 0.62) * 0.35);
+    }
     case "charcoal": {
       // Sparse deep tooth beds for dry media lodging — heavy-tailed pores, not uniform noise.
       const bed = periodicValueNoise(u, v, 10, 10, seed + 7);
       const pore = periodicValueNoise(u, v, 28, 28, seed + 19);
       const deep = Math.pow(Math.max(0, 0.72 - bed), 1.6);
       return clampUnit(0.55 + deep * 0.7 - (pore - 0.5) * 0.18);
+    }
+    case "sanded-pastel": {
+      // Abrasive grit plate — high spatial frequency + heavy tooth for pastel lodgement.
+      const grit = periodicValueNoise(u, v, 32, 32, seed + 33);
+      const plate = periodicValueNoise(u, v, 8, 8, seed + 41);
+      const sharp = Math.pow(grit, 1.35);
+      return clampUnit(0.42 + (sharp - 0.5) * 0.78 + (plate - 0.5) * 0.14);
     }
     case "kraft": {
       // Recycled-fibre flecks + mild board grain.
@@ -374,14 +525,54 @@ function specialtyMicrostructure(
       const grit = Math.pow(tooth, 0.85);
       return clampUnit(0.48 + (grit - 0.5) * 0.62 + (plateau - 0.5) * 0.12);
     }
-    case "bristol": {
-      // Near-plate finish with only micro polish marks.
-      const polish = periodicValueNoise(u, v, 56, 56, seed + 31);
-      return clampUnit(0.5 + (polish - 0.5) * 0.16);
+    case "bristol":
+    case "marker-pad": {
+      // Near-plate finish with only micro polish marks (marker-pad even flatter).
+      const polish = periodicValueNoise(u, v, kind === "marker-pad" ? 64 : 56, kind === "marker-pad" ? 64 : 56, seed + 31);
+      return clampUnit(0.5 + (polish - 0.5) * (kind === "marker-pad" ? 0.1 : 0.16));
+    }
+    case "manga-paper": {
+      const pulp = periodicValueNoise(u, v, 52, 50, seed + 37);
+      const wire = periodicValueNoise(u, v, 70, 18, seed + 43);
+      return clampUnit(0.5 + (pulp - 0.5) * 0.28 + (wire - 0.5) * 0.12);
+    }
+    case "cotton-rag": {
+      // Soft cotton flocks + mild felt.
+      const flock = periodicValueNoise(u, v, 18, 18, seed + 45);
+      const felt = periodicValueNoise(u, v, 12, 14, seed + 47);
+      return clampUnit(0.48 + (flock - 0.5) * 0.4 + (felt - 0.5) * 0.28);
+    }
+    case "watercolor-block": {
+      // Cold-press family with more even sizing film (less extreme peaks).
+      const felt = periodicValueNoise(u, v, 15, 18, seed + 49);
+      const size = periodicValueNoise(u, v, 28, 28, seed + 51);
+      return clampUnit(0.5 + (felt - 0.5) * 0.32 + (size - 0.5) * 0.14);
+    }
+    case "cold-press": {
+      const felt = periodicValueNoise(u, v, 14, 18, seed + 53);
+      const pore = periodicValueNoise(u, v, 26, 26, seed + 55);
+      return clampUnit(0.5 + (felt - 0.5) * 0.38 + (pore - 0.5) * 0.16);
+    }
+    case "rough": {
+      // Heavy felt impressions + deep troughs.
+      const felt = periodicValueNoise(u, v, 8, 10, seed + 57);
+      const trough = Math.pow(Math.max(0, 0.68 - felt), 1.45);
+      const pore = periodicValueNoise(u, v, 20, 20, seed + 59);
+      return clampUnit(0.45 + trough * 0.65 + (pore - 0.5) * 0.12);
+    }
+    case "toned-tan":
+    case "toned-gray": {
+      const pulp = periodicValueNoise(u, v, 24, 22, seed + 61);
+      const fleck = periodicValueNoise(u, v, 38, 36, seed + 63);
+      const speck = fleck > 0.78 ? (fleck - 0.78) * 2.4 : 0;
+      return clampUnit(0.5 + (pulp - 0.5) * 0.32 + speck * 0.3);
+    }
+    case "vellum": {
+      const smooth = periodicValueNoise(u, v, 40, 40, seed + 65);
+      const veil = periodicValueNoise(u, v, 18, 18, seed + 67);
+      return clampUnit(0.5 + (smooth - 0.5) * 0.2 + (veil - 0.5) * 0.1);
     }
     case "hot-press":
-    case "cold-press":
-    case "rough":
     default:
       return 0.5;
   }
@@ -391,10 +582,18 @@ function specialtyMixWeight(kind: PaperGrainKind): number {
   switch (kind) {
     case "canvas":
       return 0.42;
+    case "linen-canvas":
+      return 0.4;
     case "washi":
       return 0.38;
+    case "rice-paper":
+      return 0.4;
+    case "mulberry":
+      return 0.42;
     case "charcoal":
       return 0.4;
+    case "sanded-pastel":
+      return 0.46;
     case "kraft":
       return 0.28;
     case "newsprint":
@@ -403,9 +602,250 @@ function specialtyMixWeight(kind: PaperGrainKind): number {
       return 0.32;
     case "bristol":
       return 0.18;
+    case "marker-pad":
+      return 0.14;
+    case "manga-paper":
+      return 0.2;
+    case "cotton-rag":
+      return 0.34;
+    case "watercolor-block":
+      return 0.3;
+    case "cold-press":
+      return 0.26;
+    case "rough":
+      return 0.36;
+    case "toned-tan":
+    case "toned-gray":
+      return 0.26;
+    case "vellum":
+      return 0.2;
+    case "hot-press":
+      return 0.1;
     default:
       return 0;
   }
+}
+
+/**
+ * Document paper physical axes — drive brush coupling and Living Ink materials.
+ * Values are unitless 0..1 gains (or multipliers around 1 for scaleMul).
+ */
+export interface StudioPaperPhysicsProfile {
+  /** Multiplies brush granulation (tooth contact). */
+  readonly toothGain: number;
+  /** Multiplies brush staining (surface sizing / ink hold). */
+  readonly sizingGain: number;
+  /** Multiplies paper texels-per-document-px. */
+  readonly scaleMul: number;
+  /** Wet absorbency — higher soaks water/pigment faster. */
+  readonly absorbency: number;
+  /** Lateral wet bleed bias for Living Ink / wet paths. */
+  readonly bleedBias: number;
+  /** Relative drying rate (higher = dries faster). */
+  readonly dryRate: number;
+  /** Dry-media friction / lodging (charcoal, pastel). */
+  readonly contactFriction: number;
+}
+
+export const PAPER_PHYSICS_PROFILES: Readonly<
+  Record<PaperGrainKind, StudioPaperPhysicsProfile>
+> = {
+  "hot-press": {
+    toothGain: 0.55,
+    sizingGain: 1.15,
+    scaleMul: 0.9,
+    absorbency: 0.42,
+    bleedBias: 0.35,
+    dryRate: 0.72,
+    contactFriction: 0.35,
+  },
+  "cold-press": {
+    toothGain: 1,
+    sizingGain: 1,
+    scaleMul: 1,
+    absorbency: 0.62,
+    bleedBias: 0.55,
+    dryRate: 0.55,
+    contactFriction: 0.55,
+  },
+  rough: {
+    toothGain: 1.22,
+    sizingGain: 0.88,
+    scaleMul: 1.25,
+    absorbency: 0.78,
+    bleedBias: 0.72,
+    dryRate: 0.42,
+    contactFriction: 0.72,
+  },
+  bristol: {
+    toothGain: 0.4,
+    sizingGain: 1.25,
+    scaleMul: 0.85,
+    absorbency: 0.28,
+    bleedBias: 0.18,
+    dryRate: 0.85,
+    contactFriction: 0.28,
+  },
+  washi: {
+    toothGain: 0.95,
+    sizingGain: 0.75,
+    scaleMul: 1.1,
+    absorbency: 0.88,
+    bleedBias: 0.82,
+    dryRate: 0.38,
+    contactFriction: 0.48,
+  },
+  kraft: {
+    toothGain: 0.92,
+    sizingGain: 0.9,
+    scaleMul: 1.05,
+    absorbency: 0.55,
+    bleedBias: 0.48,
+    dryRate: 0.6,
+    contactFriction: 0.58,
+  },
+  canvas: {
+    toothGain: 1.08,
+    sizingGain: 0.95,
+    scaleMul: 1.15,
+    absorbency: 0.48,
+    bleedBias: 0.32,
+    dryRate: 0.5,
+    contactFriction: 0.65,
+  },
+  charcoal: {
+    toothGain: 1.28,
+    sizingGain: 0.7,
+    scaleMul: 1.35,
+    absorbency: 0.5,
+    bleedBias: 0.28,
+    dryRate: 0.65,
+    contactFriction: 0.92,
+  },
+  newsprint: {
+    toothGain: 0.7,
+    sizingGain: 0.65,
+    scaleMul: 0.95,
+    absorbency: 0.7,
+    bleedBias: 0.6,
+    dryRate: 0.48,
+    contactFriction: 0.42,
+  },
+  "pastel-board": {
+    toothGain: 1.15,
+    sizingGain: 0.85,
+    scaleMul: 1.2,
+    absorbency: 0.4,
+    bleedBias: 0.22,
+    dryRate: 0.7,
+    contactFriction: 0.85,
+  },
+  "cotton-rag": {
+    toothGain: 1.05,
+    sizingGain: 0.95,
+    scaleMul: 1.05,
+    absorbency: 0.72,
+    bleedBias: 0.58,
+    dryRate: 0.48,
+    contactFriction: 0.6,
+  },
+  "watercolor-block": {
+    toothGain: 0.95,
+    sizingGain: 1.2,
+    scaleMul: 1,
+    absorbency: 0.58,
+    bleedBias: 0.45,
+    dryRate: 0.62,
+    contactFriction: 0.52,
+  },
+  "linen-canvas": {
+    toothGain: 1.02,
+    sizingGain: 1,
+    scaleMul: 1.08,
+    absorbency: 0.45,
+    bleedBias: 0.28,
+    dryRate: 0.52,
+    contactFriction: 0.62,
+  },
+  "marker-pad": {
+    toothGain: 0.25,
+    sizingGain: 1.45,
+    scaleMul: 0.8,
+    absorbency: 0.15,
+    bleedBias: 0.08,
+    dryRate: 0.92,
+    contactFriction: 0.18,
+  },
+  "manga-paper": {
+    toothGain: 0.48,
+    sizingGain: 1.2,
+    scaleMul: 0.88,
+    absorbency: 0.32,
+    bleedBias: 0.2,
+    dryRate: 0.8,
+    contactFriction: 0.32,
+  },
+  "toned-tan": {
+    toothGain: 0.88,
+    sizingGain: 0.95,
+    scaleMul: 1,
+    absorbency: 0.52,
+    bleedBias: 0.42,
+    dryRate: 0.58,
+    contactFriction: 0.55,
+  },
+  "toned-gray": {
+    toothGain: 0.86,
+    sizingGain: 0.95,
+    scaleMul: 1,
+    absorbency: 0.5,
+    bleedBias: 0.4,
+    dryRate: 0.6,
+    contactFriction: 0.54,
+  },
+  "sanded-pastel": {
+    toothGain: 1.35,
+    sizingGain: 0.65,
+    scaleMul: 1.4,
+    absorbency: 0.35,
+    bleedBias: 0.15,
+    dryRate: 0.75,
+    contactFriction: 0.98,
+  },
+  "rice-paper": {
+    toothGain: 0.82,
+    sizingGain: 0.55,
+    scaleMul: 1.05,
+    absorbency: 0.95,
+    bleedBias: 0.92,
+    dryRate: 0.28,
+    contactFriction: 0.4,
+  },
+  mulberry: {
+    toothGain: 1.1,
+    sizingGain: 0.68,
+    scaleMul: 1.18,
+    absorbency: 0.9,
+    bleedBias: 0.85,
+    dryRate: 0.32,
+    contactFriction: 0.55,
+  },
+  vellum: {
+    toothGain: 0.5,
+    sizingGain: 1.18,
+    scaleMul: 0.9,
+    absorbency: 0.38,
+    bleedBias: 0.25,
+    dryRate: 0.78,
+    contactFriction: 0.38,
+  },
+};
+
+export function getStudioPaperPhysicsProfile(
+  kind: PaperGrainKind | unknown,
+): StudioPaperPhysicsProfile {
+  const id = normalizePaperGrainKind(kind);
+  return PAPER_PHYSICS_PROFILES[id];
 }
 
 /**

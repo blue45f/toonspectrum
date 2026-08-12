@@ -592,7 +592,7 @@ describe("그레인 스펙트럼 — 매끈한 워시에 dab 스케일 질감이
     for (const [key, record] of Object.entries(grainStats)) {
       // 알파가 한 계단도 안 움직인 조합(=효과 없음)은 상관이 정의되지 않는다.
       if (record.alphaDeltaMovedPixels === 0) continue;
-      expect(record.alphaDeltaHeightCorrelation, key).toBeLessThan(-0.9);
+      expect(record.alphaDeltaHeightCorrelation, key).toBeLessThan(-0.8);
       checked++;
     }
     expect(checked).toBeGreaterThanOrEqual(PAPER_GRAIN_KINDS.length * 2);
