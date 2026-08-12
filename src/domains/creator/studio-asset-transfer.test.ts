@@ -22,6 +22,9 @@ describe("studio asset transfer acceptance", () => {
   it("accepts Studio asset and insertion payloads", () => {
     expect(studioTransferCanInsert(transfer(["application/json-asset"]))).toBe(true);
     expect(studioTransferCanInsert(transfer(["application/json-insert"]))).toBe(true);
+    expect(
+      studioTransferCanInsert(transfer(["application/x-studio-object-insert+json"])),
+    ).toBe(true);
   });
 
   it("accepts image files and rejects known non-image files", () => {

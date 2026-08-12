@@ -460,6 +460,14 @@ export interface StudioToolBeltContentHandlers {
   ) => void;
   addBuiltinRasterAsset: (asset: StudioRasterAsset) => Promise<void>;
   addCatalogElement: (item: { svg: string; width: number; height: number; label: string; }) => void;
+  /**
+   * Elements 3D rail: open BG3D / VRM with a one-shot template·primitive·prop seed.
+   * Host owns seed state so drag/drop and click share one entry.
+   */
+  openStudioObjectInsert: (request: {
+    readonly openTarget: "bg3d-editor" | "vrm-poser" | "bg3d-templates";
+    readonly sourceId: string;
+  }) => void;
   addDiagonalSplit: () => void;
   addDialogueBubbles: () => Promise<void>;
   addDialogueSuggestionToScript: (candidate: DialogueSuggestionCandidate) => void;

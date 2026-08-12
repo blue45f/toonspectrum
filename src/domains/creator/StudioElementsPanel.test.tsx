@@ -159,6 +159,34 @@ describe("StudioElementsPanel expanded catalog UX", () => {
     });
   });
 
+  it("exports 3D object tiles through the object-insert drag contract with openTarget", () => {
+    render(
+      <StudioElementsPanel
+        onAdd={vi.fn()}
+        onOpenObjectInsert={vi.fn()}
+        canvasWidth={800}
+        canvasHeight={1200}
+        acquireUiPreferences={stablePreferences.acquire}
+      />,
+    );
+    fireEvent.click(screen.getByRole("tab", { name: /3D 오브젝트/u }));
+    fireEvent.change(screen.getByRole("searchbox", { name: "3D 오브젝트 검색" }), {
+      target: { value: "검" },
+    });
+    const sword = screen.getByRole("button", { name: /검,/u });
+    const setData = vi.fn();
+    fireEvent.dragStart(sword, { dataTransfer: { effectAllowed: "none", setData } });
+
+    expect(setData).toHaveBeenCalledOnce();
+    expect(setData.mock.calls[0]?.[0]).toBe("application/x-studio-object-insert+json");
+    expect(JSON.parse(setData.mock.calls[0]?.[1])).toMatchObject({
+      kind: "studio-object-insert",
+      openTarget: "vrm-poser",
+      sourceId: "sword",
+      itemId: "obj-prop-sword",
+    });
+  });
+
   it("switches packs and places the selected SVG asset", () => {
     const onAdd = vi.fn();
     render(<StudioElementsPanel onAdd={onAdd} acquireUiPreferences={stablePreferences.acquire} />);

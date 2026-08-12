@@ -27,10 +27,31 @@ import {
   studioShared3dStageReusableHiddenCharacterElementIds,
 } from "./studio-shared-3d-stage-collection";
 
+import type { BgPrimitiveKind } from "./studio-background-3d-metadata";
 import type {
   StudioLazyPanelStackHandlers,
   StudioLazyPanelStackProps,
 } from "./StudioLazyPanelStack";
+
+function asBgPrimitiveKindOrNull(value: string | null): BgPrimitiveKind | null {
+  if (!value) return null;
+  const kinds: readonly string[] = [
+    "box",
+    "cylinder",
+    "plane",
+    "sphere",
+    "hemisphere",
+    "cone",
+    "pyramid",
+    "triangularPrism",
+    "hexPrism",
+    "torus",
+    "tube",
+    "ring",
+    "capsule",
+  ];
+  return kinds.includes(value) ? (value as BgPrimitiveKind) : null;
+}
 
 const EMPTY_STUDIO_PAGE_ELEMENTS: never[] = [];
 const EMPTY_STUDIO_PAGE_GROUPS: never[] = [];
@@ -63,6 +84,9 @@ export type StudioThreeDPreviewPanelStackProps = Pick<
   | "bg3dBatchRecoveryScope"
   | "validateRecoveryAccess"
   | "bg3dOpen"
+  | "bg3dSeedTemplateId"
+  | "bg3dSeedPrimitiveKind"
+  | "onSeedObjectInsertConsumed"
   | "composeWorkAssetPreviewPage"
   | "currentPageId"
   | "elementById"
@@ -76,6 +100,7 @@ export type StudioThreeDPreviewPanelStackProps = Pick<
   | "mannequinPoserOpen"
   | "poserInitialDataUrl"
   | "poserInitialElementId"
+  | "poserSeedPropId"
   | "poserVrmOpen"
   | "quickActionsAnchor"
   | "quickActionsDisabledActions"
@@ -232,6 +257,9 @@ export const StudioThreeDPreviewPanelStack = memo(function StudioThreeDPreviewPa
   bg3dBatchRecoveryScope,
   validateRecoveryAccess,
   bg3dOpen,
+  bg3dSeedTemplateId,
+  bg3dSeedPrimitiveKind,
+  onSeedObjectInsertConsumed,
   composeWorkAssetPreviewPage,
   currentPageId,
   elementById,
@@ -245,6 +273,7 @@ export const StudioThreeDPreviewPanelStack = memo(function StudioThreeDPreviewPa
   mannequinPoserOpen,
   poserInitialDataUrl,
   poserInitialElementId,
+  poserSeedPropId,
   poserVrmOpen,
   quickActionsAnchor,
   quickActionsDisabledActions,
@@ -420,10 +449,13 @@ export const StudioThreeDPreviewPanelStack = memo(function StudioThreeDPreviewPa
             open
             initialDataUrl={poserInitialDataUrl}
             initialScene={poserInitialScene}
+            seedPropId={poserSeedPropId}
+            onSeedObjectInsertConsumed={onSeedObjectInsertConsumed}
             onClose={() => {
               setPoserVrmOpen(false);
               setPoserInitialDataUrl(undefined);
               setPoserInitialElementId(undefined);
+              onSeedObjectInsertConsumed();
             }}
             onInsert={insertVrmResult}
           />
@@ -446,6 +478,9 @@ export const StudioThreeDPreviewPanelStack = memo(function StudioThreeDPreviewPa
             open
             initialDataUrl={bg3dInitialDataUrl}
             initialScene={bg3dInitialScene}
+            seedSceneTemplateId={bg3dSeedTemplateId}
+            seedPrimitiveKind={asBgPrimitiveKindOrNull(bg3dSeedPrimitiveKind)}
+            onSeedObjectInsertConsumed={onSeedObjectInsertConsumed}
             sharedSceneSession={shared3dSceneSession}
             sharedStageResolution={masterEditMode ? undefined : shared3dStageResolution}
             sharedStageSessionScopeKey={sharedStageSessionScopeKey}
@@ -460,6 +495,7 @@ export const StudioThreeDPreviewPanelStack = memo(function StudioThreeDPreviewPa
               setBg3dInitialDataUrl(undefined);
               setBg3dInitialScene(undefined);
               setBg3dInitialElementId(undefined);
+              onSeedObjectInsertConsumed();
             }}
             onInsert={insertBg3dResult}
             onUseAsAiMethodReference={useBg3dFrameAsAiMethodReference}

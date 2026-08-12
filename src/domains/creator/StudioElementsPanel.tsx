@@ -26,6 +26,7 @@ import {
   type StudioObjectInsertItem,
   type StudioObjectInsertPlacementPlan,
 } from "./studio-object-insert-catalog";
+import { writeStudioObjectInsertDragPayload } from "./studio-object-insert-drag";
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 import { serializeStudioLocalAssetDragPayload } from "./studio-shared-asset-drag";
 import {
@@ -195,6 +196,23 @@ export function StudioElementsPanel({
     });
     if (!plan) return;
     onOpenObjectInsert({ item, plan });
+  }
+
+  function handleObjectDragStart(
+    event: DragEvent<HTMLButtonElement>,
+    item: StudioObjectInsertItem,
+  ) {
+    const plan = planStudioObjectInsertPlacement({
+      itemId: item.id,
+      canvasWidth,
+      canvasHeight,
+      existingCount: 0,
+    });
+    if (!plan) {
+      event.preventDefault();
+      return;
+    }
+    writeStudioObjectInsertDragPayload(event.dataTransfer, { item, plan });
   }
 
   function handlePick(item: StudioElementItem) {
@@ -421,9 +439,11 @@ export function StudioElementsPanel({
                   aria-label={`${item.label}, ${item.familyLabel}`}
                   data-studio-object-insert={item.id}
                   data-studio-object-open-target={item.openTarget}
+                  draggable
+                  onDragStart={(event) => handleObjectDragStart(event, item)}
                   onClick={() => handlePickObject(item)}
                   className={cn(
-                    "flex min-h-[4.5rem] flex-col items-start justify-center gap-0.5 rounded-lg border border-line bg-card px-2 py-1.5 text-left",
+                    "group flex min-h-[4.5rem] flex-col items-start justify-center gap-0.5 rounded-lg border border-line bg-card px-2 py-1.5 text-left",
                     STUDIO_EASE,
                     STUDIO_FOCUS_RING,
                     "hover:border-accent/45 hover:bg-raised",
@@ -431,12 +451,19 @@ export function StudioElementsPanel({
                 >
                   <span className="text-[0.68rem] font-semibold text-fg">{item.label}</span>
                   <span className="text-[0.55rem] text-fg-3">{item.familyLabel}</span>
-                  <span className="text-[0.52rem] font-medium text-accent">
-                    {item.openTarget === "vrm-poser"
-                      ? "VRM 포저 열기"
-                      : item.openTarget === "bg3d-templates"
-                        ? "BG3D 템플릿"
-                        : "BG3D 편집기"}
+                  <span className="inline-flex w-full items-center justify-between gap-1 text-[0.52rem] font-medium text-accent">
+                    <span>
+                      {item.openTarget === "vrm-poser"
+                        ? "VRM 포저 열기"
+                        : item.openTarget === "bg3d-templates"
+                          ? "BG3D 템플릿"
+                          : "BG3D 편집기"}
+                    </span>
+                    <Grip
+                      size={10}
+                      aria-hidden
+                      className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+                    />
                   </span>
                 </button>
               ))

@@ -401,6 +401,12 @@ type StudioVrmPoserProps = {
   onInsert: (result: StudioVrmPoserInsertResult) => boolean | void | Promise<boolean | void>;
   initialDataUrl?: string;
   initialScene?: StudioVrmSceneDocument;
+  /**
+   * One-shot seed from Elements 3D rail: spawn a VRM prop after open, then call
+   * `onSeedObjectInsertConsumed`.
+   */
+  seedPropId?: string | null;
+  onSeedObjectInsertConsumed?: () => void;
   /** Async test seam. Product defaults to the shared studio-local-v12.db authority. */
   creativeRepository?: StudioVrmCreativeSqliteRepository;
   /** Async test seam. Product defaults to a dedicated namespace in studio-local-v12.db. */
@@ -2965,12 +2971,15 @@ export function StudioVrmPoser({
   onInsert,
   initialDataUrl,
   initialScene,
+  seedPropId = null,
+  onSeedObjectInsertConsumed,
   creativeRepository: creativeRepositoryOverride,
   trackingCalibrationRepository: trackingCalibrationRepositoryOverride,
 }: StudioVrmPoserProps) {
   const dialogTitleId = useId();
   const dialogDescriptionId = useId();
   const viewportInstructionsId = useId();
+  const objectInsertSeedKeyRef = useRef<string | null>(null);
   useEffect(() => {
     // Clipboard payloads can contain full pose/expression state. Do not retain or
     // migrate the former persistent browser copies across sessions.
@@ -8579,6 +8588,21 @@ export function StudioVrmPoser({
     setVrmPropItems((prev) => [...prev, instance]);
     setSelectedVrmPropUid(instance.uid);
   }
+
+  // Elements 3D rail one-shot seed: spawn prop once after open, then clear host seed state.
+  useEffect(() => {
+    if (!open) {
+      objectInsertSeedKeyRef.current = null;
+      return;
+    }
+    const propId = typeof seedPropId === "string" ? seedPropId.trim() : "";
+    if (!propId) return;
+    const key = `prop:${propId}`;
+    if (objectInsertSeedKeyRef.current === key) return;
+    objectInsertSeedKeyRef.current = key;
+    addVrmProp(propId);
+    onSeedObjectInsertConsumed?.();
+  }, [open, seedPropId, onSeedObjectInsertConsumed]);
 
   function updateVrmProp(uid: string, patch: Partial<PropInstance>) {
     setVrmPropItems((prev) => prev.map((it) => (it.uid === uid ? { ...it, ...patch } : it)));

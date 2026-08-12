@@ -2,6 +2,7 @@ import {
   STUDIO_ASSET_DRAG_MIME,
   STUDIO_INSERT_DRAG_MIME,
 } from "./studio-insert-drag-core";
+import { STUDIO_OBJECT_INSERT_DRAG_MIME } from "./studio-object-insert-drag";
 
 export type StudioAssetTransferLike = Pick<DataTransfer, "types" | "items" | "files">;
 
@@ -28,7 +29,8 @@ export function studioTransferCanInsert(dataTransfer: StudioAssetTransferLike): 
   const types = new Set(safeTransferList<string>(dataTransfer.types));
   if (
     types.has(STUDIO_ASSET_DRAG_MIME) ||
-    types.has(STUDIO_INSERT_DRAG_MIME)
+    types.has(STUDIO_INSERT_DRAG_MIME) ||
+    types.has(STUDIO_OBJECT_INSERT_DRAG_MIME)
   ) return true;
   if (!types.has("Files")) return false;
 

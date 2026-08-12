@@ -238,6 +238,10 @@ export interface StudioLazyPanelStackProps {
     signal: AbortSignal
   ) => Promise<boolean>;
   bg3dOpen: boolean;
+  /** Elements 3D rail one-shot seeds for BG3D (cleared after consume). */
+  bg3dSeedTemplateId: string | null;
+  bg3dSeedPrimitiveKind: string | null;
+  onSeedObjectInsertConsumed: () => void;
   characterBible: StudioCharacterBible;
   characterBibleOpen: boolean;
   checkpointError: string | null;
@@ -280,6 +284,8 @@ export interface StudioLazyPanelStackProps {
   mannequinPoserOpen: boolean;
   poserInitialDataUrl: string | undefined;
   poserInitialElementId: string | undefined;
+  /** Elements 3D rail one-shot prop seed for VRM (cleared after consume). */
+  poserSeedPropId: string | null;
   poserVrmOpen: boolean;
   productionInsightsOpen: boolean;
   productionInsightsResult: StudioProductionInsights | null;
@@ -415,6 +421,9 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
   bg3dBatchRecoveryScope,
   validateRecoveryAccess,
   bg3dOpen,
+  bg3dSeedTemplateId,
+  bg3dSeedPrimitiveKind,
+  onSeedObjectInsertConsumed,
   characterBible,
   characterBibleOpen,
   checkpointError,
@@ -457,6 +466,7 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
   mannequinPoserOpen,
   poserInitialDataUrl,
   poserInitialElementId,
+  poserSeedPropId,
   poserVrmOpen,
   productionInsightsOpen,
   productionInsightsResult,
@@ -623,6 +633,9 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
         bg3dBatchRecoveryScope={bg3dBatchRecoveryScope}
         validateRecoveryAccess={validateRecoveryAccess}
         bg3dOpen={bg3dOpen}
+        bg3dSeedTemplateId={bg3dSeedTemplateId}
+        bg3dSeedPrimitiveKind={bg3dSeedPrimitiveKind}
+        onSeedObjectInsertConsumed={onSeedObjectInsertConsumed}
         composeWorkAssetPreviewPage={composeWorkAssetPreviewPage}
         currentPageId={currentPageId}
         elementById={elementById}
@@ -636,6 +649,7 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
         mannequinPoserOpen={mannequinPoserOpen}
         poserInitialDataUrl={poserInitialDataUrl}
         poserInitialElementId={poserInitialElementId}
+        poserSeedPropId={poserSeedPropId}
         poserVrmOpen={poserVrmOpen}
         quickActionsAnchor={quickActionsAnchor}
         quickActionsDisabledActions={quickActionsDisabledActions}

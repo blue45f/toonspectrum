@@ -23,10 +23,11 @@ describe("Studio asset placement UI boundary", () => {
     expect(elementPanel).toContain("onOpenObjectInsert");
     expect(elementPanel).toContain("filterStudioObjectInsertItems");
     expect(elementPanel).toContain("planStudioObjectInsertPlacement");
+    expect(elementPanel).toContain("writeStudioObjectInsertDragPayload");
     expect(elementPanel).toContain("3D 오브젝트");
     expect(assetMenu).toContain("onOpenObjectInsert=");
-    expect(assetMenu).toContain("setPoserVrmOpen(true)");
-    expect(assetMenu).toContain("setBg3dOpen(true)");
+    expect(assetMenu).toContain("openStudioObjectInsert({");
+    expect(assetMenu).toContain("plan.sourceId");
   });
 
   it("uses one drag writer for image-backed elements and native insertions", () => {

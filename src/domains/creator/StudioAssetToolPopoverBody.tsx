@@ -128,9 +128,7 @@ export function StudioAssetToolPopoverBody({
     setEmeresTab,
     setFxPickerSection,
     setFxSearchQuery,
-    setBg3dOpen,
     setMenu,
-    setPoserVrmOpen,
     setRasterFavoriteOnly,
     setRenamingAssetId,
     setRenamingAssetName,
@@ -155,6 +153,7 @@ export function StudioAssetToolPopoverBody({
   const {
     addBuiltinRasterAsset,
     addCatalogElement,
+    openStudioObjectInsert,
     addEmeresLibraryItem,
     addEmeresTemplate,
     addFocusLines,
@@ -280,15 +279,12 @@ export function StudioAssetToolPopoverBody({
                     canvasWidth={CANVAS_W}
                     canvasHeight={1_200}
                     onOpenObjectInsert={({ plan }) => {
-                      // Canva-style Elements → production 3D tools (no generative mesh).
+                      // Canva-style Elements → production 3D tools with one-shot seed.
                       setMenu(null);
-                      if (plan.openTarget === "vrm-poser") {
-                        setPoserVrmOpen(true);
-                        return;
-                      }
-                      // bg3d-editor + bg3d-templates share the BG3D surface; template catalog
-                      // lives inside the editor (scene templates strip).
-                      setBg3dOpen(true);
+                      openStudioObjectInsert({
+                        openTarget: plan.openTarget,
+                        sourceId: plan.sourceId,
+                      });
                     }}
                   />
                 </Suspense>

@@ -935,6 +935,11 @@ import {
   type NodeEditTool,
 } from "./studio-node-edit";
 import {
+  parseStudioObjectInsertDragPayload,
+  resolveStudioObjectInsertOpenSeed,
+  STUDIO_OBJECT_INSERT_DRAG_MIME,
+} from "./studio-object-insert-drag";
+import {
   projectStudioDocumentRectToClient,
   type StudioSurfaceRect,
 } from "./studio-oncanvas-command-surfaces";
@@ -9542,7 +9547,12 @@ function StudioCuttoonEditor({
   const [mannequinPoserOpen, setMannequinPoserOpen] = useState(false);
   const [poserInitialDataUrl, setPoserInitialDataUrl] = useState<string | undefined>(undefined);
   const [poserInitialElementId, setPoserInitialElementId] = useState<string | undefined>(undefined);
+  /** Elements 3D rail → VRM poser one-shot prop seed (cleared after consume). */
+  const [poserSeedPropId, setPoserSeedPropId] = useState<string | null>(null);
   const [bg3dOpen, setBg3dOpen] = useState(false);
+  /** Elements 3D rail → BG3D one-shot seeds (cleared after consume). */
+  const [bg3dSeedTemplateId, setBg3dSeedTemplateId] = useState<string | null>(null);
+  const [bg3dSeedPrimitiveKind, setBg3dSeedPrimitiveKind] = useState<string | null>(null);
   // Route ownership is evaluated during render, before a layout effect can retire stale modal
   // state restored by browser Forward. Only these admitted booleans may reach a 3D renderer.
   const interactiveThreeDSurfaceAdmission = resolveStudioInteractiveThreeDSurfaceAdmission({
@@ -12219,6 +12229,18 @@ function StudioCuttoonEditor({
       : undefined;
     const assetData = e.dataTransfer.getData(STUDIO_ASSET_DRAG_MIME);
     const insertData = e.dataTransfer.getData(STUDIO_INSERT_DRAG_MIME);
+    // Custom MIME must be read synchronously during the drop event (browser clears after).
+    const objectInsertData = e.dataTransfer.getData(STUDIO_OBJECT_INSERT_DRAG_MIME);
+    if (objectInsertData) {
+      const objectPayload = parseStudioObjectInsertDragPayload(objectInsertData);
+      if (objectPayload) {
+        openStudioObjectInsert({
+          openTarget: objectPayload.openTarget,
+          sourceId: objectPayload.sourceId,
+        });
+        return;
+      }
+    }
     if (hasFiles && !imageFile && !assetData && !insertData) {
       setError("캔버스에는 PNG, JPEG, WebP, GIF, BMP, TGA, PPM, PAM, QOI, TIFF 이미지만 놓을 수 있어요.");
       return;
@@ -29484,6 +29506,35 @@ const puppetWarpArmed =
       })
     );
   }
+
+  /** Elements 3D object rail / canvas drop → production BG3D or VRM with one-shot seed. */
+  function openStudioObjectInsert(request: {
+    readonly openTarget: "bg3d-editor" | "vrm-poser" | "bg3d-templates";
+    readonly sourceId: string;
+  }) {
+    const seed = resolveStudioObjectInsertOpenSeed(request);
+    setBg3dSeedTemplateId(seed.bg3dSeedTemplateId);
+    setBg3dSeedPrimitiveKind(seed.bg3dSeedPrimitiveKind);
+    setPoserSeedPropId(seed.poserSeedPropId);
+    if (request.openTarget === "vrm-poser") {
+      setPoserInitialDataUrl(undefined);
+      setPoserInitialElementId(undefined);
+      setPoserVrmOpen(true);
+      return;
+    }
+    // Fresh insert path (not re-edit of an existing LT plate).
+    setBg3dInitialDataUrl(undefined);
+    setBg3dInitialScene(undefined);
+    setBg3dInitialElementId(undefined);
+    setBg3dOpen(true);
+  }
+
+  function clearStudioObjectInsertSeeds() {
+    setBg3dSeedTemplateId(null);
+    setBg3dSeedPrimitiveKind(null);
+    setPoserSeedPropId(null);
+  }
+
   function applyBgPreset(p: BgPreset) {
     if (p.grad) setBgGrad(p.grad);
     else if (p.fill) {
@@ -42358,6 +42409,7 @@ function clearSelectionForEdit() {
     addBubble,
     addBuiltinRasterAsset,
     addCatalogElement,
+    openStudioObjectInsert,
     addDiagonalSplit,
     addDialogueBubbles,
     addDialogueSuggestionToScript,
@@ -45585,6 +45637,9 @@ function clearSelectionForEdit() {
           bg3dBatchRecoveryScope={bg3dBatchRecoveryScope}
           validateRecoveryAccess={validateRecoveryAccess}
           bg3dOpen={admittedBg3dOpen}
+          bg3dSeedTemplateId={bg3dSeedTemplateId}
+          bg3dSeedPrimitiveKind={bg3dSeedPrimitiveKind}
+          onSeedObjectInsertConsumed={clearStudioObjectInsertSeeds}
           characterBible={characterBible}
           characterBibleOpen={characterBibleOpen}
           checkpointError={checkpointError}
@@ -45627,6 +45682,7 @@ function clearSelectionForEdit() {
           mannequinPoserOpen={admittedMannequinPoserOpen}
           poserInitialDataUrl={poserInitialDataUrl}
           poserInitialElementId={poserInitialElementId}
+          poserSeedPropId={poserSeedPropId}
           poserVrmOpen={admittedPoserVrmOpen}
           productionInsightsOpen={productionInsightsOpen}
           productionInsightsResult={productionInsightsResult}

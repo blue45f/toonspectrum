@@ -620,6 +620,14 @@ export interface StudioBackground3DProps {
   open: boolean;
   initialDataUrl?: string;
   initialScene?: StudioBg3dSceneDocument;
+  /**
+   * One-shot seed from Elements 3D rail: apply a scene template after open, then call
+   * `onSeedObjectInsertConsumed`.
+   */
+  seedSceneTemplateId?: string | null;
+  /** One-shot seed: spawn a primitive kind after open. */
+  seedPrimitiveKind?: BgPrimitiveKind | null;
+  onSeedObjectInsertConsumed?: () => void;
   /** Runtime-only page composition. Character documents remain owned by their source layers. */
   sharedSceneSession?: StudioShared3dSceneSession;
   /** Page-persistent association state for the exact LT bundle being edited. */
@@ -2160,6 +2168,9 @@ export function StudioBackground3D({
   open,
   initialDataUrl,
   initialScene,
+  seedSceneTemplateId = null,
+  seedPrimitiveKind = null,
+  onSeedObjectInsertConsumed,
   sharedSceneSession,
   sharedStageResolution,
   sharedStageSessionScopeKey,
@@ -3690,6 +3701,42 @@ export function StudioBackground3D({
     setPrimitives(nextPrimitives);
     setSelectedIds(new Set([parts[0].id]));
   };
+
+  // Elements 3D rail one-shot seed: apply template/primitive after restore settles, then clear.
+  // apply via refs so the effect does not re-fire when addPrimitive/addSceneTemplate identities churn.
+  const addPrimitiveRef = useRef(addPrimitive);
+  addPrimitiveRef.current = addPrimitive;
+  const addSceneTemplateRef = useRef(addSceneTemplate);
+  addSceneTemplateRef.current = addSceneTemplate;
+  const objectInsertSeedKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!open) {
+      objectInsertSeedKeyRef.current = null;
+      return;
+    }
+    if (isRestoringScene) return;
+    const templateId =
+      typeof seedSceneTemplateId === "string" ? seedSceneTemplateId.trim() : "";
+    const primitiveKind = seedPrimitiveKind ?? null;
+    if (!templateId && !primitiveKind) return;
+    const key = templateId
+      ? `template:${templateId}`
+      : `primitive:${primitiveKind}`;
+    if (objectInsertSeedKeyRef.current === key) return;
+    objectInsertSeedKeyRef.current = key;
+    if (templateId) {
+      addSceneTemplateRef.current(templateId);
+    } else if (primitiveKind && primitiveKind in PRIMITIVE_DEFS) {
+      addPrimitiveRef.current(primitiveKind);
+    }
+    onSeedObjectInsertConsumed?.();
+  }, [
+    open,
+    isRestoringScene,
+    seedSceneTemplateId,
+    seedPrimitiveKind,
+    onSeedObjectInsertConsumed,
+  ]);
 
   // 방 만들기 스펙 → BgPrimitive[] 전개 추가 — addSceneTemplate과 동일한 "추가 = 선택" UX와
   // 디바운스 히스토리 계약(Ctrl+Z 한 번에 방 전체가 되돌아간다).
