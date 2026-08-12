@@ -77,7 +77,7 @@ describe(`${CORE_BRUSH_CATALOG_COUNT}-preset brush catalog contract`, () => {
   });
 
   it("keeps all 259 identities behind one searchable quick/full catalogue source", () => {
-    expect(STUDIO_BRUSH_CATALOG_COUNTS).toEqual({ core: 99, pro: 160, total: 259 });
+    expect(STUDIO_BRUSH_CATALOG_COUNTS).toEqual({ core: 99, pro: 160, total: 259, erase: 2, paint: 257 });
     expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(259);
     expect(new Set(STUDIO_ALL_BRUSH_CATALOG_ITEMS.map((item) => item.id))).toHaveProperty(
       "size",

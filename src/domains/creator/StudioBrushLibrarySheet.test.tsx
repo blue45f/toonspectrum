@@ -36,9 +36,7 @@ const beginnerCatalogItems = filterStudioBrushCatalogItems({
   recentIds: [],
 });
 const beginnerCatalogCount = beginnerCatalogItems.length;
-const paintCatalogCount = STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter(
-  (item) => item.operation === "paint",
-).length;
+const paintCatalogCount = STUDIO_BRUSH_CATALOG_COUNTS.paint;
 const paintCoreCatalogCount = STUDIO_CORE_BRUSH_CATALOG_ITEMS.filter(
   (item) => item.operation === "paint",
 ).length;

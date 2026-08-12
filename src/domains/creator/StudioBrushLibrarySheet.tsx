@@ -26,8 +26,7 @@ import { createPortal } from "react-dom";
 
 import {
   filterStudioBrushCatalogItems,
-  STUDIO_ERASER_BRUSH_CATALOG_ITEMS,
-  STUDIO_PAINT_BRUSH_CATALOG_ITEMS,
+  STUDIO_BRUSH_CATALOG_COUNTS,
   studioBrushCatalogItemById,
   studioBrushCatalogKindLabel,
 } from "./studio-brush-catalog";
@@ -779,13 +778,16 @@ export function StudioBrushLibrarySheet({
   const catalogTabs = operation === "erase"
     ? STUDIO_ERASER_LIBRARY_TABS
     : STUDIO_BRUSH_LIBRARY_TABS;
-  const operationCatalogItems = operation === "erase"
-    ? STUDIO_ERASER_BRUSH_CATALOG_ITEMS
-    : STUDIO_PAINT_BRUSH_CATALOG_ITEMS;
-  const operationCoreCount = operationCatalogItems.filter(
-    (item) => item.source === "core",
-  ).length;
-  const operationProCount = operationCatalogItems.length - operationCoreCount;
+  // SSOT totals — never hardcode (legacy copy said "229 paint" from core 71 era).
+  const operationCatalogCount = operation === "erase"
+    ? STUDIO_BRUSH_CATALOG_COUNTS.erase
+    : STUDIO_BRUSH_CATALOG_COUNTS.paint;
+  const operationCoreCount = operation === "erase"
+    ? STUDIO_BRUSH_CATALOG_COUNTS.erase
+    : STUDIO_BRUSH_CATALOG_COUNTS.core - STUDIO_BRUSH_CATALOG_COUNTS.erase;
+  const operationProCount = operation === "erase"
+    ? 0
+    : STUDIO_BRUSH_CATALOG_COUNTS.pro;
   const operationLabel = operation === "erase" ? "지우개" : "브러시";
 
   useEffect(() => {
@@ -1092,8 +1094,8 @@ export function StudioBrushLibrarySheet({
             )}
           >
             {operation === "erase"
-              ? `지우개 ${operationCatalogItems.length}종 · ${visibleItems.length}/${items.length}개 표시`
-              : `브러시 ${operationCatalogItems.length}종 · 코어 ${operationCoreCount} + 프로시저럴 ${operationProCount} · ${visibleItems.length}/${items.length}개 표시`}
+              ? `지우개 ${operationCatalogCount}종 · ${visibleItems.length}/${items.length}개 표시`
+              : `브러시 ${operationCatalogCount}종 · 코어 ${operationCoreCount} + 프로시저럴 ${operationProCount} · ${visibleItems.length}/${items.length}개 표시`}
           </p>
         </div>
         <button
@@ -1136,8 +1138,8 @@ export function StudioBrushLibrarySheet({
               setFocusedBrushId(null);
             }}
             placeholder={operation === "erase"
-              ? `지우개 ${operationCatalogItems.length}종 검색`
-              : `전체 ${operationCatalogItems.length}종 검색 (네온, 수채, G펜…)`}
+              ? `지우개 ${operationCatalogCount}종 검색`
+              : `전체 ${operationCatalogCount}종 검색 (네온, 수채, G펜…)`}
             className="min-h-11 w-full rounded-xl border border-line bg-card py-1.5 pl-9 pr-3 text-xs outline-none placeholder:text-fg-3 focus:border-accent focus:ring-1 focus:ring-accent/40"
             aria-label={`전체 ${operationLabel} 검색`}
             aria-controls={panelId}
@@ -1154,7 +1156,7 @@ export function StudioBrushLibrarySheet({
           )}
         >
           {normalizedQuery
-            ? `분류와 관계없이 전체 ${operationCatalogItems.length}종에서 검색 중`
+            ? `분류와 관계없이 전체 ${operationCatalogCount}종에서 검색 중`
             : operation === "erase"
               ? "지우는 강도와 결과를 비교해 선택하세요."
               : "분류를 고르거나 이름·용도·종류로 전체 검색"}

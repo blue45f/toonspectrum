@@ -106,7 +106,7 @@ export function listStudioQuickBrushCatalogItems(options: {
 } = {}): StudioQuickBrushTrayItem[] {
   return listStudioQuickBrushTrayItems({
     ...options,
-    // Missing injection must never silently collapse the shelf from 231 to the 71 core tools.
+    // Missing injection must never silently collapse the shelf to core-only tools.
     catalogItems: options.catalogItems ?? STUDIO_ALL_BRUSH_CATALOG_ITEMS,
   });
 }

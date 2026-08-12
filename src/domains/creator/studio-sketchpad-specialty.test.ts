@@ -43,11 +43,7 @@ describe("sketchpad specialty planners", () => {
       });
       expect(classified.status, id).toBe("classified");
     }
-    expect(STUDIO_BRUSH_CATALOG_COUNTS).toEqual({
-      core: 99,
-      pro: 160,
-      total: 259,
-    });
+    expect(STUDIO_BRUSH_CATALOG_COUNTS).toEqual({ core: 99, pro: 160, total: 259, erase: 2, paint: 257 });
   });
 
   it("plans non-overlapping tile stations along a freehand path", () => {

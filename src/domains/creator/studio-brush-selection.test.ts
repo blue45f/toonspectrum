@@ -192,7 +192,7 @@ describe("studio brush catalogue selection", () => {
 
   it("materializes all 234 catalogue ids through one fail-closed selection source", async () => {
     expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(STUDIO_ALL_BRUSH_CATALOG_ITEMS.length);
-    expect(STUDIO_BRUSH_CATALOG_COUNTS).toEqual({ core: 99, pro: 160, total: 259 });
+    expect(STUDIO_BRUSH_CATALOG_COUNTS).toEqual({ core: 99, pro: 160, total: 259, erase: 2, paint: 257 });
 
     for (const item of STUDIO_ALL_BRUSH_CATALOG_ITEMS) {
       const selection = await materializeStudioBrushCatalogSelection(item.id);

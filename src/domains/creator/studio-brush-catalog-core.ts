@@ -1,9 +1,10 @@
 /**
  * Launch-safe brush catalogue contract.
  *
- * Studio's 66 core brushes are small enough for the always-visible quick shelf. The 160
- * procedural descriptors intentionally live in `studio-brush-catalog.ts`, which is loaded only
- * when a saved pro brush needs metadata or the full library opens.
+ * Core brushes stay on the always-visible quick shelf. The 160 procedural descriptors live in
+ * `studio-brush-catalog.ts` and load when a saved pro brush needs metadata or the full library opens.
+ *
+ * Counts are derived from the live catalogues — never hardcode "229"/"231" in product copy.
  */
 import { STUDIO_BRUSH_PACK_CATALOG_IDS } from "./studio-brush-pack-id";
 import {
@@ -35,10 +36,25 @@ export function listStudioCoreBrushCatalogItems(
     : STUDIO_CORE_BRUSH_CATALOG_ITEMS.filter((item) => item.operation === operation);
 }
 
+const STUDIO_CORE_ERASE_BRUSH_COUNT = STUDIO_CORE_BRUSH_CATALOG_ITEMS.filter(
+  (item) => item.operation === "erase",
+).length;
+
+/**
+ * Single source of truth for product-facing brush totals.
+ * - `total` = paint + erase (currently 259)
+ * - `paint` = every selectable pen/tool in the paint library (currently 257)
+ * - historical "229 paint" was core 71 − 2 erase + pro 160 before web-kit core expansion
+ */
 export const STUDIO_BRUSH_CATALOG_COUNTS = Object.freeze({
   core: STUDIO_CORE_BRUSH_CATALOG_ITEMS.length,
   pro: STUDIO_BRUSH_PACK_CATALOG_IDS.length,
   total: STUDIO_CORE_BRUSH_CATALOG_ITEMS.length + STUDIO_BRUSH_PACK_CATALOG_IDS.length,
+  erase: STUDIO_CORE_ERASE_BRUSH_COUNT,
+  paint:
+    STUDIO_CORE_BRUSH_CATALOG_ITEMS.length
+    - STUDIO_CORE_ERASE_BRUSH_COUNT
+    + STUDIO_BRUSH_PACK_CATALOG_IDS.length,
 });
 
 export const STUDIO_BRUSH_MEDIA_LABELS: Readonly<Record<StudioBrushMediaGroup, string>> =

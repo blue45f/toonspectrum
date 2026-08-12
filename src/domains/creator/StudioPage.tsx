@@ -45539,7 +45539,6 @@ function clearSelectionForEdit() {
           setQuickShapeActive={setQuickShapeActive}
           setRightPanelOpen={setRightPanelOpenWithOverride}
           setSavedBrushes={commitSavedBrushProjection}
-          openBrushLibraryRepository={productBrushRepository}
           setShapeFill={setShapeFill}
           setSharedDocumentNotice={setSharedDocumentNotice}
           setShowGrid={setShowGrid}
@@ -45726,7 +45725,6 @@ function clearSelectionForEdit() {
           setPressureMinSize={setPressureMinSize}
           setQuickStartOpen={setQuickStartOpen}
           setSavedBrushes={commitSavedBrushProjection}
-          openBrushLibraryRepository={productBrushRepository}
           setSelectedId={setSelectedId}
           setShapeFill={setShapeFill}
           setStampTuning={setStampTuning}
