@@ -509,7 +509,8 @@ export interface StudioDynamicBrushLegacyDestinationContext
     startAngle: number,
     endAngle: number
   ): void;
-  fill(): void;
+  fill(fillRule?: CanvasFillRule): void;
+  fill(path: Path2D, fillRule?: CanvasFillRule): void;
   translate(x: number, y: number): void;
   rotate(angle: number): void;
   scale(x: number, y: number): void;
@@ -790,19 +791,39 @@ export function renderStudioDynamicBrushCoverageMark(
       return;
     }
     if (context.fillStyle !== mark.color) context.fillStyle = mark.color;
+    if (typeof Path2D !== "undefined") {
+      let path = (mark.ribbon as { _cachedPath?: Path2D })._cachedPath;
+      if (!path) {
+        path = new Path2D();
+        const polygons = mark.ribbon.polygons;
+        for (let pIndex = 0; pIndex < polygons.length; pIndex += 1) {
+          const points = polygons[pIndex]!;
+          const len = points.length;
+          if (len < 2) continue;
+          path.moveTo(points[0]!, points[1]!);
+          for (let index = 2; index < len; index += 2) {
+            path.lineTo(points[index]!, points[index + 1]!);
+          }
+          path.closePath();
+        }
+        (mark.ribbon as { _cachedPath?: Path2D })._cachedPath = path;
+      }
+      try {
+        context.fill(path);
+        return;
+      } catch {
+        // Fallback for mock contexts that do not accept Path2D in fill()
+      }
+    }
     context.beginPath();
-    for (const points of mark.ribbon.polygons) {
+    const polygons = mark.ribbon.polygons;
+    for (let pIndex = 0; pIndex < polygons.length; pIndex += 1) {
+      const points = polygons[pIndex]!;
       const len = points.length;
       if (len < 2) continue;
-      const firstX = points[0];
-      const firstY = points[1];
-      if (firstX === undefined || firstY === undefined) continue;
-      context.moveTo(firstX, firstY);
+      context.moveTo(points[0]!, points[1]!);
       for (let index = 2; index < len; index += 2) {
-        const x = points[index];
-        const y = points[index + 1];
-        if (x === undefined || y === undefined) break;
-        context.lineTo(x, y);
+        context.lineTo(points[index]!, points[index + 1]!);
       }
       context.closePath();
     }

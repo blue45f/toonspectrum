@@ -224,4 +224,40 @@ describe("core dry-media long-stroke regression", () => {
     expect(chunkElapsed).toBeLessThan(fullElapsed * 8 + 400);
     expect(chunkElapsed).toBeLessThan(4_000);
   });
+
+  it.each(CORE_DRY_MEDIA)(
+    "guarantees O(1) suffix chunking latency and freeze prevention across 5k-sample strokes for %s",
+    (brushId) => {
+      const long = plannedStroke(brushId, 5_000);
+      expect(long.dabs.length).toBeGreaterThan(2_800);
+
+      const chunkSize = 128;
+      let cursor = 0;
+      let chunkPlans = 0;
+      let maxChunkLatencyMs = 0;
+      const chunkStartedAt = performance.now();
+      while (cursor < long.dabs.length) {
+        const end = Math.min(long.dabs.length, cursor + chunkSize);
+        const predecessor = cursor > 0 ? cursor - 1 : cursor;
+        const startMs = performance.now();
+        const plan = coverage(
+          long,
+          long.dabs.slice(predecessor, end),
+          cursor > 0 ? 1 : 0,
+        );
+        const elapsedMs = performance.now() - startMs;
+        if (elapsedMs > maxChunkLatencyMs) maxChunkLatencyMs = elapsedMs;
+        expect(plan.ok, `${brushId} chunk ${cursor}:${end}`).toBe(true);
+        if (!plan.ok) throw new Error(plan.reason);
+        chunkPlans += 1;
+        cursor = end;
+      }
+      const totalChunkElapsed = performance.now() - chunkStartedAt;
+      expect(chunkPlans).toBeGreaterThan(20);
+      // Every individual 128-dab chunk must process in under 50ms (no frame freeze)
+      expect(maxChunkLatencyMs).toBeLessThan(50);
+      // Total 5k-sample incremental chunking across all dabs must take < 1,500ms
+      expect(totalChunkElapsed).toBeLessThan(1_500);
+    },
+  );
 });

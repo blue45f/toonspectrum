@@ -583,16 +583,19 @@ function polygonBounds(
   let minY = Number.POSITIVE_INFINITY;
   let maxX = Number.NEGATIVE_INFINITY;
   let maxY = Number.NEGATIVE_INFINITY;
-  for (const polygon of polygons) {
-    if (polygon.length < 6 || polygon.length % 2 !== 0) return null;
-    for (let index = 0; index < polygon.length; index += 2) {
+  const count = polygons.length;
+  for (let pIndex = 0; pIndex < count; pIndex += 1) {
+    const polygon = polygons[pIndex]!;
+    const len = polygon.length;
+    if (len < 6 || (len & 1) !== 0) return null;
+    for (let index = 0; index < len; index += 2) {
       const x = polygon[index]!;
       const y = polygon[index + 1]!;
       if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
-      minX = Math.min(minX, x);
-      minY = Math.min(minY, y);
-      maxX = Math.max(maxX, x);
-      maxY = Math.max(maxY, y);
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
     }
   }
   if (!(maxX > minX) || !(maxY > minY)) return null;

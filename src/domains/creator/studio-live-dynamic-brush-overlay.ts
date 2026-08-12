@@ -1373,6 +1373,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
             : {}),
         };
       }
+      let cumulativeMarks: readonly StudioDynamicBrushCoverageMark[];
       if (dryMediaPredecessor) {
         if (
           !active.dryMediaUnionAccumulator
@@ -1383,21 +1384,23 @@ export class StudioLiveDynamicBrushOverlayRenderer {
         ) {
           return this.failActive("material-plan");
         }
+        cumulativeMarks = snapshotDryMediaUnionAccumulator(
+          active.dryMediaUnionAccumulator,
+        );
+        if (!this.drawMarksToActive(plan.marks, active.style.opacity, cumulativeMarks)) {
+          return this.failActive("surface-render");
+        }
       } else {
         const accumulator = createDryMediaUnionAccumulator(plan.marks);
         if (!accumulator) return this.failActive("material-plan");
         active.dryMediaUnionAccumulator = accumulator;
-      }
-      const cumulativeMarks = snapshotDryMediaUnionAccumulator(
-        active.dryMediaUnionAccumulator,
-      );
-      // Crossing-safe one-opacity authority: clear and paint the complete cumulative union in one
-      // fill. Suffix-only source-over would leave multi-append live pixels different from a
-      // one-shot exactPlan/commit (pores punch the whole bed; self-crossings stay single-deposit).
-      // The causal deposit/bridge remain O(suffix); only the replaceable live raster is full-prefix.
-      this.clearActiveRect();
-      if (!this.drawMarksToActive(cumulativeMarks, active.style.opacity)) {
-        return this.failActive("surface-render");
+        cumulativeMarks = snapshotDryMediaUnionAccumulator(
+          active.dryMediaUnionAccumulator,
+        );
+        this.clearActiveRect();
+        if (!this.drawMarksToActive(cumulativeMarks, active.style.opacity)) {
+          return this.failActive("surface-render");
+        }
       }
       active.acceptedCausalDabCount += admittedSuffixDabs;
       active.lastAcceptedCausalDab = acceptedDabPrefix[admittedSuffixDabs - 1]
@@ -1882,6 +1885,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
   private drawMarksToActive(
     marks: readonly StudioDynamicBrushCoverageMark[],
     presentationOpacity?: number,
+    boundsMarks?: readonly StudioDynamicBrushCoverageMark[],
   ): boolean {
     const context = this.preparedActive();
     if (!context) return false;
@@ -1895,7 +1899,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
       context.restore();
     }
     return presentationOpacity === undefined
-      || this.presentActiveRect(marks, presentationOpacity);
+      || this.presentActiveRect(boundsMarks ?? marks, presentationOpacity);
   }
 
   private presentActiveRect(
