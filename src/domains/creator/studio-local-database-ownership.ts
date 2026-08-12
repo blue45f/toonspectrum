@@ -67,3 +67,17 @@ export const STUDIO_LOCAL_DATABASE_OWNERSHIP_BUSY_SESSION_HINT =
 
 export const STUDIO_BRUSH_QUICK_SLOTS_OWNERSHIP_BUSY_HINT =
   "다른 Studio 탭이 로컬 저장소를 사용 중이라 이 탭의 브러시 퀵 슬롯은 세션 전용으로 유지해요." as const;
+
+export const STUDIO_WATERMARK_PREFERENCES_OWNERSHIP_BUSY_HINT =
+  "다른 Studio 탭이 로컬 저장소를 사용 중이라 이 탭의 워터마크 설정은 세션 전용으로 유지해요." as const;
+
+/**
+ * Product-facing soft copy for multi-tab ownership busy. Technical Worker/lock stack text never
+ * reaches the banner when the failure is classified as ownership busy.
+ */
+export function studioLocalDatabaseOwnershipBusyUserMessage(
+  cause: unknown,
+  ownershipBusyHint: string = STUDIO_LOCAL_DATABASE_OWNERSHIP_BUSY_SESSION_HINT,
+): string | null {
+  return isStudioLocalDatabaseOwnershipBusyError(cause) ? ownershipBusyHint : null;
+}

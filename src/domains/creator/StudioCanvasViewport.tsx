@@ -1,8 +1,8 @@
 import { BookOpen, CircleHelp, Clapperboard, Eraser, FlipHorizontal2, Grid3X3, ImagePlus, Keyboard, Lock, Maximize2, MessageSquare, Minimize2, Minus, Mouse, MousePointer2, PaintBucket, Pencil, PenTool, Plus, Shapes, Sparkles, Square, Unlock, Wind } from "lucide-react";
 import { Fragment, Profiler, Suspense, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type SetStateAction } from "react";
 import { createPortal } from "react-dom";
-import { Stage, Layer, Rect, Group, Circle as KCircle, Line, Transformer, Shape, Text } from "react-konva/lib/ReactKonvaCore";
-// Image is not required — paper grain uses fillPatternImage on Rect.
+import { Stage, Layer, Rect, Group, Circle as KCircle, Line, Transformer, Shape, Text, Image as KImage } from "react-konva/lib/ReactKonvaCore";
+// Paper grain still uses fillPatternImage on Rect; KImage is for live liquify warp preview.
 
 import { ClipMaskGroup } from "./ClipMaskGroup";
 import { studioAdjustmentStackToFilterFields } from "./studio-adjustment-stack";
@@ -810,6 +810,11 @@ export interface StudioCanvasViewportProps {
   smudgeCursorRef: import("react").RefObject<import("konva/lib/shapes/Circle").Circle | null>;
   /** Live paint-retouch stroke trail (smudge / dodge-burn / wet-mix); mutated outside React. */
   paintRetouchStrokeLineRef: import("react").RefObject<import("konva/lib/shapes/Line").Line | null>;
+  /**
+   * Live liquify warp preview (downscaled canvas/ImageData). Mutated outside React during drag;
+   * cleared on pointerup before the full-resolution bake commits.
+   */
+  liquifyPreviewImageRef: import("react").RefObject<import("konva/lib/shapes/Image").Image | null>;
   smudgeRadius: number;
   sourceHydrationPending: boolean;
   stabilizer: number;
@@ -1107,6 +1112,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
   liquifyRadius,
   smudgeCursorRef,
   paintRetouchStrokeLineRef,
+  liquifyPreviewImageRef,
   smudgeRadius,
   sourceHydrationPending,
   stabilizer,
@@ -3730,6 +3736,16 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
               ) : null}
             {!isExporting && (smudgeArmed || liquifyArmed || dodgeBurnArmed || wetMixArmed) && (
               <Layer listening={false}>
+                {liquifyArmed ? (
+                  <KImage
+                    ref={liquifyPreviewImageRef}
+                    // Filled imperatively during drag; ImageConfig requires an image key.
+                    image={undefined as unknown as HTMLCanvasElement}
+                    visible={false}
+                    listening={false}
+                    opacity={0.92}
+                  />
+                ) : null}
                 <Line
                   ref={paintRetouchStrokeLineRef}
                   visible={false}

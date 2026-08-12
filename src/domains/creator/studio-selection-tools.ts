@@ -1024,6 +1024,24 @@ export function resolveSelectionCombineOverride(
 }
 
 /**
+ * Magma Selection-tool semantics: click-drag *inside* an existing marquee (without Shift/Alt
+ * add·subtract·intersect override) moves only the outline, not the pixels. Content moves via
+ * Transform (Shift+T in Magma) / content-transform actions in Studio.
+ */
+export function shouldMoveSelectionMarquee(input: {
+  readonly hasUsableSelection: boolean;
+  readonly pointInside: boolean;
+  /** Result of {@link resolveSelectionCombineOverride} for this pointer-down. */
+  readonly operationMode: SelectionOperationMode;
+}): boolean {
+  return (
+    input.hasUsableSelection
+    && input.pointInside
+    && input.operationMode === "replace"
+  );
+}
+
+/**
  * 드래그 시작 — rect/ellipse 는 퇴화 폴리곤(면적 0), lasso/brush 는 시작점 1개로 초기화한다.
  * poly-lasso 는 클릭 세션(beginPolyLassoSession)을 쓰므로 여기로 오지 않는다.
  * brushRadiusNorm: 브러시 도구의 정규화 반경(캔버스 px ÷ 요소 폭). 다른 도구는 무시된다.

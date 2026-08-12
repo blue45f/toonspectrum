@@ -27,4 +27,24 @@ describe("studio liquify performance boundaries", () => {
     expect(pointer).toContain("session.points.push(");
     expect(pointer).not.toContain("points: [...session.points");
   });
+
+  it("pointerup bake thins the journal so long strokes stay bounded", () => {
+    const page = source("./StudioPage.tsx");
+    const sampling = source("./studio-liquify-stroke-sampling.ts");
+
+    expect(sampling).toContain("STUDIO_LIQUIFY_APPLY_MAX_POINTS = 384");
+    expect(page).toContain("thinStudioLiquifyPointsForApply");
+    expect(page).toContain("studioLiquifyDragMinDistance");
+  });
+
+  it("keeps a drop-frame live warp preview path during drag", () => {
+    const page = source("./StudioPage.tsx");
+    const preview = source("./studio-liquify-live-preview.ts");
+    const viewport = source("./StudioCanvasViewport.tsx");
+
+    expect(preview).toContain("planStudioLiquifyLivePreview");
+    expect(page).toContain("scheduleLiquifyLivePreview");
+    expect(page).toContain("pumpLiquifyLivePreview");
+    expect(viewport).toContain("liquifyPreviewImageRef");
+  });
 });

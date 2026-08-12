@@ -772,6 +772,7 @@ import {
   validateStudioLinked3dReservedPageState,
 } from "./studio-linked-3d-render-document";
 import { type StudioLiquifyMode } from "./studio-liquify-contract";
+import { planStudioLiquifyLivePreview } from "./studio-liquify-live-preview";
 import {
   appendStudioLiquifyPointerPoint,
   beginStudioLiquifyPointerSession,
@@ -779,6 +780,10 @@ import {
   isStudioLiquifyPointerOwner,
   type StudioLiquifyPointerSession,
 } from "./studio-liquify-pointer";
+import {
+  studioLiquifyDragMinDistance,
+  thinStudioLiquifyPointsForApply,
+} from "./studio-liquify-stroke-sampling";
 import {
   gateStudioCanvasMutation,
   type StudioCanvasMutationIntent,
@@ -870,6 +875,7 @@ import { studioLivingInkVectorShadowElement } from "./studio-living-ink-vector-s
 import {
   isStudioLocalDatabaseOwnershipBusyError,
   STUDIO_BRUSH_QUICK_SLOTS_OWNERSHIP_BUSY_HINT,
+  STUDIO_WATERMARK_PREFERENCES_OWNERSHIP_BUSY_HINT,
 } from "./studio-local-database-ownership";
 import { localizeStudioText } from "./studio-localize-text";
 import {
@@ -1302,6 +1308,7 @@ import {
   isSelectionUsable,
   normalizedPointToCanvas,
   planSelectionAdjust,
+  pointInSelection,
   polyLassoCloseToStart,
   rasterizeSelectionMask,
   resolvePixelSelectionAutoTarget,
@@ -1311,9 +1318,11 @@ import {
   selectionOperationBase,
   selectionBoundsNorm,
   SELECTION_BRUSH_RADIUS_DEFAULT,
+  shouldMoveSelectionMarquee,
   snapLassoPointToEdge,
   toggleSelectionInvert,
   transformSelectionMarquee,
+  translateSelection,
   updateSelectionDrag,
   type PixelSelection,
   type PixelSelectionAutoTargetCandidate,
@@ -16137,6 +16146,16 @@ function StudioCuttoonEditor({
   const [liquifyBusy, setLiquifyBusy] = useState(false);
   const liquifyAbortRef = useRef<AbortController | null>(null);
   const liquifyDragRef = useRef<StudioLiquifyPointerSession | null>(null);
+  /** Live warp overlay (Konva.Image); updated outside React during drag. */
+  const liquifyPreviewImageRef = useRef<Konva.Image>(null);
+  const liquifyPreviewBusyRef = useRef(false);
+  const liquifyPreviewPendingRef = useRef(false);
+  const liquifyPreviewTokenRef = useRef(0);
+  const liquifyPreviewSourceRef = useRef<{
+    elId: string;
+    src: string;
+    image: CanvasImageSource;
+  } | null>(null);
   const liquifyCaptureTargetRef = useRef<Element | null>(null);
   const liquifyHandledNativeEndEventsRef = useRef(new WeakSet<Event>());
   const liquifyPointerGlobalEndRef = useRef<(event: PointerEvent, cancelled: boolean) => boolean>(
@@ -16156,6 +16175,14 @@ function StudioCuttoonEditor({
     const session = liquifyDragRef.current;
     liquifyDragRef.current = null;
     releaseLiquifyPointerCapture(session);
+    liquifyPreviewTokenRef.current += 1;
+    liquifyPreviewPendingRef.current = false;
+    const preview = liquifyPreviewImageRef.current;
+    if (preview) {
+      preview.visible(false);
+      preview.image(undefined);
+      preview.getLayer()?.batchDraw();
+    }
   }, [releaseLiquifyPointerCapture]);
   useEffect(() => {
     const onPointerUp = (event: PointerEvent) => {
@@ -16304,6 +16331,14 @@ function StudioCuttoonEditor({
     pointerId: number;
     /** 자석 올가미 휘도장 스냅샷(드래그 시작 시점) — null 이면 일반 올가미와 동일하게 동작. */
     magneticField: SelectionLuminanceField | null;
+    /**
+     * Magma-style marquee move: drag started inside an existing selection with replace intent.
+     * Only the outline moves; pixels stay put until a content transform is applied.
+     */
+    marqueeMove?: {
+      startNorm: { x: number; y: number };
+      baseSelection: PixelSelection;
+    };
   } | null>(null);
   // arm-anytime(2026-07-24) — 대상 이미지 없이 무장된 픽셀 선택 도구의 첫 제스처가 방금 자동
   // 획득한 이미지 id. 요소 전환 effect 가 이 값을 보고, 같은 포인터 제스처로 연 드래그/다각형
@@ -17364,12 +17399,15 @@ function StudioCuttoonEditor({
       })
       .catch((cause: unknown) => {
         if (!active) return;
+        const ownershipBusy = isStudioLocalDatabaseOwnershipBusyError(cause);
         const detail = cause instanceof Error ? cause.message : String(cause);
         setWatermarkPreferenceSnapshot((current) => ({
           ...current,
           state: "memory-only",
           durable: false,
-          message: `워터마크 설정 저장소를 불러오지 못했습니다. 현재 탭에서만 유지됩니다: ${detail}`,
+          message: ownershipBusy
+            ? STUDIO_WATERMARK_PREFERENCES_OWNERSHIP_BUSY_HINT
+            : `워터마크 설정 저장소를 불러오지 못했습니다. 현재 탭에서만 유지됩니다: ${detail}`,
           cause,
         }));
       });
@@ -30183,6 +30221,8 @@ const puppetWarpArmed =
     ) {
       return;
     }
+    // Worker already resamples by brush radius; denser journals only freeze pointerup.
+    const applyPoints = thinStudioLiquifyPointsForApply(points);
     const mutationTicket = captureStudioMutationTicket();
     const controller = new AbortController();
     liquifyAbortRef.current = controller;
@@ -30203,7 +30243,7 @@ const puppetWarpArmed =
       if (controller.signal.aborted) return;
       const { width: w, height: h } = studioRetouchSourceDimensions(img);
       // 정규화 → 디바이스 px 궤적
-      const devicePts = points.map((p) => ({
+      const devicePts = applyPoints.map((p) => ({
         x: p.x * w,
         y: p.y * h,
         ...(p.pressure === undefined ? {} : { pressure: p.pressure }),
@@ -30221,6 +30261,9 @@ const puppetWarpArmed =
           flipX: target.flipped ?? false,
           flipY: target.flippedY ?? false,
           mode: strokeMode,
+          // Mild path stabilization + spacing so long drags read as continuous brush dabs.
+          stabilizer: 0.18,
+          spacingRatio: 0.4,
           signal: controller.signal,
         }
       );
@@ -30242,6 +30285,109 @@ const puppetWarpArmed =
       if (liquifyAbortRef.current === controller) {
         liquifyAbortRef.current = null;
         setLiquifyBusy(false);
+      }
+    }
+  }
+
+  function clearLiquifyLivePreview() {
+    liquifyPreviewTokenRef.current += 1;
+    liquifyPreviewPendingRef.current = false;
+    const node = liquifyPreviewImageRef.current;
+    if (node) {
+      node.visible(false);
+      node.image(undefined);
+      node.getLayer()?.batchDraw();
+    }
+  }
+
+  function scheduleLiquifyLivePreview() {
+    liquifyPreviewPendingRef.current = true;
+    if (liquifyPreviewBusyRef.current) return;
+    void pumpLiquifyLivePreview();
+  }
+
+  async function pumpLiquifyLivePreview() {
+    if (liquifyPreviewBusyRef.current) return;
+    liquifyPreviewBusyRef.current = true;
+    try {
+      while (liquifyPreviewPendingRef.current && liquifyDragRef.current) {
+        liquifyPreviewPendingRef.current = false;
+        const session = liquifyDragRef.current;
+        if (!session) break;
+        const target = activeElementsRef.current.find((element) => element.id === session.elId);
+        if (!target || target.type !== "image") break;
+        const token = liquifyPreviewTokenRef.current + 1;
+        liquifyPreviewTokenRef.current = token;
+        try {
+          const [
+            { bakeLiquifyStrokeToCanvas },
+            { loadStudioRetouchSourceImage, studioRetouchSourceDimensions },
+          ] = await Promise.all([
+            loadStudioLiquifyBrowserRuntime(),
+            loadStudioPixelEditBrushRuntime(),
+          ]);
+          if (token !== liquifyPreviewTokenRef.current || !liquifyDragRef.current) break;
+          let source = liquifyPreviewSourceRef.current;
+          if (!source || source.elId !== target.id || source.src !== target.src) {
+            const image = await loadStudioRetouchSourceImage(target.src);
+            if (token !== liquifyPreviewTokenRef.current || !liquifyDragRef.current) break;
+            source = { elId: target.id, src: target.src, image };
+            liquifyPreviewSourceRef.current = source;
+          }
+          const { width: w, height: h } = studioRetouchSourceDimensions(
+            source.image as HTMLImageElement,
+          );
+          const plan = planStudioLiquifyLivePreview({
+            points: session.points,
+            sourceWidth: w,
+            sourceHeight: h,
+            elementWidth: target.width,
+            radiusCanvasPx: liquifyRadius,
+          });
+          if (!plan) continue;
+          const out = await bakeLiquifyStrokeToCanvas(
+            source.image as never,
+            plan.width,
+            plan.height,
+            plan.points,
+            plan.radiusDevice,
+            liquifyStrength / 100,
+            createStudioPixelEditCanvas,
+            {
+              flipX: target.flipped ?? false,
+              flipY: target.flippedY ?? false,
+              mode: session.mode,
+              stabilizer: 0.12,
+              spacingRatio: 0.45,
+            },
+          );
+          if (token !== liquifyPreviewTokenRef.current || !liquifyDragRef.current || !out) {
+            continue;
+          }
+          const node = liquifyPreviewImageRef.current;
+          if (!node) continue;
+          const frame = session.frame;
+          const flipX = target.flipped ? -1 : 1;
+          const flipY = target.flippedY ? -1 : 1;
+          node.image(out as HTMLCanvasElement);
+          node.x(frame.x + (flipX < 0 ? frame.width : 0));
+          node.y(frame.y + (flipY < 0 ? frame.height : 0));
+          node.width(frame.width);
+          node.height(frame.height);
+          node.scaleX(flipX);
+          node.scaleY(flipY);
+          node.rotation(frame.rotation);
+          node.visible(true);
+          node.getLayer()?.batchDraw();
+        } catch (cause) {
+          if (cause instanceof Error && cause.name === "AbortError") continue;
+          // Preview is best-effort; keep the trail and full bake path authoritative.
+        }
+      }
+    } finally {
+      liquifyPreviewBusyRef.current = false;
+      if (liquifyPreviewPendingRef.current && liquifyDragRef.current) {
+        void pumpLiquifyLivePreview();
       }
     }
   }
@@ -30272,6 +30418,8 @@ const puppetWarpArmed =
     if (outcome.kind === "ignored") return false;
     liquifyDragRef.current = null;
     releaseLiquifyPointerCapture(session);
+    clearPaintRetouchStrokePreview();
+    clearLiquifyLivePreview();
     if (outcome.kind === "apply") {
       void applyLiquifyStroke(outcome.elId, outcome.points, session.mode);
     }
@@ -30371,6 +30519,25 @@ const puppetWarpArmed =
     pixelDragRef.current = null;
     releasePixelSelectionPointerCapture(session);
     clearPixelDragPreview();
+    if (session.marqueeMove) {
+      if (cancelled) {
+        pixelSelRef.current = session.marqueeMove.baseSelection;
+        setPixelSel(session.marqueeMove.baseSelection);
+        return true;
+      }
+      const end = releasePoint ?? session.marqueeMove.startNorm;
+      const dx = end.x - session.marqueeMove.startNorm.x;
+      const dy = end.y - session.marqueeMove.startNorm.y;
+      commitPixelSelectionState(
+        (previous) => translateSelection(
+          previous ?? session.marqueeMove!.baseSelection,
+          dx,
+          dy,
+        ) ?? previous,
+        "move",
+      );
+      return true;
+    }
     if (!cancelled) {
       commitPixelSelectionState(
         (previous) => (
@@ -33227,6 +33394,14 @@ const puppetWarpArmed =
       });
       if (!session) return;
       liquifyDragRef.current = session;
+      const radiusNorm = liquifyRadius / Math.max(1, frame.width);
+      schedulePaintRetouchStrokePreview({
+        frame,
+        radiusNorm,
+        points: session.points,
+      });
+      // Twirl/pinch/bloat can be a single dab — kick a preview immediately on down.
+      scheduleLiquifyLivePreview();
       const captureTarget = stagePointerEvent.target instanceof Element
         ? stagePointerEvent.target
         : e.target.getStage()?.container() ?? null;
@@ -33516,6 +33691,53 @@ const puppetWarpArmed =
         { shift: e.evt.shiftKey, alt: e.evt.altKey },
         isSelectionUsable(pixelSelRef.current)
       );
+      const startNorm = canvasPointToNormalized(pos.x, pos.y, frame);
+      const existingSelection = pixelSelRef.current;
+      const frameAspect = frame.height / Math.max(1, frame.width);
+      // Magma: drag inside the marching-ants marquee (without Shift/Alt combine) moves the
+      // outline only. Content moves via Transform / content-transform actions.
+      if (
+        (pixelTool as string) !== "wand"
+        && pixelTool !== "poly-lasso"
+        && shouldMoveSelectionMarquee({
+          hasUsableSelection: isSelectionUsable(existingSelection),
+          pointInside: pointInSelection(existingSelection, startNorm, { aspect: frameAspect }),
+          operationMode: effectiveCombine,
+        })
+        && existingSelection
+      ) {
+        const pointerId = Number.isFinite(stagePointerEvent.pointerId)
+          ? stagePointerEvent.pointerId
+          : 1;
+        const stubDrag = beginSelectionDrag(
+          pixelTool,
+          selectionCombineModeForOperation(effectiveCombine),
+          startNorm,
+          0,
+        );
+        pixelDragRef.current = {
+          elId: pixelTarget.id,
+          frame,
+          drag: stubDrag,
+          operation: effectiveCombine,
+          pointerId,
+          magneticField: null,
+          marqueeMove: {
+            startNorm,
+            baseSelection: existingSelection,
+          },
+        };
+        const captureTarget = stagePointerEvent.target instanceof Element
+          ? stagePointerEvent.target
+          : e.target.getStage()?.container() ?? null;
+        pixelSelectionCaptureTargetRef.current = captureTarget;
+        try {
+          captureTarget?.setPointerCapture(pointerId);
+        } catch {
+          // Global capture-phase pointerup remains the safety net on browsers without capture.
+        }
+        return;
+      }
       // 다각형 올가미 — 클릭마다 꼭짓점. 시작점 근처 재클릭·더블클릭으로 닫기(드래그 세션 아님).
       if (pixelTool === "poly-lasso") {
         const raw = canvasPointToNormalized(pos.x, pos.y, frame);
@@ -34408,24 +34630,36 @@ const puppetWarpArmed =
     }
     // 픽셀 선택 드래그 중이면 궤적/박스를 갱신한다(시작 시점 프레임 스냅샷 기준 좌표 변환).
     // 올가미는 최소 간격 미만이면 같은 상태를 돌려주므로 그때는 RAF 예약도 건너뛴다.
+    // Magma 마퀴 이동: 선택 안 드래그는 아웃라인만 평행 이동(픽셀 변형은 Transform/내용 변형).
     if (pixelDragRef.current) {
       const pos = e.target.getStage()?.getRelativePointerPosition();
       if (pos) {
         const session = pixelDragRef.current;
-        const aspect = session.frame.height / Math.max(1, session.frame.width);
-        const next = updateSelectionDrag(
-          session.drag,
-          canvasPointToNormalized(pos.x, pos.y, session.frame),
-          {
-            shift: e.evt.shiftKey,
-            alt: e.evt.altKey,
-            aspect,
-            magneticField: session.magneticField,
+        const norm = canvasPointToNormalized(pos.x, pos.y, session.frame);
+        if (session.marqueeMove) {
+          const dx = norm.x - session.marqueeMove.startNorm.x;
+          const dy = norm.y - session.marqueeMove.startNorm.y;
+          const moved =
+            translateSelection(session.marqueeMove.baseSelection, dx, dy)
+            ?? session.marqueeMove.baseSelection;
+          pixelSelRef.current = moved;
+          setPixelSel(moved);
+        } else {
+          const aspect = session.frame.height / Math.max(1, session.frame.width);
+          const next = updateSelectionDrag(
+            session.drag,
+            norm,
+            {
+              shift: e.evt.shiftKey,
+              alt: e.evt.altKey,
+              aspect,
+              magneticField: session.magneticField,
+            }
+          );
+          if (next !== session.drag) {
+            session.drag = next;
+            schedulePixelDragPreview(next);
           }
-        );
-        if (next !== session.drag) {
-          session.drag = next;
-          schedulePixelDragPreview(next);
         }
       }
       return;
@@ -34488,11 +34722,19 @@ const puppetWarpArmed =
       if (pos) {
         const session = liquifyDragRef.current;
         const next = canvasPointToNormalized(pos.x, pos.y, session.frame);
+        const radiusNorm = liquifyRadius / Math.max(1, session.frame.width);
         liquifyDragRef.current = appendStudioLiquifyPointerPoint(
           session,
           pointerEvent,
-          next
+          next,
+          studioLiquifyDragMinDistance(radiusNorm),
         );
+        schedulePaintRetouchStrokePreview({
+          frame: session.frame,
+          radiusNorm,
+          points: liquifyDragRef.current.points,
+        });
+        scheduleLiquifyLivePreview();
       }
       return;
     }
@@ -45060,6 +45302,7 @@ function clearSelectionForEdit() {
           liquifyRadius={liquifyRadius}
           smudgeCursorRef={smudgeCursorRef}
           paintRetouchStrokeLineRef={paintRetouchStrokeLineRef}
+          liquifyPreviewImageRef={liquifyPreviewImageRef}
           smudgeRadius={smudgeRadius}
           sourceHydrationPending={sourceHydrationPending}
           stabilizer={stabilizer}

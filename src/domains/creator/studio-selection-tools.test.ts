@@ -62,6 +62,7 @@ import {
   rotateSelection,
   scaleSelection,
   selectAllPixels,
+  shouldMoveSelectionMarquee,
   selectionBoundsNorm,
   selectionCentroidNorm,
   setSelectionFeather,
@@ -1407,5 +1408,38 @@ describe("resolveSelectionCombineOverride", () => {
     expect(resolveSelectionCombineOverride("add", { alt: true }, true)).toBe("subtract");
     expect(resolveSelectionCombineOverride("add", { shift: true, alt: true }, true)).toBe("intersect");
     expect(resolveSelectionCombineOverride("subtract", {}, true)).toBe("subtract");
+  });
+});
+
+describe("shouldMoveSelectionMarquee (Magma outline-drag)", () => {
+  it("moves only when an existing marquee is hit with replace intent", () => {
+    expect(
+      shouldMoveSelectionMarquee({
+        hasUsableSelection: true,
+        pointInside: true,
+        operationMode: "replace",
+      }),
+    ).toBe(true);
+    expect(
+      shouldMoveSelectionMarquee({
+        hasUsableSelection: true,
+        pointInside: true,
+        operationMode: "add",
+      }),
+    ).toBe(false);
+    expect(
+      shouldMoveSelectionMarquee({
+        hasUsableSelection: true,
+        pointInside: false,
+        operationMode: "replace",
+      }),
+    ).toBe(false);
+    expect(
+      shouldMoveSelectionMarquee({
+        hasUsableSelection: false,
+        pointInside: true,
+        operationMode: "replace",
+      }),
+    ).toBe(false);
   });
 });

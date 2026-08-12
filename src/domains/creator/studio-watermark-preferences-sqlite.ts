@@ -1,4 +1,8 @@
 import {
+  isStudioLocalDatabaseOwnershipBusyError,
+  STUDIO_WATERMARK_PREFERENCES_OWNERSHIP_BUSY_HINT,
+} from "./studio-local-database-ownership";
+import {
   DEFAULT_WATERMARK,
   normalizeWatermark,
   type WatermarkSettings,
@@ -8,7 +12,21 @@ import type { StudioAsyncKeyValueStore } from "./studio-local-database";
 
 async function acquireStudioWatermarkDatabase() {
   const { acquireStudioLocalDatabase } = await import("./studio-local-database-runtime");
-  return acquireStudioLocalDatabase();
+  try {
+    return await acquireStudioLocalDatabase();
+  } catch (cause) {
+    if (!isStudioLocalDatabaseOwnershipBusyError(cause)) throw cause;
+    const memoryStore = new Map<string, string>();
+    return {
+      asAsyncKeyValueStore(namespace: string): StudioAsyncKeyValueStore {
+        return {
+          async get(key: string) { return memoryStore.get(`${namespace}:${key}`) ?? null; },
+          async set(key: string, value: string) { memoryStore.set(`${namespace}:${key}`, value); },
+          async delete(key: string) { memoryStore.delete(`${namespace}:${key}`); },
+        };
+      },
+    } as Awaited<ReturnType<typeof acquireStudioLocalDatabase>>;
+  }
 }
 
 export const STUDIO_WATERMARK_PREFERENCES_SQLITE_NAMESPACE =
@@ -115,6 +133,9 @@ export function resetStudioWatermarkPreferencesRepositoryForTests(): void {
 }
 
 function memoryOnlyMessage(cause: unknown): string {
+  if (isStudioLocalDatabaseOwnershipBusyError(cause)) {
+    return STUDIO_WATERMARK_PREFERENCES_OWNERSHIP_BUSY_HINT;
+  }
   const detail = cause instanceof Error ? cause.message : String(cause);
   return `SQLite/OPFS에 워터마크 설정을 저장하지 못했습니다. 현재 탭 메모리에서만 유지되며 새로고침하면 사라집니다: ${detail}`;
 }

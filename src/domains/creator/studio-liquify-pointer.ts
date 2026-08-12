@@ -70,11 +70,21 @@ export function appendStudioLiquifyPointerPoint(
   session: StudioLiquifyPointerSession,
   pointer: StudioLiquifyPointerLike,
   point: SelPoint,
-  minimumDistance = 0.002
+  /**
+   * Normalized element-space spacing. Prefer radius-based values from
+   * {@link studioLiquifyDragMinDistance}; the previous 0.002 floor packed too many dabs.
+   */
+  minimumDistance = 0.004,
 ): StudioLiquifyPointerSession {
   if (!isStudioLiquifyPointerOwner(session, pointer)) return session;
   const last = session.points.at(-1);
   if (last && Math.hypot(point.x - last.x, point.y - last.y) < minimumDistance) return session;
+  // Cap pathological long strokes so pointerup bake cannot explode dab×cell visits.
+  const maxPoints = 4_096;
+  if (session.points.length >= maxPoints) {
+    session.points[maxPoints - 1] = pointWithPointerPressure(point, pointer);
+    return session;
+  }
   // 세션은 StudioPage의 ref가 단독 소유하고 points도 공개 타입부터 mutable이다. 매 move마다 누적
   // 배열 전체를 복사하면 n개 점에 O(n²) 복사가 발생하므로 다른 raster brush와 동일하게 제자리 append한다.
   session.points.push(pointWithPointerPressure(point, pointer));
