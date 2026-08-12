@@ -257,8 +257,8 @@ export const StudioThreeDPreviewPanelStack = memo(function StudioThreeDPreviewPa
   bg3dBatchRecoveryScope,
   validateRecoveryAccess,
   bg3dOpen,
-  bg3dSeedTemplateId,
-  bg3dSeedPrimitiveKind,
+  bg3dSeedTemplateId = null,
+  bg3dSeedPrimitiveKind = null,
   onSeedObjectInsertConsumed,
   composeWorkAssetPreviewPage,
   currentPageId,
@@ -273,7 +273,7 @@ export const StudioThreeDPreviewPanelStack = memo(function StudioThreeDPreviewPa
   mannequinPoserOpen,
   poserInitialDataUrl,
   poserInitialElementId,
-  poserSeedPropId,
+  poserSeedPropId = null,
   poserVrmOpen,
   quickActionsAnchor,
   quickActionsDisabledActions,
@@ -455,7 +455,9 @@ export const StudioThreeDPreviewPanelStack = memo(function StudioThreeDPreviewPa
               setPoserVrmOpen(false);
               setPoserInitialDataUrl(undefined);
               setPoserInitialElementId(undefined);
-              onSeedObjectInsertConsumed?.();
+              if (typeof onSeedObjectInsertConsumed === "function") {
+                onSeedObjectInsertConsumed();
+              }
             }}
             onInsert={insertVrmResult}
           />
@@ -495,7 +497,9 @@ export const StudioThreeDPreviewPanelStack = memo(function StudioThreeDPreviewPa
               setBg3dInitialDataUrl(undefined);
               setBg3dInitialScene(undefined);
               setBg3dInitialElementId(undefined);
-              onSeedObjectInsertConsumed?.();
+              if (typeof onSeedObjectInsertConsumed === "function") {
+                onSeedObjectInsertConsumed();
+              }
             }}
             onInsert={insertBg3dResult}
             onUseAsAiMethodReference={useBg3dFrameAsAiMethodReference}

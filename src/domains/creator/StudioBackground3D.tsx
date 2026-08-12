@@ -3702,8 +3702,7 @@ export function StudioBackground3D({
     setSelectedIds(new Set([parts[0].id]));
   };
 
-  // Elements 3D rail one-shot seed: apply template/primitive after restore settles, then clear.
-  // apply via refs so the effect does not re-fire when addPrimitive/addSceneTemplate identities churn.
+  // Elements 3D one-shot seed after restore; refs avoid add* identity churn in deps.
   const addPrimitiveRef = useRef(addPrimitive);
   addPrimitiveRef.current = addPrimitive;
   const addSceneTemplateRef = useRef(addSceneTemplate);
@@ -3719,24 +3718,15 @@ export function StudioBackground3D({
       typeof seedSceneTemplateId === "string" ? seedSceneTemplateId.trim() : "";
     const primitiveKind = seedPrimitiveKind ?? null;
     if (!templateId && !primitiveKind) return;
-    const key = templateId
-      ? `template:${templateId}`
-      : `primitive:${primitiveKind}`;
+    const key = templateId ? `t:${templateId}` : `p:${primitiveKind}`;
     if (objectInsertSeedKeyRef.current === key) return;
     objectInsertSeedKeyRef.current = key;
-    if (templateId) {
-      addSceneTemplateRef.current(templateId);
-    } else if (primitiveKind && primitiveKind in PRIMITIVE_DEFS) {
+    if (templateId) addSceneTemplateRef.current(templateId);
+    else if (primitiveKind && primitiveKind in PRIMITIVE_DEFS) {
       addPrimitiveRef.current(primitiveKind);
     }
     onSeedObjectInsertConsumed?.();
-  }, [
-    open,
-    isRestoringScene,
-    seedSceneTemplateId,
-    seedPrimitiveKind,
-    onSeedObjectInsertConsumed,
-  ]);
+  }, [open, isRestoringScene, seedSceneTemplateId, seedPrimitiveKind, onSeedObjectInsertConsumed]);
 
   // 방 만들기 스펙 → BgPrimitive[] 전개 추가 — addSceneTemplate과 동일한 "추가 = 선택" UX와
   // 디바운스 히스토리 계약(Ctrl+Z 한 번에 방 전체가 되돌아간다).
