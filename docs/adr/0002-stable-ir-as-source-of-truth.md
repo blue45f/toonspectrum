@@ -21,7 +21,7 @@ IR 계열은 InputIR/StrokeIR/BrushProgramIR/PathIR/ShapeIR/TextIR/PaintIR/Layer
 ## 근거
 
 - §2.1의 원본/캐시 분리는 엔진 교체·폴백·버전업에도 문서가 불변임을 보장한다 — Verified-first 정책에서 provider는 경쟁·교체 대상이므로(§0.1), 원본이 특정 엔진 객체에 묶이면 교체 자체가 불가능해진다.
-- 폴백 체인(hybrid-design.md §5)은 "동일 IR에서 재컴파일되므로 데이터 손실이 없다"는 전제 위에 서 있다. IR 원본 없이는 provider fallback 게이트(매트릭스 검증 게이트 공통 항목)를 통과할 수 없다.
+- IR 원본이 있으면 복구 후 **동일 provider pin**으로 seed 재실행해 데이터 손실 없이 재렌더할 수 있다. 자연매체는 엔진 교체 폴백이 아니라 fail-closed + journal 보존이다(`natural-media/hybrid-design.md` §4). 포트폴리오 전반의 capability 라우팅은 `engine-portfolio/hybrid-design.md` §5를 본다.
 - TS+zod 선행은 스파인이 웹 셸·CommandRegistry·스토리지와 같은 언어로 시작해 반복 속도가 가장 빠르고, zod가 런타임 검증·JSON 직렬화·타입 추론을 동시에 제공하기 때문이다.
 - serde 미러 + golden 테스트는 이중 정의의 드리프트 위험을 "감지 불가능한 버그"에서 "CI 실패"로 격하한다. 매트릭스의 검증 게이트(golden image 계열)와 동형의 접근이다.
 

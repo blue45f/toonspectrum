@@ -590,7 +590,39 @@ export type StudioBrushBackendForbiddenFallback =
   | "silent-backend-substitution"
   | "unversioned-async-placeholder"
   | "live-only-approximation"
-  | "pixi-scene-as-brush-authority";
+  | "pixi-scene-as-brush-authority"
+  /** Hokusai↔libmypaint↔Skia 등으로 픽셀 권한을 넘기는 제품 폴백 — 질감 이질 유발. */
+  | "cross-engine-natural-media-fallback";
+
+/**
+ * Product invariant: natural-media (and every quality family) never substitutes a
+ * different pixel engine when the pinned backend is unavailable. Fail closed,
+ * preserve the surface and journal, then re-run the same pin after recovery.
+ *
+ * Multi-step Hokusai → MyPaint → Skia "fallback chains" are design-doc legacy only.
+ * See docs/candidates/natural-media/hybrid-design.md §4 (revised 2026-08-12).
+ */
+export const STUDIO_BRUSH_CROSS_ENGINE_PRODUCT_FALLBACK_POLICY = Object.freeze({
+  version: "studio-brush-cross-engine-product-fallback-v1" as const,
+  allowed: false as const,
+  unavailableBehavior: "fail-closed" as const,
+  preserveExistingSurface: true as const,
+  emitApproximation: false as const,
+  midStrokeProviderSwitchAllowed: false as const,
+  libmypaintRole: "benchmark-reference-only-not-product-fallback" as const,
+  onPinnedProviderUnavailable: Object.freeze([
+    "reject-new-stroke-or-disable-preset",
+    "preserve-command-journal-and-seed",
+    "show-existing-bake-only-if-present",
+    "re-run-same-provider-pin-after-recovery",
+  ] as const),
+  forbidden: Object.freeze([
+    "silent-backend-substitution",
+    "cross-engine-natural-media-fallback",
+    "live-only-approximation",
+    "generic-round-circle-carrier",
+  ] as const satisfies readonly StudioBrushBackendForbiddenFallback[]),
+});
 
 export interface StudioBrushBackendFamilyPolicy {
   readonly family: StudioBrushBackendQualityFamily;
@@ -616,6 +648,7 @@ const COMMON_FORBIDDEN: readonly StudioBrushBackendForbiddenFallback[] = [
   "unversioned-async-placeholder",
   "live-only-approximation",
   "pixi-scene-as-brush-authority",
+  "cross-engine-natural-media-fallback",
 ];
 
 function familyPolicy(

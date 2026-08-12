@@ -142,7 +142,8 @@ describe("studio brush alias profiles", () => {
   it("gives ink wash a denser plan, compact dark core and broad pale diffuse bleed", () => {
     const watercolor = resolveStudioBrushAliasWatercolorPlanSettings("watercolor", 20);
     expect(watercolor?.baseWidth).toBe(20);
-    expect(watercolor?.spacing).toBeCloseTo(6.8);
+    // denser wash stations (spacingRatio 0.22) keep wet edge continuous vs soft airbrush
+    expect(watercolor?.spacing).toBeCloseTo(4.4);
     const inkWash = resolveStudioBrushAliasWatercolorPlanSettings("ink-wash", 20);
     // Sumi is slightly narrower than toolbar size, denser stations, stronger core vs pale wash.
     expect(inkWash?.baseWidth).toBeCloseTo(18.4);

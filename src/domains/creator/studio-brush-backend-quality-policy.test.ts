@@ -8,6 +8,7 @@ import {
   STUDIO_BRUSH_BACKEND_INTEGRATION_AUDIT,
   STUDIO_BRUSH_BACKEND_QUALITY_POLICY_VERSION,
   STUDIO_BRUSH_BACKEND_ROUTE_CANDIDATES,
+  STUDIO_BRUSH_CROSS_ENGINE_PRODUCT_FALLBACK_POLICY,
   STUDIO_CORE_BRUSH_BACKEND_ROUTE_PROFILES,
   STUDIO_HOKUSAI_FULLSIZE_PROMOTION_GATE,
   STUDIO_HOKUSAI_MYB_PROVIDER_POLICY,
@@ -441,6 +442,36 @@ describe("Hokusai .myb provider admission", () => {
       userVisibleStatus: "experimental-quality-gate-blocked",
       noProductLibmypaintFallback: true,
     });
+  });
+
+  it("forbids cross-engine product fallback (no Hokusai→MyPaint→Skia ladder)", () => {
+    expect(STUDIO_BRUSH_CROSS_ENGINE_PRODUCT_FALLBACK_POLICY).toMatchObject({
+      allowed: false,
+      unavailableBehavior: "fail-closed",
+      emitApproximation: false,
+      midStrokeProviderSwitchAllowed: false,
+      libmypaintRole: "benchmark-reference-only-not-product-fallback",
+    });
+    expect(STUDIO_BRUSH_CROSS_ENGINE_PRODUCT_FALLBACK_POLICY.forbidden)
+      .toContain("cross-engine-natural-media-fallback");
+    expect(STUDIO_BRUSH_CROSS_ENGINE_PRODUCT_FALLBACK_POLICY.forbidden)
+      .toContain("silent-backend-substitution");
+    expect(STUDIO_HOKUSAI_MYB_PROVIDER_POLICY.rollout.benchmarkReferenceIsProductFallback)
+      .toBe(false);
+    expect(STUDIO_HOKUSAI_MYB_PROVIDER_POLICY.rollout.midStrokeProviderSwitchAllowed)
+      .toBe(false);
+
+    for (const policy of Object.values(STUDIO_BRUSH_BACKEND_FAMILY_POLICIES)) {
+      expect(policy.unavailablePolicy).toEqual({
+        behavior: "fail-closed",
+        preserveExistingSurface: true,
+        emitApproximation: false,
+      });
+      expect(policy.forbiddenFallbacks)
+        .toContain("cross-engine-natural-media-fallback");
+      expect(policy.forbiddenFallbacks)
+        .toContain("silent-backend-substitution");
+    }
   });
 
   it("admits Hokusai only when the caller carries an explicit experimental choice", () => {

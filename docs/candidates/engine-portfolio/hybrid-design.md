@@ -107,10 +107,12 @@ Vello Classic ↔ Vello Hybrid (문서별 벤치마크 선택)
   → CanvasKit (마스크·복합 필터 등 미지원 구간 재주입)
     → Vello CPU / CanvasKit Software (GPU 장애·context-loss 복구)
 
-[자연매체]
-Hokusai(studio-hokusai-wasm) ← parity lab 교차 검증 → libmypaint
-  둘 중 corpus 우위 엔진을 주력으로, 나머지를 폴백으로 유지 (ADR 0006)
-    → CanvasKit 일반 래스터 브러시 (자연매체 불가 시 기능 축소 폴백)
+[자연매체]  ※ 픽셀 권한 폴백 사다리 폐기 (2026-08-12)
+Hokusai / family specialist pin (프리셋 metadata) — 단일 권위
+  parity lab: libmypaint는 벤치마크 참조만 (제품 폴백 금지)
+  pin Provider 불가 → fail-closed (획 거부·프리셋 비활성 + journal/seed 보존)
+  → CanvasKit 일반 래스터로 “같은 oil을 근사”하는 축소 폴백 금지
+  상세: docs/candidates/natural-media/hybrid-design.md §4
 
 [SVG]
 vello_svg → ThorVG → resvg(정적 렌더 폴백 겸 reference)

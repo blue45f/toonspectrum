@@ -1,3 +1,8 @@
+import {
+  STUDIO_OSS_DRY_CARRIER_RECIPE,
+  STUDIO_OSS_OIL_FILM_RECIPE,
+} from "./studio-oss-brush-kernels";
+
 import type {
   StudioHokusaiNaturalMediaPresetId,
 } from "./studio-hokusai-natural-media-contract";
@@ -55,69 +60,77 @@ export function studioHokusaiNaturalMediaPresetSettings(
         slow_tracking_per_dab: setting(0.5),
         tracking_noise: setting(0.012),
       };
-    case "charcoal":
+    case "charcoal": {
+      // libmypaint charcoal.myb DNA (STUDIO_OSS_DRY_CARRIER_RECIPE).
+      const dry = STUDIO_OSS_DRY_CARRIER_RECIPE;
       return {
-        anti_aliasing: setting(0.8),
-        dabs_per_actual_radius: setting(15),
-        dabs_per_basic_radius: setting(0.55),
-        elliptical_dab_ratio: setting(1.2),
-        hardness: setting(0.72, {
-          pressure: [[0, -0.06], [1, 0.1]],
+        anti_aliasing: setting(dry.antiAliasing),
+        dabs_per_actual_radius: setting(dry.dabsPerActualRadius),
+        dabs_per_basic_radius: setting(dry.dabsPerBasicRadius),
+        elliptical_dab_ratio: setting(dry.ellipticalDabRatio),
+        hardness: setting(dry.hardness, {
+          pressure: [[0, -0.08], [1, 0.12]],
         }),
-        offset_by_random: setting(0.12, {
-          pressure: [[0, 0.04], [1, -0.06]],
+        offset_by_random: setting(dry.offsetByRandom, {
+          pressure: [[0, 0.05], [1, -0.05]],
         }),
-        opaque: setting(0.84, {
-          pressure: [[0, -0.2], [0.55, 0], [1, 0.14]],
+        opaque: setting(dry.opaque, {
+          pressure: [[0, -0.22], [0.55, 0], [1, 0.14]],
         }),
-        opaque_linearize: setting(0.94),
+        opaque_linearize: setting(dry.opaqueLinearize),
         opaque_multiply: setting(0, {
           pressure: [[0, 0], [0.02, 0.55], [0.12, 1], [1, 1]],
         }),
-        radius_by_random: setting(0.02),
-        radius_logarithmic: setting(0.8, {
+        radius_by_random: setting(dry.radiusByRandom),
+        radius_logarithmic: setting(dry.radiusLogarithmic, {
           pressure: [[0, -0.28], [0.55, 0.02], [1, 0.38]],
         }),
-        slow_tracking: setting(1),
-        tracking_noise: setting(0.012),
+        slow_tracking: setting(dry.slowTracking),
+        tracking_noise: setting(dry.trackingNoise),
       };
-    case "oil":
+    }
+    case "oil": {
+      // Hybrid: modelling + Wet_Paint_Plus hardness (OSS) + Hokusai paint_mode.
+      const oil = STUDIO_OSS_OIL_FILM_RECIPE;
       return {
-        anti_aliasing: setting(1),
-        dabs_per_actual_radius: setting(11.5),
-        dabs_per_basic_radius: setting(0.85),
-        direction_filter: setting(0.38),
+        anti_aliasing: setting(oil.antiAliasing),
+        dabs_per_actual_radius: setting(oil.dabsPerActualRadius),
+        dabs_per_basic_radius: setting(oil.dabsPerBasicRadius),
+        direction_filter: setting(oil.directionFilter),
         elliptical_dab_angle: setting(0, {
           direction: [[0, 0], [180, 180]],
         }),
-        elliptical_dab_ratio: setting(1.78, {
-          pressure: [[0, -0.28], [0.45, -0.04], [1, 0.18]],
+        elliptical_dab_ratio: setting(oil.ellipticalDabRatio, {
+          pressure: [[0, -0.22], [0.45, -0.02], [1, 0.14]],
         }),
-        hardness: setting(0.9, {
-          pressure: [[0, -0.1], [1, 0.08]],
+        hardness: setting(oil.hardness, {
+          pressure: [[0, -0.14], [0.55, 0], [1, 0.12]],
         }),
-        opaque: setting(0.96, {
-          pressure: [[0, -0.22], [0.4, -0.04], [1, 0.08]],
+        offset_by_random: setting(oil.offsetByRandom, {
+          pressure: [[0, 0.02], [1, -0.02]],
         }),
-        opaque_linearize: setting(0.98),
+        opaque: setting(oil.opaque, {
+          pressure: [[0, -0.28], [0.35, -0.08], [0.7, 0.02], [1, 0.1]],
+        }),
+        opaque_linearize: setting(oil.opaqueLinearize),
         opaque_multiply: setting(0, {
-          pressure: [[0, 0], [0.05, 0.18], [0.2, 0.72], [1, 1]],
+          pressure: [[0, 0], [0.04, 0.22], [0.18, 0.78], [1, 1]],
         }),
         // Hokusai/libmypaint's canonical spectral-pigment switch is
         // `paint_mode`; the unknown `paint` key silently disables it.
+        // Literal 0.88 kept for worker-boundary AST gate (= oil.paintMode).
         paint_mode: setting(0.88),
-        radius_logarithmic: setting(1.45, {
-          pressure: [[0, -0.32], [0.35, -0.02], [0.65, 0.28], [1, 0.78]],
+        radius_by_random: setting(oil.radiusByRandom),
+        radius_logarithmic: setting(oil.radiusLogarithmic, {
+          pressure: [[0, -0.28], [0.35, 0], [0.65, 0.24], [1, 0.62]],
         }),
-        slow_tracking: setting(0.78),
-        slow_tracking_per_dab: setting(0.28),
-        // The selected-stroke transform starts on a transparent surface.
-        // Spectral paint is retained, while opacity-destructive smudge
-        // feedback is disabled so retracing can only add coverage.
-        smudge: setting(0),
-        smudge_length: setting(0.9),
+        slow_tracking: setting(oil.slowTracking),
+        slow_tracking_per_dab: setting(oil.slowTrackingPerDab),
+        smudge: setting(oil.smudge),
+        smudge_length: setting(oil.smudgeLength),
         smudge_length_log: setting(0.3),
       };
+    }
     case "calligraphy":
       return {
         anti_aliasing: setting(1),

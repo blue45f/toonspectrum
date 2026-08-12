@@ -1,8 +1,12 @@
 # ToonStudio V11 — natural-media 하이브리드 설계 (hybrid design)
 
 - 기준일: 2026-08-07
+- 개정: 2026-08-12 — §4 다단 엔진 폴백 폐기 → fail-closed 단일 권위 (질감 이질 방지)
 - 관련 매트릭스 행: E11 (libmypaint), E12 (Hokusai), E28 (ToonWet/wgpu)
 - 결합 유형: V11 §1.2의 **5. 동역학/재질 분리** + **8. 교차 검증** + **9. 선택적 자체 구현**
+- 제품 정책 거울: `src/domains/creator/studio-brush-backend-quality-policy.ts`  
+  (`emitApproximation: false`, `benchmarkReferenceIsProductFallback: false`,  
+  `silent-backend-substitution` 금지)
 
 ## 1. 단계별 파이프라인 (입력 → 처리 → 렌더 → 출력)
 
@@ -15,13 +19,12 @@ Pointer Events (coalesced/predicted, pressure/tilt/azimuth/twist)
         ▼
 [처리]
 BrushProgramIR (dynamics/tip/texture/mixing/material 그래프)
-→ HybridExecutionPlanner가 NaturalMediaProvider 선택
-   ├─ MyPaintProvider  : libmypaint dynamics/dab 계산 (E11)
-   └─ HokusaiProvider  : studio-hokusai-wasm — beginStroke(brush, seed)
-                         → addSample(x, y, pressure, tiltX, tiltY, timeMs)
-                         → finishStroke (E12)
-→ (선택) ToonWetProvider: wet-tile simulation pass
-   — pigment/water 상태 타일에 backrun·granulation·건조 타임라인 적용 (E28)
+→ HybridExecutionPlanner가 **프리셋 pin된 NaturalMediaProvider 정확히 하나** 선택
+   (패밀리 라우팅: dry / wet-oil / spray 등 — 계단형 엔진 폴백 아님)
+   ├─ HokusaiProvider  : studio-hokusai-wasm (.myb carrier + texture v2) — 제품 natural-media 후보
+   ├─ (parity lab only) MyPaintProvider / libmypaint WASM — 벤치마크 참조, 제품 폴백 금지
+   └─ 패밀리 전용 specialist (oil ribbon, dry anisotropic, stamp spray…) — 카탈로그 pin
+→ (선택) ToonWet / Living Ink: wet-tile pass — 권위 pigment 타일 위 종속 pass only
         │
         ▼
 [렌더]
@@ -59,41 +62,73 @@ Preview와 Final이 같은 Provider를 쓰는 것이 원칙이다(자연매체�
 
 V11 §1.1 "한 Surface 또는 큰 Island에 주 소유자 하나" 규칙의 natural-media 적용:
 
-- **Natural-media tile island**: 소유자는 활성 NaturalMediaProvider **정확히 하나** (`HokusaiProvider` 또는 `MyPaintProvider`). 같은 레이어의 같은 stroke를 두 엔진이 동시에 그리지 않는다. 두 엔진 동시 실행은 parity lab(교차 검증)에서만 허용된다.
-- **ToonWet pass**: island 내부의 종속 pass다. 독립 island가 아니며, 소유 Provider가 만든 pigment 타일 위에서만 동작하고 자체 표면을 소유하지 않는다.
+- **Natural-media tile island**: 소유자는 프리셋에 pin된 NaturalMediaProvider **정확히 하나**. 같은 stroke를 두 엔진이 동시에 그리지 않는다. 두 엔진 동시 실행은 **parity lab(교차 검증) 전용**이며 제품 폴백 경로가 아니다.
+- **ToonWet / Living Ink pass**: island 내부의 종속 pass다. 독립 island가 아니며, 소유 Provider가 만든 pigment 타일 위에서만 동작하고 자체 표면을 소유하지 않는다.
 - **Composite surface**: 소유자는 CanvasKit/Skia (E01 — 기본 페인팅 Surface·혼합·마스크). natural-media island는 텍스처/이미지로만 결과를 전달한다.
 - **Overlay scene**: 소유자는 Vello (E02) — 브러시 커서·가이드·선택·HUD. natural-media 픽셀에 관여하지 않는다.
-- 엔진 전환은 객체별이 아니라 **island별**로만 일어난다(V11 §9.1). 레이어 단위로 Provider 태그를 기록해 어떤 레이어가 어떤 엔진 결과인지 항상 추적한다.
+- 엔진 전환은 객체별이 아니라 **island별·프리셋 pin 변경**으로만 일어난다(V11 §9.1). mid-stroke provider switch 금지. 레이어/획에 Provider·version·seed 태그를 기록한다.
 
 WASM Provider는 Worker에 lazy load하고, island 비활성 시 Worker 종료로 메모리를 회수한다(V11 §9.1). Hokusai 래퍼는 `dispose()`(타일 해제, idempotent) → `free()`(래퍼 메모리) 순서의 명시적 수명 계약을 이미 제공한다.
 
-## 4. 폴백 체인
+## 4. 실패 모드 — fail-closed 단일 권위 (다단 엔진 폴백 폐기)
+
+### 4.1 왜 계단형 폴백을 쓰지 않는가
+
+자연매체는 **엔진 = 질감**이다. Hokusai → libmypaint → Skia 근사로 바꾸면 같은 프리셋이 기기·세션마다 이질 픽셀을 내고, live/commit/reopen parity가 깨진다.  
+따라서 **픽셀 권한을 넘기는 cross-engine product fallback은 금지**한다. libmypaint는 벤치마크 참조만 담당한다 (`benchmark-reference-only-not-product-fallback`).
+
+### 4.2 권위 경로 (정상)
 
 ```text
-HokusaiProvider (품질 게이트 통과 시 주력)
-  │ 실패: WASM init 실패 / worker crash / parity 게이트 미통과 프리셋
-  ▼
-MyPaintProvider (자연매체 기준선)
-  │ 실패: libmypaint WASM 포팅 불가 장치 / 메모리 부족
-  ▼
-SkiaRasterProvider 근사 (E01 batched dab — dynamics 단순화, "근사 렌더" 배지 표시)
-  │ 실패: Surface 자체 상실 (GPU context loss 등)
-  ▼
-편집 잠금 + CommandJournal 보존 → 복구 후 seed 재실행으로 무손실 재렌더
+프리셋 metadata.provider pin (또는 패밀리 기본 pin)
+  → 해당 Provider만 live / commit / final
+  → seed + engineVersion + adapterVersion + input/pixel receipt 영속
 ```
 
-- **ToonWet 폴백**: WebGPU 미지원·성능 미달 장치에서는 wet pass를 생략하고 기본 수채(libmypaint/Hokusai 단독)로 동작한다. 문서에는 wet 파라미터가 IR로 보존되므로 상위 장치에서 다시 열면 재현된다. wet bake가 이미 있으면 bake를 표시한다.
-- 폴백은 CapabilityRegistry가 프리셋·장치 단위로 라우팅한다(V11 §8 — 불안정 구간만 다른 Provider로 보낸다). 어떤 프리셋이 어떤 엔진에서 실행 가능한지는 preset의 provider/version 메타데이터(V11 §6.4)에 고정한다.
-- 폴백 발생은 사용자에게 고지하고(품질 배지), Final bake는 반드시 원래 지정된 Provider가 가용해진 뒤에만 수행한다 — 폴백 엔진의 픽셀을 정본으로 승격하지 않는다.
+하이브리드는 “한 획 안에서 엔진을 계단으로 갈아끼우기”가 아니라  
+**패밀리마다 주력 엔진을 고르는 라우팅**(oil ribbon / Hokusai oil, dry anisotropic, stamp spray, wet-field …)이다.
+
+### 4.3 실패 모드 (가용성만 — 질감 교체 없음)
+
+```text
+pin된 Provider 사용 가능?
+  ├─ 예 → 그 엔진만 실행 (mid-stroke switch 금지)
+  └─ 아니오
+        → 새 획 입력 거부 또는 해당 프리셋 비활성 (fail-closed)
+        → 기존 표면 보존 (emitApproximation: false)
+        → CommandJournal + seed + provider pin 보존
+        → 이미 bake된 결과(PNG/tile)만 표시 가능
+        → 복구 후 **동일 pin Provider**로 seed 재실행 (무손실 재렌더)
+```
+
+| 상황 | 허용 | 금지 |
+| --- | --- | --- |
+| WASM init 실패 / worker crash | 편집 잠금·프리셋 비활성·journal 보존 | MyPaint/Skia로 같은 oil을 몰래 그리기 |
+| 품질 게이트 미통과 | 기존 exact product route 유지, Hokusai는 experimental opt-in만 | identity만으로 자동 승격·대체 |
+| WebGPU wet pass 불가 | wet pass 생략 + **이미 bake된 wash 표시**; 문서에 wet IR 보존 | 다른 dab 엔진을 “수채”로 위장 승격 |
+| Surface/GPU context 상실 | 편집 잠금 + journal 보존 | live-only approximation을 final로 승격 |
+| silent-backend-substitution | — | **항상 금지** |
+| generic-round-circle / cross-family round dab | — | dry/wet 품질 패밀리에서 **항상 금지** |
+
+### 4.4 ToonWet / Living Ink
+
+- WebGPU 미지원·성능 미달: **신규 물리 획을 다른 엔진으로 대체하지 않는다.**  
+  wet 파라미터는 IR로 남기고, bake가 있으면 bake를 보여 주며, 상위 장치에서 동일 pin으로 재현한다.
+- Living Ink 신규 물리 획 게이트가 OFF이면 soft wash 경로가 별도 pin된 제품 경로일 뿐, Hokusai/oil 실패 시의 폴백이 아니다.
+
+### 4.5 사용자 고지
+
+- pin Provider 불가로 프리셋이 막히면 UI에 이유(품질 게이트 / 런타임 미준비 / 장치 capability)를 고지한다.
+- experimental opt-in 변환은 명시 선택이며, 자동 identity 라우팅과 혼동하지 않는다.
 
 ## 5. parity lab 운영 구조
 
-교차 검증(V11 §1.2-8)을 상시 파이프라인으로 둔다.
+교차 검증(V11 §1.2-8)을 상시 파이프라인으로 둔다. **lab에서의 이중 엔진 실행은 제품 폴백이 아니라 승격 증거 수집**이다.
 
 1. 동일 `.myb` preset corpus를 두 엔진에 로드 (Hokusai는 `.myb` 호환 지향 — 미지원 매핑은 커버리지 리포트로 분리).
 2. 동일 InputIR 샘플 스트림(기록된 실제 획)을 동일 seed로 재생.
 3. 타일 출력을 straight-alpha sRGB RGBA8로 정규화해 픽셀 diff (Hokusai 래퍼가 이미 이 형식 — libmypaint 어댑터도 동일 계약으로 변환).
-4. diff 결과·지연·메모리를 ProviderBenchmarkRegistry에 기록, QualityOrchestrator가 프리셋별 주력 엔진을 판정.
-5. 판정 결과는 preset 메타데이터에 provider pin으로 저장되어 런타임 라우팅에 쓰인다.
+4. diff 결과·지연·메모리를 ProviderBenchmarkRegistry에 기록, QualityOrchestrator가 프리셋별 **주력 pin 후보**를 판정.
+5. 게이트 통과 시에만 preset 메타데이터에 provider pin을 기록한다. 미통과 시 **기존 exact product route 유지** — libmypaint를 제품 폴백으로 승격하지 않는다.
 
 측정 지표·임계·게이트는 `benchmark-plan.md`가 정의한다.

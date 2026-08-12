@@ -8,7 +8,15 @@
  * 결정성 계약: 모든 무작위 요소(연필 그레인 지터 등)는 스탬프 인덱스에서 유도한 해시로만
  * 만든다. 같은 입력(points/pressures/style)이면 증분이든 전체 재생이든 동일한 픽셀이 나온다.
  * 이 계약 덕에 뷰포트 리플레이·커밋 핸드오프에서 획의 모양이 변하지 않는다.
+ *
+ * Hybrid OSS tips: airbrush/watercolor tip pixels come from studio-oss-brush-kernels
+ * (Klecks multi-octave spray/chalk DNA + equal-area scatter), not pure CSS gradients.
  */
+
+import {
+  studioOssSprayTipCoverage,
+  studioOssWatercolorTipCoverage,
+} from "./studio-oss-brush-kernels";
 
 export type StudioStampBrushKind =
   | "airbrush"
@@ -67,11 +75,12 @@ export interface StudioStampBrushStyle {
 
 /** dab 지름 대비 스탬프 간격 비율 — 종류별 질감을 만드는 1차 변수. */
 const STAMP_SPACING_RATIO: Record<StudioStampBrushKind, number> = {
-  airbrush: 0.16,
+  // Klecks/Kleki airbrush: dense soft dabs keep the mist continuous.
+  airbrush: 0.12,
   pencil: 0.24,
   ink: 0.32,
-  // 수채는 dab 이 겹치며 링이 연속된 젖은 경계로 읽히도록 촘촘하게 찍는다.
-  watercolor: 0.11,
+  // Wet wash: dense stations so the OSS wet-edge ring forms a continuous front.
+  watercolor: 0.09,
   mypaint: 0.2,
   "krita-auto": 0.15,
 };
@@ -81,13 +90,78 @@ export const STUDIO_STAMP_BRUSH_DEFAULTS: Record<
   StudioStampBrushKind,
   Pick<StudioStampBrushStyle, "flow" | "hardness" | "minSizeRatio">
 > = {
-  airbrush: { flow: 0.22, hardness: 0.12, minSizeRatio: 0.75 },
+  // Klecks spray DNA: low per-dab flow so grit tip builds by overlap.
+  airbrush: { flow: 0.16, hardness: 0.06, minSizeRatio: 0.7 },
   pencil: { flow: 0.62, hardness: 0.85, minSizeRatio: 0.35 },
   ink: { flow: 1, hardness: 1, minSizeRatio: 0.08 },
-  watercolor: { flow: 0.3, hardness: 0.35, minSizeRatio: 0.6 },
+  watercolor: { flow: 0.26, hardness: 0.28, minSizeRatio: 0.55 },
   mypaint: { flow: 0.75, hardness: 0.6, minSizeRatio: 0.25 },
   "krita-auto": { flow: 0.85, hardness: 0.75, minSizeRatio: 0.3 },
 };
+
+function parseCssRgbColor(
+  color: string,
+): Readonly<{ r: number; g: number; b: number }> | null {
+  const hex = /^#([\da-f]{3}|[\da-f]{6})$/iu.exec(color.trim());
+  if (hex) {
+    const raw = hex[1]!;
+    const full = raw.length === 3
+      ? [...raw].map((c) => `${c}${c}`).join("")
+      : raw;
+    return {
+      r: Number.parseInt(full.slice(0, 2), 16),
+      g: Number.parseInt(full.slice(2, 4), 16),
+      b: Number.parseInt(full.slice(4, 6), 16),
+    };
+  }
+  const rgb = /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/iu.exec(color);
+  if (!rgb) return null;
+  return {
+    r: Math.round(Number(rgb[1])),
+    g: Math.round(Number(rgb[2])),
+    b: Math.round(Number(rgb[3])),
+  };
+}
+
+/**
+ * Bake an OSS multi-octave tip into ImageData (Klecks chalk/spray structure).
+ * Falls back to null when the context cannot allocate ImageData (jsdom stubs).
+ */
+function rasterizeOssTexturedTip(
+  ctx: CanvasRenderingContext2D,
+  kind: "airbrush" | "watercolor",
+  color: string,
+  radius: number,
+  hardness: number,
+  seed: number,
+): boolean {
+  const channels = parseCssRgbColor(color);
+  if (!channels || typeof ctx.createImageData !== "function") return false;
+  const size = Math.max(4, Math.round(radius * 2 + 4));
+  const image = ctx.createImageData(size, size);
+  const cx = (size - 1) / 2;
+  const cy = (size - 1) / 2;
+  const invR = 1 / Math.max(1e-6, radius);
+  const data = image.data;
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const nx = (x - cx) * invR;
+      const ny = (y - cy) * invR;
+      const coverage = kind === "airbrush"
+        ? studioOssSprayTipCoverage(nx, ny, seed, hardness)
+        : studioOssWatercolorTipCoverage(nx, ny, seed, hardness);
+      const offset = (y * size + x) * 4;
+      data[offset] = channels.r;
+      data[offset + 1] = channels.g;
+      data[offset + 2] = channels.b;
+      data[offset + 3] = Math.round(Math.min(1, Math.max(0, coverage)) * 255);
+    }
+  }
+  if (typeof ctx.putImageData !== "function") return false;
+  ctx.putImageData(image, 0, 0);
+  return true;
+}
+
 
 /** 사용자 조절 가능한 스탬프 파라미터(부분 지정) — DrawEl.stamp 로 획에 영속화된다. */
 export interface StudioStampBrushTuning {
@@ -225,19 +299,33 @@ function getCachedDabTipCanvas(
   const r = roundedRadius;
 
   if (kind === "airbrush" || kind === "watercolor") {
-    const gradient = ctx.createRadialGradient(cx, cy, r * roundedHardness * 0.85, cx, cy, r);
-    gradient.addColorStop(0, color);
-    gradient.addColorStop(1, "transparent");
-    ctx.fillStyle = gradient;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.fill();
-    if (kind === "watercolor") {
-      ctx.strokeStyle = color;
-      ctx.lineWidth = Math.max(0.25, r * 0.06);
+    const tipSeed =
+      (Math.imul(roundedRadius + 1, 0x9e37) ^ Math.imul(Math.round(roundedHardness * 100) + 1, 0x85eb))
+      >>> 0;
+    const baked = rasterizeOssTexturedTip(
+      ctx,
+      kind,
+      color,
+      r,
+      roundedHardness,
+      tipSeed,
+    );
+    if (!baked) {
+      // jsdom / headless stubs without ImageData — soft gradient fallback.
+      const gradient = ctx.createRadialGradient(cx, cy, r * roundedHardness * 0.85, cx, cy, r);
+      gradient.addColorStop(0, color);
+      gradient.addColorStop(1, "transparent");
+      ctx.fillStyle = gradient;
       ctx.beginPath();
-      ctx.arc(cx, cy, r * 0.94, 0, Math.PI * 2);
-      ctx.stroke();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fill();
+      if (kind === "watercolor") {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = Math.max(0.25, r * 0.06);
+        ctx.beginPath();
+        ctx.arc(cx, cy, r * 0.94, 0, Math.PI * 2);
+        ctx.stroke();
+      }
     }
   } else if (kind === "mypaint") {
     const gradient = ctx.createRadialGradient(cx, cy, r * roundedHardness * 0.5, cx, cy, r);
@@ -332,6 +420,8 @@ function drawDab(
       else if (kind === "krita-auto") dabAlpha = alpha * 0.95;
       context.globalAlpha = dabAlpha;
       context.drawImage(cachedTip, x - cachedTip.width / 2, y - cachedTip.height / 2);
+      // Spray grit is baked into the OSS tip raster (Klecks multi-octave coverage).
+      // Extra micro-arcs would break plan/render dab-count parity contracts.
       return;
     }
   }

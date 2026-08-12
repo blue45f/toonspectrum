@@ -359,12 +359,15 @@ export const STUDIO_BRUSH_ALIAS_PROFILES = {
     family: "watercolor",
     diameterScale: 1,
     pressure: IDENTITY_PRESSURE,
+    // Expresii/Kleki wash feel without Living Ink CFD: denser stations, denser
+    // core pigment, wider lower-opacity diffuse skirt so soft airbrush and wet
+    // wash stop reading as the same envelope (browser texture QA 2026-08-12).
     watercolor: {
-      spacingRatio: 0.34,
-      coreRadiusScale: 1,
-      coreOpacityScale: 1,
-      diffuseRadiusScale: 1,
-      diffuseOpacityScale: 1,
+      spacingRatio: 0.22,
+      coreRadiusScale: 0.76,
+      coreOpacityScale: 1.42,
+      diffuseRadiusScale: 1.62,
+      diffuseOpacityScale: 0.55,
     },
   },
   "ink-wash": {

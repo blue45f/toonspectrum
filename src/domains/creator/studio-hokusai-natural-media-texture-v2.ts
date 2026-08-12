@@ -4,6 +4,13 @@ import {
   type StudioHokusaiNaturalMediaPresetId,
   type StudioHokusaiNaturalMediaRenderPlan,
 } from "./studio-hokusai-natural-media-contract";
+import {
+  studioOssApplyMaterialColorChannel,
+  studioOssDirectionalWaxSample,
+  studioOssKlecksChalkCoverage,
+  studioOssMaterialColorModeForProfile,
+  studioOssOilBristleFilm,
+} from "./studio-oss-brush-kernels";
 
 export const STUDIO_HOKUSAI_NATURAL_MEDIA_TEXTURE_VERSION =
   "studio-hokusai-material-texture-v2" as const;
@@ -489,12 +496,17 @@ function chalkTexture(
   seed: number,
   diagnostics?: NoiseEvaluationDiagnostics,
 ): MaterialTextureSample {
-  const field = pigmentFields(x, y, seed, 41, 0.058, 0.41, diagnostics);
-  const powder = field.broad * 0.47 + field.fine * 0.31 + field.fibre * 0.22;
+  // Klecks genBrushAlpha01 structure via studio-oss-brush-kernels (MIT).
+  // Four internal multi-octave samples (budget = 4). Document coords map into
+  // a local tip cell so mineral tooth is structural, not a flat opacity knob.
+  if (diagnostics) diagnostics.count += 4;
+  const cellX = Math.sin(x * 0.11 + y * 0.03) * 0.95;
+  const cellY = Math.cos(y * 0.11 - x * 0.04) * 0.95;
+  const chalk = studioOssKlecksChalkCoverage(cellX, cellY, seed ^ 0x41);
   return {
-    alpha: 0.48 + powder * 0.47,
-    color: 0.77 + powder * 0.34,
-    lift: 0.012 + (1 - field.fine) * 0.035,
+    alpha: 0.34 + chalk * 0.62,
+    color: 0.7 + chalk * 0.4,
+    lift: 0.02 + (1 - chalk) * 0.055,
   };
 }
 
@@ -502,16 +514,21 @@ function crayonTexture(
   x: number,
   y: number,
   seed: number,
+  directionRadians: number,
   diagnostics?: NoiseEvaluationDiagnostics,
 ): MaterialTextureSample {
-  // Anisotropic wax: fibre lanes dominate so the grain follows the stylus, not an isotropic tile.
-  const field = pigmentFields(x, y, seed, 47, 0.096, 0.28, diagnostics);
-  const wax = field.broad * 0.22 + field.fine * 0.18 + field.fibre * 0.6;
-  const tooth = Math.max(0, field.fibre - 0.48);
+  // Direction-aligned wax scrape (OSS kernel, 3 value-noise samples).
+  if (diagnostics) diagnostics.count += 3;
+  const sample = studioOssDirectionalWaxSample(
+    x,
+    y,
+    directionRadians,
+    seed ^ 0x47,
+  );
   return {
-    alpha: 0.58 + wax * 0.4,
-    color: 0.68 + wax * 0.5,
-    lift: tooth * 0.09 + Math.max(0, field.fine - 0.62) * 0.03,
+    alpha: 0.5 + sample.wax * 0.46,
+    color: 0.62 + sample.wax * 0.54,
+    lift: sample.scrape * 0.12 + sample.grit * 0.05,
   };
 }
 
@@ -521,12 +538,16 @@ function pastelTexture(
   seed: number,
   diagnostics?: NoiseEvaluationDiagnostics,
 ): MaterialTextureSample {
-  const field = pigmentFields(x, y, seed, 53, 0.039, 0.52, diagnostics);
-  const powder = field.broad * 0.58 + field.fine * 0.3 + field.fibre * 0.12;
+  // Soft cake body via pigment fields (budget 4) with subtractive fine crumb.
+  const field = pigmentFields(x, y, seed, 53, 0.034, 0.56, diagnostics);
+  const powder = Math.max(
+    0,
+    field.broad * 0.62 + field.fine * 0.28 + field.fibre * 0.1 - field.fine * 0.12,
+  );
   return {
-    alpha: 0.43 + powder * 0.52,
-    color: 0.72 + powder * 0.42,
-    lift: 0.018 + (1 - field.broad) * 0.052,
+    alpha: 0.36 + powder * 0.58,
+    color: 0.68 + powder * 0.46,
+    lift: 0.024 + (1 - field.broad) * 0.06 + Math.max(0, field.fine - 0.62) * 0.04,
   };
 }
 
@@ -537,38 +558,19 @@ function oilTexture(
   directionRadians: number,
   diagnostics?: NoiseEvaluationDiagnostics,
 ): MaterialTextureSample {
-  const tangentX = Math.cos(directionRadians);
-  const tangentY = Math.sin(directionRadians);
-  const normalX = -tangentY;
-  const normalY = tangentX;
-  const across = x * normalX + y * normalY;
-  const along = x * tangentX + y * tangentY;
-  // Multi-scale bristle ridges: fine hairs, mid-width clumps and a slow load undulation.
-  // Along-stroke modulation stays weak so the axis stays readable through curves and zoom.
-  const fineBristle = valueNoise1d(
-    across * 1.42 + along * 0.022,
-    31,
-    seed ^ 0x9e57_41b3,
-    diagnostics,
+  // libmypaint modelling + soft bristle film (OSS kernel, 3× valueNoise1d).
+  const film = studioOssOilBristleFilm(
+    x,
+    y,
+    directionRadians,
+    seed,
+    (coordinate, lane, filmSeed) =>
+      valueNoise1d(coordinate, lane, filmSeed, diagnostics),
   );
-  const midBristle = valueNoise1d(
-    across * 0.48 + along * 0.011,
-    33,
-    seed ^ 0x2c1b_8e47,
-    diagnostics,
-  );
-  const broadBristle = valueNoise1d(
-    across * 0.18 - along * 0.006,
-    32,
-    seed ^ 0x4b16_f2d9,
-    diagnostics,
-  );
-  const ridge = 0.5 * fineBristle + 0.32 * midBristle + 0.18 * broadBristle;
-  const impasto = Math.max(0, ridge - 0.42);
   return {
-    alpha: 0.68 + ridge * 0.32,
-    color: 0.62 + ridge * 0.52,
-    lift: impasto * 0.34 + Math.max(0, midBristle - 0.55) * 0.08,
+    alpha: film.alpha,
+    color: film.color,
+    lift: film.lift,
   };
 }
 
@@ -628,11 +630,12 @@ function oilPastelTexture(
     0.28,
     diagnostics,
   );
-  const wax = tooth.broad * 0.42 + tooth.detail * 0.58;
+  // Oil-pastel = soft oil film + wax scrape tooth (Krita oil pastel feel).
+  const wax = tooth.broad * 0.38 + tooth.detail * 0.62;
   return {
-    alpha: 0.73 + (oil.alpha * 0.45 + wax * 0.55) * 0.26,
-    color: 0.68 + (oil.color * 0.38 + wax * 0.62) * 0.43,
-    lift: oil.lift * 0.32 + Math.max(0, wax - 0.62) * 0.09,
+    alpha: 0.7 + (oil.alpha * 0.4 + wax * 0.6) * 0.28,
+    color: 0.72 + (oil.color * 0.35 + wax * 0.65) * 0.38,
+    lift: oil.lift * 0.45 + Math.max(0, wax - 0.58) * 0.1,
   };
 }
 
@@ -736,21 +739,26 @@ function materialCoverage(
       // preserving pressure order and never painting transparent pixels.
       return Math.min(1, normalized ** 0.86 * 1.28);
     case "chalk":
-      return Math.min(1, normalized ** 0.8 * 1.3);
+      // Powder build: sub-linear so overlapping mineral flakes accumulate softly.
+      return Math.min(1, normalized ** 0.78 * 1.28);
     case "crayon":
-      return Math.min(1, normalized ** 0.94 * 1.22);
+      // Wax scrape still needs a continuous core; mild sub-linear keeps tooth
+      // without bead gaps between Hokusai dabs.
+      return Math.min(1, normalized ** 0.9 * 1.2);
     case "pastel":
-      return Math.min(1, normalized ** 0.82 * 1.26);
+      return Math.min(1, normalized ** 0.8 * 1.24);
     case "oil-pastel":
-      return Math.min(1, normalized ** 0.98 * 1.2);
+      return Math.min(1, normalized ** 0.94 * 1.18);
     case "oil":
-      return Math.min(1, normalized ** 1.18 * 1.28);
+      // Super-linear **1.18 punched soft dab shoulders into hard plastic ridges
+      // (Magma-class oil wants soft film build, not posterized edges).
+      return Math.min(1, normalized ** 0.94 * 1.16);
     case "acrylic":
-      return Math.min(1, normalized ** 1.06 * 1.24);
+      return Math.min(1, normalized ** 1.0 * 1.2);
     case "gouache":
-      return Math.min(1, normalized ** 0.92 * 1.2);
+      return Math.min(1, normalized ** 0.9 * 1.18);
     case "painterly":
-      return Math.min(1, normalized ** 1.1 * 1.25);
+      return Math.min(1, normalized ** 0.98 * 1.18);
     case "calligraphy":
     case "marker":
       return normalized;
@@ -773,7 +781,7 @@ function materialTexture(
     case "chalk":
       return chalkTexture(x, y, seed, diagnostics);
     case "crayon":
-      return crayonTexture(x, y, seed, diagnostics);
+      return crayonTexture(x, y, seed, directionRadians, diagnostics);
     case "pastel":
       return pastelTexture(x, y, seed, diagnostics);
     case "oil-pastel":
@@ -901,10 +909,14 @@ export function applyStudioHokusaiNaturalMediaTextureV2(
     || plan.materialProfileId === "oil-pastel"
     || plan.materialProfileId === "acrylic"
     || plan.materialProfileId === "painterly"
+    || plan.materialProfileId === "crayon"
   );
   const localMaterialDirection = directionAwareProfile
     ? localStrokeDirectionResolver(plan, directionRadians)
     : null;
+  const colorMode = studioOssMaterialColorModeForProfile(
+    plan.materialProfileId,
+  );
   for (let y = dirtyY; y < dirtyY + dirtyHeight; y += 1) {
     const documentY = plan.logicalBounds.y + y * inverseScale;
     let index = (
@@ -928,10 +940,12 @@ export function applyStudioHokusaiNaturalMediaTextureV2(
       const powderCoefficient = plan.materialProfileId === "charcoal"
         ? 0.55
         : plan.materialProfileId === "chalk"
-          ? 0.42
+          ? 0.48
           : plan.materialProfileId === "pastel"
-            ? 0.32
-            : 0;
+            ? 0.38
+            : plan.materialProfileId === "crayon"
+              ? 0.22
+              : 0;
       const materialAlpha = powderCoefficient > 0
         ? texture.alpha ** (1 + (1 - coverage) * powderCoefficient)
         : texture.alpha;
@@ -944,8 +958,15 @@ export function applyStudioHokusaiNaturalMediaTextureV2(
 
       for (let channel = 0; channel < 3; channel += 1) {
         const source = pixels[index + channel] ?? 0;
+        // Paint-film mode multiplies density only (OSS hybrid): dark oil no longer
+        // invents grey glitter via (255-source)*lift white mix.
         const textured = clampByte(
-          source * texture.color + (255 - source) * texture.lift,
+          studioOssApplyMaterialColorChannel(
+            source,
+            texture.color,
+            texture.lift,
+            colorMode,
+          ),
         );
         if (textured !== source) colorChangedPixels += 1;
         pixels[index + channel] = textured;
