@@ -241,6 +241,24 @@ const STUDIO_CRDT_BOUNDED_FLOW_DYNAMIC_BRUSH_IDS = new Set([
   "web-pressure-flat",
   "web-smudge-trail",
   "web-cross-hatch-pen",
+  // Engine-lane dynamic twins (bounded-flow-v2 only; mirrors browser dynamics resolver).
+  "oil--tube-extrude",
+  "oil--knife-edge",
+  "acrylic--polymer-flat",
+  "charcoal--vine-soft",
+  "charcoal--compressed-edge",
+  "crayon--wax-scrape",
+  "chalk--klecks-powder",
+  "pastel--cake-soft",
+  "oil-pastel--waxy-film",
+  "pencil--erodible-wear",
+  "airbrush--klecks-grit",
+  "airbrush--hard-envelope",
+  "spray--equal-area",
+  "splatter--burst-cloud",
+  "marker--soft-dynamic",
+  "brush--dry-rake",
+  "ink-particle--scatter-cloud",
 ]);
 const STUDIO_CRDT_SCENE_INDEX_ROOT = "scene-elements";
 const STUDIO_CRDT_PAGE_INDEX_ROOT = "studio-pages";
@@ -1544,8 +1562,14 @@ function isBoundedFlowStrokeSymmetryCompatible(value: unknown): boolean {
 
 function isLayeredFlowStrokeBrushCompatible(brush: unknown): boolean {
   if (typeof brush !== "string" || brush.length === 0) return true;
-  return STUDIO_CRDT_LAYERED_FLOW_COMPATIBLE_BRUSH_IDS.has(brush)
-    || !STUDIO_CRDT_KNOWN_INCOMPATIBLE_LAYERED_FLOW_BRUSH_IDS.has(brush);
+  if (STUDIO_CRDT_LAYERED_FLOW_COMPATIBLE_BRUSH_IDS.has(brush)) return true;
+  if (STUDIO_CRDT_KNOWN_INCOMPATIBLE_LAYERED_FLOW_BRUSH_IDS.has(brush)) return false;
+  // Engine-lane ids (`{base}--{lane}`) mirror browser render-family admission:
+  // only causal pen lanes stay on layered-flow-v1; oil/wet/perfect/stamp lanes fail closed.
+  if (brush.includes("--")) {
+    return brush === "gpen--causal-round";
+  }
+  return true;
 }
 
 function rendererSignificantR8GrainAdmission(
