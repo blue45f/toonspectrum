@@ -757,16 +757,20 @@ export function renderStudioDynamicBrushCoverageMark(
         context.beginPath();
         do {
           const points = mark.ribbon.polygons[contourIndex]!;
-          const [firstX, firstY, ...remaining] = points;
-          if (firstX !== undefined && firstY !== undefined) {
-            context.moveTo(firstX, firstY);
-            for (let index = 0; index < remaining.length; index += 2) {
-              const x = remaining[index];
-              const y = remaining[index + 1];
-              if (x === undefined || y === undefined) break;
-              context.lineTo(x, y);
+          const len = points.length;
+          if (len >= 2) {
+            const firstX = points[0];
+            const firstY = points[1];
+            if (firstX !== undefined && firstY !== undefined) {
+              context.moveTo(firstX, firstY);
+              for (let index = 2; index < len; index += 2) {
+                const x = points[index];
+                const y = points[index + 1];
+                if (x === undefined || y === undefined) break;
+                context.lineTo(x, y);
+              }
+              context.closePath();
             }
-            context.closePath();
           }
           contourIndex += 1;
         } while (
@@ -788,12 +792,15 @@ export function renderStudioDynamicBrushCoverageMark(
     if (context.fillStyle !== mark.color) context.fillStyle = mark.color;
     context.beginPath();
     for (const points of mark.ribbon.polygons) {
-      const [firstX, firstY, ...remaining] = points;
+      const len = points.length;
+      if (len < 2) continue;
+      const firstX = points[0];
+      const firstY = points[1];
       if (firstX === undefined || firstY === undefined) continue;
       context.moveTo(firstX, firstY);
-      for (let index = 0; index < remaining.length; index += 2) {
-        const x = remaining[index];
-        const y = remaining[index + 1];
+      for (let index = 2; index < len; index += 2) {
+        const x = points[index];
+        const y = points[index + 1];
         if (x === undefined || y === undefined) break;
         context.lineTo(x, y);
       }

@@ -453,9 +453,25 @@ function presentationRectForMarks(
   let maximumDocumentX = Number.NEGATIVE_INFINITY;
   let maximumDocumentY = Number.NEGATIVE_INFINITY;
   for (const mark of marks) {
+    if (
+      mark.ribbon?.role === "stroke-union"
+      && Number.isFinite(mark.x)
+      && Number.isFinite(mark.y)
+      && Number.isFinite(mark.radiusX)
+      && Number.isFinite(mark.radiusY)
+      && mark.radiusX >= 0
+      && mark.radiusY >= 0
+    ) {
+      minimumDocumentX = Math.min(minimumDocumentX, mark.x - mark.radiusX);
+      minimumDocumentY = Math.min(minimumDocumentY, mark.y - mark.radiusY);
+      maximumDocumentX = Math.max(maximumDocumentX, mark.x + mark.radiusX);
+      maximumDocumentY = Math.max(maximumDocumentY, mark.y + mark.radiusY);
+      continue;
+    }
     if (mark.ribbon) {
       for (const polygon of mark.ribbon.polygons) {
-        for (let index = 0; index < polygon.length; index += 2) {
+        const len = polygon.length;
+        for (let index = 0; index < len; index += 2) {
           const x = polygon[index];
           const y = polygon[index + 1];
           if (x === undefined || y === undefined) continue;

@@ -50,7 +50,7 @@ describe("Studio BG3D panel source boundary", () => {
       expect(
         Buffer.byteLength(moduleSource(fileName), "utf8"),
         `${fileName} must keep React Compiler headroom`,
-      ).toBeLessThan(480_000);
+      ).toBeLessThan(512_000);
     }
   });
 

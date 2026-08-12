@@ -224,8 +224,8 @@ describe("Studio ToolBelt content module boundary", () => {
       initializer.arguments[0] as ts.ObjectLiteralExpression
     ).toSorted();
 
-    expect(handlerNames).toHaveLength(74);
-    expect(wiredHandlerNames).toHaveLength(74);
+    expect(handlerNames).toHaveLength(75);
+    expect(wiredHandlerNames).toHaveLength(75);
     expect(wiredHandlerNames).toEqual(handlerNames);
     expect(page.source).toContain("stableHandlers={studioToolBeltContentHandlers}");
   });
