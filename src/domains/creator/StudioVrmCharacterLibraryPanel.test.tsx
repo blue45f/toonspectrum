@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { StudioVrmCharacterLibraryPanel } from "./StudioVrmCharacterLibraryPanel";
 
@@ -9,6 +9,50 @@ import type { VrmLibraryEntry } from "./vrm-library";
 import type { ComponentProps } from "react";
 
 type PanelProps = ComponentProps<typeof StudioVrmCharacterLibraryPanel>;
+
+class CharacterLibraryIntersectionObserver implements IntersectionObserver {
+  static instances: CharacterLibraryIntersectionObserver[] = [];
+
+  readonly root: Element | Document | null = null;
+  readonly rootMargin: string;
+  readonly scrollMargin: string = "0px";
+  readonly thresholds: ReadonlyArray<number> = [0];
+  private target: Element | null = null;
+
+  constructor(
+    private readonly callback: IntersectionObserverCallback,
+    options: IntersectionObserverInit = {},
+  ) {
+    this.root = options.root ?? null;
+    this.rootMargin = options.rootMargin ?? "0px";
+    CharacterLibraryIntersectionObserver.instances.push(this);
+  }
+
+  observe(target: Element): void {
+    this.target = target;
+  }
+
+  unobserve(): void {
+    this.target = null;
+  }
+
+  disconnect(): void {
+    this.target = null;
+  }
+
+  takeRecords(): IntersectionObserverEntry[] {
+    return [];
+  }
+
+  /** Test helper — fire one intersecting notification for the observed sentinel. */
+  trigger(isIntersecting = true): void {
+    if (!this.target) return;
+    this.callback(
+      [{ isIntersecting, target: this.target } as IntersectionObserverEntry],
+      this,
+    );
+  }
+}
 
 function createEntry(
   id: string,
@@ -51,8 +95,14 @@ function renderPanel(overrides: Partial<PanelProps> = {}) {
   return { props, ...render(<StudioVrmCharacterLibraryPanel {...props} />) };
 }
 
+beforeEach(() => {
+  CharacterLibraryIntersectionObserver.instances.length = 0;
+  vi.stubGlobal("IntersectionObserver", CharacterLibraryIntersectionObserver);
+});
+
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
@@ -99,6 +149,7 @@ describe("StudioVrmCharacterLibraryPanel", () => {
 
     expect(screen.getByText("표시 12/14명")).toBeTruthy();
     expect(screen.queryByText("캐릭터 13")).toBeNull();
+    expect(screen.getByText(/스크롤하면 자동으로 더 표시/)).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: /캐릭터 2명 더 보기/ }));
     expect(screen.getByText("표시 14/14명")).toBeTruthy();
@@ -122,6 +173,25 @@ describe("StudioVrmCharacterLibraryPanel", () => {
     expect(screen.queryByText("캐릭터 13")).toBeNull();
   });
 
+  it("expands the local window when the infinite-scroll sentinel intersects", () => {
+    const entries = Array.from({ length: 14 }, (_, index) =>
+      createEntry(`character-${index + 1}`, `캐릭터 ${String(index + 1).padStart(2, "0")}`),
+    );
+    renderPanel({ entries });
+
+    expect(screen.getByText("표시 12/14명")).toBeTruthy();
+    expect(screen.queryByText("캐릭터 13")).toBeNull();
+
+    const observer = CharacterLibraryIntersectionObserver.instances.at(-1);
+    expect(observer).toBeTruthy();
+    act(() => {
+      observer?.trigger(true);
+    });
+
+    expect(screen.getByText("표시 14/14명")).toBeTruthy();
+    expect(screen.getByText("캐릭터 13")).toBeTruthy();
+  });
+
   it("requests only the current 12-entry thumbnail window and advances durable metadata pages", () => {
     const entries = Array.from({ length: 14 }, (_, index) =>
       createEntry(`paged-${index + 1}`, `페이지 캐릭터 ${index + 1}`, "sqlite-opfs"),
@@ -141,6 +211,29 @@ describe("StudioVrmCharacterLibraryPanel", () => {
     fireEvent.click(screen.getByRole("button", {
       name: "저장된 캐릭터 다음 페이지 불러오기",
     }));
+    expect(onLoadMore).toHaveBeenCalledOnce();
+  });
+
+  it("loads the next durable page when the sentinel intersects after the local window is exhausted", () => {
+    const entries = Array.from({ length: 12 }, (_, index) =>
+      createEntry(`paged-${index + 1}`, `페이지 캐릭터 ${index + 1}`, "sqlite-opfs"),
+    );
+    const onLoadMore = vi.fn();
+    renderPanel({
+      entries,
+      hasMoreEntries: true,
+      onLoadMore,
+    });
+
+    expect(screen.getByRole("button", {
+      name: "저장된 캐릭터 다음 페이지 불러오기",
+    })).toBeTruthy();
+
+    const observer = CharacterLibraryIntersectionObserver.instances.at(-1);
+    expect(observer).toBeTruthy();
+    act(() => {
+      observer?.trigger(true);
+    });
     expect(onLoadMore).toHaveBeenCalledOnce();
   });
 

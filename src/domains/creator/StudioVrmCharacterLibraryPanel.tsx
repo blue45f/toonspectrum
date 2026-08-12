@@ -16,9 +16,31 @@ import { useEffect, useRef, useState, type ChangeEventHandler } from "react";
 import type { VrmLibraryEntry } from "./vrm-library";
 
 const LIBRARY_BATCH_SIZE = 12;
+/** Prefetch margin so the next batch starts before the user hits the list end. */
+const LIBRARY_INFINITE_ROOT_MARGIN = "280px 0px";
 
 const CONTROL_BUTTON =
   "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45";
+
+/**
+ * Nearest overflow-y scrollport, if any. Side-panel lists scroll inside an aside rather than the
+ * document, so IntersectionObserver must use that root or the sentinel never re-fires.
+ */
+function resolveScrollParent(node: HTMLElement | null): Element | null {
+  let current = node?.parentElement ?? null;
+  while (current) {
+    const { overflowY } = globalThis.getComputedStyle?.(current) ?? { overflowY: "" };
+    if (
+      overflowY === "auto"
+      || overflowY === "scroll"
+      || overflowY === "overlay"
+    ) {
+      return current;
+    }
+    current = current.parentElement;
+  }
+  return null;
+}
 
 type StudioVrmCharacterLibraryPanelProps = {
   hidden: boolean;
@@ -68,6 +90,9 @@ export function StudioVrmCharacterLibraryPanel({
   const [query, setQuery] = useState("");
   const [visibleCount, setVisibleCount] = useState(LIBRARY_BATCH_SIZE);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
+  const loadMorePendingRef = useRef(false);
+  const loadMoreActionRef = useRef<() => void>(() => undefined);
 
   const entryById = new Map(entries.map((entry) => [entry.id, entry] as const));
   const recentEntries = recentCharacterIds
@@ -82,11 +107,83 @@ export function StudioVrmCharacterLibraryPanel({
   const visibleWindowEntries = visibleEntries.slice(-LIBRARY_BATCH_SIZE);
   const visibleWindowKey = visibleWindowEntries.map((entry) => entry.id).join("\u0000");
   const hiddenEntryCount = Math.max(0, filteredEntries.length - visibleEntries.length);
+  const canExpandLocal = hiddenEntryCount > 0;
+  const canFetchRemote = !canExpandLocal && hasMoreEntries && typeof onLoadMore === "function";
+  const hasMoreToReveal = canExpandLocal || canFetchRemote;
   const hasUploadedModels = entries.some((entry) => entry.source !== "sample");
+
+  // Search is a new filtered list — always restart from the first progressive window.
+  useEffect(() => {
+    setVisibleCount(LIBRARY_BATCH_SIZE);
+    loadMorePendingRef.current = false;
+  }, [normalizedQuery]);
 
   useEffect(() => {
     if (!hidden) onVisibleWindowChange?.(visibleWindowEntries);
   }, [hidden, onVisibleWindowChange, visibleWindowEntries, visibleWindowKey]);
+
+  const expandLocalBatch = () => {
+    setVisibleCount((count) => count + LIBRARY_BATCH_SIZE);
+  };
+
+  const revealMoreCharacters = () => {
+    if (canExpandLocal) {
+      expandLocalBatch();
+      return;
+    }
+    if (canFetchRemote && !isLoadingMore) {
+      onLoadMore?.();
+    }
+  };
+
+  loadMoreActionRef.current = revealMoreCharacters;
+
+  // Infinite scroll — Explore/brush-library style sentinel. Button remains an a11y/manual fallback.
+  useEffect(() => {
+    loadMorePendingRef.current = false;
+    const sentinel = loadMoreSentinelRef.current;
+    if (
+      hidden
+      || !hasMoreToReveal
+      || !sentinel
+      || typeof globalThis.IntersectionObserver !== "function"
+    ) {
+      return;
+    }
+
+    const observer = new globalThis.IntersectionObserver(
+      (entries) => {
+        if (
+          loadMorePendingRef.current
+          || isLoadingMore
+          || !entries.some((entry) => entry.isIntersecting)
+        ) {
+          return;
+        }
+        loadMorePendingRef.current = true;
+        loadMoreActionRef.current();
+      },
+      {
+        root: resolveScrollParent(sentinel),
+        rootMargin: LIBRARY_INFINITE_ROOT_MARGIN,
+        threshold: 0,
+      },
+    );
+    observer.observe(sentinel);
+    return () => {
+      observer.disconnect();
+      loadMorePendingRef.current = false;
+    };
+  }, [
+    canExpandLocal,
+    canFetchRemote,
+    filteredEntries.length,
+    hasMoreToReveal,
+    hidden,
+    isLoadingMore,
+    visibleCount,
+    visibleEntries.length,
+  ]);
 
   return (
     <section
@@ -346,25 +443,41 @@ export function StudioVrmCharacterLibraryPanel({
         })}
       </div>
 
-      {hiddenEntryCount > 0 ? (
-        <button
-          type="button"
-          className={cx(CONTROL_BUTTON, "mt-3 w-full border-line bg-card text-fg-2 hover:bg-raised hover:text-fg")}
-          onClick={() => setVisibleCount((count) => count + LIBRARY_BATCH_SIZE)}
+      {hasMoreToReveal ? (
+        <div
+          ref={loadMoreSentinelRef}
+          className="mt-3 space-y-2"
+          data-studio-character-library-load-more
         >
-          캐릭터 {Math.min(LIBRARY_BATCH_SIZE, hiddenEntryCount)}명 더 보기
-          <span className="text-fg-3">· {hiddenEntryCount}명 남음</span>
-        </button>
-      ) : hasMoreEntries ? (
-        <button
-          type="button"
-          className={cx(CONTROL_BUTTON, "mt-3 w-full border-line bg-card text-fg-2 hover:bg-raised hover:text-fg")}
-          disabled={isLoadingMore}
-          onClick={onLoadMore}
-        >
-          {isLoadingMore ? <Loader2 className="animate-spin" size={14} aria-hidden /> : null}
-          저장된 캐릭터 다음 페이지 불러오기
-        </button>
+          <p className="text-center text-[0.68rem] text-fg-3" aria-live="polite">
+            {isLoadingMore
+              ? "다음 캐릭터를 불러오는 중…"
+              : canExpandLocal
+                ? `스크롤하면 자동으로 더 표시 · ${hiddenEntryCount}명 남음`
+                : "스크롤하면 저장된 캐릭터를 이어서 불러옵니다"}
+          </p>
+          {/* Manual fallback for keyboard / reduced-motion / IO-less environments (Explore 동일). */}
+          <button
+            type="button"
+            className={cx(
+              CONTROL_BUTTON,
+              "w-full border-line bg-card text-fg-2 hover:bg-raised hover:text-fg",
+            )}
+            disabled={isLoadingMore && canFetchRemote}
+            aria-busy={isLoadingMore || undefined}
+            onClick={revealMoreCharacters}
+          >
+            {isLoadingMore ? <Loader2 className="animate-spin" size={14} aria-hidden /> : null}
+            {canExpandLocal
+              ? (
+                <>
+                  캐릭터 {Math.min(LIBRARY_BATCH_SIZE, hiddenEntryCount)}명 더 보기
+                  <span className="text-fg-3">· {hiddenEntryCount}명 남음</span>
+                </>
+              )
+              : "저장된 캐릭터 다음 페이지 불러오기"}
+          </button>
+        </div>
       ) : filteredEntries.length > LIBRARY_BATCH_SIZE ? (
         <button
           type="button"
