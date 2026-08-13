@@ -1452,10 +1452,14 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               : planWatercolorBrushDabs(watercolorInput);
             // The stroke seed feeds the opt-in wet-edge-bloom lanes; SVG export passes the same
             // seed at its two watercolor sites so Canvas and SVG stay pixel-agreeing.
+            // The phase gates only the opt-in living-ink settled bake (2026-08-13 wave 3): the
+            // fluid field is global, so live drafts render the base wash and the bloom lands on
+            // settle — SVG export is settled by definition and passes "settled" at both sites.
             const dabs = applyStudioBrushAliasWatercolorMaterial(
               brush,
               plannedDabs,
               watercolorSeed,
+              activeDraft ? "live" : "settled",
             );
             const wetRibbonPlan = causalWatercolor
               ? planStudioWetRibbonCarrier(dabs, { seed: watercolorSeed })
@@ -2115,21 +2119,29 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               maxDabs: FX_OIL_DAB_CAP,
             });
             // brush--bristle-depletion 레인만 v1 강모 고갈 다이내믹을 켠다(갈필),
-            // brush--impasto-relief 레인만 dli GGX 릴리프 오버레이 프로그램을 켠다. 옵션이 없는
-            // 다른 모든 유화 브러시는 캐리어 계약상 바이트 동일 플랜을 유지하며, SVG 내보내기의
-            // 유화 분기와 입력(대브·시드)이 같아 두 렌더러가 픽셀 일치한다.
-            const carrier = brush === "brush--bristle-depletion"
+            // brush--impasto-relief 레인만 dli GGX 릴리프 오버레이 프로그램을 켠다,
+            // brush--bristle-physics 레인만 WetBrush-2D 강모 물리 시뮬을 켠다(2026-08-13 wave 3).
+            // 옵션이 없는 다른 모든 유화 브러시는 캐리어 계약상 바이트 동일 플랜을 유지하며, SVG
+            // 내보내기의 유화 분기와 입력(대브·시드)이 같아 두 렌더러가 픽셀 일치한다.
+            const carrier = brush === "brush--bristle-physics"
               ? planStudioOilRibbonCarrier(dabs, {
-                  bristleLoadDynamics: {
+                  bristlePhysics: {
                     enabled: true,
                     seed: fxBrushSeedFromKey(el.id),
                   },
                 })
-              : brush === "brush--impasto-relief"
+              : brush === "brush--bristle-depletion"
                 ? planStudioOilRibbonCarrier(dabs, {
-                    impastoRelief: { enabled: true },
+                    bristleLoadDynamics: {
+                      enabled: true,
+                      seed: fxBrushSeedFromKey(el.id),
+                    },
                   })
-                : planStudioOilRibbonCarrier(dabs);
+                : brush === "brush--impasto-relief"
+                  ? planStudioOilRibbonCarrier(dabs, {
+                      impastoRelief: { enabled: true },
+                    })
+                  : planStudioOilRibbonCarrier(dabs);
             return (
               <Shape
                 key={index}

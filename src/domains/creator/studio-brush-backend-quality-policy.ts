@@ -1158,12 +1158,37 @@ const ENGINE_LANE_ROUTE_PROFILE_OVERRIDES = Object.freeze({
   "chalk--klecks-stamp": "dry-stamp",
   "charcoal--mypaint-stamp": "dry-stamp",
   "pastel--soft-stamp": "dry-stamp",
+  // 2026-08-13 wave 3 — CC0 MyPaint 축자 이식 풀. baseId(mypaint-cc0)는 코어 프리셋이 아니라
+  // 파생이 불가능하므로 레인별 명시 라우트가 유일한 소스다. 프로필은 코어 스탬프 전례를 따른다
+  // (pencil-grain→dry-stamp, wash-brush→wet-stamp, airbrush-fine→spray-stamp, ink-brush→
+  // continuous-stamp): 실행 백엔드는 전부 검증된 스탬프 워커, 패밀리 정책만 재료군을 따라간다.
+  "mypaint-cc0--charcoal": "dry-stamp",
+  "mypaint-cc0--charcoal-tanda": "dry-stamp",
+  "mypaint-cc0--2b-pencil": "dry-stamp",
+  "mypaint-cc0--dry-brush": "dry-stamp",
+  "mypaint-cc0--pastel": "dry-stamp",
+  "mypaint-cc0--splatter": "spray-stamp",
+  "mypaint-cc0--spray": "spray-stamp",
+  "mypaint-cc0--ink-blot": "wet-stamp",
+  "mypaint-cc0--watercolor-fringe": "wet-stamp",
+  "mypaint-cc0--watercolor-expressive": "wet-stamp",
+  "mypaint-cc0--oil-paint": "wet-stamp",
+  "mypaint-cc0--kabura": "continuous-stamp",
+  // 2026-08-13 wave 3 — croquis 캡슐 아웃라인 레인은 둘 다 아웃라인 라우트다. base "pen" 파생은
+  // continuous-analytic 이라 스태빌라이즈드 레인만 명시로 바로잡는다(gpen 파생은 이미 outline).
+  "pen--croquis-stabilized": "continuous-outline",
 } as const satisfies Readonly<Record<string, StudioBrushBackendRouteProfile>>);
 
 const CORE_ROUTE_PROFILE_BY_ID = Object.freeze({
   ...CORE_ROUTE_PROFILE_BY_ID_BASE,
   ...Object.fromEntries(
     STUDIO_BRUSH_ENGINE_LANE_CATALOG_ROWS.map((row) => {
+      // Explicit per-lane routes win; base-derivation stays the default for every other lane and
+      // still fail-fasts when a lane has neither an override nor a derivable base preset.
+      const override = ENGINE_LANE_ROUTE_PROFILE_OVERRIDES[
+        row.id as keyof typeof ENGINE_LANE_ROUTE_PROFILE_OVERRIDES
+      ];
+      if (override) return [row.id, override] as const;
       const baseProfile =
         CORE_ROUTE_PROFILE_BY_ID_BASE[
           row.baseId as keyof typeof CORE_ROUTE_PROFILE_BY_ID_BASE
@@ -1176,7 +1201,6 @@ const CORE_ROUTE_PROFILE_BY_ID = Object.freeze({
       return [row.id, baseProfile] as const;
     }),
   ),
-  ...ENGINE_LANE_ROUTE_PROFILE_OVERRIDES,
 }) as Readonly<Record<StudioBrushRuntimePresetId, StudioBrushBackendRouteProfile>>;
 
 export const STUDIO_CORE_BRUSH_BACKEND_ROUTE_PROFILES:

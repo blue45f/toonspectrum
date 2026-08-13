@@ -202,6 +202,7 @@ import {
   studioOilRibbonPathData,
 } from "./studio-oil-ribbon-carrier";
 import {
+  STUDIO_CROQUIS_CAPSULE_OUTLINE_STROKE_ENGINE,
   planStudioPerfectFreehandRender,
   type StudioPerfectFreehandRenderPlan,
 } from "./studio-outline-stroke-contract";
@@ -2132,10 +2133,16 @@ function serializeStudioOutlineStrokePlan(
     );
     return "";
   }
+  // The capsule sibling branch carries its own honest engine label; the perfect-freehand label is
+  // byte-frozen ("perfect-outline-contract-v1") so pre-wave exports stay identical (2026-08-13).
+  const engineLabel =
+    plan.contract.engine === STUDIO_CROQUIS_CAPSULE_OUTLINE_STROKE_ENGINE
+      ? "croquis-capsule-outline-contract-v1"
+      : "perfect-outline-contract-v1";
   if (plan.kind === "outline") {
     return (
       `<path d="${plan.pathData}" fill="${escapeXml(stroke)}"`
-      + ` data-brush-engine="perfect-outline-contract-v1"`
+      + ` data-brush-engine="${engineLabel}"`
       + ` data-brush-profile="${escapeXml(plan.contract.profile.id)}"${opacityAttr}/>`
     );
   }
@@ -2168,7 +2175,7 @@ function serializeStudioOutlineStrokePlan(
     }
   }
   return (
-    `<g data-brush-engine="perfect-outline-contract-v1"`
+    `<g data-brush-engine="${engineLabel}"`
     + ` data-brush-fallback="${plan.reason}"${opacityAttr}>`
     + `${lineMarkup}${capMarkup.join("")}</g>`
   );
@@ -2529,7 +2536,14 @@ function serializeFreehand(
           seed: watercolorSeed,
           maxDabs: DEFAULT_STUDIO_CAUSAL_WATERCOLOR_MAX_DABS,
         }, true);
-      const dabs = applyStudioBrushAliasWatercolorMaterial(brush, plannedDabs, watercolorSeed);
+      // Export is settled by definition — the opt-in living-ink bake runs here exactly as it does
+      // on the settled Canvas commit (same seed, same planner), keeping the two surfaces agreeing.
+      const dabs = applyStudioBrushAliasWatercolorMaterial(
+        brush,
+        plannedDabs,
+        watercolorSeed,
+        "settled",
+      );
       const wetRibbonPlan = planStudioWetRibbonCarrier(dabs, {
         seed: watercolorSeed,
       });
@@ -2550,7 +2564,12 @@ function serializeFreehand(
       seed: watercolorSeed,
       maxDabs: 512,
     });
-    const dabs = applyStudioBrushAliasWatercolorMaterial(brush, plannedDabs, watercolorSeed);
+    const dabs = applyStudioBrushAliasWatercolorMaterial(
+      brush,
+      plannedDabs,
+      watercolorSeed,
+      "settled",
+    );
     if (dabs.length === 0) return "";
     const diffuseId = nextId(ctx, "sw");
     ctx.defs.push(
@@ -2935,21 +2954,29 @@ function serializeFreehand(
       maxDabs: FX_OIL_DAB_CAP,
     });
     // brush--bristle-depletion 레인만 v1 강모 고갈 다이내믹을 켠다, brush--impasto-relief 레인만
-    // dli GGX 릴리프 오버레이 프로그램을 켠다 — Canvas 렌더러(StudioDrawNode)의 유화 분기와 동일
+    // dli GGX 릴리프 오버레이 프로그램을 켠다, brush--bristle-physics 레인만 WetBrush-2D 강모
+    // 물리 시뮬을 켠다(2026-08-13 wave 3) — Canvas 렌더러(StudioDrawNode)의 유화 분기와 동일
     // 입력(대브·시드)이라 두 렌더러의 플랜이 일치한다. 옵션이 없는 다른 모든 유화 브러시는
     // 캐리어 계약상 바이트 동일 플랜을 유지한다.
-    const carrier = brush === "brush--bristle-depletion"
+    const carrier = brush === "brush--bristle-physics"
       ? planStudioOilRibbonCarrier(dabs, {
-          bristleLoadDynamics: {
+          bristlePhysics: {
             enabled: true,
             seed: fxBrushSeedFromKey(el.id),
           },
         })
-      : brush === "brush--impasto-relief"
+      : brush === "brush--bristle-depletion"
         ? planStudioOilRibbonCarrier(dabs, {
-            impastoRelief: { enabled: true },
+            bristleLoadDynamics: {
+              enabled: true,
+              seed: fxBrushSeedFromKey(el.id),
+            },
           })
-        : planStudioOilRibbonCarrier(dabs);
+        : brush === "brush--impasto-relief"
+          ? planStudioOilRibbonCarrier(dabs, {
+              impastoRelief: { enabled: true },
+            })
+          : planStudioOilRibbonCarrier(dabs);
     if (!carrier.body) return "";
     const body = `<path data-paint-carrier="contiguous-variable-width-ribbon" d="${studioOilRibbonPathData(carrier.body, true)}" fill="${escapeXml(stroke)}" opacity="${fmtDabOpacity(carrier.bodyOpacity * strokeOpacity)}"/>`;
     // One <path> per load band, with every run of that band as a subpath: SVG paints a path once,

@@ -12,6 +12,8 @@ import {
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
   studioBrushDynamicsPresetSettings,
+  studioBrushDynamicsSettingsForBrushId,
+  studioDryMediaUnionComposableProgramPin,
   type StudioDynamicBrushDab,
   type StudioBrushDynamicsPresetId,
 } from "./studio-brush-dynamics";
@@ -1517,12 +1519,53 @@ describe("도형 직렬화", () => {
   });
 
   it.each(["pastel", "oil-pastel"] as const)(
-    "%s은 원형 스탬프 열 대신 Canvas와 같은 단일 union 섬유 경로를 직렬화한다",
+    "%s은 원형 스탬프 열 대신 커널 알파맵 dab 마크를 직렬화한다 (de-polygon)",
     (brush) => {
       const { svg } = exportPageToSvg(page([rectEl({
         id: `${brush}-anisotropic-fibres`,
         kind: "freehand",
         brush,
+        points: [8, 12, 40, 20, 72, 12],
+        pressures: [0.45, 0.8, 0.6],
+        stroke: "#4455aa",
+        strokeWidth: 20,
+        fill: undefined,
+      })]));
+      // Fresh unpinned strokes never serialize the polygon-union carrier.
+      expect(svg).not.toContain('data-brush-coverage="dry-media-union-ribbon"');
+      const fibres = Array.from(svg.matchAll(
+        new RegExp(
+          `<use data-brush-coverage="alpha-map"`
+          + ` data-brush-carrier="soft-pigment-fiber"`
+          + ` data-brush-material="${brush}" href="#([^"]+)"`,
+          "gu",
+        ),
+      ));
+      expect(fibres.length).toBeGreaterThan(8);
+      // Shared kernel tip bakes are content-addressed symbols: many dabs, few defs.
+      const symbolIds = new Set(fibres.map((match) => match[1]));
+      expect(symbolIds.size).toBeGreaterThan(0);
+      expect(symbolIds.size).toBeLessThanOrEqual(40);
+      expect(
+        (svg.match(/data-brush-tip-asset="full-alpha-map-v1"/gu) ?? []).length,
+      ).toBe(symbolIds.size);
+      expect(svg).not.toMatch(/<circle [^>]*fill="url\(#sp/u);
+      expect(svg).not.toMatch(/<ellipse [^>]*data-brush-material=/u);
+    },
+  );
+
+  it.each(["pastel", "oil-pastel"] as const)(
+    "핀된 %s 레거시 리플레이는 기존 단일 union 섬유 경로를 그대로 직렬화한다",
+    (brush) => {
+      const pinnedDynamics = normalizeStudioBrushDynamicsSettings({
+        ...studioBrushDynamicsSettingsForBrushId(brush)!,
+        dryMediaUnionProgram: studioDryMediaUnionComposableProgramPin(),
+      });
+      const { svg } = exportPageToSvg(page([rectEl({
+        id: `${brush}-pinned-union-fibres`,
+        kind: "freehand",
+        brush,
+        brushDynamics: pinnedDynamics,
         points: [8, 12, 40, 20, 72, 12],
         pressures: [0.45, 0.8, 0.6],
         stroke: "#4455aa",

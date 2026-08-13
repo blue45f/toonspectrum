@@ -3,6 +3,8 @@
  * Id: `{base}--{lane}` e.g. oil--filbert-ribbon, watercolor--granular.
  */
 import type { StudioStampPaperProgramId } from "./studio-brush-stamp-engine";
+import type { StudioCroquisCapsulePenProgramId } from "./studio-croquis-capsule-pen-v1";
+import type { StudioLivingInkSettledBakeProgramId } from "./studio-living-ink-settled-bake-v1";
 import type { StudioPaperPresetIdV1 } from "./studio-paper-media-profile-v1";
 import type { StudioSpectralWgmColorMixProgramId } from "./studio-spectral-wgm-mix-v1";
 import type { StudioWetEdgeBloomProgramId } from "./studio-wet-edge-bloom-v1";
@@ -13,6 +15,7 @@ export const STUDIO_BRUSH_ENGINE_LANE_CATALOG_VERSION =
 export type StudioBrushEngineLaneId =
   | "causal-ink"
   | "perfect-outline"
+  | "capsule-outline"
   | "oil-ribbon"
   | "oil-extrude"
   | "wet-dabs"
@@ -57,6 +60,13 @@ export interface StudioBrushEngineLaneWatercolorMaterial {
    * program id are augmented (2026-08-13 brush quality wave).
    */
   readonly wetEdgeBloomProgramId?: StudioWetEdgeBloomProgramId;
+  /**
+   * Opt-in settled-only fluid bake program (studio-living-ink-settled-bake-v1). Absent means the
+   * lane's settled plan stays bit-identical; live prefixes are always identity regardless. A lane
+   * row must pin EITHER wetEdgeBloomProgramId OR livingInkBakeProgramId, never both — one wet
+   * texture authority per lane (2026-08-13 wave 3).
+   */
+  readonly livingInkBakeProgramId?: StudioLivingInkSettledBakeProgramId;
 }
 
 export interface StudioBrushEngineLaneStampTuning {
@@ -187,6 +197,39 @@ export const STUDIO_BRUSH_ENGINE_LANE_CATALOG_ROWS: readonly StudioBrushEngineLa
     r("glitter--star-field", "글리터 · 스타필드", "glitter", "particle-fx", 28, 0.92, ["스타필드 글리터"], "glitter", "particle-scatter", "star-dust", "glitter", "glitter", "spark", "procedural-spark", "seeded-particles", "engine-variant"),
     r("screentone--sparse-grid", "스크린톤 · 성긴 격자", "screentone", "stamp-tone", 24, 0.88, ["성긴 스크린톤"], "screentone", "screentone-dots", "sparse-grid", "screentone", "tone", "tone-dot", "tone-grid", "global-grid", "engine-variant"),
     r("ink-particle--scatter-cloud", "잉크입자 · 산란 구름", "ink-particle", "spray-dynamic", 20, 0.85, ["산란 잉크입자"], "ink-particle", "dynamic-dabs", "ink-scatter-cloud", "ink-particle", "dots", "flake", "custom-alpha-capable", "mapped-dabs", "engine-variant"),
+    // ── 2026-08-13 wave 3 (lifecycle experimental) ──────────────────────────────────────────────
+    // CC0 MyPaint 축자 이식 풀(mypaint-brushes, CC0-1.0): 파라미터 테이블·킨드 해석·dab 선형화는
+    // studio-cc0-mypaint-preset-import-v1 이 단일 튜닝 소스다 — ENGINE_LANE_STAMP_TUNING 에 이
+    // id들을 추가하지 말 것(중복 행은 죽은 설정). engineVariant 는 프리셋이 핀한 검증 스탬프
+    // 킨드와 정확히 일치해야 하며(카탈로그 계약 감사: stampKind === engineVariant), 프리셋별
+    // exact-id 튜닝은 profile-variant 규율로 선언된다 — watercolor--edge-stamp 전례.
+    r("mypaint-cc0--charcoal", "MyPaint CC0 · 목탄", "mypaint-cc0", "dry-stamp", 14, 0.75, ["CC0 목탄", "mypaint charcoal"], "dry-media", "stamp-dabs", "charcoal", "charcoal--mypaint-stamp", "texture", "stamp-pencil", "procedural-grain", "stamp-pressure-flow", "profile-variant"),
+    r("mypaint-cc0--charcoal-tanda", "MyPaint CC0 · 목탄 슬리버", "mypaint-cc0", "dry-stamp", 12, 0.8, ["목탄 슬리버", "charcoal sliver"], "dry-media", "stamp-dabs", "charcoal", "charcoal--mypaint-stamp", "texture", "stamp-pencil", "procedural-grain", "stamp-pressure-flow", "profile-variant"),
+    r("mypaint-cc0--2b-pencil", "MyPaint CC0 · 2B 연필", "mypaint-cc0", "dry-stamp", 9, 0.9, ["CC0 2B", "2b pencil"], "pencil", "stamp-dabs", "pencil", "pencil-grain", "texture", "stamp-pencil", "procedural-grain", "stamp-pressure-flow", "profile-variant"),
+    r("mypaint-cc0--dry-brush", "MyPaint CC0 · 드라이 브러시", "mypaint-cc0", "dry-stamp", 18, 0.85, ["CC0 드라이 브러시", "dry brush"], "dry-media", "stamp-dabs", "ink", "ink-brush", "texture", "stamp-ink", "none", "stamp-pressure-flow", "profile-variant"),
+    r("mypaint-cc0--splatter", "MyPaint CC0 · 스플래터", "mypaint-cc0", "spray-stamp", 42, 0.7, ["CC0 스플래터", "splatter burst"], "stamp", "stamp-dabs", "airbrush", "airbrush-fine", "dots", "stamp-airbrush", "soft-gradient", "stamp-pressure-flow", "profile-variant"),
+    // ink-blot 이 "mypaint" 스탬프 킨드 시그니처의 카탈로그 canonical(unique); oil-paint 는 같은
+    // 킨드의 exact-id 튜닝 변형(profile-variant)이다.
+    r("mypaint-cc0--ink-blot", "MyPaint CC0 · 잉크 블롯", "mypaint-cc0", "wet-stamp", 30, 0.85, ["잉크 블롯", "ink blot"], "stamp", "stamp-dabs", "mypaint", "mypaint-cc0--ink-blot", "soft", "stamp-airbrush", "soft-gradient", "stamp-pressure-flow", "unique"),
+    r("mypaint-cc0--kabura", "MyPaint CC0 · 카부라 펜", "mypaint-cc0", "wet-stamp", 6, 1, ["카부라", "kabura pen"], "stamp", "stamp-dabs", "ink", "ink-brush", "solid", "stamp-ink", "none", "stamp-pressure-flow", "profile-variant"),
+    r("mypaint-cc0--watercolor-fringe", "MyPaint CC0 · 수채 프린지", "mypaint-cc0", "wet-stamp", 34, 0.55, ["수채 프린지", "watercolor fringe"], "stamp", "stamp-dabs", "watercolor", "wash-brush", "soft", "stamp-wet-edge", "wet-edge", "stamp-pressure-flow", "profile-variant"),
+    r("mypaint-cc0--watercolor-expressive", "MyPaint CC0 · 수채 익스프레시브", "mypaint-cc0", "wet-stamp", 30, 0.5, ["수채 익스프레시브", "watercolor expressive"], "stamp", "stamp-dabs", "watercolor", "wash-brush", "soft", "stamp-wet-edge", "wet-edge", "stamp-pressure-flow", "profile-variant"),
+    r("mypaint-cc0--oil-paint", "MyPaint CC0 · 오일 페인트", "mypaint-cc0", "wet-stamp", 24, 0.93, ["CC0 오일", "oil paint"], "stamp", "stamp-dabs", "mypaint", "mypaint-cc0--ink-blot", "oil", "stamp-airbrush", "soft-gradient", "stamp-pressure-flow", "profile-variant"),
+    r("mypaint-cc0--pastel", "MyPaint CC0 · 파스텔", "mypaint-cc0", "dry-stamp", 20, 0.72, ["CC0 파스텔", "pastel cc0"], "pastel", "stamp-dabs", "pastel", "pastel--soft-stamp", "texture", "stamp-airbrush", "soft-gradient", "stamp-pressure-flow", "profile-variant"),
+    r("mypaint-cc0--spray", "MyPaint CC0 · 스프레이", "mypaint-cc0", "spray-stamp", 40, 0.6, ["CC0 스프레이", "spray fade"], "stamp", "stamp-dabs", "airbrush", "airbrush-fine", "dots", "stamp-airbrush", "soft-gradient", "stamp-pressure-flow", "profile-variant"),
+    // croquis.js(MIT OR Apache-2.0) 외접 탄젠트 캡슐 잉킹 — 필압 스파이크에서도 무벌지 가변 굵기.
+    // 프로그램 핀은 ENGINE_LANE_CROQUIS_CAPSULE_PROGRAM(아래) — wetEdgeBloomProgramId 규율 미러.
+    // 폭 7.5는 gpen(7px) 계열 정렬을 유지하면서 gpen--causal-round(7/1)와의 연속성 감사 지문
+    // 충돌만 피한 값. 두 캡슐 레인은 같은 엔진의 변형이라 스태빌라이즈드가 캡슐의 engine-variant.
+    r("gpen--croquis-capsule", "G펜 · 크로키 캡슐", "gpen", "capsule-outline", 7.5, 1, ["크로키 G펜", "croquis gpen", "캡슐 G펜"], "gpen", "capsule-outline", "croquis-capsule", "gpen--croquis-capsule", "solid", "pressure-round", "none", "outline-pressure", "unique"),
+    // 0.96 opacity: croquis(스케치) 안정화 선의 살짝 투명한 연출이자, 0.025-quantized perceptual
+    // planner fingerprint를 형제 캡슐 레인(불투명 1.0)과 구분하는 정직한 기본값 차등.
+    r("pen--croquis-stabilized", "펜 · 크로키 안정화", "pen", "capsule-outline", 8, 0.96, ["크로키 안정화 펜", "croquis stabilized pen", "풀드 스트링 펜"], "gpen", "capsule-outline", "croquis-capsule-pulled-string", "gpen--croquis-capsule", "calligraphy", "pressure-round", "none", "outline-pressure", "engine-variant"),
+    // 물리 질감 레인: 리빙잉크 정착 베이크(수묵/수채, 프로그램 핀은 워터컬러 재질 행) +
+    // WetBrush-2D 강모 물리(유화, 캐리어 옵션은 렌더러 양쪽에서 레인 id 리터럴로 게이트).
+    r("ink-wash--living-bake", "수묵 · 리빙잉크 베이크", "ink-wash", "wet-dabs", 30, 0.66, ["리빙잉크 수묵", "living ink bake"], "watercolor", "watercolor-dabs", "living-ink-settled-bake", "watercolor", "soft", "bristle", "wet-edge", "watercolor-pressure", "engine-variant"),
+    r("watercolor--fluid-feather", "수채 · 유체 페더", "watercolor", "wet-dabs", 28, 0.52, ["유체 페더", "fluid feather"], "watercolor", "watercolor-dabs", "fluid-feather-bake", "watercolor", "soft", "sponge", "wet-edge", "watercolor-pressure", "engine-variant"),
+    r("brush--bristle-physics", "붓 · 물리 강모", "brush", "oil-ribbon", 18, 0.92, ["물리 강모 붓", "physics bristle", "WetBrush"], "oil", "oil-ribbon", "bristle-physics-tuft", "oil", "oil", "bristle", "procedural-bristle", "bristle-pressure", "engine-variant"),
   ]);
 
 const LANE_ID_RE = /^([a-z0-9-]+)--([a-z0-9-]+)$/u;
@@ -306,6 +349,18 @@ const ENGINE_LANE_WATERCOLOR_MATERIAL: Readonly<
     diffuseRadiusScale: 1.9, diffuseOpacityScale: 0.46,
     wetEdgeBloomProgramId: "chroma-halo",
   }),
+  // 2026-08-13 wave 3 physics-texture lanes: settled-only 리빙잉크 베이크 핀. 정착 시에만
+  // 유체장이 번짐/림/페더를 굽는다(라이브 프리픽스는 항등) — UI 카피도 "정착 시 번짐"으로.
+  "ink-wash--living-bake": Object.freeze({
+    spacingRatio: 0.2, coreRadiusScale: 0.82, coreOpacityScale: 1.75,
+    diffuseRadiusScale: 1.6, diffuseOpacityScale: 0.44,
+    livingInkBakeProgramId: "sumi-flow-bake",
+  }),
+  "watercolor--fluid-feather": Object.freeze({
+    spacingRatio: 0.26, coreRadiusScale: 0.68, coreOpacityScale: 1.15,
+    diffuseRadiusScale: 1.85, diffuseOpacityScale: 0.46,
+    livingInkBakeProgramId: "fluid-feather-lite",
+  }),
 });
 
 const ENGINE_LANE_STAMP_TUNING: Readonly<
@@ -361,9 +416,24 @@ const ENGINE_LANE_COLOR_PIGMENT_TUNING: Readonly<
   }),
 });
 
+/**
+ * Opt-in croquis capsule-outline program pins (studio-croquis-capsule-pen-v1) — the exact
+ * wetEdgeBloomProgramId/pigmentMixProgramId discipline: a brush id gains the capsule engine only
+ * through an explicit pin here; every unpinned brush keeps its current renderer byte-identically,
+ * and unknown/removed ids resolve to null so they can never converge to another renderer
+ * (2026-08-13 wave 3).
+ */
+const ENGINE_LANE_CROQUIS_CAPSULE_PROGRAM: Readonly<
+  Record<string, StudioCroquisCapsulePenProgramId>
+> = Object.freeze({
+  "gpen--croquis-capsule": "croquis-capsule-v1",
+  "pen--croquis-stabilized": "croquis-capsule-pulled-string-v1",
+});
+
 const ENGINE_LANE_LABEL_KO: Readonly<Record<StudioBrushEngineLaneId, string>> = Object.freeze({
   "causal-ink": "연속 잉크",
   "perfect-outline": "퍼펙트 아웃라인",
+  "capsule-outline": "캡슐 아웃라인",
   "oil-ribbon": "오일 리본",
   "oil-extrude": "튜브·나이프",
   "wet-dabs": "웻 다브",
@@ -397,6 +467,14 @@ export function resolveStudioBrushEngineLaneColorPigmentTuning(
 ): StudioBrushEngineLaneColorPigmentTuning | null {
   if (!brushId) return null;
   return ENGINE_LANE_COLOR_PIGMENT_TUNING[brushId] ?? null;
+}
+
+/** Fail-closed: only explicitly pinned lane ids resolve a croquis capsule program id. */
+export function resolveStudioBrushEngineLaneCroquisCapsuleProgramId(
+  brushId: string | null | undefined,
+): StudioCroquisCapsulePenProgramId | null {
+  if (!brushId) return null;
+  return ENGINE_LANE_CROQUIS_CAPSULE_PROGRAM[brushId] ?? null;
 }
 
 export function resolveStudioBrushEngineLaneLabelKo(

@@ -115,7 +115,10 @@ describe("Studio Hokusai natural-media render contract", () => {
       pressureSource: "recorded",
     });
     expect(outlineStroke).not.toBeNull();
-    if (!outlineStroke) return;
+    // mapping-pen rides the perfect-freehand contract branch (capsule lanes are pinned ids only).
+    if (outlineStroke?.engine !== "perfect-freehand-outline") {
+      throw new Error("mapping-pen must capture the perfect-freehand outline contract");
+    }
     expect(outlineStroke.profile.diameterScale).toBe(0.45);
     const source = stroke({
       brush: "mapping-pen",

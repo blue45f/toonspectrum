@@ -1,9 +1,21 @@
 import { describe, expect, it } from "vitest";
 
-import { STUDIO_PAINT_BRUSH_CATALOG_ITEMS } from "./studio-brush-catalog";
 import {
+  filterStudioBrushCatalogItems,
+  STUDIO_PAINT_BRUSH_CATALOG_ITEMS,
+  studioBrushCatalogItemById,
+} from "./studio-brush-catalog";
+import {
+  resolveStudioBrushRuntime,
+  resolveStudioBrushRuntimeContract,
+  STUDIO_BRUSH_SAFE_FALLBACK_ID,
+} from "./studio-brush-runtime-contract";
+import {
+  isStudioBrushQuarantinedPresetId,
   STUDIO_BRUSH_EXPERIMENTAL_LANE_PRESET_IDS,
   STUDIO_BRUSH_QUALITY_WEIGHTS,
+  STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID,
+  STUDIO_BRUSH_QUARANTINED_PRESET_IDS,
   buildStudioBrushVariantGroups,
   certifyStudioBrushQualityReceipt,
   computeStudioBrushPlanDigest,
@@ -54,12 +66,14 @@ describe("studio brush variant group manifest", () => {
   });
 
   it("keeps the derived group count stable against accidental catalogue drift", () => {
-    // Snapshot of the derived group COUNT only (never the content): 64 medium families + 14 pro
-    // pack categories over the 295-preset paint SSOT. This number moves ONLY with a deliberate
+    // Snapshot of the derived group COUNT only (never the content): 65 medium families + 14 pro
+    // pack categories over the 312-preset paint SSOT. This number moves ONLY with a deliberate
     // catalogue change (new preset family, new engine-lane base, or a new pro-pack category);
     // update it in the same change that lands the catalogue rows, citing that change.
+    // 2026-08-13 wave 3: +1 medium family (medium:mypaint-cc0 — the CC0 MyPaint import pool's
+    // engine-lane base) alongside 17 new engine-lane presets.
     const groups = buildStudioBrushVariantGroups();
-    expect(groups.length).toBe(78);
+    expect(groups.length).toBe(79);
   });
 
   it("builds deterministically and freezes every artifact", () => {
@@ -86,7 +100,8 @@ describe("studio brush variant group manifest", () => {
     expect(resolveStudioBrushLifecycleStage("no-such-brush")).toBeNull();
     expect(resolveStudioBrushLifecycleStage(42)).toBeNull();
     // The wave's new engine lanes are pinned experimental by the catalogue integrator here
-    // (2026-08-13 brush quality wave: dry-stamp x4, wet-texture x4, oil x3).
+    // (2026-08-13 brush quality wave: dry-stamp x4, wet-texture x4, oil x3;
+    // 2026-08-13 wave 3: CC0 MyPaint x12, croquis capsule x2, living-ink bake x2, physics oil x1).
     expect(STUDIO_BRUSH_EXPERIMENTAL_LANE_PRESET_IDS).toEqual([
       "crayon--klecks-stamp",
       "chalk--klecks-stamp",
@@ -99,10 +114,84 @@ describe("studio brush variant group manifest", () => {
       "brush--impasto-relief",
       "brush--bristle-depletion",
       "oil-pastel--wgm-mix",
+      "mypaint-cc0--charcoal",
+      "mypaint-cc0--charcoal-tanda",
+      "mypaint-cc0--2b-pencil",
+      "mypaint-cc0--dry-brush",
+      "mypaint-cc0--splatter",
+      "mypaint-cc0--ink-blot",
+      "mypaint-cc0--kabura",
+      "mypaint-cc0--watercolor-fringe",
+      "mypaint-cc0--watercolor-expressive",
+      "mypaint-cc0--oil-paint",
+      "mypaint-cc0--pastel",
+      "mypaint-cc0--spray",
+      "gpen--croquis-capsule",
+      "pen--croquis-stabilized",
+      "ink-wash--living-bake",
+      "watercolor--fluid-feather",
+      "brush--bristle-physics",
     ]);
     for (const experimentalId of STUDIO_BRUSH_EXPERIMENTAL_LANE_PRESET_IDS) {
       expect(resolveStudioBrushLifecycleStage(experimentalId), experimentalId)
         .toBe("experimental");
+    }
+  });
+
+  it("stages quarantined ids as quarantined with an owner-auditable reason each", () => {
+    // 2026-08-13 wave 3 pruning (workstream M §2): glitter--star-field is the only clear case —
+    // identical execution signature to star-dust, no alias profile, and the durable glitter
+    // dispatch never honours its declared engineVariant, so it paints as plain glitter (지침 6).
+    expect(STUDIO_BRUSH_QUARANTINED_PRESET_IDS).toEqual(["glitter--star-field"]);
+    expect(Object.isFrozen(STUDIO_BRUSH_QUARANTINED_PRESET_IDS)).toBe(true);
+    expect(Object.isFrozen(STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID)).toBe(true);
+    for (const quarantinedId of STUDIO_BRUSH_QUARANTINED_PRESET_IDS) {
+      expect(isStudioBrushQuarantinedPresetId(quarantinedId), quarantinedId).toBe(true);
+      expect(resolveStudioBrushLifecycleStage(quarantinedId), quarantinedId).toBe("quarantined");
+      expect(
+        (STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID[quarantinedId] ?? "").trim().length,
+        quarantinedId,
+      ).toBeGreaterThan(0);
+    }
+    // The retained in-group alternatives stay exposed on their own stages.
+    expect(isStudioBrushQuarantinedPresetId("glitter")).toBe(false);
+    expect(resolveStudioBrushLifecycleStage("glitter")).toBe("core");
+    expect(resolveStudioBrushLifecycleStage("star-dust")).toBe("core");
+    expect(isStudioBrushQuarantinedPresetId(42)).toBe(false);
+  });
+
+  it("keeps every quarantined id on its own runtime contract — never the pen safe-fallback", () => {
+    // Pen-convergence regression (지침 3): quarantine removes exposure, not registration. A
+    // quarantined id must resolve `exact` with its own contract so persisted strokes keep their
+    // texture; only genuinely unknown ids may converge to the documented pen fallback.
+    for (const quarantinedId of STUDIO_BRUSH_QUARANTINED_PRESET_IDS) {
+      const resolution = resolveStudioBrushRuntime(quarantinedId);
+      expect(resolution.status, quarantinedId).toBe("exact");
+      expect(resolution.reason, quarantinedId).toBe("supported");
+      expect(resolution.resolvedId, quarantinedId).toBe(quarantinedId);
+      expect(resolution.resolvedId, quarantinedId).not.toBe(STUDIO_BRUSH_SAFE_FALLBACK_ID);
+      expect(resolution.contract, quarantinedId).toBe(
+        resolveStudioBrushRuntimeContract(quarantinedId),
+      );
+    }
+    const unknown = resolveStudioBrushRuntime("quarantine-never-shipped-id");
+    expect(unknown.status).toBe("safe-fallback");
+    expect(unknown.resolvedId).toBe(STUDIO_BRUSH_SAFE_FALLBACK_ID);
+  });
+
+  it("keeps quarantined ids inside the SSOT partition while the picker stops listing them", () => {
+    const groups = buildStudioBrushVariantGroups();
+    for (const quarantinedId of STUDIO_BRUSH_QUARANTINED_PRESET_IDS) {
+      // Still governed: exactly one variant group owns the id (exposure ≠ governance removal).
+      const owners = groups.filter((group) => group.memberPresetIds.includes(quarantinedId));
+      expect(owners.length, quarantinedId).toBe(1);
+      // Still resolvable for persisted documents…
+      expect(studioBrushCatalogItemById(quarantinedId), quarantinedId).not.toBeNull();
+      // …but absent from the default catalogue listing derived from the lifecycle stage.
+      expect(
+        filterStudioBrushCatalogItems({}).some((item) => item.id === quarantinedId),
+        quarantinedId,
+      ).toBe(false);
     }
   });
 

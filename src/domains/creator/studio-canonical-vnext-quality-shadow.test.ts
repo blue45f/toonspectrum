@@ -39,7 +39,11 @@ function dryTextureElement(overrides: Partial<DrawEl> = {}): DrawEl {
     speeds: [0, 6.32, 8.48],
     stroke: "#334155",
     strokeWidth: 14,
-    opacity: 0.8,
+    // Product pointer-start stamps the bounded-flow-v2 seam with causal sampleSpacing on every
+    // retained-dynamics pen stroke; the vNext specialist admits only its unit-opacity form.
+    opacity: 1,
+    paintModel: "bounded-flow-v2",
+    sampleSpacing: 1,
     brush: "dry-media",
     brushDynamics: normalizeStudioBrushDynamicsSettings({
       seed: 91,

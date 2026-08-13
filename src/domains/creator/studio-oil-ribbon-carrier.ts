@@ -8,6 +8,10 @@
  */
 
 import {
+  planStudioBristlePhysicsOil,
+  type StudioBristlePhysicsOilPlan,
+} from "./studio-bristle-physics-oil-v1";
+import {
   computeStudioImpastoReliefShading,
 } from "./studio-impasto-relief-shading-v1";
 import {
@@ -113,9 +117,35 @@ export interface StudioOilRibbonCarrierImpastoReliefOptions {
   readonly enabled: boolean;
 }
 
+/**
+ * Program flag for the v1 WetBrush-2D physics variant (`brush--bristle-physics`).
+ * Enabling it swaps the hashed per-station lane offsets for the simulated
+ * tuft's contact trajectory and modulates lane load/width by the sim's contact
+ * alpha and flattening (see studio-bristle-physics-oil-v1). The flag gates
+ * every behavioural change: with the options object absent, or `enabled`
+ * false, the plan is byte-identical to the legacy carrier.
+ */
+export interface StudioOilRibbonCarrierBristlePhysicsOptions {
+  readonly enabled: boolean;
+  /** Deterministic seed — pass the stroke's brush seed. Default 0. */
+  readonly seed?: number;
+  /** Normalized 0..1 stylus pressure per station; omitted → opacity proxy. */
+  readonly pressures?: readonly number[];
+  /** Normalized 0..1 speed per station; omitted → derived from geometry. */
+  readonly speeds?: readonly number[];
+  /** Canvas-plane tilt, each -1..1. Default untilted. */
+  readonly tiltX?: number;
+  readonly tiltY?: number;
+  /** Simulated hair count, clamped into 16..32 by the physics module. */
+  readonly bristleCount?: number;
+  /** Ink dip at stroke start, 0..1 (default 1 = fully loaded). */
+  readonly initialLoad?: number;
+}
+
 export interface StudioOilRibbonCarrierOptions {
   readonly bristleLoadDynamics?: StudioOilRibbonCarrierBristleLoadDynamicsOptions;
   readonly impastoRelief?: StudioOilRibbonCarrierImpastoReliefOptions;
+  readonly bristlePhysics?: StudioOilRibbonCarrierBristlePhysicsOptions;
 }
 
 interface OilCarrierStation {
@@ -360,6 +390,7 @@ interface PlannedBristleRun {
 function planBristleLanes(
   stations: readonly OilCarrierStation[],
   dynamics?: StudioOilBristleLoadDynamicsPlan,
+  physics?: StudioBristlePhysicsOilPlan,
 ): readonly StudioOilRibbonBristleLane[] {
   if (stations.length < 2) return [];
   const bristleCount = Math.min(
@@ -379,7 +410,13 @@ function planBristleLanes(
       for (let index = runStart; index <= runEnd; index += 1) {
         const station = stations[index]!;
         const bristle = station.source.bristles[bristleIndex]!;
-        const offset = station.radiusY * bristle.offsetRatio;
+        // v1 bristle physics (flag-gated): the simulated tuft's contact
+        // trajectory replaces the hashed per-station offset, in the same
+        // radiusY units, so splay/hysteresis/clump-split drive the lane path.
+        const offset = physics
+          ? station.radiusY
+            * physics.laneOffsetRatio[index * physics.laneCount + bristleIndex]!
+          : station.radiusY * bristle.offsetRatio;
         points.push(
           station.x + station.normalX * offset,
           station.y + station.normalY * offset,
@@ -405,6 +442,17 @@ function planBristleLanes(
           1,
         );
         width *= dynamics.footprintScale[sampleIndex]!;
+      }
+      if (physics) {
+        // v1 bristle physics (flag-gated): simulated contact alpha modulates
+        // the deposit (lifted/starving hairs thin) and simulated contact
+        // radius flattens/thins the ridge width per lane.
+        load = clamp(
+          load * physics.laneLoadMultiplier[sampleIndex * physics.laneCount + bristleIndex]!,
+          0,
+          1,
+        );
+        width *= physics.laneWidthScale[sampleIndex * physics.laneCount + bristleIndex]!;
       }
       minimumLoad = Math.min(minimumLoad, load);
       maximumLoad = Math.max(maximumLoad, load);
@@ -457,6 +505,45 @@ function planBristleLanes(
  */
 function pressureProxyFromStationOpacity(opacity: number): number {
   return clamp((opacity - 0.16) / 0.38, 0, 1);
+}
+
+/**
+ * v1 bristle-physics adapter (`brush--bristle-physics`). Feeds the carrier's
+ * own smoothed centreline and pressure proxy into the platform's WetBrush-2D
+ * tuft; lane count and station count come from the exact same `stations` array
+ * the band walker iterates, so the returned streams index it 1:1 by
+ * construction.
+ */
+function planBristlePhysics(
+  stations: readonly OilCarrierStation[],
+  options: StudioOilRibbonCarrierBristlePhysicsOptions,
+): StudioBristlePhysicsOilPlan | undefined {
+  if (stations.length < 2) return undefined;
+  const laneCount = Math.min(
+    ...stations.map((station) => station.source.bristles.length),
+  );
+  if (laneCount <= 0) return undefined;
+  const pressures = options.pressures && options.pressures.length > 0
+    ? options.pressures
+    : stations.map((station) => pressureProxyFromStationOpacity(station.opacity));
+  return planStudioBristlePhysicsOil({
+    stationXs: stations.map((station) => station.x),
+    stationYs: stations.map((station) => station.y),
+    laneCount,
+    seed: Math.floor(finite(options.seed, 0)),
+    // Tuft rest half-width — the offset stream's normalization radius.
+    baseRadiusPx: mean(stations.map((station) => station.radiusY)),
+    pressures,
+    ...(options.speeds ? { speeds: options.speeds } : {}),
+    ...(options.tiltX !== undefined ? { tiltX: options.tiltX } : {}),
+    ...(options.tiltY !== undefined ? { tiltY: options.tiltY } : {}),
+    ...(options.bristleCount !== undefined
+      ? { bristleCount: options.bristleCount }
+      : {}),
+    ...(options.initialLoad !== undefined
+      ? { initialLoad: options.initialLoad }
+      : {}),
+  });
 }
 
 function planLoadDynamics(
@@ -917,6 +1004,12 @@ export function planStudioOilRibbonCarrier(
   const dynamics = loadDynamicsOptions?.enabled === true
     ? planLoadDynamics(stations, loadDynamicsOptions)
     : undefined;
+  // v1 bristle physics touches ONLY the bristle lanes: body geometry/opacity
+  // stay byte-identical so the pinned lane inherits the settled silhouette.
+  const bristlePhysicsOptions = options?.bristlePhysics;
+  const physics = bristlePhysicsOptions?.enabled === true
+    ? planBristlePhysics(stations, bristlePhysicsOptions)
+    : undefined;
   // The relief overlay is additive only: enabling it must never change the base plan fields, and
   // NOT enabling it must not even add the key (legacy plans stay structurally identical).
   const impastoReliefLanes = options?.impastoRelief?.enabled === true
@@ -933,7 +1026,7 @@ export function planStudioOilRibbonCarrier(
     // Body is the paint the bristles have already spread. Two virtual overlaps leave clear headroom
     // so multi-band ridges can still carve tonal relief on top of a continuous wet film.
     bodyOpacity: quantize(accumulatedOpacity(averageOpacity, 2)),
-    bristleLanes: planBristleLanes(stations, dynamics),
+    bristleLanes: planBristleLanes(stations, dynamics, physics),
     repeatedBodyStampCount: 0,
     ...(impastoReliefLanes ? { impastoReliefLanes } : {}),
   });

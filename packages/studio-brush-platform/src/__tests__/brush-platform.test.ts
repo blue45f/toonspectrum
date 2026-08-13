@@ -15,7 +15,7 @@ import { describe, expect, it } from "vitest";
 import { BrushCompileError, compileVectorBrush } from "../compile";
 import { effectiveSizeAt } from "../geometry";
 import { modelRawInput } from "../input";
-import { registerBrushPlatformProviders } from "../providers";
+import { hokusaiProviderDescriptor, registerBrushPlatformProviders } from "../providers";
 import { applyStabilizer, pathJitterEnergy } from "../stabilizer";
 
 import type {
@@ -217,6 +217,19 @@ describe("provider registration + planner routing", () => {
     });
     expect(plan.islands.map((island) => island.providerId)).toEqual([
       "perfect-freehand",
+      "hokusai-natural-media",
+    ]);
+  });
+
+  it("keeps the Hokusai natural-media lane fail-closed without a texture-substituting fallback", () => {
+    // V17.1: no texture-equivalence certification exists for a Skia rendition of Hokusai
+    // natural-media output, so the descriptor must not advertise a fallback provider — a
+    // device-incapable host hides natural-media brushes instead of silently substituting
+    // texture. Restoring a fallback requires a checked-in equivalence certification.
+    expect(hokusaiProviderDescriptor.fallbackProviderId).toBeNull();
+    const registry = new EngineCapabilityRegistry();
+    registerBrushPlatformProviders(registry);
+    expect(registry.fallbackChain("hokusai-natural-media")).toEqual([
       "hokusai-natural-media",
     ]);
   });

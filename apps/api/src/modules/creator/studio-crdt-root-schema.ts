@@ -262,6 +262,10 @@ const STUDIO_CRDT_BOUNDED_FLOW_DYNAMIC_BRUSH_IDS = new Set([
   // 2026-08-13 brush quality wave: the only new dynamic-dabs lane (stamp/wet/oil-ribbon lanes
   // stay off bounded-flow-v2 by both mirrors, matching the browser dynamics resolver).
   "oil-pastel--wgm-mix",
+  // 2026-08-13 wave 3 mirror audit: all 17 new engine lanes (mypaint-cc0--* stamp pool, croquis
+  // capsule-outline pair, living-ink bake wet lanes, bristle-physics oil lane) execute on
+  // stamp/capsule/wet/oil engines — zero dynamic-dabs lanes, so this set deliberately gains no
+  // ids and the generic `--` fail-closed rule below keeps admitting them nowhere else.
 ]);
 const STUDIO_CRDT_SCENE_INDEX_ROOT = "scene-elements";
 const STUDIO_CRDT_PAGE_INDEX_ROOT = "studio-pages";

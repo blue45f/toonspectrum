@@ -65,6 +65,12 @@ import {
   type StudioDynamicBrushMaterialIdentity,
 } from "./studio-dry-media-dynamic-bridge";
 import {
+  linearizeStudioDryMediaKernelDepositionAlpha,
+  resolveStudioDryMediaKernelTipAlphaMap,
+  studioDryMediaKernelDabPathOwnsMaterial,
+  studioDryMediaKernelStrokeToothMultiplier,
+} from "./studio-dry-media-kernel-tip";
+import {
   planStudioDryMediaUnionRibbonCarrier,
   studioDryMediaUnionRibbonCarrierOwnsMaterial,
   type StudioDryMediaUnionRibbonPolygon,
@@ -1019,6 +1025,19 @@ export function planStudioDynamicBrushCoverageMarks(
       input.materialIdentity,
       dynamics,
     );
+  /*
+   * T1 de-polygon: unpinned causal core dry media never enters the union carrier. The same
+   * bridged multi-lane dabs stay ellipse/alpha-map primitives whose primary tip is a verified
+   * OSS kernel bake (crayon wax / chalk powder / charcoal grit / pastel velvet / oil-pastel wax
+   * film). Asset-backed R8 paper keeps its byte-authoritative composed maps, so the kernel tip
+   * only engages when no R8 grain sampler is active — mirroring the union authority gate above.
+   */
+  const dryMediaKernelTipMaterial = r8GrainSampler === null
+    ? studioDryMediaKernelDabPathOwnsMaterial(
+        input.materialIdentity,
+        dynamics,
+      )
+    : null;
   const dryMediaUnionLeadingSourceDabsToSkip = Math.max(
     0,
     Math.floor(input.dryMediaUnionLeadingSourceDabsToSkip ?? 0),
@@ -1122,6 +1141,7 @@ export function planStudioDynamicBrushCoverageMarks(
   ));
   const tipAlphaMaps = tipDefinitions.map((tip, tipIndex) => (
     dryMediaUnionRibbonAuthority
+      || (tipIndex === 0 && dryMediaKernelTipMaterial !== null)
       || tipUsesEllipse[tipIndex]
       || tipUsesAnalyticFalloff[tipIndex]
       ? null
@@ -1271,14 +1291,45 @@ export function planStudioDynamicBrushCoverageMarks(
       ) * paperAcrossFootprint(x, y, radiusX, radiusY, angleRadians)
     );
     const appendTipDab = (
-      composedDab: StudioBrushComposableDab,
+      // Kernel-authority primary dabs carry their causal identity (index, arc distance); composed
+      // layer dabs do not — and the kernel material is gated to tipIndex 0, so the fallbacks below
+      // are type-level only (typecheck fix, runtime-identical).
+      composedDab: StudioBrushComposableDab & Readonly<{
+        index?: number;
+        distanceFromStrokeStart?: number;
+      }>,
       tip: NormalizedStudioBrushTipSettings,
       tipIndex: number,
       dabColor: string
     ): "ok" | "invalid-mark" | "mark-budget" => {
-      const depositionAlpha = clampAlpha(composedDab.opacity * composedDab.flow);
+      /*
+       * Kernel dab authority (T1): the primary dry-media tip is a verified OSS material bake
+       * resolved per dab. The stable expanded dab index rotates a small immutable variant set, so
+       * live suffix planning, pointer-up replay and SVG export select identical maps while
+       * neighbouring fibres never tile the same grain orientation. The deposition alpha is
+       * linearized per material so the overlapping fibre lanes reach the historical dry-media bed
+       * density instead of reading as a lighter half-tone of it.
+       */
+      const kernelTipMaterial = tipIndex === 0 ? dryMediaKernelTipMaterial : null;
+      const depositionAlpha = kernelTipMaterial
+        ? clampAlpha(linearizeStudioDryMediaKernelDepositionAlpha(
+            kernelTipMaterial,
+            composedDab.opacity * composedDab.flow,
+          ))
+        : clampAlpha(composedDab.opacity * composedDab.flow);
       if (depositionAlpha <= 0) return "ok";
-      const tipAlphaMap = tipAlphaMaps[tipIndex] ?? null;
+      const tipAlphaMap = kernelTipMaterial
+        ? resolveStudioDryMediaKernelTipAlphaMap(
+            kernelTipMaterial,
+            dynamics.tip,
+            // The resolver's own non-safe-integer fallback is 0, so the type-level default is
+            // behavior-identical (primary kernel dabs always carry their causal index).
+            composedDab.index ?? 0,
+            // Band width follows the RAW pressure-resolved alpha (the union carrier's
+            // coverageHalfWidth input), not the linearized deposition alpha.
+            clampAlpha(composedDab.opacity * composedDab.flow),
+          )
+        : tipAlphaMaps[tipIndex] ?? null;
       if (r8GrainSampler) {
         if (!tipAlphaMap) return "invalid-mark";
         const radiusX = Math.max(0.25, composedDab.size / 2);
@@ -1348,9 +1399,11 @@ export function planStudioDynamicBrushCoverageMarks(
         return failure ?? "ok";
       };
       if (
-        tipUsesEllipse[tipIndex]
-        || tipUsesAnalyticFalloff[tipIndex]
-        || !tipAlphaMap
+        !tipAlphaMap
+        || (
+          !kernelTipMaterial
+          && (tipUsesEllipse[tipIndex] || tipUsesAnalyticFalloff[tipIndex])
+        )
       ) {
         const radiusX = Math.max(0.25, composedDab.size / 2);
         const radiusY = radiusX * composedDab.roundness;
@@ -1497,7 +1550,29 @@ export function planStudioDynamicBrushCoverageMarks(
                 radiusX,
                 radiusY,
                 angleRadians,
-              )),
+              ))
+          // Kernel lane only: stroke-anchored paper tooth. Tip-local grain cannot survive five
+          // overlapping fibres, so full-contrast pores live in the stroke's own coordinates where
+          // every overlapping dab dips at the same valley (the union carrier's pores did too).
+          * (kernelTipMaterial
+            ? studioDryMediaKernelStrokeToothMultiplier(
+                kernelTipMaterial,
+                {
+                  index: composedDab.index ?? 0,
+                  x: composedDab.x,
+                  y: composedDab.y,
+                  ...(composedDab.distanceFromStrokeStart !== undefined
+                    ? {
+                        distanceFromStrokeStart:
+                          composedDab.distanceFromStrokeStart,
+                      }
+                    : {}),
+                },
+                strokeOriginX,
+                strokeOriginY,
+                dynamicSeed,
+              )
+            : 1),
         ),
         color: dabColor,
         texture: {

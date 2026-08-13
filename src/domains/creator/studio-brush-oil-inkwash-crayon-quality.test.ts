@@ -17,6 +17,7 @@ import {
   normalizeStudioBrushDynamicsSettings,
   planNormalizedStudioDynamicBrushDabs,
   studioBrushDynamicsSettingsForBrushId,
+  studioDryMediaUnionComposableProgramPin,
 } from "./studio-brush-dynamics";
 import {
   STUDIO_DRY_MEDIA_ANISOTROPIC_PRESETS_V1,
@@ -203,6 +204,8 @@ describe("oil / ink-wash / crayon competitive material quality", () => {
     const charcoalSig = JSON.stringify(charcoal.receipt.marks[9]);
     expect(crayonSig).not.toBe(charcoalSig);
 
+    // The union carrier is a pinned legacy-replay authority after the T1 de-polygon flip;
+    // its connected-transport quality contract is asserted through the explicit program pin.
     const carrier = planStudioDryMediaUnionRibbonCarrier({
       dabs: bridged.receipt.adjustedDabs,
       marks: bridged.receipt.marks.map((mark) => ({
@@ -215,7 +218,10 @@ describe("oil / ink-wash / crayon competitive material quality", () => {
         color: "#3a2a18",
       })),
       materialIdentity: identity,
-      dynamics: normalizeStudioBrushDynamicsSettings(dynamics),
+      dynamics: normalizeStudioBrushDynamicsSettings({
+        ...dynamics,
+        dryMediaUnionProgram: studioDryMediaUnionComposableProgramPin(),
+      }),
     });
     expect(carrier.applied).toBe(true);
     if (!carrier.applied) return;

@@ -27,6 +27,9 @@
  *
  * Lifecycle stages gate catalogue EXPOSURE only. Persisted strokes replay through the runtime
  * contract regardless of stage (`USED_PRESET_DATA_PRESERVED` — 노출 제거 ≠ 작품 데이터 삭제).
+ * V17.1 adds the `quarantined` stage on top: ids in the `studio-brush-quarantine.ts` ledger drop
+ * out of the default picker listing while staying fully registered, and the audit at the bottom
+ * of this module fail-fasts if a quarantined id ever loses its catalogue row or runtime contract.
  *
  * This module imports the FULL catalogue (`studio-brush-catalog.ts`, a lazy boundary), so it is
  * governance/lab/CI-side by construction — never import it from always-visible Studio chrome.
@@ -39,11 +42,22 @@ import {
   type StudioBrushPackCategory,
 } from "./studio-brush-pack-index";
 import {
+  isStudioBrushQuarantinedPresetId,
+  STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID,
+  STUDIO_BRUSH_QUARANTINED_PRESET_IDS,
+} from "./studio-brush-quarantine";
+import {
   resolveStudioBrushRuntimeContract,
   studioBrushRuntimeExecutionSignature,
 } from "./studio-brush-runtime-contract";
 
 import type { StudioBrushCatalogItem } from "./studio-brush-catalog";
+
+export {
+  isStudioBrushQuarantinedPresetId,
+  STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID,
+  STUDIO_BRUSH_QUARANTINED_PRESET_IDS,
+};
 
 export const STUDIO_BRUSH_VARIANT_GROUP_MANIFEST_VERSION =
   "studio-brush-variant-group-manifest-v1" as const;
@@ -56,14 +70,26 @@ export const STUDIO_BRUSH_VARIANT_GROUP_MANIFEST_VERSION =
  * `lab` is the pre-catalogue stage (candidate recipes exercised by the fidelity labs only). The
  * resolver below can never return it for a shipped id — anything inside the SSOT is at least
  * `experimental` — but the stage participates in the type so lab manifests share one vocabulary.
+ *
+ * `quarantined` is the exposure-removal stage (V17.1): the preset stays fully registered — SSOT
+ * row, runtime contract, byte-identical persisted replay — but the catalogue picker stops listing
+ * it (`studio-brush-catalog.ts` derives its default listing from this stage). Membership lives in
+ * the `studio-brush-quarantine.ts` ledger, one reason per id, and is audited below.
  */
-export type BrushLifecycleStage = "lab" | "experimental" | "extended" | "core";
+export type BrushLifecycleStage =
+  | "lab"
+  | "experimental"
+  | "extended"
+  | "core"
+  | "quarantined";
 
 /**
  * Shipped ids pinned to the `experimental` stage while their browser-lab receipts are pending.
  * The current wave's new engine lanes are appended here by the catalogue integrator in the same
  * change that lands their rows, so they surface as 실험 단계 from day one.
  * 2026-08-13 brush quality wave: 11 new engine lanes (dry-stamp x4, wet-texture x4, oil x3).
+ * 2026-08-13 wave 3: 17 new engine lanes (CC0 MyPaint verbatim import x12, croquis capsule x2,
+ * living-ink settled bake x2, bristle-physics oil x1).
  */
 export const STUDIO_BRUSH_EXPERIMENTAL_LANE_PRESET_IDS: readonly string[] = Object.freeze([
   "crayon--klecks-stamp",
@@ -77,6 +103,24 @@ export const STUDIO_BRUSH_EXPERIMENTAL_LANE_PRESET_IDS: readonly string[] = Obje
   "brush--impasto-relief",
   "brush--bristle-depletion",
   "oil-pastel--wgm-mix",
+  // 2026-08-13 wave 3
+  "mypaint-cc0--charcoal",
+  "mypaint-cc0--charcoal-tanda",
+  "mypaint-cc0--2b-pencil",
+  "mypaint-cc0--dry-brush",
+  "mypaint-cc0--splatter",
+  "mypaint-cc0--ink-blot",
+  "mypaint-cc0--kabura",
+  "mypaint-cc0--watercolor-fringe",
+  "mypaint-cc0--watercolor-expressive",
+  "mypaint-cc0--oil-paint",
+  "mypaint-cc0--pastel",
+  "mypaint-cc0--spray",
+  "gpen--croquis-capsule",
+  "pen--croquis-stabilized",
+  "ink-wash--living-bake",
+  "watercolor--fluid-feather",
+  "brush--bristle-physics",
 ]);
 
 const EXPERIMENTAL_LANE_PRESET_ID_SET: ReadonlySet<string> = new Set(
@@ -85,18 +129,68 @@ const EXPERIMENTAL_LANE_PRESET_ID_SET: ReadonlySet<string> = new Set(
 
 /**
  * Stage resolution is derivational, mirroring the grouping-key sources:
- * experimental pin → pro pack (`extended`) → engine lane (`extended`) → runtime contract
- * (`core`). Unknown ids resolve to `null` — the caller decides, never a silent stage.
+ * quarantine ledger → experimental pin → pro pack (`extended`) → engine lane (`extended`) →
+ * runtime contract (`core`). Unknown ids resolve to `null` — the caller decides, never a silent
+ * stage. Quarantine wins over every other stage: exposure is removed even though the preset stays
+ * fully registered for persisted-document replay (`USED_PRESET_DATA_PRESERVED`).
  */
 export function resolveStudioBrushLifecycleStage(
   brushId: unknown,
 ): BrushLifecycleStage | null {
   if (typeof brushId !== "string" || brushId.length === 0) return null;
+  if (isStudioBrushQuarantinedPresetId(brushId)) return "quarantined";
   if (EXPERIMENTAL_LANE_PRESET_ID_SET.has(brushId)) return "experimental";
   if (studioBrushPackDescriptorById(brushId)) return "extended";
   if (studioBrushEngineLaneRowById(brushId)) return "extended";
   if (resolveStudioBrushRuntimeContract(brushId)) return "core";
   return null;
+}
+
+/**
+ * Fail-fast quarantine registration audit (pen-convergence guard). Quarantine is EXPOSURE removal
+ * only, so every ledger entry must still be a fully registered paint preset:
+ * - SSOT catalogue row present — persisted documents keep resolving metadata by id,
+ * - runtime contract present — `resolveStudioBrushRuntime` keeps resolving `exact`, never the pen
+ *   safe-fallback and never a silent texture substitute (지침 3),
+ * - never a pro pack (owner-sold content) and never a pinned experimental lane (lab period),
+ * - a non-quarantined canonical sibling exists — the owner's removal precondition (그룹 내 대안)
+ *   stays mechanically true, which also shields self-canonical core family representatives.
+ */
+function auditStudioBrushQuarantineRegistration(): string[] {
+  const paintIds = new Set(STUDIO_PAINT_BRUSH_CATALOG_ITEMS.map((item) => item.id));
+  const issues: string[] = [];
+  for (const quarantinedId of STUDIO_BRUSH_QUARANTINED_PRESET_IDS) {
+    if ((STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID[quarantinedId] ?? "").trim().length === 0) {
+      issues.push(`${quarantinedId}: quarantine entry has no owner-auditable reason`);
+    }
+    if (!paintIds.has(quarantinedId)) {
+      issues.push(`${quarantinedId}: not a shipped paint preset — quarantine would orphan persisted strokes`);
+    }
+    if (studioBrushPackDescriptorById(quarantinedId)) {
+      issues.push(`${quarantinedId}: pro-pack preset (owner-sold content) must never be quarantined`);
+    }
+    if (EXPERIMENTAL_LANE_PRESET_ID_SET.has(quarantinedId)) {
+      issues.push(`${quarantinedId}: pinned experimental lane keeps its lab period — resolve the pin first`);
+    }
+    const contract = resolveStudioBrushRuntimeContract(quarantinedId);
+    if (!contract) {
+      issues.push(`${quarantinedId}: runtime contract missing — the id would converge to the pen safe-fallback`);
+      continue;
+    }
+    if (contract.canonicalId === quarantinedId) {
+      issues.push(`${quarantinedId}: self-canonical preset has no in-group alternative to keep exposed`);
+    } else if (isStudioBrushQuarantinedPresetId(contract.canonicalId)) {
+      issues.push(`${quarantinedId}: canonical alternative ${contract.canonicalId} is quarantined too`);
+    }
+  }
+  return issues;
+}
+
+const STUDIO_BRUSH_QUARANTINE_REGISTRATION_ISSUES = auditStudioBrushQuarantineRegistration();
+if (STUDIO_BRUSH_QUARANTINE_REGISTRATION_ISSUES.length > 0) {
+  throw new Error(
+    `Invalid Studio brush quarantine manifest: ${STUDIO_BRUSH_QUARANTINE_REGISTRATION_ISSUES.join("; ")}`,
+  );
 }
 
 // ---------------------------------------------------------------------------

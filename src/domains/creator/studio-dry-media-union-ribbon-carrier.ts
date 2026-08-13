@@ -11,6 +11,7 @@
 
 import {
   isStudioDryMediaUnionComposableProgramPin,
+  isStudioDynamicBrushCausalDepositPipeline,
   STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_DIGEST,
   STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_VERSION,
   type NormalizedStudioBrushDynamicsSettings,
@@ -21,6 +22,10 @@ import {
   studioDryMediaDynamicBridgeMarkMultiplier,
   type StudioDynamicBrushMaterialIdentity,
 } from "./studio-dry-media-dynamic-bridge";
+import {
+  resolveStudioDryMediaKernelTipMaterial,
+  type StudioDryMediaCoreId,
+} from "./studio-dry-media-kernel-tip";
 
 import type { StudioBrushTipAlphaMap } from "./studio-brush-tip-stamp";
 
@@ -144,31 +149,12 @@ export type StudioDryMediaUnionRibbonPlanResult =
       readonly marks: readonly StudioDryMediaUnionRibbonSourceMark[];
     }>;
 
-const CORE_DRY_MEDIA_IDS = new Set([
-  "crayon",
-  "chalk",
-  "charcoal",
-  "pastel",
-  "oil-pastel",
-]);
-const CORE_DRY_MEDIA_TIP_SHAPES = Object.freeze({
-  crayon: "hard",
-  chalk: "sponge",
-  charcoal: "bristle",
-  pastel: "sponge",
-  "oil-pastel": "bristle",
-} as const);
 const COORDINATE_LIMIT = 1_000_000_000;
 const QUANTIZATION = 10_000;
 const EPSILON = 1e-6;
 const TAU = Math.PI * 2;
 
-type CoreDryMediaId =
-  | "crayon"
-  | "chalk"
-  | "charcoal"
-  | "pastel"
-  | "oil-pastel";
+type CoreDryMediaId = StudioDryMediaCoreId;
 
 interface DryMediaNegativeGrainPolicy {
   /** Probability that one causal lane segment exposes a paper-tooth slit. */
@@ -245,35 +231,24 @@ function quantize(value: number): number {
   ) / QUANTIZATION;
 }
 
+/**
+ * Union-carrier ownership is now a legacy-replay authority (T1 de-polygon):
+ * - an explicit `dryMediaUnionProgram` pin keeps the stroke on this carrier byte-identically;
+ * - an unpinned legacy (non-causal) dynamics snapshot also stays here so historical documents
+ *   replay their exact union bytes instead of degrading to sampled circle grids.
+ * Every unpinned causal stroke — which is every freshly authored core dry-media stroke — is owned
+ * by the verified-kernel dab path (`studioDryMediaKernelDabPathOwnsMaterial`) and never plans
+ * union polygons.
+ */
 export function studioDryMediaUnionRibbonCarrierOwnsMaterial(
   materialIdentity: StudioDynamicBrushMaterialIdentity | undefined,
   dynamics: NormalizedStudioBrushDynamicsSettings,
 ): boolean {
-  if (
-    materialIdentity?.brushCatalogId === "paint-roller"
-    || materialIdentity?.brushCatalogId?.includes("pencil")
-    || materialIdentity?.brushId?.includes("pencil")
-    || materialIdentity?.dryMediaPresetId?.includes("pencil")
-  ) return false;
-  const brushId = materialIdentity?.brushId;
-  const catalogId = materialIdentity?.brushCatalogId;
-  const targetId = typeof brushId === "string" && CORE_DRY_MEDIA_IDS.has(brushId)
-    ? brushId
-    : typeof catalogId === "string" && CORE_DRY_MEDIA_IDS.has(catalogId)
-      ? catalogId
-      : null;
-  if (!targetId) return false;
-  const expectedShape = CORE_DRY_MEDIA_TIP_SHAPES[targetId as keyof typeof CORE_DRY_MEDIA_TIP_SHAPES];
-  if (dynamics.tip.shape !== expectedShape) return false;
-  const color = dynamics.colorDynamics;
-  return dynamics.tipLayers.length === 0
-    && dynamics.dualBrush?.enabled !== true
-    && color.backgroundColor === null
-    && color.foregroundBackgroundMix === 0
-    && color.foregroundBackgroundJitter === 0
-    && color.hueJitter === 0
-    && color.saturationJitter === 0
-    && color.valueJitter === 0;
+  return resolveStudioDryMediaKernelTipMaterial(materialIdentity, dynamics) !== null
+    && (
+      isStudioDryMediaUnionComposableProgramPin(dynamics.dryMediaUnionProgram)
+      || !isStudioDynamicBrushCausalDepositPipeline(dynamics.depositPipeline)
+    );
 }
 
 function validFrame(

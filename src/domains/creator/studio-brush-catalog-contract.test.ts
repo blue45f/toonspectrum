@@ -23,6 +23,10 @@ import {
   studioBrushDynamicsSettingsForBrushId,
 } from "./studio-brush-dynamics";
 import {
+  isStudioBrushQuarantinedPresetId,
+  STUDIO_BRUSH_QUARANTINED_PRESET_IDS,
+} from "./studio-brush-quarantine";
+import {
   STUDIO_BRUSH_RUNTIME_CONTRACT,
   resolveStudioBrushRuntimeContract,
   resolveStudioBrushSinglePointRoute,
@@ -94,6 +98,9 @@ describe(`${CORE_BRUSH_CATALOG_COUNT}-preset brush catalog contract`, () => {
       expect(studioBrushCatalogKindLabel(item), `${item.id}: missing kind label`).toMatch(
         /^(선화|마커|채색|효과|질감|지우개)$/u
       );
+      // V17.1 quarantined ids stay resolvable above but leave every picker listing/search —
+      // their exposure contract is asserted in the dedicated quarantine block below.
+      if (isStudioBrushQuarantinedPresetId(item.id)) continue;
       expect(
         filterStudioBrushCatalogItems({
           // Exact-id search must be global even while the UI still has another category selected.
@@ -117,6 +124,36 @@ describe(`${CORE_BRUSH_CATALOG_COUNT}-preset brush catalog contract`, () => {
       ["hair-fiber", "recent"],
       ["pen", "recent"],
     ]);
+  });
+
+  it("keeps quarantined presets resolvable for persisted documents while removing picker exposure", () => {
+    // V17.1 quarantine (studio-brush-quarantine.ts): exposure removal must never break existing
+    // documents. Each quarantined id keeps its SSOT row, metadata lookup, and its own renderer
+    // contract, but no picker listing or search path may surface it (no 숨김 포함 flag exists).
+    expect(STUDIO_BRUSH_QUARANTINED_PRESET_IDS.length).toBeGreaterThan(0);
+    for (const quarantinedId of STUDIO_BRUSH_QUARANTINED_PRESET_IDS) {
+      expect(studioBrushCatalogItemById(quarantinedId), `${quarantinedId}: lookup lost`)
+        .not.toBeNull();
+      expect(
+        BRUSH_PRESETS.some((preset) => preset.id === quarantinedId),
+        `${quarantinedId}: left the preset SSOT`
+      ).toBe(true);
+      expect(
+        resolveStudioBrushRuntimeContract(quarantinedId)?.id,
+        `${quarantinedId}: renderer contract lost`
+      ).toBe(quarantinedId);
+      for (const listing of [
+        filterStudioBrushCatalogItems({}),
+        filterStudioBrushCatalogItems({ operation: "paint" }),
+        filterStudioBrushCatalogItems({ category: "engines" }),
+        filterStudioBrushCatalogItems({ query: quarantinedId }),
+      ]) {
+        expect(
+          listing.some((item) => item.id === quarantinedId),
+          `${quarantinedId}: still exposed by the picker`
+        ).toBe(false);
+      }
+    }
   });
 
   it("keeps paint and eraser catalogues disjoint on the operation axis", () => {

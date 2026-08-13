@@ -39,6 +39,7 @@ import {
   resolveStudioDynamicBrushMaterialIdentity,
   type StudioDynamicBrushMaterialIdentity,
 } from "../src/domains/creator/studio-dry-media-dynamic-bridge";
+import { studioDryMediaUnionRibbonCarrierOwnsMaterial } from "../src/domains/creator/studio-dry-media-union-ribbon-carrier";
 import {
   planStudioDynamicBrushCoverageMarks,
   type StudioDynamicBrushCoverageMark,
@@ -153,7 +154,12 @@ function sourceArrays(sampleCount: number) {
   };
 }
 
-function planDynamics(
+/**
+ * Matrix-canonical dynamics for one paint id: authored settings first, pack runtime dynamics as
+ * fallback, both under the same derived deterministic seed every matrix/probe/soak run reuses.
+ * Exported so byte-identity sweeps can resolve the exact settings object the perf rows plan with.
+ */
+export function planStudioBrushCataloguePaintDynamics(
   brushId: string,
   packById?: ReadonlyMap<string, StudioBrushPackSelection>,
 ): NormalizedStudioBrushDynamicsSettings | null {
@@ -346,7 +352,7 @@ export function evaluateStudioBrushCataloguePaintPerfRow(
     ?? (pack?.runtimeBrushId
       ? resolveStudioBrushDynamicsPresetId(pack.runtimeBrushId)
       : null);
-  const dynamics = planDynamics(catalogId, options?.packById);
+  const dynamics = planStudioBrushCataloguePaintDynamics(catalogId, options?.packById);
   const identity = resolveStudioDynamicBrushMaterialIdentity(
     pack?.runtimeBrushId ?? catalogId,
     catalogId,
@@ -445,6 +451,102 @@ export function evaluateStudioBrushCataloguePaintDeterminismProbe(
 }
 
 /**
+ * Long-session soak sentinels: the five slowest paint ids from the exhaustive matrix ranking
+ * (workstream-M measurement, warm-run medians). They stay pinned after optimization so the ids
+ * that once flirted with the freeze budget keep proving repeated plans neither drift bytes nor
+ * degrade monotonically the way a leaking cache or growing shared buffer would.
+ */
+export const STUDIO_BRUSH_CATALOGUE_SOAK_IDS = [
+  "pixel-square",
+  "needle-graphite",
+  "acrylic-stiff-flat",
+  "alcohol-chisel-marker",
+  "hair-curl-ribbon",
+] as const;
+export const STUDIO_BRUSH_CATALOGUE_SOAK_RUNS = 3;
+/** Consecutive-plan growth tolerated before monotonic slowdown counts as degradation. */
+export const STUDIO_BRUSH_CATALOGUE_SOAK_MAX_MONOTONIC_GROWTH = 1.2;
+/**
+ * Absolute floor under the relative gate. Optimized plans finish in single-digit milliseconds,
+ * where ±0.5ms of timer jitter alone can read as ">20%"; real leak-driven degradation keeps
+ * compounding and clears this floor immediately, so the floor never shelters a genuine freeze.
+ */
+export const STUDIO_BRUSH_CATALOGUE_SOAK_MIN_DEGRADATION_MS = 4;
+
+export interface StudioBrushCataloguePaintSoakResult {
+  readonly catalogId: string;
+  readonly path: StudioBrushCataloguePerfPath;
+  readonly runCount: number;
+  readonly elapsedMs: readonly number[];
+  readonly digests: readonly (string | null)[];
+  readonly planOk: boolean;
+  /** `null` when the path exposes no geometry stream to hash (unmeasured, not failed). */
+  readonly digestsStable: boolean | null;
+  /** True when every consecutive plan slowed down and the last exceeded the first by >20%. */
+  readonly monotonicDegradation: boolean;
+  readonly freezeCount: number;
+  readonly ok: boolean;
+}
+
+/**
+ * Soak mode: plans the same stroke `runs` times back to back, mirroring a long editing session
+ * replaying one heavy brush. A healthy planner stays flat (JIT warm-up may only speed it up) and
+ * replays byte-identical geometry; strictly increasing times ending >20% above the first run mean
+ * per-plan state is accumulating somewhere and must fail the gate.
+ */
+export function evaluateStudioBrushCataloguePaintSoak(
+  catalogId: string,
+  options?: {
+    readonly runs?: number;
+    readonly sampleCount?: number;
+    readonly budgetMs?: number;
+    readonly packById?: ReadonlyMap<string, StudioBrushPackSelection>;
+  },
+): StudioBrushCataloguePaintSoakResult {
+  const runCount = Math.max(2, options?.runs ?? STUDIO_BRUSH_CATALOGUE_SOAK_RUNS);
+  const rows: StudioBrushCataloguePerfRow[] = [];
+  for (let run = 0; run < runCount; run += 1) {
+    rows.push(evaluateStudioBrushCataloguePaintPerfRow(catalogId, options));
+  }
+  const elapsedMs = rows.map((row) => row.elapsedMs);
+  const digests = rows.map((row) => row.digest);
+  const planOk = rows.every((row) => row.ok);
+  const measuredDigests = digests.filter((digest): digest is string => digest !== null);
+  const digestsStable = measuredDigests.length === 0
+    ? null
+    : measuredDigests.length === digests.length
+      && measuredDigests.every((digest) => digest === measuredDigests[0]);
+  let strictlyIncreasing = true;
+  for (let run = 1; run < elapsedMs.length; run += 1) {
+    if (elapsedMs[run]! <= elapsedMs[run - 1]!) {
+      strictlyIncreasing = false;
+      break;
+    }
+  }
+  const monotonicDegradation = strictlyIncreasing
+    && elapsedMs.at(-1)!
+      > elapsedMs[0]! * STUDIO_BRUSH_CATALOGUE_SOAK_MAX_MONOTONIC_GROWTH
+    && elapsedMs.at(-1)! - elapsedMs[0]!
+      > STUDIO_BRUSH_CATALOGUE_SOAK_MIN_DEGRADATION_MS;
+  const freezeCount = rows.filter((row) => row.freeze).length;
+  return {
+    catalogId,
+    path: rows[0]!.path,
+    runCount,
+    elapsedMs,
+    digests,
+    planOk,
+    digestsStable,
+    monotonicDegradation,
+    freezeCount,
+    ok: planOk
+      && digestsStable !== false
+      && !monotonicDegradation
+      && freezeCount === 0,
+  };
+}
+
+/**
  * Deterministic probe sample: every strided paint id plus the crayon family. Keeps the full
  * matrix + determinism sweep well under 2× a single exhaustive run while every id remains
  * probe-able on demand through `evaluateStudioBrushCataloguePaintDeterminismProbe`.
@@ -528,7 +630,7 @@ export function evaluateStudioBrushCrayonFamilyIncrementalChunks(
   readonly ok: boolean;
   readonly freeze: boolean;
 } {
-  const dynamics = planDynamics(catalogId);
+  const dynamics = planStudioBrushCataloguePaintDynamics(catalogId);
   const identity = resolveStudioDynamicBrushMaterialIdentity(catalogId);
   if (!dynamics || !identity?.dryMediaPresetId) {
     return {
@@ -562,10 +664,18 @@ export function evaluateStudioBrushCrayonFamilyIncrementalChunks(
   let cursor = 0;
   let chunkCount = 0;
   let maxChunkMs = 0;
+  // Mirror the live overlay's incremental call contract exactly (T1 de-polygon, 2026-08-13):
+  // the predecessor-dab + leading-skip mechanism belongs to the legacy union carrier only. Fresh
+  // unpinned causal strokes are owned by the verified-kernel dab path, which plans plain suffix
+  // chunks — passing the union-era skip flag there is fail-closed by the renderer.
+  const unionCarrierAuthority = studioDryMediaUnionRibbonCarrierOwnsMaterial(
+    identity,
+    dynamics,
+  );
   const startedAt = performance.now();
   while (cursor < dabs.length) {
     const end = Math.min(dabs.length, cursor + chunkSize);
-    const predecessor = cursor > 0 ? cursor - 1 : cursor;
+    const predecessor = unionCarrierAuthority && cursor > 0 ? cursor - 1 : cursor;
     const t0 = performance.now();
     const coverage = planStudioDynamicBrushCoverageMarks({
       dabVariations: [dabs.slice(predecessor, end)],
@@ -576,7 +686,8 @@ export function evaluateStudioBrushCrayonFamilyIncrementalChunks(
       stroke: "#2b211c",
       stampGrid: STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID,
       markBudget: STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
-      dryMediaUnionLeadingSourceDabsToSkip: cursor > 0 ? 1 : 0,
+      dryMediaUnionLeadingSourceDabsToSkip:
+        unionCarrierAuthority && cursor > 0 ? 1 : 0,
     });
     maxChunkMs = Math.max(maxChunkMs, performance.now() - t0);
     if (!coverage.ok) {
@@ -644,8 +755,25 @@ function runStudioBrushCataloguePerfMatrixCli(): void {
       );
     }
   }
+  let soakOk = true;
+  const packById = new Map(
+    materializeAllStudioBrushPackSelections().map((selection) => [
+      selection.catalogId,
+      selection,
+    ]),
+  );
+  for (const catalogId of STUDIO_BRUSH_CATALOGUE_SOAK_IDS) {
+    const soak = evaluateStudioBrushCataloguePaintSoak(catalogId, { packById });
+    if (soak.ok) continue;
+    soakOk = false;
+    logMatrix(
+      `FAIL ${catalogId} soak planOk=${soak.planOk} digestsStable=${soak.digestsStable} `
+      + `monotonicDegradation=${soak.monotonicDegradation} freezes=${soak.freezeCount} `
+      + `elapsed=[${soak.elapsedMs.map((ms) => ms.toFixed(1)).join(", ")}]ms`,
+    );
+  }
   const elapsedMs = performance.now() - startedAt;
-  const ok = report.ok && incrementalOk;
+  const ok = report.ok && incrementalOk && soakOk;
   logMatrix(`${ok ? "OK" : "FAILED"} in ${(elapsedMs / 1000).toFixed(1)}s`);
   if (!ok) process.exitCode = 1;
 }

@@ -7,6 +7,7 @@ import {
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
   studioBrushDynamicsSettingsForBrushId,
   studioBrushDynamicsPresetSettings,
+  studioDryMediaUnionComposableProgramPin,
 } from "./studio-brush-dynamics";
 import { STUDIO_BRUSH_PACK_DESCRIPTORS } from "./studio-brush-pack-index";
 import { materializeStudioBrushPackSelection } from "./studio-brush-pack-runtime";
@@ -1111,20 +1112,20 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
         );
         expect(maximumGap).toBeLessThan(brushDynamics.width.base * 1.1);
       } else {
-        // Core dry media owns one non-overpainting full-prefix union. The command is compact,
-        // but its byte receipt must still contain the complete high-resolution fibre geometry.
-        expect(liveMarks).toHaveLength(1);
-        expect(liveMarks[0]?.unionGeometry).toMatchObject({
-          coordinateCount: expect.any(Number),
-          byteLength: expect.any(Number),
-          sha256: expect.stringMatching(/^[0-9a-f]{64}$/),
-        });
+        // T1 kernel dab path: fresh unpinned core dry media renders per-fibre textured marks and
+        // never paints a union polygon command. Coverage must stay continuous through the body.
+        expect(liveMarks.length).toBeGreaterThan(pointPairs.length);
         expect(
-          liveMarks[0]!.unionGeometry!.coordinateCount,
-        ).toBeGreaterThan(pointPairs.length * 2);
-        expect(
-          liveMarks[0]!.unionGeometry!.byteLength,
-        ).toBeGreaterThan(liveMarks[0]!.unionGeometry!.coordinateCount);
+          liveMarks.every((mark) => mark.unionGeometry === undefined),
+        ).toBe(true);
+        const startX = pointPairs[0]![0] + brushDynamics.width.base * 2;
+        const endX = pointPairs.at(-1)![0] - brushDynamics.width.base * 2;
+        const maximumGap = maximumLongitudinalCoverageGap(
+          liveMarks,
+          startX,
+          endX,
+        );
+        expect(maximumGap).toBeLessThan(brushDynamics.width.base * 1.1);
       }
 
       const liveRoundMarks = liveMarks.filter((mark) =>
@@ -1230,10 +1231,16 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     "pastel",
     "oil-pastel",
   ] as const)(
-    "replaces every accepted %s crossing prefix with the canonical one-fill union",
+    "replaces every accepted PINNED %s crossing prefix with the canonical one-fill union",
     (brushId) => {
-      const brushDynamics = studioBrushDynamicsSettingsForBrushId(brushId);
-      if (!brushDynamics) throw new Error(`missing ${brushId} dynamics`);
+      const authoredDynamics = studioBrushDynamicsSettingsForBrushId(brushId);
+      if (!authoredDynamics) throw new Error(`missing ${brushId} dynamics`);
+      // The union carrier is now a pinned legacy-replay authority; fresh strokes take the
+      // kernel dab path (covered by the dedicated O(1) append test below).
+      const brushDynamics = normalizeStudioBrushDynamicsSettings({
+        ...authoredDynamics,
+        dryMediaUnionProgram: studioDryMediaUnionComposableProgramPin(),
+      });
       const anchors = [
         [18, 30],
         [210, 130],
@@ -1343,6 +1350,82 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
       const settled = live.renderer.end(complete);
       expect(settled.status).toBe("settled");
       expect(live.settledCanvas.recordedComposites[0]?.marks).toHaveLength(4);
+    },
+  );
+
+  it.each([
+    "crayon",
+    "chalk",
+    "charcoal",
+    "pastel",
+    "oil-pastel",
+  ] as const)(
+    "appends fresh unpinned %s strokes O(1) per frame with no union accumulator",
+    (brushId) => {
+      const brushDynamics = studioBrushDynamicsSettingsForBrushId(brushId);
+      if (!brushDynamics) throw new Error(`missing ${brushId} dynamics`);
+      expect(brushDynamics.dryMediaUnionProgram).toBeUndefined();
+      const pointPairs = Array.from({ length: 96 }, (_, index) => [
+        14 + index * 5,
+        66 + Math.sin(index / 6) * 8,
+      ]);
+      const live = attachedRenderer();
+      const elementAt = (count: number) =>
+        drawElement(
+          `${brushId}-kernel-o1`,
+          pointPairs.slice(0, count).flat(),
+          {
+            brush: brushId,
+            brushDynamics,
+            strokeWidth: brushDynamics.width.base,
+            pressures: Array.from({ length: count }, () => 0.68),
+            speeds: Array.from({ length: count }, () => 9),
+            tiltXs: Array.from({ length: count }, () => 12),
+            tiltYs: Array.from({ length: count }, () => -6),
+          },
+        );
+      expect(live.renderer.begin(elementAt(1)).status).toBe("started");
+      let clearsAfterFirstMove: number | null = null;
+      let cumulativeMarks = 0;
+      for (const count of [12, 37, 68, 96]) {
+        const appended = live.renderer.appendFrom(elementAt(count));
+        expect(appended.status, `${brushId}: append ${count}`).toBe("appended");
+        if (appended.status !== "appended") continue;
+        // O(1) per append: the causal kernel path paints only the new suffix marks. After the
+        // tap-replacing first movement frame the active surface is never cleared or rebuilt, so
+        // recorded mark count grows exactly by the appended amount — no cumulative union replay.
+        if (clearsAfterFirstMove === null) {
+          clearsAfterFirstMove = live.activeCanvas.clearCount();
+          cumulativeMarks = live.activeCanvas.recordedMarks.length;
+        } else {
+          expect(
+            live.activeCanvas.clearCount(),
+            `${brushId}: no cumulative redraw at ${count}`,
+          ).toBe(clearsAfterFirstMove);
+          expect(
+            live.activeCanvas.recordedMarks.length,
+            `${brushId}: additive marks at ${count}`,
+          ).toBe(cumulativeMarks + appended.appendedMarks);
+          cumulativeMarks += appended.appendedMarks;
+        }
+        expect(appended.appendedMarks).toBeGreaterThan(0);
+      }
+      // No union accumulator involvement: not a single fill carries union polygon geometry.
+      expect(
+        live.activeCanvas.recordedMarks.every(
+          (mark) => mark.unionGeometry === undefined,
+        ),
+        brushId,
+      ).toBe(true);
+
+      const complete = elementAt(96);
+      const liveMarks = structuredClone(live.activeCanvas.recordedMarks);
+      const settled = live.renderer.end(complete);
+      expect(settled.status).toBe("settled");
+      if (settled.status !== "settled") return;
+      // Live suffix appends and pointer-up replay agree byte-for-byte on the kernel path.
+      expect(live.settledCanvas.recordedComposites[0]?.marks).toEqual(liveMarks);
+      expect(settled.markCount).toBe(liveMarks.length);
     },
   );
 

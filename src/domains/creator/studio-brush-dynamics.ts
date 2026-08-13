@@ -52,6 +52,14 @@ export interface StudioDryMediaUnionProgramPin {
   readonly programDigest: typeof STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_DIGEST;
 }
 
+/**
+ * Legacy-replay provider pin (T1 de-polygon discipline, mirrors wetEdgeBloomProgramId /
+ * pigmentMixProgramId): the pin is the ONLY way a causal dry-media stroke reaches the
+ * polygon-union carrier. Fresh strokes must never mint it — authored catalogue dynamics stay
+ * unpinned so every new core dry-media stroke renders through the verified-kernel dab path.
+ * Normalization preserves an incoming pin byte-for-byte (and rejects malformed ones) so persisted
+ * pinned elements replay their exact union-carrier output forever.
+ */
 export function studioDryMediaUnionComposableProgramPin(): StudioDryMediaUnionProgramPin {
   return Object.freeze({
     version: STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_VERSION,
@@ -3601,6 +3609,24 @@ export function resolveStudioBrushDynamics(
   const normalizedSettings = normalizeStudioBrushDynamicsSettings(settings);
   const normalizedSample = normalizeStudioBrushDynamicsSample(sample, normalizedSettings);
   return resolveNormalizedStudioBrushDynamics(normalizedSample, normalizedSettings);
+}
+
+/**
+ * Hot planner path for settings that already crossed the normalization boundary.
+ *
+ * `normalizeStudioBrushDynamicsSettings` is a byte-level fixpoint on its own output, so this
+ * produces the exact recipe `resolveStudioBrushDynamics` would while skipping the per-dab re-walk
+ * of every mapping/tip/grain/tip-layer field. The causal deposit walker resolves one recipe per
+ * emitted dab, where that redundant re-normalization dominated whole-stroke planning cost.
+ */
+export function resolveStudioBrushDynamicsForNormalizedSettings(
+  sample: StudioBrushDynamicsSample | null | undefined,
+  settings: NormalizedStudioBrushDynamicsSettings
+): StudioBrushDynamicsRecipe {
+  return resolveNormalizedStudioBrushDynamics(
+    normalizeStudioBrushDynamicsSample(sample, settings),
+    settings,
+  );
 }
 
 /** Stable FNV-1a seed for document/stroke ids. */

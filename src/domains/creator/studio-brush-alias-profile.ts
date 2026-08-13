@@ -14,6 +14,11 @@
 
 import { resolveStudioBrushEngineLaneWatercolorMaterial } from "./studio-brush-engine-lane-catalog";
 import {
+  augmentStudioLivingInkSettledBakeDabs,
+  resolveStudioLivingInkSettledBakeProgram,
+  type StudioLivingInkSettledBakePhase,
+} from "./studio-living-ink-settled-bake-v1";
+import {
   augmentStudioWetEdgeBloomDabs,
   resolveStudioWetEdgeBloomProgram,
 } from "./studio-wet-edge-bloom-v1";
@@ -715,11 +720,17 @@ export interface StudioBrushAliasWatercolorDab {
  * consumed only when the lane material declares a wet-edge-bloom program, so every lane without a
  * program id — including all pre-wave lanes — returns exactly the scaled dabs as before
  * (2026-08-13 brush quality wave).
+ *
+ * `phase` (2026-08-13 wave 3) feeds only the opt-in living-ink settled bake: the fluid field is
+ * global over the stroke, so live prefixes must stay identity and only an explicit `"settled"`
+ * bakes. The augmenter defaults every non-settled value to identity, so a caller that omits the
+ * parameter can never destabilize a live prefix (fail-closed).
  */
 export function applyStudioBrushAliasWatercolorMaterial(
   brushId: unknown,
   dabs: readonly StudioBrushAliasWatercolorDab[],
   seed?: number,
+  phase?: StudioLivingInkSettledBakePhase,
 ): readonly StudioBrushAliasWatercolorDab[] {
   const laneMaterial = typeof brushId === "string"
     ? resolveStudioBrushEngineLaneWatercolorMaterial(brushId)
@@ -748,8 +759,22 @@ export function applyStudioBrushAliasWatercolorMaterial(
   const wetEdgeBloomProgram = resolveStudioWetEdgeBloomProgram(
     laneMaterial?.wetEdgeBloomProgramId
   );
-  if (!wetEdgeBloomProgram) return scaledDabs;
-  return augmentStudioWetEdgeBloomDabs(scaledDabs, { ...wetEdgeBloomProgram, seed });
+  if (wetEdgeBloomProgram) {
+    return augmentStudioWetEdgeBloomDabs(scaledDabs, { ...wetEdgeBloomProgram, seed });
+  }
+  // Opt-in settled-only living-ink bake (2026-08-13 wave 3). One wet-texture authority per lane:
+  // a bake program is consulted only when no wet-edge-bloom program is pinned.
+  const livingInkBakeProgram = resolveStudioLivingInkSettledBakeProgram(
+    laneMaterial?.livingInkBakeProgramId
+  );
+  if (livingInkBakeProgram) {
+    return augmentStudioLivingInkSettledBakeDabs(scaledDabs, {
+      ...livingInkBakeProgram,
+      seed,
+      phase: phase ?? "live",
+    });
+  }
+  return scaledDabs;
 }
 
 /** Empty for non-pencil families; returned profiles are immutable catalogue constants. */

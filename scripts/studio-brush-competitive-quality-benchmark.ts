@@ -901,6 +901,9 @@ function perfectRendererPressureSample(
   });
   const stroker = peekStudioPerfectFreehandStroker();
   if (!contract || !stroker) return null;
+  // This probe measures the perfect-freehand taper/thinning response; the croquis capsule
+  // sibling branch (2026-08-13 wave 3) has no taper profile and is measured by its own suite.
+  if (contract.engine !== "perfect-freehand-outline") return null;
   const points = pressureProbePoints();
   const pressures = constantPressureSamples(pressure);
   const planInput = {

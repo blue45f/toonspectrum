@@ -15,6 +15,12 @@
 
 import { resolveStudioBrushEngineLaneStampTuning } from "./studio-brush-engine-lane-catalog";
 import {
+  isStudioCc0MypaintPresetBrushId,
+  resolveStudioCc0MypaintDabDynamicsStyle,
+  resolveStudioCc0MypaintStampBrushKind,
+  resolveStudioCc0MypaintStampTuning,
+} from "./studio-cc0-mypaint-preset-import-v1";
+import {
   studioOssDirectionalWaxSample,
   studioOssKlecksChalkCoverage,
   studioOssSprayTipCoverage,
@@ -27,6 +33,7 @@ import {
 } from "./studio-paper-media-profile-v1";
 
 import type { StudioBrushEngineLaneStampTuning } from "./studio-brush-engine-lane-catalog";
+import type { StudioCc0MypaintDabDynamicsStyle } from "./studio-cc0-mypaint-preset-import-v1";
 import type {
   StudioPaperMediumV1,
   StudioPaperPresetIdV1,
@@ -58,6 +65,12 @@ export function resolveStudioStampBrushKind(
   brushId: string | undefined
 ): StudioStampBrushKind | null {
   if (!brushId) return null;
+  // CC0 MyPaint verbatim import pool (`mypaint-cc0--*`): each registered preset pins one of the
+  // EXISTING verified stamp kinds (charcoal/pencil/ink/watercolor/mypaint/airbrush/pastel) as its
+  // retained pixel authority. Unregistered suffixes resolve to null — this module never guesses a
+  // renderer for them; the selection layer's fail-closed contract (selection-invalidated) applies.
+  const cc0Kind = resolveStudioCc0MypaintStampBrushKind(brushId);
+  if (cc0Kind) return cc0Kind;
   switch (brushId) {
     case "ink-brush":
       return "ink";
@@ -254,6 +267,12 @@ export interface StudioStampBrushStyle {
    * 없으면 dab 알파 산식이 종이 배선 이전과 비트 단위로 같다.
    */
   readonly paperGrain?: StudioStampPaperGrainStyle;
+  /**
+   * CC0 MyPaint 프리셋 dab 물리(옵트인, `mypaint-cc0--*` 전용) — libmypaint opaque_linearize
+   * 알파 선형화 + offset/radius_by_random 산란. paperGrain 과 같은 규약: 필드가 없으면 dab
+   * 계획이 이 배선 이전과 비트 단위로 동일하다(기존 브러시 byte-identity 계약).
+   */
+  readonly mypaintCc0Dynamics?: StudioCc0MypaintDabDynamicsStyle;
 }
 
 /** dab 지름 대비 스탬프 간격 비율 — 종류별 질감을 만드는 1차 변수. */
@@ -455,24 +474,42 @@ export function resolveStudioStampBrushStyle(
 ): StudioStampBrushStyle {
   const defaults = STUDIO_STAMP_BRUSH_DEFAULTS[kind];
   const lane = resolveStudioBrushEngineLaneStampTuning(brushId);
+  // CC0 MyPaint 프리셋(`mypaint-cc0--*` 등록 id)만 verbatim 튜닝 소스를 쓴다. 그 외 id 는
+  // null 이라 아래의 모든 산식이 기존 표현식과 문자 그대로 같은 값을 낸다(byte-identity).
+  const cc0 = brushId && isStudioCc0MypaintPresetBrushId(brushId)
+    ? resolveStudioCc0MypaintStampTuning(brushId)
+    : null;
   const pick = (value: number | undefined, fallback: number): number =>
     typeof value === "number" && Number.isFinite(value)
       ? Math.min(1, Math.max(0, value))
       : fallback;
-  const sizeScale = lane?.sizeScale ?? 1;
+  const sizeScale = cc0?.sizeScale ?? lane?.sizeScale ?? 1;
   // 종이 프로그램 핀은 레인 카탈로그 전용이다 — 핀이 없으면 필드 자체가 없어서 dab 계획이
   // 종이 배선 이전과 비트 단위로 같다(비핀 레인 회귀 계약).
   const paperGrain = resolveStudioStampPaperGrainStyle(kind, lane);
+  const flow = Math.max(0.03, pick(tuning?.flow, cc0?.flow ?? lane?.flow ?? defaults.flow));
+  // CC0 프리셋의 dab 간격은 sparse 스플래터(간격 > 1 지름)까지 유효하다 — 전용 클램프 [0.03, 4].
+  const spacingRatio = cc0
+    ? Math.max(0.03, Math.min(4, cc0.spacingRatio))
+    : Math.max(0.03, Math.min(1, lane?.spacingRatio ?? STAMP_SPACING_RATIO[kind]));
+  // 사용자가 flow 를 튜닝하면 선형화도 그 값 기준으로 다시 푼다(목표 채도 재해석).
+  const mypaintCc0Dynamics = cc0
+    ? resolveStudioCc0MypaintDabDynamicsStyle(cc0, flow)
+    : null;
   return {
     kind,
     color: base.color,
     size: Math.max(1, base.size * sizeScale),
     opacity: Math.min(1, Math.max(0, base.opacity)),
-    flow: Math.max(0.03, pick(tuning?.flow, lane?.flow ?? defaults.flow)),
-    hardness: pick(tuning?.hardness, lane?.hardness ?? defaults.hardness),
-    minSizeRatio: pick(tuning?.minSize, lane?.minSizeRatio ?? defaults.minSizeRatio),
-    spacingRatio: Math.max(0.03, Math.min(1, lane?.spacingRatio ?? STAMP_SPACING_RATIO[kind])),
+    flow,
+    hardness: pick(tuning?.hardness, cc0?.hardness ?? lane?.hardness ?? defaults.hardness),
+    minSizeRatio: pick(
+      tuning?.minSize,
+      cc0?.minSizeRatio ?? lane?.minSizeRatio ?? defaults.minSizeRatio,
+    ),
+    spacingRatio,
     ...(paperGrain ? { paperGrain } : {}),
+    ...(mypaintCc0Dynamics ? { mypaintCc0Dynamics } : {}),
   };
 }
 
@@ -538,6 +575,16 @@ export function beginStampWalker(x: number, y: number, pressure: number): Studio
   return { lastX: x, lastY: y, lastPressure: pressure, residual: 0, stampIndex: 0 };
 }
 
+/**
+ * 최종 dab flow(0..1) — CC0 선형화 핀(`mypaintCc0Dynamics.linearizedFlow`)이 있으면 libmypaint
+ * `1 − (1−opaque)^(1/dabs_per_pixel)` 환산 알파, 없으면 기존 표현식(clamp01(style.flow))
+ * 그대로다. Canvas·SVG·증분·재생이 이 한 함수를 공유한다.
+ */
+function stampFlowAlpha(style: StudioStampBrushStyle): number {
+  const linearized = style.mypaintCc0Dynamics?.linearizedFlow;
+  return typeof linearized === "number" ? clamp01(linearized) : clamp01(style.flow);
+}
+
 function stampDotPlan(
   style: StudioStampBrushStyle,
   x: number,
@@ -545,16 +592,36 @@ function stampDotPlan(
   pressure: number,
   index: number
 ): StudioStampBrushDab {
-  const baseAlpha = clamp01(style.flow) * clamp01(style.opacity);
+  const baseAlpha = stampFlowAlpha(style) * clamp01(style.opacity);
+  const safePressure = normalizedPressure(pressure);
+  let dabX = x;
+  let dabY = y;
+  let radius = pressureRadius(style, pressure);
+  // CC0 MyPaint 산란/반경 지터(옵트인): stampJitter(index) 만 사용 — 필드가 없으면 이 블록이
+  // 아예 실행되지 않아 기존 브러시의 dab 계획이 비트 단위로 같다.
+  const cc0Dynamics = style.mypaintCc0Dynamics ?? null;
+  if (cc0Dynamics) {
+    const scatterAmount = Math.max(
+      0,
+      cc0Dynamics.scatter + cc0Dynamics.scatterPressureResponse * safePressure,
+    );
+    if (scatterAmount > 0) {
+      dabX += (stampJitter(index, 71) - 0.5) * 2 * scatterAmount * radius;
+      dabY += (stampJitter(index, 89) - 0.5) * 2 * scatterAmount * radius;
+    }
+    if (cc0Dynamics.radiusJitter > 0) {
+      radius *= Math.exp((stampJitter(index, 97) - 0.5) * cc0Dynamics.radiusJitter);
+    }
+  }
   return {
-    x,
-    y,
-    radius: pressureRadius(style, pressure),
+    x: dabX,
+    y: dabY,
+    radius,
     // 종이 프로그램을 핀한 레인만 W7 peak-catch 침착을 곱한다(planner 레벨 — Canvas·SVG 공유).
     alpha: style.paperGrain
       ? clamp01(
           baseAlpha
-          * stampPaperDepositScale(style.paperGrain, x, y, normalizedPressure(pressure)),
+          * stampPaperDepositScale(style.paperGrain, dabX, dabY, safePressure),
         )
       : baseAlpha,
     index,
@@ -830,8 +897,9 @@ function walkStampSegmentPlan(
   const speedFactor = style.kind === "ink"
     ? inkVelocityFactor(distance / Math.max(1, style.size))
     : 1;
-  const baseAlpha = clamp01(style.flow) * clamp01(style.opacity);
+  const baseAlpha = stampFlowAlpha(style) * clamp01(style.opacity);
   const paperGrain = style.paperGrain ?? null;
+  const cc0Dynamics = style.mypaintCc0Dynamics ?? null;
   let travelled = state.residual;
   const spacingOf = (p: number): number =>
     Math.max(0.5, pressureRadius(style, p) * 2 * (style.spacingRatio ?? STAMP_SPACING_RATIO[style.kind]));
@@ -847,10 +915,26 @@ function walkStampSegmentPlan(
   }
   while (travelled <= distance && state.stampIndex < maximumDabs) {
     const t = distance === 0 ? 0 : travelled / distance;
-    const px = state.lastX + dx * t;
-    const py = state.lastY + dy * t;
+    let px = state.lastX + dx * t;
+    let py = state.lastY + dy * t;
     const p = state.lastPressure + (safePressure - state.lastPressure) * t;
-    const radius = pressureRadius(style, p) * speedFactor;
+    let radius = pressureRadius(style, p) * speedFactor;
+    // CC0 MyPaint 산란/반경 지터(옵트인) — offset/radius_by_random 의 결정적 재현.
+    // stampJitter(stampIndex) 시드만 쓰므로 증분·재생·SVG 가 같은 배치를 공유하고,
+    // 필드가 없는 브러시는 이 블록을 건너뛰어 계획이 비트 단위로 같다.
+    if (cc0Dynamics) {
+      const scatterAmount = Math.max(
+        0,
+        cc0Dynamics.scatter + cc0Dynamics.scatterPressureResponse * p,
+      );
+      if (scatterAmount > 0) {
+        px += (stampJitter(state.stampIndex, 71) - 0.5) * 2 * scatterAmount * radius;
+        py += (stampJitter(state.stampIndex, 89) - 0.5) * 2 * scatterAmount * radius;
+      }
+      if (cc0Dynamics.radiusJitter > 0) {
+        radius *= Math.exp((stampJitter(state.stampIndex, 97) - 0.5) * cc0Dynamics.radiusJitter);
+      }
+    }
     emit({
       x: px,
       y: py,

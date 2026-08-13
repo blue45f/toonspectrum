@@ -13,6 +13,7 @@ import {
   type StudioBrushCatalogItem,
 } from "./studio-brush-catalog-core";
 import { STUDIO_BRUSH_PACK_DESCRIPTORS } from "./studio-brush-pack-index";
+import { isStudioBrushQuarantinedPresetId } from "./studio-brush-quarantine";
 import {
   listStudioQuickBrushTrayItems,
   type StudioBrushTrayCategory,
@@ -73,6 +74,26 @@ export function studioBrushCatalogItemById(
     : null;
 }
 
+/**
+ * V17.1 quarantine: picker exposure derives from the lifecycle stage. Quarantined ids (see
+ * `studio-brush-quarantine.ts`) leave every default listing/search below, but the SSOT arrays
+ * above deliberately keep them — persisted documents still resolve metadata by id
+ * (`studioBrushCatalogItemById`), replay through their own runtime contract, and the variant-group
+ * manifest still partitions them. No "숨김 포함" affordance exists today, so exclusion from the
+ * listing is complete until an id is delisted from the quarantine ledger.
+ */
+const STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] = Object.freeze(
+  STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter((item) => !isStudioBrushQuarantinedPresetId(item.id)),
+);
+
+const STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] = Object.freeze(
+  STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.filter((item) => item.operation === "paint"),
+);
+
+const STUDIO_LISTED_ERASER_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] = Object.freeze(
+  STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.filter((item) => item.operation === "erase"),
+);
+
 export function filterStudioBrushCatalogItems(options: {
   operation?: StudioToolOperation;
   category?: StudioBrushTrayCategory | "favorites" | "recent";
@@ -91,10 +112,10 @@ export function filterStudioBrushCatalogItems(options: {
     category,
     query,
     catalogItems: operation === undefined
-      ? STUDIO_ALL_BRUSH_CATALOG_ITEMS
+      ? STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS
       : operation === "paint"
-        ? STUDIO_PAINT_BRUSH_CATALOG_ITEMS
-        : STUDIO_ERASER_BRUSH_CATALOG_ITEMS,
+        ? STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS
+        : STUDIO_LISTED_ERASER_BRUSH_CATALOG_ITEMS,
   }) as StudioBrushCatalogItem[];
 }
 
