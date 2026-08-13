@@ -518,7 +518,7 @@ describe("v2 stamp symmetry render plan", () => {
     }
   });
 
-  it("applies symmetry to the complete pencil footprint instead of regenerating axial jitter", () => {
+  it("plans each symmetry copy in document space with SVG-procedure tip jitter", () => {
     const context = new RecordingContext();
     const plan = drawStudioStampStrokeWithSymmetry(
       context as unknown as CanvasRenderingContext2D,
@@ -529,14 +529,27 @@ describe("v2 stamp symmetry render plan", () => {
     );
 
     expect(plan.transforms).toHaveLength(2);
-    expect(context.operations.filter((operation) => operation.startsWith("transform:"))).toEqual([
-      "transform:1,0,0,1,0,0",
-      "transform:-1,0,0,1,20,0",
-    ]);
+    expect(plan.dabVariations).toHaveLength(2);
+    expect(plan.dabs).toBe(plan.dabVariations[0]);
+    // Dab copies draw without a context transform: the mirrored copy is planned at its true
+    // document position and re-derives index-keyed tip jitter there, exactly like the SVG
+    // per-variation serializer (and the shared paper sheet for pinned lanes).
+    expect(
+      context.operations.some((operation) => operation.startsWith("transform:"))
+    ).toBe(false);
     const perCopyArcCount = 3;
-    const arcs = context.operations.filter((operation) => operation.startsWith("arc:"));
+    const arcs = context.operations
+      .filter((operation) => operation.startsWith("arc:"))
+      .map((operation) => operation.slice("arc:".length).split(",").map(Number));
     expect(arcs).toHaveLength(perCopyArcCount * 2);
-    expect(arcs.slice(0, perCopyArcCount)).toEqual(arcs.slice(perCopyArcCount));
+    const sourceArcs = arcs.slice(0, perCopyArcCount);
+    const mirroredArcs = arcs.slice(perCopyArcCount);
+    mirroredArcs.forEach((arc, index) => {
+      const source = sourceArcs[index]!;
+      // Same jitter offsets around the mirrored dab centre: x shifts by 2·(centerX − x₀) = 16.
+      expect(arc[0]).toBeCloseTo(source[0]! + 16, 12);
+      expect(arc.slice(1)).toEqual(source.slice(1));
+    });
   });
 
   it("keeps the identity Canvas fallback byte-for-operation equivalent to direct replay", () => {
@@ -556,12 +569,14 @@ describe("v2 stamp symmetry render plan", () => {
       );
 
       expect(plan.transforms).toHaveLength(1);
-      expect(symmetric.operations.slice(0, 2)).toEqual([
-        "save",
-        "transform:1,0,0,1,0,0",
-      ]);
+      expect(symmetric.operations[0]).toBe("save");
       expect(symmetric.operations.at(-1)).toBe("restore");
-      expect(symmetric.operations.slice(2, -1)).toEqual(direct.operations);
+      // Identity plans on the untouched source array and draws without a context transform,
+      // so a symmetry-off stroke stays byte-for-operation identical to direct replay.
+      expect(
+        symmetric.operations.some((operation) => operation.startsWith("transform:"))
+      ).toBe(false);
+      expect(symmetric.operations.slice(1, -1)).toEqual(direct.operations);
     }
 
     const ink = new RecordingContext();
@@ -573,6 +588,8 @@ describe("v2 stamp symmetry render plan", () => {
       undefined,
     );
     expect(inkPlan.transforms).toHaveLength(1);
+    // The ink ribbon keeps its affine-replay path: one shared silhouette per copy.
+    expect(ink.operations.slice(0, 2)).toEqual(["save", "transform:1,0,0,1,0,0"]);
     expect(ink.operations.filter((operation) => operation === "fill")).toHaveLength(1);
     expect(ink.operations.some((operation) => operation.startsWith("arc:"))).toBe(false);
     expect(ink.operations.some((operation) => operation.startsWith("move:"))).toBe(true);

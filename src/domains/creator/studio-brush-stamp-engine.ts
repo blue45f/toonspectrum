@@ -211,10 +211,9 @@ export function resolveStudioStampPaperGrainStyle(
  * 같은 (paper, x, y, pressure)는 항상 같은 값이라 증분/재생/SVG 픽셀 규약이 유지된다.
  *
  * 종이는 문서 좌표에 고정된 낱장이다(웻 레인·다이나믹 레인의 종이 침착과 동일 규약).
- * 알려진 갭(F1): 대칭 팬에서 Canvas(studio-stamp-symmetry-rendering)는 원본 계획 하나를
- * 컨텍스트 변환으로 복제하고 SVG는 변환된 변주 좌표로 재계획하므로, 비항등 대칭 사본의
- * 침착 패턴이 두 표면에서 다르게 나온다(항등 사본 = 실제 획은 정확히 일치). 정합 방법은
- * 대칭 렌더러를 다이나믹 레인처럼 변주별 재계획으로 맞추는 것 — 별도 후속 작업으로 추적한다.
+ * 대칭 팬도 이 규약을 따른다: Canvas(studio-stamp-symmetry-rendering)와 SVG 내보내기가
+ * 똑같이 변환된 변주 좌표로 dab 을 재계획하므로, 비항등 대칭 사본도 두 표면에서 같은
+ * 문서 위치의 이빨을 읽는다(다이나믹 레인의 변주별 계획과 동일한 정합 방식).
  */
 function stampPaperDepositScale(
   paper: StudioStampPaperGrainStyle,

@@ -23,6 +23,8 @@ import {
   type StudioStampBrushKind,
   type StudioStampBrushStyle,
 } from "./studio-brush-stamp-engine";
+import { transformStudioBrushSymmetryPoint } from "./studio-brush-symmetry";
+import { drawStudioStampStrokeWithSymmetry } from "./studio-stamp-symmetry-rendering";
 import { exportPageToSvg } from "./studio-svg-export";
 
 const BASE = { color: "#1f6feb", size: 14, opacity: 0.85 } as const;
@@ -240,6 +242,8 @@ function recordingContext() {
       if (pathArc) dabs.push({ ...pathArc, alpha });
     },
     stroke: () => undefined,
+    save: () => undefined,
+    restore: () => undefined,
   } as unknown as CanvasRenderingContext2D;
   return { context, dabs };
 }
@@ -311,5 +315,86 @@ describe("F1 Canvas/SVG shared-planner parity (charcoal--mypaint-stamp)", () => 
     drawStampStroke(recorder.context, style, POINTS, PRESSURES);
     expect(recorder.dabs.map((dab) => dab.alpha)).toEqual(plan.map((dab) => dab.alpha));
     expect(recorder.dabs.map((dab) => dab.r)).toEqual(plan.map((dab) => dab.radius));
+  });
+
+  it("mirrored symmetry copies agree byte-for-byte with the SVG per-variation plans", () => {
+    const { style } = planForExportInputs();
+    const symmetry = { type: "vertical", centerX: 47.3, centerY: 0 } as const;
+    const recorder = recordingContext();
+    const plan = drawStudioStampStrokeWithSymmetry(
+      recorder.context,
+      style,
+      POINTS,
+      PRESSURES,
+      symmetry,
+    );
+
+    expect(plan.transforms).toHaveLength(2);
+    // SVG 절차 그대로: 원본 점열을 변환한 뒤 변주마다 문서 좌표에서 독립적으로 계획한다.
+    const svgVariationPlans = plan.transforms.map((transform) => {
+      const variationPoints: number[] = [];
+      for (let index = 0; index + 1 < POINTS.length; index += 2) {
+        variationPoints.push(...transformStudioBrushSymmetryPoint(
+          POINTS[index]!,
+          POINTS[index + 1]!,
+          transform,
+        ));
+      }
+      return planStudioStampBrushDabs(style, variationPoints, PRESSURES);
+    });
+    expect(plan.dabVariations).toEqual(svgVariationPlans);
+
+    // Canvas 팬은 그 문서 좌표 dab 을 컨텍스트 변환 없이 그대로 그린다(거울 사본 포함).
+    const flat = svgVariationPlans.flat();
+    expect(recorder.dabs.map((dab) => dab.alpha)).toEqual(flat.map((dab) => dab.alpha));
+    expect(recorder.dabs.map((dab) => dab.x)).toEqual(flat.map((dab) => dab.x));
+
+    // 종이는 문서에 고정된 낱장 — 거울 사본은 원본과 다른 이빨을 읽어야 한다. (구 affine
+    // 복제는 두 사본이 같은 원본 알파를 실어 날랐다: 이 단언이 그 회귀를 막는다.)
+    const sourcePlan = plan.dabVariations[0]!;
+    const mirroredPlan = plan.dabVariations[1]!;
+    expect(mirroredPlan).toHaveLength(sourcePlan.length);
+    expect(
+      mirroredPlan.some((dab, index) => dab.alpha !== sourcePlan[index]!.alpha),
+    ).toBe(true);
+
+    // 엔드투엔드: 내보낸 SVG 도 변주마다 자기 위치의 종이 변조 알파를 자릿수까지 직렬화한다.
+    const { svg } = exportPageToSvg({
+      width: 128,
+      height: 64,
+      bg: "#ffffff",
+      transparentBg: true,
+      elements: [{
+        id: "paper-parity-mirrored-stroke",
+        type: "draw",
+        kind: "freehand",
+        mode: "pen",
+        brush: BRUSH_ID,
+        brushCatalogId: BRUSH_ID,
+        points: POINTS,
+        pressures: PRESSURES,
+        stroke: STROKE,
+        strokeWidth: WIDTH,
+        opacity: OPACITY,
+        sampleSpacing: 1,
+        stampPipeline: "causal-walker-v2",
+        symmetry: { ...symmetry },
+      }],
+    });
+    const groups = [...svg.matchAll(/<g data-stamp-brush="charcoal">([\s\S]*?)<\/g>/gu)]
+      .map((match) => match[1]!);
+    expect(groups).toHaveLength(2);
+    groups.forEach((group, variationIndex) => {
+      const opacities = [...group.matchAll(/<circle [^>]*opacity="([^"]+)"/gu)]
+        .map((match) => match[1]!);
+      const variation = plan.dabVariations[variationIndex]!;
+      expect(opacities.length).toBe(variation.length * 2);
+      variation.forEach((dab, index) => {
+        expect(
+          opacities[index * 2],
+          `variation ${variationIndex} dab ${index}`,
+        ).toBe(fmtDabOpacityMirror(dab.alpha));
+      });
+    });
   });
 });
