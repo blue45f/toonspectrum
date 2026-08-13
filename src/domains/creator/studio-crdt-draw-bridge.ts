@@ -377,6 +377,7 @@ export function studioDrawElementToCrdtStroke(
     ? STUDIO_CRDT_STROKE_PAYLOAD_VERSION
     : extensions?.materialPressureModel !== undefined
       || dynamicMinimumDiameterRatio !== undefined
+      || brushDynamics !== undefined
       ? STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION
       : extensions?.paintModel !== undefined
         ? STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION

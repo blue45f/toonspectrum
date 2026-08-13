@@ -10,6 +10,13 @@ import {
   normalizeStudioBrushR8TextureGrainSource,
   type StudioBrushR8TextureGrainSource,
 } from "./studio-brush-r8-grain-asset-contract";
+import {
+  isStudioSpectralWgmColorMixProgramId,
+  mixStudioSpectralWgm,
+  STUDIO_SPECTRAL_WGM_COLOR_MIX_PAINT_MODE,
+  STUDIO_SPECTRAL_WGM_COLOR_MIX_PROGRAM_ID,
+  type StudioSpectralWgmColorMixProgramId,
+} from "./studio-spectral-wgm-mix-v1";
 
 export type {
   StudioBrushR8GrainAssetReference,
@@ -45,6 +52,15 @@ export interface StudioBrushColorDynamicsSettings {
   saturationJitter?: number;
   /** Maximum signed value/lightness delta (0..1) for each dab. */
   valueJitter?: number;
+  /**
+   * Opt-in pigment program for the foreground↔background mix (F3, 2026-08-13).
+   * Only the exact `spectral-wgm-v1` id survives normalization; anything else —
+   * including every legacy snapshot that omits the key — keeps the historical
+   * linear-RGB lerp byte-for-byte. The pin is threaded from the engine-lane
+   * catalogue tuning (studio-brush-engine-lane-catalog) exactly like
+   * `wetEdgeBloomProgramId` / stamp `paperProgramId`.
+   */
+  pigmentMixProgramId?: string | null;
 }
 
 export interface NormalizedStudioBrushColorDynamicsSettings {
@@ -54,6 +70,8 @@ export interface NormalizedStudioBrushColorDynamicsSettings {
   hueJitter: number;
   saturationJitter: number;
   valueJitter: number;
+  /** Present only for a strictly admitted pigment-mix program pin. */
+  pigmentMixProgramId?: StudioSpectralWgmColorMixProgramId;
 }
 
 export interface StudioBrushGrainSettings {
@@ -218,6 +236,12 @@ export function normalizeStudioBrushColorDynamicsSettings(
       STUDIO_BRUSH_COLOR_DYNAMICS_LIMITS.valueJitter.min,
       STUDIO_BRUSH_COLOR_DYNAMICS_LIMITS.valueJitter.max
     ),
+    // Fail-closed program admission appended last: legacy snapshots without the
+    // key keep their exact canonical JSON (key set and order unchanged), and an
+    // unknown/misspelled program id normalizes back to the linear path.
+    ...(isStudioSpectralWgmColorMixProgramId(source.pigmentMixProgramId)
+      ? { pigmentMixProgramId: source.pigmentMixProgramId }
+      : {}),
   };
 }
 
@@ -382,11 +406,31 @@ export function resolveNormalizedStudioBrushDabColor(
     const mixJitter = (seededUnit(strokeSeed, dabIndex, 0xa511_e9b3) * 2 - 1)
       * settings.foregroundBackgroundJitter;
     const mix = clamp01(settings.foregroundBackgroundMix + mixJitter);
-    rgb = [
-      foreground[0] + (background[0] - foreground[0]) * mix,
-      foreground[1] + (background[1] - foreground[1]) * mix,
-      foreground[2] + (background[2] - foreground[2]) * mix,
-    ];
+    if (settings.pigmentMixProgramId === STUDIO_SPECTRAL_WGM_COLOR_MIX_PROGRAM_ID) {
+      /*
+       * libmypaint `mix_colors` semantics: `factor` weighs the FIRST colour
+       * (upstream: the accumulated smudge bucket). Our `mix` measures progress
+       * TOWARD the background pigment, so the foreground keeps weight
+       * `1 - mix` — mix 0 stays the (10-band round-tripped) foreground exactly
+       * like the linear branch below keeps the raw foreground. This is the same
+       * per-dab seed stream as the linear branch, so the pinned lane replays,
+       * exports and collaborates deterministically; unpinned snapshots never
+       * reach this call and keep the historical lerp bytes.
+       */
+      const mixed = mixStudioSpectralWgm(
+        { r: foreground[0], g: foreground[1], b: foreground[2] },
+        { r: background[0], g: background[1], b: background[2] },
+        1 - mix,
+        STUDIO_SPECTRAL_WGM_COLOR_MIX_PAINT_MODE,
+      );
+      rgb = [mixed.r, mixed.g, mixed.b];
+    } else {
+      rgb = [
+        foreground[0] + (background[0] - foreground[0]) * mix,
+        foreground[1] + (background[1] - foreground[1]) * mix,
+        foreground[2] + (background[2] - foreground[2]) * mix,
+      ];
+    }
   }
 
   if (

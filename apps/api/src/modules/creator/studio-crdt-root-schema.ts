@@ -259,6 +259,9 @@ const STUDIO_CRDT_BOUNDED_FLOW_DYNAMIC_BRUSH_IDS = new Set([
   "marker--soft-dynamic",
   "brush--dry-rake",
   "ink-particle--scatter-cloud",
+  // 2026-08-13 brush quality wave: the only new dynamic-dabs lane (stamp/wet/oil-ribbon lanes
+  // stay off bounded-flow-v2 by both mirrors, matching the browser dynamics resolver).
+  "oil-pastel--wgm-mix",
 ]);
 const STUDIO_CRDT_SCENE_INDEX_ROOT = "scene-elements";
 const STUDIO_CRDT_PAGE_INDEX_ROOT = "studio-pages";

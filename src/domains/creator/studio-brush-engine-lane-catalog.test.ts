@@ -34,6 +34,7 @@ function exportBrushSvg(brushId: string): string {
       kind: "freehand",
       mode: "pen",
       brush: brushId,
+      brushCatalogId: brushId,
       points: [10, 34, 24, 18, 42, 42, 62, 20, 82, 31],
       pressures: [0.35, 0.55, 0.8, 0.6, 0.42],
       stroke: "#1f6feb",

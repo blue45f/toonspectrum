@@ -66,7 +66,9 @@ function expectPrefixParity(
     );
 
     // 이미 방출한 prefix는 바뀌지 않고 이번 append가 정확히 새 suffix만 내야 한다.
-    expect(emitted.length).toBeGreaterThanOrEqual(0);
+    // suffix 들의 연결이 batch 계획과 원소 단위로 같아야 라이브 dab 위치가 재생과 일치한다
+    // (간격비 분기 회귀를 잡는 실질 픽셀 패리티 게이트).
+    expect(emitted).toEqual(batch.ops);
     expect({
       runs: append.snapshot.runs,
       seamBreaks: append.snapshot.seamBreaks,
@@ -84,7 +86,11 @@ function expectPrefixParity(
 
 describe("studio-vrm-texture-stroke-walker batch parity", () => {
   it("matches every prefix for all production brush kinds and varying pressure", () => {
-    for (const kind of ["pencil", "ink", "watercolor"] as const) {
+    // 드라이 미디어 스탬프 레인(crayon/chalk/charcoal/pastel)은 batch planner 와 같은
+    // spacingRatio(resolveStudioStampBrushStyle 해석값)로 걸어야 suffix 가 어긋나지 않는다.
+    for (const kind of [
+      "pencil", "ink", "watercolor", "airbrush", "crayon", "chalk", "charcoal", "pastel",
+    ] as const) {
       const incremental = expectPrefixParity(style(kind), expressiveSamples(), SIZE, {
         seed: 73,
       });

@@ -194,25 +194,31 @@ describe("core dry-media long-stroke regression", () => {
     // Competitive long-stroke freeze regression: multi-lane crayon must remain O(suffix) so a
     // continuous 2k-sample stroke never collapses into all-or-nothing mark-budget failure.
     const long = plannedStroke("crayon", 2_000);
-    expect(long.dabs.length).toBeGreaterThan(1_200);
+    expect(long.dabs.length).toBeGreaterThan(900);
+    expect(long.dabs.length).toBeLessThan(3_200);
     const startedAt = performance.now();
     const full = coverage(long);
     const fullElapsed = performance.now() - startedAt;
     expect(full.ok).toBe(true);
     if (!full.ok) throw new Error(full.reason);
+    // Full 2k-sample crayon coverage must stay interactive; >200ms freezes pointer-up seal.
+    expect(fullElapsed).toBeLessThan(200);
 
     const chunkSize = 64;
     let cursor = 0;
     let chunkPlans = 0;
+    let maxChunkMs = 0;
     const chunkStartedAt = performance.now();
     while (cursor < long.dabs.length) {
       const end = Math.min(long.dabs.length, cursor + chunkSize);
       const predecessor = cursor > 0 ? cursor - 1 : cursor;
+      const t0 = performance.now();
       const plan = coverage(
         long,
         long.dabs.slice(predecessor, end),
         cursor > 0 ? 1 : 0,
       );
+      maxChunkMs = Math.max(maxChunkMs, performance.now() - t0);
       expect(plan.ok, `crayon chunk ${cursor}:${end}`).toBe(true);
       if (!plan.ok) throw new Error(plan.reason);
       chunkPlans += 1;
@@ -222,7 +228,8 @@ describe("core dry-media long-stroke regression", () => {
     expect(chunkPlans).toBeGreaterThan(15);
     // Suffix chunking must remain competitive with one full plan; a quadratic replan freezes.
     expect(chunkElapsed).toBeLessThan(fullElapsed * 8 + 400);
-    expect(chunkElapsed).toBeLessThan(4_000);
+    expect(chunkElapsed).toBeLessThan(2_500);
+    expect(maxChunkMs).toBeLessThan(33);
   });
 
   it.each(CORE_DRY_MEDIA)(

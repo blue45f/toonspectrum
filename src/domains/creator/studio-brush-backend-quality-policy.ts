@@ -1147,6 +1147,19 @@ const CORE_ROUTE_PROFILE_BY_ID_BASE = Object.freeze({
   StudioBrushBackendRouteProfile
 >>);
 
+/**
+ * 2026-08-13 brush quality wave: dry-stamp engine lanes execute on the stamp walker
+ * (canvas2d-stamp-pattern / seeded-dry-stamp-v2), not the base material's dynamic-coverage
+ * profile — the same honest routing precedent as the core `pencil-grain` id. Base-derivation
+ * below stays the default for every other lane.
+ */
+const ENGINE_LANE_ROUTE_PROFILE_OVERRIDES = Object.freeze({
+  "crayon--klecks-stamp": "dry-stamp",
+  "chalk--klecks-stamp": "dry-stamp",
+  "charcoal--mypaint-stamp": "dry-stamp",
+  "pastel--soft-stamp": "dry-stamp",
+} as const satisfies Readonly<Record<string, StudioBrushBackendRouteProfile>>);
+
 const CORE_ROUTE_PROFILE_BY_ID = Object.freeze({
   ...CORE_ROUTE_PROFILE_BY_ID_BASE,
   ...Object.fromEntries(
@@ -1163,6 +1176,7 @@ const CORE_ROUTE_PROFILE_BY_ID = Object.freeze({
       return [row.id, baseProfile] as const;
     }),
   ),
+  ...ENGINE_LANE_ROUTE_PROFILE_OVERRIDES,
 }) as Readonly<Record<StudioBrushRuntimePresetId, StudioBrushBackendRouteProfile>>;
 
 export const STUDIO_CORE_BRUSH_BACKEND_ROUTE_PROFILES:

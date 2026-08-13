@@ -52,7 +52,12 @@ function shippedPastelElement(
     tangentialPressures,
     stroke: "#334155",
     strokeWidth: selection.defaultWidth,
-    opacity: selection.defaultOpacity,
+    // Product pointer-start stamps the bounded-flow-v2 seam (with causal sampleSpacing) on every
+    // pen stroke with retained dynamics; the specialist only admits the unit-opacity identity form
+    // of that seam. Legacy seamless strokes intentionally stay on the retained Canvas authority.
+    opacity: 1,
+    paintModel: "bounded-flow-v2",
+    sampleSpacing: 1,
     brush: selection.runtimeBrushId,
     brushCatalogId: selection.catalogId,
     brushCatalogName: selection.catalogName,
@@ -73,10 +78,10 @@ async function ready(
     strokeEpoch: 1,
     commandSequence: 1,
   });
-  expect(result).toMatchObject({ status: "ready" });
   if (result.status !== "ready") {
-    throw new Error(`${result.reason}:${result.detail ?? ""}`);
+    throw new Error(`compile failed with status=${result.status} reason=${result.reason} detail=${result.detail ?? ""}`);
   }
+  expect(result.status).toBe("ready");
   return result;
 }
 
@@ -195,6 +200,7 @@ describe("canonical vNext dry-media product adapter", () => {
       [{
         ...base,
         id: "bounded-flow-opacity",
+        opacity: 0.72,
         paintModel: "bounded-flow-v2",
         sampleSpacing: 1,
       }, "unsupported-paint-model"],

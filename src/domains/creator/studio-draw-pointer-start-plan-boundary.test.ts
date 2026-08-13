@@ -69,7 +69,9 @@ describe("studio draw pointer-start planning ownership boundary", () => {
     // 의도적 변경(2026-08-09): calligraphy authoring tip을 시작 스냅샷에 보존한다(310 → 315).
     // 의도적 변경(2026-08-10): 이름 있는 지우개의 operation·catalog identity를 보존한다
     // (315 → 318). 브라우저·렌더러 소유권은 여전히 이 순수 플래너 밖에 있다.
-    expect(planner.source.split("\n").length).toBeLessThanOrEqual(318);
+    // 의도적 변경(2026-08-13): retained dynamics가 있는 스트로크는 스탬프 파이프라인 대신
+    // bounded-flow 동역학 파이프라인을 타도록 stamp 게이트를 좁힌다(318 → 320).
+    expect(planner.source.split("\n").length).toBeLessThanOrEqual(320);
   });
 
   it("leaves gesture priority, leases, transport, CRDT publication, and live surfaces in the Page", () => {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { studioBrushPackDescriptorById } from "./studio-brush-pack-index";
 import { materializeStudioBrushPackDynamics } from "./studio-brush-pack-runtime";
 import { resolveStudioDynamicBrushMaterialIdentity } from "./studio-dry-media-dynamic-bridge";
 import { planStudioDynamicBrushCoverageMarks } from "./studio-dynamic-brush-coverage-renderer";
@@ -223,6 +224,19 @@ function fixtureDabs(
 }
 
 describe("professional shelf connected ribbon carrier", () => {
+  it("keeps its expected runtime table identical to the pack descriptor authority", () => {
+    // The catalogue descriptor is the single durable source of each preset's runtime carrier.
+    // Pinning the carrier's admission table to it means a runtime reassignment must be made at
+    // the descriptor (and route contract), never by widening admission with an anonymous
+    // special-case pair such as the once-shipped `oil-filbert` + `ink-particle` escape hatch.
+    for (const id of STUDIO_PROFESSIONAL_SHELF_RIBBON_CATALOG_IDS) {
+      expect(
+        studioBrushPackDescriptorById(id)?.runtimeBrushId,
+        `${id}: descriptor runtime`,
+      ).toBe(RUNTIME_BY_ID[id]);
+    }
+  });
+
   it.each(STUDIO_PROFESSIONAL_SHELF_RIBBON_CATALOG_IDS)(
     "owns the exact runtime/catalog pair and emits a distinct connected profile: %s",
     (id) => {
@@ -340,6 +354,17 @@ describe("professional shelf connected ribbon carrier", () => {
       materialIdentity: wrongRuntime ?? undefined,
       dynamics: dynamics(id),
     });
+    // Exactly the pair a deleted transitional special-case used to admit. No production or
+    // persistence path emits it, so admission must stay fail-closed instead of guessing.
+    const retiredSpecialCasePair = planStudioProfessionalShelfRibbonCarrier({
+      dabs: plannedDabs,
+      marks: sourceMarks,
+      materialIdentity: resolveStudioDynamicBrushMaterialIdentity(
+        "ink-particle",
+        "oil-filbert",
+      ) ?? undefined,
+      dynamics: dynamics("oil-filbert"),
+    });
     const countMismatch = planStudioProfessionalShelfRibbonCarrier({
       dabs: plannedDabs,
       marks: sourceMarks.slice(0, 1),
@@ -385,6 +410,10 @@ describe("professional shelf connected ribbon carrier", () => {
     });
 
     expect(mismatch).toMatchObject({
+      applied: false,
+      reason: "ineligible-material",
+    });
+    expect(retiredSpecialCasePair).toMatchObject({
       applied: false,
       reason: "ineligible-material",
     });

@@ -349,14 +349,23 @@ export function resolveStudioDryMediaAnisotropicPresetIdV1(
   brushId: unknown,
   brushCatalogId?: unknown,
 ): StudioDryMediaAnisotropicPresetIdV1 | null {
+  const target =
+    typeof brushCatalogId === "string" && brushCatalogId.length > 0
+      ? brushCatalogId
+      : typeof brushId === "string" ? brushId : "";
   if (
-    brushId === "crayon"
-    || brushId === "charcoal"
-    || brushId === "chalk"
-    || brushId === "pastel"
-  ) return brushId;
-  if (brushId === "oil-pastel") return "pastel";
-  const classification = classifyStudioDryMediaCatalogIdV1(brushCatalogId);
+    target === "crayon"
+    || target === "charcoal"
+    || target === "chalk"
+    || target === "pastel"
+  ) return target;
+  if (target === "oil-pastel") return "pastel";
+  if (target.startsWith("crayon")) return "crayon";
+  if (target.startsWith("charcoal")) return "charcoal";
+  if (target.startsWith("chalk")) return "chalk";
+  if (target.startsWith("pastel")) return "pastel";
+  if (target.startsWith("oil-pastel")) return "pastel";
+  const classification = classifyStudioDryMediaCatalogIdV1(brushCatalogId ?? brushId);
   return classification?.kind === "anisotropic-continuous"
     ? classification.presetId
     : null;

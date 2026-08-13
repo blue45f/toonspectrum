@@ -89,6 +89,7 @@ import {
 import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "./studio-material-pressure-model";
 import {
   planStudioOilRibbonCarrier,
+  STUDIO_OIL_IMPASTO_RELIEF_HIGHLIGHT_COLOR,
   traceStudioOilRibbonPath,
 } from "./studio-oil-ribbon-carrier";
 import { planStudioPerfectFreehandRender } from "./studio-outline-stroke-contract";
@@ -1449,7 +1450,13 @@ export const StudioDrawNode = memo(function StudioDrawNode({
             const plannedDabs = causalWatercolor
               ? planCausalWatercolorBrushDabs(watercolorInput, !activeDraft)
               : planWatercolorBrushDabs(watercolorInput);
-            const dabs = applyStudioBrushAliasWatercolorMaterial(brush, plannedDabs);
+            // The stroke seed feeds the opt-in wet-edge-bloom lanes; SVG export passes the same
+            // seed at its two watercolor sites so Canvas and SVG stay pixel-agreeing.
+            const dabs = applyStudioBrushAliasWatercolorMaterial(
+              brush,
+              plannedDabs,
+              watercolorSeed,
+            );
             const wetRibbonPlan = causalWatercolor
               ? planStudioWetRibbonCarrier(dabs, { seed: watercolorSeed })
               : null;
@@ -2107,7 +2114,22 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               seed: fxBrushSeedFromKey(el.id),
               maxDabs: FX_OIL_DAB_CAP,
             });
-            const carrier = planStudioOilRibbonCarrier(dabs);
+            // brush--bristle-depletion 레인만 v1 강모 고갈 다이내믹을 켠다(갈필),
+            // brush--impasto-relief 레인만 dli GGX 릴리프 오버레이 프로그램을 켠다. 옵션이 없는
+            // 다른 모든 유화 브러시는 캐리어 계약상 바이트 동일 플랜을 유지하며, SVG 내보내기의
+            // 유화 분기와 입력(대브·시드)이 같아 두 렌더러가 픽셀 일치한다.
+            const carrier = brush === "brush--bristle-depletion"
+              ? planStudioOilRibbonCarrier(dabs, {
+                  bristleLoadDynamics: {
+                    enabled: true,
+                    seed: fxBrushSeedFromKey(el.id),
+                  },
+                })
+              : brush === "brush--impasto-relief"
+                ? planStudioOilRibbonCarrier(dabs, {
+                    impastoRelief: { enabled: true },
+                  })
+                : planStudioOilRibbonCarrier(dabs);
             return (
               <Shape
                 key={index}
@@ -2145,6 +2167,29 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                       traceStudioOilRibbonPath(context, run);
                     }
                     context.stroke();
+                  }
+                  // brush--impasto-relief 전용 dli GGX 릴리프 오버레이. 플랜이 담을 때만 존재하며
+                  // SVG 직렬화와 동일한 페인트 계약을 쓴다 — 하이라이트는 공유 상수 화이트를
+                  // screen으로, 섀도우는 스트로크 색을 multiply로, 레인당 정확히 한 번 stroke.
+                  if (carrier.impastoReliefLanes) {
+                    context.lineCap = "round";
+                    for (const lane of carrier.impastoReliefLanes) {
+                      const highlight = lane.kind === "highlight";
+                      context.globalCompositeOperation = highlight ? "screen" : "multiply";
+                      context.strokeStyle = highlight
+                        ? STUDIO_OIL_IMPASTO_RELIEF_HIGHLIGHT_COLOR
+                        : stroke;
+                      context.globalAlpha = Math.min(
+                        1,
+                        Math.max(0, lane.opacity * opacity),
+                      );
+                      context.lineWidth = Math.max(0.12, lane.lineWidth);
+                      context.beginPath();
+                      for (const run of lane.runs) {
+                        traceStudioOilRibbonPath(context, run);
+                      }
+                      context.stroke();
+                    }
                   }
                   context.restore();
                 }}

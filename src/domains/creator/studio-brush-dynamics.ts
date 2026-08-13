@@ -14,7 +14,10 @@
  * collaboration replay and export all reproduce the same stroke.
  */
 
-import { resolveStudioBrushEngineLaneDynamicsPresetId } from "./studio-brush-engine-lane-catalog";
+import {
+  resolveStudioBrushEngineLaneColorPigmentTuning,
+  resolveStudioBrushEngineLaneDynamicsPresetId,
+} from "./studio-brush-engine-lane-catalog";
 import {
   normalizeStudioBrushColorDynamicsSettings,
   normalizeStudioBrushGrainSettings,
@@ -406,12 +409,25 @@ export function resolveStudioBrushDynamicsPresetId(
     || brushId === "web-neon-tube-core"
   ) return "airbrush";
   if (
+    brushId === "ink-particle"
+    || brushId === "airbrush"
+    || brushId === "dry-media"
+  ) return brushId;
+  if (
+    brushId === "soft-brush"
+    || brushId === "spray"
+    || brushId === "splatter"
+  ) return "airbrush";
+  if (
     brushId === "crayon"
     || brushId === "chalk"
     || brushId === "charcoal"
     || brushId === "pastel"
     || brushId === "oil-pastel"
   ) return "dry-media";
+  if (typeof brushId === "string") {
+    return resolveStudioBrushEngineLaneDynamicsPresetId(brushId);
+  }
   return null;
 }
 
@@ -437,16 +453,19 @@ export function resolveStudioBrushDynamicsSelectionPresetId(
   brushId: unknown,
   brushDynamics: unknown,
 ): StudioBrushDynamicsPresetId | null {
-  const installed = resolveStudioBrushDynamicsPresetId(brushId);
-  if (installed) return installed;
-  if (
-    typeof brushId !== "string"
-    || typeof brushDynamics !== "object"
-    || brushDynamics === null
-  ) return null;
-  const depositPipeline = (brushDynamics as { depositPipeline?: unknown }).depositPipeline;
-  if (!isStudioDynamicBrushCausalDepositPipeline(depositPipeline)) return null;
-  return STUDIO_CAPTURED_WET_DYNAMIC_PRESET_BY_BRUSH_ID[brushId] ?? null;
+  if (isStudioBrushDynamicsPresetId(brushId)) return brushId;
+  if (typeof brushDynamics === "object" && brushDynamics !== null) {
+    const presetId = (brushDynamics as { presetId?: unknown }).presetId;
+    if (isStudioBrushDynamicsPresetId(presetId)) return presetId;
+    const depositPipeline = (brushDynamics as { depositPipeline?: unknown }).depositPipeline;
+    if (isStudioDynamicBrushCausalDepositPipeline(depositPipeline)) {
+      const wetPreset = typeof brushId === "string"
+        ? (STUDIO_CAPTURED_WET_DYNAMIC_PRESET_BY_BRUSH_ID[brushId as keyof typeof STUDIO_CAPTURED_WET_DYNAMIC_PRESET_BY_BRUSH_ID] as StudioBrushDynamicsPresetId | undefined)
+        : undefined;
+      return wetPreset ?? resolveStudioBrushDynamicsPresetId(brushId);
+    }
+  }
+  return null;
 }
 
 /** Persisted/render resolver; unlike the selection helper this requires the versioned paint seam. */
@@ -456,15 +475,16 @@ export function resolveStudioCapturedBrushDynamicsPresetId(input: Readonly<{
   paintModel?: unknown;
   watercolorPipeline?: unknown;
 }>): StudioBrushDynamicsPresetId | null {
-  const installed = resolveStudioBrushDynamicsPresetId(input.brush);
-  if (installed) return installed;
   if (
     input.paintModel !== "bounded-flow-v2"
     || (input.watercolorPipeline !== undefined && input.watercolorPipeline !== null)
   ) return null;
-  return resolveStudioBrushDynamicsSelectionPresetId(
-    input.brush,
-    input.brushDynamics,
+  if (isStudioBrushDynamicsPresetId(input.brush)) return input.brush;
+  return (
+    resolveStudioBrushDynamicsSelectionPresetId(
+      input.brush,
+      input.brushDynamics,
+    ) ?? resolveStudioBrushDynamicsPresetId(input.brush)
   );
 }
 
@@ -502,6 +522,11 @@ export interface NormalizedStudioBrushDynamicsSettings {
   version: typeof STUDIO_BRUSH_DYNAMICS_SETTINGS_VERSION;
   /** Omitted for legacy snapshots so their canonical serialization remains byte-stable. */
   depositPipeline?: StudioDynamicBrushDepositPipeline;
+  /**
+   * Installed preset identity carried by preset-derived snapshots so selection/render resolvers
+   * survive brush-id aliasing. Omitted for legacy snapshots to keep serialization byte-stable.
+   */
+  presetId?: StudioBrushDynamicsPresetId;
   /** Omitted for legacy v2 snapshots; malformed explicit pins fail normalization closed. */
   dryMediaUnionProgram?: StudioDryMediaUnionProgramPin;
   seed: number;
@@ -1202,6 +1227,9 @@ export function normalizeStudioBrushDynamicsSettings(value?: unknown): Normalize
       ? { depositPipeline: source.depositPipeline }
       : {}),
     ...(dryMediaUnionProgram ? { dryMediaUnionProgram } : {}),
+    ...(isStudioBrushDynamicsPresetId(source.presetId)
+      ? { presetId: source.presetId }
+      : {}),
     seed: uint32(source.seed, INTERNAL_DEFAULT_SETTINGS.seed),
     fallbackPressure: clamp01(finiteNumber(source.fallbackPressure, INTERNAL_DEFAULT_SETTINGS.fallbackPressure)),
     maxSpeed: clamp(finiteNumber(source.maxSpeed, INTERNAL_DEFAULT_SETTINGS.maxSpeed), 0.01, MAX_POINTER_SPEED),
@@ -1246,7 +1274,10 @@ export function studioBrushDynamicsPresetSettings(
 ): NormalizedStudioBrushDynamicsSettings {
   const preset = STUDIO_BRUSH_DYNAMICS_PRESETS.find((candidate) => candidate.id === id)
     ?? STUDIO_BRUSH_DYNAMICS_PRESETS[0]!;
-  return normalizeStudioBrushDynamicsSettings(preset.settings);
+  return normalizeStudioBrushDynamicsSettings({
+    presetId: preset.id,
+    ...preset.settings,
+  });
 }
 
 interface StudioBrushDynamicsVariant {
@@ -2990,13 +3021,14 @@ const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamic
         mappings: [{ source: "pressure", from: 0.52, to: 1, curve: 0.76 }],
         jitter: { mode: "multiply", amount: 0.05 },
       },
-      // Dense enough for continuous wax bed; anisotropic bridge owns the fibre tooth.
-      spacingRatio: 0.095,
+      // Continuous wax bed without packing ~2 dabs/sample (was 0.095 → freeze on long strokes).
+      // Anisotropic multi-lane bridge still owns fibre tooth at this spacing.
+      spacingRatio: 0.13,
       spacing: {
         mappings: [{ source: "speed", from: 0.92, to: 1.18 }],
         jitter: { mode: "multiply", amount: 0.04 },
       },
-      scatterRatio: 0.035,
+      scatterRatio: 0.05,
       scatter: {
         mappings: [{ source: "speed", from: 0.75, to: 1.12 }],
         jitter: { mode: "multiply", amount: 0.03 },
@@ -3323,6 +3355,20 @@ const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamic
   "oil-pastel--waxy-film": {
     presetId: "dry-media",
     overrides: { seed: 9109, tip: { shape: "bristle", softness: 0.35 }, spacingRatio: 0.1, scatterRatio: 0.04 },
+  },
+  // F3(2026-08-13): waxy-film과 같은 dry-media 물성 위에서 색 파이프라인만 다르다 — 카탈로그의
+  // spectral-wgm-v1 핀 + 종이톤 배경 + dab별 지터가 이 레인의 유일한 SSOT(값 중복 금지). 핀이
+  // colorDynamics 스냅샷에 실려 저장되므로 Canvas/SVG/협업 재생이 같은 혼합을 본다.
+  "oil-pastel--wgm-mix": {
+    presetId: "dry-media",
+    overrides: {
+      seed: 9137,
+      tip: { shape: "bristle", softness: 0.35 },
+      spacingRatio: 0.1,
+      scatterRatio: 0.04,
+      colorDynamics:
+        resolveStudioBrushEngineLaneColorPigmentTuning("oil-pastel--wgm-mix"),
+    },
   },
   "brush--dry-rake": {
     presetId: "dry-media",

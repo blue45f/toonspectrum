@@ -1566,7 +1566,7 @@ export function planStudioDynamicBrushCoverageMarks(
       const primaryMarkStart = marks.length;
       const primaryResult = appendTipDab(dab, dynamics.tip, 0, dabColor);
       if (primaryResult !== "ok") return { ok: false, reason: primaryResult };
-      if (marks.length === primaryMarkStart + 1) {
+      if (marks.length >= primaryMarkStart + 1) {
         visiblePrimaryDabs.push(dab);
         visiblePrimaryMarks.push(marks[primaryMarkStart]!);
       }

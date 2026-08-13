@@ -169,7 +169,12 @@ describe(`${CORE_BRUSH_CATALOG_COUNT}-preset brush catalog contract`, () => {
       );
       const previewKind = /data-studio-brush-preview-kind="([^"]+)"/.exec(previewHtml)?.[1];
 
-      expect(stampKind !== null, `${preset.id}: stamp route mismatch`).toBe(family === "stamp");
+      // 2026-08-13 brush quality wave: dry-stamp engine lanes keep their material family
+      // (dry-media/pastel) while executing on stamp-dabs, so the stamp route is pinned to the
+      // declared runtime engine rather than the presentation family.
+      expect(stampKind !== null, `${preset.id}: stamp route mismatch`).toBe(
+        runtime?.engine === "stamp-dabs"
+      );
       expect(dynamicsId !== null, `${preset.id}: dynamics route mismatch`).toBe(dynamicsFamily);
       expect(runtime, `${preset.id}: missing runtime contract`).toBeDefined();
       expect(runtime?.family, `${preset.id}: family contract drift`).toBe(family);

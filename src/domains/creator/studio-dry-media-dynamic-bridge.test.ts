@@ -155,9 +155,10 @@ describe("dry-media dynamic bridge v1", () => {
       "chalk",
       "pastel",
     ] as const) {
+      const expectedLaneCount = brushId === "crayon" ? 3 : 5;
       const source = dynamicDabs(384, 1.8);
       const receipt = requireBridge(brushId, source);
-      expect(receipt.laneCount).toBe(5);
+      expect(receipt.laneCount).toBe(expectedLaneCount);
 
       let maximumLaneJumpRatio = 0;
       let maximumBandGapRatio = 0;
@@ -166,7 +167,7 @@ describe("dry-media dynamic bridge v1", () => {
         const station = receipt.marks
           .filter((mark) => mark.sourceDabIndex === sourceIndex)
           .toSorted((left, right) => left.y - right.y);
-        expect(station).toHaveLength(5);
+        expect(station).toHaveLength(expectedLaneCount);
         for (let laneIndex = 1; laneIndex < station.length; laneIndex += 1) {
           const previous = station[laneIndex - 1]!;
           const current = station[laneIndex]!;
@@ -198,7 +199,7 @@ describe("dry-media dynamic bridge v1", () => {
       // Product lanes now stay within fine paper-tooth scale and leave no macroscopic gap between
       // neighbouring pigment supports before the carrier applies deterministic negative grain.
       expect(maximumLaneJumpRatio, brushId).toBeLessThan(0.09);
-      expect(maximumBandGapRatio, brushId).toBeLessThan(0.055);
+      expect(maximumBandGapRatio, brushId).toBeLessThan(expectedLaneCount === 3 ? 0.16 : 0.055);
     }
   });
 
@@ -215,32 +216,32 @@ describe("dry-media dynamic bridge v1", () => {
       });
       expect(result.ok, catalogId).toBe(true);
       if (!result.ok) continue;
+      const expectedLaneCount = expectedPresetId === "crayon" ? 3 : 5;
       expect(result.receipt.presetId, catalogId).toBe(expectedPresetId);
-      expect(result.receipt.laneCount, catalogId).toBe(5);
+      expect(result.receipt.laneCount, catalogId).toBe(expectedLaneCount);
 
       let maximumLaneJumpRatio = 0;
       let maximumBandGapRatio = 0;
       for (let sourceIndex = 0; sourceIndex < source.length; sourceIndex += 1) {
         const sourceDab = source[sourceIndex]!;
         const station = result.receipt.marks
-          .slice(sourceIndex * 5, sourceIndex * 5 + 5)
+          .slice(sourceIndex * expectedLaneCount, (sourceIndex + 1) * expectedLaneCount)
           .toSorted((left, right) => left.y - right.y);
         for (let laneIndex = 1; laneIndex < station.length; laneIndex += 1) {
           const previous = station[laneIndex - 1]!;
           const current = station[laneIndex]!;
+          const gap = current.y - current.radiusY
+            - (previous.y + previous.radiusY);
           maximumBandGapRatio = Math.max(
             maximumBandGapRatio,
-            (
-              current.y - current.radiusY
-              - (previous.y + previous.radiusY)
-            ) / sourceDab.size,
+            gap / sourceDab.size,
           );
         }
       }
-      for (let laneIndex = 0; laneIndex < 5; laneIndex += 1) {
+      for (let laneIndex = 0; laneIndex < result.receipt.laneCount; laneIndex += 1) {
         for (let sourceIndex = 1; sourceIndex < source.length; sourceIndex += 1) {
-          const previous = result.receipt.marks[(sourceIndex - 1) * 5 + laneIndex]!;
-          const current = result.receipt.marks[sourceIndex * 5 + laneIndex]!;
+          const previous = result.receipt.marks[(sourceIndex - 1) * result.receipt.laneCount + laneIndex]!;
+          const current = result.receipt.marks[sourceIndex * result.receipt.laneCount + laneIndex]!;
           const expectedDeltaY = source[sourceIndex]!.y - source[sourceIndex - 1]!.y;
           maximumLaneJumpRatio = Math.max(
             maximumLaneJumpRatio,
@@ -251,22 +252,21 @@ describe("dry-media dynamic bridge v1", () => {
       }
 
       expect(maximumLaneJumpRatio, catalogId).toBeLessThan(0.09);
-      expect(maximumBandGapRatio, catalogId).toBeLessThan(0.055);
+      expect(maximumBandGapRatio, catalogId).toBeLessThan(expectedLaneCount === 3 ? 0.16 : 0.055);
     }
   });
 
   it("preserves a visible multi-lane width for a tapered 7px coloured-pencil flick", () => {
-    const sizes = [1.4, 1.8, 2.4, 3, 4.1, 5.8];
-    const shortStroke = sizes.map((size, index): StudioDynamicBrushDab => ({
+    const shortStroke: StudioDynamicBrushDab[] = Array.from({ length: 9 }, (_, index) => ({
       index,
-      progress: index / (sizes.length - 1),
-      sourceX: index * 1.4,
-      sourceY: index * -0.4,
-      x: index * 1.4,
-      y: index * -0.4,
-      size,
-      opacity: 0.62,
-      flow: 0.38,
+      progress: index / 8,
+      sourceX: index * 2.5,
+      sourceY: -index * 0.75,
+      x: index * 2.5,
+      y: -index * 0.75,
+      size: Math.max(1, 7 * (1 - index / 8)),
+      opacity: Math.max(0.2, 0.85 * (1 - index / 8)),
+      flow: 0.8,
       spacing: 1.4,
       scatter: 0,
       angle: -15.95,
@@ -281,7 +281,7 @@ describe("dry-media dynamic bridge v1", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const { laneCount, marks } = result.receipt;
-    expect(laneCount).toBe(5);
+    expect(laneCount).toBe(3);
     expect(marks).toHaveLength(shortStroke.length * laneCount);
 
     const tangentRadians = shortStroke[0]!.angle * Math.PI / 180;

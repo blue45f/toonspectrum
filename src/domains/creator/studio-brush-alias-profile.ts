@@ -13,6 +13,10 @@
  */
 
 import { resolveStudioBrushEngineLaneWatercolorMaterial } from "./studio-brush-engine-lane-catalog";
+import {
+  augmentStudioWetEdgeBloomDabs,
+  resolveStudioWetEdgeBloomProgram,
+} from "./studio-wet-edge-bloom-v1";
 
 export const STUDIO_BRUSH_ALIAS_PROFILE_VERSION = "brush-alias-profile-v1" as const;
 
@@ -704,17 +708,25 @@ export interface StudioBrushAliasWatercolorDab {
   readonly role: "core" | "diffuse";
 }
 
-/** Applies material-only radius/pigment differences without moving deterministic dab centres. */
+/**
+ * Applies material-only radius/pigment differences without moving deterministic dab centres.
+ *
+ * `seed` is the stroke-stable watercolor seed (`watercolorBrushSeedFromKey(element.id)`); it is
+ * consumed only when the lane material declares a wet-edge-bloom program, so every lane without a
+ * program id — including all pre-wave lanes — returns exactly the scaled dabs as before
+ * (2026-08-13 brush quality wave).
+ */
 export function applyStudioBrushAliasWatercolorMaterial(
   brushId: unknown,
-  dabs: readonly StudioBrushAliasWatercolorDab[]
+  dabs: readonly StudioBrushAliasWatercolorDab[],
+  seed?: number,
 ): readonly StudioBrushAliasWatercolorDab[] {
-  const material = resolveStudioBrushAliasProfile(brushId)?.watercolor
-    ?? (typeof brushId === "string"
-      ? resolveStudioBrushEngineLaneWatercolorMaterial(brushId)
-      : null);
+  const laneMaterial = typeof brushId === "string"
+    ? resolveStudioBrushEngineLaneWatercolorMaterial(brushId)
+    : null;
+  const material = resolveStudioBrushAliasProfile(brushId)?.watercolor ?? laneMaterial;
   if (!material) return dabs;
-  return dabs.map((dab) => {
+  const scaledDabs = dabs.map((dab) => {
     const core = dab.role === "core";
     return {
       ...dab,
@@ -731,6 +743,13 @@ export function applyStudioBrushAliasWatercolorMaterial(
       ),
     };
   });
+  // Opt-in wet-texture physics (coffee ring / granulation / chromatography / fresh-ink wetness):
+  // only engine lanes whose material row carries a program id ever reach the augment pass.
+  const wetEdgeBloomProgram = resolveStudioWetEdgeBloomProgram(
+    laneMaterial?.wetEdgeBloomProgramId
+  );
+  if (!wetEdgeBloomProgram) return scaledDabs;
+  return augmentStudioWetEdgeBloomDabs(scaledDabs, { ...wetEdgeBloomProgram, seed });
 }
 
 /** Empty for non-pencil families; returned profiles are immutable catalogue constants. */

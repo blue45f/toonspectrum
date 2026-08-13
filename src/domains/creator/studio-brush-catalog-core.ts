@@ -46,6 +46,8 @@ const STUDIO_CORE_ERASE_BRUSH_COUNT = STUDIO_CORE_BRUSH_CATALOG_ITEMS.filter(
  * - `paint` = every selectable pen/tool in the paint library
  * - historical "229 paint" was core 71 − 2 erase + pro 160 before web-kit core expansion
  * - historical core 99 grew with engine-lane variants (`oil--filbert-ribbon`, …)
+ * - 2026-08-13 brush quality wave: core 137 → 148 (total 297 → 308) with 11 new engine lanes
+ *   (dry-stamp ×4, wet-texture ×4, oil/impasto ×3)
  */
 export const STUDIO_BRUSH_CATALOG_COUNTS = Object.freeze({
   core: STUDIO_CORE_BRUSH_CATALOG_ITEMS.length,

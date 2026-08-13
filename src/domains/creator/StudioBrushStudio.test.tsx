@@ -104,6 +104,12 @@ describe("StudioBrushStudio", () => {
       <StudioBrushStudio
         {...props({
           brushId: "pen",
+          settings: normalizeStudioBrushDynamicsSettings(),
+          currentSnapshot: {
+            ...DEFAULT_STUDIO_BRUSH_SNAPSHOT,
+            brushId: "pen",
+            brushDynamics: normalizeStudioBrushDynamicsSettings(),
+          },
           onSelectDynamicsPreset,
         })}
       />,
@@ -297,7 +303,18 @@ describe("StudioBrushStudio", () => {
 
   it("uses a 44px-or-larger launcher in touch density and summarizes calligraphy", () => {
     const html = renderToStaticMarkup(
-      <StudioBrushStudio {...props({ brushId: "calligraphy", density: "touch" })} />
+      <StudioBrushStudio {...props({
+        brushId: "calligraphy",
+        density: "touch",
+        tipAngle: -30,
+        tipRoundness: 0.24,
+        settings: normalizeStudioBrushDynamicsSettings(),
+        currentSnapshot: {
+          ...DEFAULT_STUDIO_BRUSH_SNAPSHOT,
+          brushId: "calligraphy",
+          brushDynamics: normalizeStudioBrushDynamicsSettings(),
+        },
+      })} />
     );
     expect(html).toContain("min-h-14");
     expect(html).toContain("촉 -30° · 원형도 24%");

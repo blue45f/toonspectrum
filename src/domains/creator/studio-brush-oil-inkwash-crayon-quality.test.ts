@@ -178,7 +178,7 @@ describe("oil / ink-wash / crayon competitive material quality", () => {
       .toBeGreaterThan(mean(lightDabs.map((dab) => dab.opacity * dab.flow)) * 1.15);
 
     const identity = resolveStudioDynamicBrushMaterialIdentity("crayon")!;
-    expect(studioDryMediaDynamicBridgeMarkMultiplier(identity)).toBe(5);
+    expect(studioDryMediaDynamicBridgeMarkMultiplier(identity)).toBe(3);
     const bridged = bridgeStudioDynamicDabsToDryMediaV1({
       brushId: "crayon",
       seed: dynamics.seed,
@@ -186,7 +186,7 @@ describe("oil / ink-wash / crayon competitive material quality", () => {
     });
     expect(bridged.ok).toBe(true);
     if (!bridged.ok) return;
-    expect(bridged.receipt.laneCount).toBe(5);
+    expect(bridged.receipt.laneCount).toBe(3);
     expect(bridged.receipt.marks.every((mark) => (
       mark.shape === "wax-ribbon"
       && mark.radiusX / mark.radiusY >= preset.minimumAspectRatio - 1e-8
@@ -226,8 +226,8 @@ describe("oil / ink-wash / crayon competitive material quality", () => {
   });
 
   it("charges crayon multi-lane expansion at budget admission time (not all-or-nothing later)", () => {
-    const identity = resolveStudioDynamicBrushMaterialIdentity("crayon");
-    expect(studioDryMediaDynamicBridgeMarkMultiplier(identity)).toBe(5);
+    const identity = resolveStudioDynamicBrushMaterialIdentity("crayon")!;
+    expect(studioDryMediaDynamicBridgeMarkMultiplier(identity)).toBe(3);
     expect(studioDryMediaDynamicBridgeMarkMultiplier(null)).toBe(1);
     expect(
       studioDryMediaDynamicBridgeMarkMultiplier(

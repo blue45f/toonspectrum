@@ -359,6 +359,7 @@ describe("sanitizeBrushSnapshot", () => {
 
   it("키 순서가 달라도 이미 정규화된 동역학은 보정된 것으로 표시하지 않는다", () => {
     const reordered = {
+      presetId: validSnapshot.brushDynamics.presetId,
       tipLayers: validSnapshot.brushDynamics.tipLayers,
       grain: validSnapshot.brushDynamics.grain,
       colorDynamics: validSnapshot.brushDynamics.colorDynamics,

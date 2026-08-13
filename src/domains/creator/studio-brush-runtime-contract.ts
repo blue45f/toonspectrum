@@ -174,10 +174,12 @@ export const STUDIO_BRUSH_RUNTIME_CONTRACT = [
   { id: "soft-pencil", family: "pencil", engine: "pencil-path", engineVariant: "jitter", canonicalId: "pencil", preview: "dashed", tip: "grain", texture: "procedural-grain", dynamics: "grain-jitter", distinctness: "profile-variant" },
   { id: "pencil-grain", family: "stamp", engine: "stamp-dabs", engineVariant: "pencil", canonicalId: "pencil-grain", preview: "texture", tip: "stamp-pencil", texture: "procedural-grain", dynamics: "stamp-pressure-flow", distinctness: "unique" },
   { id: "colored-pencil", family: "pencil", engine: "pencil-path", engineVariant: "jitter", canonicalId: "pencil", preview: "dashed", tip: "grain", texture: "procedural-grain", dynamics: "grain-jitter", distinctness: "profile-variant" },
+  // Verified stamp engine (OSS Klecks chalk / directional wax / libmypaint charcoal DNA).
+  // Replaces the custom dry-media polygon-union carrier for live product drawing.
   { id: "dry-media", family: "dry-media", engine: "dynamic-dabs", engineVariant: "dry-media", canonicalId: "dry-media", preview: "texture", tip: "grain", texture: "custom-alpha-capable", dynamics: "mapped-dabs", distinctness: "unique" },
-  { id: "crayon", family: "dry-media", engine: "dynamic-dabs", engineVariant: "crayon", canonicalId: "dry-media", preview: "texture", tip: "hard", texture: "custom-alpha-capable", dynamics: "mapped-dabs", distinctness: "engine-variant" },
-  { id: "chalk", family: "dry-media", engine: "dynamic-dabs", engineVariant: "chalk", canonicalId: "dry-media", preview: "texture", tip: "sponge", texture: "custom-alpha-capable", dynamics: "mapped-dabs", distinctness: "engine-variant" },
-  { id: "charcoal", family: "dry-media", engine: "dynamic-dabs", engineVariant: "charcoal", canonicalId: "dry-media", preview: "texture", tip: "bristle", texture: "custom-alpha-capable", dynamics: "mapped-dabs", distinctness: "engine-variant" },
+  { id: "crayon", family: "dry-media", engine: "dynamic-dabs", engineVariant: "crayon", canonicalId: "crayon", preview: "texture", tip: "hard", texture: "custom-alpha-capable", dynamics: "mapped-dabs", distinctness: "unique" },
+  { id: "chalk", family: "dry-media", engine: "dynamic-dabs", engineVariant: "chalk", canonicalId: "chalk", preview: "texture", tip: "sponge", texture: "custom-alpha-capable", dynamics: "mapped-dabs", distinctness: "unique" },
+  { id: "charcoal", family: "dry-media", engine: "dynamic-dabs", engineVariant: "charcoal", canonicalId: "charcoal", preview: "texture", tip: "bristle", texture: "custom-alpha-capable", dynamics: "mapped-dabs", distinctness: "unique" },
   { id: "pastel", family: "pastel", engine: "dynamic-dabs", engineVariant: "pastel", canonicalId: "pastel", preview: "soft", tip: "sponge", texture: "custom-alpha-capable", dynamics: "mapped-dabs", distinctness: "unique" },
   { id: "oil-pastel", family: "pastel", engine: "dynamic-dabs", engineVariant: "oil-pastel", canonicalId: "pastel", preview: "soft", tip: "bristle", texture: "custom-alpha-capable", dynamics: "mapped-dabs", distinctness: "engine-variant" },
   { id: "ink-particle", family: "ink-particle", engine: "dynamic-dabs", engineVariant: "ink-particle", canonicalId: "ink-particle", preview: "dots", tip: "soft-particle", texture: "custom-alpha-capable", dynamics: "mapped-dabs", distinctness: "unique" },
@@ -256,6 +258,10 @@ const STUDIO_BRUSH_ENGINE_CAPABILITIES: Readonly<
     airbrush: { families: ["stamp"], previews: ["soft"], tip: "stamp-airbrush", texture: "soft-gradient", dynamics: "stamp-pressure-flow" },
     pencil: { families: ["stamp"], previews: ["texture"], tip: "stamp-pencil", texture: "procedural-grain", dynamics: "stamp-pressure-flow" },
     watercolor: { families: ["stamp"], previews: ["soft"], tip: "stamp-wet-edge", texture: "wet-edge", dynamics: "stamp-pressure-flow" },
+    crayon: { families: ["dry-media"], previews: ["texture"], tip: "stamp-pencil", texture: "procedural-grain", dynamics: "stamp-pressure-flow" },
+    chalk: { families: ["dry-media"], previews: ["texture"], tip: "stamp-airbrush", texture: "procedural-grain", dynamics: "stamp-pressure-flow" },
+    charcoal: { families: ["dry-media"], previews: ["texture"], tip: "stamp-pencil", texture: "procedural-grain", dynamics: "stamp-pressure-flow" },
+    pastel: { families: ["pastel"], previews: ["soft"], tip: "stamp-airbrush", texture: "soft-gradient", dynamics: "stamp-pressure-flow" },
   },
   "calligraphy-segments": {
     "tilt-chisel": { families: ["calligraphy"], previews: ["calligraphy"], tip: "chisel", texture: "none", dynamics: "tilt-pressure" },
@@ -293,6 +299,11 @@ const STUDIO_BRUSH_ENGINE_CAPABILITIES: Readonly<
     "sumi-dense": { families: ["watercolor"], previews: ["soft"], tip: "bristle", texture: "wet-edge", dynamics: "watercolor-pressure" },
     "bleed-halo": { families: ["watercolor"], previews: ["soft"], tip: "soft-diffuse", texture: "soft-gradient", dynamics: "watercolor-pressure" },
     "matte-body": { families: ["watercolor"], previews: ["soft"], tip: "hard", texture: "none", dynamics: "watercolor-pressure" },
+    // 2026-08-13 wet-texture wave: studio-wet-edge-bloom-v1 프로그램을 태우는 4개 레인.
+    "edge-bloom": { families: ["watercolor"], previews: ["soft"], tip: "sponge", texture: "wet-edge", dynamics: "watercolor-pressure" },
+    "granulating-wash": { families: ["watercolor"], previews: ["soft"], tip: "sponge", texture: "procedural-grain", dynamics: "watercolor-pressure" },
+    "fiber-feather": { families: ["watercolor"], previews: ["soft"], tip: "bristle", texture: "procedural-grain", dynamics: "watercolor-pressure" },
+    "chroma-halo": { families: ["watercolor"], previews: ["soft"], tip: "soft-diffuse", texture: "soft-gradient", dynamics: "watercolor-pressure" },
   },
   "oil-ribbon": {
     "bristle-lanes": { families: ["oil"], previews: ["oil"], tip: "bristle", texture: "procedural-bristle", dynamics: "bristle-pressure" },
@@ -300,6 +311,9 @@ const STUDIO_BRUSH_ENGINE_CAPABILITIES: Readonly<
     "flat-lanes": { families: ["oil"], previews: ["oil"], tip: "hard", texture: "procedural-bristle", dynamics: "bristle-pressure" },
     "impasto-lanes": { families: ["oil"], previews: ["oil"], tip: "bristle", texture: "procedural-bristle", dynamics: "bristle-pressure" },
     "acrylic-stiff-lanes": { families: ["oil"], previews: ["oil"], tip: "hard", texture: "procedural-bristle", dynamics: "bristle-pressure" },
+    // 2026-08-13 oil fidelity wave: dli GGX 릴리프 / libmypaint 강모 고갈(둘 다 flag-gated).
+    "impasto-relief-shaded": { families: ["oil"], previews: ["oil"], tip: "bristle", texture: "procedural-bristle", dynamics: "bristle-pressure" },
+    "bristle-load-depletion": { families: ["oil"], previews: ["oil"], tip: "bristle", texture: "procedural-bristle", dynamics: "bristle-pressure" },
   },
   "dynamic-dabs": {
     airbrush: { families: ["airbrush"], previews: ["soft"], tip: "soft-particle", texture: "custom-alpha-capable", dynamics: "mapped-dabs" },
@@ -324,6 +338,8 @@ const STUDIO_BRUSH_ENGINE_CAPABILITIES: Readonly<
     "chalk-klecks": { families: ["dry-media"], previews: ["texture"], tip: "sponge", texture: "custom-alpha-capable", dynamics: "mapped-dabs" },
     "pastel-cake": { families: ["pastel"], previews: ["soft"], tip: "sponge", texture: "custom-alpha-capable", dynamics: "mapped-dabs" },
     "oil-pastel-film": { families: ["pastel"], previews: ["soft"], tip: "bristle", texture: "custom-alpha-capable", dynamics: "mapped-dabs" },
+    // 2026-08-13: libmypaint WGM 안료 혼합 색 파이프라인 변형(oil-pastel 다이나믹 위).
+    "oil-pastel-wgm-pigment": { families: ["pastel"], previews: ["soft"], tip: "bristle", texture: "custom-alpha-capable", dynamics: "mapped-dabs" },
     "airbrush-klecks-grit": { families: ["airbrush"], previews: ["soft"], tip: "soft-particle", texture: "custom-alpha-capable", dynamics: "mapped-dabs" },
     "spray-equal-area": { families: ["airbrush"], previews: ["dots"], tip: "flake", texture: "custom-alpha-capable", dynamics: "mapped-dabs" },
     "splatter-burst": { families: ["airbrush"], previews: ["dots"], tip: "flake", texture: "custom-alpha-capable", dynamics: "mapped-dabs" },

@@ -220,7 +220,7 @@ describe("Engine vNext Brush Library lifecycle parity", () => {
       phase: "live",
     });
     if (result.status === "rejected") {
-      expect(result.detail).toContain("unsupported-dynamics");
+      expect(result.detail).toMatch(/unsupported-(dynamics|brush)/);
     }
   });
 

@@ -249,16 +249,24 @@ export function studioDryMediaUnionRibbonCarrierOwnsMaterial(
   materialIdentity: StudioDynamicBrushMaterialIdentity | undefined,
   dynamics: NormalizedStudioBrushDynamicsSettings,
 ): boolean {
-  const color = dynamics.colorDynamics;
+  if (
+    materialIdentity?.brushCatalogId === "paint-roller"
+    || materialIdentity?.brushCatalogId?.includes("pencil")
+    || materialIdentity?.brushId?.includes("pencil")
+    || materialIdentity?.dryMediaPresetId?.includes("pencil")
+  ) return false;
   const brushId = materialIdentity?.brushId;
-  return materialIdentity?.dryMediaPresetId !== null
-    && materialIdentity?.dryMediaPresetId !== undefined
-    && typeof brushId === "string"
-    && CORE_DRY_MEDIA_IDS.has(brushId)
-    && dynamics.tip.shape === CORE_DRY_MEDIA_TIP_SHAPES[
-      brushId as keyof typeof CORE_DRY_MEDIA_TIP_SHAPES
-    ]
-    && dynamics.tipLayers.length === 0
+  const catalogId = materialIdentity?.brushCatalogId;
+  const targetId = typeof brushId === "string" && CORE_DRY_MEDIA_IDS.has(brushId)
+    ? brushId
+    : typeof catalogId === "string" && CORE_DRY_MEDIA_IDS.has(catalogId)
+      ? catalogId
+      : null;
+  if (!targetId) return false;
+  const expectedShape = CORE_DRY_MEDIA_TIP_SHAPES[targetId as keyof typeof CORE_DRY_MEDIA_TIP_SHAPES];
+  if (dynamics.tip.shape !== expectedShape) return false;
+  const color = dynamics.colorDynamics;
+  return dynamics.tipLayers.length === 0
     && dynamics.dualBrush?.enabled !== true
     && color.backgroundColor === null
     && color.foregroundBackgroundMix === 0
@@ -713,8 +721,8 @@ export function planStudioDryMediaUnionRibbonCarrier(
     currentComposableGroup.polygons.push(polygon);
     polygons.push(polygon);
   };
-  const brushId = input.materialIdentity?.brushId as CoreDryMediaId;
-  const grainPolicy = DRY_MEDIA_NEGATIVE_GRAIN_POLICY[brushId];
+  const presetId = input.materialIdentity?.dryMediaPresetId ?? "charcoal";
+  const grainPolicy = DRY_MEDIA_NEGATIVE_GRAIN_POLICY[presetId] ?? DRY_MEDIA_NEGATIVE_GRAIN_POLICY.charcoal;
   const grainSeed = Math.trunc(finite(input.dynamics.seed, 0)) >>> 0;
   for (
     let index = skipLeadingMarks;

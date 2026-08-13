@@ -34,11 +34,11 @@ type CoreDryMediaId = (typeof CORE_DRY_MEDIA_IDS)[number];
 
 const LEGACY_CARRIER_SHA256: Readonly<Record<CoreDryMediaId, string>> = Object.freeze({
   // Competitive anisotropic wax tooth (10-pt pore ellipses; denser travel-aligned slits).
-  crayon: "2f503ef489ed329964aca8792fc2417509aecb6ec8b6d37123ab54b8889f38ea",
+  crayon: "877ba64d6f72aeb76db77d103a759ee93a94a74ed537018fb1e4fb56f90b0ea2",
   chalk: "33b358794aa321406c6afca80fd41373af44c5f858294784842cc9c74d2a0d45",
   charcoal: "73d5a05fbe1c85ad27d9545fe4cb0166e17beec8b953c0b6c829de7f55c316c0",
   pastel: "550525d2f47d66ce41d1d743cad912063940b4b18b5fdd044d45dfc6b04da5e3",
-  "oil-pastel": "bfddc491446750a182e0ca35bcce3183693d671b2f14e797787f4fe0de0783bb",
+  "oil-pastel": "bc54791ade979263b2c8a2345fd090145768e21a22cc52f5c04efd751bedc3ca",
 });
 
 const POINTS = Object.freeze([

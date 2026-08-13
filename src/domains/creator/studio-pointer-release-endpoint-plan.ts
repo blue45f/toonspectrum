@@ -9,7 +9,10 @@
 import {
   normalizeCalligraphyStylusInput,
 } from "./studio-brush";
-import { resolveStudioCapturedBrushDynamicsPresetId } from "./studio-brush-dynamics";
+import {
+  resolveStudioBrushDynamicsPresetId,
+  resolveStudioCapturedBrushDynamicsPresetId,
+} from "./studio-brush-dynamics";
 import { resolveStudioBrushReleasePressure } from "./studio-brush-velocity-pressure";
 import { studioInkFallbackPressure } from "./studio-ink-pressure-model";
 import { normalizeStudioPersistedPointerChannels } from "./studio-persisted-pointer-channels";
@@ -89,7 +92,8 @@ export function planStudioPointerReleaseEndpoint(
       })
     : lastPressure;
   const capturePointerDynamics =
-    stroke.mode === "pen" && resolveStudioCapturedBrushDynamicsPresetId(stroke) !== null;
+    stroke.mode === "pen"
+    && (resolveStudioBrushDynamicsPresetId(stroke.brush) !== null || resolveStudioCapturedBrushDynamicsPresetId(stroke) !== null);
   const captureInkSensorChannels =
     stroke.mode === "pen" && stroke.inkInput !== undefined;
   const captureExtendedInkSensorChannels =

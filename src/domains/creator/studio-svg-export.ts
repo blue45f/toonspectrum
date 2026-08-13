@@ -51,6 +51,7 @@ import {
   isStudioDynamicBrushCausalDepositPipeline,
   normalizeStudioBrushDynamicsSettings,
   planStudioDynamicBrushDabs,
+  resolveStudioBrushDynamicsPresetId,
   resolveStudioCapturedBrushDynamicsPresetId,
   studioDynamicBrushDepositPipelineUsesContinuation,
   studioBrushDynamicsSettingsForBrushId,
@@ -196,6 +197,8 @@ import {
 } from "./studio-material-pressure-model";
 import {
   planStudioOilRibbonCarrier,
+  STUDIO_OIL_IMPASTO_RELIEF_HIGHLIGHT_COLOR,
+  STUDIO_OIL_IMPASTO_RELIEF_OVERLAY_VERSION,
   studioOilRibbonPathData,
 } from "./studio-oil-ribbon-carrier";
 import {
@@ -1023,9 +1026,11 @@ function serializeStudioDynamicCoverageMark(
   );
   const angleDegrees = mark.angleRadians * 180 / Math.PI;
   const transform = `rotate(${fmtCoverageNumber(angleDegrees)} ${fmtCoverageNumber(mark.x)} ${fmtCoverageNumber(mark.y)})`;
-  const materialAttributes = materialIdentity?.dryMediaPresetId === "pastel"
+  const materialAttributes = materialIdentity
     ? (
-        ` data-brush-carrier="soft-pigment-fiber"`
+        (materialIdentity.dryMediaPresetId === "pastel"
+          ? ` data-brush-carrier="soft-pigment-fiber"`
+          : "")
         + ` data-brush-material="${escapeXml(materialIdentity.brushId)}"`
       )
     : "";
@@ -1158,10 +1163,16 @@ function serializeStudioDynamicCoverageMark(
     );
   }
 
+  // 솔리드 타원 커버리지도 리본·알파맵·해석적 falloff 분기와 같은 재질 주석을 남긴다 —
+  // data-brush-material/data-brush-carrier는 내보낸 문서에서 질감 정체성을 추적하는
+  // 시맨틱 메타데이터라 지오메트리가 가장 단순한 분기에서도 생략하지 않는다.
+  // 위치 계약: 재질 속성은 ry 뒤에 둔다. Canvas↔SVG 교차 검증 파서는
+  // `data-brush-coverage="ellipse" cx=…` 인접성을 전제하므로 지오메트리 앞에 끼워 넣지 않는다.
   return (
-    `<ellipse data-brush-coverage="ellipse"${materialAttributes}`
+    `<ellipse data-brush-coverage="ellipse"`
       + ` cx="${fmtCoverageNumber(mark.x)}" cy="${fmtCoverageNumber(mark.y)}"`
       + ` rx="${fmtCoverageNumber(mark.radiusX)}" ry="${fmtCoverageNumber(mark.radiusY)}"`
+      + `${materialAttributes}`
       + ` fill="${escapeXml(mark.color)}" opacity="${fmtDabOpacity(opacity)}"`
       + ` transform="${transform}"/>`
   );
@@ -1174,6 +1185,7 @@ function serializeStudioDynamicCoverageMarks(
   boundedFlow: boolean,
   materialIdentity?: StudioDynamicBrushMaterialIdentity,
 ): string | null {
+  if (marks.length === 0) return null;
   const initialDefsLength = ctx.defs.length;
   const initialSequence = ctx.seq;
   const initialAssetKeys = new Set(ctx.brushTextureAssets.keys());
@@ -1624,7 +1636,7 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
 
   const variations = getSymmetricPoints(el.points, el.symmetry);
   const dynamicBrushId = kind === "freehand"
-    ? resolveStudioCapturedBrushDynamicsPresetId(el)
+    ? (resolveStudioCapturedBrushDynamicsPresetId(el) ?? resolveStudioBrushDynamicsPresetId(el.brush))
     : null;
   // Plan randomness exactly once in the original stroke coordinate space. Symmetry then transforms
   // the complete dab (source station, scatter offset and elliptical axis) just like Canvas does.
@@ -1849,6 +1861,12 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
             completeOffset = partitionEnd;
           }
           if (completeOffset !== completeCoverage.marks.length) {
+            // 리테인드 Canvas는 completeCoverage.marks를 그대로 그린다. 변주별 재계획은 그
+            // 마크 배열을 variation 경계로 자르기 위한 자 역할일 뿐이라, 두 계획의 총 마크
+            // 수가 어긋나면 결정성 어딘가가 이미 깨진 것이다. 그때 변주별 계획을 조용히
+            // 직렬화하면 SVG가 Canvas와 다른 지오메트리를 내보내므로(비등가 조용한 폴백 금지
+            // — studio-brush-backend-quality-policy의 cross-engine 폴백 계약과 동일 원칙)
+            // skip 영수증을 남기고 fail-closed 한다.
             dynamicPlanFailed = true;
             return null;
           }
@@ -2174,7 +2192,8 @@ function serializeFreehand(
 ): string {
   const brush = el.brush ?? "pen";
   const brushFamily = resolveStudioBrushRenderFamily(brush);
-  const dynamicsPresetId = resolveStudioCapturedBrushDynamicsPresetId(el);
+  const dynamicsPresetId = resolveStudioCapturedBrushDynamicsPresetId(el)
+    ?? resolveStudioBrushDynamicsPresetId(brush);
   const dynamicBrush = dynamicsPresetId !== null;
   const stampKind = resolveStudioStampBrushKind(brush);
   const renderSampleDistance = strokeRenderDistance(el.sampleSpacing);
@@ -2306,38 +2325,11 @@ function serializeFreehand(
     return `<circle cx="${fmt(points[0])}" cy="${fmt(points[1])}" r="${fmt(radius)}" fill="${escapeXml(stroke)}"${opacityAttr}/>`;
   }
 
-  if (stampKind) {
-    const style = resolveStudioStampBrushStyle(
-      stampKind,
-      { color: stroke, size: strokeWidth, opacity: strokeOpacity },
-      el.stamp,
-      brush,
-    );
-    // v2는 이미 수락·안정화된 append-only 입력이다. legacy만 과거 평활화/압력 재표본을 유지한다.
-    const causal = el.stampPipeline === "causal-walker-v2";
-    const stampPoints = causal
-      ? points
-      : resolveStudioFreehandRenderPath(points, {
-          sampleSpacing: el.sampleSpacing,
-          legacyMinDistance: renderSampleDistance,
-          legacyTension: 0,
-        }).points;
-    const sourceAligned = causal || stampPoints === points;
-    const stampPressures = sourceAligned
-      ? el.pressures
-      : resampleStrokePressures(
-          el.pressures ?? [],
-          Math.floor(stampPoints.length / 2),
-          0.5
-        );
-    return serializeStampBrushDabs(
-      ctx,
-      style,
-      planStudioStampBrushDabs(style, stampPoints, stampPressures)
-    );
-  }
-
-  if (dynamicBrush && dynamicsPresetId) {
+  if (
+    dynamicBrush &&
+    dynamicsPresetId &&
+    ((causalCoverageMarks !== undefined && causalCoverageMarks.length > 0) || (dynamicDabs !== undefined && dynamicDabs.length > 0))
+  ) {
     const normalizedDynamics = dynamics ?? normalizeStudioBrushDynamicsSettings(
       el.brushDynamics
         ?? studioBrushDynamicsSettingsForBrushId(brush)
@@ -2447,6 +2439,37 @@ function serializeFreehand(
       : `<g>${marks.join("")}</g>`;
   }
 
+  if (stampKind) {
+    const style = resolveStudioStampBrushStyle(
+      stampKind,
+      { color: stroke, size: strokeWidth, opacity: strokeOpacity },
+      el.stamp,
+      brush,
+    );
+    // v2는 이미 수락·안정화된 append-only 입력이다. legacy만 과거 평활화/압력 재표본을 유지한다.
+    const causal = el.stampPipeline === "causal-walker-v2";
+    const stampPoints = causal
+      ? points
+      : resolveStudioFreehandRenderPath(points, {
+          sampleSpacing: el.sampleSpacing,
+          legacyMinDistance: renderSampleDistance,
+          legacyTension: 0,
+        }).points;
+    const sourceAligned = causal || stampPoints === points;
+    const stampPressures = sourceAligned
+      ? el.pressures
+      : resampleStrokePressures(
+          el.pressures ?? [],
+          Math.floor(stampPoints.length / 2),
+          0.5
+        );
+    return serializeStampBrushDabs(
+      ctx,
+      style,
+      planStudioStampBrushDabs(style, stampPoints, stampPressures)
+    );
+  }
+
   const perfectProfile = resolveStudioPerfectFreehandProfile(brush);
   if (perfectProfile) {
     // perfect 잉크와 G펜 계열 — 캔버스와 같은 연속 가변 폭 아웃라인을 선 색으로 채운다.
@@ -2506,7 +2529,7 @@ function serializeFreehand(
           seed: watercolorSeed,
           maxDabs: DEFAULT_STUDIO_CAUSAL_WATERCOLOR_MAX_DABS,
         }, true);
-      const dabs = applyStudioBrushAliasWatercolorMaterial(brush, plannedDabs);
+      const dabs = applyStudioBrushAliasWatercolorMaterial(brush, plannedDabs, watercolorSeed);
       const wetRibbonPlan = planStudioWetRibbonCarrier(dabs, {
         seed: watercolorSeed,
       });
@@ -2527,7 +2550,7 @@ function serializeFreehand(
       seed: watercolorSeed,
       maxDabs: 512,
     });
-    const dabs = applyStudioBrushAliasWatercolorMaterial(brush, plannedDabs);
+    const dabs = applyStudioBrushAliasWatercolorMaterial(brush, plannedDabs, watercolorSeed);
     if (dabs.length === 0) return "";
     const diffuseId = nextId(ctx, "sw");
     ctx.defs.push(
@@ -2911,7 +2934,22 @@ function serializeFreehand(
       seed: fxBrushSeedFromKey(el.id),
       maxDabs: FX_OIL_DAB_CAP,
     });
-    const carrier = planStudioOilRibbonCarrier(dabs);
+    // brush--bristle-depletion 레인만 v1 강모 고갈 다이내믹을 켠다, brush--impasto-relief 레인만
+    // dli GGX 릴리프 오버레이 프로그램을 켠다 — Canvas 렌더러(StudioDrawNode)의 유화 분기와 동일
+    // 입력(대브·시드)이라 두 렌더러의 플랜이 일치한다. 옵션이 없는 다른 모든 유화 브러시는
+    // 캐리어 계약상 바이트 동일 플랜을 유지한다.
+    const carrier = brush === "brush--bristle-depletion"
+      ? planStudioOilRibbonCarrier(dabs, {
+          bristleLoadDynamics: {
+            enabled: true,
+            seed: fxBrushSeedFromKey(el.id),
+          },
+        })
+      : brush === "brush--impasto-relief"
+        ? planStudioOilRibbonCarrier(dabs, {
+            impastoRelief: { enabled: true },
+          })
+        : planStudioOilRibbonCarrier(dabs);
     if (!carrier.body) return "";
     const body = `<path data-paint-carrier="contiguous-variable-width-ribbon" d="${studioOilRibbonPathData(carrier.body, true)}" fill="${escapeXml(stroke)}" opacity="${fmtDabOpacity(carrier.bodyOpacity * strokeOpacity)}"/>`;
     // One <path> per load band, with every run of that band as a subpath: SVG paints a path once,
@@ -2919,7 +2957,13 @@ function serializeFreehand(
     const bristles = carrier.bristleLanes.map((lane) => (
       `<path data-paint-bristle-lane="true" d="${lane.runs.map((run) => studioOilRibbonPathData(run)).join("")}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(lane.lineWidth)}" stroke-linecap="butt" stroke-linejoin="round" opacity="${fmtDabOpacity(lane.opacity * strokeOpacity)}"/>`
     )).join("");
-    return `<g data-brush-engine="oil-ribbon-carrier-v1">${body}<g style="mix-blend-mode:multiply">${bristles}</g></g>`;
+    // brush--impasto-relief 오버레이 — Canvas sceneFunc과 같은 페인트 계약(하이라이트=공유 화이트
+    // 상수 screen, 섀도우=스트로크 색 multiply, 레인당 한 번 페인트). 플랜에 키가 없으면 빈
+    // 문자열이라 기존 유화 lane 직렬화 바이트가 그대로 유지된다.
+    const relief = (carrier.impastoReliefLanes ?? []).map((lane) => (
+      `<path data-paint-impasto-relief="${lane.kind}" d="${lane.runs.map((run) => studioOilRibbonPathData(run)).join("")}" fill="none" stroke="${lane.kind === "highlight" ? STUDIO_OIL_IMPASTO_RELIEF_HIGHLIGHT_COLOR : escapeXml(stroke)}" stroke-width="${fmt(lane.lineWidth)}" stroke-linecap="round" stroke-linejoin="round" opacity="${fmtDabOpacity(lane.opacity * strokeOpacity)}" style="mix-blend-mode:${lane.kind === "highlight" ? "screen" : "multiply"}"/>`
+    )).join("");
+    return `<g data-brush-engine="oil-ribbon-carrier-v1">${body}<g style="mix-blend-mode:multiply">${bristles}</g>${relief === "" ? "" : `<g data-brush-engine-overlay="${STUDIO_OIL_IMPASTO_RELIEF_OVERLAY_VERSION}">${relief}</g>`}</g>`;
   }
 
   if (brushFamily === "airbrush") {

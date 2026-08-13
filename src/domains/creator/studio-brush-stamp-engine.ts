@@ -15,9 +15,23 @@
 
 import { resolveStudioBrushEngineLaneStampTuning } from "./studio-brush-engine-lane-catalog";
 import {
+  studioOssDirectionalWaxSample,
+  studioOssKlecksChalkCoverage,
   studioOssSprayTipCoverage,
   studioOssWatercolorTipCoverage,
 } from "./studio-oss-brush-kernels";
+import {
+  getStudioPaperPresetV1,
+  isStudioPaperPresetIdV1,
+  resolveStudioPaperMediaModulationV1,
+} from "./studio-paper-media-profile-v1";
+
+import type { StudioBrushEngineLaneStampTuning } from "./studio-brush-engine-lane-catalog";
+import type {
+  StudioPaperMediumV1,
+  StudioPaperPresetIdV1,
+  StudioPaperPresetV1,
+} from "./studio-paper-media-profile-v1";
 
 export type StudioStampBrushKind =
   | "airbrush"
@@ -25,7 +39,12 @@ export type StudioStampBrushKind =
   | "ink"
   | "watercolor"
   | "mypaint"
-  | "krita-auto";
+  | "krita-auto"
+  /** Verified dry-media stamps (Klecks chalk / directional wax / libmypaint charcoal DNA). */
+  | "crayon"
+  | "chalk"
+  | "charcoal"
+  | "pastel";
 
 /**
  * One logical stamp stroke may be replayed from an imported/collaborative document. A finite cap
@@ -38,6 +57,7 @@ export const STUDIO_STAMP_BRUSH_MAX_DABS = 100_000;
 export function resolveStudioStampBrushKind(
   brushId: string | undefined
 ): StudioStampBrushKind | null {
+  if (!brushId) return null;
   switch (brushId) {
     case "ink-brush":
       return "ink";
@@ -62,9 +82,154 @@ export function resolveStudioStampBrushKind(
       return "airbrush";
     case "pencil--stamp-grain":
       return "pencil";
+    // 검증된 OSS 드라이 미디어 스탬프 레인(의도적 유사 변종). 코어 id(crayon/chalk/charcoal/
+    // pastel)는 dynamic-dabs 엔진 계약을 유지하고, `--*-stamp` 레인만 이 walker를 탄다 —
+    // 같은 재료라도 스탬프 beds 의 필기감(겹침 빌드업·왁스 골)이 달라 둘 다 제품 가치가 있다.
+    case "crayon--klecks-stamp":
+      return "crayon";
+    case "chalk--klecks-stamp":
+      return "chalk";
+    case "charcoal--mypaint-stamp":
+      return "charcoal";
+    case "pastel--soft-stamp":
+      return "pastel";
     default:
       return null;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Opt-in W7 paper tooth program — dry stamp lanes (2026-08-13 brush quality wave, F1)
+// ---------------------------------------------------------------------------
+
+/**
+ * 카탈로그 스탬프 튜닝이 레인별로 핀하는 종이 프로그램 id.
+ * wetEdgeBloomProgramId 와 같은 규약: 프로그램 id 가 없는 레인의 dab 계획은 종이 배선
+ * 이전과 비트 단위로 동일하다(회귀 테스트가 이 계약을 고정한다).
+ */
+export type StudioStampPaperProgramId = "dry-peak-catch-v1";
+
+export interface StudioStampPaperProgram {
+  /**
+   * 프로그램이 실제로 렌더하는 매체만 등재한다(레인 정직성 정책). 미등재 kind 로 프로그램을
+   * 핀해도 결합이 만들어지지 않아 정확한 항등으로 fail-closed 한다.
+   */
+  readonly mediumByKind: Readonly<
+    Partial<Record<StudioStampBrushKind, StudioPaperMediumV1>>
+  >;
+  /** 레인이 종이를 고정하지 않았을 때의 기본 낱장 — W7 기본 지도에서 유도한 값. */
+  readonly defaultPresetIdByKind: Readonly<
+    Partial<Record<StudioStampBrushKind, StudioPaperPresetIdV1>>
+  >;
+}
+
+/**
+ * dry-peak-catch-v1: W7 peak-catch(건식) — 저필압은 종이 봉우리에만 안료가 걸리고
+ * (드라이브러시 스파클), 고필압은 골까지 메운다. 기본 낱장은 크레용·초크·목탄이 판화지
+ * (깊은 알갱이 이빨), 파스텔이 켄트지(고운 미세 이빨)다.
+ */
+export const STUDIO_STAMP_PAPER_PROGRAMS: Readonly<
+  Record<StudioStampPaperProgramId, StudioStampPaperProgram>
+> = Object.freeze({
+  "dry-peak-catch-v1": Object.freeze({
+    mediumByKind: Object.freeze({
+      crayon: "crayon",
+      chalk: "chalk",
+      charcoal: "charcoal",
+      pastel: "pastel",
+    }),
+    defaultPresetIdByKind: Object.freeze({
+      crayon: "printmaking",
+      chalk: "printmaking",
+      charcoal: "printmaking",
+      pastel: "kent",
+    }),
+  }),
+});
+
+export function resolveStudioStampPaperProgram(
+  programId: string | null | undefined,
+): StudioStampPaperProgram | null {
+  if (!programId) return null;
+  return (
+    STUDIO_STAMP_PAPER_PROGRAMS as Record<string, StudioStampPaperProgram>
+  )[programId] ?? null;
+}
+
+/** 스타일에 상주하는 해석 완료 종이 결합 — 프로그램을 핀한 레인의 스타일만 이 필드를 가진다. */
+export interface StudioStampPaperGrainStyle {
+  readonly programId: StudioStampPaperProgramId;
+  readonly presetId: StudioPaperPresetIdV1;
+  readonly preset: StudioPaperPresetV1;
+  readonly medium: StudioPaperMediumV1;
+  /** (programId, presetId)에서 유도한 결정적 낱장 시드 — 같은 레인·같은 종이 = 같은 낱장. */
+  readonly seed: number;
+}
+
+/**
+ * 낱장 시드 — FNV-1a(programId:presetId). 종이는 문서에 깔린 한 장이므로 획·시각과 무관하게
+ * 고정이어야 라이브 오버레이·커밋 재생·SVG 내보내기가 같은 이빨 패턴을 읽는다.
+ */
+function studioStampPaperSheetSeed(programId: string, presetId: string): number {
+  const key = `${programId}:${presetId}`;
+  let hash = 2166136261;
+  for (let index = 0; index < key.length; index += 1) {
+    hash ^= key.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+/**
+ * 레인 스탬프 튜닝의 종이 핀을 스타일 결합으로 해석한다. 프로그램 미핀, 미등재 kind,
+ * 알 수 없는 프리셋 id 는 전부 null(정확한 항등)로 fail-closed 한다.
+ */
+export function resolveStudioStampPaperGrainStyle(
+  kind: StudioStampBrushKind,
+  lane: Pick<
+    StudioBrushEngineLaneStampTuning,
+    "paperProgramId" | "paperPresetId"
+  > | null,
+): StudioStampPaperGrainStyle | null {
+  const programId = lane?.paperProgramId;
+  const program = resolveStudioStampPaperProgram(programId);
+  if (!programId || !program) return null;
+  const medium = program.mediumByKind[kind];
+  const presetId = lane?.paperPresetId ?? program.defaultPresetIdByKind[kind];
+  if (!medium || !isStudioPaperPresetIdV1(presetId)) return null;
+  return Object.freeze({
+    programId,
+    presetId,
+    preset: getStudioPaperPresetV1(presetId),
+    medium,
+    seed: studioStampPaperSheetSeed(programId, presetId),
+  });
+}
+
+/**
+ * W7 peak-catch 침착 스케일(0..1) — 핀된 레인의 dab 알파에 곱한다. 순수·결정적:
+ * 같은 (paper, x, y, pressure)는 항상 같은 값이라 증분/재생/SVG 픽셀 규약이 유지된다.
+ *
+ * 종이는 문서 좌표에 고정된 낱장이다(웻 레인·다이나믹 레인의 종이 침착과 동일 규약).
+ * 알려진 갭(F1): 대칭 팬에서 Canvas(studio-stamp-symmetry-rendering)는 원본 계획 하나를
+ * 컨텍스트 변환으로 복제하고 SVG는 변환된 변주 좌표로 재계획하므로, 비항등 대칭 사본의
+ * 침착 패턴이 두 표면에서 다르게 나온다(항등 사본 = 실제 획은 정확히 일치). 정합 방법은
+ * 대칭 렌더러를 다이나믹 레인처럼 변주별 재계획으로 맞추는 것 — 별도 후속 작업으로 추적한다.
+ */
+function stampPaperDepositScale(
+  paper: StudioStampPaperGrainStyle,
+  x: number,
+  y: number,
+  pressure: number,
+): number {
+  return resolveStudioPaperMediaModulationV1({
+    medium: paper.medium,
+    preset: paper.preset,
+    pressure,
+    x,
+    y,
+    seed: paper.seed,
+  }).depositScale;
 }
 
 export interface StudioStampBrushStyle {
@@ -85,6 +250,11 @@ export interface StudioStampBrushStyle {
    * 생략 시 kind 기본값(STAMP_SPACING_RATIO)을 사용한다.
    */
   readonly spacingRatio?: number;
+  /**
+   * W7 종이 결합(peak-catch). 카탈로그 튜닝이 paperProgramId 를 핀한 레인에서만 존재하며,
+   * 없으면 dab 알파 산식이 종이 배선 이전과 비트 단위로 같다.
+   */
+  readonly paperGrain?: StudioStampPaperGrainStyle;
 }
 
 /** dab 지름 대비 스탬프 간격 비율 — 종류별 질감을 만드는 1차 변수. */
@@ -97,6 +267,12 @@ const STAMP_SPACING_RATIO: Record<StudioStampBrushKind, number> = {
   watercolor: 0.09,
   mypaint: 0.2,
   "krita-auto": 0.15,
+  // Verified dry-media stamps: denser than pencil so wax/chalk beds stay continuous without
+  // polygon union expansion.
+  crayon: 0.16,
+  chalk: 0.14,
+  charcoal: 0.18,
+  pastel: 0.13,
 };
 
 /** 종류별 기본 파라미터 — UI 슬라이더의 초기값이자 스타일 미지정 필드의 폴백. */
@@ -111,6 +287,14 @@ export const STUDIO_STAMP_BRUSH_DEFAULTS: Record<
   watercolor: { flow: 0.26, hardness: 0.28, minSizeRatio: 0.55 },
   mypaint: { flow: 0.75, hardness: 0.6, minSizeRatio: 0.25 },
   "krita-auto": { flow: 0.85, hardness: 0.75, minSizeRatio: 0.3 },
+  // Wax scrape: moderate flow so tooth builds without flooding.
+  crayon: { flow: 0.72, hardness: 0.88, minSizeRatio: 0.4 },
+  // Klecks chalk powder: lower flow, soft mineral rim.
+  chalk: { flow: 0.38, hardness: 0.22, minSizeRatio: 0.55 },
+  // libmypaint charcoal DNA: higher grit, medium hardness.
+  charcoal: { flow: 0.55, hardness: 0.48, minSizeRatio: 0.32 },
+  // Krita soft pastel cake.
+  pastel: { flow: 0.48, hardness: 0.35, minSizeRatio: 0.5 },
 };
 
 function parseCssRgbColor(
@@ -137,13 +321,94 @@ function parseCssRgbColor(
   };
 }
 
+/** OSS 질감 팁을 굽는 스탬프 종류(잉크·mypaint·krita-auto 는 그라디언트 팁을 유지한다). */
+export type StudioStampOssTexturedTipKind =
+  | "airbrush"
+  | "watercolor"
+  | "crayon"
+  | "chalk"
+  | "charcoal"
+  | "pastel";
+
+/** 캐시 가능한 dab 을 위해 고정한 팁 로컬 스트로크 축. 라이브 경로는 배치 지터로 회전감을 얻는다. */
+const OSS_TIP_DIRECTION_RADIANS = -Math.PI / 5;
+
 /**
- * Bake an OSS multi-octave tip into ImageData (Klecks chalk/spray structure).
+ * OSS 질감 팁의 픽셀 커버리지(순수·결정적) — (nx, ny)는 팁 반경으로 정규화한 좌표.
+ * rasterizeOssTexturedTip 이 이 함수로 ImageData 를 굽고, 테스트가 같은 함수를 그리드
+ * 샘플링해 질감 분산·종류 간 구분·경도 응답을 고정한다.
+ *
+ * 종류별 질감 의도:
+ * - airbrush: Klecks 스프레이 — 소프트 엔벨로프 × 멀티 옥타브 그릿(겹쳐도 입자감 유지).
+ * - watercolor: 소프트 바디 + 웻엣지 링(r≈0.92 어두운 띠) × 과립.
+ * - crayon: 방향성 왁스 베드. 림은 wax 노이즈로 반경 끝까지 너덜너덜하게 닿고(잘린 원판 금지),
+ *   경도가 오르면 눌린 왁스 플래토가 넓어지며 scrape 골이 종이 이를 드러낸다.
+ * - chalk: Klecks genBrushAlpha01 이 질감 마스터. 경도는 파우더 바디의 어깨 지수만 조인다
+ *   (경도↑ = 판판하게 눌린 사이드스틱, 경도↓ = 가장자리로 흩어지는 가루).
+ * - charcoal: libmypaint charcoal.myb DNA — wax.grit 이 이(tooth), scrape 가 종이 보임 골,
+ *   Klecks 파우더가 바디. 경도가 낮을수록 파우더 엣지가 길게 풀린다.
+ * - pastel: 소프트 케이크 — smoothstep 벨벳 어깨 × 굵은 파우더. 초크보다 결이 곱고 균일하다.
+ */
+export function studioStampOssTipCoverage(
+  kind: StudioStampOssTexturedTipKind,
+  normalizedX: number,
+  normalizedY: number,
+  seed: number,
+  hardness: number,
+): number {
+  const hard = clamp01(hardness);
+  const radial = Math.hypot(normalizedX, normalizedY);
+  if (kind === "airbrush") {
+    return studioOssSprayTipCoverage(normalizedX, normalizedY, seed, hard);
+  }
+  if (kind === "watercolor") {
+    return studioOssWatercolorTipCoverage(normalizedX, normalizedY, seed, hard);
+  }
+  if (kind === "chalk") {
+    const klecks = studioOssKlecksChalkCoverage(normalizedX, normalizedY, seed);
+    const shoulder = clamp01(1 - radial);
+    const body = shoulder ** (0.4 + (1 - hard) * 0.9);
+    return clamp01(klecks * (0.5 + 0.5 * body));
+  }
+  if (kind === "crayon") {
+    const wax = studioOssDirectionalWaxSample(
+      normalizedX,
+      normalizedY,
+      OSS_TIP_DIRECTION_RADIANS,
+      seed,
+    );
+    const rimWobble = (wax.wax - 0.5) * 0.24;
+    const plateau = 0.42 + hard * 0.3;
+    const shoulderWidth = Math.max(0.14, 1 - plateau);
+    const disk = clamp01(1 - (radial + rimWobble - plateau) / shoulderWidth);
+    return clamp01(disk * (0.34 + 0.66 * wax.wax) * (1 - wax.scrape * 0.55));
+  }
+  if (kind === "charcoal") {
+    const wax = studioOssDirectionalWaxSample(
+      normalizedX,
+      normalizedY,
+      OSS_TIP_DIRECTION_RADIANS,
+      seed ^ 0xc4,
+    );
+    const chalkPowder = studioOssKlecksChalkCoverage(normalizedX, normalizedY, seed ^ 0xa1);
+    const body = clamp01(1 - radial) ** (0.55 + (1 - hard) * 0.95);
+    const packed = 0.28 * chalkPowder + 0.5 * wax.wax + 0.42 * wax.grit;
+    return clamp01(body * packed * (1 - wax.scrape * 0.38));
+  }
+  // pastel
+  const chalkPowder = studioOssKlecksChalkCoverage(normalizedX, normalizedY, seed ^ 0xb7);
+  const shoulder = clamp01(1 - radial * (0.8 + hard * 0.25));
+  const velvet = shoulder * shoulder * (3 - 2 * shoulder);
+  return clamp01(velvet * (0.45 + 0.55 * chalkPowder) * (0.72 + 0.28 * hard));
+}
+
+/**
+ * Bake an OSS multi-octave tip into ImageData (Klecks chalk/spray/wax structure).
  * Falls back to null when the context cannot allocate ImageData (jsdom stubs).
  */
 function rasterizeOssTexturedTip(
   ctx: CanvasRenderingContext2D,
-  kind: "airbrush" | "watercolor",
+  kind: StudioStampOssTexturedTipKind,
   color: string,
   radius: number,
   hardness: number,
@@ -161,14 +426,12 @@ function rasterizeOssTexturedTip(
     for (let x = 0; x < size; x += 1) {
       const nx = (x - cx) * invR;
       const ny = (y - cy) * invR;
-      const coverage = kind === "airbrush"
-        ? studioOssSprayTipCoverage(nx, ny, seed, hardness)
-        : studioOssWatercolorTipCoverage(nx, ny, seed, hardness);
+      const coverage = studioStampOssTipCoverage(kind, nx, ny, seed, hardness);
       const offset = (y * size + x) * 4;
       data[offset] = channels.r;
       data[offset + 1] = channels.g;
       data[offset + 2] = channels.b;
-      data[offset + 3] = Math.round(Math.min(1, Math.max(0, coverage)) * 255);
+      data[offset + 3] = Math.round(clamp01(coverage) * 255);
     }
   }
   if (typeof ctx.putImageData !== "function") return false;
@@ -198,6 +461,9 @@ export function resolveStudioStampBrushStyle(
       ? Math.min(1, Math.max(0, value))
       : fallback;
   const sizeScale = lane?.sizeScale ?? 1;
+  // 종이 프로그램 핀은 레인 카탈로그 전용이다 — 핀이 없으면 필드 자체가 없어서 dab 계획이
+  // 종이 배선 이전과 비트 단위로 같다(비핀 레인 회귀 계약).
+  const paperGrain = resolveStudioStampPaperGrainStyle(kind, lane);
   return {
     kind,
     color: base.color,
@@ -207,6 +473,7 @@ export function resolveStudioStampBrushStyle(
     hardness: pick(tuning?.hardness, lane?.hardness ?? defaults.hardness),
     minSizeRatio: pick(tuning?.minSize, lane?.minSizeRatio ?? defaults.minSizeRatio),
     spacingRatio: Math.max(0.03, Math.min(1, lane?.spacingRatio ?? STAMP_SPACING_RATIO[kind])),
+    ...(paperGrain ? { paperGrain } : {}),
   };
 }
 
@@ -279,11 +546,18 @@ function stampDotPlan(
   pressure: number,
   index: number
 ): StudioStampBrushDab {
+  const baseAlpha = clamp01(style.flow) * clamp01(style.opacity);
   return {
     x,
     y,
     radius: pressureRadius(style, pressure),
-    alpha: clamp01(style.flow) * clamp01(style.opacity),
+    // 종이 프로그램을 핀한 레인만 W7 peak-catch 침착을 곱한다(planner 레벨 — Canvas·SVG 공유).
+    alpha: style.paperGrain
+      ? clamp01(
+          baseAlpha
+          * stampPaperDepositScale(style.paperGrain, x, y, normalizedPressure(pressure)),
+        )
+      : baseAlpha,
     index,
   };
 }
@@ -315,7 +589,14 @@ function getCachedDabTipCanvas(
   const cy = size / 2;
   const r = roundedRadius;
 
-  if (kind === "airbrush" || kind === "watercolor") {
+  if (
+    kind === "airbrush"
+    || kind === "watercolor"
+    || kind === "crayon"
+    || kind === "chalk"
+    || kind === "charcoal"
+    || kind === "pastel"
+  ) {
     const tipSeed =
       (Math.imul(roundedRadius + 1, 0x9e37) ^ Math.imul(Math.round(roundedHardness * 100) + 1, 0x85eb))
       >>> 0;
@@ -435,6 +716,10 @@ function drawDab(
       let dabAlpha = alpha;
       if (kind === "mypaint") dabAlpha = alpha * 0.9;
       else if (kind === "krita-auto") dabAlpha = alpha * 0.95;
+      else if (kind === "crayon") dabAlpha = alpha * 0.92;
+      else if (kind === "chalk") dabAlpha = alpha * 0.88;
+      else if (kind === "charcoal") dabAlpha = alpha * 0.9;
+      else if (kind === "pastel") dabAlpha = alpha * 0.9;
       context.globalAlpha = dabAlpha;
       context.drawImage(cachedTip, x - cachedTip.width / 2, y - cachedTip.height / 2);
       // Spray grit is baked into the OSS tip raster (Klecks multi-octave coverage).
@@ -547,6 +832,7 @@ function walkStampSegmentPlan(
     ? inkVelocityFactor(distance / Math.max(1, style.size))
     : 1;
   const baseAlpha = clamp01(style.flow) * clamp01(style.opacity);
+  const paperGrain = style.paperGrain ?? null;
   let travelled = state.residual;
   const spacingOf = (p: number): number =>
     Math.max(0.5, pressureRadius(style, p) * 2 * (style.spacingRatio ?? STAMP_SPACING_RATIO[style.kind]));
@@ -566,7 +852,17 @@ function walkStampSegmentPlan(
     const py = state.lastY + dy * t;
     const p = state.lastPressure + (safePressure - state.lastPressure) * t;
     const radius = pressureRadius(style, p) * speedFactor;
-    emit({ x: px, y: py, radius, alpha: baseAlpha, index: state.stampIndex });
+    emit({
+      x: px,
+      y: py,
+      radius,
+      // 종이 스테이션 샘플: 핀된 레인만 dab 위치의 W7 peak-catch 침착을 곱한다. 저필압은
+      // 봉우리만 받아 이빨이 드러나고, 고필압은 골까지 잠겨 스케일이 1로 수렴한다.
+      alpha: paperGrain
+        ? clamp01(baseAlpha * stampPaperDepositScale(paperGrain, px, py, p))
+        : baseAlpha,
+      index: state.stampIndex,
+    });
     state.stampIndex += 1;
     travelled += spacingOf(p);
   }
