@@ -80,24 +80,31 @@ describe("vite migration", () => {
 
   it("keeps studio-only Google Fonts out of the global render-blocking stylesheet", () => {
     const html = readFileSync(join(process.cwd(), "index.html"), "utf8");
-    const studio = readFileSync(join(process.cwd(), "src/domains/creator/StudioPage.tsx"), "utf8");
+    // Ownership moved out of StudioPage: the studio no longer injects all eight families on idle,
+    // it loads the families a document actually uses and defers the rest to the preset list. The
+    // css2 URL is assembled from these declarations at runtime, so the source carries plain names
+    // rather than `family=`-encoded literals.
+    const presetFonts = readFileSync(
+      join(process.cwd(), "src/domains/creator/studio-preset-font-loading.ts"),
+      "utf8",
+    );
     const studioOnlyFamilies = [
-      "Black+Han+Sans",
-      "East+Sea+Dokdo",
+      "Black Han Sans",
+      "East Sea Dokdo",
       "Gaegu",
-      "Gamja+Flower",
+      "Gamja Flower",
       "Jua",
-      "Nanum+Myeongjo",
-      "Nanum+Pen+Script",
-      "Yeon+Sung",
+      "Nanum Myeongjo",
+      "Nanum Pen Script",
+      "Yeon Sung",
     ];
 
     // Space Grotesk alone earns the render-blocking slot: globals.css numeral/eyebrow use it on
     // every route and, being latin-only, its stylesheet is 12 @font-face / 543 B gzip.
     expect(html).toContain("family=Space+Grotesk");
     for (const family of studioOnlyFamilies) {
-      expect(html).not.toContain(`family=${family}`);
-      expect(studio).toContain(`family=${family}`);
+      expect(html).not.toContain(`family=${family.replaceAll(" ", "+")}`);
+      expect(presetFonts).toContain(`family: "${family}"`);
     }
   });
 
