@@ -144,6 +144,12 @@ export interface StudioMainMenuUiActions extends StudioMainMenuSurfaceActions {
   togglePageSequence: () => unknown;
   openProductionInsights: () => unknown;
   collapseSidePanels: () => unknown;
+  /**
+   * Inverse of `collapseSidePanels`, for the surfaces that promise a way back. 창 ▸ 전체 레이아웃
+   * only restored UI density, so from the super-simple state it measurably did nothing — the
+   * panels the collapse had closed stayed closed and the artist read the menu item as broken.
+   */
+  expandSidePanels: () => unknown;
   openToolsCompanion: () => unknown;
   toggleQuickAccessPalette: () => unknown;
   toggleLeftPanel: () => unknown;

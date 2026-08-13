@@ -140,6 +140,7 @@ function createUiActions(): StudioMainMenuUiActions {
     openScrollPreview: vi.fn(),
     openStoryboardGrid: vi.fn(),
     collapseSidePanels: vi.fn(),
+    expandSidePanels: vi.fn(),
     openToolsCompanion: vi.fn(),
     toggleQuickAccessPalette: vi.fn(),
     toggleLeftPanel: vi.fn(),
@@ -640,6 +641,9 @@ describe("buildStudioMainMenuGroups", () => {
     expect(editor.setStudioUiDensity).toHaveBeenNthCalledWith(1, "focus");
     expect(ui.collapseSidePanels).toHaveBeenCalledOnce();
     expect(editor.setStudioUiDensity).toHaveBeenNthCalledWith(2, "full");
+    // 전체 레이아웃 must undo what 슈퍼심플 collapsed — density alone leaves the panels shut
+    // and the menu item measurably did nothing from the collapsed state.
+    expect(ui.expandSidePanels).toHaveBeenCalledOnce();
     expect(menuItem(groups, "window", "tools-companion").label).toBe(
       "멀티 디스플레이 작업공간…"
     );

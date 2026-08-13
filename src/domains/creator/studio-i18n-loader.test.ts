@@ -32,7 +32,7 @@ describe("Studio lazy i18n assets", () => {
     for (const locale of STUDIO_I18N_ASSET_LOCALES) {
       const dictionary = parseStudioI18nDictionary(readAsset(locale));
       expect(dictionary).not.toBeNull();
-      expect(Object.keys(dictionary ?? {})).toHaveLength(1_269);
+      expect(Object.keys(dictionary ?? {})).toHaveLength(1_297);
     }
     // The mobile dock used to hardcode Korean labels; every pack must now carry the keys that
     // replaced them, so an `en` viewport cannot fall back to Korean chrome.
@@ -52,6 +52,26 @@ describe("Studio lazy i18n assets", () => {
     }
     expect(resolveI18nValue("en", "studio.mobileDock.tool.shape")).toBe("Shape");
     expect(resolveI18nValue("ko", "studio.mobileDock.tool.shape")).toBe("도형");
+    // The filter menu generates a row per pack kind, but 28 kinds (the advanced blurs, the
+    // clean-up filters and the whole union wave) had no locale keys, so an `en` menubar showed
+    // "렌즈 블러" between English rows. Every pack now carries the keys — untranslated locales
+    // deliberately hold the English catalogue label, the same pending-translation convention the
+    // mobile-dock keys established, because a French reader is better served by "Lens blur"
+    // than by Hangul.
+    for (const key of [
+      "studio.mainMenu.item.filter.lens-blur",
+      "studio.mainMenu.item.filter.tilt-shift-blur",
+      "studio.mainMenu.item.filter.screentone-removal",
+      "studio.mainMenu.item.filter.god-rays",
+      "studio.mainMenu.item.filter.wave-warp",
+    ]) {
+      for (const locale of STUDIO_I18N_ASSET_LOCALES) {
+        expect(parseStudioI18nDictionary(readAsset(locale))?.[key]).toBeTruthy();
+      }
+    }
+    expect(resolveI18nValue("en", "studio.mainMenu.item.filter.lens-blur")).toBe("Lens blur");
+    expect(resolveI18nValue("ko", "studio.mainMenu.item.filter.lens-blur")).toBe("렌즈 블러");
+    expect(resolveI18nValue("ko", "studio.mainMenu.item.filter.god-rays")).toBe("볼류메트릭 광선");
     expect(resolveI18nValue("ko", "studio.canvas.wheelMode.zoom")).toBe(
       "휠: 캔버스 확대·축소",
     );

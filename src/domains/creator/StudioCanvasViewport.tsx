@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { Stage, Layer, Rect, Group, Circle as KCircle, Line, Transformer, Shape, Text, Image as KImage } from "react-konva/lib/ReactKonvaCore";
 // Paper grain still uses fillPatternImage on Rect; KImage is for live liquify warp preview.
 
+import { BlendIsolationGroup } from "./BlendIsolationGroup";
 import { ClipMaskGroup } from "./ClipMaskGroup";
 import { studioAdjustmentStackToFilterFields } from "./studio-adjustment-stack";
 import { type StudioAdvancedRuler, type StudioAdvancedRulerDocument } from "./studio-advanced-ruler-document";
@@ -2901,18 +2902,31 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                     (el.blendMode || "source-over")) as NonNullable<
                     Konva.NodeConfig["globalCompositeOperation"]
                   >;
-                  const clippedNode = clip ? (
-                    <Group key={el.id} clipX={clip.x} clipY={clip.y} clipWidth={clip.width} clipHeight={clip.height} globalCompositeOperation={composite}>
+                  // 합성 모드가 켜진 요소는 캐시 그룹으로 평탄화해야 한다. 평범한 Group에
+                  // globalCompositeOperation을 걸면 자식 스탬프 하나하나가 레이어와 개별
+                  // 합성되어, 한 획(스탬프 수십 개)이 같은 물리를 그만큼 반복 적용받는다.
+                  // 실측: 단일 탭(fill 1회) 곱하기는 이론값과 1/255 일치하는데 30스탬프 획은
+                  // 검정으로 붕괴했다. BlendIsolationGroup이 획을 비트맵 한 장으로 만든 뒤
+                  // 합성을 정확히 한 번 적용한다.
+                  const isolatedComposite = composite !== "source-over";
+                  const blendCacheKey = isolatedComposite
+                    ? [el.id, composite, pagesHi, JSON.stringify(elBounds(el))].join("|")
+                    : "";
+                  const clippedNode = isolatedComposite ? (
+                    <BlendIsolationGroup
+                      key={el.id}
+                      cacheKey={blendCacheKey}
+                      composite={composite}
+                      {...(clip ? { clip } : {})}
+                    >
+                      {node}
+                    </BlendIsolationGroup>
+                  ) : clip ? (
+                    <Group key={el.id} clipX={clip.x} clipY={clip.y} clipWidth={clip.width} clipHeight={clip.height}>
                       {node}
                     </Group>
                   ) : (
-                    composite !== "source-over" ? (
-                      <Group key={el.id} globalCompositeOperation={composite}>
-                        {node}
-                      </Group>
-                    ) : (
-                      node
-                    )
+                    node
                   );
                   return wrapRenderInteraction(clippedNode);
                 };

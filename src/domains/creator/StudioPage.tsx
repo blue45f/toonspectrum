@@ -499,6 +499,7 @@ import {
   isStudioPasteScopeCurrent,
   resolveStudioEditAvailability,
   resolveStudioEditShortcut,
+  isStudioUndoRedoChord,
   shouldHandleStudioEditEvent,
 } from "./studio-edit-controls";
 import {
@@ -26577,6 +26578,7 @@ const puppetWarpArmed =
         typing,
         editing: Boolean(editing),
         insideShortcutBoundary,
+        undoRedoIntent: isStudioUndoRedoChord(e),
         timelapseCapturing,
       })) return;
       const mod = e.metaKey || e.ctrlKey;
@@ -27566,6 +27568,8 @@ const puppetWarpArmed =
           typing,
           editing: Boolean(editing),
           insideShortcutBoundary,
+          // No undoRedoIntent here: this is the paste route and `e` is a ClipboardEvent — a
+          // paste can never be the history chord, so the panel-scope exemption stays keydown-only.
           modalOpen,
           timelapseCapturing,
         })
@@ -40803,6 +40807,10 @@ function clearSelectionForEdit() {
           collapseSidePanels: () => {
             setLeftPanelOpen(false);
             setRightPanelOpenWithOverride(false);
+          },
+          expandSidePanels: () => {
+            setLeftPanelOpen(true);
+            setRightPanelOpenWithOverride(true);
           },
           openToolsCompanion: () => openStudioToolsCompanionForMenu({
             ensureRuntime: ensureStudioToolsCompanionRuntime,

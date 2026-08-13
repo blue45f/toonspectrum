@@ -285,19 +285,43 @@ export interface StudioEditEventGuardInput {
   insideShortcutBoundary?: boolean;
   modalOpen?: boolean;
   timelapseCapturing?: boolean;
+  /**
+   * The event is ⌘Z / ⌘⇧Z.
+   *
+   * History is the one command an artist expects to work from wherever their hands are. A panel
+   * that claims its own shortcut scope — the layer navigator, the menu bar — should stop `B`, `E`
+   * and `Delete` from reaching the document, but swallowing undo makes the app feel broken: two
+   * independent audits measured ⌘Z doing nothing at all, once with focus in the layer panel and
+   * once right after a filter dialog handed focus back to its menu trigger.
+   *
+   * This deliberately does NOT reach past `typing`/`editing` (there ⌘Z means "undo my text") or
+   * past `modalOpen` (a modal's first frame must not let undo hit the document behind it).
+   */
+  undoRedoIntent?: boolean;
 }
 
 /** Shared by keydown and paste so neither can mutate the canvas behind menus, fields, or modals. */
 export function shouldHandleStudioEditEvent(input: StudioEditEventGuardInput): boolean {
+  const boundaryBlocks = Boolean(input.insideShortcutBoundary) && !input.undoRedoIntent;
   return !(
     input.defaultPrevented ||
     input.composing ||
     input.typing ||
     input.editing ||
-    input.insideShortcutBoundary ||
+    boundaryBlocks ||
     input.modalOpen ||
     input.timelapseCapturing
   );
+}
+
+/** True for the history chord, whichever platform modifier the artist used. */
+export function isStudioUndoRedoChord(event: {
+  key?: string;
+  metaKey?: boolean;
+  ctrlKey?: boolean;
+}): boolean {
+  if (!(event.metaKey || event.ctrlKey)) return false;
+  return typeof event.key === "string" && event.key.toLowerCase() === "z";
 }
 
 export interface StudioPasteScopeInput {

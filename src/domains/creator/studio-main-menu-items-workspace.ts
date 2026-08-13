@@ -50,6 +50,10 @@ export function buildStudioWindowMenuItems({
       separatorAfter: true,
       onSelect: () => {
         editor.setStudioUiDensity("full");
+        // 슈퍼심플이 접은 패널까지 되돌려야 "전체"다. 밀도만 복원하면 접힌 상태에서 이
+        // 항목은 아무 가시 변화가 없고, 사용자는 되돌아갈 길이 없다고 느낀다(실측: 접힌
+        // 상태에서 클릭 2연타에도 bodyLen 314 그대로).
+        ui.expandSidePanels();
       },
     },
     {

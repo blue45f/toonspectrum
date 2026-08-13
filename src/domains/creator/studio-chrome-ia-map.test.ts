@@ -145,6 +145,7 @@ function buildLiveMenuGroups() {
     openScrollPreview: vi.fn(),
     openStoryboardGrid: vi.fn(),
     collapseSidePanels: vi.fn(),
+    expandSidePanels: vi.fn(),
     openToolsCompanion: vi.fn(),
     toggleQuickAccessPalette: vi.fn(),
     toggleLeftPanel: vi.fn(),
