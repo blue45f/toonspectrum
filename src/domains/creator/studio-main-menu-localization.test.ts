@@ -159,16 +159,33 @@ describe("localizeStudioMainMenuGroups", () => {
     );
 
     expect(item(projected, "edit", "undo").label).toBe("Undo");
+    // 상태가 실제 사유를 들고 오면 **그 문장이 이긴다.** 정적 키는 사유를 모를 때 쓰는 일반
+    // 문구라, 여기서 키가 이기면 어렵게 계산한 사유(자동 줄바꿈 글상자·지우개 자국 레이어…)가
+    // 매번 지워진다 — 측정된 #10 결함이 그 모양이었다(51개 항목이 전부 같은 한 줄).
     expect(item(projected, "filter", "last-filter").unavailableReason).toBe(
-      "Stop playback to use filters.",
+      "재생 중에는 필터를 적용할 수 없습니다.",
     );
     expect(item(projected, "filter", "gaussian-blur").unavailableReason).toBe(
-      "Stop playback to use filters.",
+      "재생 중에는 필터를 적용할 수 없습니다.",
     );
     expect(item(projected, "view", "color-vision-grayscale").unavailableReason).toBe(
       "Preview unavailable.",
     );
     expect(projected.find((group) => group.id === "view")?.label).toBe("보기");
+  });
+
+  it("falls back to the localized generic filter reason when no specific reason exists", () => {
+    const projected = localizeStudioMainMenuGroups(
+      groups(),
+      { ...BASE_STATE, filterDisabled: true, filterUnavailableReason: null },
+      translator({
+        "studio.mainMenu.item.filter.unavailable": "Stop playback to use filters.",
+      }),
+    );
+
+    expect(item(projected, "filter", "gaussian-blur").unavailableReason).toBe(
+      "Stop playback to use filters.",
+    );
   });
 
   it("uses the empty-last-filter unavailable key when filters are otherwise available", () => {

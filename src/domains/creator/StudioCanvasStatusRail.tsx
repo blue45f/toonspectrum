@@ -449,8 +449,25 @@ export function StudioCanvasStatusRail({
         </div>
       ) : null}
 
-      {selectionCount > 0 && (
-        <div className="mb-2 flex min-w-0 items-center gap-2 rounded-xl border border-accent/40 bg-accent-soft/30 px-2.5 py-1.5 text-xs shadow-sm">
+      {/*
+       * 선택 명령 레인 — 높이를 **상시 예약**한다.
+       *
+       * 이 바는 캔버스 열의 흐름(flow) 안에 있고, 선택이 생길 때만 마운트되면 그 아래 캔버스
+       * 뷰포트를 통째로 밀어 내린다(실측 51px = 바 43px + mb-2 8px). 그 밀림은 보기 흉한 데서
+       * 끝나지 않는다: 요소를 눌러 선택하는 순간 바가 붙으면서 스테이지 원점이 51px 내려가는데,
+       * 이미 시작된 Konva 드래그는 누를 때 잡아 둔 원점을 계속 쓰므로 첫 move에서 요소가 정확히
+       * 51px 위로 튄다(실측). 즉 "선택 상태가 캔버스 기하를 바꾸는 것" 하나가 두 결함의 뿌리다.
+       *
+       * 오버레이(absolute)로 띄우면 흰 원고 위를 덮으므로, 이미 §select-options 스트립이 쓰고 있는
+       * 관례(빈 상태에도 자리를 잡아 두는 예약 띠)를 그대로 따른다. 선택 유무와 무관하게 레인
+       * 높이가 고정되므로 캔버스 원점 이동은 0px이고, 캔버스 콘텐츠는 아무것도 가려지지 않는다.
+       */}
+      <div
+        data-studio-selection-command-lane="true"
+        className="mb-2 h-[2.6875rem] shrink-0"
+      >
+      {selectionCount > 0 ? (
+        <div className="flex h-full min-w-0 items-center gap-2 rounded-xl border border-accent/40 bg-accent-soft/30 px-2.5 py-1.5 text-xs shadow-sm">
           <span className="flex shrink-0 items-center gap-1.5 font-semibold text-accent">
             <span>{selectionCount}개 선택</span>
             {selectionGroupName ? (
@@ -697,7 +714,19 @@ export function StudioCanvasStatusRail({
             </button>
           </div>
         </div>
+      ) : (
+        <div
+          data-studio-selection-command-reserve="true"
+          aria-hidden="true"
+          className="flex h-full min-w-0 items-center gap-2 overflow-hidden rounded-xl border border-line/45 px-2.5 py-1.5 text-[0.7rem] text-fg-3"
+        >
+          <span className="size-1.5 shrink-0 rounded-full bg-line" />
+          <span className="truncate">
+            요소를 선택하면 정렬·복제·삭제 명령이 여기에 표시됩니다
+          </span>
+        </div>
       )}
+      </div>
 
       {(advancedFillBusy || hasAdvancedFillPreview) && (
         <div

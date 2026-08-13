@@ -39,6 +39,7 @@ import { studioDrawHudToolLabel, studioPressureCurveHudLabel, studioShapeFillHud
 import { drawLiveFreehandDraftToContext, getSymmetricPoints } from "./studio-draw-rendering";
 import { containingPanel, elBounds } from "./studio-element-geometry";
 import { elementLabel } from "./studio-element-label";
+import { unionStudioSelectionBounds } from "./studio-figma-selection-ux";
 import { type FilterMaskPaintMode } from "./studio-filter-mask";
 import { clampFrameIndex, frameIndexOf, MAX_ANIM_FRAMES, onionSkinLayers, type OnionSkinSettings } from "./studio-frame-animation";
 import { type SharedGutterSegment } from "./studio-frame-folder";
@@ -1932,16 +1933,13 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
             // 원점(0,0)을 끼워 넣을 수 있다. 그러면 그룹 union이 캔버스 좌상단까지 부풀고
             // 이름 배지가 화면 밖으로 사라진다. 선화는 권위 points 기반 bounds를 사용한다.
             if (element.type === "draw") {
-              const raw = elBounds(element);
               // Horizontal/vertical freehand lines can report 0 height/width; free-scale
-              // handles require a positive box, so pad by stroke radius.
-              const pad = Math.max(1, Number(element.strokeWidth) > 0 ? element.strokeWidth / 2 : 1);
-              return {
-                x: raw.x - pad,
-                y: raw.y - pad,
-                w: Math.max(pad * 2, raw.w + pad * 2),
-                h: Math.max(pad * 2, raw.h + pad * 2),
-              };
+              // handles require a positive box, so pad by stroke radius. That padding rule is
+              // owned by `unionStudioSelectionBounds` — the same box the Design 패널 W/H,
+              // 플립 피벗, 수치 변형이 읽는다. 여기서 규칙을 한 번 더 적어 두면 두 사본이
+              // 조용히 갈라지는 날 선택 핸들과 사용자가 타이핑한 수치가 서로 다른 상자를
+              // 가리키게 되므로, 계산은 하지 않고 그 함수에 위임한다.
+              return unionStudioSelectionBounds([element]) ?? elBounds(element);
             }
             return liveNodeDisplayBounds(
               nodeRefsRef.current[element.id],

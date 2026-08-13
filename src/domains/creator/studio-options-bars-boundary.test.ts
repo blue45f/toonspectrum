@@ -147,7 +147,13 @@ describe("Studio options-bars module boundary", () => {
     expect(
       registry.dynamicImports.filter((specifier) => specifier === "./StudioSelectOptionsBar")
     ).toEqual(["./StudioSelectOptionsBar"]);
-    expect(optionsBars.source.match(/<Suspense fallback=\{null\}>/gu)).toHaveLength(2);
+    // 그리기 옵션 바는 도구를 바꿀 때만 스왑되고 그 자리를 예약하는 이웃 스트립이 따로 없어
+    // `null` 폴백으로 충분하다. 선택 옵션 바는 다르다 — lazy 청크가 풀리는 한 프레임 동안
+    // 44px 레인이 사라지면 그 아래 캔버스가 내려갔다 올라온다(측정된 선택 시 2단계 밀림의
+    // 뒷단계). 그래서 선택 쪽 폴백은 바와 **같은 기하**를 붙들고 있어야 한다.
+    expect(optionsBars.source.match(/<Suspense fallback=\{null\}>/gu)).toHaveLength(1);
+    expect(optionsBars.source).toContain('data-studio-select-options-pending="true"');
+    expect(optionsBars.source).toContain("h-11 min-h-11 shrink-0 border-b border-line");
     expect(optionsBars.source).toContain("key={draw.drawMode}");
   });
 

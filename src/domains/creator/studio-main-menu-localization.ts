@@ -95,9 +95,15 @@ function localizeUnavailableReason(
   // always "no image layer selected".
   const layerAdjustment = path === "filter/levels" || path === "filter/tone-curve";
   if (!layerAdjustment && path.startsWith("filter/") && state.filterDisabled) {
+    // 상태가 구체적인 사유를 들고 왔으면 **그 문장이 정본**이다. 정적 키
+    // (`studio.mainMenu.item.filter.unavailable`)는 "왜 막혔는지 모를 때" 쓰는 일반 문구이고,
+    // `localizeText`는 키가 팩에 있으면 fallback 인자를 통째로 버린다 — 즉 여기서 키를 먼저
+    // 물으면 어렵게 계산한 사유("자동 줄바꿈 글상자를 …", "지우개 자국이 남은 레이어를 …")가
+    // 매번 일반 문구로 덮여 사라진다. 실제로 그래서 51개 항목이 전부 같은 한 줄만 보여 줬다.
+    if (state.filterUnavailableReason) return state.filterUnavailableReason;
     return localizeText(
       t,
-      state.filterUnavailableReason ?? "현재 편집 상태에서는 필터를 적용할 수 없습니다.",
+      "현재 편집 상태에서는 필터를 적용할 수 없습니다.",
       "studio.mainMenu.item.filter.unavailable",
     );
   }

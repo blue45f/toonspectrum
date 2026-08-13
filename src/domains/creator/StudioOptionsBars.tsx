@@ -233,7 +233,18 @@ export const StudioOptionsBars = memo(function StudioOptionsBars({
       ) : null}
 
       {selection.visible ? (
-        <Suspense fallback={null}>
+        // `null` fallback would collapse the 44px bar lane for the one frame the lazy chunk
+        // takes to resolve, so the canvas below drops and springs back — the second half of the
+        // measured two-step selection shift. The placeholder holds the exact bar geometry.
+        <Suspense
+          fallback={
+            <div
+              aria-hidden="true"
+              data-studio-select-options-pending="true"
+              className="relative z-[40] h-11 min-h-11 shrink-0 border-b border-line"
+            />
+          }
+        >
           <StudioSelectOptionsBar
             selectionCount={selection.count}
             selectionLabel={selection.label}

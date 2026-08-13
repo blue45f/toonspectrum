@@ -97,6 +97,8 @@ export interface LayerNavigatorRowHandlers {
   onToggleItemLocked: (itemId: string, locked: boolean) => void;
   /** `opacity` is 0–1. */
   onSetItemOpacity: (itemId: string, opacity: number) => void;
+  /** `opacity` is 0–1. Mid-scrub sample: apply to the canvas now, coalesce into one undo step. */
+  onPreviewItemOpacity: (itemId: string, opacity: number) => void;
   onOpenItemActionMenu: (
     event: ReactMouseEvent<HTMLButtonElement>,
     itemId: string
@@ -217,9 +219,11 @@ export const StudioLayerNavigatorItemRow = memo(
       (liveOwnership?.kind === "self" ? "나" : "·");
     const showLiveOwnershipBadge =
       liveOwnership != null && liveOwnership.kind !== "free";
-    // One scrub gesture must be one undo step. The scrubber previews into this draft while the
-    // pointer is down (or an arrow run is still going) and hands the settled value to the
-    // document exactly once, so the history stack gets one entry instead of one per 1%.
+    // One scrub gesture must be one undo step — and the canvas must follow the pointer while it
+    // happens. Mid-scrub samples go to the document as `live` previews that the editor coalesces
+    // under one history key, so the pixels move in real time and ⌘Z still rewinds the whole
+    // gesture at once. The draft is kept because a rejected preview (locked page, save in flight)
+    // never comes back as `item.opacity`, and the row must still track the pointer.
     const [opacityDraft, setOpacityDraft] = useState<number | null>(null);
     const opacityPercent = opacityDraft ?? committedOpacityPercent;
 
@@ -472,12 +476,20 @@ export const StudioLayerNavigatorItemRow = memo(
             step={1}
             valueText={`${opacityPercent}%`}
             disabled={readOnly || effectivelyLocked || peerBlocked}
-            onChange={setOpacityDraft}
+            onChange={(next) => {
+              setOpacityDraft(next);
+              if (next === (opacityDraft ?? committedOpacityPercent)) return;
+              stableHandlers.onPreviewItemOpacity(item.id, next / 100);
+            }}
             onCommit={(next) => {
               // Clearing the draft in the same batch as the mutation means a rejected commit
               // (read-only page, save in flight) snaps back to the truth instead of lying.
+              const scrubbed = opacityDraft !== null;
               setOpacityDraft(null);
-              if (next === committedOpacityPercent) return;
+              // After a live scrub the document already holds `next`, so the value test would
+              // skip this call — but the settling commit is also what closes the coalesce chain.
+              // Skipping it would fold the *next* gesture into this gesture's undo entry.
+              if (!scrubbed && next === committedOpacityPercent) return;
               stableHandlers.onSetItemOpacity(item.id, next / 100);
             }}
             className={cn(

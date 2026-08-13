@@ -39,6 +39,7 @@ function rowHandlers(
     onToggleItemHidden: vi.fn(),
     onToggleItemLocked: vi.fn(),
     onSetItemOpacity: vi.fn(),
+    onPreviewItemOpacity: vi.fn(),
     onOpenItemActionMenu: vi.fn(),
     registerRowRef: vi.fn(),
     ...overrides,
@@ -421,6 +422,40 @@ describe("StudioLayerNavigatorItemRow", () => {
     // A trailing blur after the gesture already settled must not write the same edit twice.
     fireEvent.blur(opacity);
     expect(onSetItemOpacity).toHaveBeenCalledTimes(1);
+  });
+
+  it("previews every scrub step to the document so the canvas moves before release", () => {
+    // 측정된 잔여 갭(D7): 드래그 중에는 행 숫자와 aria-valuenow 만 바뀌고 캔버스 픽셀은
+    // pointerup 까지 얼어 있었다. 이제 표본마다 `onPreviewItemOpacity` 가 나가고, 에디터가
+    // 같은 키로 합쳐 undo 는 여전히 한 번이다(합치기는 StudioPage 쪽 계약).
+    const onSetItemOpacity = vi.fn();
+    const onPreviewItemOpacity = vi.fn();
+    renderRow(
+      rowProps({
+        item: { ...ITEM, opacity: 1 },
+        stableHandlers: rowHandlers({ onSetItemOpacity, onPreviewItemOpacity }),
+      })
+    );
+
+    const opacity = screen.getByRole("slider", { name: "주인공 원화 불투명도" });
+    for (let press = 0; press < 4; press += 1) {
+      fireEvent.keyDown(opacity, { key: "ArrowLeft" });
+    }
+
+    expect(onPreviewItemOpacity.mock.calls).toEqual([
+      ["line-art", 0.99],
+      ["line-art", 0.98],
+      ["line-art", 0.97],
+      ["line-art", 0.96],
+    ]);
+    // 프리뷰는 문서를 이미 움직였지만 히스토리는 아직 확정되지 않았다.
+    expect(onSetItemOpacity).not.toHaveBeenCalled();
+
+    fireEvent.blur(opacity);
+    // 확정 표본은 값이 프리뷰와 같아도 반드시 나가야 한다 — 이게 합치기 체인을 끊어
+    // 다음 제스처가 이번 제스처의 undo 항목에 빨려 들어가지 않게 한다.
+    expect(onSetItemOpacity).toHaveBeenCalledTimes(1);
+    expect(onSetItemOpacity).toHaveBeenCalledWith("line-art", 0.96);
   });
 
   it("commits a pointer scrub once, on release", () => {

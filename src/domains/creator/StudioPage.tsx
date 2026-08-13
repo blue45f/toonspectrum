@@ -23744,7 +23744,12 @@ const puppetWarpArmed =
 
   function patchLayerItems(
     ids: readonly string[],
-    resolvePatch: (element: El) => Partial<El>
+    resolvePatch: (element: El) => Partial<El>,
+    /**
+     * 스크럽처럼 한 제스처가 여러 표본을 쏘는 편집은 `coalesceKey`를 준다. 같은 키의 연속
+     * 표본은 히스토리 최상단을 교체하므로 ⌘Z 한 번이 제스처 전체를 되돌린다.
+     */
+    options?: { readonly coalesceKey?: string }
   ) {
     const idSet = new Set(ids);
     if (idSet.size === 0) return;
@@ -23758,7 +23763,9 @@ const puppetWarpArmed =
       changed = true;
       return { ...element, ...patch } as El;
     });
-    if (changed) commit(next);
+    if (!changed) return;
+    if (options?.coalesceKey) commitCoalesced(next, options.coalesceKey);
+    else commit(next);
   }
 
   async function commitLayerMergePlan(
@@ -24395,6 +24402,10 @@ const puppetWarpArmed =
 
   function handleLayerNavigatorAction(action: StudioLayerNavigatorAction) {
     if (pageEditLocked && !masterEditMode) {
+      // 드래그 중 프리뷰는 포인터가 움직이는 동안 초당 수십 번 들어온다. 잠긴 페이지에서
+      // 표본마다 토스트를 띄우면 안내가 아니라 폭주다 — 조용히 무시하고, 사용자가 포인터를
+      // 놓는 순간 오는 확정 액션 하나만 잠금 사유를 알린다.
+      if (action.type === "set-items-opacity" && action.live) return;
       setError("이 페이지는 검토 잠금 상태예요. 잠금을 해제한 뒤 레이어를 편집해 주세요.");
       return;
     }
@@ -24499,7 +24510,14 @@ const puppetWarpArmed =
         return;
       case "set-items-opacity": {
         const opacity = Math.min(1, Math.max(0, action.opacity));
-        patchLayerItems(action.ids, () => ({ opacity }));
+        // 스크러버가 포인터를 놓기 전에도 문서에 값을 넣어야 캔버스 픽셀이 실시간으로 따라온다.
+        // 표본마다 `commit()`을 부르면 undo가 1%마다 하나씩 쌓이므로, 같은 키의 연속 표본을
+        // 최상단 스냅샷 교체로 합치는 `commitCoalesced`로 보낸다 — 라이브 반영 + ⌘Z 1회.
+        // 확정 표본(live 없음)은 같은 키로 한 번 더 합친 뒤 체인을 끊어, 다음 제스처가 이번
+        // 제스처의 히스토리 항목에 빨려 들어가지 않게 한다.
+        const coalesceKey = `opacity:${[...action.ids].join(",")}`;
+        patchLayerItems(action.ids, () => ({ opacity }), { coalesceKey });
+        if (!action.live) coalesceKeyRef.current = null;
         return;
       }
       case "merge-down": {
@@ -40764,6 +40782,73 @@ function clearSelectionForEdit() {
     !isEffectivelyHidden(selected, groups);
   const studioFilterTargetLabel: "선택 이미지" | "현재 페이지 합성본" =
     studioDirectImageFilterTarget ? "선택 이미지" : "현재 페이지 합성본";
+  /**
+   * §Filter 문서 사전점검 — 메뉴가 **광고하는 가용성**을 실제 결과와 같게 만든다.
+   *
+   * 지금까지 필터 게이트는 "재생 중 · 저장 중 · 검토 잠금" 같은 **세션** 사유만 봤다. 정작
+   * 자주 막는 쪽은 문서다: 화면과 똑같이 합칠 수 없는 레이어(자동 줄바꿈 글상자, 지우개 자국이
+   * 남은 그리기 레이어, 인터넷 주소로 연결된 이미지…)가 하나라도 있으면 준비 단계가
+   * fail-closed 로 멈춘다. 그런데도 메뉴는 51개 항목을 전부 활성으로 보여 줬고, 눌러도 사유 한
+   * 줄 없이 끝났다(실측). 막는 것 자체는 옳다 — 필터가 화면과 다른 결과를 조용히 구워 내면 안
+   * 된다. 틀린 건 **광고와 실제의 불일치**다.
+   *
+   * 그래서 추측하지 않고, 눌렀을 때 실제로 도는 그 계획 함수를 미리 한 번 돌려 사유를 그대로
+   * 가져온다. 두 경로가 같은 함수를 쓰므로 메뉴와 결과가 어긋날 수 없고, 사유 문구도 이미
+   * 작가용으로 쓰여 있다("…상자를 조금 넓히거나 원하는 자리에서 엔터로 줄을 나눈 뒤…").
+   *
+   * 비용은 문서가 실제로 바뀐 뒤 한 번, 그것도 획이 멎고 나서만 낸다. 획 커밋마다 페이지를
+   * 직렬화하면 그리기 핫패스를 갉아먹는다.
+   */
+  const [studioFilterDocumentPreflightReason, setStudioFilterDocumentPreflightReason] =
+    useState<string | null>(null);
+  const studioFilterPreflightContextRef =
+    useRef<typeof currentStudioFilterPageRasterContext | null>(null);
+  useEffect(() => {
+    // 컨텍스트 빌더는 렌더마다 새로 만들어지는 함수다. 아래 사전점검 효과의 deps 에 넣으면
+    // 렌더마다 점검이 다시 예약되므로, 최신 빌더만 여기 담아 두고 점검은 문서 변화에만
+    // 반응하게 한다. 효과 실행 순서상 이 갱신이 항상 먼저 끝난다.
+    studioFilterPreflightContextRef.current = currentStudioFilterPageRasterContext;
+  });
+  useEffect(() => {
+    // 이미지 레이어를 직접 고른 경우엔 페이지 합성을 굽지 않는다 — 문서 사전점검 대상이 아니다.
+    if (studioDirectImageFilterTarget) {
+      setStudioFilterDocumentPreflightReason(null);
+      return;
+    }
+    let cancelled = false;
+    const handle = globalThis.setTimeout(() => {
+      // 아직 획을 긋는 중이면 건너뛴다. 획이 끝나면 문서가 다시 바뀌면서 이 효과가 재실행된다.
+      if (cancelled || drawingRef.current) return;
+      void import("./studio-raster-edit-preparation")
+        .then((rasterRuntime) => {
+          if (cancelled) return;
+          const buildContext = studioFilterPreflightContextRef.current;
+          if (!buildContext) return;
+          const context = buildContext("필터 사전점검", rasterRuntime);
+          const planned = rasterRuntime.planStudioEditableRasterCopy(context.input);
+          setStudioFilterDocumentPreflightReason(planned.ok ? null : planned.reason);
+        })
+        .catch(() => {
+          // 준비 모듈을 못 받은 것 자체는 필터 금지 사유가 아니다. 그 경우엔 눌렀을 때 나오는
+          // 실제 오류가 더 정확한 안내를 준다 — 여기서 미리 잠그면 오히려 거짓 안내가 된다.
+          if (!cancelled) setStudioFilterDocumentPreflightReason(null);
+        });
+    }, 260);
+    return () => {
+      cancelled = true;
+      globalThis.clearTimeout(handle);
+    };
+  }, [
+    bg,
+    bgGrad,
+    canvasH,
+    elements,
+    groups,
+    localHiddenElementIds,
+    masterEditMode,
+    studioDirectImageFilterTarget,
+    webtoonTheme,
+  ]);
   const studioFilterUnavailableReason = timelinePlaying
     ? "타임라인 재생을 멈춘 뒤 필터를 적용하세요."
     : timelapseCapturing
@@ -40782,7 +40867,8 @@ function clearSelectionForEdit() {
                 ? "애니메이션 이미지는 정적 프레임으로 만든 뒤 필터를 적용하세요."
                 : masterEditMode && selected && isEffectivelyHidden(selected, groups)
                   ? "숨긴 이미지 레이어를 다시 표시한 뒤 필터를 적용하세요."
-                  : null;
+                  // 세션 사유가 전부 통과했으면 마지막으로 문서 자체를 묻는다.
+                  : studioFilterDocumentPreflightReason;
   const menuFilterDisabled = studioFilterPreparationBusy || studioFilterUnavailableReason !== null;
   const menuSharedNonOwnerSave = Boolean(sharedDocument && sharedDocument.role !== "owner");
   const menuHasSavedView = savedStudioView?.pageId === activePage.id;

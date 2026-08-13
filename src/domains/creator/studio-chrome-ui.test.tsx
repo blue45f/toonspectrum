@@ -3,7 +3,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { Folder, Pencil } from "lucide-react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   StudioAppMenubar,
@@ -31,9 +31,47 @@ import {
   StudioDualColorWell,
 } from "./StudioDualColorWell";
 
+import { useI18n } from "@/lib/i18n";
+
 afterEach(cleanup);
 
+// 셸 문구(툴벨트·툴레일 이름, 그룹 구분선)는 이제 로케일을 따라간다. jsdom 의 기본 navigator
+// 로케일은 en 이라, 한국어 문구를 검증하는 케이스는 검증 대상 로케일을 명시해야 한다.
+beforeEach(() => {
+  useI18n.setState({ lang: "ko" });
+});
+
 describe("studio chrome UI", () => {
+  it("translates rail tool labels from the shared tool catalogue outside Korean", () => {
+    // 측정된 결함(#14): en 로케일에서 좌측 레일 34개 중 32개가 한국어였다. 라벨은 버튼마다
+    // 박힌 리터럴이라 `t()`를 타지 않았다. 이제 버튼에 이미 붙어 있는 `data-studio-rail-tool-id`
+    // 로 도구 카탈로그 번역(75개 팩에 이미 있는 `studio.settings.tool.*`)을 찾아 갈아끼운다.
+    // 단축키 표기는 로케일과 무관하므로 그대로 따라간다.
+    useI18n.setState({ lang: "en" });
+    const { container } = render(
+      <StudioRailToolButton
+        data-studio-rail-tool-id="select"
+        icon={Pencil}
+        label="선택 (V)"
+      />
+    );
+    expect(container.innerHTML).toContain('aria-label="Select (V)"');
+    expect(container.innerHTML).not.toContain("선택");
+  });
+
+  it("keeps rail tool labels untouched in Korean", () => {
+    const { container } = render(
+      <StudioRailToolButton
+        data-studio-rail-tool-id="hand"
+        icon={Pencil}
+        label="핸드 (팬)"
+      />
+    );
+    // 한국어 카탈로그 라벨은 설정 목록용 축약형("핸드(팬)")이라 레일 문구와 글자가 다르다.
+    // 한국어에서는 갈아타지 않는 것이 계약이다.
+    expect(container.innerHTML).toContain('aria-label="핸드 (팬)"');
+  });
+
   it("renders labeled toolbar dividers for competitor-style tool groups", () => {
     const html = renderToStaticMarkup(<StudioToolbarDivider label="도구" />);
     expect(html).toContain('role="separator"');
@@ -63,11 +101,15 @@ describe("studio chrome UI", () => {
   });
 
   it("renders a full tool-belt rail for the immersive draw-app shell", () => {
-    const html = renderToStaticMarkup(
+    // 셸 이름이 로케일을 따라가므로 클라이언트 렌더로 검증한다. `renderToStaticMarkup` 은
+    // zustand v5 의 서버 스냅샷(= 스토어 **초기** 상태)을 읽어 테스트가 고정한 로케일을 보지
+    // 못한다 — 앱은 항상 클라이언트 렌더이므로 이쪽이 실제 동작에도 더 가깝다.
+    const { container } = render(
       <StudioToolBelt>
         <button type="button">펜</button>
       </StudioToolBelt>
     );
+    const html = container.innerHTML;
     expect(html).toContain('role="toolbar"');
     expect(html).toContain('data-studio-tool-belt="true"');
     expect(html).toContain("스튜디오 도구");

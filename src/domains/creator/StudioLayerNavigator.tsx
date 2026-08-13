@@ -118,8 +118,14 @@ export type StudioLayerNavigatorAction =
     }
   | { type: "set-items-hidden"; ids: readonly string[]; hidden: boolean }
   | { type: "set-items-locked"; ids: readonly string[]; locked: boolean }
-  /** 0–1. Emitted by the row's inline opacity scrubber (V5 §15 레이어 행 동작 120px). */
-  | { type: "set-items-opacity"; ids: readonly string[]; opacity: number }
+  /**
+   * 0–1. Emitted by the row's inline opacity scrubber (V5 §15 레이어 행 동작 120px).
+   *
+   * `live`는 아직 포인터를 놓지 않은 **드래그 중 프리뷰** 표본이다. 수신자는 이 표본도 실제
+   * 문서에 적용해 캔버스가 즉시 따라오게 하되, 한 제스처가 undo 한 번으로 남도록 같은 키로
+   * 합쳐야 한다. 마지막(놓는 순간) 표본은 `live` 없이 와서 합치기 체인을 끊는다.
+   */
+  | { type: "set-items-opacity"; ids: readonly string[]; opacity: number; live?: boolean }
   | { type: "set-item-flag"; id: string; flag: StudioLayerNavigatorItemFlag; value: boolean }
   | { type: "assign-items-to-group"; ids: readonly string[]; groupId?: string }
   | { type: "set-items-role"; ids: readonly string[]; role?: StudioLayerRole }
@@ -797,6 +803,9 @@ export function StudioLayerNavigator({
     },
     onSetItemOpacity: (itemId, opacity) => {
       onAction({ type: "set-items-opacity", ids: [itemId], opacity });
+    },
+    onPreviewItemOpacity: (itemId, opacity) => {
+      onAction({ type: "set-items-opacity", ids: [itemId], opacity, live: true });
     },
     onOpenItemActionMenu: (event, itemId) => {
       openActionMenu(event, { kind: "item", id: itemId });

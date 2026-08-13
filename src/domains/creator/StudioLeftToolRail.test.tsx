@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { defaultStudioAppSettings } from "./studio-app-settings";
 import { type El } from "./studio-element-model";
@@ -12,6 +12,15 @@ import {
 
 import type { LucideIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
+
+import { useI18n } from "@/lib/i18n";
+
+// 이 파일의 기대값은 전부 **한국어 제품 문구**다. 레일 셸 문구는 이제 로케일을 따라가므로,
+// jsdom 의 기본 navigator 로케일(en)에 기대면 한국어를 검증하는 테스트가 영어를 받게 된다.
+// 검증하려는 로케일을 명시적으로 고정한다.
+beforeEach(() => {
+  useI18n.setState({ lang: "ko" });
+});
 
 const preloadRasterRetouchRuntime = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 

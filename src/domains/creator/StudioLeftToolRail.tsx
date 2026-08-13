@@ -61,6 +61,10 @@ import {
   type StudioRailMoreViewport,
 } from "./studio-left-tool-rail-position";
 import { preloadStudioReferencePanel } from "./studio-page-lazy-ui";
+import {
+  isKoreanUiLocale,
+  localizeStudioRailShellText,
+} from "./studio-rail-tool-localization";
 import { preloadStudioRasterRetouchRuntime } from "./studio-raster-retouch-preload";
 import {
   STUDIO_RETOUCH_EDITABLE_COPY_NOTE,
@@ -74,6 +78,7 @@ import {
 import { studioUiDensityAllows } from "./studio-ui-density";
 import { StudioToolHintTarget } from "./StudioToolHint";
 
+import { useI18n, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 const REVIEW_LOCK_REASON = "현재 작업면의 검토 잠금을 먼저 해제하세요.";
@@ -311,6 +316,10 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
 }: StudioLeftToolRailProps) {
   const railMoreDialogId = useId();
   const railMoreTriggerId = `${railMoreDialogId}-trigger`;
+  // 도구 버튼 라벨은 `StudioRailToolButton` 안에서 도구 id 로 번역된다. 여기서 쓰는 건 도구가
+  // 아닌 레일 셸 문구(더보기 버튼, 숨긴 도구 목록, 설정 진입)뿐이다.
+  const railLang = useI18n((state) => state.lang);
+  const railT = useT();
   const railMoreTitleId = `${railMoreDialogId}-title`;
   const zoomShortcut = appSettings.shortcuts["tool-zoom"];
   const rotateViewShortcut = appSettings.shortcuts["tool-rotate-view"];
@@ -515,7 +524,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
       <StudioRailToolButton
         id={railMoreTriggerId}
         icon={Settings2}
-        label="더보기 · 툴바 설정"
+        label={localizeStudioRailShellText("더보기 · 툴바 설정", railLang, railT)}
         description="숨긴 도구를 열거나 애플리케이션 설정에서 툴바·단축키·마우스·터치를 맞춤 설정합니다."
         active={railMoreOpen || appSettingsOpen}
         aria-controls={railMoreOpen ? railMoreDialogId : undefined}
@@ -606,7 +615,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
                     closeRailMoreAndRestoreFocus();
                   }}
                 >
-                  {studioRailToolLabel(id)}
+                  {isKoreanUiLocale(railLang) ? studioRailToolLabel(id) : studioRailToolLabel(id, railT)}
                 </button>
               ))
           )}
@@ -621,7 +630,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
             }}
           >
             <Settings2 className="size-3.5" aria-hidden />
-            애플리케이션 설정
+            {localizeStudioRailShellText("애플리케이션 설정", railLang, railT)}
           </button>
         </div>
       ), document.body) : null}

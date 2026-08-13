@@ -29,12 +29,17 @@ import {
   studioSegmentChipClass,
   studioToolButtonClass,
 } from "./studio-panel-ui";
+import {
+  localizeStudioRailShellText,
+  localizeStudioRailToolLabel,
+} from "./studio-rail-tool-localization";
 import { studioToolHintFromLabel } from "./studio-tool-hints";
 import { StudioToolHintTarget } from "./StudioToolHint";
 
 import type { StudioToolHintConsumerPreviewFields } from "./studio-tool-hint-preview-kind";
 import type { LucideIcon } from "lucide-react";
 
+import { useI18n, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 /* eslint-disable react-refresh/only-export-components -- chrome tokens shared with StudioPage toolbar shell */
@@ -142,10 +147,12 @@ export function StudioToolBelt({
   "aria-hidden"?: boolean;
   "aria-label"?: string;
 }): ReactElement {
+  const lang = useI18n((state) => state.lang);
+  const t = useT();
   return (
     <div
       role="toolbar"
-      aria-label={ariaLabel}
+      aria-label={localizeStudioRailShellText(ariaLabel, lang, t)}
       aria-hidden={ariaHidden}
       inert={inert ? true : undefined}
       data-studio-tool-belt="true"
@@ -613,11 +620,13 @@ export function StudioVerticalToolRail({
   footer?: ReactNode;
   "aria-label"?: string;
 }): ReactElement {
+  const lang = useI18n((state) => state.lang);
+  const t = useT();
   return (
     <div
       role="toolbar"
       aria-orientation="vertical"
-      aria-label={ariaLabel}
+      aria-label={localizeStudioRailShellText(ariaLabel, lang, t)}
       data-studio-tool-rail="true"
       className={cn(
         // xl: slightly wider like Krita docker / Ibis tool column
@@ -795,13 +804,25 @@ export function StudioRailToolButton({
   title,
   ...rest
 }: StudioRailToolButtonProps): ReactElement {
+  // 레일 라벨의 로케일 전환은 여기 한 군데서 한다. 34개 버튼이 저마다 문자열 리터럴·헬프
+  // 카탈로그·단축키 조합으로 라벨을 만들고 있어서, 호출부를 하나씩 고치면 다음에 추가되는
+  // 버튼이 또 한국어로 새어 나간다. 버튼마다 이미 `data-studio-rail-tool-id`가 붙어 있으므로
+  // 그 id로 도구 카탈로그 번역을 찾아 갈아끼우면 새 버튼도 공짜로 번역된다.
+  const lang = useI18n((state) => state.lang);
+  const t = useT();
+  const localizedLabel = localizeStudioRailToolLabel({
+    toolId: (rest as Record<string, unknown>)["data-studio-rail-tool-id"] as string | undefined,
+    authoredLabel: label,
+    lang,
+    t,
+  });
   // When a rich description is provided, leave title empty so the rich hint bubble is the only hover UI.
-  const nativeTitle = description ? undefined : (title ?? label);
+  const nativeTitle = description ? undefined : (title ?? localizedLabel);
   const button = (
     <button
       type={type}
       disabled={disabled}
-      aria-label={label}
+      aria-label={localizedLabel}
       aria-keyshortcuts={ariaKeyShortcuts}
       title={nativeTitle}
       data-studio-tool-description={description ? "true" : undefined}
@@ -875,11 +896,14 @@ export function StudioRailDivider({
   /** Short CSP-style group caption under the hairline (scannable tool belt). */
   label?: string;
 } & Record<string, string | number | undefined>): ReactElement {
-  if (label) {
+  const lang = useI18n((state) => state.lang);
+  const t = useT();
+  const localizedLabel = label === undefined ? undefined : localizeStudioRailShellText(label, lang, t);
+  if (localizedLabel) {
     return (
       <span
         role="separator"
-        aria-label={label}
+        aria-label={localizedLabel}
         className={cn(
           "my-1 flex w-full max-w-[2.75rem] flex-col items-center gap-0.5 px-0.5",
           className,
@@ -888,7 +912,7 @@ export function StudioRailDivider({
       >
         <span aria-hidden className="h-px w-6 shrink-0 bg-line/80" />
         <span className="select-none text-center text-[0.5rem] font-semibold leading-tight tracking-tight text-fg-3">
-          {label}
+          {localizedLabel}
         </span>
       </span>
     );

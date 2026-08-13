@@ -146,6 +146,34 @@ describe("StudioCanvasStatusRail", () => {
     expect(screen.queryByRole("button", { name: "JSON 백업" })).toBeNull();
   });
 
+  it("reserves the selection command lane so selecting cannot move the canvas", () => {
+    // 측정된 결함(#15): 이 바가 선택될 때만 마운트돼 아래 캔버스를 51px 밀어 내렸고, 이미
+    // 시작된 Konva 드래그가 낡은 스테이지 원점을 계속 써서 요소가 정확히 그만큼 위로 튀었다.
+    // 레인은 선택 유무와 무관하게 **항상 있어야** 한다 — 그래야 캔버스 기하가 선택 상태와
+    // 무관해진다. 비어 있을 때는 조용한 안내만 두고, 캔버스를 덮지 않도록 흐름 안에 남는다.
+    const props = createProps({ selectionCount: 0 });
+    const { container, rerender } = render(<StudioCanvasStatusRail {...props} />);
+
+    const emptyLane = container.querySelector("[data-studio-selection-command-lane]");
+    expect(emptyLane).toBeTruthy();
+    expect(emptyLane?.className).toContain("h-[2.6875rem]");
+    expect(container.querySelector("[data-studio-selection-command-reserve]")).toBeTruthy();
+    // 예약 자리는 보조기술에 잡히면 안 된다 — 실제 명령이 아니라 자리표시자다.
+    expect(
+      container
+        .querySelector("[data-studio-selection-command-reserve]")
+        ?.getAttribute("aria-hidden")
+    ).toBe("true");
+
+    rerender(<StudioCanvasStatusRail {...props} selectionCount={3} />);
+    const filledLane = container.querySelector("[data-studio-selection-command-lane]");
+    expect(filledLane).toBeTruthy();
+    // 같은 레인, 같은 높이 클래스. 선택은 레인 안을 채울 뿐 레인 크기를 바꾸지 않는다.
+    expect(filledLane?.className).toBe(emptyLane?.className);
+    expect(container.querySelector("[data-studio-selection-command-reserve]")).toBeNull();
+    expect(screen.getByRole("button", { name: "선택 요소 그룹화" })).toBeTruthy();
+  });
+
   it("preserves selection thresholds and every semantic layout callback", () => {
     const props = createProps({ selectionCount: 1 });
     const { rerender } = render(<StudioCanvasStatusRail {...props} />);
