@@ -5,6 +5,9 @@ import { describe, expect, it } from "vitest";
 import {
   STUDIO_ALL_BRUSH_CATALOG_ITEMS,
   STUDIO_ERASER_BRUSH_CATALOG_ITEMS,
+  STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS,
+  STUDIO_LISTED_ERASER_BRUSH_CATALOG_ITEMS,
+  STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS,
   STUDIO_PAINT_BRUSH_CATALOG_ITEMS,
 } from "./studio-brush-catalog";
 
@@ -17,6 +20,8 @@ interface StudioBrushBrowserEvidence {
     readonly pro: number;
     readonly paint: number;
     readonly erase: number;
+    /** Registered but delisted ids (V17.1 quarantine); UI matrices cover total - quarantined. */
+    readonly quarantined: number;
   };
   readonly desktop: {
     readonly selectedAndRendered: number;
@@ -68,7 +73,12 @@ describe("Studio brush browser evidence", () => {
       (item) => item.source === "pro",
     ).length;
 
-    expect(evidence.schemaVersion).toBe(1);
+    // Schema v2: the receipt distinguishes the durable registry (total/core/pro/paint/erase,
+    // preserved for persisted documents) from the LISTED matrix the shipped UI can actually
+    // select — quarantined ids are registered but never selectable, so every UI-driven counter
+    // pins the listed set.
+    const listedTotal = STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.length;
+    expect(evidence.schemaVersion).toBe(2);
     expect(evidence.status).toBe("pass");
     expect(evidence.catalog).toEqual({
       total: STUDIO_ALL_BRUSH_CATALOG_ITEMS.length,
@@ -76,16 +86,20 @@ describe("Studio brush browser evidence", () => {
       pro: proCount,
       paint: STUDIO_PAINT_BRUSH_CATALOG_ITEMS.length,
       erase: STUDIO_ERASER_BRUSH_CATALOG_ITEMS.length,
+      quarantined: STUDIO_ALL_BRUSH_CATALOG_ITEMS.length - listedTotal,
     });
     expect(evidence.desktop).toMatchObject({
-      selectedAndRendered: evidence.catalog.total,
-      undoPassed: evidence.catalog.total,
-      redoPassed: evidence.catalog.total,
+      selectedAndRendered: listedTotal,
+      undoPassed: listedTotal,
+      redoPassed: listedTotal,
       errorCount: 0,
     });
+    const listedCoreCount = STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.filter(
+      (item) => item.source === "core",
+    ).length;
     expect(evidence.longRouteCore).toMatchObject({
-      passed: coreCount,
-      total: coreCount,
+      passed: listedCoreCount,
+      total: listedCoreCount,
       visibleSegmentsPerTool: 6,
       totalSegmentsPerTool: 6,
       continuousPolicyFailures: 0,
@@ -94,17 +108,17 @@ describe("Studio brush browser evidence", () => {
     expect(
       Object.values(evidence.longRouteCore.qualityPolicyCounts)
         .reduce((sum, count) => sum + count, 0),
-    ).toBe(coreCount);
+    ).toBe(listedCoreCount);
     expect(evidence.smartShapes).toMatchObject({ passed: 6, total: 6, errorCount: 0 });
     expect(evidence.mobile).toMatchObject({
-      paintSelections: evidence.catalog.paint,
-      eraserSelections: evidence.catalog.erase,
+      paintSelections: STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.length,
+      eraserSelections: STUDIO_LISTED_ERASER_BRUSH_CATALOG_ITEMS.length,
       minimumTargetWidthPx: 44,
       minimumTargetHeightPx: 44,
       undersizedTargets: 0,
       errorCount: 0,
     });
-    expect(evidence.mobile.interactiveTargets).toBeGreaterThanOrEqual(evidence.catalog.total * 2);
+    expect(evidence.mobile.interactiveTargets).toBeGreaterThanOrEqual(listedTotal * 2);
     expect(evidence.pointerUpDurability).toMatchObject({
       payloadContainsEveryStroke: true,
       recoveryBannerShown: true,

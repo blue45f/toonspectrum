@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  isStudioDryMediaKernelDabProgramPin,
   normalizeStudioBrushDynamicsSettings,
+  serializeStudioBrushDynamicsSettingsCanonical,
   studioBrushDynamicsSettingsForBrushId,
   studioDryMediaUnionComposableProgramPin,
   type NormalizedStudioBrushDynamicsSettings,
 } from "./studio-brush-dynamics";
+import {
+  captureStudioDrawPointerPressureContract,
+} from "./studio-draw-pointer-pressure-contract";
 import {
   resolveStudioDynamicBrushMaterialIdentity,
 } from "./studio-dry-media-dynamic-bridge";
@@ -35,6 +40,20 @@ function authoredSettings(
   return authored;
 }
 
+/**
+ * Persisted pre-wave snapshot shape: causal deposit pipeline, no fresh-authoring kernel marker,
+ * no wave-added preset identity. This is what every stored core dry-media stroke carries.
+ */
+function preWaveSettings(
+  brushId: StudioDryMediaCoreId,
+): NormalizedStudioBrushDynamicsSettings {
+  return normalizeStudioBrushDynamicsSettings({
+    ...authoredSettings(brushId),
+    presetId: undefined,
+    dryMediaKernelProgram: undefined,
+  });
+}
+
 function identityOf(brushId: string) {
   const identity = resolveStudioDynamicBrushMaterialIdentity(brushId);
   if (!identity) throw new Error(`missing ${brushId} identity`);
@@ -42,11 +61,16 @@ function identityOf(brushId: string) {
 }
 
 describe("dry-media kernel tip routing", () => {
-  it("owns every unpinned causal core dry medium while the union carrier releases it", () => {
+  it("owns freshly authored core dry media via the explicit kernel marker", () => {
     for (const brushId of STUDIO_DRY_MEDIA_CORE_IDS) {
       const settings = authoredSettings(brushId);
       const identity = identityOf(brushId);
       expect(settings.dryMediaUnionProgram, brushId).toBeUndefined();
+      // Fresh authoring is the ONLY marker mint: the authored preset snapshot carries it.
+      expect(
+        isStudioDryMediaKernelDabProgramPin(settings.dryMediaKernelProgram),
+        brushId,
+      ).toBe(true);
       expect(
         studioDryMediaKernelDabPathOwnsMaterial(identity, settings),
         brushId,
@@ -58,8 +82,45 @@ describe("dry-media kernel tip routing", () => {
     }
   });
 
+  it("keeps stored pre-wave causal snapshots (no kernel marker) on the union carrier", () => {
+    // Reviewer probe D3/F5: before the marker gate, every unpinned causal stroke — i.e. every
+    // pre-wave persisted core dry-media stroke — was silently re-routed union → kernel.
+    for (const brushId of STUDIO_DRY_MEDIA_CORE_IDS) {
+      const persisted = preWaveSettings(brushId);
+      const identity = identityOf(brushId);
+      expect(persisted.dryMediaKernelProgram, brushId).toBeUndefined();
+      expect(persisted.dryMediaUnionProgram, brushId).toBeUndefined();
+      expect(persisted.depositPipeline, brushId).toBe("causal-deposit-v3-segmented");
+      expect(
+        studioDryMediaKernelDabPathOwnsMaterial(identity, persisted),
+        brushId,
+      ).toBeNull();
+      expect(
+        studioDryMediaUnionRibbonCarrierOwnsMaterial(identity, persisted),
+        brushId,
+      ).toBe(true);
+    }
+  });
+
+  it("never injects the kernel marker into a persisted snapshot round-trip", () => {
+    for (const brushId of STUDIO_DRY_MEDIA_CORE_IDS) {
+      const persistedJson = JSON.parse(
+        JSON.stringify(preWaveSettings(brushId)),
+      ) as Record<string, unknown>;
+      expect(persistedJson, brushId).not.toHaveProperty("dryMediaKernelProgram");
+      const canonical = serializeStudioBrushDynamicsSettingsCanonical(persistedJson);
+      expect(canonical, brushId).not.toContain("dryMediaKernelProgram");
+      // Byte-stable fixpoint: normalizing the persisted snapshot again changes nothing.
+      expect(
+        serializeStudioBrushDynamicsSettingsCanonical(JSON.parse(canonical)),
+        brushId,
+      ).toBe(canonical);
+    }
+  });
+
   it("returns pinned strokes to the union carrier and never to the kernel path", () => {
     for (const brushId of STUDIO_DRY_MEDIA_CORE_IDS) {
+      // Even a snapshot carrying BOTH programs stays on the union byte authority.
       const pinned = normalizeStudioBrushDynamicsSettings({
         ...authoredSettings(brushId),
         dryMediaUnionProgram: studioDryMediaUnionComposableProgramPin(),
@@ -79,7 +140,7 @@ describe("dry-media kernel tip routing", () => {
   it("keeps unpinned legacy (non-causal) snapshots on the union carrier", () => {
     for (const brushId of STUDIO_DRY_MEDIA_CORE_IDS) {
       const legacy = normalizeStudioBrushDynamicsSettings({
-        ...authoredSettings(brushId),
+        ...preWaveSettings(brushId),
         depositPipeline: undefined,
       });
       const identity = identityOf(brushId);
@@ -92,6 +153,66 @@ describe("dry-media kernel tip routing", () => {
         studioDryMediaUnionRibbonCarrierOwnsMaterial(identity, legacy),
         brushId,
       ).toBe(true);
+    }
+  });
+
+  it("fails the kernel gate closed when the marker rides a non-causal snapshot", () => {
+    for (const brushId of STUDIO_DRY_MEDIA_CORE_IDS) {
+      const markedLegacy = normalizeStudioBrushDynamicsSettings({
+        ...authoredSettings(brushId),
+        depositPipeline: undefined,
+      });
+      const identity = identityOf(brushId);
+      expect(
+        isStudioDryMediaKernelDabProgramPin(markedLegacy.dryMediaKernelProgram),
+        brushId,
+      ).toBe(true);
+      expect(
+        studioDryMediaKernelDabPathOwnsMaterial(identity, markedLegacy),
+        brushId,
+      ).toBeNull();
+      expect(
+        studioDryMediaUnionRibbonCarrierOwnsMaterial(identity, markedLegacy),
+        brushId,
+      ).toBe(true);
+    }
+  });
+
+  it("rejects malformed kernel markers instead of guessing a route", () => {
+    expect(() => normalizeStudioBrushDynamicsSettings({
+      ...JSON.parse(JSON.stringify(preWaveSettings("crayon"))) as object,
+      dryMediaKernelProgram: { version: "dry-media-kernel-dab-path-v999" },
+    })).toThrowError(TypeError);
+  });
+
+  it("embeds the marker in the pointer-start element snapshot so replay routes to the kernel", () => {
+    // Fresh authoring path: toolbar preset dynamics → pointer-start pressure contract →
+    // element.brushDynamics. The persisted snapshot (JSON round trip) must carry the marker and
+    // own the kernel route, exactly like the live stroke that created it.
+    for (const brushId of STUDIO_DRY_MEDIA_CORE_IDS) {
+      const captured = captureStudioDrawPointerPressureContract({
+        drawMode: "pen",
+        brush: brushId,
+        brushDynamics: authoredSettings(brushId),
+        strokeWidth: 18,
+      }, true).brushDynamics;
+      expect(captured, brushId).toBeDefined();
+      if (!captured) continue;
+      const persisted = normalizeStudioBrushDynamicsSettings(
+        JSON.parse(JSON.stringify(captured)),
+      );
+      expect(
+        isStudioDryMediaKernelDabProgramPin(persisted.dryMediaKernelProgram),
+        brushId,
+      ).toBe(true);
+      expect(
+        studioDryMediaKernelDabPathOwnsMaterial(identityOf(brushId), persisted),
+        brushId,
+      ).toBe(brushId);
+      expect(
+        studioDryMediaUnionRibbonCarrierOwnsMaterial(identityOf(brushId), persisted),
+        brushId,
+      ).toBe(false);
     }
   });
 
@@ -122,13 +243,26 @@ describe("dry-media kernel tip routing", () => {
     for (const brushId of STUDIO_DRY_MEDIA_CORE_IDS) {
       const identity = identityOf(brushId);
       const variants = [
+        // Fresh authored (kernel marker, causal).
         authoredSettings(brushId),
+        // Stored pre-wave shape (causal, no marker).
+        preWaveSettings(brushId),
+        // Explicit union program pin (with and without the fresh marker).
         normalizeStudioBrushDynamicsSettings({
           ...authoredSettings(brushId),
           dryMediaUnionProgram: studioDryMediaUnionComposableProgramPin(),
         }),
         normalizeStudioBrushDynamicsSettings({
+          ...preWaveSettings(brushId),
+          dryMediaUnionProgram: studioDryMediaUnionComposableProgramPin(),
+        }),
+        // Legacy non-causal snapshots (with and without the fresh marker).
+        normalizeStudioBrushDynamicsSettings({
           ...authoredSettings(brushId),
+          depositPipeline: undefined,
+        }),
+        normalizeStudioBrushDynamicsSettings({
+          ...preWaveSettings(brushId),
           depositPipeline: undefined,
         }),
       ];

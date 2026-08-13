@@ -102,6 +102,12 @@ const STUDIO_CRDT_BOUNDED_FLOW_PAINT_MODEL = "bounded-flow-v2";
 const STUDIO_CRDT_MATERIAL_PRESSURE_MODEL = "canonical-material-v1";
 const STUDIO_CRDT_SEGMENTED_CAUSAL_DEPOSIT_PIPELINE =
   "causal-deposit-v3-segmented";
+// Fresh-authoring dry-media routing marker (`brushDynamics.dryMediaKernelProgram`, browser
+// `studioDryMediaKernelDabProgramPin`). It travels inside the bounded brushDynamics JSON and is
+// intentionally admitted by the bounded-JSON rules without a key whitelist — tightening
+// brushDynamics admission must keep accepting it or freshly authored core dry-media strokes
+// would be dropped server-side while the author still sees them (oracle-pinned in the service
+// test alongside the browser paint contract).
 const STUDIO_CRDT_CAUSAL_PRESSURE_MODELS = new Set([
   "linear-full-v1",
   "linear-residual-v2",

@@ -82,17 +82,20 @@ export function studioBrushCatalogItemById(
  * manifest still partitions them. No "숨김 포함" affordance exists today, so exclusion from the
  * listing is complete until an id is delisted from the quarantine ledger.
  */
-const STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] = Object.freeze(
-  STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter((item) => !isStudioBrushQuarantinedPresetId(item.id)),
-);
+export const STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
+  Object.freeze(
+    STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter((item) => !isStudioBrushQuarantinedPresetId(item.id)),
+  );
 
-const STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] = Object.freeze(
-  STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.filter((item) => item.operation === "paint"),
-);
+export const STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
+  Object.freeze(
+    STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.filter((item) => item.operation === "paint"),
+  );
 
-const STUDIO_LISTED_ERASER_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] = Object.freeze(
-  STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.filter((item) => item.operation === "erase"),
-);
+export const STUDIO_LISTED_ERASER_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
+  Object.freeze(
+    STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.filter((item) => item.operation === "erase"),
+  );
 
 export function filterStudioBrushCatalogItems(options: {
   operation?: StudioToolOperation;

@@ -60,8 +60,9 @@ import { isStudioBrushEraserAliasId } from "../src/domains/creator/studio-brush-
 import { studioBrushPresetUsesIntentionalDiscreteCarrier } from "../src/domains/creator/studio-brush-carrier-quality";
 import {
   STUDIO_ALL_BRUSH_CATALOG_ITEMS,
-  STUDIO_ERASER_BRUSH_CATALOG_ITEMS,
-  STUDIO_PAINT_BRUSH_CATALOG_ITEMS,
+  STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS,
+  STUDIO_LISTED_ERASER_BRUSH_CATALOG_ITEMS,
+  STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS,
   type StudioBrushCatalogItem,
 } from "../src/domains/creator/studio-brush-catalog";
 import { serializeStudioBrushDynamicsSettingsCanonical } from "../src/domains/creator/studio-brush-dynamics";
@@ -109,17 +110,19 @@ const REQUESTED_BRUSH_VERIFY_IDS = (process.env.TOONSPECTRUM_BRUSH_VERIFY_IDS ??
   .map((id) => id.trim())
   .filter(Boolean);
 const REQUESTED_BRUSH_VERIFY_ID_SET = new Set(REQUESTED_BRUSH_VERIFY_IDS);
+// The matrices drive the shipped UI, so they iterate the LISTED (quarantine-aware) catalogue;
+// quarantined ids stay registered for persisted replay but are not selectable choices.
 const BRUSH_MATRIX_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
   REQUESTED_BRUSH_VERIFY_IDS.length > 0
-    ? STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter((item) =>
+    ? STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.filter((item) =>
         REQUESTED_BRUSH_VERIFY_ID_SET.has(item.id)
       )
-    : STUDIO_ALL_BRUSH_CATALOG_ITEMS;
+    : STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS;
 const BRUSH_MATRIX_CATALOG_COUNT = BRUSH_MATRIX_CATALOG_ITEMS.length;
 const LONG_BRUSH_CATALOG_CANDIDATES: readonly StudioBrushCatalogItem[] =
   ALL_BRUSH_LONG_MATRIX
-    ? STUDIO_ALL_BRUSH_CATALOG_ITEMS
-    : STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter((item) => item.source === "core");
+    ? STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS
+    : STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.filter((item) => item.source === "core");
 const LONG_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
   REQUESTED_BRUSH_VERIFY_IDS.length > 0
     ? LONG_BRUSH_CATALOG_CANDIDATES.filter((item) =>
@@ -612,7 +615,12 @@ async function prepareStudioPage(page: Page, studioUrl: string): Promise<void> {
   // Hide transient evidence chrome before any gesture. Moving the pointer or waiting after
   // pointerup would skip the exact live-to-retained boundary this verifier must measure.
   await page.addStyleTag({
-    content: '[data-studio-brush-hud="true"] { display: none !important; }',
+    content: [
+      '[data-studio-brush-hud="true"] { display: none !important; }',
+      // The Konva brush-cursor ring is transient chrome, not document ink; hiding its dedicated
+      // canvas keeps live-gesture energy measurements about pigment only.
+      'canvas[data-studio-brush-cursor-canvas="true"] { display: none !important; }',
+    ].join("\n"),
   });
   await dismissTransientChrome(page);
   const shellState = await page.evaluate(() => ({
@@ -776,7 +784,7 @@ async function assertUiEraserQuickPickerMatchesProductCatalog(
     .locator("[data-studio-eraser-quick-option]")
     .evaluateAll((buttons) => buttons.map((button) =>
       button.getAttribute("data-studio-eraser-quick-option") ?? ""));
-  const expectedIds = STUDIO_ERASER_BRUSH_CATALOG_ITEMS.map((item) => item.id);
+  const expectedIds = STUDIO_LISTED_ERASER_BRUSH_CATALOG_ITEMS.map((item) => item.id);
   invariant(
     JSON.stringify(actualIds) === JSON.stringify(expectedIds),
     `desktop erase quick picker exposes ${actualIds.join(",") || "no choices"}; expected ${expectedIds.join(",")}`,
@@ -1264,11 +1272,18 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
     const catalogDialogCount = await page
       .locator('[role="dialog"][data-studio-brush-catalog="built-in"]')
       .count();
-    await assertUiBrushCatalogMatchesProductCatalog(
-      firstCatalog,
-      STUDIO_PAINT_BRUSH_CATALOG_ITEMS,
-      "paint",
-    );
+    // External-origin runs may target a build whose catalogue predates this tree; the strict
+    // UI-vs-catalogue match only holds for the co-built local preview.
+    const skipUiCatalogMatch =
+      process.env.TOONSPECTRUM_SKIP_UI_CATALOG_MATCH === "1"
+      && Boolean(process.env.TOONSPECTRUM_VERIFY_ORIGIN);
+    if (!skipUiCatalogMatch) {
+      await assertUiBrushCatalogMatchesProductCatalog(
+        firstCatalog,
+        STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS,
+        "paint",
+      );
+    }
     await page.screenshot({ path: catalogScreenshot, animations: "disabled" });
     await firstCatalog.locator('[data-studio-brush-library-close="true"]').click();
     await firstCatalog.waitFor({ state: "detached" });
@@ -1484,6 +1499,11 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
                 + "expected one bounded retained-layer lift",
             );
           } else {
+            if (process.env.TOONSPECTRUM_DUMP_ERASE_DIAG === "1") {
+              writeFileSync(join(SCRATCH, `erase-diag-${preset.id}-empty.png`), emptyBefore!);
+              writeFileSync(join(SCRATCH, `erase-diag-${preset.id}-baseline.png`), before);
+              writeFileSync(join(SCRATCH, `erase-diag-${preset.id}-live.png`), live);
+            }
             invariant(
               liveEraseLift.residualEnergyRatio <= 0.1,
               `${preset.id}: live full-strength gesture retained `
@@ -3036,7 +3056,7 @@ async function runMobileTouchAudit(browser: Browser, studioUrl: string): Promise
     await catalog.getByRole("tab", { name: "전체", exact: true }).click();
     await expandFullBrushCatalog(catalog);
     const selectionCount = await catalog.locator('button[aria-label$=" 선택"]').count();
-    const expectedCatalogCount = STUDIO_PAINT_BRUSH_CATALOG_ITEMS.length;
+    const expectedCatalogCount = STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.length;
     invariant(
       selectionCount === expectedCatalogCount,
       `mobile paint catalogue exposes ${selectionCount}/${expectedCatalogCount} brush choices`,
@@ -3086,7 +3106,7 @@ async function runMobileTouchAudit(browser: Browser, studioUrl: string): Promise
       .locator("[data-studio-eraser-quick-option]")
       .evaluateAll((buttons) => buttons.map((button) =>
         button.getAttribute("data-studio-eraser-quick-option") ?? ""));
-    const expectedEraserIds = STUDIO_ERASER_BRUSH_CATALOG_ITEMS.map((item) => item.id);
+    const expectedEraserIds = STUDIO_LISTED_ERASER_BRUSH_CATALOG_ITEMS.map((item) => item.id);
     invariant(
       JSON.stringify(actualEraserIds) === JSON.stringify(expectedEraserIds),
       `mobile eraser quick picker exposes ${actualEraserIds.join(",") || "no choices"}; expected ${expectedEraserIds.join(",")}`,

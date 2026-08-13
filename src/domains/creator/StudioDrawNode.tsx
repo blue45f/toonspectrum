@@ -1,4 +1,4 @@
-import { memo, useEffect, useState } from "react";
+import { memo, useEffect, useReducer, useState } from "react";
 import {
   Arrow,
   Circle as KCircle,
@@ -30,10 +30,12 @@ import {
   resolveStudioBrushAliasPencilPasses,
   resolveStudioBrushAliasWatercolorPlanSettings,
   studioBrushAliasEffectiveDiameter,
+  type StudioBrushAliasWatercolorDab,
 } from "./studio-brush-alias-profile";
 import {
   resolveStudioCapturedBrushDynamicsPresetId,
 } from "./studio-brush-dynamics";
+import { resolveStudioBrushEngineLaneWatercolorMaterial } from "./studio-brush-engine-lane-catalog";
 import {
   resolveStudioBrushRuntimeContract,
   resolveStudioBrushSinglePointRoute,
@@ -86,6 +88,10 @@ import {
   traceStudioHighlighterWashDetail,
   traceStudioHighlighterWashPlan,
 } from "./studio-highlighter-wash-ribbon";
+import {
+  requestStudioLivingInkSettledBakeDabs,
+  resolveStudioLivingInkSettledBakeProgram,
+} from "./studio-living-ink-settled-bake-v1";
 import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "./studio-material-pressure-model";
 import {
   planStudioOilRibbonCarrier,
@@ -303,6 +309,15 @@ export const StudioDrawNode = memo(function StudioDrawNode({
   const kind = el.kind ?? "freehand";
   // 패턴 채우기 타일(로드 전 null) — 우선순위: 패턴 > 그라데이션 > 단색(fillPriority).
   const patternImage = usePatternFillImage(el.pattern);
+  // Opt-in living-ink settled bake (2026-08-14 stall fix): the whole-stroke fluid solve is far
+  // over the 33ms chunk budget, so committed bake-lane strokes render their byte-identical base
+  // wash immediately and a time-sliced background job bakes the bloom. This generation counter
+  // is bumped when a requested bake lands in the deterministic cache; it flows into the request
+  // call below so compiled (React Compiler) render bodies re-execute it and pick up the cache.
+  const [livingInkBakeGeneration, notifyLivingInkBakeReady] = useReducer(
+    (generation: number) => (generation + 1) | 0,
+    0,
+  );
   const isEraserOperation = el.mode === "eraser"
     || (el.brush ? resolveStudioBrushRuntimeContract(el.brush)?.operation === "erase" : false);
   const composite = isEraserOperation ? "destination-out" : "source-over";
@@ -1455,12 +1470,52 @@ export const StudioDrawNode = memo(function StudioDrawNode({
             // The phase gates only the opt-in living-ink settled bake (2026-08-13 wave 3): the
             // fluid field is global, so live drafts render the base wash and the bloom lands on
             // settle — SVG export is settled by definition and passes "settled" at both sites.
-            const dabs = applyStudioBrushAliasWatercolorMaterial(
-              brush,
-              plannedDabs,
-              watercolorSeed,
-              activeDraft ? "live" : "settled",
-            );
+            //
+            // 2026-08-14 stall fix: the settled bake is a whole-stroke fluid solve measured at
+            // 30–116ms — it must never run synchronously in this render body. The "live" result
+            // below is byte-identical to the bake's input (the bake augments AFTER material
+            // scaling and is identity for the live phase), so bake lanes render that base wash
+            // now and request the settled augment from the time-sliced deterministic cache; the
+            // bloom lands when the job completes — the settled-bake contract's own drying
+            // language. Program resolution mirrors applyStudioBrushAliasWatercolorMaterial's
+            // one-authority order (wet-edge-bloom pin wins; bake consulted only without it), so
+            // lanes without a bake program keep the exact single-call path and bytes.
+            const laneWatercolorMaterial =
+              resolveStudioBrushEngineLaneWatercolorMaterial(brush);
+            const livingInkBakeProgram =
+              !activeDraft && laneWatercolorMaterial
+              && !laneWatercolorMaterial.wetEdgeBloomProgramId
+                ? resolveStudioLivingInkSettledBakeProgram(
+                    laneWatercolorMaterial.livingInkBakeProgramId,
+                  )
+                : null;
+            let dabs: readonly StudioBrushAliasWatercolorDab[];
+            if (livingInkBakeProgram) {
+              const baseDabs = applyStudioBrushAliasWatercolorMaterial(
+                brush,
+                plannedDabs,
+                watercolorSeed,
+                "live",
+              );
+              dabs =
+                requestStudioLivingInkSettledBakeDabs(
+                  baseDabs,
+                  {
+                    ...livingInkBakeProgram,
+                    seed: watercolorSeed,
+                    phase: "settled",
+                  },
+                  notifyLivingInkBakeReady,
+                  livingInkBakeGeneration,
+                ) ?? baseDabs;
+            } else {
+              dabs = applyStudioBrushAliasWatercolorMaterial(
+                brush,
+                plannedDabs,
+                watercolorSeed,
+                activeDraft ? "live" : "settled",
+              );
+            }
             const wetRibbonPlan = causalWatercolor
               ? planStudioWetRibbonCarrier(dabs, { seed: watercolorSeed })
               : null;

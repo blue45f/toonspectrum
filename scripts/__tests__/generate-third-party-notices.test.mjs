@@ -15,9 +15,11 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import {
+  EMBEDDED_FIRST_PARTY_PORT_NOTICES,
   OPAQUE_WASM_POLICIES,
   isRecoverablePnpmLicenseInventoryError,
   parsePnpmLicenseInventory,
+  readEmbeddedFirstPartyPortDocuments,
   readFilesystemLicenseInventory,
   readResolvedLicenseInventory,
   validateLockedNoticeFiles,
@@ -349,6 +351,60 @@ describe("generated third-party notice inventory", () => {
     }
   });
 
+  it("collects the embedded first-party port licenses fail-closed", () => {
+    // Adversarial-review probe (Lens 2): the dli/paint and croquis.js code
+    // ports shipped without any distribution-notice coverage. Before the fix
+    // these exports did not exist and the generated dist notice omitted both
+    // upstreams; now the checked-in verbatim copies are mandatory inputs.
+    expect(
+      EMBEDDED_FIRST_PARTY_PORT_NOTICES.map(({ licensePath }) =>
+        licensePath.slice(licensePath.indexOf("third_party")),
+      ),
+    ).toEqual([
+      join("third_party", "dli-paint", "LICENSE"),
+      join("third_party", "croquis-js", "LICENSE-MIT"),
+      join("third_party", "klecks", "LICENSE"),
+    ]);
+
+    const documents = readEmbeddedFirstPartyPortDocuments();
+    expect(documents).toHaveLength(3);
+    for (const document of documents) {
+      expect(document.text).toContain("Permission is hereby granted");
+      expect(document.text).toContain(
+        "The above copyright notice and this permission notice shall be included",
+      );
+    }
+    expect(documents[0].text).toContain("Copyright (c) 2017 David Li");
+    expect(documents[1].text).toContain("JongChan Choi");
+    expect(documents[2].text).toContain("bitbof");
+
+    const directory = mkdtempSync(
+      join(tmpdir(), "toonspectrum-embedded-port-license-test-"),
+    );
+    try {
+      const missing = [
+        {
+          ...EMBEDDED_FIRST_PARTY_PORT_NOTICES[0],
+          licensePath: join(directory, "LICENSE"),
+        },
+      ];
+      expect(() => readEmbeddedFirstPartyPortDocuments(missing)).toThrow(
+        "First-party embedded port license copy is missing",
+      );
+
+      writeFileSync(
+        join(directory, "LICENSE"),
+        "MIT License\n\nCopyright (c) 2017 David Li (http://david.li)\n",
+        "utf8",
+      );
+      expect(() => readEmbeddedFirstPartyPortDocuments(missing)).toThrow(
+        "First-party embedded port license changed and needs review",
+      );
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it("passes the full legal audit without pnpm's package index", () => {
     const output = execFileSync(
       process.execPath,
@@ -421,6 +477,20 @@ describe("generated third-party notice inventory", () => {
       expect(notice).toContain("`google/ink-stroke-modeler`");
       expect(notice).toContain("`abseil-cpp`");
       expect(notice).toContain("`libmypaint`");
+      // Lens-2 regression: MIT permission notices for the hand-ported
+      // dli/paint, croquis.js, and Klecks code must reach the dist notice.
+      // These four assertions fail on the pre-fix generator.
+      expect(notice).toContain(
+        "dli/paint (Fluid Paint) painting.frag CPU port",
+      );
+      expect(notice).toContain("Copyright (c) 2017 David Li");
+      expect(notice).toContain(
+        "croquis.js (@disjukr/croquis-js 0.0.3) capsule pen + pulled-string port",
+      );
+      expect(notice).toContain("JongChan Choi");
+      expect(notice).toContain(
+        "Klecks brush tip kernel re-implementations",
+      );
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }

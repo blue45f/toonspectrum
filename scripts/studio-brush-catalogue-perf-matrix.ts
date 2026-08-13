@@ -455,6 +455,13 @@ export function evaluateStudioBrushCataloguePaintDeterminismProbe(
  * (workstream-M measurement, warm-run medians). They stay pinned after optimization so the ids
  * that once flirted with the freeze budget keep proving repeated plans neither drift bytes nor
  * degrade monotonically the way a leaking cache or growing shared buffer would.
+ *
+ * 2026-08-14 cold-start finding: the original five excluded every dry-media material, so the
+ * de-polygon kernel path (and its measured cold first-chunk class — crayon 53.8ms fresh-process)
+ * had zero soak coverage. The two banded wax sticks join as dry-media sentinels: they exercise
+ * the kernel tip cache and the deepest (36-key) working sets on the causal-coverage path. The
+ * pinned legacy-union replay path keeps its own chunked perf gate in
+ * src/domains/creator/studio-dry-media-long-stroke-regression.test.ts.
  */
 export const STUDIO_BRUSH_CATALOGUE_SOAK_IDS = [
   "pixel-square",
@@ -462,6 +469,8 @@ export const STUDIO_BRUSH_CATALOGUE_SOAK_IDS = [
   "acrylic-stiff-flat",
   "alcohol-chisel-marker",
   "hair-curl-ribbon",
+  "crayon",
+  "oil-pastel",
 ] as const;
 export const STUDIO_BRUSH_CATALOGUE_SOAK_RUNS = 3;
 /** Consecutive-plan growth tolerated before monotonic slowdown counts as degradation. */

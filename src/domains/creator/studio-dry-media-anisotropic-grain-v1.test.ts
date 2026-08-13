@@ -81,6 +81,46 @@ describe("dry-media anisotropic grain v1", () => {
     expect(resolveStudioDryMediaAnisotropicPresetIdV1("dry-media")).toBeNull();
   });
 
+  it("keeps pre-wave engine-lane runtime ids null-material — exact matching, never prefixes (probe D1)", () => {
+    // These ids ship in persisted/collaborative documents (apps/api bounded-flow mirror).
+    // Their stored strokes replay through the bridge identity pass (mark multiplier 1); a
+    // prefix match would silently expand every one of them into 3–5 anisotropic lanes.
+    for (const engineLaneId of [
+      "crayon--wax-scrape",
+      "charcoal--vine-soft",
+      "charcoal--compressed-edge",
+      "chalk--klecks-powder",
+      "pastel--cake-soft",
+      "oil-pastel--waxy-film",
+      "oil-pastel--wgm-mix",
+    ]) {
+      expect(
+        resolveStudioDryMediaAnisotropicPresetIdV1(engineLaneId),
+        engineLaneId,
+      ).toBeNull();
+    }
+    // Prefix-shaped catalogue ids resolve through the explicit key table only.
+    expect(resolveStudioDryMediaAnisotropicPresetIdV1(
+      "dry-media",
+      "pastel-paper-soft",
+    )).toBe("pastel");
+    expect(resolveStudioDryMediaAnisotropicPresetIdV1(
+      "dry-media",
+      "chalk-powder-unshipped",
+    )).toBeNull();
+  });
+
+  it("prefers the exact runtime brush id over catalogue classification (probe D4)", () => {
+    // A stored core stroke keeps its own material even when the catalogue id classifies
+    // differently — the runtime id decided its bytes when it was authored.
+    expect(resolveStudioDryMediaAnisotropicPresetIdV1("chalk", "velvet-charcoal"))
+      .toBe("chalk");
+    expect(resolveStudioDryMediaAnisotropicPresetIdV1("oil-pastel", "chalk-powder"))
+      .toBe("pastel");
+    // The classification path never falls back to the brush id.
+    expect(resolveStudioDryMediaAnisotropicPresetIdV1("velvet-charcoal")).toBeNull();
+  });
+
   it("projects canonical pressure independently into causal fibre geometry and pigment", () => {
     const base = {
       presetId: "charcoal" as const,

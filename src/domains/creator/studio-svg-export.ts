@@ -51,7 +51,6 @@ import {
   isStudioDynamicBrushCausalDepositPipeline,
   normalizeStudioBrushDynamicsSettings,
   planStudioDynamicBrushDabs,
-  resolveStudioBrushDynamicsPresetId,
   resolveStudioCapturedBrushDynamicsPresetId,
   studioDynamicBrushDepositPipelineUsesContinuation,
   studioBrushDynamicsSettingsForBrushId,
@@ -1636,8 +1635,10 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
     : null;
 
   const variations = getSymmetricPoints(el.points, el.symmetry);
+  // Same captured resolver as StudioDrawNode — one shared engine decision keeps the durable SVG
+  // output and the Canvas replay on the same branch (no SVG-only fallback may widen this set).
   const dynamicBrushId = kind === "freehand"
-    ? (resolveStudioCapturedBrushDynamicsPresetId(el) ?? resolveStudioBrushDynamicsPresetId(el.brush))
+    ? resolveStudioCapturedBrushDynamicsPresetId(el)
     : null;
   // Plan randomness exactly once in the original stroke coordinate space. Symmetry then transforms
   // the complete dab (source station, scatter offset and elliptical axis) just like Canvas does.
@@ -2199,8 +2200,8 @@ function serializeFreehand(
 ): string {
   const brush = el.brush ?? "pen";
   const brushFamily = resolveStudioBrushRenderFamily(brush);
-  const dynamicsPresetId = resolveStudioCapturedBrushDynamicsPresetId(el)
-    ?? resolveStudioBrushDynamicsPresetId(brush);
+  // Mirrors StudioDrawNode's engine decision exactly (shared captured resolver, no fallback).
+  const dynamicsPresetId = resolveStudioCapturedBrushDynamicsPresetId(el);
   const dynamicBrush = dynamicsPresetId !== null;
   const stampKind = resolveStudioStampBrushKind(brush);
   const renderSampleDistance = strokeRenderDistance(el.sampleSpacing);
@@ -2332,6 +2333,40 @@ function serializeFreehand(
     return `<circle cx="${fmt(points[0])}" cy="${fmt(points[1])}" r="${fmt(radius)}" fill="${escapeXml(stroke)}"${opacityAttr}/>`;
   }
 
+  // Branch order mirrors StudioDrawNode exactly: the stamp engine wins before dynamics. The two
+  // id sets are disjoint under the shared resolver, but keeping the order identical guarantees
+  // both surfaces take the same branch even for foreign/corrupt documents.
+  if (stampKind) {
+    const style = resolveStudioStampBrushStyle(
+      stampKind,
+      { color: stroke, size: strokeWidth, opacity: strokeOpacity },
+      el.stamp,
+      brush,
+    );
+    // v2는 이미 수락·안정화된 append-only 입력이다. legacy만 과거 평활화/압력 재표본을 유지한다.
+    const causal = el.stampPipeline === "causal-walker-v2";
+    const stampPoints = causal
+      ? points
+      : resolveStudioFreehandRenderPath(points, {
+          sampleSpacing: el.sampleSpacing,
+          legacyMinDistance: renderSampleDistance,
+          legacyTension: 0,
+        }).points;
+    const sourceAligned = causal || stampPoints === points;
+    const stampPressures = sourceAligned
+      ? el.pressures
+      : resampleStrokePressures(
+          el.pressures ?? [],
+          Math.floor(stampPoints.length / 2),
+          0.5
+        );
+    return serializeStampBrushDabs(
+      ctx,
+      style,
+      planStudioStampBrushDabs(style, stampPoints, stampPressures)
+    );
+  }
+
   if (
     dynamicBrush &&
     dynamicsPresetId &&
@@ -2444,37 +2479,6 @@ function serializeFreehand(
     return boundedFlow
       ? `<g opacity="${fmtDabOpacity(strokeOpacity)}">${marks.join("")}</g>`
       : `<g>${marks.join("")}</g>`;
-  }
-
-  if (stampKind) {
-    const style = resolveStudioStampBrushStyle(
-      stampKind,
-      { color: stroke, size: strokeWidth, opacity: strokeOpacity },
-      el.stamp,
-      brush,
-    );
-    // v2는 이미 수락·안정화된 append-only 입력이다. legacy만 과거 평활화/압력 재표본을 유지한다.
-    const causal = el.stampPipeline === "causal-walker-v2";
-    const stampPoints = causal
-      ? points
-      : resolveStudioFreehandRenderPath(points, {
-          sampleSpacing: el.sampleSpacing,
-          legacyMinDistance: renderSampleDistance,
-          legacyTension: 0,
-        }).points;
-    const sourceAligned = causal || stampPoints === points;
-    const stampPressures = sourceAligned
-      ? el.pressures
-      : resampleStrokePressures(
-          el.pressures ?? [],
-          Math.floor(stampPoints.length / 2),
-          0.5
-        );
-    return serializeStampBrushDabs(
-      ctx,
-      style,
-      planStudioStampBrushDabs(style, stampPoints, stampPressures)
-    );
   }
 
   const perfectProfile = resolveStudioPerfectFreehandProfile(brush);

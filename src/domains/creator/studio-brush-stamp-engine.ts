@@ -29,7 +29,7 @@ import {
 import {
   getStudioPaperPresetV1,
   isStudioPaperPresetIdV1,
-  resolveStudioPaperMediaModulationV1,
+  resolveStudioPaperDepositScaleV1,
 } from "./studio-paper-media-profile-v1";
 
 import type { StudioBrushEngineLaneStampTuning } from "./studio-brush-engine-lane-catalog";
@@ -234,14 +234,18 @@ function stampPaperDepositScale(
   y: number,
   pressure: number,
 ): number {
-  return resolveStudioPaperMediaModulationV1({
-    medium: paper.medium,
-    preset: paper.preset,
+  // Scalar fast path (2026-08-14): byte-identical to
+  // `resolveStudioPaperMediaModulationV1({...}).depositScale` — the two share one
+  // deposit-math source — but allocates no per-dab input/result objects. The
+  // planner reads only depositScale, thousands of times per long stroke.
+  return resolveStudioPaperDepositScaleV1(
+    paper.medium,
+    paper.preset,
     pressure,
     x,
     y,
-    seed: paper.seed,
-  }).depositScale;
+    paper.seed,
+  );
 }
 
 export interface StudioStampBrushStyle {

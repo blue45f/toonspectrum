@@ -5,6 +5,9 @@
  * - croquis.js (disjukr/croquis.js, package `@disjukr/croquis-js` 0.0.3) — dual-licensed
  *   "(MIT OR Apache-2.0)" per package.json `license` and README §license ("croquis.js is
  *   dual-licensed under Apache 2.0 and MIT terms"). Author: JongChan Choi <jong@chan.moe>.
+ *   ToonSpectrum elects the MIT option; the permission notice is checked in at
+ *   `third_party/croquis-js/LICENSE-MIT` and embedded into
+ *   `dist/legal/THIRD_PARTY_NOTICES.generated.md` (upstream ships no license text file).
  * - `src/brush/simple.ts` — outer-bitangent capsule fill (drawCapsule case1/case2, swallow
  *   guard `big.r > small.r + d`, radius rule `r = pressure * size * 0.5`).
  * - `src/stabilizer/pulled-string.ts` — pulled-string input smoothing

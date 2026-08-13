@@ -11,7 +11,6 @@
 
 import {
   isStudioDryMediaUnionComposableProgramPin,
-  isStudioDynamicBrushCausalDepositPipeline,
   STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_DIGEST,
   STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_VERSION,
   type NormalizedStudioBrushDynamicsSettings,
@@ -24,6 +23,7 @@ import {
 } from "./studio-dry-media-dynamic-bridge";
 import {
   resolveStudioDryMediaKernelTipMaterial,
+  studioDryMediaKernelDabPathOwnsMaterial,
   type StudioDryMediaCoreId,
 } from "./studio-dry-media-kernel-tip";
 
@@ -232,23 +232,20 @@ function quantize(value: number): number {
 }
 
 /**
- * Union-carrier ownership is now a legacy-replay authority (T1 de-polygon):
- * - an explicit `dryMediaUnionProgram` pin keeps the stroke on this carrier byte-identically;
- * - an unpinned legacy (non-causal) dynamics snapshot also stays here so historical documents
- *   replay their exact union bytes instead of degrading to sampled circle grids.
- * Every unpinned causal stroke — which is every freshly authored core dry-media stroke — is owned
- * by the verified-kernel dab path (`studioDryMediaKernelDabPathOwnsMaterial`) and never plans
- * union polygons.
+ * Union-carrier ownership is the legacy byte authority of the T1 de-polygon flip, defined as the
+ * exact complement of the kernel dab path over eligible materials (fail-safe): it keeps every
+ * eligible stroke whose dynamics do NOT carry the explicit fresh-authoring `dryMediaKernelProgram`
+ * marker. That set is every persisted pre-wave document — unpinned causal strokes included —
+ * plus every explicitly pinned element, so historical replay is byte-identical to the pre-flip
+ * output instead of being silently re-rendered by the kernel tips. Only freshly authored core
+ * dry-media strokes (whose preset snapshots mint the marker) leave this carrier.
  */
 export function studioDryMediaUnionRibbonCarrierOwnsMaterial(
   materialIdentity: StudioDynamicBrushMaterialIdentity | undefined,
   dynamics: NormalizedStudioBrushDynamicsSettings,
 ): boolean {
   return resolveStudioDryMediaKernelTipMaterial(materialIdentity, dynamics) !== null
-    && (
-      isStudioDryMediaUnionComposableProgramPin(dynamics.dryMediaUnionProgram)
-      || !isStudioDynamicBrushCausalDepositPipeline(dynamics.depositPipeline)
-    );
+    && studioDryMediaKernelDabPathOwnsMaterial(materialIdentity, dynamics) === null;
 }
 
 function validFrame(
@@ -696,8 +693,23 @@ export function planStudioDryMediaUnionRibbonCarrier(
     currentComposableGroup.polygons.push(polygon);
     polygons.push(polygon);
   };
-  const presetId = input.materialIdentity?.dryMediaPresetId ?? "charcoal";
-  const grainPolicy = DRY_MEDIA_NEGATIVE_GRAIN_POLICY[presetId] ?? DRY_MEDIA_NEGATIVE_GRAIN_POLICY.charcoal;
+  // Legacy-replay byte authority: the negative-grain policy is keyed by the kernel-tip material
+  // id — the runtime brushId for every persisted core dry-media stroke — never by the resolved
+  // anisotropic preset. `dryMediaPresetId` folds oil-pastel onto the "pastel" row and would
+  // silently change the paper-tooth slit bytes of every stored oil-pastel stroke.
+  const grainMaterialId = resolveStudioDryMediaKernelTipMaterial(
+    input.materialIdentity,
+    input.dynamics,
+  );
+  if (grainMaterialId === null) {
+    // Unreachable behind the ownership gate above; fail closed instead of substituting a policy.
+    return Object.freeze({
+      applied: false,
+      reason: "ineligible-material",
+      marks: input.marks,
+    });
+  }
+  const grainPolicy = DRY_MEDIA_NEGATIVE_GRAIN_POLICY[grainMaterialId];
   const grainSeed = Math.trunc(finite(input.dynamics.seed, 0)) >>> 0;
   for (
     let index = skipLeadingMarks;

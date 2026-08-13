@@ -16,6 +16,13 @@ import {
   resolveStudioDynamicBrushMaterialIdentity,
   type StudioDynamicBrushMaterialIdentity,
 } from "./studio-dry-media-dynamic-bridge";
+import {
+  ensureStudioDryMediaKernelTipIdlePrewarm,
+  prewarmStudioDryMediaKernelTipMaps,
+  resetStudioDryMediaKernelTipCacheForTests,
+  studioDryMediaKernelTipCacheSizeForTests,
+  studioDryMediaKernelTipWorkingSet,
+} from "./studio-dry-media-kernel-tip";
 import { planStudioDynamicBrushCoverageMarks } from "./studio-dynamic-brush-coverage-renderer";
 
 const CORE_DRY_MEDIA = [
@@ -261,5 +268,123 @@ describe("core dry-media long-stroke regression", () => {
     const first = perStrokeElapsed[0]!;
     const last = perStrokeElapsed.at(-1)!;
     expect(last).toBeLessThan(first * 1.2 + 40);
+  });
+});
+
+describe("cold-start first-chunk freeze gate (adversarial-review regression)", () => {
+  // Probe being reproduced (Lens 3, major): every freeze gate in this file and in the perf
+  // matrix warmed caches before timing, so the measured cold first-stroke class — 75.8ms
+  // first chunk on the pre-wave union path; crayon 53.8ms / charcoal 51.1ms / oil-pastel
+  // 40.8ms fresh-process on the replacement kernel path vs ~2ms warm — was structurally
+  // invisible. The dominant cost is kernel tip cache misses (1.6-5.4ms per 128×128 bake).
+  //
+  // The product fix pays those bakes during browser idle time before the first stroke
+  // (ensureStudioDryMediaKernelTipIdlePrewarm, wired at kernel-tip module load). This gate
+  // forces a COLD planner state (tip cache fully reset — "fresh planner state"; process-level
+  // module/JIT cost is page-load-amortized in the app and is not part of a stroke), replays
+  // the admission prewarm, and pins two facts per material:
+  //   1. the prewarmed working set covers the whole first chunk — ZERO tip bakes remain, so
+  //      the 1.6-5.4ms × N bake stall class cannot recur on the first chunk;
+  //   2. the prewarmed first 24-sample chunk plans well under the 33ms freeze budget
+  //      (measured ~2-8ms here — a >4× documented margin).
+  // Before the fix, the prewarm APIs did not exist and the first chunk re-baked its tips
+  // inside the stroke, exceeding the budget on the banded materials.
+  const FIRST_CHUNK_SAMPLES = 24;
+  const CHUNK_FREEZE_BUDGET_MS = 33;
+
+  it.each(CORE_DRY_MEDIA)(
+    "plans the admission-prewarmed cold first chunk for %s under the freeze budget with zero tip bakes",
+    (brushId) => {
+      resetStudioDryMediaKernelTipCacheForTests();
+      const stroke = plannedStroke(brushId, FIRST_CHUNK_SAMPLES);
+
+      // Admission prewarm at the material's authored softness bakes the full working set.
+      const baked = prewarmStudioDryMediaKernelTipMaps(
+        brushId,
+        stroke.dynamics.tip.softness,
+      );
+      expect(baked).toBe(
+        studioDryMediaKernelTipWorkingSet(brushId, stroke.dynamics.tip.softness).length,
+      );
+      const cacheSizeAfterPrewarm = studioDryMediaKernelTipCacheSizeForTests();
+
+      const startedAt = performance.now();
+      const plan = coverage(stroke);
+      const elapsedMs = performance.now() - startedAt;
+      expect(plan.ok, brushId).toBe(true);
+
+      // 1. Working-set coverage: the first chunk resolved every tip from cache.
+      expect(studioDryMediaKernelTipCacheSizeForTests()).toBe(cacheSizeAfterPrewarm);
+      // 2. Freeze budget with margin (typical ~2-8ms measured on the gate machine).
+      expect(elapsedMs, `${brushId} cold prewarmed first chunk`).toBeLessThan(
+        CHUNK_FREEZE_BUDGET_MS,
+      );
+    },
+  );
+
+  it("pumps the idle prewarm one bounded bake per slice until the working set is resident", () => {
+    resetStudioDryMediaKernelTipCacheForTests();
+    const pending: Array<() => void> = [];
+    const scheduled = ensureStudioDryMediaKernelTipIdlePrewarm(
+      () => CORE_DRY_MEDIA.map((materialId) => ({ materialId, softness: 0.4 })),
+      (pump) => pending.push(pump),
+    );
+    expect(scheduled).toBe(true);
+    // Re-entry is a no-op while a pump is scheduled (StrictMode/dual-import safety).
+    expect(
+      ensureStudioDryMediaKernelTipIdlePrewarm(
+        () => CORE_DRY_MEDIA.map((materialId) => ({ materialId, softness: 0.4 })),
+        (pump) => pending.push(pump),
+      ),
+    ).toBe(false);
+
+    const expectedKeys = CORE_DRY_MEDIA.reduce(
+      (total, materialId) =>
+        total + studioDryMediaKernelTipWorkingSet(materialId, 0.4).length,
+      0,
+    );
+    let slices = 0;
+    let maxSliceMs = 0;
+    while (pending.length > 0 && slices < expectedKeys + 8) {
+      const pump = pending.shift()!;
+      const sliceStartedAt = performance.now();
+      pump();
+      maxSliceMs = Math.max(maxSliceMs, performance.now() - sliceStartedAt);
+      slices += 1;
+    }
+    expect(pending).toHaveLength(0);
+    expect(studioDryMediaKernelTipCacheSizeForTests()).toBeGreaterThanOrEqual(
+      // The 64-entry LRU bounds residency; every slice stays a single bake.
+      Math.min(expectedKeys, 64),
+    );
+    expect(slices).toBeGreaterThanOrEqual(Math.min(expectedKeys, 64));
+    // One 128×128 bake per idle slice: far under the 33ms chunk freeze budget.
+    expect(maxSliceMs).toBeLessThan(CHUNK_FREEZE_BUDGET_MS);
+    resetStudioDryMediaKernelTipCacheForTests();
+  });
+
+  it("keeps PINNED legacy-union chunked replay inside the freeze budget (soak sentinel)", () => {
+    // The perf-matrix soak sentinels exercise the kernel path; the pinned union replay path
+    // previously had byte-identity coverage but no perf gate at all. Warm-path pin: chunked
+    // replay of a pinned 1500-sample stroke must never exceed one 30fps frame per chunk.
+    unionPolygons(coverage(plannedStroke("crayon", 96, 0, true)));
+    const stroke = plannedStroke("oil-pastel", 1_500, 0.7, true);
+    const chunkSize = 128;
+    let cursor = 0;
+    let maxChunkMs = 0;
+    while (cursor < stroke.dabs.length) {
+      const end = Math.min(stroke.dabs.length, cursor + chunkSize);
+      const predecessor = cursor > 0 ? cursor - 1 : cursor;
+      const chunkStartedAt = performance.now();
+      const plan = coverage(
+        stroke,
+        stroke.dabs.slice(predecessor, end),
+        cursor > 0 ? 1 : 0,
+      );
+      maxChunkMs = Math.max(maxChunkMs, performance.now() - chunkStartedAt);
+      expect(plan.ok, `pinned union chunk ${cursor}:${end}`).toBe(true);
+      cursor = end;
+    }
+    expect(maxChunkMs).toBeLessThan(CHUNK_FREEZE_BUDGET_MS);
   });
 });

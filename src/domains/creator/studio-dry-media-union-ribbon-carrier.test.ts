@@ -38,7 +38,11 @@ const LEGACY_CARRIER_SHA256: Readonly<Record<CoreDryMediaId, string>> = Object.f
   chalk: "33b358794aa321406c6afca80fd41373af44c5f858294784842cc9c74d2a0d45",
   charcoal: "73d5a05fbe1c85ad27d9545fe4cb0166e17beec8b953c0b6c829de7f55c316c0",
   pastel: "550525d2f47d66ce41d1d743cad912063940b4b18b5fdd044d45dfc6b04da5e3",
-  "oil-pastel": "bc54791ade979263b2c8a2345fd090145768e21a22cc52f5c04efd751bedc3ca",
+  // Re-captured with the restored brushId-keyed negative-grain policy: the original T1 capture
+  // was taken while the carrier mis-keyed oil-pastel onto the "pastel" row (dryMediaPresetId),
+  // so it pinned the regression, not the pre-wave production bytes. The other four rows are
+  // unchanged under both keyings and prove the rest of the byte pipeline is untouched.
+  "oil-pastel": "bfddc491446750a182e0ca35bcce3183693d671b2f14e797787f4fe0de0783bb",
 });
 
 /**
@@ -51,7 +55,9 @@ const PINNED_CARRIER_SHA256: Readonly<Record<CoreDryMediaId, string>> = Object.f
   chalk: "80530301e273c109833d00b9d98ddeb358eddcd5eba739aac31c1abed321b8c6",
   charcoal: "4a620ecebdf8e8c4bf7092d9020b49178f35f8722cf2970aa3f06aca5b8b9346",
   pastel: "10290a11eba1cad4a16472206bf7b385e2c436c184eb732bfc0c8a45c612adbf",
-  "oil-pastel": "485239de5c8f7bb9d83e90526a3b1b72d59ac3853b4a2db181bc3d6d23c3848e",
+  // Re-captured for the same reason as the legacy row above: the original capture pinned the
+  // mis-keyed "pastel" grain policy instead of the pre-wave "oil-pastel" row.
+  "oil-pastel": "837c1b93aefd8b7ef5fb0fd7ac5b4d63cc735d4a0741e9f404a749251ff2ade3",
 });
 
 const POINTS = Object.freeze([
@@ -66,7 +72,7 @@ const PRESSURES = Object.freeze([0.2, 0.55, 0.9, 0.4, 0.75, 0.6]);
 
 function settingsFor(
   brushId: CoreDryMediaId,
-  mode: "authored" | "pinned" | "legacy-pipeline",
+  mode: "authored" | "pinned" | "pre-wave-causal" | "legacy-pipeline",
 ): NormalizedStudioBrushDynamicsSettings {
   const authored = studioBrushDynamicsSettingsForBrushId(brushId);
   if (!authored) throw new Error(`Missing ${brushId} dynamics`);
@@ -77,9 +83,20 @@ function settingsFor(
       dryMediaUnionProgram: studioDryMediaUnionComposableProgramPin(),
     });
   }
+  if (mode === "pre-wave-causal") {
+    // Persisted pre-wave stroke shape: causal pipeline, no fresh-authoring kernel marker and no
+    // wave-added preset identity (normalization omits both, keeping the snapshot byte-stable).
+    return normalizeStudioBrushDynamicsSettings({
+      ...authored,
+      presetId: undefined,
+      dryMediaKernelProgram: undefined,
+    });
+  }
   // Historical persisted snapshot without a causal deposit pipeline.
   return normalizeStudioBrushDynamicsSettings({
     ...authored,
+    presetId: undefined,
+    dryMediaKernelProgram: undefined,
     depositPipeline: undefined,
   });
 }
@@ -160,10 +177,12 @@ function composableGroups(
 }
 
 describe("dry-media union ribbon carrier v3 representation", () => {
-  it("rejects unpinned causal core dry media — the kernel dab path owns fresh strokes", () => {
+  it("rejects freshly authored strokes — the explicit kernel marker owns them, zero union polygons", () => {
     for (const brushId of CORE_DRY_MEDIA_IDS) {
       const settings = settingsFor(brushId, "authored");
       expect(settings.dryMediaUnionProgram, brushId).toBeUndefined();
+      // Fresh authoring is the only marker mint; it is what routes the stroke off this carrier.
+      expect(settings.dryMediaKernelProgram, brushId).toBeDefined();
       const bridged = sourceMarksFor(brushId, settings, sourceDabsFor(settings));
       const result = planStudioDryMediaUnionRibbonCarrier({
         dabs: bridged.dabs,
@@ -176,6 +195,45 @@ describe("dry-media union ribbon carrier v3 representation", () => {
       if (!result.applied) {
         expect(result.reason, brushId).toBe("ineligible-material");
       }
+    }
+  });
+
+  it("replays stored pre-wave causal strokes (no kernel marker) through the union carrier byte-identically", () => {
+    // Reviewer probe D3/F5: pre-wave persisted core dry-media strokes are unpinned causal
+    // snapshots. Before the marker gate they were re-routed to the kernel dab path; they must
+    // plan the exact union geometry captured pre-flip. The pinned capture is SHA-pinned below,
+    // and the pin only contributes the compositing metadata, so polygon equality against the
+    // pinned plan is byte equality against the pre-flip production output.
+    for (const brushId of CORE_DRY_MEDIA_IDS) {
+      const persisted = settingsFor(brushId, "pre-wave-causal");
+      expect(persisted.dryMediaKernelProgram, brushId).toBeUndefined();
+      expect(persisted.dryMediaUnionProgram, brushId).toBeUndefined();
+      expect(persisted.depositPipeline, brushId).toBe("causal-deposit-v3-segmented");
+      const mark = requireCarrier(brushId, persisted, sourceDabsFor(persisted));
+      // No explicit pin ⇒ no composable-program metadata, exactly as the pre-flip carrier.
+      expect(mark.ribbon.compositing, brushId).toBeUndefined();
+
+      const pinned = settingsFor(brushId, "pinned");
+      const pinnedMark = requireCarrier(brushId, pinned, sourceDabsFor(pinned));
+      expect(mark.ribbon.polygons, brushId).toEqual(pinnedMark.ribbon.polygons);
+      expect(
+        {
+          x: mark.x,
+          y: mark.y,
+          radiusX: mark.radiusX,
+          radiusY: mark.radiusY,
+          alpha: mark.alpha,
+          color: mark.color,
+        },
+        brushId,
+      ).toEqual({
+        x: pinnedMark.x,
+        y: pinnedMark.y,
+        radiusX: pinnedMark.radiusX,
+        radiusY: pinnedMark.radiusY,
+        alpha: pinnedMark.alpha,
+        color: pinnedMark.color,
+      });
     }
   });
 

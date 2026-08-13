@@ -2,7 +2,9 @@
  * dli/paint impasto relief lighting — CPU port for the settled oil lane.
  *
  * Ported from David Li's Fluid Paint (github.com/dli/paint, MIT License,
- * © 2017 David Li, http://david.li) `shaders/painting.frag`: Sobel
+ * © 2017 David Li, http://david.li — verbatim permission notice checked in at
+ * `third_party/dli-paint/LICENSE` and embedded into
+ * `dist/legal/THIRD_PARTY_NOTICES.generated.md`) `shaders/painting.frag`: Sobel
  * height→normal, GGX distribution + "GGGX" Smith-style visibility + Schlick
  * fresnel specular, and the wrapped diffuse `d·diffuseScale + (1−diffuseScale)`.
  * Default parameters are paint.js verbatim: NORMAL_SCALE 7.0 (divided by the

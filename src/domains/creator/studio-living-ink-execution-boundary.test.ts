@@ -8,6 +8,12 @@ const webGpuRuntime = readFileSync(
   "utf8",
 );
 const wgsl = readFileSync(new URL("./studio-living-ink-wgsl-shaders.ts", import.meta.url), "utf8");
+// CPU reference solver + shared damping selector, split out of the WGSL library (2026-08-14) so
+// the route-side settled bake stops dragging the compute-kernel sources into the studio chunk.
+const fluidReference = readFileSync(
+  new URL("./studio-living-ink-fluid-reference.ts", import.meta.url),
+  "utf8",
+);
 const worker = readFileSync(new URL("./studio-living-ink.worker.ts", import.meta.url), "utf8");
 const provider = readFileSync(new URL("./studio-living-ink-provider.ts", import.meta.url), "utf8");
 const validation = readFileSync(
@@ -125,9 +131,19 @@ describe("Living Ink actual execution boundary", () => {
     expect(runtime).toContain("Math.exp(-dt / (fixing ? 0.25 : dryWindow))");
     expect(webGpuRuntime).toContain("fixTransfer: fixing ? 1 - Math.exp(-dt * 5) : 0");
     expect(webGpuRuntime).toContain("if (fixing) {");
-    expect(wgsl).toContain("STUDIO_LIVING_INK_RELEASE_VELOCITY_DAMPING_RATE_PER_SECOND = 60");
+    // The selector is defined once, in the shader-free CPU reference leaf …
+    expect(fluidReference).toContain(
+      "STUDIO_LIVING_INK_RELEASE_VELOCITY_DAMPING_RATE_PER_SECOND = 60",
+    );
+    expect(fluidReference).toContain(
+      "if (fixing) return studioLivingInkVelocityDamping(flow, dt, true)",
+    );
+    // … and the WGSL library consumes and re-exports that single copy (uniform slot 12), so the
+    // GPU backends and the CPU reference cannot drift into two different retention curves.
     expect(wgsl).toContain("studioLivingInkVelocityDampingForStep(");
-    expect(wgsl).toContain("if (fixing) return studioLivingInkVelocityDamping(flow, dt, true)");
+    expect(wgsl).toContain(
+      'import { studioLivingInkVelocityDampingForStep } from "./studio-living-ink-fluid-reference"',
+    );
     expect(wgsl).toContain(
       "studioLivingInkEvaporationMultiplier(input.dryRate, input.dt, input.fixing)",
     );

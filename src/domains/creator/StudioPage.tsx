@@ -9418,9 +9418,10 @@ function StudioCuttoonEditor({
       const dynamics = slot.brushDynamics
         ? normalizeStudioBrushDynamicsSettings(slot.brushDynamics)
         : studioBrushDynamicsSettingsForBrushId(preset.id);
-      if (dynamics) {
-        setBrushDynamics(dynamics);
-      }
+      // Non-dynamics presets reset to neutral defaults. Keeping the previous brush's snapshot
+      // alive here leaked its presetId/depositPipeline into currentBrushSnapshot, polluting
+      // saved brushes, slots and tool memory with stale dynamics.
+      setBrushDynamics(dynamics ?? normalizeStudioBrushDynamicsSettings());
     } else {
       setBrush(slot.brushId);
       setStampTuning(defaultStampTuningForBrushId(slot.brushId));

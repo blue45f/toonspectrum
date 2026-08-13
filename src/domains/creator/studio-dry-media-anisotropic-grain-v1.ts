@@ -344,28 +344,30 @@ export function isStudioDryMediaAnisotropicPresetIdV1(
  * roller and rake materials receive an anisotropic carrier; only entries explicitly classified as
  * intentional motif/stamp deposits keep their authored discrete renderer. A generic `dry-media`
  * id without catalogue provenance remains unsupported rather than being guessed.
+ *
+ * This resolver is a stored-replay authority: persisted material identity is recomputed from it on
+ * every render, so its answers are frozen for every id combination that ever shipped.
+ * - The runtime brush id wins with EXACT matching only. Engine-lane ids such as
+ *   `crayon--wax-scrape` or `oil-pastel--waxy-film` are pre-wave persisted dynamic lanes whose
+ *   identity is null (bridge identity pass, mark multiplier 1); any prefix heuristic would flip
+ *   their stored strokes into a 3–5x anisotropic lane expansion.
+ * - Catalogue classification consults the explicit `brushCatalogId` key table only, never the
+ *   brush id, so a core runtime id (`"chalk"`) is never overridden by its catalogue material.
+ * A new lane that deserves a material identity must be added as an explicit exact entry to
+ * `STUDIO_DRY_MEDIA_ANISOTROPIC_CATALOG_PRESETS_V1` instead of widening this matcher.
  */
 export function resolveStudioDryMediaAnisotropicPresetIdV1(
   brushId: unknown,
   brushCatalogId?: unknown,
 ): StudioDryMediaAnisotropicPresetIdV1 | null {
-  const target =
-    typeof brushCatalogId === "string" && brushCatalogId.length > 0
-      ? brushCatalogId
-      : typeof brushId === "string" ? brushId : "";
   if (
-    target === "crayon"
-    || target === "charcoal"
-    || target === "chalk"
-    || target === "pastel"
-  ) return target;
-  if (target === "oil-pastel") return "pastel";
-  if (target.startsWith("crayon")) return "crayon";
-  if (target.startsWith("charcoal")) return "charcoal";
-  if (target.startsWith("chalk")) return "chalk";
-  if (target.startsWith("pastel")) return "pastel";
-  if (target.startsWith("oil-pastel")) return "pastel";
-  const classification = classifyStudioDryMediaCatalogIdV1(brushCatalogId ?? brushId);
+    brushId === "crayon"
+    || brushId === "charcoal"
+    || brushId === "chalk"
+    || brushId === "pastel"
+  ) return brushId;
+  if (brushId === "oil-pastel") return "pastel";
+  const classification = classifyStudioDryMediaCatalogIdV1(brushCatalogId);
   return classification?.kind === "anisotropic-continuous"
     ? classification.presetId
     : null;

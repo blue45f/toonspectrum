@@ -1026,11 +1026,14 @@ export function planStudioDynamicBrushCoverageMarks(
       dynamics,
     );
   /*
-   * T1 de-polygon: unpinned causal core dry media never enters the union carrier. The same
-   * bridged multi-lane dabs stay ellipse/alpha-map primitives whose primary tip is a verified
-   * OSS kernel bake (crayon wax / chalk powder / charcoal grit / pastel velvet / oil-pastel wax
-   * film). Asset-backed R8 paper keeps its byte-authoritative composed maps, so the kernel tip
-   * only engages when no R8 grain sampler is active — mirroring the union authority gate above.
+   * T1 de-polygon: a core dry-media stroke leaves the union carrier only when its dynamics carry
+   * the explicit fresh-authoring `dryMediaKernelProgram` marker. Marked strokes keep the same
+   * bridged multi-lane dabs as ellipse/alpha-map primitives whose primary tip is a verified OSS
+   * kernel bake (crayon wax / chalk powder / charcoal grit / pastel velvet / oil-pastel wax
+   * film); every unmarked persisted stroke — causal or legacy — replays through the union
+   * authority above byte-identically. Asset-backed R8 paper keeps its byte-authoritative composed
+   * maps, so the kernel tip only engages when no R8 grain sampler is active — mirroring the union
+   * authority gate above.
    */
   const dryMediaKernelTipMaterial = r8GrainSampler === null
     ? studioDryMediaKernelDabPathOwnsMaterial(

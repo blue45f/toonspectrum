@@ -13,17 +13,23 @@
  *   (wider pressed plateau, weaker scrape reveal than crayon — mirrors the smoother union-era
  *   oil-pastel grain policy without any polygon transport).
  *
- * Routing discipline (provider pinning, no non-equivalent fallback):
- * - `dryMediaUnionProgram` pin present ⇒ the legacy union carrier keeps the stroke byte-identical.
- * - No pin + causal deposit pipeline ⇒ this kernel dab path owns the material.
- * - No pin + legacy (non-causal) snapshot ⇒ the union carrier keeps ownership so historical
- *   documents replay their exact bytes instead of degrading to sampled circle grids.
- * The two owners are mutually exclusive and cover the eligible material set exactly.
+ * Routing discipline (provider pinning, fail-safe to the legacy byte authority):
+ * - This kernel dab path owns ONLY strokes whose dynamics carry the explicit
+ *   `dryMediaKernelProgram` marker (minted exclusively by the authored core dry-media preset
+ *   snapshots, so pointer start embeds it in every freshly authored element), on a causal deposit
+ *   pipeline, without a `dryMediaUnionProgram` pin.
+ * - Every other eligible stroke — every persisted pre-wave document (causal or legacy), every
+ *   pinned element, and any snapshot of unknown provenance — stays on the union carrier so its
+ *   replay is byte-identical to the pre-flip output.
+ * The two owners are mutually exclusive and cover the eligible material set exactly: the union
+ * carrier is defined as the complement of this owner over eligible materials.
  */
 
 import {
+  isStudioDryMediaKernelDabProgramPin,
   isStudioDryMediaUnionComposableProgramPin,
   isStudioDynamicBrushCausalDepositPipeline,
+  studioBrushDynamicsSettingsForBrushId,
   type NormalizedStudioBrushDynamicsSettings,
 } from "./studio-brush-dynamics";
 import { studioStampOssTipCoverage } from "./studio-brush-stamp-engine";
@@ -117,7 +123,10 @@ export function resolveStudioDryMediaKernelTipMaterial(
 }
 
 /**
- * Kernel dab path ownership: eligible material, no legacy union program pin, causal pipeline.
+ * Kernel dab path ownership: eligible material carrying the explicit `dryMediaKernelProgram`
+ * marker on a causal pipeline, without a legacy union program pin. The marker is minted only by
+ * the authored core dry-media preset snapshots, so every persisted pre-wave stroke (whose
+ * dynamics cannot carry it) fails this gate and replays through the union carrier byte-identically.
  * Returns the owned material id so planners can resolve tips without re-deriving identity.
  */
 export function studioDryMediaKernelDabPathOwnsMaterial(
@@ -130,6 +139,7 @@ export function studioDryMediaKernelDabPathOwnsMaterial(
   );
   if (
     !material
+    || !isStudioDryMediaKernelDabProgramPin(dynamics.dryMediaKernelProgram)
     || isStudioDryMediaUnionComposableProgramPin(dynamics.dryMediaUnionProgram)
     || !isStudioDynamicBrushCausalDepositPipeline(dynamics.depositPipeline)
   ) return null;
@@ -529,8 +539,46 @@ export function resolveStudioDryMediaKernelTipAlphaMap(
   // keeping the softness slider connected to the material response.
   const hardnessStep = Math.round(clamp01(1 - tip.softness) * 20);
   const widthStep = studioDryMediaKernelTipWidthStep(materialId, depositionAlpha);
-  const cacheKey =
-    `${STUDIO_DRY_MEDIA_KERNEL_TIP_VERSION}:${materialId}:${variant}:${hardnessStep}:${widthStep}`;
+  return resolveKernelTipMapForSteps(materialId, variant, hardnessStep, widthStep);
+}
+
+/**
+ * Interned cache-key strings (2026-08-14 hot-path allocation fix): the per-dab
+ * cache-hit path used to build this template literal for every dab. The key
+ * space is tiny and closed — ≤5 materials × 4 variants × 21 hardness steps ×
+ * 9 width steps — so keys intern behind a numeric composite. Byte layout of
+ * the produced string (and therefore every baked map's content-stable
+ * `revision`) is unchanged.
+ */
+const kernelTipKeyIntern = new Map<StudioDryMediaCoreId, Map<number, string>>();
+
+function kernelTipMapCacheKey(
+  materialId: StudioDryMediaCoreId,
+  variant: number,
+  hardnessStep: number,
+  widthStep: number,
+): string {
+  const composite = (variant * 32 + hardnessStep) * 16 + widthStep;
+  let byMaterial = kernelTipKeyIntern.get(materialId);
+  if (!byMaterial) {
+    byMaterial = new Map();
+    kernelTipKeyIntern.set(materialId, byMaterial);
+  }
+  let key = byMaterial.get(composite);
+  if (key === undefined) {
+    key = `${STUDIO_DRY_MEDIA_KERNEL_TIP_VERSION}:${materialId}:${variant}:${hardnessStep}:${widthStep}`;
+    byMaterial.set(composite, key);
+  }
+  return key;
+}
+
+function resolveKernelTipMapForSteps(
+  materialId: StudioDryMediaCoreId,
+  variant: number,
+  hardnessStep: number,
+  widthStep: number,
+): StudioBrushTipAlphaMap {
+  const cacheKey = kernelTipMapCacheKey(materialId, variant, hardnessStep, widthStep);
   const cached = kernelTipMapCache.get(cacheKey);
   if (cached) {
     // Map insertion order is the LRU queue (same idiom as the shared tip alpha-map cache).
@@ -552,3 +600,188 @@ export function resolveStudioDryMediaKernelTipAlphaMap(
   kernelTipMapCache.set(cacheKey, baked);
   return baked;
 }
+
+// ---------------------------------------------------------------------------
+// Cold-start prewarm (2026-08-14 fix for the measured cold first-chunk class)
+//
+// Adversarial review measured the FIRST dry-media chunk of a session at
+// 28-54ms on this path (crayon 53.8ms, charcoal 51.1ms, oil-pastel 40.8ms
+// fresh-process vs ~2ms warm; the pre-wave union path showed the same class
+// at 75.8ms) — over the 33ms main-thread freeze budget. The dominant cost is
+// kernel tip cache misses (1.6-5.4ms per 128×128 bake, up to the full banded
+// working set on the first pressure ramp): with tips prewarmed the same first
+// chunk measures ~6-8ms. The working set below is enumerated exactly like the
+// resolver's key derivation, and an idle-time pump bakes it one map per idle
+// slice so no prewarm slice can exceed a single bake (≤ ~5.4ms).
+// ---------------------------------------------------------------------------
+
+/**
+ * Deterministic (variant × width-step) working set for one material at one
+ * softness: banded wax sticks bake 4 variants × 9 width steps (≤36 keys, the
+ * whole pressure ramp), powder media 4 variants × the single non-banded step.
+ */
+export function studioDryMediaKernelTipWorkingSet(
+  materialId: StudioDryMediaCoreId,
+  softness: number,
+): ReadonlyArray<{
+  readonly variant: number;
+  readonly hardnessStep: number;
+  readonly widthStep: number;
+}> {
+  const hardnessStep = Math.round(clamp01(1 - clamp01(softness)) * 20);
+  const widthSteps = KERNEL_TIP_SHAPING[materialId].band
+    ? Array.from(
+        { length: STUDIO_DRY_MEDIA_KERNEL_TIP_WIDTH_STEPS + 1 },
+        (_, step) => step,
+      )
+    : [STUDIO_DRY_MEDIA_KERNEL_TIP_WIDTH_STEPS];
+  const keys: Array<{ variant: number; hardnessStep: number; widthStep: number }> = [];
+  for (
+    let variant = 0;
+    variant < STUDIO_DRY_MEDIA_KERNEL_TIP_VARIANT_COUNT;
+    variant += 1
+  ) {
+    for (const widthStep of widthSteps) {
+      keys.push({ variant, hardnessStep, widthStep });
+    }
+  }
+  return keys;
+}
+
+/**
+ * Synchronously bakes every missing working-set map for `materialId` at the
+ * given softness. Returns the number of maps actually baked (cache misses
+ * filled). Bakes are pure, so prewarming can never change planned bytes —
+ * only when the bake cost is paid.
+ */
+export function prewarmStudioDryMediaKernelTipMaps(
+  materialId: StudioDryMediaCoreId,
+  softness: number,
+): number {
+  let baked = 0;
+  for (const key of studioDryMediaKernelTipWorkingSet(materialId, softness)) {
+    const cacheKey = kernelTipMapCacheKey(
+      materialId,
+      key.variant,
+      key.hardnessStep,
+      key.widthStep,
+    );
+    if (kernelTipMapCache.has(cacheKey)) continue;
+    resolveKernelTipMapForSteps(
+      materialId,
+      key.variant,
+      key.hardnessStep,
+      key.widthStep,
+    );
+    baked += 1;
+  }
+  return baked;
+}
+
+type KernelTipPrewarmUnit = Readonly<{
+  materialId: StudioDryMediaCoreId;
+  variant: number;
+  hardnessStep: number;
+  widthStep: number;
+}>;
+
+let kernelTipIdlePrewarmScheduled = false;
+
+/**
+ * Schedules the idle-time cold-start prewarm for the given materials (slowest
+ * cold classes first). One map bakes per idle callback slice (≤ ~5.4ms), so
+ * the prewarm itself can never breach the 33ms chunk freeze budget. Runs only
+ * where `requestIdleCallback` exists (browsers) unless a scheduler is
+ * injected, so Node scripts/tests stay deterministic and exit cleanly.
+ * Returns true when a pump was scheduled by this call.
+ */
+export function ensureStudioDryMediaKernelTipIdlePrewarm(
+  listMaterials: () => ReadonlyArray<{
+    readonly materialId: StudioDryMediaCoreId;
+    readonly softness: number;
+  }>,
+  scheduleIdle: ((pump: () => void) => void) | null = typeof globalThis.requestIdleCallback === "function"
+    ? (pump) => globalThis.requestIdleCallback(pump)
+    : null,
+): boolean {
+  if (kernelTipIdlePrewarmScheduled || !scheduleIdle) return false;
+  kernelTipIdlePrewarmScheduled = true;
+  // The queue materializes inside the first idle slice, never at module load.
+  let queue: KernelTipPrewarmUnit[] | null = null;
+  let cursor = 0;
+  const pump = (): void => {
+    if (queue === null) {
+      queue = [];
+      for (const { materialId, softness } of listMaterials()) {
+        for (const key of studioDryMediaKernelTipWorkingSet(materialId, softness)) {
+          queue.push({ materialId, ...key });
+        }
+      }
+    }
+    while (cursor < queue.length) {
+      const unit = queue[cursor] as KernelTipPrewarmUnit;
+      cursor += 1;
+      const cacheKey = kernelTipMapCacheKey(
+        unit.materialId,
+        unit.variant,
+        unit.hardnessStep,
+        unit.widthStep,
+      );
+      if (kernelTipMapCache.has(cacheKey)) continue;
+      resolveKernelTipMapForSteps(
+        unit.materialId,
+        unit.variant,
+        unit.hardnessStep,
+        unit.widthStep,
+      );
+      break; // exactly one bake per idle slice
+    }
+    if (cursor < queue.length) scheduleIdle(pump);
+  };
+  scheduleIdle(pump);
+  return true;
+}
+
+/** Test-only isolation hooks for the forced-cold first-chunk gate. */
+export function resetStudioDryMediaKernelTipCacheForTests(): void {
+  kernelTipMapCache.clear();
+  kernelTipIdlePrewarmScheduled = false;
+}
+
+export function studioDryMediaKernelTipCacheSizeForTests(): number {
+  return kernelTipMapCache.size;
+}
+
+/**
+ * Idle-prewarm order: banded wax sticks first — they own the deepest cold
+ * working sets (36 keys) and measured the worst cold first chunks.
+ */
+const KERNEL_TIP_COLD_PREWARM_ORDER: readonly StudioDryMediaCoreId[] = [
+  "crayon",
+  "oil-pastel",
+  "charcoal",
+  "chalk",
+  "pastel",
+];
+
+/** Authored default softness per core material (the shelf's cold-start state). */
+function authoredKernelTipPrewarmMaterials(): ReadonlyArray<{
+  readonly materialId: StudioDryMediaCoreId;
+  readonly softness: number;
+}> {
+  return KERNEL_TIP_COLD_PREWARM_ORDER.map((materialId) => {
+    const softness = studioBrushDynamicsSettingsForBrushId(materialId)?.tip.softness;
+    return {
+      materialId,
+      softness: typeof softness === "number" && Number.isFinite(softness)
+        ? clamp01(softness)
+        : 0.5,
+    };
+  });
+}
+
+// Module-load wiring: the studio route statically carries this module, so the
+// cold working set starts baking during browser idle time before the user's
+// first dry-media stroke (no-op in Node/jsdom, where requestIdleCallback is
+// absent — tests drive prewarm explicitly through the exported functions).
+ensureStudioDryMediaKernelTipIdlePrewarm(authoredKernelTipPrewarmMaterials);

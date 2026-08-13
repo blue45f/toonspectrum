@@ -76,6 +76,43 @@ export function isStudioDryMediaUnionComposableProgramPin(
     && candidate.programDigest === STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_DIGEST
     && Object.keys(candidate).every((key) => key === "version" || key === "programDigest");
 }
+
+export const STUDIO_DRY_MEDIA_KERNEL_PROGRAM_VERSION =
+  "dry-media-kernel-dab-path-v1" as const;
+export const STUDIO_DRY_MEDIA_KERNEL_PROGRAM_DIGEST =
+  "30c48947ab54ce7efde21a4935d7d5e278e08510e061fc5fbefb7056de818860" as const;
+
+export interface StudioDryMediaKernelProgramPin {
+  readonly version: typeof STUDIO_DRY_MEDIA_KERNEL_PROGRAM_VERSION;
+  readonly programDigest: typeof STUDIO_DRY_MEDIA_KERNEL_PROGRAM_DIGEST;
+}
+
+/**
+ * Fresh-authoring provider pin for the T1 de-polygon flip (dryMediaUnionProgram idiom).
+ *
+ * This marker is the ONLY way a core dry-media stroke reaches the verified-kernel dab path: the
+ * authored crayon/chalk/charcoal/pastel/oil-pastel preset snapshots mint it, pointer start embeds
+ * the snapshot in the new element, and every stroke whose dynamics do not carry it — every
+ * pre-wave persisted document, causal or legacy — stays on the union carrier byte-identically.
+ * Normalization preserves an incoming pin byte-for-byte (and rejects malformed ones) and never
+ * injects it, so canonical serialization of un-opted-in snapshots is unchanged.
+ */
+export function studioDryMediaKernelDabProgramPin(): StudioDryMediaKernelProgramPin {
+  return Object.freeze({
+    version: STUDIO_DRY_MEDIA_KERNEL_PROGRAM_VERSION,
+    programDigest: STUDIO_DRY_MEDIA_KERNEL_PROGRAM_DIGEST,
+  });
+}
+
+export function isStudioDryMediaKernelDabProgramPin(
+  value: unknown,
+): value is StudioDryMediaKernelProgramPin {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const candidate = value as Record<string, unknown>;
+  return candidate.version === STUDIO_DRY_MEDIA_KERNEL_PROGRAM_VERSION
+    && candidate.programDigest === STUDIO_DRY_MEDIA_KERNEL_PROGRAM_DIGEST
+    && Object.keys(candidate).every((key) => key === "version" || key === "programDigest");
+}
 export const STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2 =
   "causal-deposit-v2" as const;
 /**
@@ -242,6 +279,11 @@ export interface StudioBrushDynamicsSettings {
   depositPipeline?: StudioDynamicBrushDepositPipeline;
   /** Absent snapshots are immutable legacy v2; only an exact supported pin enables v3. */
   dryMediaUnionProgram?: StudioDryMediaUnionProgramPin;
+  /**
+   * Explicit kernel-dab-path opt-in minted only by authored dry-media preset snapshots. Absent
+   * snapshots (every persisted pre-wave stroke) replay through the union carrier byte-identically.
+   */
+  dryMediaKernelProgram?: StudioDryMediaKernelProgramPin;
   seed?: number;
   fallbackPressure?: number;
   /** CSS px/ms at which the normalized speed source reaches 1. */
@@ -417,25 +459,12 @@ export function resolveStudioBrushDynamicsPresetId(
     || brushId === "web-neon-tube-core"
   ) return "airbrush";
   if (
-    brushId === "ink-particle"
-    || brushId === "airbrush"
-    || brushId === "dry-media"
-  ) return brushId;
-  if (
-    brushId === "soft-brush"
-    || brushId === "spray"
-    || brushId === "splatter"
-  ) return "airbrush";
-  if (
     brushId === "crayon"
     || brushId === "chalk"
     || brushId === "charcoal"
     || brushId === "pastel"
     || brushId === "oil-pastel"
   ) return "dry-media";
-  if (typeof brushId === "string") {
-    return resolveStudioBrushEngineLaneDynamicsPresetId(brushId);
-  }
   return null;
 }
 
@@ -451,49 +480,67 @@ const STUDIO_CAPTURED_WET_DYNAMIC_PRESET_BY_BRUSH_ID: Readonly<
 });
 
 /**
- * Pointer-start resolver for newly authored wet presets.
+ * Pointer-start resolver for the currently selected brush plus its dynamics panel snapshot.
  *
- * Bare brush ids deliberately remain legacy watercolor ids. Only a captured causal dynamics
- * snapshot opts a new stroke into the bounded dynamic renderer, so old saved documents retain
- * their historical watercolor pixels.
+ * Resolution priority:
+ * 1. A brush id that itself contracts a dynamics engine (installed shortcut) always resolves —
+ *    including legacy snapshots that omit `presetId`/`depositPipeline` for byte-stable
+ *    serialization. A snapshot `presetId` is honored only for such brushes; any-brush `presetId`
+ *    shortcuts are rejected fail-closed because the collaboration mirror
+ *    (`STUDIO_CRDT_BOUNDED_FLOW_DYNAMIC_BRUSH_IDS`) admits bounded-flow strokes by brush id, so a
+ *    hijacked pen/stamp stroke would render locally and be refused by the server.
+ * 2. Bare wet brush ids deliberately remain legacy watercolor ids. Only a captured causal
+ *    dynamics snapshot opts a new wet stroke into the bounded dynamic renderer, so old saved
+ *    documents retain their historical watercolor pixels.
  */
 export function resolveStudioBrushDynamicsSelectionPresetId(
   brushId: unknown,
   brushDynamics: unknown,
 ): StudioBrushDynamicsPresetId | null {
   if (isStudioBrushDynamicsPresetId(brushId)) return brushId;
+  const installed = resolveStudioBrushDynamicsPresetId(brushId);
   if (typeof brushDynamics === "object" && brushDynamics !== null) {
     const presetId = (brushDynamics as { presetId?: unknown }).presetId;
-    if (isStudioBrushDynamicsPresetId(presetId)) return presetId;
+    if (installed !== null && isStudioBrushDynamicsPresetId(presetId)) return presetId;
     const depositPipeline = (brushDynamics as { depositPipeline?: unknown }).depositPipeline;
     if (isStudioDynamicBrushCausalDepositPipeline(depositPipeline)) {
       const wetPreset = typeof brushId === "string"
         ? (STUDIO_CAPTURED_WET_DYNAMIC_PRESET_BY_BRUSH_ID[brushId as keyof typeof STUDIO_CAPTURED_WET_DYNAMIC_PRESET_BY_BRUSH_ID] as StudioBrushDynamicsPresetId | undefined)
         : undefined;
-      return wetPreset ?? resolveStudioBrushDynamicsPresetId(brushId);
+      return wetPreset ?? installed;
     }
   }
-  return null;
+  // Pre-seam installed shortcut: legacy tool memory/slot snapshots (no presetId, no pipeline)
+  // must keep selecting the brush id's contracted engine instead of silently losing texture.
+  return installed;
 }
 
-/** Persisted/render resolver; unlike the selection helper this requires the versioned paint seam. */
+/**
+ * Persisted/render resolver shared verbatim by Canvas (StudioDrawNode), the draft-preview lane,
+ * the SVG exporter and the pointer capture gates — one decision point keeps surfaces in parity.
+ *
+ * - `bounded-flow-v2` elements resolve through the full selection contract (snapshot presetId /
+ *   captured wet pipeline / installed shortcut).
+ * - Elements with NO paint model are the historical contract (old dynamic strokes and today's
+ *   silk-symmetry strokes, which are bounded-flow-incompatible): they resolve through the
+ *   installed brush-id shortcut exactly as pre-seam builds did, so legacy documents replay
+ *   byte-identically. Wet ids stay null here — their dynamics opt-in requires the versioned seam.
+ * - Any explicit non-bounded paint model or wet pipeline fails closed to the legacy renderer.
+ */
 export function resolveStudioCapturedBrushDynamicsPresetId(input: Readonly<{
   brush?: unknown;
   brushDynamics?: unknown;
   paintModel?: unknown;
   watercolorPipeline?: unknown;
 }>): StudioBrushDynamicsPresetId | null {
-  if (
-    input.paintModel !== "bounded-flow-v2"
-    || (input.watercolorPipeline !== undefined && input.watercolorPipeline !== null)
-  ) return null;
-  if (isStudioBrushDynamicsPresetId(input.brush)) return input.brush;
-  return (
-    resolveStudioBrushDynamicsSelectionPresetId(
-      input.brush,
-      input.brushDynamics,
-    ) ?? resolveStudioBrushDynamicsPresetId(input.brush)
-  );
+  if (input.watercolorPipeline !== undefined && input.watercolorPipeline !== null) return null;
+  if (input.paintModel === "bounded-flow-v2") {
+    return resolveStudioBrushDynamicsSelectionPresetId(input.brush, input.brushDynamics);
+  }
+  if (input.paintModel === undefined || input.paintModel === null) {
+    return resolveStudioBrushDynamicsPresetId(input.brush);
+  }
+  return null;
 }
 
 export interface StudioBrushDynamicsPreset {
@@ -537,6 +584,12 @@ export interface NormalizedStudioBrushDynamicsSettings {
   presetId?: StudioBrushDynamicsPresetId;
   /** Omitted for legacy v2 snapshots; malformed explicit pins fail normalization closed. */
   dryMediaUnionProgram?: StudioDryMediaUnionProgramPin;
+  /**
+   * Explicit kernel-dab-path opt-in (fresh authored dry-media presets only). Omitted whenever the
+   * source snapshot omits it so persisted canonical serialization stays byte-stable; malformed
+   * explicit pins fail normalization closed.
+   */
+  dryMediaKernelProgram?: StudioDryMediaKernelProgramPin;
   seed: number;
   fallbackPressure: number;
   maxSpeed: number;
@@ -1020,6 +1073,9 @@ function cloneNormalizedSettings(
     ...(settings.dryMediaUnionProgram
       ? { dryMediaUnionProgram: { ...settings.dryMediaUnionProgram } }
       : {}),
+    ...(settings.dryMediaKernelProgram
+      ? { dryMediaKernelProgram: { ...settings.dryMediaKernelProgram } }
+      : {}),
     seed: settings.seed,
     fallbackPressure: settings.fallbackPressure,
     maxSpeed: settings.maxSpeed,
@@ -1229,12 +1285,20 @@ export function normalizeStudioBrushDynamicsSettings(value?: unknown): Normalize
     }
     dryMediaUnionProgram = { ...source.dryMediaUnionProgram };
   }
+  let dryMediaKernelProgram: StudioDryMediaKernelProgramPin | undefined;
+  if (source.dryMediaKernelProgram !== undefined) {
+    if (!isStudioDryMediaKernelDabProgramPin(source.dryMediaKernelProgram)) {
+      throw new TypeError("Unsupported dry-media kernel program pin.");
+    }
+    dryMediaKernelProgram = { ...source.dryMediaKernelProgram };
+  }
   return {
     version: STUDIO_BRUSH_DYNAMICS_SETTINGS_VERSION,
     ...(isStudioDynamicBrushCausalDepositPipeline(source.depositPipeline)
       ? { depositPipeline: source.depositPipeline }
       : {}),
     ...(dryMediaUnionProgram ? { dryMediaUnionProgram } : {}),
+    ...(dryMediaKernelProgram ? { dryMediaKernelProgram } : {}),
     ...(isStudioBrushDynamicsPresetId(source.presetId)
       ? { presetId: source.presetId }
       : {}),
@@ -3012,6 +3076,9 @@ const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamic
   crayon: {
     presetId: "dry-media",
     overrides: {
+      // Fresh-authoring kernel opt-in (T1 de-polygon). Only these authored core snapshots mint
+      // the marker; persisted documents never gain it, so their union replay stays byte-stable.
+      dryMediaKernelProgram: studioDryMediaKernelDabProgramPin(),
       seed: 307,
       tip: { shape: "hard", softness: 0.32 },
       width: {
@@ -3056,6 +3123,7 @@ const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamic
   chalk: {
     presetId: "dry-media",
     overrides: {
+      dryMediaKernelProgram: studioDryMediaKernelDabProgramPin(),
       seed: 311,
       tip: { shape: "sponge", softness: 0.48 },
       width: {
@@ -3098,6 +3166,7 @@ const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamic
   charcoal: {
     presetId: "dry-media",
     overrides: {
+      dryMediaKernelProgram: studioDryMediaKernelDabProgramPin(),
       seed: 317,
       tip: { shape: "bristle", softness: 0.58 },
       width: {
@@ -3143,6 +3212,7 @@ const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamic
   pastel: {
     presetId: "dry-media",
     overrides: {
+      dryMediaKernelProgram: studioDryMediaKernelDabProgramPin(),
       seed: 331,
       taper: {
         enabled: true,
@@ -3203,6 +3273,7 @@ const STUDIO_BRUSH_DYNAMICS_VARIANTS: Readonly<Record<string, StudioBrushDynamic
   "oil-pastel": {
     presetId: "dry-media",
     overrides: {
+      dryMediaKernelProgram: studioDryMediaKernelDabProgramPin(),
       seed: 337,
       taper: {
         enabled: true,

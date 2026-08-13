@@ -25,6 +25,9 @@ import {
   STUDIO_BRUSH_RENDER_FAMILY,
 } from "../../../../../src/domains/creator/studio-brush";
 import {
+  studioBrushDynamicsSettingsForBrushId,
+} from "../../../../../src/domains/creator/studio-brush-dynamics";
+import {
   isStudioStrokePaintModelCompatible as hasValidBrowserStrokePaintContract,
 } from "../../../../../src/domains/creator/studio-stroke-paint-model";
 
@@ -2531,6 +2534,56 @@ describe("StudioCrdtService", () => {
         payloadVersion: 3,
         ...browserContract,
       })).toBe(hasValidBrowserStrokePaintContract(browserContract));
+    }
+  });
+
+  it("admits the fresh-authoring dry-media kernel marker in brushDynamics, matching the browser oracle", () => {
+    // The `dryMediaKernelProgram` marker is minted by the authored core dry-media preset
+    // snapshots and travels inside the persisted brushDynamics JSON. Admission is bounded-JSON
+    // (no key whitelist), so the mirror must accept exactly what the browser accepts — a
+    // rejection here would drop the stroke server-side while the author keeps seeing it.
+    for (const brush of ["crayon", "chalk", "charcoal", "pastel", "oil-pastel"] as const) {
+      const authored = studioBrushDynamicsSettingsForBrushId(brush);
+      expect(authored?.dryMediaKernelProgram, brush).toBeDefined();
+      const persistedDynamics =
+        JSON.parse(JSON.stringify(authored)) as Record<string, unknown>;
+      expect(persistedDynamics.dryMediaKernelProgram, brush).toEqual({
+        version: "dry-media-kernel-dab-path-v1",
+        programDigest:
+          "30c48947ab54ce7efde21a4935d7d5e278e08510e061fc5fbefb7056de818860",
+      });
+      const browserContract = {
+        paintModel: "bounded-flow-v2" as const,
+        kind: "freehand",
+        mode: "pen",
+        brush,
+        sampleSpacing: 0,
+        brushDynamics: persistedDynamics,
+      };
+      const expected = hasValidBrowserStrokePaintContract(browserContract);
+      expect(expected, brush).toBe(true);
+      // The authored snapshots ride the segmented causal pipeline, which both mirrors gate to
+      // payload v4; older payload versions stay rejected regardless of the marker.
+      expect(
+        hasValidStudioCrdtStrokePaintContract({ payloadVersion: 4, ...browserContract }),
+        brush,
+      ).toBe(expected);
+      for (const payloadVersion of [2, 3]) {
+        expect(
+          hasValidStudioCrdtStrokePaintContract({ payloadVersion, ...browserContract }),
+          `${brush}:v${payloadVersion}`,
+        ).toBe(false);
+      }
+
+      const document = createStrokeDocument();
+      const stroke = document.getMap<Y.Map<unknown>>("strokes").get("stroke-1")!;
+      stroke.set("payloadVersion", 4);
+      stroke.set("brush", brush);
+      stroke.set("sampleSpacing", 0);
+      stroke.set("brushDynamics", persistedDynamics);
+      stroke.set("extensions", { paintModel: "bounded-flow-v2" });
+      expect(hasValidStudioCrdtRootSchema(document), brush).toBe(true);
+      document.destroy();
     }
   });
 

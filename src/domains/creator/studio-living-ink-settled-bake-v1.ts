@@ -2,8 +2,10 @@
  * Living-ink settled BAKE v1 — 정착(커밋) 시점에 CPU 유체 레퍼런스로 획을 "말리는" 증강 패스.
  *
  * The repo carries a complete deterministic stable-fluids reference
- * (studio-living-ink-wgsl-shaders.ts, READ-ONLY — the certified CPU twin of the WebGL2/WebGPU
- * living-ink engine). Product admission for page-wide physical strokes is OFF
+ * (studio-living-ink-fluid-reference.ts, READ-ONLY — the certified CPU twin of the WebGL2/WebGPU
+ * living-ink engine, split out of studio-living-ink-wgsl-shaders.ts on 2026-08-14 so this
+ * route-side bake never drags the GPU kernel sources into the studio chunk). Product admission
+ * for page-wide physical strokes is OFF
  * (studio-living-ink-brush-admission.ts), so this module reuses the verified solver in the one
  * place it fits today's document model: a **stroke-local, settled-only bake** that augments an
  * ordinary ink/watercolor dab plan and then disappears — no full-page raster, no journal, no
@@ -45,7 +47,7 @@ import {
   depositStudioLivingInkReference,
   stepStudioLivingInkFluidReference,
   type StudioLivingInkFluidReferenceField,
-} from "./studio-living-ink-wgsl-shaders";
+} from "./studio-living-ink-fluid-reference";
 import { studioOssUnitHash } from "./studio-oss-brush-kernels";
 
 import type { WatercolorBrushDab } from "./studio-watercolor-brush";
@@ -54,7 +56,7 @@ export const STUDIO_LIVING_INK_SETTLED_BAKE_VERSION_V1 = 1 as const;
 
 export const STUDIO_LIVING_INK_SETTLED_BAKE_PROVENANCE = Object.freeze({
   solver:
-    "repo-internal certified CPU stable-fluids reference (studio-living-ink-wgsl-shaders.ts) — no new fluid was invented",
+    "repo-internal certified CPU stable-fluids reference (studio-living-ink-fluid-reference.ts, split from studio-living-ink-wgsl-shaders.ts) — no new fluid was invented",
   radialImpulse:
     "living-ink GLSL deposit radialVector semantics — a dwell water mark injects divergent capillary outflow",
   chroma:
@@ -426,6 +428,42 @@ export function bakeStudioLivingInkSettledField(
   settings?: Partial<StudioLivingInkSettledBakeSettings> | null,
 ): StudioLivingInkSettledBakeFieldResult | null {
   const normalized = normalizeStudioLivingInkSettledBakeSettings(settings);
+  const solve = createSettledBakeSolve(dabs, normalized);
+  if (!solve) return null;
+  advanceSettledBakeSolve(solve, STUDIO_LIVING_INK_SETTLED_BAKE_STEPS);
+  return finishSettledBakeSolve(solve);
+}
+
+/**
+ * Mutable in-flight solve state shared by the synchronous bake and the
+ * time-sliced job (2026-08-14 stall fix). Both paths run literally the same
+ * seed → fixed-tick → freeze sequence, so slicing can only change scheduling,
+ * never bytes.
+ */
+interface SettledBakeSolveState {
+  readonly field: StudioLivingInkFluidReferenceField;
+  readonly originXPx: number;
+  readonly originYPx: number;
+  readonly cellPx: number;
+  readonly stepParams: {
+    readonly dt: number;
+    readonly flow: number;
+    readonly bleed: number;
+    readonly dryRate: number;
+    readonly chromaticSeparation: number;
+    readonly vorticity: number;
+    readonly capillaryCreep: number;
+    readonly pressureIterations: number;
+  };
+  ticksDone: number;
+  divergenceAfter: number;
+}
+
+/** Seeds the stroke-local field (grid plan + deposits + impulses); null when no dab is finite. */
+function createSettledBakeSolve(
+  dabs: readonly WatercolorBrushDab[],
+  normalized: StudioLivingInkSettledBakeSettings,
+): SettledBakeSolveState | null {
   const finiteDabs = collectFiniteDabs(dabs);
   if (finiteDabs.length === 0) return null;
 
@@ -513,29 +551,59 @@ export function bakeStudioLivingInkSettledField(
     });
   }
 
-  // --- 2. fixed deterministic settle ------------------------------------------
-  const stepParams = {
-    dt: STUDIO_LIVING_INK_EXECUTION_LIMITS.fixedTimeStepSeconds,
-    flow: normalized.flow,
-    bleed: normalized.bleed,
-    dryRate: normalized.dryRate,
-    chromaticSeparation: normalized.chromaticSeparation,
-    vorticity: normalized.vorticity,
-    capillaryCreep: normalized.capillaryCreep,
-    pressureIterations: STUDIO_LIVING_INK_FLUID_DEFAULTS.settlePressureIterations,
-  } as const;
-  let divergenceAfter = 0;
-  for (let step = 0; step < STUDIO_LIVING_INK_SETTLED_BAKE_STEPS; step += 1) {
-    divergenceAfter = stepStudioLivingInkFluidReference(field, stepParams).divergenceAfter;
-  }
-
-  return Object.freeze({
+  return {
     field,
     originXPx,
     originYPx,
     cellPx,
+    stepParams: {
+      dt: STUDIO_LIVING_INK_EXECUTION_LIMITS.fixedTimeStepSeconds,
+      flow: normalized.flow,
+      bleed: normalized.bleed,
+      dryRate: normalized.dryRate,
+      chromaticSeparation: normalized.chromaticSeparation,
+      vorticity: normalized.vorticity,
+      capillaryCreep: normalized.capillaryCreep,
+      pressureIterations: STUDIO_LIVING_INK_FLUID_DEFAULTS.settlePressureIterations,
+    },
+    ticksDone: 0,
+    divergenceAfter: 0,
+  };
+}
+
+/**
+ * Advances the fixed deterministic settle by at most `maxTicks` solver ticks.
+ * Returns true when all STUDIO_LIVING_INK_SETTLED_BAKE_STEPS ticks have run.
+ */
+function advanceSettledBakeSolve(
+  solve: SettledBakeSolveState,
+  maxTicks: number,
+): boolean {
+  const budget = Math.max(1, Math.floor(maxTicks));
+  for (
+    let tick = 0;
+    tick < budget && solve.ticksDone < STUDIO_LIVING_INK_SETTLED_BAKE_STEPS;
+    tick += 1
+  ) {
+    solve.divergenceAfter = stepStudioLivingInkFluidReference(
+      solve.field,
+      solve.stepParams,
+    ).divergenceAfter;
+    solve.ticksDone += 1;
+  }
+  return solve.ticksDone >= STUDIO_LIVING_INK_SETTLED_BAKE_STEPS;
+}
+
+function finishSettledBakeSolve(
+  solve: SettledBakeSolveState,
+): StudioLivingInkSettledBakeFieldResult {
+  return Object.freeze({
+    field: solve.field,
+    originXPx: solve.originXPx,
+    originYPx: solve.originYPx,
+    cellPx: solve.cellPx,
     steps: STUDIO_LIVING_INK_SETTLED_BAKE_STEPS,
-    divergenceAfter,
+    divergenceAfter: solve.divergenceAfter,
   });
 }
 
@@ -708,11 +776,67 @@ export function augmentStudioLivingInkSettledBakeDabs(
   if (dabs.length === 0 || isStudioLivingInkSettledBakeIdentitySettings(normalized)) {
     return dabs;
   }
-  const bake = bakeStudioLivingInkSettledField(dabs, normalized);
-  if (!bake) return dabs;
+  // Deterministic memo (2026-08-14 stall fix): the bake is a pure function of
+  // (dabs, normalized settings), so byte-equal inputs return the previously
+  // computed plan without re-running the ~24-tick fluid solve. Canvas renders,
+  // symmetry variations, undo/redo remounts and SVG export all share entries.
+  // Passed-through objects (cores, non-finite dabs) are re-materialized from
+  // the CALLER's array, preserving the core same-object contract.
+  const signature = computeSettledBakeInputSignature(dabs);
+  const cacheKey = settledBakeCacheKey(dabs.length, signature, normalized);
+  const cached = readSettledBakeCacheEntry(cacheKey, signature, dabs);
+  if (cached) return cached;
 
+  const plan = computeSettledBakePlan(dabs, normalized);
+  storeSettledBakeCacheEntry(cacheKey, signature, dabs, plan);
+  resolvePendingSettledBakeJob(cacheKey);
+  return plan.output;
+}
+
+/** Augmented plan plus the identity bookkeeping the memo cache needs. */
+interface DerivedSettledBakePlan {
+  readonly output: readonly WatercolorBrushDab[];
+  /**
+   * output index → input index for dabs passed through by object identity
+   * (cores, non-finite dabs); -1 for augmented/feather dabs the bake created.
+   */
+  readonly passthroughSources: Int32Array;
+  /** True when the plan is the input array itself (e.g. no finite dab). */
+  readonly identityOutput: boolean;
+}
+
+/** Full solve + lowering, shared verbatim by the sync and time-sliced paths. */
+function computeSettledBakePlan(
+  dabs: readonly WatercolorBrushDab[],
+  normalized: StudioLivingInkSettledBakeSettings,
+): DerivedSettledBakePlan {
+  const solve = createSettledBakeSolve(dabs, normalized);
+  if (!solve) {
+    return {
+      output: dabs,
+      passthroughSources: identityPassthroughSources(dabs.length),
+      identityOutput: true,
+    };
+  }
+  advanceSettledBakeSolve(solve, STUDIO_LIVING_INK_SETTLED_BAKE_STEPS);
+  return deriveAugmentedSettledDabs(dabs, normalized, finishSettledBakeSolve(solve));
+}
+
+function identityPassthroughSources(length: number): Int32Array {
+  const sources = new Int32Array(length);
+  for (let index = 0; index < length; index += 1) sources[index] = index;
+  return sources;
+}
+
+/** Field → dab-plan lowering, shared verbatim by the sync and time-sliced paths. */
+function deriveAugmentedSettledDabs(
+  dabs: readonly WatercolorBrushDab[],
+  normalized: StudioLivingInkSettledBakeSettings,
+  bake: StudioLivingInkSettledBakeFieldResult,
+): DerivedSettledBakePlan {
   const { seed, strength, rimGain, featherCount } = normalized;
   const output: WatercolorBrushDab[] = [];
+  const passthrough: number[] = [];
   let extraBudget = normalized.maxExtraDabs;
   let stationOrdinal = -1;
   let stationHasFeathered = true;
@@ -720,19 +844,23 @@ export function augmentStudioLivingInkSettledBakeDabs(
   const pushExtra = (dab: WatercolorBrushDab): void => {
     if (extraBudget <= 0 || dab.opacity < MIN_VISIBLE_EXTRA_OPACITY) return;
     output.push(dab);
+    passthrough.push(-1);
     extraBudget -= 1;
   };
 
-  for (const dab of dabs) {
+  for (let dabIndex = 0; dabIndex < dabs.length; dabIndex += 1) {
+    const dab = dabs[dabIndex] as WatercolorBrushDab;
     if (dab.role === "core") {
       stationOrdinal += 1;
       stationHasFeathered = false;
       // Core pigment is the settled deposit itself — byte-identical passthrough.
       output.push(dab);
+      passthrough.push(dabIndex);
       continue;
     }
     if (!Number.isFinite(dab.x) || !Number.isFinite(dab.y)) {
       output.push(dab);
+      passthrough.push(dabIndex);
       continue;
     }
     const radius = Math.max(MIN_DAB_RADIUS, finiteNumber(dab.radius, MIN_DAB_RADIUS));
@@ -755,6 +883,7 @@ export function augmentStudioLivingInkSettledBakeDabs(
       opacity: clampAugmentedOpacity(opacity * (1 + rimGain * derived.rimSignal)),
       role: "diffuse",
     });
+    passthrough.push(-1);
 
     if (!stationHasFeathered && featherCount > 0) {
       stationHasFeathered = true;
@@ -791,5 +920,354 @@ export function augmentStudioLivingInkSettledBakeDabs(
     }
   }
 
-  return output;
+  return {
+    output,
+    passthroughSources: Int32Array.from(passthrough),
+    identityOutput: false,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Deterministic memo cache + time-sliced scheduling (2026-08-14 stall fix)
+//
+// Adversarial review measured a single synchronous settled bake at 30–116 ms
+// (machine dependent) for a 1000–8192-dab stroke — over the repo's 33 ms
+// main-thread chunk budget — and StudioDrawNode re-paid it on every render of
+// every committed living-ink stroke × symmetry variation. Two layers fix it
+// without changing a single output byte:
+//   1. a bounded content-keyed cache — byte-equal (dabs, settings) inputs
+//      return the stored plan (the bake is pure);
+//   2. a cooperative job that advances the SAME fixed tick sequence a few
+//      solver ticks per macrotask slice, so no main-thread slice exceeds the
+//      budget. Same ticks, same order, same result — slicing only changes
+//      scheduling, and the finished plan is stored in the same cache the
+//      synchronous path (SVG export) reads.
+// ---------------------------------------------------------------------------
+
+interface SettledBakeCacheEntry {
+  readonly signature: Float64Array;
+  readonly inputDabCount: number;
+  /** The input array the stored output's passthrough objects belong to. */
+  source: readonly WatercolorBrushDab[];
+  output: readonly WatercolorBrushDab[];
+  readonly passthroughSources: Int32Array;
+  readonly identityOutput: boolean;
+}
+
+/** Bounded LRU: entries and total retained input dabs (memory ceiling). */
+const SETTLED_BAKE_CACHE_MAX_ENTRIES = 32;
+const SETTLED_BAKE_CACHE_MAX_TOTAL_DABS = 98_304;
+const settledBakeCache = new Map<string, SettledBakeCacheEntry>();
+let settledBakeCacheTotalDabs = 0;
+
+const SIGNATURE_FIELDS_PER_DAB = 5;
+
+/** Exact per-dab numeric snapshot; the equality check below never false-hits. */
+function computeSettledBakeInputSignature(
+  dabs: readonly WatercolorBrushDab[],
+): Float64Array {
+  const signature = new Float64Array(dabs.length * SIGNATURE_FIELDS_PER_DAB);
+  let cursor = 0;
+  for (const dab of dabs) {
+    signature[cursor] = dab.x;
+    signature[cursor + 1] = dab.y;
+    signature[cursor + 2] = dab.radius;
+    signature[cursor + 3] = dab.opacity;
+    // Only the "core" distinction changes behavior anywhere in the bake.
+    signature[cursor + 4] = dab.role === "core" ? 1 : 0;
+    cursor += SIGNATURE_FIELDS_PER_DAB;
+  }
+  return signature;
+}
+
+function settledBakeSignatureHash(signature: Float64Array): string {
+  // FNV-1a over the raw float bytes; collisions are handled by the exact
+  // signature comparison, so the hash only partitions the key space.
+  const bytes = new Uint8Array(
+    signature.buffer,
+    signature.byteOffset,
+    signature.byteLength,
+  );
+  let hashLow = 0x811c_9dc5;
+  let hashHigh = 0xcbf2_9ce4;
+  for (let index = 0; index < bytes.length; index += 1) {
+    hashLow = Math.imul(hashLow ^ (bytes[index] ?? 0), 0x0100_0193) >>> 0;
+    hashHigh = Math.imul(hashHigh ^ (bytes[index] ?? 0), 0x0100_01a7) >>> 0;
+  }
+  return `${hashLow.toString(36)}-${hashHigh.toString(36)}`;
+}
+
+function settledBakeSettingsKey(
+  normalized: StudioLivingInkSettledBakeSettings,
+): string {
+  // Every normalized field participates in the output; phase is always
+  // "settled" past the identity gate but is included for self-evidence.
+  return [
+    normalized.phase,
+    normalized.seed,
+    normalized.strength,
+    normalized.rimGain,
+    normalized.featherCount,
+    normalized.maxExtraDabs,
+    normalized.flow,
+    normalized.bleed,
+    normalized.dryRate,
+    normalized.vorticity,
+    normalized.capillaryCreep,
+    normalized.chromaticSeparation,
+  ].join(",");
+}
+
+function settledBakeCacheKey(
+  dabCount: number,
+  signature: Float64Array,
+  normalized: StudioLivingInkSettledBakeSettings,
+): string {
+  return `${settledBakeSettingsKey(normalized)}|${dabCount}|${settledBakeSignatureHash(signature)}`;
+}
+
+function settledBakeSignaturesEqual(
+  left: Float64Array,
+  right: Float64Array,
+): boolean {
+  if (left.length !== right.length) return false;
+  for (let index = 0; index < left.length; index += 1) {
+    const a = left[index] as number;
+    const b = right[index] as number;
+    if (a !== b && !(Number.isNaN(a) && Number.isNaN(b))) return false;
+  }
+  return true;
+}
+
+/**
+ * Cache read that preserves the passthrough object-identity contract: cores
+ * and non-finite dabs in the returned plan are the CALLER's own objects. When
+ * the caller passes the exact array the stored plan was built from, the stored
+ * plan is returned as-is; a content-equal but distinct array re-materializes
+ * the passthrough positions from it (O(n), no solve) and re-anchors the entry.
+ */
+function readSettledBakeCacheEntry(
+  key: string,
+  signature: Float64Array,
+  dabs: readonly WatercolorBrushDab[],
+): readonly WatercolorBrushDab[] | null {
+  const entry = settledBakeCache.get(key);
+  if (!entry) return null;
+  if (!settledBakeSignaturesEqual(entry.signature, signature)) return null;
+  // LRU touch.
+  settledBakeCache.delete(key);
+  settledBakeCache.set(key, entry);
+  if (entry.source === dabs) return entry.output;
+  if (entry.identityOutput) {
+    entry.source = dabs;
+    entry.output = dabs;
+    return dabs;
+  }
+  const materialized: WatercolorBrushDab[] = new Array(entry.output.length);
+  for (let index = 0; index < entry.output.length; index += 1) {
+    const sourceIndex = entry.passthroughSources[index] ?? -1;
+    materialized[index] = (
+      sourceIndex >= 0 ? dabs[sourceIndex] : entry.output[index]
+    ) as WatercolorBrushDab;
+  }
+  entry.source = dabs;
+  entry.output = materialized;
+  return materialized;
+}
+
+function storeSettledBakeCacheEntry(
+  key: string,
+  signature: Float64Array,
+  source: readonly WatercolorBrushDab[],
+  plan: DerivedSettledBakePlan,
+): void {
+  const existing = settledBakeCache.get(key);
+  if (existing) {
+    settledBakeCache.delete(key);
+    settledBakeCacheTotalDabs -= existing.inputDabCount;
+  }
+  settledBakeCache.set(key, {
+    signature,
+    inputDabCount: source.length,
+    source,
+    output: plan.output,
+    passthroughSources: plan.passthroughSources,
+    identityOutput: plan.identityOutput,
+  });
+  settledBakeCacheTotalDabs += source.length;
+  while (
+    settledBakeCache.size > SETTLED_BAKE_CACHE_MAX_ENTRIES
+    || settledBakeCacheTotalDabs > SETTLED_BAKE_CACHE_MAX_TOTAL_DABS
+  ) {
+    const oldestKey = settledBakeCache.keys().next().value;
+    if (oldestKey === undefined) break;
+    const oldest = settledBakeCache.get(oldestKey);
+    settledBakeCache.delete(oldestKey);
+    settledBakeCacheTotalDabs -= oldest?.inputDabCount ?? 0;
+  }
+}
+
+interface PendingSettledBakeJob {
+  readonly key: string;
+  readonly dabs: readonly WatercolorBrushDab[];
+  readonly signature: Float64Array;
+  readonly normalized: StudioLivingInkSettledBakeSettings;
+  readonly listeners: Set<() => void>;
+  solve: SettledBakeSolveState | null;
+  seeded: boolean;
+}
+
+const pendingSettledBakeJobs = new Map<string, PendingSettledBakeJob>();
+let settledBakeSliceScheduled = false;
+
+/**
+ * Per-slice main-thread budget. One solver tick measures ≈3 ms and seeding a
+ * capped 8192-dab stroke ≈10 ms, so a slice tops out near budget + one tick —
+ * comfortably inside the repo's 33 ms chunk freeze budget.
+ */
+const SETTLED_BAKE_SLICE_BUDGET_MS = 8;
+
+function settledBakeNowMs(): number {
+  return globalThis.performance?.now?.() ?? Date.now();
+}
+
+function scheduleSettledBakeSlice(): void {
+  if (settledBakeSliceScheduled || pendingSettledBakeJobs.size === 0) return;
+  settledBakeSliceScheduled = true;
+  globalThis.setTimeout(runSettledBakeSlice, 0);
+}
+
+/**
+ * A synchronous compute for the same key supersedes the queued job. The
+ * listeners are notified from a fresh task so a synchronous caller can never
+ * observe re-entrant dispatch (e.g. state updates during someone's render).
+ */
+function resolvePendingSettledBakeJob(key: string): void {
+  const pending = pendingSettledBakeJobs.get(key);
+  if (!pending) return;
+  pendingSettledBakeJobs.delete(key);
+  if (pending.listeners.size === 0) return;
+  const listeners = [...pending.listeners];
+  if (typeof globalThis.setTimeout === "function") {
+    globalThis.setTimeout(() => {
+      for (const listener of listeners) listener();
+    }, 0);
+    return;
+  }
+  for (const listener of listeners) listener();
+}
+
+function runSettledBakeSlice(): void {
+  settledBakeSliceScheduled = false;
+  const startedAt = settledBakeNowMs();
+  const readyListeners = new Set<() => void>();
+  while (pendingSettledBakeJobs.size > 0) {
+    const pending = pendingSettledBakeJobs.values().next()
+      .value as PendingSettledBakeJob;
+    if (!pending.seeded) {
+      // Seeding is one unbreakable unit (~10ms at the 8192-dab cap); a slice
+      // that seeds does nothing else unless budget remains.
+      pending.solve = createSettledBakeSolve(pending.dabs, pending.normalized);
+      pending.seeded = true;
+    }
+    if (pending.solve) {
+      // One deterministic tick per iteration; the budget is re-checked BEFORE
+      // each tick so a slice never stacks seeding + a full tick run. Progress
+      // is guaranteed: a slice that starts on an already-seeded job has spent
+      // ~0ms and always advances at least one tick.
+      while (
+        pending.solve.ticksDone < STUDIO_LIVING_INK_SETTLED_BAKE_STEPS
+        && settledBakeNowMs() - startedAt < SETTLED_BAKE_SLICE_BUDGET_MS
+      ) {
+        advanceSettledBakeSolve(pending.solve, 1);
+      }
+      if (pending.solve.ticksDone < STUDIO_LIVING_INK_SETTLED_BAKE_STEPS) break;
+      if (settledBakeNowMs() - startedAt >= SETTLED_BAKE_SLICE_BUDGET_MS) break;
+    }
+    const plan = pending.solve
+      ? deriveAugmentedSettledDabs(
+          pending.dabs,
+          pending.normalized,
+          finishSettledBakeSolve(pending.solve),
+        )
+      : {
+          output: pending.dabs,
+          passthroughSources: identityPassthroughSources(pending.dabs.length),
+          identityOutput: true,
+        };
+    storeSettledBakeCacheEntry(
+      pending.key,
+      pending.signature,
+      pending.dabs,
+      plan,
+    );
+    pendingSettledBakeJobs.delete(pending.key);
+    for (const listener of pending.listeners) readyListeners.add(listener);
+    if (settledBakeNowMs() - startedAt >= SETTLED_BAKE_SLICE_BUDGET_MS) break;
+  }
+  // Notifications run outside the budget window: they only dispatch renders.
+  for (const listener of readyListeners) listener();
+  scheduleSettledBakeSlice();
+}
+
+/**
+ * Render-safe entry for the settled living-ink bake (StudioDrawNode watercolor
+ * commit path). Returns the augmented plan when it is already known —
+ * identity settings, empty plans, or a cache hit — and otherwise enqueues a
+ * time-sliced job and returns null so the caller renders the byte-identical
+ * base plan this frame (the same wash the live phase shows; the bloom lands
+ * when the job completes, which is the settled-bake contract's own drying
+ * language). `onReady` fires once the plan is cached; calling again then
+ * (with byte-equal inputs) returns it.
+ *
+ * `renderGeneration` exists for compiled render bodies (React Compiler): pass
+ * a counter you bump in `onReady` so the memoized call site re-executes after
+ * completion. The value itself is never read.
+ *
+ * Determinism: the sliced job and the synchronous
+ * `augmentStudioLivingInkSettledBakeDabs` run the same seed → fixed-tick →
+ * derive sequence, so both produce identical bytes for identical inputs.
+ */
+export function requestStudioLivingInkSettledBakeDabs(
+  dabs: readonly WatercolorBrushDab[],
+  settings: Partial<StudioLivingInkSettledBakeSettings> | null | undefined,
+  onReady: () => void,
+  renderGeneration = 0,
+): readonly WatercolorBrushDab[] | null {
+  void renderGeneration;
+  const normalized = normalizeStudioLivingInkSettledBakeSettings(settings);
+  if (dabs.length === 0 || isStudioLivingInkSettledBakeIdentitySettings(normalized)) {
+    return dabs;
+  }
+  const signature = computeSettledBakeInputSignature(dabs);
+  const cacheKey = settledBakeCacheKey(dabs.length, signature, normalized);
+  const cached = readSettledBakeCacheEntry(cacheKey, signature, dabs);
+  if (cached) return cached;
+  if (typeof globalThis.setTimeout !== "function") {
+    // No scheduler in this environment (defensive) — stay correct over smooth.
+    return augmentStudioLivingInkSettledBakeDabs(dabs, normalized);
+  }
+  const pending = pendingSettledBakeJobs.get(cacheKey);
+  if (pending) {
+    pending.listeners.add(onReady);
+    return null;
+  }
+  pendingSettledBakeJobs.set(cacheKey, {
+    key: cacheKey,
+    dabs,
+    signature,
+    normalized,
+    listeners: new Set([onReady]),
+    solve: null,
+    seeded: false,
+  });
+  scheduleSettledBakeSlice();
+  return null;
+}
+
+/** Test-only isolation hook: clears the memo cache and abandons queued jobs. */
+export function resetStudioLivingInkSettledBakeCacheForTests(): void {
+  settledBakeCache.clear();
+  settledBakeCacheTotalDabs = 0;
+  pendingSettledBakeJobs.clear();
 }

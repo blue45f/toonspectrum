@@ -600,6 +600,88 @@ function smoothstepUnit(edge0: number, edge1: number, value: number): number {
 }
 
 /**
+ * depositScale 수학의 단일 소스 — 오브젝트 경로(resolveStudioPaperMediaModulationV1)와
+ * 스칼라 핫패스(resolveStudioPaperDepositScaleV1)가 같은 식을 공유하므로 두 경로가
+ * 바이트 단위로 갈라질 수 없다 (2026-08-14 스탬프 dab 당 할당 제거).
+ */
+function paperDepositScaleForModeV1(
+  profile: StudioPaperMediaInteractionProfileV1,
+  pressure: number,
+  affinity: number,
+  height: number,
+  flood: number,
+  thinnessInput: number | undefined,
+): number {
+  switch (profile.mode) {
+    case "peak-catch": {
+      const contactThreshold =
+        profile.contactThresholdLight
+        + (profile.contactThresholdHeavy - profile.contactThresholdLight) * flood;
+      return smoothstepUnit(
+        contactThreshold - profile.contactFeather,
+        contactThreshold + profile.contactFeather,
+        height,
+      );
+    }
+    case "valley-settle": {
+      const valley = 1 - height;
+      // h 평균이 0.5라 (valley - 0.5) 편향은 평균적으로 안료량을 보존한다.
+      return clamp(
+        1 + profile.depositDepth * affinity * (valley - 0.5),
+        STUDIO_PAPER_MEDIA_MODULATION_BOUNDS_V1.depositScale.min,
+        STUDIO_PAPER_MEDIA_MODULATION_BOUNDS_V1.depositScale.max,
+      );
+    }
+    case "weave-reveal": {
+      const thinness = clamp01(finiteNumber(thinnessInput, 1 - pressure));
+      const reveal = thinness * profile.thinnessReveal;
+      // coverage *= mix(1, height, reveal) — 두꺼운 임파스토(reveal→0)는 종이를 무시한다.
+      return 1 + reveal * (height - 1);
+    }
+    case "neutral-light":
+      return 1 + profile.depositDepth * (height - 0.5) * 2;
+  }
+}
+
+/**
+ * dab/텍셀 핫패스용 스칼라 fast path — `resolveStudioPaperMediaModulationV1(...).depositScale`
+ * 과 항상 정확히 같은 값을 돌려주지만 입력/결과 객체를 만들지 않는다(할당 0, freeze 0).
+ * 스탬프 플래너는 dab 당 depositScale 하나만 소비하므로 이 경로를 쓴다. 검증되지 않은
+ * 입력은 오브젝트 경로와 동일하게 항등(1)으로 fail-closed 한다.
+ */
+export function resolveStudioPaperDepositScaleV1(
+  medium: unknown,
+  preset: StudioPaperPresetV1,
+  pressure: number,
+  x: number,
+  y: number,
+  seed: number,
+  thinness?: number,
+): number {
+  if (
+    !isStudioPaperMediumV1(medium)
+    || typeof preset !== "object"
+    || preset === null
+    || !Number.isFinite(pressure)
+  ) {
+    return STUDIO_PAPER_MEDIA_MODULATION_IDENTITY_V1.depositScale;
+  }
+  const profile = STUDIO_PAPER_MEDIA_INTERACTION_V1[medium];
+  const clampedPressure = clamp01(pressure);
+  const affinity = clamp01(finiteNumber(preset.granulationAffinity, 0));
+  const height = samplePaperHeightV1(preset, x, y, seed);
+  const flood = Math.pow(clampedPressure, profile.pressureCurve);
+  return paperDepositScaleForModeV1(
+    profile,
+    clampedPressure,
+    affinity,
+    height,
+    flood,
+    thinness,
+  );
+}
+
+/**
  * (매체, 종이, 필압, 문서 좌표) → { depositScale, granulationScale, bleedScale }.
  *
  * 순수·결정적. 높이는 `samplePaperHeightV1` 한 번만 읽으므로 dab/텍셀 핫패스에서
@@ -626,18 +708,18 @@ export function resolveStudioPaperMediaModulationV1(
   const height = samplePaperHeightV1(input.preset, input.x, input.y, input.seed);
   const flood = Math.pow(pressure, profile.pressureCurve);
 
+  const depositScale = paperDepositScaleForModeV1(
+    profile,
+    pressure,
+    affinity,
+    height,
+    flood,
+    input.thinness,
+  );
   switch (profile.mode) {
     case "peak-catch": {
-      const contactThreshold =
-        profile.contactThresholdLight
-        + (profile.contactThresholdHeavy - profile.contactThresholdLight) * flood;
-      const deposit = smoothstepUnit(
-        contactThreshold - profile.contactFeather,
-        contactThreshold + profile.contactFeather,
-        height,
-      );
       return Object.freeze({
-        depositScale: deposit,
+        depositScale,
         // 고필압이 골을 메우면 이빨 질감도 함께 잦아든다(0.8 하한은 완전 소실 방지).
         granulationScale: clamp01(profile.granulationGain * affinity * (1 - 0.8 * flood)),
         bleedScale: clamp01(profile.bleedGain * absorbency),
@@ -646,12 +728,7 @@ export function resolveStudioPaperMediaModulationV1(
     case "valley-settle": {
       const valley = 1 - height;
       return Object.freeze({
-        // h 평균이 0.5라 (valley - 0.5) 편향은 평균적으로 안료량을 보존한다.
-        depositScale: clamp(
-          1 + profile.depositDepth * affinity * (valley - 0.5),
-          STUDIO_PAPER_MEDIA_MODULATION_BOUNDS_V1.depositScale.min,
-          STUDIO_PAPER_MEDIA_MODULATION_BOUNDS_V1.depositScale.max,
-        ),
+        depositScale,
         granulationScale: clamp01(profile.granulationGain * affinity * valley),
         // 물이 많고(필압↑) 골일수록(웅덩이) 더 번진다.
         bleedScale: clamp01(
@@ -665,15 +742,14 @@ export function resolveStudioPaperMediaModulationV1(
       );
       const reveal = thinness * profile.thinnessReveal;
       return Object.freeze({
-        // coverage *= mix(1, height, reveal) — 두꺼운 임파스토(reveal→0)는 종이를 무시한다.
-        depositScale: 1 + reveal * (height - 1),
+        depositScale,
         granulationScale: clamp01(profile.granulationGain * affinity * reveal),
         bleedScale: clamp01(profile.bleedGain * absorbency * (0.25 + 0.75 * flood)),
       });
     }
     case "neutral-light": {
       return Object.freeze({
-        depositScale: 1 + profile.depositDepth * (height - 0.5) * 2,
+        depositScale,
         granulationScale: clamp01(profile.granulationGain * affinity),
         bleedScale: clamp01(profile.bleedGain * absorbency * (0.4 + 0.6 * flood)),
       });

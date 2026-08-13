@@ -8,6 +8,7 @@ import {
   bridgeStudioDynamicDabVariationToDryMediaV1,
   bridgeStudioDynamicDabsToDryMediaV1,
   resolveStudioDynamicBrushMaterialIdentity,
+  studioDryMediaDynamicBridgeMarkMultiplier,
 } from "./studio-dry-media-dynamic-bridge";
 
 import type { StudioDynamicBrushDab } from "./studio-brush-dynamics";
@@ -357,6 +358,64 @@ describe("dry-media dynamic bridge v1", () => {
     ) return;
     expect(segmented.applied).toBe(true);
     expect(segmented.variation.segments.flat()).toEqual(complete.variation);
+  });
+
+  it("passes pre-wave engine-lane strokes through as identity — null material, multiplier 1 (probe D1)", () => {
+    // These runtime lane ids predate the wave and exist in persisted/collaborative documents.
+    // Their material identity is null, so the bridge must return the authored dabs untouched;
+    // resolving them onto a core preset would multiply every stored dab into 3–5 lanes.
+    const source = dynamicDabs(24);
+    for (const engineLaneId of [
+      "crayon--wax-scrape",
+      "charcoal--vine-soft",
+      "charcoal--compressed-edge",
+      "chalk--klecks-powder",
+      "pastel--cake-soft",
+      "oil-pastel--waxy-film",
+    ]) {
+      const materialIdentity =
+        resolveStudioDynamicBrushMaterialIdentity(engineLaneId);
+      expect(materialIdentity, engineLaneId).toMatchObject({
+        brushId: engineLaneId,
+        dryMediaPresetId: null,
+      });
+      if (!materialIdentity) throw new Error(`missing ${engineLaneId} identity`);
+      expect(
+        studioDryMediaDynamicBridgeMarkMultiplier(materialIdentity),
+        engineLaneId,
+      ).toBe(1);
+      const bridged = bridgeStudioDynamicDabVariationToDryMediaV1({
+        materialIdentity,
+        seed: 19,
+        variation: source,
+      });
+      expect(bridged.ok, engineLaneId).toBe(true);
+      if (!bridged.ok) continue;
+      expect(bridged.applied, engineLaneId).toBe(false);
+      expect(bridged.variation, engineLaneId).toBe(source);
+    }
+  });
+
+  it("keeps a stored core runtime id on its own material over the catalogue classification (probe D4)", () => {
+    const materialIdentity = resolveStudioDynamicBrushMaterialIdentity(
+      "chalk",
+      "velvet-charcoal",
+    );
+    expect(materialIdentity).toMatchObject({
+      brushId: "chalk",
+      brushCatalogId: "velvet-charcoal",
+      dryMediaPresetId: "chalk",
+    });
+    if (!materialIdentity) throw new Error("missing chalk identity");
+    const receipt = bridgeStudioDynamicDabsToDryMediaV1({
+      brushId: "chalk",
+      brushCatalogId: "velvet-charcoal",
+      seed: 19,
+      dabs: dynamicDabs(24),
+    });
+    expect(receipt.ok).toBe(true);
+    if (!receipt.ok) return;
+    expect(receipt.receipt.presetId).toBe("chalk");
   });
 
   it("keeps same-colour source-over self-overlap alpha monotonic", () => {
