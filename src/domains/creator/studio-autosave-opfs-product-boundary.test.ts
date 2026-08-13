@@ -28,9 +28,15 @@ describe("Studio OPFS + SQLite autosave product boundary", () => {
     );
 
     expect(setup).toContain('import("./studio-autosave-opfs-session")');
-    expect(setup).toContain("createStudioAutosaveOpfsSession(autosaveKey)");
+    // 문서 열기 시점에 leader/follower 를 정하고, 그 결정에 맞는 쓰기 능력의 세션을 받는다.
+    expect(setup).toContain("openStudioAutosaveDocumentSession(autosaveKey)");
     expect(setup).toContain("autosaveOpfsSessionRef.current = sessionPromise");
-    expect(setup).toContain("session?.dispose()");
+    expect(setup).toContain("opened?.session?.dispose()");
+    // 임차권은 세션 정리 **뒤에** 놓는다 — 순서가 뒤집히면 follower 가 살아 있는 writer 위로
+    // 승격해 같은 문서에 두 저장 권위가 생긴다.
+    expect(setup.indexOf("opened?.session?.dispose()")).toBeLessThan(
+      setup.indexOf("opened?.lease.release()"),
+    );
     expect(setup).toContain('import("./studio-autosave-sqlite-store")');
     expect(setup).toContain("acquireStudioAutosaveSqliteStore()");
     expect(setup).toContain("autosaveSqliteStoreRef.current = storePromise");

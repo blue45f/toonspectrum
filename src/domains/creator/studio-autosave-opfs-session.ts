@@ -7,6 +7,12 @@ import {
   type StudioAutosaveStorage,
 } from "./studio-autosave";
 import {
+  requestStudioAutosaveDocumentLeadership,
+  type StudioAutosaveDocumentLeadershipRegistry,
+  type StudioAutosaveDocumentLease,
+  type StudioAutosaveDocumentRole,
+} from "./studio-autosave-document-leader";
+import {
   selectStudioOpfsFileSystem,
   type StudioOpfsStorageManagerLike,
 } from "./studio-opfs-filesystem";
@@ -109,6 +115,35 @@ export class StudioAutosaveDurabilityError extends Error {
   }
 }
 
+/**
+ * Another tab on this origin owns the document. This is deliberately NOT a
+ * `StudioAutosaveDurabilityError`: the difference between "storage broke" and "someone else is the
+ * author of record" decides whether falling back to the second authority is a repair or a fork.
+ */
+export class StudioAutosaveDocumentBusyError extends Error {
+  constructor(cause?: unknown) {
+    super(
+      "이 원고는 다른 탭에서 편집 중입니다. 이 탭의 변경은 저장되지 않습니다.",
+      { cause },
+    );
+    this.name = "StudioAutosaveDocumentBusyError";
+  }
+}
+
+/**
+ * True when a failure means "a different tab or window is the document's writer". Duck-typed on the
+ * journal error code so the check survives module/chunk boundaries and a lane that owns the journal
+ * re-exporting its error class.
+ */
+export function studioAutosaveDocumentBusy(error: unknown): boolean {
+  if (error instanceof StudioAutosaveDocumentBusyError) return true;
+  if (typeof error !== "object" || error === null) return false;
+  const code = (error as { readonly code?: unknown }).code;
+  if (code === "LEASE_BUSY") return true;
+  const cause = (error as { readonly cause?: unknown }).cause;
+  return cause !== undefined && cause !== error && studioAutosaveDocumentBusy(cause);
+}
+
 export interface StudioAutosaveOpfsJournalPort {
   scan(options?: { readonly signal?: AbortSignal }): Promise<StudioOpfsRecoveryScan>;
   readPayload(
@@ -159,8 +194,13 @@ interface StudioAutosaveBrowserScope {
     readonly locks?: {
       request<T>(
         name: string,
-        options: { readonly mode: "exclusive"; readonly signal?: AbortSignal },
-        callback: () => Promise<T>,
+        options: {
+          readonly mode: "exclusive";
+          /** Web Locks `ifAvailable`. Used by document-open leader arbitration. */
+          readonly ifAvailable?: boolean;
+          readonly signal?: AbortSignal;
+        },
+        callback: (lock?: unknown) => T | PromiseLike<T>,
       ): Promise<T>;
     };
   };
@@ -508,6 +548,10 @@ export async function createStudioAutosaveOpfsSession(
   autosaveKey: string,
   scope: StudioAutosaveBrowserScope =
     globalThis as unknown as StudioAutosaveBrowserScope,
+  options: {
+    /** Follower tabs get a session that reads the document but refuses every mutation. */
+    readonly readOnly?: boolean;
+  } = {},
 ): Promise<StudioAutosaveOpfsSession | null> {
   const lockManager = scope.navigator?.locks ?? null;
   if (!lockManager || typeof lockManager.request !== "function") return null;
@@ -539,9 +583,94 @@ export async function createStudioAutosaveOpfsSession(
   ).slice(0, 32);
   return new StudioAutosaveOpfsSession({
     autosaveKey,
-    journal,
+    journal: options.readOnly ? createStudioAutosaveFollowerJournal(journal) : journal,
     ownerId: `autosave-${randomId}`,
   });
+}
+
+/**
+ * Read-through, write-refusing view of a document journal.
+ *
+ * A follower tab still needs to *read* the manuscript (recovery discovery, reconciliation), so the
+ * scan/read surface passes through untouched. Everything that could mutate the shared document is
+ * refused before it reaches storage, which keeps the failure at the session boundary instead of
+ * deep inside an append that has already advanced a revision.
+ */
+function createStudioAutosaveFollowerJournal(
+  journal: StudioAutosaveOpfsJournalPort,
+): StudioAutosaveOpfsJournalPort {
+  const refuse = (): never => {
+    throw new StudioAutosaveDocumentBusyError();
+  };
+  const follower: StudioAutosaveOpfsJournalPort = {
+    scan: (options) => journal.scan(options),
+    readPayload: (entry, options) => journal.readPayload(entry, options),
+    acquireWriter: () => Promise.reject(new StudioAutosaveDocumentBusyError()),
+    renewWriter: () => Promise.reject(new StudioAutosaveDocumentBusyError()),
+    releaseWriter: () => Promise.resolve(),
+    appendCheckpoint: refuse,
+    evictObsolete: refuse,
+  };
+  return Object.freeze(follower);
+}
+
+export type StudioAutosaveDocumentSession = Readonly<{
+  role: StudioAutosaveDocumentRole;
+  /**
+   * Always a usable *read* session when OPFS is available. For a follower every write path rejects
+   * with `StudioAutosaveDocumentBusyError`, so the persistence helper fails closed instead of
+   * forking into the SQLite authority.
+   */
+  session: StudioAutosaveOpfsSession | null;
+  lease: StudioAutosaveDocumentLease;
+}>;
+
+/**
+ * Document-open entry point: decides the leader before any stroke can be authored, then hands back
+ * a session whose write capability matches that decision.
+ *
+ * Call `lease.release()` alongside `session.dispose()` when the document closes. The Web Lock is
+ * released by the browser on tab destruction regardless, which is what lets a waiting follower take
+ * over after a crash or a closed window.
+ */
+export async function openStudioAutosaveDocumentSession(
+  autosaveKey: string,
+  scope: StudioAutosaveBrowserScope =
+    globalThis as unknown as StudioAutosaveBrowserScope,
+  options: {
+    readonly registry?: StudioAutosaveDocumentLeadershipRegistry;
+  } = {},
+): Promise<StudioAutosaveDocumentSession> {
+  const lease = await requestStudioAutosaveDocumentLeadership({
+    autosaveKey,
+    locks: scope.navigator?.locks ?? null,
+    registry: options.registry,
+  });
+  try {
+    const session = await createStudioAutosaveOpfsSession(autosaveKey, scope, {
+      readOnly: lease.role === "follower",
+    });
+    return Object.freeze({ role: lease.role, session, lease });
+  } catch (cause: unknown) {
+    await lease.release();
+    throw cause;
+  }
+}
+
+/**
+ * Withholds the second persistence authority from a follower tab.
+ *
+ * `persistStudioAutosaveWithOpfsPrimary` already fails closed on a busy document, but the emergency
+ * pagehide path and the empty-document tombstone path write to SQLite *in parallel* with OPFS. A
+ * follower reaching SQLite on its own writes a newer row than the leader's OPFS checkpoint, and the
+ * next reconcile promotes it — the same fork, through a side door. Callers pass their acquired port
+ * through this guard so a follower simply has no second authority to reach.
+ */
+export function withStudioAutosaveDocumentLeadership(
+  sqlite: StudioAutosaveSqlitePort | null,
+  lease: Pick<StudioAutosaveDocumentLease, "role"> | null,
+): StudioAutosaveSqlitePort | null {
+  return lease?.role === "follower" ? null : sqlite;
 }
 
 function browserRecoveryCandidate(
@@ -598,6 +727,20 @@ export async function persistStudioAutosaveWithOpfsPrimary(input: {
       discardAutosaveBrowserCompatibility(input.storage, input.key);
       return receipt;
     } catch (cause: unknown) {
+      if (studioAutosaveDocumentBusy(cause)) {
+        // 다른 탭이 이 원고의 leader다. 여기서 SQLite 권위로 우회하면 두 탭이 서로 다른 스냅샷을
+        // 갖게 되고, 다음 reconcile에서 더 늦은 쪽이 상대의 작업을 통째로 덮는다. 조용한 포크
+        // 대신 실패로 끝내고, 브라우저 KV도 건드리지 않는다.
+        const busy = cause instanceof StudioAutosaveDocumentBusyError
+          ? cause
+          : new StudioAutosaveDocumentBusyError(cause);
+        try {
+          input.onDurableAuthorityDegraded?.(busy);
+        } catch {
+          // 관측자 격리 — 고지 실패가 명시적인 busy error까지 막지 않는다.
+        }
+        throw busy;
+      }
       durableFailure = cause;
     }
   }

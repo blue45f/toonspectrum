@@ -9,6 +9,7 @@ export type StudioLiveSyncPhase =
   | "retrying"
   | "repairing"
   | "durability-risk"
+  | "read-only-follower"
   | "revoked"
   | "recovery-required";
 
@@ -76,6 +77,15 @@ export interface ProjectStudioLiveSyncSnapshotInput {
   telemetry: StudioCrdtSyncTelemetry | null;
   /** True only after the initial authoritative frontier has been applied and exposed to Studio. */
   operationSyncReady?: boolean;
+  /**
+   * False when another tab holds the document's autosave leadership, so this tab cannot persist.
+   *
+   * Without this signal, `mode === "local"` alone counted as durable and a follower tab showed the
+   * green "안전하게 동기화됨" while every one of its saves was being rejected — the measured
+   * two-tab fork advertised safety on the exact tab that had none. Undefined means "not tracked"
+   * and keeps the historical behaviour, so callers that predate leadership stay unchanged.
+   */
+  documentWritable?: boolean;
   terminalTransportState?: "revoked" | "recovery-required" | null;
   transportMessage?: string | null;
 }
@@ -103,6 +113,7 @@ export function projectStudioLiveSyncSnapshot({
   canEdit,
   telemetry,
   operationSyncReady: exposedOperationSyncReady,
+  documentWritable,
   terminalTransportState = null,
   transportMessage = null,
 }: ProjectStudioLiveSyncSnapshotInput): StudioLiveSyncSnapshot {
@@ -114,7 +125,7 @@ export function projectStudioLiveSyncSnapshot({
   const operationSyncReady = exposedOperationSyncReady ?? telemetry?.state === "ready";
   const message = transportMessage?.trim() || telemetry?.message || INITIAL_STUDIO_LIVE_SYNC_SNAPSHOT.message;
   const editsDurablyProtected = canEdit
-    ? operationSyncReady && (
+    ? documentWritable !== false && operationSyncReady && (
         mode === "local" ||
         serverDurable({ mode, transportReady, operationSyncReady }) ||
         browserDurable(persistenceDurability)
@@ -141,6 +152,12 @@ export function projectStudioLiveSyncSnapshot({
     telemetry?.state === "recovery-required"
   ) {
     return { ...common, phase: "recovery-required", editsDurablyProtected: false };
+  }
+  // A follower tab is healthy, not at risk — its document lives safely in the leader tab. What it
+  // must never do is claim the green "안전하게 동기화됨" while its own saves are being rejected, so
+  // this branch sits above every optimistic phase and below the terminal ones.
+  if (canEdit && documentWritable === false) {
+    return { ...common, phase: "read-only-follower" };
   }
   if (telemetry?.state === "repairing") return { ...common, phase: "repairing" };
 
@@ -208,6 +225,14 @@ export function presentStudioLiveSyncSnapshot(
             : "팀 서버가 새 원고 연산을 승인하고 있습니다.",
         tone: "good",
         assertive: false,
+      };
+    case "read-only-follower":
+      return {
+        shortLabel: "다른 탭이 편집 중",
+        detail:
+          "이 원고는 다른 탭에서 편집하고 있어 여기서는 저장되지 않습니다. 그 탭을 닫으면 이 탭이 이어받습니다.",
+        tone: "warn",
+        assertive: true,
       };
     case "syncing":
       return {

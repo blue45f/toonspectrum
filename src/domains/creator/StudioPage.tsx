@@ -416,12 +416,16 @@ import {
   planStudioDeferredStrokePostprocess,
   replaceStudioPendingStrokePostprocess,
 } from "./studio-deferred-stroke-postprocess";
-import { confirmStudioDestructiveAction } from "./studio-destructive-action-preview";
+import {
+  confirmStudioDestructiveAction,
+  runStudioDestructiveAction,
+} from "./studio-destructive-action-preview";
 import {
   settleStudioDestructiveCommit,
   studioApplyCollageRequest,
   studioApplyPanelLayoutRequest,
   studioApplyTemplateRequest,
+  studioClearAutosaveRequest,
   studioClearLivingInkRequest,
   studioDeleteCheckpointRequest,
   studioQuickComicReplaceRequest,
@@ -1875,6 +1879,13 @@ type StudioAutosaveOpfsSession = NonNullable<
 
 type StudioAutosaveSqlitePort =
   import("./studio-autosave-sqlite-store").StudioAutosaveSqlitePort;
+
+type StudioAutosaveDocumentLease =
+  import("./studio-autosave-document-leader").StudioAutosaveDocumentLease;
+type StudioAutosaveDocumentRole =
+  import("./studio-autosave-document-leader").StudioAutosaveDocumentRole;
+type StudioAutosaveDocumentLeadershipBasis =
+  import("./studio-autosave-document-leader").StudioAutosaveDocumentLeadershipBasis;
 
 type StudioHybridDccWorkspacePersistence = ReturnType<
   typeof import("./studio-hybrid-dcc-workspace-persistence")
@@ -3768,6 +3779,19 @@ function StudioCuttoonEditor({
   const checkpointKey = studioCheckpointKey({ userId: studioAuthUserId, workId, remixId });
   const autosaveOpfsSessionRef =
     useRef<Promise<StudioAutosaveOpfsSession | null> | null>(null);
+  /**
+   * 문서 열기 시점에 정해지는 leader 임차권.
+   *
+   * follower 탭이 두 번째 저장 권위(SQLite)에 직접 닿으면 선행 탭의 OPFS 체크포인트보다 늦은
+   * savedAt 행을 써서 다음 reconcile 이 그것을 승격시킨다 — 옆문으로 들어온 문서 포크다.
+   * 그래서 persist 경로를 우회하는 두 곳(pagehide 긴급 저장·빈 문서 tombstone)은 반드시
+   * `withStudioAutosaveDocumentLeadership` 를 지난다.
+   */
+  const autosaveDocumentLeaseRef = useRef<StudioAutosaveDocumentLease | null>(null);
+  const [autosaveDocumentLeadership, setAutosaveDocumentLeadership] = useState<{
+    readonly role: StudioAutosaveDocumentRole;
+    readonly basis: StudioAutosaveDocumentLeadershipBasis;
+  } | null>(null);
   const autosaveSqliteStoreRef =
     useRef<Promise<StudioAutosaveSqlitePort | null> | null>(null);
   useEffect(() => {
@@ -3789,22 +3813,41 @@ function StudioCuttoonEditor({
     };
   }, []);
   useEffect(() => {
-    const sessionPromise = import("./studio-autosave-opfs-session")
-      .then(({ createStudioAutosaveOpfsSession }) =>
-        createStudioAutosaveOpfsSession(autosaveKey)
+    let disposed = false;
+    const openedPromise = import("./studio-autosave-opfs-session")
+      .then(({ openStudioAutosaveDocumentSession }) =>
+        openStudioAutosaveDocumentSession(autosaveKey)
       )
+      .then((opened) => {
+        if (!disposed) {
+          autosaveDocumentLeaseRef.current = opened.lease;
+          setAutosaveDocumentLeadership({
+            role: opened.role,
+            basis: opened.lease.basis,
+          });
+        }
+        return opened;
+      })
       .catch((cause: unknown) => {
         if (import.meta.env.DEV) {
           console.warn("Studio OPFS autosave session is unavailable.", cause);
         }
         return null;
       });
+    const sessionPromise = openedPromise.then((opened) => opened?.session ?? null);
     autosaveOpfsSessionRef.current = sessionPromise;
     return () => {
+      disposed = true;
       if (autosaveOpfsSessionRef.current === sessionPromise) {
         autosaveOpfsSessionRef.current = null;
       }
-      void sessionPromise.then((session) => session?.dispose());
+      autosaveDocumentLeaseRef.current = null;
+      void openedPromise.then(async (opened) => {
+        // 세션을 먼저 정리하고 임차권을 나중에 놓는다. 순서가 뒤집히면 대기 중인 follower 가
+        // 아직 살아 있는 writer 위로 승격해 같은 문서에 두 저장 권위가 생긴다.
+        await opened?.session?.dispose();
+        await opened?.lease.release();
+      });
     };
   }, [autosaveKey]);
   const [scenarioImageReferenceDocument, setScenarioImageReferenceDocument] =
@@ -4361,11 +4404,22 @@ function StudioCuttoonEditor({
     if (!markStudioDocumentChanged()) return;
     setMasterState(next);
   };
+  /**
+   * 히스토리 밖 사이드카(캐릭터 바이블·Writer Room) 편집 배리어.
+   *
+   * 이 문서들은 `pagesHistory` 에 들어가지 않는다. 그래서 사이드카를 고친 직후의 ⌘Z 는
+   * 사이드카를 되돌리는 대신 **화면 밖 캔버스 획을 지운다** — 사용자가 방금 만진 것과
+   * 전혀 다른 대상을 파괴하는 조용한 실패다. 마지막 문서 편집이 사이드카였으면 그 한 번의
+   * ⌘Z 를 소비해 사실을 알리고 캔버스 히스토리는 건드리지 않는다(1회성 — 다음 ⌘Z 는 평소대로
+   * 캔버스를 되돌린다. 영구 차단은 undo 자체를 못 쓰게 만드는 더 나쁜 실패다).
+   */
+  const sidecarHistoryBarrierRef = useRef<string | null>(null);
   const [characterBible, setCharacterBibleState] = useState<StudioCharacterBible>(() =>
     normalizeStudioCharacterBible(undefined)
   );
   const setCharacterBible = (next: Parameters<typeof setCharacterBibleState>[0]) => {
     if (!markStudioDocumentChanged()) return;
+    sidecarHistoryBarrierRef.current = "캐릭터 바이블";
     setCharacterBibleState(next);
   };
   const [writerRoom, setWriterRoomState] = useState<StudioWriterRoomDocument>(() =>
@@ -4373,6 +4427,7 @@ function StudioCuttoonEditor({
   );
   const setWriterRoom = (next: Parameters<typeof setWriterRoomState>[0]) => {
     if (!markStudioDocumentChanged()) return;
+    sidecarHistoryBarrierRef.current = "Writer Room";
     setWriterRoomState(next);
   };
   const [aiProvenance, setAiProvenanceState] = useState<StudioAiProvenanceDocument>(() =>
@@ -11495,10 +11550,18 @@ function StudioCuttoonEditor({
         const sessionPromise = autosaveOpfsSessionRef.current;
         const sqlitePromise = autosaveSqliteStoreRef.current;
         void (async () => {
-          const [session, sqlite] = await Promise.all([
-            sessionPromise ?? Promise.resolve(null),
-            sqlitePromise ?? Promise.resolve(null),
-          ]);
+          const [{ withStudioAutosaveDocumentLeadership }, session, acquiredSqlite] =
+            await Promise.all([
+              import("./studio-autosave-opfs-session"),
+              sessionPromise ?? Promise.resolve(null),
+              sqlitePromise ?? Promise.resolve(null),
+            ]);
+          // persist 경로를 우회하는 옆문 ①. follower 가 여기서 tombstone 을 쓰면 선행 탭이
+          // 방금 저장한 문서를 "비었다"로 덮는다.
+          const sqlite = withStudioAutosaveDocumentLeadership(
+            acquiredSqlite,
+            autosaveDocumentLeaseRef.current,
+          );
           if (
             studioRevisionProjectGenerationRef.current !== scheduledGeneration
             || (
@@ -11918,6 +11981,8 @@ function StudioCuttoonEditor({
         setPublishPackageCredits(publishPackageCreditsFromPack(parsed.publishPack));
         setCharacterBible(normalizeStudioCharacterBible(parsed.characterBible));
         setWriterRoom(normalizeStudioWriterRoomDocument(parsed.writerRoom));
+        // 문서 전체 수화는 사용자의 사이드카 편집이 아니다 — 배리어를 남기지 않는다.
+        sidecarHistoryBarrierRef.current = null;
         setAiProvenance(
           recoverInterruptedStudioAiOperations(
             normalizeStudioAiProvenanceDocument(parsed.aiProvenance)
@@ -11971,7 +12036,7 @@ function StudioCuttoonEditor({
       });
   }
 
-  function clearAutosave() {
+  function clearAutosaveRecord() {
     clearAutosaveDurableAuthority();
     try {
       localStorage.removeItem(autosaveKey);
@@ -11983,6 +12048,40 @@ function StudioCuttoonEditor({
     autosaveRecoveryCandidateRef.current = null;
     setHasAutosave(false);
     setAutosaveRestoreBlockedReason(null);
+  }
+
+  /**
+   * 복구 배너의 "비우기".
+   *
+   * 이 버튼은 브라우저가 죽었을 때 남은 **유일한 사본**을 localStorage·OPFS·SQLite 에서
+   * 한꺼번에 지운다. 히스토리 커밋이 아니라 ⌘Z 로도 돌아오지 않는데, 예전에는 확인 한 번
+   * 없이 클릭 즉시 실행됐다 — 훨씬 덜 위험한 페이지 삭제에는 확인 모달이 있는데도.
+   * 파괴 승인 seam(되돌릴 수 없음 등급)에 태우고 무엇이 몇 개 사라지는지 먼저 보여준다.
+   */
+  async function clearAutosave() {
+    const saved = autosaveRecoveryCandidateRef.current;
+    const savedPages = saved?.payload.pagesList ?? [];
+    const savedAt = saved ? new Date(saved.savedAt) : null;
+    const savedAtLabel =
+      savedAt && Number.isFinite(savedAt.getTime())
+        ? savedAt.toLocaleString("ko-KR")
+        : undefined;
+    const request = studioClearAutosaveRequest({
+      pageCount: savedPages.length,
+      elementCount: savedPages.reduce(
+        (total, page) => total + (page.elements?.length ?? 0),
+        0,
+      ),
+      ...(savedAtLabel ? { savedAtLabel } : {}),
+    });
+    // runStudioDestructiveAction 이 승인·실행·결과 고지를 한 흐름으로 묶는다 — 거절도
+    // 실패도 원장에 남으므로 "눌렀는데 아무 일도 없다"가 생기지 않는다.
+    await runStudioDestructiveAction({
+      request,
+      execute: () => {
+        clearAutosaveRecord();
+      },
+    });
   }
 
   function downloadAutosaveBackup() {
@@ -15948,6 +16047,8 @@ function StudioCuttoonEditor({
     pendingStrokeCommitsRef.current = batch;
     batch.strokes.push(finished);
     batch.retryCount = 0;
+    // 아직 히스토리 밖이지만 이 획이 마지막 문서 편집이다 — 사이드카 배리어를 내린다.
+    sidecarHistoryBarrierRef.current = null;
     if (batch.timer) globalThis.clearTimeout(batch.timer);
     batch.timer = globalThis.setTimeout(() => {
       flushPendingStrokeCommitsRef.current();
@@ -21828,6 +21929,7 @@ const puppetWarpArmed =
       }
     }
     coalesceKeyRef.current = null; // 일반 커밋은 합치기 체인을 끊는다.
+    sidecarHistoryBarrierRef.current = null; // 마지막 편집 대상이 다시 캔버스가 됐다.
     const localNextPages = commitBasePages.map((p) =>
       p.id === commitPageId ? { ...p, ...finalExtraPatch, elements: resolved } : p
     );
@@ -21939,6 +22041,62 @@ const puppetWarpArmed =
     setPagesHistory(nextHistory);
     if (!replacesCurrentSnapshot) setPagesHi(nextHistoryIndex);
     coalesceKeyRef.current = key;
+    sidecarHistoryBarrierRef.current = null; // 마지막 편집 대상이 다시 캔버스가 됐다.
+  }
+  /**
+   * 지연 커밋 배치 하나를 **획 개수만큼의 히스토리 항목**으로 펼친다.
+   *
+   * 배칭은 렌더와 CRDT 발행을 아끼는 성능 장치지 undo 입도가 아니다. 한 배치를 한 항목으로
+   * 두면 200ms 안에 그은 해칭 40획이 ⌘Z 한 번에 전멸한다 — CSP·Photoshop·Procreate 는 전부
+   * 획당 1 undo 다. 그렇다고 획마다 `commit()` 을 부르면 같은 태스크에서 장면 발행이 여러 번
+   * 겹쳐 "중복된 드로우 식별자"로 거절된다(실측). 그래서 발행·검증은 배치 단위로 한 번만 하고,
+   * 여기서는 방금 만들어진 스냅샷에서 뒤쪽 획을 하나씩 걷어낸 **접두 스냅샷**을 되돌려 끼운다.
+   * 히스토리 배열은 순수한 로컬 UI 상태이므로 이 재구성은 문서를 건드리지 않는다.
+   */
+  function expandDeferredStrokeCommitHistory(batch: PendingStrokeCommitBatch): void {
+    if (batch.strokes.length < 2) return;
+    const history = pagesHistoryRef.current;
+    const finalIndex = Math.max(
+      0,
+      Math.min(pagesHiRef.current, Math.max(0, history.length - 1))
+    );
+    const finalPages = history[finalIndex];
+    const basePages = history[finalIndex - 1];
+    // 직전 스냅샷이 히스토리 상한에 밀려 없어졌다면 펼칠 기준이 없다. 배치 1항목으로 남긴다 —
+    // 잘못된 기준으로 접두를 만들면 undo 가 엉뚱한 상태로 점프한다.
+    if (!finalPages || !basePages) return;
+    let accHistory = history;
+    let accIndex = finalIndex - 1;
+    let previousPages = basePages;
+    for (let kept = 1; kept <= batch.strokes.length; kept += 1) {
+      const dropped = new Set(batch.strokes.slice(kept).map((stroke) => stroke.id));
+      const snapshot =
+        dropped.size === 0
+          ? finalPages
+          : finalPages.map((page) =>
+              page.id === batch.pageId
+                ? {
+                    ...page,
+                    elements: page.elements.filter((element) => !dropped.has(element.id)),
+                  }
+                : page
+            );
+      const appended = appendStudioPagesHistorySnapshot(accHistory, accIndex, snapshot);
+      recordStudioHistoryTransition({
+        mutationKind: "elements.commit",
+        previousPages,
+        nextPages: snapshot,
+        previousHistoryIndex: accIndex,
+        nextHistoryIndex: appended.historyIndex,
+      });
+      accHistory = appended.history;
+      accIndex = appended.historyIndex;
+      previousPages = snapshot;
+    }
+    pagesHistoryRef.current = accHistory;
+    pagesHiRef.current = accIndex;
+    setPagesHistory(accHistory);
+    setPagesHi(accIndex);
   }
   // 커밋 지연 파이프라인의 동기화/폐기 — 타이머·이벤트 핸들러가 stale 클로저 없이 최신
   // 상태(commit/pages/elements)로 실행되도록 렌더마다 ref 에 재바인딩한다(updateScrollPosRef 패턴).
@@ -21966,6 +22124,8 @@ const puppetWarpArmed =
         restorePendingStrokeCommits(batch);
         return false;
       }
+      // 한 번의 커밋(=한 번의 CRDT 발행·검증) 뒤, 그 스냅샷을 획 단위 undo 항목으로 펼친다.
+      expandDeferredStrokeCommitHistory(batch);
       // 즉시 커밋 경로와 동일한 래스터 승격 — 배치의 각 획을 개별 작업으로 큐잉한다.
       const rasterWorkId = authorizedWorkAssetScopeId;
       const rasterDocument = studioCrdtDocumentRef.current;
@@ -22528,6 +22688,7 @@ const puppetWarpArmed =
       resolvedPages = mergeStudioCrdtFrontier(rebasedNextPages);
     }
     coalesceKeyRef.current = null;
+    sidecarHistoryBarrierRef.current = null; // 마지막 편집 대상이 다시 캔버스가 됐다.
     const appended = appendStudioPagesHistorySnapshot(
       currentHistory,
       currentHistoryIndex,
@@ -26037,9 +26198,24 @@ const puppetWarpArmed =
         return;
       }
     }
-    // 커밋 동기화를 기다리는 획이 있으면 그것이 "마지막 동작"이다 — 이번 undo 는 대기 획
-    // 폐기로 소비된다(히스토리 밖이므로 redo 로 되살릴 수는 없다).
-    if (pendingStrokeCommitsRef.current) {
+    // 사이드카(캐릭터 바이블·Writer Room)가 마지막 편집이었으면 이 ⌘Z 는 화면 밖 캔버스 획을
+    // 지우게 된다. 그 한 번을 여기서 소비해 사실만 알리고 히스토리는 건드리지 않는다.
+    const sidecarBarrier = sidecarHistoryBarrierRef.current;
+    if (sidecarBarrier) {
+      sidecarHistoryBarrierRef.current = null;
+      const notice =
+        `${sidecarBarrier} 편집은 실행 취소(⌘Z) 대상이 아니에요.`
+        + ` ${sidecarBarrier} 패널에서 직접 되돌려 주세요.`
+        + " 한 번 더 누르면 캔버스 작업이 실행 취소됩니다.";
+      setError(notice);
+      announceDrawingShortcut(notice);
+      return;
+    }
+    // 커밋 동기화를 기다리는 획이 있으면 먼저 히스토리에 안착시킨다 — 획 하나당 항목 하나로
+    // 들어가므로 아래 일반 undo 가 **마지막 한 획만** 되돌린다(그리고 redo 로 되살아난다).
+    // 예전에는 대기 배치를 통째로 폐기해, 200ms 안에 그은 해칭 40획이 ⌘Z 한 번에 사라졌다.
+    if (pendingStrokeCommitsRef.current && !flushPendingStrokeCommitsRef.current()) {
+      // 잠금·저장 중이라 히스토리에 못 넣는 배치는 예전 계약대로 폐기가 유일한 되돌림이다.
       discardPendingStrokeCommitsRef.current();
       return;
     }
@@ -26049,12 +26225,27 @@ const puppetWarpArmed =
     setAdvancedFillBusy(false);
     setAdvancedFillPreview(null);
     setAdvancedFillStatus(null);
-    const nextIndex = Math.max(0, pagesHi - 1);
-    const nextSnapshot = pagesHistory[nextIndex];
-    if (nextSnapshot && !publishStudioCrdtHistoryTransition(pages, nextSnapshot)) return;
-    if (nextIndex !== pagesHi && nextSnapshot) {
+    // flush 는 pagesHistoryRef/pagesHiRef 를 **동기** 전진시키지만 이 렌더의 pagesHistory/pagesHi
+    // 는 아직 옛 값이다. 방금 안착한 획을 그대로 지나치지 않도록 ref 에서 읽는다.
+    const undoHistory = pagesHistoryRef.current;
+    const undoIndex = Math.max(
+      0,
+      Math.min(pagesHiRef.current, Math.max(0, undoHistory.length - 1))
+    );
+    const undoBasePages = undoHistory[undoIndex] ?? pages;
+    const nextIndex = Math.max(0, undoIndex - 1);
+    const nextSnapshot = undoHistory[nextIndex];
+    if (nextSnapshot && !publishStudioCrdtHistoryTransition(undoBasePages, nextSnapshot)) return;
+    if (nextIndex !== undoIndex && nextSnapshot) {
       recordStudioHistoryUndoRedo("undo", nextSnapshot, nextIndex);
     }
+    // `setPagesHi` 는 저장 중이면 거절한다. 거절될 갱신으로 ref 를 앞세우면 렌더 없이
+    // ref 와 상태가 어긋난 채 남으므로, 커밋 경로와 같은 게이트를 먼저 통과시킨다.
+    if (documentSaveInFlightRef.current) {
+      setError("저장 중에는 원고를 변경할 수 없어요. 저장이 끝난 뒤 다시 시도해 주세요.");
+      return;
+    }
+    pagesHiRef.current = nextIndex;
     setPagesHi(nextIndex);
   };
   const redo = () => {
@@ -26077,6 +26268,9 @@ const puppetWarpArmed =
     if (hokusaiStroke?.transactionCommitted) {
       releaseStudioHokusaiLivePresentation(hokusaiStroke);
     }
+    // redo 는 캔버스를 파괴하지 않으므로 배리어를 세우지 않지만, 소비되지 않은 배리어가
+    // 뒤늦게 엉뚱한 ⌘Z 에서 튀어나오지 않도록 여기서 내린다.
+    sidecarHistoryBarrierRef.current = null;
     // 대기 획을 먼저 히스토리에 안착시킨다 — 이번 redo 입력은 동기화로 소비된다.
     if (pendingStrokeCommitsRef.current) {
       flushPendingStrokeCommitsRef.current();
@@ -41562,7 +41756,15 @@ function clearSelectionForEdit() {
         }
         const sqlitePromise = autosaveSqliteStoreRef.current;
         if (sqlitePromise) {
-          durableWrites.push(sqlitePromise.then(async (sqlite) => {
+          durableWrites.push(sqlitePromise.then(async (acquiredSqlite) => {
+            // persist 경로를 우회하는 옆문 ②. follower 탭의 pagehide 저장이 더 늦은 savedAt 으로
+            // 선행 탭 문서를 덮는 유일한 실제 포크 경로였다.
+            const { withStudioAutosaveDocumentLeadership } =
+              await import("./studio-autosave-opfs-session");
+            const sqlite = withStudioAutosaveDocumentLeadership(
+              acquiredSqlite,
+              autosaveDocumentLeaseRef.current,
+            );
             if (!sqlite) throw new Error("SQLite autosave authority is unavailable");
             await sqlite.write(autosaveKey, emergency.payload);
             return "sqlite-fallback" as const;
@@ -41670,6 +41872,8 @@ function clearSelectionForEdit() {
     setMaster(normalizeDocumentMaster(projectData.master) as DocumentMaster<El>);
     setCharacterBible(normalizeStudioCharacterBible(projectData.characterBible));
     setWriterRoom(normalizeStudioWriterRoomDocument(projectData.writerRoom));
+    // 문서 전체 수화는 사용자의 사이드카 편집이 아니다 — 배리어를 남기지 않는다.
+    sidecarHistoryBarrierRef.current = null;
     setAiProvenance(
       recoverInterruptedStudioAiOperations(
         normalizeStudioAiProvenanceDocument(projectData.aiProvenance)
@@ -45210,6 +45414,7 @@ function clearSelectionForEdit() {
           groups={groups}
           guides={guides}
           hasAutosave={hasAutosave}
+          autosaveDocumentLeadership={autosaveDocumentLeadership}
           healCloneArmed={healCloneArmed}
           healCloneCursorRef={healCloneCursorRef}
           healCloneDragPreview={healCloneDragPreview}

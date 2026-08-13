@@ -28,9 +28,19 @@ import type { ReactNode } from "react";
 
 export function ClipMaskGroup({
   cacheKey,
+  composite,
   children,
 }: {
   cacheKey: string;
+  /**
+   * How the finished (cached, mask-applied) sandwich composites against what is below it.
+   *
+   * Inside the group, clipping is always the children's own `source-in` contract; this prop is for
+   * the OUTSIDE — a masked layer that itself carries a blend mode, or a masked layer that must in
+   * turn clip to the layer below (nested clipBelow + own mask). Because the group is cached, the
+   * mode applies exactly once to the flattened bitmap, never per child.
+   */
+  composite?: Konva.NodeConfig["globalCompositeOperation"];
   children: ReactNode;
 }): React.ReactElement {
   const ref = useRef<Konva.Group>(null);
@@ -64,5 +74,9 @@ export function ClipMaskGroup({
     };
   }, [cacheKey]);
 
-  return <Group ref={ref}>{children}</Group>;
+  return (
+    <Group ref={ref} {...(composite ? { globalCompositeOperation: composite } : {})}>
+      {children}
+    </Group>
+  );
 }

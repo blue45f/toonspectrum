@@ -101,7 +101,8 @@ describe("Studio reliability product boundary", () => {
     );
     expect(statusRail).toContain("<StudioReliabilityStatusRail />");
     const railIndex = statusRail.indexOf("<StudioReliabilityStatusRail />");
-    const autosaveBannerIndex = statusRail.indexOf("{hasAutosave && (");
+    // 배너 조건에는 follower 게이트가 함께 걸린다(후발 탭에는 복구 버튼을 띄우지 않는다).
+    const autosaveBannerIndex = statusRail.indexOf("{hasAutosave && ");
     // 세션 복구 배너와 같은 레일에, 그 위에 산다.
     expect(railIndex).toBeGreaterThan(0);
     expect(autosaveBannerIndex).toBeGreaterThan(railIndex);

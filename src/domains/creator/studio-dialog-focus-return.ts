@@ -21,6 +21,11 @@
  *
  * 관찰 범위는 `body` 의 직계 자식(`subtree: false`)뿐이다. 포털 루트가 정확히 그 자리에
  * 붙기 때문에 캔버스·패널의 잦은 DOM 변경을 한 건도 보지 않는다(핫패스 비용 0).
+ *
+ * 판정을 **한 번이 아니라 세 시점에** 반복하는 이유는 `restoreWhenSettled` 주석에 있다 —
+ * 요약하면 포털이 사라진 그 순간이 항상 "되돌리기 좋은 순간"은 아니기 때문이다. 반복되는
+ * 것은 판정이지 복원이 아니다: 매번 "바닥일 때만" 조건을 다시 보므로, 이미 제자리면 전부
+ * 무동작이고 다른 다이얼로그의 자기 복원을 덮어쓰지 않는 계약도 그대로다.
  */
 
 const MODAL_SELECTOR = '[aria-modal="true"]';
@@ -131,10 +136,52 @@ export function installStudioDialogFocusReturn(
   const view = ownerDocument?.defaultView ?? null;
   const Observer = view?.MutationObserver ?? null;
   const body = ownerDocument?.body ?? null;
-  if (!ownerDocument || !body || !Observer) return () => undefined;
+  if (!ownerDocument || !body || !Observer || !view) return () => undefined;
 
   const openers = new Map<Element, HTMLElement | null>();
   let lastOutsideFocus: Element | null = null;
+  // `view.setTimeout`/`requestAnimationFrame` 은 DOM 쪽 시그니처라 number 를 돌려준다
+  // (@types/node 의 Timeout 이 아니다).
+  let settleTimer: number | null = null;
+  let settleFrame: number | null = null;
+
+  const cancelSettle = () => {
+    if (settleTimer !== null) view.clearTimeout(settleTimer);
+    if (settleFrame !== null) view.cancelAnimationFrame(settleFrame);
+    settleTimer = null;
+    settleFrame = null;
+  };
+
+  /** "바닥일 때만" 조건을 지킨 채 한 번 되돌린다. */
+  const restoreIfDropped = (opener: Element | null) => {
+    if (!studioDialogFocusWasDropped(ownerDocument)) return;
+    returnStudioDialogFocus(opener, ownerDocument);
+  };
+
+  /**
+   * 세 시점에 같은 판정을 반복한다 — 지금, 다음 매크로태스크, 다음 프레임.
+   * 매번 "바닥일 때만" 조건을 다시 보므로 이미 제자리면 전부 무동작이다.
+   *
+   * 왜 한 번으로 안 되는가(둘 다 브라우저 실측 2026-08-13):
+   *  - 백드롭 클릭: 1차 복원 **직후** 같은 입력의 `mousedown` 기본 동작이 포커스를 다시
+   *    body 로 떨어뜨린다. 늦은 확인이 그걸 주워야 한다.
+   *  - 기능 튜토리얼: 이 다이얼로그는 열릴 때 `body` 의 다른 자식을 전부 `inert` 로 만들고
+   *    **자기 정리(passive effect)에서** 되돌린다. 포털이 사라진 직후에는 메뉴바가 아직
+   *    inert 라서 되돌릴 후보가 하나도 없다(`canReturnStudioDialogFocus` 가 전부 거른다).
+   *    정리가 끝난 뒤 다시 봐야 트리거를 잡는다.
+   */
+  const restoreWhenSettled = (opener: Element | null) => {
+    cancelSettle();
+    restoreIfDropped(opener);
+    settleTimer = view.setTimeout(() => {
+      settleTimer = null;
+      restoreIfDropped(opener);
+    }, 0);
+    settleFrame = view.requestAnimationFrame(() => {
+      settleFrame = null;
+      restoreIfDropped(opener);
+    });
+  };
 
   const onFocusIn = (event: Event) => {
     const target = asElement(event.target as Node);
@@ -165,8 +212,7 @@ export function installStudioDialogFocusReturn(
       }
     }
     if (!pendingRestore) return;
-    if (!studioDialogFocusWasDropped(ownerDocument)) return;
-    returnStudioDialogFocus(pendingOpener, ownerDocument);
+    restoreWhenSettled(pendingOpener);
   });
 
   ownerDocument.addEventListener("focusin", onFocusIn, true);
@@ -175,6 +221,7 @@ export function installStudioDialogFocusReturn(
   installed = () => {
     ownerDocument.removeEventListener("focusin", onFocusIn, true);
     observer.disconnect();
+    cancelSettle();
     openers.clear();
     installed = null;
   };

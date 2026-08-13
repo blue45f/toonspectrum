@@ -305,6 +305,9 @@ function syncToneClass(tone: ReturnType<typeof presentStudioLiveSyncSnapshot>["t
 
 function StudioSyncStatusIcon({ phase }: { phase: StudioLiveSyncPhase }) {
   if (phase === "synced") return <ShieldCheck size={14} aria-hidden />;
+  // A follower tab cannot persist — the shield-alert matches the warn tone of its presentation
+  // without borrowing the green shield a writable tab earns.
+  if (phase === "read-only-follower") return <ShieldAlert size={14} aria-hidden />;
   if (phase === "offline-queued") return <CloudOff size={14} aria-hidden />;
   if (phase === "repairing") return <Wrench size={14} aria-hidden />;
   if (phase === "durability-risk" || phase === "revoked" || phase === "recovery-required") {

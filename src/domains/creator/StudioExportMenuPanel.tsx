@@ -24,7 +24,6 @@ import {
 import {
   formatExportPageRangeLabel,
   planMultiPageExportCapture,
-  planStudioExportPrintGeometry,
   preflightStudioExportPackage,
   STUDIO_EXPORT_BLEED_MM_RANGE,
   STUDIO_EXPORT_DPI_RANGE,
@@ -50,7 +49,10 @@ import {
   exportContactSheetPdf,
 } from "./studio-pdf-contact-sheet";
 import { exportPagesToPdf, pdfExportResultMessage } from "./studio-pdf-export";
-import { publishStudioExportResolutionDpi } from "./studio-raster-resolution-metadata";
+import {
+  publishStudioExportPrintBoxMm,
+  publishStudioExportResolutionDpi,
+} from "./studio-raster-resolution-metadata";
 import { WATERMARK_POSITIONS, type WatermarkSettings } from "./studio-watermark";
 import { StudioContactSheetPanel } from "./StudioContactSheetPanel";
 
@@ -275,34 +277,47 @@ export function StudioExportMenuPanel({
     requireDialogueTxt: includeDialogueTxt,
     pagesForDialogue: dialoguePages ?? undefined,
     dialogueTitle: exportTitle,
+    exportScale,
   });
 
   /**
    * 인쇄 지오메트리 계획 — 트림/도련은 픽셀에 굽지 않고(그림을 자르지 않기 위해) "지금 배율이
    * 실제로 몇 DPI인가"와 "목표 DPI에 닿으려면 무엇이 바뀌어야 하는가"만 계산한다.
+   * 계획은 프리플라이트가 소유한다 — 여기서 다시 계산하면 표기와 차단 판정이 어긋날 수 있다.
    */
-  const printPlan =
-    geometryTrimW != null && geometryTrimH != null
-      ? planStudioExportPrintGeometry({
-          canvasWidthPx: canvasWidth,
-          canvasHeightPx: canvasHeight,
-          dpi: geometryDpi,
-          trimWidthMm: geometryTrimW,
-          trimHeightMm: geometryTrimH,
-          ...(geometryBleed != null ? { bleedMm: geometryBleed } : {}),
-          exportScale,
-        })
-      : null;
+  const printPlan = packagePreflight.printPlan;
+  /**
+   * 해상도 오류는 지오메트리 섹션의 전용 알림(export-geometry-dpi-alert)이 이미 띄운다 —
+   * 하단 차단 목록에서 한 번 더 반복하지 않는다.
+   */
+  const nonPrintDpiErrors = packagePreflight.errors.filter(
+    (issue) => !issue.code.startsWith("PRINT_DPI_")
+  );
   /**
    * 파일에 실제로 기록할 해상도 — 트림이 있으면 "출력 크기를 덮는 실측 DPI", 없으면 사용자가
    * 고른 DPI 그대로. UI 표기와 파일 바이트가 같은 값을 말하게 하는 단일 출처다.
    */
   const exportResolutionDpi = printPlan ? printPlan.currentDpi : geometryDpi;
+  /**
+   * 인쇄 출력 상자(트림+도련) — 이 값이 게시되면 파일에 박히는 DPI는 예측이 아니라 인코딩된
+   * 픽셀에서 실측된다. 내보내기 픽셀 수는 편집기 줌(effectiveScale)에 따라 1px 달라질 수 있어
+   * 순수 계산으로는 정확히 맞출 수 없기 때문이다.
+   */
+  const printBoxWidthMm = printPlan?.outputWidthMm ?? null;
+  const printBoxHeightMm = printPlan?.outputHeightMm ?? null;
 
   useEffect(() => {
     // 언마운트(메뉴 닫힘)에서 지우지 않는다 — 툴바 다운로드는 이 패널이 닫힌 뒤에 눌린다.
     publishStudioExportResolutionDpi(exportResolutionDpi);
   }, [exportResolutionDpi]);
+
+  useEffect(() => {
+    publishStudioExportPrintBoxMm(
+      printBoxWidthMm != null && printBoxHeightMm != null
+        ? { widthMm: printBoxWidthMm, heightMm: printBoxHeightMm }
+        : null
+    );
+  }, [printBoxWidthMm, printBoxHeightMm]);
 
   useEffect(() => {
     writeStudioExportGeometryDraft({
@@ -1076,15 +1091,16 @@ export function StudioExportMenuPanel({
           </p>
           <p data-testid="export-geometry-actual" className="text-[0.6rem] leading-snug text-fg-2">
             {printPlan
-              ? `실제 저장: ${exportScale}× → ${printPlan.currentWidthPx}×${printPlan.currentHeightPx}px `
-                + `· ${Math.round(printPlan.currentDpi)}DPI 기록`
-              : `실제 저장: ${exportScale}× → ${Math.round(canvasWidth * exportScale)}×${Math.round(canvasHeight * exportScale)}px `
+              ? `실제 저장: ${exportScale}× → 약 ${printPlan.currentWidthPx}×${printPlan.currentHeightPx}px `
+                + `· 약 ${Math.round(printPlan.currentDpi)}DPI 기록`
+              : `실제 저장: ${exportScale}× → ${Math.floor(canvasWidth * exportScale)}×${Math.floor(canvasHeight * exportScale)}px `
                 + `· ${Math.round(geometryDpi)}DPI 기록`}
           </p>
           <p className="text-[0.58rem] leading-snug text-fg-3">
             트림·도련은 픽셀에 적용하지 않습니다 — 캔버스 비율을 유지해 그림을 자르지 않고, 출력
             크기에 맞춘 해상도만 PNG(pHYs)·JPG(JFIF)·PSD에 기록합니다. WebP·QOI는 규격상 해상도
-            태그를 담지 못합니다.
+            태그를 담지 못합니다. 위 픽셀·DPI는 예상치이며(화면 배율에 따라 1px 차이가 날 수
+            있음), 파일에는 저장된 실제 픽셀에서 실측한 DPI가 기록됩니다.
             {printPlan && (printPlan.overflowWidthMm > 0.5 || printPlan.overflowHeightMm > 0.5)
               ? ` 캔버스 비율이 출력 비율과 달라 인쇄 시 ${
                   printPlan.overflowHeightMm >= printPlan.overflowWidthMm ? "세로" : "가로"
@@ -1119,15 +1135,15 @@ export function StudioExportMenuPanel({
             </button>
           ) : null}
         </div>
-        {!packagePreflight.canExport ? (
+        {!packagePreflight.canExport && nonPrintDpiErrors.length > 0 ? (
           <div role="alert" className="space-y-0.5 rounded-md bg-warn/10 px-2 py-1.5">
-            {packagePreflight.errors.map((issue) => (
+            {nonPrintDpiErrors.map((issue) => (
               <p key={issue.code} className="text-[0.62rem] leading-snug text-warn">
                 {issue.message}
               </p>
             ))}
           </div>
-        ) : packagePreflight.warnings[0] ? (
+        ) : !packagePreflight.canExport ? null : packagePreflight.warnings[0] ? (
           <p role="status" className="rounded-md bg-raised/50 px-2 py-1.5 text-[0.62rem] leading-snug text-fg-2">
             {packagePreflight.warnings[0].message}
           </p>

@@ -355,9 +355,13 @@ export class StudioOpfsRecoveryRuntime {
   }): Promise<StudioOpfsRecoveryWriterLease> {
     this.#assertReady();
     if (this.#writer) {
+      // The owner id is an `autosave-<uuid>` machine string — it belongs in the cause for logs
+      // and bug reports, never in the sentence a banner might surface (same audience split the
+      // journal's LEASE_BUSY message already follows).
       runtimeError(
         "WRITER_ALREADY_HELD",
-        `이미 ${this.#writer.ownerId} writer lease를 보유하고 있습니다.`,
+        "이 탭이 이미 복구 저장소의 writer lease를 보유하고 있습니다.",
+        { heldOwnerId: this.#writer.ownerId, requestedOwnerId: input.ownerId },
       );
     }
     if (this.#writerTransitionPending) {

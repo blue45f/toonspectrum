@@ -1,13 +1,18 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  dpiForPixelsInBox,
   dpiToPixelsPerMetre,
   isJpegBytes,
   isPngBytes,
+  publishStudioExportPrintBoxMm,
   publishStudioExportResolutionDpi,
   rasterResolutionTagKind,
   readJpegJfifDensity,
+  readJpegPixelSize,
   readPngPhysDensity,
+  readPngPixelSize,
+  readStudioExportPrintBoxMm,
   readStudioExportResolutionDpi,
   resetStudioExportResolutionDpi,
   tagStudioRasterBlobResolution,
@@ -202,5 +207,76 @@ describe("withRasterResolutionMetadata", () => {
       .toEqual({ dpiX: 144, dpiY: 144 });
     const webp = new Uint8Array([1, 2, 3]);
     expect(withRasterResolutionMetadata(webp, "image/webp", 144)).toBe(webp);
+  });
+});
+
+describe("measured print density (print box channel)", () => {
+  /** PNG whose IHDR declares an arbitrary size — stand-in for a real export. */
+  function pngWithSize(width: number, height: number): Uint8Array {
+    const be32 = (value: number) => [
+      (value >>> 24) & 0xff,
+      (value >>> 16) & 0xff,
+      (value >>> 8) & 0xff,
+      value & 0xff,
+    ];
+    return new Uint8Array([
+      ...PNG_SIGNATURE,
+      ...chunk("IHDR", [...be32(width), ...be32(height), 8, 6, 0, 0, 0]),
+      ...chunk("IDAT", [1, 2, 3, 4]),
+      ...chunk("IEND", []),
+    ]);
+  }
+
+  it("reads the real pixel size out of IHDR", () => {
+    expect(readPngPixelSize(pngWithSize(2556, 3833))).toEqual({ width: 2556, height: 3833 });
+    expect(readPngPixelSize(new Uint8Array([1, 2, 3]))).toBeNull();
+  });
+
+  it("reads the real pixel size out of a JPEG frame header", () => {
+    // SOI, APP0(JFIF), DQT, SOF0 (height 3833, width 2556), EOI
+    const jpeg = new Uint8Array([
+      0xff, 0xd8,
+      0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x02, 0x01,
+      0x00, 0x48, 0x00, 0x48, 0x00, 0x00,
+      0xff, 0xdb, 0x00, 0x04, 0x11, 0x22,
+      0xff, 0xc0, 0x00, 0x11, 0x08, 0x0e, 0xf9, 0x09, 0xfc, 0x03,
+      0x01, 0x11, 0x00, 0x02, 0x11, 0x01, 0x03, 0x11, 0x01,
+      0xff, 0xd9,
+    ]);
+    expect(readJpegPixelSize(jpeg)).toEqual({ width: 2556, height: 3833 });
+  });
+
+  it("derives DPI from the limiting axis of the output box", () => {
+    // A4 + 3 mm bleed = 216×303 mm. 2556 px wide → 300.57 DPI on the limiting width axis.
+    const dpi = dpiForPixelsInBox({ width: 2556, height: 3833 }, { widthMm: 216, heightMm: 303 });
+    expect(dpi).toBeCloseTo(300.57, 1);
+  });
+
+  it("records the DPI the encoded pixels really achieve, not the predicted one", async () => {
+    // The panel predicted 3834 rows; the browser wrote 3833. The tag must follow the bytes.
+    publishStudioExportResolutionDpi(999);
+    publishStudioExportPrintBoxMm({ widthMm: 216, heightMm: 303 });
+    const blob = new Blob([pngWithSize(2556, 3833) as unknown as BlobPart], { type: "image/png" });
+    const tagged = await tagStudioRasterBlobResolution(blob, "image/png");
+    const reading = readPngPhysDensity(new Uint8Array(await tagged.arrayBuffer()));
+    expect(reading!.dpiX).toBeCloseTo(300.57, 0);
+    // The stale published DPI must not win.
+    expect(reading!.dpiX).toBeLessThan(400);
+  });
+
+  it("falls back to the published DPI when no print box is set (screen packs)", async () => {
+    publishStudioExportResolutionDpi(72);
+    publishStudioExportPrintBoxMm(null);
+    const blob = new Blob([pngWithSize(1440, 2160) as unknown as BlobPart], { type: "image/png" });
+    const tagged = await tagStudioRasterBlobResolution(blob, "image/png");
+    const reading = readPngPhysDensity(new Uint8Array(await tagged.arrayBuffer()));
+    expect(reading!.dpiX).toBeCloseTo(72, 0);
+  });
+
+  it("rejects a non-positive print box instead of publishing it", () => {
+    publishStudioExportPrintBoxMm({ widthMm: 0, heightMm: 303 });
+    expect(readStudioExportPrintBoxMm()).toBeNull();
+    publishStudioExportPrintBoxMm({ widthMm: Number.NaN, heightMm: 303 });
+    expect(readStudioExportPrintBoxMm()).toBeNull();
   });
 });

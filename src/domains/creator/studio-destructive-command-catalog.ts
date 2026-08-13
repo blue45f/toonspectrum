@@ -546,6 +546,37 @@ export function studioResetApplicationSettingsRequest(): StudioDestructiveAction
 }
 
 /**
+ * ㉚ 복구 배너의 "비우기" — **되돌릴 수 없다.** 이 명령이 지우는 임시저장본은 브라우저가
+ * 죽었을 때 남은 **유일한 사본**이고, `localStorage`/OPFS/SQLite 레코드를 직접 지우므로
+ * 히스토리 커밋이 전혀 없다(⌘Z 로도 돌아오지 않는다). 같은 앱의 페이지 삭제(⌘Z 가능)보다
+ * 훨씬 위험한데 확인이 없던 자리다 — 무엇이 몇 개 사라지는지 preview 에 명시한다.
+ */
+export function studioClearAutosaveRequest(input: {
+  readonly pageCount: number;
+  readonly elementCount: number;
+  readonly savedAtLabel?: string;
+}): StudioDestructiveActionRequest {
+  return {
+    id: "studio.autosave.clear",
+    title: "임시저장본 비우기",
+    intro:
+      "브라우저가 꺼졌을 때 남은 마지막 작업본이에요. 지우기 전에 '복구하기'로 되살리거나"
+      + " 'JSON 백업'으로 내려받아 둘 수 있어요.",
+    losses: [
+      {
+        label: "임시저장본",
+        note:
+          `페이지 ${input.pageCount}개 · 요소 ${input.elementCount}개`
+          + (input.savedAtLabel ? ` (${input.savedAtLabel} 저장)` : ""),
+      },
+    ],
+    reversibility: "irreversible",
+    confirmLabel: "임시저장본 영구 삭제",
+    cancelLabel: "그대로 두기",
+  };
+}
+
+/**
  * 커밋 결과를 원장에 남기고 그대로 돌려준다.
  *
  * 감사가 찾아낸 조용한 실패: 파괴 승인 뒤의 `commit(...)` 다섯 곳이 반환값을 버려서,

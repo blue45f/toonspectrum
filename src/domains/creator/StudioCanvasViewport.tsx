@@ -474,7 +474,7 @@ export interface StudioCanvasViewportHandlers {
   captureAnimFrame: (elId: string) => Promise<void>;
   captureTimelineKeyframe: (trackId: string, frameIndex: number) => Promise<void>;
   clearAdvancedFillTapGesture: () => void;
-  clearAutosave: () => void;
+  clearAutosave: () => void | Promise<void>;
   clearCanvasSelection: () => void;
   commitAppSettings: (next: StudioAppSettings) => void;
   retryAppSettingsPersistence: () => void;
@@ -660,6 +660,9 @@ export interface StudioCanvasViewportProps {
   groups: LayerGroup[];
   guides: { x: number[]; y: number[]; };
   hasAutosave: boolean;
+  /** 이 탭이 문서 저장을 맡는지 — follower 면 복구 배너 대신 읽기 전용 고지를 띄운다. */
+  autosaveDocumentLeadership:
+    import("./StudioCanvasStatusRail").StudioCanvasStatusRailProps["autosaveDocumentLeadership"];
   healCloneArmed: boolean;
   healCloneCursorRef: import("react").RefObject<import("konva/lib/shapes/Circle").Circle | null>;
   healCloneDragPreview: { points: SelPoint[]; } | null;
@@ -966,6 +969,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
   groups,
   guides,
   hasAutosave,
+  autosaveDocumentLeadership,
   healCloneArmed,
   healCloneCursorRef,
   healCloneDragPreview,
@@ -2114,6 +2118,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
             activeGroupName={activeCanvasGroupName}
             mobileImmersive={mobileImmersive}
             hasAutosave={hasAutosave}
+            autosaveDocumentLeadership={autosaveDocumentLeadership}
             autosaveRestoreBlockedReason={autosaveRestoreBlockedReason}
             selectionCount={canvasSelectionEls.length}
             selectionGroupName={completeSelectionGroup?.name ?? null}
@@ -3341,8 +3346,15 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                   // maskSrc로 자른 ClipMaskGroup"으로 한 번 더 감싼다. opts는 clipBelow 분기
                   // (source-in override)와 평범한 분기(opts={}) 양쪽에서 재사용된다.
                   const renderWithOwnMask = (opts: { compositeOverride?: string } = {}) => {
-                    const content = renderEl(el, idx, opts);
-                    if (!maskOn) return content;
+                    if (!maskOn) return renderEl(el, idx, opts);
+                    // The sandwich content must composite `source-in` against its mask sibling —
+                    // ALWAYS, not only when the caller wanted source-in for the element itself.
+                    // The plain branch used to pass the content through with `source-over`, which
+                    // covered the mask instead of being clipped by it: painting on the mask
+                    // measurably changed nothing. The caller's intent (the element's blend mode,
+                    // or clipBelow's source-in) moves onto the cached sandwich root instead, where
+                    // it applies exactly once to the flattened, already-masked result.
+                    const content = renderEl(el, idx, { ...opts, compositeOverride: "source-in" });
                     const imgEl = el as ImageEl;
                     const maskSrc = (el as El).maskSrc;
                     // 마스크 노드는 최소 필드만 새로 구성한다(el 스프레드 후 필터 필드를 하나하나
@@ -3361,8 +3373,20 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                       flippedY: imgEl.flippedY,
                     } as ImageEl;
                     const mck = [el.id, "mask", maskSrc, JSON.stringify(elBounds(el)), imgEl.rotation ?? 0].join("|");
+                    // What the caller wanted for the element — clipBelow's source-in, or the
+                    // element's own blend mode — now rides on the sandwich root. Without this the
+                    // nested clipBelow+mask case clipped by its own mask but no longer by the
+                    // layer below, and a masked layer's blend mode silently vanished.
+                    const sandwichComposite = (opts.compositeOverride ??
+                      (el.blendMode && el.blendMode !== "source-over" ? el.blendMode : undefined)) as
+                      | Konva.NodeConfig["globalCompositeOperation"]
+                      | undefined;
                     return (
-                      <ClipMaskGroup key={`${el.id}-mask`} cacheKey={mck}>
+                      <ClipMaskGroup
+                        key={`${el.id}-mask`}
+                        cacheKey={mck}
+                        {...(sandwichComposite ? { composite: sandwichComposite } : {})}
+                      >
                         {renderEl(maskEl, idx, { asMask: true })}
                         {content}
                       </ClipMaskGroup>

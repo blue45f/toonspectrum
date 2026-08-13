@@ -83,10 +83,20 @@ describe("Studio canvas mask hit isolation boundary", () => {
     expect(composite).toContain(
       "renderEl(base, idx - 1, { asMask: true })",
     );
-    expect(composite).toContain("const content = renderEl(el, idx, opts)");
+    // The sandwich content must be `source-in` unconditionally. It used to inherit the caller's
+    // composite, so on the plain (non-clipBelow) branch it rendered `source-over`, covered its
+    // mask sibling instead of being clipped by it, and painting on the mask changed nothing.
+    expect(composite).toContain(
+      'const content = renderEl(el, idx, { ...opts, compositeOverride: "source-in" })',
+    );
+    expect(composite).not.toContain("const content = renderEl(el, idx, opts)");
     expect(composite).toContain(
       'renderWithOwnMask({ compositeOverride: "source-in" })',
     );
+    // The caller's intent survives on the cached sandwich root: clipBelow's source-in keeps
+    // clipping to the layer below, and a masked layer's blend mode is not silently dropped.
+    expect(composite).toContain("const sandwichComposite = (opts.compositeOverride ??");
+    expect(composite).toContain("composite: sandwichComposite");
   });
 });
 

@@ -15,10 +15,16 @@ import {
   PaintBucket,
   ScanSearch,
 } from "lucide-react";
+import { useRef } from "react";
 
+import { presentStudioAutosaveDocumentLeadership } from "./studio-autosave-document-leader";
 import { StudioReliabilityStatusRail } from "./StudioReliabilityStatusRail";
 import { StudioToolHintTarget } from "./StudioToolHint";
 
+import type {
+  StudioAutosaveDocumentLeadershipBasis,
+  StudioAutosaveDocumentRole,
+} from "./studio-autosave-document-leader";
 import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
@@ -249,7 +255,19 @@ export interface StudioCanvasStatusRailProps {
   alignmentSelectionDisabledReason?: string | null;
   onDownloadAutosaveBackup: () => void;
   onRestoreAutosave: () => void | Promise<void>;
-  onClearAutosave: () => void;
+  /**
+   * 임시저장본 영구 삭제. 파괴 승인 다이얼로그를 지나므로 비동기다 — 승인 결과와 무관하게
+   * 결정이 끝나면 안전한 기본 행동인 "복구하기"로 포커스를 되돌린다.
+   */
+  onClearAutosave: () => void | Promise<void>;
+  /**
+   * 이 탭이 문서 저장을 맡는지(leader) 아닌지(follower). 결정 전(`null`)에는 아무 고지도
+   * 하지 않는다 — 아직 모르는 것을 단정하는 쪽이 더 나쁜 실패다.
+   */
+  autosaveDocumentLeadership?: {
+    readonly role: StudioAutosaveDocumentRole;
+    readonly basis: StudioAutosaveDocumentLeadershipBasis;
+  } | null;
   onGroupSelection: () => void;
   onUngroupSelection?: () => void;
   onToggleSelectionLock?: () => void;
@@ -289,6 +307,7 @@ export function StudioCanvasStatusRail({
   onDownloadAutosaveBackup,
   onRestoreAutosave,
   onClearAutosave,
+  autosaveDocumentLeadership = null,
   onGroupSelection,
   onUngroupSelection,
   onToggleSelectionLock,
@@ -308,6 +327,23 @@ export function StudioCanvasStatusRail({
 }: StudioCanvasStatusRailProps) {
   const hasAdvancedFillPreview = advancedFillPreviewMessage !== null;
   const normalizedActiveGroupName = activeGroupName?.trim() || null;
+  /**
+   * 후발(follower) 탭에는 **복구 버튼이 뜨면 안 된다.** 누르면 선행 탭의 문서를 메모리에
+   * 올려놓고 저장은 못 하는 최악의 상태가 된다 — 화면에는 작업이 있는데 어디에도 남지 않는다.
+   * 그래서 복구 배너 자리를 읽기 전용 고지로 통째로 대체한다.
+   */
+  const followerNotice =
+    autosaveDocumentLeadership && autosaveDocumentLeadership.role === "follower"
+      ? presentStudioAutosaveDocumentLeadership(autosaveDocumentLeadership)
+      : null;
+  // 복구 배너의 안전한 기본 행동은 "복구하기"(복구가 막혔으면 "JSON 백업")다. 영구 삭제
+  // 승인 창을 닫고 나면 포커스를 파괴 버튼이 아니라 이 안전한 쪽에 되돌려 준다.
+  const autosaveSafeActionRef = useRef<HTMLButtonElement | null>(null);
+  const requestClearAutosave = () => {
+    void Promise.resolve(onClearAutosave()).finally(() => {
+      autosaveSafeActionRef.current?.focus();
+    });
+  };
 
   return (
     <div
@@ -322,7 +358,30 @@ export function StudioCanvasStatusRail({
       {/* 저장·GPU·저장소 상태와 Safe Mode 고지 — prop 없이 스토어를 직접 구독한다. */}
       <StudioReliabilityStatusRail />
 
-      {hasAutosave && (
+      {followerNotice ? (
+        <div
+          data-studio-autosave-document-follower
+          role="status"
+          aria-live="polite"
+          className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-warning/30 bg-warning-soft/20 p-2.5 text-xs text-warning"
+        >
+          <span className="min-w-0 flex-1 leading-relaxed">
+            <strong className="block font-bold">⚠️ {followerNotice.title}</strong>
+            <span className="mt-0.5 block font-medium">{followerNotice.detail}</span>
+          </span>
+          {followerNotice.actionLabel ? (
+            <button
+              type="button"
+              onClick={() => globalThis.location.reload()}
+              className="ml-auto min-h-11 shrink-0 rounded-lg bg-accent/20 px-3 py-2 font-bold text-accent hover:bg-accent/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              {followerNotice.actionLabel}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {hasAutosave && !followerNotice && (
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-warning/30 bg-warning-soft/20 p-2.5 text-xs text-warning">
           <span className="min-w-0 flex-1 font-medium leading-relaxed">
             {autosaveRestoreBlockedReason
@@ -335,6 +394,7 @@ export function StudioCanvasStatusRail({
             {autosaveRestoreBlockedReason ? (
               <button
                 type="button"
+                ref={autosaveSafeActionRef}
                 onClick={onDownloadAutosaveBackup}
                 className="min-h-11 rounded-lg bg-accent/20 px-3 py-2 font-bold text-accent hover:bg-accent/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
               >
@@ -343,6 +403,7 @@ export function StudioCanvasStatusRail({
             ) : (
               <button
                 type="button"
+                ref={autosaveSafeActionRef}
                 onClick={() => void onRestoreAutosave()}
                 className="min-h-11 rounded-lg bg-accent/20 px-3 py-2 font-bold text-accent hover:bg-accent/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
               >
@@ -351,7 +412,7 @@ export function StudioCanvasStatusRail({
             )}
             <button
               type="button"
-              onClick={onClearAutosave}
+              onClick={requestClearAutosave}
               className="min-h-11 rounded-lg bg-line px-3 py-2 font-medium text-fg-3 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
               비우기

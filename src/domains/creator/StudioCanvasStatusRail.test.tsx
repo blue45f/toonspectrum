@@ -83,6 +83,59 @@ describe("StudioCanvasStatusRail", () => {
     expect(props.onClearAutosave).toHaveBeenCalledOnce();
   });
 
+  it("replaces the recovery banner with a read-only notice in a follower tab", () => {
+    // 후발 탭에서 "복구하기"를 누르면 선행 탭의 문서를 메모리에 올려놓고 저장은 못 하는
+    // 최악의 상태가 된다 — 화면에는 작업이 있는데 어디에도 남지 않는다.
+    const props = createProps({
+      hasAutosave: true,
+      autosaveDocumentLeadership: { role: "follower", basis: "web-lock" },
+    });
+
+    render(<StudioCanvasStatusRail {...props} />);
+
+    expect(screen.getByText(/다른 탭에서 편집 중/u)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "복구하기" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "비우기" })).toBeNull();
+    expect(screen.getByRole("button", { name: "새로고침으로 다시 확인" })).toBeTruthy();
+  });
+
+  it("keeps the recovery banner for the leading tab", () => {
+    const props = createProps({
+      hasAutosave: true,
+      autosaveDocumentLeadership: { role: "leader", basis: "web-lock" },
+    });
+
+    render(<StudioCanvasStatusRail {...props} />);
+
+    expect(screen.getByRole("button", { name: "복구하기" })).toBeTruthy();
+    expect(screen.queryByText(/다른 탭에서 편집 중/u)).toBeNull();
+  });
+
+  it("returns focus to the safe recovery action after the clear decision settles", async () => {
+    // "비우기" 는 유일한 복구본을 영구 삭제하는 승인 창을 연다. 창이 닫힌 뒤 포커스가 파괴
+    // 버튼에 그대로 남으면 Enter 한 번이 두 번째 파괴 시도가 된다 — 안전한 쪽으로 되돌린다.
+    let settle!: () => void;
+    const decision = new Promise<void>((resolve) => {
+      settle = resolve;
+    });
+    const props = createProps({
+      hasAutosave: true,
+      onClearAutosave: vi.fn(() => decision),
+    });
+
+    render(<StudioCanvasStatusRail {...props} />);
+    const restore = screen.getByRole("button", { name: "복구하기" });
+    fireEvent.click(screen.getByRole("button", { name: "비우기" }));
+
+    expect(props.onClearAutosave).toHaveBeenCalledOnce();
+    expect(document.activeElement).not.toBe(restore);
+
+    settle();
+    await vi.waitFor(() => {
+      expect(document.activeElement).toBe(restore);
+    });
+  });
+
   it("restores a compatible autosave through the semantic callback", () => {
     const props = createProps({ hasAutosave: true });
 

@@ -75,6 +75,7 @@
     "verify:studio-lifecycle": "tsx scripts/verify-studio-lifecycle.mts",
     "verify:studio-artist-journey": "tsx scripts/verify-studio-artist-journey.mts",
     "verify:studio-autosave-opfs": "tsx scripts/verify-studio-autosave-opfs-session.mts",
+    "verify:studio-autosave-two-tab": "tsx scripts/verify-studio-autosave-two-tab-leader.mts",
     "verify:studio-brushes": "tsx scripts/verify-studio-brushes.mts",
     "verify:studio-brush-media": "tsx scripts/verify-studio-brush-media.mts",
     "verify:studio-brush-latency": "tsx scripts/verify-studio-brush-latency.mts",

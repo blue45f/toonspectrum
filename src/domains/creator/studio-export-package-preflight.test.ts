@@ -346,6 +346,22 @@ describe("planStudioExportPrintGeometry", () => {
     expect(plan.reachable).toBe(true);
   });
 
+  it("models the exporter's truncation, so it never quotes more pixels than it can deliver", () => {
+    // The export ends at `canvas.width = size * pixelRatio`, which discards the fraction.
+    // Rounding up would promise a pixel row the file does not contain.
+    const plan = planStudioExportPrintGeometry({ ...a4, exportScale: 3.56 })!;
+    expect(plan.currentWidthPx).toBe(Math.floor(720 * 3.56));
+    expect(plan.currentHeightPx).toBe(Math.floor(1080 * 3.56));
+    expect(plan.currentHeightPx).toBe(3844);
+    expect(plan.currentHeightPx).toBeLessThan(Math.round(1080 * 3.56));
+  });
+
+  it("keeps the recommended scale covering the requirement after truncation", () => {
+    const plan = planStudioExportPrintGeometry({ ...a4, exportScale: 1 })!;
+    expect(Math.floor(720 * plan.recommendedScale)).toBeGreaterThanOrEqual(plan.requiredWidthPx);
+    expect(Math.floor(1080 * plan.recommendedScale)).toBeGreaterThanOrEqual(plan.requiredHeightPx);
+  });
+
   it("clears the issue once the recommended scale is applied", () => {
     const plan = planStudioExportPrintGeometry({ ...a4, exportScale: 3.55 })!;
     expect(plan.meetsTargetDpi).toBe(true);
@@ -404,5 +420,80 @@ describe("planStudioExportPrintGeometry", () => {
         exportScale: 2,
       })
     ).toBeNull();
+  });
+});
+
+describe("preflightStudioExportPackage — print resolution honesty", () => {
+  const a4Geometry = {
+    widthPx: 720,
+    heightPx: 1080,
+    dpi: 300,
+    trimWidthMm: 210,
+    trimHeightMm: 297,
+    bleedMm: 3,
+  };
+
+  it("blocks the package when the selected scale cannot deliver the requested DPI", () => {
+    const result = preflightStudioExportPackage({
+      pageCount: 1,
+      geometry: a4Geometry,
+      exportScale: 2,
+    });
+    expect(result.canExport).toBe(false);
+    expect(result.errors.map((issue) => issue.code)).toContain("PRINT_DPI_BELOW_TARGET");
+    // The plan is reported, not just the failure, so the UI shows the same numbers it blocks on.
+    expect(result.printPlan).not.toBeNull();
+    expect(result.printPlan!.currentWidthPx).toBe(1440);
+    expect(result.printPlan!.currentHeightPx).toBe(2160);
+    expect(Math.round(result.printPlan!.currentDpi)).toBe(169);
+  });
+
+  it("passes once the recommended scale is applied", () => {
+    const blocked = preflightStudioExportPackage({
+      pageCount: 1,
+      geometry: a4Geometry,
+      exportScale: 2,
+    });
+    const result = preflightStudioExportPackage({
+      pageCount: 1,
+      geometry: a4Geometry,
+      exportScale: blocked.printPlan!.recommendedScale,
+    });
+    expect(result.canExport).toBe(true);
+    expect(result.printPlan!.meetsTargetDpi).toBe(true);
+    expect(result.printPlan!.currentDpi).toBeGreaterThanOrEqual(300);
+  });
+
+  it("blocks with the required canvas size when the target is unreachable", () => {
+    const result = preflightStudioExportPackage({
+      pageCount: 1,
+      geometry: { ...a4Geometry, trimWidthMm: 1000, trimHeightMm: 1400 },
+      exportScale: 2,
+    });
+    expect(result.canExport).toBe(false);
+    const unreachable = result.errors.find((issue) => issue.code === "PRINT_DPI_UNREACHABLE");
+    expect(unreachable).toBeDefined();
+    expect(unreachable!.message).toContain("캔버스를");
+    expect(unreachable!.message).toContain("px 이상으로 키운 뒤");
+  });
+
+  it("leaves screen/webtoon packs alone — no trim means no print plan and no block", () => {
+    const result = preflightStudioExportPackage({
+      pageCount: 1,
+      geometry: { widthPx: 720, heightPx: 1080, dpi: 72 },
+      exportScale: 2,
+    });
+    expect(result.printPlan).toBeNull();
+    expect(result.canExport).toBe(true);
+  });
+
+  it("does not stack a resolution message on top of an invalid geometry", () => {
+    const result = preflightStudioExportPackage({
+      pageCount: 1,
+      geometry: { ...a4Geometry, bleedMm: 200 },
+      exportScale: 2,
+    });
+    expect(result.printPlan).toBeNull();
+    expect(result.errors.some((issue) => issue.code.startsWith("PRINT_DPI_"))).toBe(false);
   });
 });

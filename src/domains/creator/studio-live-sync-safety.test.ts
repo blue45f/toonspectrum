@@ -41,6 +41,63 @@ describe("studio live sync safety", () => {
     expect(presentStudioLiveSyncSnapshot(snapshot).shortLabel).toBe("안전하게 동기화됨");
   });
 
+  it("never shows the green synced label on a tab that cannot persist", () => {
+    // The measured two-tab fork: a follower tab's every save was rejected by the leader's lease,
+    // yet `mode === "local"` alone counted as durable and the rail showed "안전하게 동기화됨" on
+    // the exact tab that had no durability at all.
+    const snapshot = projectStudioLiveSyncSnapshot({
+      availability: "ready",
+      mode: "local",
+      canEdit: true,
+      documentWritable: false,
+      telemetry: telemetry(),
+    });
+
+    expect(snapshot.phase).toBe("read-only-follower");
+    expect(snapshot.editsDurablyProtected).toBe(false);
+    const presentation = presentStudioLiveSyncSnapshot(snapshot);
+    expect(presentation.shortLabel).toBe("다른 탭이 편집 중");
+    expect(presentation.tone).toBe("warn");
+    expect(presentation.assertive).toBe(true);
+  });
+
+  it("keeps the historical behaviour when writability is not tracked", () => {
+    // Callers that predate document leadership pass no `documentWritable`; their snapshots must
+    // be byte-identical to before, or every existing rail would need auditing at once.
+    const untracked = projectStudioLiveSyncSnapshot({
+      availability: "ready",
+      mode: "local",
+      canEdit: true,
+      telemetry: telemetry(),
+    });
+    const explicitlyWritable = projectStudioLiveSyncSnapshot({
+      availability: "ready",
+      mode: "local",
+      canEdit: true,
+      documentWritable: true,
+      telemetry: telemetry(),
+    });
+
+    expect(untracked.phase).toBe("synced");
+    expect(untracked.editsDurablyProtected).toBe(true);
+    expect(explicitlyWritable).toEqual(untracked);
+  });
+
+  it("lets terminal states outrank the follower notice", () => {
+    // A revoked session is a stronger fact than "another tab is editing"; the follower notice
+    // must never mask it.
+    const snapshot = projectStudioLiveSyncSnapshot({
+      availability: "ready",
+      mode: "local",
+      canEdit: true,
+      documentWritable: false,
+      terminalTransportState: "revoked",
+      telemetry: telemetry(),
+    });
+
+    expect(snapshot.phase).toBe("revoked");
+  });
+
   it("fails closed when neither the authoritative server nor IndexedDB is durable", () => {
     const snapshot = projectStudioLiveSyncSnapshot({
       availability: "connecting",

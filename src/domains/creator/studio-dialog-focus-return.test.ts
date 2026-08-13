@@ -33,6 +33,15 @@ async function settle() {
   });
 }
 
+/**
+ * 관찰자가 예약한 2차 확인(`setTimeout(0)`)까지 흘려보낸다. 1차는 관찰자 마이크로태스크
+ * 안에서 끝나므로 `settle()` 한 번이면 되지만, 2차는 그때 예약되는 타이머라 한 틱 더 든다.
+ */
+async function settleTwice() {
+  await settle();
+  await settle();
+}
+
 function mountTrigger(id = "trigger") {
   const trigger = document.createElement("button");
   trigger.id = id;
@@ -69,6 +78,69 @@ describe("studio-dialog-focus-return", () => {
     await settle();
 
     expect(document.activeElement).toBe(trigger);
+  });
+
+  it("백드롭을 눌러 닫아 복원 직후 포커스를 다시 빼앗겨도 되돌린다", async () => {
+    // 실측(2026-08-13): `pointerdown` 으로 백드롭을 닫으면 그물이 1차 복원을 마친 뒤
+    // 같은 입력의 `mousedown` 기본 동작이 포커스를 다시 body 로 떨어뜨렸다.
+    dispose = installStudioDialogFocusReturn(document);
+    const trigger = mountTrigger("help-trigger");
+    trigger.focus();
+
+    const { dialog, portalRoot } = mountModalPortal();
+    await settle();
+    dialog.focus();
+
+    portalRoot.remove();
+    await settle();
+    expect(document.activeElement).toBe(trigger);
+
+    // 마우스 기본 동작이 방금 되돌린 포커스를 지운다.
+    trigger.blur();
+    expect(studioDialogFocusWasDropped(document)).toBe(true);
+    await settle();
+
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it("닫히는 순간 배경이 아직 inert 여도 정리가 끝난 뒤 되돌린다", async () => {
+    // 기능 튜토리얼은 열릴 때 body 의 다른 자식을 inert 로 만들고 자기 정리에서 되돌린다.
+    // 포털이 사라진 직후에는 되돌릴 후보가 전부 걸러져 한 번의 판정으로는 실패한다.
+    dispose = installStudioDialogFocusReturn(document);
+    const trigger = mountTrigger("help-trigger");
+    trigger.focus();
+
+    const { dialog, portalRoot } = mountModalPortal();
+    await settle();
+    dialog.focus();
+    trigger.setAttribute("inert", "");
+
+    portalRoot.remove();
+    await settle();
+    expect(document.activeElement).toBe(document.body);
+
+    // 다이얼로그의 정리가 뒤늦게 inert 를 되돌린다.
+    trigger.removeAttribute("inert");
+    await settleTwice();
+
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it("2차 확인도 스스로 복원한 다이얼로그의 결정은 덮어쓰지 않는다", async () => {
+    dispose = installStudioDialogFocusReturn(document);
+    const trigger = mountTrigger("opener");
+    const elsewhere = mountTrigger("dialog-picked-this");
+    trigger.focus();
+
+    const { dialog, portalRoot } = mountModalPortal();
+    await settle();
+    dialog.focus();
+
+    portalRoot.remove();
+    elsewhere.focus();
+    await settleTwice();
+
+    expect(document.activeElement).toBe(elsewhere);
   });
 
   it("스스로 복원한 다이얼로그의 결정은 덮어쓰지 않는다", async () => {

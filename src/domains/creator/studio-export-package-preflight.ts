@@ -50,6 +50,12 @@ export type StudioExportPackagePreflightInput = {
   requireDialogueTxt?: boolean;
   pagesForDialogue?: readonly DialoguePageLike[] | null;
   dialogueTitle?: string;
+  /**
+   * Export scale currently selected in the menu. Supplied together with print geometry
+   * (trim W/H), it makes the preflight evaluate the real output resolution, so a package that
+   * cannot deliver the requested DPI is blocked instead of merely annotated.
+   */
+  exportScale?: number;
 };
 
 export type StudioExportPackageIssueSeverity = "error" | "warning";
@@ -91,6 +97,12 @@ export interface StudioExportPackagePreflightResult {
   readonly dialogueTxt: StudioExportDialogueTxtPlan | null;
   /** Physical output size after bleed when geometry is valid. */
   readonly outputSizeMm: { width: number; height: number } | null;
+  /**
+   * Print resolution plan for the selected scale — null for screen/webtoon packs or when the
+   * geometry did not validate. Single source of truth for what the UI displays and what the
+   * exporter records, so the panel never recomputes it and cannot drift.
+   */
+  readonly printPlan: StudioExportPrintPlan | null;
 }
 
 /** Inclusive DPI bounds for print/export geometry editors and validation. */
@@ -145,6 +157,13 @@ export function studioExportGeometryPreset(
  * express, so it can silently under-deliver the requested DPI. Anything that reports or
  * records print resolution must use {@link planStudioExportPrintGeometry}, which reports the
  * exact scale, the DPI actually achieved, and whether the target is reachable at all.
+ *
+ * The 3× ceiling is a UI affordance (`EXPORT_SCALES = [1, 2, 3]`), never a safety limit — the
+ * real ceiling is {@link studioExportMaxSafeScale} (11.34× for a 720×1080 page). Clamping print
+ * geometry to it is what produced "300 DPI" files that were really 254 DPI.
+ *
+ * @deprecated No production caller remains; retained only so the regression suite can pin the
+ * legacy clamp it replaced. Do not use it to report or record resolution.
  */
 export function recommendExportScaleForPrint(input: {
   canvasWidthPx: number;
@@ -262,6 +281,16 @@ export interface StudioExportPrintPlan {
   readonly issue: StudioExportPackageIssue | null;
 }
 
+/**
+ * Pixels the export actually produces at a scale.
+ *
+ * Truncation — not rounding — is what the browser does: the export path ends at
+ * `stage.toCanvas({ pixelRatio })`, and Konva assigns the scaled size to `canvas.width` /
+ * `canvas.height`, which the HTML spec converts to an unsigned long by discarding the
+ * fraction. Measured: a 720×1080 page at 3.55× writes a 2556×**3833** PNG, not 3834
+ * (1080 × 3.55 = 3833.999…). Rounding here made the panel quote one more pixel row than the
+ * file contains and would inflate the recorded DPI whenever height is the limiting axis.
+ */
 function dpiForScale(input: {
   canvasWidthPx: number;
   canvasHeightPx: number;
@@ -269,8 +298,8 @@ function dpiForScale(input: {
   outputHeightMm: number;
   scale: number;
 }): { dpi: number; widthPx: number; heightPx: number } {
-  const widthPx = Math.max(1, Math.round(input.canvasWidthPx * input.scale));
-  const heightPx = Math.max(1, Math.round(input.canvasHeightPx * input.scale));
+  const widthPx = Math.max(1, Math.floor(input.canvasWidthPx * input.scale));
+  const heightPx = Math.max(1, Math.floor(input.canvasHeightPx * input.scale));
   const dpi = Math.min(
     widthPx / (input.outputWidthMm / MM_PER_INCH),
     heightPx / (input.outputHeightMm / MM_PER_INCH)
@@ -320,10 +349,19 @@ export function planStudioExportPrintGeometry(
   });
   // Never downscale below 1× to "hit" the target — that throws away authored detail. When the
   // canvas is already denser than the target the file simply prints at its own higher DPI.
-  const recommendedScale = Math.min(
-    Math.max(1, maxSafeScale),
-    Math.max(1, ceilToHundredth(neededScale))
-  );
+  const scaleCeiling = Math.max(1, maxSafeScale);
+  let recommendedScale = Math.min(scaleCeiling, Math.max(1, ceilToHundredth(neededScale)));
+  // `neededScale` is exact, but the exporter truncates the scaled size, so a scale rounded to
+  // the hundredth can still land one pixel short of the requirement. Nudge up in hundredths
+  // (bounded, and never past the safe ceiling) until the *truncated* pixels really cover it.
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const widthPx = Math.floor(input.canvasWidthPx * recommendedScale);
+    const heightPx = Math.floor(input.canvasHeightPx * recommendedScale);
+    if (widthPx >= requiredWidthPx && heightPx >= requiredHeightPx) break;
+    const nudged = Math.min(scaleCeiling, ceilToHundredth(recommendedScale + 0.01));
+    if (nudged <= recommendedScale) break;
+    recommendedScale = nudged;
+  }
 
   const geometry = {
     canvasWidthPx: input.canvasWidthPx,
@@ -685,10 +723,30 @@ export function preflightStudioExportPackage(
   }
 
   let outputSizeMm: { width: number; height: number } | null = null;
+  let printPlan: StudioExportPrintPlan | null = null;
   if (input.geometry) {
     const geometry = validateStudioExportGeometry(input.geometry);
     issues.push(...geometry.issues);
     outputSizeMm = geometry.outputSizeMm;
+
+    // Only plan print resolution once the geometry itself is sound — planning on top of an
+    // invalid trim/DPI would stack a second, confusing message on the same root cause.
+    const geometrySound = geometry.issues.every((entry) => entry.severity !== "error");
+    const { trimWidthMm, trimHeightMm } = input.geometry;
+    if (geometrySound && trimWidthMm != null && trimHeightMm != null) {
+      printPlan = planStudioExportPrintGeometry({
+        canvasWidthPx: input.geometry.widthPx,
+        canvasHeightPx: input.geometry.heightPx,
+        dpi: input.geometry.dpi,
+        trimWidthMm,
+        trimHeightMm,
+        ...(input.geometry.bleedMm != null ? { bleedMm: input.geometry.bleedMm } : {}),
+        exportScale: input.exportScale != null && input.exportScale > 0 ? input.exportScale : 1,
+      });
+      // An error-severity resolution issue has to block. Showing a red "300DPI를 만들 수
+      // 없습니다" next to a green "통과" chip is the same dishonesty in a different place.
+      if (printPlan?.issue) issues.push(printPlan.issue);
+    }
   }
 
   let dialogueTxt: StudioExportDialogueTxtPlan | null = null;
@@ -732,5 +790,6 @@ export function preflightStudioExportPackage(
       ? null
       : dialogueTxt,
     outputSizeMm,
+    printPlan,
   };
 }
