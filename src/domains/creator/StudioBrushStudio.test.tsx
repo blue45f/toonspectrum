@@ -183,7 +183,7 @@ describe("StudioBrushStudio", () => {
     expect(transaction.after).toMatchObject({
       strokeWidth: 40,
       brushOpacity: 0.55,
-      stabilizer: 0,
+      stabilizer: 3,
       pressureCurve: 1,
       tipAngle: -30,
     });
