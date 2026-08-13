@@ -157,6 +157,17 @@ const CORE_DISCRETE_BRUSH_IDS: ReadonlySet<string> = new Set([
   "crosshatch",
 ]);
 
+/**
+ * Hatching pens draw their mark by repeating parallel or crossed strokes, so the periodicity the
+ * continuous metrics treat as a defect is the motif itself (the classic `crosshatch` preset is
+ * already listed above). Matching on the name keeps every present and future hatch lane —
+ * `web-hatch-color`, `web-cross-hatch-pen`, their lattice variants — on the same authored-motif
+ * policy instead of demanding an unbroken, non-repeating edge from a brush designed to repeat.
+ */
+function isAuthoredHatchMotifBrushId(brushId: string): boolean {
+  return brushId.includes("hatch");
+}
+
 const CORE_SOFT_WET_BRUSH_IDS: ReadonlySet<string> = new Set([
   "watercolor",
   "ink-wash",
@@ -731,6 +742,7 @@ export function classifyStudioLongBrushQualityPolicy(
   if (
     input.intentionalDiscrete
     || (input.source === "core" && CORE_DISCRETE_BRUSH_IDS.has(input.id))
+    || isAuthoredHatchMotifBrushId(input.id)
   ) {
     return {
       kind: "record-only-discrete",
