@@ -1892,6 +1892,8 @@ type StudioAutosaveDocumentRole =
   import("./studio-autosave-document-leader").StudioAutosaveDocumentRole;
 type StudioAutosaveDocumentLeadershipBasis =
   import("./studio-autosave-document-leader").StudioAutosaveDocumentLeadershipBasis;
+type StudioAutosaveDocumentLeadershipGuard =
+  typeof import("./studio-autosave-opfs-session").withStudioAutosaveDocumentLeadership;
 
 type StudioHybridDccWorkspacePersistence = ReturnType<
   typeof import("./studio-hybrid-dcc-workspace-persistence")
@@ -3795,6 +3797,13 @@ function StudioCuttoonEditor({
    * `withStudioAutosaveDocumentLeadership` 를 지난다.
    */
   const autosaveDocumentLeaseRef = useRef<StudioAutosaveDocumentLease | null>(null);
+  /**
+   * pointerup 긴급 저장은 내비게이션이 문서를 헐기 전의 한 홉 안에서 SQLite 쓰기를 발행해야
+   * 한다. 그래서 leadership 가드를 그 자리에서 동적 import 하지 않고 세션 오픈 때 미리 잡아
+   * 둔다 — import 한 번이 늘면 쓰기가 unload task 뒤로 밀려 영구 저장이 사라진다.
+   */
+  const autosaveLeadershipGuardRef =
+    useRef<StudioAutosaveDocumentLeadershipGuard | null>(null);
   const [autosaveDocumentLeadership, setAutosaveDocumentLeadership] = useState<{
     readonly role: StudioAutosaveDocumentRole;
     readonly basis: StudioAutosaveDocumentLeadershipBasis;
@@ -3822,9 +3831,15 @@ function StudioCuttoonEditor({
   useEffect(() => {
     let disposed = false;
     const openedPromise = import("./studio-autosave-opfs-session")
-      .then(({ openStudioAutosaveDocumentSession }) =>
-        openStudioAutosaveDocumentSession(autosaveKey)
-      )
+      .then(({
+        openStudioAutosaveDocumentSession,
+        withStudioAutosaveDocumentLeadership,
+      }) => {
+        if (!disposed) {
+          autosaveLeadershipGuardRef.current = withStudioAutosaveDocumentLeadership;
+        }
+        return openStudioAutosaveDocumentSession(autosaveKey);
+      })
       .then((opened) => {
         if (!disposed) {
           autosaveDocumentLeaseRef.current = opened.lease;
@@ -41899,12 +41914,14 @@ function clearSelectionForEdit() {
           durableWrites.push(sqlitePromise.then(async (acquiredSqlite) => {
             // persist 경로를 우회하는 옆문 ②. follower 탭의 pagehide 저장이 더 늦은 savedAt 으로
             // 선행 탭 문서를 덮는 유일한 실제 포크 경로였다.
-            const { withStudioAutosaveDocumentLeadership } =
-              await import("./studio-autosave-opfs-session");
-            const sqlite = withStudioAutosaveDocumentLeadership(
-              acquiredSqlite,
-              autosaveDocumentLeaseRef.current,
-            );
+            //
+            // 가드는 마운트 때 잡아둔 것을 쓴다(동적 import 금지 — 그 한 홉이 pointerup 쓰기를
+            // unload 뒤로 밀어낸다). 아직 못 잡았다면 세션도 안 열렸다는 뜻이라 임차권이 없고,
+            // 임차권이 없으면 follower 일 수 없으므로 가드와 같은 판정(통과)이다.
+            const applyLeadership = autosaveLeadershipGuardRef.current;
+            const sqlite = applyLeadership
+              ? applyLeadership(acquiredSqlite, autosaveDocumentLeaseRef.current)
+              : acquiredSqlite;
             if (!sqlite) throw new Error("SQLite autosave authority is unavailable");
             await sqlite.write(autosaveKey, emergency.payload);
             return "sqlite-fallback" as const;
