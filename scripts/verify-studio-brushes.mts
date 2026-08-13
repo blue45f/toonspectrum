@@ -75,6 +75,7 @@ import {
   materializeStudioBrushCatalogSelection,
   type StudioBrushCatalogSelection,
 } from "../src/domains/creator/studio-brush-selection";
+import { studioCc0MypaintPresetUsesIntentionalDiscreteCarrier } from "../src/domains/creator/studio-cc0-mypaint-preset-import-v1";
 import { captureStudioDrawPointerPressureContract } from "../src/domains/creator/studio-draw-pointer-pressure-contract";
 import { classifyStudioDryMediaCatalogIdV1 } from "../src/domains/creator/studio-dry-media-anisotropic-grain-v1";
 
@@ -862,6 +863,13 @@ function strokePoint(
   box: { x: number; y: number; width: number; height: number },
   viewport: { width: number; height: number },
   index: number,
+  /**
+   * Intentionally discrete carriers (splatter, glint, repeated stamps) place scatter stations
+   * along the path instead of a continuous bed, so a 9 px flick can legitimately land between two
+   * stations and deposit nothing. Those presets get a longer — still short and fast — gesture so
+   * the visibility assertion keeps its meaning instead of being skipped.
+   */
+  intentionalDiscreteCarrier = false,
 ): { x: number; y: number; dx: number; dy: number } {
   // Konva intentionally extends behind the side inspectors and bottom dock. Keep evidence in the
   // central exposed surface; elementFromPoint below additionally proves every gesture hits canvas.
@@ -877,8 +885,8 @@ function strokePoint(
   return {
     x: safeLeft + ((safeRight - safeLeft) * column) / 6,
     y: safeTop + ((safeBottom - safeTop) * (row + 0.5)) / rows,
-    dx: index % 2 === 0 ? 9 : 7,
-    dy: index % 3 === 0 ? 3 : -2,
+    dx: (index % 2 === 0 ? 9 : 7) * (intentionalDiscreteCarrier ? 6 : 1),
+    dy: (index % 3 === 0 ? 3 : -2) * (intentionalDiscreteCarrier ? 6 : 1),
   };
 }
 
@@ -1318,7 +1326,14 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
         && isStudioBrushEraserAliasId(expectedSelection.runtimeBrushId);
       await selectDesktopBrush(page, preset, expectedSelection);
       await page.mouse.move(4, 4);
-      const point = strokePoint(stageBox, viewport, index);
+      const presetDescriptor = studioBrushPackDescriptorById(preset.id);
+      const desktopDryMediaClassification = classifyStudioDryMediaCatalogIdV1(preset.id);
+      const usesDiscreteCarrier = desktopDryMediaClassification
+        ? desktopDryMediaClassification.kind === "intentional-discrete"
+        : presetDescriptor
+          ? studioBrushPresetUsesIntentionalDiscreteCarrier(presetDescriptor)
+          : studioCc0MypaintPresetUsesIntentionalDiscreteCarrier(preset.id);
+      const point = strokePoint(stageBox, viewport, index, usesDiscreteCarrier);
       if (DEBUG_BRUSH_VERIFIER) {
         log(`viewport=${JSON.stringify(viewport)} stageBox=${JSON.stringify(stageBox)} presetIndex=${index}`);
       }
@@ -2462,7 +2477,9 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
         ? dryMediaClassification.kind === "intentional-discrete"
         : descriptor
           ? studioBrushPresetUsesIntentionalDiscreteCarrier(descriptor)
-          : false;
+          // Imported CC0 presets declare discreteness from their own upstream parameters, so a
+          // faithfully sparse splatter records density instead of failing a continuity gate.
+          : studioCc0MypaintPresetUsesIntentionalDiscreteCarrier(preset.id);
       const classifiedQualityPolicy = classifyStudioLongBrushQualityPolicy({
         id: preset.id,
         source: preset.source,

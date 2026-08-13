@@ -654,6 +654,28 @@ export function resolveStudioCc0MypaintPresetImport(
   return PRESET_BY_BRUSH_ID.get(brushId) ?? null;
 }
 
+/**
+ * Spacing — not scatter — is what breaks a continuous bed. Charcoal and spray displace their dabs
+ * by one to two diameters yet still cover the path because they place one every tenth of a
+ * diameter; only a preset whose neighbouring dabs cannot touch skips ground (the imported
+ * splatter sits at 4 diameters, every other import at or below 0.16).
+ */
+const DISCRETE_SPACING_RATIO = 1;
+
+/**
+ * True when an imported preset deposits intentionally separated marks rather than a continuous
+ * carrier — derived from the upstream `dabs_per_basic_radius` itself, never from a hand-kept id
+ * list. Splatter-class presets are faithful to their CC0 source precisely because they skip
+ * ground between marks, so coverage gates record their density instead of demanding an unbroken
+ * line; every denser import keeps the ordinary continuity requirement.
+ */
+export function studioCc0MypaintPresetUsesIntentionalDiscreteCarrier(
+  brushId: string | null | undefined,
+): boolean {
+  const preset = resolveStudioCc0MypaintPresetImport(brushId);
+  return preset !== null && preset.mapped.spacingRatio >= DISCRETE_SPACING_RATIO;
+}
+
 /** Stamp kind for a registered cc0 preset id; null for everything else (incl. unknown suffixes). */
 export function resolveStudioCc0MypaintStampBrushKind(
   brushId: string | null | undefined,
