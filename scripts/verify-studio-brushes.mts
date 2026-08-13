@@ -596,11 +596,46 @@ async function installCleanStudioState(page: Page): Promise<void> {
   );
 }
 
+/**
+ * Onboarding chrome is restored from the SQLite preference store, so on the mobile layout it
+ * mounts a beat after the editor is interactive — after the seeded localStorage flags have
+ * already been read — and then swallows every tap. The starter closes through its own Close
+ * control; modal wizards (quick comic) close on Escape, exactly as a person would dismiss them.
+ * Both leave the editor in its normal state instead of forcing gestures through overlay chrome.
+ */
+async function dismissQuickStartOverlay(page: Page, appearTimeoutMs: number): Promise<void> {
+  const modalOverlay = page.locator('[data-studio-quick-comic-overlay="true"]');
+  if (
+    await modalOverlay.first().isVisible().catch(() => false)
+  ) {
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(200);
+  }
+  const backdrop = page.locator('[data-studio-quickstart-backdrop="true"]');
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    // isVisible() resolves immediately, so the starter must be awaited explicitly: it arrives
+    // only after the preference store reconciles, well past the editor becoming interactive.
+    const appeared = await backdrop
+      .first()
+      .waitFor({ state: "visible", timeout: attempt === 0 ? appearTimeoutMs : 600 })
+      .then(() => true)
+      .catch(() => false);
+    if (!appeared) return;
+    await backdrop.first().click({ timeout: 2_000, force: true }).catch(() => undefined);
+    await page.waitForTimeout(200);
+    if (await modalOverlay.first().isVisible().catch(() => false)) {
+      await page.keyboard.press("Escape");
+      await page.waitForTimeout(200);
+    }
+  }
+}
+
 async function dismissTransientChrome(page: Page, clearAutosave = true): Promise<void> {
   const quickstart = page.locator('[data-studio-creative-starter="true"]');
   if (await quickstart.isVisible({ timeout: 250 }).catch(() => false)) {
     await quickstart.locator('[data-studio-quickstart-dismiss="true"]').click();
   }
+  await dismissQuickStartOverlay(page, 250);
   if (
     clearAutosave
     && await page.getByText("이전에 작성 중이던 임시저장 데이터가 있습니다.", { exact: false })
@@ -3090,6 +3125,7 @@ async function runMobileTouchAudit(browser: Browser, studioUrl: string): Promise
     await prepareStudioPage(page, studioUrl);
     const dock = page.locator('nav[data-studio-mobile-editing-dock="true"]');
     await dock.waitFor({ state: "visible", timeout: 10_000 });
+    await dismissQuickStartOverlay(page, 4_000);
     await dock.locator('button[aria-controls="studio-mobile-draw-settings"]').click();
     const drawSheet = page.locator('[data-studio-sheet-id="draw"][data-studio-mobile-sheet="draw"]');
     await drawSheet.waitFor({ state: "visible" });
