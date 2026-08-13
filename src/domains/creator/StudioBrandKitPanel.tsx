@@ -36,6 +36,7 @@ import {
 import { downscaleImageFile } from "./studio-image-utils";
 import { type StudioNamedPalette } from "./studio-palette-library";
 import { getProductStudioPaletteSqliteRepository } from "./studio-palette-sqlite-repository";
+import { ensureStudioPresetFontsLoaded } from "./studio-preset-font-loading";
 
 import { cx } from "@/lib/cx";
 
@@ -226,6 +227,14 @@ export function StudioBrandKitPanel({
   repository = PRODUCT_REPOSITORY,
   paletteRepository = PRODUCT_PALETTE_REPOSITORY,
 }: StudioBrandKitPanelProps) {
+  // 이 패널은 팝오버 안에서만 마운트되고(닫혀 있으면 `StudioFloatingToolPopover` 가 null 을
+  // 돌려준다), 마운트되자마자 BRAND_KIT_FONTS 미리보기 버튼 18개를 각자 자기 글꼴로 그린다.
+  // 즉 마운트 시점이 곧 "프리셋 목록을 열었다" 는 신호다 — 여기서 8종을 확보한다.
+  // 스튜디오 로드 시점에는 문서가 실제로 쓰는 글꼴만 받으므로(studio-preset-font-loading.ts),
+  // 이 호출이 없으면 미리보기가 계속 시스템 글꼴로 남는다.
+  useEffect(() => {
+    ensureStudioPresetFontsLoaded();
+  }, []);
   const [kits, setKits] = useState<BrandKit[]>([]);
   const [palettes, setPalettes] = useState<StudioNamedPalette[]>([]);
   const [error, setError] = useState<string | null>(null);

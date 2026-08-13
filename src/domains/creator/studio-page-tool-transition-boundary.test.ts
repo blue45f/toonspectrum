@@ -52,7 +52,6 @@ describe("StudioPage tool transition boundary", () => {
     for (const cleanup of [
       "setAdvancedFillActive(false);",
       "setAdvancedFillBusy(false);",
-      "setAdvancedFillPreview(null);",
       "setAutoColorScribbleCanvasArmed(false);",
       "setPixelTool(null);",
       "clearPolyLassoDraft();",
@@ -77,6 +76,20 @@ describe("StudioPage tool transition boundary", () => {
     ]) {
       expect(disarm, cleanup).toContain(cleanup);
     }
+
+    // 도구 해제가 **버리지 말아야 할** 것: 아직 적용하지 않은 채우기 미리보기.
+    //
+    // 예전에는 이 목록에 `setAdvancedFillPreview(null);` 이 있었다. 그래서 채우기를 계산해 둔
+    // 채 스포이드·지우개를 한 번 거치면 "채우기 미리보기 · 적용/취소" 배너가 안내 한 줄 없이
+    // 사라졌다(실측: 잉크 229,019 → 15,885 로 되돌아감). 도구를 내리는 것과 사용자가 만든
+    // 결과를 폐기하는 것은 다른 결정이다 — 후자는 사용자가 취소를 눌러야 일어난다.
+    //
+    // 미리보기가 도구와 무관하게 살아 있는 것은 이미 이 저장소의 설계다: 캔버스 렌더는
+    // preview 의 targetId/historyIndex 만 보고, 상태 레일 배너도 preview 유무만 본다.
+    // `toggleAdvancedFill` 이 스스로 도구를 내릴 때도 재사용 가능한 미리보기는 남긴다.
+    expect(disarm).not.toContain("setAdvancedFillPreview(null);");
+    expect(disarm).toContain("advancedFillPreviewRef.current !== null");
+    expect(disarm).toContain("적용하거나 취소할 수 있어요");
   });
 
   it("runs Color Range selection as one abortable Worker-owned operation", () => {

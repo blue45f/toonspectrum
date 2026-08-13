@@ -161,6 +161,7 @@ import { type PageState } from "./studio-page-state";
 import { type StudioPathBooleanOp } from "./studio-path-boolean";
 import { type VanishingPoint } from "./studio-perspective-guide";
 import { type PixelSelectionHistoryOperation } from "./studio-pixel-selection-history";
+import { StudioPresetFontPreload } from "./studio-preset-font-loading";
 import {
   isPuppetWarpNoop,
   removePuppetPin,
@@ -175,6 +176,10 @@ import {
   type StudioRasterToolAvailabilityContext,
   type StudioRasterToolId,
 } from "./studio-raster-tool-availability";
+import {
+  localizeStudioInspectorRasterPolicy,
+  localizeStudioRasterToolAvailability,
+} from "./studio-raster-tool-reason-localization";
 import {
   DEFAULT_STUDIO_SKETCH_STYLE,
   studioSketchStyleOfElement,
@@ -261,6 +266,7 @@ import type { StudioLayerNavigatorAction } from "./StudioLayerNavigator";
 import type { StudioMobileSheet } from "./StudioMobileEditingDock";
 
 import { buttonClass } from "@/components/ui/button-utils";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 export interface StudioInspectorAsideHandlers {
@@ -1216,6 +1222,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
     toggleLayerSolo,
     updateAdvancedFillSettings,
   } = stableHandlers;
+  const t = useT(); // 래스터 도구 사유·라벨을 화면 경계에서 로케일로 옮길 때 쓴다.
   const selectedRasterPresentation = useStudioRasterSourcePresentation(
     selectedRasterSource,
     { consumer: "studio-inspector-selected-image" },
@@ -1414,8 +1421,12 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   const activeImageRasterAvailability = activeImageInspectorTab
     ? rasterAvailabilityForTab(activeImageInspectorTab)[0]
     : null;
+  // 사유·라벨은 저자형 한국어로 만들고 **화면 경계에서만** 옮긴다(필터 사유와 같은 관례) — 한국어이거나 표에 없으면 원문 그대로.
   const activeImageRasterPolicy = activeImageRasterAvailability
-    ? resolveStudioInspectorRasterToolPolicy(activeImageRasterAvailability)
+    ? localizeStudioInspectorRasterPolicy(
+        resolveStudioInspectorRasterToolPolicy(activeImageRasterAvailability),
+        t,
+      )
     : null;
   const editableRasterCandidates = elements.filter(
     (element): element is ImageEl =>
@@ -1780,7 +1791,9 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
               {inspectorInteractionPolicy.selection.disabled && activeImageInspectorTab ? (
                 <div className="mb-3">
                   <StudioRasterToolRecoveryPanel
-                    entries={rasterAvailabilityForTab(activeImageInspectorTab)}
+                    entries={rasterAvailabilityForTab(activeImageInspectorTab).map((entry) =>
+                      localizeStudioRasterToolAvailability(entry, t),
+                    )}
                     busy={studioFilterPreparationBusy}
                     onRecover={handleRasterRecovery}
                   />
@@ -2034,6 +2047,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                 <>
                   <div className="mt-2">
                     <p className="mb-1 text-[0.66rem] font-medium text-fg-3">글꼴</p>
+                    <StudioPresetFontPreload />
                     <div className="flex flex-wrap gap-1">
                       {[
                         { label: "고딕", v: "Pretendard, sans-serif" },

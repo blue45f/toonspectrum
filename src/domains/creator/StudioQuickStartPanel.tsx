@@ -212,6 +212,31 @@ export function StudioQuickStartPanel({
     };
   }, []);
 
+  // 캔버스로 향한 첫 pointerdown 은 **그리려는 동작**이다 — click 까지 기다리면 그 획의 시작점을
+  // 잃는다. 그래서 캔버스에 닿는 순간에는 예외적으로 pointerdown 에서 비킨다.
+  //
+  // 위 경로가 click 을 기다리는 이유(메뉴바 재배치가 사용자가 겨눈 트리거를 바꿔치기함)는 여기에
+  // 해당하지 않는다. 코치는 캔버스의 형제 오버레이라 사라져도 캔버스가 재배치되지 않고, 배경이
+  // 이제 `pointer-events-none` 이라 이 pointerdown 은 이미 캔버스가 받은 이벤트다. 우리는 그
+  // 이벤트를 가로채지 않고(preventDefault·stopPropagation 없음) 코치만 치운다.
+  const dismissFromCanvasPointerDown = useEffectEvent(() => onDismiss());
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const ownerDocument = root.ownerDocument;
+    const onPointerDown = (event: Event) => {
+      const target = event.target as Element | null;
+      if (!target || root.contains(target)) return;
+      if (typeof target.closest !== "function") return;
+      if (!target.closest("[data-studio-canvas-viewport]")) return;
+      queueMicrotask(dismissFromCanvasPointerDown);
+    };
+    ownerDocument.addEventListener("pointerdown", onPointerDown, true);
+    return () => {
+      ownerDocument.removeEventListener("pointerdown", onPointerDown, true);
+    };
+  }, []);
+
   const quickTools: {
     id: "smart-shape" | "brush-kit" | "template" | "character" | "background-3d" | "collab-focus";
     label: string;
@@ -277,7 +302,19 @@ export function StudioQuickStartPanel({
         aria-label={localizeText(t, "빠른 시작 닫기", "studio.quickStart.dismiss")}
         data-studio-quickstart-backdrop="true"
         data-studio-modal-backdrop="true"
-        className="pointer-events-auto absolute inset-0 cursor-default bg-canvas/25 backdrop-blur-[1px]"
+        // `pointer-events-none` 이 이 결함의 수선이다.
+        //
+        // 이 배경은 캔버스 컬럼을 통째로 덮는 `inset-0` 이라, 붙잡고 있던 동안 **캔버스로 가야 할
+        // 첫 pointerdown 을 자기가 먹었다.** 코치가 뜬 직후 그리려고 획을 그으면 그 획은 시작조차
+        // 되지 않고, 코치는 뒤이은 click 에서야 닫혔다 — "그리려는 순간 가로막히는" 실체가 이것이다.
+        //
+        // 이제 배경은 **장식**이다(흐림·톤만 담당). 닫기는 세 갈래로 나뉘어 그대로 살아 있다:
+        //   · 캔버스 위 pointerdown → 아래 관찰자가 즉시 닫고, 그 이벤트는 캔버스가 그대로 받는다.
+        //   · 그 밖의 바깥 조작 → 기존 click 캡처 + 마이크로태스크 경로(메뉴 트리거 회귀 방지).
+        //   · 명시적 닫기 → 헤더의 X 버튼과 Esc.
+        // onClick 은 남겨 둔다 — 포인터를 안 쓰는 경로(키보드 활성화·합성 이벤트)에서 이 버튼이
+        // 여전히 "빠른 시작 닫기" 로 동작해야 한다.
+        className="pointer-events-none absolute inset-0 cursor-default bg-canvas/25 backdrop-blur-[1px]"
         onClick={onDismiss}
       />
       <div className="pointer-events-none absolute inset-x-2 top-16 z-[1] mx-auto max-w-[34rem] p-2 sm:top-4 sm:p-3">

@@ -1143,6 +1143,12 @@ import {
   replaceStudioPredictedInkTail,
   type StudioPredictedInkTailState,
 } from "./studio-predicted-ink-tail";
+import {
+  buildStudioPresetFontsCss2Url,
+  collectStudioPresetFontsInUse,
+  ensureStudioDocumentFontStylesheet,
+  ensureStudioDocumentPresetFontsLoaded,
+} from "./studio-preset-font-loading";
 import { executeStudioPrimaryCanvasToolTransition } from "./studio-primary-canvas-tool-transition";
 import {
   applyBrushPresetWithLocks,
@@ -2622,9 +2628,10 @@ function filterSfxPresets(presets: SfxPreset[], query: string): SfxPreset[] {
 // 스튜디오 사용자뿐이다. 나머지 BRAND_KIT_FONTS 와 같은 <link> 에 둬야 아래 idle 프리로드 타이밍과
 // document.fonts "loadingdone" 재도색 보정이 8종에 똑같이 걸린다(Konva 캔버스 텍스트는 DOM 과 달리
 // 폰트 스왑을 스스로 감지하지 못한다). 웹 크롬 쪽 소비자는 src/app/serif-webfont.ts 가 담당한다.
-const STUDIO_FONTS_LINK_ID = "studio-google-fonts";
-const STUDIO_FONTS_CSS2_URL =
-  "https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=East+Sea+Dokdo&family=Gaegu:wght@400;700&family=Gamja+Flower&family=Jua&family=Nanum+Myeongjo:wght@400;700&family=Nanum+Pen+Script&family=Yeon+Sung&display=swap";
+//
+// 2026-08: 그 8종을 담은 단일 상수(`STUDIO_FONTS_CSS2_URL`)는 `studio-preset-font-loading.ts`
+// 의 `STUDIO_PRESET_FONT_SPECS` 표로 옮겼다. 마운트 시 무조건 8종을 붙이던 것을 "문서가 쓰는
+// 글꼴은 즉시 · 나머지는 프리셋 목록을 처음 열 때" 두 갈래로 나누기 위해서다.
 
 // 부착된 말풍선(tailAnchorId/tailAnchorPoint)의 꼬리 방향/비율/길이를 매 커밋마다 다시
 // 계산한다. commit()/commitCoalesced() 가 pagesHistory 에 넣기 직전(+ masterEditMode 분기
@@ -16204,6 +16211,10 @@ function StudioCuttoonEditor({
   const advancedFillUserRevisionRef = useRef(0);
   advancedFillSettingsRef.current = advancedFillSettings;
   const [advancedFillPreview, setAdvancedFillPreview] = useState<StudioAdvancedFillPreview | null>(null);
+  // `disarmAllPixelTools` 는 도구 전환 이벤트 중간에 불려 렌더 시점 state 가 낡아 있을 수 있다.
+  // "미적용 미리보기가 있는가"는 그 함수가 미리보기를 버릴지 말지를 가르는 판단이라 최신값이어야 한다.
+  const advancedFillPreviewRef = useRef(advancedFillPreview);
+  advancedFillPreviewRef.current = advancedFillPreview;
   const [advancedFillVirtualTarget, setAdvancedFillVirtualTarget] =
     useState<StudioAdvancedFillVirtualTarget | null>(null);
   const [advancedFillStatus, setAdvancedFillStatus] = useState<string | null>(null);
@@ -16819,10 +16830,19 @@ function StudioCuttoonEditor({
     advancedFillTouchPanRef.current = null;
     setAdvancedFillActive(false);
     setAdvancedFillBusy(false);
-    setAdvancedFillPreview(null);
+    // 도구 전환은 **진행 중 계산**만 버린다. 이미 계산이 끝나 사용자의 적용/취소를 기다리는
+    // 미리보기는 남긴다 — `disarmAllPixelTools` 와 같은 계약이다(그쪽 주석이 근거).
+    // 예전에는 여기서도 미리보기를 지웠는데, 실제로는 disarm 이 같은 이벤트에서 먼저 지워
+    // 이 안내 문구조차 뜨지 않았다. 이제 두 경로 모두 미리보기를 살려 둔다.
+    if (advancedFillPreview) {
+      setAdvancedFillStatus(
+        "다른 도구로 전환했어요. 채우기 미리보기는 아직 적용하거나 취소할 수 있어요.",
+      );
+      return;
+    }
     setAdvancedFillVirtualTarget(null);
     advancedFillVirtualReferenceRef.current = null;
-    setAdvancedFillStatus("다른 도구로 전환해 고급 채우기 미리보기를 취소했습니다.");
+    setAdvancedFillStatus("다른 도구로 전환해 고급 채우기 계산을 취소했습니다.");
   }, [tool, advancedFillActive, advancedFillBusy, advancedFillPreview]);
   useEffect(() => {
     if (advancedFillColorRef.current === color) return;
@@ -20519,13 +20539,11 @@ const puppetWarpArmed =
 
     const startLoad = () => {
       if (!mounted) return;
-      if (!document.getElementById(STUDIO_FONTS_LINK_ID)) {
-        const link = document.createElement("link");
-        link.id = STUDIO_FONTS_LINK_ID;
-        link.rel = "stylesheet";
-        link.href = STUDIO_FONTS_CSS2_URL;
-        document.head.appendChild(link);
-      }
+      // **문서가 실제로 쓰는 프리셋 글꼴만** 받는다. 8종 전부를 무조건 받던 자리다.
+      // 나머지는 글꼴 프리셋 목록이 처음 열릴 때 `ensureStudioPresetFontsLoaded()` 가 받는다
+      // (studio-preset-font-loading.ts 머리말이 두 갈래의 근거).
+      // 캔버스에 이미 그 글자가 있는 경우만 여기서 즉시 받으므로 리플로·오작화는 그대로 막힌다.
+      ensureStudioDocumentPresetFontsLoaded(activeElementsRef.current);
       const redrawStage = () => stageRef.current?.batchDraw();
       // 진행 중이던 로드(전역 폰트 포함)가 정리된 뒤 일회 보정 — 이미 캐시돼 있으면 즉시 실행된다.
       document.fonts.ready.then(() => {
@@ -20551,6 +20569,19 @@ const puppetWarpArmed =
       removeLoadingDoneListener?.();
     };
   }, []);
+
+  // 위 효과는 마운트 때 한 번뿐이라, 나중에 도착하는 문서(작품 하이드레이션·페이지 이동·스냅샷
+  // 복원)가 쓰는 글꼴을 놓친다. 필요한 패밀리 집합이 바뀔 때마다 다시 확보한다 — URL 이 같으면
+  // 링크 id 가드가 아무 것도 하지 않으므로 매 렌더 비용은 스캔 한 번이다.
+  const studioDocumentPresetFontsHref = buildStudioPresetFontsCss2Url(
+    collectStudioPresetFontsInUse(elements),
+  );
+  useEffect(() => {
+    if (ensureStudioDocumentFontStylesheet(studioDocumentPresetFontsHref)) {
+      // Konva 는 폰트 스왑을 스스로 감지하지 못한다 — 도착하면 한 번 다시 그린다.
+      void document.fonts.ready.then(() => stageRef.current?.batchDraw());
+    }
+  }, [studioDocumentPresetFontsHref]);
 
   // 커스텀 에셋 라이브러리 목록 불러오기 및 관리
   const loadAssetsList = async () => {
@@ -22848,12 +22879,34 @@ const puppetWarpArmed =
     advancedFillTapGestureRef.current = null;
     advancedFillTapPayloadRef.current = null;
     advancedFillTouchPanRef.current = null;
+    // 아직 적용하지 않은 채우기 미리보기는 **도구를 내린다고 버리지 않는다.**
+    //
+    // 예전에는 여기서 preview 와 status 를 함께 null 로 만들었다. 이 함수는 도구 전환마다
+    // (executeStudioPrimaryCanvasToolTransition·스포이드 등) 무조건 불리므로, 채우기를 계산해
+    // 놓고 지우개나 스포이드를 한 번 거치면 "채우기 미리보기 · 적용/취소" 배너가 안내 한 줄 없이
+    // 사라졌다 — 사용자는 자기가 만든 결과를 잃은 줄도 몰랐다.
+    //
+    // 미적용 미리보기가 도구와 무관하게 살아 있는 것은 이미 이 저장소의 설계다:
+    // 캔버스 렌더는 `advancedFillPreview.targetId`/`historyIndex` 만 보고 그리고(도구·활성 여부를
+    // 보지 않는다), 상태 레일의 배너도 `hasAdvancedFillPreview` 만 본다. `toggleAdvancedFill` 이
+    // 스스로 도구를 내릴 때도 재사용 가능한 미리보기는 그대로 두고 "적용하거나 취소할 수 있어요"
+    // 라고 안내한다. 여기만 그 계약을 어기고 있었다.
+    //
+    // 그래서 도구만 내리고 미리보기·가상 타깃은 남긴다. 문서가 실제로 바뀌는 경로(페이지·선택
+    // 변경, undo/redo, commit, 문서 교체)는 각자 따로 미리보기를 무효화하므로 낡은 미리보기가
+    // 남지 않고, 적용 시점의 stale 가드(targetId·originalSrc·historyIndex)가 마지막 방어선이다.
+    const hasUnappliedAdvancedFillPreview = advancedFillPreviewRef.current !== null;
     setAdvancedFillActive(false);
     setAdvancedFillBusy(false);
-    setAdvancedFillPreview(null);
-    setAdvancedFillVirtualTarget(null);
-    advancedFillVirtualReferenceRef.current = null;
-    setAdvancedFillStatus(null);
+    if (!hasUnappliedAdvancedFillPreview) {
+      setAdvancedFillVirtualTarget(null);
+      advancedFillVirtualReferenceRef.current = null;
+      setAdvancedFillStatus(null);
+    } else {
+      setAdvancedFillStatus(
+        "다른 도구로 전환했어요. 채우기 미리보기는 아직 적용하거나 취소할 수 있어요.",
+      );
+    }
     advancedFillAutoArmTargetRef.current = null;
     setCropRect(null);
     setPixelTool(null);
@@ -27281,9 +27334,6 @@ const puppetWarpArmed =
         setColor(secondaryColor);
         setSecondaryColor(color);
         announceDrawingShortcut("색 교체");
-      } else if (!mod && (e.key === "g" || e.key === "G") && selected?.type === "image") {
-        e.preventDefault();
-        toggleAdvancedFill();
       } else if ((e.key === "Delete" || e.key === "Backspace") && (selectedId || marqueeIds.length > 0)) {
         e.preventDefault();
         if (
@@ -31743,11 +31793,15 @@ const puppetWarpArmed =
       const candidateReasons = [...new Set(
         entry.ineligibleRasters.map(({ reason }) => reason),
       )];
-      const message = selectedReason
+      const reason = selectedReason
         ?? (candidateReasons.length === 1 ? candidateReasons[0] : null)
         ?? entry.vectorFailure.reason;
+      // 단축키(G)로 들어온 경우 도구 행이 그대로라 "키를 먹었다"로 읽힌다. 사유 앞에 무엇이
+      // 실패했는지 붙여, 키는 도착했고 채우기가 켜지지 못한 것임을 문장 자체로 알린다.
+      const message = `채우기 도구를 켜지 못했어요. ${reason}`;
       setAdvancedFillStatus(message);
       setError(message);
+      announceDrawingShortcut(message);
       return;
     }
     const target = entry.target;

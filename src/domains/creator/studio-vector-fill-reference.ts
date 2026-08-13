@@ -847,6 +847,96 @@ export async function renderPreparedStudioVectorReference(
   };
 }
 
+type StudioDrawStroke = Extract<El, { type: "draw" }>;
+
+/**
+ * 획의 바운딩 박스(선 두께 포함).
+ *
+ * `studio-element-geometry` 의 `elBounds` 는 중심선만 보고 두께를 무시한다. 여기서는 "겹치지
+ * 않는다"는 판정으로 fail-open 을 하므로 **넓게 잡는 쪽이 안전**하다 — 두께의 절반에 1px 여유를
+ * 더해 부풀린다. 브러시 다이내믹스로 실제 자국이 공칭 두께보다 넓어질 수 있어서 여유를 둔다.
+ */
+function strokeBounds(element: StudioDrawStroke): {
+  readonly minX: number;
+  readonly minY: number;
+  readonly maxX: number;
+  readonly maxY: number;
+} | null {
+  const { points } = element;
+  if (points.length < 2) return null;
+  let minX = points[0];
+  let minY = points[1];
+  let maxX = minX;
+  let maxY = minY;
+  for (let i = 2; i + 1 < points.length; i += 2) {
+    const x = points[i];
+    const y = points[i + 1];
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+  }
+  const pad = Math.max(1, element.strokeWidth) / 2 + 1;
+  return { minX: minX - pad, minY: minY - pad, maxX: maxX + pad, maxY: maxY + pad };
+}
+
+/**
+ * 참조 이미지 합성에 아무 기여도 하지 않는 지우개 획을 뺀다.
+ *
+ * 왜 필요한가
+ * -----------
+ * 공유 SVG 직렬화기는 지우개 획을 재현할 수 없어 통째로 `skipped` 처리한다
+ * (`studio-svg-export.ts` `serializeDraw`). 그래서 이 모듈은 "지우개 획이 하나라도 있으면"
+ * 참조 이미지가 화면과 달라진다고 보고 fail-closed 했다 — 진입 단계에서 통째로 막고
+ * "지우개 벡터 획은 … 정확히 재현할 수 없습니다" 배너를 띄웠다.
+ *
+ * 그런데 **"지우개 획이 있다"와 "지우개가 화면을 바꾼다"는 다르다.** 지우개는 자기보다 아래
+ * (먼저 그려진) 잉크만 지운다. 아래에 겹치는 잉크가 없는 지우개 획 — 빈 곳을 문지른 획,
+ * 잉크를 다 지우고 이어서 그은 꼬리, 잉크보다 먼저 놓인 획 — 은 합성 결과에 흔적을 남기지
+ * 않는다. 그런 획을 직렬화 입력에서 빼면 SVG 는 화면을 **정확히** 재현하고 `skipped` 도 비므로,
+ * 사유 배너를 띄울 근거 자체가 사라진다. 반대로 실제로 잉크를 지운 획이 하나라도 남으면
+ * 예전과 똑같이 막힌다 — 배너 문구가 참인 경우는 그대로 지킨다.
+ *
+ * 판정은 보수적이다. 바운딩 박스가 조금이라도 겹치면 "영향 있음"으로 본다(실제 획 모양이
+ * 겹치는지는 보지 않는다). 즉 이 함수가 빼는 것은 **확실히 무해한 획**뿐이다.
+ */
+function dropInertEraserStrokes(
+  elements: readonly StudioDrawStroke[],
+): StudioDrawStroke[] {
+  if (!elements.some((element) => element.mode === "eraser")) return [...elements];
+  const boundsByIndex = elements.map(strokeBounds);
+  const kept: StudioDrawStroke[] = [];
+  for (let i = 0; i < elements.length; i += 1) {
+    const element = elements[i];
+    if (element.mode !== "eraser") {
+      kept.push(element);
+      continue;
+    }
+    const eraser = boundsByIndex[i];
+    // 좌표를 못 읽는 획은 판정할 수 없다 — 예전처럼 남겨 fail-closed 를 유지한다.
+    let affectsInk = eraser === null;
+    if (eraser) {
+      for (let below = 0; below < i; below += 1) {
+        const ink = elements[below];
+        if (ink.mode === "eraser") continue;
+        const inkBounds = boundsByIndex[below];
+        if (!inkBounds) continue;
+        if (
+          inkBounds.minX <= eraser.maxX &&
+          inkBounds.maxX >= eraser.minX &&
+          inkBounds.minY <= eraser.maxY &&
+          inkBounds.maxY >= eraser.minY
+        ) {
+          affectsInk = true;
+          break;
+        }
+      }
+    }
+    if (affectsInk) kept.push(element);
+  }
+  return kept;
+}
+
 function prepareAdvancedFillVectorInput(
   input: StudioAdvancedFillVectorTargetInput,
 ): PreparedAdvancedFillVectorInput | Extract<StudioAdvancedFillVectorTargetPlan, { ok: false }> {
@@ -868,9 +958,11 @@ function prepareAdvancedFillVectorInput(
       insertionIndex: safeInsertionIndex,
     };
   }
-  const elements = input.elements.filter(
-    (element): element is Extract<El, { type: "draw" }> =>
-      element.type === "draw" && !isEffectivelyHidden(element, groups),
+  const elements = dropInertEraserStrokes(
+    input.elements.filter(
+      (element): element is Extract<El, { type: "draw" }> =>
+        element.type === "draw" && !isEffectivelyHidden(element, groups),
+    ),
   );
   if (elements.length === 0 && !input.allowBlankPage) {
     return {

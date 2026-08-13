@@ -205,6 +205,58 @@ describe("planStudioAdvancedFillVectorTarget", () => {
     expect(plan).toMatchObject({ ok: false, code: "unsupported-vector-fidelity", insertionIndex: 0 });
   });
 
+  // 아래 세 건은 "지우개 획이 있다" 와 "지우개가 화면을 바꾼다" 를 가르는 회귀다.
+  // 예전에는 지우개가 하나라도 있으면 채우기 진입 자체가 막히고 "지우개 벡터 획은 선화 참조
+  // 이미지에서 …" 배너가 떴다 — 잉크에 닿지도 않은 획까지 그랬다.
+  it("proceeds when an eraser stroke never overlaps any ink", () => {
+    const plan = planStudioAdvancedFillVectorTarget(input([
+      draw("ink"),
+      draw("erase-elsewhere", { mode: "eraser", points: [600, 800, 620, 820] }),
+    ]));
+    expect(plan.ok).toBe(true);
+  });
+
+  it("proceeds when the eraser sits below the ink it would have to erase", () => {
+    // 지우개는 자기보다 먼저 그려진 것만 지운다 — 나중에 올라온 잉크는 건드리지 못한다.
+    const plan = planStudioAdvancedFillVectorTarget(input([
+      draw("erase-first", { mode: "eraser" }),
+      draw("ink-on-top"),
+    ]));
+    expect(plan.ok).toBe(true);
+  });
+
+  it("reports an empty page rather than an eraser-fidelity failure when only erasers exist", () => {
+    const plan = planStudioAdvancedFillVectorTarget(input([
+      draw("erase-only", { mode: "eraser" }),
+    ]));
+    expect(plan).toMatchObject({ ok: false, code: "no-visible-vector-draw" });
+  });
+
+  it("still fails closed when one eraser is inert but another really erases ink", () => {
+    const plan = planStudioAdvancedFillVectorTarget(input([
+      draw("ink"),
+      draw("erase-elsewhere", { mode: "eraser", points: [600, 800, 620, 820] }),
+      draw("erase-the-ink", { mode: "eraser" }),
+    ]));
+    expect(plan).toMatchObject({ ok: false, code: "unsupported-vector-fidelity" });
+  });
+
+  it("keeps inert erasers out of the serialized source so the SVG matches the screen", async () => {
+    // 참조 PNG 를 만드는 경로도 같은 필터를 지나야 한다 — 안 그러면 렌더 단계의
+    // `assertSvgResult` 가 skipped 를 보고 다시 막는다.
+    const svgs: string[] = [];
+    await expect(
+      renderStudioAdvancedFillVectorReference(
+        input([
+          draw("ink"),
+          draw("erase-elsewhere", { mode: "eraser", points: [600, 800, 620, 820] }),
+        ]),
+        { workerFactory: null, rasterize: rasterizer((svg) => svgs.push(svg)) },
+      ),
+    ).resolves.toMatchObject({ elementCount: 1 });
+    expect(svgs).toHaveLength(1);
+  });
+
   it("reports dimension and byte-budget failures before raster allocation", () => {
     expect(planStudioAdvancedFillVectorTarget(input([draw("line")], { width: 0 }))).toMatchObject({
       ok: false,
