@@ -737,6 +737,9 @@ function tipUsesAnalyticSoftFalloff(
     );
 }
 
+/** Path2D memo for frozen carrier ribbons, keyed by ribbon identity (see the paint path below). */
+const RIBBON_PATH_CACHE = new WeakMap<object, Path2D>();
+
 /**
  * Shared mark compositor for live, bounded committed and direct legacy paths. Keeping procedural
  * falloff here prevents pointer-up/replay from changing the airbrush footprint.
@@ -798,7 +801,12 @@ export function renderStudioDynamicBrushCoverageMark(
     }
     if (context.fillStyle !== mark.color) context.fillStyle = mark.color;
     if (typeof Path2D !== "undefined") {
-      let path = (mark.ribbon as { _cachedPath?: Path2D })._cachedPath;
+      // Carriers hand out deep-frozen ribbons, so the cache cannot live on the ribbon itself:
+      // under ES-module strict mode the property write throws a TypeError and takes the whole
+      // stroke down with it (measured 2026-08-14 as a blank canvas for every unstyled ribbon,
+      // e.g. hard-airbrush and erodible-pencil). A keyed side table caches identically without
+      // touching the frozen object.
+      let path = RIBBON_PATH_CACHE.get(mark.ribbon);
       if (!path) {
         path = new Path2D();
         const polygons = mark.ribbon.polygons;
@@ -812,7 +820,7 @@ export function renderStudioDynamicBrushCoverageMark(
           }
           path.closePath();
         }
-        (mark.ribbon as { _cachedPath?: Path2D })._cachedPath = path;
+        RIBBON_PATH_CACHE.set(mark.ribbon, path);
       }
       try {
         context.fill(path);

@@ -139,9 +139,11 @@ describe("studio brush variant group manifest", () => {
   });
 
   it("stages quarantined ids as quarantined with an owner-auditable reason each", () => {
-    // 2026-08-13 wave 3 pruning (workstream M §2): glitter--star-field is the only clear case —
-    // identical execution signature to star-dust, no alias profile, and the durable glitter
-    // dispatch never honours its declared engineVariant, so it paints as plain glitter (지침 6).
+    // 2026-08-13 wave 3 pruning (workstream M §2): glitter--star-field paints as plain glitter
+    // because the durable dispatch never honours its declared engineVariant (지침 6).
+    // 2026-08-14 browser gate: erodible-pencil and hard-airbrush render zero pixels on release for
+    // both short and long strokes — a pre-wave defect (reproduced on the 65e9bf64 build) whose
+    // family siblings, including the same-engine pencil--erodible-wear lane, are verified working.
     expect(STUDIO_BRUSH_QUARANTINED_PRESET_IDS).toEqual(["glitter--star-field"]);
     expect(Object.isFrozen(STUDIO_BRUSH_QUARANTINED_PRESET_IDS)).toBe(true);
     expect(Object.isFrozen(STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID)).toBe(true);

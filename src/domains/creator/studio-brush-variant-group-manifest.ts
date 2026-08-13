@@ -177,8 +177,21 @@ function auditStudioBrushQuarantineRegistration(): string[] {
       issues.push(`${quarantinedId}: runtime contract missing — the id would converge to the pen safe-fallback`);
       continue;
     }
+    // The invariant is that an alternative stays drawable, not that the id happens to be a
+    // variant of something. A self-canonical preset therefore qualifies when its render family
+    // still exposes another preset (사용자 기준: "대체 브러시군이 있다면"), which is exactly the
+    // case for defective singletons whose family siblings are verified working.
     if (contract.canonicalId === quarantinedId) {
-      issues.push(`${quarantinedId}: self-canonical preset has no in-group alternative to keep exposed`);
+      const exposedFamilySibling = STUDIO_PAINT_BRUSH_CATALOG_ITEMS.some((item) => (
+        item.id !== quarantinedId
+        && !isStudioBrushQuarantinedPresetId(item.id)
+        && resolveStudioBrushRuntimeContract(item.id)?.family === contract.family
+      ));
+      if (!exposedFamilySibling) {
+        issues.push(
+          `${quarantinedId}: self-canonical preset leaves no exposed ${contract.family} alternative`,
+        );
+      }
     } else if (isStudioBrushQuarantinedPresetId(contract.canonicalId)) {
       issues.push(`${quarantinedId}: canonical alternative ${contract.canonicalId} is quarantined too`);
     }

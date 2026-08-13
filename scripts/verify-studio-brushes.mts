@@ -103,6 +103,9 @@ const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
   "/api/studio-ai/status",
 ] as const;
 const DEBUG_BRUSH_VERIFIER = process.env.TOONSPECTRUM_DEBUG_BRUSH_VERIFIER === "1";
+/** Opt-in diagnostic sweep: keep auditing after a preset fails so one pass lists them all. */
+const DESKTOP_SURVEY_MODE = process.env.TOONSPECTRUM_BRUSH_SURVEY === "1";
+const surveyFailures: string[] = [];
 const ALL_BRUSH_LONG_MATRIX =
   process.env.TOONSPECTRUM_ALL_BRUSH_LONG_MATRIX === "1";
 const REQUESTED_BRUSH_VERIFY_IDS = (process.env.TOONSPECTRUM_BRUSH_VERIFY_IDS ?? "")
@@ -1303,6 +1306,7 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
 
     const evidence: BrushStrokeEvidence[] = [];
     for (const [index, preset] of BRUSH_MATRIX_CATALOG_ITEMS.entries()) {
+      try {
       const expectedSelection = await materializeStudioBrushCatalogSelection(preset.id);
       invariant(expectedSelection, `${preset.id}: product catalogue selection did not materialize`);
       invariant(
@@ -1529,6 +1533,13 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
           globalState.__perfectInkDebugState = null;
         });
       }
+      if (!hasMeaningfulPixelChange(immediateDiff)) {
+        // Capture what the surface actually showed; an invisible release is either a renderer
+        // regression or a selection mishap, and the two are indistinguishable from the message.
+        writeFileSync(join(SCRATCH, `release-diag-${preset.id}-before.png`), before);
+        writeFileSync(join(SCRATCH, `release-diag-${preset.id}-immediate.png`), immediate);
+        log(`release diagnostic for ${preset.id}: ${JSON.stringify(immediateDiff)}`);
+      }
       invariant(
         hasMeaningfulPixelChange(immediateDiff),
         operation === "erase"
@@ -1687,6 +1698,22 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
         `desktop ${index + 1}/${BRUSH_MATRIX_CATALOG_COUNT} `
           + `${preset.id}: select/${operation}/undo/redo OK`,
       );
+      } catch (error) {
+        // Survey mode is diagnostic only: the gate still fails at the end, but one pass
+        // enumerates every broken preset instead of stopping at the first.
+        if (!DESKTOP_SURVEY_MODE) throw error;
+        const message = error instanceof Error ? error.message : String(error);
+        surveyFailures.push(message);
+        log(`SURVEY FAILURE ${index + 1}/${BRUSH_MATRIX_CATALOG_COUNT} ${message}`);
+        await installCleanStudioState(page);
+        await page.reload({ waitUntil: "domcontentloaded" });
+        await prepareStudioPage(page, studioUrl);
+        await activateDesktopPen(page);
+      }
+    }
+    if (DESKTOP_SURVEY_MODE) {
+      log(`SURVEY COMPLETE: ${surveyFailures.length} failing preset(s)`);
+      for (const failure of surveyFailures) log(`SURVEY -> ${failure}`);
     }
 
     await page.screenshot({ path: screenshot, animations: "disabled" });
