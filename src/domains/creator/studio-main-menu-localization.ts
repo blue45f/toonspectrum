@@ -1,3 +1,5 @@
+import { localizeStudioFilterUnavailableReason } from "./studio-filter-unavailable-reason-localization";
+
 import type {
   StudioMainMenuGroup,
   StudioMainMenuItem,
@@ -100,7 +102,14 @@ function localizeUnavailableReason(
     // `localizeText`는 키가 팩에 있으면 fallback 인자를 통째로 버린다 — 즉 여기서 키를 먼저
     // 물으면 어렵게 계산한 사유("자동 줄바꿈 글상자를 …", "지우개 자국이 남은 레이어를 …")가
     // 매번 일반 문구로 덮여 사라진다. 실제로 그래서 51개 항목이 전부 같은 한 줄만 보여 줬다.
-    if (state.filterUnavailableReason) return state.filterUnavailableReason;
+    // 다만 그 "정본"은 저자형 한국어라, 로케일 팩이 붙은 비한국어 화면에서는 메뉴 라벨만
+    // 영어가 되고 사유만 한국어로 남았다(실측: en 로케일에서 "Required conditions: 마스터
+    // 편집에서는 필터를 적용할 이미지 레이어를 선택하세요."). 계산된 사유를 버리지 않으면서
+    // 로케일만 맞추려면 여기서 문장 표로 옮기는 수밖에 없다 — 팩에 키를 넣는 길은 75개 팩
+    // 1,297키 동수 계약 때문에 막혀 있다(모듈 헤더 참고).
+    if (state.filterUnavailableReason) {
+      return localizeStudioFilterUnavailableReason(state.filterUnavailableReason, t);
+    }
     return localizeText(
       t,
       "현재 편집 상태에서는 필터를 적용할 수 없습니다.",

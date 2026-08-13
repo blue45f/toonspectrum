@@ -419,7 +419,10 @@ describe("PSD export capability and loss preflight", () => {
     });
     expect(result.lossManifest?.decisions).toEqual(expect.arrayContaining([
       expect.objectContaining({ feature: "groups", disposition: "dropped", count: 1 }),
-      expect.objectContaining({ feature: "layer-mask", disposition: "rasterized", count: 1 }),
+      // 마스크는 캡처 노드의 조상(ClipMaskGroup)에 붙어 있어 `node.toCanvas()` 범위 밖이다 —
+      // 브라우저 실측에서 가린 영역이 PSD 레이어에 되살아났다(studio-psd-export.ts 주석 참고).
+      // "픽셀에 합성" 고지는 거짓이므로 dropped 로 고지한다.
+      expect.objectContaining({ feature: "layer-mask", disposition: "dropped", count: 1 }),
       expect.objectContaining({ feature: "adjustment-layer", disposition: "rasterized", count: 1 }),
       expect.objectContaining({ feature: "smart-object", disposition: "rasterized", count: 1 }),
     ]));
