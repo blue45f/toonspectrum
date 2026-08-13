@@ -6,6 +6,7 @@
  * cloning Figma's branding.
  */
 
+import { planStudioDrawObjectTransform } from "./studio-draw-object-transform";
 import { elBounds, type StudioElementBounds } from "./studio-element-geometry";
 import {
   normalizeStudioViewRotation,
@@ -15,7 +16,7 @@ import {
   type StudioViewRotation,
 } from "./studio-view-controls";
 
-import type { El } from "./studio-element-model";
+import type { DrawEl, El } from "./studio-element-model";
 
 /** Design-panel edit: only the fields the creator actually typed into. */
 export interface StudioFigmaSelectionLayoutPatch {
@@ -37,7 +38,32 @@ export interface StudioFigmaSelectionLayoutMetrics {
   readonly hasFixedSize: boolean;
   readonly supportsOpacity: boolean;
   readonly supportsRotation: boolean;
+  /**
+   * True when the rotation field means "turn it this much more", not "sit at this angle".
+   *
+   * A stroke bakes its transform into `points` (see `studio-draw-object-transform`), so there is
+   * no stored angle to display or to type an absolute value against. Inventing one would mean
+   * adding a rotation field to `DrawEl` — a different authoring model, and one that would
+   * re-rasterize ink through a Konva node transform instead of re-rendering the vector path.
+   * Photoshop's free-transform angle box behaves exactly this way for the same reason.
+   */
+  readonly rotationIsRelative: boolean;
+  /** Why W/H is inert, for the field's tooltip. Null when the field is live. */
+  readonly sizeDisabledReason: string | null;
+  /** Why rotation is inert, for the field's tooltip. Null when the field is live. */
+  readonly rotationDisabledReason: string | null;
   readonly elementCount: number;
+}
+
+/**
+ * Shape strokes (`rect`/`ellipse`/`star`/`triangle`/`polygon`) are rendered from the axis-aligned
+ * box of their first two points (`drawBounds` in `StudioDrawNode`), so baking an angle into those
+ * points would only move the box corners — the shape would resize, never turn. Freehand, `line`
+ * and `arrow` keep their geometry in the raw point array, so rotation is exact for them.
+ */
+function studioDrawRotationSupported(element: DrawEl): boolean {
+  const kind = element.kind ?? "freehand";
+  return kind === "freehand" || kind === "line" || kind === "arrow";
 }
 
 export function unionStudioSelectionBounds(
@@ -105,12 +131,20 @@ export function resolveStudioFigmaSelectionLayoutMetrics(
     single && typeof single.opacity === "number" && Number.isFinite(single.opacity)
       ? Math.min(1, Math.max(0, single.opacity))
       : 1;
+  // A stroke has no width/height field, but it does have a size: the handles already scale one
+  // by baking the target box into `points`. The numeric path calls that same planner, so gating
+  // W/H on the presence of a stored field would disable a capability the object demonstrably has.
   const hasFixedSize = Boolean(
     single
-    && single.type !== "draw"
-    && "width" in single
-    && "height" in single,
+    && (single.type === "draw" || ("width" in single && "height" in single)),
   );
+  const supportsRotation = Boolean(
+    single
+    && (single.type === "draw"
+      ? studioDrawRotationSupported(single)
+      : "rotation" in single),
+  );
+  const multi = elements.length > 1;
   return {
     x: roundLayout(bounds.x),
     y: roundLayout(bounds.y),
@@ -122,11 +156,20 @@ export function resolveStudioFigmaSelectionLayoutMetrics(
     // Frames are the one type whose renderer ignores opacity, and the existing inspector
     // slider already hides itself for them.
     supportsOpacity: single !== null && single.type !== "frame",
-    supportsRotation: Boolean(
-      single
-      && single.type !== "draw"
-      && "rotation" in single,
-    ),
+    supportsRotation,
+    rotationIsRelative: single?.type === "draw",
+    sizeDisabledReason: hasFixedSize
+      ? null
+      : multi
+        ? "여러 개를 선택하면 크기는 하나씩만 입력할 수 있어요."
+        : "이 요소는 크기를 숫자로 지정할 수 없어요.",
+    rotationDisabledReason: supportsRotation
+      ? null
+      : multi
+        ? "여러 개를 선택하면 회전은 하나씩만 입력할 수 있어요."
+        : single?.type === "draw"
+          ? "사각형·원·별·다각형 도형은 축에 정렬된 상자로 그려져서 각도를 가질 수 없어요. 자유곡선·직선·화살표는 회전할 수 있어요."
+          : "이 요소는 회전을 지원하지 않아요.",
     elementCount: elements.length,
   };
 }
@@ -304,7 +347,6 @@ export function planStudioSelectionLayoutPatch(
   patch: StudioFigmaSelectionLayoutPatch,
 ): Partial<El> | null {
   const next: Record<string, unknown> = {};
-  const box = elBounds(element);
 
   if (
     typeof patch.opacity === "number"
@@ -323,16 +365,8 @@ export function planStudioSelectionLayoutPatch(
   }
 
   if (element.type === "draw") {
-    // The panel shows the padded stroke bounds, so move relative to those or the stroke
-    // would slide by half its width every time the field round-trips.
-    const shown = unionStudioSelectionBounds([element]) ?? box;
-    const dx = typeof patch.x === "number" && Number.isFinite(patch.x) ? patch.x - shown.x : 0;
-    const dy = typeof patch.y === "number" && Number.isFinite(patch.y) ? patch.y - shown.y : 0;
-    if (dx !== 0 || dy !== 0) {
-      next.points = element.points.map((value, index) =>
-        value + (index % 2 === 0 ? dx : dy),
-      );
-    }
+    const geometry = planStudioDrawLayoutGeometry(element, patch);
+    if (geometry) Object.assign(next, geometry);
     return Object.keys(next).length > 0 ? (next as Partial<El>) : null;
   }
 
@@ -360,6 +394,166 @@ export function planStudioSelectionLayoutPatch(
   }
 
   return Object.keys(next).length > 0 ? (next as Partial<El>) : null;
+}
+
+/** How close the fixed-point solve below has to land before it stops refining. Document px. */
+const DRAW_LAYOUT_SOLVE_TOLERANCE = 1e-4;
+const DRAW_LAYOUT_SOLVE_MAX_STEPS = 6;
+
+function finiteNumber(value: number | undefined): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+/**
+ * Turns one Design-panel X/Y/W/H/rotation edit on a stroke into a geometry patch.
+ *
+ * The numeric path deliberately owns no transform maths of its own: it resolves a target box and
+ * hands it to `planStudioDrawObjectTransform`, the same planner the on-canvas resize/rotate
+ * handles commit through (`commitCanvasSelectionResize` in `StudioPage`). Typing 150 into W and
+ * dragging the handle to 150 therefore produce byte-identical points, stroke width and shape
+ * params — there is one bake, not two.
+ *
+ * Conventions, both chosen to match what the artist is already looking at:
+ *  - the box is the *padded* stroke box the panel displays (`unionStudioSelectionBounds`), which
+ *    is also the box the selection handles draw, so a typed number and a dragged handle refer to
+ *    the same edge;
+ *  - W/H scale from the top-left, exactly like the W/H fields on an image in this same panel;
+ *  - rotation turns about the box centre, exactly like the rotate handle.
+ */
+function planStudioDrawLayoutGeometry(
+  element: DrawEl,
+  patch: StudioFigmaSelectionLayoutPatch,
+): Record<string, unknown> | null {
+  const shown = unionStudioSelectionBounds([element]);
+  if (!shown || shown.w <= 0 || shown.h <= 0) return null;
+
+  const widthTyped = finiteNumber(patch.width) && patch.width > 0;
+  const heightTyped = finiteNumber(patch.height) && patch.height > 0;
+  let goalW = widthTyped ? patch.width! : shown.w;
+  let goalH = heightTyped ? patch.height! : shown.h;
+  // The Transformer keeps the ratio for aspect-locked elements (`keepRatio` in the viewport), so
+  // the numeric path has to honour the same lock or the two would disagree on the same object.
+  if (element.lockAspect && widthTyped !== heightTyped) {
+    if (widthTyped) goalH = shown.h * (goalW / shown.w);
+    else goalW = shown.w * (goalH / shown.h);
+  }
+  const goalX = finiteNumber(patch.x) ? patch.x : shown.x;
+  const goalY = finiteNumber(patch.y) ? patch.y : shown.y;
+
+  // Relative, not absolute: the field always reads 0 because a stroke stores no angle. See
+  // `rotationIsRelative`.
+  const rotationDeg =
+    finiteNumber(patch.rotation) && studioDrawRotationSupported(element)
+      ? normalizeSignedDegrees(patch.rotation)
+      : 0;
+
+  const moved =
+    Math.abs(goalX - shown.x) > DRAW_LAYOUT_SOLVE_TOLERANCE
+    || Math.abs(goalY - shown.y) > DRAW_LAYOUT_SOLVE_TOLERANCE;
+  const resized =
+    Math.abs(goalW - shown.w) > DRAW_LAYOUT_SOLVE_TOLERANCE
+    || Math.abs(goalH - shown.h) > DRAW_LAYOUT_SOLVE_TOLERANCE;
+  if (!moved && !resized && rotationDeg === 0) return null;
+
+  const source = { x: shown.x, y: shown.y, width: shown.w, height: shown.h };
+  const bake = (target: { x: number; y: number; width: number; height: number }) =>
+    planStudioDrawObjectTransform({
+      el: element,
+      sourceBounds: source,
+      // The planner rotates about the target box origin, so rotating the *unrotated* box about
+      // its own centre first turns the whole thing into a centre rotation — which is what the
+      // rotate handle does, and what "기울이기 15°" means to an artist.
+      targetBounds: rotateBoxOriginAboutCentre(target, rotationDeg),
+      rotationDeg,
+    });
+
+  let target = { x: goalX, y: goalY, width: goalW, height: goalH };
+  let result = bake(target);
+  if (!result) return null;
+
+  // The displayed box is the point box grown by half a stroke width, and the planner scales the
+  // width by the geometric mean of the axis factors. Those agree exactly for a uniform scale, so
+  // one pass already lands the typed number; a lopsided W-only edit leaves a sub-percent residue.
+  // Re-solving against the measured result — through the same planner, so no second formula
+  // exists — makes "make both panels 480 wide" land on 480 either way. Rotation is skipped
+  // because a turned stroke's axis-aligned box is not the box that was typed.
+  if (rotationDeg === 0) {
+    for (let step = 0; step < DRAW_LAYOUT_SOLVE_MAX_STEPS; step += 1) {
+      const got = unionStudioSelectionBounds([result]);
+      if (!got) break;
+      const errorX = goalX - got.x;
+      const errorY = goalY - got.y;
+      const errorW = goalW - got.w;
+      const errorH = goalH - got.h;
+      if (
+        Math.abs(errorX) <= DRAW_LAYOUT_SOLVE_TOLERANCE
+        && Math.abs(errorY) <= DRAW_LAYOUT_SOLVE_TOLERANCE
+        && Math.abs(errorW) <= DRAW_LAYOUT_SOLVE_TOLERANCE
+        && Math.abs(errorH) <= DRAW_LAYOUT_SOLVE_TOLERANCE
+      ) {
+        break;
+      }
+      const nextTarget = {
+        x: target.x + errorX,
+        y: target.y + errorY,
+        width: target.width + errorW,
+        height: target.height + errorH,
+      };
+      if (nextTarget.width <= 0 || nextTarget.height <= 0) break;
+      const refined = bake(nextTarget);
+      if (!refined) break;
+      target = nextTarget;
+      result = refined;
+    }
+  }
+
+  // Only the keys the transform actually moved. Handing back the whole element — or a rebuilt
+  // sub-object holding identical numbers — would make untouched fields look changed to the CRDT
+  // diff and to the revision compare view.
+  const geometry: Record<string, unknown> = { points: result.points };
+  if (result.strokeWidth !== element.strokeWidth) geometry.strokeWidth = result.strokeWidth;
+  if (result.sampleSpacing !== element.sampleSpacing) {
+    geometry.sampleSpacing = result.sampleSpacing;
+  }
+  if (result.shapeParams?.cornerRadius !== element.shapeParams?.cornerRadius) {
+    geometry.shapeParams = result.shapeParams;
+  }
+  if (
+    result.symmetry?.centerX !== element.symmetry?.centerX
+    || result.symmetry?.centerY !== element.symmetry?.centerY
+  ) {
+    geometry.symmetry = result.symmetry;
+  }
+  return geometry;
+}
+
+/**
+ * Where the top-left corner of `box` ends up after the box turns `degrees` about its own centre.
+ * Feeding that origin to `planStudioDrawObjectTransform` converts its origin rotation into a
+ * centre rotation without the planner needing to know about pivots.
+ */
+function rotateBoxOriginAboutCentre(
+  box: { x: number; y: number; width: number; height: number },
+  degrees: number,
+): { x: number; y: number; width: number; height: number } {
+  if (degrees === 0) return box;
+  const radians = (degrees * Math.PI) / 180;
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+  const halfW = box.width / 2;
+  const halfH = box.height / 2;
+  return {
+    x: box.x + halfW - halfW * cos + halfH * sin,
+    y: box.y + halfH - halfW * sin - halfH * cos,
+    width: box.width,
+    height: box.height,
+  };
+}
+
+/** Folds full turns away so typing 360 is the no-op it looks like. */
+function normalizeSignedDegrees(degrees: number): number {
+  const wrapped = degrees % 360;
+  return wrapped === 0 ? 0 : wrapped;
 }
 
 /** A mirror reverses the sense of every angle/tilt channel; non-finite entries stay as they are. */

@@ -226,6 +226,150 @@ describe("studio figma selection ux", () => {
     expect(planStudioSelectionLayoutPatch(frame, { opacity: 0.5 })).toBeNull();
   });
 
+  it("opens W/H and rotation for a lone freehand stroke", () => {
+    // The handles already scale and rotate a stroke by baking the box into `points`; the numeric
+    // fields must not claim the object cannot do what it demonstrably does.
+    const metrics = resolveStudioFigmaSelectionLayoutMetrics([
+      draw({ id: "s", points: [10, 10, 110, 60], strokeWidth: 4 }),
+    ]);
+    expect(metrics).toMatchObject({
+      hasFixedSize: true,
+      supportsRotation: true,
+      rotationIsRelative: true,
+      rotation: 0,
+      sizeDisabledReason: null,
+      rotationDisabledReason: null,
+    });
+  });
+
+  it("keeps rotation off box-derived shape strokes and says why", () => {
+    // rect/ellipse/star/triangle/polygon render from the axis-aligned box of their points, so a
+    // baked angle would only resize them. Size still works, and the field explains itself.
+    for (const kind of ["rect", "ellipse", "star", "triangle", "polygon"] as const) {
+      const metrics = resolveStudioFigmaSelectionLayoutMetrics([
+        draw({ id: kind, kind, points: [0, 0, 80, 40], strokeWidth: 2 }),
+      ]);
+      expect(metrics!.hasFixedSize).toBe(true);
+      expect(metrics!.supportsRotation).toBe(false);
+      expect(metrics!.rotationDisabledReason).toContain("자유곡선");
+    }
+    for (const kind of ["line", "arrow"] as const) {
+      const metrics = resolveStudioFigmaSelectionLayoutMetrics([
+        draw({ id: kind, kind, points: [0, 0, 80, 40], strokeWidth: 2 }),
+      ]);
+      expect(metrics!.supportsRotation).toBe(true);
+    }
+  });
+
+  it("resizes a stroke to exactly the width that was typed", () => {
+    const stroke = draw({ id: "s", points: [10, 10, 110, 10, 110, 60], strokeWidth: 8 });
+    const before = resolveStudioFigmaSelectionLayoutMetrics([stroke])!;
+    const patch = planStudioSelectionLayoutPatch(stroke, {
+      width: before.width * 1.5,
+    }) as Partial<DrawEl>;
+    const scaled = { ...stroke, ...patch } as DrawEl;
+    const after = resolveStudioFigmaSelectionLayoutMetrics([scaled])!;
+    expect(after.width).toBeCloseTo(before.width * 1.5, 3);
+    // A W-only edit must leave the displayed H where the artist left it.
+    expect(after.height).toBeCloseTo(before.height, 3);
+    // Top-left anchored, exactly like the W/H fields on an image in this same panel.
+    expect(after.x).toBeCloseTo(before.x, 3);
+    expect(after.y).toBeCloseTo(before.y, 3);
+    // The ink itself grew — a stroke scaled by rewriting its points, not by resampling pixels.
+    expect(scaled.points).not.toEqual(stroke.points);
+    expect(scaled.strokeWidth).toBeGreaterThan(stroke.strokeWidth);
+  });
+
+  it("keeps the ratio on an aspect-locked stroke", () => {
+    const stroke = draw({
+      id: "s",
+      kind: "rect",
+      points: [0, 0, 100, 50],
+      strokeWidth: 4,
+      lockAspect: true,
+    } as Partial<DrawEl> & Pick<DrawEl, "id" | "points">);
+    const before = resolveStudioFigmaSelectionLayoutMetrics([stroke])!;
+    const patch = planStudioSelectionLayoutPatch(stroke, { width: before.width * 2 });
+    const after = resolveStudioFigmaSelectionLayoutMetrics([
+      { ...stroke, ...patch } as El,
+    ])!;
+    expect(after.width / before.width).toBeCloseTo(2, 3);
+    expect(after.height / before.height).toBeCloseTo(2, 3);
+  });
+
+  it("rotates a stroke about its centre and treats the field as a delta", () => {
+    const stroke = draw({ id: "s", points: [0, 0, 100, 0], strokeWidth: 2 });
+    const before = resolveStudioFigmaSelectionLayoutMetrics([stroke])!;
+    const centreX = before.x + before.width / 2;
+    const centreY = before.y + before.height / 2;
+    const turned = {
+      ...stroke,
+      ...planStudioSelectionLayoutPatch(stroke, { rotation: 90 }),
+    } as DrawEl;
+    const after = resolveStudioFigmaSelectionLayoutMetrics([turned])!;
+    // A quarter turn about the centre swaps the extents and leaves the centre alone.
+    expect(after.width).toBeCloseTo(before.height, 3);
+    expect(after.height).toBeCloseTo(before.width, 3);
+    expect(after.x + after.width / 2).toBeCloseTo(centreX, 3);
+    expect(after.y + after.height / 2).toBeCloseTo(centreY, 3);
+    // Relative: four 90° presses come back to the start, and the field still reads 0.
+    let round = stroke;
+    for (let press = 0; press < 4; press += 1) {
+      round = {
+        ...round,
+        ...planStudioSelectionLayoutPatch(round, { rotation: 90 }),
+      } as DrawEl;
+    }
+    expect(after.rotation).toBe(0);
+    round.points.forEach((value, index) => {
+      expect(value).toBeCloseTo(stroke.points[index]!, 6);
+    });
+  });
+
+  it("refuses no-op numeric edits so they never spend a history entry", () => {
+    const stroke = draw({ id: "s", points: [10, 10, 90, 40], strokeWidth: 6 });
+    const shown = resolveStudioFigmaSelectionLayoutMetrics([stroke])!;
+    expect(planStudioSelectionLayoutPatch(stroke, { rotation: 0 })).toBeNull();
+    expect(planStudioSelectionLayoutPatch(stroke, { rotation: 360 })).toBeNull();
+    expect(planStudioSelectionLayoutPatch(stroke, { x: shown.x })).toBeNull();
+    expect(planStudioSelectionLayoutPatch(stroke, { width: shown.width })).toBeNull();
+    // A rotation typed onto a shape stroke is inert rather than a silent resize.
+    const rect = draw({ id: "r", kind: "rect", points: [0, 0, 40, 20], strokeWidth: 2 });
+    expect(planStudioSelectionLayoutPatch(rect, { rotation: 30 })).toBeNull();
+  });
+
+  it("carries a numeric resize through the same bake the handles use", async () => {
+    // Not "similar maths" — the identical planner. A number typed into W and a handle dragged to
+    // the same box must not be able to drift apart.
+    const { planStudioDrawObjectTransform } = await import("./studio-draw-object-transform");
+    const stroke = draw({ id: "s", points: [4, 4, 84, 44], strokeWidth: 10 });
+    const shown = unionStudioSelectionBounds([stroke])!;
+    const patch = planStudioSelectionLayoutPatch(stroke, {
+      x: shown.x + 25,
+      y: shown.y - 10,
+    }) as Partial<DrawEl>;
+    const handle = planStudioDrawObjectTransform({
+      el: stroke,
+      sourceBounds: { x: shown.x, y: shown.y, width: shown.w, height: shown.h },
+      targetBounds: {
+        x: shown.x + 25,
+        y: shown.y - 10,
+        width: shown.w,
+        height: shown.h,
+      },
+      rotationDeg: 0,
+    })!;
+    expect(patch.points).toEqual(handle.points);
+    expect(patch.strokeWidth).toBeUndefined();
+    expect(handle.strokeWidth).toBe(stroke.strokeWidth);
+  });
+
+  it("only emits the geometry keys the transform can move", () => {
+    const stroke = draw({ id: "s", points: [0, 0, 60, 30], strokeWidth: 4 });
+    const patch = planStudioSelectionLayoutPatch(stroke, { width: 200, opacity: 0.4 })!;
+    expect(Object.keys(patch).sort()).toEqual(["opacity", "points", "strokeWidth"]);
+  });
+
   it("reports Figma-like layout metrics for a single image", () => {
     const metrics = resolveStudioFigmaSelectionLayoutMetrics([
       image({ id: "i", x: 12, y: 24, width: 80, height: 40, opacity: 0.5, rotation: 15 }),

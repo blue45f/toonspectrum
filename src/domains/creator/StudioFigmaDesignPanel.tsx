@@ -28,6 +28,7 @@ function Field({
   label,
   value,
   disabled,
+  disabledReason,
   step = 1,
   min,
   max,
@@ -37,6 +38,8 @@ function Field({
   label: string;
   value: number;
   disabled?: boolean;
+  /** Shown as the field's tooltip while it is inert, so a grey box always says why. */
+  disabledReason?: string | null;
   step?: number;
   min?: number;
   max?: number;
@@ -44,9 +47,11 @@ function Field({
   onCommit: (next: number) => void;
 }) {
   // Edits stay local until Enter/blur: committing per keystroke would push a half-typed
-  // "1" (or a 0 from a momentarily empty field) straight onto the canvas.
+  // "1" (or a 0 from a momentarily empty field) straight onto the canvas — and would spend one
+  // undo entry per digit. One typed number is one history step.
   const [draft, setDraft] = useState<string | null>(null);
   const settled = Number.isFinite(value) ? value : 0;
+  const inertHint = disabled ? (disabledReason ?? undefined) : undefined;
 
   function commitDraft() {
     if (draft === null) return;
@@ -57,7 +62,7 @@ function Field({
   }
 
   return (
-    <label className="grid min-w-0 gap-0.5">
+    <label className="grid min-w-0 gap-0.5" title={inertHint}>
       <span className="text-[0.58rem] font-bold uppercase tracking-wide text-fg-3">
         {label}
       </span>
@@ -66,6 +71,7 @@ function Field({
           type="number"
           inputMode="decimal"
           disabled={disabled}
+          title={inertHint}
           step={step}
           min={min}
           max={max}
@@ -193,6 +199,7 @@ export function StudioFigmaDesignPanel({
           label="W"
           value={metrics.width}
           disabled={disabled || multi || !metrics.hasFixedSize}
+          disabledReason={metrics.sizeDisabledReason}
           min={1}
           onCommit={(width) => onChange({ width })}
         />
@@ -200,6 +207,7 @@ export function StudioFigmaDesignPanel({
           label="H"
           value={metrics.height}
           disabled={disabled || multi || !metrics.hasFixedSize}
+          disabledReason={metrics.sizeDisabledReason}
           min={1}
           onCommit={(height) => onChange({ height })}
         />
@@ -207,9 +215,13 @@ export function StudioFigmaDesignPanel({
 
       <div className="mt-1.5 grid grid-cols-2 gap-1.5">
         <Field
-          label="회전"
+          // A stroke has no stored angle, so the box is an "and now turn it this much" input
+          // rather than a readout. Labelling it plain 회전 would promise a state that the
+          // document does not carry.
+          label={metrics.rotationIsRelative ? "회전(상대)" : "회전"}
           value={metrics.rotation}
           disabled={disabled || multi || !metrics.supportsRotation}
+          disabledReason={metrics.rotationDisabledReason}
           step={1}
           suffix="°"
           onCommit={(rotation) => onChange({ rotation })}
@@ -230,6 +242,17 @@ export function StudioFigmaDesignPanel({
         <p className="mt-2 text-[0.6rem] leading-snug text-fg-3">
           여러 개 선택 중에는 정렬·분배·반전·선택 확대를 사용하세요. 개별 X/Y/W/H는
           하나만 선택했을 때 편집할 수 있어요.
+        </p>
+      ) : null}
+      {!multi && metrics.rotationIsRelative && metrics.supportsRotation ? (
+        <p className="mt-2 text-[0.6rem] leading-snug text-fg-3">
+          선화는 회전이 점에 그대로 구워져요. 회전 칸은 현재 각도가 아니라 &ldquo;여기서 몇 도
+          더&rdquo;예요 — 15를 넣으면 15° 돌아가고 칸은 0으로 돌아옵니다.
+        </p>
+      ) : null}
+      {!multi && metrics.rotationIsRelative && metrics.rotationDisabledReason ? (
+        <p className="mt-2 text-[0.6rem] leading-snug text-fg-3">
+          {metrics.rotationDisabledReason}
         </p>
       ) : null}
     </section>
