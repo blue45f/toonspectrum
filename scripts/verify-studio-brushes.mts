@@ -3340,6 +3340,16 @@ async function runDeferredDurabilityAudit(
     );
 
     const emergency = await waitForEmergencyAutosave(page);
+    if (!emergency) {
+      // Which authority refused decides the diagnosis: a follower verdict means the leadership
+      // guard suppressed the SQLite write (product defect), while both authorities failing points
+      // at the write racing document teardown instead.
+      const raw = await persistedStudioDocument(page).catch((cause: unknown) => ({
+        readFailure: cause instanceof Error ? cause.message : String(cause),
+      }));
+      log(`durability diagnostic: persisted payload ${JSON.stringify(raw)?.slice(0, 600) ?? "null"}`);
+      log(`durability diagnostic: console messages ${JSON.stringify(errors.messages).slice(0, 800)}`);
+    }
     invariant(emergency, "pointerup did not create a durable autosave for the deferred stroke");
     const marker = emergency.pendingStrokeDurability;
     const strokeIds = Array.isArray(marker?.strokeIds)
