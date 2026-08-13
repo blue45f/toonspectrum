@@ -1762,7 +1762,7 @@ describe("StudioDrawNode orchestration", () => {
     expect(captured("Shape").length).toBeGreaterThan(0);
   });
 
-  it("renders a symmetric v2 pencil stamp through one bounded affine compositor", async () => {
+  it("renders a symmetric v2 pencil stamp as per-variation document-space plans", async () => {
     render(
       <StudioDrawNode
         el={drawEl({
@@ -1784,12 +1784,20 @@ describe("StudioDrawNode orchestration", () => {
     ) => void;
     sceneFunc(context as unknown as CanvasRenderingContext2D);
 
-    expect(context.transforms).toEqual([
-      "1,0,0,1,0,0",
-      "-1,0,0,1,20,0",
-    ]);
+    // Copies are planned in document space and drawn without a context transform, so the
+    // mirrored copy re-derives its index-keyed tip jitter at the mirrored dab centre —
+    // the SVG per-variation procedure (and the shared paper sheet for pinned lanes).
+    expect(context.transforms).toEqual([]);
     expect(context.arcs).toHaveLength(6);
-    expect(context.arcs.slice(0, 3)).toEqual(context.arcs.slice(3));
+    const parseArc = (arc: string): number[] => arc.split(",").map(Number);
+    const sourceArcs = context.arcs.slice(0, 3).map(parseArc);
+    const mirroredArcs = context.arcs.slice(3).map(parseArc);
+    mirroredArcs.forEach((arc, index) => {
+      const source = sourceArcs[index]!;
+      // Same jitter offsets around the mirrored dab centre: x shifts by 2·(centerX − x₀) = 16.
+      expect(arc[0]).toBeCloseTo(source[0]! + 16, 12);
+      expect(arc.slice(1)).toEqual(source.slice(1));
+    });
   });
 
   it("does not overpaint a kaleidoscope center tap through duplicate Shapes or dabs", async () => {
