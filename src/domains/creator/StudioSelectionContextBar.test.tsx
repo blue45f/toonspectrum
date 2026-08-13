@@ -237,7 +237,9 @@ describe("StudioSelectionContextBar layout site (StudioPage)", () => {
     expect(pageSource).toContain(
       'const selectOptionsStripArmed = tool === "select" && !canvasOnlyMode && !selectionOptionsSuppressed;'
     );
-    expect(pageSource).toContain("visible: selectOptionsStripArmed && count > 0,");
+    expect(pageSource).toContain(
+      "visible: selectOptionsStripArmed && count > 0 && selectionLaneMounted,"
+    );
   });
 
   it("reserves the strip height while nothing is selected", () => {
@@ -253,10 +255,43 @@ describe("StudioSelectionContextBar layout site (StudioPage)", () => {
   });
 
   it("keeps the reserved lane independent of the active tool", () => {
-    // 도구 전환이 캔버스 기하를 바꾸면 안 된다 — 예약은 canvasOnlyMode 하나로만 닫힌다.
-    expect(pageSource).toContain("const selectOptionsLaneReserved = !canvasOnlyMode;");
+    // 도구 전환이 캔버스 기하를 바꾸면 안 된다 — 예약은 canvasOnlyMode 와 뷰포트로만 닫힌다.
+    expect(pageSource).toContain(
+      "const selectOptionsLaneReserved = !canvasOnlyMode && selectionLaneMounted;"
+    );
     // 실제 바가 뜰 조건은 여전히 도구·무장·선택 수에 묶여 있어야 한다.
-    expect(pageSource).toContain("visible: selectOptionsStripArmed && count > 0,");
+    expect(pageSource).toContain(
+      "visible: selectOptionsStripArmed && count > 0 && selectionLaneMounted,"
+    );
+  });
+
+  /**
+   * 모바일에서는 이 레인을 예약하지 **않는다.** 44px 은 360px 화면에서 그대로 그리기 면적
+   * 손실인데, 레인이 주는 명령은 요소를 고르는 순간 뜨는 플로팅 "선택 항목 빠른 작업" 바가
+   * 이미 엄지 영역에 제공한다. 중요한 건 조건이 선택 상태가 아니라 **뷰포트**라는 점이다 —
+   * 모바일에서는 선택 유무와 무관하게 항상 없으므로 "선택 시 레이아웃 이동 0px" 은 유지된다.
+   */
+  it("drops the lane below lg by viewport, never by selection state", () => {
+    expect(pageSource).toContain("const selectionLaneMounted = !isMobile;");
+    // 레인 마운트 여부가 선택/도구 상태에 다시 얽히면 안 된다.
+    const laneDecl = pageSource.slice(
+      pageSource.indexOf("const selectionLaneMounted = !isMobile;")
+    );
+    expect(laneDecl.slice(0, 120)).not.toContain("selectedId");
+    expect(laneDecl.slice(0, 120)).not.toContain("marqueeIds");
+  });
+
+  /**
+   * 레인이 빠지면서 사라질 뻔한 두 명령은 플로팅 바가 넘겨받는다. 같은 구현을 부르지 않으면
+   * 같은 라벨의 버튼이 기기마다 다르게 동작한다.
+   */
+  it("hands lock and lettering edit to the mobile floating quick-action bar", () => {
+    expect(pageSource).toContain("toggleSelectionLock: toggleSelectedElementsLocked,");
+    expect(pageSource).toContain("editSelectionText: editSelectedElementText,");
+    expect(pageSource).toContain("selectionLocked={mobileSelectionLocked}");
+    expect(pageSource).toContain(
+      "selectionTextEditLabel={studioOptionsBarsSelectionModel.textEditLabel}"
+    );
   });
 
   it("mounts the on-canvas context bar as an overlay sibling, not a canvas child", () => {

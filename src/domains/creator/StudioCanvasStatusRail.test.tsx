@@ -10,6 +10,12 @@ import {
 
 import type { ReactNode } from "react";
 
+const viewportState = vi.hoisted(() => ({ mobile: false }));
+
+vi.mock("@/components/use-media-query", () => ({
+  useIsMobile: () => viewportState.mobile,
+}));
+
 vi.mock("./StudioToolHint", () => ({
   StudioToolHintTarget: ({
     hint,
@@ -34,7 +40,10 @@ vi.mock("./StudioToolHint", () => ({
   ),
 }));
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  viewportState.mobile = false;
+});
 
 function createProps(
   overrides: Partial<StudioCanvasStatusRailProps> = {}
@@ -172,6 +181,23 @@ describe("StudioCanvasStatusRail", () => {
     expect(filledLane?.className).toBe(emptyLane?.className);
     expect(container.querySelector("[data-studio-selection-command-reserve]")).toBeNull();
     expect(screen.getByRole("button", { name: "선택 요소 그룹화" })).toBeTruthy();
+  });
+
+  it("drops the selection command lane entirely below lg, selected or not", () => {
+    // 360px 에서 이 레인은 51px(바 43px + mb-2 8px)의 그리기 면적을 상시 먹는데, 그 명령은
+    // 플로팅 "선택 항목 빠른 작업" 바가 이미 엄지 영역에 제공한다. 예약을 없애도 조건이
+    // **뷰포트**라서 선택 유무와 무관하게 항상 없다 — 캔버스 원점 이동 0px 불변식은 그대로다.
+    viewportState.mobile = true;
+    const props = createProps({ selectionCount: 0 });
+    const { container, rerender } = render(<StudioCanvasStatusRail {...props} />);
+
+    expect(container.querySelector("[data-studio-selection-command-lane]")).toBeNull();
+    expect(container.querySelector("[data-studio-selection-command-reserve]")).toBeNull();
+
+    rerender(<StudioCanvasStatusRail {...props} selectionCount={3} />);
+    // 선택이 생겨도 레인이 되돌아오면 안 된다 — 그 순간이 곧 캔버스가 밀리는 순간이다.
+    expect(container.querySelector("[data-studio-selection-command-lane]")).toBeNull();
+    expect(screen.queryByRole("button", { name: "선택 요소 그룹화" })).toBeNull();
   });
 
   it("preserves selection thresholds and every semantic layout callback", () => {

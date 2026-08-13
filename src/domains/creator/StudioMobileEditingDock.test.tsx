@@ -158,6 +158,7 @@ function createHandlers(): StudioMobileEditingDockHandlers {
     dismissBrushManager: vi.fn(),
     dismissMobileHint: vi.fn(),
     duplicateSelected: vi.fn(),
+    editSelectionText: vi.fn(),
     fitCanvasToWidth: vi.fn(),
     openBrushManager: vi.fn(),
     openInspectorRoute: vi.fn(),
@@ -168,6 +169,7 @@ function createHandlers(): StudioMobileEditingDockHandlers {
     reorder: vi.fn(),
     restoreBrushDefaults: vi.fn(),
     toggleAdvancedFill: vi.fn(),
+    toggleSelectionLock: vi.fn(),
     toggleStudioCommentPinPlacement: vi.fn(),
     undo: vi.fn(),
   };
@@ -249,6 +251,8 @@ function createProps(
     quickActionsOpen: false,
     savedBrushes: [],
     selected: null,
+    selectionLocked: false,
+    selectionTextEditLabel: null,
     setBrushDynamics: vi.fn(),
     setBrushOpacity: vi.fn(),
     setColor: vi.fn(),
@@ -1253,6 +1257,87 @@ describe("StudioMobileEditingDock", () => {
     expect(stableHandlers.removeSelected).toHaveBeenCalledOnce();
     expect(setSelectedId).toHaveBeenCalledWith(null);
     expect(setMarqueeIds).toHaveBeenCalledWith([]);
+  });
+
+  /**
+   * 모바일에는 상단 선택 레인이 없다. 레인에만 있던 잠금이 여기서도 빠지면 모바일에서는
+   * 요소를 고정할 방법이 사라진다 — 그래서 이 바가 유일한 빠른 경로다.
+   */
+  it("carries the lock command the removed top lane used to own", () => {
+    const stableHandlers = createHandlers();
+    const { rerender } = render(
+      <StudioMobileEditingDock
+        {...createProps({
+          isMobile: true,
+          selected: { id: "image-1", type: "image" } as StudioMobileEditingDockProps["selected"],
+          selectionLocked: false,
+          stableHandlers,
+        })}
+      />,
+    );
+
+    const toolbar = screen.getByRole("toolbar", { name: "선택 항목 빠른 작업" });
+    // 44px 터치 타깃은 공용 `StudioContextActionButton`(min-h-11 min-w-14)이 보장한다 —
+    // 이 파일에서는 그 버튼이 목이라 기하 대신 배선만 확인하고, 실측은 브라우저에서 한다.
+    const lock = within(toolbar).getByRole("button", { name: "잠금" });
+    lock.click();
+    expect(stableHandlers.toggleSelectionLock).toHaveBeenCalledOnce();
+
+    // 잠긴 뒤에는 라벨이 실제로 일어날 일을 가리켜야 한다.
+    rerender(
+      <StudioMobileEditingDock
+        {...createProps({
+          isMobile: true,
+          selected: { id: "image-1", type: "image" } as StudioMobileEditingDockProps["selected"],
+          selectionLocked: true,
+          stableHandlers,
+        })}
+      />,
+    );
+    const relocked = screen.getByRole("toolbar", { name: "선택 항목 빠른 작업" });
+    expect(within(relocked).getByRole("button", { name: "잠금 해제" })).toBeTruthy();
+    expect(within(relocked).queryByRole("button", { name: "잠금" })).toBeNull();
+  });
+
+  /**
+   * 대사 편집은 말풍선·글자에서만 뜻이 있다. 더블탭으로도 편집에 들어가지만 보이지 않는
+   * 제스처라, 데스크톱 선택 옵션 바와 같은 라벨로 발견 가능한 자리를 하나 둔다.
+   */
+  it("exposes lettering edit only for elements that can be edited", () => {
+    const stableHandlers = createHandlers();
+    const { rerender } = render(
+      <StudioMobileEditingDock
+        {...createProps({
+          isMobile: true,
+          selected: { id: "bubble-1", type: "bubble" } as StudioMobileEditingDockProps["selected"],
+          selectionTextEditLabel: "대사 편집",
+          stableHandlers,
+        })}
+      />,
+    );
+
+    const toolbar = screen.getByRole("toolbar", { name: "선택 항목 빠른 작업" });
+    const edit = within(toolbar).getByRole("button", { name: "대사 편집" });
+    expect(edit.title).toContain("더블탭");
+    edit.click();
+    expect(stableHandlers.editSelectionText).toHaveBeenCalledOnce();
+
+    // 잠금·검수 잠금이면 컨트롤러가 라벨을 null 로 내리고, 그러면 항목 자체가 사라진다.
+    rerender(
+      <StudioMobileEditingDock
+        {...createProps({
+          isMobile: true,
+          selected: { id: "bubble-1", type: "bubble" } as StudioMobileEditingDockProps["selected"],
+          selectionTextEditLabel: null,
+          stableHandlers,
+        })}
+      />,
+    );
+    expect(
+      within(screen.getByRole("toolbar", { name: "선택 항목 빠른 작업" })).queryByRole("button", {
+        name: "대사 편집",
+      }),
+    ).toBeNull();
   });
 
   it("offers all five page-composite filters for a selected draw element", () => {

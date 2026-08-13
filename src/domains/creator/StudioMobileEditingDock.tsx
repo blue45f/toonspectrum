@@ -9,7 +9,10 @@ import {
   Grid3X3,
   Hand,
   Layers,
+  Lock,
+  LockOpen,
   MessageCircle,
+  MessageSquareText,
   Minus,
   MousePointer2,
   PaintBucket,
@@ -345,6 +348,8 @@ export interface StudioMobileEditingDockHandlers {
   dismissBrushManager: () => void;
   dismissMobileHint: () => void;
   duplicateSelected: () => void;
+  /** 선택한 말풍선·글자를 캔버스 위 편집기로 연다(데스크톱 선택 옵션 바와 같은 구현). */
+  editSelectionText: () => void;
   fitCanvasToWidth: () => void;
   openBrushManager: (launcher: HTMLButtonElement) => void;
   openInspectorRoute: (
@@ -358,6 +363,8 @@ export interface StudioMobileEditingDockHandlers {
   reorder: (dir: "front" | "back" | "forward" | "backward") => void;
   restoreBrushDefaults: () => void;
   toggleAdvancedFill: () => void;
+  /** 선택(그룹 상속 포함)의 잠금을 토글한다 — 데스크톱 선택 명령 레인과 같은 구현. */
+  toggleSelectionLock: () => void;
   toggleStudioCommentPinPlacement: () => void;
   undo: () => void;
 }
@@ -427,6 +434,16 @@ export interface StudioMobileEditingDockProps {
   quickActionsOpen: boolean;
   savedBrushes: StudioSavedBrush[];
   selected: El | null;
+  /**
+   * 현재 선택이 (그룹 상속을 포함해) 잠겨 있는지. 빠른 작업 바의 잠금 버튼 라벨이
+   * 실제로 일어날 동작을 가리키게 하려면 토글 구현과 같은 판정을 써야 한다.
+   */
+  selectionLocked: boolean;
+  /**
+   * 말풍선이면 "대사 편집", 글자·스티커면 "글자 편집", 편집할 수 없으면 null.
+   * 데스크톱 선택 옵션 바와 같은 계산 결과를 그대로 받는다.
+   */
+  selectionTextEditLabel: "대사 편집" | "글자 편집" | null;
   setBrushDynamics: import("react").Dispatch<import("react").SetStateAction<NormalizedStudioBrushDynamicsSettings>>;
   setBrushOpacity: import("react").Dispatch<import("react").SetStateAction<number>>;
   setColor: import("react").Dispatch<import("react").SetStateAction<string>>;
@@ -520,6 +537,8 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
   quickActionsOpen,
   savedBrushes,
   selected,
+  selectionLocked,
+  selectionTextEditLabel,
   setBrushDynamics,
   setBrushOpacity,
   setColor,
@@ -580,6 +599,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
     dismissBrushManager,
     dismissMobileHint,
     duplicateSelected,
+    editSelectionText,
     fitCanvasToWidth,
     openBrushManager,
     openInspectorRoute,
@@ -590,6 +610,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
     reorder,
     restoreBrushDefaults,
     toggleAdvancedFill,
+    toggleSelectionLock,
     toggleStudioCommentPinPlacement,
     undo,
   } = stableHandlers;
@@ -757,7 +778,11 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
   return (
     <>
         {/* Photoshop Mobile식 선택 문맥 작업바. 속성 패널까지 왕복하지 않고 가장 빈번한 후속 행동을
-            엄지 영역에 노출한다. 선택이 없거나 시트/첫 안내가 열리면 캔버스를 가리지 않도록 숨긴다. */}
+            엄지 영역에 노출한다. 선택이 없거나 시트/첫 안내가 열리면 캔버스를 가리지 않도록 숨긴다.
+
+            모바일에는 상단 선택 레인(선택 옵션 44px + 선택 명령 51px)이 아예 없다 — 그 95px 은
+            전부 그리기 면적으로 돌아갔다. 대신 레인에만 있던 두 명령(잠금 · 대사/글자 편집)을
+            이 바가 넘겨받는다. 라벨과 아이콘은 데스크톱 레인과 같은 용어를 쓴다. */}
         {isMobile && !mobileSheet && !quickActionsOpen && !showMobileHint && (selected || marqueeIds.length > 0) ? (
           <div
             role="toolbar"
@@ -785,6 +810,18 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 openInspectorRoute({ primary: "properties" }, "props");
               }}
             />
+            {/* 말풍선·글자를 고른 순간에만 뜬다. 더블탭으로도 편집에 들어가지만 그건 보이지
+                않는 제스처라, 데스크톱 선택 옵션 바와 같은 자리·같은 라벨로 노출해 둔다.
+                잠기거나 검수 잠금이면 라벨이 null 로 와서 항목 자체가 사라진다. */}
+            {selectionTextEditLabel && marqueeIds.length === 0 ? (
+              <StudioContextActionButton
+                icon={MessageSquareText}
+                label={selectionTextEditLabel}
+                className="whitespace-nowrap"
+                title={`${selectionTextEditLabel} · 요소를 더블탭해도 열려요`}
+                onClick={editSelectionText}
+              />
+            ) : null}
             {selectedSupportsContextFilter ? (
               <StudioMobileFilterSelect
                 filterMutationLocked={filterMutationLocked}
@@ -815,6 +852,18 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 <StudioContextActionButton icon={ArrowDownToLine} label="뒤로" onClick={() => reorder("back")} />
               </>
             ) : null}
+            {/* 잠금은 상단 레인에만 있던 명령이라 모바일에서 사라지면 안 된다. 그룹 상속 잠금과
+                다중 선택까지 데스크톱과 같은 구현으로 처리한다. */}
+            <StudioContextActionButton
+              icon={selectionLocked ? LockOpen : Lock}
+              label={selectionLocked ? "잠금 해제" : "잠금"}
+              className="whitespace-nowrap"
+              active={selectionLocked}
+              title={selectionLocked
+                ? "잠금을 풀어 다시 이동·변형·편집할 수 있게 합니다."
+                : "선택 요소를 고정해 실수로 이동하거나 편집하지 않도록 보호합니다."}
+              onClick={toggleSelectionLock}
+            />
             <StudioContextActionButton icon={Trash2} label="삭제" danger onClick={removeSelected} />
             <StudioContextActionButton
               icon={X}

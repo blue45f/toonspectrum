@@ -43436,6 +43436,22 @@ function clearSelectionForEdit() {
     toggleFavorite: toggleBuiltInBrushFavorite,
   });
 
+  /**
+   * 선택한 레터링을 캔버스 위 편집기로 여는 단일 구현. 데스크톱 선택 옵션 바와 모바일
+   * 플로팅 빠른 작업 바가 같은 함수를 부른다 — 잠금·검수 잠금 판정이 갈리면 같은 라벨의
+   * 버튼이 기기마다 다르게 동작한다(V5 §15 "명령 일관성 — 중복 구현 금지").
+   */
+  function editSelectedElementText() {
+    if (
+      selected &&
+      (selected.type === "text" || selected.type === "bubble" || selected.type === "sticker") &&
+      !activeSurfaceReviewLocked &&
+      !isEffectivelyLocked(selected, groups)
+    ) {
+      void startEditText(selected.id);
+    }
+  }
+
   const studioMobileEditingDockHandlers = useStudioStableHandlers<StudioMobileEditingDockHandlers>({
       activateCanvasTool: activatePrimaryCanvasTool,
       applyBuiltInBrushPreset,
@@ -43445,6 +43461,7 @@ function clearSelectionForEdit() {
     dismissBrushManager: dismissBrushManagerToDraw,
     dismissMobileHint,
     duplicateSelected,
+    editSelectionText: editSelectedElementText,
     fitCanvasToWidth,
     openBrushManager,
     openInspectorRoute,
@@ -43457,6 +43474,9 @@ function clearSelectionForEdit() {
       void brushBaselineController.restoreDefaults();
     },
     toggleAdvancedFill,
+    // 모바일 상단 레인이 빠진 자리를 메우는 잠금. 데스크톱 선택 명령 레인과 같은 구현이라
+    // 그룹 상속 잠금·다중 선택도 똑같이 처리된다.
+    toggleSelectionLock: toggleSelectedElementsLocked,
     toggleStudioCommentPinPlacement,
       undo,
     });
@@ -43699,16 +43719,7 @@ function clearSelectionForEdit() {
     },
     deleteSelection: removeSelected,
     duplicateSelection: duplicateSelected,
-    editSelectionText: () => {
-      if (
-        selected &&
-        (selected.type === "text" || selected.type === "bubble" || selected.type === "sticker") &&
-        !activeSurfaceReviewLocked &&
-        !isEffectivelyLocked(selected, groups)
-      ) {
-        void startEditText(selected.id);
-      }
-    },
+    editSelectionText: editSelectedElementText,
     fitSelectionBubble: () => {
       void fitBubbleToText();
     },
@@ -43958,12 +43969,22 @@ function clearSelectionForEdit() {
    * 만들었으므로, 레인 예약은 그 조건들과도 분리한다. 오버레이로 띄우지 않는 이유는 선택
    * 명령 레인과 동일하다 — absolute 로 겹치면 흰 원고 위를 덮는다.
    */
-  const selectOptionsLaneReserved = !canvasOnlyMode;
+  /**
+   * ...단, 그 예약이 값을 하는 곳은 **데스크톱뿐이다.** 360px 모바일에서 이 44px 은 그대로
+   * 그리기 면적 손실인데, 정작 레인이 주는 복제·앞뒤·삭제·잠금·대사 편집은 요소를 고르는
+   * 순간 뜨는 플로팅 "선택 항목 빠른 작업" 바가 이미 엄지 영역에 제공한다. 그래서 모바일은
+   * 레인을 **예약도 렌더도 하지 않는다**(선택 명령 레인도 같은 이유로 함께 빠진다).
+   *
+   * 조건이 선택 상태가 아니라 뷰포트라는 점이 이 분기의 안전장치다 — 모바일에서는 선택 유무와
+   * 무관하게 항상 없으므로 "선택 시 레이아웃 이동 0px" 불변식이 그대로 성립한다.
+   */
+  const selectionLaneMounted = !isMobile;
+  const selectOptionsLaneReserved = !canvasOnlyMode && selectionLaneMounted;
 
   const studioOptionsBarsSelectionModel = useMemo<StudioOptionsBarsSelectionModel>(() => {
     const count = marqueeIds.length > 0 ? marqueeIds.length : selectedId ? 1 : 0;
     return {
-      visible: selectOptionsStripArmed && count > 0,
+      visible: selectOptionsStripArmed && count > 0 && selectionLaneMounted,
       count,
       label: selected ? elementLabel(selected) : null,
       locked: Boolean(selected?.locked),
@@ -43985,10 +44006,27 @@ function clearSelectionForEdit() {
     activeSurfaceReviewLocked,
     groups,
     marqueeIds.length,
+    selectionLaneMounted,
     selectOptionsStripArmed,
     selected,
     selectedId,
   ]);
+
+  /**
+   * 모바일 플로팅 빠른 작업 바의 잠금 버튼이 쓸 상태. 판정식은 `toggleSelectedElementsLocked`
+   * 가 다음 잠금 값을 정할 때 쓰는 것과 **같아야** 한다 — 그래야 라벨("잠금"/"잠금 해제")이
+   * 실제로 일어날 일을 가리킨다. 그룹에서 상속된 잠금도 잠긴 것으로 본다.
+   */
+  const mobileSelectionLocked = useMemo(() => {
+    const ids = marqueeIds.length > 0 ? marqueeIds : selectedId ? [selectedId] : [];
+    if (ids.length === 0) return false;
+    const idSet = new Set(ids);
+    const picked = elements.filter((element) => idSet.has(element.id));
+    return (
+      picked.length > 0 &&
+      picked.every((element) => isEffectivelyLocked(element, groups))
+    );
+  }, [elements, groups, marqueeIds, selectedId]);
 
   // 렌더 시점 ref 스냅샷 — RC 컴파일 자식(캔버스)은 렌더 중 ref 접근이 금지라, 비컴파일
   // 에디터에서 읽어 값으로 전달한다(어차피 렌더 시점 값만 화면에 반영되므로 의미 동일).
@@ -46310,6 +46348,8 @@ function clearSelectionForEdit() {
           quickActionsOpen={quickActionsOpen}
           savedBrushes={savedBrushes}
           selected={selected}
+          selectionLocked={mobileSelectionLocked}
+          selectionTextEditLabel={studioOptionsBarsSelectionModel.textEditLabel}
           setBrushDynamics={setBrushDynamics}
           setBrushOpacity={setBrushOpacity}
           setColor={setColor}
