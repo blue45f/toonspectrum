@@ -43950,6 +43950,15 @@ function clearSelectionForEdit() {
    * 상시 유지해 선택 상태가 캔버스 기하를 건드리지 못하게 한다.
    */
   const selectOptionsStripArmed = tool === "select" && !canvasOnlyMode && !selectionOptionsSuppressed;
+  /**
+   * ...그리고 그 줄은 "도구와 무관하게" 항상 같은 높이를 차지한다. 도구를 select 로 바꾸는
+   * 순간에만 스트립이 flow 에 들어오면, 선택이 아니라 도구 전환이 캔버스 기하를 바꾼다
+   * (브라우저 실측: 펜 y=121/h=599 ↔ 선택 y=165/h=555 — 전환 1회마다 원점 44px 이동).
+   * 픽셀 도구·크롭·리퀴파이처럼 selectionOptionsSuppressed 를 켜는 무장도 같은 점프를
+   * 만들었으므로, 레인 예약은 그 조건들과도 분리한다. 오버레이로 띄우지 않는 이유는 선택
+   * 명령 레인과 동일하다 — absolute 로 겹치면 흰 원고 위를 덮는다.
+   */
+  const selectOptionsLaneReserved = !canvasOnlyMode;
 
   const studioOptionsBarsSelectionModel = useMemo<StudioOptionsBarsSelectionModel>(() => {
     const count = marqueeIds.length > 0 ? marqueeIds.length : selectedId ? 1 : 0;
@@ -44951,15 +44960,18 @@ function clearSelectionForEdit() {
         같은 높이의 안내 줄을 세워 둔다(오버레이가 아니라 예약이라 캔버스를 가리지도
         않는다).
       */}
-      {selectOptionsStripArmed && !studioOptionsBarsSelectionModel.visible ? (
+      {selectOptionsLaneReserved && !studioOptionsBarsSelectionModel.visible ? (
         <div
           data-studio-select-options-reserve="true"
+          data-studio-select-options-armed={selectOptionsStripArmed ? "true" : "false"}
           data-studio-icon-first="true"
           className="relative z-[40] flex h-11 min-h-11 shrink-0 items-center gap-1.5 overflow-hidden border-b border-line bg-panel/70 px-2.5 text-[0.7rem] text-fg-3"
         >
           <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-line" />
           <span className="truncate">
-            요소를 클릭하면 선택 옵션이 여기에 표시됩니다 · 드래그로 여러 개 선택
+            {selectOptionsStripArmed
+              ? "요소를 클릭하면 선택 옵션이 여기에 표시됩니다 · 드래그로 여러 개 선택"
+              : "선택 도구(V)로 요소를 고르면 복제·정렬·잠금 옵션이 여기에 표시됩니다"}
           </span>
         </div>
       ) : null}

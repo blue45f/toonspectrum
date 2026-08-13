@@ -221,6 +221,10 @@ describe("StudioSelectionContextBar", () => {
  * 선택 시 캔버스 원점이 95px 밀렸고, 그중 44px 은 "선택이 생길 때만" flow 에 끼어드는
  * 선택 옵션 스트립이었다. 스트립 높이를 선택 도구 세션 내내 예약해 두는 배선이
  * 사라지면 그 44px 점프가 그대로 돌아온다.
+ *
+ * 2차 실측에서는 잔여분이 남아 있었다 — 예약이 `tool === "select"` 에 묶여 있어 도구를
+ * 바꾸는 순간 같은 44px 이 움직였다(펜 y=121/h=599 ↔ 선택 y=165/h=555). 예약 조건을
+ * 도구·픽셀도구 무장과 분리해 캔버스 기하가 도구 전환에 반응하지 않게 한다.
  */
 describe("StudioSelectionContextBar layout site (StudioPage)", () => {
   const pageSource = readFileSync(
@@ -239,13 +243,20 @@ describe("StudioSelectionContextBar layout site (StudioPage)", () => {
   it("reserves the strip height while nothing is selected", () => {
     expect(pageSource).toContain('data-studio-select-options-reserve="true"');
     expect(pageSource).toContain(
-      "{selectOptionsStripArmed && !studioOptionsBarsSelectionModel.visible ? ("
+      "{selectOptionsLaneReserved && !studioOptionsBarsSelectionModel.visible ? ("
     );
     // 실제 스트립과 같은 높이(h-11 = 44px)여야 예약이 성립한다.
     const reserveBlock = pageSource.slice(
       pageSource.indexOf('data-studio-select-options-reserve="true"')
     );
-    expect(reserveBlock.slice(0, 600)).toContain("h-11 min-h-11 shrink-0");
+    expect(reserveBlock.slice(0, 800)).toContain("h-11 min-h-11 shrink-0");
+  });
+
+  it("keeps the reserved lane independent of the active tool", () => {
+    // 도구 전환이 캔버스 기하를 바꾸면 안 된다 — 예약은 canvasOnlyMode 하나로만 닫힌다.
+    expect(pageSource).toContain("const selectOptionsLaneReserved = !canvasOnlyMode;");
+    // 실제 바가 뜰 조건은 여전히 도구·무장·선택 수에 묶여 있어야 한다.
+    expect(pageSource).toContain("visible: selectOptionsStripArmed && count > 0,");
   });
 
   it("mounts the on-canvas context bar as an overlay sibling, not a canvas child", () => {

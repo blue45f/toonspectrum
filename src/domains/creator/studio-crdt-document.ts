@@ -2172,6 +2172,12 @@ export class StudioCrdtDocument {
       previousLayerId !== input.layerId ||
       options.beforeStrokeId !== undefined;
     if (requiresReorder) this.assertOrderEditBound(input.id);
+    // An explicit target wins; an implicit same-page layer change keeps the existing z-order slot.
+    const reorderBeforeId = options.beforeStrokeId !== undefined
+      ? options.beforeStrokeId
+      : requiresReorder && previousPageId === input.pageId
+        ? this.liveMixedOrderSuccessorId(input.id, "strokeId", input.pageId)
+        : null;
     this.doc.transact(() => {
       if (deleted && options.resurrect) {
         this.acknowledgeCurrentDeletionOperations(existing, deletionTarget);
@@ -2202,7 +2208,7 @@ export class StudioCrdtDocument {
       }
       if (requiresReorder) {
         this.deactivateOrderEntries(input.id);
-        this.insertOrderEntry(input, options.beforeStrokeId ?? null);
+        this.insertOrderEntry(input, reorderBeforeId);
       }
     }, STUDIO_CRDT_ORIGIN_LOCAL);
     this.appendNormalizedSamples(existing, normalized);
@@ -2261,6 +2267,10 @@ export class StudioCrdtDocument {
 
     const requiresReorder = pageId !== current.pageId || layerId !== current.layerId;
     if (requiresReorder) this.assertOrderEditBound(id);
+    // A same-page layer change must not repaint the canvas, so keep the exact z-order slot.
+    const reorderBeforeId = requiresReorder && pageId === current.pageId
+      ? this.liveMixedOrderSuccessorId(id, "strokeId", pageId)
+      : null;
     const sampleChanged = changedKeys.some((key) =>
       (SAMPLE_ARRAY_KEYS as readonly string[]).includes(key)
     );
@@ -2275,7 +2285,7 @@ export class StudioCrdtDocument {
         record.set("pageId", pageId);
         record.set("layerId", layerId);
         this.deactivateOrderEntries(id);
-        this.insertOrderEntry({ id, pageId, layerId }, null);
+        this.insertOrderEntry({ id, pageId, layerId }, reorderBeforeId);
       }
       for (const key of metadataKeys) setPayloadMetadataField(record, payload, key);
       if (sampleChanged) {
@@ -2455,6 +2465,12 @@ export class StudioCrdtDocument {
     const requiresOrderEntry = !exists || previousPageId !== input.pageId ||
       previousLayerId !== input.layerId || options.beforeElementId !== undefined;
     if (exists && requiresOrderEntry) this.assertMixedOrderEditBound(input.id, "elementId");
+    // An explicit target wins; an implicit same-page layer change keeps the existing z-order slot.
+    const reorderBeforeId = options.beforeElementId !== undefined
+      ? options.beforeElementId
+      : exists && requiresOrderEntry && previousPageId === input.pageId
+        ? this.liveMixedOrderSuccessorId(input.id, "elementId", input.pageId)
+        : null;
 
     this.doc.transact(() => {
       if (deleted && options.resurrect) {
@@ -2482,7 +2498,7 @@ export class StudioCrdtDocument {
       }
       if (requiresOrderEntry) {
         this.deactivateMixedOrderEntries(input.id, "elementId");
-        this.insertSceneOrderEntry(input, options.beforeElementId ?? null);
+        this.insertSceneOrderEntry(input, reorderBeforeId);
       }
     }, STUDIO_CRDT_ORIGIN_LOCAL);
     return this.requiredSceneElement(input.id);
@@ -2514,6 +2530,10 @@ export class StudioCrdtDocument {
     if (!nextPageId || !nextLayerId) throw new Error("장면 요소 위치 정보가 손상되었습니다.");
     const reparented = nextPageId !== record.get("pageId") || nextLayerId !== record.get("layerId");
     if (reparented) this.assertMixedOrderEditBound(id, "elementId");
+    // A same-page layer change must not repaint the canvas, so keep the exact z-order slot.
+    const reorderBeforeId = reparented && nextPageId === record.get("pageId")
+      ? this.liveMixedOrderSuccessorId(id, "elementId", nextPageId)
+      : null;
 
     this.doc.transact(() => {
       record.set("pageId", nextPageId);
@@ -2522,7 +2542,10 @@ export class StudioCrdtDocument {
       for (const key of unset) record.set(`${UNSET_PROPERTY_PREFIX}${key}`, true);
       if (reparented) {
         this.deactivateMixedOrderEntries(id, "elementId");
-        this.insertSceneOrderEntry({ id, pageId: nextPageId, layerId: nextLayerId }, null);
+        this.insertSceneOrderEntry(
+          { id, pageId: nextPageId, layerId: nextLayerId },
+          reorderBeforeId
+        );
       }
     }, STUDIO_CRDT_ORIGIN_LOCAL);
     return this.requiredSceneElement(id);
@@ -4287,6 +4310,41 @@ export class StudioCrdtDocument {
         }
       }
     }
+  }
+
+  /**
+   * Returns the element the given one currently sits *below* in the shared page z-order.
+   *
+   * A layer reparent (grouping, ungrouping, "group with the layer below") only changes membership
+   * metadata; the drawing must look identical afterwards. Re-inserting the order entry before this
+   * successor keeps the element in its exact slot, whereas a `null` tail push would silently lift
+   * every reparented element above its unreparented siblings. `null` means "already last", where a
+   * tail push is itself position preserving.
+   */
+  private liveMixedOrderSuccessorId(
+    id: string,
+    idKey: "strokeId" | "elementId",
+    pageId: string
+  ): string | null {
+    let anchorIndex = -1;
+    this.order.forEach((entry, index) => {
+      if (
+        entry instanceof Y.Map && entry.get("active") === true &&
+        orderEntryValue(entry, idKey) === id
+      ) {
+        anchorIndex = index;
+      }
+    });
+    if (anchorIndex < 0) return null;
+    for (let index = anchorIndex + 1; index < this.order.length; index += 1) {
+      const entry = this.order.get(index);
+      if (!(entry instanceof Y.Map) || entry.get("active") !== true) continue;
+      const candidateId = mixedOrderEntryId(entry);
+      if (!candidateId || candidateId === id) continue;
+      if (!this.isLiveMixedOrderEntry(entry, pageId)) continue;
+      return candidateId;
+    }
+    return null;
   }
 
   private lastActiveMixedOrderIndex(id: string, idKey: "strokeId" | "elementId"): number {

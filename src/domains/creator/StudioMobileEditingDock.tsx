@@ -178,7 +178,7 @@ function StudioMobileScrollCues({
       <span
         aria-hidden
         data-studio-mobile-scroll-cue={`${placement}-before`}
-        className="pointer-events-none absolute inset-y-0 left-0 z-[2] grid w-5 place-items-center bg-gradient-to-r from-panel via-panel/80 to-transparent text-[0.65rem] font-black text-fg-2/70 opacity-0 transition-opacity"
+        className="pointer-events-none absolute inset-y-0 left-0 z-[2] grid w-5 place-items-center bg-gradient-to-r from-panel via-panel/80 to-transparent text-[0.8rem] font-black leading-none text-fg-2 opacity-0 transition-opacity"
         style={{ opacity: "var(--studio-mobile-scroll-before, 0)" }}
       >
         ‹
@@ -186,7 +186,7 @@ function StudioMobileScrollCues({
       <span
         aria-hidden
         data-studio-mobile-scroll-cue={`${placement}-after`}
-        className="pointer-events-none absolute inset-y-0 right-0 z-[2] grid w-5 place-items-center bg-gradient-to-l from-panel via-panel/80 to-transparent text-[0.65rem] font-black text-fg-2/70 opacity-0 transition-opacity"
+        className="pointer-events-none absolute inset-y-0 right-0 z-[2] grid w-5 place-items-center bg-gradient-to-l from-panel via-panel/80 to-transparent text-[0.8rem] font-black leading-none text-fg-2 opacity-0 transition-opacity"
         style={{ opacity: "var(--studio-mobile-scroll-after, 0)" }}
       >
         ›
@@ -1510,7 +1510,13 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
             >
               <div
                 ref={primaryDockScrollRef}
-                className="flex min-w-0 touch-pan-x items-stretch gap-0.5 overflow-x-auto overscroll-x-contain pr-1 [scrollbar-width:none] min-[360px]:gap-1 [&::-webkit-scrollbar]:hidden"
+                // 간격이 도크의 "다음 버튼이 반쯤 보이는" 어포던스를 결정한다. 44px 타깃 10개는
+                // 어느 폰에서도 한 줄에 들어가지 않으므로, 잘리는 지점이 버튼 한복판에 오도록
+                // 간격을 맞춘다. 4px 간격을 360px 부터 켜면 트랙(348px)이 8번째 버튼 시작점
+                // 바로 뒤(344px)에서 끝나 4px 만 노출되고, 그 4px 은 20px 페이드에 완전히
+                // 덮여 "더 없음"으로 읽힌다(실측). 4px 간격은 390px 이상에서만 켠다 —
+                // 320/360 은 2px 간격에서 각각 26px·20px 이 노출돼 반 버튼 피크가 된다.
+                className="flex min-w-0 touch-pan-x items-stretch gap-0.5 overflow-x-auto overscroll-x-contain pr-1 [scrollbar-width:none] min-[390px]:gap-1 [&::-webkit-scrollbar]:hidden"
                 role="toolbar"
                 aria-label={label.drawingTools}
                 aria-describedby={`${scrollDescriptionId}-primary`}
