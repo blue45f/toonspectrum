@@ -630,6 +630,24 @@ async function dismissQuickStartOverlay(page: Page, appearTimeoutMs: number): Pr
   }
 }
 
+/**
+ * Onboarding chrome can mount at any point once the preference store reconciles, so a single
+ * dismissal before the gesture is not enough: it may arrive between the dismissal and the tap.
+ * Retrying the tap with a dismissal in between keeps the audit measuring the editor rather than
+ * racing its overlays, and still fails loudly if the control never becomes reachable.
+ */
+async function clickPastTransientOverlays(page: Page, target: Locator): Promise<void> {
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const clicked = await target
+      .click({ timeout: attempt === 3 ? 7_000 : 2_500 })
+      .then(() => true)
+      .catch(() => false);
+    if (clicked) return;
+    await dismissQuickStartOverlay(page, 500);
+  }
+  await target.click({ timeout: 7_000 });
+}
+
 async function dismissTransientChrome(page: Page, clearAutosave = true): Promise<void> {
   const quickstart = page.locator('[data-studio-creative-starter="true"]');
   if (await quickstart.isVisible({ timeout: 250 }).catch(() => false)) {
@@ -3126,10 +3144,16 @@ async function runMobileTouchAudit(browser: Browser, studioUrl: string): Promise
     const dock = page.locator('nav[data-studio-mobile-editing-dock="true"]');
     await dock.waitFor({ state: "visible", timeout: 10_000 });
     await dismissQuickStartOverlay(page, 4_000);
-    await dock.locator('button[aria-controls="studio-mobile-draw-settings"]').click();
+    await clickPastTransientOverlays(
+      page,
+      dock.locator('button[aria-controls="studio-mobile-draw-settings"]'),
+    );
     const drawSheet = page.locator('[data-studio-sheet-id="draw"][data-studio-mobile-sheet="draw"]');
     await drawSheet.waitFor({ state: "visible" });
-    await drawSheet.locator('[data-studio-open-brush-library="true"]').click();
+    await clickPastTransientOverlays(
+      page,
+      drawSheet.locator('[data-studio-open-brush-library="true"]'),
+    );
     const catalog = page.locator('[data-studio-brush-catalog-session="true"]');
     await catalog.waitFor({ state: "visible" });
     invariant(await catalog.count() === 1, "mobile opened more than one built-in catalogue session");
