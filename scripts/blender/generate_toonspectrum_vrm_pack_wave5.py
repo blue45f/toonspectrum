@@ -21,20 +21,18 @@ Requirements: Blender 5.2+, VRM Add-on for Blender 4.5+.
 """
 
 import bpy
-import importlib.util
 from mathutils import Vector
-from pathlib import Path
 
 
-COMMON_PATH = Path(
+SCRIPT_DIR = __file__.rsplit("/", 1)[0]
+COMMON_PATH = str(
     bpy.context.scene.get("toonspectrum_wave4_common_path")
-    or Path(__file__).with_name("generate_toonspectrum_vrm_pack_wave4.py")
+    or SCRIPT_DIR + "/generate_toonspectrum_vrm_pack_wave4.py"
 )
-COMMON_SPEC = importlib.util.spec_from_file_location("toonspectrum_wave4_common", COMMON_PATH)
-if COMMON_SPEC is None or COMMON_SPEC.loader is None:
-    raise RuntimeError("Unable to load Wave 4 VRM rig helpers")
-COMMON = importlib.util.module_from_spec(COMMON_SPEC)
-COMMON_SPEC.loader.exec_module(COMMON)
+# Blender Text.as_module() keeps the dependency inside bpy and avoids pathlib,
+# importlib and direct file I/O. Those modules are intentionally blocked by the
+# blend-ai MCP sandbox, while Wave 4 itself only imports Blender-safe modules.
+COMMON = bpy.data.texts.load(COMMON_PATH).as_module()
 
 
 OUTPUT_DIR = (

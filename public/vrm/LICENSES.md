@@ -72,9 +72,16 @@ ToonSpectrum은 이 22개 원본 모델을 **CC0 1.0**으로 제공합니다.
 - Wave 5의 선자·마야·이슬·너울도 같은 엄격 리그 계약과 MToon 1.0 재질, 13개 이상의 실제
   morph expression 바인딩을 따릅니다. 선자의 잠수 장비와 이슬의 구조 장비는 고정 도구·탈것 없이
   캐릭터 의상 실루엣만 표현하며, 이슬의 의족은 오른쪽 다리·발·발가락 본에 연결된 신체 일부입니다.
-- Wave 5 카드 썸네일은 각 VRM을 공식 Blender VRM importer로 다시 연 뒤 정면 조명에서 렌더한
-  320×400 PNG입니다. 생성·정면/3/4/동작 포즈 QA는
-  `scripts/blender/render_toonspectrum_vrm_wave5_qa.py`로 재현할 수 있습니다.
+- Wave 6에서는 위 4종의 ID·URL·이름·CC0 조건을 그대로 유지하면서
+  `scripts/blender/generate_toonspectrum_vrm_pack_wave6.py`로 시각 품질 v2를 재생성했습니다. 고밀도
+  얼굴과 귀·눈꺼풀·홍채·코·입술, 손톱·관절·신발 구조, 겹의상·헤어, 이슬의 의족 하드웨어,
+  너울의 분기 산호와 폴립을 실제 이름 있는 스킨 메시로 추가했습니다. 각 파일은 104~130개 메시,
+  37,068~42,264개 삼각형, 15~18개 MToon 재질과 동일 수의 내부 PNG 텍스처를 가지며
+  1.67~1.84MB 범위입니다. 외부 이미지·텍스처 URI는 없습니다.
+- Wave 6 카드 썸네일은 각 전달 VRM을 공식 Blender VRM importer로 다시 연 뒤 팔을 내린 정면
+  포즈에서 렌더한 320×400 PNG입니다. 정면·3/4·표정·팔·무릎·의족 변형 QA는
+  `scripts/blender/render_toonspectrum_vrm_wave6_qa.py`로 재현할 수 있습니다. 초기 Wave 5 렌더러는
+  `scripts/blender/render_toonspectrum_vrm_wave5_qa.py`에 v1 바이너리 비교·회귀 감사용으로 보존합니다.
 - 외부 URI: 없음. 메시·재질·권리 메타데이터는 각 `.vrm` 안에 포함됩니다.
 - 하람 모델은 아동 캐릭터 안전정책에 따라 VRM 메타데이터에서도 과도한 폭력 및 과도한 성적 이용을 명시적으로 허용하지 않습니다.
 - CC0 원문: <https://creativecommons.org/publicdomain/zero/1.0/>
