@@ -115,19 +115,88 @@ describe("pending stroke durability", () => {
     expect(second.historyIndex).toBe(2);
   });
 
-  it("긴 편집 세션에서 undo 히스토리는 최대 200개로 제한된다", () => {
-    const baseSnapshot = [{ id: "page", elements: [{ id: "seed" }] }];
-    let result = appendStudioPagesHistorySnapshot([], -1, baseSnapshot);
+  it("가벼운 편집은 옛 200개 상한을 넘어 계속 쌓인다 — 예산 근처에도 못 간다", () => {
+    const seed = { id: "page", elements: [{ id: "seed" }] };
+    let result = appendStudioPagesHistorySnapshot([], -1, [seed]);
 
-    for (let i = 0; i < 205; i += 1) {
-      const pages = [{ id: `page-${i + 1}`, elements: [{ id: `stroke-${i}` }] }];
+    for (let i = 0; i < 605; i += 1) {
+      const previous = result.history[result.historyIndex]![0]!;
+      const pages = [{ ...previous, elements: [...previous.elements, { id: `stroke-${i}` }] }];
       result = appendStudioPagesHistorySnapshot(result.history, result.historyIndex, pages);
     }
 
-    expect(result.history).toHaveLength(200);
-    expect(result.history[0]?.[0]?.elements[0]).toEqual({ id: "stroke-5" });
-    expect(result.history[199]?.[0]?.elements[0]).toEqual({ id: "stroke-204" });
-    expect(result.historyIndex).toBe(199);
+    // 오늘의 상한이었다면 여기서 200 이고 처음 406단계가 조용히 사라졌다.
+    expect(result.history).toHaveLength(606);
+    expect(result.historyIndex).toBe(605);
+    expect(result.history[0]?.[0]?.elements).toEqual([{ id: "seed" }]);
+    expect(result.evictedCount).toBe(0);
+    expect(result.retainedBytes).toBeLessThan(result.budgetBytes);
+  });
+
+  it("개수 방벽은 예산이 헐거워도 배열 길이를 묶고, 그때도 앞에서만 자른다", () => {
+    const maxEntries = 24;
+    let result = appendStudioPagesHistorySnapshot([], -1, [
+      { id: "page", elements: [{ id: "seed" }] },
+    ], { maxEntries });
+
+    for (let i = 0; i < 60; i += 1) {
+      const previous = result.history[result.historyIndex]![0]!;
+      const pages = [{ ...previous, elements: [...previous.elements, { id: `stroke-${i}` }] }];
+      result = appendStudioPagesHistorySnapshot(
+        result.history,
+        result.historyIndex,
+        pages,
+        { maxEntries }
+      );
+    }
+
+    expect(result.history).toHaveLength(maxEntries);
+    expect(result.historyIndex).toBe(maxEntries - 1);
+    expect(result.evictedForBudget).toBe(false);
+    expect(result.history.at(-1)?.[0]?.elements.at(-1)).toEqual({ id: "stroke-59" });
+  });
+
+  it("무거운 커밋 하나가 예산을 넘기면 앞에서 여러 단계를 한 번에 버린다", () => {
+    const retention = { budgetBytes: 8_000, minEntries: 2 };
+    type HeavyPage = { id: string; elements: { id: string; points?: number[] }[] };
+    let result = appendStudioPagesHistorySnapshot<HeavyPage>([], -1, [
+      { id: "page", elements: [{ id: "stroke", points: [0, 0] }] },
+    ], retention);
+
+    for (let i = 0; i < 8; i += 1) {
+      const previous = result.history[result.historyIndex]![0]!;
+      const pages = [{ ...previous, elements: [...previous.elements, { id: `light-${i}` }] }];
+      result = appendStudioPagesHistorySnapshot(
+        result.history,
+        result.historyIndex,
+        pages,
+        retention
+      );
+    }
+    const depthBefore = result.history.length;
+    expect(result.evictedCount).toBe(0);
+
+    // 3,000 샘플 획 하나를 다시 굽는 커밋 — 이 하나가 예산을 여러 엔트리분 넘긴다.
+    const base = result.history[result.historyIndex]![0]!;
+    const heavy = [{
+      ...base,
+      elements: base.elements.map((element, index) =>
+        index === 0 ? { ...element, points: Array.from({ length: 6_000 }, () => 1) } : element
+      ),
+    }];
+    result = appendStudioPagesHistorySnapshot(
+      result.history,
+      result.historyIndex,
+      heavy,
+      retention
+    );
+
+    expect(result.evictedForBudget).toBe(true);
+    expect(result.evictedCount).toBeGreaterThan(1);
+    expect(result.history).toHaveLength(depthBefore + 1 - result.evictedCount);
+    expect(result.historyIndex).toBe(result.history.length - 1);
+    expect(result.history.at(-1)).toBe(heavy);
+    expect(result.appendedEntryBytes).toBeGreaterThan(48_000);
   });
 
   it("undo 뒤 새 커밋은 redo 분기를 잘라내고 현재 snapshot 뒤에만 추가한다", () => {

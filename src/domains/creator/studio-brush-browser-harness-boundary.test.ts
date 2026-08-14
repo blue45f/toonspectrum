@@ -48,8 +48,10 @@ describe("Studio brush browser harness catalogue boundary", () => {
       "const PRODUCT_BRUSH_CATALOG_COUNT = STUDIO_ALL_BRUSH_CATALOG_ITEMS.length;",
     );
     expect(harness).toContain("assertProductBrushCatalogContract()");
+    // 2026-08-14: the UI matrices audit the LISTED (quarantine-aware) catalogue — quarantined ids
+    // stay registered for persisted replay but are never selectable choices in the shipped UI.
     expect(harness).toContain(
-      "assertUiBrushCatalogMatchesProductCatalog(\n      firstCatalog,\n      STUDIO_PAINT_BRUSH_CATALOG_ITEMS,\n      \"paint\",\n    )",
+      "assertUiBrushCatalogMatchesProductCatalog(\n        firstCatalog,\n        STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS,\n        \"paint\",\n      )",
     );
     expect(harness).toContain(
       "assertUiEraserQuickPickerMatchesProductCatalog(eraserCatalog)",
@@ -164,10 +166,10 @@ describe("Studio brush browser harness catalogue boundary", () => {
       'process.env.TOONSPECTRUM_ALL_BRUSH_LONG_MATRIX === "1"',
     );
     expect(harness).toContain(
-      "? STUDIO_ALL_BRUSH_CATALOG_ITEMS",
+      "? STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS",
     );
     expect(harness).toContain(
-      ': STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter((item) => item.source === "core")',
+      ': STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.filter((item) => item.source === "core")',
     );
     expect(harness).toContain(
       'const longOnly = process.env.TOONSPECTRUM_BRUSH_LONG_ONLY === "1";',

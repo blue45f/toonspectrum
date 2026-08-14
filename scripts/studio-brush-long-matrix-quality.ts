@@ -157,6 +157,37 @@ const CORE_DISCRETE_BRUSH_IDS: ReadonlySet<string> = new Set([
   "crosshatch",
 ]);
 
+/**
+ * Hatching pens draw their mark by repeating parallel or crossed strokes, so the periodicity the
+ * continuous metrics treat as a defect is the motif itself (the classic `crosshatch` preset is
+ * already listed above). Enumerated rather than matched on the substring "hatch": this waives the
+ * 6/6 route-coverage invariant, so joining the lane has to be a reviewable diff. A future
+ * `thatch-roller` — or a genuinely broken hatch carrier — must not exempt itself by its name.
+ */
+const AUTHORED_HATCH_MOTIF_BRUSH_IDS: ReadonlySet<string> = new Set([
+  "cross-hatch",
+  "crosshatch",
+  "fill-hatch",
+  "hatch",
+  "hatch-1",
+  "hatch-dense",
+  "hatch-light",
+  "hatch-tone",
+  "hatching",
+  "hatching-contour-rake",
+  "pattern-crosshatch",
+  "speed-hatch",
+  "toon-hatch-tone",
+  "web-cross-hatch-pen",
+  "web-cross-hatch-pen-x",
+  "web-hatch-color",
+  "web-hatch-color-lattice",
+]);
+
+function isAuthoredHatchMotifBrushId(brushId: string): boolean {
+  return AUTHORED_HATCH_MOTIF_BRUSH_IDS.has(brushId);
+}
+
 const CORE_SOFT_WET_BRUSH_IDS: ReadonlySet<string> = new Set([
   "watercolor",
   "ink-wash",
@@ -731,6 +762,12 @@ export function classifyStudioLongBrushQualityPolicy(
   if (
     input.intentionalDiscrete
     || (input.source === "core" && CORE_DISCRETE_BRUSH_IDS.has(input.id))
+    || isAuthoredHatchMotifBrushId(input.id)
+    // A "tone" preview is the catalogue's own word for a halftone/screentone carrier, and the
+    // sibling carrier-quality SSOT already treats that preview style as intentionally discrete.
+    // Engine-lane rows carry no brush-pack descriptor, so they never reached that SSOT and a
+    // screentone was being held to an unbroken-edge standard a dot grid cannot meet by design.
+    || input.previewStyle === "tone"
   ) {
     return {
       kind: "record-only-discrete",

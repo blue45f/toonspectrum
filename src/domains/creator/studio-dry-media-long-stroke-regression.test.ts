@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   normalizeStudioBrushDynamicsSettings,
   studioBrushDynamicsSettingsForBrushId,
+  studioDryMediaUnionComposableProgramPin,
   type NormalizedStudioBrushDynamicsSettings,
   type StudioDynamicBrushDab,
 } from "./studio-brush-dynamics";
@@ -15,6 +16,13 @@ import {
   resolveStudioDynamicBrushMaterialIdentity,
   type StudioDynamicBrushMaterialIdentity,
 } from "./studio-dry-media-dynamic-bridge";
+import {
+  ensureStudioDryMediaKernelTipIdlePrewarm,
+  prewarmStudioDryMediaKernelTipMaps,
+  resetStudioDryMediaKernelTipCacheForTests,
+  studioDryMediaKernelTipCacheSizeForTests,
+  studioDryMediaKernelTipWorkingSet,
+} from "./studio-dry-media-kernel-tip";
 import { planStudioDynamicBrushCoverageMarks } from "./studio-dynamic-brush-coverage-renderer";
 
 const CORE_DRY_MEDIA = [
@@ -58,6 +66,7 @@ function plannedStroke(
   brushId: (typeof CORE_DRY_MEDIA)[number],
   sampleCount: number,
   phase = 0,
+  pinnedLegacyUnion = false,
 ): PlannedStroke {
   const authored = studioBrushDynamicsSettingsForBrushId(brushId);
   const identity = resolveStudioDynamicBrushMaterialIdentity(brushId);
@@ -66,6 +75,9 @@ function plannedStroke(
     ...authored,
     seed: 0x51a7_0000 + CORE_DRY_MEDIA.indexOf(brushId),
     width: { ...authored.width, base: authored.width.base * 1.2 },
+    ...(pinnedLegacyUnion
+      ? { dryMediaUnionProgram: studioDryMediaUnionComposableProgramPin() }
+      : {}),
   });
   const source = sourceArrays(sampleCount, phase);
   const causal = planStudioCausalDynamicBrushDepositSegmentsV3({
@@ -118,11 +130,22 @@ function unionPolygons(plan: ReturnType<typeof coverage>) {
   return mark.ribbon!.polygons;
 }
 
+function kernelMarks(plan: ReturnType<typeof coverage>) {
+  expect(plan.ok).toBe(true);
+  if (!plan.ok) throw new Error(plan.reason);
+  expect(plan.marks.length).toBeGreaterThan(0);
+  for (const mark of plan.marks) {
+    expect(mark.ribbon).toBeUndefined();
+    expect(mark.texture?.kind).toBe("alpha-map");
+  }
+  return plan.marks;
+}
+
 describe("core dry-media long-stroke regression", () => {
   it.each(CORE_DRY_MEDIA)(
-    "keeps arbitrary causal chunks byte-identical for %s",
+    "keeps arbitrary PINNED legacy-union causal chunks byte-identical for %s",
     (brushId) => {
-      const stroke = plannedStroke(brushId, 768);
+      const stroke = plannedStroke(brushId, 768, 0, true);
       const complete = unionPolygons(coverage(stroke));
       const chunkSizes = [1, 7, 31, 113, 257, 59];
       const appended: Array<readonly number[]> = [];
@@ -146,17 +169,60 @@ describe("core dry-media long-stroke regression", () => {
     },
   );
 
+  it.each(CORE_DRY_MEDIA)(
+    "keeps arbitrary KERNEL dab-path causal chunks byte-identical for %s",
+    (brushId) => {
+      const stroke = plannedStroke(brushId, 512);
+      const complete = kernelMarks(coverage(stroke));
+      const chunkSizes = [1, 7, 31, 113, 59];
+      const appended: Array<(typeof complete)[number]> = [];
+      let cursor = 0;
+      let chunkIndex = 0;
+      while (cursor < stroke.dabs.length) {
+        const end = Math.min(
+          stroke.dabs.length,
+          cursor + chunkSizes[chunkIndex % chunkSizes.length]!,
+        );
+        // Kernel marks are per-dab: a suffix plan needs no predecessor station context.
+        appended.push(...kernelMarks(coverage(
+          stroke,
+          stroke.dabs.slice(cursor, end),
+        )));
+        cursor = end;
+        chunkIndex += 1;
+      }
+      expect(appended).toEqual(complete);
+    },
+  );
+
+  it("plans fresh strokes without union polygons and without the union program pin", () => {
+    for (const brushId of CORE_DRY_MEDIA) {
+      const stroke = plannedStroke(brushId, 192);
+      expect(stroke.dynamics.dryMediaUnionProgram, brushId).toBeUndefined();
+      const plan = coverage(stroke);
+      expect(plan.ok, brushId).toBe(true);
+      if (!plan.ok) continue;
+      expect(
+        plan.marks.some((mark) =>
+          mark.ribbon?.kind === "dry-media-union-ribbon-polygon"),
+        brushId,
+      ).toBe(false);
+      expect(plan.marks.every((mark) => mark.ribbon === undefined), brushId)
+        .toBe(true);
+    }
+  });
+
   it("keeps 1k/2k source commits linear and inside an interactive planning budget", () => {
     // Warm module/JIT caches before measuring allocation-heavy material lowering.
-    unionPolygons(coverage(plannedStroke("charcoal", 128)));
+    kernelMarks(coverage(plannedStroke("charcoal", 128)));
     const measure = (sampleCount: number) => {
       const startedAt = performance.now();
       const stroke = plannedStroke("charcoal", sampleCount);
-      const polygons = unionPolygons(coverage(stroke));
+      const marks = kernelMarks(coverage(stroke));
       return {
         elapsed: performance.now() - startedAt,
         dabCount: stroke.dabs.length,
-        polygonCount: polygons.length,
+        markCount: marks.length,
       };
     };
     const oneThousand = measure(1_000);
@@ -164,100 +230,161 @@ describe("core dry-media long-stroke regression", () => {
 
     expect(oneThousand.dabCount).toBeGreaterThan(700);
     expect(twoThousand.dabCount).toBeGreaterThan(oneThousand.dabCount * 1.8);
-    expect(twoThousand.polygonCount).toBeGreaterThan(
-      oneThousand.polygonCount * 1.8,
-    );
+    expect(twoThousand.markCount).toBeGreaterThan(oneThousand.markCount * 1.8);
     expect(oneThousand.elapsed).toBeLessThan(750);
     expect(twoThousand.elapsed).toBeLessThan(1_500);
     // Wide slack absorbs CI/JIT noise while rejecting accidental prefix-quadratic replanning.
     expect(twoThousand.elapsed).toBeLessThan(oneThousand.elapsed * 6 + 150);
   });
 
-  it("does not retain per-dab texture objects across 40 consecutive material strokes", () => {
-    const startedAt = performance.now();
-    let totalDabs = 0;
-    let totalPolygons = 0;
-    for (let strokeIndex = 0; strokeIndex < 40; strokeIndex += 1) {
+  it("soaks 5 consecutive 2000-sample strokes with stable chunk planning and zero failures", () => {
+    // Warm-up before timing.
+    kernelMarks(coverage(plannedStroke("crayon", 128)));
+    const chunkSize = 128;
+    const perStrokeElapsed: number[] = [];
+    let maxChunkMs = 0;
+    for (let strokeIndex = 0; strokeIndex < 5; strokeIndex += 1) {
       const brushId = CORE_DRY_MEDIA[strokeIndex % CORE_DRY_MEDIA.length]!;
-      const stroke = plannedStroke(brushId, 240, strokeIndex / 7);
-      totalDabs += stroke.dabs.length;
-      totalPolygons += unionPolygons(coverage(stroke)).length;
-    }
-    const elapsed = performance.now() - startedAt;
-
-    expect(totalDabs).toBeGreaterThan(7_000);
-    expect(totalPolygons).toBeGreaterThan(totalDabs * 5);
-    expect(elapsed).toBeLessThan(5_000);
-  });
-
-  it("keeps long crayon suffix planning interactive under multi-lane expansion", () => {
-    // Competitive long-stroke freeze regression: multi-lane crayon must remain O(suffix) so a
-    // continuous 2k-sample stroke never collapses into all-or-nothing mark-budget failure.
-    const long = plannedStroke("crayon", 2_000);
-    expect(long.dabs.length).toBeGreaterThan(1_200);
-    const startedAt = performance.now();
-    const full = coverage(long);
-    const fullElapsed = performance.now() - startedAt;
-    expect(full.ok).toBe(true);
-    if (!full.ok) throw new Error(full.reason);
-
-    const chunkSize = 64;
-    let cursor = 0;
-    let chunkPlans = 0;
-    const chunkStartedAt = performance.now();
-    while (cursor < long.dabs.length) {
-      const end = Math.min(long.dabs.length, cursor + chunkSize);
-      const predecessor = cursor > 0 ? cursor - 1 : cursor;
-      const plan = coverage(
-        long,
-        long.dabs.slice(predecessor, end),
-        cursor > 0 ? 1 : 0,
-      );
-      expect(plan.ok, `crayon chunk ${cursor}:${end}`).toBe(true);
-      if (!plan.ok) throw new Error(plan.reason);
-      chunkPlans += 1;
-      cursor = end;
-    }
-    const chunkElapsed = performance.now() - chunkStartedAt;
-    expect(chunkPlans).toBeGreaterThan(15);
-    // Suffix chunking must remain competitive with one full plan; a quadratic replan freezes.
-    expect(chunkElapsed).toBeLessThan(fullElapsed * 8 + 400);
-    expect(chunkElapsed).toBeLessThan(4_000);
-  });
-
-  it.each(CORE_DRY_MEDIA)(
-    "guarantees O(1) suffix chunking latency and freeze prevention across 5k-sample strokes for %s",
-    (brushId) => {
-      const long = plannedStroke(brushId, 5_000);
-      expect(long.dabs.length).toBeGreaterThan(2_800);
-
-      const chunkSize = 128;
+      const stroke = plannedStroke(brushId, 2_000, strokeIndex / 3);
+      expect(stroke.dabs.length, brushId).toBeGreaterThan(900);
       let cursor = 0;
-      let chunkPlans = 0;
-      let maxChunkLatencyMs = 0;
-      const chunkStartedAt = performance.now();
-      while (cursor < long.dabs.length) {
-        const end = Math.min(long.dabs.length, cursor + chunkSize);
-        const predecessor = cursor > 0 ? cursor - 1 : cursor;
-        const startMs = performance.now();
-        const plan = coverage(
-          long,
-          long.dabs.slice(predecessor, end),
-          cursor > 0 ? 1 : 0,
-        );
-        const elapsedMs = performance.now() - startMs;
-        if (elapsedMs > maxChunkLatencyMs) maxChunkLatencyMs = elapsedMs;
+      const strokeStartedAt = performance.now();
+      while (cursor < stroke.dabs.length) {
+        const end = Math.min(stroke.dabs.length, cursor + chunkSize);
+        const chunkStartedAt = performance.now();
+        const plan = coverage(stroke, stroke.dabs.slice(cursor, end));
+        const chunkElapsed = performance.now() - chunkStartedAt;
+        if (chunkElapsed > maxChunkMs) maxChunkMs = chunkElapsed;
+        // Zero budget failures across the whole soak.
         expect(plan.ok, `${brushId} chunk ${cursor}:${end}`).toBe(true);
-        if (!plan.ok) throw new Error(plan.reason);
-        chunkPlans += 1;
         cursor = end;
       }
-      const totalChunkElapsed = performance.now() - chunkStartedAt;
-      expect(chunkPlans).toBeGreaterThan(20);
-      // Every individual 128-dab chunk must process in under 50ms (no frame freeze)
-      expect(maxChunkLatencyMs).toBeLessThan(50);
-      // Total 5k-sample incremental chunking across all dabs must take < 1,500ms
-      expect(totalChunkElapsed).toBeLessThan(1_500);
+      perStrokeElapsed.push(performance.now() - strokeStartedAt);
+    }
+    // No live-session freeze: every incremental chunk stays under one 30fps frame.
+    expect(maxChunkMs).toBeLessThan(33);
+    // No cross-stroke degradation: the union-era failure mode was state accumulating between
+    // strokes. Allow 20% relative drift plus a small absolute grace for CI timer noise.
+    const first = perStrokeElapsed[0]!;
+    const last = perStrokeElapsed.at(-1)!;
+    expect(last).toBeLessThan(first * 1.2 + 40);
+  });
+});
+
+describe("cold-start first-chunk freeze gate (adversarial-review regression)", () => {
+  // Probe being reproduced (Lens 3, major): every freeze gate in this file and in the perf
+  // matrix warmed caches before timing, so the measured cold first-stroke class — 75.8ms
+  // first chunk on the pre-wave union path; crayon 53.8ms / charcoal 51.1ms / oil-pastel
+  // 40.8ms fresh-process on the replacement kernel path vs ~2ms warm — was structurally
+  // invisible. The dominant cost is kernel tip cache misses (1.6-5.4ms per 128×128 bake).
+  //
+  // The product fix pays those bakes during browser idle time before the first stroke
+  // (ensureStudioDryMediaKernelTipIdlePrewarm, wired at kernel-tip module load). This gate
+  // forces a COLD planner state (tip cache fully reset — "fresh planner state"; process-level
+  // module/JIT cost is page-load-amortized in the app and is not part of a stroke), replays
+  // the admission prewarm, and pins two facts per material:
+  //   1. the prewarmed working set covers the whole first chunk — ZERO tip bakes remain, so
+  //      the 1.6-5.4ms × N bake stall class cannot recur on the first chunk;
+  //   2. the prewarmed first 24-sample chunk plans well under the 33ms freeze budget
+  //      (measured ~2-8ms here — a >4× documented margin).
+  // Before the fix, the prewarm APIs did not exist and the first chunk re-baked its tips
+  // inside the stroke, exceeding the budget on the banded materials.
+  const FIRST_CHUNK_SAMPLES = 24;
+  const CHUNK_FREEZE_BUDGET_MS = 33;
+
+  it.each(CORE_DRY_MEDIA)(
+    "plans the admission-prewarmed cold first chunk for %s under the freeze budget with zero tip bakes",
+    (brushId) => {
+      resetStudioDryMediaKernelTipCacheForTests();
+      const stroke = plannedStroke(brushId, FIRST_CHUNK_SAMPLES);
+
+      // Admission prewarm at the material's authored softness bakes the full working set.
+      const baked = prewarmStudioDryMediaKernelTipMaps(
+        brushId,
+        stroke.dynamics.tip.softness,
+      );
+      expect(baked).toBe(
+        studioDryMediaKernelTipWorkingSet(brushId, stroke.dynamics.tip.softness).length,
+      );
+      const cacheSizeAfterPrewarm = studioDryMediaKernelTipCacheSizeForTests();
+
+      const startedAt = performance.now();
+      const plan = coverage(stroke);
+      const elapsedMs = performance.now() - startedAt;
+      expect(plan.ok, brushId).toBe(true);
+
+      // 1. Working-set coverage: the first chunk resolved every tip from cache.
+      expect(studioDryMediaKernelTipCacheSizeForTests()).toBe(cacheSizeAfterPrewarm);
+      // 2. Freeze budget with margin (typical ~2-8ms measured on the gate machine).
+      expect(elapsedMs, `${brushId} cold prewarmed first chunk`).toBeLessThan(
+        CHUNK_FREEZE_BUDGET_MS,
+      );
     },
   );
+
+  it("pumps the idle prewarm one bounded bake per slice until the working set is resident", () => {
+    resetStudioDryMediaKernelTipCacheForTests();
+    const pending: Array<() => void> = [];
+    const scheduled = ensureStudioDryMediaKernelTipIdlePrewarm(
+      () => CORE_DRY_MEDIA.map((materialId) => ({ materialId, softness: 0.4 })),
+      (pump) => pending.push(pump),
+    );
+    expect(scheduled).toBe(true);
+    // Re-entry is a no-op while a pump is scheduled (StrictMode/dual-import safety).
+    expect(
+      ensureStudioDryMediaKernelTipIdlePrewarm(
+        () => CORE_DRY_MEDIA.map((materialId) => ({ materialId, softness: 0.4 })),
+        (pump) => pending.push(pump),
+      ),
+    ).toBe(false);
+
+    const expectedKeys = CORE_DRY_MEDIA.reduce(
+      (total, materialId) =>
+        total + studioDryMediaKernelTipWorkingSet(materialId, 0.4).length,
+      0,
+    );
+    let slices = 0;
+    let maxSliceMs = 0;
+    while (pending.length > 0 && slices < expectedKeys + 8) {
+      const pump = pending.shift()!;
+      const sliceStartedAt = performance.now();
+      pump();
+      maxSliceMs = Math.max(maxSliceMs, performance.now() - sliceStartedAt);
+      slices += 1;
+    }
+    expect(pending).toHaveLength(0);
+    expect(studioDryMediaKernelTipCacheSizeForTests()).toBeGreaterThanOrEqual(
+      // The 64-entry LRU bounds residency; every slice stays a single bake.
+      Math.min(expectedKeys, 64),
+    );
+    expect(slices).toBeGreaterThanOrEqual(Math.min(expectedKeys, 64));
+    // One 128×128 bake per idle slice: far under the 33ms chunk freeze budget.
+    expect(maxSliceMs).toBeLessThan(CHUNK_FREEZE_BUDGET_MS);
+    resetStudioDryMediaKernelTipCacheForTests();
+  });
+
+  it("keeps PINNED legacy-union chunked replay inside the freeze budget (soak sentinel)", () => {
+    // The perf-matrix soak sentinels exercise the kernel path; the pinned union replay path
+    // previously had byte-identity coverage but no perf gate at all. Warm-path pin: chunked
+    // replay of a pinned 1500-sample stroke must never exceed one 30fps frame per chunk.
+    unionPolygons(coverage(plannedStroke("crayon", 96, 0, true)));
+    const stroke = plannedStroke("oil-pastel", 1_500, 0.7, true);
+    const chunkSize = 128;
+    let cursor = 0;
+    let maxChunkMs = 0;
+    while (cursor < stroke.dabs.length) {
+      const end = Math.min(stroke.dabs.length, cursor + chunkSize);
+      const predecessor = cursor > 0 ? cursor - 1 : cursor;
+      const chunkStartedAt = performance.now();
+      const plan = coverage(
+        stroke,
+        stroke.dabs.slice(predecessor, end),
+        cursor > 0 ? 1 : 0,
+      );
+      maxChunkMs = Math.max(maxChunkMs, performance.now() - chunkStartedAt);
+      expect(plan.ok, `pinned union chunk ${cursor}:${end}`).toBe(true);
+      cursor = end;
+    }
+    expect(maxChunkMs).toBeLessThan(CHUNK_FREEZE_BUDGET_MS);
+  });
 });

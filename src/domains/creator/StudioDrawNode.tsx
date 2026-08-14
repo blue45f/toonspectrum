@@ -1,4 +1,4 @@
-import { memo, useEffect, useState } from "react";
+import { memo, useEffect, useReducer, useState } from "react";
 import {
   Arrow,
   Circle as KCircle,
@@ -30,10 +30,12 @@ import {
   resolveStudioBrushAliasPencilPasses,
   resolveStudioBrushAliasWatercolorPlanSettings,
   studioBrushAliasEffectiveDiameter,
+  type StudioBrushAliasWatercolorDab,
 } from "./studio-brush-alias-profile";
 import {
   resolveStudioCapturedBrushDynamicsPresetId,
 } from "./studio-brush-dynamics";
+import { resolveStudioBrushEngineLaneWatercolorMaterial } from "./studio-brush-engine-lane-catalog";
 import {
   resolveStudioBrushRuntimeContract,
   resolveStudioBrushSinglePointRoute,
@@ -86,9 +88,14 @@ import {
   traceStudioHighlighterWashDetail,
   traceStudioHighlighterWashPlan,
 } from "./studio-highlighter-wash-ribbon";
+import {
+  requestStudioLivingInkSettledBakeDabs,
+  resolveStudioLivingInkSettledBakeProgram,
+} from "./studio-living-ink-settled-bake-v1";
 import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "./studio-material-pressure-model";
 import {
   planStudioOilRibbonCarrier,
+  STUDIO_OIL_IMPASTO_RELIEF_HIGHLIGHT_COLOR,
   traceStudioOilRibbonPath,
 } from "./studio-oil-ribbon-carrier";
 import { planStudioPerfectFreehandRender } from "./studio-outline-stroke-contract";
@@ -302,6 +309,15 @@ export const StudioDrawNode = memo(function StudioDrawNode({
   const kind = el.kind ?? "freehand";
   // 패턴 채우기 타일(로드 전 null) — 우선순위: 패턴 > 그라데이션 > 단색(fillPriority).
   const patternImage = usePatternFillImage(el.pattern);
+  // Opt-in living-ink settled bake (2026-08-14 stall fix): the whole-stroke fluid solve is far
+  // over the 33ms chunk budget, so committed bake-lane strokes render their byte-identical base
+  // wash immediately and a time-sliced background job bakes the bloom. This generation counter
+  // is bumped when a requested bake lands in the deterministic cache; it flows into the request
+  // call below so compiled (React Compiler) render bodies re-execute it and pick up the cache.
+  const [livingInkBakeGeneration, notifyLivingInkBakeReady] = useReducer(
+    (generation: number) => (generation + 1) | 0,
+    0,
+  );
   const isEraserOperation = el.mode === "eraser"
     || (el.brush ? resolveStudioBrushRuntimeContract(el.brush)?.operation === "erase" : false);
   const composite = isEraserOperation ? "destination-out" : "source-over";
@@ -1449,7 +1465,57 @@ export const StudioDrawNode = memo(function StudioDrawNode({
             const plannedDabs = causalWatercolor
               ? planCausalWatercolorBrushDabs(watercolorInput, !activeDraft)
               : planWatercolorBrushDabs(watercolorInput);
-            const dabs = applyStudioBrushAliasWatercolorMaterial(brush, plannedDabs);
+            // The stroke seed feeds the opt-in wet-edge-bloom lanes; SVG export passes the same
+            // seed at its two watercolor sites so Canvas and SVG stay pixel-agreeing.
+            // The phase gates only the opt-in living-ink settled bake (2026-08-13 wave 3): the
+            // fluid field is global, so live drafts render the base wash and the bloom lands on
+            // settle — SVG export is settled by definition and passes "settled" at both sites.
+            //
+            // 2026-08-14 stall fix: the settled bake is a whole-stroke fluid solve measured at
+            // 30–116ms — it must never run synchronously in this render body. The "live" result
+            // below is byte-identical to the bake's input (the bake augments AFTER material
+            // scaling and is identity for the live phase), so bake lanes render that base wash
+            // now and request the settled augment from the time-sliced deterministic cache; the
+            // bloom lands when the job completes — the settled-bake contract's own drying
+            // language. Program resolution mirrors applyStudioBrushAliasWatercolorMaterial's
+            // one-authority order (wet-edge-bloom pin wins; bake consulted only without it), so
+            // lanes without a bake program keep the exact single-call path and bytes.
+            const laneWatercolorMaterial =
+              resolveStudioBrushEngineLaneWatercolorMaterial(brush);
+            const livingInkBakeProgram =
+              !activeDraft && laneWatercolorMaterial
+              && !laneWatercolorMaterial.wetEdgeBloomProgramId
+                ? resolveStudioLivingInkSettledBakeProgram(
+                    laneWatercolorMaterial.livingInkBakeProgramId,
+                  )
+                : null;
+            let dabs: readonly StudioBrushAliasWatercolorDab[];
+            if (livingInkBakeProgram) {
+              const baseDabs = applyStudioBrushAliasWatercolorMaterial(
+                brush,
+                plannedDabs,
+                watercolorSeed,
+                "live",
+              );
+              dabs =
+                requestStudioLivingInkSettledBakeDabs(
+                  baseDabs,
+                  {
+                    ...livingInkBakeProgram,
+                    seed: watercolorSeed,
+                    phase: "settled",
+                  },
+                  notifyLivingInkBakeReady,
+                  livingInkBakeGeneration,
+                ) ?? baseDabs;
+            } else {
+              dabs = applyStudioBrushAliasWatercolorMaterial(
+                brush,
+                plannedDabs,
+                watercolorSeed,
+                activeDraft ? "live" : "settled",
+              );
+            }
             const wetRibbonPlan = causalWatercolor
               ? planStudioWetRibbonCarrier(dabs, { seed: watercolorSeed })
               : null;
@@ -2107,7 +2173,30 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               seed: fxBrushSeedFromKey(el.id),
               maxDabs: FX_OIL_DAB_CAP,
             });
-            const carrier = planStudioOilRibbonCarrier(dabs);
+            // brush--bristle-depletion 레인만 v1 강모 고갈 다이내믹을 켠다(갈필),
+            // brush--impasto-relief 레인만 dli GGX 릴리프 오버레이 프로그램을 켠다,
+            // brush--bristle-physics 레인만 WetBrush-2D 강모 물리 시뮬을 켠다(2026-08-13 wave 3).
+            // 옵션이 없는 다른 모든 유화 브러시는 캐리어 계약상 바이트 동일 플랜을 유지하며, SVG
+            // 내보내기의 유화 분기와 입력(대브·시드)이 같아 두 렌더러가 픽셀 일치한다.
+            const carrier = brush === "brush--bristle-physics"
+              ? planStudioOilRibbonCarrier(dabs, {
+                  bristlePhysics: {
+                    enabled: true,
+                    seed: fxBrushSeedFromKey(el.id),
+                  },
+                })
+              : brush === "brush--bristle-depletion"
+                ? planStudioOilRibbonCarrier(dabs, {
+                    bristleLoadDynamics: {
+                      enabled: true,
+                      seed: fxBrushSeedFromKey(el.id),
+                    },
+                  })
+                : brush === "brush--impasto-relief"
+                  ? planStudioOilRibbonCarrier(dabs, {
+                      impastoRelief: { enabled: true },
+                    })
+                  : planStudioOilRibbonCarrier(dabs);
             return (
               <Shape
                 key={index}
@@ -2145,6 +2234,29 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                       traceStudioOilRibbonPath(context, run);
                     }
                     context.stroke();
+                  }
+                  // brush--impasto-relief 전용 dli GGX 릴리프 오버레이. 플랜이 담을 때만 존재하며
+                  // SVG 직렬화와 동일한 페인트 계약을 쓴다 — 하이라이트는 공유 상수 화이트를
+                  // screen으로, 섀도우는 스트로크 색을 multiply로, 레인당 정확히 한 번 stroke.
+                  if (carrier.impastoReliefLanes) {
+                    context.lineCap = "round";
+                    for (const lane of carrier.impastoReliefLanes) {
+                      const highlight = lane.kind === "highlight";
+                      context.globalCompositeOperation = highlight ? "screen" : "multiply";
+                      context.strokeStyle = highlight
+                        ? STUDIO_OIL_IMPASTO_RELIEF_HIGHLIGHT_COLOR
+                        : stroke;
+                      context.globalAlpha = Math.min(
+                        1,
+                        Math.max(0, lane.opacity * opacity),
+                      );
+                      context.lineWidth = Math.max(0.12, lane.lineWidth);
+                      context.beginPath();
+                      for (const run of lane.runs) {
+                        traceStudioOilRibbonPath(context, run);
+                      }
+                      context.stroke();
+                    }
                   }
                   context.restore();
                 }}

@@ -149,14 +149,19 @@ const RADIANS_TO_DEGREES = 180 / Math.PI;
 const POINT_EPSILON = 1e-8;
 /**
  * Product lane counts are deliberately bounded below the full simulation's most expensive
- * presets, but never collapse a selected-width nib to one representative fibre. Five lanes keep
- * wax, carbon and soft pigment visibly broad. Chalk also uses five connected lanes: three wide
- * mineral footprints produced conspicuous square flakes, while fine subtractive grain inside a
- * continuous five-lane bed retains tooth without revealing the transport primitive. This is still
- * O(source dabs) with a small material constant and remains prefix-stable.
+ * presets, but never collapse a selected-width nib to one representative fibre.
+ *
+ * Crayon uses three connected wax fibres. The original reason was the polygon-union carrier,
+ * where five lanes at crayon's dense spacing froze the live canvas; de-polygonising removed that
+ * cost, and the long-stroke freeze gate now passes at five. The binding reason today is the mark
+ * ceiling: a 3,000-sample crayon stroke plans 76,565 marks at five lanes against the 65,536
+ * retained/SVG budget, so the tail of a long stroke would be truncated away. Three lanes leave
+ * headroom while keeping a broad stick, O(source dabs) and prefix-stable. Raising the lane count
+ * therefore costs drawing, not just frame time — re-measure both gates before touching it.
+ * Charcoal / chalk / pastel stay at five for fibrous/mineral beds where spacing is already coarser.
  */
 const PRODUCT_LANE_COUNT = Object.freeze({
-  crayon: 5,
+  crayon: 3,
   charcoal: 5,
   chalk: 5,
   pastel: 5,

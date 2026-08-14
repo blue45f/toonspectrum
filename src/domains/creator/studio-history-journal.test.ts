@@ -22,6 +22,7 @@ import {
   type StudioHistoryJournal,
   type StudioHistoryJournalSidecarEntry,
 } from "./studio-history-journal";
+import { STUDIO_PAGES_HISTORY_MAX_ENTRIES } from "./studio-history-retention-budget";
 import { appendStudioPagesHistorySnapshot } from "./studio-pending-stroke-durability";
 import {
   createEmptyStudioWriterRoomDocument,
@@ -164,13 +165,14 @@ describe("합치기 — 키 입력마다 항목이 생기지 않는다", () => {
 
 describe("상한 — 저널이 무한히 자라지 않는다", () => {
   it("스냅샷 히스토리가 앞을 버리면 저널도 같은 수의 pages 항목을 앞에서 버린다", () => {
-    // 실제 상한 동작을 그대로 쓴다 — 상수를 복제하면 둘이 갈라진다.
+    // 실제 유지 경계 동작을 그대로 쓴다 — 상수를 복제하면 둘이 갈라진다.
     let history: number[][] = [[0]];
     let historyIndex = 0;
     let journal: Journal = createStudioHistoryJournal();
     journal = recordStudioHistoryJournalSidecarEdit(journal, bibleEdit("없음", "하람", 0));
 
-    for (let step = 1; step <= 260; step += 1) {
+    // 개수 방벽(2,000)을 실제로 넘겨 앞자르기가 돌게 만든다.
+    for (let step = 1; step <= STUDIO_PAGES_HISTORY_MAX_ENTRIES + 60; step += 1) {
       const appended = appendStudioPagesHistorySnapshot(history, historyIndex, [step]);
       history = appended.history as number[][];
       historyIndex = appended.historyIndex;
@@ -180,12 +182,90 @@ describe("상한 — 저널이 무한히 자라지 않는다", () => {
       });
     }
 
+    expect(history).toHaveLength(STUDIO_PAGES_HISTORY_MAX_ENTRIES);
     expect(countStudioHistoryJournalPagesEntries(journal.entries)).toBe(historyIndex);
     expect(journal.cursor).toBe(journal.entries.length);
-    // 캔버스를 260번 커밋했다고 되돌릴 수 있던 캐릭터 바이블 편집을 잃지는 않는다.
+    // 캔버스를 2,060번 커밋했다고 되돌릴 수 있던 캐릭터 바이블 편집을 잃지는 않는다.
     expect(journal.entries[0]).toMatchObject({ kind: "sidecar" });
   });
 
+  /**
+   * 예산제가 새로 여는 경로 — 개수 상한 시절에는 한 전이가 스냅샷을 정확히 1개만 버렸다.
+   * 무거운 커밋 하나가 예산을 여러 엔트리분 넘기면 N 개를 한 번에 버린다. 두 불변식이
+   * 그 전이를 통과해야 undo 가 스냅샷과 어긋나지 않는다.
+   */
+  it("한 전이에서 pages 항목 N개가 앞에서 잘려도 두 불변식이 유지된다", () => {
+    const retention = { budgetBytes: 8_000, minEntries: 2 };
+    type Page = { id: string; elements: { id: string; points?: number[] }[] };
+    let history: Page[][] = [[{ id: "page", elements: [{ id: "stroke", points: [0, 0] }] }]];
+    let historyIndex = 0;
+    let journal: Journal = createStudioHistoryJournal();
+    // 캔버스보다 오래된 사이드카 — 앞자르기가 이걸 건드리면 안 된다.
+    journal = recordStudioHistoryJournalSidecarEdit(journal, bibleEdit("없음", "하람", 0));
+
+    for (let step = 0; step < 8; step += 1) {
+      const previous = history[historyIndex]![0]!;
+      const appended = appendStudioPagesHistorySnapshot(
+        history,
+        historyIndex,
+        [{ ...previous, elements: [...previous.elements, { id: `light-${step}` }] }],
+        retention
+      );
+      history = appended.history;
+      historyIndex = appended.historyIndex;
+      journal = recordStudioHistoryJournalPagesSteps(journal, {
+        addedSteps: 1,
+        nextUndoDepth: historyIndex,
+      });
+    }
+    expect(countStudioHistoryJournalPagesEntries(journal.entries)).toBe(8);
+
+    const base = history[historyIndex]![0]!;
+    const heavy: Page[] = [{
+      ...base,
+      elements: base.elements.map((element, index) =>
+        index === 0 ? { ...element, points: Array.from({ length: 6_000 }, () => 1) } : element
+      ),
+    }];
+    const appended = appendStudioPagesHistorySnapshot(history, historyIndex, heavy, retention);
+    journal = recordStudioHistoryJournalPagesSteps(journal, {
+      addedSteps: 1,
+      nextUndoDepth: appended.historyIndex,
+    });
+
+    // 이 전이가 실제로 N(>1)개를 버렸는지 먼저 확인한다 — 안 그러면 테스트가 아무것도 안 지킨다.
+    expect(appended.evictedCount).toBeGreaterThan(1);
+    // 불변식 A: 커서 앞의 `pages` 수 == pagesHi.
+    expect(
+      countStudioHistoryJournalPagesEntries(journal.entries.slice(0, journal.cursor))
+    ).toBe(appended.historyIndex);
+    // 불변식 B: 전체 `pages` 수 == pagesHistory.length - 1.
+    expect(countStudioHistoryJournalPagesEntries(journal.entries)).toBe(
+      appended.history.length - 1
+    );
+    expect(journal.cursor).toBe(journal.entries.length);
+    // 오래된 사이드카는 캔버스 앞자르기에 휩쓸리지 않는다.
+    expect(journal.entries[0]).toMatchObject({ kind: "sidecar" });
+  });
+
+  it("N-퇴출 전이 뒤에도 ⌘Z 가 저널 순서대로 걸어간다", () => {
+    let journal: Journal = createStudioHistoryJournal();
+    for (let step = 1; step <= 6; step += 1) journal = commitPagesStep(journal, step);
+    journal = recordStudioHistoryJournalSidecarEdit(journal, writerEdit("옛", "새", 0));
+    journal = commitPagesStep(journal, 7);
+
+    // 스냅샷 3개가 한 번에 잘려 나간 전이(pagesHi 7 → 5).
+    journal = recordStudioHistoryJournalPagesSteps(journal, { addedSteps: 1, nextUndoDepth: 5 });
+
+    expect(countStudioHistoryJournalPagesEntries(journal.entries)).toBe(5);
+    // 앞에서 잘려 나간 것은 `pages` 3개뿐이다 — 그보다 오래된 자리에 있던 사이드카는
+    // 스냅샷 히스토리에 기대지 않으므로 제자리에 남는다.
+    expect(journal.entries.map((entry) => entry.kind)).toEqual([
+      "pages", "pages", "pages", "sidecar", "pages", "pages",
+    ]);
+    expect(journal.cursor).toBe(journal.entries.length);
+    expect(readStudioHistoryJournalUndoEntry(journal)).toEqual({ kind: "pages" });
+  });
   it("사이드카 항목은 상한에서 가장 오래된 것부터 버린다", () => {
     let journal: Journal = createStudioHistoryJournal();
     for (let step = 0; step < STUDIO_HISTORY_JOURNAL_MAX_SIDECAR_ENTRIES + 40; step += 1) {
@@ -198,6 +278,15 @@ describe("상한 — 저널이 무한히 자라지 않는다", () => {
     expect(journal.entries).toHaveLength(STUDIO_HISTORY_JOURNAL_MAX_SIDECAR_ENTRIES);
     expect(journal.cursor).toBe(STUDIO_HISTORY_JOURNAL_MAX_SIDECAR_ENTRIES);
     expect(journal.entries[0]).toMatchObject({ before: { label: "40" } });
+  });
+
+  /**
+   * 사이드카를 200 에 남겨 두면 비대칭이 생긴다 — 긴 세션 뒤 ⌘Z 가 캔버스 단계는 수천 칸
+   * 걸어가는데 그 구간의 오래된 로그라인 편집만 조용히 사라진다. 사이드카 페이로드는 참조 보관
+   * 이라 엔트리당 포인터 수준이므로 개수가 옳은 게이트이고, 그 개수는 캔버스 방벽과 같아야 한다.
+   */
+  it("사이드카 상한은 캔버스 개수 방벽과 같은 상수를 쓴다", () => {
+    expect(STUDIO_HISTORY_JOURNAL_MAX_SIDECAR_ENTRIES).toBe(STUDIO_PAGES_HISTORY_MAX_ENTRIES);
   });
 });
 

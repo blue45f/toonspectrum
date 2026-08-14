@@ -17,6 +17,7 @@ import {
   normalizeStudioBrushDynamicsSettings,
   planNormalizedStudioDynamicBrushDabs,
   studioBrushDynamicsSettingsForBrushId,
+  studioDryMediaUnionComposableProgramPin,
 } from "./studio-brush-dynamics";
 import {
   STUDIO_DRY_MEDIA_ANISOTROPIC_PRESETS_V1,
@@ -178,7 +179,7 @@ describe("oil / ink-wash / crayon competitive material quality", () => {
       .toBeGreaterThan(mean(lightDabs.map((dab) => dab.opacity * dab.flow)) * 1.15);
 
     const identity = resolveStudioDynamicBrushMaterialIdentity("crayon")!;
-    expect(studioDryMediaDynamicBridgeMarkMultiplier(identity)).toBe(5);
+    expect(studioDryMediaDynamicBridgeMarkMultiplier(identity)).toBe(3);
     const bridged = bridgeStudioDynamicDabsToDryMediaV1({
       brushId: "crayon",
       seed: dynamics.seed,
@@ -186,7 +187,7 @@ describe("oil / ink-wash / crayon competitive material quality", () => {
     });
     expect(bridged.ok).toBe(true);
     if (!bridged.ok) return;
-    expect(bridged.receipt.laneCount).toBe(5);
+    expect(bridged.receipt.laneCount).toBe(3);
     expect(bridged.receipt.marks.every((mark) => (
       mark.shape === "wax-ribbon"
       && mark.radiusX / mark.radiusY >= preset.minimumAspectRatio - 1e-8
@@ -203,6 +204,8 @@ describe("oil / ink-wash / crayon competitive material quality", () => {
     const charcoalSig = JSON.stringify(charcoal.receipt.marks[9]);
     expect(crayonSig).not.toBe(charcoalSig);
 
+    // The union carrier is a pinned legacy-replay authority after the T1 de-polygon flip;
+    // its connected-transport quality contract is asserted through the explicit program pin.
     const carrier = planStudioDryMediaUnionRibbonCarrier({
       dabs: bridged.receipt.adjustedDabs,
       marks: bridged.receipt.marks.map((mark) => ({
@@ -215,7 +218,10 @@ describe("oil / ink-wash / crayon competitive material quality", () => {
         color: "#3a2a18",
       })),
       materialIdentity: identity,
-      dynamics: normalizeStudioBrushDynamicsSettings(dynamics),
+      dynamics: normalizeStudioBrushDynamicsSettings({
+        ...dynamics,
+        dryMediaUnionProgram: studioDryMediaUnionComposableProgramPin(),
+      }),
     });
     expect(carrier.applied).toBe(true);
     if (!carrier.applied) return;
@@ -226,8 +232,8 @@ describe("oil / ink-wash / crayon competitive material quality", () => {
   });
 
   it("charges crayon multi-lane expansion at budget admission time (not all-or-nothing later)", () => {
-    const identity = resolveStudioDynamicBrushMaterialIdentity("crayon");
-    expect(studioDryMediaDynamicBridgeMarkMultiplier(identity)).toBe(5);
+    const identity = resolveStudioDynamicBrushMaterialIdentity("crayon")!;
+    expect(studioDryMediaDynamicBridgeMarkMultiplier(identity)).toBe(3);
     expect(studioDryMediaDynamicBridgeMarkMultiplier(null)).toBe(1);
     expect(
       studioDryMediaDynamicBridgeMarkMultiplier(

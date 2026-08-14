@@ -191,7 +191,12 @@ const BACKEND_DERIVATIONS: Readonly<
     runtime: "wasm-worker",
     license: "MIT / Apache-2.0",
     determinism: "tolerance",
-    fallbackProviderId: "canvas2d-causal-ink",
+    // V17.1 fail-closed policy (mirrors packages/studio-brush-platform/src/providers.ts
+    // hokusaiProviderDescriptor): no fallback provider — no texture-equivalence
+    // certification exists for a causal-ink rendition of Hokusai natural-media output,
+    // so device-incapable hosts hide natural-media brushes instead of substituting.
+    // Restore a fallback only together with a checked-in equivalence certification.
+    fallbackProviderId: null,
   },
 });
 

@@ -4,7 +4,11 @@ import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
 
 import { BRUSH_PRESETS } from "./studio-brush";
-import { planNormalizedStudioDynamicBrushDabs } from "./studio-brush-dynamics";
+import {
+  normalizeStudioBrushDynamicsSettings,
+  planNormalizedStudioDynamicBrushDabs,
+  studioDryMediaUnionComposableProgramPin,
+} from "./studio-brush-dynamics";
 import { STUDIO_DYNAMIC_BRUSH_CAUSAL_STAMP_GRID } from "./studio-brush-render-budget";
 import { studioCoreBrushCatalogSelection } from "./studio-brush-selection";
 import {
@@ -37,7 +41,12 @@ function plannedMark(
 ): StudioDynamicBrushCoverageMark {
   const preset = BRUSH_PRESETS.find(({ id }) => id === brushId)!;
   const selection = studioCoreBrushCatalogSelection(preset);
-  const dynamics = selection.brushDynamics!;
+  // Legacy-replay raster QA: the union carrier is now reached through the explicit program pin
+  // (fresh unpinned strokes render via the kernel dab path and never plan union polygons).
+  const dynamics = normalizeStudioBrushDynamicsSettings({
+    ...selection.brushDynamics!,
+    dryMediaUnionProgram: studioDryMediaUnionComposableProgramPin(),
+  });
   const dabs = planNormalizedStudioDynamicBrushDabs({
     points,
     pressures: Array.from(

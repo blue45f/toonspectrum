@@ -1762,7 +1762,7 @@ describe("StudioDrawNode orchestration", () => {
     expect(captured("Shape").length).toBeGreaterThan(0);
   });
 
-  it("renders a symmetric v2 pencil stamp through one bounded affine compositor", async () => {
+  it("renders a symmetric v2 pencil stamp as per-variation document-space plans", async () => {
     render(
       <StudioDrawNode
         el={drawEl({
@@ -1784,12 +1784,20 @@ describe("StudioDrawNode orchestration", () => {
     ) => void;
     sceneFunc(context as unknown as CanvasRenderingContext2D);
 
-    expect(context.transforms).toEqual([
-      "1,0,0,1,0,0",
-      "-1,0,0,1,20,0",
-    ]);
+    // Copies are planned in document space and drawn without a context transform, so the
+    // mirrored copy re-derives its index-keyed tip jitter at the mirrored dab centre —
+    // the SVG per-variation procedure (and the shared paper sheet for pinned lanes).
+    expect(context.transforms).toEqual([]);
     expect(context.arcs).toHaveLength(6);
-    expect(context.arcs.slice(0, 3)).toEqual(context.arcs.slice(3));
+    const parseArc = (arc: string): number[] => arc.split(",").map(Number);
+    const sourceArcs = context.arcs.slice(0, 3).map(parseArc);
+    const mirroredArcs = context.arcs.slice(3).map(parseArc);
+    mirroredArcs.forEach((arc, index) => {
+      const source = sourceArcs[index]!;
+      // Same jitter offsets around the mirrored dab centre: x shifts by 2·(centerX − x₀) = 16.
+      expect(arc[0]).toBeCloseTo(source[0]! + 16, 12);
+      expect(arc.slice(1)).toEqual(source.slice(1));
+    });
   });
 
   it("does not overpaint a kaleidoscope center tap through duplicate Shapes or dabs", async () => {
@@ -1844,6 +1852,7 @@ describe("StudioDrawNode orchestration", () => {
       id: "phase-two-canvas",
       brush: "ink-particle",
       mode: "pen",
+      paintModel: "bounded-flow-v2",
       points: [10, 20, 50, 20],
       pressures: [0.7, 0.7],
       stroke: "#356dcc",
@@ -1995,6 +2004,7 @@ describe("StudioDrawNode orchestration", () => {
         id: "allocation-free-alpha-tip",
         brush: "ink-particle",
         mode: "pen",
+        paintModel: "bounded-flow-v2",
         points: [0, 0, 36, 0],
         pressures: [0.7, 0.7],
         brushDynamics,
@@ -2018,7 +2028,7 @@ describe("StudioDrawNode orchestration", () => {
     const alphaBytes = new Uint8Array(alphaMapSize * alphaMapSize);
     alphaBytes.fill(255);
     const brushDynamics = normalizeStudioBrushDynamicsSettings({
-      ...studioBrushDynamicsPresetSettings("dry-media"),
+      ...studioBrushDynamicsPresetSettings("ink-particle"),
       tip: {
         shape: "hard",
         softness: 0,
@@ -2034,7 +2044,7 @@ describe("StudioDrawNode orchestration", () => {
     });
     const element = drawEl({
       id: "causal-grid3-cross-layer",
-      brush: "dry-media",
+      brush: "ink-particle",
       mode: "pen",
       points: [0, 0, 16, 0, 32, 8, 48, 4],
       pressures: [0.25, 0.5, 0.8, 1],
@@ -2042,6 +2052,7 @@ describe("StudioDrawNode orchestration", () => {
       stroke: "#3257d6",
       strokeWidth: 16,
       opacity: 1,
+      paintModel: "bounded-flow-v2",
       sampleSpacing: 1,
       brushDynamics,
     });
@@ -2136,6 +2147,7 @@ describe("StudioDrawNode orchestration", () => {
       kind: "freehand",
       brush: "ink-particle",
       mode: "pen",
+      paintModel: "bounded-flow-v2",
       points: [0, 24, 1_299, 24],
       pressures: [0.72, 0.72],
       stroke: "#3257d6",
@@ -2162,6 +2174,45 @@ describe("StudioDrawNode orchestration", () => {
     });
     expect(budget.maxDabsPerVariation).toBe(causal.dabs.length);
 
+    // bounded-flow-v2 accumulates marks on stroke-local OffscreenCanvas tiles and composites the
+    // result once, so per-mark deposits are observed on the offscreen surface (not scene arcs).
+    const depositedEllipses: Array<{ radius: number }> = [];
+    class CountingCoverageSurface {
+      width: number;
+      height: number;
+      readonly context = {
+        canvas: this as unknown as OffscreenCanvas,
+        globalAlpha: 1,
+        globalCompositeOperation: "source-over",
+        fillStyle: "",
+        save: () => undefined,
+        restore: () => undefined,
+        setTransform: () => undefined,
+        clearRect: () => undefined,
+        translate: () => undefined,
+        rotate: () => undefined,
+        scale: () => undefined,
+        beginPath: () => undefined,
+        ellipse: (
+          _cx: number,
+          _cy: number,
+          radiusX: number,
+        ) => {
+          depositedEllipses.push({ radius: radiusX });
+        },
+        fill: () => undefined,
+        drawImage: () => undefined,
+      };
+      constructor(width: number, height: number) {
+        this.width = width;
+        this.height = height;
+      }
+      getContext(): typeof this.context {
+        return this.context;
+      }
+    }
+    vi.stubGlobal("OffscreenCanvas", CountingCoverageSurface);
+
     render(<StudioDrawNode el={element} />);
     const context = new StampSceneContext();
     const sceneFunc = captured("Shape")[0]!.props.sceneFunc as (
@@ -2186,21 +2237,21 @@ describe("StudioDrawNode orchestration", () => {
       }),
     );
 
-    expect(context.arcs).toHaveLength(causal.dabs.length);
+    // Tile-boundary marks are deposited once per intersecting 256px coverage tile, so the
+    // offscreen deposit count may exceed the dab count by the boundary overlap only.
+    expect(depositedEllipses.length).toBeGreaterThanOrEqual(causal.dabs.length);
+    expect(depositedEllipses.length).toBeLessThanOrEqual(Math.ceil(causal.dabs.length * 1.2));
+    expect(context.drawImages.length).toBeGreaterThan(0);
     expect(svgMarks).toHaveLength(causal.dabs.length);
     expect(exported.skipped).toEqual([]);
-    const [canvasStartX, canvasStartY, canvasStartRadius] = context.arcs[0]!
-      .split(",")
-      .map(Number);
-    const [canvasEndX, canvasEndY, canvasEndRadius] = context.arcs.at(-1)!
-      .split(",")
-      .map(Number);
-    expect(svgMarks[0]!.radius).toBeCloseTo(canvasStartRadius!, 3);
-    expect(svgMarks[0]!.x).toBeCloseTo(canvasStartX!, 3);
-    expect(svgMarks[0]!.y).toBeCloseTo(canvasStartY!, 3);
-    expect(svgMarks.at(-1)!.radius).toBeCloseTo(canvasEndRadius!, 3);
-    expect(svgMarks.at(-1)!.x).toBeCloseTo(canvasEndX!, 3);
-    expect(svgMarks.at(-1)!.y).toBeCloseTo(canvasEndY!, 3);
+    // Cross-surface identity: both surfaces consume the same causal dab plan, so the SVG marks
+    // must sit exactly on the causal dab stations with the deposited canvas radii.
+    expect(svgMarks[0]!.x).toBeCloseTo(causal.dabs[0]!.x, 3);
+    expect(svgMarks[0]!.y).toBeCloseTo(causal.dabs[0]!.y, 3);
+    expect(svgMarks[0]!.radius).toBeCloseTo(depositedEllipses[0]!.radius, 3);
+    expect(svgMarks.at(-1)!.x).toBeCloseTo(causal.dabs.at(-1)!.x, 3);
+    expect(svgMarks.at(-1)!.y).toBeCloseTo(causal.dabs.at(-1)!.y, 3);
+    expect(svgMarks.at(-1)!.radius).toBeCloseTo(depositedEllipses.at(-1)!.radius, 3);
   });
 
   it("retains one v3 DrawEl beyond 65,536 dabs with an exact v2 prefix and one final opacity", () => {
@@ -2390,6 +2441,7 @@ describe("StudioDrawNode orchestration", () => {
         id: "bounded-live-kaleidoscope",
         brush: "ink-particle",
         mode: "pen",
+        paintModel: "bounded-flow-v2",
         points: [0, 0, 5_000, 0],
         pressures: [0.7, 0.7],
         brushDynamics,

@@ -255,6 +255,13 @@ type DryMediaUnionRibbon = Extract<
 
 interface DryMediaUnionAccumulatorEntry {
   readonly color: string;
+  /**
+   * Stroke-constant union alpha captured from the first planned mark. The carrier emits opaque
+   * stroke-local coverage today, but the accumulator must not assume that: a snapshot that forced
+   * alpha back to 1 would make replay/settle composite darker than the live suffix fills whenever
+   * a future carrier version ships flow-scaled unions.
+   */
+  readonly alpha: number;
   readonly ribbonVersion: DryMediaUnionRibbon["version"];
   readonly polygons: Array<readonly number[]>;
   minimumX: number;
@@ -301,17 +308,15 @@ function dryMediaUnionPolygonBounds(
   let maximumX = Number.NEGATIVE_INFINITY;
   let maximumY = Number.NEGATIVE_INFINITY;
   for (const polygon of polygons) {
-    if (polygon.length < 6 || polygon.length % 2 !== 0) return null;
-    for (let index = 0; index < polygon.length; index += 2) {
-      const x = polygon[index];
-      const y = polygon[index + 1];
-      if (x === undefined || y === undefined || !Number.isFinite(x) || !Number.isFinite(y)) {
-        return null;
-      }
-      minimumX = Math.min(minimumX, x);
-      minimumY = Math.min(minimumY, y);
-      maximumX = Math.max(maximumX, x);
-      maximumY = Math.max(maximumY, y);
+    const len = polygon.length;
+    if (len < 6 || len % 2 !== 0) return null;
+    for (let index = 0; index < len; index += 2) {
+      const x = polygon[index]!;
+      const y = polygon[index + 1]!;
+      if (x < minimumX) minimumX = x;
+      if (x > maximumX) maximumX = x;
+      if (y < minimumY) minimumY = y;
+      if (y > maximumY) maximumY = y;
     }
   }
   return maximumX > minimumX && maximumY > minimumY
@@ -325,7 +330,8 @@ function quantizeDryMediaUnionCoordinate(value: number): number {
   ) / 10_000;
 }
 
-function createDryMediaUnionAccumulator(
+/** @internal exported for the colocated overlay contract test only. */
+export function createDryMediaUnionAccumulator(
   marks: readonly StudioDynamicBrushCoverageMark[],
 ): DryMediaUnionAccumulator | null {
   if (marks.length === 0) return null;
@@ -335,12 +341,13 @@ function createDryMediaUnionAccumulator(
     if (
       ribbon?.kind !== "dry-media-union-ribbon-polygon"
       || ribbon.role !== "stroke-union"
-      || mark.alpha !== 1
+      || mark.alpha <= 0
     ) return null;
     const bounds = dryMediaUnionPolygonBounds(ribbon.polygons);
     if (!bounds) return null;
     entries.push({
       color: mark.color,
+      alpha: mark.alpha,
       ribbonVersion: ribbon.version,
       polygons: [...ribbon.polygons],
       ...bounds,
@@ -349,7 +356,8 @@ function createDryMediaUnionAccumulator(
   return { entries };
 }
 
-function appendDryMediaUnionAccumulator(
+/** @internal exported for the colocated overlay contract test only. */
+export function appendDryMediaUnionAccumulator(
   accumulator: DryMediaUnionAccumulator,
   suffixMarks: readonly StudioDynamicBrushCoverageMark[],
 ): boolean {
@@ -366,10 +374,13 @@ function appendDryMediaUnionAccumulator(
     const ribbon = mark.ribbon;
     if (
       !entry
+      // A union stroke owns one immutable colour and one stroke-local alpha. A suffix that
+      // changes either is a planner contract violation, so the caller fails closed instead of
+      // recording a snapshot that would settle differently from the already-presented fills.
       || ribbon?.kind !== "dry-media-union-ribbon-polygon"
       || ribbon.role !== "stroke-union"
       || ribbon.version !== entry.ribbonVersion
-      || mark.alpha !== 1
+      || mark.alpha !== entry.alpha
       || mark.color !== entry.color
     ) return false;
     const bounds = dryMediaUnionPolygonBounds(ribbon.polygons);
@@ -387,7 +398,16 @@ function appendDryMediaUnionAccumulator(
   return true;
 }
 
-function snapshotDryMediaUnionAccumulator(
+/**
+ * Materializes the cumulative union as canonical coverage marks.
+ *
+ * The polygon list is shallow-copied so a retained snapshot stays immutable while later pointer
+ * frames keep appending suffix contours to the live accumulator. Incremental appends never call
+ * this (they only need the entry count), so the copy runs once per stroke start and replay.
+ *
+ * @internal exported for the colocated overlay contract test only.
+ */
+export function snapshotDryMediaUnionAccumulator(
   accumulator: DryMediaUnionAccumulator,
 ): readonly StudioDynamicBrushCoverageMark[] {
   return accumulator.entries.map((entry) => ({
@@ -400,13 +420,13 @@ function snapshotDryMediaUnionAccumulator(
       Math.max(0.25, (entry.maximumY - entry.minimumY) / 2),
     ),
     angleRadians: 0,
-    alpha: 1,
+    alpha: entry.alpha,
     color: entry.color,
     ribbon: {
       kind: "dry-media-union-ribbon-polygon",
       version: entry.ribbonVersion,
       role: "stroke-union",
-      polygons: entry.polygons,
+      polygons: [...entry.polygons],
     },
   }));
 }
@@ -1373,7 +1393,7 @@ export class StudioLiveDynamicBrushOverlayRenderer {
             : {}),
         };
       }
-      let cumulativeMarks: readonly StudioDynamicBrushCoverageMark[];
+      let cumulativeUnionCommandCount: number;
       if (dryMediaPredecessor) {
         if (
           !active.dryMediaUnionAccumulator
@@ -1384,29 +1404,28 @@ export class StudioLiveDynamicBrushOverlayRenderer {
         ) {
           return this.failActive("material-plan");
         }
-        cumulativeMarks = snapshotDryMediaUnionAccumulator(
-          active.dryMediaUnionAccumulator,
-        );
-        if (!this.drawMarksToActive(plan.marks, active.style.opacity, cumulativeMarks)) {
+        // O(1) append: paint and present only the planned suffix fills. The cumulative union is
+        // never re-materialized here; seal/replay bookkeeping only needs the entry count.
+        if (!this.drawMarksToActive(plan.marks, active.style.opacity, plan.marks)) {
           return this.failActive("surface-render");
         }
+        cumulativeUnionCommandCount = active.dryMediaUnionAccumulator.entries.length;
       } else {
         const accumulator = createDryMediaUnionAccumulator(plan.marks);
         if (!accumulator) return this.failActive("material-plan");
         active.dryMediaUnionAccumulator = accumulator;
-        cumulativeMarks = snapshotDryMediaUnionAccumulator(
-          active.dryMediaUnionAccumulator,
-        );
+        const cumulativeMarks = snapshotDryMediaUnionAccumulator(accumulator);
         this.clearActiveRect();
         if (!this.drawMarksToActive(cumulativeMarks, active.style.opacity)) {
           return this.failActive("surface-render");
         }
+        cumulativeUnionCommandCount = cumulativeMarks.length;
       }
       active.acceptedCausalDabCount += admittedSuffixDabs;
       active.lastAcceptedCausalDab = acceptedDabPrefix[admittedSuffixDabs - 1]
         ?? acceptedDabPrefix.at(-1);
       // One stroke-local union mark was painted; seal/replay markCount must match that authority.
-      active.markCount = cumulativeMarks.length;
+      active.markCount = cumulativeUnionCommandCount;
       active.r8AlphaMapBytes = 0;
       return {
         status: "appended",
@@ -1564,6 +1583,9 @@ export class StudioLiveDynamicBrushOverlayRenderer {
 
     if (
       planned.replaceInitialTap
+      // This branch relies on appendDabs' incremental-union rebuild to clear the replaced tap.
+      // A grain-source stroke never enters that rebuild, so it must keep the explicit
+      // clear-then-replay replacement path below instead of double-painting the tap.
       && active.style.dynamics.grain.source === undefined
       && studioDryMediaUnionRibbonCarrierOwnsMaterial(
         active.style.materialIdentity,

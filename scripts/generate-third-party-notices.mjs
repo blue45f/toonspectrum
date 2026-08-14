@@ -353,6 +353,79 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
 IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.`;
 
+/**
+ * First-party modules that embed hand-ported third-party code (no npm/cargo
+ * artifact carries their notice). Each entry pins a checked-in verbatim
+ * license copy whose permission notice must reach the generated dist notice.
+ * Missing or altered copies fail the audit — the same fail-closed posture as
+ * the opaque WASM inventories.
+ */
+export const EMBEDDED_FIRST_PARTY_PORT_NOTICES = Object.freeze([
+  Object.freeze({
+    label:
+      "dli/paint (Fluid Paint) painting.frag CPU port — src/domains/creator/studio-impasto-relief-shading-v1.ts — MIT",
+    licensePath: join(REPOSITORY_ROOT, "third_party", "dli-paint", "LICENSE"),
+    upstream: "https://github.com/dli/paint/blob/master/LICENSE",
+    requiredMarkers: Object.freeze([
+      "Copyright (c) 2017 David Li",
+      "Permission is hereby granted",
+    ]),
+  }),
+  Object.freeze({
+    label:
+      "croquis.js (@disjukr/croquis-js 0.0.3) capsule pen + pulled-string port — src/domains/creator/studio-croquis-capsule-pen-v1.ts — MIT option of (MIT OR Apache-2.0)",
+    licensePath: join(
+      REPOSITORY_ROOT,
+      "third_party",
+      "croquis-js",
+      "LICENSE-MIT",
+    ),
+    upstream: "https://github.com/disjukr/croquis.js",
+    requiredMarkers: Object.freeze([
+      "JongChan Choi",
+      "Permission is hereby granted",
+    ]),
+  }),
+  Object.freeze({
+    label:
+      "Klecks brush tip kernel re-implementations — src/domains/creator/studio-oss-brush-kernels.ts — MIT",
+    licensePath: join(REPOSITORY_ROOT, "third_party", "klecks", "LICENSE"),
+    upstream: "https://github.com/bitbof/klecks/blob/main/LICENSE",
+    requiredMarkers: Object.freeze([
+      "bitbof",
+      "Permission is hereby granted",
+    ]),
+  }),
+]);
+
+export function readEmbeddedFirstPartyPortDocuments(
+  ports = EMBEDDED_FIRST_PARTY_PORT_NOTICES,
+) {
+  return ports.map((port) => {
+    if (!existsSync(port.licensePath) || !statSync(port.licensePath).isFile()) {
+      throw new Error(
+        `First-party embedded port license copy is missing: ${relative(REPOSITORY_ROOT, port.licensePath)}`,
+      );
+    }
+    const text = readFileSync(port.licensePath, "utf8");
+    for (const marker of port.requiredMarkers) {
+      if (!text.includes(marker)) {
+        throw new Error(
+          `First-party embedded port license changed and needs review: ${relative(REPOSITORY_ROOT, port.licensePath)} no longer contains "${marker}".`,
+        );
+      }
+    }
+    return {
+      labels: new Set([port.label]),
+      sources: new Set([
+        port.upstream,
+        relative(REPOSITORY_ROOT, port.licensePath),
+      ]),
+      text,
+    };
+  });
+}
+
 const REVIEWED_RUST_LICENSE_EXPRESSIONS = new Set([
   "(MIT OR Apache-2.0) AND Unicode-3.0",
   "0BSD OR MIT OR Apache-2.0",
@@ -1671,6 +1744,9 @@ function collectLicenseDocuments(inventory, additionalDocuments = []) {
     relative(REPOSITORY_ROOT, xatlasCompanion),
     xatlasCompanionText,
   );
+  for (const document of readEmbeddedFirstPartyPortDocuments()) {
+    addDocument([...document.labels], [...document.sources], document.text);
+  }
   for (const document of additionalDocuments) {
     addDocument(
       [...document.labels],
@@ -1711,6 +1787,15 @@ function validateRepositoryPolicy() {
     OCCT_WASM_SHA256,
     "docs/third-party/opencascade-lgpl.md",
     "pnpm run audit:licenses",
+    "https://github.com/dli/paint",
+    "https://github.com/disjukr/croquis.js",
+    "https://github.com/bitbof/klecks",
+    "third_party/dli-paint/LICENSE",
+    "third_party/croquis-js/LICENSE-MIT",
+    "third_party/klecks/LICENSE",
+    "studio-impasto-relief-shading-v1.ts",
+    "studio-croquis-capsule-pen-v1.ts",
+    "studio-oss-brush-kernels.ts",
     "dist/legal/THIRD_PARTY_NOTICES.generated.md",
     "crates/studio-engine-vello/THIRD_PARTY_INVENTORY.json",
     "crates/studio-engine-vello/pkg/THIRD_PARTY_LICENSES.txt",

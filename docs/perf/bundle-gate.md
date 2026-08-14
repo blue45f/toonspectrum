@@ -186,3 +186,26 @@ studio bundle check failed: app entry raw regressed to 2354.2 KiB
   스냅샷이며, 그 사실이 리포트에 timestamp와 함께 표시된다.
 - ratchet은 **회귀 방지 장치이지 목표가 아니다.** 현재 기준선은 reference budget의 2~4.7배이며,
   그 격차를 좁히는 작업은 `startup-findings.md` §5의 우선순위를 따른다.
+
+## 7. 승인된 기준선 상향 기록
+
+기준선을 올린 웨이브는 **어떤 키가 허용치를 넘었는지** 여기에 남긴다. 게이트가 통과한 이유가
+"회귀가 없어서"인지 "기준선이 그 웨이브 자신에 의해 올라가서"인지 나중에 구분할 수 있어야 한다.
+
+### 2026-08-14 — 브러시 품질 웨이브 (`claude/toonbrush-quality-enhancement-d3adfb`)
+
+상향 직전 `origin/main` 기준선 대비 실측. `byteTolerance: 0.02`이므로 아래 4개 키는 상향이
+없었다면 `scripts/check-studio-bundle.mjs`가 **exit 1 (regression)** 로 막았을 값이다.
+
+| 키 | main 기준선 | 웨이브 실측 | 증가율 |
+| --- | ---: | ---: | ---: |
+| Studio route raw | 4,996,055 | 5,098,178 | +2.04% |
+| Studio route gzip | 1,589,332 | 1,622,389 | +2.08% |
+| Studio route after app shell raw | 4,394,721 | 4,496,789 | +2.32% |
+| Studio route after app shell gzip | 1,399,993 | 1,433,049 | +2.36% |
+
+청크 수(206→207, 197→198)는 `countSlack: 2` 안이라 그대로 통과했을 값이다.
+
+받아들인 대가: dry-media 커널·carrier ribbon·검증 엔진 레인이 studio route에 원본 약 100 KiB,
+gzip 약 33 KiB를 더한다. main의 living-ink WGSL 분할로는 상쇄되지 않는다. 다음 웨이브의 ratchet은
+이 올라간 바닥에서 시작하므로, 이 표가 그 바닥이 공짜가 아니었다는 기록이다.

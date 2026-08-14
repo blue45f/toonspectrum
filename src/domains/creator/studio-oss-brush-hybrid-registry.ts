@@ -532,6 +532,19 @@ const CORE_BRUSH_TEXTURE_KIND: Readonly<Record<string, StudioBrushTextureKind>> 
     "oil-pastel": "dry-oil-pastel",
     "ink-particle": "fx-particle",
     "tangent-normal-brush": "dynamics-generic",
+    // 2026-08-13 wave 3: CC0 MyPaint harvest lanes pin their upstream medium identity.
+    "mypaint-cc0--charcoal": "dry-charcoal",
+    "mypaint-cc0--charcoal-tanda": "dry-charcoal",
+    "mypaint-cc0--2b-pencil": "dry-graphite",
+    "mypaint-cc0--dry-brush": "paint-bristle",
+    "mypaint-cc0--splatter": "spray-splatter",
+    "mypaint-cc0--ink-blot": "line-ink",
+    "mypaint-cc0--kabura": "line-gpen",
+    "mypaint-cc0--watercolor-fringe": "wet-watercolor",
+    "mypaint-cc0--watercolor-expressive": "wet-watercolor",
+    "mypaint-cc0--oil-paint": "paint-oil",
+    "mypaint-cc0--pastel": "dry-pastel",
+    "mypaint-cc0--spray": "spray-airbrush",
     screentone: "stamp-tone",
     crosshatch: "stamp-tone",
     // Sketchpad / web specialty pack — pin by texture role, not generic default.
@@ -564,6 +577,17 @@ const CORE_BRUSH_TEXTURE_KIND: Readonly<Record<string, StudioBrushTextureKind>> 
     "web-smudge-trail": "paint-bristle",
     "web-cross-hatch-pen": "stamp-tone",
   });
+
+/**
+ * True when the id carries an explicit per-id texture-kind pin. Collection-base lanes (e.g. the
+ * heterogeneous-media mypaint-cc0 harvest) pin per id, deliberately diverging from their base id.
+ */
+export function hasStudioBrushTextureKindExactPin(
+  brushId: string | null | undefined,
+): boolean {
+  if (!brushId) return false;
+  return CORE_BRUSH_TEXTURE_KIND[brushId.trim().toLowerCase()] !== undefined;
+}
 
 /**
  * Resolve texture kind for any brush id (core + pack aliases).

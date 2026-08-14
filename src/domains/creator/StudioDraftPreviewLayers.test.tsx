@@ -222,6 +222,8 @@ describe("StudioDraftPreviewLayers", () => {
     expect(resolveStudioDraftPreviewActiveLane(draw("oil", { brush: "oil" }))).toBe("normal");
     expect(resolveStudioDraftPreviewActiveLane(draw("dynamic", {
       brush: "ink-particle",
+      // Captured-preset routing requires the bounded-flow-v2 seam the product stamps at start.
+      paintModel: "bounded-flow-v2",
     }))).toBe("dynamic");
     expect(resolveStudioDraftPreviewActiveLane(draw("eraser", {
       mode: "eraser",

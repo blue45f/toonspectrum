@@ -62,12 +62,18 @@ export const hokusaiProviderDescriptor: ProviderDescriptor =
     limitations: [
       "tile output composites through the raster surface owner — no direct surface ownership",
       "libmypaint parity lab pending for the full .myb corpus (matrix E11/E12 gate)",
+      "no fallback provider — device-incapable hosts hide natural-media brushes instead of substituting texture",
     ],
     previewQuality: "production",
     finalQuality: "production",
     determinism: "bit-exact",
     memoryEstimateMb: 24,
-    fallbackProviderId: "skia-canvaskit",
+    // V17.1 fail-closed policy: the former "skia-canvaskit" fallback is removed because no
+    // texture-equivalence certification exists for a Skia rendition of Hokusai natural-media
+    // output (사용자 지시 3: a brush must never silently render with a different texture — a
+    // device that cannot run this provider hides the brush rather than substituting). Restore a
+    // fallback only together with a checked-in texture-equivalence certification.
+    fallbackProviderId: null,
     knownIssues: [],
   });
 

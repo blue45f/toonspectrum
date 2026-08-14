@@ -43,7 +43,11 @@ function element(): DrawEl {
     speeds: [0, 5.4, 7.2],
     stroke: "#334155",
     strokeWidth: 14,
-    opacity: 0.9,
+    // Product pointer-start stamps the bounded-flow-v2 seam with causal sampleSpacing on every
+    // retained-dynamics pen stroke; the vNext specialist admits only its unit-opacity form.
+    opacity: 1,
+    paintModel: "bounded-flow-v2",
+    sampleSpacing: 1,
     brush: "dry-media",
     brushCatalogId: "dry-media",
     brushDynamics: normalizeStudioBrushDynamicsSettings({

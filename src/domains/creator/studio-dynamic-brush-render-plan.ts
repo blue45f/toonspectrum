@@ -12,7 +12,7 @@ import {
   normalizeStudioBrushDynamicsSettings,
   planNormalizedStudioDynamicBrushDabs,
   studioBrushDynamicsSeedFromKey,
-  studioBrushDynamicsSettingsForBrushId,
+  studioReplaySafeBrushDynamicsSettingsForBrushId,
   studioDynamicBrushDepositPipelineUsesContinuation,
 } from "./studio-brush-dynamics";
 import {
@@ -106,8 +106,10 @@ function settingsFor(
     : dynamicBrushId;
   const cached = defaultDynamicsByBrushId.get(brushId);
   if (cached) return cached;
-  const normalized = studioBrushDynamicsSettingsForBrushId(brushId)
-    ?? studioBrushDynamicsSettingsForBrushId(dynamicBrushId)
+  // Replay fail-safe, shared with the SVG exporter so the two surfaces cannot diverge: the
+  // id-derived path never hands out the dry-media kernel pin, only an element's own snapshot can.
+  const normalized = studioReplaySafeBrushDynamicsSettingsForBrushId(brushId)
+    ?? studioReplaySafeBrushDynamicsSettingsForBrushId(dynamicBrushId)
     ?? normalizeStudioBrushDynamicsSettings();
   defaultDynamicsByBrushId.set(brushId, normalized);
   return normalized;

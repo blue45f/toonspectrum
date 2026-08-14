@@ -156,7 +156,8 @@ describe("sanitizeBrushSnapshot", () => {
     const { snapshot, adjustedFields } = sanitizeBrushSnapshot(null);
     expect(snapshot.brushId).toBe("pen");
     expect(snapshot.color).toBe("#7c5cfc");
-    expect(snapshot.stabilizer).toBe(0);
+    // 2026-08-14: 기본 선 보정이 속도 적응 3으로 바뀌었다(느린 장선 손떨림 통과율 100%→48%).
+    expect(snapshot.stabilizer).toBe(3);
     expect(snapshot.postCorrection).toBe(0);
     expect(snapshot.useVelocityPressure).toBe(false);
     expect(adjustedFields).toContain("brushId");
@@ -206,7 +207,7 @@ describe("sanitizeBrushSnapshot", () => {
       pressureMinSize: 0,
     });
     expect(snapshot.strokeWidth).toBe(6);
-    expect(snapshot.stabilizer).toBe(0);
+    expect(snapshot.stabilizer).toBe(3);
     expect(snapshot.pressureCurve).toBe(1.0);
     expect(adjustedFields).toEqual(["strokeWidth", "stabilizer", "pressureCurve"]);
   });
@@ -236,7 +237,7 @@ describe("sanitizeBrushSnapshot", () => {
       postCorrection: 999,
       preserveCorners: "yes",
     });
-    expect(snapshot.stabilizerMode).toBe("standard");
+    expect(snapshot.stabilizerMode).toBe("adaptive");
     expect(snapshot.postCorrection).toBe(10);
     expect(snapshot.preserveCorners).toBe(true);
     expect(adjustedFields).toEqual(["postCorrection", "stabilizerMode", "preserveCorners"]);
@@ -359,6 +360,7 @@ describe("sanitizeBrushSnapshot", () => {
 
   it("키 순서가 달라도 이미 정규화된 동역학은 보정된 것으로 표시하지 않는다", () => {
     const reordered = {
+      presetId: validSnapshot.brushDynamics.presetId,
       tipLayers: validSnapshot.brushDynamics.tipLayers,
       grain: validSnapshot.brushDynamics.grain,
       colorDynamics: validSnapshot.brushDynamics.colorDynamics,
@@ -496,7 +498,7 @@ describe("listBrushes", () => {
     const s = fakeStorage({ [BRUSH_LIBRARY_KEY]: JSON.stringify([legacy]) });
     expect(listBrushes(s)[0]).toMatchObject({
       id: "legacy-v2",
-      stabilizerMode: "standard",
+      stabilizerMode: "adaptive",
       postCorrection: 0,
       preserveCorners: true,
     });

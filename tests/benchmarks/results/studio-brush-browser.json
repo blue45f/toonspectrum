@@ -1,19 +1,22 @@
 {
-  "schemaVersion": 1,
-  "measuredAt": "2026-08-11T00:12:45+09:00",
+  "schemaVersion": 2,
+  "measuredAt": "2026-08-14T05:17:56.290Z",
   "command": "pnpm run verify:studio-brushes",
   "status": "pass",
   "catalog": {
-    "total": 297,
-    "core": 137,
+    "total": 325,
+    "core": 165,
     "pro": 160,
-    "paint": 295,
-    "erase": 2
+    "paint": 323,
+    "erase": 2,
+    "quarantined": 2
   },
   "desktop": {
-    "selectedAndRendered": 297,
-    "undoPassed": 297,
-    "redoPassed": 297,
+    "selectedAndRendered": 323,
+    "undoPassed": 323,
+    "redoPassed": 323,
+    "uiCatalogMatchSkipped": false,
+    "surveyMode": false,
     "errorCount": 0,
     "erasers": {
       "standard-eraser": {
@@ -24,22 +27,26 @@
       "kneaded-eraser": {
         "operation": "erase",
         "liveRetainedLayerActive": true,
-        "residualEnergyRatio": 0.6204371299198885
+        "residualEnergyRatio": 0.6194507291693148
       }
     }
   },
   "longRouteCore": {
-    "passed": 137,
-    "total": 137,
-    "visibleSegmentsPerTool": 6,
+    "passed": 163,
+    "total": 163,
     "totalSegmentsPerTool": 6,
-    "representativePersistedPathDistancePx": 392.7396173371252,
-    "undoPassed": 137,
+    "continuousPolicyTools": 151,
+    "discretePolicyTools": 12,
+    "continuousMinimumVisibleSegments": 6,
+    "discreteMinimumVisibleSegments": 4,
+    "toolsBelowFullCoverage": 1,
     "continuousPolicyFailures": 0,
+    "undoPassed": 163,
+    "representativePersistedPathDistancePx": 392.7396173371252,
     "qualityPolicyCounts": {
-      "strict-continuous": 111,
-      "soft-wet-continuous": 18,
-      "record-only-discrete": 8
+      "strict-continuous": 137,
+      "soft-wet-continuous": 14,
+      "record-only-discrete": 12
     },
     "errorCount": 0
   },
@@ -50,19 +57,23 @@
     "errorCount": 0
   },
   "mobile": {
-    "paintSelections": 295,
+    "paintSelections": 321,
     "eraserSelections": 2,
-    "interactiveTargets": 594,
+    "interactiveTargets": 659,
     "minimumTargetWidthPx": 44,
     "minimumTargetHeightPx": 44,
     "undersizedTargets": 0,
     "errorCount": 0
   },
   "pointerUpDurability": {
-    "navigationIssuedInMs": 0.21958399994764477,
+    "receiptMarkerReason": "pointerup",
+    "receiptSettledInMs": 43.13,
+    "receiptStrokeCount": 1,
+    "survivorMarkerReason": "pointerup",
+    "survivorStrokeCount": 2,
+    "unloadPromptHeldMs": 150,
+    "navigationIssuedInMs": 0.95,
     "unloadGuardShown": true,
-    "markerReason": "pointerup",
-    "strokeCount": 1,
     "payloadContainsEveryStroke": true,
     "recoveryBannerShown": true,
     "recoveredPixelsChanged": true,

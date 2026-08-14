@@ -635,7 +635,7 @@ describe("studio CRDT page bridge", () => {
     const encoded = studioDrawElementToCrdtStroke("page-a", element);
     expect(studioDrawElementToCrdtStroke("page-a", element)).toEqual(encoded);
     expect(encoded.payload).toMatchObject({
-      version: STUDIO_CRDT_PAINT_STROKE_PAYLOAD_VERSION,
+      version: STUDIO_CRDT_MATERIAL_STROKE_PAYLOAD_VERSION,
       brush: "airbrush",
       brushDynamics,
       extensions: { paintModel: "bounded-flow-v2" },

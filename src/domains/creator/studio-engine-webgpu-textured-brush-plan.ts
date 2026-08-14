@@ -617,29 +617,74 @@ function validCanonicalWetMedia(input: unknown): boolean {
 }
 
 function validCanonicalRecipe(input: unknown): boolean {
-  const recipe = strictFrozenRecord(input, [
-    "version",
-    "brushId",
-    "engine",
-    "material",
-    "tip",
-    "size",
-    "flow",
-    "hardness",
-    "spacingRatio",
-    "scatter",
-    "angleRadians",
-    "roundness",
-    "pressure",
-    "grain",
-    "wetMedia",
-  ]);
+  if (typeof input !== "object" || input === null) return false;
+  const version = (input as { version?: unknown }).version;
+  const hasTipComposition = Object.hasOwn(input, "tipComposition");
+  const expectedKeys = version === 2
+    ? hasTipComposition
+      ? [
+          "version",
+          "brushId",
+          "engine",
+          "material",
+          "tip",
+          "size",
+          "flow",
+          "hardness",
+          "spacingRatio",
+          "scatter",
+          "angleRadians",
+          "roundness",
+          "pressure",
+          "grain",
+          "wetMedia",
+          "paint",
+          "retainedDynamics",
+          "tipComposition",
+        ]
+      : [
+          "version",
+          "brushId",
+          "engine",
+          "material",
+          "tip",
+          "size",
+          "flow",
+          "hardness",
+          "spacingRatio",
+          "scatter",
+          "angleRadians",
+          "roundness",
+          "pressure",
+          "grain",
+          "wetMedia",
+          "paint",
+          "retainedDynamics",
+        ]
+    : [
+        "version",
+        "brushId",
+        "engine",
+        "material",
+        "tip",
+        "size",
+        "flow",
+        "hardness",
+        "spacingRatio",
+        "scatter",
+        "angleRadians",
+        "roundness",
+        "pressure",
+        "grain",
+        "wetMedia",
+      ];
+  const recipe = strictFrozenRecord(input, expectedKeys);
   if (!recipe) return false;
   const scatter = strictFrozenRecord(recipe.scatter, ["radiusRatio", "distribution"]);
   const wetRelationship =
     (recipe.engine === "wet-media-v1") === (recipe.wetMedia !== null)
     && (recipe.wetMedia === null || recipe.material === "pigment");
-  return recipe.version === 1
+  return (recipe.version === 1 || recipe.version === 2)
     && canonicalIdentifier(recipe.brushId)
     && (recipe.engine === "dab-v1" || recipe.engine === "wet-media-v1")
     && (
@@ -746,12 +791,6 @@ function validCanonicalSource(input: unknown): boolean {
   return firstSequence === source.firstSequence && lastSequence === source.lastSequence;
 }
 
-/**
- * Performs complete descriptor-based validation of the durable canonical schema. The original
- * candidate `role` is intentionally absent from durable samples, so re-running the candidate
- * parser would change the schema; this equivalent authority check validates every consumed field
- * and requires the parser's exact deep-frozen output shape.
- */
 function canonicalPlanIsValidated(input: StudioCanonicalBrushPlan): boolean {
   const plan = strictFrozenRecord(input, [
     "kind",

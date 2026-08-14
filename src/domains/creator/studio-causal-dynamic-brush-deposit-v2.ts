@@ -10,7 +10,7 @@ import {
   applyStudioDynamicBrushMinimumDiameterRatio,
   studioDynamicBrushContactFactor,
   studioDynamicBrushDepositPipelineUsesContinuation,
-  resolveStudioBrushDynamics,
+  resolveStudioBrushDynamicsForNormalizedSettings,
   studioBrushTaperFactors,
   STUDIO_DYNAMIC_BRUSH_DAB_CAP_RANGE,
 } from "./studio-brush-dynamics";
@@ -435,7 +435,9 @@ function dabAt(
   distanceFromPrevious = 0,
   segmentStartFrame?: StudioDynamicBrushSegmentStartFrame,
 ): Readonly<{ dab: StudioDynamicBrushDab; spacing: number }> | null {
-  const recipe = resolveStudioBrushDynamics({
+  // The walker only ever holds normalized settings, so resolving through the normalized fast path
+  // yields byte-identical recipes while skipping a full settings re-normalization per emitted dab.
+  const recipe = resolveStudioBrushDynamicsForNormalizedSettings({
     pressure: sample.pressure,
     tangentialPressure: sample.tangentialPressure,
     speed: sample.speed,
