@@ -112,7 +112,8 @@ describe("Studio inspector bubble-appearance boundary", () => {
     // linked-pass projection과 함께 보존(4_145 → 4_150).
     // 의도적 확장(2026-08-12): paper surface catalog / async pixel-edit inspector glue
     // (4_150 → 4_180).
-    expect(inspector.split("\n").length).toBeLessThanOrEqual(4_180);
+    // 의도적 확장(2026-08-14): Page가 소유한 brush repository factory 전달(4_180 → 4_190).
+    expect(inspector.split("\n").length).toBeLessThanOrEqual(4_190);
     expect(leaf.source).not.toContain('"use no memo"');
     expect(leaf.source).not.toMatch(/\b(?:memo|useCallback|useMemo)\s*\(/u);
     expect(leaf.source).toContain(

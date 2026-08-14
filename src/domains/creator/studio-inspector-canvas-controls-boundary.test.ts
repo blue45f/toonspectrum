@@ -89,7 +89,8 @@ describe("Studio inspector canvas-controls boundary", () => {
     // 의도적 통합(2026-08-12): main의 raster preparation busy fail-closed 배선 5줄을
     // linked-pass projection과 함께 보존(4_145 → 4_150).
     // 의도적 확장(2026-08-12): paper surface catalog / async pixel-edit glue (4_150 → 4_180).
-    expect(inspector.split("\n").length).toBeLessThanOrEqual(4_180);
+    // 의도적 확장(2026-08-14): Page가 소유한 brush repository factory 전달(4_180 → 4_190).
+    expect(inspector.split("\n").length).toBeLessThanOrEqual(4_190);
     expect(leaf).not.toContain('"use no memo"');
     expect(leaf).not.toMatch(/\b(?:memo|useCallback|useMemo)\s*\(/u);
     expect(leaf).toContain("export function StudioInspectorCanvasControls(");
