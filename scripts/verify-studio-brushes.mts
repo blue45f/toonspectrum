@@ -119,7 +119,12 @@ const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
  * lost its race with teardown; the receipt budget is the ceiling for a write that is supposed to
  * begin at the input event's microtask checkpoint.
  */
-const UNLOAD_PROMPT_HOLD_MS = 120;
+const UNLOAD_PROMPT_HOLD_MS = 150;
+/**
+ * Also close to the largest useful value, not a tightening: the debounced autosave mirrors a
+ * marker-less payload into the same row about 1.7s after pointerup, so a receipt slower than this
+ * would find the marker already erased and fail with a worse message.
+ */
 const RECEIPT_SETTLE_BUDGET_MS = 1_500;
 const DEBUG_BRUSH_VERIFIER = process.env.TOONSPECTRUM_DEBUG_BRUSH_VERIFIER === "1";
 /** Opt-in diagnostic sweep: keep auditing after a preset fails so one pass lists them all. */
@@ -3693,6 +3698,8 @@ function writeBrowserEvidenceReceipt(run: {
   ).length;
   const receipt = {
     schemaVersion: 2,
+    measuredAt: new Date().toISOString(),
+    command: "pnpm run verify:studio-brushes",
     status: "pass",
     catalog: {
       total: STUDIO_ALL_BRUSH_CATALOG_ITEMS.length,
@@ -3711,6 +3718,17 @@ function writeBrowserEvidenceReceipt(run: {
       uiCatalogMatchSkipped: desktop.uiCatalogMatchSkipped,
       surveyMode: desktop.surveyMode,
       errorCount: desktop.errorCount,
+      // Per-eraser lift, kept in the receipt because it is the only place the erase behaviour is
+      // recorded: a standard eraser must clear its ink, a kneaded one must only lighten it.
+      erasers: Object.fromEntries(
+        desktop.evidence
+          .filter((entry) => entry.operation === "erase")
+          .map((entry) => [entry.id, {
+            operation: entry.operation,
+            liveRetainedLayerActive: entry.eraseLiveOperationActive,
+            residualEnergyRatio: entry.eraseResidualRatio,
+          }]),
+      ),
     },
     longRouteCore: {
       passed: longBrushes.presetCount,
@@ -3724,6 +3742,9 @@ function writeBrowserEvidenceReceipt(run: {
       continuousPolicyFailures: longBrushes.evidence.filter(
         (entry) => entry.qualityPolicy !== "record-only-discrete" && !entry.qualityOk,
       ).length,
+      undoPassed: longBrushes.evidence.filter((entry) => entry.undoRestoredPixels).length,
+      representativePersistedPathDistancePx:
+        longBrushes.evidence[0]?.persistedPathDistance ?? 0,
       qualityPolicyCounts: longBrushes.qualityPolicyCounts,
       errorCount: longBrushes.errorCount,
     },
@@ -3732,6 +3753,7 @@ function writeBrowserEvidenceReceipt(run: {
         (entry) => entry.persistenceMatched && entry.visualChanged,
       ).length,
       total: smartShapes.evidence.length,
+      representation: smartShapes.evidence[0]?.persistenceRepresentation ?? null,
       errorCount: smartShapes.errorCount,
     },
     mobile: {

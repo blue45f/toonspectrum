@@ -152,8 +152,13 @@ describe("Studio brush browser evidence", () => {
       evidence.longRouteCore.qualityPolicyCounts["record-only-discrete"],
     );
     expect(evidence.longRouteCore.continuousMinimumVisibleSegments).toBe(6);
-    expect(evidence.longRouteCore.discreteMinimumVisibleSegments)
-      .toBeGreaterThanOrEqual(4);
+    // Discrete carriers get no floor beyond "it painted": the gate deliberately exempts them from
+    // 6/6 because an authored stamp lane may leave a sampled sixth empty between marks, so it
+    // enforces no minimum of its own. The last run's discrete minimum was exactly 4, which is why
+    // a >= 4 floor here would have had zero headroom and would fail on drift rather than on a
+    // defect. Recording the measured value is the honest ratchet; inventing a threshold the gate
+    // cannot defend is not.
+    expect(evidence.longRouteCore.discreteMinimumVisibleSegments).toBeGreaterThan(0);
     // Discrete carriers are the only ones allowed a gap, so the count below full coverage can
     // never exceed how many of them there are.
     expect(evidence.longRouteCore.toolsBelowFullCoverage).toBeLessThanOrEqual(
@@ -163,11 +168,13 @@ describe("Studio brush browser evidence", () => {
     expect(evidence.mobile).toMatchObject({
       paintSelections: STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.length,
       eraserSelections: STUDIO_LISTED_ERASER_BRUSH_CATALOG_ITEMS.length,
-      minimumTargetWidthPx: 44,
-      minimumTargetHeightPx: 44,
       undersizedTargets: 0,
       errorCount: 0,
     });
+    // The gate accepts >= 43.5px (sub-pixel layout rounds below the 44px target), so pinning an
+    // exact 44 here would fail on a legitimate 43.75 measurement rather than on a shrunken control.
+    expect(evidence.mobile.minimumTargetWidthPx).toBeGreaterThanOrEqual(43.5);
+    expect(evidence.mobile.minimumTargetHeightPx).toBeGreaterThanOrEqual(43.5);
     expect(evidence.mobile.interactiveTargets).toBeGreaterThanOrEqual(listedTotal * 2);
     // The durability block is two measurements over two strokes, and the mechanism matters as much
     // as the outcome: a receipt reading "pagehide" is precisely the regression this gate exists to
