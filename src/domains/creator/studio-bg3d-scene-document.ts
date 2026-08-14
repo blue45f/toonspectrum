@@ -52,6 +52,10 @@ export type StudioBg3dSceneDocumentBudgetErrorCode =
   | "attachment-count-budget-exceeded"
   | "model-byte-budget-exceeded"
   | "node-count-budget-exceeded"
+  | "pose-joint-count-budget-exceeded"
+  | "morph-target-count-budget-exceeded"
+  | "aim-constraint-count-budget-exceeded"
+  | "two-bone-ik-count-budget-exceeded"
   | "shot-count-budget-exceeded"
   | "shot-visibility-count-budget-exceeded"
   | "document-byte-budget-exceeded";
@@ -1771,9 +1775,9 @@ function normalizePoseLayer(value: unknown): StudioBg3dPoseLayer | null {
     const jointKey = normalizedText(rawJoint.jointKey, 128);
     const rotationOffset = normalizeQuaternion(rawJoint.rotationOffset);
     if (!jointKey || !rotationOffset || keys.has(jointKey)) continue;
+    if (joints.length >= 256) failBudget("pose-joint-count-budget-exceeded");
     keys.add(jointKey);
     joints.push({ jointKey, rotationOffset });
-    if (joints.length >= 256) break;
   }
   return {
     enabled: normalizedBoolean(value.enabled, true),
@@ -1790,12 +1794,12 @@ function normalizeMorphLayer(value: unknown): StudioBg3dMorphLayer | null {
     if (!isRecord(rawTarget)) continue;
     const targetKey = normalizedText(rawTarget.targetKey, 128);
     if (!targetKey || keys.has(targetKey)) continue;
+    if (targets.length >= 256) failBudget("morph-target-count-budget-exceeded");
     keys.add(targetKey);
     targets.push({
       targetKey,
       weightOffset: boundedNumber(rawTarget.weightOffset, 0, -1, 1),
     });
-    if (targets.length >= 256) break;
   }
   return {
     enabled: normalizedBoolean(value.enabled, true),
@@ -1817,6 +1821,7 @@ function normalizeConstraintLayer(value: unknown): StudioBg3dConstraintLayer | n
       ? rawAim.axis as StudioBg3dAimAxis
       : null;
     if (!jointKey || !axis || keys.has(jointKey)) continue;
+    if (aims.length >= 128) failBudget("aim-constraint-count-budget-exceeded");
     keys.add(jointKey);
     aims.push({
       jointKey,
@@ -1824,7 +1829,6 @@ function normalizeConstraintLayer(value: unknown): StudioBg3dConstraintLayer | n
       axis,
       weight: boundedNumber(rawAim.weight, 1, 0, 1),
     });
-    if (aims.length >= 128) break;
   }
   const rawTwoBoneIks = hasOwn(value, "twoBoneIks") ? value.twoBoneIks : [];
   if (!Array.isArray(rawTwoBoneIks)) return null;
@@ -1845,6 +1849,9 @@ function normalizeConstraintLayer(value: unknown): StudioBg3dConstraintLayer | n
     ) {
       continue;
     }
+    if (twoBoneIks.length >= STUDIO_BG3D_MAX_TWO_BONE_IK_CONSTRAINTS) {
+      failBudget("two-bone-ik-count-budget-exceeded");
+    }
     claimedJointKeys.add(upperJointKey);
     claimedJointKeys.add(middleJointKey);
     claimedJointKeys.add(endJointKey);
@@ -1861,7 +1868,6 @@ function normalizeConstraintLayer(value: unknown): StudioBg3dConstraintLayer | n
       ),
       weight: boundedNumber(rawIk.weight, 1, 0, 1),
     });
-    if (twoBoneIks.length >= STUDIO_BG3D_MAX_TWO_BONE_IK_CONSTRAINTS) break;
   }
   return {
     enabled: normalizedBoolean(value.enabled, true),
