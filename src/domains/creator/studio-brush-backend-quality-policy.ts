@@ -1174,6 +1174,8 @@ const ENGINE_LANE_ROUTE_PROFILE_OVERRIDES = Object.freeze({
   "mypaint-cc0--watercolor-expressive": "wet-stamp",
   "mypaint-cc0--oil-paint": "wet-stamp",
   "mypaint-cc0--kabura": "continuous-stamp",
+  "mypaint-cc0--calligraphy": "continuous-stamp",
+  "mypaint-cc0--marker-fat": "continuous-stamp",
   // 2026-08-13 wave 3 — croquis 캡슐 아웃라인 레인은 둘 다 아웃라인 라우트다. base "pen" 파생은
   // continuous-analytic 이라 스태빌라이즈드 레인만 명시로 바로잡는다(gpen 파생은 이미 outline).
   "pen--croquis-stabilized": "continuous-outline",

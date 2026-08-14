@@ -2174,7 +2174,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               maxDabs: FX_OIL_DAB_CAP,
             });
             // brush--bristle-depletion 레인만 v1 강모 고갈 다이내믹을 켠다(갈필),
-            // brush--impasto-relief 레인만 dli GGX 릴리프 오버레이 프로그램을 켠다,
+            // dli GGX 릴리프 오버레이는 brush--impasto-relief 와 oil--impasto-ribbon 두 레인이 켠다,
             // brush--bristle-physics 레인만 WetBrush-2D 강모 물리 시뮬을 켠다(2026-08-13 wave 3).
             // 옵션이 없는 다른 모든 유화 브러시는 캐리어 계약상 바이트 동일 플랜을 유지하며, SVG
             // 내보내기의 유화 분기와 입력(대브·시드)이 같아 두 렌더러가 픽셀 일치한다.
@@ -2193,6 +2193,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                     },
                   })
                 : brush === "brush--impasto-relief"
+                  || brush === "oil--impasto-ribbon"
                   ? planStudioOilRibbonCarrier(dabs, {
                       impastoRelief: { enabled: true },
                     })

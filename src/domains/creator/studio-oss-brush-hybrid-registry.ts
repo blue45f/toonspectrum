@@ -540,6 +540,8 @@ const CORE_BRUSH_TEXTURE_KIND: Readonly<Record<string, StudioBrushTextureKind>> 
     "mypaint-cc0--splatter": "spray-splatter",
     "mypaint-cc0--ink-blot": "line-ink",
     "mypaint-cc0--kabura": "line-gpen",
+    "mypaint-cc0--calligraphy": "calligraphy",
+    "mypaint-cc0--marker-fat": "marker",
     "mypaint-cc0--watercolor-fringe": "wet-watercolor",
     "mypaint-cc0--watercolor-expressive": "wet-watercolor",
     "mypaint-cc0--oil-paint": "paint-oil",

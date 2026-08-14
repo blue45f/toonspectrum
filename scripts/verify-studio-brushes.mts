@@ -887,6 +887,16 @@ async function assertUiBrushCatalogMatchesProductCatalog(
     })));
   const actualLabels = actualSelections.map((selection) => selection.label);
 
+  if (actualSelections.length !== expectedCatalogItems.length) {
+    const actualSet = new Set(actualLabels);
+    const missing = expectedSelections
+      .filter((selection) => !actualSet.has(selection.label))
+      .map((selection) => selection.label);
+    const expectedSet = new Set(expectedSelections.map((s) => s.label));
+    const unexpected = actualLabels.filter((label) => !expectedSet.has(label));
+    console.log(`[verify-studio-brushes] MISSING(${missing.length}): ${missing.join(" | ")}`);
+    console.log(`[verify-studio-brushes] UNEXPECTED(${unexpected.length}): ${unexpected.join(" | ")}`);
+  }
   invariant(
     actualSelections.length === expectedCatalogItems.length,
     `desktop ${operationLabel} catalogue exposes ${actualSelections.length}/${expectedCatalogItems.length} product choices`,

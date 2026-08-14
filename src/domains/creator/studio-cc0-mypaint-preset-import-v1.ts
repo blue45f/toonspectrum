@@ -599,6 +599,87 @@ export const STUDIO_CC0_MYPAINT_PRESET_IMPORTS: readonly StudioCc0MypaintPresetI
       "Speed-driven scatter approximated by a mid-speed constant; hardness←pressure S-curve (soft graze → hard press) recorded, not executed.",
     ),
     preset(
+      "calligraphy",
+      "MyPaint CC0 · 캘리그래피",
+      "brushes/classic/calligraphy.myb",
+      "classic",
+      "ink",
+      {
+        opaque: { baseValue: 1 },
+        opaque_multiply: {
+          baseValue: 0,
+          inputs: { pressure: [[0, 0], [0.015, 0], [0.015, 1], [1, 1]] },
+        },
+        radius_logarithmic: {
+          baseValue: 2.02,
+          inputs: { pressure: [[0, 0], [1, 0.5]], speed1: [[0, -0], [1, -0.12]] },
+        },
+        hardness: {
+          baseValue: 0.74,
+          inputs: { pressure: [[0, 0], [1, 0.05]], speed1: [[0, -0], [1, -0.04]] },
+        },
+        dabs_per_actual_radius: { baseValue: 2.2 },
+        elliptical_dab_ratio: { baseValue: 5.46 },
+        elliptical_dab_angle: { baseValue: 45.92 },
+        direction_filter: { baseValue: 2 },
+        anti_aliasing: { baseValue: 3.53 },
+        offset_by_speed_slowness: { baseValue: 1 },
+        smudge_length: { baseValue: 0.5 },
+        slow_tracking: { baseValue: 0.65 },
+        slow_tracking_per_dab: { baseValue: 0.8 },
+      },
+      {
+        // 2·(2.2+0) = 4.4 dabs per diameter → spacing 0.2273; opaque 1 gated ON above p=0.015,
+        // so effective opacity at the p=0.5 reference is 1·1 = 1.
+        spacingRatio: 0.2273, flow: 1, hardness: 0.74, minSizeRatio: 0.6065, sizeScale: 1,
+        scatter: 0, scatterPressureResponse: 0, radiusJitter: 0,
+        opaqueLinearize: 0, dabsPerPixel: 4.4,
+      },
+      "elliptical_dab_ratio 5.46 / angle 45.92 is the flat nib and is NOT executed by the stamp walker — this import lands the wax/ink density and spacing, not the chisel geometry. direction_filter, speed1 envelopes, smudge_length and both slow_tracking settings are recorded verbatim and unexecuted.",
+    ),
+    preset(
+      "marker-fat",
+      "MyPaint CC0 · 광폭 마커",
+      "brushes/classic/marker_fat.myb",
+      "classic",
+      "ink",
+      {
+        opaque: { baseValue: 1 },
+        opaque_multiply: {
+          baseValue: 0,
+          inputs: { pressure: [[0, 0], [0.060241, 1], [1, 1]] },
+        },
+        opaque_linearize: { baseValue: 0.9 },
+        radius_logarithmic: {
+          baseValue: 2.48,
+          inputs: { tilt_declination: [[20, -0], [50, -0], [80, -1]] },
+        },
+        hardness: { baseValue: 1 },
+        dabs_per_actual_radius: { baseValue: 2 },
+        dabs_per_basic_radius: { baseValue: 1.5 },
+        elliptical_dab_ratio: {
+          baseValue: 10,
+          inputs: { tilt_declination: [[0, -0], [68.042169, -9], [90, -9]] },
+        },
+        elliptical_dab_angle: {
+          baseValue: 113.08,
+          inputs: { tilt_ascension: [[-180, -180], [180, 180]] },
+        },
+        direction_filter: { baseValue: 2 },
+        anti_aliasing: { baseValue: 0.78 },
+        smudge_length: { baseValue: 0.5 },
+        slow_tracking: { baseValue: 3 },
+      },
+      {
+        // 2·(2+1.5) = 7 dabs per diameter → spacing 0.1429; hardness 1 and opaque 1 gated ON above
+        // p=0.0602 give the flat, saturated marker bed. opaque_linearize 0.9 is the upstream value.
+        spacingRatio: 0.1429, flow: 1, hardness: 1, minSizeRatio: 1, sizeScale: 1,
+        scatter: 0, scatterPressureResponse: 0, radiusJitter: 0,
+        opaqueLinearize: 0.9, dabsPerPixel: 7,
+      },
+      "The chisel is tilt-driven upstream (elliptical_dab_ratio 10 collapsing to -9 with declination, angle following ascension); the stamp walker executes neither tilt input nor elliptical dabs, so this import lands the dense saturated marker bed and its 0.9 linearization, not the chisel. minSizeRatio is 1 because the radius envelope is tilt-driven, not pressure-driven.",
+    ),
+    preset(
       "spray",
       "MyPaint CC0 · 스프레이",
       "brushes/deevad/spray.myb",

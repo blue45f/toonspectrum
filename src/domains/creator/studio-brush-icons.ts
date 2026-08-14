@@ -406,6 +406,8 @@ export const STUDIO_BRUSH_ICON_BY_ID: Readonly<Record<string, StudioBrushIconId>
   "mypaint-cc0--splatter": "spray-can",
   "mypaint-cc0--ink-blot": "droplets",
   "mypaint-cc0--kabura": "pen-line",
+  "mypaint-cc0--calligraphy": "pen-line",
+  "mypaint-cc0--marker-fat": "highlighter",
   "mypaint-cc0--watercolor-fringe": "droplets",
   "mypaint-cc0--watercolor-expressive": "droplets",
   "mypaint-cc0--oil-paint": "paintbrush",

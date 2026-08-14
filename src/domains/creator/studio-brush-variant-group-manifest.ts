@@ -111,6 +111,8 @@ export const STUDIO_BRUSH_EXPERIMENTAL_LANE_PRESET_IDS: readonly string[] = Obje
   "mypaint-cc0--splatter",
   "mypaint-cc0--ink-blot",
   "mypaint-cc0--kabura",
+  "mypaint-cc0--calligraphy",
+  "mypaint-cc0--marker-fat",
   "mypaint-cc0--watercolor-fringe",
   "mypaint-cc0--watercolor-expressive",
   "mypaint-cc0--oil-paint",

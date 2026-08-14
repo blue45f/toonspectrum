@@ -104,9 +104,9 @@ function pairCoverageDistance(a: Float64Array, b: Float64Array): number {
 }
 
 describe("studio-cc0-mypaint-preset-import-v1", () => {
-  it("ships 12 registered presets with exact CC0 provenance", () => {
+  it("ships 14 registered presets with exact CC0 provenance", () => {
     const imports = listStudioCc0MypaintPresetImports();
-    expect(imports).toHaveLength(12);
+    expect(imports).toHaveLength(14);
     expect(STUDIO_CC0_MYPAINT_PRESET_PROVENANCE.license).toBe("CC0-1.0");
     expect(STUDIO_CC0_MYPAINT_PRESET_PROVENANCE.repository).toContain("mypaint/mypaint-brushes");
     const ids = new Set<string>();

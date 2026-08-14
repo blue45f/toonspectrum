@@ -111,8 +111,13 @@ afterEach(() => {
 });
 
 describe("StudioDrawNode — brush--impasto-relief Canvas 릴리프 오버레이", () => {
-  it("임파스토 릴리프 레인만 screen 글린트와 round-cap 코어 섀도우를 페인트한다", () => {
-    render(<StudioDrawNode el={oilEl("brush--impasto-relief")} />);
+  // oil--impasto-ribbon 은 2026-08-15 에 이 프로그램에 합류했다. 이름만 임파스토였던 레인으로,
+  // 릴리프가 없으면 선언 필드가 oil--filbert-ribbon 과 완전히 동일했고 렌더 픽셀 거리도
+  // oil--flat-ribbon 0.163 / acrylic--stiff-ribbon 0.168 로 코퍼스 중앙값(1.04)의 6분의 1이었다.
+  it.each(["brush--impasto-relief", "oil--impasto-ribbon"])(
+    "임파스토 릴리프 레인(%s)은 screen 글린트와 round-cap 코어 섀도우를 페인트한다",
+    (brush) => {
+    render(<StudioDrawNode el={oilEl(brush)} />);
     const context = paintOilShape();
 
     // 유화 바디는 그대로 한 번 채운다.
@@ -147,9 +152,10 @@ describe("StudioDrawNode — brush--impasto-relief Canvas 릴리프 오버레이
       .map(({ cap, composite }) => cap === "round" && composite === "multiply")
       .lastIndexOf(true);
     expect(firstGlint).toBeGreaterThan(lastCoreShadow);
-  });
+  },
+  );
 
-  it.each(["oil--impasto-ribbon", "brush--oil-lanes", "brush--bristle-depletion"])(
+  it.each(["brush--oil-lanes", "brush--bristle-depletion"])(
     "프로그램에 핀되지 않은 유화 형제 레인(%s)은 릴리프 패스를 전혀 페인트하지 않는다",
     (brush) => {
       render(<StudioDrawNode el={oilEl(brush)} />);

@@ -2961,11 +2961,18 @@ function serializeFreehand(
       seed: fxBrushSeedFromKey(el.id),
       maxDabs: FX_OIL_DAB_CAP,
     });
-    // brush--bristle-depletion 레인만 v1 강모 고갈 다이내믹을 켠다, brush--impasto-relief 레인만
-    // dli GGX 릴리프 오버레이 프로그램을 켠다, brush--bristle-physics 레인만 WetBrush-2D 강모
-    // 물리 시뮬을 켠다(2026-08-13 wave 3) — Canvas 렌더러(StudioDrawNode)의 유화 분기와 동일
-    // 입력(대브·시드)이라 두 렌더러의 플랜이 일치한다. 옵션이 없는 다른 모든 유화 브러시는
-    // 캐리어 계약상 바이트 동일 플랜을 유지한다.
+    // brush--bristle-depletion 레인만 v1 강모 고갈 다이내믹을 켠다, brush--bristle-physics 레인만
+    // WetBrush-2D 강모 물리 시뮬을 켠다(2026-08-13 wave 3) — Canvas 렌더러(StudioDrawNode)의 유화
+    // 분기와 동일 입력(대브·시드)이라 두 렌더러의 플랜이 일치한다. 옵션이 없는 다른 모든 유화
+    // 브러시는 캐리어 계약상 바이트 동일 플랜을 유지한다.
+    //
+    // dli GGX 릴리프 오버레이는 brush--impasto-relief 와 **oil--impasto-ribbon** 두 레인이 켠다
+    // (2026-08-15). 임파스토 레인이 이름만 임파스토였던 것을 고친 것이다: 릴리프가 없으면
+    // oil--impasto-ribbon 은 선언 필드가 oil--filbert-ribbon 과 완전히 동일해서 defaultWidth/
+    // defaultOpacity 만 다른 같은 브러시였고, 렌더 픽셀 비교에서도 oil--flat-ribbon 과 0.163,
+    // acrylic--stiff-ribbon 과 0.168 로 코퍼스 중앙값(1.04)의 6분의 1 거리에 붙어 있었다.
+    // 저장된 oil--impasto-ribbon 획은 이제 릴리프와 함께 다시 그려진다 — 질감을 바이트 안정성보다
+    // 우선한다는 기존 결정(크레용 5레인)과 같은 판단.
     const carrier = brush === "brush--bristle-physics"
       ? planStudioOilRibbonCarrier(dabs, {
           bristlePhysics: {
@@ -2980,7 +2987,7 @@ function serializeFreehand(
               seed: fxBrushSeedFromKey(el.id),
             },
           })
-        : brush === "brush--impasto-relief"
+        : brush === "brush--impasto-relief" || brush === "oil--impasto-ribbon"
           ? planStudioOilRibbonCarrier(dabs, {
               impastoRelief: { enabled: true },
             })
