@@ -84,6 +84,27 @@ describe("Studio exhaustive long-brush quality policy", () => {
     }).kind).toBe("record-only-discrete");
   });
 
+  it("records the authored dash-stitch motif without exempting ordinary line pens", () => {
+    const shared = {
+      source: "core" as const,
+      runtimeBrushId: "web-dash-stitch",
+      mediaGroup: "line" as const,
+      previewStyle: "dots",
+      intentionalDiscrete: false,
+    };
+
+    expect(classifyStudioLongBrushQualityPolicy({
+      ...shared,
+      id: "web-dash-stitch",
+    }).kind).toBe("record-only-discrete");
+    expect(classifyStudioLongBrushQualityPolicy({
+      ...shared,
+      id: "ordinary-line-pen",
+      runtimeBrushId: "ink-particle",
+      previewStyle: "line",
+    }).kind).toBe("strict-continuous");
+  });
+
   it("assigns every shipped brush exactly one policy without hiding continuous dry media", () => {
     const policies = STUDIO_ALL_BRUSH_CATALOG_ITEMS.map((item) => {
       const descriptor = studioBrushPackDescriptorById(item.id);

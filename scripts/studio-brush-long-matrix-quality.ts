@@ -155,6 +155,8 @@ const CORE_DISCRETE_BRUSH_IDS: ReadonlySet<string> = new Set([
   "sparkle-star",
   "splatter",
   "crosshatch",
+  // The product promise is a repeated dash/stitch motif, not an unbroken pen carrier.
+  "web-dash-stitch",
 ]);
 
 /**

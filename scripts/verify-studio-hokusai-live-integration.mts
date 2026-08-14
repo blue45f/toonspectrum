@@ -1,16 +1,16 @@
 /**
- * Production-preview vertical-slice gate for Studio's automatic Hokusai live brushes.
+ * Production-preview vertical-slice gate for Studio's Hokusai product boundary.
  *
- * This verifier deliberately drives the shipped Studio UI on a blank native document. It never
- * uploads or injects raster input. For pencil, charcoal, and oil it selects the real catalogue
- * entry, draws through trusted Playwright mouse/pointer input, observes the dedicated Worker
- * protocol, and proves that the one user gesture becomes one hidden recoverable DrawEl plus one
- * canonical PNG ImageEl carrying the exact receipt. One Undo must remove both, Redo must restore
- * both, and local autosave + a real page reload must preserve the receipt byte-for-byte.
+ * The committed full-size quality/throughput evidence intentionally blocks automatic Hokusai live
+ * promotion. This verifier therefore proves two distinct shipped contracts without injecting
+ * raster input or bypassing product policy:
  *
- * The fallback scenario flips the canvas before drawing. A flipped view is intentionally outside
- * Hokusai v1 admission, so the same direct pointer route must persist as one ordinary vector with
- * no Hokusai begin/frame/complete traffic and no lost trusted input samples.
+ * 1. Selecting pencil, charcoal, or oil from the normal shelf keeps the exact existing vector
+ *    route. One trusted pointer gesture persists as one visible DrawEl, and no Hokusai live Worker
+ *    may become ready or receive begin/frame/complete traffic.
+ * 2. The user-visible "Hokusai 자연매체 · 실험적" inspector is the explicit conversion route.
+ *    It probes the settled Hokusai Worker, converts a selected DrawEl into one hidden source plus
+ *    one PNG ImageEl, and preserves that pair through one-step Undo/Redo and autosave reload.
  *
  * This file never builds the application. Run it only after a known-good production build exists:
  *   pnpm exec tsx scripts/verify-studio-hokusai-live-integration.mts
@@ -38,7 +38,7 @@ import {
   type Page,
 } from "playwright";
 
-export const STUDIO_HOKUSAI_LIVE_INTEGRATION_REPORT_SCHEMA_VERSION = 1 as const;
+export const STUDIO_HOKUSAI_LIVE_INTEGRATION_REPORT_SCHEMA_VERSION = 2 as const;
 
 const SCRATCH =
   process.env.TOONSPECTRUM_HOKUSAI_LIVE_INTEGRATION_DIR
@@ -75,73 +75,56 @@ interface BrowserDiagnostics {
   readonly fiveHundredResponses: string[];
 }
 
-interface StoredElementSnapshot {
-  readonly id: string;
-  readonly type: string;
-  readonly hidden: boolean;
-  readonly brush: string | null;
-  readonly brushCatalogId: string | null;
-  readonly mode: string | null;
-  readonly pointCount: number;
-  readonly points: number[];
-  readonly hokusaiLiveReceipt: unknown;
-}
-
-interface StoredDocumentSnapshot {
-  readonly key: string | null;
-  readonly savedAt: string | null;
-  readonly elements: StoredElementSnapshot[];
-}
-
 interface WorkerBeginEvidence {
   readonly strokeId: string;
-  readonly presetId: string;
-  readonly radiusPixels: number | null;
-  readonly opacity: number | null;
-  readonly color: string | null;
-  readonly seed: number | null;
 }
 
 interface WorkerFrameEvidence {
   readonly strokeId: string;
-  readonly phase: string;
-  readonly sequence: number | null;
-  readonly pixelHash: string | null;
-  readonly pixelBytes: number;
-  readonly nonZeroAlphaPixels: number;
-  readonly blank: boolean;
 }
 
 interface WorkerCompleteEvidence {
   readonly strokeId: string;
+}
+
+interface StudioHokusaiProductRenderEvidence {
+  readonly version: number | null;
+  readonly requestId: number | null;
+  readonly engineEpoch: number | null;
+  readonly sourceElementId: string | null;
+  readonly sourceRevision: string | null;
   readonly presetId: string | null;
-  readonly sampleCount: number | null;
-  readonly finalSequence: number | null;
+  readonly materialProfileId: string | null;
+  readonly sourcePointCount: number | null;
+}
+
+interface StudioHokusaiProductResultEvidence {
+  readonly version: number | null;
+  readonly requestId: number | null;
+  readonly engineEpoch: number | null;
+  readonly receiptKind: string | null;
+  readonly receiptVersion: number | null;
+  readonly receiptRequestId: number | null;
+  readonly receiptEngineEpoch: number | null;
+  readonly sourceElementId: string | null;
+  readonly presetId: string | null;
+  readonly materialProfileId: string | null;
   readonly inputHash: string | null;
-  readonly lastLivePixelHash: string | null;
-  readonly settledPixelHash: string | null;
+  readonly pixelHash: string | null;
   readonly pngHash: string | null;
-  readonly exactLiveCommitParity: boolean;
-  readonly materialTexture: string | null;
-  readonly endpointPolicy: string | null;
-  readonly colorOpacityApplication: string | null;
-  readonly quality: StudioHokusaiLiveProductQualityEvidence | null;
+  readonly adapterVersion: string | null;
+  readonly execution: string | null;
+  readonly pngByteLength: number;
+  readonly pngSignatureValid: boolean;
   readonly complete: boolean;
 }
 
-export interface StudioHokusaiLiveProductQualityEvidence {
-  readonly nonZeroPixels: number;
-  readonly alphaMean: number;
-  readonly alphaStandardDeviation: number;
-  readonly edgeDensity: number;
-  readonly neighbourDifference: number;
-  readonly periodicity: number;
-  readonly circleCarrierExposure: number;
-  readonly startBackMassRatio: number;
-  readonly centerlineGapsAfterStart: number;
-  readonly horizontalVariation: number;
-  readonly verticalVariation: number;
-  readonly directionalAnisotropy: number;
+interface StudioLayerRowEvidence {
+  readonly id: string;
+  readonly semanticKind: string | null;
+  readonly hidden: boolean;
+  readonly selected: boolean;
+  readonly accessibleLabel: string;
 }
 
 interface TrustedPointerContactEvidence {
@@ -153,6 +136,8 @@ interface TrustedPointerContactEvidence {
 }
 
 interface BrowserMonitorSnapshot {
+  readonly liveWorkerConstructionCount: number;
+  readonly productWorkerConstructionCount: number;
   readonly readyCount: number;
   readonly begins: WorkerBeginEvidence[];
   readonly frames: WorkerFrameEvidence[];
@@ -163,62 +148,96 @@ interface BrowserMonitorSnapshot {
     strokeId: string | null;
   }>[];
   readonly pointerContacts: TrustedPointerContactEvidence[];
+  readonly productReadyCount: number;
+  readonly productReadyProtocolValidCount: number;
+  readonly productRenders: StudioHokusaiProductRenderEvidence[];
+  readonly productResults: StudioHokusaiProductResultEvidence[];
+  readonly productPngDataUrlCount: number;
+  readonly productFailures: readonly Readonly<{
+    reason: string | null;
+    detail: string | null;
+    requestId: number | null;
+  }>[];
 }
 
-export interface StudioHokusaiLiveFamilyIntegrationEvidence {
+export interface StudioHokusaiDefaultShelfIntegrationEvidence {
   readonly brushId: string;
   readonly brushName: string;
   readonly presetId: HokusaiFamilyId;
   readonly blankNativePageElementCount: 0;
-  readonly workerBeginCount: number;
+  readonly liveReadyCount: number;
+  readonly liveWorkerConstructionCount: number;
+  readonly liveBeginCount: number;
   readonly liveFrameCount: number;
-  readonly blankFrameCount: number;
-  readonly firstLiveFrame: WorkerFrameEvidence | null;
-  readonly workerCompleteCount: number;
-  readonly completeReceipt: WorkerCompleteEvidence | null;
+  readonly liveCompleteCount: number;
+  readonly liveFailureCount: number;
+  readonly productReadyCount: number;
+  readonly productWorkerConstructionCount: number;
+  readonly productReadyProtocolValidCount: number;
+  readonly productRenderCount: number;
+  readonly productResultCount: number;
+  readonly productFailureCount: number;
+  readonly productPngDataUrlCount: number;
   readonly trustedPointerSampleCount: number;
-  readonly canonicalSourceId: string | null;
-  readonly canonicalImageId: string | null;
-  readonly canonicalPairElementCount: number;
+  readonly vectorElementId: string | null;
+  readonly committedElementCount: number;
+  readonly visibleVectorCount: number;
+  readonly undoLayerCount: number;
+  readonly screenshot: string;
+}
+
+export interface StudioHokusaiExplicitInspectorIntegrationEvidence {
+  readonly mode: "selected-stroke-explicit-conversion";
+  readonly presetId: "charcoal";
+  readonly materialProfileId: "charcoal";
+  readonly blankNativePageElementCount: 0;
+  readonly liveReadyCount: number;
+  readonly liveWorkerConstructionCount: number;
+  readonly liveBeginCount: number;
+  readonly liveFrameCount: number;
+  readonly liveCompleteCount: number;
+  readonly liveFailureCount: number;
+  readonly trustedPointerSampleCount: number;
+  readonly sourceSelectedBeforeConversion: boolean;
+  readonly productReadyCount: number;
+  readonly productWorkerConstructionCount: number;
+  readonly productReadyProtocolValidCount: number;
+  readonly productRenderCount: number;
+  readonly productResultCount: number;
+  readonly productFailureCount: number;
+  readonly productPngDataUrlCount: number;
+  readonly productRender: StudioHokusaiProductRenderEvidence | null;
+  readonly productReceipt: StudioHokusaiProductResultEvidence | null;
+  readonly sourceElementId: string | null;
+  readonly convertedImageId: string | null;
+  readonly convertedPairElementCount: number;
   readonly hiddenDrawCount: number;
-  readonly canonicalReceiptCount: number;
-  readonly provisionalVisibleDrawCount: number;
+  readonly visibleImageCount: number;
+  readonly convertedImageHasPngSource: boolean;
+  readonly convertedImageSelected: boolean;
   readonly receiptSourceMatched: boolean;
   readonly receiptPresetMatched: boolean;
-  readonly receiptWorkerHashMatched: boolean;
+  readonly receiptRequestMatched: boolean;
   readonly undoLayerCount: number;
   readonly redoLayerCount: number;
   readonly reloadLayerCount: number;
-  readonly redoReceiptPreserved: boolean;
-  readonly reloadReceiptPreserved: boolean;
-  readonly screenshotLive: string;
-  readonly screenshotCommitted: string;
+  readonly sourceRestoredByUndo: boolean;
+  readonly pairRestoredByRedo: boolean;
+  readonly pairPreservedByReload: boolean;
+  readonly redoSourceElementId: string | null;
+  readonly redoImageElementId: string | null;
+  readonly reloadSourceElementId: string | null;
+  readonly reloadImageElementId: string | null;
+  readonly screenshotConverted: string;
   readonly screenshotReloaded: string;
-}
-
-export interface StudioHokusaiLiveFallbackIntegrationEvidence {
-  readonly mode: "canvas-horizontal-flip";
-  readonly blankNativePageElementCount: 0;
-  readonly hokusaiBeginDelta: number;
-  readonly hokusaiFrameDelta: number;
-  readonly hokusaiCompleteDelta: number;
-  readonly trustedPointerSampleCount: number;
-  readonly persistedVectorPointCount: number;
-  readonly lostInputSamples: number;
-  readonly persistedVectorPathDistance: number;
-  readonly persistedElementCount: number;
-  readonly visibleDrawCount: number;
-  readonly canonicalReceiptCount: number;
-  readonly undoLayerCount: number;
-  readonly screenshot: string;
 }
 
 export interface StudioHokusaiLiveIntegrationResult {
   readonly status: "ok" | "failed";
   readonly schemaVersion: typeof STUDIO_HOKUSAI_LIVE_INTEGRATION_REPORT_SCHEMA_VERSION;
-  readonly execution: "vite-production-preview-shipped-studio-direct-pointer";
-  readonly families: StudioHokusaiLiveFamilyIntegrationEvidence[];
-  readonly fallback: StudioHokusaiLiveFallbackIntegrationEvidence | null;
+  readonly execution: "vite-production-preview-shipped-studio-policy-and-explicit-inspector";
+  readonly shelf: StudioHokusaiDefaultShelfIntegrationEvidence[];
+  readonly explicitInspector: StudioHokusaiExplicitInspectorIntegrationEvidence | null;
   readonly diagnostics: BrowserDiagnostics;
   readonly issues: string[];
   readonly evidenceDirectory: string;
@@ -226,10 +245,6 @@ export interface StudioHokusaiLiveIntegrationResult {
 
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function finite(value: unknown): value is number {
-  return typeof value === "number" && Number.isFinite(value);
 }
 
 function integer(value: unknown, minimum = 0): value is number {
@@ -254,37 +269,6 @@ function log(message: string): void {
   console.log(line);
 }
 
-function exactReceiptIdentity(receipt: unknown): Readonly<{
-  sourceElementId: string;
-  sourceRevision: string;
-  presetId: string;
-  inputHash: string;
-  settledPixelHash: string;
-  pngHash: string;
-  exactLiveCommitParity: boolean;
-}> | null {
-  if (!record(receipt) || receipt.kind !== "studio-hokusai-live/document-receipt") return null;
-  const canonical = receipt.canonical;
-  if (!record(canonical)) return null;
-  if (
-    !string(receipt.sourceElementId)
-    || !string(receipt.sourceRevision)
-    || !string(canonical.presetId)
-    || !string(canonical.inputHash)
-    || !string(canonical.settledPixelHash)
-    || !string(canonical.pngHash)
-  ) return null;
-  return {
-    sourceElementId: receipt.sourceElementId,
-    sourceRevision: receipt.sourceRevision,
-    presetId: canonical.presetId,
-    inputHash: canonical.inputHash,
-    settledPixelHash: canonical.settledPixelHash,
-    pngHash: canonical.pngHash,
-    exactLiveCommitParity: canonical.exactLiveCommitParity === true,
-  };
-}
-
 /** Pure policy validation is exported so CI can reject incomplete/mocked browser evidence. */
 export function validateStudioHokusaiLiveIntegrationResult(candidate: unknown): string[] {
   const issues: string[] = [];
@@ -293,195 +277,172 @@ export function validateStudioHokusaiLiveIntegrationResult(candidate: unknown): 
   if (candidate.schemaVersion !== STUDIO_HOKUSAI_LIVE_INTEGRATION_REPORT_SCHEMA_VERSION) {
     issues.push("integration report schema version is invalid");
   }
-  if (candidate.execution !== "vite-production-preview-shipped-studio-direct-pointer") {
-    issues.push("integration run did not use the shipped production-preview direct-pointer path");
+  if (
+    candidate.execution
+    !== "vite-production-preview-shipped-studio-policy-and-explicit-inspector"
+  ) {
+    issues.push(
+      "integration run did not use the shipped product-policy and explicit-inspector path",
+    );
   }
 
-  const families = array(candidate.families) ? candidate.families : [];
+  const shelf = array(candidate.shelf) ? candidate.shelf : [];
   const expectedPresetIds = FAMILY_SCENARIOS.map(({ presetId }) => presetId);
-  const actualPresetIds = families.flatMap((family) => (
-    record(family) && string(family.presetId) ? [family.presetId] : []
+  const actualPresetIds = shelf.flatMap((entry) => (
+    record(entry) && string(entry.presetId) ? [entry.presetId] : []
   ));
   if (
-    families.length !== FAMILY_SCENARIOS.length
+    shelf.length !== FAMILY_SCENARIOS.length
     || JSON.stringify(actualPresetIds) !== JSON.stringify(expectedPresetIds)
   ) {
-    issues.push("pencil, charcoal, and oil were not each exercised exactly once");
+    issues.push("pencil, charcoal, and oil shelf policy was not each exercised exactly once");
   }
 
   for (const expected of FAMILY_SCENARIOS) {
-    const family = families.find((value) => record(value) && value.presetId === expected.presetId);
-    if (!record(family)) continue;
+    const entry = shelf.find((value) => record(value) && value.presetId === expected.presetId);
+    if (!record(entry)) continue;
     const prefix = expected.presetId;
-    if (family.brushId !== expected.brushId || family.brushName !== expected.brushName) {
+    if (entry.brushId !== expected.brushId || entry.brushName !== expected.brushName) {
       issues.push(`${prefix}: the shipped catalogue identity was not selected`);
     }
-    if (family.blankNativePageElementCount !== 0) {
+    if (entry.blankNativePageElementCount !== 0) {
       issues.push(`${prefix}: scenario did not begin on a blank native document`);
     }
-    if (family.workerBeginCount !== 1 || family.workerCompleteCount !== 1) {
-      issues.push(`${prefix}: one pointer gesture did not own exactly one Hokusai session`);
-    }
-    if (!integer(family.liveFrameCount, 1) || family.blankFrameCount !== 0) {
-      issues.push(`${prefix}: live frames are missing or include a blank frame`);
-    }
-    const firstFrame = family.firstLiveFrame;
     if (
-      !record(firstFrame)
-      || firstFrame.phase !== "live"
-      || !integer(firstFrame.pixelBytes, 4)
-      || !integer(firstFrame.nonZeroAlphaPixels, 1)
-      || firstFrame.blank !== false
-      || !string(firstFrame.pixelHash)
-      || !HASH_PATTERN.test(firstFrame.pixelHash)
+      entry.liveReadyCount !== 0
+      || entry.liveWorkerConstructionCount !== 0
+      || entry.liveBeginCount !== 0
+      || entry.liveFrameCount !== 0
+      || entry.liveCompleteCount !== 0
+      || entry.liveFailureCount !== 0
+      || entry.productReadyCount !== 0
+      || entry.productWorkerConstructionCount !== 0
+      || entry.productReadyProtocolValidCount !== 0
+      || entry.productRenderCount !== 0
+      || entry.productResultCount !== 0
+      || entry.productFailureCount !== 0
+      || entry.productPngDataUrlCount !== 0
     ) {
-      issues.push(`${prefix}: first live overlay frame lacks visible receipted pixels`);
-    }
-    const complete = family.completeReceipt;
-    if (
-      !record(complete)
-      || complete.presetId !== expected.presetId
-      || !integer(complete.sampleCount, 2)
-      || !integer(family.trustedPointerSampleCount, 2)
-      || (complete.sampleCount as number) < (family.trustedPointerSampleCount as number)
-      || complete.exactLiveCommitParity !== true
-      || complete.complete !== true
-      || !string(complete.inputHash)
-      || !HASH_PATTERN.test(complete.inputHash)
-      || !string(complete.lastLivePixelHash)
-      || !HASH_PATTERN.test(complete.lastLivePixelHash)
-      || !string(complete.settledPixelHash)
-      || complete.lastLivePixelHash !== complete.settledPixelHash
-      || !string(complete.pngHash)
-      || !HASH_PATTERN.test(complete.pngHash)
-      || complete.materialTexture !== "studio-hokusai-material-texture-v2"
-      || complete.endpointPolicy !== "tapered-start-no-dab-carrier-v1"
-      || complete.colorOpacityApplication !== "worker-once-before-material-transfer-v1"
-    ) {
-      issues.push(`${prefix}: canonical Worker receipt is incomplete or lost pointer samples`);
-    }
-    const quality = record(complete) && record(complete.quality)
-      ? complete.quality
-      : null;
-    // Graphite is intentionally porous: a single sampled centerline pixel can
-    // land in paper grain even when the canonical stroke is visually
-    // continuous. Charcoal and oil remain gap-free, and the separate sparse
-    // figure-eight gate proves both lobes and their alpha mass survive.
-    const maximumMaterialCenterlineGaps = expected.presetId === "pencil" ? 1 : 0;
-    if (
-      !quality
-      || !integer(quality.nonZeroPixels, 128)
-      || !finite(quality.alphaMean)
-      || quality.alphaMean < 0.12
-      || quality.alphaMean > 0.98
-      || !finite(quality.alphaStandardDeviation)
-      || quality.alphaStandardDeviation < 10
-      || !finite(quality.edgeDensity)
-      || quality.edgeDensity < 0.06
-      || !finite(quality.neighbourDifference)
-      || quality.neighbourDifference < 1.5
-      || !finite(quality.periodicity)
-      || quality.periodicity > 0.58
-      || !finite(quality.circleCarrierExposure)
-      || quality.circleCarrierExposure > 0.48
-      || !finite(quality.startBackMassRatio)
-      || quality.startBackMassRatio > 0.35
-      || !integer(quality.centerlineGapsAfterStart, 0)
-      || quality.centerlineGapsAfterStart > maximumMaterialCenterlineGaps
-      || !finite(quality.directionalAnisotropy)
-      || quality.directionalAnisotropy < 1.01
-    ) {
-      issues.push(`${prefix}: actual canonical pixels failed material quality gates`);
+      issues.push(`${prefix}: blocked normal shelf created Hokusai Worker traffic`);
     }
     if (
-      family.canonicalPairElementCount !== 2
-      || family.hiddenDrawCount !== 1
-      || family.canonicalReceiptCount !== 1
-      || family.provisionalVisibleDrawCount !== 0
-      || !string(family.canonicalSourceId)
-      || !string(family.canonicalImageId)
-      || family.canonicalSourceId === family.canonicalImageId
-      || family.receiptSourceMatched !== true
-      || family.receiptPresetMatched !== true
-      || family.receiptWorkerHashMatched !== true
+      !integer(entry.trustedPointerSampleCount, 2)
+      || !string(entry.vectorElementId)
+      || entry.committedElementCount !== 1
+      || entry.visibleVectorCount !== 1
+      || entry.undoLayerCount !== 0
     ) {
-      issues.push(`${prefix}: pointerup did not yield exactly one hidden DrawEl/canonical ImageEl pair`);
-    }
-    if (
-      family.undoLayerCount !== 0
-      || family.redoLayerCount !== 2
-      || family.reloadLayerCount !== 2
-      || family.redoReceiptPreserved !== true
-      || family.reloadReceiptPreserved !== true
-    ) {
-      issues.push(`${prefix}: one-step Undo/Redo or save-reload receipt preservation failed`);
+      issues.push(`${prefix}: blocked shelf route lost vector input or failed one-step Undo`);
     }
   }
 
-  const qualityByPreset = new Map<string, Record<string, unknown>>();
-  for (const family of families) {
-    if (!record(family) || !string(family.presetId)) continue;
-    if (!record(family.completeReceipt) || !record(family.completeReceipt.quality)) continue;
-    qualityByPreset.set(family.presetId, family.completeReceipt.quality);
-  }
-  const pencilQuality = qualityByPreset.get("pencil");
-  const charcoalQuality = qualityByPreset.get("charcoal");
-  const oilQuality = qualityByPreset.get("oil");
-  if (
-    !pencilQuality
-    || !charcoalQuality
-    || !oilQuality
-    || !finite(pencilQuality.edgeDensity)
-    || !finite(charcoalQuality.edgeDensity)
-    || !finite(oilQuality.edgeDensity)
-    || !finite(pencilQuality.alphaStandardDeviation)
-    || !finite(charcoalQuality.alphaStandardDeviation)
-    || !finite(oilQuality.alphaStandardDeviation)
-    || !finite(oilQuality.directionalAnisotropy)
-    || Math.max(
-      pencilQuality.edgeDensity,
-      charcoalQuality.edgeDensity,
-      oilQuality.edgeDensity,
-    ) - Math.min(
-      pencilQuality.edgeDensity,
-      charcoalQuality.edgeDensity,
-      oilQuality.edgeDensity,
-    ) < 0.025
-    || Math.max(
-      pencilQuality.alphaStandardDeviation,
-      charcoalQuality.alphaStandardDeviation,
-      oilQuality.alphaStandardDeviation,
-    ) - Math.min(
-      pencilQuality.alphaStandardDeviation,
-      charcoalQuality.alphaStandardDeviation,
-      oilQuality.alphaStandardDeviation,
-    ) < 2
-    || oilQuality.directionalAnisotropy < 1.05
-  ) {
-    issues.push("pencil graphite, charcoal grain, and oil bristles are not measurably separated");
-  }
-
-  const fallback = candidate.fallback;
-  if (!record(fallback)) {
-    issues.push("the rotated/flipped fail-visible vector scenario is missing");
-  } else if (
-    fallback.mode !== "canvas-horizontal-flip"
-    || fallback.blankNativePageElementCount !== 0
-    || fallback.hokusaiBeginDelta !== 0
-    || fallback.hokusaiFrameDelta !== 0
-    || fallback.hokusaiCompleteDelta !== 0
-    || !integer(fallback.trustedPointerSampleCount, 2)
-    || !integer(fallback.persistedVectorPointCount, 2)
-    || fallback.persistedVectorPointCount < fallback.trustedPointerSampleCount
-    || fallback.lostInputSamples !== 0
-    || !finite(fallback.persistedVectorPathDistance)
-    || fallback.persistedVectorPathDistance <= 100
-    || fallback.persistedElementCount !== 1
-    || fallback.visibleDrawCount !== 1
-    || fallback.canonicalReceiptCount !== 0
-    || fallback.undoLayerCount !== 0
-  ) {
-    issues.push("flipped-view fallback lost vector input or incorrectly entered Hokusai");
+  const inspector = candidate.explicitInspector;
+  const receipt = record(inspector) && record(inspector.productReceipt)
+    ? inspector.productReceipt
+    : null;
+  const render = record(inspector) && record(inspector.productRender)
+    ? inspector.productRender
+    : null;
+  if (!record(inspector)) {
+    issues.push("the explicit Hokusai inspector conversion scenario is missing");
+  } else {
+    if (
+      inspector.mode !== "selected-stroke-explicit-conversion"
+      || inspector.presetId !== "charcoal"
+      || inspector.materialProfileId !== "charcoal"
+      || inspector.blankNativePageElementCount !== 0
+      || !integer(inspector.trustedPointerSampleCount, 2)
+      || inspector.sourceSelectedBeforeConversion !== true
+    ) {
+      issues.push("explicit inspector did not start from one trusted selected vector stroke");
+    }
+    if (
+      inspector.liveReadyCount !== 0
+      || inspector.liveWorkerConstructionCount !== 0
+      || inspector.liveBeginCount !== 0
+      || inspector.liveFrameCount !== 0
+      || inspector.liveCompleteCount !== 0
+      || inspector.liveFailureCount !== 0
+    ) {
+      issues.push("explicit settled inspector conversion incorrectly entered Hokusai live");
+    }
+    if (
+      inspector.productWorkerConstructionCount !== 2
+      || inspector.productReadyCount !== 2
+      || inspector.productReadyProtocolValidCount !== 2
+      || inspector.productRenderCount !== 1
+      || inspector.productResultCount !== 1
+      || inspector.productFailureCount !== 0
+      || inspector.productPngDataUrlCount !== 1
+      || !render
+      || render.version !== 3
+      || !integer(render.requestId, 1)
+      || render.engineEpoch !== 1
+      || render.sourceElementId !== inspector.sourceElementId
+      || !string(render.sourceRevision)
+      || !SOURCE_REVISION_PATTERN.test(render.sourceRevision)
+      || render.presetId !== inspector.presetId
+      || render.materialProfileId !== inspector.materialProfileId
+      || !integer(
+        render.sourcePointCount,
+        integer(inspector.trustedPointerSampleCount, 2)
+          ? inspector.trustedPointerSampleCount
+          : 2,
+      )
+      || !receipt
+      || receipt.version !== 3
+      || receipt.requestId !== render.requestId
+      || receipt.engineEpoch !== render.engineEpoch
+      || receipt.receiptKind !== "studio-hokusai/receipt"
+      || receipt.receiptVersion !== 3
+      || receipt.receiptRequestId !== render.requestId
+      || receipt.receiptEngineEpoch !== render.engineEpoch
+      || receipt.sourceElementId !== inspector.sourceElementId
+      || receipt.presetId !== inspector.presetId
+      || receipt.materialProfileId !== inspector.materialProfileId
+      || receipt.complete !== true
+      || receipt.adapterVersion !== "0.3.0-packed-dirty-frame-adapter.3-profile-routing"
+      || receipt.execution !== "dedicated-worker-wasm-packed-dirty-frame"
+      || !string(receipt.inputHash)
+      || !HASH_PATTERN.test(receipt.inputHash)
+      || !string(receipt.pixelHash)
+      || !HASH_PATTERN.test(receipt.pixelHash)
+      || !string(receipt.pngHash)
+      || !HASH_PATTERN.test(receipt.pngHash)
+      || !integer(receipt.pngByteLength, 33)
+      || receipt.pngSignatureValid !== true
+      || inspector.receiptSourceMatched !== true
+      || inspector.receiptPresetMatched !== true
+      || inspector.receiptRequestMatched !== true
+    ) {
+      issues.push("explicit inspector Worker receipt is incomplete or mismatched");
+    }
+    if (
+      !string(inspector.sourceElementId)
+      || !string(inspector.convertedImageId)
+      || inspector.sourceElementId === inspector.convertedImageId
+      || inspector.convertedPairElementCount !== 2
+      || inspector.hiddenDrawCount !== 1
+      || inspector.visibleImageCount !== 1
+      || inspector.convertedImageHasPngSource !== true
+      || inspector.convertedImageSelected !== true
+    ) {
+      issues.push("explicit inspector did not create one hidden source and one visible PNG image");
+    }
+    if (
+      inspector.undoLayerCount !== 1
+      || inspector.redoLayerCount !== 2
+      || inspector.reloadLayerCount !== 2
+      || inspector.sourceRestoredByUndo !== true
+      || inspector.pairRestoredByRedo !== true
+      || inspector.pairPreservedByReload !== true
+      || inspector.redoSourceElementId !== inspector.sourceElementId
+      || inspector.redoImageElementId !== inspector.convertedImageId
+      || inspector.reloadSourceElementId !== inspector.sourceElementId
+      || inspector.reloadImageElementId !== inspector.convertedImageId
+    ) {
+      issues.push("explicit inspector pair identity failed one-step Undo/Redo or durable reload");
+    }
   }
 
   const diagnostics = candidate.diagnostics;
@@ -625,11 +586,19 @@ async function installInstrumentedCleanStudioState(page: Page): Promise<void> {
       quickstartKey,
     } = input;
     type MutableMonitor = {
+      liveWorkerConstructionCount: number;
+      productWorkerConstructionCount: number;
       readyCount: number;
       begins: Array<Record<string, unknown>>;
       frames: Array<Record<string, unknown>>;
       completes: Array<Record<string, unknown>>;
       failures: Array<Record<string, unknown>>;
+      productReadyCount: number;
+      productReadyProtocolValidCount: number;
+      productRenders: Array<Record<string, unknown>>;
+      productResults: Array<Record<string, unknown>>;
+      productPngDataUrlCount: number;
+      productFailures: Array<Record<string, unknown>>;
       pointerContacts: Array<{
         pointerId: number;
         pointerType: string;
@@ -642,185 +611,41 @@ async function installInstrumentedCleanStudioState(page: Page): Promise<void> {
       __studioHokusaiLiveIntegrationMonitor?: MutableMonitor;
     };
     const monitor: MutableMonitor = {
+      liveWorkerConstructionCount: 0,
+      productWorkerConstructionCount: 0,
       readyCount: 0,
       begins: [],
       frames: [],
       completes: [],
       failures: [],
+      productReadyCount: 0,
+      productReadyProtocolValidCount: 0,
+      productRenders: [],
+      productResults: [],
+      productPngDataUrlCount: 0,
+      productFailures: [],
       pointerContacts: [],
     };
     scope.__studioHokusaiLiveIntegrationMonitor = monitor;
-    const strokeTraces = new Map<string, {
-      radiusPixels: number;
-      samples: Array<{ x: number; y: number }>;
-    }>();
 
-    const alphaAt = (
-      pixels: Uint8Array,
-      width: number,
-      height: number,
-      x: number,
-      y: number,
-    ): number => {
-      let maximum = 0;
-      for (let offsetY = -1; offsetY <= 1; offsetY += 1) {
-        for (let offsetX = -1; offsetX <= 1; offsetX += 1) {
-          const sampleX = Math.round(x + offsetX);
-          const sampleY = Math.round(y + offsetY);
-          if (sampleX < 0 || sampleY < 0 || sampleX >= width || sampleY >= height) continue;
-          maximum = Math.max(
-            maximum,
-            pixels[(sampleY * width + sampleX) * 4 + 3] ?? 0,
-          );
-        }
-      }
-      return maximum;
-    };
-    const normalizedPeriodicity = (values: readonly number[]): number => {
-      const residual = values.map((value, index) => {
-        let sum = 0;
-        let count = 0;
-        for (
-          let neighbour = Math.max(0, index - 8);
-          neighbour <= Math.min(values.length - 1, index + 8);
-          neighbour += 1
-        ) {
-          sum += values[neighbour] ?? 0;
-          count += 1;
-        }
-        return value - sum / Math.max(1, count);
+    const nativeReadAsDataUrl = globalThis.FileReader?.prototype.readAsDataURL;
+    if (typeof nativeReadAsDataUrl === "function") {
+      Object.defineProperty(globalThis.FileReader.prototype, "readAsDataURL", {
+        configurable: true,
+        writable: true,
+        value(this: FileReader, blob: Blob): void {
+          if (blob.type === "image/png") {
+            this.addEventListener("load", () => {
+              if (
+                typeof this.result === "string"
+                && this.result.startsWith("data:image/png;base64,")
+              ) monitor.productPngDataUrlCount += 1;
+            }, { once: true });
+          }
+          nativeReadAsDataUrl.call(this, blob);
+        },
       });
-      let maximum = 0;
-      for (let lag = 3; lag <= Math.min(24, residual.length / 3); lag += 1) {
-        let correlation = 0;
-        let leftEnergy = 0;
-        let rightEnergy = 0;
-        for (let index = lag; index < residual.length; index += 1) {
-          const left = residual[index] ?? 0;
-          const right = residual[index - lag] ?? 0;
-          correlation += left * right;
-          leftEnergy += left * left;
-          rightEnergy += right * right;
-        }
-        const denominator = Math.sqrt(leftEnergy * rightEnergy);
-        if (denominator > 0) maximum = Math.max(maximum, correlation / denominator);
-      }
-      return Math.max(0, maximum);
-    };
-    const measureQuality = (
-      pixels: Uint8Array,
-      width: number,
-      height: number,
-      placement: Readonly<{ x: number; y: number }>,
-      trace: { radiusPixels: number; samples: Array<{ x: number; y: number }> },
-    ): StudioHokusaiLiveProductQualityEvidence | null => {
-      if (
-        width <= 0
-        || height <= 0
-        || pixels.byteLength !== width * height * 4
-        || trace.samples.length < 2
-      ) return null;
-      let nonZeroPixels = 0;
-      let alphaSum = 0;
-      let alphaSquareSum = 0;
-      let edgeCount = 0;
-      let neighbourCount = 0;
-      let horizontalDifference = 0;
-      let verticalDifference = 0;
-      let horizontalPairs = 0;
-      let verticalPairs = 0;
-      for (let y = 1; y < height - 1; y += 1) {
-        for (let x = 1; x < width - 1; x += 1) {
-          const index = (y * width + x) * 4 + 3;
-          const alpha = pixels[index] ?? 0;
-          if (alpha <= 0) continue;
-          nonZeroPixels += 1;
-          alphaSum += alpha;
-          alphaSquareSum += alpha * alpha;
-          const right = pixels[index + 4] ?? 0;
-          const down = pixels[index + width * 4] ?? 0;
-          edgeCount += Math.abs(alpha - right) >= 12 ? 1 : 0;
-          edgeCount += Math.abs(alpha - down) >= 12 ? 1 : 0;
-          neighbourCount += 2;
-          if (right > 0) {
-            horizontalDifference += Math.abs(alpha - right);
-            horizontalPairs += 1;
-          }
-          if (down > 0) {
-            verticalDifference += Math.abs(alpha - down);
-            verticalPairs += 1;
-          }
-        }
-      }
-      const localSamples = trace.samples.map((sample) => ({
-        x: sample.x - placement.x,
-        y: sample.y - placement.y,
-      }));
-      const centerline = localSamples.map((sample) => (
-        alphaAt(pixels, width, height, sample.x, sample.y)
-      ));
-      const mean = alphaSum / Math.max(1, nonZeroPixels);
-      const variance = Math.max(
-        0,
-        alphaSquareSum / Math.max(1, nonZeroPixels) - mean * mean,
-      );
-      const periodicity = normalizedPeriodicity(centerline);
-      const horizontalVariation = horizontalDifference / Math.max(1, horizontalPairs);
-      const verticalVariation = verticalDifference / Math.max(1, verticalPairs);
-      const origin = localSamples[0]!;
-      const next = localSamples.find((sample) => (
-        Math.hypot(sample.x - origin.x, sample.y - origin.y) >= 0.5
-      ));
-      let backMass = 0;
-      let forwardMass = 0;
-      if (next) {
-        const deltaX = next.x - origin.x;
-        const deltaY = next.y - origin.y;
-        const length = Math.hypot(deltaX, deltaY);
-        const tangentX = deltaX / length;
-        const tangentY = deltaY / length;
-        const normalX = -tangentY;
-        const normalY = tangentX;
-        const radius = Math.max(3, trace.radiusPixels * 1.5);
-        for (
-          let y = Math.max(0, Math.floor(origin.y - radius));
-          y <= Math.min(height - 1, Math.ceil(origin.y + radius));
-          y += 1
-        ) {
-          for (
-            let x = Math.max(0, Math.floor(origin.x - radius));
-            x <= Math.min(width - 1, Math.ceil(origin.x + radius));
-            x += 1
-          ) {
-            const relativeX = x - origin.x;
-            const relativeY = y - origin.y;
-            const along = relativeX * tangentX + relativeY * tangentY;
-            const across = Math.abs(relativeX * normalX + relativeY * normalY);
-            if (across > trace.radiusPixels || Math.abs(along) > trace.radiusPixels) continue;
-            const alpha = pixels[(y * width + x) * 4 + 3] ?? 0;
-            if (along < 0) backMass += alpha;
-            else forwardMass += alpha;
-          }
-        }
-      }
-      return {
-        nonZeroPixels,
-        alphaMean: mean / 255,
-        alphaStandardDeviation: Math.sqrt(variance),
-        edgeDensity: edgeCount / Math.max(1, neighbourCount),
-        neighbourDifference:
-          (horizontalDifference + verticalDifference)
-          / Math.max(1, horizontalPairs + verticalPairs),
-        periodicity,
-        circleCarrierExposure: periodicity * Math.min(1, Math.sqrt(variance) / 64),
-        startBackMassRatio: backMass / Math.max(1, forwardMass),
-        centerlineGapsAfterStart: centerline.slice(2).filter((alpha) => alpha <= 0).length,
-        horizontalVariation,
-        verticalVariation,
-        directionalAnisotropy: Math.max(horizontalVariation, verticalVariation)
-          / Math.max(0.001, Math.min(horizontalVariation, verticalVariation)),
-      };
-    };
+    }
 
     try {
       window.localStorage.setItem(quickstartKey, "1");
@@ -855,6 +680,14 @@ async function installInstrumentedCleanStudioState(page: Page): Promise<void> {
     if (typeof nativeWorker === "function") {
       const instrumentedWorker = new Proxy(nativeWorker, {
         construct(target, argumentsList) {
+          const options = argumentsList[1] && typeof argumentsList[1] === "object"
+            ? argumentsList[1] as Record<string, unknown>
+            : {};
+          if (options.name === "studio-hokusai-live-brush") {
+            monitor.liveWorkerConstructionCount += 1;
+          } else if (options.name === "studio-hokusai-natural-media") {
+            monitor.productWorkerConstructionCount += 1;
+          }
           const worker = Reflect.construct(target, argumentsList, target) as Worker;
           const mutableWorker = worker as unknown as {
             postMessage(message: unknown, transferOrOptions?: unknown): void;
@@ -864,44 +697,30 @@ async function installInstrumentedCleanStudioState(page: Page): Promise<void> {
             if (message && typeof message === "object" && !Array.isArray(message)) {
               const value = message as Record<string, unknown>;
               if (value.type === "studio-hokusai-live/begin") {
-                const config = value.config && typeof value.config === "object"
-                  ? value.config as Record<string, unknown>
-                  : {};
                 monitor.begins.push({
                   strokeId: typeof value.strokeId === "string" ? value.strokeId : "",
-                  presetId: typeof config.presetId === "string" ? config.presetId : "",
-                  radiusPixels: typeof config.radiusPixels === "number" ? config.radiusPixels : null,
-                  opacity: typeof config.opacity === "number" ? config.opacity : null,
-                  color: typeof config.color === "string" ? config.color : null,
-                  seed: typeof config.seed === "number" ? config.seed : null,
                 });
-                if (
-                  typeof value.strokeId === "string"
-                  && typeof config.radiusPixels === "number"
-                ) {
-                  strokeTraces.set(value.strokeId, {
-                    radiusPixels: config.radiusPixels,
-                    samples: [],
-                  });
-                }
-              } else if (
-                value.type === "studio-hokusai-live/append"
-                && typeof value.strokeId === "string"
-                && value.samples instanceof ArrayBuffer
-                && typeof value.sampleCount === "number"
-                && value.sampleStride === 6
-              ) {
-                const trace = strokeTraces.get(value.strokeId);
-                if (trace) {
-                  const packed = new Float32Array(value.samples);
-                  for (let index = 0; index < value.sampleCount; index += 1) {
-                    const offset = index * 6;
-                    trace.samples.push({
-                      x: packed[offset] ?? 0,
-                      y: packed[offset + 1] ?? 0,
-                    });
-                  }
-                }
+              } else if (value.type === "studio-hokusai/render") {
+                const plan = value.plan && typeof value.plan === "object"
+                  ? value.plan as Record<string, unknown>
+                  : {};
+                const source = plan.source && typeof plan.source === "object"
+                  ? plan.source as Record<string, unknown>
+                  : {};
+                monitor.productRenders.push({
+                  version: typeof value.version === "number" ? value.version : null,
+                  requestId: typeof value.requestId === "number" ? value.requestId : null,
+                  engineEpoch: typeof value.engineEpoch === "number" ? value.engineEpoch : null,
+                  sourceElementId: typeof source.elementId === "string" ? source.elementId : null,
+                  sourceRevision: typeof source.revision === "string" ? source.revision : null,
+                  presetId: typeof plan.presetId === "string" ? plan.presetId : null,
+                  materialProfileId: typeof plan.materialProfileId === "string"
+                    ? plan.materialProfileId
+                    : null,
+                  sourcePointCount: typeof source.sourcePointCount === "number"
+                    ? source.sourcePointCount
+                    : null,
+                });
               }
             }
             if (transferOrOptions === undefined) nativePostMessage(message);
@@ -910,83 +729,87 @@ async function installInstrumentedCleanStudioState(page: Page): Promise<void> {
           worker.addEventListener("message", (event: MessageEvent<unknown>) => {
             if (!event.data || typeof event.data !== "object" || Array.isArray(event.data)) return;
             const value = event.data as Record<string, unknown>;
+            if (value.type === "studio-hokusai/ready") {
+              monitor.productReadyCount += 1;
+              const runtime = value.runtime && typeof value.runtime === "object"
+                ? value.runtime as Record<string, unknown>
+                : {};
+              if (
+                value.version === 3
+                && runtime.engine === "reearth-hokusai"
+                && runtime.version === "0.3.0"
+                && runtime.adapterVersion
+                  === "0.3.0-packed-dirty-frame-adapter.3-profile-routing"
+                && runtime.wasm === true
+                && runtime.dedicatedWorker === true
+                && runtime.transparentRgba === true
+                && runtime.dirtyTiles === true
+                && runtime.packedDirtyFrame === true
+                && runtime.mainThreadFallback === false
+              ) monitor.productReadyProtocolValidCount += 1;
+              return;
+            }
+            if (value.type === "studio-hokusai/result") {
+              const receipt = value.receipt && typeof value.receipt === "object"
+                ? value.receipt as Record<string, unknown>
+                : {};
+              const pngBytes = value.pngBytes instanceof ArrayBuffer
+                ? new Uint8Array(value.pngBytes)
+                : new Uint8Array();
+              monitor.productResults.push({
+                version: typeof value.version === "number" ? value.version : null,
+                requestId: typeof value.requestId === "number" ? value.requestId : null,
+                engineEpoch: typeof value.engineEpoch === "number" ? value.engineEpoch : null,
+                receiptKind: typeof receipt.kind === "string" ? receipt.kind : null,
+                receiptVersion: typeof receipt.version === "number" ? receipt.version : null,
+                receiptRequestId: typeof receipt.requestId === "number"
+                  ? receipt.requestId
+                  : null,
+                receiptEngineEpoch: typeof receipt.engineEpoch === "number"
+                  ? receipt.engineEpoch
+                  : null,
+                sourceElementId: typeof receipt.sourceElementId === "string"
+                  ? receipt.sourceElementId
+                  : null,
+                presetId: typeof receipt.presetId === "string" ? receipt.presetId : null,
+                materialProfileId: typeof receipt.materialProfileId === "string"
+                  ? receipt.materialProfileId
+                  : null,
+                inputHash: typeof receipt.inputHash === "string" ? receipt.inputHash : null,
+                pixelHash: typeof receipt.pixelHash === "string" ? receipt.pixelHash : null,
+                pngHash: typeof receipt.pngHash === "string" ? receipt.pngHash : null,
+                adapterVersion: typeof receipt.adapterVersion === "string"
+                  ? receipt.adapterVersion
+                  : null,
+                execution: typeof receipt.execution === "string" ? receipt.execution : null,
+                pngByteLength: pngBytes.byteLength,
+                pngSignatureValid: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
+                  .every((byte, index) => pngBytes[index] === byte),
+                complete: receipt.complete === true,
+              });
+              return;
+            }
+            if (value.type === "studio-hokusai/failure") {
+              monitor.productFailures.push({
+                reason: typeof value.reason === "string" ? value.reason : null,
+                detail: typeof value.detail === "string" ? value.detail : null,
+                requestId: typeof value.requestId === "number" ? value.requestId : null,
+              });
+              return;
+            }
             if (value.type === "studio-hokusai-live/ready") {
               monitor.readyCount += 1;
               return;
             }
             if (value.type === "studio-hokusai-live/frame") {
-              const pixels = value.pixels instanceof ArrayBuffer
-                ? new Uint8Array(value.pixels)
-                : new Uint8Array();
-              let nonZeroAlphaPixels = 0;
-              for (let offset = 3; offset < pixels.byteLength; offset += 4) {
-                if ((pixels[offset] ?? 0) > 0) nonZeroAlphaPixels += 1;
-              }
               monitor.frames.push({
                 strokeId: typeof value.strokeId === "string" ? value.strokeId : "",
-                phase: typeof value.phase === "string" ? value.phase : "",
-                sequence: typeof value.sequence === "number" ? value.sequence : null,
-                pixelHash: typeof value.pixelHash === "string" ? value.pixelHash : null,
-                pixelBytes: pixels.byteLength,
-                nonZeroAlphaPixels,
-                blank: nonZeroAlphaPixels === 0,
               });
               return;
             }
             if (value.type === "studio-hokusai-live/complete") {
-              const receipt = value.receipt && typeof value.receipt === "object"
-                ? value.receipt as Record<string, unknown>
-                : {};
-              const pixels = value.pixels instanceof ArrayBuffer
-                ? new Uint8Array(value.pixels)
-                : new Uint8Array();
-              const dirtyBounds = Array.isArray(value.dirtyBounds)
-                ? value.dirtyBounds
-                : [];
-              const placement = value.logicalPlacement && typeof value.logicalPlacement === "object"
-                ? value.logicalPlacement as Record<string, unknown>
-                : {};
-              const trace = typeof value.strokeId === "string"
-                ? strokeTraces.get(value.strokeId)
-                : undefined;
-              const quality = trace
-                && typeof dirtyBounds[2] === "number"
-                && typeof dirtyBounds[3] === "number"
-                && typeof placement.x === "number"
-                && typeof placement.y === "number"
-                ? measureQuality(
-                    pixels,
-                    dirtyBounds[2],
-                    dirtyBounds[3],
-                    { x: placement.x, y: placement.y },
-                    trace,
-                  )
-                : null;
               monitor.completes.push({
                 strokeId: typeof value.strokeId === "string" ? value.strokeId : "",
-                presetId: typeof receipt.presetId === "string" ? receipt.presetId : null,
-                sampleCount: typeof receipt.sampleCount === "number" ? receipt.sampleCount : null,
-                finalSequence: typeof receipt.finalSequence === "number" ? receipt.finalSequence : null,
-                inputHash: typeof receipt.inputHash === "string" ? receipt.inputHash : null,
-                lastLivePixelHash: typeof receipt.lastLivePixelHash === "string"
-                  ? receipt.lastLivePixelHash
-                  : null,
-                settledPixelHash: typeof receipt.settledPixelHash === "string"
-                  ? receipt.settledPixelHash
-                  : null,
-                pngHash: typeof receipt.pngHash === "string" ? receipt.pngHash : null,
-                exactLiveCommitParity: receipt.exactLiveCommitParity === true,
-                materialTexture: typeof receipt.materialTexture === "string"
-                  ? receipt.materialTexture
-                  : null,
-                endpointPolicy: typeof receipt.endpointPolicy === "string"
-                  ? receipt.endpointPolicy
-                  : null,
-                colorOpacityApplication: typeof receipt.colorOpacityApplication === "string"
-                  ? receipt.colorOpacityApplication
-                  : null,
-                quality,
-                complete: receipt.complete === true,
               });
               return;
             }
@@ -1068,90 +891,60 @@ async function readBrowserMonitor(page: Page): Promise<BrowserMonitorSnapshot> {
   });
 }
 
-async function readStoredDocument(page: Page): Promise<StoredDocumentSnapshot> {
-  return page.evaluate((prefix) => {
-    type StoredDocument = {
-      savedAt?: string;
-      currentPageId?: string;
-      pagesList?: Array<{ id?: string; elements?: unknown[] }>;
-    };
-    let newest: { key: string; value: StoredDocument } | null = null;
-    for (let index = 0; index < window.localStorage.length; index += 1) {
-      const key = window.localStorage.key(index);
-      if (!key?.startsWith(prefix) || key.endsWith(":lifecycle")) continue;
-      const raw = window.localStorage.getItem(key);
-      if (!raw) continue;
-      try {
-        const value = JSON.parse(raw) as StoredDocument;
-        if (!Array.isArray(value.pagesList)) continue;
-        if (!newest || String(value.savedAt ?? "") >= String(newest.value.savedAt ?? "")) {
-          newest = { key, value };
-        }
-      } catch {
-        // Keep looking for the newest valid Studio autosave.
-      }
-    }
-    if (!newest) return { key: null, savedAt: null, elements: [] };
-    const pageRecord = newest.value.pagesList?.find(
-      (candidate) => candidate.id === newest?.value.currentPageId,
-    ) ?? newest.value.pagesList?.[0];
-    const elements = (pageRecord?.elements ?? []).flatMap((element) => {
-      if (!element || typeof element !== "object" || Array.isArray(element)) return [];
-      const value = element as Record<string, unknown>;
-      const points = Array.isArray(value.points)
-        ? value.points.filter((point): point is number => (
-            typeof point === "number" && Number.isFinite(point)
-          ))
-        : [];
-      return [{
-        id: typeof value.id === "string" ? value.id : "",
-        type: typeof value.type === "string" ? value.type : "",
-        hidden: value.hidden === true,
-        brush: typeof value.brush === "string" ? value.brush : null,
-        brushCatalogId: typeof value.brushCatalogId === "string" ? value.brushCatalogId : null,
-        mode: typeof value.mode === "string" ? value.mode : null,
-        pointCount: Math.floor(points.length / 2),
-        points,
-        hokusaiLiveReceipt: value.hokusaiLiveReceipt ?? null,
-      }];
-    });
+async function readLayerRows(page: Page): Promise<StudioLayerRowEvidence[]> {
+  return page.locator('[data-studio-layer-row="true"]').evaluateAll((rows) => rows.map((row) => {
+    const visibility = row.querySelector<HTMLElement>(
+      '[data-studio-layer-row-action="visibility"]',
+    );
+    const visibilityLabel = visibility?.getAttribute("aria-label") ?? "";
+    const selectionState = row.getAttribute("data-studio-layer-selection-state");
     return {
-      key: newest.key,
-      savedAt: typeof newest.value.savedAt === "string" ? newest.value.savedAt : null,
-      elements,
+      id: row.id.startsWith("studio-layer-")
+        ? row.id.slice("studio-layer-".length)
+        : "",
+      semanticKind: row.querySelector<HTMLElement>("[data-studio-layer-kind-badge]")
+        ?.getAttribute("data-studio-layer-kind-badge") ?? null,
+      hidden: visibilityLabel.endsWith(" 표시"),
+      selected: row.getAttribute("data-studio-layer-selected") === "true"
+        || selectionState === "current"
+        || selectionState === "selected",
+      accessibleLabel: row.getAttribute("aria-label") ?? "",
     };
-  }, AUTOSAVE_PREFIX);
+  }));
 }
 
-function canonicalPair(snapshot: StoredDocumentSnapshot): Readonly<{
-  source: StoredElementSnapshot;
-  image: StoredElementSnapshot;
-  receipt: NonNullable<ReturnType<typeof exactReceiptIdentity>>;
+function explicitInspectorPair(
+  rows: readonly StudioLayerRowEvidence[],
+  sourceElementId: string,
+  expectedImageId?: string,
+): Readonly<{
+  source: StudioLayerRowEvidence;
+  image: StudioLayerRowEvidence;
 }> | null {
-  const images = snapshot.elements.flatMap((element) => {
-    const receipt = exactReceiptIdentity(element.hokusaiLiveReceipt);
-    return element.type === "image" && receipt ? [{ element, receipt }] : [];
-  });
+  const source = rows.find(({ id }) => id === sourceElementId);
+  const images = rows.filter(({ semanticKind, hidden }) => semanticKind === "raster" && !hidden);
+  if (!source || source.semanticKind !== "vector" || !source.hidden) return null;
   if (images.length !== 1) return null;
-  const [{ element: image, receipt }] = images;
-  const source = snapshot.elements.find(({ id }) => id === receipt.sourceElementId);
-  return source?.type === "draw" ? { source, image, receipt } : null;
+  const image = images[0]!;
+  if (expectedImageId !== undefined && image.id !== expectedImageId) return null;
+  if (!image.accessibleLabel.includes("Hokusai")) return null;
+  return { source, image };
 }
 
-async function waitForStoredDocument(
+async function waitForLayerRows(
   page: Page,
-  predicate: (snapshot: StoredDocumentSnapshot) => boolean,
+  predicate: (rows: readonly StudioLayerRowEvidence[]) => boolean,
   message: string,
   timeoutMilliseconds = 12_000,
-): Promise<StoredDocumentSnapshot> {
+): Promise<StudioLayerRowEvidence[]> {
   const deadline = Date.now() + timeoutMilliseconds;
-  let snapshot = await readStoredDocument(page);
-  while (!predicate(snapshot) && Date.now() < deadline) {
-    await page.waitForTimeout(150);
-    snapshot = await readStoredDocument(page);
+  let rows = await readLayerRows(page);
+  while (!predicate(rows) && Date.now() < deadline) {
+    await page.waitForTimeout(100);
+    rows = await readLayerRows(page);
   }
-  invariant(predicate(snapshot), message);
-  return snapshot;
+  invariant(predicate(rows), message);
+  return rows;
 }
 
 async function prepareStudio(page: Page, studioUrl: string): Promise<void> {
@@ -1279,25 +1072,6 @@ function pointerSampleCount(contact: TrustedPointerContactEvidence | undefined):
   return contact ? 1 + contact.moves.length : 0;
 }
 
-function pathDistance(points: readonly number[]): number {
-  let distance = 0;
-  for (let offset = 2; offset + 1 < points.length; offset += 2) {
-    distance += Math.hypot(
-      points[offset]! - points[offset - 2]!,
-      points[offset + 1]! - points[offset - 1]!,
-    );
-  }
-  return distance;
-}
-
-async function waitForWorkerReady(page: Page): Promise<void> {
-  await page.waitForFunction(() => (
-    ((globalThis as typeof globalThis & {
-      __studioHokusaiLiveIntegrationMonitor?: BrowserMonitorSnapshot;
-    }).__studioHokusaiLiveIntegrationMonitor?.readyCount ?? 0) > 0
-  ), undefined, { timeout: 12_000 });
-}
-
 async function restoreAutosaveAfterReload(page: Page): Promise<void> {
   await page.locator('[data-studio-editor="true"]').waitFor({ state: "visible", timeout: 15_000 });
   const banner = page.getByText(
@@ -1309,112 +1083,66 @@ async function restoreAutosaveAfterReload(page: Page): Promise<void> {
   await banner.waitFor({ state: "detached", timeout: 10_000 });
 }
 
-async function runFamilyScenario(
+async function runDefaultShelfScenario(
   browser: Browser,
   studioUrl: string,
   scenario: (typeof FAMILY_SCENARIOS)[number],
   aggregateDiagnostics: BrowserDiagnostics,
-): Promise<StudioHokusaiLiveFamilyIntegrationEvidence> {
+): Promise<StudioHokusaiDefaultShelfIntegrationEvidence> {
   const context = await browser.newContext({ viewport: { width: 1_440, height: 1_000 } });
   const page = await context.newPage();
   const diagnostics = collectBrowserDiagnostics(page, scenario.presetId, studioUrl);
-  const screenshotLive = join(SCRATCH, `${scenario.presetId}-01-live.png`);
-  const screenshotCommitted = join(SCRATCH, `${scenario.presetId}-02-committed.png`);
-  const screenshotReloaded = join(SCRATCH, `${scenario.presetId}-03-reloaded.png`);
+  const screenshot = join(SCRATCH, `${scenario.presetId}-blocked-shelf-vector.png`);
   try {
     await installInstrumentedCleanStudioState(page);
     await prepareStudio(page, studioUrl);
     await activatePen(page);
     await selectBrush(page, scenario);
-    await page.locator('[data-studio-hokusai-live-overlay="true"]').waitFor({ state: "attached" });
-    await waitForWorkerReady(page);
     await openLayerNavigator(page);
     const blankNativePageElementCount = await waitForLayerCount(page, 0);
     const route = await directPointerRoute(page);
-    await drawDirectPointerRoute(page, route, {
-      waitForLiveFrame: true,
-      liveScreenshot: screenshotLive,
-    });
-    await waitForLayerCount(page, 2);
-    const committed = await waitForStoredDocument(
+    await drawDirectPointerRoute(page, route, { waitForLiveFrame: false });
+    await waitForLayerCount(page, 1);
+    const committed = await waitForLayerRows(
       page,
-      (snapshot) => canonicalPair(snapshot) !== null && snapshot.elements.length === 2,
-      `${scenario.presetId}: pointerup did not autosave the canonical pair`,
+      (rows) => rows.length === 1
+        && rows[0]?.semanticKind === "vector"
+        && rows[0]?.hidden === false,
+      `${scenario.presetId}: blocked shelf route did not commit one visible vector layer`,
     );
-    const pair = canonicalPair(committed);
-    invariant(pair, `${scenario.presetId}: canonical pair is missing`);
-    await page.screenshot({ path: screenshotCommitted, animations: "disabled" });
     const monitor = await readBrowserMonitor(page);
-    invariant(monitor.failures.length === 0, `${scenario.presetId}: Worker reported ${JSON.stringify(monitor.failures)}`);
-    const begins = monitor.begins.filter(({ strokeId }) => strokeId === pair.source.id);
-    const frames = monitor.frames.filter(({ strokeId }) => strokeId === pair.source.id);
-    const completes = monitor.completes.filter(({ strokeId }) => strokeId === pair.source.id);
-    const firstLiveFrame = frames.find(({ phase }) => phase === "live") ?? null;
-    const completeReceipt = completes[0] ?? null;
     const contact = monitor.pointerContacts[0];
-
+    const trustedPointerSampleCount = pointerSampleCount(contact);
+    const vector = committed[0]!;
+    await page.screenshot({ path: screenshot, animations: "disabled" });
     await page.keyboard.press("Meta+z");
     const undoLayerCount = await waitForLayerCount(page, 0);
-    await page.keyboard.press("Meta+Shift+z");
-    const redoLayerCount = await waitForLayerCount(page, 2);
-    const redone = await waitForStoredDocument(
-      page,
-      (snapshot) => canonicalPair(snapshot) !== null && snapshot.elements.length === 2,
-      `${scenario.presetId}: Redo did not restore the canonical pair`,
-    );
-    const redonePair = canonicalPair(redone);
-    invariant(redonePair, `${scenario.presetId}: redone canonical pair is missing`);
-
-    await page.reload({ waitUntil: "domcontentloaded", timeout: 25_000 });
-    await restoreAutosaveAfterReload(page);
-    await openLayerNavigator(page);
-    const reloadLayerCount = await waitForLayerCount(page, 2);
-    const reloaded = await readStoredDocument(page);
-    const reloadedPair = canonicalPair(reloaded);
-    invariant(reloadedPair, `${scenario.presetId}: reload did not preserve the canonical pair`);
-    await page.screenshot({ path: screenshotReloaded, animations: "disabled" });
-
-    const receipt = pair.receipt;
-    const workerReceiptHashMatched = Boolean(
-      completeReceipt
-      && receipt.inputHash === completeReceipt.inputHash
-      && receipt.settledPixelHash === completeReceipt.settledPixelHash
-      && receipt.pngHash === completeReceipt.pngHash,
-    );
     return {
       brushId: scenario.brushId,
       brushName: scenario.brushName,
       presetId: scenario.presetId,
       blankNativePageElementCount: blankNativePageElementCount as 0,
-      workerBeginCount: begins.length,
-      liveFrameCount: frames.length,
-      blankFrameCount: frames.filter(({ blank }) => blank).length,
-      firstLiveFrame,
-      workerCompleteCount: completes.length,
-      completeReceipt,
-      trustedPointerSampleCount: pointerSampleCount(contact),
-      canonicalSourceId: pair.source.id,
-      canonicalImageId: pair.image.id,
-      canonicalPairElementCount: committed.elements.length,
-      hiddenDrawCount: committed.elements.filter(({ type, hidden }) => type === "draw" && hidden).length,
-      canonicalReceiptCount: committed.elements.filter((element) => (
-        exactReceiptIdentity(element.hokusaiLiveReceipt) !== null
+      liveReadyCount: monitor.readyCount,
+      liveWorkerConstructionCount: monitor.liveWorkerConstructionCount,
+      liveBeginCount: monitor.begins.length,
+      liveFrameCount: monitor.frames.length,
+      liveCompleteCount: monitor.completes.length,
+      liveFailureCount: monitor.failures.length,
+      productReadyCount: monitor.productReadyCount,
+      productWorkerConstructionCount: monitor.productWorkerConstructionCount,
+      productReadyProtocolValidCount: monitor.productReadyProtocolValidCount,
+      productRenderCount: monitor.productRenders.length,
+      productResultCount: monitor.productResults.length,
+      productFailureCount: monitor.productFailures.length,
+      productPngDataUrlCount: monitor.productPngDataUrlCount,
+      trustedPointerSampleCount,
+      vectorElementId: vector.id,
+      committedElementCount: committed.length,
+      visibleVectorCount: committed.filter(({ semanticKind, hidden }) => (
+        semanticKind === "vector" && !hidden
       )).length,
-      provisionalVisibleDrawCount: committed.elements.filter(({ type, hidden }) => (
-        type === "draw" && !hidden
-      )).length,
-      receiptSourceMatched: receipt.sourceElementId === pair.source.id
-        && SOURCE_REVISION_PATTERN.test(receipt.sourceRevision),
-      receiptPresetMatched: receipt.presetId === scenario.presetId,
-      receiptWorkerHashMatched: workerReceiptHashMatched,
       undoLayerCount,
-      redoLayerCount,
-      reloadLayerCount,
-      redoReceiptPreserved: JSON.stringify(redonePair.receipt) === JSON.stringify(receipt),
-      reloadReceiptPreserved: JSON.stringify(reloadedPair.receipt) === JSON.stringify(receipt),
-      screenshotLive,
-      screenshotCommitted,
-      screenshotReloaded,
+      screenshot,
     };
   } finally {
     mergeDiagnostics(aggregateDiagnostics, diagnostics);
@@ -1422,67 +1150,240 @@ async function runFamilyScenario(
   }
 }
 
-async function runFallbackScenario(
+async function runExplicitInspectorScenario(
   browser: Browser,
   studioUrl: string,
   aggregateDiagnostics: BrowserDiagnostics,
-): Promise<StudioHokusaiLiveFallbackIntegrationEvidence> {
+): Promise<StudioHokusaiExplicitInspectorIntegrationEvidence> {
   const context: BrowserContext = await browser.newContext({
     viewport: { width: 1_440, height: 1_000 },
   });
   const page = await context.newPage();
-  const diagnostics = collectBrowserDiagnostics(page, "flipped-fallback", studioUrl);
-  const screenshot = join(SCRATCH, "fallback-flipped-vector.png");
+  const diagnostics = collectBrowserDiagnostics(page, "explicit-inspector", studioUrl);
+  const screenshotSelected = join(SCRATCH, "explicit-inspector-00-selected.png");
+  const screenshotConverted = join(SCRATCH, "explicit-inspector-01-converted.png");
+  const screenshotReloaded = join(SCRATCH, "explicit-inspector-02-reloaded.png");
   try {
     await installInstrumentedCleanStudioState(page);
     await prepareStudio(page, studioUrl);
     await activatePen(page);
     await selectBrush(page, FAMILY_SCENARIOS[0]);
-    await waitForWorkerReady(page);
     await openLayerNavigator(page);
     const blankNativePageElementCount = await waitForLayerCount(page, 0);
-    const flip = page.getByRole("button", { name: "캔버스 좌우 반전", exact: true }).first();
-    await flip.waitFor({ state: "visible" });
-    await flip.click();
-    invariant(await flip.getAttribute("aria-pressed") === "true", "canvas flip did not activate");
-    const before = await readBrowserMonitor(page);
     const route = await directPointerRoute(page);
     await drawDirectPointerRoute(page, route, { waitForLiveFrame: false });
     await waitForLayerCount(page, 1);
-    const persisted = await waitForStoredDocument(
+    const sourceRows = await waitForLayerRows(
       page,
-      (snapshot) => snapshot.elements.length === 1
-        && snapshot.elements[0]?.type === "draw"
-        && snapshot.elements[0]?.hidden === false,
-      "flipped fallback did not autosave one visible DrawEl",
+      (rows) => rows.length === 1
+        && rows[0]?.semanticKind === "vector"
+        && rows[0]?.hidden === false,
+      "explicit inspector source did not commit one visible vector layer",
     );
-    const after = await readBrowserMonitor(page);
-    const vector = persisted.elements[0]!;
-    const contact = after.pointerContacts[0];
-    const trustedPointerSampleCount = pointerSampleCount(contact);
-    const persistedVectorPointCount = vector.pointCount;
-    await page.screenshot({ path: screenshot, animations: "disabled" });
+    const source = sourceRows[0]!;
+    const sourceElementId = source.id;
+    // Leave draw-mode tool settings before selecting the authored stroke so
+    // the shipped properties inspector renders the selected freehand path
+    // controls (including the explicit Hokusai conversion section).
+    const selectTool = page.locator('[data-studio-rail-tool-id="select"]').first();
+    await selectTool.click();
+    await page.waitForFunction(() => (
+      document.querySelector('[data-studio-rail-tool-id="select"]')
+        ?.getAttribute("aria-pressed") === "true"
+    ));
+    await page.locator(
+      '[data-studio-rail-tool-id="select"][aria-pressed="true"]',
+    ).first().waitFor({ state: "attached", timeout: 8_000 });
+    const layerRow = page.locator('[data-studio-layer-row="true"]').first();
+    // Clicking the row's geometric centre can land on an inline opacity or
+    // visibility control, which intentionally stops row selection. The
+    // selection marker is the shipped non-control target for primary/current
+    // selection and bubbles through the same row handler as a user click.
+    await layerRow.locator('[data-studio-layer-selection-marker]').click();
+    const selectedSourceRows = await waitForLayerRows(
+      page,
+      (rows) => rows.some(({ id, selected }) => id === sourceElementId && selected),
+      "explicit inspector source layer was not selected",
+    );
+    const navigator = page.getByTestId("studio-inspector-navigator");
+    const properties = navigator.locator(
+      '[data-studio-inspector-primary-tab="properties"]',
+    );
+    await properties.click();
+    await page.screenshot({ path: screenshotSelected, animations: "disabled" });
+    const inspectorRoute = await page.evaluate(() => {
+      const selectionContext = document.querySelector<HTMLElement>(
+        '[data-testid="studio-inspector-context-selection"]',
+      );
+      const activeSelectionTool = document.querySelector<HTMLElement>(
+        '[data-studio-rail-tool-id="select"][aria-pressed="true"]',
+      );
+      return {
+        activeSelectionTool: activeSelectionTool !== null,
+        selectionContextPresent: selectionContext !== null,
+        selectionContextHidden: selectionContext?.hidden ?? null,
+        selectedLayerStates: Array.from(
+          document.querySelectorAll<HTMLElement>('[data-studio-layer-row="true"]'),
+        ).map((row) => ({
+          id: row.id,
+          selected: row.getAttribute("data-studio-layer-selected"),
+          selectionState: row.getAttribute("data-studio-layer-selection-state"),
+        })),
+      };
+    });
+    log(`explicit inspector route: ${JSON.stringify(inspectorRoute)}`);
+    // The selection inspector is a long, content-visibility-managed scroll
+    // surface. Move through the shipped aside so the freehand leaf mounts;
+    // querying an offscreen lazy section alone does not activate it.
+    await page.locator('[data-studio-sheet-id="props"]').evaluate((element) => {
+      element.scrollTop = element.scrollHeight;
+    });
+    // Freehand controls live inside the shipped, collapsed-by-default shape-style disclosure.
+    // Open that surface first. The drawing-tool inspector also keeps a hidden Hokusai duplicate,
+    // so scope every following interaction to this selected-element section.
+    const shapeStyleSection = page.getByTestId("studio-inspector-context-selection").locator(
+      '[data-inspector-section="element.shape-style"]',
+    );
+    const shapeStyleDisclosure = shapeStyleSection.getByRole("button", {
+      name: "도형 스타일",
+      exact: true,
+    });
+    if (await shapeStyleDisclosure.getAttribute("aria-expanded") !== "true") {
+      await shapeStyleDisclosure.click();
+    }
+    const inspector = shapeStyleSection.locator(
+      '[data-studio-hokusai-natural-media="true"]',
+    ).first();
+    await inspector.scrollIntoViewIfNeeded();
+    await inspector.waitFor({ state: "attached", timeout: 15_000 });
+    await inspector.scrollIntoViewIfNeeded();
+    await inspector.waitFor({ state: "visible", timeout: 15_000 });
+    await inspector.locator("summary").click();
+    await inspector.getByText("사용 가능", { exact: true }).waitFor({
+      state: "visible",
+      timeout: 30_000,
+    });
+    await inspector.locator(
+      'label:has(input[name="studio-hokusai-preset"][value="charcoal"])',
+    ).click();
+    await inspector.getByRole("button", {
+      name: "선택 획을 자연매체로 변환",
+      exact: true,
+    }).click();
+    // Successful conversion selects the new raster immediately, which unmounts the selected-Draw
+    // inspector. Observe the Worker outcome independently, then prove the product commit in Layers.
+    await page.waitForFunction(() => {
+      const monitor = (globalThis as typeof globalThis & {
+        __studioHokusaiLiveIntegrationMonitor?: BrowserMonitorSnapshot;
+      }).__studioHokusaiLiveIntegrationMonitor;
+      return Boolean(
+        monitor
+        && monitor.productResults.length + monitor.productFailures.length >= 1,
+      );
+    }, undefined, { timeout: 60_000 });
+    await openLayerNavigator(page);
+    const converted = await waitForLayerRows(
+      page,
+      (rows) => rows.length === 2 && explicitInspectorPair(rows, sourceElementId) !== null,
+      "explicit inspector did not commit the hidden-source/image pair",
+    );
+    const pair = explicitInspectorPair(converted, sourceElementId);
+    invariant(pair, "explicit inspector pair is missing");
+    await page.screenshot({ path: screenshotConverted, animations: "disabled" });
+    const monitor = await readBrowserMonitor(page);
+    const contact = monitor.pointerContacts[0];
+    const productRender = monitor.productRenders[0] ?? null;
+    const productReceipt = monitor.productResults[0] ?? null;
+
     await page.keyboard.press("Meta+z");
-    const undoLayerCount = await waitForLayerCount(page, 0);
+    const undone = await waitForLayerRows(
+      page,
+      (rows) => rows.length === 1
+        && rows[0]?.id === sourceElementId
+        && rows[0]?.semanticKind === "vector"
+        && rows[0]?.hidden === false,
+      "Undo did not restore the explicit inspector source vector",
+    );
+    await page.keyboard.press("Meta+Shift+z");
+    const redone = await waitForLayerRows(
+      page,
+      (rows) => rows.length === 2
+        && explicitInspectorPair(rows, sourceElementId, pair.image.id) !== null,
+      "Redo did not restore the explicit inspector pair",
+    );
+    const redonePair = explicitInspectorPair(redone, sourceElementId, pair.image.id);
+    invariant(redonePair, "Redo pair is missing");
+
+    // Studio's durable OPFS/SQLite autosave starts after a 1.5-second debounce. Let that write
+    // settle before reload; the recovery banner plus exact restored IDs below is the durable proof.
+    await page.waitForTimeout(3_500);
+    await page.reload({ waitUntil: "domcontentloaded", timeout: 25_000 });
+    await restoreAutosaveAfterReload(page);
+    await openLayerNavigator(page);
+    const reloaded = await waitForLayerRows(
+      page,
+      (rows) => rows.length === 2
+        && explicitInspectorPair(rows, sourceElementId, pair.image.id) !== null,
+      "reload did not preserve the explicit inspector pair",
+    );
+    const reloadedPair = explicitInspectorPair(reloaded, sourceElementId, pair.image.id);
+    invariant(reloadedPair, "reload did not preserve the explicit inspector pair");
+    await page.screenshot({ path: screenshotReloaded, animations: "disabled" });
     return {
-      mode: "canvas-horizontal-flip",
+      mode: "selected-stroke-explicit-conversion",
+      presetId: "charcoal",
+      materialProfileId: "charcoal",
       blankNativePageElementCount: blankNativePageElementCount as 0,
-      hokusaiBeginDelta: after.begins.length - before.begins.length,
-      hokusaiFrameDelta: after.frames.length - before.frames.length,
-      hokusaiCompleteDelta: after.completes.length - before.completes.length,
-      trustedPointerSampleCount,
-      persistedVectorPointCount,
-      lostInputSamples: Math.max(0, trustedPointerSampleCount - persistedVectorPointCount),
-      persistedVectorPathDistance: pathDistance(vector.points),
-      persistedElementCount: persisted.elements.length,
-      visibleDrawCount: persisted.elements.filter(({ type, hidden }) => (
-        type === "draw" && !hidden
+      liveReadyCount: monitor.readyCount,
+      liveWorkerConstructionCount: monitor.liveWorkerConstructionCount,
+      liveBeginCount: monitor.begins.length,
+      liveFrameCount: monitor.frames.length,
+      liveCompleteCount: monitor.completes.length,
+      liveFailureCount: monitor.failures.length,
+      trustedPointerSampleCount: pointerSampleCount(contact),
+      sourceSelectedBeforeConversion: selectedSourceRows.some(
+        ({ id, selected }) => id === sourceElementId && selected,
+      ),
+      productReadyCount: monitor.productReadyCount,
+      productWorkerConstructionCount: monitor.productWorkerConstructionCount,
+      productReadyProtocolValidCount: monitor.productReadyProtocolValidCount,
+      productRenderCount: monitor.productRenders.length,
+      productResultCount: monitor.productResults.length,
+      productFailureCount: monitor.productFailures.length,
+      productPngDataUrlCount: monitor.productPngDataUrlCount,
+      productRender,
+      productReceipt,
+      sourceElementId,
+      convertedImageId: pair.image.id,
+      convertedPairElementCount: converted.length,
+      hiddenDrawCount: converted.filter(({ semanticKind, hidden }) => (
+        semanticKind === "vector" && hidden
       )).length,
-      canonicalReceiptCount: persisted.elements.filter((element) => (
-        exactReceiptIdentity(element.hokusaiLiveReceipt) !== null
+      visibleImageCount: converted.filter(({ semanticKind, hidden }) => (
+        semanticKind === "raster" && !hidden
       )).length,
-      undoLayerCount,
-      screenshot,
+      convertedImageHasPngSource: monitor.productPngDataUrlCount === 1
+        && productReceipt?.pngSignatureValid === true,
+      convertedImageSelected: pair.image.selected,
+      receiptSourceMatched: productReceipt?.sourceElementId === sourceElementId,
+      receiptPresetMatched: productReceipt?.presetId === "charcoal"
+        && productReceipt.materialProfileId === "charcoal",
+      receiptRequestMatched: productReceipt?.requestId === productRender?.requestId
+        && productReceipt?.engineEpoch === productRender?.engineEpoch
+        && productReceipt?.receiptRequestId === productRender?.requestId
+        && productReceipt?.receiptEngineEpoch === productRender?.engineEpoch,
+      undoLayerCount: undone.length,
+      redoLayerCount: redone.length,
+      reloadLayerCount: reloaded.length,
+      sourceRestoredByUndo: undone[0]?.id === sourceElementId && !undone[0]?.hidden,
+      pairRestoredByRedo: redonePair.image.id === pair.image.id,
+      pairPreservedByReload: reloadedPair.image.id === pair.image.id,
+      redoSourceElementId: redonePair.source.id,
+      redoImageElementId: redonePair.image.id,
+      reloadSourceElementId: reloadedPair.source.id,
+      reloadImageElementId: reloadedPair.image.id,
+      screenshotConverted,
+      screenshotReloaded,
     };
   } finally {
     mergeDiagnostics(aggregateDiagnostics, diagnostics);
@@ -1540,7 +1441,7 @@ async function stopChildProcess(child: ChildProcess): Promise<void> {
 function prepareScratch(): void {
   mkdirSync(SCRATCH, { recursive: true });
   for (const name of readdirSync(SCRATCH)) {
-    if (!/^(?:pencil|charcoal|oil|fallback|studio-hokusai-live-integration).*(?:\.png|\.json|\.log)$/u.test(name)) {
+    if (!/^(?:pencil|charcoal|oil|explicit-inspector|studio-hokusai-live-integration).*(?:\.png|\.json|\.log)$/u.test(name)) {
       continue;
     }
     try {
@@ -1588,19 +1489,25 @@ async function main(): Promise<void> {
     await waitForServer(origin);
     log(`production preview ready @ ${studioUrl}`);
     browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
-    const families: StudioHokusaiLiveFamilyIntegrationEvidence[] = [];
+    const shelf: StudioHokusaiDefaultShelfIntegrationEvidence[] = [];
     for (const scenario of FAMILY_SCENARIOS) {
-      log(`${scenario.presetId}: direct-pointer scenario starting`);
-      families.push(await runFamilyScenario(browser, studioUrl, scenario, diagnostics));
-      log(`${scenario.presetId}: canonical pair, Undo/Redo, and reload observed`);
+      log(`${scenario.presetId}: blocked-shelf direct-pointer scenario starting`);
+      shelf.push(await runDefaultShelfScenario(browser, studioUrl, scenario, diagnostics));
+      log(`${scenario.presetId}: exact vector fallback and zero Hokusai live traffic observed`);
     }
-    const fallback = await runFallbackScenario(browser, studioUrl, diagnostics);
+    log("explicit inspector: selected-stroke conversion scenario starting");
+    const explicitInspector = await runExplicitInspectorScenario(
+      browser,
+      studioUrl,
+      diagnostics,
+    );
+    log("explicit inspector: Worker receipt, pair, Undo/Redo, and reload observed");
     const candidate = {
       status: "ok",
       schemaVersion: STUDIO_HOKUSAI_LIVE_INTEGRATION_REPORT_SCHEMA_VERSION,
-      execution: "vite-production-preview-shipped-studio-direct-pointer",
-      families,
-      fallback,
+      execution: "vite-production-preview-shipped-studio-policy-and-explicit-inspector",
+      shelf,
+      explicitInspector,
       diagnostics,
       issues: [],
       evidenceDirectory: SCRATCH,

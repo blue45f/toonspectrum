@@ -5,7 +5,8 @@ import { describe, expect, it } from "vitest";
 import {
   STUDIO_HOKUSAI_LIVE_INTEGRATION_REPORT_SCHEMA_VERSION,
   validateStudioHokusaiLiveIntegrationResult,
-  type StudioHokusaiLiveFamilyIntegrationEvidence,
+  type StudioHokusaiDefaultShelfIntegrationEvidence,
+  type StudioHokusaiExplicitInspectorIntegrationEvidence,
   type StudioHokusaiLiveIntegrationResult,
 } from "./verify-studio-hokusai-live-integration.mts";
 
@@ -13,78 +14,110 @@ const HASH_A = `sha256:${"a".repeat(64)}`;
 const HASH_B = `sha256:${"b".repeat(64)}`;
 const HASH_C = `sha256:${"c".repeat(64)}`;
 
-function family(
+function shelfEntry(
   presetId: "pencil" | "charcoal" | "oil",
   brushName: "연필" | "목탄" | "유화 붓",
-): StudioHokusaiLiveFamilyIntegrationEvidence {
+): StudioHokusaiDefaultShelfIntegrationEvidence {
   return {
     brushId: presetId,
     brushName,
     presetId,
     blankNativePageElementCount: 0,
-    workerBeginCount: 1,
-    liveFrameCount: 3,
-    blankFrameCount: 0,
-    firstLiveFrame: {
-      strokeId: `stroke-${presetId}`,
-      phase: "live",
-      sequence: 1,
-      pixelHash: HASH_A,
-      pixelBytes: 8_192,
-      nonZeroAlphaPixels: 600,
-      blank: false,
+    liveReadyCount: 0,
+    liveWorkerConstructionCount: 0,
+    liveBeginCount: 0,
+    liveFrameCount: 0,
+    liveCompleteCount: 0,
+    liveFailureCount: 0,
+    productReadyCount: 0,
+    productWorkerConstructionCount: 0,
+    productReadyProtocolValidCount: 0,
+    productRenderCount: 0,
+    productResultCount: 0,
+    productFailureCount: 0,
+    productPngDataUrlCount: 0,
+    trustedPointerSampleCount: 17,
+    vectorElementId: `${presetId}-vector`,
+    committedElementCount: 1,
+    visibleVectorCount: 1,
+    undoLayerCount: 0,
+    screenshot: `/tmp/${presetId}-blocked-shelf-vector.png`,
+  };
+}
+
+function explicitInspector(): StudioHokusaiExplicitInspectorIntegrationEvidence {
+  return {
+    mode: "selected-stroke-explicit-conversion",
+    presetId: "charcoal",
+    materialProfileId: "charcoal",
+    blankNativePageElementCount: 0,
+    liveReadyCount: 0,
+    liveWorkerConstructionCount: 0,
+    liveBeginCount: 0,
+    liveFrameCount: 0,
+    liveCompleteCount: 0,
+    liveFailureCount: 0,
+    trustedPointerSampleCount: 17,
+    sourceSelectedBeforeConversion: true,
+    productReadyCount: 2,
+    productWorkerConstructionCount: 2,
+    productReadyProtocolValidCount: 2,
+    productRenderCount: 1,
+    productResultCount: 1,
+    productFailureCount: 0,
+    productPngDataUrlCount: 1,
+    productRender: {
+      version: 3,
+      requestId: 1,
+      engineEpoch: 1,
+      sourceElementId: "source-charcoal",
+      sourceRevision: `hokusai-source-v1:${"d".repeat(16)}`,
+      presetId: "charcoal",
+      materialProfileId: "charcoal",
+      sourcePointCount: 18,
     },
-    workerCompleteCount: 1,
-    completeReceipt: {
-      strokeId: `stroke-${presetId}`,
-      presetId,
-      sampleCount: 19,
-      finalSequence: 4,
-      inputHash: HASH_B,
-      lastLivePixelHash: HASH_A,
-      settledPixelHash: HASH_A,
+    productReceipt: {
+      version: 3,
+      requestId: 1,
+      engineEpoch: 1,
+      receiptKind: "studio-hokusai/receipt",
+      receiptVersion: 3,
+      receiptRequestId: 1,
+      receiptEngineEpoch: 1,
+      sourceElementId: "source-charcoal",
+      presetId: "charcoal",
+      materialProfileId: "charcoal",
+      inputHash: HASH_A,
+      pixelHash: HASH_B,
       pngHash: HASH_C,
-      exactLiveCommitParity: true,
-      materialTexture: "studio-hokusai-material-texture-v2",
-      endpointPolicy: "tapered-start-no-dab-carrier-v1",
-      colorOpacityApplication: "worker-once-before-material-transfer-v1",
-      quality: {
-        nonZeroPixels: 2_000,
-        alphaMean: presetId === "charcoal" ? 0.4 : 0.55,
-        alphaStandardDeviation:
-          presetId === "pencil" ? 42 : presetId === "charcoal" ? 52 : 64,
-        edgeDensity:
-          presetId === "pencil" ? 0.42 : presetId === "charcoal" ? 0.21 : 0.33,
-        neighbourDifference:
-          presetId === "pencil" ? 13 : presetId === "charcoal" ? 7 : 10,
-        periodicity: 0.12,
-        circleCarrierExposure: 0.1,
-        startBackMassRatio: 0.04,
-        centerlineGapsAfterStart: 0,
-        horizontalVariation: 8,
-        verticalVariation: presetId === "oil" ? 12 : 10,
-        directionalAnisotropy: presetId === "oil" ? 1.5 : 1.25,
-      },
+      adapterVersion: "0.3.0-packed-dirty-frame-adapter.3-profile-routing",
+      execution: "dedicated-worker-wasm-packed-dirty-frame",
+      pngByteLength: 128,
+      pngSignatureValid: true,
       complete: true,
     },
-    trustedPointerSampleCount: 17,
-    canonicalSourceId: `stroke-${presetId}`,
-    canonicalImageId: `image-${presetId}`,
-    canonicalPairElementCount: 2,
+    sourceElementId: "source-charcoal",
+    convertedImageId: "image-charcoal",
+    convertedPairElementCount: 2,
     hiddenDrawCount: 1,
-    canonicalReceiptCount: 1,
-    provisionalVisibleDrawCount: 0,
+    visibleImageCount: 1,
+    convertedImageHasPngSource: true,
+    convertedImageSelected: true,
     receiptSourceMatched: true,
     receiptPresetMatched: true,
-    receiptWorkerHashMatched: true,
-    undoLayerCount: 0,
+    receiptRequestMatched: true,
+    undoLayerCount: 1,
     redoLayerCount: 2,
     reloadLayerCount: 2,
-    redoReceiptPreserved: true,
-    reloadReceiptPreserved: true,
-    screenshotLive: `/tmp/${presetId}-live.png`,
-    screenshotCommitted: `/tmp/${presetId}-committed.png`,
-    screenshotReloaded: `/tmp/${presetId}-reloaded.png`,
+    sourceRestoredByUndo: true,
+    pairRestoredByRedo: true,
+    pairPreservedByReload: true,
+    redoSourceElementId: "source-charcoal",
+    redoImageElementId: "image-charcoal",
+    reloadSourceElementId: "source-charcoal",
+    reloadImageElementId: "image-charcoal",
+    screenshotConverted: "/tmp/explicit-inspector-01-converted.png",
+    screenshotReloaded: "/tmp/explicit-inspector-02-reloaded.png",
   };
 }
 
@@ -92,28 +125,13 @@ function successfulResult(): StudioHokusaiLiveIntegrationResult {
   return {
     status: "ok",
     schemaVersion: STUDIO_HOKUSAI_LIVE_INTEGRATION_REPORT_SCHEMA_VERSION,
-    execution: "vite-production-preview-shipped-studio-direct-pointer",
-    families: [
-      family("pencil", "연필"),
-      family("charcoal", "목탄"),
-      family("oil", "유화 붓"),
+    execution: "vite-production-preview-shipped-studio-policy-and-explicit-inspector",
+    shelf: [
+      shelfEntry("pencil", "연필"),
+      shelfEntry("charcoal", "목탄"),
+      shelfEntry("oil", "유화 붓"),
     ],
-    fallback: {
-      mode: "canvas-horizontal-flip",
-      blankNativePageElementCount: 0,
-      hokusaiBeginDelta: 0,
-      hokusaiFrameDelta: 0,
-      hokusaiCompleteDelta: 0,
-      trustedPointerSampleCount: 17,
-      persistedVectorPointCount: 18,
-      lostInputSamples: 0,
-      persistedVectorPathDistance: 612,
-      persistedElementCount: 1,
-      visibleDrawCount: 1,
-      canonicalReceiptCount: 0,
-      undoLayerCount: 0,
-      screenshot: "/tmp/fallback.png",
-    },
+    explicitInspector: explicitInspector(),
     diagnostics: {
       consoleErrors: [],
       consoleWarnings: [],
@@ -127,137 +145,148 @@ function successfulResult(): StudioHokusaiLiveIntegrationResult {
 }
 
 describe("Studio Hokusai production-preview integration evidence", () => {
-  it("accepts complete real-pointer, Worker, canonical-pair, history, and reload evidence", () => {
+  it("accepts blocked default shelves plus one explicit inspector conversion", () => {
     expect(validateStudioHokusaiLiveIntegrationResult(successfulResult())).toEqual([]);
   });
 
-  it("rejects a blank first live frame, missing pointer samples, or provisional vector duplicate", () => {
+  it("rejects a normal shelf that starts Hokusai live or loses trusted vector input", () => {
     const result = successfulResult();
-    const pencil = result.families[0]!;
-    result.families[0] = {
-      ...pencil,
-      blankFrameCount: 1,
-      firstLiveFrame: {
-        ...pencil.firstLiveFrame!,
-        nonZeroAlphaPixels: 0,
-        blank: true,
-      },
-      completeReceipt: {
-        ...pencil.completeReceipt!,
-        sampleCount: pencil.trustedPointerSampleCount - 1,
-      },
-      provisionalVisibleDrawCount: 1,
-    };
-    const issues = validateStudioHokusaiLiveIntegrationResult(result);
-    expect(issues).toContain("pencil: live frames are missing or include a blank frame");
-    expect(issues).toContain("pencil: first live overlay frame lacks visible receipted pixels");
-    expect(issues).toContain("pencil: canonical Worker receipt is incomplete or lost pointer samples");
-    expect(issues).toContain(
-      "pencil: pointerup did not yield exactly one hidden DrawEl/canonical ImageEl pair",
-    );
-  });
-
-  it("rejects split history or a receipt that changes across Redo/save-reload", () => {
-    const result = successfulResult();
-    result.families[1] = {
-      ...result.families[1]!,
-      undoLayerCount: 1,
-      redoReceiptPreserved: false,
-      reloadReceiptPreserved: false,
-    };
-    expect(validateStudioHokusaiLiveIntegrationResult(result)).toContain(
-      "charcoal: one-step Undo/Redo or save-reload receipt preservation failed",
-    );
-  });
-
-  it("rejects a fallback that enters Hokusai or loses any trusted vector input sample", () => {
-    const result = successfulResult();
-    result.fallback = {
-      ...result.fallback!,
-      hokusaiBeginDelta: 1,
-      persistedVectorPointCount: 12,
-      lostInputSamples: 5,
-    };
-    expect(validateStudioHokusaiLiveIntegrationResult(result)).toContain(
-      "flipped-view fallback lost vector input or incorrectly entered Hokusai",
-    );
-  });
-
-  it("rejects smooth, faint, periodic, bulb-ended, or indistinguishable product pixels", () => {
-    const result = successfulResult();
-    const pencil = result.families[0]!;
-    result.families[0] = {
-      ...pencil,
-      completeReceipt: {
-        ...pencil.completeReceipt!,
-        quality: {
-          ...pencil.completeReceipt!.quality!,
-          alphaMean: 0.04,
-          alphaStandardDeviation: 2,
-          edgeDensity: 0.01,
-          neighbourDifference: 0.4,
-          periodicity: 0.9,
-          circleCarrierExposure: 0.7,
-          startBackMassRatio: 0.8,
-          centerlineGapsAfterStart: 4,
-          directionalAnisotropy: 1,
-        },
-      },
+    result.shelf[0] = {
+      ...result.shelf[0]!,
+      liveReadyCount: 1,
+      liveBeginCount: 1,
+      visibleVectorCount: 0,
     };
     expect(validateStudioHokusaiLiveIntegrationResult(result)).toEqual(expect.arrayContaining([
-      "pencil: actual canonical pixels failed material quality gates",
+      "pencil: blocked normal shelf created Hokusai Worker traffic",
+      "pencil: blocked shelf route lost vector input or failed one-step Undo",
     ]));
   });
 
-  it("allows one paper-grain centerline void only for the graphite preset", () => {
+  it("rejects silent live/product Worker construction and live failure on normal shelves", () => {
     const result = successfulResult();
-    const pencil = result.families[0]!;
-    result.families[0] = {
-      ...pencil,
-      completeReceipt: {
-        ...pencil.completeReceipt!,
-        quality: {
-          ...pencil.completeReceipt!.quality!,
-          centerlineGapsAfterStart: 1,
-        },
-      },
+    result.shelf[0] = {
+      ...result.shelf[0]!,
+      liveWorkerConstructionCount: 1,
     };
-    expect(validateStudioHokusaiLiveIntegrationResult(result)).toEqual([]);
+    result.shelf[1] = {
+      ...result.shelf[1]!,
+      productWorkerConstructionCount: 1,
+    };
+    result.shelf[2] = {
+      ...result.shelf[2]!,
+      liveFailureCount: 1,
+    };
+    expect(validateStudioHokusaiLiveIntegrationResult(result)).toEqual(expect.arrayContaining([
+      "pencil: blocked normal shelf created Hokusai Worker traffic",
+      "charcoal: blocked normal shelf created Hokusai Worker traffic",
+      "oil: blocked normal shelf created Hokusai Worker traffic",
+    ]));
+  });
 
-    const charcoal = result.families[1]!;
-    result.families[1] = {
-      ...charcoal,
-      completeReceipt: {
-        ...charcoal.completeReceipt!,
-        quality: {
-          ...charcoal.completeReceipt!.quality!,
-          centerlineGapsAfterStart: 1,
-        },
+  it("requires the exact expected settled Worker and protocol-ready counts", () => {
+    const result = successfulResult();
+    const inspector = result.explicitInspector!;
+    const invalid: StudioHokusaiLiveIntegrationResult = {
+      ...result,
+      explicitInspector: {
+        ...inspector,
+        productWorkerConstructionCount: 3,
+        productReadyCount: 3,
+        productReadyProtocolValidCount: 3,
       },
     };
-    expect(validateStudioHokusaiLiveIntegrationResult(result)).toContain(
-      "charcoal: actual canonical pixels failed material quality gates",
+    expect(validateStudioHokusaiLiveIntegrationResult(invalid)).toContain(
+      "explicit inspector Worker receipt is incomplete or mismatched",
     );
   });
 
-  it("rejects three nominally passing families when their texture fingerprints collapse", () => {
+  it("directly rejects forged receipt identity even when summary booleans claim a match", () => {
     const result = successfulResult();
-    const sharedQuality = {
-      ...result.families[0]!.completeReceipt!.quality!,
-      edgeDensity: 0.25,
-      alphaStandardDeviation: 44,
-      directionalAnisotropy: 1.08,
-    };
-    const collapsed = result.families.map((entry) => ({
-      ...entry,
-      completeReceipt: {
-        ...entry.completeReceipt!,
-        quality: { ...sharedQuality },
+    const inspector = result.explicitInspector!;
+    const invalid: StudioHokusaiLiveIntegrationResult = {
+      ...result,
+      explicitInspector: {
+        ...inspector,
+        receiptSourceMatched: true,
+        receiptPresetMatched: true,
+        receiptRequestMatched: true,
+        productReceipt: {
+          ...inspector.productReceipt!,
+          sourceElementId: "forged-source",
+          presetId: "oil",
+          materialProfileId: "oil",
+          receiptRequestId: 9,
+        },
       },
-    }));
-    result.families.splice(0, result.families.length, ...collapsed);
-    expect(validateStudioHokusaiLiveIntegrationResult(result)).toContain(
-      "pencil graphite, charcoal grain, and oil bristles are not measurably separated",
+    };
+    expect(validateStudioHokusaiLiveIntegrationResult(invalid)).toContain(
+      "explicit inspector Worker receipt is incomplete or mismatched",
+    );
+  });
+
+  it("rejects live failure traffic and a missing actual PNG data URL/signature", () => {
+    const result = successfulResult();
+    const inspector = result.explicitInspector!;
+    const invalid: StudioHokusaiLiveIntegrationResult = {
+      ...result,
+      explicitInspector: {
+        ...inspector,
+        liveFailureCount: 1,
+        productPngDataUrlCount: 0,
+        convertedImageHasPngSource: false,
+        productReceipt: {
+          ...inspector.productReceipt!,
+          pngSignatureValid: false,
+        },
+      },
+    };
+    expect(validateStudioHokusaiLiveIntegrationResult(invalid)).toEqual(expect.arrayContaining([
+      "explicit settled inspector conversion incorrectly entered Hokusai live",
+      "explicit inspector Worker receipt is incomplete or mismatched",
+      "explicit inspector did not create one hidden source and one visible PNG image",
+    ]));
+  });
+
+  it("rejects a corrupt explicit Worker receipt or an incomplete converted pair", () => {
+    const result = successfulResult();
+    const inspector = result.explicitInspector!;
+    const invalid: StudioHokusaiLiveIntegrationResult = {
+      ...result,
+      explicitInspector: {
+        ...inspector,
+        productFailureCount: 1,
+        productReceipt: {
+          ...inspector.productReceipt!,
+          pngHash: "not-a-hash",
+        },
+        visibleImageCount: 0,
+        receiptSourceMatched: false,
+      },
+    };
+    expect(validateStudioHokusaiLiveIntegrationResult(invalid)).toEqual(expect.arrayContaining([
+      "explicit inspector Worker receipt is incomplete or mismatched",
+      "explicit inspector did not create one hidden source and one visible PNG image",
+    ]));
+  });
+
+  it("rejects changed source/image identities across Redo and durable reload", () => {
+    const result = successfulResult();
+    const inspector = result.explicitInspector!;
+    const invalid: StudioHokusaiLiveIntegrationResult = {
+      ...result,
+      explicitInspector: {
+        ...inspector,
+        pairRestoredByRedo: true,
+        pairPreservedByReload: true,
+        redoSourceElementId: "replacement-source",
+        redoImageElementId: "replacement-image",
+        reloadSourceElementId: "replacement-source",
+        reloadImageElementId: "replacement-image",
+      },
+    };
+    expect(validateStudioHokusaiLiveIntegrationResult(invalid)).toContain(
+      "explicit inspector pair identity failed one-step Undo/Redo or durable reload",
     );
   });
 
@@ -277,7 +306,7 @@ describe("Studio Hokusai production-preview integration evidence", () => {
     ]));
   });
 
-  it("uses shipped UI and direct pointer input without an upload, mock renderer, or implicit build", () => {
+  it("uses shipped shelf and inspector UI without an upload, hidden opt-in, or implicit build", () => {
     const source = readFileSync(
       new URL("./verify-studio-hokusai-live-integration.mts", import.meta.url),
       "utf8",
@@ -285,21 +314,27 @@ describe("Studio Hokusai production-preview integration evidence", () => {
     expect(source).toContain('page.mouse.down()');
     expect(source).toContain('page.mouse.up()');
     expect(source).toContain('new Proxy(nativeWorker');
-    expect(source).toContain('const monitorBootstrap = (input: Readonly<{');
-    expect(source).toContain('"var __name = function(target) { return target; };"');
-    expect(source).toContain('value.type === "studio-hokusai-live/frame"');
-    expect(source).toContain('value.type === "studio-hokusai-live/complete"');
-    expect(source).toContain("measureQuality");
-    expect(source).toContain("startBackMassRatio");
-    expect(source).toContain("colorOpacityApplication");
-    expect(source).toContain('[data-studio-hokusai-live-overlay="true"]');
+    expect(source).toContain('options.name === "studio-hokusai-live-brush"');
+    expect(source).toContain('options.name === "studio-hokusai-natural-media"');
+    expect(source).toContain('value.type === "studio-hokusai-live/begin"');
+    expect(source).toContain('value.type === "studio-hokusai/render"');
+    expect(source).toContain('value.type === "studio-hokusai/result"');
+    expect(source).toContain('[data-studio-hokusai-natural-media="true"]');
+    expect(source).toContain('[data-studio-sheet-id="props"]');
+    expect(source).toContain('name: "선택 획을 자연매체로 변환"');
     expect(source).toContain('[data-studio-layer-row="true"]');
-    expect(source).toContain('data-studio-inspector-primary-tab="layers"');
+    expect(source).toContain('[data-studio-layer-selection-marker]');
+    expect(source).toContain('data-studio-layer-selection-state');
+    expect(source).toContain('[data-studio-rail-tool-id="select"]');
     expect(source).toContain('page.keyboard.press("Meta+z")');
     expect(source).toContain('page.keyboard.press("Meta+Shift+z")');
     expect(source).toContain('page.reload({ waitUntil: "domcontentloaded"');
     expect(source).toContain('name: "복구하기"');
-    expect(source).toContain('"preview"');
+    expect(source).not.toContain("waitForWorkerReady");
+    expect(source).not.toContain("readStoredDocument");
+    expect(source).not.toContain("waitForStoredDocument");
+    expect(source).not.toContain("canonicalPair");
+    expect(source).not.toContain("explicitExperimentalOptIn");
     expect(source).not.toContain("setInputFiles");
     expect(source).not.toMatch(/(?:pnpm|npm|yarn)[^\n]*\bbuild\b/u);
     expect(source).not.toContain("page.evaluate(() => import(");
