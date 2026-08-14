@@ -3,11 +3,15 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { resetStudioBg3dRetainedOwnerForTests } from "./studio-bg3d-retained-owner";
+import { StudioBg3dRetainedOwnerHost } from "./StudioBg3dRetainedOwnerHost";
 import {
   StudioLazyPanelStack,
   type StudioLazyPanelStackHandlers,
   type StudioLazyPanelStackProps,
 } from "./StudioLazyPanelStack";
+
+import type { ReactElement } from "react";
 
 const commentsSessionHarness = vi.hoisted(() => ({ nextInstanceId: 0 }));
 
@@ -126,48 +130,58 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  resetStudioBg3dRetainedOwnerForTests();
   vi.clearAllMocks();
 });
 
+function withRetainedBg3dHost(element: ReactElement) {
+  return (
+    <>
+      <StudioBg3dRetainedOwnerHost />
+      {element}
+    </>
+  );
+}
+
 describe("StudioLazyPanelStack", () => {
   it("does not mount optional surfaces while every open flag is false", () => {
-    const view = render(<StudioLazyPanelStack {...createProps()} />);
+    const view = render(withRetainedBg3dHost(<StudioLazyPanelStack {...createProps()} />));
 
     expect(view.container.querySelectorAll("[data-optional-panel]")).toHaveLength(0);
   });
 
   it("keeps one comments session instance mounted across close and reopen after activation", () => {
-    const view = render(
+    const view = render(withRetainedBg3dHost(
       <StudioLazyPanelStack
         {...createProps({ commentsOpen: false, commentsPanelMounted: false })}
       />
-    );
+    ));
     expect(view.container.querySelector('[data-optional-panel="comments"]')).toBeNull();
 
-    view.rerender(
+    view.rerender(withRetainedBg3dHost(
       <StudioLazyPanelStack
         {...createProps({ commentsOpen: true, commentsPanelMounted: true })}
       />
-    );
+    ));
     const openedSession = view.container.querySelector('[data-optional-panel="comments"]');
     expect(openedSession?.getAttribute("data-open")).toBe("true");
     expect(openedSession?.getAttribute("data-instance-id")).toBe("1");
 
-    view.rerender(
+    view.rerender(withRetainedBg3dHost(
       <StudioLazyPanelStack
         {...createProps({ commentsOpen: false, commentsPanelMounted: true })}
       />
-    );
+    ));
     const closedSession = view.container.querySelector('[data-optional-panel="comments"]');
     expect(closedSession).toBe(openedSession);
     expect(closedSession?.getAttribute("data-open")).toBe("false");
     expect(closedSession?.getAttribute("data-instance-id")).toBe("1");
 
-    view.rerender(
+    view.rerender(withRetainedBg3dHost(
       <StudioLazyPanelStack
         {...createProps({ commentsOpen: true, commentsPanelMounted: true })}
       />
-    );
+    ));
     const reopenedSession = view.container.querySelector('[data-optional-panel="comments"]');
     expect(reopenedSession).toBe(openedSession);
     expect(reopenedSession?.getAttribute("data-open")).toBe("true");
@@ -180,7 +194,7 @@ describe("StudioLazyPanelStack", () => {
     const setPoserInitialElementId = vi.fn();
     const setPoserVrmOpen = vi.fn();
     const scene = { version: 2 };
-    render(
+    render(withRetainedBg3dHost(
       <StudioLazyPanelStack
         {...createProps({
           elementById: new Map([
@@ -194,7 +208,7 @@ describe("StudioLazyPanelStack", () => {
           stableHandlers,
         })}
       />
-    );
+    ));
 
     expect(screen.getByText("VRM 삽입").closest("[data-has-initial-scene]")?.getAttribute("data-has-initial-scene"))
       .toBe("true");
@@ -213,7 +227,7 @@ describe("StudioLazyPanelStack", () => {
     const setBg3dInitialElementId = vi.fn();
     const setBg3dInitialScene = vi.fn();
     const setBg3dOpen = vi.fn();
-    render(
+    render(withRetainedBg3dHost(
       <StudioLazyPanelStack
         {...createProps({
           bg3dOpen: true,
@@ -224,7 +238,7 @@ describe("StudioLazyPanelStack", () => {
           stableHandlers,
         })}
       />
-    );
+    ));
 
     fireEvent.click(screen.getByRole("button", { name: "BG3D 삽입" }));
     expect(stableHandlers.insertBg3dResult).toHaveBeenCalledWith({ kind: "bg3d" });

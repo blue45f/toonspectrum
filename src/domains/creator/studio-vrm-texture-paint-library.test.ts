@@ -15,6 +15,7 @@ import {
   STUDIO_VRM_TEXTURE_PAINT_LIBRARY_DATABASE_VERSION,
   STUDIO_VRM_TEXTURE_PAINT_LIBRARY_LIMITS,
   STUDIO_VRM_TEXTURE_PAINT_LIBRARY_STORE_NAME,
+  deleteStudioVrmTexturePaintLibraryCreationBatchIfMatches,
   getStudioVrmTexturePaintLibraryArtifact,
   saveStudioVrmTexturePaintLibraryArtifact,
 } from "./studio-vrm-texture-paint-library";
@@ -234,6 +235,37 @@ describe("studio VRM texture-paint IndexedDB library", () => {
         .keyPath,
     ).toBe("contentHash");
     database.close();
+  });
+
+  it("issues one-shot creation receipts and preserves a hash after any later legacy reuse", async () => {
+    const factory = new IDBFactory();
+    const first = await artifact("creation-receipt", png(2, 2));
+    const created = await saveStudioVrmTexturePaintLibraryArtifact(first, options(factory));
+    expect(created.creationReceipt).toMatchObject({
+      authority: "legacy-indexeddb",
+      contentHash: first.metadata.contentHash,
+    });
+    await expect(deleteStudioVrmTexturePaintLibraryCreationBatchIfMatches(
+      [created.creationReceipt!],
+      [],
+      options(factory),
+    )).resolves.toBe(true);
+    await expect(getStudioVrmTexturePaintLibraryArtifact(
+      first.metadata.contentHash,
+      options(factory),
+    )).rejects.toMatchObject({ code: "ARTIFACT_MISSING" });
+
+    const recreated = await saveStudioVrmTexturePaintLibraryArtifact(first, options(factory));
+    await saveStudioVrmTexturePaintLibraryArtifact(first, options(factory));
+    await expect(deleteStudioVrmTexturePaintLibraryCreationBatchIfMatches(
+      [recreated.creationReceipt!],
+      [],
+      options(factory),
+    )).resolves.toBe(false);
+    await expect(getStudioVrmTexturePaintLibraryArtifact(
+      first.metadata.contentHash,
+      options(factory),
+    )).resolves.toMatchObject({ metadata: first.metadata });
   });
 
   it("rejects non-canonical hashes, URLs, and raw RGBA before opening IndexedDB", async () => {

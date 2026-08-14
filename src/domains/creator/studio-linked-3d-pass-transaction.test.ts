@@ -19,9 +19,11 @@ const PNG_DATA_URL =
 function createAuthority(options: {
   readonly kind?: StudioLinked3dPassCasAuthority["kind"];
   readonly delayHash?: `sha256:${string}`;
+  readonly sharedOwners?: Map<string, string[]>;
+  readonly runOwnerMutationExclusive?: <T>(owner: string, task: () => Promise<T>) => Promise<T>;
 } = {}) {
   const blobs = new Map<string, Uint8Array>();
-  const owners = new Map<string, string[]>();
+  const owners = options.sharedOwners ?? new Map<string, string[]>();
   const authority: StudioLinked3dPassCasAuthority = {
     kind: options.kind ?? "opfs",
     async put(bytes, putOptions) {
@@ -58,6 +60,9 @@ function createAuthority(options: {
       return next;
     },
   };
+  if (options.runOwnerMutationExclusive) {
+    authority.runOwnerMutationExclusive = options.runOwnerMutationExclusive;
+  }
   return { authority, blobs, owners };
 }
 
@@ -176,6 +181,51 @@ describe("Studio linked 3D pass transaction", () => {
     ]);
   });
 
+  it("uses the origin-wide owner seam across independent product authority instances", async () => {
+    const first = prepared("6", 1);
+    const second = prepared("7", 2);
+    const sharedOwners = new Map<string, string[]>();
+    const tails = new Map<string, Promise<void>>();
+    const runOwnerMutationExclusive = <T>(owner: string, task: () => Promise<T>): Promise<T> => {
+      const previous = tails.get(owner) ?? Promise.resolve();
+      const run = previous.then(task, task);
+      const settled = run.then(() => undefined, () => undefined);
+      tails.set(owner, settled);
+      return run.finally(() => {
+        if (tails.get(owner) === settled) tails.delete(owner);
+      });
+    };
+    const firstAuthority = createAuthority({
+      sharedOwners,
+      delayHash: first.descriptor.artifact.contentHash,
+      runOwnerMutationExclusive,
+    }).authority;
+    const secondAuthority = createAuthority({
+      sharedOwners,
+      runOwnerMutationExclusive,
+    }).authority;
+
+    await Promise.all([
+      commitStudioLinked3dPreparedPass({
+        authority: firstAuthority,
+        ownerId: "page-cross-tab:bundle",
+        prepared: first,
+        apply: () => "first",
+      }),
+      commitStudioLinked3dPreparedPass({
+        authority: secondAuthority,
+        ownerId: "page-cross-tab:bundle",
+        prepared: second,
+        apply: () => "second",
+      }),
+    ]);
+
+    expect(sharedOwners.get("page-cross-tab:bundle")).toEqual([
+      first.descriptor.artifact.contentHash,
+      second.descriptor.artifact.contentHash,
+    ]);
+  });
+
   it("rolls back only the rejected transaction before admitting the next same-owner commit", async () => {
     const first = prepared("d", 1);
     const second = prepared("e", 2);
@@ -199,5 +249,73 @@ describe("Studio linked 3D pass transaction", () => {
     expect(owners.get("page-2:bundle-2")).toEqual([
       second.descriptor.artifact.contentHash,
     ]);
+  });
+
+  it("restores the exact previous refs when forward publication mutates then throws", async () => {
+    const next = prepared("8", 2);
+    const { authority, owners } = createAuthority();
+    const ownerId = "page-commit-unknown:bundle";
+    const previousHash = `sha256:${"9".repeat(64)}`;
+    owners.set(ownerId, [previousHash]);
+    const setOwnerRefs = authority.setOwnerRefs.bind(authority);
+    const forwardError = new Error("forward-owner-ack-lost");
+    let publications = 0;
+    let applyCalled = false;
+    authority.setOwnerRefs = async (owner, hashes) => {
+      publications += 1;
+      const result = await setOwnerRefs(owner, hashes);
+      if (publications === 1) throw forwardError;
+      return result;
+    };
+
+    await expect(commitStudioLinked3dPreparedPass({
+      authority,
+      ownerId,
+      prepared: next,
+      apply: () => {
+        applyCalled = true;
+        return true;
+      },
+    })).rejects.toBe(forwardError);
+
+    expect(applyCalled).toBe(false);
+    expect(publications).toBe(2);
+    expect(owners.get(ownerId)).toEqual([previousHash]);
+  });
+
+  it("surfaces original and rollback failures when exact previous-ref restoration throws", async () => {
+    const next = prepared("a", 2);
+    const { authority, owners } = createAuthority();
+    const ownerId = "page-rollback-failure:bundle";
+    const previousHash = `sha256:${"b".repeat(64)}`;
+    owners.set(ownerId, [previousHash]);
+    const setOwnerRefs = authority.setOwnerRefs.bind(authority);
+    const forwardError = new Error("forward-owner-ack-lost");
+    const rollbackError = new Error("rollback-owner-ack-lost");
+    let publications = 0;
+    authority.setOwnerRefs = async (owner, hashes) => {
+      publications += 1;
+      await setOwnerRefs(owner, hashes);
+      if (publications === 1) throw forwardError;
+      throw rollbackError;
+    };
+
+    let rejected: unknown;
+    try {
+      await commitStudioLinked3dPreparedPass({
+        authority,
+        ownerId,
+        prepared: next,
+        apply: () => true,
+      });
+    } catch (cause) {
+      rejected = cause;
+    }
+
+    expect(rejected).toBeInstanceOf(AggregateError);
+    expect((rejected as AggregateError).errors).toEqual([forwardError, rollbackError]);
+    expect((rejected as AggregateError).cause).toBe(forwardError);
+    expect(publications).toBe(2);
+    expect(owners.get(ownerId)).toEqual([previousHash]);
   });
 });

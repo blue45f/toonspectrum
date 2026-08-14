@@ -116,35 +116,112 @@ describe("B — 복구 배너의 비우기는 파괴 승인 seam을 지난다", 
   });
 });
 
-describe("G — 히스토리 밖 사이드카 편집은 캔버스 undo로 새지 않는다", () => {
-  it("사이드카 setter 가 배리어를 세우고 캔버스 커밋이 내린다", () => {
-    expect(studioPageSource).toContain('sidecarHistoryBarrierRef.current = "캐릭터 바이블"');
-    expect(studioPageSource).toContain('sidecarHistoryBarrierRef.current = "Writer Room"');
+/**
+ * G 는 원래 "사이드카 편집 뒤의 ⌘Z 가 화면 밖 캔버스 획을 지운다"는 파괴였고, 1회성 배리어가
+ * 그 파괴만 막았다(사이드카 자체는 여전히 되돌릴 수 없었다). 이제 통합 저널이 사이드카 편집을
+ * 진짜 undo 단계로 만들었으므로 배리어는 사라졌다. 계약은 더 강해졌다 — "엉뚱한 걸 지우지
+ * 않는다" 에서 "만진 그것을 되돌린다" 로.
+ */
+describe("G — 사이드카 편집은 캔버스와 한 시간 순서로 되돌아간다", () => {
+  it("사이드카 setter 가 통합 저널에 이전/다음 문서를 남긴다", () => {
+    // 배리어와 그 고지는 남아 있으면 안 된다 — 되돌릴 수 있는 편집을 못 되돌린다고 거짓말한다.
+    expect(studioPageSource).not.toContain("sidecarHistoryBarrierRef");
+    expect(studioPageSource).not.toContain("실행 취소(⌘Z) 대상이 아니에요");
 
-    const commit = sourceBetween("function commit(\n", "// 같은 key의 연속 동작이면");
-    expect(commit).toContain("sidecarHistoryBarrierRef.current = null");
+    for (const target of ["characterBible", "writerRoom"]) {
+      const setter = target === "characterBible"
+        ? sourceBetween(
+            "const setCharacterBible = (next: Parameters<typeof setCharacterBibleState>[0]) => {",
+            "const setWriterRoom = (next:",
+          )
+        : sourceBetween(
+            "const setWriterRoom = (next: Parameters<typeof setWriterRoomState>[0]) => {",
+            "  /**\n   * 저널의 사이드카 항목 한 건을",
+          );
 
-    const queue = sourceBetween(
-      "function queueDeferredStrokeCommit(finished: DrawEl)",
-      "const scheduleMarqueeRect =",
-    );
-    expect(queue).toContain("sidecarHistoryBarrierRef.current = null");
+      // 렌더 클로저가 아니라 ref 에서 읽어야 한 태스크의 연속 편집이 같은 `before` 를 겹쳐 쓰지 않는다.
+      expect(setter).toContain(".current");
+      expect(setter).toContain("recordStudioSidecarHistoryEntry({");
+      expect(setter).toContain(`target: "${target}"`);
+      expect(setter).toContain("before,");
+      expect(setter).toContain("after,");
+    }
   });
 
-  it("배리어가 서 있으면 undo 는 히스토리를 건드리지 않고 사실만 알린다", () => {
+  it("사이드카 기록은 대기 획 배치를 먼저 안착시켜 시간 순서를 지킨다", () => {
+    const record = sourceBetween(
+      "function recordStudioSidecarHistoryEntry(entry: StudioPageHistorySidecarEntry): void {",
+      "const setCharacterBible =",
+    );
+
+    // 배치는 나중에 flush 된다 — 먼저 안착시키지 않으면 "획 → 사이드카" 가 저널에서 뒤집힌다.
+    expect(record).toContain("if (pendingStrokeCommitsRef.current) flushPendingStrokeCommitsRef.current();");
+    expect(record.indexOf("flushPendingStrokeCommitsRef")).toBeLessThan(
+      record.indexOf("recordStudioHistoryJournalSidecarEdit"),
+    );
+  });
+
+  it("undo 는 최신 항목이 사이드카면 문서만 되돌리고 pagesHi 는 건드리지 않는다", () => {
     const undo = sourceBetween("const undo = () => {", "const redo = () => {");
-    const barrierIndex = undo.indexOf("const sidecarBarrier = sidecarHistoryBarrierRef.current");
+    const flushIndex = undo.indexOf("if (pendingStrokeCommitsRef.current && !flushPendingStrokeCommitsRef.current())");
+    const journalIndex = undo.indexOf("const undoEntry = readStudioHistoryJournalUndoEntry(historyJournalRef.current)");
     const historyIndex = undo.indexOf("const undoHistory = pagesHistoryRef.current");
 
-    expect(barrierIndex).toBeGreaterThanOrEqual(0);
-    expect(historyIndex).toBeGreaterThan(barrierIndex);
-    expect(undo).toContain("실행 취소(⌘Z) 대상이 아니에요");
-    // 1회성이어야 한다 — 영구 차단은 undo 자체를 못 쓰게 만드는 더 나쁜 실패다.
-    expect(undo).toContain("sidecarHistoryBarrierRef.current = null;");
+    // flush 는 저널을 동기 전진시킨다 — 조회보다 먼저 와야 방금 안착한 획이 최신 항목으로 보인다.
+    expect(flushIndex).toBeGreaterThanOrEqual(0);
+    expect(journalIndex).toBeGreaterThan(flushIndex);
+    expect(historyIndex).toBeGreaterThan(journalIndex);
+
+    const sidecarBranch = undo.slice(journalIndex, historyIndex);
+    expect(sidecarBranch).toContain('if (undoEntry?.kind === "sidecar")');
+    expect(sidecarBranch).toContain('restoreStudioSidecarDocument(undoEntry, "undo")');
+    expect(sidecarBranch).toContain("return;");
+    // 사이드카 분기는 캔버스 히스토리를 절대 움직이지 않는다 — 그게 이 버그의 본체였다.
+    expect(sidecarBranch).not.toContain("setPagesHi(");
+    expect(sidecarBranch).not.toContain("pagesHiRef.current =");
   });
 
-  it("문서 전체 수화는 배리어를 남기지 않는다", () => {
+  it("redo 가 undo 를 거울처럼 되짚는다", () => {
+    const redo = sourceBetween("const redo = () => {", "companionHistoryHandlerRef.current =");
+
+    expect(redo).toContain("readStudioHistoryJournalRedoEntry(historyJournalRef.current)");
+    expect(redo).toContain('restoreStudioSidecarDocument(redoEntry, "redo")');
+    expect(redo).toContain('stepStudioHistoryJournal(historyJournalRef.current, "redo")');
+  });
+
+  it("저널은 스냅샷 히스토리가 앞을 버릴 때 같이 버린다", () => {
+    // 상한을 넘겨 잘려 나간 스냅샷 단계 수만큼 저널도 `pages` 항목을 버려야 둘이 어긋나지 않는다.
+    const record = sourceBetween(
+      "function recordStudioHistoryJournalPages(addedSteps: number, nextUndoDepth: number): void {",
+      "/** 문서 전체 수화(프로젝트 로드",
+    );
+    expect(record).toContain("recordStudioHistoryJournalPagesSteps(historyJournalRef.current, { addedSteps, nextUndoDepth })");
+
+    // 새 단계를 만드는 모든 경로가 실제 결과 인덱스를 그대로 넘긴다(기대값을 다시 계산하지 않는다).
+    for (const site of [
+      "recordStudioHistoryJournalPages(1, appended.historyIndex);",
+      "recordStudioHistoryJournalPages(batch.strokes.length - 1, accIndex);",
+    ]) {
+      expect(studioPageSource).toContain(site);
+    }
+    // 합치기 분기는 새 단계가 없다 — 저널도 늘리지 않는다.
+    expect(studioPageSource).toContain(
+      "if (!replacesCurrentSnapshot) recordStudioHistoryJournalPages(1, nextHistoryIndex);",
+    );
+  });
+
+  it("문서 전체 수화는 저널을 비우고 사이드카 항목을 남기지 않는다", () => {
     const restore = sourceBetween("async function restoreAutosave()", "function clearAutosaveDurableAuthority(");
-    expect(restore).toContain("sidecarHistoryBarrierRef.current = null");
+    expect(restore).toContain("resetStudioHistoryJournal();");
+    expect(restore).toContain("hydrateStudioSidecarDocuments({");
+
+    const hydrate = sourceBetween(
+      "function hydrateStudioSidecarDocuments(input: {",
+      "const [aiProvenance, setAiProvenanceState]",
+    );
+    // 수화는 사용자의 편집이 아니다 — raw setter 로 가고 저널 항목을 만들지 않는다.
+    expect(hydrate).toContain("setCharacterBibleState(input.characterBible);");
+    expect(hydrate).toContain("setWriterRoomState(input.writerRoom);");
+    expect(hydrate).not.toContain("recordStudioSidecarHistoryEntry");
   });
 });

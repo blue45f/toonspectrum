@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   assertStudioLinked3dPassProjectArchiveEvidence,
@@ -347,5 +347,84 @@ describe("Studio linked 3D pass project archive", () => {
       apply: () => false,
     })).rejects.toMatchObject({ code: "commit-rejected" });
     expect(target.owners.get(owner)).toEqual(["sha256:previous"]);
+  });
+
+  it("restores owners sequentially in reverse order and surfaces any rollback failure", async () => {
+    const source = createAuthority();
+    const project = await projectWithLinkedPages(source.authority);
+    const attachments = await prepareStudioLinked3dPassProjectArchiveExport({
+      project,
+      authority: source.authority,
+    });
+    const imported = await importStudioProjectArchive(
+      (await buildStudioProjectArchive({ project, attachments })).blob,
+    );
+    const target = createAuthority();
+    const ownerA = "studio-linked-3d-pass:page-linked-a:page-linked-a-bundle";
+    const ownerB = "studio-linked-3d-pass:page-linked-b:page-linked-b-bundle";
+    target.owners.set(ownerA, ["sha256:previous-a"]);
+    target.owners.set(ownerB, ["sha256:previous-b"]);
+    const baseSetOwnerRefs = target.authority.setOwnerRefs.bind(target.authority);
+    const order: string[] = [];
+    const authority: StudioLinked3dPassCasAuthority = {
+      ...target.authority,
+      setOwnerRefs: vi.fn(async (owner, hashes) => {
+        const rollback = hashes.length === 1
+          && hashes[0] === (owner === ownerA ? "sha256:previous-a" : "sha256:previous-b");
+        order.push(`${rollback ? "rollback" : "install"}:${owner}`);
+        if (rollback && owner === ownerB) throw new Error("owner-b rollback failed");
+        return baseSetOwnerRefs(owner, hashes);
+      }),
+    };
+
+    await expect(restoreStudioLinked3dPassProjectArchiveImport({
+      archive: imported,
+      authority,
+      apply: () => false,
+    })).rejects.toThrow("owner 참조 일부를 되돌리지 못했습니다");
+    expect(order).toEqual([
+      `install:${ownerA}`,
+      `install:${ownerB}`,
+      `rollback:${ownerB}`,
+      `rollback:${ownerA}`,
+    ]);
+    expect(target.owners.get(ownerA)).toEqual(["sha256:previous-a"]);
+    expect(target.owners.get(ownerB)).not.toEqual(["sha256:previous-b"]);
+  });
+
+  it("rolls back an owner whose publication mutates before its acknowledgement fails", async () => {
+    const source = createAuthority();
+    const project = await projectWithLinkedPages(source.authority);
+    const attachments = await prepareStudioLinked3dPassProjectArchiveExport({
+      project,
+      authority: source.authority,
+    });
+    const imported = await importStudioProjectArchive(
+      (await buildStudioProjectArchive({ project, attachments })).blob,
+    );
+    const target = createAuthority();
+    const owner = "studio-linked-3d-pass:page-linked-a:page-linked-a-bundle";
+    const previous = ["sha256:previous-a"] as const;
+    target.owners.set(owner, [...previous]);
+    const baseSetOwnerRefs = target.authority.setOwnerRefs.bind(target.authority);
+    let loseFirstPublicationAcknowledgement = true;
+    const authority: StudioLinked3dPassCasAuthority = {
+      ...target.authority,
+      async setOwnerRefs(currentOwner, hashes) {
+        const result = await baseSetOwnerRefs(currentOwner, hashes);
+        if (currentOwner === owner && loseFirstPublicationAcknowledgement) {
+          loseFirstPublicationAcknowledgement = false;
+          throw new Error("owner publication acknowledgement lost");
+        }
+        return result;
+      },
+    };
+
+    await expect(restoreStudioLinked3dPassProjectArchiveImport({
+      archive: imported,
+      authority,
+      apply: () => true,
+    })).rejects.toThrow("owner publication acknowledgement lost");
+    expect(target.owners.get(owner)).toEqual(previous);
   });
 });

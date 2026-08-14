@@ -59,6 +59,8 @@ function dependencies(
     saveArtifact: vi.fn(async () => ({
       receipt: stored.metadata,
       deduplicated: false,
+      creationReceipt: null,
+      mutationGeneration: null,
     })),
     getArtifact: vi.fn(async () => stored),
     decodeArtifact: vi.fn(async () => ({

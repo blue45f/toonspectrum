@@ -1048,6 +1048,34 @@ export function planStudioAdvancedFillVectorTarget(
   };
 }
 
+/**
+ * 래스터 대상 채우기에서 벡터 선화 참조를 만들지 못했을 때 쓸 정직한 제외 문구.
+ *
+ * 왜 던지지 않는가
+ * ----------------
+ * 벡터 대상(`virtual-vector-fill`)에서 이 참조는 채우기 경계 **그 자체**라 없으면 할 일이
+ * 없다. 하지만 래스터 대상에서는 래스터 경계 위에 얹는 **추가** 경계일 뿐이다. 참조를 못
+ * 만든다고 래스터 채우기가 틀려지지는 않는다 — 경계가 하나 줄어들 뿐이다. 그런데도 실패를
+ * 던지면 페이지 어딘가의 지우개 획 하나가 무관한 래스터 레이어의 채우기를 통째로 막고,
+ * 배너는 "먼저 레이어를 병합해 주세요" 라며 파괴적인 작업을 요구한다.
+ *
+ * 그래서 이 경로는 `studio-svg-export.ts` 의 정직성 규약을 그대로 따른다 — 완벽 재현이
+ * 불가한 것은 그리지 않고, 대신 무엇을 왜 뺐는지 전부 알린다. 채우기 결과는 명시적 적용
+ * 전까지 미리보기라, 경계가 하나 빠진 결과를 사용자가 눈으로 보고 판단할 수 있다.
+ *
+ * 근사본을 대신 넣지 않는 이유도 같은 규약이다. 지우개를 뺀 SVG 는 화면에 없는 선을 경계로
+ * 세운다. 채우기가 보이지 않는 벽에서 멈추면 미리보기로도 확인할 방법이 없다. 아예 빼면
+ * 채우기가 선화를 넘어 번지는 모습이 그대로 보이므로 적용 전에 알아챌 수 있다.
+ *
+ * @returns 뺄 것이 애초에 없으면(`no-visible-vector-draw`) null — 알릴 사실이 없다.
+ */
+export function describeStudioAdvancedFillVectorReferenceExclusion(
+  failure: Extract<StudioAdvancedFillVectorTargetPlan, { readonly ok: false }>,
+): string | null {
+  if (failure.code === "no-visible-vector-draw") return null;
+  return `벡터 선화는 채우기 경계에서 빼고 래스터 경계만으로 계산했어요. ${failure.reason}`;
+}
+
 export async function renderStudioAdvancedFillVectorReference(
   input: StudioAdvancedFillVectorTargetInput,
   options: StudioVectorReferenceRenderOptions = {},

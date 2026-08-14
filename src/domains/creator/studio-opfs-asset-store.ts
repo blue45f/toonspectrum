@@ -135,60 +135,96 @@ function emptyIndex(): StudioOpfsIndexState {
   return { entries: new Map(), owners: new Map() };
 }
 
-function finiteNumber(value: unknown, fallback: number): number {
-  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : fallback;
+function isNonNegativeSafeInteger(value: unknown): value is number {
+  return Number.isSafeInteger(value) && (value as number) >= 0;
 }
 
 function normalizeEntry(value: unknown): StudioOpfsAssetEntry | null {
   if (!value || typeof value !== "object") return null;
   const record = value as Record<string, unknown>;
   const hash = canonicalizeStudioOpfsContentHash(record.hash);
-  if (!hash) return null;
+  if (!hash || record.hash !== hash) return null;
   const codec = isStudioOpfsCodec(record.codec) ? record.codec : null;
   if (!codec) return null;
-  const path = typeof record.path === "string" ? record.path : blobPath(hash, codec);
-  const bytes = finiteNumber(record.bytes, -1);
-  if (bytes < 0) return null;
+  const canonicalPath = blobPath(hash, codec);
+  if (
+    record.path !== canonicalPath
+    || !isNonNegativeSafeInteger(record.bytes)
+    || !isNonNegativeSafeInteger(record.storedBytes)
+    || !isNonNegativeSafeInteger(record.createdAt)
+    || !isNonNegativeSafeInteger(record.lastAccessAt)
+    || record.lastAccessAt < record.createdAt
+    || typeof record.mime !== "string"
+    || record.mime.trim() !== record.mime
+    || record.mime.length < 1
+    || record.mime.length > 1_024
+  ) return null;
   return {
     hash,
-    path,
-    bytes,
-    storedBytes: finiteNumber(record.storedBytes, bytes),
+    path: canonicalPath,
+    bytes: record.bytes,
+    storedBytes: record.storedBytes,
     codec,
-    mime: typeof record.mime === "string" ? record.mime : "application/octet-stream",
-    createdAt: finiteNumber(record.createdAt, 0),
-    lastAccessAt: finiteNumber(record.lastAccessAt, 0),
+    mime: record.mime,
+    createdAt: record.createdAt,
+    lastAccessAt: record.lastAccessAt,
   };
 }
 
-/** 절대 throw하지 않는다. 손상된 색인은 빈 색인으로 취급하고 rebuild가 복구한다. */
 function parseIndex(raw: Uint8Array | null): StudioOpfsIndexState {
-  if (!raw || raw.byteLength === 0) return emptyIndex();
+  if (raw === null) return emptyIndex();
+  if (raw.byteLength === 0) {
+    throw new StudioOpfsError("CORRUPT_ENTRY", "OPFS 자산 색인이 비어 있어 안전하게 열 수 없어요.");
+  }
   let parsed: unknown;
   try {
     parsed = JSON.parse(new TextDecoder().decode(raw));
-  } catch {
-    return emptyIndex();
+  } catch (cause) {
+    throw new StudioOpfsError(
+      "CORRUPT_ENTRY",
+      "OPFS 자산 색인 JSON이 손상되어 안전하게 열 수 없어요.",
+      cause,
+    );
   }
-  if (!parsed || typeof parsed !== "object") return emptyIndex();
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new StudioOpfsError("CORRUPT_ENTRY", "OPFS 자산 색인 구조가 손상됐어요.");
+  }
   const file = parsed as Partial<StudioOpfsIndexFile>;
-  if (file.version !== INDEX_VERSION) return emptyIndex();
-  const state = emptyIndex();
-  for (const value of Array.isArray(file.entries) ? file.entries : []) {
-    const entry = normalizeEntry(value);
-    if (entry && !state.entries.has(entry.hash)) state.entries.set(entry.hash, entry);
+  if (file.version !== INDEX_VERSION) {
+    throw new StudioOpfsError("CORRUPT_ENTRY", "지원하지 않는 OPFS 자산 색인 버전이에요.");
   }
-  for (const value of Array.isArray(file.owners) ? file.owners : []) {
-    if (!value || typeof value !== "object") continue;
+  if (!Array.isArray(file.entries) || !Array.isArray(file.owners)) {
+    throw new StudioOpfsError("CORRUPT_ENTRY", "OPFS 자산 색인 목록이 손상됐어요.");
+  }
+  const state = emptyIndex();
+  for (const value of file.entries) {
+    const entry = normalizeEntry(value);
+    if (!entry || state.entries.has(entry.hash)) {
+      throw new StudioOpfsError("CORRUPT_ENTRY", "OPFS 자산 색인 항목이 손상됐어요.");
+    }
+    state.entries.set(entry.hash, entry);
+  }
+  for (const value of file.owners) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      throw new StudioOpfsError("CORRUPT_ENTRY", "OPFS 자산 owner 색인이 손상됐어요.");
+    }
     const record = value as Record<string, unknown>;
     const owner = typeof record.owner === "string" ? record.owner.trim() : "";
-    if (!owner) continue;
-    const hashes = new Set<StudioOpfsContentHash>();
-    for (const candidate of Array.isArray(record.hashes) ? record.hashes : []) {
-      const hash = canonicalizeStudioOpfsContentHash(candidate);
-      if (hash) hashes.add(hash);
+    if (record.owner !== owner || !owner || state.owners.has(owner) || !Array.isArray(record.hashes)) {
+      throw new StudioOpfsError("CORRUPT_ENTRY", "OPFS 자산 owner 색인이 손상됐어요.");
     }
-    state.owners.set(owner, { hashes, updatedAt: finiteNumber(record.updatedAt, 0) });
+    const hashes = new Set<StudioOpfsContentHash>();
+    for (const candidate of record.hashes) {
+      const hash = canonicalizeStudioOpfsContentHash(candidate);
+      if (candidate !== hash || !hash || hashes.has(hash)) {
+        throw new StudioOpfsError("CORRUPT_ENTRY", "OPFS 자산 owner 참조가 손상됐어요.");
+      }
+      hashes.add(hash);
+    }
+    if (!isNonNegativeSafeInteger(record.updatedAt)) {
+      throw new StudioOpfsError("CORRUPT_ENTRY", "OPFS 자산 owner 갱신 시각이 손상됐어요.");
+    }
+    state.owners.set(owner, { hashes, updatedAt: record.updatedAt });
   }
   return state;
 }
@@ -319,8 +355,8 @@ export async function estimateStudioOpfsQuota(
 
 /**
  * 색인은 통째로 다시 쓰이므로 read-modify-write가 겹치면 갱신이 사라진다. 모든 변경 연산을
- * 한 줄로 세워 그 창을 없앤다(같은 탭 안에서의 동시성 보장). 탭 간 경합은 rebuildIndex()가
- * 사후 교정한다 — blob 파일 자체는 내용주소라 절대 충돌하지 않기 때문이다.
+ * 한 줄로 세워 그 창을 없앤다. 제품 OPFS는 여기에 origin-wide Web Lock을
+ * 추가로 주입해 독립된 탭/인스턴스도 같은 순서를 공유한다.
  */
 function createSequencer(): <T>(task: () => Promise<T>) => Promise<T> {
   let tail: Promise<unknown> = Promise.resolve();
@@ -342,7 +378,11 @@ export interface StudioOpfsAssetStoreOptions {
   now?: () => number;
   /** sweep이 참조 없는 신규 blob을 보호하는 창. 기본 5분. */
   graceMs?: number;
+  /** 독립 store/탭 간 index read-modify-write를 직렬화하는 제품 Web Lock seam. */
+  mutationRunExclusive?: StudioOpfsAssetStoreRunExclusive | null;
 }
+
+export type StudioOpfsAssetStoreRunExclusive = <T>(task: () => Promise<T>) => Promise<T>;
 
 export interface StudioOpfsPutOptions {
   mime?: string;
@@ -391,25 +431,38 @@ export function createStudioOpfsAssetStore(
   const compressionScope = options.compressionScope ?? (globalThis as StudioOpfsCompressionScope);
   const support = options.compressionSupport ?? studioOpfsCompressionSupport(compressionScope);
   const sequence = createSequencer();
-
   let cached: StudioOpfsIndexState | null = null;
 
-  async function loadIndex(): Promise<StudioOpfsIndexState> {
-    if (cached) return cached;
-    let raw: Uint8Array | null;
-    try {
-      raw = await fs.read(INDEX_PATH);
-    } catch {
-      // 색인을 못 읽어도 저장소는 살아 있어야 한다 — 빈 색인에서 다시 자란다.
-      raw = null;
-    }
-    cached = parseIndex(raw);
+  async function loadIndex(fresh = false): Promise<StudioOpfsIndexState> {
+    if (!fresh && cached) return cached;
+    cached = parseIndex(await fs.read(INDEX_PATH));
     return cached;
   }
 
   async function saveIndex(state: StudioOpfsIndexState): Promise<void> {
     await fs.write(INDEX_PATH, serializeIndex(state));
     cached = state;
+  }
+
+  function mutate<T>(task: () => Promise<T>): Promise<T> {
+    return sequence(async () => {
+      const runExclusive = options.mutationRunExclusive;
+      const freshTask = async () => {
+        // The lock may have waited behind another tab. Discard the instance snapshot only after
+        // entering it, so every mutation read-modify-writes the latest durable index.
+        cached = null;
+        return await task();
+      };
+      return runExclusive ? await runExclusive(freshTask) : await freshTask();
+    });
+  }
+
+  function timestampNow(): number {
+    const value = now();
+    if (!isNonNegativeSafeInteger(value)) {
+      throw new StudioOpfsError("CORRUPT_ENTRY", "OPFS 자산 갱신 시각이 올바르지 않아요.");
+    }
+    return value;
   }
 
   async function hashOf(bytes: Uint8Array): Promise<StudioOpfsContentHash> {
@@ -439,17 +492,23 @@ export function createStudioOpfsAssetStore(
     kind: fs.kind,
 
     put(bytes, putOptions = {}) {
-      return sequence(async () => {
+      return mutate(async () => {
         if (!(bytes instanceof Uint8Array) || bytes.byteLength === 0) {
           throw new StudioOpfsError("CORRUPT_ENTRY", "빈 자산은 저장할 수 없어요.");
         }
         const mime = putOptions.mime?.trim() || "application/octet-stream";
+        if (mime.length > 1_024) {
+          throw new StudioOpfsError("CORRUPT_ENTRY", "OPFS 자산 MIME 원장이 너무 길어요.");
+        }
         const hash = await hashOf(bytes);
         const state = await loadIndex();
         const existing = state.entries.get(hash);
         if (existing) {
           // 이미 같은 내용이 있다 — 파일도 색인도 그대로 두고 접근 시각만 올린다.
-          const touched: StudioOpfsAssetEntry = { ...existing, lastAccessAt: now() };
+          const touched: StudioOpfsAssetEntry = {
+            ...existing,
+            lastAccessAt: Math.max(existing.createdAt, timestampNow()),
+          };
           state.entries.set(hash, touched);
           await saveIndex(state);
           return {
@@ -471,7 +530,7 @@ export function createStudioOpfsAssetStore(
 
         const path = blobPath(hash, encoded.codec);
         await fs.write(path, encoded.bytes);
-        const timestamp = now();
+        const timestamp = timestampNow();
         const entry: StudioOpfsAssetEntry = {
           hash,
           path,
@@ -526,7 +585,7 @@ export function createStudioOpfsAssetStore(
     },
 
     delete(hash) {
-      return sequence(async () => {
+      return mutate(async () => {
         const key = canonicalizeStudioOpfsContentHash(hash);
         if (!key) return false;
         const state = await loadIndex();
@@ -544,7 +603,7 @@ export function createStudioOpfsAssetStore(
     },
 
     setOwnerRefs(owner, hashes) {
-      return sequence(async () => {
+      return mutate(async () => {
         const name = String(owner ?? "").trim();
         if (!name) {
           throw new StudioOpfsError("CORRUPT_ENTRY", "자산 소유자 이름이 비어 있어요.");
@@ -559,14 +618,16 @@ export function createStudioOpfsAssetStore(
           }
         }
         const state = await loadIndex();
-        state.owners.set(name, { hashes: seen, updatedAt: now() });
+        state.owners.set(name, { hashes: seen, updatedAt: timestampNow() });
         await saveIndex(state);
         return normalized;
       });
     },
 
     async ownerRefs(owner) {
-      const record = (await loadIndex()).owners.get(String(owner ?? "").trim());
+      // ownerRefs -> setOwnerRefs is a logical RMW protected by the product owner Web Lock. Its
+      // first read must observe the tab that held that lock immediately before this one.
+      const record = (await loadIndex(true)).owners.get(String(owner ?? "").trim());
       return record ? [...record.hashes] : [];
     },
 
@@ -575,9 +636,9 @@ export function createStudioOpfsAssetStore(
     },
 
     sweep(sweepOptions = {}) {
-      return sequence(async () => {
+      return mutate(async () => {
         const grace = sweepOptions.graceMs ?? graceMs;
-        const at = now();
+        const at = timestampNow();
         const state = await loadIndex();
         const referenced = new Set<StudioOpfsContentHash>();
         for (const record of state.owners.values()) {
@@ -610,7 +671,7 @@ export function createStudioOpfsAssetStore(
     },
 
     rebuildIndex() {
-      return sequence(async () => {
+      return mutate(async () => {
         const state = await loadIndex();
         const rebuilt: StudioOpfsIndexState = { entries: new Map(), owners: state.owners };
         const paths = await fs.list(`${BLOB_DIR}/`);
@@ -636,6 +697,7 @@ export function createStudioOpfsAssetStore(
           } catch {
             continue; // 풀 수 없는 파일은 입양하지 않는다(다음 sweep이 손대지도 않는다).
           }
+          const timestamp = timestampNow();
           rebuilt.entries.set(hash, {
             hash,
             path,
@@ -643,8 +705,8 @@ export function createStudioOpfsAssetStore(
             storedBytes,
             codec,
             mime: previous?.mime ?? "application/octet-stream",
-            createdAt: previous?.createdAt ?? now(),
-            lastAccessAt: previous?.lastAccessAt ?? now(),
+            createdAt: previous?.createdAt ?? timestamp,
+            lastAccessAt: previous?.lastAccessAt ?? timestamp,
           });
         }
         await saveIndex(rebuilt);

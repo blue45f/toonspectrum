@@ -643,11 +643,13 @@ export async function hydrateStudioLinked3dPassCloudArtifacts<T>(input: {
         throwIfAborted(input.signal);
         const ownerRefs = await input.authority.ownerRefs(owner);
         previous.set(owner, ownerRefs);
+        // Publication can mutate durable owner state before its acknowledgement is lost. Record
+        // the attempted owner before awaiting so that failure enters exact compensation.
+        updated.push(owner);
         await input.authority.setOwnerRefs(owner, [...new Set([
           ...ownerRefs,
           ...(desiredByOwner.get(owner) ?? []),
         ])].toSorted());
-        updated.push(owner);
       }
       throwIfAborted(input.signal);
       const result = await input.apply(input.project);
@@ -656,9 +658,21 @@ export async function hydrateStudioLinked3dPassCloudArtifacts<T>(input: {
       }
       return result;
     } catch (cause) {
-      await Promise.all(updated.toReversed().map(async (owner) => {
-        await input.authority.setOwnerRefs(owner, previous.get(owner) ?? []).catch(() => undefined);
-      }));
+      const rollbackFailures: unknown[] = [];
+      for (const owner of updated.toReversed()) {
+        try {
+          await input.authority.setOwnerRefs(owner, previous.get(owner) ?? []);
+        } catch (rollbackCause) {
+          rollbackFailures.push(rollbackCause);
+        }
+      }
+      if (rollbackFailures.length > 0) {
+        throw new AggregateError(
+          [cause, ...rollbackFailures],
+          "cloud 연결형 3D pass 복원 실패 뒤 owner 참조 일부를 되돌리지 못했습니다.",
+          { cause },
+        );
+      }
       throw cause;
     }
   });

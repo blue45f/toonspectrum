@@ -8,8 +8,8 @@ import {
   resetStudioDestructiveActionLedger,
 } from "./studio-destructive-action-preview";
 import {
-  studioDeleteCharacterBibleEntryRequest,
   studioDeletePageRequest,
+  studioDeleteProductionBibleEntryRequest,
   studioExportSplitChoiceRequest,
 } from "./studio-destructive-command-catalog";
 import { StudioDestructiveConfirmHost } from "./StudioDestructiveConfirmHost";
@@ -53,8 +53,9 @@ describe("StudioDestructiveConfirmHost", () => {
 
   it("declines on cancel without running anything", async () => {
     render(<StudioDestructiveConfirmHost />);
+    // 자체 저장소를 쓰는 사이드카 — 통합 저널을 지나지 않아 여전히 되돌릴 수 없다.
     const answer = confirmStudioDestructiveAction(
-      studioDeleteCharacterBibleEntryRequest("주인공"),
+      studioDeleteProductionBibleEntryRequest("소품 목록"),
     );
     await flush();
 

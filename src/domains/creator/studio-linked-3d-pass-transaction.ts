@@ -68,6 +68,8 @@ export interface StudioLinked3dPassCasAuthority {
   get(hash: string, options?: { readonly verify?: boolean }): ReturnType<StudioOpfsAssetStore["get"]>;
   ownerRefs(owner: string): ReturnType<StudioOpfsAssetStore["ownerRefs"]>;
   setOwnerRefs(owner: string, hashes: readonly string[]): ReturnType<StudioOpfsAssetStore["setOwnerRefs"]>;
+  /** Product-only origin-wide owner RMW fence. Tests/non-OPFS adapters use the in-realm fallback. */
+  runOwnerMutationExclusive?<T>(owner: string, task: () => Promise<T>): Promise<T>;
 }
 
 export class StudioLinked3dPassAuthorityError extends Error {

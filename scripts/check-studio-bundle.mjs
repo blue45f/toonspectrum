@@ -185,6 +185,11 @@ const verboseReportRequested = hasFlag("--verbose", "STUDIO_BUNDLE_VERBOSE");
 // tolerance plus a 2-chunk absolute floor for the small closures.
 const ratchetPolicy = { byteTolerance: 0.02, countTolerance: 0.02, countSlack: 2 };
 
+// How long a recorded (not re-measured) startup block may be reprinted before the report says it
+// can no longer be trusted. One working week: long enough that a normal feature branch never trips
+// it, short enough that a silent multi-release drift cannot hide behind it.
+const runtimeStalenessDays = 7;
+
 // Onboarding overlays the runtime probe dismisses so it measures a returning
 // user's cold entry rather than the first-run tour. Declared here because the
 // probe is awaited from the main block, above its own definition.
@@ -1063,6 +1068,40 @@ function reportReferenceOverages() {
   );
 }
 
+/**
+ * The runtime block is the only measurement this gate cannot recompute from the manifest, so a
+ * plain `check:studio-bundle` reprints it verbatim. That is how the 2026-08-13 static acceptance
+ * shipped while the runtime numbers still described the 2026-08-10 build: the printed table looked
+ * authoritative but was three days and one accepted static ratchet out of date. Say so out loud.
+ */
+function runtimeStalenessWarnings(baseline) {
+  const recordedAt = Date.parse(baseline?.runtime?.recordedAt ?? "");
+  if (!Number.isFinite(recordedAt)) return [];
+  const warnings = [];
+  const acceptedAt = Date.parse(baseline?.recordedAt ?? "");
+  if (Number.isFinite(acceptedAt) && recordedAt < acceptedAt) {
+    warnings.push(
+      `studio bundle observation: the recorded startup measurement (${baseline.runtime.recordedAt}) `
+        + `predates the last accepted static measurement (${baseline.recordedAt}). Static growth `
+        + "accepted since then is invisible to the numbers printed above.",
+    );
+  }
+  const ageDays = Math.floor((Date.now() - recordedAt) / 86_400_000);
+  if (ageDays >= runtimeStalenessDays) {
+    warnings.push(
+      `studio bundle observation: the recorded startup measurement is ${ageDays} day(s) old `
+        + `(staleness window ${runtimeStalenessDays} days).`,
+    );
+  }
+  if (warnings.length > 0) {
+    warnings.push(
+      "  re-measure with \"node scripts/check-studio-bundle.mjs --runtime\" before trusting the "
+        + "block above.",
+    );
+  }
+  return warnings;
+}
+
 function reportRuntimeSection(runtimeReport, baseline) {
   console.log("");
   if (!runtimeReport) {
@@ -1088,6 +1127,7 @@ function reportRuntimeSection(runtimeReport, baseline) {
     console.log(
       `  ${recorded.eagerDynamicChunks.length} module(s) declared dynamic in the manifest were loaded during startup with no user input`,
     );
+    for (const warning of runtimeStalenessWarnings(baseline)) console.warn(warning);
     return;
   }
 

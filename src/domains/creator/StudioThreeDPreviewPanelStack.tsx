@@ -26,6 +26,7 @@ import {
   studioShared3dStageOwnedCharacterElementIds,
   studioShared3dStageReusableHiddenCharacterElementIds,
 } from "./studio-shared-3d-stage-collection";
+import { StudioBg3dRetainedOwnerRouteBridge } from "./StudioBg3dRetainedOwnerRouteBridge";
 
 import type { BgPrimitiveKind } from "./studio-background-3d-metadata";
 import type {
@@ -188,17 +189,6 @@ function MannequinLoadingOverlay() {
       <div className="inline-flex items-center gap-2 rounded-lg border border-line bg-panel px-4 py-3 text-sm font-semibold shadow-xl">
         <Loader2 className="animate-spin text-accent" size={16} aria-hidden />
         <span>3D 데생 인형을 여는 중</span>
-      </div>
-    </div>
-  );
-}
-
-function Bg3DLoadingOverlay() {
-  return (
-    <div aria-live="polite" className="fixed inset-0 z-50 grid place-items-center bg-[oklch(0.08_0.01_70/0.72)] p-4 text-fg backdrop-blur-sm">
-      <div className="inline-flex items-center gap-2 rounded-lg border border-line bg-panel px-4 py-3 text-sm font-semibold shadow-xl">
-        <Loader2 className="animate-spin text-accent" size={16} aria-hidden />
-        <span>3D 배경 도구를 여는 중</span>
       </div>
     </div>
   );
@@ -427,6 +417,37 @@ export const StudioThreeDPreviewPanelStack = memo(function StudioThreeDPreviewPa
     operation: bg3dOperation,
   });
 
+  const bg3dElement = bg3dOpen ? (
+    <StudioBackground3D
+      open={bg3dOpen}
+      initialDataUrl={bg3dInitialDataUrl}
+      initialScene={bg3dInitialScene}
+      seedSceneTemplateId={bg3dSeedTemplateId}
+      seedPrimitiveKind={asBgPrimitiveKindOrNull(bg3dSeedPrimitiveKind)}
+      onSeedObjectInsertConsumed={onSeedObjectInsertConsumed}
+      sharedSceneSession={shared3dSceneSession}
+      sharedStageResolution={masterEditMode ? undefined : shared3dStageResolution}
+      sharedStageSessionScopeKey={sharedStageSessionScopeKey}
+      sharedCharactersLinkedToOtherBackgroundCount={
+        sharedCharactersLinkedToOtherBackgroundCount
+      }
+      operation={bg3dOperation}
+      recoveryScope={bg3dBatchRecoveryScope}
+      validateRecoveryAccess={validateRecoveryAccess}
+      onClose={() => {
+        setBg3dOpen(false);
+        setBg3dInitialDataUrl(undefined);
+        setBg3dInitialScene(undefined);
+        setBg3dInitialElementId(undefined);
+        if (typeof onSeedObjectInsertConsumed === "function") {
+          onSeedObjectInsertConsumed();
+        }
+      }}
+      onInsert={insertBg3dResult}
+      onUseAsAiMethodReference={useBg3dFrameAsAiMethodReference}
+    />
+  ) : null;
+
   return (
     <>
       <Suspense fallback={null}>
@@ -474,38 +495,10 @@ export const StudioThreeDPreviewPanelStack = memo(function StudioThreeDPreviewPa
         ) : null}
       </Suspense>
 
-      <Suspense fallback={<Bg3DLoadingOverlay />}>
-        {bg3dOpen ? (
-          <StudioBackground3D
-            open
-            initialDataUrl={bg3dInitialDataUrl}
-            initialScene={bg3dInitialScene}
-            seedSceneTemplateId={bg3dSeedTemplateId}
-            seedPrimitiveKind={asBgPrimitiveKindOrNull(bg3dSeedPrimitiveKind)}
-            onSeedObjectInsertConsumed={onSeedObjectInsertConsumed}
-            sharedSceneSession={shared3dSceneSession}
-            sharedStageResolution={masterEditMode ? undefined : shared3dStageResolution}
-            sharedStageSessionScopeKey={sharedStageSessionScopeKey}
-            sharedCharactersLinkedToOtherBackgroundCount={
-              sharedCharactersLinkedToOtherBackgroundCount
-            }
-            operation={bg3dOperation}
-            recoveryScope={bg3dBatchRecoveryScope}
-            validateRecoveryAccess={validateRecoveryAccess}
-            onClose={() => {
-              setBg3dOpen(false);
-              setBg3dInitialDataUrl(undefined);
-              setBg3dInitialScene(undefined);
-              setBg3dInitialElementId(undefined);
-              if (typeof onSeedObjectInsertConsumed === "function") {
-                onSeedObjectInsertConsumed();
-              }
-            }}
-            onInsert={insertBg3dResult}
-            onUseAsAiMethodReference={useBg3dFrameAsAiMethodReference}
-          />
-        ) : null}
-      </Suspense>
+      <StudioBg3dRetainedOwnerRouteBridge
+        element={bg3dElement}
+        open={bg3dOpen}
+      />
 
       <Suspense fallback={<TimelapseLoadingOverlay />}>
         {timelapseOpen ? (

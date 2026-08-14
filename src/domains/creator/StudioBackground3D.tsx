@@ -195,6 +195,10 @@ import {
   resolveStudioBg3dHierarchy,
 } from "./studio-bg3d-hierarchy";
 import {
+  planStudioBg3dImmersiveStage,
+  studioBg3dImmersiveStageFailureMessage,
+} from "./studio-bg3d-immersive-stage";
+import {
   resolveStudioBg3dInsertBackgroundFromDocument,
   resolveStudioBg3dInsertBackgroundMode,
 } from "./studio-bg3d-insert-background-mode";
@@ -539,6 +543,7 @@ import {
 } from "./studio-shared-3d-scene-runtime";
 import { StudioBg3dActionFooter } from "./StudioBg3dActionFooter";
 import { StudioBg3dDirectionalShadowLight } from "./StudioBg3dDirectionalShadowLight";
+import { StudioBg3dImmersivePanel } from "./StudioBg3dImmersivePanel";
 import { StudioBg3dLtPanel } from "./StudioBg3dLtPanel";
 import { StudioBg3dMeasurementPanel } from "./StudioBg3dMeasurementPanel";
 import { StudioBg3dMeasurementViewport } from "./StudioBg3dMeasurementViewport";
@@ -561,6 +566,10 @@ import {
   type StudioBg3dBabylonDiagnosticState,
 } from "./StudioBg3dViewPanel";
 import {
+  StudioBg3dImmersiveRenderBridge,
+  StudioBg3dWebXrSessionBridge,
+} from "./StudioBg3dWebXrSessionBridge";
+import {
   StudioGeneric3dModelModePanel,
   type StudioGeneric3dControlMode,
 } from "./StudioGeneric3dModelModePanel";
@@ -575,6 +584,7 @@ import type {
   StudioBg3dCaptureAdapter,
   StudioBg3dCaptureRequest,
 } from "./studio-bg3d-capture-adapter";
+import type { StudioBg3dImmersiveStagePlan } from "./studio-bg3d-immersive-stage";
 import type { StudioBg3dImportProgress } from "./studio-bg3d-model-import";
 import type { StudioBg3dModelThumbnailCaptureController } from "./studio-bg3d-model-thumbnail-capture";
 import type { StudioBg3dModelThumbnailThreeCaptureHandle } from "./studio-bg3d-model-thumbnail-three-capture";
@@ -604,6 +614,12 @@ import type { StudioBg3dShotContactSheetImage } from "./studio-bg3d-shot-contact
 import type { StudioShared3dSceneSession } from "./studio-shared-3d-scene-bridge";
 import type { StudioShared3dStageResolution } from "./studio-shared-3d-stage-document";
 import type { StudioToolHintSpec } from "./studio-tool-hints";
+import type {
+  StudioWebXrMode,
+  StudioWebXrSessionController,
+  StudioWebXrSessionState,
+  StudioWebXrSupportSnapshot,
+} from "./studio-webxr-session";
 
 export type {
   StudioBackground3DInsertResult,
@@ -643,6 +659,8 @@ export interface StudioBackground3DProps {
     scope: StudioBg3dShotBatchRecoveryScope,
     signal: AbortSignal,
   ) => Promise<boolean>;
+  /** Keeps the owning R3F Canvas mounted, but hidden, while a non-cancellable XR attach settles. */
+  onWebXrCleanupPendingChange?: (pending: boolean) => void;
   onClose: () => void;
   onInsert: (
     result: StudioBackground3DInsertResult,
@@ -1392,11 +1410,17 @@ function StudioBg3dWebglRenderSettingsController({
 }
 
 /* 장면 배경이 없는 흰색 모드와 절차적 파노라마 생성 전 프레임의 안전한 clear color를 적용한다. */
-function SkyClearColorController({ clearColor }: { clearColor: string }) {
+function SkyClearColorController({
+  clearColor,
+  alpha = 1,
+}: {
+  clearColor: string;
+  alpha?: number;
+}) {
   const gl = useThree((s) => s.gl);
   useEffect(() => {
-    gl.setClearColor(clearColor, 1);
-  }, [gl, clearColor]);
+    gl.setClearColor(clearColor, alpha);
+  }, [alpha, gl, clearColor]);
   return null;
 }
 
@@ -2164,6 +2188,11 @@ function BgCustomModelInstanceBatch({
   );
 }
 
+type StudioBg3dImmersiveStageSuccess = Extract<
+  StudioBg3dImmersiveStagePlan,
+  { readonly ok: true }
+>;
+
 export function StudioBackground3D({
   open,
   initialDataUrl,
@@ -2178,6 +2207,7 @@ export function StudioBackground3D({
   operation = "insert",
   recoveryScope,
   validateRecoveryAccess,
+  onWebXrCleanupPendingChange,
   onClose,
   onInsert,
   onUseAsAiMethodReference,
@@ -2324,6 +2354,27 @@ export function StudioBackground3D({
   const [magicLayerEnabled, setMagicLayerEnabled] = useState(false);
   const [isTransforming, setIsTransforming] = useState(false);
   const [isQuadView, setIsQuadView] = useState(false);
+  const [webXrSupport, setWebXrSupport] =
+    useState<StudioWebXrSupportSnapshot | null>(null);
+  const [webXrSessionState, setWebXrSessionState] =
+    useState<StudioWebXrSessionState>({ status: "idle" });
+  const [webXrController, setWebXrController] =
+    useState<StudioWebXrSessionController | null>(null);
+  const [webXrRendererLifetimeRetained, setWebXrRendererLifetimeRetained] =
+    useState(open);
+  const [webXrBridgeGeneration, setWebXrBridgeGeneration] = useState(0);
+  const [webXrCanvasGeneration, setWebXrCanvasGeneration] = useState(0);
+  const [immersiveStagePlan, setImmersiveStagePlan] =
+    useState<StudioBg3dImmersiveStageSuccess | null>(null);
+  const webXrSessionStateRef = useRef<StudioWebXrSessionState>({ status: "idle" });
+  const webXrControllerRef = useRef<StudioWebXrSessionController | null>(null);
+  const webXrRestoreCameraRef = useRef<StudioBg3dCameraSettings | null>(null);
+  const webXrCleanupPromiseRef = useRef<Promise<void> | null>(null);
+  const webXrRendererRecreationPendingRef = useRef(false);
+  const webXrCloseRequestedRef = useRef(false);
+  const webXrOpenRef = useRef(open);
+  const webXrMountedRef = useRef(true);
+  webXrOpenRef.current = open;
   const viewTopRef = useRef<HTMLDivElement>(null);
   const viewFrontRef = useRef<HTMLDivElement>(null);
   const viewRightRef = useRef<HTMLDivElement>(null);
@@ -2503,9 +2554,16 @@ export function StudioBackground3D({
   }, []);
   useEffect(() => () => shotBatchAbortRef.current?.abort(), []);
   useEffect(() => {
-    if (!open) {
+    if (!open && !webXrRendererLifetimeRetained) {
       primitiveGeometryPool.dispose();
       setAdaptiveDprScale(1);
+      webXrControllerRef.current = null;
+      webXrSessionStateRef.current = { status: "idle" };
+      webXrRestoreCameraRef.current = null;
+      setWebXrController(null);
+      setWebXrSupport(null);
+      setWebXrSessionState({ status: "idle" });
+      setImmersiveStagePlan(null);
       measurementActiveRef.current = false;
       setMeasurementActive(false);
       setMeasurementStartWorld(null);
@@ -2518,7 +2576,7 @@ export function StudioBackground3D({
       modelRendererRef.current = null;
       setModelRenderer(null);
     }
-  }, [open, primitiveGeometryPool]);
+  }, [open, primitiveGeometryPool, webXrRendererLifetimeRetained]);
   useEffect(() => {
     if (!open) return;
     return () => {
@@ -2992,6 +3050,120 @@ export function StudioBackground3D({
       applyOrDeferStudioBg3dHistoryCamera(api, pendingInitialCameraRef, pendingView);
     }
   }, []);
+
+  function resetWebXrPresentationUi(): void {
+    setWebXrController(null);
+    setWebXrSupport(null);
+    const restoreCamera = webXrRestoreCameraRef.current;
+    if (restoreCamera) pendingInitialCameraRef.current = restoreCamera;
+    webXrRestoreCameraRef.current = null;
+    webXrSessionStateRef.current = { status: "idle" };
+    setWebXrSessionState({ status: "idle" });
+    setImmersiveStagePlan(null);
+  }
+
+  function finishWebXrControllerCleanup(cleanup: Promise<void>): void {
+    if (webXrCleanupPromiseRef.current !== cleanup) return;
+    webXrCleanupPromiseRef.current = null;
+    if (!webXrMountedRef.current) return;
+    const rendererMustStayMounted = webXrOpenRef.current;
+    const replacePoisonedRenderer = webXrRendererRecreationPendingRef.current;
+    webXrRendererRecreationPendingRef.current = false;
+    setWebXrRendererLifetimeRetained(rendererMustStayMounted);
+    onWebXrCleanupPendingChange?.(false);
+    if (rendererMustStayMounted && !webXrCloseRequestedRef.current) {
+      if (replacePoisonedRenderer) {
+        // Three can revive isPresenting after native end when its setSession continuation wins a
+        // race. Its public API cannot repair that manager, so replace this one Canvas only after
+        // controller.dispose() proves both attachment and native dispatch have settled.
+        setWebXrCanvasGeneration((generation) => generation + 1);
+      } else {
+        // The modal was reopened before an ordinary controller generation finished. Recreate only
+        // the bridge; the admitted scene and its one Canvas remain the same.
+        setWebXrBridgeGeneration((generation) => generation + 1);
+      }
+    }
+  }
+
+  function disposeCurrentWebXrControllerGeneration(): Promise<void> | null {
+    const existingCleanup = webXrCleanupPromiseRef.current;
+    if (existingCleanup) return existingCleanup;
+    const controller = webXrControllerRef.current;
+    webXrControllerRef.current = null;
+    resetWebXrPresentationUi();
+    if (!controller) {
+      if (!webXrOpenRef.current) {
+        setWebXrRendererLifetimeRetained(false);
+        onWebXrCleanupPendingChange?.(false);
+      }
+      return null;
+    }
+
+    const cleanup = controller.dispose();
+    webXrCleanupPromiseRef.current = cleanup;
+    // This state is committed in the same discrete close turn as the parent's logical close. It
+    // renders the existing Canvas hidden, never a second renderer, until Three can be torn down.
+    setWebXrRendererLifetimeRetained(true);
+    onWebXrCleanupPendingChange?.(true);
+    void cleanup.then(
+      () => finishWebXrControllerCleanup(cleanup),
+      () => finishWebXrControllerCleanup(cleanup),
+    );
+    return cleanup;
+  }
+
+  const disposeWebXrControllerForOpenChange = useEffectEvent(() => {
+    disposeCurrentWebXrControllerGeneration();
+  });
+
+  useLayoutEffect(() => {
+    if (open) {
+      webXrCloseRequestedRef.current = false;
+      setWebXrRendererLifetimeRetained(true);
+      return;
+    }
+    webXrCloseRequestedRef.current = true;
+    disposeWebXrControllerForOpenChange();
+  }, [open]);
+
+  useEffect(() => {
+    webXrMountedRef.current = true;
+    return () => {
+      webXrMountedRef.current = false;
+    };
+  }, []);
+
+  const handleWebXrControllerReady = (controller: StudioWebXrSessionController | null) => {
+    const lostController = controller === null && webXrControllerRef.current !== null;
+    webXrControllerRef.current = controller;
+    setWebXrController(controller);
+    if (!lostController) return;
+    const restoreCamera = webXrRestoreCameraRef.current;
+    if (restoreCamera) pendingInitialCameraRef.current = restoreCamera;
+    webXrRestoreCameraRef.current = null;
+    webXrSessionStateRef.current = { status: "idle" };
+    setWebXrSessionState({ status: "idle" });
+    setImmersiveStagePlan(null);
+  };
+
+  const handleWebXrSessionStateChange = (nextState: StudioWebXrSessionState) => {
+    webXrSessionStateRef.current = nextState;
+    setWebXrSessionState(nextState);
+    if (
+      nextState.status === "error"
+      && nextState.code === "renderer-failed"
+      && webXrControllerRef.current?.requiresRendererRecreation
+    ) {
+      webXrRendererRecreationPendingRef.current = true;
+      disposeCurrentWebXrControllerGeneration();
+      return;
+    }
+    if (nextState.status !== "idle" && nextState.status !== "error") return;
+    const restoreCamera = webXrRestoreCameraRef.current;
+    if (restoreCamera) pendingInitialCameraRef.current = restoreCamera;
+    webXrRestoreCameraRef.current = null;
+    setImmersiveStagePlan(null);
+  };
 
   const historyRef = useRef<StudioBg3dHistorySnapshot[]>([]);
   const historyIndexRef = useRef(-1);
@@ -6856,6 +7028,10 @@ export function StudioBackground3D({
       const typing = !!target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
       if (typing) return;
       if (captureInFlightRef.current) return;
+      if (
+        webXrSessionStateRef.current.status !== "idle" &&
+        webXrSessionStateRef.current.status !== "error"
+      ) return;
 
       if (e.key === "Delete" || e.key === "Backspace") {
         if (
@@ -6960,6 +7136,8 @@ export function StudioBackground3D({
     }
     if (measurementActiveRef.current) cancelMeasurement();
     cancelSurfaceSnap();
+    webXrCloseRequestedRef.current = true;
+    disposeCurrentWebXrControllerGeneration();
     invalidateModalAssetSession();
     onClose();
   }
@@ -9177,22 +9355,31 @@ export function StudioBackground3D({
     setLtUserPresetDescription(exactUserPreset.description);
   }, [appliedLtPreset, ltManagedUserPresetId, ltUserPresetPayload, open]);
 
-  if (!open) return null;
+  if (!open && !webXrRendererLifetimeRetained) return null;
 
   const placementActive =
     placementSession.phase === "preview" && placementPreviewAsset !== null;
+  const immersiveSceneActive = immersiveStagePlan !== null;
+  const immersiveTransitionActive = webXrSessionState.status === "requesting"
+    || webXrSessionState.status === "presenting"
+    || webXrSessionState.status === "ending";
   // Capture renders the main View's virtual Scene/Camera into an offscreen target, so the quad
   // topology can remain intact. Keeping this View mounted prevents linked VRMs, wardrobe, props,
   // auto-grip, and their post-commit readiness generation from restarting during capture.
-  const effectiveIsQuadView = isQuadView && !physicsInteractionLocked && !placementActive;
+  const effectiveIsQuadView = isQuadView
+    && !physicsInteractionLocked
+    && !placementActive
+    && !immersiveSceneActive;
   const mainViewTrackRef = effectiveIsQuadView ? viewPerspRef : viewportHostRef;
-  const bg3dFrameLoop = resolveStudioBg3dFrameLoop({
-    modelAnimationPlaying: customModels.some((model) => model.animation?.playing === true),
-    physicsPlaying: physicsPhase === "running",
-    transforming: isTransforming,
-    capturing: isCapturing,
-    batchRendering: isBatchRenderingShots,
-  });
+  const bg3dFrameLoop = immersiveSceneActive
+    ? "always"
+    : resolveStudioBg3dFrameLoop({
+        modelAnimationPlaying: customModels.some((model) => model.animation?.playing === true),
+        physicsPlaying: physicsPhase === "running",
+        transforming: isTransforming,
+        capturing: isCapturing,
+        batchRendering: isBatchRenderingShots,
+      });
   const isMainOrtho = sceneBaseDocument.camera.projection === "orthographic";
   const currentFocalLengthMm = Math.round(
     studioBg3dFovDegreesToFocalLength(sceneBaseDocument.camera.fovDegrees),
@@ -9410,47 +9597,129 @@ export function StudioBackground3D({
     groundY: 0,
     mapSize: shadowMapSize,
   });
+
+  const webXrDisabledReason = !webXrController
+    ? "기존 Three.js 렌더러의 WebXR 연결을 준비하는 중입니다."
+    : sceneRecoveryError
+      ? "3D 장면 복원 오류를 해결한 뒤 AR·VR 미리보기를 열어 주세요."
+      : hasCloneFailure || hasUnavailableSharedCharacter
+        ? "불러오지 못한 3D 모델이 있어 모든 공간 경계를 검증할 수 없습니다."
+        : hasPendingClone || hasPendingSharedCharacter
+          ? "모든 3D 모델과 캐릭터가 표시될 때까지 기다려 주세요."
+          : isCapturing || isBatchRenderingShots || captureInFlightRef.current
+            ? "3D 캡처나 컷 배치 출력이 끝난 뒤 AR·VR 미리보기를 열어 주세요."
+            : isRestoringScene
+              ? "3D 장면 복원이 끝난 뒤 AR·VR 미리보기를 열어 주세요."
+              : isUploadingModel || applyingTemplateId !== null || deletingModelId !== null
+                || isSavingTemplate
+                ? "3D 에셋 작업이 끝난 뒤 AR·VR 미리보기를 열어 주세요."
+                : physicsInteractionLocked
+                  ? "물리 미리보기를 적용하거나 초기화한 뒤 AR·VR 미리보기를 열어 주세요."
+                  : isTransforming || placementActive || measurementActive || surfaceSnapArmed
+                    ? "현재 배치·측정·변형 도구를 마친 뒤 AR·VR 미리보기를 열어 주세요."
+                    : destructiveMutationGuardRef.current.blocksClose
+                      ? "진행 중인 3D 변경을 마친 뒤 AR·VR 미리보기를 열어 주세요."
+                      : shadowSceneBounds.includedEntityCount === 0
+                        ? "몰입형 미리보기에 표시할 3D 오브젝트가 없습니다."
+                        : shadowSceneBounds.clamped || shadowSceneBounds.rejectedEntityCount > 0
+                          ? "일부 3D 오브젝트의 실제 공간 경계를 확인하지 못했습니다."
+                          : null;
+
+  const startStudioBg3dWebXr = (mode: StudioWebXrMode) => {
+    const controller = webXrControllerRef.current;
+    if (!controller || webXrDisabledReason || immersiveTransitionActive) return;
+    if (captureInFlightRef.current || destructiveMutationGuardRef.current.blocksClose) return;
+    const currentScene = readCurrentCanonicalSceneForShot();
+    if (!currentScene) return;
+    const plannedStage = planStudioBg3dImmersiveStage({
+      mode,
+      sceneBounds: shadowSceneBounds,
+      camera: currentScene.camera,
+    });
+    if (!plannedStage.ok) {
+      setError(studioBg3dImmersiveStageFailureMessage(plannedStage.reason));
+      return;
+    }
+
+    webXrRestoreCameraRef.current = currentScene.camera;
+    flushSync(() => {
+      setIsQuadView(false);
+      setActivePanelTab("view");
+      setImmersiveStagePlan(plannedStage);
+      setError(null);
+    });
+    void controller.start(mode).catch(() => {
+      if (webXrControllerRef.current !== controller) return;
+      const restoreCamera = webXrRestoreCameraRef.current;
+      if (restoreCamera) pendingInitialCameraRef.current = restoreCamera;
+      webXrRestoreCameraRef.current = null;
+      setImmersiveStagePlan(null);
+    });
+  };
+
+  const endStudioBg3dWebXr = () => {
+    void webXrControllerRef.current?.end();
+  };
   
   const sceneContent = (
     <Fragment>
       <StudioBg3dWebglRenderSettingsController render={sceneBaseDocument.render} />
-      <SkyClearColorController clearColor={getSkyPreset(renderedSkyPresetId).clearColor} />
-      <StudioBg3dScenePanorama
-        presetId={renderedSkyPresetId}
-        rotationDegrees={renderedPanoramaRotation}
+      <SkyClearColorController
+        clearColor={immersiveStagePlan?.mode === "immersive-ar"
+          ? "#000000"
+          : getSkyPreset(renderedSkyPresetId).clearColor}
+        alpha={immersiveStagePlan?.mode === "immersive-ar" ? 0 : 1}
       />
-      <StudioBg3dSceneFog background={renderedBackgroundSettings} />
+      {immersiveStagePlan?.mode !== "immersive-ar" ? (
+        <Fragment>
+          <StudioBg3dScenePanorama
+            presetId={renderedSkyPresetId}
+            rotationDegrees={renderedPanoramaRotation}
+          />
+          <StudioBg3dSceneFog background={renderedBackgroundSettings} />
+        </Fragment>
+      ) : null}
       <ambientLight
         color={sceneBaseDocument.lighting.ambientColor}
         intensity={sceneBaseDocument.lighting.ambientIntensity}
       />
       <StudioBg3dDirectionalShadowLight
         fit={keyShadowFit}
-        castShadow={deviceQuality.shadows && sceneBaseDocument.lighting.key.castsShadow}
+        castShadow={
+          immersiveStagePlan?.mode !== "immersive-ar"
+          && deviceQuality.shadows
+          && sceneBaseDocument.lighting.key.castsShadow
+        }
         color={sceneBaseDocument.lighting.key.color}
         intensity={sceneBaseDocument.lighting.key.intensity}
         radius={1.5}
       />
       <StudioBg3dDirectionalShadowLight
         fit={fillShadowFit}
-        castShadow={deviceQuality.shadows && sceneBaseDocument.lighting.fill.castsShadow}
+        castShadow={
+          immersiveStagePlan?.mode !== "immersive-ar"
+          && deviceQuality.shadows
+          && sceneBaseDocument.lighting.fill.castsShadow
+        }
         color={sceneBaseDocument.lighting.fill.color}
         intensity={sceneBaseDocument.lighting.fill.intensity}
         radius={1.25}
       />
-      <BgGroundHelper visible={!lineArtPreview && !isCapturing} />
-      <BgSectionPlaneController state={sectionPlane} />
-      <BgScaleGuide visible={scaleGuideVisible && !isCapturing} />
-      <StudioBg3dMeasurementViewport
-        active={measurementActive && !effectiveIsQuadView}
-        capturing={isCapturing}
-        document={measurementDocument}
-        draftMeasurement={measurementDraft}
-        startWorld={measurementStartWorld}
-        onPointPick={pickMeasurementPoint}
-        onPointPreview={updateMeasurementPreview}
-      />
-      {placementSession.phase === "preview" && placementPreviewAsset ? (
+      <BgGroundHelper visible={!immersiveSceneActive && !lineArtPreview && !isCapturing} />
+      {!immersiveSceneActive ? <BgSectionPlaneController state={sectionPlane} /> : null}
+      <BgScaleGuide visible={!immersiveSceneActive && scaleGuideVisible && !isCapturing} />
+      {!immersiveSceneActive ? (
+        <StudioBg3dMeasurementViewport
+          active={measurementActive && !effectiveIsQuadView}
+          capturing={isCapturing}
+          document={measurementDocument}
+          draftMeasurement={measurementDraft}
+          startWorld={measurementStartWorld}
+          onPointPick={pickMeasurementPoint}
+          onPointPreview={updateMeasurementPreview}
+        />
+      ) : null}
+      {!immersiveSceneActive && placementSession.phase === "preview" && placementPreviewAsset ? (
         <BgPlacementPreview asset={placementPreviewAsset} preview={placementSession} />
       ) : null}
       {staticModelBatches.map((batch) => (
@@ -9471,7 +9740,8 @@ export function StudioBackground3D({
         />
       ))}
       {sceneHierarchy.roots.map(renderSceneEntity)}
-      {!isCapturing &&
+      {!immersiveSceneActive &&
+      !isCapturing &&
       !physicsInteractionLocked &&
       !surfaceSnapArmed &&
       !measurementActive &&
@@ -9565,13 +9835,53 @@ export function StudioBackground3D({
     />
   );
 
+  const immersiveCameraNode = immersiveStagePlan ? (
+    <group
+      key={`studio-bg3d-xr-camera-${immersiveStagePlan.mode}`}
+      position={[...immersiveStagePlan.cameraRigTransform.position]}
+      quaternion={[...immersiveStagePlan.cameraRigTransform.quaternion]}
+      scale={immersiveStagePlan.cameraRigTransform.uniformScale}
+    >
+      <PerspectiveCamera
+        makeDefault
+        fov={sceneBaseDocument.camera.fovDegrees}
+        position={[0, 0, 0]}
+        near={immersiveStagePlan.mode === "immersive-ar" ? 0.01 : mainCameraNearClip}
+        far={mainCameraFarClip}
+      />
+    </group>
+  ) : null;
+
+  const mainScenePresentationNode = (
+    <group
+      position={immersiveStagePlan
+        ? [...immersiveStagePlan.stageRootTransform.position]
+        : [0, 0, 0]}
+      quaternion={immersiveStagePlan
+        ? [...immersiveStagePlan.stageRootTransform.quaternion]
+        : [0, 0, 0, 1]}
+      scale={immersiveStagePlan?.stageRootTransform.uniformScale ?? 1}
+    >
+      <group position={immersiveStagePlan ? [...immersiveStagePlan.contentOffset] : [0, 0, 0]}>
+        {sceneContent}
+        {sharedCharacterSceneContent}
+      </group>
+    </group>
+  );
+
   const commonOrbitControls = (
     <OrbitControls
       makeDefault
       enableDamping
       dampingFactor={0.08}
       enablePan
-      enabled={!isTransforming && !isCapturing && !placementActive && !measurementActive}
+      enabled={
+        !immersiveSceneActive
+        && !isTransforming
+        && !isCapturing
+        && !placementActive
+        && !measurementActive
+      }
       minDistance={2}
       maxDistance={mainCameraMaxOrbitDistance}
     />
@@ -9580,11 +9890,14 @@ export function StudioBackground3D({
   const modal = (
     <div
       ref={modalDialogRef}
-      aria-modal="true"
+      aria-hidden={!open || undefined}
+      aria-modal={open ? "true" : undefined}
       aria-labelledby="studio-bg3d-dialog-title"
       data-testid="studio-bg3d-dialog"
+      hidden={!open}
+      inert={!open ? true : undefined}
       className="fixed inset-0 z-[80] bg-[oklch(0.08_0.01_70/0.82)] p-2 text-fg backdrop-blur-sm sm:p-4"
-      role="dialog"
+      role={open ? "dialog" : undefined}
       tabIndex={-1}
       style={{
         paddingTop: "max(0.5rem, env(safe-area-inset-top))",
@@ -9622,7 +9935,11 @@ export function StudioBackground3D({
               type="button"
               aria-label="닫기"
               data-bg3d-initial-focus="true"
-              title={isCapturing || deletingModelId !== null ? "진행 중인 작업이 끝난 뒤 닫을 수 있습니다" : "닫기 (Esc)"}
+              title={isCapturing || deletingModelId !== null
+                ? "진행 중인 작업이 끝난 뒤 닫을 수 있습니다"
+                : webXrSessionState.status !== "idle" && webXrSessionState.status !== "error"
+                  ? "AR·VR 미리보기를 종료하고 닫기"
+                  : "닫기 (Esc)"}
               className={ICON_BUTTON}
               disabled={isCapturing}
               aria-disabled={deletingModelId !== null || undefined}
@@ -9644,6 +9961,7 @@ export function StudioBackground3D({
               <div
                 ref={viewportHostRef}
                 data-testid="studio-bg3d-viewport"
+                inert={immersiveSceneActive || undefined}
                 className="relative aspect-video h-full max-h-full min-h-0 w-auto overflow-hidden rounded-xl border border-line/80 bg-white shadow-[inset_0_0_0_1px_oklch(1_0_0/0.04)] lg:min-h-[360px]"
               >
                 {effectiveIsQuadView && (
@@ -9655,6 +9973,7 @@ export function StudioBackground3D({
                   </div>
                 )}
                 <Canvas
+                  key={webXrCanvasGeneration}
                   eventSource={viewportHostRef as unknown as React.RefObject<HTMLElement>}
                   camera={{
                     fov: sceneBaseDocument.camera.fovDegrees,
@@ -9665,7 +9984,9 @@ export function StudioBackground3D({
                   }}
                   className={cx(
                     "h-full w-full",
-                    (surfaceSnapArmed || placementActive || measurementActive) && "cursor-crosshair",
+                    !immersiveSceneActive
+                      && (surfaceSnapArmed || placementActive || measurementActive)
+                      && "cursor-crosshair",
                     effectiveIsQuadView && "pointer-events-none absolute inset-0 z-10",
                   )}
                   dpr={deviceQuality.effectiveDpr * adaptiveDprScale}
@@ -9679,6 +10000,7 @@ export function StudioBackground3D({
                     gl.setClearColor(getSkyPreset(renderedSkyPresetId).clearColor, 1);
                   }}
                   onPointerMissed={(event) => {
+                    if (immersiveSceneActive) return;
                     if (isStudioBg3dViewportControlTarget(event.target)) return;
                     if (placementActive) return;
                     if (surfaceSnapArmedRef.current) {
@@ -9694,13 +10016,20 @@ export function StudioBackground3D({
                     }
                   }}
                 >
+                  <StudioBg3dWebXrSessionBridge
+                    key={webXrBridgeGeneration}
+                    domOverlayRootRef={modalDialogRef}
+                    onControllerReady={handleWebXrControllerReady}
+                    onSupportChange={setWebXrSupport}
+                    onStateChange={handleWebXrSessionStateChange}
+                  />
                   <BgAdaptiveDprController
                     targetFps={deviceQuality.targetFps}
-                    paused={isCapturing || !open}
+                    paused={isCapturing || immersiveSceneActive || !open}
                     onScaleChange={setAdaptiveDprScale}
                   />
                   <StudioBg3dPlacementPointerController
-                    active={placementActive && !effectiveIsQuadView}
+                    active={placementActive && !effectiveIsQuadView && !immersiveSceneActive}
                     objectsRef={primitiveObjectsRef}
                     onMove={moveCustomModelPlacement}
                     onCommit={commitCustomModelPlacement}
@@ -9729,17 +10058,22 @@ export function StudioBackground3D({
                   <View
                     key="studio-bg3d-main-view"
                     track={mainViewTrackRef as unknown as React.RefObject<HTMLElement>}
+                    visible={!immersiveSceneActive}
                   >
-                    {mainCameraNode}
-                    <CaptureBridge onCaptureUpdate={onCaptureUpdate} />
-                    <BgViewportController onReady={handleViewportReady} />
-                    {sceneContent}
-                    {sharedCharacterSceneContent}
-                    {commonOrbitControls}
+                    {immersiveCameraNode ?? mainCameraNode}
+                    {!immersiveSceneActive ? (
+                      <Fragment>
+                        <CaptureBridge onCaptureUpdate={onCaptureUpdate} />
+                        <BgViewportController onReady={handleViewportReady} />
+                      </Fragment>
+                    ) : null}
+                    {mainScenePresentationNode}
+                    <StudioBg3dImmersiveRenderBridge active={immersiveSceneActive} />
+                    {!immersiveSceneActive ? commonOrbitControls : null}
                   </View>
                 </Canvas>
 
-                {!isCapturing ? (
+                {!isCapturing && !immersiveSceneActive ? (
                   <StudioBg3dSharedCharacterStatusOverlay
                     totalCount={sharedCharacters.length}
                     readyCount={sharedCharacterReadyCount}
@@ -9752,7 +10086,10 @@ export function StudioBackground3D({
                   />
                 ) : null}
 
-                {sharedCharacters.length === 0 && sharedStageResolution && !isCapturing ? (
+                {sharedCharacters.length === 0
+                && sharedStageResolution
+                && !isCapturing
+                && !immersiveSceneActive ? (
                   <div
                     role={sharedStageResolution.phase === "ready" ? "status" : "alert"}
                     data-testid="studio-bg3d-shared-stage-status"
@@ -9763,7 +10100,11 @@ export function StudioBackground3D({
                 ) : null}
 
                 {/* Capture-derived, pointer-transparent safe frame and crop mask. */}
-                {!effectiveIsQuadView && !isCapturing && viewportBoxSize && ltCaptureSafeFrame ? (
+                {!immersiveSceneActive
+                && !effectiveIsQuadView
+                && !isCapturing
+                && viewportBoxSize
+                && ltCaptureSafeFrame ? (
                   <div className="pointer-events-none absolute inset-0 z-20" aria-hidden="true">
                     <div
                       className={cx(
@@ -9845,7 +10186,10 @@ export function StudioBackground3D({
                 <div
                   data-bg3d-viewport-control="true"
                   inert={placementActive || undefined}
-                  className="absolute left-2 top-2 z-10 grid grid-cols-3 gap-1.5 sm:left-2.5 sm:top-2.5 sm:flex sm:flex-col"
+                  className={cx(
+                    "absolute left-2 top-2 z-10 grid grid-cols-3 gap-1.5 sm:left-2.5 sm:top-2.5 sm:flex sm:flex-col",
+                    immersiveSceneActive && "hidden",
+                  )}
                 >
                   <div className="col-span-3 grid grid-cols-3 gap-1 rounded-lg border border-line/70 bg-panel/80 p-1 shadow-sm backdrop-blur sm:flex sm:flex-col">
                     {TRANSFORM_MODES.map((m) => {
@@ -10161,7 +10505,10 @@ export function StudioBackground3D({
                 <div
                   data-bg3d-viewport-control="true"
                   inert={placementActive || undefined}
-                  className="absolute right-2 top-2 z-10 grid grid-cols-2 gap-1.5 sm:right-2.5 sm:top-2.5 sm:flex sm:flex-col"
+                  className={cx(
+                    "absolute right-2 top-2 z-10 grid grid-cols-2 gap-1.5 sm:right-2.5 sm:top-2.5 sm:flex sm:flex-col",
+                    immersiveSceneActive && "hidden",
+                  )}
                 >
                   <StudioToolHintTarget hint={BG3D_VIEWPORT_HINTS.zoomIn} preferredSide="left">
                     <button
@@ -10206,7 +10553,7 @@ export function StudioBackground3D({
                   </StudioToolHintTarget>
                 </div>
 
-                {surfaceSnapStatus ? (
+                {surfaceSnapStatus && !immersiveSceneActive ? (
                   <div
                     role="status"
                     aria-live="polite"
@@ -10225,7 +10572,8 @@ export function StudioBackground3D({
                   </div>
                 ) : null}
 
-                {measurementActive || measurementStartWorld || measurementDraft ? (
+                {!immersiveSceneActive
+                && (measurementActive || measurementStartWorld || measurementDraft) ? (
                   <output
                     aria-live="polite"
                     aria-atomic="true"
@@ -10262,7 +10610,7 @@ export function StudioBackground3D({
                   {describeStudioBg3dPhysicsStatus(physicsPhase, physicsError)}
                 </output>
 
-                {!physicsInteractionLocked && !viewportHinted ? (
+                {!immersiveSceneActive && !physicsInteractionLocked && !viewportHinted ? (
                   <div className="pointer-events-none absolute inset-x-0 bottom-3 z-10 flex justify-center">
                     <span className="rounded-full border border-line/70 bg-panel/85 px-3 py-1 text-center text-[0.66rem] font-medium text-fg-3 shadow-sm backdrop-blur">
                       끌어서 회전 · 오른쪽 드래그로 이동 · 도형 클릭으로 선택
@@ -10290,7 +10638,7 @@ export function StudioBackground3D({
             <div
               role="tablist"
               aria-label="컨트롤 카테고리"
-              inert={physicsInteractionLocked}
+              inert={physicsInteractionLocked || immersiveSceneActive}
               className="grid shrink-0 grid-cols-6 gap-1 border-b border-line bg-panel/95 px-2 py-2 backdrop-blur sm:px-3"
             >
               {BG_PANEL_TABS.map((tab) => {
@@ -10343,9 +10691,10 @@ export function StudioBackground3D({
               inert={physicsInteractionLocked}
               className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 sm:px-5"
             >
-<StudioBg3dShapesPanel
-                hidden={hideOnTab("shapes")}
-                context={{
+              {open ? (
+                <StudioBg3dShapesPanel
+                  hidden={hideOnTab("shapes")}
+                  context={{
                   Boxes,
                   ADD_BUTTONS,
                   addPrimitive,
@@ -10455,8 +10804,9 @@ export function StudioBackground3D({
                   selectedMorphTargetKey,
                   setMorphTargetSelection,
                   selectedMorphOverride,
-                }}
-              />
+                  }}
+                />
+              ) : null}
 
               <section hidden={hideOnTab("templates")}>
                 <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
@@ -10712,6 +11062,7 @@ export function StudioBackground3D({
                 )}
               </section>
 
+              <div inert={immersiveSceneActive || undefined}>
               <StudioBg3dViewPanel
                 hidden={hideOnTab("view")}
                 babylonDiagnosticState={babylonDiagnosticState}
@@ -10855,6 +11206,22 @@ export function StudioBackground3D({
                   disabled={Boolean(measurementDisabledReason) && !measurementActive}
                   onDocumentChange={setMeasurementDocument}
                   onLengthLockChange={handleMeasurementLengthLockChange}
+                />
+              </section>
+              </div>
+
+              <section
+                hidden={hideOnTab("view")}
+                className="border-t border-line pt-4"
+              >
+                <StudioBg3dImmersivePanel
+                  support={webXrSupport}
+                  sessionState={webXrSessionState}
+                  onStart={startStudioBg3dWebXr}
+                  onEnd={endStudioBg3dWebXr}
+                  supportPending={webXrController === null && webXrSupport === null}
+                  disabledReason={webXrDisabledReason}
+                  savedShotCount={savedShots.length}
                 />
               </section>
 
@@ -11099,7 +11466,12 @@ export function StudioBackground3D({
               error={error}
               isCapturing={isCapturing}
               deletingModelInProgress={deletingModelId !== null}
-              saveDisabled={(primitives.length === 0 && customModels.length === 0) || isCapturing || insertBlocked}
+              saveDisabled={
+                (primitives.length === 0 && customModels.length === 0)
+                || isCapturing
+                || insertBlocked
+                || immersiveSceneActive
+              }
               onClose={requestUserClose}
               onSave={handleSaveToLibrary}
               insertDisabled={(
@@ -11107,7 +11479,10 @@ export function StudioBackground3D({
                 customModels.length === 0 &&
                 sharedCharacterCaptureElementIds.length === 0 &&
                 !mayApplyEmptySharedStageMutation
-              ) || isCapturing || insertBlocked || sharedStageUpdateBlockedReason !== null}
+              ) || isCapturing
+                || insertBlocked
+                || immersiveSceneActive
+                || sharedStageUpdateBlockedReason !== null}
               onInsert={handleInsert}
               operation={operation}
               mutationKind={sharedStageMutationKind}

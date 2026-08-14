@@ -29,6 +29,11 @@ const SiteFooter = lazy(() =>
     default: mod.SiteFooter,
   })),
 );
+const StudioBg3dRetainedOwnerHost = lazy(() =>
+  import("../domains/creator/StudioBg3dRetainedOwnerHost").then((mod) => ({
+    default: mod.StudioBg3dRetainedOwnerHost,
+  })),
+);
 
 const HAS_DESKCLOUD_MOUNTS = Boolean(
   import.meta.env.VITE_SURVEYDESK_URL ||
@@ -196,6 +201,9 @@ export default function App() {
         }
         chromeOverlay={
           <>
+            <Suspense fallback={null}>
+              <StudioBg3dRetainedOwnerHost />
+            </Suspense>
             {!studioImmersive ? (
               <>
                 <DeferredBackToTop />

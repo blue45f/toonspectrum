@@ -6,6 +6,14 @@ import {
   type StudioVrmModelAssetMetadata,
   type StudioVrmThumbnailAsset,
 } from "./studio-vrm-asset-sqlite-opfs-repository";
+import {
+  getProductStudioVrmLicenseAuthorityStore,
+  type StudioVrmLicenseAuthorityStore,
+} from "./studio-vrm-license-authority-store";
+import {
+  inspectStudioVrmLicenseAuthority,
+  type StudioVrmLicenseAuthority,
+} from "./studio-vrm-license-product-gate";
 
 const DB_NAME = "toonspectrum-studio-vrm-library";
 const DB_VERSION = 1;
@@ -46,6 +54,8 @@ export type VrmStoredModelRecord = {
   byteSize?: number;
   mimeType?: string;
   validationVersion?: number;
+  /** Raw GLB JSON에서 검증한 로컬 action-policy authority. 모델 manifest에는 넣지 않는다. */
+  licenseAuthority?: StudioVrmLicenseAuthority;
 };
 
 export type VrmStoredModelWithContentIdentity = VrmStoredModelRecord & {
@@ -54,6 +64,13 @@ export type VrmStoredModelWithContentIdentity = VrmStoredModelRecord & {
   mimeType: string;
   validationVersion: number;
 };
+
+export interface SaveVerifiedVrmBlobDisposition {
+  /** Fully verified canonical library row returned by the durable writer. */
+  readonly record: VrmStoredModelRecord;
+  /** False means the content hash already belonged to an existing shared library row. */
+  readonly created: boolean;
+}
 
 export type VrmLibraryEntry = {
   id: string;
@@ -65,11 +82,14 @@ export type VrmLibraryEntry = {
   contentHash?: VrmContentHash;
   byteSize?: number;
   mimeType?: string;
+  licenseAuthority?: StudioVrmLicenseAuthority;
 };
 
 export interface VrmLibraryStorageOptions {
   /** Product default. Tests may inject one repository backed by memory SQLite + fake OPFS. */
   readonly repository?: StudioVrmAssetSqliteOpfsRepository;
+  /** Tests/embeds may inject the receipt store without opening the product SQLite runtime. */
+  readonly licenseAuthorityStore?: StudioVrmLicenseAuthorityStore;
   /** Explicit pre-V12 test/embed seam. Product code never supplies or probes this value. */
   readonly legacyIndexedDb?: IDBFactory | null;
 }
@@ -279,6 +299,11 @@ export type ValidatedVrmGlb = {
   vrmVersion: 0 | 1;
 };
 
+export type InspectedVrmGlb = ValidatedVrmGlb & {
+  /** Already decoded, structurally admitted glTF JSON; callers must still bound selected data. */
+  json: Record<string, unknown>;
+};
+
 export function canonicalizeVrmContentHash(value: unknown): VrmContentHash | null {
   if (typeof value !== "string") return null;
   const match = SHA256_CONTENT_HASH_PATTERN.exec(value.trim());
@@ -291,8 +316,8 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return prototype === Object.prototype || prototype === null;
 }
 
-/** GLB 2.0 컨테이너와 첫 JSON 청크 안의 VRM 0.x/1.x 확장을 검증한다. */
-export function validateVrmGlbBytes(input: ArrayBuffer | Uint8Array): ValidatedVrmGlb {
+/** GLB 2.0 컨테이너를 검증하고 기존 첫 JSON 청크 decode seam을 함께 반환한다. */
+export function inspectVrmGlbBytes(input: ArrayBuffer | Uint8Array): InspectedVrmGlb {
   const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
   if (bytes.byteLength < GLB_HEADER_BYTES + GLB_CHUNK_HEADER_BYTES) {
     throw new TypeError("VRM 파일이 너무 짧거나 GLB 헤더가 없습니다.");
@@ -369,12 +394,18 @@ export function validateVrmGlbBytes(input: ArrayBuffer | Uint8Array): ValidatedV
   if (hasVrm1 && hasVrm0) {
     throw new TypeError("VRM 0.x와 1.x 확장을 동시에 포함한 모호한 파일은 사용할 수 없습니다.");
   }
-  if (hasVrm1 && isPlainObject(extensions.VRMC_vrm)) return { vrmVersion: 1 };
-  if (hasVrm0 && isPlainObject(extensions.VRM)) return { vrmVersion: 0 };
+  if (hasVrm1 && isPlainObject(extensions.VRMC_vrm)) return { vrmVersion: 1, json };
+  if (hasVrm0 && isPlainObject(extensions.VRM)) return { vrmVersion: 0, json };
   if (hasVrm1 || hasVrm0) {
     throw new TypeError("VRM 확장 메타데이터가 올바른 객체가 아닙니다.");
   }
   throw new TypeError("GLB에 VRM 확장(VRM 또는 VRMC_vrm)이 없습니다.");
+}
+
+/** Compatibility validation facade for callers that do not need the decoded JSON. */
+export function validateVrmGlbBytes(input: ArrayBuffer | Uint8Array): ValidatedVrmGlb {
+  const { vrmVersion } = inspectVrmGlbBytes(input);
+  return { vrmVersion };
 }
 
 /**
@@ -516,16 +547,20 @@ async function inspectVrmBlobWithBytes(blob: Blob): Promise<{
   byteSize: number;
   mimeType: string;
   bytes: Uint8Array;
+  gltfJson: Record<string, unknown>;
+  licenseAuthority: StudioVrmLicenseAuthority;
 }> {
   return runSerializedBlobWork(async () => {
     const buffer = await readVrmBlobBytes(blob);
-    validateVrmGlbBytes(buffer);
+    const inspected = inspectVrmGlbBytes(buffer);
     return {
       contentHash: await sha256Bytes(buffer),
       byteSize: buffer.byteLength,
       // 입력의 Content-Type은 신뢰 경계가 아니다. 구조 검증을 통과한 뒤 안전한 정규 MIME을 부여한다.
       mimeType: "model/gltf-binary",
       bytes: new Uint8Array(buffer),
+      gltfJson: inspected.json,
+      licenseAuthority: inspectStudioVrmLicenseAuthority(inspected.json),
     };
   });
 }
@@ -534,8 +569,13 @@ async function inspectVrmBlob(blob: Blob): Promise<{
   contentHash: VrmContentHash;
   byteSize: number;
   mimeType: string;
+  licenseAuthority: StudioVrmLicenseAuthority;
 }> {
-  const { bytes: _bytes, ...identity } = await inspectVrmBlobWithBytes(blob);
+  const {
+    bytes: _bytes,
+    gltfJson: _gltfJson,
+    ...identity
+  } = await inspectVrmBlobWithBytes(blob);
   return identity;
 }
 
@@ -613,6 +653,16 @@ function productRepository(
   options: VrmLibraryStorageOptions,
 ): StudioVrmAssetSqliteOpfsRepository {
   return options.repository ?? getProductStudioVrmAssetSqliteOpfsRepository();
+}
+
+function licenseAuthorityStore(
+  options: VrmLibraryStorageOptions,
+): StudioVrmLicenseAuthorityStore | null {
+  if (options.licenseAuthorityStore) return options.licenseAuthorityStore;
+  // Explicit repositories and legacy IndexedDB are test/embed seams; never open product SQLite
+  // behind those callers unless they explicitly provide a matching receipt store.
+  if (usesLegacyIndexedDb(options) || options.repository) return null;
+  return getProductStudioVrmLicenseAuthorityStore();
 }
 
 function requestResult<T>(request: IDBRequest<T>) {
@@ -704,7 +754,9 @@ export function withDefaultVrmEntry(storedModels: VrmStoredModelRecord[], sample
 
 export function getDeletableModelIds(entries: VrmLibraryEntry[]) {
   return entries
-    .filter((entry) => entry.source === "memory" || entry.source === "sqlite-opfs")
+    // Durable hashes can be referenced by saved project documents. Until a project-owner index
+    // can prove a zero-reference count, the product deletion surface must fail closed.
+    .filter((entry) => entry.source === "memory")
     .map((entry) => entry.id);
 }
 
@@ -964,7 +1016,8 @@ function libraryEntryFromLegacyRecord(model: VrmStoredModelRecord): VrmLibraryEn
 export function durableVrmLibraryEntry(
   model: VrmStoredModelRecord,
 ): VrmLibraryEntry {
-  return libraryEntryFromLegacyRecord(model);
+  const entry = libraryEntryFromLegacyRecord(model);
+  return model.licenseAuthority ? { ...entry, licenseAuthority: model.licenseAuthority } : entry;
 }
 
 export function memoryVrmLibraryEntry(
@@ -980,6 +1033,7 @@ export function memoryVrmLibraryEntry(
     contentHash: record.contentHash,
     byteSize: record.byteSize,
     mimeType: record.mimeType,
+    licenseAuthority: record.licenseAuthority,
   };
 }
 
@@ -1121,14 +1175,26 @@ export async function hydrateVrmLibraryThumbnailWindow(
     );
   }
   const repository = usesLegacyIndexedDb(options) ? null : productRepository(options);
+  const authorityStore = licenseAuthorityStore(options);
   let totalBytes = 0;
   const hydrated: VrmLibraryEntry[] = [];
   for (const entry of entries) {
     if (options.signal?.aborted) {
       throw new StudioVrmAssetRepositoryError("aborted", "VRM thumbnail hydration was aborted.");
     }
+    let licenseAuthority = entry.licenseAuthority;
+    if (!licenseAuthority && entry.contentHash && authorityStore) {
+      try {
+        licenseAuthority = await authorityStore.get(entry.contentHash) ?? undefined;
+      } catch {
+        // Receipt storage availability must not turn a local preview warning into a load failure.
+      }
+    }
+    const withAuthority = licenseAuthority && licenseAuthority !== entry.licenseAuthority
+      ? { ...entry, licenseAuthority }
+      : entry;
     if (entry.thumbnail || entry.source === "memory") {
-      hydrated.push(entry);
+      hydrated.push(withAuthority);
       continue;
     }
     let thumbnail: string | null = null;
@@ -1177,7 +1243,7 @@ export async function hydrateVrmLibraryThumbnailWindow(
         totalBytes += estimatedBytes;
       }
     }
-    hydrated.push(thumbnail ? { ...entry, thumbnail } : entry);
+    hydrated.push(thumbnail ? { ...withAuthority, thumbnail } : withAuthority);
   }
   return Object.freeze(hydrated);
 }
@@ -1193,11 +1259,11 @@ function runSerializedSave<T>(work: () => Promise<T>): Promise<T> {
   return result;
 }
 
-export async function saveVerifiedVrmBlob(input: {
+export async function saveVerifiedVrmBlobWithDisposition(input: {
   name: string;
   blob: Blob;
   expectedHash?: string;
-}, options: VrmLibraryStorageOptions = {}): Promise<VrmStoredModelRecord> {
+}, options: VrmLibraryStorageOptions = {}): Promise<SaveVerifiedVrmBlobDisposition> {
   return runSerializedSave(async () => {
     const expectedHash = input.expectedHash === undefined
       ? null
@@ -1208,7 +1274,7 @@ export async function saveVerifiedVrmBlob(input: {
 
     // 검증·해시가 모두 끝나기 전에는 어떤 durable authority도 열거나 변경하지 않는다.
     const inspected = await inspectVrmBlobWithBytes(input.blob);
-    const { bytes, ...identity } = inspected;
+    const { bytes, gltfJson, ...identity } = inspected;
     if (expectedHash && identity.contentHash !== expectedHash) {
       throw new TypeError("VRM 파일의 SHA-256 해시가 프로젝트에 기록된 값과 일치하지 않습니다.");
     }
@@ -1224,18 +1290,31 @@ export async function saveVerifiedVrmBlob(input: {
         createdAt: timestamp,
         updatedAt: timestamp,
       });
+      const authorityStore = licenseAuthorityStore(options);
+      if (authorityStore) {
+        try {
+          await authorityStore.put(result.metadata.contentHash, gltfJson);
+        } catch {
+          // The GLB remains a valid local-preview model. Missing receipt is shown as unknown and
+          // every outgoing model-file action remains fail-closed.
+        }
+      }
       return {
-        id: result.metadata.id,
-        name: result.metadata.name,
-        // The caller-supplied immutable Blob has the same fully verified SHA-256 bytes.
-        blob: input.blob,
-        thumbnail: null,
-        createdAt: result.metadata.createdAt,
-        updatedAt: result.metadata.updatedAt,
-        contentHash: result.metadata.contentHash,
-        byteSize: result.metadata.byteSize,
-        mimeType: result.metadata.mimeType,
-        validationVersion: result.metadata.validationVersion,
+        record: {
+          id: result.metadata.id,
+          name: result.metadata.name,
+          // The caller-supplied immutable Blob has the same fully verified SHA-256 bytes.
+          blob: input.blob,
+          thumbnail: null,
+          createdAt: result.metadata.createdAt,
+          updatedAt: result.metadata.updatedAt,
+          contentHash: result.metadata.contentHash,
+          byteSize: result.metadata.byteSize,
+          mimeType: result.metadata.mimeType,
+          validationVersion: result.metadata.validationVersion,
+          licenseAuthority: identity.licenseAuthority,
+        },
+        created: !result.deduplicated,
       };
     }
 
@@ -1253,7 +1332,7 @@ export async function saveVerifiedVrmBlob(input: {
       if (duplicate) {
         await done;
         // 기존 표시 이름/썸네일을 덮어쓰지 않는다.
-        return duplicate;
+        return { record: duplicate, created: false };
       }
 
       const now = Date.now();
@@ -1267,11 +1346,27 @@ export async function saveVerifiedVrmBlob(input: {
         ...identity,
         validationVersion: VRM_VALIDATION_VERSION,
       };
+      const authorityStore = licenseAuthorityStore(options);
+      if (authorityStore) {
+        try {
+          await authorityStore.put(identity.contentHash, gltfJson);
+        } catch {
+          // Explicit legacy/embed receipt persistence is best-effort; policy still fails closed.
+        }
+      }
       store.put(record);
       await done;
-      return record;
+      return { record, created: true };
     });
   });
+}
+
+export async function saveVerifiedVrmBlob(input: {
+  name: string;
+  blob: Blob;
+  expectedHash?: string;
+}, options: VrmLibraryStorageOptions = {}): Promise<VrmStoredModelRecord> {
+  return (await saveVerifiedVrmBlobWithDisposition(input, options)).record;
 }
 
 export function saveUploadedVrm(
@@ -1312,19 +1407,45 @@ export async function saveVrmThumbnail(
 
 export async function deleteStoredVrmModel(
   id: string,
-  options: VrmLibraryStorageOptions = {},
+  _options: VrmLibraryStorageOptions = {},
 ): Promise<void> {
   if (isSampleVrmId(id)) return;
 
+  throw new StudioVrmAssetRepositoryError(
+    "conflict",
+    "저장된 VRM은 프로젝트에서 콘텐츠 해시로 참조될 수 있어 현재 삭제할 수 없습니다. 프로젝트 참조 소유권 검사가 제공될 때까지 원본을 보존합니다.",
+  );
+}
+
+/**
+ * Exact failed-import compensation. This is deliberately separate from the user deletion API:
+ * callers may pass only a creation receipt's private id + canonical hash, so a pre-existing or
+ * deduplicated shared row can never satisfy the compare-and-delete.
+ */
+export async function deleteStoredVrmModelIfIdentityMatches(
+  id: string,
+  value: string,
+  options: VrmLibraryStorageOptions = {},
+): Promise<boolean> {
+  if (isSampleVrmId(id)) return false;
+  const contentHash = canonicalizeVrmContentHash(value);
+  if (!contentHash) return false;
+
   if (!usesLegacyIndexedDb(options)) {
-    await productRepository(options).deleteModel(id);
-    return;
+    return productRepository(options).deleteModelIfIdentityMatches(id, contentHash);
   }
   return withDatabase(legacyIndexedDb(options), async (db) => {
     const transaction = db.transaction([MODEL_STORE, THUMBNAIL_STORE], "readwrite");
     const done = transactionDone(transaction);
-    transaction.objectStore(MODEL_STORE).delete(id);
-    transaction.objectStore(THUMBNAIL_STORE).delete(id);
+    const modelStore = transaction.objectStore(MODEL_STORE);
+    const existing = await requestResult<unknown>(modelStore.get(id));
+    const matches = isStoredVrmModelRecord(existing)
+      && canonicalizeVrmContentHash(existing.contentHash) === contentHash;
+    if (matches) {
+      modelStore.delete(id);
+      transaction.objectStore(THUMBNAIL_STORE).delete(id);
+    }
     await done;
+    return matches;
   });
 }

@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  compensateImportedBg3dModelsIfCreationMatchesV12,
   deleteStoredBg3dModelV12,
   getBg3dModelDeletionReceiptByHashV12,
   getCachedBg3dModelThumbnailV12,
   getStoredBg3dModelByHashV12,
   importVerifiedBg3dModelsAtomicallyV12,
+  importVerifiedBg3dModelsAtomicallyWithDispositionV12,
   listBg3dModelLibraryEntriesV12,
   listStoredBg3dModelsV12,
   saveBg3dModelThumbnailV12,
@@ -40,7 +42,10 @@ import type {
   StudioLocalDatabase,
   StudioSqliteApiHandle,
 } from "./studio-local-database";
-import type { StudioOpfsAssetStore } from "./studio-opfs-asset-store";
+import type {
+  StudioOpfsAssetStore,
+  StudioOpfsContentHash,
+} from "./studio-opfs-asset-store";
 import type { StudioOpfsMemoryFileSystem } from "./studio-opfs-filesystem";
 
 const JSON_CHUNK = 0x4e4f534a;
@@ -219,6 +224,83 @@ describe("BG3D shared SQLite/OPFS product authority", () => {
       .toBe(thumbnailDataUrl());
   });
 
+  it("compensates only exact newly-created model rows and fails closed after a later revision", async () => {
+    const database = await openNamedDatabase();
+    const fileSystem = createStudioOpfsMemoryFileSystem();
+    const authority = authorityFor(database, fileSystem);
+    const created = await importVerifiedBg3dModelsAtomicallyWithDispositionV12(
+      [glbFile("created.glb", "created-for-failed-project")],
+      { authority, idFactory: () => "created-for-import", now: 10 },
+    );
+    expect(created.created).toEqual([{
+      id: "created-for-import",
+      contentHash: created.records[0]!.contentHash,
+    }]);
+    await expect(compensateImportedBg3dModelsIfCreationMatchesV12(created, { authority }))
+      .resolves.toBe(true);
+    await expect(listStoredBg3dModelsV12({ authority })).resolves.toEqual([]);
+    await expect(compensateImportedBg3dModelsIfCreationMatchesV12(created, { authority }))
+      .resolves.toBe(false);
+
+    const deleted = await importVerifiedBg3dModelsAtomicallyV12(
+      [glbFile("deleted.glb", "deletion-receipt-restored")],
+      { authority, idFactory: () => "deleted-before-import", now: 12 },
+    );
+    await deleteStoredBg3dModelV12("deleted-before-import", { authority, now: 13 });
+    const deletionReceipt = await getBg3dModelDeletionReceiptByHashV12(
+      deleted[0]!.contentHash,
+      { authority },
+    );
+    const reimported = await importVerifiedBg3dModelsAtomicallyWithDispositionV12(
+      [glbFile("reimported.glb", "deletion-receipt-restored")],
+      { authority, idFactory: () => "reimported-for-failed-project", now: 14 },
+    );
+    expect(reimported.removedDeletions).toEqual([deletionReceipt]);
+    await expect(getBg3dModelDeletionReceiptByHashV12(
+      deleted[0]!.contentHash,
+      { authority },
+    )).resolves.toBeNull();
+    await expect(compensateImportedBg3dModelsIfCreationMatchesV12(reimported, { authority }))
+      .resolves.toBe(true);
+    await expect(getStoredBg3dModelByHashV12(deleted[0]!.contentHash, { authority }))
+      .resolves.toBeNull();
+    await expect(getBg3dModelDeletionReceiptByHashV12(
+      deleted[0]!.contentHash,
+      { authority },
+    )).resolves.toEqual(deletionReceipt);
+
+    const shared = await importVerifiedBg3dModelsAtomicallyV12(
+      [glbFile("shared.glb", "shared-before-import")],
+      { authority, idFactory: () => "shared-existing", now: 20 },
+    );
+    const deduplicated = await importVerifiedBg3dModelsAtomicallyWithDispositionV12(
+      [glbFile("shared-again.glb", "shared-before-import")],
+      { authority, idFactory: () => "must-not-be-used", now: 21 },
+    );
+    expect(deduplicated.created).toEqual([]);
+    await expect(compensateImportedBg3dModelsIfCreationMatchesV12(deduplicated, { authority }))
+      .resolves.toBe(true);
+    await expect(getStoredBg3dModelByHashV12(shared[0]!.contentHash, { authority }))
+      .resolves.toMatchObject({ id: "shared-existing" });
+
+    const fenced = await importVerifiedBg3dModelsAtomicallyWithDispositionV12(
+      [glbFile("fenced.glb", "created-before-later-write")],
+      { authority, idFactory: () => "fenced-created", now: 30 },
+    );
+    await importVerifiedBg3dModelsAtomicallyV12(
+      [glbFile("later.glb", "later-manifest-write")],
+      { authority, idFactory: () => "later-created", now: 31 },
+    );
+    await expect(compensateImportedBg3dModelsIfCreationMatchesV12(fenced, { authority }))
+      .resolves.toBe(false);
+    await expect(listStoredBg3dModelsV12({ authority })).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "fenced-created" }),
+        expect.objectContaining({ id: "later-created" }),
+      ]),
+    );
+  });
+
   it("survives a real sqlite-wasm close/reopen with identical model hash and bytes", async () => {
     const filename = `bg3d-reopen-${crypto.randomUUID()}.sqlite3`;
     const fileSystem = createStudioOpfsMemoryFileSystem();
@@ -318,7 +400,80 @@ describe("BG3D shared SQLite/OPFS product authority", () => {
     )).toBeNull();
   });
 
-  it("keeps union owner refs when a Worker loses the SQLite commit response", async () => {
+  it("returns a created-row disposition when reread proves an unknown kvSet committed", async () => {
+    const database = await openNamedDatabase();
+    const fileSystem = createStudioOpfsMemoryFileSystem();
+    const assets = createStudioOpfsAssetStore({ fs: fileSystem, now: () => 100 });
+    const committedUnknownDatabase = new Proxy(database, {
+      get(target, property, receiver) {
+        if (property === "kvSet") {
+          return async (namespace: string, key: string, value: string) => {
+            await target.kvSet(namespace, key, value);
+            throw new StudioLocalDatabaseCommitOutcomeUnknownError(
+              "kvSet",
+              new Error("response-channel-lost-after-commit"),
+            );
+          };
+        }
+        const value = Reflect.get(target, property, receiver) as unknown;
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+    const authority = authorityFor(committedUnknownDatabase, fileSystem, { assetStore: assets });
+
+    const disposition = await importVerifiedBg3dModelsAtomicallyWithDispositionV12(
+      [glbFile("committed-unknown.glb", "committed-unknown")],
+      { authority, idFactory: () => "committed-unknown", now: 10 },
+    );
+
+    expect(disposition.created).toEqual([{
+      id: "committed-unknown",
+      contentHash: disposition.records[0]!.contentHash,
+    }]);
+    await expect(listStoredBg3dModelsV12({ authority })).resolves.toMatchObject([{
+      id: "committed-unknown",
+    }]);
+    await expect(compensateImportedBg3dModelsIfCreationMatchesV12(disposition, { authority }))
+      .resolves.toBe(true);
+    await expect(listStoredBg3dModelsV12({ authority })).resolves.toEqual([]);
+  });
+
+  it("returns a created-row disposition after a generic error from a durable kvSet", async () => {
+    const database = await openNamedDatabase();
+    const fileSystem = createStudioOpfsMemoryFileSystem();
+    const assets = createStudioOpfsAssetStore({ fs: fileSystem, now: () => 100 });
+    const genericPostCommitDatabase = new Proxy(database, {
+      get(target, property, receiver) {
+        if (property === "kvSet") {
+          return async (namespace: string, key: string, value: string) => {
+            await target.kvSet(namespace, key, value);
+            throw new Error("generic-error-after-durable-autocommit");
+          };
+        }
+        const value = Reflect.get(target, property, receiver) as unknown;
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+    const authority = authorityFor(genericPostCommitDatabase, fileSystem, { assetStore: assets });
+
+    const disposition = await importVerifiedBg3dModelsAtomicallyWithDispositionV12(
+      [glbFile("generic-post-commit.glb", "generic-post-commit")],
+      { authority, idFactory: () => "generic-post-commit", now: 11 },
+    );
+
+    expect(disposition.created).toEqual([{
+      id: "generic-post-commit",
+      contentHash: disposition.records[0]!.contentHash,
+    }]);
+    await expect(listStoredBg3dModelsV12({ authority })).resolves.toMatchObject([{
+      id: "generic-post-commit",
+    }]);
+    await expect(compensateImportedBg3dModelsIfCreationMatchesV12(disposition, { authority }))
+      .resolves.toBe(true);
+    await expect(listStoredBg3dModelsV12({ authority })).resolves.toEqual([]);
+  });
+
+  it("restores old owner refs when reread proves an unknown kvSet did not commit", async () => {
     const database = await openNamedDatabase();
     const fileSystem = createStudioOpfsMemoryFileSystem();
     const assets = createStudioOpfsAssetStore({ fs: fileSystem, now: () => 100 });
@@ -346,8 +501,95 @@ describe("BG3D shared SQLite/OPFS product authority", () => {
     })).rejects.toMatchObject({ code: "transaction-failed" });
 
     expect(await assets.ownerRefs("studio-bg3d-libraries-v12:models"))
-      .toEqual([uncertainHash]);
-    expect((await assets.sweep({ graceMs: 0 })).removed).toHaveLength(0);
+      .toEqual([]);
+    expect((await assets.sweep({ graceMs: 0 })).removed)
+      .toEqual([expect.objectContaining({ hash: uncertainHash })]);
+    expect(await database.kvGet(
+      STUDIO_BG3D_LIBRARIES_SQLITE_NAMESPACE,
+      STUDIO_BG3D_LIBRARY_MANIFEST_KEYS.models,
+    )).toBeNull();
+  });
+
+  it("returns the durable result and preserves the owner union when final contraction fails", async () => {
+    const database = await openNamedDatabase();
+    const fileSystem = createStudioOpfsMemoryFileSystem();
+    const assets = createStudioOpfsAssetStore({ fs: fileSystem, now: () => 100 });
+    const baselineAuthority = authorityFor(database, fileSystem, { assetStore: assets });
+    let oldHash: StudioOpfsContentHash = `sha256:${"0".repeat(64)}`;
+    await baselineAuthority.mutate("models", () => [], async (context) => {
+      const receipt = await context.putBlob(
+        new Uint8Array([7, 8, 9]),
+        "application/octet-stream",
+      );
+      oldHash = receipt.hash;
+      return { nextRaw: '{"state":"old"}', nextRefs: [receipt.hash], result: undefined };
+    });
+
+    let candidatePublished = false;
+    const noDiagnosticReadDatabase = new Proxy(database, {
+      get(target, property, receiver) {
+        if (property === "kvSet") {
+          return async (namespace: string, key: string, value: string) => {
+            await target.kvSet(namespace, key, value);
+            candidatePublished = true;
+          };
+        }
+        if (property === "kvGet") {
+          return async (namespace: string, key: string) => {
+            if (candidatePublished) throw new Error("forced-post-root-diagnostic-read-fault");
+            return target.kvGet(namespace, key);
+          };
+        }
+        const value = Reflect.get(target, property, receiver) as unknown;
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+
+    let ownerPublicationCalls = 0;
+    const contractionFaultStore = new Proxy(assets, {
+      get(target, property, receiver) {
+        if (property === "setOwnerRefs") {
+          return async (...args: Parameters<StudioOpfsAssetStore["setOwnerRefs"]>) => {
+            ownerPublicationCalls += 1;
+            if (ownerPublicationCalls === 2) throw new Error("forced-final-owner-contraction-fault");
+            return target.setOwnerRefs(...args);
+          };
+        }
+        const value = Reflect.get(target, property, receiver) as unknown;
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+    const authority = authorityFor(
+      noDiagnosticReadDatabase,
+      fileSystem,
+      { assetStore: contractionFaultStore },
+    );
+    let candidateHash: StudioOpfsContentHash = `sha256:${"0".repeat(64)}`;
+    const disposition = await authority.mutate(
+      "models",
+      (raw) => raw === '{"state":"old"}' ? [oldHash] : [],
+      async (context) => {
+        const receipt = await context.putBlob(
+          new Uint8Array([10, 11, 12]),
+          "application/octet-stream",
+        );
+        candidateHash = receipt.hash;
+        return {
+          nextRaw: '{"state":"candidate"}',
+          nextRefs: [receipt.hash],
+          result: Object.freeze({ createdHash: receipt.hash }),
+        };
+      },
+    );
+
+    expect(disposition).toEqual({ createdHash: candidateHash });
+    expect(ownerPublicationCalls).toBe(2);
+    expect(await database.kvGet(
+      STUDIO_BG3D_LIBRARIES_SQLITE_NAMESPACE,
+      STUDIO_BG3D_LIBRARY_MANIFEST_KEYS.models,
+    )).toBe('{"state":"candidate"}');
+    expect(await assets.ownerRefs("studio-bg3d-libraries-v12:models"))
+      .toEqual([oldHash, candidateHash].sort());
   });
 
   it("rejects a CAS quota failure without publishing a model manifest", async () => {

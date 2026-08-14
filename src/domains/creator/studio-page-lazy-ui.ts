@@ -423,6 +423,21 @@ const StudioFilterMaskPanel = lazyRetry(
   () => import("./StudioFilterMaskPanel").then((mod) => ({ default: mod.StudioFilterMaskPanel })),
   "StudioFilterMaskPanel"
 );
+// Inspector sections that only exist for one selection or tool state. They used to ride into the
+// always-rendered inspector chunk on a static import, so a launch with nothing selected still paid
+// for the font manager, the line-art cleanup kernels and the quick-mask editor.
+const StudioCustomFontsPanel = lazyRetry(
+  () => import("./StudioCustomFontsPanel").then((mod) => ({ default: mod.StudioCustomFontsPanel })),
+  "StudioCustomFontsPanel"
+);
+const StudioLineCleanupPanel = lazyRetry(
+  () => import("./StudioLineCleanupPanel").then((mod) => ({ default: mod.StudioLineCleanupPanel })),
+  "StudioLineCleanupPanel"
+);
+const StudioQuickMaskPanel = lazyRetry(
+  () => import("./StudioQuickMaskPanel").then((mod) => ({ default: mod.StudioQuickMaskPanel })),
+  "StudioQuickMaskPanel"
+);
 const StudioPuppetWarpPanel = lazyRetry(
   () => import("./StudioPuppetWarpPanel").then((mod) => ({ default: mod.StudioPuppetWarpPanel })),
   "StudioPuppetWarpPanel"
@@ -832,6 +847,7 @@ export {
   StudioContinuityPanel,
   StudioCropOverlay,
   StudioCropPanel,
+  StudioCustomFontsPanel,
   StudioDialogueBatchPanel,
   StudioDialogueSuggestPanel,
   StudioDialogueTranslatePanel,
@@ -858,6 +874,7 @@ export {
   StudioLayerMaskPanel,
   StudioLayerMaskOverlay,
   StudioLayerLiftDialog,
+  StudioLineCleanupPanel,
   StudioQuickMaskOverlay,
   StudioLayerNavigator,
   StudioLiquifyPanel,
@@ -892,6 +909,7 @@ export {
   StudioPuppetWarpPanel,
   StudioPuppetWarpOverlay,
   StudioQuickActionsMenu,
+  StudioQuickMaskPanel,
   StudioQuickShapePanel,
   StudioRasterAssetGrid,
   StudioRasterCrdtSurface,

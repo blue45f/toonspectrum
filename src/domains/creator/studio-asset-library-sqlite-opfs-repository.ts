@@ -18,7 +18,6 @@ import {
   STUDIO_ASSET_CONTENT_IDENTITY_MAX_RETURN_DATA_URL_CHARS,
   STUDIO_ASSET_DATA_URL_MAX_CHARS,
 } from "./studio-asset-library";
-import { isStudioLocalDatabaseCommitOutcomeUnknownError } from "./studio-local-database-commit-outcome";
 import { acquireStudioLocalDatabase } from "./studio-local-database-runtime";
 import {
   createStudioOpfsAssetStore,
@@ -141,6 +140,7 @@ export interface StudioAssetQueryPage {
 
 export interface StudioAssetLibraryRepository extends StudioAssetLibraryPort {
   readonly authority: "sqlite-opfs";
+  listReadOnly(): Promise<StudioAsset[]>;
   query(input?: StudioAssetQuery): Promise<StudioAssetQueryPage>;
   cleanupOrphans(): Promise<number>;
 }
@@ -641,18 +641,55 @@ export function createStudioAssetLibrarySqliteOpfsRepository(
     const oldHashes = uniqueHashes(current.entries);
     const nextHashes = uniqueHashes(next.entries);
     const protectedHashes = [...new Set([...oldHashes, ...nextHashes])].sort();
+    const oldSerialized = serializeStudioAssetManifest(current.entries);
+    const nextSerialized = serializeStudioAssetManifest(next.entries);
     try {
       await store.setOwnerRefs(STUDIO_ASSET_LIBRARY_CAS_OWNER, protectedHashes);
       await database.kvSet(
         STUDIO_ASSET_LIBRARY_SQLITE_NAMESPACE,
         STUDIO_ASSET_LIBRARY_SQLITE_MANIFEST_KEY,
-        serializeStudioAssetManifest(next.entries),
+        nextSerialized,
       );
     } catch (error) {
-      if (!isStudioLocalDatabaseCommitOutcomeUnknownError(error)) {
-        await store.setOwnerRefs(STUDIO_ASSET_LIBRARY_CAS_OWNER, oldHashes).catch(() => []);
+      // SQLite statement errors are not guaranteed to keep their typed Worker transport wrapper.
+      // Reconcile every publication error against the exact durable old/candidate bytes.
+      let observed: string | null;
+      try {
+        observed = await database.kvGet(
+          STUDIO_ASSET_LIBRARY_SQLITE_NAMESPACE,
+          STUDIO_ASSET_LIBRARY_SQLITE_MANIFEST_KEY,
+        );
+      } catch (reconcileCause) {
+        throw new AggregateError(
+          [error, reconcileCause],
+          "SQLite/OPFS 에셋 manifest 커밋 결과를 재확인하지 못했습니다. old/candidate CAS union은 보존됩니다.",
+          { cause: reconcileCause },
+        );
       }
-      throw asRepositoryError(error, "manifest 커밋");
+      // A missing manifest is the exact durable representation of the initial empty ledger.
+      const observedOld = observed === oldSerialized
+        || (observed === null && current.entries.length === 0);
+      if (observed === nextSerialized) {
+        // The mutation committed; return the candidate so callers receive and can compensate its
+        // exact creation identity instead of losing the receipt with the response channel.
+      } else if (observedOld) {
+        try {
+          await store.setOwnerRefs(STUDIO_ASSET_LIBRARY_CAS_OWNER, oldHashes);
+        } catch (rollbackCause) {
+          throw new AggregateError(
+            [error, rollbackCause],
+            "SQLite/OPFS 에셋 manifest 미커밋 확인 뒤 owner 참조를 되돌리지 못했습니다.",
+            { cause: rollbackCause },
+          );
+        }
+        throw asRepositoryError(error, "manifest 커밋");
+      } else {
+        throw new StudioAssetLibraryRepositoryError(
+          "unavailable",
+          "SQLite/OPFS 에셋 manifest가 old/candidate 어느 쪽과도 일치하지 않아 CAS union을 보존한 채 중단했습니다.",
+          { cause: error },
+        );
+      }
     }
     // Manifest is now authoritative. Cleanup is recoverable bookkeeping and cannot roll it back.
     await store.setOwnerRefs(STUDIO_ASSET_LIBRARY_CAS_OWNER, nextHashes).catch(() => []);
@@ -732,6 +769,10 @@ export function createStudioAssetLibrarySqliteOpfsRepository(
               "에셋 kind",
             );
         if (!ID_PATTERN.test(record.id)) invalid("생성된 에셋 ID가 안전한 형식이 아닙니다.");
+        const current = await readManifest(database);
+        if (current.entries.some(({ id: currentId }) => currentId === record.id)) {
+          invalid("생성된 에셋 ID가 기존 행과 충돌했습니다.");
+        }
         let put;
         try {
           put = await store.put(decoded.bytes, { mime: decoded.mimeType });
@@ -760,10 +801,9 @@ export function createStudioAssetLibrarySqliteOpfsRepository(
           rights: normalizeRights(input.rights, kind ?? undefined),
         });
         await verifiedBytes(store, entry);
-        const current = await readManifest(database);
         const next = await commitManifest(database, store, current, [
           entry,
-          ...current.entries.filter(({ id: currentId }) => currentId !== entry.id),
+          ...current.entries,
         ]);
         const committed = next.entries.find(({ id: currentId }) => currentId === entry.id);
         if (!committed) corrupt("커밋된 manifest에서 신규 에셋을 찾지 못했습니다.");
@@ -778,6 +818,13 @@ export function createStudioAssetLibrarySqliteOpfsRepository(
       const assets = await listHydrated(store, manifest.entries);
       await reconcileOwnerAndSweep(store, manifest).catch(() => undefined);
       return assets;
+    },
+
+    async listReadOnly() {
+      await mutationTail;
+      const { database, store } = await resources();
+      const manifest = await readManifest(database);
+      return listHydrated(store, manifest.entries);
     },
 
     async query(input = {}) {
@@ -866,6 +913,25 @@ export function createStudioAssetLibrarySqliteOpfsRepository(
           current,
           current.entries.filter((entry) => entry.id !== id),
         );
+      }));
+    },
+
+    deleteIfIdentityMatches(id: string, value: StudioAssetContentHash) {
+      return enqueue(() => mutation(async (database, store) => {
+        const contentHash = canonicalizeStudioAssetContentHash(value);
+        if (!ID_PATTERN.test(id) || !contentHash) return false;
+        const current = await readManifest(database);
+        const matching = current.entries.find(
+          (entry) => entry.id === id && entry.contentHash === contentHash,
+        );
+        if (!matching) return false;
+        await commitManifest(
+          database,
+          store,
+          current,
+          current.entries.filter((entry) => entry.id !== id),
+        );
+        return true;
       }));
     },
 
