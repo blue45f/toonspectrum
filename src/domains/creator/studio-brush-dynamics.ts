@@ -93,10 +93,7 @@ export interface StudioDryMediaKernelProgramPin {
  * This marker is the ONLY way a core dry-media stroke reaches the verified-kernel dab path: the
  * authored crayon/chalk/charcoal/pastel/oil-pastel preset snapshots mint it, pointer start embeds
  * the snapshot in the new element, and every stroke whose dynamics do not carry it — every
- * pre-wave persisted document, causal or legacy — stays on the union carrier. That routing is
- * exact; the carrier's own grain is not frozen, so a tooth improvement (see the crayon row in
- * studio-dry-media-union-ribbon-carrier.test.ts) does reach already-saved strokes. Stroke data is
- * never rewritten — only how it is drawn — and reverting the grain restores the earlier look.
+ * pre-wave persisted document, causal or legacy — stays on the union carrier byte-identically.
  * Normalization preserves an incoming pin byte-for-byte (and rejects malformed ones) and never
  * injects it, so canonical serialization of un-opted-in snapshots is unchanged.
  */
@@ -284,8 +281,7 @@ export interface StudioBrushDynamicsSettings {
   dryMediaUnionProgram?: StudioDryMediaUnionProgramPin;
   /**
    * Explicit kernel-dab-path opt-in minted only by authored dry-media preset snapshots. Absent
-   * snapshots (every persisted pre-wave stroke) replay through the union carrier, not the kernel
-   * dab path. The carrier engine is pinned, its grain constants are not.
+   * snapshots (every persisted pre-wave stroke) replay through the union carrier byte-identically.
    */
   dryMediaKernelProgram?: StudioDryMediaKernelProgramPin;
   seed?: number;

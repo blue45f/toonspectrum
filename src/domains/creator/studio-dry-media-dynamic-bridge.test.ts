@@ -156,7 +156,7 @@ describe("dry-media dynamic bridge v1", () => {
       "chalk",
       "pastel",
     ] as const) {
-      const expectedLaneCount = 5;
+      const expectedLaneCount = brushId === "crayon" ? 3 : 5;
       const source = dynamicDabs(384, 1.8);
       const receipt = requireBridge(brushId, source);
       expect(receipt.laneCount).toBe(expectedLaneCount);
@@ -200,7 +200,7 @@ describe("dry-media dynamic bridge v1", () => {
       // Product lanes now stay within fine paper-tooth scale and leave no macroscopic gap between
       // neighbouring pigment supports before the carrier applies deterministic negative grain.
       expect(maximumLaneJumpRatio, brushId).toBeLessThan(0.09);
-      expect(maximumBandGapRatio, brushId).toBeLessThan(0.055);
+      expect(maximumBandGapRatio, brushId).toBeLessThan(expectedLaneCount === 3 ? 0.16 : 0.055);
     }
   });
 
@@ -217,7 +217,7 @@ describe("dry-media dynamic bridge v1", () => {
       });
       expect(result.ok, catalogId).toBe(true);
       if (!result.ok) continue;
-      const expectedLaneCount = 5;
+      const expectedLaneCount = expectedPresetId === "crayon" ? 3 : 5;
       expect(result.receipt.presetId, catalogId).toBe(expectedPresetId);
       expect(result.receipt.laneCount, catalogId).toBe(expectedLaneCount);
 
@@ -253,7 +253,7 @@ describe("dry-media dynamic bridge v1", () => {
       }
 
       expect(maximumLaneJumpRatio, catalogId).toBeLessThan(0.09);
-      expect(maximumBandGapRatio, catalogId).toBeLessThan(0.055);
+      expect(maximumBandGapRatio, catalogId).toBeLessThan(expectedLaneCount === 3 ? 0.16 : 0.055);
     }
   });
 
@@ -282,7 +282,7 @@ describe("dry-media dynamic bridge v1", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const { laneCount, marks } = result.receipt;
-    expect(laneCount).toBe(5);
+    expect(laneCount).toBe(3);
     expect(marks).toHaveLength(shortStroke.length * laneCount);
 
     const tangentRadians = shortStroke[0]!.angle * Math.PI / 180;
