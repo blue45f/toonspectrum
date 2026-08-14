@@ -31,6 +31,7 @@ import { CANVAS_W, type BgPreset, type TemplateSpec } from "./studio-assets";
 import { preloadStudioBackground3D } from "./studio-background-3d-loader";
 import { parseStudio3dTool } from "./studio-background-3d-metadata";
 import { type StudioBg3dSceneDocument } from "./studio-bg3d-scene-document";
+import { BRAND_KIT_FONTS, DEFAULT_BRAND_KIT_FONT } from "./studio-brand-kit";
 import { BRUSH_PRESETS } from "./studio-brush";
 import {
   type NormalizedStudioBrushDynamicsSettings,
@@ -2054,25 +2055,15 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                     <p className="mb-1 text-[0.66rem] font-medium text-fg-3">글꼴</p>
                     <StudioPresetFontPreload />
                     <div className="flex flex-wrap gap-1">
-                      {[
-                        { label: "고딕", v: "Pretendard, sans-serif" },
-                        { label: "명조", v: "'Nanum Myeongjo', serif" },
-                        { label: "둥근만화", v: "'Jua', sans-serif" },
-                        { label: "타이틀/굵은", v: "'Black Han Sans', sans-serif" },
-                        { label: "손글씨", v: "'Gaegu', cursive" },
-                        { label: "펜글씨", v: "'Nanum Pen Script', cursive" },
-                        { label: "아기자기", v: "'Gamja Flower', cursive" },
-                        { label: "붓글씨/고풍", v: "'Yeon Sung', cursive" },
-                        { label: "분노/공포", v: "'East Sea Dokdo', cursive" },
-                      ].map((f) => (
+                      {BRAND_KIT_FONTS.map((f) => (
                         <button
                           key={f.label}
                           type="button"
-                          onClick={() => patchEl(selected.id, { font: f.v } as Partial<El>)}
-                          style={{ fontFamily: f.v }}
+                          onClick={() => patchEl(selected.id, { font: f.value } as Partial<El>)}
+                          style={{ fontFamily: f.value }}
                           className={cn(
                             "rounded-md border px-2 py-1 text-xs",
-                            (selected.font ?? "Pretendard, sans-serif") === f.v
+                            (selected.font ?? DEFAULT_BRAND_KIT_FONT) === f.value
                               ? "border-accent/60 bg-accent-soft/50 text-fg"
                               : "border-line text-fg-2 hover:bg-raised"
                           )}

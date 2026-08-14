@@ -15,10 +15,14 @@
 
 import type { StudioNamedPalette } from "./studio-palette-library";
 
-/** 글꼴 선택지 — StudioPage.tsx 속성 패널의 인라인 글꼴 그리드(텍스트/말풍선 "글꼴" 절)와
- *  값이 1:1로 일치해야 한다(el.font 로 그대로 쓰이는 CSS font-family 문자열이므로).
- *  통합 시 StudioPage.tsx의 인라인 배열과 이 상수는 값이 어긋나면 안 된다 — 의도적 중복이다
- *  (§4 디자인 편차: 13k줄 StudioPage.tsx를 이 기능 랜딩과 함께 리팩터링하지 않기 위한 절충). */
+/** 글꼴 선택지 — 속성 패널의 글꼴 그리드(텍스트/말풍선 "글꼴" 절)가 그대로 쓰는 단일 출처다.
+ *  값은 el.font 로 직행하는 CSS font-family 문자열이다.
+ *
+ *  이전에는 StudioPage.tsx 인라인 배열과의 "의도적 중복"이었다 — 13k줄 파일을 이 기능 랜딩과
+ *  함께 리팩터링하지 않으려던 절충(§4 디자인 편차). 그 뒤 속성 패널이
+ *  StudioInspectorAside.tsx 로 빠져나오면서 인라인 사본도 딸려갔고, 절충의 근거였던
+ *  "StudioPage.tsx를 건드려야 함"이 사라졌다. 사본은 값이 한 글자도 다르지 않은 채 남아
+ *  조용히 어긋날 위험만 남겼으므로 2026-08-14 에 인스펙터가 이 상수를 직접 쓰도록 정리했다. */
 export interface BrandKitFontOption {
   label: string;
   value: string; // CSS font-family 값. El.font 와 동일 shape.
