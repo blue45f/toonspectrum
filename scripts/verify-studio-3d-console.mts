@@ -1249,6 +1249,21 @@ async function run(page: Page, studioUrl: string): Promise<void> {
     exact: true,
   });
   try {
+    await backgroundDialog.getByText(KTX2_SMOKE_MODEL_LABEL, { exact: true }).first().waitFor({
+      state: "visible",
+      timeout: 90_000,
+    });
+    await assetLibraryReadySection.waitFor({
+      state: "visible",
+      timeout: 90_000,
+    });
+    for (let batch = 0; batch < 10 && !(await importedModelButton.isVisible()); batch += 1) {
+      const revealMoreModelsButton = backgroundDialog.getByRole("button", {
+        name: /^모델 \d+개 더 보기/u,
+      });
+      if (!(await revealMoreModelsButton.isVisible())) break;
+      await revealMoreModelsButton.click();
+    }
     await importedModelButton.waitFor({ state: "visible", timeout: 90_000 });
   } catch (cause) {
     const dialogText = await backgroundDialog.innerText().catch(() => "(dialog unavailable)");
