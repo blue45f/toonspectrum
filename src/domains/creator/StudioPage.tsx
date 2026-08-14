@@ -32232,32 +32232,48 @@ const puppetWarpArmed =
           rasterTarget.id,
           referenceScope,
         );
-        const projectedLayerIds = new Set([
-          rasterTarget.id,
-          ...scopedRasterReferences.map(({ id }) => id),
-        ]);
-        const { withStudioRasterSourceProjection } = await import(
-          "./studio-raster-source-projection"
-        );
-        const composed = await withStudioRasterSourceProjection({
-          consumer: "studio-advanced-fill-reference",
-          signal: controller.signal,
-          values: layers.filter(({ id }) => projectedLayerIds.has(id)),
-          run: async (projectedLayers) => {
-            const projectedById = new Map(
-              projectedLayers.map((layer) => [layer.id, layer] as const),
-            );
-            return composeStudioFillReferenceImageWithPageReferences(
-              layers.map((layer) => projectedById.get(layer.id) ?? layer),
-              rasterTarget.id,
-              referenceScope,
-              pageReferences,
-              undefined,
-              controller.signal,
-            );
-          },
-        });
-        referenceSrc = composed.dataUrl;
+        if (pageReferences.length === 0 && scopedRasterReferences.length === 0) {
+          // 합성할 참조가 하나도 남지 않았다. 이 상태로 합성기를 부르면 "참조할 표시 래스터
+          // 레이어가 없습니다"로 던져 채우기가 그대로 멈추고, 정작 벡터 선화를 왜 뺐는지는
+          // catch 로 흘러가 사라진다 — 축소해서 진행한다는 계약이 무너진다.
+          //
+          // 참조가 비는 건 대상 하나만 있는 페이지에서 흔하다. 참조 범위는 대상 자신을 늘
+          // 제외하므로(studio-fill-reference.ts `collectStudioFillReferenceLayers`), 선화가
+          // 유일한 참조였다가 빠지면 곧바로 0이 된다. 대상 레이어 자체를 경계로 삼아
+          // 진행하고(현재 레이어 범위와 같은 동작) 두 사실을 모두 문구에 싣는다.
+          referenceSrc = undefined;
+          const emptyReferenceNotice = "참조로 남은 레이어가 없어 대상 레이어만 경계로 사용했어요.";
+          vectorReferenceExclusion = vectorReferenceExclusion === null
+            ? emptyReferenceNotice
+            : `${vectorReferenceExclusion} ${emptyReferenceNotice}`;
+        } else {
+          const projectedLayerIds = new Set([
+            rasterTarget.id,
+            ...scopedRasterReferences.map(({ id }) => id),
+          ]);
+          const { withStudioRasterSourceProjection } = await import(
+            "./studio-raster-source-projection"
+          );
+          const composed = await withStudioRasterSourceProjection({
+            consumer: "studio-advanced-fill-reference",
+            signal: controller.signal,
+            values: layers.filter(({ id }) => projectedLayerIds.has(id)),
+            run: async (projectedLayers) => {
+              const projectedById = new Map(
+                projectedLayers.map((layer) => [layer.id, layer] as const),
+              );
+              return composeStudioFillReferenceImageWithPageReferences(
+                layers.map((layer) => projectedById.get(layer.id) ?? layer),
+                rasterTarget.id,
+                referenceScope,
+                pageReferences,
+                undefined,
+                controller.signal,
+              );
+            },
+          });
+          referenceSrc = composed.dataUrl;
+        }
       }
       if (
         runId !== advancedFillRunIdRef.current ||
