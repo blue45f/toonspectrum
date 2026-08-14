@@ -1,12 +1,17 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { DEFAULT_STUDIO_BRUSH_SNAPSHOT } from "./studio-brush-library";
+import { openProductBrushLibraryRepository } from
+  "./studio-brush-library-sqlite-repository";
+import {
+  SqliteUnavailableError,
+  type StudioLocalDatabase,
+} from "./studio-local-database";
 import {
   acquireStudioLocalDatabase,
   closeStudioLocalDatabaseRuntime,
   probeStudioLocalDatabaseRuntime,
 } from "./studio-local-database-runtime";
-
-import type { StudioLocalDatabase } from "./studio-local-database";
 
 const productWorker = vi.hoisted(() => ({
   acquire: vi.fn<() => Promise<StudioLocalDatabase>>(),
@@ -128,5 +133,31 @@ describe("studio local database runtime", () => {
     await closeStudioLocalDatabaseRuntime();
     const database = { close: vi.fn(async () => undefined) } as unknown as StudioLocalDatabase;
     await expect(acquireStudioLocalDatabase(async () => database)).resolves.toBe(database);
+  });
+
+  it("invalidates the brush catalog generation when the shared database session closes", async () => {
+    productWorker.acquire.mockRejectedValue(
+      new SqliteUnavailableError("Studio OPFS is already owned by another page"),
+    );
+    productWorker.close.mockResolvedValue(undefined);
+
+    const first = await openProductBrushLibraryRepository();
+    await first.repository.put({
+      ...DEFAULT_STUDIO_BRUSH_SNAPSHOT,
+      id: "session-brush",
+      name: "첫 세션",
+      createdAt: 1,
+      updatedAt: 1,
+      pinned: false,
+      lastUsedAt: null,
+    });
+
+    await closeStudioLocalDatabaseRuntime();
+    const reopened = await openProductBrushLibraryRepository();
+
+    expect(reopened).not.toBe(first);
+    expect(reopened.authority).toBe("memory-session");
+    await expect(reopened.repository.getById("session-brush")).resolves.toBeNull();
+    expect(productWorker.acquire).toHaveBeenCalledTimes(2);
   });
 });

@@ -58,8 +58,18 @@ export async function closeStudioLocalDatabaseRuntime(): Promise<void> {
   sharedDatabase = null;
   const usesProductWorker = sharedDatabaseUsesProductWorker;
   sharedDatabaseUsesProductWorker = false;
-  if (!database) return;
   const closing = (async () => {
+    // A product brush repository retains either this database generation or its
+    // memory-session fallback. Invalidate it before a caller can reopen the DB.
+    // The dynamic edge avoids making the shared DB authority depend statically on
+    // one of its consumers.
+    try {
+      const brushLibrary = await import("./studio-brush-library-sqlite-repository");
+      brushLibrary.resetProductBrushLibraryRepositoryRuntime();
+    } catch {
+      // The brush module can be absent from narrow runtime/test graphs.
+    }
+    if (!database) return;
     try {
       if (usesProductWorker) {
         // First let the pending dynamic import/acquire establish its module singleton. Closing the

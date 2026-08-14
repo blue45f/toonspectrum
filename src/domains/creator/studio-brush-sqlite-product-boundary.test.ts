@@ -6,12 +6,29 @@ const studioPageSource = readFileSync(
   new URL("./StudioPage.tsx", import.meta.url),
   "utf8",
 );
+const inspectorSource = readFileSync(
+  new URL("./StudioInspectorAside.tsx", import.meta.url),
+  "utf8",
+);
+const mobileDockSource = readFileSync(
+  new URL("./StudioMobileEditingDock.tsx", import.meta.url),
+  "utf8",
+);
 
 describe("Studio brush-library SQLite product boundary", () => {
   it("hydrates the quick shelf from the same paged product repository as the library panel", () => {
     expect(studioPageSource).toContain("openProductBrushLibraryRepository");
     expect(studioPageSource).toContain("readAllBrushesFromRepository");
     expect(studioPageSource).toContain("productBrushRepository()");
+  });
+
+  it("routes desktop and mobile library panels through the page-owned repository", () => {
+    expect(
+      studioPageSource.match(/openBrushLibraryRepository=\{productBrushRepository\}/g),
+    ).toHaveLength(2);
+    for (const projection of [inspectorSource, mobileDockSource]) {
+      expect(projection).toContain("repositoryFactory: openBrushLibraryRepository");
+    }
   });
 
   it("commits apply metadata, undo, and menu import through the async repository", () => {

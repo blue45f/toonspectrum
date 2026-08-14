@@ -439,6 +439,10 @@ export interface StudioMobileEditingDockProps {
   proDrawPrefs: StudioProDrawPrefs;
   quickActionsOpen: boolean;
   savedBrushes: StudioSavedBrush[];
+  /** Page-owned product authority shared with imports and the desktop projection. */
+  openBrushLibraryRepository?: () => Promise<
+    import("./studio-brush-library-sqlite-repository").ProductBrushLibraryRepository
+  >;
   selected: El | null;
   /**
    * 현재 선택이 (그룹 상속을 포함해) 잠겨 있는지. 빠른 작업 바의 잠금 버튼 라벨이
@@ -544,6 +548,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
   proDrawPrefs,
   quickActionsOpen,
   savedBrushes,
+  openBrushLibraryRepository,
   selected,
   selectionLocked,
   selectionTextEditLabel,
@@ -973,6 +978,9 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 onBrushesChange={setSavedBrushes}
                 onApplyBrush={applySavedBrush}
                 onBrushDeleted={queueBrushDelete}
+                {...(openBrushLibraryRepository
+                  ? { repositoryFactory: openBrushLibraryRepository }
+                  : {})}
               />
             </Suspense>
           </div>

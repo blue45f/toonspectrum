@@ -465,8 +465,8 @@ export async function migrateLegacyBrushLibraryToSqlite(
   };
 }
 
-export async function openProductBrushLibraryRepository(
-  options: OpenProductBrushLibraryRepositoryOptions = {},
+async function openProductBrushLibraryRepositoryInternal(
+  options: OpenProductBrushLibraryRepositoryOptions,
 ): Promise<ProductBrushLibraryRepository> {
   let database: StudioLocalDatabase;
   try {
@@ -496,6 +496,47 @@ export async function openProductBrushLibraryRepository(
     }),
     migration,
   };
+}
+
+/**
+ * The page, desktop inspector, mobile dock, and import surfaces are projections of
+ * one app-lifetime catalog. In particular, an OPFS ownership failure must not give
+ * every projection a different empty memory fallback: a later panel hydration could
+ * otherwise replace an in-session import with `[]`.
+ */
+let sharedProductBrushLibraryPromise: Promise<ProductBrushLibraryRepository> | null = null;
+
+function usesProductBrushLibraryRuntime(
+  options: OpenProductBrushLibraryRepositoryOptions,
+): boolean {
+  return options.acquireDatabase === undefined
+    && options.storage === undefined
+    && options.legacyDataPolicy === undefined
+    && options.now === undefined
+    && options.uuid === undefined;
+}
+
+/** Test/session retry seam. The shared SQLite handle remains owned by its runtime. */
+export function resetProductBrushLibraryRepositoryRuntime(): void {
+  sharedProductBrushLibraryPromise = null;
+}
+
+export function openProductBrushLibraryRepository(
+  options: OpenProductBrushLibraryRepositoryOptions = {},
+): Promise<ProductBrushLibraryRepository> {
+  if (!usesProductBrushLibraryRuntime(options)) {
+    return openProductBrushLibraryRepositoryInternal(options);
+  }
+  if (!sharedProductBrushLibraryPromise) {
+    const opening = openProductBrushLibraryRepositoryInternal({});
+    sharedProductBrushLibraryPromise = opening;
+    void opening.catch(() => {
+      if (sharedProductBrushLibraryPromise === opening) {
+        sharedProductBrushLibraryPromise = null;
+      }
+    });
+  }
+  return sharedProductBrushLibraryPromise;
 }
 
 /**

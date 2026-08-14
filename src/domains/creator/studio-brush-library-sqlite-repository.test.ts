@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import {
   BRUSH_LIBRARY_KEY,
@@ -17,6 +17,7 @@ import {
   migrateLegacyBrushLibraryToSqlite,
   openProductBrushLibraryRepository,
   readAllBrushesFromRepository,
+  resetProductBrushLibraryRepositoryRuntime,
   studioBrushToSqlRecord,
 } from "./studio-brush-library-sqlite-repository";
 import {
@@ -26,6 +27,14 @@ import {
   type StudioLocalDatabase,
   type StudioSqliteApiHandle,
 } from "./studio-local-database";
+
+const localDatabaseRuntime = vi.hoisted(() => ({
+  acquire: vi.fn<() => Promise<StudioLocalDatabase>>(),
+}));
+
+vi.mock("./studio-local-database-runtime", () => ({
+  acquireStudioLocalDatabase: localDatabaseRuntime.acquire,
+}));
 
 let sqlite3: StudioSqliteApiHandle;
 const opened: StudioLocalDatabase[] = [];
@@ -37,6 +46,11 @@ beforeAll(async () => {
 
 afterAll(async () => {
   for (const database of opened) await database.close();
+});
+
+afterEach(() => {
+  resetProductBrushLibraryRepositoryRuntime();
+  localDatabaseRuntime.acquire.mockReset();
 });
 
 async function openMemoryDatabase(options: {
@@ -253,6 +267,77 @@ describe("SQLite unlimited brush repository", () => {
 });
 
 describe("legacy localStorage migration and product memory session", () => {
+  it("coalesces product consumers onto one app-lifetime SQLite repository", async () => {
+    const database = await openMemoryDatabase();
+    localDatabaseRuntime.acquire.mockResolvedValue(database);
+
+    const [page, inspector, mobile] = await Promise.all([
+      openProductBrushLibraryRepository(),
+      openProductBrushLibraryRepository(),
+      openProductBrushLibraryRepository(),
+    ]);
+
+    expect(page).toBe(inspector);
+    expect(inspector).toBe(mobile);
+    expect(localDatabaseRuntime.acquire).toHaveBeenCalledOnce();
+    await page.repository.put(brush(9, { name: "공유 카탈로그" }));
+    await expect(mobile.repository.getById("brush-00009")).resolves.toMatchObject({
+      name: "공유 카탈로그",
+    });
+  });
+
+  it("keeps one shared memory catalog when the product OPFS authority is unavailable", async () => {
+    localDatabaseRuntime.acquire.mockRejectedValue(
+      new SqliteUnavailableError("Studio OPFS is already owned by another page"),
+    );
+
+    const first = await openProductBrushLibraryRepository();
+    const second = await openProductBrushLibraryRepository();
+
+    expect(first).toBe(second);
+    expect(first.authority).toBe("memory-session");
+    expect(localDatabaseRuntime.acquire).toHaveBeenCalledOnce();
+    await first.repository.put(brush(7, { name: "현재 탭 공유 브러시" }));
+    await expect(second.repository.getById("brush-00007")).resolves.toMatchObject({
+      name: "현재 탭 공유 브러시",
+    });
+  });
+
+  it("retries a failed product open instead of retaining an arbitrary rejection", async () => {
+    const database = await openMemoryDatabase();
+    localDatabaseRuntime.acquire
+      .mockRejectedValueOnce(new Error("worker bootstrap failed"))
+      .mockResolvedValueOnce(database);
+
+    await expect(openProductBrushLibraryRepository()).rejects.toThrow(
+      "worker bootstrap failed",
+    );
+    await expect(openProductBrushLibraryRepository()).resolves.toMatchObject({
+      authority: "sqlite",
+    });
+    expect(localDatabaseRuntime.acquire).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not let an obsolete failed generation clear a newer product open", async () => {
+    const database = await openMemoryDatabase();
+    let rejectObsolete!: (reason: unknown) => void;
+    localDatabaseRuntime.acquire
+      .mockImplementationOnce(() => new Promise<StudioLocalDatabase>((_resolve, reject) => {
+        rejectObsolete = reject;
+      }))
+      .mockResolvedValueOnce(database);
+
+    const obsolete = openProductBrushLibraryRepository();
+    resetProductBrushLibraryRepositoryRuntime();
+    const current = openProductBrushLibraryRepository();
+    rejectObsolete(new Error("obsolete worker failed"));
+
+    await expect(obsolete).rejects.toThrow("obsolete worker failed");
+    await expect(current).resolves.toMatchObject({ authority: "sqlite" });
+    expect(openProductBrushLibraryRepository()).toBe(current);
+    expect(localDatabaseRuntime.acquire).toHaveBeenCalledTimes(2);
+  });
+
   it("discards the legacy envelope by default and leaves no migration marker", async () => {
     const database = await openMemoryDatabase();
     const storage = storageWith([brush(1, { name: "폐기할 내부 데이터" })]);
@@ -343,21 +428,26 @@ describe("legacy localStorage migration and product memory session", () => {
       .toMatchObject({ code: "read-error" });
   });
 
-  it("opens a fresh memory session without touching localStorage when SQLite is unavailable", async () => {
+  it("keeps injected memory-session seams isolated and never touches localStorage", async () => {
     const getItem = vi.fn(() => null);
     const setItem = vi.fn();
     vi.stubGlobal("localStorage", { getItem, setItem });
     try {
-      const product = await openProductBrushLibraryRepository({
-        acquireDatabase: () => Promise.reject(new SqliteUnavailableError("no OPFS")),
-      });
+      const acquireDatabase = vi.fn(
+        () => Promise.reject(new SqliteUnavailableError("no OPFS")),
+      );
+      const product = await openProductBrushLibraryRepository({ acquireDatabase });
+      const isolated = await openProductBrushLibraryRepository({ acquireDatabase });
 
       expect(product.authority).toBe("memory-session");
+      expect(isolated).not.toBe(product);
+      expect(acquireDatabase).toHaveBeenCalledTimes(2);
       expect((await product.repository.query()).items).toEqual([]);
       await product.repository.put(brush(4, { name: "현재 세션 브러시" }));
       expect((await product.repository.query()).items.map((item) => item.name)).toEqual([
         "현재 세션 브러시",
       ]);
+      expect((await isolated.repository.query()).items).toEqual([]);
       expect(getItem).not.toHaveBeenCalled();
       expect(setItem).not.toHaveBeenCalled();
     } finally {

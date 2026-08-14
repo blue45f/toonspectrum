@@ -539,6 +539,10 @@ interface StudioInspectorAsideProps {
   recentColors: string[];
   rightResize: import("@/components/use-resizable").Resizable;
   savedBrushes: StudioSavedBrush[];
+  /** Page-owned product authority shared with imports and the mobile projection. */
+  openBrushLibraryRepository?: () => Promise<
+    import("./studio-brush-library-sqlite-repository").ProductBrushLibraryRepository
+  >;
   saving: boolean;
   studioFilterPreparationBusy: boolean;
   studioLayerLiftDisabledReason: string | null;
@@ -905,6 +909,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   recentColors,
   rightResize,
   savedBrushes,
+  openBrushLibraryRepository,
   saving,
   studioFilterPreparationBusy,
   studioLayerLiftDisabledReason,
@@ -3547,6 +3552,9 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                     onBrushesChange={setSavedBrushes}
                     onApplyBrush={applySavedBrush}
                     onBrushDeleted={queueBrushDelete}
+                    {...(openBrushLibraryRepository
+                      ? { repositoryFactory: openBrushLibraryRepository }
+                      : {})}
                   />
                 </Suspense>
               )}

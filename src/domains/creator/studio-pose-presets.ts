@@ -363,6 +363,19 @@ export function pickNaturalIdlePose(characterId: string): StudioPosePreset {
 // ── 포즈 프리셋 22종 (기본 제공 포즈와 id가 겹치지 않도록 xp_ 접두) ──────
 export const EXTRA_POSE_PRESETS: StudioPosePreset[] = [
   {
+    id: "xp_wave_greeting",
+    label: "손들어 인사",
+    tone: "반갑게 오른손을 들어 인사",
+    bones: basePose({
+      spine: rotate([0, 0, d(-2)]),
+      chest: rotate([d(-2), 0, d(-1)]),
+      head: rotate([d(-2), d(-5), d(3)]),
+      rightUpperArm: aim(0.55, 0.45, 0.4),
+      rightLowerArm: aim(0.15, 0.85, 0.35),
+      rightHand: rotate([0, d(15), d(25)]),
+    }),
+  },
+  {
     id: "xp_idle_relax",
     label: "서있기(휴식)",
     tone: "힘 뺀 기본 대기",

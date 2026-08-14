@@ -636,6 +636,24 @@ export const BG_SCENE_TEMPLATES: BgSceneTemplate[] = [
       { type: "composite", presetId: "rock_cluster", anchor: [4.2, 0, -2.5] },
     ],
   },
+  {
+    id: "fantasy_tavern",
+    category: "interior",
+    label: "목재 주점",
+    description: "목재 바닥 · 테이블 좌석 · 술통 · 벽 랜턴",
+    footprint: { width: 8, depth: 8 },
+    placements: [
+      { type: "primitive", kind: "plane", position: [0, 0, 0], rotation: [-Math.PI / 2, 0, 0], scale: [8, 8, 1], color: "#4a3525" },
+      { type: "primitive", kind: "box", position: [0, 1.5, -4], rotation: [0, 0, 0], scale: [8, 3, 0.2], color: "#382618" },
+      { type: "primitive", kind: "box", position: [-4, 1.5, 0], rotation: [0, 0, 0], scale: [0.2, 3, 8], color: "#382618" },
+      { type: "composite", presetId: "prop_table_set", anchor: [-2, 0, -1.5] },
+      { type: "composite", presetId: "prop_table_set", anchor: [2, 0, -1.5] },
+      { type: "composite", presetId: "prop_barrel", anchor: [-3.2, 0, -3.2] },
+      { type: "composite", presetId: "prop_barrel", anchor: [-2.5, 0, -3.2] },
+      { type: "composite", presetId: "prop_crate", anchor: [3, 0, -3.2] },
+      { type: "composite", presetId: "prop_lantern", anchor: [0, 0, -3.8] },
+    ],
+  },
 ];
 
 // ── 전개 함수 ─────────────────────────────────────────────────────────────

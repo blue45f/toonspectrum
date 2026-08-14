@@ -31380,9 +31380,10 @@ const puppetWarpArmed =
     targetId,
     tool: replayTool,
   }) => {
-    if (replayTool === "smudge") void applySmudgeStroke(targetId, points);
-    else if (replayTool === "dodge-burn") void applyDodgeBurnStroke(targetId, points);
-    else if (replayTool === "wet-mix") void applyWetMixStroke(targetId, points);
+    const bakePoints = thinStudioRasterRetouchPointsForApply(points);
+    if (replayTool === "smudge") void applySmudgeStroke(targetId, bakePoints);
+    else if (replayTool === "dodge-burn") void applyDodgeBurnStroke(targetId, bakePoints);
+    else if (replayTool === "wet-mix") void applyWetMixStroke(targetId, bakePoints);
     else void applyLiquifyStroke(targetId, points, replayLiquifyMode);
   };
 
@@ -46424,6 +46425,7 @@ function clearSelectionForEdit() {
           recentColors={recentColors}
           rightResize={rightResize}
           savedBrushes={savedBrushes}
+          openBrushLibraryRepository={productBrushRepository}
           saving={saving}
           studioFilterPreparationBusy={studioFilterPreparationBusy}
           studioLayerLiftDisabledReason={studioLayerLiftDisabledReason}
@@ -46701,6 +46703,7 @@ function clearSelectionForEdit() {
           proDrawPrefs={proDrawPrefs}
           quickActionsOpen={quickActionsOpen}
           savedBrushes={savedBrushes}
+          openBrushLibraryRepository={productBrushRepository}
           selected={selected}
           selectionLocked={mobileSelectionLocked}
           selectionTextEditLabel={studioOptionsBarsSelectionModel.textEditLabel}

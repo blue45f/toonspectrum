@@ -132,6 +132,23 @@ describe("Studio inspector raster recovery boundary", () => {
     expect(pendingEnd).toContain("queuePendingRasterRetouchGesture");
     expect(pageSource).toContain("normalizeStudioPendingRasterRetouchGesture");
     expect(pageSource).toContain("applyQueuedRasterRetouchReplayRef.current");
+    const replayStart = pageSource.indexOf(
+      "applyQueuedRasterRetouchReplayRef.current = ({",
+    );
+    const replayEnd = pageSource.indexOf(
+      "\n  // ── 레이어 마스크 브러시 스트로크 굽기",
+      replayStart,
+    );
+    const replay = pageSource.slice(replayStart, replayEnd);
+    expect(replay).toContain(
+      "const bakePoints = thinStudioRasterRetouchPointsForApply(points)",
+    );
+    expect(replay).toContain('applySmudgeStroke(targetId, bakePoints)');
+    expect(replay).toContain('applyDodgeBurnStroke(targetId, bakePoints)');
+    expect(replay).toContain('applyWetMixStroke(targetId, bakePoints)');
+    expect(replay).toContain(
+      "applyLiquifyStroke(targetId, points, replayLiquifyMode)",
+    );
     expect(nodeInteractionBegin).toContain("studioRasterRetouchPreparationRef.current");
     expect(nodeInteractionBegin.indexOf("studioRasterRetouchPreparationRef.current"))
       .toBeLessThan(nodeInteractionBegin.indexOf("canvasInteractionUnitIds(elementId)"));

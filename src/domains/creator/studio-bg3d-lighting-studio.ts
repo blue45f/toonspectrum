@@ -8,7 +8,12 @@ import type {
 const VALUE_EPSILON = 1e-4;
 
 export interface StudioBg3dLightingStudioPreset {
-  readonly id: "balanced" | "portrait-soft" | "action-rim" | "lineart-flat";
+  readonly id:
+    | "balanced"
+    | "portrait-soft"
+    | "action-rim"
+    | "lineart-flat"
+    | "cinematic-3point";
   readonly label: string;
   readonly description: string;
   readonly lighting: StudioBg3dLightingSettings;
@@ -23,6 +28,34 @@ function deepFreeze<T>(value: T): T {
 
 export const STUDIO_BG3D_LIGHTING_STUDIO_PRESETS:
 readonly StudioBg3dLightingStudioPreset[] = deepFreeze([
+  {
+    id: "cinematic-3point",
+    label: "시네마틱 3점",
+    description: "따뜻한 키와 차가운 필, 낮은 환경광으로 인물 실루엣을 또렷하게 분리",
+    exposure: 1.12,
+    lighting: {
+      ambientColor: "#222a36",
+      ambientIntensity: 0.42,
+      key: {
+        color: "#ffdfa0",
+        direction: studioBg3dLightAnglesToDirection({
+          azimuthDeg: 45,
+          elevationDeg: 45,
+        }),
+        intensity: 1.65,
+        castsShadow: true,
+      },
+      fill: {
+        color: "#60a5fa",
+        direction: studioBg3dLightAnglesToDirection({
+          azimuthDeg: -135,
+          elevationDeg: 25,
+        }),
+        intensity: 0.45,
+        castsShadow: false,
+      },
+    },
+  },
   {
     id: "balanced",
     label: "균형 3점",
