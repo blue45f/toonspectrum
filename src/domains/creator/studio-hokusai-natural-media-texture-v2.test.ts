@@ -320,8 +320,11 @@ describe("Studio Hokusai natural-media texture v2", () => {
       pencil: 5,
       charcoal: 4,
       chalk: 4,
-      // Directional wax scrape (OSS kernel) is three 2-D samples in stroke space.
-      crayon: 3,
+      // Directional wax scrape (OSS kernel, three 2-D samples in stroke space) plus a two-sample
+      // paper tooth. The scrape alone laid an even film; wax rides the sheet's peaks and skips
+      // its valleys, and every sibling dry medium already carried a tooth term while crayon did
+      // not. The two extra samples buy that texture back.
+      crayon: 5,
       pastel: 4,
       "oil-pastel": 5,
       oil: 3,

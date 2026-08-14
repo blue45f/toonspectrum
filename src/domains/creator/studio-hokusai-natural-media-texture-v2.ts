@@ -517,7 +517,14 @@ function crayonTexture(
   directionRadians: number,
   diagnostics?: NoiseEvaluationDiagnostics,
 ): MaterialTextureSample {
-  // Direction-aligned wax scrape (OSS kernel, 3 value-noise samples).
+  // Direction-aligned wax scrape (OSS kernel, 3 value-noise samples) over paper tooth.
+  //
+  // The scrape alone was this material's entire texture, and it reads as procedural: a wax stick
+  // does not lay an even film, it rides the peaks of the sheet and skips the valleys, and that
+  // skipping is what the eye recognises as wax. Every sibling dry medium already carried a tooth
+  // term — chalk, charcoal and pastel each spend 4 samples — while crayon spent 3 and had none,
+  // which is why it was the one material that looked wrong. The extra field is deliberate cost:
+  // texture is not traded away to keep a smaller noise budget.
   if (diagnostics) diagnostics.count += 3;
   const sample = studioOssDirectionalWaxSample(
     x,
@@ -525,10 +532,20 @@ function crayonTexture(
     directionRadians,
     seed ^ 0x47,
   );
+  // Two samples, not a full pigment field: the wax only needs the sheet's undulation and the
+  // grain riding on it, so crayon lands at 5 like pencil rather than becoming the costliest
+  // material. `broad` is the sheet, `fine` the grain.
+  const broad = valueNoise2d(x * 0.026, y * 0.026, 0x47, seed, diagnostics);
+  const fine = valueNoise2d(x * 0.071, y * 0.071, 0x48, seed, diagnostics);
+  // Bias above the midpoint so the bed stays continuous instead of punching holes: a light pass
+  // breaks up on the peaks while a burnished second pass still fills in.
+  const peak = Math.min(1, Math.max(0, 0.46 + (broad - 0.5) * 1.24 + (fine - 0.5) * 0.52));
+  const deposit = Math.min(1, Math.max(0, sample.wax * (0.58 + peak * 0.62)));
   return {
-    alpha: 0.5 + sample.wax * 0.46,
-    color: 0.62 + sample.wax * 0.54,
-    lift: sample.scrape * 0.12 + sample.grit * 0.05,
+    alpha: 0.5 + deposit * 0.46,
+    color: 0.62 + deposit * 0.54,
+    // A bare valley reads as lifted paper, so skipped tooth joins the scrape and grit.
+    lift: sample.scrape * 0.12 + sample.grit * 0.05 + (1 - peak) * 0.05,
   };
 }
 
