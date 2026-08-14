@@ -83,6 +83,9 @@ describe("Studio VRM asset runtime ownership boundary", () => {
     expect(runtime.allImports).not.toContain("./StudioVrmPoser");
     expect(runtime.valueImports).toEqual([
       "three",
+      // 라이선스 게이트는 메타데이터·정책 모듈만 잇는 리프다(에디터를 되끌지 않는다).
+      // 이 경계가 지키려는 것은 위의 `not.toContain("./StudioVrmPoser")` 쪽이다.
+      "./studio-vrm-license-product-gate",
       "./studio-vrm-texture-paint-binding",
       "./vrm-library",
       "@/src/catalog-static",
