@@ -1,5 +1,9 @@
 import * as THREE from "three";
 
+import {
+  inspectStudioVrmLicenseAuthority,
+  type StudioVrmLicenseAuthority,
+} from "./studio-vrm-license-product-gate";
 import { stampStudioVrmTexturePaintMaterialLocator } from "./studio-vrm-texture-paint-binding";
 import { isUsableVrmAssetResponse } from "./vrm-library";
 
@@ -28,6 +32,27 @@ export type StudioVrmAssetRuntimeDependencies = {
 type StudioVrmGltfAssociation = Readonly<{
   materials?: number;
 }>;
+
+const studioVrmLicenseAuthorityByAsset = new WeakMap<VRM, StudioVrmLicenseAuthority>();
+
+/**
+ * Binds the bounded, immutable license receipt to the loaded VRM object. Keeping the authority in
+ * a WeakMap avoids trusting mutable scene userData and releases it automatically with the asset.
+ */
+export function stampStudioVrmAssetLicenseAuthority(
+  vrm: VRM,
+  gltfJson: unknown,
+): StudioVrmLicenseAuthority {
+  const authority = inspectStudioVrmLicenseAuthority(gltfJson);
+  studioVrmLicenseAuthorityByAsset.set(vrm, authority);
+  return authority;
+}
+
+export function readStudioVrmAssetLicenseAuthority(
+  vrm: VRM | null | undefined,
+): StudioVrmLicenseAuthority | null {
+  return vrm ? studioVrmLicenseAuthorityByAsset.get(vrm) ?? null : null;
+}
 
 /**
  * Keeps GLTFLoader's stable material index after the parser is released. Runtime UUIDs and model
@@ -123,6 +148,10 @@ async function loadResolvedVrm(url: string): Promise<VRM> {
     VRMUtils.deepDispose(gltf.scene);
     throw new Error("VRM 데이터를 찾지 못했습니다.");
   }
+  stampStudioVrmAssetLicenseAuthority(
+    loadedVrm,
+    (gltf.parser as unknown as { readonly json?: unknown }).json,
+  );
   if (loadedVrm.meta.metaVersion === "0") VRMUtils.rotateVRM0(loadedVrm);
   return loadedVrm;
 }

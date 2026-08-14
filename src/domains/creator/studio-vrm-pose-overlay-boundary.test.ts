@@ -147,12 +147,18 @@ describe("Studio VRM visual pose bone boundary", () => {
     expect(source).toContain("}, controller.signal)");
     // 권리 확인 문구는 파괴/게시 승인 카탈로그가 소유하고, 포저는 그 요청을 거쳐서만
     // 업로드에 진입한다. 문구가 코드에서 사라지면 두 검사 중 하나가 반드시 깨진다.
-    expect(source).toContain("studioSharePoseConsentRequest(title)");
-    expect(destructiveCatalogSource).toContain("ToonSpectrum 표준 사용권으로 공유할 권한");
-    expect(source).toContain('license: "toonspectrum-standard"');
+    expect(source).toContain("studioVrmPoseShareUseContextConsentRequest({");
+    expect(source).toContain("prepareStudioVrmRenderedPoseMarketplaceAttestation(");
+    expect(source).toContain("planStudioVrmRenderedPoseMarketplaceShare(shareLicenseAuthority");
+    expect(source).toContain("studioSharePoseConsentRequest({");
+    expect(destructiveCatalogSource).toContain("방금 확인한 이용 맥락을 기준으로");
+    expect(destructiveCatalogSource).toContain("필수 크레딧");
+    expect(source).toContain("license: sharePlan.license");
+    expect(source).toContain("attributionText: sharePlan.attributionText");
+    expect(source).not.toContain('license: "toonspectrum-standard"');
     expect(source).toContain('containsAi: false');
     expect(source).toContain('tags: ["VRM", "3D 데생 인형", "포즈"]');
-    expect(source).toContain("rightsConfirmed: true");
+    expect(source).toContain("rightsConfirmed: sharePlan.rightsConfirmed");
     expect(source).not.toContain("preserveDrawingBuffer: true");
     expect(source).not.toContain('gl.domElement.toDataURL("image/png")');
     expect(source).toContain('{isSharingPose ? "공유 취소" : "포즈 서버에 공유"}');

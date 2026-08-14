@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   createStudioVrmAssetRuntime,
+  readStudioVrmAssetLicenseAuthority,
+  stampStudioVrmAssetLicenseAuthority,
   stampStudioVrmGltfMaterialAssociations,
   type StudioVrmAssetRuntimeDependencies,
 } from "./studio-vrm-asset-runtime";
@@ -30,6 +32,36 @@ function dependencies(
 }
 
 describe("studio VRM asset runtime", () => {
+  it("binds an immutable license authority to only the inspected VRM instance", () => {
+    const inspected = fakeVrm();
+    const different = fakeVrm();
+    const authority = stampStudioVrmAssetLicenseAuthority(inspected, {
+      extensions: {
+        VRMC_vrm: {
+          specVersion: "1.0",
+          meta: {
+            name: "CC0 avatar",
+            authors: ["ToonSpectrum"],
+            licenseUrl: "https://vrm.dev/licenses/1.0/",
+            avatarPermission: "everyone",
+            commercialUsage: "corporation",
+            allowRedistribution: true,
+            modification: "allowModificationRedistribution",
+            creditNotation: "unnecessary",
+          },
+        },
+      },
+    });
+
+    expect(authority).toMatchObject({
+      status: "verified",
+      receipt: { licenseIdentifier: "VRM-Public-License-1.0" },
+    });
+    expect(readStudioVrmAssetLicenseAuthority(inspected)).toBe(authority);
+    expect(readStudioVrmAssetLicenseAuthority(different)).toBeNull();
+    expect(readStudioVrmAssetLicenseAuthority(null)).toBeNull();
+  });
+
   it("preserves stable glTF material indices for surface-paint rehydration", () => {
     const first = new THREE.MeshStandardMaterial();
     const second = new THREE.MeshStandardMaterial();

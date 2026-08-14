@@ -13,6 +13,7 @@ import {
   studioDeleteSharedPoseRequest,
   studioImportPosesRequest,
   studioSharePoseConsentRequest,
+  studioVrmPoseShareUseContextConsentRequest,
 } from "./studio-destructive-command-catalog";
 import {
   isStudioHumanoidBoneName,
@@ -26,6 +27,7 @@ import {
   STUDIO_VRM_HTML_FALLBACK_ERROR as HTML_FALLBACK_VRM_ERROR,
   disposeStudioVrmAsset as disposeVrm,
   loadStudioVrmAsset as loadVrmAsset,
+  readStudioVrmAssetLicenseAuthority,
 } from "./studio-vrm-asset-runtime";
 import {
   createStudioVrmAuthoredFingerSnapshot,
@@ -90,6 +92,12 @@ import {
 } from "./studio-vrm-ik-constraints";
 import { resolveStudioVrmInsertBackgroundMode } from "./studio-vrm-insert-background-mode";
 import { clampStudioVrmJointRotation, getStudioVrmJointLimit } from "./studio-vrm-joint-limits";
+import {
+  createStudioVrmRenderedPoseUseContextReceipt,
+  planStudioVrmRenderedPoseMarketplaceShare,
+  prepareStudioVrmRenderedPoseMarketplaceAttestation,
+  STUDIO_VRM_RENDERED_POSE_PLATFORM_GRANT,
+} from "./studio-vrm-license-product-gate";
 import {
   buildStudioVrmPersistentIkSignature,
   type StudioVrmPersistentIkSignatureInput,
@@ -6494,7 +6502,52 @@ export function StudioVrmPoser({
       alert("이름은 최대 30자까지 가능합니다.");
       return;
     }
-    if (!(await confirmStudioDestructiveAction(studioSharePoseConsentRequest(title)))) return;
+    const shareLicenseAuthority = readStudioVrmAssetLicenseAuthority(currentVrm);
+    const shareAttestation = prepareStudioVrmRenderedPoseMarketplaceAttestation(
+      shareLicenseAuthority,
+    );
+    if (!shareAttestation.ok) {
+      alert(shareAttestation.message);
+      return;
+    }
+    if (!shareAttestation.permittedActorBases.includes("other")) {
+      alert("이 VRM은 저작자 또는 별도 이용 허락을 받은 사용자만 아바타로 사용할 수 있어 현재 확인 방식으로는 공유할 수 없습니다.");
+      return;
+    }
+    if (!(await confirmStudioDestructiveAction(studioVrmPoseShareUseContextConsentRequest({
+      attributionText: shareAttestation.attributionText,
+      creditRequired: shareAttestation.creditRequired,
+    })))) return;
+    const shareUseContextReceipt = createStudioVrmRenderedPoseUseContextReceipt({
+      confirmedByUser: true,
+      avatarPermissionBasis: "other",
+      publisherKind: "corporation",
+      confirmedAttributionText: shareAttestation.attributionText,
+      containsModifiedModel: true,
+      excessivelyViolent: "absent",
+      excessivelySexual: "absent",
+      politicalOrReligious: "absent",
+      antisocialOrHate: "absent",
+      shareAlike: "not-satisfied",
+    });
+    const sharePlan = planStudioVrmRenderedPoseMarketplaceShare(shareLicenseAuthority, {
+      useContextReceipt: shareUseContextReceipt,
+      toonspectrumRenderedPoseGrant: STUDIO_VRM_RENDERED_POSE_PLATFORM_GRANT,
+    });
+    if (!sharePlan.ok) {
+      alert(sharePlan.message);
+      return;
+    }
+    const shareLicenseLabel = shareLicenseAuthority?.status === "verified"
+      ? shareLicenseAuthority.receipt.licenseIdentifier
+        ?? shareLicenseAuthority.receipt.licenseUrl
+        ?? "VRM 이용 조건"
+      : "VRM 이용 조건";
+    if (!(await confirmStudioDestructiveAction(studioSharePoseConsentRequest({
+      poseTitle: title,
+      licenseLabel: shareLicenseLabel,
+      attributionText: sharePlan.attributionText,
+    })))) return;
 
     const shareVisualAuthority = captureVisualAuthorityRef.current;
     const shareCameraIdentity = readVrmCaptureCameraIdentity();
@@ -6640,9 +6693,10 @@ export function StudioVrmPoser({
         width,
         height,
         kind: "vrm_pose",
-        license: "toonspectrum-standard",
+        license: sharePlan.license,
+        attributionText: sharePlan.attributionText,
         containsAi: false,
-        rightsConfirmed: true,
+        rightsConfirmed: sharePlan.rightsConfirmed,
       }, controller.signal);
 
       alert("포즈가 성공적으로 서버에 공유되었습니다!");
