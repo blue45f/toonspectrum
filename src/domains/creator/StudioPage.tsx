@@ -17671,7 +17671,15 @@ function StudioCuttoonEditor({
   >(null);
   const watermarkPendingSettingsRef = useRef<WatermarkSettings>({ ...DEFAULT_WATERMARK });
   const watermarkPreferenceDirtyRef = useRef(false);
+  // Watermark settings reach exactly one place — StudioExportMenuPanel — so nothing on the launch
+  // screen depends on them, yet subscribing at mount pulled their SQLite runtime into the startup
+  // graph. Wait for the first sign the artist needs them.
+  const [watermarkPreferenceWanted, setWatermarkPreferenceWanted] = useState(false);
   const acquireWatermarkPreferenceRuntime = useCallback((): Promise<StudioWatermarkPreferenceRuntime> => {
+    // Any caller reaching for the runtime is the signal the subscription effect below waits for —
+    // otherwise an export triggered without opening the menu would load the settings and then
+    // render a stale snapshot, because nothing was listening for the hydrated value.
+    setWatermarkPreferenceWanted(true);
     if (watermarkPreferenceRuntimeRef.current) {
       return Promise.resolve(watermarkPreferenceRuntimeRef.current);
     }
@@ -17697,7 +17705,13 @@ function StudioCuttoonEditor({
     return pending;
   }, []);
   const watermark = watermarkPreferenceSnapshot.settings;
+  // Opening the export menu is the ordinary signal; `acquire` above flips the same flag so the
+  // export shortcut and the publish path still get a live subscription without the menu.
   useEffect(() => {
+    if (exportMenuOpen) setWatermarkPreferenceWanted(true);
+  }, [exportMenuOpen]);
+  useEffect(() => {
+    if (!watermarkPreferenceWanted) return;
     let active = true;
     let unsubscribe: () => void = () => undefined;
     void acquireWatermarkPreferenceRuntime()
@@ -17731,7 +17745,7 @@ function StudioCuttoonEditor({
       active = false;
       unsubscribe();
     };
-  }, [acquireWatermarkPreferenceRuntime]);
+  }, [acquireWatermarkPreferenceRuntime, watermarkPreferenceWanted]);
   const ensureWatermarkLoaded = async () => {
     try {
       const runtime = await acquireWatermarkPreferenceRuntime();
