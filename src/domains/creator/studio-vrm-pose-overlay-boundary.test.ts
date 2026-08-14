@@ -147,7 +147,12 @@ describe("Studio VRM visual pose bone boundary", () => {
     expect(source).toContain("}, controller.signal)");
     // 권리 확인 문구는 파괴/게시 승인 카탈로그가 소유하고, 포저는 그 요청을 거쳐서만
     // 업로드에 진입한다. 문구가 코드에서 사라지면 두 검사 중 하나가 반드시 깨진다.
-    expect(source).toContain("studioVrmPoseShareUseContextConsentRequest({");
+    expect(source).toContain("const shareUseContextDisclosure = {");
+    expect(source).toContain("} satisfies StudioVrmPoseShareUseContextDisclosure;");
+    expect(source).toContain(
+      "studioVrmPoseShareUseContextConsentRequest(shareUseContextDisclosure)",
+    );
+    expect(source).toContain("confirmedByUser: true,\n      ...shareUseContextDisclosure,");
     expect(source).toContain("prepareStudioVrmRenderedPoseMarketplaceAttestation(");
     expect(source).toContain("planStudioVrmRenderedPoseMarketplaceShare(shareLicenseAuthority");
     expect(source).toContain("studioSharePoseConsentRequest({");

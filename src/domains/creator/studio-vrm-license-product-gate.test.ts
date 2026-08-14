@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { STUDIO_VRM_1_PUBLIC_LICENSE_URL } from "./studio-vrm-license-metadata";
+import {
+  STUDIO_VRM_1_PUBLIC_LICENSE_URL,
+  STUDIO_VRM_CC0_1_LICENSE_URL,
+  STUDIO_VRM_CC_BY_4_LICENSE_URL,
+  STUDIO_VRM_CC_BY_NC_4_LICENSE_URL,
+} from "./studio-vrm-license-metadata";
 import {
   createStudioVrmProjectArchiveUseContextReceipt,
   createStudioVrmRenderedPoseUseContextReceipt,
@@ -256,6 +261,48 @@ describe("studio VRM license product gate", () => {
       license: "cc0-1.0",
       attributionText: "",
     });
+  });
+
+  it("maps exact VRM 1.0 Creative Commons otherLicenseUrl declarations without opening custom terms", () => {
+    const explicitVrm1 = (otherLicenseUrl: string) => inspectStudioVrmLicenseAuthority(vrm1({
+      name: "Explicitly licensed pose model",
+      authors: ["Model Creator"],
+      licenseUrl: STUDIO_VRM_1_PUBLIC_LICENSE_URL,
+      otherLicenseUrl,
+      avatarPermission: "everyone",
+      commercialUsage: "corporation",
+      allowRedistribution: true,
+      modification: "allowModificationRedistribution",
+      creditNotation: "unnecessary",
+    }));
+
+    const cc0 = explicitVrm1(STUDIO_VRM_CC0_1_LICENSE_URL);
+    expect(planStudioVrmRenderedPoseMarketplaceShare(cc0, shareContext(cc0))).toMatchObject({
+      ok: true,
+      rightsConfirmed: true,
+      license: "cc0-1.0",
+      attributionText: "",
+    });
+
+    const ccBy = explicitVrm1(STUDIO_VRM_CC_BY_4_LICENSE_URL);
+    const ccByPlan = planStudioVrmRenderedPoseMarketplaceShare(ccBy, shareContext(ccBy));
+    expect(ccByPlan).toMatchObject({
+      ok: true,
+      rightsConfirmed: true,
+      license: "cc-by-4.0",
+    });
+    if (!ccByPlan.ok) throw new Error(ccByPlan.message);
+    expect(ccByPlan.attributionText).toContain("Model Creator");
+    expect(ccByPlan.attributionText).toContain("CC_BY");
+    expect(ccByPlan.attributionText).toContain(STUDIO_VRM_CC_BY_4_LICENSE_URL);
+
+    const ccByNc = explicitVrm1(STUDIO_VRM_CC_BY_NC_4_LICENSE_URL);
+    expect(planStudioVrmRenderedPoseMarketplaceShare(ccByNc, shareContext(ccByNc)))
+      .toMatchObject({ ok: false, code: "policy-blocked" });
+
+    const custom = explicitVrm1("https://licenses.example/custom");
+    expect(planStudioVrmRenderedPoseMarketplaceShare(custom, shareContext(custom)))
+      .toMatchObject({ ok: false, code: "policy-blocked" });
   });
 
   it("blocks additional or unrepresentable CC terms instead of downgrading their license", () => {

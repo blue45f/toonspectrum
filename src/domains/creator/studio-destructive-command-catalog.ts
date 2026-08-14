@@ -22,6 +22,7 @@
 import { recordStudioDestructiveOutcome } from "./studio-destructive-action-preview";
 
 import type { StudioDestructiveActionRequest } from "./studio-destructive-action-preview";
+import type { StudioVrmRenderedPoseUseContextInput } from "./studio-vrm-license-product-gate";
 
 const PAGE_ELEMENTS_LABEL = "현재 페이지의 요소";
 
@@ -456,22 +457,83 @@ function boundedStudioShareConsentText(value: string, maxCharacters: number): st
   return Array.from(plain).slice(0, maxCharacters).join("");
 }
 
+export type StudioVrmPoseShareUseContextDisclosure = Omit<
+  StudioVrmRenderedPoseUseContextInput,
+  "confirmedByUser"
+>;
+
+function studioVrmPoseShareActorStatement(
+  basis: StudioVrmPoseShareUseContextDisclosure["avatarPermissionBasis"],
+): string {
+  if (basis === "author") return "나는 이 아바타의 저작자입니다.";
+  if (basis === "separately-licensed-person") {
+    return "나는 이 아바타를 사용할 별도 이용 허락을 받은 사람입니다.";
+  }
+  if (basis === "other") {
+    return "나는 이 아바타의 저작자도, 별도 이용 허락을 받은 사람도 아닙니다.";
+  }
+  return "이 아바타와 나의 이용 권한 관계는 확인되지 않았습니다.";
+}
+
+function studioVrmPoseSharePublisherStatement(
+  publisherKind: StudioVrmPoseShareUseContextDisclosure["publisherKind"],
+): string {
+  if (publisherKind === "corporation") {
+    return "이 공유는 ToonSpectrum 플랫폼 게시이며 게시 주체는 법인(corporation)으로 평가됩니다.";
+  }
+  if (publisherKind === "individual") return "이 공유의 게시 주체는 개인(individual)입니다.";
+  return "이 공유의 개인·법인 게시 주체는 확인되지 않았습니다.";
+}
+
+function studioVrmPoseShareContentStatement(
+  label: string,
+  value: StudioVrmPoseShareUseContextDisclosure["excessivelyViolent"],
+): string {
+  const classification = value === "absent"
+    ? "해당하지 않음"
+    : value === "present"
+      ? "포함함"
+      : "확인되지 않음";
+  return `${label}: ${classification}`;
+}
+
+function studioVrmPoseShareAlikeStatement(
+  shareAlike: StudioVrmPoseShareUseContextDisclosure["shareAlike"],
+): string {
+  if (shareAlike === "satisfied") {
+    return "필요한 동일조건변경허락(share-alike)을 호환되는 조건으로 이행합니다.";
+  }
+  if (shareAlike === "not-satisfied") {
+    return "별도의 동일조건변경허락(share-alike) 이행을 주장하지 않습니다.";
+  }
+  return "동일조건변경허락(share-alike) 이행 여부는 확인되지 않았습니다.";
+}
+
 /** 공유 플래너의 정확한 크레딧·사용 맥락을 확인한 뒤만 typed receipt를 만든다. */
-export function studioVrmPoseShareUseContextConsentRequest(input: Readonly<{
-  attributionText: string;
-  creditRequired: boolean;
-}>): StudioDestructiveActionRequest {
-  const attributionText = boundedStudioShareConsentText(input.attributionText, 160);
-  const attributionStatement = input.creditRequired
+export function studioVrmPoseShareUseContextConsentRequest(
+  input: StudioVrmPoseShareUseContextDisclosure,
+): StudioDestructiveActionRequest {
+  const attributionText = boundedStudioShareConsentText(input.confirmedAttributionText, 160);
+  const attributionStatement = attributionText
     ? `게시할 크레딧(변경 없이 게시): ${attributionText}`
     : "이 모델은 현재 렌더 포즈 게시에 별도 크레딧을 요구하지 않습니다.";
+  const modifiedModelStatement = input.containsModifiedModel
+    ? "현재 렌더에는 개조된 모델 표현이 포함됩니다."
+    : "현재 렌더에는 개조된 모델 표현이 포함되지 않습니다.";
+  const contentStatement = [
+    studioVrmPoseShareContentStatement("과도한 폭력", input.excessivelyViolent),
+    studioVrmPoseShareContentStatement("과도한 성적 표현", input.excessivelySexual),
+    studioVrmPoseShareContentStatement("정치·종교적 이용", input.politicalOrReligious),
+    studioVrmPoseShareContentStatement("반사회적·혐오 이용", input.antisocialOrHate),
+  ].join(", ");
   return {
     id: "studio.vrm-pose.share-use-context",
     title: "VRM 포즈 공유 이용 맥락 확인",
     intro:
-      "나는 이 아바타의 저작자도, 별도 이용 허락을 받은 사람도 아닙니다. "
-      + "이 렌더 포즈는 과도한 폭력, 과도한 성적 표현, 정치·종교적 이용, "
-      + `반사회적·혐오 이용에 해당하지 않습니다. ${attributionStatement}`,
+      `${studioVrmPoseShareActorStatement(input.avatarPermissionBasis)} `
+      + `${studioVrmPoseSharePublisherStatement(input.publisherKind)} `
+      + `${modifiedModelStatement} 콘텐츠 분류 — ${contentStatement}. `
+      + `${studioVrmPoseShareAlikeStatement(input.shareAlike)} ${attributionStatement}`,
     losses: [],
     gains: ["현재 공유 시도에만 사용하는 이용 맥락 확인"],
     reversibility: "document-untouched",

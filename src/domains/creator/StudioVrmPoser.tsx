@@ -14,6 +14,7 @@ import {
   studioImportPosesRequest,
   studioSharePoseConsentRequest,
   studioVrmPoseShareUseContextConsentRequest,
+  type StudioVrmPoseShareUseContextDisclosure,
 } from "./studio-destructive-command-catalog";
 import {
   isStudioHumanoidBoneName,
@@ -6514,12 +6515,7 @@ export function StudioVrmPoser({
       alert("이 VRM은 저작자 또는 별도 이용 허락을 받은 사용자만 아바타로 사용할 수 있어 현재 확인 방식으로는 공유할 수 없습니다.");
       return;
     }
-    if (!(await confirmStudioDestructiveAction(studioVrmPoseShareUseContextConsentRequest({
-      attributionText: shareAttestation.attributionText,
-      creditRequired: shareAttestation.creditRequired,
-    })))) return;
-    const shareUseContextReceipt = createStudioVrmRenderedPoseUseContextReceipt({
-      confirmedByUser: true,
+    const shareUseContextDisclosure = {
       avatarPermissionBasis: "other",
       publisherKind: "corporation",
       confirmedAttributionText: shareAttestation.attributionText,
@@ -6529,6 +6525,13 @@ export function StudioVrmPoser({
       politicalOrReligious: "absent",
       antisocialOrHate: "absent",
       shareAlike: "not-satisfied",
+    } satisfies StudioVrmPoseShareUseContextDisclosure;
+    if (!(await confirmStudioDestructiveAction(
+      studioVrmPoseShareUseContextConsentRequest(shareUseContextDisclosure),
+    ))) return;
+    const shareUseContextReceipt = createStudioVrmRenderedPoseUseContextReceipt({
+      confirmedByUser: true,
+      ...shareUseContextDisclosure,
     });
     const sharePlan = planStudioVrmRenderedPoseMarketplaceShare(shareLicenseAuthority, {
       useContextReceipt: shareUseContextReceipt,

@@ -4,6 +4,9 @@ import {
   canonicalStudioVrmLicenseMetadataReceiptJson,
   parseStudioVrmLicenseMetadata,
   STUDIO_VRM_1_PUBLIC_LICENSE_URL,
+  STUDIO_VRM_CC0_1_LICENSE_URL,
+  STUDIO_VRM_CC_BY_4_LICENSE_URL,
+  STUDIO_VRM_CC_BY_NC_4_LICENSE_URL,
   STUDIO_VRM_LICENSE_METADATA_LIMITS,
   type StudioVrmLicenseMetadataReceipt,
 } from "./studio-vrm-license-metadata";
@@ -83,6 +86,78 @@ describe("studio VRM license metadata admission", () => {
     expect(Object.isFrozen(receipt)).toBe(true);
     expect(Object.isFrozen(receipt.authors)).toBe(true);
     expect(Object.isFrozen(receipt.rawIntent)).toBe(true);
+  });
+
+  it.each([
+    {
+      otherLicenseUrl: STUDIO_VRM_CC0_1_LICENSE_URL,
+      licenseIdentifier: "CC0",
+      commercial: "allow",
+      credit: "unnecessary",
+    },
+    {
+      otherLicenseUrl: STUDIO_VRM_CC_BY_4_LICENSE_URL,
+      licenseIdentifier: "CC_BY",
+      commercial: "allow",
+      credit: "required",
+    },
+    {
+      otherLicenseUrl: STUDIO_VRM_CC_BY_NC_4_LICENSE_URL,
+      licenseIdentifier: "CC_BY_NC",
+      commercial: "disallow",
+      credit: "required",
+    },
+  ] as const)(
+    "treats exact VRM 1.0 $licenseIdentifier otherLicenseUrl as the explicit model license",
+    ({ otherLicenseUrl, licenseIdentifier, commercial, credit }) => {
+      const receipt = parseReceipt(vrm1({
+        name: `${licenseIdentifier} model`,
+        authors: ["Model Creator"],
+        licenseUrl: STUDIO_VRM_1_PUBLIC_LICENSE_URL,
+        otherLicenseUrl,
+        avatarPermission: "everyone",
+        commercialUsage: "corporation",
+        allowRedistribution: true,
+        modification: "allowModificationRedistribution",
+        creditNotation: "unnecessary",
+      }));
+
+      expect(receipt).toMatchObject({
+        conformance: "conformant",
+        licenseIdentifier,
+        licenseUrl: otherLicenseUrl,
+        additionalLicenseUrl: null,
+        commercial,
+        modification: "allow-modification-redistribution",
+        redistribution: "allow",
+        credit,
+        shareAlike: "not-required",
+        rawIntent: {
+          licenseUrl: STUDIO_VRM_1_PUBLIC_LICENSE_URL,
+          otherLicenseUrl,
+        },
+      });
+    },
+  );
+
+  it("keeps unrecognized or noncanonical VRM 1.0 otherLicenseUrl terms fail-closed", () => {
+    for (const otherLicenseUrl of [
+      "https://licenses.example/custom",
+      `${STUDIO_VRM_CC_BY_4_LICENSE_URL}?variant=custom`,
+      "http://creativecommons.org/licenses/by/4.0/",
+    ]) {
+      const receipt = parseReceipt(vrm1({
+        name: "Unrecognized terms",
+        authors: ["Creator"],
+        licenseUrl: STUDIO_VRM_1_PUBLIC_LICENSE_URL,
+        otherLicenseUrl,
+      }));
+      expect(receipt).toMatchObject({
+        licenseIdentifier: "VRM-Public-License-1.0",
+        licenseUrl: STUDIO_VRM_1_PUBLIC_LICENSE_URL,
+        additionalLicenseUrl: otherLicenseUrl,
+      });
+    }
   });
 
   it("applies official VRM 1.0 defaults only when optional declarations are absent", () => {

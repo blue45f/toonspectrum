@@ -20,6 +20,12 @@ export const STUDIO_VRM_LICENSE_METADATA_LIMITS = Object.freeze({
 });
 
 export const STUDIO_VRM_1_PUBLIC_LICENSE_URL = "https://vrm.dev/licenses/1.0/";
+export const STUDIO_VRM_CC0_1_LICENSE_URL =
+  "https://creativecommons.org/publicdomain/zero/1.0/";
+export const STUDIO_VRM_CC_BY_4_LICENSE_URL =
+  "https://creativecommons.org/licenses/by/4.0/";
+export const STUDIO_VRM_CC_BY_NC_4_LICENSE_URL =
+  "https://creativecommons.org/licenses/by-nc/4.0/";
 
 export type StudioVrmLicenseSpec = "vrm0" | "vrm1";
 export type StudioVrmCommercialPermission =
@@ -154,6 +160,66 @@ const LEGACY_LICENSE_NAMES = new Set([
   "CC_BY_NC_ND",
   "Other",
 ]);
+
+type StudioVrmCanonicalCreativeCommonsLicense = Readonly<{
+  identifier: "CC0" | "CC_BY" | "CC_BY_NC";
+  url: string;
+  commercial: StudioVrmCommercialPermission;
+  modification: StudioVrmModificationPermission;
+  redistribution: StudioVrmBinaryPermission;
+  credit: StudioVrmCreditPermission;
+  shareAlike: StudioVrmShareAlikePermission;
+}>;
+
+const STUDIO_VRM_CANONICAL_CREATIVE_COMMONS_LICENSES = new Map<
+  string,
+  StudioVrmCanonicalCreativeCommonsLicense
+>([
+  [
+    STUDIO_VRM_CC0_1_LICENSE_URL,
+    Object.freeze({
+      identifier: "CC0",
+      url: STUDIO_VRM_CC0_1_LICENSE_URL,
+      commercial: "allow",
+      modification: "allow-modification-redistribution",
+      redistribution: "allow",
+      credit: "unnecessary",
+      shareAlike: "not-required",
+    }),
+  ],
+  [
+    STUDIO_VRM_CC_BY_4_LICENSE_URL,
+    Object.freeze({
+      identifier: "CC_BY",
+      url: STUDIO_VRM_CC_BY_4_LICENSE_URL,
+      commercial: "allow",
+      modification: "allow-modification-redistribution",
+      redistribution: "allow",
+      credit: "required",
+      shareAlike: "not-required",
+    }),
+  ],
+  [
+    STUDIO_VRM_CC_BY_NC_4_LICENSE_URL,
+    Object.freeze({
+      identifier: "CC_BY_NC",
+      url: STUDIO_VRM_CC_BY_NC_4_LICENSE_URL,
+      commercial: "disallow",
+      modification: "allow-modification-redistribution",
+      redistribution: "allow",
+      credit: "required",
+      shareAlike: "not-required",
+    }),
+  ],
+]);
+
+function explicitVrm1CreativeCommonsLicense(
+  mandatoryLicenseUrl: string | null,
+  otherLicenseUrl: string | null,
+): StudioVrmCanonicalCreativeCommonsLicense | null {
+  if (mandatoryLicenseUrl !== STUDIO_VRM_1_PUBLIC_LICENSE_URL || !otherLicenseUrl) return null;
+  return STUDIO_VRM_CANONICAL_CREATIVE_COMMONS_LICENSES.get(otherLicenseUrl) ?? null;
+}
 
 function deepFreeze<T>(value: T): T {
   if (value !== null && typeof value === "object" && !Object.isFrozen(value)) {
@@ -801,6 +867,13 @@ function buildVrm1Receipt(
     `${basePath}.otherLicenseUrl`,
     writer.add
   );
+  // VRM 1.0 requires its public-license document in `licenseUrl`. A second, exact canonical
+  // Creative Commons URL is an explicit model license, not an opaque extra term. Anything else
+  // remains in `additionalLicenseUrl` and therefore continues to fail closed in outgoing policy.
+  const explicitCreativeCommonsLicense = explicitVrm1CreativeCommonsLicense(
+    licenseUrl,
+    otherLicenseUrl,
+  );
 
   const diagnostics = Object.freeze(writer.diagnostics.map((entry) => Object.freeze(entry)));
   return deepFreeze({
@@ -815,11 +888,12 @@ function buildVrm1Receipt(
     metadataJsonBytes,
     title,
     authors: Object.freeze(authors),
-    licenseIdentifier: licenseUrl === STUDIO_VRM_1_PUBLIC_LICENSE_URL
-      ? "VRM-Public-License-1.0"
-      : null,
-    licenseUrl,
-    additionalLicenseUrl: otherLicenseUrl,
+    licenseIdentifier: explicitCreativeCommonsLicense?.identifier
+      ?? (licenseUrl === STUDIO_VRM_1_PUBLIC_LICENSE_URL
+        ? "VRM-Public-License-1.0"
+        : null),
+    licenseUrl: explicitCreativeCommonsLicense?.url ?? licenseUrl,
+    additionalLicenseUrl: explicitCreativeCommonsLicense ? null : otherLicenseUrl,
     additionalPermissionUrl: null,
     avatarPermission: avatarPermissionRaw === undefined
       ? "only-author"
@@ -830,38 +904,42 @@ function buildVrm1Receipt(
           : avatarPermissionEnum === "everyone"
             ? "everyone"
             : "unknown",
-    commercial: commercialRaw === undefined
-      ? "personal-nonprofit"
-      : commercialEnum === "personalNonProfit"
+    commercial: explicitCreativeCommonsLicense?.commercial
+      ?? (commercialRaw === undefined
         ? "personal-nonprofit"
-        : commercialEnum === "personalProfit"
-          ? "personal-profit"
-          : commercialEnum === "corporation"
-            ? "corporation"
-            : "unknown",
-    modification: modificationRaw === undefined
-      ? "prohibited"
-      : modificationEnum === "prohibited"
+        : commercialEnum === "personalNonProfit"
+          ? "personal-nonprofit"
+          : commercialEnum === "personalProfit"
+            ? "personal-profit"
+            : commercialEnum === "corporation"
+              ? "corporation"
+              : "unknown"),
+    modification: explicitCreativeCommonsLicense?.modification
+      ?? (modificationRaw === undefined
         ? "prohibited"
-        : modificationEnum === "allowModification"
-          ? "allow-modification"
-          : modificationEnum === "allowModificationRedistribution"
-            ? "allow-modification-redistribution"
-            : "unknown",
-    redistribution: redistributionRaw === undefined
-      ? "disallow"
-      : redistribution === true
-        ? "allow"
-        : redistribution === false
-          ? "disallow"
-          : "unknown",
-    credit: creditRaw === undefined
-      ? "required"
-      : creditEnum === "required"
+        : modificationEnum === "prohibited"
+          ? "prohibited"
+          : modificationEnum === "allowModification"
+            ? "allow-modification"
+            : modificationEnum === "allowModificationRedistribution"
+              ? "allow-modification-redistribution"
+              : "unknown"),
+    redistribution: explicitCreativeCommonsLicense?.redistribution
+      ?? (redistributionRaw === undefined
+        ? "disallow"
+        : redistribution === true
+          ? "allow"
+          : redistribution === false
+            ? "disallow"
+            : "unknown"),
+    credit: explicitCreativeCommonsLicense?.credit
+      ?? (creditRaw === undefined
         ? "required"
-        : creditEnum === "unnecessary"
-          ? "unnecessary"
-          : "unknown",
+        : creditEnum === "required"
+          ? "required"
+          : creditEnum === "unnecessary"
+            ? "unnecessary"
+            : "unknown"),
     violent: violentRaw === undefined
       ? "disallow"
       : violent === true
@@ -891,7 +969,7 @@ function buildVrm1Receipt(
           ? "disallow"
           : "unknown",
     thirdPartyLicenses,
-    shareAlike: "not-required" as const,
+    shareAlike: explicitCreativeCommonsLicense?.shareAlike ?? "not-required" as const,
     rawIntent: {
       title: rawString(meta, "name"),
       authors: rawStringArray(meta, "authors"),

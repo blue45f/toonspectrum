@@ -5,6 +5,14 @@ import { VRMLoaderPlugin } from "@pixiv/three-vrm";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { describe, expect, it } from "vitest";
 
+import { STUDIO_VRM_CC0_1_LICENSE_URL as CC0_LICENSE_URL } from "./studio-vrm-license-metadata";
+import {
+  createStudioVrmRenderedPoseUseContextReceipt,
+  inspectStudioVrmLicenseAuthority,
+  planStudioVrmRenderedPoseMarketplaceShare,
+  prepareStudioVrmRenderedPoseMarketplaceAttestation,
+  STUDIO_VRM_RENDERED_POSE_PLATFORM_GRANT,
+} from "./studio-vrm-license-product-gate";
 import { validateVrmGlbBytes } from "./vrm-library";
 
 (globalThis as unknown as { self: typeof globalThis }).self = globalThis;
@@ -24,8 +32,6 @@ const ORIGINAL_VRM_FILES = [
   "TS_Dami_RescueCaptain.vrm",
   "TS_Moru_MossGolem.vrm",
 ] as const;
-
-const CC0_LICENSE_URL = "https://creativecommons.org/publicdomain/zero/1.0/";
 
 const REQUIRED_HUMANOID_BONES = [
   "hips",
@@ -215,4 +221,48 @@ describe("ToonSpectrum original Blender MCP VRM pack", () => {
       expect(vrm.humanoid.getNormalizedBoneNode(bone), `${fileName}: ${bone}`).not.toBeNull();
     }
   });
+
+  it.each(ORIGINAL_VRM_FILES)(
+    "%s maps its embedded CC0 declaration through the rendered-pose product gate",
+    (fileName) => {
+      const authority = inspectStudioVrmLicenseAuthority(embeddedJson(bundledBytes(fileName)));
+      expect(authority).toMatchObject({
+        status: "verified",
+        receipt: {
+          licenseIdentifier: "CC0",
+          licenseUrl: CC0_LICENSE_URL,
+          additionalLicenseUrl: null,
+        },
+      });
+      const attestation = prepareStudioVrmRenderedPoseMarketplaceAttestation(authority);
+      expect(attestation).toMatchObject({
+        ok: true,
+        attributionText: "",
+        creditRequired: false,
+      });
+      if (!attestation.ok) throw new Error(attestation.message);
+      const useContextReceipt = createStudioVrmRenderedPoseUseContextReceipt({
+        confirmedByUser: true,
+        avatarPermissionBasis: "other",
+        publisherKind: "corporation",
+        confirmedAttributionText: attestation.attributionText,
+        containsModifiedModel: true,
+        excessivelyViolent: "absent",
+        excessivelySexual: "absent",
+        politicalOrReligious: "absent",
+        antisocialOrHate: "absent",
+        shareAlike: "not-satisfied",
+      });
+
+      expect(planStudioVrmRenderedPoseMarketplaceShare(authority, {
+        useContextReceipt,
+        toonspectrumRenderedPoseGrant: STUDIO_VRM_RENDERED_POSE_PLATFORM_GRANT,
+      })).toMatchObject({
+        ok: true,
+        rightsConfirmed: true,
+        license: "cc0-1.0",
+        attributionText: "",
+      });
+    },
+  );
 });
