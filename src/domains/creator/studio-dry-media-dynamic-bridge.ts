@@ -151,17 +151,18 @@ const POINT_EPSILON = 1e-8;
  * Product lane counts are deliberately bounded below the full simulation's most expensive
  * presets, but never collapse a selected-width nib to one representative fibre.
  *
- * Crayon uses three connected wax fibres. The original reason was the polygon-union carrier,
- * where five lanes at crayon's dense spacing froze the live canvas; de-polygonising removed that
- * cost, and the long-stroke freeze gate now passes at five. The binding reason today is the mark
- * ceiling: a 3,000-sample crayon stroke plans 76,565 marks at five lanes against the 65,536
- * retained/SVG budget, so the tail of a long stroke would be truncated away. Three lanes leave
- * headroom while keeping a broad stick, O(source dabs) and prefix-stable. Raising the lane count
- * therefore costs drawing, not just frame time — re-measure both gates before touching it.
- * Charcoal / chalk / pastel stay at five for fibrous/mineral beds where spacing is already coarser.
+ * Every material runs its kernel's full native lane count. Crayon was briefly cut to three
+ * because a 3,000-sample stroke plans 76,565 marks at five lanes against a quoted 65,536 ceiling.
+ * That reasoning used the wrong ceiling: 65,536 is the per-segment budget, while a complete causal
+ * stroke is bounded by CAUSAL_CONTINUATION_MARK_BUDGET (16x that), so those 76,565 marks are drawn
+ * whole — measured, not inferred: the live renderer records all 76,565 with no accepted-prefix
+ * truncation, inside the same frame-time gates. What three lanes did buy was a defect: they map
+ * onto native fibres 0/2/4 and drop 1 and 3, leaving ~1.1px bare bands inside the stroke — the
+ * "too much white showing" the bed was reported for. See `depositionLinearize` in the kernel tip
+ * for the paired change that keeps the restored five-fibre bed off the half-tone band.
  */
 const PRODUCT_LANE_COUNT = Object.freeze({
-  crayon: 3,
+  crayon: 5,
   charcoal: 5,
   chalk: 5,
   pastel: 5,

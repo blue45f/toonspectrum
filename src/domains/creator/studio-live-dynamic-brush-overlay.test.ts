@@ -1700,7 +1700,12 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
     expect(totalAppendMs).toBeLessThan(750);
 
     expect(liveMarks.length).toBeGreaterThan(0);
-    expect(liveMarks.length).toBeLessThanOrEqual(65_536);
+    // Bounded by the complete-stroke ceiling, not the per-segment one: a 3,000-sample crayon
+    // plans 76,565 marks across its five native wax fibres and is drawn whole (the recorded count
+    // IS the planned count — no accepted-prefix truncation). The old 65,536 pin here was the
+    // per-segment budget, which this path never applied; three lanes merely happened to fit it.
+    expect(liveMarks.length)
+      .toBeLessThanOrEqual(STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET);
     const sealed = lastRenderer!.end(element);
     expect(sealed.status).toBe("settled");
   });

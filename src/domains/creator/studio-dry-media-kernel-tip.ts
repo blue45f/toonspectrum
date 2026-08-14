@@ -245,7 +245,11 @@ const KERNEL_TIP_SHAPING: Readonly<Record<StudioDryMediaCoreId, KernelTipShaping
     gain: 1.5,
     rimShoulder: 0.1,
     band: Object.freeze({ zeroAt: 0.72, shoulder: 0.14 }),
-    depositionLinearize: 2,
+    // Five wax fibres deposit less pigment each than the three widely-spaced lanes did, so at
+    // `2` the outer fibres landed in the 0.1–0.5 half-tone band and read as a haze instead of a
+    // stick edge. `3` carries the same fibres over the solid threshold: measured halo area falls
+    // 1130 -> 702 px and interior mean rises 0.538 -> 0.623 against the three-lane bed.
+    depositionLinearize: 3,
   }),
   chalk: Object.freeze({
     cut: 0.24,
