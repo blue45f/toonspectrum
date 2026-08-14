@@ -297,8 +297,8 @@ import {
   selectableWardrobeItemsBySlot,
   wardrobeItemById,
   selectableWardrobeSetById,
+  applyWardrobeItemSelection,
   applyWardrobeSet,
-  createWardrobeEquip,
   mergeWardrobeCostumeVisibility,
   parseWardrobeDocument,
   serializeWardrobe,
@@ -8470,17 +8470,7 @@ export function StudioVrmPoser({
   /* ── 실장착 워드로브 핸들러 ─────────────────────────────────────── */
   function equipWardrobeItem(slot: WardrobeSlot, itemId: string | null) {
     if (wardrobeMutationBlockedRef.current || isCapturing) return;
-    if (itemId) {
-      const equip = createWardrobeEquip(itemId);
-      if (!equip) return;
-      setWardrobeState((prev) => ({ ...prev, [slot]: equip }));
-    } else {
-      setWardrobeState((prev) => {
-        const next = { ...prev };
-        delete next[slot];
-        return next;
-      });
-    }
+    setWardrobeState((current) => applyWardrobeItemSelection(current, slot, itemId));
   }
 
   function updateWardrobeEquip(slot: WardrobeSlot, patch: Partial<WardrobeEquip>) {

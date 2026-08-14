@@ -1,4 +1,14 @@
 import {
+  loadStudioBg3dBundledEnvironmentSource,
+  releaseStudioBg3dBundledEnvironmentSource,
+} from
+  "./studio-bg3d-bundled-environment-loader";
+import {
+  STUDIO_BG3D_ENVIRONMENT_ASSETS,
+  getStudioBg3dEnvironmentAsset,
+  getStudioBg3dEnvironmentAssetByHash,
+} from "./studio-bg3d-environment-catalog";
+import {
   DEFAULT_STUDIO_BG3D_GLB_BUDGET_PROFILES,
   STUDIO_BG3D_GLB_MAX_BYTES,
   STUDIO_BG3D_GLB_MIME_TYPE,
@@ -155,7 +165,10 @@ export interface SampleBg3dModel {
   readonly id: string;
   readonly name: string;
   readonly url: string;
-  readonly format: Bg3dModelFormat;
+  readonly thumbnail: string;
+  readonly format: "glb";
+  readonly contentHash: `sha256:${string}`;
+  readonly byteSize: number;
 }
 
 interface Bg3dModelThumbnailRecord {
@@ -269,24 +282,92 @@ export class Bg3dModelLibraryError extends Error {
   }
 }
 
-// Bundled sample assets remain intentionally empty until both their binaries and commercial rights
-// have been audited. The types stay in place so a future audited bundle does not alter callers.
-export const SAMPLE_BG3D_MODELS: SampleBg3dModel[] = [];
+// First-party Blender 5.2 environments are authored by ToonSpectrum and released as CC0. Their
+// immutable hashes/sizes are checked before the existing BG3D validator and renderer admit them.
+export const SAMPLE_BG3D_MODELS: SampleBg3dModel[] =
+  STUDIO_BG3D_ENVIRONMENT_ASSETS.map((asset) => Object.freeze({
+    id: asset.id,
+    name: asset.name,
+    url: asset.url,
+    thumbnail: asset.thumbnailUrl,
+    format: "glb",
+    contentHash: asset.sha256,
+    byteSize: asset.byteSize,
+  }));
 export const SAMPLE_BG3D_MODEL_ENTRIES: Bg3dModelLibraryEntry[] = SAMPLE_BG3D_MODELS.map((sample) => ({
   id: sample.id,
   name: sample.name,
   format: sample.format,
   source: "sample",
-  thumbnail: null,
+  thumbnail: sample.thumbnail,
   createdAt: 0,
   updatedAt: 0,
-  status: "legacy-reimport-required",
-  canUse: false,
-  statusMessage: BG3D_MODEL_LEGACY_GLB_STATUS_MESSAGE,
-  contentHash: null,
-  byteSize: null,
-  commercialUse: false,
+  status: "verified",
+  canUse: true,
+  statusMessage: "ToonSpectrum CC0 번들 · GLB 안전 검사 후 원본 미터 크기로 배치됩니다.",
+  contentHash: sample.contentHash,
+  byteSize: sample.byteSize,
+  commercialUse: true,
 }));
+
+const bundledEnvironmentRecordPromiseById = new Map<
+  string,
+  Promise<Bg3dVerifiedStoredRecord>
+>();
+
+async function loadBundledEnvironmentRecord(
+  id: string,
+  signal?: AbortSignal,
+): Promise<Bg3dVerifiedStoredRecord | null> {
+  const asset = getStudioBg3dEnvironmentAsset(id);
+  if (!asset) return null;
+  throwIfBg3dOperationAborted(signal);
+  let pending = bundledEnvironmentRecordPromiseById.get(asset.id);
+  if (!pending) {
+    pending = loadStudioBg3dBundledEnvironmentSource(asset.id).then(async (source) => {
+      try {
+        return await prepareVerifiedBg3dModelRecord({
+          file: {
+            name: asset.fileName,
+            size: asset.byteSize,
+            type: source.mimeType,
+            arrayBuffer: () => Promise.resolve(
+              Uint8Array.from(source.bytes).buffer as ArrayBuffer,
+            ),
+          },
+          rights: {
+            status: "public-domain",
+            commercialUse: true,
+            attributionRequired: false,
+            licenseName: "CC0 1.0",
+          },
+          expectedSha256: asset.sha256,
+        }, {
+          // Passing the strictest product profile here means the catalog cannot claim usability for
+          // a bundled scene that only a desktop document can admit. Runtime admission still repeats
+          // validation against the active document's exact budgets.
+          profile: "mobile",
+          idFactory: () => asset.id,
+          now: 0,
+        });
+      } finally {
+        // The verified record owns its Blob. Retaining the deployment Uint8Array as well would
+        // double memory, and retaining a same-size/hash-mismatched response would make retries
+        // fail until a page reload even after the CDN is healthy again.
+        releaseStudioBg3dBundledEnvironmentSource(asset.id);
+      }
+    });
+    bundledEnvironmentRecordPromiseById.set(asset.id, pending);
+    void pending.catch(() => {
+      if (bundledEnvironmentRecordPromiseById.get(asset.id) === pending) {
+        bundledEnvironmentRecordPromiseById.delete(asset.id);
+      }
+    });
+  }
+  const record = await pending;
+  throwIfBg3dOperationAborted(signal);
+  return record;
+}
 
 /** Legacy detection stays broad so V1 records can be classified without deleting them. */
 export function detectBg3dModelFormat(fileName: string): Bg3dModelFormat | null {
@@ -925,7 +1006,8 @@ export function withDefaultBg3dModelEntry(
   const sampleEntries = SAMPLE_BG3D_MODEL_ENTRIES.map((entry) => ({
     ...entry,
     thumbnail: normalizeStudioBg3dModelThumbnailDataUrl(thumbnails[entry.id])
-      ?? normalizeStudioBg3dModelThumbnailDataUrl(entry.thumbnail),
+      ?? normalizeStudioBg3dModelThumbnailDataUrl(entry.thumbnail)
+      ?? entry.thumbnail,
   }));
   const uploadedEntries = storedModels
     .filter(isBaseStoredRecord)
@@ -1821,10 +1903,12 @@ export async function listStoredBg3dModelsV12(
 
 export async function getStoredBg3dModelByHashV12(
   hash: string,
-  options: Bg3dModelV12StorageOptions = {},
+  options: Bg3dModelV12StorageOptions & Bg3dModelDatabaseOperationOptions = {},
 ): Promise<Bg3dVerifiedStoredRecord | null> {
   const canonicalHash = canonicalizeBg3dModelHash(hash);
   if (!canonicalHash) return null;
+  const bundled = getStudioBg3dEnvironmentAssetByHash(canonicalHash);
+  if (bundled) return loadBundledEnvironmentRecord(bundled.id, options.signal);
   const authority = v12Authority(options);
   const manifest = parseV12ModelManifest(await authority.readManifest("models"));
   const record = manifest.records.find(({ contentHash }) => contentHash === canonicalHash);
@@ -1850,6 +1934,13 @@ export async function resolveBg3dModelHashV12(
   const canonicalHash = canonicalizeBg3dModelHash(hash);
   if (!canonicalHash) return { record: null, deletionReceipt: null };
   throwIfBg3dOperationAborted(options.signal);
+  const bundled = getStudioBg3dEnvironmentAssetByHash(canonicalHash);
+  if (bundled) {
+    return {
+      record: await loadBundledEnvironmentRecord(bundled.id, options.signal),
+      deletionReceipt: null,
+    };
+  }
   const authority = v12Authority(options);
   const manifest = parseV12ModelManifest(await authority.readManifest("models"));
   const stored = manifest.records.find(({ contentHash }) => contentHash === canonicalHash);
@@ -1967,9 +2058,11 @@ export function saveUploadedBg3dModelV12(
 
 export async function getStoredBg3dModelV12(
   id: string,
-  options: Bg3dModelV12StorageOptions = {},
+  options: Bg3dModelV12StorageOptions & Bg3dModelDatabaseOperationOptions = {},
 ): Promise<Bg3dVerifiedStoredRecord | null> {
   if (!isSafeBg3dModelStorageId(id)) return null;
+  const bundled = await loadBundledEnvironmentRecord(id, options.signal);
+  if (bundled) return bundled;
   const authority = v12Authority(options);
   const manifest = parseV12ModelManifest(await authority.readManifest("models"));
   const record = manifest.records.find((candidate) => candidate.id === id);

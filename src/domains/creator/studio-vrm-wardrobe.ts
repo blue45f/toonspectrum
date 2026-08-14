@@ -366,18 +366,12 @@ const WARDROBE_ITEM_BASES: readonly WardrobeItemBase[] = [
  * 문서는 계속 파싱·렌더링할 수 있지만, 신규 선택 화면에서는 replacementId로
  * 치환한다. 의상 이름을 통한 휴리스틱은 의도적으로 사용하지 않는다.
  */
-export const LEGACY_WARDROBE_REPLACEMENTS: Readonly<Record<string, string>> = {
-  tank: "shirt",
-  tshirt: "shirt",
-  shorts: "jeans",
-  scrubs: "shirt",
-  sailor: "shirt",
-  dress: "sweater",
-  cardigan: "blazer",
-  pants: "jeans",
-  wide: "jeans",
-  scrubpants: "jeans",
-};
+/**
+ * Wave 3에서 이전 저품질 10종을 본 추종형 다중 파츠로 다시 제작했다. 과거 문서의
+ * ID를 바꾸지 않고 원본 아이템 자체를 승격했으므로 신규 선택 시 대체가 필요 없다.
+ * 이후 품질 감사에서 격리가 필요한 항목이 생기면 이 명시적 맵에만 추가한다.
+ */
+export const LEGACY_WARDROBE_REPLACEMENTS: Readonly<Record<string, string>> = {};
 
 export const WARDROBE_ITEMS: readonly WardrobeItemDef[] = WARDROBE_ITEM_BASES.map(
   (item) => {
@@ -507,6 +501,13 @@ function normalizeWardrobeEquip(slot: WardrobeSlot, raw: unknown): WardrobeEquip
   };
 }
 
+function normalizeWardrobeSlotOccupancy(slots: WardrobeState): void {
+  // A dress occupies both upper- and lower-body space. Old/shared documents could contain a dress
+  // and bottoms simultaneously; prefer the full-body garment deterministically so restoring the
+  // document cannot recreate overlapping meshes.
+  if (slots.top?.itemId === "dress") delete slots.bottom;
+}
+
 /**
  * Parses both the old v1 slot-only payload and the authored v2 document. Runtime diagnostics,
  * measured body data, and derived visibility never enter this document.
@@ -537,6 +538,7 @@ export function parseWardrobeDocument(raw: unknown): ParsedWardrobeDocument {
     const equip = normalizeWardrobeEquip(slot, (slotsRaw as Record<string, unknown>)[slot]);
     if (equip) slots[slot] = equip;
   }
+  normalizeWardrobeSlotOccupancy(slots);
 
   const optionsRaw = root.options && typeof root.options === "object"
     ? root.options as { autoHideOriginal?: unknown }
@@ -559,13 +561,13 @@ export function serializeWardrobe(
   options: WardrobeOptions = DEFAULT_WARDROBE_OPTIONS,
 ): SerializedWardrobe | undefined {
   const slots: WardrobeState = {};
-  let count = 0;
   for (const slot of WARDROBE_SLOTS) {
     const equip = normalizeWardrobeEquip(slot, state[slot]);
     if (!equip) continue;
     slots[slot] = { ...equip };
-    count += 1;
   }
+  normalizeWardrobeSlotOccupancy(slots);
+  const count = WARDROBE_SLOTS.reduce((total, slot) => total + (slots[slot] ? 1 : 0), 0);
   const normalizedOptions: WardrobeOptions = {
     autoHideOriginal: options.autoHideOriginal !== false,
   };
@@ -586,6 +588,29 @@ export function createWardrobeEquip(itemId: string): WardrobeEquip | null {
     fitMode: "auto",
     fabricId: def.defaultFabricId,
   };
+}
+
+/**
+ * 신규 선택 UI의 단일 슬롯 변경을 정규화한다. 원피스는 상·하의를 함께 차지하므로 원피스를
+ * 고르면 하의를, 원피스 위에서 하의를 고르면 원피스를 해제해 겹친 메시를 만들지 않는다.
+ * 저장·공유 문서 파서에도 같은 점유 규칙을 적용해 과거의 중첩 상태가 다시 나타나지 않게 한다.
+ */
+export function applyWardrobeItemSelection(
+  current: WardrobeState,
+  slot: WardrobeSlot,
+  itemId: string | null,
+): WardrobeState {
+  const next: WardrobeState = { ...current };
+  if (!itemId) {
+    delete next[slot];
+    return next;
+  }
+  const equip = createWardrobeEquip(itemId);
+  if (!equip || wardrobeItemById(itemId)?.slot !== slot) return current;
+  next[slot] = equip;
+  if (itemId === "dress") delete next.bottom;
+  else if (slot === "bottom" && next.top?.itemId === "dress") delete next.top;
+  return next;
 }
 
 /* ── 테마 세트(원클릭 코디) ──────────────────────────────────────────── */
@@ -720,6 +745,11 @@ export type GarmentShape =
 export interface GarmentPart {
   bone: WardrobeBone;
   shape: GarmentShape;
+  /**
+   * 골반에 매단 원통형 치마는 이 모드에서 밑단으로 갈수록 좌우 허벅지 본을 함께 따른다.
+   * 생략한 파츠는 기존 관절 체인 웨이트 규칙을 그대로 사용한다.
+   */
+  skinMode?: "lower-body-drape";
   /** 본 로컬 오프셋(미터). */
   offset: Vec3;
   /** 도형의 +Y축을 이 방향(본 로컬 단위 벡터)으로 정렬. 생략 시 그대로. */
@@ -808,6 +838,7 @@ function skirtCone(
   const rBottom = rTop * opts.flare;
   return {
     bone: "hips",
+    skinMode: "lower-body-drape",
     // A slightly eased hem reads as cloth instead of a rigid traffic cone while retaining a
     // deterministic, inexpensive surface that can follow the hips bone in every browser.
     shape: {
@@ -1010,11 +1041,57 @@ export function buildGarmentParts(itemId: string, metricsRaw: WardrobeMetrics, f
       break;
     }
     case "cardigan": {
+      const fwd = m.footForward.left;
       parts.push(torsoShell(m, { rMul: 1.1 * f, bottomExt: 3.1, roughness: 0.92 }));
       for (const s of SIDES) {
         parts.push(limbSleeve(s === "left" ? "leftUpperArm" : "rightUpperArm", m.upperArm[s], { coverage: 1.0, r: armR(s, 1.3), roughness: 0.92 }));
         parts.push(limbSleeve(s === "left" ? "leftLowerArm" : "rightLowerArm", m.lowerArm[s], { coverage: 0.92, r: armR(s, 1.18), roughness: 0.92 }));
+        parts.push({
+          bone: s === "left" ? "leftLowerArm" : "rightLowerArm",
+          shape: { kind: "torus", r: armR(s, 1.12), tube: 0.009 },
+          offset: scaleVec(m.lowerArm[s].axis, m.lowerArm[s].len * 0.88),
+          align: m.lowerArm[s].axis,
+          roughness: 0.94,
+        });
       }
+      // 열린 앞섶, 골지 밑단, 포켓과 단추를 분리해 블레이저와 다른 니트 실루엣을 만든다.
+      for (const side of [-1, 1] as const) {
+        parts.push({
+          bone: "spine",
+          shape: { kind: "box", w: m.shoulderW * 0.2, h: m.spineToNeck * 0.82, d: 0.018 },
+          offset: addVec(
+            addVec(scaleVec(m.up, m.spineToNeck * 0.18), scaleVec(fwd, m.shoulderW * 0.53 * f)),
+            [side * m.shoulderW * 0.13, 0, 0],
+          ),
+          roughness: 0.94,
+        });
+        parts.push({
+          bone: "spine",
+          shape: { kind: "box", w: m.shoulderW * 0.18, h: m.hipsToSpine * 0.35, d: 0.022 },
+          offset: addVec(
+            addVec(scaleVec(m.up, -m.hipsToSpine * 0.76), scaleVec(fwd, m.shoulderW * 0.55 * f)),
+            [side * m.shoulderW * 0.18, 0, 0],
+          ),
+          roughness: 0.94,
+        });
+      }
+      for (const y of [0.38, 0.12, -0.14] as const) {
+        parts.push({
+          bone: "spine",
+          shape: { kind: "sphere", r: 0.012 },
+          offset: addVec(scaleVec(m.up, m.spineToNeck * y), scaleVec(fwd, m.shoulderW * 0.57 * f)),
+          color: "#d6b98c",
+          roughness: 0.72,
+        });
+      }
+      parts.push({
+        bone: "hips",
+        shape: { kind: "torus", r: Math.max(m.hipW, m.shoulderW * 0.43) * f, tube: 0.014 },
+        offset: scaleVec(m.up, m.hipsToSpine * 0.48),
+        align: m.up,
+        squash: [1, 1, 0.84],
+        roughness: 0.94,
+      });
       break;
     }
     case "armor": {
@@ -1054,10 +1131,19 @@ export function buildGarmentParts(itemId: string, metricsRaw: WardrobeMetrics, f
       break;
     }
     case "tshirt": {
+      const fwd = m.footForward.left;
       parts.push(torsoShell(m, { rMul: 1.04 * f, roughness: 0.82 }));
       for (const s of SIDES) {
         parts.push(limbSleeve(s === "left" ? "leftUpperArm" : "rightUpperArm", m.upperArm[s], { coverage: 0.42, r: armR(s, 1.26), roughness: 0.82 }));
       }
+      parts.push({ bone: "spine", shape: { kind: "torus", r: m.shoulderW * 0.23, tube: 0.012 }, offset: scaleVec(m.up, m.spineToNeck * 0.91), align: m.up, squash: [1, 1, 0.74], roughness: 0.86 });
+      parts.push({ bone: "hips", shape: { kind: "torus", r: Math.max(m.hipW, m.shoulderW * 0.42) * f, tube: 0.011 }, offset: scaleVec(m.up, m.hipsToSpine * 0.5), align: m.up, squash: [1, 1, 0.84], roughness: 0.86 });
+      parts.push({
+        bone: "spine",
+        shape: { kind: "box", w: m.shoulderW * 0.16, h: m.spineToNeck * 0.16, d: 0.012 },
+        offset: addVec(addVec(scaleVec(m.up, m.spineToNeck * 0.38), scaleVec(fwd, m.shoulderW * 0.54 * f)), [m.shoulderW * 0.15, 0, 0]),
+        roughness: 0.86,
+      });
       break;
     }
     case "scrubs": {
@@ -1076,6 +1162,25 @@ export function buildGarmentParts(itemId: string, metricsRaw: WardrobeMetrics, f
         ),
         roughness: 0.84,
       });
+      for (const side of [-1, 1] as const) {
+        parts.push({
+          bone: "spine",
+          shape: { kind: "box", w: m.shoulderW * 0.2, h: m.hipsToSpine * 0.36, d: 0.015 },
+          offset: addVec(
+            addVec(scaleVec(m.up, -m.hipsToSpine * 0.72), scaleVec(fwd, m.shoulderW * 0.55 * f)),
+            [side * m.shoulderW * 0.18, 0, 0],
+          ),
+          roughness: 0.86,
+        });
+      }
+      parts.push({
+        bone: "spine",
+        shape: { kind: "box", w: m.shoulderW * 0.045, h: m.spineToNeck * 0.28, d: 0.014 },
+        offset: addVec(scaleVec(m.up, m.spineToNeck * 0.68), scaleVec(fwd, m.shoulderW * 0.57 * f)),
+        color: "#d1fae5",
+        roughness: 0.8,
+      });
+      parts.push({ bone: "hips", shape: { kind: "torus", r: Math.max(m.hipW, m.shoulderW * 0.43) * f, tube: 0.011 }, offset: scaleVec(m.up, m.hipsToSpine * 0.46), align: m.up, squash: [1, 1, 0.84], roughness: 0.86 });
       break;
     }
     case "shirt": {
@@ -1131,10 +1236,47 @@ export function buildGarmentParts(itemId: string, metricsRaw: WardrobeMetrics, f
         color: "#d8475e",
         roughness: 0.8,
       });
+      parts.push({
+        bone: "spine",
+        shape: { kind: "box", w: m.shoulderW * 0.48, h: m.spineToNeck * 0.2, d: 0.014 },
+        offset: addVec(scaleVec(m.up, m.spineToNeck * 0.72), scaleVec(fwd, m.shoulderW * 0.57 * f)),
+        color: "#2b3a5e",
+        roughness: 0.82,
+      });
+      parts.push({
+        bone: "spine",
+        shape: { kind: "sphere", r: m.shoulderW * 0.075 },
+        offset: addVec(scaleVec(m.up, m.spineToNeck * 0.59), scaleVec(fwd, m.shoulderW * 0.62 * f)),
+        squash: [1.35, 0.65, 0.42],
+        color: "#d8475e",
+        roughness: 0.82,
+      });
+      for (const s of SIDES) {
+        parts.push({
+          bone: s === "left" ? "leftUpperArm" : "rightUpperArm",
+          shape: { kind: "torus", r: armR(s, 1.22), tube: 0.009 },
+          offset: scaleVec(m.upperArm[s].axis, m.upperArm[s].len * 0.43),
+          align: m.upperArm[s].axis,
+          color: "#2b3a5e",
+          roughness: 0.82,
+        });
+      }
       break;
     }
     case "tank": {
+      const fwd = m.footForward.left;
       parts.push(torsoShell(m, { rMul: 1.06 * f, topExt: 0.82, roughness: 0.82 }));
+      parts.push({ bone: "spine", shape: { kind: "torus", r: m.shoulderW * 0.24, tube: 0.014 }, offset: scaleVec(m.up, m.spineToNeck * 0.81), align: m.up, squash: [1, 1, 0.74], roughness: 0.86 });
+      for (const side of [-1, 1] as const) {
+        parts.push({
+          bone: "spine",
+          shape: { kind: "torus", r: m.shoulderW * 0.17, tube: 0.012, arc: Math.PI },
+          offset: addVec(addVec(scaleVec(m.up, m.spineToNeck * 0.69), scaleVec(fwd, m.shoulderW * 0.42)), [side * m.shoulderW * 0.35, 0, 0]),
+          align: m.up,
+          roughness: 0.86,
+        });
+      }
+      parts.push({ bone: "hips", shape: { kind: "torus", r: Math.max(m.hipW, m.shoulderW * 0.43) * f, tube: 0.011 }, offset: scaleVec(m.up, m.hipsToSpine * 0.48), align: m.up, squash: [1, 1, 0.84], roughness: 0.86 });
       break;
     }
     case "dress": {
@@ -1144,6 +1286,17 @@ export function buildGarmentParts(itemId: string, metricsRaw: WardrobeMetrics, f
       for (const s of SIDES) {
         parts.push(limbSleeve(s === "left" ? "leftUpperArm" : "rightUpperArm", m.upperArm[s], { coverage: 0.3, r: armR(s, 1.3), roughness: 0.8 }));
       }
+      parts.push({ bone: "spine", shape: { kind: "torus", r: m.shoulderW * 0.25, tube: 0.012 }, offset: scaleVec(m.up, m.spineToNeck * 0.91), align: m.up, squash: [1, 1, 0.76], roughness: 0.74 });
+      parts.push({ bone: "hips", shape: { kind: "torus", r: Math.max(m.hipW, m.shoulderW * 0.43) * f, tube: 0.018 }, offset: scaleVec(m.up, m.hipsToSpine * 0.52), align: m.up, squash: [1, 1, 0.86], color: "#d4af37", roughness: 0.42, metalness: 0.25 });
+      parts.push({
+        bone: "hips",
+        skinMode: "lower-body-drape",
+        shape: { kind: "torus", r: Math.max(m.hipW, m.shoulderW * 0.43) * 1.85 * f, tube: 0.016 },
+        offset: scaleVec(m.up, m.hipsToSpine * 0.55 - skirtLen * 0.96),
+        align: m.up,
+        squash: [1, 1, 0.88],
+        roughness: 0.72,
+      });
       break;
     }
     case "pleated": {
@@ -1158,16 +1311,32 @@ export function buildGarmentParts(itemId: string, metricsRaw: WardrobeMetrics, f
       break;
     }
     case "shorts": {
+      const fwd = m.footForward.left;
       parts.push(skirtCone(m, { len: m.hipsToSpine * 1.15, rTopMul: f, flare: 1.05 }));
       for (const s of SIDES) {
         parts.push(limbSleeve(s === "left" ? "leftUpperLeg" : "rightUpperLeg", m.upperLeg[s], { coverage: 0.42, r: legR(s, 1.26), roughness: 0.75 }));
+        parts.push({
+          bone: s === "left" ? "leftUpperLeg" : "rightUpperLeg",
+          shape: { kind: "torus", r: legR(s, 1.22), tube: 0.01 },
+          offset: scaleVec(m.upperLeg[s].axis, m.upperLeg[s].len * 0.41),
+          align: m.upperLeg[s].axis,
+          roughness: 0.78,
+        });
+        parts.push({
+          bone: "hips",
+          shape: { kind: "box", w: m.hipW * 0.28, h: m.hipsToSpine * 0.3, d: 0.014 },
+          offset: addVec(addVec(scaleVec(m.up, m.hipsToSpine * 0.06), scaleVec(fwd, m.hipW * 1.02 * f)), [s === "left" ? m.hipW * 0.48 : -m.hipW * 0.48, 0, 0]),
+          roughness: 0.78,
+        });
       }
+      parts.push({ bone: "hips", shape: { kind: "torus", r: Math.max(m.hipW, m.shoulderW * 0.42) * f, tube: 0.015 }, offset: scaleVec(m.up, m.hipsToSpine * 0.53), align: m.up, squash: [1, 1, 0.84], roughness: 0.78 });
       break;
     }
     case "pants":
     case "scrubpants":
     case "jeans":
     case "wide": {
+      const fwd = m.footForward.left;
       const flare = def.id === "wide" ? 1.55 : 1.02;
       const rMul = def.id === "wide" ? 1.3 : 1.16;
       const rough = def.id === "jeans" ? 0.9 : 0.72;
@@ -1194,7 +1363,29 @@ export function buildGarmentParts(itemId: string, metricsRaw: WardrobeMetrics, f
             roughness: 0.9,
           });
         }
+        if (def.id === "wide" || def.id === "scrubpants") {
+          parts.push({
+            bone: s === "left" ? "leftLowerLeg" : "rightLowerLeg",
+            shape: { kind: "torus", r: legR(s, rMul * flare * 0.86), tube: 0.011 },
+            offset: scaleVec(m.lowerLeg[s].axis, m.lowerLeg[s].len * 0.9),
+            align: m.lowerLeg[s].axis,
+            roughness: rough,
+          });
+        }
+        parts.push({
+          bone: "hips",
+          shape: { kind: "box", w: m.hipW * 0.24, h: m.hipsToSpine * 0.28, d: 0.014 },
+          offset: addVec(addVec(scaleVec(m.up, m.hipsToSpine * 0.08), scaleVec(fwd, m.hipW * 1.04 * f)), [s === "left" ? m.hipW * 0.5 : -m.hipW * 0.5, 0, 0]),
+          roughness: rough,
+        });
       }
+      parts.push({ bone: "hips", shape: { kind: "torus", r: Math.max(m.hipW, m.shoulderW * 0.42) * f, tube: 0.015 }, offset: scaleVec(m.up, m.hipsToSpine * 0.53), align: m.up, squash: [1, 1, 0.84], roughness: rough });
+      parts.push({
+        bone: "hips",
+        shape: { kind: "box", w: 0.018, h: m.hipsToSpine * 0.46, d: 0.016 },
+        offset: addVec(scaleVec(m.up, -m.hipsToSpine * 0.03), scaleVec(fwd, m.hipW * 1.07 * f)),
+        roughness: rough,
+      });
       break;
     }
     case "sneakers":

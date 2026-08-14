@@ -271,6 +271,33 @@ describe("스마트 anchor wrapper", () => {
     expect(legacyResult.rotationDeg).toEqual([0, 0, -90]);
   });
 
+  it("Wave 3 검·총·요술봉의 실제 -Z 끝점은 손가락 소켓 전방을 향한다", () => {
+    const metrics = measureVrmPropRigMetrics(createMeasuredVrm());
+    for (const id of [
+      "blender_cyber_katana",
+      "blender_medieval_greatsword",
+      "blender_cyber_sniper_rifle",
+      "blender_magic_wand_staff",
+      "blender_scifi_laser_gun",
+    ]) {
+      const def = propDefById(id)!;
+      const instance = createPropInstance(id, `direction-${id}`)!;
+      const result = resolvePropAttachment(def, instance, metrics);
+      const wrapperRotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(
+        THREE.MathUtils.degToRad(result.rotationDeg[0]),
+        THREE.MathUtils.degToRad(result.rotationDeg[1]),
+        THREE.MathUtils.degToRad(result.rotationDeg[2]),
+        "XYZ",
+      ));
+      const semanticForward = new THREE.Vector3(0, 0, -1).applyQuaternion(wrapperRotation);
+      const socket = metrics.handSockets[instance.bone as "leftHand" | "rightHand"];
+      const socketForward = new THREE.Vector3(0, 0, 1).applyQuaternion(
+        new THREE.Quaternion(...socket.rotationQuaternion),
+      );
+      expect(semanticForward.dot(socketForward), id).toBeGreaterThan(0.999);
+    }
+  });
+
   it("오른손 프리셋을 왼손에 붙이면 delta와 회전이 좌우 미러된다", () => {
     const def = propDefById("sword")!;
     const instance = createPropInstance("sword", "left-sword")!;

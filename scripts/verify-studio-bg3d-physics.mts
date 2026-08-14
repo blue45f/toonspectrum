@@ -245,9 +245,22 @@ async function waitForElementAnimations(locator: Locator): Promise<void> {
   });
 }
 
+async function dismissQuickStartIfPresent(page: Page): Promise<void> {
+  const backdrop = page.locator('[data-studio-quickstart-backdrop="true"]');
+  try {
+    await backdrop.waitFor({ state: "visible", timeout: 2_000 });
+  } catch {
+    return;
+  }
+  const dismiss = page.locator('[data-studio-quickstart-dismiss="true"]');
+  await dismiss.click();
+  await backdrop.waitFor({ state: "hidden", timeout: 5_000 });
+}
+
 async function openDesktopBackground3d(page: Page): Promise<Locator> {
   const mainMenu = page.locator('[data-studio-main-menu="true"]');
   await mainMenu.waitFor({ state: "visible", timeout: 20_000 });
+  await dismissQuickStartIfPresent(page);
   await mainMenu.getByRole("menuitem", { name: "3D", exact: true }).click();
   const threeDMenu = page.locator('[role="menu"][aria-label="3D"]');
   await threeDMenu.waitFor({ state: "visible", timeout: 5_000 });
@@ -256,6 +269,7 @@ async function openDesktopBackground3d(page: Page): Promise<Locator> {
 }
 
 async function openMobileBackground3d(page: Page): Promise<Locator> {
+  await dismissQuickStartIfPresent(page);
   const editor = page.locator('[data-studio-editor="true"]');
   await poll(
     "default mobile immersive editor",

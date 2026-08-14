@@ -33,3 +33,39 @@ CC0 원문: <https://creativecommons.org/publicdomain/zero/1.0/>
 | `adaptive_power_wheelchair.glb` | 풋레스트·조이스틱을 갖춘 전동 휠체어 | 0.68 × 1.03 × 1.05 m | CC0 1.0 |
 
 ToonSpectrum은 위 6개 원본 모델도 **CC0 1.0**으로 제공합니다.
+
+## ToonSpectrum 매핑 소품 고품질 팩 v3
+
+아래 21개 GLB는 ToonSpectrum이 Blender 5.2와
+`scripts/blender/generate_mapped_props_pack_v3.py`로 직접 재제작한 절차형 에셋입니다.
+기존 직렬화 ID와 URL을 깨지 않도록 파일명을 그대로 유지하면서, 단일 프리미티브 수준의
+초안을 이름 있는 다중 부품, 베벨 실루엣, 4개 이상의 PBR 재질과 자체 포함 바이너리로
+교체했습니다. 외부 모델·텍스처·버퍼 URI는 사용하지 않았습니다.
+
+| 파일 | 에셋 | 기준 크기 | 라이선스 |
+| --- | --- | --- | --- |
+| `cyber_katana.glb` | 플라즈마 날·그립 랩 사이버 카타나 | 0.32 × 1.72 × 0.12 m | CC0 1.0 |
+| `magic_staff_crystal.glb` | 궤도 링·수정 코어 마법 지팡이 | 0.31 × 0.31 × 1.86 m | CC0 1.0 |
+| `scifi_drone_bot.glb` | 4기 리프트 링 탐사 드론 | 0.90 × 0.78 × 0.49 m | CC0 1.0 |
+| `neom_bench_prop.glb` | 카본 패널·네온 프레임 벤치 | 1.98 × 0.68 × 1.04 m | CC0 1.0 |
+| `cyber_helmet_visor.glb` | HUD·센서 모듈 사이버 바이저 | 0.37 × 0.25 × 0.18 m | CC0 1.0 |
+| `hologram_tablet.glb` | 투영 코어·양손 그립 홀로 태블릿 | 0.45 × 0.17 × 0.27 m | CC0 1.0 |
+| `ancient_rune_shield.glb` | 룬 원·후면 손잡이 고대 방패 | 0.80 × 0.66 × 0.18 m | CC0 1.0 |
+| `arcade_game_cabinet.glb` | CRT·조이스틱·코인 도어 게임기 | 0.82 × 0.82 × 1.84 m | CC0 1.0 |
+| `medieval_greatsword.glb` | 풀러·룬·가드 대검 | 0.76 × 2.09 × 0.18 m | CC0 1.0 |
+| `cyberpunk_hoverbike.glb` | 4기 리프트 포드 호버바이크 | 1.12 × 2.02 × 0.87 m | CC0 1.0 |
+| `cyber_sniper_rifle.glb` | 광학 조준경·양각대 저격 소총 | 0.50 × 2.48 × 0.78 m | CC0 1.0 |
+| `fantasy_magic_wand_staff.glb` | 오각 별·궤도 링 요술봉 | 0.40 × 1.24 × 0.40 m | CC0 1.0 |
+| `steampunk_airship.glb` | 곤돌라·엔진·프로펠러 비행선 | 1.12 × 2.30 × 1.40 m | CC0 1.0 |
+| `cyberpunk_motorcycle.glb` | 네온 림·엔진·포크 모터사이클 | 0.78 × 2.10 × 0.93 m | CC0 1.0 |
+| `scifi_laser_gun.glb` | 플라즈마 코일·센서 레이저 건 | 0.32 × 1.65 × 0.58 m | CC0 1.0 |
+| `magic_grimoire.glb` | 금속 모서리·룬·소울 젬 마도서 | 0.46 × 0.56 × 0.15 m | CC0 1.0 |
+| `medieval_shield.glb` | 철제 면·문장·후면 손잡이 방패 | 0.76 × 0.20 × 1.04 m | CC0 1.0 |
+| `street_lamp.glb` | 쌍등·유리 글로브 도시 가로등 | 1.30 × 0.58 × 3.34 m | CC0 1.0 |
+| `royal_throne.glb` | 벨벳 쿠션·왕관 장식 황실 왕좌 | 1.20 × 1.00 × 2.22 m | CC0 1.0 |
+| `crystal_orb.glb` | 이중 궤도·수정 코어 마법 수정구 | 0.54 × 0.54 × 0.59 m | CC0 1.0 |
+| `tactical_helmet.glb` | 장갑판·카메라·통신 모듈 헬멧 | 0.43 × 0.48 × 0.43 m | CC0 1.0 |
+
+`neom_bench_prop.glb`의 `neom` 표기는 기존 앱 매핑과 저장된 프로젝트의 URL 호환성을
+유지하기 위해 그대로 둔 파일명입니다. ToonSpectrum은 위 21개 원본 모델도
+**CC0 1.0**으로 제공합니다.

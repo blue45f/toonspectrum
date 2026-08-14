@@ -210,7 +210,8 @@ describe("BG3D shared SQLite/OPFS product authority", () => {
     expect(manifest).not.toContain("data:image/");
     expect([...fileSystem.snapshot().keys()].filter((path) => path.startsWith("blobs/")))
       .toHaveLength(2);
-    expect((await listBg3dModelLibraryEntriesV12({ authority }))[0]).toMatchObject({
+    expect((await listBg3dModelLibraryEntriesV12({ authority }))
+      .find(({ id }) => id === "model-hero")).toMatchObject({
       id: "model-hero",
       source: "sqlite-opfs",
       status: "verified",

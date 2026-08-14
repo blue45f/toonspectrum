@@ -185,6 +185,7 @@ import {
   STUDIO_BG3D_ICON_BUTTON as ICON_BUTTON,
   studioBg3dClassNames as cx,
 } from "./studio-bg3d-editor-ui";
+import { isStudioBg3dEnvironmentAssetId } from "./studio-bg3d-environment-catalog";
 import {
   advanceStudioBg3dFrameQuality,
   createStudioBg3dFrameQualityState,
@@ -4529,7 +4530,10 @@ export function StudioBackground3D({
       ?? parseStudioGeneric3dWorkflowMetadata(existingAttachment)?.classification
       ?? null;
     const attachment = withStudioGeneric3dWorkflowMetadata(
-      existingAttachment ?? await createStudioBg3dModelAttachment(record),
+      existingAttachment ?? await createStudioBg3dModelAttachment(
+        record,
+        isStudioBg3dEnvironmentAssetId(record.id) ? { source: "bundled" } : {},
+      ),
       { sourceFormat, classification },
     );
     const live = physicsRuntimeSourceRef.current;

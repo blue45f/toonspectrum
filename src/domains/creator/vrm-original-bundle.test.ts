@@ -19,6 +19,10 @@ const ORIGINAL_VRM_FILES = [
   "cyber_agent_zero.vrm",
   "TS_Seojin_Architect.vrm",
   "TS_Mira_Detective.vrm",
+  "TS_Okseon_HanjiArchivist.vrm",
+  "TS_Nuri_RobotClub.vrm",
+  "TS_Dami_RescueCaptain.vrm",
+  "TS_Moru_MossGolem.vrm",
 ] as const;
 
 const CC0_LICENSE_URL = "https://creativecommons.org/publicdomain/zero/1.0/";
@@ -161,7 +165,7 @@ describe("ToonSpectrum original Blender MCP VRM pack", () => {
       const binds = (expression as JsonRecord).morphTargetBinds;
       return Array.isArray(binds) && binds.length > 0;
     });
-    expect(nonEmptyPresets.length).toBeGreaterThanOrEqual(10);
+    expect(nonEmptyPresets.length).toBeGreaterThanOrEqual(13);
 
     const targetNames = meshes.flatMap((mesh) => {
       const extras = mesh.extras as { targetNames?: string[] } | undefined;

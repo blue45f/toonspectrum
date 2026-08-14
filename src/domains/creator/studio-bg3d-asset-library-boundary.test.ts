@@ -45,7 +45,11 @@ describe("Studio BG3D asset-library ownership boundary", () => {
   it("keeps the leaf panel renderer-free and prevents a reverse editor import", () => {
     const imports = moduleImports("./StudioBg3dAssetLibraryPanel.tsx");
 
-    expect(imports.valueImports).toEqual(["lucide-react", "react"]);
+    expect(imports.valueImports).toEqual([
+      "lucide-react",
+      "react",
+      "./studio-bg3d-environment-catalog",
+    ]);
     expect(imports.typeImports).toEqual(["./bg3d-model-library"]);
     expect(imports.dynamicImports).toEqual(["./studio-bg3d-canonical-glb-download"]);
     expect([...imports.valueImports, ...imports.typeImports]).not.toContain("./StudioBackground3D");

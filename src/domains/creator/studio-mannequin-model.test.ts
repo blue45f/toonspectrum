@@ -5,6 +5,7 @@ import {
   STUDIO_MANNEQUIN_DEFAULT_BODY_PARAMS,
   STUDIO_MANNEQUIN_JOINT_IDS,
   STUDIO_MANNEQUIN_JOINT_LIMITS,
+  STUDIO_MANNEQUIN_MATERIAL_STYLES,
   STUDIO_MANNEQUIN_PARAM_RANGES,
   buildStudioMannequinSpec,
   canonicalizeStudioMannequinAngle,
@@ -119,6 +120,30 @@ describe("studio-mannequin-model 비례 수학", () => {
       .toBe(3.2);
   });
 
+  it("고령·단단한 체형·무용수·판타지 거인 프리셋을 서로 다른 실루엣으로 제공한다", () => {
+    const presets = STUDIO_MANNEQUIN_BODY_PRESETS;
+    expect(Object.keys(presets)).toEqual(expect.arrayContaining([
+      "senior",
+      "stocky",
+      "dancer",
+      "fantasyGiant",
+    ]));
+    expect(presets.senior.params.legLength).toBeLessThan(presets.dancer.params.legLength);
+    expect(presets.stocky.params.shoulderWidth).toBeGreaterThan(presets.dancer.params.shoulderWidth);
+    expect(presets.fantasyGiant.params.heightCm).toBe(200);
+
+    const signatures = ["senior", "stocky", "dancer", "fantasyGiant"].map((id) => {
+      const preset = presets[id as keyof typeof presets];
+      const spec = buildStudioMannequinSpec(preset.params);
+      return JSON.stringify({
+        params: spec.params,
+        pelvis: studioMannequinRestJointPosition(spec, "pelvis"),
+        shoulder: studioMannequinRestJointPosition(spec, "leftUpperArm"),
+      });
+    });
+    expect(new Set(signatures).size).toBe(signatures.length);
+  });
+
   it("어깨·팔꿈치·손목·고관절·무릎·발목에 데생용 관절구를 만든다", () => {
     const spec = buildStudioMannequinSpec(params());
     const jointBallIds = [
@@ -171,6 +196,51 @@ describe("studio-mannequin-model 비례 수학", () => {
       const footJointY = studioMannequinRestJointPosition(spec, footId)[1];
       expect(footJointY + foot.center[1] - foot.radius * foot.scale[1]).toBeCloseTo(0, 12);
     }
+  });
+
+  it("각 손은 네 손가락과 엄지 캡슐을 가지며 좌우 디테일이 X축 미러다", () => {
+    const spec = buildStudioMannequinSpec(params());
+    const digits = (jointId: "leftHand" | "rightHand") => spec.primitives.filter(
+      (primitive) => primitive.kind === "capsule" && primitive.jointId === jointId,
+    );
+    const left = digits("leftHand");
+    const right = digits("rightHand");
+    expect(left).toHaveLength(5);
+    expect(right).toHaveLength(5);
+
+    for (let index = 0; index < left.length; index += 1) {
+      const leftDigit = left[index];
+      const rightDigit = right[index];
+      if (leftDigit?.kind !== "capsule" || rightDigit?.kind !== "capsule") continue;
+      expect(rightDigit.from).toEqual([-leftDigit.from[0], leftDigit.from[1], leftDigit.from[2]]);
+      expect(rightDigit.to).toEqual([-leftDigit.to[0], leftDigit.to[1], leftDigit.to[2]]);
+      expect(rightDigit.radius).toBe(leftDigit.radius);
+    }
+  });
+
+  it("두 눈 가이드는 좌우 대칭이고 머리와 함께 정수리 신장 불변식을 보존한다", () => {
+    const spec = buildStudioMannequinSpec(params());
+    const eyes = spec.primitives.filter((primitive) =>
+      primitive.kind === "sphere"
+      && primitive.jointId === "head"
+      && primitive.scale?.[2] === 0.38,
+    );
+    expect(eyes).toHaveLength(2);
+    if (eyes[0]?.kind === "sphere" && eyes[1]?.kind === "sphere") {
+      expect(eyes[0].center[0]).toBe(-eyes[1].center[0]);
+      expect(eyes[0].center.slice(1)).toEqual(eyes[1].center.slice(1));
+    }
+    expect(studioMannequinRestStature(spec)).toBeCloseTo(spec.heightM, 12);
+  });
+});
+
+describe("studio-mannequin-model 재질 다양성", () => {
+  it("청동과 백자를 포함한 재질 id/label이 중복 없이 노출된다", () => {
+    const ids = STUDIO_MANNEQUIN_MATERIAL_STYLES.map((style) => style.id);
+    const labels = STUDIO_MANNEQUIN_MATERIAL_STYLES.map((style) => style.label);
+    expect(ids).toEqual(expect.arrayContaining(["bronze", "porcelain"]));
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(new Set(labels).size).toBe(labels.length);
   });
 });
 

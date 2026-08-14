@@ -12,6 +12,11 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 
+import {
+  getStudioBg3dEnvironmentAsset,
+  isStudioBg3dEnvironmentAssetId,
+} from "./studio-bg3d-environment-catalog";
+
 import type { Bg3dModelImportItem, Bg3dModelLibraryEntry } from "./bg3d-model-library";
 
 const ASSET_BATCH_SIZE = 12;
@@ -24,7 +29,7 @@ const CONTROL_BUTTON =
 
 type AssetFilter = "all" | "usable" | "review";
 type AssetClassification = "character" | "creature" | "prop";
-type AssetClassificationFilter = "all" | AssetClassification;
+type AssetClassificationFilter = "all" | AssetClassification | "environment";
 type ImportRights = NonNullable<Bg3dModelImportItem["rights"]>;
 type ImportRightsStatus = NonNullable<ImportRights["status"]>;
 type DownloadFeedback = {
@@ -47,6 +52,7 @@ const ASSET_CLASSIFICATION_FILTERS: ReadonlyArray<{
   { id: "character", label: "캐릭터" },
   { id: "creature", label: "크리처" },
   { id: "prop", label: "소품" },
+  { id: "environment", label: "환경" },
 ];
 
 const RIGHTS_PRESETS: ReadonlyArray<{
@@ -195,12 +201,19 @@ export function StudioBg3dAssetLibraryPanel({
   const filteredEntries = entries.filter((entry) => {
     if (filter === "usable" && !entry.canUse) return false;
     if (filter === "review" && entry.canUse) return false;
-    if (
-      classificationFilter !== "all" &&
-      classificationByModelId?.get(entry.id) !== classificationFilter
-    ) return false;
+    const classification = isStudioBg3dEnvironmentAssetId(entry.id)
+      ? "environment"
+      : classificationByModelId?.get(entry.id);
+    if (classificationFilter !== "all" && classification !== classificationFilter) return false;
     if (!normalizedQuery) return true;
-    return [entry.name, entry.format, entry.statusMessage].some((value) =>
+    const environment = getStudioBg3dEnvironmentAsset(entry.id);
+    return [
+      entry.name,
+      entry.format,
+      entry.statusMessage,
+      environment?.description ?? "",
+      ...(environment?.tags ?? []),
+    ].some((value) =>
       value.toLocaleLowerCase("ko-KR").includes(normalizedQuery),
     );
   });
@@ -425,7 +438,7 @@ export function StudioBg3dAssetLibraryPanel({
         ))}
       </div>
 
-      <div className="mt-2 grid grid-cols-4 gap-1.5" role="group" aria-label="3D 모델 종류 필터">
+      <div className="mt-2 grid grid-cols-5 gap-1.5" role="group" aria-label="3D 모델 종류 필터">
         {ASSET_CLASSIFICATION_FILTERS.map((option) => (
           <button
             key={option.id}
@@ -473,6 +486,7 @@ export function StudioBg3dAssetLibraryPanel({
         {visibleEntries.map((entry) => {
           const isDeleting = deletingModelId === entry.id;
           const isExporting = exportingModelId === entry.id;
+          const bundledEnvironment = getStudioBg3dEnvironmentAsset(entry.id);
           const canDownloadCanonicalGlb = entry.source !== "sample"
             && entry.status === "verified"
             && entry.canUse
@@ -504,6 +518,11 @@ export function StudioBg3dAssetLibraryPanel({
                     <span className="inline-flex rounded-full bg-raised px-1.5 py-0.5 text-[0.64rem] font-bold uppercase text-fg-3">
                       {entry.format}
                     </span>
+                    {bundledEnvironment ? (
+                      <span className="inline-flex rounded-full bg-accent-soft px-1.5 py-0.5 text-[0.64rem] font-bold text-accent">
+                        환경 · CC0
+                      </span>
+                    ) : null}
                     <span
                       className={cx(
                         "inline-flex rounded-full px-1.5 py-0.5 text-[0.64rem] font-bold",
@@ -516,7 +535,7 @@ export function StudioBg3dAssetLibraryPanel({
                     </span>
                   </span>
                   <span id={`bg3d-model-status-${entry.id}`} className="mt-1 line-clamp-2 block text-[0.64rem] leading-snug text-fg-3">
-                    {entry.statusMessage}
+                    {bundledEnvironment?.description ?? entry.statusMessage}
                   </span>
                 </span>
               </button>

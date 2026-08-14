@@ -258,14 +258,43 @@ export function planStudioVrmGarmentSkinInfluences(
   part: GarmentPart,
   vertexLocalY: number,
   availableBones: ReadonlySet<StudioVrmGarmentSkinBone>,
+  vertexLocalX = 0,
 ): StudioVrmGarmentSkinInfluence[] {
   const main = part.bone as StudioVrmGarmentSkinBone;
   const range = shapeAxialRange(part.shape);
-  if (!range) return [{ bone: main, weight: 1 }];
-  const t = clamp01((vertexLocalY - range[0]) / Math.max(GEOMETRY_EPSILON, range[1] - range[0]));
+  // A matching hem trim may be a torus, which has no axial range in the generic joint-chain
+  // planner. Treat that trim as the skirt's bottom edge (t=0) so it follows the exact same
+  // lower-body drape weights instead of remaining rigidly attached to the hips.
+  const t = range
+    ? clamp01((vertexLocalY - range[0]) / Math.max(GEOMETRY_EPSILON, range[1] - range[0]))
+    : 0;
   const previous = PREVIOUS_BONE[main];
   const next = NEXT_BONE[main];
   const influences: StudioVrmGarmentSkinInfluence[] = [];
+
+  if (part.skinMode === "lower-body-drape" && main === "hips") {
+    const hasLeftLeg = availableBones.has("leftUpperLeg");
+    const hasRightLeg = availableBones.has("rightUpperLeg");
+    if (!hasLeftLeg && !hasRightLeg) return [{ bone: main, weight: 1 }];
+
+    // 허리는 골반에 고정하고 밑단은 최대 72%까지 허벅지를 따라가게 한다. 좌우 경계는
+    // 좁은 중앙 블렌드 구간을 둬 다리를 벌리거나 굽혀도 치마 전체가 한쪽으로 끌리지 않는다.
+    const legWeight = 0.72 * (1 - smoothstep(0.42, 0.9, t));
+    const leftBias = smoothstep(-0.06, 0.06, vertexLocalX);
+    const rawLeft = hasLeftLeg ? leftBias : 0;
+    const rawRight = hasRightLeg ? 1 - leftBias : 0;
+    const legShareTotal = rawLeft + rawRight;
+    influences.push({ bone: main, weight: 1 - legWeight });
+    if (rawLeft > 0) {
+      influences.push({ bone: "leftUpperLeg", weight: legWeight * rawLeft / legShareTotal });
+    }
+    if (rawRight > 0) {
+      influences.push({ bone: "rightUpperLeg", weight: legWeight * rawRight / legShareTotal });
+    }
+    return normalizeInfluences(influences, main);
+  }
+
+  if (!range) return [{ bone: main, weight: 1 }];
 
   if (main === "spine") {
     const hipsWeight = previous && availableBones.has(previous)
@@ -343,6 +372,7 @@ function receiptSignature(input: {
 }): string {
   const parts = input.parts.map((part) => ({
     bone: part.bone,
+    skinMode: part.skinMode ?? null,
     shape: part.shape,
     offset: part.offset.map((value) => round(value)),
     align: part.align?.map((value) => round(value)) ?? null,
@@ -553,7 +583,12 @@ function appendGenericPart(
       assembly.uvs.push(sourceUv?.getX(localIndex) ?? 0, sourceUv?.getY(localIndex) ?? 0);
       appendSkinInfluences(
         assembly,
-        planStudioVrmGarmentSkinInfluences(part, sourcePosition.getY(localIndex), availableBones),
+        planStudioVrmGarmentSkinInfluences(
+          part,
+          sourcePosition.getY(localIndex),
+          availableBones,
+          sourcePosition.getX(localIndex),
+        ),
         mainBone,
         boneIndices,
       );
@@ -991,6 +1026,10 @@ export function buildStudioVrmSkinnedGarment(
   }
 
   const candidateBones = new Set<StudioVrmGarmentSkinBone>(requiredBones);
+  if (input.parts.some((part) => part.skinMode === "lower-body-drape")) {
+    candidateBones.add("leftUpperLeg");
+    candidateBones.add("rightUpperLeg");
+  }
   for (const bone of requiredBones) {
     const previous = PREVIOUS_BONE[bone];
     const next = NEXT_BONE[bone];

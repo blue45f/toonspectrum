@@ -115,8 +115,52 @@ export interface StudioMannequinSceneHandle {
   dispose(): void;
 }
 
-const CAMERA_TARGET = new THREE.Vector3(0, 0.92, 0);
-const CAMERA_HOME_POSITION = new THREE.Vector3(1.55, 1.45, 3.1);
+export type StudioMannequinCameraPreset =
+  | "home"
+  | "front"
+  | "side"
+  | "back"
+  | "top"
+  | "high"
+  | "low";
+
+export interface StudioMannequinCameraFrame {
+  readonly target: StudioMannequinVec3;
+  readonly position: StudioMannequinVec3;
+}
+
+const CAMERA_REFERENCE_HEIGHT_M = 1.65;
+const CAMERA_REFERENCE_OFFSETS: Readonly<Record<StudioMannequinCameraPreset, StudioMannequinVec3>> = {
+  home: [1.55, 0.53, 3.1],
+  front: [0, 0.18, 3.4],
+  side: [3.4, 0.18, 0],
+  back: [0, 0.18, -3.4],
+  top: [0, 2.88, 0.01],
+  high: [1.8, 2.28, 2.6],
+  low: [1.4, -0.72, 2.8],
+};
+
+/** 120–200cm 체형을 같은 화면 여유로 담는 결정적 카메라 프레임. */
+export function resolveStudioMannequinCameraFrame(
+  heightM: number,
+  preset: StudioMannequinCameraPreset = "home",
+): StudioMannequinCameraFrame {
+  const safeHeight = Number.isFinite(heightM)
+    ? Math.min(3, Math.max(0.5, heightM))
+    : CAMERA_REFERENCE_HEIGHT_M;
+  const scale = safeHeight / CAMERA_REFERENCE_HEIGHT_M;
+  const target: StudioMannequinVec3 = [0, safeHeight / 2, 0];
+  const offset = CAMERA_REFERENCE_OFFSETS[preset];
+  return {
+    target,
+    position: [
+      target[0] + offset[0] * scale,
+      target[1] + offset[1] * scale,
+      target[2] + offset[2] * scale,
+    ],
+  };
+}
+
 const CAPTURE_PNG_TIMEOUT_MS = 20_000;
 const MIN_CAPTURE_SCALE = 0.5;
 const MAX_CAPTURE_SCALE = 3;
@@ -229,14 +273,16 @@ export function createStudioMannequinScene(
     0.05,
     60,
   );
-  perspectiveCamera.position.copy(CAMERA_HOME_POSITION);
+  const initialCameraFrame = resolveStudioMannequinCameraFrame(spec.heightM);
+  const cameraTarget = toVec3(initialCameraFrame.target);
+  perspectiveCamera.position.copy(toVec3(initialCameraFrame.position));
   const orthographicCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.05, 60);
-  orthographicCamera.position.copy(CAMERA_HOME_POSITION);
+  orthographicCamera.position.copy(toVec3(initialCameraFrame.position));
   let activeCamera: THREE.Camera = perspectiveCamera;
   let controls: OrbitControls | null = null;
 
   function updateOrthographicFrustum(): void {
-    const distance = orthographicCamera.position.distanceTo(CAMERA_TARGET);
+    const distance = orthographicCamera.position.distanceTo(cameraTarget);
     const halfHeight = Math.max(
       0.2,
       distance * Math.tan(THREE.MathUtils.degToRad(perspectiveCamera.fov / 2)),
@@ -252,7 +298,7 @@ export function createStudioMannequinScene(
   function attachControls(): void {
     controls?.dispose();
     controls = new OrbitControls(activeCamera, renderer.domElement);
-    controls.target.copy(CAMERA_TARGET);
+    controls.target.copy(cameraTarget);
     controls.enableDamping = false;
     controls.minDistance = 0.5;
     controls.maxDistance = 12;
@@ -606,8 +652,19 @@ export function createStudioMannequinScene(
   return {
     setBodySpec(nextSpec) {
       if (disposed) return;
+      const previousTarget = cameraTarget.clone();
+      const heightScale = nextSpec.heightM / Math.max(0.5, spec.heightM);
       spec = nextSpec;
       rebuildMannequin();
+      cameraTarget.set(0, spec.heightM / 2, 0);
+      for (const camera of [perspectiveCamera, orthographicCamera]) {
+        const offset = camera.position.clone().sub(previousTarget).multiplyScalar(heightScale);
+        camera.position.copy(cameraTarget).add(offset);
+        camera.lookAt(cameraTarget);
+      }
+      controls?.target.copy(cameraTarget);
+      controls?.update();
+      updateOrthographicFrustum();
       invalidate();
     },
     setPose(posePatch) {
@@ -653,6 +710,20 @@ export function createStudioMannequinScene(
         nextMaterial = new THREE.MeshStandardMaterial({ color: 0x18181b, emissive: 0xf97316, emissiveIntensity: 0.7, roughness: 0.3 });
       } else if (style === "stencil") {
         nextMaterial = new THREE.MeshBasicMaterial({ color: 0x09090b });
+      } else if (style === "bronze") {
+        nextMaterial = new THREE.MeshStandardMaterial({
+          color: 0x9c6b30,
+          metalness: 0.72,
+          roughness: 0.28,
+        });
+      } else if (style === "porcelain") {
+        nextMaterial = new THREE.MeshPhysicalMaterial({
+          color: 0xf5efe7,
+          metalness: 0,
+          roughness: 0.24,
+          clearcoat: 0.65,
+          clearcoatRoughness: 0.18,
+        });
       } else {
         nextMaterial = new THREE.MeshStandardMaterial({
           color: 0xc58b57,
@@ -674,19 +745,15 @@ export function createStudioMannequinScene(
     },
     setCameraPreset(preset) {
       if (disposed) return;
-      const target = new THREE.Vector3(0, 0.92, 0);
-      const pos = new THREE.Vector3(1.55, 1.45, 3.1);
-      if (preset === "front") pos.set(0, 1.1, 3.4);
-      else if (preset === "side") pos.set(3.4, 1.1, 0);
-      else if (preset === "back") pos.set(0, 1.1, -3.4);
-      else if (preset === "top") pos.set(0, 3.8, 0.01);
-      else if (preset === "high") pos.set(1.8, 3.2, 2.6);
-      else if (preset === "low") pos.set(1.4, 0.2, 2.8);
-      activeCamera.position.copy(pos);
+      const frame = resolveStudioMannequinCameraFrame(spec.heightM, preset);
+      cameraTarget.copy(toVec3(frame.target));
+      activeCamera.position.copy(toVec3(frame.position));
+      activeCamera.lookAt(cameraTarget);
       if (controls) {
-        controls.target.copy(target);
+        controls.target.copy(cameraTarget);
         controls.update();
       }
+      if (projection === "orthographic") updateOrthographicFrustum();
       invalidate();
     },
     setProjection(nextProjection) {
@@ -695,7 +762,7 @@ export function createStudioMannequinScene(
       const previousCamera = activeCamera;
       activeCamera = projection === "perspective" ? perspectiveCamera : orthographicCamera;
       activeCamera.position.copy(previousCamera.position);
-      activeCamera.lookAt(CAMERA_TARGET);
+      activeCamera.lookAt(cameraTarget);
       if (projection === "orthographic") updateOrthographicFrustum();
       attachControls();
       invalidate();
@@ -705,10 +772,12 @@ export function createStudioMannequinScene(
     },
     resetCamera() {
       if (disposed) return;
-      activeCamera.position.copy(CAMERA_HOME_POSITION);
-      activeCamera.lookAt(CAMERA_TARGET);
+      const frame = resolveStudioMannequinCameraFrame(spec.heightM);
+      cameraTarget.copy(toVec3(frame.target));
+      activeCamera.position.copy(toVec3(frame.position));
+      activeCamera.lookAt(cameraTarget);
       if (projection === "orthographic") updateOrthographicFrustum();
-      controls?.target.copy(CAMERA_TARGET);
+      controls?.target.copy(cameraTarget);
       controls?.update();
       invalidate();
     },
