@@ -121,6 +121,10 @@ describe("studio project archive VRM completeness gate", () => {
       "studioVrmArchiveAttestationInputMatchesPlan(attestationInput, attestationPlan)",
       prompt,
     );
+    const neutralCancel = exportFlow.indexOf(
+      "if (attestationInput === null)",
+      prompt,
+    );
     const receipt = exportFlow.indexOf(
       "createStudioVrmProjectArchiveUseContextReceipt(attestationInput)",
       exactPlanCheck,
@@ -152,7 +156,11 @@ describe("studio project archive VRM completeness gate", () => {
     expect(exportFlow.slice(attestationPlan, prompt)).toContain(
       "if (!requestStudioVrmProjectArchiveUseContext)",
     );
-    expect(exactPlanCheck).toBeGreaterThan(prompt);
+    expect(neutralCancel).toBeGreaterThan(prompt);
+    expect(exactPlanCheck).toBeGreaterThan(neutralCancel);
+    expect(exportFlow.slice(neutralCancel, exactPlanCheck)).toContain('tone: "warn"');
+    expect(exportFlow.slice(neutralCancel, exactPlanCheck)).toContain("setError(null)");
+    expect(exportFlow.slice(neutralCancel, exactPlanCheck)).toContain("return;");
     expect(receipt).toBeGreaterThan(exactPlanCheck);
     expect(postPromptTicket).toBeGreaterThan(receipt);
     expect(postPromptSnapshot).toBeGreaterThan(postPromptTicket);
@@ -162,7 +170,7 @@ describe("studio project archive VRM completeness gate", () => {
     expect(exportFlow.slice(sourceGate, buildArchive).match(/vrmUseContextReceipt/gu))
       .toHaveLength(2);
     expect(exportFlow.slice(prompt, sourceGate)).toContain(
-      "if (\n          !attestationInput",
+      "if (!studioVrmArchiveAttestationInputMatchesPlan(attestationInput, attestationPlan))",
     );
   });
 
