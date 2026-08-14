@@ -418,6 +418,12 @@ export interface StudioMobileEditingDockProps {
   filterUnavailableReason: string | null;
   hi: number;
   history: PageState[][];
+  /**
+   * 통합 실행취소 저널의 다음 ⌘Z/⇧⌘Z 대상이 사이드카 편집(캐릭터 바이블·Writer Room)인가.
+   * 이 문서들은 `history` 스냅샷 밖이라 `hi` 만 보면 동작하는 ⌘Z 버튼이 꺼진 채로 보인다.
+   */
+  sidecarUndoAvailable?: boolean;
+  sidecarRedoAvailable?: boolean;
   isMobile: boolean;
   livingInk: StudioLivingInkControlsProps;
   marqueeIds: string[];
@@ -521,6 +527,8 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
   filterUnavailableReason,
   hi,
   history,
+  sidecarUndoAvailable = false,
+  sidecarRedoAvailable = false,
   isMobile,
   livingInk,
   marqueeIds,
@@ -682,8 +690,9 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
     drawMode === "eraser" && resolveStudioBrushPresetOperation(brush) === "erase";
   const activeEraserQuickId: StudioEraserQuickPickerId =
     brush === "kneaded-eraser" ? "kneaded-eraser" : "standard-eraser";
-  const undoDisabled = hi === 0 || collaborationDocumentLocked;
-  const redoDisabled = hi >= history.length - 1 || collaborationDocumentLocked;
+  const undoDisabled = (hi === 0 && !sidecarUndoAvailable) || collaborationDocumentLocked;
+  const redoDisabled =
+    (hi >= history.length - 1 && !sidecarRedoAvailable) || collaborationDocumentLocked;
   const undoUnavailableTitle = collaborationDocumentLocked
     ? "공동 작업 문서 잠금을 해제한 뒤 편집 기록을 이동할 수 있어요."
     : "아직 되돌릴 편집 기록이 없어요.";

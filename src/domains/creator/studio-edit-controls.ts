@@ -140,6 +140,16 @@ export const STUDIO_EDIT_MENU_COMMAND_ORDER: readonly StudioEditMenuCommandId[] 
 export interface StudioEditAvailabilityInput {
   historyIndex: number;
   historyLength: number;
+  /**
+   * 통합 실행취소 저널의 다음 ⌘Z 대상이 사이드카 편집(캐릭터 바이블·Writer Room)인가.
+   *
+   * 이 문서들은 `pagesHistory` 스냅샷에 들어가지 않는다. `historyIndex` 만 보면 방금 고친
+   * 로그라인이 "되돌릴 편집 작업이 아직 없습니다"로 보여, 실제로 동작하는 ⌘Z 를 메뉴가
+   * 막아 버린다.
+   */
+  sidecarUndoAvailable?: boolean;
+  /** 위와 대칭 — 다음 ⇧⌘Z 대상이 사이드카 편집인가. */
+  sidecarRedoAvailable?: boolean;
   documentEmpty: boolean;
   hasElementSelection: boolean;
   hasSingleElementSelection: boolean;
@@ -186,8 +196,10 @@ export function resolveStudioEditAvailability(
   const hasAnySelection = input.hasElementSelection || input.hasPixelSelection;
   const historyLocked = input.mutationLocked || input.masterEditMode;
   return {
-    undoDisabled: historyLocked || input.historyIndex <= 0,
-    redoDisabled: historyLocked || input.historyIndex >= input.historyLength - 1,
+    undoDisabled: historyLocked || (input.historyIndex <= 0 && !input.sidecarUndoAvailable),
+    redoDisabled:
+      historyLocked
+      || (input.historyIndex >= input.historyLength - 1 && !input.sidecarRedoAvailable),
     cutDisabled: input.mutationLocked || !input.hasElementSelection,
     copyDisabled: input.interactionLocked || !input.hasElementSelection,
     pasteDisabled: input.mutationLocked,
