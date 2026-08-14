@@ -626,6 +626,18 @@ import {
   HISTORY_BRUSH_RADIUS_DEFAULT,
 } from "./studio-history-brush";
 import {
+  createStudioHistoryJournal,
+  readStudioHistoryJournalRedoEntry,
+  readStudioHistoryJournalUndoEntry,
+  recordStudioHistoryJournalPagesSteps,
+  recordStudioHistoryJournalSidecarEdit,
+  seekStudioHistoryJournalToPagesDepth,
+  stepStudioHistoryJournal,
+  studioHistoryJournalSidecarLabel,
+  type StudioHistoryJournal,
+  type StudioHistoryJournalSidecarEntry,
+} from "./studio-history-journal";
+import {
   StudioHokusaiLiveOverlayRenderer,
 } from "./studio-hokusai-live-brush-overlay";
 import {
@@ -1489,6 +1501,7 @@ import {
 } from "./studio-vector-erase-to-intersection-apply";
 import {
   currentStudioVectorReferenceBudgets,
+  describeStudioAdvancedFillVectorReferenceExclusion,
   materializeStudioAdvancedFillVectorTarget,
   planStudioAdvancedFillVectorTarget,
   prepareStudioVectorReferenceExport,
@@ -1878,6 +1891,13 @@ import { STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK } from "@/lib/studio-work-asset-c
 import { cn } from "@/lib/utils";
 import { resolveAssetUrl } from "@/src/catalog-static";
 import { useSession } from "@/src/compat/auth-session-store";
+
+/** 이 편집기의 통합 실행취소 저널 — 캔버스 스냅샷 단계와 사이드카 편집을 한 시간 순서로 담는다. */
+type StudioPageHistoryJournal = StudioHistoryJournal<StudioCharacterBible, StudioWriterRoomDocument>;
+type StudioPageHistorySidecarEntry = StudioHistoryJournalSidecarEntry<
+  StudioCharacterBible,
+  StudioWriterRoomDocument
+>;
 
 type StudioAutosaveOpfsSession = NonNullable<
   Awaited<ReturnType<typeof import("./studio-autosave-opfs-session").createStudioAutosaveOpfsSession>>
@@ -4290,6 +4310,50 @@ function StudioCuttoonEditor({
   pagesHiRef.current = pagesHi;
   const pagesHistoryRef = useRef(pagesHistory);
   pagesHistoryRef.current = pagesHistory;
+  /**
+   * 통합 실행취소 저널 — 캔버스 스냅샷 단계와 히스토리 밖 사이드카 편집을 **한 시간 순서**로 묶는다.
+   *
+   * 스냅샷 히스토리를 대체하지 않는다. `{kind:"pages"}` 항목은 페이로드 없이 "여기서 `pagesHi`
+   * 기계 장치가 한 칸 움직인다"만 표시하므로, 획별 undo 입도·CRDT 전이 발행·저장 중 게이트·
+   * 살아있는 잉크/호쿠사이 중단·합치기 계약이 전부 손대지 않은 채로 남는다.
+   *
+   * `undo()` 가 `pagesHistoryRef`/`pagesHiRef` 를 읽는 이유(대기 획 flush 가 ref 만 동기 전진시킨다)
+   * 가 저널에도 그대로 적용되므로, 기록 지점마다 ref 를 먼저 옮기고 React 상태를 뒤따르게 한다.
+   */
+  const [historyJournal, setHistoryJournalState] = useState<StudioPageHistoryJournal>(() =>
+    createStudioHistoryJournal()
+  );
+  const historyJournalRef = useRef(historyJournal);
+  historyJournalRef.current = historyJournal;
+  function commitStudioHistoryJournal(next: StudioPageHistoryJournal): void {
+    historyJournalRef.current = next;
+    setHistoryJournalState(next);
+  }
+  /**
+   * 스냅샷 히스토리가 새 단계를 만들었을 때 저널에 같은 수의 `pages` 항목을 넣는다.
+   *
+   * `nextUndoDepth` 는 전이 뒤의 실제 `pagesHi` 다. 상한(200)에 밀려 스냅샷이 앞에서 잘려 나가면
+   * 이 값이 기대치보다 작고, 저널도 같은 수만큼 앞을 버려 둘이 어긋나지 않는다.
+   */
+  function recordStudioHistoryJournalPages(addedSteps: number, nextUndoDepth: number): void {
+    if (addedSteps <= 0) return;
+    commitStudioHistoryJournal(
+      recordStudioHistoryJournalPagesSteps(historyJournalRef.current, { addedSteps, nextUndoDepth })
+    );
+  }
+  /** 문서 전체 수화(프로젝트 로드·임시저장 복구)는 저널도 처음부터 다시 시작한다. */
+  function resetStudioHistoryJournal(): void {
+    commitStudioHistoryJournal(createStudioHistoryJournal<StudioCharacterBible, StudioWriterRoomDocument>());
+  }
+  // ⌘Z/⇧⌘Z 가능 여부 — 스냅샷 단계가 없어도 되돌릴 사이드카 편집이 남아 있을 수 있다.
+  // 저널이 비었거나 어긋난 경우(원격 CRDT 재조정 등)에도 `pagesHi` 만으로 예전 답을 낸다.
+  const studioHistorySidecarUndoAvailable =
+    readStudioHistoryJournalUndoEntry(historyJournal)?.kind === "sidecar";
+  const studioHistorySidecarRedoAvailable =
+    readStudioHistoryJournalRedoEntry(historyJournal)?.kind === "sidecar";
+  const studioHistoryCanUndo = pagesHi > 0 || studioHistorySidecarUndoAvailable;
+  const studioHistoryCanRedo =
+    pagesHi < pagesHistory.length - 1 || studioHistorySidecarRedoAvailable;
   const [pagesHistoryDurabilityStatus, setPagesHistoryDurabilityStatus] =
     useState<StudioPagesHistoryCommandJournalDurabilityStatus>(
       STUDIO_PAGES_HISTORY_INITIAL_DURABILITY_STATUS
@@ -4426,32 +4490,106 @@ function StudioCuttoonEditor({
     if (!markStudioDocumentChanged()) return;
     setMasterState(next);
   };
-  /**
-   * 히스토리 밖 사이드카(캐릭터 바이블·Writer Room) 편집 배리어.
-   *
-   * 이 문서들은 `pagesHistory` 에 들어가지 않는다. 그래서 사이드카를 고친 직후의 ⌘Z 는
-   * 사이드카를 되돌리는 대신 **화면 밖 캔버스 획을 지운다** — 사용자가 방금 만진 것과
-   * 전혀 다른 대상을 파괴하는 조용한 실패다. 마지막 문서 편집이 사이드카였으면 그 한 번의
-   * ⌘Z 를 소비해 사실을 알리고 캔버스 히스토리는 건드리지 않는다(1회성 — 다음 ⌘Z 는 평소대로
-   * 캔버스를 되돌린다. 영구 차단은 undo 자체를 못 쓰게 만드는 더 나쁜 실패다).
-   */
-  const sidecarHistoryBarrierRef = useRef<string | null>(null);
+  // ── 히스토리 밖 사이드카(캐릭터 바이블·Writer Room) ──
+  // 이 문서들은 `pagesHistory` 에 들어가지 않는다. 예전에는 그래서 사이드카를 고친 직후의 ⌘Z 가
+  // **화면 밖 캔버스 획**을 지웠다. 이제는 두 setter 가 통합 저널에 사이드카 항목을 남기므로
+  // ⌘Z 가 방금 만진 그 문서를 되돌린다 — 파괴도 없고, 되돌릴 수 없는 사이드카도 없다.
+  //
+  // 저널이 렌더 클로저가 아니라 ref 에서 이전 문서를 읽는 이유: 한 브라우저 태스크에서 두 번
+  // 고치면(패널의 연속 onChange) 렌더 전에 두 번째 편집이 첫 편집을 못 보고 같은 `before` 를
+  // 기록해 되돌림이 한 단계 새어 나간다.
   const [characterBible, setCharacterBibleState] = useState<StudioCharacterBible>(() =>
     normalizeStudioCharacterBible(undefined)
   );
-  const setCharacterBible = (next: Parameters<typeof setCharacterBibleState>[0]) => {
-    if (!markStudioDocumentChanged()) return;
-    sidecarHistoryBarrierRef.current = "캐릭터 바이블";
-    setCharacterBibleState(next);
-  };
+  const characterBibleRef = useRef(characterBible);
+  characterBibleRef.current = characterBible;
   const [writerRoom, setWriterRoomState] = useState<StudioWriterRoomDocument>(() =>
     createEmptyStudioWriterRoomDocument()
   );
+  const writerRoomRef = useRef(writerRoom);
+  writerRoomRef.current = writerRoom;
+  /**
+   * 사이드카 편집 한 건을 통합 저널에 남긴다.
+   *
+   * 대기 중인 지연 획 배치가 있으면 **먼저** 히스토리에 안착시킨다. 그러지 않으면 "획 → 사이드카"
+   * 순서로 한 일이 저널에는 "사이드카 → 획" 으로 뒤집혀 들어간다(배치는 나중에 flush 되므로).
+   * 잠금·저장 중이라 flush 가 실패하면 그대로 진행한다 — 그 경우 획은 아직 히스토리 밖이고,
+   * 순서를 지키자고 사이드카 편집 자체를 막는 건 더 나쁜 거래다.
+   */
+  function recordStudioSidecarHistoryEntry(entry: StudioPageHistorySidecarEntry): void {
+    if (pendingStrokeCommitsRef.current) flushPendingStrokeCommitsRef.current();
+    commitStudioHistoryJournal(
+      recordStudioHistoryJournalSidecarEdit(historyJournalRef.current, entry)
+    );
+  }
+  const setCharacterBible = (next: Parameters<typeof setCharacterBibleState>[0]) => {
+    if (!markStudioDocumentChanged()) return;
+    const before = characterBibleRef.current;
+    const after = typeof next === "function" ? next(before) : next;
+    if (after === before) return;
+    characterBibleRef.current = after;
+    recordStudioSidecarHistoryEntry({
+      kind: "sidecar",
+      target: "characterBible",
+      before,
+      after,
+      at: Date.now(),
+    });
+    setCharacterBibleState(after);
+  };
   const setWriterRoom = (next: Parameters<typeof setWriterRoomState>[0]) => {
     if (!markStudioDocumentChanged()) return;
-    sidecarHistoryBarrierRef.current = "Writer Room";
-    setWriterRoomState(next);
+    const before = writerRoomRef.current;
+    const after = typeof next === "function" ? next(before) : next;
+    if (after === before) return;
+    writerRoomRef.current = after;
+    recordStudioSidecarHistoryEntry({
+      kind: "sidecar",
+      target: "writerRoom",
+      before,
+      after,
+      at: Date.now(),
+    });
+    setWriterRoomState(after);
   };
+  /**
+   * 저널의 사이드카 항목 한 건을 되돌리거나(⌘Z) 다시 적용한다(⇧⌘Z).
+   *
+   * 저널을 다시 건드리지 않도록 raw setter 로 간다. 다만 문서 변경 게이트(저장 중 거절·리비전
+   * 세대 증가)는 일반 편집과 똑같이 통과시킨다 — 되돌림도 문서 변경이다.
+   */
+  function restoreStudioSidecarDocument(
+    entry: StudioPageHistorySidecarEntry,
+    direction: "undo" | "redo"
+  ): boolean {
+    if (!markStudioDocumentChanged()) return false;
+    if (entry.target === "characterBible") {
+      const value = direction === "undo" ? entry.before : entry.after;
+      characterBibleRef.current = value;
+      setCharacterBibleState(value);
+    } else {
+      const value = direction === "undo" ? entry.before : entry.after;
+      writerRoomRef.current = value;
+      setWriterRoomState(value);
+    }
+    return true;
+  }
+  /**
+   * 문서 전체 수화(임시저장 복구·프로젝트 스냅샷 복원)로 사이드카를 통째로 갈아끼운다.
+   *
+   * 사용자가 만든 사이드카 편집이 아니므로 저널 항목을 남기지 않는다 — 예전 배리어를 여기서
+   * 내려 주던 것과 같은 이유다. 프로젝트 교체는 예전 계약 그대로 `pages` 단계 하나로 남는다.
+   */
+  function hydrateStudioSidecarDocuments(input: {
+    readonly characterBible: StudioCharacterBible;
+    readonly writerRoom: StudioWriterRoomDocument;
+  }): void {
+    if (!markStudioDocumentChanged()) return;
+    characterBibleRef.current = input.characterBible;
+    writerRoomRef.current = input.writerRoom;
+    setCharacterBibleState(input.characterBible);
+    setWriterRoomState(input.writerRoom);
+  }
   const [aiProvenance, setAiProvenanceState] = useState<StudioAiProvenanceDocument>(() =>
     createEmptyStudioAiProvenanceDocument()
   );
@@ -11979,6 +12117,8 @@ function StudioCuttoonEditor({
           });
           pagesHistoryRef.current = [restoredPages];
           pagesHiRef.current = 0;
+          // 히스토리를 통째로 갈아치웠으니 통합 저널도 처음부터 — 남은 항목은 사라진 스냅샷을 가리킨다.
+          resetStudioHistoryJournal();
           setPagesHistory([restoredPages]);
           setPagesHi(0);
           const restoredCurrentId = restoredPages.some((page) => page.id === parsed.currentPageId)
@@ -12002,10 +12142,10 @@ function StudioCuttoonEditor({
         setPublishCompliance(publishPack.compliance);
         setPublishPackageSettings(publishPackageSettingsFromPack(parsed.publishPack));
         setPublishPackageCredits(publishPackageCreditsFromPack(parsed.publishPack));
-        setCharacterBible(normalizeStudioCharacterBible(parsed.characterBible));
-        setWriterRoom(normalizeStudioWriterRoomDocument(parsed.writerRoom));
-        // 문서 전체 수화는 사용자의 사이드카 편집이 아니다 — 배리어를 남기지 않는다.
-        sidecarHistoryBarrierRef.current = null;
+        hydrateStudioSidecarDocuments({
+          characterBible: normalizeStudioCharacterBible(parsed.characterBible),
+          writerRoom: normalizeStudioWriterRoomDocument(parsed.writerRoom),
+        });
         setAiProvenance(
           recoverInterruptedStudioAiOperations(
             normalizeStudioAiProvenanceDocument(parsed.aiProvenance)
@@ -16070,8 +16210,6 @@ function StudioCuttoonEditor({
     pendingStrokeCommitsRef.current = batch;
     batch.strokes.push(finished);
     batch.retryCount = 0;
-    // 아직 히스토리 밖이지만 이 획이 마지막 문서 편집이다 — 사이드카 배리어를 내린다.
-    sidecarHistoryBarrierRef.current = null;
     if (batch.timer) globalThis.clearTimeout(batch.timer);
     batch.timer = globalThis.setTimeout(() => {
       flushPendingStrokeCommitsRef.current();
@@ -17694,11 +17832,10 @@ function StudioCuttoonEditor({
       documentRevision: studioRevisionProjectGenerationRef.current,
       pageLabel: pageDisplayName(activePage, activePageIndex),
       selectionLabel: selectedElement ? elementLabel(selectedElement) : null,
-      canUndo: !masterEditMode && !collaborationDocumentLocked && pagesHi > 0,
-      canRedo:
-        !masterEditMode
-        && !collaborationDocumentLocked
-        && pagesHi < pagesHistory.length - 1,
+      // 사이드카 편집도 되돌릴 수 있는 항목이다 — `pagesHi` 만 보면 방금 고친 로그라인이
+      // 되돌릴 수 없는 것처럼 보인다.
+      canUndo: !masterEditMode && !collaborationDocumentLocked && studioHistoryCanUndo,
+      canRedo: !masterEditMode && !collaborationDocumentLocked && studioHistoryCanRedo,
       captureAllowed:
         drawingRef.current === null
         && !drawingPointerTransportRef.current?.getSession(),
@@ -20239,6 +20376,15 @@ const puppetWarpArmed =
           pages: hydratedPages,
           historyIndex: 0,
         });
+        // 서버 프로젝트 로드는 히스토리를 통째로 갈아치운다 — 통합 저널도 처음부터 다시 시작한다.
+        // 이웃 줄들과 같은 이유로 안정적인 raw setter/ref 만 쓴다(렌더마다 새로 만들어지는
+        // 컴포넌트 함수를 부르면 이 effect 의 deps 가 매 렌더 무효화된다).
+        const freshJournal = createStudioHistoryJournal<
+          StudioCharacterBible,
+          StudioWriterRoomDocument
+        >();
+        historyJournalRef.current = freshJournal;
+        setHistoryJournalState(freshJournal);
         setPagesHistoryState([hydratedPages]);
         setPagesHiState(0);
         setCurrentPageId(
@@ -20249,12 +20395,16 @@ const puppetWarpArmed =
         );
         // 문서 마스터(공통 요소) — 과거 문서(master 미존재)는 빈 마스터로(하위호환). 리믹스도 마스터를 승계한다.
         setMasterState(normalizeDocumentMaster(doc?.master) as DocumentMaster<El>);
-        setCharacterBibleState(normalizeStudioCharacterBible(doc?.characterBible));
-        setWriterRoomState(
-          remixId
-            ? createEmptyStudioWriterRoomDocument()
-            : normalizeStudioWriterRoomDocument(doc?.writerRoom)
-        );
+        // 로드는 문서 변경 게이트 밖에서 raw setter 로 수화한다(저널 항목도 남기지 않는다).
+        // ref 까지 함께 옮겨야 같은 태스크의 첫 사이드카 편집이 낡은 `before` 를 기록하지 않는다.
+        const hydratedCharacterBible = normalizeStudioCharacterBible(doc?.characterBible);
+        const hydratedWriterRoom = remixId
+          ? createEmptyStudioWriterRoomDocument()
+          : normalizeStudioWriterRoomDocument(doc?.writerRoom);
+        characterBibleRef.current = hydratedCharacterBible;
+        writerRoomRef.current = hydratedWriterRoom;
+        setCharacterBibleState(hydratedCharacterBible);
+        setWriterRoomState(hydratedWriterRoom);
         setAiProvenanceState(
           remixId
             ? resetStudioAiProvenanceForRemix()
@@ -21976,7 +22126,6 @@ const puppetWarpArmed =
       }
     }
     coalesceKeyRef.current = null; // 일반 커밋은 합치기 체인을 끊는다.
-    sidecarHistoryBarrierRef.current = null; // 마지막 편집 대상이 다시 캔버스가 됐다.
     const localNextPages = commitBasePages.map((p) =>
       p.id === commitPageId ? { ...p, ...finalExtraPatch, elements: resolved } : p
     );
@@ -21998,6 +22147,7 @@ const puppetWarpArmed =
     // first snapshot even though React Compiler batching has not rendered it yet.
     pagesHistoryRef.current = appended.history;
     pagesHiRef.current = appended.historyIndex;
+    recordStudioHistoryJournalPages(1, appended.historyIndex);
     setPagesHistory(appended.history);
     setPagesHi(appended.historyIndex);
     return true;
@@ -22085,10 +22235,11 @@ const puppetWarpArmed =
     // Advance refs before React setters so a second sample in this task sees this exact result.
     pagesHistoryRef.current = nextHistory;
     pagesHiRef.current = nextHistoryIndex;
+    // 합치기 분기는 최상단 스냅샷만 갈아끼운다 — 새 단계가 없으므로 저널도 그대로 둔다.
+    if (!replacesCurrentSnapshot) recordStudioHistoryJournalPages(1, nextHistoryIndex);
     setPagesHistory(nextHistory);
     if (!replacesCurrentSnapshot) setPagesHi(nextHistoryIndex);
     coalesceKeyRef.current = key;
-    sidecarHistoryBarrierRef.current = null; // 마지막 편집 대상이 다시 캔버스가 됐다.
   }
   /**
    * 지연 커밋 배치 하나를 **획 개수만큼의 히스토리 항목**으로 펼친다.
@@ -22142,6 +22293,9 @@ const puppetWarpArmed =
     }
     pagesHistoryRef.current = accHistory;
     pagesHiRef.current = accIndex;
+    // 배치 커밋은 `commit()` 에서 이미 저널에 1항목을 넣었다. 펼치기는 그 한 항목을 획 수만큼으로
+    // 늘리는 일이므로 나머지 N-1 개만 더한다 — 저널의 `pages` 항목 수와 스냅샷 단계 수가 계속 같다.
+    recordStudioHistoryJournalPages(batch.strokes.length - 1, accIndex);
     setPagesHistory(accHistory);
     setPagesHi(accIndex);
   }
@@ -22735,7 +22889,6 @@ const puppetWarpArmed =
       resolvedPages = mergeStudioCrdtFrontier(rebasedNextPages);
     }
     coalesceKeyRef.current = null;
-    sidecarHistoryBarrierRef.current = null; // 마지막 편집 대상이 다시 캔버스가 됐다.
     const appended = appendStudioPagesHistorySnapshot(
       currentHistory,
       currentHistoryIndex,
@@ -22750,6 +22903,7 @@ const puppetWarpArmed =
     });
     pagesHistoryRef.current = appended.history;
     pagesHiRef.current = appended.historyIndex;
+    recordStudioHistoryJournalPages(1, appended.historyIndex);
     setPagesHistory(appended.history);
     setPagesHi(appended.historyIndex);
     return true;
@@ -26285,25 +26439,24 @@ const puppetWarpArmed =
         return;
       }
     }
-    // 사이드카(캐릭터 바이블·Writer Room)가 마지막 편집이었으면 이 ⌘Z 는 화면 밖 캔버스 획을
-    // 지우게 된다. 그 한 번을 여기서 소비해 사실만 알리고 히스토리는 건드리지 않는다.
-    const sidecarBarrier = sidecarHistoryBarrierRef.current;
-    if (sidecarBarrier) {
-      sidecarHistoryBarrierRef.current = null;
-      const notice =
-        `${sidecarBarrier} 편집은 실행 취소(⌘Z) 대상이 아니에요.`
-        + ` ${sidecarBarrier} 패널에서 직접 되돌려 주세요.`
-        + " 한 번 더 누르면 캔버스 작업이 실행 취소됩니다.";
-      setError(notice);
-      announceDrawingShortcut(notice);
-      return;
-    }
     // 커밋 동기화를 기다리는 획이 있으면 먼저 히스토리에 안착시킨다 — 획 하나당 항목 하나로
     // 들어가므로 아래 일반 undo 가 **마지막 한 획만** 되돌린다(그리고 redo 로 되살아난다).
     // 예전에는 대기 배치를 통째로 폐기해, 200ms 안에 그은 해칭 40획이 ⌘Z 한 번에 사라졌다.
+    // 저널 조회보다 **먼저** 해야 방금 안착한 획이 최신 항목으로 보인다.
     if (pendingStrokeCommitsRef.current && !flushPendingStrokeCommitsRef.current()) {
       // 잠금·저장 중이라 히스토리에 못 넣는 배치는 예전 계약대로 폐기가 유일한 되돌림이다.
       discardPendingStrokeCommitsRef.current();
+      return;
+    }
+    // 통합 저널의 최신 항목이 사이드카면, 그 문서를 되돌리고 `pagesHi` 는 건드리지 않는다.
+    // 예전에는 여기서 배리어가 "되돌릴 수 없다"고 알리기만 했다 — 이제 진짜로 되돌린다.
+    const undoEntry = readStudioHistoryJournalUndoEntry(historyJournalRef.current);
+    if (undoEntry?.kind === "sidecar") {
+      if (!restoreStudioSidecarDocument(undoEntry, "undo")) return;
+      commitStudioHistoryJournal(stepStudioHistoryJournal(historyJournalRef.current, "undo"));
+      announceDrawingShortcut(
+        `${studioHistoryJournalSidecarLabel(undoEntry.target)} 편집을 실행 취소했습니다`
+      );
       return;
     }
     advancedFillRunIdRef.current += 1;
@@ -26333,6 +26486,11 @@ const puppetWarpArmed =
       return;
     }
     pagesHiRef.current = nextIndex;
+    // 스냅샷이 실제로 한 칸 움직였을 때만 저널 커서를 내린다 — 바닥에서 누른 ⌘Z 가 커서만
+    // 앞세워 저널과 `pagesHi` 를 어긋나게 하면 안 된다.
+    if (nextIndex !== undoIndex) {
+      commitStudioHistoryJournal(stepStudioHistoryJournal(historyJournalRef.current, "undo"));
+    }
     setPagesHi(nextIndex);
   };
   const redo = () => {
@@ -26355,12 +26513,19 @@ const puppetWarpArmed =
     if (hokusaiStroke?.transactionCommitted) {
       releaseStudioHokusaiLivePresentation(hokusaiStroke);
     }
-    // redo 는 캔버스를 파괴하지 않으므로 배리어를 세우지 않지만, 소비되지 않은 배리어가
-    // 뒤늦게 엉뚱한 ⌘Z 에서 튀어나오지 않도록 여기서 내린다.
-    sidecarHistoryBarrierRef.current = null;
     // 대기 획을 먼저 히스토리에 안착시킨다 — 이번 redo 입력은 동기화로 소비된다.
     if (pendingStrokeCommitsRef.current) {
       flushPendingStrokeCommitsRef.current();
+      return;
+    }
+    // undo 와 거울: 다음 항목이 사이드카면 그 문서를 다시 적용하고 `pagesHi` 는 건드리지 않는다.
+    const redoEntry = readStudioHistoryJournalRedoEntry(historyJournalRef.current);
+    if (redoEntry?.kind === "sidecar") {
+      if (!restoreStudioSidecarDocument(redoEntry, "redo")) return;
+      commitStudioHistoryJournal(stepStudioHistoryJournal(historyJournalRef.current, "redo"));
+      announceDrawingShortcut(
+        `${studioHistoryJournalSidecarLabel(redoEntry.target)} 편집을 다시 실행했습니다`
+      );
       return;
     }
     advancedFillRunIdRef.current += 1;
@@ -26374,17 +26539,18 @@ const puppetWarpArmed =
     if (nextSnapshot && !publishStudioCrdtHistoryTransition(pages, nextSnapshot)) return;
     if (nextIndex !== pagesHi && nextSnapshot) {
       recordStudioHistoryUndoRedo("redo", nextSnapshot, nextIndex);
+      commitStudioHistoryJournal(stepStudioHistoryJournal(historyJournalRef.current, "redo"));
     }
     setPagesHi(nextIndex);
   };
   companionHistoryHandlerRef.current = (action) => {
     if (masterEditMode || collaborationDocumentLocked) return;
     if (action === "undo") {
-      if (pagesHi <= 0) return;
+      if (!studioHistoryCanUndo) return;
       undo();
       return;
     }
-    if (pagesHi >= pagesHistory.length - 1) return;
+    if (!studioHistoryCanRedo) return;
     redo();
   };
   function fitCanvasToWidth() {
@@ -26557,6 +26723,10 @@ const puppetWarpArmed =
         historyIndex: nextIndex,
       });
     }
+    // 임의 점프는 캔버스만 옮기고 사이드카 문서는 그대로 둔다 — 통합 저널 커서도 그 깊이에 맞춘다.
+    commitStudioHistoryJournal(
+      seekStudioHistoryJournalToPagesDepth(historyJournalRef.current, nextIndex)
+    );
     setPagesHi(nextIndex);
   };
 
@@ -32004,6 +32174,10 @@ const puppetWarpArmed =
         pagesHiRef.current !== historyIndex
       ) return;
       let referenceSrc: string | undefined;
+      // 래스터 경로에서 벡터 선화 참조를 빼고 진행했을 때 결과 문구 뒤에 붙일 사유.
+      let vectorReferenceExclusion: string | null = null;
+      const withVectorExclusionNotice = (message: string) =>
+        vectorReferenceExclusion === null ? message : `${message} · ${vectorReferenceExclusion}`;
       if (vectorTarget) {
         const vectorInput = currentAdvancedFillVectorInput();
         const vectorPlan = planStudioAdvancedFillVectorTarget(vectorInput);
@@ -32062,8 +32236,12 @@ const puppetWarpArmed =
             pageHeight: vectorInput.height,
             fillReference: true,
           });
-        } else if (!vectorPlan.ok && vectorPlan.code !== "no-visible-vector-draw") {
-          throw new Error(vectorPlan.reason);
+        } else if (!vectorPlan.ok) {
+          // 여기서 벡터 선화 참조는 래스터 경계 위에 얹는 추가 경계일 뿐이다. 못 만든다고
+          // 채우기 전체를 막으면 페이지 어딘가의 지우개 획 하나가 무관한 래스터 레이어의
+          // 채우기까지 못 하게 한다. 참조만 빼고 진행하고 무엇을 왜 뺐는지 결과에 붙인다 —
+          // 적용 전까지는 미리보기라 경계 하나 빠진 결과를 눈으로 확인할 수 있다.
+          vectorReferenceExclusion = describeStudioAdvancedFillVectorReferenceExclusion(vectorPlan);
         }
         const scopedRasterReferences = collectOverlappingStudioFillReferenceLayers(
           layers,
@@ -32146,24 +32324,29 @@ const puppetWarpArmed =
       }
       const message = studioAdvancedFillResultMessage(result);
       if (!result.changed) {
-        setAdvancedFillStatus(message);
-        if (result.blockedReason) setError(message);
+        // 빠진 경계가 곧 누수 보호가 막은 이유일 수 있다 — 배너에도 사유를 함께 싣는다.
+        const blockedMessage = withVectorExclusionNotice(message);
+        setAdvancedFillStatus(blockedMessage);
+        if (result.blockedReason) setError(blockedMessage);
         return;
       }
       const diagnostics = result.diagnostics;
       const previewSummary = summarizeStudioAdvancedFillPreview(message, diagnostics, previousPreview);
+      // 누적 미리보기는 요약 문구가 원본 문구를 대체하므로 제외 사유는 요약 뒤에 붙인다.
+      // 앞이 아니라 뒤인 것도 계약이다 — 패널이 "누적 미리보기" 접두사로 누적 여부를 읽는다.
+      const previewMessage = withVectorExclusionNotice(previewSummary.message);
       setAdvancedFillPreview({
         targetId: rasterTarget?.id ?? vectorTarget!.id,
         originalSrc: rasterTarget?.src ?? vectorTarget!.blankSrc,
         historyIndex,
         resultSrc: result.dataUrl,
         diagnostics,
-        message: previewSummary.message,
+        message: previewMessage,
         paintedPixelCount: previewSummary.paintedPixelCount,
         regionCount: previewSummary.regionCount,
         ...(vectorTarget ? { virtualTarget: vectorTarget } : null),
       });
-      setAdvancedFillStatus(previewSummary.message);
+      setAdvancedFillStatus(previewMessage);
       if (!advancedFillSettings.continuousFill) setAdvancedFillActive(false);
       setError(null);
     } catch (err) {
@@ -40830,6 +41013,9 @@ function clearSelectionForEdit() {
   } = resolveStudioEditAvailability({
     historyIndex: pagesHi,
     historyLength: pagesHistory.length,
+    // 사이드카 편집도 되돌릴 수 있는 작업이다 — 스냅샷 인덱스만 보면 메뉴가 동작하는 ⌘Z 를 막는다.
+    sidecarUndoAvailable: studioHistorySidecarUndoAvailable,
+    sidecarRedoAvailable: studioHistorySidecarRedoAvailable,
     documentEmpty: menuDocumentEmpty,
     hasElementSelection: menuHasElementSelection,
     hasSingleElementSelection: menuHasSingleElementSelection,
@@ -42008,6 +42194,7 @@ function clearSelectionForEdit() {
     });
     pagesHistoryRef.current = appended.history;
     pagesHiRef.current = appended.historyIndex;
+    recordStudioHistoryJournalPages(1, appended.historyIndex);
     setPagesHistory(appended.history);
     setPagesHi(appended.historyIndex);
     setCurrentPageId(
@@ -42028,10 +42215,10 @@ function clearSelectionForEdit() {
     setPublishPackageSettings(publishPackageSettingsFromPack(projectData.publishPack));
     setPublishPackageCredits(publishPackageCreditsFromPack(projectData.publishPack));
     setMaster(normalizeDocumentMaster(projectData.master) as DocumentMaster<El>);
-    setCharacterBible(normalizeStudioCharacterBible(projectData.characterBible));
-    setWriterRoom(normalizeStudioWriterRoomDocument(projectData.writerRoom));
-    // 문서 전체 수화는 사용자의 사이드카 편집이 아니다 — 배리어를 남기지 않는다.
-    sidecarHistoryBarrierRef.current = null;
+    hydrateStudioSidecarDocuments({
+      characterBible: normalizeStudioCharacterBible(projectData.characterBible),
+      writerRoom: normalizeStudioWriterRoomDocument(projectData.writerRoom),
+    });
     setAiProvenance(
       recoverInterruptedStudioAiOperations(
         normalizeStudioAiProvenanceDocument(projectData.aiProvenance)
@@ -46397,6 +46584,8 @@ function clearSelectionForEdit() {
           filterUnavailableReason={studioFilterUnavailableReason}
           hi={hi}
           history={history}
+          sidecarUndoAvailable={studioHistorySidecarUndoAvailable}
+          sidecarRedoAvailable={studioHistorySidecarRedoAvailable}
           isMobile={isMobile}
           livingInk={{
             ...studioOptionsBarsDrawModel.livingInk,

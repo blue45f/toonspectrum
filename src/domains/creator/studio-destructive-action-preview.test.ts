@@ -21,6 +21,8 @@ import {
   studioDeleteCharacterBibleEntryRequest,
   studioDeleteCheckpointRequest,
   studioDeletePageRequest,
+  studioDeleteProductionBibleEntryRequest,
+  studioDeletePromisePayoffEntryRequest,
   studioDeleteWriterRoomItemRequest,
   studioExportSplitChoiceRequest,
   studioRemoveEmeresUnderlaysRequest,
@@ -152,13 +154,27 @@ describe("destructive action preview", () => {
     expect(request.cancelLabel).toBe("2×로 낮춰 한 파일");
   });
 
-  it("keeps history-free document sidecars out of the undo promise", () => {
+  it("keeps sidecars with their own storage out of the undo promise", () => {
+    for (const request of [
+      studioDeleteProductionBibleEntryRequest("소품 목록"),
+      studioDeletePromisePayoffEntryRequest("떡밥 1"),
+    ]) {
+      expect(request.reversibility).toBe("irreversible");
+      expect(formatStudioDestructivePreview(request)).toContain(
+        STUDIO_DESTRUCTIVE_IRREVERSIBLE_HINT,
+      );
+    }
+  });
+
+  // 통합 실행취소 저널이 편집 전 문서를 들고 있다. 여기서 "되돌릴 수 없음"이라고 하면
+  // 되돌릴 수 있는 삭제를 못 되돌린다고 거짓말하는 셈이라 사용자가 헛되이 겁먹는다.
+  it("promises undo for sidecars that pass through the unified history journal", () => {
     for (const request of [
       studioDeleteCharacterBibleEntryRequest("주인공"),
       studioDeleteWriterRoomItemRequest("1화 시놉시스"),
     ]) {
-      expect(request.reversibility).toBe("irreversible");
-      expect(formatStudioDestructivePreview(request)).toContain(
+      expect(request.reversibility).toBe("undoable");
+      expect(formatStudioDestructivePreview(request)).not.toContain(
         STUDIO_DESTRUCTIVE_IRREVERSIBLE_HINT,
       );
     }

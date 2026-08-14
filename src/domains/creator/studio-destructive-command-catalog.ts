@@ -5,10 +5,11 @@
  * 판정 기준은 **문서 히스토리(⌘Z)에 실제로 들어가는가** 하나다.
  *  - `undoable` — `commit`/`commitPages`/`updateActivePage`/`patchEl` 을 지나 `pagesHistory`
  *    에 스냅샷이 쌓이는 명령. 페이지·요소·페이지 사이드카(animTimeline 등)가 여기 속한다.
- *  - `irreversible` — 히스토리를 지나지 않는 명령. 서버 삭제(작품·시리즈·공유 포즈), 브라우저
- *    저장소 레코드 삭제(복구 지점·커스텀 포즈·포즈 소재), 그리고 **히스토리 밖 문서 사이드카**
- *    (캐릭터 바이블·작가의 방·프로덕션 바이블·약속/회수 원장). `pagesHistory` 는 페이지 배열만
- *    담으므로 사이드카는 ⌘Z 로 돌아오지 않는다 — 이 사실을 preview 에 명시한다.
+ *    캐릭터 바이블·작가의 방도 `pagesHistory` 스냅샷에는 안 들어가지만, 통합 실행취소
+ *    저널(`studio-history-journal`)이 편집 전 문서를 들고 있어 ⌘Z 로 돌아온다.
+ *  - `irreversible` — 히스토리도 저널도 지나지 않는 명령. 서버 삭제(작품·시리즈·공유 포즈),
+ *    브라우저 저장소 레코드 삭제(복구 지점·커스텀 포즈·포즈 소재), 그리고 자체 저장소를 쓰는
+ *    사이드카(프로덕션 바이블·약속/회수 원장) — 이 사실을 preview 에 명시한다.
  *  - `document-untouched` — 그림 문서를 아예 건드리지 않는 명령(내보내기 분할 선택, 공유 동의,
  *    기기 포즈 라이브러리 가져오기). 되돌림을 약속하지도, 영구 소실을 경고하지도 않는다.
  *
@@ -313,8 +314,8 @@ export function studioRemoveFrameAnimationRequest(
 }
 
 /**
- * 히스토리 밖 문서 사이드카(캐릭터 바이블·작가의 방·프로덕션 바이블·약속/회수 원장)의
- * 공통 요청. `pagesHistory` 는 페이지 배열만 담기 때문에 이 삭제들은 ⌘Z 로 돌아오지 않는다.
+ * 아직 히스토리 밖인 문서 사이드카(프로덕션 바이블·약속/회수 원장)의 공통 요청.
+ * 이 둘은 자체 저장소를 쓰고 통합 실행취소 저널을 지나지 않아 ⌘Z 로 돌아오지 않는다.
  */
 function sidecarDeleteRequest(input: {
   readonly id: string;
@@ -330,27 +331,44 @@ function sidecarDeleteRequest(input: {
   };
 }
 
-/** ⑯ 캐릭터 설정 삭제 — 캐릭터 바이블은 페이지 히스토리 밖이라 ⌘Z 대상이 아니다. */
+/**
+ * 통합 실행취소 저널(`studio-history-journal`)을 지나는 사이드카(캐릭터 바이블·작가의 방)의
+ * 공통 요청. `pagesHistory` 스냅샷에는 안 들어가지만 저널이 이전 문서를 들고 있어 ⌘Z 로 돌아온다.
+ */
+function journaledSidecarDeleteRequest(input: {
+  readonly id: string;
+  readonly title: string;
+  readonly lossLabel: string;
+  readonly note?: string;
+}): StudioDestructiveActionRequest {
+  return {
+    id: input.id,
+    title: input.title,
+    losses: [{ label: input.lossLabel, ...(input.note ? { note: input.note } : {}) }],
+    reversibility: "undoable",
+  };
+}
+
+/** ⑯ 캐릭터 설정 삭제 — 캐릭터 바이블은 통합 저널을 지나므로 ⌘Z 로 돌아온다. */
 export function studioDeleteCharacterBibleEntryRequest(
   characterLabel: string,
 ): StudioDestructiveActionRequest {
-  return sidecarDeleteRequest({
+  return journaledSidecarDeleteRequest({
     id: "studio.character-bible.delete-entry",
     title: `${characterLabel} 설정 삭제`,
     lossLabel: `${characterLabel}의 캐릭터 설정 전부`,
-    note: "캐릭터 바이블은 실행 취소 대상이 아니에요",
   });
 }
 
-/** ⑰ 작가의 방 항목 삭제 — 히스토리 밖. 연결된 참조는 자동 정리되지 않는다. */
+/** ⑰ 작가의 방 항목 삭제 — 저널로 ⌘Z 가능. 다만 연결된 참조는 자동 정리되지 않는다. */
 export function studioDeleteWriterRoomItemRequest(
   itemLabel: string,
 ): StudioDestructiveActionRequest {
-  return sidecarDeleteRequest({
+  return journaledSidecarDeleteRequest({
     id: "studio.writer-room.delete-item",
     title: `${itemLabel} 삭제`,
     lossLabel: `${itemLabel}`,
-    note: "연결된 참조는 직접 다시 확인해야 하고, 실행 취소 대상이 아니에요",
+    note: "연결된 참조는 직접 다시 확인해야 해요",
   });
 }
 
