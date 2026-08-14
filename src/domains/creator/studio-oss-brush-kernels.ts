@@ -279,7 +279,7 @@ export const STUDIO_OSS_DRY_CARRIER_RECIPE = Object.freeze({
   dabsPerActualRadius: 14,
   dabsPerBasicRadius: 0.6,
   ellipticalDabRatio: 1.25,
-  hardness: 0.55,
+  hardness: 0.72,
   opaque: 0.72,
   opaqueLinearize: 0.9,
   offsetByRandom: 0.22,
@@ -369,7 +369,7 @@ export function studioOssDirectionalWaxSample(
 }
 
 /**
- * Soft oil bristle film (Magma-class look via multi-scale soft channels).
+ * Oil bristle film (Magma-class look via multi-scale loaded channels).
  * Uses three 1-D value samples across the stroke — same noise budget as before.
  */
 export function studioOssOilBristleFilm(
@@ -387,19 +387,19 @@ export function studioOssOilBristleFilm(
   const tangentY = Math.sin(directionRadians);
   const across = x * -tangentY + y * tangentX;
   const along = x * tangentX + y * tangentY;
-  const fine = sample1d(across * 1.15 + along * 0.02, 31, seed ^ 0x9e57_41b3);
-  const mid = sample1d(across * 0.4 + along * 0.01, 33, seed ^ 0x2c1b_8e47);
-  const broad = sample1d(across * 0.15 - along * 0.005, 32, seed ^ 0x4b16_f2d9);
-  // Soft channel mask: peaks are paint ridges, valleys still hold film.
-  const channel = 1 - Math.abs(fine * 2 - 1) * 0.38;
-  const clump = 0.55 + mid * 0.45;
-  const load = 0.7 + broad * 0.3;
-  const ridge = channel * clump * load;
+  const fine = sample1d(across * 1.42 + along * 0.022, 31, seed ^ 0x9e57_41b3);
+  const mid = sample1d(across * 0.48 + along * 0.011, 33, seed ^ 0x2c1b_8e47);
+  const broad = sample1d(across * 0.18 - along * 0.006, 32, seed ^ 0x4b16_f2d9);
+  // Weighted load preserves long directional lanes. Expanding its useful
+  // range restores visible loaded ridges and dark grooves while keeping a
+  // continuous paint bed and the original three-sample noise budget.
+  const load = fine * 0.5 + mid * 0.32 + broad * 0.18;
+  const ridge = Math.min(1, Math.max(0, (load - 0.28) / 0.52));
   return {
-    alpha: 0.72 + ridge * 0.26,
-    color: 0.86 + ridge * 0.16,
+    alpha: 0.68 + ridge * 0.3,
+    color: 0.32 + ridge * 0.98,
     // paint-film darken amount only (never white lift)
-    lift: Math.max(0, 0.55 - ridge) * 0.12,
+    lift: (1 - ridge) * 0.35,
     ridge,
   };
 }

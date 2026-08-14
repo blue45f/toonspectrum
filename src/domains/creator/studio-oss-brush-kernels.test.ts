@@ -12,6 +12,7 @@ import {
   studioOssEqualAreaDiskOffset,
   studioOssKlecksChalkCoverage,
   studioOssMaterialColorModeForProfile,
+  studioOssOilBristleFilm,
   studioOssSprayTipCoverage,
   studioOssWatercolorTipCoverage,
 } from "./studio-oss-brush-kernels";
@@ -86,6 +87,18 @@ describe("studio OSS brush kernels (verified hybrid)", () => {
     expect(STUDIO_OSS_OIL_FILM_RECIPE.paintMode).toBe(0.88);
     expect(STUDIO_OSS_OIL_FILM_RECIPE.hardness).toBeLessThan(0.7);
     expect(STUDIO_OSS_DRY_CARRIER_RECIPE.offsetByRandom).toBeGreaterThan(0.1);
+    expect(STUDIO_OSS_DRY_CARRIER_RECIPE.hardness).toBeGreaterThanOrEqual(0.7);
+  });
+
+  it("keeps oil grooves measurably separated from loaded bristle ridges", () => {
+    const valley = studioOssOilBristleFilm(20, 12, 0, 17, () => 0);
+    const ridge = studioOssOilBristleFilm(20, 12, 0, 17, () => 1);
+
+    expect(valley.ridge).toBe(0);
+    expect(ridge.ridge).toBe(1);
+    expect(ridge.alpha - valley.alpha).toBeGreaterThanOrEqual(0.25);
+    expect(ridge.color - valley.color).toBeGreaterThanOrEqual(0.8);
+    expect(valley.lift - ridge.lift).toBeGreaterThanOrEqual(0.3);
   });
 
   it("routes site families to hybrid OSS stacks", () => {
