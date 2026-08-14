@@ -7,6 +7,7 @@ import {
   createStudioBg3dPhysicsThreeJob,
   measureStudioBg3dPhysicsModelLocalBounds,
   projectStudioBg3dPhysicsSamples,
+  STUDIO_BG3D_PHYSICS_PROJECTION_ROOT_USER_DATA_KEY,
 } from "./studio-bg3d-physics-three";
 import {
   DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
@@ -248,5 +249,34 @@ describe("Studio BG3D physics Three projection", () => {
       rotation: [0, 0, 0, 1],
     }], objects)).toBe(false);
     expect(root.position.toArray()).toEqual([1, 2, 3]);
+  });
+
+  it("projects through the marked retained presentation root and rejects arbitrary groups", () => {
+    const scene = new THREE.Scene();
+    const stageRoot = new THREE.Group();
+    const presentationRoot = new THREE.Group();
+    presentationRoot.userData[STUDIO_BG3D_PHYSICS_PROJECTION_ROOT_USER_DATA_KEY] = true;
+    const dynamic = new THREE.Group();
+    scene.add(stageRoot);
+    stageRoot.add(presentationRoot);
+    presentationRoot.add(dynamic);
+    const objects = new Map([["dynamic", dynamic]]);
+
+    expect(projectStudioBg3dPhysicsSamples([{
+      nodeId: "dynamic",
+      position: [4, 5, 6],
+      rotation: [0, 0, 0, 1],
+    }], objects)).toBe(true);
+    expect(dynamic.position.toArray()).toEqual([4, 5, 6]);
+
+    const arbitraryParent = new THREE.Group();
+    scene.add(arbitraryParent);
+    arbitraryParent.add(dynamic);
+    expect(projectStudioBg3dPhysicsSamples([{
+      nodeId: "dynamic",
+      position: [7, 8, 9],
+      rotation: [0, 0, 0, 1],
+    }], objects)).toBe(false);
+    expect(dynamic.position.toArray()).toEqual([4, 5, 6]);
   });
 });

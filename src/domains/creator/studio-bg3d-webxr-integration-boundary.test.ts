@@ -41,6 +41,9 @@ describe("Studio BG3D WebXR product boundary", () => {
     expect(source).toContain("{mainScenePresentationNode}");
     expect(source).toContain("<StudioBg3dImmersiveRenderBridge active={immersiveSceneActive} />");
     expect(source.match(/\{mainScenePresentationNode\}/gu)).toHaveLength(1);
+    expect(source).toMatch(
+      /userData=\{\{ \[STUDIO_BG3D_PHYSICS_PROJECTION_ROOT_USER_DATA_KEY\]: true \}\}/u,
+    );
     expect(source).toContain("<CaptureBridge onCaptureUpdate={onCaptureUpdate} />");
     expect(source).not.toMatch(/new\s+THREE\.WebGLRenderer/u);
     expect(source).not.toMatch(/@babylonjs\/core\/XR/u);

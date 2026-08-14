@@ -344,6 +344,7 @@ import {
   createStudioBg3dPhysicsThreeJob,
   measureStudioBg3dPhysicsModelLocalBounds,
   projectStudioBg3dPhysicsSamples,
+  STUDIO_BG3D_PHYSICS_PROJECTION_ROOT_USER_DATA_KEY,
 } from "./studio-bg3d-physics-three";
 import {
   sampleStudioBg3dPhysicsTimeline,
@@ -9866,7 +9867,10 @@ export function StudioBackground3D({
         : [0, 0, 0, 1]}
       scale={immersiveStagePlan?.stageRootTransform.uniformScale ?? 1}
     >
-      <group position={immersiveStagePlan ? [...immersiveStagePlan.contentOffset] : [0, 0, 0]}>
+      <group
+        position={immersiveStagePlan ? [...immersiveStagePlan.contentOffset] : [0, 0, 0]}
+        userData={{ [STUDIO_BG3D_PHYSICS_PROJECTION_ROOT_USER_DATA_KEY]: true }}
+      >
         {sceneContent}
         {sharedCharacterSceneContent}
       </group>

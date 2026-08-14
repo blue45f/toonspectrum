@@ -20,6 +20,14 @@ import type {
 const MAX_WORLD_COORDINATE = 10_000;
 const MIN_COLLIDER_HALF_EXTENT = 0.001;
 
+/**
+ * Marks the retained WebXR content root whose direct children still use canonical BG3D world
+ * coordinates. Arbitrary groups stay ineligible so a document child cannot accidentally receive
+ * a world-space physics sample as a local transform.
+ */
+export const STUDIO_BG3D_PHYSICS_PROJECTION_ROOT_USER_DATA_KEY =
+  "studioBg3dPhysicsProjectionRoot";
+
 export interface StudioBg3dPhysicsModelLocalBounds {
   readonly center: StudioBg3dVec3;
   readonly halfExtents: StudioBg3dVec3;
@@ -198,9 +206,15 @@ export function projectStudioBg3dPhysicsSamples(
   for (const sample of samples) {
     if (seen.has(sample.nodeId)) return false;
     const object = objects.get(sample.nodeId);
-    if (!object || object.parent?.type !== "Scene") {
-      // Dynamic bodies are root-only. Rejecting a newly parented object prevents a transient world
-      // transform from being interpreted as a local transform if the scene changes mid-session.
+    const parent = object?.parent;
+    if (
+      !object || !parent || (
+        parent.type !== "Scene" &&
+        parent.userData[STUDIO_BG3D_PHYSICS_PROJECTION_ROOT_USER_DATA_KEY] !== true
+      )
+    ) {
+      // Dynamic bodies are document-root-only. Rejecting every unmarked parent prevents a
+      // transient world transform from being interpreted as a local transform after reparenting.
       return false;
     }
     const [x, y, z] = sample.position;
