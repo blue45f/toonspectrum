@@ -712,11 +712,18 @@ describe("성능 예산 — 스칼라 샘플러", () => {
     for (let index = 0; index < 10_000; index += 1) {
       sink += samplePaperHeightV1(preset, index * 0.83, index * 0.57, SEED);
     }
-    const start = performance.now();
-    for (let index = 0; index < 1_000_000; index += 1) {
-      sink += samplePaperHeightV1(preset, (index % 1024) * 0.83, (index / 1024) * 0.57, SEED);
+    // 전체 스위트(2400여 파일) 안에서 벽시계를 한 번만 재면 그 순간의 스케줄링 운이 판정에 섞인다.
+    // 노이즈는 시간을 더하기만 하므로 여러 번 중 최솟값이 샘플러 실제 비용의 정직한 추정치다.
+    // 기준은 200ms 그대로 — 진짜로 느려졌다면 어떤 회차도 실제 작업량보다 빠를 수 없다.
+    // (이 레포의 bestMs·physicsBest 예산이 이미 같은 방식을 쓴다.)
+    let elapsedMs = Number.POSITIVE_INFINITY;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const start = performance.now();
+      for (let index = 0; index < 1_000_000; index += 1) {
+        sink += samplePaperHeightV1(preset, (index % 1024) * 0.83, (index / 1024) * 0.57, SEED);
+      }
+      elapsedMs = Math.min(elapsedMs, performance.now() - start);
     }
-    const elapsedMs = performance.now() - start;
     expect(Number.isFinite(sink)).toBe(true);
     expect(sink).toBeGreaterThan(0);
     expect(elapsedMs).toBeLessThan(200);
