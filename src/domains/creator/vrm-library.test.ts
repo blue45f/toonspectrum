@@ -109,6 +109,9 @@ const ORIGINAL_BUNDLE_FILES = [
   "TS_Haram_Explorer.vrm",
   "TS_Yeonhui_RuneGuard.vrm",
   "TS_Nova_ServiceAndroid.vrm",
+  "cyber_agent_zero.vrm",
+  "TS_Seojin_Architect.vrm",
+  "TS_Mira_Detective.vrm",
 ] as const;
 
 const MIN_BUNDLE_FILE_BYTES = 100 * 1024;
@@ -119,13 +122,16 @@ describe("VRM library helpers", () => {
 
     // 대표 엔트리 스팟 체크(기존 + 2026-07 신규).
     expect(names.slice(0, 4)).toEqual(["루미", "하린", "세라", "유나"]);
-    expect(names.slice(4, 10)).toEqual([
+    expect(names.slice(4, 13)).toEqual([
       "민서 (캠퍼스 메이커)",
       "태오 (동네 바리스타)",
       "정화 (노년 정원사)",
       "하람 (어린 탐험가)",
       "연휘 (룬 수호자)",
       "노바 (서비스 안드로이드)",
+      "사이버 에이전트 제로",
+      "서진 (배리어프리 건축가)",
+      "미라 (느와르 탐정)",
     ]);
     expect(names).toContain("데빌 (악마)");
     expect(names).toContain("쿨에일리언 (외계인)");
@@ -141,8 +147,8 @@ describe("VRM library helpers", () => {
     expect(names.join(" ")).not.toMatch(/샘플|아바타|Avatar|VRoid/i);
   });
 
-  it("bundles 95 selectable sample characters with unique ids and local /vrm/ urls", () => {
-    expect(SAMPLE_VRMS).toHaveLength(95);
+  it("bundles 97 selectable sample characters with unique ids and local /vrm/ urls", () => {
+    expect(SAMPLE_VRMS).toHaveLength(97);
 
     const ids = SAMPLE_VRMS.map((sample) => sample.id);
     expect(new Set(ids).size).toBe(ids.length);
