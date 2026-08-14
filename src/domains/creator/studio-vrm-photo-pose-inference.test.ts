@@ -107,6 +107,22 @@ describe("studio VRM photo-pose main-thread inference boundary", () => {
     expect(image.bitmap.close).toHaveBeenCalledOnce();
   });
 
+  it("passes distinct A/B photo bitmaps to the inference provider without reusing the prior input", () => {
+    const photoA = preprocessed(21);
+    const photoB = preprocessed(22);
+    const bitmapA = photoA.bitmap;
+    const bitmapB = photoB.bitmap;
+    const detector = { detect: vi.fn(() => poseResult()) };
+
+    inferStudioVrmPhotoPoseFromImage(photoA, detector, { expectedGenerationId: 21 });
+    inferStudioVrmPhotoPoseFromImage(photoB, detector, { expectedGenerationId: 22 });
+
+    expect(bitmapA).not.toBe(bitmapB);
+    expect(detector.detect.mock.calls).toEqual([[bitmapA], [bitmapB]]);
+    expect(bitmapA.close).toHaveBeenCalledOnce();
+    expect(bitmapB.close).toHaveBeenCalledOnce();
+  });
+
   it("recognizes zero, one, and two optional hands on the same transferred bitmap", () => {
     for (const labels of [[], ["Left"], ["Left", "Right"]] as const) {
       const image = preprocessed();

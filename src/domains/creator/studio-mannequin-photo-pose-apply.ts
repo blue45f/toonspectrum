@@ -8,6 +8,10 @@ import {
   normalizeStudioMannequinPose,
   type StudioMannequinPose,
 } from "./studio-mannequin-poses";
+import {
+  solvePoseToMannequinJoints,
+  type PoseLandmark,
+} from "./studio-mannequin-webcam-tracking";
 
 export interface StudioMannequinPhotoPoseLandmark {
   readonly x: number;
@@ -18,6 +22,11 @@ export interface StudioMannequinPhotoPoseLandmark {
 
 export interface StudioMannequinPhotoPoseInput {
   readonly landmarks?: Readonly<Record<string, StudioMannequinPhotoPoseLandmark>>;
+  /** Validated MediaPipe Pose world landmarks from the shared VRM photo scanner. */
+  readonly mediaPipeLandmarks?: readonly PoseLandmark[];
+  readonly currentPose?: StudioMannequinPose;
+  readonly mirrorMode?: boolean;
+  readonly minimumVisibility?: number;
   readonly joints?: Readonly<Partial<Record<StudioMannequinJointId, StudioMannequinVec3>>>;
   readonly pelvisOffset?: StudioMannequinVec3;
 }
@@ -34,19 +43,61 @@ export interface StudioMannequinPhotoPoseApplyPlan {
 export function createStudioMannequinPhotoPoseApplyPlan(
   input: StudioMannequinPhotoPoseInput,
 ): StudioMannequinPhotoPoseApplyPlan {
-  const joints: Partial<Record<StudioMannequinJointId, StudioMannequinVec3>> = {};
+  const currentPose = normalizeStudioMannequinPose(input.currentPose ?? {
+    joints: {},
+    pelvisOffset: [0, 0, 0],
+  });
+  const joints: Partial<Record<StudioMannequinJointId, StudioMannequinVec3>> = {
+    ...currentPose.joints,
+  };
   const appliedJoints: StudioMannequinJointId[] = [];
+  const appliedJointSet = new Set<StudioMannequinJointId>();
   const skippedJoints: string[] = [];
+
+  const applyJoint = (key: string, value: StudioMannequinVec3 | undefined): void => {
+    if (!isStudioMannequinJointId(key) || !value) {
+      skippedJoints.push(key);
+      return;
+    }
+    const rotation = clampStudioMannequinJointRotation(key, value);
+    joints[key] = rotation;
+    if (!appliedJointSet.has(key)) {
+      appliedJointSet.add(key);
+      appliedJoints.push(key);
+    }
+  };
+
+  if (input.mediaPipeLandmarks) {
+    const minimumVisibility = input.minimumVisibility ?? 0.35;
+    const validLandmarks = input.mediaPipeLandmarks.length === 33
+      && input.mediaPipeLandmarks.every((landmark) =>
+        Number.isFinite(landmark.x)
+        && Number.isFinite(landmark.y)
+        && Number.isFinite(landmark.z)
+        && (landmark.visibility === undefined
+          || (Number.isFinite(landmark.visibility)
+            && landmark.visibility >= 0
+            && landmark.visibility <= 1)))
+      && Number.isFinite(minimumVisibility)
+      && minimumVisibility >= 0
+      && minimumVisibility <= 1;
+
+    if (!validLandmarks) {
+      skippedJoints.push("mediaPipeLandmarks");
+    } else {
+      const solved = solvePoseToMannequinJoints(input.mediaPipeLandmarks, {
+        mirrorMode: input.mirrorMode ?? false,
+        minVisibility: minimumVisibility,
+      });
+      for (const [key, value] of Object.entries(solved)) {
+        applyJoint(key, value);
+      }
+    }
+  }
 
   if (input.joints) {
     for (const [key, value] of Object.entries(input.joints)) {
-      if (!isStudioMannequinJointId(key) || !value) {
-        skippedJoints.push(key);
-        continue;
-      }
-      const rotation = clampStudioMannequinJointRotation(key, value);
-      joints[key] = rotation;
-      appliedJoints.push(key);
+      applyJoint(key, value);
     }
   }
 
@@ -105,7 +156,7 @@ export function createStudioMannequinPhotoPoseApplyPlan(
 
   const pose = normalizeStudioMannequinPose({
     joints,
-    pelvisOffset: input.pelvisOffset ?? [0, 0, 0],
+    pelvisOffset: input.pelvisOffset ?? currentPose.pelvisOffset,
   });
 
   return Object.freeze({
