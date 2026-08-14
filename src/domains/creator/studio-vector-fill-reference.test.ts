@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { exportPageToSvg } from "./studio-svg-export";
 import {
+  describeStudioAdvancedFillVectorReferenceExclusion,
   fingerprintStudioVectorReference,
   materializeStudioAdvancedFillVectorTarget,
   planStudioAdvancedFillVectorTarget,
@@ -268,6 +269,47 @@ describe("planStudioAdvancedFillVectorTarget", () => {
     expect(planStudioAdvancedFillVectorTarget(input([draw("line")], {
       budgets: { maxSvgBytes: 8 },
     }))).toMatchObject({ ok: false, code: "svg-budget-exceeded" });
+  });
+});
+
+// 래스터 대상에서 벡터 선화 참조는 래스터 경계 위에 얹는 **추가** 경계다. 못 만들어도
+// 래스터 채우기 자체는 유효하므로, 실패는 채우기를 막을 근거가 아니라 알릴 사실이다.
+describe("describeStudioAdvancedFillVectorReferenceExclusion", () => {
+  it("stays silent when there was no vector line art to exclude", () => {
+    const plan = planStudioAdvancedFillVectorTarget(input([]));
+    expect(plan).toMatchObject({ ok: false, code: "no-visible-vector-draw" });
+    if (plan.ok) return;
+    expect(describeStudioAdvancedFillVectorReferenceExclusion(plan)).toBeNull();
+  });
+
+  it("names both what was dropped and the plan's own reason for every other failure", () => {
+    const failures = [
+      planStudioAdvancedFillVectorTarget(input([draw("ink"), draw("erase", { mode: "eraser" })])),
+      planStudioAdvancedFillVectorTarget(input([draw("line")], { width: 0 })),
+      planStudioAdvancedFillVectorTarget(input([draw("line")], { budgets: { maxSourceBytes: 8 } })),
+      planStudioAdvancedFillVectorTarget(input([draw("line")], { budgets: { maxSvgBytes: 8 } })),
+      planStudioAdvancedFillVectorTarget(input([draw("line")], { pageId: "  " })),
+    ];
+
+    for (const failure of failures) {
+      expect(failure.ok).toBe(false);
+      if (failure.ok) continue;
+      const notice = describeStudioAdvancedFillVectorReferenceExclusion(failure);
+      expect(notice).toContain("벡터 선화는 채우기 경계에서 빼고 래스터 경계만으로 계산했어요.");
+      expect(notice).toContain(failure.reason);
+    }
+  });
+
+  it("degrades the eraser-fidelity failure that used to abort an unrelated raster fill", () => {
+    const plan = planStudioAdvancedFillVectorTarget(input([
+      draw("ink"),
+      draw("erase-the-ink", { mode: "eraser" }),
+    ]));
+    expect(plan).toMatchObject({ ok: false, code: "unsupported-vector-fidelity" });
+    if (plan.ok) return;
+    expect(describeStudioAdvancedFillVectorReferenceExclusion(plan)).toContain(
+      "지우개 벡터 획은 선화 참조 이미지에서 원본 합성을 정확히 재현할 수 없습니다.",
+    );
   });
 });
 

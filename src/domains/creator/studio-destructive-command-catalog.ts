@@ -500,26 +500,17 @@ export function studioVrmPoseShareUseContextConsentRequest(input: Readonly<{
   };
 }
 
+// 사용권·크레딧을 문구에 싣는 확장판은 호출부(StudioVrmPoser)와 함께 따로 착지한다. 서명만
+// 먼저 바꾸면 이 카탈로그를 쓰는 포즈 공유가 타입 단계에서 깨진다.
 export function studioSharePoseConsentRequest(
-  input: Readonly<{
-    poseTitle: string;
-    licenseLabel: string;
-    attributionText: string;
-  }>,
+  poseTitle: string,
 ): StudioDestructiveActionRequest {
-  const poseTitle = boundedStudioShareConsentText(input.poseTitle, 30);
-  const licenseLabel = boundedStudioShareConsentText(input.licenseLabel, 80);
-  const attributionText = boundedStudioShareConsentText(input.attributionText, 160);
-  const attributionStatement = attributionText
-    ? `필수 크레딧 “${attributionText}”을 변경하지 않고 게시 정보에 함께 싣습니다.`
-    : "이 사용권은 이 포즈 게시에 별도 출처 표시를 요구하지 않습니다.";
   return {
     id: "studio.vrm-pose.share-consent",
-    title: `'${poseTitle}' 포즈를 서버에 공유`,
+    title: `'${boundedStudioShareConsentText(poseTitle, 30)}' 포즈를 서버에 공유`,
     intro:
-      `방금 확인한 이용 맥락을 기준으로 이 개조된 VRM 렌더 포즈의 ${licenseLabel} 조건을 검토했습니다. `
-      + `${attributionStatement} `
-      + "이 포즈 이미지와 모델·의상·소품 표현을 공유할 권리가 있고 타인의 권리를 침해하지 않음을 확인합니다.",
+      "이 포즈 이미지와 모델·의상·소품 표현을 ToonSpectrum 표준 사용권으로 공유할 권한이 있으며, "
+      + "타인의 권리를 침해하지 않음을 확인합니다.",
     losses: [],
     gains: ["다른 사용자가 쓸 수 있는 공유 포즈 1개"],
     reversibility: "document-untouched",
