@@ -286,6 +286,9 @@ interface LongBrushResult {
    * carrier with a gap is a defect, while a discrete carrier is authored to leave gaps.
    */
   totalSegmentsPerTool: number;
+  /** Lane sizes travel with the minimums: an empty lane must not report perfect coverage. */
+  continuousPolicyTools: number;
+  discretePolicyTools: number;
   continuousMinimumVisibleSegments: number;
   discreteMinimumVisibleSegments: number;
   toolsBelowFullCoverage: number;
@@ -2864,6 +2867,12 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
     reportBrowserErrors(errors);
     invariant(errors.messages.length === 0, "long-brush browser emitted console/page errors");
     invariant(errors.failedResponses.length === 0, "long-brush browser received unexpected 5xx responses");
+    const continuousSegmentCounts = evidence
+      .filter((entry) => entry.qualityPolicy !== "record-only-discrete")
+      .map((entry) => entry.visibleSegments);
+    const discreteSegmentCounts = evidence
+      .filter((entry) => entry.qualityPolicy === "record-only-discrete")
+      .map((entry) => entry.visibleSegments);
     return {
       ok: evidence.length === LONG_BRUSH_CATALOG_COUNT && evidence.every((entry) =>
         entry.visualChanged
@@ -2908,18 +2917,12 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
         ).length,
       },
       totalSegmentsPerTool: 6,
-      continuousMinimumVisibleSegments: Math.min(
-        ...evidence
-          .filter((entry) => entry.qualityPolicy !== "record-only-discrete")
-          .map((entry) => entry.visibleSegments),
-        6,
-      ),
-      discreteMinimumVisibleSegments: Math.min(
-        ...evidence
-          .filter((entry) => entry.qualityPolicy === "record-only-discrete")
-          .map((entry) => entry.visibleSegments),
-        6,
-      ),
+      // The lane sizes travel with the minimums on purpose. `Math.min(...[], 6)` is 6, so an empty
+      // lane would report perfect coverage and its assertion would pass while measuring nothing.
+      continuousPolicyTools: continuousSegmentCounts.length,
+      discretePolicyTools: discreteSegmentCounts.length,
+      continuousMinimumVisibleSegments: Math.min(...continuousSegmentCounts, 6),
+      discreteMinimumVisibleSegments: Math.min(...discreteSegmentCounts, 6),
       toolsBelowFullCoverage: evidence.filter((entry) => entry.visibleSegments < 6).length,
       errorCount: errors.messages.length + errors.failedResponses.length,
     };
@@ -3713,6 +3716,8 @@ function writeBrowserEvidenceReceipt(run: {
       passed: longBrushes.presetCount,
       total: listedCoreCount,
       totalSegmentsPerTool: longBrushes.totalSegmentsPerTool,
+      continuousPolicyTools: longBrushes.continuousPolicyTools,
+      discretePolicyTools: longBrushes.discretePolicyTools,
       continuousMinimumVisibleSegments: longBrushes.continuousMinimumVisibleSegments,
       discreteMinimumVisibleSegments: longBrushes.discreteMinimumVisibleSegments,
       toolsBelowFullCoverage: longBrushes.toolsBelowFullCoverage,

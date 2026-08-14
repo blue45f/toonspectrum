@@ -36,6 +36,9 @@ interface StudioBrushBrowserEvidence {
     readonly passed: number;
     readonly total: number;
     readonly totalSegmentsPerTool: number;
+    /** Lane sizes: a minimum over an empty lane is 6 and would certify nothing. */
+    readonly continuousPolicyTools: number;
+    readonly discretePolicyTools: number;
     /**
      * Measured distribution, emitted by runLongBrushMatrix. A universal
      * `visibleSegmentsPerTool: 6` used to sit here and was untrue — the same run's log recorded a
@@ -138,7 +141,16 @@ describe("Studio brush browser evidence", () => {
     // Full route coverage is the rule. Every tool held to the continuous policy must paint all six
     // sampled sixths — that is the assertion a regression cannot escape by reclassifying itself,
     // because reclassifying a broken tool as discrete moves it out of this minimum and into the
-    // discrete floor below, which is also pinned.
+    // discrete floor below, which is also pinned. The lane sizes are checked first: a minimum over
+    // an empty lane comes out as a perfect 6 and would certify nothing at all.
+    expect(
+      evidence.longRouteCore.continuousPolicyTools
+        + evidence.longRouteCore.discretePolicyTools,
+    ).toBe(listedCoreCount);
+    expect(evidence.longRouteCore.continuousPolicyTools).toBeGreaterThan(0);
+    expect(evidence.longRouteCore.discretePolicyTools).toBe(
+      evidence.longRouteCore.qualityPolicyCounts["record-only-discrete"],
+    );
     expect(evidence.longRouteCore.continuousMinimumVisibleSegments).toBe(6);
     expect(evidence.longRouteCore.discreteMinimumVisibleSegments)
       .toBeGreaterThanOrEqual(4);
