@@ -74,6 +74,7 @@ import {
   planNeonBrushPasses,
   planOilBrushDabs,
   studioOilPaintBodyForBrush,
+  studioOilTipProfileForBrush,
   planPastelBrushDabs,
   planStudioFxBrushPressurePath,
   planStudioFxLuminousRibbonPass,
@@ -96,6 +97,7 @@ import {
 import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "./studio-material-pressure-model";
 import {
   planStudioOilRibbonCarrier,
+  studioOilRibbonProgramsForBrush,
   STUDIO_OIL_IMPASTO_RELIEF_HIGHLIGHT_COLOR,
   traceStudioOilRibbonPath,
 } from "./studio-oil-ribbon-carrier";
@@ -2174,32 +2176,17 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               seed: fxBrushSeedFromKey(el.id),
               maxDabs: FX_OIL_DAB_CAP,
               paintBody: studioOilPaintBodyForBrush(brush),
+              tipProfile: studioOilTipProfileForBrush(brush),
             });
             // brush--bristle-depletion 레인만 v1 강모 고갈 다이내믹을 켠다(갈필),
             // dli GGX 릴리프 오버레이는 brush--impasto-relief 와 oil--impasto-ribbon 두 레인이 켠다,
             // brush--bristle-physics 레인만 WetBrush-2D 강모 물리 시뮬을 켠다(2026-08-13 wave 3).
             // 옵션이 없는 다른 모든 유화 브러시는 캐리어 계약상 바이트 동일 플랜을 유지하며, SVG
             // 내보내기의 유화 분기와 입력(대브·시드)이 같아 두 렌더러가 픽셀 일치한다.
-            const carrier = brush === "brush--bristle-physics"
-              ? planStudioOilRibbonCarrier(dabs, {
-                  bristlePhysics: {
-                    enabled: true,
-                    seed: fxBrushSeedFromKey(el.id),
-                  },
-                })
-              : brush === "brush--bristle-depletion"
-                ? planStudioOilRibbonCarrier(dabs, {
-                    bristleLoadDynamics: {
-                      enabled: true,
-                      seed: fxBrushSeedFromKey(el.id),
-                    },
-                  })
-                : brush === "brush--impasto-relief"
-                  || brush === "oil--impasto-ribbon"
-                  ? planStudioOilRibbonCarrier(dabs, {
-                      impastoRelief: { enabled: true },
-                    })
-                  : planStudioOilRibbonCarrier(dabs);
+            const carrier = planStudioOilRibbonCarrier(
+              dabs,
+              studioOilRibbonProgramsForBrush(brush, fxBrushSeedFromKey(el.id)),
+            );
             return (
               <Shape
                 key={index}

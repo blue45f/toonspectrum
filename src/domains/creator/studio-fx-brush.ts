@@ -1327,6 +1327,17 @@ export type FxOilBristle = {
  */
 export type FxOilPaintBody = "oil" | "acrylic";
 
+/**
+ * The head doing the depositing.
+ *
+ * The lane catalogue has always declared this per row - `oil--flat-ribbon` says "hard",
+ * `brush--oil-lanes` says "bristle" - and, like `engineVariant`, no renderer read it, so the two
+ * planned byte-identical beds. A flat/hard head lays a more even film: its ridges are shallower and
+ * its load varies less across the head, because there is no soft tuft to splay and starve
+ * unevenly. A bristle head keeps the full variation.
+ */
+export type FxOilTipProfile = "bristle" | "hard";
+
 export type FxOilPlanInput = {
   points: readonly number[];
   pressures?: readonly number[] | null;
@@ -1335,6 +1346,8 @@ export type FxOilPlanInput = {
   maxDabs?: number;
   /** Defaults to "oil" so every existing caller keeps byte-identical plans. */
   paintBody?: FxOilPaintBody;
+  /** Defaults to "bristle", the historical behaviour. */
+  tipProfile?: FxOilTipProfile;
 };
 
 /**
@@ -1367,6 +1380,14 @@ const BRISTLE_LOAD_WAVELENGTH_STATIONS = 20;
 const ACRYLIC_LOAD_WAVELENGTH_SCALE = 0.45;
 const ACRYLIC_RIDGE_SCALE = 1.35;
 
+/**
+ * A hard head evens the bed out: ridges sit lower and the spread of load across the head narrows
+ * toward its own mean. Deliberately a pull TOWARD the mean rather than a cut in amplitude, so the
+ * bed stays textured instead of turning into a flat slab.
+ */
+const HARD_TIP_RIDGE_SCALE = 0.72;
+const HARD_TIP_LOAD_EVENNESS = 0.55;
+
 function bristleLoadAlongTravel(
   stationIndex: number,
   bristleIndex: number,
@@ -1395,6 +1416,13 @@ export function studioOilPaintBodyForBrush(brush: string): FxOilPaintBody {
   return brush.startsWith("acrylic") ? "acrylic" : "oil";
 }
 
+/** Hard heads (flat, stiff) deposit a more even film than a soft tuft; declared per lane row. */
+export function studioOilTipProfileForBrush(brush: string): FxOilTipProfile {
+  return brush === "oil--flat-ribbon" || brush === "acrylic--stiff-ribbon"
+    ? "hard"
+    : "bristle";
+}
+
 export function planOilBrushDabs(input: FxOilPlanInput): FxOilDab[] {
   const points = sanitizePoints(input.points, input.pressures);
   if (points.length === 0) return [];
@@ -1410,6 +1438,7 @@ export function planOilBrushDabs(input: FxOilPlanInput): FxOilDab[] {
   // Dense wet carrier so stations read as one continuous load of paint without becoming a stamp
   // lattice. Long strokes remain bounded by sampleStations' whole-path redistribution.
   const paintBody: FxOilPaintBody = input.paintBody === "acrylic" ? "acrylic" : "oil";
+  const tipProfile: FxOilTipProfile = input.tipProfile === "hard" ? "hard" : "bristle";
   const spacing = Math.max(0.5, baseWidth * 0.068);
   const stations = sampleStations(points, spacing, maxDabs);
   const dabs: FxOilDab[] = [];
@@ -1450,7 +1479,11 @@ export function planOilBrushDabs(input: FxOilPlanInput): FxOilDab[] {
     const bristleOffsets = [-0.88, -0.58, -0.3, 0, 0.3, 0.58, 0.88];
     const bristles = bristleOffsets.map(
       (offsetRatio, bristleIndex): FxOilBristle => {
-        const tooth = bristleLoadAlongTravel(si, bristleIndex, seed, paintBody);
+        const rawTooth = bristleLoadAlongTravel(si, bristleIndex, seed, paintBody);
+        // A hard head pulls each hair's load toward the head's mean instead of clipping its range.
+        const tooth = tipProfile === "hard"
+          ? 0.5 + (rawTooth - 0.5) * HARD_TIP_LOAD_EVENNESS
+          : rawTooth;
         // Contact widens under pressure: outer hairs only load once the stylus digs in.
         const edge = Math.abs(offsetRatio);
         const contact = clamp(
@@ -1465,7 +1498,8 @@ export function planOilBrushDabs(input: FxOilPlanInput): FxOilDab[] {
           // Ridges must remain a material fraction of radiusY after the ribbon carrier's
           // 0.17 + ratio*1.1 width map — keep them resolvable without repainting the body.
           radiusYRatio: (0.055 + tooth * 0.05 + contact * 0.03)
-            * (paintBody === "acrylic" ? ACRYLIC_RIDGE_SCALE : 1),
+            * (paintBody === "acrylic" ? ACRYLIC_RIDGE_SCALE : 1)
+            * (tipProfile === "hard" ? HARD_TIP_RIDGE_SCALE : 1),
           // Bimodal load with pressure-gated contact: skimming hairs stay near-dry film while
           // loaded ridges carry a clear pigment step. Self-crossings stay honest because mid-alpha
           // stacking (worst a·(1−a)) is avoided on the dominant band.

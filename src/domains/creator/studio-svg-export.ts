@@ -158,6 +158,7 @@ import {
   planNeonBrushPasses,
   planOilBrushDabs,
   studioOilPaintBodyForBrush,
+  studioOilTipProfileForBrush,
   planPastelBrushDabs,
   planStudioFxBrushPressurePath,
   planStudioFxLuminousRibbonPass,
@@ -197,6 +198,7 @@ import {
 } from "./studio-material-pressure-model";
 import {
   planStudioOilRibbonCarrier,
+  studioOilRibbonProgramsForBrush,
   STUDIO_OIL_IMPASTO_RELIEF_HIGHLIGHT_COLOR,
   STUDIO_OIL_IMPASTO_RELIEF_OVERLAY_VERSION,
   studioOilRibbonPathData,
@@ -2962,6 +2964,7 @@ function serializeFreehand(
       seed: fxBrushSeedFromKey(el.id),
       maxDabs: FX_OIL_DAB_CAP,
       paintBody: studioOilPaintBodyForBrush(brush),
+      tipProfile: studioOilTipProfileForBrush(brush),
     });
     // brush--bristle-depletion 레인만 v1 강모 고갈 다이내믹을 켠다, brush--bristle-physics 레인만
     // WetBrush-2D 강모 물리 시뮬을 켠다(2026-08-13 wave 3) — Canvas 렌더러(StudioDrawNode)의 유화
@@ -2975,25 +2978,10 @@ function serializeFreehand(
     // acrylic--stiff-ribbon 과 0.168 로 코퍼스 중앙값(1.04)의 6분의 1 거리에 붙어 있었다.
     // 저장된 oil--impasto-ribbon 획은 이제 릴리프와 함께 다시 그려진다 — 질감을 바이트 안정성보다
     // 우선한다는 기존 결정(크레용 5레인)과 같은 판단.
-    const carrier = brush === "brush--bristle-physics"
-      ? planStudioOilRibbonCarrier(dabs, {
-          bristlePhysics: {
-            enabled: true,
-            seed: fxBrushSeedFromKey(el.id),
-          },
-        })
-      : brush === "brush--bristle-depletion"
-        ? planStudioOilRibbonCarrier(dabs, {
-            bristleLoadDynamics: {
-              enabled: true,
-              seed: fxBrushSeedFromKey(el.id),
-            },
-          })
-        : brush === "brush--impasto-relief" || brush === "oil--impasto-ribbon"
-          ? planStudioOilRibbonCarrier(dabs, {
-              impastoRelief: { enabled: true },
-            })
-          : planStudioOilRibbonCarrier(dabs);
+    const carrier = planStudioOilRibbonCarrier(
+      dabs,
+      studioOilRibbonProgramsForBrush(brush, fxBrushSeedFromKey(el.id)),
+    );
     if (!carrier.body) return "";
     const body = `<path data-paint-carrier="contiguous-variable-width-ribbon" d="${studioOilRibbonPathData(carrier.body, true)}" fill="${escapeXml(stroke)}" opacity="${fmtDabOpacity(carrier.bodyOpacity * strokeOpacity)}"/>`;
     // One <path> per load band, with every run of that band as a subpath: SVG paints a path once,

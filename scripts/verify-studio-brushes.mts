@@ -1835,8 +1835,20 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
       // Exercise the product's trusted keyboard route. Some responsive layouts render more than
       // one history control and the first DOM copy can sit underneath the document menubar.
       await page.keyboard.press("Meta+z");
-      await page.waitForTimeout(60);
-      const undone = await page.screenshot({ animations: "disabled", clip: usedClip });
+      // Wait for the undo to actually SETTLE rather than for a fixed 60ms. The old constant made
+      // this assertion trip on whichever brush happened to still be compositing when the clock ran
+      // out — soft-glow and liner both did, on unrelated commits, at 7-10 residual pixels of Δ22
+      // against a Δ20 threshold, while the diagnostic capture was visually blank paper. Polling for
+      // two identical consecutive frames measures the same thing the bound below asks about, and
+      // does NOT widen that bound: real residual ink still fails.
+      let undone = await page.screenshot({ animations: "disabled", clip: usedClip });
+      for (let settleAttempt = 0; settleAttempt < 12; settleAttempt += 1) {
+        await page.waitForTimeout(60);
+        const next = await page.screenshot({ animations: "disabled", clip: usedClip });
+        const settled = next.equals(undone);
+        undone = next;
+        if (settled) break;
+      }
       // Konva may re-rasterize the untouched paper by a few channel values after a history jump.
       // Ignore imperceptible antialias noise while still rejecting any residual ink above Δ20.
       const undoDiff = await compareScreenshotPixels(page, before, undone, 20);

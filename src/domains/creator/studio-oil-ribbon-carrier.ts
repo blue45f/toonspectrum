@@ -148,6 +148,50 @@ export interface StudioOilRibbonCarrierOptions {
   readonly bristlePhysics?: StudioOilRibbonCarrierBristlePhysicsOptions;
 }
 
+/**
+ * Which carrier programs a given oil/acrylic lane runs.
+ *
+ * This replaces an either/or `brush === ...` chain that was duplicated in the Canvas renderer and
+ * the SVG exporter. The chain could only ever grant ONE program, so a lane could not be both
+ * loaded and impasto, and every lane that was not one of the three demo ids fell through to the
+ * plain carrier - which is why oil--filbert-ribbon, oil--impasto-ribbon and brush--oil-lanes all
+ * painted the same bed. Returning the option object from one place makes combinations expressible
+ * and keeps the two renderers from drifting into disagreeing about a stroke's programs.
+ *
+ * The matrix is physical, not decorative:
+ * - a filbert is a loaded tuft, so it splays under pressure          -> bristlePhysics
+ * - impasto is that same tuft leaving standing ridges                -> bristlePhysics + relief
+ * - flat and acrylic-stiff declare a HARD tip: flat instruments whose mechanism is not tuft
+ *   splay, so they stay off the sim (acrylic is already separated by its fast-setting body)
+ * - brush--oil-lanes stays plain, which is what now distinguishes it from the filbert
+ */
+export function studioOilRibbonProgramsForBrush(
+  brush: string,
+  seed: number,
+): StudioOilRibbonCarrierOptions | undefined {
+  const bristlePhysics = { enabled: true, seed } as const;
+  switch (brush) {
+    case "brush--bristle-physics":
+      // The mechanics showcase runs BOTH mechanical programs. It has to stay distinguishable from
+      // oil--filbert-ribbon, which now also runs the sim: with the sim alone the two planned
+      // identical beds (same lane widths, same opacities). Quarantining the demo instead is not
+      // available - it is a pinned experimental lane and the governance audit keeps it through its
+      // lab period - so it earns its own identity rather than losing its row.
+      return { bristlePhysics, bristleLoadDynamics: { enabled: true, seed } };
+    case "brush--bristle-depletion":
+      return { bristleLoadDynamics: { enabled: true, seed } };
+    case "brush--impasto-relief":
+      return { impastoRelief: { enabled: true } };
+    case "oil--filbert-ribbon":
+      return { bristlePhysics };
+    case "oil--impasto-ribbon":
+      return { bristlePhysics, impastoRelief: { enabled: true } };
+    default:
+      return undefined;
+  }
+}
+
+
 interface OilCarrierStation {
   readonly x: number;
   readonly y: number;
