@@ -35,12 +35,53 @@ describe("Avatar Forge reference recommendation clean-room boundary", () => {
     expect(inferenceSource).toContain(
       'new Worker(new URL("./studio-vrm-avatar-reference.worker.ts", import.meta.url)',
     );
+    expect(inferenceSource).toContain('type: "module"');
+    expect(inferenceSource).toContain("official module WASM loader");
     expect(inferenceSource).toContain("new StudioVrmPhotoPosePreprocessor()");
     expect(inferenceSource).toContain("maxOutputDimension: STUDIO_VRM_AVATAR_REFERENCE_LIMITS.maxOutputDimension");
     expect(inferenceSource).toContain("maxOutputPixels: STUDIO_VRM_AVATAR_REFERENCE_LIMITS.maxOutputPixels");
     expect(workerSource).toContain("embedder.embed(request.bitmap)");
     expect(panelSource).not.toContain("embed(");
     expect(panelSource).not.toContain("createImageBitmap");
+  });
+
+  it("locks inference egress before loading MediaPipe and uses only official module assets", () => {
+    expect(workerSource).toContain(
+      '@mediapipe/tasks-vision/vision_wasm_module_internal.js?url',
+    );
+    expect(workerSource).toContain(
+      '@mediapipe/tasks-vision/vision_wasm_module_internal.wasm?url',
+    );
+    expect(workerSource).not.toContain("resolveStudioMediaPipeVisionWasmFileset");
+    expect(workerSource).toContain("installStudioVrmAvatarReferenceEgressPolicy");
+    expect(workerSource.indexOf("installStudioVrmAvatarReferenceEgressPolicy();"))
+      .toBeLessThan(workerSource.indexOf("loadStudioMediaPipeVisionModule()"));
+    expect(workerSource).toContain("allowedFetchUrls");
+    expect(workerSource).toContain("STUDIO_VRM_AVATAR_REFERENCE_MODEL_URL");
+    expect(workerSource).toContain("response.redirected");
+    expect(workerSource).toContain('requestMethod(input, init) !== "GET"');
+    expect(workerSource).toContain("Never forward caller-controlled headers");
+    expect(workerSource).toContain("propertyOwner");
+    expect(workerSource).toContain("WorkerGlobalScope.prototype.fetch/importScripts");
+    expect(workerSource).toContain('credentials: "omit"');
+    expect(workerSource).toContain('redirect: "error"');
+    expect(workerSource).toContain('referrerPolicy: "no-referrer"');
+    expect(workerSource).not.toContain("nativeFetch(input, init)");
+    for (const blockedGlobal of [
+      "EventSource",
+      "FontFace",
+      "CacheStorage",
+      "SharedWorker",
+      "WebSocket",
+      "WebTransport",
+      "Worker",
+      "XMLHttpRequest",
+      "importScripts",
+      "sendBeacon",
+      "fonts",
+    ]) {
+      expect(workerSource).toContain(blockedGlobal);
+    }
   });
 
   it("keeps reference bytes ephemeral and requires explicit preview/apply callbacks", () => {
