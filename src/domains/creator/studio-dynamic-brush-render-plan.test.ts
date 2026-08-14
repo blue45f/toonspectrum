@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   normalizeStudioBrushDynamicsSettings,
+  studioBrushDynamicsSettingsForBrushId,
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
 } from "./studio-brush-dynamics";
 import { materializeStudioBrushPackDynamics } from "./studio-brush-pack-runtime";
@@ -284,5 +285,47 @@ describe("studio dynamic brush render plan", () => {
       status: "rejected",
       reason: "deposit-plan",
     });
+  });
+});
+
+/**
+ * Legacy replay fail-safe. Strokes drawn before element-level dynamics capture carry no
+ * `brushDynamics`, so their dynamics are re-derived from today's catalogue. That catalogue now
+ * mints the dry-media kernel pin for freshly authored presets — and inheriting it would move a
+ * saved stroke off the union carrier it was actually drawn with, changing its grain and edge in a
+ * document the artist already finished. Only an element's own stored snapshot may carry the pin.
+ */
+describe("legacy dry-media replay ownership", () => {
+  const DRY_MEDIA_IDS = ["crayon", "chalk", "charcoal", "pastel", "oil-pastel"] as const;
+
+  it("keeps the fresh-authoring catalogue pin off strokes that stored no dynamics", () => {
+    for (const brushId of DRY_MEDIA_IDS) {
+      const authored = studioBrushDynamicsSettingsForBrushId(brushId);
+      if (!authored?.dryMediaKernelProgram) continue;
+      const legacy = drawElement(`legacy-${brushId}`, {
+        brush: brushId,
+        brushDynamics: undefined,
+      });
+
+      const plan = requireReady(planStudioDynamicBrushRender(legacy, brushId, false));
+
+      expect(plan.dynamics.dryMediaKernelProgram, brushId).toBeUndefined();
+    }
+  });
+
+  it("still honours the pin when the stroke stored it itself", () => {
+    const brushId = DRY_MEDIA_IDS.find(
+      (id) => studioBrushDynamicsSettingsForBrushId(id)?.dryMediaKernelProgram !== undefined,
+    );
+    if (!brushId) return;
+    const authored = studioBrushDynamicsSettingsForBrushId(brushId)!;
+    const captured = drawElement(`captured-${brushId}`, {
+      brush: brushId,
+      brushDynamics: authored,
+    });
+
+    const plan = requireReady(planStudioDynamicBrushRender(captured, brushId, false));
+
+    expect(plan.dynamics.dryMediaKernelProgram).toBeDefined();
   });
 });

@@ -47,6 +47,7 @@ import {
 } from "./studio-engine-webgpu-textured-brush-plan";
 import { parseStudioProfessionalBrushDynamicsPlan } from "./studio-professional-brush-dynamics";
 import { sha256HexPortable } from "./studio-sha256";
+import { STUDIO_STROKE_PAINT_MODEL_BOUNDED_FLOW_V2 } from "./studio-stroke-paint-model";
 
 import type {
   NormalizedStudioBrushDynamicsSettings,
@@ -192,6 +193,7 @@ function canonicalProjection(
     taper: { enabled: false },
     tip: dynamics.tip,
     tipLayers: [],
+    dualBrush: { enabled: false },
     colorDynamics: {
       backgroundColor: null,
       foregroundBackgroundMix: 0,
@@ -225,7 +227,9 @@ function canonicalProjection(
     // bounded-flow-v2 applies element opacity once after stroke-local accumulation. At exactly
     // unit opacity that final operation is an identity, so the specialist's transparent RGBA16F
     // rebuild is pixel-equivalent. Non-unit bounded flow is rejected before projection.
-    paintModel: undefined,
+    paintModel: element.paintModel === STUDIO_STROKE_PAINT_MODEL_BOUNDED_FLOW_V2
+      ? STUDIO_STROKE_PAINT_MODEL_BOUNDED_FLOW_V2
+      : undefined,
     brushDynamics: projectedDynamics,
   };
 }

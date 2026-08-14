@@ -149,14 +149,15 @@ const RADIANS_TO_DEGREES = 180 / Math.PI;
 const POINT_EPSILON = 1e-8;
 /**
  * Product lane counts are deliberately bounded below the full simulation's most expensive
- * presets, but never collapse a selected-width nib to one representative fibre. Five lanes keep
- * wax, carbon and soft pigment visibly broad. Chalk also uses five connected lanes: three wide
- * mineral footprints produced conspicuous square flakes, while fine subtractive grain inside a
- * continuous five-lane bed retains tooth without revealing the transport primitive. This is still
- * O(source dabs) with a small material constant and remains prefix-stable.
+ * presets, but never collapse a selected-width nib to one representative fibre.
+ *
+ * Crayon uses three connected wax fibres: five-lane expansion with dense spacing produced
+ * tens of thousands of union polygons on multi-second strokes and froze the live canvas path.
+ * Three lanes keep a broad stick while remaining O(source dabs) and prefix-stable. Charcoal /
+ * chalk / pastel stay at five for fibrous/mineral beds where spacing is already coarser.
  */
 const PRODUCT_LANE_COUNT = Object.freeze({
-  crayon: 5,
+  crayon: 3,
   charcoal: 5,
   chalk: 5,
   pastel: 5,

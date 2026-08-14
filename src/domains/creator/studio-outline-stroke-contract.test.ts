@@ -9,7 +9,7 @@ import {
   STUDIO_OUTLINE_STROKE_ADAPTER_VERSION,
   STUDIO_OUTLINE_STROKE_PACKAGE_ALGORITHM,
   StudioOutlineStrokeContractError,
-  type StudioOutlineStrokeContractV1,
+  type StudioPerfectFreehandOutlineStrokeContractV1,
 } from "./studio-outline-stroke-contract";
 import {
   loadStudioPerfectFreehandStroker,
@@ -20,12 +20,15 @@ import {
 function capture(
   brushId = "perfect-ink",
   pressureSource: "recorded" | "simulated-distance" = "recorded",
-): StudioOutlineStrokeContractV1 {
+): StudioPerfectFreehandOutlineStrokeContractV1 {
   const contract = captureStudioOutlineStrokeContractV1({
     brushId,
     pressureSource,
   });
-  if (!contract) throw new Error(`테스트 브러시 ${brushId}의 계약이 없습니다.`);
+  // 이 스위트의 픽스처 브러시는 전부 perfect-freehand 브랜치다(캡슐 브랜치는 자기 스위트 소유).
+  if (!contract || contract.engine !== "perfect-freehand-outline") {
+    throw new Error(`테스트 브러시 ${brushId}의 perfect-freehand 계약이 없습니다.`);
+  }
   return contract;
 }
 
@@ -170,9 +173,12 @@ describe("StudioOutlineStrokeContractV1 capture / normalization", () => {
       },
     };
     const normalized = normalizeStudioOutlineStrokeContract(historical);
-    expect(normalized?.profile.diameterScale).toBe(0.72);
-    expect(normalized?.profile.thinning).toBe(0.61);
-    expect(normalized?.profile.taperEndFactor).toBe(4.25);
+    const normalizedProfile = normalized?.engine === "perfect-freehand-outline"
+      ? normalized.profile
+      : null;
+    expect(normalizedProfile?.diameterScale).toBe(0.72);
+    expect(normalizedProfile?.thinning).toBe(0.61);
+    expect(normalizedProfile?.taperEndFactor).toBe(4.25);
 
     expect(resolveStudioOutlineStrokeContract({
       ...contract,

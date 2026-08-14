@@ -34,11 +34,30 @@ type CoreDryMediaId = (typeof CORE_DRY_MEDIA_IDS)[number];
 
 const LEGACY_CARRIER_SHA256: Readonly<Record<CoreDryMediaId, string>> = Object.freeze({
   // Competitive anisotropic wax tooth (10-pt pore ellipses; denser travel-aligned slits).
-  crayon: "2f503ef489ed329964aca8792fc2417509aecb6ec8b6d37123ab54b8889f38ea",
+  crayon: "877ba64d6f72aeb76db77d103a759ee93a94a74ed537018fb1e4fb56f90b0ea2",
   chalk: "33b358794aa321406c6afca80fd41373af44c5f858294784842cc9c74d2a0d45",
   charcoal: "73d5a05fbe1c85ad27d9545fe4cb0166e17beec8b953c0b6c829de7f55c316c0",
   pastel: "550525d2f47d66ce41d1d743cad912063940b4b18b5fdd044d45dfc6b04da5e3",
+  // Re-captured with the restored brushId-keyed negative-grain policy: the original T1 capture
+  // was taken while the carrier mis-keyed oil-pastel onto the "pastel" row (dryMediaPresetId),
+  // so it pinned the regression, not the pre-wave production bytes. The other four rows are
+  // unchanged under both keyings and prove the rest of the byte pipeline is untouched.
   "oil-pastel": "bfddc491446750a182e0ca35bcce3183693d671b2f14e797787f4fe0de0783bb",
+});
+
+/**
+ * Serialized carrier plans for PINNED dynamics, captured from the pre-T1 production code.
+ * An element whose dynamics carry the `dryMediaUnionProgram` pin must replay these exact bytes
+ * forever (provider pinning; the de-polygon flip must not disturb the legacy union output).
+ */
+const PINNED_CARRIER_SHA256: Readonly<Record<CoreDryMediaId, string>> = Object.freeze({
+  crayon: "1de55b6cc53f3bcd096de32537d16878fdcc2f8a4e635cc8570961094498e0a5",
+  chalk: "80530301e273c109833d00b9d98ddeb358eddcd5eba739aac31c1abed321b8c6",
+  charcoal: "4a620ecebdf8e8c4bf7092d9020b49178f35f8722cf2970aa3f06aca5b8b9346",
+  pastel: "10290a11eba1cad4a16472206bf7b385e2c436c184eb732bfc0c8a45c612adbf",
+  // Re-captured for the same reason as the legacy row above: the original capture pinned the
+  // mis-keyed "pastel" grain policy instead of the pre-wave "oil-pastel" row.
+  "oil-pastel": "837c1b93aefd8b7ef5fb0fd7ac5b4d63cc735d4a0741e9f404a749251ff2ade3",
 });
 
 const POINTS = Object.freeze([
@@ -53,16 +72,33 @@ const PRESSURES = Object.freeze([0.2, 0.55, 0.9, 0.4, 0.75, 0.6]);
 
 function settingsFor(
   brushId: CoreDryMediaId,
-  pinned: boolean,
+  mode: "authored" | "pinned" | "pre-wave-causal" | "legacy-pipeline",
 ): NormalizedStudioBrushDynamicsSettings {
   const authored = studioBrushDynamicsSettingsForBrushId(brushId);
   if (!authored) throw new Error(`Missing ${brushId} dynamics`);
-  return pinned
-    ? normalizeStudioBrushDynamicsSettings({
-        ...authored,
-        dryMediaUnionProgram: studioDryMediaUnionComposableProgramPin(),
-      })
-    : authored;
+  if (mode === "authored") return authored;
+  if (mode === "pinned") {
+    return normalizeStudioBrushDynamicsSettings({
+      ...authored,
+      dryMediaUnionProgram: studioDryMediaUnionComposableProgramPin(),
+    });
+  }
+  if (mode === "pre-wave-causal") {
+    // Persisted pre-wave stroke shape: causal pipeline, no fresh-authoring kernel marker and no
+    // wave-added preset identity (normalization omits both, keeping the snapshot byte-stable).
+    return normalizeStudioBrushDynamicsSettings({
+      ...authored,
+      presetId: undefined,
+      dryMediaKernelProgram: undefined,
+    });
+  }
+  // Historical persisted snapshot without a causal deposit pipeline.
+  return normalizeStudioBrushDynamicsSettings({
+    ...authored,
+    presetId: undefined,
+    dryMediaKernelProgram: undefined,
+    depositPipeline: undefined,
+  });
 }
 
 function sourceDabsFor(
@@ -141,10 +177,71 @@ function composableGroups(
 }
 
 describe("dry-media union ribbon carrier v3 representation", () => {
-  it("keeps every unpinned core dry-media carrier byte-identical to the legacy baseline", () => {
+  it("rejects freshly authored strokes — the explicit kernel marker owns them, zero union polygons", () => {
     for (const brushId of CORE_DRY_MEDIA_IDS) {
-      const settings = settingsFor(brushId, false);
+      const settings = settingsFor(brushId, "authored");
       expect(settings.dryMediaUnionProgram, brushId).toBeUndefined();
+      // Fresh authoring is the only marker mint; it is what routes the stroke off this carrier.
+      expect(settings.dryMediaKernelProgram, brushId).toBeDefined();
+      const bridged = sourceMarksFor(brushId, settings, sourceDabsFor(settings));
+      const result = planStudioDryMediaUnionRibbonCarrier({
+        dabs: bridged.dabs,
+        marks: bridged.marks,
+        materialIdentity:
+          resolveStudioDynamicBrushMaterialIdentity(brushId) ?? undefined,
+        dynamics: settings,
+      });
+      expect(result.applied, brushId).toBe(false);
+      if (!result.applied) {
+        expect(result.reason, brushId).toBe("ineligible-material");
+      }
+    }
+  });
+
+  it("replays stored pre-wave causal strokes (no kernel marker) through the union carrier byte-identically", () => {
+    // Reviewer probe D3/F5: pre-wave persisted core dry-media strokes are unpinned causal
+    // snapshots. Before the marker gate they were re-routed to the kernel dab path; they must
+    // plan the exact union geometry captured pre-flip. The pinned capture is SHA-pinned below,
+    // and the pin only contributes the compositing metadata, so polygon equality against the
+    // pinned plan is byte equality against the pre-flip production output.
+    for (const brushId of CORE_DRY_MEDIA_IDS) {
+      const persisted = settingsFor(brushId, "pre-wave-causal");
+      expect(persisted.dryMediaKernelProgram, brushId).toBeUndefined();
+      expect(persisted.dryMediaUnionProgram, brushId).toBeUndefined();
+      expect(persisted.depositPipeline, brushId).toBe("causal-deposit-v3-segmented");
+      const mark = requireCarrier(brushId, persisted, sourceDabsFor(persisted));
+      // No explicit pin ⇒ no composable-program metadata, exactly as the pre-flip carrier.
+      expect(mark.ribbon.compositing, brushId).toBeUndefined();
+
+      const pinned = settingsFor(brushId, "pinned");
+      const pinnedMark = requireCarrier(brushId, pinned, sourceDabsFor(pinned));
+      expect(mark.ribbon.polygons, brushId).toEqual(pinnedMark.ribbon.polygons);
+      expect(
+        {
+          x: mark.x,
+          y: mark.y,
+          radiusX: mark.radiusX,
+          radiusY: mark.radiusY,
+          alpha: mark.alpha,
+          color: mark.color,
+        },
+        brushId,
+      ).toEqual({
+        x: pinnedMark.x,
+        y: pinnedMark.y,
+        radiusX: pinnedMark.radiusX,
+        radiusY: pinnedMark.radiusY,
+        alpha: pinnedMark.alpha,
+        color: pinnedMark.color,
+      });
+    }
+  });
+
+  it("keeps unpinned legacy-pipeline snapshots byte-identical to the historical baseline", () => {
+    for (const brushId of CORE_DRY_MEDIA_IDS) {
+      const settings = settingsFor(brushId, "legacy-pipeline");
+      expect(settings.dryMediaUnionProgram, brushId).toBeUndefined();
+      expect(settings.depositPipeline, brushId).toBeUndefined();
       const mark = requireCarrier(brushId, settings, sourceDabsFor(settings));
       expect(mark.ribbon.compositing, brushId).toBeUndefined();
       const serialized = JSON.stringify({ applied: true, marks: [mark] });
@@ -155,9 +252,22 @@ describe("dry-media union ribbon carrier v3 representation", () => {
     }
   });
 
+  it("replays pinned dynamics byte-identically to the pre-de-polygon capture", () => {
+    for (const brushId of CORE_DRY_MEDIA_IDS) {
+      const settings = settingsFor(brushId, "pinned");
+      const mark = requireCarrier(brushId, settings, sourceDabsFor(settings));
+      expect(mark.ribbon.compositing, brushId).toBeDefined();
+      const serialized = JSON.stringify({ applied: true, marks: [mark] });
+      expect(
+        sha256HexPortable(new TextEncoder().encode(serialized)),
+        brushId,
+      ).toBe(PINNED_CARRIER_SHA256[brushId]);
+    }
+  });
+
   it("pins immutable station groups whose arbitrary delivery chunks flatten to one full plan", () => {
     for (const brushId of CORE_DRY_MEDIA_IDS) {
-      const settings = settingsFor(brushId, true);
+      const settings = settingsFor(brushId, "pinned");
       const sourceDabs = sourceDabsFor(settings);
       const full = requireCarrier(brushId, settings, sourceDabs);
       const fullGroups = composableGroups(full);

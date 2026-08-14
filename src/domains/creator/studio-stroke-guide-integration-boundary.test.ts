@@ -127,7 +127,10 @@ describe("studio stroke guide integration boundary", () => {
   });
 
   it("keeps the presentation line outside export, document, history, CRDT, and hit-test models", () => {
-    expect(cursorSource).toContain('<Layer listening={false} name="studio-brush-cursor-layer">');
+    // The layer carries a ref only to tag its own canvas element for evidence tooling; it stays
+    // non-listening presentation chrome outside every document model.
+    expect(cursorSource).toContain('listening={false} name="studio-brush-cursor-layer">');
+    expect(cursorSource).toContain('data-studio-brush-cursor-canvas');
     expect(cursorSource).toContain("perfectDrawEnabled={false}");
     expect(pageSource).not.toContain("elements.push(strokeGuideRef");
     expect(pageSource).not.toContain("commit(strokeGuideRef");

@@ -48,8 +48,8 @@ describe("soft coloured-pencil endpoint visibility", () => {
     expect(bridged.ok).toBe(true);
     if (!bridged.ok) return;
 
-    expect(bridged.receipt.laneCount).toBe(5);
-    expect(bridged.receipt.marks).toHaveLength(dabs.length * 5);
+    expect(bridged.receipt.laneCount).toBe(3);
+    expect(bridged.receipt.marks).toHaveLength(dabs.length * 3);
     const integratedPigment = bridged.receipt.marks.reduce(
       (sum, mark) => sum
         + Math.PI * mark.radiusX * mark.radiusY * mark.alpha * 0.78,

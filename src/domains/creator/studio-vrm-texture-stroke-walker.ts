@@ -33,13 +33,23 @@ import {
 import type { StudioVrmTexturePaintOp } from "./studio-vrm-texture-paint-ops";
 import type { StudioVrmTextureSize } from "./studio-vrm-texture-uv";
 
+/**
+ * `resolveStudioVrmTextureStrokeBrush`가 만드는 스타일은 항상 `spacingRatio`를 실어 오므로
+ * 이 표는 손으로 조립한 스타일의 폴백일 뿐이다. 값은 studio-brush-stamp-engine 의
+ * STAMP_SPACING_RATIO 와 동일하게 유지한다 — walker 가 batch planner(저장/재생 기준 규약)와
+ * 다른 간격으로 걸으면 라이브 dab 위치가 재생과 어긋난다.
+ */
 const STAMP_SPACING_RATIO: Readonly<Record<StudioStampBrushKind, number>> = Object.freeze({
-  airbrush: 0.16,
+  airbrush: 0.12,
   pencil: 0.24,
   ink: 0.32,
-  watercolor: 0.11,
+  watercolor: 0.09,
   mypaint: 0.2,
   "krita-auto": 0.15,
+  crayon: 0.16,
+  chalk: 0.14,
+  charcoal: 0.18,
+  pastel: 0.13,
 });
 
 export interface StudioVrmTextureStrokeWalkerSnapshot {
@@ -114,7 +124,9 @@ function walkIncrementalStampSegment(
   const spacingOf = (samplePressure: number): number =>
     Math.max(
       0.5,
-      pressureRadius(style, samplePressure) * 2 * STAMP_SPACING_RATIO[style.kind],
+      pressureRadius(style, samplePressure)
+        * 2
+        * (style.spacingRatio ?? STAMP_SPACING_RATIO[style.kind]),
     );
   if (travelled === 0 && state.stampIndex > 0) {
     travelled = spacingOf(state.lastPressure);

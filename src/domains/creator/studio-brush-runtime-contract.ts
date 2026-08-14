@@ -26,6 +26,7 @@ export type StudioBrushRuntimeEngine =
   | "stamp-dabs"
   | "calligraphy-segments"
   | "perfect-outline"
+  | "capsule-outline"
   | "highlighter-path"
   | "neon-halo"
   | "glow-halo"
@@ -174,10 +175,12 @@ export const STUDIO_BRUSH_RUNTIME_CONTRACT = [
   { id: "soft-pencil", family: "pencil", engine: "pencil-path", engineVariant: "jitter", canonicalId: "pencil", preview: "dashed", tip: "grain", texture: "procedural-grain", dynamics: "grain-jitter", distinctness: "profile-variant" },
   { id: "pencil-grain", family: "stamp", engine: "stamp-dabs", engineVariant: "pencil", canonicalId: "pencil-grain", preview: "texture", tip: "stamp-pencil", texture: "procedural-grain", dynamics: "stamp-pressure-flow", distinctness: "unique" },
   { id: "colored-pencil", family: "pencil", engine: "pencil-path", engineVariant: "jitter", canonicalId: "pencil", preview: "dashed", tip: "grain", texture: "procedural-grain", dynamics: "grain-jitter", distinctness: "profile-variant" },
+  // Verified stamp engine (OSS Klecks chalk / directional wax / libmypaint charcoal DNA).
+  // Replaces the custom dry-media polygon-union carrier for live product drawing.
   { id: "dry-media", family: "dry-media", engine: "dynamic-dabs", engineVariant: "dry-media", canonicalId: "dry-media", preview: "texture", tip: "grain", texture: "custom-alpha-capable", dynamics: "mapped-dabs", distinctness: "unique" },
-  { id: "crayon", family: "dry-media", engine: "dynamic-dabs", engineVariant: "crayon", canonicalId: "dry-media", preview: "texture", tip: "hard", texture: "custom-alpha-capable", dynamics: "mapped-dabs", distinctness: "engine-variant" },
-  { id: "chalk", family: "dry-media", engine: "dynamic-dabs", engineVariant: "chalk", canonicalId: "dry-media", preview: "texture", tip: "sponge", texture: "custom-alpha-capable", dynamics: "mapped-dabs", distinctness: "engine-variant" },
-  { id: "charcoal", family: "dry-media", engine: "dynamic-dabs", engineVariant: "charcoal", canonicalId: "dry-media", preview: "texture", tip: "bristle", texture: "custom-alpha-capable", dynamics: "mapped-dabs", distinctness: "engine-variant" },
+  { id: "crayon", family: "dry-media", engine: "dynamic-dabs", engineVariant: "crayon", canonicalId: "crayon", preview: "texture", tip: "hard", texture: "custom-alpha-capable", dynamics: "mapped-dabs", distinctness: "unique" },
+  { id: "chalk", family: "dry-media", engine: "dynamic-dabs", engineVariant: "chalk", canonicalId: "chalk", preview: "texture", tip: "sponge", texture: "custom-alpha-capable", dynamics: "mapped-dabs", distinctness: "unique" },
+  { id: "charcoal", family: "dry-media", engine: "dynamic-dabs", engineVariant: "charcoal", canonicalId: "charcoal", preview: "texture", tip: "bristle", texture: "custom-alpha-capable", dynamics: "mapped-dabs", distinctness: "unique" },
   { id: "pastel", family: "pastel", engine: "dynamic-dabs", engineVariant: "pastel", canonicalId: "pastel", preview: "soft", tip: "sponge", texture: "custom-alpha-capable", dynamics: "mapped-dabs", distinctness: "unique" },
   { id: "oil-pastel", family: "pastel", engine: "dynamic-dabs", engineVariant: "oil-pastel", canonicalId: "pastel", preview: "soft", tip: "bristle", texture: "custom-alpha-capable", dynamics: "mapped-dabs", distinctness: "engine-variant" },
   { id: "ink-particle", family: "ink-particle", engine: "dynamic-dabs", engineVariant: "ink-particle", canonicalId: "ink-particle", preview: "dots", tip: "soft-particle", texture: "custom-alpha-capable", dynamics: "mapped-dabs", distinctness: "unique" },
@@ -251,11 +254,20 @@ const STUDIO_BRUSH_ENGINE_CAPABILITIES: Readonly<
     round: { families: ["pen", "marker"], previews: ["solid"], tip: "round", texture: "none", dynamics: "causal-pressure" },
     "standard-erase": { families: ["pen"], previews: ["solid"], tip: "round", texture: "none", dynamics: "causal-pressure" },
   },
+  // 2026-08-13 wave 3: mypaint-cc0--* 레인이 기존 검증 킨드의 profile-variant 로 실리면서 표현
+  // 패밀리/프리뷰 조합이 넓어졌다(ink+dry-media/texture, airbrush+dots, pencil+pencil,
+  // pastel+texture, mypaint 킨드 신설). 시그니처 튜플(tip/texture/dynamics)은 그대로다.
   "stamp-dabs": {
-    ink: { families: ["stamp"], previews: ["solid"], tip: "stamp-ink", texture: "none", dynamics: "stamp-pressure-flow" },
-    airbrush: { families: ["stamp"], previews: ["soft"], tip: "stamp-airbrush", texture: "soft-gradient", dynamics: "stamp-pressure-flow" },
-    pencil: { families: ["stamp"], previews: ["texture"], tip: "stamp-pencil", texture: "procedural-grain", dynamics: "stamp-pressure-flow" },
+    ink: { families: ["stamp", "dry-media"], previews: ["solid", "texture"], tip: "stamp-ink", texture: "none", dynamics: "stamp-pressure-flow" },
+    airbrush: { families: ["stamp"], previews: ["soft", "dots"], tip: "stamp-airbrush", texture: "soft-gradient", dynamics: "stamp-pressure-flow" },
+    pencil: { families: ["stamp", "pencil"], previews: ["texture"], tip: "stamp-pencil", texture: "procedural-grain", dynamics: "stamp-pressure-flow" },
     watercolor: { families: ["stamp"], previews: ["soft"], tip: "stamp-wet-edge", texture: "wet-edge", dynamics: "stamp-pressure-flow" },
+    // libmypaint 하이브리드 스머지/표현 킨드 — 카탈로그 canonical 은 mypaint-cc0--ink-blot.
+    mypaint: { families: ["stamp"], previews: ["soft", "oil"], tip: "stamp-airbrush", texture: "soft-gradient", dynamics: "stamp-pressure-flow" },
+    crayon: { families: ["dry-media"], previews: ["texture"], tip: "stamp-pencil", texture: "procedural-grain", dynamics: "stamp-pressure-flow" },
+    chalk: { families: ["dry-media"], previews: ["texture"], tip: "stamp-airbrush", texture: "procedural-grain", dynamics: "stamp-pressure-flow" },
+    charcoal: { families: ["dry-media"], previews: ["texture"], tip: "stamp-pencil", texture: "procedural-grain", dynamics: "stamp-pressure-flow" },
+    pastel: { families: ["pastel"], previews: ["soft", "texture"], tip: "stamp-airbrush", texture: "soft-gradient", dynamics: "stamp-pressure-flow" },
   },
   "calligraphy-segments": {
     "tilt-chisel": { families: ["calligraphy"], previews: ["calligraphy"], tip: "chisel", texture: "none", dynamics: "tilt-pressure" },
@@ -266,6 +278,14 @@ const STUDIO_BRUSH_ENGINE_CAPABILITIES: Readonly<
     "ink-taper": { families: ["perfect"], previews: ["calligraphy"], tip: "pressure-round", texture: "none", dynamics: "outline-pressure" },
     "marker-flat": { families: ["perfect"], previews: ["solid"], tip: "round", texture: "none", dynamics: "outline-pressure" },
     "gpen-taper": { families: ["gpen"], previews: ["calligraphy"], tip: "pressure-round", texture: "none", dynamics: "outline-pressure" },
+  },
+  // croquis.js 외접 탄젠트 캡슐 아웃라인(studio-croquis-capsule-pen-v1). 각 variant는 실제
+  // 프로그램(캡슐 vs 캡슐+풀드 스트링 프리필터)이 다른 별개 실행 시그니처다(2026-08-13 wave 3).
+  // 패밀리는 아웃라인 잉킹 계열(gpen) — pen 패밀리로 두면 브라우저 layered-flow-v1 admission 이
+  // 이 레인을 평범한 펜으로 승인해 API 미러(`--` fail-closed)와 어긋난다.
+  "capsule-outline": {
+    "croquis-capsule": { families: ["gpen"], previews: ["solid"], tip: "pressure-round", texture: "none", dynamics: "outline-pressure" },
+    "croquis-capsule-pulled-string": { families: ["gpen"], previews: ["calligraphy"], tip: "pressure-round", texture: "none", dynamics: "outline-pressure" },
   },
   "highlighter-path": {
     "one-wash-round": { families: ["highlighter"], previews: ["solid"], tip: "round", texture: "none", dynamics: "ribbon-pressure" },
@@ -293,6 +313,14 @@ const STUDIO_BRUSH_ENGINE_CAPABILITIES: Readonly<
     "sumi-dense": { families: ["watercolor"], previews: ["soft"], tip: "bristle", texture: "wet-edge", dynamics: "watercolor-pressure" },
     "bleed-halo": { families: ["watercolor"], previews: ["soft"], tip: "soft-diffuse", texture: "soft-gradient", dynamics: "watercolor-pressure" },
     "matte-body": { families: ["watercolor"], previews: ["soft"], tip: "hard", texture: "none", dynamics: "watercolor-pressure" },
+    // 2026-08-13 wet-texture wave: studio-wet-edge-bloom-v1 프로그램을 태우는 4개 레인.
+    "edge-bloom": { families: ["watercolor"], previews: ["soft"], tip: "sponge", texture: "wet-edge", dynamics: "watercolor-pressure" },
+    "granulating-wash": { families: ["watercolor"], previews: ["soft"], tip: "sponge", texture: "procedural-grain", dynamics: "watercolor-pressure" },
+    "fiber-feather": { families: ["watercolor"], previews: ["soft"], tip: "bristle", texture: "procedural-grain", dynamics: "watercolor-pressure" },
+    "chroma-halo": { families: ["watercolor"], previews: ["soft"], tip: "soft-diffuse", texture: "soft-gradient", dynamics: "watercolor-pressure" },
+    // 2026-08-13 wave 3: studio-living-ink-settled-bake-v1 정착 베이크 프로그램을 태우는 2개 레인.
+    "living-ink-settled-bake": { families: ["watercolor"], previews: ["soft"], tip: "bristle", texture: "wet-edge", dynamics: "watercolor-pressure" },
+    "fluid-feather-bake": { families: ["watercolor"], previews: ["soft"], tip: "sponge", texture: "wet-edge", dynamics: "watercolor-pressure" },
   },
   "oil-ribbon": {
     "bristle-lanes": { families: ["oil"], previews: ["oil"], tip: "bristle", texture: "procedural-bristle", dynamics: "bristle-pressure" },
@@ -300,6 +328,11 @@ const STUDIO_BRUSH_ENGINE_CAPABILITIES: Readonly<
     "flat-lanes": { families: ["oil"], previews: ["oil"], tip: "hard", texture: "procedural-bristle", dynamics: "bristle-pressure" },
     "impasto-lanes": { families: ["oil"], previews: ["oil"], tip: "bristle", texture: "procedural-bristle", dynamics: "bristle-pressure" },
     "acrylic-stiff-lanes": { families: ["oil"], previews: ["oil"], tip: "hard", texture: "procedural-bristle", dynamics: "bristle-pressure" },
+    // 2026-08-13 oil fidelity wave: dli GGX 릴리프 / libmypaint 강모 고갈(둘 다 flag-gated).
+    "impasto-relief-shaded": { families: ["oil"], previews: ["oil"], tip: "bristle", texture: "procedural-bristle", dynamics: "bristle-pressure" },
+    "bristle-load-depletion": { families: ["oil"], previews: ["oil"], tip: "bristle", texture: "procedural-bristle", dynamics: "bristle-pressure" },
+    // 2026-08-13 wave 3: WetBrush-2D 강모 물리 시뮬(레인 궤적 스트림, bristlePhysics 캐리어 옵션).
+    "bristle-physics-tuft": { families: ["oil"], previews: ["oil"], tip: "bristle", texture: "procedural-bristle", dynamics: "bristle-pressure" },
   },
   "dynamic-dabs": {
     airbrush: { families: ["airbrush"], previews: ["soft"], tip: "soft-particle", texture: "custom-alpha-capable", dynamics: "mapped-dabs" },
@@ -324,6 +357,8 @@ const STUDIO_BRUSH_ENGINE_CAPABILITIES: Readonly<
     "chalk-klecks": { families: ["dry-media"], previews: ["texture"], tip: "sponge", texture: "custom-alpha-capable", dynamics: "mapped-dabs" },
     "pastel-cake": { families: ["pastel"], previews: ["soft"], tip: "sponge", texture: "custom-alpha-capable", dynamics: "mapped-dabs" },
     "oil-pastel-film": { families: ["pastel"], previews: ["soft"], tip: "bristle", texture: "custom-alpha-capable", dynamics: "mapped-dabs" },
+    // 2026-08-13: libmypaint WGM 안료 혼합 색 파이프라인 변형(oil-pastel 다이나믹 위).
+    "oil-pastel-wgm-pigment": { families: ["pastel"], previews: ["soft"], tip: "bristle", texture: "custom-alpha-capable", dynamics: "mapped-dabs" },
     "airbrush-klecks-grit": { families: ["airbrush"], previews: ["soft"], tip: "soft-particle", texture: "custom-alpha-capable", dynamics: "mapped-dabs" },
     "spray-equal-area": { families: ["airbrush"], previews: ["dots"], tip: "flake", texture: "custom-alpha-capable", dynamics: "mapped-dabs" },
     "splatter-burst": { families: ["airbrush"], previews: ["dots"], tip: "flake", texture: "custom-alpha-capable", dynamics: "mapped-dabs" },
@@ -656,8 +691,11 @@ export function resolveStudioBrushSinglePointRoute({
     case "causal-ink":
       return causalInkEnabled ? "causal-ink" : "generic-dot";
     // perfect-outline 도 최소 한 세그먼트가 필요하다(테이퍼가 탭을 지워버리는 것 방지).
+    // capsule-outline 은 계약이 있으면 1점도 원 dab을 그리지만, 계약 없는 레거시 탭은
+    // perfect-outline 과 같은 규율로 generic-dot 을 쓴다(2026-08-13 wave 3).
     case "calligraphy-segments":
     case "perfect-outline":
+    case "capsule-outline":
     case "highlighter-path":
     case "angled-ribbon":
     case "pencil-path":

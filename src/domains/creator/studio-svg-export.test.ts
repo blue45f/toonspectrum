@@ -12,6 +12,8 @@ import {
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V2,
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,
   studioBrushDynamicsPresetSettings,
+  studioBrushDynamicsSettingsForBrushId,
+  studioDryMediaUnionComposableProgramPin,
   type StudioDynamicBrushDab,
   type StudioBrushDynamicsPresetId,
 } from "./studio-brush-dynamics";
@@ -58,6 +60,7 @@ import {
   type SvgExportResult,
 } from "./studio-svg-export";
 
+import type { StudioDynamicBrushMaterialIdentity } from "./studio-dry-media-dynamic-bridge";
 import type { DrawEl, El } from "./studio-element-model";
 
 // ---------------------------------------------------------------------------
@@ -136,9 +139,23 @@ function referenceDabOpacity(value: number): string {
   return visible.toFixed(6).replace(/\.?0+$/u, "");
 }
 
+/** 프로덕션과 같은 공식 — 재질 주석은 pastel 계열만 carrier를 더하고 brushId를 그대로 싣는다. */
+function referenceMaterialAttributes(
+  materialIdentity?: StudioDynamicBrushMaterialIdentity,
+): string {
+  if (!materialIdentity) return "";
+  return (
+    (materialIdentity.dryMediaPresetId === "pastel"
+      ? ` data-brush-carrier="soft-pigment-fiber"`
+      : "")
+    + ` data-brush-material="${escapeXml(materialIdentity.brushId)}"`
+  );
+}
+
 function appendReferenceEllipseCoverage(
   hash: ReturnType<typeof createHash>,
   mark: StudioDynamicBrushCoverageMark,
+  materialIdentity?: StudioDynamicBrushMaterialIdentity,
 ): void {
   const angleDegrees = mark.angleRadians * 180 / Math.PI;
   const transform =
@@ -151,6 +168,7 @@ function appendReferenceEllipseCoverage(
       + ` cy="${referenceCoverageNumber(mark.y)}"`
       + ` rx="${referenceCoverageNumber(mark.radiusX)}"`
       + ` ry="${referenceCoverageNumber(mark.radiusY)}"`
+      + referenceMaterialAttributes(materialIdentity)
       + ` fill="${escapeXml(mark.color)}"`
       + ` opacity="${referenceDabOpacity(mark.alpha)}"`
       + ` transform="${transform}"/>`,
@@ -300,6 +318,56 @@ function dynamicCoverageUses(svg: string): DynamicCoverageUse[] {
         centerY: Number(transform[3]),
       };
     },
+  );
+}
+
+function optionalSvgAttribute(tag: string, name: string): string | null {
+  return new RegExp(`\\b${name}="([^"]+)"`, "u").exec(tag)?.[1] ?? null;
+}
+
+interface DynamicCoverageEllipse {
+  readonly cx: number;
+  readonly cy: number;
+  readonly rx: number;
+  readonly ry: number;
+  readonly angle: number;
+  readonly opacity: number;
+  readonly fill: string;
+  readonly material: string | null;
+  readonly carrier: string | null;
+}
+
+/**
+ * 변주별 `<g>`에서 솔리드 타원 커버리지의 지오메트리와 재질 주석을 전부 읽는다.
+ * `dynamicEllipseGroups`와 달리 순수 coverage 타원으로만 구성된 그룹만 받아
+ * 파티션 경계(변주 순서)까지 함께 검증할 수 있다.
+ */
+function dynamicMaterialEllipseGroups(svg: string): DynamicCoverageEllipse[][] {
+  return Array.from(
+    svg.matchAll(
+      /<g(?: opacity="[^"]+")?>((?:<ellipse data-brush-coverage="ellipse"[^>]*\/>)+)<\/g>/gu,
+    ),
+    (groupMatch) => Array.from(
+      groupMatch[1]!.matchAll(/<ellipse data-brush-coverage="ellipse"[^>]*\/>/gu),
+      (ellipseMatch) => {
+        const tag = ellipseMatch[0];
+        const transform = /^rotate\(([^ ]+) [^)]+\)$/u.exec(
+          svgAttribute(tag, "transform"),
+        );
+        if (!transform) throw new Error("invalid dynamic coverage transform");
+        return {
+          cx: Number(svgAttribute(tag, "cx")),
+          cy: Number(svgAttribute(tag, "cy")),
+          rx: Number(svgAttribute(tag, "rx")),
+          ry: Number(svgAttribute(tag, "ry")),
+          angle: Number(transform[1]),
+          opacity: Number(svgAttribute(tag, "opacity")),
+          fill: svgAttribute(tag, "fill"),
+          material: optionalSvgAttribute(tag, "data-brush-material"),
+          carrier: optionalSvgAttribute(tag, "data-brush-carrier"),
+        };
+      },
+    ),
   );
 }
 
@@ -1451,12 +1519,53 @@ describe("도형 직렬화", () => {
   });
 
   it.each(["pastel", "oil-pastel"] as const)(
-    "%s은 원형 스탬프 열 대신 Canvas와 같은 단일 union 섬유 경로를 직렬화한다",
+    "%s은 원형 스탬프 열 대신 커널 알파맵 dab 마크를 직렬화한다 (de-polygon)",
     (brush) => {
       const { svg } = exportPageToSvg(page([rectEl({
         id: `${brush}-anisotropic-fibres`,
         kind: "freehand",
         brush,
+        points: [8, 12, 40, 20, 72, 12],
+        pressures: [0.45, 0.8, 0.6],
+        stroke: "#4455aa",
+        strokeWidth: 20,
+        fill: undefined,
+      })]));
+      // Fresh unpinned strokes never serialize the polygon-union carrier.
+      expect(svg).not.toContain('data-brush-coverage="dry-media-union-ribbon"');
+      const fibres = Array.from(svg.matchAll(
+        new RegExp(
+          `<use data-brush-coverage="alpha-map"`
+          + ` data-brush-carrier="soft-pigment-fiber"`
+          + ` data-brush-material="${brush}" href="#([^"]+)"`,
+          "gu",
+        ),
+      ));
+      expect(fibres.length).toBeGreaterThan(8);
+      // Shared kernel tip bakes are content-addressed symbols: many dabs, few defs.
+      const symbolIds = new Set(fibres.map((match) => match[1]));
+      expect(symbolIds.size).toBeGreaterThan(0);
+      expect(symbolIds.size).toBeLessThanOrEqual(40);
+      expect(
+        (svg.match(/data-brush-tip-asset="full-alpha-map-v1"/gu) ?? []).length,
+      ).toBe(symbolIds.size);
+      expect(svg).not.toMatch(/<circle [^>]*fill="url\(#sp/u);
+      expect(svg).not.toMatch(/<ellipse [^>]*data-brush-material=/u);
+    },
+  );
+
+  it.each(["pastel", "oil-pastel"] as const)(
+    "핀된 %s 레거시 리플레이는 기존 단일 union 섬유 경로를 그대로 직렬화한다",
+    (brush) => {
+      const pinnedDynamics = normalizeStudioBrushDynamicsSettings({
+        ...studioBrushDynamicsSettingsForBrushId(brush)!,
+        dryMediaUnionProgram: studioDryMediaUnionComposableProgramPin(),
+      });
+      const { svg } = exportPageToSvg(page([rectEl({
+        id: `${brush}-pinned-union-fibres`,
+        kind: "freehand",
+        brush,
+        brushDynamics: pinnedDynamics,
         points: [8, 12, 40, 20, 72, 12],
         pressures: [0.45, 0.8, 0.6],
         stroke: "#4455aa",
@@ -1520,41 +1629,36 @@ describe("도형 직렬화", () => {
       paintModel: "bounded-flow-v2",
       brushDynamics: ellipseDynamics("dry-media"),
     });
-    const { svg } = exportPageToSvg(page([fixture]));
+    const { svg, skipped } = exportPageToSvg(page([fixture]));
+    const plannedMarks = canvasCoverageMarksForSvgFixture(fixture);
+    const groups = dynamicMaterialEllipseGroups(svg);
+    const serialized = groups.flat();
 
-    const ellipse = /<ellipse data-brush-coverage="ellipse"[^>]*rx="([^"]+)" ry="([^"]+)"[^>]*transform="rotate\(([^ ]+) /u
-      .exec(svg);
-    const radiusX = Number(ellipse?.[1]);
-    const radiusY = Number(ellipse?.[2]);
-    const angle = Number(ellipse?.[3]);
-
-    const retainedPlan = planStudioDynamicBrushRender(
-      fixture as DrawEl,
-      "dry-media",
-      false,
-    );
-    expect(retainedPlan.status).toBe("ready");
-    if (retainedPlan.status !== "ready") return;
-    const canonicalCoverage = planStudioDynamicBrushCoverageAndLegacyMarks({
-      dabVariations: retainedPlan.plan.dabVariations,
-      dynamics: retainedPlan.plan.dynamics,
-      materialIdentity: retainedPlan.plan.materialIdentity,
-      dynamicSeed: retainedPlan.plan.seed,
-      stroke: fixture.stroke,
-      stampGrid: retainedPlan.plan.renderBudget.stampGrid,
-      markBudget: retainedPlan.plan.markBudget,
-    }).coveragePlan;
-    expect(canonicalCoverage.ok).toBe(true);
-    if (!canonicalCoverage.ok) return;
-    const canonicalMark = canonicalCoverage.marks[0]!;
-
-    // SVG is not allowed to carry its own hard-coded dry-media roundness. The retained Canvas
-    // coverage planner—including the canonical anisotropic bridge—is the geometry authority.
-    expectNear(radiusX, canonicalMark.radiusX, 0.000_001);
-    expectNear(radiusY, canonicalMark.radiusY, 0.000_001);
-    expectNear(angle, canonicalMark.angleRadians * 180 / Math.PI, 0.000_001);
-    expect(radiusX).toBeGreaterThanOrEqual(0.25);
-    expect(radiusY).toBeLessThan(radiusX);
+    expect(skipped).toEqual([]);
+    // SVG는 리테인드 Canvas 플래너의 지오메트리 종속이다 — 같은 플래너 입력으로 계획한
+    // coverage mark와 직렬화된 타원이 마크 단위(cx/cy/rx/ry/회전)로 1e-6 안에서 일치해야 한다.
+    expect(plannedMarks.length).toBeGreaterThan(0);
+    expect(plannedMarks.every((mark) => (
+      mark.ribbon === undefined
+      && mark.texture === undefined
+      && mark.falloff === undefined
+    ))).toBe(true);
+    expect(groups).toHaveLength(1);
+    expect(serialized).toHaveLength(plannedMarks.length);
+    serialized.forEach((ellipse, index) => {
+      const mark = plannedMarks[index]!;
+      expectNear(ellipse.cx, mark.x, 0.000001);
+      expectNear(ellipse.cy, mark.y, 0.000001);
+      expectNear(ellipse.rx, mark.radiusX, 0.000001);
+      expectNear(ellipse.ry, mark.radiusY, 0.000001);
+      expectNear(ellipse.angle, mark.angleRadians * 180 / Math.PI, 0.000001);
+      expect(ellipse.material).toBe("chalk");
+      expect(ellipse.carrier).toBeNull();
+      // Canvas와 같은 순서 — anisotropic 브리지의 반지름 최소값(0.125)을 먼저 적용한 뒤
+      // roundness로 ry만 축소하므로 극세 획에서도 ry < rx 섬유 축이 살아 있어야 한다.
+      expect(ellipse.rx).toBeGreaterThanOrEqual(0.125 - 0.000001);
+      expect(ellipse.ry).toBeLessThan(ellipse.rx);
+    });
   });
 
   it("크레용·초크·목탄 SVG가 retained Canvas의 동일 anisotropic coverage를 직렬화한다", () => {
@@ -1575,49 +1679,26 @@ describe("도형 직렬화", () => {
         brushDynamics: ellipseDynamics("dry-media"),
       });
       const { svg, skipped } = exportPageToSvg(page([fixture]));
-      expect(skipped).toEqual([]);
-      const svgMarks = Array.from(svg.matchAll(
-        /<ellipse data-brush-coverage="ellipse" cx="([^"]+)" cy="([^"]+)" rx="([^"]+)" ry="([^"]+)"[^>]*transform="rotate\(([^ ]+) /gu,
-      ), (match) => ({
-        x: Number(match[1]),
-        y: Number(match[2]),
-        radiusX: Number(match[3]),
-        radiusY: Number(match[4]),
-        angleDegrees: Number(match[5]),
-      }));
+      const plannedMarks = canvasCoverageMarksForSvgFixture(fixture);
+      const serialized = dynamicMaterialEllipseGroups(svg).flat();
 
-      const retainedPlan = planStudioDynamicBrushRender(
-        fixture as DrawEl,
-        "dry-media",
-        false,
-      );
-      expect(retainedPlan.status).toBe("ready");
-      if (retainedPlan.status !== "ready") continue;
-      const coverage = planStudioDynamicBrushCoverageAndLegacyMarks({
-        dabVariations: retainedPlan.plan.dabVariations,
-        dynamics: retainedPlan.plan.dynamics,
-        materialIdentity: retainedPlan.plan.materialIdentity,
-        dynamicSeed: retainedPlan.plan.seed,
-        stroke: fixture.stroke,
-        stampGrid: retainedPlan.plan.renderBudget.stampGrid,
-        markBudget: retainedPlan.plan.markBudget,
-      }).coveragePlan;
-      expect(coverage.ok).toBe(true);
-      if (!coverage.ok) continue;
-      expect(svgMarks).toHaveLength(coverage.marks.length);
-      for (const [index, svgMark] of svgMarks.entries()) {
-        const retainedMark = coverage.marks[index]!;
-        expectNear(svgMark.x, retainedMark.x, 0.000_001);
-        expectNear(svgMark.y, retainedMark.y, 0.000_001);
-        expectNear(svgMark.radiusX, retainedMark.radiusX, 0.000_001);
-        expectNear(svgMark.radiusY, retainedMark.radiusY, 0.000_001);
-        expectNear(
-          svgMark.angleDegrees,
-          retainedMark.angleRadians * 180 / Math.PI,
-          0.000_001,
-        );
-      }
-      const signatureMark = coverage.marks[Math.floor(coverage.marks.length / 2)]!;
+      expect(skipped, brush).toEqual([]);
+      // anisotropic 브리지의 lane 확장(크레용 3 · 초크/목탄 5)까지 포함한 전체 마크 수와
+      // 마크별 affine 지오메트리가 retained Canvas 플랜과 정확히 일치해야 한다.
+      expect(plannedMarks.length, brush).toBeGreaterThan(1);
+      expect(serialized, brush).toHaveLength(plannedMarks.length);
+      serialized.forEach((ellipse, index) => {
+        const mark = plannedMarks[index]!;
+        expectNear(ellipse.cx, mark.x, 0.000001);
+        expectNear(ellipse.cy, mark.y, 0.000001);
+        expectNear(ellipse.rx, mark.radiusX, 0.000001);
+        expectNear(ellipse.ry, mark.radiusY, 0.000001);
+        expectNear(ellipse.angle, mark.angleRadians * 180 / Math.PI, 0.000001);
+        expect(ellipse.material, brush).toBe(brush);
+        // 세 재질 모두 원형 스탬프가 아닌 기울어진 섬유 축(rx/ry ≥ 2)을 유지해야 한다.
+        expect(ellipse.rx / ellipse.ry, brush).toBeGreaterThanOrEqual(2);
+      });
+      const signatureMark = plannedMarks[Math.floor(plannedMarks.length / 2)]!;
       signatures.push([
         signatureMark.radiusX,
         signatureMark.radiusY,
@@ -1625,7 +1706,102 @@ describe("도형 직렬화", () => {
         signatureMark.alpha,
       ].map((value) => value.toFixed(8)).join(":"));
     }
+    // 질감 정체성 — 같은 stroke 입력에서도 세 재질의 kernel 응답이 서로 달라야 한다.
     expect(new Set(signatures).size).toBe(3);
+  });
+
+  it("대칭 dry-media 파티션 — 변주별 재계획이 complete coverage의 정확한 분할과 일치한다", () => {
+    // 내보내기는 complete plan(모든 변주를 한 번에 계획)의 마크를 변주별 재계획의 마크 수로
+    // 잘라 <g>마다 싣는다. 이 테스트는 그 자(변주별 재계획)가 complete plan과 총 개수·값
+    // 모두 정확히 일치함을 증명한다 — 어긋나면 내보내기는 조용한 대체 없이 fail-closed 한다.
+    const fixture = rectEl({
+      id: "crayon-symmetric-partition",
+      kind: "freehand",
+      brush: "crayon",
+      points: [12, 16, 30, 24, 52, 18],
+      pressures: [0.5, 0.82, 0.66],
+      tiltXs: [12, 16, 9],
+      tiltYs: [-4, -7, -2],
+      stroke: "#5a3d2b",
+      strokeWidth: 14,
+      paintModel: "bounded-flow-v2",
+      brushDynamics: ellipseDynamics("dry-media"),
+      symmetry: { type: "vertical", centerX: 60, centerY: 50 },
+    });
+    const retainedPlan = planStudioDynamicBrushRender(
+      fixture as DrawEl,
+      "dry-media",
+      false,
+    );
+    expect(retainedPlan.status).toBe("ready");
+    if (retainedPlan.status !== "ready") return;
+    const coverageInput = {
+      dynamics: retainedPlan.plan.dynamics,
+      materialIdentity: retainedPlan.plan.materialIdentity,
+      dynamicSeed: retainedPlan.plan.seed,
+      stroke: fixture.stroke,
+      stampGrid: retainedPlan.plan.renderBudget.stampGrid,
+      markBudget: retainedPlan.plan.markBudget,
+      ...(retainedPlan.plan.paper ? { paper: retainedPlan.plan.paper } : {}),
+    };
+    const complete = planStudioDynamicBrushCoverageAndLegacyMarks({
+      ...coverageInput,
+      dabVariations: retainedPlan.plan.dabVariations,
+    }).coveragePlan;
+    expect(complete.ok).toBe(true);
+    if (!complete.ok) throw new Error(complete.reason);
+    const variationPlans = retainedPlan.plan.dabVariations.map((dabs) => {
+      const variationCoverage = planStudioDynamicBrushCoverageAndLegacyMarks({
+        ...coverageInput,
+        dabVariations: [dabs],
+      }).coveragePlan;
+      if (!variationCoverage.ok) throw new Error(variationCoverage.reason);
+      return variationCoverage.marks;
+    });
+
+    expect(retainedPlan.plan.dabVariations.length).toBe(2);
+    expect(complete.marks.length).toBeGreaterThan(1);
+    // 파티션 오프셋 합이 complete와 일치한다 — 내보내기 fail-closed 분기가 잠들어 있음을 증명.
+    expect(variationPlans.reduce((sum, marks) => sum + marks.length, 0))
+      .toBe(complete.marks.length);
+    // 값 자체도 마크 단위로 결정적으로 동일하다(변주끼리 상쇄되는 drift 배제).
+    let offset = 0;
+    for (const variationMarks of variationPlans) {
+      variationMarks.forEach((variationMark, index) => {
+        const completeMark = complete.marks[offset + index]!;
+        expect(completeMark.x).toBe(variationMark.x);
+        expect(completeMark.y).toBe(variationMark.y);
+        expect(completeMark.radiusX).toBe(variationMark.radiusX);
+        expect(completeMark.radiusY).toBe(variationMark.radiusY);
+        expect(completeMark.angleRadians).toBe(variationMark.angleRadians);
+        expect(completeMark.alpha).toBe(variationMark.alpha);
+        expect(completeMark.color).toBe(variationMark.color);
+      });
+      offset += variationMarks.length;
+    }
+
+    // 내보낸 SVG의 변주 <g> 그룹은 complete plan의 파티션을 순서 그대로 직렬화한다.
+    const { svg, skipped } = exportPageToSvg(page([fixture]));
+    expect(skipped).toEqual([]);
+    const groups = dynamicMaterialEllipseGroups(svg);
+    expect(groups).toHaveLength(retainedPlan.plan.dabVariations.length);
+    expect(groups.map((group) => group.length)).toEqual(
+      variationPlans.map((marks) => marks.length),
+    );
+    offset = 0;
+    for (const group of groups) {
+      group.forEach((ellipse, index) => {
+        const mark = complete.marks[offset + index]!;
+        expectNear(ellipse.cx, mark.x, 0.000001);
+        expectNear(ellipse.cy, mark.y, 0.000001);
+        expectNear(ellipse.rx, mark.radiusX, 0.000001);
+        expectNear(ellipse.ry, mark.radiusY, 0.000001);
+        expectNear(ellipse.angle, mark.angleRadians * 180 / Math.PI, 0.000001);
+        expect(ellipse.material).toBe("crayon");
+      });
+      offset += group.length;
+    }
+    expect(offset).toBe(complete.marks.length);
   });
 
   it("causal PNG 알파 팁은 희소 texel 전부를 한 번의 무손실 defs 자산과 dab별 use로 보존한다", () => {
@@ -2822,7 +2998,11 @@ describe("도형 직렬화", () => {
       `<g opacity="${referenceDabOpacity(dynamic.opacity ?? 1)}">`,
     );
     for (const plannedMark of referenceCoverage.marks) {
-      appendReferenceEllipseCoverage(referenceHash, plannedMark);
+      appendReferenceEllipseCoverage(
+        referenceHash,
+        plannedMark,
+        retainedAuthority.plan.materialIdentity,
+      );
     }
     referenceHash.update("</g>");
     expect(actualHash).toBe(referenceHash.digest("hex"));

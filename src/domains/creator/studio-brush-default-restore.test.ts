@@ -57,7 +57,8 @@ describe("studio brush default restore contract", () => {
       values: {
         strokeWidth: 40,
         brushOpacity: 0.55,
-        stabilizer: 0,
+        // 2026-08-14: 기본 선 보정이 속도 적응 3(느린 장선 손떨림 절반)으로 바뀌었다.
+        stabilizer: 3,
         postCorrection: 0,
         pressureCurve: 1,
         pressureMinSize: 0,

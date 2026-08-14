@@ -21,6 +21,11 @@ import {
   studioDryMediaDynamicBridgeMarkMultiplier,
   type StudioDynamicBrushMaterialIdentity,
 } from "./studio-dry-media-dynamic-bridge";
+import {
+  resolveStudioDryMediaKernelTipMaterial,
+  studioDryMediaKernelDabPathOwnsMaterial,
+  type StudioDryMediaCoreId,
+} from "./studio-dry-media-kernel-tip";
 
 import type { StudioBrushTipAlphaMap } from "./studio-brush-tip-stamp";
 
@@ -144,31 +149,12 @@ export type StudioDryMediaUnionRibbonPlanResult =
       readonly marks: readonly StudioDryMediaUnionRibbonSourceMark[];
     }>;
 
-const CORE_DRY_MEDIA_IDS = new Set([
-  "crayon",
-  "chalk",
-  "charcoal",
-  "pastel",
-  "oil-pastel",
-]);
-const CORE_DRY_MEDIA_TIP_SHAPES = Object.freeze({
-  crayon: "hard",
-  chalk: "sponge",
-  charcoal: "bristle",
-  pastel: "sponge",
-  "oil-pastel": "bristle",
-} as const);
 const COORDINATE_LIMIT = 1_000_000_000;
 const QUANTIZATION = 10_000;
 const EPSILON = 1e-6;
 const TAU = Math.PI * 2;
 
-type CoreDryMediaId =
-  | "crayon"
-  | "chalk"
-  | "charcoal"
-  | "pastel"
-  | "oil-pastel";
+type CoreDryMediaId = StudioDryMediaCoreId;
 
 interface DryMediaNegativeGrainPolicy {
   /** Probability that one causal lane segment exposes a paper-tooth slit. */
@@ -245,27 +231,21 @@ function quantize(value: number): number {
   ) / QUANTIZATION;
 }
 
+/**
+ * Union-carrier ownership is the legacy byte authority of the T1 de-polygon flip, defined as the
+ * exact complement of the kernel dab path over eligible materials (fail-safe): it keeps every
+ * eligible stroke whose dynamics do NOT carry the explicit fresh-authoring `dryMediaKernelProgram`
+ * marker. That set is every persisted pre-wave document — unpinned causal strokes included —
+ * plus every explicitly pinned element, so historical replay is byte-identical to the pre-flip
+ * output instead of being silently re-rendered by the kernel tips. Only freshly authored core
+ * dry-media strokes (whose preset snapshots mint the marker) leave this carrier.
+ */
 export function studioDryMediaUnionRibbonCarrierOwnsMaterial(
   materialIdentity: StudioDynamicBrushMaterialIdentity | undefined,
   dynamics: NormalizedStudioBrushDynamicsSettings,
 ): boolean {
-  const color = dynamics.colorDynamics;
-  const brushId = materialIdentity?.brushId;
-  return materialIdentity?.dryMediaPresetId !== null
-    && materialIdentity?.dryMediaPresetId !== undefined
-    && typeof brushId === "string"
-    && CORE_DRY_MEDIA_IDS.has(brushId)
-    && dynamics.tip.shape === CORE_DRY_MEDIA_TIP_SHAPES[
-      brushId as keyof typeof CORE_DRY_MEDIA_TIP_SHAPES
-    ]
-    && dynamics.tipLayers.length === 0
-    && dynamics.dualBrush?.enabled !== true
-    && color.backgroundColor === null
-    && color.foregroundBackgroundMix === 0
-    && color.foregroundBackgroundJitter === 0
-    && color.hueJitter === 0
-    && color.saturationJitter === 0
-    && color.valueJitter === 0;
+  return resolveStudioDryMediaKernelTipMaterial(materialIdentity, dynamics) !== null
+    && studioDryMediaKernelDabPathOwnsMaterial(materialIdentity, dynamics) === null;
 }
 
 function validFrame(
@@ -713,8 +693,23 @@ export function planStudioDryMediaUnionRibbonCarrier(
     currentComposableGroup.polygons.push(polygon);
     polygons.push(polygon);
   };
-  const brushId = input.materialIdentity?.brushId as CoreDryMediaId;
-  const grainPolicy = DRY_MEDIA_NEGATIVE_GRAIN_POLICY[brushId];
+  // Legacy-replay byte authority: the negative-grain policy is keyed by the kernel-tip material
+  // id — the runtime brushId for every persisted core dry-media stroke — never by the resolved
+  // anisotropic preset. `dryMediaPresetId` folds oil-pastel onto the "pastel" row and would
+  // silently change the paper-tooth slit bytes of every stored oil-pastel stroke.
+  const grainMaterialId = resolveStudioDryMediaKernelTipMaterial(
+    input.materialIdentity,
+    input.dynamics,
+  );
+  if (grainMaterialId === null) {
+    // Unreachable behind the ownership gate above; fail closed instead of substituting a policy.
+    return Object.freeze({
+      applied: false,
+      reason: "ineligible-material",
+      marks: input.marks,
+    });
+  }
+  const grainPolicy = DRY_MEDIA_NEGATIVE_GRAIN_POLICY[grainMaterialId];
   const grainSeed = Math.trunc(finite(input.dynamics.seed, 0)) >>> 0;
   for (
     let index = skipLeadingMarks;

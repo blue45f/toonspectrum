@@ -102,6 +102,12 @@ const STUDIO_CRDT_BOUNDED_FLOW_PAINT_MODEL = "bounded-flow-v2";
 const STUDIO_CRDT_MATERIAL_PRESSURE_MODEL = "canonical-material-v1";
 const STUDIO_CRDT_SEGMENTED_CAUSAL_DEPOSIT_PIPELINE =
   "causal-deposit-v3-segmented";
+// Fresh-authoring dry-media routing marker (`brushDynamics.dryMediaKernelProgram`, browser
+// `studioDryMediaKernelDabProgramPin`). It travels inside the bounded brushDynamics JSON and is
+// intentionally admitted by the bounded-JSON rules without a key whitelist — tightening
+// brushDynamics admission must keep accepting it or freshly authored core dry-media strokes
+// would be dropped server-side while the author still sees them (oracle-pinned in the service
+// test alongside the browser paint contract).
 const STUDIO_CRDT_CAUSAL_PRESSURE_MODELS = new Set([
   "linear-full-v1",
   "linear-residual-v2",
@@ -259,6 +265,13 @@ const STUDIO_CRDT_BOUNDED_FLOW_DYNAMIC_BRUSH_IDS = new Set([
   "marker--soft-dynamic",
   "brush--dry-rake",
   "ink-particle--scatter-cloud",
+  // 2026-08-13 brush quality wave: the only new dynamic-dabs lane (stamp/wet/oil-ribbon lanes
+  // stay off bounded-flow-v2 by both mirrors, matching the browser dynamics resolver).
+  "oil-pastel--wgm-mix",
+  // 2026-08-13 wave 3 mirror audit: all 17 new engine lanes (mypaint-cc0--* stamp pool, croquis
+  // capsule-outline pair, living-ink bake wet lanes, bristle-physics oil lane) execute on
+  // stamp/capsule/wet/oil engines — zero dynamic-dabs lanes, so this set deliberately gains no
+  // ids and the generic `--` fail-closed rule below keeps admitting them nowhere else.
 ]);
 const STUDIO_CRDT_SCENE_INDEX_ROOT = "scene-elements";
 const STUDIO_CRDT_PAGE_INDEX_ROOT = "studio-pages";

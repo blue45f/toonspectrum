@@ -198,18 +198,23 @@ export const BRUSH_STAMP_TUNING_RANGE = [0, 1] as const;
 /**
  * 새 캔버스와 누락 필드를 가진 레거시 브러시가 공유하는 기본 필기감.
  *
- * 새 획은 코얼레스트 하드웨어 입력을 즉시 반영한다. 안정화는 선화 성격에 따라 작가가 명시적으로
- * 켜는 opt-in 설정이다. 이전 3.4 기본값은 5ms·10단 cascade만으로 t90 약 60ms의 trailing을
- * 만들어 입력 처리 자체가 빠른 기기에서도 펜 끝이 무겁게 느껴졌다. 저장된 사용자 브러시의 값은
- * 그대로 유지하며, 신규/누락 필드만 저지연 기본값을 사용한다.
+ * 이전 3.4 고정 cascade 기본값은 t90 약 60ms trailing으로 펜 끝이 무거웠고, 그 반작용으로 0(보정
+ * 없음)까지 내렸다. 0에서는 손떨림이 그대로 통과해 느린 장선에서 미세한 흔들림이 보인다
+ * (scripts/probe-stabilizer-tradeoff.mts 실측: 통과율 100%).
+ *
+ * 그래서 고정 cascade 대신 속도 적응 3을 기본으로 둔다. 같은 실측에서 350px/s 느린 장선은
+ * 떨림 통과율 48%(강도 0 대비 절반)를 지연 3.9px로 얻고, 2000px/s 빠른 플릭에서는 지연 0px로
+ * 완전히 비켜선다 — 같은 강도의 고정 cascade가 플릭에서 44.8px를 끄는 것과 대비된다. 즉 손떨림이
+ * 보이는 느린 선만 잡고 필기감은 건드리지 않는다. 저장된 사용자 브러시의 값은 그대로 유지하며,
+ * 신규/누락 필드만 이 기본값을 사용한다.
  */
 export const DEFAULT_STUDIO_BRUSH_SNAPSHOT: StudioBrushSnapshot = {
   brushId: "pen",
   strokeWidth: 6,
   brushOpacity: 1,
   color: "#7c5cfc",
-  stabilizer: 0,
-  stabilizerMode: "standard",
+  stabilizer: 3,
+  stabilizerMode: "adaptive",
   postCorrection: 0,
   preserveCorners: true,
   pressureCurve: 1.0,

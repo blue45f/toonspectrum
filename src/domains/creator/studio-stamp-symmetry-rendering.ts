@@ -25,7 +25,10 @@ import type {
 export const STUDIO_STAMP_SYMMETRY_MAX_OUTPUT_DABS = STUDIO_STAMP_BRUSH_MAX_DABS;
 
 export interface StudioStampSymmetryRenderPlan {
+  /** Source-variation plan (identity copy) — also the ink-ribbon input. */
   readonly dabs: readonly StudioStampBrushDab[];
+  /** One document-space plan per symmetry copy, index-aligned with `transforms`. */
+  readonly dabVariations: ReadonlyArray<readonly StudioStampBrushDab[]>;
   readonly transforms: readonly StudioBrushSymmetryTransform[];
   readonly sourcePointCount: number;
   readonly totalDabCount: number;
@@ -124,10 +127,38 @@ function uniqueStampSymmetryTransforms(
   return unique;
 }
 
+function isIdentityStampSymmetryTransform(
+  transform: StudioBrushSymmetryTransform
+): boolean {
+  return transform.a === 1 && transform.b === 0 && transform.c === 0
+    && transform.d === 1 && transform.e === 0 && transform.f === 0;
+}
+
+/** Identity returns the source array itself so symmetry-off planning stays byte-identical. */
+function transformStampSymmetryPoints(
+  points: readonly number[],
+  transform: StudioBrushSymmetryTransform
+): readonly number[] {
+  if (isIdentityStampSymmetryTransform(transform)) return points;
+  const transformed: number[] = [];
+  for (let index = 0; index + 1 < points.length; index += 2) {
+    const [x, y] = transformStudioBrushSymmetryPoint(
+      points[index]!,
+      points[index + 1]!,
+      transform
+    );
+    transformed.push(x, y);
+  }
+  return transformed;
+}
+
 /**
- * Plans one prefix-stable v2 stamp stream and the exact affine copies that consume it. Planning the
- * dabs once is important: pencil grain and every other tip-local offset are then mirrored/rotated
- * with the Canvas transform instead of being regenerated in the original axis for each copy.
+ * Plans one prefix-stable v2 stamp stream per symmetry copy. Each copy is planned in document
+ * space on its transformed source points — the exact procedure the SVG export uses — so a
+ * position-dependent dab alpha (W7 paper peak-catch) samples the true document position of every
+ * copy instead of reading the source position through an affine context replay. The symmetry
+ * transforms are isometries, so position-independent lanes keep their radii/alphas/jitter indices
+ * per copy, and the identity copy plans on the untouched source array.
  */
 export function planStudioStampSymmetryRender(
   style: StudioStampBrushStyle,
@@ -138,7 +169,13 @@ export function planStudioStampSymmetryRender(
 ): StudioStampSymmetryRenderPlan {
   const finitePoints = finiteStampPointPrefix(points);
   if (finitePoints.length === 0) {
-    return { dabs: [], transforms: [], sourcePointCount: 0, totalDabCount: 0 };
+    return {
+      dabs: [],
+      dabVariations: [],
+      transforms: [],
+      sourcePointCount: 0,
+      totalDabCount: 0,
+    };
   }
   const requestedBudget = Number.isFinite(maximumOutputDabs)
     ? Math.floor(maximumOutputDabs)
@@ -151,13 +188,23 @@ export function planStudioStampSymmetryRender(
   // With the production budget every legal symmetry copy is retained. Slicing only matters for a
   // deliberately smaller caller/test budget and still preserves source-first ordering.
   const transforms = uniqueTransforms.slice(0, outputBudget);
+  // The budget stays a fan-wide total, split evenly across copies — not a per-copy allowance.
   const maximumBaseDabs = Math.max(1, Math.floor(outputBudget / transforms.length));
-  const dabs = planStudioStampBrushDabs(style, finitePoints, pressures, maximumBaseDabs);
+  const dabVariations = transforms.map((transform) => planStudioStampBrushDabs(
+    style,
+    transformStampSymmetryPoints(finitePoints, transform),
+    pressures,
+    maximumBaseDabs
+  ));
   return {
-    dabs,
+    dabs: dabVariations[0] ?? [],
+    dabVariations,
     transforms,
     sourcePointCount: finitePoints.length / 2,
-    totalDabCount: dabs.length * transforms.length,
+    totalDabCount: dabVariations.reduce(
+      (total, variation) => total + variation.length,
+      0
+    ),
   };
 }
 
@@ -170,28 +217,34 @@ export function drawStudioStampStrokeWithSymmetry(
   symmetry: StudioBrushSymmetrySpec | undefined
 ): StudioStampSymmetryRenderPlan {
   const plan = planStudioStampSymmetryRender(style, points, pressures, symmetry);
-  const inkRibbon = style.kind === "ink"
-    ? planStudioStampInkRibbon(plan.dabs)
-    : null;
-  for (const transform of plan.transforms) {
-    context.save();
-    context.transform(
-      transform.a,
-      transform.b,
-      transform.c,
-      transform.d,
-      transform.e,
-      transform.f
-    );
-    if (inkRibbon) {
+  if (style.kind === "ink") {
+    // Ink keeps the affine-replay ribbon: its dab alpha is position-independent and one shared
+    // ribbon guarantees every copy carries the exact same union silhouette.
+    const inkRibbon = planStudioStampInkRibbon(plan.dabs);
+    for (const transform of plan.transforms) {
+      context.save();
+      context.transform(
+        transform.a,
+        transform.b,
+        transform.c,
+        transform.d,
+        transform.e,
+        transform.f
+      );
       context.globalAlpha = inkRibbon.opacity;
       context.fillStyle = style.color;
       context.beginPath();
       traceStudioStampInkRibbon(context, inkRibbon);
       context.fill();
-    } else {
-      drawStudioStampBrushDabs(context, style, plan.dabs);
+      context.restore();
     }
+    return plan;
+  }
+  for (const dabs of plan.dabVariations) {
+    // Copies are planned in document space, so they draw without a context transform and
+    // paper-pinned lanes deposit at each copy's true position (SVG per-variation parity).
+    context.save();
+    drawStudioStampBrushDabs(context, style, dabs);
     context.restore();
   }
   return plan;

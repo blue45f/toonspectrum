@@ -38,6 +38,9 @@ obscure, or claim ownership of these libraries.
 | `google/ink-stroke-modeler` | 0.1.0 / `f2388813b0b25bc3e33d143d369a8367ab2e30c8` | Apache-2.0 | <https://github.com/google/ink-stroke-modeler> |
 | `abseil-cpp` linked into Google Ink WASM | 20260526.0 and 20250512.0 | Apache-2.0 | <https://github.com/abseil/abseil-cpp> |
 | `libmypaint` WASM | 1.6.1 / `2768251dacce3939136c839aeca413f4aa4241d0` | ISC | <https://github.com/mypaint/libmypaint> |
+| dli/paint (Fluid Paint) `painting.frag` CPU port | first-party embedded port, no npm artifact | MIT | <https://github.com/dli/paint> |
+| croquis.js capsule pen + pulled-string port | `@disjukr/croquis-js` 0.0.3, first-party embedded port | (MIT OR Apache-2.0), MIT elected | <https://github.com/disjukr/croquis.js> |
+| Klecks brush tip kernel re-implementations | first-party embedded kernels, no npm artifact | MIT | <https://github.com/bitbof/klecks> |
 
 Some npm archives do not contain a standalone `LICENSE` file even though their
 package metadata declares an SPDX license. In particular,
@@ -58,6 +61,26 @@ Studio standalone-brush chunk. The MIT-licensed `p5.brush` archive carries a
 local deterministic finite-difference fill-compositor patch: it replaces an
 undefined fragment-quad derivative at translucent fill edges while retaining
 the upstream spectral pigment blend, public API, attribution, and license.
+
+Three natural-media modules embed third-party code ported by hand rather than
+resolved from npm: `src/domains/creator/studio-impasto-relief-shading-v1.ts`
+(CPU port of dli/paint `shaders/painting.frag` and its `paint.js` defaults,
+MIT), `src/domains/creator/studio-croquis-capsule-pen-v1.ts` (re-typed port of
+croquis.js `brush/simple.ts` and `stabilizer/pulled-string.ts`, dual
+`(MIT OR Apache-2.0)` with the MIT option elected), and
+`src/domains/creator/studio-oss-brush-kernels.ts` (clean re-implementations of
+Klecks brush algorithms that closely follow specific upstream functions, MIT;
+the libmypaint `.myb` recipes it also carries are ISC parameter values covered
+by the libmypaint WASM notice above). croquis.js declares its SPDX expression
+in `package.json` and README but ships no license text file, so the canonical
+MIT text with upstream author attribution is preserved — the same treatment
+given to `@resvg/resvg-wasm` and `onnxruntime-web` above. The verbatim
+permission notices are checked in at `third_party/dli-paint/LICENSE`,
+`third_party/croquis-js/LICENSE-MIT`, and `third_party/klecks/LICENSE`. The
+release notice generator embeds each of those texts into
+`dist/legal/THIRD_PARTY_NOTICES.generated.md`, and `pnpm run audit:licenses`
+fails if a copy is missing, its permission notice is altered, or this notice
+stops referencing it.
 
 The checked-in `studio-hokusai-wasm` wrapper uses a Cargo v4 lockfile and exact
 manifest pins: `hokusai-brush`, `hokusai-core`, and `hokusai-tile-mem` are

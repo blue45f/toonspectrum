@@ -65,6 +65,12 @@ import {
   type StudioDynamicBrushMaterialIdentity,
 } from "./studio-dry-media-dynamic-bridge";
 import {
+  linearizeStudioDryMediaKernelDepositionAlpha,
+  resolveStudioDryMediaKernelTipAlphaMap,
+  studioDryMediaKernelDabPathOwnsMaterial,
+  studioDryMediaKernelStrokeToothMultiplier,
+} from "./studio-dry-media-kernel-tip";
+import {
   planStudioDryMediaUnionRibbonCarrier,
   studioDryMediaUnionRibbonCarrierOwnsMaterial,
   type StudioDryMediaUnionRibbonPolygon,
@@ -731,6 +737,9 @@ function tipUsesAnalyticSoftFalloff(
     );
 }
 
+/** Path2D memo for frozen carrier ribbons, keyed by ribbon identity (see the paint path below). */
+const RIBBON_PATH_CACHE = new WeakMap<object, Path2D>();
+
 /**
  * Shared mark compositor for live, bounded committed and direct legacy paths. Keeping procedural
  * falloff here prevents pointer-up/replay from changing the airbrush footprint.
@@ -792,7 +801,12 @@ export function renderStudioDynamicBrushCoverageMark(
     }
     if (context.fillStyle !== mark.color) context.fillStyle = mark.color;
     if (typeof Path2D !== "undefined") {
-      let path = (mark.ribbon as { _cachedPath?: Path2D })._cachedPath;
+      // Carriers hand out deep-frozen ribbons, so the cache cannot live on the ribbon itself:
+      // under ES-module strict mode the property write throws a TypeError and takes the whole
+      // stroke down with it (measured 2026-08-14 as a blank canvas for every unstyled ribbon,
+      // e.g. hard-airbrush and erodible-pencil). A keyed side table caches identically without
+      // touching the frozen object.
+      let path = RIBBON_PATH_CACHE.get(mark.ribbon);
       if (!path) {
         path = new Path2D();
         const polygons = mark.ribbon.polygons;
@@ -806,7 +820,7 @@ export function renderStudioDynamicBrushCoverageMark(
           }
           path.closePath();
         }
-        (mark.ribbon as { _cachedPath?: Path2D })._cachedPath = path;
+        RIBBON_PATH_CACHE.set(mark.ribbon, path);
       }
       try {
         context.fill(path);
@@ -1019,6 +1033,22 @@ export function planStudioDynamicBrushCoverageMarks(
       input.materialIdentity,
       dynamics,
     );
+  /*
+   * T1 de-polygon: a core dry-media stroke leaves the union carrier only when its dynamics carry
+   * the explicit fresh-authoring `dryMediaKernelProgram` marker. Marked strokes keep the same
+   * bridged multi-lane dabs as ellipse/alpha-map primitives whose primary tip is a verified OSS
+   * kernel bake (crayon wax / chalk powder / charcoal grit / pastel velvet / oil-pastel wax
+   * film); every unmarked persisted stroke — causal or legacy — replays through the union
+   * authority above byte-identically. Asset-backed R8 paper keeps its byte-authoritative composed
+   * maps, so the kernel tip only engages when no R8 grain sampler is active — mirroring the union
+   * authority gate above.
+   */
+  const dryMediaKernelTipMaterial = r8GrainSampler === null
+    ? studioDryMediaKernelDabPathOwnsMaterial(
+        input.materialIdentity,
+        dynamics,
+      )
+    : null;
   const dryMediaUnionLeadingSourceDabsToSkip = Math.max(
     0,
     Math.floor(input.dryMediaUnionLeadingSourceDabsToSkip ?? 0),
@@ -1122,6 +1152,7 @@ export function planStudioDynamicBrushCoverageMarks(
   ));
   const tipAlphaMaps = tipDefinitions.map((tip, tipIndex) => (
     dryMediaUnionRibbonAuthority
+      || (tipIndex === 0 && dryMediaKernelTipMaterial !== null)
       || tipUsesEllipse[tipIndex]
       || tipUsesAnalyticFalloff[tipIndex]
       ? null
@@ -1271,14 +1302,45 @@ export function planStudioDynamicBrushCoverageMarks(
       ) * paperAcrossFootprint(x, y, radiusX, radiusY, angleRadians)
     );
     const appendTipDab = (
-      composedDab: StudioBrushComposableDab,
+      // Kernel-authority primary dabs carry their causal identity (index, arc distance); composed
+      // layer dabs do not — and the kernel material is gated to tipIndex 0, so the fallbacks below
+      // are type-level only (typecheck fix, runtime-identical).
+      composedDab: StudioBrushComposableDab & Readonly<{
+        index?: number;
+        distanceFromStrokeStart?: number;
+      }>,
       tip: NormalizedStudioBrushTipSettings,
       tipIndex: number,
       dabColor: string
     ): "ok" | "invalid-mark" | "mark-budget" => {
-      const depositionAlpha = clampAlpha(composedDab.opacity * composedDab.flow);
+      /*
+       * Kernel dab authority (T1): the primary dry-media tip is a verified OSS material bake
+       * resolved per dab. The stable expanded dab index rotates a small immutable variant set, so
+       * live suffix planning, pointer-up replay and SVG export select identical maps while
+       * neighbouring fibres never tile the same grain orientation. The deposition alpha is
+       * linearized per material so the overlapping fibre lanes reach the historical dry-media bed
+       * density instead of reading as a lighter half-tone of it.
+       */
+      const kernelTipMaterial = tipIndex === 0 ? dryMediaKernelTipMaterial : null;
+      const depositionAlpha = kernelTipMaterial
+        ? clampAlpha(linearizeStudioDryMediaKernelDepositionAlpha(
+            kernelTipMaterial,
+            composedDab.opacity * composedDab.flow,
+          ))
+        : clampAlpha(composedDab.opacity * composedDab.flow);
       if (depositionAlpha <= 0) return "ok";
-      const tipAlphaMap = tipAlphaMaps[tipIndex] ?? null;
+      const tipAlphaMap = kernelTipMaterial
+        ? resolveStudioDryMediaKernelTipAlphaMap(
+            kernelTipMaterial,
+            dynamics.tip,
+            // The resolver's own non-safe-integer fallback is 0, so the type-level default is
+            // behavior-identical (primary kernel dabs always carry their causal index).
+            composedDab.index ?? 0,
+            // Band width follows the RAW pressure-resolved alpha (the union carrier's
+            // coverageHalfWidth input), not the linearized deposition alpha.
+            clampAlpha(composedDab.opacity * composedDab.flow),
+          )
+        : tipAlphaMaps[tipIndex] ?? null;
       if (r8GrainSampler) {
         if (!tipAlphaMap) return "invalid-mark";
         const radiusX = Math.max(0.25, composedDab.size / 2);
@@ -1348,9 +1410,11 @@ export function planStudioDynamicBrushCoverageMarks(
         return failure ?? "ok";
       };
       if (
-        tipUsesEllipse[tipIndex]
-        || tipUsesAnalyticFalloff[tipIndex]
-        || !tipAlphaMap
+        !tipAlphaMap
+        || (
+          !kernelTipMaterial
+          && (tipUsesEllipse[tipIndex] || tipUsesAnalyticFalloff[tipIndex])
+        )
       ) {
         const radiusX = Math.max(0.25, composedDab.size / 2);
         const radiusY = radiusX * composedDab.roundness;
@@ -1497,7 +1561,29 @@ export function planStudioDynamicBrushCoverageMarks(
                 radiusX,
                 radiusY,
                 angleRadians,
-              )),
+              ))
+          // Kernel lane only: stroke-anchored paper tooth. Tip-local grain cannot survive five
+          // overlapping fibres, so full-contrast pores live in the stroke's own coordinates where
+          // every overlapping dab dips at the same valley (the union carrier's pores did too).
+          * (kernelTipMaterial
+            ? studioDryMediaKernelStrokeToothMultiplier(
+                kernelTipMaterial,
+                {
+                  index: composedDab.index ?? 0,
+                  x: composedDab.x,
+                  y: composedDab.y,
+                  ...(composedDab.distanceFromStrokeStart !== undefined
+                    ? {
+                        distanceFromStrokeStart:
+                          composedDab.distanceFromStrokeStart,
+                      }
+                    : {}),
+                },
+                strokeOriginX,
+                strokeOriginY,
+                dynamicSeed,
+              )
+            : 1),
         ),
         color: dabColor,
         texture: {
@@ -1566,7 +1652,7 @@ export function planStudioDynamicBrushCoverageMarks(
       const primaryMarkStart = marks.length;
       const primaryResult = appendTipDab(dab, dynamics.tip, 0, dabColor);
       if (primaryResult !== "ok") return { ok: false, reason: primaryResult };
-      if (marks.length === primaryMarkStart + 1) {
+      if (marks.length >= primaryMarkStart + 1) {
         visiblePrimaryDabs.push(dab);
         visiblePrimaryMarks.push(marks[primaryMarkStart]!);
       }

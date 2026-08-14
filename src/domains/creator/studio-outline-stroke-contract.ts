@@ -11,6 +11,16 @@
 
 import { resolveStudioFreehandRenderPath } from "./studio-brush";
 import { resolveStudioBrushAliasProfile } from "./studio-brush-alias-profile";
+import { resolveStudioBrushEngineLaneCroquisCapsuleProgramId } from "./studio-brush-engine-lane-catalog";
+import {
+  STUDIO_CROQUIS_CAPSULE_PEN_ALGORITHM,
+  applyStudioCroquisPulledStringPrefilter,
+  buildStudioCroquisCapsuleStrokeLoops,
+  resolveStudioCroquisCapsulePenProgram,
+  studioCroquisCapsuleLoopsToPathData,
+  studioCroquisCapsuleRadiiFromPressures,
+  type StudioCroquisCapsulePenProgramId,
+} from "./studio-croquis-capsule-pen-v1";
 import {
   buildStudioPerfectFreehandOutline,
   resolveStudioPerfectFreehandProfile,
@@ -29,6 +39,16 @@ export const STUDIO_OUTLINE_STROKE_ADAPTER_VERSION =
   "toonspectrum-perfect-freehand-adapter-v1" as const;
 export const STUDIO_OUTLINE_STROKE_PACKAGE_ALGORITHM =
   "perfect-freehand@1.2.3:getStroke" as const;
+/**
+ * Sibling v1 engine branch (2026-08-13 wave 3): croquis.js circumscribed-tangent capsule inking.
+ * Same durable-contract discipline as the perfect-freehand branch — a pointer-start caller
+ * captures the snapshot once and every renderer resolves it; the engine is granted only through
+ * an explicit catalog program pin (`resolveStudioBrushEngineLaneCroquisCapsuleProgramId`).
+ */
+export const STUDIO_CROQUIS_CAPSULE_OUTLINE_STROKE_ENGINE =
+  "croquis-capsule-outline" as const;
+export const STUDIO_CROQUIS_CAPSULE_OUTLINE_PACKAGE_ALGORITHM =
+  STUDIO_CROQUIS_CAPSULE_PEN_ALGORITHM;
 
 export type StudioOutlineStrokePressureSource =
   | "recorded"
@@ -51,7 +71,7 @@ export interface StudioOutlineStrokeProfileSnapshotV1 {
   readonly capEnd: boolean;
 }
 
-export interface StudioOutlineStrokeContractV1 {
+export interface StudioPerfectFreehandOutlineStrokeContractV1 {
   readonly kind: typeof STUDIO_OUTLINE_STROKE_CONTRACT_KIND;
   readonly version: typeof STUDIO_OUTLINE_STROKE_CONTRACT_VERSION;
   readonly engine: typeof STUDIO_OUTLINE_STROKE_ENGINE;
@@ -60,6 +80,33 @@ export interface StudioOutlineStrokeContractV1 {
   readonly pressureSource: StudioOutlineStrokePressureSource;
   readonly profile: StudioOutlineStrokeProfileSnapshotV1;
 }
+
+/**
+ * Renderer-significant capsule program snapshot. Numeric values are copied at capture so replay
+ * never consults the mutable program table (same discipline as the perfect-freehand snapshot).
+ */
+export interface StudioCroquisCapsuleProfileSnapshotV1 {
+  readonly id: StudioCroquisCapsulePenProgramId;
+  /** Brush-specific selected-size multiplier captured before the mutable alias catalogue changes. */
+  readonly diameterScale: number;
+  readonly arcTolerancePx: number;
+  readonly pulledStringLengthPx: number | null;
+}
+
+export interface StudioCroquisCapsuleOutlineStrokeContractV1 {
+  readonly kind: typeof STUDIO_OUTLINE_STROKE_CONTRACT_KIND;
+  readonly version: typeof STUDIO_OUTLINE_STROKE_CONTRACT_VERSION;
+  readonly engine: typeof STUDIO_CROQUIS_CAPSULE_OUTLINE_STROKE_ENGINE;
+  readonly adapterVersion: typeof STUDIO_OUTLINE_STROKE_ADAPTER_VERSION;
+  readonly packageAlgorithm: typeof STUDIO_CROQUIS_CAPSULE_OUTLINE_PACKAGE_ALGORITHM;
+  /** Capsule radii come from recorded pressure only; this client never captures simulation. */
+  readonly pressureSource: "recorded";
+  readonly profile: StudioCroquisCapsuleProfileSnapshotV1;
+}
+
+export type StudioOutlineStrokeContractV1 =
+  | StudioPerfectFreehandOutlineStrokeContractV1
+  | StudioCroquisCapsuleOutlineStrokeContractV1;
 
 export interface StudioOutlineStrokeContractCaptureInput {
   readonly brushId: unknown;
@@ -131,6 +178,12 @@ const PROFILE_KEYS = [
   "taperEndFactor",
   "capStart",
   "capEnd",
+] as const;
+const CAPSULE_PROFILE_KEYS = [
+  "id",
+  "diameterScale",
+  "arcTolerancePx",
+  "pulledStringLengthPx",
 ] as const;
 const PROFILE_IDS = new Set<StudioPerfectFreehandProfileId>([
   "perfect-ink",
@@ -245,6 +298,53 @@ function normalizeProfileSnapshot(
   });
 }
 
+/** Mirrors `normalizeProfileSnapshot` for the croquis capsule engine branch. */
+function normalizeCapsuleProfileSnapshot(
+  value: unknown,
+): StudioCroquisCapsuleProfileSnapshotV1 | StudioOutlineStrokeContractIssue {
+  const profile = plainDataRecord(value);
+  if (!profile || !hasExactKeys(profile, CAPSULE_PROFILE_KEYS)) {
+    return issue(
+      "unsupported-profile",
+      "profile",
+      "캡슐 브러시 프로필 스냅샷의 필드가 올바르지 않습니다.",
+    );
+  }
+  // The program id must still exist in the frozen program table — an unknown/removed id must be
+  // surfaced, never rendered with another texture (fail-closed catalog discipline).
+  if (
+    typeof profile.id !== "string"
+    || resolveStudioCroquisCapsulePenProgram(profile.id) === null
+  ) {
+    return issue(
+      "unsupported-profile",
+      "profile.id",
+      "이 클라이언트가 지원하지 않는 캡슐 브러시 프로그램입니다.",
+    );
+  }
+  if (
+    !boundedFiniteNumber(profile.diameterScale, 0.01, 16)
+    || !boundedFiniteNumber(profile.arcTolerancePx, 0.01, 4)
+    || (
+      profile.pulledStringLengthPx !== null
+      && !boundedFiniteNumber(profile.pulledStringLengthPx, 1, 512)
+    )
+  ) {
+    return issue(
+      "unsupported-profile",
+      "profile",
+      "캡슐 브러시 프로필 스냅샷의 값이 안전 범위를 벗어났습니다.",
+    );
+  }
+
+  return Object.freeze({
+    id: profile.id as StudioCroquisCapsulePenProgramId,
+    diameterScale: profile.diameterScale,
+    arcTolerancePx: profile.arcTolerancePx,
+    pulledStringLengthPx: profile.pulledStringLengthPx as number | null,
+  });
+}
+
 function snapshotProfile(
   profile: StudioPerfectFreehandProfile,
   brushId: unknown,
@@ -275,22 +375,63 @@ function isPressureSource(value: unknown): value is StudioOutlineStrokePressureS
 export function captureStudioOutlineStrokeContractV1(
   input: StudioOutlineStrokeContractCaptureInput,
 ): StudioOutlineStrokeContractV1 | null {
-  const profile = resolveStudioPerfectFreehandProfile(input.brushId);
-  if (!profile) return null;
-  if (!isPressureSource(input.pressureSource)) {
+  // Narrow the source into a local so the guard survives the resolver calls below.
+  const pressureSource = input.pressureSource;
+  if (!isPressureSource(pressureSource)) {
+    // An eligible brush with an invalid pressure source is a programmer error for BOTH engine
+    // branches, so validate eligibility first and keep null the only non-owned outcome.
+    const capsuleEligible = resolveStudioCroquisCapsulePenProgram(
+      resolveStudioBrushEngineLaneCroquisCapsuleProgramId(
+        typeof input.brushId === "string" ? input.brushId : null,
+      ),
+    ) !== null;
+    if (!capsuleEligible && !resolveStudioPerfectFreehandProfile(input.brushId)) return null;
     throw new StudioOutlineStrokeContractError(issue(
       "unsupported-pressure-source",
       "pressureSource",
       "외곽선 획의 필압 출처를 pointer-start에서 명시해야 합니다.",
     ));
   }
+  // Explicit catalog program pin wins: a pinned lane id captures the capsule engine snapshot
+  // (2026-08-13 wave 3). Unpinned brushes fall through to the perfect-freehand branch untouched.
+  const capsuleProgram = resolveStudioCroquisCapsulePenProgram(
+    resolveStudioBrushEngineLaneCroquisCapsuleProgramId(
+      typeof input.brushId === "string" ? input.brushId : null,
+    ),
+  );
+  if (capsuleProgram) {
+    if (pressureSource !== "recorded") {
+      // Capsule radii are recorded-pressure functions; this client never simulates them.
+      throw new StudioOutlineStrokeContractError(issue(
+        "unsupported-pressure-source",
+        "pressureSource",
+        "캡슐 외곽선 획은 recorded 필압만 캡처할 수 있습니다.",
+      ));
+    }
+    return Object.freeze({
+      kind: STUDIO_OUTLINE_STROKE_CONTRACT_KIND,
+      version: STUDIO_OUTLINE_STROKE_CONTRACT_VERSION,
+      engine: STUDIO_CROQUIS_CAPSULE_OUTLINE_STROKE_ENGINE,
+      adapterVersion: STUDIO_OUTLINE_STROKE_ADAPTER_VERSION,
+      packageAlgorithm: STUDIO_CROQUIS_CAPSULE_OUTLINE_PACKAGE_ALGORITHM,
+      pressureSource: "recorded",
+      profile: Object.freeze({
+        id: capsuleProgram.id,
+        diameterScale: resolveStudioBrushAliasProfile(input.brushId)?.diameterScale ?? 1,
+        arcTolerancePx: capsuleProgram.arcTolerancePx,
+        pulledStringLengthPx: capsuleProgram.pulledStringLengthPx,
+      }),
+    });
+  }
+  const profile = resolveStudioPerfectFreehandProfile(input.brushId);
+  if (!profile) return null;
   return Object.freeze({
     kind: STUDIO_OUTLINE_STROKE_CONTRACT_KIND,
     version: STUDIO_OUTLINE_STROKE_CONTRACT_VERSION,
     engine: STUDIO_OUTLINE_STROKE_ENGINE,
     adapterVersion: STUDIO_OUTLINE_STROKE_ADAPTER_VERSION,
     packageAlgorithm: STUDIO_OUTLINE_STROKE_PACKAGE_ALGORITHM,
-    pressureSource: input.pressureSource,
+    pressureSource,
     profile: snapshotProfile(profile, input.brushId),
   });
 }
@@ -364,7 +505,8 @@ export function resolveStudioOutlineStrokeContract(
       ),
     });
   }
-  if (contract.engine !== STUDIO_OUTLINE_STROKE_ENGINE) {
+  const capsuleEngine = contract.engine === STUDIO_CROQUIS_CAPSULE_OUTLINE_STROKE_ENGINE;
+  if (contract.engine !== STUDIO_OUTLINE_STROKE_ENGINE && !capsuleEngine) {
     return Object.freeze({
       status: "unsupported",
       contract: null,
@@ -386,18 +528,31 @@ export function resolveStudioOutlineStrokeContract(
       ),
     });
   }
-  if (contract.packageAlgorithm !== STUDIO_OUTLINE_STROKE_PACKAGE_ALGORITHM) {
+  // Each engine branch owns exactly one package algorithm — a mismatched pairing is a fabricated
+  // contract and must never pick a renderer by guesswork.
+  if (
+    contract.packageAlgorithm !== (
+      capsuleEngine
+        ? STUDIO_CROQUIS_CAPSULE_OUTLINE_PACKAGE_ALGORITHM
+        : STUDIO_OUTLINE_STROKE_PACKAGE_ALGORITHM
+    )
+  ) {
     return Object.freeze({
       status: "unsupported",
       contract: null,
       issue: issue(
         "unsupported-package-algorithm",
         "packageAlgorithm",
-        "이 클라이언트가 지원하지 않는 perfect-freehand 알고리즘입니다.",
+        capsuleEngine
+          ? "이 클라이언트가 지원하지 않는 croquis 캡슐 알고리즘입니다."
+          : "이 클라이언트가 지원하지 않는 perfect-freehand 알고리즘입니다.",
       ),
     });
   }
-  if (!isPressureSource(contract.pressureSource)) {
+  // Hoist the validated source into a local so its narrowing survives the calls below.
+  const rawPressureSource = contract.pressureSource;
+  const pressureSource = isPressureSource(rawPressureSource) ? rawPressureSource : null;
+  if (pressureSource === null || (capsuleEngine && pressureSource !== "recorded")) {
     return Object.freeze({
       status: "unsupported",
       contract: null,
@@ -420,6 +575,29 @@ export function resolveStudioOutlineStrokeContract(
     });
   }
 
+  if (capsuleEngine) {
+    const normalizedCapsuleProfile = normalizeCapsuleProfileSnapshot(contract.profile);
+    if ("code" in normalizedCapsuleProfile) {
+      return Object.freeze({
+        status: "unsupported",
+        contract: null,
+        issue: normalizedCapsuleProfile,
+      });
+    }
+    return Object.freeze({
+      status: "ready",
+      contract: Object.freeze({
+        kind: STUDIO_OUTLINE_STROKE_CONTRACT_KIND,
+        version: STUDIO_OUTLINE_STROKE_CONTRACT_VERSION,
+        engine: STUDIO_CROQUIS_CAPSULE_OUTLINE_STROKE_ENGINE,
+        adapterVersion: STUDIO_OUTLINE_STROKE_ADAPTER_VERSION,
+        packageAlgorithm: STUDIO_CROQUIS_CAPSULE_OUTLINE_PACKAGE_ALGORITHM,
+        pressureSource: "recorded",
+        profile: normalizedCapsuleProfile,
+      }),
+    });
+  }
+
   const normalizedProfile = normalizeProfileSnapshot(contract.profile);
   if ("code" in normalizedProfile) {
     return Object.freeze({
@@ -436,7 +614,7 @@ export function resolveStudioOutlineStrokeContract(
       engine: STUDIO_OUTLINE_STROKE_ENGINE,
       adapterVersion: STUDIO_OUTLINE_STROKE_ADAPTER_VERSION,
       packageAlgorithm: STUDIO_OUTLINE_STROKE_PACKAGE_ALGORITHM,
-      pressureSource: contract.pressureSource,
+      pressureSource,
       profile: normalizedProfile,
     }),
   });
@@ -640,6 +818,66 @@ function freezeOutline(
 }
 
 /**
+ * Croquis capsule engine branch (2026-08-13 wave 3). Pure per-segment hull geometry — no stroker
+ * module, no polygon-union step. Empty geometry (e.g. an all-zero recorded pressure stroke) falls
+ * back to the round Line + endpoint caps plan, which is the uniform-width degenerate form of the
+ * same capsule texture; it must never route to perfect-freehand or the plain pen renderer.
+ */
+function planStudioCroquisCapsuleRender(
+  contract: StudioCroquisCapsuleOutlineStrokeContractV1,
+  input: StudioPerfectFreehandRenderPlanInput,
+  points: number[],
+  pressures: readonly number[],
+  renderStrokeWidth: number,
+): StudioPerfectFreehandRenderPlan {
+  const capsulePoints = contract.profile.pulledStringLengthPx !== null
+    ? applyStudioCroquisPulledStringPrefilter(points, {
+        stringLengthPx: contract.profile.pulledStringLengthPx,
+      })
+    : points;
+  const metrics = sourceMetrics(capsulePoints);
+  const pointCount = Math.floor(capsulePoints.length / 2);
+  // Recorded pressure normally arrives one-per-point; a shorter array carries the last known
+  // stylus state forward (croquis forwards the current stylus state), never an invented curve.
+  const alignedPressures = pressures.length === pointCount
+    ? pressures
+    : Array.from(
+        { length: pointCount },
+        (_, index) => pressures[Math.min(index, pressures.length - 1)]!,
+      );
+  const loops = buildStudioCroquisCapsuleStrokeLoops({
+    points: capsulePoints,
+    radii: studioCroquisCapsuleRadiiFromPressures(alignedPressures, renderStrokeWidth),
+    arcTolerancePx: contract.profile.arcTolerancePx,
+  });
+  const pathData = studioCroquisCapsuleLoopsToPathData(loops);
+  if (!pathData) {
+    const representativePressure = alignedPressures.length > 0
+      ? alignedPressures.reduce((total, pressure) => total + pressure, 0)
+        / alignedPressures.length
+      : 0.5;
+    return fallbackLinePlan(
+      contract,
+      input,
+      capsulePoints,
+      metrics,
+      "invalid-outline",
+      true,
+      // croquis diameter response is linear in pressure (r = p × size / 2).
+      Math.max(0.01, renderStrokeWidth * representativePressure),
+    );
+  }
+  const flattenedLoops = loops.flat();
+  return Object.freeze({
+    kind: "outline",
+    contract,
+    outline: freezeOutline(flattenedLoops),
+    pathData,
+    metrics: outlineMetrics(metrics, flattenedLoops),
+  });
+}
+
+/**
  * Shared v1 plan for retained live preview, committed canvas and SVG export.
  *
  * It owns all perfect-freehand fallback decisions. A caller renders either the returned filled
@@ -695,6 +933,17 @@ export function planStudioPerfectFreehandRender(
         reason: "invalid-recorded-pressure",
       });
     }
+  }
+  if (contract.engine === STUDIO_CROQUIS_CAPSULE_OUTLINE_STROKE_ENGINE) {
+    // The recorded-pressure guard above already ran (capsule contracts are always `recorded`),
+    // so `pressures` is a validated non-empty array here.
+    return planStudioCroquisCapsuleRender(
+      contract,
+      input,
+      points,
+      pressures ?? [],
+      renderStrokeWidth,
+    );
   }
   const representativePressure = pressures && pressures.length > 0
     ? pressures.reduce((total, pressure) => total + pressure, 0) / pressures.length

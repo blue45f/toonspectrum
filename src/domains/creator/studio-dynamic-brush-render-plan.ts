@@ -106,9 +106,21 @@ function settingsFor(
     : dynamicBrushId;
   const cached = defaultDynamicsByBrushId.get(brushId);
   if (cached) return cached;
-  const normalized = studioBrushDynamicsSettingsForBrushId(brushId)
+  const derived = studioBrushDynamicsSettingsForBrushId(brushId)
     ?? studioBrushDynamicsSettingsForBrushId(dynamicBrushId)
     ?? normalizeStudioBrushDynamicsSettings();
+  // Replay fail-safe. We are here because the element stored NO dynamics snapshot — it predates
+  // element-level capture — so its dynamics are being re-derived from today's catalogue. That
+  // catalogue mints the dry-media kernel pin for freshly authored presets, and letting a legacy
+  // stroke inherit it would move it off the union carrier it was drawn with: same document,
+  // different grain and edge, with no way back for the artist. Only an element's own stored
+  // snapshot may carry the pin, so strip it from the id-derived fallback.
+  const normalized = derived.dryMediaKernelProgram === undefined
+    ? derived
+    : normalizeStudioBrushDynamicsSettings({
+      ...derived,
+      dryMediaKernelProgram: undefined,
+    });
   defaultDynamicsByBrushId.set(brushId, normalized);
   return normalized;
 }

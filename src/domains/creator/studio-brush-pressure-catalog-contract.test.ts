@@ -15,6 +15,7 @@ import {
   planNormalizedStudioDynamicBrushDabs,
   studioBrushDynamicsSettingsForBrushId,
 } from "./studio-brush-dynamics";
+import { resolveStudioBrushEngineLaneCroquisCapsuleProgramId } from "./studio-brush-engine-lane-catalog";
 import {
   materializeAllStudioBrushPackSelections,
   type StudioBrushPackSelection,
@@ -29,6 +30,12 @@ import {
   resolveStudioStampBrushStyle,
 } from "./studio-brush-stamp-engine";
 import { planStudioCausalInk } from "./studio-causal-ink";
+import {
+  applyStudioCroquisPulledStringPrefilter,
+  buildStudioCroquisCapsuleStrokeLoops,
+  resolveStudioCroquisCapsulePenProgram,
+  studioCroquisCapsuleRadiiFromPressures,
+} from "./studio-croquis-capsule-pen-v1";
 import {
   isStudioFxPressureBrushId,
   planGlitterBrushParticles,
@@ -190,6 +197,31 @@ function corePressureAxes(brushId: string, pressure: number): readonly number[] 
         profile,
       });
       return [outline.length, outlineArea(outline)];
+    }
+    // 2026-08-13 wave 3: croquis capsule lanes — radii are linear in recorded pressure
+    // (r = p × size / 2), so hull area is the honest pressure axis.
+    case "capsule-outline": {
+      const program = resolveStudioCroquisCapsulePenProgram(
+        resolveStudioBrushEngineLaneCroquisCapsuleProgramId(brushId),
+      );
+      if (!program) return [];
+      const capsulePoints = program.pulledStringLengthPx !== null
+        ? applyStudioCroquisPulledStringPrefilter(PROBE_POINTS, {
+            stringLengthPx: program.pulledStringLengthPx,
+          })
+        : [...PROBE_POINTS];
+      const loops = buildStudioCroquisCapsuleStrokeLoops({
+        points: capsulePoints,
+        radii: studioCroquisCapsuleRadiiFromPressures(
+          pressures.slice(0, Math.floor(capsulePoints.length / 2)),
+          diameter,
+        ),
+        arcTolerancePx: program.arcTolerancePx,
+      });
+      return [
+        loops.length,
+        sum(loops.map((loop) => outlineArea(loop))),
+      ];
     }
     case "particle-scatter": {
       const mode = brushId === "star-dust"

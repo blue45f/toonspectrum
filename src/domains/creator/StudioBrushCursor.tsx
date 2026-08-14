@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import {
   Circle as KCircle,
   Ellipse,
@@ -95,8 +96,15 @@ export function StudioBrushCursor({
     tipRoundness,
   });
 
+  // The cursor layer owns its own Konva canvas element. Tag it in the DOM so evidence tooling
+  // (browser verifiers, recordings, exports) can exclude the transient cursor chrome from pixel
+  // measurements — the ring is UI, never document ink.
+  const tagCursorCanvas = useCallback((layer: Konva.Layer | null) => {
+    layer?.getCanvas()._canvas.setAttribute("data-studio-brush-cursor-canvas", "true");
+  }, []);
+
   return (
-    <Layer listening={false} name="studio-brush-cursor-layer">
+    <Layer ref={tagCursorCanvas} listening={false} name="studio-brush-cursor-layer">
       {guideRef ? (
         <KLine
           ref={guideRef}

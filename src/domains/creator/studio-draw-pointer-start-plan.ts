@@ -182,7 +182,6 @@ export function planStudioDrawPointerStart(
   const boundedDynamicFlowPaintEligible =
     drawMode === "pen"
     && hasBrushDynamics
-    && stampKind === null
     && isStudioBoundedFlowSymmetryCompatible(symmetry);
   const hybridPressure = (drawMode === "pen" || lowDensityEraser) && brush !== "pen"
     ? resolveStudioHybridPressureSample(brush, {
@@ -259,8 +258,8 @@ export function planStudioDrawPointerStart(
     brushTip: drawMode === "pen"
       ? resolveStudioCalligraphyAuthoringTip(brush, brushTip)
       : undefined,
-    stamp: drawMode === "pen" && stampTuning && stampKind ? { ...stampTuning } : undefined,
-    stampPipeline: drawMode === "pen" && stampKind ? "causal-walker-v2" as const : undefined,
+    stamp: drawMode === "pen" && stampTuning && stampKind && !hasBrushDynamics ? { ...stampTuning } : undefined,
+    stampPipeline: drawMode === "pen" && stampKind && !hasBrushDynamics ? "causal-walker-v2" as const : undefined,
     watercolorPipeline: causalWatercolor ? "causal-walker-v2" as const : undefined,
     symmetry: drawMode === "pixel" || symmetry.type === "none"
       ? undefined

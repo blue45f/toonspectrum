@@ -103,6 +103,10 @@ function dynamicElement(overrides: Partial<DrawEl> = {}): DrawEl {
     strokeWidth: 12,
     opacity: 0.65,
     brush: "ink-particle",
+    // Product pointer-start stamps the bounded-flow-v2 paint seam with causal sampleSpacing on
+    // every retained-dynamics pen stroke; the captured-preset resolver requires that seam.
+    paintModel: "bounded-flow-v2",
+    sampleSpacing: 1,
     brushDynamics: normalizeStudioBrushDynamicsSettings({
       seed: 123,
       fallbackPressure: 0.45,
@@ -177,7 +181,12 @@ describe("Studio DrawEl canonical brush adapter", () => {
     const second = ready(adaptStudioDrawElementToCanonicalBrushPlan(request(structuredClone(element))));
 
     expect(first.plan).toEqual(second.plan);
-    expect(first.requirements).toEqual(["texture-tip", "grain"]);
+    expect(first.requirements).toEqual([
+      "texture-tip",
+      "grain",
+      "retained-dynamics",
+      "stroke-local-compositor",
+    ]);
     expect(first.plan.transform).toEqual(TRANSFORM);
     expect(first.plan.source.samples).toEqual([
       {
@@ -238,17 +247,21 @@ describe("Studio DrawEl canonical brush adapter", () => {
         seed: 77,
       },
     });
-    expect(first.plan.recipe.pressure.size.minimum).toBeCloseTo(0.4, 12);
-    expect(first.plan.recipe.pressure.size.maximum).toBeCloseTo(1.2, 12);
-    expect(first.plan.recipe.pressure.size.exponent).toBe(1.4);
-    expect(first.plan.recipe.pressure.opacity).toEqual({
-      minimum: 0.75,
-      maximum: 0.75,
-      exponent: 1,
-    });
-    expect(first.plan.recipe.pressure.flow.minimum).toBeCloseTo(0.3, 12);
-    expect(first.plan.recipe.pressure.flow.maximum).toBeCloseTo(0.6, 12);
-    expect(first.plan.recipe.pressure.flow.exponent).toBe(1.25);
+    // v2 bounded recipes neutralize channel-serialized pressure curves to identity; the truth
+    // travels in retainedDynamics and is replayed by the consumer with the retained planner.
+    const identityCurve = { minimum: 1, maximum: 1, exponent: 1 };
+    expect(first.plan.recipe.pressure.size).toEqual(identityCurve);
+    expect(first.plan.recipe.pressure.opacity).toEqual(identityCurve);
+    expect(first.plan.recipe.pressure.flow).toEqual(identityCurve);
+    expect(first.plan.recipe.version).toBe(2);
+    const recipeWithDynamics = first.plan.recipe as typeof first.plan.recipe & {
+      retainedDynamics: NormalizedStudioBrushDynamicsSettings | null;
+    };
+    expect(recipeWithDynamics.retainedDynamics).not.toBeNull();
+    expect(recipeWithDynamics.retainedDynamics!.spacingRatio).toBe(0.22);
+    expect(recipeWithDynamics.retainedDynamics!.scatterRatio).toBe(0.15);
+    expect(recipeWithDynamics.retainedDynamics!.width.base).toBe(12);
+    expect(recipeWithDynamics.retainedDynamics!.angle.base).toBe(-18);
     expect(first.plan.recipe.angleRadians).toBeCloseTo(-Math.PI / 10, 12);
     expect(first.plan.color.components[3]).toBeCloseTo(0.8, 5);
     expect(Object.isFrozen(first.plan)).toBe(true);
@@ -665,42 +678,6 @@ describe("Studio DrawEl canonical brush adapter", () => {
       readonly path: string;
     }> = [
       {
-        element: dynamicElement({
-          brushDynamics: normalizeStudioBrushDynamicsSettings({
-            ...dynamicElement().brushDynamics,
-            angle: {
-              base: 0,
-              min: -180,
-              max: 180,
-              mappings: [{
-                source: "direction",
-                mode: "add",
-                from: 0,
-                to: 360,
-                amount: 1,
-              }],
-            },
-          }),
-        }),
-        reason: "unsupported-dynamics",
-        path: "element.brushDynamics.angle",
-      },
-      {
-        element: dynamicElement({
-          brushDynamics: normalizeStudioBrushDynamicsSettings({
-            ...dynamicElement().brushDynamics,
-            dualBrush: {
-              enabled: true,
-              tip: { shape: "star", softness: 0.1 },
-              blendMode: "multiply",
-              sizeRatio: 1,
-            },
-          }),
-        }),
-        reason: "unsupported-dynamics",
-        path: "element.brushDynamics.dualBrush",
-      },
-      {
         element: dynamicElement({ tiltXs: [0, 1] }),
         reason: "invalid-samples",
         path: "element.tiltXs",
@@ -711,6 +688,48 @@ describe("Studio DrawEl canonical brush adapter", () => {
         path: "element.speeds[1]",
       },
     ];
+
+    // Direction-source mappings are not serializable channel-by-channel, but the v2 paint recipe
+    // binds the complete retained dynamics for consumer-side replay, so they now compile ready.
+    const directionMapped = adaptStudioDrawElementToCanonicalBrushPlan(request(dynamicElement({
+      brushDynamics: normalizeStudioBrushDynamicsSettings({
+        ...dynamicElement().brushDynamics,
+        angle: {
+          base: 0,
+          min: -180,
+          max: 180,
+          mappings: [{
+            source: "direction",
+            mode: "add",
+            from: 0,
+            to: 360,
+            amount: 1,
+          }],
+        },
+      }),
+    })));
+    expect(directionMapped.status).toBe("ready");
+    if (directionMapped.status === "ready") {
+      expect(directionMapped.requirements).toContain("retained-dynamics");
+    }
+
+    // Dual-tip dynamics likewise ride the v2 retained replay (the dual-tip WebGPU verifiers own
+    // the consumer-side parity gates), so they no longer fail closed at the adapter boundary.
+    const dualTip = adaptStudioDrawElementToCanonicalBrushPlan(request(dynamicElement({
+      brushDynamics: normalizeStudioBrushDynamicsSettings({
+        ...dynamicElement().brushDynamics,
+        dualBrush: {
+          enabled: true,
+          tip: { shape: "star", softness: 0.1 },
+          blendMode: "multiply",
+          sizeRatio: 1,
+        },
+      }),
+    })));
+    expect(dualTip.status).toBe("ready");
+    if (dualTip.status === "ready") {
+      expect(dualTip.requirements).toContain("retained-dynamics");
+    }
 
     for (const expected of cases) {
       const result = adaptStudioDrawElementToCanonicalBrushPlan(request(expected.element));
