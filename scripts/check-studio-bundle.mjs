@@ -196,6 +196,12 @@ const runtimeStalenessDays = 7;
 const runtimeQuickStartKey = "toonspectrum-studio-quick-start-dismissed";
 const runtimeMobileHintKey = "toonspectrum-studio-mobile-hint-dismissed";
 
+// Chunks only a first-run visitor downloads. If any land in the measured pass, the probe is
+// describing onboarding rather than the returning user it claims to, and every byte it reports
+// is inflated by code a returning user never fetches. Declared up here for the same reason the
+// two keys above are: the probe is awaited from the main block, above its own definition.
+const runtimeFirstRunOnlyChunks = ["StudioQuickStartPanel"];
+
 /** Every number the gate measures, in declaration order, for the ratchet + report. */
 const measurements = [];
 
@@ -1283,6 +1289,43 @@ async function waitForPreviewServer(baseUrl, child, timeoutMs) {
   throw new Error(`vite preview did not become reachable at ${baseUrl}`);
 }
 
+/**
+ * Establish the returning-user state the measured pass depends on.
+ *
+ * Onboarding dismissal used to live in localStorage, which the init script above could seed
+ * before navigation. It now lives in studio-ui-preferences-sqlite (OPFS), which no init script
+ * can reach — so the only honest way to become a returning user is to *be* one: visit once,
+ * dismiss, and let the write land. The measured pass then reuses this context, so the OPFS
+ * database it wrote is still there.
+ *
+ * Failures here are deliberately swallowed. A warm-up that cannot dismiss still leaves the
+ * measurement runnable, and the first-run assertion after the measured pass is what refuses to
+ * let a contaminated number pass as clean.
+ */
+async function warmUpReturningUser(context, baseUrl) {
+  const page = await context.newPage();
+  try {
+    await page.goto(`${baseUrl}/studio`, { waitUntil: "commit", timeout: 180_000 });
+    await page.waitForSelector(".konvajs-content, canvas", { state: "attached", timeout: 120_000 });
+    // The coach does not appear at first paint: its gate waits for the UI preference, work and
+    // autosave hydrations, all of which resolve after the SQLite worker is up. Dismissing on the
+    // canvas signal alone fires before the panel exists and silently changes nothing, so wait for
+    // the panel's own dismiss control instead of a clock.
+    const dismiss = await page.waitForSelector("[data-studio-quickstart-dismiss='true']", {
+      state: "visible",
+      timeout: 60_000,
+    });
+    await dismiss.click();
+    // The dismissal persists through an async SQLite write; give it room to reach OPFS before
+    // the context's next page asks for it.
+    await page.waitForTimeout(3000);
+  } catch {
+    // Warm-up is best effort by design — see above.
+  } finally {
+    await page.close();
+  }
+}
+
 async function probeRuntimeStartup(staticClosureFileNames) {
   const port = Number(process.env.STUDIO_BUNDLE_RUNTIME_PORT ?? 4288);
   const settleMs = Number(process.env.STUDIO_BUNDLE_RUNTIME_SETTLE_MS ?? 5000);
@@ -1331,6 +1374,11 @@ async function probeRuntimeStartup(staticClosureFileNames) {
         deviceScaleFactor: 1,
       });
       // Resource Timing defaults to a 250-entry buffer; Studio blows past that.
+      // The localStorage seeds are kept for older builds, but they are no longer the
+      // authority: `quick-start-dismissed` and `mobile-hint-dismissed` moved into
+      // studio-ui-preferences-sqlite, so writing the keys silently stopped dismissing
+      // anything and every "returning user" number recorded since was a first-run tour.
+      // The warm-up pass below is what actually establishes the returning-user state.
       await context.addInitScript(`(() => {
         try { performance.setResourceTimingBufferSize(3000); } catch {}
         try {
@@ -1338,6 +1386,7 @@ async function probeRuntimeStartup(staticClosureFileNames) {
           localStorage.setItem(${JSON.stringify(runtimeMobileHintKey)}, "1");
         } catch {}
       })();`);
+      await warmUpReturningUser(context, baseUrl);
       const page = await context.newPage();
       const startedAt = Date.now();
       await page.goto(`${baseUrl}/studio`, { waitUntil: "commit", timeout: 180_000 });
@@ -1380,6 +1429,20 @@ async function probeRuntimeStartup(staticClosureFileNames) {
         .sort((left, right) => right.decodedBytes - left.decodedBytes);
 
       const sum = (records) => records.reduce((total, record) => total + record.decodedBytes, 0);
+      // The warm-up is best effort, so this is the part that must not be. A number that
+      // silently describes onboarding is worse than no number: it reads as authoritative
+      // and it moves the ratchet.
+      const firstRunLeaks = eager.filter((chunk) =>
+        runtimeFirstRunOnlyChunks.some((name) => chunk.name.startsWith(name)),
+      );
+      if (firstRunLeaks.length > 0) {
+        console.warn(
+          "studio bundle observation: the startup measurement below still contains first-run "
+            + `onboarding (${firstRunLeaks.map((chunk) => chunk.name).join(", ")}). It describes a `
+            + "new visitor, not the returning user the probe reports, so its requests and bytes are "
+            + "inflated by code a returning user never fetches.",
+        );
+      }
       return {
         probe: {
           url: "/studio",
@@ -1387,6 +1450,7 @@ async function probeRuntimeStartup(staticClosureFileNames) {
           viewport: "1440x900",
           interactiveMs,
           crossOriginIsolated: observed.crossOriginIsolated,
+          returningUser: firstRunLeaks.length === 0,
         },
         metrics: [
           { key: "startup JS requests", kind: "count", value: scripts.length },
