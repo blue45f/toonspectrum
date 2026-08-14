@@ -1,6 +1,6 @@
 {
   "schema": "toonspectrum.bundle-baseline/1",
-  "recordedAt": "2026-08-14T08:13:26.277Z",
+  "recordedAt": "2026-08-14T08:28:47.567Z",
   "note": "Last accepted measurement of scripts/check-studio-bundle.mjs. Regressions beyond the tolerance fail the build; see docs/perf/bundle-gate.md. Regenerate with UPDATE_BUNDLE_BASELINE=1 node scripts/check-studio-bundle.mjs. 2026-08-14: re-measured on the brush-quality wave rebased onto main — the wave's dry-media kernels, carrier ribbons and verified-engine lanes cost ~100 KiB raw / ~33 KiB gzip on the studio route, which main's living-ink WGSL split does not offset. 2026-08-14: first runtime block measured by a probe that actually reaches a returning user — the previous one seeded localStorage keys that had moved into SQLite, so it recorded a first-run tour. Startup grew to 276 requests / 6228 KiB because the durable local database now gates what the artist sees: the coach only resolves after the UI preference, work and autosave hydrations, so studio-local-database*, studio-ui-preferences-sqlite, studio-workspace-sqlite-runtime and studio-autosave-sqlite-store are boot-critical rather than deferrable. studio-tournament-sqlite-persistence is the documented post-mount hydration that keeps the first stroke on the right renderer lane. Shrinking further needs a lightweight boot fast path with SQLite as the later authority; filed separately, not traded for a first-render flicker.",
   "policy": {
     "byteTolerance": 0.02,
@@ -10,16 +10,16 @@
   },
   "static": {
     "Studio route raw": 5110369,
-    "Studio route gzip": 1626643,
+    "Studio route gzip": 1626679,
     "StudioPage entry raw": 2010509,
-    "StudioPage entry gzip": 595718,
+    "StudioPage entry gzip": 595725,
     "Studio route after app shell raw": 4508274,
-    "Studio route after app shell gzip": 1437092,
+    "Studio route after app shell gzip": 1437125,
     "Studio route after app shell chunks": 199,
-    "app entry raw": 602095,
-    "app entry gzip": 189551,
+    "app entry raw": 602090,
+    "app entry gzip": 189526,
     "BG3D editor activation raw": 2805683,
-    "BG3D editor activation gzip": 830425,
+    "BG3D editor activation gzip": 830442,
     "BG3D editor activation chunks": 39,
     "BG3D shot-batch runtime after editor raw": 113533,
     "BG3D shot-batch runtime after editor gzip": 33903,
@@ -38,20 +38,20 @@
     "app entry chunks": 9
   },
   "runtime": {
-    "recordedAt": "2026-08-14T08:13:26.277Z",
+    "recordedAt": "2026-08-14T08:28:47.567Z",
     "probe": {
       "url": "/studio",
       "settleMs": 5000,
       "viewport": "1440x900",
-      "interactiveMs": 1230,
+      "interactiveMs": 1196,
       "crossOriginIsolated": true,
       "returningUser": true
     },
     "metrics": {
-      "startup JS requests": 275,
-      "startup JS decoded bytes": 6374549,
-      "eager-dynamic requests": 67,
-      "eager-dynamic decoded bytes": 1264081
+      "startup JS requests": 274,
+      "startup JS decoded bytes": 6377710,
+      "eager-dynamic requests": 66,
+      "eager-dynamic decoded bytes": 1263563
     },
     "eagerDynamicChunks": [
       "StudioActiveBrushSummary",
@@ -118,7 +118,6 @@
       "studio-ui-preferences-sqlite",
       "studio-webgpu-dab-planner",
       "studio-workspace-sqlite-runtime",
-      "studio-z-index",
       "toast-host",
       "use-studio-raster-source-presentation"
     ]
