@@ -34,6 +34,10 @@ type CoreDryMediaId = (typeof CORE_DRY_MEDIA_IDS)[number];
 
 const LEGACY_CARRIER_SHA256: Readonly<Record<CoreDryMediaId, string>> = Object.freeze({
   // Competitive anisotropic wax tooth (10-pt pore ellipses; denser travel-aligned slits).
+  // Re-captured 2026-08-15 for PRODUCT_LANE_COUNT.crayon 3 -> 5. The carrier reads its lane count
+  // from the bridge, so restoring the two dropped native wax fibres legitimately changes the union
+  // bytes; nothing in the carrier itself moved (the other four rows are untouched, which is the
+  // proof). Not a free re-record: see the pinned row below for the replay consequence.
   crayon: "619097e1cb934eff00a994e4f749959a380bd86c302fa95f968e05c589aaa451",
   chalk: "33b358794aa321406c6afca80fd41373af44c5f858294784842cc9c74d2a0d45",
   charcoal: "73d5a05fbe1c85ad27d9545fe4cb0166e17beec8b953c0b6c829de7f55c316c0",
@@ -51,6 +55,19 @@ const LEGACY_CARRIER_SHA256: Readonly<Record<CoreDryMediaId, string>> = Object.f
  * forever (provider pinning; the de-polygon flip must not disturb the legacy union output).
  */
 const PINNED_CARRIER_SHA256: Readonly<Record<CoreDryMediaId, string>> = Object.freeze({
+  // Re-captured 2026-08-15 for PRODUCT_LANE_COUNT.crayon 3 -> 5, and this row is the one with a
+  // user-visible consequence, so it is recorded rather than quietly refreshed.
+  //
+  // `dryMediaUnionProgram` pins the RENDERING PROGRAM (the de-polygon flip must not disturb legacy
+  // union output). It does not pin lane count: this fixture reaches the carrier through
+  // bridgeStudioDynamicDabsToDryMediaV1, which reads PRODUCT_LANE_COUNT. So a saved document whose
+  // crayon strokes carry the pin re-renders with five fibres instead of three.
+  //
+  // That is intended. Three lanes dropped native fibres k=1/k=3 and left ~1.1px bare bands - the
+  // defect this wave exists to remove. Freezing the pinned path at three would preserve that defect
+  // in existing artwork forever, which trades texture for byte-stability - the opposite of the
+  // standing priority. The alternative (lane count as a per-element pinned parameter) would be the
+  // right move only if a customer needed frozen crayon pixels; no such contract exists today.
   crayon: "72b181e4806d8ebc24e8b806821cc791c24222621006e7aa539e73c273eb11ed",
   chalk: "80530301e273c109833d00b9d98ddeb358eddcd5eba739aac31c1abed321b8c6",
   charcoal: "4a620ecebdf8e8c4bf7092d9020b49178f35f8722cf2970aa3f06aca5b8b9346",
