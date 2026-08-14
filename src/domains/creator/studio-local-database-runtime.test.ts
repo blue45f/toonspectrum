@@ -18,6 +18,16 @@ const productWorker = vi.hoisted(() => ({
   close: vi.fn<() => Promise<void>>(),
 }));
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (cause: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, reject, resolve };
+}
+
 vi.mock("./studio-local-database-worker-client", () => ({
   acquireStudioLocalDatabaseWorker: productWorker.acquire,
   closeStudioLocalDatabaseWorker: productWorker.close,
@@ -159,5 +169,63 @@ describe("studio local database runtime", () => {
     expect(reopened.authority).toBe("memory-session");
     await expect(reopened.repository.getById("session-brush")).resolves.toBeNull();
     expect(productWorker.acquire).toHaveBeenCalledTimes(2);
+  });
+
+  it("retains the tab-lifetime brush fallback while another product surface retries OPFS", async () => {
+    productWorker.acquire.mockRejectedValue(
+      new SqliteUnavailableError("Studio OPFS is already owned by another page"),
+    );
+    productWorker.close.mockResolvedValue(undefined);
+
+    const first = await openProductBrushLibraryRepository();
+    await first.repository.put({
+      ...DEFAULT_STUDIO_BRUSH_SNAPSHOT,
+      id: "retained-session-brush",
+      name: "현재 탭 보존 브러시",
+      createdAt: 1,
+      updatedAt: 1,
+      pinned: false,
+      lastUsedAt: null,
+    });
+
+    await closeStudioLocalDatabaseRuntime({ preserveBrushMemorySession: true });
+    const reopened = await openProductBrushLibraryRepository();
+
+    expect(reopened).toBe(first);
+    await expect(reopened.repository.getById("retained-session-brush")).resolves
+      .toMatchObject({ name: "현재 탭 보존 브러시" });
+    expect(productWorker.acquire).toHaveBeenCalledOnce();
+  });
+
+  it("preserves a pending fallback when another consumer closes the failed DB generation first", async () => {
+    const databaseOpening = deferred<StudioLocalDatabase>();
+    productWorker.acquire.mockReturnValue(databaseOpening.promise);
+    productWorker.close.mockResolvedValue(undefined);
+
+    const otherConsumer = acquireStudioLocalDatabase();
+    const closeAfterFailure = otherConsumer.catch(async () => {
+      await closeStudioLocalDatabaseRuntime({ preserveBrushMemorySession: true });
+    });
+    const brushOpening = openProductBrushLibraryRepository();
+    const pendingSave = brushOpening.then((product) => product.repository.put({
+      ...DEFAULT_STUDIO_BRUSH_SNAPSHOT,
+      id: "pending-session-brush",
+      name: "경합 중 보존 브러시",
+      createdAt: 1,
+      updatedAt: 1,
+      pinned: false,
+      lastUsedAt: null,
+    }));
+
+    databaseOpening.reject(
+      new SqliteUnavailableError("Studio OPFS is already owned by another page"),
+    );
+    await Promise.all([closeAfterFailure, pendingSave]);
+
+    const reopened = await openProductBrushLibraryRepository();
+    await expect(brushOpening).resolves.toBe(reopened);
+    await expect(reopened.repository.getById("pending-session-brush")).resolves
+      .toMatchObject({ name: "경합 중 보존 브러시" });
+    expect(productWorker.acquire).toHaveBeenCalledOnce();
   });
 });
