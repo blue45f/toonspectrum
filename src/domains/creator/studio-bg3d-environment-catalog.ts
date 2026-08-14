@@ -14,8 +14,24 @@ export type StudioBg3dEnvironmentTheme =
   | "hospitality"
   | "urban"
   | "education"
+  | "healthcare"
+  | "heritage"
   | "fantasy"
   | "science-fiction";
+
+export interface StudioBg3dEnvironmentProvenance {
+  readonly origin: "original-procedural";
+  readonly author: "ToonSpectrum";
+  readonly generator:
+    | "scripts/blender/generate_environment_pack_v3.py"
+    | "scripts/blender/generate_environment_pack_v4.py";
+  readonly blenderVersion: "5.2";
+  readonly license: "CC0-1.0";
+  readonly licenseUrl: "https://creativecommons.org/publicdomain/zero/1.0/";
+  readonly attributionRequired: false;
+  readonly commercialUse: true;
+  readonly externalResources: 0;
+}
 
 export interface StudioBg3dEnvironmentAsset {
   readonly id: string;
@@ -36,20 +52,10 @@ export interface StudioBg3dEnvironmentAsset {
     readonly fovDegrees: number;
   };
   readonly normalization: "authored-metres";
-  readonly provenance: {
-    readonly origin: "original-procedural";
-    readonly author: "ToonSpectrum";
-    readonly generator: "scripts/blender/generate_environment_pack_v3.py";
-    readonly blenderVersion: "5.2";
-    readonly license: "CC0-1.0";
-    readonly licenseUrl: "https://creativecommons.org/publicdomain/zero/1.0/";
-    readonly attributionRequired: false;
-    readonly commercialUse: true;
-    readonly externalResources: 0;
-  };
+  readonly provenance: StudioBg3dEnvironmentProvenance;
 }
 
-const PROVENANCE = Object.freeze({
+const V3_PROVENANCE = Object.freeze({
   origin: "original-procedural",
   author: "ToonSpectrum",
   generator: "scripts/blender/generate_environment_pack_v3.py",
@@ -61,8 +67,14 @@ const PROVENANCE = Object.freeze({
   externalResources: 0,
 } as const);
 
+const V4_PROVENANCE = Object.freeze({
+  ...V3_PROVENANCE,
+  generator: "scripts/blender/generate_environment_pack_v4.py",
+} as const);
+
 function defineEnvironment(
   input: Omit<StudioBg3dEnvironmentAsset, "normalization" | "provenance">,
+  provenance: StudioBg3dEnvironmentProvenance = V3_PROVENANCE,
 ): StudioBg3dEnvironmentAsset {
   return Object.freeze({
     ...input,
@@ -74,11 +86,11 @@ function defineEnvironment(
       fovDegrees: input.camera.fovDegrees,
     }),
     normalization: "authored-metres",
-    provenance: PROVENANCE,
+    provenance,
   });
 }
 
-export const STUDIO_BG3D_ENVIRONMENT_ASSETS = Object.freeze([
+export const STUDIO_BG3D_ENVIRONMENT_ASSETS_V3 = Object.freeze([
   defineEnvironment({
     id: "ts-bg3d-compact_apartment_interior-v1",
     name: "콤팩트 아파트",
@@ -163,6 +175,56 @@ export const STUDIO_BG3D_ENVIRONMENT_ASSETS = Object.freeze([
     bounds: [7, 4.5, 16],
     camera: { position: [0, 4.9, 20.5], target: [0, 2, -2.8], fovDegrees: 44 },
   }),
+] as const satisfies readonly StudioBg3dEnvironmentAsset[]);
+
+export const STUDIO_BG3D_ENVIRONMENT_ASSETS_V4 = Object.freeze([
+  defineEnvironment({
+    id: "ts-bg3d-hospital_emergency_nurse_station-v1",
+    name: "병원 응급실 · 간호 스테이션",
+    description: "중앙 간호 스테이션·3개 응급 베이·환자 침대·바이탈 모니터·IV·약품장을 갖춘 의료 세트",
+    theme: "healthcare",
+    tags: ["hospital", "emergency", "nurse station", "병원", "응급실", "간호 스테이션"],
+    fileName: "hospital_emergency_nurse_station.glb",
+    url: "/assets/3d/environments/hospital_emergency_nurse_station.glb",
+    thumbnailUrl: "/assets/3d/environments/thumbnails/hospital_emergency_nurse_station.png",
+    byteSize: 2_263_556,
+    sha256: "sha256:7c08f38b2dfdeb418fadfca4ee24f0e73b92f9b20abcde11f29a67d5dae9a8e6",
+    bounds: [12, 4.2, 9],
+    camera: { position: [14.2, 9.4, 14.5], target: [0, 1.35, -1], fovDegrees: 46 },
+  }, V4_PROVENANCE),
+  defineEnvironment({
+    id: "ts-bg3d-korean_school_rooftop-v1",
+    name: "한국 학교 옥상",
+    description: "안전 펜스·계단실·물탱크·태양광 패널·실외기·벤치와 화단이 있는 한국형 학교 옥상",
+    theme: "education",
+    tags: ["school", "rooftop", "korea", "학교", "옥상", "한국"],
+    fileName: "korean_school_rooftop.glb",
+    url: "/assets/3d/environments/korean_school_rooftop.glb",
+    thumbnailUrl: "/assets/3d/environments/thumbnails/korean_school_rooftop.png",
+    byteSize: 1_871_832,
+    sha256: "sha256:00a2ca9dd79b1e4957e94df7e2e9824e7c404e85f98bc45dc4691934d3e18115",
+    bounds: [15, 4, 12],
+    camera: { position: [18, 12, 18.5], target: [0, 1.15, -0.2], fovDegrees: 46 },
+  }, V4_PROVENANCE),
+  defineEnvironment({
+    id: "ts-bg3d-hanok_market_courtyard-v1",
+    name: "한옥 장터 안마당",
+    description: "삼면 한옥·격자문·기와지붕·장터 좌판·등롱·옹기가 둘러싼 전통 시장 안마당",
+    theme: "heritage",
+    tags: ["hanok", "market", "courtyard", "korea", "한옥", "장터", "안마당"],
+    fileName: "hanok_market_courtyard.glb",
+    url: "/assets/3d/environments/hanok_market_courtyard.glb",
+    thumbnailUrl: "/assets/3d/environments/thumbnails/hanok_market_courtyard.png",
+    byteSize: 2_335_872,
+    sha256: "sha256:64540cd8540a6e8768152ae78bb908b97853aea064a263b9c43cd9b2373fe766",
+    bounds: [16, 4.2, 13],
+    camera: { position: [18.5, 11.8, 19], target: [0, 1.45, -0.7], fovDegrees: 46 },
+  }, V4_PROVENANCE),
+] as const satisfies readonly StudioBg3dEnvironmentAsset[]);
+
+export const STUDIO_BG3D_ENVIRONMENT_ASSETS = Object.freeze([
+  ...STUDIO_BG3D_ENVIRONMENT_ASSETS_V3,
+  ...STUDIO_BG3D_ENVIRONMENT_ASSETS_V4,
 ] as const satisfies readonly StudioBg3dEnvironmentAsset[]);
 
 const ENVIRONMENT_BY_ID = new Map(

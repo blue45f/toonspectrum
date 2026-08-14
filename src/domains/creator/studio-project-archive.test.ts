@@ -719,6 +719,57 @@ describe("studio-project-archive", () => {
     );
   });
 
+  it("번들 BG3D attachment provenance를 archive와 복원 경계에서 그대로 보존한다", async () => {
+    const glb = glbBytes(23);
+    const glbHash = await sha256(glb);
+    const pointer = "/pagesList/0/elements/0/bg3dScene/attachments/0/hash";
+    const scene = {
+      ...createDefaultStudioBg3dSceneDocument(),
+      attachments: [{
+        id: "bundled-environment-attachment",
+        name: "hospital_emergency_nurse_station.glb",
+        mime: STUDIO_BG3D_GLB_MIME,
+        byteSize: glb.byteLength,
+        hash: `sha256:${glbHash}`,
+        rights: {
+          status: "public-domain" as const,
+          commercialUse: true,
+          attributionRequired: false,
+          licenseName: "CC0-1.0",
+        },
+        source: "bundled" as const,
+      }],
+    };
+    const project = projectWith([{
+      id: "bundled-bg3d-render",
+      type: "image",
+      src: "render-pending",
+      bg3dScene: scene,
+    }]);
+    const built = await buildStudioProjectArchive({
+      project,
+      attachments: [{
+        kind: "glb",
+        data: glb,
+        mimeType: STUDIO_BG3D_GLB_MIME,
+        documentReferences: [{ pointer, usage: "glb", mode: "sha256-prefixed" }],
+      }],
+    });
+
+    expect(collectStudioBg3dProjectArchivePlan(project).attachments[0]?.attachment.source)
+      .toBe("bundled");
+    const imported = await importStudioProjectArchive(built.blob);
+    const restoredScene = (imported.project.pagesList[0]?.elements[0] as {
+      bg3dScene: { attachments: Array<{ source: string; hash: string }> };
+    }).bg3dScene;
+    expect(restoredScene.attachments[0]).toMatchObject({
+      source: "bundled",
+      hash: `sha256:${glbHash}`,
+    });
+    expect(collectStudioBg3dProjectArchivePlan(imported.project)
+      .attachments[0]?.attachment.source).toBe("bundled");
+  });
+
   it("VRM 표면 페인팅 PNG를 exact hash pointer로 연결하고 누락·크기 위조를 거부한다", async () => {
     const png = surfacePaintPngBytes(2, 1, 17);
     const rawHash = await sha256(png);

@@ -11,7 +11,7 @@ import {
 import { loadStudioBg3dBundledEnvironmentSource } from
   "./studio-bg3d-bundled-environment-loader";
 import {
-  STUDIO_BG3D_ENVIRONMENT_ASSETS,
+  STUDIO_BG3D_ENVIRONMENT_ASSETS_V3,
   getStudioBg3dEnvironmentAsset,
   getStudioBg3dEnvironmentAssetByHash,
   isStudioBg3dEnvironmentAssetId,
@@ -110,10 +110,10 @@ afterEach(() => {
 
 describe("Studio BG3D Blender 5.2 environment pack", () => {
   it("contains six distinct CC0 catalog entries with exact immutable URL mappings", () => {
-    expect(STUDIO_BG3D_ENVIRONMENT_ASSETS).toHaveLength(6);
-    expect(new Set(STUDIO_BG3D_ENVIRONMENT_ASSETS.map(({ id }) => id)).size).toBe(6);
-    expect(new Set(STUDIO_BG3D_ENVIRONMENT_ASSETS.map(({ fileName }) => fileName)).size).toBe(6);
-    expect(STUDIO_BG3D_ENVIRONMENT_ASSETS.map(({ theme }) => theme)).toEqual([
+    expect(STUDIO_BG3D_ENVIRONMENT_ASSETS_V3).toHaveLength(6);
+    expect(new Set(STUDIO_BG3D_ENVIRONMENT_ASSETS_V3.map(({ id }) => id)).size).toBe(6);
+    expect(new Set(STUDIO_BG3D_ENVIRONMENT_ASSETS_V3.map(({ fileName }) => fileName)).size).toBe(6);
+    expect(STUDIO_BG3D_ENVIRONMENT_ASSETS_V3.map(({ theme }) => theme)).toEqual([
       "home",
       "hospitality",
       "urban",
@@ -121,7 +121,7 @@ describe("Studio BG3D Blender 5.2 environment pack", () => {
       "fantasy",
       "science-fiction",
     ]);
-    for (const asset of STUDIO_BG3D_ENVIRONMENT_ASSETS) {
+    for (const asset of STUDIO_BG3D_ENVIRONMENT_ASSETS_V3) {
       expect(asset.url).toBe(`/assets/3d/environments/${asset.fileName}`);
       expect(asset.thumbnailUrl).toBe(
         `/assets/3d/environments/thumbnails/${asset.fileName.replace(/\.glb$/u, ".png")}`,
@@ -140,7 +140,7 @@ describe("Studio BG3D Blender 5.2 environment pack", () => {
     }
   });
 
-  it.each(STUDIO_BG3D_ENVIRONMENT_ASSETS)(
+  it.each(STUDIO_BG3D_ENVIRONMENT_ASSETS_V3)(
     "$fileName is substantial, mobile-admissible, self-contained, PBR, grounded, and reproducible",
     (asset) => {
       const { bytes, document, triangles } = parseEnvironmentGlb(asset.url);
@@ -205,7 +205,7 @@ describe("Studio BG3D Blender 5.2 environment pack", () => {
   );
 
   it("coalesces default fetches and returns defensive byte clones before existing validation", async () => {
-    const asset = STUDIO_BG3D_ENVIRONMENT_ASSETS[0];
+    const asset = STUDIO_BG3D_ENVIRONMENT_ASSETS_V3[0];
     const deployedBytes = new Uint8Array(readFileSync(publicAssetPath(asset.url)));
     const fetcher = vi.fn(async () => ({
       ok: true,
@@ -234,7 +234,7 @@ describe("Studio BG3D Blender 5.2 environment pack", () => {
   });
 
   it("drops a same-size SHA-mismatched source so a repaired deployment can retry", async () => {
-    const asset = STUDIO_BG3D_ENVIRONMENT_ASSETS[4];
+    const asset = STUDIO_BG3D_ENVIRONMENT_ASSETS_V3[4];
     const deployedBytes = new Uint8Array(readFileSync(publicAssetPath(asset.url)));
     const corruptedBytes = Uint8Array.from(deployedBytes);
     corruptedBytes[corruptedBytes.length - 1] ^= 0x01;
@@ -258,8 +258,8 @@ describe("Studio BG3D Blender 5.2 environment pack", () => {
   });
 
   it("publishes the environments as usable samples and preserves metres through insertion", () => {
-    expect(SAMPLE_BG3D_MODEL_ENTRIES).toEqual(STUDIO_BG3D_ENVIRONMENT_ASSETS.map((asset) =>
-      expect.objectContaining({
+    expect(SAMPLE_BG3D_MODEL_ENTRIES).toEqual(expect.arrayContaining(
+      STUDIO_BG3D_ENVIRONMENT_ASSETS_V3.map((asset) => expect.objectContaining({
         id: asset.id,
         name: asset.name,
         source: "sample",
@@ -269,9 +269,9 @@ describe("Studio BG3D Blender 5.2 environment pack", () => {
         contentHash: asset.sha256,
         byteSize: asset.byteSize,
         commercialUse: true,
-      }),
+      })),
     ));
-    for (const asset of STUDIO_BG3D_ENVIRONMENT_ASSETS) {
+    for (const asset of STUDIO_BG3D_ENVIRONMENT_ASSETS_V3) {
       expect(resolveStudioBg3dModelNormalizationScale(asset.id, asset.bounds)).toBe(1);
     }
     expect(resolveStudioBg3dModelNormalizationScale("uploaded-chair", [10, 2, 2]))
@@ -285,8 +285,8 @@ describe("Studio BG3D Blender 5.2 environment pack", () => {
       fileURLToPath(new URL("./StudioBg3dAssetLibraryPanel.tsx", import.meta.url)),
       "utf8",
     );
-    expect(editorSource).toContain("isStudioBg3dEnvironmentAssetId(record.id)");
-    expect(editorSource).toContain('{ source: "bundled" }');
+    expect(editorSource).toContain("createStudioBg3dModelAttachment(record)");
+    expect(editorSource).not.toContain('{ source: "bundled" }');
     expect(editorSource).toContain("onAdd={addCustomModelToScene}");
     expect(panelSource).toContain('{ id: "environment", label: "환경" }');
     expect(panelSource).toContain("bundledEnvironment?.description");

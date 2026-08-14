@@ -114,6 +114,30 @@ describe("StudioBg3dAssetLibraryPanel", () => {
     expect(screen.getByText("표시 0/0개 · 데스크톱 기준")).toBeTruthy();
   });
 
+  it("keeps bundled environments usable when only the local OPFS library is degraded", () => {
+    const onAdd = vi.fn();
+    const bundled = createEntry(
+      "ts-bg3d-korean_school_rooftop-v1",
+      "한국 학교 옥상",
+      { source: "sample" },
+    );
+    renderPanel({
+      entries: [bundled],
+      libraryStatus: "degraded",
+      onAdd,
+    });
+
+    expect(screen.getByRole("status").textContent).toContain(
+      "번들 환경은 계속 사용할 수 있습니다.",
+    );
+    const add = screen.getByRole("button", { name: "한국 학교 옥상 장면에 추가" });
+    expect(add).toHaveProperty("disabled", false);
+    fireEvent.click(add);
+    expect(onAdd).toHaveBeenCalledOnce();
+    expect(onAdd).toHaveBeenCalledWith(bundled.id);
+    expect(screen.getByText("환경 · CC0")).toBeTruthy();
+  });
+
   it("searches, filters, and resets twelve-item pagination", () => {
     const entries = Array.from({ length: 14 }, (_, index) =>
       createEntry(`model-${index + 1}`, `모델 ${String(index + 1).padStart(2, "0")}`, {

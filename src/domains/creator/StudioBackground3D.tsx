@@ -127,6 +127,8 @@ import {
   STUDIO_BG3D_STABLE_ID_PROFILE,
   normalizeStudioBg3dArtifactCaptureResultV2,
 } from "./studio-bg3d-artifact-capture-v2";
+import { copyStudioBg3dBundledEnvironmentLibraryEntries } from
+  "./studio-bg3d-bundled-environment-library";
 import {
   applyStudioBg3dProjectionAwareZoom,
   applyStudioBg3dViewportAfterTransition,
@@ -185,7 +187,6 @@ import {
   STUDIO_BG3D_ICON_BUTTON as ICON_BUTTON,
   studioBg3dClassNames as cx,
 } from "./studio-bg3d-editor-ui";
-import { isStudioBg3dEnvironmentAssetId } from "./studio-bg3d-environment-catalog";
 import {
   advanceStudioBg3dFrameQuality,
   createStudioBg3dFrameQualityState,
@@ -2499,8 +2500,11 @@ export function StudioBackground3D({
 
   // 업로드된 커스텀 3D 모델(§bg3d-model-library.ts)의 씬 배치 인스턴스 + 라이브러리 목록/상태.
   const [customModels, setCustomModels] = useState<BgCustomModelInstance[]>([]);
-  const [modelLibrary, setModelLibrary] = useState<Bg3dModelLibraryEntry[]>([]);
-  const [modelLibraryStatus, setModelLibraryStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [modelLibrary, setModelLibrary] = useState<Bg3dModelLibraryEntry[]>(
+    copyStudioBg3dBundledEnvironmentLibraryEntries,
+  );
+  const [modelLibraryStatus, setModelLibraryStatus] =
+    useState<"idle" | "loading" | "ready" | "degraded" | "error">("idle");
   const [genericModelSourceFormats, setGenericModelSourceFormats] =
     useState<ReadonlyMap<string, StudioGeneric3dSourceFormat>>(() => new Map());
   const [genericModelClassifications, setGenericModelClassifications] =
@@ -3367,6 +3371,7 @@ export function StudioBackground3D({
     if (!open || !modelsPanelActivated) return;
     const session = modalAssetSessionRef.current;
     if (!session) return;
+    setModelLibrary(copyStudioBg3dBundledEnvironmentLibraryEntries());
     setModelLibraryStatus("loading");
     studioBg3dModalOperationCoordinator.waitForSceneMutationLane()
       .then(() => {
@@ -3383,7 +3388,8 @@ export function StudioBackground3D({
       })
       .catch(() => {
         studioBg3dModalOperationCoordinator.commitIfCurrent(session, () => {
-          setModelLibraryStatus("error");
+          setModelLibrary(copyStudioBg3dBundledEnvironmentLibraryEntries());
+          setModelLibraryStatus("degraded");
         });
       });
   }, [modelsPanelActivated, open, setTemplateLibrary, setTemplateLibraryStatus]);
@@ -4703,10 +4709,7 @@ export function StudioBackground3D({
       ?? parseStudioGeneric3dWorkflowMetadata(existingAttachment)?.classification
       ?? null;
     const attachment = withStudioGeneric3dWorkflowMetadata(
-      existingAttachment ?? await createStudioBg3dModelAttachment(
-        record,
-        isStudioBg3dEnvironmentAssetId(record.id) ? { source: "bundled" } : {},
-      ),
+      existingAttachment ?? await createStudioBg3dModelAttachment(record),
       { sourceFormat, classification },
     );
     const live = physicsRuntimeSourceRef.current;

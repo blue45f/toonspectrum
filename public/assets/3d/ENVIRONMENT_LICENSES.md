@@ -1,8 +1,9 @@
 # ToonSpectrum Studio BG3D environment pack
 
-The six files under `public/assets/3d/environments/` were created from scratch by ToonSpectrum
-with the reproducible Blender 5.2 generator
-`scripts/blender/generate_environment_pack_v3.py`. ToonSpectrum dedicates these environment models
+The nine files under `public/assets/3d/environments/` were created from scratch by ToonSpectrum
+with the reproducible Blender 5.2 generators
+`scripts/blender/generate_environment_pack_v3.py` and
+`scripts/blender/generate_environment_pack_v4.py`. ToonSpectrum dedicates these environment models
 to the public domain under **CC0 1.0 Universal**.
 
 - License: CC0-1.0
@@ -23,6 +24,9 @@ to the public domain under **CC0 1.0 Universal**.
 | `ts-bg3d-classroom_art_studio-v1` | `environments/classroom_art_studio.glb` | `b0e14d9e45b8181798a09fc675d6c3aadf46bae5a2b24200fe751518c55016d8` | 2,167,224 | 201 | 12 | 66,880 |
 | `ts-bg3d-fantasy_ruin_courtyard-v1` | `environments/fantasy_ruin_courtyard.glb` | `cd7b7aaa142c473b8373c9d666edc2d130ee0735a2290502489d721f1d87cb22` | 2,081,960 | 213 | 9 | 74,352 |
 | `ts-bg3d-scifi_command_corridor-v1` | `environments/scifi_command_corridor.glb` | `a2eff1b6d07f8e09ef2f1deebc240dd5ccb591384bce59d5f092cc4dd0d59821` | 3,486,400 | 248 | 11 | 92,456 |
+| `ts-bg3d-hospital_emergency_nurse_station-v1` | `environments/hospital_emergency_nurse_station.glb` | `7c08f38b2dfdeb418fadfca4ee24f0e73b92f9b20abcde11f29a67d5dae9a8e6` | 2,263,556 | 188 | 13 | 60,920 |
+| `ts-bg3d-korean_school_rooftop-v1` | `environments/korean_school_rooftop.glb` | `00a2ca9dd79b1e4957e94df7e2e9824e7c404e85f98bc45dc4691934d3e18115` | 1,871,832 | 204 | 12 | 53,000 |
+| `ts-bg3d-hanok_market_courtyard-v1` | `environments/hanok_market_courtyard.glb` | `64540cd8540a6e8768152ae78bb908b97853aea064a263b9c43cd9b2373fe766` | 2,335,872 | 245 | 14 | 76,944 |
 
 Catalog thumbnails in `public/assets/3d/environments/thumbnails/` are renders produced by the same
 generator from the corresponding CC0 scenes and are released under the same terms.
@@ -34,6 +38,10 @@ From the repository root with Blender 5.2 installed:
 ```sh
 /Applications/Blender.app/Contents/MacOS/Blender --background \
   --python scripts/blender/generate_environment_pack_v3.py -- \
+  --output-dir public/assets/3d/environments
+
+/Applications/Blender.app/Contents/MacOS/Blender --background \
+  --python scripts/blender/generate_environment_pack_v4.py -- \
   --output-dir public/assets/3d/environments
 ```
 

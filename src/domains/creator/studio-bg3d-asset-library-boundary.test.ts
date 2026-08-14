@@ -111,6 +111,34 @@ describe("Studio BG3D asset-library ownership boundary", () => {
     expect(editorSource).toContain('if (tab === "lt") setLtPresetPanelActivated(true)');
   });
 
+  it("projects bundled environments before OPFS and degrades only the local library on failure", () => {
+    const editorSource = moduleSource("./StudioBackground3D.tsx");
+    const editorImports = moduleImports("./StudioBackground3D.tsx");
+    const effectStart = editorSource.indexOf(
+      "// 모델 라이브러리 목록은 모달이 열릴 때 한 번 읽어온다",
+    );
+    const effectEnd = editorSource.indexOf(
+      "setTemplateLibraryStatus(\"loading\")",
+      effectStart,
+    );
+    const modelLibraryEffect = editorSource.slice(effectStart, effectEnd);
+
+    expect(editorImports.valueImports).toContain(
+      "./studio-bg3d-bundled-environment-library",
+    );
+    expect(editorImports.valueImports).not.toContain("./bg3d-model-library");
+    expect(editorSource).toContain(
+      "useState<Bg3dModelLibraryEntry[]>(\n    copyStudioBg3dBundledEnvironmentLibraryEntries,",
+    );
+    expect(modelLibraryEffect).toContain(
+      "setModelLibrary(copyStudioBg3dBundledEnvironmentLibraryEntries());",
+    );
+    expect(modelLibraryEffect).toContain('setModelLibraryStatus("degraded")');
+    expect(modelLibraryEffect).not.toContain('setModelLibraryStatus("error")');
+    expect(modelLibraryEffect.indexOf("copyStudioBg3dBundledEnvironmentLibraryEntries"))
+      .toBeLessThan(modelLibraryEffect.indexOf("listBg3dModelLibraryEntries()"));
+  });
+
   it("keeps the editor operation lifecycle active before the optional Models surface opens", () => {
     const editorSource = moduleSource("./StudioBackground3D.tsx");
     const activeAssignment = editorSource.indexOf("componentActiveRef.current = true;");

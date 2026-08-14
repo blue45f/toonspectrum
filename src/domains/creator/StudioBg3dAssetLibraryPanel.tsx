@@ -69,7 +69,7 @@ const RIGHTS_PRESETS: ReadonlyArray<{
 type StudioBg3dAssetLibraryPanelProps = {
   entries: readonly Bg3dModelLibraryEntry[];
   classificationByModelId?: ReadonlyMap<string, AssetClassification>;
-  libraryStatus: "idle" | "loading" | "ready" | "error";
+  libraryStatus: "idle" | "loading" | "ready" | "degraded" | "error";
   deletingModelId: string | null;
   isUploading: boolean;
   importProgress: {
@@ -395,6 +395,13 @@ export function StudioBg3dAssetLibraryPanel({
         <p className="mt-2 rounded-xl border border-line bg-card/70 px-3 py-2 text-xs leading-relaxed text-fg-3" role="alert">
           <AlertTriangle className="mr-1 inline align-[-2px] text-accent" size={14} aria-hidden />
           저장된 3D 모델 목록을 불러오지 못했습니다.
+        </p>
+      ) : null}
+
+      {libraryStatus === "degraded" ? (
+        <p className="mt-2 rounded-xl border border-line bg-card/70 px-3 py-2 text-xs leading-relaxed text-fg-3" role="status">
+          <AlertTriangle className="mr-1 inline align-[-2px] text-accent" size={14} aria-hidden />
+          번들 환경은 계속 사용할 수 있습니다. 로컬 3D 모델 저장소만 현재 사용할 수 없습니다.
         </p>
       ) : null}
 

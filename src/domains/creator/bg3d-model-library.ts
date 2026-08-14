@@ -1,4 +1,7 @@
 import {
+  copyStudioBg3dBundledEnvironmentLibraryEntries,
+} from "./studio-bg3d-bundled-environment-library";
+import {
   loadStudioBg3dBundledEnvironmentSource,
   releaseStudioBg3dBundledEnvironmentSource,
 } from
@@ -308,21 +311,8 @@ export const SAMPLE_BG3D_MODELS: SampleBg3dModel[] =
     contentHash: asset.sha256,
     byteSize: asset.byteSize,
   }));
-export const SAMPLE_BG3D_MODEL_ENTRIES: Bg3dModelLibraryEntry[] = SAMPLE_BG3D_MODELS.map((sample) => ({
-  id: sample.id,
-  name: sample.name,
-  format: sample.format,
-  source: "sample",
-  thumbnail: sample.thumbnail,
-  createdAt: 0,
-  updatedAt: 0,
-  status: "verified",
-  canUse: true,
-  statusMessage: "ToonSpectrum CC0 번들 · GLB 안전 검사 후 원본 미터 크기로 배치됩니다.",
-  contentHash: sample.contentHash,
-  byteSize: sample.byteSize,
-  commercialUse: true,
-}));
+export const SAMPLE_BG3D_MODEL_ENTRIES: Bg3dModelLibraryEntry[] =
+  copyStudioBg3dBundledEnvironmentLibraryEntries();
 
 const bundledEnvironmentRecordPromiseById = new Map<
   string,
@@ -2334,6 +2324,13 @@ export const saveBg3dModelThumbnailIfCurrent = saveBg3dModelThumbnailIfCurrentV1
 export const saveBg3dModelThumbnail = saveBg3dModelThumbnailV12;
 export const deleteStoredBg3dModel = deleteStoredBg3dModelV12;
 
+/** Central source authority shared by new insertion and legacy initialDataUrl restoration. */
+export function resolveStudioBg3dModelAttachmentSource(
+  recordId: string,
+): StudioBg3dAttachmentSource {
+  return getStudioBg3dEnvironmentAsset(recordId) ? "bundled" : "local-library";
+}
+
 /** Creates a scene-local attachment without exposing or reusing the private local storage key. */
 export function createStudioBg3dModelAttachment(
   record: Bg3dVerifiedStoredRecord,
@@ -2358,6 +2355,6 @@ export function createStudioBg3dModelAttachment(
     byteSize: record.byteSize,
     hash: record.contentHash,
     rights: Object.freeze({ ...record.rights }),
-    source: options.source ?? "local-library",
+    source: options.source ?? resolveStudioBg3dModelAttachmentSource(record.id),
   });
 }
