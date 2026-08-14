@@ -87,6 +87,30 @@ function upperBodyRig() {
   return { root, nodes, resolveBone: (name: StudioVrmGarmentSkinBone) => nodes.get(name) ?? null };
 }
 
+function lowerBodyRig() {
+  const root = new THREE.Group();
+  const hips = new THREE.Bone();
+  const leftUpperLeg = new THREE.Bone();
+  const rightUpperLeg = new THREE.Bone();
+  hips.name = "hips";
+  leftUpperLeg.name = "leftUpperLeg";
+  rightUpperLeg.name = "rightUpperLeg";
+  leftUpperLeg.position.set(0.2, -0.1, 0);
+  rightUpperLeg.position.set(-0.2, -0.1, 0);
+  root.add(hips);
+  hips.add(leftUpperLeg, rightUpperLeg);
+  root.updateMatrixWorld(true);
+  const nodes = new Map<StudioVrmGarmentSkinBone, THREE.Object3D>([
+    ["hips", hips],
+    ["leftUpperLeg", leftUpperLeg],
+    ["rightUpperLeg", rightUpperLeg],
+  ]);
+  return {
+    root,
+    resolveBone: (name: StudioVrmGarmentSkinBone) => nodes.get(name) ?? null,
+  };
+}
+
 const UPPER_SLEEVE: GarmentPart = {
   bone: "leftUpperArm",
   shape: { kind: "cylinder", rTop: 0.16, rBottom: 0.14, h: 1, open: true },
@@ -135,6 +159,28 @@ const UPPER_BODY_PARTS: readonly GarmentPart[] = [
   },
 ] as const;
 
+const DRAPED_SKIRT: GarmentPart = {
+  bone: "hips",
+  skinMode: "lower-body-drape",
+  shape: {
+    kind: "lathe",
+    profile: [
+      { radius: 0.55, y: -0.6 },
+      { radius: 0.48, y: -0.2 },
+      { radius: 0.36, y: 0.6 },
+    ],
+    segments: 40,
+  },
+  offset: [0, -0.5, 0],
+};
+
+const DRAPED_HEM: GarmentPart = {
+  bone: "hips",
+  skinMode: "lower-body-drape",
+  shape: { kind: "torus", r: 0.55, tube: 0.02 },
+  offset: [0, -1.1, 0],
+};
+
 function materials(count: number): THREE.MeshBasicMaterial[] {
   return Array.from({ length: count }, () => new THREE.MeshBasicMaterial());
 }
@@ -167,6 +213,92 @@ describe("Studio VRM skinned garment", () => {
     expect(planStudioVrmGarmentSkinInfluences(UPPER_SLEEVE, 0.5, available)).toEqual([
       { bone: "leftLowerArm", weight: 1 },
     ]);
+  });
+
+  it("치마는 허리는 골반에 고정하고 밑단 좌우를 각 허벅지 본에 혼합한다", () => {
+    const available = new Set<StudioVrmGarmentSkinBone>([
+      "hips",
+      "leftUpperLeg",
+      "rightUpperLeg",
+    ]);
+    expect(planStudioVrmGarmentSkinInfluences(DRAPED_SKIRT, 0.6, available, 0.3)).toEqual([
+      { bone: "hips", weight: 1 },
+    ]);
+
+    const leftHem = planStudioVrmGarmentSkinInfluences(DRAPED_SKIRT, -0.6, available, 0.3);
+    const rightHem = planStudioVrmGarmentSkinInfluences(DRAPED_SKIRT, -0.6, available, -0.3);
+    expect(leftHem).toEqual([
+      { bone: "leftUpperLeg", weight: 0.72 },
+      { bone: "hips", weight: 0.28 },
+    ]);
+    expect(rightHem).toEqual([
+      { bone: "rightUpperLeg", weight: 0.72 },
+      { bone: "hips", weight: 0.28 },
+    ]);
+    expect(planStudioVrmGarmentSkinInfluences(DRAPED_HEM, 0, available, 0.3)).toEqual([
+      { bone: "leftUpperLeg", weight: 0.72 },
+      { bone: "hips", weight: 0.28 },
+    ]);
+
+    const rig = lowerBodyRig();
+    const itemMaterials = [
+      new THREE.MeshStandardMaterial(),
+      new THREE.MeshStandardMaterial(),
+    ];
+    const built = buildStudioVrmSkinnedGarment({
+      name: "wardrobe:bottom:dress",
+      root: rig.root,
+      parts: [DRAPED_SKIRT, DRAPED_HEM],
+      materials: itemMaterials,
+      resolveBone: rig.resolveBone,
+    });
+    const surface = built.surface!;
+    expect(surface.receipt).toEqual(expect.objectContaining({
+      mode: "skinned-shell-v1",
+      usedBones: ["hips", "leftUpperLeg", "rightUpperLeg"],
+      boneCount: 3,
+      fallbackReason: null,
+    }));
+    expect(surface.receipt.blendedVertexCount).toBeGreaterThan(0);
+    expectNormalizedFiniteWeights(surface.mesh);
+
+    const indices = surface.mesh.geometry.getAttribute("skinIndex");
+    const weights = surface.mesh.geometry.getAttribute("skinWeight");
+    const hasLegInfluence = (boneIndex: number) => Array.from(
+      { length: indices.count },
+      (_, vertex) => [
+        [indices.getX(vertex), weights.getX(vertex)],
+        [indices.getY(vertex), weights.getY(vertex)],
+        [indices.getZ(vertex), weights.getZ(vertex)],
+        [indices.getW(vertex), weights.getW(vertex)],
+      ],
+    ).some((slots) => slots.some(([index, weight]) => index === boneIndex && weight > 0.5));
+    expect(hasLegInfluence(1)).toBe(true);
+    expect(hasLegInfluence(2)).toBe(true);
+
+    const hemGroup = surface.mesh.geometry.groups.find((group) => group.materialIndex === 1)!;
+    const geometryIndex = surface.mesh.geometry.getIndex()!;
+    const hemVertices = new Set<number>();
+    for (let offset = hemGroup.start; offset < hemGroup.start + hemGroup.count; offset += 1) {
+      hemVertices.add(geometryIndex.getX(offset));
+    }
+    expect(hemVertices.size).toBeGreaterThan(0);
+    for (const vertex of hemVertices) {
+      const slots = [
+        [indices.getX(vertex), weights.getX(vertex)],
+        [indices.getY(vertex), weights.getY(vertex)],
+        [indices.getZ(vertex), weights.getZ(vertex)],
+        [indices.getW(vertex), weights.getW(vertex)],
+      ];
+      const legWeight = slots.reduce(
+        (total, [bone, weight]) => total + (bone === 1 || bone === 2 ? weight : 0),
+        0,
+      );
+      expect(legWeight).toBeCloseTo(0.72, 5);
+    }
+
+    disposeStudioVrmSkinnedGarment(surface);
+    disposeMaterials(itemMaterials);
   });
 
   it("일반 파츠도 indexed 단일 SkinnedMesh와 정규화된 웨이트로 합친다", () => {

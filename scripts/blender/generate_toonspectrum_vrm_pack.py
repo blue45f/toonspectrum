@@ -16,6 +16,7 @@ generator.  Facial meshes include real shape keys wired to VRM expressions.
 """
 
 import bpy
+from math import pi
 from mathutils import Vector
 
 
@@ -169,6 +170,77 @@ CHARACTERS = (
         "arm_scale": 1.06,
         "leg_scale": 1.08,
     },
+    {
+        "file": "TS_Okseon_HanjiArchivist.vrm",
+        "name": "옥선 (한지 기록가)",
+        "height": 1.54,
+        "heads": 6.15,
+        "age": 0.94,
+        "shoulder": 0.068,
+        "body": (1.08, 1.10, 0.94),
+        "skin": (0.72, 0.50, 0.37, 1.0),
+        "primary": (0.19, 0.32, 0.30, 1.0),
+        "secondary": (0.76, 0.68, 0.52, 1.0),
+        "accent": (0.68, 0.16, 0.17, 1.0),
+        "hair": (0.68, 0.66, 0.62, 1.0),
+        "style": "hanji_archivist",
+        "arm_scale": 0.96,
+        "leg_scale": 0.92,
+    },
+    {
+        "file": "TS_Nuri_RobotClub.vrm",
+        "name": "누리 (로봇 동아리원)",
+        "height": 1.47,
+        "heads": 5.85,
+        "age": 0.30,
+        "shoulder": 0.062,
+        "body": (0.90, 0.94, 0.88),
+        "skin": (0.82, 0.62, 0.47, 1.0),
+        "primary": (0.16, 0.28, 0.52, 1.0),
+        "secondary": (0.88, 0.40, 0.12, 1.0),
+        "accent": (0.10, 0.78, 0.74, 1.0),
+        "hair": (0.055, 0.045, 0.052, 1.0),
+        "style": "robot_club",
+        "arm_scale": 0.90,
+        "leg_scale": 0.88,
+    },
+    {
+        "file": "TS_Dami_RescueCaptain.vrm",
+        "name": "다미 (구조대장)",
+        "height": 1.76,
+        "heads": 6.75,
+        "age": 0.88,
+        "shoulder": 0.112,
+        "body": (1.36, 1.24, 1.22),
+        "skin": (0.30, 0.18, 0.12, 1.0),
+        "primary": (0.76, 0.16, 0.07, 1.0),
+        "secondary": (0.10, 0.12, 0.15, 1.0),
+        "accent": (0.98, 0.72, 0.06, 1.0),
+        "hair": (0.020, 0.015, 0.014, 1.0),
+        "style": "rescue_captain",
+        "arm_scale": 1.28,
+        "leg_scale": 1.20,
+    },
+    {
+        "file": "TS_Moru_MossGolem.vrm",
+        "name": "모루 (이끼 골렘)",
+        "height": 1.92,
+        "heads": 6.40,
+        "age": 0.91,
+        "shoulder": 0.118,
+        "body": (1.30, 1.24, 1.30),
+        "skin": (0.28, 0.30, 0.27, 1.0),
+        "primary": (0.16, 0.33, 0.17, 1.0),
+        "secondary": (0.33, 0.38, 0.28, 1.0),
+        "accent": (0.35, 0.92, 0.43, 1.0),
+        "hair": (0.10, 0.27, 0.12, 1.0),
+        "eye": (0.14, 0.20, 0.12, 1.0),
+        "pupil": (0.32, 1.00, 0.44, 1.0),
+        "style": "moss_golem",
+        "arm_scale": 1.34,
+        "leg_scale": 1.30,
+        "head_scale": (1.12, 1.05, 0.96),
+    },
 )
 
 
@@ -315,7 +387,7 @@ def add_character_meshes(spec, armature):
     secondary = make_material(prefix + "_Secondary", spec["secondary"], roughness=0.58)
     hair = make_material(prefix + "_Hair", spec["hair"], roughness=0.76)
     accent_emission = None
-    if spec["style"] in ("rune_guard", "android", "cyber_agent"):
+    if spec["style"] in ("rune_guard", "android", "cyber_agent", "moss_golem"):
         accent_emission = (spec["accent"], 2.0)
     accent = make_material(
         prefix + "_Accent",
@@ -324,8 +396,15 @@ def add_character_meshes(spec, armature):
         roughness=0.32,
         emission=accent_emission,
     )
-    eye = make_material(prefix + "_Eye", (0.93, 0.96, 0.98, 1.0), roughness=0.32)
-    pupil = make_material(prefix + "_Pupil", (0.012, 0.018, 0.026, 1.0), roughness=0.44)
+    eye_color = spec.get("eye", (0.93, 0.96, 0.98, 1.0))
+    pupil_color = spec.get("pupil", (0.012, 0.018, 0.026, 1.0))
+    eye = make_material(prefix + "_Eye", eye_color, roughness=0.32)
+    pupil = make_material(
+        prefix + "_Pupil",
+        pupil_color,
+        roughness=0.30 if spec["style"] == "moss_golem" else 0.44,
+        emission=(pupil_color, 2.5) if spec["style"] == "moss_golem" else None,
+    )
     mouth_material = make_material(prefix + "_Mouth", (0.36, 0.055, 0.065, 1.0), roughness=0.52)
 
     hips = bone_head(armature, "hips")
@@ -350,10 +429,13 @@ def add_character_meshes(spec, armature):
 
     face_center = (head + head_tip) * 0.5
     face_center.y = -unit * 0.01
+    head_scale = spec.get("head_scale", (1.0, 1.0, 1.0))
     ellipsoid(prefix + "_Head", face_center,
-              (unit * 0.50, unit * 0.43, unit * 0.60), armature, "head", skin, 24, 16)
+              (unit * 0.50 * head_scale[0], unit * 0.43 * head_scale[1], unit * 0.60 * head_scale[2]),
+              armature, "head", skin, 24, 16)
     ellipsoid(prefix + "_HairCap", (face_center.x, face_center.y + unit * 0.035, face_center.z + unit * 0.12),
-              (unit * 0.515, unit * 0.445, unit * 0.49), armature, "head", hair, 24, 16)
+              (unit * 0.515 * head_scale[0], unit * 0.445 * head_scale[1], unit * 0.49 * head_scale[2]),
+              armature, "head", hair, 24, 16)
 
     eye_z = face_center.z + unit * 0.07
     eye_y = face_center.y - unit * 0.40
@@ -527,6 +609,133 @@ def add_character_meshes(spec, armature):
                       (sign * unit * 0.23, -unit * 0.54, hips.z + unit * 0.56),
                       (unit * 0.065, unit * 0.030, unit * 0.065),
                       armature, "spine", accent, 14, 8)
+    elif style == "hanji_archivist":
+        # A contemporary hanbok-inspired layered vest, sash and silver hair
+        # bun communicate the elder archivist without relying on a prop.
+        ellipsoid(prefix + "_HairBun", (0, unit * 0.25, face_center.z + unit * 0.39),
+                  (unit * 0.30, unit * 0.25, unit * 0.28), armature, "head", hair, 20, 12)
+        limb(prefix + "_HairPin", (-unit * 0.42, unit * 0.25, face_center.z + unit * 0.42),
+             (unit * 0.42, unit * 0.25, face_center.z + unit * 0.42), unit * 0.035,
+             armature, "head", accent, depth=0.72)
+        glasses_y = eye_y - unit * 0.055
+        for sign in (-1, 1):
+            # Frame-only elliptical rings keep the eyes and Blink morph visible. The previous
+            # solid ellipsoids behaved like opaque lenses and completely covered both eyes.
+            bpy.ops.mesh.primitive_torus_add(
+                major_radius=unit * 0.115,
+                minor_radius=unit * 0.012,
+                major_segments=28,
+                minor_segments=8,
+                location=(sign * unit * 0.18, glasses_y, eye_z),
+                rotation=(pi * 0.5, 0, 0),
+            )
+            glasses_frame = bpy.context.object
+            glasses_frame.name = prefix + "_GlassesFrame_" + str(sign)
+            glasses_frame.scale = (1.25, 0.82, 1.0)
+            bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+            rig_mesh(glasses_frame, armature, "head", accent)
+            ellipsoid(prefix + "_OverVestPanel_" + str(sign),
+                      (sign * unit * 0.30, -unit * 0.50, hips.z + unit * 0.52),
+                      (unit * 0.29, unit * 0.050, unit * 0.76),
+                      armature, "spine", secondary, 20, 12, blend_bone="chest")
+        limb(prefix + "_GlassesBridge", (-unit * 0.055, glasses_y, eye_z),
+             (unit * 0.055, glasses_y, eye_z), unit * 0.012,
+             armature, "head", accent, depth=1.0)
+        for sign in (-1, 1):
+            limb(prefix + "_GlassesTemple_" + str(sign),
+                 (sign * unit * 0.31, glasses_y, eye_z + unit * 0.01),
+                 (sign * unit * 0.45, face_center.y, eye_z + unit * 0.015),
+                 unit * 0.010, armature, "head", accent, depth=1.0)
+        ellipsoid(prefix + "_Sash", (0, -unit * 0.50, hips.z + unit * 0.16),
+                  (unit * 0.78 * width, unit * 0.052, unit * 0.14),
+                  armature, "hips", accent, 22, 10, blend_bone="spine")
+    elif style == "robot_club":
+        # Neutral, practical youth styling: padded hoodie collar, headphones,
+        # compact project backpack and reinforced knee patches.
+        bpy.ops.mesh.primitive_torus_add(
+            major_radius=unit * 0.36,
+            minor_radius=unit * 0.075,
+            major_segments=28,
+            minor_segments=10,
+            location=(0, 0, neck.z - unit * 0.03),
+        )
+        collar = bpy.context.object
+        collar.name = prefix + "_HoodCollar"
+        rig_mesh(collar, armature, "chest", secondary)
+        ellipsoid(prefix + "_ProjectBackpack", (0, unit * 0.48, shoulder_z - unit * 0.36),
+                  (unit * 0.66, unit * 0.25, unit * 0.72),
+                  armature, "chest", primary, 20, 12)
+        for sign in (-1, 1):
+            ellipsoid(prefix + "_Headphone_" + str(sign),
+                      (sign * unit * 0.49, face_center.y, face_center.z + unit * 0.04),
+                      (unit * 0.12, unit * 0.11, unit * 0.19),
+                      armature, "head", accent, 18, 10)
+            knee_bone = "lower_leg.L" if sign > 0 else "lower_leg.R"
+            ellipsoid(prefix + "_KneePatch_" + str(sign), bone_head(armature, knee_bone),
+                      (leg_radius * 0.76, leg_radius * 0.46, leg_radius * 0.68),
+                      armature, knee_bone, accent, 18, 10)
+        ellipsoid(prefix + "_RobotBadge", (0, -unit * 0.53, shoulder_z - unit * 0.24),
+                  (unit * 0.15, unit * 0.035, unit * 0.15),
+                  armature, "chest", accent, 18, 10)
+    elif style == "rescue_captain":
+        # Broad high-visibility harness, utility belt and shoulder protection
+        # keep the plus-size action lead readable in motion and at thumbnail scale.
+        for sign in (-1, 1):
+            ellipsoid(prefix + "_HarnessStrap_" + str(sign),
+                      (sign * unit * 0.36, -unit * 0.54, shoulder_z - unit * 0.29),
+                      (unit * 0.09, unit * 0.045, unit * 0.67),
+                      armature, "chest", accent, 16, 10)
+            shoulder_bone = "upper_arm.L" if sign > 0 else "upper_arm.R"
+            ellipsoid(prefix + "_ShoulderGuard_" + str(sign),
+                      bone_head(armature, shoulder_bone),
+                      (arm_radius * 1.30, arm_radius * 1.10, arm_radius * 0.84),
+                      armature, shoulder_bone, secondary, 20, 12)
+            bpy.ops.mesh.primitive_cube_add(
+                size=1.0,
+                location=(sign * unit * 0.47, -unit * 0.48, hips.z + unit * 0.08),
+            )
+            pouch = bpy.context.object
+            pouch.name = prefix + "_UtilityPouch_" + str(sign)
+            pouch.scale = (unit * 0.20, unit * 0.10, unit * 0.18)
+            bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+            rig_mesh(pouch, armature, "hips", secondary)
+        ellipsoid(prefix + "_UtilityBelt", (0, -unit * 0.49, hips.z + unit * 0.10),
+                  (unit * 0.87 * width, unit * 0.060, unit * 0.14),
+                  armature, "hips", accent, 24, 10, blend_bone="spine")
+        ellipsoid(prefix + "_HelmetLamp", (0, eye_y - unit * 0.01, face_center.z + unit * 0.52),
+                  (unit * 0.13, unit * 0.050, unit * 0.10),
+                  armature, "head", accent, 16, 8)
+    elif style == "moss_golem":
+        # Stone-and-moss clusters preserve the full humanoid rig while making
+        # the silhouette unmistakably nonhuman. Branches remain head-bound so
+        # they follow animation without introducing nonstandard humanoid bones.
+        ellipsoid(prefix + "_HeartRune", (0, -unit * 0.56, shoulder_z - unit * 0.22),
+                  (unit * 0.22, unit * 0.040, unit * 0.22),
+                  armature, "chest", accent, 20, 12)
+        for sign in (-1, 1):
+            shoulder_bone = "upper_arm.L" if sign > 0 else "upper_arm.R"
+            ellipsoid(prefix + "_MossShoulder_" + str(sign),
+                      bone_head(armature, shoulder_bone),
+                      (arm_radius * 1.45, arm_radius * 1.20, arm_radius * 1.10),
+                      armature, shoulder_bone, hair, 20, 12)
+            branch_root = Vector((sign * unit * 0.27, face_center.y + unit * 0.10,
+                                  face_center.z + unit * 0.45))
+            branch_tip = Vector((sign * unit * 0.72, face_center.y + unit * 0.13,
+                                 face_center.z + unit * 0.92))
+            limb(prefix + "_Branch_" + str(sign), branch_root, branch_tip,
+                 unit * 0.045, armature, "head", secondary, depth=0.82)
+            limb(prefix + "_BranchFork_" + str(sign), branch_tip * 0.82 + branch_root * 0.18,
+                 branch_tip + Vector((sign * unit * 0.18, 0, -unit * 0.06)),
+                 unit * 0.028, armature, "head", secondary, depth=0.80)
+            ellipsoid(prefix + "_BranchLeaf_" + str(sign), branch_tip,
+                      (unit * 0.13, unit * 0.08, unit * 0.19),
+                      armature, "head", hair, 16, 9)
+        for index, x in enumerate((-0.24, 0.0, 0.24)):
+            ellipsoid(prefix + "_CrownMoss_" + str(index),
+                      (unit * x, face_center.y + unit * 0.16,
+                       face_center.z + unit * (0.52 + 0.04 * (index % 2))),
+                      (unit * 0.16, unit * 0.12, unit * 0.18),
+                      armature, "head", hair, 16, 10)
 
     return expression_targets
 
@@ -618,9 +827,23 @@ def generate_character(spec):
 
 
 def main():
-    for character in CHARACTERS:
+    requested_value = bpy.context.scene.get("toonspectrum_vrm_files", "")
+    requested = {
+        file_name.strip()
+        for file_name in requested_value.split(",")
+        if file_name.strip()
+    }
+    characters = [
+        character
+        for character in CHARACTERS
+        if not requested or character["file"] in requested
+    ]
+    if requested and len(characters) != len(requested):
+        known = {character["file"] for character in CHARACTERS}
+        raise ValueError("Unknown ToonSpectrum VRM files: " + ", ".join(sorted(requested - known)))
+    for character in characters:
         generate_character(character)
-    print("VRM_PACK_COMPLETE " + str(len(CHARACTERS)))
+    print("VRM_PACK_COMPLETE " + str(len(characters)))
 
 
 if __name__ == "__main__":

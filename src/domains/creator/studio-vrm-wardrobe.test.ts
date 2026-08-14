@@ -14,6 +14,7 @@ import {
   SELECTABLE_WARDROBE_SETS,
   WARDROBE_SETS,
   WARDROBE_SLOTS,
+  applyWardrobeItemSelection,
   applyWardrobeSet,
   buildGarmentParts,
   createWardrobeEquip,
@@ -102,8 +103,8 @@ describe("워드로브 카탈로그", () => {
     expect(wardrobeItemById("blazer")?.slot).toBe("outer");
   });
 
-  it("감사에서 확인한 저품질 절차형 ID를 명시적으로 legacy-only 격리한다", () => {
-    const expectedLegacyIds = [
+  it("Wave 3에서 저품질 10종을 다중 파츠 본 추종형 의상으로 승격한다", () => {
+    const upgradedIds = [
       "tank",
       "tshirt",
       "shorts",
@@ -116,28 +117,28 @@ describe("워드로브 카탈로그", () => {
       "scrubpants",
     ].sort();
 
-    expect(Object.keys(LEGACY_WARDROBE_REPLACEMENTS).sort()).toEqual(
-      expectedLegacyIds,
-    );
+    expect(LEGACY_WARDROBE_REPLACEMENTS).toEqual({});
     expect(
       WARDROBE_ITEMS.filter((item) => item.catalogStatus === "legacy-only")
         .map((item) => item.id)
         .sort(),
-    ).toEqual(expectedLegacyIds);
+    ).toEqual([]);
 
-    for (const id of expectedLegacyIds) {
-      const legacy = wardrobeItemById(id);
-      const replacement = resolveWardrobeItemForNewSelection(id);
-      expect(legacy?.quality, id).toBe("low-fidelity-procedural");
-      expect(legacy?.replacementId, id).toBe(
-        LEGACY_WARDROBE_REPLACEMENTS[id],
-      );
-      expect(replacement?.catalogStatus, id).toBe("selectable");
-      expect(replacement?.slot, id).toBe(legacy?.slot);
+    for (const id of upgradedIds) {
+      const item = wardrobeItemById(id);
+      const resolved = resolveWardrobeItemForNewSelection(id);
+      const parts = buildGarmentParts(id, FALLBACK_WARDROBE_METRICS);
+      expect(item?.quality, id).toBe("standard-procedural");
+      expect(item?.catalogStatus, id).toBe("selectable");
+      expect(item?.replacementId, id).toBeNull();
+      expect(item?.geometrySource, id).toBe("skinned-procedural-v1");
+      expect(resolved?.id, id).toBe(id);
+      expect(parts.length, id).toBeGreaterThanOrEqual(5);
+      expect(new Set(parts.map((part) => part.shape.kind)).size, id).toBeGreaterThanOrEqual(2);
     }
   });
 
-  it("신규 선택 목록과 세트에는 legacy-only ID가 노출되지 않는다", () => {
+  it("신규 선택 목록과 세트에는 legacy-only ID가 없고 승격 ID를 그대로 쓴다", () => {
     const legacyIds = new Set(Object.keys(LEGACY_WARDROBE_REPLACEMENTS));
     for (const slot of WARDROBE_SLOTS) {
       const selectable = selectableWardrobeItemsBySlot(slot);
@@ -381,6 +382,30 @@ describe("측정값 정규화", () => {
 });
 
 describe("장착 상태 직렬화", () => {
+  it("원피스와 하의는 신규 선택에서 상호 배타적으로 장착된다", () => {
+    const pants = createWardrobeEquip("pants")!;
+    const dress = applyWardrobeItemSelection({ bottom: pants }, "top", "dress");
+    expect(dress.top?.itemId).toBe("dress");
+    expect(dress.bottom).toBeUndefined();
+
+    const nextPants = applyWardrobeItemSelection(dress, "bottom", "pants");
+    expect(nextPants.top).toBeUndefined();
+    expect(nextPants.bottom?.itemId).toBe("pants");
+    expect(applyWardrobeItemSelection(nextPants, "top", null).bottom).toEqual(nextPants.bottom);
+  });
+
+  it("과거 저장·공유 문서의 원피스와 하의 중첩도 복원·직렬화 경계에서 제거한다", () => {
+    const dress = createWardrobeEquip("dress")!;
+    const pants = createWardrobeEquip("pants")!;
+    const conflicting = { top: dress, bottom: pants } satisfies WardrobeState;
+
+    expect(parseWardrobeDocument({
+      version: VRM_WARDROBE_VERSION,
+      slots: conflicting,
+    }).slots).toEqual({ top: dress });
+    expect(serializeWardrobe(conflicting)?.slots).toEqual({ top: dress });
+  });
+
   it("정상 상태를 왕복 직렬화한다", () => {
     const state: WardrobeState = {
       outer: { itemId: "blazer", color: "#123456", fit: 1.2, fitMode: "manual", fabricId: "wool" },
@@ -393,7 +418,7 @@ describe("장착 상태 직렬화", () => {
     expect(parsed).toEqual(state);
   });
 
-  it("legacy-only 의상 ID는 기존 저장 문서 복원과 렌더 호환을 유지한다", () => {
+  it("Wave 3 승격 의상 ID는 기존 저장 문서 복원과 렌더 호환을 유지한다", () => {
     const parsed = parseWardrobe({
       version: 1,
       slots: {

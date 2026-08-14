@@ -452,9 +452,21 @@ describe("bg3d-model-library format and metadata policy", () => {
     );
   });
 
-  it("ships no unaudited bundled 3D assets", () => {
-    expect(SAMPLE_BG3D_MODELS).toEqual([]);
-    expect(SAMPLE_BG3D_MODEL_ENTRIES).toEqual([]);
+  it("ships only the six audited CC0 environment samples as verified insertable entries", () => {
+    expect(SAMPLE_BG3D_MODELS).toHaveLength(6);
+    expect(SAMPLE_BG3D_MODEL_ENTRIES).toHaveLength(6);
+    expect(new Set(SAMPLE_BG3D_MODELS.map((sample) => sample.id)).size).toBe(6);
+    expect(SAMPLE_BG3D_MODEL_ENTRIES).toEqual(SAMPLE_BG3D_MODELS.map((sample) =>
+      expect.objectContaining({
+        id: sample.id,
+        source: "sample",
+        status: "verified",
+        canUse: true,
+        commercialUse: true,
+        contentHash: sample.contentHash,
+        byteSize: sample.byteSize,
+      }),
+    ));
   });
 
   it("canonicalizes exact SHA-256 identities and rejects near matches", () => {
@@ -771,7 +783,7 @@ describe("V3 IndexedDB behavior", () => {
     expect(state.deletedKeys).toEqual([]);
     expect(state.records.get("legacy-obj")).toBe(legacy);
 
-    const [entry] = withDefaultBg3dModelEntry([legacy]);
+    const entry = withDefaultBg3dModelEntry([legacy]).find(({ id }) => id === legacy.id);
     expect(entry).toMatchObject({
       id: "legacy-obj",
       status: "legacy-reimport-required",
@@ -857,7 +869,8 @@ describe("V3 IndexedDB behavior", () => {
       now: 21,
     })).toBe(false);
     expect(await getCachedBg3dModelThumbnail(record.id)).toBe(first);
-    expect((await listBg3dModelLibraryEntries())[0]?.thumbnail).toBe(first);
+    expect((await listBg3dModelLibraryEntries()).find(({ id }) => id === record.id)?.thumbnail)
+      .toBe(first);
     expect(state.thumbnails.get(record.id)).toMatchObject({
       id: record.id,
       thumbnail: first,
@@ -896,8 +909,12 @@ describe("V3 IndexedDB behavior", () => {
     });
 
     expect(await getCachedBg3dModelThumbnail(record.id)).toBeNull();
-    expect((await listBg3dModelLibraryEntries())[0]?.thumbnail).toBeNull();
-    expect(withDefaultBg3dModelEntry([record], { [record.id]: "data:image/png;base64,AAAA" })[0]?.thumbnail)
+    expect((await listBg3dModelLibraryEntries()).find(({ id }) => id === record.id)?.thumbnail)
+      .toBeNull();
+    expect(withDefaultBg3dModelEntry(
+      [record],
+      { [record.id]: "data:image/png;base64,AAAA" },
+    ).find(({ id }) => id === record.id)?.thumbnail)
       .toBeNull();
     expect(await getCachedBg3dModelThumbnail("../unsafe")).toBeNull();
   });
@@ -1092,9 +1109,10 @@ describe("scene attachment isolation and library presentation", () => {
     };
     const entries = withDefaultBg3dModelEntry([legacy, verified]);
 
-    expect(entries.map((entry) => entry.id)).toEqual(["verified", "legacy"]);
-    expect(entries[0]).toMatchObject({ status: "verified", canUse: true, contentHash: verified.contentHash });
-    expect(entries[1]).toMatchObject({ status: "legacy-reimport-required", canUse: false, contentHash: null });
+    const localEntries = entries.filter((entry) => entry.source !== "sample");
+    expect(localEntries.map((entry) => entry.id)).toEqual(["verified", "legacy"]);
+    expect(localEntries[0]).toMatchObject({ status: "verified", canUse: true, contentHash: verified.contentHash });
+    expect(localEntries[1]).toMatchObject({ status: "legacy-reimport-required", canUse: false, contentHash: null });
     expect(
       getDeletableModelIds([
         ...entries,

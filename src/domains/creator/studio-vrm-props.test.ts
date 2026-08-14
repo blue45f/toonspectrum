@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 
+import { Box3, Vector3 } from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { describe, expect, it, vi } from "vitest";
 
@@ -132,6 +133,124 @@ describe("VRM 소품 카탈로그", () => {
         if (object.type === "Mesh") meshCount += 1;
       });
       expect(meshCount, url).toBeGreaterThan(0);
+    }
+  });
+
+  it("Wave 3 손 소품 앵커가 실제 GLB 손잡이 메시 안에 있다", async () => {
+    const gates = [
+      { id: "blender_cyber_katana", node: "Handle_Core", anchors: ["primary", "secondary"] },
+      { id: "blender_magic_staff", node: "Staff_LeatherGrip", anchors: ["primary", "secondary"] },
+      { id: "blender_rune_shield", node: "RuneShield_BackGrip", anchors: ["primary", "secondary"] },
+      { id: "blender_holo_tablet", node: "Tablet_LeftGrip", anchors: ["primary"] },
+      { id: "blender_medieval_greatsword", node: "Greatsword_GripCore", anchors: ["primary"] },
+      { id: "blender_cyber_sniper_rifle", node: "Sniper_PistolGrip", anchors: ["primary"] },
+      { id: "blender_magic_wand_staff", node: "Wand_GripWrap_5", anchors: ["primary"] },
+      { id: "blender_scifi_laser_gun", node: "LaserGun_PistolGrip", anchors: ["primary"] },
+      { id: "blender_magic_grimoire", node: "Grimoire_BackCover", anchors: ["primary"] },
+      { id: "blender_medieval_shield", node: "MedievalShield_BackHandle", anchors: ["primary"] },
+      { id: "blender_crystal_orb", node: "CrystalOrb_Pedestal", anchors: ["primary"] },
+    ] as const;
+    const loader = new GLTFLoader();
+    for (const gate of gates) {
+      const def = propDefById(gate.id)!;
+      const url = BLENDER_PROP_GLTF_URLS[gate.id];
+      const bytes = readFileSync(new URL(`../../../public${url}`, import.meta.url));
+      const arrayBuffer = bytes.buffer.slice(
+        bytes.byteOffset,
+        bytes.byteOffset + bytes.byteLength,
+      ) as ArrayBuffer;
+      const gltf = await loader.parseAsync(arrayBuffer, "");
+      gltf.scene.updateMatrixWorld(true);
+      const contact = gltf.scene.getObjectByName(gate.node);
+      expect(contact, `${gate.id}: ${gate.node}`).toBeDefined();
+      const contactBounds = new Box3().setFromObject(contact!);
+      for (const anchorId of gate.anchors) {
+        const contactAnchor = def.anchors.find((candidate) => candidate.id === anchorId)!;
+        const gap = contactBounds.distanceToPoint(new Vector3(...contactAnchor.position));
+        expect(gap, `${gate.id}/${anchorId}: contact gap`).toBeLessThanOrEqual(0.002);
+      }
+    }
+  });
+
+  it("Wave 3 무기 앵커는 GLB의 -Z 날끝·총구 방향을 손가락 전방으로 선언한다", () => {
+    for (const id of [
+      "blender_cyber_katana",
+      "blender_medieval_greatsword",
+      "blender_cyber_sniper_rifle",
+      "blender_magic_wand_staff",
+      "blender_scifi_laser_gun",
+    ]) {
+      const primary = propDefById(id)!.anchors.find((candidate) => candidate.role === "primary")!;
+      expect(primary.forward, id).toEqual([0, 0, -1]);
+    }
+  });
+
+  it("Wave 3 머리 GLB 기본 배율과 전면 앵커가 실측 VRM 머리 범위에 맞는다", async () => {
+    const gates = [
+      { id: "blender_cyber_visor", maxScale: 0.68, anchorZ: 0.015 },
+      { id: "blender_tactical_helmet", maxScale: 0.48, anchorZ: 0.105 },
+    ] as const;
+    const loader = new GLTFLoader();
+    for (const gate of gates) {
+      const def = propDefById(gate.id)!;
+      expect(def.defaultScale, gate.id).toBeLessThanOrEqual(gate.maxScale);
+      expect(def.anchors[0].position[2], gate.id).toBeCloseTo(gate.anchorZ, 6);
+
+      const url = BLENDER_PROP_GLTF_URLS[gate.id];
+      const bytes = readFileSync(new URL(`../../../public${url}`, import.meta.url));
+      const arrayBuffer = bytes.buffer.slice(
+        bytes.byteOffset,
+        bytes.byteOffset + bytes.byteLength,
+      ) as ArrayBuffer;
+      const gltf = await loader.parseAsync(arrayBuffer, "");
+      const size = new Vector3();
+      new Box3().setFromObject(gltf.scene).getSize(size);
+      const minseoHeadMetric = 0.185916;
+      const minseoHeadBounds = new Vector3(0.232394, 0.278873, 0.199859);
+      const fittedScale = def.defaultScale * minseoHeadMetric / def.fit.designReference;
+      const fitted = size.multiplyScalar(fittedScale);
+      expect(fitted.x / minseoHeadBounds.x, `${gate.id}: width`).toBeLessThanOrEqual(1.2);
+      expect(fitted.y / minseoHeadBounds.y, `${gate.id}: height`).toBeLessThanOrEqual(1.2);
+      expect(fitted.z / minseoHeadBounds.z, `${gate.id}: depth`).toBeLessThanOrEqual(1.35);
+    }
+  });
+
+  it("좌석·컨트롤 surface 앵커는 실제 접촉면 상단이며 기존 GLB root 배치를 보존한다", async () => {
+    const gates = [
+      { id: "blender_neon_bench", nodePrefix: "Bench_SeatSlat_", root: [0, -0.85, 0] },
+      { id: "blender_arcade_cabinet", nodePrefix: "Arcade_ControlDeck", root: [0, -0.85, -0.2] },
+      { id: "blender_cyber_hoverbike", nodePrefix: "Hoverbike_RiderSeat", root: [0, -0.95, 0] },
+      { id: "blender_cyberpunk_motorcycle", nodePrefix: "Motorcycle_RiderSeat", root: [0, -0.85, 0] },
+      { id: "blender_royal_throne", nodePrefix: "Throne_SeatCushion", root: [0, -1, -0.2] },
+    ] as const;
+    const loader = new GLTFLoader();
+    for (const gate of gates) {
+      const def = propDefById(gate.id)!;
+      const anchor = def.anchors.find((candidate) => candidate.role === "surface")!;
+      const url = BLENDER_PROP_GLTF_URLS[gate.id];
+      const bytes = readFileSync(new URL(`../../../public${url}`, import.meta.url));
+      const arrayBuffer = bytes.buffer.slice(
+        bytes.byteOffset,
+        bytes.byteOffset + bytes.byteLength,
+      ) as ArrayBuffer;
+      const gltf = await loader.parseAsync(arrayBuffer, "");
+      gltf.scene.updateMatrixWorld(true);
+      const surfaceBounds = new Box3();
+      gltf.scene.traverse((object) => {
+        if (object.name.startsWith(gate.nodePrefix)) surfaceBounds.expandByObject(object);
+      });
+      expect(surfaceBounds.isEmpty(), `${gate.id}: contact bounds`).toBe(false);
+      expect(anchor.position[1], `${gate.id}: surface top`).toBeCloseTo(surfaceBounds.max.y, 3);
+      expect(anchor.position[0]).toBeGreaterThanOrEqual(surfaceBounds.min.x - 0.002);
+      expect(anchor.position[0]).toBeLessThanOrEqual(surfaceBounds.max.x + 0.002);
+      expect(anchor.position[2]).toBeGreaterThanOrEqual(surfaceBounds.min.z - 0.002);
+      expect(anchor.position[2]).toBeLessThanOrEqual(surfaceBounds.max.z + 0.002);
+      for (let axis = 0; axis < 3; axis += 1) {
+        expect(
+          def.defaultPosition[axis]! - anchor.position[axis]!,
+          `${gate.id}: preserved root axis ${axis}`,
+        ).toBeCloseTo(gate.root[axis]!, 6);
+      }
     }
   });
 

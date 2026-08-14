@@ -14,6 +14,7 @@ import {
   deriveStudioBg3dGlbValidationPolicy,
   type StudioBg3dResolvedDeviceQuality,
 } from "./studio-bg3d-device-quality";
+import { isStudioBg3dEnvironmentAssetId } from "./studio-bg3d-environment-catalog";
 import {
   combineStudioBg3dAbortSignals,
   StudioBg3dStaleModalOperationError,
@@ -60,6 +61,20 @@ export type StudioBg3dModelRootCacheEntry = Pick<
   readonly semanticMaterials: StudioBg3dSemanticMaterialClassificationResult;
   readonly genericHints: StudioGeneric3dManifestHints;
 };
+
+/**
+ * Uploaded props receive the long-standing 2m auto-fit normalization. First-party environments
+ * are authored and audited in metres, so shrinking their 7–16m footprint to 2m would turn doors,
+ * furniture, and camera paths into miniature geometry.
+ */
+export function resolveStudioBg3dModelNormalizationScale(
+  recordId: string,
+  boundingSize: readonly [number, number, number],
+): number {
+  return isStudioBg3dEnvironmentAssetId(recordId)
+    ? 1
+    : computeAutoFitScale([...boundingSize] as [number, number, number]);
+}
 
 interface ModelBindingMaps {
   readonly attachmentByStorageModelId: Map<string, StudioBg3dModelAttachment>;
@@ -221,7 +236,10 @@ export async function admitAndCacheStudioBg3dModel(args: {
           cumulativeUsedBytes: args.cumulativeUsedBytes,
           maximumCumulativeBytes: selectedBudgets.complexity.maxModelBytes,
         });
-        loaded.root.scale.setScalar(computeAutoFitScale(measureBg3dObjectSize(loaded.root)));
+        loaded.root.scale.setScalar(resolveStudioBg3dModelNormalizationScale(
+          args.record.id,
+          measureBg3dObjectSize(loaded.root),
+        ));
         loaded.root.traverse((object) => {
           const renderable = object as Mesh;
           if (!renderable.isMesh) return;

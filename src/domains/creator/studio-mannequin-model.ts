@@ -119,7 +119,11 @@ export type StudioMannequinBodyPresetId =
   | "petite"
   | "athletic"
   | "plusSize"
-  | "mature";
+  | "mature"
+  | "senior"
+  | "stocky"
+  | "dancer"
+  | "fantasyGiant";
 
 export const STUDIO_MANNEQUIN_BODY_PRESETS: Readonly<
   Record<StudioMannequinBodyPresetId, { label: string; params: StudioMannequinBodyParams }>
@@ -296,6 +300,54 @@ export const STUDIO_MANNEQUIN_BODY_PRESETS: Readonly<
       build: 1.35,
     }),
   },
+  senior: {
+    label: "고령 균형형 6.1등신",
+    params: Object.freeze({
+      heightCm: 156,
+      headCount: 6.1,
+      shoulderWidth: 0.9,
+      pelvisWidth: 1.04,
+      armLength: 0.91,
+      legLength: 0.88,
+      build: 1.15,
+    }),
+  },
+  stocky: {
+    label: "단단한 체형 6.2등신",
+    params: Object.freeze({
+      heightCm: 165,
+      headCount: 6.2,
+      shoulderWidth: 1.17,
+      pelvisWidth: 1.1,
+      armLength: 0.92,
+      legLength: 0.9,
+      build: 2.35,
+    }),
+  },
+  dancer: {
+    label: "무용수 8등신",
+    params: Object.freeze({
+      heightCm: 174,
+      headCount: 8,
+      shoulderWidth: 0.96,
+      pelvisWidth: 0.96,
+      armLength: 1.08,
+      legLength: 1.14,
+      build: 0.55,
+    }),
+  },
+  fantasyGiant: {
+    label: "판타지 거인 8.2등신",
+    params: Object.freeze({
+      heightCm: 200,
+      headCount: 8.2,
+      shoulderWidth: 1.28,
+      pelvisWidth: 1.12,
+      armLength: 1.13,
+      legLength: 1.06,
+      build: 2.65,
+    }),
+  },
 });
 
 export type StudioMannequinMaterialStyle =
@@ -304,7 +356,9 @@ export type StudioMannequinMaterialStyle =
   | "wireframe"
   | "shaded"
   | "magma"
-  | "stencil";
+  | "stencil"
+  | "bronze"
+  | "porcelain";
 
 export const STUDIO_MANNEQUIN_MATERIAL_STYLES: readonly {
   id: StudioMannequinMaterialStyle;
@@ -317,6 +371,8 @@ export const STUDIO_MANNEQUIN_MATERIAL_STYLES: readonly {
   { id: "shaded", label: "2톤 셀 셰이딩", desc: "명확한 툰 음영 경계선 드로잉 가이드" },
   { id: "magma", label: "네온 마그마", desc: "고대비 발광 앰비언트 실루엣 모드" },
   { id: "stencil", label: "흑백 실루엣", desc: "외곽 형태 선명 추출용 스텐실 모드" },
+  { id: "bronze", label: "청동 조각상", desc: "금속 하이라이트로 면 전환을 읽는 고전 조각 모드" },
+  { id: "porcelain", label: "백자 인형", desc: "부드러운 반사와 밝은 명암을 보는 유광 백자 모드" },
 ]);
 
 function clampNumber(value: unknown, min: number, max: number, fallback: number): number {
@@ -547,6 +603,36 @@ function vec3(x: number, y: number, z: number): StudioMannequinVec3 {
   return [x, y, z];
 }
 
+/** 손바닥 끝에 길이가 다른 네 손가락과 바깥쪽 엄지를 붙인다. 좌우는 X축 미러다. */
+function buildHandDigitPrimitives(
+  jointId: "leftHand" | "rightHand",
+  handLen: number,
+  sideSign: 1 | -1,
+): readonly StudioMannequinPrimitiveSpec[] {
+  const fingers = [
+    { x: -0.15, endY: -1.03 },
+    { x: -0.05, endY: -1.11 },
+    { x: 0.05, endY: -1.14 },
+    { x: 0.15, endY: -1.07 },
+  ] as const;
+  return [
+    ...fingers.map(({ x, endY }): StudioMannequinPrimitiveSpec => ({
+      kind: "capsule",
+      jointId,
+      from: vec3(sideSign * x * handLen, -0.76 * handLen, 0.02 * handLen),
+      to: vec3(sideSign * x * handLen, endY * handLen, 0.025 * handLen),
+      radius: 0.045 * handLen,
+    })),
+    {
+      kind: "capsule",
+      jointId,
+      from: vec3(sideSign * 0.19 * handLen, -0.46 * handLen, 0.025 * handLen),
+      to: vec3(sideSign * 0.38 * handLen, -0.72 * handLen, 0.065 * handLen),
+      radius: 0.06 * handLen,
+    },
+  ];
+}
+
 /**
  * 파라미터로부터 결정적 마네킹 스펙을 생성한다.
  * 불변식: rest 자세의 정수리 높이 == heightCm/100 (legLength가 다리/몸통 비율만 재분배).
@@ -677,6 +763,21 @@ export function buildStudioMannequinSpec(input: unknown): StudioMannequinSpec {
       radius: 0.065 * hu,
       scale: vec3(0.45, 0.8, 0.55),
     },
+    // 눈 돌출부 — 코와 함께 +Z 시선 방향, 좌우 기울기와 머리 회전을 빠르게 읽게 한다.
+    {
+      kind: "sphere",
+      jointId: "head",
+      center: vec3(0.17 * hu, headLen * 0.59, headLen * 0.395),
+      radius: 0.055 * hu,
+      scale: vec3(1, 0.72, 0.38),
+    },
+    {
+      kind: "sphere",
+      jointId: "head",
+      center: vec3(-0.17 * hu, headLen * 0.59, headLen * 0.395),
+      radius: 0.055 * hu,
+      scale: vec3(1, 0.72, 0.38),
+    },
     {
       kind: "sphere",
       jointId: "head",
@@ -691,12 +792,14 @@ export function buildStudioMannequinSpec(input: unknown): StudioMannequinSpec {
     { kind: "capsule", jointId: "leftLowerArm", from: vec3(0, 0, 0), to: vec3(0, -foreArmLen, 0), radius: 0.095 * hu * limbR },
     { kind: "sphere", jointId: "leftHand", center: vec3(0, 0, 0), radius: 0.095 * hu },
     { kind: "sphere", jointId: "leftHand", center: vec3(0, -handLen * 0.5, 0), radius: handLen * 0.5, scale: vec3(0.45, 1, 0.28) },
+    ...buildHandDigitPrimitives("leftHand", handLen, 1),
     { kind: "sphere", jointId: "rightUpperArm", center: vec3(0, 0, 0), radius: 0.14 * hu * limbR },
     { kind: "capsule", jointId: "rightUpperArm", from: vec3(0, 0, 0), to: vec3(0, -upperArmLen, 0), radius: 0.115 * hu * limbR },
     { kind: "sphere", jointId: "rightLowerArm", center: vec3(0, 0, 0), radius: 0.12 * hu * limbR },
     { kind: "capsule", jointId: "rightLowerArm", from: vec3(0, 0, 0), to: vec3(0, -foreArmLen, 0), radius: 0.095 * hu * limbR },
     { kind: "sphere", jointId: "rightHand", center: vec3(0, 0, 0), radius: 0.095 * hu },
     { kind: "sphere", jointId: "rightHand", center: vec3(0, -handLen * 0.5, 0), radius: handLen * 0.5, scale: vec3(0.45, 1, 0.28) },
+    ...buildHandDigitPrimitives("rightHand", handLen, -1),
     // 다리 — 고관절·무릎·발목 관절구와 둥근 발 볼륨.
     { kind: "sphere", jointId: "leftUpperLeg", center: vec3(0, 0, 0), radius: 0.18 * hu * limbR },
     { kind: "capsule", jointId: "leftUpperLeg", from: vec3(0, 0, 0), to: vec3(0, -upperLegLen, 0), radius: 0.155 * hu * limbR },

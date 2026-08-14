@@ -159,7 +159,7 @@ export function isBundledVrmRightsBlocked(id: string): boolean {
 //  2026-07: github.com/ToxSam/open-source-avatars 레지스트리의 Polygonal Mind
 //  100Avatars R1~R3 CC0 모델 71종 — 캐릭터/로봇/동물/판타지/SF/푸드 마스코트,
 //  그 중 OldMoustache·Eugenia는 "노인" 카테고리 보강,
-//  2026-08: Blender MCP + VRM Add-on으로 제작한 ToonSpectrum 오리지널 VRM 1.0 9종).
+//  2026-08: Blender MCP + VRM Add-on으로 제작한 ToonSpectrum 오리지널 VRM 1.0 13종).
 export const SAMPLE_VRMS: SampleVrm[] = [
   { id: SAMPLE_VRM_ID, name: "루미", url: SAMPLE_VRM_URL },
   { id: "avatar-a", name: "하린", url: "/vrm/AvatarSample_A.vrm" },
@@ -174,6 +174,10 @@ export const SAMPLE_VRMS: SampleVrm[] = [
   { id: "cyber_agent_zero", name: "사이버 에이전트 제로", url: "/vrm/cyber_agent_zero.vrm" },
   { id: "ts-seojin-architect", name: "서진 (배리어프리 건축가)", url: "/vrm/TS_Seojin_Architect.vrm" },
   { id: "ts-mira-detective", name: "미라 (느와르 탐정)", url: "/vrm/TS_Mira_Detective.vrm" },
+  { id: "ts-okseon-hanji-archivist", name: "옥선 (한지 기록가)", url: "/vrm/TS_Okseon_HanjiArchivist.vrm" },
+  { id: "ts-nuri-robot-club", name: "누리 (로봇 동아리원)", url: "/vrm/TS_Nuri_RobotClub.vrm" },
+  { id: "ts-dami-rescue-captain", name: "다미 (구조대장)", url: "/vrm/TS_Dami_RescueCaptain.vrm" },
+  { id: "ts-moru-moss-golem", name: "모루 (이끼 골렘)", url: "/vrm/TS_Moru_MossGolem.vrm" },
   { id: "shion", name: "시온", url: "/vrm/Sendagaya_Shibu.vrm" },
   { id: "vivi", name: "비비", url: "/vrm/Vivi.vrm" },
   { id: "vita", name: "비타", url: "/vrm/Vita.vrm" },
