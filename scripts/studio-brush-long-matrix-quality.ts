@@ -160,12 +160,32 @@ const CORE_DISCRETE_BRUSH_IDS: ReadonlySet<string> = new Set([
 /**
  * Hatching pens draw their mark by repeating parallel or crossed strokes, so the periodicity the
  * continuous metrics treat as a defect is the motif itself (the classic `crosshatch` preset is
- * already listed above). Matching on the name keeps every present and future hatch lane —
- * `web-hatch-color`, `web-cross-hatch-pen`, their lattice variants — on the same authored-motif
- * policy instead of demanding an unbroken, non-repeating edge from a brush designed to repeat.
+ * already listed above). Enumerated rather than matched on the substring "hatch": this waives the
+ * 6/6 route-coverage invariant, so joining the lane has to be a reviewable diff. A future
+ * `thatch-roller` — or a genuinely broken hatch carrier — must not exempt itself by its name.
  */
+const AUTHORED_HATCH_MOTIF_BRUSH_IDS: ReadonlySet<string> = new Set([
+  "cross-hatch",
+  "crosshatch",
+  "fill-hatch",
+  "hatch",
+  "hatch-1",
+  "hatch-dense",
+  "hatch-light",
+  "hatch-tone",
+  "hatching",
+  "hatching-contour-rake",
+  "pattern-crosshatch",
+  "speed-hatch",
+  "toon-hatch-tone",
+  "web-cross-hatch-pen",
+  "web-cross-hatch-pen-x",
+  "web-hatch-color",
+  "web-hatch-color-lattice",
+]);
+
 function isAuthoredHatchMotifBrushId(brushId: string): boolean {
-  return brushId.includes("hatch");
+  return AUTHORED_HATCH_MOTIF_BRUSH_IDS.has(brushId);
 }
 
 const CORE_SOFT_WET_BRUSH_IDS: ReadonlySet<string> = new Set([

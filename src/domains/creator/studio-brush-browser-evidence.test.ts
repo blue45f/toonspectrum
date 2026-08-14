@@ -32,13 +32,15 @@ interface StudioBrushBrowserEvidence {
   readonly longRouteCore: {
     readonly passed: number;
     readonly total: number;
-    readonly visibleSegmentsPerTool: number;
     readonly totalSegmentsPerTool: number;
-    /** Tools held to full route coverage; the rest are intentionally discrete carriers. */
-    readonly continuousPolicyTools: number;
-    readonly discretePolicyTools: number;
+    /**
+     * Measured distribution, emitted by runLongBrushMatrix. A universal
+     * `visibleSegmentsPerTool: 6` used to sit here and was untrue — the same run's log recorded a
+     * discrete carrier at 4/6 — so the receipt now records the worst case in each policy lane.
+     */
+    readonly continuousMinimumVisibleSegments: number;
+    readonly discreteMinimumVisibleSegments: number;
     readonly toolsBelowFullCoverage: number;
-    readonly minimumVisibleSegments: number;
     readonly continuousPolicyFailures: number;
     readonly qualityPolicyCounts: Readonly<Record<string, number>>;
     readonly errorCount: number;
@@ -58,6 +60,18 @@ interface StudioBrushBrowserEvidence {
     readonly errorCount: number;
   };
   readonly pointerUpDurability: {
+    /** Phase 1 — which authority made the released stroke durable, read on a live page. */
+    readonly receiptMarkerReason: string;
+    readonly receiptSettledInMs: number;
+    readonly receiptStrokeCount: number;
+    /** Phase 2 — which authority wrote the payload that survived teardown, and how long the
+     * unload prompt was held (it must stay under the product's 200ms deferred idle flush, or the
+     * flush could author the survivor and hide a pointerup write that lost its race). */
+    readonly survivorMarkerReason: string;
+    readonly survivorStrokeCount: number;
+    readonly unloadPromptHeldMs: number;
+    readonly navigationIssuedInMs: number;
+    readonly unloadGuardShown: boolean;
     readonly payloadContainsEveryStroke: boolean;
     readonly recoveryBannerShown: boolean;
     readonly recoveredPixelsChanged: boolean;
@@ -105,7 +119,6 @@ describe("Studio brush browser evidence", () => {
     expect(evidence.longRouteCore).toMatchObject({
       passed: listedCoreCount,
       total: listedCoreCount,
-      visibleSegmentsPerTool: 6,
       totalSegmentsPerTool: 6,
       continuousPolicyFailures: 0,
       errorCount: 0,
@@ -114,18 +127,18 @@ describe("Studio brush browser evidence", () => {
       Object.values(evidence.longRouteCore.qualityPolicyCounts)
         .reduce((sum, count) => sum + count, 0),
     ).toBe(listedCoreCount);
-    // Full route coverage is the rule; only intentionally discrete carriers may leave a sampled
-    // sixth empty. Pin that split so a regression cannot buy coverage by reclassifying tools.
-    expect(
-      evidence.longRouteCore.continuousPolicyTools
-        + evidence.longRouteCore.discretePolicyTools,
-    ).toBe(listedCoreCount);
-    expect(evidence.longRouteCore.discretePolicyTools).toBe(
-      evidence.longRouteCore.qualityPolicyCounts["record-only-discrete"],
+    // Full route coverage is the rule. Every tool held to the continuous policy must paint all six
+    // sampled sixths — that is the assertion a regression cannot escape by reclassifying itself,
+    // because reclassifying a broken tool as discrete moves it out of this minimum and into the
+    // discrete floor below, which is also pinned.
+    expect(evidence.longRouteCore.continuousMinimumVisibleSegments).toBe(6);
+    expect(evidence.longRouteCore.discreteMinimumVisibleSegments)
+      .toBeGreaterThanOrEqual(4);
+    // Discrete carriers are the only ones allowed a gap, so the count below full coverage can
+    // never exceed how many of them there are.
+    expect(evidence.longRouteCore.toolsBelowFullCoverage).toBeLessThanOrEqual(
+      evidence.longRouteCore.qualityPolicyCounts["record-only-discrete"] ?? 0,
     );
-    expect(evidence.longRouteCore.toolsBelowFullCoverage)
-      .toBeLessThanOrEqual(evidence.longRouteCore.discretePolicyTools);
-    expect(evidence.longRouteCore.minimumVisibleSegments).toBeGreaterThan(0);
     expect(evidence.smartShapes).toMatchObject({ passed: 6, total: 6, errorCount: 0 });
     expect(evidence.mobile).toMatchObject({
       paintSelections: STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.length,
@@ -136,11 +149,24 @@ describe("Studio brush browser evidence", () => {
       errorCount: 0,
     });
     expect(evidence.mobile.interactiveTargets).toBeGreaterThanOrEqual(listedTotal * 2);
+    // The durability block is two measurements over two strokes, and the mechanism matters as much
+    // as the outcome: a receipt reading "pagehide" is precisely the regression this gate exists to
+    // catch, so pin the authority on both the live receipt and the payload that survived teardown.
     expect(evidence.pointerUpDurability).toMatchObject({
+      receiptMarkerReason: "pointerup",
+      survivorMarkerReason: "pointerup",
+      unloadGuardShown: true,
       payloadContainsEveryStroke: true,
       recoveryBannerShown: true,
       recoveredPixelsChanged: true,
       errorCount: 0,
     });
+    expect(evidence.pointerUpDurability.receiptStrokeCount).toBeGreaterThan(0);
+    expect(evidence.pointerUpDurability.survivorStrokeCount)
+      .toBeGreaterThan(evidence.pointerUpDurability.receiptStrokeCount);
+    expect(evidence.pointerUpDurability.navigationIssuedInMs).toBeLessThan(50);
+    // Held below the product's 200ms deferred idle flush, so only pointerup can have authored the
+    // survivor. A longer prompt would let the flush write it and mask a lost race with teardown.
+    expect(evidence.pointerUpDurability.unloadPromptHeldMs).toBeLessThan(200);
   });
 });

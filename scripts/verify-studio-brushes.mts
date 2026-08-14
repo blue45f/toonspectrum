@@ -43,6 +43,7 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
+import { fileURLToPath } from "node:url";
 
 import { decodePng } from "image-js";
 import {
@@ -61,9 +62,11 @@ import { isStudioBrushEraserAliasId } from "../src/domains/creator/studio-brush-
 import { studioBrushPresetUsesIntentionalDiscreteCarrier } from "../src/domains/creator/studio-brush-carrier-quality";
 import {
   STUDIO_ALL_BRUSH_CATALOG_ITEMS,
+  STUDIO_ERASER_BRUSH_CATALOG_ITEMS,
   STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS,
   STUDIO_LISTED_ERASER_BRUSH_CATALOG_ITEMS,
   STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS,
+  STUDIO_PAINT_BRUSH_CATALOG_ITEMS,
   type StudioBrushCatalogItem,
 } from "../src/domains/creator/studio-brush-catalog";
 import { serializeStudioBrushDynamicsSettingsCanonical } from "../src/domains/creator/studio-brush-dynamics";
@@ -102,12 +105,22 @@ const CLEAN_SESSION_KEY = "toonspectrum-brush-verifier-cleaned";
 const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
   "/api/auth/session",
   // The durability audit navigates to the catalogue home as its away-target. That route's data
-  // comes from the API (or the static catalogue bundle) which no local preview serves, so its
-  // failure says nothing about Studio; every studio-origin 5xx still fails the audit.
+  // comes from the API (or the static catalogue bundle) which no local preview serves. Excused
+  // only on the local preview origin — see expectedStaticPreviewError, which checks the origin
+  // and the exact pathname, so /api/home failing on a real deployment still fails the audit.
   "/api/home",
   "/api/kmas/merge-on-access",
   "/api/studio-ai/status",
 ] as const;
+/**
+ * Durability timing, both tied to the product's deferred-commit idle flush
+ * (DEFERRED_STROKE_COMMIT_IDLE_MS = 200 in StudioPage.tsx). The unload prompt is held BELOW that
+ * window so the idle flush cannot author the surviving payload and mask a pointerup write that
+ * lost its race with teardown; the receipt budget is the ceiling for a write that is supposed to
+ * begin at the input event's microtask checkpoint.
+ */
+const UNLOAD_PROMPT_HOLD_MS = 120;
+const RECEIPT_SETTLE_BUDGET_MS = 1_500;
 const DEBUG_BRUSH_VERIFIER = process.env.TOONSPECTRUM_DEBUG_BRUSH_VERIFIER === "1";
 /** Opt-in diagnostic sweep: keep auditing after a preset fails so one pass lists them all. */
 const DESKTOP_SURVEY_MODE = process.env.TOONSPECTRUM_BRUSH_SURVEY === "1";
@@ -260,6 +273,15 @@ interface LongBrushResult {
   qualityRunDirectory: LongBrushArtifactPath;
   qualityReport: LongBrushArtifactPath;
   qualityPolicyCounts: Readonly<Record<StudioLongBrushQualityResult["policy"]["kind"], number>>;
+  /**
+   * Measured route coverage, so the receipt records the distribution instead of a universal claim.
+   * `continuousMinimumVisibleSegments` is the one that must stay at the full count: a continuous
+   * carrier with a gap is a defect, while a discrete carrier is authored to leave gaps.
+   */
+  totalSegmentsPerTool: number;
+  continuousMinimumVisibleSegments: number;
+  discreteMinimumVisibleSegments: number;
+  toolsBelowFullCoverage: number;
   errorCount: number;
 }
 
@@ -311,8 +333,14 @@ interface DeferredDurabilityResult {
   ok: boolean;
   navigationIssuedInMs: number;
   unloadGuardShown: boolean;
-  markerReason: string;
-  strokeCount: number;
+  /** Phase 1, measured on a live page: which authority made the just-released stroke durable. */
+  receiptMarkerReason: string;
+  receiptSettledInMs: number;
+  receiptStrokeCount: number;
+  /** Phase 2, measured after teardown: which authority wrote the payload that actually survived. */
+  survivorMarkerReason: string;
+  survivorStrokeCount: number;
+  unloadPromptHeldMs: number;
   payloadContainsEveryStroke: boolean;
   recoveryBannerShown: boolean;
   recoveredPixelsChanged: boolean;
@@ -460,9 +488,20 @@ function assertProductBrushCatalogContract(): {
   };
 }
 
-function expectedStaticPreviewError(message: string, studioUrl: string): boolean {
-  if (OPTIONAL_STATIC_PREVIEW_API_PATHS.some((path) => message.includes(path))) return true;
+/** Every absolute URL a console line or failed-response line mentions. */
+function messageUrls(message: string): URL[] {
+  const urls: URL[] = [];
+  for (const token of message.split(/\s+/u)) {
+    try {
+      urls.push(new URL(token));
+    } catch {
+      // Not a URL token — console text is mostly prose.
+    }
+  }
+  return urls;
+}
 
+function expectedStaticPreviewError(message: string, studioUrl: string): boolean {
   let previewUrl: URL;
   try {
     previewUrl = new URL(studioUrl);
@@ -476,6 +515,16 @@ function expectedStaticPreviewError(message: string, studioUrl: string): boolean
   ) {
     return false;
   }
+
+  // Scoped to this local preview's own origin and matched on exact pathname. A substring test ran
+  // before the guard above and so excused these paths on ANY origin in every stage — including
+  // runs against a real deployment, where a genuine 500 must always fail the audit.
+  if (
+    messageUrls(message).some((url) =>
+      url.origin === previewUrl.origin
+      && (OPTIONAL_STATIC_PREVIEW_API_PATHS as readonly string[]).includes(url.pathname)
+    )
+  ) return true;
 
   const socketUrl =
     `ws://127.0.0.1:${previewUrl.port}/socket.io/?EIO=4&transport=websocket`;
@@ -1787,6 +1836,13 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
     if (DESKTOP_SURVEY_MODE) {
       log(`SURVEY COMPLETE: ${surveyFailures.length} failing preset(s)`);
       for (const failure of surveyFailures) log(`SURVEY -> ${failure}`);
+      // Without this the mode is not diagnostic-only as advertised: the cleanup invariants throw
+      // after the entry is already recorded, so a survey run could satisfy every per-entry
+      // predicate and report a pass while presets were failing.
+      invariant(
+        surveyFailures.length === 0,
+        `survey mode recorded ${surveyFailures.length} failing preset(s)`,
+      );
     }
 
     await page.screenshot({ path: screenshot, animations: "disabled" });
@@ -2831,6 +2887,20 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
           entry.quality.policy.kind === "record-only-discrete"
         ).length,
       },
+      totalSegmentsPerTool: 6,
+      continuousMinimumVisibleSegments: Math.min(
+        ...evidence
+          .filter((entry) => entry.qualityPolicy !== "record-only-discrete")
+          .map((entry) => entry.visibleSegments),
+        6,
+      ),
+      discreteMinimumVisibleSegments: Math.min(
+        ...evidence
+          .filter((entry) => entry.qualityPolicy === "record-only-discrete")
+          .map((entry) => entry.visibleSegments),
+        6,
+      ),
+      toolsBelowFullCoverage: evidence.filter((entry) => entry.visibleSegments < 6).length,
       errorCount: errors.messages.length + errors.failedResponses.length,
     };
   } finally {
@@ -3372,7 +3442,13 @@ async function runDeferredDurabilityAudit(
     await page.mouse.down();
     await page.mouse.move(endX, receiptLane.y + 46, { steps: 14 });
     await page.mouse.up();
-    const receipt = await waitForEmergencyAutosave(page);
+    const receiptRequestedAt = performance.now();
+    // Bounded on purpose: pointerup starts the durable write at the input event's microtask
+    // checkpoint, so the receipt lands in tens of milliseconds. An unbounded poll would also
+    // accept a write that had been pushed behind a timer or a dynamic import — exactly the
+    // regression the product forbids — because it would still arrive "eventually".
+    const receipt = await waitForEmergencyAutosave(page, RECEIPT_SETTLE_BUDGET_MS);
+    const receiptSettledInMs = performance.now() - receiptRequestedAt;
     if (!receipt) {
       const raw = await persistedStudioDocument(page).catch((cause: unknown) => ({
         readFailure: cause instanceof Error ? cause.message : String(cause),
@@ -3402,10 +3478,18 @@ async function runDeferredDurabilityAudit(
       receiptStrokeIds.every((id) => receiptPayloadIds.has(id)),
       "pointerup receipt marker references a stroke missing from its own payload",
     );
+    invariant(
+      receiptSettledInMs < RECEIPT_SETTLE_BUDGET_MS,
+      `pointerup receipt took ${receiptSettledInMs.toFixed(0)}ms, past its microtask checkpoint`,
+    );
+    await page.mouse.move(4, 4);
+    // The canvas as it stands with ONLY the proven-durable stroke. Recovery must differ from this,
+    // or it repainted stroke one and silently dropped the stroke that was actually at risk.
+    const afterReceiptStroke = await stage.screenshot({ animations: "disabled" });
 
-    // 2) Navigating away in the same beat as the release must lose nothing. The stroke may reach
-    // durability as a pending batch or as an already-flushed commit; both are exact, so the audit
-    // pins the surviving payload's contents rather than which lifecycle write happened to be last.
+    // 2) Navigating away in the same beat as the release must lose nothing, AND the payload that
+    // survives teardown must be the one pointerup wrote — a survivor written by pagehide would mean
+    // the microtask checkpoint lost its race and durability now rides on the unload handler.
     const knownStrokeIds = [...receiptPayloadIds];
     // Let the first batch leave the deferred window so the navigation below audits one fresh
     // release rather than a batch this audit already proved durable.
@@ -3426,10 +3510,11 @@ async function runDeferredDurabilityAudit(
           return;
         }
         unloadGuardShown = true;
-        // Model a creator reading and accepting the browser warning. The SQLite Dedicated Worker
-        // remains alive during the prompt, giving the already-issued pointerup write a bounded
-        // opportunity to return a durable receipt before pagehide tears down the document.
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        // Deliberately shorter than the product's deferred-commit idle flush: a longer prompt lets
+        // that flush produce the surviving payload, which would mask a pointerup write that had
+        // been pushed past teardown. Holding the prompt under the idle window keeps pointerup the
+        // only authority that can have written what survives.
+        await new Promise((resolve) => setTimeout(resolve, UNLOAD_PROMPT_HOLD_MS));
         await dialog.accept();
       })().catch((cause: unknown) => {
         dialogFailure = cause instanceof Error ? cause : new Error(String(cause));
@@ -3463,6 +3548,42 @@ async function runDeferredDurabilityAudit(
       payloadContainsEveryStroke,
       `immediate navigation lost deferred ink: kept ${survivorIds.size} of ${knownStrokeIds.length + 1} strokes`,
     );
+    // Cardinality alone would accept any extra element — a live-surface draft, or the committed
+    // element with its geometry projected away. Name the released stroke and check it carries ink.
+    const releasedStrokeId = [...survivorIds].find((id) => !knownStrokeIds.includes(id));
+    invariant(releasedStrokeId, "the survivor kept a stroke count but not the released stroke");
+    const releasedStrokeHasGeometry = ((survivor.pagesList ?? []) as Array<{
+      elements?: Array<{ id?: unknown; points?: unknown }>;
+    }>).some((savedPage) =>
+      (savedPage.elements ?? []).some((element) =>
+        element?.id === releasedStrokeId
+        && Array.isArray(element.points)
+        && element.points.length > 0
+      )
+    );
+    invariant(
+      releasedStrokeHasGeometry,
+      "the released stroke survived as an empty shell with no points",
+    );
+    // Provenance is the whole contract: pointerup must beat teardown. With the unload prompt held
+    // under the idle-flush window, a survivor marked anything else means the durable write moved
+    // behind document teardown and a tab kill (which shows no prompt at all) would lose the ink.
+    const survivorMarker = (survivor as unknown as {
+      pendingStrokeDurability?: { reason?: unknown; strokeIds?: unknown };
+    }).pendingStrokeDurability;
+    const survivorMarkerReason =
+      typeof survivorMarker?.reason === "string" ? survivorMarker.reason : "missing";
+    invariant(
+      survivorMarkerReason === "pointerup",
+      `the payload that survived teardown was written by ${survivorMarkerReason}, not pointerup`,
+    );
+    const survivorMarkerStrokeIds = Array.isArray(survivorMarker?.strokeIds)
+      ? survivorMarker.strokeIds.filter((id): id is string => typeof id === "string")
+      : [];
+    invariant(
+      survivorMarkerStrokeIds.includes(releasedStrokeId),
+      "the surviving pointerup marker does not claim the stroke released just before navigation",
+    );
 
     await page.goto(studioUrl, { waitUntil: "domcontentloaded", timeout: 20_000 });
     await page.locator('[data-studio-editor="true"]').waitFor({ state: "visible", timeout: 12_000 });
@@ -3482,6 +3603,12 @@ async function runDeferredDurabilityAudit(
     const restored = await restoredStage.screenshot({ animations: "disabled" });
     const recoveredPixelsChanged = !baseline.equals(restored);
     invariant(recoveredPixelsChanged, "restored emergency autosave did not repaint the deferred stroke");
+    // Against the empty baseline, repainting stroke one alone would pass. Compare against the
+    // canvas that already held stroke one so the assertion is about the at-risk stroke.
+    invariant(
+      !afterReceiptStroke.equals(restored),
+      "recovery repainted only the proven stroke; the released stroke is missing from the canvas",
+    );
     await page.screenshot({ path: screenshot, animations: "disabled" });
 
     reportBrowserErrors(errors);
@@ -3491,8 +3618,15 @@ async function runDeferredDurabilityAudit(
       ok: true,
       navigationIssuedInMs,
       unloadGuardShown,
-      markerReason,
-      strokeCount: receiptStrokeIds.length,
+      // Two measurements over two strokes: the receipt fields come from phase 1 on a live page,
+      // the survivor fields from phase 2's payload after teardown. Naming them apart keeps a
+      // reader from combining them into a claim neither phase makes on its own.
+      receiptMarkerReason: markerReason,
+      receiptSettledInMs,
+      receiptStrokeCount: receiptStrokeIds.length,
+      survivorMarkerReason,
+      survivorStrokeCount: survivorIds.size,
+      unloadPromptHeldMs: UNLOAD_PROMPT_HOLD_MS,
       payloadContainsEveryStroke,
       recoveryBannerShown,
       recoveredPixelsChanged,
@@ -3502,6 +3636,103 @@ async function runDeferredDurabilityAudit(
   } finally {
     await context.close();
   }
+}
+
+const EVIDENCE_RECEIPT_PATH = fileURLToPath(
+  new URL("../tests/benchmarks/results/studio-brush-browser.json", import.meta.url),
+);
+
+/**
+ * Writes the wave's checked-in receipt from the run that just passed. Hand-transcribing it from
+ * stdout is how the receipt came to claim full route coverage while the same run's log recorded a
+ * discrete carrier at four sixths — a number no assertion could catch, because both the claim and
+ * the check were typed by the same hand. Only a complete, unfiltered run may author it: a focused
+ * or single-stage run would otherwise overwrite the wave's proof with a partial one.
+ */
+function writeBrowserEvidenceReceipt(run: {
+  desktop: DesktopBrushResult | null;
+  longBrushes: LongBrushResult | null;
+  smartShapes: SmartShapeResult | null;
+  mobile: MobileTouchResult | null;
+  durability: DeferredDurabilityResult | null;
+}): void {
+  const { desktop, longBrushes, smartShapes, mobile, durability } = run;
+  if (!desktop || !longBrushes || !smartShapes || !mobile || !durability) {
+    log("receipt: skipped — not every stage ran, so this run cannot author the wave's proof");
+    return;
+  }
+  if (REQUESTED_BRUSH_VERIFY_IDS.length > 0 || ALL_BRUSH_LONG_MATRIX) {
+    log("receipt: skipped — brush selection was filtered, so the counts are not the shipped set");
+    return;
+  }
+  const listedCoreCount = STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.filter(
+    (item) => item.source === "core",
+  ).length;
+  const receipt = {
+    schemaVersion: 2,
+    status: "pass",
+    catalog: {
+      total: STUDIO_ALL_BRUSH_CATALOG_ITEMS.length,
+      core: STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter((item) => item.source === "core").length,
+      pro: STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter((item) => item.source === "pro").length,
+      paint: STUDIO_PAINT_BRUSH_CATALOG_ITEMS.length,
+      erase: STUDIO_ERASER_BRUSH_CATALOG_ITEMS.length,
+      quarantined:
+        STUDIO_ALL_BRUSH_CATALOG_ITEMS.length - STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.length,
+    },
+    desktop: {
+      selectedAndRendered: desktop.evidence.filter((entry) => entry.selected && entry.visualChanged)
+        .length,
+      undoPassed: desktop.evidence.filter((entry) => entry.undoRestoredPixels).length,
+      redoPassed: desktop.evidence.filter((entry) => entry.redoRestoredStroke).length,
+      errorCount: desktop.errorCount,
+    },
+    longRouteCore: {
+      passed: longBrushes.presetCount,
+      total: listedCoreCount,
+      totalSegmentsPerTool: longBrushes.totalSegmentsPerTool,
+      continuousMinimumVisibleSegments: longBrushes.continuousMinimumVisibleSegments,
+      discreteMinimumVisibleSegments: longBrushes.discreteMinimumVisibleSegments,
+      toolsBelowFullCoverage: longBrushes.toolsBelowFullCoverage,
+      continuousPolicyFailures: longBrushes.evidence.filter(
+        (entry) => entry.qualityPolicy !== "record-only-discrete" && !entry.qualityOk,
+      ).length,
+      qualityPolicyCounts: longBrushes.qualityPolicyCounts,
+      errorCount: longBrushes.errorCount,
+    },
+    smartShapes: {
+      passed: smartShapes.evidence.filter(
+        (entry) => entry.persistenceMatched && entry.visualChanged,
+      ).length,
+      total: smartShapes.evidence.length,
+      errorCount: smartShapes.errorCount,
+    },
+    mobile: {
+      paintSelections: mobile.selectionCount,
+      eraserSelections: mobile.eraserSelectionCount,
+      interactiveTargets: mobile.interactiveTargetCount,
+      minimumTargetWidthPx: mobile.minimumWidth,
+      minimumTargetHeightPx: mobile.minimumHeight,
+      undersizedTargets: mobile.undersized.length,
+      errorCount: mobile.errorCount,
+    },
+    pointerUpDurability: {
+      receiptMarkerReason: durability.receiptMarkerReason,
+      receiptSettledInMs: Number(durability.receiptSettledInMs.toFixed(2)),
+      receiptStrokeCount: durability.receiptStrokeCount,
+      survivorMarkerReason: durability.survivorMarkerReason,
+      survivorStrokeCount: durability.survivorStrokeCount,
+      unloadPromptHeldMs: durability.unloadPromptHeldMs,
+      navigationIssuedInMs: Number(durability.navigationIssuedInMs.toFixed(2)),
+      unloadGuardShown: durability.unloadGuardShown,
+      payloadContainsEveryStroke: durability.payloadContainsEveryStroke,
+      recoveryBannerShown: durability.recoveryBannerShown,
+      recoveredPixelsChanged: durability.recoveredPixelsChanged,
+      errorCount: durability.errorCount,
+    },
+  };
+  writeFileSync(EVIDENCE_RECEIPT_PATH, `${JSON.stringify(receipt, null, 2)}\n`);
+  log(`receipt: wrote ${EVIDENCE_RECEIPT_PATH}`);
 }
 
 async function findFreePort(): Promise<number> {
@@ -3672,6 +3903,7 @@ async function main(): Promise<void> {
           ? `ALL ${LONG_BRUSH_CATALOG_COUNT} LONG-ROUTE BRUSH GATES OK`
           : "ALL BRUSH AND SMART SHAPE BROWSER GATES OK",
     );
+    writeBrowserEvidenceReceipt({ desktop, longBrushes, smartShapes, mobile, durability });
     console.log(JSON.stringify({ scratch: SCRATCH, desktop, longBrushes, smartShapes, mobile, durability }, null, 2));
   } finally {
     if (browser) await browser.close().catch(() => undefined);
