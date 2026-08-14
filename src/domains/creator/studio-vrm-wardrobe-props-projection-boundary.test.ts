@@ -12,6 +12,10 @@ const projectionSource = readFileSync(
   new URL("./StudioVrmWardrobePropsProjection.tsx", import.meta.url),
   "utf8",
 );
+const propMaterialSource = readFileSync(
+  new URL("./studio-vrm-prop-material.ts", import.meta.url),
+  "utf8",
+);
 const propAssetRuntimeSource = readFileSync(
   new URL("./studio-vrm-prop-asset-runtime.ts", import.meta.url),
   "utf8",
@@ -141,6 +145,11 @@ describe("Studio VRM wardrobe/prop projection boundary", () => {
     expect(propRuntime).toContain("loadedLease.release();");
     expect(propRuntime).toContain("lease?.release();");
     expect(propRuntime).toContain("!loadedGltfProp.lease.released");
+    expect(propRuntime).toContain("applyStudioVrmPropTint(gltfObject, instance.propId, instance.color)");
+    expect(propMaterialSource).toContain("material.userData.toonspectrum_tintable === true");
+    expect(propMaterialSource).toContain(
+      'propId === "smartphone" && material.name === "PhoneV2_AnodizedBody"',
+    );
   });
 
   it("loads first-party GLBs through a cached clone lease without a procedural fallback", () => {

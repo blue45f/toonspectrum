@@ -77,6 +77,7 @@ export interface PropGripProfile {
 }
 
 export type PropFitReference = "hand" | "avatarHeight" | "head" | "eyeDistance" | "shoulder" | "hip" | "none";
+export type PropWearSocket = "bone" | "face";
 
 /** 모델 실측값 대비 소품 자동 배율을 계산하기 위한 제작 기준 치수. */
 export interface PropFitProfile {
@@ -128,12 +129,24 @@ export interface PropDef {
   grip?: PropGripProfile;
   /** 모델별 자동 맞춤 프로필. */
   fit: PropFitProfile;
+  /** 비직렬화 definition 의미: 얼굴 표면 소켓 또는 부착 본의 카탈로그 기본점. */
+  wearSocket: PropWearSocket;
 }
 
-type LegacyPropDef = Omit<PropDef, "anchors" | "geometrySource" | "grip" | "fit">;
+type LegacyPropDef = Omit<PropDef, "anchors" | "geometrySource" | "grip" | "fit" | "wearSocket">;
 
 /** Blender로 제작해 public 번들에 포함한 소품의 안정적인 직렬화 ID → GLB 경로 매핑. */
 export const BLENDER_PROP_GLTF_URLS = Object.freeze({
+  // Recommended-row stable IDs. Existing documents keep their IDs and rig profiles while the
+  // renderer upgrades only their geometry source. The legacy blender phone ID below remains
+  // resolvable and deliberately shares the same decoded GLB cache entry.
+  smartphone: "/assets/3d/modern_smartphone_prop.glb",
+  mug: "/assets/3d/everyday_mug.glb",
+  book: "/assets/3d/everyday_book.glb",
+  cap: "/assets/3d/everyday_cap.glb",
+  glasses: "/assets/3d/everyday_glasses.glb",
+  backpack: "/assets/3d/everyday_backpack.glb",
+  stethoscope: "/assets/3d/medical_stethoscope.glb",
   blender_cyber_katana: "/assets/3d/cyber_katana.glb",
   blender_magic_staff: "/assets/3d/magic_staff_crystal.glb",
   blender_scifi_drone: "/assets/3d/scifi_drone_bot.glb",
@@ -276,6 +289,7 @@ type PropProfile = Pick<PropDef, "anchors" | "fit"> & {
   grip?: PropGripProfile;
   smartRotationDeg?: Vec3;
   secondaryGripInfluence?: number;
+  wearSocket?: PropWearSocket;
 };
 
 const FORWARD: Vec3 = [0, 0, 1];
@@ -392,12 +406,12 @@ const PROP_PROFILES: Record<VrmPropId, PropProfile> = {
   },
   cap: { anchors: [anchor("surface", "surface", [0, 0, 0])], fit: fit("head", 0.18, 0.72, 1.45) },
   beret: { anchors: [anchor("surface", "surface", [0, -0.02, 0])], fit: fit("head", 0.18, 0.72, 1.45) },
-  glasses: { anchors: [anchor("surface", "surface", [0, 0, 0])], fit: fit("eyeDistance", 0.064, 0.72, 1.45) },
-  sunglasses: { anchors: [anchor("surface", "surface", [0, 0, 0])], fit: fit("eyeDistance", 0.064, 0.72, 1.45) },
+  glasses: { anchors: [anchor("surface", "surface", [0, 0, 0])], fit: fit("eyeDistance", 0.064, 0.72, 1.45), wearSocket: "face" },
+  sunglasses: { anchors: [anchor("surface", "surface", [0, 0, 0])], fit: fit("eyeDistance", 0.064, 0.72, 1.45), wearSocket: "face" },
   crown: { anchors: [anchor("surface", "surface", [0, -0.055, 0])], fit: fit("head", 0.18, 0.68, 1.55) },
   ribbon: { anchors: [anchor("surface", "surface", [-0.05, 0, 0])], fit: fit("head", 0.18, 0.68, 1.55) },
   surgicalCap: { anchors: [anchor("surface", "surface", [0, 0, 0])], fit: fit("head", 0.18, 0.72, 1.45) },
-  faceMask: { anchors: [anchor("surface", "surface", [0, 0, -0.004])], fit: fit("eyeDistance", 0.064, 0.72, 1.45) },
+  faceMask: { anchors: [anchor("surface", "surface", [0, 0, -0.004])], fit: fit("eyeDistance", 0.064, 0.72, 1.45), wearSocket: "face" },
   backpack: { anchors: [anchor("surface", "surface", [0, 0, 0.06], [0, 0, -1])], fit: fit("shoulder", 0.32, 0.68, 1.55) },
   shoulderbag: { anchors: [anchor("surface", "surface", [0, 0.06, 0])], fit: fit("shoulder", 0.32, 0.68, 1.55) },
   cape: { anchors: [anchor("surface", "surface", [0, 0, 0.01], [0, 0, -1])], fit: fit("shoulder", 0.32, 0.68, 1.6) },
@@ -489,11 +503,11 @@ const PROP_PROFILES: Record<VrmPropId, PropProfile> = {
   catEars: { anchors: [anchor("surface", "surface", [0, -0.02, 0])], fit: fit("head", 0.18, 0.72, 1.45) },
   horns: { anchors: [anchor("surface", "surface", [0, -0.02, 0])], fit: fit("head", 0.18, 0.72, 1.5) },
   halo: { anchors: [anchor("surface", "surface", [0, 0, 0])], fit: fit("head", 0.18, 0.72, 1.45) },
-  eyepatch: { anchors: [anchor("surface", "surface", [0, 0, 0])], fit: fit("eyeDistance", 0.064, 0.72, 1.4) },
+  eyepatch: { anchors: [anchor("surface", "surface", [0, 0, 0])], fit: fit("eyeDistance", 0.064, 0.72, 1.4), wearSocket: "face" },
   beanie: { anchors: [anchor("surface", "surface", [0, 0, 0])], fit: fit("head", 0.18, 0.72, 1.45) },
   earmuffs: { anchors: [anchor("surface", "surface", [0, 0, 0])], fit: fit("head", 0.18, 0.72, 1.45) },
   hairpin: { anchors: [anchor("surface", "surface", [0, 0, 0])], fit: fit("head", 0.18, 0.7, 1.4) },
-  goggles: { anchors: [anchor("surface", "surface", [0, 0, 0])], fit: fit("eyeDistance", 0.064, 0.72, 1.45) },
+  goggles: { anchors: [anchor("surface", "surface", [0, 0, 0])], fit: fit("eyeDistance", 0.064, 0.72, 1.45), wearSocket: "face" },
   guitar: { anchors: [anchor("surface", "surface", [0, 0.08, 0])], fit: fit("shoulder", 0.32, 0.68, 1.55) },
   quiver: { anchors: [anchor("surface", "surface", [0, 0.05, 0], [0, 0, -1])], fit: fit("shoulder", 0.32, 0.7, 1.5) },
   nameTag: { anchors: [anchor("surface", "surface", [0, 0, -0.004])], fit: fit("shoulder", 0.32, 0.72, 1.4) },
@@ -529,6 +543,7 @@ const PROP_PROFILES: Record<VrmPropId, PropProfile> = {
   blender_cyber_visor: {
     anchors: [anchor("surface", "surface", [0, 0, 0.015])],
     fit: fit("head", 0.18, 0.72, 1.45),
+    wearSocket: "face",
   },
   blender_holo_tablet: {
     anchors: [handAnchor("primary", "primary", [-0.205, 0, 0], 0.012)],
@@ -597,6 +612,7 @@ const PROP_PROFILES: Record<VrmPropId, PropProfile> = {
   blender_cyber_glasses: {
     anchors: [anchor("center", "surface", [0, 0, 0])],
     fit: fit("head", 0.16, 0.8, 1.3),
+    wearSocket: "face",
   },
   blender_medieval_shield: {
     anchors: [handAnchor("primary", "primary", [0, 0, -0.075], 0.028)],
@@ -637,6 +653,7 @@ const PROP_PROFILES: Record<VrmPropId, PropProfile> = {
 export const VRM_PROPS: readonly PropDef[] = VRM_PROP_BASES.map((def): PropDef => ({
   ...def,
   geometrySource: geometrySourceForPropId(def.id),
+  wearSocket: "bone",
   ...PROP_PROFILES[def.id],
 }));
 
