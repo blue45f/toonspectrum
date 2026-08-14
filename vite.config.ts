@@ -258,6 +258,11 @@ export default defineConfig(({ mode }) => ({
             // into the app, Studio route, or BG3D editor activation graphs.
             return "studio-bg3d-babylon-runtime";
           }
+          // NOTE (2026-08-14): naming a chunk for the launch-time SQLite repositories was tried and
+          // reverted. Every entry above is a dependency-free leaf; these repositories are not, so
+          // rolldown made the named chunk the home of their whole shared color — a 671 KiB blob that
+          // the BG3D editor (+28%) and even the admin/feedback routes then had to download. Merging
+          // only pays when the merged modules carry nothing behind them.
           if (
             id.endsWith("/src/domains/creator/studio-workspaces.ts")
             || id.endsWith("/src/domains/creator/studio-drawing-palettes.ts")

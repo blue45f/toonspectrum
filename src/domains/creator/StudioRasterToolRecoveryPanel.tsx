@@ -14,20 +14,25 @@ import {
 } from "lucide-react";
 import { useId, type ReactElement } from "react";
 
+// Vocabulary only. `studio-filter-menu` re-exports the same labels/kinds, but it also owns the
+// draft engine and therefore statically pulls the whole filter pack (blur/curves/auto-adjust/
+// color-to-alpha kernels). This panel renders a <select> of names, so it reads them from the
+// dependency-free registry that is already part of the eager Studio graph.
 import {
-  STUDIO_FILTER_LABELS,
-  STUDIO_FILTER_MENU_KINDS,
-  type StudioFilterKind,
-} from "./studio-filter-menu";
+  STUDIO_FILTER_ALL_KINDS,
+  STUDIO_FILTER_ALL_LABELS,
+} from "./studio-filter-pack-registry";
 import {
   resolveStudioInspectorRasterToolPolicy,
   type StudioInspectorRasterToolPolicy,
 } from "./studio-inspector-raster-tool-policy";
 import { STUDIO_EASE, STUDIO_FOCUS_RING, StudioContextPill } from "./studio-panel-ui";
 import { preloadStudioRasterRetouchRuntime } from "./studio-raster-retouch-preload";
-import {
-  type StudioRasterRecoveryAction,
-  type StudioRasterToolAvailability,
+
+import type { StudioFilterKind } from "./studio-filter-menu";
+import type {
+  StudioRasterRecoveryAction,
+  StudioRasterToolAvailability,
 } from "./studio-raster-tool-availability";
 
 import { buttonClass } from "@/components/ui/button-utils";
@@ -600,9 +605,9 @@ export function StudioInspectorFilterLauncher({
           <option value="" disabled>
             {busy ? "미리보기 준비 중…" : "필터 선택…"}
           </option>
-          {STUDIO_FILTER_MENU_KINDS.map((kind) => (
+          {STUDIO_FILTER_ALL_KINDS.map((kind) => (
             <option key={kind} value={kind}>
-              {STUDIO_FILTER_LABELS[kind]}
+              {STUDIO_FILTER_ALL_LABELS[kind]}
             </option>
           ))}
         </select>
