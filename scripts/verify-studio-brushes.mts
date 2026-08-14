@@ -14,7 +14,8 @@
  *   the hand-drawn bounds,
  * - every registered mobile-catalogue brush is exposed and its interactive target is at least
  *   44×44 CSS px,
- * - an opaque deferred stroke survives immediate pagehide through emergency autosave + restore.
+ * - pointerup alone makes an opaque deferred stroke durable, and a second deferred stroke plus an
+ *   immediate navigation survives pagehide through emergency autosave + restore.
  *
  * Run after `pnpm build`:
  *   pnpm verify:studio-brushes
@@ -100,6 +101,10 @@ const AUTOSAVE_KEY = studioAutosaveKey({});
 const CLEAN_SESSION_KEY = "toonspectrum-brush-verifier-cleaned";
 const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
   "/api/auth/session",
+  // The durability audit navigates to the catalogue home as its away-target. That route's data
+  // comes from the API (or the static catalogue bundle) which no local preview serves, so its
+  // failure says nothing about Studio; every studio-origin 5xx still fails the audit.
+  "/api/home",
   "/api/kmas/merge-on-access",
   "/api/studio-ai/status",
 ] as const;
@@ -3254,6 +3259,44 @@ async function readEmergencyAutosave(page: Page): Promise<EmergencyAutosaveRecor
     : null;
 }
 
+/** Every persisted element id on every page, so a lost stroke is visible regardless of paging. */
+function persistedElementIds(
+  document: Pick<EmergencyAutosaveRecord, "pagesList"> | PersistedStudioDocument,
+): Set<string> {
+  return new Set(
+    (document.pagesList ?? []).flatMap((savedPage) =>
+      ((savedPage.elements ?? []) as Array<{ id?: unknown }>).flatMap((element) =>
+        typeof element?.id === "string" ? [element.id] : []
+      )
+    )
+  );
+}
+
+async function waitForPersistedStudioDocument(
+  page: Page,
+  timeoutMilliseconds = 8_000,
+): Promise<PersistedStudioDocument | null> {
+  const deadline = performance.now() + timeoutMilliseconds;
+  let lastFailure: unknown = null;
+  while (performance.now() < deadline) {
+    try {
+      const document = await persistedStudioDocument(page);
+      if (document) return document;
+      lastFailure = null;
+    } catch (cause: unknown) {
+      lastFailure = cause;
+    }
+    await page.waitForTimeout(100);
+  }
+  if (lastFailure instanceof Error) {
+    throw new Error(
+      `post-navigation SQLite autosave read failed: ${lastFailure.message}`,
+      { cause: lastFailure },
+    );
+  }
+  return null;
+}
+
 async function waitForEmergencyAutosave(
   page: Page,
   timeoutMilliseconds = 8_000,
@@ -3299,12 +3342,77 @@ async function runDeferredDurabilityAudit(
     invariant(stageBox && viewport, "could not measure canvas for deferred-stroke audit");
     await page.mouse.move(4, 4);
     const baseline = await stage.screenshot({ animations: "disabled" });
-    const start = strokePoint(stageBox, viewport, 15);
-    const endX = Math.min(stageBox.x + stageBox.width - 70, start.x + 240);
+    // This stage owns its own lanes, measured from the exposed paper rather than the brush-matrix
+    // grid: that grid's row pitch shrinks with a focused brush subset, which pushed the gesture
+    // below the viewport, where a silent no-op is indistinguishable from a lost durability receipt.
+    const safeLeft = Math.max(stageBox.x + 70, viewport.width * 0.34);
+    const safeRight = Math.min(stageBox.x + stageBox.width - 70, viewport.width * 0.69);
+    const safeTop = Math.max(stageBox.y + 70, viewport.height * 0.18);
+    const safeBottom = Math.min(stageBox.y + stageBox.height - 70, viewport.height * 0.52);
+    invariant(safeRight - safeLeft >= 240, "visible canvas is too narrow for the deferred stroke");
+    invariant(safeBottom - safeTop >= 140, "visible canvas is too short for the deferred stroke");
+    const receiptLane = { x: safeLeft, y: safeTop + (safeBottom - safeTop) * 0.3 };
+    const navigationLane = { x: safeLeft, y: safeTop + (safeBottom - safeTop) * 0.6 };
+    const endX = Math.min(safeRight, safeLeft + 240);
+    // A gesture that never reaches Konva paints nothing, so it would fail this audit as a missing
+    // emergency autosave. Prove both routes hit canvas first and fail with the real reason.
+    const canvasReceivesStrokes = await page.evaluate(
+      ({ lanes, routeEndX }) =>
+        lanes.every((lane) =>
+          document.elementFromPoint(lane.x, lane.y)?.closest(".konvajs-content") !== null
+          && document.elementFromPoint(routeEndX, lane.y + 46)?.closest(".konvajs-content") !== null
+        ),
+      { lanes: [receiptLane, navigationLane], routeEndX: endX },
+    );
+    invariant(canvasReceivesStrokes, "deferred-stroke route is covered by editor chrome");
 
-    await page.mouse.move(start.x, start.y);
+    // 1) The pointerup write alone must make a still-deferred stroke durable. Nothing else has run
+    // yet — no idle flush, no debounced autosave — so a receipt here can only come from pointerup.
+    await page.mouse.move(receiptLane.x, receiptLane.y);
     await page.mouse.down();
-    await page.mouse.move(endX, start.y + 46, { steps: 14 });
+    await page.mouse.move(endX, receiptLane.y + 46, { steps: 14 });
+    await page.mouse.up();
+    const receipt = await waitForEmergencyAutosave(page);
+    if (!receipt) {
+      const raw = await persistedStudioDocument(page).catch((cause: unknown) => ({
+        readFailure: cause instanceof Error ? cause.message : String(cause),
+      })) as Record<string, unknown> | null;
+      // A payload that carries only a lifecycle marker means the stroke never entered the deferred
+      // batch, so the durable write it produced belongs to a later lifecycle event, not pointerup.
+      log(`durability diagnostic: persisted markers ${JSON.stringify({
+        present: raw !== null,
+        lifecycleDurability: raw?.lifecycleDurability ?? null,
+        pendingStrokeDurability: raw?.pendingStrokeDurability ?? null,
+      })}`);
+      log(`durability diagnostic: console messages ${JSON.stringify(errors.messages).slice(0, 800)}`);
+    }
+    invariant(receipt, "pointerup did not create a durable autosave for the deferred stroke");
+    const marker = receipt.pendingStrokeDurability;
+    const receiptStrokeIds = Array.isArray(marker?.strokeIds)
+      ? marker.strokeIds.filter((id): id is string => typeof id === "string")
+      : [];
+    const markerReason = typeof marker?.reason === "string" ? marker.reason : "missing";
+    invariant(receiptStrokeIds.length > 0, "emergency autosave contains no deferred stroke ids");
+    invariant(
+      markerReason === "pointerup",
+      `the deferred stroke became durable through ${markerReason} instead of pointerup`,
+    );
+    const receiptPayloadIds = persistedElementIds(receipt);
+    invariant(
+      receiptStrokeIds.every((id) => receiptPayloadIds.has(id)),
+      "pointerup receipt marker references a stroke missing from its own payload",
+    );
+
+    // 2) Navigating away in the same beat as the release must lose nothing. The stroke may reach
+    // durability as a pending batch or as an already-flushed commit; both are exact, so the audit
+    // pins the surviving payload's contents rather than which lifecycle write happened to be last.
+    const knownStrokeIds = [...receiptPayloadIds];
+    // Let the first batch leave the deferred window so the navigation below audits one fresh
+    // release rather than a batch this audit already proved durable.
+    await page.waitForTimeout(400);
+    await page.mouse.move(navigationLane.x, navigationLane.y);
+    await page.mouse.down();
+    await page.mouse.move(endX, navigationLane.y + 46, { steps: 14 });
     await page.mouse.up();
     const releasedAt = performance.now();
     let unloadGuardShown = false;
@@ -3339,37 +3447,22 @@ async function runDeferredDurabilityAudit(
       `navigation was not immediate after pointerup (${navigationIssuedInMs.toFixed(2)}ms)`,
     );
 
-    const emergency = await waitForEmergencyAutosave(page);
-    if (!emergency) {
-      // Which authority refused decides the diagnosis: a follower verdict means the leadership
-      // guard suppressed the SQLite write (product defect), while both authorities failing points
-      // at the write racing document teardown instead.
-      const raw = await persistedStudioDocument(page).catch((cause: unknown) => ({
-        readFailure: cause instanceof Error ? cause.message : String(cause),
-      }));
-      log(`durability diagnostic: persisted payload ${JSON.stringify(raw)?.slice(0, 600) ?? "null"}`);
+    const survivor = await waitForPersistedStudioDocument(page);
+    if (!survivor) {
       log(`durability diagnostic: console messages ${JSON.stringify(errors.messages).slice(0, 800)}`);
     }
-    invariant(emergency, "pointerup did not create a durable autosave for the deferred stroke");
-    const marker = emergency.pendingStrokeDurability;
-    const strokeIds = Array.isArray(marker?.strokeIds)
-      ? marker.strokeIds.filter((id): id is string => typeof id === "string")
-      : [];
-    const markerReason = typeof marker?.reason === "string" ? marker.reason : "missing";
-    invariant(strokeIds.length > 0, "emergency autosave contains no deferred stroke ids");
+    invariant(survivor, "immediate navigation left no durable document behind");
+    // Which authority refused decides the diagnosis: a follower verdict means the leadership guard
+    // suppressed the SQLite write (product defect), while a payload that lost the just-released
+    // stroke points at the write racing document teardown instead.
+    const survivorIds = persistedElementIds(survivor);
+    const payloadContainsEveryStroke =
+      knownStrokeIds.every((id) => survivorIds.has(id))
+      && survivorIds.size === knownStrokeIds.length + 1;
     invariant(
-      markerReason === "pointerup",
-      `immediate navigation replaced or missed the pointerup durability receipt: ${markerReason}`,
+      payloadContainsEveryStroke,
+      `immediate navigation lost deferred ink: kept ${survivorIds.size} of ${knownStrokeIds.length + 1} strokes`,
     );
-    const payloadIds = new Set(
-      (emergency.pagesList ?? []).flatMap((savedPage) =>
-        (savedPage.elements ?? []).flatMap((element) =>
-          typeof element.id === "string" ? [element.id] : []
-        )
-      )
-    );
-    const payloadContainsEveryStroke = strokeIds.every((id) => payloadIds.has(id));
-    invariant(payloadContainsEveryStroke, "emergency payload marker references a missing stroke");
 
     await page.goto(studioUrl, { waitUntil: "domcontentloaded", timeout: 20_000 });
     await page.locator('[data-studio-editor="true"]').waitFor({ state: "visible", timeout: 12_000 });
@@ -3399,7 +3492,7 @@ async function runDeferredDurabilityAudit(
       navigationIssuedInMs,
       unloadGuardShown,
       markerReason,
-      strokeCount: strokeIds.length,
+      strokeCount: receiptStrokeIds.length,
       payloadContainsEveryStroke,
       recoveryBannerShown,
       recoveredPixelsChanged,

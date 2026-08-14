@@ -34,6 +34,11 @@ interface StudioBrushBrowserEvidence {
     readonly total: number;
     readonly visibleSegmentsPerTool: number;
     readonly totalSegmentsPerTool: number;
+    /** Tools held to full route coverage; the rest are intentionally discrete carriers. */
+    readonly continuousPolicyTools: number;
+    readonly discretePolicyTools: number;
+    readonly toolsBelowFullCoverage: number;
+    readonly minimumVisibleSegments: number;
     readonly continuousPolicyFailures: number;
     readonly qualityPolicyCounts: Readonly<Record<string, number>>;
     readonly errorCount: number;
@@ -109,6 +114,18 @@ describe("Studio brush browser evidence", () => {
       Object.values(evidence.longRouteCore.qualityPolicyCounts)
         .reduce((sum, count) => sum + count, 0),
     ).toBe(listedCoreCount);
+    // Full route coverage is the rule; only intentionally discrete carriers may leave a sampled
+    // sixth empty. Pin that split so a regression cannot buy coverage by reclassifying tools.
+    expect(
+      evidence.longRouteCore.continuousPolicyTools
+        + evidence.longRouteCore.discretePolicyTools,
+    ).toBe(listedCoreCount);
+    expect(evidence.longRouteCore.discretePolicyTools).toBe(
+      evidence.longRouteCore.qualityPolicyCounts["record-only-discrete"],
+    );
+    expect(evidence.longRouteCore.toolsBelowFullCoverage)
+      .toBeLessThanOrEqual(evidence.longRouteCore.discretePolicyTools);
+    expect(evidence.longRouteCore.minimumVisibleSegments).toBeGreaterThan(0);
     expect(evidence.smartShapes).toMatchObject({ passed: 6, total: 6, errorCount: 0 });
     expect(evidence.mobile).toMatchObject({
       paintSelections: STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.length,
