@@ -364,11 +364,16 @@ export function createStudioProjectArchiveOrchestration({
           );
         }
         const attestationInput = await requestStudioVrmProjectArchiveUseContext(attestationPlan);
-        if (
-          !attestationInput
-          || !studioVrmArchiveAttestationInputMatchesPlan(attestationInput, attestationPlan)
-        ) {
-          throw new Error("VRM archive 이용 맥락 확인이 취소되었거나 원본 고지와 일치하지 않습니다.");
+        if (attestationInput === null) {
+          setProjectArchiveStatus({
+            tone: "warn",
+            text: "VRM archive 내보내기를 취소했습니다. 프로젝트와 원본 자산은 변경되지 않았어요.",
+          });
+          setError(null);
+          return;
+        }
+        if (!studioVrmArchiveAttestationInputMatchesPlan(attestationInput, attestationPlan)) {
+          throw new Error("VRM archive 이용 맥락 확인이 원본 고지와 일치하지 않습니다.");
         }
         vrmUseContextReceipt = createStudioVrmProjectArchiveUseContextReceipt(attestationInput);
       }

@@ -1678,6 +1678,10 @@ import {
   StudioToolHintPreferencesProvider,
   StudioToolHintTarget,
 } from "./StudioToolHint";
+import {
+  requestStudioVrmProjectArchiveUseContext,
+  StudioVrmProjectArchiveAttestationHost,
+} from "./StudioVrmProjectArchiveAttestationHost";
 import { useStudioLiveTransportAuth } from "./use-studio-live-transport-auth";
 import { useStudioBrushBaselineController } from "./useStudioBrushBaselineController";
 import { useStudioModalSheet } from "./useStudioModalSheet";
@@ -42629,6 +42633,7 @@ function clearSelectionForEdit() {
     canApplyStudioMutation,
     applyStudioProjectSnapshot,
     applyStudioProjectSnapshotWithPreparedDocuments,
+    requestStudioVrmProjectArchiveUseContext,
     setProjectArchiveBusy,
     setProjectArchiveStatus,
     setError,
@@ -44530,6 +44535,7 @@ function clearSelectionForEdit() {
     {/* 파괴적 명령 승인 표면. body 로 포털되므로 위치는 자유롭지만, 스튜디오 셸 안에 두어
         스튜디오가 살아 있는 동안에만 seam 을 소유하게 한다. */}
     <StudioDestructiveConfirmHost />
+    <StudioVrmProjectArchiveAttestationHost />
     {pagesHistoryDurabilityStatus.state === "memory-only" ? (
       <div
         data-studio-pages-history-durability="memory-only"
