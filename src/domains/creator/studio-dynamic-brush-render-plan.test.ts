@@ -13,6 +13,7 @@ import {
 } from "./studio-brush-render-budget";
 import { encodeStudioBrushTipAlphaMapBase64 } from "./studio-brush-tip-stamp";
 import { planStudioDynamicBrushRender } from "./studio-dynamic-brush-render-plan";
+import { exportPageToSvg } from "./studio-svg-export";
 
 import type { StudioDynamicBrushDab } from "./studio-brush-dynamics";
 import type { DrawEl } from "./studio-element-model";
@@ -327,5 +328,41 @@ describe("legacy dry-media replay ownership", () => {
     const plan = requireReady(planStudioDynamicBrushRender(captured, brushId, false));
 
     expect(plan.dynamics.dryMediaKernelProgram).toBeDefined();
+  });
+
+  it("keeps the pin off the SVG export fallback too, not just the canvas planner", () => {
+    // Canvas and SVG each re-derive dynamics for an element that stored none. Fixing only the
+    // canvas made the SAME document render through the union carrier on screen and the kernel
+    // engine in an export — so both now share studioReplaySafeBrushDynamicsSettingsForBrushId.
+    const brushId = DRY_MEDIA_IDS.find(
+      (id) => studioBrushDynamicsSettingsForBrushId(id)?.dryMediaKernelProgram !== undefined,
+    );
+    if (!brushId) return;
+    const authored = studioBrushDynamicsSettingsForBrushId(brushId)!;
+    const stroke = {
+      id: "legacy-dry-media-export",
+      type: "draw" as const,
+      kind: "freehand" as const,
+      mode: "pen" as const,
+      brush: brushId,
+      points: [8, 44, 24, 20, 44, 48, 66, 16, 88, 42, 104, 28],
+      pressures: [0.18, 0.38, 0.72, 0.94, 0.58, 0.32],
+      stroke: "#2457d6",
+      strokeWidth: 12,
+      opacity: 0.82,
+      sampleSpacing: 1,
+    };
+    const render = (element: Record<string, unknown>): string => exportPageToSvg({
+      width: 112,
+      height: 72,
+      transparentBg: true,
+      elements: [element as never],
+    }).svg;
+
+    // No stored snapshot -> id-derived fallback. Must NOT match the pinned rendering.
+    const legacy = render({ ...stroke });
+    const pinned = render({ ...stroke, brushDynamics: authored });
+
+    expect(legacy).not.toBe(pinned);
   });
 });

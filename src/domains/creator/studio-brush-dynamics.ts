@@ -3517,6 +3517,30 @@ export function studioBrushDynamicsSettingsForBrushId(
   return presetId ? studioBrushDynamicsPresetSettings(presetId) : null;
 }
 
+/**
+ * The id-derived resolver for REPLAY of an element that stored no dynamics snapshot of its own.
+ *
+ * Such elements predate element-level capture, so their dynamics are re-derived from today's
+ * catalogue — and that catalogue mints `dryMediaKernelProgram` for freshly authored presets.
+ * Inheriting it would move a finished stroke off the union carrier it was actually drawn with,
+ * changing its grain and edge in a document the artist already closed. Only an element's own
+ * stored snapshot may carry the pin.
+ *
+ * This exists as one shared function precisely because the rule has to hold on every surface at
+ * once: canvas and SVG export each have their own fallback, and fixing only one made the same
+ * document render two different ways. Call this instead of the raw resolver in any replay path.
+ */
+export function studioReplaySafeBrushDynamicsSettingsForBrushId(
+  brushId: unknown
+): NormalizedStudioBrushDynamicsSettings | null {
+  const settings = studioBrushDynamicsSettingsForBrushId(brushId);
+  if (!settings || settings.dryMediaKernelProgram === undefined) return settings;
+  return normalizeStudioBrushDynamicsSettings({
+    ...settings,
+    dryMediaKernelProgram: undefined,
+  });
+}
+
 /** Normalizes browser/serialized pointer data without mutating the source object. */
 export function normalizeStudioBrushDynamicsSample(
   sample?: StudioBrushDynamicsSample | null,
