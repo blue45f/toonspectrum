@@ -280,7 +280,6 @@ import {
   type StudioVrmSurfacePaintPointerSample,
   type StudioVrmSurfacePaintToolSnapshot,
 } from "./studio-vrm-surface-paint-tool";
-import { createStudioVrmTexturePaintCursor } from "./studio-vrm-texture-paint-cursor";
 import {
   planStudioVrmTexturePaintDeviceTier,
   type StudioVrmTexturePaintEnvironmentSignals,
@@ -869,8 +868,17 @@ const CHARACTER_PANEL_SECTIONS: Array<{
   { id: "surface", label: "표면", icon: Paintbrush },
 ];
 
+const STUDIO_VRM_SURFACE_BRUSH_UNAVAILABLE_REASON =
+  "검증·승인된 3D 표면 브러시 엔진이 아직 연결되지 않아 브러시 그리기를 사용할 수 없습니다. 자체 라운드 촉으로 대체하지 않으며, 현재는 ColorDrop과 스포이드를 사용할 수 있습니다.";
+
+function isStudioVrmTexturePaintBrushProductBlocked(
+  tool: StudioVrmTexturePaintPanelSettings["tool"],
+): boolean {
+  return tool === "surface-brush" || tool === "brush";
+}
+
 const DEFAULT_STUDIO_VRM_TEXTURE_PAINT_SETTINGS: StudioVrmTexturePaintPanelSettings = {
-  tool: "surface-brush",
+  tool: "fill",
   brushKind: "ink",
   color: "#d85f48",
   sizeTexels: 48,
@@ -2396,19 +2404,6 @@ function VrmActor({
 
   }, VRM_FRAME_BASE_PRIORITY);
 
-  const releaseFailedTexturePaintPointer = (pointerId: number) => {
-    if (texturePaintPointerIdRef.current !== pointerId) return;
-    texturePaintPointerIdRef.current = null;
-    const captureTarget = texturePaintCaptureTargetRef.current;
-    texturePaintCaptureTargetRef.current = null;
-    if (!captureTarget) return;
-    try {
-      captureTarget.releasePointerCapture(pointerId);
-    } catch {
-      // A native pointerup/lostpointercapture may have won the race.
-    }
-  };
-
   const releaseFailedTexturePaintSurfacePointer = (pointerId: number) => {
     if (texturePaintSurfacePointerIdRef.current !== pointerId) return;
     texturePaintSurfacePointerIdRef.current = null;
@@ -2482,72 +2477,7 @@ function VrmActor({
       }
       return;
     }
-    const pointerId = event.pointerId;
-    const captureTarget = event.currentTarget as unknown as {
-      setPointerCapture(pointerId: number): void;
-      releasePointerCapture(pointerId: number): void;
-    };
-    if (settings.tool === "surface-brush") {
-      const viewportHeight = gl.domElement.getBoundingClientRect().height;
-      const begin = texturePaintSurfaceTool.begin({
-        runtime,
-        settings: {
-          color: settings.color,
-          sizeCssPixels: settings.sizeTexels,
-          opacity: settings.opacity,
-          flow: settings.tuning.flow,
-          hardness: settings.tuning.hardness,
-          minSize: settings.tuning.minSize,
-        },
-        sample: studioVrmSurfacePaintPointerSample(
-          event,
-          "down",
-          hit,
-          camera,
-          viewportHeight,
-          texturePaintSurfaceCameraPointRef.current,
-        ),
-      });
-      if (begin.route === "surface-brush") {
-        texturePaintSurfacePointerIdRef.current = pointerId;
-        try {
-          captureTarget.setPointerCapture(pointerId);
-          texturePaintSurfaceCaptureTargetRef.current = captureTarget;
-        } catch {
-          texturePaintSurfaceCaptureTargetRef.current = null;
-        }
-        return;
-      }
-    }
-
-    texturePaintPointerIdRef.current = pointerId;
-    try {
-      captureTarget.setPointerCapture(pointerId);
-      texturePaintCaptureTargetRef.current = captureTarget;
-    } catch {
-      texturePaintCaptureTargetRef.current = null;
-    }
-
-    runtime.clearError();
-    void runtime.beginStroke({
-      pointerId,
-      hit,
-      pressure: studioVrmTexturePaintPressure(event),
-      style: {
-        kind: settings.tool === "surface-brush" ? "ink" : settings.brushKind,
-        color: settings.color,
-        sizeTexels: settings.sizeTexels,
-        opacity: settings.opacity,
-        blend: settings.tool === "surface-brush" ? "normal" : settings.blend,
-        tuning: settings.tuning,
-      },
-    }).then((result) => {
-      if (!result.ok) releaseFailedTexturePaintPointer(pointerId);
-      invalidate();
-    }).catch(() => {
-      releaseFailedTexturePaintPointer(pointerId);
-      invalidate();
-    });
+    if (isStudioVrmTexturePaintBrushProductBlocked(settings.tool)) return;
   };
 
   const moveTexturePaint = (event: ThreeEvent<PointerEvent>) => {
@@ -3775,6 +3705,10 @@ export function StudioVrmPoser({
 
   const handleTexturePaintSettingsChange = useCallback(
     (update: StudioVrmTexturePaintSettingsUpdate) => {
+      if (
+        update.tool !== undefined
+        && isStudioVrmTexturePaintBrushProductBlocked(update.tool)
+      ) return;
       if (update.tool !== undefined) setTexturePaintEyedropperActive(false);
       setTexturePaintSettings((current) => {
         const brushKind = update.brushKind ?? current.brushKind;
@@ -4835,11 +4769,11 @@ export function StudioVrmPoser({
         && texturePaintSnapshot?.error?.code === "aggregate-rgba-budget"
         ? "추가 텍스처가 이 기기의 64 MiB 상주 메모리 한도를 넘습니다. 현재 결과를 캡처한 뒤 모델을 다시 열어 다음 텍스처를 편집해 주세요."
         : "";
+  const texturePaintBrushProductBlocked =
+    isStudioVrmTexturePaintBrushProductBlocked(texturePaintSettings.tool);
   const texturePaintStatus = texturePaintDisabledReason
     || texturePaintBudgetErrorStatus
-    || (texturePaintSettings.tool === "surface-brush"
-      ? texturePaintSurfaceToolSnapshot?.message ?? ""
-      : "")
+    || (texturePaintBrushProductBlocked ? STUDIO_VRM_SURFACE_BRUSH_UNAVAILABLE_REASON : "")
     || texturePaintSnapshot?.error?.message
     || texturePaintSnapshot?.guidance?.message
     || (texturePaintSnapshot?.status === "loading"
@@ -4847,17 +4781,13 @@ export function StudioVrmPoser({
         ? "표면의 baseColor 채널에서 정확한 색상을 읽는 중입니다."
         : texturePaintFilling
           ? "ColorDrop 영역을 기기 안에서 계산하고 있습니다. 완료 전에는 원본을 변경하지 않습니다."
-        : "텍스처를 안전한 편집 사본으로 준비하는 중입니다. 그대로 계속 그려도 입력이 보존됩니다."
+        : "텍스처를 안전한 편집 사본으로 준비하는 중입니다. 완료되면 ColorDrop과 스포이드를 사용할 수 있습니다."
       : texturePaintSnapshot?.status === "painting"
-        ? "표면 페인팅 중 · 포인터를 놓으면 한 획으로 저장됩니다."
+        ? "표면 작업을 안전하게 마무리하는 중입니다."
         : texturePaintEyedropperActive
-          ? `스포이드가 준비됐습니다. 캐릭터 표면을 한 번 누르면 색상만 가져오고 ${
-              texturePaintSettings.tool === "fill" ? "ColorDrop" : "브러시"
-            }로 돌아갑니다.`
+          ? "스포이드가 준비됐습니다. 캐릭터 표면을 한 번 누르면 색상만 가져오고 ColorDrop으로 돌아갑니다."
         : texturePaintSnapshot?.activeTarget
-          ? texturePaintSettings.tool === "fill"
-            ? "표면을 한 번 눌러 ColorDrop으로 채우세요. Ctrl/⌘+Z로 이 채우기를 되돌릴 수 있습니다."
-            : "표면을 끌어 칠하세요. Ctrl/⌘+Z로 이 텍스처 획을 되돌릴 수 있습니다."
+          ? "표면을 한 번 눌러 ColorDrop으로 채우세요. Ctrl/⌘+Z로 이 채우기를 되돌릴 수 있습니다."
           : "뷰포트에서 옷·피부·머리 표면을 누르면 해당 텍스처를 선택합니다.");
   const viewportCanUndo =
     !broadcastPreviewActive
@@ -9741,13 +9671,13 @@ export function StudioVrmPoser({
                       ? "crosshair"
                       : texturePaintSettings.tool === "fill"
                         ? "cell"
-                        : createStudioVrmTexturePaintCursor(texturePaintSettings)
+                        : undefined
                     : undefined,
                 }}
               >
                 <p id={viewportInstructionsId} className="sr-only">
                   {texturePaintModeSelected
-                    ? "3D 캐릭터 표면 페인트 모드입니다. 캐릭터 회전은 잠겨 있습니다. 브러시로 끌어 칠하거나 ColorDrop으로 한 번에 채우고, 스포이드 버튼 또는 Alt+클릭으로 baseColor 색상을 가져오며, 뷰포트 오른쪽의 확대·축소 버튼으로 시점을 조절하세요."
+                    ? "3D 캐릭터 표면 페인트 모드입니다. 캐릭터 회전은 잠겨 있습니다. ColorDrop으로 한 번에 채우고, 스포이드 버튼 또는 Alt+클릭으로 baseColor 색상을 가져오며, 뷰포트 오른쪽의 확대·축소 버튼으로 시점을 조절하세요. 검증된 3D 표면 브러시 엔진이 연결될 때까지 브러시 그리기는 사용할 수 없습니다."
                     : "3D 캐릭터 편집 뷰포트입니다. 포인터로 끌어 캐릭터를 회전하고, 휠·핀치 또는 뷰포트 오른쪽의 확대·축소 버튼으로 시점을 조절하세요."}
                 </p>
                 <Canvas
@@ -9779,7 +9709,7 @@ export function StudioVrmPoser({
                       setTexturePaintEyedropperActive(false);
                       setTexturePaintSettings((current) => ({
                         ...current,
-                        tool: current.tool === "fill" ? "surface-brush" : "fill",
+                        tool: "fill",
                       }));
                     }
                   }}
@@ -10321,6 +10251,7 @@ export function StudioVrmPoser({
                 settings={texturePaintSettings}
                 activeTargetId={texturePaintSnapshot?.activeTargetId ?? null}
                 activeTextureLabel={texturePaintTargetLabel}
+                surfaceBrushUnavailableReason={STUDIO_VRM_SURFACE_BRUSH_UNAVAILABLE_REASON}
                 status={texturePaintStatus}
                 restoreError={
                   texturePaintPersistenceStatus === "error"

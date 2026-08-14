@@ -50,8 +50,11 @@ describe("Studio VRM texture-paint production integration boundary", () => {
 
     expect(panelSource).toContain('id="vrm-character-section-surface"');
     expect(panelSource).toContain('aria-labelledby="vrm-character-subtab-surface"');
-    expect(panelSource).toContain("최소 굵기");
-    expect(panelSource).toContain("settings.blend === \"erase\"");
+    expect(panelSource).toContain("surfaceBrushUnavailableReason");
+    expect(poserSource).toContain("STUDIO_VRM_SURFACE_BRUSH_UNAVAILABLE_REASON");
+    expect(panelSource).toContain("표면 브러시 준비 중");
+    expect(panelSource).not.toContain('onSettingsChange({ tool: "brush" })');
+    expect(panelSource).not.toContain("합성 방식");
     expect(panelSource).toContain("value={colorDraft}");
     expect(panelSource).toContain("onBlur={commitColorDraft}");
     expect(panelSource).toContain("aria-invalid={!colorDraftIsValid}");
@@ -98,7 +101,12 @@ describe("Studio VRM texture-paint production integration boundary", () => {
     expect(poserSource).toContain("min-h-0 flex-1 space-y-5 overflow-y-auto");
   });
 
-  it("commits only explicit pointerup and rolls back cancellation, capture loss, blur, and unmount", () => {
+  it("blocks brush pointer ownership before either surface or legacy mutation path", () => {
+    const productGuard = sourceBetween(
+      poserSource,
+      "function isStudioVrmTexturePaintBrushProductBlocked(",
+      "const DEFAULT_STUDIO_VRM_TEXTURE_PAINT_SETTINGS",
+    );
     const down = poserSource.indexOf("const beginTexturePaint =");
     const move = poserSource.indexOf("const moveTexturePaint =", down);
     const finish = poserSource.indexOf("const finishTexturePaint =", move);
@@ -113,7 +121,18 @@ describe("Studio VRM texture-paint production integration boundary", () => {
     expect(cancel).toBeGreaterThan(finish);
     expect(primitive).toBeGreaterThan(cancel);
     expect(primitiveEnd).toBeGreaterThan(primitive);
-    expect(poserSource.slice(down, move)).toContain("runtime.beginStroke({");
+    expect(productGuard).toContain('tool === "surface-brush" || tool === "brush"');
+    expect(poserSource.slice(down, move)).toContain(
+      "isStudioVrmTexturePaintBrushProductBlocked(settings.tool)",
+    );
+    expect(poserSource.slice(down, move)).not.toContain("runtime.beginStroke({");
+    expect(poserSource.slice(down, move)).not.toContain("texturePaintSurfaceTool.begin({");
+    expect(poserSource.slice(down, move)).not.toContain(
+      "texturePaintPointerIdRef.current = event.pointerId",
+    );
+    expect(poserSource.slice(down, move)).not.toContain(
+      "texturePaintSurfacePointerIdRef.current = event.pointerId",
+    );
     expect(poserSource.slice(move, finish)).toContain(".moveStroke({");
     expect(poserSource).toContain("texturePaintRuntimeRef.current?.commitStroke(pointerId)");
     expect(poserSource).toContain("texturePaintRuntimeRef.current?.cancelStroke(pointerId)");
@@ -137,13 +156,14 @@ describe("Studio VRM texture-paint production integration boundary", () => {
     );
   });
 
-  it("keeps paint moves off React state and explicitly invalidates the demand renderer", () => {
+  it("keeps admitted one-shot work off React state and explicitly invalidates the demand renderer", () => {
     expect(poserSource).toContain("<StudioVrmTexturePaintInvalidateBridge");
     expect(poserSource).toContain("if (result?.ok && result.value) invalidate()");
     expect(poserSource).toContain("texturePaintInvalidateRef.current?.()");
     expect(poserSource).toContain("enableRotate={!texturePaintInteractionEnabled}");
     expect(poserSource).toContain("&& !texturePaintStrokeActive");
-    expect(poserSource).toContain("createStudioVrmTexturePaintCursor(texturePaintSettings)");
+    expect(poserSource).toContain('texturePaintSettings.tool === "fill"');
+    expect(poserSource).not.toContain("createStudioVrmTexturePaintCursor(texturePaintSettings)");
   });
 
   it("threads the R3F triangle face index through both begin and move paint hits", () => {
@@ -236,13 +256,19 @@ describe("Studio VRM texture-paint production integration boundary", () => {
       pendingOwnership,
     );
     const pendingReturn = requiredIndex(begin, "return;", tapCapture);
-    const brushStart = requiredIndex(begin, "runtime.beginStroke({", pendingReturn);
+    const blockedBrushGuard = requiredIndex(
+      begin,
+      "isStudioVrmTexturePaintBrushProductBlocked(settings.tool)",
+      pendingReturn,
+    );
 
     expect(explicitEyedropper).toBeLessThan(sampleIntent);
     expect(sampleIntent).toBeLessThan(pendingOwnership);
     expect(pendingOwnership).toBeLessThan(tapCapture);
     expect(tapCapture).toBeLessThan(pendingReturn);
-    expect(pendingReturn).toBeLessThan(brushStart);
+    expect(pendingReturn).toBeLessThan(blockedBrushGuard);
+    expect(begin).not.toContain("runtime.beginStroke({");
+    expect(begin).not.toContain("texturePaintSurfaceTool.begin({");
     expect(begin).not.toContain("runtime.sampleBaseColor(");
     expect(begin).not.toContain("runtime.fillBaseColor(");
     expect(oneShot).toContain("pending.runtime.sampleBaseColor({");
@@ -404,7 +430,7 @@ describe("Studio VRM texture-paint production integration boundary", () => {
     expect(sampleGuard).toContain('return this.fail("pointer-active");');
   });
 
-  it("arms ColorDrop as a pending tap while preserving brush pointerdown latency", () => {
+  it("arms ColorDrop as a pending tap without exposing a brush mutation tail", () => {
     const begin = sourceBetween(
       poserSource,
       "const beginTexturePaint =",
@@ -423,25 +449,19 @@ describe("Studio VRM texture-paint production integration boundary", () => {
       fillIntent,
     );
     const pendingReturn = requiredIndex(begin, "return;", pendingOwnership);
-    const brushPointerOwnership = requiredIndex(
+    const blockedBrushGuard = requiredIndex(
       begin,
-      "const pointerId = event.pointerId",
+      "isStudioVrmTexturePaintBrushProductBlocked(settings.tool)",
       pendingReturn,
     );
-    const brushPointerCapture = requiredIndex(
-      begin,
-      "captureTarget.setPointerCapture(pointerId)",
-      brushPointerOwnership,
-    );
-    const brushStart = requiredIndex(begin, "runtime.beginStroke({", brushPointerCapture);
 
     expect(settings).toBeLessThan(fillIntent);
     expect(fillIntent).toBeLessThan(pendingOwnership);
     expect(pendingOwnership).toBeLessThan(pendingReturn);
-    expect(pendingReturn).toBeLessThan(brushPointerOwnership);
-    expect(brushPointerOwnership).toBeLessThan(brushPointerCapture);
-    expect(brushPointerCapture).toBeLessThan(brushStart);
+    expect(pendingReturn).toBeLessThan(blockedBrushGuard);
     expect(begin).not.toContain("runtime.fillBaseColor({");
+    expect(begin).not.toContain("runtime.beginStroke({");
+    expect(begin).not.toContain("texturePaintSurfaceTool.begin({");
     expect(oneShot).toContain("pending.runtime.fillBaseColor({");
     expect(oneShot).toContain("color: pending.settings.color");
     expect(oneShot).toContain("tolerance: pending.settings.fillTolerance");
@@ -619,17 +639,18 @@ describe("Studio VRM texture-paint production integration boundary", () => {
 
   it("keeps idle and eyedropper guidance aligned with the selected tool", () => {
     expect(poserSource).toContain(
-      'texturePaintSettings.tool === "fill" ? "ColorDrop" : "브러시"',
+      "스포이드가 준비됐습니다. 캐릭터 표면을 한 번 누르면 색상만 가져오고 ColorDrop으로 돌아갑니다.",
     );
     expect(poserSource).toContain(
       "표면을 한 번 눌러 ColorDrop으로 채우세요. Ctrl/⌘+Z로 이 채우기를 되돌릴 수 있습니다.",
     );
-    expect(poserSource).toContain(
+    expect(poserSource).not.toContain(
       "표면을 끌어 칠하세요. Ctrl/⌘+Z로 이 텍스처 획을 되돌릴 수 있습니다.",
     );
+    expect(poserSource).toContain("STUDIO_VRM_SURFACE_BRUSH_UNAVAILABLE_REASON");
   });
 
-  it("offers an accessible F shortcut that toggles brush and ColorDrop safely", () => {
+  it("offers an accessible F shortcut that selects ColorDrop without re-enabling a brush", () => {
     const keyboard = sourceBetween(
       poserSource,
       'aria-keyshortcuts="F I"',
@@ -656,8 +677,9 @@ describe("Studio VRM texture-paint production integration boundary", () => {
       "setTexturePaintEyedropperActive(false)",
     );
     expect(keyboard.slice(fillShortcut)).toContain(
-      'tool: current.tool === "fill" ? "surface-brush" : "fill"',
+      'tool: "fill"',
     );
+    expect(keyboard.slice(fillShortcut)).not.toContain('tool: "surface-brush"');
   });
 
   it("keeps production ColorDrop behind the module Worker with no direct main-thread fallback", () => {

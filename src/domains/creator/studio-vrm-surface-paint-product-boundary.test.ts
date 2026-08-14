@@ -18,16 +18,23 @@ const panelSource = readFileSync(
 );
 
 describe("VRM V12 surface-paint product boundary", () => {
-  it("has a real non-test StudioVrmPoser caller without moving ownership into StudioPage", () => {
+  it("keeps the internal surface tool quarantined from the strict product pointer path", () => {
+    const begin = poserSource.slice(
+      poserSource.indexOf("const beginTexturePaint ="),
+      poserSource.indexOf("const moveTexturePaint ="),
+    );
+
     expect(poserSource).toContain('from "./studio-vrm-surface-paint-tool"');
     expect(poserSource).toContain("createStudioVrmSurfacePaintTool({");
-    expect(poserSource).toContain("texturePaintSurfaceTool.begin({");
-    expect(poserSource).toContain("texturePaintSurfaceTool.append(");
-    expect(poserSource).toContain("texturePaintSurfaceTool.finish(pointerId)");
-    expect(poserSource).toContain('tool: "surface-brush"');
+    expect(begin).toContain("isStudioVrmTexturePaintBrushProductBlocked(settings.tool)");
+    expect(begin).not.toContain("texturePaintSurfaceTool.begin({");
+    expect(begin).not.toContain("runtime.beginStroke({");
+    expect(poserSource).toContain('tool: "fill"');
     expect(poserSource).toContain("onPointerDown={beginTexturePaint}");
     expect(poserSource).toContain("onPointerMove={moveTexturePaint}");
     expect(poserSource).toContain("onPointerUp={finishTexturePaint}");
+    expect(panelSource).not.toContain('onSettingsChange({ tool: "surface-brush" })');
+    expect(panelSource).not.toContain('onSettingsChange({ tool: "brush" })');
     expect(pageSource).not.toContain("studio-vrm-surface-paint-tool");
   });
 
@@ -64,10 +71,14 @@ describe("VRM V12 surface-paint product boundary", () => {
     expect(poserSource).toContain("studioVrmSurfacePaintWorldUnitsPerCssPixel(");
   });
 
-  it("shows unsupported and failure states without adding an interactive readback", () => {
-    expect(panelSource).toContain("지원 범위: round 촉 · 혼색 없음");
-    expect(panelSource).toContain("stamp/image");
-    expect(panelSource).toContain("smudge/wet");
+  it("shows one honest Korean unavailable state without adding an interactive readback", () => {
+    expect(panelSource).toContain("표면 브러시 준비 중");
+    expect(panelSource).toContain("surfaceBrushUnavailableReason");
+    expect(poserSource).toContain("검증·승인된 3D 표면 브러시 엔진이 아직 연결되지 않아");
+    expect(poserSource).toContain("자체 라운드 촉으로 대체하지 않으며");
+    expect(poserSource).toContain("ColorDrop과 스포이드를 사용할 수 있습니다");
+    expect(panelSource).toContain("disabled\n            aria-disabled=\"true\"");
+    expect(panelSource).not.toContain("호환 폴백");
     expect(toolSource).toContain('code: "memory"');
     expect(toolSource).toContain('code: "upload"');
     expect(toolSource).toContain('deviceFailure ? "device-failure" : null');

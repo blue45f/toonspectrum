@@ -328,6 +328,52 @@ describe("Studio VRM texture-paint runtime", () => {
     expect(stampStudioVrmTexturePaintMaterialLocator(material, 2)).toBeNull();
   });
 
+  it("leaves texture bytes, dirty uploads, revision, and Undo untouched for blocked product brushes", async () => {
+    const source = new THREE.Texture();
+    source.flipY = false;
+    const sourcePixels = rgba(8, 8, [17, 23, 31, 255]);
+    const sourcePixelsBefore = sourcePixels.slice();
+    const scene = new THREE.Group();
+    const { material, mesh } = meshWithMap(source);
+    scene.add(mesh);
+    const canvas = canvasHarness();
+    const reader = imageReader(new Map([[source, readable(8, 8, sourcePixels)]]));
+    const runtime = createStudioVrmTexturePaintRuntime(scene, {
+      createCanvas: canvas.createCanvas,
+      readTextureImage: reader,
+    });
+    const beginStroke = vi.spyOn(runtime, "beginStroke");
+    const contentRevisionBefore = runtime.getContentRevision();
+    const textureVersionBefore = source.version;
+    const snapshotBefore = runtime.getSnapshot();
+    const exportedBefore = unwrap(runtime.exportPaintedTargets());
+
+    const attemptProductBrush = async (tool: "surface-brush" | "brush") => {
+      if (tool === "surface-brush" || tool === "brush") return;
+      unwrap(await runtime.beginStroke({ pointerId: 91, hit: hit(mesh), style: INK }));
+      unwrap(runtime.commitStroke(91));
+    };
+
+    await attemptProductBrush("surface-brush");
+    await attemptProductBrush("brush");
+
+    expect(beginStroke).not.toHaveBeenCalled();
+    expect(reader).not.toHaveBeenCalled();
+    expect(canvas.createCanvas).not.toHaveBeenCalled();
+    expect(canvas.canvases).toEqual([]);
+    expect(material.map).toBe(source);
+    expect(source.version).toBe(textureVersionBefore);
+    expect(sourcePixels).toEqual(sourcePixelsBefore);
+    expect(runtime.getContentRevision()).toBe(contentRevisionBefore);
+    expect(runtime.getSnapshot()).toEqual(snapshotBefore);
+    expect(runtime.getSnapshot().history).toMatchObject({
+      undoCount: 0,
+      redoCount: 0,
+      retainedBytes: 0,
+    });
+    expect(unwrap(runtime.exportPaintedTargets())).toEqual(exportedBefore);
+  });
+
   describe("base-color eyedropper", () => {
     it("samples an unprepared source without creating a target, history, or content revision", async () => {
       const source = new THREE.Texture();

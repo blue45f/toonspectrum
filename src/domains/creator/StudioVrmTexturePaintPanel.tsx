@@ -1,6 +1,5 @@
 import {
   AlertTriangle,
-  Eraser,
   PaintBucket,
   Paintbrush,
   Pipette,
@@ -38,6 +37,7 @@ export interface StudioVrmTexturePaintPanelProps {
   readonly settings: StudioVrmTexturePaintPanelSettings;
   readonly activeTargetId: string | null;
   readonly activeTextureLabel: string | null;
+  readonly surfaceBrushUnavailableReason: string;
   readonly status: string;
   readonly restoreError?: string | null;
   readonly strokeActive: boolean;
@@ -57,68 +57,11 @@ export interface StudioVrmTexturePaintPanelProps {
   readonly onRetryRestore?: () => void;
 }
 
-const BRUSHES: ReadonlyArray<{
-  readonly id: StudioStampBrushKind;
-  readonly label: string;
-  readonly description: string;
-}> = [
-  { id: "ink", label: "잉크", description: "선명하고 압력 반응이 큰 채색" },
-  { id: "pencil", label: "연필", description: "입자가 남는 거친 덧칠" },
-  { id: "airbrush", label: "에어", description: "부드러운 명암과 그라데이션" },
-  { id: "watercolor", label: "수채", description: "겹칠수록 농도가 쌓이는 워시" },
-];
-
-const BLENDS: ReadonlyArray<{
-  readonly id: StudioVrmTexturePaintBlendMode;
-  readonly label: string;
-}> = [
-  { id: "normal", label: "일반" },
-  { id: "multiply", label: "곱하기" },
-  { id: "screen", label: "스크린" },
-  { id: "overlay", label: "오버레이" },
-  { id: "erase", label: "지우개" },
-];
-
 const HEX_COLOR = /^#[0-9a-f]{6}$/iu;
 
 interface StudioVrmTexturePaintColorDraft {
   readonly sourceColor: string;
   readonly value: string;
-}
-
-function PercentageSlider({
-  id,
-  label,
-  value,
-  disabled,
-  onChange,
-}: {
-  readonly id: string;
-  readonly label: string;
-  readonly value: number;
-  readonly disabled: boolean;
-  readonly onChange: (value: number) => void;
-}) {
-  return (
-    <label htmlFor={id} className="grid grid-cols-[3rem_minmax(0,1fr)_2.7rem] items-center gap-2 text-xs">
-      <span className="font-semibold text-fg-2">{label}</span>
-      <input
-        id={id}
-        type="range"
-        min="0.03"
-        max="1"
-        step="0.01"
-        value={value}
-        disabled={disabled}
-        aria-label={label}
-        className="h-2 min-w-0 accent-accent disabled:cursor-not-allowed disabled:opacity-45"
-        onChange={(event) => onChange(Number(event.target.value))}
-      />
-      <output htmlFor={id} className="text-right text-[0.68rem] tabular-nums text-fg-3">
-        {Math.round(value * 100)}%
-      </output>
-    </label>
-  );
 }
 
 export function StudioVrmTexturePaintPanel({
@@ -127,6 +70,7 @@ export function StudioVrmTexturePaintPanel({
   settings,
   activeTargetId,
   activeTextureLabel,
+  surfaceBrushUnavailableReason,
   status,
   restoreError,
   strokeActive,
@@ -142,8 +86,6 @@ export function StudioVrmTexturePaintPanel({
   onRetryRestore,
 }: StudioVrmTexturePaintPanelProps) {
   const editingDisabled = disabled || strokeActive;
-  const brushTool = settings.tool !== "fill";
-  const surfaceBrushTool = settings.tool === "surface-brush";
   const hasActiveTexture = activeTargetId !== null;
   const [resetConfirmationTarget, setResetConfirmationTarget] = useState<string | null>(null);
   const resetArmed =
@@ -211,9 +153,8 @@ export function StudioVrmTexturePaintPanel({
           <div className="min-w-0">
             <h3 className="text-sm font-bold text-fg">3D 표면 페인트</h3>
             <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
-              표면을 직접 칠하거나 ColorDrop으로 연결 영역을 한 번에 채웁니다. UV 아일랜드를
-              감지해 멀리 떨어진 면 사이의 선 연결을 막고, 결과는 삽입 이미지와 캡처에 바로
-              반영됩니다. 스포이드 버튼 또는 Alt+클릭으로 현재 baseColor 색을 가져올 수 있습니다.
+              ColorDrop으로 연결 영역을 한 번에 채우고, 스포이드 버튼 또는 Alt+클릭으로 현재
+              baseColor 색을 가져옵니다. 결과는 삽입 이미지와 캡처에 바로 반영됩니다.
             </p>
           </div>
         </div>
@@ -265,35 +206,18 @@ export function StudioVrmTexturePaintPanel({
 
       <fieldset disabled={editingDisabled} className="space-y-2 disabled:opacity-60">
         <legend className="mb-2 text-xs font-bold text-fg">표면 도구</legend>
-        <div className="grid grid-cols-3 gap-1.5" role="group" aria-label="표면 페인트 도구">
+        <div className="grid grid-cols-2 gap-1.5" role="group" aria-label="표면 페인트 도구">
           <button
             type="button"
-            aria-pressed={surfaceBrushTool}
-            title="실제 R3F ray hit를 UV chart별로 나눠 한 번의 atlas transaction으로 저장합니다."
-            className={cn(
-              "inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border px-1 text-[0.64rem] font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
-              surfaceBrushTool
-                ? "border-accent/60 bg-accent-soft text-accent"
-                : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg",
-            )}
-            onClick={() => onSettingsChange({ tool: "surface-brush" })}
+            disabled
+            aria-disabled="true"
+            aria-describedby="vrm-surface-brush-unavailable-reason"
+            aria-pressed="false"
+            title={surfaceBrushUnavailableReason}
+            className="inline-flex min-h-11 cursor-not-allowed items-center justify-center gap-1.5 rounded-lg border border-line bg-card px-2 text-[0.66rem] font-bold text-fg-3 opacity-55"
           >
             <Paintbrush size={14} aria-hidden />
-            V12 UV
-          </button>
-          <button
-            type="button"
-            aria-pressed={settings.tool === "brush"}
-            className={cn(
-              "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-2 text-[0.68rem] font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
-              settings.tool === "brush"
-                ? "border-accent/60 bg-accent-soft text-accent"
-                : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg",
-            )}
-            onClick={() => onSettingsChange({ tool: "brush" })}
-          >
-            <Paintbrush size={14} aria-hidden />
-            호환
+            표면 브러시
           </button>
           <button
             type="button"
@@ -312,53 +236,22 @@ export function StudioVrmTexturePaintPanel({
           </button>
         </div>
         <p className="text-[0.64rem] leading-relaxed text-fg-3">
-          {settings.tool === "fill"
-            ? "표면을 한 번 눌러 채웁니다. 계산은 기기 안에서 처리되며 텍스처 경계를 넘어 번지지 않습니다."
-            : surfaceBrushTool
-              ? "R3F 포인터 획을 BrushProgramIR·StrokeIR로 보존하고 UV chart 경계에서 run을 나눈 뒤 한 번만 저장합니다."
-              : "기존 라운드 팁 경로로 표면을 끌어 칠합니다. V12 UV 경로를 사용할 수 없을 때의 호환 폴백입니다."}
+          표면을 한 번 눌러 채웁니다. 계산은 기기 안에서 처리되며 텍스처 경계를 넘어 번지지 않습니다.
         </p>
       </fieldset>
 
-      {surfaceBrushTool ? (
-        <div
-          className="rounded-lg border border-line bg-card/60 px-3 py-2.5 text-[0.64rem] leading-relaxed text-fg-3"
-          role="note"
-          data-testid="vrm-surface-brush-capability"
-        >
-          <span className="block font-bold text-fg-2">지원 범위: round 촉 · 혼색 없음</span>
-          stamp/image 촉과 smudge/wet 혼색은 검증된 sampler·texture-neighborhood backend가 없어
-          명시적으로 지원하지 않습니다. 이 의미를 호환 브러시로 조용히 바꾸지 않습니다.
-        </div>
-      ) : null}
-
-      {settings.tool === "brush" ? (
-        <fieldset disabled={editingDisabled} className="space-y-3 disabled:opacity-60">
-          <legend className="mb-2 text-xs font-bold text-fg">브러시 촉</legend>
-          <div className="grid grid-cols-4 gap-1" role="group" aria-label="표면 페인트 브러시">
-            {BRUSHES.map((brush) => {
-              const selected = settings.brushKind === brush.id;
-              return (
-                <button
-                  key={brush.id}
-                  type="button"
-                  aria-pressed={selected}
-                  title={brush.description}
-                  className={cn(
-                    "min-h-11 rounded-lg border px-1 text-[0.66rem] font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
-                    selected
-                      ? "border-accent/60 bg-accent-soft text-accent"
-                      : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg",
-                  )}
-                  onClick={() => onSettingsChange({ brushKind: brush.id })}
-                >
-                  {brush.label}
-                </button>
-              );
-            })}
-          </div>
-        </fieldset>
-      ) : null}
+      <div
+        id="vrm-surface-brush-unavailable-reason"
+        className="flex items-start gap-2 rounded-lg border border-warn/35 bg-warn/10 px-3 py-2.5 text-[0.64rem] leading-relaxed text-warn"
+        role="note"
+        data-testid="vrm-surface-brush-capability"
+      >
+        <AlertTriangle size={14} className="mt-0.5 shrink-0" aria-hidden />
+        <span className="min-w-0">
+          <span className="block font-bold text-fg-2">표면 브러시 준비 중</span>
+          {surfaceBrushUnavailableReason}
+        </span>
+      </div>
 
       <div className="space-y-3 border-t border-line pt-3">
         <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2">
@@ -370,9 +263,7 @@ export function StudioVrmTexturePaintPanel({
               id="vrm-surface-paint-color"
               type="color"
               value={settings.color}
-              disabled={
-                editingDisabled || (settings.tool === "brush" && settings.blend === "erase")
-              }
+              disabled={editingDisabled}
               aria-label="표면 페인트 색상 선택"
               className="size-11 shrink-0 cursor-pointer rounded-lg border border-line bg-card p-1 disabled:cursor-not-allowed disabled:opacity-45"
               onChange={(event) => {
@@ -399,9 +290,7 @@ export function StudioVrmTexturePaintPanel({
             <input
               type="text"
               value={colorDraft}
-              disabled={
-                editingDisabled || (settings.tool === "brush" && settings.blend === "erase")
-              }
+              disabled={editingDisabled}
               inputMode="text"
               maxLength={7}
               pattern="#[0-9A-Fa-f]{6}"
@@ -430,137 +319,55 @@ export function StudioVrmTexturePaintPanel({
           </div>
         </div>
 
-        {brushTool ? (
-          <>
-            <label htmlFor="vrm-surface-paint-size" className="grid grid-cols-[3rem_minmax(0,1fr)_3.5rem] items-center gap-2 text-xs">
-              <span className="font-semibold text-fg-2">크기</span>
-              <input
-                id="vrm-surface-paint-size"
-                type="range"
-                min="2"
-                max="256"
-                step="1"
-                value={settings.sizeTexels}
-                disabled={editingDisabled}
-                aria-label="크기"
-                className="h-2 min-w-0 accent-accent disabled:cursor-not-allowed disabled:opacity-45"
-                onChange={(event) => onSettingsChange({ sizeTexels: Number(event.target.value) })}
-              />
-              <output htmlFor="vrm-surface-paint-size" className="text-right text-[0.68rem] tabular-nums text-fg-3">
-                {Math.round(settings.sizeTexels)} px
-              </output>
-            </label>
-
-            <PercentageSlider
-              id="vrm-surface-paint-opacity"
-              label="불투명"
-              value={settings.opacity}
-              disabled={editingDisabled}
-              onChange={(opacity) => onSettingsChange({ opacity })}
-            />
-            <PercentageSlider
-              id="vrm-surface-paint-flow"
-              label="도포량"
-              value={settings.tuning.flow}
-              disabled={editingDisabled}
-              onChange={(flow) => onSettingsChange({ tuning: { flow } })}
-            />
-            <PercentageSlider
-              id="vrm-surface-paint-hardness"
-              label="경도"
-              value={settings.tuning.hardness}
-              disabled={editingDisabled}
-              onChange={(hardness) => onSettingsChange({ tuning: { hardness } })}
-            />
-            <PercentageSlider
-              id="vrm-surface-paint-min-size"
-              label="최소 굵기"
-              value={settings.tuning.minSize}
-              disabled={editingDisabled}
-              onChange={(minSize) => onSettingsChange({ tuning: { minSize } })}
-            />
-          </>
-        ) : (
-          <>
-            <label htmlFor="vrm-surface-fill-tolerance" className="grid grid-cols-[3rem_minmax(0,1fr)_3.5rem] items-center gap-2 text-xs">
-              <span className="font-semibold text-fg-2">허용치</span>
-              <input
-                id="vrm-surface-fill-tolerance"
-                type="range"
-                min="0"
-                max="255"
-                step="1"
-                value={settings.fillTolerance}
-                disabled={editingDisabled}
-                aria-label="ColorDrop 색상 허용치"
-                className="h-2 min-w-0 accent-accent disabled:cursor-not-allowed disabled:opacity-45"
-                onChange={(event) =>
-                  onSettingsChange({ fillTolerance: Number(event.target.value) })}
-              />
-              <output htmlFor="vrm-surface-fill-tolerance" className="text-right text-[0.68rem] tabular-nums text-fg-3">
-                {Math.round(settings.fillTolerance)}
-              </output>
-            </label>
-            <fieldset disabled={editingDisabled} className="space-y-2 disabled:opacity-60">
-              <legend className="text-xs font-semibold text-fg-2">채울 범위</legend>
-              <div className="grid grid-cols-2 gap-1.5" role="group" aria-label="ColorDrop 채울 범위">
-                {([
-                  ["contiguous", "연결 영역"],
-                  ["whole-material", "텍스처 전체"],
-                ] as const).map(([scope, label]) => (
-                  <button
-                    key={scope}
-                    type="button"
-                    aria-pressed={settings.fillScope === scope}
-                    className={cn(
-                      "min-h-11 rounded-lg border px-2 text-[0.66rem] font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
-                      settings.fillScope === scope
-                        ? "border-accent/60 bg-accent-soft text-accent"
-                        : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg",
-                    )}
-                    onClick={() => onSettingsChange({ fillScope: scope })}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-              <p className="text-[0.62rem] leading-relaxed text-fg-3">
-                {settings.fillScope === "contiguous"
-                  ? "누른 지점과 이어진 비슷한 색만 채웁니다."
-                  : "현재 텍스처 전체에서 비슷한 색을 찾습니다. 떨어진 UV 조각도 함께 바뀔 수 있습니다."}
-              </p>
-            </fieldset>
-          </>
-        )}
-      </div>
-
-      {settings.tool === "brush" ? (
-        <fieldset disabled={editingDisabled} className="border-t border-line pt-3 disabled:opacity-60">
-          <legend className="mb-2 text-xs font-bold text-fg">합성 방식</legend>
-          <div className="grid grid-cols-3 gap-1 sm:grid-cols-5" role="group" aria-label="표면 페인트 합성 방식">
-            {BLENDS.map((blend) => {
-              const selected = settings.blend === blend.id;
-              return (
-                <button
-                  key={blend.id}
-                  type="button"
-                  aria-pressed={selected}
-                  className={cn(
-                    "inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border px-1 text-[0.64rem] font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
-                    selected
-                      ? "border-accent/60 bg-accent-soft text-accent"
-                      : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg",
-                  )}
-                  onClick={() => onSettingsChange({ blend: blend.id })}
-                >
-                  {blend.id === "erase" ? <Eraser size={12} aria-hidden /> : null}
-                  {blend.label}
-                </button>
-              );
-            })}
+        <label htmlFor="vrm-surface-fill-tolerance" className="grid grid-cols-[3rem_minmax(0,1fr)_3.5rem] items-center gap-2 text-xs">
+          <span className="font-semibold text-fg-2">허용치</span>
+          <input
+            id="vrm-surface-fill-tolerance"
+            type="range"
+            min="0"
+            max="255"
+            step="1"
+            value={settings.fillTolerance}
+            disabled={editingDisabled}
+            aria-label="ColorDrop 색상 허용치"
+            className="h-2 min-w-0 accent-accent disabled:cursor-not-allowed disabled:opacity-45"
+            onChange={(event) =>
+              onSettingsChange({ fillTolerance: Number(event.target.value) })}
+          />
+          <output htmlFor="vrm-surface-fill-tolerance" className="text-right text-[0.68rem] tabular-nums text-fg-3">
+            {Math.round(settings.fillTolerance)}
+          </output>
+        </label>
+        <fieldset disabled={editingDisabled} className="space-y-2 disabled:opacity-60">
+          <legend className="text-xs font-semibold text-fg-2">채울 범위</legend>
+          <div className="grid grid-cols-2 gap-1.5" role="group" aria-label="ColorDrop 채울 범위">
+            {([
+              ["contiguous", "연결 영역"],
+              ["whole-material", "텍스처 전체"],
+            ] as const).map(([scope, label]) => (
+              <button
+                key={scope}
+                type="button"
+                aria-pressed={settings.fillScope === scope}
+                className={cn(
+                  "min-h-11 rounded-lg border px-2 text-[0.66rem] font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
+                  settings.fillScope === scope
+                    ? "border-accent/60 bg-accent-soft text-accent"
+                    : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg",
+                )}
+                onClick={() => onSettingsChange({ fillScope: scope })}
+              >
+                {label}
+              </button>
+            ))}
           </div>
+          <p className="text-[0.62rem] leading-relaxed text-fg-3">
+            {settings.fillScope === "contiguous"
+              ? "누른 지점과 이어진 비슷한 색만 채웁니다."
+              : "현재 텍스처 전체에서 비슷한 색을 찾습니다. 떨어진 UV 조각도 함께 바뀔 수 있습니다."}
+          </p>
         </fieldset>
-      ) : null}
+      </div>
 
       <div className="grid grid-cols-3 gap-2 border-t border-line pt-3">
         <button
