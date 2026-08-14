@@ -51,6 +51,16 @@ const EXCLUDED_WAVE2_IDS = [
   "blender_adaptive_power_wheelchair",
 ] as const;
 
+const EXCLUDED_EVERYDAY_V4_IDS = [
+  "smartphone",
+  "mug",
+  "book",
+  "cap",
+  "glasses",
+  "backpack",
+  "stethoscope",
+] as const;
+
 const GLB_MAGIC = 0x4654_6c67;
 const GLB_JSON_CHUNK = 0x4e4f_534a;
 const GENERATOR = "scripts/blender/generate_mapped_props_pack_v3.py";
@@ -92,11 +102,12 @@ function triangleCount(json: JsonRecord): number {
 
 describe("ToonSpectrum mapped Blender prop pack v3", () => {
   it("covers exactly the 21 mappings not already replaced by the v2 pack", () => {
-    expect(Object.keys(BLENDER_PROP_GLTF_URLS)).toHaveLength(27);
+    expect(Object.keys(BLENDER_PROP_GLTF_URLS)).toHaveLength(34);
     expect(WAVE3_PROPS).toHaveLength(21);
     const expectedIds = new Set([
       ...WAVE3_PROPS.map((gate) => gate.mappedId),
       ...EXCLUDED_WAVE2_IDS,
+      ...EXCLUDED_EVERYDAY_V4_IDS,
     ]);
     expect(new Set(Object.keys(BLENDER_PROP_GLTF_URLS))).toEqual(expectedIds);
     for (const gate of WAVE3_PROPS) {

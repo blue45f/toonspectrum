@@ -13,6 +13,7 @@ import {
   createVrmTwoBoneGripState,
   releaseVrmTwoBoneGripState,
 } from "./studio-vrm-prop-ik";
+import { applyStudioVrmPropTint } from "./studio-vrm-prop-material";
 import {
   resolvePropAttachment,
   resolveSecondaryHandConstraint,
@@ -166,6 +167,11 @@ export function StudioVrmPropAttachment({
   const secondary = definition ? resolveSecondaryPropTarget(definition, instance) : null;
   const secondaryActive = Boolean(secondary && secondary.influence > 0);
   const secondaryBone = secondary?.bone ?? null;
+
+  useEffect(() => {
+    if (!gltfObject || instance.color === null) return;
+    return applyStudioVrmPropTint(gltfObject, instance.propId, instance.color);
+  }, [gltfObject, instance.color, instance.propId]);
 
   function reportAttachmentStatus(status: StudioVrmProjectionAttachmentStatus) {
     if (attachmentStatusRef.current === status) return;

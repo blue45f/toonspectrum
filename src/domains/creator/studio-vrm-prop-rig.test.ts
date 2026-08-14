@@ -12,12 +12,14 @@ import {
   measureVrmPropRigMetrics,
   resolvePropAttachment,
   resolveSecondaryHandConstraint,
+  usesVrmPropFaceSocket,
   resolveSecondaryPropTarget,
   sanitizeVrmPropRigMetrics,
   scaleVrmPropRigMetrics,
   type VrmPropMetricBone,
 } from "./studio-vrm-prop-rig";
 import {
+  VRM_PROPS,
   createPropInstance,
   propDefById,
   type PropInstance,
@@ -118,10 +120,10 @@ describe("VRM 소품 리그 실측", () => {
     expect(metrics.handSockets.rightHand.source).toBe("measured");
     expect(Math.hypot(...metrics.handSockets.leftHand.position)).toBeGreaterThan(0.03);
     expect(Math.hypot(...metrics.handSockets.rightHand.position)).toBeGreaterThan(0.03);
-    // 얼굴 소켓: 눈 높이 전방 — Z(전방)가 Y보다 커 정수리가 아니라 얼굴 쪽.
+    // 얼굴 소켓: head 본의 시작점에서 실제 눈 높이와 얼굴 표면까지 유도한다.
     expect(metrics.faceSocket.source).not.toBe("fallback");
-    expect(metrics.faceSocket.position[2]).toBeGreaterThan(metrics.faceSocket.position[1]);
-    expect(metrics.faceSocket.position[2]).toBeGreaterThan(0.04);
+    expect(metrics.faceSocket.position[1] / metrics.head).toBeCloseTo(0.5, 6);
+    expect(metrics.faceSocket.position[2] / metrics.head).toBeCloseTo(0.58, 6);
   });
 
   it("좌우 손의 palm basis가 반사되고 quaternion은 정규화된다", () => {
@@ -200,6 +202,69 @@ describe("얼굴 착용 소켓(선글라스)", () => {
     expectVecClose(result.socketPosition, metrics.faceSocket.position, 4);
     // 전방(+Z)이 충분해 얼굴 앞에 앉는다
     expect(result.position[2]).toBeGreaterThan(0.03);
+  });
+});
+
+describe("머리 소품의 face/bone socket 의미 계약", () => {
+  const FACE_WEAR_IDS = [
+    "glasses",
+    "sunglasses",
+    "faceMask",
+    "eyepatch",
+    "goggles",
+    "blender_cyber_visor",
+    "blender_cyber_glasses",
+  ] as const;
+  const BONE_WEAR_IDS = [
+    "cap",
+    "beret",
+    "crown",
+    "ribbon",
+    "surgicalCap",
+    "headphones",
+    "headband",
+    "flowerCrown",
+    "choker",
+    "catEars",
+    "horns",
+    "halo",
+    "beanie",
+    "earmuffs",
+    "hairpin",
+    "blender_tactical_helmet",
+  ] as const;
+
+  it("classifies every current head-category definition exhaustively", () => {
+    const headIds = VRM_PROPS
+      .filter((definition) => definition.category === "head")
+      .map((definition) => definition.id)
+      .sort();
+    expect(headIds).toEqual([...FACE_WEAR_IDS, ...BONE_WEAR_IDS].sort());
+    for (const id of FACE_WEAR_IDS) {
+      const definition = propDefById(id)!;
+      expect(definition.wearSocket, id).toBe("face");
+      expect(usesVrmPropFaceSocket(definition, "head"), id).toBe(true);
+      expect(usesVrmPropFaceSocket(definition, "neck"), `${id}/neck`).toBe(false);
+    }
+    for (const id of BONE_WEAR_IDS) {
+      const definition = propDefById(id)!;
+      expect(definition.wearSocket, id).toBe("bone");
+      expect(usesVrmPropFaceSocket(definition, definition.defaultBone), id).toBe(false);
+    }
+  });
+
+  it("keeps crown wear on its catalog head point and face wear on the derived face socket", () => {
+    const metrics = measureVrmPropRigMetrics(createMeasuredVrm());
+    const cap = resolvePropAttachment(propDefById("cap")!, createPropInstance("cap", "cap-socket")!, metrics);
+    const glasses = resolvePropAttachment(
+      propDefById("glasses")!,
+      createPropInstance("glasses", "glasses-socket")!,
+      metrics,
+    );
+    expect(cap.socketPosition).toEqual(propDefById("cap")!.defaultPosition);
+    expect(glasses.socketPosition).toEqual(metrics.faceSocket.position);
+    expect(metrics.faceSocket.position[1] / metrics.head).toBeCloseTo(0.5, 6);
+    expect(metrics.faceSocket.position[2] / metrics.head).toBeCloseTo(0.58, 6);
   });
 });
 

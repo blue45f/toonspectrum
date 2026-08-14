@@ -70,8 +70,15 @@ describe("VRM 소품 카탈로그", () => {
     expect(propsByCategory("body").length).toBeGreaterThan(0);
   });
 
-  it("Blender 27종의 안정 ID를 번들된 first-party GLB 경로에 정확히 연결한다", () => {
+  it("34개 안정 ID를 번들된 first-party GLB 경로에 정확히 연결한다", () => {
     const expected = {
+      smartphone: "/assets/3d/modern_smartphone_prop.glb",
+      mug: "/assets/3d/everyday_mug.glb",
+      book: "/assets/3d/everyday_book.glb",
+      cap: "/assets/3d/everyday_cap.glb",
+      glasses: "/assets/3d/everyday_glasses.glb",
+      backpack: "/assets/3d/everyday_backpack.glb",
+      stethoscope: "/assets/3d/medical_stethoscope.glb",
       blender_cyber_katana: "/assets/3d/cyber_katana.glb",
       blender_magic_staff: "/assets/3d/magic_staff_crystal.glb",
       blender_scifi_drone: "/assets/3d/scifi_drone_bot.glb",
@@ -104,6 +111,7 @@ describe("VRM 소품 카탈로그", () => {
     expect(BLENDER_PROP_GLTF_URLS).toEqual(expected);
     const blenderDefs = VRM_PROPS.filter((definition) => definition.id.startsWith("blender_"));
     expect(blenderDefs).toHaveLength(27);
+    expect(Object.keys(BLENDER_PROP_GLTF_URLS)).toHaveLength(34);
 
     for (const [id, url] of Object.entries(expected)) {
       expect(propDefById(id)?.geometrySource, id).toEqual({ kind: "gltf", url });
@@ -112,14 +120,17 @@ describe("VRM 소품 카탈로그", () => {
     }
   });
 
-  it("기존 소품은 명시적인 procedural 출처를 유지한다", () => {
-    const proceduralDefs = VRM_PROPS.filter((definition) => !definition.id.startsWith("blender_"));
+  it("업그레이드하지 않은 기존 소품은 명시적인 procedural 출처를 유지한다", () => {
+    const proceduralDefs = VRM_PROPS.filter((definition) => definition.geometrySource.kind === "procedural");
     expect(proceduralDefs.length).toBeGreaterThan(0);
     expect(proceduralDefs.every((definition) => definition.geometrySource.kind === "procedural"))
       .toBe(true);
+    for (const id of ["smartphone", "mug", "book", "cap", "glasses", "backpack", "stethoscope"]) {
+      expect(propDefById(id)?.geometrySource.kind, id).toBe("gltf");
+    }
   });
 
-  it("매핑된 Blender GLB 27개가 실제 mesh scene으로 파싱된다", async () => {
+  it("매핑된 first-party GLB 34개가 실제 mesh scene으로 파싱된다", async () => {
     const loader = new GLTFLoader();
     for (const url of Object.values(BLENDER_PROP_GLTF_URLS)) {
       const bytes = readFileSync(new URL(`../../../public${url}`, import.meta.url));
@@ -1056,7 +1067,7 @@ describe("소품 메시 빌더", () => {
     ) => ({ kind: "rounded-box" }));
     buildPropObject(
       three,
-      propDefById("smartphone")!,
+      propDefById("cape")!,
       null,
       { roundedBox },
     );

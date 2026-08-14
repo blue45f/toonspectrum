@@ -470,9 +470,10 @@ export function measureFaceSocket(
   if (!headNode || !headPos) return FALLBACK_FACE_SOCKET;
 
   const safeHead = clamp(headSize, METRIC_RANGES.head[0], METRIC_RANGES.head[1]);
-  // 눈 높이는 정수리 쪽이 아니라 머리 중심에서 약간 아래(−Y), 전방(+Z) — VRM head 로컬 관례.
-  const y = safeHead * 0.06;
-  const z = safeHead * 0.36;
+  // VRM head 본은 구의 중심이 아니라 목 바로 위에서 시작한다. 머리 치수의 절반만큼
+  // 올라가야 실제 눈 높이에 도달하며, 전방도 얼굴 표면에 맞춰 같은 비율로 유도한다.
+  const y = safeHead * 0.50;
+  const z = safeHead * 0.58;
   let source: PropMetricSource = "derived";
 
   // neck→head 방향이 있으면 고개를 든/숙인 rest 포즈에 맞춰 전방 축을 보정한다.
@@ -734,6 +735,11 @@ function primaryAnchor(def: PropDef, instance: PropInstance): PropAnchorDef {
     ?? def.anchors[0];
 }
 
+/** Definition-only placement contract; persisted instances remain schema-compatible. */
+export function usesVrmPropFaceSocket(def: PropDef, bone: PropAttachBone): boolean {
+  return bone === "head" && def.wearSocket === "face";
+}
+
 export interface ResolvedPropAttachment {
   bone: PropAttachBone;
   anchorId: string;
@@ -803,10 +809,9 @@ export function resolvePropAttachment(
   // rig가 존재하면 top-level V1 transform은 절대 base로 재사용하지 않는다.
   // 손 → 실측 palm socket, 머리 착용(선글라스 등) → face socket, 그 외 → 카탈로그 기본점.
   const handSocket = targetHand ? metrics.handSockets[targetHand] : null;
-  const faceWear =
-    !handSocket
-    && (instance.bone === "head" || instance.bone === "neck")
-    && (def.category === "head" || def.fit.reference === "eyeDistance" || def.fit.reference === "head");
+  // 얼굴 장비만 derived face socket을 사용한다. 모자·왕관·헬멧은 저장된 defaultPosition이
+  // 표현하는 head-bone 접점을 유지하고, neck으로 옮긴 항목도 임의로 얼굴에 재배치하지 않는다.
+  const faceWear = !handSocket && usesVrmPropFaceSocket(def, instance.bone);
   const faceSocket = faceWear ? metrics.faceSocket : null;
   const activeSocket = handSocket ?? faceSocket;
   const socketBasis = activeSocket

@@ -69,3 +69,26 @@ ToonSpectrum은 위 6개 원본 모델도 **CC0 1.0**으로 제공합니다.
 `neom_bench_prop.glb`의 `neom` 표기는 기존 앱 매핑과 저장된 프로젝트의 URL 호환성을
 유지하기 위해 그대로 둔 파일명입니다. ToonSpectrum은 위 21개 원본 모델도
 **CC0 1.0**으로 제공합니다.
+
+## ToonSpectrum 일상 소품 고품질 팩 v4
+
+아래 6개 GLB는 외부 모델·텍스처를 사용하지 않고 ToonSpectrum이 Blender 5.2와
+`scripts/blender/generate_everyday_props_pack_v4.py`로 직접 만든 절차형 3D 에셋입니다.
+Studio 추천 소품의 기존 직렬화 ID, 표시 이름, 장착 본, 앵커와 핏 프로필은 그대로 두고,
+단순 프리미티브 초안을 이름 있는 다중 부품, 접촉 노드, 베벨 디테일과 4개 이상의 PBR
+재질을 갖춘 자체 포함 모델로 교체했습니다. 모든 버퍼와 재질은 GLB 안에 포함되어 외부
+URI가 없습니다.
+
+| 파일 | 에셋 | 기준 크기 | 라이선스 |
+| --- | --- | --- | --- |
+| `everyday_mug.glb` | 손잡이 접촉부·음료 표면·테두리가 있는 머그컵 | 0.12 × 0.09 × 0.09 m | CC0 1.0 |
+| `everyday_book.glb` | 양손 그립 모서리·페이지 블록·금속 코너가 있는 책 | 0.17 × 0.24 × 0.05 m | CC0 1.0 |
+| `everyday_cap.glb` | 패널 솔기·곡면 챙·조절 스트랩이 있는 캡모자 | 0.22 × 0.27 × 0.17 m | CC0 1.0 |
+| `everyday_glasses.glb` | 렌즈·브리지·힌지·템플 암이 분리된 안경 | 0.16 × 0.17 × 0.07 m | CC0 1.0 |
+| `everyday_backpack.glb` | 어깨 스트랩·지퍼·포켓·등 접촉부가 있는 백팩 | 0.33 × 0.42 × 0.40 m | CC0 1.0 |
+| `medical_stethoscope.glb` | 이어팁·요크·이중 튜빙·체스트피스가 있는 청진기 | 0.22 × 0.18 × 0.29 m | CC0 1.0 |
+
+기본 `smartphone` 소품은 중복 바이너리를 만들지 않고 기존의 감사된
+`modern_smartphone_prop.glb`를 재사용합니다. 저장된 문서 호환성을 위해
+`blender_modern_smartphone` ID도 같은 URL을 계속 가리킵니다. ToonSpectrum은 위 6개
+원본 모델도 **CC0 1.0**으로 제공합니다.
