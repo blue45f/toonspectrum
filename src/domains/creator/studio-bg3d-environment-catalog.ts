@@ -16,6 +16,8 @@ export type StudioBg3dEnvironmentTheme =
   | "education"
   | "healthcare"
   | "heritage"
+  | "retail"
+  | "transit"
   | "fantasy"
   | "science-fiction";
 
@@ -24,7 +26,8 @@ export interface StudioBg3dEnvironmentProvenance {
   readonly author: "ToonSpectrum";
   readonly generator:
     | "scripts/blender/generate_environment_pack_v3.py"
-    | "scripts/blender/generate_environment_pack_v4.py";
+    | "scripts/blender/generate_environment_pack_v4.py"
+    | "scripts/blender/generate_environment_pack_v5.py";
   readonly blenderVersion: "5.2";
   readonly license: "CC0-1.0";
   readonly licenseUrl: "https://creativecommons.org/publicdomain/zero/1.0/";
@@ -70,6 +73,11 @@ const V3_PROVENANCE = Object.freeze({
 const V4_PROVENANCE = Object.freeze({
   ...V3_PROVENANCE,
   generator: "scripts/blender/generate_environment_pack_v4.py",
+} as const);
+
+const V5_PROVENANCE = Object.freeze({
+  ...V3_PROVENANCE,
+  generator: "scripts/blender/generate_environment_pack_v5.py",
 } as const);
 
 function defineEnvironment(
@@ -222,9 +230,55 @@ export const STUDIO_BG3D_ENVIRONMENT_ASSETS_V4 = Object.freeze([
   }, V4_PROVENANCE),
 ] as const satisfies readonly StudioBg3dEnvironmentAsset[]);
 
+export const STUDIO_BG3D_ENVIRONMENT_ASSETS_V5 = Object.freeze([
+  defineEnvironment({
+    id: "ts-bg3d-korean_convenience_store_night-v1",
+    name: "한국 편의점 · 야간",
+    description: "유리 전면·야간 간판·냉장고·진열대·계산대·즉석조리 코너를 갖춘 한국형 편의점 실내",
+    theme: "retail",
+    tags: ["convenience store", "retail", "night", "korea", "편의점", "야간", "매장"],
+    fileName: "korean_convenience_store_night.glb",
+    url: "/assets/3d/environments/korean_convenience_store_night.glb",
+    thumbnailUrl: "/assets/3d/environments/thumbnails/korean_convenience_store_night.png",
+    byteSize: 3_748_664,
+    sha256: "sha256:e31665694ca5ab05e09736d24623a4bfe14cc07b9f60bec261445f7dcf6f476e",
+    bounds: [10, 3.8, 8.9],
+    camera: { position: [8.8, 8.4, 17.8], target: [0, 1.35, 0.15], fovDegrees: 43 },
+  }, V5_PROVENANCE),
+  defineEnvironment({
+    id: "ts-bg3d-seoul_subway_platform-v1",
+    name: "서울 지하철 승강장",
+    description: "스크린도어·선로·점자 블록·노선 안내·벤치·기둥·CCTV를 따라 깊게 이동 가능한 도시철도 승강장",
+    theme: "transit",
+    tags: ["subway", "platform", "transit", "seoul", "지하철", "승강장", "서울"],
+    fileName: "seoul_subway_platform.glb",
+    url: "/assets/3d/environments/seoul_subway_platform.glb",
+    thumbnailUrl: "/assets/3d/environments/thumbnails/seoul_subway_platform.png",
+    byteSize: 3_734_156,
+    sha256: "sha256:d5670f9e0240402fbf69308bbbdfb936775c6a3c30420bd693f5747b71598669",
+    bounds: [13.9, 4.5, 20],
+    camera: { position: [-2.3, 2.25, 9.25], target: [0.2, 1.75, -3], fovDegrees: 38 },
+  }, V5_PROVENANCE),
+  defineEnvironment({
+    id: "ts-bg3d-fantasy_alchemist_workshop_library-v1",
+    name: "판타지 연금술 공방 · 서재",
+    description: "벽면 서재·중앙 연금술대·가마솥·증류기·포션 선반·수정과 약초가 채워진 마법 공방",
+    theme: "fantasy",
+    tags: ["fantasy", "alchemy", "workshop", "library", "연금술", "공방", "서재", "판타지"],
+    fileName: "fantasy_alchemist_workshop_library.glb",
+    url: "/assets/3d/environments/fantasy_alchemist_workshop_library.glb",
+    thumbnailUrl: "/assets/3d/environments/thumbnails/fantasy_alchemist_workshop_library.png",
+    byteSize: 3_610_428,
+    sha256: "sha256:c8aa1be5f39a09b369f21fef47455f1070117947973fdee73c4b24c7e6bf675c",
+    bounds: [12, 5.8, 10],
+    camera: { position: [15.2, 10.6, 17], target: [0, 2.05, -0.25], fovDegrees: 46 },
+  }, V5_PROVENANCE),
+] as const satisfies readonly StudioBg3dEnvironmentAsset[]);
+
 export const STUDIO_BG3D_ENVIRONMENT_ASSETS = Object.freeze([
   ...STUDIO_BG3D_ENVIRONMENT_ASSETS_V3,
   ...STUDIO_BG3D_ENVIRONMENT_ASSETS_V4,
+  ...STUDIO_BG3D_ENVIRONMENT_ASSETS_V5,
 ] as const satisfies readonly StudioBg3dEnvironmentAsset[]);
 
 const ENVIRONMENT_BY_ID = new Map(

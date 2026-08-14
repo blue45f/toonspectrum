@@ -16,6 +16,7 @@ import {
   STUDIO_BG3D_ENVIRONMENT_ASSETS,
   STUDIO_BG3D_ENVIRONMENT_ASSETS_V3,
   STUDIO_BG3D_ENVIRONMENT_ASSETS_V4,
+  STUDIO_BG3D_ENVIRONMENT_ASSETS_V5,
   getStudioBg3dEnvironmentAsset,
   getStudioBg3dEnvironmentAssetByHash,
   isStudioBg3dEnvironmentAssetId,
@@ -121,10 +122,11 @@ describe("Studio BG3D Blender 5.2 Wave 4 environment pack", () => {
     expect(STUDIO_BG3D_ENVIRONMENT_ASSETS).toEqual([
       ...STUDIO_BG3D_ENVIRONMENT_ASSETS_V3,
       ...STUDIO_BG3D_ENVIRONMENT_ASSETS_V4,
+      ...STUDIO_BG3D_ENVIRONMENT_ASSETS_V5,
     ]);
-    expect(STUDIO_BG3D_ENVIRONMENT_ASSETS).toHaveLength(9);
-    expect(new Set(STUDIO_BG3D_ENVIRONMENT_ASSETS.map(({ id }) => id)).size).toBe(9);
-    expect(new Set(STUDIO_BG3D_ENVIRONMENT_ASSETS.map(({ fileName }) => fileName)).size).toBe(9);
+    expect(STUDIO_BG3D_ENVIRONMENT_ASSETS).toHaveLength(12);
+    expect(new Set(STUDIO_BG3D_ENVIRONMENT_ASSETS.map(({ id }) => id)).size).toBe(12);
+    expect(new Set(STUDIO_BG3D_ENVIRONMENT_ASSETS.map(({ fileName }) => fileName)).size).toBe(12);
     expect(STUDIO_BG3D_ENVIRONMENT_ASSETS_V4.map(({ theme }) => theme)).toEqual([
       "healthcare",
       "education",
@@ -242,8 +244,8 @@ describe("Studio BG3D Blender 5.2 Wave 4 environment pack", () => {
     }
   });
 
-  it("publishes all nine samples at authored metres and centralizes bundled attachment provenance", async () => {
-    expect(SAMPLE_BG3D_MODEL_ENTRIES).toHaveLength(9);
+  it("publishes all twelve samples at authored metres and centralizes bundled attachment provenance", async () => {
+    expect(SAMPLE_BG3D_MODEL_ENTRIES).toHaveLength(12);
     expect(SAMPLE_BG3D_MODEL_ENTRIES.map(({ id }) => id)).toEqual(
       STUDIO_BG3D_ENVIRONMENT_ASSETS.map(({ id }) => id),
     );

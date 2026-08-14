@@ -3,7 +3,10 @@ import { useThree } from "@react-three/fiber";
 import { useEffect, useEffectEvent } from "react";
 import * as THREE from "three";
 
-import { readStudioBg3dWorldSurfaceHit } from "./studio-bg3d-camera-application";
+import {
+  isStudioBg3dViewportControlTarget,
+  readStudioBg3dWorldSurfaceHit,
+} from "./studio-bg3d-camera-application";
 import { STUDIO_BG3D_PLACEMENT_MAX_WORLD_COORDINATE } from "./studio-bg3d-placement-session";
 
 import type { StudioBg3dPlacementPointerTarget } from "./studio-bg3d-placement-session";
@@ -243,6 +246,9 @@ export function StudioBg3dPlacementPointerController({
 }: StudioBg3dPlacementPointerControllerProps) {
   const camera = useThree((state) => state.camera);
   const canvas = useThree((state) => state.gl.domElement);
+  const connectedEventTarget = useThree(
+    (state) => state.events.connected as HTMLElement | undefined,
+  );
   const emitMove = useEffectEvent(onMove);
   const emitCommit = useEffectEvent(onCommit);
   const emitCancel = useEffectEvent(onCancel);
@@ -250,6 +256,7 @@ export function StudioBg3dPlacementPointerController({
 
   useEffect(() => {
     if (!active || !canvas?.addEventListener) return undefined;
+    const pointerEventTarget = connectedEventTarget ?? canvas;
     const ownerWindow = canvas.ownerDocument?.defaultView;
     if (!ownerWindow) return undefined;
 
@@ -267,13 +274,18 @@ export function StudioBg3dPlacementPointerController({
       }, scratch);
     };
     const handlePointerMove = (event: PointerEvent) => {
-      if (disposed || event.isPrimary === false) return;
+      if (
+        disposed ||
+        event.isPrimary === false ||
+        isStudioBg3dViewportControlTarget(event.target)
+      ) return;
       const target = readTarget(event);
       if (target) emitMove(target, event.shiftKey);
     };
     const handlePointerDown = (event: PointerEvent) => {
+      if (disposed || isStudioBg3dViewportControlTarget(event.target)) return;
       blockPlacementPointerDown(event);
-      if (disposed || event.isPrimary === false || event.button !== 0) return;
+      if (event.isPrimary === false || event.button !== 0) return;
       const target = readTarget(event);
       if (target) emitCommit(target, event.shiftKey);
     };
@@ -304,19 +316,19 @@ export function StudioBg3dPlacementPointerController({
       emitRotate(direction);
     };
 
-    canvas.addEventListener("pointermove", handlePointerMove, { capture: true, passive: true });
-    canvas.addEventListener("pointerdown", handlePointerDown, { capture: true, passive: false });
+    pointerEventTarget.addEventListener("pointermove", handlePointerMove, { capture: true, passive: true });
+    pointerEventTarget.addEventListener("pointerdown", handlePointerDown, { capture: true, passive: false });
     ownerWindow.addEventListener("keydown", handleKeyDown, true);
     return () => {
       disposed = true;
-      canvas.removeEventListener("pointermove", handlePointerMove, true);
-      canvas.removeEventListener("pointerdown", handlePointerDown, true);
+      pointerEventTarget.removeEventListener("pointermove", handlePointerMove, true);
+      pointerEventTarget.removeEventListener("pointerdown", handlePointerDown, true);
       ownerWindow.removeEventListener("keydown", handleKeyDown, true);
       scratch.intersections.length = 0;
       scratch.roots.length = 0;
       scratch.rootSet.clear();
     };
-  }, [active, camera, canvas, objectsRef]);
+  }, [active, camera, canvas, connectedEventTarget, objectsRef]);
 
   return null;
 }
