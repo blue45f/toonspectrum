@@ -452,10 +452,10 @@ describe("bg3d-model-library format and metadata policy", () => {
     );
   });
 
-  it("ships only the nine audited CC0 environment samples as verified insertable entries", () => {
-    expect(SAMPLE_BG3D_MODELS).toHaveLength(9);
-    expect(SAMPLE_BG3D_MODEL_ENTRIES).toHaveLength(9);
-    expect(new Set(SAMPLE_BG3D_MODELS.map((sample) => sample.id)).size).toBe(9);
+  it("ships only the twelve audited CC0 environment samples as verified insertable entries", () => {
+    expect(SAMPLE_BG3D_MODELS).toHaveLength(12);
+    expect(SAMPLE_BG3D_MODEL_ENTRIES).toHaveLength(12);
+    expect(new Set(SAMPLE_BG3D_MODELS.map((sample) => sample.id)).size).toBe(12);
     expect(SAMPLE_BG3D_MODEL_ENTRIES).toEqual(SAMPLE_BG3D_MODELS.map((sample) =>
       expect.objectContaining({
         id: sample.id,

@@ -101,6 +101,7 @@ function renderController(
 beforeEach(() => {
   fiberMock.state = {
     camera: makeCamera(),
+    events: { connected: undefined },
     gl: { domElement: makeCanvas() },
   };
 });
@@ -231,6 +232,50 @@ describe("Studio BG3D placement raycast", () => {
 });
 
 describe("StudioBg3dPlacementPointerController", () => {
+  it("commits from the connected R3F event source when the canvas is pointer-transparent", () => {
+    const onCommit = vi.fn();
+    const state = fiberMock.state as {
+      events: { connected: HTMLElement | undefined };
+      gl: { domElement: HTMLCanvasElement };
+    };
+    const viewport = document.createElement("div");
+    document.body.append(viewport);
+    viewport.append(state.gl.domElement);
+    state.events.connected = viewport;
+
+    renderController({ onCommit });
+    viewport.dispatchEvent(makePointerEvent("pointerdown"));
+
+    expect(onCommit).toHaveBeenCalledOnce();
+    expect(onCommit.mock.calls[0]?.[0]).toEqual({ floorPoint: [0, 0] });
+  });
+
+  it("does not intercept placement controls inside the connected event source", () => {
+    const onCommit = vi.fn();
+    const controlPointerDown = vi.fn();
+    const state = fiberMock.state as {
+      events: { connected: HTMLElement | undefined };
+      gl: { domElement: HTMLCanvasElement };
+    };
+    const viewport = document.createElement("div");
+    const controls = document.createElement("div");
+    controls.dataset.bg3dViewportControl = "true";
+    const rotateButton = document.createElement("button");
+    rotateButton.addEventListener("pointerdown", controlPointerDown);
+    controls.append(rotateButton);
+    viewport.append(state.gl.domElement, controls);
+    document.body.append(viewport);
+    state.events.connected = viewport;
+
+    renderController({ onCommit });
+    const event = makePointerEvent("pointerdown");
+    expect(rotateButton.dispatchEvent(event)).toBe(true);
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(controlPointerDown).toHaveBeenCalledOnce();
+    expect(onCommit).not.toHaveBeenCalled();
+  });
+
   it("emits native primary-pointer hover and commit targets with Shift state", () => {
     const onMove = vi.fn();
     const onCommit = vi.fn();
