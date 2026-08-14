@@ -90,11 +90,21 @@ function settingsFor(
     : authored;
 }
 
+/**
+ * Planning dominates this file's runtime and every call is deterministic, so the same
+ * (brush, path, sample count) is planned once and shared. Marks are read-only here — the
+ * compositor and the SVG serializer only ever read them.
+ */
+const PLAN_CACHE = new Map<string, readonly StudioDynamicBrushCoverageMark[]>();
+
 function planMarks(
   brushId: (typeof STUDIO_DRY_MEDIA_CORE_IDS)[number],
   pinned: boolean,
   sampleCount = 90,
 ): readonly StudioDynamicBrushCoverageMark[] {
+  const cacheKey = `${brushId}:${pinned}:${sampleCount}`;
+  const cached = PLAN_CACHE.get(cacheKey);
+  if (cached) return cached;
   const dynamics = settingsFor(brushId, pinned);
   const identity = resolveStudioDynamicBrushMaterialIdentity(brushId);
   if (!identity) throw new Error(`missing ${brushId} identity`);
@@ -347,6 +357,14 @@ function blindMetricsOf(field: Float32Array): BlindMetrics {
   });
 }
 
+/**
+ * Planning five materials and rasterizing their union baselines costs tens of seconds of pure
+ * CPU. Nothing here asserts a duration — the assertions are deterministic parity and texture
+ * comparisons — so the clock only decides whether a busy machine turns a real verdict into a
+ * spurious failure. Latency is gated by the dedicated budget suites, not by this file.
+ */
+const PIXEL_PARITY_TIMEOUT_MS = 180_000;
+
 describe("dry-media kernel dab path (de-polygon)", () => {
   it("plans fresh core dry strokes with zero union polygons and kernel-textured primaries", () => {
     for (const brushId of STUDIO_DRY_MEDIA_CORE_IDS) {
@@ -367,7 +385,7 @@ describe("dry-media kernel dab path (de-polygon)", () => {
       expect(settingsFor(brushId, false).dryMediaUnionProgram, brushId)
         .toBeUndefined();
     }
-  });
+  }, PIXEL_PARITY_TIMEOUT_MS);
 
   it("keeps arbitrary causal suffix chunks byte-identical to the full kernel plan", () => {
     for (const brushId of ["crayon", "chalk"] as const) {
@@ -410,7 +428,7 @@ describe("dry-media kernel dab path (de-polygon)", () => {
       }
       expect(appended, brushId).toEqual(complete);
     }
-  });
+  }, PIXEL_PARITY_TIMEOUT_MS);
 
   it("measures kernel texture >= union tooth and <= union edge blur for the gated materials", async () => {
     const summary: Record<string, unknown> = {};
@@ -443,5 +461,5 @@ describe("dry-media kernel dab path (de-polygon)", () => {
     }
     // Numbers for the workstream summary (deterministic — identical on every run).
     expect(Object.keys(summary)).toHaveLength(5);
-  });
+  }, PIXEL_PARITY_TIMEOUT_MS);
 });
