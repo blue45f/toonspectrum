@@ -1525,6 +1525,12 @@ describe("도형 직렬화", () => {
         id: `${brush}-anisotropic-fibres`,
         kind: "freehand",
         brush,
+        // A freshly authored stroke stores its own dynamics, which is what carries the kernel
+        // pin. Without a snapshot this element is a LEGACY stroke, and the replay fail-safe
+        // deliberately keeps those on the union carrier so a saved document does not change
+        // when it is reopened — so the de-polygon path must be exercised the way the product
+        // actually produces it.
+        brushDynamics: studioBrushDynamicsSettingsForBrushId(brush) ?? undefined,
         points: [8, 12, 40, 20, 72, 12],
         pressures: [0.45, 0.8, 0.6],
         stroke: "#4455aa",

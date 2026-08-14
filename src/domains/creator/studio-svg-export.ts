@@ -53,7 +53,7 @@ import {
   planStudioDynamicBrushDabs,
   resolveStudioCapturedBrushDynamicsPresetId,
   studioDynamicBrushDepositPipelineUsesContinuation,
-  studioBrushDynamicsSettingsForBrushId,
+  studioReplaySafeBrushDynamicsSettingsForBrushId,
   studioBrushDynamicsSeedFromKey,
   type NormalizedStudioBrushDynamicsSettings,
   type StudioDynamicBrushDab,
@@ -1650,9 +1650,12 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
           el.brushCatalogId,
         ) ?? resolveStudioDynamicBrushMaterialIdentity(dynamicBrushId)!;
         const sourceDynamics = normalizeStudioBrushDynamicsSettings(
+          // Replay fail-safe shared with the canvas planner: an element that stored no snapshot
+          // must not inherit today's dry-media kernel pin, or the same document renders through
+          // the union carrier on screen and the kernel engine in an export.
           el.brushDynamics
-            ?? studioBrushDynamicsSettingsForBrushId(el.brush)
-            ?? studioBrushDynamicsSettingsForBrushId(dynamicBrushId)
+            ?? studioReplaySafeBrushDynamicsSettingsForBrushId(el.brush)
+            ?? studioReplaySafeBrushDynamicsSettingsForBrushId(dynamicBrushId)
         );
         const seed = studioBrushDynamicsSeedFromKey(
           `${el.id}:${sourceDynamics.seed}`,
@@ -2373,9 +2376,10 @@ function serializeFreehand(
     ((causalCoverageMarks !== undefined && causalCoverageMarks.length > 0) || (dynamicDabs !== undefined && dynamicDabs.length > 0))
   ) {
     const normalizedDynamics = dynamics ?? normalizeStudioBrushDynamicsSettings(
+      // Same replay fail-safe as serializeDraw and the canvas planner.
       el.brushDynamics
-        ?? studioBrushDynamicsSettingsForBrushId(brush)
-        ?? studioBrushDynamicsSettingsForBrushId(dynamicsPresetId)
+        ?? studioReplaySafeBrushDynamicsSettingsForBrushId(brush)
+        ?? studioReplaySafeBrushDynamicsSettingsForBrushId(dynamicsPresetId)
     );
     if (causalCoverageMarks) {
       const exactCoverage = serializeStudioDynamicCoverageMarks(
