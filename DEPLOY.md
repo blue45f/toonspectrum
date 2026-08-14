@@ -212,12 +212,15 @@ upgrade 전용이므로 base relation이 없으면 DDL 전에 실패하며, 새 
 승인 작업으로 먼저 완료해야 합니다. 앱의 build/start/health 명령에서는 DDL이나
 `drizzle-kit push`를 실행하지 않습니다.
 
-운영 migration release 순서는 다음과 같습니다.
+Vercel production은 `origin/main` push에 자동 배포됩니다(2026-08-14 소유자 결정). 이전에는
+`vercel.json`의 `ignoreCommand`가 `TOONSPECTRUM_APPROVED_PRODUCTION_SHA`와 커밋 SHA의 exact
+match를 요구해 릴리스마다 승인 SHA를 수동 회전해야 했습니다. 그 승인 단계는 제거했고, 대신
+**migration을 동반하는 release는 merge 전에 아래 순서를 끝내야 합니다** — 배포가 merge를 뒤따르므로
+더 이상 배포 시점에 기다려 주지 않습니다.
 
-1. reviewed release commit SHA를 확정합니다. Render는 `autoDeployTrigger: off`를 유지합니다.
-   Vercel production build는 `scripts/vercel-production-release-gate.mjs`가
-   `TOONSPECTRUM_APPROVED_PRODUCTION_SHA`와 `VERCEL_GIT_COMMIT_SHA`의 exact match 없이는
-   취소합니다.
+migration을 동반하는 release 순서는 다음과 같습니다. Render는 `autoDeployTrigger: off`를 유지합니다.
+
+1. reviewed release commit SHA를 확정합니다.
 2. 기존 DB upgrade라면 현재 Studio writer를 모두 drain하고 이전 binary가 새 mutation을 받지
    않는지 확인합니다. 특히 `0017` 최초 cutover와 최초 `adopt`에는 이 단계가 필수입니다.
 3. workflow에서 exact release SHA가 `origin/main`의 ancestor인지 확인하고
@@ -226,16 +229,11 @@ upgrade 전용이므로 base relation이 없으면 DDL 전에 실패하며, 새 
    사용하지 않습니다.
 4. migration과 full capability verification이 성공한 뒤 Cloudflare Worker·Render realtime canary를
    같은 SHA 기준으로 완료합니다.
-5. Vercel production 환경의 `TOONSPECTRUM_APPROVED_PRODUCTION_SHA`를 exact SHA로 설정하고 같은
-   commit을 수동 production redeploy합니다. 환경변수 변경은 새 deployment에만 반영되므로 기존
-   deployment 재사용으로 끝내면 안 됩니다.
-6. 다음 commit은 approved SHA와 달라 production build gate에서 다시 취소됩니다. 새 release마다
-   DB/realtime canary 후 승인 SHA를 회전하며 wildcard나 빈 값으로 gate를 우회하지 않습니다.
+5. 그 다음에 main으로 merge합니다. push가 곧 production 배포입니다.
 
-`vercel.json`의 repository gate와 Render의 수동 release 설정을 제거하면 Vercel Git Integration이
-database workflow 완료를 기다리지 않고 새 runtime을 먼저 띄울 수 있습니다. 따라서 gate 환경변수
-미설정/불일치가 build 진행으로 해석되거나 dashboard의 Ignored Build Step을 우회하도록 바꾸는 것은
-릴리스 차단 사유입니다.
+migration·realtime 계약을 건드리지 않는 순수 프론트엔드 release는 1~4단계에 해당 대상이 없으므로
+바로 merge하면 됩니다. 반대로 schema나 realtime 계약을 바꾸는 커밋을 canary 없이 main에 올리면
+새 runtime이 DB보다 먼저 뜰 수 있다는 위험은 그대로이며, 이제 그것을 막아 주는 자동 장치는 없습니다.
 
 PostgreSQL adapter는 listener와 publisher를 동시에 확보하기 때문에 풀 최솟값이 2이며, `pooler`
 호스트나 PgBouncer transaction endpoint는 사용할 수 없습니다. 원격/운영 URL은
