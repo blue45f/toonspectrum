@@ -47,8 +47,7 @@ describe("studio-mannequin-model 비례 수학", () => {
       params({ legLength: 1.2, armLength: 1.2 }),
       params({ build: 0 }),
       params({ build: 3, shoulderWidth: 1.3, pelvisWidth: 1.3 }),
-      STUDIO_MANNEQUIN_BODY_PRESETS.male.params,
-      STUDIO_MANNEQUIN_BODY_PRESETS.female.params,
+      ...Object.values(STUDIO_MANNEQUIN_BODY_PRESETS).map((preset) => preset.params),
     ];
     for (const bodyParams of cases) {
       const spec = buildStudioMannequinSpec(bodyParams);
@@ -110,6 +109,68 @@ describe("studio-mannequin-model 비례 수학", () => {
     const shoulderX = (spec: ReturnType<typeof buildStudioMannequinSpec>) =>
       studioMannequinRestJointPosition(spec, "leftUpperArm")[0] / spec.heightM;
     expect(shoulderX(male)).toBeGreaterThan(shoulderX(female));
+  });
+
+  it("모든 체형 프리셋은 클램프 왕복에서 조용히 변형되지 않는다", () => {
+    for (const [presetId, preset] of Object.entries(STUDIO_MANNEQUIN_BODY_PRESETS)) {
+      expect(clampStudioMannequinBodyParams(preset.params), presetId).toEqual(preset.params);
+    }
+    expect(buildStudioMannequinSpec(STUDIO_MANNEQUIN_BODY_PRESETS.chibi3.params).params.headCount)
+      .toBe(3.2);
+  });
+
+  it("어깨·팔꿈치·손목·고관절·무릎·발목에 데생용 관절구를 만든다", () => {
+    const spec = buildStudioMannequinSpec(params());
+    const jointBallIds = [
+      "leftUpperArm",
+      "leftLowerArm",
+      "leftHand",
+      "rightUpperArm",
+      "rightLowerArm",
+      "rightHand",
+      "leftUpperLeg",
+      "leftLowerLeg",
+      "leftFoot",
+      "rightUpperLeg",
+      "rightLowerLeg",
+      "rightFoot",
+    ] as const;
+    for (const jointId of jointBallIds) {
+      expect(
+        spec.primitives.some((primitive) =>
+          primitive.kind === "sphere"
+          && primitive.jointId === jointId
+          && primitive.center.every((value) => value === 0)
+          && primitive.radius > 0),
+        jointId,
+      ).toBe(true);
+    }
+  });
+
+  it("손과 발은 방향을 읽기 쉬운 비균등 타원체이고 양발 바닥은 y=0이다", () => {
+    const spec = buildStudioMannequinSpec(params());
+    for (const handId of ["leftHand", "rightHand"] as const) {
+      const palm = spec.primitives.find((primitive) =>
+        primitive.kind === "sphere"
+        && primitive.jointId === handId
+        && primitive.center[1] < 0);
+      expect(palm?.kind).toBe("sphere");
+      if (palm?.kind === "sphere") {
+        expect(palm.scale?.[0]).not.toBe(palm.scale?.[1]);
+        expect(palm.scale?.[2]).not.toBe(palm.scale?.[1]);
+      }
+    }
+
+    for (const footId of ["leftFoot", "rightFoot"] as const) {
+      const foot = spec.primitives.find((primitive) =>
+        primitive.kind === "sphere"
+        && primitive.jointId === footId
+        && primitive.center[1] < 0);
+      expect(foot?.kind).toBe("sphere");
+      if (foot?.kind !== "sphere" || !foot.scale) continue;
+      const footJointY = studioMannequinRestJointPosition(spec, footId)[1];
+      expect(footJointY + foot.center[1] - foot.radius * foot.scale[1]).toBeCloseTo(0, 12);
+    }
   });
 });
 

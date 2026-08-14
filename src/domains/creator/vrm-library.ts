@@ -138,12 +138,19 @@ export function isBundledVrmRightsBlocked(id: string): boolean {
 // (2026-06: madjin/vrm-samples VRoid 공식 샘플 + UniVRM Alicia Solid,
 //  2026-07: github.com/ToxSam/open-source-avatars 레지스트리의 Polygonal Mind
 //  100Avatars R1~R3 CC0 모델 71종 — 캐릭터/로봇/동물/판타지/SF/푸드 마스코트,
-//  그 중 OldMoustache·Eugenia는 "노인" 카테고리 보강).
+//  그 중 OldMoustache·Eugenia는 "노인" 카테고리 보강,
+//  2026-08: Blender MCP + VRM Add-on으로 제작한 ToonSpectrum 오리지널 VRM 1.0 6종).
 export const SAMPLE_VRMS: SampleVrm[] = [
   { id: SAMPLE_VRM_ID, name: "루미", url: SAMPLE_VRM_URL },
   { id: "avatar-a", name: "하린", url: "/vrm/AvatarSample_A.vrm" },
   { id: "avatar-b", name: "세라", url: "/vrm/AvatarSample_B.vrm" },
   { id: "avatar-c", name: "유나", url: "/vrm/AvatarSample_C.vrm" },
+  { id: "ts-minseo-campus", name: "민서 (캠퍼스 메이커)", url: "/vrm/TS_Minseo_Campus.vrm" },
+  { id: "ts-taeo-barista", name: "태오 (동네 바리스타)", url: "/vrm/TS_Taeo_Barista.vrm" },
+  { id: "ts-jeonghwa-gardener", name: "정화 (노년 정원사)", url: "/vrm/TS_Jeonghwa_Gardener.vrm" },
+  { id: "ts-haram-explorer", name: "하람 (어린 탐험가)", url: "/vrm/TS_Haram_Explorer.vrm" },
+  { id: "ts-yeonhui-rune-guard", name: "연휘 (룬 수호자)", url: "/vrm/TS_Yeonhui_RuneGuard.vrm" },
+  { id: "ts-nova-service-android", name: "노바 (서비스 안드로이드)", url: "/vrm/TS_Nova_ServiceAndroid.vrm" },
   { id: "shion", name: "시온", url: "/vrm/Sendagaya_Shibu.vrm" },
   { id: "vivi", name: "비비", url: "/vrm/Vivi.vrm" },
   { id: "vita", name: "비타", url: "/vrm/Vita.vrm" },
