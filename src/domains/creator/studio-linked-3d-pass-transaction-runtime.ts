@@ -153,6 +153,9 @@ export async function sequenceStudioLinked3dPassOwnerMutationRuntime<T>(
   ownerId: string,
   task: () => Promise<T>,
 ): Promise<T> {
+  if (authority.runOwnerMutationExclusive) {
+    return await authority.runOwnerMutationExclusive(ownerId, task);
+  }
   let tails = ownerMutationTails.get(authority);
   if (!tails) {
     tails = new Map();
@@ -184,15 +187,30 @@ export async function commitStudioLinked3dPreparedPassRuntime<T>(
         ...previousRefs,
         input.prepared.descriptor.artifact.contentHash,
       ])].toSorted();
-      await input.authority.setOwnerRefs(input.ownerId, nextRefs);
       try {
+        // Publication may mutate durable owner state and then lose its acknowledgement. Keep the
+        // attempted write inside the compensation boundary so every forward failure restores the
+        // exact snapshot captured under this same owner fence.
+        await input.authority.setOwnerRefs(input.ownerId, nextRefs);
         const result = input.apply(input.prepared.descriptor);
         if (result === false) {
           passError("commit-rejected", "Studio 문서가 3D pass commit을 거절했습니다.");
         }
         return result;
       } catch (cause) {
-        await input.authority.setOwnerRefs(input.ownerId, previousRefs).catch(() => undefined);
+        let rollbackFailure: unknown;
+        try {
+          await input.authority.setOwnerRefs(input.ownerId, previousRefs);
+        } catch (rollbackCause) {
+          rollbackFailure = rollbackCause;
+        }
+        if (rollbackFailure !== undefined) {
+          throw new AggregateError(
+            [cause, rollbackFailure],
+            "연결형 3D pass commit 실패 뒤 owner 참조를 되돌리지 못했습니다.",
+            { cause },
+          );
+        }
         throw cause;
       }
     },

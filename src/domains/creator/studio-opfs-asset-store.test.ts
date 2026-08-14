@@ -432,6 +432,100 @@ describe("studio-opfs-asset-store · 회수(mark-and-sweep)", () => {
 // ── 동시성 ──────────────────────────────────────────────────────────────
 
 describe("studio-opfs-asset-store · 동시 쓰기 안전성", () => {
+  it("독립 store가 origin-wide lock 안에서 fresh index를 읽어 갱신을 잃지 않는다", async () => {
+    const fs = createStudioOpfsMemoryFileSystem();
+    let tail: Promise<unknown> = Promise.resolve();
+    let active = 0;
+    let maximumActive = 0;
+    const mutationRunExclusive = <T>(task: () => Promise<T>): Promise<T> => {
+      const run = tail.then(async () => {
+        active += 1;
+        maximumActive = Math.max(maximumActive, active);
+        try {
+          return await task();
+        } finally {
+          active -= 1;
+        }
+      });
+      tail = run.catch(() => undefined);
+      return run;
+    };
+    const first = createStudioOpfsAssetStore({ fs, mutationRunExclusive });
+    const second = createStudioOpfsAssetStore({ fs, mutationRunExclusive });
+    // Both instances observe the initial empty index before their competing mutations.
+    await Promise.all([first.list(), second.list()]);
+
+    const [a, b] = await Promise.all([
+      first.put(bytesOf("탭 A 자산"), { mime: "text/plain" }),
+      second.put(bytesOf("탭 B 자산"), { mime: "text/plain" }),
+    ]);
+    await Promise.all([
+      first.setOwnerRefs("owner-a", [a.ref.hash]),
+      second.setOwnerRefs("owner-b", [b.ref.hash]),
+    ]);
+
+    const reopened = createStudioOpfsAssetStore({ fs });
+    expect(maximumActive).toBe(1);
+    expect((await reopened.list()).map(({ hash }) => hash).sort())
+      .toEqual([a.ref.hash, b.ref.hash].sort());
+    expect(await reopened.ownerRefs("owner-a")).toEqual([a.ref.hash]);
+    expect(await reopened.ownerRefs("owner-b")).toEqual([b.ref.hash]);
+  });
+
+  it("손상된 index를 empty로 덮지 않고 기존 blob과 owner를 보존한다", async () => {
+    const fs = createStudioOpfsMemoryFileSystem();
+    const store = createStudioOpfsAssetStore({ fs });
+    const existing = await store.put(bytesOf("기존 자산"), { mime: "text/plain" });
+    await store.setOwnerRefs("existing-owner", [existing.ref.hash]);
+    const blobBefore = fs.snapshot().get(existing.entry.path)!;
+    const corrupt = new TextEncoder().encode(JSON.stringify({
+      version: 1,
+      entries: [{
+        ...existing.entry,
+        path: "index.json",
+      }],
+      owners: [{ owner: "existing-owner", hashes: [existing.ref.hash], updatedAt: 1 }],
+    }));
+    await fs.write("index.json", corrupt);
+
+    await expect(store.put(bytesOf("신규 자산"), { mime: "text/plain" }))
+      .rejects.toMatchObject({ code: "CORRUPT_ENTRY" });
+    expect(fs.snapshot().get("index.json")).toEqual(corrupt);
+    expect(fs.snapshot().get(existing.entry.path)).toEqual(blobBefore);
+  });
+
+  it("미래 index 버전을 empty로 간주해 기존 owner를 덮지 않는다", async () => {
+    const fs = createStudioOpfsMemoryFileSystem();
+    const seed = createStudioOpfsAssetStore({ fs });
+    const existing = await seed.put(bytesOf("미래 버전 전 자산"), { mime: "text/plain" });
+    await seed.setOwnerRefs("existing-owner", [existing.ref.hash]);
+    const validIndex = fs.snapshot().get("index.json")!;
+    const futureDocument = JSON.parse(new TextDecoder().decode(validIndex)) as Record<string, unknown>;
+    futureDocument.version = 99;
+    const futureIndex = new TextEncoder().encode(JSON.stringify(futureDocument));
+    await fs.write("index.json", futureIndex);
+    const reopened = createStudioOpfsAssetStore({ fs });
+
+    await expect(reopened.setOwnerRefs("new-owner", [existing.ref.hash]))
+      .rejects.toMatchObject({ code: "CORRUPT_ENTRY" });
+    expect(fs.snapshot().get("index.json")).toEqual(futureIndex);
+    expect(fs.snapshot().get(existing.entry.path)).toBeDefined();
+  });
+
+  it("index 읽기 실패를 empty로 덮지 않고 mutation을 fail-closed 한다", async () => {
+    const fs = createStudioOpfsMemoryFileSystem();
+    const seed = createStudioOpfsAssetStore({ fs });
+    const existing = await seed.put(bytesOf("읽기 실패 전 자산"), { mime: "text/plain" });
+    await seed.setOwnerRefs("existing-owner", [existing.ref.hash]);
+    const before = fs.snapshot();
+    fs.restart({ failReadAfter: 1 });
+    const faulting = createStudioOpfsAssetStore({ fs });
+
+    await expect(faulting.setOwnerRefs("new-owner", [existing.ref.hash]))
+      .rejects.toMatchObject({ code: "READ_FAILED" });
+    expect(fs.snapshot()).toEqual(before);
+  });
+
   it("같은 자산을 동시에 20번 저장해도 파일은 하나이고 색인은 정확하다", async () => {
     const { store, fs } = memoryStore();
     const payload = jsonBytes(31, 1_200);

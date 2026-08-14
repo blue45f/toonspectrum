@@ -55,7 +55,26 @@ export interface StudioVrmTexturePaintLibraryOptions {
 export interface StudioVrmTexturePaintLibrarySaveResult {
   readonly receipt: StudioVrmTexturePaintArtifactMetadata;
   readonly deduplicated: boolean;
+  /** Present only when this call created the durable authority row. */
+  readonly creationReceipt: StudioVrmTexturePaintLibraryCreationReceipt | null;
+  /** Product-authority manifest generation for every write, including a raced reuse/repair. */
+  readonly mutationGeneration: number | null;
 }
+
+export type StudioVrmTexturePaintLibraryCreationReceipt =
+  | {
+      readonly schema: "toonspectrum.vrm-texture-paint-library-creation";
+      readonly version: 1;
+      readonly authority: "sqlite-opfs";
+      readonly contentHash: StudioVrmTexturePaintArtifactHash;
+      readonly generation: number;
+    }
+  | {
+      readonly schema: "toonspectrum.vrm-texture-paint-library-creation";
+      readonly version: 1;
+      readonly authority: "legacy-indexeddb";
+      readonly contentHash: StudioVrmTexturePaintArtifactHash;
+    };
 
 export type StudioVrmTexturePaintLibraryErrorCode =
   | "ABORTED"
@@ -102,6 +121,30 @@ interface StoredPaintArtifact {
 
 const CONTENT_HASH_PATTERN = /^sha256:[0-9a-f]{64}$/u;
 const STORED_RECORD_KEYS = ["contentHash", "png", "receipt"] as const;
+const LIVE_CREATION_RECEIPTS = new WeakSet<object>();
+const LEGACY_CREATION_RECEIPTS = new WeakMap<
+  IDBFactory,
+  Map<StudioVrmTexturePaintArtifactHash, StudioVrmTexturePaintLibraryCreationReceipt>
+>();
+
+function registerCreationReceipt(
+  receipt: StudioVrmTexturePaintLibraryCreationReceipt,
+): StudioVrmTexturePaintLibraryCreationReceipt {
+  const frozen = Object.freeze(receipt);
+  LIVE_CREATION_RECEIPTS.add(frozen);
+  return frozen;
+}
+
+function legacyCreationReceipts(
+  factory: IDBFactory,
+): Map<StudioVrmTexturePaintArtifactHash, StudioVrmTexturePaintLibraryCreationReceipt> {
+  let receipts = LEGACY_CREATION_RECEIPTS.get(factory);
+  if (!receipts) {
+    receipts = new Map();
+    LEGACY_CREATION_RECEIPTS.set(factory, receipts);
+  }
+  return receipts;
+}
 
 function libraryError(
   code: StudioVrmTexturePaintLibraryErrorCode,
@@ -565,12 +608,23 @@ export async function saveStudioVrmTexturePaintLibraryArtifact(
       return Object.freeze({
         receipt: result.receipt,
         deduplicated: result.deduplicated,
+        creationReceipt: result.created
+          ? registerCreationReceipt({
+              schema: "toonspectrum.vrm-texture-paint-library-creation",
+              version: 1,
+              authority: "sqlite-opfs",
+              contentHash: result.receipt.contentHash,
+              generation: result.generation,
+            })
+          : null,
+        mutationGeneration: result.generation,
       });
     } catch (cause) {
       throw repositoryError(cause, options.signal);
     }
   }
-  return withObjectStore("readwrite", options, async (store) => {
+  const factory = resolveIndexedDb(options);
+  const result = await withObjectStore("readwrite", options, async (store) => {
     const existingValue = await requestResult<unknown>(
       store.get(artifact.metadata.contentHash),
       options.signal,
@@ -588,6 +642,113 @@ export async function saveStudioVrmTexturePaintLibraryArtifact(
       deduplicated: existingValue !== undefined,
     });
   });
+  const receipts = legacyCreationReceipts(factory);
+  // Any overwrite/reuse makes an older creation receipt unsafe: the row may now be shared.
+  receipts.delete(artifact.metadata.contentHash);
+  const creationReceipt = result.deduplicated
+    ? null
+    : registerCreationReceipt({
+        schema: "toonspectrum.vrm-texture-paint-library-creation",
+        version: 1,
+        authority: "legacy-indexeddb",
+        contentHash: artifact.metadata.contentHash,
+      });
+  if (creationReceipt) receipts.set(artifact.metadata.contentHash, creationReceipt);
+  return Object.freeze({ ...result, creationReceipt, mutationGeneration: null });
+}
+
+/**
+ * Failed-import compensation. A forged, replayed, superseded, or cross-authority receipt is a
+ * no-op; user-facing deletion continues through its separate durable-delete path.
+ */
+export async function deleteStudioVrmTexturePaintLibraryArtifactIfCreationMatches(
+  receipt: StudioVrmTexturePaintLibraryCreationReceipt,
+  options: StudioVrmTexturePaintLibraryOptions = {},
+): Promise<boolean> {
+  if (!LIVE_CREATION_RECEIPTS.has(receipt)) return false;
+  LIVE_CREATION_RECEIPTS.delete(receipt);
+  const contentHash = strictContentHash(receipt.contentHash);
+  if (!usesLegacyIndexedDb(options)) {
+    if (receipt.authority !== "sqlite-opfs") return false;
+    try {
+      return await repository(options).deleteTextureIfCreationMatches(
+        contentHash,
+        receipt.generation,
+        options.signal,
+      );
+    } catch (cause) {
+      throw repositoryError(cause, options.signal);
+    }
+  }
+  if (receipt.authority !== "legacy-indexeddb") return false;
+  const factory = resolveIndexedDb(options);
+  const receipts = legacyCreationReceipts(factory);
+  if (receipts.get(contentHash) !== receipt) return false;
+  const deleted = await withObjectStore("readwrite", options, async (store) => {
+    const value = await requestResult<unknown>(store.get(contentHash), options.signal);
+    if (value === undefined) return false;
+    const record = storedRecord(value);
+    if (record.contentHash !== contentHash || record.receipt.contentHash !== contentHash) {
+      return false;
+    }
+    await requestResult(store.delete(contentHash), options.signal);
+    return true;
+  });
+  receipts.delete(contentHash);
+  return deleted;
+}
+
+/**
+ * Compensates one import's contiguous texture-manifest mutations in a single compare-and-delete.
+ * This is intentionally stricter than deleting each receipt independently: any interleaved or
+ * later manifest write makes the whole operation fail closed and preserves all shared data.
+ */
+export async function deleteStudioVrmTexturePaintLibraryCreationBatchIfMatches(
+  receipts: readonly StudioVrmTexturePaintLibraryCreationReceipt[],
+  mutationGenerations: readonly number[],
+  options: StudioVrmTexturePaintLibraryOptions = {},
+): Promise<boolean> {
+  if (receipts.length === 0) return true;
+  if (
+    receipts.some((receipt) => !LIVE_CREATION_RECEIPTS.has(receipt))
+    || new Set(receipts).size !== receipts.length
+  ) return false;
+  receipts.forEach((receipt) => LIVE_CREATION_RECEIPTS.delete(receipt));
+  if (!usesLegacyIndexedDb(options)) {
+    if (
+      receipts.some((receipt) => receipt.authority !== "sqlite-opfs")
+      || mutationGenerations.length < 1
+    ) return false;
+    try {
+      return await repository(options).deleteTexturesIfCreationBatchMatches(
+        receipts.map((receipt) => {
+          if (receipt.authority !== "sqlite-opfs") throw libraryError("TRANSACTION_FAILED");
+          return { contentHash: receipt.contentHash, generation: receipt.generation };
+        }),
+        mutationGenerations,
+        options.signal,
+      );
+    } catch (cause) {
+      throw repositoryError(cause, options.signal);
+    }
+  }
+  if (receipts.some((receipt) => receipt.authority !== "legacy-indexeddb")) return false;
+  const factory = resolveIndexedDb(options);
+  const live = legacyCreationReceipts(factory);
+  if (receipts.some((receipt) => live.get(receipt.contentHash) !== receipt)) return false;
+  const hashes = new Set(receipts.map((receipt) => receipt.contentHash));
+  const deleted = await withObjectStore("readwrite", options, async (store) => {
+    for (const contentHash of hashes) {
+      const value = await requestResult<unknown>(store.get(contentHash), options.signal);
+      if (value === undefined || storedRecord(value).contentHash !== contentHash) return false;
+    }
+    for (const contentHash of hashes) {
+      await requestResult(store.delete(contentHash), options.signal);
+    }
+    return true;
+  });
+  if (deleted) hashes.forEach((contentHash) => live.delete(contentHash));
+  return deleted;
 }
 
 /**

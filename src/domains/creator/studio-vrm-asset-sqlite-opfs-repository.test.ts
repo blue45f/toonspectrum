@@ -17,6 +17,7 @@ import {
 } from "./studio-vrm-asset-sqlite-opfs-repository";
 import { createStudioVrmTexturePaintArtifact } from "./studio-vrm-texture-paint-artifact";
 import {
+  deleteStudioVrmTexturePaintLibraryCreationBatchIfMatches,
   getStudioVrmTexturePaintLibraryArtifact,
   saveStudioVrmTexturePaintLibraryArtifact,
 } from "./studio-vrm-texture-paint-library";
@@ -26,6 +27,7 @@ import {
   listVrmLibraryEntries,
   queryUploadedVrmLibraryEntriesPage,
   saveVerifiedVrmBlob,
+  saveVerifiedVrmBlobWithDisposition,
 } from "./vrm-library";
 
 import type { StudioLocalDatabase } from "./studio-local-database";
@@ -189,6 +191,20 @@ describe("VRM asset SQLite/OPFS repository", () => {
     expect(await fileSystem.read(studioVrmAssetCommitPath(input.expectedHash))).not.toBeNull();
   });
 
+  it("compare-deletes only an exact private id + canonical hash compensation receipt", async () => {
+    const { repository } = await repositoryFixture();
+    const input = await modelInput("archive-created-row", "archive-created-row");
+    await repository.saveModel(input);
+    const otherHash = `sha256:${"f".repeat(64)}` as const;
+
+    await expect(repository.deleteModelIfIdentityMatches(input.id, otherHash)).resolves.toBe(false);
+    await expect(repository.getModel(input.id)).resolves.toMatchObject({ id: input.id });
+    await expect(
+      repository.deleteModelIfIdentityMatches(input.id, input.expectedHash),
+    ).resolves.toBe(true);
+    await expect(repository.getModel(input.id)).resolves.toBeNull();
+  });
+
   it("reopens the same SQLite manifest and OPFS root without legacy probing", async () => {
     const fixture = await repositoryFixture();
     const input = await modelInput("model-reopen");
@@ -340,6 +356,244 @@ describe("VRM asset SQLite/OPFS repository", () => {
     );
     expect(raw).toContain(artifact.metadata.contentHash);
     expect(raw).not.toContain("iVBOR");
+  });
+
+  it("batch-compensates only contiguous texture creations and refuses later/interleaved writes", async () => {
+    const firstFixture = await repositoryFixture();
+    const createArtifact = async (bindingKey: string, width: number) => {
+      const value = await createStudioVrmTexturePaintArtifact({
+        bindingKey,
+        source: png(width, 1),
+        expectedWidth: width,
+        expectedHeight: 1,
+      });
+      return {
+        value,
+        bytes: new Uint8Array(await value.archiveEntry.data.arrayBuffer()),
+      };
+    };
+    const first = await createArtifact("atomic:first", 2);
+    const second = await createArtifact("atomic:second", 3);
+    const firstSave = await firstFixture.repository.saveTexture({
+      receipt: first.value.metadata,
+      bytes: first.bytes,
+    });
+    const secondSave = await firstFixture.repository.saveTexture({
+      receipt: second.value.metadata,
+      bytes: second.bytes,
+    });
+    expect(firstSave).toMatchObject({ created: true, generation: 1 });
+    expect(secondSave).toMatchObject({ created: true, generation: 2 });
+    await expect(firstFixture.repository.deleteTexturesIfCreationBatchMatches(
+      [
+        { contentHash: first.value.metadata.contentHash, generation: firstSave.generation },
+        { contentHash: second.value.metadata.contentHash, generation: secondSave.generation },
+      ],
+      [firstSave.generation, secondSave.generation],
+    )).resolves.toBe(true);
+    await expect(firstFixture.repository.getTexture(first.value.metadata.contentHash)).resolves.toBeNull();
+    await expect(firstFixture.repository.getTexture(second.value.metadata.contentHash)).resolves.toBeNull();
+
+    const racedFixture = await repositoryFixture();
+    const racedFirst = await racedFixture.repository.saveTexture({
+      receipt: first.value.metadata,
+      bytes: first.bytes,
+    });
+    const external = await createArtifact("external", 4);
+    await racedFixture.repository.saveTexture({
+      receipt: external.value.metadata,
+      bytes: external.bytes,
+    });
+    const racedSecond = await racedFixture.repository.saveTexture({
+      receipt: second.value.metadata,
+      bytes: second.bytes,
+    });
+    await expect(racedFixture.repository.deleteTexturesIfCreationBatchMatches(
+      [
+        { contentHash: first.value.metadata.contentHash, generation: racedFirst.generation },
+        { contentHash: second.value.metadata.contentHash, generation: racedSecond.generation },
+      ],
+      [racedFirst.generation, racedSecond.generation],
+    )).resolves.toBe(false);
+    await expect(racedFixture.repository.getTexture(first.value.metadata.contentHash))
+      .resolves.toMatchObject({ receipt: first.value.metadata });
+
+    const laterWrite = await racedFixture.repository.saveTexture({
+      receipt: second.value.metadata,
+      bytes: second.bytes,
+    });
+    expect(laterWrite.created).toBe(false);
+    await expect(racedFixture.repository.deleteTextureIfCreationMatches(
+      second.value.metadata.contentHash,
+      racedSecond.generation,
+    )).resolves.toBe(false);
+    await expect(racedFixture.repository.getTexture(second.value.metadata.contentHash))
+      .resolves.toMatchObject({ receipt: second.value.metadata });
+  });
+
+  it("returns and compensates the product creation receipt when abort races after durable texture commit", async () => {
+    const database = await memoryDatabase();
+    const fileSystem = createStudioOpfsMemoryFileSystem();
+    const controller = new AbortController();
+    let abortAfterRoot = true;
+    let closeRepository: () => Promise<void> = async () => {};
+    const abortingDatabase = new Proxy(database, {
+      get(target, property, receiver) {
+        if (property === "kvSet") {
+          return async (namespace: string, key: string, value: string) => {
+            await target.kvSet(namespace, key, value);
+            if (
+              namespace === STUDIO_VRM_TEXTURE_SQLITE_NAMESPACE
+              && key === STUDIO_VRM_ASSET_SQLITE_MANIFEST_KEY
+              && abortAfterRoot
+            ) {
+              abortAfterRoot = false;
+              controller.abort();
+              await closeRepository();
+            }
+          };
+        }
+        const value = Reflect.get(target, property, receiver) as unknown;
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+    const repository = createStudioVrmAssetSqliteOpfsRepository({
+      acquireDatabase: async () => abortingDatabase,
+      fileSystem,
+    });
+    closeRepository = () => repository.close();
+    const artifact = await createStudioVrmTexturePaintArtifact({
+      bindingKey: "archive:abort-after-root/baseColor",
+      source: png(2, 2),
+      expectedWidth: 2,
+      expectedHeight: 2,
+    });
+
+    const saved = await saveStudioVrmTexturePaintLibraryArtifact(artifact, {
+      repository,
+      signal: controller.signal,
+    });
+    expect(controller.signal.aborted).toBe(true);
+    expect(saved).toMatchObject({
+      deduplicated: false,
+      creationReceipt: { authority: "sqlite-opfs", generation: 1 },
+      mutationGeneration: 1,
+    });
+    expect(saved.creationReceipt).not.toBeNull();
+    const reopened = createStudioVrmAssetSqliteOpfsRepository({
+      acquireDatabase: async () => database,
+      fileSystem,
+    });
+    await expect(deleteStudioVrmTexturePaintLibraryCreationBatchIfMatches(
+      [saved.creationReceipt!],
+      [saved.mutationGeneration!],
+      { repository: reopened },
+    )).resolves.toBe(true);
+    await expect(reopened.getTexture(artifact.metadata.contentHash)).resolves.toBeNull();
+  });
+
+  it("returns a created VRM disposition when close races immediately after durable model commit", async () => {
+    const database = await memoryDatabase();
+    const fileSystem = createStudioOpfsMemoryFileSystem();
+    let closeAfterRoot = true;
+    let closeRepository: () => Promise<void> = async () => {};
+    const closingDatabase = new Proxy(database, {
+      get(target, property, receiver) {
+        if (property === "kvSet") {
+          return async (namespace: string, key: string, value: string) => {
+            await target.kvSet(namespace, key, value);
+            if (
+              namespace === STUDIO_VRM_MODEL_SQLITE_NAMESPACE
+              && key === STUDIO_VRM_ASSET_SQLITE_MANIFEST_KEY
+              && closeAfterRoot
+            ) {
+              closeAfterRoot = false;
+              await closeRepository();
+            }
+          };
+        }
+        const value = Reflect.get(target, property, receiver) as unknown;
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+    const repository = createStudioVrmAssetSqliteOpfsRepository({
+      acquireDatabase: async () => closingDatabase,
+      fileSystem,
+    });
+    closeRepository = () => repository.close();
+    const input = await modelInput("archive-model-close-after-root");
+
+    const saved = await saveVerifiedVrmBlobWithDisposition({
+      name: input.name,
+      blob: new Blob([Uint8Array.from(input.bytes).buffer], { type: "model/gltf-binary" }),
+      expectedHash: input.expectedHash,
+    }, { repository });
+    expect(saved).toMatchObject({
+      created: true,
+      record: { contentHash: input.expectedHash },
+    });
+    const reopened = createStudioVrmAssetSqliteOpfsRepository({
+      acquireDatabase: async () => database,
+      fileSystem,
+    });
+    await expect(reopened.getModelByHash(input.expectedHash)).resolves.toMatchObject({
+      contentHash: input.expectedHash,
+    });
+    await expect(reopened.deleteModelIfIdentityMatches(
+      saved.record.id,
+      input.expectedHash,
+    )).resolves.toBe(true);
+  });
+
+  it("keeps the texture creation disposition when post-root diagnostic reads are unavailable", async () => {
+    const database = await memoryDatabase();
+    const fileSystem = createStudioOpfsMemoryFileSystem();
+    let rejectPostRootReads = false;
+    const diagnosticFaultDatabase = new Proxy(database, {
+      get(target, property, receiver) {
+        if (property === "kvSet") {
+          return async (namespace: string, key: string, value: string) => {
+            await target.kvSet(namespace, key, value);
+            if (
+              namespace === STUDIO_VRM_TEXTURE_SQLITE_NAMESPACE
+              && key === STUDIO_VRM_ASSET_SQLITE_MANIFEST_KEY
+            ) rejectPostRootReads = true;
+          };
+        }
+        if (property === "kvGet") {
+          return (namespace: string, key: string) => {
+            if (
+              rejectPostRootReads
+              && namespace === STUDIO_VRM_TEXTURE_SQLITE_NAMESPACE
+              && key === STUDIO_VRM_ASSET_SQLITE_MANIFEST_KEY
+            ) return Promise.reject(new Error("post-root diagnostic read unavailable"));
+            return target.kvGet(namespace, key);
+          };
+        }
+        const value = Reflect.get(target, property, receiver) as unknown;
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+    const repository = createStudioVrmAssetSqliteOpfsRepository({
+      acquireDatabase: async () => diagnosticFaultDatabase,
+      fileSystem,
+    });
+    const artifact = await createStudioVrmTexturePaintArtifact({
+      bindingKey: "archive:no-post-root-read/baseColor",
+      source: png(3, 2),
+      expectedWidth: 3,
+      expectedHeight: 2,
+    });
+    const bytes = new Uint8Array(await artifact.archiveEntry.data.arrayBuffer());
+
+    await expect(repository.saveTexture({ receipt: artifact.metadata, bytes })).resolves
+      .toMatchObject({ created: true, generation: 1 });
+    const reopened = createStudioVrmAssetSqliteOpfsRepository({
+      acquireDatabase: async () => database,
+      fileSystem,
+    });
+    await expect(reopened.getTexture(artifact.metadata.contentHash)).resolves
+      .toMatchObject({ receipt: artifact.metadata });
   });
 
   it("stores 129 texture artifacts across bounded metadata pages", async () => {

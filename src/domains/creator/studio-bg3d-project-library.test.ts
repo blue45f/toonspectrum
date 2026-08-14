@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   buildStudioProjectArchiveWithVerifiedBg3dModels,
+  installPreparedStudioBg3dProjectArchiveModelsAndApply,
   installStudioBg3dProjectArchiveModelsAndApply,
+  prepareStudioBg3dProjectArchiveImport,
   prepareStudioBg3dProjectArchiveAttachments,
   StudioBg3dProjectLibraryError,
   type StudioBg3dProjectLibraryDependencies,
@@ -19,7 +21,11 @@ import {
   type StudioProjectArchiveManifest,
 } from "./studio-project-archive";
 
-import type { Bg3dModelImportItem, Bg3dVerifiedStoredRecord } from "./bg3d-model-library";
+import type {
+  Bg3dModelAtomicImportDispositionV12,
+  Bg3dModelImportItem,
+  Bg3dVerifiedStoredRecord,
+} from "./bg3d-model-library";
 import type { StudioProjectFile } from "./studio-project-file";
 
 const HASH_A = "1".repeat(64);
@@ -431,5 +437,79 @@ describe("studio BG3D project-library bridge", () => {
       { importAtomically },
     )).rejects.toMatchObject({ code: "import-attachment-mismatch" });
     expect(importAtomically).not.toHaveBeenCalled();
+  });
+
+  it.each(["rejects", "throws", "compensation-fails"] as const)(
+    "prepare는 쓰지 않고 apply가 %s이면 exact created BG3D batch만 보상한다",
+    async (failure) => {
+      const result = importedResultFor(projectWithHashes([HASH_A]));
+      const created = storedRecord(HASH_A, "created-bg3d-row");
+      const disposition: Bg3dModelAtomicImportDispositionV12 = Object.freeze({
+        kind: "toonspectrum-bg3d-model-atomic-import",
+        version: 1,
+        manifestRevision: 7,
+        records: Object.freeze([created]),
+        created: Object.freeze([{ id: created.id, contentHash: created.contentHash }]),
+        removedDeletions: Object.freeze([]),
+      });
+      const importWithDisposition = vi.fn(async () => disposition);
+      const compensate = vi.fn(async (receipt: Bg3dModelAtomicImportDispositionV12) => {
+        expect(receipt).toBe(disposition);
+        return failure !== "compensation-fails";
+      });
+      const prepared = prepareStudioBg3dProjectArchiveImport(result, {}, {
+        importAtomicallyWithDisposition: importWithDisposition,
+        compensateImported: compensate,
+      });
+      expect(importWithDisposition).not.toHaveBeenCalled();
+
+      const commit = installPreparedStudioBg3dProjectArchiveModelsAndApply(
+        prepared,
+        prepared.project,
+        () => {
+          if (failure === "throws") throw new Error("apply exploded");
+          return false;
+        },
+        { didApply: (value) => value !== false },
+      );
+      if (failure === "throws") await expect(commit).rejects.toThrow("apply exploded");
+      else if (failure === "compensation-fails") {
+        await expect(commit).rejects.toThrow("안전하게 되돌리지 못했습니다");
+      } else await expect(commit).resolves.toEqual({ records: [], applyResult: false });
+      expect(importWithDisposition).toHaveBeenCalledTimes(1);
+      expect(compensate).toHaveBeenCalledTimes(1);
+      await expect(installPreparedStudioBg3dProjectArchiveModelsAndApply(
+        prepared,
+        prepared.project,
+        () => true,
+        { didApply: (value) => value },
+      )).rejects.toMatchObject({ code: "import-project-mismatch" });
+    },
+  );
+
+  it("ticket-style apply rejection preserves a deduplicated BG3D row", async () => {
+    const result = importedResultFor(projectWithHashes([HASH_A]));
+    const reused = storedRecord(HASH_A, "shared-bg3d-row");
+    const disposition: Bg3dModelAtomicImportDispositionV12 = Object.freeze({
+      kind: "toonspectrum-bg3d-model-atomic-import",
+      version: 1,
+      manifestRevision: 9,
+      records: Object.freeze([reused]),
+      created: Object.freeze([]),
+      removedDeletions: Object.freeze([]),
+    });
+    const compensate = vi.fn(async () => true);
+    const prepared = prepareStudioBg3dProjectArchiveImport(result, {}, {
+      importAtomicallyWithDisposition: vi.fn(async () => disposition),
+      compensateImported: compensate,
+    });
+
+    await expect(installPreparedStudioBg3dProjectArchiveModelsAndApply(
+      prepared,
+      prepared.project,
+      () => false,
+      { didApply: (value) => value },
+    )).resolves.toEqual({ records: [], applyResult: false });
+    expect(compensate).not.toHaveBeenCalled();
   });
 });

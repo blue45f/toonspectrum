@@ -7,7 +7,6 @@
  * explicit error that the UI can surface as unsaved/session-only state.
  */
 
-import { isStudioLocalDatabaseCommitOutcomeUnknownError } from "./studio-local-database-commit-outcome";
 import { acquireStudioLocalDatabase } from "./studio-local-database-runtime";
 import { createStudioOpfsAssetStore } from "./studio-opfs-asset-store";
 import { createStudioOpfsNativeFileSystem } from "./studio-opfs-filesystem";
@@ -355,39 +354,116 @@ export function createStudioBg3dLibrariesAuthority(
         const nextRefs = normalizeRefs(mutation.nextRefs);
         const unionRefs = normalizeRefs([...oldRefs, ...nextRefs]);
         const owner = ownerFor(slot);
-        let manifestCommitted = false;
+        const manifestKey = STUDIO_BG3D_LIBRARY_MANIFEST_KEYS[slot];
+        const publicationFailure = (cause: unknown) => authorityError(
+          "transaction-failed",
+          "BG3D CAS 기록 뒤 SQLite manifest 최종 커밋에 실패했습니다.",
+          cause,
+        );
+        const setReconciledOwnerRefs = async (
+          refs: readonly StudioOpfsContentHash[],
+          cause: unknown,
+          message: string,
+        ): Promise<void> => {
+          try {
+            await assets.setOwnerRefs(owner, refs);
+          } catch (reconciliationCause) {
+            throw authorityError(
+              "transaction-failed",
+              message,
+              new AggregateError(
+                [cause, reconciliationCause],
+                "BG3D manifest 커밋 오류와 CAS owner 재조정 오류가 함께 발생했습니다.",
+              ),
+            );
+          }
+        };
+        const readDurablePublicationState = async (
+          cause: unknown,
+        ): Promise<"candidate" | "old" | "third"> => {
+          let durableRaw: string | null;
+          try {
+            durableRaw = await database.kvGet(
+              STUDIO_BG3D_LIBRARIES_SQLITE_NAMESPACE,
+              manifestKey,
+            );
+          } catch (reconciliationCause) {
+            throw authorityError(
+              "transaction-failed",
+              "BG3D SQLite manifest 커밋 결과를 재확인하지 못했습니다.",
+              new AggregateError(
+                [cause, reconciliationCause],
+                "BG3D manifest 커밋 응답과 재확인 읽기가 함께 실패했습니다.",
+              ),
+            );
+          }
+          // Candidate wins the equality tie for a canonical no-op mutation. In that case both
+          // interpretations expose the same durable manifest, so returning its disposition is safe.
+          if (durableRaw === mutation.nextRaw) return "candidate";
+          if (durableRaw === currentRaw) return "old";
+          return "third";
+        };
+
         try {
           // Preserve both sides while the SQLite commit is still reversible. This closes deletion
           // races without exposing a newly referenced blob before its bytes have been verified.
           await assets.setOwnerRefs(owner, unionRefs);
+        } catch (cause) {
+          await setReconciledOwnerRefs(
+            oldRefs,
+            cause,
+            "BG3D manifest 게시 전 CAS owner를 이전 상태로 복구하지 못했습니다.",
+          );
+          if (cause instanceof StudioBg3dLibrariesAuthorityError) throw cause;
+          throw publicationFailure(cause);
+        }
+
+        try {
           throwIfAborted(signal);
+        } catch (cause) {
+          await setReconciledOwnerRefs(
+            oldRefs,
+            cause,
+            "취소된 BG3D manifest의 CAS owner를 이전 상태로 복구하지 못했습니다.",
+          );
+          throw cause;
+        }
+
+        try {
           await database.kvSet(
             STUDIO_BG3D_LIBRARIES_SQLITE_NAMESPACE,
-            STUDIO_BG3D_LIBRARY_MANIFEST_KEYS[slot],
+            manifestKey,
             mutation.nextRaw,
           );
-          manifestCommitted = true;
-          // The manifest is now authoritative; shrinking owner refs cannot make the commit torn.
-          await assets.setOwnerRefs(owner, nextRefs);
         } catch (cause) {
-          if (
-            !manifestCommitted
-            && !isStudioLocalDatabaseCommitOutcomeUnknownError(cause)
-          ) {
-            // A failed SQLite publication must not pin the newly written CAS payload forever.
-            // Restoring the old owner set is best-effort; the grace window still prevents unsafe
-            // collection if this repair itself is interrupted.
-            await assets.setOwnerRefs(owner, oldRefs).catch(() => []);
-          } else if (!manifestCommitted) {
-            // The Worker may have committed before its response was lost. Keep the old+new union
-            // pinned until a later reopen can reconcile it against the durable manifest.
+          // Do not trust the exception class as proof of commit outcome. A Worker/database adapter
+          // can surface a generic error after its durable autocommit. Exact readback is the only
+          // authority for deciding whether callers must receive the mutation disposition.
+          const state = await readDurablePublicationState(cause);
+          if (state === "candidate") {
+            // The root commit completed before the error surfaced. Continue and return the exact
+            // disposition so a higher-level failed project apply can compensate created rows.
+          } else if (state === "old") {
+            await setReconciledOwnerRefs(
+              oldRefs,
+              cause,
+              "미커밋 BG3D manifest의 CAS owner를 이전 상태로 복구하지 못했습니다.",
+            );
+            throw publicationFailure(cause);
+          } else {
+            // A third durable value cannot be attributed to this operation. The union was already
+            // installed, so preserve both sides and fail closed without collecting either set.
+            throw publicationFailure(cause);
           }
-          if (cause instanceof StudioBg3dLibrariesAuthorityError) throw cause;
-          throw authorityError(
-            "transaction-failed",
-            "BG3D CAS 기록 뒤 SQLite manifest 최종 커밋에 실패했습니다.",
-            cause,
-          );
+        }
+
+        try {
+          // The candidate manifest is durable; contraction is cleanup of the conservative union.
+          await assets.setOwnerRefs(owner, nextRefs);
+        } catch {
+          // Root kvSet is already known durable (resolved, or exact-candidate readback). Contraction
+          // is leak-only cleanup: both its pre-call union and commit-before-throw nextRefs retain all
+          // candidate blobs. Do not risk losing the exact mutation disposition on a diagnostic read.
         }
 
         // Cleanup is deliberately bounded. A suspiciously large index is left untouched for a

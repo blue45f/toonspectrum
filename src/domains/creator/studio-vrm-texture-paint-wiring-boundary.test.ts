@@ -330,7 +330,7 @@ describe("Studio VRM texture-paint wiring boundary", () => {
     const archiveImport = sourceBetween(
       projectArchiveSource,
       "async function handleImportProjectArchive(",
-      "return {",
+      "    } finally {",
     );
     const archiveRead = requiredIndex(archiveImport, "importStudioProjectArchive(file");
     const vrmRestore = requiredIndex(
@@ -338,20 +338,25 @@ describe("Studio VRM texture-paint wiring boundary", () => {
       "restoreStudioVrmProjectArchiveImport(",
       archiveRead,
     );
-    const paintRestore = requiredIndex(
+    const paintPrepare = requiredIndex(
       archiveImport,
-      "importStudioVrmTexturePaintProjectLibrary({",
+      "prepareStudioVrmTexturePaintProjectArchiveImport({",
       vrmRestore,
     );
     const postRestoreMutationGate = requiredIndex(
       archiveImport,
       "if (!canApplyStudioMutation(mutationTicket)) return;",
-      paintRestore,
+      paintPrepare,
+    );
+    const paintInstall = requiredIndex(
+      archiveImport,
+      "installPreparedStudioVrmTexturePaintProjectArchiveImportAndApply(",
+      postRestoreMutationGate,
     );
     const projectApply = requiredIndex(
       archiveImport,
       "applyStudioProjectSnapshotWithPreparedDocuments(",
-      postRestoreMutationGate,
+      paintInstall,
     );
     const presentation = requiredIndex(
       archiveImport,
@@ -364,17 +369,18 @@ describe("Studio VRM texture-paint wiring boundary", () => {
       presentation,
     );
 
-    const restoreArguments = archiveImport.slice(paintRestore, postRestoreMutationGate);
-    expect(restoreArguments).toContain("project: restoredVrmModels.project");
-    expect(restoreArguments).toContain(
-      "canonicalProject: restoredVrmModels.canonicalProject",
+    const prepareArguments = archiveImport.slice(paintPrepare, postRestoreMutationGate);
+    expect(prepareArguments).toContain("project: preparedVrmModels.project");
+    expect(prepareArguments).toContain(
+      "canonicalProject: preparedVrmModels.canonicalProject",
     );
-    expect(restoreArguments).toContain("manifest: result.manifest");
-    expect(restoreArguments).toContain("attachments: result.attachments");
+    expect(prepareArguments).toContain("manifest: result.manifest");
+    expect(prepareArguments).toContain("attachments: result.attachments");
     expect(archiveRead).toBeLessThan(vrmRestore);
-    expect(vrmRestore).toBeLessThan(paintRestore);
-    expect(paintRestore).toBeLessThan(postRestoreMutationGate);
-    expect(postRestoreMutationGate).toBeLessThan(projectApply);
+    expect(vrmRestore).toBeLessThan(paintPrepare);
+    expect(paintPrepare).toBeLessThan(postRestoreMutationGate);
+    expect(postRestoreMutationGate).toBeLessThan(paintInstall);
+    expect(paintInstall).toBeLessThan(projectApply);
     expect(projectApply).toBeLessThan(presentation);
     expect(presentation).toBeLessThan(statusUpdate);
   });

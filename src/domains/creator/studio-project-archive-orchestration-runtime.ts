@@ -8,6 +8,10 @@ import type { StudioProjectSnapshot } from "./studio-project-snapshot";
 import type { StudioPublicationAnalyticsDocument } from "./studio-publication-analytics";
 import type { StudioReleaseSchedule } from "./studio-release-schedule";
 import type { StudioReleaseScheduleRuntime } from "./studio-release-schedule-loader";
+import type {
+  StudioVrmProjectArchiveAttestationPlan,
+  StudioVrmProjectArchiveUseContextInput,
+} from "./studio-vrm-license-product-gate";
 import type { MutableRefObject } from "react";
 
 const MOBILE_PROJECT_ARCHIVE_LIMITS = Object.freeze({
@@ -21,6 +25,70 @@ type StudioProjectArchiveStatus = {
   readonly tone: "good" | "warn" | "bad";
   readonly text: string;
 };
+
+interface StudioVrmArchiveCompletenessGateInput {
+  readonly isComplete: boolean;
+  readonly missing: readonly unknown[];
+  readonly diagnostics: readonly {
+    readonly code: string;
+    readonly message: string;
+  }[];
+}
+
+const STUDIO_VRM_ARCHIVE_DIAGNOSTIC_PREVIEW_COUNT = 3;
+const STUDIO_VRM_ARCHIVE_DIAGNOSTIC_TEXT_CHARACTERS = 160;
+
+function boundedStudioVrmArchiveDiagnosticText(value: string): string {
+  const displaySafe = Array.from(value.normalize("NFKC"), (character) => {
+    const codePoint = character.codePointAt(0) ?? 0;
+    return codePoint <= 0x1f || (codePoint >= 0x7f && codePoint <= 0x9f)
+      ? " "
+      : character;
+  }).join("");
+  return Array.from(displaySafe
+    .replace(/\s+/gu, " ")
+    .trim())
+    .slice(0, STUDIO_VRM_ARCHIVE_DIAGNOSTIC_TEXT_CHARACTERS)
+    .join("");
+}
+
+export class StudioProjectArchiveIncompleteVrmError extends Error {
+  readonly code = "vrm-archive-incomplete" as const;
+  readonly missingCount: number;
+
+  constructor(missingCount: number, diagnosticSummary: string) {
+    super(
+      `VRM 원본 ${missingCount}개를 안전하게 포함할 수 없어 portable archive 내보내기를 중단했습니다.`
+      + (diagnosticSummary ? ` ${diagnosticSummary}` : ""),
+    );
+    this.name = "StudioProjectArchiveIncompleteVrmError";
+    this.missingCount = missingCount;
+  }
+}
+
+/** A portable project archive must never silently omit an attachment-backed VRM model. */
+export function assertCompleteStudioVrmProjectArchive(
+  result: StudioVrmArchiveCompletenessGateInput,
+): void {
+  if (result.isComplete && result.missing.length === 0) return;
+  const previews = result.diagnostics
+    .slice(0, STUDIO_VRM_ARCHIVE_DIAGNOSTIC_PREVIEW_COUNT)
+    .map(({ code, message }) => {
+      const boundedCode = boundedStudioVrmArchiveDiagnosticText(code);
+      const boundedMessage = boundedStudioVrmArchiveDiagnosticText(message);
+      return [boundedCode, boundedMessage].filter(Boolean).join(": ");
+    })
+    .filter(Boolean);
+  const omittedCount = Math.max(0, result.diagnostics.length - previews.length);
+  const diagnosticSummary = [
+    previews.join(" / "),
+    omittedCount > 0 ? `외 ${omittedCount}건` : "",
+  ].filter(Boolean).join(" · ");
+  throw new StudioProjectArchiveIncompleteVrmError(
+    result.missing.length,
+    diagnosticSummary,
+  );
+}
 
 function measureStudioProjectArchiveAttachment(
   attachment: { readonly data: Blob | Uint8Array | ArrayBuffer },
@@ -81,11 +149,73 @@ export interface StudioProjectArchiveOrchestrationInput {
     normalizeReleaseSchedule: (value: unknown) => StudioReleaseSchedule,
     publicationAnalytics: StudioPublicationAnalyticsDocument
   ) => boolean;
+  /** Injectable product UI seam; null/cancel always fails closed before archive materialization. */
+  readonly requestStudioVrmProjectArchiveUseContext?: (
+    plan: Extract<StudioVrmProjectArchiveAttestationPlan, { readonly ok: true }>
+  ) => Promise<StudioVrmProjectArchiveUseContextInput | null>;
   readonly setProjectArchiveBusy: (busy: boolean) => void;
   readonly setProjectArchiveStatus: (
     status: StudioProjectArchiveStatus | null
   ) => void;
   readonly setError: (message: string | null) => void;
+}
+
+const STUDIO_VRM_ARCHIVE_CONTENT_PROMPTS = Object.freeze([
+  ["excessivelyViolent", "과도한 폭력 콘텐츠"],
+  ["excessivelySexual", "과도한 성적 콘텐츠"],
+  ["politicalOrReligious", "정치·종교 콘텐츠"],
+  ["antisocialOrHate", "반사회·혐오 콘텐츠"],
+] as const);
+
+async function requestStudioVrmProjectArchiveUseContextFromBrowser(
+  plan: Extract<StudioVrmProjectArchiveAttestationPlan, { readonly ok: true }>,
+): Promise<StudioVrmProjectArchiveUseContextInput | null> {
+  const disclosure = plan.exactAttributionTexts
+    .map((text, index) => `${index + 1}. ${text || "(크레딧 불필요 선언)"}`)
+    .join("\n");
+  if (!globalThis.confirm(
+    `VRM 원본 ${plan.modelCount}개를 portable archive에 포함합니다.\n\n`
+    + `아래 저작자·라이선스 고지를 원본 안에 그대로 유지하는 데 동의해야 합니다.\n${disclosure}`,
+  )) return null;
+  const actor = globalThis.prompt(
+    `아바타 이용자 관계를 아래 값 중 하나로 정확히 입력하세요.\n${plan.permittedActorBases.join(" / ")}`,
+  );
+  if (!actor || !plan.permittedActorBases.includes(
+    actor as (typeof plan.permittedActorBases)[number],
+  )) return null;
+  const classifications: Record<string, "absent" | "present" | "unknown"> = {};
+  for (const [key, label] of STUDIO_VRM_ARCHIVE_CONTENT_PROMPTS) {
+    const value = globalThis.prompt(
+      `${label} 포함 여부를 absent / present / unknown 중 하나로 입력하세요.`,
+    );
+    if (value !== "absent" && value !== "present" && value !== "unknown") return null;
+    classifications[key] = value;
+  }
+  if (!globalThis.confirm(
+    "입력한 아바타 관계·4개 콘텐츠 분류와 위의 정확한 크레딧 유지 조건으로 archive를 만들까요?",
+  )) return null;
+  return {
+    confirmedByUser: true,
+    avatarPermissionBasis: actor as (typeof plan.permittedActorBases)[number],
+    confirmedAttributionTexts: [...plan.exactAttributionTexts],
+    excessivelyViolent: classifications.excessivelyViolent!,
+    excessivelySexual: classifications.excessivelySexual!,
+    politicalOrReligious: classifications.politicalOrReligious!,
+    antisocialOrHate: classifications.antisocialOrHate!,
+  };
+}
+
+function studioVrmArchiveAttestationInputMatchesPlan(
+  input: StudioVrmProjectArchiveUseContextInput,
+  plan: Extract<StudioVrmProjectArchiveAttestationPlan, { readonly ok: true }>,
+): boolean {
+  return plan.permittedActorBases.includes(
+    input.avatarPermissionBasis as (typeof plan.permittedActorBases)[number],
+  )
+    && input.confirmedAttributionTexts.length === plan.exactAttributionTexts.length
+    && input.confirmedAttributionTexts.every(
+      (text, index) => text === plan.exactAttributionTexts[index],
+    );
 }
 
 export interface StudioProjectArchiveOrchestration {
@@ -123,9 +253,12 @@ export function createStudioProjectArchiveOrchestration({
   filterMaskSurfaceArchiveDependencies,
   loadStudioReleaseScheduleRuntime,
   normalizeStudioPublicationAnalyticsDeferred,
+  captureStudioMutationTicket,
   canApplyStudioMutation,
   applyStudioProjectSnapshot,
   applyStudioProjectSnapshotWithPreparedDocuments,
+  requestStudioVrmProjectArchiveUseContext =
+    requestStudioVrmProjectArchiveUseContextFromBrowser,
   setProjectArchiveBusy,
   setProjectArchiveStatus,
   setError,
@@ -204,6 +337,8 @@ export function createStudioProjectArchiveOrchestration({
   async function handleExportProjectArchive() {
     if (!ensureSharedDocumentAvailableForExport()) return;
     if (projectArchiveBusy) return;
+    const exportMutationTicket = captureStudioMutationTicket();
+    if (!canApplyStudioMutation(exportMutationTicket)) return;
     setProjectArchiveBusy(true);
     setProjectArchiveStatus(null);
     let archiveExportController: AbortController | null = null;
@@ -214,7 +349,12 @@ export function createStudioProjectArchiveOrchestration({
       const [
         { buildStudioProjectArchiveWithVerifiedBg3dModels },
         { prepareStudioReferenceBoardArchiveExport },
-        { prepareStudioVrmProjectArchiveExport },
+        {
+          collectStudioVrmProjectArchiveReferences,
+          prepareStudioVrmProjectArchiveExport,
+          prepareStudioVrmProjectArchiveUseContextAttestation,
+        },
+        { createStudioVrmProjectArchiveUseContextReceipt },
         {
           prepareStudioVrmTexturePaintProjectArchiveExport,
           presentStudioVrmTexturePaintProjectArchiveExport,
@@ -234,6 +374,7 @@ export function createStudioProjectArchiveOrchestration({
         import("./studio-bg3d-project-library"),
         import("./studio-reference-board-archive"),
         import("./studio-vrm-project-library"),
+        import("./studio-vrm-license-product-gate"),
         import("./studio-vrm-texture-paint-project-library"),
         import("./studio-filter-mask-surface-archive"),
         import("./studio-linked-3d-pass-project-archive"),
@@ -241,6 +382,59 @@ export function createStudioProjectArchiveOrchestration({
         import("./studio-project-file"),
         import("./studio-export"),
       ]);
+      const sourceVrmFingerprint = JSON.stringify(
+        collectStudioVrmProjectArchiveReferences(sourceProject).map((reference) => ({
+          hash: reference.hash,
+          pointer: reference.pointer,
+          model: reference.model,
+        })),
+      );
+      const attestationPlan = await prepareStudioVrmProjectArchiveUseContextAttestation(
+        sourceProject,
+      );
+      if (!attestationPlan.ok) throw new Error(attestationPlan.message);
+      if (
+        !canApplyStudioMutation(exportMutationTicket)
+        || revisionProjectGenerationRef.current !== exportGeneration
+      ) {
+        throw new Error("VRM archive 확인을 열기 전에 프로젝트 범위가 변경되었습니다.");
+      }
+      let vrmUseContextReceipt = null;
+      if (attestationPlan.modelCount > 0) {
+        const attestationInput = await requestStudioVrmProjectArchiveUseContext(attestationPlan);
+        if (
+          !attestationInput
+          || !studioVrmArchiveAttestationInputMatchesPlan(attestationInput, attestationPlan)
+        ) {
+          throw new Error("VRM archive 이용 맥락 확인이 취소되었거나 원본 고지와 일치하지 않습니다.");
+        }
+        vrmUseContextReceipt = createStudioVrmProjectArchiveUseContextReceipt(attestationInput);
+      }
+      const currentVrmFingerprint = JSON.stringify(
+        collectStudioVrmProjectArchiveReferences(currentStudioProjectSnapshot()).map(
+          (reference) => ({
+            hash: reference.hash,
+            pointer: reference.pointer,
+            model: reference.model,
+          }),
+        ),
+      );
+      if (
+        !canApplyStudioMutation(exportMutationTicket)
+        || revisionProjectGenerationRef.current !== exportGeneration
+        || currentVrmFingerprint !== sourceVrmFingerprint
+      ) {
+        throw new Error("VRM archive 확인 중 프로젝트가 변경되어 오래된 내보내기를 취소했습니다.");
+      }
+      // Fail before any other archive materializer touches bytes. Filter-mask projection is then
+      // allowed to normalize the project, but its final snapshot must pass the same gate again so
+      // the VRM attachments always cover the exact project that reaches project.json.
+      let vrmArchive = await prepareStudioVrmProjectArchiveExport(
+        sourceProject,
+        {},
+        vrmUseContextReceipt,
+      );
+      assertCompleteStudioVrmProjectArchive(vrmArchive);
       let project: unknown = sourceProject;
       if (hasStudioFilterMaskSurfaceArchiveReferences(sourceProject)) {
         if (!workId || !filterMaskSurfaceArchiveDependencies) {
@@ -262,11 +456,21 @@ export function createStudioProjectArchiveOrchestration({
         }, filterMaskSurfaceArchiveDependencies);
         project = filterMaskArchive.project;
       }
-      if (revisionProjectGenerationRef.current !== exportGeneration) {
+      if (project !== sourceProject) {
+        vrmArchive = await prepareStudioVrmProjectArchiveExport(
+          project,
+          {},
+          vrmUseContextReceipt,
+        );
+        assertCompleteStudioVrmProjectArchive(vrmArchive);
+      }
+      if (
+        !canApplyStudioMutation(exportMutationTicket)
+        || revisionProjectGenerationRef.current !== exportGeneration
+      ) {
         throw new Error("프로젝트가 변경되어 오래된 archive 내보내기를 취소했습니다.");
       }
       const referenceArchive = await prepareStudioReferenceBoardArchiveExport(project);
-      const vrmArchive = await prepareStudioVrmProjectArchiveExport(project);
       const texturePaintAttachments =
         await prepareStudioVrmTexturePaintProjectArchiveExport({
           project,
@@ -304,7 +508,20 @@ export function createStudioProjectArchiveOrchestration({
       }, {
         limits: isMobile ? MOBILE_PROJECT_ARCHIVE_LIMITS : undefined,
       });
-      if (revisionProjectGenerationRef.current !== exportGeneration) {
+      const downloadVrmFingerprint = JSON.stringify(
+        collectStudioVrmProjectArchiveReferences(currentStudioProjectSnapshot()).map(
+          (reference) => ({
+            hash: reference.hash,
+            pointer: reference.pointer,
+            model: reference.model,
+          }),
+        ),
+      );
+      if (
+        !canApplyStudioMutation(exportMutationTicket)
+        || revisionProjectGenerationRef.current !== exportGeneration
+        || downloadVrmFingerprint !== sourceVrmFingerprint
+      ) {
         throw new Error("프로젝트가 변경되어 오래된 archive 다운로드를 취소했습니다.");
       }
       const warningCount = result.diagnostics.filter(
@@ -402,11 +619,21 @@ export function createStudioProjectArchiveOrchestration({
     try {
       const [
         { importStudioProjectArchive },
-        { installStudioBg3dProjectArchiveModelsAndApply },
-        { restoreStudioReferenceBoardArchiveImport },
-        { restoreStudioVrmProjectArchiveImport },
         {
-          importStudioVrmTexturePaintProjectLibrary,
+          installPreparedStudioBg3dProjectArchiveModelsAndApply,
+          prepareStudioBg3dProjectArchiveImport,
+        },
+        {
+          installPreparedStudioReferenceBoardArchiveImportAndApply,
+          prepareStudioReferenceBoardArchiveImport,
+        },
+        {
+          installPreparedStudioVrmProjectArchiveImportAndApply,
+          restoreStudioVrmProjectArchiveImport,
+        },
+        {
+          installPreparedStudioVrmTexturePaintProjectArchiveImportAndApply,
+          prepareStudioVrmTexturePaintProjectArchiveImport,
           presentStudioVrmTexturePaintProjectArchiveImport,
         },
         {
@@ -414,6 +641,7 @@ export function createStudioProjectArchiveOrchestration({
           restoreStudioLinked3dPassProjectArchiveImport,
         },
         { acquireStudioLinked3dPassProductAuthority },
+        { runStudioProjectArchiveFinalInstallExclusive },
         { normalizeStudioReleaseSchedule },
       ] = await Promise.all([
         import("./studio-project-archive"),
@@ -423,6 +651,7 @@ export function createStudioProjectArchiveOrchestration({
         import("./studio-vrm-texture-paint-project-library"),
         import("./studio-linked-3d-pass-project-archive"),
         import("./studio-linked-3d-pass-product-authority"),
+        import("./studio-project-archive-final-install-lock"),
         loadStudioReleaseScheduleRuntime(),
       ]);
       const result = await importStudioProjectArchive(file, {
@@ -430,63 +659,152 @@ export function createStudioProjectArchiveOrchestration({
         limits: isMobile ? MOBILE_PROJECT_ARCHIVE_LIMITS : undefined,
       });
       if (!canApplyStudioMutation(mutationTicket)) return;
-      const restoredReferences = await restoreStudioReferenceBoardArchiveImport(result);
+      const preparedReferences = await prepareStudioReferenceBoardArchiveImport(result);
       const restoredResult = {
         ...result,
-        project: restoredReferences.project,
-        canonicalProject: restoredReferences.canonicalProject,
+        project: preparedReferences.project,
+        canonicalProject: preparedReferences.canonicalProject,
       };
-      const restoredVrmModels = await restoreStudioVrmProjectArchiveImport(restoredResult);
+      const preparedVrmModels = await restoreStudioVrmProjectArchiveImport(restoredResult);
       if (!canApplyStudioMutation(mutationTicket)) return;
-      const restoredTexturePaint = await importStudioVrmTexturePaintProjectLibrary({
-        project: restoredVrmModels.project,
-        canonicalProject: restoredVrmModels.canonicalProject,
+      const preparedTexturePaint = await prepareStudioVrmTexturePaintProjectArchiveImport({
+        project: preparedVrmModels.project,
+        canonicalProject: preparedVrmModels.canonicalProject,
         manifest: result.manifest,
         attachments: result.attachments,
       });
       if (!canApplyStudioMutation(mutationTicket)) return;
       const portableResult = {
         ...restoredResult,
-        project: restoredVrmModels.project,
-        canonicalProject: restoredVrmModels.canonicalProject,
+        project: preparedVrmModels.project,
+        canonicalProject: preparedVrmModels.canonicalProject,
       };
+      const preparedBg3dModels = prepareStudioBg3dProjectArchiveImport(
+        portableResult,
+        {
+          limits: isMobile ? MOBILE_PROJECT_ARCHIVE_LIMITS : undefined,
+          verification: { profile: isMobile ? "mobile" : "desktop" },
+        },
+      );
       const publicationAnalyticsDocument =
         await normalizeStudioPublicationAnalyticsDeferred(
           portableResult.project.publicationAnalytics
         );
       if (!canApplyStudioMutation(mutationTicket)) return;
       let projectApplied = false;
+      let vrmCommitCompleted = false;
+      let vrmInstalledCount = 0;
+      let vrmReusedCount = 0;
+      let vrmUnresolvedCount = 0;
+      let referenceInstalledCount = 0;
+      let referenceReusedCount = 0;
+      let referenceUnresolvedCount = 0;
+      let background3dInstalledCount = 0;
+      let restoredTexturePaint = preparedTexturePaint.status === "ready"
+        ? {
+            status: "ready" as const,
+            sceneFingerprint: preparedTexturePaint.sceneFingerprint,
+            installed: 0,
+            reused: 0,
+            diagnostics: [] as readonly [],
+          }
+        : {
+            status: "unresolved" as const,
+            sceneFingerprint: preparedTexturePaint.sceneFingerprint,
+            installed: 0 as const,
+            reused: 0 as const,
+            diagnostics: preparedTexturePaint.diagnostics,
+          };
       const installAndApply = async (project: StudioProjectFile) => {
-        const importedForApply = { ...portableResult, project };
-        const installed = await installStudioBg3dProjectArchiveModelsAndApply(
-          importedForApply,
-          (preparedProject) => {
-          if (!canApplyStudioMutation(mutationTicket)) return;
-          projectApplied = applyStudioProjectSnapshotWithPreparedDocuments(
-            preparedProject,
-            normalizeStudioReleaseSchedule,
-            publicationAnalyticsDocument
-          );
-          return projectApplied;
-        },
-        {
-          limits: isMobile ? MOBILE_PROJECT_ARCHIVE_LIMITS : undefined,
-          verification: { profile: isMobile ? "mobile" : "desktop" },
-        }
+        if (!canApplyStudioMutation(mutationTicket)) return false;
+        const referenceCommit = await installPreparedStudioReferenceBoardArchiveImportAndApply(
+          preparedReferences,
+          project,
+          async (preparedReferenceProject) => {
+            if (!canApplyStudioMutation(mutationTicket)) return false;
+            const textureCommit =
+              await installPreparedStudioVrmTexturePaintProjectArchiveImportAndApply(
+                preparedTexturePaint,
+                preparedReferenceProject,
+                async (preparedTextureProject) => {
+                  if (!canApplyStudioMutation(mutationTicket)) return false;
+                  const vrmCommit = await installPreparedStudioVrmProjectArchiveImportAndApply(
+                    preparedVrmModels,
+                    preparedTextureProject,
+                    async (preparedVrmProject) => {
+                      if (!canApplyStudioMutation(mutationTicket)) return false;
+                      const bg3dCommit =
+                        await installPreparedStudioBg3dProjectArchiveModelsAndApply(
+                          preparedBg3dModels,
+                          preparedVrmProject,
+                          (preparedProject) => {
+                            if (!canApplyStudioMutation(mutationTicket)) return false;
+                            projectApplied = applyStudioProjectSnapshotWithPreparedDocuments(
+                              preparedProject,
+                              normalizeStudioReleaseSchedule,
+                              publicationAnalyticsDocument,
+                            );
+                            return projectApplied;
+                          },
+                          { didApply: (value) => value !== false },
+                        );
+                      if (bg3dCommit.applyResult === false) return false;
+                      background3dInstalledCount = bg3dCommit.records.length;
+                      return bg3dCommit;
+                    },
+                    { didApply: (value) => value !== false },
+                  );
+                  if (vrmCommit.applyResult === false) return false;
+                  vrmInstalledCount = vrmCommit.installed.length;
+                  vrmReusedCount = vrmCommit.reused.length;
+                  vrmUnresolvedCount = vrmCommit.unresolved.length;
+                  vrmCommitCompleted = true;
+                  return vrmCommit;
+                },
+                { didApply: (value) => value !== false },
+              );
+            if (textureCommit.applyResult === false) return false;
+            restoredTexturePaint = textureCommit.status === "ready"
+              ? {
+                  status: "ready" as const,
+                  sceneFingerprint: textureCommit.sceneFingerprint,
+                  installed: textureCommit.installed,
+                  reused: textureCommit.reused,
+                  diagnostics: [] as readonly [],
+                }
+              : {
+                  status: "unresolved" as const,
+                  sceneFingerprint: textureCommit.sceneFingerprint,
+                  installed: 0 as const,
+                  reused: 0 as const,
+                  diagnostics: textureCommit.diagnostics,
+                };
+            return textureCommit;
+          },
+          { didApply: (value) => value !== false },
         );
-        return installed.applyResult ? installed : false;
+        if (referenceCommit.applyResult === false) return false;
+        referenceInstalledCount = referenceCommit.installed.length;
+        referenceReusedCount = referenceCommit.reused.length;
+        referenceUnresolvedCount = referenceCommit.unresolved.length;
+        return { records: [] as readonly [] };
       };
-      const installed = hasStudioLinked3dPassProjectArchiveReferences(portableResult.project)
-        ? await restoreStudioLinked3dPassProjectArchiveImport({
-            archive: {
-              project: portableResult.project,
-              attachments: result.attachments,
-            },
-            authority: await acquireStudioLinked3dPassProductAuthority(),
-            apply: installAndApply,
-          })
-        : await installAndApply(portableResult.project);
-      if (!projectApplied || installed === false) return;
+      const installed = await runStudioProjectArchiveFinalInstallExclusive(async () => {
+        // Preparation is read-only and may run concurrently. Revalidate only after this import owns
+        // the origin-wide final transaction, before any provisional library row or CAS owner exists.
+        if (!canApplyStudioMutation(mutationTicket)) return false;
+        return hasStudioLinked3dPassProjectArchiveReferences(portableResult.project)
+          ? await restoreStudioLinked3dPassProjectArchiveImport({
+              archive: {
+                project: portableResult.project,
+                attachments: result.attachments,
+              },
+              authority: await acquireStudioLinked3dPassProductAuthority(),
+              apply: installAndApply,
+            })
+          : await installAndApply(portableResult.project);
+      });
+      if (!projectApplied || installed === false || !vrmCommitCompleted) return;
       const warningCount = result.diagnostics.filter(
         (item) => item.severity === "warning"
       ).length;
@@ -495,13 +813,13 @@ export function createStudioProjectArchiveOrchestration({
           isSelfContained: result.isSelfContained,
           attachmentCount: result.attachments.size,
           warningCount,
-          referenceInstalled: restoredReferences.installed.length,
-          referenceReused: restoredReferences.reused.length,
-          referenceUnresolved: restoredReferences.unresolved.length,
-          vrmInstalled: restoredVrmModels.installed.length,
-          vrmReused: restoredVrmModels.reused.length,
-          vrmUnresolved: restoredVrmModels.unresolved.length,
-          background3dInstalled: installed.records.length,
+          referenceInstalled: referenceInstalledCount,
+          referenceReused: referenceReusedCount,
+          referenceUnresolved: referenceUnresolvedCount,
+          vrmInstalled: vrmInstalledCount,
+          vrmReused: vrmReusedCount,
+          vrmUnresolved: vrmUnresolvedCount,
+          background3dInstalled: background3dInstalledCount,
           texturePaint: restoredTexturePaint,
         });
       setProjectArchiveStatus(texturePaintArchivePresentation.notice);
