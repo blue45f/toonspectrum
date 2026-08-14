@@ -763,6 +763,11 @@ export function classifyStudioLongBrushQualityPolicy(
     input.intentionalDiscrete
     || (input.source === "core" && CORE_DISCRETE_BRUSH_IDS.has(input.id))
     || isAuthoredHatchMotifBrushId(input.id)
+    // A "tone" preview is the catalogue's own word for a halftone/screentone carrier, and the
+    // sibling carrier-quality SSOT already treats that preview style as intentionally discrete.
+    // Engine-lane rows carry no brush-pack descriptor, so they never reached that SSOT and a
+    // screentone was being held to an unbroken-edge standard a dot grid cannot meet by design.
+    || input.previewStyle === "tone"
   ) {
     return {
       kind: "record-only-discrete",

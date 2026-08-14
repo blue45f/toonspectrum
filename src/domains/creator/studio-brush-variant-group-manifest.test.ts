@@ -144,7 +144,11 @@ describe("studio brush variant group manifest", () => {
     // 2026-08-14 browser gate: erodible-pencil and hard-airbrush render zero pixels on release for
     // both short and long strokes — a pre-wave defect (reproduced on the 65e9bf64 build) whose
     // family siblings, including the same-engine pencil--erodible-wear lane, are verified working.
-    expect(STUDIO_BRUSH_QUARANTINED_PRESET_IDS).toEqual(["glitter--star-field"]);
+    // 2026-08-14 long-route quality gate: airbrush--stamp-soft declares preview "soft" (a
+    // continuous carrier) but measures edgePeriodicityScore 0.85 at a 7px period — a visible
+    // ridge. Its stamp-family and airbrush-family siblings all clear the same bar (지침 6).
+    expect(STUDIO_BRUSH_QUARANTINED_PRESET_IDS)
+      .toEqual(["airbrush--stamp-soft", "glitter--star-field"]);
     expect(Object.isFrozen(STUDIO_BRUSH_QUARANTINED_PRESET_IDS)).toBe(true);
     expect(Object.isFrozen(STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID)).toBe(true);
     for (const quarantinedId of STUDIO_BRUSH_QUARANTINED_PRESET_IDS) {

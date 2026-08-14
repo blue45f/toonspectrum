@@ -215,21 +215,33 @@ upgrade 전용이므로 base relation이 없으면 DDL 전에 실패하며, 새 
 Vercel production은 `origin/main` push에 자동 배포됩니다(2026-08-14 소유자 결정). 이전에는
 `vercel.json`의 `ignoreCommand`가 `TOONSPECTRUM_APPROVED_PRODUCTION_SHA`와 커밋 SHA의 exact
 match를 요구해 릴리스마다 승인 SHA를 수동 회전해야 했습니다. 그 승인 단계는 제거했고, 대신
-**migration을 동반하는 release는 merge 전에 아래 순서를 끝내야 합니다** — 배포가 merge를 뒤따르므로
-더 이상 배포 시점에 기다려 주지 않습니다.
+**migration을 동반하는 release는 반드시 expand/contract 2회 merge로 나눠야 합니다.** 이유는 두 제약이
+서로 맞물려 있기 때문입니다. `production-database-migrations.yml`은 release SHA가 **이미
+`origin/main`의 ancestor일 것**을 요구하고(ancestor 아니면 즉시 실패), main merge는 곧 배포입니다.
+따라서 DDL은 언제나 **새 runtime이 이미 떠 있는 뒤에만** 실행할 수 있습니다. "merge 전에 migration을
+끝낸다"는 순서는 이 workflow로 실행이 불가능하므로, 새 runtime은 반드시 **구 schema에서도 동작해야**
+합니다.
 
 migration을 동반하는 release 순서는 다음과 같습니다. Render는 `autoDeployTrigger: off`를 유지합니다.
 
-1. reviewed release commit SHA를 확정합니다.
-2. 기존 DB upgrade라면 현재 Studio writer를 모두 drain하고 이전 binary가 새 mutation을 받지
+1. reviewed release commit SHA를 확정합니다. 이 커밋의 runtime은 **구/신 schema 양쪽에서 동작하는
+   backward-compatible(expand) 단계**여야 합니다 — 새 컬럼·테이블은 optional로 읽고, 없으면 기존
+   경로로 동작해야 합니다. 이 조건을 만족하지 못하면 merge하지 않습니다.
+2. expand 커밋을 main에 merge합니다. 배포가 따라오지만 구 schema에서 정상 동작합니다.
+3. 기존 DB upgrade라면 현재 Studio writer를 모두 drain하고 이전 binary가 새 mutation을 받지
    않는지 확인합니다. 특히 `0017` 최초 cutover와 최초 `adopt`에는 이 단계가 필수입니다.
-3. workflow에서 exact release SHA가 `origin/main`의 ancestor인지 확인하고
-   `NO-STUDIO-WRITERS`를 입력합니다. 최초 원장 채택은 `adopt`, 이후는 `apply`를 선택합니다.
+4. workflow를 **merge된 그 SHA로** 실행합니다(이제 ancestor 조건을 만족합니다).
+   `NO-STUDIO-WRITERS`를 입력하고, 최초 원장 채택은 `adopt`, 이후는 `apply`를 선택합니다.
    base schema가 완전히 provision되지 않은 DB는 거부되며 이 workflow를 새 DB bootstrap 수단으로
    사용하지 않습니다.
-4. migration과 full capability verification이 성공한 뒤 Cloudflare Worker·Render realtime canary를
+5. migration과 full capability verification이 성공한 뒤 Cloudflare Worker·Render realtime canary를
    같은 SHA 기준으로 완료합니다.
-5. 그 다음에 main으로 merge합니다. push가 곧 production 배포입니다.
+6. 그 다음에 **contract 단계**(구 schema 호환 경로 제거, 필요하면 컬럼 drop migration)를 별도 커밋으로
+   merge합니다. 이 단계는 구 binary가 모두 사라진 뒤에만 안전합니다.
+
+expand 단계로 나눌 수 없는 변경(같은 커밋에서 구 schema를 반드시 깨야 하는 경우)은 자동배포와 양립하지
+않습니다. 그 경우 Vercel 대시보드에서 production 배포를 일시 중지하고 수동 순서로 처리한 뒤 재개하십시오
+— 이제 그것을 대신 막아 주는 repository gate는 없습니다.
 
 migration·realtime 계약을 건드리지 않는 순수 프론트엔드 release는 1~4단계에 해당 대상이 없으므로
 바로 merge하면 됩니다. 반대로 schema나 realtime 계약을 바꾸는 커밋을 canary 없이 main에 올리면

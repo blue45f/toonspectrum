@@ -30,6 +30,18 @@ export const STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID: Readonly<Record<string
     // duplicate. Canvas and SVG agree with each other, so replay stays consistent (지침 5).
     // Reinstatement path: make the glitter dispatch honour the lane's declared engineVariant
     // behind an explicit program pin (지침 4 byte-identity), then delist the id here.
+    // 2026-08-14 브러시 품질 웨이브: 이 프리셋은 카탈로그에 preview "soft"(연속 캐리어)로 선언돼
+    // 있고 spacingRatio 0.08 / hardness 0.04 로 촘촘히 겹치도록 저작됐는데, 실측은 그 선언과
+    // 어긋납니다 — long-route 품질 계측에서 edgePeriodicityScore 0.85, edgePeriodPx 7 로 눈에
+    // 보이는 주기적 능선이 남습니다(전체 164개 중 실패 2건에 포함). 같은 stamp family 의
+    // pencil--stamp-grain·watercolor--edge-stamp·gouache--flat-stamp 와 같은 airbrush 계열의
+    // spray--equal-area·splatter--burst-cloud·ink-particle--scatter-cloud 는 모두 동일 기준을
+    // 통과하므로 그룹 내 대안이 충분합니다(지침: 품질이 안 나오고 대체 브러시군이 있으면 제거).
+    // 복귀 경로: 스탬프 간격이 저작값대로 적용되도록 고쳐 edgePeriodicity 가 연속 기준을 통과하면
+    // 여기서 delist 합니다. 그때까지 저장된 문서는 계속 원래대로 재생됩니다.
+    "airbrush--stamp-soft":
+      "preview \"soft\"(연속)로 선언됐지만 실측 edgePeriodicityScore 0.85 · period 7px 로 주기적 "
+      + "능선이 보이는 품질 미달 — 같은 family 의 통과 대안이 다수 존재(지침 6).",
     "glitter--star-field":
       "선언된 engineVariant(star-dust)가 페인트 시점에 실재하지 않아 기본 glitter 모드로 그려지는 "
       + "사실상 중복 — 실제 star-dust 모드를 가진 star-dust와 기본 glitter가 그룹 내 대안(지침 6).",
