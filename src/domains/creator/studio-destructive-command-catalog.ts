@@ -429,15 +429,59 @@ export function studioImportPosesRequest(
 }
 
 /** ㉔ 포즈 공유 권한 확인 — 파괴가 아니라 게시 전 동의 게이트다. */
+function boundedStudioShareConsentText(value: string, maxCharacters: number): string {
+  const plain = value
+    .normalize("NFC")
+    .replace(/[\p{Cc}\p{Cf}]+/gu, " ")
+    .replace(/\s+/gu, " ")
+    .trim();
+  return Array.from(plain).slice(0, maxCharacters).join("");
+}
+
+/** 공유 플래너의 정확한 크레딧·사용 맥락을 확인한 뒤만 typed receipt를 만든다. */
+export function studioVrmPoseShareUseContextConsentRequest(input: Readonly<{
+  attributionText: string;
+  creditRequired: boolean;
+}>): StudioDestructiveActionRequest {
+  const attributionText = boundedStudioShareConsentText(input.attributionText, 160);
+  const attributionStatement = input.creditRequired
+    ? `게시할 크레딧(변경 없이 게시): ${attributionText}`
+    : "이 모델은 현재 렌더 포즈 게시에 별도 크레딧을 요구하지 않습니다.";
+  return {
+    id: "studio.vrm-pose.share-use-context",
+    title: "VRM 포즈 공유 이용 맥락 확인",
+    intro:
+      "나는 이 아바타의 저작자도, 별도 이용 허락을 받은 사람도 아닙니다. "
+      + "이 렌더 포즈는 과도한 폭력, 과도한 성적 표현, 정치·종교적 이용, "
+      + `반사회적·혐오 이용에 해당하지 않습니다. ${attributionStatement}`,
+    losses: [],
+    gains: ["현재 공유 시도에만 사용하는 이용 맥락 확인"],
+    reversibility: "document-untouched",
+    undoNote: "취소하면 이용 맥락 receipt를 만들지 않고 공유를 중단합니다.",
+    confirmLabel: "위 내용을 확인하고 계속",
+  };
+}
+
 export function studioSharePoseConsentRequest(
-  poseTitle: string,
+  input: Readonly<{
+    poseTitle: string;
+    licenseLabel: string;
+    attributionText: string;
+  }>,
 ): StudioDestructiveActionRequest {
+  const poseTitle = boundedStudioShareConsentText(input.poseTitle, 30);
+  const licenseLabel = boundedStudioShareConsentText(input.licenseLabel, 80);
+  const attributionText = boundedStudioShareConsentText(input.attributionText, 160);
+  const attributionStatement = attributionText
+    ? `필수 크레딧 “${attributionText}”을 변경하지 않고 게시 정보에 함께 싣습니다.`
+    : "이 사용권은 이 포즈 게시에 별도 출처 표시를 요구하지 않습니다.";
   return {
     id: "studio.vrm-pose.share-consent",
     title: `'${poseTitle}' 포즈를 서버에 공유`,
     intro:
-      "이 포즈 이미지와 모델·의상·소품 표현을 ToonSpectrum 표준 사용권으로 공유할 권한이 있으며, "
-      + "타인의 권리를 침해하지 않음을 확인합니다.",
+      `방금 확인한 이용 맥락을 기준으로 이 개조된 VRM 렌더 포즈의 ${licenseLabel} 조건을 검토했습니다. `
+      + `${attributionStatement} `
+      + "이 포즈 이미지와 모델·의상·소품 표현을 공유할 권리가 있고 타인의 권리를 침해하지 않음을 확인합니다.",
     losses: [],
     gains: ["다른 사용자가 쓸 수 있는 공유 포즈 1개"],
     reversibility: "document-untouched",

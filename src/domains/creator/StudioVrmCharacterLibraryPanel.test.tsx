@@ -3,6 +3,8 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { STUDIO_VRM_1_PUBLIC_LICENSE_URL } from "./studio-vrm-license-metadata";
+import { inspectStudioVrmLicenseAuthority } from "./studio-vrm-license-product-gate";
 import { StudioVrmCharacterLibraryPanel } from "./StudioVrmCharacterLibraryPanel";
 
 import type { VrmLibraryEntry } from "./vrm-library";
@@ -301,6 +303,37 @@ describe("StudioVrmCharacterLibraryPanel", () => {
     expect(thumbnail?.className).toContain("object-contain");
     expect(screen.getByText("번들")).toBeTruthy();
     expect(screen.getByText("SQLite/OPFS")).toBeTruthy();
+  });
+
+  it("shows unknown and restricted rights without disabling local model selection", () => {
+    const restrictedAuthority = inspectStudioVrmLicenseAuthority({
+      extensions: {
+        VRMC_vrm: {
+          specVersion: "1.0",
+          meta: {
+            name: "재배포 금지 모델",
+            authors: ["Creator"],
+            licenseUrl: STUDIO_VRM_1_PUBLIC_LICENSE_URL,
+            allowRedistribution: false,
+          },
+        },
+      },
+    });
+    const unknown = createEntry("unknown", "미확인 모델", "sqlite-opfs");
+    const restricted = createEntry("restricted", "제한 모델", "sqlite-opfs", {
+      licenseAuthority: restrictedAuthority,
+    });
+    const onSelect = vi.fn();
+    renderPanel({ entries: [unknown, restricted], activeModelId: "none", onSelect });
+
+    expect(screen.getByText("권리 미확인")).toBeTruthy();
+    expect(screen.getByText("재배포 제한")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "미확인 모델 선택" }));
+    expect(onSelect).toHaveBeenCalledWith(unknown);
+    fireEvent.click(screen.getByText("재배포 제한"));
+    expect(screen.getByText("원본 파일 재배포 금지")).toBeTruthy();
+    expect(screen.getByRole("link", { name: /라이선스 문서/ }).getAttribute("href"))
+      .toBe(STUDIO_VRM_1_PUBLIC_LICENSE_URL);
   });
 
   it("owns a multiple .vrm file picker and forwards its change exactly once", () => {

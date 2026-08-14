@@ -13,6 +13,7 @@ import {
   studioDeleteSharedPoseRequest,
   studioImportPosesRequest,
   studioSharePoseConsentRequest,
+  studioVrmPoseShareUseContextConsentRequest,
 } from "./studio-destructive-command-catalog";
 import {
   isStudioHumanoidBoneName,
@@ -41,8 +42,20 @@ import {
   createStudioVrmAvatarForgeFaceController,
   deriveStudioVrmAvatarForgeFaceScale,
 } from "./studio-vrm-avatar-forge-face-controller";
+import {
+  STUDIO_VRM_AVATAR_REFERENCE_APPROVED_CATALOGUE,
+  resolveStudioVrmAvatarReferenceAppearanceState,
+} from "./studio-vrm-avatar-reference-product";
 import { BlinkStabilizer } from "./studio-vrm-blink-stabilizer";
 import { HEAD_BONE_SMOOTHER, VrmBoneSmoother } from "./studio-vrm-bone-smoother";
+import {
+  STUDIO_VRM_BROADCAST_FRAMEBUFFER_MIN_DPR,
+  createStudioVrmBroadcastPreviewPlan,
+  planStudioVrmBroadcastFramebuffer,
+  type StudioVrmBroadcastBackgroundId,
+  type StudioVrmBroadcastBlocker,
+  type StudioVrmBroadcastPreviewReceipt,
+} from "./studio-vrm-broadcast-preview";
 import {
   COSTUME_SLOT_LABELS,
   COSTUME_PALETTES,
@@ -90,6 +103,12 @@ import {
 } from "./studio-vrm-ik-constraints";
 import { resolveStudioVrmInsertBackgroundMode } from "./studio-vrm-insert-background-mode";
 import { clampStudioVrmJointRotation, getStudioVrmJointLimit } from "./studio-vrm-joint-limits";
+import {
+  createStudioVrmRenderedPoseUseContextReceipt,
+  planStudioVrmRenderedPoseMarketplaceShare,
+  prepareStudioVrmRenderedPoseMarketplaceAttestation,
+  STUDIO_VRM_RENDERED_POSE_PLATFORM_GRANT,
+} from "./studio-vrm-license-product-gate";
 import {
   buildStudioVrmPersistentIkSignature,
   type StudioVrmPersistentIkSignatureInput,
@@ -328,6 +347,15 @@ import {
 import { StudioToolHintTarget } from "./StudioToolHint";
 import { StudioVrmAvatarForge, countDetectedVrmHairMeshes } from "./StudioVrmAvatarForge";
 import { StudioVrmAvatarForgePanel } from "./StudioVrmAvatarForgePanel";
+import {
+  StudioVrmAvatarReferenceRecommendationsPanel,
+  type StudioVrmAvatarReferenceSelection,
+} from "./StudioVrmAvatarReferenceRecommendationsPanel";
+import {
+  StudioVrmBroadcastPreviewBridge,
+  StudioVrmBroadcastPreviewOverlay,
+  StudioVrmBroadcastPreviewPanel,
+} from "./StudioVrmBroadcastPreview";
 import { StudioVrmCharacterLibraryPanel } from "./StudioVrmCharacterLibraryPanel";
 import {
   STUDIO_VRM_JOINT_HANDLE_DEFINITIONS,
@@ -383,6 +411,7 @@ import type { StudioToolHintSpec } from "./studio-tool-hints";
 import type { FaceLandmarker, HandLandmarker, PoseLandmarker } from "@mediapipe/tasks-vision";
 import type { VRM, VRMHumanBoneName } from "@pixiv/three-vrm";
 
+import { creatorAssetLicenseOf } from "@/lib/creator-asset-contract";
 import {
   publishAsset,
   listSharedAssetCatalog,
@@ -1379,6 +1408,37 @@ type ViewportApi = {
   readCamera: () => StudioVrmCameraSettings | null;
   restoreCamera: (settings: StudioVrmCameraSettings) => void;
 };
+
+type StudioVrmBroadcastCameraLease = Readonly<{
+  settings: StudioVrmCameraSettings;
+  restoreCamera: ViewportApi["restoreCamera"];
+}>;
+
+function restoreStudioVrmBroadcastImperativeState(input: Readonly<{
+  cameraLeaseRef: { current: StudioVrmBroadcastCameraLease | null };
+  mutationLockSnapshotRef: {
+    current: Readonly<{ texturePaint: boolean; wardrobe: boolean }> | null;
+  };
+  texturePaintMutationBlockedRef: { current: boolean };
+  wardrobeMutationBlockedRef: { current: boolean };
+}>): boolean {
+  const cameraLease = input.cameraLeaseRef.current;
+  input.cameraLeaseRef.current = null;
+  const mutationSnapshot = input.mutationLockSnapshotRef.current;
+  input.mutationLockSnapshotRef.current = null;
+  let cameraRestored = true;
+  try {
+    if (cameraLease) cameraLease.restoreCamera(cameraLease.settings);
+  } catch {
+    cameraRestored = false;
+  } finally {
+    if (mutationSnapshot) {
+      input.texturePaintMutationBlockedRef.current = mutationSnapshot.texturePaint;
+      input.wardrobeMutationBlockedRef.current = mutationSnapshot.wardrobe;
+    }
+  }
+  return cameraRestored;
+}
 
 // Canvas 내부에서 OrbitControls/카메라를 잡아 줌 등 명령형 동작을 패널 오버레이로 노출.
 function ViewportController({ onReady }: { onReady: (api: ViewportApi | null) => void }) {
@@ -3065,6 +3125,15 @@ export function StudioVrmPoser({
   const [jointHandleStatus, setJointHandleStatus] = useState("");
   // 뷰포트 오버레이 컨트롤 — 줌/시점초기화/턴테이블/드래그 힌트.
   const [turntable, setTurntable] = useState(false);
+  const [broadcastBackgroundId, setBroadcastBackgroundId] =
+    useState<StudioVrmBroadcastBackgroundId>("green");
+  const [broadcastPreviewReceipt, setBroadcastPreviewReceipt] =
+    useState<StudioVrmBroadcastPreviewReceipt | null>(null);
+  const [broadcastPreviewError, setBroadcastPreviewError] = useState("");
+  const [broadcastCanvasDpr, setBroadcastCanvasDpr] = useState(
+    STUDIO_VRM_BROADCAST_FRAMEBUFFER_MIN_DPR,
+  );
+  const broadcastPreviewActive = broadcastPreviewReceipt !== null;
   const turntableHint: StudioToolHintSpec = turntable
     ? {
         ...VRM_VIEWPORT_HINTS.turntable,
@@ -3078,6 +3147,15 @@ export function StudioVrmPoser({
   const [viewResetNonce, setViewResetNonce] = useState(0);
   const [viewportHinted, setViewportHinted] = useState(false);
   const viewportApiRef = useRef<ViewportApi | null>(null);
+  const broadcastViewportHostRef = useRef<HTMLDivElement | null>(null);
+  const broadcastExitButtonRef = useRef<HTMLButtonElement | null>(null);
+  const broadcastPreviousFocusRef = useRef<HTMLElement | null>(null);
+  const broadcastCameraLeaseRef = useRef<StudioVrmBroadcastCameraLease | null>(null);
+  const broadcastFocusFrameRef = useRef<number | null>(null);
+  const broadcastMutationLockSnapshotRef = useRef<Readonly<{
+    texturePaint: boolean;
+    wardrobe: boolean;
+  }> | null>(null);
   // 편집 되돌리기/다시실행 — 전체 포저 상태 스냅샷 히스토리(직렬화 재사용).
   const fullStateHistoryRef = useRef(createStudioVrmFullStateHistory());
   const isRestoringRef = useRef(false);
@@ -3086,6 +3164,8 @@ export function StudioVrmPoser({
   const [isCapturing, setIsCapturing] = useState(false);
   const [isThumbnailCapturing, setIsThumbnailCapturing] = useState(false);
   const [libraryEntries, setLibraryEntries] = useState<VrmLibraryEntry[]>(SAMPLE_VRM_ENTRIES);
+  const libraryEntriesRef = useRef(libraryEntries);
+  libraryEntriesRef.current = libraryEntries;
   const [libraryNextCursor, setLibraryNextCursor] = useState<string | null>(null);
   const [isLoadingLibraryPage, setIsLoadingLibraryPage] = useState(false);
   const memoryVrmModelsRef = useRef(new Map<string, VrmStoredModelWithContentIdentity>());
@@ -3104,6 +3184,24 @@ export function StudioVrmPoser({
   // early decl for new features used in effects
   const [bodyScale, setBodyScale] = useState<BodyScale>({ height: 1, width: 1 });
   const [avatarForgeState, setAvatarForgeState] = useState<AvatarForgeState>(() => createAvatarForgeState());
+  const [avatarForgeReferencePreview, setAvatarForgeReferencePreview] = useState<Readonly<{
+    modelId: string;
+    authorityIdentity: string;
+    presetId: string;
+    state: AvatarForgeState;
+  }> | null>(null);
+  const avatarForgeReferenceAuthorityIdentity = JSON.stringify(
+    serializeAvatarForgeState(avatarForgeState),
+  );
+  const avatarForgeReferencePreviewActive =
+    avatarForgeReferencePreview
+    && avatarForgeReferencePreview.modelId === activeModelId
+    && avatarForgeReferencePreview.authorityIdentity === avatarForgeReferenceAuthorityIdentity
+    && activePanelTab === "character"
+    && activeCharacterSection === "forge"
+    && !broadcastPreviewActive
+      ? avatarForgeReferencePreview
+      : null;
   const [avatarForgeFaceController] = useState(createStudioVrmAvatarForgeFaceController);
   const [proportionRigStatus, setProportionRigStatus] = useState<
     "empty" | "ready" | "applying" | "unavailable" | "reload-required"
@@ -3178,7 +3276,7 @@ export function StudioVrmPoser({
   const wardrobeAuthoredIdentity = JSON.stringify(
     serializeWardrobe(wardrobeState, { autoHideOriginal: wardrobeAutoHide }) ?? null,
   );
-  const wardrobeInteractionLocked = isCapturing;
+  const wardrobeInteractionLocked = isCapturing || broadcastPreviewActive;
 
   // Wardrobe/prop measurements are committed by the proportion-rig lifecycle while the rebuilt
   // humanoid is in rest pose. Measuring one animation frame after a React effect can mix two rig
@@ -3619,12 +3717,14 @@ export function StudioVrmPoser({
 
   const handlePanelTabChange = useCallback((tab: PanelTab) => {
     setActivePanelTab(tab);
+    if (tab !== "character") setAvatarForgeReferencePreview(null);
     if (tab !== "character") setTexturePaintEyedropperActive(false);
     if (panelScrollRef.current) panelScrollRef.current.scrollTop = 0;
   }, []);
 
   const handleCharacterSectionChange = (section: CharacterPanelSection) => {
     setActiveCharacterSection(section);
+    if (section !== "forge") setAvatarForgeReferencePreview(null);
     if (section !== "surface") setTexturePaintEyedropperActive(false);
     if (section === "surface") {
       setTurntable(false);
@@ -3829,6 +3929,7 @@ export function StudioVrmPoser({
   }, [avatarForgeState, proportionRigStatus]);
 
   const avatarForgeFaceCaptureIsReady = useCallback((): boolean => {
+    if (avatarForgeReferencePreviewActive) return false;
     const snapshot = avatarForgeFaceController.getSnapshot();
     const expectedScale = deriveStudioVrmAvatarForgeFaceScale(
       avatarForgeCommittedStateRef.current.face,
@@ -3839,7 +3940,7 @@ export function StudioVrmPoser({
       && snapshot.nodeCount > 0
       && snapshot.scale !== null
       && snapshot.scale.every((value, index) => value === expectedScale[index]);
-  }, [avatarForgeFaceController]);
+  }, [avatarForgeFaceController, avatarForgeReferencePreviewActive]);
 
   function handleJointHandleSelect(bone: StudioVrmJointHandleBone) {
     setSelectedIkPole(null);
@@ -4688,6 +4789,8 @@ export function StudioVrmPoser({
     || (initialScene?.surfacePaint.textures.length ?? 0) > 0;
   const texturePaintDisabledReason = !vrm
     ? "표면을 칠할 VRM 모델을 먼저 불러오세요."
+    : broadcastPreviewActive
+      ? "방송 미리보기를 종료한 뒤 표면을 칠할 수 있습니다."
     : texturePaintSceneSyncRequired
       ? "새 장면의 표면 페인팅 런타임을 준비하는 중입니다."
       : texturePaintRestoreRequired && texturePaintPersistenceStatus === "idle"
@@ -4757,10 +4860,12 @@ export function StudioVrmPoser({
             : "표면을 끌어 칠하세요. Ctrl/⌘+Z로 이 텍스처 획을 되돌릴 수 있습니다."
           : "뷰포트에서 옷·피부·머리 표면을 누르면 해당 텍스처를 선택합니다.");
   const viewportCanUndo =
-    !texturePaintStrokeActive
+    !broadcastPreviewActive
+    && !texturePaintStrokeActive
     && (canUndo || (texturePaintModeSelected && (texturePaintSnapshot?.history.undoCount ?? 0) > 0));
   const viewportCanRedo =
-    !texturePaintStrokeActive
+    !broadcastPreviewActive
+    && !texturePaintStrokeActive
     && (canRedo || (texturePaintModeSelected && (texturePaintSnapshot?.history.redoCount ?? 0) > 0));
   const viewportCameraInteractionLocked =
     isCapturing || isSharingPose || isThumbnailCapturing;
@@ -4812,8 +4917,13 @@ export function StudioVrmPoser({
     setCanRedo(transition.history.index < transition.history.entries.length - 1);
   };
   const doUndo = () => {
+    if (avatarForgeReferencePreviewActive) {
+      setAvatarForgeReferencePreview(null);
+      return;
+    }
     if (
-      texturePaintMutationBlockedRef.current
+      broadcastPreviewActive
+      || texturePaintMutationBlockedRef.current
       || texturePaintSurfaceStrokeActive
       || typeof texturePaintSnapshotRef.current?.activePointerId === "number"
     ) return;
@@ -4827,8 +4937,13 @@ export function StudioVrmPoser({
     restoreHistoryStep(-1);
   };
   const doRedo = () => {
+    if (avatarForgeReferencePreviewActive) {
+      setAvatarForgeReferencePreview(null);
+      return;
+    }
     if (
-      texturePaintMutationBlockedRef.current
+      broadcastPreviewActive
+      || texturePaintMutationBlockedRef.current
       || texturePaintSurfaceStrokeActive
       || typeof texturePaintSnapshotRef.current?.activePointerId === "number"
     ) return;
@@ -4844,6 +4959,7 @@ export function StudioVrmPoser({
 
   const poseMaterialRuntimeDisabled =
     !vrm ||
+    broadcastPreviewActive ||
     webcamActive ||
     webcamLoading ||
     idleAnimation ||
@@ -4865,6 +4981,220 @@ export function StudioVrmPoser({
     sharingPose: isSharingPose,
     thumbnailCapturing: isThumbnailCapturing,
   });
+
+  function currentBroadcastPreviewBlockers(): StudioVrmBroadcastBlocker[] {
+    const blockers: StudioVrmBroadcastBlocker[] = [];
+    if (!vrm) blockers.push("model-unavailable");
+    if (
+      status !== "ready"
+      || !captureRef.current.gl
+      || !captureRef.current.scene
+      || !captureRef.current.camera
+      || !viewportApiRef.current
+    ) blockers.push("model-loading");
+    if (
+      isUploading
+      || deletingModelId !== null
+      || isLoadingLibraryPage
+      || libraryStatus === "loading"
+      || sharedPosesStatus === "loading"
+    ) blockers.push("asset-mutation");
+    if (
+      isCapturing
+      || isSharingPose
+      || isThumbnailCapturing
+      || captureOperationRef.current !== null
+    ) blockers.push("capture");
+    if (
+      vrmCreativePersistenceStatus === "saving"
+      || calibrationPersistenceStatus === "saving"
+    ) blockers.push("creative-persistence");
+    if (
+      texturePaintStrokeActive
+      || typeof texturePaintSnapshotRef.current?.activePointerId === "number"
+      || texturePaintPersistenceStatus === "restoring"
+    ) blockers.push("texture-paint");
+    if (
+      persistentIkReconciling
+      || pendingPersistentIkCommandRef.current !== null
+      || jointHandleInteracting
+      || jointIkTransactionRef.current !== null
+      || isViewportHandIkDragging
+      || sharedPoseSelectionAssetId !== null
+      || proportionRigStatus === "applying"
+      || proportionRigStatus === "reload-required"
+    ) blockers.push("pose-transaction");
+    if (turntable) blockers.push("camera-motion");
+    if (webcamActive || webcamLoading || calibrating) blockers.push("tracking-transition");
+    return blockers;
+  }
+
+  const broadcastPreviewAvailability = createStudioVrmBroadcastPreviewPlan({
+    backgroundId: broadcastBackgroundId,
+    blockers: currentBroadcastPreviewBlockers(),
+  });
+  const broadcastPreviewDisabledReason = broadcastPreviewAvailability.ok
+    ? null
+    : broadcastPreviewAvailability.reason;
+
+  function finishBroadcastPreview(options: Readonly<{ restoreFocus: boolean }>) {
+    const cameraRestored = restoreStudioVrmBroadcastImperativeState({
+      cameraLeaseRef: broadcastCameraLeaseRef,
+      mutationLockSnapshotRef: broadcastMutationLockSnapshotRef,
+      texturePaintMutationBlockedRef,
+      wardrobeMutationBlockedRef,
+    });
+    setBroadcastPreviewReceipt(null);
+    setBroadcastCanvasDpr(STUDIO_VRM_BROADCAST_FRAMEBUFFER_MIN_DPR);
+    if (!cameraRestored) {
+      setBroadcastPreviewError(
+        "기존 3D 카메라 구도를 복원하지 못했습니다. 편집기를 닫았다가 다시 열어 주세요.",
+      );
+    }
+
+    if (broadcastFocusFrameRef.current !== null) {
+      cancelAnimationFrame(broadcastFocusFrameRef.current);
+      broadcastFocusFrameRef.current = null;
+    }
+    if (options.restoreFocus) {
+      broadcastFocusFrameRef.current = requestAnimationFrame(() => {
+        broadcastFocusFrameRef.current = null;
+        const previousFocus = broadcastPreviousFocusRef.current;
+        const fallback = dialogRef.current?.querySelector<HTMLButtonElement>(
+          '[data-studio-vrm-broadcast-enter="true"]',
+        ) ?? null;
+        if (previousFocus?.isConnected && previousFocus.getClientRects().length > 0) {
+          previousFocus.focus({ preventScroll: true });
+        } else {
+          fallback?.focus({ preventScroll: true });
+        }
+        broadcastPreviousFocusRef.current = null;
+      });
+    } else {
+      broadcastPreviousFocusRef.current = null;
+    }
+  }
+
+  function handleBroadcastPreviewStart() {
+    const plan = createStudioVrmBroadcastPreviewPlan({
+      backgroundId: broadcastBackgroundId,
+      blockers: currentBroadcastPreviewBlockers(),
+    });
+    if (!plan.ok) {
+      setBroadcastPreviewError(plan.reason);
+      return;
+    }
+    const viewportApi = viewportApiRef.current;
+    const cameraSnapshot = viewportApi?.readCamera() ?? null;
+    if (!viewportApi || !cameraSnapshot) {
+      setBroadcastPreviewError("현재 카메라 구도를 확인한 뒤 방송 화면을 열 수 있습니다.");
+      return;
+    }
+    const framebufferPreflight = planStudioVrmBroadcastFramebuffer({
+      cssWidth: window.innerWidth,
+      cssHeight: window.innerHeight,
+      requestedDpr: window.devicePixelRatio,
+    });
+    if (!framebufferPreflight.ok) {
+      setBroadcastPreviewError(framebufferPreflight.reason);
+      return;
+    }
+
+    broadcastPreviousFocusRef.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    broadcastCameraLeaseRef.current = Object.freeze({
+      settings: cameraSnapshot,
+      restoreCamera: viewportApi.restoreCamera,
+    });
+    broadcastMutationLockSnapshotRef.current = Object.freeze({
+      texturePaint: texturePaintMutationBlockedRef.current,
+      wardrobe: wardrobeMutationBlockedRef.current,
+    });
+    texturePaintMutationBlockedRef.current = true;
+    wardrobeMutationBlockedRef.current = true;
+    setBroadcastCanvasDpr(framebufferPreflight.receipt.dpr);
+    setBroadcastPreviewError("");
+    setBroadcastPreviewReceipt(plan.receipt);
+  }
+
+  function handleBroadcastPreviewRuntimeError(message: string) {
+    setBroadcastPreviewError(message);
+    finishBroadcastPreview({ restoreFocus: true });
+  }
+
+  const requestBroadcastPreviewExit = useEffectEvent(() => {
+    finishBroadcastPreview({ restoreFocus: true });
+  });
+
+  const reportBroadcastPreviewRuntimeError = useEffectEvent((message: string) => {
+    handleBroadcastPreviewRuntimeError(message);
+  });
+
+  const updateBroadcastFramebufferAdmission = useEffectEvent((
+    cssWidth: number,
+    cssHeight: number,
+  ) => {
+    if (!broadcastPreviewReceipt) return;
+    const framebufferPlan = planStudioVrmBroadcastFramebuffer({
+      cssWidth,
+      cssHeight,
+      requestedDpr: window.devicePixelRatio,
+    });
+    if (!framebufferPlan.ok) {
+      reportBroadcastPreviewRuntimeError(framebufferPlan.reason);
+      return;
+    }
+    setBroadcastCanvasDpr((current) => (
+      current === framebufferPlan.receipt.dpr ? current : framebufferPlan.receipt.dpr
+    ));
+  });
+
+  useLayoutEffect(() => {
+    if (!broadcastPreviewActive) return;
+    const host = broadcastViewportHostRef.current;
+    if (!host || typeof ResizeObserver !== "function") {
+      reportBroadcastPreviewRuntimeError(
+        "방송 뷰포트의 실제 크기를 안전하게 관찰할 수 없습니다.",
+      );
+      return;
+    }
+
+    const initialRect = host.getBoundingClientRect();
+    updateBroadcastFramebufferAdmission(initialRect.width, initialRect.height);
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries.find((candidate) => candidate.target === host);
+      if (!entry) return;
+      updateBroadcastFramebufferAdmission(
+        entry.contentRect.width,
+        entry.contentRect.height,
+      );
+    });
+    observer.observe(host);
+    return () => observer.disconnect();
+  }, [broadcastPreviewActive]);
+
+  useEffect(() => {
+    if (!broadcastPreviewActive) return;
+    const focusFrame = requestAnimationFrame(() => {
+      broadcastExitButtonRef.current?.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(focusFrame);
+  }, [broadcastPreviewActive]);
+
+  useLayoutEffect(() => {
+    return () => {
+      if (broadcastFocusFrameRef.current !== null) {
+        cancelAnimationFrame(broadcastFocusFrameRef.current);
+      }
+      restoreStudioVrmBroadcastImperativeState({
+        cameraLeaseRef: broadcastCameraLeaseRef,
+        mutationLockSnapshotRef: broadcastMutationLockSnapshotRef,
+        texturePaintMutationBlockedRef,
+        wardrobeMutationBlockedRef,
+      });
+    };
+  }, []);
 
   function portableLockedPoseBones(): StudioHumanoidBoneName[] {
     return lockedPoseBones.filter(
@@ -5059,6 +5389,10 @@ export function StudioVrmPoser({
         if (e.defaultPrevented || !dialogIsTopmost) return;
         e.preventDefault();
         e.stopPropagation();
+        if (broadcastPreviewActive) {
+          requestBroadcastPreviewExit();
+          return;
+        }
         if (isCapturing) return;
         cancelActiveTexturePaintStroke();
         sharePoseAbortRef.current?.abort();
@@ -5067,6 +5401,11 @@ export function StudioVrmPoser({
       }
 
       if (e.key === "Tab" && dialog && dialogIsTopmost) {
+        if (broadcastPreviewActive) {
+          e.preventDefault();
+          broadcastExitButtonRef.current?.focus({ preventScroll: true });
+          return;
+        }
         const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(
           'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])'
         )).filter((element) => element.tabIndex >= 0 && element.getClientRects().length > 0 && element.getAttribute("aria-hidden") !== "true");
@@ -5090,6 +5429,13 @@ export function StudioVrmPoser({
 
       const target = e.target as HTMLElement | null;
       const typing = !!target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
+      if (broadcastPreviewActive) {
+        if (e.metaKey || e.ctrlKey) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+        return;
+      }
       if (typing || !(e.metaKey || e.ctrlKey)) return;
       const key = e.key.toLowerCase();
       if (key === "z") {
@@ -5103,7 +5449,7 @@ export function StudioVrmPoser({
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [cancelActiveTexturePaintStroke, isCapturing, open, onClose, texturePaintStrokeActive]);
+  }, [broadcastPreviewActive, cancelActiveTexturePaintStroke, isCapturing, open, onClose, texturePaintStrokeActive]);
 
   // 자연 포즈도 모든 손가락을 저작값으로 포함하므로 자동 그립이 켜진 손에서는 소품
   // 접촉 결과를 최종 권위로 둔다. 자동 그립을 끄면 가려졌던 저작값이 즉시 복원된다.
@@ -5112,14 +5458,86 @@ export function StudioVrmPoser({
     createAutoGripFingerOverrides(vrmPropItems, propDefById, effectivePropRigMetrics),
   );
 
+  function avatarForgeReferenceInteractionBlocked(): boolean {
+    return !vrm
+      || broadcastPreviewActive
+      || isCapturing
+      || isSharingPose
+      || isThumbnailCapturing
+      || persistentIkReconciling
+      || proportionRigStatus === "applying"
+      || proportionRigStatus === "reload-required";
+  }
+
+  function resolveAvatarForgeReferenceSelection(
+    selection: StudioVrmAvatarReferenceSelection,
+  ): AvatarForgeState | null {
+    return resolveStudioVrmAvatarReferenceAppearanceState({
+      current: avatarForgeState,
+      selection,
+      catalogue: STUDIO_VRM_AVATAR_REFERENCE_APPROVED_CATALOGUE,
+    });
+  }
+
+  function handleAvatarForgeReferencePreview(
+    selection: StudioVrmAvatarReferenceSelection,
+  ): void {
+    if (avatarForgeReferenceInteractionBlocked()) return;
+    const nextState = resolveAvatarForgeReferenceSelection(selection);
+    if (!nextState) {
+      setAvatarForgeReferencePreview(null);
+      setError("검증된 참고 이미지 추천 기준을 확인하지 못해 미리 보기를 시작하지 않았습니다.");
+      return;
+    }
+    setAvatarForgeReferencePreview({
+      modelId: activeModelId,
+      authorityIdentity: avatarForgeReferenceAuthorityIdentity,
+      presetId: selection.presetId,
+      state: nextState,
+    });
+    setError("");
+  }
+
+  function handleAvatarForgeReferenceApply(
+    selection: StudioVrmAvatarReferenceSelection,
+  ): void {
+    if (avatarForgeReferenceInteractionBlocked()) return;
+    const nextState = resolveAvatarForgeReferenceSelection(selection);
+    if (!nextState) {
+      setAvatarForgeReferencePreview(null);
+      setError("추천 출처가 현재 프리셋 기준과 일치하지 않아 아바타를 변경하지 않았습니다.");
+      return;
+    }
+
+    const before = captureFullState();
+    const after = serializeFullVrmState({
+      ...before,
+      avatarForge: serializeAvatarForgeState(nextState),
+    });
+    const nextHistory = commitStudioVrmFullStateHistoryTransaction(
+      fullStateHistoryRef.current,
+      before,
+      after,
+      activeModelId,
+    );
+    fullStateHistoryRef.current = nextHistory;
+    setCanUndo(nextHistory.index > 0);
+    setCanRedo(nextHistory.index < nextHistory.entries.length - 1);
+    setAvatarForgeReferencePreview(null);
+    setAvatarForgeState(nextState);
+    setError("");
+  }
+
   function handleAvatarForgeChange(rawState: AvatarForgeState) {
     if (
-      isCapturing
+      broadcastPreviewActive
+      || isCapturing
       || isSharingPose
       || isThumbnailCapturing
       || proportionRigStatus === "applying"
       || proportionRigStatus === "reload-required"
     ) return;
+    setAvatarForgeReferencePreview(null);
     const nextState = parseAvatarForgeState(rawState);
     const proportionsChanged = JSON.stringify(nextState.proportions)
       !== JSON.stringify(avatarForgeState.proportions);
@@ -5944,7 +6362,7 @@ export function StudioVrmPoser({
   }
 
   function handleSavePose() {
-    if (vrmCreativeReadOnly) return;
+    if (broadcastPreviewActive || vrmCreativeReadOnly) return;
     const label = globalThis.prompt("포즈 이름을 입력해 주세요:", `마이 포즈 ${savedPoses.length + 1}`);
     if (!label) return;
     const canonicalLabel = label.normalize("NFKC").trim().replace(/\s+/gu, " ");
@@ -5976,6 +6394,7 @@ export function StudioVrmPoser({
   }
 
   function handleDeletePose(id: string, e: MouseEvent<HTMLButtonElement>) {
+    if (broadcastPreviewActive) return;
     e.stopPropagation();
     const poseLabel = savedPoses.find((p) => p.id === id)?.label;
     void (async () => {
@@ -6052,6 +6471,7 @@ export function StudioVrmPoser({
   }
 
   async function handlePastePose() {
+    if (broadcastPreviewActive) return;
     try {
       let jsonStr = "";
       try {
@@ -6110,6 +6530,7 @@ export function StudioVrmPoser({
     } catch { alert("전체 상태 복사 실패"); }
   }
   async function handlePasteFullState() {
+    if (broadcastPreviewActive) return;
     try {
       let json = ""; try { json = await navigator.clipboard.readText(); } catch { json = sessionStorage.getItem("studio_vrm_full_clip") || ""; }
       if (!json) return alert("전체 상태 데이터 없음");
@@ -6121,7 +6542,7 @@ export function StudioVrmPoser({
     } catch { alert("붙여넣기 실패"); }
   }
   function handleSaveFullLocal() {
-    if (vrmCreativeReadOnly) return;
+    if (broadcastPreviewActive || vrmCreativeReadOnly) return;
     const name = (fullStateName || `full-${Date.now()}`)
       .normalize("NFKC")
       .trim()
@@ -6149,7 +6570,7 @@ export function StudioVrmPoser({
   }
 
   function handleDeleteFullLocal(name: string): void {
-    if (vrmCreativeReadOnly) return;
+    if (broadcastPreviewActive || vrmCreativeReadOnly) return;
     const next = { ...savedFullStatesRef.current };
     if (!Object.prototype.hasOwnProperty.call(next, name)) return;
     delete next[name];
@@ -6454,6 +6875,7 @@ export function StudioVrmPoser({
   ]);
 
   async function handleSharePoseToServer() {
+    if (broadcastPreviewActive) return;
     if (isSharingPose) {
       cancelPendingPoseShare();
       return;
@@ -6487,6 +6909,84 @@ export function StudioVrmPoser({
       return;
     }
 
+    const shareLibraryEntry = activeLibraryEntry;
+    if (
+      !shareLibraryEntry
+      || !shareLibraryEntry.contentHash
+      || activeModelIdRef.current !== shareLibraryEntry.id
+      || installedModelId !== shareLibraryEntry.id
+      || modelLoadTargetIdRef.current !== shareLibraryEntry.id
+    ) {
+      setError("현재 렌더링 중인 VRM과 이용 조건 영수증을 연결할 수 없습니다. 모델을 다시 선택한 뒤 공유해 주세요.");
+      return;
+    }
+    const shareLicenseAuthorityIsCurrent = (): boolean => {
+      const currentEntry = libraryEntriesRef.current.find(
+        (entry) => entry.id === shareLibraryEntry.id,
+      );
+      return Boolean(
+        currentEntry
+        && activeModelIdRef.current === shareLibraryEntry.id
+        && modelLoadTargetIdRef.current === shareLibraryEntry.id
+        && vrmRef.current === currentVrm
+        && currentEntry.source === shareLibraryEntry.source
+        && currentEntry.contentHash === shareLibraryEntry.contentHash
+        && currentEntry.licenseAuthority === shareLibraryEntry.licenseAuthority
+      );
+    };
+    if (!shareLicenseAuthorityIsCurrent()) {
+      setError("공유 권한을 확인하는 동안 활성 VRM이 바뀌었습니다. 현재 모델에서 다시 공유해 주세요.");
+      return;
+    }
+    const shareAttestation = prepareStudioVrmRenderedPoseMarketplaceAttestation(
+      shareLibraryEntry.licenseAuthority,
+    );
+    if (!shareAttestation.ok) {
+      setError(shareAttestation.message);
+      return;
+    }
+    if (!shareAttestation.permittedActorBases.includes("other")) {
+      setError("이 VRM은 저작자 또는 별도 이용 허락을 받은 사용자만 공유할 수 있습니다. 현재 간편 확인 경로에서는 안전하게 공유를 진행할 수 없습니다.");
+      return;
+    }
+    if (!(await confirmStudioDestructiveAction(
+      studioVrmPoseShareUseContextConsentRequest({
+        attributionText: shareAttestation.attributionText,
+        creditRequired: shareAttestation.creditRequired,
+      }),
+    ))) return;
+    if (!shareLicenseAuthorityIsCurrent()) {
+      setError("이용 맥락을 확인하는 동안 활성 VRM 또는 이용 조건 영수증이 바뀌었습니다. 현재 모델에서 다시 공유해 주세요.");
+      return;
+    }
+    const shareUseContextReceipt = createStudioVrmRenderedPoseUseContextReceipt({
+      confirmedByUser: true,
+      avatarPermissionBasis: "other",
+      publisherKind: "unknown",
+      confirmedAttributionText: shareAttestation.attributionText,
+      containsModifiedModel: true,
+      excessivelyViolent: "absent",
+      excessivelySexual: "absent",
+      politicalOrReligious: "absent",
+      antisocialOrHate: "absent",
+      shareAlike: "unknown",
+    });
+    const sharePlan = planStudioVrmRenderedPoseMarketplaceShare(
+      shareLibraryEntry.licenseAuthority,
+      {
+        useContextReceipt: shareUseContextReceipt,
+        toonspectrumRenderedPoseGrant: STUDIO_VRM_RENDERED_POSE_PLATFORM_GRANT,
+      },
+    );
+    if (!sharePlan.ok) {
+      setError([sharePlan.message, ...sharePlan.reasons].join("\n"));
+      return;
+    }
+    if (!shareLicenseAuthorityIsCurrent()) {
+      setError("공유 권한을 계획하는 동안 활성 VRM이 바뀌었습니다. 현재 모델에서 다시 공유해 주세요.");
+      return;
+    }
+
     const title = globalThis.prompt("서버에 공유할 포즈의 이름을 입력해주세요 (최대 30자):");
     if (!title) return;
 
@@ -6494,7 +6994,19 @@ export function StudioVrmPoser({
       alert("이름은 최대 30자까지 가능합니다.");
       return;
     }
-    if (!(await confirmStudioDestructiveAction(studioSharePoseConsentRequest(title)))) return;
+    if (!shareLicenseAuthorityIsCurrent()) {
+      setError("공유 권한을 확인하는 동안 활성 VRM이 바뀌었습니다. 현재 모델에서 다시 공유해 주세요.");
+      return;
+    }
+    if (!(await confirmStudioDestructiveAction(studioSharePoseConsentRequest({
+      poseTitle: title,
+      licenseLabel: creatorAssetLicenseOf(sharePlan.license).label,
+      attributionText: sharePlan.attributionText,
+    })))) return;
+    if (!shareLicenseAuthorityIsCurrent()) {
+      setError("동의하는 동안 활성 VRM 또는 이용 조건 영수증이 바뀌었습니다. 현재 모델에서 다시 공유해 주세요.");
+      return;
+    }
 
     const shareVisualAuthority = captureVisualAuthorityRef.current;
     const shareCameraIdentity = readVrmCaptureCameraIdentity();
@@ -6578,6 +7090,7 @@ export function StudioVrmPoser({
         proportionRigReceiptRef.current !== shareProportionRigReceipt ||
         avatarForgeAuthorityIdentityRef.current !== shareAvatarForgeIdentity ||
         avatarForgeFaceController.getSnapshot() !== shareFaceControllerSnapshot ||
+        !shareLicenseAuthorityIsCurrent() ||
         !shareVisualAuthorityIsCurrent() ||
         !shareXpbdSkirtAuthorityIsCurrent() ||
         webcamActiveRef.current ||
@@ -6607,7 +7120,11 @@ export function StudioVrmPoser({
         bones: stripFingerBones(bakedPose.bones),
         yOffset: bakedPose.yOffset,
       }, modelName);
-      if (!shareVisualAuthorityIsCurrent() || !shareXpbdSkirtAuthorityIsCurrent()) {
+      if (
+        !shareLicenseAuthorityIsCurrent()
+        || !shareVisualAuthorityIsCurrent()
+        || !shareXpbdSkirtAuthorityIsCurrent()
+      ) {
         throw new Error("공유 캡처 장면이 변경되었습니다.");
       }
       const rgba = captureStudioVrmRgba(gl, scene, camera, { width, height });
@@ -6629,6 +7146,7 @@ export function StudioVrmPoser({
         || dynamicPoseGenerationRef.current !== shareDynamicPoseGeneration
         || webcamActiveRef.current
         || idleAnimationRef.current
+        || !shareLicenseAuthorityIsCurrent()
         || !shareVisualAuthorityIsCurrent()
         || !shareXpbdSkirtAuthorityIsCurrent()
       ) return;
@@ -6640,9 +7158,10 @@ export function StudioVrmPoser({
         width,
         height,
         kind: "vrm_pose",
-        license: "toonspectrum-standard",
+        license: sharePlan.license,
+        attributionText: sharePlan.attributionText,
         containsAi: false,
-        rightsConfirmed: true,
+        rightsConfirmed: sharePlan.rightsConfirmed,
       }, controller.signal);
 
       alert("포즈가 성공적으로 서버에 공유되었습니다!");
@@ -6706,6 +7225,9 @@ export function StudioVrmPoser({
 
   useEffect(() => {
     if (open) return;
+    if (broadcastPreviewReceipt) {
+      finishBroadcastPreview({ restoreFocus: false });
+    }
     cancelPendingInsertCapture();
     cancelPendingPoseShare();
     cancelPendingSharedPoseCatalog();
@@ -6728,6 +7250,8 @@ export function StudioVrmPoser({
     setIsCapturing(false);
     setIsThumbnailCapturing(false);
     setIsSharingPose(false);
+    setBroadcastPreviewReceipt(null);
+    setBroadcastPreviewError("");
     captureOperationRef.current = null;
     setTexturePaintEyedropperActive(false);
     setIsViewportHandIkDragging(false);
@@ -6759,6 +7283,7 @@ export function StudioVrmPoser({
     setPhysicsPreview(false);
     setSpringJointCount(0);
   }, [
+    broadcastPreviewReceipt,
     open,
     cancelPendingSharedPoseCatalog,
     cancelPendingSharedPoseSelection,
@@ -6997,9 +7522,7 @@ export function StudioVrmPoser({
         const hydratedById = new Map(hydrated.map((entry) => [entry.id, entry] as const));
         setLibraryEntries((current) => current.map((entry) => {
           const visible = hydratedById.get(entry.id);
-          if (visible) {
-            return visible.thumbnail === entry.thumbnail ? entry : visible;
-          }
+          if (visible) return visible;
           if (
             entry.source === "memory" ||
             entry.id === activeModelIdRef.current ||
@@ -7020,6 +7543,7 @@ export function StudioVrmPoser({
     if (
       !open
       || status !== "ready"
+      || broadcastPreviewActive
       || texturePaintPersistenceStatus !== "ready"
       || !vrm
       || !activeLibraryEntry
@@ -7136,6 +7660,7 @@ export function StudioVrmPoser({
     avatarForgeState.proportions,
     bodyRotation,
     bodyScale,
+    broadcastPreviewActive,
     captureVisualAuthorityIdentity,
     customBones,
     customYOffset,
@@ -7556,6 +8081,10 @@ export function StudioVrmPoser({
   }
 
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+    if (broadcastPreviewActive) {
+      event.currentTarget.value = "";
+      return;
+    }
     const files = Array.from(event.currentTarget.files ?? []).filter((file) => /\.vrm$/i.test(file.name));
     event.currentTarget.value = "";
     if (files.length === 0) return;
@@ -7643,10 +8172,12 @@ export function StudioVrmPoser({
   }
 
   function handleSampleLoad() {
+    if (broadcastPreviewActive) return;
     loadModelFromLibraryEntry(SAMPLE_VRM_ENTRIES[0]);
   }
 
   async function handleDeleteEntry(entry: VrmLibraryEntry) {
+    if (broadcastPreviewActive) return;
     if (entry.source === "sample") return;
 
     setDeletingModelId(entry.id);
@@ -8708,7 +9239,7 @@ export function StudioVrmPoser({
   }
 
   function handleInsert() {
-    if (isCapturing || isSharingPose || isThumbnailCapturing) return;
+    if (broadcastPreviewActive || isCapturing || isSharingPose || isThumbnailCapturing) return;
     if (
       proportionRigStatus === "reload-required"
       || (
@@ -9099,8 +9630,21 @@ export function StudioVrmPoser({
         paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))",
       }}
     >
-      <div className="mx-auto flex h-full min-h-0 max-h-full max-w-[1280px] flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-[0_24px_80px_oklch(0.05_0.01_70/0.55)]">
-        <header className="flex shrink-0 items-start justify-between gap-3 border-b border-line px-4 py-3 sm:px-5">
+      <div
+        className={cx(
+          "relative mx-auto flex h-full min-h-0 max-h-full flex-col overflow-hidden bg-panel",
+          broadcastPreviewActive
+            ? "max-w-none rounded-none border-0 shadow-none"
+            : "max-w-[1280px] rounded-2xl border border-line shadow-[0_24px_80px_oklch(0.05_0.01_70/0.55)]",
+        )}
+      >
+        <header
+          hidden={broadcastPreviewActive}
+          className={cx(
+            "flex shrink-0 items-start justify-between gap-3 border-b border-line px-4 py-3 sm:px-5",
+            broadcastPreviewActive && "!hidden",
+          )}
+        >
           <div className="min-w-0">
             <p className="eyebrow flex items-center gap-1.5 text-accent">
               <UserRound size={14} aria-hidden />
@@ -9136,7 +9680,7 @@ export function StudioVrmPoser({
           </button>
         </header>
 
-        {recentPreferencesSnapshot.state === "memory-only" ? (
+        {!broadcastPreviewActive && recentPreferencesSnapshot.state === "memory-only" ? (
           <div
             className="flex shrink-0 items-center justify-between gap-3 border-b border-warn/30 bg-warn/10 px-4 py-2 text-[0.68rem] leading-relaxed text-warn sm:px-5"
             role="status"
@@ -9158,21 +9702,38 @@ export function StudioVrmPoser({
             (행을 안 잡으면 패널이 모달 밖으로 흘러 하단의 웹캠/푸터가 잘림). 데스크톱(lg): 2단 컬럼. */}
         <div
           className={cx(
-            "grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] lg:grid-rows-1",
-            texturePaintModeSelected
-              ? "grid-rows-[minmax(0,2fr)_minmax(0,3fr)] sm:grid-rows-[minmax(0,1fr)_minmax(0,1fr)]"
-              : "grid-rows-[minmax(0,36dvh)_minmax(0,1fr)] sm:grid-rows-[minmax(0,40dvh)_minmax(0,1fr)]",
+            "grid min-h-0 flex-1 grid-cols-1 lg:grid-rows-1",
+            broadcastPreviewActive
+              ? "grid-rows-1 lg:grid-cols-1"
+              : texturePaintModeSelected
+                ? "grid-rows-[minmax(0,2fr)_minmax(0,3fr)] sm:grid-rows-[minmax(0,1fr)_minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_360px]"
+                : "grid-rows-[minmax(0,36dvh)_minmax(0,1fr)] sm:grid-rows-[minmax(0,40dvh)_minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_360px]",
           )}
         >
-          <section className="relative min-h-0 overflow-hidden bg-card lg:min-h-0">
+          <section
+            aria-hidden={broadcastPreviewActive || undefined}
+            className="relative min-h-0 overflow-hidden bg-card lg:min-h-0"
+            inert={broadcastPreviewActive ? true : undefined}
+          >
             <div
               aria-hidden
               className="absolute inset-0 opacity-80 [background-image:linear-gradient(45deg,oklch(0.75_0.01_80/0.16)_25%,transparent_25%),linear-gradient(-45deg,oklch(0.75_0.01_80/0.16)_25%,transparent_25%),linear-gradient(45deg,transparent_75%,oklch(0.75_0.01_80/0.16)_75%),linear-gradient(-45deg,transparent_75%,oklch(0.75_0.01_80/0.16)_75%)] [background-position:0_0,0_12px,12px_-12px,-12px_0] [background-size:24px_24px]"
             />
-            <div className="relative mx-auto flex h-full max-h-full min-h-0 w-full max-w-[min(82vw,720px)] items-center justify-center p-2 sm:p-5 lg:max-h-[calc(100dvh-12rem)] lg:min-h-[420px]">
+            <div
+              className={cx(
+                "relative mx-auto flex h-full min-h-0 w-full items-center justify-center",
+                broadcastPreviewActive
+                  ? "max-h-none max-w-none p-0 lg:min-h-0"
+                  : "max-h-full max-w-[min(82vw,720px)] p-2 sm:p-5 lg:max-h-[calc(100dvh-12rem)] lg:min-h-[420px]",
+              )}
+            >
               <div
+                ref={broadcastViewportHostRef}
                 className={cx(
-                  "relative aspect-[9/13] h-full max-h-full min-h-0 w-auto overflow-hidden rounded-xl border border-line/80 bg-transparent shadow-[inset_0_0_0_1px_oklch(1_0_0/0.04)] lg:min-h-[390px]",
+                  "relative h-full min-h-0 overflow-hidden bg-transparent",
+                  broadcastPreviewActive
+                    ? "max-h-none w-full rounded-none border-0 shadow-none lg:min-h-0"
+                    : "aspect-[9/13] max-h-full w-auto rounded-xl border border-line/80 shadow-[inset_0_0_0_1px_oklch(1_0_0/0.04)] lg:min-h-[390px]",
                 )}
                 style={{
                   cursor: texturePaintInteractionEnabled
@@ -9224,7 +9785,7 @@ export function StudioVrmPoser({
                   }}
                   camera={{ fov: activeCamera.fov, position: [...activeCamera.position], near: 0.1, far: 20 }}
                   className="h-full w-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent"
-                  dpr={[1, 2]}
+                  dpr={broadcastPreviewActive ? broadcastCanvasDpr : [1, 2]}
                   frameloop={vrmFrameLoop}
                   gl={{ alpha: true, antialias: true }}
                   onCreated={({ gl }) => {
@@ -9236,6 +9797,14 @@ export function StudioVrmPoser({
                   }}
                 >
                   <CaptureBridge onCaptureUpdate={onCaptureUpdate} />
+                  {broadcastPreviewReceipt ? (
+                    <StudioVrmBroadcastPreviewBridge
+                      receipt={broadcastPreviewReceipt}
+                      environmentRef={envRootRef}
+                      groundRef={groundShadowRef}
+                      onError={handleBroadcastPreviewRuntimeError}
+                    />
+                  ) : null}
                   <StudioVrmViewportReadyFrame
                     revision={`${installedModelId ?? "empty"}:${status}:${texturePaintModeSelected ? "surface" : "standard"}`}
                   />
@@ -9277,7 +9846,7 @@ export function StudioVrmPoser({
                       onTexturePaintSurfaceStateChange={setTexturePaintSurfaceToolSnapshot}
                     />
                   ) : null}
-                  {vrm && showPoseBoneOverlay && !texturePaintModeSelected && !isCapturing && !isSharingPose && !isThumbnailCapturing && !webcamActive ? (
+                  {vrm && showPoseBoneOverlay && !texturePaintModeSelected && !isCapturing && !isSharingPose && !isThumbnailCapturing && !webcamActive && !broadcastPreviewActive ? (
                     <VrmPoseBoneOverlay
                       vrm={vrm}
                       selectedBone={selectedViewportPoseBone}
@@ -9290,7 +9859,7 @@ export function StudioVrmPoser({
                   {vrm ? (
                     <StudioVrmAvatarForge
                       vrm={vrm}
-                      state={avatarForgeState}
+                      state={avatarForgeReferencePreviewActive?.state ?? avatarForgeState}
                       rigRevision={proportionRigRevision}
                       faceController={avatarForgeFaceController}
                     />
@@ -9310,6 +9879,7 @@ export function StudioVrmPoser({
                       visible={
                         jointHandlesVisible
                         && activePanelTab === "pose"
+                        && !broadcastPreviewActive
                         && !isCapturing
                         && !isSharingPose
                         && !isThumbnailCapturing
@@ -9395,6 +9965,7 @@ export function StudioVrmPoser({
                       && !jointHandleInteracting
                       && !texturePaintStrokeActive
                       && !viewportCameraInteractionLocked
+                      && !broadcastPreviewActive
                     }
                     enableRotate={!texturePaintInteractionEnabled}
                     enableDamping
@@ -9406,6 +9977,7 @@ export function StudioVrmPoser({
                       && !jointHandleInteracting
                       && !isViewportHandIkDragging
                       && !viewportCameraInteractionLocked
+                      && !broadcastPreviewActive
                     }
                     autoRotateSpeed={1.6}
                     minDistance={1.3}
@@ -9415,7 +9987,7 @@ export function StudioVrmPoser({
                   />
                 </Canvas>
 
-                {vrm ? (
+                {vrm && !broadcastPreviewActive ? (
                   <>
                     <div className="absolute left-2.5 top-2.5 z-10 flex flex-col gap-1.5">
                       <StudioToolHintTarget
@@ -9598,7 +10170,15 @@ export function StudioVrmPoser({
             </div>
           </section>
 
-          <aside className="flex min-h-0 flex-col border-t border-line bg-panel lg:border-l lg:border-t-0">
+          <aside
+            aria-hidden={broadcastPreviewActive || undefined}
+            hidden={broadcastPreviewActive}
+            inert={broadcastPreviewActive ? true : undefined}
+            className={cx(
+              "flex min-h-0 flex-col border-t border-line bg-panel lg:border-l lg:border-t-0",
+              broadcastPreviewActive && "!hidden",
+            )}
+          >
             <div role="tablist" aria-label="컨트롤 카테고리" className="grid shrink-0 grid-cols-5 gap-1 border-b border-line bg-panel/95 px-2 py-2 backdrop-blur sm:px-3">
               {PANEL_TABS.map((tab) => {
                 const TabIcon = tab.icon;
@@ -9723,6 +10303,16 @@ export function StudioVrmPoser({
                   }
                   onChange={handleAvatarForgeChange}
                 />
+                <div className="mt-3">
+                  <StudioVrmAvatarReferenceRecommendationsPanel
+                    catalogue={STUDIO_VRM_AVATAR_REFERENCE_APPROVED_CATALOGUE}
+                    disabled={avatarForgeReferenceInteractionBlocked()}
+                    previewingPresetId={avatarForgeReferencePreviewActive?.presetId ?? null}
+                    onPreview={handleAvatarForgeReferencePreview}
+                    onPreviewClear={() => setAvatarForgeReferencePreview(null)}
+                    onApply={handleAvatarForgeReferenceApply}
+                  />
+                </div>
               </section>
 
               <StudioVrmTexturePaintPanel
@@ -11251,6 +11841,19 @@ export function StudioVrmPoser({
                 </div>
               </section>
 
+              <div hidden={hideOnTab("scene")}>
+                <StudioVrmBroadcastPreviewPanel
+                  backgroundId={broadcastBackgroundId}
+                  disabledReason={broadcastPreviewDisabledReason}
+                  error={broadcastPreviewError || null}
+                  onBackgroundChange={(backgroundId) => {
+                    setBroadcastBackgroundId(backgroundId);
+                    setBroadcastPreviewError("");
+                  }}
+                  onStart={handleBroadcastPreviewStart}
+                />
+              </div>
+
               {/* ── 고도화 컨트롤 (body scale, lighting+, env, full state) ── */}
               <details hidden={hideOnTab("scene")} className="group mt-4 rounded-xl border border-line bg-card/45 p-3">
                 <summary className="mb-3 flex cursor-pointer list-none items-center gap-1.5 text-sm font-bold text-fg [&::-webkit-details-marker]:hidden">
@@ -12411,6 +13014,13 @@ export function StudioVrmPoser({
             </footer>
           </aside>
         </div>
+        {broadcastPreviewReceipt ? (
+          <StudioVrmBroadcastPreviewOverlay
+            receipt={broadcastPreviewReceipt}
+            exitButtonRef={broadcastExitButtonRef}
+            onExit={() => finishBroadcastPreview({ restoreFocus: true })}
+          />
+        ) : null}
       </div>
     </div>,
     document.body

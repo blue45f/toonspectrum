@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState, type ChangeEventHandler } from "react";
 
+import { presentStudioVrmLicenseAuthority } from "./studio-vrm-license-product-gate";
+
 import type { VrmLibraryEntry } from "./vrm-library";
 
 const LIBRARY_BATCH_SIZE = 12;
@@ -222,6 +224,7 @@ export function StudioVrmCharacterLibraryPanel({
       </button>
       <p className="mt-2 rounded-xl border border-line bg-card/60 px-3 py-2 text-xs leading-relaxed text-fg-3">
         여러 .vrm 파일을 한 번에 올려 로맨스, 판타지, 학원물, 액션 등 장르별 캐릭터를 전환하세요. VRoid Studio에서 무료 애니메이션풍 VRM 캐릭터를 직접 만들 수 있습니다.
+        이용 조건이 없거나 손상된 모델도 로컬 미리보기는 가능하지만, 모델 파일을 포함하는 archive·내보내기·공유는 확인 전까지 차단됩니다.
       </p>
 
       <details className="group mt-3 rounded-xl border border-line bg-accent-soft/30 p-3">
@@ -381,6 +384,9 @@ export function StudioVrmCharacterLibraryPanel({
         {visibleEntries.map((entry) => {
           const isActive = entry.id === activeModelId;
           const isDeleting = deletingModelId === entry.id;
+          const licensePresentation = entry.source === "sample"
+            ? null
+            : presentStudioVrmLicenseAuthority(entry.licenseAuthority);
 
           return (
             <div
@@ -423,6 +429,50 @@ export function StudioVrmCharacterLibraryPanel({
                   </span>
                 </span>
               </button>
+
+              {licensePresentation ? (
+                <details
+                  className="group/license mx-2.5 mb-2 rounded-lg border border-line/80 bg-panel/70 px-2 py-1.5 text-[0.68rem]"
+                  data-studio-vrm-license-authority={licensePresentation.tone}
+                >
+                  <summary
+                    className={cx(
+                      "flex min-h-7 cursor-pointer list-none items-center gap-1 font-bold [&::-webkit-details-marker]:hidden",
+                      licensePresentation.tone === "positive"
+                        ? "text-success"
+                        : licensePresentation.tone === "blocking"
+                          ? "text-danger"
+                          : "text-accent",
+                    )}
+                  >
+                    <AlertTriangle size={11} aria-hidden />
+                    {licensePresentation.badge}
+                    <ChevronDown
+                      className="ml-auto transition-transform group-open/license:rotate-180"
+                      size={11}
+                      aria-hidden
+                    />
+                  </summary>
+                  <p className="mt-1 leading-relaxed text-fg-2">
+                    {licensePresentation.summary}
+                  </p>
+                  <ul className="mt-1 list-disc space-y-0.5 pl-3.5 text-fg-3">
+                    {licensePresentation.details.map((detail) => (
+                      <li key={detail}>{detail}</li>
+                    ))}
+                  </ul>
+                  {licensePresentation.licenseUrl ? (
+                    <a
+                      href={licensePresentation.licenseUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-1 inline-flex min-h-7 items-center gap-1 font-semibold text-accent underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                    >
+                      라이선스 문서 <ExternalLink size={10} aria-hidden />
+                    </a>
+                  ) : null}
+                </details>
+              ) : null}
 
               {entry.source !== "sample" ? (
                 <button

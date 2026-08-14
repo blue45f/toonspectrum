@@ -2,6 +2,12 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { formatStudioDestructivePreview } from "./studio-destructive-action-preview";
+import {
+  studioSharePoseConsentRequest,
+  studioVrmPoseShareUseContextConsentRequest,
+} from "./studio-destructive-command-catalog";
+
 const source = readFileSync(new URL("./StudioVrmPoser.tsx", import.meta.url), "utf8");
 const studioPageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
 const studioLazyPanelStackSource = readFileSync(
@@ -136,23 +142,68 @@ describe("Studio VRM visual pose bone boundary", () => {
   });
 
   it("bounds server sharing and releases local capture helpers before upload", () => {
-    const readbackIndex = source.indexOf("const rgba = captureStudioVrmRgba(gl, scene, camera, { width, height });");
-    const releaseIndex = source.indexOf("releaseLocalCapture();", readbackIndex);
-    const encodeIndex = source.indexOf("await encodeStudioVrmCapturePngDataUrl(", releaseIndex);
-    const uploadIndex = source.indexOf("await publishAsset({", releaseIndex);
+    const shareStart = source.indexOf("async function handleSharePoseToServer()");
+    const shareEnd = source.indexOf("\n  // Effect Event", shareStart);
+    const shareSource = source.slice(shareStart, shareEnd);
+    const disclosureIndex = shareSource.indexOf(
+      "prepareStudioVrmRenderedPoseMarketplaceAttestation(",
+    );
+    const useContextConsentIndex = shareSource.indexOf(
+      "studioVrmPoseShareUseContextConsentRequest({",
+      disclosureIndex,
+    );
+    const receiptIndex = shareSource.indexOf(
+      "createStudioVrmRenderedPoseUseContextReceipt({",
+      useContextConsentIndex,
+    );
+    const plannerIndex = shareSource.indexOf("planStudioVrmRenderedPoseMarketplaceShare(");
+    const plannerGuardIndex = shareSource.indexOf("if (!sharePlan.ok)", plannerIndex);
+    const promptIndex = shareSource.indexOf("globalThis.prompt(", plannerGuardIndex);
+    const consentIndex = shareSource.indexOf("studioSharePoseConsentRequest({", promptIndex);
+    const captureLeaseIndex = shareSource.indexOf('acquireVrmCaptureOperation("share")', consentIndex);
+    const readbackIndex = shareSource.indexOf("const rgba = captureStudioVrmRgba(gl, scene, camera, { width, height });");
+    const releaseIndex = shareSource.indexOf("releaseLocalCapture();", readbackIndex);
+    const encodeIndex = shareSource.indexOf("await encodeStudioVrmCapturePngDataUrl(", releaseIndex);
+    const uploadIndex = shareSource.indexOf("await publishAsset({", releaseIndex);
+    const uploadEnd = shareSource.indexOf("}, controller.signal)", uploadIndex);
+    const uploadSource = shareSource.slice(uploadIndex, uploadEnd);
 
     expect(source).toContain("const STUDIO_VRM_SHARE_TIMEOUT_MS = 30_000");
     expect(source).toContain("const sharePoseAbortRef = useRef<AbortController | null>(null)");
     expect(source).toContain("controller.abort()");
     expect(source).toContain("}, controller.signal)");
-    // 권리 확인 문구는 파괴/게시 승인 카탈로그가 소유하고, 포저는 그 요청을 거쳐서만
-    // 업로드에 진입한다. 문구가 코드에서 사라지면 두 검사 중 하나가 반드시 깨진다.
-    expect(source).toContain("studioSharePoseConsentRequest(title)");
-    expect(destructiveCatalogSource).toContain("ToonSpectrum 표준 사용권으로 공유할 권한");
-    expect(source).toContain('license: "toonspectrum-standard"');
-    expect(source).toContain('containsAi: false');
-    expect(source).toContain('tags: ["VRM", "3D 데생 인형", "포즈"]');
-    expect(source).toContain("rightsConfirmed: true");
+    expect(shareSource).toContain("const shareLibraryEntry = activeLibraryEntry");
+    expect(shareSource).toContain("shareLibraryEntry.licenseAuthority,");
+    expect(shareSource).toContain('avatarPermissionBasis: "other"');
+    expect(shareSource).toContain('publisherKind: "unknown"');
+    expect(shareSource).toContain(
+      "confirmedAttributionText: shareAttestation.attributionText",
+    );
+    expect(shareSource).toContain("containsModifiedModel: true");
+    expect(shareSource).toContain('excessivelyViolent: "absent"');
+    expect(shareSource).toContain('excessivelySexual: "absent"');
+    expect(shareSource).toContain('politicalOrReligious: "absent"');
+    expect(shareSource).toContain('antisocialOrHate: "absent"');
+    expect(shareSource).not.toContain("containsViolentContent: false");
+    expect(shareSource).not.toContain("containsSexualContent: false");
+    expect(shareSource).toContain("STUDIO_VRM_RENDERED_POSE_PLATFORM_GRANT");
+    expect(disclosureIndex).toBeGreaterThan(-1);
+    expect(useContextConsentIndex).toBeGreaterThan(disclosureIndex);
+    expect(receiptIndex).toBeGreaterThan(useContextConsentIndex);
+    expect(plannerIndex).toBeGreaterThan(receiptIndex);
+    expect(plannerGuardIndex).toBeGreaterThan(plannerIndex);
+    expect(promptIndex).toBeGreaterThan(plannerGuardIndex);
+    expect(consentIndex).toBeGreaterThan(promptIndex);
+    expect(captureLeaseIndex).toBeGreaterThan(consentIndex);
+    expect(shareSource).toContain("licenseLabel: creatorAssetLicenseOf(sharePlan.license).label");
+    expect(shareSource).toContain("attributionText: sharePlan.attributionText");
+    expect(uploadSource).toContain("license: sharePlan.license");
+    expect(uploadSource).toContain("attributionText: sharePlan.attributionText");
+    expect(uploadSource).toContain("rightsConfirmed: sharePlan.rightsConfirmed");
+    expect(uploadSource).not.toContain('license: "toonspectrum-standard"');
+    expect(uploadSource).not.toContain("rightsConfirmed: true");
+    expect(shareSource).toContain('containsAi: false');
+    expect(shareSource).toContain('tags: ["VRM", "3D 데생 인형", "포즈"]');
     expect(source).not.toContain("preserveDrawingBuffer: true");
     expect(source).not.toContain('gl.domElement.toDataURL("image/png")');
     expect(source).toContain('{isSharingPose ? "공유 취소" : "포즈 서버에 공유"}');
@@ -160,6 +211,88 @@ describe("Studio VRM visual pose bone boundary", () => {
     expect(releaseIndex).toBeGreaterThan(readbackIndex);
     expect(encodeIndex).toBeGreaterThan(releaseIndex);
     expect(uploadIndex).toBeGreaterThan(encodeIndex);
+  });
+
+  it("keeps the share receipt bound to the exact active model and retains authority-only hydration", () => {
+    const shareStart = source.indexOf("async function handleSharePoseToServer()");
+    const shareEnd = source.indexOf("\n  // Effect Event", shareStart);
+    const shareSource = source.slice(shareStart, shareEnd);
+    const publishIndex = shareSource.indexOf("await publishAsset({");
+    const lastAuthorityCheck = shareSource.lastIndexOf(
+      "!shareLicenseAuthorityIsCurrent()",
+      publishIndex,
+    );
+    const hydrationStart = source.indexOf("const handleVisibleVrmThumbnailWindow = useCallback(");
+    const hydrationEnd = source.indexOf("\n\n  useEffect(() =>", hydrationStart);
+    const hydrationSource = source.slice(hydrationStart, hydrationEnd);
+
+    expect(shareSource).toContain("!shareLibraryEntry.contentHash");
+    expect(shareSource).toContain("activeModelIdRef.current === shareLibraryEntry.id");
+    expect(shareSource).toContain("modelLoadTargetIdRef.current === shareLibraryEntry.id");
+    expect(shareSource).toContain("vrmRef.current === currentVrm");
+    expect(shareSource).toContain("currentEntry.source === shareLibraryEntry.source");
+    expect(shareSource).toContain("currentEntry.contentHash === shareLibraryEntry.contentHash");
+    expect(shareSource).toContain(
+      "currentEntry.licenseAuthority === shareLibraryEntry.licenseAuthority",
+    );
+    expect(shareSource.match(/shareLicenseAuthorityIsCurrent\(\)/gu)?.length ?? 0)
+      .toBeGreaterThanOrEqual(5);
+    expect(lastAuthorityCheck).toBeGreaterThan(-1);
+    expect(lastAuthorityCheck).toBeLessThan(publishIndex);
+    expect(hydrationSource).toContain("const visible = hydratedById.get(entry.id)");
+    expect(hydrationSource).toContain("if (visible) return visible;");
+    expect(hydrationSource).not.toContain(
+      "visible.thumbnail === entry.thumbnail ? entry : visible",
+    );
+  });
+
+  it("shows bounded plain platform-license consent, exact credit, and explicit attestations", () => {
+    const ccByCredit = "Pose model · Model Creator · CC_BY";
+    const attestationPreview = formatStudioDestructivePreview(
+      studioVrmPoseShareUseContextConsentRequest({
+        attributionText: ccByCredit,
+        creditRequired: true,
+      }),
+    );
+    expect(attestationPreview).toContain(
+      "나는 이 아바타의 저작자도, 별도 이용 허락을 받은 사람도 아닙니다",
+    );
+    expect(attestationPreview).toContain(
+      "과도한 폭력, 과도한 성적 표현, 정치·종교적 이용, 반사회적·혐오 이용에 해당하지 않습니다",
+    );
+    expect(attestationPreview).toContain(
+      `게시할 크레딧(변경 없이 게시): ${ccByCredit}`,
+    );
+    const ccByPreview = formatStudioDestructivePreview(studioSharePoseConsentRequest({
+      poseTitle: "영웅 포즈",
+      licenseLabel: "CC BY 4.0",
+      attributionText: ccByCredit,
+    }));
+    expect(ccByPreview).toContain("CC BY 4.0 조건을 검토했습니다");
+    expect(ccByPreview).toContain(`필수 크레딧 “${ccByCredit}”을 변경하지 않고`);
+    expect(ccByPreview).toContain("개조된 VRM 렌더 포즈");
+
+    const cc0Preview = formatStudioDestructivePreview(
+      studioVrmPoseShareUseContextConsentRequest({
+        attributionText: "",
+        creditRequired: false,
+      }),
+    );
+    expect(cc0Preview).toContain("별도 크레딧을 요구하지 않습니다");
+
+    const hostilePreview = formatStudioDestructivePreview(
+      studioVrmPoseShareUseContextConsentRequest({
+        attributionText: `작가\u0000\n\u202e${"다".repeat(300)}`,
+        creditRequired: true,
+      }),
+    );
+    expect(hostilePreview).not.toContain("\n\u202e");
+    expect(hostilePreview).not.toContain("\u0000");
+    expect(hostilePreview).not.toContain("다".repeat(161));
+    expect(Array.from(hostilePreview).length).toBeLessThan(700);
+    expect(destructiveCatalogSource).not.toContain(
+      "ToonSpectrum 표준 사용권으로 공유할 권한",
+    );
   });
 
   it("cancels stale insert encodes and captures independently of the default framebuffer", () => {
