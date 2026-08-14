@@ -31,18 +31,18 @@ function successPlan(assetId: string): StudioBg3dProceduralInsertionPlan {
 afterEach(cleanup);
 
 describe("StudioBg3dProceduralStarterPanel", () => {
-  it("exposes original/CC0 provenance and paginates the twelve-item catalog", () => {
+  it("exposes original/CC0 provenance and paginates the expanded catalog", () => {
     render(
       <StudioBg3dProceduralStarterPanel onInsert={(assetId) => successPlan(assetId)} />,
     );
 
     expect(screen.getByText("오리지널 · CC0")).toBeTruthy();
     expect(screen.getByText(/직접 제작 · CC0 1.0/)).toBeTruthy();
-    expect(screen.getByText("12개 찾음 · WebGL2/WebGPU 공용 · 외부 리소스 0")).toBeTruthy();
+    expect(screen.getByText("17개 찾음 · WebGL2/WebGPU 공용 · 외부 리소스 0")).toBeTruthy();
     expect(screen.getAllByRole("button", { name: /장면에 추가$/ })).toHaveLength(6);
 
-    fireEvent.click(screen.getByRole("button", { name: "에셋 6개 더 보기" }));
-    expect(screen.getAllByRole("button", { name: /장면에 추가$/ })).toHaveLength(12);
+    fireEvent.click(screen.getByRole("button", { name: "에셋 11개 더 보기" }));
+    expect(screen.getAllByRole("button", { name: /장면에 추가$/ })).toHaveLength(17);
     expect(screen.getByRole("button", { name: "처음 6개만 보기" })).toBeTruthy();
   });
 
@@ -54,7 +54,7 @@ describe("StudioBg3dProceduralStarterPanel", () => {
     fireEvent.change(screen.getByRole("searchbox", { name: "절차형 3D 에셋 검색" }), {
       target: { value: "가구" },
     });
-    expect(screen.getAllByRole("button", { name: /장면에 추가$/ })).toHaveLength(3);
+    expect(screen.getAllByRole("button", { name: /장면에 추가$/ })).toHaveLength(6);
 
     fireEvent.click(screen.getByRole("radio", { name: "문·창호" }));
     expect(screen.getByText("0개 찾음 · WebGL2/WebGPU 공용 · 외부 리소스 0")).toBeTruthy();
