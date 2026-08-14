@@ -262,6 +262,13 @@ interface DesktopBrushResult {
   evidence: BrushStrokeEvidence[];
   screenshot: string;
   catalogScreenshot: string;
+  /**
+   * Escape hatches, recorded so a receipt produced with one on can never read like a full run:
+   * the external-origin skip drops the picker/catalogue equality check, and survey mode keeps
+   * going past a failing preset.
+   */
+  uiCatalogMatchSkipped: boolean;
+  surveyMode: boolean;
   errorCount: number;
 }
 
@@ -989,11 +996,20 @@ function strokePoint(
   const column = index % 7;
   const row = Math.floor(index / 7);
   const rows = Math.max(1, Math.ceil(BRUSH_MATRIX_CATALOG_COUNT / 7));
+  const x = safeLeft + ((safeRight - safeLeft) * column) / 6;
+  const y = safeTop + ((safeBottom - safeTop) * (row + 0.5)) / rows;
+  const reach = intentionalDiscreteCarrier ? 6 : 1;
+  // Column 6 sits exactly on safeRight, so a discrete carrier's 6x gesture would end on the
+  // inspector: the stroke still paints (Konva captured the pointer) but the evidence clip then
+  // spans chrome whose hover state differs between captures, and the undo comparison measures
+  // that instead of ink. Fold the gesture back inside rather than shortening it.
+  const foldIntoSafeArea = (start: number, delta: number, low: number, high: number): number =>
+    start + delta > high || start + delta < low ? -delta : delta;
   return {
-    x: safeLeft + ((safeRight - safeLeft) * column) / 6,
-    y: safeTop + ((safeBottom - safeTop) * (row + 0.5)) / rows,
-    dx: (index % 2 === 0 ? 9 : 7) * (intentionalDiscreteCarrier ? 6 : 1),
-    dy: (index % 3 === 0 ? 3 : -2) * (intentionalDiscreteCarrier ? 6 : 1),
+    x,
+    y,
+    dx: foldIntoSafeArea(x, (index % 2 === 0 ? 9 : 7) * reach, safeLeft, safeRight),
+    dy: foldIntoSafeArea(y, (index % 3 === 0 ? 3 : -2) * reach, safeTop, safeBottom),
   };
 }
 
@@ -1401,6 +1417,8 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
         STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS,
         "paint",
       );
+    } else {
+      log("desktop: UI/catalogue equality SKIPPED (external origin) — receipt records the skip");
     }
     await page.screenshot({ path: catalogScreenshot, animations: "disabled" });
     await firstCatalog.locator('[data-studio-brush-library-close="true"]').click();
@@ -1891,6 +1909,8 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
       evidence,
       screenshot,
       catalogScreenshot,
+      uiCatalogMatchSkipped: skipUiCatalogMatch,
+      surveyMode: DESKTOP_SURVEY_MODE,
       errorCount: errors.messages.length + errors.failedResponses.length,
     };
   } finally {
@@ -3685,6 +3705,8 @@ function writeBrowserEvidenceReceipt(run: {
         .length,
       undoPassed: desktop.evidence.filter((entry) => entry.undoRestoredPixels).length,
       redoPassed: desktop.evidence.filter((entry) => entry.redoRestoredStroke).length,
+      uiCatalogMatchSkipped: desktop.uiCatalogMatchSkipped,
+      surveyMode: desktop.surveyMode,
       errorCount: desktop.errorCount,
     },
     longRouteCore: {

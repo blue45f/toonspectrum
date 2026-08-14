@@ -27,6 +27,9 @@ interface StudioBrushBrowserEvidence {
     readonly selectedAndRendered: number;
     readonly undoPassed: number;
     readonly redoPassed: number;
+    /** Escape hatches; a receipt that used one is not the wave's proof. */
+    readonly uiCatalogMatchSkipped: boolean;
+    readonly surveyMode: boolean;
     readonly errorCount: number;
   };
   readonly longRouteCore: {
@@ -111,6 +114,11 @@ describe("Studio brush browser evidence", () => {
       selectedAndRendered: listedTotal,
       undoPassed: listedTotal,
       redoPassed: listedTotal,
+      // A run against an external origin may skip the picker/catalogue equality check, and survey
+      // mode continues past a failing preset. Either makes the numbers above mean less than they
+      // read, so neither may appear in the receipt this test pins.
+      uiCatalogMatchSkipped: false,
+      surveyMode: false,
       errorCount: 0,
     });
     const listedCoreCount = STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS.filter(
