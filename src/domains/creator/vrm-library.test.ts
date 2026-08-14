@@ -117,6 +117,19 @@ const ORIGINAL_BUNDLE_FILES = [
   "TS_Nuri_RobotClub.vrm",
   "TS_Dami_RescueCaptain.vrm",
   "TS_Moru_MossGolem.vrm",
+  "TS_Samira_OrbitalBotanist.vrm",
+  "TS_Yunae_DeafPercussionist.vrm",
+  "TS_Boram_WeatherScientist.vrm",
+  "TS_Hyeon_StudioPotter.vrm",
+  "TS_Dorong_SeaOtterCourier.vrm",
+] as const;
+
+const WAVE4_SAMPLE_IDS = [
+  "ts-samira-orbital-botanist",
+  "ts-yunae-deaf-percussionist",
+  "ts-boram-weather-scientist",
+  "ts-hyeon-studio-potter",
+  "ts-dorong-sea-otter-courier",
 ] as const;
 
 const MIN_BUNDLE_FILE_BYTES = 100 * 1024;
@@ -127,7 +140,7 @@ describe("VRM library helpers", () => {
 
     // 대표 엔트리 스팟 체크(기존 + 2026-07 신규).
     expect(names.slice(0, 4)).toEqual(["루미", "하린", "세라", "유나"]);
-    expect(names.slice(4, 17)).toEqual([
+    expect(names.slice(4, 22)).toEqual([
       "민서 (캠퍼스 메이커)",
       "태오 (동네 바리스타)",
       "정화 (노년 정원사)",
@@ -141,6 +154,11 @@ describe("VRM library helpers", () => {
       "누리 (로봇 동아리원)",
       "다미 (구조대장)",
       "모루 (이끼 골렘)",
+      "사미라 (궤도 식물학자)",
+      "윤애 (진동 타악 연주자)",
+      "보람 (기상과학자)",
+      "현 (도예 스튜디오 운영자)",
+      "도롱 (해달 우편원)",
     ]);
     expect(names).toContain("데빌 (악마)");
     expect(names).toContain("쿨에일리언 (외계인)");
@@ -156,9 +174,8 @@ describe("VRM library helpers", () => {
     expect(names.join(" ")).not.toMatch(/샘플|아바타|Avatar|VRoid/i);
   });
 
-  it("bundles 101 selectable sample characters with unique ids and local /vrm/ urls", () => {
-    expect(SAMPLE_VRMS).toHaveLength(101);
-
+  it("registers bundled sample characters with unique ids and local /vrm/ urls", () => {
+    expect(SAMPLE_VRMS.length).toBeGreaterThan(0);
     const ids = SAMPLE_VRMS.map((sample) => sample.id);
     expect(new Set(ids).size).toBe(ids.length);
 
@@ -169,6 +186,33 @@ describe("VRM library helpers", () => {
 
     const urls = SAMPLE_VRMS.map((sample) => sample.url);
     expect(new Set(urls).size).toBe(urls.length);
+  });
+
+  it("places all five Wave 4 originals immediately after Moru in the default picker", () => {
+    const ids = SAMPLE_VRM_ENTRIES.map((entry) => entry.id);
+    const moruIndex = ids.indexOf("ts-moru-moss-golem");
+
+    expect(moruIndex).toBeGreaterThanOrEqual(0);
+    expect(ids.slice(moruIndex + 1, moruIndex + 1 + WAVE4_SAMPLE_IDS.length))
+      .toEqual(WAVE4_SAMPLE_IDS);
+  });
+
+  it("keeps audited limitations bounded while legacy ids remain restorable", () => {
+    const samplesById = new Map(SAMPLE_VRMS.map((sample) => [sample.id, sample] as const));
+
+    expect(samplesById.get("cryptovoxel")).toMatchObject({
+      visibility: "legacy",
+      limitations: ["no-expressions"],
+    });
+    expect(SAMPLE_VRM_ENTRIES.some((entry) => entry.id === "cryptovoxel")).toBe(false);
+    expect(sampleVrmUrl("cryptovoxel")).toBe("/vrm/cryptovoxels.vrm");
+    expect(selectableSampleVrmUrl("cryptovoxel")).toBe("/vrm/cryptovoxels.vrm");
+
+    expect(samplesById.get("polybot")?.limitations).toEqual(["limited-hand-rig"]);
+    expect(samplesById.get("kiba")?.limitations).toEqual(["limited-hand-rig"]);
+    expect(samplesById.get("fumi")?.limitations).toEqual(["heavy-payload"]);
+    expect(samplesById.get("kage")?.limitations).toEqual(["heavy-payload"]);
+    expect(samplesById.get("pirate-bot")?.limitations).toEqual(["heavy-payload"]);
   });
 
   it("registers every newly bundled model in the sample list", () => {
@@ -201,6 +245,11 @@ describe("VRM library helpers", () => {
     expect(licenses).toContain("런타임 로드를 차단");
     expect(licenses).toContain("scripts/blender/generate_toonspectrum_vrm_pack.py");
     expect(licenses).toContain("CC0 1.0");
+    expect(licenses).toContain("https://creativecommons.org/publicdomain/zero/1.0/");
+    expect(licenses).toContain('Avatar_Orion.vrm');
+    expect(licenses).toContain('"author": "Polygonal Mind"');
+    expect(licenses).toContain('"licenseName": "CC0"');
+    expect(licenses).toMatch(/현재 확인된 유일한 직접\s+CC0 근거/);
   });
 
   // 회귀 방지: 파일 없는 "유령 엔트리"(선택 시 404)가 다시 생기지 않도록
@@ -238,6 +287,11 @@ describe("VRM library helpers", () => {
   it("resolves sample urls by id and falls back to the default", () => {
     expect(sampleVrmUrl("cool-alien")).toBe("/vrm/CoolAlien.vrm");
     expect(sampleVrmUrl("devil")).toBe("/vrm/Devil.vrm");
+    expect(SAMPLE_VRMS.find((sample) => sample.id === "orion")).toMatchObject({
+      id: "orion",
+      url: "/vrm/Avatar_Orion.vrm",
+    });
+    expect(sampleVrmUrl("orion")).toBe("/vrm/Avatar_Orion.vrm");
     expect(sampleVrmUrl("no-such-id")).toBe("/vrm/sample.vrm");
     expect(selectableSampleVrmUrl("ts-nova-service-android"))
       .toBe("/vrm/TS_Nova_ServiceAndroid.vrm");

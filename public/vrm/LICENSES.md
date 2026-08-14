@@ -25,11 +25,12 @@ ToonSpectrum 스튜디오(/studio)에 번들된 VRM 캐릭터 모델의 출처�
 
 ## ToonSpectrum 오리지널 VRM 1.0 캐릭터 팩 (2026-08)
 
-아래 13종은 외부 모델이나 텍스처를 사용하지 않고 ToonSpectrum이 Blender MCP와
-`scripts/blender/generate_toonspectrum_vrm_pack.py`로 직접 생성한 절차형 캐릭터입니다.
-Blender 5.2 및 VRM Add-on 4.5의 정식 `export_scene.vrm` 경로로 내보냈으며, 각 파일 안에
+아래 18종은 외부 모델이나 텍스처를 사용하지 않고 ToonSpectrum이 Blender MCP로 직접 제작한
+오리지널 캐릭터입니다. 기존 13종은
+`scripts/blender/generate_toonspectrum_vrm_pack.py`로 생성했고, Wave 4의 추가 5종은 실제
+손가락·눈·발가락 변형까지 검증하는 강화된 Blender MCP 생성 파이프라인을 적용합니다. 각 파일에는
 VRM 1.0 공개 라이선스 URL과 상업 이용·재배포·수정 허용 메타데이터가 포함됩니다.
-ToonSpectrum은 이 13개 원본 모델을 **CC0 1.0**으로 제공합니다.
+ToonSpectrum은 이 18개 원본 모델을 **CC0 1.0**으로 제공합니다.
 
 | 파일 | 스튜디오 이름 | 다양성/용도 | 저작자·라이선스 |
 | --- | --- | --- | --- |
@@ -46,6 +47,11 @@ ToonSpectrum은 이 13개 원본 모델을 **CC0 1.0**으로 제공합니다.
 | `TS_Nuri_RobotClub.vrm` | 누리 (로봇 동아리원) | 아동·어린 청소년, 성 중립적 동아리 작업복·안전한 일상 스타일 | ToonSpectrum 오리지널 · CC0 1.0 |
 | `TS_Dami_RescueCaptain.vrm` | 다미 (구조대장) | 성인 액션 주역, 큰 체형·강한 팔다리·고가시성 구조 장비 | ToonSpectrum 오리지널 · CC0 1.0 |
 | `TS_Moru_MossGolem.vrm` | 모루 (이끼 골렘) | 비인간 판타지, 돌·이끼·나뭇가지 실루엣·발광 심장 룬 | ToonSpectrum 오리지널 · CC0 1.0 |
+| `TS_Samira_OrbitalBotanist.vrm` | 사미라 (궤도 식물학자) | 성인 과학자, 장신·마른 체형·히잡과 우주 작업복 | ToonSpectrum 오리지널 · [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| `TS_Yunae_DeafPercussionist.vrm` | 윤애 (진동 타악 연주자) | 농인 성인 예술가, 강한 팔·보이는 보청 및 진동 장치 | ToonSpectrum 오리지널 · [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| `TS_Boram_WeatherScientist.vrm` | 보람 (기상과학자) | 임신 중인 성인 전문직, 자연스러운 임신 체형·실용 작업복 | ToonSpectrum 오리지널 · [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| `TS_Hyeon_StudioPotter.vrm` | 현 (도예 스튜디오 운영자) | 저신장 성인, 넓은 몸통·짧은 사지·도예 작업복 | ToonSpectrum 오리지널 · [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| `TS_Dorong_SeaOtterCourier.vrm` | 도롱 (해달 우편원) | 유기적 비인간 캐릭터, 해달 실루엣·물갈퀴 손·꼬리 | ToonSpectrum 오리지널 · [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 
 - 공통 리그: VRM 휴머노이드 53개 매핑(손가락 포함), 실제 skin 및 `JOINTS_0`/`WEIGHTS_0`.
 - 관절 전환부는 인접 본 2개에 나뉜 실제 혼합 웨이트를 사용하며, `Blink`와 10종의 입모양·감정
@@ -55,6 +61,9 @@ ToonSpectrum은 이 13개 원본 모델을 **CC0 1.0**으로 제공합니다.
   교체·회전·포즈 조절이 가능하고, VRM 자체도 다른 좌석이나 장면에 재사용할 수 있습니다.
 - 누리는 어린 사용자를 성인화하지 않는 중립적인 동아리 작업복으로 디자인했습니다. 모루도 표준
   휴머노이드 리그를 유지해 기존 포즈·표정 도구를 그대로 사용하면서 비인간 실루엣을 제공합니다.
+- Wave 4의 사미라·윤애·보람·현·도롱은 손가락 30본, 좌우 눈, 좌우 발가락 본이 실제 양의 스킨
+  웨이트를 가진 정점에 연결되고, 13개 이상의 비어 있지 않은 표정 바인딩을 갖도록 검증합니다.
+  악기·물레 같은 장면 프롭은 VRM 캐릭터에 고정하지 않습니다.
 - 외부 URI: 없음. 메시·재질·권리 메타데이터는 각 `.vrm` 안에 포함됩니다.
 - CC0 원문: <https://creativecommons.org/publicdomain/zero/1.0/>
 
@@ -172,7 +181,25 @@ ToonSpectrum은 이 13개 원본 모델을 **CC0 1.0**으로 제공합니다.
 | `Vivi.vrm` | 비비 | madjin/vrm-samples | 저장소 고지 조건 |
 | `Vita.vrm` | 비타 | madjin/vrm-samples | 저장소 고지 조건 |
 | `Victoria_Rubin.vrm` | 루빈 | madjin/vrm-samples | 저장소 고지 조건 |
-| `Avatar_Orion.vrm` | 오리온 (로봇) | madjin/vrm-samples | 저장소 고지 조건 |
+| `Avatar_Orion.vrm` | 오리온 (로봇) | Polygonal Mind 원본 메시·텍스처·스킨 + ToonSpectrum VRM 1.0 리그 수리 | 원본 내장 `author: Polygonal Mind`, `licenseName: CC0` |
 | `cryptovoxels.vrm` | 크립토 (복셀봇) | madjin/vrm-samples | 저장소 고지 조건 |
 | `meebit_09842.vrm` | 미빗 (블록맨) | madjin/vrm-samples | **권리 격리:** Meebits 보유자 이용조건을 일반 번들 재배포·상업 서비스 권한으로 간주할 수 없어 신규 카탈로그 제공과 런타임 로드를 차단함 |
 | `Seed_san.vrm` | 시드상 (마스코트) | madjin/vrm-samples | VRM 프로젝트 마스코트 샘플 고지 조건 |
+
+### Orion 라이선스 감사 근거
+
+수리 전 `Avatar_Orion.vrm`의 GLB JSON에서 `extensions.VRM.meta`를 직접 파싱해
+`"author": "Polygonal Mind"`, `"contactInformation": "www.PolygonalMind.com"`,
+`"allowedUserName": "Everyone"`, `"commercialUssageName": "Allow"`,
+`"licenseName": "CC0"`를 확인했습니다. 외부 원배포 페이지나 별도 라이선스 URL은 원본 메타에
+들어 있지 않으므로 이를 임의로 보완하지 않습니다. 이 임베디드 원본 메타가 현재 확인된 유일한 직접
+CC0 근거입니다. 그 원본은
+`scripts/blender/source_assets/Avatar_Orion_vrm0_source.vrm`에 바이트 그대로 보존했으며 SHA-256은
+`efa262d131a6bd919c1a776f0707c2d358bfb3bf0b82e6886b43d873969574f5`입니다.
+
+현재 공개 파일은 `scripts/blender/repair_avatar_orion_vrm1.py`가 Blender 5.2와 정식 VRM Add-on
+exporter로 만든 VRM 1.0 수리본입니다. 기존 `orion` ID와 `/vrm/Avatar_Orion.vrm` URL, 원본 메시,
+패킹 텍스처, Mixamo 스킨, 16개 원본 morph target을 보존하면서 53개 휴머노이드 매핑, 실제 눈
+가중치, 13개 이상의 바인딩된 표정을 추가했습니다. 원본에 외부 라이선스 URL이 없으므로 수리본의
+`otherLicenseUrl`도 비워 두며, exporter가 요구하는 표준 VRM 1.0 `licenseUrl`을 CC0 출처 URL로
+오해하지 않습니다.

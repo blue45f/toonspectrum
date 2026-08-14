@@ -103,10 +103,21 @@ export interface VrmUploadedLibraryEntryPage {
   readonly generation: number;
 }
 
+export type BundledVrmVisibility = "default" | "legacy";
+
+export type BundledVrmLimitation =
+  | "no-expressions"
+  | "limited-hand-rig"
+  | "heavy-payload";
+
 export type SampleVrm = {
   id: string;
   name: string;
   url: string;
+  /** Legacy models remain resolvable for saved projects but are hidden from the default picker. */
+  visibility?: BundledVrmVisibility;
+  /** Audited capability or delivery limitations; absence means no catalog-level warning. */
+  limitations?: readonly BundledVrmLimitation[];
 };
 
 export type BundledVrmRightsBlock = SampleVrm & {
@@ -122,9 +133,9 @@ type VrmThumbnailRecord = {
 };
 
 /**
- * 파일은 과거 번들 감사와 저장 문서 추적을 위해 남아 있지만 신규 카탈로그 제공과
- * 런타임 로드는 차단한 모델. 원 라이선스를 임의로 재분류하지 않고 권리 제한
- * 사실과 사유를 별도 레코드로 보존한다.
+ * 과거 번들 감사와 저장 문서 추적을 위해 차단 기록만 남기고, 배포 바이너리·신규
+ * 카탈로그 제공·런타임 로드는 모두 차단한 모델. 원 라이선스를 임의로 재분류하지
+ * 않고 권리 제한 사실과 사유를 별도 레코드로 보존한다.
  */
 export const BUNDLED_VRM_RIGHTS_BLOCKS: readonly BundledVrmRightsBlock[] = [
   {
@@ -152,14 +163,15 @@ export function isBundledVrmRightsBlocked(id: string): boolean {
   return BUNDLED_VRM_RIGHTS_BLOCK_BY_ID.has(id);
 }
 
-// 신규 선택 가능한 기본 번들 VRM 캐릭터. 모든 엔트리는 public/vrm/ 아래 실파일과 1:1 대응한다.
+// 전체 번들 VRM 레지스트리. 모든 엔트리는 public/vrm/ 아래 실파일과 1:1 대응한다.
+// visibility가 legacy인 모델은 기존 프로젝트 복원을 위해 여기에 남지만 기본 선택 목록에서는 숨긴다.
 // A-C는 pixiv VRoidPreset 조건, old beta 샘플 4종은 pixiv CC0 조건을 따른다.
 // 모델별 출처 URL·라이선스 요약은 public/vrm/LICENSES.md 참고
 // (2026-06: madjin/vrm-samples VRoid 공식 샘플 + UniVRM Alicia Solid,
 //  2026-07: github.com/ToxSam/open-source-avatars 레지스트리의 Polygonal Mind
 //  100Avatars R1~R3 CC0 모델 71종 — 캐릭터/로봇/동물/판타지/SF/푸드 마스코트,
 //  그 중 OldMoustache·Eugenia는 "노인" 카테고리 보강,
-//  2026-08: Blender MCP + VRM Add-on으로 제작한 ToonSpectrum 오리지널 VRM 1.0 13종).
+//  2026-08: Blender MCP + VRM Add-on으로 제작한 ToonSpectrum 오리지널 VRM 1.0 18종).
 export const SAMPLE_VRMS: SampleVrm[] = [
   { id: SAMPLE_VRM_ID, name: "루미", url: SAMPLE_VRM_URL },
   { id: "avatar-a", name: "하린", url: "/vrm/AvatarSample_A.vrm" },
@@ -178,16 +190,37 @@ export const SAMPLE_VRMS: SampleVrm[] = [
   { id: "ts-nuri-robot-club", name: "누리 (로봇 동아리원)", url: "/vrm/TS_Nuri_RobotClub.vrm" },
   { id: "ts-dami-rescue-captain", name: "다미 (구조대장)", url: "/vrm/TS_Dami_RescueCaptain.vrm" },
   { id: "ts-moru-moss-golem", name: "모루 (이끼 골렘)", url: "/vrm/TS_Moru_MossGolem.vrm" },
+  { id: "ts-samira-orbital-botanist", name: "사미라 (궤도 식물학자)", url: "/vrm/TS_Samira_OrbitalBotanist.vrm" },
+  { id: "ts-yunae-deaf-percussionist", name: "윤애 (진동 타악 연주자)", url: "/vrm/TS_Yunae_DeafPercussionist.vrm" },
+  { id: "ts-boram-weather-scientist", name: "보람 (기상과학자)", url: "/vrm/TS_Boram_WeatherScientist.vrm" },
+  { id: "ts-hyeon-studio-potter", name: "현 (도예 스튜디오 운영자)", url: "/vrm/TS_Hyeon_StudioPotter.vrm" },
+  { id: "ts-dorong-sea-otter-courier", name: "도롱 (해달 우편원)", url: "/vrm/TS_Dorong_SeaOtterCourier.vrm" },
   { id: "shion", name: "시온", url: "/vrm/Sendagaya_Shibu.vrm" },
   { id: "vivi", name: "비비", url: "/vrm/Vivi.vrm" },
   { id: "vita", name: "비타", url: "/vrm/Vita.vrm" },
   { id: "rubin", name: "루빈", url: "/vrm/Victoria_Rubin.vrm" },
   { id: "orion", name: "오리온 (로봇)", url: "/vrm/Avatar_Orion.vrm" },
-  { id: "cryptovoxel", name: "크립토 (복셀봇)", url: "/vrm/cryptovoxels.vrm" },
+  {
+    id: "cryptovoxel",
+    name: "크립토 (복셀봇)",
+    url: "/vrm/cryptovoxels.vrm",
+    visibility: "legacy",
+    limitations: ["no-expressions"],
+  },
   { id: "seedsan", name: "시드상 (마스코트)", url: "/vrm/Seed_san.vrm" },
   { id: "shino", name: "시노", url: "/vrm/Sendagaya_Shino.vrm" },
-  { id: "fumi", name: "후미", url: "/vrm/Sakurada_Fumiriya.vrm" },
-  { id: "kage", name: "카게 (다크)", url: "/vrm/Darkness_Shibu.vrm" },
+  {
+    id: "fumi",
+    name: "후미",
+    url: "/vrm/Sakurada_Fumiriya.vrm",
+    limitations: ["heavy-payload"],
+  },
+  {
+    id: "kage",
+    name: "카게 (다크)",
+    url: "/vrm/Darkness_Shibu.vrm",
+    limitations: ["heavy-payload"],
+  },
   { id: "mio", name: "미오", url: "/vrm/fem_vroid.vrm" },
   { id: "noa", name: "노아", url: "/vrm/masc_vroid.vrm" },
   { id: "alicia", name: "아리시아", url: "/vrm/AliciaSolid.vrm" },
@@ -216,7 +249,12 @@ export const SAMPLE_VRMS: SampleVrm[] = [
   { id: "zombie", name: "좀비", url: "/vrm/Zombie.vrm" },
   { id: "dino-kid", name: "디노키드 (공룡)", url: "/vrm/DinoKid.vrm" },
   { id: "astronaut", name: "애스트로넛 (우주비행사)", url: "/vrm/Astronaut.vrm" },
-  { id: "polybot", name: "폴리봇 (로봇)", url: "/vrm/Polybot.vrm" },
+  {
+    id: "polybot",
+    name: "폴리봇 (로봇)",
+    url: "/vrm/Polybot.vrm",
+    limitations: ["limited-hand-rig"],
+  },
   { id: "jennifer", name: "제니퍼", url: "/vrm/Jennifer.vrm" },
   { id: "erika", name: "에리카", url: "/vrm/Erika.vrm" },
   { id: "olivia", name: "올리비아", url: "/vrm/Olivia.vrm" },
@@ -238,10 +276,20 @@ export const SAMPLE_VRMS: SampleVrm[] = [
   { id: "chill-palm", name: "칠팜 (야자수)", url: "/vrm/ChillPalm.vrm" },
   { id: "good-knight", name: "굿나이트 (기사)", url: "/vrm/GoodKnight.vrm" },
   { id: "bad-bot", name: "배드봇 (로봇)", url: "/vrm/BadBot.vrm" },
-  { id: "pirate-bot", name: "파이럿봇 (해적 로봇)", url: "/vrm/PirateBot.vrm" },
+  {
+    id: "pirate-bot",
+    name: "파이럿봇 (해적 로봇)",
+    url: "/vrm/PirateBot.vrm",
+    limitations: ["heavy-payload"],
+  },
   { id: "cyberpal", name: "사이버팔 (사이보그)", url: "/vrm/Cyberpal.vrm" },
   { id: "bao-samurai", name: "바오사무라이", url: "/vrm/BaoSamurai.vrm" },
-  { id: "kiba", name: "키바 (늑대)", url: "/vrm/Kiba.vrm" },
+  {
+    id: "kiba",
+    name: "키바 (늑대)",
+    url: "/vrm/Kiba.vrm",
+    limitations: ["limited-hand-rig"],
+  },
   { id: "stitch-witch", name: "스티치위치 (마녀 인형)", url: "/vrm/StitchWitch.vrm" },
   { id: "mega-angel", name: "메가엔젤 (천사)", url: "/vrm/MegaAngel.vrm" },
   { id: "mushroom-fairy", name: "머시룸페어리 (버섯 요정)", url: "/vrm/MushroomFairy.vrm" },
@@ -263,14 +311,16 @@ export const SAMPLE_VRMS: SampleVrm[] = [
   { id: "old-moustache", name: "올드무스타치 (할아버지)", url: "/vrm/OldMoustache.vrm" },
   { id: "eugenia", name: "유제니아 (할머니)", url: "/vrm/Eugenia.vrm" },
 ];
-export const SAMPLE_VRM_ENTRIES: VrmLibraryEntry[] = SAMPLE_VRMS.map((s) => ({
-  id: s.id,
-  name: s.name,
-  source: "sample",
-  thumbnail: null,
-  createdAt: 0,
-  updatedAt: 0,
-}));
+export const SAMPLE_VRM_ENTRIES: VrmLibraryEntry[] = SAMPLE_VRMS
+  .filter((sample) => sample.visibility !== "legacy")
+  .map((sample) => ({
+    id: sample.id,
+    name: sample.name,
+    source: "sample",
+    thumbnail: null,
+    createdAt: 0,
+    updatedAt: 0,
+  }));
 export const SAMPLE_VRM_LIBRARY_ENTRY: VrmLibraryEntry = SAMPLE_VRM_ENTRIES[0];
 
 export function sampleVrmUrl(id: string): string {
@@ -278,8 +328,9 @@ export function sampleVrmUrl(id: string): string {
 }
 
 /**
- * 카탈로그 선택에서 사용할 fail-closed URL 해석기.
- * 권리 차단·미등록 ID를 기본 모델로 조용히 치환하지 않는다.
+ * 카탈로그와 저장 장면에서 사용할 fail-closed URL 해석기.
+ * 권리 차단·미등록 ID를 기본 모델로 조용히 치환하지 않는다. 레거시 모델은
+ * 신규 선택 목록에서만 숨기며 기존 프로젝트 복원을 위해 URL 해석은 유지한다.
  */
 export function selectableSampleVrmUrl(id: string): string | null {
   if (isBundledVrmRightsBlocked(id)) return null;
