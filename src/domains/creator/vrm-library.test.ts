@@ -122,6 +122,10 @@ const ORIGINAL_BUNDLE_FILES = [
   "TS_Boram_WeatherScientist.vrm",
   "TS_Hyeon_StudioPotter.vrm",
   "TS_Dorong_SeaOtterCourier.vrm",
+  "TS_Sunja_HaenyeoMentor.vrm",
+  "TS_Maya_CoutureDirector.vrm",
+  "TS_Iseul_AdaptiveRescuer.vrm",
+  "TS_Neoul_CoralDjinn.vrm",
 ] as const;
 
 const WAVE4_SAMPLE_IDS = [
@@ -132,6 +136,13 @@ const WAVE4_SAMPLE_IDS = [
   "ts-dorong-sea-otter-courier",
 ] as const;
 
+const WAVE5_SAMPLE_IDS = [
+  "ts-sunja-haenyeo-mentor",
+  "ts-maya-couture-director",
+  "ts-iseul-adaptive-rescuer",
+  "ts-neoul-coral-djinn",
+] as const;
+
 const MIN_BUNDLE_FILE_BYTES = 100 * 1024;
 
 describe("VRM library helpers", () => {
@@ -140,7 +151,7 @@ describe("VRM library helpers", () => {
 
     // 대표 엔트리 스팟 체크(기존 + 2026-07 신규).
     expect(names.slice(0, 4)).toEqual(["루미", "하린", "세라", "유나"]);
-    expect(names.slice(4, 22)).toEqual([
+    expect(names.slice(4, 26)).toEqual([
       "민서 (캠퍼스 메이커)",
       "태오 (동네 바리스타)",
       "정화 (노년 정원사)",
@@ -159,6 +170,10 @@ describe("VRM library helpers", () => {
       "보람 (기상과학자)",
       "현 (도예 스튜디오 운영자)",
       "도롱 (해달 우편원)",
+      "선자 (해녀 멘토)",
+      "마야 (쿠튀르 디렉터)",
+      "이슬 (의족 구조전문가)",
+      "너울 (산호 진)",
     ]);
     expect(names).toContain("데빌 (악마)");
     expect(names).toContain("쿨에일리언 (외계인)");
@@ -195,6 +210,31 @@ describe("VRM library helpers", () => {
     expect(moruIndex).toBeGreaterThanOrEqual(0);
     expect(ids.slice(moruIndex + 1, moruIndex + 1 + WAVE4_SAMPLE_IDS.length))
       .toEqual(WAVE4_SAMPLE_IDS);
+  });
+
+  it("places all four Wave 5 originals immediately after Wave 4 with real bundled card art", () => {
+    const ids = SAMPLE_VRM_ENTRIES.map((entry) => entry.id);
+    const wave4End = ids.indexOf(WAVE4_SAMPLE_IDS.at(-1) ?? "");
+
+    expect(wave4End).toBeGreaterThanOrEqual(0);
+    expect(ids.slice(wave4End + 1, wave4End + 1 + WAVE5_SAMPLE_IDS.length))
+      .toEqual(WAVE5_SAMPLE_IDS);
+
+    for (const id of WAVE5_SAMPLE_IDS) {
+      const sample = SAMPLE_VRMS.find((candidate) => candidate.id === id);
+      const entry = SAMPLE_VRM_ENTRIES.find((candidate) => candidate.id === id);
+      expect(sample?.thumbnailUrl).toMatch(/^\/vrm\/thumbnails\/[A-Za-z0-9_.-]+\.png$/);
+      expect(entry?.thumbnail).toBe(sample?.thumbnailUrl);
+      if (!sample?.thumbnailUrl) continue;
+      const thumbnailPath = join(process.cwd(), "public", sample.thumbnailUrl.replace(/^\//, ""));
+      expect(existsSync(thumbnailPath), `${id}: missing bundled thumbnail`).toBe(true);
+      expect(statSync(thumbnailPath).size, `${id}: non-placeholder bundled thumbnail`)
+        .toBeGreaterThan(10 * 1024);
+      const thumbnailBytes = readFileSync(thumbnailPath);
+      expect(thumbnailBytes.subarray(1, 4).toString("ascii"), `${id}: PNG signature`).toBe("PNG");
+      expect(thumbnailBytes.readUInt32BE(16), `${id}: card width`).toBe(320);
+      expect(thumbnailBytes.readUInt32BE(20), `${id}: card height`).toBe(400);
+    }
   });
 
   it("keeps audited limitations bounded while legacy ids remain restorable", () => {
@@ -244,6 +284,8 @@ describe("VRM library helpers", () => {
     expect(licenses).toContain("권리 격리");
     expect(licenses).toContain("런타임 로드를 차단");
     expect(licenses).toContain("scripts/blender/generate_toonspectrum_vrm_pack.py");
+    expect(licenses).toContain("scripts/blender/generate_toonspectrum_vrm_pack_wave5.py");
+    expect(licenses).toContain("scripts/blender/render_toonspectrum_vrm_wave5_qa.py");
     expect(licenses).toContain("CC0 1.0");
     expect(licenses).toContain("https://creativecommons.org/publicdomain/zero/1.0/");
     expect(licenses).toContain('Avatar_Orion.vrm');
@@ -295,6 +337,8 @@ describe("VRM library helpers", () => {
     expect(sampleVrmUrl("no-such-id")).toBe("/vrm/sample.vrm");
     expect(selectableSampleVrmUrl("ts-nova-service-android"))
       .toBe("/vrm/TS_Nova_ServiceAndroid.vrm");
+    expect(selectableSampleVrmUrl("ts-iseul-adaptive-rescuer"))
+      .toBe("/vrm/TS_Iseul_AdaptiveRescuer.vrm");
   });
 
   it("권리 제한 meebit을 별도 메타데이터로 격리하고 신규 카탈로그·엄격 로드에서 차단한다", () => {

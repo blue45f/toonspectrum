@@ -67,6 +67,18 @@ describe("VRM asset SQLite/OPFS product boundary", () => {
     );
   });
 
+  it("keeps packaged bundle card art resident while evicting offscreen hydrated data", () => {
+    const poser = source("StudioVrmPoser.tsx");
+    const hydrateStart = poser.indexOf("void hydrateVrmLibraryThumbnailWindow(windowEntries");
+    const hydrateEnd = poser.indexOf("useEffect(() => {", hydrateStart);
+    const hydrate = poser.slice(hydrateStart, hydrateEnd);
+
+    expect(hydrate).toContain('entry.source === "sample"');
+    expect(hydrate).toContain('entry.thumbnail?.startsWith("/vrm/thumbnails/")');
+    expect(hydrate).toContain("isBundledStaticThumbnail");
+    expect(hydrate).toContain("return { ...entry, thumbnail: null }");
+  });
+
   it("makes shared SQLite/OPFS the no-options authority while keeping IDB explicit-only", () => {
     const library = source("vrm-library.ts");
     expect(library).toContain("options.repository ?? getProductStudioVrmAssetSqliteOpfsRepository()");

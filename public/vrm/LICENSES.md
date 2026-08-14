@@ -25,12 +25,13 @@ ToonSpectrum 스튜디오(/studio)에 번들된 VRM 캐릭터 모델의 출처�
 
 ## ToonSpectrum 오리지널 VRM 1.0 캐릭터 팩 (2026-08)
 
-아래 18종은 외부 모델이나 텍스처를 사용하지 않고 ToonSpectrum이 Blender MCP로 직접 제작한
+아래 22종은 외부 모델이나 텍스처를 사용하지 않고 ToonSpectrum이 Blender와 Blender MCP로 직접 제작한
 오리지널 캐릭터입니다. 기존 13종은
-`scripts/blender/generate_toonspectrum_vrm_pack.py`로 생성했고, Wave 4의 추가 5종은 실제
-손가락·눈·발가락 변형까지 검증하는 강화된 Blender MCP 생성 파이프라인을 적용합니다. 각 파일에는
+`scripts/blender/generate_toonspectrum_vrm_pack.py`로 생성했고, Wave 4의 추가 5종과
+`scripts/blender/generate_toonspectrum_vrm_pack_wave5.py`의 추가 4종은 실제
+손가락·눈·발가락 변형까지 검증하는 강화된 Blender 생성 파이프라인을 적용합니다. 각 파일에는
 VRM 1.0 공개 라이선스 URL과 상업 이용·재배포·수정 허용 메타데이터가 포함됩니다.
-ToonSpectrum은 이 18개 원본 모델을 **CC0 1.0**으로 제공합니다.
+ToonSpectrum은 이 22개 원본 모델을 **CC0 1.0**으로 제공합니다.
 
 | 파일 | 스튜디오 이름 | 다양성/용도 | 저작자·라이선스 |
 | --- | --- | --- | --- |
@@ -52,6 +53,10 @@ ToonSpectrum은 이 18개 원본 모델을 **CC0 1.0**으로 제공합니다.
 | `TS_Boram_WeatherScientist.vrm` | 보람 (기상과학자) | 임신 중인 성인 전문직, 자연스러운 임신 체형·실용 작업복 | ToonSpectrum 오리지널 · [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 | `TS_Hyeon_StudioPotter.vrm` | 현 (도예 스튜디오 운영자) | 저신장 성인, 넓은 몸통·짧은 사지·도예 작업복 | ToonSpectrum 오리지널 · [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 | `TS_Dorong_SeaOtterCourier.vrm` | 도롱 (해달 우편원) | 유기적 비인간 캐릭터, 해달 실루엣·물갈퀴 손·꼬리 | ToonSpectrum 오리지널 · [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| `TS_Sunja_HaenyeoMentor.vrm` | 선자 (해녀 멘토) | 70대 제주 해녀 멘토, 작은 키·강한 체형·잠수 후드와 테왁 표식 | ToonSpectrum 오리지널 · [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| `TS_Maya_CoutureDirector.vrm` | 마야 (쿠튀르 디렉터) | 플러스사이즈 성인 디자이너, 짙은 피부톤·비대칭 쿠튀르 케이프 | ToonSpectrum 오리지널 · [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| `TS_Iseul_AdaptiveRescuer.vrm` | 이슬 (의족 구조전문가) | 성인 구조·스포츠 전문가, 보이는 오른쪽 종아리 의족·고가시성 구조복 | ToonSpectrum 오리지널 · [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| `TS_Neoul_CoralDjinn.vrm` | 너울 (산호 진) | 비인간 성인 판타지, 청록 피부·산호 왕관·관자 지느러미 | ToonSpectrum 오리지널 · [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 
 - 공통 리그: VRM 휴머노이드 53개 매핑(손가락 포함), 실제 skin 및 `JOINTS_0`/`WEIGHTS_0`.
 - 관절 전환부는 인접 본 2개에 나뉜 실제 혼합 웨이트를 사용하며, `Blink`와 10종의 입모양·감정
@@ -64,6 +69,12 @@ ToonSpectrum은 이 18개 원본 모델을 **CC0 1.0**으로 제공합니다.
 - Wave 4의 사미라·윤애·보람·현·도롱은 손가락 30본, 좌우 눈, 좌우 발가락 본이 실제 양의 스킨
   웨이트를 가진 정점에 연결되고, 13개 이상의 비어 있지 않은 표정 바인딩을 갖도록 검증합니다.
   악기·물레 같은 장면 프롭은 VRM 캐릭터에 고정하지 않습니다.
+- Wave 5의 선자·마야·이슬·너울도 같은 엄격 리그 계약과 MToon 1.0 재질, 13개 이상의 실제
+  morph expression 바인딩을 따릅니다. 선자의 잠수 장비와 이슬의 구조 장비는 고정 도구·탈것 없이
+  캐릭터 의상 실루엣만 표현하며, 이슬의 의족은 오른쪽 다리·발·발가락 본에 연결된 신체 일부입니다.
+- Wave 5 카드 썸네일은 각 VRM을 공식 Blender VRM importer로 다시 연 뒤 정면 조명에서 렌더한
+  320×400 PNG입니다. 생성·정면/3/4/동작 포즈 QA는
+  `scripts/blender/render_toonspectrum_vrm_wave5_qa.py`로 재현할 수 있습니다.
 - 외부 URI: 없음. 메시·재질·권리 메타데이터는 각 `.vrm` 안에 포함됩니다.
 - 하람 모델은 아동 캐릭터 안전정책에 따라 VRM 메타데이터에서도 과도한 폭력 및 과도한 성적 이용을 명시적으로 허용하지 않습니다.
 - CC0 원문: <https://creativecommons.org/publicdomain/zero/1.0/>

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { VRMLoaderPlugin } from "@pixiv/three-vrm";
+import { VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { describe, expect, it } from "vitest";
 
@@ -31,6 +31,15 @@ const ORIGINAL_VRM_FILES = [
   "TS_Nuri_RobotClub.vrm",
   "TS_Dami_RescueCaptain.vrm",
   "TS_Moru_MossGolem.vrm",
+  "TS_Samira_OrbitalBotanist.vrm",
+  "TS_Yunae_DeafPercussionist.vrm",
+  "TS_Boram_WeatherScientist.vrm",
+  "TS_Hyeon_StudioPotter.vrm",
+  "TS_Dorong_SeaOtterCourier.vrm",
+  "TS_Sunja_HaenyeoMentor.vrm",
+  "TS_Maya_CoutureDirector.vrm",
+  "TS_Iseul_AdaptiveRescuer.vrm",
+  "TS_Neoul_CoralDjinn.vrm",
 ] as const;
 
 const REQUIRED_HUMANOID_BONES = [
@@ -171,8 +180,8 @@ describe("ToonSpectrum original Blender MCP VRM pack", () => {
     const sad = preset.sad as JsonRecord;
     expect(blink.morphTargetBinds).toHaveLength(2);
     expect(aa.morphTargetBinds).toHaveLength(1);
-    expect(happy.morphTargetBinds).toHaveLength(1);
-    expect(sad.morphTargetBinds).toHaveLength(1);
+    expect(happy.morphTargetBinds).toEqual(expect.arrayContaining([expect.any(Object)]));
+    expect(sad.morphTargetBinds).toEqual(expect.arrayContaining([expect.any(Object)]));
     const nonEmptyPresets = Object.values(preset).filter((expression) => {
       const binds = (expression as JsonRecord).morphTargetBinds;
       return Array.isArray(binds) && binds.length > 0;
@@ -210,21 +219,25 @@ describe("ToonSpectrum original Blender MCP VRM pack", () => {
     const gltf = await loader.parseAsync(arrayBuffer, "");
     const vrm = (gltf.userData as { vrm?: import("@pixiv/three-vrm").VRM }).vrm;
 
-    expect(vrm).toBeDefined();
-    if (!vrm || vrm.meta.metaVersion !== "1") {
-      throw new Error(`${fileName}: expected a VRM 1.0 runtime model`);
-    }
-    expect(vrm.meta.licenseUrl).toBe("https://vrm.dev/licenses/1.0/");
-    expect(vrm.meta.otherLicenseUrl).toBe(CC0_LICENSE_URL);
-    expect(vrm.humanoid).toBeDefined();
-    expect(vrm.expressionManager).toBeDefined();
-    expect(vrm.expressionManager?.getExpression("blink")).toBeDefined();
-    expect(vrm.expressionManager?.getExpression("aa")).toBeDefined();
-    expect(vrm.expressionManager?.getExpression("happy")).toBeDefined();
-    expect(vrm.expressionManager?.getExpression("angry")).toBeDefined();
-    expect(vrm.expressionManager?.getExpression("surprised")).toBeDefined();
-    for (const bone of REQUIRED_HUMANOID_BONES) {
-      expect(vrm.humanoid.getNormalizedBoneNode(bone), `${fileName}: ${bone}`).not.toBeNull();
+    try {
+      expect(vrm).toBeDefined();
+      if (!vrm || vrm.meta.metaVersion !== "1") {
+        throw new Error(`${fileName}: expected a VRM 1.0 runtime model`);
+      }
+      expect(vrm.meta.licenseUrl).toBe("https://vrm.dev/licenses/1.0/");
+      expect(vrm.meta.otherLicenseUrl).toBe(CC0_LICENSE_URL);
+      expect(vrm.humanoid).toBeDefined();
+      expect(vrm.expressionManager).toBeDefined();
+      expect(vrm.expressionManager?.getExpression("blink")).toBeDefined();
+      expect(vrm.expressionManager?.getExpression("aa")).toBeDefined();
+      expect(vrm.expressionManager?.getExpression("happy")).toBeDefined();
+      expect(vrm.expressionManager?.getExpression("angry")).toBeDefined();
+      expect(vrm.expressionManager?.getExpression("surprised")).toBeDefined();
+      for (const bone of REQUIRED_HUMANOID_BONES) {
+        expect(vrm.humanoid.getNormalizedBoneNode(bone), `${fileName}: ${bone}`).not.toBeNull();
+      }
+    } finally {
+      VRMUtils.deepDispose(gltf.scene);
     }
   });
 

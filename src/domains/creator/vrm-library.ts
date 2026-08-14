@@ -114,6 +114,8 @@ export type SampleVrm = {
   id: string;
   name: string;
   url: string;
+  /** Optional same-origin card art for bundled characters. */
+  thumbnailUrl?: string;
   /** Legacy models remain resolvable for saved projects but are hidden from the default picker. */
   visibility?: BundledVrmVisibility;
   /** Audited capability or delivery limitations; absence means no catalog-level warning. */
@@ -171,7 +173,7 @@ export function isBundledVrmRightsBlocked(id: string): boolean {
 //  2026-07: github.com/ToxSam/open-source-avatars 레지스트리의 Polygonal Mind
 //  100Avatars R1~R3 CC0 모델 71종 — 캐릭터/로봇/동물/판타지/SF/푸드 마스코트,
 //  그 중 OldMoustache·Eugenia는 "노인" 카테고리 보강,
-//  2026-08: Blender MCP + VRM Add-on으로 제작한 ToonSpectrum 오리지널 VRM 1.0 18종).
+//  2026-08: Blender MCP + VRM Add-on으로 제작한 ToonSpectrum 오리지널 VRM 1.0 22종).
 export const SAMPLE_VRMS: SampleVrm[] = [
   { id: SAMPLE_VRM_ID, name: "루미", url: SAMPLE_VRM_URL },
   { id: "avatar-a", name: "하린", url: "/vrm/AvatarSample_A.vrm" },
@@ -195,6 +197,30 @@ export const SAMPLE_VRMS: SampleVrm[] = [
   { id: "ts-boram-weather-scientist", name: "보람 (기상과학자)", url: "/vrm/TS_Boram_WeatherScientist.vrm" },
   { id: "ts-hyeon-studio-potter", name: "현 (도예 스튜디오 운영자)", url: "/vrm/TS_Hyeon_StudioPotter.vrm" },
   { id: "ts-dorong-sea-otter-courier", name: "도롱 (해달 우편원)", url: "/vrm/TS_Dorong_SeaOtterCourier.vrm" },
+  {
+    id: "ts-sunja-haenyeo-mentor",
+    name: "선자 (해녀 멘토)",
+    url: "/vrm/TS_Sunja_HaenyeoMentor.vrm",
+    thumbnailUrl: "/vrm/thumbnails/TS_Sunja_HaenyeoMentor.png",
+  },
+  {
+    id: "ts-maya-couture-director",
+    name: "마야 (쿠튀르 디렉터)",
+    url: "/vrm/TS_Maya_CoutureDirector.vrm",
+    thumbnailUrl: "/vrm/thumbnails/TS_Maya_CoutureDirector.png",
+  },
+  {
+    id: "ts-iseul-adaptive-rescuer",
+    name: "이슬 (의족 구조전문가)",
+    url: "/vrm/TS_Iseul_AdaptiveRescuer.vrm",
+    thumbnailUrl: "/vrm/thumbnails/TS_Iseul_AdaptiveRescuer.png",
+  },
+  {
+    id: "ts-neoul-coral-djinn",
+    name: "너울 (산호 진)",
+    url: "/vrm/TS_Neoul_CoralDjinn.vrm",
+    thumbnailUrl: "/vrm/thumbnails/TS_Neoul_CoralDjinn.png",
+  },
   { id: "shion", name: "시온", url: "/vrm/Sendagaya_Shibu.vrm" },
   { id: "vivi", name: "비비", url: "/vrm/Vivi.vrm" },
   { id: "vita", name: "비타", url: "/vrm/Vita.vrm" },
@@ -317,7 +343,7 @@ export const SAMPLE_VRM_ENTRIES: VrmLibraryEntry[] = SAMPLE_VRMS
     id: sample.id,
     name: sample.name,
     source: "sample",
-    thumbnail: null,
+    thumbnail: sample.thumbnailUrl ?? null,
     createdAt: 0,
     updatedAt: 0,
   }));

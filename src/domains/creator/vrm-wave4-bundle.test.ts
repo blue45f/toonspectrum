@@ -28,6 +28,13 @@ const WAVE4_VRM_FILES = [
   "TS_Hyeon_StudioPotter.vrm",
   "TS_Dorong_SeaOtterCourier.vrm",
 ] as const;
+const WAVE5_VRM_FILES = [
+  "TS_Sunja_HaenyeoMentor.vrm",
+  "TS_Maya_CoutureDirector.vrm",
+  "TS_Iseul_AdaptiveRescuer.vrm",
+  "TS_Neoul_CoralDjinn.vrm",
+] as const;
+const STRICT_ORIGINAL_VRM_FILES = [...WAVE4_VRM_FILES, ...WAVE5_VRM_FILES] as const;
 const ORION_REPAIR_FILE = "Avatar_Orion.vrm";
 
 const CC0_LICENSE_URL = "https://creativecommons.org/publicdomain/zero/1.0/";
@@ -35,8 +42,8 @@ const MAX_WAVE4_FILE_BYTES = 5 * 1024 * 1024;
 const ACTIVE_WEIGHT_EPSILON = 0.01;
 
 /**
- * Wave 4 deliberately requires the 53-bone profile used by the Studio poser. Optional VRM bones
- * such as upperChest and jaw are allowed by the specification but are outside this batch contract.
+ * Waves 4 and 5 deliberately require the 53-bone profile used by the Studio poser. Optional VRM
+ * bones such as upperChest and jaw are allowed by the specification but are outside this contract.
  */
 const WAVE4_HUMANOID_BONES = [
   "hips",
@@ -130,6 +137,11 @@ type GltfAccessor = JsonRecord & {
   componentType?: number;
   count?: number;
   normalized?: boolean;
+  sparse?: {
+    count?: number;
+    indices?: { bufferView?: number; byteOffset?: number; componentType?: number };
+    values?: { bufferView?: number; byteOffset?: number };
+  };
   type?: string;
 };
 
@@ -158,7 +170,7 @@ type GltfSkin = JsonRecord & {
 
 function bundledBytes(fileName: string): Uint8Array {
   const filePath = join(process.cwd(), "public", "vrm", fileName);
-  expect(existsSync(filePath), `${fileName}: Wave 4 binary has not been generated`).toBe(true);
+  expect(existsSync(filePath), `${fileName}: strict original binary has not been generated`).toBe(true);
   return readFileSync(filePath);
 }
 
@@ -261,9 +273,7 @@ function accessorVectors(
   const bufferViews = json.bufferViews as GltfBufferView[];
   const accessor = accessors[accessorIndex];
   const bufferViewIndex = accessor?.bufferView;
-  if (!accessor || typeof bufferViewIndex !== "number" || !Number.isInteger(bufferViewIndex)) {
-    throw new TypeError(`Accessor ${accessorIndex} has no supported bufferView`);
-  }
+  if (!accessor) throw new TypeError(`Accessor ${accessorIndex} does not exist`);
   if (
     typeof accessor.componentType !== "number"
     || typeof accessor.count !== "number"
@@ -272,30 +282,84 @@ function accessorVectors(
     throw new TypeError(`Accessor ${accessorIndex} is missing its layout`);
   }
 
-  const bufferView = bufferViews[bufferViewIndex];
-  if (!bufferView) throw new RangeError(`Accessor ${accessorIndex} references a missing bufferView`);
-
   const bytesPerComponent = componentByteSize(accessor.componentType);
   const components = accessorComponentCount(accessor.type);
   const packedStride = bytesPerComponent * components;
-  const stride = Number(bufferView.byteStride ?? packedStride);
-  if (stride < packedStride) throw new RangeError(`Accessor ${accessorIndex} has an invalid stride`);
-
-  const baseOffset = Number(bufferView.byteOffset ?? 0) + Number(accessor.byteOffset ?? 0);
   const view = new DataView(binary.buffer, binary.byteOffset, binary.byteLength);
-  const vectors: number[][] = [];
-  for (let item = 0; item < accessor.count; item += 1) {
-    const vector: number[] = [];
-    for (let component = 0; component < components; component += 1) {
-      const offset = baseOffset + item * stride + component * bytesPerComponent;
-      const raw = readComponent(view, offset, accessor.componentType);
-      vector.push(
-        applyNormalization && accessor.normalized
+  const vectors: number[][] = Array.from(
+    { length: accessor.count },
+    () => Array.from({ length: components }, () => 0),
+  );
+
+  if (typeof bufferViewIndex === "number" && Number.isInteger(bufferViewIndex)) {
+    const bufferView = bufferViews[bufferViewIndex];
+    if (!bufferView) throw new RangeError(`Accessor ${accessorIndex} references a missing bufferView`);
+    const stride = Number(bufferView.byteStride ?? packedStride);
+    if (stride < packedStride) throw new RangeError(`Accessor ${accessorIndex} has an invalid stride`);
+    const baseOffset = Number(bufferView.byteOffset ?? 0) + Number(accessor.byteOffset ?? 0);
+    for (let item = 0; item < accessor.count; item += 1) {
+      const vector = vectors[item];
+      if (!vector) throw new RangeError(`Accessor ${accessorIndex} base item is missing`);
+      for (let component = 0; component < components; component += 1) {
+        const offset = baseOffset + item * stride + component * bytesPerComponent;
+        const raw = readComponent(view, offset, accessor.componentType);
+        vector[component] = applyNormalization && accessor.normalized
           ? normalizedComponent(raw, accessor.componentType)
-          : raw,
-      );
+          : raw;
+      }
     }
-    vectors.push(vector);
+  }
+
+  const sparse = accessor.sparse;
+  if (sparse) {
+    const sparseCount = sparse.count;
+    const indicesBufferViewIndex = sparse.indices?.bufferView;
+    const indicesComponentType = sparse.indices?.componentType;
+    const valuesBufferViewIndex = sparse.values?.bufferView;
+    if (
+      typeof sparseCount !== "number"
+      || typeof indicesBufferViewIndex !== "number"
+      || typeof indicesComponentType !== "number"
+      || typeof valuesBufferViewIndex !== "number"
+    ) {
+      throw new TypeError(`Accessor ${accessorIndex} has an incomplete sparse layout`);
+    }
+    const indicesBufferView = bufferViews[indicesBufferViewIndex];
+    const valuesBufferView = bufferViews[valuesBufferViewIndex];
+    if (!indicesBufferView || !valuesBufferView) {
+      throw new RangeError(`Accessor ${accessorIndex} sparse bufferView is missing`);
+    }
+    const indexByteSize = componentByteSize(indicesComponentType);
+    const indicesOffset = Number(indicesBufferView.byteOffset ?? 0)
+      + Number(sparse.indices?.byteOffset ?? 0);
+    const valuesOffset = Number(valuesBufferView.byteOffset ?? 0)
+      + Number(sparse.values?.byteOffset ?? 0);
+    for (let sparseIndex = 0; sparseIndex < sparseCount; sparseIndex += 1) {
+      const targetIndex = readComponent(
+        view,
+        indicesOffset + sparseIndex * indexByteSize,
+        indicesComponentType,
+      );
+      if (!Number.isInteger(targetIndex) || targetIndex < 0 || targetIndex >= vectors.length) {
+        throw new RangeError(`Accessor ${accessorIndex} sparse index is out of range`);
+      }
+      const vector = vectors[targetIndex];
+      if (!vector) throw new RangeError(`Accessor ${accessorIndex} sparse item is missing`);
+      for (let component = 0; component < components; component += 1) {
+        const raw = readComponent(
+          view,
+          valuesOffset + (sparseIndex * components + component) * bytesPerComponent,
+          accessor.componentType,
+        );
+        vector[component] = applyNormalization && accessor.normalized
+          ? normalizedComponent(raw, accessor.componentType)
+          : raw;
+      }
+    }
+  }
+
+  if (typeof bufferViewIndex !== "number" && !sparse) {
+    throw new TypeError(`Accessor ${accessorIndex} has no base bufferView or sparse values`);
   }
   return vectors;
 }
@@ -309,7 +373,7 @@ function validateSkinning(fileName: string, json: JsonRecord, binary: Uint8Array
   const humanBones = humanoid.humanBones as Record<string, { node?: unknown }>;
 
   const boneNames = Object.keys(humanBones).sort();
-  expect(boneNames, `${fileName}: exact Wave 4 humanoid profile`)
+  expect(boneNames, `${fileName}: exact 53-bone humanoid profile`)
     .toEqual([...WAVE4_HUMANOID_BONES].sort());
 
   const mappedNodes = WAVE4_HUMANOID_BONES.map((bone) => {
@@ -448,8 +512,33 @@ function validateExpressions(fileName: string, json: JsonRecord): void {
   }
 }
 
-describe("ToonSpectrum Wave 4 character quality contract", () => {
-  it.each(WAVE4_VRM_FILES)("%s is a compact, self-contained VRM 1.0 with an active full rig", (fileName) => {
+function validateBoundedMorphTargets(
+  fileName: string,
+  json: JsonRecord,
+  binary: Uint8Array,
+): void {
+  const meshes = json.meshes as GltfMesh[];
+  let targetCount = 0;
+  for (const mesh of meshes) {
+    for (const primitive of mesh.primitives ?? []) {
+      for (const target of primitive.targets ?? []) {
+        const positionAccessor = target.POSITION;
+        expect(positionAccessor, `${fileName}: morph POSITION accessor`).toBeTypeOf("number");
+        if (typeof positionAccessor !== "number") continue;
+        targetCount += 1;
+        const deltas = accessorVectors(json, binary, positionAccessor, true).flat();
+        expect(deltas.every(Number.isFinite), `${fileName}: finite morph deltas`).toBe(true);
+        const maxAbsoluteDelta = Math.max(...deltas.map(Math.abs));
+        expect(maxAbsoluteDelta, `${fileName}: bounded independent morph target`)
+          .toBeLessThanOrEqual(0.12);
+      }
+    }
+  }
+  expect(targetCount, `${fileName}: real morph target count`).toBeGreaterThanOrEqual(11);
+}
+
+describe("ToonSpectrum Wave 4/5 character quality contract", () => {
+  it.each(STRICT_ORIGINAL_VRM_FILES)("%s is a compact, self-contained MToon VRM 1.0 with an active full rig", (fileName) => {
     const bytes = bundledBytes(fileName);
     expect(validateVrmGlbBytes(bytes)).toEqual({ vrmVersion: 1 });
     expect(bytes.byteLength, `${fileName}: non-placeholder binary`).toBeGreaterThan(100 * 1024);
@@ -458,6 +547,7 @@ describe("ToonSpectrum Wave 4 character quality contract", () => {
     );
 
     const json = embeddedJson(bytes);
+    const extensionsUsed = json.extensionsUsed as string[];
     const extensions = json.extensions as JsonRecord;
     const vrm = extensions.VRMC_vrm as JsonRecord;
     const meta = vrm.meta as JsonRecord;
@@ -467,6 +557,10 @@ describe("ToonSpectrum Wave 4 character quality contract", () => {
     ];
 
     expect(vrm.specVersion).toBe("1.0");
+    expect(extensionsUsed).toEqual(expect.arrayContaining([
+      "VRMC_vrm",
+      "VRMC_materials_mtoon",
+    ]));
     expect(meta).toMatchObject({
       authors: ["ToonSpectrum"],
       licenseUrl: "https://vrm.dev/licenses/1.0/",
@@ -483,9 +577,12 @@ describe("ToonSpectrum Wave 4 character quality contract", () => {
     const binary = binaryChunk(bytes);
     validateSkinning(fileName, json, binary);
     validateExpressions(fileName, json);
+    if ((WAVE5_VRM_FILES as readonly string[]).includes(fileName)) {
+      validateBoundedMorphTargets(fileName, json, binary);
+    }
   });
 
-  it.each(WAVE4_VRM_FILES)("%s loads through GLTFLoader and the app's three-vrm plugin", async (fileName) => {
+  it.each(STRICT_ORIGINAL_VRM_FILES)("%s loads through GLTFLoader and the app's three-vrm plugin", async (fileName) => {
     const bytes = bundledBytes(fileName);
     const arrayBuffer = bytes.buffer.slice(
       bytes.byteOffset,
