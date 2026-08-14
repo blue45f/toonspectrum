@@ -981,13 +981,23 @@ function writeBaseline({ previous, runtimeReport, tightenOnly }) {
     };
   }
 
+  // Every number here can be re-derived by re-running the gate. The one thing that cannot is
+  // the sentence a human wrote explaining *why* a regression was accepted — and rewriting
+  // `note` wholesale destroyed exactly that on 2026-08-14, silently deleting the brush wave's
+  // own accounting of its ~100 KiB. Regenerate the boilerplate, carry the rest.
+  const generatedNote =
+    "Last accepted measurement of scripts/check-studio-bundle.mjs. Regressions beyond the "
+    + "tolerance fail the build; see docs/perf/bundle-gate.md. Regenerate with "
+    + "UPDATE_BUNDLE_BASELINE=1 node scripts/check-studio-bundle.mjs.";
+  const priorNote = typeof previous?.note === "string" ? previous.note : "";
+  const authoredNote = priorNote.startsWith(generatedNote)
+    ? priorNote.slice(generatedNote.length).trim()
+    : priorNote.trim();
+
   const next = {
     schema: baselineSchema,
     recordedAt: new Date().toISOString(),
-    note:
-      "Last accepted measurement of scripts/check-studio-bundle.mjs. Regressions beyond the "
-      + "tolerance fail the build; see docs/perf/bundle-gate.md. Regenerate with "
-      + "UPDATE_BUNDLE_BASELINE=1 node scripts/check-studio-bundle.mjs.",
+    note: authoredNote ? `${generatedNote} ${authoredNote}` : generatedNote,
     policy: {
       ...ratchetPolicy,
       authority: "scripts/check-studio-bundle.mjs (this file records the values only)",
