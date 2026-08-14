@@ -92,7 +92,7 @@ describe("shared character/background 3D scene integration boundary", () => {
       "const mainViewTrackRef = effectiveIsQuadView ? viewPerspRef : viewportHostRef;",
     );
     expect(backgroundSource).toContain(
-      "const effectiveIsQuadView = isQuadView && !physicsInteractionLocked && !placementActive;",
+      "&& !placementActive\n    && !immersiveSceneActive;",
     );
   });
 
