@@ -45,7 +45,6 @@ import {
   deriveStudioVrmAvatarForgeFaceScale,
 } from "./studio-vrm-avatar-forge-face-controller";
 import {
-  STUDIO_VRM_AVATAR_REFERENCE_APPROVED_CATALOGUE,
   resolveStudioVrmAvatarReferenceAppearanceState,
 } from "./studio-vrm-avatar-reference-product";
 import { BlinkStabilizer } from "./studio-vrm-blink-stabilizer";
@@ -386,6 +385,10 @@ import {
   type StudioVrmWardrobeCaptureSync,
   type StudioVrmWardrobeSurfaceReceipt,
 } from "./StudioVrmWardrobePropsProjection";
+import {
+  studioVrmAvatarReferenceCatalogueDiagnosticMessage,
+  useStudioVrmAvatarReferenceCatalogue,
+} from "./useStudioVrmAvatarReferenceCatalogue";
 import {
   canonicalizeVrmContentHash,
   createUploadedVrmRecord,
@@ -3014,6 +3017,11 @@ export function StudioVrmPoser({
   const [activeCameraId, setActiveCameraId] = useState("front");
   const [activePanelTab, setActivePanelTab] = useState<PanelTab>("character");
   const [activeCharacterSection, setActiveCharacterSection] = useState<CharacterPanelSection>("library");
+  const avatarForgeReferenceSurfaceActive =
+    open && activePanelTab === "character" && activeCharacterSection === "forge";
+  const avatarForgeReferenceCatalogue = useStudioVrmAvatarReferenceCatalogue({
+    active: avatarForgeReferenceSurfaceActive,
+  });
   const [texturePaintSettings, setTexturePaintSettings] =
     useState<StudioVrmTexturePaintPanelSettings>(DEFAULT_STUDIO_VRM_TEXTURE_PAINT_SETTINGS);
   const [texturePaintEyedropperActive, setTexturePaintEyedropperActive] = useState(false);
@@ -3119,6 +3127,7 @@ export function StudioVrmPoser({
   const [avatarForgeReferencePreview, setAvatarForgeReferencePreview] = useState<Readonly<{
     modelId: string;
     authorityIdentity: string;
+    catalogueRevision: string;
     presetId: string;
     state: AvatarForgeState;
   }> | null>(null);
@@ -3129,8 +3138,10 @@ export function StudioVrmPoser({
     avatarForgeReferencePreview
     && avatarForgeReferencePreview.modelId === activeModelId
     && avatarForgeReferencePreview.authorityIdentity === avatarForgeReferenceAuthorityIdentity
-    && activePanelTab === "character"
-    && activeCharacterSection === "forge"
+    && avatarForgeReferenceCatalogue.status === "ready"
+    && avatarForgeReferencePreview.catalogueRevision
+      === avatarForgeReferenceCatalogue.catalogueRevision
+    && avatarForgeReferenceSurfaceActive
     && !broadcastPreviewActive
       ? avatarForgeReferencePreview
       : null;
@@ -5391,7 +5402,8 @@ export function StudioVrmPoser({
   );
 
   function avatarForgeReferenceInteractionBlocked(): boolean {
-    return !vrm
+    return !avatarForgeReferenceSurfaceActive
+      || !vrm
       || broadcastPreviewActive
       || isCapturing
       || isSharingPose
@@ -5407,7 +5419,7 @@ export function StudioVrmPoser({
     return resolveStudioVrmAvatarReferenceAppearanceState({
       current: avatarForgeState,
       selection,
-      catalogue: STUDIO_VRM_AVATAR_REFERENCE_APPROVED_CATALOGUE,
+      catalogue: avatarForgeReferenceCatalogue.catalogue,
     });
   }
 
@@ -5424,6 +5436,7 @@ export function StudioVrmPoser({
     setAvatarForgeReferencePreview({
       modelId: activeModelId,
       authorityIdentity: avatarForgeReferenceAuthorityIdentity,
+      catalogueRevision: selection.receipt.catalogueRevision,
       presetId: selection.presetId,
       state: nextState,
     });
@@ -10237,9 +10250,26 @@ export function StudioVrmPoser({
                 />
                 <div className="mt-3">
                   <StudioVrmAvatarReferenceRecommendationsPanel
-                    catalogue={STUDIO_VRM_AVATAR_REFERENCE_APPROVED_CATALOGUE}
+                    catalogue={
+                      avatarForgeReferenceSurfaceActive
+                        ? avatarForgeReferenceCatalogue.catalogue
+                        : null
+                    }
+                    catalogueStatus={
+                      avatarForgeReferenceSurfaceActive
+                        ? avatarForgeReferenceCatalogue.status
+                        : "idle"
+                    }
+                    catalogueUnavailableReason={
+                      avatarForgeReferenceCatalogue.status === "unavailable"
+                        ? studioVrmAvatarReferenceCatalogueDiagnosticMessage(
+                            avatarForgeReferenceCatalogue.diagnosticCode,
+                          )
+                        : undefined
+                    }
                     disabled={avatarForgeReferenceInteractionBlocked()}
                     previewingPresetId={avatarForgeReferencePreviewActive?.presetId ?? null}
+                    onCatalogueRetry={avatarForgeReferenceCatalogue.retry}
                     onPreview={handleAvatarForgeReferencePreview}
                     onPreviewClear={() => setAvatarForgeReferencePreview(null)}
                     onApply={handleAvatarForgeReferenceApply}

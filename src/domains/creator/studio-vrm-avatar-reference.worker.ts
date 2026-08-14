@@ -1,6 +1,10 @@
 /// <reference lib="webworker" />
 
-import { resolveStudioMediaPipeVisionWasmFileset } from "./studio-mediapipe-vision-assets";
+import studioMediaPipeVisionModuleLoaderUrl from
+  "@mediapipe/tasks-vision/vision_wasm_module_internal.js?url";
+import studioMediaPipeVisionModuleWasmUrl from
+  "@mediapipe/tasks-vision/vision_wasm_module_internal.wasm?url";
+
 import {
   loadStudioMediaPipeVisionModule,
   runStudioMediaPipeVisionTaskCreation,
@@ -27,6 +31,165 @@ import {
 import type { ImageEmbedder as MediaPipeImageEmbedder } from "@mediapipe/tasks-vision";
 
 const scope = self as unknown as DedicatedWorkerGlobalScope;
+
+const STUDIO_VRM_AVATAR_REFERENCE_BLOCKED_EGRESS_GLOBALS = Object.freeze([
+  "Cache",
+  "CacheStorage",
+  "EventSource",
+  "FontFace",
+  "RTCPeerConnection",
+  "ServiceWorker",
+  "ServiceWorkerContainer",
+  "SharedWorker",
+  "WebSocket",
+  "WebSocketStream",
+  "WebTransport",
+  "Worker",
+  "XMLHttpRequest",
+  "caches",
+  "fonts",
+] as const);
+
+function resolveSameOriginMediaPipeAssetUrl(value: string, label: string): string {
+  const workerUrl = new URL(scope.location.href);
+  const assetUrl = new URL(value, workerUrl);
+  if (
+    assetUrl.origin !== workerUrl.origin
+    || (assetUrl.protocol !== "http:" && assetUrl.protocol !== "https:")
+  ) {
+    throw new TypeError(`${label} must resolve to an exact same-origin HTTP asset.`);
+  }
+  return assetUrl.href;
+}
+
+const STUDIO_VRM_AVATAR_REFERENCE_MODULE_FILESET = Object.freeze({
+  wasmLoaderPath: resolveSameOriginMediaPipeAssetUrl(
+    studioMediaPipeVisionModuleLoaderUrl,
+    "MediaPipe module loader",
+  ),
+  wasmBinaryPath: resolveSameOriginMediaPipeAssetUrl(
+    studioMediaPipeVisionModuleWasmUrl,
+    "MediaPipe module WASM",
+  ),
+});
+
+function blockedEgressError(): TypeError {
+  return new TypeError("Avatar reference inference blocked an undeclared network channel.");
+}
+
+function propertyOwner(target: object, name: PropertyKey): object | null {
+  let current: object | null = target;
+  while (current) {
+    if (Object.prototype.hasOwnProperty.call(current, name)) return current;
+    current = Object.getPrototypeOf(current) as object | null;
+  }
+  return null;
+}
+
+function lockEgressProperty(target: object, name: PropertyKey, value: unknown): void {
+  const owner = propertyOwner(target, name) ?? target;
+  const descriptor = Reflect.getOwnPropertyDescriptor(owner, name);
+  if (descriptor && !descriptor.configurable) {
+    if ("value" in descriptor && descriptor.value === value && descriptor.writable === false) return;
+    throw blockedEgressError();
+  }
+  if (!Reflect.defineProperty(owner, name, {
+    configurable: false,
+    enumerable: descriptor?.enumerable ?? false,
+    value,
+    writable: false,
+  })) throw blockedEgressError();
+}
+
+function requestUrl(input: RequestInfo | URL): string {
+  if (typeof Request === "function" && input instanceof Request) return input.url;
+  if (input instanceof URL) return input.href;
+  return String(input);
+}
+
+function requestMethod(input: RequestInfo | URL, init?: RequestInit): string {
+  if (typeof init?.method === "string") return init.method.toUpperCase();
+  if (typeof Request === "function" && input instanceof Request) {
+    return input.method.toUpperCase();
+  }
+  return "GET";
+}
+
+function requestSignal(input: RequestInfo | URL, init?: RequestInit): AbortSignal | undefined {
+  if (init?.signal) return init.signal;
+  if (typeof Request === "function" && input instanceof Request) return input.signal;
+  return undefined;
+}
+
+/**
+ * Locks the short-lived inference Worker to the three declared network resources it needs:
+ * the pinned model and Vite's exact same-origin module-loader/WASM asset URLs. Image pixels never
+ * enter a request body. Other browser egress primitives are locked before tasks-vision loads.
+ */
+function installStudioVrmAvatarReferenceEgressPolicy(): void {
+  if (typeof scope.fetch !== "function") throw blockedEgressError();
+  const nativeFetch = scope.fetch.bind(scope);
+  const modelUrl = new URL(STUDIO_VRM_AVATAR_REFERENCE_MODEL_URL).href;
+  const allowedFetchUrls = new Set([
+    modelUrl,
+    STUDIO_VRM_AVATAR_REFERENCE_MODULE_FILESET.wasmLoaderPath,
+    STUDIO_VRM_AVATAR_REFERENCE_MODULE_FILESET.wasmBinaryPath,
+  ]);
+  const guardedFetch: typeof fetch = async (input, init) => {
+    let normalizedUrl: string;
+    try {
+      normalizedUrl = new URL(requestUrl(input), scope.location.href).href;
+    } catch {
+      throw blockedEgressError();
+    }
+    if (requestMethod(input, init) !== "GET" || !allowedFetchUrls.has(normalizedUrl)) {
+      throw blockedEgressError();
+    }
+    // Never forward caller-controlled headers, bodies, credentials or referrers. Even a request
+    // to an allowed URL is reconstructed from the exact constant and the cancellation signal.
+    const response = await nativeFetch(normalizedUrl, {
+      cache: normalizedUrl === modelUrl ? "force-cache" : "no-cache",
+      credentials: "omit",
+      method: "GET",
+      mode: normalizedUrl === modelUrl ? "cors" : "same-origin",
+      redirect: "error",
+      referrerPolicy: "no-referrer",
+      signal: requestSignal(input, init),
+    });
+    if (response.redirected || !allowedFetchUrls.has(new URL(response.url).href)) {
+      try {
+        await response.body?.cancel();
+      } catch {
+        // The undeclared response is rejected independently of best-effort stream cleanup.
+      }
+      throw blockedEgressError();
+    }
+    return response;
+  };
+  // Patch the actual prototype owner, not only `self`: otherwise third-party code could recover
+  // WorkerGlobalScope.prototype.fetch/importScripts and bypass an own-property shadow.
+  lockEgressProperty(scope, "fetch", guardedFetch);
+
+  for (const name of STUDIO_VRM_AVATAR_REFERENCE_BLOCKED_EGRESS_GLOBALS) {
+    lockEgressProperty(scope, name, undefined);
+  }
+
+  const rejectImportScripts = (): never => {
+    throw new TypeError("Avatar reference inference requires the pinned module loader.");
+  };
+  lockEgressProperty(scope, "importScripts", rejectImportScripts);
+
+  const navigatorRecord = scope.navigator as unknown as object;
+  if (
+    "sendBeacon" in navigatorRecord
+  ) lockEgressProperty(navigatorRecord, "sendBeacon", undefined);
+  if ("serviceWorker" in navigatorRecord) {
+    lockEgressProperty(navigatorRecord, "serviceWorker", undefined);
+  }
+}
+
+installStudioVrmAvatarReferenceEgressPolicy();
+
 const active = new Map<number, AbortController>();
 
 function postProgress(
@@ -62,9 +225,8 @@ async function fetchBoundedModel(signal: AbortSignal): Promise<Uint8Array> {
     timedOut = true;
     requestController.abort();
   }, STUDIO_VRM_AVATAR_REFERENCE_MODEL_FETCH_TIMEOUT_MS);
-  let response: Response;
   try {
-    response = await fetch(STUDIO_VRM_AVATAR_REFERENCE_MODEL_URL, {
+    const response = await fetch(STUDIO_VRM_AVATAR_REFERENCE_MODEL_URL, {
       cache: "force-cache",
       credentials: "omit",
       mode: "cors",
@@ -72,13 +234,6 @@ async function fetchBoundedModel(signal: AbortSignal): Promise<Uint8Array> {
       referrerPolicy: "no-referrer",
       signal: requestController.signal,
     });
-  } catch (cause) {
-    scope.clearTimeout(timeout);
-    signal.removeEventListener("abort", handleAbort);
-    if (signal.aborted) throw new StudioVrmAvatarReferenceError("aborted", { cause });
-    throw new StudioVrmAvatarReferenceError("model-unavailable", { cause });
-  }
-  try {
     if (!response.ok || timedOut) throw new StudioVrmAvatarReferenceError("model-unavailable");
     const contentLengthHeader = response.headers.get("content-length");
     if (contentLengthHeader !== null) {
@@ -152,26 +307,26 @@ async function createImageEmbedder(
   readonly cosineSimilarity: typeof import("@mediapipe/tasks-vision").ImageEmbedder.cosineSimilarity;
 }> {
   try {
-    const { FilesetResolver, ImageEmbedder } = await loadStudioMediaPipeVisionModule();
-    const [wasm, modelAssetBuffer] = await Promise.all([
-      resolveStudioMediaPipeVisionWasmFileset({
-        isSimdSupported: () => FilesetResolver.isSimdSupported(false),
-      }),
-      fetchBoundedModel(signal),
-    ]);
+    const { ImageEmbedder } = await loadStudioMediaPipeVisionModule();
+    // The official module loader writes ModuleFactory onto globalThis before its default export
+    // settles. tasks-vision reaches it through the module-worker TypeError -> dynamic-import path.
+    const modelAssetBuffer = await fetchBoundedModel(signal);
     if (signal.aborted) throw new StudioVrmAvatarReferenceError("aborted");
     const embedder = await runStudioMediaPipeVisionTaskCreation({
       owner: "vrm-avatar-reference-image",
       signal,
-      create: () => ImageEmbedder.createFromOptions(wasm.fileset, {
-        baseOptions: {
-          delegate: "CPU",
-          modelAssetBuffer,
+      create: () => ImageEmbedder.createFromOptions(
+        STUDIO_VRM_AVATAR_REFERENCE_MODULE_FILESET,
+        {
+          baseOptions: {
+            delegate: "CPU",
+            modelAssetBuffer,
+          },
+          runningMode: "IMAGE",
+          l2Normalize: false,
+          quantize: false,
         },
-        runningMode: "IMAGE",
-        l2Normalize: false,
-        quantize: false,
-      }),
+      ),
     });
     return { embedder, cosineSimilarity: ImageEmbedder.cosineSimilarity };
   } catch (cause) {

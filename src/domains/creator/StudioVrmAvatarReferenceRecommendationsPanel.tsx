@@ -2,12 +2,13 @@ import {
   Check,
   Eye,
   ImagePlus,
+  LoaderCircle,
   RotateCcw,
   ScanSearch,
   ShieldCheck,
   TriangleAlert,
 } from "lucide-react";
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useId, useRef, useState, type ChangeEvent } from "react";
 
 import { createAvatarForgeState, type AvatarForgeState } from "./studio-vrm-avatar-forge";
 import {
@@ -44,12 +45,15 @@ export interface StudioVrmAvatarReferenceSelection {
 
 export interface StudioVrmAvatarReferenceRecommendationsPanelProps {
   readonly catalogue?: StudioVrmAvatarReferenceCatalogue | null;
+  readonly catalogueStatus?: "idle" | "loading" | "ready" | "unavailable";
+  readonly catalogueUnavailableReason?: string;
   readonly disabled?: boolean;
   readonly previewingPresetId?: string | null;
   readonly runtimeSupported?: boolean;
   readonly onPreview: (selection: StudioVrmAvatarReferenceSelection) => void;
   readonly onPreviewClear?: () => void;
   readonly onApply: (selection: StudioVrmAvatarReferenceSelection) => void;
+  readonly onCatalogueRetry?: () => void;
   /** Host/test seam. Product code uses the bounded preprocessing + dedicated embedder Workers. */
   readonly analyzeImage?: (
     file: File,
@@ -97,25 +101,34 @@ function selectionFor(
 
 export function StudioVrmAvatarReferenceRecommendationsPanel({
   catalogue: catalogueInput = null,
+  catalogueStatus: catalogueStatusInput,
+  catalogueUnavailableReason,
   disabled = false,
   previewingPresetId = null,
   runtimeSupported = supportsStudioVrmAvatarReferenceRecommendations(),
   onPreview,
   onPreviewClear,
   onApply,
+  onCatalogueRetry,
   analyzeImage = analyzeStudioVrmAvatarReferenceImage,
 }: StudioVrmAvatarReferenceRecommendationsPanelProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const mediaPipeConsentDescriptionId = useId();
   const abortRef = useRef<AbortController | null>(null);
   const aliveRef = useRef(true);
   const generationRef = useRef(0);
   const [busy, setBusy] = useState(false);
+  const [mediaPipeConsentGranted, setMediaPipeConsentGranted] = useState(false);
   const [fileName, setFileName] = useState("");
   const [error, setError] = useState("");
   const [progress, setProgress] = useState<StudioVrmAvatarReferenceProgress | null>(null);
   const [receipt, setReceipt] = useState<StudioVrmAvatarReferenceRecommendationReceipt | null>(null);
   const catalogue = safeCatalogue(catalogueInput);
-  const available = Boolean(catalogue) && runtimeSupported;
+  const catalogueStatus = catalogueStatusInput ?? (catalogue ? "ready" : "unavailable");
+  const effectiveCatalogueStatus = catalogueStatus === "ready" && !catalogue
+    ? "unavailable"
+    : catalogueStatus;
+  const available = effectiveCatalogueStatus === "ready" && Boolean(catalogue) && runtimeSupported;
 
   useEffect(() => {
     aliveRef.current = true;
@@ -136,12 +149,37 @@ export function StudioVrmAvatarReferenceRecommendationsPanel({
     setReceipt(null);
     setError("");
     setFileName("");
+    setMediaPipeConsentGranted(false);
   }, [catalogueInput]);
+
+  function clearAnalysisState(): void {
+    generationRef.current += 1;
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setBusy(false);
+    setProgress(null);
+    setReceipt(null);
+    setError("");
+    setFileName("");
+    onPreviewClear?.();
+  }
+
+  function handleMediaPipeConsentChanged(event: ChangeEvent<HTMLInputElement>): void {
+    const granted = event.target.checked;
+    setMediaPipeConsentGranted(granted);
+    if (!granted) clearAnalysisState();
+  }
 
   async function handleFileSelected(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
-    if (!file || disabled || !available || !catalogue) return;
+    if (
+      !file
+      || disabled
+      || !available
+      || !catalogue
+      || !mediaPipeConsentGranted
+    ) return;
 
     onPreviewClear?.();
     abortRef.current?.abort();
@@ -242,12 +280,42 @@ export function StudioVrmAvatarReferenceRecommendationsPanel({
       </div>
 
       <div className="p-3.5">
-        {!catalogue ? (
+        {effectiveCatalogueStatus === "idle" || effectiveCatalogueStatus === "loading" ? (
+          <div
+            role="status"
+            aria-live="polite"
+            className="flex items-start gap-2 rounded-xl border border-line bg-panel/55 p-3 text-[0.65rem] leading-relaxed text-fg-2"
+          >
+            <LoaderCircle
+              size={15}
+              className="mt-0.5 shrink-0 animate-spin text-accent motion-reduce:animate-none"
+              aria-hidden
+            />
+            <div>
+              <p className="font-bold text-fg">검증된 추천 기준을 불러오는 중</p>
+              <p className="mt-1 text-fg-3">Forge를 사용할 때만 작은 기준 파일을 확인합니다.</p>
+            </div>
+          </div>
+        ) : effectiveCatalogueStatus === "unavailable" || !catalogue ? (
           <div role="status" className="flex items-start gap-2 rounded-xl border border-line bg-panel/55 p-3 text-[0.65rem] leading-relaxed text-fg-2">
             <TriangleAlert size={15} className="mt-0.5 shrink-0 text-warn" aria-hidden />
-            <p>
-              검증된 프리셋 기준 임베딩이 아직 연결되지 않아 추천을 사용할 수 없습니다. 스타일 탭에서 프리셋을 직접 선택해 주세요.
-            </p>
+            <div className="min-w-0 flex-1">
+              <p>
+                {catalogueUnavailableReason
+                  ?? "검증된 프리셋 추천 기준을 사용할 수 없습니다. 스타일 탭에서 프리셋을 직접 선택해 주세요."}
+              </p>
+              {onCatalogueRetry ? (
+                <button
+                  type="button"
+                  disabled={disabled}
+                  onClick={onCatalogueRetry}
+                  className="mt-2 inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-line bg-card px-3 text-[0.64rem] font-bold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-40"
+                >
+                  <RotateCcw size={13} aria-hidden />
+                  추천 기준 다시 불러오기
+                </button>
+              ) : null}
+            </div>
           </div>
         ) : !runtimeSupported ? (
           <div role="status" className="flex items-start gap-2 rounded-xl border border-line bg-panel/55 p-3 text-[0.65rem] leading-relaxed text-fg-2">
@@ -256,18 +324,48 @@ export function StudioVrmAvatarReferenceRecommendationsPanel({
           </div>
         ) : (
           <>
+            <div className="mb-3 rounded-xl border border-line bg-panel/55 p-3">
+              <label className="flex min-h-11 cursor-pointer items-start gap-2.5 text-[0.65rem] font-bold leading-relaxed text-fg-2">
+                <input
+                  type="checkbox"
+                  checked={mediaPipeConsentGranted}
+                  disabled={disabled}
+                  onChange={handleMediaPipeConsentChanged}
+                  aria-describedby={mediaPipeConsentDescriptionId}
+                  className="mt-1 size-4 shrink-0 accent-[var(--color-accent)]"
+                />
+                <span>MediaPipe 분석과 아래 메타데이터 처리 가능성을 확인하고 동의합니다.</span>
+              </label>
+              <p
+                id={mediaPipeConsentDescriptionId}
+                className="mt-1.5 text-[0.6rem] leading-relaxed text-fg-3"
+              >
+                이미지 픽셀은 이 기기의 메모리 Worker에서 처리되고 업로드되지 않습니다. Google
+                MediaPipe API는 앱 식별자, 처리 매체의 일반적 특성, 추론·세션 수, 호스트 환경 같은
+                이용·성능 메타데이터를 처리할 수 있습니다. 동의하지 않아도 프리셋을 직접 선택할 수
+                있습니다.{" "}
+                <a
+                  href="https://developers.google.com/edge/mediapipe/legal/tos"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-bold text-accent underline underline-offset-2"
+                >
+                  MediaPipe API 약관
+                </a>
+              </p>
+            </div>
             <input
               ref={inputRef}
               className="sr-only"
               type="file"
               accept="image/jpeg,image/png,image/webp"
-              disabled={disabled || busy}
+              disabled={disabled || busy || !mediaPipeConsentGranted}
               onChange={handleFileSelected}
               aria-label="아바타 스타일 참고 이미지 선택"
             />
             <button
               type="button"
-              disabled={disabled || busy}
+              disabled={disabled || busy || !mediaPipeConsentGranted}
               onClick={() => inputRef.current?.click()}
               className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-accent px-3 text-[0.7rem] font-extrabold text-on-accent transition-colors hover:bg-accent-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-40"
             >

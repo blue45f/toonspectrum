@@ -78,7 +78,7 @@ export interface StudioVrmAvatarReferenceAnalyzeOptions {
   readonly topK?: number;
   readonly timeoutMs?: number;
   readonly onProgress?: (progress: StudioVrmAvatarReferenceProgress) => void;
-  /** Host/test seam. Product code uses the dedicated module Worker. */
+  /** Host/test seam. Product code uses the dedicated Vite-managed module Worker. */
   readonly workerFactory?: () => StudioVrmAvatarReferenceWorkerLike;
   /** Host/test seam. Product code uses the existing bounded photo preprocessing Worker. */
   readonly preprocessorFactory?: () => StudioVrmAvatarReferencePreprocessorLike;
@@ -92,6 +92,10 @@ function nextRequestId(): number {
 }
 
 function defaultWorkerFactory(): StudioVrmAvatarReferenceWorkerLike {
+  // Vite dev serves Worker entries as native ESM while production emits the configured bundled
+  // entry. Keep the constructor explicitly module-typed in both modes; the Worker selects
+  // MediaPipe's official module WASM loader, whose global ModuleFactory hand-off is compatible
+  // with tasks-vision's module-worker fallback without evaluating unbundled ESM as classic code.
   return new Worker(new URL("./studio-vrm-avatar-reference.worker.ts", import.meta.url), {
     type: "module",
     name: "studio-vrm-avatar-reference-image-embedder",
