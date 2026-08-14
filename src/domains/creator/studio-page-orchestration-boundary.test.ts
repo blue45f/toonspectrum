@@ -95,6 +95,9 @@ describe("StudioPage user-action orchestration boundary", () => {
     expect(studioPageSource).toContain(
       "normalizeStudioPublicationAnalyticsDeferred,",
     );
+    expect(studioPageSource).toContain(
+      "requestStudioVrmProjectArchiveUseContext,",
+    );
     expect(rasterExportLoaderSource).toContain(
       'import("./studio-page-orchestration-runtime")',
     );

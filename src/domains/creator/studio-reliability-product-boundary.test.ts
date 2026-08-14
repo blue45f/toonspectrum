@@ -31,6 +31,10 @@ const confirmHost = readFileSync(
   new URL("./StudioDestructiveConfirmHost.tsx", import.meta.url),
   "utf8",
 );
+const vrmArchiveAttestationHost = readFileSync(
+  new URL("./StudioVrmProjectArchiveAttestationHost.tsx", import.meta.url),
+  "utf8",
+);
 const createWorkPage = readFileSync(
   new URL("./CreateWorkPage.tsx", import.meta.url),
   "utf8",
@@ -151,6 +155,15 @@ describe("Studio reliability product boundary", () => {
     for (const mount of [studioPage, createWorkPage, createSeriesPage]) {
       expect(mount).toContain("<StudioDestructiveConfirmHost />");
     }
+  });
+
+  it("routes VRM archive attestations through a bounded on-canvas presenter", () => {
+    expect(studioPage).toContain("<StudioVrmProjectArchiveAttestationHost />");
+    expect(studioPage).toContain("requestStudioVrmProjectArchiveUseContext,");
+    expect(vrmArchiveAttestationHost).not.toMatch(
+      /(?:globalThis|window)\s*\.\s*(?:confirm|prompt)\s*(?:\?\.)?\s*\(/u,
+    );
+    expect(vrmArchiveAttestationHost).toContain("StudioVrmProjectArchiveAttestationDialog");
   });
 
   it("breaks the silence when the WebGPU filter runtime loses its device", () => {
