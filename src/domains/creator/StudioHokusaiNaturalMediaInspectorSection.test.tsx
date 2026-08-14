@@ -7,9 +7,11 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import {
   afterEach,
+  beforeEach,
   describe,
   expect,
   it,
@@ -25,6 +27,10 @@ import {
 } from "./StudioHokusaiNaturalMediaInspectorSection";
 
 import type { DrawEl } from "./studio-element-model";
+import type {
+  StudioHokusaiMaterialProfileId,
+  StudioHokusaiNaturalMediaPresetId,
+} from "./studio-hokusai-natural-media-contract";
 import type { StudioHokusaiNaturalMediaProductResult } from "./studio-hokusai-natural-media-product";
 
 const probeProduct = vi.fn(async () => ({
@@ -59,6 +65,11 @@ const selected: DrawEl = {
   brush: "gpen",
 };
 
+beforeEach(() => {
+  probeProduct.mockClear();
+  generateProduct.mockReset();
+});
+
 afterEach(cleanup);
 
 function deferred<T>(): Readonly<{
@@ -78,7 +89,10 @@ function deferred<T>(): Readonly<{
   };
 }
 
-function productResult(): StudioHokusaiNaturalMediaProductResult {
+function productResult(
+  presetId: StudioHokusaiNaturalMediaPresetId = "pencil",
+  materialProfileId: StudioHokusaiMaterialProfileId = "pencil",
+): StudioHokusaiNaturalMediaProductResult {
   return {
     src: "data:image/png;base64,iVBORw0KGgo=",
     rasterWidth: 32,
@@ -94,8 +108,8 @@ function productResult(): StudioHokusaiNaturalMediaProductResult {
       requestId: 1,
       engineEpoch: 1,
       sourceElementId: selected.id,
-      presetId: "pencil",
-      materialProfileId: "pencil",
+      presetId,
+      materialProfileId,
       seed: 0x48_4f_4b_55,
       rasterWidth: 32,
       rasterHeight: 24,
@@ -120,6 +134,17 @@ function openSection(container: HTMLElement): void {
   }
   details.open = true;
   fireEvent(details, new Event("toggle"));
+}
+
+function selectPreset(
+  container: HTMLElement,
+  presetId: StudioHokusaiNaturalMediaPresetId,
+): void {
+  const input = container.querySelector<HTMLInputElement>(
+    `input[name="studio-hokusai-preset"][value="${presetId}"]`,
+  );
+  if (!input) throw new Error(`Missing Hokusai preset radio: ${presetId}`);
+  fireEvent.click(input);
 }
 
 describe("Studio Hokusai natural-media inspector", () => {
@@ -148,10 +173,132 @@ describe("Studio Hokusai natural-media inspector", () => {
         name: new RegExp(`^${label}`, "u"),
       })).not.toBeNull();
     }
+    expect(screen.queryByRole("group", { name: "재질 결" })).toBeNull();
     const action = screen.getByRole("button", {
       name: "선택 획을 자연매체로 변환",
     });
     expect((action as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("shows only carrier-compatible material profiles with an accessible touch target", async () => {
+    const { container } = render(
+      <StudioHokusaiNaturalMediaInspectorSection
+        selected={selected}
+        currentColor="#102030"
+        documentWidth={800}
+        documentHeight={1_200}
+        pageId="page-1"
+        masterEditMode={false}
+        disabled={false}
+        disabledReason={null}
+        onReplace={vi.fn(() => true)}
+      />,
+    );
+    openSection(container);
+    await waitFor(() => {
+      expect(screen.getByText("사용 가능")).not.toBeNull();
+    });
+
+    selectPreset(container, "charcoal");
+    let group = screen.getByRole("group", { name: "재질 결" });
+    const charcoalProfiles = within(group).getAllByRole("radio");
+    expect(charcoalProfiles).toHaveLength(5);
+    for (const label of [
+      "목탄 · 거친 탄가루",
+      "초크 · 분필 미네랄 결",
+      "크레용 · 왁스 긁힘 결",
+      "파스텔 · 분말·종이 비침",
+      "오일파스텔 · 유막 위 왁스",
+    ]) {
+      expect(within(group).getByRole("radio", {
+        name: label,
+      })).not.toBeNull();
+    }
+    const charcoal = within(group).getByRole("radio", {
+      name: "목탄 · 거친 탄가루",
+    }) as HTMLInputElement;
+    expect(charcoal.checked).toBe(true);
+    expect(charcoal.closest("label")?.className).toContain("min-h-11");
+    const hintId = group.getAttribute("aria-describedby");
+    expect(hintId).toBeTruthy();
+    expect(document.getElementById(hintId ?? "")?.textContent).toContain(
+      "표면의 입자와 도막",
+    );
+
+    fireEvent.click(within(group).getByRole("radio", {
+      name: "파스텔 · 분말·종이 비침",
+    }));
+    expect((within(group).getByRole("radio", {
+      name: "파스텔 · 분말·종이 비침",
+    }) as HTMLInputElement).checked)
+      .toBe(true);
+
+    selectPreset(container, "oil");
+    group = screen.getByRole("group", { name: "재질 결" });
+    expect(within(group).getAllByRole("radio")).toHaveLength(4);
+    expect((within(group).getByRole("radio", {
+      name: "유화 · 유화 필름",
+    }) as HTMLInputElement).checked).toBe(true);
+    expect(within(group).queryByRole("radio", {
+      name: "파스텔 · 분말·종이 비침",
+    })).toBeNull();
+
+    selectPreset(container, "marker");
+    expect(screen.queryByRole("group", { name: "재질 결" })).toBeNull();
+
+    selectPreset(container, "charcoal");
+    group = screen.getByRole("group", { name: "재질 결" });
+    expect((within(group).getByRole("radio", {
+      name: "목탄 · 거친 탄가루",
+    }) as HTMLInputElement).checked).toBe(true);
+  });
+
+  it("passes the explicitly selected material profile into the generation request", async () => {
+    generateProduct.mockResolvedValueOnce(productResult("charcoal", "chalk"));
+    const onReplace = vi.fn(() => true);
+    const { container } = render(
+      <StudioHokusaiNaturalMediaInspectorSection
+        selected={selected}
+        currentColor="#102030"
+        documentWidth={800}
+        documentHeight={1_200}
+        pageId="page-1"
+        masterEditMode={false}
+        disabled={false}
+        disabledReason={null}
+        onReplace={onReplace}
+      />,
+    );
+    openSection(container);
+    await waitFor(() => {
+      expect(screen.getByText("사용 가능")).not.toBeNull();
+    });
+
+    selectPreset(container, "charcoal");
+    const group = screen.getByRole("group", { name: "재질 결" });
+    fireEvent.click(within(group).getByRole("radio", {
+      name: "초크 · 분필 미네랄 결",
+    }));
+    fireEvent.click(screen.getByRole("button", {
+      name: "선택 획을 자연매체로 변환",
+    }));
+
+    await waitFor(() => expect(generateProduct).toHaveBeenCalledOnce());
+    expect(generateProduct).toHaveBeenCalledWith(
+      selected,
+      expect.objectContaining({
+        presetId: "charcoal",
+        materialProfileId: "chalk",
+      }),
+      expect.objectContaining({
+        documentWidth: 800,
+        documentHeight: 1_200,
+      }),
+    );
+    await waitFor(() => {
+      expect(onReplace).toHaveBeenCalledOnce();
+      expect(screen.getByText("Hokusai 자연매체 변환 완료")).not.toBeNull();
+    });
   });
 
   it("offers a direct route into stroke selection when no completed freehand vector is selected", () => {

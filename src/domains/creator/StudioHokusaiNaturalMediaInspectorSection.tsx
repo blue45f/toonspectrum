@@ -1,5 +1,6 @@
 import {
   Brush,
+  Check,
   ChevronDown,
   Feather,
   Highlighter,
@@ -11,12 +12,17 @@ import {
 } from "lucide-react";
 import {
   useEffect,
+  useId,
   useRef,
   useState,
 } from "react";
 
 import {
+  STUDIO_HOKUSAI_MATERIAL_PROFILES,
   STUDIO_HOKUSAI_NATURAL_MEDIA_PRESETS,
+  studioHokusaiDefaultMaterialProfileId,
+  studioHokusaiMaterialProfileIsCompatible,
+  type StudioHokusaiMaterialProfileId,
   type StudioHokusaiNaturalMediaPresetId,
 } from "./studio-hokusai-natural-media-contract";
 import {
@@ -59,6 +65,39 @@ const PRESET_ICONS: Readonly<Record<
   calligraphy: Brush,
   marker: Highlighter,
 });
+/**
+ * Korean labels for the material transfer applied over a carrier's MYB dab alpha.
+ *
+ * The carrier preset chooses the libmypaint dab dynamics; the material profile chooses the
+ * per-pixel texture pass. Several profiles share one carrier, so a carrier alone cannot select
+ * them — `studioHokusaiDefaultMaterialProfileId` only ever resolves the carrier's legacy profile.
+ */
+const MATERIAL_PROFILE_LABELS: Readonly<Record<
+  StudioHokusaiMaterialProfileId,
+  Readonly<{ label: string; description: string }>
+>> = Object.freeze({
+  pencil: { label: "흑연", description: "연필 결" },
+  charcoal: { label: "목탄", description: "거친 탄가루" },
+  chalk: { label: "초크", description: "분필 미네랄 결" },
+  crayon: { label: "크레용", description: "왁스 긁힘 결" },
+  pastel: { label: "파스텔", description: "분말·종이 비침" },
+  "oil-pastel": { label: "오일파스텔", description: "유막 위 왁스" },
+  oil: { label: "유화", description: "유화 필름" },
+  acrylic: { label: "아크릴", description: "폴리머 평탄 도막" },
+  gouache: { label: "과슈", description: "무광 불투명" },
+  painterly: { label: "회화", description: "브로큰 컬러" },
+  calligraphy: { label: "서예", description: "치즐 획" },
+  marker: { label: "마커", description: "틸트 치즐" },
+});
+
+function materialProfilesForCarrier(
+  presetId: StudioHokusaiNaturalMediaPresetId,
+): readonly StudioHokusaiMaterialProfileId[] {
+  return STUDIO_HOKUSAI_MATERIAL_PROFILES
+    .filter((profile) => profile.carrierPresetId === presetId)
+    .map((profile) => profile.id);
+}
+
 const COLOR_PATTERN = /^#[0-9a-f]{6}$/iu;
 
 function selectedFreehand(value: El | null): DrawEl | null {
@@ -110,12 +149,18 @@ export function StudioHokusaiNaturalMediaInspectorSection({
   onRequestSelectStroke,
   onReplace,
 }: StudioHokusaiNaturalMediaInspectorSectionProps): ReactElement {
+  const materialProfileGroupId = useId().replace(/:/gu, "");
+  const materialProfileHintId = `${materialProfileGroupId}-hint`;
   const selectedDraw = selectedFreehand(selected);
   const selectedDefaultColor = sourceColor(selectedDraw, currentColor);
   const selectedDefaultOpacity = sourceOpacity(selectedDraw);
   const [open, setOpen] = useState(false);
   const [presetId, setPresetId] =
     useState<StudioHokusaiNaturalMediaPresetId>("pencil");
+  const [materialProfileId, setMaterialProfileId] =
+    useState<StudioHokusaiMaterialProfileId>(
+      () => studioHokusaiDefaultMaterialProfileId("pencil"),
+    );
   const [color, setColor] = useState(selectedDefaultColor);
   const [sizeScale, setSizeScale] = useState(1);
   const [opacity, setOpacity] = useState(selectedDefaultOpacity);
@@ -194,6 +239,10 @@ export function StudioHokusaiNaturalMediaInspectorSection({
       || capability !== "ready"
       || !selectedDraw
       || !COLOR_PATTERN.test(color)
+      || !studioHokusaiMaterialProfileIsCompatible(
+        presetId,
+        materialProfileId,
+      )
     ) return;
     const controller = new AbortController();
     const sourceSnapshot = selectedDraw;
@@ -209,6 +258,7 @@ export function StudioHokusaiNaturalMediaInspectorSection({
           sourceSnapshot,
           {
             presetId,
+            materialProfileId,
             color: color.toLowerCase() as `#${string}`,
             sizeScale,
             opacity,
@@ -248,9 +298,15 @@ export function StudioHokusaiNaturalMediaInspectorSection({
       });
   };
 
+  const carrierMaterialProfiles = materialProfilesForCarrier(presetId);
+  const materialProfileCompatible = studioHokusaiMaterialProfileIsCompatible(
+    presetId,
+    materialProfileId,
+  );
   const controlsDisabled =
     disabled || busy || capability !== "ready";
-  const actionDisabled = controlsDisabled || selectedDraw === null;
+  const actionDisabled =
+    controlsDisabled || selectedDraw === null || !materialProfileCompatible;
   const statusLabel =
     busy
       ? "변환 중"
@@ -389,7 +445,12 @@ export function StudioHokusaiNaturalMediaInspectorSection({
                       value={preset.id}
                       checked={presetId === preset.id}
                       className="sr-only"
-                      onChange={() => setPresetId(preset.id)}
+                      onChange={() => {
+                        setPresetId(preset.id);
+                        setMaterialProfileId(
+                          studioHokusaiDefaultMaterialProfileId(preset.id),
+                        );
+                      }}
                     />
                     <Icon size={14} aria-hidden className="shrink-0" />
                     <span className="min-w-0">
@@ -405,6 +466,77 @@ export function StudioHokusaiNaturalMediaInspectorSection({
               })}
             </div>
           </fieldset>
+
+          {carrierMaterialProfiles.length > 1 ? (
+            <fieldset
+              disabled={controlsDisabled}
+              aria-describedby={materialProfileHintId}
+              className="min-w-0"
+            >
+              <legend className="mb-1.5 text-[0.68rem] font-semibold text-fg-2">
+                재질 결
+              </legend>
+              <p
+                id={materialProfileHintId}
+                className="mb-2 text-[0.6rem] leading-relaxed text-fg-3"
+              >
+                붓 움직임은 유지하고 표면의 입자와 도막만 바꿉니다.
+              </p>
+              <div className="grid grid-cols-2 gap-1.5">
+                {carrierMaterialProfiles.map((profileId) => {
+                  const profile = MATERIAL_PROFILE_LABELS[profileId];
+                  const inputId = `${materialProfileGroupId}-${profileId}`;
+                  const selectedProfile = materialProfileId === profileId;
+                  return (
+                    <label
+                      key={profileId}
+                      htmlFor={inputId}
+                      title={profile.description}
+                      className={cn(
+                        "flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-2 py-1.5 transition-colors",
+                        "has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent",
+                        selectedProfile
+                          ? "border-accent/60 bg-accent-soft/50 text-fg"
+                          : "border-line bg-card text-fg-2 hover:bg-raised",
+                        controlsDisabled && "cursor-not-allowed opacity-45",
+                      )}
+                    >
+                      <input
+                        id={inputId}
+                        type="radio"
+                        name="studio-hokusai-material-profile"
+                        value={profileId}
+                        checked={selectedProfile}
+                        aria-label={`${profile.label} · ${profile.description}`}
+                        aria-describedby={materialProfileHintId}
+                        className="sr-only"
+                        onChange={() => setMaterialProfileId(profileId)}
+                      />
+                      <span
+                        aria-hidden
+                        className={cn(
+                          "grid size-4 shrink-0 place-items-center rounded-full border",
+                          selectedProfile
+                            ? "border-accent bg-accent text-on-accent"
+                            : "border-line-strong bg-panel text-transparent",
+                        )}
+                      >
+                        <Check size={10} strokeWidth={3} />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[0.68rem] font-semibold">
+                          {profile.label}
+                        </span>
+                        <span className="block break-words text-[0.58rem] leading-relaxed text-fg-3">
+                          {profile.description}
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
+          ) : null}
 
           <div className="grid grid-cols-[minmax(0,1fr)_5.5rem] gap-2">
             <label className="min-w-0 text-[0.68rem] font-semibold text-fg-2">
@@ -509,7 +641,7 @@ export function StudioHokusaiNaturalMediaInspectorSection({
               disabled={actionDisabled}
               onClick={generate}
               className={cn(
-                "flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-bold text-white shadow-sm",
+                "flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-bold text-on-accent shadow-sm",
                 STUDIO_FOCUS_RING,
                 "disabled:cursor-not-allowed disabled:opacity-40",
               )}
