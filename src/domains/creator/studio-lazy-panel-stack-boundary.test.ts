@@ -243,12 +243,12 @@ describe("Studio lazy panel stack boundary", () => {
     expect(accessGate).toContain("return false;");
   });
 
-  it("keeps all seven modal loading overlays colocated with their Suspense boundaries", () => {
+  it("keeps all seven modal loading overlays colocated with their Suspense owners", () => {
     const stack = moduleEdges("./StudioThreeDPreviewPanelStack.tsx").source;
+    const retainedBg3dHost = moduleEdges("./StudioBg3dRetainedOwnerHost.tsx").source;
     const contracts = [
       ["PoserLoadingOverlay", "포저를 여는 중"],
       ["MannequinLoadingOverlay", "3D 데생 인형을 여는 중"],
-      ["Bg3DLoadingOverlay", "3D 배경 도구를 여는 중"],
       ["TimelapseLoadingOverlay", "타임랩스 도구를 여는 중"],
       ["StoryboardGridLoadingOverlay", "스토리보드 그리드를 여는 중"],
       ["ScrollPreviewLoadingOverlay", "스크롤 미리보기를 여는 중"],
@@ -260,8 +260,13 @@ describe("Studio lazy panel stack boundary", () => {
       expect(stack).toContain(label);
       expect(stack).toContain(`<Suspense fallback={<${name} />}>`);
     }
-    expect(stack.match(/aria-live="polite"/g)).toHaveLength(7);
-    expect(stack.match(/<Loader2\b/g)).toHaveLength(7);
+    expect(retainedBg3dHost).toContain("function Bg3DRetainedLoadingOverlay()");
+    expect(retainedBg3dHost).toContain("3D 배경 도구를 여는 중");
+    expect(retainedBg3dHost).toContain(
+      "<Suspense fallback={lease.logicalOpen ? <Bg3DRetainedLoadingOverlay /> : null}>",
+    );
+    expect(`${stack}\n${retainedBg3dHost}`.match(/aria-live="polite"/g)).toHaveLength(7);
+    expect(`${stack}\n${retainedBg3dHost}`.match(/<Loader2\b/g)).toHaveLength(7);
   });
 
   it("guards optional surfaces with their existing open or mounted flags", () => {

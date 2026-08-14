@@ -4,6 +4,7 @@ import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 const PANEL_FILES = [
+  "./StudioBg3dImmersivePanel.tsx",
   "./StudioBg3dShapesPanel.tsx",
   "./StudioBg3dViewPanel.tsx",
   "./StudioBg3dLtPanel.tsx",
@@ -57,6 +58,7 @@ describe("Studio BG3D panel source boundary", () => {
   it("keeps the panels inside the single static BG3D editor closure", () => {
     const editorImports = moduleImports("./StudioBackground3D.tsx");
     expect(editorImports.staticImports).toEqual(expect.arrayContaining([
+      "./StudioBg3dImmersivePanel",
       "./StudioBg3dShapesPanel",
       "./StudioBg3dViewPanel",
       "./StudioBg3dLtPanel",
