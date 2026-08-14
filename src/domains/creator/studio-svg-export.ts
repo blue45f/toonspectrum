@@ -157,6 +157,7 @@ import {
   planGlowBrushPasses,
   planNeonBrushPasses,
   planOilBrushDabs,
+  studioOilPaintBodyForBrush,
   planPastelBrushDabs,
   planStudioFxBrushPressurePath,
   planStudioFxLuminousRibbonPass,
@@ -2960,6 +2961,7 @@ function serializeFreehand(
       baseWidth: aliasStrokeWidth,
       seed: fxBrushSeedFromKey(el.id),
       maxDabs: FX_OIL_DAB_CAP,
+      paintBody: studioOilPaintBodyForBrush(brush),
     });
     // brush--bristle-depletion 레인만 v1 강모 고갈 다이내믹을 켠다, brush--bristle-physics 레인만
     // WetBrush-2D 강모 물리 시뮬을 켠다(2026-08-13 wave 3) — Canvas 렌더러(StudioDrawNode)의 유화

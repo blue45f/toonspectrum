@@ -1316,12 +1316,25 @@ export type FxOilBristle = {
   opacity: number;
 };
 
+/**
+ * Which paint the bristle bed is carrying.
+ *
+ * Oil and acrylic share this planner, and until now they shared it completely: every declared
+ * runtime field of `oil--flat-ribbon` and `acrylic--stiff-ribbon` was identical, so the two
+ * differed only by defaultWidth/defaultOpacity and measured as the same texture. The split below
+ * is the physical one - acrylic sets fast, so it runs dry sooner and keeps a crisper ridge, while
+ * oil stays open and buttery for a longer stretch of travel.
+ */
+export type FxOilPaintBody = "oil" | "acrylic";
+
 export type FxOilPlanInput = {
   points: readonly number[];
   pressures?: readonly number[] | null;
   baseWidth: number;
   seed: number;
   maxDabs?: number;
+  /** Defaults to "oil" so every existing caller keeps byte-identical plans. */
+  paintBody?: FxOilPaintBody;
 };
 
 /**
@@ -1347,12 +1360,22 @@ export type FxOilPlanInput = {
 // proportionally longer streak, and the value stays integer-deterministic for replay.
 const BRISTLE_LOAD_WAVELENGTH_STATIONS = 20;
 
+/**
+ * Acrylic sets while the stroke is still travelling, so its load cycles about twice as often as
+ * oil's and its ridges stay sharper instead of levelling into the wet body. Oil keeps 1.
+ */
+const ACRYLIC_LOAD_WAVELENGTH_SCALE = 0.45;
+const ACRYLIC_RIDGE_SCALE = 1.35;
+
 function bristleLoadAlongTravel(
   stationIndex: number,
   bristleIndex: number,
   seed: number,
+  paintBody: FxOilPaintBody,
 ): number {
-  const t = stationIndex / BRISTLE_LOAD_WAVELENGTH_STATIONS;
+  const wavelength = BRISTLE_LOAD_WAVELENGTH_STATIONS
+    * (paintBody === "acrylic" ? ACRYLIC_LOAD_WAVELENGTH_SCALE : 1);
+  const t = stationIndex / wavelength;
   const knot = Math.floor(t);
   const fraction = t - knot;
   const key = 31 + bristleIndex * 7;
@@ -1361,6 +1384,15 @@ function bristleLoadAlongTravel(
   // Smoothstep so the load has no corner at a knot; a linear ramp still reads as a crease.
   const eased = fraction * fraction * (3 - 2 * fraction);
   return start + (end - start) * eased;
+}
+
+/**
+ * Acrylic lanes carry the fast-setting body; everything else on this carrier is oil. Kept as one
+ * shared predicate so the Canvas and SVG renderers cannot drift into disagreeing about which paint
+ * a stroke is made of.
+ */
+export function studioOilPaintBodyForBrush(brush: string): FxOilPaintBody {
+  return brush.startsWith("acrylic") ? "acrylic" : "oil";
 }
 
 export function planOilBrushDabs(input: FxOilPlanInput): FxOilDab[] {
@@ -1377,6 +1409,7 @@ export function planOilBrushDabs(input: FxOilPlanInput): FxOilDab[] {
   ));
   // Dense wet carrier so stations read as one continuous load of paint without becoming a stamp
   // lattice. Long strokes remain bounded by sampleStations' whole-path redistribution.
+  const paintBody: FxOilPaintBody = input.paintBody === "acrylic" ? "acrylic" : "oil";
   const spacing = Math.max(0.5, baseWidth * 0.068);
   const stations = sampleStations(points, spacing, maxDabs);
   const dabs: FxOilDab[] = [];
@@ -1417,7 +1450,7 @@ export function planOilBrushDabs(input: FxOilPlanInput): FxOilDab[] {
     const bristleOffsets = [-0.88, -0.58, -0.3, 0, 0.3, 0.58, 0.88];
     const bristles = bristleOffsets.map(
       (offsetRatio, bristleIndex): FxOilBristle => {
-        const tooth = bristleLoadAlongTravel(si, bristleIndex, seed);
+        const tooth = bristleLoadAlongTravel(si, bristleIndex, seed, paintBody);
         // Contact widens under pressure: outer hairs only load once the stylus digs in.
         const edge = Math.abs(offsetRatio);
         const contact = clamp(
@@ -1431,7 +1464,8 @@ export function planOilBrushDabs(input: FxOilPlanInput): FxOilDab[] {
           radiusXRatio: 0.62 + tooth * 0.28 + pressureFeel * 0.08,
           // Ridges must remain a material fraction of radiusY after the ribbon carrier's
           // 0.17 + ratio*1.1 width map — keep them resolvable without repainting the body.
-          radiusYRatio: 0.055 + tooth * 0.05 + contact * 0.03,
+          radiusYRatio: (0.055 + tooth * 0.05 + contact * 0.03)
+            * (paintBody === "acrylic" ? ACRYLIC_RIDGE_SCALE : 1),
           // Bimodal load with pressure-gated contact: skimming hairs stay near-dry film while
           // loaded ridges carry a clear pigment step. Self-crossings stay honest because mid-alpha
           // stacking (worst a·(1−a)) is avoided on the dominant band.

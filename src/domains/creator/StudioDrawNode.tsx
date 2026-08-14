@@ -73,6 +73,7 @@ import {
   planGlowBrushPasses,
   planNeonBrushPasses,
   planOilBrushDabs,
+  studioOilPaintBodyForBrush,
   planPastelBrushDabs,
   planStudioFxBrushPressurePath,
   planStudioFxLuminousRibbonPass,
@@ -2172,6 +2173,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               baseWidth: aliasStrokeWidth,
               seed: fxBrushSeedFromKey(el.id),
               maxDabs: FX_OIL_DAB_CAP,
+              paintBody: studioOilPaintBodyForBrush(brush),
             });
             // brush--bristle-depletion 레인만 v1 강모 고갈 다이내믹을 켠다(갈필),
             // dli GGX 릴리프 오버레이는 brush--impasto-relief 와 oil--impasto-ribbon 두 레인이 켠다,
