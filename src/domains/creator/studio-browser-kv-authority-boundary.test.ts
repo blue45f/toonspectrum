@@ -378,6 +378,10 @@ const LEGACY_IDB =
   "Explicit pre-V12 IndexedDB import/test or observable emergency rollback seam; SQLite/OPFS remains the product-default authority.";
 const LEGACY_IDB_PROOF =
   "The legacy database name and exact operation count are pinned here; adding an open/write/delete or changing the key requires review.";
+const VRM_LIBRARY_MIXED_PERSISTENCE =
+  "Four calls belong to the explicit pre-V12 IndexedDB seam; two reviewed authorityStore writes persist hash-bound VRM license receipts through the product SQLite/OPFS database port.";
+const VRM_LIBRARY_MIXED_PERSISTENCE_PROOF =
+  "The exact total is pinned at six, while licenseAuthorityStore returns null for legacy or injected repositories and the product store delegates only to acquireStudioLocalDatabase().kvSet.";
 const HISTORY_LEGACY_IDB =
   "Explicit pages-history emergency adapter only; the product factory cannot construct or infer this IndexedDB authority.";
 const HISTORY_LEGACY_IDB_PROOF =
@@ -461,7 +465,7 @@ const ALLOWANCES: readonly BrowserKvAllowance[] = Object.freeze([
   allow("src/domains/creator/studio-vrm-texture-paint-library.ts", "indexeddb-write", "put", 1, LEGACY_IDB, LEGACY_IDB_PROOF),
   allow("src/domains/creator/studio-vrm-texture-paint-library.ts", "indexeddb-cleanup", "delete", 2, CLEANUP_ONLY, CLEANUP_PROOF),
   allow("src/domains/creator/vrm-library.ts", "indexeddb-open", '"toonspectrum-studio-vrm-library"', 1, LEGACY_IDB, LEGACY_IDB_PROOF),
-  allow("src/domains/creator/vrm-library.ts", "indexeddb-write", "put", 4, LEGACY_IDB, LEGACY_IDB_PROOF),
+  allow("src/domains/creator/vrm-library.ts", "indexeddb-write", "put", 6, VRM_LIBRARY_MIXED_PERSISTENCE, VRM_LIBRARY_MIXED_PERSISTENCE_PROOF),
   allow("src/domains/creator/vrm-library.ts", "indexeddb-cleanup", "delete", 2, CLEANUP_ONLY, CLEANUP_PROOF),
 ]);
 
