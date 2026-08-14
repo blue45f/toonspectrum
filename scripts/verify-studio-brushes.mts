@@ -995,10 +995,13 @@ function strokePoint(
 ): { x: number; y: number; dx: number; dy: number } {
   // Konva intentionally extends behind the side inspectors and bottom dock. Keep evidence in the
   // central exposed surface; elementFromPoint below additionally proves every gesture hits canvas.
-  const safeLeft = Math.max(Math.max(0, box.x) + 52, viewport.width * 0.32);
-  const safeRight = Math.min(Math.min(viewport.width, box.x + box.width) - 52, viewport.width * 0.68);
-  const safeTop = Math.max(Math.max(0, box.y) + 70, viewport.height * 0.2);
-  const safeBottom = Math.min(box.y + box.height - 50, viewport.height * 0.65);
+  // The evidence clip is clamped to this same rectangle, so the two cannot drift apart.
+  const {
+    left: safeLeft,
+    right: safeRight,
+    top: safeTop,
+    bottom: safeBottom,
+  } = canvasSafeRect(box, viewport);
   invariant(safeRight - safeLeft >= 260, "visible canvas is too narrow for the brush grid");
   invariant(safeBottom - safeTop >= 220, "visible canvas is too short for the brush grid");
   const column = index % 7;
@@ -1007,31 +1010,75 @@ function strokePoint(
   const x = safeLeft + ((safeRight - safeLeft) * column) / 6;
   const y = safeTop + ((safeBottom - safeTop) * (row + 0.5)) / rows;
   const reach = intentionalDiscreteCarrier ? 6 : 1;
-  // Column 6 sits exactly on safeRight, so a discrete carrier's 6x gesture would end on the
-  // inspector: the stroke still paints (Konva captured the pointer) but the evidence clip then
-  // spans chrome whose hover state differs between captures, and the undo comparison measures
-  // that instead of ink. Fold the gesture back inside rather than shortening it.
+  // Uniform length, deliberately the longer of the two the parity used to alternate between.
+  // Alternating 9px/7px by index tested nothing about parity, but it made a marginal wet carrier's
+  // verdict depend on its POSITION in the catalogue: quarantining one preset shifted every later
+  // index by one, moved mypaint-cc0--watercolor-fringe from a 9px flick to a 7px one, and it
+  // deposited nothing. A gate whose result changes when an unrelated brush is delisted is not
+  // measuring the brush. Every gesture is now at least as long as before, never shorter.
+  const dx = 9 * reach;
+  const dy = (index % 3 === 0 ? 3 : -2) * reach;
+  // Every ordinary preset keeps its historical gesture byte for byte. A 9px flick from column 6
+  // ends 9px past safeRight, which is still deep inside the 52px inset this rectangle was given,
+  // so "correcting" it would perturb a 324-preset matrix that passes with these exact coordinates
+  // — and on the top row, where the row pitch is a few pixels, flipping dy is a real change.
+  if (!intentionalDiscreteCarrier) return { x, y, dx, dy };
+  // Discrete carriers alone take the 6x reach, and column 6 starts exactly on safeRight, so
+  // theirs is the gesture that can finish on the inspector. The stroke still paints (Konva
+  // captured the pointer at pointerdown), but the evidence clip then spans chrome whose hover
+  // state differs between captures, and the undo comparison measures that instead of ink.
   const foldIntoSafeArea = (start: number, delta: number, low: number, high: number): number =>
     start + delta > high || start + delta < low ? -delta : delta;
   return {
     x,
     y,
-    dx: foldIntoSafeArea(x, (index % 2 === 0 ? 9 : 7) * reach, safeLeft, safeRight),
-    dy: foldIntoSafeArea(y, (index % 3 === 0 ? 3 : -2) * reach, safeTop, safeBottom),
+    dx: foldIntoSafeArea(x, dx, safeLeft, safeRight),
+    dy: foldIntoSafeArea(y, dy, safeTop, safeBottom),
+  };
+}
+
+/**
+ * The exposed paper — the rectangle strokePoint aims into. Konva extends behind the side
+ * inspectors and the bottom dock, so this trims the editor chrome that overlaps the stage.
+ */
+function canvasSafeRect(
+  box: { x: number; y: number; width: number; height: number },
+  viewport: { width: number; height: number },
+): { left: number; right: number; top: number; bottom: number } {
+  return {
+    left: Math.max(Math.max(0, box.x) + 52, viewport.width * 0.32),
+    right: Math.min(Math.min(viewport.width, box.x + box.width) - 52, viewport.width * 0.68),
+    top: Math.max(Math.max(0, box.y) + 70, viewport.height * 0.2),
+    bottom: Math.min(box.y + box.height - 50, viewport.height * 0.65),
   };
 }
 
 function strokeEvidenceClip(
   point: { x: number; y: number; dx: number; dy: number },
   viewport: { width: number; height: number },
+  safe: { left: number; right: number; top: number; bottom: number } | null,
 ): { x: number; y: number; width: number; height: number } {
   // Compare only the painted neighbourhood. Element screenshots include fixed UI chrome that
   // visually overlaps the canvas; focus rings in that chrome legitimately change after Undo.
+  // Clamping to the safe rectangle rather than the viewport is what keeps that chrome out: on the
+  // top row the 40px margin otherwise reached into the floating control at the stage's top-right,
+  // and a repaint of THAT was read as "Undo left perceptible stroke pixels behind".
   const margin = 40;
-  const left = Math.max(0, Math.min(point.x, point.x + point.dx) - margin);
-  const top = Math.max(0, Math.min(point.y, point.y + point.dy) - margin);
-  const right = Math.min(viewport.width, Math.max(point.x, point.x + point.dx) + margin);
-  const bottom = Math.min(viewport.height, Math.max(point.y, point.y + point.dy) + margin);
+  const lowX = safe ? Math.max(0, safe.left) : 0;
+  const lowY = safe ? Math.max(0, safe.top) : 0;
+  const highX = safe ? Math.min(viewport.width, safe.right) : viewport.width;
+  const highY = safe ? Math.min(viewport.height, safe.bottom) : viewport.height;
+  const strokeLeft = Math.min(point.x, point.x + point.dx);
+  const strokeRight = Math.max(point.x, point.x + point.dx);
+  const strokeTop = Math.min(point.y, point.y + point.dy);
+  const strokeBottom = Math.max(point.y, point.y + point.dy);
+  // Only the MARGIN is trimmed at the safe boundary — never the stroke. Column 6 starts exactly on
+  // safeRight and its gesture legitimately reaches 9px beyond, so clamping the whole clip there
+  // left the ink outside its own measurement window and read as "produced no visible pixels".
+  const left = Math.min(strokeLeft, Math.max(lowX, strokeLeft - margin));
+  const top = Math.min(strokeTop, Math.max(lowY, strokeTop - margin));
+  const right = Math.max(strokeRight, Math.min(highX, strokeRight + margin));
+  const bottom = Math.max(strokeBottom, Math.min(highY, strokeBottom + margin));
   return { x: left, y: top, width: right - left, height: bottom - top };
 }
 
@@ -1556,7 +1603,10 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
           dy: point.dy,
         };
       }
-      const usedClip = sanitizeEvidenceClip(strokeEvidenceClip(evidencePoint, viewport), viewport);
+      const usedClip = sanitizeEvidenceClip(
+        strokeEvidenceClip(evidencePoint, viewport, canvasSafeRect(stageBox, viewport)),
+        viewport,
+      );
       const eraseBaseline = operation === "erase"
         ? await prepareVisibleEraserBaseline(page, {
             start: {

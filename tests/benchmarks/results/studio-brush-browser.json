@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "measuredAt": "2026-08-14T10:17:06+09:00",
+  "measuredAt": "2026-08-14T04:09:20.498Z",
   "command": "pnpm run verify:studio-brushes",
   "status": "pass",
   "catalog": {
@@ -9,12 +9,14 @@
     "pro": 160,
     "paint": 323,
     "erase": 2,
-    "quarantined": 1
+    "quarantined": 2
   },
   "desktop": {
-    "selectedAndRendered": 324,
-    "undoPassed": 324,
-    "redoPassed": 324,
+    "selectedAndRendered": 323,
+    "undoPassed": 323,
+    "redoPassed": 323,
+    "uiCatalogMatchSkipped": false,
+    "surveyMode": false,
     "errorCount": 0,
     "erasers": {
       "standard-eraser": {
@@ -25,26 +27,26 @@
       "kneaded-eraser": {
         "operation": "erase",
         "liveRetainedLayerActive": true,
-        "residualEnergyRatio": 0.6203969704883782
+        "residualEnergyRatio": 0.6194507291693148
       }
     }
   },
   "longRouteCore": {
-    "passed": 164,
-    "total": 164,
-    "visibleSegmentsPerTool": 6,
+    "passed": 163,
+    "total": 163,
     "totalSegmentsPerTool": 6,
-    "continuousPolicyTools": 153,
-    "discretePolicyTools": 11,
+    "continuousPolicyTools": 151,
+    "discretePolicyTools": 12,
+    "continuousMinimumVisibleSegments": 6,
+    "discreteMinimumVisibleSegments": 4,
     "toolsBelowFullCoverage": 1,
-    "minimumVisibleSegments": 4,
-    "representativePersistedPathDistancePx": 392.7396173371252,
-    "undoPassed": 164,
     "continuousPolicyFailures": 0,
+    "undoPassed": 163,
+    "representativePersistedPathDistancePx": 392.7396173371252,
     "qualityPolicyCounts": {
-      "strict-continuous": 139,
+      "strict-continuous": 137,
       "soft-wet-continuous": 14,
-      "record-only-discrete": 11
+      "record-only-discrete": 12
     },
     "errorCount": 0
   },
@@ -55,19 +57,23 @@
     "errorCount": 0
   },
   "mobile": {
-    "paintSelections": 322,
+    "paintSelections": 321,
     "eraserSelections": 2,
-    "interactiveTargets": 661,
+    "interactiveTargets": 659,
     "minimumTargetWidthPx": 44,
     "minimumTargetHeightPx": 44,
     "undersizedTargets": 0,
     "errorCount": 0
   },
   "pointerUpDurability": {
-    "navigationIssuedInMs": 0.5108750001527369,
+    "receiptMarkerReason": "pointerup",
+    "receiptSettledInMs": 11.85,
+    "receiptStrokeCount": 1,
+    "survivorMarkerReason": "pointerup",
+    "survivorStrokeCount": 2,
+    "unloadPromptHeldMs": 150,
+    "navigationIssuedInMs": 0.47,
     "unloadGuardShown": true,
-    "markerReason": "pointerup",
-    "strokeCount": 1,
     "payloadContainsEveryStroke": true,
     "recoveryBannerShown": true,
     "recoveredPixelsChanged": true,
