@@ -250,7 +250,7 @@ class FakeHokusaiLiveWorker implements StudioHokusaiLiveWorkerLike {
 }
 
 describe("Studio Hokusai live brush vertical slice", () => {
-  it("automatically maps only quality-gated pencil, charcoal and oil core shelves", () => {
+  it("automatically maps every quality-gated core shelf, and nothing else", () => {
     expect(resolveStudioHokusaiLivePreset("pencil-6b")).toBe("pencil");
     expect(resolveStudioHokusaiLivePreset("charcoal")).toBe("charcoal");
     expect(resolveStudioHokusaiLivePreset("acrylic")).toBe("oil");
@@ -263,8 +263,13 @@ describe("Studio Hokusai live brush vertical slice", () => {
     expect(resolveStudioHokusaiLiveMaterialProfile("acrylic")).toBe("acrylic");
     expect(resolveStudioHokusaiLiveMaterialProfile("gouache")).toBe("gouache");
     expect(resolveStudioHokusaiLiveMaterialProfile("brush")).toBe("painterly");
-    expect(resolveStudioHokusaiLivePreset("parallel-pen")).toBeNull();
-    expect(resolveStudioHokusaiLivePreset("alcohol-marker")).toBeNull();
+    expect(resolveStudioHokusaiLivePreset("parallel-pen")).toBe("calligraphy");
+    expect(resolveStudioHokusaiLiveMaterialProfile("parallel-pen"))
+      .toBe("calligraphy");
+    expect(resolveStudioHokusaiLivePreset("alcohol-marker")).toBe("marker");
+    expect(resolveStudioHokusaiLiveMaterialProfile("alcohol-marker"))
+      .toBe("marker");
+    // gpen stays procedural: no natural-media preset claims the G-pen ink family.
     expect(resolveStudioHokusaiLivePreset("gpen")).toBeNull();
     expect(resolveStudioHokusaiLiveAutoRouteDecision(
       "dry-media",

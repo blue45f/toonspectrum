@@ -40,7 +40,7 @@ export type StudioDrawingLibraryDecision =
   | "opt-in-input-stabilizer"
   | "runtime-rough-shape-renderer"
   | "isolated-live-natural-media-provider-ready-for-wiring"
-  | "isolated-live-natural-media-provider-active-19-routes"
+  | "isolated-live-natural-media-provider-active-30-routes"
   | "isolated-settled-only-provider"
   | "runtime-object-selection-overlay"
   | "isolated-gpu-scene-overlay-provider"
@@ -139,7 +139,7 @@ export const STUDIO_DRAWING_LIBRARY_STRATEGIES: readonly StudioDrawingLibraryStr
       packageName: "studio-hokusai-wasm",
       license: "MIT OR Apache-2.0",
       productLayer: "natural-media-worker",
-      decision: "isolated-live-natural-media-provider-active-19-routes",
+      decision: "isolated-live-natural-media-provider-active-30-routes",
       runtimeInstallation: "installed-isolated-provider",
       maintenanceNote:
         "The local Rust/WASM wrapper pins Hokusai 0.3.0 exactly. Nineteen verified pencil, charcoal and oil identities now auto-route through its transferable packed-dirty Dedicated Worker; the canonical transparent PNG plus hash-keyed Konva draw receipt owns commit handoff.",

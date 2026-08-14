@@ -48,6 +48,17 @@ const EXPECTED_CORE_AUTO_ROUTE = new Map<string, StudioHokusaiNaturalMediaPreset
   ["gouache", "oil"],
   ["brush", "oil"],
   ["flat-brush", "oil"],
+  ["calligraphy", "calligraphy"],
+  ["fountain-pen", "calligraphy"],
+  ["parallel-pen", "calligraphy"],
+  ["brush-pen", "calligraphy"],
+  ["marker", "marker"],
+  ["felt-tip", "marker"],
+  ["marker-bold", "marker"],
+  ["alcohol-marker", "marker"],
+  ["highlighter", "marker"],
+  ["chisel-highlighter", "marker"],
+  ["pastel-highlighter", "marker"],
 ]);
 const EXPECTED_CORE_MATERIAL_PROFILE = new Map<string, StudioHokusaiMaterialProfileId>([
   ...[...EXPECTED_CORE_AUTO_ROUTE.keys()]
@@ -65,6 +76,12 @@ const EXPECTED_CORE_MATERIAL_PROFILE = new Map<string, StudioHokusaiMaterialProf
   ["gouache", "gouache"],
   ["brush", "painterly"],
   ["flat-brush", "painterly"],
+  ...[...EXPECTED_CORE_AUTO_ROUTE.keys()]
+    .filter((identity) => EXPECTED_CORE_AUTO_ROUTE.get(identity) === "calligraphy")
+    .map((identity) => [identity, "calligraphy" as const] as const),
+  ...[...EXPECTED_CORE_AUTO_ROUTE.keys()]
+    .filter((identity) => EXPECTED_CORE_AUTO_ROUTE.get(identity) === "marker")
+    .map((identity) => [identity, "marker" as const] as const),
 ]);
 
 const CAPABILITIES: StudioHokusaiLiveBrushCapabilities = {
@@ -249,10 +266,10 @@ describe("Studio Hokusai auto-route catalogue quality policy", () => {
     }
   });
 
-  it("withholds calligraphy and marker until a specialist parity gate exists", () => {
+  it("routes the calligraphy and marker specialists through the same evidence gate", () => {
     expect(STUDIO_HOKUSAI_LIVE_AUTO_ROUTE_POLICY.qualityGate).toEqual({
       id: STUDIO_HOKUSAI_LIVE_AUTO_ROUTE_QUALITY_GATE,
-      admittedPresets: ["pencil", "charcoal", "oil"],
+      admittedPresets: ["pencil", "charcoal", "oil", "calligraphy", "marker"],
       requiredEvidence: [
         "real-wasm-visible-output",
         "deterministic-seed-replay",
@@ -262,17 +279,32 @@ describe("Studio Hokusai auto-route catalogue quality policy", () => {
         "identity-specific-material-profile",
       ],
     });
-    const withheld = STUDIO_HOKUSAI_LIVE_AUTO_ROUTE_POLICY.withheldSpecialistIdentities;
-    expect(withheld).toHaveLength(11);
-    expect(new Set(withheld.map(({ candidatePresetId }) => candidatePresetId))).toEqual(
-      new Set(["calligraphy", "marker"]),
-    );
-    for (const { brushId } of withheld) {
-      expect(resolveStudioHokusaiLiveAutoRouteDecision(brushId, brushId)).toEqual({
-        status: "rejected",
-        reason: "catalog-identity-not-quality-gated",
-      });
+    // The eleven specialists that used to sit in `withheldSpecialistIdentities`. They cleared the
+    // unchanged six-part gate in scripts/verify-studio-hokusai-live-brush.mjs (same texture,
+    // edge-density, anti-circle-carrier and centreline thresholds as the original three) and all
+    // five families produce distinct settled pixel hashes, so they now paint with the real WASM
+    // engine instead of the procedural specialist fallback.
+    const specialists = [
+      ["calligraphy", "fountain-pen", "parallel-pen", "brush-pen"],
+      ["marker", "felt-tip", "marker-bold", "alcohol-marker", "highlighter",
+        "chisel-highlighter", "pastel-highlighter"],
+    ] as const;
+    for (const [presetId, ...rest] of specialists) {
+      for (const brushId of [presetId, ...rest]) {
+        expect(resolveStudioHokusaiLiveAutoRouteDecision(brushId, brushId), brushId)
+          .toEqual({
+            status: "admitted",
+            identity: brushId,
+            identityAuthority: "catalog-id",
+            presetId,
+            materialProfileId: presetId,
+            policyVersion: STUDIO_HOKUSAI_LIVE_AUTO_ROUTE_POLICY.version,
+            qualityGate: STUDIO_HOKUSAI_LIVE_AUTO_ROUTE_QUALITY_GATE,
+          });
+      }
     }
+    expect(STUDIO_HOKUSAI_LIVE_AUTO_ROUTE_POLICY.withheldSpecialistIdentities)
+      .toHaveLength(0);
     expect(resolveStudioHokusaiLiveAutoRouteDecision("dry-media", "pencil"))
       .toEqual({
         status: "rejected",

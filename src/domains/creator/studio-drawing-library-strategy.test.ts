@@ -83,7 +83,7 @@ describe("studio drawing library strategy", () => {
       packageName: "studio-hokusai-wasm",
       license: "MIT OR Apache-2.0",
       productLayer: "natural-media-worker",
-      decision: "isolated-live-natural-media-provider-active-19-routes",
+      decision: "isolated-live-natural-media-provider-active-30-routes",
       runtimeInstallation: "installed-isolated-provider",
       canonicalAuthority: false,
       brushPixelAuthority: false,

@@ -25,7 +25,8 @@ const QUALITY_WIDTH = 1_024;
 const QUALITY_HEIGHT = 320;
 const QUALITY_RADIUS = 16;
 
-type QualityPresetId = "pencil" | "charcoal" | "oil";
+type QualityPresetId =
+  | "pencil" | "charcoal" | "oil" | "calligraphy" | "marker";
 
 type MainThreadMeasurementPhase =
   | "startup-prewarm"
@@ -856,7 +857,10 @@ async function main(): Promise<void> {
     // Material analysis below is intentionally synchronous verifier work and
     // is excluded from shipped main-thread input latency.
     const materialFamilies = [];
-    for (const presetId of ["pencil", "charcoal", "oil"] as const) {
+    for (
+      const presetId of
+      ["pencil", "charcoal", "oil", "calligraphy", "marker"] as const
+    ) {
       materialFamilies.push(await renderQualityFamily(provider, presetId));
     }
     const sparseFigureEightCoverage = await renderSparseFigureEightCoverage(provider);

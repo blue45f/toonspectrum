@@ -48,10 +48,12 @@ canvas{display:block;width:100%;height:auto}
 <section class="card" id="first-card"><h2>첫 live dirty frame</h2><div class="frame"><canvas id="first-frame" width="1024" height="256"></canvas></div></section>
 <section class="card" id="live-card"><h2>모든 delta + finish tail 합성</h2><div class="frame"><canvas id="live-frame" width="1024" height="256"></canvas></div></section>
 <section class="card" id="canonical-card"><h2>canonical PNG</h2><div class="frame"><canvas id="canonical-frame" width="1024" height="256"></canvas></div></section>
-<section class="card" id="material-card"><h2>동일 입력 자연매체 3종 · canonical</h2>
+<section class="card" id="material-card"><h2>동일 입력 자연매체 5종 · canonical</h2>
 <div class="frame"><canvas id="quality-pencil" width="1024" height="320"></canvas></div>
 <div class="frame"><canvas id="quality-charcoal" width="1024" height="320"></canvas></div>
-<div class="frame"><canvas id="quality-oil" width="1024" height="320"></canvas></div></section>
+<div class="frame"><canvas id="quality-oil" width="1024" height="320"></canvas></div>
+<div class="frame"><canvas id="quality-calligraphy" width="1024" height="320"></canvas></div>
+<div class="frame"><canvas id="quality-marker" width="1024" height="320"></canvas></div></section>
 <section class="card" id="sparse-card"><h2>시간 채널 없는 희소 8자 획 · canonical</h2>
 <div class="frame"><canvas id="quality-sparse-figure-eight" width="1024" height="320"></canvas></div></section>
 </div><script type="module" src="${ENTRY}"></script></body></html>`;
@@ -136,9 +138,15 @@ function validate(result, diagnostics) {
     || result.cancelRecovery?.recoveryEngineEpoch < 3
   ) failures.push("epoch cancellation/recovery gate failed");
   const families = Array.isArray(result.materialFamilies) ? result.materialFamilies : [];
-  if (families.length !== 3) failures.push("pencil/charcoal/oil material evidence is incomplete");
+  if (families.length !== 5) {
+    failures.push(
+      "pencil/charcoal/oil/calligraphy/marker material evidence is incomplete",
+    );
+  }
   const hashes = new Set();
-  for (const presetId of ["pencil", "charcoal", "oil"]) {
+  for (
+    const presetId of ["pencil", "charcoal", "oil", "calligraphy", "marker"]
+  ) {
     const family = families.find((candidate) => candidate?.presetId === presetId);
     const metrics = family?.metrics;
     const timing = family?.timing;
@@ -182,7 +190,11 @@ function validate(result, diagnostics) {
       || timing.framePresentationMaximumMilliseconds > 20
     ) failures.push(`${presetId} material quality/continuity gate failed`);
   }
-  if (hashes.size !== 3) failures.push("pencil/charcoal/oil material outputs are not distinct");
+  if (hashes.size !== 5) {
+    failures.push(
+      "pencil/charcoal/oil/calligraphy/marker material outputs are not distinct",
+    );
+  }
   const sparse = result.sparseFigureEightCoverage;
   if (
     sparse?.sampleCount !== 24

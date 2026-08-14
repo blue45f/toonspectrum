@@ -22,7 +22,7 @@ export const STUDIO_HOKUSAI_LIVE_AUTO_ROUTE_QUALITY_GATE =
 
 export type StudioHokusaiLiveAutoRoutePresetId = Extract<
   StudioHokusaiNaturalMediaPresetId,
-  "pencil" | "charcoal" | "oil"
+  "pencil" | "charcoal" | "oil" | "calligraphy" | "marker"
 >;
 
 interface CoreMaterialRoute {
@@ -72,6 +72,8 @@ export const STUDIO_HOKUSAI_LIVE_AUTO_ROUTE_POLICY = Object.freeze({
       "pencil",
       "charcoal",
       "oil",
+      "calligraphy",
+      "marker",
     ] as const),
     requiredEvidence: Object.freeze([
       "real-wasm-visible-output",
@@ -100,19 +102,30 @@ export const STUDIO_HOKUSAI_LIVE_AUTO_ROUTE_POLICY = Object.freeze({
     coreMaterialRoute("gouache", "oil", "gouache"),
     coreMaterialRoute("brush", "oil", "painterly"),
     coreMaterialRoute("flat-brush", "oil", "painterly"),
-  ]),
-  withheldSpecialistIdentities: Object.freeze([
-    ...CALLIGRAPHY_IDS.map((brushId) => Object.freeze({
+    ...CALLIGRAPHY_IDS.map((brushId) => coreMaterialRoute(
       brushId,
-      candidatePresetId: "calligraphy" as const,
-      reason: "specialist-family-parity-gate-missing" as const,
-    })),
-    ...MARKER_IDS.map((brushId) => Object.freeze({
+      "calligraphy",
+      "calligraphy",
+    )),
+    ...MARKER_IDS.map((brushId) => coreMaterialRoute(
       brushId,
-      candidatePresetId: "marker" as const,
-      reason: "specialist-family-parity-gate-missing" as const,
-    })),
+      "marker",
+      "marker",
+    )),
   ]),
+  /**
+   * Empty since the calligraphy/marker specialist families cleared the same six-part evidence
+   * gate as pencil/charcoal/oil. Kept as a declared, typed field rather than deleted: withholding
+   * a family is a normal outcome of that gate, and a future preset lands here before it lands
+   * above.
+   */
+  withheldSpecialistIdentities: Object.freeze(
+    [] as ReadonlyArray<Readonly<{
+      readonly brushId: string;
+      readonly candidatePresetId: StudioHokusaiNaturalMediaPresetId;
+      readonly reason: "specialist-family-parity-gate-missing";
+    }>>,
+  ),
 });
 
 const AUTO_ROUTE_BY_CORE_IDENTITY: ReadonlyMap<string, CoreMaterialRoute> = new Map(
