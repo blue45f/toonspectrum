@@ -1,6 +1,10 @@
+import { readFileSync } from "node:fs";
+
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  BLENDER_PROP_GLTF_URLS,
   PROP_ATTACH_BONES,
   VRM_PROPS_VERSION,
   VRM_PROPS,
@@ -16,6 +20,8 @@ import {
   type ThreeLike,
   type ThreeObject,
 } from "./studio-vrm-props";
+
+(globalThis as unknown as { self: typeof globalThis }).self = globalThis;
 
 describe("VRM 소품 카탈로그", () => {
   it("id가 모두 고유하다", () => {
@@ -61,6 +67,97 @@ describe("VRM 소품 카탈로그", () => {
     expect(propsByCategory("hand").length).toBeGreaterThan(0);
     expect(propsByCategory("head").length).toBeGreaterThan(0);
     expect(propsByCategory("body").length).toBeGreaterThan(0);
+  });
+
+  it("Blender 27종의 안정 ID를 번들된 first-party GLB 경로에 정확히 연결한다", () => {
+    const expected = {
+      blender_cyber_katana: "/assets/3d/cyber_katana.glb",
+      blender_magic_staff: "/assets/3d/magic_staff_crystal.glb",
+      blender_scifi_drone: "/assets/3d/scifi_drone_bot.glb",
+      blender_neon_bench: "/assets/3d/neom_bench_prop.glb",
+      blender_cyber_visor: "/assets/3d/cyber_helmet_visor.glb",
+      blender_holo_tablet: "/assets/3d/hologram_tablet.glb",
+      blender_rune_shield: "/assets/3d/ancient_rune_shield.glb",
+      blender_arcade_cabinet: "/assets/3d/arcade_game_cabinet.glb",
+      blender_medieval_greatsword: "/assets/3d/medieval_greatsword.glb",
+      blender_cyber_hoverbike: "/assets/3d/cyberpunk_hoverbike.glb",
+      blender_magic_chest: "/assets/3d/fantasy_magic_chest.glb",
+      blender_modern_smartphone: "/assets/3d/modern_smartphone_prop.glb",
+      blender_cyber_sniper_rifle: "/assets/3d/cyber_sniper_rifle.glb",
+      blender_magic_wand_staff: "/assets/3d/fantasy_magic_wand_staff.glb",
+      blender_steampunk_airship: "/assets/3d/steampunk_airship.glb",
+      blender_cyberpunk_motorcycle: "/assets/3d/cyberpunk_motorcycle.glb",
+      blender_scifi_laser_gun: "/assets/3d/scifi_laser_gun.glb",
+      blender_magic_grimoire: "/assets/3d/magic_grimoire.glb",
+      blender_cyber_glasses: "/assets/3d/cyber_glasses.glb",
+      blender_medieval_shield: "/assets/3d/medieval_shield.glb",
+      blender_street_lamp: "/assets/3d/street_lamp.glb",
+      blender_vending_machine: "/assets/3d/vending_machine.glb",
+      blender_royal_throne: "/assets/3d/royal_throne.glb",
+      blender_crystal_orb: "/assets/3d/crystal_orb.glb",
+      blender_tactical_helmet: "/assets/3d/tactical_helmet.glb",
+      blender_school_desk: "/assets/3d/school_desk.glb",
+      blender_adaptive_power_wheelchair: "/assets/3d/adaptive_power_wheelchair.glb",
+    } as const;
+
+    expect(BLENDER_PROP_GLTF_URLS).toEqual(expected);
+    const blenderDefs = VRM_PROPS.filter((definition) => definition.id.startsWith("blender_"));
+    expect(blenderDefs).toHaveLength(27);
+
+    for (const [id, url] of Object.entries(expected)) {
+      expect(propDefById(id)?.geometrySource, id).toEqual({ kind: "gltf", url });
+      const bytes = readFileSync(new URL(`../../../public${url}`, import.meta.url));
+      expect(bytes.subarray(0, 4).toString("ascii"), url).toBe("glTF");
+    }
+  });
+
+  it("기존 소품은 명시적인 procedural 출처를 유지한다", () => {
+    const proceduralDefs = VRM_PROPS.filter((definition) => !definition.id.startsWith("blender_"));
+    expect(proceduralDefs.length).toBeGreaterThan(0);
+    expect(proceduralDefs.every((definition) => definition.geometrySource.kind === "procedural"))
+      .toBe(true);
+  });
+
+  it("매핑된 Blender GLB 27개가 실제 mesh scene으로 파싱된다", async () => {
+    const loader = new GLTFLoader();
+    for (const url of Object.values(BLENDER_PROP_GLTF_URLS)) {
+      const bytes = readFileSync(new URL(`../../../public${url}`, import.meta.url));
+      const arrayBuffer = bytes.buffer.slice(
+        bytes.byteOffset,
+        bytes.byteOffset + bytes.byteLength,
+      ) as ArrayBuffer;
+      const gltf = await loader.parseAsync(arrayBuffer, "");
+      let meshCount = 0;
+      gltf.scene.traverse((object) => {
+        if (object.type === "Mesh") meshCount += 1;
+      });
+      expect(meshCount, url).toBeGreaterThan(0);
+    }
+  });
+
+  it("어댑티브 전동휠체어를 별도 body 소품과 실측 좌석 앵커로 제공한다", () => {
+    const wheelchair = propDefById("blender_adaptive_power_wheelchair");
+
+    expect(wheelchair).toMatchObject({
+      category: "body",
+      defaultBone: "hips",
+      defaultColor: null,
+      defaultPosition: [0, -0.39, 0.02],
+      geometrySource: {
+        kind: "gltf",
+        url: "/assets/3d/adaptive_power_wheelchair.glb",
+      },
+    });
+    expect(wheelchair?.anchors).toEqual([
+      expect.objectContaining({
+        id: "seat",
+        role: "surface",
+        position: [0, 0.61, 0.02],
+      }),
+    ]);
+    const seat = wheelchair?.anchors[0];
+    expect((wheelchair?.defaultPosition[1] ?? 0) - (seat?.position[1] ?? 0))
+      .toBeCloseTo(-1, 6);
   });
 
   it("등록된 모든 소품이 유효한 접촉 앵커와 자동 맞춤 프로필을 가진다", () => {
@@ -797,8 +894,8 @@ function makeThreeMock(): { three: ThreeLike; created: string[]; meshObjects: Th
 }
 
 describe("소품 메시 빌더", () => {
-  it("모든 소품이 에러 없이 메시 그룹을 만든다", () => {
-    for (const def of VRM_PROPS as readonly PropDef[]) {
+  it("모든 절차형 소품이 에러 없이 메시 그룹을 만든다", () => {
+    for (const def of VRM_PROPS.filter((definition) => definition.geometrySource.kind === "procedural") as readonly PropDef[]) {
       const { three } = makeThreeMock();
       const obj = buildPropObject(three, def, def.defaultColor);
       expect(obj.name).toBe(`prop:${def.id}`);
@@ -813,12 +910,20 @@ describe("소품 메시 빌더", () => {
   });
 
   it("모든 절차형 소품 표면이 캐릭터 장면의 그림자에 참여한다", () => {
-    for (const def of VRM_PROPS as readonly PropDef[]) {
+    for (const def of VRM_PROPS.filter((definition) => definition.geometrySource.kind === "procedural") as readonly PropDef[]) {
       const { three, meshObjects } = makeThreeMock();
       buildPropObject(three, def, def.defaultColor);
       expect(meshObjects.length, def.id).toBeGreaterThan(0);
       expect(meshObjects.every((object) => object.castShadow && object.receiveShadow), def.id)
         .toBe(true);
+    }
+  });
+
+  it("GLB 소품을 5cm 절차형 fallback 큐브로 위장하지 않는다", () => {
+    for (const def of VRM_PROPS.filter((definition) => definition.geometrySource.kind === "gltf")) {
+      const { three, created } = makeThreeMock();
+      expect(() => buildPropObject(three, def, null), def.id).toThrow(/must be loaded from/u);
+      expect(created, def.id).toEqual([]);
     }
   });
 

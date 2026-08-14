@@ -139,7 +139,7 @@ export function isBundledVrmRightsBlocked(id: string): boolean {
 //  2026-07: github.com/ToxSam/open-source-avatars 레지스트리의 Polygonal Mind
 //  100Avatars R1~R3 CC0 모델 71종 — 캐릭터/로봇/동물/판타지/SF/푸드 마스코트,
 //  그 중 OldMoustache·Eugenia는 "노인" 카테고리 보강,
-//  2026-08: Blender MCP + VRM Add-on으로 제작한 ToonSpectrum 오리지널 VRM 1.0 6종).
+//  2026-08: Blender MCP + VRM Add-on으로 제작한 ToonSpectrum 오리지널 VRM 1.0 9종).
 export const SAMPLE_VRMS: SampleVrm[] = [
   { id: SAMPLE_VRM_ID, name: "루미", url: SAMPLE_VRM_URL },
   { id: "avatar-a", name: "하린", url: "/vrm/AvatarSample_A.vrm" },
@@ -151,6 +151,9 @@ export const SAMPLE_VRMS: SampleVrm[] = [
   { id: "ts-haram-explorer", name: "하람 (어린 탐험가)", url: "/vrm/TS_Haram_Explorer.vrm" },
   { id: "ts-yeonhui-rune-guard", name: "연휘 (룬 수호자)", url: "/vrm/TS_Yeonhui_RuneGuard.vrm" },
   { id: "ts-nova-service-android", name: "노바 (서비스 안드로이드)", url: "/vrm/TS_Nova_ServiceAndroid.vrm" },
+  { id: "cyber_agent_zero", name: "사이버 에이전트 제로", url: "/vrm/cyber_agent_zero.vrm" },
+  { id: "ts-seojin-architect", name: "서진 (배리어프리 건축가)", url: "/vrm/TS_Seojin_Architect.vrm" },
+  { id: "ts-mira-detective", name: "미라 (느와르 탐정)", url: "/vrm/TS_Mira_Detective.vrm" },
   { id: "shion", name: "시온", url: "/vrm/Sendagaya_Shibu.vrm" },
   { id: "vivi", name: "비비", url: "/vrm/Vivi.vrm" },
   { id: "vita", name: "비타", url: "/vrm/Vita.vrm" },
@@ -235,7 +238,6 @@ export const SAMPLE_VRMS: SampleVrm[] = [
   { id: "cosmic-bot", name: "코스믹봇 (로봇)", url: "/vrm/CosmicBot.vrm" },
   { id: "old-moustache", name: "올드무스타치 (할아버지)", url: "/vrm/OldMoustache.vrm" },
   { id: "eugenia", name: "유제니아 (할머니)", url: "/vrm/Eugenia.vrm" },
-  { id: "cyber_agent_zero", name: "사이버 에이전트 제로 (블렌더)", url: "/vrm/cyber_agent_zero.vrm" },
 ];
 export const SAMPLE_VRM_ENTRIES: VrmLibraryEntry[] = SAMPLE_VRMS.map((s) => ({
   id: s.id,

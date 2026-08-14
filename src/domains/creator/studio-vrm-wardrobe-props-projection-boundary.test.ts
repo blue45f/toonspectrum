@@ -12,6 +12,10 @@ const projectionSource = readFileSync(
   new URL("./StudioVrmWardrobePropsProjection.tsx", import.meta.url),
   "utf8",
 );
+const propAssetRuntimeSource = readFileSync(
+  new URL("./studio-vrm-prop-asset-runtime.ts", import.meta.url),
+  "utf8",
+);
 const xpbdSkirtAttachmentSource = readFileSync(
   new URL("./StudioVrmXpbdSkirtAttachment.tsx", import.meta.url),
   "utf8",
@@ -112,7 +116,7 @@ describe("Studio VRM wardrobe/prop projection boundary", () => {
     expect(lazyUiSource).not.toContain("StudioVrmWardrobePropsProjection");
   });
 
-  it("preserves the smart prop follower, secondary-hand IK, quality, and StrictMode disposal", () => {
+  it("preserves the smart prop follower, secondary-hand IK, quality, and source-aware disposal", () => {
     const propRuntime = sourceBetween(
       projectionSource,
       "const pendingPropDisposals",
@@ -130,8 +134,30 @@ describe("Studio VRM wardrobe/prop projection boundary", () => {
     expect(propRuntime).toContain("{ targetQuaternion, state: secondaryGripState }");
     expect(propRuntime).toContain("}, VRM_FRAME_PROP_PRIORITY);");
     expect(propRuntime.match(/queueMicrotask\(/gu)).toHaveLength(1);
-    expect(propRuntime).toContain("cancelScheduledPropDisposal(object);");
-    expect(propRuntime).toContain("return () => schedulePropDisposal(object);");
+    expect(propRuntime).toContain("cancelScheduledPropDisposal(proceduralObject);");
+    expect(propRuntime).toContain("return () => schedulePropDisposal(proceduralObject);");
+    expect(propRuntime).toContain("definition.geometrySource.kind !== \"procedural\"");
+    expect(propRuntime).toContain("acquireStudioVrmPropAsset(instance.propId, source)");
+    expect(propRuntime).toContain("loadedLease.release();");
+    expect(propRuntime).toContain("lease?.release();");
+    expect(propRuntime).toContain("!loadedGltfProp.lease.released");
+  });
+
+  it("loads first-party GLBs through a cached clone lease without a procedural fallback", () => {
+    expect(propAssetRuntimeSource).toContain(
+      'import("three/examples/jsm/loaders/GLTFLoader.js")',
+    );
+    expect(propAssetRuntimeSource).toContain("const cache = new Map<string, PropAssetCacheEntry>();");
+    expect(propAssetRuntimeSource).toContain("entry.reservations += 1;");
+    expect(propAssetRuntimeSource).toContain("object = await dependencies.cloneRoot(root);");
+    expect(propAssetRuntimeSource).toContain("object.removeFromParent();");
+    expect(propAssetRuntimeSource).toContain("if (entry.root) dependencies.disposeRoot(entry.root);");
+    expect(propAssetRuntimeSource).toContain(
+      "scheduleCleanup: (callback) => globalThis.queueMicrotask(callback)",
+    );
+    expect(propAssetRuntimeSource).not.toContain("scheduleCleanup: queueMicrotask");
+    expect(propAssetRuntimeSource).not.toContain("buildPropObject");
+    expect(propAssetRuntimeSource).not.toMatch(/BoxGeometry|fallback cube/iu);
   });
 
   it("preserves skinned/rigid garment assembly and material-only color or fabric updates", () => {

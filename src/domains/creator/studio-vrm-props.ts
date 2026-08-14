@@ -1,8 +1,8 @@
-// VRM 본 부착 소품(아이템) 시스템 — 캐릭터 손/머리/몸에 프로시저럴 three.js 소품을 자유롭게 부착한다.
+// VRM 본 부착 소품(아이템) 시스템 — 캐릭터 손/머리/몸에 프로시저럴/GLB 소품을 자유롭게 부착한다.
 // 코미Po!의 "소품 배치"를 넘어, 부착 본·오프셋·회전·스케일·색상을 모두 사용자가 제어하고 직렬화한다.
 //
 // 설계 원칙:
-//  - 외부 에셋 URL 0. 모든 소품은 three 프리미티브 조합으로 런타임 생성(빌더는 three 주입형 → 순수 테스트 가능).
+//  - 기본 소품은 three 프리미티브 조합으로 생성하고, Blender 원본은 번들된 first-party GLB만 사용한다.
 //  - 부착 본은 VRM humanoid 표준 본 이름만 사용(StudioVrmPoser의 본 집합과 호환).
 //  - 직렬화는 옵셔널·버전 필드 → 기존 스튜디오 문서 하위호환.
 
@@ -86,10 +86,26 @@ export interface PropFitProfile {
   maxScale: number;
 }
 
+export interface PropProceduralGeometrySource {
+  readonly kind: "procedural";
+}
+
+export type PropGltfAssetUrl = `/assets/3d/${string}.glb`;
+
+export interface PropGltfGeometrySource {
+  readonly kind: "gltf";
+  /** Vite public 디렉터리에 포함되는 동일 출처(first-party) 정적 GLB 경로. */
+  readonly url: PropGltfAssetUrl;
+}
+
+export type PropGeometrySource = PropProceduralGeometrySource | PropGltfGeometrySource;
+
 export interface PropDef {
   id: string;
   label: string;
   category: PropCategory;
+  /** 렌더 geometry의 단일 권위 출처. GLTF 항목은 절차형 fallback으로 대체하지 않는다. */
+  geometrySource: PropGeometrySource;
   /** 기본 부착 본. */
   defaultBone: PropAttachBone;
   /** 기본 오프셋(부착 본 로컬, 미터). */
@@ -114,7 +130,45 @@ export interface PropDef {
   fit: PropFitProfile;
 }
 
-type LegacyPropDef = Omit<PropDef, "anchors" | "grip" | "fit">;
+type LegacyPropDef = Omit<PropDef, "anchors" | "geometrySource" | "grip" | "fit">;
+
+/** Blender로 제작해 public 번들에 포함한 소품의 안정적인 직렬화 ID → GLB 경로 매핑. */
+export const BLENDER_PROP_GLTF_URLS = Object.freeze({
+  blender_cyber_katana: "/assets/3d/cyber_katana.glb",
+  blender_magic_staff: "/assets/3d/magic_staff_crystal.glb",
+  blender_scifi_drone: "/assets/3d/scifi_drone_bot.glb",
+  blender_neon_bench: "/assets/3d/neom_bench_prop.glb",
+  blender_cyber_visor: "/assets/3d/cyber_helmet_visor.glb",
+  blender_holo_tablet: "/assets/3d/hologram_tablet.glb",
+  blender_rune_shield: "/assets/3d/ancient_rune_shield.glb",
+  blender_arcade_cabinet: "/assets/3d/arcade_game_cabinet.glb",
+  blender_medieval_greatsword: "/assets/3d/medieval_greatsword.glb",
+  blender_cyber_hoverbike: "/assets/3d/cyberpunk_hoverbike.glb",
+  blender_magic_chest: "/assets/3d/fantasy_magic_chest.glb",
+  blender_modern_smartphone: "/assets/3d/modern_smartphone_prop.glb",
+  blender_cyber_sniper_rifle: "/assets/3d/cyber_sniper_rifle.glb",
+  blender_magic_wand_staff: "/assets/3d/fantasy_magic_wand_staff.glb",
+  blender_steampunk_airship: "/assets/3d/steampunk_airship.glb",
+  blender_cyberpunk_motorcycle: "/assets/3d/cyberpunk_motorcycle.glb",
+  blender_scifi_laser_gun: "/assets/3d/scifi_laser_gun.glb",
+  blender_magic_grimoire: "/assets/3d/magic_grimoire.glb",
+  blender_cyber_glasses: "/assets/3d/cyber_glasses.glb",
+  blender_medieval_shield: "/assets/3d/medieval_shield.glb",
+  blender_street_lamp: "/assets/3d/street_lamp.glb",
+  blender_vending_machine: "/assets/3d/vending_machine.glb",
+  blender_royal_throne: "/assets/3d/royal_throne.glb",
+  blender_crystal_orb: "/assets/3d/crystal_orb.glb",
+  blender_tactical_helmet: "/assets/3d/tactical_helmet.glb",
+  blender_school_desk: "/assets/3d/school_desk.glb",
+  blender_adaptive_power_wheelchair: "/assets/3d/adaptive_power_wheelchair.glb",
+} as const satisfies Readonly<Record<string, PropGltfAssetUrl>>);
+
+const PROCEDURAL_PROP_GEOMETRY_SOURCE = Object.freeze({ kind: "procedural" } as const);
+
+function geometrySourceForPropId(id: string): PropGeometrySource {
+  const url = (BLENDER_PROP_GLTF_URLS as Readonly<Record<string, PropGltfAssetUrl>>)[id];
+  return url ? Object.freeze({ kind: "gltf" as const, url }) : PROCEDURAL_PROP_GEOMETRY_SOURCE;
+}
 
 /* ── 소품 카탈로그(현대·판타지·의료 직업 소품) ──────────────────────── */
 
@@ -213,6 +267,7 @@ const VRM_PROP_BASES = [
   { id: "blender_crystal_orb", label: "블렌더 마법 수정구", category: "hand", defaultBone: "rightHand", defaultPosition: [0, 0.02, 0.02], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 발광 마법 수정구." },
   { id: "blender_tactical_helmet", label: "블렌더 택티컬 헬멧", category: "head", defaultBone: "head", defaultPosition: [0, 0.05, 0.01], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 SF 택티컬 헬멧." },
   { id: "blender_school_desk", label: "블렌더 학교 책상", category: "body", defaultBone: "hips", defaultPosition: [0, -0.7, 0.3], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 학교/오피스 책상." },
+  { id: "blender_adaptive_power_wheelchair", label: "블렌더 어댑티브 전동휠체어", category: "body", defaultBone: "hips", defaultPosition: [0, -0.39, 0.02], defaultRotationDeg: [0, 0, 0], defaultScale: 1.0, defaultColor: null, hint: "Blender 5.2 생성 어댑티브 전동휠체어. 좌석 앵커로 캐릭터 골반을 자연스럽게 맞춥니다." },
 ] as const satisfies readonly LegacyPropDef[];
 
 export type VrmPropId = (typeof VRM_PROP_BASES)[number]["id"];
@@ -565,10 +620,15 @@ const PROP_PROFILES: Record<VrmPropId, PropProfile> = {
     anchors: [anchor("top", "surface", [0, 0.72, 0])],
     fit: fit("avatarHeight", 1.65, 0.8, 1.5),
   },
+  blender_adaptive_power_wheelchair: {
+    anchors: [anchor("seat", "surface", [0, 0.61, 0.02])],
+    fit: fit("avatarHeight", 1.65, 0.8, 1.5),
+  },
 };
 
-export const VRM_PROPS: readonly PropDef[] = VRM_PROP_BASES.map((def) => ({
+export const VRM_PROPS: readonly PropDef[] = VRM_PROP_BASES.map((def): PropDef => ({
   ...def,
+  geometrySource: geometrySourceForPropId(def.id),
   ...PROP_PROFILES[def.id],
 }));
 
@@ -1409,6 +1469,9 @@ export function buildPropObject(
   color: string | null,
   qualityAdapter?: PropGeometryQualityAdapter,
 ): ThreeObject {
+  if (def.geometrySource.kind !== "procedural") {
+    throw new TypeError(`GLTF prop ${def.id} must be loaded from ${def.geometrySource.url}`);
+  }
   const group = new three.Group();
   group.name = `prop:${def.id}`;
   const hex = color ?? def.defaultColor ?? "#cccccc";

@@ -5,6 +5,10 @@ import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeom
 
 import { PHYSICS_PREVIEW_MAX_DELTA } from "./studio-vrm-physics";
 import {
+  acquireStudioVrmPropAsset,
+  type StudioVrmPropAssetLease,
+} from "./studio-vrm-prop-asset-runtime";
+import {
   applyVrmTwoBoneGrip,
   createVrmTwoBoneGripState,
   releaseVrmTwoBoneGripState,
@@ -133,18 +137,31 @@ export function StudioVrmPropAttachment({
   const handWorldScaleRef = useRef(new THREE.Vector3());
   const attachmentStatusRef = useRef<StudioVrmProjectionAttachmentStatus | null>(null);
   const [secondaryGripState] = useState(createVrmTwoBoneGripState);
+  const [loadedGltfProp, setLoadedGltfProp] = useState<{
+    readonly propId: string;
+    readonly url: string;
+    readonly lease: StudioVrmPropAssetLease;
+  } | null>(null);
+  const definition = propDefById(instance.propId);
 
-  const object = useMemo(() => {
-    const def = propDefById(instance.propId);
-    if (!def) return null;
+  const proceduralObject = useMemo(() => {
+    if (!definition || definition.geometrySource.kind !== "procedural") return null;
     return buildPropObject(
       THREE as unknown as Parameters<typeof buildPropObject>[0],
-      def,
+      definition,
       instance.color,
       STUDIO_VRM_PROP_GEOMETRY_QUALITY,
     ) as unknown as THREE.Object3D;
-  }, [instance.color, instance.propId]);
-  const definition = propDefById(instance.propId);
+  }, [definition, instance.color]);
+  const gltfUrl = definition?.geometrySource.kind === "gltf"
+    ? definition.geometrySource.url
+    : null;
+  const gltfObject = loadedGltfProp?.propId === instance.propId
+    && loadedGltfProp.url === gltfUrl
+    && !loadedGltfProp.lease.released
+    ? loadedGltfProp.lease.object
+    : null;
+  const object = proceduralObject ?? gltfObject;
   const resolved = definition ? resolvePropAttachment(definition, instance, metrics) : null;
   const secondary = definition ? resolveSecondaryPropTarget(definition, instance) : null;
   const secondaryActive = Boolean(secondary && secondary.influence > 0);
@@ -155,6 +172,31 @@ export function StudioVrmPropAttachment({
     attachmentStatusRef.current = status;
     onAttachmentStatus?.(instance.uid, instance.propId, status);
   }
+
+  useEffect(() => {
+    const source = definition?.geometrySource;
+    if (!source || source.kind !== "gltf") return;
+    let active = true;
+    let lease: StudioVrmPropAssetLease | null = null;
+
+    void acquireStudioVrmPropAsset(instance.propId, source)
+      .then((loadedLease) => {
+        if (!active) {
+          loadedLease.release();
+          return;
+        }
+        lease = loadedLease;
+        setLoadedGltfProp({ propId: instance.propId, url: source.url, lease: loadedLease });
+      })
+      .catch(() => {
+        // GLB 항목은 절차형 큐브로 위장하지 않는다. object=null이 attachment unavailable을 보고한다.
+      });
+
+    return () => {
+      active = false;
+      lease?.release();
+    };
+  }, [definition, instance.propId]);
 
   useLayoutEffect(() => {
     if (!onAttachmentStatus) return;
@@ -216,10 +258,10 @@ export function StudioVrmPropAttachment({
   }, [object, instance.position, instance.rig, instance.rotationDeg, instance.scale]);
 
   useEffect(() => {
-    if (!object) return;
-    cancelScheduledPropDisposal(object);
-    return () => schedulePropDisposal(object);
-  }, [object]);
+    if (!proceduralObject) return;
+    cancelScheduledPropDisposal(proceduralObject);
+    return () => schedulePropDisposal(proceduralObject);
+  }, [proceduralObject]);
 
   useFrame(() => {
     const group = smartGroupRef.current;

@@ -22,15 +22,14 @@ ToonSpectrum 스튜디오(/studio)에 번들된 VRM 캐릭터 모델의 출처�
 | `Eggplant.vrm` | 에그플랜트 (가지) | <https://github.com/ToxSam/open-source-avatars> | Polygonal-Mind의 100Avatars R1 시리즈 모델 — CC0 라이선스 적용 |
 | `CoolBanana.vrm` | 쿨바나나 | <https://github.com/ToxSam/open-source-avatars> | Polygonal-Mind의 100Avatars R1 시리즈 모델 — CC0 라이선스 적용 |
 | `Skull.vrm` | 스컬 (해골) | <https://github.com/ToxSam/open-source-avatars> | Polygonal-Mind의 100Avatars R1 시리즈 모델 — CC0 라이선스 적용 |
-| `cyber_agent_zero.vrm` | 사이버 에이전트 제로 | ToonSpectrum Blender 5.2 | Blender 5.2 절차적 스컬프팅/PBR 생성 자사 캐릭터 — MIT / CC0 적용 |
 
 ## ToonSpectrum 오리지널 VRM 1.0 캐릭터 팩 (2026-08)
 
-아래 6종은 외부 모델이나 텍스처를 사용하지 않고 ToonSpectrum이 Blender MCP와
+아래 9종은 외부 모델이나 텍스처를 사용하지 않고 ToonSpectrum이 Blender MCP와
 `scripts/blender/generate_toonspectrum_vrm_pack.py`로 직접 생성한 절차형 캐릭터입니다.
 Blender 5.2 및 VRM Add-on 4.5의 정식 `export_scene.vrm` 경로로 내보냈으며, 각 파일 안에
 VRM 1.0 공개 라이선스 URL과 상업 이용·재배포·수정 허용 메타데이터가 포함됩니다.
-ToonSpectrum은 이 6개 원본 모델을 **CC0 1.0**으로 제공합니다.
+ToonSpectrum은 이 9개 원본 모델을 **CC0 1.0**으로 제공합니다.
 
 | 파일 | 스튜디오 이름 | 다양성/용도 | 저작자·라이선스 |
 | --- | --- | --- | --- |
@@ -40,8 +39,16 @@ ToonSpectrum은 이 6개 원본 모델을 **CC0 1.0**으로 제공합니다.
 | `TS_Haram_Explorer.vrm` | 하람 (어린 탐험가) | 아동, 중성적 탐험가 | ToonSpectrum 오리지널 · CC0 1.0 |
 | `TS_Yeonhui_RuneGuard.vrm` | 연휘 (룬 수호자) | 판타지, 어두운 피부톤, 중성적 수호자 | ToonSpectrum 오리지널 · CC0 1.0 |
 | `TS_Nova_ServiceAndroid.vrm` | 노바 (서비스 안드로이드) | SF·로봇, 발광 얼굴 패널 | ToonSpectrum 오리지널 · CC0 1.0 |
+| `cyber_agent_zero.vrm` | 사이버 에이전트 제로 | SF·성인, 바이저·발광 코어·기계식 어깨 | ToonSpectrum 오리지널 · CC0 1.0 |
+| `TS_Seojin_Architect.vrm` | 서진 (배리어프리 건축가) | 성인 휠체어 사용자, 강한 상체·작업 조끼·안경 | ToonSpectrum 오리지널 · CC0 1.0 |
+| `TS_Mira_Detective.vrm` | 미라 (느와르 탐정) | 40대, 풍부한 체형·페도라·더블 코트 | ToonSpectrum 오리지널 · CC0 1.0 |
 
 - 공통 리그: VRM 휴머노이드 53개 매핑(손가락 포함), 실제 skin 및 `JOINTS_0`/`WEIGHTS_0`.
+- 관절 전환부는 인접 본 2개에 나뉜 실제 혼합 웨이트를 사용하며, `Blink`와 10종의 입모양·감정
+  셰이프 키(`AA`·`IH`·`OU`·`EE`·`OH`·`Happy`·`Sad`·`Angry`·`Relaxed`·`Surprised`)가
+  VRM 1.0 expression에 직접 바인딩됩니다.
+- 서진의 휠체어는 캐릭터의 일부로 고정하지 않았습니다. 스튜디오에서 별도 휠체어 프롭을 배치하면
+  교체·회전·포즈 조절이 가능하고, VRM 자체도 다른 좌석이나 장면에 재사용할 수 있습니다.
 - 외부 URI: 없음. 메시·재질·권리 메타데이터는 각 `.vrm` 안에 포함됩니다.
 - CC0 원문: <https://creativecommons.org/publicdomain/zero/1.0/>
 
