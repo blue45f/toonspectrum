@@ -70,7 +70,7 @@ export const STUDIO_MANNEQUIN_JOINT_LABELS: Readonly<Record<StudioMannequinJoint
 export interface StudioMannequinBodyParams {
   /** 신장(cm). 120–200. */
   readonly heightCm: number;
-  /** 두신 비율(머리 개수). 4–9. */
+  /** 두신 비율(머리 개수). 3–9. */
   readonly headCount: number;
   /** 어깨 너비 배율. 0.7–1.3. */
   readonly shoulderWidth: number;
@@ -86,7 +86,7 @@ export interface StudioMannequinBodyParams {
 
 export const STUDIO_MANNEQUIN_PARAM_RANGES = Object.freeze({
   heightCm: [120, 200],
-  headCount: [4, 9],
+  headCount: [3, 9],
   shoulderWidth: [0.7, 1.3],
   pelvisWidth: [0.7, 1.3],
   armLength: [0.8, 1.2],
@@ -115,7 +115,11 @@ export type StudioMannequinBodyPresetId =
   | "slender"
   | "bodybuilder"
   | "child"
-  | "anime7";
+  | "anime7"
+  | "petite"
+  | "athletic"
+  | "plusSize"
+  | "mature";
 
 export const STUDIO_MANNEQUIN_BODY_PRESETS: Readonly<
   Record<StudioMannequinBodyPresetId, { label: string; params: StudioMannequinBodyParams }>
@@ -242,6 +246,54 @@ export const STUDIO_MANNEQUIN_BODY_PRESETS: Readonly<
       armLength: 1.0,
       legLength: 1.08,
       build: 0.8,
+    }),
+  },
+  petite: {
+    label: "아담한 체형 6.3등신",
+    params: Object.freeze({
+      heightCm: 150,
+      headCount: 6.3,
+      shoulderWidth: 0.9,
+      pelvisWidth: 1,
+      armLength: 0.95,
+      legLength: 0.98,
+      build: 0.65,
+    }),
+  },
+  athletic: {
+    label: "운동형 7.4등신",
+    params: Object.freeze({
+      heightCm: 176,
+      headCount: 7.4,
+      shoulderWidth: 1.1,
+      pelvisWidth: 1.02,
+      armLength: 1.03,
+      legLength: 1.04,
+      build: 1.9,
+    }),
+  },
+  plusSize: {
+    label: "플러스 사이즈 6.6등신",
+    params: Object.freeze({
+      heightCm: 168,
+      headCount: 6.6,
+      shoulderWidth: 1.04,
+      pelvisWidth: 1.18,
+      armLength: 0.98,
+      legLength: 0.98,
+      build: 2.85,
+    }),
+  },
+  mature: {
+    label: "중장년 균형형 6.5등신",
+    params: Object.freeze({
+      heightCm: 164,
+      headCount: 6.5,
+      shoulderWidth: 0.96,
+      pelvisWidth: 1.02,
+      armLength: 0.94,
+      legLength: 0.93,
+      build: 1.35,
     }),
   },
 });
@@ -530,6 +582,8 @@ export function buildStudioMannequinSpec(input: unknown): StudioMannequinSpec {
 
   const limbR = build.limbRadius;
   const footLen = 0.95 * hu;
+  const pelvisRadius = 0.3 * hu * build.torsoLower;
+  const chestRadius = 0.34 * hu * build.torsoUpper;
 
   const joints: StudioMannequinJointSpec[] = [
     { id: "pelvis", parentId: null, offset: vec3(0, pelvisHeight, 0) },
@@ -558,13 +612,13 @@ export function buildStudioMannequinSpec(input: unknown): StudioMannequinSpec {
   ];
 
   const primitives: StudioMannequinPrimitiveSpec[] = [
-    // 몸통
+    // 몸통 — 흉곽과 골반을 분리된 타원체로 만들어 데생 랜드마크와 실루엣을 읽기 쉽게 한다.
     {
-      kind: "capsule",
+      kind: "sphere",
       jointId: "pelvis",
-      from: vec3(-hipHalf * 0.7, 0.04 * hu, 0),
-      to: vec3(hipHalf * 0.7, 0.04 * hu, 0),
-      radius: 0.3 * hu * build.torsoLower * Math.max(params.pelvisWidth, 0.85),
+      center: vec3(0, 0.04 * hu, 0),
+      radius: pelvisRadius,
+      scale: vec3(1.5 * params.pelvisWidth, 0.8, 0.92),
     },
     {
       kind: "capsule",
@@ -574,11 +628,15 @@ export function buildStudioMannequinSpec(input: unknown): StudioMannequinSpec {
       radius: 0.24 * hu * build.torsoLower,
     },
     {
-      kind: "capsule",
+      kind: "sphere",
       jointId: "chest",
-      from: vec3(0, 0.02 * torsoLen, 0),
-      to: vec3(0, 0.33 * torsoLen, 0),
-      radius: 0.33 * hu * build.torsoUpper,
+      center: vec3(0, 0.175 * torsoLen, 0),
+      radius: chestRadius,
+      scale: vec3(
+        1.32 * params.shoulderWidth,
+        (0.31 * torsoLen) / (2 * chestRadius),
+        0.72,
+      ),
     },
     // 쇄골
     {
@@ -604,30 +662,66 @@ export function buildStudioMannequinSpec(input: unknown): StudioMannequinSpec {
       radius: headLen * 0.5,
       scale: vec3(0.78, 1, 0.85),
     },
-    // 팔
+    // 코·귀 방향 가이드 — 별도 얼굴 골격 없이도 +Z 시선과 머리 회전을 즉시 읽을 수 있다.
+    {
+      kind: "sphere",
+      jointId: "head",
+      center: vec3(0, headLen * 0.52, headLen * 0.43),
+      radius: 0.06 * hu,
+      scale: vec3(0.55, 0.72, 1.15),
+    },
+    {
+      kind: "sphere",
+      jointId: "head",
+      center: vec3(0.4 * hu, headLen * 0.52, 0),
+      radius: 0.065 * hu,
+      scale: vec3(0.45, 0.8, 0.55),
+    },
+    {
+      kind: "sphere",
+      jointId: "head",
+      center: vec3(-0.4 * hu, headLen * 0.52, 0),
+      radius: 0.065 * hu,
+      scale: vec3(0.45, 0.8, 0.55),
+    },
+    // 팔 — 관절구와 손바닥 타원체를 겹쳐 관절 굽힘과 손 방향을 명확히 표시한다.
+    { kind: "sphere", jointId: "leftUpperArm", center: vec3(0, 0, 0), radius: 0.14 * hu * limbR },
     { kind: "capsule", jointId: "leftUpperArm", from: vec3(0, 0, 0), to: vec3(0, -upperArmLen, 0), radius: 0.115 * hu * limbR },
+    { kind: "sphere", jointId: "leftLowerArm", center: vec3(0, 0, 0), radius: 0.12 * hu * limbR },
     { kind: "capsule", jointId: "leftLowerArm", from: vec3(0, 0, 0), to: vec3(0, -foreArmLen, 0), radius: 0.095 * hu * limbR },
-    { kind: "capsule", jointId: "leftHand", from: vec3(0, 0, 0), to: vec3(0, -handLen, 0), radius: 0.09 * hu },
+    { kind: "sphere", jointId: "leftHand", center: vec3(0, 0, 0), radius: 0.095 * hu },
+    { kind: "sphere", jointId: "leftHand", center: vec3(0, -handLen * 0.5, 0), radius: handLen * 0.5, scale: vec3(0.45, 1, 0.28) },
+    { kind: "sphere", jointId: "rightUpperArm", center: vec3(0, 0, 0), radius: 0.14 * hu * limbR },
     { kind: "capsule", jointId: "rightUpperArm", from: vec3(0, 0, 0), to: vec3(0, -upperArmLen, 0), radius: 0.115 * hu * limbR },
+    { kind: "sphere", jointId: "rightLowerArm", center: vec3(0, 0, 0), radius: 0.12 * hu * limbR },
     { kind: "capsule", jointId: "rightLowerArm", from: vec3(0, 0, 0), to: vec3(0, -foreArmLen, 0), radius: 0.095 * hu * limbR },
-    { kind: "capsule", jointId: "rightHand", from: vec3(0, 0, 0), to: vec3(0, -handLen, 0), radius: 0.09 * hu },
-    // 다리
+    { kind: "sphere", jointId: "rightHand", center: vec3(0, 0, 0), radius: 0.095 * hu },
+    { kind: "sphere", jointId: "rightHand", center: vec3(0, -handLen * 0.5, 0), radius: handLen * 0.5, scale: vec3(0.45, 1, 0.28) },
+    // 다리 — 고관절·무릎·발목 관절구와 둥근 발 볼륨.
+    { kind: "sphere", jointId: "leftUpperLeg", center: vec3(0, 0, 0), radius: 0.18 * hu * limbR },
     { kind: "capsule", jointId: "leftUpperLeg", from: vec3(0, 0, 0), to: vec3(0, -upperLegLen, 0), radius: 0.155 * hu * limbR },
+    { kind: "sphere", jointId: "leftLowerLeg", center: vec3(0, 0, 0), radius: 0.15 * hu * limbR },
     { kind: "capsule", jointId: "leftLowerLeg", from: vec3(0, 0, 0), to: vec3(0, -lowerLegLen, 0), radius: 0.115 * hu * limbR },
     {
-      kind: "box",
+      kind: "sphere",
       jointId: "leftFoot",
       center: vec3(0, -ankleHeight * 0.5, footLen * 0.22),
-      size: vec3(0.26 * hu, ankleHeight, footLen),
+      radius: footLen * 0.5,
+      scale: vec3((0.26 * hu) / footLen, ankleHeight / footLen, 1),
     },
+    { kind: "sphere", jointId: "leftFoot", center: vec3(0, 0, 0), radius: 0.105 * hu * limbR },
+    { kind: "sphere", jointId: "rightUpperLeg", center: vec3(0, 0, 0), radius: 0.18 * hu * limbR },
     { kind: "capsule", jointId: "rightUpperLeg", from: vec3(0, 0, 0), to: vec3(0, -upperLegLen, 0), radius: 0.155 * hu * limbR },
+    { kind: "sphere", jointId: "rightLowerLeg", center: vec3(0, 0, 0), radius: 0.15 * hu * limbR },
     { kind: "capsule", jointId: "rightLowerLeg", from: vec3(0, 0, 0), to: vec3(0, -lowerLegLen, 0), radius: 0.115 * hu * limbR },
     {
-      kind: "box",
+      kind: "sphere",
       jointId: "rightFoot",
       center: vec3(0, -ankleHeight * 0.5, footLen * 0.22),
-      size: vec3(0.26 * hu, ankleHeight, footLen),
+      radius: footLen * 0.5,
+      scale: vec3((0.26 * hu) / footLen, ankleHeight / footLen, 1),
     },
+    { kind: "sphere", jointId: "rightFoot", center: vec3(0, 0, 0), radius: 0.105 * hu * limbR },
   ];
 
   const chains: Record<StudioMannequinChainId, StudioMannequinChainSpec> = {

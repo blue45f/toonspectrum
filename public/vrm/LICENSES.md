@@ -24,6 +24,27 @@ ToonSpectrum 스튜디오(/studio)에 번들된 VRM 캐릭터 모델의 출처�
 | `Skull.vrm` | 스컬 (해골) | <https://github.com/ToxSam/open-source-avatars> | Polygonal-Mind의 100Avatars R1 시리즈 모델 — CC0 라이선스 적용 |
 | `cyber_agent_zero.vrm` | 사이버 에이전트 제로 | ToonSpectrum Blender 5.2 | Blender 5.2 절차적 스컬프팅/PBR 생성 자사 캐릭터 — MIT / CC0 적용 |
 
+## ToonSpectrum 오리지널 VRM 1.0 캐릭터 팩 (2026-08)
+
+아래 6종은 외부 모델이나 텍스처를 사용하지 않고 ToonSpectrum이 Blender MCP와
+`scripts/blender/generate_toonspectrum_vrm_pack.py`로 직접 생성한 절차형 캐릭터입니다.
+Blender 5.2 및 VRM Add-on 4.5의 정식 `export_scene.vrm` 경로로 내보냈으며, 각 파일 안에
+VRM 1.0 공개 라이선스 URL과 상업 이용·재배포·수정 허용 메타데이터가 포함됩니다.
+ToonSpectrum은 이 6개 원본 모델을 **CC0 1.0**으로 제공합니다.
+
+| 파일 | 스튜디오 이름 | 다양성/용도 | 저작자·라이선스 |
+| --- | --- | --- | --- |
+| `TS_Minseo_Campus.vrm` | 민서 (캠퍼스 메이커) | 현대·캠퍼스, 평균 체형 | ToonSpectrum 오리지널 · CC0 1.0 |
+| `TS_Taeo_Barista.vrm` | 태오 (동네 바리스타) | 현대·카페, 넓고 풍부한 체형 | ToonSpectrum 오리지널 · CC0 1.0 |
+| `TS_Jeonghwa_Gardener.vrm` | 정화 (노년 정원사) | 노년, 정원·일상 장면 | ToonSpectrum 오리지널 · CC0 1.0 |
+| `TS_Haram_Explorer.vrm` | 하람 (어린 탐험가) | 아동, 중성적 탐험가 | ToonSpectrum 오리지널 · CC0 1.0 |
+| `TS_Yeonhui_RuneGuard.vrm` | 연휘 (룬 수호자) | 판타지, 어두운 피부톤, 중성적 수호자 | ToonSpectrum 오리지널 · CC0 1.0 |
+| `TS_Nova_ServiceAndroid.vrm` | 노바 (서비스 안드로이드) | SF·로봇, 발광 얼굴 패널 | ToonSpectrum 오리지널 · CC0 1.0 |
+
+- 공통 리그: VRM 휴머노이드 53개 매핑(손가락 포함), 실제 skin 및 `JOINTS_0`/`WEIGHTS_0`.
+- 외부 URI: 없음. 메시·재질·권리 메타데이터는 각 `.vrm` 안에 포함됩니다.
+- CC0 원문: <https://creativecommons.org/publicdomain/zero/1.0/>
+
 - VRoid 공식 샘플(구 베타 포함) 모음 출처: <https://github.com/madjin/vrm-samples> (pixiv/VRoid 프로젝트가 배포한 샘플을 모아 둔 저장소).
 - Alicia Solid 원 배포처: <https://3d.nicovideo.jp/works/td14712> — UniVRM 저장소의 VRM 0.51 변환본을 사용.
 

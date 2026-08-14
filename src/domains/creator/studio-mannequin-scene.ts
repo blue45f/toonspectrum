@@ -158,6 +158,9 @@ export function createStudioMannequinScene(
     powerPreference: "low-power",
   });
   renderer.setPixelRatio(Math.min(2, globalThis.devicePixelRatio || 1));
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.05;
   const initialWidth = Math.max(1, container.clientWidth || 1);
   const initialHeight = Math.max(1, container.clientHeight || 1);
   renderer.setSize(initialWidth, initialHeight, false);
@@ -187,9 +190,14 @@ export function createStudioMannequinScene(
   helpers.add(grid);
   scene.add(helpers);
 
-  // 머티리얼 — 밝은 회색 툰 셰이딩(선택 시 accent 틴트).
+  // 머티리얼 — 기본은 실제 목조 인형에 가까운 따뜻한 무광 재질(선택 시 accent 틴트).
   const gradientMap = createToonGradientTexture();
-  let bodyMaterial: THREE.Material = new THREE.MeshToonMaterial({ color: 0xd2cec7, gradientMap });
+  let bodyMaterial: THREE.Material = new THREE.MeshStandardMaterial({
+    color: 0xc58b57,
+    roughness: 0.62,
+    metalness: 0.02,
+  });
+  let currentMaterialStyle: StudioMannequinMaterialStyle = "wood";
   const selectedMaterial = new THREE.MeshToonMaterial({ color: 0xe0925c, gradientMap });
   const handleMaterial = new THREE.MeshBasicMaterial({
     color: 0xe0925c,
@@ -291,7 +299,7 @@ export function createStudioMannequinScene(
   ): THREE.Mesh {
     if (primitive.kind === "sphere") {
       const mesh = new THREE.Mesh(
-        new THREE.SphereGeometry(primitive.radius, 24, 18),
+        new THREE.SphereGeometry(primitive.radius, 32, 24),
         bodyMaterial,
       );
       mesh.position.copy(toVec3(primitive.center));
@@ -311,7 +319,7 @@ export function createStudioMannequinScene(
     const segment = new THREE.Vector3().subVectors(to, from);
     const segmentLength = segment.length();
     const mesh = new THREE.Mesh(
-      new THREE.CapsuleGeometry(primitive.radius, Math.max(0.001, segmentLength), 6, 14),
+      new THREE.CapsuleGeometry(primitive.radius, Math.max(0.001, segmentLength), 8, 20),
       bodyMaterial,
     );
     mesh.position.copy(from).addScaledVector(segment, 0.5);
@@ -633,7 +641,7 @@ export function createStudioMannequinScene(
     },
     setMaterialStyle(style) {
       if (disposed) return;
-      const gradientMap = createToonGradientTexture();
+      currentMaterialStyle = style;
       let nextMaterial: THREE.Material;
       if (style === "clay") {
         nextMaterial = new THREE.MeshStandardMaterial({ color: 0xe6e2dd, roughness: 0.85, metalness: 0.05 });
@@ -646,10 +654,14 @@ export function createStudioMannequinScene(
       } else if (style === "stencil") {
         nextMaterial = new THREE.MeshBasicMaterial({ color: 0x09090b });
       } else {
-        nextMaterial = new THREE.MeshToonMaterial({ color: 0xd2cec7, gradientMap });
+        nextMaterial = new THREE.MeshStandardMaterial({
+          color: 0xc58b57,
+          roughness: 0.62,
+          metalness: 0.02,
+        });
       }
       bodyMaterial.dispose();
-      bodyMaterial = nextMaterial as THREE.MeshToonMaterial;
+      bodyMaterial = nextMaterial;
       for (const mesh of bodyMeshes) {
         if (mesh.userData.studioMannequinJointId !== selectedJointId) {
           mesh.material = bodyMaterial;
@@ -658,7 +670,7 @@ export function createStudioMannequinScene(
       invalidate();
     },
     getMaterialStyle() {
-      return "wood";
+      return currentMaterialStyle;
     },
     setCameraPreset(preset) {
       if (disposed) return;

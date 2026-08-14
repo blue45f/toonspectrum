@@ -1,3 +1,6 @@
+import { readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -46,5 +49,43 @@ describe("StudioMultiObjectLayoutManager", () => {
     const classroomObjs = manager.loadPreset("classroom");
     expect(classroomObjs.length).toBeGreaterThan(0);
     expect(STUDIO_ROOM_LAYOUT_PRESETS.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("backs every room preset URL with a real Blender GLB asset", () => {
+    const urls = new Set(
+      STUDIO_ROOM_LAYOUT_PRESETS.flatMap((preset) =>
+        preset.objects.map((object) => object.modelUrl)),
+    );
+    expect(urls).toEqual(new Set([
+      "/assets/3d/blackboard.glb",
+      "/assets/3d/desk.glb",
+      "/assets/3d/chair.glb",
+      "/assets/3d/round_table.glb",
+      "/assets/3d/sofa.glb",
+    ]));
+
+    for (const url of urls) {
+      expect(url).toMatch(/^\/assets\/3d\/[a-z_]+\.glb$/);
+      const file = statSync(join(process.cwd(), "public", url));
+      expect(file.isFile(), url).toBe(true);
+      expect(file.size, url).toBeGreaterThan(10 * 1024);
+    }
+  });
+
+  it("documents first-party source and redistribution rights for every bundled GLB", () => {
+    const licensePath = join(process.cwd(), "public", "assets", "3d", "LICENSES.md");
+    const license = readFileSync(licensePath, "utf8");
+
+    expect(license).toContain("generate_core_furniture_pack.py");
+    expect(license).toContain("CC0 1.0");
+    for (const filename of [
+      "blackboard.glb",
+      "desk.glb",
+      "chair.glb",
+      "round_table.glb",
+      "sofa.glb",
+    ]) {
+      expect(license).toContain(`\`${filename}\``);
+    }
   });
 });

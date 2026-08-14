@@ -102,6 +102,15 @@ const NEW_BUNDLE_FILES = [
   "Eugenia.vrm",
 ] as const;
 
+const ORIGINAL_BUNDLE_FILES = [
+  "TS_Minseo_Campus.vrm",
+  "TS_Taeo_Barista.vrm",
+  "TS_Jeonghwa_Gardener.vrm",
+  "TS_Haram_Explorer.vrm",
+  "TS_Yeonhui_RuneGuard.vrm",
+  "TS_Nova_ServiceAndroid.vrm",
+] as const;
+
 const MIN_BUNDLE_FILE_BYTES = 100 * 1024;
 
 describe("VRM library helpers", () => {
@@ -110,6 +119,14 @@ describe("VRM library helpers", () => {
 
     // 대표 엔트리 스팟 체크(기존 + 2026-07 신규).
     expect(names.slice(0, 4)).toEqual(["루미", "하린", "세라", "유나"]);
+    expect(names.slice(4, 10)).toEqual([
+      "민서 (캠퍼스 메이커)",
+      "태오 (동네 바리스타)",
+      "정화 (노년 정원사)",
+      "하람 (어린 탐험가)",
+      "연휘 (룬 수호자)",
+      "노바 (서비스 안드로이드)",
+    ]);
     expect(names).toContain("데빌 (악마)");
     expect(names).toContain("쿨에일리언 (외계인)");
     expect(names).toContain("스포츠메카 (메카)");
@@ -124,8 +141,8 @@ describe("VRM library helpers", () => {
     expect(names.join(" ")).not.toMatch(/샘플|아바타|Avatar|VRoid/i);
   });
 
-  it("bundles 89 selectable sample characters with unique ids and local /vrm/ urls", () => {
-    expect(SAMPLE_VRMS).toHaveLength(89);
+  it("bundles 95 selectable sample characters with unique ids and local /vrm/ urls", () => {
+    expect(SAMPLE_VRMS).toHaveLength(95);
 
     const ids = SAMPLE_VRMS.map((sample) => sample.id);
     expect(new Set(ids).size).toBe(ids.length);
@@ -141,7 +158,7 @@ describe("VRM library helpers", () => {
 
   it("registers every newly bundled model in the sample list", () => {
     const urls = new Set(SAMPLE_VRMS.map((sample) => sample.url));
-    for (const fileName of NEW_BUNDLE_FILES) {
+    for (const fileName of [...NEW_BUNDLE_FILES, ...ORIGINAL_BUNDLE_FILES]) {
       expect(urls.has(`/vrm/${fileName}`), `missing sample entry for ${fileName}`).toBe(true);
     }
   });
@@ -154,6 +171,9 @@ describe("VRM library helpers", () => {
     for (const fileName of NEW_BUNDLE_FILES) {
       expect(licenses, `LICENSES.md missing ${fileName}`).toContain(fileName);
     }
+    for (const fileName of ORIGINAL_BUNDLE_FILES) {
+      expect(licenses, `LICENSES.md missing ${fileName}`).toContain(fileName);
+    }
     // 출처 저장소와 Alicia(니코니 솔리드) 라이선스 고지 링크가 명시되어야 한다.
     expect(licenses).toContain("github.com/madjin/vrm-samples");
     expect(licenses).toContain("github.com/vrm-c/UniVRM");
@@ -164,6 +184,8 @@ describe("VRM library helpers", () => {
     expect(licenses).toContain("meebit_09842.vrm");
     expect(licenses).toContain("권리 격리");
     expect(licenses).toContain("런타임 로드를 차단");
+    expect(licenses).toContain("scripts/blender/generate_toonspectrum_vrm_pack.py");
+    expect(licenses).toContain("CC0 1.0");
   });
 
   // 회귀 방지: 파일 없는 "유령 엔트리"(선택 시 404)가 다시 생기지 않도록
@@ -202,6 +224,8 @@ describe("VRM library helpers", () => {
     expect(sampleVrmUrl("cool-alien")).toBe("/vrm/CoolAlien.vrm");
     expect(sampleVrmUrl("devil")).toBe("/vrm/Devil.vrm");
     expect(sampleVrmUrl("no-such-id")).toBe("/vrm/sample.vrm");
+    expect(selectableSampleVrmUrl("ts-nova-service-android"))
+      .toBe("/vrm/TS_Nova_ServiceAndroid.vrm");
   });
 
   it("권리 제한 meebit을 별도 메타데이터로 격리하고 신규 카탈로그·엄격 로드에서 차단한다", () => {

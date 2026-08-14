@@ -37,7 +37,7 @@ describe("studio BG3D procedural starter UI model", () => {
       { query: "가구", category: "furniture" },
     );
 
-    expect(result).toHaveLength(3);
+    expect(result).toHaveLength(6);
     expect(STUDIO_BG3D_PROCEDURAL_STARTER_ASSETS.map((asset) => asset.id)).toEqual(sourceIds);
   });
 
