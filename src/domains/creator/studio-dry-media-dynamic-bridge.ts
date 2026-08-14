@@ -151,13 +151,16 @@ const POINT_EPSILON = 1e-8;
  * Product lane counts are deliberately bounded below the full simulation's most expensive
  * presets, but never collapse a selected-width nib to one representative fibre.
  *
- * Crayon uses three connected wax fibres: five-lane expansion with dense spacing produced
- * tens of thousands of union polygons on multi-second strokes and froze the live canvas path.
- * Three lanes keep a broad stick while remaining O(source dabs) and prefix-stable. Charcoal /
- * chalk / pastel stay at five for fibrous/mineral beds where spacing is already coarser.
+ * Every dry medium now expands to the five fibres its reference preset declares. Crayon was
+ * cut to three while the carrier still built union polygons: five lanes at crayon's dense
+ * spacing produced tens of thousands of them on multi-second strokes and froze the live canvas.
+ * De-polygonising the carrier removed that cost, and the long-stroke freeze-prevention gate
+ * passes at five, so the reduction no longer buys anything — it only dropped the two interior
+ * fibres, leaving visible gaps inside the stick. Quality leads here; performance may veto a
+ * choice only while it is actually failing, which this one no longer is.
  */
 const PRODUCT_LANE_COUNT = Object.freeze({
-  crayon: 3,
+  crayon: 5,
   charcoal: 5,
   chalk: 5,
   pastel: 5,

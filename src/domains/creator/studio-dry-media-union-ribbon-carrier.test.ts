@@ -33,8 +33,13 @@ const CORE_DRY_MEDIA_IDS = [
 type CoreDryMediaId = (typeof CORE_DRY_MEDIA_IDS)[number];
 
 const LEGACY_CARRIER_SHA256: Readonly<Record<CoreDryMediaId, string>> = Object.freeze({
-  // Competitive anisotropic wax tooth (10-pt pore ellipses; denser travel-aligned slits).
-  crayon: "877ba64d6f72aeb76db77d103a759ee93a94a74ed537018fb1e4fb56f90b0ea2",
+  // Crayon deliberately does NOT match its pre-wave bytes. This wave improved the anisotropic
+  // wax tooth (10-pt pore ellipses; denser travel-aligned slits) and that improvement is applied
+  // to already-saved strokes as well: stroke DATA is never rewritten, only how it is drawn, so an
+  // artist's library gains the better tooth and the change is undone by reverting the grain code.
+  // Freezing old strokes on the old tooth would fork this carrier into two permanent grain paths.
+  // What this row still guards is that the replay stays deterministic and lane-complete.
+  crayon: "619097e1cb934eff00a994e4f749959a380bd86c302fa95f968e05c589aaa451",
   chalk: "33b358794aa321406c6afca80fd41373af44c5f858294784842cc9c74d2a0d45",
   charcoal: "73d5a05fbe1c85ad27d9545fe4cb0166e17beec8b953c0b6c829de7f55c316c0",
   pastel: "550525d2f47d66ce41d1d743cad912063940b4b18b5fdd044d45dfc6b04da5e3",
@@ -51,7 +56,8 @@ const LEGACY_CARRIER_SHA256: Readonly<Record<CoreDryMediaId, string>> = Object.f
  * forever (provider pinning; the de-polygon flip must not disturb the legacy union output).
  */
 const PINNED_CARRIER_SHA256: Readonly<Record<CoreDryMediaId, string>> = Object.freeze({
-  crayon: "1de55b6cc53f3bcd096de32537d16878fdcc2f8a4e635cc8570961094498e0a5",
+  // Re-captured for the restored five-lane product expansion (see PRODUCT_LANE_COUNT).
+  crayon: "72b181e4806d8ebc24e8b806821cc791c24222621006e7aa539e73c273eb11ed",
   chalk: "80530301e273c109833d00b9d98ddeb358eddcd5eba739aac31c1abed321b8c6",
   charcoal: "4a620ecebdf8e8c4bf7092d9020b49178f35f8722cf2970aa3f06aca5b8b9346",
   pastel: "10290a11eba1cad4a16472206bf7b385e2c436c184eb732bfc0c8a45c612adbf",
