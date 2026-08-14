@@ -51,8 +51,15 @@ export async function probeStudioLocalDatabaseRuntime(): Promise<StudioSqliteSup
   }
 }
 
+export interface CloseStudioLocalDatabaseRuntimeOptions {
+  /** Preserve the tab-lifetime brush fallback while another product surface retries OPFS. */
+  readonly preserveBrushMemorySession?: boolean;
+}
+
 /** Test/session shutdown seam. Product code normally keeps the handle for the app lifetime. */
-export async function closeStudioLocalDatabaseRuntime(): Promise<void> {
+export async function closeStudioLocalDatabaseRuntime(
+  options: CloseStudioLocalDatabaseRuntimeOptions = {},
+): Promise<void> {
   if (sharedClosing) return sharedClosing;
   const database = sharedDatabase;
   sharedDatabase = null;
@@ -65,7 +72,9 @@ export async function closeStudioLocalDatabaseRuntime(): Promise<void> {
     // one of its consumers.
     try {
       const brushLibrary = await import("./studio-brush-library-sqlite-repository");
-      brushLibrary.resetProductBrushLibraryRepositoryRuntime();
+      await brushLibrary.reconcileProductBrushLibraryRepositoryForDatabaseClose({
+        preserveMemorySession: options.preserveBrushMemorySession,
+      });
     } catch {
       // The brush module can be absent from narrow runtime/test graphs.
     }

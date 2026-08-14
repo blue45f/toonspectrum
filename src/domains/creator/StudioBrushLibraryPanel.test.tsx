@@ -278,6 +278,51 @@ describe("StudioBrushLibraryPanel", () => {
     expect(screen.getByText(/2개 · 무제한 · 로컬 SQL/u)).toBeTruthy();
   });
 
+  it("첫 repository 열기 실패 뒤 같은 패널에서 새 generation으로 복구한다", async () => {
+    const repository = createStorageBrushLibraryRepository({
+      getItem: () => null,
+      setItem: () => undefined,
+    });
+    const repositoryFactory = vi.fn()
+      .mockRejectedValueOnce(new Error("worker bootstrap failed"))
+      .mockResolvedValue({
+        authority: "sqlite" as const,
+        repository,
+        migration: null,
+      });
+
+    function Harness() {
+      const [items, setItems] = useState<StudioSavedBrush[]>([]);
+      return (
+        <StudioBrushLibraryPanel
+          currentSnapshot={snapshot}
+          brushes={items}
+          onBrushesChange={setItems}
+          onApplyBrush={vi.fn()}
+          onBrushDeleted={vi.fn()}
+          repositoryFactory={repositoryFactory}
+        />
+      );
+    }
+
+    const { container } = render(<Harness />);
+    await waitFor(() => expect(
+      container.querySelector("[data-studio-brush-library-authority]")
+        ?.getAttribute("data-studio-brush-library-authority"),
+    ).toBe("error"));
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "내 브러시 검색" }), {
+      target: { value: "복구" },
+    });
+
+    await waitFor(() => expect(
+      container.querySelector("[data-studio-brush-library-authority]")
+        ?.getAttribute("data-studio-brush-library-authority"),
+    ).toBe("sqlite"));
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(repositoryFactory).toHaveBeenCalledTimes(2);
+  });
+
   it("SQLite 비가용 메모리 세션을 비영속으로 표시하고 저장·무제한을 주장하지 않는다", async () => {
     const values = new Map<string, string>([
       [

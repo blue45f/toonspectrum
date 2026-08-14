@@ -519,6 +519,31 @@ function usesProductBrushLibraryRuntime(
 /** Test/session retry seam. The shared SQLite handle remains owned by its runtime. */
 export function resetProductBrushLibraryRepositoryRuntime(): void {
   sharedProductBrushLibraryPromise = null;
+  notifyStudioBrushLibraryChanged();
+}
+
+/**
+ * A different SQLite consumer can retry the shared DB while the brush opening is
+ * still resolving to its tab-lifetime fallback. Wait for that exact generation so
+ * a pending save cannot be orphaned between two memory repositories.
+ */
+export async function reconcileProductBrushLibraryRepositoryForDatabaseClose(
+  options: { readonly preserveMemorySession?: boolean } = {},
+): Promise<void> {
+  const opening = sharedProductBrushLibraryPromise;
+  if (!opening) return;
+  if (options.preserveMemorySession) {
+    try {
+      const product = await opening;
+      if (sharedProductBrushLibraryPromise !== opening) return;
+      if (product.authority === "memory-session") return;
+    } catch {
+      // The opening rejection path already clears this exact generation.
+    }
+  }
+  if (sharedProductBrushLibraryPromise === opening) {
+    resetProductBrushLibraryRepositoryRuntime();
+  }
 }
 
 export function openProductBrushLibraryRepository(
@@ -530,11 +555,14 @@ export function openProductBrushLibraryRepository(
   if (!sharedProductBrushLibraryPromise) {
     const opening = openProductBrushLibraryRepositoryInternal({});
     sharedProductBrushLibraryPromise = opening;
-    void opening.catch(() => {
-      if (sharedProductBrushLibraryPromise === opening) {
-        sharedProductBrushLibraryPromise = null;
-      }
-    });
+    void opening.then(
+      () => undefined,
+      () => {
+        if (sharedProductBrushLibraryPromise === opening) {
+          sharedProductBrushLibraryPromise = null;
+        }
+      },
+    );
   }
   return sharedProductBrushLibraryPromise;
 }

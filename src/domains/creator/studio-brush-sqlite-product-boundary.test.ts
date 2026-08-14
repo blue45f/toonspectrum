@@ -14,6 +14,14 @@ const mobileDockSource = readFileSync(
   new URL("./StudioMobileEditingDock.tsx", import.meta.url),
   "utf8",
 );
+const panelSource = readFileSync(
+  new URL("./StudioBrushLibraryPanel.tsx", import.meta.url),
+  "utf8",
+);
+const vrmPreferencesSource = readFileSync(
+  new URL("./studio-vrm-poser-preferences-sqlite.ts", import.meta.url),
+  "utf8",
+);
 
 describe("Studio brush-library SQLite product boundary", () => {
   it("hydrates the quick shelf from the same paged product repository as the library panel", () => {
@@ -29,6 +37,17 @@ describe("Studio brush-library SQLite product boundary", () => {
     for (const projection of [inspectorSource, mobileDockSource]) {
       expect(projection).toContain("repositoryFactory: openBrushLibraryRepository");
     }
+  });
+
+  it("delegates every projection access to the generation-aware product repository", () => {
+    expect(studioPageSource).not.toContain("brushRepositoryPromiseRef");
+    expect(panelSource).not.toContain("repositoryPromiseRef");
+    expect(studioPageSource).toContain(
+      "loadStudioBrushLibrarySqliteRepository().then(",
+    );
+    expect(panelSource).toContain("const repositoryPromise = repositoryFactory();");
+    expect(panelSource).toContain("return repositoryFactory();");
+    expect(vrmPreferencesSource).toContain("preserveBrushMemorySession: true");
   });
 
   it("commits apply metadata, undo, and menu import through the async repository", () => {

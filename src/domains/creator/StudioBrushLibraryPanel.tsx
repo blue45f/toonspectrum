@@ -273,7 +273,6 @@ export function StudioBrushLibraryPanel({
   const saveTriggerRef = useRef<HTMLButtonElement>(null);
   const renameReturnFocusRef = useRef<HTMLButtonElement | null>(null);
   const sectionRef = useRef<HTMLElement>(null);
-  const repositoryPromiseRef = useRef<Promise<ProductBrushLibraryRepository> | null>(null);
   const mutationClockRef = useRef<() => number>(Date.now);
   const pageGenerationRef = useRef(0);
   const loadedDepthRef = useRef(BRUSH_LIBRARY_PRODUCT_PAGE_SIZE);
@@ -300,8 +299,7 @@ export function StudioBrushLibraryPanel({
     let active = true;
     const generation = ++pageGenerationRef.current;
     setPageLoading(true);
-    const repositoryPromise = repositoryPromiseRef.current ?? repositoryFactory();
-    repositoryPromiseRef.current = repositoryPromise;
+    const repositoryPromise = repositoryFactory();
     void repositoryPromise
       .then(async (product) => {
         const page = await product.repository.query(
@@ -310,6 +308,7 @@ export function StudioBrushLibraryPanel({
         if (!active || generation !== pageGenerationRef.current) return;
         const stored = [...page.items];
         loadedDepthRef.current = Math.max(BRUSH_LIBRARY_PRODUCT_PAGE_SIZE, stored.length);
+        setError(null);
         setRepositoryAuthority(product.authority);
         setPageCursor(page.nextCursor);
         setHasMorePages(page.hasMore);
@@ -350,9 +349,7 @@ export function StudioBrushLibraryPanel({
   });
 
   function productRepository(): Promise<ProductBrushLibraryRepository> {
-    const repositoryPromise = repositoryPromiseRef.current ?? repositoryFactory();
-    repositoryPromiseRef.current = repositoryPromise;
-    return repositoryPromise;
+    return repositoryFactory();
   }
 
   function setRepositoryError(caught: unknown): void {
@@ -390,6 +387,7 @@ export function StudioBrushLibraryPanel({
     const stored = [...page.items];
     loadedDepthRef.current = retainedDepth;
     onBrushesChange(stored);
+    setError(null);
     setRepositoryAuthority(product.authority);
     setPageCursor(page.nextCursor);
     setHasMorePages(page.hasMore);

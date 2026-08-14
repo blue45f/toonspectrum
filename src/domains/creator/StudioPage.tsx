@@ -8911,16 +8911,13 @@ function StudioCuttoonEditor({
     brushProjectionGenerationRef.current += 1;
     setSavedBrushes(update);
   }, []);
-  const brushRepositoryPromiseRef = useRef<Promise<ProductBrushLibraryRepository> | null>(null);
-  const productBrushRepository = useCallback(() => {
-    const repository = brushRepositoryPromiseRef.current
-      ?? loadStudioBrushLibrarySqliteRepository().then(
-        ({ openProductBrushLibraryRepository }) =>
-          openProductBrushLibraryRepository(),
-      );
-    brushRepositoryPromiseRef.current = repository;
-    return repository;
-  }, []);
+  const productBrushRepository = useCallback(
+    () => loadStudioBrushLibrarySqliteRepository().then(
+      ({ openProductBrushLibraryRepository }) =>
+        openProductBrushLibraryRepository(),
+    ),
+    [],
+  );
   const refreshSavedBrushesFromRepository = useCallback(async (
     product?: ProductBrushLibraryRepository,
   ) => {

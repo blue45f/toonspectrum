@@ -139,7 +139,9 @@ export async function acquireProductStudioVrmPoserPreferencesRepository(): Promi
     const database = await databaseRuntime.acquireStudioLocalDatabase().catch(async (cause: unknown) => {
       // The shared DB runtime memoizes its open promise. Reset only when opening itself failed so
       // the visible retry action can recover from a transient OPFS/worker startup failure.
-      await databaseRuntime.closeStudioLocalDatabaseRuntime();
+      await databaseRuntime.closeStudioLocalDatabaseRuntime({
+        preserveBrushMemorySession: true,
+      });
       throw cause;
     });
     return createStudioVrmPoserPreferencesRepository(
