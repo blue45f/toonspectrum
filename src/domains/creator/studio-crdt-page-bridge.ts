@@ -546,27 +546,123 @@ export interface StudioCrdtSceneGraphAuthority {
   layerGroupIds: ReadonlySet<string>;
 }
 
-function withConvergedLayerGroup<TElement extends StudioCrdtCompatibleElement>(
-  element: TElement,
+/**
+ * The converged group membership of a CRDT-managed element is a pure function of its record's
+ * page/layer plus the currently reachable group keys — never of the element body. Materialization
+ * reuse below depends on that: only this verdict has to be recomputed when a group appears or is
+ * tombstoned, even if the element itself was untouched.
+ */
+function resolveConvergedGroupId(
   pageId: string,
   layerId: string,
   availableGroupKeys: ReadonlySet<string>
+): string | null {
+  try {
+    return layerId !== "page-root" &&
+      availableGroupKeys.has(studioCrdtLayerGroupKey(pageId, layerId))
+      ? layerId
+      : null;
+  } catch {
+    // Invalid/reserved layer identifiers converge to the page root.
+    return null;
+  }
+}
+
+function withConvergedGroupId<TElement extends StudioCrdtCompatibleElement>(
+  element: TElement,
+  groupId: string | null
 ): TElement {
   const next = { ...element } as TElement & { groupId?: string };
-  let valid: boolean;
-  try {
-    valid = layerId !== "page-root" &&
-      availableGroupKeys.has(studioCrdtLayerGroupKey(pageId, layerId));
-  } catch {
-    delete next.groupId;
-    return next;
-  }
-  if (valid) {
-    next.groupId = layerId;
-  } else {
-    delete next.groupId;
-  }
+  if (groupId === null) delete next.groupId;
+  else next.groupId = groupId;
   return next;
+}
+
+interface StudioCrdtMaterializedElementEntry {
+  id: string;
+  pageId: string;
+  layerId: string;
+  /** Only `reference` scene payloads read the local source; strokes/field payloads pass undefined. */
+  source: unknown;
+  groupId: string | null;
+  element: unknown;
+}
+
+/**
+ * Materialization memo keyed by the *record payload object itself*.
+ *
+ * `StudioCrdtDocument` decodes each record once, `deepFreeze`s it, and hands the very same frozen
+ * payload object out of `getStrokes()`/`getSceneElements()` until a transaction touches that record
+ * — at which point the cache is re-decoded into a brand new object. Payload identity is therefore
+ * already the document's own "this record did not change" signal; the record cache relies on that
+ * exact immutability for its own correctness. Reusing it here adds no new assumption, and it is
+ * conservative in the only direction that matters: an unrecognized or mutable payload simply
+ * rebuilds, exactly like today.
+ *
+ * A WeakMap keeps the memo bounded — a superseded payload becomes unreachable with its record.
+ */
+const STUDIO_CRDT_MATERIALIZED_ELEMENTS =
+  new WeakMap<object, StudioCrdtMaterializedElementEntry>();
+
+/**
+ * Frozen payload + frozen direct children. `deepFreeze` guarantees both; anything looser (a
+ * hand-built record in a test, a future decoder that forgets to freeze) fails this gate and is
+ * rebuilt from scratch. Cost is one pass over the payload's own keys — negligible next to copying
+ * `points` and eleven parallel sample channels.
+ */
+function isStableCrdtPayload(payload: object): boolean {
+  if (!Object.isFrozen(payload)) return false;
+  for (const value of Object.values(payload)) {
+    if (value !== null && typeof value === "object" && !Object.isFrozen(value)) return false;
+  }
+  return true;
+}
+
+/**
+ * Returns the converged element for an authoritative record, reusing the previously materialized
+ * object whenever the record demonstrably did not change.
+ *
+ * Reuse requires all of: the same frozen payload object, the same record identity/page/layer, and
+ * the same reference source. The source test accepts either the exact object the entry was built
+ * from or the entry's own output — `studioCrdtElementToSceneElement` is idempotent over its own
+ * result (it re-applies the same reference props, id, type and src onto a spread of the source),
+ * so a page whose element is already our previous output converges instead of oscillating.
+ *
+ * Group membership is the one thing allowed to change without a rebuild: when only the verdict
+ * moved, the cached body is re-converged, so a remote group create/tombstone still lands on an
+ * otherwise untouched element.
+ */
+function materializeConvergedCrdtElement<TElement extends StudioCrdtCompatibleElement>(
+  payload: object,
+  id: string,
+  pageId: string,
+  layerId: string,
+  source: unknown,
+  availableGroupKeys: ReadonlySet<string>,
+  build: () => TElement
+): TElement {
+  const groupId = resolveConvergedGroupId(pageId, layerId, availableGroupKeys);
+  if (!isStableCrdtPayload(payload)) return withConvergedGroupId(build(), groupId);
+  const cached = STUDIO_CRDT_MATERIALIZED_ELEMENTS.get(payload);
+  if (
+    cached && cached.id === id && cached.pageId === pageId && cached.layerId === layerId &&
+    (cached.source === source || cached.element === source)
+  ) {
+    if (cached.groupId === groupId) return cached.element as TElement;
+    const regrouped = withConvergedGroupId(cached.element as TElement, groupId);
+    STUDIO_CRDT_MATERIALIZED_ELEMENTS.set(payload, { ...cached, groupId, element: regrouped });
+    return regrouped;
+  }
+  const element = withConvergedGroupId(build(), groupId);
+  STUDIO_CRDT_MATERIALIZED_ELEMENTS.set(payload, {
+    id,
+    pageId,
+    layerId,
+    source,
+    groupId,
+    element,
+  });
+  return element;
 }
 
 /**
@@ -756,11 +852,15 @@ export function reconcileStudioCrdtSceneGraphPages<
       id: record.id,
       orderIndex: record.orderIndex,
       element: authoritative
-        ? withConvergedLayerGroup(
-          studioCrdtStrokeToDrawElement(record) as unknown as TElement,
+        ? materializeConvergedCrdtElement(
+          record.payload,
+          record.id,
           record.pageId,
           record.layerId,
-          availableGroupKeys
+          // studioCrdtStrokeToDrawElement reads only the record, never a local source.
+          undefined,
+          availableGroupKeys,
+          () => studioCrdtStrokeToDrawElement(record) as unknown as TElement
         )
         : source!.element,
     });
@@ -827,11 +927,14 @@ export function reconcileStudioCrdtSceneGraphPages<
       id: record.id,
       orderIndex: record.orderIndex,
       element: authoritative
-        ? withConvergedLayerGroup(
-          studioCrdtElementToSceneElement(record, source?.element) as TElement,
+        ? materializeConvergedCrdtElement(
+          record.payload,
+          record.id,
           record.pageId,
           record.layerId,
-          availableGroupKeys
+          source?.element,
+          availableGroupKeys,
+          () => studioCrdtElementToSceneElement(record, source?.element) as TElement
         )
         : source!.element,
     });
