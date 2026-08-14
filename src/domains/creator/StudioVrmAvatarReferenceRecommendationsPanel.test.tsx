@@ -67,6 +67,8 @@ function deferred<T>() {
 }
 
 function upload(name = "reference.png") {
+  const consent = screen.getByRole("checkbox", { name: /MediaPipe 분석/u });
+  if (!(consent as HTMLInputElement).checked) fireEvent.click(consent);
   const input = screen.getByLabelText("아바타 스타일 참고 이미지 선택");
   fireEvent.change(input, {
     target: { files: [new File([new Uint8Array([1, 2, 3])], name, { type: "image/png" })] },
@@ -74,19 +76,72 @@ function upload(name = "reference.png") {
 }
 
 describe("StudioVrmAvatarReferenceRecommendationsPanel", () => {
-  it("shows an honest unavailable state when no vetted preset catalogue is wired", () => {
+  it("requires explicit MediaPipe metadata consent before reading a reference image", async () => {
+    const analyzeImage = vi.fn(async () => receipt());
+    render(
+      <StudioVrmAvatarReferenceRecommendationsPanel
+        catalogue={catalogue()}
+        runtimeSupported
+        analyzeImage={analyzeImage}
+        onPreview={vi.fn()}
+        onApply={vi.fn()}
+      />,
+    );
+
+    const consent = screen.getByRole("checkbox", { name: /MediaPipe 분석/u });
+    const input = screen.getByLabelText("아바타 스타일 참고 이미지 선택");
+    const selectButton = screen.getByRole("button", { name: "참고 이미지 선택" });
+    expect((consent as HTMLInputElement).checked).toBe(false);
+    expect((input as HTMLInputElement).disabled).toBe(true);
+    expect((selectButton as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText(/이용·성능 메타데이터를 처리할 수 있습니다/u)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "MediaPipe API 약관" })).toBeTruthy();
+
+    fireEvent.change(input, {
+      target: { files: [new File([new Uint8Array([1])], "blocked.png", { type: "image/png" })] },
+    });
+    expect(analyzeImage).not.toHaveBeenCalled();
+
+    fireEvent.click(consent);
+    expect((input as HTMLInputElement).disabled).toBe(false);
+    upload();
+    await waitFor(() => expect(analyzeImage).toHaveBeenCalledOnce());
+  });
+
+  it("shows an honest unavailable state with an explicit retry", () => {
+    const onCatalogueRetry = vi.fn();
     render(
       <StudioVrmAvatarReferenceRecommendationsPanel
         catalogue={null}
+        catalogueStatus="unavailable"
+        catalogueUnavailableReason="추천 기준 파일을 안전하게 검증하지 못했습니다."
+        runtimeSupported
+        onCatalogueRetry={onCatalogueRetry}
+        onPreview={vi.fn()}
+        onApply={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("status").textContent).toContain("안전하게 검증하지 못했습니다");
+    expect(screen.queryByLabelText("아바타 스타일 참고 이미지 선택")).toBeNull();
+    expect(screen.getByText(/추천은 자동 적용되지 않습니다/u)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "추천 기준 다시 불러오기" }));
+    expect(onCatalogueRetry).toHaveBeenCalledOnce();
+  });
+
+  it("reports lazy catalogue loading without exposing an upload action early", () => {
+    render(
+      <StudioVrmAvatarReferenceRecommendationsPanel
+        catalogue={null}
+        catalogueStatus="loading"
         runtimeSupported
         onPreview={vi.fn()}
         onApply={vi.fn()}
       />,
     );
 
-    expect(screen.getByRole("status").textContent).toContain("기준 임베딩이 아직 연결되지 않아");
+    expect(screen.getByRole("status").textContent).toContain("추천 기준을 불러오는 중");
     expect(screen.queryByLabelText("아바타 스타일 참고 이미지 선택")).toBeNull();
-    expect(screen.getByText(/추천은 자동 적용되지 않습니다/u)).toBeTruthy();
   });
 
   it("reports a missing Worker/OffscreenCanvas runtime instead of falling back to heuristics", () => {
@@ -228,5 +283,70 @@ describe("StudioVrmAvatarReferenceRecommendationsPanel", () => {
     await waitFor(() => expect(analyzeImage).toHaveBeenCalledOnce());
     view.unmount();
     expect(signal?.aborted).toBe(true);
+  });
+
+  it("revokes consent by aborting inference and clearing every transient result", async () => {
+    const pending = deferred<StudioVrmAvatarReferenceRecommendationReceipt>();
+    const onPreviewClear = vi.fn();
+    let signal: AbortSignal | undefined;
+    const analyzeImage = vi.fn((_file, _catalogue, options) => {
+      signal = options?.signal;
+      return pending.promise;
+    });
+    render(
+      <StudioVrmAvatarReferenceRecommendationsPanel
+        catalogue={catalogue()}
+        runtimeSupported
+        analyzeImage={analyzeImage}
+        onPreview={vi.fn()}
+        onPreviewClear={onPreviewClear}
+        onApply={vi.fn()}
+      />,
+    );
+
+    upload();
+    await waitFor(() => expect(analyzeImage).toHaveBeenCalledOnce());
+    const consent = screen.getByRole("checkbox", { name: /MediaPipe 분석/u });
+    fireEvent.click(consent);
+
+    expect(signal?.aborted).toBe(true);
+    expect(onPreviewClear).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText("reference.png")).toBeNull();
+    expect((screen.getByRole("button", { name: "참고 이미지 선택" }) as HTMLButtonElement).disabled)
+      .toBe(true);
+  });
+
+  it("aborts and clears an in-flight image when the hidden Forge surface releases its catalogue", async () => {
+    const pending = deferred<StudioVrmAvatarReferenceRecommendationReceipt>();
+    let signal: AbortSignal | undefined;
+    const analyzeImage = vi.fn((_file, _catalogue, options) => {
+      signal = options?.signal;
+      return pending.promise;
+    });
+    const view = render(
+      <StudioVrmAvatarReferenceRecommendationsPanel
+        catalogue={catalogue()}
+        catalogueStatus="ready"
+        runtimeSupported
+        analyzeImage={analyzeImage}
+        onPreview={vi.fn()}
+        onApply={vi.fn()}
+      />,
+    );
+    upload();
+    await waitFor(() => expect(analyzeImage).toHaveBeenCalledOnce());
+
+    view.rerender(
+      <StudioVrmAvatarReferenceRecommendationsPanel
+        catalogue={null}
+        catalogueStatus="idle"
+        runtimeSupported
+        analyzeImage={analyzeImage}
+        onPreview={vi.fn()}
+        onApply={vi.fn()}
+      />,
+    );
+    expect(signal?.aborted).toBe(true);
+    expect(screen.queryByText("reference.png")).toBeNull();
   });
 });

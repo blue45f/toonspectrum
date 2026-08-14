@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
+import catalogueRuntimeSource from "./studio-vrm-avatar-reference-catalogue-runtime.ts?raw";
 import productSource from "./studio-vrm-avatar-reference-product.ts?raw";
 import panelSource from "./StudioVrmAvatarReferenceRecommendationsPanel.tsx?raw";
 import poserSource from "./StudioVrmPoser.tsx?raw";
+import hookSource from "./useStudioVrmAvatarReferenceCatalogue.ts?raw";
 
 function section(source: string, start: string, end: string): string {
   const startIndex = source.indexOf(start);
@@ -13,17 +15,30 @@ function section(source: string, start: string, end: string): string {
 }
 
 describe("Avatar reference recommendation product wiring", () => {
-  it("mounts the fail-closed recommendation panel on the real Avatar Forge screen", () => {
+  it("lazy-loads the verified catalogue only on the real Avatar Forge screen", () => {
     const forgePanel = section(
       poserSource,
       '<section\n                id="vrm-character-section-forge"',
       "<StudioVrmTexturePaintPanel",
     );
     expect(forgePanel).toContain("<StudioVrmAvatarReferenceRecommendationsPanel");
-    expect(forgePanel).toContain("STUDIO_VRM_AVATAR_REFERENCE_APPROVED_CATALOGUE");
+    expect(forgePanel).toContain("? avatarForgeReferenceCatalogue.catalogue");
+    expect(forgePanel).toContain("? avatarForgeReferenceCatalogue.status");
+    expect(forgePanel).toContain("onCatalogueRetry={avatarForgeReferenceCatalogue.retry}");
     expect(forgePanel).toContain("avatarForgeReferenceInteractionBlocked()");
-    expect(productSource).toContain("StudioVrmAvatarReferenceCatalogue | null = null");
-    expect(panelSource).toContain("검증된 프리셋 기준 임베딩이 아직 연결되지 않아");
+    expect(poserSource).toContain(
+      'open && activePanelTab === "character" && activeCharacterSection === "forge"',
+    );
+    expect(poserSource).toContain("active: avatarForgeReferenceSurfaceActive");
+    expect(forgePanel).toContain("avatarForgeReferenceSurfaceActive");
+    expect(hookSource).toContain("loadStudioVrmAvatarReferenceCatalogue");
+    expect(hookSource).toContain("controller.abort()");
+    expect(catalogueRuntimeSource).toContain('cache: "no-cache"');
+    expect(catalogueRuntimeSource).toContain('mode: "same-origin"');
+    expect(panelSource).toContain("추천 기준 다시 불러오기");
+    expect(panelSource).toContain("mediaPipeConsentGranted");
+    expect(panelSource).toContain("이용·성능 메타데이터를 처리할 수 있습니다");
+    expect(panelSource).toContain("MediaPipe API 약관");
   });
 
   it("keeps preview ephemeral, reversible, and outside full-state persistence", () => {
@@ -31,6 +46,8 @@ describe("Avatar reference recommendation product wiring", () => {
       "state={avatarForgeReferencePreviewActive?.state ?? avatarForgeState}",
     );
     expect(poserSource).toContain('&& !broadcastPreviewActive\n      ? avatarForgeReferencePreview');
+    expect(poserSource).toContain("avatarForgeReferencePreview.catalogueRevision");
+    expect(poserSource).toContain("avatarForgeReferenceCatalogue.catalogueRevision");
     expect(poserSource).toContain("if (avatarForgeReferencePreviewActive) return false");
     expect(poserSource).toContain("onPreviewClear={() => setAvatarForgeReferencePreview(null)}");
     expect(panelSource).toContain("아직 프로젝트와 되돌리기 기록에는 반영되지 않았습니다");
@@ -54,9 +71,10 @@ describe("Avatar reference recommendation product wiring", () => {
   });
 
   it("pins catalogue generation to the tracked VRM and every canonical preset state", () => {
-    expect(productSource).toContain("sourceByteLength: 15_096_320");
+    expect(productSource).toContain('sourceUrl: "/vrm/TS_Minseo_Campus.vrm"');
+    expect(productSource).toContain("sourceByteLength: 463_276");
     expect(productSource).toContain(
-      "b86b0b8a66d48911431d6f920a5211a974226f83aa672eca3f3dfade58ac346e",
+      "d361aa40f6da91da167631f4cc0357b0a2c5c2d286684688ab787f0991a6c9c0",
     );
     expect(productSource).toContain("studioVrmAvatarReferencePresetStateSha256");
     expect(productSource).toContain("referenceImageSha256");

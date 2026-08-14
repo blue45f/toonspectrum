@@ -187,6 +187,8 @@ describe("PolicyArticle", () => {
 
     expect(doc.source).toBe("static");
     expect(html).toContain("1. 수집하는 항목");
+    expect(html).toContain("기기 내 AI 기능과 MediaPipe");
+    expect(html).toContain("이용·성능 메타데이터");
     expect(html).toContain("내장 정책 사본");
     expect(html).toContain("TermsDesk에서 원문·버전 이력 보기");
     expect(html).toContain(policyPublicUrl("privacy-policy"));
