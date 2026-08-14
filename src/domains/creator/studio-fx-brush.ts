@@ -1324,6 +1324,45 @@ export type FxOilPlanInput = {
   maxDabs?: number;
 };
 
+/**
+ * Bristle load along travel.
+ *
+ * `tooth` gates the bimodal loaded/dry split below. Sampling it as `hash2(si, ...)` made it
+ * INDEPENDENT at every station: one hair measured 0.641, 0.677, 0.025, 0.030, 0.032, 0.704, 0.022
+ * ... with a lag-1 autocorrelation of -0.03, i.e. white noise. A real bristle depletes gradually,
+ * so a hair that flips loaded->dry->loaded between adjacent stations rasterises as a row of
+ * disconnected angular dashes rather than a continuous streak - the "각진 입자" the bed was
+ * reported for. Round caps, curve-smoothed lane paths and finer load banding were all rendered and
+ * all left it unchanged, because the artefact is in the load signal, not the rasteriser.
+ *
+ * Value noise over station index fixes the frequency without touching the amplitude: the knots are
+ * the same `hash2` draws over the same seed, so the loaded fraction and its range are preserved and
+ * texture is not reduced - only its wavelength grows to ~`STATIONS` stations, which is what keeps a
+ * hair loaded (or dry) for a stretch of travel the way a real one is.
+ */
+// 20 stations. Rendered against 7 and 12 on the same stroke: 7 still broke a hair into visible
+// segments, 20 carries one loaded streak across roughly a brush-width of travel before it depletes,
+// which is what reads as bristle drag instead of particles. Counted in stations rather than pixels
+// so the wavelength scales with dab spacing - a wider brush lays coarser stations and gets a
+// proportionally longer streak, and the value stays integer-deterministic for replay.
+const BRISTLE_LOAD_WAVELENGTH_STATIONS = 20;
+
+function bristleLoadAlongTravel(
+  stationIndex: number,
+  bristleIndex: number,
+  seed: number,
+): number {
+  const t = stationIndex / BRISTLE_LOAD_WAVELENGTH_STATIONS;
+  const knot = Math.floor(t);
+  const fraction = t - knot;
+  const key = 31 + bristleIndex * 7;
+  const start = hash2(knot, key, seed);
+  const end = hash2(knot + 1, key, seed);
+  // Smoothstep so the load has no corner at a knot; a linear ramp still reads as a crease.
+  const eased = fraction * fraction * (3 - 2 * fraction);
+  return start + (end - start) * eased;
+}
+
 export function planOilBrushDabs(input: FxOilPlanInput): FxOilDab[] {
   const points = sanitizePoints(input.points, input.pressures);
   if (points.length === 0) return [];
@@ -1378,7 +1417,7 @@ export function planOilBrushDabs(input: FxOilPlanInput): FxOilDab[] {
     const bristleOffsets = [-0.88, -0.58, -0.3, 0, 0.3, 0.58, 0.88];
     const bristles = bristleOffsets.map(
       (offsetRatio, bristleIndex): FxOilBristle => {
-        const tooth = hash2(si, 31 + bristleIndex * 7, seed);
+        const tooth = bristleLoadAlongTravel(si, bristleIndex, seed);
         // Contact widens under pressure: outer hairs only load once the stylus digs in.
         const edge = Math.abs(offsetRatio);
         const contact = clamp(

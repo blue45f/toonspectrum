@@ -85,7 +85,15 @@ describe("Studio oil/acrylic ribbon raster crossing quality", () => {
     expect(new Set(carrier.bristleLanes.map(({ loadBand }) => loadBand)).size)
       .toBe(carrier.bristleLanes.length);
     for (const lane of carrier.bristleLanes) {
-      expect(lane.runs.length).toBeGreaterThan(1);
+      // A lane must deposit something, but it is NOT required to be fragmented. The old
+      // `> 1` bound encoded the white-noise load model, where a hair flipped loaded/dry every
+      // station and therefore always split across several runs. Load now varies smoothly along
+      // travel (studio-fx-brush bristleLoadAlongTravel), so a hair that stays loaded across this
+      // short figure-eight legitimately merges into ONE contiguous run - that continuity is the
+      // fix, not a regression. The once-per-band guarantee this test exists for is the loadBand
+      // uniqueness assertion above plus the luminance knot probe below, neither of which cares
+      // how many subpaths a band is drawn from.
+      expect(lane.runs.length).toBeGreaterThan(0);
       expect(lane.opacity).toBeGreaterThan(0);
     }
   });
