@@ -1,7 +1,7 @@
 {
   "schema": "toonspectrum.bundle-baseline/1",
-  "recordedAt": "2026-08-13T17:13:32.341Z",
-  "note": "Last accepted measurement of scripts/check-studio-bundle.mjs. Regressions beyond the tolerance fail the build; see docs/perf/bundle-gate.md. Regenerate with UPDATE_BUNDLE_BASELINE=1 node scripts/check-studio-bundle.mjs.",
+  "recordedAt": "2026-08-14T01:39:31.057Z",
+  "note": "Last accepted measurement of scripts/check-studio-bundle.mjs. Regressions beyond the tolerance fail the build; see docs/perf/bundle-gate.md. Regenerate with UPDATE_BUNDLE_BASELINE=1 node scripts/check-studio-bundle.mjs. 2026-08-14: re-measured on the brush-quality wave rebased onto main \u2014 the wave's dry-media kernels, carrier ribbons and verified-engine lanes cost ~100 KiB raw / ~33 KiB gzip on the studio route, which main's living-ink WGSL split does not offset.",
   "policy": {
     "byteTolerance": 0.02,
     "countTolerance": 0.02,
@@ -9,17 +9,17 @@
     "authority": "scripts/check-studio-bundle.mjs (this file records the values only)"
   },
   "static": {
-    "Studio route raw": 4996055,
-    "Studio route gzip": 1589332,
-    "StudioPage entry raw": 2005741,
-    "StudioPage entry gzip": 593984,
-    "Studio route after app shell raw": 4394721,
-    "Studio route after app shell gzip": 1399993,
-    "Studio route after app shell chunks": 197,
-    "app entry raw": 601334,
-    "app entry gzip": 189339,
-    "BG3D editor activation raw": 2777371,
-    "BG3D editor activation gzip": 821567,
+    "Studio route raw": 5098178,
+    "Studio route gzip": 1622389,
+    "StudioPage entry raw": 2005062,
+    "StudioPage entry gzip": 593551,
+    "Studio route after app shell raw": 4496789,
+    "Studio route after app shell gzip": 1433049,
+    "Studio route after app shell chunks": 198,
+    "app entry raw": 601389,
+    "app entry gzip": 189340,
+    "BG3D editor activation raw": 2777426,
+    "BG3D editor activation gzip": 821564,
     "BG3D editor activation chunks": 39,
     "BG3D shot-batch runtime after editor raw": 113533,
     "BG3D shot-batch runtime after editor gzip": 33902,
@@ -34,7 +34,7 @@
     "BG3D PSD Worker gzip": 83718,
     "BG3D physics Worker raw": 2312023,
     "BG3D physics Worker gzip": 853424,
-    "Studio route chunks": 206,
+    "Studio route chunks": 207,
     "app entry chunks": 9
   },
   "runtime": {
