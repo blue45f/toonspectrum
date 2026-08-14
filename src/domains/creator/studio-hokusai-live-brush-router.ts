@@ -118,6 +118,16 @@ export const STUDIO_HOKUSAI_LIVE_AUTO_ROUTE_POLICY = Object.freeze({
    * gate as pencil/charcoal/oil. Kept as a declared, typed field rather than deleted: withholding
    * a family is a normal outcome of that gate, and a future preset lands here before it lands
    * above.
+   *
+   * SCOPE, so this list is not misread as a production claim: being eligible here is necessary but
+   * NOT sufficient to paint with the WASM engine. Production admission runs through
+   * `resolveStudioHokusaiProductLiveAdmission`, which additionally requires an entry in
+   * STUDIO_HOKUSAI_PRODUCT_PROMOTED_PRESETS - and that list is empty, because the committed
+   * full-size comparison failed both visual parity and the 1.2x throughput gate. So the normal
+   * shelf still starts no Hokusai stroke for ANY identity, these eleven included. What eligibility
+   * buys them is the explicit experimental surface: before this they were refused there too
+   * ("identity-not-supported"); now an explicit opt-in reaches the real engine instead of a
+   * refusal. Automatic routing for every identity stays gated on new full-size evidence.
    */
   withheldSpecialistIdentities: Object.freeze(
     [] as ReadonlyArray<Readonly<{

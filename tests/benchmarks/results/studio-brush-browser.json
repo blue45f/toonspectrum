@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "measuredAt": "2026-08-14T05:17:56.290Z",
+  "measuredAt": "2026-08-14T17:48:13.918Z",
   "command": "pnpm run verify:studio-brushes",
   "status": "pass",
   "catalog": {
@@ -35,8 +35,8 @@
     "passed": 163,
     "total": 163,
     "totalSegmentsPerTool": 6,
-    "continuousPolicyTools": 151,
-    "discretePolicyTools": 12,
+    "continuousPolicyTools": 150,
+    "discretePolicyTools": 13,
     "continuousMinimumVisibleSegments": 6,
     "discreteMinimumVisibleSegments": 4,
     "toolsBelowFullCoverage": 1,
@@ -44,9 +44,9 @@
     "undoPassed": 163,
     "representativePersistedPathDistancePx": 392.7396173371252,
     "qualityPolicyCounts": {
-      "strict-continuous": 137,
+      "strict-continuous": 136,
       "soft-wet-continuous": 14,
-      "record-only-discrete": 12
+      "record-only-discrete": 13
     },
     "errorCount": 0
   },
@@ -67,12 +67,12 @@
   },
   "pointerUpDurability": {
     "receiptMarkerReason": "pointerup",
-    "receiptSettledInMs": 43.13,
+    "receiptSettledInMs": 6.65,
     "receiptStrokeCount": 1,
     "survivorMarkerReason": "pointerup",
     "survivorStrokeCount": 2,
     "unloadPromptHeldMs": 150,
-    "navigationIssuedInMs": 0.95,
+    "navigationIssuedInMs": 0.3,
     "unloadGuardShown": true,
     "payloadContainsEveryStroke": true,
     "recoveryBannerShown": true,

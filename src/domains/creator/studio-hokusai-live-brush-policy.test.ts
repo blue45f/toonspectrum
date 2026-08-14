@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import { BRUSH_PRESETS } from "./studio-brush";
+import {
+  resolveStudioHokusaiProductLiveAdmission,
+} from "./studio-brush-backend-quality-policy";
 import { STUDIO_BRUSH_PACK_DESCRIPTORS } from "./studio-brush-pack-index";
 import { materializeAllStudioBrushPackSelections } from "./studio-brush-pack-runtime";
 import {
@@ -305,6 +308,26 @@ describe("Studio Hokusai auto-route catalogue quality policy", () => {
     }
     expect(STUDIO_HOKUSAI_LIVE_AUTO_ROUTE_POLICY.withheldSpecialistIdentities)
       .toHaveLength(0);
+
+    // Eligibility is not production routing, and this test exists so the two never get conflated.
+    // resolveStudioHokusaiProductLiveAdmission additionally requires a promoted-preset entry, and
+    // that list is empty while the full-size comparison fails parity/throughput - so the normal
+    // shelf starts no WASM stroke for ANY identity. Eligibility only changes what an EXPLICIT
+    // experimental opt-in gets: a real engine stroke instead of "identity-not-supported".
+    for (const brushId of ["calligraphy", "marker", "pencil", "charcoal", "oil"]) {
+      expect(resolveStudioHokusaiProductLiveAdmission({ brushId }), brushId)
+        .toMatchObject({
+          status: "blocked",
+          reason: "fullsize-quality-gate-failed",
+        });
+      expect(
+        resolveStudioHokusaiProductLiveAdmission({
+          brushId,
+          explicitExperimentalOptIn: true,
+        }),
+        brushId,
+      ).toMatchObject({ status: "admitted", mode: "experimental-explicit-opt-in" });
+    }
     expect(resolveStudioHokusaiLiveAutoRouteDecision("dry-media", "pencil"))
       .toEqual({
         status: "rejected",
