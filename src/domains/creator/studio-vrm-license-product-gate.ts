@@ -5,6 +5,7 @@ import {
 } from "./studio-vrm-license-metadata";
 import {
   evaluateStudioVrmLicenseAction,
+  STUDIO_VRM_CC0_1_PUBLIC_DOMAIN_URL,
   type StudioVrmLicenseAction,
   type StudioVrmLicenseActionContext,
   type StudioVrmLicenseActionPolicy,
@@ -510,6 +511,7 @@ function platformLicenseForRenderedPose(
   receipt: StudioVrmLicenseMetadataReceipt,
   context: StudioVrmRenderedPoseMarketplaceShareContext,
 ): CreatorAssetLicenseId | null {
+  if (receipt.additionalLicenseUrl === STUDIO_VRM_CC0_1_PUBLIC_DOMAIN_URL) return "cc0-1.0";
   if (receipt.licenseIdentifier === "CC0") return "cc0-1.0";
   if (receipt.licenseIdentifier === "CC_BY") return "cc-by-4.0";
   if (receipt.licenseIdentifier === "CC_BY_NC") return "cc-by-nc-4.0";

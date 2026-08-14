@@ -87,6 +87,8 @@ CHARACTERS = (
         "accent": (0.72, 0.18, 0.12, 1.0),
         "hair": (0.10, 0.055, 0.025, 1.0),
         "style": "explorer",
+        "allow_excessively_violent_usage": False,
+        "allow_excessively_sexual_usage": False,
     },
     {
         "file": "TS_Yeonhui_RuneGuard.vrm",
@@ -547,8 +549,8 @@ def configure_vrm(armature, spec):
     meta.allow_redistribution = True
     meta.modification = "allowModificationRedistribution"
     meta.other_license_url = CC0_LICENSE_URL
-    meta.allow_excessively_violent_usage = True
-    meta.allow_excessively_sexual_usage = True
+    meta.allow_excessively_violent_usage = spec.get("allow_excessively_violent_usage", True)
+    meta.allow_excessively_sexual_usage = spec.get("allow_excessively_sexual_usage", True)
     meta.allow_political_or_religious_usage = True
     meta.allow_antisocial_or_hate_usage = False
 
@@ -618,9 +620,17 @@ def generate_character(spec):
 
 
 def main():
-    for character in CHARACTERS:
+    selected_file = bpy.context.scene.get("toonspectrum_vrm_character_file")
+    selected_characters = tuple(
+        character
+        for character in CHARACTERS
+        if not selected_file or character["file"] == selected_file
+    )
+    if selected_file and not selected_characters:
+        raise ValueError("Unknown ToonSpectrum VRM character file: " + str(selected_file))
+    for character in selected_characters:
         generate_character(character)
-    print("VRM_PACK_COMPLETE " + str(len(CHARACTERS)))
+    print("VRM_PACK_COMPLETE " + str(len(selected_characters)))
 
 
 if __name__ == "__main__":

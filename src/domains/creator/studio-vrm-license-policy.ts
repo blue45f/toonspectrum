@@ -14,6 +14,8 @@ export const STUDIO_VRM_LICENSE_ACTIONS = [
 export type StudioVrmLicenseAction = (typeof STUDIO_VRM_LICENSE_ACTIONS)[number];
 export type StudioVrmLicenseDecision = "allow" | "warn" | "block" | "unknown";
 export type StudioVrmPublisherKind = "individual" | "corporation" | "unknown";
+export const STUDIO_VRM_CC0_1_PUBLIC_DOMAIN_URL =
+  "https://creativecommons.org/publicdomain/zero/1.0/";
 export type StudioVrmAvatarActorBasis =
   | "author"
   | "separately-licensed-person"
@@ -188,8 +190,10 @@ function applyMetadataAuthority(
     );
   }
 
+  const hasUnreviewedAdditionalLicense = receipt.additionalLicenseUrl !== null
+    && receipt.additionalLicenseUrl !== STUDIO_VRM_CC0_1_PUBLIC_DOMAIN_URL;
   if (
-    receipt.additionalLicenseUrl
+    hasUnreviewedAdditionalLicense
     || receipt.additionalPermissionUrl
     || receipt.thirdPartyLicenses
   ) {

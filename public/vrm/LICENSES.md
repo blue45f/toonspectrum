@@ -36,7 +36,7 @@ ToonSpectrum은 이 9개 원본 모델을 **CC0 1.0**으로 제공합니다.
 | `TS_Minseo_Campus.vrm` | 민서 (캠퍼스 메이커) | 현대·캠퍼스, 평균 체형 | ToonSpectrum 오리지널 · CC0 1.0 |
 | `TS_Taeo_Barista.vrm` | 태오 (동네 바리스타) | 현대·카페, 넓고 풍부한 체형 | ToonSpectrum 오리지널 · CC0 1.0 |
 | `TS_Jeonghwa_Gardener.vrm` | 정화 (노년 정원사) | 노년, 정원·일상 장면 | ToonSpectrum 오리지널 · CC0 1.0 |
-| `TS_Haram_Explorer.vrm` | 하람 (어린 탐험가) | 아동, 중성적 탐험가 | ToonSpectrum 오리지널 · CC0 1.0 |
+| `TS_Haram_Explorer.vrm` | 하람 (어린 탐험가) | 아동, 중성적 탐험가 · 과도한 폭력/성적 이용 금지 | ToonSpectrum 오리지널 · CC0 1.0, VRM 이용 제한 적용 |
 | `TS_Yeonhui_RuneGuard.vrm` | 연휘 (룬 수호자) | 판타지, 어두운 피부톤, 중성적 수호자 | ToonSpectrum 오리지널 · CC0 1.0 |
 | `TS_Nova_ServiceAndroid.vrm` | 노바 (서비스 안드로이드) | SF·로봇, 발광 얼굴 패널 | ToonSpectrum 오리지널 · CC0 1.0 |
 | `cyber_agent_zero.vrm` | 사이버 에이전트 제로 | SF·성인, 바이저·발광 코어·기계식 어깨 | ToonSpectrum 오리지널 · CC0 1.0 |
@@ -50,6 +50,7 @@ ToonSpectrum은 이 9개 원본 모델을 **CC0 1.0**으로 제공합니다.
 - 서진의 휠체어는 캐릭터의 일부로 고정하지 않았습니다. 스튜디오에서 별도 휠체어 프롭을 배치하면
   교체·회전·포즈 조절이 가능하고, VRM 자체도 다른 좌석이나 장면에 재사용할 수 있습니다.
 - 외부 URI: 없음. 메시·재질·권리 메타데이터는 각 `.vrm` 안에 포함됩니다.
+- 하람 모델은 아동 캐릭터 안전정책에 따라 VRM 메타데이터에서도 과도한 폭력 및 과도한 성적 이용을 명시적으로 허용하지 않습니다.
 - CC0 원문: <https://creativecommons.org/publicdomain/zero/1.0/>
 
 - VRoid 공식 샘플(구 베타 포함) 모음 출처: <https://github.com/madjin/vrm-samples> (pixiv/VRoid 프로젝트가 배포한 샘플을 모아 둔 저장소).
