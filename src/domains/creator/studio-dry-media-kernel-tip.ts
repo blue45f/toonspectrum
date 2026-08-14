@@ -217,7 +217,13 @@ interface KernelTipShaping {
   readonly cut: number;
   readonly gamma: number;
   readonly gain: number;
-  /** Radial width of the hard rim shoulder; long soft skirts read blurrier than the union edge. */
+  /**
+   * Radial width of the hard rim shoulder; long soft skirts read blurrier than the union edge.
+   * It only bites where the kernel still has coverage at `radial > 1 - rimShoulder`. Materials
+   * whose kernel already falls to zero inside that radius (crayon reaches 0 by radial 0.85) are
+   * unaffected by it at any value in that range — their outer falloff is set by `cut`, `gain` and
+   * the `band` envelope instead, so tune those rather than this.
+   */
   readonly rimShoulder: number;
   /**
    * Optional minor-axis fibre band (wax sticks only). The union carrier drew each fibre at
@@ -242,6 +248,12 @@ const KERNEL_TIP_SHAPING: Readonly<Record<StudioDryMediaCoreId, KernelTipShaping
   crayon: Object.freeze({
     cut: 0.3,
     gamma: 1,
+    // Unlike every sibling, this bake never reaches full pigment anywhere: 0% of its live texels,
+    // body mean 0.68, against 100% for chalk/charcoal/pastel and 74% for oil-pastel. The bed
+    // reaches its density through overlapping fibres and `depositionLinearize` instead. Raising
+    // this tightens the silhouette further (1.8 measured halo 702 -> 525 px, interior mean
+    // 0.623 -> 0.651) but trades measured tooth variance away for it, so it stays at 1.5 while
+    // the edge gate is met.
     gain: 1.5,
     rimShoulder: 0.1,
     band: Object.freeze({ zeroAt: 0.72, shoulder: 0.14 }),
