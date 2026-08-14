@@ -81,7 +81,6 @@ import {
   type StudioFigmaSelectionLayoutPatch,
 } from "./studio-figma-selection-ux";
 import { type FilterMaskPaintMode } from "./studio-filter-mask";
-import { type StudioFilterKind } from "./studio-filter-menu";
 import { legacyTextGradientToSpec } from "./studio-gradient-engine";
 import { type HealCloneMode } from "./studio-heal-clone";
 import { openStudioHelpCenter } from "./studio-help-center-channel";
@@ -130,6 +129,7 @@ import {
   StudioBubbleTailControls,
   StudioColorPalettePanel,
   StudioCropPanel,
+  StudioCustomFontsPanel,
   StudioAutoColorHintsPanel,
   StudioDrawingPaletteStack,
   StudioFloodFillPanel,
@@ -141,10 +141,12 @@ import {
   StudioIsometricGridPanel,
   StudioLayerMaskPanel,
   StudioLayerNavigator,
+  StudioLineCleanupPanel,
   StudioLiquifyPanel,
   StudioPatternFillPanel,
   StudioPerspectivePanel,
   StudioPuppetWarpPanel,
+  StudioQuickMaskPanel,
   StudioQuickShapePanel,
   StudioSelectionToolsPanel,
   StudioShapePickerGrid,
@@ -210,7 +212,6 @@ import { normalizeTextPath, type TextPathConfig } from "./studio-text-path";
 import { type StudioViewRotation } from "./studio-view-controls";
 import { StudioBgRemoveButton } from "./StudioBgRemoveButton";
 import { StudioCommandSearchHost } from "./StudioCommandSearchHost";
-import { StudioCustomFontsPanel } from "./StudioCustomFontsPanel";
 import { StudioFigmaDesignPanel } from "./StudioFigmaDesignPanel";
 import {
   StudioHokusaiNaturalMediaInspectorMount,
@@ -235,13 +236,11 @@ import {
   StudioInspectorPublishPanel,
 } from "./StudioInspectorUtilityPanels";
 import { StudioPanelLoading } from "./StudioLazySurfaceFallback";
-import { StudioLineCleanupPanel } from "./StudioLineCleanupPanel";
 import { StudioLineCorrectionControls } from "./StudioLineCorrectionControls";
 import { StudioMagicWandPanel } from "./StudioMagicWandPanel";
 import { StudioMinimapViewportBox } from "./StudioMinimapViewportBox";
 import { StudioMobileSheetHandle } from "./StudioMobileSheetHandle";
 import { StudioProceduralArtisticBrushInspectorSection } from "./StudioProceduralArtisticBrushInspectorSection";
-import { StudioQuickMaskPanel } from "./StudioQuickMaskPanel";
 import {
   StudioInspectorFilterLauncher,
   StudioInspectorPixelSelectionLauncher,
@@ -261,6 +260,7 @@ import type {
   StudioBrushDefaultRestoreDirection,
   StudioBrushDefaultRestoreTransaction,
 } from "./studio-brush-default-restore";
+import type { StudioFilterKind } from "./studio-filter-menu"; // keep type-only: inline `import { type X }` still emits a live import and drags the filter pack into launch
 import type { StudioScrollViewportStore } from "./studio-scroll-viewport-store";
 import type { StudioLayerNavigatorAction } from "./StudioLayerNavigator";
 import type { StudioMobileSheet } from "./StudioMobileEditingDock";

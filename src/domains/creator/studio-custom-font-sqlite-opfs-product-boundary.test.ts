@@ -10,8 +10,14 @@ describe("/studio custom-font V12 product authority boundary", () => {
   it("mounts the once-dormant panel in the existing lazy typography inspector", () => {
     const inspector = source("./StudioInspectorAside.tsx");
     const page = source("./StudioPage.tsx");
+    const lazyRegistry = source("./studio-page-lazy-ui.ts");
 
-    expect(inspector).toContain('import { StudioCustomFontsPanel } from "./StudioCustomFontsPanel"');
+    // The panel only renders for a selected text element, so it sits one boundary deeper than the
+    // inspector itself: the inspector consumes it from the lazy registry instead of pulling the
+    // font manager (and studio-custom-fonts) into every Studio launch.
+    expect(lazyRegistry).toContain('import("./StudioCustomFontsPanel")');
+    expect(inspector).toContain("StudioCustomFontsPanel,");
+    expect(inspector).not.toContain('from "./StudioCustomFontsPanel"');
     expect(inspector).toContain("<StudioCustomFontsPanel");
     expect(inspector).toContain('sectionId="element.typography"');
     expect(inspector).toContain("patchEl(selected.id, { font }");
