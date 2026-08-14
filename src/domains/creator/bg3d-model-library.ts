@@ -210,6 +210,20 @@ export interface Bg3dModelImportItem {
   readonly expectedSha256?: string;
 }
 
+export interface Bg3dModelAtomicImportDispositionV12 {
+  readonly kind: "toonspectrum-bg3d-model-atomic-import";
+  readonly version: 1;
+  readonly manifestRevision: number;
+  readonly records: readonly Bg3dVerifiedStoredRecord[];
+  /** Exact manifest identities added by this import; deduplicated rows are never included. */
+  readonly created: readonly {
+    readonly id: string;
+    readonly contentHash: `sha256:${string}`;
+  }[];
+  /** Durable delete evidence removed by the import and restored if project apply fails. */
+  readonly removedDeletions: readonly Bg3dModelDeletionReceipt[];
+}
+
 export interface Bg3dModelVerificationOptions {
   readonly profile?: StudioBg3dGlbProfile;
   readonly budgets?: StudioBg3dGlbBudgetProfiles;
@@ -1470,6 +1484,9 @@ export const BG3D_MODEL_LIBRARY_V12_MAX_TOTAL_BYTES = 4 * 1024 * 1024 * 1024;
 export const BG3D_MODEL_LIBRARY_V12_MAX_DELETION_RECEIPTS = 2_048;
 export const BG3D_MODEL_LIBRARY_V12_MAX_MANIFEST_BYTES = 8 * 1024 * 1024;
 
+const LIVE_V12_ATOMIC_IMPORTS = new WeakSet<object>();
+const V12_ATOMIC_IMPORT_AUTHORITIES = new WeakMap<object, StudioBg3dLibrariesAuthority>();
+
 const V12_MODEL_MANIFEST_KEYS = [
   "kind",
   "version",
@@ -1862,12 +1879,25 @@ export async function resolveBg3dModelHashV12(
   };
 }
 
-export async function importVerifiedBg3dModelsAtomicallyV12(
+export async function importVerifiedBg3dModelsAtomicallyWithDispositionV12(
   inputs: readonly (Bg3dModelUploadSource | Bg3dModelImportItem)[],
   options: Bg3dModelVerificationOptions & Bg3dModelV12StorageOptions = {},
-): Promise<Bg3dVerifiedStoredRecord[]> {
-  if (inputs.length === 0) return [];
+): Promise<Bg3dModelAtomicImportDispositionV12> {
   const authority = v12Authority(options);
+  if (inputs.length === 0) {
+    const current = parseV12ModelManifest(await authority.readManifest("models"));
+    const empty = Object.freeze({
+      kind: "toonspectrum-bg3d-model-atomic-import" as const,
+      version: 1 as const,
+      manifestRevision: current.revision,
+      records: Object.freeze([]) as readonly Bg3dVerifiedStoredRecord[],
+      created: Object.freeze([]) as Bg3dModelAtomicImportDispositionV12["created"],
+      removedDeletions: Object.freeze([]) as readonly Bg3dModelDeletionReceipt[],
+    });
+    LIVE_V12_ATOMIC_IMPORTS.add(empty);
+    V12_ATOMIC_IMPORT_AUTHORITIES.set(empty, authority);
+    return empty;
+  }
   const initial = parseV12ModelManifest(await authority.readManifest("models"));
   const existingByHash = new Map(initial.records.map((record) => [record.contentHash, record]));
   const occupiedIds = new Set(initial.records.map(({ id }) => id));
@@ -1896,11 +1926,12 @@ export async function importVerifiedBg3dModelsAtomicallyV12(
     }
   }
   throwIfBg3dOperationAborted(options.signal);
-  return authority.mutate("models", v12ManifestRefs, async (context) => {
+  const disposition = await authority.mutate("models", v12ManifestRefs, async (context) => {
     const current = parseV12ModelManifest(context.currentRaw);
     const byHash = new Map(current.records.map((record) => [record.contentHash, record]));
     const byId = new Map(current.records.map((record) => [record.id, record]));
     const emitted = new Map<string, Bg3dVerifiedStoredRecord>();
+    const created: Array<{ readonly id: string; readonly contentHash: `sha256:${string}` }> = [];
     for (const prepared of preparedByHash.values()) {
       const duplicate = byHash.get(prepared.contentHash);
       if (duplicate) {
@@ -1918,6 +1949,7 @@ export async function importVerifiedBg3dModelsAtomicallyV12(
       byHash.set(stored.contentHash, stored);
       byId.set(stored.id, stored);
       emitted.set(stored.contentHash, prepared);
+      created.push(Object.freeze({ id: stored.id, contentHash: stored.contentHash }));
     }
     const records = [...byId.values()];
     if (
@@ -1926,6 +1958,9 @@ export async function importVerifiedBg3dModelsAtomicallyV12(
         BG3D_MODEL_LIBRARY_V12_MAX_TOTAL_BYTES
     ) throw createLibraryError("storage-unavailable");
     const importedHashes = new Set(preparedByHash.keys());
+    const removedDeletions = current.deletions
+      .filter(({ contentHash }) => importedHashes.has(contentHash))
+      .map((receipt) => Object.freeze({ ...receipt }));
     const next = canonicalV12Manifest({
       ...current,
       revision: current.revision + 1,
@@ -1943,9 +1978,77 @@ export async function importVerifiedBg3dModelsAtomicallyV12(
         result.push("blob" in record ? record : await hydrateV12ModelRecord(record, authority));
       }
     }
-    return { nextRaw: serializeV12ModelManifest(next), nextRefs: v12ManifestRefs(
-      serializeV12ModelManifest(next),
-    ), result };
+    const nextRaw = serializeV12ModelManifest(next);
+    return {
+      nextRaw,
+      nextRefs: v12ManifestRefs(nextRaw),
+      result: {
+        kind: "toonspectrum-bg3d-model-atomic-import" as const,
+        version: 1 as const,
+        manifestRevision: next.revision,
+        records: Object.freeze(result),
+        created: Object.freeze(created),
+        removedDeletions: Object.freeze(removedDeletions),
+      },
+    };
+  }, options.signal);
+  const frozen = Object.freeze(disposition);
+  LIVE_V12_ATOMIC_IMPORTS.add(frozen);
+  V12_ATOMIC_IMPORT_AUTHORITIES.set(frozen, authority);
+  return frozen;
+}
+
+export async function importVerifiedBg3dModelsAtomicallyV12(
+  inputs: readonly (Bg3dModelUploadSource | Bg3dModelImportItem)[],
+  options: Bg3dModelVerificationOptions & Bg3dModelV12StorageOptions = {},
+): Promise<Bg3dVerifiedStoredRecord[]> {
+  return [...(await importVerifiedBg3dModelsAtomicallyWithDispositionV12(inputs, options)).records];
+}
+
+/**
+ * Failed-project-apply compensation for one exact import. A later manifest mutation, a different
+ * authority, a forged/replayed receipt, or any id/hash mismatch preserves the entire manifest.
+ */
+export async function compensateImportedBg3dModelsIfCreationMatchesV12(
+  disposition: Bg3dModelAtomicImportDispositionV12,
+  options: Bg3dModelV12StorageOptions & { readonly signal?: AbortSignal } = {},
+): Promise<boolean> {
+  if (!LIVE_V12_ATOMIC_IMPORTS.has(disposition)) return false;
+  LIVE_V12_ATOMIC_IMPORTS.delete(disposition);
+  const authority = v12Authority(options);
+  if (V12_ATOMIC_IMPORT_AUTHORITIES.get(disposition) !== authority) return false;
+  V12_ATOMIC_IMPORT_AUTHORITIES.delete(disposition);
+  if (disposition.created.length === 0 && disposition.removedDeletions.length === 0) return true;
+  const createdById = new Map(disposition.created.map((entry) => [entry.id, entry.contentHash]));
+  if (createdById.size !== disposition.created.length) return false;
+  return authority.mutate("models", v12ManifestRefs, async (context) => {
+    const current = parseV12ModelManifest(context.currentRaw);
+    const matches = current.revision === disposition.manifestRevision
+      && disposition.created.every(({ id, contentHash }) =>
+        current.records.some((record) => record.id === id && record.contentHash === contentHash)
+      )
+      && disposition.removedDeletions.every(({ id }) =>
+        !current.deletions.some((receipt) => receipt.id === id)
+      );
+    if (!matches) {
+      const currentRaw = serializeV12ModelManifest(current);
+      return { nextRaw: currentRaw, nextRefs: v12ManifestRefs(currentRaw), result: false };
+    }
+    const next = canonicalV12Manifest({
+      ...current,
+      revision: current.revision + 1,
+      updatedAt: context.now,
+      records: current.records.filter((record) => !createdById.has(record.id)),
+      thumbnails: current.thumbnails.filter((thumbnail) => !createdById.has(thumbnail.id)),
+      deletions: [
+        ...current.deletions.filter((receipt) =>
+          !disposition.removedDeletions.some((removed) => removed.id === receipt.id)
+        ),
+        ...disposition.removedDeletions,
+      ],
+    });
+    const nextRaw = serializeV12ModelManifest(next);
+    return { nextRaw, nextRefs: v12ManifestRefs(nextRaw), result: true };
   }, options.signal);
 }
 
@@ -2124,6 +2227,10 @@ export const getStoredBg3dModelByHash = getStoredBg3dModelByHashV12;
 export const getBg3dModelDeletionReceiptByHash = getBg3dModelDeletionReceiptByHashV12;
 export const resolveBg3dModelHash = resolveBg3dModelHashV12;
 export const importVerifiedBg3dModelsAtomically = importVerifiedBg3dModelsAtomicallyV12;
+export const importVerifiedBg3dModelsAtomicallyWithDisposition =
+  importVerifiedBg3dModelsAtomicallyWithDispositionV12;
+export const compensateImportedBg3dModelsIfCreationMatches =
+  compensateImportedBg3dModelsIfCreationMatchesV12;
 export const saveVerifiedBg3dModel = saveVerifiedBg3dModelV12;
 export const saveUploadedBg3dModel = saveUploadedBg3dModelV12;
 export const getStoredBg3dModel = getStoredBg3dModelV12;

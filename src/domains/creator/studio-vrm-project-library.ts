@@ -6,6 +6,15 @@ import {
 } from "./studio-project-archive";
 import { parseStudioProjectFile, type StudioProjectFile } from "./studio-project-file";
 import {
+  evaluateStudioVrmLicenseAuthority,
+  inspectStudioVrmLicenseAuthority,
+  prepareStudioVrmProjectArchiveAttestation,
+  studioVrmProjectArchiveActionContext,
+  type StudioVrmLicenseAuthority,
+  type StudioVrmProjectArchiveAttestationPlan,
+  type StudioVrmProjectArchiveUseContextReceipt,
+} from "./studio-vrm-license-product-gate";
+import {
   parseStudioVrmSceneDocument,
   serializeStudioVrmSceneDocument,
   type StudioVrmAttachmentModel,
@@ -13,12 +22,14 @@ import {
 } from "./studio-vrm-scene-document";
 import {
   canonicalizeVrmContentHash,
+  deleteStoredVrmModelIfIdentityMatches,
   ensureStoredVrmContentIdentity,
   getStoredVrmModelByHash,
   hashVrmBlob,
-  saveVerifiedVrmBlob,
-  validateVrmGlbBytes,
+  inspectVrmGlbBytes,
+  saveVerifiedVrmBlobWithDisposition,
   VRM_VALIDATION_VERSION,
+  type SaveVerifiedVrmBlobDisposition,
   type VrmContentHash,
   type VrmStoredModelRecord,
   type VrmStoredModelWithContentIdentity,
@@ -41,6 +52,7 @@ export type StudioVrmProjectLibraryDiagnosticCode =
   | "ATTACHMENT_MISSING"
   | "LOCAL_MODEL_BYTES_INVALID"
   | "LOCAL_MODEL_HASH_MISMATCH"
+  | "LOCAL_MODEL_LICENSE_RESTRICTED"
   | "LOCAL_MODEL_METADATA_CONFLICT"
   | "LOCAL_MODEL_MIME_MISMATCH"
   | "LOCAL_MODEL_NOT_FOUND"
@@ -52,6 +64,8 @@ export interface StudioVrmProjectLibraryDiagnostic {
   readonly message: string;
   readonly hash: VrmContentHash;
   readonly pointers: readonly string[];
+  /** Human-readable policy causes when a license gate—not byte integrity—blocked export. */
+  readonly policyReasons?: readonly string[];
 }
 
 export interface StudioVrmProjectArchiveReference {
@@ -68,6 +82,7 @@ export interface StudioVrmProjectArchiveReference {
 export type StudioVrmProjectArchiveMissingReason =
   | "bytes-invalid"
   | "hash-mismatch"
+  | "license-restricted"
   | "metadata-conflict"
   | "mime-mismatch"
   | "not-found"
@@ -77,6 +92,7 @@ export interface StudioVrmProjectArchiveMissingModel {
   readonly hash: VrmContentHash;
   readonly pointers: readonly string[];
   readonly reason: StudioVrmProjectArchiveMissingReason;
+  readonly policyReasons?: readonly string[];
 }
 
 export interface PrepareStudioVrmProjectArchiveExportResult {
@@ -92,23 +108,53 @@ export interface StudioVrmProjectLibraryDependencies {
     record: VrmStoredModelRecord,
   ) => Promise<VrmStoredModelWithContentIdentity>;
   readonly hashBlob: (blob: Blob) => Promise<VrmContentHash>;
-  readonly validateGlbVrmBytes: typeof validateVrmGlbBytes;
-  readonly saveVerifiedBlob: typeof saveVerifiedVrmBlob;
+  readonly inspectGlbVrmBytes: typeof inspectVrmGlbBytes;
+  readonly saveVerifiedBlobWithDisposition: typeof saveVerifiedVrmBlobWithDisposition;
+  readonly deleteStoredIfIdentityMatches: typeof deleteStoredVrmModelIfIdentityMatches;
+}
+
+export interface PreparedStudioVrmProjectArchiveModel {
+  readonly hash: VrmContentHash;
+  readonly expectedBytes: number;
+  readonly name: string;
+  /** Null means the archive copy was unavailable/invalid; final local reuse may still resolve it. */
+  readonly blob: Blob | null;
 }
 
 export interface RestoreStudioVrmProjectArchiveImportResult {
   /** Canonical snapshots; VRM scene documents are unchanged and contain no local model ids. */
   readonly project: StudioProjectFile;
   readonly canonicalProject: StudioProjectFile;
-  readonly installed: ReadonlyArray<{ hash: VrmContentHash; modelId: string }>;
+  /** Authenticated blobs retained in memory only; preparation performs no durable writes. */
+  readonly prepared: readonly PreparedStudioVrmProjectArchiveModel[];
   readonly reused: ReadonlyArray<{ hash: VrmContentHash; modelId: string }>;
   readonly unresolved: readonly VrmContentHash[];
   readonly diagnostics: readonly StudioVrmProjectLibraryDiagnostic[];
 }
 
-export type StudioVrmProjectLibraryErrorCode = "import-project-mismatch" | "project-invalid";
+export interface InstallStudioVrmProjectArchiveImportResult<ApplyResult> {
+  readonly project: StudioProjectFile;
+  readonly installed: ReadonlyArray<{ hash: VrmContentHash; modelId: string }>;
+  readonly reused: ReadonlyArray<{ hash: VrmContentHash; modelId: string }>;
+  readonly unresolved: readonly VrmContentHash[];
+  readonly diagnostics: readonly StudioVrmProjectLibraryDiagnostic[];
+  readonly applyResult: ApplyResult;
+}
+
+export interface InstallStudioVrmProjectArchiveImportOptions<ApplyResult> {
+  /** A false result triggers exact compensation of only rows created by this import. */
+  readonly didApply: (result: ApplyResult) => boolean;
+}
+
+export type StudioVrmProjectLibraryErrorCode =
+  | "import-commit-failed"
+  | "import-plan-invalid"
+  | "import-project-mismatch"
+  | "project-invalid";
 
 const ERROR_MESSAGES: Readonly<Record<StudioVrmProjectLibraryErrorCode, string>> = Object.freeze({
+  "import-commit-failed": "검증된 VRM 원본을 프로젝트 적용 경계에서 안전하게 저장하지 못했습니다.",
+  "import-plan-invalid": "VRM archive 가져오기 준비 결과가 현재 검증 세션에 속하지 않습니다.",
   "import-project-mismatch": "검증한 프로젝트와 복구할 VRM 장면 원본이 일치하지 않습니다.",
   "project-invalid": "VRM 모델 참조를 수집할 프로젝트가 올바르지 않습니다.",
 });
@@ -116,8 +162,8 @@ const ERROR_MESSAGES: Readonly<Record<StudioVrmProjectLibraryErrorCode, string>>
 export class StudioVrmProjectLibraryError extends Error {
   readonly code: StudioVrmProjectLibraryErrorCode;
 
-  constructor(code: StudioVrmProjectLibraryErrorCode) {
-    super(ERROR_MESSAGES[code]);
+  constructor(code: StudioVrmProjectLibraryErrorCode, options?: ErrorOptions) {
+    super(ERROR_MESSAGES[code], options);
     this.name = "StudioVrmProjectLibraryError";
     this.code = code;
   }
@@ -127,9 +173,12 @@ const DEFAULT_DEPENDENCIES: StudioVrmProjectLibraryDependencies = Object.freeze(
   getStoredByContentHash: getStoredVrmModelByHash,
   ensureStoredIdentity: ensureStoredVrmContentIdentity,
   hashBlob: hashVrmBlob,
-  validateGlbVrmBytes: validateVrmGlbBytes,
-  saveVerifiedBlob: saveVerifiedVrmBlob,
+  inspectGlbVrmBytes: inspectVrmGlbBytes,
+  saveVerifiedBlobWithDisposition: saveVerifiedVrmBlobWithDisposition,
+  deleteStoredIfIdentityMatches: deleteStoredVrmModelIfIdentityMatches,
 });
+
+const PREPARED_IMPORTS = new WeakSet<object>();
 
 function resolveDependencies(
   overrides: Partial<StudioVrmProjectLibraryDependencies>,
@@ -234,39 +283,56 @@ function metadataConflict(
 
 type BlobVerificationFailure = Exclude<
   StudioVrmProjectArchiveMissingReason,
-  "metadata-conflict" | "not-found"
+  "license-restricted" | "metadata-conflict" | "not-found"
 >;
+
+interface BlobVerificationResult {
+  readonly failure: BlobVerificationFailure | null;
+  readonly licenseAuthority: StudioVrmLicenseAuthority | null;
+}
 
 async function verifyVrmBlob(
   blob: Blob,
   expectedHash: VrmContentHash,
   expectedBytes: number,
   dependencies: StudioVrmProjectLibraryDependencies,
-): Promise<BlobVerificationFailure | null> {
-  if (!Number.isSafeInteger(blob.size) || blob.size !== expectedBytes) return "size-mismatch";
+): Promise<BlobVerificationResult> {
+  const failed = (failure: BlobVerificationFailure): BlobVerificationResult => ({
+    failure,
+    licenseAuthority: null,
+  });
+  if (!Number.isSafeInteger(blob.size) || blob.size !== expectedBytes) {
+    return failed("size-mismatch");
+  }
   let bytes: ArrayBuffer;
   try {
     bytes = await blob.arrayBuffer();
   } catch {
-    return "bytes-invalid";
+    return failed("bytes-invalid");
   }
-  if (bytes.byteLength !== expectedBytes) return "size-mismatch";
+  if (bytes.byteLength !== expectedBytes) return failed("size-mismatch");
+  let licenseAuthority: StudioVrmLicenseAuthority;
   try {
-    dependencies.validateGlbVrmBytes(bytes);
+    licenseAuthority = inspectStudioVrmLicenseAuthority(
+      dependencies.inspectGlbVrmBytes(bytes).json,
+    );
   } catch {
-    return "bytes-invalid";
+    return failed("bytes-invalid");
   }
   try {
     const actualHash = canonicalizeVrmContentHash(await dependencies.hashBlob(blob));
-    return actualHash === expectedHash ? null : "hash-mismatch";
+    return actualHash === expectedHash
+      ? { failure: null, licenseAuthority }
+      : failed("hash-mismatch");
   } catch {
-    return "bytes-invalid";
+    return failed("bytes-invalid");
   }
 }
 
 interface VerifiedStoredModel {
   readonly record: VrmStoredModelWithContentIdentity;
   readonly blob: Blob;
+  readonly licenseAuthority: StudioVrmLicenseAuthority;
 }
 
 interface ResolveStoredModelResult {
@@ -306,10 +372,17 @@ async function resolveVerifiedStoredModel(
   if (ensured.mimeType !== "model/gltf-binary") {
     return { match: null, reason: "mime-mismatch" };
   }
-  const failure = await verifyVrmBlob(ensured.blob, hash, expectedBytes, dependencies);
-  return failure
-    ? { match: null, reason: failure }
-    : { match: { record: ensured, blob: ensured.blob }, reason: "not-found" };
+  const verification = await verifyVrmBlob(ensured.blob, hash, expectedBytes, dependencies);
+  return verification.failure || !verification.licenseAuthority
+    ? { match: null, reason: verification.failure ?? "bytes-invalid" }
+    : {
+        match: {
+          record: ensured,
+          blob: ensured.blob,
+          licenseAuthority: verification.licenseAuthority,
+        },
+        reason: "not-found",
+      };
 }
 
 function diagnosticForMissing(
@@ -326,6 +399,10 @@ function diagnosticForMissing(
     "hash-mismatch": {
       code: "LOCAL_MODEL_HASH_MISMATCH",
       message: "로컬 VRM의 실제 SHA-256이 장면 문서의 모델 해시와 일치하지 않습니다.",
+    },
+    "license-restricted": {
+      code: "LOCAL_MODEL_LICENSE_RESTRICTED",
+      message: "VRM 이용 조건이 프로젝트 archive 재배포를 허용하지 않아 모델 파일을 포함하지 않았습니다.",
     },
     "metadata-conflict": {
       code: "LOCAL_MODEL_METADATA_CONFLICT",
@@ -344,7 +421,12 @@ function diagnosticForMissing(
       message: "로컬 VRM의 실제 크기가 장면 문서의 모델 크기와 일치하지 않습니다.",
     },
   };
-  return { ...details[missing.reason], hash: missing.hash, pointers: missing.pointers };
+  return {
+    ...details[missing.reason],
+    hash: missing.hash,
+    pointers: missing.pointers,
+    ...(missing.policyReasons ? { policyReasons: missing.policyReasons } : {}),
+  };
 }
 
 /**
@@ -355,6 +437,7 @@ function diagnosticForMissing(
 export async function prepareStudioVrmProjectArchiveExport(
   project: StudioProjectFile | unknown,
   dependencyOverrides: Partial<StudioVrmProjectLibraryDependencies> = {},
+  useContextReceipt: StudioVrmProjectArchiveUseContextReceipt | null = null,
 ): Promise<PrepareStudioVrmProjectArchiveExportResult> {
   const dependencies = resolveDependencies(dependencyOverrides);
   // Capture a bounded canonical snapshot before the first asynchronous library lookup.
@@ -378,6 +461,23 @@ export async function prepareStudioVrmProjectArchiveExport(
       missing.push({ hash, pointers, reason: resolved.reason });
       continue;
     }
+    const receipt = resolved.match.licenseAuthority.status === "verified"
+      ? resolved.match.licenseAuthority.receipt
+      : null;
+    const archivePolicy = evaluateStudioVrmLicenseAuthority(
+      resolved.match.licenseAuthority,
+      "project-archive-redistribution",
+      receipt ? studioVrmProjectArchiveActionContext(useContextReceipt, receipt) : {},
+    );
+    if (!archivePolicy.authorized) {
+      missing.push({
+        hash,
+        pointers,
+        reason: "license-restricted",
+        policyReasons: archivePolicy.reasons.map(({ message }) => message),
+      });
+      continue;
+    }
     const documentReferences: StudioProjectArchiveDocumentReference[] = pointers.map((pointer) => ({
       pointer,
       usage: "vrm",
@@ -393,6 +493,30 @@ export async function prepareStudioVrmProjectArchiveExport(
 
   const diagnostics = missing.map(diagnosticForMissing);
   return { attachments, missing, diagnostics, isComplete: missing.length === 0 };
+}
+
+/** Read-only first pass used to render the exact multi-model archive consent UI. */
+export async function prepareStudioVrmProjectArchiveUseContextAttestation(
+  project: StudioProjectFile | unknown,
+  dependencyOverrides: Partial<StudioVrmProjectLibraryDependencies> = {},
+): Promise<StudioVrmProjectArchiveAttestationPlan> {
+  const dependencies = resolveDependencies(dependencyOverrides);
+  const grouped = groupReferences(snapshotProjectVrmReferences(project).references);
+  const authorities: Array<StudioVrmLicenseAuthority | null> = [];
+  for (const [hash, references] of grouped) {
+    if (metadataConflict(references)) {
+      authorities.push(null);
+      continue;
+    }
+    const expectedBytes = references[0]?.model.byteSize;
+    if (!expectedBytes) {
+      authorities.push(null);
+      continue;
+    }
+    const resolved = await resolveVerifiedStoredModel(hash, expectedBytes, dependencies);
+    authorities.push(resolved.match?.licenseAuthority ?? null);
+  }
+  return prepareStudioVrmProjectArchiveAttestation(authorities);
 }
 
 function sceneSnapshotsMatch(left: ProjectVrmSnapshot, right: ProjectVrmSnapshot): boolean {
@@ -477,9 +601,10 @@ function diagnosticForImportedFailure(
 }
 
 /**
- * Installs only VRM attachments referenced by the authenticated project. Existing verified hashes
- * are reused; imported bytes are otherwise validated once here and again by the library writer.
- * Returned project snapshots preserve every scene/model field and never receive a local model id.
+ * Authenticates only VRM attachments referenced by the imported project. This phase is deliberately
+ * read-only: blobs stay in this bounded in-memory plan until the caller reaches the exact project
+ * mutation seam. Local storage is never opened here because a cold SQLite open may migrate schema;
+ * verified local reuse is resolved only at final commit.
  */
 export async function restoreStudioVrmProjectArchiveImport(
   archive: ImportStudioProjectArchiveResult,
@@ -495,7 +620,7 @@ export async function restoreStudioVrmProjectArchiveImport(
   }
 
   const grouped = groupReferences(canonicalSnapshot.references);
-  const installed: Array<{ hash: VrmContentHash; modelId: string }> = [];
+  const prepared: PreparedStudioVrmProjectArchiveModel[] = [];
   const reused: Array<{ hash: VrmContentHash; modelId: string }> = [];
   const unresolved: VrmContentHash[] = [];
   const diagnostics: StudioVrmProjectLibraryDiagnostic[] = [];
@@ -523,10 +648,16 @@ export async function restoreStudioVrmProjectArchiveImport(
       });
       continue;
     }
+    const pending = {
+      hash,
+      expectedBytes,
+      name: references[0]?.model.name ?? "VRM 모델",
+    };
     const imported = archive.attachments.get(hash.slice("sha256:".length));
     if (!imported) {
       unresolved.push(hash);
       diagnostics.push(diagnosticForImportedFailure(hash, pointers, "missing"));
+      prepared.push(Object.freeze({ ...pending, blob: null }));
       continue;
     }
     const coverageFailure = attachmentCoversAllReferences(
@@ -538,78 +669,190 @@ export async function restoreStudioVrmProjectArchiveImport(
     if (coverageFailure) {
       unresolved.push(hash);
       diagnostics.push(diagnosticForImportedFailure(hash, pointers, coverageFailure));
+      prepared.push(Object.freeze({ ...pending, blob: null }));
       continue;
     }
-    const byteFailure = await verifyVrmBlob(imported.blob, hash, expectedBytes, dependencies);
-    if (byteFailure) {
+    const byteVerification = await verifyVrmBlob(
+      imported.blob,
+      hash,
+      expectedBytes,
+      dependencies,
+    );
+    if (byteVerification.failure) {
       unresolved.push(hash);
-      diagnostics.push(diagnosticForImportedFailure(hash, pointers, byteFailure));
-      continue;
-    }
-
-    const existing = await resolveVerifiedStoredModel(hash, expectedBytes, dependencies);
-    if (existing.match) {
-      reused.push({ hash, modelId: existing.match.record.id });
-      continue;
-    }
-
-    let saved: VrmStoredModelRecord;
-    try {
-      saved = await dependencies.saveVerifiedBlob({
-        name: references[0]?.model.name ?? "VRM 모델",
-        blob: imported.blob,
-        expectedHash: hash,
-      });
-    } catch {
-      unresolved.push(hash);
-      diagnostics.push({
-        code: "LOCAL_MODEL_SAVE_FAILED",
-        message: "검증된 archive VRM을 이 기기의 모델 라이브러리에 저장하지 못했습니다.",
+      diagnostics.push(diagnosticForImportedFailure(
         hash,
         pointers,
-      });
+        byteVerification.failure,
+      ));
+      prepared.push(Object.freeze({ ...pending, blob: null }));
       continue;
     }
-
-    let verifiedSaved: VrmStoredModelWithContentIdentity;
-    try {
-      verifiedSaved = await dependencies.ensureStoredIdentity(saved);
-    } catch {
-      unresolved.push(hash);
-      diagnostics.push({
-        code: "LOCAL_MODEL_SAVE_FAILED",
-        message: "저장한 VRM 모델을 다시 검증하지 못했습니다.",
-        hash,
-        pointers,
-      });
-      continue;
-    }
-    const savedFailure =
-      canonicalizeVrmContentHash(verifiedSaved.contentHash) !== hash
-      || verifiedSaved.byteSize !== expectedBytes
-      || verifiedSaved.mimeType !== "model/gltf-binary"
-      || verifiedSaved.validationVersion !== VRM_VALIDATION_VERSION
-        ? "metadata-mismatch" as const
-        : await verifyVrmBlob(verifiedSaved.blob, hash, expectedBytes, dependencies);
-    if (savedFailure) {
-      unresolved.push(hash);
-      diagnostics.push({
-        code: "LOCAL_MODEL_SAVE_FAILED",
-        message: "저장 결과가 장면 문서의 VRM 콘텐츠 식별 정보와 일치하지 않습니다.",
-        hash,
-        pointers,
-      });
-      continue;
-    }
-    installed.push({ hash, modelId: verifiedSaved.id });
+    prepared.push(Object.freeze({
+      ...pending,
+      blob: imported.blob,
+    }));
   }
 
-  return {
+  const result: RestoreStudioVrmProjectArchiveImportResult = Object.freeze({
     project: projectSnapshot.project,
     canonicalProject: canonicalSnapshot.project,
-    installed,
-    reused,
-    unresolved,
-    diagnostics,
-  };
+    prepared: Object.freeze(prepared),
+    reused: Object.freeze(reused),
+    unresolved: Object.freeze(unresolved),
+    diagnostics: Object.freeze(diagnostics),
+  });
+  PREPARED_IMPORTS.add(result);
+  return result;
+}
+
+interface CreatedStudioVrmImportRow {
+  readonly hash: VrmContentHash;
+  readonly modelId: string;
+}
+
+async function rollbackCreatedStudioVrmImportRows(
+  rows: readonly CreatedStudioVrmImportRow[],
+  dependencies: StudioVrmProjectLibraryDependencies,
+): Promise<void> {
+  const failures: unknown[] = [];
+  for (const row of [...rows].reverse()) {
+    try {
+      // False is a safe no-op: the exact created id+hash pair is already absent or no longer
+      // matches. In either case compensation did not delete someone else's row.
+      await dependencies.deleteStoredIfIdentityMatches(row.modelId, row.hash);
+    } catch (cause) {
+      failures.push(cause);
+    }
+  }
+  if (failures.length > 0) {
+    throw new AggregateError(
+      failures,
+      "프로젝트 적용 실패 뒤 새로 만든 VRM 원본 일부를 안전하게 되돌리지 못했습니다.",
+    );
+  }
+}
+
+async function verifyCommittedStudioVrmRow(
+  disposition: SaveVerifiedVrmBlobDisposition,
+  model: PreparedStudioVrmProjectArchiveModel,
+  dependencies: StudioVrmProjectLibraryDependencies,
+): Promise<VrmStoredModelWithContentIdentity | null> {
+  let verified: VrmStoredModelWithContentIdentity;
+  try {
+    verified = await dependencies.ensureStoredIdentity(disposition.record);
+  } catch {
+    return null;
+  }
+  if (
+    canonicalizeVrmContentHash(verified.contentHash) !== model.hash
+    || verified.byteSize !== model.expectedBytes
+    || verified.mimeType !== "model/gltf-binary"
+    || verified.validationVersion !== VRM_VALIDATION_VERSION
+  ) return null;
+  const blobVerification = await verifyVrmBlob(
+    verified.blob,
+    model.hash,
+    model.expectedBytes,
+    dependencies,
+  );
+  return blobVerification.failure ? null : verified;
+}
+
+/**
+ * Commits a read-only import plan at the final mutation seam and then applies the project. If the
+ * downstream apply is rejected or throws, compensation compares both the newly-created private id
+ * and its canonical hash. Deduplicated/pre-existing rows are never eligible for deletion.
+ */
+export async function installPreparedStudioVrmProjectArchiveImportAndApply<ApplyResult>(
+  preparedImport: RestoreStudioVrmProjectArchiveImportResult,
+  project: StudioProjectFile | unknown,
+  applyProject: (project: StudioProjectFile) => ApplyResult | Promise<ApplyResult>,
+  options: InstallStudioVrmProjectArchiveImportOptions<ApplyResult>,
+  dependencyOverrides: Partial<StudioVrmProjectLibraryDependencies> = {},
+): Promise<InstallStudioVrmProjectArchiveImportResult<ApplyResult>> {
+  if (!PREPARED_IMPORTS.has(preparedImport)) {
+    throw new StudioVrmProjectLibraryError("import-plan-invalid");
+  }
+  const dependencies = resolveDependencies(dependencyOverrides);
+  const applySnapshot = snapshotProjectVrmReferences(project);
+  const preparedSnapshot = snapshotProjectVrmReferences(preparedImport.project);
+  if (!sceneSnapshotsMatch(preparedSnapshot, applySnapshot)) {
+    throw new StudioVrmProjectLibraryError("import-project-mismatch");
+  }
+  // A prepared Blob plan is mutation-scoped and one-shot; retrying requires a fresh authenticated
+  // archive read so callers cannot replay stale bytes after a failed route/application attempt.
+  PREPARED_IMPORTS.delete(preparedImport);
+
+  const installed: CreatedStudioVrmImportRow[] = [];
+  const reused: Array<{ hash: VrmContentHash; modelId: string }> = [];
+  const unresolved = [...preparedImport.unresolved];
+  const diagnostics = [...preparedImport.diagnostics];
+  try {
+    for (const model of preparedImport.prepared) {
+      const existing = await resolveVerifiedStoredModel(
+        model.hash,
+        model.expectedBytes,
+        dependencies,
+      );
+      if (existing.match) {
+        reused.push({ hash: model.hash, modelId: existing.match.record.id });
+        const unresolvedIndex = unresolved.indexOf(model.hash);
+        if (unresolvedIndex >= 0) unresolved.splice(unresolvedIndex, 1);
+        for (let index = diagnostics.length - 1; index >= 0; index -= 1) {
+          if (diagnostics[index]?.hash === model.hash) diagnostics.splice(index, 1);
+        }
+        continue;
+      }
+
+      if (!model.blob) continue;
+
+      let disposition: SaveVerifiedVrmBlobDisposition;
+      try {
+        disposition = await dependencies.saveVerifiedBlobWithDisposition({
+          name: model.name,
+          blob: model.blob,
+          expectedHash: model.hash,
+        });
+      } catch (cause) {
+        throw new StudioVrmProjectLibraryError("import-commit-failed", { cause });
+      }
+      if (disposition.created) {
+        // Register before post-write verification so every newly rooted row is compensatable.
+        installed.push({ hash: model.hash, modelId: disposition.record.id });
+      }
+      const verified = await verifyCommittedStudioVrmRow(disposition, model, dependencies);
+      if (!verified) throw new StudioVrmProjectLibraryError("import-commit-failed");
+      if (!disposition.created) {
+        reused.push({ hash: model.hash, modelId: verified.id });
+      } else if (verified.id !== disposition.record.id) {
+        throw new StudioVrmProjectLibraryError("import-commit-failed");
+      }
+    }
+
+    const applyResult = await applyProject(applySnapshot.project);
+    if (!options.didApply(applyResult)) {
+      await rollbackCreatedStudioVrmImportRows(installed, dependencies);
+      installed.length = 0;
+    }
+    return {
+      project: applySnapshot.project,
+      installed: Object.freeze([...installed]),
+      reused: Object.freeze(reused),
+      unresolved: Object.freeze(unresolved),
+      diagnostics: Object.freeze(diagnostics),
+      applyResult,
+    };
+  } catch (cause) {
+    try {
+      await rollbackCreatedStudioVrmImportRows(installed, dependencies);
+    } catch (rollbackCause) {
+      throw new AggregateError(
+        [cause, rollbackCause],
+        "VRM archive 가져오기와 정확한 보상을 모두 완료하지 못했습니다.",
+        { cause: rollbackCause },
+      );
+    }
+    throw cause;
+  }
 }

@@ -257,6 +257,10 @@ export interface SaveStudioVrmTextureAssetInput {
 export interface SaveStudioVrmTextureAssetResult {
   readonly receipt: StudioVrmTexturePaintArtifactMetadata;
   readonly deduplicated: boolean;
+  /** True only when this write added the content hash to the durable texture manifest. */
+  readonly created: boolean;
+  /** Exact manifest generation produced by this write, used only for failed-import compensation. */
+  readonly generation: number;
 }
 
 export interface StudioVrmTextureAsset {
@@ -316,10 +320,34 @@ export interface StudioVrmAssetSqliteOpfsRepository {
   ): Promise<void>;
   getThumbnail(id: string, signal?: AbortSignal): Promise<StudioVrmThumbnailAsset | null>;
   deleteModel(id: string, signal?: AbortSignal): Promise<boolean>;
+  /**
+   * Compensation-only compare-and-delete. The row is removed only when both its private id and
+   * canonical content hash still match the receipt returned by the creating write.
+   */
+  deleteModelIfIdentityMatches(
+    id: string,
+    contentHash: StudioVrmAssetHash,
+    signal?: AbortSignal,
+  ): Promise<boolean>;
   saveTexture(
     input: SaveStudioVrmTextureAssetInput,
     signal?: AbortSignal,
   ): Promise<SaveStudioVrmTextureAssetResult>;
+  /** Removes a newly-created texture only if no later texture-manifest write has occurred. */
+  deleteTextureIfCreationMatches(
+    contentHash: StudioVrmAssetHash,
+    generation: number,
+    signal?: AbortSignal,
+  ): Promise<boolean>;
+  /** Batch form used when one archive import created several hashes in contiguous mutations. */
+  deleteTexturesIfCreationBatchMatches(
+    creations: readonly {
+      readonly contentHash: StudioVrmAssetHash;
+      readonly generation: number;
+    }[],
+    mutationGenerations: readonly number[],
+    signal?: AbortSignal,
+  ): Promise<boolean>;
   queryTextureMetadataPage(options?: {
     readonly cursor?: string | null;
     readonly signal?: AbortSignal;
@@ -1763,18 +1791,18 @@ export function createStudioVrmAssetSqliteOpfsRepository(
       // SQLite may report an I/O failure after the root became durable. The union owner refs are
       // already safe, so finish as the committed generation instead of inviting a duplicate retry.
     }
-    const persisted = await databaseHandle.kvGet(
-      STUDIO_VRM_MODEL_SQLITE_NAMESPACE,
-      STUDIO_VRM_ASSET_SQLITE_MANIFEST_KEY,
-    );
-    if (persisted !== prepared.raw) fail("conflict", "VRM model manifest commit was superseded.");
-    await assets().setOwnerRefs(
-      STUDIO_VRM_ASSET_CAS_OWNER,
-      uniqueLiveHashes(canonical, textures),
-    ).catch(() => {
+    // The root write resolved, or the failure path reread this exact candidate. From here the
+    // mutation is durably authoritative. A diagnostic read/close/abort must not discard the
+    // creation disposition needed by archive compensation.
+    try {
+      await assets().setOwnerRefs(
+        STUDIO_VRM_ASSET_CAS_OWNER,
+        uniqueLiveHashes(canonical, textures),
+      );
+    } catch {
       // The pre-root union still retains every old and new live blob. Exact ref compaction is a
-      // recoverable leak-only optimization and must not turn a committed root into a false failure.
-    });
+      // recoverable leak-only optimization; close racing here cannot revoke the committed result.
+    }
     await Promise.all(priorPageKeys
       .filter((key) => !prepared.pages.some((page) => page.descriptor.key === key))
       .map((key) => databaseHandle.kvDelete(
@@ -1851,17 +1879,16 @@ export function createStudioVrmAssetSqliteOpfsRepository(
       }
       // Root authority won despite the surfaced SQLite failure; keep the safe union and finish.
     }
-    const persisted = await databaseHandle.kvGet(
-      STUDIO_VRM_TEXTURE_SQLITE_NAMESPACE,
-      STUDIO_VRM_ASSET_SQLITE_MANIFEST_KEY,
-    );
-    if (persisted !== prepared.raw) fail("conflict", "VRM texture manifest commit was superseded.");
-    await assets().setOwnerRefs(
-      STUDIO_VRM_ASSET_CAS_OWNER,
-      uniqueLiveHashes(models, canonical),
-    ).catch(() => {
-      // The pre-root union remains safe if exact post-root compaction cannot be persisted.
-    });
+    // The root write resolved, or the failure path reread this exact candidate. Post-root reads are
+    // diagnostic only; losing one must not turn a committed texture into a receipt-less failure.
+    try {
+      await assets().setOwnerRefs(
+        STUDIO_VRM_ASSET_CAS_OWNER,
+        uniqueLiveHashes(models, canonical),
+      );
+    } catch {
+      // The pre-root union remains safe if close or exact post-root compaction races this cleanup.
+    }
     await Promise.all(priorPageKeys
       .filter((key) => !prepared.pages.some((page) => page.descriptor.key === key))
       .map((key) => databaseHandle.kvDelete(
@@ -1884,6 +1911,22 @@ export function createStudioVrmAssetSqliteOpfsRepository(
       ensureOpen(generation);
       throwIfAborted(signal);
       return result;
+    });
+  }
+
+  async function queuedMutation<T>(
+    signal: AbortSignal | undefined,
+    task: (databaseHandle: StudioLocalDatabase, generation: number) => Promise<T>,
+  ): Promise<T> {
+    throwIfAborted(signal);
+    const generation = lifecycleGeneration;
+    const databaseHandle = await database();
+    return queueForDatabase(databaseHandle, async () => {
+      ensureOpen(generation);
+      throwIfAborted(signal);
+      // Once a mutation task resolves it may have published a durable root. A close/cancel racing
+      // afterward cannot revoke its exact disposition, which higher layers need for compensation.
+      return task(databaseHandle, generation);
     });
   }
 
@@ -1988,7 +2031,7 @@ export function createStudioVrmAssetSqliteOpfsRepository(
     },
 
     saveModel(input, signal) {
-      return queued(signal, async (databaseHandle) => {
+      return queuedMutation(signal, async (databaseHandle) => {
         const name = normalizeName(input.name);
         if (
           !ID_PATTERN.test(input.id)
@@ -2054,7 +2097,7 @@ export function createStudioVrmAssetSqliteOpfsRepository(
     },
 
     saveThumbnail(id, thumbnail, updatedAt, signal) {
-      return queued(signal, async (databaseHandle) => {
+      return queuedMutation(signal, async (databaseHandle) => {
         if (
           !ID_PATTERN.test(id)
           || !SAFE_IMAGE_MIMES.has(thumbnail.mimeType)
@@ -2123,7 +2166,7 @@ export function createStudioVrmAssetSqliteOpfsRepository(
     },
 
     deleteModel(id, signal) {
-      return queued(signal, async (databaseHandle) => {
+      return queuedMutation(signal, async (databaseHandle) => {
         if (!ID_PATTERN.test(id)) return false;
         const state = await readManifests(databaseHandle);
         const models = state.models.models.filter((entry) => entry.id !== id);
@@ -2150,8 +2193,33 @@ export function createStudioVrmAssetSqliteOpfsRepository(
       });
     },
 
+    deleteModelIfIdentityMatches(id, value, signal) {
+      return queuedMutation(signal, async (databaseHandle) => {
+        const contentHash = hash(value.toLowerCase());
+        if (!ID_PATTERN.test(id) || !contentHash) return false;
+        const state = await readManifests(databaseHandle);
+        const matching = state.models.models.find(
+          (entry) => entry.id === id && entry.contentHash === contentHash,
+        );
+        if (!matching) return false;
+        const next: ModelManifestV1 = {
+          ...state.models,
+          generation: nextManifestGeneration(state.models.generation),
+          models: state.models.models.filter((entry) => entry.id !== id),
+        };
+        await commitModelManifest(
+          databaseHandle,
+          state.modelRaw,
+          state.models,
+          next,
+          state.textures,
+        );
+        return true;
+      });
+    },
+
     saveTexture(input, signal) {
-      return queued(signal, async (databaseHandle) => {
+      return queuedMutation(signal, async (databaseHandle) => {
         const receipt = textureReceipt(input.receipt);
         const limits = resolveTextureLimits(input.limits);
         if (
@@ -2198,7 +2266,62 @@ export function createStudioVrmAssetSqliteOpfsRepository(
           state.textures,
           next,
         );
-        return { receipt, deduplicated: existingIndex >= 0 || deduplicated };
+        return {
+          receipt,
+          deduplicated: existingIndex >= 0 || deduplicated,
+          created: existingIndex < 0,
+          generation: nextGeneration,
+        };
+      });
+    },
+
+    deleteTextureIfCreationMatches(value, generation, signal) {
+      return this.deleteTexturesIfCreationBatchMatches(
+        [{ contentHash: value, generation }],
+        [generation],
+        signal,
+      );
+    },
+
+    deleteTexturesIfCreationBatchMatches(creations, mutationGenerations, signal) {
+      return queuedMutation(signal, async (databaseHandle) => {
+        if (creations.length < 1 || mutationGenerations.length < 1) return false;
+        const normalized = creations.map((creation) => ({
+          contentHash: hash(creation.contentHash.toLowerCase()),
+          generation: creation.generation,
+        }));
+        if (
+          normalized.some(({ contentHash, generation }) => !contentHash || !safeInteger(generation, 1))
+          || new Set(normalized.map(({ contentHash }) => contentHash)).size !== normalized.length
+          || mutationGenerations.some((generation) => !safeInteger(generation, 1))
+          || mutationGenerations.some(
+            (generation, index) => index > 0 && generation !== mutationGenerations[index - 1]! + 1,
+          )
+          || normalized.some(({ generation }) => !mutationGenerations.includes(generation))
+        ) return false;
+        const state = await readManifests(databaseHandle);
+        if (state.textures.generation !== mutationGenerations.at(-1)) return false;
+        const createdHashes = new Set(normalized.map(({ contentHash }) => contentHash!));
+        if (
+          normalized.some(({ contentHash }) =>
+            !state.textures.artifacts.some((entry) => entry.contentHash === contentHash)
+          )
+        ) return false;
+        const next: TextureManifestV1 = {
+          ...state.textures,
+          generation: nextManifestGeneration(state.textures.generation),
+          artifacts: state.textures.artifacts.filter(
+            (entry) => !createdHashes.has(entry.contentHash),
+          ),
+        };
+        await commitTextureManifest(
+          databaseHandle,
+          state.textureRaw,
+          state.models,
+          state.textures,
+          next,
+        );
+        return true;
       });
     },
 
@@ -2270,7 +2393,7 @@ export function createStudioVrmAssetSqliteOpfsRepository(
 
     cleanupOrphans(cleanupOptions = {}) {
       const signal = cleanupOptions.signal;
-      return queued(signal, async (databaseHandle) => {
+      return queuedMutation(signal, async (databaseHandle) => {
         const maxRemovals = cleanupOptions.maxRemovals ?? 32;
         const graceMs = cleanupOptions.graceMs ?? orphanGraceMs;
         if (!safeInteger(maxRemovals, 1) || maxRemovals > 256 || !safeInteger(graceMs, 0)) {

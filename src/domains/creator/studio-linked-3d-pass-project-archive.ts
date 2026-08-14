@@ -600,19 +600,36 @@ export async function restoreStudioLinked3dPassProjectArchiveImport<T>(input: {
       for (const owner of owners) {
         const ownerRefs = await input.authority.ownerRefs(owner);
         previous.set(owner, ownerRefs);
+        // A durable authority may update its in-memory/index state and then lose the publication
+        // acknowledgement. Track the attempted owner before awaiting so commit-outcome-unknown is
+        // compensated just like an acknowledged publication.
+        updated.push(owner);
         await input.authority.setOwnerRefs(owner, [...new Set([
           ...ownerRefs,
           ...(desiredByOwner.get(owner) ?? []),
         ])].toSorted());
-        updated.push(owner);
       }
       const result = await input.apply(input.archive.project);
       if (result === false) archiveError("commit-rejected", "Studio가 복원된 3D pass 문서 적용을 거절했습니다.");
       return result;
     } catch (cause) {
-      await Promise.all(updated.toReversed().map(async (owner) => {
-        await input.authority.setOwnerRefs(owner, previous.get(owner) ?? []).catch(() => undefined);
-      }));
+      const rollbackFailures: unknown[] = [];
+      // Restore in strict reverse publication order. Continue after one owner fails so the maximum
+      // recoverable prefix is restored, but never report the archive import as atomic/successful.
+      for (const owner of updated.toReversed()) {
+        try {
+          await input.authority.setOwnerRefs(owner, previous.get(owner) ?? []);
+        } catch (rollbackCause) {
+          rollbackFailures.push(rollbackCause);
+        }
+      }
+      if (rollbackFailures.length > 0) {
+        throw new AggregateError(
+          [cause, ...rollbackFailures],
+          "연결형 3D pass 문서 적용 실패 뒤 owner 참조 일부를 되돌리지 못했습니다.",
+          { cause },
+        );
+      }
       throw cause;
     }
   });

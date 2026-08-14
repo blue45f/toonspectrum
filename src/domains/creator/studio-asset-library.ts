@@ -81,11 +81,15 @@ export type StudioAssetContentIdentityCandidateMap = ReadonlyMap<
 export interface StudioAssetLibraryPort {
   save(input: StudioAssetSaveInput): Promise<StudioAssetWithContentHash>;
   list(): Promise<StudioAsset[]>;
+  /** Pure snapshot read for staged archive validation; must not reconcile refs or sweep storage. */
+  listReadOnly?(): Promise<StudioAsset[]>;
   findByContentIdentities(
     lookups: readonly StudioAssetContentIdentityLookup[],
     signal?: AbortSignal,
   ): Promise<StudioAssetContentIdentityCandidateMap>;
   delete(id: string): Promise<void>;
+  /** Compensation-only compare-and-delete for a row created by a failed archive import. */
+  deleteIfIdentityMatches(id: string, contentHash: StudioAssetContentHash): Promise<boolean>;
   rename(id: string, newName: string): Promise<void>;
 }
 
@@ -461,7 +465,16 @@ async function legacySaveAsset(
   await withLegacyDatabase(indexedDb, async (db) => {
     const tx = db.transaction(STORE, "readwrite");
     const done = transactionDone(tx);
-    tx.objectStore(STORE).put(record);
+    const store = tx.objectStore(STORE);
+    // `save` is creation-only. A generated-id collision must never overwrite a pre-existing row,
+    // because failed-import compensation is allowed to remove only the row this call created.
+    const existing = await requestResult<unknown>(store.get(record.id));
+    if (existing !== undefined) {
+      tx.abort();
+      await done.catch(() => undefined);
+      throw new Error("생성된 에셋 ID가 기존 행과 충돌했습니다.");
+    }
+    store.put(record);
     await done;
   });
   return record;
@@ -629,6 +642,24 @@ async function legacyDeleteAsset(indexedDb: IDBFactory | null, id: string): Prom
   });
 }
 
+async function legacyDeleteAssetIfIdentityMatches(
+  indexedDb: IDBFactory | null,
+  id: string,
+  contentHash: StudioAssetContentHash,
+): Promise<boolean> {
+  return withLegacyDatabase(indexedDb, async (db) => {
+    const tx = db.transaction(STORE, "readwrite");
+    const done = transactionDone(tx);
+    const store = tx.objectStore(STORE);
+    const candidate = await requestResult<unknown>(store.get(id));
+    const matches = isStudioAssetRecord(candidate)
+      && canonicalizeStudioAssetContentHash(candidate.contentHash) === contentHash;
+    if (matches) store.delete(id);
+    await done;
+    return matches;
+  });
+}
+
 async function legacyRenameAsset(
   indexedDb: IDBFactory | null,
   id: string,
@@ -664,6 +695,8 @@ export function createLegacyIndexedDbStudioAssetLibrary(
     findByContentIdentities: (lookups, signal) =>
       legacyFindStudioAssetCandidatesByContentIdentities(indexedDb, lookups, signal),
     delete: (id) => legacyDeleteAsset(indexedDb, id),
+    deleteIfIdentityMatches: (id, contentHash) =>
+      legacyDeleteAssetIfIdentityMatches(indexedDb, id, contentHash),
     rename: (id, newName) => legacyRenameAsset(indexedDb, id, newName),
   };
 }
@@ -693,6 +726,11 @@ export async function listAssets(): Promise<StudioAsset[]> {
   return (await productPort()).list();
 }
 
+export async function listAssetsReadOnly(): Promise<StudioAsset[]> {
+  const port = await productPort();
+  return port.listReadOnly ? port.listReadOnly() : port.list();
+}
+
 export async function findStudioAssetCandidatesByContentIdentities(
   lookups: readonly StudioAssetContentIdentityLookup[],
   signal?: AbortSignal,
@@ -714,6 +752,15 @@ export async function findStudioAssetCandidatesByContentIdentity(
 
 export async function deleteAsset(id: string): Promise<void> {
   return (await productPort()).delete(id);
+}
+
+export async function deleteAssetIfIdentityMatches(
+  id: string,
+  value: string,
+): Promise<boolean> {
+  const contentHash = canonicalizeStudioAssetContentHash(value);
+  if (!contentHash) return false;
+  return (await productPort()).deleteIfIdentityMatches(id, contentHash);
 }
 
 export async function renameAsset(id: string, newName: string): Promise<void> {

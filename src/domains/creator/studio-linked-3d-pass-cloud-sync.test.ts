@@ -504,6 +504,79 @@ describe("Studio linked 3D pass cloud sync", () => {
     for (const owner of owners) expect(target.owners.get(owner)).toEqual([previousHash]);
   });
 
+  it("restores the attempted owner when cloud publication mutates then throws", async () => {
+    const source = createAuthority();
+    const project = await projectWithPngs(source.authority, [PNG_FIXTURES[0]!]);
+    const cloud = await captureCloudEntries(project, source.authority);
+    const target = createAuthority();
+    const owner = collectStudioLinked3dPassProjectArchiveReferences(project)[0]!.ownerId;
+    const previousHash = `sha256:${"c".repeat(64)}`;
+    target.owners.set(owner, [previousHash]);
+    const setOwnerRefs = target.authority.setOwnerRefs.bind(target.authority);
+    const forwardError = new Error("cloud-owner-ack-lost");
+    let publications = 0;
+    const apply = vi.fn();
+    target.authority.setOwnerRefs = async (currentOwner, hashes) => {
+      publications += 1;
+      const result = await setOwnerRefs(currentOwner, hashes);
+      if (publications === 1) throw forwardError;
+      return result;
+    };
+
+    await expect(hydrateStudioLinked3dPassCloudArtifacts({
+      workId: "work-cloud",
+      project,
+      authority: target.authority,
+      download: async (_workId, reference) => cloud.get(reference.assetId)!,
+      apply,
+    })).rejects.toBe(forwardError);
+
+    expect(apply).not.toHaveBeenCalled();
+    expect(publications).toBe(2);
+    expect(target.owners.get(owner)).toEqual([previousHash]);
+  });
+
+  it("surfaces cloud publication and rollback failures without reporting success", async () => {
+    const source = createAuthority();
+    const project = await projectWithPngs(source.authority, [PNG_FIXTURES[0]!]);
+    const cloud = await captureCloudEntries(project, source.authority);
+    const target = createAuthority();
+    const owner = collectStudioLinked3dPassProjectArchiveReferences(project)[0]!.ownerId;
+    const previousHash = `sha256:${"d".repeat(64)}`;
+    target.owners.set(owner, [previousHash]);
+    const setOwnerRefs = target.authority.setOwnerRefs.bind(target.authority);
+    const forwardError = new Error("cloud-owner-ack-lost");
+    const rollbackError = new Error("cloud-owner-rollback-ack-lost");
+    let publications = 0;
+    const apply = vi.fn();
+    target.authority.setOwnerRefs = async (currentOwner, hashes) => {
+      publications += 1;
+      await setOwnerRefs(currentOwner, hashes);
+      if (publications === 1) throw forwardError;
+      throw rollbackError;
+    };
+
+    let rejected: unknown;
+    try {
+      await hydrateStudioLinked3dPassCloudArtifacts({
+        workId: "work-cloud",
+        project,
+        authority: target.authority,
+        download: async (_workId, reference) => cloud.get(reference.assetId)!,
+        apply,
+      });
+    } catch (cause) {
+      rejected = cause;
+    }
+
+    expect(rejected).toBeInstanceOf(AggregateError);
+    expect((rejected as AggregateError).errors).toEqual([forwardError, rollbackError]);
+    expect((rejected as AggregateError).cause).toBe(forwardError);
+    expect(apply).not.toHaveBeenCalled();
+    expect(publications).toBe(2);
+    expect(target.owners.get(owner)).toEqual([previousHash]);
+  });
+
   it("bounds concurrent uploads and stops scheduling after AbortSignal cancellation", async () => {
     const source = createAuthority();
     const project = await projectWithPngs(source.authority, PNG_FIXTURES);

@@ -26,10 +26,13 @@ import {
   exportStudioVrmTexturePaintProjectLibrary,
   importStudioVrmTexturePaintProjectLibrary,
   inspectStudioVrmTexturePaintJsonExport,
+  installPreparedStudioVrmTexturePaintProjectArchiveImportAndApply,
+  prepareStudioVrmTexturePaintProjectArchiveImport,
   prepareStudioVrmTexturePaintProjectArchiveExport,
   presentStudioVrmTexturePaintProjectArchiveExport,
   presentStudioVrmTexturePaintProjectArchiveImport,
   type StudioVrmTexturePaintProjectArtifactPlan,
+  type StudioVrmTexturePaintProjectAtomicLibraryAdapter,
   type StudioVrmTexturePaintProjectLibraryAdapter,
   type StudioVrmTexturePaintProjectPlan,
 } from "./studio-vrm-texture-paint-project-library";
@@ -775,6 +778,230 @@ describe("studio VRM texture-paint project library bridge", () => {
 
     const exported = await exportStudioVrmTexturePaintProjectLibrary(bridge);
     expect(exported).toMatchObject({ status: "ready", attachments: [{ kind: "raster" }] });
+  });
+
+  it.each(["rejects", "throws", "compensation-fails"] as const)(
+    "keeps staged prepare read-only and exactly compensates created PNGs when apply %s",
+    async (failure) => {
+      const value = await artifact(`atomic-${failure}`, 2, 2);
+      const raw = project([image(`atomic-${failure}`, scene([
+        texture(value, `atomic-${failure}`, "gltf-material:0"),
+      ]))]);
+      const plan = await collectStudioVrmTexturePaintProjectPlan(raw);
+      const stored = new Map<StudioVrmTexturePaintArtifactHash, Blob>();
+      const install = vi.fn(async (candidate: StudioVrmTexturePaintArtifact) => {
+        stored.set(candidate.metadata.contentHash, candidate.archiveEntry.data);
+        return {
+          disposition: "installed" as const,
+          creationReceipt: {
+            schema: "toonspectrum.vrm-texture-paint-library-creation" as const,
+            version: 1 as const,
+            authority: "legacy-indexeddb" as const,
+            contentHash: candidate.metadata.contentHash,
+          },
+          mutationGeneration: null,
+        };
+      });
+      const compensate = vi.fn(async (receipts: readonly { readonly contentHash: string }[]) => {
+        receipts.forEach((receipt) => stored.delete(
+          receipt.contentHash as StudioVrmTexturePaintArtifactHash,
+        ));
+        return failure !== "compensation-fails";
+      });
+      const library: StudioVrmTexturePaintProjectAtomicLibraryAdapter = {
+        resolve: (hash) => stored.get(hash) ?? null,
+        installWithCreationReceipt: install,
+        compensateCreated: compensate,
+      };
+      const prepared = await prepareStudioVrmTexturePaintProjectArchiveImport({
+        project: raw,
+        canonicalProject: raw,
+        manifest: manifestFor(plan),
+        attachments: importedAttachments(
+          plan,
+          new Map([[value.metadata.contentHash, value]]),
+        ),
+        library,
+      });
+      expect(install).not.toHaveBeenCalled();
+      expect(stored.size).toBe(0);
+
+      const commit = installPreparedStudioVrmTexturePaintProjectArchiveImportAndApply(
+        prepared,
+        prepared.project,
+        () => {
+          if (failure === "throws") throw new Error("apply exploded");
+          return false;
+        },
+        { didApply: (result) => result !== false },
+      );
+      if (failure === "throws") await expect(commit).rejects.toThrow("apply exploded");
+      else if (failure === "compensation-fails") {
+        await expect(commit).rejects.toThrow("안전한 보상을 완료하지 못했습니다");
+      } else await expect(commit).resolves.toMatchObject({ applyResult: false });
+      expect(install).toHaveBeenCalledTimes(1);
+      expect(compensate).toHaveBeenCalledTimes(1);
+      expect(stored.size).toBe(0);
+      await expect(installPreparedStudioVrmTexturePaintProjectArchiveImportAndApply(
+        prepared,
+        prepared.project,
+        () => true,
+        { didApply: (result) => result },
+      )).rejects.toMatchObject({ code: "LIBRARY_INSTALL_FAILED" });
+    },
+  );
+
+  it("compensates a created PNG even when caller cancellation arrives after its durable install", async () => {
+    const value = await artifact("atomic-abort-after-install", 2, 2);
+    const raw = project([image("atomic-abort-after-install", scene([
+      texture(value, "atomic-abort-after-install", "gltf-material:0"),
+    ]))]);
+    const plan = await collectStudioVrmTexturePaintProjectPlan(raw);
+    const controller = new AbortController();
+    const stored = new Map<StudioVrmTexturePaintArtifactHash, Blob>();
+    const compensate = vi.fn(async (
+      receipts: readonly { readonly contentHash: string }[],
+      _generations: readonly number[],
+      context: { readonly signal?: AbortSignal },
+    ) => {
+      expect(context.signal).toBeUndefined();
+      receipts.forEach((receipt) => stored.delete(
+        receipt.contentHash as StudioVrmTexturePaintArtifactHash,
+      ));
+      return true;
+    });
+    const library: StudioVrmTexturePaintProjectAtomicLibraryAdapter = {
+      resolve: (hash) => stored.get(hash) ?? null,
+      installWithCreationReceipt: async (candidate) => {
+        stored.set(candidate.metadata.contentHash, candidate.archiveEntry.data);
+        controller.abort();
+        return {
+          disposition: "installed",
+          creationReceipt: {
+            schema: "toonspectrum.vrm-texture-paint-library-creation",
+            version: 1,
+            authority: "legacy-indexeddb",
+            contentHash: candidate.metadata.contentHash,
+          },
+          mutationGeneration: null,
+        };
+      },
+      compensateCreated: compensate,
+    };
+    const prepared = await prepareStudioVrmTexturePaintProjectArchiveImport({
+      project: raw,
+      canonicalProject: raw,
+      manifest: manifestFor(plan),
+      attachments: importedAttachments(plan, new Map([[value.metadata.contentHash, value]])),
+      library,
+      signal: controller.signal,
+    });
+
+    await expect(installPreparedStudioVrmTexturePaintProjectArchiveImportAndApply(
+      prepared,
+      prepared.project,
+      () => true,
+      { didApply: (result) => result },
+    )).rejects.toMatchObject({ code: "ABORTED" });
+    expect(compensate).toHaveBeenCalledTimes(1);
+    expect(stored.size).toBe(0);
+  });
+
+  it("preserves a verified shared PNG on rejected apply and never calls compensation", async () => {
+    const value = await artifact("atomic-reuse", 2, 2);
+    const raw = project([image("atomic-reuse", scene([
+      texture(value, "atomic-reuse", "gltf-material:0"),
+    ]))]);
+    const plan = await collectStudioVrmTexturePaintProjectPlan(raw);
+    const install = vi.fn();
+    const compensate = vi.fn(async () => true);
+    const prepared = await prepareStudioVrmTexturePaintProjectArchiveImport({
+      project: raw,
+      canonicalProject: raw,
+      manifest: manifestFor(plan),
+      attachments: importedAttachments(plan, new Map([[value.metadata.contentHash, value]])),
+      library: {
+        resolve: () => value.archiveEntry.data,
+        installWithCreationReceipt: install,
+        compensateCreated: compensate,
+      },
+    });
+    await expect(installPreparedStudioVrmTexturePaintProjectArchiveImportAndApply(
+      prepared,
+      prepared.project,
+      () => false,
+      { didApply: (result) => result },
+    )).resolves.toMatchObject({ applyResult: false, installed: 0, reused: 1 });
+    expect(install).not.toHaveBeenCalled();
+    expect(compensate).not.toHaveBeenCalled();
+  });
+
+  it("atomically consumes a prepared capability before concurrent fingerprint awaits", async () => {
+    const value = await artifact("concurrent-one-shot", 2, 2);
+    const raw = project([image("concurrent-one-shot", scene([
+      texture(value, "concurrent-one-shot", "gltf-material:0"),
+    ]))]);
+    let releaseDigest: (() => void) | undefined;
+    let blockNextDigest = false;
+    const digestText = vi.fn(async () => {
+      if (blockNextDigest) {
+        blockNextDigest = false;
+        await new Promise<void>((resolve) => {
+          releaseDigest = resolve;
+        });
+      }
+      return "a".repeat(64);
+    });
+    const initialPlan = await collectStudioVrmTexturePaintProjectPlan(raw, {
+      dependencies: { digestText },
+    });
+    const stored = new Map<StudioVrmTexturePaintArtifactHash, Blob>();
+    const install = vi.fn(async (candidate: StudioVrmTexturePaintArtifact) => {
+      stored.set(candidate.metadata.contentHash, candidate.archiveEntry.data);
+      return {
+        disposition: "installed" as const,
+        creationReceipt: {
+          schema: "toonspectrum.vrm-texture-paint-library-creation" as const,
+          version: 1 as const,
+          authority: "legacy-indexeddb" as const,
+          contentHash: candidate.metadata.contentHash,
+        },
+        mutationGeneration: null,
+      };
+    });
+    const library: StudioVrmTexturePaintProjectAtomicLibraryAdapter = {
+      resolve: (hash) => stored.get(hash) ?? null,
+      installWithCreationReceipt: install,
+      compensateCreated: async () => true,
+    };
+    const prepared = await prepareStudioVrmTexturePaintProjectArchiveImport({
+      project: raw,
+      canonicalProject: raw,
+      manifest: manifestFor(initialPlan),
+      attachments: importedAttachments(
+        initialPlan,
+        new Map([[value.metadata.contentHash, value]]),
+      ),
+      library,
+      dependencies: { digestText },
+    });
+    blockNextDigest = true;
+    const first = installPreparedStudioVrmTexturePaintProjectArchiveImportAndApply(
+      prepared,
+      prepared.project,
+      () => true,
+      { didApply: (result) => result },
+    );
+    await vi.waitFor(() => expect(releaseDigest).toBeTypeOf("function"));
+    await expect(installPreparedStudioVrmTexturePaintProjectArchiveImportAndApply(
+      prepared,
+      prepared.project,
+      () => true,
+      { didApply: (result) => result },
+    )).rejects.toMatchObject({ code: "LIBRARY_INSTALL_FAILED" });
+    releaseDigest?.();
+    await expect(first).resolves.toMatchObject({ applyResult: true, installed: 1 });
+    expect(install).toHaveBeenCalledTimes(1);
   });
 
   it("round-trips through the real project archive and installs its authenticated PNG", async () => {

@@ -6,10 +6,15 @@ import {
   type ImportStudioProjectArchiveResult,
   type StudioProjectArchiveAttachmentInput,
 } from "./studio-project-archive";
+import { STUDIO_VRM_1_PUBLIC_LICENSE_URL } from "./studio-vrm-license-metadata";
+import { createStudioVrmProjectArchiveUseContextReceipt } from "./studio-vrm-license-product-gate";
 import {
   collectStudioVrmProjectArchiveReferences,
+  installPreparedStudioVrmProjectArchiveImportAndApply,
   prepareStudioVrmProjectArchiveExport,
+  prepareStudioVrmProjectArchiveUseContextAttestation,
   restoreStudioVrmProjectArchiveImport,
+  type RestoreStudioVrmProjectArchiveImportResult,
   type StudioVrmProjectLibraryDependencies,
 } from "./studio-vrm-project-library";
 import {
@@ -43,7 +48,46 @@ function glbBytes(document: Record<string, unknown>): Uint8Array {
 function vrmBytes(seed = 1): Uint8Array {
   return glbBytes({
     asset: { version: "2.0" },
-    extensions: { VRMC_vrm: { specVersion: "1.0" } },
+    extensions: {
+      VRMC_vrm: {
+        specVersion: "1.0",
+        meta: {
+          name: "Archive test",
+          authors: ["Test Creator"],
+          licenseUrl: STUDIO_VRM_1_PUBLIC_LICENSE_URL,
+          avatarPermission: "everyone",
+          commercialUsage: "corporation",
+          allowRedistribution: true,
+          modification: "allowModificationRedistribution",
+          creditNotation: "required",
+        },
+      },
+    },
+    extras: { seed },
+  });
+}
+
+const ARCHIVE_USE_CONTEXT = createStudioVrmProjectArchiveUseContextReceipt({
+  confirmedByUser: true,
+  avatarPermissionBasis: "other",
+  confirmedAttributionTexts: [
+    "Archive test · Test Creator · VRM-Public-License-1.0 · https://vrm.dev/licenses/1.0/",
+  ],
+  excessivelyViolent: "absent",
+  excessivelySexual: "absent",
+  politicalOrReligious: "absent",
+  antisocialOrHate: "absent",
+});
+
+function vrmBytesWithMeta(meta: Record<string, unknown> | null, seed = 1): Uint8Array {
+  return glbBytes({
+    asset: { version: "2.0" },
+    extensions: {
+      VRMC_vrm: {
+        specVersion: "1.0",
+        ...(meta === null ? {} : { meta }),
+      },
+    },
     extras: { seed },
   });
 }
@@ -137,11 +181,25 @@ function projectWithScenes(
 function savedRecordFactory(
   id: string,
   hash: VrmContentHash,
-): StudioVrmProjectLibraryDependencies["saveVerifiedBlob"] {
-  return async ({ blob, expectedHash }): Promise<VrmStoredModelRecord> => {
+): StudioVrmProjectLibraryDependencies["saveVerifiedBlobWithDisposition"] {
+  return async ({ blob, expectedHash }) => {
     expect(expectedHash).toBe(hash);
-    return storedRecord(id, blob, hash);
+    return { record: storedRecord(id, blob, hash), created: true };
   };
+}
+
+function commitPrepared(
+  prepared: RestoreStudioVrmProjectArchiveImportResult,
+  dependencies: Partial<StudioVrmProjectLibraryDependencies>,
+  apply: (project: ImportStudioProjectArchiveResult["project"]) => boolean = () => true,
+) {
+  return installPreparedStudioVrmProjectArchiveImportAndApply(
+    prepared,
+    prepared.project,
+    apply,
+    { didApply: (result) => result },
+    dependencies,
+  );
 }
 
 async function selfContainedArchive(
@@ -150,7 +208,7 @@ async function selfContainedArchive(
 ): Promise<ImportStudioProjectArchiveResult> {
   const prepared = await prepareStudioVrmProjectArchiveExport(project, {
     getStoredByContentHash: async () => record,
-  });
+  }, ARCHIVE_USE_CONTEXT);
   expect(prepared.isComplete).toBe(true);
   const built = await buildStudioProjectArchive({
     project,
@@ -193,9 +251,32 @@ describe("studio VRM project library bridge", () => {
 
     const prepared = await prepareStudioVrmProjectArchiveExport(project, {
       getStoredByContentHash: async () => record,
+    }, ARCHIVE_USE_CONTEXT);
+    const attestation = await prepareStudioVrmProjectArchiveUseContextAttestation(project, {
+      getStoredByContentHash: async () => record,
     });
 
     expect(prepared).toMatchObject({ isComplete: true, missing: [], diagnostics: [] });
+    expect(attestation).toMatchObject({
+      ok: true,
+      modelCount: 1,
+      permittedActorBases: ["author", "separately-licensed-person", "other"],
+      exactAttributionTexts: ARCHIVE_USE_CONTEXT.attribution.exactTexts,
+    });
+    const missingExactCredit = await prepareStudioVrmProjectArchiveExport(
+      project,
+      { getStoredByContentHash: async () => record },
+      createStudioVrmProjectArchiveUseContextReceipt({
+        confirmedByUser: true,
+        avatarPermissionBasis: "other",
+        confirmedAttributionTexts: [],
+        excessivelyViolent: "absent",
+        excessivelySexual: "absent",
+        politicalOrReligious: "absent",
+        antisocialOrHate: "absent",
+      }),
+    );
+    expect(missingExactCredit.missing[0]).toMatchObject({ reason: "license-restricted" });
     expect(prepared.attachments).toHaveLength(1);
     expect(prepared.attachments[0]).toMatchObject({
       kind: "vrm",
@@ -223,19 +304,93 @@ describe("studio VRM project library bridge", () => {
       kinds: ["vrm"],
     });
     const imported = await importStudioProjectArchive(built.blob);
-    const saveVerifiedBlob = vi.fn(savedRecordFactory("destination-device-id", hash));
+    const saveVerifiedBlobWithDisposition = vi.fn(
+      savedRecordFactory("destination-device-id", hash),
+    );
     const restored = await restoreStudioVrmProjectArchiveImport(imported, {
       getStoredByContentHash: async () => null,
-      saveVerifiedBlob,
+      saveVerifiedBlobWithDisposition,
+    });
+    expect(saveVerifiedBlobWithDisposition).not.toHaveBeenCalled();
+    const committed = await commitPrepared(restored, {
+      getStoredByContentHash: async () => null,
+      saveVerifiedBlobWithDisposition,
     });
 
-    expect(restored.installed).toEqual([{ hash, modelId: "destination-device-id" }]);
-    expect(restored.reused).toEqual([]);
+    expect(committed.installed).toEqual([{ hash, modelId: "destination-device-id" }]);
+    expect(committed.reused).toEqual([]);
     expect(restored.unresolved).toEqual([]);
-    expect(saveVerifiedBlob).toHaveBeenCalledOnce();
+    expect(saveVerifiedBlobWithDisposition).toHaveBeenCalledOnce();
     expect(JSON.stringify(restored.project)).not.toContain("destination-device-id");
     expect(collectStudioVrmProjectArchiveReferences(restored.project).map(({ model }) => model))
       .toEqual([scene.model, scene.model]);
+  });
+
+  it("fail-closes archive redistribution when raw VRM metadata is missing or prohibits it", async () => {
+    const cases = [
+      vrmBytesWithMeta(null, 31),
+      vrmBytesWithMeta({
+        name: "No redistribution",
+        authors: ["Creator"],
+        licenseUrl: STUDIO_VRM_1_PUBLIC_LICENSE_URL,
+        avatarPermission: "everyone",
+        allowRedistribution: false,
+      }, 32),
+    ];
+
+    for (const bytes of cases) {
+      const blob = blobFrom(bytes);
+      const hash = await hashOf(blob);
+      const prepared = await prepareStudioVrmProjectArchiveExport(
+        projectWithScenes(attachmentScene(hash, blob.size)),
+        { getStoredByContentHash: async () => storedRecord("restricted", blob, hash) },
+        ARCHIVE_USE_CONTEXT,
+      );
+
+      expect(prepared.attachments).toEqual([]);
+      expect(prepared.missing[0]).toMatchObject({ reason: "license-restricted" });
+      expect(prepared.missing[0]?.policyReasons?.length).toBeGreaterThan(0);
+      expect(prepared.diagnostics[0]).toMatchObject({
+        code: "LOCAL_MODEL_LICENSE_RESTRICTED",
+      });
+      expect(prepared.isComplete).toBe(false);
+    }
+  });
+
+  it("still permits authenticated archive import for local preview when rights are unknown", async () => {
+    const blob = blobFrom(vrmBytesWithMeta(null, 33));
+    const hash = await hashOf(blob);
+    const project = projectWithScenes(attachmentScene(hash, blob.size));
+    const built = await buildStudioProjectArchive({
+      project,
+      attachments: [{
+        kind: "vrm",
+        data: blob.slice(0, blob.size, "model/vrm"),
+        mimeType: "model/vrm",
+        documentReferences: [{
+          pointer: "/pagesList/0/elements/0/vrmScene/model/hash",
+          usage: "vrm",
+          mode: "sha256-prefixed",
+        }],
+      }],
+    });
+    const imported = await importStudioProjectArchive(built.blob);
+    const saveVerifiedBlobWithDisposition = vi.fn(
+      savedRecordFactory("local-unknown-rights", hash),
+    );
+    const restored = await restoreStudioVrmProjectArchiveImport(imported, {
+      getStoredByContentHash: async () => null,
+      saveVerifiedBlobWithDisposition,
+    });
+    expect(saveVerifiedBlobWithDisposition).not.toHaveBeenCalled();
+    const committed = await commitPrepared(restored, {
+      getStoredByContentHash: async () => null,
+      saveVerifiedBlobWithDisposition,
+    });
+
+    expect(committed.installed).toEqual([{ hash, modelId: "local-unknown-rights" }]);
+    expect(restored.diagnostics).toEqual([]);
+    expect(saveVerifiedBlobWithDisposition).toHaveBeenCalledOnce();
   });
 
   it("reports missing, stale-hash, wrong-size, and non-VRM local rows without exporting bytes", async () => {
@@ -301,15 +456,22 @@ describe("studio VRM project library bridge", () => {
     const scene = attachmentScene(hash, blob.size);
     const local = storedRecord("existing-local-id", blob, hash);
     const imported = await selfContainedArchive(projectWithScenes(scene), local);
-    const saveVerifiedBlob = vi.fn(savedRecordFactory("unused-id", hash));
+    const saveVerifiedBlobWithDisposition = vi.fn(savedRecordFactory("unused-id", hash));
+    const getStoredByContentHash = vi.fn(async () => local);
     const restored = await restoreStudioVrmProjectArchiveImport(imported, {
-      getStoredByContentHash: async () => local,
-      saveVerifiedBlob,
+      getStoredByContentHash,
+      saveVerifiedBlobWithDisposition,
+    });
+    expect(getStoredByContentHash).not.toHaveBeenCalled();
+    const committed = await commitPrepared(restored, {
+      getStoredByContentHash,
+      saveVerifiedBlobWithDisposition,
     });
 
-    expect(restored.reused).toEqual([{ hash, modelId: "existing-local-id" }]);
-    expect(restored.installed).toEqual([]);
-    expect(saveVerifiedBlob).not.toHaveBeenCalled();
+    expect(getStoredByContentHash).toHaveBeenCalledTimes(1);
+    expect(committed.reused).toEqual([{ hash, modelId: "existing-local-id" }]);
+    expect(committed.installed).toEqual([]);
+    expect(saveVerifiedBlobWithDisposition).not.toHaveBeenCalled();
   });
 
   it("ignores authenticated orphan VRM files and installs only hashes used by a scene", async () => {
@@ -320,7 +482,7 @@ describe("studio VRM project library bridge", () => {
     const project = projectWithScenes(scene);
     const prepared = await prepareStudioVrmProjectArchiveExport(project, {
       getStoredByContentHash: async () => storedRecord("used", usedBlob, usedHash),
-    });
+    }, ARCHIVE_USE_CONTEXT);
     const orphanInput: StudioProjectArchiveAttachmentInput = {
       kind: "vrm",
       data: orphanBlob,
@@ -332,15 +494,21 @@ describe("studio VRM project library bridge", () => {
     });
     const imported = await importStudioProjectArchive(built.blob);
     expect(imported.attachments).toHaveLength(2);
-    const saveVerifiedBlob = vi.fn(savedRecordFactory("used-installed", usedHash));
+    const saveVerifiedBlobWithDisposition = vi.fn(
+      savedRecordFactory("used-installed", usedHash),
+    );
 
     const restored = await restoreStudioVrmProjectArchiveImport(imported, {
       getStoredByContentHash: async () => null,
-      saveVerifiedBlob,
+      saveVerifiedBlobWithDisposition,
+    });
+    const committed = await commitPrepared(restored, {
+      getStoredByContentHash: async () => null,
+      saveVerifiedBlobWithDisposition,
     });
 
-    expect(restored.installed).toEqual([{ hash: usedHash, modelId: "used-installed" }]);
-    expect(saveVerifiedBlob).toHaveBeenCalledOnce();
+    expect(committed.installed).toEqual([{ hash: usedHash, modelId: "used-installed" }]);
+    expect(saveVerifiedBlobWithDisposition).toHaveBeenCalledOnce();
   });
 
   it("rejects forged reference metadata, MIME, or bytes before saving", async () => {
@@ -357,7 +525,9 @@ describe("studio VRM project library bridge", () => {
     const original = imported.attachments.get(rawHash);
     expect(original).toBeDefined();
     if (!original) throw new Error("missing test attachment");
-    const saveVerifiedBlob = vi.fn(savedRecordFactory("must-not-save", hash));
+    const saveVerifiedBlobWithDisposition = vi.fn(
+      savedRecordFactory("must-not-save", hash),
+    );
 
     const withoutReference: ImportStudioProjectArchiveResult = {
       ...imported,
@@ -368,7 +538,7 @@ describe("studio VRM project library bridge", () => {
     };
     const missingReference = await restoreStudioVrmProjectArchiveImport(withoutReference, {
       getStoredByContentHash: async () => null,
-      saveVerifiedBlob,
+      saveVerifiedBlobWithDisposition,
     });
     expect(missingReference.diagnostics[0]?.code).toBe("ATTACHMENT_METADATA_MISMATCH");
 
@@ -381,7 +551,7 @@ describe("studio VRM project library bridge", () => {
     };
     const rejectedMime = await restoreStudioVrmProjectArchiveImport(wrongMime, {
       getStoredByContentHash: async () => null,
-      saveVerifiedBlob,
+      saveVerifiedBlobWithDisposition,
     });
     expect(rejectedMime.diagnostics[0]?.code).toBe("ATTACHMENT_MIME_MISMATCH");
 
@@ -394,10 +564,10 @@ describe("studio VRM project library bridge", () => {
     };
     const rejectedBytes = await restoreStudioVrmProjectArchiveImport(wrongBytes, {
       getStoredByContentHash: async () => null,
-      saveVerifiedBlob,
+      saveVerifiedBlobWithDisposition,
     });
     expect(rejectedBytes.diagnostics[0]?.code).toBe("ATTACHMENT_HASH_MISMATCH");
-    expect(saveVerifiedBlob).not.toHaveBeenCalled();
+    expect(saveVerifiedBlobWithDisposition).not.toHaveBeenCalled();
   });
 
   it("rejects a caller result whose rehydrated and canonical VRM scenes differ", async () => {
@@ -424,6 +594,109 @@ describe("studio VRM project library bridge", () => {
     });
   });
 
+  it("compensates only the exact row created at commit when the final project apply is stale", async () => {
+    const blob = blobFrom(vrmBytes(41));
+    const hash = await hashOf(blob);
+    const imported = await selfContainedArchive(
+      projectWithScenes(attachmentScene(hash, blob.size)),
+      storedRecord("source", blob, hash),
+    );
+    const saveVerifiedBlobWithDisposition = vi.fn(
+      savedRecordFactory("created-by-this-import", hash),
+    );
+    const deleteStoredIfIdentityMatches = vi.fn(async () => true);
+    const prepared = await restoreStudioVrmProjectArchiveImport(imported, {
+      getStoredByContentHash: async () => null,
+      saveVerifiedBlobWithDisposition,
+      deleteStoredIfIdentityMatches,
+    });
+
+    const committed = await commitPrepared(
+      prepared,
+      {
+        getStoredByContentHash: async () => null,
+        saveVerifiedBlobWithDisposition,
+        deleteStoredIfIdentityMatches,
+      },
+      () => false,
+    );
+
+    expect(committed.applyResult).toBe(false);
+    expect(committed.installed).toEqual([]);
+    expect(deleteStoredIfIdentityMatches).toHaveBeenCalledOnce();
+    expect(deleteStoredIfIdentityMatches).toHaveBeenCalledWith(
+      "created-by-this-import",
+      hash,
+    );
+    await expect(commitPrepared(prepared, {
+      getStoredByContentHash: async () => null,
+      saveVerifiedBlobWithDisposition,
+      deleteStoredIfIdentityMatches,
+    })).rejects.toMatchObject({ code: "import-plan-invalid" });
+  });
+
+  it("never compensates a row deduplicated by a concurrent/pre-existing hash owner", async () => {
+    const blob = blobFrom(vrmBytes(42));
+    const hash = await hashOf(blob);
+    const imported = await selfContainedArchive(
+      projectWithScenes(attachmentScene(hash, blob.size)),
+      storedRecord("source", blob, hash),
+    );
+    const deduplicated = storedRecord("shared-existing-row", blob, hash);
+    const saveVerifiedBlobWithDisposition = vi.fn(async () => ({
+      record: deduplicated,
+      created: false,
+    }));
+    const deleteStoredIfIdentityMatches = vi.fn(async () => true);
+    const prepared = await restoreStudioVrmProjectArchiveImport(imported, {
+      getStoredByContentHash: async () => null,
+    });
+
+    const committed = await commitPrepared(
+      prepared,
+      {
+        getStoredByContentHash: async () => null,
+        saveVerifiedBlobWithDisposition,
+        deleteStoredIfIdentityMatches,
+      },
+      () => false,
+    );
+
+    expect(committed.reused).toEqual([{ hash, modelId: "shared-existing-row" }]);
+    expect(deleteStoredIfIdentityMatches).not.toHaveBeenCalled();
+  });
+
+  it("compensates a newly created row when the downstream apply throws", async () => {
+    const blob = blobFrom(vrmBytes(43));
+    const hash = await hashOf(blob);
+    const imported = await selfContainedArchive(
+      projectWithScenes(attachmentScene(hash, blob.size)),
+      storedRecord("source", blob, hash),
+    );
+    const saveVerifiedBlobWithDisposition = vi.fn(
+      savedRecordFactory("created-before-throw", hash),
+    );
+    const deleteStoredIfIdentityMatches = vi.fn(async () => true);
+    const prepared = await restoreStudioVrmProjectArchiveImport(imported, {
+      getStoredByContentHash: async () => null,
+    });
+
+    await expect(installPreparedStudioVrmProjectArchiveImportAndApply(
+      prepared,
+      prepared.project,
+      () => {
+        throw new Error("route closed");
+      },
+      { didApply: () => true },
+      {
+        getStoredByContentHash: async () => null,
+        saveVerifiedBlobWithDisposition,
+        deleteStoredIfIdentityMatches,
+      },
+    )).rejects.toThrow("route closed");
+    expect(deleteStoredIfIdentityMatches).toHaveBeenCalledWith("created-before-throw", hash);
+  });
+
   it("does no library I/O for projects that use bundled mannequins only", async () => {
     const getStoredByContentHash = vi.fn(async () => null);
     const exported = await prepareStudioVrmProjectArchiveExport(
@@ -440,16 +713,16 @@ describe("studio VRM project library bridge", () => {
 
     const built = await buildStudioProjectArchive({ project: projectWithScenes(bundledScene()) });
     const imported = await importStudioProjectArchive(built.blob);
-    const saveVerifiedBlob = vi.fn(savedRecordFactory(
+    const saveVerifiedBlobWithDisposition = vi.fn(savedRecordFactory(
       "unused",
       `sha256:${"0".repeat(64)}`,
     ));
     const restored = await restoreStudioVrmProjectArchiveImport(imported, {
       getStoredByContentHash,
-      saveVerifiedBlob,
+      saveVerifiedBlobWithDisposition,
     });
-    expect(restored.installed).toEqual([]);
+    expect(restored.prepared).toEqual([]);
     expect(restored.reused).toEqual([]);
-    expect(saveVerifiedBlob).not.toHaveBeenCalled();
+    expect(saveVerifiedBlobWithDisposition).not.toHaveBeenCalled();
   });
 });

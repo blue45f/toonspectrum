@@ -146,6 +146,44 @@ describe("Studio asset SQLite manifest + OPFS CAS authority", () => {
     await expect(repository.list()).resolves.toEqual([saved]);
   });
 
+  it("offers a pure list snapshot that never reconciles owner refs or sweeps CAS", async () => {
+    const database = await openMemoryDatabase();
+    const fs = createStudioOpfsMemoryFileSystem();
+    const baseStore = createStudioOpfsAssetStore({ fs, graceMs: 0 });
+    const setOwnerRefs = vi.spyOn(baseStore, "setOwnerRefs");
+    const sweep = vi.spyOn(baseStore, "sweep");
+    const { repository } = await fixture({ database, fs, store: baseStore });
+    const saved = await repository.save(saveInput(104));
+    setOwnerRefs.mockClear();
+    sweep.mockClear();
+
+    await expect(repository.listReadOnly()).resolves.toEqual([saved]);
+    expect(setOwnerRefs).not.toHaveBeenCalled();
+    expect(sweep).not.toHaveBeenCalled();
+  });
+
+  it("compare-deletes only an exact reference-import id + content hash", async () => {
+    const { repository } = await fixture();
+    const saved = await repository.save(saveInput(101));
+    await expect(repository.deleteIfIdentityMatches(
+      saved.id,
+      `sha256:${"f".repeat(64)}`,
+    )).resolves.toBe(false);
+    await expect(repository.list()).resolves.toEqual([saved]);
+    await expect(repository.deleteIfIdentityMatches(saved.id, saved.contentHash))
+      .resolves.toBe(true);
+    await expect(repository.list()).resolves.toEqual([]);
+    await expect(repository.deleteIfIdentityMatches(saved.id, saved.contentHash))
+      .resolves.toBe(false);
+  });
+
+  it("fails a generated-id collision instead of overwriting a row eligible for compensation", async () => {
+    const { repository } = await fixture({ createId: () => "fixed-import-id" });
+    const original = await repository.save(saveInput(102));
+    await expect(repository.save(saveInput(103))).rejects.toMatchObject({ code: "invalid" });
+    await expect(repository.list()).resolves.toEqual([original]);
+  });
+
   it("persists through a real sqlite-wasm close/reopen and a new CAS store instance", async () => {
     const filename = `asset-reopen-${crypto.randomUUID()}.sqlite3`;
     const fs = createStudioOpfsMemoryFileSystem();
@@ -266,7 +304,12 @@ describe("Studio asset SQLite manifest + OPFS CAS authority", () => {
         return database.kvSet(namespace, key, value);
       },
     });
-    const failed = await fixture({ database: failing, fs, store });
+    const failed = await fixture({
+      database: failing,
+      fs,
+      store,
+      createId: () => "asset-failed-commit",
+    });
 
     await expect(failed.repository.save(saveInput(10))).rejects.toMatchObject({
       code: "quota-exceeded",
@@ -279,7 +322,7 @@ describe("Studio asset SQLite manifest + OPFS CAS authority", () => {
     expect((await stable.repository.list()).map(({ id }) => id)).toEqual([first.id]);
   });
 
-  it("keeps old and candidate asset blobs pinned when the commit response is lost", async () => {
+  it("reconciles a non-committed unknown response to the exact old manifest", async () => {
     const database = await openMemoryDatabase();
     const fs = createStudioOpfsMemoryFileSystem();
     const store = createStudioOpfsAssetStore({ fs, graceMs: 0 });
@@ -306,6 +349,104 @@ describe("Studio asset SQLite manifest + OPFS CAS authority", () => {
     await expect(candidate.repository.save(saveInput(23)))
       .rejects.toMatchObject({ code: "unavailable" });
 
+    expect(await store.ownerRefs(STUDIO_ASSET_LIBRARY_CAS_OWNER)).toEqual([first.contentHash]);
+    expect((await stable.repository.list()).map(({ id }) => id)).toEqual([first.id]);
+  });
+
+  it("returns an exact creation receipt when the commit succeeded but its response was lost", async () => {
+    const database = await openMemoryDatabase();
+    const fs = createStudioOpfsMemoryFileSystem();
+    const store = createStudioOpfsAssetStore({ fs, graceMs: 0 });
+    const stable = await fixture({ database, fs, store, createId: () => "stable-asset" });
+    const first = await stable.repository.save(saveInput(24));
+    const committedUnknown = proxyDatabase(database, {
+      kvSet: async (namespace, key, value) => {
+        await database.kvSet(namespace, key, value);
+        if (namespace === STUDIO_ASSET_LIBRARY_SQLITE_NAMESPACE) {
+          throw new StudioLocalDatabaseCommitOutcomeUnknownError(
+            "kvSet",
+            new Error("response-channel-lost-after-commit"),
+          );
+        }
+      },
+    });
+    const candidate = await fixture({
+      database: committedUnknown,
+      fs,
+      store,
+      createId: () => "candidate-asset",
+    });
+
+    const saved = await candidate.repository.save(saveInput(25));
+    expect(saved.id).toBe("candidate-asset");
+    expect((await stable.repository.list()).map(({ id }) => id)).toEqual([
+      saved.id,
+      first.id,
+    ]);
+    expect(await store.ownerRefs(STUDIO_ASSET_LIBRARY_CAS_OWNER)).toEqual([
+      first.contentHash,
+      saved.contentHash,
+    ].toSorted());
+  });
+
+  it("returns the candidate row after a generic SQLite error surfaced post-autocommit", async () => {
+    const database = await openMemoryDatabase();
+    const fs = createStudioOpfsMemoryFileSystem();
+    const store = createStudioOpfsAssetStore({ fs, graceMs: 0 });
+    const genericPostCommit = proxyDatabase(database, {
+      kvSet: async (namespace, key, value) => {
+        await database.kvSet(namespace, key, value);
+        if (namespace === STUDIO_ASSET_LIBRARY_SQLITE_NAMESPACE) {
+          throw new Error("SQLITE_IOERR_AFTER_AUTOCOMMIT");
+        }
+      },
+    });
+    const candidate = await fixture({
+      database: genericPostCommit,
+      fs,
+      store,
+      createId: () => "generic-post-commit-asset",
+    });
+
+    const saved = await candidate.repository.save(saveInput(28));
+    expect(saved.id).toBe("generic-post-commit-asset");
+    await expect(candidate.repository.deleteIfIdentityMatches(saved.id, saved.contentHash))
+      .resolves.toBe(true);
+  });
+
+  it("fails closed with the old/candidate CAS union when unknown reconciliation sees a third manifest", async () => {
+    const database = await openMemoryDatabase();
+    const fs = createStudioOpfsMemoryFileSystem();
+    const store = createStudioOpfsAssetStore({ fs, graceMs: 0 });
+    const stable = await fixture({ database, fs, store, createId: () => "stable-asset" });
+    const first = await stable.repository.save(saveInput(26));
+    const thirdState = proxyDatabase(database, {
+      kvSet: async (namespace, key, value) => {
+        if (namespace === STUDIO_ASSET_LIBRARY_SQLITE_NAMESPACE) {
+          const candidate = parseStudioAssetManifest(value);
+          await database.kvSet(namespace, key, serializeStudioAssetManifest(
+            candidate.entries.map((entry, index) => index === 0
+              ? { ...entry, name: "third-state-name" }
+              : entry),
+          ));
+          throw new StudioLocalDatabaseCommitOutcomeUnknownError(
+            "kvSet",
+            new Error("response-channel-lost-with-third-state"),
+          );
+        }
+        return database.kvSet(namespace, key, value);
+      },
+    });
+    const candidate = await fixture({
+      database: thirdState,
+      fs,
+      store,
+      createId: () => "candidate-asset",
+    });
+
+    await expect(candidate.repository.save(saveInput(27))).rejects.toMatchObject({
+      code: "unavailable",
+    });
     const ownerRefs = await store.ownerRefs(STUDIO_ASSET_LIBRARY_CAS_OWNER);
     expect(ownerRefs).toContain(first.contentHash);
     expect(ownerRefs).toHaveLength(2);

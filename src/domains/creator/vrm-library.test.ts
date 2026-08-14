@@ -7,6 +7,7 @@ import {
   BUNDLED_VRM_RIGHTS_BLOCKS,
   bundledVrmRightsBlockById,
   createUploadedVrmRecord,
+  deleteStoredVrmModel,
   extractEmbeddedVrmThumbnailBytes,
   getDeletableModelIds,
   isBundledVrmRightsBlocked,
@@ -253,7 +254,7 @@ describe("VRM library helpers", () => {
     expect(record.blob).toBe(file);
   });
 
-  it("only allows uploaded models to be deleted", () => {
+  it("allows only non-durable memory models to enter the deletion surface", () => {
     const deletableIds = getDeletableModelIds([
       SAMPLE_VRM_LIBRARY_ENTRY,
       {
@@ -264,9 +265,23 @@ describe("VRM library helpers", () => {
         createdAt: 1,
         updatedAt: 1,
       },
+      {
+        id: "memory-1",
+        name: "Current-tab model",
+        source: "memory",
+        thumbnail: null,
+        createdAt: 2,
+        updatedAt: 2,
+      },
     ]);
 
-    expect(deletableIds).toEqual(["upload-1"]);
+    expect(deletableIds).toEqual(["memory-1"]);
+  });
+
+  it("fails closed before opening durable storage when user deletion has no owner proof", async () => {
+    await expect(deleteStoredVrmModel("upload-1")).rejects.toMatchObject({
+      code: "conflict",
+    });
   });
 
   it("extracts embedded PNG/JPEG thumbnails or main texture bytes from sample VRM GLB files", () => {

@@ -16,6 +16,8 @@ import {
 } from "./studio-reference-board";
 import {
   collectStudioReferenceBoardArchiveReferences,
+  installPreparedStudioReferenceBoardArchiveImportAndApply,
+  prepareStudioReferenceBoardArchiveImport,
   prepareStudioReferenceBoardArchiveExport,
   restoreStudioReferenceBoardArchiveImport,
 } from "./studio-reference-board-archive";
@@ -296,5 +298,147 @@ describe("studio reference-board archive bridge", () => {
     expect(restored.diagnostics).toEqual([expect.objectContaining({
       code: "ATTACHMENT_NOT_REFERENCE",
     })]);
+  });
+
+  it("keeps prepare read-only and compensates only the exact created row when apply rejects", async () => {
+    const bytes = pngBytes(10);
+    const hash = await contentHash(bytes);
+    const project = projectWithBoard(referenceBoard(hash));
+    const source = localAsset("source", bytes, hash);
+    const exported = await prepareStudioReferenceBoardArchiveExport(project, {
+      listAssets: async () => [source],
+    });
+    const built = await buildStudioProjectArchive({ project, attachments: exported.attachments });
+    const imported = await importStudioProjectArchive(built.blob, { rehydrateDataUrls: false });
+    const save = vi.fn(async (input: Parameters<typeof createAssetRecord>[0]) => ({
+      ...createAssetRecord(input, "created-by-import", 5),
+      contentHash: hash,
+    }));
+    const compensate = vi.fn(async () => true);
+    const listAssets = vi.fn(async () => [] as StudioAsset[]);
+    const dependencies = {
+      listAssets,
+      saveAsset: save,
+      deleteAssetIfIdentityMatches: compensate,
+    };
+
+    const prepared = await prepareStudioReferenceBoardArchiveImport(imported, dependencies);
+    expect(listAssets).not.toHaveBeenCalled();
+    expect(save).not.toHaveBeenCalled();
+    expect(compensate).not.toHaveBeenCalled();
+
+    const committed = await installPreparedStudioReferenceBoardArchiveImportAndApply(
+      prepared,
+      prepared.project,
+      () => false,
+      { didApply: (value) => value },
+      dependencies,
+    );
+    expect(committed.applyResult).toBe(false);
+    expect(listAssets).toHaveBeenCalledTimes(1);
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(compensate).toHaveBeenCalledTimes(1);
+    expect(compensate).toHaveBeenCalledWith("created-by-import", hash);
+    await expect(installPreparedStudioReferenceBoardArchiveImportAndApply(
+      prepared,
+      prepared.project,
+      () => true,
+      { didApply: (value) => value },
+      dependencies,
+    )).rejects.toThrow("현재 검증 세션");
+  });
+
+  it("compensates an exact created reference row when project apply throws", async () => {
+    const bytes = pngBytes(11);
+    const hash = await contentHash(bytes);
+    const project = projectWithBoard(referenceBoard(hash));
+    const source = localAsset("source", bytes, hash);
+    const exported = await prepareStudioReferenceBoardArchiveExport(project, {
+      listAssets: async () => [source],
+    });
+    const built = await buildStudioProjectArchive({ project, attachments: exported.attachments });
+    const imported = await importStudioProjectArchive(built.blob, { rehydrateDataUrls: false });
+    const compensate = vi.fn(async () => true);
+    const dependencies = {
+      listAssets: async () => [],
+      saveAsset: async (input: Parameters<typeof createAssetRecord>[0]) => ({
+        ...createAssetRecord(input, "throw-created", 8),
+        contentHash: hash,
+      }),
+      deleteAssetIfIdentityMatches: compensate,
+    };
+    const prepared = await prepareStudioReferenceBoardArchiveImport(imported, dependencies);
+
+    await expect(installPreparedStudioReferenceBoardArchiveImportAndApply(
+      prepared,
+      prepared.project,
+      () => {
+        throw new Error("apply exploded");
+      },
+      { didApply: () => true },
+      dependencies,
+    )).rejects.toThrow("apply exploded");
+    expect(compensate).toHaveBeenCalledTimes(1);
+    expect(compensate).toHaveBeenCalledWith("throw-created", hash);
+  });
+
+  it("never compensates a byte-verified shared reference row", async () => {
+    const bytes = pngBytes(11);
+    const hash = await contentHash(bytes);
+    const project = projectWithBoard(referenceBoard(hash));
+    const source = localAsset("source", bytes, hash);
+    const exported = await prepareStudioReferenceBoardArchiveExport(project, {
+      listAssets: async () => [source],
+    });
+    const built = await buildStudioProjectArchive({ project, attachments: exported.attachments });
+    const imported = await importStudioProjectArchive(built.blob, { rehydrateDataUrls: false });
+    const existing = localAsset("shared-existing", bytes, hash);
+    const compensate = vi.fn(async () => true);
+    const prepared = await prepareStudioReferenceBoardArchiveImport(imported, {
+      listAssets: async () => [existing],
+    });
+
+    await expect(installPreparedStudioReferenceBoardArchiveImportAndApply(
+      prepared,
+      prepared.project,
+      () => {
+        throw new Error("apply exploded");
+      },
+      { didApply: () => true },
+      {
+        listAssets: async () => [existing],
+        deleteAssetIfIdentityMatches: compensate,
+      },
+    )).rejects.toThrow("apply exploded");
+    expect(compensate).not.toHaveBeenCalled();
+  });
+
+  it("surfaces a failed exact compensation instead of claiming an atomic rollback", async () => {
+    const bytes = pngBytes(12);
+    const hash = await contentHash(bytes);
+    const project = projectWithBoard(referenceBoard(hash));
+    const source = localAsset("source", bytes, hash);
+    const exported = await prepareStudioReferenceBoardArchiveExport(project, {
+      listAssets: async () => [source],
+    });
+    const built = await buildStudioProjectArchive({ project, attachments: exported.attachments });
+    const imported = await importStudioProjectArchive(built.blob, { rehydrateDataUrls: false });
+    const dependencies = {
+      listAssets: async () => [],
+      saveAsset: async (input: Parameters<typeof createAssetRecord>[0]) => ({
+        ...createAssetRecord(input, "changed-after-create", 9),
+        contentHash: hash,
+      }),
+      deleteAssetIfIdentityMatches: async () => false,
+    };
+    const prepared = await prepareStudioReferenceBoardArchiveImport(imported, dependencies);
+
+    await expect(installPreparedStudioReferenceBoardArchiveImportAndApply(
+      prepared,
+      prepared.project,
+      () => false,
+      { didApply: (value) => value },
+      dependencies,
+    )).rejects.toThrow("안전하게 되돌리지 못했습니다");
   });
 });

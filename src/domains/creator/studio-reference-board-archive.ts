@@ -1,8 +1,9 @@
 import {
   canonicalizeStudioAssetContentHash,
-  deleteAsset,
+  deleteAssetIfIdentityMatches,
   ensureStudioAssetContentHash,
   listAssets,
+  listAssetsReadOnly,
   saveAsset,
   type StudioAsset,
   type StudioAssetWithContentHash,
@@ -82,19 +83,50 @@ export interface StudioReferenceBoardArchiveImportDependencies
     width: number;
     height: number;
     kind?: string;
+    contentHash?: string;
   }) => Promise<StudioAssetWithContentHash>;
-  deleteAsset: (id: string) => Promise<void>;
+  deleteAssetIfIdentityMatches: (id: string, contentHash: string) => Promise<boolean>;
   decodeImageDimensions: (blob: Blob) => Promise<{ width: number; height: number } | null>;
 }
 
+export interface PreparedStudioReferenceBoardArchiveAsset {
+  readonly sha256: StudioReferenceBoardSha256;
+  readonly input: {
+    readonly name: string;
+    readonly dataUrl: string;
+    readonly width: number;
+    readonly height: number;
+    readonly contentHash: StudioReferenceBoardSha256;
+  };
+}
+
+export interface PrepareStudioReferenceBoardArchiveImportResult {
+  readonly document: StudioReferenceBoardDocument;
+  readonly project: StudioProjectFile;
+  readonly canonicalProject: StudioProjectFile;
+  readonly prepared: readonly PreparedStudioReferenceBoardArchiveAsset[];
+  readonly reused: ReadonlyArray<{ sha256: StudioReferenceBoardSha256; assetId: string }>;
+  readonly unresolved: readonly StudioReferenceBoardSha256[];
+  readonly diagnostics: readonly StudioReferenceBoardArchiveDiagnostic[];
+}
+
+export interface InstallStudioReferenceBoardArchiveImportOptions<ApplyResult> {
+  readonly didApply: (result: ApplyResult) => boolean;
+}
+
+export interface InstallStudioReferenceBoardArchiveImportResult<ApplyResult>
+  extends RestoreStudioReferenceBoardArchiveImportResult {
+  readonly applyResult: ApplyResult;
+}
+
 export interface RestoreStudioReferenceBoardArchiveImportResult {
-  document: StudioReferenceBoardDocument;
-  project: StudioProjectFile;
-  canonicalProject: StudioProjectFile;
-  installed: Array<{ sha256: StudioReferenceBoardSha256; assetId: string }>;
-  reused: Array<{ sha256: StudioReferenceBoardSha256; assetId: string }>;
-  unresolved: StudioReferenceBoardSha256[];
-  diagnostics: StudioReferenceBoardArchiveDiagnostic[];
+  readonly document: StudioReferenceBoardDocument;
+  readonly project: StudioProjectFile;
+  readonly canonicalProject: StudioProjectFile;
+  readonly installed: readonly { sha256: StudioReferenceBoardSha256; assetId: string }[];
+  readonly reused: readonly { sha256: StudioReferenceBoardSha256; assetId: string }[];
+  readonly unresolved: readonly StudioReferenceBoardSha256[];
+  readonly diagnostics: readonly StudioReferenceBoardArchiveDiagnostic[];
 }
 
 interface VerifiedLocalAsset {
@@ -379,10 +411,13 @@ async function defaultDecodeImageDimensions(
 
 const defaultImportDependencies: StudioReferenceBoardArchiveImportDependencies = {
   ...defaultExportDependencies,
+  listAssets: listAssetsReadOnly,
   saveAsset,
-  deleteAsset,
+  deleteAssetIfIdentityMatches,
   decodeImageDimensions: defaultDecodeImageDimensions,
 };
+
+const PREPARED_REFERENCE_IMPORTS = new WeakSet<object>();
 
 function archiveReferenceCoversPointers(
   sha256: StudioReferenceBoardSha256,
@@ -416,39 +451,23 @@ function replaceReferenceBoardAssetIds(
 }
 
 /**
- * Installs only authenticated `reference` attachments actually used by the imported board. Equal
- * local hashes are reused, and the returned project changes only device-local assetId hints.
+ * Authenticates reference attachments and retains bounded data URLs in memory. This phase performs
+ * no durable writes; installation is deferred to the exact project-apply seam.
  */
-export async function restoreStudioReferenceBoardArchiveImport(
+export async function prepareStudioReferenceBoardArchiveImport(
   archive: ImportStudioProjectArchiveResult,
   dependencyOverrides: Partial<StudioReferenceBoardArchiveImportDependencies> = {}
-): Promise<RestoreStudioReferenceBoardArchiveImportResult> {
+): Promise<PrepareStudioReferenceBoardArchiveImportResult> {
   const dependencies = { ...defaultImportDependencies, ...dependencyOverrides };
   const sourceDocument = parseStudioReferenceBoardDocument(archive.project.referenceBoard)
     ?? createDefaultStudioReferenceBoardDocument();
   const grouped = referencesByHash(collectStudioReferenceBoardArchiveReferences(archive.project));
   const diagnostics: StudioReferenceBoardArchiveDiagnostic[] = [];
-  const installed: Array<{ sha256: StudioReferenceBoardSha256; assetId: string }> = [];
-  const reused: Array<{ sha256: StudioReferenceBoardSha256; assetId: string }> = [];
+  const prepared: PreparedStudioReferenceBoardArchiveAsset[] = [];
   const unresolved: StudioReferenceBoardSha256[] = [];
-  const localIds = new Map<StudioReferenceBoardSha256, string>();
-  let assets: StudioAsset[];
-  try {
-    assets = await dependencies.listAssets();
-  } catch {
-    assets = [];
-  }
 
   for (const [sha256, references] of grouped) {
     const pointers = references.map(({ pointer }) => pointer);
-    const hints = new Set(references.flatMap(({ asset }) => asset.assetId ? [asset.assetId] : []));
-    const existing = await resolveVerifiedLocalAsset(assets, sha256, hints, dependencies);
-    if (existing.match) {
-      localIds.set(sha256, existing.match.asset.id);
-      reused.push({ sha256, assetId: existing.match.asset.id });
-      continue;
-    }
-
     const coverage = archiveReferenceCoversPointers(sha256, pointers, archive);
     const importedAttachment = archive.attachments.get(sha256.slice("sha256:".length));
     if (coverage !== "covered" || !importedAttachment) {
@@ -482,25 +501,22 @@ export async function restoreStudioReferenceBoardArchiveImport(
       });
     }
 
-    let saved: StudioAssetWithContentHash;
     try {
       const bytes = new Uint8Array(await importedAttachment.blob.arrayBuffer());
-      const dataUrl = bytesToDataUrl(importedAttachment.blob, bytes);
-      saved = await dependencies.saveAsset({
-        name: descriptor?.name ?? "참고 이미지",
-        dataUrl,
-        width: dimensions.width,
-        height: dimensions.height,
-      });
-      const canonicalSavedHash = canonicalizeStudioAssetContentHash(saved.contentHash);
-      if (canonicalSavedHash !== sha256) {
-        try {
-          await dependencies.deleteAsset(saved.id);
-        } catch {
-          // Best effort rollback. A mismatching row is never linked into the document.
-        }
-        throw new Error("saved hash mismatch");
+      if (await dependencies.digestBlob(importedAttachment.blob) !== sha256) {
+        throw new Error("attachment hash mismatch");
       }
+      const dataUrl = bytesToDataUrl(importedAttachment.blob, bytes);
+      prepared.push(Object.freeze({
+        sha256,
+        input: Object.freeze({
+          name: descriptor?.name ?? "참고 이미지",
+          dataUrl,
+          width: dimensions.width,
+          height: dimensions.height,
+          contentHash: sha256,
+        }),
+      }));
     } catch {
       unresolved.push(sha256);
       diagnostics.push({
@@ -511,16 +527,196 @@ export async function restoreStudioReferenceBoardArchiveImport(
       });
       continue;
     }
-    localIds.set(sha256, saved.id);
-    installed.push({ sha256, assetId: saved.id });
-    assets = [...assets, saved];
   }
 
-  const document = replaceReferenceBoardAssetIds(sourceDocument, localIds);
+  const document = sourceDocument;
   const project = parseStudioProjectFile({ ...archive.project, referenceBoard: document });
   const canonicalProject = parseStudioProjectFile({
     ...archive.canonicalProject,
     referenceBoard: document,
   });
-  return { document, project, canonicalProject, installed, reused, unresolved, diagnostics };
+  const result: PrepareStudioReferenceBoardArchiveImportResult = Object.freeze({
+    document,
+    project,
+    canonicalProject,
+    prepared: Object.freeze(prepared),
+    reused: Object.freeze([]),
+    unresolved: Object.freeze(unresolved),
+    diagnostics: Object.freeze(diagnostics),
+  });
+  PREPARED_REFERENCE_IMPORTS.add(result);
+  return result;
+}
+
+function referenceBoardFingerprint(project: StudioProjectFile | unknown): string {
+  const parsed = parseStudioProjectFile(project);
+  const document = parseStudioReferenceBoardDocument(parsed.referenceBoard)
+    ?? createDefaultStudioReferenceBoardDocument();
+  return JSON.stringify(document);
+}
+
+async function rollbackCreatedReferenceAssets(
+  rows: readonly { sha256: StudioReferenceBoardSha256; assetId: string }[],
+  dependencies: StudioReferenceBoardArchiveImportDependencies,
+): Promise<void> {
+  const failures: unknown[] = [];
+  for (const row of [...rows].reverse()) {
+    try {
+      if (!(await dependencies.deleteAssetIfIdentityMatches(row.assetId, row.sha256))) {
+        failures.push(new Error(`참고 보드 에셋 ${row.assetId}의 생성 identity가 변경되었습니다.`));
+      }
+    } catch (cause) {
+      failures.push(cause);
+    }
+  }
+  if (failures.length > 0) {
+    throw new AggregateError(
+      failures,
+      "프로젝트 적용 실패 뒤 새로 만든 참고 보드 에셋 일부를 안전하게 되돌리지 못했습니다.",
+    );
+  }
+}
+
+/** Commits a one-shot prepared plan and compensates only exact rows created by this import. */
+export async function installPreparedStudioReferenceBoardArchiveImportAndApply<ApplyResult>(
+  preparedImport: PrepareStudioReferenceBoardArchiveImportResult,
+  project: StudioProjectFile | unknown,
+  applyProject: (project: StudioProjectFile) => ApplyResult | Promise<ApplyResult>,
+  options: InstallStudioReferenceBoardArchiveImportOptions<ApplyResult>,
+  dependencyOverrides: Partial<StudioReferenceBoardArchiveImportDependencies> = {},
+): Promise<InstallStudioReferenceBoardArchiveImportResult<ApplyResult>> {
+  if (!PREPARED_REFERENCE_IMPORTS.has(preparedImport)) {
+    throw new Error("참고 보드 archive 준비 결과가 현재 검증 세션에 속하지 않습니다.");
+  }
+  const applyProjectSnapshot = parseStudioProjectFile(project);
+  if (referenceBoardFingerprint(preparedImport.project) !== referenceBoardFingerprint(applyProjectSnapshot)) {
+    throw new Error("검증한 참고 보드와 적용할 프로젝트가 일치하지 않습니다.");
+  }
+  PREPARED_REFERENCE_IMPORTS.delete(preparedImport);
+  const dependencies = { ...defaultImportDependencies, ...dependencyOverrides };
+  const installed: Array<{ sha256: StudioReferenceBoardSha256; assetId: string }> = [];
+  const reused = [...preparedImport.reused];
+  const unresolved = [...preparedImport.unresolved];
+  const diagnostics = [...preparedImport.diagnostics];
+  const localIds = new Map(reused.map(({ sha256, assetId }) => [sha256, assetId]));
+  let assets: StudioAsset[];
+  try {
+    assets = await dependencies.listAssets();
+  } catch {
+    assets = [];
+  }
+
+  try {
+    const references = referencesByHash(
+      collectStudioReferenceBoardArchiveReferences(applyProjectSnapshot),
+    );
+    // Preparation never opens the local authority (a cold open may migrate SQLite). Resolve all
+    // local reuse only now, inside the final install/apply transaction seam.
+    for (const sha256 of [...unresolved]) {
+      const candidates = references.get(sha256) ?? [];
+      const hints = new Set(candidates.flatMap(({ asset }) => asset.assetId ? [asset.assetId] : []));
+      const existing = await resolveVerifiedLocalAsset(assets, sha256, hints, dependencies);
+      if (!existing.match) continue;
+      localIds.set(sha256, existing.match.asset.id);
+      reused.push({ sha256, assetId: existing.match.asset.id });
+      unresolved.splice(unresolved.indexOf(sha256), 1);
+      for (let index = diagnostics.length - 1; index >= 0; index -= 1) {
+        if (diagnostics[index]?.sha256 === sha256) diagnostics.splice(index, 1);
+      }
+    }
+    for (const preview of preparedImport.reused) {
+      const verified = await resolveVerifiedLocalAsset(
+        assets,
+        preview.sha256,
+        new Set([preview.assetId]),
+        dependencies,
+      );
+      if (!verified.match) {
+        throw new Error("준비 단계에서 재사용한 참고 보드 에셋이 최종 적용 전에 변경되었습니다.");
+      }
+      localIds.set(preview.sha256, verified.match.asset.id);
+    }
+    for (const asset of preparedImport.prepared) {
+      const existing = await resolveVerifiedLocalAsset(
+        assets,
+        asset.sha256,
+        new Set((references.get(asset.sha256) ?? []).flatMap(
+          ({ asset: descriptor }) => descriptor.assetId ? [descriptor.assetId] : [],
+        )),
+        dependencies,
+      );
+      if (existing.match) {
+        localIds.set(asset.sha256, existing.match.asset.id);
+        if (!reused.some(({ sha256 }) => sha256 === asset.sha256)) {
+          reused.push({ sha256: asset.sha256, assetId: existing.match.asset.id });
+        }
+        continue;
+      }
+      const saved = await dependencies.saveAsset(asset.input);
+      installed.push({ sha256: asset.sha256, assetId: saved.id });
+      const savedHash = canonicalizeStudioAssetContentHash(saved.contentHash);
+      const savedBlob = studioAssetDataUrlToBlob(saved.dataUrl);
+      if (savedHash !== asset.sha256 || await dependencies.digestBlob(savedBlob) !== asset.sha256) {
+        throw new Error("저장한 참고 보드 에셋의 콘텐츠 식별자가 준비된 원본과 다릅니다.");
+      }
+      localIds.set(asset.sha256, saved.id);
+      assets = [...assets, saved];
+    }
+
+    const sourceDocument = parseStudioReferenceBoardDocument(applyProjectSnapshot.referenceBoard)
+      ?? createDefaultStudioReferenceBoardDocument();
+    const document = replaceReferenceBoardAssetIds(sourceDocument, localIds);
+    const appliedProject = parseStudioProjectFile({
+      ...applyProjectSnapshot,
+      referenceBoard: document,
+    });
+    const canonicalProject = parseStudioProjectFile({
+      ...preparedImport.canonicalProject,
+      referenceBoard: document,
+    });
+    const applyResult = await applyProject(appliedProject);
+    if (!options.didApply(applyResult)) {
+      const created = installed.splice(0);
+      await rollbackCreatedReferenceAssets(created, dependencies);
+    }
+    return {
+      document,
+      project: appliedProject,
+      canonicalProject,
+      installed: Object.freeze([...installed]),
+      reused: Object.freeze(reused),
+      unresolved,
+      diagnostics,
+      applyResult,
+    };
+  } catch (cause) {
+    try {
+      const created = installed.splice(0);
+      await rollbackCreatedReferenceAssets(created, dependencies);
+    } catch (rollbackCause) {
+      throw new AggregateError(
+        [cause, rollbackCause],
+        "참고 보드 archive 적용과 보상에 실패했습니다.",
+        { cause: rollbackCause },
+      );
+    }
+    throw cause;
+  }
+}
+
+/** Compatibility helper. Product orchestration uses the explicit prepare/final-commit pair above. */
+export async function restoreStudioReferenceBoardArchiveImport(
+  archive: ImportStudioProjectArchiveResult,
+  dependencyOverrides: Partial<StudioReferenceBoardArchiveImportDependencies> = {},
+): Promise<RestoreStudioReferenceBoardArchiveImportResult> {
+  const prepared = await prepareStudioReferenceBoardArchiveImport(archive, dependencyOverrides);
+  const installed = await installPreparedStudioReferenceBoardArchiveImportAndApply(
+    prepared,
+    prepared.project,
+    (project) => project,
+    { didApply: () => true },
+    dependencyOverrides,
+  );
+  const { applyResult: _applyResult, ...result } = installed;
+  return result;
 }

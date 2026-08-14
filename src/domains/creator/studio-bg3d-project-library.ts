@@ -1,7 +1,10 @@
 import {
+  compensateImportedBg3dModelsIfCreationMatchesV12 as compensateImportedBg3dModelsIfCreationMatches,
   getStoredBg3dModelByHashV12 as getStoredBg3dModelByHash,
   importVerifiedBg3dModelsAtomicallyV12 as importVerifiedBg3dModelsAtomically,
+  importVerifiedBg3dModelsAtomicallyWithDispositionV12 as importVerifiedBg3dModelsAtomicallyWithDisposition,
   revalidateStoredBg3dModelForRendering,
+  type Bg3dModelAtomicImportDispositionV12,
   type Bg3dModelImportItem,
   type Bg3dModelVerificationOptions,
   type Bg3dVerifiedStoredRecord,
@@ -63,6 +66,8 @@ export interface StudioBg3dProjectLibraryDependencies {
   readonly getStoredByHash: typeof getStoredBg3dModelByHash;
   readonly revalidateStored: typeof revalidateStoredBg3dModelForRendering;
   readonly importAtomically: typeof importVerifiedBg3dModelsAtomically;
+  readonly importAtomicallyWithDisposition: typeof importVerifiedBg3dModelsAtomicallyWithDisposition;
+  readonly compensateImported: typeof compensateImportedBg3dModelsIfCreationMatches;
   readonly buildArchive: typeof buildStudioProjectArchive;
 }
 
@@ -83,6 +88,8 @@ const DEFAULT_DEPENDENCIES: StudioBg3dProjectLibraryDependencies = Object.freeze
   getStoredByHash: getStoredBg3dModelByHash,
   revalidateStored: revalidateStoredBg3dModelForRendering,
   importAtomically: importVerifiedBg3dModelsAtomically,
+  importAtomicallyWithDisposition: importVerifiedBg3dModelsAtomicallyWithDisposition,
+  compensateImported: compensateImportedBg3dModelsIfCreationMatches,
   buildArchive: buildStudioProjectArchive,
 });
 
@@ -311,6 +318,122 @@ function createImportItem(
 export interface InstallStudioBg3dProjectArchiveResult<ApplyResult> {
   readonly records: readonly Bg3dVerifiedStoredRecord[];
   readonly applyResult: ApplyResult;
+}
+
+export interface PreparedStudioBg3dProjectArchiveImport {
+  readonly project: StudioProjectFile;
+  readonly attachmentCount: number;
+  readonly totalAttachmentBytes: number;
+}
+
+const PREPARED_BG3D_IMPORTS = new WeakMap<object, {
+  readonly importedResult: ImportStudioProjectArchiveResult;
+  readonly plan: StudioBg3dProjectArchivePlan;
+  readonly items: readonly Bg3dModelImportItem[];
+  readonly options: InstallStudioBg3dProjectArchiveOptions;
+  readonly dependencies: StudioBg3dProjectLibraryDependencies;
+}>();
+
+/** Validates the complete canonical/project/archive map without writing the model authority. */
+export function prepareStudioBg3dProjectArchiveImport(
+  importedResult: ImportStudioProjectArchiveResult,
+  options: InstallStudioBg3dProjectArchiveOptions = {},
+  dependencyOverrides: Partial<StudioBg3dProjectLibraryDependencies> = {},
+): PreparedStudioBg3dProjectArchiveImport {
+  const dependencies = resolveDependencies(dependencyOverrides);
+  const plan = dependencies.collectPlan(importedResult.canonicalProject, { limits: options.limits });
+  const applyPlan = dependencies.collectPlan(importedResult.project, { limits: options.limits });
+  if (!bg3dScenesMatch(plan.project, applyPlan.project)) {
+    throw new StudioBg3dProjectLibraryError("import-project-mismatch");
+  }
+  const items: Bg3dModelImportItem[] = [];
+  for (const planned of plan.attachments) {
+    const imported = importedResult.attachments.get(planned.sha256);
+    if (!imported) throw new StudioBg3dProjectLibraryError("import-attachment-missing");
+    items.push(createImportItem(planned, imported));
+  }
+  const prepared = Object.freeze({
+    project: applyPlan.project,
+    attachmentCount: items.length,
+    totalAttachmentBytes: plan.totalAttachmentBytes,
+  });
+  PREPARED_BG3D_IMPORTS.set(prepared, {
+    importedResult,
+    plan,
+    items: Object.freeze(items),
+    options,
+    dependencies,
+  });
+  return prepared;
+}
+
+async function compensateBg3dImport(
+  disposition: Bg3dModelAtomicImportDispositionV12,
+  dependencies: StudioBg3dProjectLibraryDependencies,
+): Promise<void> {
+  if (disposition.created.length === 0 && disposition.removedDeletions.length === 0) return;
+  if (!(await dependencies.compensateImported(disposition))) {
+    throw new Error(
+      "프로젝트 적용 실패 뒤 3D 모델 저장소가 변경되어 새로 만든 모델을 안전하게 되돌리지 못했습니다.",
+    );
+  }
+}
+
+/** One-shot final model install + project apply with exact created-only compensation. */
+export async function installPreparedStudioBg3dProjectArchiveModelsAndApply<ApplyResult>(
+  prepared: PreparedStudioBg3dProjectArchiveImport,
+  project: unknown,
+  applyProject: (
+    project: StudioProjectFile,
+    importedResult: ImportStudioProjectArchiveResult,
+  ) => ApplyResult | Promise<ApplyResult>,
+  applyOptions: { readonly didApply: (result: ApplyResult) => boolean },
+): Promise<InstallStudioBg3dProjectArchiveResult<ApplyResult>> {
+  const state = PREPARED_BG3D_IMPORTS.get(prepared);
+  if (!state) throw new StudioBg3dProjectLibraryError("import-project-mismatch");
+  const currentPlan = state.dependencies.collectPlan(project, { limits: state.options.limits });
+  if (!bg3dScenesMatch(state.plan.project, currentPlan.project)) {
+    throw new StudioBg3dProjectLibraryError("import-project-mismatch");
+  }
+  PREPARED_BG3D_IMPORTS.delete(prepared);
+  let disposition: Bg3dModelAtomicImportDispositionV12 | null = null;
+  try {
+    disposition = state.items.length > 0
+      ? await state.dependencies.importAtomicallyWithDisposition(state.items, {
+          ...state.options.verification,
+          profile: state.options.verification?.profile ?? "desktop",
+          cumulativeUsedBytes: state.options.verification?.cumulativeUsedBytes ?? 0,
+          maximumCumulativeBytes: state.options.verification?.maximumCumulativeBytes
+            ?? Math.max(
+              1,
+              (state.options.verification?.cumulativeUsedBytes ?? 0)
+                + state.plan.totalAttachmentBytes,
+            ),
+        })
+      : null;
+    const importedForApply = { ...state.importedResult, project: currentPlan.project };
+    const applyResult = await applyProject(currentPlan.project, importedForApply);
+    if (!applyOptions.didApply(applyResult) && disposition) {
+      const receipt = disposition;
+      disposition = null;
+      await compensateBg3dImport(receipt, state.dependencies);
+    }
+    return { records: disposition?.records ?? [], applyResult };
+  } catch (cause) {
+    if (disposition) {
+      const receipt = disposition;
+      try {
+        await compensateBg3dImport(receipt, state.dependencies);
+      } catch (rollbackCause) {
+        throw new AggregateError(
+          [cause, rollbackCause],
+          "3D 모델 archive 적용과 보상에 실패했습니다.",
+          { cause: rollbackCause },
+        );
+      }
+    }
+    throw cause;
+  }
 }
 
 /**
