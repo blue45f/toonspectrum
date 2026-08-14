@@ -149,7 +149,10 @@ export interface StudioProjectArchiveOrchestrationInput {
     normalizeReleaseSchedule: (value: unknown) => StudioReleaseSchedule,
     publicationAnalytics: StudioPublicationAnalyticsDocument
   ) => boolean;
-  /** Injectable product UI seam; null/cancel always fails closed before archive materialization. */
+  /**
+   * Injectable typed product UI seam. The orchestration runtime never falls back to native
+   * confirm/prompt dialogs; an absent presenter fails closed before archive materialization.
+   */
   readonly requestStudioVrmProjectArchiveUseContext?: (
     plan: Extract<StudioVrmProjectArchiveAttestationPlan, { readonly ok: true }>
   ) => Promise<StudioVrmProjectArchiveUseContextInput | null>;
@@ -158,51 +161,6 @@ export interface StudioProjectArchiveOrchestrationInput {
     status: StudioProjectArchiveStatus | null
   ) => void;
   readonly setError: (message: string | null) => void;
-}
-
-const STUDIO_VRM_ARCHIVE_CONTENT_PROMPTS = Object.freeze([
-  ["excessivelyViolent", "과도한 폭력 콘텐츠"],
-  ["excessivelySexual", "과도한 성적 콘텐츠"],
-  ["politicalOrReligious", "정치·종교 콘텐츠"],
-  ["antisocialOrHate", "반사회·혐오 콘텐츠"],
-] as const);
-
-async function requestStudioVrmProjectArchiveUseContextFromBrowser(
-  plan: Extract<StudioVrmProjectArchiveAttestationPlan, { readonly ok: true }>,
-): Promise<StudioVrmProjectArchiveUseContextInput | null> {
-  const disclosure = plan.exactAttributionTexts
-    .map((text, index) => `${index + 1}. ${text || "(크레딧 불필요 선언)"}`)
-    .join("\n");
-  if (!globalThis.confirm(
-    `VRM 원본 ${plan.modelCount}개를 portable archive에 포함합니다.\n\n`
-    + `아래 저작자·라이선스 고지를 원본 안에 그대로 유지하는 데 동의해야 합니다.\n${disclosure}`,
-  )) return null;
-  const actor = globalThis.prompt(
-    `아바타 이용자 관계를 아래 값 중 하나로 정확히 입력하세요.\n${plan.permittedActorBases.join(" / ")}`,
-  );
-  if (!actor || !plan.permittedActorBases.includes(
-    actor as (typeof plan.permittedActorBases)[number],
-  )) return null;
-  const classifications: Record<string, "absent" | "present" | "unknown"> = {};
-  for (const [key, label] of STUDIO_VRM_ARCHIVE_CONTENT_PROMPTS) {
-    const value = globalThis.prompt(
-      `${label} 포함 여부를 absent / present / unknown 중 하나로 입력하세요.`,
-    );
-    if (value !== "absent" && value !== "present" && value !== "unknown") return null;
-    classifications[key] = value;
-  }
-  if (!globalThis.confirm(
-    "입력한 아바타 관계·4개 콘텐츠 분류와 위의 정확한 크레딧 유지 조건으로 archive를 만들까요?",
-  )) return null;
-  return {
-    confirmedByUser: true,
-    avatarPermissionBasis: actor as (typeof plan.permittedActorBases)[number],
-    confirmedAttributionTexts: [...plan.exactAttributionTexts],
-    excessivelyViolent: classifications.excessivelyViolent!,
-    excessivelySexual: classifications.excessivelySexual!,
-    politicalOrReligious: classifications.politicalOrReligious!,
-    antisocialOrHate: classifications.antisocialOrHate!,
-  };
 }
 
 function studioVrmArchiveAttestationInputMatchesPlan(
@@ -257,8 +215,7 @@ export function createStudioProjectArchiveOrchestration({
   canApplyStudioMutation,
   applyStudioProjectSnapshot,
   applyStudioProjectSnapshotWithPreparedDocuments,
-  requestStudioVrmProjectArchiveUseContext =
-    requestStudioVrmProjectArchiveUseContextFromBrowser,
+  requestStudioVrmProjectArchiveUseContext,
   setProjectArchiveBusy,
   setProjectArchiveStatus,
   setError,
@@ -401,6 +358,11 @@ export function createStudioProjectArchiveOrchestration({
       }
       let vrmUseContextReceipt = null;
       if (attestationPlan.modelCount > 0) {
+        if (!requestStudioVrmProjectArchiveUseContext) {
+          throw new Error(
+            "VRM 원본 이용 맥락을 구조화해 확인할 Studio 승인 화면을 사용할 수 없어 portable archive 내보내기를 중단했습니다.",
+          );
+        }
         const attestationInput = await requestStudioVrmProjectArchiveUseContext(attestationPlan);
         if (
           !attestationInput

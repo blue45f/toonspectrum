@@ -1175,7 +1175,7 @@ export async function hydrateVrmLibraryThumbnailWindow(
     );
   }
   const repository = usesLegacyIndexedDb(options) ? null : productRepository(options);
-  const authorityStore = licenseAuthorityStore(options);
+  const authorityRepository = licenseAuthorityStore(options);
   let totalBytes = 0;
   const hydrated: VrmLibraryEntry[] = [];
   for (const entry of entries) {
@@ -1183,9 +1183,9 @@ export async function hydrateVrmLibraryThumbnailWindow(
       throw new StudioVrmAssetRepositoryError("aborted", "VRM thumbnail hydration was aborted.");
     }
     let licenseAuthority = entry.licenseAuthority;
-    if (!licenseAuthority && entry.contentHash && authorityStore) {
+    if (!licenseAuthority && entry.contentHash && authorityRepository) {
       try {
-        licenseAuthority = await authorityStore.get(entry.contentHash) ?? undefined;
+        licenseAuthority = await authorityRepository.get(entry.contentHash) ?? undefined;
       } catch {
         // Receipt storage availability must not turn a local preview warning into a load failure.
       }
@@ -1290,10 +1290,10 @@ export async function saveVerifiedVrmBlobWithDisposition(input: {
         createdAt: timestamp,
         updatedAt: timestamp,
       });
-      const authorityStore = licenseAuthorityStore(options);
-      if (authorityStore) {
+      const authorityRepository = licenseAuthorityStore(options);
+      if (authorityRepository) {
         try {
-          await authorityStore.put(result.metadata.contentHash, gltfJson);
+          await authorityRepository.put(result.metadata.contentHash, gltfJson);
         } catch {
           // The GLB remains a valid local-preview model. Missing receipt is shown as unknown and
           // every outgoing model-file action remains fail-closed.
@@ -1346,10 +1346,10 @@ export async function saveVerifiedVrmBlobWithDisposition(input: {
         ...identity,
         validationVersion: VRM_VALIDATION_VERSION,
       };
-      const authorityStore = licenseAuthorityStore(options);
-      if (authorityStore) {
+      const authorityRepository = licenseAuthorityStore(options);
+      if (authorityRepository) {
         try {
-          await authorityStore.put(identity.contentHash, gltfJson);
+          await authorityRepository.put(identity.contentHash, gltfJson);
         } catch {
           // Explicit legacy/embed receipt persistence is best-effort; policy still fails closed.
         }

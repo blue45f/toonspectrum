@@ -3,6 +3,11 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+  resetStudioDestructiveActionLedger,
+  setStudioDestructiveConfirmPresenter,
+  type StudioDestructiveActionRequest,
+} from "./studio-destructive-action-preview";
 import { STUDIO_MANNEQUIN_DEFAULT_BODY_PARAMS } from "./studio-mannequin-model";
 import { STUDIO_MANNEQUIN_POSE_PRESETS } from "./studio-mannequin-poses";
 
@@ -181,6 +186,7 @@ afterEach(() => {
   cleanup();
   localStorage.clear();
   vi.restoreAllMocks();
+  resetStudioDestructiveActionLedger();
   vi.clearAllMocks();
   webcamRuntimeMocks.init.mockReset();
   webcamRuntimeMocks.dispose.mockReset();
@@ -663,12 +669,22 @@ describe("StudioMannequinPoserPanel", () => {
       expect(screen.getByRole("alert").textContent).toContain("불러오지 못해");
     });
     persistenceRuntimeMocks.save.mockClear();
-    const confirmClose = vi.spyOn(window, "confirm").mockReturnValue(false);
+    const approvals: StudioDestructiveActionRequest[] = [];
+    let approveClose = false;
+    setStudioDestructiveConfirmPresenter((request) => {
+      approvals.push(request);
+      return approveClose;
+    });
 
     const closeButton = screen.getByRole("button", { name: "3D 데생 인형 닫기" }) as HTMLButtonElement;
     expect(closeButton.disabled).toBe(false);
     fireEvent.click(closeButton);
-    expect(confirmClose).toHaveBeenCalledWith(expect.stringContaining("저장하지 않고 닫을까요"));
+    await waitFor(() => expect(approvals).toHaveLength(1));
+    expect(approvals[0]).toMatchObject({
+      id: "studio.mannequin.discard-unpersisted-state",
+      reversibility: "irreversible",
+      confirmLabel: "저장하지 않고 닫기",
+    });
     fireEvent.keyDown(window, { key: "Escape" });
     fireEvent.click(screen.getByRole("button", { name: /^카메라/ }));
     const captureButton = screen.getByRole("button", { name: /캔버스로 캡처/ }) as HTMLButtonElement;
@@ -681,10 +697,10 @@ describe("StudioMannequinPoserPanel", () => {
     expect(onClose).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: /내보내기/ })).toBeTruthy();
 
-    confirmClose.mockReturnValue(true);
+    approveClose = true;
     fireEvent.click(closeButton);
     expect(persistenceRuntimeMocks.save).not.toHaveBeenCalled();
-    expect(onClose).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
   });
 
   it("늦은 SQLite hydration이 사용자가 먼저 바꾼 체형을 덮어쓰지 않는다", async () => {

@@ -103,6 +103,9 @@ describe("studio project archive VRM completeness gate", () => {
       new URL("./studio-project-archive-orchestration-runtime.ts", import.meta.url),
       "utf8",
     );
+    expect(source).not.toMatch(
+      /(?:globalThis|window)\s*\.\s*(?:confirm|prompt)\s*(?:\?\.)?\s*\(/u,
+    );
     const start = source.indexOf("async function handleExportProjectArchive()");
     const end = source.indexOf("async function handleImportProject(", start);
     const exportFlow = source.slice(start, end);
@@ -146,6 +149,9 @@ describe("studio project archive VRM completeness gate", () => {
     expect(mutationTicket).toBeGreaterThan(-1);
     expect(attestationPlan).toBeGreaterThan(mutationTicket);
     expect(prompt).toBeGreaterThan(attestationPlan);
+    expect(exportFlow.slice(attestationPlan, prompt)).toContain(
+      "if (!requestStudioVrmProjectArchiveUseContext)",
+    );
     expect(exactPlanCheck).toBeGreaterThan(prompt);
     expect(receipt).toBeGreaterThan(exactPlanCheck);
     expect(postPromptTicket).toBeGreaterThan(receipt);

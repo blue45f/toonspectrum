@@ -32,6 +32,8 @@ import {
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+import { confirmStudioDestructiveAction } from "./studio-destructive-action-preview";
+import { studioDiscardUnpersistedMannequinStateRequest } from "./studio-destructive-command-catalog";
 import { getProductStudioMannequinStateSqliteRepository } from "./studio-mannequin-bg3d-preset-sqlite-repository";
 import {
   STUDIO_MANNEQUIN_BODY_PRESETS,
@@ -934,7 +936,7 @@ export function StudioMannequinPoserPanel({
       // Route/access transitions can unmount this panel without calling closeWithPersist().
       // Queue the latest canonical state before invalidating UI generations. The SQLite
       // repository serializes writes, so this also safely follows an in-flight explicit save.
-      // There is no localStorage/memory fallback: a failed late flush remains an observable
+      // There is no browser-KV/memory fallback: a failed late flush remains an observable
       // repository failure in diagnostics, while the component is already gone and cannot
       // truthfully present a retry UI.
       if (hydrationSafeForFinalFlushRef.current) {
@@ -1003,10 +1005,10 @@ export function StudioMannequinPoserPanel({
     });
   }, [onClose, persistState, persistenceStatus, releaseWebcamResources]);
 
-  const closeWithoutPersist = useCallback(() => {
-    if (!window.confirm(
-      "SQLite 상태를 확인하지 못했습니다. 현재 탭의 변경을 저장하지 않고 닫을까요? 먼저 JSON 내보내기로 보존하는 것을 권장합니다.",
-    )) return;
+  const closeWithoutPersist = useCallback(async () => {
+    if (!(await confirmStudioDestructiveAction(
+      studioDiscardUnpersistedMannequinStateRequest(),
+    )) || !mountedRef.current) return;
     releaseWebcamResources();
     setWebcamActive(false);
     setWebcamLoadingStage(null);
