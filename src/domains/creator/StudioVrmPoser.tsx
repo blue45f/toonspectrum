@@ -7461,9 +7461,7 @@ export function StudioVrmPoser({
         const hydratedById = new Map(hydrated.map((entry) => [entry.id, entry] as const));
         setLibraryEntries((current) => current.map((entry) => {
           const visible = hydratedById.get(entry.id);
-          if (visible) {
-            return visible.thumbnail === entry.thumbnail ? entry : visible;
-          }
+          if (visible) return visible;
           const isBundledStaticThumbnail = entry.source === "sample"
             && entry.thumbnail?.startsWith("/vrm/thumbnails/");
           if (
