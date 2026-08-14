@@ -1,3 +1,8 @@
+import {
+  applyStudioPagesHistoryRetention,
+  type StudioPagesHistoryRetentionOptions,
+} from "./studio-history-retention-budget";
+
 import type {
   StudioAutosavePayload,
   StudioPendingStrokeDurabilityReason,
@@ -72,14 +77,17 @@ export type StudioLifecycleEmergencyAutosaveResult =
 export type StudioPagesHistoryAppendResult<Page> = {
   history: Page[][];
   historyIndex: number;
+  /** 이 히스토리 배열이 붙들고 있는 것으로 계량된 바이트 누계. */
+  retainedBytes: number;
+  /** 적용된 유지 바이트 예산 — 호출자가 같은 숫자를 아티스트에게 보여줄 수 있게 함께 돌려준다. */
+  budgetBytes: number;
+  /** 이번에 새로 붙은 엔트리 1개의 계량 바이트("단계당 약 N MB" 예고용). */
+  appendedEntryBytes: number;
+  /** 이번 append 가 앞에서 걷어낸 스냅샷 수. */
+  evictedCount: number;
+  /** 퇴출 원인이 바이트 예산이면 true(개수 방벽만 물었으면 false). */
+  evictedForBudget: boolean;
 };
-
-/**
- * Durable undo history must stay bounded in long sessions to avoid runaway allocation growth.
- * Keeping only the most recent snapshots is an explicit quality/performance trade-off that protects
- * responsiveness for very long stroke sessions and keeps emergency restore semantics intact.
- */
-const STUDIO_PAGES_HISTORY_MAX_ENTRIES = 200;
 
 function nonEmptyId(value: unknown): string | null {
   return typeof value === "string" && value.trim().length > 0 ? value : null;
@@ -217,23 +225,43 @@ function sourceMetadataMatchesScope(
  * Appends one immutable snapshot to the current undo branch. The helper deliberately accepts the
  * caller's latest ref-backed history so two commits in one browser task cannot both branch from an
  * old React render and replace each other.
+ *
+ * 유지 경계는 **엔트리 수가 아니라 계량된 유지 바이트**다(`studio-history-retention-budget.ts`).
+ * 스냅샷이 참조 공유라 엔트리 1개의 한계비용이 376 B ~ 6.46 MiB 로 네 자릿수 배 갈리기 때문에,
+ * 고정 개수 상한은 가벼운 편집에는 500배 과하고 무거운 편집에는 무력했다. 퇴출 동작 자체는
+ * 그대로다 — 항상 **앞에서만** 잘라내고 `historyIndex = length - 1` 을 유지하므로, 이 값을
+ * `recordStudioHistoryJournalPagesSteps` 의 `nextUndoDepth` 로 넘기는 기존 배선이 저널을
+ * 그대로 보조 맞춰 준다. 달라진 건 **한 커밋이 한 개가 아니라 N 개를 버릴 수 있다**는 점뿐이다.
  */
 export function appendStudioPagesHistorySnapshot<Page>(
   history: readonly (readonly Page[])[],
   historyIndex: number,
-  nextPages: readonly Page[]
+  nextPages: readonly Page[],
+  retention?: StudioPagesHistoryRetentionOptions
 ): StudioPagesHistoryAppendResult<Page> {
   const boundedIndex = Math.max(0, Math.min(historyIndex, Math.max(0, history.length - 1)));
   const nextHistory = history
     .slice(0, boundedIndex + 1)
     .map((snapshot) => snapshot as Page[]);
+  const keptLength = nextHistory.length;
   nextHistory.push(nextPages as Page[]);
 
-  if (nextHistory.length > STUDIO_PAGES_HISTORY_MAX_ENTRIES) {
-    nextHistory.splice(0, nextHistory.length - STUDIO_PAGES_HISTORY_MAX_ENTRIES);
-  }
+  const applied = applyStudioPagesHistoryRetention({
+    sourceHistory: history,
+    keptLength,
+    nextHistory: nextHistory as unknown[],
+    options: retention,
+  });
 
-  return { history: nextHistory, historyIndex: nextHistory.length - 1 };
+  return {
+    history: nextHistory,
+    historyIndex: nextHistory.length - 1,
+    retainedBytes: applied.retainedBytes,
+    budgetBytes: applied.budgetBytes,
+    appendedEntryBytes: applied.appendedEntryBytes,
+    evictedCount: applied.evictedCount,
+    evictedForBudget: applied.evictedForBudget,
+  };
 }
 
 /**

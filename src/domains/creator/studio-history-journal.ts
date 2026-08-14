@@ -21,9 +21,18 @@
  * 두 사이드카 문서는 zod 파싱으로만 만들어지는 값 객체이고, `studio-character-bible.ts` ·
  * `studio-writer-room.ts` 의 모든 변경 함수는 입력을 건드리지 않고 새 객체를 돌려준다
  * (`studio-history-journal.test.ts` 가 이 불변식을 검증한다). 참조를 그대로 담으면 바뀐 경로만
- * 새로 할당되는 **구조 공유**가 유지돼 200개짜리 저널이 싸게 유지된다. 여기서 `structuredClone`
+ * 새로 할당되는 **구조 공유**가 유지돼 긴 저널이 싸게 유지된다. 여기서 `structuredClone`
  * 을 부르면 그 공유가 통째로 깨져 오히려 메모리가 폭발한다.
+ *
+ * ## 저널 길이 상한이 어디에 서는가
+ *
+ * `pages` 항목 수는 **스냅샷 히스토리의 유지 바이트 예산**이 정한다
+ * (`studio-history-retention-budget.ts`; 개수 방벽 `STUDIO_PAGES_HISTORY_MAX_ENTRIES`).
+ * 저널은 그 결과를 `nextUndoDepth` 로 받아 같은 수만큼 앞에서 걷어낼 뿐 스스로 판단하지 않는다.
+ * 사이드카 항목만 저널이 직접 묶는다 — 아래 `STUDIO_HISTORY_JOURNAL_MAX_SIDECAR_ENTRIES` 참고.
  */
+
+import { STUDIO_PAGES_HISTORY_MAX_ENTRIES } from "./studio-history-retention-budget";
 
 /** 저널이 추적하는 히스토리 밖 문서. */
 export type StudioHistoryJournalSidecarTarget = "characterBible" | "writerRoom";
@@ -57,11 +66,23 @@ export interface StudioHistoryJournal<Bible, Writer> {
 }
 
 /**
- * 사이드카 항목 상한. 스냅샷 히스토리의 `STUDIO_PAGES_HISTORY_MAX_ENTRIES` 와 같은 값으로 둔다 —
- * `pages` 항목은 스냅샷 히스토리 상한이 이미 묶고 있으므로, 저널이 따로 묶어야 하는 건 사이드카뿐이다.
- * 따라서 저널 전체 길이는 200(pages) + 200(sidecar) 로 상한이 선다.
+ * 사이드카 항목 상한 — 캔버스 쪽 개수 방벽과 **같은 상수**를 쓴다(리터럴을 복제하면 둘이 갈라진다).
+ *
+ * ## 왜 사이드카는 바이트가 아니라 개수로 묶는가
+ *
+ * 캔버스 스냅샷에서 개수가 틀린 게이트인 이유는 엔트리당 페이로드가 376 B ~ 6.46 MiB 로 네 자릿수
+ * 배 갈리기 때문이다. 사이드카는 정반대다 — 페이로드가 zod 값 객체 **참조**이고 모든 변경 함수가
+ * 구조 공유를 유지하므로 엔트리당 비용이 포인터 수준으로 균일하다(2,000개면 수백 KB 규모).
+ * 크기가 균일한 곳에서는 개수가 정확히 옳은 게이트다.
+ *
+ * 반대로 사이드카를 바이트로 재려면 두 문서를 깊게 걸어야 하는데, 그건 800 ms 합치기 창 안에서
+ * **키 입력마다** O(문서) 를 무는 일이다 — 이득 없는 비용이다.
+ *
+ * 다만 값을 200 에 남겨 두면 비대칭이 생긴다: 긴 세션 뒤 ⌘Z 가 캔버스 단계는 수천 칸 걸어가는데
+ * 그 구간의 오래된 로그라인 편집만 조용히 사라진다. 아티스트가 만진 것과 다른 게 되돌려지는,
+ * 이 모듈이 애초에 없애려던 실패 그대로다. 그래서 캔버스 방벽과 같은 값으로 함께 올린다.
  */
-export const STUDIO_HISTORY_JOURNAL_MAX_SIDECAR_ENTRIES = 200;
+export const STUDIO_HISTORY_JOURNAL_MAX_SIDECAR_ENTRIES = STUDIO_PAGES_HISTORY_MAX_ENTRIES;
 
 /**
  * 같은 사이드카를 연속으로 고칠 때 한 항목으로 합치는 시간 창(ms).
@@ -133,9 +154,15 @@ function capStudioHistoryJournalSidecarEntries<Bible, Writer>(
  * 스냅샷 히스토리가 새 단계를 만들었을 때 저널에 같은 수의 `pages` 항목을 넣는다.
  *
  * @param addedSteps    이번 전이가 커서 위치에 새로 만든 `pages` 단계 수.
- * @param nextUndoDepth 전이 후의 `pagesHi`. 상한(`STUDIO_PAGES_HISTORY_MAX_ENTRIES`)에 밀려
- *                      스냅샷이 앞에서 잘려 나갔으면 이 값이 기대치보다 작다. 저널도 같은 수의
- *                      `pages` 항목을 앞에서 버려 둘이 어긋나지 않게 한다.
+ * @param nextUndoDepth 전이 후의 `pagesHi`. 유지 바이트 예산에 밀려 스냅샷이 앞에서 잘려 나갔으면
+ *                      이 값이 기대치보다 작다. 저널도 같은 수의 `pages` 항목을 앞에서 버려
+ *                      둘이 어긋나지 않게 한다.
+ *
+ * 개수 상한 시절에는 한 전이가 스냅샷을 **정확히 1개**만 버렸다. 바이트 예산에서는 무거운 커밋
+ * 하나가 예산을 여러 엔트리분 넘길 수 있어 `excess` 가 2 이상이 된다 — 아래 루프는 처음부터
+ * N 개 일괄 처리로 쓰여 있지만 그 경로가 실제로 돌기 시작한 것은 예산제부터다. 두 불변식
+ * (커서 앞 `pages` 수 == `pagesHi`, 전체 `pages` 수 == `pagesHistory.length - 1`)에 대한
+ * N-퇴출 회귀 테스트를 `studio-history-journal.test.ts` 가 들고 있다.
  */
 export function recordStudioHistoryJournalPagesSteps<Bible, Writer>(
   journal: StudioHistoryJournal<Bible, Writer>,
