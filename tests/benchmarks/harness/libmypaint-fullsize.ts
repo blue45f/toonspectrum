@@ -87,6 +87,23 @@ const LIBMYPAINT_WASM = join(
 );
 const HOKUSAI_WASM = join(HOKUSAI_PKG_DIR, "studio_hokusai_wasm_bg.wasm");
 
+/**
+ * Canvas and dab size are ONE coupled measurement point, not two independent knobs, and the
+ * contract enforces that (parseNaturalMediaFullsizeBenchmarkResult rejects a dab outside
+ * 950-1050px as "workload bounds drift"). Read this before retuning either.
+ *
+ * This artifact answers "does either engine survive an extreme full-size dab" - memory bound,
+ * no silent loss, determinism. It is NOT a product-operating-point measurement: shipping brushes
+ * are 8-40px. Do not quote its throughput ratio as a product verdict on its own.
+ *
+ * Measured 2026-08-15, because the obvious "just measure at 24px" is a trap. Shrinking the dab
+ * while leaving this 1792x1536 canvas in place makes Hokusai look FASTER than libmypaint
+ * (wash-soft 1.59x, ink-crisp 1.19x over 5 runs) - but that is the 11MiB frame allocation
+ * dominating both engines, not brush work. Scale the canvas down with the dab (448x384, 0.69MiB)
+ * and the ordering snaps back to libmypaint ahead (wash-soft 0.82x, ink-crisp 0.52x). A
+ * product-scale profile must therefore scale canvas WITH dab, or it measures allocator throughput
+ * and silently reverses its own conclusion.
+ */
 const CANVAS_WIDTH = 1792;
 const CANVAS_HEIGHT = 1536;
 const BASE_DAB_DIAMETER_PX = 1000;
