@@ -88,6 +88,8 @@ CHARACTERS = (
         "accent": (0.72, 0.18, 0.12, 1.0),
         "hair": (0.10, 0.055, 0.025, 1.0),
         "style": "explorer",
+        "allow_excessively_violent_usage": False,
+        "allow_excessively_sexual_usage": False,
     },
     {
         "file": "TS_Yeonhui_RuneGuard.vrm",
@@ -756,8 +758,8 @@ def configure_vrm(armature, spec):
     meta.allow_redistribution = True
     meta.modification = "allowModificationRedistribution"
     meta.other_license_url = CC0_LICENSE_URL
-    meta.allow_excessively_violent_usage = True
-    meta.allow_excessively_sexual_usage = True
+    meta.allow_excessively_violent_usage = spec.get("allow_excessively_violent_usage", True)
+    meta.allow_excessively_sexual_usage = spec.get("allow_excessively_sexual_usage", True)
     meta.allow_political_or_religious_usage = True
     meta.allow_antisocial_or_hate_usage = False
 
@@ -828,9 +830,10 @@ def generate_character(spec):
 
 def main():
     requested_value = bpy.context.scene.get("toonspectrum_vrm_files", "")
+    selected_file = bpy.context.scene.get("toonspectrum_vrm_character_file", "")
     requested = {
         file_name.strip()
-        for file_name in requested_value.split(",")
+        for file_name in (requested_value + "," + selected_file).split(",")
         if file_name.strip()
     }
     characters = [

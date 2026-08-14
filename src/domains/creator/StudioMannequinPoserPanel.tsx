@@ -32,6 +32,8 @@ import {
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+import { confirmStudioDestructiveAction } from "./studio-destructive-action-preview";
+import { studioDiscardUnpersistedMannequinStateRequest } from "./studio-destructive-command-catalog";
 import { getProductStudioMannequinStateSqliteRepository } from "./studio-mannequin-bg3d-preset-sqlite-repository";
 import {
   STUDIO_MANNEQUIN_BODY_PRESETS,
@@ -88,6 +90,10 @@ import {
   StudioToggleChip,
   studioSegmentChipClass,
 } from "./studio-panel-ui";
+import {
+  StudioVrmPhotoPoseScanner,
+  type StudioVrmPhotoPoseApplyPayload,
+} from "./StudioVrmPhotoPoseScanner";
 
 import type { ReactElement } from "react";
 
@@ -111,9 +117,21 @@ type StudioMannequinPersistenceStatus =
   | "saving"
   | "memory-only";
 
+interface StudioMannequinPhotoPoseUndoEntry {
+  readonly before: StudioMannequinPose;
+  readonly after: StudioMannequinPose;
+}
+
+interface StudioMannequinPhotoPoseApplyStatus {
+  readonly sourceName: string;
+  readonly confidencePercent: number;
+  readonly appliedJointCount: number;
+}
+
 const RAD_TO_DEG = 180 / Math.PI;
 const DEG_TO_RAD = Math.PI / 180;
 const CAPTURE_SCALES = [1, 2, 3] as const;
+const STUDIO_MANNEQUIN_PHOTO_MIN_APPLIED_JOINTS = 6;
 
 const TABS: readonly { id: MannequinTabId; label: string; icon: ReactElement }[] = Object.freeze([
   { id: "body", label: "체형", icon: <UserRound size={13} aria-hidden /> },
@@ -400,6 +418,7 @@ export function StudioMannequinCameraSection({
   onResetCamera,
   onCapture,
   capturing,
+  captureDisabled = false,
   webcamActive,
   webcamLoadingStage,
   webcamError,
@@ -421,6 +440,7 @@ export function StudioMannequinCameraSection({
   onResetCamera: () => void;
   onCapture: () => void;
   capturing: boolean;
+  captureDisabled?: boolean;
   webcamActive: boolean;
   webcamLoadingStage: StudioMannequinWebcamLoadingStage;
   webcamError: string | null;
@@ -597,7 +617,8 @@ export function StudioMannequinCameraSection({
       <button
         type="button"
         onClick={onCapture}
-        disabled={capturing}
+        disabled={capturing || captureDisabled}
+        title={captureDisabled ? "SQLite 저장 상태를 확인한 뒤 캡처할 수 있습니다." : undefined}
         className={buttonClass({ size: "md", variant: "solid", className: "w-full gap-1.5" })}
       >
         {capturing ? (
@@ -622,7 +643,6 @@ export function StudioMannequinPoserPanel({
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const sceneRef = useRef<StudioMannequinSceneHandle | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const photoInputRef = useRef<HTMLInputElement | null>(null);
   const [stateRepository] = useState(getProductStudioMannequinStateSqliteRepository);
 
   const [params, setParams] = useState<StudioMannequinBodyParams>(
@@ -641,6 +661,10 @@ export function StudioMannequinPoserPanel({
   const [sceneError, setSceneError] = useState<string | null>(null);
   const [persistenceStatus, setPersistenceStatus] =
     useState<StudioMannequinPersistenceStatus>("idle");
+  const [photoPoseUndoEntry, setPhotoPoseUndoEntry] =
+    useState<StudioMannequinPhotoPoseUndoEntry | null>(null);
+  const [photoPoseApplyStatus, setPhotoPoseApplyStatus] =
+    useState<StudioMannequinPhotoPoseApplyStatus | null>(null);
 
   const [webcamActive, setWebcamActive] = useState(false);
   const [webcamLoadingStage, setWebcamLoadingStage] =
@@ -663,13 +687,30 @@ export function StudioMannequinPoserPanel({
   const mirrorModeRef = useRef(true);
   const mountedRef = useRef(false);
   const hydrationGenerationRef = useRef(0);
+  const hydrationSafeForFinalFlushRef = useRef(false);
   const persistenceGenerationRef = useRef(0);
   const stateRevisionRef = useRef(0);
+  const poseRef = useRef(pose);
+  const stateRef = useRef({ params, pose });
+  stateRef.current = { params, pose };
   const webcamLoading = webcamLoadingStage !== null;
   webcamActiveRef.current = webcamActive;
   webcamLoadingRef.current = webcamLoading;
   poseFrozenRef.current = poseFrozen;
   mirrorModeRef.current = mirrorMode;
+
+  const commitParams = useCallback((nextParams: StudioMannequinBodyParams) => {
+    stateRevisionRef.current += 1;
+    stateRef.current = { ...stateRef.current, params: nextParams };
+    setParams(nextParams);
+  }, []);
+
+  const commitPose = useCallback((nextPose: StudioMannequinPose) => {
+    stateRevisionRef.current += 1;
+    poseRef.current = nextPose;
+    stateRef.current = { ...stateRef.current, pose: nextPose };
+    setPose(nextPose);
+  }, []);
 
   const releaseWebcamResources = useCallback(() => {
     webcamSessionRef.current += 1;
@@ -813,8 +854,13 @@ export function StudioMannequinPoserPanel({
 
   useEffect(() => () => releaseWebcamResources(), [releaseWebcamResources]);
 
-  const poseRef = useRef(pose);
   poseRef.current = pose;
+
+  useEffect(() => {
+    if (!photoPoseUndoEntry || pose === photoPoseUndoEntry.after) return;
+    setPhotoPoseUndoEntry(null);
+    setPhotoPoseApplyStatus(null);
+  }, [photoPoseUndoEntry, pose]);
 
   useEffect(() => {
     if (!webcamActive) return;
@@ -852,8 +898,7 @@ export function StudioMannequinPoserPanel({
                   ...smoothedJoints,
                 },
               };
-              poseRef.current = updatedPose;
-              setPose(updatedPose);
+              commitPose(updatedPose);
               sceneRef.current?.setPose(updatedPose);
             }
           } finally {
@@ -879,28 +924,44 @@ export function StudioMannequinPoserPanel({
         webcamFrameRef.current = null;
       }
     };
-  }, [releaseWebcamResources, webcamActive]);
+  }, [commitPose, releaseWebcamResources, webcamActive]);
 
   const spec = useMemo(() => buildStudioMannequinSpec(params), [params]);
 
   const poseFromSceneRef = useRef(false);
-  const stateRef = useRef({ params, pose });
-  stateRef.current = { params, pose };
 
   useEffect(() => {
     mountedRef.current = true;
     return () => {
+      // Route/access transitions can unmount this panel without calling closeWithPersist().
+      // Queue the latest canonical state before invalidating UI generations. The SQLite
+      // repository serializes writes, so this also safely follows an in-flight explicit save.
+      // There is no browser-KV/memory fallback: a failed late flush remains an observable
+      // repository failure in diagnostics, while the component is already gone and cannot
+      // truthfully present a retry UI.
+      if (hydrationSafeForFinalFlushRef.current) {
+        void stateRepository.save(stateRef.current).catch((cause: unknown) => {
+          console.warn("Studio mannequin final SQLite flush failed:", cause);
+        });
+      }
       mountedRef.current = false;
       hydrationGenerationRef.current += 1;
       persistenceGenerationRef.current += 1;
     };
-  }, []);
-
-  useEffect(() => {
-    stateRevisionRef.current += 1;
-  }, [params, pose]);
+  }, [stateRepository]);
 
   const persistState = useCallback(async (): Promise<boolean> => {
+    // A save is only authoritative after the prior durable snapshot has been read. Saving while
+    // hydration is pending (or after it failed) could replace an unknown existing snapshot with
+    // the component's initial defaults.
+    if (!hydrationSafeForFinalFlushRef.current) {
+      setError(
+        persistenceStatus === "memory-only"
+          ? "기존 SQLite 상태를 확인하지 못해 저장하거나 닫을 수 없습니다. JSON으로 내보낸 뒤 다시 열어 주세요."
+          : "기존 SQLite 상태를 불러오는 중입니다. 완료된 뒤 다시 시도해 주세요.",
+      );
+      return false;
+    }
     const generation = persistenceGenerationRef.current + 1;
     persistenceGenerationRef.current = generation;
     setPersistenceStatus("saving");
@@ -925,21 +986,40 @@ export function StudioMannequinPoserPanel({
       }
       return false;
     }
-  }, [stateRepository]);
+  }, [persistenceStatus, stateRepository]);
 
   const closeWithPersist = useCallback(() => {
+    if (!hydrationSafeForFinalFlushRef.current) {
+      setError(
+        persistenceStatus === "memory-only"
+          ? "기존 SQLite 상태를 확인하지 못해 닫기 저장을 수행할 수 없습니다. JSON으로 내보낸 뒤 다시 열어 주세요."
+          : "기존 SQLite 상태를 불러오는 중입니다. 완료된 뒤 다시 닫아 주세요.",
+      );
+      return;
+    }
     releaseWebcamResources();
     setWebcamActive(false);
     setWebcamLoadingStage(null);
     void persistState().then((saved) => {
       if (saved && mountedRef.current) onClose();
     });
-  }, [onClose, persistState, releaseWebcamResources]);
+  }, [onClose, persistState, persistenceStatus, releaseWebcamResources]);
+
+  const closeWithoutPersist = useCallback(async () => {
+    if (!(await confirmStudioDestructiveAction(
+      studioDiscardUnpersistedMannequinStateRequest(),
+    )) || !mountedRef.current) return;
+    releaseWebcamResources();
+    setWebcamActive(false);
+    setWebcamLoadingStage(null);
+    onClose();
+  }, [onClose, releaseWebcamResources]);
 
   useEffect(() => {
     if (!open) return;
     const generation = hydrationGenerationRef.current + 1;
     hydrationGenerationRef.current = generation;
+    hydrationSafeForFinalFlushRef.current = false;
     const startingRevision = stateRevisionRef.current;
     let active = true;
     setPersistenceStatus("loading");
@@ -948,15 +1028,27 @@ export function StudioMannequinPoserPanel({
       if (
         !active ||
         !mountedRef.current ||
-        hydrationGenerationRef.current !== generation ||
-        stateRevisionRef.current !== startingRevision
+        hydrationGenerationRef.current !== generation
       ) {
         return;
       }
+      // A real edit made while the read was pending is newer than the loaded snapshot. Keep the
+      // edited state, but mark it safe to flush because the prior durable read completed first.
+      if (stateRevisionRef.current !== startingRevision) {
+        hydrationSafeForFinalFlushRef.current = true;
+        setPersistenceStatus("ready");
+        return;
+      }
       if (stored) {
+        // React may unmount in the same turn before these state updates commit. Advance the
+        // synchronous flush authority first so final cleanup can never write initial defaults
+        // over the durable snapshot that just finished loading.
+        stateRef.current = stored;
+        poseRef.current = stored.pose;
         setParams(stored.params);
         setPose(stored.pose);
       }
+      hydrationSafeForFinalFlushRef.current = true;
       setPersistenceStatus("ready");
     }).catch((cause: unknown) => {
       if (!active || !mountedRef.current || hydrationGenerationRef.current !== generation) return;
@@ -987,7 +1079,7 @@ export function StudioMannequinPoserPanel({
         onSelectJoint: (jointId) => setSelectedJointId(jointId),
         onPoseEdited: (editedPose) => {
           poseFromSceneRef.current = true;
-          setPose(editedPose);
+          commitPose(editedPose);
         },
       });
       sceneRef.current = handle;
@@ -1010,7 +1102,7 @@ export function StudioMannequinPoserPanel({
       sceneRef.current = null;
       handle.dispose();
     };
-  }, [open]);
+  }, [commitPose, open]);
 
   useEffect(() => {
     sceneRef.current?.setBodySpec(spec);
@@ -1027,7 +1119,7 @@ export function StudioMannequinPoserPanel({
   useEffect(() => {
     if (!open) return;
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || capturing || persistenceStatus === "saving") return;
+      if (event.key !== "Escape" || capturing || persistenceStatus !== "ready") return;
       event.preventDefault();
       closeWithPersist();
     };
@@ -1037,21 +1129,21 @@ export function StudioMannequinPoserPanel({
 
   const applyPosePreset = useCallback((presetId: string) => {
     const preset = STUDIO_MANNEQUIN_POSE_PRESETS.find((entry) => entry.id === presetId);
-    if (preset) setPose(normalizeStudioMannequinPose(preset.pose));
-  }, []);
+    if (preset) commitPose(normalizeStudioMannequinPose(preset.pose));
+  }, [commitPose]);
 
   const handleRotateSelected = useCallback(
     (rotation: StudioMannequinVec3) => {
       if (!selectedJointId) return;
       const clamped = clampStudioMannequinJointRotation(selectedJointId, rotation);
-      setPose((previous) =>
+      commitPose(
         normalizeStudioMannequinPose({
-          joints: { ...previous.joints, [selectedJointId]: clamped },
-          pelvisOffset: previous.pelvisOffset,
+          joints: { ...poseRef.current.joints, [selectedJointId]: clamped },
+          pelvisOffset: poseRef.current.pelvisOffset,
         }),
       );
     },
-    [selectedJointId],
+    [commitPose, selectedJointId],
   );
 
   const handleExportJson = useCallback(() => {
@@ -1073,8 +1165,8 @@ export function StudioMannequinPoserPanel({
       const content = e.target?.result;
       const imported = importStudioMannequinStateFromJSON(content);
       if (imported) {
-        setParams(imported.params);
-        setPose(imported.pose);
+        commitParams(imported.params);
+        commitPose(imported.pose);
         setError(null);
       } else {
         setError("유효하지 않은 데생 인형 JSON 파일입니다.");
@@ -1082,7 +1174,7 @@ export function StudioMannequinPoserPanel({
     };
     reader.readAsText(file);
     event.target.value = "";
-  }, []);
+  }, [commitParams, commitPose]);
 
   const handleCopyShareLink = useCallback(() => {
     const hash = encodeStudioMannequinShareHash(stateRef.current);
@@ -1092,25 +1184,64 @@ export function StudioMannequinPoserPanel({
     setTimeout(() => setCopiedLink(false), 2000);
   }, []);
 
-  const handlePhotoPoseScan = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const handleApplyPhotoPose = useCallback((payload: StudioVrmPhotoPoseApplyPayload): boolean => {
+    if (
+      payload.confidence.quality === "low"
+      || payload.confidence.overall < 0.5
+      || payload.confidence.coverage < 0.6
+    ) {
+      setError("사진 포즈 신뢰도가 낮아 적용하지 않았습니다. 사람이 더 크게 보이는 전신 사진을 선택해 주세요.");
+      return false;
+    }
+
+    const before = poseRef.current;
     const plan = createStudioMannequinPhotoPoseApplyPlan({
-      joints: {
-        leftUpperArm: [-0.4, 0, 0.8],
-        rightUpperArm: [-0.4, 0, -0.8],
-        leftLowerArm: [-0.6, 0, 0],
-        rightLowerArm: [-0.6, 0, 0],
-        spine: [0.1, 0, 0],
-      },
+      currentPose: before,
+      mediaPipeLandmarks: payload.worldLandmarks,
+      mirrorMode: false,
+      minimumVisibility: 0.35,
     });
-    setPose(plan.pose);
-    event.target.value = "";
-  }, []);
+
+    if (plan.appliedJoints.length < STUDIO_MANNEQUIN_PHOTO_MIN_APPLIED_JOINTS) {
+      setError("사진에서 안전하게 적용할 수 있는 관절이 부족해 기존 포즈를 유지했습니다. 팔·다리가 선명한 전신 사진을 다시 선택해 주세요.");
+      return false;
+    }
+
+    commitPose(plan.pose);
+    setPhotoPoseUndoEntry({ before, after: plan.pose });
+    setPhotoPoseApplyStatus({
+      sourceName: payload.sourceName,
+      confidencePercent: Math.round(payload.confidence.overall * 100),
+      appliedJointCount: plan.appliedJoints.length,
+    });
+    setError(null);
+    return true;
+  }, [commitPose]);
+
+  const handleUndoPhotoPose = useCallback(() => {
+    const entry = photoPoseUndoEntry;
+    if (!entry || poseRef.current !== entry.after) {
+      setPhotoPoseUndoEntry(null);
+      setPhotoPoseApplyStatus(null);
+      return;
+    }
+    commitPose(entry.before);
+    setPhotoPoseUndoEntry(null);
+    setPhotoPoseApplyStatus(null);
+    setError(null);
+  }, [commitPose, photoPoseUndoEntry]);
 
   const handleCapture = useCallback(() => {
     const handle = sceneRef.current;
     if (!handle || capturing) return;
+    if (!hydrationSafeForFinalFlushRef.current) {
+      setError(
+        persistenceStatus === "memory-only"
+          ? "기존 SQLite 상태를 확인하지 못해 캡처를 삽입할 수 없습니다. JSON으로 내보낸 뒤 다시 열어 주세요."
+          : "기존 SQLite 상태를 불러오는 중입니다. 완료된 뒤 다시 캡처해 주세요.",
+      );
+      return;
+    }
     setCapturing(true);
     setError(null);
     void (async () => {
@@ -1127,7 +1258,7 @@ export function StudioMannequinPoserPanel({
         setCapturing(false);
       }
     })();
-  }, [captureScale, capturing, onClose, onInsert, persistState]);
+  }, [captureScale, capturing, onClose, onInsert, persistState, persistenceStatus]);
 
   if (!open) return null;
 
@@ -1154,14 +1285,6 @@ export function StudioMannequinPoserPanel({
         className="hidden"
         onChange={handleImportJson}
       />
-      <input
-        ref={photoInputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={handlePhotoPoseScan}
-      />
-
       <div className="mx-auto flex h-full w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-2xl">
         <header className="flex items-center justify-between gap-2 border-b border-line/70 px-3 py-2">
           <div className="flex items-center gap-2">
@@ -1212,18 +1335,29 @@ export function StudioMannequinPoserPanel({
               </button>
               <button
                 type="button"
-                onClick={() => photoInputRef.current?.click()}
+                onClick={() => setTab("pose")}
                 className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1 text-[0.7rem]" })}
-                title="사진/동작 인식으로 포즈 맞추기"
+                title="MediaPipe 사진 포즈 스캐너 열기"
               >
-                <ImageIcon size={13} aria-hidden /> 동작 인식
+                <ImageIcon size={13} aria-hidden /> 사진 포즈
               </button>
             </div>
           </div>
           <button
             type="button"
-            onClick={closeWithPersist}
-            disabled={persistenceStatus === "saving"}
+            onClick={persistenceStatus === "memory-only" ? closeWithoutPersist : closeWithPersist}
+            disabled={
+              persistenceStatus === "idle"
+              || persistenceStatus === "loading"
+              || persistenceStatus === "saving"
+            }
+            title={
+              persistenceStatus === "loading" || persistenceStatus === "idle"
+                ? "SQLite 상태를 불러온 뒤 닫을 수 있습니다."
+                : persistenceStatus === "memory-only"
+                  ? "현재 탭의 변경을 저장하지 않고 닫습니다. 먼저 JSON으로 내보내세요."
+                  : undefined
+            }
             className={buttonClass({ size: "icon", variant: "quiet" })}
             aria-label="3D 데생 인형 닫기"
           >
@@ -1280,9 +1414,9 @@ export function StudioMannequinPoserPanel({
                 <StudioMannequinBodySection
                   params={params}
                   materialStyle={materialStyle}
-                  onParamsChange={setParams}
+                  onParamsChange={commitParams}
                   onApplyPreset={(presetId) =>
-                    setParams(STUDIO_MANNEQUIN_BODY_PRESETS[presetId].params)
+                    commitParams(STUDIO_MANNEQUIN_BODY_PRESETS[presetId].params)
                   }
                   onMaterialStyleChange={(style) => {
                     setMaterialStyle(style);
@@ -1291,13 +1425,43 @@ export function StudioMannequinPoserPanel({
                 />
               ) : null}
               {tab === "pose" ? (
-                <StudioMannequinPoseSection
-                  selectedCategory={poseCategory}
-                  onCategorySelect={setPoseCategory}
-                  onApplyPreset={applyPosePreset}
-                  onMirror={() => setPose((previous) => mirrorStudioMannequinPose(previous))}
-                  onResetJoints={() => setPose(createStudioMannequinRestPose())}
-                />
+                <>
+                  <StudioVrmPhotoPoseScanner
+                    disabled={webcamActive || webcamLoading || capturing}
+                    includeHandDetection={false}
+                    minimumApplyQuality="medium"
+                    onApply={handleApplyPhotoPose}
+                  />
+                  {photoPoseApplyStatus ? (
+                    <div
+                      role="status"
+                      aria-live="polite"
+                      className="mb-3 rounded-lg border border-accent/35 bg-accent-soft/60 p-2 text-[0.66rem] leading-relaxed text-fg-2"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="min-w-0 truncate" title={photoPoseApplyStatus.sourceName}>
+                          사진 포즈 적용됨 · 관절 {photoPoseApplyStatus.appliedJointCount}개 · 신뢰도 {photoPoseApplyStatus.confidencePercent}%
+                        </span>
+                        {photoPoseUndoEntry?.after === pose ? (
+                          <button
+                            type="button"
+                            onClick={handleUndoPhotoPose}
+                            className={buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 text-[0.66rem]" })}
+                          >
+                            1단계 실행 취소
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : null}
+                  <StudioMannequinPoseSection
+                    selectedCategory={poseCategory}
+                    onCategorySelect={setPoseCategory}
+                    onApplyPreset={applyPosePreset}
+                    onMirror={() => commitPose(mirrorStudioMannequinPose(poseRef.current))}
+                    onResetJoints={() => commitPose(createStudioMannequinRestPose())}
+                  />
+                </>
               ) : null}
               {tab === "joint" ? (
                 <StudioMannequinJointSection
@@ -1324,6 +1488,7 @@ export function StudioMannequinPoserPanel({
                   onResetCamera={() => sceneRef.current?.resetCamera()}
                   onCapture={handleCapture}
                   capturing={capturing}
+                  captureDisabled={persistenceStatus !== "ready"}
                   webcamActive={webcamActive}
                   webcamLoadingStage={webcamLoadingStage}
                   webcamError={webcamError}

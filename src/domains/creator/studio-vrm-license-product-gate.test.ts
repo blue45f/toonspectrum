@@ -332,6 +332,29 @@ describe("studio VRM license product gate", () => {
     )).toMatchObject({ ok: false, code: "license-unrepresentable" });
   });
 
+  it("projects an exact official CC0 grant from a first-party VRM 1.0 receipt", () => {
+    const firstParty = inspectStudioVrmLicenseAuthority(vrm1({
+      name: "ToonSpectrum first-party character",
+      authors: ["ToonSpectrum"],
+      licenseUrl: STUDIO_VRM_1_PUBLIC_LICENSE_URL,
+      otherLicenseUrl: STUDIO_VRM_CC0_1_LICENSE_URL,
+      avatarPermission: "everyone",
+      commercialUsage: "corporation",
+      allowRedistribution: true,
+      modification: "allowModificationRedistribution",
+      creditNotation: "unnecessary",
+    }));
+
+    expect(planStudioVrmRenderedPoseMarketplaceShare(
+      firstParty,
+      shareContext(firstParty),
+    )).toMatchObject({
+      ok: true,
+      license: "cc0-1.0",
+      attributionText: "",
+    });
+  });
+
   it("uses ToonSpectrum standard only for a permissive VRM 1.0 rendered-only grant", () => {
     const authority = inspectStudioVrmLicenseAuthority(vrm1({
       name: "VRM 1 rendered pose",

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   parseStudioVrmLicenseMetadata,
   STUDIO_VRM_1_PUBLIC_LICENSE_URL,
+  STUDIO_VRM_CC0_1_LICENSE_URL,
   type StudioVrmLicenseMetadataReceipt,
 } from "./studio-vrm-license-metadata";
 import {
@@ -218,6 +219,38 @@ describe("studio VRM license action policy", () => {
       .toBe("unknown");
     expect(policy(receipt, "derivative-export", outgoingContext()).decision).toBe("block");
     expect(policy(receipt, "marketplace-share", outgoingContext()).decision).toBe("block");
+  });
+
+  it("recognizes only the exact official CC0 URL as a canonical nonrestrictive license", () => {
+    const rights = {
+      commercialUsage: "corporation",
+      modification: "allowModificationRedistribution",
+      allowRedistribution: true,
+      creditNotation: "unnecessary",
+    } as const;
+    const cc0 = receiptFor({
+      ...rights,
+      otherLicenseUrl: STUDIO_VRM_CC0_1_LICENSE_URL,
+    });
+
+    expect(cc0).toMatchObject({
+      licenseIdentifier: "CC0",
+      licenseUrl: STUDIO_VRM_CC0_1_LICENSE_URL,
+      additionalLicenseUrl: null,
+    });
+    expect(policy(cc0, "derivative-export", outgoingContext()).decision).toBe("allow");
+    expect(policy(cc0, "project-archive-redistribution", outgoingContext({
+      containsModifiedModel: true,
+    })).decision).toBe("allow");
+
+    const lookalike = receiptFor({
+      ...rights,
+      otherLicenseUrl: `${STUDIO_VRM_CC0_1_LICENSE_URL}terms`,
+    });
+    expect(policy(lookalike, "derivative-export", outgoingContext()).decision).toBe("block");
+    expect(policy(lookalike, "project-archive-redistribution", outgoingContext({
+      containsModifiedModel: true,
+    })).decision).toBe("block");
   });
 
   it("requires explicit content classifications and enforces all four official restrictions", () => {

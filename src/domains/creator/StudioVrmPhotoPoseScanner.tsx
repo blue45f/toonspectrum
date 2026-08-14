@@ -2,12 +2,6 @@ import { Check, FlipHorizontal2, ImageUp, Loader2, RotateCcw, X } from "lucide-r
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 
 import {
-  type StudioVrmPhotoHandDetection,
-  type StudioVrmPhotoHandInferenceResult,
-  type StudioVrmPhotoHandSide,
-  type StudioVrmPhotoHandWarningCode,
-} from "./studio-vrm-photo-hand";
-import {
   StudioVrmPhotoPoseError,
   type StudioVrmPhotoPoseConfidenceSummary,
   type StudioVrmPhotoPoseLandmark,
@@ -29,15 +23,28 @@ import {
   initPhotoPoseLandmarker,
 } from "./studio-vrm-webcam-tracking";
 
+import type {
+  StudioVrmPhotoHandDetection,
+  StudioVrmPhotoHandInferenceResult,
+  StudioVrmPhotoHandSide,
+  StudioVrmPhotoHandWarningCode,
+} from "./studio-vrm-photo-hand";
 import type { BoneEulerMap } from "./studio-vrm-pose-solver";
 
 export interface StudioVrmPhotoPoseScannerProps {
   readonly disabled?: boolean;
+  /** Mannequin scans do not need the optional hand model or finger controls. */
+  readonly includeHandDetection?: boolean;
+  /** Defaults to `low` for backwards-compatible VRM review/apply behavior. */
+  readonly minimumApplyQuality?: StudioVrmPhotoPoseConfidenceSummary["quality"];
   readonly onApply: (payload: StudioVrmPhotoPoseApplyPayload) => boolean;
 }
 
 export interface StudioVrmPhotoPoseApplyPayload {
+  readonly sourceName: string;
   readonly bones: BoneEulerMap;
+  readonly landmarks: readonly StudioVrmPhotoPoseLandmark[];
+  readonly worldLandmarks: readonly StudioVrmPhotoPoseLandmark[];
   readonly confidence: StudioVrmPhotoPoseConfidenceSummary;
   readonly fingerEdits: StudioVrmPhotoHandInferenceResult["fingerEdits"];
   readonly detectedHandSides: readonly StudioVrmPhotoHandSide[];
@@ -47,6 +54,7 @@ interface PhotoPoseCandidate {
   readonly sourceName: string;
   readonly bones: BoneEulerMap;
   readonly landmarks: readonly StudioVrmPhotoPoseLandmark[];
+  readonly worldLandmarks: readonly StudioVrmPhotoPoseLandmark[];
   readonly confidence: StudioVrmPhotoPoseConfidenceSummary;
   readonly hands: StudioVrmPhotoHandInferenceResult;
 }
@@ -111,6 +119,17 @@ function confidenceLabel(summary: StudioVrmPhotoPoseConfidenceSummary): string {
   if (summary.quality === "high") return "높음";
   if (summary.quality === "medium") return "보통";
   return "낮음";
+}
+
+const PHOTO_POSE_QUALITY_RANK: Readonly<
+  Record<StudioVrmPhotoPoseConfidenceSummary["quality"], number>
+> = Object.freeze({ low: 0, medium: 1, high: 2 });
+
+function doesStudioVrmPhotoPoseConfidenceMeetMinimum(
+  confidence: StudioVrmPhotoPoseConfidenceSummary,
+  minimumQuality: StudioVrmPhotoPoseConfidenceSummary["quality"],
+): boolean {
+  return PHOTO_POSE_QUALITY_RANK[confidence.quality] >= PHOTO_POSE_QUALITY_RANK[minimumQuality];
 }
 
 function waitForOptionalPhotoHandDetector(
@@ -237,7 +256,12 @@ function SkeletonPreview({
   );
 }
 
-export function StudioVrmPhotoPoseScanner({ disabled = false, onApply }: StudioVrmPhotoPoseScannerProps) {
+export function StudioVrmPhotoPoseScanner({
+  disabled = false,
+  includeHandDetection = true,
+  minimumApplyQuality = "low",
+  onApply,
+}: StudioVrmPhotoPoseScannerProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const preprocessorRef = useRef<StudioVrmPhotoPosePreprocessor | null>(null);
   const jobRef = useRef<StudioVrmPhotoPosePreprocessJob | null>(null);
@@ -323,10 +347,12 @@ export function StudioVrmPhotoPoseScanner({ disabled = false, onApply }: StudioV
 
       setProgress(0.94);
       setProgressStage("inference");
-      const handPhase = waitForOptionalPhotoHandDetector(
-        initPhotoHandLandmarker(),
-        scanController.signal,
-      );
+      const handPhase = includeHandDetection
+        ? waitForOptionalPhotoHandDetector(
+            initPhotoHandLandmarker(),
+            scanController.signal,
+          )
+        : Promise.resolve(null);
       const landmarker = await waitForStudioVrmPhotoPosePhase(
         initPhotoPoseLandmarker(),
         scanController.signal,
@@ -372,6 +398,7 @@ export function StudioVrmPhotoPoseScanner({ disabled = false, onApply }: StudioV
         sourceName: file.name,
         bones: inference.bones,
         landmarks: inference.normalizedLandmarks,
+        worldLandmarks: inference.worldLandmarks,
         confidence: inference.confidence,
         hands: scan.hands,
       });
@@ -402,6 +429,10 @@ export function StudioVrmPhotoPoseScanner({ disabled = false, onApply }: StudioV
     jobRef.current?.cancel();
   }
 
+  const candidateMeetsMinimum = candidate
+    ? doesStudioVrmPhotoPoseConfidenceMeetMinimum(candidate.confidence, minimumApplyQuality)
+    : true;
+
   return (
     <section className="mb-3 rounded-xl border border-line bg-card/45 p-3" aria-label="사진 포즈 스캐너">
       <input
@@ -418,7 +449,8 @@ export function StudioVrmPhotoPoseScanner({ disabled = false, onApply }: StudioV
             <ImageUp size={13} className="text-accent" aria-hidden /> 사진 포즈 스캔
           </h4>
           <p className="mt-1 text-[0.65rem] leading-relaxed text-fg-3">
-            사진은 서버로 보내지 않고, Worker 전처리 후 브라우저 안에서 한 사람의 전신 포즈와 보이는 손가락을 분석합니다.
+            사진은 서버로 보내지 않고, Worker 전처리 후 브라우저 안에서 한 사람의 전신 포즈
+            {includeHandDetection ? "와 보이는 손가락을" : "를"} 분석합니다.
           </p>
         </div>
         {busy ? (
@@ -497,15 +529,22 @@ export function StudioVrmPhotoPoseScanner({ disabled = false, onApply }: StudioV
               확인 권장: {candidate.confidence.lowConfidenceGroups.map((group) => LOW_CONFIDENCE_LABELS[group] ?? group).join(", ")}
             </p>
           ) : null}
-          <p className="text-[0.64rem] font-semibold text-fg-2" aria-live="polite">
-            {handStatusLabel(candidate.hands)}
-          </p>
-          {candidate.hands.warnings.map((warning) => (
+          {!candidateMeetsMinimum ? (
+            <p role="alert" className="text-[0.64rem] leading-relaxed text-danger">
+              신뢰도가 적용 기준보다 낮습니다. 사람이 더 크게 보이고 팔·다리가 선명한 사진을 다시 선택해 주세요.
+            </p>
+          ) : null}
+          {includeHandDetection ? (
+            <p className="text-[0.64rem] font-semibold text-fg-2" aria-live="polite">
+              {handStatusLabel(candidate.hands)}
+            </p>
+          ) : null}
+          {includeHandDetection ? candidate.hands.warnings.map((warning) => (
             <p key={warning} className="text-[0.64rem] leading-relaxed text-warning">
               {HAND_WARNING_LABELS[warning]}
             </p>
-          ))}
-          {candidate.hands.detectedSides.length > 0 ? (
+          )) : null}
+          {includeHandDetection && candidate.hands.detectedSides.length > 0 ? (
             <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-line bg-panel px-3 text-[0.66rem] font-semibold text-fg-2">
               <input
                 type="checkbox"
@@ -527,14 +566,21 @@ export function StudioVrmPhotoPoseScanner({ disabled = false, onApply }: StudioV
             <button
               type="button"
               className="inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border border-accent/60 bg-accent px-2 py-1.5 text-[0.68rem] font-bold text-on-accent hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-45"
-              disabled={disabled}
+              disabled={disabled || !candidateMeetsMinimum}
               onClick={() => {
-                if (disabled) return;
+                if (disabled || !candidateMeetsMinimum) return;
                 const applied = onApply({
+                  sourceName: candidate.sourceName,
                   bones: candidate.bones,
+                  landmarks: candidate.landmarks,
+                  worldLandmarks: candidate.worldLandmarks,
                   confidence: candidate.confidence,
-                  fingerEdits: includeFingerEdits ? candidate.hands.fingerEdits : {},
-                  detectedHandSides: includeFingerEdits ? candidate.hands.detectedSides : [],
+                  fingerEdits: includeHandDetection && includeFingerEdits
+                    ? candidate.hands.fingerEdits
+                    : {},
+                  detectedHandSides: includeHandDetection && includeFingerEdits
+                    ? candidate.hands.detectedSides
+                    : [],
                 });
                 if (applied) setCandidate(null);
               }}

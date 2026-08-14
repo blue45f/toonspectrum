@@ -258,6 +258,26 @@ export function studioDiscardLocalChangesRequest(): StudioDestructiveActionReque
   };
 }
 
+/**
+ * SQLite 권위를 읽지 못한 데생 인형 패널 닫기. 현재 탭의 포즈·체형은 문서 히스토리나
+ * durable repository에 들어가지 않았으므로 닫는 즉시 복구할 수 없다.
+ */
+export function studioDiscardUnpersistedMannequinStateRequest(): StudioDestructiveActionRequest {
+  return {
+    id: "studio.mannequin.discard-unpersisted-state",
+    title: "저장되지 않은 3D 데생 인형 변경 닫기",
+    losses: [
+      {
+        label: "현재 탭의 저장되지 않은 체형·포즈 변경",
+        note: "SQLite 상태를 확인하지 못했으며 닫은 뒤에는 복구할 수 없어요",
+      },
+    ],
+    gains: ["3D 데생 인형 패널 닫기"],
+    reversibility: "irreversible",
+    confirmLabel: "저장하지 않고 닫기",
+  };
+}
+
 /** ⑭ 레이어 타임라인 트랙 삭제 — `updateActivePage` 경유, ⌘Z 가능. */
 export function studioRemoveTimelineTrackRequest(
   layerLabel: string,

@@ -390,6 +390,91 @@ describe("Studio BG3D scene document normalization", () => {
     expect(parseStudioBg3dSceneDocument(JSON.stringify(hostile))).toBeNull();
   });
 
+  it("fails closed instead of silently truncating valid per-model rig collections", () => {
+    const modelNode = {
+      id: "model-node-1",
+      name: "리그 예산 모델",
+      kind: "model",
+      attachmentId: "model-1",
+      transform: { position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] },
+      parentId: null,
+      visible: true,
+      locked: false,
+      castsShadow: true,
+      receivesShadow: true,
+    };
+    const cases = [
+      {
+        code: "pose-joint-count-budget-exceeded" as const,
+        patch: {
+          pose: {
+            enabled: true,
+            weight: 1,
+            joints: Array.from({ length: 257 }, (_, index) => ({
+              jointKey: `joint-${index}`,
+              rotationOffset: [0, 0, 0, 1],
+            })),
+          },
+        },
+      },
+      {
+        code: "morph-target-count-budget-exceeded" as const,
+        patch: {
+          morph: {
+            enabled: true,
+            weight: 1,
+            targets: Array.from({ length: 257 }, (_, index) => ({
+              targetKey: `target-${index}`,
+              weightOffset: 0.5,
+            })),
+          },
+        },
+      },
+      {
+        code: "aim-constraint-count-budget-exceeded" as const,
+        patch: {
+          constraints: {
+            enabled: true,
+            aims: Array.from({ length: 129 }, (_, index) => ({
+              jointKey: `aim-${index}`,
+              target: [0, 1, 0],
+              axis: "+z",
+              weight: 1,
+            })),
+            twoBoneIks: [],
+          },
+        },
+      },
+      {
+        code: "two-bone-ik-count-budget-exceeded" as const,
+        patch: {
+          constraints: {
+            enabled: true,
+            aims: [],
+            twoBoneIks: Array.from({ length: 33 }, (_, index) => ({
+              upperJointKey: `upper-${index}`,
+              middleJointKey: `middle-${index}`,
+              endJointKey: `end-${index}`,
+              target: [0, 1, 0],
+              poleTarget: [0, 0, 1],
+              weight: 1,
+            })),
+          },
+        },
+      },
+    ];
+
+    for (const { code, patch } of cases) {
+      const candidate = currentDocument({
+        attachments: [attachment(1)],
+        nodes: [{ ...modelNode, ...patch }],
+      });
+      expectSceneBudgetError(() => normalizeStudioBg3dSceneDocument(candidate), code);
+      expect(parseStudioBg3dSceneDocument(JSON.stringify(candidate))).toBeNull();
+      expect(serializeStudioBg3dSceneDocument(candidate)).toBeNull();
+    }
+  });
+
   it("migrates aim-only v2 constraints and rejects ambiguous or falsely versioned IK chains", () => {
     const modelNode = {
       id: "model-node-1",

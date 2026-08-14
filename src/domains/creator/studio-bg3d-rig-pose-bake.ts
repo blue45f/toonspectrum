@@ -9,6 +9,7 @@ import {
 const QUATERNION_MIN_MAGNITUDE = 1e-8;
 const IDENTITY_VECTOR_EPSILON = 1e-8;
 const MAX_JOINT_KEY_LENGTH = 128;
+const MAX_POSE_JOINT_OFFSETS = 256;
 
 export interface StudioBg3dRigPoseBakeSample {
   readonly jointKey: string;
@@ -141,7 +142,12 @@ export function bakeStudioBg3dRigPoseLayer(
     joints.push({ jointKey, rotationOffset });
   }
 
-  // Reuse SceneDocument's canonical 256-joint cap and deep-freeze boundary. A length mismatch means
+  // Reuse SceneDocument's canonical 256-joint cap and deep-freeze boundary. Reject the retained
+  // collection before entering the throwing persistence normalizer so this user-command boundary
+  // keeps its documented null-on-invalid contract.
+  if (joints.length > MAX_POSE_JOINT_OFFSETS) return null;
+
+  // A length mismatch means
   // normalization would have dropped or truncated data, which this bake operation must never hide.
   const normalized = normalizeStudioBg3dPoseLayer({ enabled: true, weight: 1, joints });
   return normalized && normalized.joints.length === joints.length ? normalized : null;

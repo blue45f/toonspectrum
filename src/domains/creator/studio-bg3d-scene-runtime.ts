@@ -305,7 +305,16 @@ function normalizeRuntimePayloadLosslessly<Value>(
   const snapshot = snapshotJsonValue(raw);
   if (!snapshot.ok) return { status: "invalid" };
   const input = upgrade ? upgrade(snapshot.value) : snapshot.value;
-  const normalized = normalize(input);
+  let normalized: Value | null;
+  try {
+    normalized = normalize(input);
+  } catch (cause) {
+    // SceneDocument deliberately throws typed budget failures so direct persistence callers can
+    // reject an oversized document. At this per-model adapter boundary the established contract is
+    // to drop the complete lossy model with a bounded diagnostic, never leak an event-loop error.
+    if (cause instanceof StudioBg3dSceneDocumentBudgetError) return { status: "lossy" };
+    throw cause;
+  }
   if (!normalized) return { status: "invalid" };
   if (!jsonStructuresEqual(input, normalized)) return { status: "lossy" };
   return { status: "valid", value: normalized };

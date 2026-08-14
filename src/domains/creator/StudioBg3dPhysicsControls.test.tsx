@@ -152,7 +152,11 @@ describe("Studio BG3D modal focus contract", () => {
     expect(background3dSource).toContain('normalizedText(button) === "3D 배경"');
     expect(background3dSource).toContain('data-bg3d-initial-focus="true"');
     expect(background3dSource).toContain("ref={modalDialogRef}");
-    expect(background3dSource).toContain('aria-modal="true"');
+    expect(background3dSource).toContain('aria-hidden={!open || undefined}');
+    expect(background3dSource).toContain('aria-modal={open ? "true" : undefined}');
+    expect(background3dSource).toContain("hidden={!open}");
+    expect(background3dSource).toContain("inert={!open ? true : undefined}");
+    expect(background3dSource).toContain('role={open ? "dialog" : undefined}');
     expect(background3dSource).toContain("tabIndex={-1}");
 
     const keyboardHandler = sourceSlice(

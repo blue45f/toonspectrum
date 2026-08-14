@@ -122,6 +122,12 @@ describe("ToonSpectrum original Blender MCP VRM pack", () => {
       modification: "allowModificationRedistribution",
       otherLicenseUrl: CC0_LICENSE_URL,
     });
+    expect(meta).toMatchObject({
+      allowExcessivelyViolentUsage: fileName !== "TS_Haram_Explorer.vrm",
+      allowExcessivelySexualUsage: fileName !== "TS_Haram_Explorer.vrm",
+      allowPoliticalOrReligiousUsage: true,
+      allowAntisocialOrHateUsage: false,
+    });
 
     const mappedNodes = REQUIRED_HUMANOID_BONES.map((bone) => {
       const binding = humanBones[bone] as { node?: unknown } | undefined;

@@ -54,8 +54,8 @@ describe("Studio 3D viewport Motion Coach integration", () => {
   it("replaces native background toolbar titles and explains unavailable actions", () => {
     const toolbar = sliceBetween(
       backgroundSource,
-      'className="absolute left-2 top-2 z-10 grid grid-cols-3 gap-1.5 sm:left-2.5 sm:top-2.5 sm:flex sm:flex-col"',
-      "{!physicsInteractionLocked && !viewportHinted ?"
+      '"absolute left-2 top-2 z-10 grid grid-cols-3 gap-1.5 sm:left-2.5 sm:top-2.5 sm:flex sm:flex-col"',
+      "{!immersiveSceneActive && !physicsInteractionLocked && !viewportHinted ?"
     );
 
     expect(toolbar).toContain("<StudioToolHintTarget");
@@ -70,14 +70,16 @@ describe("Studio 3D viewport Motion Coach integration", () => {
 
   it("keeps both viewport tool groups inside short mobile canvases", () => {
     expect(backgroundSource).toContain(
-      'className="absolute left-2 top-2 z-10 grid grid-cols-3 gap-1.5 sm:left-2.5 sm:top-2.5 sm:flex sm:flex-col"'
+      '"absolute left-2 top-2 z-10 grid grid-cols-3 gap-1.5 sm:left-2.5 sm:top-2.5 sm:flex sm:flex-col"'
     );
     expect(backgroundSource).toContain(
       'className="col-span-3 grid grid-cols-3 gap-1 rounded-lg border border-line/70 bg-panel/80 p-1 shadow-sm backdrop-blur sm:flex sm:flex-col"'
     );
     expect(backgroundSource).toContain(
-      'className="absolute right-2 top-2 z-10 grid grid-cols-2 gap-1.5 sm:right-2.5 sm:top-2.5 sm:flex sm:flex-col"'
+      '"absolute right-2 top-2 z-10 grid grid-cols-2 gap-1.5 sm:right-2.5 sm:top-2.5 sm:flex sm:flex-col"'
     );
+    expect(backgroundSource.match(/immersiveSceneActive && "hidden"/gu)?.length ?? 0)
+      .toBeGreaterThanOrEqual(2);
   });
 
   it("grounds every unlocked member of a mixed multi-selection", () => {

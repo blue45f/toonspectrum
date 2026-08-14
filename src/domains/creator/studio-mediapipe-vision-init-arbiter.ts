@@ -10,6 +10,7 @@
 export type StudioMediaPipeVisionInitOwner =
   | "foreground-image-segmenter"
   | "mannequin-video-pose"
+  | "vrm-avatar-reference-image"
   | "vrm-photo-hand"
   | "vrm-photo-pose"
   | "vrm-video-face"

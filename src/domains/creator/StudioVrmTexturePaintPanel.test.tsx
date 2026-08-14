@@ -3,15 +3,17 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createStudioVrmTexturePaintCursor } from "./studio-vrm-texture-paint-cursor";
 import {
   StudioVrmTexturePaintPanel,
   type StudioVrmTexturePaintPanelProps,
   type StudioVrmTexturePaintPanelSettings,
 } from "./StudioVrmTexturePaintPanel";
 
+const SURFACE_BRUSH_UNAVAILABLE_REASON =
+  "검증·승인된 3D 표면 브러시 엔진이 아직 연결되지 않아 브러시 그리기를 사용할 수 없습니다. 자체 라운드 촉으로 대체하지 않으며, 현재는 ColorDrop과 스포이드를 사용할 수 있습니다.";
+
 const SETTINGS: StudioVrmTexturePaintPanelSettings = {
-  tool: "brush",
+  tool: "fill",
   brushKind: "ink",
   color: "#3a7bd5",
   sizeTexels: 48,
@@ -33,7 +35,8 @@ function renderPanel(overrides: Partial<StudioVrmTexturePaintPanelProps> = {}) {
     settings: SETTINGS,
     activeTargetId: "vrm-texture:face",
     activeTextureLabel: "Face · 2048×2048",
-    status: "표면을 끌어 칠하세요.",
+    surfaceBrushUnavailableReason: SURFACE_BRUSH_UNAVAILABLE_REASON,
+    status: "표면을 한 번 눌러 ColorDrop으로 채우세요.",
     strokeActive: false,
     eyedropperActive: false,
     targetCount: 1,
@@ -64,15 +67,12 @@ describe("StudioVrmTexturePaintPanel", () => {
     expect(screen.getByText("3D 표면 페인트")).toBeTruthy();
     expect(screen.getByText("Face · 2048×2048")).toBeTruthy();
     expect(
-      screen.getByText("표면을 끌어 칠하세요.").closest('[role="status"]')?.getAttribute("aria-live"),
+      screen.getByText("표면을 한 번 눌러 ColorDrop으로 채우세요.")
+        .closest('[role="status"]')?.getAttribute("aria-live"),
     ).toBe("polite");
 
-    for (const label of ["잉크", "연필", "에어", "수채"]) {
-      expect(screen.getByRole("button", { name: label }).className).toContain("min-h-11");
-    }
-    for (const label of ["일반", "곱하기", "스크린", "오버레이", "지우개"]) {
-      expect(screen.getByRole("button", { name: label }).className).toContain("min-h-11");
-    }
+    expect(screen.getByRole("button", { name: "표면 브러시" }).className).toContain("min-h-11");
+    expect(screen.getByRole("button", { name: "ColorDrop" }).className).toContain("min-h-11");
     for (const label of ["취소", "재실행", "원본"]) {
       expect(screen.getByRole("button", { name: label }).className).toContain("min-h-11");
     }
@@ -92,52 +92,50 @@ describe("StudioVrmTexturePaintPanel", () => {
     expect(eyedropper.getAttribute("aria-pressed")).toBe("false");
   });
 
-  it("offers controlled V12, compatibility, and ColorDrop tools", () => {
+  it("keeps admitted one-shot tools live while the surface brush is explicitly unavailable", () => {
     const { props, rerender } = renderPanel();
-    const surface = screen.getByRole("button", { name: "V12 UV" });
-    const brush = screen.getByRole("button", { name: "호환" });
+    const surface = screen.getByRole("button", { name: "표면 브러시" });
     const fill = screen.getByRole("button", { name: "ColorDrop" });
 
     expect(surface.className).toContain("min-h-11");
-    expect(brush.className).toContain("min-h-11");
     expect(fill.className).toContain("min-h-11");
+    expect((surface as HTMLButtonElement).disabled).toBe(true);
     expect(surface.getAttribute("aria-pressed")).toBe("false");
-    expect(brush.getAttribute("aria-pressed")).toBe("true");
-    expect(fill.getAttribute("aria-pressed")).toBe("false");
+    expect(surface.getAttribute("aria-describedby")).toBe(
+      "vrm-surface-brush-unavailable-reason",
+    );
+    expect(fill.getAttribute("aria-pressed")).toBe("true");
 
     fireEvent.click(surface);
-    expect(props.onSettingsChange).toHaveBeenNthCalledWith(1, { tool: "surface-brush" });
+    expect(props.onSettingsChange).not.toHaveBeenCalled();
     fireEvent.click(fill);
-    expect(props.onSettingsChange).toHaveBeenNthCalledWith(2, { tool: "fill" });
+    expect(props.onSettingsChange).toHaveBeenCalledOnce();
+    expect(props.onSettingsChange).toHaveBeenCalledWith({ tool: "fill" });
 
     rerender(
       <StudioVrmTexturePaintPanel
         {...props}
-        settings={{ ...SETTINGS, tool: "fill" }}
+        settings={{ ...SETTINGS, tool: "surface-brush" }}
       />,
     );
-    expect(screen.getByRole("button", { name: "호환" }).getAttribute("aria-pressed")).toBe(
+    expect(screen.getByRole("button", { name: "ColorDrop" }).getAttribute("aria-pressed")).toBe(
       "false",
     );
-    expect(screen.getByRole("button", { name: "ColorDrop" }).getAttribute("aria-pressed")).toBe(
-      "true",
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: "호환" }));
-    expect(props.onSettingsChange).toHaveBeenNthCalledWith(3, { tool: "brush" });
-    expect(props.onSettingsChange).toHaveBeenCalledTimes(3);
+    expect(screen.queryByRole("button", { name: "호환" })).toBeNull();
   });
 
-  it("keeps unproved V12 tip and mixing modes visibly unsupported", () => {
+  it("fails every unadmitted brush family closed without misleading engine claims", () => {
     renderPanel({ settings: { ...SETTINGS, tool: "surface-brush" } });
 
     const capability = screen.getByTestId("vrm-surface-brush-capability");
-    expect(capability.textContent).toContain("round 촉 · 혼색 없음");
-    expect(capability.textContent).toContain("stamp/image");
-    expect(capability.textContent).toContain("smudge/wet");
-    expect(screen.queryByRole("button", { name: "수채" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "곱하기" })).toBeNull();
-    expect(screen.getByRole("slider", { name: "크기" })).toBeTruthy();
+    expect(capability.textContent).toContain("표면 브러시 준비 중");
+    expect(capability.textContent).toContain(SURFACE_BRUSH_UNAVAILABLE_REASON);
+    expect(capability.textContent).toContain("자체 라운드 촉으로 대체하지 않으며");
+    for (const label of ["호환", "잉크", "연필", "에어", "수채", "곱하기", "지우개"]) {
+      expect(screen.queryByRole("button", { name: label })).toBeNull();
+    }
+    expect(screen.queryByRole("slider", { name: "크기" })).toBeNull();
+    expect(screen.getByRole("slider", { name: "ColorDrop 색상 허용치" })).toBeTruthy();
   });
 
   it("shows only ColorDrop controls and keeps colour editable after eraser use", () => {
@@ -201,7 +199,7 @@ describe("StudioVrmTexturePaintPanel", () => {
       strokeActive: true,
     });
 
-    for (const label of ["V12 UV", "호환", "ColorDrop", "연결 영역", "텍스처 전체"]) {
+    for (const label of ["표면 브러시", "ColorDrop", "연결 영역", "텍스처 전체"]) {
       expect(screen.getByRole("button", { name: label }).matches(":disabled")).toBe(true);
     }
     expect(
@@ -236,35 +234,21 @@ describe("StudioVrmTexturePaintPanel", () => {
     expect(props.onEyedropperToggle).not.toHaveBeenCalled();
   });
 
-  it("reports brush, blend, colour, size, and pressure-style changes", () => {
+  it("does not expose legacy brush, blend, or pressure-style mutations", () => {
     const { props } = renderPanel();
 
-    fireEvent.click(screen.getByRole("button", { name: "수채" }));
-    fireEvent.click(screen.getByRole("button", { name: "곱하기" }));
+    for (const label of ["잉크", "연필", "에어", "수채", "일반", "곱하기", "지우개"]) {
+      expect(screen.queryByRole("button", { name: label })).toBeNull();
+    }
+    for (const label of ["크기", "불투명", "도포량", "경도", "최소 굵기"]) {
+      expect(screen.queryByRole("slider", { name: label })).toBeNull();
+    }
     fireEvent.change(screen.getByLabelText("표면 페인트 색상 선택"), {
       target: { value: "#ff8800" },
     });
-    fireEvent.change(screen.getByRole("slider", { name: "크기" }), {
-      target: { value: "72" },
-    });
-    fireEvent.change(screen.getByRole("slider", { name: "도포량" }), {
-      target: { value: "0.42" },
-    });
-    fireEvent.change(screen.getByRole("slider", { name: "경도" }), {
-      target: { value: "0.55" },
-    });
-    fireEvent.change(screen.getByRole("slider", { name: "최소 굵기" }), {
-      target: { value: "0.16" },
-    });
 
-    expect(props.onSettingsChange).toHaveBeenCalledWith({ brushKind: "watercolor" });
-    expect(props.onSettingsChange).toHaveBeenCalledWith({ blend: "multiply" });
     expect(props.onSettingsChange).toHaveBeenCalledWith({ color: "#ff8800" });
-    expect(props.onSettingsChange).toHaveBeenCalledWith({ sizeTexels: 72 });
-    expect(props.onSettingsChange).toHaveBeenCalledWith({ tuning: { flow: 0.42 } });
-    expect(props.onSettingsChange).toHaveBeenCalledWith({ tuning: { hardness: 0.55 } });
-    expect(props.onSettingsChange).toHaveBeenCalledWith({ tuning: { minSize: 0.16 } });
-    expect(props.onSettingsChange).toHaveBeenCalledTimes(7);
+    expect(props.onSettingsChange).toHaveBeenCalledTimes(1);
     expect(props.onEyedropperToggle).not.toHaveBeenCalled();
   });
 
@@ -363,33 +347,17 @@ describe("StudioVrmTexturePaintPanel", () => {
     );
   });
 
-  it("builds brush-dependent precision cursors with an explicit eraser mark", () => {
-    const inkCursor = createStudioVrmTexturePaintCursor(SETTINGS);
-    const eraserCursor = createStudioVrmTexturePaintCursor({
-      ...SETTINGS,
-      blend: "erase",
-      sizeTexels: 192,
-    });
-
-    expect(inkCursor).toContain("data:image/svg+xml");
-    expect(inkCursor).toContain("crosshair");
-    expect(eraserCursor).not.toBe(inkCursor);
-    expect(decodeURIComponent(eraserCursor)).toContain("#ff6b6b");
-  });
-
-  it("disables colour entry in eraser mode while keeping the eraser selected", () => {
+  it("keeps ColorDrop colour entry available even if stale settings retain legacy erase", () => {
     renderPanel({
       settings: { ...SETTINGS, blend: "erase" },
     });
 
-    expect(screen.getByRole("button", { name: "지우개" }).getAttribute("aria-pressed")).toBe(
-      "true",
-    );
+    expect(screen.queryByRole("button", { name: "지우개" })).toBeNull();
     expect((screen.getByLabelText("표면 페인트 색상 선택") as HTMLInputElement).disabled).toBe(
-      true,
+      false,
     );
     expect((screen.getByLabelText("표면 페인트 HEX 색상") as HTMLInputElement).disabled).toBe(
-      true,
+      false,
     );
   });
 });

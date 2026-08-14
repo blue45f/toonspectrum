@@ -3,6 +3,11 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+  resetStudioDestructiveActionLedger,
+  setStudioDestructiveConfirmPresenter,
+  type StudioDestructiveActionRequest,
+} from "./studio-destructive-action-preview";
 import { STUDIO_MANNEQUIN_DEFAULT_BODY_PARAMS } from "./studio-mannequin-model";
 import { STUDIO_MANNEQUIN_POSE_PRESETS } from "./studio-mannequin-poses";
 
@@ -46,6 +51,67 @@ const persistenceRuntimeMocks = vi.hoisted(() => ({
   load: vi.fn<() => Promise<unknown>>(async () => null),
   save: vi.fn(async (state: unknown) => state),
 }));
+const photoPoseScannerMocks = vi.hoisted(() => {
+  const worldLandmarks = Array.from({ length: 33 }, () => ({
+    x: 0.5,
+    y: 0.5,
+    z: 0,
+    visibility: 0.95,
+    presence: 0.95,
+  }));
+  Object.assign(worldLandmarks[11]!, { x: 0.4, y: 0.25 });
+  Object.assign(worldLandmarks[12]!, { x: 0.6, y: 0.25 });
+  Object.assign(worldLandmarks[13]!, { x: 0.3, y: 0.45 });
+  Object.assign(worldLandmarks[14]!, { x: 0.7, y: 0.45 });
+  Object.assign(worldLandmarks[15]!, { x: 0.2, y: 0.65 });
+  Object.assign(worldLandmarks[16]!, { x: 0.8, y: 0.65 });
+  Object.assign(worldLandmarks[23]!, { x: 0.44, y: 0.55 });
+  Object.assign(worldLandmarks[24]!, { x: 0.56, y: 0.55 });
+  Object.assign(worldLandmarks[25]!, { x: 0.43, y: 0.75 });
+  Object.assign(worldLandmarks[26]!, { x: 0.57, y: 0.75 });
+  Object.assign(worldLandmarks[27]!, { x: 0.42, y: 0.95 });
+  Object.assign(worldLandmarks[28]!, { x: 0.58, y: 0.95 });
+  Object.assign(worldLandmarks[29]!, { x: 0.42, y: 0.98, z: 0.08 });
+  Object.assign(worldLandmarks[30]!, { x: 0.58, y: 0.98, z: 0.08 });
+  const confidence = {
+    overall: 0.9,
+    coverage: 1,
+    quality: "high" as const,
+    groups: { torso: 0.9, leftArm: 0.9, rightArm: 0.9, leftLeg: 0.9, rightLeg: 0.9 },
+    joints: {
+      leftShoulder: 0.9,
+      rightShoulder: 0.9,
+      leftElbow: 0.9,
+      rightElbow: 0.9,
+      leftWrist: 0.9,
+      rightWrist: 0.9,
+      leftHip: 0.9,
+      rightHip: 0.9,
+      leftKnee: 0.9,
+      rightKnee: 0.9,
+      leftAnkle: 0.9,
+      rightAnkle: 0.9,
+    },
+    lowConfidenceGroups: [] as const,
+  };
+  const payload = {
+    sourceName: "photo-a.png",
+    bones: {},
+    landmarks: worldLandmarks,
+    worldLandmarks,
+    confidence,
+    fingerEdits: {},
+    detectedHandSides: [] as const,
+  };
+  return {
+    payload,
+    lowPayload: {
+      ...payload,
+      sourceName: "photo-low.png",
+      confidence: { ...confidence, overall: 0.3, coverage: 0.25, quality: "low" as const },
+    },
+  };
+});
 
 vi.mock("./studio-mannequin-scene", () => ({
   createStudioMannequinScene: (options: unknown) => createScene(options),
@@ -68,6 +134,44 @@ vi.mock("./studio-mannequin-bg3d-preset-sqlite-repository", () => ({
   }),
 }));
 
+vi.mock("./StudioVrmPhotoPoseScanner", async () => {
+  const { createElement } = await import("react");
+  return {
+    StudioVrmPhotoPoseScanner: ({
+      disabled,
+      onApply,
+    }: {
+      disabled?: boolean;
+      onApply: (
+        payload:
+          | typeof photoPoseScannerMocks.payload
+          | typeof photoPoseScannerMocks.lowPayload
+      ) => boolean;
+    }) => createElement(
+      "div",
+      { "aria-label": "사진 포즈 스캐너" },
+      createElement(
+        "button",
+        {
+          disabled,
+          onClick: () => onApply(photoPoseScannerMocks.payload),
+          type: "button",
+        },
+        "테스트 사진 포즈 적용",
+      ),
+      createElement(
+        "button",
+        {
+          disabled,
+          onClick: () => onApply(photoPoseScannerMocks.lowPayload),
+          type: "button",
+        },
+        "테스트 낮은 신뢰도 포즈 적용",
+      ),
+    ),
+  };
+});
+
 const { StudioMannequinPoserPanel } = await import("./StudioMannequinPoserPanel");
 
 const originalMediaDevicesDescriptor = Object.getOwnPropertyDescriptor(navigator, "mediaDevices");
@@ -82,6 +186,7 @@ afterEach(() => {
   cleanup();
   localStorage.clear();
   vi.restoreAllMocks();
+  resetStudioDestructiveActionLedger();
   vi.clearAllMocks();
   webcamRuntimeMocks.init.mockReset();
   webcamRuntimeMocks.dispose.mockReset();
@@ -115,6 +220,15 @@ function renderPanel(overrides: {
       onInsert={overrides.onInsert ?? vi.fn()}
     />,
   );
+}
+
+async function waitForPersistenceReady(): Promise<void> {
+  await waitFor(() => {
+    expect(
+      (screen.getByRole("button", { name: "3D 데생 인형 닫기" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(false);
+  });
 }
 
 function installWebcamBrowserStubs(getUserMedia: ReturnType<typeof vi.fn>): void {
@@ -160,6 +274,43 @@ describe("StudioMannequinPoserPanel", () => {
     });
   });
 
+  it("검증된 사진 landmark를 한 번의 포즈 스냅샷으로 적용하고 한 단계 실행 취소한다", async () => {
+    renderPanel();
+    await waitFor(() => expect(persistenceRuntimeMocks.load).toHaveBeenCalledTimes(1));
+    vi.mocked(sceneHandle.setPose).mockClear();
+
+    fireEvent.click(screen.getByRole("button", { name: "테스트 사진 포즈 적용" }));
+    await waitFor(() => {
+      expect(screen.getByRole("status").textContent).toContain("관절");
+      expect(screen.getByRole("status").textContent).toContain("신뢰도 90%");
+      expect(sceneHandle.setPose).toHaveBeenCalledTimes(1);
+    });
+    const applied = vi.mocked(sceneHandle.setPose).mock.calls[0]?.[0];
+    expect(applied?.joints.leftUpperArm).toBeDefined();
+    expect(applied?.joints.rightUpperLeg).toBeDefined();
+
+    fireEvent.click(screen.getByRole("button", { name: "1단계 실행 취소" }));
+    await waitFor(() => expect(sceneHandle.setPose).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(sceneHandle.setPose).mock.calls[1]?.[0]).toEqual({
+      joints: {},
+      pelvisOffset: [0, 0, 0],
+    });
+    expect(screen.queryByRole("button", { name: "1단계 실행 취소" })).toBeNull();
+  });
+
+  it("낮은 신뢰도의 사진 포즈는 기존 마네킹 포즈를 변경하지 않는다", async () => {
+    renderPanel();
+    await waitFor(() => expect(persistenceRuntimeMocks.load).toHaveBeenCalledTimes(1));
+    vi.mocked(sceneHandle.setPose).mockClear();
+
+    fireEvent.click(screen.getByRole("button", { name: "테스트 낮은 신뢰도 포즈 적용" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert").textContent).toContain("신뢰도가 낮아 적용하지 않았습니다");
+    });
+    expect(sceneHandle.setPose).not.toHaveBeenCalled();
+  });
+
   it("체형 탭 슬라이더 조작이 새 스펙을 씬으로 보낸다", async () => {
     renderPanel();
     fireEvent.click(screen.getByRole("button", { name: /^체형/ }));
@@ -174,6 +325,7 @@ describe("StudioMannequinPoserPanel", () => {
     const onClose = vi.fn();
     const onInsert = vi.fn(() => true);
     renderPanel({ onClose, onInsert });
+    await waitForPersistenceReady();
     fireEvent.click(screen.getByRole("button", { name: /카메라/ }));
     fireEvent.click(screen.getByRole("button", { name: /캔버스로 캡처/ }));
     await waitFor(() => {
@@ -196,6 +348,7 @@ describe("StudioMannequinPoserPanel", () => {
     });
     const onInsert = vi.fn(() => true);
     renderPanel({ onInsert });
+    await waitForPersistenceReady();
     fireEvent.click(screen.getByRole("button", { name: /카메라/ }));
     fireEvent.click(screen.getByRole("button", { name: /캔버스로 캡처/ }));
     await waitFor(() => {
@@ -389,6 +542,7 @@ describe("StudioMannequinPoserPanel", () => {
   it("onInsert 가 false 를 반환하면 닫지 않고 오류를 보여준다", async () => {
     const onClose = vi.fn();
     renderPanel({ onClose, onInsert: () => false });
+    await waitForPersistenceReady();
     fireEvent.click(screen.getByRole("button", { name: /카메라/ }));
     fireEvent.click(screen.getByRole("button", { name: /캔버스로 캡처/ }));
     await waitFor(() => {
@@ -403,9 +557,60 @@ describe("StudioMannequinPoserPanel", () => {
     expect(sceneHandle.dispose).toHaveBeenCalledTimes(1);
   });
 
+  it("명시적 닫기 없이 언마운트돼도 마지막 체형·포즈를 SQLite 저장 큐에 넘긴다", async () => {
+    const { unmount } = renderPanel();
+    await waitFor(() => expect(persistenceRuntimeMocks.load).toHaveBeenCalledTimes(1));
+    persistenceRuntimeMocks.save.mockClear();
+
+    fireEvent.click(screen.getByRole("button", { name: "테스트 사진 포즈 적용" }));
+    await waitFor(() => expect(sceneHandle.setPose).toHaveBeenCalled());
+    const appliedPose = vi.mocked(sceneHandle.setPose).mock.calls.at(-1)?.[0];
+    expect(appliedPose).toBeDefined();
+
+    unmount();
+
+    await waitFor(() => expect(persistenceRuntimeMocks.save).toHaveBeenCalledWith({
+      params: STUDIO_MANNEQUIN_DEFAULT_BODY_PARAMS,
+      pose: appliedPose,
+    }));
+  });
+
+  it("초기 SQLite 읽기가 끝나기 전 언마운트하면 기본값으로 기존 저장본을 덮지 않는다", () => {
+    persistenceRuntimeMocks.load.mockReturnValueOnce(new Promise(() => undefined));
+    const { unmount } = renderPanel();
+    persistenceRuntimeMocks.save.mockClear();
+
+    unmount();
+
+    expect(persistenceRuntimeMocks.save).not.toHaveBeenCalled();
+  });
+
+  it("초기 SQLite 읽기가 해결된 같은 turn에 언마운트해도 저장본을 기본값으로 덮지 않는다", async () => {
+    let resolveLoad!: (value: {
+      params: typeof STUDIO_MANNEQUIN_DEFAULT_BODY_PARAMS;
+      pose: { joints: Record<string, never>; pelvisOffset: [number, number, number] };
+    }) => void;
+    persistenceRuntimeMocks.load.mockReturnValueOnce(new Promise((resolve) => {
+      resolveLoad = resolve;
+    }));
+    const stored = {
+      params: { ...STUDIO_MANNEQUIN_DEFAULT_BODY_PARAMS, heightCm: 182 },
+      pose: { joints: {}, pelvisOffset: [0, 0.25, 0] as [number, number, number] },
+    };
+    const { unmount } = renderPanel();
+    persistenceRuntimeMocks.save.mockClear();
+
+    resolveLoad(stored);
+    await Promise.resolve();
+    unmount();
+
+    await waitFor(() => expect(persistenceRuntimeMocks.save).toHaveBeenCalledWith(stored));
+  });
+
   it("닫기 버튼은 마지막 체형/포즈를 SQLite에 저장한 뒤 닫는다", async () => {
     const onClose = vi.fn();
     renderPanel({ onClose });
+    await waitForPersistenceReady();
     fireEvent.click(screen.getByRole("button", { name: "3D 데생 인형 닫기" }));
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
     expect(persistenceRuntimeMocks.save).toHaveBeenCalledWith({
@@ -420,6 +625,8 @@ describe("StudioMannequinPoserPanel", () => {
     const onClose = vi.fn();
     renderPanel({ onClose });
 
+    await waitForPersistenceReady();
+
     fireEvent.click(screen.getByRole("button", { name: "3D 데생 인형 닫기" }));
 
     await waitFor(() => {
@@ -427,6 +634,73 @@ describe("StudioMannequinPoserPanel", () => {
     });
     expect(screen.getByRole("button", { name: /내보내기/ })).toBeTruthy();
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("초기 SQLite 읽기 중에는 닫기·Escape·캡처가 기존 저장본을 덮거나 삽입하지 않는다", async () => {
+    persistenceRuntimeMocks.load.mockReturnValueOnce(new Promise(() => undefined));
+    const onClose = vi.fn();
+    const onInsert = vi.fn();
+    renderPanel({ onClose, onInsert });
+    persistenceRuntimeMocks.save.mockClear();
+
+    const closeButton = screen.getByRole("button", { name: "3D 데생 인형 닫기" }) as HTMLButtonElement;
+    expect(closeButton.disabled).toBe(true);
+    fireEvent.click(closeButton);
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    fireEvent.click(screen.getByRole("button", { name: /^카메라/ }));
+    const captureButton = screen.getByRole("button", { name: /캔버스로 캡처/ }) as HTMLButtonElement;
+    expect(captureButton.disabled).toBe(true);
+    fireEvent.click(captureButton);
+
+    expect(persistenceRuntimeMocks.save).not.toHaveBeenCalled();
+    expect(sceneHandle.captureDataUrl).not.toHaveBeenCalled();
+    expect(onInsert).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("초기 SQLite 읽기 실패 뒤에도 닫기·캡처가 알 수 없는 저장본을 기본값으로 덮지 않는다", async () => {
+    persistenceRuntimeMocks.load.mockRejectedValueOnce(new Error("sqlite read failed"));
+    const onClose = vi.fn();
+    const onInsert = vi.fn();
+    renderPanel({ onClose, onInsert });
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert").textContent).toContain("불러오지 못해");
+    });
+    persistenceRuntimeMocks.save.mockClear();
+    const approvals: StudioDestructiveActionRequest[] = [];
+    let approveClose = false;
+    setStudioDestructiveConfirmPresenter((request) => {
+      approvals.push(request);
+      return approveClose;
+    });
+
+    const closeButton = screen.getByRole("button", { name: "3D 데생 인형 닫기" }) as HTMLButtonElement;
+    expect(closeButton.disabled).toBe(false);
+    fireEvent.click(closeButton);
+    await waitFor(() => expect(approvals).toHaveLength(1));
+    expect(approvals[0]).toMatchObject({
+      id: "studio.mannequin.discard-unpersisted-state",
+      reversibility: "irreversible",
+      confirmLabel: "저장하지 않고 닫기",
+    });
+    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.click(screen.getByRole("button", { name: /^카메라/ }));
+    const captureButton = screen.getByRole("button", { name: /캔버스로 캡처/ }) as HTMLButtonElement;
+    expect(captureButton.disabled).toBe(true);
+    fireEvent.click(captureButton);
+
+    expect(persistenceRuntimeMocks.save).not.toHaveBeenCalled();
+    expect(sceneHandle.captureDataUrl).not.toHaveBeenCalled();
+    expect(onInsert).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: /내보내기/ })).toBeTruthy();
+
+    approveClose = true;
+    fireEvent.click(closeButton);
+    expect(persistenceRuntimeMocks.save).not.toHaveBeenCalled();
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
   });
 
   it("늦은 SQLite hydration이 사용자가 먼저 바꾼 체형을 덮어쓰지 않는다", async () => {
@@ -444,13 +718,12 @@ describe("StudioMannequinPoserPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: /^체형/ }));
     const heightSlider = screen.getByLabelText(/신장/);
     fireEvent.change(heightSlider, { target: { value: "190" } });
-    await waitFor(() => expect((heightSlider as HTMLInputElement).value).toBe("190"));
-
+    // Resolve the durable read immediately, before a passive React effect could observe the edit.
+    // The mutation authority must advance synchronously in the input handler.
     resolveLoad({
       params: { ...STUDIO_MANNEQUIN_DEFAULT_BODY_PARAMS, heightCm: 150 },
       pose: { joints: {}, pelvisOffset: [0, 0, 0] },
     });
-    await waitFor(() => expect(persistenceRuntimeMocks.load).toHaveBeenCalledTimes(1));
-    expect((heightSlider as HTMLInputElement).value).toBe("190");
+    await waitFor(() => expect((heightSlider as HTMLInputElement).value).toBe("190"));
   });
 });
