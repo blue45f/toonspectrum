@@ -638,6 +638,10 @@ import {
   type StudioHistoryJournalSidecarEntry,
 } from "./studio-history-journal";
 import {
+  createStudioHistoryRetentionUiState,
+  observeStudioHistoryRetentionAppend,
+} from "./studio-history-retention-ui";
+import {
   StudioHokusaiLiveOverlayRenderer,
 } from "./studio-hokusai-live-brush-overlay";
 import {
@@ -1093,6 +1097,7 @@ import {
   appendStudioPagesHistorySnapshot,
   createStudioLifecycleEmergencyAutosave,
   projectStudioPendingStrokes,
+  type StudioPagesHistoryAppendResult,
 } from "./studio-pending-stroke-durability";
 import { normalizeStudioPersistedPointerChannels } from "./studio-persisted-pointer-channels";
 import {
@@ -4332,6 +4337,33 @@ function StudioCuttoonEditor({
   function commitStudioHistoryJournal(next: StudioPageHistoryJournal): void {
     historyJournalRef.current = next;
     setHistoryJournalState(next);
+  }
+  /**
+   * 되돌리기 유지 경계의 진단 상태. 계량값은 매 append마다 갱신하지만, 사용자 안내 문장은 실제
+   * 바이트 예산 퇴출 때만 새로 만들어 `role="status"`가 평범한 붓질마다 반복되지 않게 한다.
+   */
+  const [studioHistoryRetention, setStudioHistoryRetention] = useState(
+    createStudioHistoryRetentionUiState
+  );
+  const studioHistoryRetentionRef = useRef(studioHistoryRetention);
+  studioHistoryRetentionRef.current = studioHistoryRetention;
+  function commitStudioHistoryRetention(next: typeof studioHistoryRetention): void {
+    studioHistoryRetentionRef.current = next;
+    setStudioHistoryRetention(next);
+  }
+  function noteStudioHistoryRetention(
+    appended: StudioPagesHistoryAppendResult<PageState>
+  ): void {
+    commitStudioHistoryRetention(
+      observeStudioHistoryRetentionAppend(
+        studioHistoryRetentionRef.current,
+        appended,
+        { collaborating: Boolean(studioCrdtDocumentRef.current) }
+      )
+    );
+  }
+  function resetStudioHistoryRetention(): void {
+    commitStudioHistoryRetention(createStudioHistoryRetentionUiState());
   }
   /**
    * 스냅샷 히스토리가 새 단계를 만들었을 때 저널에 같은 수의 `pages` 항목을 넣는다.
@@ -12122,6 +12154,7 @@ function StudioCuttoonEditor({
           pagesHistoryRef.current = [restoredPages];
           pagesHiRef.current = 0;
           // 히스토리를 통째로 갈아치웠으니 통합 저널도 처음부터 — 남은 항목은 사라진 스냅샷을 가리킨다.
+          resetStudioHistoryRetention();
           resetStudioHistoryJournal();
           setPagesHistory([restoredPages]);
           setPagesHi(0);
@@ -20389,6 +20422,9 @@ const puppetWarpArmed =
         >();
         historyJournalRef.current = freshJournal;
         setHistoryJournalState(freshJournal);
+        const freshHistoryRetention = createStudioHistoryRetentionUiState();
+        studioHistoryRetentionRef.current = freshHistoryRetention;
+        setStudioHistoryRetention(freshHistoryRetention);
         setPagesHistoryState([hydratedPages]);
         setPagesHiState(0);
         setCurrentPageId(
@@ -22152,6 +22188,7 @@ const puppetWarpArmed =
     pagesHistoryRef.current = appended.history;
     pagesHiRef.current = appended.historyIndex;
     recordStudioHistoryJournalPages(1, appended.historyIndex);
+    noteStudioHistoryRetention(appended);
     setPagesHistory(appended.history);
     setPagesHi(appended.historyIndex);
     return true;
@@ -22227,6 +22264,7 @@ const puppetWarpArmed =
       );
       nextHistory = appended.history;
       nextHistoryIndex = appended.historyIndex;
+      noteStudioHistoryRetention(appended);
     }
     recordStudioHistoryTransition({
       mutationKind: "elements.coalesced-commit",
@@ -22294,6 +22332,8 @@ const puppetWarpArmed =
       accHistory = appended.history;
       accIndex = appended.historyIndex;
       previousPages = snapshot;
+      // 한 배치를 N개 undo 단계로 펼치므로, 계량 관측도 각 append를 빠짐없이 본다.
+      noteStudioHistoryRetention(appended);
     }
     pagesHistoryRef.current = accHistory;
     pagesHiRef.current = accIndex;
@@ -22908,6 +22948,7 @@ const puppetWarpArmed =
     pagesHistoryRef.current = appended.history;
     pagesHiRef.current = appended.historyIndex;
     recordStudioHistoryJournalPages(1, appended.historyIndex);
+    noteStudioHistoryRetention(appended);
     setPagesHistory(appended.history);
     setPagesHi(appended.historyIndex);
     return true;
@@ -42215,6 +42256,7 @@ function clearSelectionForEdit() {
     pagesHistoryRef.current = appended.history;
     pagesHiRef.current = appended.historyIndex;
     recordStudioHistoryJournalPages(1, appended.historyIndex);
+    noteStudioHistoryRetention(appended);
     setPagesHistory(appended.history);
     setPagesHi(appended.historyIndex);
     setCurrentPageId(
@@ -44507,6 +44549,20 @@ function clearSelectionForEdit() {
       data-studio-editor="true"
       data-studio-app-shell="true"
       data-studio-watermark-persistence={watermarkPreferenceSnapshot.state}
+      data-studio-history-entry-count={pagesHistory.length}
+      data-studio-history-undo-depth={pagesHi}
+      data-studio-history-last-measured-retained-bytes={
+        studioHistoryRetention.lastMeasuredRetainedBytes
+      }
+      data-studio-history-last-measured-budget-bytes={
+        studioHistoryRetention.lastMeasuredBudgetBytes
+      }
+      data-studio-history-last-measured-entry-bytes={
+        studioHistoryRetention.lastMeasuredEntryBytes
+      }
+      data-studio-history-budget-evicted-steps={
+        studioHistoryRetention.totalBudgetEvictedSteps
+      }
       className={cn(
         // Default draw-app shell: fill the viewport without site chrome padding.
         "flex min-h-0 flex-col bg-canvas text-fg",
@@ -45260,6 +45316,21 @@ function clearSelectionForEdit() {
                 다시 시도
               </button>
             ) : null}
+          </div>
+        ) : null}
+        {studioHistoryRetention.notice && !mobileImmersive && !canvasOnlyMode ? (
+          <div
+            key={studioHistoryRetention.notice.id}
+            data-studio-history-budget-notice="true"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            className="my-1 flex min-h-9 items-start gap-2 rounded-lg border border-warn/40 bg-warn/10 px-2.5 py-1.5 text-xs text-fg-2"
+          >
+            <Undo2 size={15} className="mt-0.5 shrink-0 text-warn" aria-hidden />
+            <span className="min-w-0 flex-1 leading-relaxed">
+              {studioHistoryRetention.notice.message}
+            </span>
           </div>
         ) : null}
         {/* 게시·로그인 안내는 드로잉 크롬에 띄우지 않음 — 저장/게시 액션 시점에만 노출. */}
