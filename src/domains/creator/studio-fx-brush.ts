@@ -1389,12 +1389,32 @@ export type FxOilPlanInput = {
  * texture is not reduced - only its wavelength grows to ~`STATIONS` stations, which is what keeps a
  * hair loaded (or dry) for a stretch of travel the way a real one is.
  */
-// 20 stations. Rendered against 7 and 12 on the same stroke: 7 still broke a hair into visible
-// segments, 20 carries one loaded streak across roughly a brush-width of travel before it depletes,
-// which is what reads as bristle drag instead of particles. Counted in stations rather than pixels
-// so the wavelength scales with dab spacing - a wider brush lays coarser stations and gets a
-// proportionally longer streak, and the value stays integer-deterministic for replay.
-const BRISTLE_LOAD_WAVELENGTH_STATIONS = 20;
+/**
+ * Station pitch as a fraction of head width. Shared, because every "per station" length in this
+ * carrier is really a length in head widths and reading it any other way is how the load
+ * wavelength came to be twenty-four cycles long on one stroke.
+ */
+const OIL_STATION_SPACING_RATIO = 0.068;
+// Counted in stations rather than pixels so the wavelength scales with dab spacing - a wider brush
+// lays coarser stations and gets a proportionally longer streak, and the value stays
+// integer-deterministic for replay.
+//
+// It was 20, and the note that defended it claimed 20 stations was "roughly a brush-width of
+// travel". It is not: stations sit at 0.068·width, so 20 of them span 1.36 widths and a hair
+// therefore ran dry → loaded → dry roughly every 22px on a 16px brush. Measured on a 528px stroke
+// that is twenty-four full load cycles, and the emitted furrows came out with a MEDIAN welded
+// length of seven stations — eight pixels. Eight-pixel furrows on a five-hundred-pixel stroke are
+// the dashes the oil bed was reported as; no amount of banding or welding downstream can join a
+// hair the load signal itself has already chopped up.
+//
+// A loaded bristle does not deplete in one head-width. It holds its charge for many, and the
+// depletion is what the artist reads as the stroke "running out" over its length. Seven widths is
+// the shortest period that still leaves a long stroke visibly drying toward its end while making
+// each furrow a continuous drag rather than a dash.
+const BRISTLE_LOAD_WAVELENGTH_HEAD_WIDTHS = 7;
+const BRISTLE_LOAD_WAVELENGTH_STATIONS = Math.round(
+  BRISTLE_LOAD_WAVELENGTH_HEAD_WIDTHS / OIL_STATION_SPACING_RATIO,
+);
 
 /**
  * Acrylic sets while the stroke is still travelling, so its load cycles about twice as often as
@@ -1470,8 +1490,63 @@ function bristleLoadAlongTravel(
  */
 const BRISTLE_PITCH_JITTER = 0.05;
 const BRISTLE_DRIFT_AMPLITUDE = 0.1;
-/** Longer than the load's wavelength: a hair should wander over the stroke, not vibrate. */
-const BRISTLE_DRIFT_WAVELENGTH_STATIONS = 34;
+
+/**
+ * Hairs in the bed, as a function of head width.
+ *
+ * It was seven, hardcoded, for every oil brush at every size — and seven is what made the mark
+ * read as a flat slab with a few decals stuck on it rather than as paint. A 48px filbert laid down
+ * seven furrows across a 20px-tall ribbon, so the space BETWEEN furrows was wider than the furrows
+ * themselves and the continuous body showed through as untextured pigment everywhere else. Every
+ * reference in this class (Rebelle's bristle head, Krita's bristle engine, david.li/paint) puts
+ * dozens of tracks under a head that size; the furrow pitch, not the furrow itself, is what the
+ * eye reads as "brush".
+ *
+ * Scaled by width rather than pinned, because pitch is what matters: a 6px liner with 30 hairs
+ * would be sub-pixel mush and a 60px flat with 7 is the slab above. `HAIRS_PER_PX` puts the pitch
+ * near two thirds of a document pixel at every size, which stays resolvable the moment the artist
+ * zooms in — and antialiasing turns anything finer into honest tone rather than into a lie.
+ *
+ * The floor stays at the old seven so narrow strokes keep the exact bed they were tuned against.
+ */
+const BRISTLE_HAIRS_PER_PX = 0.78;
+const BRISTLE_MIN_HAIRS = 7;
+const BRISTLE_MAX_HAIRS = 44;
+
+/**
+ * The bed's lateral offsets, in ribbon half-widths.
+ *
+ * Deliberately NOT an even lattice. Evenly-spaced hairs are the plywood grain this file has been
+ * fighting since the first version: the eye locks onto a constant pitch instantly. Each hair takes
+ * an independent squash within its own slot, so neighbours clump and gap the way a real ferrule
+ * splays, and the outermost pair is pushed to the ribbon edge so the silhouette has teeth.
+ */
+function bristleBedOffsets(baseWidth: number, seed: number): readonly number[] {
+  const count = Math.max(
+    BRISTLE_MIN_HAIRS,
+    Math.min(BRISTLE_MAX_HAIRS, Math.round(baseWidth * BRISTLE_HAIRS_PER_PX)),
+  );
+  const offsets: number[] = [];
+  for (let index = 0; index < count; index += 1) {
+    const slot = count === 1 ? 0.5 : index / (count - 1);
+    // ±0.42 of a slot, so a hair never crosses its neighbour's centre and the bed stays ordered —
+    // an unordered bed would break the width gauges' assumption that a hair keeps one thickness.
+    const jitter = (hash2(index, 1_181, seed) - 0.5) * 0.84 / Math.max(1, count - 1);
+    offsets.push(clamp((slot + jitter) * 2 - 1, -1, 1) * 0.9);
+  }
+  return offsets;
+}
+/**
+ * Longer than the load's wavelength: a hair should wander over the stroke, not vibrate.
+ *
+ * Same scale error as the load wavelength had — 34 stations is 2.3 head widths, so a hair crossed
+ * the ribbon and came back roughly every two brush-widths, which reads as a shimmer rather than as
+ * splay. A hair that has splayed stays splayed for the length of the drag.
+ */
+const BRISTLE_DRIFT_WAVELENGTH_HEAD_WIDTHS = 11;
+const BRISTLE_DRIFT_WAVELENGTH_STATIONS = Math.round(
+  BRISTLE_DRIFT_WAVELENGTH_HEAD_WIDTHS / OIL_STATION_SPACING_RATIO,
+);
 
 function bristleDriftAlongTravel(
   stationIndex: number,
@@ -1540,8 +1615,9 @@ export function planOilBrushDabs(input: FxOilPlanInput): FxOilDab[] {
   // lattice. Long strokes remain bounded by sampleStations' whole-path redistribution.
   const paintBody: FxOilPaintBody = input.paintBody === "acrylic" ? "acrylic" : "oil";
   const tipProfile: FxOilTipProfile = input.tipProfile === "hard" ? "hard" : "bristle";
-  const spacing = Math.max(0.5, baseWidth * 0.068);
+  const spacing = Math.max(0.5, baseWidth * OIL_STATION_SPACING_RATIO);
   const stations = sampleStations(points, spacing, maxDabs);
+  const bristleOffsets = bristleBedOffsets(baseWidth, seed);
   const dabs: FxOilDab[] = [];
 
   for (let si = 0; si < stations.length; si++) {
@@ -1575,9 +1651,6 @@ export function planOilBrushDabs(input: FxOilPlanInput): FxOilDab[] {
     );
     const normalJitter = (n2 - 0.5) * baseWidth * (0.018 + pressureFeel * 0.014);
     const tap = stations.length === 1;
-    // Seven lanes: competitive oil/acrylic reads as a real brush head, not five schematic hairs.
-    // Offsets stay within the ribbon so the continuous carrier still owns the silhouette.
-    const bristleOffsets = [-0.88, -0.58, -0.3, 0, 0.3, 0.58, 0.88];
     const bristles = bristleOffsets.map(
       (offsetRatio, bristleIndex): FxOilBristle => {
         const rawTooth = bristleLoadAlongTravel(si, bristleIndex, seed, paintBody);
@@ -1586,9 +1659,18 @@ export function planOilBrushDabs(input: FxOilPlanInput): FxOilDab[] {
           ? 0.5 + (rawTooth - 0.5) * HARD_TIP_LOAD_EVENNESS
           : rawTooth;
         // Contact widens under pressure: outer hairs only load once the stylus digs in.
+        //
+        // The penalty used to be a flat 0.55·edge at every pressure, which meant the outermost
+        // hairs were ALWAYS the ones that fell under the dry-liftoff cut — so every oil stroke
+        // came out as a textured core band inside two smooth flat margins, the exact opposite of
+        // what a bristle brush leaves. A real ferrule at working pressure has its whole width on
+        // the paper and the EDGE is where the individual strands are most legible; only a light
+        // skim rides on the middle of the head. Fading the penalty out with pressure says that,
+        // and leaves the light-touch narrow contact intact.
         const edge = Math.abs(offsetRatio);
         const contact = clamp(
-          pressureFeel * (1.08 - edge * 0.55) + tooth * 0.12 - 0.08,
+          pressureFeel * (1.06 - edge * 0.55 * (1 - pressureFeel * 0.76))
+            + tooth * 0.12 - 0.08,
           0,
           1,
         );
@@ -1611,12 +1693,22 @@ export function planOilBrushDabs(input: FxOilPlanInput): FxOilDab[] {
         const pitch = (hash2(bristleIndex, 613, seed) - 0.5) * 2 * BRISTLE_PITCH_JITTER;
         const drift = bristleDriftAlongTravel(si, bristleIndex, seed)
           * BRISTLE_DRIFT_AMPLITUDE;
+        // Skewed so most hairs are fine and a few are the fat ones a real ferrule always has —
+        // a bed of identical-diameter hairs is the same lattice tell as identical spacing.
+        const hairGauge = hash2(bristleIndex, 733, seed) ** 1.4;
         return {
           offsetRatio: (offsetRatio + pitch + drift) * (0.9 + pressureFeel * 0.14),
           radiusXRatio: 0.62 + tooth * 0.28 + pressureFeel * 0.08,
           // Ridges must remain a material fraction of radiusY after the ribbon carrier's
           // 0.17 + ratio*1.1 width map — keep them resolvable without repainting the body.
-          radiusYRatio: (0.055 + tooth * 0.05 + contact * 0.03)
+          //
+          // A hair's DIAMETER is its own and does not change as it travels; only its footprint
+          // does, when pressure flattens it. The per-station `tooth` used to drive this, so every
+          // hair swelled and thinned along its own length and no hair could be tracked across the
+          // stroke — which also meant a hair's runs scattered across width gauges and could not be
+          // welded back into one furrow. The gauge is now hashed on the hair alone; `contact` is
+          // the only term left that varies with travel, and that one is physical.
+          radiusYRatio: (0.032 + hairGauge * 0.062 + contact * 0.03)
             * (paintBody === "acrylic" ? ACRYLIC_RIDGE_SCALE : 1)
             * (tipProfile === "hard" ? HARD_TIP_RIDGE_SCALE : 1),
           // Bimodal load with pressure-gated contact: skimming hairs stay near-dry film while

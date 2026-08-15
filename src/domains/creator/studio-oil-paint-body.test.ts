@@ -39,7 +39,11 @@ function bristleSeries(paintBody: "oil" | "acrylic"): {
     maxDabs: 4_096,
     paintBody,
   });
-  const sampled = dabs.slice(0, 80);
+  // The whole serpentine, not its first 80 stations. A load cycle is measured in HEAD WIDTHS
+  // (seven for oil, half that for acrylic) and a station is 0.068 of one, so 80 stations is barely
+  // five widths — less than a single oil cycle, and a window shorter than the signal cannot count
+  // the signal's crossings for either paint.
+  const sampled = dabs;
   return {
     load: sampled.map((dab) => dab.bristles[0]?.opacity ?? 0),
     ridge: sampled.map((dab) => dab.bristles[0]?.radiusYRatio ?? 0),

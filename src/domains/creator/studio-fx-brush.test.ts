@@ -182,8 +182,10 @@ describe("planOilBrushDabs", () => {
       expect(d.radiusY).toBeGreaterThan(0);
       expect(d.opacity).toBeGreaterThan(0);
       expect(Number.isFinite(d.angleRad)).toBe(true);
-      expect(d.bristles.length).toBeGreaterThanOrEqual(5);
-      expect(d.bristles.length).toBeLessThanOrEqual(7);
+      // The bed is width-scaled, floored at the seven it used to be pinned at and capped so a
+      // huge head cannot ask for sub-pixel hairs without bound.
+      expect(d.bristles.length).toBeGreaterThanOrEqual(7);
+      expect(d.bristles.length).toBeLessThanOrEqual(44);
       for (const bristle of d.bristles) {
         expect(Math.abs(bristle.offsetRatio)).toBeLessThanOrEqual(1.05);
         expect(bristle.radiusXRatio).toBeGreaterThan(0.6);

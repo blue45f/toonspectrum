@@ -519,7 +519,7 @@ const BRISTLE_LOAD_BANDS = 16;
  * start collapsing downward instead. Mean ink moves only 0.883 -> 0.847 and the ink standard
  * deviation is unchanged, so this buys tonal range without thinning the stroke.
  */
-const BRISTLE_VIRTUAL_OVERLAPS = 6;
+const BRISTLE_VIRTUAL_OVERLAPS = 3;
 
 /**
  * Ridge-width classes the runs are split into before they are banded by load.
@@ -556,6 +556,9 @@ interface PlannedBristleRun {
   readonly points: readonly number[];
   readonly load: number;
   readonly width: number;
+  /** Which hair this run belongs to, and where in that hair's travel it sits. */
+  readonly bristleIndex: number;
+  readonly runIndex: number;
 }
 
 interface BristleWidthGauge {
@@ -563,17 +566,198 @@ interface BristleWidthGauge {
   readonly lineWidth: number;
 }
 
-/** Equal-count width quantiles, so each gauge is a real population rather than an empty bucket. */
+/**
+ * Welds a hair's consecutive runs that landed in the same band back into one polyline.
+ *
+ * A run carries ONE load, so a run boundary is a hard tonal step — and at 4x that step is exactly
+ * the "dash" the oil bed was reported as: short dark bars with square ends floating on a flat
+ * slab, never a furrow dragged the length of the stroke. Neighbouring runs of one hair very often
+ * land in the SAME band (the load is smoothstepped along travel, so it changes slowly), and when
+ * they do the step between them is not a step at all — it is a seam this planner invented by
+ * cutting the hair up. Welding them removes the seam without changing one deposited value.
+ *
+ * It is also the change that pays for the wider bed: the run count falls by roughly the mean weld
+ * length, so a bed with five times the hairs does not emit five times the geometry.
+ *
+ * Runs share their boundary station by construction, so the joint point is dropped exactly once.
+ */
+function weldRuns(runs: readonly PlannedBristleRun[]): readonly PlannedBristleRun[] {
+  return weldByTrack(
+    runs,
+    (run) => run.bristleIndex,
+    (run) => run.runIndex,
+    (points, first, last) => ({
+      points,
+      // The welded furrow keeps the band's identity; load and width are only ever read as the band
+      // mean and the gauge mean, and both members already belong to the same band and gauge.
+      load: (first.load + last.load) / 2,
+      width: (first.width + last.width) / 2,
+      bristleIndex: last.bristleIndex,
+      runIndex: last.runIndex,
+    }),
+  );
+}
+
+/**
+ * Joins consecutive runs of one track into a single polyline, in linear time.
+ *
+ * Linear matters: the obvious `[...previous.points, ...run.points]` accumulator rebuilds the whole
+ * array at every join, so a stripe that welds n runs copies O(n²) coordinates — measured, that
+ * alone took a 2000-station impasto plan from 25ms to 74ms and blew the planner's budget. Appending
+ * into one buffer and freezing it once at the end is the same output for linear work.
+ *
+ * Runs share their boundary station by construction, so the joint point is dropped exactly once.
+ */
+function weldByTrack<TRun extends { readonly points: readonly number[] }>(
+  runs: readonly TRun[],
+  trackOf: (run: TRun) => number,
+  orderOf: (run: TRun) => number,
+  build: (points: readonly number[], first: TRun, last: TRun, members: number) => TRun,
+): readonly TRun[] {
+  const ordered = [...runs].sort((left, right) =>
+    trackOf(left) - trackOf(right) || orderOf(left) - orderOf(right));
+  const welded: TRun[] = [];
+  let buffer: number[] | null = null;
+  let first: TRun | null = null;
+  let previous: TRun | null = null;
+  let members = 0;
+  const flush = (): void => {
+    if (!buffer || !first || !previous) return;
+    welded.push(members === 1 ? previous : build(buffer, first, previous, members));
+    buffer = null;
+    first = null;
+    previous = null;
+    members = 0;
+  };
+  for (const run of ordered) {
+    if (
+      previous
+      && trackOf(previous) === trackOf(run)
+      && orderOf(previous) === orderOf(run) - 1
+    ) {
+      for (let index = 2; index < run.points.length; index += 1) buffer!.push(run.points[index]!);
+      previous = run;
+      members += 1;
+      continue;
+    }
+    flush();
+    buffer = [...run.points];
+    first = run;
+    previous = run;
+    members = 1;
+  }
+  flush();
+  return welded;
+}
+
+/**
+ * Equal-count width quantiles over the HAIRS, so each gauge is a real population rather than an
+ * empty bucket — and so a hair is never split between two of them.
+ *
+ * This used to quantile the runs. A run's width is `radiusY · f(hair)` and radiusY tracks
+ * pressure, so one hair's runs spanned a 2x width range down a pressure-tapered stroke and landed
+ * on both sides of the gauge boundary. That put the two halves of one furrow into two different
+ * lanes, which the weld can never rejoin — measured, it was holding the median welded furrow at
+ * seven stations while the load signal was already carrying it for seventy. Grouping by hair costs
+ * the ridge its pressure-widening (the lane can only carry one lineWidth either way) and buys back
+ * every furrow's continuity; the bed still fans under pressure because the hairs' OFFSETS scale
+ * with radiusY.
+ */
 function widthGauges(planned: readonly PlannedBristleRun[]): readonly BristleWidthGauge[] {
-  const ordered = [...planned].sort((left, right) => left.width - right.width);
+  const byHair = new Map<number, PlannedBristleRun[]>();
+  for (const run of planned) {
+    const hair = byHair.get(run.bristleIndex);
+    if (hair) hair.push(run);
+    else byHair.set(run.bristleIndex, [run]);
+  }
+  const hairs = [...byHair.values()]
+    .map((runs) => ({ runs, width: mean(runs.map(({ width }) => width)) }))
+    .sort((left, right) => left.width - right.width);
   const gauges: BristleWidthGauge[] = [];
-  const size = Math.ceil(ordered.length / STUDIO_OIL_BRISTLE_WIDTH_GAUGES);
-  for (let start = 0; start < ordered.length; start += size) {
-    const runs = ordered.slice(start, start + size);
-    if (runs.length === 0) continue;
+  const size = Math.ceil(hairs.length / STUDIO_OIL_BRISTLE_WIDTH_GAUGES);
+  for (let start = 0; start < hairs.length; start += size) {
+    const group = hairs.slice(start, start + size);
+    if (group.length === 0) continue;
+    const runs = group.flatMap(({ runs: hairRuns }) => hairRuns);
     gauges.push({ runs, lineWidth: mean(runs.map(({ width }) => width)) });
   }
   return gauges;
+}
+
+/**
+ * Band width a hair's load must overshoot before the hair is allowed to change band.
+ *
+ * Quantising each run independently is what cut the furrows into dashes. A hair's load wanders
+ * slowly, so it spends much of its travel sitting ON a band boundary — and there the raw
+ * `floor(load · bands)` flickers between two bands from one run to the next. Every flicker is a
+ * seam the weld cannot close, and a row of seams three stations apart is exactly the bar-code the
+ * oil bed was reported as. The flicker is not tone: the load either side of it differs by a
+ * millionth, while the rendered step is a full band.
+ *
+ * A Schmitt trigger removes it. The band follows the load only once the load has committed past
+ * the boundary by this margin, so genuine ramps still move band by band while boundary noise does
+ * not. Nothing is smoothed and no load is altered — only the *choice of quantiser* changes, and it
+ * changes toward the one whose output is stable under an input that barely moves.
+ */
+const BRISTLE_BAND_HYSTERESIS = 0.4;
+
+/**
+ * Assigns every run its load band, walking each hair along its own travel so the trigger has a
+ * history. Runs below the dry-liftoff cut get no band at all and are simply never emitted.
+ *
+ * A hair that runs out of paint lifts off the paper. Without that cut every hair painted the full
+ * length of the stroke at SOME opacity — the virtual-overlap fold guarantees it, since
+ * `1 - (1-a)^6` turns even a 0.015 load into 0.087 — so the bed rendered as unbroken parallel
+ * ribbons, which is the grain of plywood rather than the mark of a brush. Skipping the driest runs
+ * is what breaks those ribbons into the interrupted, skipping stroke that reads as bristle.
+ */
+function bandRunsAlongEachHair(
+  planned: readonly PlannedBristleRun[],
+  minimumLoad: number,
+  span: number,
+): ReadonlyMap<PlannedBristleRun, number> {
+  const byHair = new Map<number, PlannedBristleRun[]>();
+  for (const run of planned) {
+    const hair = byHair.get(run.bristleIndex);
+    if (hair) hair.push(run);
+    else byHair.set(run.bristleIndex, [run]);
+  }
+  const bandByRun = new Map<PlannedBristleRun, number>();
+  for (const hair of byHair.values()) {
+    hair.sort((left, right) => left.runIndex - right.runIndex);
+    let held = -1;
+    for (const run of hair) {
+      const normalized = span > POINT_EPSILON ? (run.load - minimumLoad) / span : 0;
+      if (normalized < BRISTLE_DRY_LIFTOFF) {
+        // Lifting off ends the hair's history: when it touches down again it re-enters on whatever
+        // band its load says, with no memory of the band it carried before the gap.
+        held = -1;
+        continue;
+      }
+      const scaled = normalized * BRISTLE_LOAD_BANDS;
+      const raw = Math.min(BRISTLE_LOAD_BANDS - 1, Math.floor(scaled));
+      const band = held < 0
+        || (raw > held && scaled >= held + 1 + BRISTLE_BAND_HYSTERESIS)
+        || (raw < held && scaled <= held - BRISTLE_BAND_HYSTERESIS)
+        ? raw
+        : held;
+      held = band;
+      bandByRun.set(run, band);
+    }
+  }
+  return bandByRun;
+}
+
+/** One frozen, quantised path per run, memoised so the shells above it can share it. */
+function quantizedRun(
+  run: PlannedBristleRun,
+  cache: Map<PlannedBristleRun, StudioOilRibbonPath>,
+): StudioOilRibbonPath {
+  const cached = cache.get(run);
+  if (cached) return cached;
+  const frozen = Object.freeze({ points: quantizedPoints(run.points) });
+  cache.set(run, frozen);
+  return frozen;
 }
 
 function planBristleLanes(
@@ -596,11 +780,13 @@ function planBristleLanes(
     // Striding the phase by 2 spreads seven hairs over all five phases (0,2,4,1,3,0,2), so the
     // steps scatter into a mosaic instead of a grid. Nothing about the load itself changes.
     const phase = (bristleIndex * BRISTLE_RUN_PHASE_STRIDE) % BRISTLE_RUN_STATIONS;
+    let runIndex = -1;
     for (
       let runOrigin = -phase;
       runOrigin < stations.length - 1;
       runOrigin += BRISTLE_RUN_STATIONS
     ) {
+      runIndex += 1;
       const runStart = Math.max(0, runOrigin);
       const runEnd = Math.min(stations.length - 1, runOrigin + BRISTLE_RUN_STATIONS);
       if (runEnd <= runStart) continue;
@@ -633,10 +819,12 @@ function planBristleLanes(
       const sample = stations[sampleIndex]!;
       const sampleBristle = sample.source.bristles[bristleIndex]!;
       let load = clamp(sample.opacity * sampleBristle.opacity, 0, 1);
-      // Size ridges against lane pitch so seven hairs leave real furrows without repainting the
-      // body. 0.15–0.28·radiusY keeps impasto readable at 1× while surviving the body opacity
-      // headroom reserved below.
-      let width = Math.max(0.38, sample.radiusY * (0.15 + sampleBristle.radiusYRatio * 1.18));
+      // Ridge width against lane pitch. The constant term used to be 0.15 — over half the final
+      // width — which flattened the hairs' own diameters into one gauge no matter what the planner
+      // hashed. Shifting the weight onto the ratio spreads the bed over 2.4x instead of 1.6x, so
+      // fine hairs and clumped ones are visibly different strands. 0.15–0.37·radiusY still keeps
+      // impasto readable at 1x while surviving the body opacity headroom reserved below.
+      let width = Math.max(0.38, sample.radiusY * (0.075 + sampleBristle.radiusYRatio * 2.35));
       if (dynamics) {
         // v1 load dynamics (flag-gated): the lane's evolving film strength
         // scales the deposit and the flattened footprint widens the ridge.
@@ -660,12 +848,14 @@ function planBristleLanes(
       }
       minimumLoad = Math.min(minimumLoad, load);
       maximumLoad = Math.max(maximumLoad, load);
-      planned.push({ points, load, width });
+      planned.push({ points, load, width, bristleIndex, runIndex });
     }
   }
   if (planned.length === 0) return [];
 
   const span = maximumLoad - minimumLoad;
+  const bandByRun = bandRunsAlongEachHair(planned, minimumLoad, span);
+  const quantizedByRun = new Map<PlannedBristleRun, StudioOilRibbonPath>();
   const lanes: StudioOilRibbonBristleLane[] = [];
   for (const gauge of widthGauges(planned)) {
     const bands: PlannedBristleRun[][] = Array.from(
@@ -673,20 +863,11 @@ function planBristleLanes(
       () => [],
     );
     for (const run of gauge.runs) {
-      const normalized = span > POINT_EPSILON ? (run.load - minimumLoad) / span : 0;
-      // A hair that runs out of paint lifts off the paper. Without this every hair painted the
-      // full length of the stroke at SOME opacity - the virtual-overlap fold guarantees it, since
-      // `1 - (1-a)^6` turns even a 0.015 load into 0.087 - so the bed rendered as seven unbroken
-      // parallel ribbons, which is the grain of plywood rather than the mark of a brush. Skipping
-      // the driest runs is what breaks those ribbons into the interrupted, skipping stroke that
-      // reads as bristle. It removes deposit that was never physical to begin with.
-      if (normalized < BRISTLE_DRY_LIFTOFF) continue;
-      const band = Math.min(
-        BRISTLE_LOAD_BANDS - 1,
-        Math.floor(normalized * BRISTLE_LOAD_BANDS),
-      );
+      const band = bandByRun.get(run);
+      if (band === undefined) continue;
       bands[band]!.push(run);
     }
+    for (const [band, runs] of bands.entries()) bands[band] = [...weldRuns(runs)];
 
     // Target deposit per band, monotone in load. Flat overlap count, deliberately: the bands are
     // ALREADY ordered by load, so scaling the overlap count by the band index applied that
@@ -711,6 +892,22 @@ function planBristleLanes(
     // are jointly covered by shells 0..max(i, m) and each shell is ONE paint, so the crossing
     // lands on max(target) instead of folding both - the knot cost of a band goes to zero and the
     // count stops being capped by self-crossings.
+    //
+    // Built as SUFFIXES from the outermost band inward, and quantised once per run. A run in band
+    // m belongs to shells 0..m, and the straightforward `slice(index).flatMap(...).map(quantise)`
+    // re-walked and re-quantised its coordinates once for every one of those shells — on a
+    // 1300-station scribble that redundancy was most of the planner's time. Shell k is exactly
+    // `band k ++ shell k+1`, and the frozen path objects are shared, so the emitted plan is
+    // identical while each coordinate is touched once.
+    // The deposit walk runs FIRST and touches no geometry, so a shell whose deposit cannot survive
+    // 8-bit quantisation is never built at all. Materialising every band's suffix up front and
+    // discarding the skipped ones measured slower than the redundant version it replaced.
+    //
+    // A shell repaints every run at and above its band, so it is the most expensive thing this
+    // planner emits - measured, the shells raise an oil stroke's lane path data about 6x. A shell
+    // that is skipped deliberately does NOT advance `carried`, which leaves the skipped band's
+    // target to the next shell that IS worth painting, so tone stays exact instead of drifting.
+    const emitted: { index: number; band: number; delta: number }[] = [];
     let carried = 0;
     for (let index = 0; index < occupied.length; index += 1) {
       const entry = occupied[index]!;
@@ -719,21 +916,34 @@ function planBristleLanes(
       const delta = carried >= 1
         ? 0
         : clamp(1 - (1 - entry.target) / (1 - carried), 0, 1);
-      // A shell repaints every run at and above its band, so it is the most expensive thing this
-      // planner emits - measured, the shells raise an oil stroke's lane path data about 6x. One
-      // whose deposit cannot survive 8-bit quantisation is pure cost, so it is absorbed rather
-      // than emitted: `carried` is deliberately NOT advanced, which leaves the skipped band's
-      // target to the next shell that IS worth painting, so tone stays exact instead of drifting.
       if (delta < BRISTLE_SHELL_VISIBLE_DEPOSIT) continue;
       carried = entry.target;
-      const shell = occupied.slice(index).flatMap(({ runs }) => runs);
+      emitted.push({ index, band: entry.band, delta });
+    }
+
+    // Built inward from the outermost emitted shell, and quantised once per run. A run in band m
+    // belongs to shells 0..m, and the straightforward `slice(index).flatMap(...)` re-walked and
+    // re-quantised its coordinates once for every one of those shells — on a 1300-station scribble
+    // that redundancy was most of the planner's time. Shell k is exactly `bands k..next ++ shell
+    // next`, and the frozen path objects are shared, so the emitted plan is identical while each
+    // coordinate is quantised once.
+    const shells: (readonly StudioOilRibbonPath[])[] = new Array(emitted.length);
+    for (let slot = emitted.length - 1; slot >= 0; slot -= 1) {
+      const from = emitted[slot]!.index;
+      const to = emitted[slot + 1]?.index ?? occupied.length;
+      const own: StudioOilRibbonPath[] = [];
+      for (let index = from; index < to; index += 1) {
+        for (const run of occupied[index]!.runs) own.push(quantizedRun(run, quantizedByRun));
+      }
+      const outer = shells[slot + 1];
+      shells[slot] = outer ? own.concat(outer) : own;
+    }
+    for (const [slot, shell] of emitted.entries()) {
       lanes.push(Object.freeze({
-        runs: Object.freeze(shell.map((run) => Object.freeze({
-          points: quantizedPoints(run.points),
-        }))),
+        runs: Object.freeze(shells[slot]!),
         lineWidth: quantize(gauge.lineWidth),
-        opacity: quantize(delta),
-        loadBand: entry.band,
+        opacity: quantize(shell.delta),
+        loadBand: shell.band,
       }));
     }
   }
@@ -899,8 +1109,36 @@ interface ImpastoReliefField {
   readonly cell: number;
   readonly originX: number;
   readonly originY: number;
+  /** Hairs skipped between ridges — the flank stripes must walk the bed on the same stride. */
+  readonly hairStride: number;
   /** Flat-normalized dli shading multipliers (1 = flat paint). */
   readonly shading: Float32Array;
+}
+
+/**
+ * How many hairs to skip between relief ridges, so the height field is never asked to resolve
+ * detail finer than its own cell.
+ *
+ * The relief grid is coarse on purpose — the corrugation between hairs is a one-texel signal at
+ * best. When the bed's pitch drops below one cell, two neighbouring hairs splat into the SAME
+ * cells under a max blend, so the second one changes no value in the field and no pixel in the
+ * render: it is pure cost. That went unnoticed while the bed was a fixed seven hairs; a
+ * width-scaled bed can put forty-four hairs under a 20px ribbon, where the redundancy is 4x and
+ * dominates the whole planner.
+ *
+ * The same stride governs the flank stripes, because a stripe samples one texel off its crest: a
+ * stripe placed on a hair that raised no ridge would read flat film and report a glint that is not
+ * there. Ridges and stripes therefore have to walk the bed in step.
+ */
+function impastoHairStride(
+  stations: readonly OilCarrierStation[],
+  cell: number,
+  bristleCount: number,
+): number {
+  if (bristleCount <= 1 || cell <= POINT_EPSILON) return 1;
+  const ribbonWidth = 2 * mean(stations.map((station) => station.radiusY));
+  const resolvable = Math.max(1, Math.floor(ribbonWidth / cell));
+  return Math.max(1, Math.round(bristleCount / Math.min(bristleCount, resolvable)));
 }
 
 function impastoBristleCount(stations: readonly OilCarrierStation[]): number {
@@ -998,11 +1236,12 @@ function buildImpastoReliefField(
   // crossing of equal loads must not stack itself into a knot (mirrors the one-pass band rule).
   const ridge = new Float32Array(cellCount);
   const bristleCount = impastoBristleCount(stations);
+  const hairStride = impastoHairStride(stations, cell, bristleCount);
   const ridgeReach = cell * IMPASTO_RELIEF_RIDGE_REACH_CELLS;
   const hairX = new Float64Array(stations.length);
   const hairY = new Float64Array(stations.length);
   const hairLoad = new Float64Array(stations.length);
-  for (let bristleIndex = 0; bristleIndex < bristleCount; bristleIndex += 1) {
+  for (let bristleIndex = 0; bristleIndex < bristleCount; bristleIndex += hairStride) {
     for (let index = 0; index < stations.length; index += 1) {
       const station = stations[index]!;
       const hair = station.source.bristles[bristleIndex]!;
@@ -1059,6 +1298,7 @@ function buildImpastoReliefField(
     cell,
     originX: minX,
     originY: minY,
+    hairStride,
     // dli defaults verbatim (normalScale 7, roughness 0.075, F0 0.05, light (0,−1,1) image-space);
     // only heightScale compensates the single-stroke tile (see the constant above).
     shading: computeStudioImpastoReliefShading(film, {
@@ -1091,6 +1331,58 @@ interface PlannedImpastoReliefRun {
   /** Mean signed shading distance from flat (positive = lit flank). */
   readonly strength: number;
   readonly width: number;
+  /** Which flank stripe this run belongs to, and where along it the run sits. */
+  readonly trackIndex: number;
+  readonly runIndex: number;
+}
+
+/**
+ * Welds a relief stripe's consecutive runs that landed in the same tone bucket.
+ *
+ * Same defect and same cure as the bristle furrows: the flanks are cut into three-station runs and
+ * bucketed independently, so one continuous glint along a ridge came out as a row of rectangular
+ * tiles — the light and dark blocks that made the impasto lane read as digital camouflage rather
+ * than as raked paint. Runs share their boundary station, so the joint point is dropped once.
+ */
+/**
+ * Overshoot, as a fraction of the max opacity, a flank must commit before it changes tone bucket.
+ * Same Schmitt trigger, same reason, as the bristle bands' hysteresis.
+ */
+const IMPASTO_RELIEF_BUCKET_HYSTERESIS = 0.06;
+
+/** Upper edge of a bucket, as a fraction of max opacity — Infinity for the top bucket. */
+function bucketEdgeAbove(bucket: number): number {
+  return bucket === 0
+    ? IMPASTO_RELIEF_BUCKET_EDGE_LOW
+    : bucket === 1
+      ? IMPASTO_RELIEF_BUCKET_EDGE_HIGH
+      : Number.POSITIVE_INFINITY;
+}
+
+/** Lower edge of a bucket, as a fraction of max opacity — 0 for the bottom bucket. */
+function bucketEdgeBelow(bucket: number): number {
+  return bucket === 0
+    ? 0
+    : bucket === 1
+      ? IMPASTO_RELIEF_BUCKET_EDGE_LOW
+      : IMPASTO_RELIEF_BUCKET_EDGE_HIGH;
+}
+
+function weldReliefRuns(
+  runs: readonly PlannedImpastoReliefRun[],
+): readonly PlannedImpastoReliefRun[] {
+  return weldByTrack(
+    runs,
+    (run) => run.trackIndex,
+    (run) => run.runIndex,
+    (points, first, last) => ({
+      points,
+      strength: (first.strength + last.strength) / 2,
+      width: (first.width + last.width) / 2,
+      trackIndex: last.trackIndex,
+      runIndex: last.runIndex,
+    }),
+  );
 }
 
 /**
@@ -1109,6 +1401,10 @@ function planImpastoReliefOverlayLanes(
   if (!field) return Object.freeze([]);
   const planned: PlannedImpastoReliefRun[] = [];
   const bristleCount = impastoBristleCount(stations);
+  // The stripes walk the bed on the SAME stride the height field raised its ridges on. See
+  // `impastoHairStride`: a stripe on a hair that raised no ridge would sample flat film and claim
+  // a glint that is not in the field.
+  const stripeStride = field.hairStride;
 
   const collectRun = (
     runStart: number,
@@ -1119,6 +1415,8 @@ function planImpastoReliefOverlayLanes(
       readonly width: number;
     },
     side: 1 | -1,
+    trackIndex: number,
+    runIndex: number,
   ): void => {
     const points: number[] = [];
     let strengthSum = 0;
@@ -1144,15 +1442,23 @@ function planImpastoReliefOverlayLanes(
       points,
       strength: strengthSum / samples,
       width: widthSum / samples,
+      trackIndex,
+      runIndex,
     });
   };
 
+  // One track per (side, stripe): the flank stripes are numbered by hair and the rim takes the
+  // slot past them, so a welded stripe is always the same physical ridge flank end to end.
+  const trackOf = (side: 1 | -1, stripe: number): number =>
+    (side === 1 ? 0 : bristleCount + 1) * 2 + stripe;
+
   for (let runStart = 0; runStart < stations.length - 1; runStart += BRISTLE_RUN_STATIONS) {
     const runEnd = Math.min(stations.length - 1, runStart + BRISTLE_RUN_STATIONS);
+    const runIndex = runStart / BRISTLE_RUN_STATIONS;
     for (const side of [-1, 1] as const) {
       // Ridge flanks — one lit and one shaded band per hair, clamped inside the body silhouette
       // so a screen-blended glint can never halo outside the paint.
-      for (let bristleIndex = 0; bristleIndex < bristleCount; bristleIndex += 1) {
+      for (let bristleIndex = 0; bristleIndex < bristleCount; bristleIndex += stripeStride) {
         collectRun(runStart, runEnd, (station, flankSide) => {
           const hair = station.source.bristles[bristleIndex]!;
           const ridgeWidth = Math.max(
@@ -1172,7 +1478,7 @@ function planImpastoReliefOverlayLanes(
             sampleOffset: offset + flankSide * field.cell * 0.9,
             width,
           };
-        }, side);
+        }, side, trackOf(side, bristleIndex), runIndex);
       }
       // Body rim — thick paint catches light along its own silhouette cliff.
       collectRun(runStart, runEnd, (station, rimSide) => {
@@ -1186,7 +1492,7 @@ function planImpastoReliefOverlayLanes(
           sampleOffset: rimSide * Math.max(station.radiusY - 0.9 * field.cell, station.radiusY * 0.5),
           width,
         };
-      }, side);
+      }, side, trackOf(side, bristleCount), runIndex);
     }
   }
 
@@ -1198,9 +1504,18 @@ function planImpastoReliefOverlayLanes(
     runs: PlannedImpastoReliefRun[];
     opacities: number[];
   }>();
-  for (const run of planned) {
+  // Walked in track order so the bucket choice has a history. Independent bucketing let one ridge
+  // flank flicker between two tone buckets from one three-station run to the next, which put the
+  // two halves of a single glint in two different lanes: the weld could not rejoin them and the
+  // lane rendered as a mosaic of light and dark tiles instead of a raked ridge.
+  const held = new Map<number, { kind: StudioOilRibbonImpastoReliefKind; bucket: number }>();
+  for (const run of [...planned].sort((left, right) =>
+    left.trackIndex - right.trackIndex || left.runIndex - right.runIndex)) {
     const magnitude = Math.abs(run.strength);
-    if (magnitude < IMPASTO_RELIEF_MIN_STRENGTH) continue;
+    if (magnitude < IMPASTO_RELIEF_MIN_STRENGTH) {
+      held.delete(run.trackIndex);
+      continue;
+    }
     const kind: StudioOilRibbonImpastoReliefKind = run.strength > 0 ? "highlight" : "shadow";
     const maxOpacity = kind === "highlight"
       ? IMPASTO_RELIEF_MAX_HIGHLIGHT_OPACITY
@@ -1209,11 +1524,25 @@ function planImpastoReliefOverlayLanes(
       ? IMPASTO_RELIEF_HIGHLIGHT_GAIN
       : IMPASTO_RELIEF_SHADOW_GAIN;
     const opacity = Math.min(maxOpacity, magnitude * gain);
-    const bucket = opacity < maxOpacity * IMPASTO_RELIEF_BUCKET_EDGE_LOW
+    const raw = opacity < maxOpacity * IMPASTO_RELIEF_BUCKET_EDGE_LOW
       ? 0
       : opacity < maxOpacity * IMPASTO_RELIEF_BUCKET_EDGE_HIGH
         ? 1
         : IMPASTO_RELIEF_OPACITY_BUCKETS - 1;
+    // A flank that flips lit/shaded is a genuinely different surface, so the trigger only holds
+    // within one kind; crossing zero always re-enters on the raw bucket.
+    const previous = held.get(run.trackIndex);
+    const ratio = opacity / maxOpacity;
+    const bucket = !previous || previous.kind !== kind
+      ? raw
+      : raw > previous.bucket
+        ? (ratio >= bucketEdgeAbove(previous.bucket) + IMPASTO_RELIEF_BUCKET_HYSTERESIS
+            ? raw : previous.bucket)
+        : raw < previous.bucket
+          ? (ratio <= bucketEdgeBelow(previous.bucket) - IMPASTO_RELIEF_BUCKET_HYSTERESIS
+              ? raw : previous.bucket)
+          : raw;
+    held.set(run.trackIndex, { kind, bucket });
     // Shadows first, glints last: paint order is the plan order on both surfaces.
     const order = (kind === "shadow" ? 0 : IMPASTO_RELIEF_OPACITY_BUCKETS) + bucket;
     const key = `${kind}:${bucket}`;
@@ -1225,14 +1554,19 @@ function planImpastoReliefOverlayLanes(
 
   const lanes = [...buckets.values()]
     .sort((left, right) => left.order - right.order)
-    .map((entry) => Object.freeze({
-      runs: Object.freeze(entry.runs.map((run) => Object.freeze({
-        points: quantizedPoints(run.points),
-      }))),
-      lineWidth: quantize(mean(entry.runs.map(({ width }) => width))),
-      opacity: quantize(mean(entry.opacities)),
-      kind: entry.kind,
-    }));
+    .map((entry) => {
+      const welded = weldReliefRuns(entry.runs);
+      return Object.freeze({
+        runs: Object.freeze(welded.map((run) => Object.freeze({
+          points: quantizedPoints(run.points),
+        }))),
+        // Width and opacity stay the bucket's means over its RUNS, not over the welded stripes:
+        // welding is a geometry join and must not re-weight the tone by stripe length.
+        lineWidth: quantize(mean(entry.runs.map(({ width }) => width))),
+        opacity: quantize(mean(entry.opacities)),
+        kind: entry.kind,
+      });
+    });
   return Object.freeze(lanes);
 }
 
@@ -1266,9 +1600,13 @@ export function planStudioOilRibbonCarrier(
       : stations.length === 1
         ? directionalTap(stations[0]!)
         : variableWidthBody(stations),
-    // Body is the paint the bristles have already spread. Two virtual overlaps leave clear headroom
-    // so multi-band ridges can still carve tonal relief on top of a continuous wet film.
-    bodyOpacity: quantize(accumulatedOpacity(averageOpacity, 2)),
+    // Body is the paint the bristles have already spread — a film UNDER the ridges, not a slab
+    // beside them. Two virtual overlaps put it at 0.68 while the lowest band a hair can deposit
+    // came out at 0.65, so every furrow lighter than the film was invisible by construction and
+    // only the top two or three bands ever showed: a flat slab with a few dark decals on it, which
+    // is exactly how the bed was reported. One overlap is the film itself, and it leaves the whole
+    // band range visible against it.
+    bodyOpacity: quantize(accumulatedOpacity(averageOpacity, 1)),
     bristleLanes: planBristleLanes(stations, dynamics, physics),
     repeatedBodyStampCount: 0,
     ...(impastoReliefLanes ? { impastoReliefLanes } : {}),

@@ -30,9 +30,16 @@ describe("studio oil/acrylic ribbon carrier", () => {
       .flatMap((lane) => lane.runs)
       .reduce((total, run) => total + run.points.length / 2, 0);
     expect(runStations).toBeGreaterThanOrEqual(5 * dabs.length);
-    expect(plan.bodyOpacity).toBeGreaterThan(
-      dabs.reduce((sum, dab) => sum + dab.opacity, 0) / dabs.length,
-    );
+    // The body is the film the head spread, so it carries at least the mean station load. It used
+    // to carry a two-overlap fold of it (0.68 against a 0.44 mean), which put the film ABOVE the
+    // lowest band a hair could deposit — every furrow lighter than the film was then invisible by
+    // construction and the bed rendered as a slab with a few dark decals. What the film must do is
+    // leave the band range visible against it, so that is what is asserted.
+    const meanStationLoad = dabs.reduce((sum, dab) => sum + dab.opacity, 0) / dabs.length;
+    expect(plan.bodyOpacity).toBeCloseTo(meanStationLoad, 3);
+    const bandTones = plan.bristleLanes.map(({ opacity }) => opacity);
+    expect(Math.min(...bandTones)).toBeLessThan(plan.bodyOpacity);
+    expect(Math.max(...bandTones)).toBeGreaterThan(0);
   });
 
   it("keeps bristle load varying along the stroke instead of collapsing it to one mean", () => {
@@ -108,9 +115,14 @@ describe("studio oil/acrylic ribbon carrier", () => {
     const heavyRidge = Math.max(...heavy.bristleLanes.map(({ lineWidth }) => lineWidth));
     const lightRidge = Math.max(...light.bristleLanes.map(({ lineWidth }) => lineWidth));
     expect(heavyRidge).toBeGreaterThan(lightRidge * 1.08);
-    const lightRuns = light.bristleLanes.reduce((sum, lane) => sum + lane.runs.length, 0);
-    const heavyRuns = heavy.bristleLanes.reduce((sum, lane) => sum + lane.runs.length, 0);
-    expect(heavyRuns).toBeGreaterThanOrEqual(lightRuns);
+    // Deposited relief, measured as run STATIONS rather than run count. Consecutive runs of one
+    // hair that stay in the same band are welded into a single furrow, so a heavier stroke — whose
+    // load is steadier and therefore welds further — legitimately emits FEWER, longer runs while
+    // laying down more paint. Counting runs measured the fragmentation, not the deposit.
+    const stations = (plan: ReturnType<typeof planStudioOilRibbonCarrier>) => plan.bristleLanes
+      .flatMap((lane) => lane.runs)
+      .reduce((total, run) => total + run.points.length / 2, 0);
+    expect(stations(heavy)).toBeGreaterThanOrEqual(stations(light));
   });
 
   it("emits multi-lane bristle structure rather than a soft round dab or flat ribbon only", () => {
@@ -120,8 +132,12 @@ describe("studio oil/acrylic ribbon carrier", () => {
       baseWidth: 28,
       seed: 33,
     });
-    expect(dabs.every((dab) => dab.bristles.length >= 5)).toBe(true);
-    expect(dabs.every((dab) => dab.bristles.length <= 7)).toBe(true);
+    // The bed scales with head width now (it was seven hairs at every size, which left a 28px head
+    // with furrows further apart than they were wide). Pinned as a band around the width rule so
+    // the count stays a deliberate choice rather than drifting.
+    expect(dabs.every((dab) => dab.bristles.length >= 7)).toBe(true);
+    expect(dabs.every((dab) => dab.bristles.length <= 44)).toBe(true);
+    expect(dabs[0]!.bristles.length).toBe(Math.round(28 * 0.78));
     const plan = planStudioOilRibbonCarrier(dabs);
     expect(plan.repeatedBodyStampCount).toBe(0);
     expect(plan.bristleLanes.length).toBeGreaterThanOrEqual(2);
