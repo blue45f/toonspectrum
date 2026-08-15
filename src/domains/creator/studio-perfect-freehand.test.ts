@@ -91,9 +91,35 @@ describe("studioPerfectFreehandStrokeOptions", () => {
     expect(studioPerfectFreehandStrokeOptions(profile, 12, true, Number.NaN).start?.taper).toBe(0);
     expect(studioPerfectFreehandStrokeOptions(profile, 12, true, Number.POSITIVE_INFINITY).end?.taper).toBe(0);
 
-    const long = studioPerfectFreehandStrokeOptions(profile, 12, true, 40);
+    // 충분히 긴 획은 프로필 값을 그대로 받는다. 예산이 프로필 전량을 덮는 길이는
+    // 1.4×size(짧은 획 경계) + (2.8 + 3.4)×size 다.
+    const long = studioPerfectFreehandStrokeOptions(profile, 12, true, 12 * 7.6);
     expect(long.start?.taper).toBe(12 * profile.taperStartFactor);
     expect(long.end?.taper).toBe(12 * profile.taperEndFactor);
+  });
+
+  it("짧은 획 경계를 끊지 않고 연속으로 넘어간다", () => {
+    // 예전에는 boolean 이었다: 길이 1.39×size 는 테이퍼 0, 1.41×size 는 프로필 전량
+    // (12px 브러시에서 시작 33.60 / 끝 40.80)이라 거의 같은 길이의 두 획이 뭉툭한 막대와
+    // 바늘로 갈렸다. 짧은 해칭을 반복하는 선화에서 그대로 드러난다.
+    const profile = STUDIO_PERFECT_FREEHAND_PROFILES["perfect-ink"];
+    const size = 12;
+    const taperAt = (multiple: number): number => {
+      const t = studioPerfectFreehandStrokeOptions(profile, size, true, size * multiple).start?.taper;
+      return typeof t === "number" ? t : -1;
+    };
+
+    // 경계 양쪽이 이어져 있다 — 한 걸음의 변화가 프로필 전량 근처일 수 없다.
+    expect(taperAt(1.39)).toBe(0);
+    expect(taperAt(1.41)).toBeGreaterThan(0);
+    expect(taperAt(1.41)).toBeLessThan(size * profile.taperStartFactor * 0.05);
+
+    // 그리고 길이에 대해 단조 증가한 뒤 프로필 값에서 멈춘다.
+    const samples = [1.4, 1.6, 2, 3, 5, 7.6, 12, 40].map(taperAt);
+    for (let index = 1; index < samples.length; index += 1) {
+      expect(samples[index]).toBeGreaterThanOrEqual(samples[index - 1]!);
+    }
+    expect(Math.max(...samples)).toBe(size * profile.taperStartFactor);
   });
 });
 

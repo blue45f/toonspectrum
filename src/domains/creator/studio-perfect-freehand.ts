@@ -157,8 +157,25 @@ export function studioPerfectFreehandStrokeOptions(
 ): StrokeOptions {
   const size = clampTo(strokeWidth, 0.5, 400, 6);
   const safeShortLength = size * 1.4;
-  const shouldDisableTaper = segmentLength !== undefined
-    && (!Number.isFinite(segmentLength) || segmentLength <= 0 || segmentLength <= safeShortLength);
+  const measured = segmentLength !== undefined;
+  const usableLength = measured && Number.isFinite(segmentLength) && segmentLength > 0
+    ? segmentLength
+    : 0;
+  // 짧은 획에서 테이퍼를 끄는 규칙은 필요하다 — 양끝 테이퍼가 길이보다 길면 획이 제 굵기에
+  // 닿지 못하고 바늘이 된다. 문제는 그게 boolean 이었다는 것이다. 길이 1.4×size 를 경계로
+  // 1.39배는 테이퍼 0(뭉툭한 막대), 1.41배는 프로필 테이퍼 전량(perfect-ink 는 양끝 합
+  // 6.2×size)이 한꺼번에 걸려서, 거의 같은 길이의 두 획이 전혀 다른 모양으로 나왔다. 짧은
+  // 해칭이나 점을 여러 번 찍는 웹툰 선화에서 바로 드러나는 불연속이다.
+  //
+  // 경계 위로 남는 길이를 테이퍼 예산으로 삼아 프로필 값까지 선형으로 열어준다. 경계에서
+  // 정확히 0 이라 기존 동작과 연속이고, 긴 획은 종전대로 프로필 값을 그대로 받는다. 예산은
+  // 양끝의 factor 비율대로 나눠 시작/끝의 성격 차이(perfect-ink 는 끝이 더 길다)를 지킨다.
+  const taperBudget = measured ? Math.max(0, usableLength - safeShortLength) : Infinity;
+  const totalFactor = Math.max(0, profile.taperStartFactor) + Math.max(0, profile.taperEndFactor);
+  const taperFor = (factor: number): number => {
+    if (factor <= 0 || totalFactor <= 0) return 0;
+    return Math.min(size * factor, taperBudget * (factor / totalFactor));
+  };
   return {
     size,
     thinning: profile.thinning,
@@ -168,15 +185,11 @@ export function studioPerfectFreehandStrokeOptions(
     last: true,
     start: {
       cap: profile.capStart,
-      taper: shouldDisableTaper || profile.taperStartFactor <= 0
-        ? 0
-        : size * profile.taperStartFactor,
+      taper: taperFor(profile.taperStartFactor),
     },
     end: {
       cap: profile.capEnd,
-      taper: shouldDisableTaper || profile.taperEndFactor <= 0
-        ? 0
-        : size * profile.taperEndFactor,
+      taper: taperFor(profile.taperEndFactor),
     },
   };
 }
