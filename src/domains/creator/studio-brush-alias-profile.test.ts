@@ -176,10 +176,25 @@ describe("studio brush alias profiles", () => {
     expect(resolveStudioBrushAliasPencilPasses("pencil")).toEqual([
       { role: "core", widthScale: 1, opacityScale: 1, jitterRadius: 0.75 },
     ]);
-    expect(resolveStudioBrushAliasPencilPasses("soft-pencil")).toEqual([
-      { role: "soft-edge", widthScale: 1.9, opacityScale: 0.18, jitterRadius: 0.3 },
+    // soft-edge 는 이제 한 장이 아니라 껍질 여러 장으로 펼쳐진다. 예전 구현은 코어 뒤에 폭만
+    // 넓힌 단단한 선 하나였고, 확대하면 부드러운 가장자리가 아니라 균일한 회색 테두리로 보였다.
+    const soft = resolveStudioBrushAliasPencilPasses("soft-pencil");
+    const skirt = soft.filter(({ role }) => role === "soft-edge");
+    const core = soft.filter(({ role }) => role === "core");
+    expect(core).toEqual([
       { role: "core", widthScale: 1, opacityScale: 0.72, jitterRadius: 1.2 },
     ]);
+    expect(skirt.length).toBeGreaterThan(2);
+    // 폭은 선언 폭에서 코어 폭까지 단조 감소해야 기울기가 된다.
+    expect(skirt[0]!.widthScale).toBeCloseTo(1.9, 6);
+    expect(skirt.at(-1)!.widthScale).toBeCloseTo(1, 6);
+    for (let index = 1; index < skirt.length; index += 1) {
+      expect(skirt[index]!.widthScale).toBeLessThan(skirt[index - 1]!.widthScale);
+    }
+    // 껍질들이 접히면 원래 선언한 불투명도에 정확히 도달한다 — 농도가 조용히 달라지지 않는다.
+    const folded = skirt.reduce((carried, pass) => 1 - (1 - carried) * (1 - pass.opacityScale), 0);
+    expect(folded).toBeCloseTo(0.18, 6);
+    expect(new Set(skirt.map(({ jitterRadius }) => jitterRadius))).toEqual(new Set([0.3]));
     expect(studioBrushAliasEffectiveDiameter("soft-pencil", 5)).toBe(6.4);
     expect(resolveStudioBrushAliasPencilPasses("marker")).toEqual([]);
   });

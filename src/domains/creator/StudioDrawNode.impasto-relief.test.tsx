@@ -122,7 +122,13 @@ describe("StudioDrawNode — brush--impasto-relief Canvas 릴리프 오버레이
 
     // 유화 바디는 그대로 한 번 채운다.
     expect(context.fills.length).toBeGreaterThan(0);
-    const bandStrokes = context.strokes.filter(({ cap }) => cap === "butt");
+    // 강모 밴드와 릴리프 섀도우는 이제 캔버스 API 로 구분되지 않는다 — 강모 런의 각진 끝을
+    // 없애려고 밴드도 round 캡으로 바꿨고(studio-oil-ribbon-carrier), 둘 다 multiply 에 스트로크
+    // 색이다. 그래서 판별은 관찰 가능한 것만 쓴다: screen 글린트는 유일하고, 릴리프가 붙었다는
+    // 사실은 형제 레인보다 multiply 패스가 더 많다는 것으로 확인한다(아래 별도 테스트).
+    const bandStrokes = context.strokes.filter(
+      ({ composite }) => composite === "multiply",
+    );
     const glints = context.strokes.filter(
       ({ composite, style }) =>
         composite === "screen" && style === STUDIO_OIL_IMPASTO_RELIEF_HIGHLIGHT_COLOR,
@@ -134,24 +140,21 @@ describe("StudioDrawNode — brush--impasto-relief Canvas 릴리프 오버레이
     expect(bandStrokes.length).toBeGreaterThan(0);
     expect(glints.length).toBeGreaterThan(0);
     expect(coreShadows.length).toBeGreaterThan(0);
-    // (kind × 톤 버킷) 양자화: 릴리프는 최대 3 + 3 페인트 패스.
-    expect(glints.length + coreShadows.length).toBeLessThanOrEqual(6);
+    // (kind × 톤 버킷) 양자화: 글린트는 최대 3 패스.
+    expect(glints.length).toBeLessThanOrEqual(3);
     for (const glint of glints) {
       expect(glint.cap).toBe("round");
       expect(glint.alpha).toBeGreaterThan(0);
       expect(glint.alpha).toBeLessThanOrEqual(0.44);
     }
-    // 페인트 순서 계약: 릴리프는 강모 밴드 뒤에, 섀도우가 글린트보다 먼저.
-    const lastBand = context.strokes.map(({ cap }) => cap).lastIndexOf("butt");
-    const firstRelief = context.strokes.findIndex(({ cap }) => cap === "round");
-    expect(firstRelief).toBeGreaterThan(lastBand);
+    // 페인트 순서 계약: 글린트는 모든 multiply 패스 뒤에 온다(릴리프가 마지막 층이다).
     const firstGlint = context.strokes.findIndex(
       ({ composite }) => composite === "screen",
     );
-    const lastCoreShadow = context.strokes
-      .map(({ cap, composite }) => cap === "round" && composite === "multiply")
+    const lastMultiply = context.strokes
+      .map(({ composite }) => composite === "multiply")
       .lastIndexOf(true);
-    expect(firstGlint).toBeGreaterThan(lastCoreShadow);
+    expect(firstGlint).toBeGreaterThan(lastMultiply);
   },
   );
 
@@ -162,7 +165,7 @@ describe("StudioDrawNode — brush--impasto-relief Canvas 릴리프 오버레이
       const context = paintOilShape();
 
       expect(context.strokes.length).toBeGreaterThan(0);
-      expect(context.strokes.every(({ cap }) => cap === "butt")).toBe(true);
+      expect(context.strokes.every(({ composite }) => composite === "multiply")).toBe(true);
       expect(context.strokes.some(({ composite }) => composite === "screen")).toBe(false);
       expect(context.strokes.some(
         ({ style }) => style === STUDIO_OIL_IMPASTO_RELIEF_HIGHLIGHT_COLOR,

@@ -936,18 +936,21 @@ describe("StudioDrawNode orchestration", () => {
       />,
     );
     expect(captured("Shape")).toHaveLength(0);
-    expect(captured("Line").map((node) => node.props.strokeWidth)).toEqual([
-      24.32,
-      12.8,
-    ]);
-    expect(captured("Line").map((node) => node.props.opacity)).toEqual([
-      0.18,
-      0.72,
-    ]);
-    expect(captured("Line").map((node) => node.props.lineCap)).toEqual([
-      "round",
-      "round",
-    ]);
+    // soft-edge 는 껍질 여러 장으로 펼쳐진다. 예전엔 코어 뒤에 폭만 넓힌 단단한 선 하나였고,
+    // 확대하면 부드러운 가장자리가 아니라 균일한 회색 테두리로 보였다.
+    const widths = captured("Line").map((node) => node.props.strokeWidth as number);
+    const opacities = captured("Line").map((node) => node.props.opacity as number);
+    expect(widths.length).toBeGreaterThan(2);
+    // 가장 넓은 껍질은 예전 skirt 폭 그대로, 마지막은 코어 폭이다.
+    expect(widths[0]).toBeCloseTo(24.32, 6);
+    expect(widths.at(-1)).toBeCloseTo(12.8, 6);
+    expect(opacities.at(-1)).toBeCloseTo(0.72, 6);
+    // 껍질들이 접히면 예전 skirt 불투명도에 정확히 도달한다.
+    const folded = opacities.slice(0, -1)
+      .reduce((carried, value) => 1 - (1 - carried) * (1 - value), 0);
+    expect(folded).toBeCloseTo(0.18, 6);
+    expect(new Set(captured("Line").map((node) => node.props.lineCap)))
+      .toEqual(new Set(["round"]));
   });
 
   it("versions pencil pressure while legacy strokes retain their fixed width and pigment", () => {
@@ -1646,14 +1649,17 @@ describe("StudioDrawNode orchestration", () => {
       />,
     );
 
-    expect(captured("Circle")).toHaveLength(2);
-    expect(captured("Circle").map(({ props }) => ({
-      opacity: props.opacity,
-      radius: props.radius,
-    }))).toEqual([
-      { opacity: 0.18, radius: 12.16 },
-      { opacity: 0.72, radius: 6.4 },
-    ]);
+    // 탭도 같은 껍질 구성을 쓴다 — 획과 탭이 다른 재질로 보이면 안 된다.
+    const circles = captured("Circle").map(({ props }) => ({
+      opacity: props.opacity as number,
+      radius: props.radius as number,
+    }));
+    expect(circles.length).toBeGreaterThan(2);
+    expect(circles[0]!.radius).toBeCloseTo(12.16, 6);
+    expect(circles.at(-1)!).toEqual({ opacity: 0.72, radius: 6.4 });
+    const foldedTap = circles.slice(0, -1)
+      .reduce((carried, circle) => 1 - (1 - carried) * (1 - circle.opacity), 0);
+    expect(foldedTap).toBeCloseTo(0.18, 6);
   });
 
   it.each(["pencil-2b", "brush"] as const)(

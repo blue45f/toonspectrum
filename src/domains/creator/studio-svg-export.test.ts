@@ -796,7 +796,11 @@ describe("도형 직렬화", () => {
     const pencil = render("pencil");
     const softPencil = render("soft-pencil");
     expect(pencil.match(/data-pencil-pass=/g)).toHaveLength(1);
-    expect(softPencil.match(/data-pencil-pass=/g)).toHaveLength(2);
+    // soft-edge 는 껍질 여러 장으로 나간다 — 캔버스와 같은 패스 목록을 쓰므로 두 표면이 같다.
+    expect((softPencil.match(/data-pencil-pass=/g) ?? []).length).toBeGreaterThan(2);
+    expect((softPencil.match(/data-pencil-pass="soft-edge"/g) ?? []).length)
+      .toBeGreaterThan(1);
+    expect((softPencil.match(/data-pencil-pass="core"/g) ?? []).length).toBe(1);
     expect(softPencil).toContain('data-pencil-pass="soft-edge"');
     expect(softPencil).toContain('data-pencil-pass="core"');
     expect(softPencil).not.toBe(pencil);

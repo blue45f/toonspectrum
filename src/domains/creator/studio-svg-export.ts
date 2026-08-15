@@ -2994,7 +2994,7 @@ function serializeFreehand(
     // One <path> per load band, with every run of that band as a subpath: SVG paints a path once,
     // which is what keeps a self-crossing from depositing its bristle ridges twice.
     const bristles = carrier.bristleLanes.map((lane) => (
-      `<path data-paint-bristle-lane="true" d="${lane.runs.map((run) => studioOilRibbonPathData(run)).join("")}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(lane.lineWidth)}" stroke-linecap="butt" stroke-linejoin="round" opacity="${fmtDabOpacity(lane.opacity * strokeOpacity)}"/>`
+      `<path data-paint-bristle-lane="true" d="${lane.runs.map((run) => studioOilRibbonPathData(run)).join("")}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(lane.lineWidth)}" stroke-linecap="round" stroke-linejoin="round" opacity="${fmtDabOpacity(lane.opacity * strokeOpacity)}"/>`
     )).join("");
     // brush--impasto-relief 오버레이 — Canvas sceneFunc과 같은 페인트 계약(하이라이트=공유 화이트
     // 상수 screen, 섀도우=스트로크 색 multiply, 레인당 한 번 페인트). 플랜에 키가 없으면 빈

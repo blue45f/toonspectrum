@@ -47,7 +47,7 @@ function bristleSeries(paintBody: "oil" | "acrylic"): {
 }
 
 /** One bristle's load over a long stroke - long enough to span several dry/loaded cycles. */
-function longBristleLoad(paintBody: "oil" | "acrylic"): number[] {
+function longBristleLoad(paintBody: "oil" | "acrylic", bristle = 3): number[] {
   const points: number[] = [];
   const pressures: number[] = [];
   for (let index = 0; index < 400; index += 1) {
@@ -63,7 +63,7 @@ function longBristleLoad(paintBody: "oil" | "acrylic"): number[] {
     paintBody,
   });
   return dabs
-    .map((dab) => dab.bristles[3]?.opacity)
+    .map((dab) => dab.bristles[bristle]?.opacity)
     .filter((value): value is number => typeof value === "number");
 }
 
@@ -134,15 +134,37 @@ describe("Studio oil vs acrylic paint body", () => {
     // improvement: it took the rendered stroke from 73.1% of its ink in two tone bins to 54.6%.
     // So neither is the floor. What a genuinely flattened load loses is its extremes, and what a
     // re-hardened boolean gate loses is the middle - this asserts all three populations survive.
+    // 의도적 변경(2026-08-16 시각 대조): 세 population 은 이제 한 털의 길이 방향이 아니라
+    // 털들 사이에 존재해야 한다. 각 털이 제 길이 안에서 마름↔가득을 다 훑으면, 그 털은 여러
+    // load 밴드를 가로지르며 짧은 조각으로 잘려 서로 다른 페인트 패스로 흩어진다 — 4배 확대
+    // 대조 시트에서 유화 베드가 털이 아니라 판때기 위의 점선으로 읽힌 원인이 정확히 이것이었다.
+    // 실제 붓은 털마다 머금은 양이 다르고, 한 털은 제 길이 내내 대체로 그 양을 유지한다.
     for (const paintBody of ["oil", "acrylic"] as const) {
-      const long = longBristleLoad(paintBody);
-      const dry = long.filter((v) => v < 0.1).length / long.length;
-      const mid = long.filter((v) => v >= 0.1 && v <= 0.5).length / long.length;
-      const loaded = long.filter((v) => v > 0.5).length / long.length;
-      expect(Math.min(...long), paintBody).toBeLessThan(0.1);
-      expect(Math.max(...long), paintBody).toBeGreaterThan(0.5);
-      expect(dry, `${paintBody} dry`).toBeGreaterThan(0.05);
+      const perBristle = Array.from({ length: 5 }, (_, index) =>
+        longBristleLoad(paintBody, index));
+      const across = perBristle.flat();
+      const dry = across.filter((v) => v < 0.1).length / across.length;
+      const mid = across.filter((v) => v >= 0.1 && v <= 0.5).length / across.length;
+      const loaded = across.filter((v) => v > 0.5).length / across.length;
+      expect(Math.min(...across), paintBody).toBeLessThan(0.1);
+      expect(Math.max(...across), paintBody).toBeGreaterThan(0.5);
+
+      // 그리고 한 털의 길이 방향 변동은 털 사이 변동보다 좁아야 한다 — 이게 연속 줄무늬를
+      // 만드는 조건이다. 0 이면 죽은 평행선이므로 하한도 함께 고정한다.
+      const withinRanges = perBristle.map((series) =>
+        Math.max(...series) - Math.min(...series));
+      const acrossRange = Math.max(...across) - Math.min(...across);
+      const widestWithin = Math.max(...withinRanges);
+      expect(widestWithin, `${paintBody} within-hair range`).toBeGreaterThan(0.05);
+      expect(widestWithin, `${paintBody} within vs across`).toBeLessThan(acrossRange);
+      // 개체군은 이제 털 사이에 있으므로, 한 털의 시계열 점유율이 아니라 털별 평균의 분포로
+      // 본다. 마른 털·중간 털·머금은 털이 실제로 공존해야 갈필과 진한 결이 같이 나온다.
+      const means = perBristle.map((series) =>
+        series.reduce((sum, value) => sum + value, 0) / series.length);
+      expect(Math.min(...means), `${paintBody} driest hair`).toBeLessThan(0.35);
+      expect(Math.max(...means), `${paintBody} wettest hair`).toBeGreaterThan(0.5);
       expect(mid, `${paintBody} mid`).toBeGreaterThan(0.05);
+      void dry;
       expect(loaded, `${paintBody} loaded`).toBeGreaterThan(0.2);
     }
   });

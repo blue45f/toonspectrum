@@ -1,0 +1,178 @@
+{
+  "schema": "toon-brush-tremor-sweep-v1",
+  "generatedAtUtc": "2026-08-15T16:05:09.506Z",
+  "limitPx": 0.5,
+  "measured": 170,
+  "overLimit": 72,
+  "worst": [
+    {
+      "id": "sparkle-star",
+      "topRms": 7.724951928227108,
+      "bottomRms": 7.8789256336321145,
+      "worstRms": 7.8789256336321145,
+      "inkedColumns": 1374
+    },
+    {
+      "id": "star-dust",
+      "topRms": 7.659697109670891,
+      "bottomRms": 6.911154239748464,
+      "worstRms": 7.659697109670891,
+      "inkedColumns": 1186
+    },
+    {
+      "id": "mypaint-cc0--splatter",
+      "topRms": 7.222438682741464,
+      "bottomRms": 6.168034524776029,
+      "worstRms": 7.222438682741464,
+      "inkedColumns": 440
+    },
+    {
+      "id": "web-scatter-stamp",
+      "topRms": 5.878716083020737,
+      "bottomRms": 5.8722159377956995,
+      "worstRms": 5.878716083020737,
+      "inkedColumns": 1582
+    },
+    {
+      "id": "glitter--star-field",
+      "topRms": 5.4786765862455304,
+      "bottomRms": 5.230214386571512,
+      "worstRms": 5.4786765862455304,
+      "inkedColumns": 1551
+    },
+    {
+      "id": "mypaint-cc0--spray",
+      "topRms": 4.49452099033688,
+      "bottomRms": 3.837072409421811,
+      "worstRms": 4.49452099033688,
+      "inkedColumns": 1766
+    },
+    {
+      "id": "glitter",
+      "topRms": 4.4214971892256845,
+      "bottomRms": 4.457562530897728,
+      "worstRms": 4.457562530897728,
+      "inkedColumns": 1527
+    },
+    {
+      "id": "crosshatch",
+      "topRms": 4.204495843370415,
+      "bottomRms": 4.188313363223529,
+      "worstRms": 4.204495843370415,
+      "inkedColumns": 1723
+    },
+    {
+      "id": "splatter--burst-cloud",
+      "topRms": 4.1637725854577585,
+      "bottomRms": 3.9967170416919098,
+      "worstRms": 4.1637725854577585,
+      "inkedColumns": 735
+    },
+    {
+      "id": "web-cross-hatch-pen",
+      "topRms": 3.693056426922967,
+      "bottomRms": 3.6928231448740463,
+      "worstRms": 3.693056426922967,
+      "inkedColumns": 1367
+    },
+    {
+      "id": "screentone--sparse-grid",
+      "topRms": 3.5367475420972943,
+      "bottomRms": 3.5398077543713744,
+      "worstRms": 3.5398077543713744,
+      "inkedColumns": 1707
+    },
+    {
+      "id": "web-hatch-color",
+      "topRms": 3.481134963905574,
+      "bottomRms": 3.4773875439198108,
+      "worstRms": 3.481134963905574,
+      "inkedColumns": 1279
+    },
+    {
+      "id": "spray--equal-area",
+      "topRms": 3.3501473770662313,
+      "bottomRms": 3.448800051940211,
+      "worstRms": 3.448800051940211,
+      "inkedColumns": 1495
+    },
+    {
+      "id": "screentone",
+      "topRms": 3.375284320852109,
+      "bottomRms": 3.33321788206219,
+      "worstRms": 3.375284320852109,
+      "inkedColumns": 1711
+    },
+    {
+      "id": "watercolor--granulating",
+      "topRms": 3.032473671224068,
+      "bottomRms": 2.735929415117416,
+      "worstRms": 3.032473671224068,
+      "inkedColumns": 1714
+    },
+    {
+      "id": "mypaint-cc0--charcoal-tanda",
+      "topRms": 2.591361366889437,
+      "bottomRms": 3.0026862118226645,
+      "worstRms": 3.0026862118226645,
+      "inkedColumns": 1632
+    },
+    {
+      "id": "web-dot-tone",
+      "topRms": 2.910935834545806,
+      "bottomRms": 2.7166641949675006,
+      "worstRms": 2.910935834545806,
+      "inkedColumns": 1446
+    },
+    {
+      "id": "web-multi-agent",
+      "topRms": 2.2375384056934107,
+      "bottomRms": 2.5792551919135813,
+      "worstRms": 2.5792551919135813,
+      "inkedColumns": 1708
+    },
+    {
+      "id": "web-radial-burst",
+      "topRms": 2.509041025326141,
+      "bottomRms": 2.523422872054955,
+      "worstRms": 2.523422872054955,
+      "inkedColumns": 1655
+    },
+    {
+      "id": "inkwash-bleed-wash",
+      "topRms": 2.4244201370144767,
+      "bottomRms": 1.9569829820137727,
+      "worstRms": 2.4244201370144767,
+      "inkedColumns": 1748
+    },
+    {
+      "id": "inkwash-water-brush",
+      "topRms": 1.6054130485348903,
+      "bottomRms": 2.372904102792682,
+      "worstRms": 2.372904102792682,
+      "inkedColumns": 1725
+    },
+    {
+      "id": "watercolor--edge-bloom",
+      "topRms": 2.0358172253188926,
+      "bottomRms": 1.9438314784344575,
+      "worstRms": 2.0358172253188926,
+      "inkedColumns": 1717
+    },
+    {
+      "id": "ink-wash--chroma-halo",
+      "topRms": 1.9522109090657223,
+      "bottomRms": 1.8822552126987446,
+      "worstRms": 1.9522109090657223,
+      "inkedColumns": 1729
+    },
+    {
+      "id": "sketchpad-tile",
+      "topRms": 1.914380507025483,
+      "bottomRms": 1.9143805070254836,
+      "worstRms": 1.9143805070254836,
+      "inkedColumns": 1588
+    }
+  ],
+  "failures": []
+}

@@ -1573,7 +1573,12 @@ export function paintStudioOilRibbonCarrier(
 
   context.globalCompositeOperation = "multiply";
   context.strokeStyle = input.stroke;
-  context.lineCap = "butt";
+  // 강모 런은 3 스테이션짜리 짧은 폴리라인이고 레인 폭은 radiusY 의 상당 비율이다. butt 캡을
+  // 씌우면 짧고 두꺼운 선분이 그대로 축정렬 직사각형이 되어, 4배 확대 대조 시트에서 유화 베드가
+  // 털이 아니라 바코드 막대로 읽혔다 — 처음 보고된 "각진 입자"가 바로 이것이다. round 캡은 같은
+  // 런을 캡슐로 만들어 각을 없앤다. 한 hair 의 이웃 런끼리 반 폭 겹치지만 레인은 한 번의 stroke
+  // 로 그려지므로 겹침이 두 번 칠해지지 않는다(임파스토 릴리프는 이미 round 를 쓴다).
+  context.lineCap = "round";
   context.lineJoin = "round";
   for (const lane of input.carrier.bristleLanes) {
     context.globalAlpha = clampUnit(lane.opacity * input.opacity);

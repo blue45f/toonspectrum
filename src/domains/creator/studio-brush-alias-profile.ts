@@ -781,8 +781,54 @@ export function applyStudioBrushAliasWatercolorMaterial(
 }
 
 /** Empty for non-pencil families; returned profiles are immutable catalogue constants. */
+/**
+ * 연필의 `soft-edge` 패스를 여러 겹의 껍질로 펼친다.
+ *
+ * 선언은 "soft-edge" 인데 구현은 코어 뒤에 폭만 넓힌 단단한 선 하나였다(6B 는 1.5배 폭에
+ * 불투명도 0.4, soft-pencil 은 1.9배에 0.18). 가장자리가 부드러워지는 게 아니라 균일한 회색
+ * 테두리가 생기고, 확대해 보면 연필이 아니라 스티커 윤곽선으로 읽힌다 — 대조 시트에서 이
+ * 두 브러시만 눈에 띄게 달라 보이는 이유다. 실제 연필의 부드러운 가장자리는 흑연이 촉 주변으로
+ * 흩어지며 만드는 '기울기'이지 '한 단'이 아니다.
+ *
+ * 그래서 껍질 K 장으로 기울기를 만든다. 각 껍질은 폭이 안쪽으로 줄고, 겹치는 알파가 접히면서
+ * 바깥은 옅고 안쪽은 진해진다. 껍질당 증분은 안쪽 끝에서 원래 선언한 불투명도에 정확히 도달하도록
+ * delta = 1 - (1 - A)^(1/K) 로 잡는다 — 그래야 코어와의 합성 결과가 예전과 같은 값에 안착하고,
+ * 이 브러시의 농도가 조용히 달라지지 않는다.
+ *
+ * 리졸버에서 펼치는 이유는 캔버스와 SVG 내보내기가 둘 다 이 배열을 그대로 순회하기 때문이다.
+ * 렌더러를 건드리지 않으므로 두 표면이 어긋날 수 없다.
+ */
+const PENCIL_SOFT_EDGE_SHELLS = 8;
+
+function expandPencilSoftEdge(
+  pass: StudioBrushAliasPencilPass,
+  innerWidthScale: number,
+): readonly StudioBrushAliasPencilPass[] {
+  if (pass.role !== "soft-edge" || PENCIL_SOFT_EDGE_SHELLS < 2) return [pass];
+  const delta = 1 - (1 - clamp(pass.opacityScale, 0, 1)) ** (1 / PENCIL_SOFT_EDGE_SHELLS);
+  if (!(delta > 0)) return [pass];
+  const shells: StudioBrushAliasPencilPass[] = [];
+  for (let index = 0; index < PENCIL_SOFT_EDGE_SHELLS; index += 1) {
+    // 가장 바깥(index 0)이 선언 폭, 가장 안쪽이 코어 폭에 붙는다.
+    const t = index / (PENCIL_SOFT_EDGE_SHELLS - 1);
+    shells.push(Object.freeze({
+      role: pass.role,
+      widthScale: pass.widthScale + (innerWidthScale - pass.widthScale) * t,
+      opacityScale: delta,
+      jitterRadius: pass.jitterRadius,
+    }));
+  }
+  return Object.freeze(shells);
+}
+
 export function resolveStudioBrushAliasPencilPasses(
   brushId: unknown
 ): readonly StudioBrushAliasPencilPass[] {
-  return resolveStudioBrushAliasProfile(brushId)?.pencilPasses ?? [];
+  const passes = resolveStudioBrushAliasProfile(brushId)?.pencilPasses ?? [];
+  if (passes.length === 0) return passes;
+  const core = passes.find(({ role }) => role === "core");
+  const innerWidthScale = core?.widthScale ?? 1;
+  return Object.freeze(
+    passes.flatMap((pass) => expandPencilSoftEdge(pass, innerWidthScale)),
+  );
 }

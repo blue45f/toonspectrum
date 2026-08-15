@@ -1411,6 +1411,17 @@ const ACRYLIC_RIDGE_SCALE = 1.35;
 const HARD_TIP_RIDGE_SCALE = 0.72;
 const HARD_TIP_LOAD_EVENNESS = 0.55;
 
+/**
+ * How much of a hair's load is its own reservoir versus variation along travel.
+ *
+ * Hair identity has to dominate or the streaks break up; travel variation has to survive or the
+ * bed goes back to constant parallel lanes. 0.62 keeps continuous streaks that still fade and
+ * recover along their length.
+ */
+const BRISTLE_RESERVOIR_WEIGHT = 0.62;
+/** >1 이면 마른 털 쪽으로 치우친다. 갈필이 남으려면 소수가 확실히 굶어야 한다. */
+const BRISTLE_RESERVOIR_SKEW = 1.9;
+
 function bristleLoadAlongTravel(
   stationIndex: number,
   bristleIndex: number,
@@ -1427,7 +1438,17 @@ function bristleLoadAlongTravel(
   const end = hash2(knot + 1, key, seed);
   // Smoothstep so the load has no corner at a knot; a linear ramp still reads as a crease.
   const eased = fraction * fraction * (3 - 2 * fraction);
-  return start + (end - start) * eased;
+  const travel = start + (end - start) * eased;
+  // Each hair carries its OWN reservoir, held for the whole stroke, and the travel noise only
+  // modulates it. Without this term every hair swept the entire dry..loaded range within one
+  // wavelength, so a single hair crossed many load bands over 20 stations and got chopped into
+  // short segments scattered across different paint passes — at 4x the bed read as dashes on a
+  // slab rather than hairs dragged through paint. Real bristles differ from EACH OTHER in how
+  // much they hold; one hair does not go from dry to full and back over its own length.
+  // 균등분포를 그대로 쓰면 털들이 중간으로 몰려 갈필(마른 털이 남기는 빈 결)이 사라진다.
+  // 제곱으로 눌러 소수의 털을 확실히 마르게 만든다 — 실제 붓에서도 굶은 털은 소수다.
+  const reservoir = hash2(-1, key, seed) ** BRISTLE_RESERVOIR_SKEW;
+  return reservoir * BRISTLE_RESERVOIR_WEIGHT + travel * (1 - BRISTLE_RESERVOIR_WEIGHT);
 }
 
 /**
