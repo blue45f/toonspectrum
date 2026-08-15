@@ -108,6 +108,33 @@ describe("Studio local database Worker host", () => {
     ]);
   });
 
+  it("wipes and reopens once after SQLITE_CORRUPT so kvGet can continue", async () => {
+    const scope = new FakeScope();
+    const close = vi.fn(async () => undefined);
+    const recoveredGet = vi.fn(async () => "rebuilt");
+    const openDatabase = vi.fn()
+      .mockResolvedValueOnce(structuralDatabase({
+        kvGet: vi.fn(async () => {
+          throw new Error("SQLITE_CORRUPT: database disk image is malformed");
+        }),
+        close,
+      }))
+      .mockResolvedValueOnce(structuralDatabase({ kvGet: recoveredGet, close }));
+    attachStudioLocalDatabaseWorkerHost(scope, { openDatabase });
+
+    scope.send(request(1, { kind: "call", method: "kvGet", args: ["autosave", "doc"] }));
+    await vi.waitFor(() => expect(scope.responses).toHaveLength(1));
+
+    expect(close).toHaveBeenCalledOnce();
+    expect(openDatabase).toHaveBeenCalledTimes(2);
+    expect(recoveredGet).toHaveBeenCalledWith("autosave", "doc");
+    expect(scope.responses[0]).toMatchObject({
+      kind: "success",
+      requestId: 1,
+      value: "rebuilt",
+    });
+  });
+
   it("serializes operations across async method boundaries", async () => {
     const scope = new FakeScope();
     const deferred: { resolve?: () => void } = {};

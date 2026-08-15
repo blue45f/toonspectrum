@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import {
-  createStudioLiveGuestCredential,
+  persistStudioLiveGuestCredential,
   requestStudioLiveAuthTicket,
   type StudioLiveAuthTicketClientOptions,
 } from "./studio-live-auth-ticket-client";
@@ -56,7 +56,7 @@ export function useStudioLiveTransportAuth(
 ): StudioLiveTransportFactory | undefined {
   const requestTicket = dependencies.requestTicket ?? requestStudioLiveAuthTicket;
   const createGuestCredential =
-    dependencies.createGuestCredential ?? createStudioLiveGuestCredential;
+    dependencies.createGuestCredential ?? persistStudioLiveGuestCredential;
   const createServerFactory =
     dependencies.createServerFactory ?? createStudioServerLiveTransportFactory;
   const scheduleTimeout = dependencies.setTimeout ?? defaultScheduleTimeout;
@@ -171,7 +171,7 @@ export function useStudioLiveTransportAuth(
       guestFactoryRef.current = {
         credential,
         factory: createServerFactory(credential, {
-          refreshSocketCredential: async () => createGuestCredential(),
+          refreshSocketCredential: async () => credential,
         }),
       };
     } catch {

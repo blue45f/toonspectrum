@@ -2,9 +2,10 @@ import {
   STUDIO_LIVE_AUTH_TICKET_MAX_CODE_UNITS,
   STUDIO_LIVE_AUTH_TICKET_VERSION,
   StudioLiveAuthTicketResponseSchema,
-  StudioLiveGuestCredentialSchema,
   type StudioLiveAuthTicketResponse,
 } from "../../../lib/studio-live-auth-ticket";
+
+import { readOrCreateStudioLiveGuestCredential } from "./studio-live-client-identity";
 
 import { withCsrfHeader } from "@/lib/csrf";
 import { apiPath } from "@/src/infrastructure/api";
@@ -31,7 +32,12 @@ function abortError(): Error {
 export function createStudioLiveGuestCredential(
   randomUUID: () => string = () => globalThis.crypto.randomUUID(),
 ): string {
-  return StudioLiveGuestCredentialSchema.parse(`guest:v1:${randomUUID()}`);
+  return readOrCreateStudioLiveGuestCredential(null, randomUUID);
+}
+
+/** Browser guest principal that survives refresh in this profile. */
+export function persistStudioLiveGuestCredential(): string {
+  return readOrCreateStudioLiveGuestCredential();
 }
 
 /** Exchanges only the ambient HttpOnly cookie for a one-minute Socket.IO admission ticket. */

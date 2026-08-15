@@ -73,6 +73,45 @@ export class SqliteUnavailableError extends Error {
   }
 }
 
+/** The OPFS image itself is unusable. Distinct from a single corrupt JSON value in kv. */
+export class StudioSqliteCorruptError extends Error {
+  constructor(message = "studio local sqlite is corrupt", options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = "StudioSqliteCorruptError";
+  }
+}
+
+export function isStudioSqliteCorruption(error: unknown): boolean {
+  if (error instanceof StudioSqliteCorruptError) return true;
+  const message = error instanceof Error ? error.message : String(error);
+  return /SQLITE_CORRUPT|database disk image is malformed|malformed database schema|SQLITE_NOTADB|file is not a database/iu.test(
+    message,
+  );
+}
+
+export async function wipeStudioSqliteOpfsDirectory(): Promise<void> {
+  const storage = (
+    globalThis as {
+      navigator?: { storage?: { getDirectory?: () => Promise<FileSystemDirectoryHandle> } };
+    }
+  ).navigator?.storage;
+  if (typeof storage?.getDirectory !== "function") return;
+  try {
+    const root = await storage.getDirectory();
+    await root.removeEntry(STUDIO_SQLITE_OPFS_DIRECTORY, { recursive: true });
+  } catch (error) {
+    if (
+      typeof error === "object"
+      && error !== null
+      && "name" in error
+      && (error as { name?: unknown }).name === "NotFoundError"
+    ) {
+      return;
+    }
+    throw error;
+  }
+}
+
 export interface StudioLocalDatabaseMigration {
   /** 이 마이그레이션 적용 후의 PRAGMA user_version 값(1부터 순차). */
   toVersion: number;
@@ -1248,8 +1287,14 @@ class SqliteStudioLocalDatabase implements
       while (statement.step()) {
         // 이 경로의 SQL 은 행을 돌려주지 않는다 — 완료까지 소진만 한다.
       }
+    } catch (error) {
+      throw wrapStudioSqliteStepError(error);
     } finally {
-      statement.reset();
+      try {
+        statement.reset();
+      } catch {
+        // A corrupt image can fail reset; the wrapped step error is the authority.
+      }
     }
   }
 
@@ -1291,8 +1336,14 @@ class SqliteStudioLocalDatabase implements
         }
         rows.push(row);
       }
+    } catch (error) {
+      throw wrapStudioSqliteStepError(error);
     } finally {
-      statement.reset();
+      try {
+        statement.reset();
+      } catch {
+        // Same as run(): keep the original step failure.
+      }
     }
     return rows;
   }
@@ -2005,26 +2056,71 @@ function closeQuietly(handle: StudioSqliteDatabaseHandle): void {
   }
 }
 
+function wrapStudioSqliteStepError(error: unknown): unknown {
+  if (!isStudioSqliteCorruption(error)) return error;
+  return error instanceof StudioSqliteCorruptError
+    ? error
+    : new StudioSqliteCorruptError(describeError(error), { cause: error });
+}
+
+function assertStudioSqliteHealthy(handle: StudioSqliteDatabaseHandle): void {
+  const statement = handle.prepare("PRAGMA quick_check");
+  try {
+    if (!statement.step()) {
+      throw new StudioSqliteCorruptError("SQLITE_CORRUPT: quick_check returned no rows");
+    }
+    const result = String(statement.get(0) ?? "");
+    if (result.toLowerCase() !== "ok") {
+      throw new StudioSqliteCorruptError(`SQLITE_CORRUPT: ${result}`);
+    }
+  } catch (error) {
+    throw wrapStudioSqliteStepError(error);
+  } finally {
+    try {
+      statement.finalize();
+    } catch {
+      // The health check error is the authority.
+    }
+  }
+}
+
+async function openMigratedHandle(
+  api: StudioSqliteApiHandle,
+  vfs: "opfs" | "memory",
+  memoryFilename: string | undefined,
+): Promise<StudioSqliteDatabaseHandle> {
+  const handle = vfs === "memory"
+    ? new api.oo1.DB(memoryFilename ?? ":memory:", "c")
+    : await openOpfsDatabaseHandle(api);
+  try {
+    runStudioLocalDatabaseMigrations(handle);
+    if (vfs === "opfs") assertStudioSqliteHealthy(handle);
+    return handle;
+  } catch (error) {
+    closeQuietly(handle);
+    throw error;
+  }
+}
+
 /**
  * Studio 로컬 SQLite DB 를 열고 스키마를 최신 버전으로 마이그레이션한다.
  * OPFS/wasm 을 못 쓰면 {@link SqliteUnavailableError} 로 명시 실패한다.
+ * A corrupt OPFS image is wiped once and reopened empty so autosave can keep working.
  */
 export async function openStudioLocalDatabase(
   options: OpenStudioLocalDatabaseOptions = {},
 ): Promise<StudioLocalDatabase> {
   const vfs = options.vfs ?? "opfs";
   const api = await loadSqliteApi(options.loadSqlite);
-  const handle =
-    vfs === "memory"
-      ? new api.oo1.DB(options.memoryFilename ?? ":memory:", "c")
-      : await openOpfsDatabaseHandle(api);
   try {
-    runStudioLocalDatabaseMigrations(handle);
+    const handle = await openMigratedHandle(api, vfs, options.memoryFilename);
+    return new SqliteStudioLocalDatabase(handle, options.now ?? Date.now);
   } catch (error) {
-    closeQuietly(handle);
-    throw error;
+    if (vfs !== "opfs" || !isStudioSqliteCorruption(error)) throw error;
+    await wipeStudioSqliteOpfsDirectory();
+    const recovered = await openMigratedHandle(api, vfs, options.memoryFilename);
+    return new SqliteStudioLocalDatabase(recovered, options.now ?? Date.now);
   }
-  return new SqliteStudioLocalDatabase(handle, options.now ?? Date.now);
 }
 
 /** 환경 실측 프로브 — wasm 로드 가능 여부와 OPFS(sahpool) 지원 여부. */

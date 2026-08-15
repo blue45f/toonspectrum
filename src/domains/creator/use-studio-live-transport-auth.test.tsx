@@ -196,4 +196,22 @@ describe("useStudioLiveTransportAuth", () => {
     expect(hook.result.current).toBe(initialFactory);
     expect(live.createServerFactory).toHaveBeenCalledOnce();
   });
+
+  it("returns the same guest credential on socket refresh instead of minting another", async () => {
+    const live = harness();
+    live.createGuestCredential
+      .mockReturnValueOnce("guest:v1:seed-credential")
+      .mockReturnValueOnce("guest:v1:rotated-credential");
+    const hook = renderHook(
+      (input: StudioLiveTransportAuthInput) =>
+        useStudioLiveTransportAuth(input, live.dependencies),
+      { initialProps: { authReady: true, userId: null } },
+    );
+
+    expect(hook.result.current).toBe(live.factories[0]);
+    expect(live.createServerFactory).toHaveBeenCalledOnce();
+    await expect(live.refreshers[0]?.()).resolves.toBe("guest:v1:seed-credential");
+    expect(live.createGuestCredential).toHaveBeenCalledOnce();
+    expect(hook.result.current).toBe(live.factories[0]);
+  });
 });

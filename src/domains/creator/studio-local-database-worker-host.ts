@@ -165,8 +165,31 @@ export function attachStudioLocalDatabaseWorkerHost(
         );
       }
       const method = candidate as (...args: readonly unknown[]) => Promise<unknown>;
-      const value = await Reflect.apply(method, database, request.args);
-      postSuccessOrTransportFailure(request, value);
+      try {
+        const value = await Reflect.apply(method, database, request.args);
+        postSuccessOrTransportFailure(request, value);
+      } catch (error) {
+        const { isStudioSqliteCorruption, wipeStudioSqliteOpfsDirectory } = await import(
+          "./studio-local-database"
+        );
+        if (!isStudioSqliteCorruption(error) || request.kind !== "call") throw error;
+        try {
+          await database.close();
+        } catch {
+          // The corrupt handle is discarded either way.
+        }
+        databasePromise = null;
+        await wipeStudioSqliteOpfsDirectory();
+        const recovered = await acquireDatabase();
+        const recoveredMethod = Reflect.get(recovered, request.method);
+        if (typeof recoveredMethod !== "function") throw error;
+        const value = await Reflect.apply(
+          recoveredMethod as (...args: readonly unknown[]) => Promise<unknown>,
+          recovered,
+          request.args,
+        );
+        postSuccessOrTransportFailure(request, value);
+      }
     } catch (error) {
       postFailureBestEffort(request.requestId, error);
     }

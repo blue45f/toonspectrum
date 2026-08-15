@@ -5,6 +5,8 @@ import {
   STUDIO_SQLITE_DATABASE_FILENAME,
   STUDIO_SQLITE_OPFS_DIRECTORY,
   SqliteUnavailableError,
+  StudioSqliteCorruptError,
+  isStudioSqliteCorruption,
   openStudioLocalDatabase,
   probeSqliteSupport,
   runStudioLocalDatabaseMigrations,
@@ -703,5 +705,14 @@ describe("opfs naming contract", () => {
   it("pins the destruction-inventory directory and database filename", () => {
     expect(STUDIO_SQLITE_OPFS_DIRECTORY).toBe("toonspectrum-studio-sqlite");
     expect(STUDIO_SQLITE_DATABASE_FILENAME).toBe("studio-local-v12.db");
+  });
+});
+
+describe("sqlite image corruption", () => {
+  it("classifies SQLITE_CORRUPT separately from a bad JSON value", () => {
+    expect(isStudioSqliteCorruption(new StudioSqliteCorruptError())).toBe(true);
+    expect(isStudioSqliteCorruption(new Error("SQLITE_CORRUPT: database disk image is malformed"))).toBe(true);
+    expect(isStudioSqliteCorruption(new Error("sqlite3_step() rc= 11 SQLITE_CORRUPT"))).toBe(true);
+    expect(isStudioSqliteCorruption(new Error("autosave JSON is 손상되었습니다"))).toBe(false);
   });
 });

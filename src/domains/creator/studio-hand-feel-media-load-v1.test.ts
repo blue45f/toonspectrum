@@ -80,18 +80,18 @@ describe("studio hand-feel media load v1", () => {
     expect(flickMass).toBeLessThan(dwellMass);
   });
 
-  it("thins a fast watercolor alias pass without changing a rest pair", () => {
+  it("does not treat planned watercolor station travel as hand speed", () => {
     const rest = applyStudioBrushAliasWatercolorMaterial("watercolor", [
       { x: 0, y: 0, radius: 10, opacity: 0.5, role: "core" },
       { x: 2, y: 0, radius: 10, opacity: 0.5, role: "core" },
     ]);
     expect(rest[0]?.opacity).toBeCloseTo(0.5 * 1.42, 8);
     expect(rest[1]?.opacity).toBeCloseTo(rest[0]!.opacity, 8);
-    const flick = applyStudioBrushAliasWatercolorMaterial("watercolor", [
+    const spaced = applyStudioBrushAliasWatercolorMaterial("watercolor", [
       { x: 0, y: 0, radius: 8, opacity: 0.5, role: "core" },
       { x: 40, y: 0, radius: 8, opacity: 0.5, role: "core" },
     ]);
-    expect(flick[1]!.opacity).toBeLessThan(flick[0]!.opacity);
+    expect(spaced[1]!.opacity).toBeCloseTo(spaced[0]!.opacity, 8);
   });
 
   it("maps a long oil flick to a higher travel speed than a dwell", () => {

@@ -73,6 +73,21 @@ describe("studio storage recovery runtime — no silent save failure", () => {
     expect(snapshot.safeMode.active).toBe(false);
   });
 
+  it("unwraps Promise.any AggregateError so SQLITE_CORRUPT is visible", async () => {
+    install(createFakeRuntime(async () => ({ removedPaths: [], freedBytes: 0 })));
+
+    await reportStudioAutosaveFailure(
+      new AggregateError(
+        [new Error("SQLITE_CORRUPT: database disk image is malformed")],
+        "All promises were rejected",
+      ),
+    );
+
+    const snapshot = getStudioReliabilityStatusSnapshot();
+    expect(snapshot.save?.detail).toContain("SQLITE_CORRUPT");
+    expect(snapshot.save?.detail).not.toContain("All promises were rejected");
+  });
+
   it("runs the previously dead cleanupQuota on quota pressure and reports the reclaim", async () => {
     const runtime = createFakeRuntime(async () => ({
       removedPaths: ["a", "b"],

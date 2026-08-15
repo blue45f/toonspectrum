@@ -41,6 +41,11 @@ describe("studio live jam session", () => {
       draftCollaborationReady: false,
     })).toBe(false);
     expect(shouldRequireStudioLiveServer({
+      expectsSharedDocument: false,
+      draftCollaborationReady: false,
+      liveJam: true,
+    })).toBe(true);
+    expect(shouldRequireStudioLiveServer({
       expectsSharedDocument: true,
       draftCollaborationReady: false,
     })).toBe(true);

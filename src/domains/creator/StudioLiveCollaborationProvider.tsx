@@ -5,6 +5,7 @@ import {
   type ReactNode,
 } from "react";
 
+import { readOrCreateStudioLiveClientInstanceId } from "./studio-live-client-identity";
 import {
   StudioLiveCollaborationContext,
   type StudioLiveAvailability,
@@ -76,11 +77,8 @@ export interface StudioLiveCollaborationProviderProps {
   ) => void;
 }
 
-function localSessionId(): string {
-  if (typeof crypto === "undefined" || typeof crypto.randomUUID !== "function") {
-    throw new Error("안전한 공동작업 세션 식별자를 만들 수 없습니다.");
-  }
-  return crypto.randomUUID();
+function localSessionId(workId: string): string {
+  return readOrCreateStudioLiveClientInstanceId(workId);
 }
 
 function messageFrom(error: unknown, fallback: string): string {
@@ -392,7 +390,7 @@ export function StudioLiveCollaborationProvider({
       nextRoom = new StudioLiveRoom({
         workId,
         participant: {
-          sessionId: localSessionId(),
+          sessionId: localSessionId(workId),
           displayName: studioLiveDisplayName(participantName, {
             suffix: "· 이 탭",
             fallback: "내 작업",

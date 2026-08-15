@@ -38,12 +38,16 @@ export function shouldExpectStudioSharedDocument(input: {
   return Boolean(input.workAuthScopeKey && input.workId && !input.remixId);
 }
 
-/** Socket.IO is required only for authenticated team/draft rooms, not same-origin tab jams. */
+/** Socket.IO is required for saved team/draft rooms and Magma-style public jam rooms. */
 export function shouldRequireStudioLiveServer(input: {
   expectsSharedDocument: boolean;
   draftCollaborationReady: boolean;
+  /** Instant / `?room=` jam. Two browsers cannot share BroadcastChannel. */
+  liveJam?: boolean;
 }): boolean {
-  return input.expectsSharedDocument || input.draftCollaborationReady;
+  return input.expectsSharedDocument
+    || input.draftCollaborationReady
+    || input.liveJam === true;
 }
 
 export function shouldPublishStudioLiveJamRoom(input: {

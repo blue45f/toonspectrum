@@ -44,7 +44,21 @@ function causeName(cause: unknown): string {
 }
 
 function causeMessage(cause: unknown): string {
-  if (cause instanceof Error && cause.message.length > 0) return cause.message;
+  if (cause instanceof AggregateError && cause.errors.length > 0) {
+    const nested = cause.errors
+      .map((error) => causeMessage(error))
+      .filter((message) => message && message !== "알 수 없는 오류");
+    if (nested.length > 0) return nested.join(" · ");
+  }
+  if (cause instanceof Error && cause.message.length > 0) {
+    if (cause.message === "All promises were rejected" && "errors" in cause) {
+      return causeMessage(new AggregateError(
+        (cause as AggregateError).errors ?? [],
+        cause.message,
+      ));
+    }
+    return cause.message;
+  }
   if (typeof cause === "string" && cause.length > 0) return cause;
   return "알 수 없는 오류";
 }

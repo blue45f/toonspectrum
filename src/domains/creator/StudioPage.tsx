@@ -4139,6 +4139,7 @@ function StudioCuttoonEditor({
   const requiresStudioLiveServer = shouldRequireStudioLiveServer({
     expectsSharedDocument,
     draftCollaborationReady: draftCollaboration?.status === "ready",
+    liveJam: Boolean(liveRoomQueryParam || !workId),
   });
   const isRealtimeTeamSession = requiresStudioLiveServer;
   const collaborationOperationSyncRequired = Boolean(
