@@ -2,8 +2,10 @@ import {
   StudioRealtimeTicketRequestSchema,
   type StudioRealtimeTicketRequest,
 } from "./studio-realtime-provider-protocol";
-
-import type { StudioRealtimeTicketIssuer } from "./studio-realtime-provider-runtime";
+import {
+  StudioRealtimeTicketDeniedError,
+  type StudioRealtimeTicketIssuer,
+} from "./studio-realtime-provider-runtime";
 
 import { withCsrfHeader } from "@/lib/csrf";
 import { apiPath } from "@/src/infrastructure/api";
@@ -129,6 +131,9 @@ implements StudioRealtimeTicketIssuer {
         referrerPolicy: "no-referrer",
         signal: controller.signal,
       });
+      if (response.status === 401 || response.status === 403) {
+        throw new StudioRealtimeTicketDeniedError();
+      }
       if (!response.ok) {
         throw new Error("실시간 작업실 입장권을 발급받지 못했습니다.");
       }

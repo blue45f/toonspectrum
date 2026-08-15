@@ -67,6 +67,24 @@ export function isAuthMutationRequest(req: Request): boolean {
   );
 }
 
+/**
+ * Guest jam tickets are minted without a session cookie. They still need the
+ * same Origin + CSRF-header proof as login POSTs so a foreign site cannot
+ * drive ticket issuance from the victim's browser.
+ */
+export function isStudioRealtimeTicketMutationRequest(req: Request): boolean {
+  const candidates = [
+    normalizedRequestPath(req.path),
+    normalizedRequestPath(req.originalUrl),
+    queryPath(req),
+  ];
+  return candidates.some(
+    (path) =>
+      path === "/studio-realtime/tickets"
+      || path === "/api/studio-realtime/tickets",
+  );
+}
+
 function singleHeaderValue(value: string | string[] | undefined): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
 }
@@ -157,7 +175,8 @@ export function createCsrfProtectionMiddleware(
       return;
     }
     const authMutation = isAuthMutationRequest(req);
-    if (authenticationSource !== "cookie" && !authMutation) {
+    const ticketMutation = isStudioRealtimeTicketMutationRequest(req);
+    if (authenticationSource !== "cookie" && !authMutation && !ticketMutation) {
       next();
       return;
     }
@@ -179,6 +198,7 @@ export function createCsrfProtectionMiddleware(
       }
     } else if (
       authMutation
+      || ticketMutation
       || !hasAllowedMissingOriginFetchMetadata(req)
     ) {
       rejectCsrfRequest(res);

@@ -49,6 +49,50 @@ describe("StudioRealtimeTicketController", () => {
     expect(issue).not.toHaveBeenCalled();
   });
 
+  it("mints a guest principal only for Magma-style instant jam rooms", async () => {
+    const jam = {
+      ...REQUEST,
+      sessionId: "00000000-0000-4000-8000-000000000001",
+      scope: {
+        workId: "work-instant-m5kabcde-i54w",
+        roomId: "work-instant-m5kabcde-i54w",
+      },
+    } as const;
+    const response = {
+      version: 1,
+      providerId: jam.providerId,
+      scope: jam.scope,
+      workloads: jam.workloads,
+      capabilities: jam.capabilities,
+      ticket: `${"a".repeat(80)}.${"b".repeat(43)}`,
+      issuedAt: "2026-07-31T01:00:00.000Z",
+      expiresAt: "2026-07-31T01:02:00.000Z",
+    } as const;
+    const issue = vi.fn(async () => response);
+    const controller = new StudioRealtimeTicketController({ issue } as never);
+    const request = {} as never;
+    vi.mocked(getSessionAuthenticationSource).mockReturnValue(null);
+    vi.mocked(getSessionAuthenticationPrincipal).mockReturnValue(null);
+
+    await expect(
+      controller.issue(request, "https://www.toonstudio.cloud", jam),
+    ).resolves.toBe(response);
+    expect(issue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "guest:00000000-0000-4000-8000-000000000001",
+        sessionVersion: 1,
+      }),
+      "https://www.toonstudio.cloud",
+      jam,
+    );
+
+    issue.mockClear();
+    expect(() =>
+      controller.issue(request, "https://www.toonstudio.cloud", REQUEST),
+    ).toThrow(UnauthorizedException);
+    expect(issue).not.toHaveBeenCalled();
+  });
+
   it("delegates only the authenticated identity, origin, and strict request body", async () => {
     const response = {
       version: 1,

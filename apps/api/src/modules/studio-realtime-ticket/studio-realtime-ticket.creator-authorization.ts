@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { isStudioLiveJamScope } from "../../../../../lib/studio-live-jam-scope";
 import { CreatorCollaborationRepository } from "../creator/creator-collaboration.repository";
 
 import {
@@ -113,6 +114,21 @@ implements StudioRealtimeTicketAuthorizationPort {
       !isCanonicalCreatorStudioRealtimeScope(input.scope)
     ) {
       return { allowed: false };
+    }
+
+    if (isStudioLiveJamScope(input.scope)) {
+      return {
+        allowed: true,
+        ...input,
+        role: "editor",
+        creatorCapabilities: {
+          view: true,
+          comment: true,
+          edit: true,
+          manageMembers: false,
+        },
+        authorizationEpoch: new Date().toISOString(),
+      };
     }
 
     let unsafeAuthorization: unknown;

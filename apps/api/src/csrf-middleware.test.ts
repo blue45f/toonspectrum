@@ -4,6 +4,7 @@ import {
   isAuthMutationRequest,
   isAllowedCsrfOrigin,
   isSameRequestOrigin,
+  isStudioRealtimeTicketMutationRequest,
 } from "./csrf-middleware";
 
 const PRODUCTION_ENV: NodeJS.ProcessEnv = {
@@ -98,6 +99,46 @@ describe("auth mutation path recognition", () => {
   it("does not widen the anonymous mutation boundary outside auth", () => {
     expect(
       isAuthMutationRequest({
+        path: "/api/community/posts",
+        originalUrl: "/api/community/posts",
+        query: {},
+      } as never),
+    ).toBe(false);
+    expect(
+      isAuthMutationRequest({
+        path: "/api/studio-realtime/tickets",
+        originalUrl: "/api/studio-realtime/tickets",
+        query: {},
+      } as never),
+    ).toBe(false);
+  });
+});
+
+describe("studio realtime ticket mutation path recognition", () => {
+  it("recognizes direct and Vercel query-path ticket POSTs", () => {
+    expect(
+      isStudioRealtimeTicketMutationRequest({
+        path: "/api/studio-realtime/tickets",
+        originalUrl: "/api/studio-realtime/tickets",
+        query: {},
+      } as never),
+    ).toBe(true);
+    expect(
+      isStudioRealtimeTicketMutationRequest({
+        path: "/API/STUDIO-REALTIME/TICKETS",
+        originalUrl: "/API/STUDIO-REALTIME/TICKETS",
+        query: {},
+      } as never),
+    ).toBe(true);
+    expect(
+      isStudioRealtimeTicketMutationRequest({
+        path: "/api/index",
+        originalUrl: "/api/index?path=studio-realtime%2Ftickets",
+        query: { path: "studio-realtime/tickets" },
+      } as never),
+    ).toBe(true);
+    expect(
+      isStudioRealtimeTicketMutationRequest({
         path: "/api/community/posts",
         originalUrl: "/api/community/posts",
         query: {},

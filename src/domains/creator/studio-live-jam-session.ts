@@ -1,4 +1,12 @@
+import { STUDIO_LIVE_JAM_WORK_ID_PREFIX } from "../../../lib/studio-live-jam-scope";
+
 import { buildStudioLiveShareHref } from "./creator-studio-links";
+
+export {
+  isStudioLiveJamScope,
+  isStudioLiveJamWorkId,
+  STUDIO_LIVE_JAM_WORK_ID_PREFIX,
+} from "../../../lib/studio-live-jam-scope";
 
 export const STUDIO_LIVE_ROOM_SEARCH_PARAM = "room";
 
@@ -14,7 +22,8 @@ export function createStudioLiveInstantWorkId(
   now: () => number = Date.now,
   random: () => number = Math.random
 ): string {
-  return `work-instant-${now().toString(36)}-${random().toString(36).slice(2, 6)}`;
+  const salt = random().toString(36).slice(2, 6).padEnd(4, "0");
+  return `${STUDIO_LIVE_JAM_WORK_ID_PREFIX}${now().toString(36)}-${salt}`;
 }
 
 export function resolveStudioLiveSessionWorkId(input: {

@@ -67,7 +67,21 @@ class AuthCsrfProbeController {
   }
 }
 
-@Module({ controllers: [CsrfProbeController, AuthCsrfProbeController] })
+@Controller("studio-realtime")
+class StudioRealtimeTicketCsrfProbeController {
+  @Post("tickets")
+  issue() {
+    return { ok: true };
+  }
+}
+
+@Module({
+  controllers: [
+    CsrfProbeController,
+    AuthCsrfProbeController,
+    StudioRealtimeTicketCsrfProbeController,
+  ],
+})
 class CsrfProbeModule {}
 
 describe("cookie-authenticated Nest CSRF boundary", () => {
@@ -235,6 +249,36 @@ describe("cookie-authenticated Nest CSRF boundary", () => {
     expect(crossSiteLogin.status).toBe(403);
     expect(missingOriginDemo.status).toBe(403);
     expect(allowedLogin.status).toBe(201);
+  });
+
+  it("protects anonymous jam ticket POSTs with the same Origin proof as login", async () => {
+    const crossSite = await fetch(`${baseUrl}/api/studio-realtime/tickets`, {
+      method: "POST",
+      headers: {
+        Origin: "https://evil.example",
+        "Content-Type": "application/json",
+      },
+      body: "{}",
+    });
+    const missingOrigin = await fetch(`${baseUrl}/api/studio-realtime/tickets`, {
+      method: "POST",
+      headers: {
+        [TOONSPECTRUM_CSRF_HEADER]: TOONSPECTRUM_CSRF_HEADER_VALUE,
+        "Sec-Fetch-Site": "same-origin",
+        "Sec-Fetch-Mode": "cors",
+      },
+    });
+    const allowed = await fetch(`${baseUrl}/api/studio-realtime/tickets`, {
+      method: "POST",
+      headers: {
+        Origin: ALLOWED_ORIGIN,
+        [TOONSPECTRUM_CSRF_HEADER]: TOONSPECTRUM_CSRF_HEADER_VALUE,
+      },
+    });
+
+    expect(crossSite.status).toBe(403);
+    expect(missingOrigin.status).toBe(403);
+    expect(allowed.status).toBe(201);
   });
 
   it("protects the Vercel query-path auth adapter before its URL rewrite", async () => {

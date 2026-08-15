@@ -12,6 +12,7 @@ import {
   StudioRealtimeProviderContractError,
   StudioRealtimeProviderFallbackRequiredError,
   StudioRealtimeProviderSession,
+  StudioRealtimeTicketDeniedError,
   type StudioRealtimeAdapterDisconnect,
   type StudioRealtimeProviderAdapter,
   type StudioRealtimeProviderAdapterFactory,
@@ -393,6 +394,33 @@ describe("StudioRealtimeProviderSession", () => {
       session.publish(commentOutbound("2", UUIDS.event2, UUIDS.idem2)),
     ).resolves.toMatchObject({ clientSequence: "2" });
     await session.dispose();
+  });
+
+  it("stops reconnecting when ticket issuance is permanently denied", async () => {
+    vi.useFakeTimers();
+    try {
+      const provider = factory("cloudflare-realtime", "custom");
+      const issue = vi.fn(async () => {
+        throw new StudioRealtimeTicketDeniedError();
+      });
+      const session = new StudioRealtimeProviderSession(
+        options([provider.factory], issue),
+      );
+
+      await expect(session.connect()).rejects.toBeInstanceOf(
+        StudioRealtimeTicketDeniedError,
+      );
+      expect(session.currentStatus).toMatchObject({
+        state: "revoked",
+        providerId: null,
+      });
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(issue).toHaveBeenCalledTimes(1);
+      expect(provider.adapters).toHaveLength(1);
+      await session.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("stops reconnecting on ACL revocation and aborts cleanly on dispose", async () => {

@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  StudioRealtimeTicketDeniedError,
+} from "./studio-realtime-provider-runtime";
+import {
   StudioRealtimeHttpTicketIssuer,
 } from "./studio-realtime-ticket-client";
 
@@ -56,6 +59,23 @@ describe("StudioRealtimeHttpTicketIssuer", () => {
     expect(headers.get("x-toonspectrum-csrf")).toBe("1");
     expect(init?.credentials).toBe("include");
     expect(JSON.stringify(init)).not.toContain(response.ticket);
+  });
+
+  it("treats 401 and 403 as a permanent ticket denial", async () => {
+    for (const status of [401, 403]) {
+      const issuer = new StudioRealtimeHttpTicketIssuer({
+        endpoint: "/api/studio-realtime/tickets",
+        fetch: vi.fn<typeof globalThis.fetch>(
+          async () =>
+            new Response(JSON.stringify({ message: "로그인이 필요해요." }), {
+              status,
+            }),
+        ),
+      });
+      await expect(
+        issuer.issue(request, new AbortController().signal),
+      ).rejects.toBeInstanceOf(StudioRealtimeTicketDeniedError);
+    }
   });
 
   it("fails closed on oversized and token-bearing error bodies", async () => {

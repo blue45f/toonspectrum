@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createStudioLiveInstantWorkId,
+  isStudioLiveJamWorkId,
   openStudioLiveCompanionTab,
   readStudioLiveRoomQuery,
   resolveStudioLiveSessionWorkId,
@@ -54,6 +55,10 @@ describe("studio live jam session", () => {
   it("resolves the same session id for a first tab and a second tab that only has the room query", () => {
     const instant = createStudioLiveInstantWorkId(() => 1, () => 0.5);
     expect(instant.startsWith("work-instant-")).toBe(true);
+    expect(isStudioLiveJamWorkId(instant)).toBe(true);
+    expect(isStudioLiveJamWorkId(createStudioLiveInstantWorkId(() => 1, () => 0))).toBe(
+      true,
+    );
     const first = resolveStudioLiveSessionWorkId({
       workId: null,
       roomId: null,

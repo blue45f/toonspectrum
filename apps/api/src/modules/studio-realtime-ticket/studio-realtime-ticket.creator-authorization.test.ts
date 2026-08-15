@@ -149,6 +149,33 @@ describe("CreatorStudioRealtimeTicketAuthorization", () => {
     expect(getAuthorization).not.toHaveBeenCalled();
   });
 
+  it("authorizes public instant jam rooms without touching Creator ACL", async () => {
+    const getAuthorization = vi.fn();
+    const jam = request({
+      actorUserId: "guest:00000000-0000-4000-8000-000000000001",
+      scope: {
+        workId: "work-instant-m5kabcde-i54w",
+        roomId: "work-instant-m5kabcde-i54w",
+      },
+    });
+
+    await expect(
+      authorization(getAuthorization).authorize(jam),
+    ).resolves.toMatchObject({
+      allowed: true,
+      actorUserId: jam.actorUserId,
+      scope: jam.scope,
+      role: "editor",
+      creatorCapabilities: {
+        view: true,
+        comment: true,
+        edit: true,
+        manageMembers: false,
+      },
+    });
+    expect(getAuthorization).not.toHaveBeenCalled();
+  });
+
   it("turns repository failures into a denial without reflecting the cause", async () => {
     const getAuthorization = vi
       .fn()

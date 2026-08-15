@@ -151,6 +151,19 @@ export class StudioRealtimeProviderFallbackRequiredError extends Error {
   }
 }
 
+/**
+ * 401/403 ticket responses are authorization decisions, not brownouts.
+ * Reconnecting would hammer `/tickets` without changing the outcome.
+ */
+export class StudioRealtimeTicketDeniedError extends Error {
+  readonly code = "studio-realtime-ticket-denied";
+
+  constructor() {
+    super("실시간 작업실 입장 권한이 없습니다.");
+    this.name = "StudioRealtimeTicketDeniedError";
+  }
+}
+
 interface ActiveProvider {
   readonly adapter: StudioRealtimeProviderAdapter;
   readonly hello: StudioRealtimeProviderHello;
@@ -349,12 +362,16 @@ export class StudioRealtimeProviderSession {
       .catch((error: unknown) => {
         if (
           !this.disposed &&
-          error instanceof StudioRealtimeProviderFallbackRequiredError
+          (error instanceof StudioRealtimeProviderFallbackRequiredError ||
+            error instanceof StudioRealtimeTicketDeniedError)
         ) {
           this.generation += 1;
           this.emitStatus({
             state: "revoked",
-            providerId: error.providerId,
+            providerId:
+              error instanceof StudioRealtimeProviderFallbackRequiredError
+                ? error.providerId
+                : null,
             attempt,
           });
           throw error;
@@ -631,6 +648,9 @@ export class StudioRealtimeProviderSession {
           }
           if (error instanceof StudioRealtimeProviderFallbackRequiredError) {
             fallbackRequired = error;
+          }
+          if (error instanceof StudioRealtimeTicketDeniedError) {
+            throw error;
           }
         }
       }
