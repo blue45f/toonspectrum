@@ -101,7 +101,7 @@ describe("studio brush variant group manifest", () => {
     expect(resolveStudioBrushLifecycleStage(42)).toBeNull();
     // The wave's new engine lanes are pinned experimental by the catalogue integrator here
     // (2026-08-13 brush quality wave: dry-stamp x4, wet-texture x4, oil x3;
-    // 2026-08-13 wave 3: CC0 MyPaint x14, croquis capsule x2, living-ink bake x2, physics oil x1).
+    // 2026-08-13 wave 3: CC0 MyPaint x17, croquis capsule x2, living-ink bake x2, physics oil x1).
     expect(STUDIO_BRUSH_EXPERIMENTAL_LANE_PRESET_IDS).toEqual([
       "crayon--klecks-stamp",
       "chalk--klecks-stamp",
@@ -123,6 +123,9 @@ describe("studio brush variant group manifest", () => {
       "mypaint-cc0--kabura",
       "mypaint-cc0--calligraphy",
       "mypaint-cc0--marker-fat",
+      "mypaint-cc0--marker-small",
+      "mypaint-cc0--slow-ink",
+      "mypaint-cc0--knife",
       "mypaint-cc0--watercolor-fringe",
       "mypaint-cc0--watercolor-expressive",
       "mypaint-cc0--oil-paint",

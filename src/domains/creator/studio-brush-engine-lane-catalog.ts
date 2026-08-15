@@ -218,6 +218,9 @@ export const STUDIO_BRUSH_ENGINE_LANE_CATALOG_ROWS: readonly StudioBrushEngineLa
     r("mypaint-cc0--pastel", "MyPaint CC0 · 파스텔", "mypaint-cc0", "dry-stamp", 20, 0.72, ["CC0 파스텔", "pastel cc0"], "pastel", "stamp-dabs", "pastel", "pastel--soft-stamp", "texture", "stamp-airbrush", "soft-gradient", "stamp-pressure-flow", "profile-variant"),
     r("mypaint-cc0--calligraphy", "MyPaint CC0 · 캘리그래피", "mypaint-cc0", "wet-stamp", 15, 1, ["CC0 캘리그래피", "mypaint calligraphy"], "stamp", "stamp-dabs", "ink", "ink-brush", "solid", "stamp-ink", "none", "stamp-pressure-flow", "profile-variant"),
     r("mypaint-cc0--marker-fat", "MyPaint CC0 · 광폭 마커", "mypaint-cc0", "wet-stamp", 24, 1, ["CC0 마커", "mypaint marker"], "stamp", "stamp-dabs", "ink", "ink-brush", "solid", "stamp-ink", "none", "stamp-pressure-flow", "profile-variant"),
+    r("mypaint-cc0--marker-small", "MyPaint CC0 · 세필 마커", "mypaint-cc0", "wet-stamp", 10, 1, ["CC0 세필 마커", "marker small"], "stamp", "stamp-dabs", "ink", "ink-brush", "solid", "stamp-ink", "none", "stamp-pressure-flow", "profile-variant"),
+    r("mypaint-cc0--slow-ink", "MyPaint CC0 · 슬로우 잉크", "mypaint-cc0", "wet-stamp", 12, 1, ["CC0 슬로우 잉크", "slow ink"], "stamp", "stamp-dabs", "ink", "ink-brush", "solid", "stamp-ink", "none", "stamp-pressure-flow", "profile-variant"),
+    r("mypaint-cc0--knife", "MyPaint CC0 · 나이프", "mypaint-cc0", "wet-stamp", 22, 0.95, ["CC0 나이프", "paint knife"], "stamp", "stamp-dabs", "ink", "ink-brush", "solid", "stamp-ink", "none", "stamp-pressure-flow", "profile-variant"),
     r("mypaint-cc0--spray", "MyPaint CC0 · 스프레이", "mypaint-cc0", "spray-stamp", 40, 0.6, ["CC0 스프레이", "spray fade"], "stamp", "stamp-dabs", "airbrush", "airbrush-fine", "dots", "stamp-airbrush", "soft-gradient", "stamp-pressure-flow", "profile-variant"),
     // croquis.js(MIT OR Apache-2.0) 외접 탄젠트 캡슐 잉킹 — 필압 스파이크에서도 무벌지 가변 굵기.
     // 프로그램 핀은 ENGINE_LANE_CROQUIS_CAPSULE_PROGRAM(아래) — wetEdgeBloomProgramId 규율 미러.
