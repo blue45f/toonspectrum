@@ -12,6 +12,10 @@ import {
   type StudioBristlePhysicsOilPlan,
 } from "./studio-bristle-physics-oil-v1";
 import {
+  studioOilRibbonProgramsFromSet,
+  type StudioBrushOilProgramSet,
+} from "./studio-brush-engine-program-set";
+import {
   computeStudioImpastoReliefShading,
 } from "./studio-impasto-relief-shading-v1";
 import {
@@ -168,7 +172,16 @@ export interface StudioOilRibbonCarrierOptions {
 export function studioOilRibbonProgramsForBrush(
   brush: string,
   seed: number,
+  /**
+   * A program set carried by the stroke or the saved brush. When present it REPLACES the id
+   * matrix below rather than merging with it, because a user brush's program set is a complete
+   * statement of what that brush is - merging would make it impossible to turn a preset's own
+   * program off. Absent, the matrix runs unchanged and every shipped preset keeps a byte-identical
+   * plan, which the program-set contract test pins for all five ids and the default.
+   */
+  programs?: StudioBrushOilProgramSet | null,
 ): StudioOilRibbonCarrierOptions | undefined {
+  if (programs) return studioOilRibbonProgramsFromSet(programs, seed);
   const bristlePhysics = { enabled: true, seed } as const;
   switch (brush) {
     case "brush--bristle-physics":

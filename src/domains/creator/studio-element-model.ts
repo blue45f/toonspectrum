@@ -15,6 +15,7 @@ import type {
 import type { StudioBg3dSceneDocument } from "./studio-bg3d-scene-document";
 import type { BlurFx } from "./studio-blur";
 import type { NormalizedStudioBrushDynamicsSettings } from "./studio-brush-dynamics";
+import type { StudioBrushEngineProgramSet } from "./studio-brush-engine-program-set";
 import type { StudioStampBrushTuning } from "./studio-brush-stamp-engine";
 import type { BubbleTailSpec } from "./studio-bubble-path";
 import type { ChannelMixer } from "./studio-channel-mixer";
@@ -498,6 +499,15 @@ export interface DrawEl extends StudioBrushCatalogIdentityMetadata, StudioElemen
   sampleTimeOffsets?: number[];
   /** 입자 브러시의 입력→출력 매핑 스냅샷. 저장·협업·SVG 내보내기에서 같은 dab을 재현한다. */
   brushDynamics?: NormalizedStudioBrushDynamicsSettings;
+  /**
+   * 이 획이 어떤 엔진 프로그램 조합으로 그려졌는지의 스냅샷.
+   *
+   * 없으면 브러시 id 에서 유도한 기본 조합이 쓰이고, 출하된 프리셋은 전부 이 경로다(플랜이
+   * 바이트 단위로 같다는 계약을 studio-brush-engine-program-set.test.ts 가 고정한다). 사용자가
+   * 브러시 스튜디오에서 조합을 바꾼 획만 이 키를 싣는다 — id 에 대응하는 프리셋이 없는 조합도
+   * 저장·재생·내보내기에서 같은 그림이 나와야 하기 때문이다.
+   */
+  brushEnginePrograms?: StudioBrushEngineProgramSet;
   /** 이 획을 다시 열거나 내보낼 때도 같은 펜촉 결과를 재현하기 위한 스냅샷. */
   brushTip?: {
     tiltEnabled: boolean;

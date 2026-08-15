@@ -279,6 +279,7 @@ import {
 } from "./studio-wet-ribbon-carrier";
 
 import type { BubbleVariant } from "./studio-assets";
+import type { StudioBrushEngineProgramSet } from "./studio-brush-engine-program-set";
 
 // ---------------------------------------------------------------------------
 // 요소 구조 타입 — StudioPage 의 El 유니온과 구조 호환(필드 부분집합, 전부 옵셔널 위주).
@@ -445,6 +446,12 @@ export interface SvgDrawElLike extends SvgElMeta {
   speeds?: number[];
   tangentialPressures?: number[];
   brushDynamics?: StudioBrushDynamicsSettings;
+  /**
+   * 획이 실린 엔진 프로그램 조합. Canvas 렌더러와 같은 키를 같은 리졸버에 넘겨야 두 표면이
+   * 같은 플랜을 만든다 — 이 필드가 빠지면 커스텀 조합으로 그린 획이 내보내기에서 프리셋
+   * 기본 조합으로 되돌아간다.
+   */
+  brushEnginePrograms?: StudioBrushEngineProgramSet;
   brushTip?: CalligraphyTipSettings;
   strokeStyle?: StrokeStyle;
   shapeParams?: ShapeParams;
@@ -2980,7 +2987,7 @@ function serializeFreehand(
     // 우선한다는 기존 결정(크레용 5레인)과 같은 판단.
     const carrier = planStudioOilRibbonCarrier(
       dabs,
-      studioOilRibbonProgramsForBrush(brush, fxBrushSeedFromKey(el.id)),
+      studioOilRibbonProgramsForBrush(brush, fxBrushSeedFromKey(el.id), el.brushEnginePrograms?.oil),
     );
     if (!carrier.body) return "";
     const body = `<path data-paint-carrier="contiguous-variable-width-ribbon" d="${studioOilRibbonPathData(carrier.body, true)}" fill="${escapeXml(stroke)}" opacity="${fmtDabOpacity(carrier.bodyOpacity * strokeOpacity)}"/>`;

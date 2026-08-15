@@ -2185,7 +2185,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
             // 내보내기의 유화 분기와 입력(대브·시드)이 같아 두 렌더러가 픽셀 일치한다.
             const carrier = planStudioOilRibbonCarrier(
               dabs,
-              studioOilRibbonProgramsForBrush(brush, fxBrushSeedFromKey(el.id)),
+              studioOilRibbonProgramsForBrush(brush, fxBrushSeedFromKey(el.id), el.brushEnginePrograms?.oil),
             );
             return (
               <Shape
