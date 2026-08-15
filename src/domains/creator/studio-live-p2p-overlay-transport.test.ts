@@ -17,6 +17,7 @@ import {
   type StudioLiveP2pRtcDataChannel,
   type StudioLiveP2pRtcPeerConnection,
 } from "./studio-live-p2p-overlay-transport";
+import { createStudioLiveSignalingServerTransportFactory } from "./studio-live-signaling-server-transport";
 
 import type {
   StudioCrdtSyncRequest,
@@ -516,6 +517,38 @@ describe("Studio live P2P overlay", () => {
     });
     expect(localPrimary.acquireLock).toHaveBeenCalledOnce();
     expect(localPrimary.publishCrdtUpdate).not.toHaveBeenCalled();
+  });
+
+  it("keeps same-origin jam CRDT on BroadcastChannel until a P2P channel opens", async () => {
+    const workId = `work-p2p-bc-${crypto.randomUUID()}`;
+    const factory = applyStudioLiveP2pOverlay(
+      createStudioLiveSignalingServerTransportFactory,
+      {
+        createPeerConnection: () => {
+          throw new Error("rtc unused");
+        },
+        now: () => NOW,
+      },
+    );
+    const local = factory({ workId, roomName: workId, participant: LOCAL });
+    const remote = factory({ workId, roomName: workId, participant: REMOTE });
+    const received: string[] = [];
+    remote.subscribeCrdt?.((message) => {
+      if (message.type === "update") received.push(message.update.updateId);
+    });
+    await local.connect();
+    await remote.connect();
+    const updateId = "00000000-0000-4000-8000-000000000036";
+    await local.publishCrdtUpdate?.({
+      protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+      workId,
+      updateId,
+      clientSequence: 1,
+      update: "AAAA",
+    });
+    await vi.waitFor(() => expect(received).toContain(updateId));
+    local.close();
+    remote.close();
   });
 
   it("falls back to the server CRDT host when no peer data channel is open", async () => {

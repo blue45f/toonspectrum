@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   encodeStudioCrdtStateVector,
@@ -297,6 +297,56 @@ describe("StudioLiveRoom", () => {
     await serverRoom.start();
     expect(serverRoom.mode).toBe("server");
     serverRoom.close();
+  });
+
+  it("syncs presence and CRDT between two signaling-server rooms in one origin", async () => {
+    const { createStudioLiveSignalingServerTransportFactory } = await import(
+      "./studio-live-signaling-server-transport"
+    );
+    const workId = `work-instant-${Date.now().toString(36)}-jam1`;
+    const roomA = new StudioLiveRoom({
+      workId,
+      participant: alice,
+      dependencies: {
+        transportFactory: createStudioLiveSignalingServerTransportFactory,
+      },
+    });
+    const roomB = new StudioLiveRoom({
+      workId,
+      participant: bob,
+      dependencies: {
+        transportFactory: createStudioLiveSignalingServerTransportFactory,
+      },
+    });
+    const crdtIds: string[] = [];
+    roomB.subscribeCrdt((event) => {
+      if (event.type === "update") crdtIds.push(event.update.updateId);
+    });
+    await roomA.start();
+    await roomB.start();
+    await vi.waitFor(() => {
+      expect(roomB.getPeers().some((peer) => peer.sessionId === alice.sessionId)).toBe(true);
+    });
+    roomA.updatePresence({ pageId: "page-2" });
+    await vi.waitFor(() => {
+      expect(
+        roomB.getPeers().some((peer) =>
+          peer.sessionId === alice.sessionId && peer.pageId === "page-2"
+        ),
+      ).toBe(true);
+    });
+    const updateId = "00000000-0000-4000-8000-0000000000d4";
+    await roomA.publishCrdtUpdate({
+      protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+      workId,
+      updateId,
+      clientSequence: 1,
+      update: "AAAA",
+    });
+    await vi.waitFor(() => expect(crdtIds).toContain(updateId));
+    expect(roomA.mode).toBe("server");
+    roomA.close();
+    roomB.close();
   });
 
   it("forwards only same-work comment invalidation from a ready server control plane", async () => {

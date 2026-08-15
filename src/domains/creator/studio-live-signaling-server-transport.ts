@@ -1,16 +1,26 @@
-import type {
-  StudioLiveTransport,
-  StudioLiveTransportControlEvent,
-  StudioLiveTransportFactory,
-  StudioLiveTransportStatus,
+import {
+  createStudioLocalLiveTransport,
+  isStudioLocalLiveTransportSupported,
+  type StudioLiveTransport,
+  type StudioLiveTransportContext,
+  type StudioLiveTransportControlEvent,
+  type StudioLiveTransportFactory,
+  type StudioLiveTransportStatus,
 } from "./studio-live-collaboration-transport";
 
 /**
  * Server-mode shell used when production has Cloudflare presence/signaling but no
- * Nest Socket.IO CRDT host. Purpose-routing and the P2P overlay can wrap this
- * without advertising a BroadcastChannel as a remote room.
+ * Nest Socket.IO CRDT host. Same-origin tabs still share a BroadcastChannel so two
+ * Studio windows in one profile can exchange presence and Yjs without WebRTC.
+ * Purpose-routing and the P2P overlay wrap this for cross-browser peers.
  */
-export function createStudioLiveSignalingServerTransport(): StudioLiveTransport {
+export function createStudioLiveSignalingServerTransport(
+  context?: StudioLiveTransportContext,
+): StudioLiveTransport {
+  const local =
+    context && isStudioLocalLiveTransportSupported()
+      ? createStudioLocalLiveTransport(context)
+      : null;
   const listeners = new Set<(value: unknown) => void>();
   const controlListeners = new Set<(event: StudioLiveTransportControlEvent) => void>();
   let connected = false;
@@ -27,29 +37,34 @@ export function createStudioLiveSignalingServerTransport(): StudioLiveTransport 
     }
   };
 
+  const connectLocal = async (): Promise<void> => {
+    if (closed) {
+      throw new Error("이미 닫힌 실시간 시그널 채널입니다.");
+    }
+    if (local) await local.connect();
+    connected = true;
+    emitControl({
+      state: "ready",
+      message: "실시간 시그널에 연결했습니다.",
+      recoverable: true,
+    });
+  };
+
   return {
     mode: "server",
-    crdtFanout: "none",
+    crdtFanout: local ? "mesh" : "none",
     get ready() {
-      return connected && !closed;
+      return connected && !closed && (local ? local.ready : true);
     },
     connect() {
-      if (closed) {
-        return Promise.reject(new Error("이미 닫힌 실시간 시그널 채널입니다."));
-      }
-      connected = true;
-      emitControl({
-        state: "ready",
-        message: "실시간 시그널에 연결했습니다.",
-        recoverable: true,
-      });
-      return Promise.resolve();
+      return connectLocal();
     },
-    send() {
-      return false;
+    send(envelope) {
+      return local?.send(envelope) ?? false;
     },
     subscribe(listener) {
       if (closed) return () => undefined;
+      if (local) return local.subscribe(listener);
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
@@ -58,15 +73,24 @@ export function createStudioLiveSignalingServerTransport(): StudioLiveTransport 
       controlListeners.add(listener);
       return () => controlListeners.delete(listener);
     },
+    ...(local
+      ? {
+          requestCrdtSync: local.requestCrdtSync?.bind(local),
+          respondCrdtSync: local.respondCrdtSync?.bind(local),
+          publishCrdtUpdate: local.publishCrdtUpdate?.bind(local),
+          subscribeCrdt: local.subscribeCrdt?.bind(local),
+        }
+      : {}),
     close() {
       if (closed) return;
       closed = true;
       connected = false;
       listeners.clear();
       controlListeners.clear();
+      local?.close();
     },
   };
 }
 
 export const createStudioLiveSignalingServerTransportFactory: StudioLiveTransportFactory =
-  () => createStudioLiveSignalingServerTransport();
+  (context) => createStudioLiveSignalingServerTransport(context);

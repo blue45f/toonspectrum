@@ -383,6 +383,44 @@ describe("StudioLiveSocketTransport", () => {
     await transport.connect();
     expect(transport.ready).toBe(true);
     expect(transport.send({} as never)).toBe(false);
+
+    const roomName = `work-jam-signaling-${crypto.randomUUID()}`;
+    const workId = roomName;
+    const alice = createStudioLiveSignalingServerTransport({
+      workId,
+      roomName,
+      participant: {
+        sessionId: "00000000-0000-4000-8000-0000000000a1",
+        displayName: "익명 게스트",
+        role: "editor",
+      },
+    });
+    const bob = createStudioLiveSignalingServerTransport({
+      workId,
+      roomName,
+      participant: {
+        sessionId: "00000000-0000-4000-8000-0000000000b2",
+        displayName: "익명 게스트",
+        role: "editor",
+      },
+    });
+    const received: string[] = [];
+    bob.subscribeCrdt?.((message) => {
+      if (message.type === "update") received.push(message.update.updateId);
+    });
+    await alice.connect();
+    await bob.connect();
+    const updateId = "00000000-0000-4000-8000-0000000000c3";
+    await alice.publishCrdtUpdate?.({
+      protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+      workId,
+      updateId,
+      clientSequence: 1,
+      update: "AAAA",
+    });
+    await vi.waitFor(() => expect(received).toContain(updateId));
+    alice.close();
+    bob.close();
   });
 
   it("admits only an exact absolute realtime origin", () => {

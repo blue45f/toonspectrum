@@ -233,7 +233,7 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
 
   requestCrdtSync(request: StudioCrdtSyncRequest): Promise<StudioCrdtSyncResponse | null> {
     if (this.openPeerChannelCount() > 0) return this.requestMeshCrdtSync(request);
-    if (this.primary.crdtFanout === "authoritative" && this.primary.requestCrdtSync) {
+    if (this.primary.requestCrdtSync) {
       return this.primary.requestCrdtSync(request);
     }
     return Promise.resolve(null);
@@ -271,15 +271,10 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
   }
 
   publishCrdtUpdate(request: StudioCrdtUpdateRequest): Promise<StudioCrdtUpdateAck> {
-    const meshComplete = this.meshCanFanoutCompletely();
     if (this.openPeerChannelCount() > 0) {
       return this.publishMeshCrdtUpdate(request);
     }
-    if (
-      this.primary.crdtFanout === "authoritative"
-      && this.primary.publishCrdtUpdate
-      && !meshComplete
-    ) {
+    if (this.primary.publishCrdtUpdate) {
       return this.primary.publishCrdtUpdate(request);
     }
     return this.publishMeshCrdtUpdate(request);
@@ -447,10 +442,6 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
       if (!peer.closed && peer.channel?.readyState === "open") open += 1;
     }
     return open;
-  }
-
-  private meshCanFanoutCompletely(): boolean {
-    return this.peers.size > 0 && this.openPeerChannelCount() === this.peers.size;
   }
 
   private sendEphemeral(envelope: StudioLiveEnvelope): boolean {

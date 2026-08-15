@@ -1349,10 +1349,11 @@ export class StudioLiveRoom {
 
     switch (envelope.kind) {
       case "presence:hello":
-        // BroadcastChannel does not replay an older tab's hello. Reply immediately so a late joiner
-        // discovers every already-open participant without waiting for the next heartbeat tick.
-        if (this.transport?.mode === "local") {
-          this.sendPresence("presence:heartbeat");
+        // BroadcastChannel (and the jam signaling shell that uses it) does not replay an
+        // older tab's hello. Reply immediately so a late joiner discovers every already-open
+        // participant without waiting for the next heartbeat tick.
+        this.sendPresence("presence:heartbeat");
+        if (this.transport?.mode === "local" || this.transport?.crdtFanout === "mesh") {
           const voice = this.voiceMembers.get(this.participant.sessionId);
           if (voice) this.post("voice:join", { callId: voice.callId, muted: voice.muted });
         }
