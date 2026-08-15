@@ -145,6 +145,20 @@ describe("studio dynamic brush render plan", () => {
     });
   });
 
+  it("uses an explicit page surface so retained strokes update with the selected paper", () => {
+    const plan = requireReady(planStudioDynamicBrushRender(
+      drawElement("retained-paper", {
+        brush: "dry-media",
+        brushCatalogId: "chalk-rough",
+      }),
+      "dry-media",
+      false,
+      { kind: "rough", seed: 91 },
+    ));
+
+    expect(plan.paper?.surface).toEqual({ kind: "rough", seed: 91 });
+  });
+
   it("budgets the connected professional shelf carrier as one command per causal dab", () => {
     const brushDynamics = materializeStudioBrushPackDynamics("bristle-fan-dry");
     if (!brushDynamics) throw new Error("missing bristle-fan-dry dynamics");

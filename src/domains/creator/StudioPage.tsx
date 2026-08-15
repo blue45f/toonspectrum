@@ -1090,7 +1090,7 @@ import {
 } from "./studio-paper-granulation-runtime";
 import {
   getStudioPaperSurfaceCatalogEntry,
-  planStudioPaperSurfaceSelection,
+  planStudioPaperSurfaceApply,
 } from "./studio-paper-surface-catalog";
 import {
   refineStudioDrawElementWithPaper,
@@ -5445,12 +5445,13 @@ function StudioCuttoonEditor({
   };
 
   const setPaperGrainKind = (kind: PaperGrainKind) => {
-    const surface = planStudioPaperSurfaceSelection(
+    const plan = planStudioPaperSurfaceApply({
       kind,
-      activePage.paperSurface?.seed ?? DEFAULT_STUDIO_PAPER_SURFACE.seed,
-    );
-    setStudioDocumentPaperSurface(surface);
-    updateActivePage({ paperSurface: surface });
+      seed: activePage.paperSurface?.seed ?? DEFAULT_STUDIO_PAPER_SURFACE.seed,
+    });
+    setStudioDocumentPaperSurface(plan.surface);
+    patchStudioLivingInkMaterial(plan.livingInk);
+    updateActivePage({ paperSurface: plan.surface });
   };
   const setPaperGrainVisible = (visible: boolean) => {
     updateActivePage({ paperGrainVisible: visible });
@@ -46430,7 +46431,7 @@ function clearSelectionForEdit() {
           canvasRotation={canvasRotation}
           collaborationDocumentLocked={collaborationDocumentLocked}
           paperGrainKind={paperGrainKind}
-          paperGrainVisible={activePage.paperGrainVisible !== false}
+          paperGrainVisible={activePage.paperGrainVisible === true}
           color={color}
           colorRangeFuzziness={colorRangeFuzziness}
           colorRangePickActive={colorRangePickActive}

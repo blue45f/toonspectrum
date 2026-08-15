@@ -1442,6 +1442,46 @@ describe("studio CRDT page bridge", () => {
     });
   });
 
+  it("round-trips a detached paper surface and grain visibility through page reconciliation", () => {
+    const paperSurface = { kind: "washi" as const, seed: 4_294_967_295 };
+    const page = {
+      id: "page-paper",
+      bg: "#f7f1e7",
+      bgGrad: null,
+      canvasH: 1_600,
+      elements: [] as Array<{ id: string; type: string }>,
+      paperSurface,
+      paperGrainVisible: false,
+    };
+    const encoded = studioPageToCrdtPage(page);
+
+    expect(encoded.payload.props).toMatchObject({
+      paperSurface: { kind: "washi", seed: 4_294_967_295 },
+      paperGrainVisible: false,
+    });
+    paperSurface.seed = 7;
+    expect(encoded.payload.props.paperSurface).toEqual({
+      kind: "washi",
+      seed: 4_294_967_295,
+    });
+
+    const reconciled = reconcileStudioCrdtSceneGraphPages(
+      [page],
+      [],
+      [],
+      [{
+        id: page.id,
+        deleted: false,
+        orderIndex: 0,
+        payload: encoded.payload,
+      }]
+    );
+    expect(reconciled.pages[0]).toMatchObject({
+      paperSurface: { kind: "washi", seed: 4_294_967_295 },
+      paperGrainVisible: false,
+    });
+  });
+
   it("round-trips a canonical, detached page-owned drawing-assist v2 document", () => {
     const drawingAssist = createDefaultStudioDrawingAssistDocument({
       canvasWidth: 800,

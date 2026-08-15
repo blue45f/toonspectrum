@@ -9,11 +9,14 @@ import {
 import {
   STUDIO_CRDT_MAX_RUBY_READING_LENGTH,
   STUDIO_CRDT_MAX_RUBY_SPANS,
+  STUDIO_CRDT_PAGE_PAYLOAD_VERSION,
   STUDIO_CRDT_SCENE_ELEMENT_PAYLOAD_VERSION,
   isStudioCrdtImageAuxiliaryReferencePayload,
   isStudioCrdtTopologyReferencePayload,
+  validateStudioCrdtPagePayload,
   validateStudioCrdtSceneElementPayload,
   type StudioCrdtJsonObject,
+  type StudioCrdtJsonValue,
 } from "./studio-crdt-scene-schema";
 import { STUDIO_CURVE_MAX_CONTROL_POINTS } from "./studio-curves";
 
@@ -41,6 +44,47 @@ function validateReference(props: StudioCrdtJsonObject) {
     props,
   });
 }
+
+function validatePage(overrides: StudioCrdtJsonObject = {}) {
+  return validateStudioCrdtPagePayload({
+    version: STUDIO_CRDT_PAGE_PAYLOAD_VERSION,
+    props: {
+      bg: "#ffffff",
+      bgGrad: null,
+      canvasH: 1_600,
+      ...overrides,
+    },
+  });
+}
+
+describe("studio CRDT paper surface page payload", () => {
+  it("accepts the exact paper surface and grain visibility contract", () => {
+    expect(validatePage({
+      paperSurface: { kind: "washi", seed: 0xffff_ffff },
+      paperGrainVisible: false,
+    }).props).toMatchObject({
+      paperSurface: { kind: "washi", seed: 0xffff_ffff },
+      paperGrainVisible: false,
+    });
+  });
+
+  it("rejects malformed paper surfaces and a non-boolean visibility flag", () => {
+    const invalidSurfaces: StudioCrdtJsonValue[] = [
+      null,
+      { kind: "papyrus", seed: 41 },
+      { kind: "rough" },
+      { kind: "rough", seed: 41, privateNote: "smuggled" },
+      { kind: "rough", seed: -1 },
+      { kind: "rough", seed: 1.5 },
+      { kind: "rough", seed: 0x1_0000_0000 },
+      { kind: "rough", seed: "41" },
+    ];
+    for (const paperSurface of invalidSurfaces) {
+      expect(() => validatePage({ paperSurface })).toThrow(/종이 표면/u);
+    }
+    expect(() => validatePage({ paperGrainVisible: "false" })).toThrow(/종이 결 표시/u);
+  });
+});
 
 describe("studio CRDT structured work-asset filters", () => {
   it("keeps the authoring and shared persistence curve ceilings aligned", () => {

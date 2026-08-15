@@ -276,4 +276,19 @@ describe("Studio canvas viewport module boundary", () => {
     expect(shared.runtimeImports).not.toContain("react");
     expect(shared.runtimeImports).not.toContain("react-konva/lib/ReactKonvaCore");
   });
+
+  it("keeps paper grain an opt-in editor preview on unset pages", () => {
+    const page = moduleShape("./StudioPage.tsx");
+    const viewport = moduleShape("./StudioCanvasViewport.tsx");
+
+    expect(viewport.source).toContain(
+      "const paperGrainVisible = activePage.paperGrainVisible === true;",
+    );
+    expect(page.source).toContain(
+      "paperGrainVisible={activePage.paperGrainVisible === true}",
+    );
+    expect(viewport.source).not.toContain(
+      "activePage.paperGrainVisible !== false",
+    );
+  });
 });

@@ -310,7 +310,8 @@ describe("Studio PPT-style group convenience boundary", () => {
   });
 
   it("keeps authored draw paint non-listening but adds a select-only hit and drag wrapper", () => {
-    expect(viewportSource).toContain("<StudioDrawNode el={liveEl} />");
+    expect(viewportSource).toContain("<StudioDrawNode");
+    expect(viewportSource).toContain("paperSurface={paperSurfaceForPreview}");
     expect(viewportSource).toContain(
       '{tool === "select" && !isNonInteractiveRender ? (',
     );

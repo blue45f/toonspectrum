@@ -23,11 +23,11 @@ import {
 
 export interface StudioPaperSurfacePreviewOptions {
   readonly size?: number;
-  /** 0..1 visual grain strength on the backdrop (default 0.22 — readable but not muddy). */
+  /** 0..1 visual grain strength on the backdrop (default 0.52). */
   readonly grainStrength?: number;
-  /** Optional solid tint override; catalog swatch is default. */
+  /** Optional multiplier tint. Neutral white is default so page colour is never applied twice. */
   readonly tintHex?: string;
-  /** Multiply opacity of the grain layer 0..1 (Konva fill opacity is separate). */
+  /** Multiplies relief contrast 0..1 (Konva fill opacity is separate). */
   readonly grainOpacity?: number;
 }
 
@@ -105,9 +105,8 @@ export function getStudioPaperSurfacePreviewTile(
     32,
     Math.min(256, Math.round(options.size ?? PAPER_REFERENCE_TILE)),
   );
-  const grainStrength = clamp01(options.grainStrength ?? 0.28, 0.28);
-  const entryMeta = getStudioPaperSurfaceCatalogEntry(surface.kind);
-  const tintHex = options.tintHex ?? entryMeta.swatch;
+  const grainStrength = clamp01(options.grainStrength ?? 0.52, 0.52);
+  const tintHex = options.tintHex ?? "#ffffff";
   const grainOpacity = clamp01(options.grainOpacity ?? 1, 1);
   const key = cacheKey(surface, size, grainStrength, tintHex, grainOpacity);
   const hit = cache.get(key);
@@ -127,15 +126,16 @@ export function getStudioPaperSurfacePreviewTile(
   if (!ctx) return null;
   const image = ctx.createImageData(size, size);
   const data = image.data;
-  // Soft lighting: height as normal-ish shade so weave/fibre reads as surface, not noise static.
+  // Turn the physically subtle height field into a neutral relief multiplier. The previous path
+  // tinted this tile with the page background and then multiplied it over the same background,
+  // which shifted the average colour while leaving less than one 8-bit step of visible contrast.
+  // Contrast expansion keeps smooth papers restrained but makes cold/rough sheets readable at fit.
   for (let i = 0; i < field.values.length; i++) {
     const h = field.values[i]!;
-    // Mid-gray centered; valleys darker, peaks lighter — then blend onto tint.
-    const shade = (h - 0.5) * 2; // -1..1
-    const lit = 1 + shade * grainStrength * 0.55;
-    const grain = 1 + shade * grainStrength * 0.35;
-    const rr = Math.round(Math.min(255, Math.max(0, r * lit * (1 - grainOpacity * 0.08) + r * grain * grainOpacity * 0.08)));
-    const gg = Math.round(Math.min(255, Math.max(0, g * lit * (1 - grainOpacity * 0.08) + g * grain * grainOpacity * 0.08)));
+    const relief = Math.min(1, Math.max(-1, (h - 0.5) * 5));
+    const lit = 1 + relief * grainStrength * grainOpacity;
+    const rr = Math.round(Math.min(255, Math.max(0, r * lit)));
+    const gg = Math.round(Math.min(255, Math.max(0, g * lit)));
     const bb = Math.round(Math.min(255, Math.max(0, b * lit)));
     const o = i * 4;
     data[o] = rr;
@@ -157,7 +157,7 @@ export function getStudioPaperSurfacePreviewTile(
 /** Deterministic backdrop opacity — rougher papers show a bit more tooth, never overpower strokes. */
 export function studioPaperSurfacePreviewOpacity(kind: PaperGrainKind | unknown): number {
   const entry = getStudioPaperSurfaceCatalogEntry(kind);
-  return Math.min(0.55, Math.max(0.18, 0.16 + entry.tooth * 0.34));
+  return Math.min(0.72, Math.max(0.34, 0.32 + entry.tooth * 0.42));
 }
 
 export function resolveStudioPaperSurfaceTint(

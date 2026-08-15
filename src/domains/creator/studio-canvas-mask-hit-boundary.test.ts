@@ -51,7 +51,8 @@ describe("Studio canvas mask hit isolation boundary", () => {
       'if (el.type === "text")',
     );
 
-    expect(drawBranch).toContain("<StudioDrawNode el={liveEl} />");
+    expect(drawBranch).toContain("<StudioDrawNode");
+    expect(drawBranch).toContain("paperSurface={paperSurfaceForPreview}");
     expect(drawBranch).toContain(
       '{tool === "select" && !isNonInteractiveRender ? (',
     );

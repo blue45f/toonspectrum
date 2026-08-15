@@ -111,6 +111,42 @@ describe("StudioInspectorCanvasControls", () => {
     expect(props.onPaperGrainKindChange).toHaveBeenCalledWith("charcoal");
   });
 
+  it("선택 종이의 물성·브러시 반응과 미리보기 범위를 설명한다", () => {
+    const props = canvasProps();
+    const view = render(<StudioInspectorCanvasControls {...props} />);
+
+    expect(screen.getByText("균형 · 자연스러운 과립")).toBeTruthy();
+    expect(screen.getByRole("img", { name: "수채 중목 실제 결 확대 미리보기" })).toBeTruthy();
+    expect(screen.getAllByRole("meter")).toHaveLength(4);
+    expect(screen.getByText("브러시 성질별 반응")).toBeTruthy();
+    expect(screen.getByText("연필·목탄·파스텔")).toBeTruthy();
+    expect(screen.getByText("G펜·마커·에어브러시")).toBeTruthy();
+    expect(screen.getByText("영향 없음")).toBeTruthy();
+
+    view.rerender(
+      <StudioInspectorCanvasControls {...canvasProps({ paperGrainKind: "rough" })} />,
+    );
+    expect(screen.getByText("거침 · 강한 과립")).toBeTruthy();
+    expect(screen.getByText(/굵고 깊은 요철/u)).toBeTruthy();
+    expect(screen.getByText(/드라이브러시, 풍경, 질감 수채/u)).toBeTruthy();
+  });
+
+  it("편집 화면 미리보기 토글과 종이색 배경 적용을 controlled callback으로 전달한다", () => {
+    const props = canvasProps();
+    render(<StudioInspectorCanvasControls {...props} />);
+
+    const preview = screen.getByRole("checkbox", {
+      name: /편집 화면에서 종이 결 미리보기/u,
+    });
+    expect((preview as HTMLInputElement).checked).toBe(true);
+    fireEvent.click(preview);
+    expect(props.onPaperGrainVisibleChange).toHaveBeenCalledWith(false);
+    expect(screen.getByText("화면 표시만 바꾸며 브러시의 종이 반응은 유지됩니다.")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "배경도 중목 색으로 맞추기" }));
+    expect(props.onApplyPaperTintBackground).toHaveBeenCalledTimes(1);
+  });
+
   it("배경·그라디언트·편집기·캔버스 높이 동작을 부모 callback으로 전달한다", () => {
     const props = canvasProps();
     render(<StudioInspectorCanvasControls {...props} />);

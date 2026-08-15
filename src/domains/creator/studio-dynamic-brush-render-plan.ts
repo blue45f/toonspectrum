@@ -43,6 +43,7 @@ import {
 } from "./studio-dynamic-brush-coverage-renderer";
 import { resolveStudioPaperBrushResponse } from "./studio-paper-brush-response";
 import {
+  normalizeStudioPaperSurfaceSettings,
   resolveStudioDocumentPaperSurface,
   studioPaperGranulationIsActive,
   type StudioPaperGranulationSettings,
@@ -173,6 +174,7 @@ export function planStudioDynamicBrushRender(
   element: DrawEl,
   dynamicBrushId: string,
   activeDraft: boolean,
+  paperSurface?: StudioPaperSurfaceSettings,
 ): StudioDynamicBrushRenderPlanResult {
   const sourceDynamics = settingsFor(element, dynamicBrushId);
   const materialIdentity = resolveStudioDynamicBrushMaterialIdentity(
@@ -301,7 +303,9 @@ export function planStudioDynamicBrushRender(
   const paper = studioPaperGranulationIsActive(paperResponse)
     ? Object.freeze({
         response: paperResponse,
-        surface: resolveStudioDocumentPaperSurface(),
+        surface: paperSurface === undefined
+          ? resolveStudioDocumentPaperSurface()
+          : normalizeStudioPaperSurfaceSettings(paperSurface),
       })
     : undefined;
 

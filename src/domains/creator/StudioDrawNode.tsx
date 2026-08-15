@@ -161,6 +161,7 @@ import { StudioStampDrawShape } from "./StudioStampDrawShape";
 
 import type { CalligraphyStylusInput } from "./studio-brush";
 import type { DrawEl } from "./studio-element-model";
+import type { StudioPaperSurfaceSettings } from "./studio-paper-granulation-runtime";
 import type { StudioPatternSpec } from "./studio-pattern-fill";
 import type { StudioPerfectFreehandStroker } from "./studio-perfect-freehand";
 import type { StudioRoughGeneratorHandle } from "./studio-rough-shape";
@@ -304,10 +305,13 @@ function usePatternFillImage(pattern: StudioPatternSpec | undefined): HTMLImageE
 export const StudioDrawNode = memo(function StudioDrawNode({
   el,
   activeDraft = false,
+  paperSurface,
 }: {
   el: DrawEl;
   /** 활성 수채 초안은 움직이는 종점 pigment를 영구 station으로 굳히지 않는다. */
   activeDraft?: boolean;
+  /** Retained document strokes re-plan when the selected paper changes. */
+  paperSurface?: StudioPaperSurfaceSettings;
 }) {
   const kind = el.kind ?? "freehand";
   // 패턴 채우기 타일(로드 전 null) — 우선순위: 패턴 > 그라데이션 > 단색(fillPriority).
@@ -359,7 +363,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
     ? [el.points]
     : getSymmetricPoints(el.points, el.symmetry);
   const dynamicBrushPlanResult = dynamicBrushId
-    ? planStudioDynamicBrushRender(el, dynamicBrushId, activeDraft)
+    ? planStudioDynamicBrushRender(el, dynamicBrushId, activeDraft, paperSurface)
     : null;
   const dynamicBrushPlanFailed = dynamicBrushPlanResult?.status === "rejected";
   const dynamicBrushPlan = dynamicBrushPlanResult?.status === "ready"

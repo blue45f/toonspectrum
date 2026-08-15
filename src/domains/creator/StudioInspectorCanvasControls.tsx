@@ -3,12 +3,8 @@ import { Droplets } from "lucide-react";
 import { BG_PRESETS, CANVAS_W, type BgPreset } from "./studio-assets";
 import { GRADIENT_PRESETS, gradientToBgGrad } from "./studio-gradients";
 import { type MagicResizePreset, type MagicResizeStrategy } from "./studio-magic-resize";
-import {
-  getStudioPaperSurfaceCatalogEntry,
-  listStudioPaperSurfaceCatalogByGroup,
-  studioPaperSurfaceSwatchStyle,
-} from "./studio-paper-surface-catalog";
 import { StudioMagicResizePanel } from "./StudioMagicResizePanel";
+import { StudioPaperSurfacePicker } from "./StudioPaperSurfacePicker";
 import { StudioPercentGuideControls } from "./StudioPercentGuideControls";
 
 import type { PaperGrainKind } from "./studio-paper-texture";
@@ -122,8 +118,6 @@ export function StudioInspectorCanvasControls({
   const fixedAmount = 240;
   const guideAxisLabel = (type: StudioInspectorUserGuide["type"]) =>
     localizeText(t, type === "v" ? "세로" : "가로", `studio.canvas.guideType.${type === "v" ? "vertical" : "horizontal"}`);
-  const paperSections = listStudioPaperSurfaceCatalogByGroup();
-  const activePaper = getStudioPaperSurfaceCatalogEntry(paperGrainKind);
 
   return (
     <div
@@ -144,96 +138,14 @@ export function StudioInspectorCanvasControls({
         />
       </label>
 
-      <div className="mt-3 rounded-lg border border-line/70 bg-card/40 p-2" aria-label={localizeText(t, "종이 질감", "studio.canvas.paperSurface")}>
-        <div className="mb-1.5 flex items-start justify-between gap-2">
-          <div>
-            <p className="text-[0.72rem] font-semibold text-fg-2">
-              {localizeText(t, "종이 질감", "studio.canvas.paperSurface")}
-            </p>
-            <p className="text-[0.58rem] leading-snug text-fg-3">
-              {localizeText(
-                t,
-                "연필·목탄·수채 등이 반응하는 문서 종이입니다. 배경색과는 별개예요.",
-                "studio.canvas.paperSurfaceHint",
-              )}
-            </p>
-          </div>
-          <span className="shrink-0 rounded-md border border-line bg-raised/60 px-1.5 py-0.5 text-[0.55rem] font-bold text-fg-2">
-            {activePaper.shortLabel}
-          </span>
-        </div>
-        {paperSections.map((section) => (
-          <div key={section.group} className="mb-2 last:mb-0">
-            <p className="mb-1 text-[0.58rem] font-medium uppercase tracking-wide text-fg-3">
-              {section.label}
-            </p>
-            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-              {section.entries.map((entry) => {
-                const active = entry.id === paperGrainKind;
-                const swatch = studioPaperSurfaceSwatchStyle(entry);
-                return (
-                  <button
-                    key={entry.id}
-                    type="button"
-                    disabled={controlsDisabled}
-                    title={entry.description}
-                    aria-label={entry.label}
-                    aria-pressed={active}
-                    onClick={() => onPaperGrainKindChange(entry.id)}
-                    className={cn(
-                      "flex items-center gap-1.5 rounded-md border px-1.5 py-1 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50",
-                      active
-                        ? "border-accent bg-accent/12 text-accent"
-                        : "border-line bg-panel/50 text-fg-2 hover:bg-raised hover:text-fg",
-                    )}
-                  >
-                    <span
-                      className="h-6 w-6 shrink-0 rounded border border-line/80"
-                      style={swatch}
-                      aria-hidden
-                    />
-                    <span className="min-w-0">
-                      <span className="block truncate text-[0.62rem] font-semibold leading-tight">
-                        {entry.shortLabel}
-                      </span>
-                      <span className="block truncate text-[0.52rem] leading-tight text-fg-3">
-                        {entry.label}
-                      </span>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-        <p className="mt-1 text-[0.55rem] leading-relaxed text-fg-3" role="status">
-          {activePaper.description}
-        </p>
-        <div className="mt-2 flex flex-col gap-1.5 border-t border-line/60 pt-2">
-          <label className="flex items-center gap-2 text-[0.62rem] text-fg-2">
-            <input
-              type="checkbox"
-              className="size-3.5 rounded border-line"
-              checked={paperGrainVisible}
-              disabled={controlsDisabled}
-              onChange={(event) => onPaperGrainVisibleChange(event.currentTarget.checked)}
-            />
-            {localizeText(t, "캔버스에 종이 결 보이기", "studio.canvas.paperGrainVisible")}
-          </label>
-          <button
-            type="button"
-            disabled={controlsDisabled}
-            onClick={onApplyPaperTintBackground}
-            className="rounded-md border border-line bg-raised/50 px-2 py-1 text-left text-[0.6rem] font-medium text-fg-2 transition-colors hover:bg-raised hover:text-fg disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {localizeText(
-              t,
-              `배경색을 ${activePaper.shortLabel} 톤으로 (${activePaper.tintBg})`,
-              "studio.canvas.paperTintBackground",
-            ).replace("{label}", activePaper.shortLabel).replace("{hex}", activePaper.tintBg)}
-          </button>
-        </div>
-      </div>
+      <StudioPaperSurfacePicker
+        controlsDisabled={controlsDisabled}
+        paperGrainKind={paperGrainKind}
+        paperGrainVisible={paperGrainVisible}
+        onPaperGrainKindChange={onPaperGrainKindChange}
+        onPaperGrainVisibleChange={onPaperGrainVisibleChange}
+        onApplyPaperTintBackground={onApplyPaperTintBackground}
+      />
       <div className="mt-2 flex flex-wrap gap-1.5">
         {BG_PRESETS.map((preset) => (
           <button

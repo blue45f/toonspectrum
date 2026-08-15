@@ -40,6 +40,7 @@ import type {
 } from "./studio-crdt-document";
 import type { StudioCrdtCompatibleDrawElement } from "./studio-crdt-draw-bridge";
 import type { StudioDrawingAssistDocument } from "./studio-drawing-assist-document";
+import type { StudioPaperSurfaceSettings } from "./studio-paper-granulation-runtime";
 
 import {
   STUDIO_FILTER_MASK_REFERENCE_EDIT_KEYS,
@@ -461,6 +462,8 @@ const PAGE_PAYLOAD_KEYS = [
   "shotType",
   "cameraAngle",
   "drawingAssist",
+  "paperSurface",
+  "paperGrainVisible",
 ] as const;
 
 export interface StudioCrdtCompatibleOrderedPage<
@@ -475,6 +478,8 @@ export interface StudioCrdtCompatibleOrderedPage<
   shotType?: string;
   cameraAngle?: string;
   drawingAssist?: StudioDrawingAssistDocument;
+  paperSurface?: StudioPaperSurfaceSettings;
+  paperGrainVisible?: boolean;
   groups?: StudioCrdtCompatibleLayerGroup[];
 }
 

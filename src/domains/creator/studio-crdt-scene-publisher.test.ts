@@ -7,6 +7,8 @@ import {
   publishStudioCrdtSceneGraphDiff,
 } from "./studio-crdt-scene-publisher";
 
+import type { StudioPaperSurfaceSettings } from "./studio-paper-granulation-runtime";
+
 interface TestElement {
   id: string;
   type: string;
@@ -21,6 +23,8 @@ interface TestPage {
   canvasH: number;
   name?: string;
   note?: string;
+  paperSurface?: StudioPaperSurfaceSettings;
+  paperGrainVisible?: boolean;
 }
 
 function text(id: string, overrides: Record<string, unknown> = {}): TestElement {
@@ -474,6 +478,27 @@ describe("studio CRDT scene publisher", () => {
       page("page-a", [], { name: "A" }),
     ]);
     expect(document.getPage("page-a")).toBeNull();
+    document.destroy();
+  });
+
+  it("publishes paper surface and grain visibility edits as page mutations", () => {
+    const document = new StudioCrdtDocument();
+    const previous = [page("page-a", [], {
+      paperSurface: { kind: "cold-press", seed: 41 },
+      paperGrainVisible: true,
+    })];
+    const next = [page("page-a", [], {
+      paperSurface: { kind: "rough", seed: 73 },
+      paperGrainVisible: false,
+    })];
+
+    const result = publishStudioCrdtSceneGraphDiff(document, previous, next);
+
+    expect(result.pageMutations).toBe(1);
+    expect(document.getPage("page-a")?.payload.props).toMatchObject({
+      paperSurface: { kind: "rough", seed: 73 },
+      paperGrainVisible: false,
+    });
     document.destroy();
   });
 

@@ -1,5 +1,6 @@
 import { copyStudioAdvancedRulerAsJson, type StudioAdvancedRulerDocument } from "./studio-advanced-ruler-document";
 import { parseStudioDrawingAssistDocument } from "./studio-drawing-assist-document";
+import { PAPER_GRAIN_KINDS } from "./studio-paper-texture";
 
 import {
   STUDIO_FILTER_MASK_REFERENCE_EDIT_KEYS,
@@ -185,8 +186,12 @@ export const STUDIO_CRDT_REQUIRED_SCENE_ELEMENT_KEYS: Record<
 
 export const STUDIO_CRDT_PAGE_PROPERTY_KEYS: ReadonlySet<string> = new Set([
   "bg", "bgGrad", "canvasH", "name", "note", "hideMaster", "shotType", "cameraAngle",
-  "drawingAssist",
+  "drawingAssist", "paperSurface", "paperGrainVisible",
 ]);
+
+const STUDIO_CRDT_PAPER_GRAIN_KIND_SET: ReadonlySet<string> = new Set(PAPER_GRAIN_KINDS);
+const STUDIO_CRDT_PAPER_SURFACE_KEYS: ReadonlySet<string> = new Set(["kind", "seed"]);
+const STUDIO_CRDT_PAPER_SURFACE_MAX_SEED = 0xffff_ffff;
 
 export const STUDIO_CRDT_LAYER_GROUP_PROPERTY_KEYS: ReadonlySet<string> = new Set([
   "name", "hidden", "locked",
@@ -536,6 +541,27 @@ export function validateStudioCrdtPagePayload(payload: StudioCrdtPagePayload): S
   }
   if ("hideMaster" in props && typeof props.hideMaster !== "boolean") {
     throw new Error("페이지 마스터 표시 값이 올바르지 않습니다.");
+  }
+  if ("paperGrainVisible" in props && typeof props.paperGrainVisible !== "boolean") {
+    throw new Error("페이지 종이 결 표시 값이 올바르지 않습니다.");
+  }
+  if ("paperSurface" in props) {
+    const paperSurface = props.paperSurface;
+    if (
+      paperSurface === null ||
+      typeof paperSurface !== "object" ||
+      Array.isArray(paperSurface) ||
+      Object.keys(paperSurface).length !== STUDIO_CRDT_PAPER_SURFACE_KEYS.size ||
+      !Object.keys(paperSurface).every((key) => STUDIO_CRDT_PAPER_SURFACE_KEYS.has(key)) ||
+      typeof paperSurface.kind !== "string" ||
+      !STUDIO_CRDT_PAPER_GRAIN_KIND_SET.has(paperSurface.kind) ||
+      typeof paperSurface.seed !== "number" ||
+      !Number.isInteger(paperSurface.seed) ||
+      paperSurface.seed < 0 ||
+      paperSurface.seed > STUDIO_CRDT_PAPER_SURFACE_MAX_SEED
+    ) {
+      throw new Error("페이지 종이 표면 설정이 올바르지 않습니다.");
+    }
   }
   if ("drawingAssist" in props) {
     const drawingAssist = parseStudioDrawingAssistDocument(props.drawingAssist);

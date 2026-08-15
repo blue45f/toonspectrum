@@ -1328,20 +1328,20 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
   const hokusaiSurfaceHeight = webGpuViewportSurface?.surface.height;
 
   // Document paper grain preview: one seamless tile from the same height field as brush granulation.
-  // Off by paperGrainVisible === false; default on when unset (legacy pages).
+  // This is an opt-in editor aid. An unset legacy/new page stays visually clean while its selected
+  // paper can still influence paper-aware brushes.
   const paperSurfaceForPreview = useMemo(
     () => normalizeStudioPaperSurfaceSettings(activePage.paperSurface),
     [activePage.paperSurface],
   );
-  const paperGrainVisible = activePage.paperGrainVisible !== false;
+  const paperGrainVisible = activePage.paperGrainVisible === true;
   const paperGrainPatternImage = useMemo(() => {
     if (!paperGrainVisible || isExporting) return null;
     return getStudioPaperSurfacePreviewTile(paperSurfaceForPreview, {
       size: 128,
-      grainStrength: 0.32,
-      tintHex: bgGrad ? undefined : bg,
+      grainStrength: 0.58,
     });
-  }, [paperGrainVisible, isExporting, paperSurfaceForPreview, bg, bgGrad]);
+  }, [paperGrainVisible, isExporting, paperSurfaceForPreview]);
   const paperGrainOpacity = paperGrainVisible
     ? studioPaperSurfacePreviewOpacity(paperSurfaceForPreview.kind)
     : 0;
@@ -3148,7 +3148,10 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                         }
                       }}
                     >
-                      <StudioDrawNode el={liveEl} />
+                      <StudioDrawNode
+                        el={liveEl}
+                        paperSurface={paperSurfaceForPreview}
+                      />
                       {/* StudioDrawNode의 실제 페인트 노드는 드로잉 핫패스를 위해 listening=false다.
                           선택 도구일 때만 이 scene-less hit shape가 실제 polyline/도형 경로를 화면
                           10px 허용폭으로 포착한다. 긴 대각선의 빈 bbox는 hit가 아니며, 닫힌 도형도

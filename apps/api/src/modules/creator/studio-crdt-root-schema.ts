@@ -414,7 +414,35 @@ const STUDIO_CRDT_PAGE_KEYS = new Set([
   "shotType",
   "cameraAngle",
   "drawingAssist",
+  "paperSurface",
+  "paperGrainVisible",
 ]);
+
+const STUDIO_CRDT_PAPER_GRAIN_KINDS = new Set([
+  "hot-press",
+  "cold-press",
+  "rough",
+  "bristol",
+  "washi",
+  "kraft",
+  "canvas",
+  "charcoal",
+  "newsprint",
+  "pastel-board",
+  "cotton-rag",
+  "watercolor-block",
+  "linen-canvas",
+  "marker-pad",
+  "manga-paper",
+  "toned-tan",
+  "toned-gray",
+  "sanded-pastel",
+  "rice-paper",
+  "mulberry",
+  "vellum",
+]);
+const STUDIO_CRDT_PAPER_SURFACE_KEYS = new Set(["kind", "seed"]);
+const STUDIO_CRDT_PAPER_SURFACE_MAX_SEED = 0xffff_ffff;
 
 const STUDIO_CRDT_LAYER_GROUP_KEYS = new Set(["name", "hidden", "locked"]);
 
@@ -527,6 +555,16 @@ function isExactJsonObject(
   if (prototype !== Object.prototype && prototype !== null) return false;
   const keys = Object.keys(value);
   return keys.length === requiredKeys.size && keys.every((key) => requiredKeys.has(key));
+}
+
+function isValidStudioCrdtPaperSurface(value: unknown): boolean {
+  if (!isExactJsonObject(value, STUDIO_CRDT_PAPER_SURFACE_KEYS)) return false;
+  return typeof value.kind === "string" &&
+    STUDIO_CRDT_PAPER_GRAIN_KINDS.has(value.kind) &&
+    typeof value.seed === "number" &&
+    Number.isInteger(value.seed) &&
+    value.seed >= 0 &&
+    value.seed <= STUDIO_CRDT_PAPER_SURFACE_MAX_SEED;
 }
 
 const STUDIO_CRDT_DRAWING_ASSIST_LEGACY_KEYS = new Set([
@@ -1388,6 +1426,8 @@ function validatePageRoot(id: string, record: Y.Map<unknown>): boolean {
     if (key in props && !boundedString(props[key], key === "note" ? 8_192 : 512)) return false;
   }
   if ("hideMaster" in props && typeof props.hideMaster !== "boolean") return false;
+  if ("paperGrainVisible" in props && typeof props.paperGrainVisible !== "boolean") return false;
+  if ("paperSurface" in props && !isValidStudioCrdtPaperSurface(props.paperSurface)) return false;
   if ("drawingAssist" in props && !isValidStudioCrdtDrawingAssist(props.drawingAssist)) {
     return false;
   }
@@ -1397,6 +1437,18 @@ function validatePageRoot(id: string, record: Y.Map<unknown>): boolean {
     if (
       (key === "base:drawingAssist" || key === "prop:drawingAssist") &&
       !isValidStudioCrdtDrawingAssist(value)
+    ) {
+      return false;
+    }
+    if (
+      (key === "base:paperSurface" || key === "prop:paperSurface") &&
+      !isValidStudioCrdtPaperSurface(value)
+    ) {
+      return false;
+    }
+    if (
+      (key === "base:paperGrainVisible" || key === "prop:paperGrainVisible") &&
+      typeof value !== "boolean"
     ) {
       return false;
     }
