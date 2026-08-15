@@ -2,7 +2,11 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { isExpectedStaticPreviewApiError } from "./verify-studio-launch.mts";
+import {
+  isExpectedStaticPreviewApiError,
+  resolveStudioMobileDockIsolation,
+  studioLaunchTouchTargetsReady,
+} from "./verify-studio-launch.mts";
 
 const STUDIO_URL = "http://127.0.0.1:51758/studio";
 const launchHarness = readFileSync(new URL("./verify-studio-launch.mts", import.meta.url), "utf8");
@@ -27,12 +31,51 @@ describe("Studio launch static-preview diagnostics", () => {
     expect(launchHarness).not.toContain('name: "앱 브러시"');
   });
 
-  it("accepts only an above-dock sheet or a full modal cover over the inert dock", () => {
-    expect(launchHarness).toContain(
-      "const panelDockIsolation = panelEndsBeforeDock || (rootInert && panelCoversDock);",
-    );
-    expect(launchHarness).toContain("panelBox.x + panelBox.width >= dockBox.x + dockBox.width - 1");
-    expect(launchHarness).toContain("panelBox.y + panelBox.height >= dockBox.y + dockBox.height - 1");
+  it("checks every rendered Brush Studio category target without fixing the product category count", () => {
+    expect(studioLaunchTouchTargetsReady([44, 44, 44, 44, 44, 44])).toBe(true);
+    expect(studioLaunchTouchTargetsReady([44])).toBe(true);
+    expect(studioLaunchTouchTargetsReady([])).toBe(false);
+    expect(studioLaunchTouchTargetsReady([44, 43.99])).toBe(false);
+    expect(studioLaunchTouchTargetsReady([44, Number.NaN])).toBe(false);
+    expect(launchHarness).not.toContain("categoryTabHeights.length === 5");
+  });
+
+  it("accepts an above-dock panel or a BODY-portalled modal cover over the inert dock", () => {
+    const dockBox = { x: 0, y: 788, width: 390, height: 56 };
+    const fullViewport = { x: 0, y: 0, width: 390, height: 844 };
+
+    expect(resolveStudioMobileDockIsolation({
+      panelBox: { x: 0, y: 0, width: 390, height: 788 },
+      modalBox: null,
+      dockBox,
+      rootInert: false,
+      modalPortalled: false,
+    })).toMatchObject({ ok: true, panelEndsBeforeDock: true });
+
+    expect(resolveStudioMobileDockIsolation({
+      panelBox: fullViewport,
+      modalBox: fullViewport,
+      dockBox,
+      rootInert: true,
+      modalPortalled: true,
+    })).toEqual({
+      ok: true,
+      panelEndsBeforeDock: false,
+      modalCoversDock: true,
+    });
+
+    for (const contract of [
+      { rootInert: false, modalPortalled: true, modalBox: fullViewport },
+      { rootInert: true, modalPortalled: false, modalBox: fullViewport },
+      { rootInert: true, modalPortalled: true, modalBox: { ...fullViewport, height: 760 } },
+    ]) {
+      expect(resolveStudioMobileDockIsolation({
+        panelBox: fullViewport,
+        dockBox,
+        ...contract,
+      }).ok).toBe(false);
+    }
+
     expect(launchHarness).not.toContain("noPanelDockOverlap");
   });
 

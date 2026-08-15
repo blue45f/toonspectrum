@@ -36,6 +36,59 @@ const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
   "/api/studio-ai/status",
 ] as const;
 
+export interface StudioLaunchRect {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+export function studioLaunchTouchTargetsReady(
+  targetHeights: readonly number[],
+  minimumHeight = 44,
+): boolean {
+  return targetHeights.length > 0
+    && targetHeights.every(
+      (height) => Number.isFinite(height) && height >= minimumHeight,
+    );
+}
+
+export function resolveStudioMobileDockIsolation({
+  panelBox,
+  modalBox,
+  dockBox,
+  rootInert,
+  modalPortalled,
+}: {
+  readonly panelBox: StudioLaunchRect | null;
+  readonly modalBox: StudioLaunchRect | null;
+  readonly dockBox: StudioLaunchRect | null;
+  readonly rootInert: boolean;
+  readonly modalPortalled: boolean;
+}): {
+  readonly ok: boolean;
+  readonly panelEndsBeforeDock: boolean;
+  readonly modalCoversDock: boolean;
+} {
+  const panelEndsBeforeDock = Boolean(
+    panelBox && dockBox && panelBox.y + panelBox.height <= dockBox.y + 1,
+  );
+  const modalCoversDock = Boolean(
+    modalBox
+      && dockBox
+      && modalBox.x <= dockBox.x + 1
+      && modalBox.y <= dockBox.y + 1
+      && modalBox.x + modalBox.width >= dockBox.x + dockBox.width - 1
+      && modalBox.y + modalBox.height >= dockBox.y + dockBox.height - 1,
+  );
+
+  return {
+    ok: panelEndsBeforeDock || (rootInert && modalPortalled && modalCoversDock),
+    panelEndsBeforeDock,
+    modalCoversDock,
+  };
+}
+
 async function dismissHydratedQuickStart(page: Page): Promise<void> {
   const quickStart = page.locator('[data-studio-creative-starter="true"]');
   // UI preferences now hydrate from the asynchronous SQLite/OPFS authority. Pre-seeding the
@@ -687,9 +740,7 @@ async function runMobileDrawing(browser: Browser, url: string): Promise<MobileRu
   const categoryTabHeights = await categoryTabs.evaluateAll((tabs) =>
     tabs.map((tab) => tab.getBoundingClientRect().height)
   );
-  const categoryTargetsReady =
-    categoryTabHeights.length === 5 &&
-    categoryTabHeights.every((height) => height >= 44);
+  const categoryTargetsReady = studioLaunchTouchTargetsReady(categoryTabHeights);
   const rootInert = await page.locator("#root").evaluate((root) => root.hasAttribute("inert"));
 
   await brushStudio.getByRole("tab", { name: "입력", exact: true }).click();
@@ -724,22 +775,22 @@ async function runMobileDrawing(browser: Browser, url: string): Promise<MobileRu
     !siteBrandVisible &&
     !siteFooterVisible;
   const panelBox = await brushStudioPanel.boundingBox();
+  const modalBox = await brushStudio.boundingBox();
   const dockBox = await dock.boundingBox();
-  const panelEndsBeforeDock = Boolean(
-    panelBox && dockBox && panelBox.y + panelBox.height <= dockBox.y + 1
+  const modalPortalled = await brushStudio.evaluate((dialog) => {
+    const root = document.getElementById("root");
+    return Boolean(root && !root.contains(dialog));
+  });
+  // Brush Studio is a BODY-portalled, full-screen aria-modal editor on phone widths. Its modal
+  // boundary—not an animated inner panel—is the stable owner that must cover the inert app dock.
+  // Keep accepting an above-dock compact panel as well if that responsive treatment returns later.
+  const {
+    ok: panelDockIsolation,
+    panelEndsBeforeDock,
+    modalCoversDock,
+  } = resolveStudioMobileDockIsolation(
+    { panelBox, modalBox, dockBox, rootInert, modalPortalled },
   );
-  // Brush Studio is now a genuine full-screen aria-modal editor on phone widths. In that mode the
-  // correct contract is not "stop above the app dock"; the portalled panel must fully cover the
-  // inert dock so no disabled controls peek through or receive input. Keep accepting the compact
-  // above-dock geometry as well in case a smaller responsive treatment returns later.
-  const panelCoversDock = Boolean(
-    panelBox && dockBox &&
-    panelBox.x <= dockBox.x + 1 &&
-    panelBox.y <= dockBox.y + 1 &&
-    panelBox.x + panelBox.width >= dockBox.x + dockBox.width - 1 &&
-    panelBox.y + panelBox.height >= dockBox.y + dockBox.height - 1
-  );
-  const panelDockIsolation = panelEndsBeforeDock || (rootInert && panelCoversDock);
   const horizontalOverflow = await page.evaluate(() => ({
     document: Math.max(
       0,
@@ -803,7 +854,8 @@ async function runMobileDrawing(browser: Browser, url: string): Promise<MobileRu
     `siteBrand=${siteBrandVisible} siteFooter=${siteFooterVisible} controlsReady=${controlsReady} ` +
     `dynamicBrushReady=${dynamicBrushReady} ` +
     `panelDockIsolation=${panelDockIsolation} panelEndsBeforeDock=${panelEndsBeforeDock} ` +
-    `panelCoversDock=${panelCoversDock} noHorizontalOverflow=${noHorizontalOverflow} ` +
+    `modalCoversDock=${modalCoversDock} modalPortalled=${modalPortalled} ` +
+    `noHorizontalOverflow=${noHorizontalOverflow} ` +
     `categoryTargetsReady=${categoryTargetsReady} categoryTabHeights=${categoryTabHeights.join(",")} ` +
     `rootInert=${rootInert} ` +
     `launcherFocusRestored=${launcherFocusRestored} dotRecorded=${dotRecorded} dotRendered=${dotRendered} ` +
