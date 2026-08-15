@@ -295,6 +295,27 @@ describe("studio live gesture preview publisher", () => {
     expect(channelHarness.sent.map((payload) => payload.phase)).toEqual(["begin", "cancel"]);
   });
 
+  it("cancels instead of ending when release post-processing rewrites an already sent prefix", () => {
+    const { publisher, scheduler, sent } = createHarness();
+    expect(publisher.begin({
+      pageId: "page-1",
+      documentGeneration: 1,
+      element: stroke(),
+    })).toBe(true);
+    expect(publisher.append(stroke({
+      points: [10, 20, 12, 22],
+      pressures: [0.4, 0.5],
+    }), 1)).toBe(true);
+    scheduler.advance(STUDIO_LIVE_GESTURE_PREVIEW_PUBLISH_INTERVAL_MS);
+
+    expect(publisher.end(stroke({
+      points: [10, 21, 12, 22],
+      pressures: [0.4, 0.5],
+    }))).toBe(false);
+    expect(sent.map((payload) => payload.phase)).toEqual(["begin", "append", "cancel"]);
+    expect(publisher.activeGestureId).toBeNull();
+  });
+
   it("drops local state after a transport failure and reports thrown transport errors", () => {
     const failed = createHarness((payload) => payload.phase !== "append");
     expect(failed.publisher.begin({

@@ -53,6 +53,7 @@ interface ActiveGesture {
   readonly operation: StudioLiveGesturePreviewOperation;
   readonly rendererFingerprint: string;
   readonly sampleChannelKeys: readonly StudioLiveGesturePreviewSampleChannelKey[];
+  sentSamples: StudioLiveGesturePreviewSamples | null;
   nextSeq: number;
   nextSampleIndex: number;
   lastSentAt: number;
@@ -203,6 +204,44 @@ function payloadFingerprint(value: unknown): string {
   return JSON.stringify(value);
 }
 
+function appendSentSamples(
+  current: StudioLiveGesturePreviewSamples | null,
+  suffix: StudioLiveGesturePreviewSamples,
+): StudioLiveGesturePreviewSamples {
+  const next: Record<string, number | number[]> = {
+    startIndex: 0,
+    points: [...(current?.points ?? []), ...suffix.points],
+  };
+  for (const key of STUDIO_LIVE_GESTURE_PREVIEW_SAMPLE_CHANNEL_KEYS) {
+    const channel = suffix[key];
+    if (!channel) continue;
+    next[key] = [...(current?.[key] ?? []), ...channel];
+  }
+  return next as unknown as StudioLiveGesturePreviewSamples;
+}
+
+function sentPrefixMatchesElement(
+  element: DrawEl,
+  sent: StudioLiveGesturePreviewSamples | null,
+): boolean {
+  if (!sent) return true;
+  const sampleCount = sent.points.length / 2;
+  if (element.points.length < sent.points.length) return false;
+  for (let index = 0; index < sent.points.length; index += 1) {
+    if (element.points[index] !== sent.points[index]) return false;
+  }
+  for (const key of STUDIO_LIVE_GESTURE_PREVIEW_SAMPLE_CHANNEL_KEYS) {
+    const expected = sent[key];
+    if (!expected) continue;
+    const actual = element[key];
+    if (!actual || actual.length < sampleCount) return false;
+    for (let index = 0; index < sampleCount; index += 1) {
+      if (actual[index] !== expected[index]) return false;
+    }
+  }
+  return true;
+}
+
 function parsedPayload(value: unknown): StudioLiveGesturePreviewPayload | null {
   return parseStudioLiveGesturePreviewPayload(value);
 }
@@ -327,6 +366,7 @@ export class StudioLiveGesturePreviewPublisher {
       operation: plan.payload.operation,
       rendererFingerprint: plan.rendererFingerprint,
       sampleChannelKeys: plan.sampleChannelKeys,
+      sentSamples: plan.payload.samples ?? null,
       nextSeq: 2,
       nextSampleIndex: plan.sampleCount,
       lastSentAt: this.#scheduler.now(),
@@ -391,6 +431,10 @@ export class StudioLiveGesturePreviewPublisher {
       || (element && element.id !== active.gestureId)
     ) return false;
     if (element) {
+      if (
+        active.operation !== "shape"
+        && !sentPrefixMatchesElement(element, active.sentSamples)
+      ) return this.#abortMalformed();
       const accepted = active.operation === "shape"
         ? this.replaceShape(element)
         : this.append(element, active.nextSampleIndex);
@@ -520,6 +564,7 @@ export class StudioLiveGesturePreviewPublisher {
     if (!this.#send(payload)) return this.#dropAfterTransportFailure();
     active.nextSeq += 1;
     active.nextSampleIndex += chunkSize;
+    active.sentSamples = appendSentSamples(active.sentSamples, payload.samples!);
     active.lastSentAt = this.#scheduler.now();
     if (active.nextSampleIndex < totalSamples) active.pendingElement = element;
     return true;
