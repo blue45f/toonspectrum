@@ -30,9 +30,9 @@ const FILTER = process.env.BRUSH_SHEET_FILTER
   ? new RegExp(process.env.BRUSH_SHEET_FILTER)
   : null;
 const PREFIX = process.env.BRUSH_SHEET_PREFIX ?? "sheet";
-const CELL_W = 300;
+const CELL_W = Number(process.env.BRUSH_SHEET_CELL_W ?? 300);
 const CELL_H = 140;
-const COLUMNS = 2;
+const COLUMNS = Number(process.env.BRUSH_SHEET_COLUMNS ?? 2);
 const ROWS_PER_SHEET = 5;
 
 const STROKE_COLOR = "#1b1b1f";
@@ -40,19 +40,19 @@ const STROKE_COLOR = "#1b1b1f";
 /** 직선: 시작·끝 처리. 곡선: 꺾임과 자기 근접. 탭: 단독 접점. */
 function strokes(width: number) {
   const straight = { points: [] as number[], pressures: [] as number[] };
-  for (let i = 0; i < 24; i += 1) {
-    const t = i / 23;
-    straight.points.push(16 + t * 268, 26);
+  for (let i = 0; i < Math.max(24, Math.round(CELL_W / 12)); i += 1) {
+    const t = i / (Math.max(24, Math.round(CELL_W / 12)) - 1);
+    straight.points.push(16 + t * (CELL_W - 32), 26);
     // 양끝이 얇고 가운데가 두꺼운 자연스러운 필압 — taper 처리를 드러낸다.
     straight.pressures.push(0.12 + 0.78 * Math.sin(Math.PI * t));
   }
   const curve = { points: [] as number[], pressures: [] as number[] };
-  for (let i = 0; i < 40; i += 1) {
-    const t = i / 39;
-    curve.points.push(16 + t * 268, 82 + Math.sin(t * Math.PI * 2.2) * 14);
+  for (let i = 0; i < Math.max(40, Math.round(CELL_W / 8)); i += 1) {
+    const t = i / (Math.max(40, Math.round(CELL_W / 8)) - 1);
+    curve.points.push(16 + t * (CELL_W - 32), 82 + Math.sin(t * Math.PI * 2.2) * 14);
     curve.pressures.push(0.55 + 0.35 * Math.cos(t * Math.PI * 3));
   }
-  const tap = { points: [240, 126, 244, 127], pressures: [0.8, 0.8] };
+  const tap = { points: [CELL_W - 60, 126, CELL_W - 56, 127], pressures: [0.8, 0.8] };
   return [
     { id: "straight", ...straight, strokeWidth: width },
     { id: "curve", ...curve, strokeWidth: width },
