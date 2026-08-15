@@ -648,4 +648,26 @@ describe("studioAutosaveDocumentBusy", () => {
     expect(studioAutosaveDocumentBusy(new Error("nope"))).toBe(false);
     expect(studioAutosaveDocumentBusy(null)).toBe(false);
   });
+
+  it("treats Promise.any rejection as busy when every authority lost to another tab", () => {
+    const rejected = new AggregateError(
+      [
+        new StudioOpfsRecoveryJournalError(
+          "LEASE_LOST",
+          "OPFS 복구 저널 writer lease가 만료되었거나 교체되었습니다.",
+        ),
+        new Error("SQLite autosave authority is unavailable"),
+      ],
+      "All promises were rejected",
+    );
+    expect(studioAutosaveDocumentBusy(rejected)).toBe(true);
+    expect(
+      studioAutosaveDocumentBusy(
+        new AggregateError(
+          [new Error("SQLITE_CORRUPT: database disk image is malformed")],
+          "All promises were rejected",
+        ),
+      ),
+    ).toBe(false);
+  });
 });

@@ -99,6 +99,24 @@ describe("studio storage recovery runtime — no silent save failure", () => {
     expect(snapshot.save?.detail).not.toContain("All promises were rejected");
   });
 
+  it("does not treat a two-tab Promise.any rejection as a save failure", async () => {
+    install(createFakeRuntime(async () => ({ removedPaths: [], freedBytes: 0 })));
+
+    await reportStudioAutosaveFailure(
+      new AggregateError(
+        [
+          Object.assign(new Error("OPFS 복구 저널 writer lease가 만료되었거나 교체되었습니다."), {
+            code: "LEASE_LOST",
+          }),
+          new Error("SQLite autosave authority is unavailable"),
+        ],
+        "All promises were rejected",
+      ),
+    );
+
+    expect(getStudioReliabilityStatusSnapshot().save).toBeNull();
+  });
+
   it("runs the previously dead cleanupQuota on quota pressure and reports the reclaim", async () => {
     const runtime = createFakeRuntime(async () => ({
       removedPaths: ["a", "b"],

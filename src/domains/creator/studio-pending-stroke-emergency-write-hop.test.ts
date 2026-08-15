@@ -54,5 +54,9 @@ describe("pointerup emergency autosave write hop", () => {
     expect(STUDIO_PAGE_SOURCE).toContain(
       "autosaveLeadershipGuardRef.current = withStudioAutosaveDocumentLeadership",
     );
+    expect(implementation).toContain("if (studioAutosaveDocumentBusy(cause)) return;");
+    expect(implementation.indexOf("if (studioAutosaveDocumentBusy(cause)) return;")).toBeLessThan(
+      implementation.indexOf("console.error(\"Pending stroke emergency autosave failed:\""),
+    );
   });
 });
