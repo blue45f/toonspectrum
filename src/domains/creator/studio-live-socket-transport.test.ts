@@ -367,11 +367,22 @@ describe("StudioLiveSocketTransport", () => {
       createLocalTransport: localFactory,
     })(context());
 
-    // No VITE_STUDIO_LIVE_ORIGIN → no Engine.IO probe; local collaboration only.
-    // Purpose routing keeps mode "local" and does not invent a Socket.IO host.
+    // Injected local factory still wins so tests can isolate Engine.IO.
     expect(transport).toBe(localTransport);
     expect(transport.mode).toBe("local");
     expect(localFactory).toHaveBeenCalledOnce();
+  });
+
+  it("uses a server-mode signaling shell when only Cloudflare realtime is configured", async () => {
+    const { createStudioLiveSignalingServerTransport } = await import(
+      "./studio-live-signaling-server-transport"
+    );
+    const transport = createStudioLiveSignalingServerTransport();
+    expect(transport.mode).toBe("server");
+    expect(transport.publishCrdtUpdate).toBeUndefined();
+    await transport.connect();
+    expect(transport.ready).toBe(true);
+    expect(transport.send({} as never)).toBe(false);
   });
 
   it("admits only an exact absolute realtime origin", () => {

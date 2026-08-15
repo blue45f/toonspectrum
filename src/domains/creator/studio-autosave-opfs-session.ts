@@ -728,18 +728,11 @@ export async function persistStudioAutosaveWithOpfsPrimary(input: {
       return receipt;
     } catch (cause: unknown) {
       if (studioAutosaveDocumentBusy(cause)) {
-        // 다른 탭이 이 원고의 leader다. 여기서 SQLite 권위로 우회하면 두 탭이 서로 다른 스냅샷을
-        // 갖게 되고, 다음 reconcile에서 더 늦은 쪽이 상대의 작업을 통째로 덮는다. 조용한 포크
-        // 대신 실패로 끝내고, 브라우저 KV도 건드리지 않는다.
-        const busy = cause instanceof StudioAutosaveDocumentBusyError
+        // 다른 탭이 이 원고의 leader다. SQLite 우회는 포크를 만든다. Jam 팔로워에게는
+        // 예상된 상태이므로 저장 실패 배너를 올리지 않고 busy만 전파한다.
+        throw cause instanceof StudioAutosaveDocumentBusyError
           ? cause
           : new StudioAutosaveDocumentBusyError(cause);
-        try {
-          input.onDurableAuthorityDegraded?.(busy);
-        } catch {
-          // 관측자 격리 — 고지 실패가 명시적인 busy error까지 막지 않는다.
-        }
-        throw busy;
       }
       durableFailure = cause;
     }

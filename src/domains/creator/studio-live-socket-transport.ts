@@ -69,6 +69,7 @@ import { applyStudioLiveP2pOverlay } from "./studio-live-p2p-overlay-transport";
 import {
   createStudioCloudflarePurposeRoutedLiveTransportFactory,
 } from "./studio-live-purpose-routed-transport";
+import { createStudioLiveSignalingServerTransportFactory } from "./studio-live-signaling-server-transport";
 import { resolveStudioLiveSocketEndpoint } from "./studio-live-socket-endpoint";
 import {
   isRecord,
@@ -4602,8 +4603,15 @@ export function createStudioServerLiveTransportFactory(
       : dependencies.createSocket
         ? "/studio-live"
         : runtimeSocketEndpoint();
+  const hasLocalTransportOverride = Object.prototype.hasOwnProperty.call(
+    dependencies,
+    "createLocalTransport",
+  );
   const localTransportFactory =
     dependencies.createLocalTransport ?? createStudioLocalLiveTransport;
+  const realtimeOrigin = resolveStudioCloudflareRealtimeOrigin(
+    import.meta.env.VITE_STUDIO_REALTIME_ORIGIN,
+  );
   const {
     socketEndpoint: _socketEndpoint,
     createLocalTransport: _createLocalTransport,
@@ -4625,7 +4633,11 @@ export function createStudioServerLiveTransportFactory(
             serverDependencies,
           );
       })()
-    : localTransportFactory;
+    : hasLocalTransportOverride
+      ? localTransportFactory
+      : realtimeOrigin
+        ? createStudioLiveSignalingServerTransportFactory
+        : localTransportFactory;
 
   return applyStudioLiveP2pOverlay(
     applyStudioRealtimePurposeRouting(primaryFactory, {

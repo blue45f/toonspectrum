@@ -19,6 +19,7 @@
  * OPFS 저널이 생기지 않는다.
  */
 
+import { studioAutosaveDocumentBusy } from "./studio-autosave-opfs-session";
 import { createStudioOpfsRecoveryRuntime } from "./studio-opfs-recovery-runtime";
 import {
   clearStudioReliabilityChannel,
@@ -240,6 +241,7 @@ export function noteStudioSaveSucceeded(
  * 무음을 깬다. 쿼터 압박이면 복구 런타임의 `cleanupQuota()` 까지 이어진다.
  */
 export function reportStudioAutosaveFailure(cause: unknown): Promise<void> {
+  if (studioAutosaveDocumentBusy(cause)) return Promise.resolve();
   const quota = isStudioStorageQuotaPressure(cause);
   reportStudioReliabilitySignal({
     channel: "save",
@@ -262,6 +264,7 @@ export function reportStudioAutosaveFailure(cause: unknown): Promise<void> {
  * 내구 저장 성공은 아니므로 그 사실이 사용자에게 도달해야 한다.
  */
 export function reportStudioSaveAuthorityDegraded(cause: unknown): void {
+  if (studioAutosaveDocumentBusy(cause)) return;
   reportStudioReliabilitySignal({
     channel: "save",
     level: "degraded",

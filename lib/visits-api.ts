@@ -55,6 +55,9 @@ export function shouldSendVisitPing({
   origin,
 }: VisitPingEnvironment): boolean {
   if (!isProductionBuild || !origin) return false;
+  // desk-platform's visits API is currently a dead rewrite (502 / no CORS).
+  // Do not probe it from Studio until it is explicitly re-enabled.
+  if (import.meta.env.VITE_DESK_PLATFORM_VISITS !== "1") return false;
 
   try {
     return new URL(origin).origin === VISIT_PING_PRODUCTION_ORIGIN;

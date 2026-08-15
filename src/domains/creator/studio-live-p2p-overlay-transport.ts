@@ -1,4 +1,18 @@
 import {
+  createStudioCrdtLocalWireMessage,
+  isStudioCrdtLocalWireCandidate,
+  parseStudioCrdtLocalWireMessage,
+  parseStudioCrdtSyncRequest,
+  parseStudioCrdtSyncResponse,
+  parseStudioCrdtUpdateRequest,
+  STUDIO_CRDT_PROTOCOL_VERSION,
+  type StudioCrdtSyncRequest,
+  type StudioCrdtSyncResponse,
+  type StudioCrdtTransportMessage,
+  type StudioCrdtUpdateAck,
+  type StudioCrdtUpdateRequest,
+} from "./studio-crdt-protocol";
+import {
   createStudioLiveEnvelope,
   parseStudioLiveEnvelope,
   type StudioLiveEnvelope,
@@ -8,13 +22,6 @@ import {
   type StudioLiveWebRtcIcePayload,
 } from "./studio-live-collaboration-protocol";
 
-import type {
-  StudioCrdtSyncRequest,
-  StudioCrdtSyncResponse,
-  StudioCrdtTransportMessage,
-  StudioCrdtUpdateAck,
-  StudioCrdtUpdateRequest,
-} from "./studio-crdt-protocol";
 import type {
   StudioLiveTransport,
   StudioLiveTransportContext,
@@ -121,7 +128,8 @@ interface StudioLiveP2pPeerLink {
 /**
  * Opportunistic STUN-only data-channel mesh on top of an authoritative server transport.
  * Cursor, presence heartbeat, and chat hop peer-to-peer once every known peer has an open
- * channel. Join, locks, CRDT durability, and ICE signaling stay on the primary transport.
+ * channel. Join, locks, and ICE signaling stay on the primary transport. CRDT stays
+ * on the primary when it can persist updates; otherwise the mesh carries jam Yjs diffs.
  * A missing WebRTC implementation or a failed ICE path falls back without shrinking features.
  */
 class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
@@ -135,6 +143,12 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
   private readonly maxPeers: number;
   private readonly peers = new Map<string, StudioLiveP2pPeerLink>();
   private readonly listeners = new Set<(value: unknown) => void>();
+  private readonly crdtListeners = new Set<(message: StudioCrdtTransportMessage) => void>();
+  private readonly pendingCrdtSync = new Map<string, {
+    resolve: (response: StudioCrdtSyncResponse | null) => void;
+    timeout: ReturnType<typeof setTimeout>;
+  }>();
+  private readonly seenCrdtUpdateIds = new Set<string>();
   private unsubscribePrimary: (() => void) | null = null;
   private signalSequence = 1;
   private closed = false;
@@ -215,23 +229,38 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
     return this.primary.releaseLock(request);
   }
 
-  requestCrdtSync?(request: StudioCrdtSyncRequest): Promise<StudioCrdtSyncResponse | null> {
-    return this.primary.requestCrdtSync?.(request) ?? Promise.resolve(null);
+  requestCrdtSync(request: StudioCrdtSyncRequest): Promise<StudioCrdtSyncResponse | null> {
+    if (this.primary.requestCrdtSync) return this.primary.requestCrdtSync(request);
+    return this.requestMeshCrdtSync(request);
   }
 
-  respondCrdtSync?(response: StudioCrdtSyncResponse, targetSessionId: string): boolean {
-    return this.primary.respondCrdtSync?.(response, targetSessionId) ?? false;
-  }
-
-  publishCrdtUpdate?(request: StudioCrdtUpdateRequest): Promise<StudioCrdtUpdateAck> {
-    if (!this.primary.publishCrdtUpdate) {
-      return Promise.reject(new Error("권위 있는 CRDT 저장 경로가 없습니다."));
+  respondCrdtSync(response: StudioCrdtSyncResponse, targetSessionId: string): boolean {
+    if (this.primary.respondCrdtSync) {
+      return this.primary.respondCrdtSync(response, targetSessionId);
     }
-    return this.primary.publishCrdtUpdate(request);
+    const parsed = parseStudioCrdtSyncResponse(response, {
+      expectedWorkId: this.context.workId,
+    });
+    if (!parsed || !targetSessionId) return false;
+    return this.sendMeshCrdtWire({
+      workId: this.context.workId,
+      senderSessionId: this.context.participant.sessionId,
+      targetSessionId,
+      kind: "sync-response",
+      payload: parsed,
+    });
   }
 
-  subscribeCrdt?(listener: (message: StudioCrdtTransportMessage) => void): () => void {
-    return this.primary.subscribeCrdt?.(listener) ?? (() => undefined);
+  publishCrdtUpdate(request: StudioCrdtUpdateRequest): Promise<StudioCrdtUpdateAck> {
+    if (this.primary.publishCrdtUpdate) return this.primary.publishCrdtUpdate(request);
+    return this.publishMeshCrdtUpdate(request);
+  }
+
+  subscribeCrdt(listener: (message: StudioCrdtTransportMessage) => void): () => void {
+    if (this.primary.subscribeCrdt) return this.primary.subscribeCrdt(listener);
+    if (this.closed) return () => undefined;
+    this.crdtListeners.add(listener);
+    return () => this.crdtListeners.delete(listener);
   }
 
   close(): void {
@@ -239,9 +268,145 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
     this.closed = true;
     this.unsubscribePrimary?.();
     this.unsubscribePrimary = null;
+    for (const pending of this.pendingCrdtSync.values()) {
+      clearTimeout(pending.timeout);
+      pending.resolve(null);
+    }
+    this.pendingCrdtSync.clear();
+    this.seenCrdtUpdateIds.clear();
+    this.crdtListeners.clear();
     for (const sessionId of [...this.peers.keys()]) this.teardownPeer(sessionId);
     this.listeners.clear();
     this.primary.close();
+  }
+
+  private requestMeshCrdtSync(
+    request: StudioCrdtSyncRequest,
+  ): Promise<StudioCrdtSyncResponse | null> {
+    const parsed = parseStudioCrdtSyncRequest(request, {
+      expectedWorkId: this.context.workId,
+    });
+    if (!parsed) {
+      return Promise.reject(new Error("CRDT 동기화 요청이 올바르지 않습니다."));
+    }
+    if (this.pendingCrdtSync.has(parsed.requestId)) {
+      return Promise.reject(new Error("같은 CRDT 동기화 요청이 이미 진행 중입니다."));
+    }
+    return new Promise((resolve) => {
+      const timeout = setTimeout(() => {
+        this.pendingCrdtSync.delete(parsed.requestId);
+        resolve(null);
+      }, 2_000);
+      this.pendingCrdtSync.set(parsed.requestId, { resolve, timeout });
+      const sent = this.sendMeshCrdtWire({
+        workId: this.context.workId,
+        senderSessionId: this.context.participant.sessionId,
+        targetSessionId: null,
+        kind: "sync-request",
+        payload: parsed,
+      });
+      if (sent) return;
+      clearTimeout(timeout);
+      this.pendingCrdtSync.delete(parsed.requestId);
+      resolve(null);
+    });
+  }
+
+  private publishMeshCrdtUpdate(
+    request: StudioCrdtUpdateRequest,
+  ): Promise<StudioCrdtUpdateAck> {
+    const parsed = parseStudioCrdtUpdateRequest(request, {
+      expectedWorkId: this.context.workId,
+    });
+    if (!parsed) {
+      return Promise.reject(new Error("CRDT 업데이트가 올바르지 않습니다."));
+    }
+    const duplicate = this.seenCrdtUpdateIds.has(parsed.updateId);
+    if (!duplicate) {
+      this.rememberMeshCrdtUpdateId(parsed.updateId);
+      if (this.peers.size > 0) {
+        this.sendMeshCrdtWire({
+          workId: this.context.workId,
+          senderSessionId: this.context.participant.sessionId,
+          targetSessionId: null,
+          kind: "update",
+          payload: {
+            protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+            workId: this.context.workId,
+            updateId: parsed.updateId,
+            serverSequence: "0",
+            update: parsed.update,
+          },
+        });
+      }
+    }
+    return Promise.resolve({
+      protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+      workId: this.context.workId,
+      updateId: parsed.updateId,
+      serverSequence: "0",
+      serverStateVector: null,
+      duplicate,
+    });
+  }
+
+  private sendMeshCrdtWire(
+    message: Parameters<typeof createStudioCrdtLocalWireMessage>[0],
+  ): boolean {
+    if (this.closed || this.peers.size === 0) return false;
+    let delivered = 0;
+    const serialized = JSON.stringify(createStudioCrdtLocalWireMessage(message));
+    const target = message.targetSessionId;
+    for (const peer of this.peers.values()) {
+      if (target && peer.sessionId !== target) continue;
+      if (this.sendSerializedToPeer(peer, serialized)) delivered += 1;
+    }
+    return delivered > 0;
+  }
+
+  private receiveMeshCrdt(value: unknown): boolean {
+    if (!isStudioCrdtLocalWireCandidate(value)) return false;
+    const wire = parseStudioCrdtLocalWireMessage(value, {
+      expectedWorkId: this.context.workId,
+      selfSessionId: this.context.participant.sessionId,
+    });
+    if (!wire) return true;
+    if (wire.kind === "sync-response") {
+      const pending = this.pendingCrdtSync.get(wire.payload.requestId);
+      if (!pending) return true;
+      this.pendingCrdtSync.delete(wire.payload.requestId);
+      clearTimeout(pending.timeout);
+      pending.resolve(wire.payload);
+      return true;
+    }
+    if (wire.kind === "sync-request") {
+      this.emitMeshCrdt({
+        type: "sync-request",
+        request: wire.payload,
+        senderSessionId: wire.senderSessionId,
+      });
+      return true;
+    }
+    if (this.seenCrdtUpdateIds.has(wire.payload.updateId)) return true;
+    this.rememberMeshCrdtUpdateId(wire.payload.updateId);
+    this.emitMeshCrdt({
+      type: "update",
+      update: wire.payload,
+      senderSessionId: wire.senderSessionId,
+    });
+    return true;
+  }
+
+  private emitMeshCrdt(message: StudioCrdtTransportMessage): void {
+    for (const listener of this.crdtListeners) listener(message);
+  }
+
+  private rememberMeshCrdtUpdateId(updateId: string): void {
+    if (this.seenCrdtUpdateIds.has(updateId)) return;
+    this.seenCrdtUpdateIds.add(updateId);
+    if (this.seenCrdtUpdateIds.size <= 2_048) return;
+    const oldest = this.seenCrdtUpdateIds.values().next().value;
+    if (typeof oldest === "string") this.seenCrdtUpdateIds.delete(oldest);
   }
 
   private sendEphemeral(envelope: StudioLiveEnvelope): boolean {
@@ -442,6 +607,7 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
     } catch {
       return;
     }
+    if (this.receiveMeshCrdt(parsed)) return;
     const envelope = parseStudioLiveEnvelope(parsed, {
       expectedWorkId: this.context.workId,
       selfSessionId: this.context.participant.sessionId,

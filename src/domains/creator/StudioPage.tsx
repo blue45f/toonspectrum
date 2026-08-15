@@ -165,6 +165,7 @@ import {
   type StudioPendingStrokeDurabilityReason,
 } from "./studio-autosave";
 import { studioAutosaveLeadershipAllowsLocalEdit } from "./studio-autosave-document-leader";
+import { studioAutosaveDocumentBusy } from "./studio-autosave-opfs-session";
 import {
   preloadStudioBackground3D,
 } from "./studio-background-3d-loader";
@@ -1486,6 +1487,12 @@ import {
   createStudioTeamCommentRefreshSession,
   type StudioTeamCommentRefreshSession,
 } from "./studio-team-comment-refresh-session";
+import {
+  createStudioThinLineInkInputState,
+  filterStudioThinLineInkInput,
+  flushStudioThinLineInkInput,
+  shouldFilterStudioThinLineInkInput,
+} from "./studio-thin-line-ink-input-v1";
 import { suppressNextStudioToolHintFocus } from "./studio-tool-hint-focus-suppression";
 import {
   areStudioToolOperationSnapshotsEqual,
@@ -11893,6 +11900,7 @@ function StudioCuttoonEditor({
           noteStudioSaveSucceeded(receipt.authority);
         })
         .catch((cause: unknown) => {
+          if (studioAutosaveDocumentBusy(cause)) return;
           // Keep the current in-memory generation dirty. Only an OPFS/SQLite receipt may advance
           // the durable generation; browser KV is compatibility/discard-only in the V12 product.
           // 무음 금지: 상태 레일에 도달시키고, 쿼터 압박이면 복구 저널 공간 회수까지 잇는다.
@@ -13826,6 +13834,9 @@ function StudioCuttoonEditor({
   } | null>(null);
   /** Strength-zero Magma input: quantized coalesced samples with no fixed-clock latency. */
   const drawingImmediateCausalInputRef = useRef(false);
+  const drawingThinLineInkInputRef = useRef<ReturnType<
+    typeof createStudioThinLineInkInputState
+  > | null>(null);
   /** One processed/coalesced batch may mutate its private draft clone before publishing once. */
   const drawingImmediateBatchMutationRef = useRef(false);
   const drawingFixedRatePumpRef = useRef<FixedRateStrokeFramePump | null>(null);
@@ -32654,6 +32665,7 @@ const puppetWarpArmed =
       // Fall back to direct samples for the remainder of this stroke.
       onError: () => {
         drawingImmediateCausalInputRef.current = true;
+        drawingThinLineInkInputRef.current = null;
         drawingFixedRateFilterRef.current = null;
         drawingStabilizerRef.current = null;
         drawingPrecisionStabilizerBridgeRef.current?.reset();
@@ -32704,6 +32716,7 @@ const puppetWarpArmed =
     drawingPrecisionStabilizerBridgeRef.current = null;
     drawingFixedRateFilterRef.current = null;
     drawingImmediateCausalInputRef.current = false;
+    drawingThinLineInkInputRef.current = null;
     drawingImmediateBatchMutationRef.current = false;
     drawingFixedRateSampleClockRef.current = null;
     drawingLastAuthoritativePointerRef.current = null;
@@ -34681,6 +34694,16 @@ const puppetWarpArmed =
         return;
       }
       drawingImmediateCausalInputRef.current = causalInputPlan.quantizeImmediately;
+      drawingThinLineInkInputRef.current = shouldFilterStudioThinLineInkInput({
+        brushId: next.brush,
+        immediateCausalInput: causalInputPlan.quantizeImmediately,
+      })
+        ? createStudioThinLineInkInputState({
+            x: strokeOrigin.x,
+            y: strokeOrigin.y,
+            timeStamp: pointerSample.timeStamp,
+          })
+        : null;
       // Pixel pencil bypasses stabilizers; positive standard strength keeps the exact 5ms cascade.
       drawingFixedRateFilterRef.current = causalInputPlan.usesFixedRateClock
         ? createFixedRateStrokeFilter({
@@ -35797,6 +35820,24 @@ const puppetWarpArmed =
     let targetX = pos.x;
     let targetY = pos.y;
     if (
+      drawingThinLineInkInputRef.current
+      && shouldFilterStudioThinLineInkInput({
+        brushId: current.brush,
+        immediateCausalInput: drawingImmediateCausalInputRef.current,
+      })
+    ) {
+      const filtered = filterStudioThinLineInkInput(
+        drawingThinLineInkInputRef.current,
+        { x: targetX, y: targetY, timeStamp: sampleTimeStamp },
+        inputSettings?.coordinateScale ?? effScale,
+      );
+      if (!drawingPredictionPreviewRef.current) {
+        drawingThinLineInkInputRef.current = filtered.state;
+      }
+      targetX = filtered.x;
+      targetY = filtered.y;
+    }
+    if (
       drawingImmediateCausalInputRef.current
       || drawingFixedRateFilterRef.current !== null
     ) {
@@ -35912,6 +35953,7 @@ const puppetWarpArmed =
       // making the stroke run backwards. Recreate it lazily only if a later unconstrained move
       // resumes the freehand gesture.
       drawingStabilizerRef.current = transition.stabilizerState;
+      drawingThinLineInkInputRef.current = null;
       drawingPrecisionStabilizerBridgeRef.current?.reset();
       drawingPrecisionStabilizerBridgeRef.current = null;
       // A replace-in-place Shift gesture cannot retain the old fixed-clock history. If the artist
@@ -37641,6 +37683,18 @@ const puppetWarpArmed =
           const endpointPlan = planStudioPointerReleaseEndpoint({
             stroke: current,
             endpoint: { x: flushed.point[0], y: flushed.point[1] },
+            pointer: releaseEndpointPointerSample(pointerEvent, current),
+            pressureCurve: inputSettings?.pressureCurve ?? pressureCurve,
+            pressureMinSize: inputSettings?.pressureMinSize ?? pressureMinSize,
+          });
+          if (endpointPlan.appended) drawingRef.current = endpointPlan.stroke;
+        } else if (drawingThinLineInkInputRef.current) {
+          const thinLineFlush = flushStudioThinLineInkInput(drawingThinLineInkInputRef.current);
+          drawingThinLineInkInputRef.current = thinLineFlush.state;
+          const current = drawingRef.current;
+          const endpointPlan = planStudioPointerReleaseEndpoint({
+            stroke: current,
+            endpoint: { x: thinLineFlush.x, y: thinLineFlush.y },
             pointer: releaseEndpointPointerSample(pointerEvent, current),
             pressureCurve: inputSettings?.pressureCurve ?? pressureCurve,
             pressureMinSize: inputSettings?.pressureMinSize ?? pressureMinSize,
@@ -42172,6 +42226,7 @@ function clearSelectionForEdit() {
       > studioLifecycleDurableGenerationRef.current;
     if (!hasDirtyPendingState && !hasDirtyStableState) return;
     if (!workHydrated || collaborationDocumentLocked) return;
+    if (autosaveDocumentLeaseRef.current?.role === "follower") return;
     // A shared route must carry the exact hydrated revision. Treating a not-yet-hydrated work as
     // local would create a recovery that can never pass shared compatibility checks.
     if (workId && !sharedDocument) return;
@@ -42253,6 +42308,7 @@ function clearSelectionForEdit() {
             noteStudioSaveSucceeded(authority);
           })
           .catch((cause: unknown) => {
+            if (studioAutosaveDocumentBusy(cause)) return;
             // The exact payload remains in the current tab's memory. Do not advance either durable
             // frontier until an OPFS/SQLite receipt exists, and make the loss of durability visible.
             reportStudioSaveAuthorityDegraded(cause);

@@ -440,6 +440,64 @@ describe("Studio live P2P overlay", () => {
     expect(primary.sent).toContainEqual(cursor);
   });
 
+  it("carries jam CRDT updates on the mesh when the primary has no Socket.IO authority", async () => {
+    const hub = new MemoryRtcHub();
+    const bus = new SignalingBus();
+    const stripCrdt = (primary: FakePrimaryTransport): StudioLiveTransport => ({
+      mode: primary.mode,
+      get ready() {
+        return primary.ready;
+      },
+      connect: () => primary.connect(),
+      send: (envelope) => primary.send(envelope),
+      subscribe: (listener) => primary.subscribe(listener),
+      subscribeControl: (listener) => primary.subscribeControl(listener),
+      close: () => primary.close(),
+    });
+    const localPrimary = bus.create(LOCAL);
+    const remotePrimary = bus.create(REMOTE);
+    const local = applyStudioLiveP2pOverlay(() => stripCrdt(localPrimary), {
+      createPeerConnection: () => hub.create(),
+      now: () => NOW,
+    })(contextFor(LOCAL));
+    const remote = applyStudioLiveP2pOverlay(() => stripCrdt(remotePrimary), {
+      createPeerConnection: () => hub.create(),
+      now: () => NOW,
+    })(contextFor(REMOTE));
+    const received: StudioCrdtTransportMessage[] = [];
+    remote.subscribeCrdt?.((message) => received.push(message));
+    await local.connect();
+    await remote.connect();
+    localPrimary.emit(
+      envelope({
+        sender: REMOTE,
+        kind: "presence:heartbeat",
+        payload: { visibility: "active", pageId: "page-1", tool: "pen" },
+      }),
+    );
+    remotePrimary.emit(
+      envelope({
+        sender: LOCAL,
+        kind: "presence:heartbeat",
+        payload: { visibility: "active", pageId: "page-1", tool: "pen" },
+        sequence: 2,
+      }),
+    );
+    await flush();
+    const ack = await local.publishCrdtUpdate?.({
+      protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+      workId: "work-p2p",
+      updateId: "00000000-0000-4000-8000-000000000042",
+      clientSequence: 1,
+      update: "AAAA",
+    });
+    expect(ack?.duplicate).toBe(false);
+    expect(localPrimary.publishCrdtUpdate).not.toHaveBeenCalled();
+    expect(received.some((message) =>
+      message.type === "update" && message.update.updateId === "00000000-0000-4000-8000-000000000042"
+    )).toBe(true);
+  });
+
   it("keeps locks and CRDT durability on the authoritative primary transport", async () => {
     const { localPrimary, local } = await connectedMesh();
     await local.acquireLock?.({

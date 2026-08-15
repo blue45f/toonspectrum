@@ -60,6 +60,17 @@ describe("studio storage recovery runtime — no silent save failure", () => {
     expect(isStudioStorageQuotaPressure(new Error("network down"))).toBe(false);
   });
 
+  it("does not treat a follower-tab lease as a failed save", async () => {
+    install(createFakeRuntime(async () => ({ removedPaths: [], freedBytes: 0 })));
+    const { StudioAutosaveDocumentBusyError } = await import("./studio-autosave-opfs-session");
+
+    await reportStudioAutosaveFailure(new StudioAutosaveDocumentBusyError());
+    reportStudioSaveAuthorityDegraded(new StudioAutosaveDocumentBusyError());
+
+    const snapshot = getStudioReliabilityStatusSnapshot();
+    expect(snapshot.save).toBeNull();
+  });
+
   it("surfaces an ordinary autosave failure to the user instead of only the console", async () => {
     install(createFakeRuntime(async () => ({ removedPaths: [], freedBytes: 0 })));
 

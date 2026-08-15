@@ -442,8 +442,7 @@ describe("two-tab autosave persistence", () => {
     // The follower must not have reached any authority: no SQLite row change, no browser slot.
     expect(sqlite.values.get(AUTOSAVE_KEY)).toBe(leaderMirror);
     expect(storage.values.size).toBe(0);
-    expect(degraded).toHaveLength(1);
-    expect(studioAutosaveDocumentBusy(degraded[0])).toBe(true);
+    expect(degraded).toHaveLength(0);
   });
 
   it("keeps the leading tab's strokes as the durable document after a follower write attempt",

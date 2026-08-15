@@ -37,6 +37,8 @@ interface ImportMetaEnv {
   // desk-platform — 공개 문의(Inquiry) 게시판 백엔드 베이스 URL.
   // 미설정 시 prod 기본값(https://desk-platform.vercel.app)으로 폴백한다. (lib/inquiry-api.ts)
   readonly VITE_DESK_PLATFORM_URL?: string;
+  // `1` re-enables automatic visits/ping. Default off — desk-platform currently 502s without CORS.
+  readonly VITE_DESK_PLATFORM_VISITS?: "1";
   // 통합 로그인(Firebase Auth, deskcloud-fleet-auth) — 리터럴 금지, env 로만 주입(lib/firebaseAuth/config.ts).
   // apiKey/appId 미설정 시 런타임 인증 비활성(isFirebaseAuthConfigured=false), 빌드/타입은 정상.
   readonly VITE_FIREBASE_API_KEY?: string;

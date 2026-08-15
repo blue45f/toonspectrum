@@ -11,13 +11,13 @@ describe("visit ping environment policy", () => {
     vi.unstubAllGlobals();
   });
 
-  it("allows the canonical production origin in a production build", () => {
+  it("keeps production visits off until the desk-platform API is explicitly re-enabled", () => {
     expect(
       shouldSendVisitPing({
         isProductionBuild: true,
         origin: VISIT_PING_PRODUCTION_ORIGIN,
       })
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it.each([
