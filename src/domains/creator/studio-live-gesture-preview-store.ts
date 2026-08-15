@@ -17,11 +17,15 @@ export const STUDIO_LIVE_GESTURE_PREVIEW_TTL_MS = 3_000;
 export const STUDIO_LIVE_GESTURE_PREVIEW_MAX_PEERS = 64;
 export const STUDIO_LIVE_GESTURE_PREVIEW_MAX_ACTIVE_GESTURES = 64;
 export const STUDIO_LIVE_GESTURE_PREVIEW_MAX_GESTURES_PER_PEER = 2;
+export const STUDIO_LIVE_GESTURE_PREVIEW_MAX_SETTLING_GESTURES = 64;
+export const STUDIO_LIVE_GESTURE_PREVIEW_MAX_SETTLING_SAMPLES =
+  STUDIO_LIVE_GESTURE_PREVIEW_MAX_SAMPLES_PER_GESTURE;
 export const STUDIO_LIVE_GESTURE_PREVIEW_MAX_TOMBSTONES = 128;
+export const STUDIO_LIVE_GESTURE_PREVIEW_MAX_AUTHORITATIVE_WITNESSES = 128;
 
 const STUDIO_LIVE_GESTURE_PREVIEW_PRUNE_INTERVAL_MS = 1_000;
 
-type StudioLiveGesturePreviewActivePhase = "begin" | "append" | "replace";
+type StudioLiveGesturePreviewVisiblePhase = "begin" | "append" | "replace" | "end";
 
 export interface StudioLiveGesturePreviewSnapshotEntry {
   readonly key: string;
@@ -29,7 +33,7 @@ export interface StudioLiveGesturePreviewSnapshotEntry {
   readonly gestureId: string;
   readonly pageId: string;
   readonly seq: number;
-  readonly lastPhase: StudioLiveGesturePreviewActivePhase;
+  readonly lastPhase: StudioLiveGesturePreviewVisiblePhase;
   readonly operation: StudioLiveGesturePreviewOperation;
   readonly base?: StudioLiveGesturePreviewBase;
   readonly renderer?: StudioLiveGesturePreviewRendererSnapshot;
@@ -72,7 +76,10 @@ export interface StudioLiveGesturePreviewStoreLimits {
   readonly maxGesturesPerPeer: number;
   readonly maxSamplesPerGesture: number;
   readonly maxTotalSamples: number;
+  readonly maxSettlingGestures: number;
+  readonly maxSettlingSamples: number;
   readonly maxTombstones: number;
+  readonly maxAuthoritativeWitnesses: number;
 }
 
 export interface StudioLiveGesturePreviewStoreScheduler {
@@ -96,9 +103,17 @@ interface ActiveGesture {
 
 interface GestureTombstone {
   readonly senderSessionId: string;
+  readonly gestureId: string;
   readonly pageId: string;
   readonly seq: number;
   readonly payloadFingerprint: string;
+  readonly updatedAt: number;
+}
+
+interface AuthoritativeProjectionWitness {
+  readonly pageId: string;
+  readonly gestureId: string;
+  readonly senderSessionId: string | null;
   readonly updatedAt: number;
 }
 
@@ -111,7 +126,11 @@ const DEFAULT_GESTURE_PREVIEW_LIMITS: StudioLiveGesturePreviewStoreLimits = Obje
   maxSamplesPerGesture: STUDIO_LIVE_GESTURE_PREVIEW_MAX_SAMPLES_PER_GESTURE,
   // A single malicious room cannot allocate the per-gesture maximum for every active peer.
   maxTotalSamples: STUDIO_LIVE_GESTURE_PREVIEW_MAX_SAMPLES_PER_GESTURE,
+  maxSettlingGestures: STUDIO_LIVE_GESTURE_PREVIEW_MAX_SETTLING_GESTURES,
+  maxSettlingSamples: STUDIO_LIVE_GESTURE_PREVIEW_MAX_SETTLING_SAMPLES,
   maxTombstones: STUDIO_LIVE_GESTURE_PREVIEW_MAX_TOMBSTONES,
+  maxAuthoritativeWitnesses:
+    STUDIO_LIVE_GESTURE_PREVIEW_MAX_AUTHORITATIVE_WITNESSES,
 });
 
 const DEFAULT_GESTURE_PREVIEW_SCHEDULER: StudioLiveGesturePreviewStoreScheduler = {
@@ -158,10 +177,25 @@ function resolveLimits(
       DEFAULT_GESTURE_PREVIEW_LIMITS.maxTotalSamples,
       STUDIO_LIVE_GESTURE_PREVIEW_MAX_SAMPLES_PER_GESTURE * maxActiveGestures,
     ),
+    maxSettlingGestures: boundedPositiveInteger(
+      overrides?.maxSettlingGestures,
+      DEFAULT_GESTURE_PREVIEW_LIMITS.maxSettlingGestures,
+      STUDIO_LIVE_GESTURE_PREVIEW_MAX_SETTLING_GESTURES,
+    ),
+    maxSettlingSamples: boundedPositiveInteger(
+      overrides?.maxSettlingSamples,
+      DEFAULT_GESTURE_PREVIEW_LIMITS.maxSettlingSamples,
+      STUDIO_LIVE_GESTURE_PREVIEW_MAX_SETTLING_SAMPLES,
+    ),
     maxTombstones: boundedPositiveInteger(
       overrides?.maxTombstones,
       DEFAULT_GESTURE_PREVIEW_LIMITS.maxTombstones,
       STUDIO_LIVE_GESTURE_PREVIEW_MAX_TOMBSTONES,
+    ),
+    maxAuthoritativeWitnesses: boundedPositiveInteger(
+      overrides?.maxAuthoritativeWitnesses,
+      DEFAULT_GESTURE_PREVIEW_LIMITS.maxAuthoritativeWitnesses,
+      STUDIO_LIVE_GESTURE_PREVIEW_MAX_AUTHORITATIVE_WITNESSES,
     ),
   });
 }
@@ -194,11 +228,22 @@ function containsControlCharacter(value: string): boolean {
   return false;
 }
 
+function isSafePreviewIdentifier(value: string): boolean {
+  return value.length > 0
+    && value.length <= STUDIO_LIVE_GESTURE_PREVIEW_LIMITS.identifierLength
+    && value === value.trim()
+    && !containsControlCharacter(value);
+}
+
 export function studioLiveGesturePreviewKey(
   senderSessionId: string,
   gestureId: string,
 ): string {
   return `${senderSessionId.length}:${senderSessionId}${gestureId}`;
+}
+
+function authoritativeProjectionWitnessKey(pageId: string, gestureId: string): string {
+  return `${pageId.length}:${pageId}${gestureId}`;
 }
 
 function sampleCount(samples: StudioLiveGesturePreviewSamples | undefined): number {
@@ -271,6 +316,10 @@ function appendRetouch(
 export class StudioLiveGesturePreviewStore {
   private readonly active = new Map<string, ActiveGesture>();
   private readonly tombstones = new Map<string, GestureTombstone>();
+  private readonly authoritativeWitnesses = new Map<
+    string,
+    AuthoritativeProjectionWitness
+  >();
   private readonly listeners = new Set<() => void>();
   private readonly limits: StudioLiveGesturePreviewStoreLimits;
   private readonly scheduler: StudioLiveGesturePreviewStoreScheduler;
@@ -316,12 +365,7 @@ export class StudioLiveGesturePreviewStore {
     senderSessionId: string,
     input: StudioLiveGesturePreviewPayload,
   ): StudioLiveGesturePreviewApplyResult {
-    if (
-      senderSessionId.length === 0
-      || senderSessionId.length > STUDIO_LIVE_GESTURE_PREVIEW_LIMITS.identifierLength
-      || senderSessionId !== senderSessionId.trim()
-      || containsControlCharacter(senderSessionId)
-    ) {
+    if (!isSafePreviewIdentifier(senderSessionId)) {
       return { status: "rejected", reason: "invalid-sender" };
     }
     const now = this.scheduler.now();
@@ -341,8 +385,14 @@ export class StudioLiveGesturePreviewStore {
       reason: StudioLiveGesturePreviewRejectReason,
     ): StudioLiveGesturePreviewApplyResult => {
       const changed = this.active.delete(key);
+      this.clearMatchingAuthoritativeWitness(
+        payload.pageId,
+        payload.gestureId,
+        senderSessionId,
+      );
       this.addTombstone(key, {
         senderSessionId,
+        gestureId: payload.gestureId,
         pageId: payload.pageId,
         seq: payload.seq,
         payloadFingerprint: fingerprint,
@@ -354,6 +404,9 @@ export class StudioLiveGesturePreviewStore {
     const current = this.active.get(key);
     const tombstone = this.tombstones.get(key);
     if (current) {
+      // Old dual-route packets are harmless no-ops. In particular, they must not refresh the
+      // active entry's TTL or replace its last-payload fingerprint.
+      if (payload.seq < current.snapshot.seq) return finish({ status: "duplicate" });
       if (payload.seq === current.snapshot.seq) {
         return fingerprint === current.lastPayloadFingerprint
           ? finish({ status: "duplicate" })
@@ -366,6 +419,7 @@ export class StudioLiveGesturePreviewStore {
         || payload.operation !== current.snapshot.operation
       ) return reject("identity");
       if (payload.phase === "begin") return reject("unexpected-phase");
+      if (current.snapshot.lastPhase === "end") return reject("unexpected-phase");
     } else {
       if (tombstone) {
         if (
@@ -384,14 +438,51 @@ export class StudioLiveGesturePreviewStore {
     ) return reject("inactive-page");
 
     if (payload.phase === "begin") {
-      const senderAlreadyActive = [...this.active.values()].some(
+      const witnessKey = authoritativeProjectionWitnessKey(
+        payload.pageId,
+        payload.gestureId,
+      );
+      const witness = this.authoritativeWitnesses.get(witnessKey);
+      if (
+        witness
+        && (
+          witness.senderSessionId === null
+          || witness.senderSessionId === senderSessionId
+        )
+      ) {
+        this.authoritativeWitnesses.delete(witnessKey);
+        this.addTombstone(key, {
+          senderSessionId,
+          gestureId: payload.gestureId,
+          pageId: payload.pageId,
+          seq: payload.seq,
+          payloadFingerprint: fingerprint,
+          updatedAt: now,
+        });
+        return finish({ status: "applied" });
+      }
+      // Settling entries remain visible until an authoritative receipt, their own bounded budget,
+      // or TTL cleanup retires them. They never consume active-gesture caps.
+      const activeGestures = [...this.active.values()].filter(
+        (gesture) => gesture.snapshot.lastPhase !== "end",
+      );
+      const senderAlreadyActive = activeGestures.some(
         (gesture) => gesture.snapshot.senderSessionId === senderSessionId,
       );
-      if (!senderAlreadyActive && this.activeSenderCount() >= this.limits.maxPeers) {
+      const activeSenderCount = new Set(
+        activeGestures.map((gesture) => gesture.snapshot.senderSessionId),
+      ).size;
+      if (!senderAlreadyActive && activeSenderCount >= this.limits.maxPeers) {
         return reject("peer-cap");
       }
-      if (this.active.size >= this.limits.maxActiveGestures) return reject("gesture-cap");
-      if (this.activeGestureCountForSender(senderSessionId) >= this.limits.maxGesturesPerPeer) {
+      if (activeGestures.length >= this.limits.maxActiveGestures) {
+        return reject("gesture-cap");
+      }
+      if (
+        activeGestures.filter(
+          (gesture) => gesture.snapshot.senderSessionId === senderSessionId,
+        ).length >= this.limits.maxGesturesPerPeer
+      ) {
         return reject("peer-gesture-cap");
       }
       if (payload.samples && payload.samples.startIndex !== 0) {
@@ -514,15 +605,113 @@ export class StudioLiveGesturePreviewStore {
       return finish({ status: "applied" }, true);
     }
 
+    if (payload.phase === "end") {
+      const witnessKey = authoritativeProjectionWitnessKey(
+        payload.pageId,
+        payload.gestureId,
+      );
+      const witness = this.authoritativeWitnesses.get(witnessKey);
+      const authoritativeAlreadyProjected = Boolean(
+        witness
+        && (
+          witness.senderSessionId === null
+          || witness.senderSessionId === senderSessionId
+        ),
+      );
+      if (authoritativeAlreadyProjected || !this.makeSettlingRoom(
+        current.snapshot.sampleCount,
+        now,
+      )) {
+        if (authoritativeAlreadyProjected) this.authoritativeWitnesses.delete(witnessKey);
+        this.active.delete(key);
+        this.addTombstone(key, {
+          senderSessionId,
+          gestureId: payload.gestureId,
+          pageId: payload.pageId,
+          seq: payload.seq,
+          payloadFingerprint: fingerprint,
+          updatedAt: now,
+        });
+        return finish({ status: "applied" }, true);
+      }
+      const snapshot = deepFreeze({
+        ...current.snapshot,
+        seq: payload.seq,
+        lastPhase: "end" as const,
+        updatedAt: now,
+      });
+      this.active.set(key, {
+        snapshot,
+        lastPayloadFingerprint: fingerprint,
+        sampleChannelSchema: current.sampleChannelSchema,
+      });
+      return finish({ status: "applied" }, true);
+    }
+
     this.active.delete(key);
+    this.clearMatchingAuthoritativeWitness(
+      payload.pageId,
+      payload.gestureId,
+      senderSessionId,
+    );
     this.addTombstone(key, {
       senderSessionId,
+      gestureId: payload.gestureId,
       pageId: payload.pageId,
       seq: payload.seq,
       payloadFingerprint: fingerprint,
       updatedAt: now,
     });
     return finish({ status: "applied" }, true);
+  }
+
+  /**
+   * Records that the authoritative projection for a preview id has reached the retained layer.
+   * The adapter must call this only for an id it correlated to an eligible preview begin.
+   */
+  markAuthoritativeProjection(pageId: string, gestureId: string): boolean {
+    if (
+      !isSafePreviewIdentifier(pageId)
+      || !isSafePreviewIdentifier(gestureId)
+      || (
+        this.activePageId !== undefined
+        && (this.activePageId === null || this.activePageId !== pageId)
+      )
+    ) return false;
+
+    const now = this.scheduler.now();
+    const expiredVisible = this.pruneExpired(now);
+    const matching = [...this.active.entries()].filter(
+      ([, gesture]) => gesture.snapshot.pageId === pageId
+        && gesture.snapshot.gestureId === gestureId,
+    );
+    const witnessKey = authoritativeProjectionWitnessKey(pageId, gestureId);
+
+    if (matching.length > 0) {
+      // Once the authoritative slot is actually painted, keeping either an active or terminal
+      // source-over preview would double its alpha (and an eraser would destination-out twice).
+      this.retireGestures(matching, now);
+      this.authoritativeWitnesses.delete(witnessKey);
+    } else {
+      const alreadyTombstoned = [...this.tombstones.values()].some(
+        (tombstone) => tombstone.pageId === pageId && tombstone.gestureId === gestureId,
+      );
+      if (alreadyTombstoned) {
+        this.authoritativeWitnesses.delete(witnessKey);
+      } else {
+        // Commit-before-preview delivery is possible on dual transport routes. Keep only a short,
+        // bounded witness so a later end can retire without a blank speculative handoff.
+        this.addAuthoritativeWitness(witnessKey, {
+          pageId,
+          gestureId,
+          senderSessionId: null,
+          updatedAt: now,
+        });
+      }
+    }
+
+    if (expiredVisible || matching.length > 0) this.publishSnapshot();
+    return true;
   }
 
   /** Drops previews and tombstones for peers no longer present in the room. */
@@ -536,6 +725,13 @@ export class StudioLiveGesturePreviewStore {
     }
     for (const [key, tombstone] of this.tombstones) {
       if (!retained.has(tombstone.senderSessionId)) this.tombstones.delete(key);
+    }
+    for (const [key, witness] of this.authoritativeWitnesses) {
+      if (
+        witness.senderSessionId !== null
+          ? !retained.has(witness.senderSessionId)
+          : retained.size === 0
+      ) this.authoritativeWitnesses.delete(key);
     }
     if (removed > 0) this.publishSnapshot();
     return removed;
@@ -555,6 +751,10 @@ export class StudioLiveGesturePreviewStore {
       if (pageId !== null && tombstone.pageId === pageId) continue;
       this.tombstones.delete(key);
     }
+    for (const [key, witness] of this.authoritativeWitnesses) {
+      if (pageId !== null && witness.pageId === pageId) continue;
+      this.authoritativeWitnesses.delete(key);
+    }
     if (removed > 0) this.publishSnapshot();
     return removed;
   }
@@ -564,6 +764,7 @@ export class StudioLiveGesturePreviewStore {
     const removed = this.active.size;
     this.active.clear();
     this.tombstones.clear();
+    this.authoritativeWitnesses.clear();
     if (removed > 0) this.publishSnapshot();
     return removed;
   }
@@ -574,28 +775,93 @@ export class StudioLiveGesturePreviewStore {
     this.listeners.clear();
     this.active.clear();
     this.tombstones.clear();
+    this.authoritativeWitnesses.clear();
     this.snapshot = EMPTY_GESTURE_PREVIEW_SNAPSHOT;
   }
 
-  private samplesFit(currentGestureSamples: number, nextGestureSamples: number): boolean {
+  private samplesFit(
+    currentGestureSamples: number,
+    nextGestureSamples: number,
+  ): boolean {
     if (nextGestureSamples > this.limits.maxSamplesPerGesture) return false;
     let total = 0;
-    for (const gesture of this.active.values()) total += gesture.snapshot.sampleCount;
-    return total - currentGestureSamples + nextGestureSamples <= this.limits.maxTotalSamples;
-  }
-
-  private activeSenderCount(): number {
-    return new Set(
-      [...this.active.values()].map((gesture) => gesture.snapshot.senderSessionId),
-    ).size;
-  }
-
-  private activeGestureCountForSender(senderSessionId: string): number {
-    let count = 0;
     for (const gesture of this.active.values()) {
-      if (gesture.snapshot.senderSessionId === senderSessionId) count += 1;
+      if (gesture.snapshot.lastPhase !== "end") total += gesture.snapshot.sampleCount;
     }
-    return count;
+    return total - currentGestureSamples + nextGestureSamples
+      <= this.limits.maxTotalSamples;
+  }
+
+  private makeSettlingRoom(nextGestureSamples: number, now: number): boolean {
+    if (nextGestureSamples > this.limits.maxSettlingSamples) return false;
+    const settling = [...this.active.entries()]
+      .filter(([, gesture]) => gesture.snapshot.lastPhase === "end")
+      .sort(([leftKey, left], [rightKey, right]) => (
+        left.snapshot.updatedAt - right.snapshot.updatedAt
+        || leftKey.localeCompare(rightKey)
+      ));
+    let total = settling.reduce(
+      (sum, [, gesture]) => sum + gesture.snapshot.sampleCount,
+      0,
+    );
+    while (
+      settling.length >= this.limits.maxSettlingGestures
+      || total + nextGestureSamples > this.limits.maxSettlingSamples
+    ) {
+      const oldest = settling.shift();
+      if (!oldest) return false;
+      total -= oldest[1].snapshot.sampleCount;
+      this.retireGestures([oldest], now);
+    }
+    return true;
+  }
+
+  private retireGestures(
+    gestures: readonly (readonly [string, ActiveGesture])[],
+    now: number,
+  ): void {
+    for (const [key, gesture] of gestures) {
+      this.active.delete(key);
+      this.addTombstone(key, {
+        senderSessionId: gesture.snapshot.senderSessionId,
+        gestureId: gesture.snapshot.gestureId,
+        pageId: gesture.snapshot.pageId,
+        seq: gesture.snapshot.seq,
+        payloadFingerprint: gesture.lastPayloadFingerprint,
+        updatedAt: now,
+      });
+    }
+  }
+
+  private addAuthoritativeWitness(
+    key: string,
+    witness: AuthoritativeProjectionWitness,
+  ): void {
+    this.authoritativeWitnesses.delete(key);
+    this.authoritativeWitnesses.set(key, witness);
+    while (this.authoritativeWitnesses.size > this.limits.maxAuthoritativeWitnesses) {
+      const oldestKey = this.authoritativeWitnesses.keys().next().value as
+        | string
+        | undefined;
+      if (oldestKey === undefined) break;
+      this.authoritativeWitnesses.delete(oldestKey);
+    }
+  }
+
+  private clearMatchingAuthoritativeWitness(
+    pageId: string,
+    gestureId: string,
+    senderSessionId: string,
+  ): void {
+    const key = authoritativeProjectionWitnessKey(pageId, gestureId);
+    const witness = this.authoritativeWitnesses.get(key);
+    if (
+      witness
+      && (
+        witness.senderSessionId === null
+        || witness.senderSessionId === senderSessionId
+      )
+    ) this.authoritativeWitnesses.delete(key);
   }
 
   private addTombstone(key: string, tombstone: GestureTombstone): void {
@@ -615,6 +881,7 @@ export class StudioLiveGesturePreviewStore {
       this.active.delete(key);
       this.addTombstone(key, {
         senderSessionId: gesture.snapshot.senderSessionId,
+        gestureId: gesture.snapshot.gestureId,
         pageId: gesture.snapshot.pageId,
         seq: gesture.snapshot.seq,
         payloadFingerprint: gesture.lastPayloadFingerprint,
@@ -625,6 +892,11 @@ export class StudioLiveGesturePreviewStore {
     for (const [key, tombstone] of this.tombstones) {
       if (now - tombstone.updatedAt > STUDIO_LIVE_GESTURE_PREVIEW_TTL_MS) {
         this.tombstones.delete(key);
+      }
+    }
+    for (const [key, witness] of this.authoritativeWitnesses) {
+      if (now - witness.updatedAt > STUDIO_LIVE_GESTURE_PREVIEW_TTL_MS) {
+        this.authoritativeWitnesses.delete(key);
       }
     }
     return changed;
