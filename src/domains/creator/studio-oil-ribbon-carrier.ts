@@ -420,10 +420,43 @@ const BRISTLE_RUN_STATIONS = 5;
  * self-crossing inside a band costs nothing; the extra mid band restores the multi-tone bristle
  * bed competitive oil reads as without returning to per-run compositing knots.
  */
+/**
+ * Three bands, and this is currently a CEILING set by self-crossings rather than by tone.
+ *
+ * With the band overlap flattened below, raising this is the single biggest tonal win available:
+ * measured, 3/8/16/32 bands give 3/8/16/32 distinct lane tones with zero saturated, and the
+ * rendered interior's top-two-tone share falls 0.569 -> 0.385 -> 0.302 -> 0.283 (entropy 3.518 ->
+ * 4.482 -> 5.029 -> 5.377 bits), with 16 the knee. That is a large, real answer to the flat
+ * "단 2색" look.
+ *
+ * It is not landed because each band is its own multiply pass, so N bands stack N times where a
+ * stroke crosses itself: the figure-eight knot probe in studio-oil-ribbon-carrier.pixel.test.ts
+ * measures peak 0.347 at 4 bands, 0.283 at 6 and 0.274 at 8 against a 0.25 limit, while 3 passes.
+ * Raising the count therefore trades a flat interior for dark knots at every crossing, which is a
+ * different visible defect rather than a fix. The unlock is to stop cross-band stacking at a
+ * crossing (rasterise the bands' union once, as the per-band contract already does within a band);
+ * do that first, then this constant can go to 16.
+ */
 const BRISTLE_LOAD_BANDS = 3;
 
-/** Virtual overlaps folded into one deposit. See `planStudioOilRibbonCarrier` for the body budget. */
-const BRISTLE_VIRTUAL_OVERLAPS = 14;
+/**
+ * Virtual overlaps folded into one deposit. See `planStudioOilRibbonCarrier` for the body budget.
+ *
+ * Lowered 14 -> 6 because 14 put the fold deep in its own saturated regime, and that - not the load
+ * signal - is what made every oil stroke read as two flat tones. `accumulatedOpacity` folds n
+ * overlaps as `1 - (1-a)^n` clamped at 0.96, so at n=14 ANY per-dab alpha above about 0.2 lands on
+ * the ceiling: two of the three load bands came out at exactly 0.96 and the whole loaded range
+ * collapsed onto a single value.
+ *
+ * Measured on a rendered stroke - share of inked pixels in the two most-occupied tone bins, so
+ * LOWER means more tonal range and less of the "단 2색" flatness that was reported:
+ *   n=14 71.1% [0.574, 0.96, 0.96]    n=10 72.0% [0.456, 0.96, 0.96]    n=8 70.8%    n=7 70.6%
+ *   n=6  54.6% [0.306, 0.902, 0.96]   n=5  58.0%                        n=3 60.3%
+ * Six is the knee: above it the second band re-saturates onto the ceiling, below it the bands
+ * start collapsing downward instead. Mean ink moves only 0.883 -> 0.847 and the ink standard
+ * deviation is unchanged, so this buys tonal range without thinning the stroke.
+ */
+const BRISTLE_VIRTUAL_OVERLAPS = 6;
 
 interface PlannedBristleRun {
   readonly points: readonly number[];
@@ -522,9 +555,16 @@ function planBristleLanes(
   const lanes: StudioOilRibbonBristleLane[] = [];
   for (const [loadBand, runs] of bands.entries()) {
     if (runs.length === 0) continue;
-    // Higher load bands keep more of the virtual-overlap accumulation so impasto ridges sit above
-    // the dry film without needing a second source-over pass at the crossing.
-    const bandOverlap = BRISTLE_VIRTUAL_OVERLAPS + loadBand * 3;
+    // Flat, deliberately: the bands are ALREADY ordered by load, so scaling the overlap count by
+    // the band index applied that ordering a second time and pushed the top of the load range onto
+    // `accumulatedOpacity`'s 0.96 clamp. That double-count, not the band count, is what made every
+    // oil stroke read as two flat tones - measured across 288 planned strokes, 126 emitted only
+    // TWO distinct lane opacities and none ever exceeded three. At 32 bands the ramp put 24 of
+    // them on exactly 0.96, so the whole upper half of the load range collapsed onto one tone.
+    //
+    // Flat keeps the alphas monotone in load anyway (the load supplies the ordering the ramp was
+    // added to guarantee) and nothing saturates at any band count.
+    const bandOverlap = BRISTLE_VIRTUAL_OVERLAPS;
     lanes.push(Object.freeze({
       runs: Object.freeze(runs.map((run) => Object.freeze({
         points: quantizedPoints(run.points),

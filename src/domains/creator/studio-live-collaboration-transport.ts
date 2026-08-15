@@ -373,3 +373,97 @@ export const createStudioLocalLiveTransport: StudioLiveTransportFactory = ({
     participant,
   });
 };
+
+class StudioMemoryBroadcastChannel implements StudioBroadcastChannelLike {
+  private readonly listeners = new Set<(event: MessageEvent<unknown>) => void>();
+  closed = false;
+
+  constructor(
+    private readonly hub: StudioMemoryBroadcastHub,
+    readonly name: string
+  ) {}
+
+  postMessage(value: unknown): void {
+    if (this.closed) throw new Error("closed");
+    this.hub.publish(this, value);
+  }
+
+  addEventListener(
+    _type: "message",
+    listener: (event: MessageEvent<unknown>) => void
+  ): void {
+    this.listeners.add(listener);
+  }
+
+  removeEventListener(
+    _type: "message",
+    listener: (event: MessageEvent<unknown>) => void
+  ): void {
+    this.listeners.delete(listener);
+  }
+
+  receive(value: unknown): void {
+    const event = { data: structuredClone(value) } as MessageEvent<unknown>;
+    for (const listener of this.listeners) listener(event);
+  }
+
+  close(): void {
+    this.closed = true;
+    this.listeners.clear();
+  }
+}
+
+/**
+ * In-process BroadcastChannel stand-in used by StudioLiveRoom tests and same-process replicas.
+ * Protocol, envelope validation and CRDT wire handling stay inside StudioBroadcastChannelTransport.
+ */
+export class StudioMemoryBroadcastHub {
+  readonly channels: StudioMemoryBroadcastChannel[] = [];
+  queued = false;
+  private queue: Array<{ sender: StudioMemoryBroadcastChannel; value: unknown }> = [];
+
+  create = (name: string): StudioBroadcastChannelLike => {
+    const channel = new StudioMemoryBroadcastChannel(this, name);
+    this.channels.push(channel);
+    return channel;
+  };
+
+  publish(sender: StudioMemoryBroadcastChannel, value: unknown): void {
+    if (this.queued) {
+      this.queue.push({ sender, value: structuredClone(value) });
+      return;
+    }
+    this.deliver(sender, value);
+  }
+
+  flush(): void {
+    const queued = this.queue.splice(0);
+    for (const item of queued) this.deliver(item.sender, item.value);
+  }
+
+  /** Delivers the queued fan-out in reverse post order (last writer first). */
+  flushReversed(): void {
+    const queued = this.queue.splice(0).reverse();
+    for (const item of queued) this.deliver(item.sender, item.value);
+  }
+
+  private deliver(sender: StudioMemoryBroadcastChannel, value: unknown): void {
+    for (const channel of this.channels) {
+      if (channel === sender || channel.name !== sender.name || channel.closed) continue;
+      channel.receive(value);
+    }
+  }
+}
+
+export function createStudioMemoryLiveTransportFactory(
+  hub: StudioMemoryBroadcastHub,
+  dependencies: StudioBroadcastCrdtDependencies = {}
+): StudioLiveTransportFactory {
+  return ({ roomName, workId, participant }) =>
+    new StudioBroadcastChannelTransport(
+      roomName,
+      hub.create,
+      { workId, participant },
+      dependencies
+    );
+}

@@ -1073,9 +1073,10 @@ export function StudioLiveCollaborationPanel({ workId }: { workId: string }) {
   async function handleCopyInviteLink() {
     setInviteLinkNotice(null);
     try {
-      const shareUrl = new URL("/studio", window.location.origin);
-      shareUrl.searchParams.set("id", workId);
-      await navigator.clipboard.writeText(shareUrl.toString());
+      const { buildStudioLiveShareHref } = await import("./creator-studio-links");
+      await navigator.clipboard.writeText(
+        buildStudioLiveShareHref(workId, window.location.origin)
+      );
       setInviteLinkNotice("초대 링크를 복사했습니다.");
     } catch {
       setScreenError("초대 링크를 복사하지 못했습니다. 브라우저 클립보드 권한을 확인해 주세요.");

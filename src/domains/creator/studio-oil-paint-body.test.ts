@@ -46,6 +46,27 @@ function bristleSeries(paintBody: "oil" | "acrylic"): {
   };
 }
 
+/** One bristle's load over a long stroke - long enough to span several dry/loaded cycles. */
+function longBristleLoad(paintBody: "oil" | "acrylic"): number[] {
+  const points: number[] = [];
+  const pressures: number[] = [];
+  for (let index = 0; index < 400; index += 1) {
+    points.push(20 + index * 4, 60 + Math.sin(index / 30) * 20);
+    pressures.push(0.7);
+  }
+  const dabs = planOilBrushDabs({
+    points,
+    pressures,
+    baseWidth: 28,
+    seed: 7,
+    maxDabs: 16_384,
+    paintBody,
+  });
+  return dabs
+    .map((dab) => dab.bristles[3]?.opacity)
+    .filter((value): value is number => typeof value === "number");
+}
+
 function lagOneAutocorrelation(series: readonly number[]): number {
   const mean = series.reduce((sum, value) => sum + value, 0) / series.length;
   let numerator = 0;
@@ -64,13 +85,6 @@ function dryOutCycles(series: readonly number[]): number {
     if ((series[index]! > 0.3) !== (series[index - 1]! > 0.3)) flips += 1;
   }
   return flips;
-}
-
-function standardDeviation(series: readonly number[]): number {
-  const mean = series.reduce((sum, value) => sum + value, 0) / series.length;
-  return Math.sqrt(
-    series.reduce((sum, value) => sum + (value - mean) ** 2, 0) / series.length,
-  );
 }
 
 describe("Studio oil vs acrylic paint body", () => {
@@ -110,7 +124,26 @@ describe("Studio oil vs acrylic paint body", () => {
       ["acrylic", bristleSeries("acrylic").load],
     ] as const) {
       expect(lagOneAutocorrelation(series), name).toBeGreaterThan(0.5);
-      expect(standardDeviation(series), name).toBeGreaterThan(0.2);
+    }
+
+    // Texture strength is "does the hair still reach both ends, and does it pass through the
+    // middle" - measured over a LONG stroke, because a short sample need not span a full dry
+    // cycle and will report a narrow range for a perfectly healthy load.
+    //
+    // Variance and range both FALL when the load's bimodal gap is filled, and filling it is the
+    // improvement: it took the rendered stroke from 73.1% of its ink in two tone bins to 54.6%.
+    // So neither is the floor. What a genuinely flattened load loses is its extremes, and what a
+    // re-hardened boolean gate loses is the middle - this asserts all three populations survive.
+    for (const paintBody of ["oil", "acrylic"] as const) {
+      const long = longBristleLoad(paintBody);
+      const dry = long.filter((v) => v < 0.1).length / long.length;
+      const mid = long.filter((v) => v >= 0.1 && v <= 0.5).length / long.length;
+      const loaded = long.filter((v) => v > 0.5).length / long.length;
+      expect(Math.min(...long), paintBody).toBeLessThan(0.1);
+      expect(Math.max(...long), paintBody).toBeGreaterThan(0.5);
+      expect(dry, `${paintBody} dry`).toBeGreaterThan(0.05);
+      expect(mid, `${paintBody} mid`).toBeGreaterThan(0.05);
+      expect(loaded, `${paintBody} loaded`).toBeGreaterThan(0.2);
     }
   });
 });

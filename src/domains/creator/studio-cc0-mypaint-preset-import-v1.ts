@@ -243,7 +243,7 @@ export const STUDIO_CC0_MYPAINT_PRESET_IMPORTS: readonly StudioCc0MypaintPresetI
   Object.freeze([
     preset(
       "charcoal",
-      "MyPaint CC0 · 목탄",
+      "MyPaint 오픈소스 · 목탄",
       "brushes/classic/charcoal.myb",
       "classic",
       "charcoal",
@@ -269,7 +269,7 @@ export const STUDIO_CC0_MYPAINT_PRESET_IMPORTS: readonly StudioCc0MypaintPresetI
     ),
     preset(
       "charcoal-tanda",
-      "MyPaint CC0 · 목탄 슬리버",
+      "MyPaint 오픈소스 · 목탄 슬리버",
       "brushes/tanda/charcoal-01.myb",
       "tanda",
       "charcoal",
@@ -298,7 +298,7 @@ export const STUDIO_CC0_MYPAINT_PRESET_IMPORTS: readonly StudioCc0MypaintPresetI
     ),
     preset(
       "2b-pencil",
-      "MyPaint CC0 · 2B 연필",
+      "MyPaint 오픈소스 · 2B 연필",
       "brushes/deevad/2B_pencil.myb",
       "deevad",
       "pencil",
@@ -327,7 +327,7 @@ export const STUDIO_CC0_MYPAINT_PRESET_IMPORTS: readonly StudioCc0MypaintPresetI
     ),
     preset(
       "dry-brush",
-      "MyPaint CC0 · 드라이 브러시",
+      "MyPaint 오픈소스 · 드라이 브러시",
       "brushes/classic/dry_brush.myb",
       "classic",
       "ink",
@@ -354,7 +354,7 @@ export const STUDIO_CC0_MYPAINT_PRESET_IMPORTS: readonly StudioCc0MypaintPresetI
     ),
     preset(
       "splatter",
-      "MyPaint CC0 · 스플래터",
+      "MyPaint 오픈소스 · 스플래터",
       "brushes/tanda/splatter-02.myb",
       "tanda",
       "airbrush",
@@ -381,7 +381,7 @@ export const STUDIO_CC0_MYPAINT_PRESET_IMPORTS: readonly StudioCc0MypaintPresetI
     ),
     preset(
       "ink-blot",
-      "MyPaint CC0 · 잉크 블롯",
+      "MyPaint 오픈소스 · 잉크 블롯",
       "brushes/classic/ink_blot.myb",
       "classic",
       "mypaint",
@@ -406,7 +406,7 @@ export const STUDIO_CC0_MYPAINT_PRESET_IMPORTS: readonly StudioCc0MypaintPresetI
     ),
     preset(
       "kabura",
-      "MyPaint CC0 · 카부라 펜",
+      "MyPaint 오픈소스 · 카부라 펜",
       "brushes/classic/kabura.myb",
       "classic",
       "ink",
@@ -448,7 +448,7 @@ export const STUDIO_CC0_MYPAINT_PRESET_IMPORTS: readonly StudioCc0MypaintPresetI
     ),
     preset(
       "watercolor-fringe",
-      "MyPaint CC0 · 수채 프린지",
+      "MyPaint 오픈소스 · 수채 프린지",
       "brushes/deevad/large_watercolor_fringe.myb",
       "deevad",
       "watercolor",
@@ -482,7 +482,7 @@ export const STUDIO_CC0_MYPAINT_PRESET_IMPORTS: readonly StudioCc0MypaintPresetI
     ),
     preset(
       "watercolor-expressive",
-      "MyPaint CC0 · 수채 익스프레시브",
+      "MyPaint 오픈소스 · 수채 익스프레시브",
       "brushes/deevad/watercolor_expressive.myb",
       "deevad",
       "watercolor",
@@ -529,7 +529,7 @@ export const STUDIO_CC0_MYPAINT_PRESET_IMPORTS: readonly StudioCc0MypaintPresetI
     ),
     preset(
       "oil-paint",
-      "MyPaint CC0 · 오일 페인트",
+      "MyPaint 오픈소스 · 오일 페인트",
       "brushes/tanda/oil-01-paint.myb",
       "tanda",
       "mypaint",
@@ -568,7 +568,7 @@ export const STUDIO_CC0_MYPAINT_PRESET_IMPORTS: readonly StudioCc0MypaintPresetI
     ),
     preset(
       "pastel",
-      "MyPaint CC0 · 파스텔",
+      "MyPaint 오픈소스 · 파스텔",
       "brushes/ramon/Pastel_1.myb",
       "ramon",
       "pastel",
@@ -624,7 +624,7 @@ export const STUDIO_CC0_MYPAINT_PRESET_IMPORTS: readonly StudioCc0MypaintPresetI
     ),
     preset(
       "calligraphy",
-      "MyPaint CC0 · 캘리그래피",
+      "MyPaint 오픈소스 · 캘리그래피",
       "brushes/classic/calligraphy.myb",
       "classic",
       "ink",
@@ -664,7 +664,7 @@ export const STUDIO_CC0_MYPAINT_PRESET_IMPORTS: readonly StudioCc0MypaintPresetI
     ),
     preset(
       "marker-fat",
-      "MyPaint CC0 · 광폭 마커",
+      "MyPaint 오픈소스 · 광폭 마커",
       "brushes/classic/marker_fat.myb",
       "classic",
       "ink",
@@ -707,7 +707,7 @@ export const STUDIO_CC0_MYPAINT_PRESET_IMPORTS: readonly StudioCc0MypaintPresetI
     ),
     preset(
       "marker-small",
-      "MyPaint CC0 · 세필 마커",
+      "MyPaint 오픈소스 · 세필 마커",
       "brushes/classic/marker_small.myb",
       "classic",
       "ink",
@@ -735,7 +735,7 @@ export const STUDIO_CC0_MYPAINT_PRESET_IMPORTS: readonly StudioCc0MypaintPresetI
     ),
     preset(
       "slow-ink",
-      "MyPaint CC0 · 슬로우 잉크",
+      "MyPaint 오픈소스 · 슬로우 잉크",
       "brushes/classic/slow_ink.myb",
       "classic",
       "ink",
@@ -762,7 +762,7 @@ export const STUDIO_CC0_MYPAINT_PRESET_IMPORTS: readonly StudioCc0MypaintPresetI
     ),
     preset(
       "knife",
-      "MyPaint CC0 · 나이프",
+      "MyPaint 오픈소스 · 나이프",
       "brushes/classic/knife.myb",
       "classic",
       "ink",
@@ -789,7 +789,7 @@ export const STUDIO_CC0_MYPAINT_PRESET_IMPORTS: readonly StudioCc0MypaintPresetI
     ),
     preset(
       "spray",
-      "MyPaint CC0 · 스프레이",
+      "MyPaint 오픈소스 · 스프레이",
       "brushes/deevad/spray.myb",
       "deevad",
       "airbrush",

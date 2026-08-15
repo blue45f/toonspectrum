@@ -11,7 +11,7 @@ import { Profiler, Suspense, lazy, useCallback, useEffect, useEffectEvent, useLa
 import { flushSync } from "react-dom";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
-import { studioCreationLinkParams } from "./creator-studio-links";
+import { buildStudioLiveShareHref, studioCreationLinkParams } from "./creator-studio-links";
 import { applyStudioBg3dAiMethodReference } from "./studio-3d-ai-reference-application";
 import {
   applyStudioBg3dInsertResult,
@@ -3944,9 +3944,9 @@ function StudioCuttoonEditor({
   async function copyStudioDraftCollaborationShareLink(
     provisionalWorkId: string
   ): Promise<void> {
-    const shareUrl = new URL("/studio", window.location.origin);
-    shareUrl.searchParams.set("id", provisionalWorkId);
-    await navigator.clipboard.writeText(shareUrl.toString());
+    await navigator.clipboard.writeText(
+      buildStudioLiveShareHref(provisionalWorkId, window.location.origin)
+    );
     announceDrawingShortcut("팀 초대 링크를 복사했습니다 · 팀원 권한을 추가한 뒤 전달하세요");
   }
   async function requestStudioDraftCollaborationShare(): Promise<void> {

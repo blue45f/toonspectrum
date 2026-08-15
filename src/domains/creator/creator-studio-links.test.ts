@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildStudioHref,
+  buildStudioLiveShareHref,
   parseStudioSearchParams,
   studioCreationLinkParams,
 } from "./creator-studio-links";
@@ -28,6 +29,15 @@ describe("creator-studio-links", () => {
       challengeId: "c1",
       mode: "upload",
     });
+  });
+
+  it("builds a same-session live share href that joins both the work and the live room", () => {
+    expect(buildStudioLiveShareHref("work-jam-1")).toBe(
+      "/studio?id=work-jam-1&room=work-jam-1"
+    );
+    expect(buildStudioLiveShareHref("work-jam-1", "https://toonspectrum.example")).toBe(
+      "https://toonspectrum.example/studio?id=work-jam-1&room=work-jam-1"
+    );
   });
 
   it("uses query relationships only for creation and never replays them onto an existing work", () => {

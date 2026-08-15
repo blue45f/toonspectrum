@@ -2,6 +2,7 @@ import {
   STUDIO_LIVE_LOCK_MAX_LEASE_MS,
   assertStudioLiveCursorPayload,
   createStudioLiveEnvelope,
+  isStudioLiveCursorCleared,
   parseStudioLiveEnvelope,
   studioLocalLiveChannelName,
   type StudioLiveChatMessagePayload,
@@ -79,6 +80,13 @@ export interface StudioLivePeer extends StudioLiveParticipant {
   visibility: StudioLivePresencePayload["visibility"];
   pageId: string | null;
   lastSeenAt: number;
+}
+
+/** Last live canvas pointer published by a remote peer. Cleared on leave, stale expiry, or sentinel. */
+export interface StudioLivePeerCursor {
+  participant: StudioLiveParticipant;
+  cursor: StudioLiveCursorPayload;
+  updatedAt: number;
 }
 
 export type StudioLiveLock = StudioLiveLockLease;
@@ -221,6 +229,13 @@ function copyParticipant(participant: StudioLiveParticipant): StudioLiveParticip
   return { ...participant };
 }
 
+function copyCursor(cursor: StudioLiveCursorPayload): StudioLiveCursorPayload {
+  return {
+    ...cursor,
+    ...(cursor.points ? { points: [...cursor.points] } : {}),
+  };
+}
+
 function lockPriority(lock: Pick<StudioLiveLock, "claimId" | "owner">): string {
   return `${lock.claimId}\u0000${lock.owner.sessionId}`;
 }
@@ -249,6 +264,7 @@ export class StudioLiveRoom {
   private readonly crdtListeners = new Set<(event: StudioLiveCrdtRoomEvent) => void>();
   private readonly voiceListeners = new Set<(event: StudioLiveVoiceEvent) => void>();
   private readonly peers = new Map<string, StudioLivePeer>();
+  private readonly cursors = new Map<string, StudioLivePeerCursor>();
   private readonly screenShares = new Map<string, StudioLiveRoomScreenShare>();
   private readonly voiceMembers = new Map<string, StudioLiveVoiceMember>();
   private readonly locks = new Map<string, StudioLiveLock>();
@@ -399,6 +415,17 @@ export class StudioLiveRoom {
     return Array.from(this.peers.values(), (peer) => ({ ...peer })).sort((a, b) =>
       a.displayName.localeCompare(b.displayName, "ko-KR") ||
       a.sessionId.localeCompare(b.sessionId)
+    );
+  }
+
+  getCursors(): StudioLivePeerCursor[] {
+    return Array.from(this.cursors.values(), (entry) => ({
+      participant: copyParticipant(entry.participant),
+      cursor: copyCursor(entry.cursor),
+      updatedAt: entry.updatedAt,
+    })).sort((left, right) =>
+      left.participant.displayName.localeCompare(right.participant.displayName, "ko-KR") ||
+      left.participant.sessionId.localeCompare(right.participant.sessionId)
     );
   }
 
@@ -1029,6 +1056,7 @@ export class StudioLiveRoom {
     this.transport = null;
     this.emitVoice({ type: "terminal", reason: "closed" });
     this.peers.clear();
+    this.cursors.clear();
     this.screenShares.clear();
     this.voiceMembers.clear();
     this.locks.clear();
@@ -1287,6 +1315,7 @@ export class StudioLiveRoom {
 
     if (envelope.kind === "presence:leave") {
       const presenceChanged = this.peers.delete(envelope.sender.sessionId);
+      this.cursors.delete(envelope.sender.sessionId);
       this.screenShares.delete(envelope.sender.sessionId);
       this.lastSequenceBySession.delete(envelope.sender.sessionId);
       const voiceMember = this.voiceMembers.get(envelope.sender.sessionId);
@@ -1327,13 +1356,24 @@ export class StudioLiveRoom {
       case "presence:heartbeat":
         if (!presenceChanged) this.emitPresence();
         return;
-      case "cursor:update":
+      case "cursor:update": {
+        const cursor = envelope.payload as StudioLiveCursorPayload;
+        if (isStudioLiveCursorCleared(cursor)) {
+          this.cursors.delete(envelope.sender.sessionId);
+        } else {
+          this.cursors.set(envelope.sender.sessionId, {
+            participant: copyParticipant(envelope.sender),
+            cursor: copyCursor(cursor),
+            updatedAt: receivedAt,
+          });
+        }
         this.emit({
           type: "cursor",
           participant: copyParticipant(envelope.sender),
-          cursor: { ...(envelope.payload as StudioLiveCursorPayload) },
+          cursor: copyCursor(cursor),
         });
         return;
+      }
       case "lock:claim":
         this.applyLockClaim(envelope as StudioLiveEnvelope<"lock:claim">);
         return;
@@ -1475,6 +1515,7 @@ export class StudioLiveRoom {
         const hadPeers = this.peers.size > 0;
         const hadLocks = this.locks.size > 0;
         this.peers.clear();
+        this.cursors.clear();
         this.screenShares.clear();
         this.locks.clear();
         this.chatMessages.length = 0;
@@ -1493,6 +1534,7 @@ export class StudioLiveRoom {
         this.revokePendingLockReleases("disconnected", event.status.message);
         const hadPeers = this.peers.size > 0;
         this.peers.clear();
+        this.cursors.clear();
         this.screenShares.clear();
         this.lastSequenceBySession.clear();
         if (hadPeers) this.emitPresence();
@@ -1654,6 +1696,7 @@ export class StudioLiveRoom {
       for (const [sessionId, peer] of this.peers) {
         if (now - peer.lastSeenAt <= this.presenceTtlMs) continue;
         this.peers.delete(sessionId);
+        this.cursors.delete(sessionId);
         this.screenShares.delete(sessionId);
         this.lastSequenceBySession.delete(sessionId);
         const voiceMember = this.voiceMembers.get(sessionId);

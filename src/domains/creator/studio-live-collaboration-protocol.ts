@@ -459,6 +459,14 @@ export function assertStudioLiveCursorPayload(
   }
 }
 
+/**
+ * `clearCursor` publishes this sentinel so remotes drop the pointer immediately instead of
+ * waiting for presence TTL. A live cursor always names a page or a tool.
+ */
+export function isStudioLiveCursorCleared(cursor: StudioLiveCursorPayload): boolean {
+  return cursor.pageId === null && cursor.tool === null;
+}
+
 function isLockClaimPayload(
   value: unknown,
   sentAt: number

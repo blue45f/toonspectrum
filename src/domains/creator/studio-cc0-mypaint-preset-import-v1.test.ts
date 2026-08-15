@@ -114,7 +114,10 @@ describe("studio-cc0-mypaint-preset-import-v1", () => {
       expect(entry.brushId).toBe(`${STUDIO_CC0_MYPAINT_PRESET_BRUSH_ID_PREFIX}${entry.presetId}`);
       expect(entry.upstreamFile).toMatch(/^brushes\/(classic|deevad|tanda|ramon)\/.+\.myb$/u);
       expect(entry.upstreamFile).toContain(`${entry.pack}/`);
-      expect(entry.nameKo).toContain("MyPaint CC0");
+      // User-facing names spell the licence out in plain language: "CC0" is a licence identifier
+      // that means nothing to an artist, while "오픈소스" says the part they care about. The
+      // provenance record below still pins the actual CC0-1.0 licence.
+      expect(entry.nameKo).toContain("MyPaint 오픈소스");
       expect(ids.has(entry.brushId)).toBe(false);
       ids.add(entry.brushId);
       // Verbatim 테이블에는 최소한 opaque/radius/hardness 축이 남아 있어야 한다.

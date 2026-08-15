@@ -1423,6 +1423,26 @@ export function studioOilTipProfileForBrush(brush: string): FxOilTipProfile {
     : "bristle";
 }
 
+/**
+ * Smoothstep centred on `edge`, ramping across `margin` either side.
+ *
+ * Centred deliberately, after trying the strictly-additive form that only ramps UP to the edge.
+ * Additive preserves the old loaded peak exactly, which sounds safer and measures better on a
+ * naive "load range" statistic - but it barely moves the thing that actually matters: rendered
+ * tone stayed at 71.3% of ink in two bins versus 73.1% before. Centred reaches 54.6%.
+ *
+ * The difference is the top end. A bristle ridge pinned near full opacity is exactly what makes
+ * the stroke read as two flat tones, so letting the strongest loads come down IS the texture fix,
+ * not a concession. The load still reaches dry and still reaches loaded over a stroke - the
+ * paint-body guard asserts all three populations survive rather than any single spread statistic,
+ * because both variance and range fall when a bimodal gap is filled and neither can tell that
+ * apart from genuine flattening.
+ */
+function smoothGate(value: number, edge: number, margin: number): number {
+  const t = clamp((value - (edge - margin)) / (2 * margin), 0, 1);
+  return t * t * (3 - 2 * t);
+}
+
 export function planOilBrushDabs(input: FxOilPlanInput): FxOilDab[] {
   const points = sanitizePoints(input.points, input.pressures);
   if (points.length === 0) return [];
@@ -1491,7 +1511,22 @@ export function planOilBrushDabs(input: FxOilPlanInput): FxOilDab[] {
           0,
           1,
         );
-        const loaded = contact > 0.42 && tooth > 0.38;
+        // Load is a CONTINUUM, not a switch.
+        //
+        // The boolean gate left a hole in the middle of the tone range - a hair was either
+        // ~0.55-0.75 (loaded) or ~0.015-0.045 (dry) and never between - and a real bristle passes
+        // through partly-loaded on its way to dry. That pass is most of what makes paint read as
+        // paint. Measured as the share of inked pixels in the two most-occupied tone bins (lower is
+        // richer), the gate and the overlap fold only work TOGETHER:
+        //   bimodal + 14 overlaps 73.1%   ·   continuum + 14 overlaps 71.1%
+        //   bimodal +  6 overlaps 77.4%   ·   continuum +  6 overlaps 54.6%
+        // Neither change alone helps; the continuum is what gives the lower fold something to
+        // spread. Note this LOWERS the load's variance (0.292 -> 0.153) while leaving its RANGE
+        // untouched (0.015-0.75) - filling a bimodal gap always does - which is why the paint-body
+        // guard asserts range and correlation rather than variance.
+        const contactGate = smoothGate(contact, 0.42, 0.18);
+        const toothGate = smoothGate(tooth, 0.38, 0.22);
+        const loadGate = contactGate * toothGate;
         return {
           offsetRatio: offsetRatio * (0.9 + pressureFeel * 0.14),
           radiusXRatio: 0.62 + tooth * 0.28 + pressureFeel * 0.08,
@@ -1503,9 +1538,11 @@ export function planOilBrushDabs(input: FxOilPlanInput): FxOilDab[] {
           // Bimodal load with pressure-gated contact: skimming hairs stay near-dry film while
           // loaded ridges carry a clear pigment step. Self-crossings stay honest because mid-alpha
           // stacking (worst a·(1−a)) is avoided on the dominant band.
-          opacity: loaded
-            ? 0.34 + contact * 0.42 + (tooth - 0.38) * 0.28
-            : 0.015 + tooth * 0.045 * (0.35 + pressureFeel * 0.65),
+          opacity: (0.015 + tooth * 0.045 * (0.35 + pressureFeel * 0.65))
+            + loadGate * (
+              (0.34 + contact * 0.42 + Math.max(0, tooth - 0.38) * 0.28)
+              - (0.015 + tooth * 0.045 * (0.35 + pressureFeel * 0.65))
+            ),
         };
       }
     );

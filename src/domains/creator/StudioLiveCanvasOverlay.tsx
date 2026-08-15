@@ -39,6 +39,11 @@ import {
   type StudioCanvasCommentPin,
 } from "./studio-live-canvas-overlay-model";
 import { useStudioLiveCollaboration } from "./studio-live-collaboration-context";
+import {
+  isStudioLiveCursorCleared,
+  type StudioLiveCursorPayload,
+  type StudioLiveParticipant,
+} from "./studio-live-collaboration-protocol";
 import { summarizeStudioLiveActiveOwners } from "./studio-live-layer-ownership";
 import {
   INITIAL_STUDIO_LIVE_SYNC_SNAPSHOT,
@@ -49,10 +54,6 @@ import {
 } from "./studio-live-sync-safety";
 
 import type { StudioCommentAnchor } from "./studio-comments";
-import type {
-  StudioLiveCursorPayload,
-  StudioLiveParticipant,
-} from "./studio-live-collaboration-protocol";
 import type { StudioLivePeer } from "./studio-live-collaboration-room";
 
 import { cn } from "@/lib/utils";
@@ -1127,6 +1128,10 @@ export function StudioRemoteCursorOverlay({
     const unsubscribe = room.subscribe((event) => {
       if (event.type === "cursor") {
         const sessionId = event.participant.sessionId;
+        if (isStudioLiveCursorCleared(event.cursor)) {
+          if (cursorMap.delete(sessionId)) scheduleFlush();
+          return;
+        }
         if (
           !cursorMap.has(sessionId) &&
           cursorMap.size >= REMOTE_CURSOR_LIMIT

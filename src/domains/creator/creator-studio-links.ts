@@ -37,6 +37,18 @@ export function buildStudioHref(params: StudioLinkParams = {}): string {
   return query ? `/studio?${query}` : "/studio";
 }
 
+/**
+ * Magma/Figma-style same-session invite. `id` opens the work document; `room` is the live
+ * presence/cursor/CRDT session key Studio already joins from the query string.
+ */
+export function buildStudioLiveShareHref(workId: string, origin?: string): string {
+  const search = new URLSearchParams();
+  search.set("id", workId);
+  search.set("room", workId);
+  const path = `/studio?${search.toString()}`;
+  return origin ? new URL(path, origin).toString() : path;
+}
+
 export function parseStudioSearchParams(search: URLSearchParams): {
   workId: string | null;
   remixId: string | null;
