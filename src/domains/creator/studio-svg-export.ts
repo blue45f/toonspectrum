@@ -1029,6 +1029,12 @@ function serializeStudioDynamicCoverageMark(
   boundedFlow: boolean,
   retainAlphaMapIdentity = true,
   materialIdentity?: StudioDynamicBrushMaterialIdentity,
+  /**
+   * Skip the texture-asset branches and take the geometric one. Used only after an exact pass has
+   * already failed on the document's texture budget, so the stroke lands as untextured coverage
+   * rather than not landing at all.
+   */
+  geometricFallback = false,
 ): string | null {
   const opacity = Math.min(
     1,
@@ -1135,7 +1141,7 @@ function serializeStudioDynamicCoverageMark(
     );
   }
 
-  if (mark.texture?.kind === "alpha-map") {
+  if (mark.texture?.kind === "alpha-map" && !geometricFallback) {
     const asset = svgAlphaMapTextureAsset(
       ctx,
       mark.texture.alphaMap,
@@ -1153,7 +1159,7 @@ function serializeStudioDynamicCoverageMark(
     );
   }
 
-  if ("falloff" in mark && mark.falloff?.kind === "analytic-radial") {
+  if ("falloff" in mark && mark.falloff?.kind === "analytic-radial" && !geometricFallback) {
     const asset = svgSoftFalloffTextureAsset(
       ctx,
       mark.falloff.exponent,
@@ -1193,7 +1199,9 @@ function serializeStudioDynamicCoverageMarks(
   marks: readonly StudioDynamicBrushCoverageMark[],
   strokeOpacity: number,
   boundedFlow: boolean,
-  materialIdentity?: StudioDynamicBrushMaterialIdentity,
+  materialIdentity: StudioDynamicBrushMaterialIdentity | undefined,
+  /** Set when the stroke had to be drawn without its tip textures to fit the budget. */
+  approximated: { textureBudgetExhausted: boolean },
 ): string | null {
   if (marks.length === 0) return null;
   const initialDefsLength = ctx.defs.length;
@@ -1215,19 +1223,39 @@ function serializeStudioDynamicCoverageMarks(
     }
     return null;
   };
-  const markup: string[] = [];
+  const serializeAll = (geometricFallback: boolean): string[] | null => {
+    const out: string[] = [];
+    for (const mark of marks) {
+      const serialized = serializeStudioDynamicCoverageMark(
+        ctx,
+        mark,
+        strokeOpacity,
+        boundedFlow,
+        true,
+        materialIdentity,
+        geometricFallback,
+      );
+      if (serialized === null) return null;
+      out.push(serialized);
+    }
+    return out;
+  };
 
-  for (const mark of marks) {
-    const serialized = serializeStudioDynamicCoverageMark(
-      ctx,
-      mark,
-      strokeOpacity,
-      boundedFlow,
-      true,
-      materialIdentity,
-    );
-    if (serialized === null) return rollbackAssets();
-    markup.push(serialized);
+  let markup = serializeAll(false);
+  if (markup === null) {
+    // The document's texture budget is gone. Every texture branch would fail from here, so the
+    // exact pass is abandoned and the stroke is re-serialised as untextured coverage — the same
+    // positions, radii, rotations, colours and opacities, drawn as the geometric branch the
+    // renderer already falls back to. It loses the tip's alpha map; it does NOT lose the stroke.
+    //
+    // Dropping was silent data loss on every real page: paint-tube's three-stroke cell serialises
+    // to 21.2MB while its curve alone needs 22.7MB, so the second stroke exhausted the budget and
+    // the exporter removed it outright. A single-stroke probe cannot see that — the drop only
+    // appears once a page holds more than one stroke. erodible-pencil is next at 22.4MB.
+    rollbackAssets();
+    markup = serializeAll(true);
+    if (markup === null) return null;
+    approximated.textureBudgetExhausted = true;
   }
 
   return boundedFlow
@@ -2392,14 +2420,26 @@ function serializeFreehand(
         ?? studioReplaySafeBrushDynamicsSettingsForBrushId(dynamicsPresetId)
     );
     if (causalCoverageMarks) {
+      const approximated = { textureBudgetExhausted: false };
       const exactCoverage = serializeStudioDynamicCoverageMarks(
         ctx,
         causalCoverageMarks,
         strokeOpacity,
         isStudioBoundedFlowPaintModelCompatible(el),
         dynamicMaterialIdentity,
+        approximated,
       );
-      if (exactCoverage !== null) return exactCoverage;
+      if (exactCoverage !== null) {
+        if (approximated.textureBudgetExhausted) {
+          addSkip(
+            ctx,
+            el,
+            "approximated",
+            "문서의 브러시 텍스처 예산을 모두 써서, 이 획은 팁 질감 없이 형태만 그렸어요.",
+          );
+        }
+        return exactCoverage;
+      }
       addSkip(
         ctx,
         el,
