@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   STUDIO_HOKUSAI_LIVE_ADAPTER_VERSION,
@@ -80,6 +80,7 @@ class FakeHokusaiLiveWorker implements StudioHokusaiLiveWorkerLike {
   #lastSequence = 0;
   #config: Record<string, unknown> | null = null;
   #appendCount = 0;
+  terminateCount = 0;
 
   constructor(
     readonly options: Readonly<{ acceptFirstAppendWithoutFrame?: boolean }> = {},
@@ -155,7 +156,21 @@ class FakeHokusaiLiveWorker implements StudioHokusaiLiveWorkerLike {
     }
   }
 
-  terminate(): void {}
+  terminate(): void {
+    this.terminateCount += 1;
+  }
+
+  listenerSnapshot(): Readonly<{
+    message: readonly ((event: MessageEvent<unknown>) => void)[];
+    error: readonly ((event: ErrorEvent) => void)[];
+    messageerror: readonly ((event: MessageEvent<unknown>) => void)[];
+  }> {
+    return Object.freeze({
+      message: Object.freeze([...this.#messageListeners]),
+      error: Object.freeze([...this.#errorListeners]),
+      messageerror: Object.freeze([...this.#messageErrorListeners]),
+    });
+  }
 
   emit(data: unknown): void {
     const event = { data } as MessageEvent<unknown>;
@@ -248,6 +263,10 @@ class FakeHokusaiLiveWorker implements StudioHokusaiLiveWorkerLike {
     });
   }
 }
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe("Studio Hokusai live brush vertical slice", () => {
   it("automatically maps every quality-gated core shelf, and nothing else", () => {
@@ -445,6 +464,82 @@ describe("Studio Hokusai live brush vertical slice", () => {
       ...identity,
       config: { ...route.config, materialProfileId: "acrylic" },
     })).toBeNull();
+  });
+
+  it("closes a pending prewarm without letting its stale completion poison a restart", async () => {
+    vi.useFakeTimers();
+    const workers: FakeHokusaiLiveWorker[] = [];
+    const provider = new StudioHokusaiLiveBrushProvider({
+      workerFactory: () => {
+        const worker = new FakeHokusaiLiveWorker();
+        workers.push(worker);
+        return worker;
+      },
+      startupTimeoutMs: 1_000,
+    });
+
+    const firstPrewarm = provider.prewarm();
+    const firstOutcome = firstPrewarm.then(
+      () => null,
+      (cause: unknown) => cause,
+    );
+    const firstWorker = workers[0]!;
+    const staleListeners = firstWorker.listenerSnapshot();
+    expect(staleListeners.message).toHaveLength(1);
+    expect(staleListeners.error).toHaveLength(1);
+    expect(staleListeners.messageerror).toHaveLength(1);
+
+    provider.close();
+
+    const closedError = await firstOutcome;
+    expect(closedError).toBeInstanceOf(Error);
+    expect((closedError as Error).name).toBe("AbortError");
+    expect(provider.state).toBe("idle");
+    expect(provider.capabilities).toBeNull();
+    expect(firstWorker.terminateCount).toBe(1);
+    expect(firstWorker.listenerSnapshot()).toMatchObject({
+      message: [],
+      error: [],
+      messageerror: [],
+    });
+
+    const secondPrewarm = provider.prewarm();
+    const secondWorker = workers[1]!;
+    secondWorker.ready();
+    await expect(secondPrewarm).resolves.toEqual(CAPABILITIES);
+    expect(provider.state).toBe("ready");
+    expect(secondWorker.terminateCount).toBe(0);
+
+    // Model a callback already copied into the browser's dispatch queue before removeEventListener,
+    // then let the first attempt's old timeout deadline pass. Both paths must be generation-fenced.
+    const lateReadyEvent = {
+      data: {
+        type: "studio-hokusai-live/ready",
+        version: STUDIO_HOKUSAI_LIVE_BRUSH_PROTOCOL_VERSION,
+        capabilities: CAPABILITIES,
+      },
+    } as MessageEvent<unknown>;
+    for (const listener of staleListeners.message) listener(lateReadyEvent);
+    for (const listener of staleListeners.error) {
+      listener({ message: "late first-worker failure" } as ErrorEvent);
+    }
+    for (const listener of staleListeners.messageerror) listener(lateReadyEvent);
+    await vi.advanceTimersByTimeAsync(1_001);
+
+    expect(provider.state).toBe("ready");
+    expect(provider.capabilities).toEqual(CAPABILITIES);
+    expect(firstWorker.terminateCount).toBe(1);
+    expect(secondWorker.terminateCount).toBe(0);
+
+    provider.close();
+    provider.close();
+    expect(provider.state).toBe("idle");
+    expect(secondWorker.terminateCount).toBe(1);
+    expect(secondWorker.listenerSnapshot()).toMatchObject({
+      message: [],
+      error: [],
+      messageerror: [],
+    });
   });
 
   it("owns one monotonic fallback clock across missing-time append batches", async () => {

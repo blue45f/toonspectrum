@@ -126,6 +126,20 @@ function abortError(): Error {
   return error;
 }
 
+function prewarmClosedError(): Error {
+  if (typeof DOMException === "function") {
+    return new DOMException(
+      "Hokusai live Worker prewarm was cancelled because the provider closed.",
+      "AbortError",
+    );
+  }
+  const error = new Error(
+    "Hokusai live Worker prewarm was cancelled because the provider closed.",
+  );
+  error.name = "AbortError";
+  return error;
+}
+
 function smoothstep(value: number): number {
   const normalized = Math.max(0, Math.min(1, value));
   return normalized * normalized * (3 - 2 * normalized);
@@ -189,6 +203,12 @@ function requestId(): number {
   return nextRequestId;
 }
 
+interface StudioHokusaiLivePrewarmAttempt {
+  readonly generation: number;
+  readonly worker: StudioHokusaiLiveWorkerLike;
+  cancel(cause: Error): void;
+}
+
 export class StudioHokusaiLiveBrushProvider {
   readonly #workerFactory: () => StudioHokusaiLiveWorkerLike;
   readonly #startupTimeoutMs: number;
@@ -197,6 +217,8 @@ export class StudioHokusaiLiveBrushProvider {
   #state: ProviderState = "idle";
   #capabilities: StudioHokusaiLiveBrushCapabilities | null = null;
   #prewarmPromise: Promise<StudioHokusaiLiveBrushCapabilities> | null = null;
+  #prewarmAttempt: StudioHokusaiLivePrewarmAttempt | null = null;
+  #prewarmGeneration = 0;
   #active: StudioHokusaiLiveStrokeSession | null = null;
   #epoch = 0;
 
@@ -218,23 +240,36 @@ export class StudioHokusaiLiveBrushProvider {
 
   prewarm(): Promise<StudioHokusaiLiveBrushCapabilities> {
     if (this.#prewarmPromise) return this.#prewarmPromise;
+    const generation = this.#prewarmGeneration + 1;
+    this.#prewarmGeneration = generation;
     this.#state = "loading";
-    this.#prewarmPromise = new Promise((resolve, reject) => {
-      let worker: StudioHokusaiLiveWorkerLike;
-      try {
-        worker = this.#workerFactory();
-      } catch (error) {
+    let worker: StudioHokusaiLiveWorkerLike;
+    try {
+      worker = this.#workerFactory();
+    } catch (error) {
+      if (this.#prewarmGeneration === generation) {
         this.#state = "unavailable";
-        reject(error);
-        return;
       }
-      this.#worker = worker;
+      const failed = Promise.reject<StudioHokusaiLiveBrushCapabilities>(error);
+      this.#prewarmPromise = failed;
+      return failed;
+    }
+    this.#worker = worker;
+    const attempt: StudioHokusaiLivePrewarmAttempt = {
+      generation,
+      worker,
+      cancel: () => undefined,
+    };
+    this.#prewarmAttempt = attempt;
+    const promise = new Promise<StudioHokusaiLiveBrushCapabilities>((resolve, reject) => {
       let settled = false;
       const timer = globalThis.setTimeout(() => {
-        finish(() => {
-          this.#state = "failed";
+        finish((owned) => {
           worker.terminate();
-          this.#worker = null;
+          if (owned) {
+            this.#state = "failed";
+            this.#worker = null;
+          }
           reject(new Error("Hokusai live Worker prewarm timed out."));
         });
       }, this.#startupTimeoutMs);
@@ -244,22 +279,35 @@ export class StudioHokusaiLiveBrushProvider {
         worker.removeEventListener("error", onError);
         worker.removeEventListener("messageerror", onMessageError);
       };
-      const finish = (callback: () => void): void => {
+      const finish = (callback: (owned: boolean) => void): void => {
         if (settled) return;
         settled = true;
         cleanup();
-        callback();
+        const owned = this.#prewarmAttempt === attempt
+          && this.#prewarmGeneration === generation
+          && this.#worker === worker;
+        if (this.#prewarmAttempt === attempt) this.#prewarmAttempt = null;
+        callback(owned);
       };
       const onMessage = (event: MessageEvent<unknown>): void => {
         const capabilities = readyCapabilities(event.data);
         if (!capabilities) {
-          finish(() => {
-            this.#state = "failed";
+          finish((owned) => {
+            worker.terminate();
+            if (owned) {
+              this.#state = "failed";
+              this.#worker = null;
+            }
             reject(new Error("Hokusai live Worker capability receipt is invalid."));
           });
           return;
         }
-        finish(() => {
+        finish((owned) => {
+          if (!owned) {
+            worker.terminate();
+            reject(prewarmClosedError());
+            return;
+          }
           this.#capabilities = capabilities;
           this.#state = "ready";
           worker.addEventListener("message", this.#onMessage);
@@ -268,19 +316,32 @@ export class StudioHokusaiLiveBrushProvider {
           resolve(capabilities);
         });
       };
-      const onError = (event: ErrorEvent): void => finish(() => {
-        this.#state = "failed";
+      const onError = (event: ErrorEvent): void => finish((owned) => {
+        worker.terminate();
+        if (owned) {
+          this.#state = "failed";
+          this.#worker = null;
+        }
         reject(new Error(event.message || "Hokusai live Worker failed during prewarm."));
       });
-      const onMessageError = (): void => finish(() => {
-        this.#state = "failed";
+      const onMessageError = (): void => finish((owned) => {
+        worker.terminate();
+        if (owned) {
+          this.#state = "failed";
+          this.#worker = null;
+        }
         reject(new Error("Hokusai live Worker prewarm response could not be cloned."));
+      });
+      attempt.cancel = (cause: Error): void => finish(() => {
+        worker.terminate();
+        reject(cause);
       });
       worker.addEventListener("message", onMessage);
       worker.addEventListener("error", onError);
       worker.addEventListener("messageerror", onMessageError);
     });
-    return this.#prewarmPromise;
+    this.#prewarmPromise = promise;
+    return promise;
   }
 
   admitStroke(input: Omit<StudioHokusaiLiveRouteInput, "capabilities" | "providerState">):
@@ -324,12 +385,17 @@ export class StudioHokusaiLiveBrushProvider {
 
   close(): void {
     this.#active?.cancel("user-cancelled");
-    if (this.#worker) {
-      this.#worker.removeEventListener("message", this.#onMessage);
-      this.#worker.removeEventListener("error", this.#onError);
-      this.#worker.removeEventListener("messageerror", this.#onMessageError);
-      this.#worker.terminate();
+    this.#prewarmGeneration += 1;
+    const prewarmAttempt = this.#prewarmAttempt;
+    prewarmAttempt?.cancel(prewarmClosedError());
+    const worker = this.#worker;
+    if (worker) {
+      worker.removeEventListener("message", this.#onMessage);
+      worker.removeEventListener("error", this.#onError);
+      worker.removeEventListener("messageerror", this.#onMessageError);
+      if (worker !== prewarmAttempt?.worker) worker.terminate();
     }
+    this.#prewarmAttempt = null;
     this.#worker = null;
     this.#capabilities = null;
     this.#prewarmPromise = null;
