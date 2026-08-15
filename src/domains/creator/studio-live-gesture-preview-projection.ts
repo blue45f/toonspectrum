@@ -198,18 +198,40 @@ function shapeEndpointsMatch(authoritative: DrawEl, preview: DrawEl): boolean {
     && authoritative.points[3] === preview.points[3];
 }
 
-function reconcileDrawElement(authoritative: El, preview: DrawEl): El {
-  if (authoritative.type !== "draw") return authoritative;
+function rendererIdentityMatches(authoritative: DrawEl, preview: DrawEl): boolean {
+  return (authoritative.mode ?? "pen") === (preview.mode ?? "pen")
+    && authoritative.stroke === preview.stroke
+    && authoritative.strokeWidth === preview.strokeWidth
+    && (authoritative.opacity ?? 1) === (preview.opacity ?? 1)
+    && authoritative.fill === preview.fill
+    && authoritative.brush === preview.brush
+    && (authoritative.blendMode ?? "source-over") === (preview.blendMode ?? "source-over")
+    && authoritative.paintModel === preview.paintModel
+    && authoritative.pressureModel === preview.pressureModel
+    && authoritative.watercolorPipeline === preview.watercolorPipeline
+    && authoritative.stampPipeline === preview.stampPipeline;
+}
+
+function authoritativeElementWins(authoritative: El, preview: DrawEl): boolean {
+  if (authoritative.type !== "draw") return true;
   const previewKind = drawKind(preview);
   const authoritativeKind = drawKind(authoritative);
+  // The CRDT slot is authoritative for every incompatible renderer identity. In particular, an
+  // eraser preview may never temporarily replace a pen that later appears with the same id.
+  if (
+    authoritativeKind !== previewKind
+    || !rendererIdentityMatches(authoritative, preview)
+  ) return true;
   if (previewKind === "freehand") {
-    if (authoritativeKind !== "freehand") return authoritative;
     const authoritativeSampleCount = Math.floor(authoritative.points.length / 2);
     const previewSampleCount = Math.floor(preview.points.length / 2);
-    return authoritativeSampleCount >= previewSampleCount ? authoritative : preview;
+    return authoritativeSampleCount >= previewSampleCount;
   }
-  if (authoritativeKind !== previewKind) return authoritative;
-  return shapeEndpointsMatch(authoritative, preview) ? authoritative : preview;
+  return shapeEndpointsMatch(authoritative, preview);
+}
+
+function reconcileDrawElement(authoritative: El, preview: DrawEl): El {
+  return authoritativeElementWins(authoritative, preview) ? authoritative : preview;
 }
 
 /**
@@ -266,4 +288,43 @@ export function mergeStudioLiveGesturePreviewElements(
     merged[index] = reconciled;
   }
   return merged ?? authoritative;
+}
+
+/**
+ * Returns preview ids whose authoritative render slot is ready to own the next visible layer draw.
+ * The caller must wait for that draw receipt before retiring the matching store entries.
+ */
+export function studioLiveGesturePreviewAuthoritativeReceiptIds(
+  authoritative: readonly El[],
+  snapshot: StudioLiveGesturePreviewSnapshot,
+  eligiblePreviewKeys: ReadonlySet<string>,
+): readonly string[] {
+  if (!eligiblePreviewKeys || typeof eligiblePreviewKeys.has !== "function") return [];
+
+  const projectedById = new Map<string, DrawEl | null>();
+  for (const entry of snapshot) {
+    if (!eligiblePreviewKeys.has(entry.key)) continue;
+    const preview = projectStudioLiveGesturePreviewEntry(entry);
+    if (!preview) continue;
+    projectedById.set(
+      preview.id,
+      projectedById.has(preview.id) ? null : preview,
+    );
+  }
+
+  const authoritativeById = new Map<string, El | null>();
+  for (const element of authoritative) {
+    authoritativeById.set(
+      element.id,
+      authoritativeById.has(element.id) ? null : element,
+    );
+  }
+
+  const ready: string[] = [];
+  for (const [gestureId, preview] of projectedById) {
+    const retained = authoritativeById.get(gestureId);
+    if (!preview || !retained || !authoritativeElementWins(retained, preview)) continue;
+    ready.push(gestureId);
+  }
+  return ready;
 }

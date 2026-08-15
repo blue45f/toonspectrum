@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   mergeStudioLiveGesturePreviewElements,
   projectStudioLiveGesturePreviewEntry,
+  studioLiveGesturePreviewAuthoritativeReceiptIds,
 } from "./studio-live-gesture-preview-projection";
 
 import type { DrawEl, El } from "./studio-element-model";
@@ -128,6 +129,15 @@ function draw(id: string, points: number[], kind: DrawEl["kind"] = "freehand"): 
   };
 }
 
+function retainedPrefix(
+  entry: StudioLiveGesturePreviewSnapshotEntry,
+  points: number[],
+): DrawEl {
+  const projected = projectStudioLiveGesturePreviewEntry(entry);
+  if (!projected) throw new Error("test preview must project to a DrawEl");
+  return { ...projected, points };
+}
+
 function eligibleKeys(
   snapshot: StudioLiveGesturePreviewSnapshot,
 ): ReadonlySet<string> {
@@ -195,7 +205,7 @@ describe("studio live gesture preview projection", () => {
   it("inserts an absent preview exactly once and replaces a lagging freehand in the same slot", () => {
     const before = draw("before", [0, 0]);
     const after = draw("after", [0, 0]);
-    const lagging = draw("gesture-a", [0, 0]);
+    const lagging = retainedPrefix(freehandEntry(), [0, 0]);
     const snapshot: StudioLiveGesturePreviewSnapshot = [freehandEntry()];
 
     const inserted = mergeStudioLiveGesturePreviewElements(
@@ -224,7 +234,10 @@ describe("studio live gesture preview projection", () => {
   });
 
   it("uses authoritative freehand as soon as its sample count catches up", () => {
-    const caughtUp = draw("gesture-a", [100, 100, 110, 110, 120, 120]);
+    const caughtUp = retainedPrefix(
+      freehandEntry(),
+      [100, 100, 110, 110, 120, 120],
+    );
     const authoritative: readonly El[] = [caughtUp];
 
     const merged = mergeStudioLiveGesturePreviewElements(
@@ -237,7 +250,7 @@ describe("studio live gesture preview projection", () => {
   });
 
   it("keeps matching authoritative shape endpoints and substitutes a stale endpoint in place", () => {
-    const matching = draw("shape-a", [1, 2, 30, 40], "rect");
+    const matching = retainedPrefix(shapeEntry(), [1, 2, 30, 40]);
     const matchingList: readonly El[] = [matching];
     const snapshot: StudioLiveGesturePreviewSnapshot = [shapeEntry()];
     expect(mergeStudioLiveGesturePreviewElements(
@@ -248,7 +261,7 @@ describe("studio live gesture preview projection", () => {
       matchingList,
     );
 
-    const stale = draw("shape-a", [1, 2, 3, 4], "rect");
+    const stale = retainedPrefix(shapeEntry(), [1, 2, 3, 4]);
     const replaced = mergeStudioLiveGesturePreviewElements(
       [stale],
       snapshot,
@@ -322,6 +335,57 @@ describe("studio live gesture preview projection", () => {
       [],
       [senderA],
       new Set(),
+    )).toEqual([]);
+  });
+
+  it("lets an incompatible authoritative renderer win instead of replacing it with a preview", () => {
+    const authoritativePen = draw("gesture-a", [0, 0]);
+    const snapshot: StudioLiveGesturePreviewSnapshot = [freehandEntry()];
+
+    const merged = mergeStudioLiveGesturePreviewElements(
+      [authoritativePen],
+      snapshot,
+      eligibleKeys(snapshot),
+    );
+    expect(merged[0]).toBe(authoritativePen);
+    expect(studioLiveGesturePreviewAuthoritativeReceiptIds(
+      [authoritativePen],
+      snapshot,
+      eligibleKeys(snapshot),
+    )).toEqual(["gesture-a"]);
+  });
+
+  it("emits a receipt only after a compatible authoritative slot catches up", () => {
+    const entry = freehandEntry();
+    const snapshot: StudioLiveGesturePreviewSnapshot = [entry];
+    const eligible = eligibleKeys(snapshot);
+    const lagging = retainedPrefix(entry, [0, 0]);
+    const caughtUp = retainedPrefix(entry, [0, 0, 10, 10, 20, 20]);
+
+    expect(studioLiveGesturePreviewAuthoritativeReceiptIds(
+      [lagging],
+      snapshot,
+      eligible,
+    )).toEqual([]);
+    expect(studioLiveGesturePreviewAuthoritativeReceiptIds(
+      [caughtUp],
+      snapshot,
+      eligible,
+    )).toEqual(["gesture-a"]);
+    expect(studioLiveGesturePreviewAuthoritativeReceiptIds(
+      [caughtUp],
+      snapshot,
+      new Set(),
+    )).toEqual([]);
+
+    const duplicatePreview: StudioLiveGesturePreviewSnapshot = [
+      entry,
+      freehandEntry({ key: "8:sender-bgesture-a", senderSessionId: "sender-b" }),
+    ];
+    expect(studioLiveGesturePreviewAuthoritativeReceiptIds(
+      [caughtUp],
+      duplicatePreview,
+      eligibleKeys(duplicatePreview),
     )).toEqual([]);
   });
 });
