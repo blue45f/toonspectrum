@@ -128,7 +128,11 @@ describe("inventory stays in sync with the owning modules (drift contract)", () 
     expect(read("./studio-local-database.ts")).toContain(
       'STUDIO_SQLITE_OPFS_DIRECTORY = "toonspectrum-studio-sqlite"',
     );
+    expect(read("./studio-local-database.ts")).toContain(
+      'STUDIO_SQLITE_OPFS_RECOVERY_DIRECTORY = "toonspectrum-studio-sqlite-r1"',
+    );
     expect(STUDIO_OPFS_ROOTS).toContain("toonspectrum-studio-sqlite");
+    expect(STUDIO_OPFS_ROOTS).toContain("toonspectrum-studio-sqlite-r1");
     expect(read("./studio-opfs-filesystem.ts")).toContain(
       'rootName = "toonspectrum-studio-assets"',
     );

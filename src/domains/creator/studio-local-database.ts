@@ -19,6 +19,15 @@
 export const STUDIO_SQLITE_OPFS_DIRECTORY = "toonspectrum-studio-sqlite";
 
 /**
+ * Fallback SAH-pool directory when the primary root still has open SyncAccessHandles.
+ * Native `removeEntry` cannot delete a locked sahpool tree (`NoModificationAllowedError`).
+ */
+export const STUDIO_SQLITE_OPFS_RECOVERY_DIRECTORY = "toonspectrum-studio-sqlite-r1";
+
+/** VFS name used only with {@link STUDIO_SQLITE_OPFS_RECOVERY_DIRECTORY}. */
+export const STUDIO_SQLITE_SAHPOOL_RECOVERY_VFS_NAME = "opfs-sahpool-r1";
+
+/**
  * SAH pool 네임스페이스 안의 V12 전용 DB 파일명.
  *
  * LEGACY_DATA_MIGRATION=FALSE를 코드 수준에서 지키기 위해 이전
@@ -49,6 +58,8 @@ export interface StudioSqliteDatabaseHandle {
 
 export interface StudioSqlitePoolUtilHandle {
   OpfsSAHPoolDb: new (filename: string) => StudioSqliteDatabaseHandle;
+  wipeFiles?: () => Promise<void>;
+  unlink?: (filename: string) => boolean;
 }
 
 export interface StudioSqliteApiHandle {
@@ -56,6 +67,7 @@ export interface StudioSqliteApiHandle {
   installOpfsSAHPoolVfs(options: {
     directory?: string;
     name?: string;
+    forceReinitIfPreviouslyFailed?: boolean;
   }): Promise<StudioSqlitePoolUtilHandle>;
 }
 
@@ -89,25 +101,56 @@ export function isStudioSqliteCorruption(error: unknown): boolean {
   );
 }
 
-export async function wipeStudioSqliteOpfsDirectory(): Promise<void> {
+function errorName(error: unknown): string {
+  if (typeof error === "object" && error !== null && "name" in error) {
+    const name = (error as { name?: unknown }).name;
+    if (typeof name === "string") return name;
+  }
+  return "";
+}
+
+export function isStudioOpfsModificationLocked(error: unknown): boolean {
+  if (errorName(error) === "NoModificationAllowedError") return true;
+  const message = error instanceof Error ? error.message : String(error);
+  return /NoModificationAllowedError|modifications are not allowed/iu.test(message);
+}
+
+function isStudioOpfsNotFound(error: unknown): boolean {
+  return errorName(error) === "NotFoundError";
+}
+
+const STUDIO_SQLITE_OPFS_WIPE_TARGETS = Object.freeze([
+  STUDIO_SQLITE_OPFS_DIRECTORY,
+  STUDIO_SQLITE_OPFS_RECOVERY_DIRECTORY,
+]);
+
+/**
+ * Best-effort native OPFS delete. Returns true when at least one directory was removed.
+ * A locked SAH-pool tree (`NoModificationAllowedError`) is not fatal — callers must
+ * reset through {@link StudioSqlitePoolUtilHandle.wipeFiles} or a sibling directory.
+ */
+export async function wipeStudioSqliteOpfsDirectory(): Promise<boolean> {
   const storage = (
     globalThis as {
       navigator?: { storage?: { getDirectory?: () => Promise<FileSystemDirectoryHandle> } };
     }
   ).navigator?.storage;
-  if (typeof storage?.getDirectory !== "function") return;
+  if (typeof storage?.getDirectory !== "function") return false;
   try {
     const root = await storage.getDirectory();
-    await root.removeEntry(STUDIO_SQLITE_OPFS_DIRECTORY, { recursive: true });
-  } catch (error) {
-    if (
-      typeof error === "object"
-      && error !== null
-      && "name" in error
-      && (error as { name?: unknown }).name === "NotFoundError"
-    ) {
-      return;
+    let removed = false;
+    for (const name of STUDIO_SQLITE_OPFS_WIPE_TARGETS) {
+      try {
+        await root.removeEntry(name, { recursive: true });
+        removed = true;
+      } catch (error) {
+        if (isStudioOpfsNotFound(error) || isStudioOpfsModificationLocked(error)) continue;
+        throw error;
+      }
     }
+    return removed;
+  } catch (error) {
+    if (isStudioOpfsNotFound(error) || isStudioOpfsModificationLocked(error)) return false;
     throw error;
   }
 }
@@ -2028,18 +2071,51 @@ function detectOpfsSupport(): OpfsSupportCheck {
   return { supported: true };
 }
 
+async function installStudioSahPool(
+  api: StudioSqliteApiHandle,
+  directory: string,
+  name?: string,
+): Promise<StudioSqlitePoolUtilHandle> {
+  return api.installOpfsSAHPoolVfs({
+    directory,
+    ...(name === undefined ? {} : { name }),
+    forceReinitIfPreviouslyFailed: true,
+  });
+}
+
+function openStudioSahPoolDatabase(
+  pool: StudioSqlitePoolUtilHandle,
+): StudioSqliteDatabaseHandle {
+  return new pool.OpfsSAHPoolDb(`/${STUDIO_SQLITE_DATABASE_FILENAME}`);
+}
+
+let lastInstalledStudioSahPool: StudioSqlitePoolUtilHandle | undefined;
+
 async function openOpfsDatabaseHandle(
   api: StudioSqliteApiHandle,
-): Promise<StudioSqliteDatabaseHandle> {
+): Promise<{
+  readonly handle: StudioSqliteDatabaseHandle;
+  readonly pool: StudioSqlitePoolUtilHandle;
+}> {
   const opfs = detectOpfsSupport();
   if (!opfs.supported) {
     throw new SqliteUnavailableError(opfs.reason);
   }
   try {
-    const pool = await api.installOpfsSAHPoolVfs({
-      directory: STUDIO_SQLITE_OPFS_DIRECTORY,
-    });
-    return new pool.OpfsSAHPoolDb(`/${STUDIO_SQLITE_DATABASE_FILENAME}`);
+    try {
+      const pool = await installStudioSahPool(api, STUDIO_SQLITE_OPFS_DIRECTORY);
+      lastInstalledStudioSahPool = pool;
+      return { handle: openStudioSahPoolDatabase(pool), pool };
+    } catch (error) {
+      if (!isStudioOpfsModificationLocked(error)) throw error;
+      const pool = await installStudioSahPool(
+        api,
+        STUDIO_SQLITE_OPFS_RECOVERY_DIRECTORY,
+        STUDIO_SQLITE_SAHPOOL_RECOVERY_VFS_NAME,
+      );
+      lastInstalledStudioSahPool = pool;
+      return { handle: openStudioSahPoolDatabase(pool), pool };
+    }
   } catch (error) {
     throw new SqliteUnavailableError(
       `opfs-sahpool vfs install or database open failed: ${describeError(error)}`,
@@ -2084,28 +2160,73 @@ function assertStudioSqliteHealthy(handle: StudioSqliteDatabaseHandle): void {
   }
 }
 
+interface OpenedStudioSqliteHandle {
+  readonly handle: StudioSqliteDatabaseHandle;
+  readonly pool?: StudioSqlitePoolUtilHandle;
+}
+
+function migrateAndCheck(
+  handle: StudioSqliteDatabaseHandle,
+  vfs: "opfs" | "memory",
+): StudioSqliteDatabaseHandle {
+  runStudioLocalDatabaseMigrations(handle);
+  if (vfs === "opfs") assertStudioSqliteHealthy(handle);
+  return handle;
+}
+
 async function openMigratedHandle(
   api: StudioSqliteApiHandle,
   vfs: "opfs" | "memory",
   memoryFilename: string | undefined,
-): Promise<StudioSqliteDatabaseHandle> {
-  const handle = vfs === "memory"
-    ? new api.oo1.DB(memoryFilename ?? ":memory:", "c")
-    : await openOpfsDatabaseHandle(api);
+): Promise<OpenedStudioSqliteHandle> {
+  if (vfs === "memory") {
+    const handle = new api.oo1.DB(memoryFilename ?? ":memory:", "c");
+    try {
+      return { handle: migrateAndCheck(handle, vfs) };
+    } catch (error) {
+      closeQuietly(handle);
+      throw error;
+    }
+  }
+  const opened = await openOpfsDatabaseHandle(api);
   try {
-    runStudioLocalDatabaseMigrations(handle);
-    if (vfs === "opfs") assertStudioSqliteHealthy(handle);
-    return handle;
+    return { handle: migrateAndCheck(opened.handle, vfs), pool: opened.pool };
   } catch (error) {
-    closeQuietly(handle);
+    closeQuietly(opened.handle);
     throw error;
   }
+}
+
+async function recoverCorruptStudioSqliteImage(
+  api: StudioSqliteApiHandle,
+  pool: StudioSqlitePoolUtilHandle | undefined,
+): Promise<StudioSqliteDatabaseHandle> {
+  if (pool && typeof pool.wipeFiles === "function") {
+    try {
+      await pool.wipeFiles();
+      if (typeof pool.unlink === "function") {
+        pool.unlink(`/${STUDIO_SQLITE_DATABASE_FILENAME}`);
+      }
+      const handle = openStudioSahPoolDatabase(pool);
+      try {
+        return migrateAndCheck(handle, "opfs");
+      } catch (error) {
+        closeQuietly(handle);
+        throw error;
+      }
+    } catch {
+      // The live pool could not reset in place; reopen may still use a sibling directory.
+    }
+  }
+  await wipeStudioSqliteOpfsDirectory();
+  return (await openMigratedHandle(api, "opfs", undefined)).handle;
 }
 
 /**
  * Studio 로컬 SQLite DB 를 열고 스키마를 최신 버전으로 마이그레이션한다.
  * OPFS/wasm 을 못 쓰면 {@link SqliteUnavailableError} 로 명시 실패한다.
- * A corrupt OPFS image is wiped once and reopened empty so autosave can keep working.
+ * A corrupt OPFS image is reset through the live SAH pool (not native removeEntry)
+ * and reopened empty so autosave can keep working.
  */
 export async function openStudioLocalDatabase(
   options: OpenStudioLocalDatabaseOptions = {},
@@ -2113,12 +2234,14 @@ export async function openStudioLocalDatabase(
   const vfs = options.vfs ?? "opfs";
   const api = await loadSqliteApi(options.loadSqlite);
   try {
-    const handle = await openMigratedHandle(api, vfs, options.memoryFilename);
-    return new SqliteStudioLocalDatabase(handle, options.now ?? Date.now);
+    const opened = await openMigratedHandle(api, vfs, options.memoryFilename);
+    return new SqliteStudioLocalDatabase(opened.handle, options.now ?? Date.now);
   } catch (error) {
     if (vfs !== "opfs" || !isStudioSqliteCorruption(error)) throw error;
-    await wipeStudioSqliteOpfsDirectory();
-    const recovered = await openMigratedHandle(api, vfs, options.memoryFilename);
+    const recovered = await recoverCorruptStudioSqliteImage(
+      api,
+      lastInstalledStudioSahPool,
+    );
     return new SqliteStudioLocalDatabase(recovered, options.now ?? Date.now);
   }
 }

@@ -179,7 +179,11 @@ export function attachStudioLocalDatabaseWorkerHost(
           // The corrupt handle is discarded either way.
         }
         databasePromise = null;
-        await wipeStudioSqliteOpfsDirectory();
+        try {
+          await wipeStudioSqliteOpfsDirectory();
+        } catch {
+          // Locked SAH files stay until reopen resets them through the live pool.
+        }
         const recovered = await acquireDatabase();
         const recoveredMethod = Reflect.get(recovered, request.method);
         if (typeof recoveredMethod !== "function") throw error;

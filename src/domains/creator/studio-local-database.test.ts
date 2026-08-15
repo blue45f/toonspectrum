@@ -1,15 +1,18 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import {
   STUDIO_LOCAL_DATABASE_MIGRATIONS,
   STUDIO_SQLITE_DATABASE_FILENAME,
   STUDIO_SQLITE_OPFS_DIRECTORY,
+  STUDIO_SQLITE_OPFS_RECOVERY_DIRECTORY,
   SqliteUnavailableError,
   StudioSqliteCorruptError,
+  isStudioOpfsModificationLocked,
   isStudioSqliteCorruption,
   openStudioLocalDatabase,
   probeSqliteSupport,
   runStudioLocalDatabaseMigrations,
+  wipeStudioSqliteOpfsDirectory,
 } from "./studio-local-database";
 
 import type {
@@ -17,6 +20,7 @@ import type {
   StudioLocalDatabase,
   StudioSqliteApiHandle,
   StudioSqliteDatabaseHandle,
+  StudioSqlitePoolUtilHandle,
 } from "./studio-local-database";
 
 /**
@@ -704,6 +708,7 @@ describe("probeSqliteSupport", () => {
 describe("opfs naming contract", () => {
   it("pins the destruction-inventory directory and database filename", () => {
     expect(STUDIO_SQLITE_OPFS_DIRECTORY).toBe("toonspectrum-studio-sqlite");
+    expect(STUDIO_SQLITE_OPFS_RECOVERY_DIRECTORY).toBe("toonspectrum-studio-sqlite-r1");
     expect(STUDIO_SQLITE_DATABASE_FILENAME).toBe("studio-local-v12.db");
   });
 });
@@ -714,5 +719,159 @@ describe("sqlite image corruption", () => {
     expect(isStudioSqliteCorruption(new Error("SQLITE_CORRUPT: database disk image is malformed"))).toBe(true);
     expect(isStudioSqliteCorruption(new Error("sqlite3_step() rc= 11 SQLITE_CORRUPT"))).toBe(true);
     expect(isStudioSqliteCorruption(new Error("autosave JSON is 손상되었습니다"))).toBe(false);
+  });
+
+  it("classifies a locked OPFS removeEntry as a handle lock, not corruption", () => {
+    expect(isStudioOpfsModificationLocked(
+      new DOMException(
+        "An attempt was made to modify an object where modifications are not allowed.",
+        "NoModificationAllowedError",
+      ),
+    )).toBe(true);
+    expect(isStudioOpfsModificationLocked(new Error("SQLITE_CORRUPT"))).toBe(false);
+  });
+});
+
+describe("locked SAH-pool wipe", () => {
+  const originalNavigator = globalThis.navigator;
+  const originalFileHandle = (globalThis as { FileSystemFileHandle?: unknown }).FileSystemFileHandle;
+
+  afterEach(() => {
+    Object.defineProperty(globalThis, "navigator", {
+      configurable: true,
+      value: originalNavigator,
+    });
+    if (originalFileHandle === undefined) {
+      delete (globalThis as { FileSystemFileHandle?: unknown }).FileSystemFileHandle;
+    } else {
+      (globalThis as { FileSystemFileHandle?: unknown }).FileSystemFileHandle = originalFileHandle;
+    }
+  });
+
+  function installLockedOpfs(): { removeEntry: ReturnType<typeof vi.fn> } {
+    const removeEntry = vi.fn(async () => {
+      throw new DOMException(
+        "An attempt was made to modify an object where modifications are not allowed.",
+        "NoModificationAllowedError",
+      );
+    });
+    Object.defineProperty(globalThis, "navigator", {
+      configurable: true,
+      value: {
+        storage: {
+          getDirectory: async () => ({ removeEntry }),
+        },
+      },
+    });
+    (globalThis as { FileSystemFileHandle?: { prototype: { createSyncAccessHandle: () => object } } })
+      .FileSystemFileHandle = {
+        prototype: { createSyncAccessHandle: () => ({}) },
+      };
+    return { removeEntry };
+  }
+
+  function memoryPoolDatabase(): StudioSqliteDatabaseHandle {
+    return new sqlite3.oo1.DB(":memory:", "c");
+  }
+
+  it("does not throw when native removeEntry is locked by an open SAH", async () => {
+    installLockedOpfs();
+    await expect(wipeStudioSqliteOpfsDirectory()).resolves.toBe(false);
+  });
+
+  it("resets a corrupt OPFS image through wipeFiles instead of failing open", async () => {
+    const { removeEntry } = installLockedOpfs();
+    const wipeFiles = vi.fn(async () => undefined);
+    let openCount = 0;
+    const pool: StudioSqlitePoolUtilHandle = {
+      OpfsSAHPoolDb: class {
+        readonly #inner = memoryPoolDatabase();
+        readonly #index = ++openCount;
+        exec(sql: string): unknown {
+          return this.#inner.exec(sql);
+        }
+        prepare(sql: string) {
+          if (this.#index === 1 && sql.includes("quick_check")) {
+            return {
+              bind() {
+                return undefined;
+              },
+              step: () => true,
+              get: () => "database disk image is malformed",
+              reset() {
+                return undefined;
+              },
+              finalize() {
+                return undefined;
+              },
+            };
+          }
+          return this.#inner.prepare(sql);
+        }
+        changes(): number {
+          return this.#inner.changes();
+        }
+        close(): void {
+          this.#inner.close();
+        }
+      },
+      wipeFiles,
+    };
+    const database = await openStudioLocalDatabase({
+      vfs: "opfs",
+      loadSqlite: async () => ({
+        oo1: sqlite3.oo1,
+        installOpfsSAHPoolVfs: async () => pool,
+      }),
+    });
+    opened.push(database);
+    await database.kvSet("autosave", "doc", "{\"ok\":true}");
+    await expect(database.kvGet("autosave", "doc")).resolves.toBe("{\"ok\":true}");
+    expect(wipeFiles).toHaveBeenCalledOnce();
+    expect(removeEntry).not.toHaveBeenCalled();
+  });
+
+  it("opens the recovery directory when the primary SAH pool is still locked", async () => {
+    installLockedOpfs();
+    const directories: string[] = [];
+    const database = await openStudioLocalDatabase({
+      vfs: "opfs",
+      loadSqlite: async () => ({
+        oo1: sqlite3.oo1,
+        installOpfsSAHPoolVfs: async (options) => {
+          directories.push(options.directory ?? "");
+          if ((options.directory ?? "") === STUDIO_SQLITE_OPFS_DIRECTORY) {
+            throw new DOMException(
+              "An attempt was made to modify an object where modifications are not allowed.",
+              "NoModificationAllowedError",
+            );
+          }
+          return {
+            OpfsSAHPoolDb: class {
+              readonly #inner = memoryPoolDatabase();
+              exec(sql: string): unknown {
+                return this.#inner.exec(sql);
+              }
+              prepare(sql: string) {
+                return this.#inner.prepare(sql);
+              }
+              changes(): number {
+                return this.#inner.changes();
+              }
+              close(): void {
+                this.#inner.close();
+              }
+            },
+          };
+        },
+      }),
+    });
+    opened.push(database);
+    expect(directories).toEqual([
+      STUDIO_SQLITE_OPFS_DIRECTORY,
+      STUDIO_SQLITE_OPFS_RECOVERY_DIRECTORY,
+    ]);
+    await database.kvSet("slots", "quick", "fineliner");
+    await expect(database.kvGet("slots", "quick")).resolves.toBe("fineliner");
   });
 });

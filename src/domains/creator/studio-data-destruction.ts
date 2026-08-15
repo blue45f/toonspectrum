@@ -32,6 +32,8 @@ export const STUDIO_OPFS_ROOTS: readonly string[] = Object.freeze([
   "toonstudio-v11",
   // studio-local-database.ts STUDIO_SQLITE_OPFS_DIRECTORY (opfs-sahpool VFS root)
   "toonspectrum-studio-sqlite",
+  // studio-local-database.ts STUDIO_SQLITE_OPFS_RECOVERY_DIRECTORY (locked-SAH fallback)
+  "toonspectrum-studio-sqlite-r1",
   // studio-opfs-filesystem.ts default + asset/BG3D shot SHA-256 CAS
   "toonspectrum-studio-assets",
   // studio-opfs-sync-access-store.ts large-document binary authority

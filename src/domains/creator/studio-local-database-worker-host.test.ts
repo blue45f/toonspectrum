@@ -108,6 +108,43 @@ describe("Studio local database Worker host", () => {
     ]);
   });
 
+  it("reopens after SQLITE_CORRUPT even when native OPFS wipe is locked", async () => {
+    const scope = new FakeScope();
+    const close = vi.fn(async () => undefined);
+    const recoveredGet = vi.fn(async () => "rebuilt");
+    const openDatabase = vi.fn()
+      .mockResolvedValueOnce(structuralDatabase({
+        kvGet: vi.fn(async () => {
+          throw new Error("SQLITE_CORRUPT: database disk image is malformed");
+        }),
+        close,
+      }))
+      .mockResolvedValueOnce(structuralDatabase({ kvGet: recoveredGet, close }));
+    const lockedWipe = vi.spyOn(
+      await import("./studio-local-database"),
+      "wipeStudioSqliteOpfsDirectory",
+    ).mockRejectedValue(
+      new DOMException(
+        "An attempt was made to modify an object where modifications are not allowed.",
+        "NoModificationAllowedError",
+      ),
+    );
+    attachStudioLocalDatabaseWorkerHost(scope, { openDatabase });
+
+    scope.send(request(1, { kind: "call", method: "kvGet", args: ["autosave", "doc"] }));
+    await vi.waitFor(() => expect(scope.responses).toHaveLength(1));
+    lockedWipe.mockRestore();
+
+    expect(close).toHaveBeenCalledOnce();
+    expect(openDatabase).toHaveBeenCalledTimes(2);
+    expect(recoveredGet).toHaveBeenCalledWith("autosave", "doc");
+    expect(scope.responses[0]).toMatchObject({
+      kind: "success",
+      requestId: 1,
+      value: "rebuilt",
+    });
+  });
+
   it("wipes and reopens once after SQLITE_CORRUPT so kvGet can continue", async () => {
     const scope = new FakeScope();
     const close = vi.fn(async () => undefined);
