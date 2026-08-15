@@ -52,7 +52,9 @@ import { type StudioInkMeshLivePreviewRuntime } from "./studio-ink-mesh-live-pre
 import { imageFilterCacheKey } from "./studio-konva-filter-fields";
 import { shouldApplyLayerMask, type LayerMaskPaintMode } from "./studio-layer-mask";
 import { isEffectivelyHidden, isEffectivelyLocked, type LayerGroup } from "./studio-layers";
-import { type StudioLiveDynamicBrushOverlayRenderer } from "./studio-live-dynamic-brush-overlay";
+import {
+  planStudioLiveGesturePreviewRenderElements,
+} from "./studio-live-gesture-preview-projection";
 import { StudioLiveInkOverlayRenderer, StudioLiveInkPredictionRenderer } from "./studio-live-ink-overlay";
 import { StudioLiveStampOverlayRenderer } from "./studio-live-stamp-overlay";
 import { type StudioLivingInkOverlayProjection } from "./studio-living-ink-overlay";
@@ -130,6 +132,8 @@ import type { StudioTutorialTryAction } from "./studio-feature-tutorials";
 import type { StudioFilterPreview } from "./studio-filter-menu";
 import type { StudioGroupUniformResizeBounds } from "./studio-group-uniform-resize";
 import type { StudioLiveRoom } from "./studio-live-collaboration-room";
+import type { StudioLiveDynamicBrushOverlayRenderer } from "./studio-live-dynamic-brush-overlay";
+import type { StudioLiveGesturePreviewRoomAdapter } from "./studio-live-gesture-preview-room-adapter";
 import type { PageState } from "./studio-page-state";
 import type { StudioGpuBackend, StudioGpuFrameReceipt } from "./studio-webgpu-frame-contract";
 import type { StudioGpuStroke } from "./studio-webgpu-stroke";
@@ -840,6 +844,7 @@ export interface StudioCanvasViewportProps {
   studioCommentPinReanchorDisabledReason?: string;
   studioCrdtDocument: StudioCrdtDocument | null;
   studioCrdtOperationSyncReady: boolean;
+  studioLiveGesturePreviewAdapter: StudioLiveGesturePreviewRoomAdapter;
   studioLiveRoomRef: import("react").RefObject<StudioLiveRoom | null>;
   studioRasterAuthorizedAuthorityKey: string | null;
   studioRasterHandoffBaseKey: string;
@@ -1140,6 +1145,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
   studioCommentPinReanchorDisabledReason,
   studioCrdtDocument,
   studioCrdtOperationSyncReady,
+  studioLiveGesturePreviewAdapter,
   studioLiveRoomRef,
   studioRasterAuthorizedAuthorityKey,
   studioRasterHandoffBaseKey,
@@ -1333,6 +1339,118 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
   const hokusaiSurfaceTop = webGpuViewportSurface?.surface.top;
   const hokusaiSurfaceWidth = webGpuViewportSurface?.surface.width;
   const hokusaiSurfaceHeight = webGpuViewportSurface?.surface.height;
+  const studioLiveGesturePreviewSnapshot = useSyncExternalStore(
+    studioLiveGesturePreviewAdapter.subscribe,
+    studioLiveGesturePreviewAdapter.getSnapshot,
+    studioLiveGesturePreviewAdapter.getSnapshot,
+  );
+  const studioLiveGesturePreviewEligibleKeys = new Set(
+    studioLiveGesturePreviewAdapter.getEligiblePreviewKeys(),
+  );
+  const studioLiveGesturePreviewVisible =
+    !masterEditMode
+    && !isExporting
+    && !saving
+    && !timelapseCapturing
+    && !sourceHydrationPending
+    && !collaborationDocumentUnavailable
+    && studioCrdtOperationSyncReady;
+  const studioLiveGesturePreviewPageId = studioLiveGesturePreviewVisible
+    ? activePage.id
+    : null;
+  const studioLiveGesturePreviewPaintElements = masterEditMode
+    ? elements
+    : studioWorkAssetRenderProjection.elements;
+  const studioLiveGesturePreviewRenderSnapshot = studioLiveGesturePreviewVisible
+    ? studioLiveGesturePreviewSnapshot.filter(
+        (entry) => entry.pageId === activePage.id,
+      )
+    : [];
+  const studioLiveGesturePreviewReservedElementIds =
+    studioLiveGesturePreviewRenderSnapshot.length > 0
+      ? new Set(elements.map((element) => element.id))
+      : undefined;
+  const studioLiveGesturePreviewRenderPlan = planStudioLiveGesturePreviewRenderElements(
+    studioLiveGesturePreviewPaintElements,
+    studioLiveGesturePreviewRenderSnapshot,
+    studioLiveGesturePreviewVisible
+      ? studioLiveGesturePreviewEligibleKeys
+      : new Set<string>(),
+    studioLiveGesturePreviewReservedElementIds,
+  );
+  const studioLiveGesturePreviewRenderedGestureIds =
+    studioLiveGesturePreviewRenderPlan.previewElementIds.size > 0
+    || studioLiveGesturePreviewRenderPlan.authoritativeHandoffIds.length > 0
+      ? new Set([
+          ...studioLiveGesturePreviewRenderPlan.previewElementIds,
+          ...studioLiveGesturePreviewRenderPlan.authoritativeHandoffIds,
+        ])
+      : null;
+  const studioLiveGesturePreviewTrailSuppressedSessionIds =
+    studioLiveGesturePreviewRenderedGestureIds
+      ? new Set(
+          studioLiveGesturePreviewRenderSnapshot
+            .filter(
+              (entry) =>
+                studioLiveGesturePreviewEligibleKeys.has(entry.key)
+                && studioLiveGesturePreviewRenderedGestureIds.has(entry.gestureId),
+            )
+            .map((entry) => entry.senderSessionId),
+        )
+      : undefined;
+  const studioLiveGesturePreviewHandoffIdsRef = useRef<readonly string[]>([]);
+  studioLiveGesturePreviewHandoffIdsRef.current =
+    studioLiveGesturePreviewRenderPlan.authoritativeHandoffIds;
+
+  useLayoutEffect(() => {
+    studioLiveGesturePreviewAdapter.setActivePage(studioLiveGesturePreviewPageId);
+    studioLiveGesturePreviewAdapter.setAuthoritativeElementIds(
+      studioLiveGesturePreviewPageId,
+      studioLiveGesturePreviewPageId === null
+        ? []
+        : elements.map((element) => element.id),
+    );
+  }, [
+    elements,
+    studioLiveGesturePreviewAdapter,
+    studioLiveGesturePreviewPageId,
+  ]);
+
+  useLayoutEffect(() => {
+    if (
+      !studioLiveGesturePreviewVisible
+      || studioLiveGesturePreviewRenderPlan.authoritativeHandoffToken === "[]"
+    ) return;
+    const pageId = activePage.id;
+    const gestureIds = [
+      ...studioLiveGesturePreviewHandoffIdsRef.current,
+    ];
+    const frameHandle = globalThis.requestAnimationFrame(() => {
+      const layer = mainLayerRef.current;
+      if (!layer?.getStage()) return;
+      try {
+        // Clip/mask and blend wrappers refresh caches in effects. Drawing one frame later makes
+        // this synchronous draw an exact receipt for the authoritative React tree.
+        layer.draw();
+      } catch {
+        // Keep the speculative entry visible until TTL rather than risking a blank handoff.
+        return;
+      }
+      for (const gestureId of gestureIds) {
+        studioLiveGesturePreviewAdapter.markAuthoritativeProjection(
+          pageId,
+          gestureId,
+        );
+      }
+    });
+    return () => globalThis.cancelAnimationFrame(frameHandle);
+  }, [
+    activePage.id,
+    mainLayerRef,
+    studioLiveGesturePreviewAdapter,
+    studioLiveGesturePreviewRenderPlan.authoritativeHandoffToken,
+    studioLiveGesturePreviewVisible,
+  ]);
 
   // Document paper grain preview: one seamless tile from the same height field as brush granulation.
   // This is an opt-in editor aid. An unset legacy/new page stays visually clean while its selected
@@ -2832,16 +2950,13 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 // Only this paint-time array may contain ephemeral Blob URLs. The authored
                 // `elements`, page history, autosave, revisions, and CRDT publisher continue to
                 // see stable work-asset URIs.
-                const authoredCanvasRenderElements = masterEditMode
-                  ? elements
-                  : studioWorkAssetRenderProjection.elements;
                 const canvasRenderElements: El[] = studioFilterPreview
-                  ? authoredCanvasRenderElements.map((element) =>
+                  ? studioLiveGesturePreviewRenderPlan.elements.map((element) =>
                       element.id === studioFilterPreview.elementId && element.type === "image"
                         ? ({ ...element, ...studioFilterPreview.patch } as El)
                         : element,
                     )
-                  : [...authoredCanvasRenderElements];
+                  : [...studioLiveGesturePreviewRenderPlan.elements];
                 if (studioFilterPageComposite) {
                   const previewComposite = studioFilterPreview?.elementId === studioFilterPageComposite.id
                     ? ({ ...studioFilterPageComposite, ...studioFilterPreview.patch } as ImageEl & El)
@@ -2899,8 +3014,12 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 // opts.compositeOverride=알파 클리핑 자식의 "source-in" 합성.
                 const renderEl = (el: El, idx: number, opts: { asMask?: boolean; compositeOverride?: string } = {}) => {
                 const isAdvancedFillVirtualPreview = virtualFillPreviewTarget?.id === el.id;
+                const isLiveGesturePreview =
+                  studioLiveGesturePreviewRenderPlan.previewElementIds.has(el.id);
                 const isNonInteractiveRender =
-                  opts.asMask === true || isAdvancedFillVirtualPreview;
+                  opts.asMask === true
+                  || isAdvancedFillVirtualPreview
+                  || isLiveGesturePreview;
                 const locked = isAdvancedFillVirtualPreview || isEffectivelyLocked(el, groups);
                 const isGroupDragMember =
                   marqueeIds.length > 1 && marqueeIds.includes(el.id);
@@ -2999,8 +3118,16 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                   // 검정으로 붕괴했다. BlendIsolationGroup이 획을 비트맵 한 장으로 만든 뒤
                   // 합성을 정확히 한 번 적용한다.
                   const isolatedComposite = composite !== "source-over";
+                  const previewSequence =
+                    studioLiveGesturePreviewRenderPlan.previewSequenceByElementId.get(el.id);
                   const blendCacheKey = isolatedComposite
-                    ? [el.id, composite, pagesHi, JSON.stringify(elBounds(el))].join("|")
+                    ? [
+                        el.id,
+                        composite,
+                        pagesHi,
+                        previewSequence ?? "authoritative",
+                        JSON.stringify(elBounds(el)),
+                      ].join("|")
                     : "";
                   const clippedNode = isolatedComposite ? (
                     <BlendIsolationGroup
@@ -3233,6 +3360,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                     >
                       <StudioDrawNode
                         el={liveEl}
+                        activeDraft={isLiveGesturePreview}
                         paperSurface={paperSurfaceForPreview}
                       />
                       {/* StudioDrawNode의 실제 페인트 노드는 드로잉 핫패스를 위해 listening=false다.
@@ -3460,7 +3588,15 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                       flipped: imgEl.flipped,
                       flippedY: imgEl.flippedY,
                     } as ImageEl;
-                    const mck = [el.id, "mask", maskSrc, JSON.stringify(elBounds(el)), imgEl.rotation ?? 0].join("|");
+                    const mck = [
+                      el.id,
+                      "mask",
+                      studioLiveGesturePreviewRenderPlan.previewSequenceByElementId.get(el.id)
+                        ?? "authoritative",
+                      maskSrc,
+                      JSON.stringify(elBounds(el)),
+                      imgEl.rotation ?? 0,
+                    ].join("|");
                     // What the caller wanted for the element — clipBelow's source-in, or the
                     // element's own blend mode — now rides on the sandwich root. Without this the
                     // nested clipBelow+mask case clipped by its own mask but no longer by the
@@ -3485,6 +3621,10 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                     const ck = [
                       el.id,
                       base.id,
+                      studioLiveGesturePreviewRenderPlan.previewSequenceByElementId.get(el.id)
+                        ?? "authoritative",
+                      studioLiveGesturePreviewRenderPlan.previewSequenceByElementId.get(base.id)
+                        ?? "authoritative",
                       imageFilterCacheKey(el as ImageEl),
                       imageFilterCacheKey(base as ImageEl),
                       (el as { src?: string }).src ?? "",
@@ -4384,6 +4524,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 pageId={activePage.id}
                 canvasWidth={CANVAS_W}
                 canvasHeight={canvasH}
+                trailSuppressedSessionIds={studioLiveGesturePreviewTrailSuppressedSessionIds}
                 hidden={isExporting || sourceHydrationPending || collaborationDocumentUnavailable}
                 commentPins={studioCanvasCommentPins}
                 flipX={canvasFlipH}

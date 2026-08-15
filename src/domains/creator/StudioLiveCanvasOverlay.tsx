@@ -127,6 +127,8 @@ export interface StudioRemoteCursorOverlayProps {
   pageId: string;
   canvasWidth: number;
   canvasHeight: number;
+  /** Keep pointer/tip presence while the retained gesture renderer owns this peer's trail. */
+  trailSuppressedSessionIds?: ReadonlySet<string>;
   hidden?: boolean;
   commentPins: readonly StudioCanvasCommentPin[];
   onCommentPinClick: (payload: StudioCommentPinClickPayload) => void;
@@ -1082,6 +1084,7 @@ export function StudioRemoteCursorOverlay({
   pageId,
   canvasWidth,
   canvasHeight,
+  trailSuppressedSessionIds,
   hidden = false,
   commentPins,
   onCommentPinClick,
@@ -1187,7 +1190,16 @@ export function StudioRemoteCursorOverlay({
     <StudioLiveCanvasOverlay
       canvasWidth={canvasWidth}
       canvasHeight={canvasHeight}
-      cursors={cursors.filter((value) => value.cursor.pageId === pageId)}
+      cursors={cursors
+        .filter((value) => value.cursor.pageId === pageId)
+        .map((value) =>
+          trailSuppressedSessionIds?.has(value.participant.sessionId)
+            ? {
+                ...value,
+                cursor: { ...value.cursor, points: undefined },
+              }
+            : value
+        )}
       commentPins={commentPins}
       onCommentPinClick={onCommentPinClick}
       onCommentPinReanchor={onCommentPinReanchor}

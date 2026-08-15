@@ -817,6 +817,7 @@ import {
   studioLiveDynamicBrushOverlaySupportsElement,
 } from "./studio-live-dynamic-brush-overlay";
 import { StudioLiveGesturePreviewPublisher } from "./studio-live-gesture-preview-publisher";
+import { StudioLiveGesturePreviewRoomAdapter } from "./studio-live-gesture-preview-room-adapter";
 import {
   decideStudioLiveInkBackend,
 } from "./studio-live-ink-backend";
@@ -3216,6 +3217,10 @@ function StudioCuttoonEditor({
   // Command-only seam: high-frequency pointer publication does not subscribe this giant editor
   // to live cursor state. The always-mounted provider owns and rotates the actual room.
   const studioLiveRoomRef = useRef<StudioLiveRoom | null>(null);
+  const [studioLiveGesturePreviewAdapter] = useState(
+    () => new StudioLiveGesturePreviewRoomAdapter(),
+  );
+  const studioLiveGesturePreviewLifecycleGenerationRef = useRef({ generation: 0 });
   const cancelStudioLiveGesturePreviewRef = useRef<() => void>(() => undefined);
   const studioLiveCommentEventHandlerRef = useRef<(
     change: StudioTeamCommentLiveEvent
@@ -3693,6 +3698,7 @@ function StudioCuttoonEditor({
       ...releaseStudioLiveMutationLocks(previous, studioLiveHeldResourcesRef.current),
     ];
     studioLivePendingMutationRef.current = null;
+    studioLiveGesturePreviewAdapter.setRoom(room);
     studioLiveRoomRef.current = room;
     if (room) {
       const subscribedRoom = room;
@@ -3704,12 +3710,23 @@ function StudioCuttoonEditor({
         studioLiveCommentEventHandlerRef.current(event.change);
       });
     }
-  }, []);
-  useLayoutEffect(() => () => {
-    studioLiveCommentRoomUnsubscribeRef.current?.();
-    studioLiveCommentRoomUnsubscribeRef.current = null;
-    studioLiveCommentEventHandlerRef.current = () => undefined;
-  }, []);
+  }, [studioLiveGesturePreviewAdapter]);
+  useLayoutEffect(() => {
+    const lifecycle = studioLiveGesturePreviewLifecycleGenerationRef.current;
+    const lifecycleGeneration = ++lifecycle.generation;
+    return () => {
+      studioLiveCommentRoomUnsubscribeRef.current?.();
+      studioLiveCommentRoomUnsubscribeRef.current = null;
+      studioLiveCommentEventHandlerRef.current = () => undefined;
+      // React StrictMode replays setup→cleanup→setup on the same state object. Defer terminal
+      // disposal by one microtask so that replay can reacquire this adapter; a real unmount has no
+      // following setup generation and therefore still releases the Room/store deterministically.
+      globalThis.queueMicrotask(() => {
+        if (lifecycle.generation !== lifecycleGeneration) return;
+        studioLiveGesturePreviewAdapter.dispose();
+      });
+    };
+  }, [studioLiveGesturePreviewAdapter]);
   const handleStudioCrdtAuthoritativeSaveBarrierChange = useCallback((
     barrier: StudioCrdtAuthoritativeSaveBarrier | null
   ) => {
@@ -46157,6 +46174,7 @@ function clearSelectionForEdit() {
           studioCommentPinReanchorDisabledReason={studioCommentPinReanchorDisabledReason}
           studioCrdtDocument={studioCrdtDocument}
           studioCrdtOperationSyncReady={studioCrdtOperationSyncReady}
+          studioLiveGesturePreviewAdapter={studioLiveGesturePreviewAdapter}
           studioLiveRoomRef={studioLiveRoomRef}
           studioRasterAuthorizedAuthorityKey={studioRasterAuthorizedAuthorityKey}
           studioRasterHandoffBaseKey={studioRasterHandoffBaseKey}
