@@ -14,6 +14,10 @@
 
 import { resolveStudioBrushEngineLaneWatercolorMaterial } from "./studio-brush-engine-lane-catalog";
 import {
+  resolveStudioHandFeelMediaLoadV1,
+  studioHandFeelTravelSpeedV1,
+} from "./studio-hand-feel-media-load-v1";
+import {
   augmentStudioLivingInkSettledBakeDabs,
   resolveStudioLivingInkSettledBakeProgram,
   type StudioLivingInkSettledBakePhase,
@@ -737,8 +741,19 @@ export function applyStudioBrushAliasWatercolorMaterial(
     : null;
   const material = resolveStudioBrushAliasProfile(brushId)?.watercolor ?? laneMaterial;
   if (!material) return dabs;
-  const scaledDabs = dabs.map((dab) => {
+  const sumiFamily = typeof brushId === "string"
+    && /(?:ink-wash|inkwash|sumi)/u.test(brushId);
+  const scaledDabs = dabs.map((dab, index) => {
     const core = dab.role === "core";
+    const previous = dabs[index - 1];
+    const travel = previous
+      ? Math.hypot(dab.x - previous.x, dab.y - previous.y)
+      : 0;
+    const feel = resolveStudioHandFeelMediaLoadV1({
+      pressure: dab.opacity,
+      speed: studioHandFeelTravelSpeedV1(travel, dab.radius),
+      family: sumiFamily ? "sumi" : "wash",
+    });
     return {
       ...dab,
       radius: Math.max(
@@ -748,7 +763,8 @@ export function applyStudioBrushAliasWatercolorMaterial(
       ),
       opacity: clamp(
         finiteOr(dab.opacity, 0)
-          * (core ? material.coreOpacityScale : material.diffuseOpacityScale),
+          * (core ? material.coreOpacityScale : material.diffuseOpacityScale)
+          * feel.coverageScale,
         0,
         1
       ),

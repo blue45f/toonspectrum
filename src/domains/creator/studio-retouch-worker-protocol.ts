@@ -130,6 +130,19 @@ function assertWetMixSettings(value: unknown): asserts value is WetMixSettings {
   assertUnitInterval(value.strength, "혼색 도포량");
   assertUnitInterval(value.wetness, "혼색률");
   assertUnitInterval(value.pickup, "혼색 묻힘률");
+  if (value.loadDepletion !== undefined) {
+    assertUnitInterval(value.loadDepletion, "혼색 로드 고갈");
+  }
+  if (value.initialLoad !== undefined) {
+    assertUnitInterval(value.initialLoad, "혼색 초기 로드");
+  }
+  if (
+    value.mixModel !== undefined
+    && value.mixModel !== "lerp"
+    && value.mixModel !== "spectral-wgm"
+  ) {
+    throw new TypeError("혼색 모델이 올바르지 않습니다.");
+  }
   if (!isRecord(value.paintColor)) throw new TypeError("혼색 안료 색상이 올바르지 않습니다.");
   for (const channel of ["r", "g", "b"] as const) {
     assertFiniteNumber(value.paintColor[channel], `혼색 안료 ${channel}`);

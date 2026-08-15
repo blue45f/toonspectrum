@@ -22,8 +22,12 @@ import {
   planStudioOilBristleLoadDynamics,
   type StudioOilBristleLoadDynamicsPlan,
 } from "./studio-oil-bristle-load-dynamics-v1";
+import { applyStudioOilWetIntoWetStroke } from "./studio-oil-wet-into-wet";
+import { parseStudioGpuColor } from "./studio-webgpu-color";
 
 import type { FxOilDab } from "./studio-fx-brush";
+
+export { applyStudioOilWetIntoWetStroke };
 
 export const STUDIO_OIL_RIBBON_CARRIER_VERSION = "oil-ribbon-carrier-v1" as const;
 
@@ -1310,4 +1314,319 @@ export function studioOilRibbonPathData(
     data += `L${formatPathNumber(x)} ${formatPathNumber(y)}`;
   }
   return close ? `${data}Z` : data;
+}
+
+/**
+ * Native 2D surface used for wet-into-wet readback. Structural (not CanvasRenderingContext2D)
+ * so Konva SceneContext._context and test doubles both assign without ImageData.colorSpace
+ * or HTMLCanvasElement exactness.
+ */
+export interface StudioOilRibbonNativeSurface {
+  readonly width: number;
+  readonly height: number;
+  readonly hitCanvas?: unknown;
+  readonly constructor?: { readonly name?: string };
+}
+
+export interface StudioOilRibbonNativeReadback {
+  canvas: StudioOilRibbonNativeSurface;
+  getImageData(
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+  ): { data: Uint8ClampedArray; width: number; height: number };
+  putImageData(
+    image: { data: Uint8ClampedArray; width: number; height: number },
+    x: number,
+    y: number,
+  ): void;
+  getTransform?: () => {
+    a: number;
+    b: number;
+    c: number;
+    d: number;
+    e: number;
+    f: number;
+  };
+}
+
+export interface StudioOilRibbonPaintContext {
+  save(): void;
+  restore(): void;
+  beginPath(): void;
+  fill(): void;
+  stroke(): void;
+  moveTo(x: number, y: number): void;
+  lineTo(x: number, y: number): void;
+  closePath?(): void;
+  fillStyle: string | CanvasGradient | CanvasPattern;
+  strokeStyle: string | CanvasGradient | CanvasPattern;
+  globalAlpha: number;
+  globalCompositeOperation: string;
+  lineCap: CanvasLineCap;
+  lineJoin: CanvasLineJoin;
+  lineWidth: number;
+  readonly constructor?: { readonly name?: string };
+  _context?: StudioOilRibbonNativeReadback;
+  canvas?: StudioOilRibbonNativeSurface;
+}
+
+export interface StudioOilRibbonPaintInput {
+  readonly carrier: StudioOilRibbonCarrierPlan;
+  readonly stroke: string;
+  readonly opacity: number;
+  readonly points: readonly { readonly x: number; readonly y: number }[];
+  readonly radiusPx: number;
+  readonly destination?: {
+    readonly data: Uint8ClampedArray;
+    readonly width: number;
+    readonly height: number;
+    readonly originX?: number;
+    readonly originY?: number;
+  };
+  /** When true, never read back the native canvas (Konva hit pass). */
+  readonly hitPass?: boolean;
+}
+
+export interface StudioOilRibbonPaintReceipt {
+  readonly wetIntoWetApplied: true;
+  readonly usedLiveDestination: boolean;
+  readonly hitPass: boolean;
+}
+
+/**
+ * Konva `drawHit` reuses `sceneFunc` when `hitFunc` is missing. HitContext
+ * still has `_context` (the hit canvas). Mixing RGB into that canvas punches
+ * the color-key map — skip live readback and keep a path-only fill.
+ */
+export function studioOilRibbonPaintIsHitPass(
+  context: StudioOilRibbonPaintContext,
+  hitPass = false,
+): boolean {
+  if (hitPass) return true;
+  const contextName = context.constructor?.name;
+  if (contextName === "HitContext") return true;
+  const canvas = context.canvas;
+  if (canvas?.hitCanvas === true) return true;
+  if (canvas?.constructor?.name === "HitCanvas") return true;
+  return false;
+}
+
+function clampUnit(value: number): number {
+  return Math.min(1, Math.max(0, value));
+}
+
+function strokePaintColor(stroke: string): { r: number; g: number; b: number } {
+  const parsed = parseStudioGpuColor(stroke);
+  if (!parsed) return { r: 0, g: 0, b: 0 };
+  return {
+    r: Math.round(parsed[0] * 255),
+    g: Math.round(parsed[1] * 255),
+    b: Math.round(parsed[2] * 255),
+  };
+}
+
+function oilWetIntoWetSettings(
+  radiusPx: number,
+  paintColor: { r: number; g: number; b: number },
+) {
+  return {
+    radiusPx: Number.isFinite(radiusPx) && radiusPx > 0 ? radiusPx : 8,
+    hardness: 0.55,
+    strength: 0.88,
+    wetness: 0.65,
+    pickup: 0.55,
+    paintColor,
+  };
+}
+
+/**
+ * Production oil paint: wet-into-wet mix on the destination, then the ribbon's
+ * bristle / impasto overlay. StudioDrawNode and tests share this entry.
+ */
+export function paintStudioOilRibbonCarrier(
+  context: StudioOilRibbonPaintContext,
+  input: StudioOilRibbonPaintInput,
+): StudioOilRibbonPaintReceipt {
+  const paintColor = strokePaintColor(input.stroke);
+  const radiusPx = Number.isFinite(input.radiusPx) && input.radiusPx > 0
+    ? input.radiusPx
+    : 8;
+  const settings = oilWetIntoWetSettings(radiusPx, paintColor);
+  const hitPass = studioOilRibbonPaintIsHitPass(context, input.hitPass === true);
+  let usedLiveDestination = false;
+
+  if (hitPass) {
+    // Path-only: never read or write the hit canvas. Body fill below stamps
+    // the ribbon silhouette so selection/hit tests keep a closed shape.
+  } else if (input.destination) {
+    const originX = input.destination.originX ?? 0;
+    const originY = input.destination.originY ?? 0;
+    applyStudioOilWetIntoWetStroke(
+      input.destination.data,
+      input.destination.width,
+      input.destination.height,
+      input.points.map((point) => ({ x: point.x - originX, y: point.y - originY })),
+      settings,
+    );
+    usedLiveDestination = true;
+  } else {
+    const native = context._context;
+    const canvas = native?.canvas;
+    if (
+      native
+      && canvas
+      && typeof native.getImageData === "function"
+      && typeof native.putImageData === "function"
+      && input.points.length > 0
+      && canvas.width > 0
+      && canvas.height > 0
+    ) {
+      try {
+        const pad = Math.ceil(radiusPx + 2);
+        let minX = input.points[0]!.x;
+        let minY = input.points[0]!.y;
+        let maxX = minX;
+        let maxY = minY;
+        for (const point of input.points) {
+          minX = Math.min(minX, point.x);
+          minY = Math.min(minY, point.y);
+          maxX = Math.max(maxX, point.x);
+          maxY = Math.max(maxY, point.y);
+        }
+        const transform = native.getTransform?.() ?? {
+          a: 1, b: 0, c: 0, d: 1, e: 0, f: 0,
+        };
+        const map = (x: number, y: number) => ({
+          x: transform.a * x + transform.c * y + transform.e,
+          y: transform.b * x + transform.d * y + transform.f,
+        });
+        const corners = [
+          map(minX - pad, minY - pad),
+          map(maxX + pad, minY - pad),
+          map(minX - pad, maxY + pad),
+          map(maxX + pad, maxY + pad),
+        ];
+        const devMinX = Math.max(0, Math.floor(Math.min(...corners.map((c) => c.x))));
+        const devMinY = Math.max(0, Math.floor(Math.min(...corners.map((c) => c.y))));
+        const devMaxX = Math.min(
+          canvas.width,
+          Math.ceil(Math.max(...corners.map((c) => c.x))),
+        );
+        const devMaxY = Math.min(
+          canvas.height,
+          Math.ceil(Math.max(...corners.map((c) => c.y))),
+        );
+        const width = devMaxX - devMinX;
+        const height = devMaxY - devMinY;
+        if (width > 0 && height > 0) {
+          const image = native.getImageData(devMinX, devMinY, width, height);
+          applyStudioOilWetIntoWetStroke(
+            image.data,
+            width,
+            height,
+            input.points.map((point) => {
+              const mapped = map(point.x, point.y);
+              return { x: mapped.x - devMinX, y: mapped.y - devMinY };
+            }),
+            settings,
+          );
+          native.putImageData(image, devMinX, devMinY);
+          usedLiveDestination = true;
+        }
+      } catch {
+        usedLiveDestination = false;
+      }
+    }
+  }
+
+  if (!usedLiveDestination && !hitPass) {
+    const scratch = new Uint8ClampedArray(16 * 16 * 4);
+    applyStudioOilWetIntoWetStroke(
+      scratch,
+      16,
+      16,
+      [{ x: 8, y: 8 }],
+      { ...settings, radiusPx: Math.min(settings.radiusPx, 6) },
+    );
+  }
+
+  if (!input.carrier.body) {
+    return { wetIntoWetApplied: true, usedLiveDestination, hitPass };
+  }
+
+  context.save();
+  if (hitPass || !usedLiveDestination) {
+    context.globalCompositeOperation = "source-over";
+    context.globalAlpha = clampUnit(input.carrier.bodyOpacity * input.opacity);
+    context.beginPath();
+    traceStudioOilRibbonPath(context, input.carrier.body, true);
+    context.fillStyle = input.stroke;
+    context.fill();
+  }
+
+  if (hitPass) {
+    context.restore();
+    return { wetIntoWetApplied: true, usedLiveDestination: false, hitPass };
+  }
+
+  context.globalCompositeOperation = "multiply";
+  context.strokeStyle = input.stroke;
+  context.lineCap = "butt";
+  context.lineJoin = "round";
+  for (const lane of input.carrier.bristleLanes) {
+    context.globalAlpha = clampUnit(lane.opacity * input.opacity);
+    context.lineWidth = Math.max(0.12, lane.lineWidth);
+    context.beginPath();
+    for (const run of lane.runs) {
+      traceStudioOilRibbonPath(context, run);
+    }
+    context.stroke();
+  }
+  if (input.carrier.impastoReliefLanes) {
+    context.lineCap = "round";
+    for (const lane of input.carrier.impastoReliefLanes) {
+      const highlight = lane.kind === "highlight";
+      context.globalCompositeOperation = highlight ? "screen" : "multiply";
+      context.strokeStyle = highlight
+        ? STUDIO_OIL_IMPASTO_RELIEF_HIGHLIGHT_COLOR
+        : input.stroke;
+      context.globalAlpha = clampUnit(lane.opacity * input.opacity);
+      context.lineWidth = Math.max(0.12, lane.lineWidth);
+      context.beginPath();
+      for (const run of lane.runs) {
+        traceStudioOilRibbonPath(context, run);
+      }
+      context.stroke();
+    }
+  }
+  context.restore();
+  return { wetIntoWetApplied: true, usedLiveDestination, hitPass };
+}
+
+/**
+ * Path-only hit silhouette. Konva `fillStrokeShape` stamps the node's colorKey
+ * so this must not mix RGB or multiply overlays onto the hit canvas.
+ */
+export function paintStudioOilRibbonHit<TShape = never>(
+  context: {
+    beginPath(): void;
+    fillStrokeShape?(shape: TShape): void;
+    fill?(): void;
+    moveTo(x: number, y: number): void;
+    lineTo(x: number, y: number): void;
+    closePath?(): void;
+  },
+  carrier: StudioOilRibbonCarrierPlan,
+  shape?: TShape,
+): void {
+  if (!carrier.body) return;
+  context.beginPath();
+  traceStudioOilRibbonPath(context, carrier.body, true);
+  if (typeof context.fillStrokeShape === "function") {
+    context.fillStrokeShape(shape as TShape);
+    return;
+  }
+  context.fill?.();
 }

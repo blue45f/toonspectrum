@@ -27,7 +27,13 @@
  * applyWetMixStroke)가 담당한다 — applyDodgeBurnStroke 와 동일 분리.
  */
 import { dodgeBurnBrushFalloff } from "./studio-dodge-burn";
+import {
+  resolveStudioHandFeelMediaLoadV1,
+  studioHandFeelTravelSpeedV1,
+} from "./studio-hand-feel-media-load-v1";
+import { STUDIO_OSS_OIL_FILM_RECIPE } from "./studio-oss-brush-kernels";
 import { resampleSmudgePath, type SmudgePixelPoint } from "./studio-smudge";
+import { mixStudioSpectralWgmSrgb8 } from "./studio-spectral-wgm-mix-v1";
 
 // 픽셀 공간(원본 자연 해상도) 좌표 — smudge/dodge-burn 과 같은 개념이라 타입을 공유한다.
 export type WetMixPixelPoint = SmudgePixelPoint;
@@ -48,6 +54,15 @@ export type WetMixSettings = {
   pickup: number;
   /** 현재 그리기 색(안료). */
   paintColor: WetMixColor;
+  /**
+   * 0..1 — 도장마다 남는 붓 로드에 곱해지는 소모 비율. 0(기본)은 기존 일정 도포량.
+   * david.li Fluid Paint 의 load drain: 같은 스트로크의 뒤 도장은 앞보다 새 안료가 적다.
+   */
+  loadDepletion?: number;
+  /** 0..1 스트로크 시작 로드. 기본 1(가득). */
+  initialLoad?: number;
+  /** `spectral-wgm` 은 유화 경로의 감산 혼색. 기본 `lerp` 는 기존 혼색 브러시. */
+  mixModel?: "lerp" | "spectral-wgm";
 };
 
 // 표시 px 기준 범위 — DODGE_BURN_RADIUS_RANGE 와 동일 관례(자연 해상도 환산은 호출자 몫).
@@ -196,6 +211,49 @@ export function applyWetMixDab(
  * 각 위치에 파일 헤더의 도장 모델(샘플 → 묻힘 → 혼색 → 소스-오버)을 적용한다. 뒤 도장은 앞
  * 도장이 얹어 놓은 색을 다시 샘플할 수 있다(제자리 누적) — 젖은 물감이 서로 섞이는 감각.
  */
+function speedsAlongResampledPath(
+  original: readonly WetMixPixelPoint[],
+  resampled: readonly WetMixPixelPoint[],
+  radiusPx: number,
+): number[] {
+  if (original.length < 2 || resampled.length === 0) {
+    return resampled.map(() => 0);
+  }
+  const origArc: number[] = [0];
+  const origSpeed: number[] = [0];
+  for (let index = 1; index < original.length; index += 1) {
+    const travel = Math.hypot(
+      original[index]!.x - original[index - 1]!.x,
+      original[index]!.y - original[index - 1]!.y,
+    );
+    origArc.push(origArc[index - 1]! + travel);
+    origSpeed.push(studioHandFeelTravelSpeedV1(travel, radiusPx));
+  }
+  const speeds: number[] = [];
+  let walked = 0;
+  let segment = 0;
+  for (let index = 0; index < resampled.length; index += 1) {
+    if (index > 0) {
+      walked += Math.hypot(
+        resampled[index]!.x - resampled[index - 1]!.x,
+        resampled[index]!.y - resampled[index - 1]!.y,
+      );
+    }
+    while (
+      segment + 1 < origArc.length
+      && origArc[segment + 1]! < walked
+    ) {
+      segment += 1;
+    }
+    speeds.push(
+      walked <= 1e-6
+        ? 0
+        : origSpeed[Math.min(segment + 1, origSpeed.length - 1)] ?? 0,
+    );
+  }
+  return speeds;
+}
+
 export function wetMixStroke(
   data: Uint8ClampedArray,
   w: number,
@@ -214,9 +272,13 @@ export function wetMixStroke(
   const paintR = clampChannel(settings.paintColor.r);
   const paintG = clampChannel(settings.paintColor.g);
   const paintB = clampChannel(settings.paintColor.b);
+  const depletion = clamp01(settings.loadDepletion ?? 0);
+  let load = clamp01(settings.initialLoad ?? 1);
+  const spectralMix = settings.mixModel === "spectral-wgm";
 
   const step = safeRadius * WET_MIX_STEP_RATIO;
   const resampled = resampleSmudgePath(points, step).slice(0, WET_MIX_MAX_DABS);
+  const resampledSpeeds = speedsAlongResampledPath(points, resampled, safeRadius);
 
   // 붓이 머금은 색(well) — 첫 유효 샘플로 초기화, 이후 도장마다 pickup 비율로 갱신.
   let wellR = 0;
@@ -224,7 +286,12 @@ export function wetMixStroke(
   let wellB = 0;
   let hasWell = false;
 
-  for (const p of resampled) {
+  for (let dabIndex = 0; dabIndex < resampled.length; dabIndex += 1) {
+    const p = resampled[dabIndex]!;
+    const feel = resolveStudioHandFeelMediaLoadV1({
+      speed: resampledSpeeds[dabIndex] ?? 0,
+      family: spectralMix ? "oil" : "wash",
+    });
     const sampled = sampleWetMixDabAverage(data, w, h, p, safeRadius, hardness);
     if (sampled !== null) {
       if (!hasWell) {
@@ -239,14 +306,34 @@ export function wetMixStroke(
       }
     }
     // 머금은 색이 아직 없으면(투명 캔버스 시작) 현재 색만 얹는다 — deposit = paint.
-    const depR = hasWell ? paintR + (wellR - paintR) * wetness : paintR;
-    const depG = hasWell ? paintG + (wellG - paintG) * wetness : paintG;
-    const depB = hasWell ? paintB + (wellB - paintB) * wetness : paintB;
+    let depR = paintR;
+    let depG = paintG;
+    let depB = paintB;
+    if (hasWell) {
+      if (spectralMix) {
+        const mixed = mixStudioSpectralWgmSrgb8(
+          { r: paintR, g: paintG, b: paintB },
+          { r: wellR, g: wellG, b: wellB },
+          1 - wetness,
+          STUDIO_OSS_OIL_FILM_RECIPE.paintMode,
+        );
+        depR = mixed.r;
+        depG = mixed.g;
+        depB = mixed.b;
+      } else {
+        depR = paintR + (wellR - paintR) * wetness;
+        depG = paintG + (wellG - paintG) * wetness;
+        depB = paintB + (wellB - paintB) * wetness;
+      }
+    }
     applyWetMixDab(
       data, w, h, p,
       { r: depR, g: depG, b: depB },
-      safeRadius, hardness, strength,
+      safeRadius, hardness, strength * load * feel.coverageScale,
     );
+    if (depletion > 0 && load > 0) {
+      load = Math.max(0, load * (1 - depletion));
+    }
   }
 
   return data;

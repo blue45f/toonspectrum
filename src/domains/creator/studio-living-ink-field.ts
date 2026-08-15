@@ -193,6 +193,13 @@ export const STUDIO_LIVING_INK_CHROMA_COEFFS = Object.freeze({
 } as const);
 
 /**
+ * Default InkWash chromatography amount on the CPU oracle. Kept in lockstep with
+ * `DEFAULT_STUDIO_LIVING_INK_MATERIAL_CONTROLS.chromaticSeparation` (gpu-protocol imports this
+ * file, so the number is authored here).
+ */
+export const STUDIO_LIVING_INK_DEFAULT_CHROMATIC_SEPARATION = 0.08 as const;
+
+/**
  * InkWash §06 brush-tip scrub bleed: `base + gain * footprint` multiplies the wet bleed rate.
  * Uploaded as uniforms by the WebGL2 pigment pass (not re-derived in GLSL).
  */
@@ -229,6 +236,25 @@ export function studioLivingInkChromaBleedMultipliers(
 export function studioLivingInkBrushBleedBoost(brushFootprint: number): number {
   const footprint = Math.min(1, Math.max(0, brushFootprint));
   return STUDIO_LIVING_INK_BRUSH_BLEED.base + STUDIO_LIVING_INK_BRUSH_BLEED.gain * footprint;
+}
+
+/**
+ * CPU ink-wash step: the living-ink tile field with InkWash §06 per-channel bleed rates.
+ * Dry cells stay put because the tile field gates mobility on surface water; overlapping
+ * deposits add optical density (Beer–Lambert) rather than averaging RGB.
+ */
+export function advanceStudioInkWashField(
+  settingsInput: unknown,
+  stateInput: unknown,
+  fixedTicksInput: unknown,
+  chromaticSeparation: number = STUDIO_LIVING_INK_DEFAULT_CHROMATIC_SEPARATION,
+): ReturnType<typeof advanceStudioWetMediaTileField> {
+  return advanceStudioWetMediaTileField(
+    settingsInput,
+    stateInput,
+    fixedTicksInput,
+    studioLivingInkChromaBleedMultipliers(chromaticSeparation),
+  );
 }
 
 /**
@@ -1266,10 +1292,11 @@ export async function applyStudioLivingInkOperation(
         > STUDIO_LIVING_INK_LIMITS.maxWhiteTransportCellWork
     ) return failure("budget-exceeded", "$.operation.fixedTicks");
     const immutableFixedSettings = Object.freeze({ ...session.settings, rewetRate: 0 });
-    const advanced = advanceStudioWetMediaTileField(
+    const advanced = advanceStudioInkWashField(
       immutableFixedSettings,
       session.state,
       operation.fixedTicks,
+      STUDIO_LIVING_INK_DEFAULT_CHROMATIC_SEPARATION,
     );
     if (!advanced.ok) return failure("field-rejected", advanced.path);
     if (aborted(options.signal)) return failure("aborted", "$.operation");

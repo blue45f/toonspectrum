@@ -103,6 +103,20 @@ export type StudioWetMediaLinearRgba = readonly [
 ];
 
 /**
+ * Per-channel optical-density bleed multipliers (InkWash §06 chromatography).
+ * `[1, 1, 1]` is lockstep RGB — the historical default so existing oracles stay byte-stable.
+ * Rates above 1 let that dye species outrun the pigment-mass front.
+ */
+export type StudioWetMediaPigmentChannelRates = readonly [
+  red: number,
+  green: number,
+  blue: number,
+];
+
+export const STUDIO_WET_MEDIA_LOCKSTEP_PIGMENT_CHANNEL_RATES =
+  Object.freeze([1, 1, 1]) as StudioWetMediaPigmentChannelRates;
+
+/**
  * A signed delta maps directly onto a two-well brush contact:
  * - pickupFromCanvas becomes negative water/pigment deltas;
  * - depositionToCanvas becomes positive water/pigment deltas.
@@ -1251,6 +1265,45 @@ function transferScalar(
   return amount;
 }
 
+function parsePigmentChannelRates(
+  input: unknown,
+): StudioWetMediaTileFieldResult<StudioWetMediaPigmentChannelRates> {
+  if (input === undefined) {
+    return success(STUDIO_WET_MEDIA_LOCKSTEP_PIGMENT_CHANNEL_RATES);
+  }
+  const parsed = inspectNumericArray(input, 3, 0, 8, "$.pigmentChannelRates");
+  if (!parsed.ok) return parsed;
+  return success(Object.freeze([
+    parsed.value[0]!,
+    parsed.value[1]!,
+    parsed.value[2]!,
+  ]));
+}
+
+function transferOpticalDensityChannel(
+  density: [number[], number[], number[]],
+  mass: number[],
+  channel: number,
+  from: number,
+  to: number,
+  requested: number,
+): number {
+  const destinationCapacity = Math.max(
+    0,
+    mass[to]! * STUDIO_WET_MEDIA_TILE_FIELD_LIMITS.maxOpticalDensity
+    - density[channel][to]!,
+  );
+  const amount = Math.min(
+    Math.max(0, requested),
+    density[channel][from]!,
+    destinationCapacity,
+  );
+  if (amount <= 0) return 0;
+  density[channel][from] = Math.max(0, density[channel][from]! - amount);
+  density[channel][to] = density[channel][to]! + amount;
+  return amount;
+}
+
 function transferPigment(
   mass: number[],
   density: [number[], number[], number[]],
@@ -1321,11 +1374,9 @@ function diffuseWater(
 function diffuseMobilePigment(
   field: MutableField,
   settings: StudioWetMediaTileFieldSettings,
+  channelRates: StudioWetMediaPigmentChannelRates,
 ): void {
   forEachOpenPair(field, (left, right, axisX, axisY) => {
-    const difference =
-      field.mobilePigmentMass[left]! - field.mobilePigmentMass[right]!;
-    if (difference === 0) return;
     const wetMobility = Math.min(
       1,
       (
@@ -1333,6 +1384,7 @@ function diffuseMobilePigment(
         + field.surfaceWater[right]!
       ) / (2 * settings.dryThreshold),
     );
+    if (wetMobility <= 0) return;
     const coefficient = Math.min(
       0.49,
       settings.pigmentDiffusionRate
@@ -1346,25 +1398,62 @@ function diffuseMobilePigment(
         settings.anisotropy,
       ),
     );
-    const requested = Math.abs(difference) * coefficient;
-    if (difference > 0) {
-      transferPigment(
-        field.mobilePigmentMass,
-        field.mobilePigmentOpticalDensity,
-        left,
-        right,
-        requested,
-        settings.maxCellPigment - field.fixedPigmentMass[right]!,
-      );
-    } else {
-      transferPigment(
-        field.mobilePigmentMass,
-        field.mobilePigmentOpticalDensity,
-        right,
-        left,
-        requested,
-        settings.maxCellPigment - field.fixedPigmentMass[left]!,
-      );
+    if (coefficient <= 0) return;
+
+    const massDifference =
+      field.mobilePigmentMass[left]! - field.mobilePigmentMass[right]!;
+    if (massDifference !== 0) {
+      const requested = Math.abs(massDifference) * coefficient;
+      if (massDifference > 0) {
+        transferPigment(
+          field.mobilePigmentMass,
+          field.mobilePigmentOpticalDensity,
+          left,
+          right,
+          requested,
+          settings.maxCellPigment - field.fixedPigmentMass[right]!,
+        );
+      } else {
+        transferPigment(
+          field.mobilePigmentMass,
+          field.mobilePigmentOpticalDensity,
+          right,
+          left,
+          requested,
+          settings.maxCellPigment - field.fixedPigmentMass[left]!,
+        );
+      }
+    }
+
+    // Faster dye species (rate > 1) outrun the lockstep mass front. Rates ≤ 1
+    // stay with the carrier so lockstep `[1,1,1]` remains the historical step.
+    for (let channel = 0; channel < 3; channel += 1) {
+      const extraRate = channelRates[channel]! - 1;
+      if (extraRate <= 0) continue;
+      const densityDifference =
+        field.mobilePigmentOpticalDensity[channel][left]!
+        - field.mobilePigmentOpticalDensity[channel][right]!;
+      if (densityDifference === 0) continue;
+      const requested = Math.abs(densityDifference) * coefficient * extraRate;
+      if (densityDifference > 0) {
+        transferOpticalDensityChannel(
+          field.mobilePigmentOpticalDensity,
+          field.mobilePigmentMass,
+          channel,
+          left,
+          right,
+          requested,
+        );
+      } else {
+        transferOpticalDensityChannel(
+          field.mobilePigmentOpticalDensity,
+          field.mobilePigmentMass,
+          channel,
+          right,
+          left,
+          requested,
+        );
+      }
     }
   });
 }
@@ -1607,9 +1696,10 @@ function advanceOneTick(
   field: MutableField,
   settings: StudioWetMediaTileFieldSettings,
   metrics: TickMetrics,
+  channelRates: StudioWetMediaPigmentChannelRates,
 ): void {
   diffuseWater(field, settings);
-  diffuseMobilePigment(field, settings);
+  diffuseMobilePigment(field, settings, channelRates);
   applyBackrun(field, settings, metrics);
   applyEdgePooling(field, settings, metrics);
   applyCellPhases(field, settings, metrics);
@@ -1620,11 +1710,14 @@ export function advanceStudioWetMediaTileField(
   settingsInput: unknown,
   stateInput: unknown,
   fixedTicksInput: unknown,
+  pigmentChannelRatesInput?: unknown,
 ): StudioWetMediaTileFieldResult<StudioWetMediaTileFieldAdvanceResult> {
   const settings = parseStudioWetMediaTileFieldSettings(settingsInput);
   if (!settings.ok) return settings;
   const state = parseStudioWetMediaTileFieldState(stateInput, settings.value);
   if (!state.ok) return state;
+  const channelRates = parsePigmentChannelRates(pigmentChannelRatesInput);
+  if (!channelRates.ok) return channelRates;
   if (
     !safeIntegerInRange(
       fixedTicksInput,
@@ -1661,7 +1754,7 @@ export function advanceStudioWetMediaTileField(
   };
 
   for (let tick = 0; tick < fixedTicksInput; tick += 1) {
-    advanceOneTick(mutable, settings.value, metrics);
+    advanceOneTick(mutable, settings.value, metrics, channelRates.value);
   }
 
   const frozenState = freezeState(mutable);

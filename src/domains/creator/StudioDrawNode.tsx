@@ -96,10 +96,10 @@ import {
 } from "./studio-living-ink-settled-bake-v1";
 import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "./studio-material-pressure-model";
 import {
+  paintStudioOilRibbonCarrier,
+  paintStudioOilRibbonHit,
   planStudioOilRibbonCarrier,
   studioOilRibbonProgramsForBrush,
-  STUDIO_OIL_IMPASTO_RELIEF_HIGHLIGHT_COLOR,
-  traceStudioOilRibbonPath,
 } from "./studio-oil-ribbon-carrier";
 import { planStudioPerfectFreehandRender } from "./studio-outline-stroke-contract";
 import {
@@ -2191,64 +2191,20 @@ export const StudioDrawNode = memo(function StudioDrawNode({
               <Shape
                 key={index}
                 sceneFunc={(context) => {
-                  if (!carrier.body) return;
-                  context.save();
-                  // Body pigment is one variable-width outline rather than repeated ellipse fills.
-                  // Its directional caps and shared centreline remove length-dependent dab joints.
-                  context.globalAlpha = Math.min(
-                    1,
-                    Math.max(0, carrier.bodyOpacity * opacity),
-                  );
-                  context.beginPath();
-                  traceStudioOilRibbonPath(context, carrier.body, true);
-                  context.fillStyle = stroke;
-                  context.fill();
-
-                  // Bristle relief is likewise continuous: five lanes follow the entire centreline
-                  // instead of restarting a dark ellipse at every station.
-                  context.globalCompositeOperation = "multiply";
-                  context.strokeStyle = stroke;
-                  context.lineCap = "butt";
-                  context.lineJoin = "round";
-                  for (const lane of carrier.bristleLanes) {
-                    context.globalAlpha = Math.min(
+                  paintStudioOilRibbonCarrier(context, {
+                    carrier,
+                    stroke,
+                    opacity,
+                    points: dabs.map((dab) => ({ x: dab.x, y: dab.y })),
+                    radiusPx: Math.max(
                       1,
-                      Math.max(0, lane.opacity * opacity),
-                    );
-                    context.lineWidth = Math.max(0.12, lane.lineWidth);
-                    // One path, one stroke per load band. Stroking each run separately made a
-                    // figure-eight deposit its ridges twice at the crossing and read as a knot;
-                    // a single stroke rasterises the band's whole coverage before compositing.
-                    context.beginPath();
-                    for (const run of lane.runs) {
-                      traceStudioOilRibbonPath(context, run);
-                    }
-                    context.stroke();
-                  }
-                  // brush--impasto-relief 전용 dli GGX 릴리프 오버레이. 플랜이 담을 때만 존재하며
-                  // SVG 직렬화와 동일한 페인트 계약을 쓴다 — 하이라이트는 공유 상수 화이트를
-                  // screen으로, 섀도우는 스트로크 색을 multiply로, 레인당 정확히 한 번 stroke.
-                  if (carrier.impastoReliefLanes) {
-                    context.lineCap = "round";
-                    for (const lane of carrier.impastoReliefLanes) {
-                      const highlight = lane.kind === "highlight";
-                      context.globalCompositeOperation = highlight ? "screen" : "multiply";
-                      context.strokeStyle = highlight
-                        ? STUDIO_OIL_IMPASTO_RELIEF_HIGHLIGHT_COLOR
-                        : stroke;
-                      context.globalAlpha = Math.min(
-                        1,
-                        Math.max(0, lane.opacity * opacity),
-                      );
-                      context.lineWidth = Math.max(0.12, lane.lineWidth);
-                      context.beginPath();
-                      for (const run of lane.runs) {
-                        traceStudioOilRibbonPath(context, run);
-                      }
-                      context.stroke();
-                    }
-                  }
-                  context.restore();
+                      dabs.reduce((sum, dab) => sum + dab.radiusY, 0)
+                      / Math.max(1, dabs.length),
+                    ),
+                  });
+                }}
+                hitFunc={(context, shape) => {
+                  paintStudioOilRibbonHit(context, carrier, shape);
                 }}
                 globalCompositeOperation={composite}
                 listening={false}

@@ -31405,6 +31405,7 @@ const puppetWarpArmed =
           wetness: wetMixWetness / 100,
           pickup: wetMixPickup / 100,
           paintColor: hexToRgb(color),
+          loadDepletion: 0.06,
         },
         { signal: controller.signal },
       );

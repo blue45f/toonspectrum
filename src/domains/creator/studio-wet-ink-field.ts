@@ -14,6 +14,11 @@ import {
   planCausalWatercolorBrush,
 } from "./studio-causal-watercolor-brush";
 import { hash2 } from "./studio-grain";
+import {
+  resolveStudioHandFeelMediaLoadV1,
+  studioHandFeelTravelSpeedV1,
+} from "./studio-hand-feel-media-load-v1";
+import { studioLivingInkChromaBleedMultipliers } from "./studio-living-ink-field";
 
 import type { WatercolorBrushDab } from "./studio-watercolor-brush";
 
@@ -106,6 +111,12 @@ export interface StudioWetInkTile {
   wetness: Float32Array;
   stain: Float32Array;
   readonly paper: Float32Array;
+  /**
+   * Per-channel mobile optical density. Red-absorbing dye can outrun blue when
+   * `chromatography` > 0 (InkWash §06). Loaded snapshots without this field are
+   * reconstructed from scalar pigment × spectral absorption.
+   */
+  pigmentOpticalDensity?: [Float32Array, Float32Array, Float32Array];
   revision: number;
 }
 
@@ -203,6 +214,7 @@ export interface StudioWetInkCell {
   readonly wetness: number;
   readonly stain: number;
   readonly paper: number;
+  readonly pigmentOpticalDensity: readonly [number, number, number];
 }
 
 export interface StudioWetInkTileUpload {
@@ -483,8 +495,62 @@ function createTile(
     wetness: new Float32Array(count),
     stain: new Float32Array(count),
     paper,
+    pigmentOpticalDensity: [
+      new Float32Array(count),
+      new Float32Array(count),
+      new Float32Array(count),
+    ],
     revision: 0,
   };
+}
+
+function spectralWeights(field: StudioWetInkField): StudioWetInkRgb {
+  const spec = field.config.spectralAbsorption;
+  if (!spec || spec.r < 0 || spec.g < 0 || spec.b < 0) {
+    return { r: 1, g: 0.96, b: 0.88 };
+  }
+  return spec;
+}
+
+function ensurePigmentOpticalDensity(
+  tile: StudioWetInkTile,
+  spec: StudioWetInkRgb,
+): [Float32Array, Float32Array, Float32Array] {
+  const existing = tile.pigmentOpticalDensity;
+  if (
+    existing
+    && existing.length === 3
+    && existing[0]!.length === tile.pigment.length
+  ) {
+    return existing;
+  }
+  const count = tile.pigment.length;
+  const reconstructed: [Float32Array, Float32Array, Float32Array] = [
+    new Float32Array(count),
+    new Float32Array(count),
+    new Float32Array(count),
+  ];
+  const weights = [spec.r, spec.g, spec.b] as const;
+  for (let index = 0; index < count; index += 1) {
+    const mass = tile.pigment[index]!;
+    reconstructed[0][index] = fieldValue(mass * weights[0]);
+    reconstructed[1][index] = fieldValue(mass * weights[1]);
+    reconstructed[2][index] = fieldValue(mass * weights[2]);
+  }
+  tile.pigmentOpticalDensity = reconstructed;
+  return reconstructed;
+}
+
+function readOpticalDensity(
+  field: StudioWetInkField,
+  channel: 0 | 1 | 2,
+  x: number,
+  y: number,
+): number {
+  const target = tileAndIndexAt(field, x, y);
+  if (!target) return 0;
+  const density = ensurePigmentOpticalDensity(target.tile, spectralWeights(field));
+  return density[channel][target.index] ?? 0;
 }
 
 function clipBounds(
@@ -855,7 +921,21 @@ function depositStudioWetInkDabsWithSettings(
   let maxX = -1;
   let maxY = -1;
   const touchedTiles = new Set<StudioWetInkTile>();
-  for (const dab of dabs) {
+  const sumiFamily = (field.config.chromatography ?? 0) >= 0.55;
+  for (let dabIndex = 0; dabIndex < dabs.length; dabIndex += 1) {
+    const dab = dabs[dabIndex]!;
+    const previous = dabs[dabIndex - 1];
+    const travel = previous
+      ? Math.hypot(dab.x - previous.x, dab.y - previous.y)
+      : 0;
+    const feel = resolveStudioHandFeelMediaLoadV1({
+      pressure: dab.opacity,
+      speed: studioHandFeelTravelSpeedV1(travel, dab.radius),
+      family: sumiFamily ? "sumi" : "wash",
+    });
+    const waterLoad = settings.waterLoad * feel.waterScale;
+    const pigmentLoad = settings.pigmentLoad * feel.pigmentScale;
+    const wetnessLoad = settings.wetnessLoad * feel.wetnessScale;
     const radius = Math.max(0.25, dab.radius);
     const startX = Math.max(0, Math.floor(dab.x - radius));
     const endX = Math.min(field.config.width - 1, Math.ceil(dab.x + radius));
@@ -885,26 +965,37 @@ function depositStudioWetInkDabsWithSettings(
         const rolePigment = coreRole ? 1 : 0.14;
         const nextWater = fieldValue(
           target.tile.water[target.index]!
-          + settings.waterLoad * roleWater * opacity,
+          + waterLoad * roleWater * opacity,
         );
+        const pigmentDelta = pigmentLoad * rolePigment * opacity * paperResistance;
         const nextPigment = fieldValue(
-          target.tile.pigment[target.index]!
-          + settings.pigmentLoad * rolePigment * opacity * paperResistance,
+          target.tile.pigment[target.index]! + pigmentDelta,
         );
         const nextWetness = Math.fround(clamp01(Math.max(
           target.tile.wetness[target.index]!,
-          settings.wetnessLoad * falloff * (coreRole ? 0.9 : 1),
+          wetnessLoad * falloff * (coreRole ? 0.9 : 1),
         )));
         const directFixation = Math.max(
           0,
-          settings.pigmentLoad * rolePigment * opacity
-          * (1 - Math.min(1, settings.waterLoad)) * 0.22,
+          pigmentLoad * rolePigment * opacity
+          * (1 - Math.min(1, waterLoad)) * 0.22,
         );
+        const spec = spectralWeights(field);
+        const density = ensurePigmentOpticalDensity(target.tile, spec);
         target.tile.water[target.index] = nextWater;
         target.tile.pigment[target.index] = nextPigment;
         target.tile.wetness[target.index] = nextWetness;
         target.tile.stain[target.index] = fieldValue(
           target.tile.stain[target.index]! + directFixation,
+        );
+        density[0][target.index] = fieldValue(
+          density[0][target.index]! + pigmentDelta * spec.r,
+        );
+        density[1][target.index] = fieldValue(
+          density[1][target.index]! + pigmentDelta * spec.g,
+        );
+        density[2][target.index] = fieldValue(
+          density[2][target.index]! + pigmentDelta * spec.b,
         );
         touchedTiles.add(target.tile);
         minX = Math.min(minX, x);
@@ -978,6 +1069,7 @@ interface ScratchTile {
   readonly pigment: Float32Array;
   readonly wetness: Float32Array;
   readonly stain: Float32Array;
+  readonly pigmentOpticalDensity: [Float32Array, Float32Array, Float32Array];
 }
 
 function createScratchTiles(
@@ -985,15 +1077,22 @@ function createScratchTiles(
   bounds: StudioWetInkBounds,
 ): Map<string, ScratchTile> {
   const scratch = new Map<string, ScratchTile>();
+  const spec = spectralWeights(field);
   for (const coordinate of tileCoordinatesForBounds(field, bounds)) {
     const key = tileKey(coordinate.tileX, coordinate.tileY);
     const tile = field.tiles.get(key)!;
+    const density = ensurePigmentOpticalDensity(tile, spec);
     scratch.set(key, {
       tile,
       water: tile.water.slice(),
       pigment: tile.pigment.slice(),
       wetness: tile.wetness.slice(),
       stain: tile.stain.slice(),
+      pigmentOpticalDensity: [
+        density[0].slice(),
+        density[1].slice(),
+        density[2].slice(),
+      ],
     });
   }
   return scratch;
@@ -1110,12 +1209,38 @@ export function simulateStudioWetInkField(
         nextWetness = Math.max(nextWater * 0.72, nextWetness);
         nextWetness = nextWetness <= FIELD_EPSILON ? 0 : Math.fround(clamp01(nextWetness));
 
-        const mobileFactor = 0.12 + 0.88 * Math.max(nextWetness, Math.min(1, nextWater));
+        const wetMobility = Math.max(nextWetness, Math.min(1, nextWater));
+        const mobileFactor = wetMobility <= FIELD_EPSILON ? 0 : wetMobility;
         const outwardWater = Math.max(0, waterAverage - water);
+        const bleedTransport = mobileFactor <= 0
+          ? 0
+          : field.config.bleed * outwardWater * pigmentAverage * 0.18;
         let nextPigment = pigment
           + field.config.pigmentDiffusion * mobileFactor * (pigmentAverage - pigment)
-          + field.config.bleed * outwardWater * pigmentAverage * 0.18;
+          + bleedTransport;
         nextPigment = Math.max(0, nextPigment);
+        const chroma = studioLivingInkChromaBleedMultipliers(field.config.chromatography);
+        const nextOpticalDensity: [number, number, number] = [0, 0, 0];
+        for (const channel of [0, 1, 2] as const) {
+          const current = readOpticalDensity(field, channel, x, y);
+          const average = (
+            readOpticalDensity(field, channel, x - 1, y)
+            + readOpticalDensity(field, channel, x + 1, y)
+            + readOpticalDensity(field, channel, x, y - 1)
+            + readOpticalDensity(field, channel, x, y + 1)
+          ) * 0.25;
+          const channelBleed = mobileFactor <= 0
+            ? 0
+            : field.config.bleed * outwardWater * average * 0.18 * chroma[channel]!;
+          let next = current
+            + field.config.pigmentDiffusion
+              * mobileFactor
+              * chroma[channel]!
+              * (average - current)
+            + channelBleed;
+          next = Math.max(0, next);
+          nextOpticalDensity[channel] = next;
+        }
         const waterGradient = (
           Math.abs(waterLeft - waterRight)
           + Math.abs(waterUp - waterDown)
@@ -1130,8 +1255,12 @@ export function simulateStudioWetInkField(
           nextPigment,
           nextPigment * clamp(baseFixation + edgeFixation, 0, 0.92),
         );
+        const pigmentBeforeFix = nextPigment;
         nextPigment -= fixed;
         nextPigment = nextPigment <= FIELD_EPSILON ? 0 : fieldValue(nextPigment);
+        const remain = pigmentBeforeFix <= FIELD_EPSILON
+          ? 0
+          : nextPigment / pigmentBeforeFix;
         const granuleMultiplier = 1
           + (paper - 0.5) * field.config.granulation * 0.9;
         const nextStain = fieldValue(stain + fixed * granuleMultiplier);
@@ -1141,6 +1270,11 @@ export function simulateStudioWetInkField(
         target.scratch.pigment[target.index] = nextPigment;
         target.scratch.wetness[target.index] = nextWetness;
         target.scratch.stain[target.index] = nextStain;
+        for (const channel of [0, 1, 2] as const) {
+          const next = nextOpticalDensity[channel]! * remain;
+          target.scratch.pigmentOpticalDensity[channel][target.index] =
+            next <= FIELD_EPSILON ? 0 : fieldValue(next);
+        }
         if (
           Math.abs(nextWater - water) > FIELD_EPSILON
           || Math.abs(nextPigment - pigment) > FIELD_EPSILON
@@ -1171,6 +1305,7 @@ export function simulateStudioWetInkField(
       target.tile.pigment = target.pigment;
       target.tile.wetness = target.wetness;
       target.tile.stain = target.stain;
+      target.tile.pigmentOpticalDensity = target.pigmentOpticalDensity;
     }
     const stepDirty = boundsFromExtents(dirtyMinX, dirtyMinY, dirtyMaxX, dirtyMaxY);
     operationDirty = unionBounds(operationDirty, stepDirty);
@@ -1204,12 +1339,28 @@ export function readStudioWetInkCell(
     return null;
   }
   const target = tileAndIndexAt(field, x, y);
+  if (!target) {
+    return {
+      water: 0,
+      pigment: 0,
+      wetness: 0,
+      stain: 0,
+      paper: paperAt(field, x, y),
+      pigmentOpticalDensity: [0, 0, 0],
+    };
+  }
+  const density = ensurePigmentOpticalDensity(target.tile, spectralWeights(field));
   return {
-    water: target?.tile.water[target.index] ?? 0,
-    pigment: target?.tile.pigment[target.index] ?? 0,
-    wetness: target?.tile.wetness[target.index] ?? 0,
-    stain: target?.tile.stain[target.index] ?? 0,
-    paper: target?.tile.paper[target.index] ?? paperAt(field, x, y),
+    water: target.tile.water[target.index] ?? 0,
+    pigment: target.tile.pigment[target.index] ?? 0,
+    wetness: target.tile.wetness[target.index] ?? 0,
+    stain: target.tile.stain[target.index] ?? 0,
+    paper: target.tile.paper[target.index] ?? paperAt(field, x, y),
+    pigmentOpticalDensity: [
+      density[0][target.index] ?? 0,
+      density[1][target.index] ?? 0,
+      density[2][target.index] ?? 0,
+    ],
   };
 }
 
@@ -1256,6 +1407,9 @@ function renderTileRgba(
     const grainBump = (paper - 0.5) * paperRoughness * 0.55;
     const wetEdgeContrast = Math.pow(Math.max(0, wetness), 1.35) * edgeDarkening * 0.35;
     const density = Math.max(0, mobile + fixed + wetEdgeContrast) * (0.92 + grainBump);
+    const channelDensity = ensurePigmentOpticalDensity(tile, spec);
+    const mobileGain = 0.62 + wetness * 0.2;
+    const odScale = 0.92 + grainBump;
 
     let r: number;
     let g: number;
@@ -1270,9 +1424,21 @@ function renderTileRgba(
       a = Math.round(scattering * 255);
     } else {
       const chromFringe = chromatography * (paper - 0.5) * 0.3;
-      const transR = Math.exp(-density * spec.r * 1.7 * (1.0 + chromFringe));
-      const transG = Math.exp(-density * spec.g * 1.7);
-      const transB = Math.exp(-density * spec.b * 1.7 * (1.0 - chromFringe));
+      const densityR = Math.max(
+        0,
+        channelDensity[0][index]! * mobileGain + fixed * spec.r + wetEdgeContrast * spec.r,
+      ) * odScale;
+      const densityG = Math.max(
+        0,
+        channelDensity[1][index]! * mobileGain + fixed * spec.g + wetEdgeContrast * spec.g,
+      ) * odScale;
+      const densityB = Math.max(
+        0,
+        channelDensity[2][index]! * mobileGain + fixed * spec.b + wetEdgeContrast * spec.b,
+      ) * odScale;
+      const transR = Math.exp(-densityR * 1.7 * (1.0 + chromFringe));
+      const transG = Math.exp(-densityG * 1.7);
+      const transB = Math.exp(-densityB * 1.7 * (1.0 - chromFringe));
 
       r = clampByte(color.r * transR);
       g = clampByte(color.g * transG);

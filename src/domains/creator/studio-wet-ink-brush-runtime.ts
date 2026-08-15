@@ -473,6 +473,7 @@ function fieldMaterial(
       // that stays materially distinct from soft watercolor (lower bleed, flatter edge).
       absorption: 0.034,
       bleed: 0.46,
+      chromatography: 0.72,
       dryingRate: 0.038,
       edgeDarkening: 0.82,
       fixationRate: 0.132,
