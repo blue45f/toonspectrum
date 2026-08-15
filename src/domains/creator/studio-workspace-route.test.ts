@@ -6,6 +6,7 @@ import {
   isStudioWorkspaceRoutePathname,
   parseStudioWorkspaceRoute,
   shouldPreserveStudioRouteLifecycle,
+  studio2dHref,
   studioCanvasHref,
   studioDccHref,
   studioRouteStageKey,
@@ -18,6 +19,10 @@ describe("studio workspace routes", () => {
     ["/studio?id=legacy", "?id=legacy", "canvas", "legacy", null, "/studio/work/legacy/canvas"],
     ["/studio/work/work-1", "", "canvas", "work-1", null, "/studio/work/work-1/canvas"],
     ["/studio/work/work-1/canvas", "", "canvas", "work-1", null, "/studio/work/work-1/canvas"],
+    ["/studio/comic", "", "comic", null, null, "/studio/comic"],
+    ["/studio/work/work-1/animation", "", "animation", "work-1", null, "/studio/work/work-1/animation"],
+    ["/studio/remix/source-1/canvas", "", "canvas", null, null, "/studio/remix/source-1/canvas"],
+    ["/studio?remix=source-1", "?remix=source-1", "canvas", null, null, "/studio/remix/source-1/canvas"],
     ["/studio/3d", "", "dcc", null, "model", "/studio/3d/dcc/model"],
     ["/studio/3d/dcc/sculpt", "", "dcc", null, "sculpt", "/studio/3d/dcc/sculpt"],
     ["/studio/work/work-1/3d", "", "dcc", "work-1", "model", "/studio/work/work-1/3d/dcc/model"],
@@ -49,6 +54,12 @@ describe("studio workspace routes", () => {
     ["/studio/work/work-1/canvas", "?id=work-1&id=work-1", "invalid-work-id"],
     ["/studio", "?id=work-1&id=work-2", "invalid-work-id"],
     ["/studio", "?id=..", "invalid-work-id"],
+    ["/studio/remix", "", "invalid-remix-id"],
+    ["/studio", "?remix=source-1&remix=source-1", "invalid-remix-id"],
+    ["/studio/work/work-1/canvas", "?remix=source-1", "identity-conflict"],
+    ["/studio", "?id=work-1&remix=source-1", "identity-conflict"],
+    ["/studio", "?mode=upload&mode=upload", "invalid-mode"],
+    ["/studio/3d/dcc/model", "?mode=upload", "invalid-mode"],
   ] as const)("fails closed for %s", (pathname, search, errorCode) => {
     expect(parseStudioWorkspaceRoute({ pathname, search })).toEqual({
       errorCode,
@@ -59,10 +70,18 @@ describe("studio workspace routes", () => {
   it("builds canonical canvas and DCC hrefs without legacy identity or upload switches", () => {
     const search = "?id=work-1&mode=upload&room=room-2&remix=source-3";
     expect(studioCanvasHref({ search, workId: "work/한글" })).toBe(
-      "/studio/work/work%2F%ED%95%9C%EA%B8%80/canvas?room=room-2&remix=source-3",
+      "/studio/work/work%2F%ED%95%9C%EA%B8%80/canvas?room=room-2",
     );
     expect(studioDccHref({ mode: "cad", search, workId: "work/한글" })).toBe(
-      "/studio/work/work%2F%ED%95%9C%EA%B8%80/3d/dcc/cad?room=room-2&remix=source-3",
+      "/studio/work/work%2F%ED%95%9C%EA%B8%80/3d/dcc/cad?room=room-2",
+    );
+    expect(studio2dHref({
+      remixSourceWorkId: "source/한글",
+      search,
+      surface: "animation",
+      workId: null,
+    })).toBe(
+      "/studio/remix/source%2F%ED%95%9C%EA%B8%80/animation?room=room-2",
     );
     expect(parseStudioWorkspaceRoute({
       pathname: "/studio/work/work%2F%ED%95%9C%EA%B8%80/3d/dcc/cad",
@@ -82,6 +101,14 @@ describe("studio workspace routes", () => {
       pathname: "/studio/work/work-1/canvas",
       search: "?mode=upload",
     })).toBe("/studio/work:work-1/upload");
+    expect(studioRouteStageKey({
+      pathname: "/studio",
+      search: "?remix=source-1",
+    })).toBe("/studio/remix:source-1/editor");
+    expect(studioRouteStageKey({
+      pathname: "/studio/work/work-1/canvas",
+      search: "?mode=upload&mode=upload",
+    })).toBe("/studio/work/work-1/canvas?mode=upload&mode=upload");
     expect(studioRouteStageKey({
       pathname: "/studio/tools-companion",
       search: "?session=primary-a-1234",
@@ -112,6 +139,14 @@ describe("studio workspace routes", () => {
       { pathname: "/studio/work/work-1/canvas", search: "" },
     )).toBe(true);
     expect(shouldPreserveStudioRouteLifecycle(
+      { pathname: "/studio", search: "?remix=source-1" },
+      { pathname: "/studio/remix/source-1/3d/dcc/model", search: "" },
+    )).toBe(true);
+    expect(shouldPreserveStudioRouteLifecycle(
+      "/studio/remix/source-1/canvas",
+      "/studio/remix/source-2/canvas",
+    )).toBe(false);
+    expect(shouldPreserveStudioRouteLifecycle(
       "/studio/work/work-1/canvas",
       "/studio/tools-companion",
     )).toBe(false);
@@ -122,6 +157,13 @@ describe("studio workspace routes", () => {
     expect(shouldPreserveStudioRouteLifecycle(
       { pathname: "/studio/work/work-1/canvas", search: "" },
       { pathname: "/studio/work/work-1/canvas", search: "?mode=upload" },
+    )).toBe(false);
+    expect(shouldPreserveStudioRouteLifecycle(
+      { pathname: "/studio/work/work-1/canvas", search: "" },
+      {
+        pathname: "/studio/work/work-1/canvas",
+        search: "?mode=upload&mode=upload",
+      },
     )).toBe(false);
     expect(shouldPreserveStudioRouteLifecycle("/studio", "/ranking")).toBe(false);
   });
@@ -180,5 +222,29 @@ describe("studio workspace routes", () => {
       },
     });
     expect(studioWorkspaceReturnHref(state, route)).toBeNull();
+  });
+
+  it("keeps remix identity in DCC entry and return receipts", () => {
+    const canvasRoute = parseStudioWorkspaceRoute({
+      pathname: "/studio/remix/source-1/animation",
+    });
+    const dccRoute = parseStudioWorkspaceRoute({
+      pathname: "/studio/remix/source-1/3d/dcc/model",
+    });
+    if (!canvasRoute.valid || !dccRoute.valid) throw new Error("fixture route failed");
+    const state = createStudioDccNavigationState(canvasRoute, {
+      key: "remix-entry",
+      pathname: "/studio/remix/source-1/animation",
+      search: "?room=team-2",
+    });
+    expect(state.studioWorkspaceReturn.remixSourceWorkId).toBe("source-1");
+    expect(studioWorkspaceReturnHref(state, dccRoute)).toBe(
+      "/studio/remix/source-1/animation?room=team-2",
+    );
+    const otherDccRoute = parseStudioWorkspaceRoute({
+      pathname: "/studio/remix/source-2/3d/dcc/model",
+    });
+    if (!otherDccRoute.valid) throw new Error("fixture route failed");
+    expect(studioWorkspaceReturnHref(state, otherDccRoute)).toBeNull();
   });
 });
