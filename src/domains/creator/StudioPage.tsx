@@ -1687,6 +1687,7 @@ import {
   StudioSelectionContextBar,
   type StudioSelectionAlignMode,
 } from "./StudioSelectionContextBar";
+import { StudioSurfaceErrorBoundary } from "./StudioSurfaceErrorBoundary";
 import {
   StudioToolBeltContent,
   type FxPickerSection,
@@ -45019,6 +45020,16 @@ function clearSelectionForEdit() {
     />
   ) : null}
   {hybridDccOpen ? (
+    <StudioSurfaceErrorBoundary
+      detail="3D 도구 화면만 안전하게 닫았습니다. 현재 캔버스, 문서 변경, 공동작업 연결과 실행 취소 기록은 그대로 보존되어 있습니다."
+      onExit={() => setHybridDccOpen(false)}
+      resetKey={JSON.stringify([
+        hybridDccWorkspaceScope,
+        studioRoute.dccMode ?? "model",
+      ])}
+      returnFocus={hybridDccReturnFocusRef.current}
+      surfaceLabel="전문 3D 제작 도구"
+    >
       <Suspense
         fallback={(
           <StudioHybridDccRouteGate
@@ -45078,6 +45089,7 @@ function clearSelectionForEdit() {
           }}
         />
       </Suspense>
+    </StudioSurfaceErrorBoundary>
     ) : null}
     {assetRightsAuditOpen ? (
       <Suspense
