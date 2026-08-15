@@ -51,6 +51,7 @@ import type {
   StudioCrdtUpdateAck,
   StudioCrdtUpdateRequest,
 } from "./studio-crdt-protocol";
+
 import {
   parseStudioLiveLockResourceScope,
   studioLiveLockResourcesConflict,

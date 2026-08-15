@@ -341,7 +341,7 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
     connection.onconnectionstatechange = () => {
       if (link.closed) return;
       const state = connection.connectionState;
-      if (state === "failed" || state === "closed" || state === "disconnected") {
+      if (state === "failed" || state === "closed") {
         this.teardownPeer(sessionId);
       }
     };
