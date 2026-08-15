@@ -65,6 +65,10 @@ import {
   type StudioLiveTransportFactory,
   type StudioLiveTransportStatus,
 } from "./studio-live-collaboration-transport";
+import {
+  parseStudioLiveGesturePreviewPayload,
+  type StudioLiveGesturePreviewPayload,
+} from "./studio-live-gesture-preview";
 import { applyStudioLiveP2pOverlay } from "./studio-live-p2p-overlay-transport";
 import {
   createStudioCloudflarePurposeRoutedLiveTransportFactory,
@@ -101,6 +105,8 @@ import { parseStudioTeamCommentLiveEvent } from "./studio-team-comment-live-even
 import { studioLiveLockResourcesConflict } from "@/lib/studio-live-lock-resource";
 
 const SOCKET_PATH = "/socket.io";
+export const STUDIO_LIVE_GESTURE_PREVIEW_SOCKET_EVENT =
+  "studio:gesture:preview" as const;
 const CONNECT_TIMEOUT_MS = 15_000;
 const CRDT_ACK_TIMEOUT_MS = 10_000;
 const CRDT_WIRE_SELECT_ACK_TIMEOUT_MS = 8_000;
@@ -267,6 +273,27 @@ export interface StudioLiveSocketRuntimeEnvironment {
    * proof that the proxy exists (production-preview harnesses also execute Vite output locally).
    */
   readonly devProxyEnabled?: boolean;
+}
+
+interface StudioLiveGesturePreviewSocketRelay {
+  readonly connectionId: string;
+  readonly preview: StudioLiveGesturePreviewPayload;
+}
+
+function parseStudioLiveGesturePreviewSocketRelay(
+  value: unknown,
+): StudioLiveGesturePreviewSocketRelay | null {
+  if (
+    !isRecord(value) ||
+    Object.keys(value).length !== 2 ||
+    !Object.hasOwn(value, "connectionId") ||
+    !Object.hasOwn(value, "preview") ||
+    !safeIdentifier(value.connectionId, 128)
+  ) {
+    return null;
+  }
+  const preview = parseStudioLiveGesturePreviewPayload(value.preview);
+  return preview ? { connectionId: value.connectionId, preview } : null;
 }
 
 function nonBlank(value: string | null | undefined): string | null {
@@ -571,6 +598,10 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.socket.on("studio:presence:update", this.onPresenceUpdate);
     this.socket.on("studio:presence:leave", this.onPresenceLeave);
     this.socket.on("studio:cursor", this.onCursor);
+    this.socket.on(
+      STUDIO_LIVE_GESTURE_PREVIEW_SOCKET_EVENT,
+      this.onGesturePreview
+    );
     this.socket.on("studio:lock:update", this.onLockUpdate);
     this.socket.on("studio:signal", this.onSignal);
     this.socket.on("studio:screen:announce", this.onScreenAnnounce);
@@ -1080,6 +1111,14 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
           this.emitWithAck("studio:cursor", cursorData);
           return true;
         }
+        case "preview:gesture": {
+          const payload = envelope.payload as StudioLivePayloadMap["preview:gesture"];
+          this.emitWithAck(STUDIO_LIVE_GESTURE_PREVIEW_SOCKET_EVENT, {
+            workId: this.context.workId,
+            preview: payload,
+          });
+          return true;
+        }
         case "lock:claim": {
           const payload = envelope.payload as StudioLivePayloadMap["lock:claim"];
           const leaseMs = Math.max(5_000, Math.min(30_000, payload.leaseUntil - envelope.sentAt));
@@ -1413,6 +1452,10 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.socket.off("studio:presence:update", this.onPresenceUpdate);
     this.socket.off("studio:presence:leave", this.onPresenceLeave);
     this.socket.off("studio:cursor", this.onCursor);
+    this.socket.off(
+      STUDIO_LIVE_GESTURE_PREVIEW_SOCKET_EVENT,
+      this.onGesturePreview
+    );
     this.socket.off("studio:lock:update", this.onLockUpdate);
     this.socket.off("studio:signal", this.onSignal);
     this.socket.off("studio:screen:announce", this.onScreenAnnounce);
@@ -1875,6 +1918,15 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       strokeOpacity: typeof value.strokeOpacity === "number" ? value.strokeOpacity : undefined,
       points: Array.isArray(value.points) ? (value.points as number[]) : undefined,
     });
+  };
+
+  private readonly onGesturePreview = (value: unknown) => {
+    if (!this.ready) return;
+    const relay = parseStudioLiveGesturePreviewSocketRelay(value);
+    if (!relay) return;
+    const participant = this.remoteParticipant(relay.connectionId);
+    if (!participant) return;
+    this.deliver(participant, "preview:gesture", relay.preview);
   };
 
   private readonly onLockUpdate = (value: unknown) => {

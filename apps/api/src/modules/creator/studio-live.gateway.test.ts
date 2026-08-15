@@ -26,6 +26,7 @@ import {
   StudioLiveCrdtSyncSchema,
   StudioLiveCrdtUpdateSchema,
   StudioLiveCursorSchema,
+  StudioLiveGesturePreviewSchema,
   StudioLiveGateway,
   StudioLiveJoinSchema,
   StudioLiveLockReleaseSchema,
@@ -656,6 +657,30 @@ function crdtUpdateRequest(sequence = 1) {
   };
 }
 
+function gesturePreview(gestureId = "gesture-gateway-1") {
+  return {
+    version: 1 as const,
+    gestureId,
+    pageId: "page-1",
+    seq: 1,
+    phase: "begin" as const,
+    operation: "erase" as const,
+    base: { documentGeneration: 12 },
+    renderer: {
+      kind: "freehand" as const,
+      mode: "eraser" as const,
+      stroke: "#112233",
+      strokeWidth: 18,
+      opacity: 0.75,
+    },
+    samples: {
+      startIndex: 0,
+      points: [12, 18, 20, 24],
+      pressures: [0.5, 0.75],
+    },
+  };
+}
+
 function crdtBinaryStateVector(): Uint8Array {
   const doc = new Y.Doc();
   const stateVector = encodeStudioCrdtBinaryEnvelope(
@@ -747,6 +772,18 @@ describe("studio live protocol", () => {
     ).toBe(false);
     expect(StudioLiveJoinSchema.safeParse({ workId: "work\n1", clientInstanceId: "client-1" }).success).toBe(false);
     expect(StudioLiveCursorSchema.safeParse({ workId: "work-1", pageId: null, x: 1.01, y: 0 }).success).toBe(false);
+    expect(
+      StudioLiveGesturePreviewSchema.safeParse({
+        workId: "work-1",
+        preview: gesturePreview(),
+      }).success
+    ).toBe(true);
+    expect(
+      StudioLiveGesturePreviewSchema.safeParse({
+        workId: "work-1",
+        preview: { ...gesturePreview(), source: "blob:untrusted-preview" },
+      }).success
+    ).toBe(false);
     expect(
       StudioLiveSignalSchema.safeParse({
         workId: "work-1",
@@ -2131,6 +2168,116 @@ describe("StudioLiveGateway", () => {
         y: 0.75,
       }),
     });
+  });
+
+  it("relays an editor's strict gesture preview unchanged to the authorized work room and ACKs it", async () => {
+    const harness = createHarness();
+    const socket = harness.socket("preview-editor");
+    await connectAndJoin(harness, socket);
+    const preview = gesturePreview();
+    const acknowledgement = vi.fn();
+
+    const response = await harness.gateway.relayGesturePreview(
+      socket as never,
+      { workId: "work-1", preview },
+      acknowledgement
+    );
+
+    expect(response).toEqual({ ok: true, data: { accepted: true } });
+    expect(acknowledgement).toHaveBeenCalledOnce();
+    expect(acknowledgement).toHaveBeenCalledWith(response);
+    expect(harness.emissions).toContainEqual({
+      target: "from:preview-editor:studio-live:work-1",
+      event: "studio:gesture:preview",
+      payload: {
+        connectionId: "preview-editor",
+        preview,
+      },
+    });
+  });
+
+  it("rejects unsafe gesture preview extensions and prevents view-only fanout", async () => {
+    const harness = createHarness(async (userId, workId) =>
+      teamSnapshot(userId, workId, userId === "preview-viewer" ? { role: "viewer" } : {})
+    );
+    const editor = harness.socket("preview-editor");
+    const viewer = harness.socket("preview-viewer");
+    await connectAndJoin(harness, editor);
+    await connectAndJoin(harness, viewer);
+    const preview = gesturePreview();
+
+    await expect(
+      harness.gateway.relayGesturePreview(
+        editor as never,
+        {
+          workId: "work-1",
+          preview: {
+            ...preview,
+            renderer: { ...preview.renderer, brush: "blob:untrusted-brush" },
+          },
+        },
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: false, code: "invalid_payload" });
+    await expect(
+      harness.gateway.relayGesturePreview(
+        viewer as never,
+        { workId: "work-1", preview },
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: false, code: "forbidden" });
+    expect(
+      harness.emissions.some((emission) => emission.event === "studio:gesture:preview")
+    ).toBe(false);
+  });
+
+  it("uses an independent 90-per-3s gesture preview bucket instead of consuming cursor quota", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-16T00:00:00.000Z"));
+    try {
+      const harness = createHarness();
+      const socket = harness.socket("preview-rate-editor");
+      await connectAndJoin(harness, socket);
+
+      for (let index = 0; index < 90; index += 1) {
+        await expect(
+          harness.gateway.updateCursor(
+            socket as never,
+            { workId: "work-1", pageId: "page-1", x: 0.25, y: 0.75 },
+            undefined
+          )
+        ).resolves.toMatchObject({ ok: true });
+      }
+      await expect(
+        harness.gateway.updateCursor(
+          socket as never,
+          { workId: "work-1", pageId: "page-1", x: 0.25, y: 0.75 },
+          undefined
+        )
+      ).resolves.toMatchObject({ ok: false, code: "rate_limited" });
+
+      for (let index = 0; index < 90; index += 1) {
+        await expect(
+          harness.gateway.relayGesturePreview(
+            socket as never,
+            {
+              workId: "work-1",
+              preview: gesturePreview(`gesture-rate-${index}`),
+            },
+            undefined
+          )
+        ).resolves.toMatchObject({ ok: true });
+      }
+      await expect(
+        harness.gateway.relayGesturePreview(
+          socket as never,
+          { workId: "work-1", preview: gesturePreview("gesture-rate-overflow") },
+          undefined
+        )
+      ).resolves.toMatchObject({ ok: false, code: "rate_limited" });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("broadcasts bounded session chat only from roles that may write", async () => {

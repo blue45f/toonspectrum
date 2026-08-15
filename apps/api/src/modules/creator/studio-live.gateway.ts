@@ -62,6 +62,7 @@ import {
   STUDIO_LIVE_CRDT_BINARY_SYNC_EVENT,
   STUDIO_LIVE_CRDT_BINARY_UPDATE_EVENT,
   STUDIO_LIVE_CRDT_WIRE_SELECT_EVENT,
+  STUDIO_LIVE_GESTURE_PREVIEW_SOCKET_EVENT,
   STUDIO_LIVE_LOCK_PROTOCOL_VERSION,
   STUDIO_LIVE_LOCK_REVISION_VERSION,
   StudioLiveActiveScreenShareSchema,
@@ -72,6 +73,7 @@ import {
   StudioLiveCrdtSyncSchema,
   StudioLiveCrdtUpdateSchema,
   StudioLiveCursorSchema,
+  StudioLiveGesturePreviewSchema,
   StudioLiveInterServerRelayRequestSchema,
   StudioLiveJoinSchema,
   StudioLiveLockReleaseSchema,
@@ -111,6 +113,7 @@ import type {
   StudioLiveCrdtUpdateAck,
   StudioLiveCrdtUpdateInput,
   StudioLiveCursorInput,
+  StudioLiveGesturePreviewInput,
   StudioLiveFailure,
   StudioLiveInterServerRelayEvent,
   StudioLiveIdentityClaim,
@@ -148,10 +151,12 @@ import type { Namespace } from "socket.io";
 export {
   STUDIO_LIVE_SESSION_AUTHENTICATOR,
   STUDIO_LIVE_SESSION_REVALIDATOR,
+  STUDIO_LIVE_GESTURE_PREVIEW_SOCKET_EVENT,
   StudioLiveChatSchema,
   StudioLiveCrdtSyncSchema,
   StudioLiveCrdtUpdateSchema,
   StudioLiveCursorSchema,
+  StudioLiveGesturePreviewSchema,
   StudioLiveJoinSchema,
   StudioLiveLockReleaseSchema,
   StudioLiveLockRequestIdSchema,
@@ -1020,6 +1025,44 @@ export class StudioLiveGateway
       }
     );
     if (!authorized) return reply(ack, failure("not_joined", "실시간 작업실에 다시 참여해 주세요."));
+    return reply(ack, { ok: true, data: { accepted: true } });
+  }
+
+  @SubscribeMessage(STUDIO_LIVE_GESTURE_PREVIEW_SOCKET_EVENT)
+  async relayGesturePreview(
+    @ConnectedSocket() client: StudioLiveSocket,
+    @MessageBody() body: StudioLiveGesturePreviewInput,
+    @Ack() ack?: StudioLiveAckCallback<{ accepted: true }>
+  ) {
+    const parsed = StudioLiveGesturePreviewSchema.safeParse(body);
+    if (!parsed.success) {
+      return reply(ack, failure("invalid_payload", "제스처 미리보기 정보가 올바르지 않습니다."));
+    }
+    if (!this.consumeRateLimit(client.id, "gesture-preview", 90, 3_000)) {
+      return reply(ack, failure("rate_limited", "제스처 미리보기 전송이 너무 빠릅니다."));
+    }
+    const authorized = await this.runWithAuthorizedParticipant(
+      client,
+      parsed.data.workId,
+      false,
+      false,
+      (participant) => {
+        if (!participant.capabilities.edit) return false;
+        client
+          .to(studioLiveRoom(participant.workId))
+          .emit(STUDIO_LIVE_GESTURE_PREVIEW_SOCKET_EVENT, {
+            connectionId: participant.connectionId,
+            preview: parsed.data.preview,
+          });
+        return true;
+      }
+    );
+    if (!authorized) {
+      return reply(ack, failure("not_joined", "실시간 작업실에 다시 참여해 주세요."));
+    }
+    if (!authorized.value) {
+      return reply(ack, failure("forbidden", "이 작품을 편집할 권한이 없습니다."));
+    }
     return reply(ack, { ok: true, data: { accepted: true } });
   }
 

@@ -15,6 +15,7 @@ import type {
   StudioLiveAuthPrincipal,
   StudioLiveCrdtSyncInput,
   StudioLiveCrdtUpdateInput,
+  StudioLiveGesturePreviewInput,
   StudioLiveJoinResult,
   StudioLiveLockUpdate,
   StudioLiveParticipant,
@@ -54,6 +55,33 @@ const publicParticipant = {
   updatedAt: "2026-07-19T01:02:04.000Z",
 } as const satisfies StudioLiveParticipant;
 
+function gesturePreviewInput() {
+  return {
+    workId: "work-1",
+    preview: {
+      version: 1,
+      gestureId: "gesture-protocol-1",
+      pageId: "page-1",
+      seq: 1,
+      phase: "begin",
+      operation: "erase",
+      base: { documentGeneration: 12 },
+      renderer: {
+        kind: "freehand",
+        mode: "eraser",
+        stroke: "#112233",
+        strokeWidth: 18,
+        opacity: 0.75,
+      },
+      samples: {
+        startIndex: 0,
+        points: [12, 18, 20, 24],
+        pressures: [0.5, 0.75],
+      },
+    },
+  } satisfies StudioLiveGesturePreviewInput;
+}
+
 describe("studio live protocol module", () => {
   it("pins segmented causal stroke rooms to CRDT protocol v6", () => {
     expect(protocol.STUDIO_CRDT_PROTOCOL_VERSION).toBe(6);
@@ -73,6 +101,9 @@ describe("studio live protocol module", () => {
     );
     expect(protocol.STUDIO_LIVE_CRDT_BINARY_REMOTE_EVENT).toBe(
       "studio:crdt:remote:binary:v1"
+    );
+    expect(protocol.STUDIO_LIVE_GESTURE_PREVIEW_SOCKET_EVENT).toBe(
+      "studio:gesture:preview"
     );
     expect(protocol.STUDIO_LIVE_LOCK_PROTOCOL_VERSION).toBe(2);
     expectTypeOf<StudioLiveJoinResult["crdtWireFormats"]>().toEqualTypeOf<
@@ -152,6 +183,45 @@ describe("studio live protocol module", () => {
     );
     expectTypeOf<StudioLiveCrdtSyncInput["stateVector"]>().toBeString();
     expectTypeOf<StudioLiveCrdtUpdateInput["update"]>().toBeString();
+  });
+
+  it("composes the strict gesture preview mirror without admitting wrapper or resource extensions", () => {
+    const input = gesturePreviewInput();
+
+    expect(protocol.StudioLiveGesturePreviewSchema.parse(input)).toEqual(input);
+    expect(
+      protocol.StudioLiveGesturePreviewSchema.safeParse({
+        ...input,
+        transportHint: "socket",
+      }).success
+    ).toBe(false);
+    expect(
+      protocol.StudioLiveGesturePreviewSchema.safeParse({
+        ...input,
+        preview: {
+          ...input.preview,
+          renderer: {
+            ...input.preview.renderer,
+            brush: "blob:untrusted-brush",
+          },
+        },
+      }).success
+    ).toBe(false);
+    expect(
+      protocol.StudioLiveGesturePreviewSchema.safeParse({
+        ...input,
+        preview: { ...input.preview, privateAssetUrl: "https://example.com/brush.png" },
+      }).success
+    ).toBe(false);
+    expectTypeOf<StudioLiveGesturePreviewInput["preview"]>().toHaveProperty(
+      "gestureId"
+    );
+    expect(gatewayCompatibility.StudioLiveGesturePreviewSchema).toBe(
+      protocol.StudioLiveGesturePreviewSchema
+    );
+    expect(gatewayCompatibility.STUDIO_LIVE_GESTURE_PREVIEW_SOCKET_EVENT).toBe(
+      protocol.STUDIO_LIVE_GESTURE_PREVIEW_SOCKET_EVENT
+    );
   });
 
   it("normalizes owned sync and update bytes only after binary envelope validation", () => {

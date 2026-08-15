@@ -17,11 +17,13 @@ import {
 
 import { STUDIO_CRDT_UPDATE_MAX_BYTES } from "./studio-crdt.repository";
 import { STUDIO_CRDT_STATE_VECTOR_MAX_BYTES } from "./studio-crdt.service";
+import { StudioLiveGesturePreviewPayloadSchema } from "./studio-live-gesture-preview";
 
 import type { CreatorCollaborationViewerRole } from "./creator-collaboration.policy";
 import type { Namespace, Socket } from "socket.io";
 
 export const STUDIO_LIVE_INTER_SERVER_RELAY_EVENT = "studio:internal:peer-relay:v1";
+export const STUDIO_LIVE_GESTURE_PREVIEW_SOCKET_EVENT = "studio:gesture:preview" as const;
 const STUDIO_LIVE_SIGNAL_SDP_MAX_LENGTH = 48 * 1_024;
 const STUDIO_LIVE_SIGNAL_CANDIDATE_MAX_LENGTH = 8 * 1_024;
 
@@ -152,6 +154,13 @@ export const StudioLiveCursorSchema = z
     strokeWidth: z.number().finite().min(0).max(1000).optional(),
     strokeOpacity: z.number().finite().min(0).max(1).optional(),
     points: z.array(z.number().finite()).max(1024).optional(),
+  })
+  .strict();
+
+export const StudioLiveGesturePreviewSchema = z
+  .object({
+    workId: WorkIdSchema,
+    preview: StudioLiveGesturePreviewPayloadSchema,
   })
   .strict();
 
@@ -669,6 +678,9 @@ export const StudioLiveCrdtBinaryRemoteUpdateSchema = z
 export type StudioLiveJoinInput = z.infer<typeof StudioLiveJoinSchema>;
 export type StudioLivePresenceInput = z.infer<typeof StudioLivePresenceSchema>;
 export type StudioLiveCursorInput = z.infer<typeof StudioLiveCursorSchema>;
+export type StudioLiveGesturePreviewInput = z.infer<
+  typeof StudioLiveGesturePreviewSchema
+>;
 export type StudioLiveLockRequestInput = z.infer<typeof StudioLiveLockRequestSchema>;
 export type StudioLiveLockReleaseInput = z.infer<typeof StudioLiveLockReleaseSchema>;
 export type StudioLiveScreenStateInput = z.infer<typeof StudioLiveScreenStateSchema>;

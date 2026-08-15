@@ -29,6 +29,7 @@ import {
 } from "./studio-live-collaboration-protocol";
 import { StudioLiveRoom, type StudioLiveRoomEvent } from "./studio-live-collaboration-room";
 import {
+  STUDIO_LIVE_GESTURE_PREVIEW_SOCKET_EVENT,
   STUDIO_LIVE_SOCKET_RETRY_POLICY,
   StudioLiveSocketTransport,
   createStudioServerLiveTransportFactory,
@@ -242,6 +243,32 @@ function commentChanged(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function gesturePreview(
+  gestureId = "gesture-socket-1"
+) {
+  return {
+    version: 1,
+    gestureId,
+    pageId: "page-1",
+    seq: 1,
+    phase: "begin",
+    operation: "erase",
+    base: { documentGeneration: 12 },
+    renderer: {
+      kind: "freehand",
+      mode: "eraser",
+      stroke: "#112233",
+      strokeWidth: 18,
+      opacity: 0.75,
+    },
+    samples: {
+      startIndex: 0,
+      points: [12, 18, 20, 24],
+      pressures: [0.5, 0.75],
+    },
+  } satisfies StudioLivePayloadMap["preview:gesture"];
+}
+
 function envelope<K extends StudioLiveMessageKind>(
   kind: K,
   payload: StudioLivePayloadMap[K],
@@ -274,6 +301,9 @@ afterEach(() => {
 
 describe("StudioLiveSocketTransport", () => {
   it("keeps retries bounded while covering a configured free host cold start", () => {
+    expect(STUDIO_LIVE_GESTURE_PREVIEW_SOCKET_EVENT).toBe(
+      "studio:gesture:preview"
+    );
     expect(STUDIO_LIVE_SOCKET_RETRY_POLICY).toEqual({
       reconnection: true,
       reconnectionAttempts: 8,
@@ -2368,6 +2398,75 @@ describe("StudioLiveSocketTransport", () => {
     );
 
     transport.close();
+  });
+
+  it("round-trips strict gesture previews without rebuilding payloads and preserves canonical peer mapping", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    const received: StudioLiveEnvelope[] = [];
+    transport.subscribe((value) => received.push(value as StudioLiveEnvelope));
+    await transport.connect();
+    activate(transport);
+    received.length = 0;
+
+    const outbound = envelope("preview:gesture", gesturePreview(), 2);
+    expect(transport.send(outbound)).toBe(true);
+    const outboundRecord = socket.emitted.at(-1);
+    expect(outboundRecord).toEqual({
+      event: "studio:gesture:preview",
+      payload: {
+        workId: "work-1",
+        preview: outbound.payload,
+      },
+    });
+    expect(
+      (outboundRecord?.payload as { preview?: unknown } | undefined)?.preview
+    ).toBe(outbound.payload);
+
+    const inbound = gesturePreview("gesture-socket-remote");
+    socket.serverEmit("studio:gesture:preview", {
+      connectionId: remote.connectionId,
+      preview: inbound,
+    });
+    expect(received).toHaveLength(1);
+    expect(received[0]).toEqual(
+      expect.objectContaining({
+        kind: "preview:gesture",
+        sender: expect.objectContaining({ sessionId: remote.connectionId }),
+        payload: inbound,
+      })
+    );
+    expect(transport.canonicalSessionId(received[0]!.sender.sessionId)).toBe(
+      remote.clientInstanceId
+    );
+
+    socket.serverEmit("studio:gesture:preview", {
+      connectionId: remote.connectionId,
+      preview: {
+        ...inbound,
+        renderer: { ...inbound.renderer, brush: "blob:untrusted-brush" },
+      },
+    });
+    socket.serverEmit("studio:gesture:preview", {
+      connectionId: remote.connectionId,
+      preview: inbound,
+      sentAt: new Date(NOW).toISOString(),
+    });
+    socket.serverEmit("studio:gesture:preview", {
+      connectionId: "unknown-connection",
+      preview: inbound,
+    });
+    socket.serverEmit("studio:gesture:preview", {
+      connectionId: self.connectionId,
+      preview: inbound,
+    });
+    expect(received).toHaveLength(1);
+
+    transport.close();
+    expect(socket.listeners.get("studio:gesture:preview")?.size).toBe(0);
   });
 
   it("drops a signal without shareId instead of attributing it to an earlier screen lifecycle", async () => {
