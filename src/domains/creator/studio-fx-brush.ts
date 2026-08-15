@@ -1558,6 +1558,13 @@ function bristleLoadAlongTravel(
  * total must stay inside 1 or the outer hairs leave the ribbon the body draws; the base offsets
  * top out at 0.88 and the two corrections are budgeted against the 0.12 that is left.
  */
+/**
+ * Softness of the contact band's edge, in ribbon half-widths. Wide enough that the outermost
+ * touching hairs fade in rather than switching on, narrow enough that a light touch still has a
+ * clearly bounded band of contact instead of a gradient across the whole head.
+ */
+const OIL_CONTACT_SHOULDER = 0.28;
+
 const BRISTLE_PITCH_JITTER = 0.05;
 const BRISTLE_DRIFT_AMPLITUDE = 0.1;
 
@@ -1728,19 +1735,25 @@ export function planOilBrushDabs(input: FxOilPlanInput): FxOilDab[] {
         const tooth = tipProfile === "hard"
           ? 0.5 + (rawTooth - 0.5) * HARD_TIP_LOAD_EVENNESS
           : rawTooth;
-        // Contact widens under pressure: outer hairs only load once the stylus digs in.
+        // Pressure decides HOW MUCH OF THE FERRULE touches the paper, not how hard every hair
+        // presses. That distinction is the whole behaviour.
         //
-        // The penalty used to be a flat 0.55·edge at every pressure, which meant the outermost
-        // hairs were ALWAYS the ones that fell under the dry-liftoff cut — so every oil stroke
-        // came out as a textured core band inside two smooth flat margins, the exact opposite of
-        // what a bristle brush leaves. A real ferrule at working pressure has its whole width on
-        // the paper and the EDGE is where the individual strands are most legible; only a light
-        // skim rides on the middle of the head. Fading the penalty out with pressure says that,
-        // and leaves the light-touch narrow contact intact.
+        // The old form multiplied one contact term by pressure, so a light touch scaled EVERY
+        // hair down together, every hair fell under the dry-liftoff cut at once, and the mark came
+        // out as a smooth film with no bristle in it. Measured across the ribbon at constant
+        // pressure, the cross-section standard deviation was 0.14-0.19 at working pressure and
+        // collapsed to 0.046-0.053 at a light touch — the stroke lost its hairs exactly where a
+        // real brush shows them most. A light skim rides on the middle of the head and leaves a
+        // few separated strands; it does not leave a wash.
+        //
+        // So contact is a WIDTH: hairs inside the contact band touch fully and deposit according
+        // to their own load, hairs outside it do not touch at all, and pressure moves the band's
+        // edge. The shoulder keeps the boundary from being a hard cut, and `tooth` still lets a
+        // hair's own charge modulate what it lays down once it is in contact.
         const edge = Math.abs(offsetRatio);
+        const contactWidth = clamp(0.18 + pressureFeel * 0.95, 0.18, 1);
         const contact = clamp(
-          pressureFeel * (1.06 - edge * 0.55 * (1 - pressureFeel * 0.76))
-            + tooth * 0.12 - 0.08,
+          (contactWidth - edge) / OIL_CONTACT_SHOULDER + tooth * 0.12,
           0,
           1,
         );

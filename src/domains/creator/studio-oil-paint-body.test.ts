@@ -44,10 +44,25 @@ function bristleSeries(paintBody: "oil" | "acrylic"): {
   // five widths — less than a single oil cycle, and a window shorter than the signal cannot count
   // the signal's crossings for either paint.
   const sampled = dabs;
-  return {
-    load: sampled.map((dab) => dab.bristles[0]?.opacity ?? 0),
-    ridge: sampled.map((dab) => dab.bristles[0]?.radiusYRatio ?? 0),
-  };
+  // The CONTACTING half of the bed, concatenated — not one hair, and never bristles[0].
+  //
+  // Two reasons. The bed runs outermost-to-outermost, so index 0 is the hair at the very edge of
+  // the ferrule, and contact is a width: an edge hair is legitimately off the paper at anything
+  // short of a hard press. And a hair carries its own reservoir for the whole stroke, so whether
+  // any single hair crosses the dry threshold depends on the reservoir it was dealt. Sampling one
+  // hair measures that draw; sampling the contacting band measures the paint.
+  const count = dabs[0]?.bristles.length ?? 1;
+  const from = Math.floor(count * 0.25);
+  const to = Math.ceil(count * 0.75);
+  const load: number[] = [];
+  const ridge: number[] = [];
+  for (let bristle = from; bristle < to; bristle += 1) {
+    for (const dab of sampled) {
+      load.push(dab.bristles[bristle]?.opacity ?? 0);
+      ridge.push(dab.bristles[bristle]?.radiusYRatio ?? 0);
+    }
+  }
+  return { load, ridge };
 }
 
 /** One bristle's load over a long stroke - long enough to span several dry/loaded cycles. */
