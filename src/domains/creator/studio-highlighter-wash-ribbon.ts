@@ -504,10 +504,42 @@ const HIGHLIGHTER_DETAIL_PROFILES: Readonly<Record<
   "pastel-highlighter": { poolRatio: 0.18, fibreCount: 3, fibreDuty: 0.5, opacityScale: 0.24 },
 };
 
-/** Deterministic per-(section, fibre) duty gate — no RNG so replay and export stay identical. */
+/**
+ * Steps a felt fibre keeps its state for, on average.
+ *
+ * The gate below used to draw an INDEPENDENT sample per step, and a step is 1.6 nib widths, so a
+ * fibre could only ever deposit for one step at a time: at duty 0.55 the streaks came out as a
+ * scatter of short bars, roughly one nib-and-a-half long, with the same chance of stopping at
+ * every boundary. That reads as debris on a flat bar, not as a felt tip dragging.
+ *
+ * A fibre skips over a scale set by the tip, not by the sampler. Five steps is about eight nib
+ * widths of travel — long enough that a streak is unmistakably a drag, short enough that a
+ * highlighter stroke still breaks up several times across a word.
+ */
+const HIGHLIGHTER_FIBRE_RUN_STEPS = 5;
+
+function fibreHash(knot: number, fibreIndex: number): number {
+  const hash = Math.sin((knot + 1) * 12.9898 + (fibreIndex + 1) * 78.233) * 43_758.545_3;
+  return hash - Math.floor(hash);
+}
+
+/**
+ * Deterministic per-(section, fibre) duty gate — no RNG so replay and export stay identical.
+ *
+ * Value noise over the step index rather than an independent draw: the gate holds its state for a
+ * stretch of travel and then changes, so a fibre deposits in runs and lifts in runs. The duty is
+ * unchanged on average, and the same (section, fibre) still yields the same answer, so both
+ * surfaces and every replay agree exactly as before.
+ */
 function fibreDeposits(sectionIndex: number, fibreIndex: number, duty: number): boolean {
-  const hash = Math.sin((sectionIndex + 1) * 12.9898 + (fibreIndex + 1) * 78.233) * 43_758.545_3;
-  return hash - Math.floor(hash) < duty;
+  const t = sectionIndex / HIGHLIGHTER_FIBRE_RUN_STEPS;
+  const knot = Math.floor(t);
+  const fraction = t - knot;
+  const start = fibreHash(knot, fibreIndex);
+  const end = fibreHash(knot + 1, fibreIndex);
+  // Smoothstep so the gate has no corner where it crosses the duty threshold.
+  const eased = fraction * fraction * (3 - 2 * fraction);
+  return start + (end - start) * eased < duty;
 }
 
 function bandOutline(
