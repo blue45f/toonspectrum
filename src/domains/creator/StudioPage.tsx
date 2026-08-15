@@ -816,6 +816,7 @@ import {
   StudioLiveDynamicBrushOverlayRenderer,
   studioLiveDynamicBrushOverlaySupportsElement,
 } from "./studio-live-dynamic-brush-overlay";
+import { StudioLiveGesturePreviewPublisher } from "./studio-live-gesture-preview-publisher";
 import {
   decideStudioLiveInkBackend,
 } from "./studio-live-ink-backend";
@@ -3215,6 +3216,7 @@ function StudioCuttoonEditor({
   // Command-only seam: high-frequency pointer publication does not subscribe this giant editor
   // to live cursor state. The always-mounted provider owns and rotates the actual room.
   const studioLiveRoomRef = useRef<StudioLiveRoom | null>(null);
+  const cancelStudioLiveGesturePreviewRef = useRef<() => void>(() => undefined);
   const studioLiveCommentEventHandlerRef = useRef<(
     change: StudioTeamCommentLiveEvent
   ) => void>(() => undefined);
@@ -3681,6 +3683,9 @@ function StudioCuttoonEditor({
   const handleStudioLiveRoomChange = useCallback((room: StudioLiveRoom | null) => {
     const previous = studioLiveRoomRef.current;
     if (previous === room) return;
+    // The cancel must traverse the room that owned begin. A packet from the replacement room
+    // cannot safely close the old sender/gesture identity, so cancel before rotating the command.
+    cancelStudioLiveGesturePreviewRef.current();
     studioLiveCommentRoomUnsubscribeRef.current?.();
     studioLiveCommentRoomUnsubscribeRef.current = null;
     ++studioLiveMutationGenerationRef.current;
@@ -13804,6 +13809,14 @@ function StudioCuttoonEditor({
     },
     onError: (cause) => drawingCrdtPublishErrorRef.current(cause),
   });
+  const drawingGesturePreviewPublisherRef = useRef<StudioLiveGesturePreviewPublisher>(null as never);
+  drawingGesturePreviewPublisherRef.current ??= new StudioLiveGesturePreviewPublisher({
+    publish: (payload) =>
+      studioLiveRoomRef.current?.publishGesturePreview(payload) ?? false,
+  });
+  cancelStudioLiveGesturePreviewRef.current = () => {
+    drawingGesturePreviewPublisherRef.current.cancel();
+  };
   /** Predicted samples may simulate the drawing pipeline, but must never schedule durable ink. */
   const drawingPredictionPreviewRef = useRef(false);
   /** One prediction pass owns a private clone, so its samples can append without O(n²) copies. */
@@ -32645,6 +32658,7 @@ const puppetWarpArmed =
     inkMeshLivePreviewRuntimeRef.current?.cancel();
     if (discardedId) cancelLiveStrokeBackendAudit(discardedId);
     drawingCrdtPublisherRef.current.cancel(discardedId);
+    drawingGesturePreviewPublisherRef.current.cancel(discardedId);
     if (discardedId) {
       try {
         studioCrdtDocumentRef.current?.deleteStroke(discardedId);
@@ -32805,6 +32819,8 @@ const puppetWarpArmed =
     inkMeshLivePreviewRuntimeRef.current?.cancel();
     cancelAllLiveStrokeBackendAudits();
     drawingCrdtPublisherRef.current.cancel(discardedId);
+    // Also cancels a terminal packet queue whose DrawEl ref was already released on pointer-up.
+    drawingGesturePreviewPublisherRef.current.cancel();
     if (discardedId) {
       try {
         studioCrdtDocumentRef.current?.deleteStroke(discardedId);
@@ -32955,6 +32971,9 @@ const puppetWarpArmed =
         quickShapeLockedRef.current = true;
       }
       drawingRef.current = next;
+      // One v1 preview gesture cannot change immutable renderer kind in place. Cancel the
+      // freehand preview; the final CRDT element remains authoritative for QuickShape promotion.
+      drawingGesturePreviewPublisherRef.current.cancel(current.id);
       stopFixedRateStrokePump();
       drawingFixedRateFilterRef.current = null;
       scheduleDraft(next);
@@ -34676,6 +34695,11 @@ const puppetWarpArmed =
       );
       drawingInkTimeOriginRef.current = studioInkGestureTimeOrigin(next.inkInput, pointerSample.timeStamp);
       drawingRef.current = next;
+      drawingGesturePreviewPublisherRef.current.begin({
+        pageId: activePage.id,
+        documentGeneration: collaborationAccessRef.current.documentGeneration,
+        element: next,
+      });
       // The active cursor is outline-only, so it can track the contact without darkening stable
       // pixels or becoming part of the live-ink/commit receipt.
       perspectiveRayRef.current = null; // 새 스트로크마다 원근 락을 다시 잡는다(첫 move에서 재계산).
@@ -34973,6 +34997,7 @@ const puppetWarpArmed =
     }
     const next = { ...current, points: [x0, y0, x1, y1] };
     drawingRef.current = next;
+    drawingGesturePreviewPublisherRef.current.replaceShape(next);
     if (schedulePreview) scheduleDraft(next);
     return true;
   }
@@ -36593,6 +36618,7 @@ const puppetWarpArmed =
     );
     appendStudioLivingInkAuthoritativeSuffix(authoritativeDrawing, startSample);
     appendStudioHokusaiAuthoritativeSuffix(authoritativeDrawing, startSample);
+    drawingGesturePreviewPublisherRef.current.append(authoritativeDrawing, startSample);
     if (liveDraftDirectRef.current || liveStampDraftDirectRef.current) {
       if (causalPostCorrectionStateRef.current) {
         appendCausalPostCorrectionState(authoritativeDrawing, startSample);
@@ -37709,6 +37735,7 @@ const puppetWarpArmed =
     if (!drawingRef.current && !requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession()) return;
     const finishingStrokeId = drawingRef.current?.id ?? null;
     let completedLiveStrokeBackendAudit = false;
+    let gesturePreviewFinished = false;
     const inputSettings = drawingInputSettingsRef.current;
     stopFixedRateStrokePump();
     if (
@@ -37788,6 +37815,7 @@ const puppetWarpArmed =
           releasePlan = planRelease(releasePostCorrectionStrength);
         }
         const finished = releasePlan.stroke;
+        gesturePreviewFinished = drawingGesturePreviewPublisherRef.current.end(finished);
         if (livingInkWaterNoopStrokeIdsRef.current.has(finished.id)) {
           completeStudioLivingInkWaterNoop(
             finished.id,
@@ -37985,6 +38013,9 @@ const puppetWarpArmed =
         }
       }
     } finally {
+      if (!gesturePreviewFinished) {
+        drawingGesturePreviewPublisherRef.current.cancel(finishingStrokeId ?? undefined);
+      }
       // Always clear the hold timer after commit/promote so a second pointerup cannot re-use it.
       stopQuickShapeTracking();
       if (finishingStrokeId) livingInkWaterNoopStrokeIdsRef.current.delete(finishingStrokeId);
