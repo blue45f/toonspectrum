@@ -8131,6 +8131,34 @@ export function StudioVrmPoser({
     loadModelFromLibraryEntry(SAMPLE_VRM_ENTRIES[0]);
   }
 
+  async function handleGeneratedVrmFile(file: File) {
+    setIsUploading(true);
+    setLibraryError("");
+    try {
+      const validated = await ensureStoredVrmContentIdentity(createUploadedVrmRecord(file));
+      let saved: VrmStoredModelWithContentIdentity;
+      try {
+        saved = await saveUploadedVrm(file) as VrmStoredModelWithContentIdentity;
+      } catch {
+        memoryVrmModelsRef.current.set(validated.id, validated);
+        saved = validated;
+      }
+      const entry = memoryVrmModelsRef.current.has(saved.id)
+        ? memoryVrmLibraryEntry(saved)
+        : durableVrmLibraryEntry(saved);
+      setLibraryEntries((current) => [
+        entry,
+        ...current.filter((candidate) => candidate.id !== entry.id),
+      ]);
+      loadModelFromLibraryEntry(entry);
+    } catch (caughtError: unknown) {
+      setLibraryStatus("error");
+      setLibraryError(getErrorMessage(caughtError, "생성한 VRM을 라이브러리에 넣지 못했습니다."));
+    } finally {
+      setIsUploading(false);
+    }
+  }
+
   async function handleDeleteEntry(entry: VrmLibraryEntry) {
     if (broadcastPreviewActive) return;
     if (entry.source === "sample") return;
@@ -10219,13 +10247,15 @@ export function StudioVrmPoser({
                 <StudioVrmAvatarForgePanel
                   state={avatarForgeState}
                   disabled={
-                    !vrm
-                    || isCapturing
+                    isCapturing
                     || isSharingPose
                     || isThumbnailCapturing
                     || proportionRigStatus === "applying"
                     || proportionRigStatus === "reload-required"
                   }
+                  onGeneratedFile={(file) => {
+                    void handleGeneratedVrmFile(file);
+                  }}
                   detectedOriginalHairCount={detectedOriginalHairCount}
                   proportionMetrics={proportionRigReceipt?.metrics ?? null}
                   proportionMetricsLabel={

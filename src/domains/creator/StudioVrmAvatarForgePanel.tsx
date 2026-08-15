@@ -1,10 +1,12 @@
 import {
   CircleUserRound,
+  Download,
   Palette,
   PersonStanding,
   RotateCcw,
   Scissors,
   Sparkles,
+  UserPlus,
   WandSparkles,
 } from "lucide-react";
 import { useId, useState } from "react";
@@ -24,6 +26,11 @@ import {
   type AvatarForgeState,
 } from "./studio-vrm-avatar-forge";
 import { resolveStudioVrmAvatarForgeVisualProportionMetrics } from "./studio-vrm-avatar-forge-face-controller";
+import {
+  generateStudioVrmCharacter,
+  type StudioVrmGenerateResult,
+} from "./studio-vrm-generate-mcp";
+import { createStudioVrmGenerateRecipe } from "./studio-vrm-generate-recipe";
 import {
   formatStudioVrmHeadUnits,
   resolveStudioVrmProportionMetrics,
@@ -53,6 +60,7 @@ type StudioVrmAvatarForgePanelProps = {
   proportionPresetNote?: string | null;
   proportionUnavailableReason?: string | null;
   onChange: (state: AvatarForgeState) => void;
+  onGeneratedFile?: (file: File) => void;
 };
 
 const VIEWS: ReadonlyArray<{
@@ -80,9 +88,16 @@ export function StudioVrmAvatarForgePanel({
   proportionPresetNote = null,
   proportionUnavailableReason = null,
   onChange,
+  onGeneratedFile,
 }: StudioVrmAvatarForgePanelProps) {
   const controlId = useId();
   const [view, setView] = useState<ForgeView>("presets");
+  const [generateResult, setGenerateResult] = useState<StudioVrmGenerateResult | null>(null);
+  const [generateBusy, setGenerateBusy] = useState(false);
+  const previewRecipe = createStudioVrmGenerateRecipe({
+    presetId: state.presetId,
+    state,
+  });
 
   const updateFace = <K extends keyof AvatarForgeFaceParams>(key: K, value: AvatarForgeFaceParams[K]) => {
     onChange({ ...state, presetId: undefined, face: { ...state.face, [key]: value } });
@@ -146,7 +161,7 @@ export function StudioVrmAvatarForgePanel({
               </span>
             </div>
             <p className="mt-1 max-w-[34rem] text-[0.68rem] leading-relaxed text-fg-3">
-              리그와 표정을 보존하면서 체형·헤어·얼굴을 비파괴로 조형합니다. 모든 변경은 저장·공유·되돌리기에 포함돼요.
+              스타일 프리셋과 슬라이더로 새 VRM을 만들거나, 불러온 모델의 체형·헤어·얼굴을 비파괴로 조형합니다.
             </p>
           </div>
           <button
@@ -577,6 +592,120 @@ export function StudioVrmAvatarForgePanel({
             </div>
           </div>
         ) : null}
+      </div>
+
+      <div
+        data-studio-vrm-generate=""
+        className="space-y-2.5 border-t border-line/70 px-3.5 py-3"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="flex items-center gap-1.5 text-[0.72rem] font-extrabold text-fg">
+              <UserPlus size={14} className="text-accent" aria-hidden />
+              새 VRM 캐릭터
+            </p>
+            <p className="mt-0.5 text-[0.62rem] leading-relaxed text-fg-3">
+              위 프리셋·슬라이더를 레시피로 써서 휴머노이드 VRM을 생성합니다. 불러온 모델을 덮어쓰지 않아요.
+            </p>
+          </div>
+          <span
+            data-studio-vrm-generate-preset={previewRecipe.presetId ?? "custom"}
+            className="shrink-0 rounded-full border border-line bg-card px-2 py-0.5 text-[0.6rem] font-bold text-fg-2"
+          >
+            {previewRecipe.label}
+          </span>
+        </div>
+
+        <div
+          data-studio-vrm-generate-preview=""
+          className="flex items-center gap-2 rounded-xl border border-line bg-card/70 px-3 py-2"
+        >
+          <span
+            className="size-7 rounded-full border border-line"
+            style={{ background: state.hair.baseColor }}
+            aria-hidden
+          />
+          <span
+            className="size-7 rounded-full border border-line"
+            style={{ background: state.hair.tipColor }}
+            aria-hidden
+          />
+          <div className="min-w-0 text-[0.62rem] leading-relaxed text-fg-3">
+            <p>
+              헤어 {state.hair.style} · 얼굴 폭 {state.face.headWidth.toFixed(2)}× · 다리{" "}
+              {state.proportions.legLength.toFixed(2)}×
+            </p>
+          </div>
+        </div>
+
+        {generateResult?.status === "unavailable" ? (
+          <p
+            data-studio-vrm-generate-unavailable=""
+            data-studio-vrm-generate-status="unavailable"
+            role="status"
+            className="rounded-xl border border-danger/30 bg-danger/10 px-3 py-2 text-[0.66rem] leading-relaxed text-danger"
+          >
+            {generateResult.message}
+          </p>
+        ) : null}
+
+        {generateResult?.status === "ok" ? (
+          <p
+            data-studio-vrm-generate-status="ok"
+            role="status"
+            className="rounded-xl border border-accent/30 bg-accent-soft px-3 py-2 text-[0.66rem] text-accent"
+          >
+            {generateResult.recipe.label} VRM을 만들었습니다. 라이브러리에 넣고 뷰포트에서 미리볼 수 있어요.
+          </p>
+        ) : null}
+
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            data-studio-vrm-generate-submit=""
+            disabled={generateBusy}
+            onClick={() => {
+              setGenerateBusy(true);
+              void generateStudioVrmCharacter({
+                presetId: state.presetId,
+                state,
+              }).then((result) => {
+                setGenerateResult(result);
+                setGenerateBusy(false);
+                if (result.status !== "ok") return;
+                const file = new File(
+                  [result.bytes],
+                  `${result.recipe.label}.vrm`,
+                  { type: "model/gltf-binary" },
+                );
+                onGeneratedFile?.(file);
+              });
+            }}
+            className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-accent/40 bg-accent-soft px-2 text-[0.7rem] font-extrabold text-accent transition-colors hover:bg-accent/15 disabled:opacity-40"
+          >
+            <Sparkles size={14} aria-hidden />
+            {generateBusy ? "생성 중…" : "VRM 생성"}
+          </button>
+          <button
+            type="button"
+            data-studio-vrm-generate-export=""
+            disabled={generateBusy || generateResult?.status !== "ok"}
+            onClick={() => {
+              if (generateResult?.status !== "ok") return;
+              const blob = new Blob([generateResult.bytes], { type: "model/gltf-binary" });
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement("a");
+              link.href = url;
+              link.download = `${generateResult.recipe.label}.vrm`;
+              link.click();
+              URL.revokeObjectURL(url);
+            }}
+            className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-line bg-card px-2 text-[0.7rem] font-extrabold text-fg-2 transition-colors hover:bg-raised disabled:opacity-40"
+          >
+            <Download size={14} aria-hidden />
+            VRM 내보내기
+          </button>
+        </div>
       </div>
     </section>
   );

@@ -224,6 +224,9 @@ const PREVIEW_SUPPORTED = Object.freeze([
   "표정",
   "체형 배율",
   "두신·골격 비율",
+  "헤어·얼굴 조형",
+  "옷장 레이어",
+  "손에 든 소품",
   "기본 색·MToon 재질 효과",
 ] as const);
 
@@ -447,14 +450,14 @@ export function inspectStudioShared3dCharacterCompatibility(
   const avatarForgeOmission = inspectAvatarForgePreviewOmission(
     scene.appearance.avatarForge,
   );
-  if (avatarForgeOmission) {
+  // Face/hair is applied by StudioVrmAvatarForge on the shared stage. Only envelopes the
+  // runtime cannot reproduce stay preview-only.
+  if (avatarForgeOmission && avatarForgeOmission !== "face-or-hair") {
     omissions.push({
       code: "avatar-forge",
-      label: avatarForgeOmission === "face-or-hair"
-        ? "헤어·얼굴 조형"
-        : avatarForgeOmission === "legacy-hip-width"
-          ? "기존 골반 너비 조형"
-          : "지원하지 않는 아바타 포지 조형",
+      label: avatarForgeOmission === "legacy-hip-width"
+        ? "기존 골반 너비 조형"
+        : "지원하지 않는 아바타 포지 조형",
     });
   }
   if (hasCanonicalContent(scene.appearance.costume)) {
@@ -466,9 +469,7 @@ export function inspectStudioShared3dCharacterCompatibility(
   if (hasNonDefaultPhysics(scene)) {
     omissions.push({ code: "physics", label: "머리카락·의상 물리 미리보기" });
   }
-  // A structurally exact plan is not capture authority. Keep the omission until the shared
-  // runtime produces matching attachment/commit/post-commit receipts for this signature.
-  if (appearanceProjection.handProps.status !== "empty") {
+  if (appearanceProjection.handProps.status === "unsupported") {
     omissions.push({ code: "props", label: "손에 든 소품" });
   }
   if (scene.pose.ikConstraints.length > 0) {
@@ -480,7 +481,7 @@ export function inspectStudioShared3dCharacterCompatibility(
   if (scene.surfacePaint.textures.length > 0) {
     omissions.push({ code: "surface-paint", label: "표면 페인트 텍스처" });
   }
-  if (appearanceProjection.wardrobe.status !== "empty") {
+  if (appearanceProjection.wardrobe.status === "unsupported") {
     omissions.push({ code: "wardrobe", label: "옷장 레이어 상태" });
   }
   return Object.freeze({

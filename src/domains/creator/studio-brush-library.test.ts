@@ -73,6 +73,7 @@ const validSnapshot: StudioBrushSnapshot = {
   tipAngle: -35,
   tipRoundness: 0.3,
   stampTuning: null,
+  enginePrograms: null,
   brushDynamics: normalizeStudioBrushDynamicsSettings({
     ...studioBrushDynamicsPresetSettings("dry-media"),
     seed: 492,
@@ -1177,6 +1178,7 @@ describe("내장 카탈로그 160종 저장 라이브러리 왕복", () => {
       tipRoundness: 0.24,
       brushDynamics: selection.brushDynamics,
       stampTuning: null,
+  enginePrograms: null,
     };
   }
 

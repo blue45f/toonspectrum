@@ -382,6 +382,13 @@ export interface StudioWebDotToneSpec {
   readonly seed: number;
 }
 
+/**
+ * Per-dot spread on ink deposit. Small on purpose: a dot tone is still a tone, so the dots must
+ * stay recognisably one family — this only stops them being byte-identical stamps.
+ */
+const DOT_TONE_SIZE_VARIATION = 0.12;
+const DOT_TONE_OPACITY_VARIATION = 0.15;
+
 export const DEFAULT_STUDIO_WEB_DOT_TONE_SPEC: StudioWebDotToneSpec = Object.freeze({
   pitch: 8,
   baseSize: 3.2,
@@ -426,6 +433,7 @@ export function planStudioWebDotToneSamples(
   const samples: StudioWebColorSample[] = [];
   let index = 0;
   const seen = new Set<string>();
+
   for (const p of path) {
     const gx = Math.round(p.x / pitch);
     const gy = Math.round(p.y / pitch);
@@ -440,8 +448,18 @@ export function planStudioWebDotToneSamples(
       x: gx * pitch + jx,
       y: gy * pitch + jy,
       pressure,
-      size: baseSize * (0.65 + pressure * 0.55),
-      opacity: clamp(0.35 + pressure * 0.55, 0.12, 0.95),
+      // 위치는 이미 셀 안에서 흔들리는데(바로 위 주석: "완벽한 기계 격자로 보이지 않도록")
+      // 크기와 농도에는 해시 항이 아예 없었다. 필압이 일정한 구간에서는 모든 점이 완전히 같은
+      // 크기·같은 농도로 찍히고, 그러면 위치만 흔들린 스티커가 된다. 잉크가 실제로 앉는 양은
+      // 점마다 다르므로 같은 해시로 둘 다 흔든다.
+      size: baseSize * (0.65 + pressure * 0.55)
+        * (1 + (hash01(gx, gy, 3, seed) - 0.5) * 2 * DOT_TONE_SIZE_VARIATION),
+      opacity: clamp(
+        (0.35 + pressure * 0.55)
+          * (1 + (hash01(gx, gy, 4, seed) - 0.5) * 2 * DOT_TONE_OPACITY_VARIATION),
+        0.12,
+        0.95,
+      ),
       angleRadians: 0,
       index: index++,
     }));

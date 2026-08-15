@@ -17,7 +17,8 @@
     "paths": {
       "@/*": ["./*"],
       "canvaskit-wasm": ["./src/types/canvaskit-wasm-shim.d.ts"],
-      "canvaskit-wasm/bin/canvaskit.wasm?url": ["./src/types/canvaskit-wasm-url-shim.d.ts"]
+      "canvaskit-wasm/bin/canvaskit.wasm?url": ["./src/types/canvaskit-wasm-url-shim.d.ts"],
+      "@toonspectrum/studio-engine-skia": ["./src/types/studio-engine-skia-shim.d.ts"]
     }
   },
   "include": [

@@ -71,7 +71,11 @@ describe("studio draw pointer-start planning ownership boundary", () => {
     // (315 → 318). 브라우저·렌더러 소유권은 여전히 이 순수 플래너 밖에 있다.
     // 의도적 변경(2026-08-13): retained dynamics가 있는 스트로크는 스탬프 파이프라인 대신
     // bounded-flow 동역학 파이프라인을 타도록 stamp 게이트를 좁힌다(318 → 320).
-    expect(planner.source.split("\n").length).toBeLessThanOrEqual(320);
+    // 의도적 변경(2026-08-15): 사용자가 고른 엔진 프로그램 조합을 시작 스냅샷에 보존한다
+    // (320 → 325). 조합은 브러시 id 로부터 재유도할 수 없으므로 — 그게 커스텀 브러시가
+    // 성립하지 않던 이유다 — capture 시점에 획에 실려야 한다. 순수 capture 정책이며
+    // 렌더러·브라우저 소유권은 여전히 이 플래너 밖에 있다.
+    expect(planner.source.split("\n").length).toBeLessThanOrEqual(325);
   });
 
   it("leaves gesture priority, leases, transport, CRDT publication, and live surfaces in the Page", () => {

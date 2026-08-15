@@ -107,7 +107,7 @@ describe("studio shared 3D scene bridge", () => {
     expect(serializeStudioVrmSceneDocument(scene)).toBe(before);
   });
 
-  it("plans known wardrobe and hand props exactly but keeps capture fail-closed until runtime receipts exist", () => {
+  it("plans known wardrobe and hand props as capturable once the shared runtime can project them", () => {
     const exact = createStudioVrmSceneDocument();
     const scene = normalizeStudioVrmSceneDocument({
       ...exact,
@@ -138,10 +138,7 @@ describe("studio shared 3D scene bridge", () => {
         autoGripHand: "rightHand",
       }],
     });
-    expect(report.previewOmissions.map(({ code }) => code)).toEqual([
-      "props",
-      "wardrobe",
-    ]);
+    expect(report.previewOmissions).toEqual([]);
     expect(serializeStudioVrmSceneDocument(scene)).toBe(before);
   });
 
@@ -305,7 +302,22 @@ describe("studio shared 3D scene bridge", () => {
       { elementId: "unsupported-forge", scene },
     ]);
 
-    expect(session.characters[0]?.compatibility.previewOmissions).toContainEqual({
+    if (omissionLabel === "기존 골반 너비 조형") {
+      expect(session.characters[0]?.compatibility.previewOmissions).toContainEqual({
+        code: "avatar-forge",
+        label: omissionLabel,
+      });
+      expect(inspectStudioShared3dCaptureReadiness(session, {
+        [session.characters[0]!.runtimeKey]: "ready",
+      })).toEqual({
+        phase: "ready",
+        capturableElementIds: [],
+        previewOnlyElementIds: ["unsupported-forge"],
+      });
+      return;
+    }
+
+    expect(session.characters[0]?.compatibility.previewOmissions).not.toContainEqual({
       code: "avatar-forge",
       label: omissionLabel,
     });
@@ -313,8 +325,8 @@ describe("studio shared 3D scene bridge", () => {
       [session.characters[0]!.runtimeKey]: "ready",
     })).toEqual({
       phase: "ready",
-      capturableElementIds: [],
-      previewOnlyElementIds: ["unsupported-forge"],
+      capturableElementIds: ["unsupported-forge"],
+      previewOnlyElementIds: [],
     });
   });
 

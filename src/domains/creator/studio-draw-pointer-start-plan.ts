@@ -47,6 +47,7 @@ import {
   isStudioBoundedFlowSymmetryCompatible,
 } from "./studio-stroke-paint-model";
 
+import type { StudioBrushEngineProgramSet } from "./studio-brush-engine-program-set";
 import type { DrawMode, DrawShapeKind } from "./studio-editor-tool-model";
 import type { StudioStabilizerMode } from "./studio-stroke-stabilizer";
 
@@ -79,6 +80,11 @@ export interface StudioDrawPointerStartInput {
   readonly brushCatalogName?: unknown;
   readonly stampTuning?: StudioStampBrushTuning | null;
   readonly brushDynamics?: unknown;
+  /**
+   * 사용자가 고른 엔진 조합. 프리셋 기본 조합이면 null 이 오고, 그때는 이 키를 아예 싣지 않는다 —
+   * 출하 브러시의 획이 프리셋과 바이트 단위로 같은 플랜을 유지하는 경로가 '키 없음'이다.
+   */
+  readonly brushEnginePrograms?: StudioBrushEngineProgramSet | null;
   readonly stabilizer: number;
   readonly stabilizerMode: StudioStabilizerMode;
   readonly velocitySensitivity: number;
@@ -125,6 +131,7 @@ export function planStudioDrawPointerStart(
     positionScale,
     shapeFill,
     stampTuning,
+    brushEnginePrograms,
     strokeWidth,
     symmetry,
   } = input;
@@ -258,6 +265,7 @@ export function planStudioDrawPointerStart(
     brushTip: drawMode === "pen"
       ? resolveStudioCalligraphyAuthoringTip(brush, brushTip)
       : undefined,
+    ...(drawMode === "pen" && brushEnginePrograms ? { brushEnginePrograms } : {}),
     stamp: drawMode === "pen" && stampTuning && stampKind && !hasBrushDynamics ? { ...stampTuning } : undefined,
     stampPipeline: drawMode === "pen" && stampKind && !hasBrushDynamics ? "causal-walker-v2" as const : undefined,
     watercolorPipeline: causalWatercolor ? "causal-walker-v2" as const : undefined,

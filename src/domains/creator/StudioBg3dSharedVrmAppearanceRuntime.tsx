@@ -1,6 +1,8 @@
 import { useThree } from "@react-three/fiber";
-import { useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 
+import { parseAvatarForgeState } from "./studio-vrm-avatar-forge";
+import { createStudioVrmAvatarForgeFaceController } from "./studio-vrm-avatar-forge-face-controller";
 import { parseCostumeState } from "./studio-vrm-costume";
 import {
   applyStudioVrmCostumeState,
@@ -23,6 +25,7 @@ import {
   type WardrobeSlot,
   type WardrobeState,
 } from "./studio-vrm-wardrobe";
+import { StudioVrmAvatarForge } from "./StudioVrmAvatarForge";
 import {
   StudioVrmPropAttachment,
   StudioVrmRuntimeCommit,
@@ -412,6 +415,12 @@ export function StudioBg3dSharedVrmAppearanceRuntime({
   const sourceRef = useRef(source);
   const [prepared, setPrepared] = useState<StudioBg3dLinkedVrmPreparedState | null>(null);
   const [attachmentsQuarantined, setAttachmentsQuarantined] = useState(false);
+  const [faceController] = useState(createStudioVrmAvatarForgeFaceController);
+  const forgeState = parseAvatarForgeState(source.scene.appearance.avatarForge);
+
+  useEffect(() => () => {
+    faceController.dispose();
+  }, [faceController]);
 
   useLayoutEffect(() => {
     onStatusRef.current = onStatus;
@@ -668,6 +677,14 @@ export function StudioBg3dSharedVrmAppearanceRuntime({
             ) : null;
           })
         : null}
+      {preparedForIdentity ? (
+        <StudioVrmAvatarForge
+          vrm={vrm}
+          state={forgeState}
+          rigRevision={preparedForIdentity.rigRevision}
+          faceController={faceController}
+        />
+      ) : null}
       {preparedForIdentity ? (
         <StudioBg3dSharedVrmReadinessGate
           key={preparedForIdentity.preparedIdentityKey}

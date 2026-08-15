@@ -696,6 +696,9 @@ export interface StudioWebScatterStampSpec {
   readonly baseSize: number;
 }
 
+/** How much of a scattered stamp's opacity the throw distance costs it, at the disc edge. */
+const SCATTER_DISTANCE_FALLOFF = 0.28;
+
 export const DEFAULT_STUDIO_WEB_SCATTER_STAMP_SPEC: StudioWebScatterStampSpec =
   Object.freeze({
     stampsPerStation: 5,
@@ -747,7 +750,17 @@ export function planStudioWebScatterStampSamples(
         y: p.y + Math.sin(ang) * rad,
         pressure,
         size: baseSize * (0.45 + hash01(i, k, 3, seed) * 0.85) * (0.55 + pressure * 0.55),
-        opacity: clamp(0.35 + pressure * 0.5, 0.1, 0.95),
+        // 각도·거리·크기·회전·색조는 전부 입자별 해시를 쓰는데 농도만 스테이션 필압의 순수
+        // 함수였다. 그래서 한 스테이션이 뿌린 다섯 개가 크기는 달라도 농도는 정확히 같았고,
+        // 흩뿌려진 물질이 아니라 한 톤으로 칠해진 얼룩으로 읽혔다. 멀리 튄 입자가 옅어지는
+        // 것까지 함께 넣는다 — 잉크를 더 쓰고 날아간 입자다.
+        opacity: clamp(
+          (0.35 + pressure * 0.5)
+            * (0.72 + hash01(i, k, 6, seed) * 0.42)
+            * (1 - Math.sqrt(hash01(i, k, 2, seed)) * SCATTER_DISTANCE_FALLOFF),
+          0.1,
+          0.95,
+        ),
         agent: k,
         index: index++,
         angleRadians: hash01(i, k, 4, seed) * Math.PI * 2,

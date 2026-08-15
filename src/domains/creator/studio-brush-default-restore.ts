@@ -4,6 +4,10 @@ import {
   studioBrushDynamicsSettingsEqual,
 } from "./studio-brush-dynamics";
 import {
+  STUDIO_BRUSH_OIL_PROGRAM_KEYS,
+  type StudioBrushEngineProgramSet,
+} from "./studio-brush-engine-program-set";
+import {
   DEFAULT_STUDIO_BRUSH_SNAPSHOT,
   type StudioBrushSnapshot,
   type StudioBrushStampTuning,
@@ -15,6 +19,7 @@ import {
   STUDIO_STAMP_BRUSH_DEFAULTS,
 } from "./studio-brush-stamp-engine";
 
+
 import type { StudioBrushCatalogSelection } from "./studio-brush-selection";
 
 export const STUDIO_BRUSH_DEFAULT_RESTORE_FIELDS = [
@@ -22,6 +27,7 @@ export const STUDIO_BRUSH_DEFAULT_RESTORE_FIELDS = [
   "brushOpacity",
   "brushDynamics",
   "stampTuning",
+  "enginePrograms",
   "stabilizer",
   "stabilizerMode",
   "postCorrection",
@@ -77,6 +83,7 @@ const FIELD_LABELS: Readonly<Record<StudioBrushDefaultRestoreField, string>> = O
   brushOpacity: "불투명도",
   brushDynamics: "브러시 반응·질감",
   stampTuning: "스탬프 도포",
+  enginePrograms: "엔진 조합",
   stabilizer: "손떨림 보정",
   stabilizerMode: "보정 방식",
   postCorrection: "후보정",
@@ -121,6 +128,7 @@ export function studioBrushDefaultRestoreValuesFromSnapshot(
     brushOpacity: snapshot.brushOpacity,
     brushDynamics: normalizeStudioBrushDynamicsSettings(snapshot.brushDynamics),
     stampTuning: cloneStampTuning(snapshot.stampTuning),
+    enginePrograms: snapshot.enginePrograms,
     stabilizer: snapshot.stabilizer,
     stabilizerMode: snapshot.stabilizerMode,
     postCorrection: snapshot.postCorrection,
@@ -157,6 +165,8 @@ export function createStudioBuiltInBrushDefaultRestoreProfile(
         selection.brushDynamics ?? neutral.brushDynamics,
       ),
       stampTuning: defaultStampTuning(selection.runtimeBrushId),
+      // 기본값 복원은 브러시 id 의 조합으로 되돌린다 = 세트를 벗는다.
+      enginePrograms: null,
       stabilizer: neutral.stabilizer,
       stabilizerMode: neutral.stabilizerMode,
       postCorrection: neutral.postCorrection,
@@ -213,6 +223,21 @@ function stampTuningEqual(
     );
 }
 
+/**
+ * 조합은 값 비교여야 한다. 참조 비교면 같은 조합을 다시 만들었을 뿐인 브러시가 "변경됨"으로
+ * 보이고, 기본값 복원 버튼이 아무것도 되돌릴 게 없는데도 계속 떠 있게 된다.
+ */
+function studioBrushEngineProgramSetsEqual(
+  left: StudioBrushEngineProgramSet | null,
+  right: StudioBrushEngineProgramSet | null,
+): boolean {
+  if (left === right) return true;
+  if (!left || !right) return false;
+  if (left.version !== right.version) return false;
+  if (!left.oil || !right.oil) return left.oil === right.oil;
+  return STUDIO_BRUSH_OIL_PROGRAM_KEYS.every((key) => left.oil![key] === right.oil![key]);
+}
+
 function fieldEqual(
   field: StudioBrushDefaultRestoreField,
   left: StudioBrushDefaultRestoreValues,
@@ -223,6 +248,9 @@ function fieldEqual(
   }
   if (field === "stampTuning") {
     return stampTuningEqual(left.stampTuning, right.stampTuning);
+  }
+  if (field === "enginePrograms") {
+    return studioBrushEngineProgramSetsEqual(left.enginePrograms, right.enginePrograms);
   }
   return left[field] === right[field];
 }

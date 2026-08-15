@@ -31,6 +31,7 @@ function savedBrush(index: number): StudioSavedBrush {
     tipRoundness: 0.24,
     brushDynamics: studioBrushDynamicsPresetSettings("ink-particle"),
     stampTuning: null,
+  enginePrograms: null,
   };
 }
 

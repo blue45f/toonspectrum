@@ -1727,6 +1727,7 @@ import type {
   StudioBrushDefaultRestoreDirection,
   StudioBrushDefaultRestoreTransaction,
 } from "./studio-brush-default-restore";
+import type { StudioBrushEngineProgramSet } from "./studio-brush-engine-program-set";
 import type { StudioClip } from "./studio-clips";
 import type {
   ComipoAssemblyInput,
@@ -8935,6 +8936,12 @@ function StudioCuttoonEditor({
   const [tipRoundness, setTipRoundness] = useState<number>(
     initialToolOperationMemory.paint.tipRoundness,
   );
+  /**
+   * 사용자가 브러시 스튜디오에서 고른 엔진 조합. null 이면 브러시 id 의 기본 조합이 쓰인다 —
+   * 출하 프리셋이 바이트 단위로 같은 플랜을 유지하는 경로가 바로 이 null 이다.
+   */
+  const [brushEnginePrograms, setBrushEnginePrograms] =
+    useState<StudioBrushEngineProgramSet | null>(null);
   const [brushDynamics, setBrushDynamics] = useState<NormalizedStudioBrushDynamicsSettings>(() =>
     normalizeStudioBrushDynamicsSettings(initialToolOperationMemory.paint.brushDynamics)
   );
@@ -9055,6 +9062,7 @@ function StudioCuttoonEditor({
     tipRoundness,
     brushDynamics,
     stampTuning,
+    enginePrograms: brushEnginePrograms,
   };
   currentBrushSnapshotRef.current = currentBrushSnapshot;
   const activeToolOperation: StudioToolOperation | null = drawMode === "pen"
@@ -9129,6 +9137,7 @@ function StudioCuttoonEditor({
     setTipAngle(snapshot.tipAngle);
     setTipRoundness(snapshot.tipRoundness);
     setBrushDynamics(normalizeStudioBrushDynamicsSettings(snapshot.brushDynamics));
+    setBrushEnginePrograms(snapshot.enginePrograms ?? null);
     setStampTuning(snapshot.stampTuning);
   }
   applyToolOperationSnapshotRef.current = applyToolOperationSnapshot;
@@ -9278,6 +9287,7 @@ function StudioCuttoonEditor({
     setTipAngle(saved.tipAngle);
     setTipRoundness(saved.tipRoundness);
     setBrushDynamics(normalizeStudioBrushDynamicsSettings(saved.brushDynamics));
+    setBrushEnginePrograms(saved.enginePrograms ?? null);
     const usedAt = Date.now();
     void productBrushRepository()
       .then(async (product) => {
@@ -9371,6 +9381,7 @@ function StudioCuttoonEditor({
     if (!proDrawPrefs.sizeLocked) setStrokeWidth(values.strokeWidth);
     if (!proDrawPrefs.opacityLocked) setBrushOpacity(values.brushOpacity);
     setBrushDynamics(values.brushDynamics);
+    setBrushEnginePrograms(values.enginePrograms ?? null);
     setStampTuning(values.stampTuning);
     setStabilizer(values.stabilizer);
     setStabilizerMode(values.stabilizerMode);
@@ -34573,6 +34584,7 @@ const puppetWarpArmed =
         brush,
         brushCatalogId: activeCatalogBrush.id, brushCatalogName: activeCatalogBrush.name,
         stampTuning, brushDynamics,
+        brushEnginePrograms,
         stabilizer,
         stabilizerMode,
         velocitySensitivity,
@@ -43354,6 +43366,7 @@ function clearSelectionForEdit() {
     announceDrawingShortcut,
     applyBgPreset,
     applyBrushDefaultRestoreTransaction,
+    onBrushEngineProgramsChange: setBrushEnginePrograms,
     applyContentAwareFill,
     extractPixelSelectionToLayer,
     applyCropToSelectedImage,
@@ -43827,6 +43840,7 @@ function clearSelectionForEdit() {
       activateCanvasTool: activatePrimaryCanvasTool,
       applyBuiltInBrushPreset,
       applyBrushDefaultRestoreTransaction,
+      onBrushEngineProgramsChange: setBrushEnginePrograms,
       applyDynamicsPreset,
       applySavedBrush,
     dismissBrushManager: dismissBrushManagerToDraw,

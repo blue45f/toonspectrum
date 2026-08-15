@@ -7,6 +7,7 @@ import {
   ImagePlus,
   LoaderCircle,
   RotateCcw,
+  Layers,
   RotateCw,
   SlidersHorizontal,
   Sparkles,
@@ -97,16 +98,25 @@ import {
   StudioBrushGrainControls,
   StudioBrushTaperAdvancedControls,
 } from "./StudioBrushDynamicsControls";
+import { StudioBrushEngineProgramControls } from "./StudioBrushEngineProgramControls";
 import { StudioBrushInputControls } from "./StudioBrushInputControls";
 
+import type { StudioBrushEngineProgramSet } from "./studio-brush-engine-program-set";
 import type {
   StudioBrushSnapshot,
   StudioSavedBrush,
 } from "./studio-brush-library";
 
+
 import { cn } from "@/lib/utils";
 
-type BrushStudioCategory = "presets" | "response" | "stamp" | "tip" | "input";
+type BrushStudioCategory =
+  | "presets"
+  | "engines"
+  | "response"
+  | "stamp"
+  | "tip"
+  | "input";
 
 type BrushDefaultRestoreSession =
   | Readonly<{
@@ -129,6 +139,7 @@ const CATEGORY_ITEMS: readonly {
   Icon: typeof Sparkles;
 }[] = [
   { id: "presets", label: "빠른 설정", description: "용도별 시작점", Icon: Sparkles },
+  { id: "engines", label: "엔진 조합", description: "붓자국을 쌓는 패스", Icon: Layers },
   { id: "response", label: "반응", description: "필압·도포량", Icon: Activity },
   { id: "stamp", label: "도장", description: "간격·산포", Icon: Stamp },
   { id: "tip", label: "촉", description: "각도·원형도", Icon: CircleDot },
@@ -165,6 +176,8 @@ export interface StudioBrushStudioProps {
     transaction: StudioBrushDefaultRestoreTransaction,
     direction: StudioBrushDefaultRestoreDirection,
   ) => void;
+  /** 엔진 조합 변경. 없으면 조합 탭은 읽기 전용으로 동작한다. */
+  onEngineProgramsChange?: (next: StudioBrushEngineProgramSet | null) => void;
   onBeforeOpen?: () => void;
   density?: "compact" | "touch";
 }
@@ -790,6 +803,7 @@ export function StudioBrushStudio({
   tipRoundness,
   onTipRoundnessChange,
   onRestoreDefaults,
+  onEngineProgramsChange,
   onBeforeOpen,
   density = "compact",
 }: StudioBrushStudioProps) {
@@ -1328,6 +1342,18 @@ export function StudioBrushStudio({
         />
       </div>
     ) : <DynamicsRequiredNotice onRequestCompatibleBrush={onRequestCompatibleBrush} />
+  ) : category === "engines" ? (
+    <div>
+      <StudioSectionHeader
+        title="엔진 조합"
+        description="한 획은 여러 패스가 순서대로 쌓여 만들어집니다. 필요한 패스만 켜면 프리셋에 없는 브러시가 됩니다."
+      />
+      <StudioBrushEngineProgramControls
+        brushId={brushId}
+        programSet={currentSnapshot.enginePrograms ?? null}
+        onChange={onEngineProgramsChange ?? (() => undefined)}
+      />
+    </div>
   ) : (
     <div>
       <StudioSectionHeader

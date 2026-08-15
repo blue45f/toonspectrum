@@ -89,6 +89,7 @@ import type {
   NormalizedStudioBrushDynamicsSettings,
   StudioBrushDynamicsPresetId,
 } from "./studio-brush-dynamics";
+import type { StudioBrushEngineProgramSet } from "./studio-brush-engine-program-set";
 import type {
   DeletedBrushRecord,
   StudioBrushSnapshot,
@@ -339,6 +340,8 @@ export interface StudioMobileEditingDockHandlers {
     drawMode?: DrawMode
   ) => void;
   applyBuiltInBrushPreset: (preset: BrushPreset) => void;
+  /** 엔진 조합 변경 — 브러시 스튜디오의 조합 탭이 호출한다. */
+  onBrushEngineProgramsChange?: (next: StudioBrushEngineProgramSet | null) => void;
   applyBrushDefaultRestoreTransaction: (
     transaction: StudioBrushDefaultRestoreTransaction,
     direction: StudioBrushDefaultRestoreDirection,
@@ -606,6 +609,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
   const {
     activateCanvasTool,
     applyBuiltInBrushPreset,
+    onBrushEngineProgramsChange,
     applyBrushDefaultRestoreTransaction,
     applyDynamicsPreset,
     applySavedBrush,
@@ -1473,6 +1477,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                     tipRoundness={tipRoundness}
                     onTipRoundnessChange={setTipRoundness}
                     onRestoreDefaults={applyBrushDefaultRestoreTransaction}
+                    onEngineProgramsChange={onBrushEngineProgramsChange}
                     onBeforeOpen={() => setQuickStartOpen(false)}
                   />
                 </Suspense>

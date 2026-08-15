@@ -261,6 +261,7 @@ import type {
   StudioBrushDefaultRestoreDirection,
   StudioBrushDefaultRestoreTransaction,
 } from "./studio-brush-default-restore";
+import type { StudioBrushEngineProgramSet } from "./studio-brush-engine-program-set";
 import type { StudioFilterKind } from "./studio-filter-menu"; // keep type-only: inline `import { type X }` still emits a live import and drags the filter pack into launch
 import type { StudioScrollViewportStore } from "./studio-scroll-viewport-store";
 import type { StudioLayerNavigatorAction } from "./StudioLayerNavigator";
@@ -290,6 +291,8 @@ export interface StudioInspectorAsideHandlers {
   applyFigmaSelectionLayoutPatch: (patch: StudioFigmaSelectionLayoutPatch) => void;
   announceDrawingShortcut: (message: string) => void;
   applyBgPreset: (p: BgPreset) => void;
+  /** 엔진 조합 변경 — 브러시 스튜디오의 조합 탭이 호출한다. */
+  onBrushEngineProgramsChange?: (next: StudioBrushEngineProgramSet | null) => void;
   applyBrushDefaultRestoreTransaction: (
     transaction: StudioBrushDefaultRestoreTransaction,
     direction: StudioBrushDefaultRestoreDirection,
@@ -1130,6 +1133,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
     applyFigmaSelectionLayoutPatch,
     announceDrawingShortcut,
     applyBgPreset,
+    onBrushEngineProgramsChange,
     applyBrushDefaultRestoreTransaction,
     applyContentAwareFill,
     extractPixelSelectionToLayer,
@@ -3746,6 +3750,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                       tipRoundness={tipRoundness}
                       onTipRoundnessChange={setTipRoundness}
                       onRestoreDefaults={applyBrushDefaultRestoreTransaction}
+                      onEngineProgramsChange={onBrushEngineProgramsChange}
                     />
                   </Suspense>
                   </StudioInspectorSection>

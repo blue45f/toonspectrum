@@ -150,9 +150,20 @@ const SNAPSHOT_KEYS = new Set([
   "tipRoundness",
   "brushDynamics",
   "stampTuning",
+  "enginePrograms",
+]);
+/**
+ * `enginePrograms` is admitted but NOT required. Every pack published before engine program sets
+ * existed omits the key, and those packs must keep installing - a missing key means "use the
+ * brush id's own program combination", which is exactly what those packs have always painted.
+ */
+const OPTIONAL_SNAPSHOT_KEYS = new Set([
+  "sourcePresetId",
+  "sourcePresetName",
+  "enginePrograms",
 ]);
 const REQUIRED_SNAPSHOT_KEYS = [...SNAPSHOT_KEYS].filter(
-  (key) => key !== "sourcePresetId" && key !== "sourcePresetName",
+  (key) => !OPTIONAL_SNAPSHOT_KEYS.has(key),
 );
 const TRANSACTION_KEYS = [
   BRUSH_LIBRARY_KEY,

@@ -24,10 +24,30 @@ export const DEFAULT_STUDIO_WET_RIBBON_MAX_FOOTPRINTS = 4_096;
 
 const COORDINATE_LIMIT = 1_000_000;
 const MIN_RADIUS = 0.05;
-// The fixed 1/32 ladder is part of the bounded live/export budget. Longitudinal interpolation
-// below distributes those fixed levels inside each station pair instead of increasing the batch
-// count or repeating substantially more SVG geometry.
-const OPACITY_BUCKET_COUNT = 32;
+/**
+ * Opacity levels a wash may resolve to — the stroke's tonal resolution.
+ *
+ * This was 32, and 32 is far too coarse for what a wash actually paints. The skirt bands leave the
+ * material at roughly 0.03-0.09 alpha, so the whole bleed lived inside the first three rungs of the
+ * ladder and quantised onto barely more than one value. Anything finer than a rung - the diffuse
+ * falloff between bands, and any per-dab granulation a wet-texture program produces - was rounded
+ * away before it could be painted. That is why 수묵 read as a flat film with a hard edge rather
+ * than as pigment sitting in paper.
+ *
+ * Measured on a rendered 30px ink-wash curve, share of ink in the two most-occupied 8-bit luminance
+ * levels (lower is richer) and the level entropy:
+ *   32 -> 0.4805 / 2.959 bits (25 batches)      64  -> 0.3933 / 3.488 (49)
+ *   128 -> 0.2837 / 3.915 (98)                  256 -> 0.2558 / 4.352 (195)
+ * 128 is the knee: it removes 41% of the flatness for 4x the batches, while 256 buys a further 3%
+ * for another doubling.
+ *
+ * The cost is real and is the reason the old value was low - batch count is the live/export budget,
+ * and it scales linearly with this constant. It is spent deliberately: a wash whose entire bleed is
+ * one tone is the defect, and no amount of longitudinal interpolation inside a station pair can add
+ * a level the ladder cannot represent.
+ */
+export const STUDIO_WET_RIBBON_OPACITY_BUCKET_COUNT = 128;
+const OPACITY_BUCKET_COUNT = STUDIO_WET_RIBBON_OPACITY_BUCKET_COUNT;
 const GEOMETRY_QUANTIZATION = 10_000;
 const POINT_EPSILON = 1e-6;
 const TAU = Math.PI * 2;

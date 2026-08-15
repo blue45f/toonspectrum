@@ -15,6 +15,10 @@ import {
   studioBrushDynamicsSettingsEqual,
   type NormalizedStudioBrushDynamicsSettings,
 } from "./studio-brush-dynamics";
+import {
+  normalizeStudioBrushEngineProgramSet,
+  type StudioBrushEngineProgramSet,
+} from "./studio-brush-engine-program-set";
 import { resolveStudioBrushRuntime } from "./studio-brush-runtime-contract";
 import {
   resolveStudioStampBrushKind,
@@ -91,6 +95,15 @@ export interface StudioBrushSnapshot extends StudioBrushSourcePresetMetadata {
   brushDynamics: NormalizedStudioBrushDynamicsSettings;
   /** 스탬프 엔진 브러시의 흐름·경도·최소 굵기. 비스탬프 브러시는 null. */
   stampTuning: StudioBrushStampTuning | null;
+  /**
+   * 이 브러시가 어떤 엔진 프로그램 조합으로 그리는지. null 이면 brushId 에서 유도한 기본 조합.
+   *
+   * 이 키가 없던 동안 저장 브러시는 brushId + 스칼라 + brushDynamics 만 실었고, 프로그램 조합은
+   * 페인트 시점에 id 로부터 다시 유도됐다. 그래서 프리셋에 없는 조합(예: 필버트의 붓털 물리 +
+   * 임파스토 능선)은 만들 수는 있어도 저장할 수가 없었다 — 다시 열면 id 의 기본 조합으로
+   * 돌아왔기 때문이다. 커스텀 브러시가 성립하려면 조합이 브러시와 함께 저장돼야 한다.
+   */
+  enginePrograms: StudioBrushEngineProgramSet | null;
 }
 
 export interface StudioSavedBrush extends StudioBrushSnapshot {
@@ -226,6 +239,7 @@ export const DEFAULT_STUDIO_BRUSH_SNAPSHOT: StudioBrushSnapshot = {
   tipRoundness: 0.24,
   brushDynamics: DEFAULT_STUDIO_BRUSH_DYNAMICS_SETTINGS,
   stampTuning: null,
+  enginePrograms: null,
 };
 
 const DEFAULT_SNAPSHOT = DEFAULT_STUDIO_BRUSH_SNAPSHOT;
@@ -294,6 +308,7 @@ function replaceBrushSnapshot<T extends StudioBrushSnapshot>(
     tipRoundness: _tipRoundness,
     brushDynamics: _brushDynamics,
     stampTuning: _stampTuning,
+    enginePrograms: _enginePrograms,
     ...metadata
   } = source;
   return { ...metadata, ...snapshot };
@@ -550,6 +565,9 @@ export function sanitizeBrushSnapshot(raw: unknown): { snapshot: StudioBrushSnap
       tipRoundness,
       brushDynamics,
       stampTuning,
+      // 신뢰할 수 없는 입력은 normalize 가 fail-closed 로 null 을 돌려주고, null 은 곧 "브러시
+      // id 의 기본 조합"이다 — 저장된 브러시가 다시 열릴 때 없던 프로그램이 켜지지 않는다.
+      enginePrograms: normalizeStudioBrushEngineProgramSet(o.enginePrograms),
     },
     adjustedFields,
   };

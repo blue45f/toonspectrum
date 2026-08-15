@@ -125,8 +125,42 @@ interface StudioBrushTipStampUnitSample {
   readonly localX: number;
   readonly localY: number;
   readonly alpha: number;
+  /** Per-sample multiplier on the shared sub-dab radius; 1 is the lattice cell's own size. */
+  readonly radiusScale: number;
   readonly fallback?: true;
 }
+
+/**
+ * How far a sub-dab is displaced from its lattice node, and how much its size varies.
+ *
+ * The stamp used to be a rigid `grid x grid` axis-aligned lattice - default 9x9, up to 81 nodes -
+ * with ONE `sampleRadius` shared by every node, built once and rubber-stamped at every dab of every
+ * stroke with nothing but the dab angle changing. Position came from a grid, size was constant, and
+ * only alpha varied. A texture whose only variation is alpha over a regular lattice does not read
+ * as grain; it reads as a printed screen, and this is the single tip path behind dry media, pencil,
+ * spray, splatter, charcoal and chalk - the largest brush population in the product.
+ *
+ * Both values are hashed from the node's own lattice coordinates, so the whole sample set is still
+ * a pure function of (map, grid) and stays in the existing cache. Nothing is computed per dab and
+ * live, replay and SVG keep reading the identical sample list.
+ *
+ * The displacement is bounded well inside the cell. Nodes sit `1 / half` apart in unit coordinates
+ * and each sub-dab has radius `0.72` of a cell, so neighbours overlap by 1.44 diameters against a
+ * spacing of 1.0; a third of a cell of jitter breaks the alignment without opening holes.
+ */
+const TIP_SAMPLE_JITTER_CELLS = 0.34;
+/**
+ * Absolute ceiling on that displacement, in tip radii.
+ *
+ * A third of a CELL is modest at grid 9 (0.085 radii) and enormous at grid 3, where one cell is the
+ * whole tip. The small grids are also the LOD the live budget falls back to on long strokes, and
+ * unbounded jitter there moved samples into higher-alpha regions, raised the grid-3 sample count
+ * 3 -> 5, and pushed the smallest grid past the live mark budget - so a long charcoal stroke could
+ * no longer step down at all. There is no visible lattice at 9 nodes to break in the first place;
+ * the artifact this fixes lives at 81.
+ */
+const TIP_SAMPLE_JITTER_MAX_RADII = 0.09;
+const TIP_SAMPLE_RADIUS_VARIATION = 0.22;
 
 /**
  * Alpha-map lookup coordinates only depend on the immutable map identity and stamp grid. Keeping
@@ -592,18 +626,35 @@ function studioBrushTipStampUnitSamples(
   const samples: StudioBrushTipStampUnitSample[] = [];
   for (let gy = -half; gy <= half; gy++) {
     for (let gx = -half; gx <= half; gx++) {
-      const localX = half === 0 ? 0 : gx / half;
-      const localY = half === 0 ? 0 : gy / half;
+      const nodeX = half === 0 ? 0 : gx / half;
+      const nodeY = half === 0 ? 0 : gy / half;
+      // Displace off the lattice node, then read the tip's alpha where the sub-dab actually lands
+      // rather than where its node was - otherwise the silhouette keeps the grid's own edge.
+      const spread = half === 0
+        ? 0
+        : Math.min(TIP_SAMPLE_JITTER_CELLS / half, TIP_SAMPLE_JITTER_MAX_RADII);
+      const localX = clamp(
+        nodeX + (hashUnit(gx, gy, 0x51ed_2701) - 0.5) * 2 * spread,
+        -1,
+        1,
+      );
+      const localY = clamp(
+        nodeY + (hashUnit(gx, gy, 0x1b87_3f09) - 0.5) * 2 * spread,
+        -1,
+        1,
+      );
       const mapX = (localX * 0.5 + 0.5) * (map.size - 1);
       const mapY = (localY * 0.5 + 0.5) * (map.size - 1);
       const alpha = sampleStudioBrushTipAlphaMap(map, mapX, mapY);
       if (alpha <= STUDIO_BRUSH_TIP_STAMP_ALPHA_THRESHOLD) continue;
-      samples.push({ localX, localY, alpha });
+      const radiusScale = 1
+        + (hashUnit(gx, gy, 0x2f6d_9a13) - 0.5) * 2 * TIP_SAMPLE_RADIUS_VARIATION;
+      samples.push({ localX, localY, alpha, radiusScale });
     }
   }
   // Degenerate empty tip: keep a single centre dab so strokes never vanish.
   if (samples.length === 0) {
-    samples.push({ localX: 0, localY: 0, alpha: 1, fallback: true });
+    samples.push({ localX: 0, localY: 0, alpha: 1, radiusScale: 1, fallback: true });
   }
   if (revision !== undefined) {
     const samplesByGrid = (
@@ -653,7 +704,7 @@ function visitStudioBrushTipStampSamplesOnGrid(
       sx * cos - sy * sin,
       sx * sin + sy * cos,
       sample.alpha,
-      sampleRadius
+      sampleRadius * sample.radiusScale
     );
   }
   return unitSamples.length;

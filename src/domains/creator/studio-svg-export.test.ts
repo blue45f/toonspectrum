@@ -59,6 +59,7 @@ import {
   type SvgExportPageInput,
   type SvgExportResult,
 } from "./studio-svg-export";
+import { STUDIO_WET_RIBBON_OPACITY_BUCKET_COUNT } from "./studio-wet-ribbon-carrier";
 
 import type { StudioDynamicBrushMaterialIdentity } from "./studio-dry-media-dynamic-bridge";
 import type { DrawEl, El } from "./studio-element-model";
@@ -1352,7 +1353,7 @@ describe("도형 직렬화", () => {
     // Immutable station footprints are stitched into continuous render contours, so SVG does not
     // expose one antialiased subpath seam for every 3.4px causal station.
     expect(longStrokePolygonCount).toBeGreaterThan(4);
-    expect(longStrokePolygonCount).toBeLessThanOrEqual(4 * 32);
+    expect(longStrokePolygonCount).toBeLessThanOrEqual(4 * STUDIO_WET_RIBBON_OPACITY_BUCKET_COUNT);
     expect(longStroke.svg).toMatch(/L5000 -?[0-9.]+/);
   });
 

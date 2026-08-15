@@ -11,12 +11,16 @@ import {
 import {
   DEFAULT_STUDIO_WET_RIBBON_MAX_FOOTPRINTS,
   planStudioWetRibbonCarrier,
+  STUDIO_WET_RIBBON_OPACITY_BUCKET_COUNT,
   STUDIO_WET_RIBBON_CARRIER_VERSION,
   studioWetRibbonCarrierBatchPathData,
   traceStudioWetRibbonCarrierBatch,
   type StudioWetRibbonFootprint,
   type StudioWetRibbonSourceDab,
 } from "./studio-wet-ribbon-carrier";
+
+/** 양자 계단은 캐리어가 소유한 계약이다 — 리터럴을 복사해 두면 재튜닝 때 조용히 갈린다. */
+const BUCKETS = STUDIO_WET_RIBBON_OPACITY_BUCKET_COUNT;
 
 const SETTINGS = {
   baseWidth: 20,
@@ -342,8 +346,8 @@ describe("studio wet ribbon carrier geometry", () => {
     const isolatedLight = compositedLayerOpacityAt(plan, "core", 5, 5);
 
     expect(crossing).toBeCloseTo(isolatedStrong, 12);
-    expect(crossing).toBeCloseTo(Math.round(0.8 * 32) / 32, 12);
-    expect(isolatedLight).toBeCloseTo(Math.round(0.2 * 32) / 32, 12);
+    expect(crossing).toBeCloseTo(Math.round(0.8 * BUCKETS) / BUCKETS, 12);
+    expect(isolatedLight).toBeCloseTo(Math.round(0.2 * BUCKETS) / BUCKETS, 12);
     expect(crossing).toBeLessThan(
       isolatedStrong + isolatedLight * (1 - isolatedStrong),
     );
@@ -377,7 +381,7 @@ describe("studio wet ribbon carrier geometry", () => {
       const expected = (authored[segment]! + authored[segment + 1]!) * 0.5;
       expect(
         compositedLayerOpacityAt(plan, "core", segment * 20 + 10, 0),
-      ).toBeCloseTo(Math.round(expected * 32) / 32, 12);
+      ).toBeCloseTo(Math.round(expected * BUCKETS) / BUCKETS, 12);
     }
   });
 
@@ -386,7 +390,7 @@ describe("studio wet ribbon carrier geometry", () => {
       { x: 0, y: 0, radius: 4, opacity: 0.2, role: "core" },
       { x: 20, y: 0, radius: 4, opacity: 0.8, role: "core" },
     ], { seed: 9 });
-    const quantized = (value: number) => Math.round(value * 32) / 32;
+    const quantized = (value: number) => Math.round(value * BUCKETS) / BUCKETS;
 
     expect(compositedLayerOpacityAt(plan, "core", 5, 0))
       .toBeCloseTo(quantized(0.35), 12);
@@ -416,7 +420,7 @@ describe("studio wet ribbon carrier long-stroke budget", () => {
     expect(plan.footprintCount)
       .toBeLessThanOrEqual(DEFAULT_STUDIO_WET_RIBBON_MAX_FOOTPRINTS);
     expect(plan.polygonCount).toBe(plan.footprintCount * 4);
-    expect(plan.batches.length).toBeLessThanOrEqual(4 * 32);
+    expect(plan.batches.length).toBeLessThanOrEqual(4 * BUCKETS);
     expect(elapsed).toBeLessThan(750);
 
     const segments = plan.footprints.filter(({ kind }) => kind === "segment");

@@ -3,6 +3,7 @@
 import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+
 import {
   applyStudioBrushAliasWatercolorMaterial,
   mapStudioBrushAliasPressureSamples,
@@ -34,7 +35,7 @@ import {
 } from "./studio-outline-stroke-contract";
 import { peekStudioPerfectFreehandStroker } from "./studio-perfect-freehand";
 import { exportPageToSvg } from "./studio-svg-export";
-import { planStudioWetRibbonCarrier } from "./studio-wet-ribbon-carrier";
+import { STUDIO_WET_RIBBON_OPACITY_BUCKET_COUNT, planStudioWetRibbonCarrier  } from "./studio-wet-ribbon-carrier";
 import { StudioDrawNode } from "./StudioDrawNode";
 
 import type { DrawEl } from "./studio-element-model";
@@ -889,7 +890,7 @@ describe("StudioDrawNode orchestration", () => {
       applyStudioBrushAliasWatercolorMaterial("ink-wash", authoredDabs),
     );
     expect(retainedPlan.batches.length).toBeGreaterThan(4);
-    expect(retainedPlan.batches.length).toBeLessThanOrEqual(4 * 32);
+    expect(retainedPlan.batches.length).toBeLessThanOrEqual(4 * STUDIO_WET_RIBBON_OPACITY_BUCKET_COUNT);
     expect(retainedPlan.batches.every(({ polygons }) => polygons.length > 0))
       .toBe(true);
     expect(context.fillPolygons).toHaveLength(retainedPlan.batches.length);

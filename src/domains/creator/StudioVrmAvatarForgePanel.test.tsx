@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createAvatarForgeState, type AvatarForgeState } from "./studio-vrm-avatar-forge";
@@ -16,8 +16,10 @@ function renderPanel(overrides: {
   readonly proportionMetrics?: StudioVrmProportionMetrics | null;
   readonly proportionPresetNote?: string | null;
   readonly proportionUnavailableReason?: string | null;
+  readonly onGeneratedFile?: (file: File) => void;
 } = {}) {
   const onChange = vi.fn();
+  const onGeneratedFile = overrides.onGeneratedFile ?? vi.fn();
   const state = overrides.state ?? createAvatarForgeState("wave-diva");
   const view = render(
     <StudioVrmAvatarForgePanel
@@ -28,10 +30,36 @@ function renderPanel(overrides: {
       proportionPresetNote={overrides.proportionPresetNote}
       proportionUnavailableReason={overrides.proportionUnavailableReason}
       onChange={onChange}
+      onGeneratedFile={onGeneratedFile}
     />,
   );
-  return { ...view, onChange, state };
+  return { ...view, onChange, onGeneratedFile, state };
 }
+
+describe("StudioVrmAvatarForgePanel VRM generation", () => {
+  it("exposes generate, preview, and export controls on the shipped forge surface", () => {
+    renderPanel();
+    expect(document.querySelector("[data-studio-vrm-generate]")).toBeTruthy();
+    expect(document.querySelector("[data-studio-vrm-generate-preview]")).toBeTruthy();
+    expect(document.querySelector("[data-studio-vrm-generate-submit]")).toBeTruthy();
+    expect(document.querySelector("[data-studio-vrm-generate-export]")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "VRM 생성" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "VRM 내보내기" })).toBeTruthy();
+    expect(document.querySelector("[data-studio-vrm-generate-preset]")?.getAttribute(
+      "data-studio-vrm-generate-preset",
+    )).toBe("wave-diva");
+  });
+
+  it("creates a new VRM file from the current forge preset", async () => {
+    const { onGeneratedFile } = renderPanel();
+    fireEvent.click(screen.getByRole("button", { name: "VRM 생성" }));
+    await waitFor(() => expect(onGeneratedFile).toHaveBeenCalledOnce());
+    const file = vi.mocked(onGeneratedFile).mock.calls[0]?.[0] as File;
+    expect(file.name).toBe("웨이브 디바.vrm");
+    expect(file.size).toBeGreaterThan(200);
+    expect(screen.getByRole("status").textContent).toContain("웨이브 디바");
+  });
+});
 
 describe("StudioVrmAvatarForgePanel body creator", () => {
   it("exposes a compact four-step creation flow and a dedicated body workspace", () => {

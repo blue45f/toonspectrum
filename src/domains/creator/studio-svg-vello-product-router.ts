@@ -568,17 +568,28 @@ let canvasKitPromise: Promise<{
   render(scene: SceneIR): StudioSvgProductPixels;
 }> | null = null;
 
-/** Keep the app's narrow CanvasKit types separate from the adapter package. */
-const STUDIO_SKIA_ADAPTER_PACKAGE = "@toonspectrum/studio-engine-skia";
-
 interface StudioSkiaAdapterRuntime {
   renderSceneToPixels(canvasKit: unknown, scene: SceneIR): Uint8Array;
 }
 
+/**
+ * The specifier must be a literal.
+ *
+ * This used to call a dynamic import whose specifier was a const holding the package name, marked
+ * with Vite's ignore pragma, to keep the app's narrow CanvasKit types away from the adapter. The
+ * cost was invisible and total: `@vite-ignore` plus a variable specifier makes Vite emit the
+ * import verbatim, so the built bundle carried the bare string `@toonspectrum/studio-engine-skia`,
+ * which no browser can resolve. The adapter was never in `dist` at all - zero manifest entries -
+ * so `loadCanvasKitRenderer` threw on every call and the skia-canvaskit-scene-ir route degraded to
+ * resvg 100% of the time. A whole rendering route was dead in production and nothing said so,
+ * because the router's tests inject fake engines and the wiring test only greps source text.
+ *
+ * The sibling Vello lane in this same file has always used a literal specifier and bundles
+ * correctly. The type separation is preserved by the `StudioSkiaAdapterRuntime` cast below, which
+ * is what was actually doing that job.
+ */
 async function loadStudioSkiaAdapterRuntime(): Promise<StudioSkiaAdapterRuntime> {
-  return import(
-    /* @vite-ignore */ STUDIO_SKIA_ADAPTER_PACKAGE
-  ) as Promise<StudioSkiaAdapterRuntime>;
+  return import("@toonspectrum/studio-engine-skia") as Promise<StudioSkiaAdapterRuntime>;
 }
 
 async function loadCanvasKitRenderer() {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+
 import { BRUSH_PRESETS } from "./studio-brush";
 import {
   createStudioCatalogBrushBaseline,
@@ -12,6 +13,7 @@ import {
 } from "./studio-brush-baseline-contract";
 import { STUDIO_BRUSH_DEFAULT_RESTORE_FIELDS } from "./studio-brush-default-restore";
 import { studioBrushDynamicsPresetSettings } from "./studio-brush-dynamics";
+import { studioBrushEngineProgramSetFromOil } from "./studio-brush-engine-program-set";
 import {
   DEFAULT_STUDIO_BRUSH_SNAPSHOT,
   type StudioBrushSnapshot,
@@ -91,6 +93,12 @@ describe("studio brush applied baseline contract", () => {
       tipRoundness: 0.82,
       brushDynamics: studioBrushDynamicsPresetSettings("ink-particle"),
       stampTuning: { flow: 0.2, hardness: 0.3, minSize: 0.4 },
+      // pen 의 베이스라인 조합은 null(브러시 id 의 기본 조합)이므로, 세트를 실으면 dirty 다.
+      enginePrograms: studioBrushEngineProgramSetFromOil({
+        bristlePhysics: true,
+        bristleLoadDynamics: false,
+        impastoRelief: true,
+      }),
     });
 
     const inspected = inspectStudioBrushBaseline(baseline, current);
@@ -103,6 +111,7 @@ describe("studio brush applied baseline contract", () => {
       "불투명도",
       "브러시 반응·질감",
       "스탬프 도포",
+      "엔진 조합",
       "손떨림 보정",
       "보정 방식",
       "후보정",
