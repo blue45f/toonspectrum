@@ -136,6 +136,28 @@ describe("Studio tournament persistence bootstrap", () => {
     );
   });
 
+  it("does not warn when another page already owns the OPFS SQLite lock", async () => {
+    const warn = vi.fn();
+    const bootstrap = createStudioTournamentPersistenceBootstrap({
+      loadPersistence: async () => ({
+        installStudioTournamentSqlitePersistence: vi.fn(),
+      }),
+      getRuntime: () => ({
+        hydrate: vi.fn(async () => false),
+        persistenceStatus: () => ({
+          mode: "memory-only",
+          durable: false,
+          reason:
+            "database open failed: SQLite/OPFS unavailable: studio local sqlite unavailable: DedicatedWorker ownership lock failed: Studio OPFS SQLite is already owned by another page",
+        }),
+      }) as never,
+      warn,
+    });
+
+    await expect(bootstrap.boot()).resolves.toBe(false);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
   it("keeps SQLite persistence outside the StudioPage static graph", () => {
     const page = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
     const bootstrap = readFileSync(

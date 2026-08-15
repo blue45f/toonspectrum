@@ -1,3 +1,4 @@
+import { isStudioLocalDatabaseOwnershipBusyError } from "./studio-local-database-ownership";
 import {
   getStudioTournamentRuntime,
   peekStudioTournamentRuntime,
@@ -50,16 +51,22 @@ export function createStudioTournamentPersistenceBootstrap(
           await runtime.hydrate();
           const status = runtime.persistenceStatus();
           if (!status.durable) {
-            dependencies.warn(
-              "studio tournament is running memory-only; SQLite/OPFS persistence is unavailable",
-              status,
-            );
+            // Another same-origin tab already owns the OPFS SAH Worker. Memory-only
+            // tournament cache is the designed degrade — do not dump lock text.
+            if (!isStudioLocalDatabaseOwnershipBusyError(status)) {
+              dependencies.warn(
+                "studio tournament is running memory-only; SQLite/OPFS persistence is unavailable",
+                status,
+              );
+            }
             return false;
           }
           return true;
         })
         .catch((cause: unknown) => {
-          dependencies.warn("studio tournament persistence bootstrap skipped", cause);
+          if (!isStudioLocalDatabaseOwnershipBusyError(cause)) {
+            dependencies.warn("studio tournament persistence bootstrap skipped", cause);
+          }
           return false;
         });
 

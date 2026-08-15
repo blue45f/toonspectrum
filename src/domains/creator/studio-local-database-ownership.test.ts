@@ -51,4 +51,15 @@ describe("studio local database ownership busy classifier", () => {
     expect(isStudioLocalDatabaseOwnershipBusyError(new Error("disk full"))).toBe(false);
     expect(isStudioLocalDatabaseOwnershipBusyError(null)).toBe(false);
   });
+
+  it("recognizes the tournament memory-only status object from a follower tab", () => {
+    expect(
+      isStudioLocalDatabaseOwnershipBusyError({
+        mode: "memory-only",
+        durable: false,
+        reason:
+          "database open failed: SQLite/OPFS unavailable: studio local sqlite unavailable: DedicatedWorker ownership lock failed: Studio OPFS SQLite is already owned by another page",
+      }),
+    ).toBe(true);
+  });
 });
