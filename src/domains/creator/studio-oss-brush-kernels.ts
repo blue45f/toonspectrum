@@ -335,6 +335,24 @@ export function studioOssApplyMaterialColorChannel(
  * Direction-aligned wax scrape field (Krita dry-media / Photopea crayon feel).
  * Samples pigment in stroke-local (along, across) space so grain follows the stylus.
  */
+/**
+ * Tip-normalized coordinates scaled into this sampler's lattice space.
+ *
+ * `studioOssDirectionalWaxSample` is written for coordinates in TEXEL units — its three value-noise
+ * terms run at 0.42, 0.55 and 0.06 cycles per unit against a lattice of cell size one. The tip
+ * kernels feed it normalized coordinates in [-1, 1] instead, so the whole tip spans at most 0.84 of
+ * ONE lattice cell and the "wax grain" is a constant: measured over a 128-square tip, sd 0.0081 and
+ * total range 0.038. Crayon, charcoal and oil-pastel each declare that grain as their texture and
+ * none of them has ever had it — what looks like texture in their strokes comes from stamp-to-stamp
+ * scatter, not from within-tip structure.
+ *
+ * Ten is the knee of the measured curve: sd rises 0.0081 -> 0.150 and range 0.038 -> 0.61 by scale
+ * 8-12 and then plateaus, because past that the fibre term decorrelates between neighbouring texels
+ * and stops reading as fibres at all. At ten the fibre term crosses about eight lattice cells over
+ * the tip diameter, which is a wax stick's worth of strands.
+ */
+export const STUDIO_OSS_TIP_WAX_LATTICE_SCALE = 10;
+
 export function studioOssDirectionalWaxSample(
   x: number,
   y: number,

@@ -21,6 +21,7 @@ import {
   resolveStudioCc0MypaintStampTuning,
 } from "./studio-cc0-mypaint-preset-import-v1";
 import {
+  STUDIO_OSS_TIP_WAX_LATTICE_SCALE,
   studioOssDirectionalWaxSample,
   studioOssKlecksChalkCoverage,
   studioOssSprayTipCoverage,
@@ -394,8 +395,8 @@ export function studioStampOssTipCoverage(
   }
   if (kind === "crayon") {
     const wax = studioOssDirectionalWaxSample(
-      normalizedX,
-      normalizedY,
+      normalizedX * STUDIO_OSS_TIP_WAX_LATTICE_SCALE,
+      normalizedY * STUDIO_OSS_TIP_WAX_LATTICE_SCALE,
       OSS_TIP_DIRECTION_RADIANS,
       seed,
     );
@@ -407,8 +408,8 @@ export function studioStampOssTipCoverage(
   }
   if (kind === "charcoal") {
     const wax = studioOssDirectionalWaxSample(
-      normalizedX,
-      normalizedY,
+      normalizedX * STUDIO_OSS_TIP_WAX_LATTICE_SCALE,
+      normalizedY * STUDIO_OSS_TIP_WAX_LATTICE_SCALE,
       OSS_TIP_DIRECTION_RADIANS,
       seed ^ 0xc4,
     );

@@ -38,6 +38,7 @@ import {
   type StudioDynamicBrushCoverageMark,
 } from "./studio-dynamic-brush-coverage-renderer";
 import { planStudioDynamicBrushRender } from "./studio-dynamic-brush-render-plan";
+import { planGlowBrushPasses, planNeonBrushPasses } from "./studio-fx-brush";
 import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "./studio-material-pressure-model";
 import {
   captureStudioOutlineStrokeContractV1,
@@ -2460,7 +2461,11 @@ describe("도형 직렬화", () => {
         ),
         (match) => Number(match[1]),
       );
-      const expectedPasses = brush === "soft-glow" ? 4 : 3;
+      // Derived, not pinned: the halo is resampled into shells so a three-ring stack does not
+      // band, and the shell count is a tunable tradeoff. One single-fill per shell is the claim.
+      const expectedPasses = brush === "neon"
+        ? planNeonBrushPasses(12).length
+        : planGlowBrushPasses(12, brush === "soft-glow").length;
 
       expect(Math.max(...geometrySpans(heavy))).toBeGreaterThan(
         Math.max(...geometrySpans(light)),

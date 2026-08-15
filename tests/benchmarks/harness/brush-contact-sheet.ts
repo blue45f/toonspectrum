@@ -18,6 +18,7 @@ import { fileURLToPath } from "node:url";
 
 import { STUDIO_BRUSH_ENGINE_LANE_CATALOG_ROWS } from "../../../src/domains/creator/studio-brush-engine-lane-catalog";
 import { STUDIO_BRUSH_RUNTIME_CONTRACT } from "../../../src/domains/creator/studio-brush-runtime-contract";
+import { materializeStudioBrushCatalogSelection } from "../../../src/domains/creator/studio-brush-selection";
 import { exportPageToSvg } from "../../../src/domains/creator/studio-svg-export";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -79,7 +80,22 @@ function brushIds(): { id: string; name: string }[] {
   return out;
 }
 
-function cellSvg(brush: string, width: number): string {
+/**
+ * The brush's own pinned dynamics snapshot — the same one the app materialises at pointer-down.
+ *
+ * Without it this sheet was drawing a DIFFERENT ENGINE for anything whose look lives in its
+ * dynamics. Measured on dry media: unpinned, every one of crayon/chalk/charcoal/pastel/oil-pastel
+ * serialises as a single flat `dry-media-union-ribbon` path, because studio-svg-export strips an
+ * absent pin through studioReplaySafeBrushDynamicsSettingsForBrushId and the union carrier takes
+ * ownership. Pinned, the same strokes serialise as 871-1835 alpha-map stamps. The five media
+ * "sharing one pointed-shard texture" was that union silhouette, on a route no artist ever draws
+ * with — a harness artefact reported as a product defect.
+ */
+function cellSvg(
+  brush: string,
+  width: number,
+  brushDynamics: unknown,
+): string {
   const elements = strokes(width).map((stroke, index) => ({
     id: `${brush}-${stroke.id}`,
     type: "draw" as const,
@@ -91,6 +107,7 @@ function cellSvg(brush: string, width: number): string {
     strokeWidth: stroke.strokeWidth,
     opacity: 1,
     seed: 4_100 + index,
+    ...(brushDynamics ? { brushDynamics } : {}),
   }));
   const { svg } = exportPageToSvg({
     width: CELL_W,
@@ -113,7 +130,8 @@ const cells: { id: string; name: string; png: Uint8Array }[] = [];
 
 for (const { id, name } of all) {
   try {
-    const svg = cellSvg(id, 16);
+    const selection = await materializeStudioBrushCatalogSelection(id);
+    const svg = cellSvg(id, 16, selection?.brushDynamics ?? null);
     const renderer = new module_.Resvg(svg, {
       shapeRendering: 2,
       font: { loadSystemFonts: false },
