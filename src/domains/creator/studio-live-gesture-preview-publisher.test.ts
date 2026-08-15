@@ -228,7 +228,7 @@ describe("studio live gesture preview publisher", () => {
       sampleTimeOffsets: values.map((_, index) => index),
     });
     expect(publisher.append(large, 1)).toBe(true);
-    scheduler.advance(STUDIO_LIVE_GESTURE_PREVIEW_PUBLISH_INTERVAL_MS);
+    scheduler.advance(STUDIO_LIVE_GESTURE_PREVIEW_PUBLISH_INTERVAL_MS * 20);
 
     const appends = sent.filter((payload) => payload.phase === "append");
     expect(appends.length).toBeGreaterThan(2);
@@ -243,6 +243,28 @@ describe("studio live gesture preview publisher", () => {
       expectedStart += sampleCount;
     }
     expect(expectedStart).toBe(count);
+  });
+
+  it("serializes oversized suffix chunks across preview clock ticks", () => {
+    const { publisher, scheduler, sent } = createHarness();
+    expect(publisher.begin({
+      pageId: "page-1",
+      documentGeneration: 1,
+      element: stroke(),
+    })).toBe(true);
+    const count = STUDIO_LIVE_GESTURE_PREVIEW_MAX_SAMPLES_PER_MESSAGE * 2 + 2;
+    const large = stroke({
+      points: Array.from({ length: count * 2 }, (_, index) => index),
+      pressures: Array.from({ length: count }, () => 0.5),
+    });
+    expect(publisher.append(large, 1)).toBe(true);
+
+    scheduler.advance(STUDIO_LIVE_GESTURE_PREVIEW_PUBLISH_INTERVAL_MS);
+    expect(sent.filter((payload) => payload.phase === "append")).toHaveLength(1);
+    scheduler.advance(STUDIO_LIVE_GESTURE_PREVIEW_PUBLISH_INTERVAL_MS);
+    expect(sent.filter((payload) => payload.phase === "append")).toHaveLength(2);
+    scheduler.advance(STUDIO_LIVE_GESTURE_PREVIEW_PUBLISH_INTERVAL_MS);
+    expect(sent.filter((payload) => payload.phase === "append")).toHaveLength(3);
   });
 
   it("fails closed with a cancel when renderer or established channel schema changes", () => {

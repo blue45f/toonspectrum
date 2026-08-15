@@ -57,6 +57,7 @@ interface ActiveGesture {
   nextSampleIndex: number;
   lastSentAt: number;
   pendingElement: DrawEl | null;
+  endRequested: boolean;
   lastShapeFingerprint: string | null;
 }
 
@@ -332,6 +333,7 @@ export class StudioLiveGesturePreviewPublisher {
       pendingElement: plan.sampleCount < Math.floor(input.element.points.length / 2)
         ? input.element
         : null,
+      endRequested: false,
       lastShapeFingerprint: plan.shapeFingerprint,
     };
     if (this.#active.pendingElement) this.#schedule();
@@ -345,6 +347,7 @@ export class StudioLiveGesturePreviewPublisher {
       || !active
       || active.gestureId !== element.id
       || active.operation === "shape"
+      || active.endRequested
       || previewOperationOf(element) !== active.operation
     ) return false;
     if (!this.#rendererStillMatches(element, active)) return this.#abortMalformed();
@@ -367,6 +370,7 @@ export class StudioLiveGesturePreviewPublisher {
       || !active
       || active.gestureId !== element.id
       || active.operation !== "shape"
+      || active.endRequested
       || previewOperationOf(element) !== "shape"
     ) return false;
     if (!this.#rendererStillMatches(element, active) || !shapeOf(element)) {
@@ -380,23 +384,30 @@ export class StudioLiveGesturePreviewPublisher {
   /** Flushes the final authoritative suffix/shape before sending the bodyless end packet. */
   end(element?: DrawEl): boolean {
     const active = this.#active;
-    if (!active || this.#disposed || (element && element.id !== active.gestureId)) return false;
+    if (
+      !active
+      || active.endRequested
+      || this.#disposed
+      || (element && element.id !== active.gestureId)
+    ) return false;
     if (element) {
       const accepted = active.operation === "shape"
         ? this.replaceShape(element)
         : this.append(element, active.nextSampleIndex);
       if (!accepted) return false;
     }
-    if (!this.flush()) return false;
-    const current = this.#active;
-    if (!current) return false;
+    active.endRequested = true;
+    return this.flush();
+  }
+
+  #finishEnd(active: ActiveGesture): boolean {
     const payload = parsedPayload({
       version: STUDIO_LIVE_GESTURE_PREVIEW_VERSION,
-      gestureId: current.gestureId,
-      pageId: current.pageId,
-      seq: current.nextSeq,
+      gestureId: active.gestureId,
+      pageId: active.pageId,
+      seq: active.nextSeq,
       phase: "end",
-      operation: current.operation,
+      operation: active.operation,
     });
     const sent = payload ? this.#send(payload) : false;
     this.#clearActive();
@@ -423,12 +434,21 @@ export class StudioLiveGesturePreviewPublisher {
   flush(): boolean {
     this.#cancelTimer();
     const active = this.#active;
-    if (!active || !active.pendingElement) return active !== null;
+    if (!active) return false;
+    if (!active.pendingElement) {
+      return active.endRequested ? this.#finishEnd(active) : true;
+    }
     const element = active.pendingElement;
     active.pendingElement = null;
-    return active.operation === "shape"
+    const sent = active.operation === "shape"
       ? this.#flushShape(active, element)
       : this.#flushSamples(active, element);
+    if (!sent || this.#active !== active) return sent;
+    if (active.pendingElement) {
+      this.#schedule();
+      return true;
+    }
+    return active.endRequested ? this.#finishEnd(active) : true;
   }
 
   dispose(): void {
@@ -468,40 +488,40 @@ export class StudioLiveGesturePreviewPublisher {
       || !this.#channelsRemainAligned(element, active.sampleChannelKeys, totalSamples)
     ) return this.#abortMalformed();
 
-    while (active.nextSampleIndex < totalSamples) {
-      const startIndex = active.nextSampleIndex;
-      let chunkSize = Math.min(
-        STUDIO_LIVE_GESTURE_PREVIEW_MAX_SAMPLES_PER_MESSAGE,
-        totalSamples - startIndex,
+    if (active.nextSampleIndex >= totalSamples) return true;
+    const startIndex = active.nextSampleIndex;
+    let chunkSize = Math.min(
+      STUDIO_LIVE_GESTURE_PREVIEW_MAX_SAMPLES_PER_MESSAGE,
+      totalSamples - startIndex,
+    );
+    let payload: StudioLiveGesturePreviewPayload | null = null;
+    while (chunkSize >= 1) {
+      const samples = samplesOf(
+        element,
+        startIndex,
+        startIndex + chunkSize,
+        active.sampleChannelKeys,
       );
-      let payload: StudioLiveGesturePreviewPayload | null = null;
-      while (chunkSize >= 1) {
-        const samples = samplesOf(
-          element,
-          startIndex,
-          startIndex + chunkSize,
-          active.sampleChannelKeys,
-        );
-        payload = samples
-          ? parsedPayload({
-              version: STUDIO_LIVE_GESTURE_PREVIEW_VERSION,
-              gestureId: active.gestureId,
-              pageId: active.pageId,
-              seq: active.nextSeq,
-              phase: "append",
-              operation: active.operation,
-              samples,
-            })
-          : null;
-        if (payload || chunkSize === 1) break;
-        chunkSize = Math.max(1, Math.floor(chunkSize / 2));
-      }
-      if (!payload) return this.#abortMalformed();
-      if (!this.#send(payload)) return this.#dropAfterTransportFailure();
-      active.nextSeq += 1;
-      active.nextSampleIndex += chunkSize;
-      active.lastSentAt = this.#scheduler.now();
+      payload = samples
+        ? parsedPayload({
+            version: STUDIO_LIVE_GESTURE_PREVIEW_VERSION,
+            gestureId: active.gestureId,
+            pageId: active.pageId,
+            seq: active.nextSeq,
+            phase: "append",
+            operation: active.operation,
+            samples,
+          })
+        : null;
+      if (payload || chunkSize === 1) break;
+      chunkSize = Math.max(1, Math.floor(chunkSize / 2));
     }
+    if (!payload) return this.#abortMalformed();
+    if (!this.#send(payload)) return this.#dropAfterTransportFailure();
+    active.nextSeq += 1;
+    active.nextSampleIndex += chunkSize;
+    active.lastSentAt = this.#scheduler.now();
+    if (active.nextSampleIndex < totalSamples) active.pendingElement = element;
     return true;
   }
 
