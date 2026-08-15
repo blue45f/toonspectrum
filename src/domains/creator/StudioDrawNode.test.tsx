@@ -28,6 +28,7 @@ import {
   planStudioCausalDynamicBrushDepositsV2,
   STUDIO_CAUSAL_DYNAMIC_BRUSH_MAX_DABS,
 } from "./studio-causal-dynamic-brush-deposit-v2";
+import { planGlowBrushPasses, planNeonBrushPasses } from "./studio-fx-brush";
 import { STUDIO_MATERIAL_PRESSURE_MODEL_CANONICAL_V1 } from "./studio-material-pressure-model";
 import {
   captureStudioOutlineStrokeContractV1,
@@ -466,6 +467,13 @@ describe("StudioDrawNode pattern image lifecycle", () => {
     expect(patternLoader.loads).toHaveLength(2);
   });
 });
+
+/** Luminous lanes plan their own pass stacks; the count is derived so a shell retune stays honest. */
+function luminousPassCount(brush: string, strokeWidth: number): number {
+  return brush === "neon"
+    ? planNeonBrushPasses(strokeWidth).length
+    : planGlowBrushPasses(strokeWidth, brush === "soft-glow").length;
+}
 
 describe("StudioDrawNode orchestration", () => {
   it("keeps the hot-path React memo boundary", () => {
@@ -1181,7 +1189,9 @@ describe("StudioDrawNode orchestration", () => {
           />,
         );
         const circles = captured("Circle");
-        expect(circles).toHaveLength(brush === "soft-glow" ? 4 : 3);
+        // Derived, not pinned: the halo is resampled into shells so a hard-edged ring stack does
+        // not band, and the shell count is a tunable tradeoff. One pass per shell is the invariant.
+        expect(circles).toHaveLength(luminousPassCount(brush, 18));
         expect(circles.every(
           (circle) => circle.props.globalCompositeOperation === "source-over",
         )).toBe(true);
@@ -1332,7 +1342,7 @@ describe("StudioDrawNode orchestration", () => {
       expect(Math.max(...heavy.fillAlphas)).toBeGreaterThan(
         Math.max(...light.fillAlphas),
       );
-      expect(heavy.fillCount).toBe(brush === "soft-glow" ? 4 : 3);
+      expect(heavy.fillCount).toBe(luminousPassCount(brush, 12));
       expect(heavy.colorPreservingShapeCount).toBe(heavy.fillCount);
       expect(heavy.strokeCount).toBe(0);
       expect(heavy.capCount).toBe(0);
@@ -1420,7 +1430,7 @@ describe("StudioDrawNode orchestration", () => {
       expect(active).toEqual(retained);
       expect(svgPaths).toEqual(active.paths);
       expect(svgAlphas).toEqual(active.alphas);
-      expect(active.paths).toHaveLength(brush === "soft-glow" ? 4 : 3);
+      expect(active.paths).toHaveLength(luminousPassCount(brush, 14));
       expect(exported.match(
         /data-luminous-ribbon="single-fill"[^>]*data-luminous-composite="source-over"/gu,
       ))

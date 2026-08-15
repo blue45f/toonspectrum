@@ -1176,26 +1176,96 @@ export function planNeonBrushPasses(baseWidth: number): FxNeonPass[] {
 }
 
 /**
+ * Shells the declared halo control rings are resampled into.
+ *
+ * The rings ARE the falloff: the renderer composites them back to front, so N flat rings give
+ * exactly N flat tone plateaus separated by hard edges. At the declared 3 (glow) and 4 (soft-glow)
+ * that measured 7 and 9 distinct tones across the whole halo with single steps up to 136 8-bit
+ * levels — concentric bands, not a gradient. It is the same defect the pencil soft edge had, an
+ * order of magnitude worse, because pencil had to smooth a 0.40 alpha band and glow has to smooth
+ * a 0.99 one.
+ *
+ * Resampling here rather than in a renderer is deliberate: Canvas and SVG both consume this
+ * planner, so they cannot drift into disagreeing about the halo.
+ *
+ * 48 is a chosen tradeoff, not the ideal. Each shell is one more full-stroke pass, so the ideal
+ * (one 8-bit level per step, N ≈ 253) would draw a 500-point stroke 253 times and is not worth it
+ * for a decorative lane. 48 puts the step at 255·A/48 ≈ 5 levels — a 27x improvement on the
+ * measured 136 — and holds the pass count inside the same order of magnitude the emitters were
+ * built for. If the halo still bands visibly against a flat backdrop, raise it here and pay for it
+ * knowingly; do not reach for a different shape of fix.
+ */
+const GLOW_HALO_SHELLS = 48;
+
+/**
+ * Resamples declared halo control rings into evenly-spaced composited-alpha shells.
+ *
+ * The declared rings are read as (widthScale, cumulative composited alpha) control points, where
+ * cumulative alpha after ring k is `1 - Π(1-o_i)`. Shell i targets an evenly spaced fraction of
+ * the core's alpha, takes its width by linear interpolation of the control curve at that alpha,
+ * and carries the exact incremental opacity that lands the composite on the target given what the
+ * shells outside it already laid: `(target_i - target_{i-1}) / (1 - target_{i-1})`.
+ *
+ * Even spacing is in COMPOSITED alpha, which is what the eye reads as tone, so the steps are
+ * uniform in 8-bit levels rather than geometric — the outermost shell is not left as the worst one.
+ * Halo extent is unchanged because the outermost declared widthScale is kept as shell 0's width.
+ */
+function expandHaloShells(
+  rings: readonly { widthScale: number; opacity: number }[],
+): { widthScale: number; opacity: number }[] {
+  const cumulative: { widthScale: number; alpha: number }[] = [];
+  let carried = 0;
+  for (const ring of rings) {
+    carried = 1 - (1 - carried) * (1 - clamp(ring.opacity, 0, 1));
+    cumulative.push({ widthScale: ring.widthScale, alpha: carried });
+  }
+  const core = cumulative.at(-1)?.alpha ?? 0;
+  if (core <= 0 || cumulative.length < 2) return rings.map((ring) => ({ ...ring }));
+  const widthAt = (alpha: number): number => {
+    if (alpha <= cumulative[0]!.alpha) return cumulative[0]!.widthScale;
+    for (let index = 1; index < cumulative.length; index += 1) {
+      const previous = cumulative[index - 1]!;
+      const current = cumulative[index]!;
+      if (alpha > current.alpha) continue;
+      const span = current.alpha - previous.alpha;
+      const t = span > 1e-9 ? (alpha - previous.alpha) / span : 1;
+      return previous.widthScale + (current.widthScale - previous.widthScale) * t;
+    }
+    return cumulative.at(-1)!.widthScale;
+  };
+  const shells: { widthScale: number; opacity: number }[] = [];
+  let previousTarget = 0;
+  for (let index = 0; index < GLOW_HALO_SHELLS; index += 1) {
+    const target = core * (index + 1) / GLOW_HALO_SHELLS;
+    const opacity = clamp((target - previousTarget) / (1 - previousTarget), 0, 1);
+    previousTarget = target;
+    if (opacity <= 0) continue;
+    shells.push({ widthScale: widthAt(target), opacity });
+  }
+  return shells;
+}
+
+/**
  * Outer soft halo → bright core. Renderer draws passes back-to-front.
  * softGlow=true widens the halo (soft-glow preset).
  */
 export function planGlowBrushPasses(baseWidth: number, softGlow = false): FxGlowPass[] {
   const w = clamp(finiteNumber(baseWidth, 12), 0.5, 2048);
   if (softGlow) {
-    return [
+    return expandHaloShells([
       { widthScale: 4.2, opacity: 0.12 },
       { widthScale: 2.8, opacity: 0.2 },
       { widthScale: 1.6, opacity: 0.38 },
       { widthScale: 0.85, opacity: 0.92 },
-    ];
+    ]);
   }
   // Keep scales relative so tiny pens still read as glow.
   const outer = w < 6 ? 3.4 : 3.0;
-  return [
+  return expandHaloShells([
     { widthScale: outer, opacity: 0.16 },
     { widthScale: outer * 0.62, opacity: 0.32 },
     { widthScale: 1.05, opacity: 0.95 },
-  ];
+  ]);
 }
 
 // ---------------------------------------------------------------------------

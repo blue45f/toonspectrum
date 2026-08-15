@@ -22,7 +22,20 @@ describe("planGlowBrushPasses", () => {
     const passes = planGlowBrushPasses(16, false);
     expect(passes.length).toBeGreaterThanOrEqual(2);
     expect(passes[0]!.widthScale).toBeGreaterThan(passes.at(-1)!.widthScale);
-    expect(passes.at(-1)!.opacity).toBeGreaterThan(0.8);
+    // The core must still land opaque, but each pass now carries an INCREMENTAL deposit on top of
+    // the shells outside it rather than a standalone ring opacity, so the claim is about the
+    // composited result. Back-to-front normal compositing gives 1 - prod(1 - o).
+    const composited = passes.reduce((carried, pass) => 1 - (1 - carried) * (1 - pass.opacity), 0);
+    expect(composited).toBeGreaterThan(0.8);
+    // No single step may be a visible band: 255 * step must stay within a few 8-bit levels.
+    let previous = 0;
+    let worstStep = 0;
+    for (const pass of passes) {
+      const next = 1 - (1 - previous) * (1 - pass.opacity);
+      worstStep = Math.max(worstStep, next - previous);
+      previous = next;
+    }
+    expect(worstStep * 255).toBeLessThan(8);
   });
 
   it("soft glow uses a wider halo stack", () => {
