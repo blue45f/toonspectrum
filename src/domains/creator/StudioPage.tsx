@@ -910,6 +910,7 @@ import { studioLivingInkVectorShadowElement } from "./studio-living-ink-vector-s
 import {
   isStudioLocalDatabaseOwnershipBusyError,
   STUDIO_BRUSH_QUICK_SLOTS_OWNERSHIP_BUSY_HINT,
+  STUDIO_LOCAL_DATABASE_OWNERSHIP_BUSY_SESSION_HINT,
   STUDIO_WATERMARK_PREFERENCES_OWNERSHIP_BUSY_HINT,
 } from "./studio-local-database-ownership";
 import { localizeStudioText } from "./studio-localize-text";
@@ -7198,6 +7199,9 @@ function StudioCuttoonEditor({
     if (result.failure === "owner-mismatch") {
       return "계정이 바뀌어 이전 작업공간 변경을 저장하지 않았어요.";
     }
+    if (result.failure === "ownership-busy") {
+      return STUDIO_LOCAL_DATABASE_OWNERSHIP_BUSY_SESSION_HINT;
+    }
     if (result.authority === "memory-only" || result.failure) {
       return "SQLite/OPFS 저장을 사용할 수 없어 작업공간 변경을 현재 세션에 유지하고 있어요.";
     }
@@ -7385,11 +7389,13 @@ function StudioCuttoonEditor({
         false,
       );
       setWorkspaceSyncNotice(
-        result.authority === "memory-only"
-          ? "SQLite/OPFS 작업공간 저장소를 열지 못해 현재 세션에서 계속 작업할 수 있어요."
-          : result.conflictPaths.length > 0
-            ? "초기 작업공간을 현재 세션 변경과 안전하게 합쳤어요."
-            : null,
+        result.failure === "ownership-busy"
+          ? null
+          : result.authority === "memory-only"
+            ? "SQLite/OPFS 작업공간 저장소를 열지 못해 현재 세션에서 계속 작업할 수 있어요."
+            : result.conflictPaths.length > 0
+              ? "초기 작업공간을 현재 세션 변경과 안전하게 합쳤어요."
+              : null,
       );
     }).catch(() => {
       if (!active || workspaceHydrationGenerationRef.current !== generation) return;

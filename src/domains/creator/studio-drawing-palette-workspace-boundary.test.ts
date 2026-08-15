@@ -166,6 +166,7 @@ describe("Studio drawing palette workspace integration boundary", () => {
     expect(ownerSync).toContain('import("./studio-workspace-sqlite-runtime")');
     expect(ownerSync).toContain("runtime.subscribeInvalidation((invalidation)");
     expect(ownerSync).toContain("await runtime.hydrate({");
+    expect(ownerSync).toContain('result.failure === "ownership-busy"');
     expect(ownerSync).toContain("getDirtyRevision: () => workspaceDirtyRevisionRef.current");
     expect(ownerSync).toContain("authorityRevision: Math.max(");
     expect(ownerSync).not.toContain("localStorage");

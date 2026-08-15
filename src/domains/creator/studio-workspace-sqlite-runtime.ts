@@ -1,3 +1,4 @@
+import { isStudioLocalDatabaseOwnershipBusyError } from "./studio-local-database-ownership";
 import { acquireStudioLocalDatabase } from "./studio-local-database-runtime";
 import {
   STUDIO_WORKSPACE_RAW_MAX_BYTES,
@@ -413,6 +414,7 @@ function parseInvalidationMessage(value: unknown): InvalidationMessage | null {
 }
 
 function failureFrom(error: unknown, fallback: StudioWorkspacePersistenceFailure) {
+  if (isStudioLocalDatabaseOwnershipBusyError(error)) return "ownership-busy";
   return error instanceof StudioWorkspaceSqliteError ? error.failure : fallback;
 }
 

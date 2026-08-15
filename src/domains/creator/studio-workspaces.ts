@@ -260,6 +260,7 @@ export interface StudioWorkspaceMigrationInput {
 export type StudioWorkspacePersistenceStatus = "persisted" | "session-only";
 export type StudioWorkspacePersistenceFailure =
   | "storage-unavailable"
+  | "ownership-busy"
   | "read-failed"
   | "write-failed"
   | "verification-failed"

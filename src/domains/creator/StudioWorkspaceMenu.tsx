@@ -439,6 +439,8 @@ function persistenceFailureText(
   switch (failure) {
     case "storage-unavailable":
       return "브라우저 저장소를 사용할 수 없어";
+    case "ownership-busy":
+      return "다른 Studio 탭이 로컬 저장소를 사용 중이라";
     case "read-failed":
       return "기존 저장 상태를 확인하지 못해";
     case "write-failed":

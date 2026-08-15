@@ -307,6 +307,30 @@ describe("Studio workspace SQLite product runtime", () => {
     runtime.close();
   });
 
+  it("classifies another page owning OPFS SQLite as ownership-busy", async () => {
+    const runtime = createStudioWorkspacePersistenceRuntime({
+      userId: null,
+      writerInstanceId: "writer-a",
+      repositoryFactory: async () => {
+        throw new Error(
+          "DedicatedWorker ownership lock failed: Studio OPFS SQLite is already owned by another page",
+        );
+      },
+      channelFactory: () => null,
+    });
+    const state = createStudioWorkspaceDefaultState(null);
+
+    await expect(runtime.hydrate({
+      getCurrentState: () => state,
+      getDirtyRevision: () => 0,
+    })).resolves.toMatchObject({
+      authority: "memory-only",
+      status: "session-only",
+      failure: "ownership-busy",
+    });
+    runtime.close();
+  });
+
   it("accepts only same-owner revision invalidations", () => {
     const repository = createStudioWorkspaceSqliteRepository(memoryStore());
     const { channel } = testChannel();
