@@ -4,6 +4,7 @@ import {
   createStudioLiveEnvelope,
   isStudioLiveCursorCleared,
   parseStudioLiveEnvelope,
+  studioLiveEnvelopeByteLength,
   studioLocalLiveChannelName,
   type StudioLiveChatMessagePayload,
   type StudioLiveCursorPayload,
@@ -68,6 +69,10 @@ const DEFAULT_LOCK_ACK_TIMEOUT_MS = 10_000;
 const DEFAULT_CURSOR_INTERVAL_MS = 40;
 export const STUDIO_LIVE_CHAT_HISTORY_LIMIT = 200;
 export const STUDIO_LIVE_VOICE_MAX_PARTICIPANTS = 6;
+export const STUDIO_LIVE_GESTURE_PREVIEW_INBOUND_WINDOW_MS = 3_000;
+export const STUDIO_LIVE_GESTURE_PREVIEW_INBOUND_MAX_PACKETS = 90;
+export const STUDIO_LIVE_GESTURE_PREVIEW_INBOUND_MAX_BYTES = 2 * 1024 * 1024;
+export const STUDIO_LIVE_GESTURE_PREVIEW_INBOUND_MAX_SENDERS = 64;
 
 type StudioLiveSignalKind =
   | "screen:announce"
@@ -208,6 +213,12 @@ interface PendingStudioLiveLockRelease {
   timeout: unknown;
 }
 
+interface StudioLiveGesturePreviewInboundWindow {
+  readonly startedAt: number;
+  readonly packetCount: number;
+  readonly byteCount: number;
+}
+
 export interface StudioLiveRoomOptions {
   workId: string;
   participant: StudioLiveParticipant;
@@ -237,6 +248,12 @@ function boundedTiming(value: number | undefined, fallback: number, min: number,
 
 function copyParticipant(participant: StudioLiveParticipant): StudioLiveParticipant {
   return { ...participant };
+}
+
+function canEditStudioLiveGesturePreview(participant: StudioLiveParticipant): boolean {
+  return participant.role === "owner"
+    || participant.role === "admin"
+    || participant.role === "editor";
 }
 
 function copyCursor(cursor: StudioLiveCursorPayload): StudioLiveCursorPayload {
@@ -282,6 +299,11 @@ export class StudioLiveRoom {
   private readonly pendingLockReleases = new Map<string, PendingStudioLiveLockRelease>();
   private readonly chatMessages: StudioLiveChatMessage[] = [];
   private readonly lastSequenceBySession = new Map<string, number>();
+  private readonly previewParticipantBySession = new Map<string, StudioLiveParticipant>();
+  private readonly previewInboundWindowBySession = new Map<
+    string,
+    StudioLiveGesturePreviewInboundWindow
+  >();
   private transport: StudioLiveTransport | null = null;
   private unsubscribeTransport: (() => void) | null = null;
   private unsubscribeTransportControl: (() => void) | null = null;
@@ -581,7 +603,7 @@ export class StudioLiveRoom {
    * Gesture-local ordering and expiry belong to the preview store, not to this room envelope.
    */
   publishGesturePreview(payload: StudioLiveGesturePreviewPayload): boolean {
-    if (!this.ready) return false;
+    if (!this.ready || !canEditStudioLiveGesturePreview(this.participant)) return false;
     return this.post("preview:gesture", payload);
   }
 
@@ -1085,6 +1107,8 @@ export class StudioLiveRoom {
     this.locks.clear();
     this.chatMessages.length = 0;
     this.lastSequenceBySession.clear();
+    this.previewParticipantBySession.clear();
+    this.previewInboundWindowBySession.clear();
     this.listeners.clear();
     this.crdtListeners.clear();
     this.voiceListeners.clear();
@@ -1095,6 +1119,56 @@ export class StudioLiveRoom {
     if (this.chatMessages.length > STUDIO_LIVE_CHAT_HISTORY_LIMIT) {
       this.chatMessages.splice(0, this.chatMessages.length - STUDIO_LIVE_CHAT_HISTORY_LIMIT);
     }
+  }
+
+  private acceptGesturePreviewInbound(
+    envelope: StudioLiveEnvelope<"preview:gesture">,
+    receivedAt: number,
+  ): boolean {
+    const byteLength = studioLiveEnvelopeByteLength(envelope);
+    if (byteLength === null || byteLength > STUDIO_LIVE_GESTURE_PREVIEW_INBOUND_MAX_BYTES) {
+      return false;
+    }
+    const sessionId = envelope.sender.sessionId;
+    const current = this.previewInboundWindowBySession.get(sessionId);
+    if (
+      !current
+      || receivedAt < current.startedAt
+      || receivedAt - current.startedAt >= STUDIO_LIVE_GESTURE_PREVIEW_INBOUND_WINDOW_MS
+    ) {
+      if (!current && this.previewInboundWindowBySession.size
+        >= STUDIO_LIVE_GESTURE_PREVIEW_INBOUND_MAX_SENDERS) {
+        for (const [candidateSessionId, candidate] of this.previewInboundWindowBySession) {
+          if (receivedAt - candidate.startedAt < STUDIO_LIVE_GESTURE_PREVIEW_INBOUND_WINDOW_MS) {
+            continue;
+          }
+          this.previewInboundWindowBySession.delete(candidateSessionId);
+        }
+        if (this.previewInboundWindowBySession.size
+          >= STUDIO_LIVE_GESTURE_PREVIEW_INBOUND_MAX_SENDERS) return false;
+      }
+      this.previewInboundWindowBySession.set(sessionId, {
+        startedAt: receivedAt,
+        packetCount: 1,
+        byteCount: byteLength,
+      });
+      return true;
+    }
+    if (
+      current.packetCount >= STUDIO_LIVE_GESTURE_PREVIEW_INBOUND_MAX_PACKETS
+      || current.byteCount + byteLength > STUDIO_LIVE_GESTURE_PREVIEW_INBOUND_MAX_BYTES
+    ) return false;
+    this.previewInboundWindowBySession.set(sessionId, {
+      startedAt: current.startedAt,
+      packetCount: current.packetCount + 1,
+      byteCount: current.byteCount + byteLength,
+    });
+    return true;
+  }
+
+  private forgetGesturePreviewPeer(sessionId: string): void {
+    this.previewParticipantBySession.delete(sessionId);
+    this.previewInboundWindowBySession.delete(sessionId);
   }
 
   private claimLocalLock(resource: string, requestId?: string, requestedAt = this.now()): boolean {
@@ -1337,9 +1411,26 @@ export class StudioLiveRoom {
     // sequence is not authoritative. Deliver them before the shared session gate and let the
     // preview store decide only by (senderSessionId, gestureId, payload.seq).
     if (envelope.kind === "preview:gesture") {
+      this.pruneExpired(receivedAt);
+      const sessionId = envelope.sender.sessionId;
+      const peer = this.peers.get(sessionId);
+      const canonicalParticipant = this.previewParticipantBySession.get(sessionId);
+      if (
+        !peer
+        || !canonicalParticipant
+        || !canEditStudioLiveGesturePreview(canonicalParticipant)
+        || !this.acceptGesturePreviewInbound(
+          envelope as StudioLiveEnvelope<"preview:gesture">,
+          receivedAt,
+        )
+      ) return;
       this.emit({
         type: "gesture-preview",
-        participant: copyParticipant(envelope.sender),
+        participant: {
+          sessionId: canonicalParticipant.sessionId,
+          displayName: canonicalParticipant.displayName,
+          role: canonicalParticipant.role,
+        },
         payload: copyStudioLiveGesturePreviewPayload(
           envelope.payload as StudioLiveGesturePreviewPayload,
         ),
@@ -1353,6 +1444,7 @@ export class StudioLiveRoom {
 
     if (envelope.kind === "presence:leave") {
       const presenceChanged = this.peers.delete(envelope.sender.sessionId);
+      this.forgetGesturePreviewPeer(envelope.sender.sessionId);
       this.cursors.delete(envelope.sender.sessionId);
       this.screenShares.delete(envelope.sender.sessionId);
       this.lastSequenceBySession.delete(envelope.sender.sessionId);
@@ -1378,6 +1470,12 @@ export class StudioLiveRoom {
     }
 
     const presenceChanged = this.upsertPeer(envelope, receivedAt);
+    if (envelope.kind === "presence:hello" || envelope.kind === "presence:heartbeat") {
+      this.previewParticipantBySession.set(
+        envelope.sender.sessionId,
+        copyParticipant(envelope.sender),
+      );
+    }
     if (presenceChanged) this.emitPresence();
 
     switch (envelope.kind) {
@@ -1568,6 +1666,8 @@ export class StudioLiveRoom {
         this.locks.clear();
         this.chatMessages.length = 0;
         this.lastSequenceBySession.clear();
+        this.previewParticipantBySession.clear();
+        this.previewInboundWindowBySession.clear();
         if (hadPeers) this.emitPresence();
         if (hadLocks) this.emitLocks();
         this.voiceMembers.clear();
@@ -1585,6 +1685,8 @@ export class StudioLiveRoom {
         this.cursors.clear();
         this.screenShares.clear();
         this.lastSequenceBySession.clear();
+        this.previewParticipantBySession.clear();
+        this.previewInboundWindowBySession.clear();
         if (hadPeers) this.emitPresence();
         let changed = false;
         for (const [sessionId, member] of this.voiceMembers) {
@@ -1747,6 +1849,7 @@ export class StudioLiveRoom {
         this.cursors.delete(sessionId);
         this.screenShares.delete(sessionId);
         this.lastSequenceBySession.delete(sessionId);
+        this.forgetGesturePreviewPeer(sessionId);
         const voiceMember = this.voiceMembers.get(sessionId);
         if (voiceMember) {
           this.voiceMembers.delete(sessionId);

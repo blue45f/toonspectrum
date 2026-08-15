@@ -13,6 +13,7 @@ import {
 } from "./studio-crdt-protocol";
 import {
   createStudioLiveEnvelope,
+  studioLiveEnvelopeByteLength,
   type StudioLiveEnvelope,
   type StudioLiveLockAcquireResult,
   type StudioLiveLockReleaseRequest,
@@ -22,6 +23,9 @@ import {
 } from "./studio-live-collaboration-protocol";
 import {
   STUDIO_LIVE_CHAT_HISTORY_LIMIT,
+  STUDIO_LIVE_GESTURE_PREVIEW_INBOUND_MAX_BYTES,
+  STUDIO_LIVE_GESTURE_PREVIEW_INBOUND_MAX_PACKETS,
+  STUDIO_LIVE_GESTURE_PREVIEW_INBOUND_WINDOW_MS,
   StudioLiveRoom,
   type StudioLiveRoomDependencies,
   type StudioLiveRoomEvent,
@@ -246,15 +250,59 @@ function gesturePreviewBegin(gestureId = "gesture-1"): StudioLiveGesturePreviewP
   };
 }
 
-function gesturePreviewAppend(gestureId = "gesture-1"): StudioLiveGesturePreviewPayload {
+function gesturePreviewAppend(
+  gestureId = "gesture-1",
+  seq = 2,
+): StudioLiveGesturePreviewPayload {
   return {
     version: 1,
     gestureId,
     pageId: "page-1",
-    seq: 2,
+    seq,
     phase: "append",
     operation: "draw",
     samples: { startIndex: 1, points: [12, 24] },
+  };
+}
+
+function nearMaximumGesturePreview(): StudioLiveGesturePreviewPayload {
+  const sampleCount = 280;
+  const channel = (value: number) => Array.from({ length: sampleCount }, () => value);
+  return {
+    version: 1,
+    gestureId: "g",
+    pageId: "p",
+    seq: 1,
+    phase: "begin",
+    operation: "draw",
+    base: { documentGeneration: 1 },
+    renderer: {
+      kind: "freehand",
+      mode: "pen",
+      stroke: "#000",
+      strokeWidth: 1,
+    },
+    samples: {
+      startIndex: 0,
+      points: Array.from(
+        { length: sampleCount },
+        () => [9_999_999.123456789, -9_999_999.123456789],
+      ).flat(),
+      pressures: channel(0.123456789012345),
+      tiltXs: channel(-89.1234567890123),
+      tiltYs: channel(89.1234567890123),
+      twists: channel(358.123456789012),
+      speeds: channel(999_999.123456789),
+      tangentialPressures: channel(-0.123456789012345),
+      altitudeAngles: channel(1.123456789012345),
+      azimuthAngles: channel(6.123456789012345),
+      contactWidths: channel(8_191.123456789012),
+      contactHeights: channel(8_191.123456789012),
+      sampleTimeOffsets: Array.from(
+        { length: sampleCount },
+        (_, index) => index + 0.123456789012345,
+      ),
+    },
   };
 }
 
@@ -611,6 +659,302 @@ describe("StudioLiveRoom", () => {
     roomB.close();
   });
 
+  it("allows only editing roles to publish gesture previews", async () => {
+    const test = harness();
+    const editorRoom = test.room(bob);
+    const adminRoom = test.room({
+      sessionId: "session-admin",
+      displayName: "관리자",
+      role: "admin",
+    });
+    const commenterRoom = test.room({
+      sessionId: "session-commenter",
+      displayName: "댓글 참여자",
+      role: "commenter",
+    });
+    const viewerRoom = test.room({
+      sessionId: "session-viewer",
+      displayName: "보기 전용",
+      role: "viewer",
+    });
+    await editorRoom.start();
+    await adminRoom.start();
+    await commenterRoom.start();
+    await viewerRoom.start();
+    test.hub.published.length = 0;
+
+    expect(commenterRoom.publishGesturePreview(gesturePreviewBegin("commenter"))).toBe(false);
+    expect(viewerRoom.publishGesturePreview(gesturePreviewBegin("viewer"))).toBe(false);
+    expect(editorRoom.publishGesturePreview(gesturePreviewBegin("editor"))).toBe(true);
+    expect(adminRoom.publishGesturePreview(gesturePreviewBegin("admin"))).toBe(true);
+    expect(test.hub.published.filter(({ kind }) => kind === "preview:gesture")).toHaveLength(2);
+
+    editorRoom.close();
+    adminRoom.close();
+    commenterRoom.close();
+    viewerRoom.close();
+  });
+
+  it("accepts previews only from live presence peers using their canonical identity and role", async () => {
+    const test = harness();
+    const room = test.room(alice);
+    const previews: StudioLiveRoomEvent[] = [];
+    room.subscribe((event) => {
+      if (event.type === "gesture-preview") previews.push(event);
+    });
+    await room.start();
+
+    const bobPreview = createStudioLiveEnvelope({
+      workId: "work-1",
+      sender: bob,
+      sentAt: test.now(),
+      sequence: 50,
+      kind: "preview:gesture",
+      payload: gesturePreviewBegin("known-bob"),
+    });
+    test.hub.inject(0, bobPreview);
+    expect(previews).toEqual([]);
+
+    test.hub.inject(0, createStudioLiveEnvelope({
+      workId: "work-1",
+      sender: bob,
+      sentAt: test.now(),
+      sequence: 1,
+      kind: "presence:heartbeat",
+      payload: { visibility: "active", pageId: "page-1" },
+    }));
+    const bobLastSeenAt = room.getPeers().find(
+      ({ sessionId }) => sessionId === bob.sessionId,
+    )?.lastSeenAt;
+    test.advance(400);
+    test.hub.inject(0, {
+      ...bobPreview,
+      sentAt: test.now(),
+      sender: { ...bob, displayName: "위조된 이름", role: "owner" },
+    });
+    expect(previews).toEqual([
+      expect.objectContaining({ participant: bob }),
+    ]);
+    expect(room.getPeers().find(
+      ({ sessionId }) => sessionId === bob.sessionId,
+    )?.lastSeenAt).toBe(bobLastSeenAt);
+
+    test.advance(101);
+    test.hub.inject(0, {
+      ...bobPreview,
+      sentAt: test.now(),
+      sequence: 51,
+      payload: gesturePreviewAppend("known-bob"),
+    });
+    expect(previews).toHaveLength(1);
+    expect(room.getPeers().some(({ sessionId }) => sessionId === bob.sessionId)).toBe(false);
+
+    test.hub.inject(0, createStudioLiveEnvelope({
+      workId: "work-1",
+      sender: bob,
+      sentAt: test.now(),
+      sequence: 1,
+      kind: "presence:heartbeat",
+      payload: { visibility: "active", pageId: "page-1" },
+    }));
+    test.hub.inject(0, createStudioLiveEnvelope({
+      workId: "work-1",
+      sender: bob,
+      sentAt: test.now(),
+      sequence: 2,
+      kind: "presence:leave",
+      payload: {},
+    }));
+    test.hub.inject(0, { ...bobPreview, sentAt: test.now(), sequence: 52 });
+    expect(previews).toHaveLength(1);
+
+    const viewer: StudioLiveParticipant = {
+      sessionId: "session-viewer",
+      displayName: "보기 전용",
+      role: "viewer",
+    };
+    test.hub.inject(0, createStudioLiveEnvelope({
+      workId: "work-1",
+      sender: viewer,
+      sentAt: test.now(),
+      sequence: 1,
+      kind: "presence:heartbeat",
+      payload: { visibility: "active", pageId: "page-1" },
+    }));
+    test.hub.inject(0, createStudioLiveEnvelope({
+      workId: "work-1",
+      sender: { ...viewer, role: "editor" },
+      sentAt: test.now(),
+      sequence: 2,
+      kind: "cursor:update",
+      payload: { x: 0.2, y: 0.3, pageId: "page-1", tool: "pen" },
+    }));
+    const viewerLastSeenAt = room.getPeers().find(
+      ({ sessionId }) => sessionId === viewer.sessionId,
+    )?.lastSeenAt;
+    test.hub.inject(0, createStudioLiveEnvelope({
+      workId: "work-1",
+      sender: { ...viewer, role: "editor" },
+      sentAt: test.now(),
+      sequence: 3,
+      kind: "preview:gesture",
+      payload: gesturePreviewBegin("viewer-forgery"),
+    }));
+    test.hub.inject(0, createStudioLiveEnvelope({
+      workId: "work-1",
+      sender: alice,
+      sentAt: test.now(),
+      sequence: 1,
+      kind: "preview:gesture",
+      payload: gesturePreviewBegin("self"),
+    }));
+    expect(previews).toHaveLength(1);
+    expect(room.getPeers().find(
+      ({ sessionId }) => sessionId === viewer.sessionId,
+    )?.lastSeenAt).toBe(viewerLastSeenAt);
+    room.close();
+  });
+
+  it("bounds per-peer preview packet bursts while allowing a normal 25Hz stream", async () => {
+    const test = harness();
+    const room = test.room(alice);
+    const previewSeqs: number[] = [];
+    room.subscribe((event) => {
+      if (event.type === "gesture-preview") previewSeqs.push(event.payload.seq);
+    });
+    await room.start();
+    test.hub.inject(0, createStudioLiveEnvelope({
+      workId: "work-1",
+      sender: bob,
+      sentAt: test.now(),
+      sequence: 1,
+      kind: "presence:heartbeat",
+      payload: { visibility: "active", pageId: "page-1" },
+    }));
+
+    const normalPacketCount = 25 * (STUDIO_LIVE_GESTURE_PREVIEW_INBOUND_WINDOW_MS / 1_000);
+    expect(normalPacketCount).toBeLessThan(STUDIO_LIVE_GESTURE_PREVIEW_INBOUND_MAX_PACKETS);
+    let presenceSequence = 1;
+    for (let index = 0; index < normalPacketCount; index += 1) {
+      if (index > 0 && index % 5 === 0) {
+        presenceSequence += 1;
+        test.hub.inject(0, createStudioLiveEnvelope({
+          workId: "work-1",
+          sender: bob,
+          sentAt: test.now(),
+          sequence: presenceSequence,
+          kind: "presence:heartbeat",
+          payload: { visibility: "active", pageId: "page-1" },
+        }));
+      }
+      test.hub.inject(0, createStudioLiveEnvelope({
+        workId: "work-1",
+        sender: bob,
+        sentAt: test.now(),
+        sequence: index + 2,
+        kind: "preview:gesture",
+        payload: index === 0
+          ? gesturePreviewBegin("normal-25hz")
+          : gesturePreviewAppend("normal-25hz", index + 1),
+      }));
+      if (index + 1 < normalPacketCount) test.advance(40);
+    }
+    expect(previewSeqs).toHaveLength(normalPacketCount);
+
+    const duplicate = createStudioLiveEnvelope({
+      workId: "work-1",
+      sender: bob,
+      sentAt: test.now(),
+      sequence: 500,
+      kind: "preview:gesture",
+      payload: gesturePreviewAppend("normal-25hz", normalPacketCount + 1),
+    });
+    const remainingCredit = STUDIO_LIVE_GESTURE_PREVIEW_INBOUND_MAX_PACKETS
+      - normalPacketCount;
+    for (let index = 0; index < remainingCredit; index += 1) {
+      test.hub.inject(0, duplicate);
+    }
+    test.hub.inject(0, duplicate);
+    expect(previewSeqs).toHaveLength(STUDIO_LIVE_GESTURE_PREVIEW_INBOUND_MAX_PACKETS);
+
+    test.hub.inject(0, createStudioLiveEnvelope({
+      workId: "work-1",
+      sender: bob,
+      sentAt: test.now(),
+      sequence: presenceSequence + 1,
+      kind: "presence:leave",
+      payload: {},
+    }));
+    test.hub.inject(0, duplicate);
+    expect(previewSeqs).toHaveLength(STUDIO_LIVE_GESTURE_PREVIEW_INBOUND_MAX_PACKETS);
+    test.hub.inject(0, createStudioLiveEnvelope({
+      workId: "work-1",
+      sender: bob,
+      sentAt: test.now(),
+      sequence: 1,
+      kind: "presence:heartbeat",
+      payload: { visibility: "active", pageId: "page-1" },
+    }));
+    test.hub.inject(0, duplicate);
+    expect(previewSeqs).toHaveLength(STUDIO_LIVE_GESTURE_PREVIEW_INBOUND_MAX_PACKETS + 1);
+
+    test.advance(STUDIO_LIVE_GESTURE_PREVIEW_INBOUND_WINDOW_MS);
+    test.hub.inject(0, createStudioLiveEnvelope({
+      workId: "work-1",
+      sender: bob,
+      sentAt: test.now(),
+      sequence: 2,
+      kind: "presence:heartbeat",
+      payload: { visibility: "active", pageId: "page-1" },
+    }));
+    test.hub.inject(0, { ...duplicate, sentAt: test.now() });
+    expect(previewSeqs).toHaveLength(STUDIO_LIVE_GESTURE_PREVIEW_INBOUND_MAX_PACKETS + 2);
+    room.close();
+  });
+
+  it("meters actual UTF-8 preview bytes and admits one near-envelope-limit packet", async () => {
+    const test = harness();
+    const room = test.room(alice);
+    let previewCount = 0;
+    room.subscribe((event) => {
+      if (event.type === "gesture-preview") previewCount += 1;
+    });
+    await room.start();
+    test.hub.inject(0, createStudioLiveEnvelope({
+      workId: "work-1",
+      sender: bob,
+      sentAt: test.now(),
+      sequence: 1,
+      kind: "presence:heartbeat",
+      payload: { visibility: "active", pageId: "page-1" },
+    }));
+    const nearLimitEnvelope = createStudioLiveEnvelope({
+      workId: "work-1",
+      sender: bob,
+      sentAt: test.now(),
+      sequence: 2,
+      kind: "preview:gesture",
+      payload: nearMaximumGesturePreview(),
+    });
+    const envelopeBytes = studioLiveEnvelopeByteLength(nearLimitEnvelope);
+    expect(envelopeBytes).not.toBeNull();
+    if (envelopeBytes === null) throw new Error("preview envelope must be UTF-8 encodable");
+    expect(envelopeBytes).toBeGreaterThan(60 * 1_024);
+    expect(envelopeBytes).toBeLessThan(STUDIO_LIVE_GESTURE_PREVIEW_INBOUND_MAX_BYTES);
+    const byteLimitedPacketCount = Math.floor(
+      STUDIO_LIVE_GESTURE_PREVIEW_INBOUND_MAX_BYTES / envelopeBytes,
+    );
+    expect(byteLimitedPacketCount).toBeLessThan(STUDIO_LIVE_GESTURE_PREVIEW_INBOUND_MAX_PACKETS);
+
+    for (let index = 0; index < byteLimitedPacketCount; index += 1) {
+      test.hub.inject(0, nearLimitEnvelope);
+    }
+    expect(previewCount).toBe(byteLimitedPacketCount);
+    test.hub.inject(0, nearLimitEnvelope);
+    expect(previewCount).toBe(byteLimitedPacketCount);
+    room.close();
+  });
+
   it("delivers preview payload order before the unrelated envelope sequence gate", async () => {
     const test = harness();
     const room = test.room(alice);
@@ -621,6 +965,15 @@ describe("StudioLiveRoom", () => {
       if (event.type === "gesture-preview") previewSeqs.push(event.payload.seq);
     });
     await room.start();
+
+    test.hub.inject(0, createStudioLiveEnvelope({
+      workId: "work-1",
+      sender: bob,
+      sentAt: test.now(),
+      sequence: 1,
+      kind: "presence:heartbeat",
+      payload: { visibility: "active", pageId: "page-1" },
+    }));
 
     test.hub.inject(0, createStudioLiveEnvelope({
       workId: "work-1",
