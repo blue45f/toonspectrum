@@ -134,6 +134,7 @@ interface StudioLiveP2pPeerLink {
  */
 class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
   readonly mode: StudioLiveTransport["mode"];
+  readonly crdtFanout: NonNullable<StudioLiveTransport["crdtFanout"]>;
   readonly canonicalSessionId?: StudioLiveTransport["canonicalSessionId"];
   readonly transportSessionId?: StudioLiveTransport["transportSessionId"];
   private readonly context: StudioLiveTransportContext;
@@ -163,6 +164,7 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
     this.context = context;
     this.primary = primary;
     this.mode = primary.mode;
+    this.crdtFanout = primary.crdtFanout === "authoritative" ? "authoritative" : "mesh";
     this.createPeerConnection = createPeerConnection;
     this.now = now;
     this.maxPeers = maxPeers;
@@ -230,11 +232,28 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
   }
 
   requestCrdtSync(request: StudioCrdtSyncRequest): Promise<StudioCrdtSyncResponse | null> {
-    if (this.primary.requestCrdtSync) return this.primary.requestCrdtSync(request);
-    return this.requestMeshCrdtSync(request);
+    if (this.openPeerChannelCount() > 0) return this.requestMeshCrdtSync(request);
+    if (this.primary.crdtFanout === "authoritative" && this.primary.requestCrdtSync) {
+      return this.primary.requestCrdtSync(request);
+    }
+    return Promise.resolve(null);
   }
 
   respondCrdtSync(response: StudioCrdtSyncResponse, targetSessionId: string): boolean {
+    if (this.openPeerChannelCount() > 0) {
+      const parsed = parseStudioCrdtSyncResponse(response, {
+        expectedWorkId: this.context.workId,
+      });
+      if (parsed && targetSessionId && this.sendMeshCrdtWire({
+        workId: this.context.workId,
+        senderSessionId: this.context.participant.sessionId,
+        targetSessionId,
+        kind: "sync-response",
+        payload: parsed,
+      })) {
+        return true;
+      }
+    }
     if (this.primary.respondCrdtSync) {
       return this.primary.respondCrdtSync(response, targetSessionId);
     }
@@ -252,15 +271,28 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
   }
 
   publishCrdtUpdate(request: StudioCrdtUpdateRequest): Promise<StudioCrdtUpdateAck> {
-    if (this.primary.publishCrdtUpdate) return this.primary.publishCrdtUpdate(request);
+    const meshComplete = this.meshCanFanoutCompletely();
+    if (this.openPeerChannelCount() > 0) {
+      return this.publishMeshCrdtUpdate(request);
+    }
+    if (
+      this.primary.crdtFanout === "authoritative"
+      && this.primary.publishCrdtUpdate
+      && !meshComplete
+    ) {
+      return this.primary.publishCrdtUpdate(request);
+    }
     return this.publishMeshCrdtUpdate(request);
   }
 
   subscribeCrdt(listener: (message: StudioCrdtTransportMessage) => void): () => void {
-    if (this.primary.subscribeCrdt) return this.primary.subscribeCrdt(listener);
     if (this.closed) return () => undefined;
     this.crdtListeners.add(listener);
-    return () => this.crdtListeners.delete(listener);
+    const unsubscribePrimary = this.primary.subscribeCrdt?.(listener);
+    return () => {
+      this.crdtListeners.delete(listener);
+      unsubscribePrimary?.();
+    };
   }
 
   close(): void {
@@ -407,6 +439,18 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
     if (this.seenCrdtUpdateIds.size <= 2_048) return;
     const oldest = this.seenCrdtUpdateIds.values().next().value;
     if (typeof oldest === "string") this.seenCrdtUpdateIds.delete(oldest);
+  }
+
+  private openPeerChannelCount(): number {
+    let open = 0;
+    for (const peer of this.peers.values()) {
+      if (!peer.closed && peer.channel?.readyState === "open") open += 1;
+    }
+    return open;
+  }
+
+  private meshCanFanoutCompletely(): boolean {
+    return this.peers.size > 0 && this.openPeerChannelCount() === this.peers.size;
   }
 
   private sendEphemeral(envelope: StudioLiveEnvelope): boolean {

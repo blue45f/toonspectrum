@@ -154,6 +154,7 @@ function mergedFingerprint(envelope: StudioLiveAnyEnvelope): string {
  */
 class StudioPurposeRoutedLiveTransport implements StudioLiveTransport {
   readonly mode: StudioLiveTransport["mode"];
+  readonly crdtFanout?: StudioLiveTransport["crdtFanout"];
   private readonly context: StudioLiveTransportContext;
   private readonly roomId: string;
   private readonly primary: StudioLiveTransport;
@@ -204,6 +205,7 @@ class StudioPurposeRoutedLiveTransport implements StudioLiveTransport {
     this.primary = primary;
     this.coordinator = coordinator;
     this.mode = primary.mode;
+    this.crdtFanout = primary.crdtFanout;
     this.randomId = randomId;
     this.now = now;
     this.participantBySession.set(
@@ -217,6 +219,12 @@ class StudioPurposeRoutedLiveTransport implements StudioLiveTransport {
     ] as const) {
       this.outboundSequence.set(workload, BigInt(1));
       this.queues.set(workload, []);
+    }
+    if (typeof primary.publishCrdtUpdate !== "function") {
+      this.requestCrdtSync = undefined;
+      this.respondCrdtSync = undefined;
+      this.publishCrdtUpdate = undefined;
+      this.subscribeCrdt = undefined;
     }
   }
 
@@ -333,7 +341,7 @@ class StudioPurposeRoutedLiveTransport implements StudioLiveTransport {
       : Promise.reject(new Error("현재 연결은 서버 잠금 해제를 지원하지 않습니다."));
   };
 
-  requestCrdtSync(
+  requestCrdtSync?(
     request: StudioCrdtSyncRequest,
   ): Promise<StudioCrdtSyncResponse | null> {
     const operation = this.primary.requestCrdtSync;
@@ -342,7 +350,7 @@ class StudioPurposeRoutedLiveTransport implements StudioLiveTransport {
       : Promise.reject(new Error("현재 연결은 CRDT 동기화를 지원하지 않습니다."));
   }
 
-  respondCrdtSync(
+  respondCrdtSync?(
     response: StudioCrdtSyncResponse,
     targetSessionId: string,
   ): boolean {
@@ -357,7 +365,7 @@ class StudioPurposeRoutedLiveTransport implements StudioLiveTransport {
     );
   }
 
-  publishCrdtUpdate(
+  publishCrdtUpdate?(
     request: StudioCrdtUpdateRequest,
   ): Promise<StudioCrdtUpdateAck> {
     const operation = this.primary.publishCrdtUpdate;
@@ -366,7 +374,7 @@ class StudioPurposeRoutedLiveTransport implements StudioLiveTransport {
       : Promise.reject(new Error("현재 연결은 CRDT 게시를 지원하지 않습니다."));
   }
 
-  subscribeCrdt(
+  subscribeCrdt?(
     listener: (message: StudioCrdtTransportMessage) => void,
   ): () => void {
     return this.primary.subscribeCrdt?.call(this.primary, listener) ?? (() => undefined);

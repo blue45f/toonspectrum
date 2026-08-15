@@ -347,6 +347,10 @@ export class StudioLiveRoom {
     return this.transport?.mode ?? null;
   }
 
+  get crdtFanout(): import("./studio-live-collaboration-transport").StudioLiveCrdtFanout | undefined {
+    return this.transport?.crdtFanout;
+  }
+
   subscribe(listener: (event: StudioLiveRoomEvent) => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);

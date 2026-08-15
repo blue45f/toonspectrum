@@ -217,7 +217,8 @@ export class StudioCrdtRoomBinding {
     if (this.started) return this.syncNow();
     if (!this.room.ready) throw new Error("실시간 작업실 연결이 준비되지 않았습니다.");
     this.started = true;
-    this.authoritativeSyncReady = this.room.mode !== "server";
+    this.authoritativeSyncReady =
+      this.room.mode !== "server" || this.room.crdtFanout === "mesh";
     if (this.canEdit && this.outboxScope) await this.restoreOutbox();
     if (this.closed) return;
     if (this.recoveryState) {
@@ -431,10 +432,8 @@ export class StudioCrdtRoomBinding {
         if (missingOnServer.byteLength > EMPTY_UPDATE_BYTE_LENGTH) this.enqueueUpdate(missingOnServer);
       }
     }
-    if (this.room.mode === "server") {
-      if (!response) {
-        throw new Error("서버가 권위 CRDT 동기화 응답을 반환하지 않았습니다.");
-      }
+    if (this.room.mode === "server" && !response && this.room.crdtFanout !== "mesh") {
+      throw new Error("서버가 권위 CRDT 동기화 응답을 반환하지 않았습니다.");
     }
     if (this.syncRetryTimer !== null) this.cancelTimeout(this.syncRetryTimer);
     this.syncRetryTimer = null;

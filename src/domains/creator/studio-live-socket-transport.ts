@@ -455,6 +455,7 @@ function parseScreenStop(
  */
 export class StudioLiveSocketTransport implements StudioLiveTransport {
   readonly mode = "server" as const;
+  readonly crdtFanout = "authoritative" as const;
 
   private readonly context: StudioLiveTransportContext;
   private readonly socket: StudioLiveSocketLike;

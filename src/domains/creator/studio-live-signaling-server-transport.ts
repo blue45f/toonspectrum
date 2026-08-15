@@ -29,6 +29,7 @@ export function createStudioLiveSignalingServerTransport(): StudioLiveTransport 
 
   return {
     mode: "server",
+    crdtFanout: "none",
     get ready() {
       return connected && !closed;
     },

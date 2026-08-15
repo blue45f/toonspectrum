@@ -235,6 +235,7 @@ class SignalingBus {
 
 class FakePrimaryTransport implements StudioLiveTransport {
   readonly mode = "server" as const;
+  readonly crdtFanout = "authoritative" as const;
   readonly sent: StudioLiveEnvelope[] = [];
   readonly acquireLock = vi.fn(async () => ({
     status: "timeout" as const,
@@ -445,6 +446,7 @@ describe("Studio live P2P overlay", () => {
     const bus = new SignalingBus();
     const stripCrdt = (primary: FakePrimaryTransport): StudioLiveTransport => ({
       mode: primary.mode,
+      crdtFanout: "none",
       get ready() {
         return primary.ready;
       },
@@ -498,7 +500,7 @@ describe("Studio live P2P overlay", () => {
     )).toBe(true);
   });
 
-  it("keeps locks and CRDT durability on the authoritative primary transport", async () => {
+  it("keeps lock claims on the server and prefers the mesh for CRDT when every peer is connected", async () => {
     const { localPrimary, local } = await connectedMesh();
     await local.acquireLock?.({
       resource: "page:1",
@@ -512,15 +514,27 @@ describe("Studio live P2P overlay", () => {
       clientSequence: 1,
       update: "AAAA",
     });
-    await local.requestCrdtSync?.({
+    expect(localPrimary.acquireLock).toHaveBeenCalledOnce();
+    expect(localPrimary.publishCrdtUpdate).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the server CRDT host when no peer data channel is open", async () => {
+    const bus = new SignalingBus();
+    const hub = new MemoryRtcHub();
+    const primary = bus.create(LOCAL);
+    const transport = applyStudioLiveP2pOverlay(() => primary, {
+      createPeerConnection: () => hub.create(),
+      now: () => NOW,
+    })(contextFor(LOCAL));
+    await transport.connect();
+    await transport.publishCrdtUpdate?.({
       protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
       workId: "work-p2p",
-      requestId: "00000000-0000-4000-8000-000000000033",
-      stateVector: "AAAA",
+      updateId: "00000000-0000-4000-8000-000000000034",
+      clientSequence: 1,
+      update: "AAAA",
     });
-    expect(localPrimary.acquireLock).toHaveBeenCalledOnce();
-    expect(localPrimary.publishCrdtUpdate).toHaveBeenCalledOnce();
-    expect(localPrimary.requestCrdtSync).toHaveBeenCalledOnce();
+    expect(primary.publishCrdtUpdate).toHaveBeenCalledOnce();
   });
 
   it("still uses the server for lock claims after the mesh is up", async () => {

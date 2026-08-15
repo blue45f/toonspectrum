@@ -25,6 +25,9 @@ import type { StudioTeamCommentLiveEvent } from "./studio-team-comment-live-even
 
 export type StudioLiveTransportMode = "local" | "server";
 
+/** Where live Yjs diffs are fanned out. Mesh is preferred to keep Socket.IO off the hot path. */
+export type StudioLiveCrdtFanout = "authoritative" | "mesh" | "none";
+
 export interface StudioLiveTransportContext {
   workId: string;
   roomName: string;
@@ -68,6 +71,11 @@ export type StudioLiveTransportControlEvent =
 export interface StudioLiveTransport {
   readonly mode: StudioLiveTransportMode;
   readonly ready: boolean;
+  /**
+   * `authoritative` keeps a Socket.IO/CRDT host as fallback. `mesh` is P2P-only.
+   * `none` is signaling and must be wrapped by a mesh overlay.
+   */
+  readonly crdtFanout?: StudioLiveCrdtFanout;
   /**
    * Optional identity bridge for transports whose wire connection id differs from Studio's stable
    * client-instance session id. Hybrid transports use it before merging independently sequenced
