@@ -6,9 +6,12 @@ import {
   type StudioLiveGesturePreviewPayload,
 } from "./studio-live-gesture-preview";
 import {
+  STUDIO_LIVE_GESTURE_PREVIEW_BYTE_BURST,
+  STUDIO_LIVE_GESTURE_PREVIEW_BYTE_REFILL_PER_SECOND,
   STUDIO_LIVE_GESTURE_PREVIEW_PUBLISH_INTERVAL_MS,
   StudioLiveGesturePreviewPublisher,
   planStudioLiveGesturePreviewBegin,
+  type StudioLiveGesturePreviewPublisherByteBudgetOptions,
   type StudioLiveGesturePreviewPublisherScheduler,
 } from "./studio-live-gesture-preview-publisher";
 
@@ -73,19 +76,85 @@ function stroke(overrides: Partial<DrawEl> = {}): DrawEl {
   };
 }
 
+function denseStroke(count: number): DrawEl {
+  const points = Array.from({ length: count * 2 }, (_, index) => (
+    index % 2 === 0 ? index * 0.123456789012345 : index * 0.234567890123456
+  ));
+  const values = Array.from({ length: count }, () => 0.456789012345678);
+  return stroke({
+    points,
+    pressures: values,
+    tiltXs: values.map(() => 12.3456789012345),
+    tiltYs: values.map(() => -12.3456789012345),
+    twists: values.map(() => 123.456789012345),
+    speeds: values.map(() => 1234.56789012345),
+    tangentialPressures: values,
+    altitudeAngles: values,
+    azimuthAngles: values,
+    contactWidths: values,
+    contactHeights: values,
+    sampleTimeOffsets: values.map((_, index) => index),
+  });
+}
+
+function payloadBytes(payload: StudioLiveGesturePreviewPayload): number {
+  return new TextEncoder().encode(JSON.stringify(payload)).byteLength;
+}
+
+function twoSampleFixture() {
+  const initial = stroke();
+  const updated = stroke({
+    points: [10, 20, 12, 22],
+    pressures: [0.4, 0.5],
+  });
+  const begin = planStudioLiveGesturePreviewBegin({
+    pageId: "page-1",
+    documentGeneration: 1,
+    element: initial,
+  });
+  if (!begin) throw new Error("Expected a valid begin fixture.");
+  const append: StudioLiveGesturePreviewPayload = {
+    version: 1,
+    gestureId: initial.id,
+    pageId: "page-1",
+    seq: 2,
+    phase: "append",
+    operation: "draw",
+    samples: { startIndex: 1, points: [12, 22], pressures: [0.5] },
+  };
+  const end: StudioLiveGesturePreviewPayload = {
+    version: 1,
+    gestureId: initial.id,
+    pageId: "page-1",
+    seq: 3,
+    phase: "end",
+    operation: "draw",
+  };
+  const cancel: StudioLiveGesturePreviewPayload = {
+    ...end,
+    seq: 2,
+    phase: "cancel",
+  };
+  return { initial, updated, begin, append, end, cancel };
+}
+
 function createHarness(
   accept: (payload: StudioLiveGesturePreviewPayload) => boolean = () => true,
+  byteBudget?: StudioLiveGesturePreviewPublisherByteBudgetOptions,
 ) {
   const scheduler = new ManualScheduler();
   const sent: StudioLiveGesturePreviewPayload[] = [];
+  const sentAt: number[] = [];
   const publisher = new StudioLiveGesturePreviewPublisher({
     scheduler,
+    ...(byteBudget ? { byteBudget } : {}),
     publish: (payload) => {
       sent.push(payload);
+      sentAt.push(scheduler.now());
       return accept(payload);
     },
   });
-  return { publisher, scheduler, sent };
+  return { publisher, scheduler, sent, sentAt };
 }
 
 describe("studio live gesture preview publisher", () => {
@@ -163,6 +232,10 @@ describe("studio live gesture preview publisher", () => {
       pressures: [0.4, 0.5, 0.6, 0.7],
     });
     expect(publisher.end(fourth)).toBe(true);
+    expect(sent).toHaveLength(2);
+    scheduler.advance(STUDIO_LIVE_GESTURE_PREVIEW_PUBLISH_INTERVAL_MS - 1);
+    expect(sent).toHaveLength(2);
+    scheduler.advance(1);
     expect(sent.slice(2)).toMatchObject([
       { seq: 3, phase: "append", samples: { startIndex: 3, points: [16, 26] } },
       { seq: 4, phase: "end" },
@@ -189,6 +262,7 @@ describe("studio live gesture preview publisher", () => {
     scheduler.advance(STUDIO_LIVE_GESTURE_PREVIEW_PUBLISH_INTERVAL_MS);
     expect(sent).toHaveLength(2);
     expect(publisher.end(latest)).toBe(true);
+    scheduler.advance(0);
     expect(sent.at(-1)).toMatchObject({ seq: 3, phase: "end", operation: "shape" });
   });
 
@@ -265,6 +339,145 @@ describe("studio live gesture preview publisher", () => {
     expect(sent.filter((payload) => payload.phase === "append")).toHaveLength(2);
     scheduler.advance(STUDIO_LIVE_GESTURE_PREVIEW_PUBLISH_INTERVAL_MS);
     expect(sent.filter((payload) => payload.phase === "append")).toHaveLength(3);
+  });
+
+  it("holds a one-byte-short packet intact until the exact UTF-8 budget boundary", () => {
+    const fixture = twoSampleFixture();
+    const { publisher, scheduler, sent } = createHarness(() => true, {
+      burstBytes: payloadBytes(fixture.begin) + payloadBytes(fixture.append) - 2,
+      refillBytesPerSecond: 25,
+      controlBurstBytes: 0,
+      controlRefillBytesPerSecond: 0,
+    });
+    expect(publisher.begin({
+      pageId: "page-1",
+      documentGeneration: 1,
+      element: fixture.initial,
+    })).toBe(true);
+    expect(publisher.append(fixture.updated, 1)).toBe(true);
+
+    scheduler.advance(STUDIO_LIVE_GESTURE_PREVIEW_PUBLISH_INTERVAL_MS);
+    expect(sent.map((payload) => payload.phase)).toEqual(["begin"]);
+    scheduler.advance(STUDIO_LIVE_GESTURE_PREVIEW_PUBLISH_INTERVAL_MS - 1);
+    expect(sent).toHaveLength(1);
+    scheduler.advance(1);
+
+    expect(sent).toMatchObject([
+      { seq: 1, phase: "begin" },
+      { seq: 2, phase: "append", samples: { startIndex: 1, points: [12, 22] } },
+    ]);
+  });
+
+  it("keeps sustained UTF-8 payload traffic below the room byte window", () => {
+    const { publisher, scheduler, sent, sentAt } = createHarness();
+    expect(publisher.begin({
+      pageId: "page-1",
+      documentGeneration: 1,
+      element: denseStroke(1),
+    })).toBe(true);
+    expect(publisher.append(denseStroke(20_000), 1)).toBe(true);
+
+    scheduler.advance(3_000);
+
+    const transmittedBytes = sent.reduce((total, payload) => total + payloadBytes(payload), 0);
+    const tokenBucketMaximum = STUDIO_LIVE_GESTURE_PREVIEW_BYTE_BURST
+      + STUDIO_LIVE_GESTURE_PREVIEW_BYTE_REFILL_PER_SECOND * 3;
+    expect(transmittedBytes).toBeGreaterThan(STUDIO_LIVE_GESTURE_PREVIEW_BYTE_BURST);
+    expect(transmittedBytes).toBeLessThanOrEqual(tokenBucketMaximum);
+    expect(transmittedBytes).toBeLessThan(2 * 1_024 * 1_024);
+
+    const dataPacketTimes = sent.flatMap((payload, index) => (
+      payload.phase === "append" || payload.phase === "replace" ? [sentAt[index]!] : []
+    ));
+    for (let index = 1; index < dataPacketTimes.length; index += 1) {
+      expect(dataPacketTimes[index]! - dataPacketTimes[index - 1]!)
+        .toBeGreaterThanOrEqual(STUDIO_LIVE_GESTURE_PREVIEW_PUBLISH_INTERVAL_MS);
+    }
+  });
+
+  it("recovers the bounded bucket after idle time without losing the queued suffix", () => {
+    const fixture = twoSampleFixture();
+    const refillBytesPerSecond = 100;
+    const burstBytes = payloadBytes(fixture.begin) + payloadBytes(fixture.append);
+    const { publisher, scheduler, sent, sentAt } = createHarness(() => true, {
+      burstBytes,
+      refillBytesPerSecond,
+      controlBurstBytes: 0,
+      controlRefillBytesPerSecond: 0,
+    });
+    expect(publisher.begin({
+      pageId: "page-1",
+      documentGeneration: 1,
+      element: fixture.initial,
+    })).toBe(true);
+    expect(publisher.append(fixture.updated, 1)).toBe(true);
+    scheduler.advance(STUDIO_LIVE_GESTURE_PREVIEW_PUBLISH_INTERVAL_MS);
+    expect(sent.map((payload) => payload.phase)).toEqual(["begin", "append"]);
+
+    scheduler.advance(Math.ceil((burstBytes / refillBytesPerSecond) * 1_000));
+    const recoveredAt = scheduler.now();
+    const latest = stroke({
+      points: [10, 20, 12, 22, 14, 24],
+      pressures: [0.4, 0.5, 0.6],
+    });
+    expect(publisher.append(latest, 2)).toBe(true);
+    scheduler.advance(0);
+
+    expect(sent.at(-1)).toMatchObject({
+      seq: 3,
+      phase: "append",
+      samples: { startIndex: 2, points: [14, 24] },
+    });
+    expect(sentAt.at(-1)).toBe(recoveredAt);
+  });
+
+  it("uses the small control credit only after the scheduled final data packet drains", () => {
+    const fixture = twoSampleFixture();
+    const { publisher, scheduler, sent } = createHarness(() => true, {
+      burstBytes: payloadBytes(fixture.begin) + payloadBytes(fixture.append),
+      refillBytesPerSecond: 0,
+      controlBurstBytes: payloadBytes(fixture.end),
+      controlRefillBytesPerSecond: 0,
+    });
+    expect(publisher.begin({
+      pageId: "page-1",
+      documentGeneration: 1,
+      element: fixture.initial,
+    })).toBe(true);
+    expect(publisher.end(fixture.updated)).toBe(true);
+    expect(sent.map((payload) => payload.phase)).toEqual(["begin"]);
+
+    scheduler.advance(STUDIO_LIVE_GESTURE_PREVIEW_PUBLISH_INTERVAL_MS - 1);
+    expect(sent).toHaveLength(1);
+    scheduler.advance(1);
+    expect(sent.map((payload) => payload.phase)).toEqual(["begin", "append", "end"]);
+    expect(publisher.activeGestureId).toBeNull();
+  });
+
+  it("fails closed with cancel when an ordered end drain cannot finish by its deadline", () => {
+    const fixture = twoSampleFixture();
+    const { publisher, scheduler, sent, sentAt } = createHarness(() => true, {
+      burstBytes: payloadBytes(fixture.begin),
+      refillBytesPerSecond: 0,
+      controlBurstBytes: payloadBytes(fixture.cancel),
+      controlRefillBytesPerSecond: 0,
+      endDrainDeadlineMs: STUDIO_LIVE_GESTURE_PREVIEW_PUBLISH_INTERVAL_MS * 2,
+    });
+    expect(publisher.begin({
+      pageId: "page-1",
+      documentGeneration: 1,
+      element: fixture.initial,
+    })).toBe(true);
+    expect(publisher.end(fixture.updated)).toBe(true);
+
+    scheduler.advance(STUDIO_LIVE_GESTURE_PREVIEW_PUBLISH_INTERVAL_MS * 2 - 1);
+    expect(sent.map((payload) => payload.phase)).toEqual(["begin"]);
+    expect(publisher.activeGestureId).toBe(fixture.initial.id);
+    scheduler.advance(1);
+
+    expect(sent.map((payload) => payload.phase)).toEqual(["begin", "cancel"]);
+    expect(sentAt.at(-1)).toBe(1_080);
+    expect(publisher.activeGestureId).toBeNull();
   });
 
   it("fails closed with a cancel when renderer or established channel schema changes", () => {

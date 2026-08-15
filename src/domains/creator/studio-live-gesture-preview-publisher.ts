@@ -17,6 +17,13 @@ import {
 import type { DrawEl } from "./studio-element-model";
 
 export const STUDIO_LIVE_GESTURE_PREVIEW_PUBLISH_INTERVAL_MS = 40;
+export const STUDIO_LIVE_GESTURE_PREVIEW_BYTE_REFILL_PER_SECOND = 512 * 1_024;
+export const STUDIO_LIVE_GESTURE_PREVIEW_BYTE_BURST = 128 * 1_024;
+export const STUDIO_LIVE_GESTURE_PREVIEW_CONTROL_BYTE_REFILL_PER_SECOND = 8 * 1_024;
+export const STUDIO_LIVE_GESTURE_PREVIEW_CONTROL_BYTE_BURST = 8 * 1_024;
+export const STUDIO_LIVE_GESTURE_PREVIEW_END_DRAIN_DEADLINE_MS = 2_000;
+
+const UTF8_ENCODER = new TextEncoder();
 
 const PREVIEW_BLEND_MODE_SET: ReadonlySet<string> = new Set(
   STUDIO_LIVE_GESTURE_PREVIEW_BLEND_MODES,
@@ -33,11 +40,22 @@ export interface StudioLiveGesturePreviewPublisherScheduler {
   clearTimeout(handle: unknown): void;
 }
 
+export interface StudioLiveGesturePreviewPublisherByteBudgetOptions {
+  /** Test/deployment override; production values are capped at the room-safe default. */
+  readonly refillBytesPerSecond?: number;
+  readonly burstBytes?: number;
+  /** A small reserve that only begin/end/cancel may borrow when the main bucket is empty. */
+  readonly controlRefillBytesPerSecond?: number;
+  readonly controlBurstBytes?: number;
+  readonly endDrainDeadlineMs?: number;
+}
+
 export interface StudioLiveGesturePreviewPublisherOptions {
   /** Returns false when the collaboration room cannot accept the packet. */
   readonly publish: (payload: StudioLiveGesturePreviewPayload) => boolean;
   readonly scheduler?: StudioLiveGesturePreviewPublisherScheduler;
   readonly intervalMs?: number;
+  readonly byteBudget?: StudioLiveGesturePreviewPublisherByteBudgetOptions;
   readonly onError?: (cause: unknown) => void;
 }
 
@@ -59,8 +77,13 @@ interface ActiveGesture {
   lastSentAt: number;
   pendingElement: DrawEl | null;
   endRequested: boolean;
+  endDeadlineAt: number | null;
+  retryNotBefore: number;
   lastShapeFingerprint: string | null;
 }
+
+type PreviewSendOutcome = "sent" | "budget" | "transport";
+type PreviewFlushOutcome = "sent" | "noop" | "budget" | "failed";
 
 const DEFAULT_SCHEDULER: StudioLiveGesturePreviewPublisherScheduler = {
   now: () => Date.now(),
@@ -337,7 +360,15 @@ export class StudioLiveGesturePreviewPublisher {
   readonly #publish: (payload: StudioLiveGesturePreviewPayload) => boolean;
   readonly #scheduler: StudioLiveGesturePreviewPublisherScheduler;
   readonly #intervalMs: number;
+  readonly #refillBytesPerSecond: number;
+  readonly #burstBytes: number;
+  readonly #controlRefillBytesPerSecond: number;
+  readonly #controlBurstBytes: number;
+  readonly #endDrainDeadlineMs: number;
   readonly #onError: (cause: unknown) => void;
+  #availableBytes: number;
+  #availableControlBytes: number;
+  #budgetUpdatedAt: number;
   #active: ActiveGesture | null = null;
   #timer: unknown = null;
   #disposed = false;
@@ -346,9 +377,41 @@ export class StudioLiveGesturePreviewPublisher {
     this.#publish = options.publish;
     this.#scheduler = options.scheduler ?? DEFAULT_SCHEDULER;
     this.#intervalMs = finite(options.intervalMs)
-      ? Math.max(1, Math.trunc(options.intervalMs!))
+      ? Math.max(
+          STUDIO_LIVE_GESTURE_PREVIEW_PUBLISH_INTERVAL_MS,
+          Math.trunc(options.intervalMs!),
+        )
       : STUDIO_LIVE_GESTURE_PREVIEW_PUBLISH_INTERVAL_MS;
+    const budget = options.byteBudget;
+    this.#refillBytesPerSecond = this.#boundedBudgetOption(
+      budget?.refillBytesPerSecond,
+      STUDIO_LIVE_GESTURE_PREVIEW_BYTE_REFILL_PER_SECOND,
+    );
+    this.#burstBytes = this.#boundedBudgetOption(
+      budget?.burstBytes,
+      STUDIO_LIVE_GESTURE_PREVIEW_BYTE_BURST,
+    );
+    this.#controlRefillBytesPerSecond = this.#boundedBudgetOption(
+      budget?.controlRefillBytesPerSecond,
+      STUDIO_LIVE_GESTURE_PREVIEW_CONTROL_BYTE_REFILL_PER_SECOND,
+    );
+    this.#controlBurstBytes = this.#boundedBudgetOption(
+      budget?.controlBurstBytes,
+      STUDIO_LIVE_GESTURE_PREVIEW_CONTROL_BYTE_BURST,
+    );
+    this.#endDrainDeadlineMs = finite(budget?.endDrainDeadlineMs)
+      ? Math.max(
+          this.#intervalMs,
+          Math.min(
+            STUDIO_LIVE_GESTURE_PREVIEW_END_DRAIN_DEADLINE_MS,
+            Math.trunc(budget.endDrainDeadlineMs),
+          ),
+        )
+      : STUDIO_LIVE_GESTURE_PREVIEW_END_DRAIN_DEADLINE_MS;
     this.#onError = options.onError ?? (() => undefined);
+    this.#availableBytes = this.#burstBytes;
+    this.#availableControlBytes = this.#controlBurstBytes;
+    this.#budgetUpdatedAt = this.#scheduler.now();
   }
 
   get activeGestureId(): string | null {
@@ -359,7 +422,8 @@ export class StudioLiveGesturePreviewPublisher {
     if (this.#disposed) return false;
     if (this.#active) this.cancel();
     const plan = beginPayload(input);
-    if (!plan || !this.#send(plan.payload)) return false;
+    if (!plan || this.#send(plan.payload, true) !== "sent") return false;
+    const now = this.#scheduler.now();
     this.#active = {
       gestureId: input.element.id,
       pageId: input.pageId,
@@ -369,11 +433,13 @@ export class StudioLiveGesturePreviewPublisher {
       sentSamples: plan.payload.samples ?? null,
       nextSeq: 2,
       nextSampleIndex: plan.sampleCount,
-      lastSentAt: this.#scheduler.now(),
+      lastSentAt: now,
       pendingElement: plan.sampleCount < Math.floor(input.element.points.length / 2)
         ? input.element
         : null,
       endRequested: false,
+      endDeadlineAt: null,
+      retryNotBefore: now,
       lastShapeFingerprint: plan.shapeFingerprint,
     };
     if (this.#active.pendingElement) this.#schedule();
@@ -441,7 +507,12 @@ export class StudioLiveGesturePreviewPublisher {
       if (!accepted) return false;
     }
     active.endRequested = true;
-    return this.flush();
+    active.endDeadlineAt = this.#scheduler.now() + this.#endDrainDeadlineMs;
+    if (active.pendingElement) {
+      this.#schedule();
+      return true;
+    }
+    return this.#finishEnd(active);
   }
 
   #finishEnd(active: ActiveGesture): boolean {
@@ -453,9 +524,23 @@ export class StudioLiveGesturePreviewPublisher {
       phase: "end",
       operation: active.operation,
     });
-    const sent = payload ? this.#send(payload) : false;
-    this.#clearActive();
-    return sent;
+    if (!payload) {
+      this.#clearActive();
+      return false;
+    }
+    const outcome = this.#send(payload, true);
+    if (outcome === "sent") {
+      this.#clearActive();
+      return true;
+    }
+    if (outcome === "transport") {
+      this.#clearActive();
+      return false;
+    }
+    if (this.#drainDeadlineReached(active)) return this.#failClosedDrain(active);
+    active.retryNotBefore = this.#scheduler.now() + this.#intervalMs;
+    this.#schedule();
+    return true;
   }
 
   cancel(gestureId?: string): boolean {
@@ -470,7 +555,7 @@ export class StudioLiveGesturePreviewPublisher {
       phase: "cancel",
       operation: active.operation,
     });
-    const sent = payload ? this.#send(payload) : false;
+    const sent = payload ? this.#send(payload, true) === "sent" : false;
     this.#active = null;
     return sent;
   }
@@ -479,16 +564,32 @@ export class StudioLiveGesturePreviewPublisher {
     this.#cancelTimer();
     const active = this.#active;
     if (!active) return false;
+    const now = this.#scheduler.now();
     if (!active.pendingElement) {
       return active.endRequested ? this.#finishEnd(active) : true;
     }
+    if (
+      now < active.retryNotBefore
+      || now - active.lastSentAt < this.#intervalMs
+    ) {
+      if (this.#drainDeadlineReached(active)) return this.#failClosedDrain(active);
+      this.#schedule();
+      return true;
+    }
     const element = active.pendingElement;
-    active.pendingElement = null;
-    const sent = active.operation === "shape"
+    const outcome = active.operation === "shape"
       ? this.#flushShape(active, element)
       : this.#flushSamples(active, element);
-    if (!sent || this.#active !== active) return sent;
+    if (outcome === "failed" || this.#active !== active) return false;
+    if (outcome === "budget") {
+      if (this.#drainDeadlineReached(active)) return this.#failClosedDrain(active);
+      active.retryNotBefore = now + this.#intervalMs;
+      this.#schedule();
+      return true;
+    }
+    active.retryNotBefore = now;
     if (active.pendingElement) {
+      if (this.#drainDeadlineReached(active)) return this.#failClosedDrain(active);
       this.#schedule();
       return true;
     }
@@ -502,11 +603,17 @@ export class StudioLiveGesturePreviewPublisher {
     this.#cancelTimer();
   }
 
-  #flushShape(active: ActiveGesture, element: DrawEl): boolean {
+  #flushShape(active: ActiveGesture, element: DrawEl): PreviewFlushOutcome {
     const shape = shapeOf(element);
-    if (!shape || !this.#rendererStillMatches(element, active)) return this.#abortMalformed();
+    if (!shape || !this.#rendererStillMatches(element, active)) {
+      this.#abortMalformed();
+      return "failed";
+    }
     const fingerprint = payloadFingerprint(shape);
-    if (fingerprint === active.lastShapeFingerprint) return true;
+    if (fingerprint === active.lastShapeFingerprint) {
+      if (active.pendingElement === element) active.pendingElement = null;
+      return "noop";
+    }
     const payload = parsedPayload({
       version: STUDIO_LIVE_GESTURE_PREVIEW_VERSION,
       gestureId: active.gestureId,
@@ -516,23 +623,42 @@ export class StudioLiveGesturePreviewPublisher {
       operation: "shape",
       shape,
     });
-    if (!payload || !this.#send(payload)) return this.#dropAfterTransportFailure();
+    if (!payload) {
+      this.#abortMalformed();
+      return "failed";
+    }
+    const outcome = this.#send(payload, false);
+    if (outcome === "budget") return "budget";
+    if (outcome === "transport") {
+      this.#dropAfterTransportFailure();
+      return "failed";
+    }
     active.nextSeq += 1;
     active.lastSentAt = this.#scheduler.now();
     active.lastShapeFingerprint = fingerprint;
-    return true;
+    if (active.pendingElement === element) active.pendingElement = null;
+    return "sent";
   }
 
-  #flushSamples(active: ActiveGesture, element: DrawEl): boolean {
-    if (!this.#rendererStillMatches(element, active)) return this.#abortMalformed();
+  #flushSamples(active: ActiveGesture, element: DrawEl): PreviewFlushOutcome {
+    if (!this.#rendererStillMatches(element, active)) {
+      this.#abortMalformed();
+      return "failed";
+    }
     const totalSamples = Math.floor(element.points.length / 2);
     if (
       totalSamples < active.nextSampleIndex
       || totalSamples > STUDIO_LIVE_GESTURE_PREVIEW_MAX_SAMPLES_PER_GESTURE
       || !this.#channelsRemainAligned(element, active.sampleChannelKeys, totalSamples)
-    ) return this.#abortMalformed();
+    ) {
+      this.#abortMalformed();
+      return "failed";
+    }
 
-    if (active.nextSampleIndex >= totalSamples) return true;
+    if (active.nextSampleIndex >= totalSamples) {
+      if (active.pendingElement === element) active.pendingElement = null;
+      return "noop";
+    }
     const startIndex = active.nextSampleIndex;
     let chunkSize = Math.min(
       STUDIO_LIVE_GESTURE_PREVIEW_MAX_SAMPLES_PER_MESSAGE,
@@ -560,14 +686,26 @@ export class StudioLiveGesturePreviewPublisher {
       if (payload || chunkSize === 1) break;
       chunkSize = Math.max(1, Math.floor(chunkSize / 2));
     }
-    if (!payload) return this.#abortMalformed();
-    if (!this.#send(payload)) return this.#dropAfterTransportFailure();
+    if (!payload) {
+      this.#abortMalformed();
+      return "failed";
+    }
+    const outcome = this.#send(payload, false);
+    if (outcome === "budget") return "budget";
+    if (outcome === "transport") {
+      this.#dropAfterTransportFailure();
+      return "failed";
+    }
     active.nextSeq += 1;
     active.nextSampleIndex += chunkSize;
     active.sentSamples = appendSentSamples(active.sentSamples, payload.samples!);
     active.lastSentAt = this.#scheduler.now();
-    if (active.nextSampleIndex < totalSamples) active.pendingElement = element;
-    return true;
+    if (active.nextSampleIndex < totalSamples) {
+      active.pendingElement = element;
+    } else if (active.pendingElement === element) {
+      active.pendingElement = null;
+    }
+    return "sent";
   }
 
   #rendererStillMatches(element: DrawEl, active: ActiveGesture): boolean {
@@ -596,21 +734,39 @@ export class StudioLiveGesturePreviewPublisher {
     return false;
   }
 
-  #send(payload: StudioLiveGesturePreviewPayload): boolean {
+  #send(
+    payload: StudioLiveGesturePreviewPayload,
+    mayUseControlCredit: boolean,
+  ): PreviewSendOutcome {
+    const byteLength = this.#payloadByteLength(payload);
+    if (byteLength === null) return "transport";
+    const now = this.#scheduler.now();
+    this.#refillBudget(now);
+    const mainSpend = Math.min(this.#availableBytes, byteLength);
+    const controlSpend = byteLength - mainSpend;
+    if (
+      controlSpend > 0
+      && (!mayUseControlCredit || controlSpend > this.#availableControlBytes)
+    ) return "budget";
     try {
-      return this.#publish(payload);
+      if (!this.#publish(payload)) return "transport";
     } catch (cause) {
       this.#onError(cause);
-      return false;
+      return "transport";
     }
+    this.#availableBytes -= mainSpend;
+    this.#availableControlBytes -= controlSpend;
+    return "sent";
   }
 
   #schedule(): void {
     if (this.#timer !== null || !this.#active) return;
-    const delay = Math.max(
-      0,
-      this.#intervalMs - (this.#scheduler.now() - this.#active.lastSentAt),
-    );
+    const now = this.#scheduler.now();
+    const active = this.#active;
+    let dueAt = Math.max(now, active.retryNotBefore);
+    if (active.pendingElement) dueAt = Math.max(dueAt, active.lastSentAt + this.#intervalMs);
+    if (active.endDeadlineAt !== null) dueAt = Math.min(dueAt, active.endDeadlineAt);
+    const delay = Math.max(0, dueAt - now);
     this.#timer = this.#scheduler.setTimeout(() => {
       this.#timer = null;
       this.flush();
@@ -626,5 +782,52 @@ export class StudioLiveGesturePreviewPublisher {
   #clearActive(): void {
     this.#cancelTimer();
     this.#active = null;
+  }
+
+  #boundedBudgetOption(value: number | undefined, maximum: number): number {
+    if (!finite(value)) return maximum;
+    return Math.max(0, Math.min(maximum, Math.trunc(value)));
+  }
+
+  #payloadByteLength(payload: StudioLiveGesturePreviewPayload): number | null {
+    try {
+      return UTF8_ENCODER.encode(JSON.stringify(payload)).byteLength;
+    } catch (cause) {
+      this.#onError(cause);
+      return null;
+    }
+  }
+
+  #refillBudget(now: number): void {
+    const elapsedMs = Math.max(0, now - this.#budgetUpdatedAt);
+    if (elapsedMs <= 0) return;
+    this.#availableBytes = Math.min(
+      this.#burstBytes,
+      this.#availableBytes + (elapsedMs * this.#refillBytesPerSecond) / 1_000,
+    );
+    this.#availableControlBytes = Math.min(
+      this.#controlBurstBytes,
+      this.#availableControlBytes
+        + (elapsedMs * this.#controlRefillBytesPerSecond) / 1_000,
+    );
+    this.#budgetUpdatedAt = now;
+  }
+
+  #drainDeadlineReached(active: ActiveGesture): boolean {
+    return active.endDeadlineAt !== null && this.#scheduler.now() >= active.endDeadlineAt;
+  }
+
+  #failClosedDrain(active: ActiveGesture): false {
+    const payload = parsedPayload({
+      version: STUDIO_LIVE_GESTURE_PREVIEW_VERSION,
+      gestureId: active.gestureId,
+      pageId: active.pageId,
+      seq: active.nextSeq,
+      phase: "cancel",
+      operation: active.operation,
+    });
+    if (payload) this.#send(payload, true);
+    this.#clearActive();
+    return false;
   }
 }
