@@ -460,10 +460,13 @@ function mean(values: readonly number[]): number {
  * each hair into short runs lets the load change as the brush travels. Runs share their boundary
  * station with the next run, so the hair stays continuous.
  */
-const BRISTLE_RUN_STATIONS = 5;
+const BRISTLE_RUN_STATIONS = 3;
 
 /** Stations each successive hair shifts its run boundaries by. Coprime-ish with the run length. */
-const BRISTLE_RUN_PHASE_STRIDE = 2;
+const BRISTLE_RUN_PHASE_STRIDE = 1;
+
+/** Normalised load below which a hair is off the paper and deposits nothing at all. */
+const BRISTLE_DRY_LIFTOFF = 0.2;
 
 /**
  * Load bands the runs of one width gauge are quantised into - the stroke's tonal resolution.
@@ -654,6 +657,13 @@ function planBristleLanes(
     );
     for (const run of gauge.runs) {
       const normalized = span > POINT_EPSILON ? (run.load - minimumLoad) / span : 0;
+      // A hair that runs out of paint lifts off the paper. Without this every hair painted the
+      // full length of the stroke at SOME opacity - the virtual-overlap fold guarantees it, since
+      // `1 - (1-a)^6` turns even a 0.015 load into 0.087 - so the bed rendered as seven unbroken
+      // parallel ribbons, which is the grain of plywood rather than the mark of a brush. Skipping
+      // the driest runs is what breaks those ribbons into the interrupted, skipping stroke that
+      // reads as bristle. It removes deposit that was never physical to begin with.
+      if (normalized < BRISTLE_DRY_LIFTOFF) continue;
       const band = Math.min(
         BRISTLE_LOAD_BANDS - 1,
         Math.floor(normalized * BRISTLE_LOAD_BANDS),

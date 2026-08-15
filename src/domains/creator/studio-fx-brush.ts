@@ -1425,7 +1425,7 @@ function bristleLoadAlongTravel(
  * top out at 0.88 and the two corrections are budgeted against the 0.12 that is left.
  */
 const BRISTLE_PITCH_JITTER = 0.05;
-const BRISTLE_DRIFT_AMPLITUDE = 0.06;
+const BRISTLE_DRIFT_AMPLITUDE = 0.1;
 /** Longer than the load's wavelength: a hair should wander over the stroke, not vibrate. */
 const BRISTLE_DRIFT_WAVELENGTH_STATIONS = 34;
 
