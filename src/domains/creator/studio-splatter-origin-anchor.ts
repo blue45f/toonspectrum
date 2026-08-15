@@ -17,10 +17,41 @@ export const STUDIO_SPLATTER_ORIGIN_ANCHOR_DIAMETER_RATIO = 0.32 as const;
 export const STUDIO_SPLATTER_ORIGIN_ANCHOR_MIN_DIAMETER = 3 as const;
 export const STUDIO_SPLATTER_ORIGIN_ANCHOR_MAX_DIAMETER = 18 as const;
 
+/**
+ * Brushes whose first dab lands farther than one nib RADIUS from the pointer.
+ *
+ * That is this module's own criterion - "scatters that dab farther than one nib width" - and it
+ * was only ever applied to `splatter`, even though the same measurement finds nine more brushes
+ * doing it. The brush gate caught two of them intermittently as "fast short stroke produced no
+ * visible pixels", which is this defect seen from the outside: a flick short enough to be mostly
+ * dab zero deposits its whole mark somewhere the artist did not press.
+ *
+ * Measured on a 37px flick at a 24px nib (first-dab offset in nib radii):
+ *   flame-tongue-spark 7.99 · focus-ray-streak 4.11 · spray-noise-fine 1.54 · splatter 1.49 ·
+ *   dust-mote-depth 1.43 · hair-curl-ribbon 1.32 · stage-safe-splatter 1.22 · fur-soft-clumps 1.18
+ *   · flower-petal-scatter 1.13 · hatching-contour-rake 1.08
+ *
+ * Brushes below 1.0 keep their unanchored behaviour, so this is not a blanket change: the anchor
+ * costs one small extra mark on the tap dab only, and every scattered flake stays authoritative.
+ */
+const STUDIO_ORIGIN_ANCHOR_BRUSH_IDS: ReadonlySet<string> = new Set([
+  "splatter",
+  "flame-tongue-spark",
+  "focus-ray-streak",
+  "spray-noise-fine",
+  "dust-mote-depth",
+  "hair-curl-ribbon",
+  "stage-safe-splatter",
+  "fur-soft-clumps",
+  "flower-petal-scatter",
+  "hatching-contour-rake",
+]);
+
 export function studioDynamicBrushUsesSplatterOriginAnchor(
   materialIdentity: StudioDynamicBrushMaterialIdentity | null | undefined,
 ): boolean {
-  return materialIdentity?.brushId === "splatter";
+  const brushId = materialIdentity?.brushId;
+  return typeof brushId === "string" && STUDIO_ORIGIN_ANCHOR_BRUSH_IDS.has(brushId);
 }
 
 export function studioSplatterOriginAnchorMarkCount(
