@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import { planOilBrushDabs } from "./studio-fx-brush";
 import {
   planStudioOilRibbonCarrier,
+  STUDIO_OIL_BRISTLE_WIDTH_GAUGES,
   studioOilRibbonPathData,
 } from "./studio-oil-ribbon-carrier";
 
@@ -77,13 +78,35 @@ describe("Studio oil/acrylic ribbon raster crossing quality", () => {
       seed: 41,
     }));
 
-    // Every run of a band is a subpath of ONE paint operation, so where the figure-eight crosses
-    // itself the band's coverage is rasterised before compositing and the ridge is laid down once.
+    // Every run of a lane is a subpath of ONE paint operation, so where the figure-eight crosses
+    // itself the lane's coverage is rasterised before compositing and the ridge is laid down once.
     // This is the structural guarantee the luminance probe below can only sample.
-    expect(carrier.bristleLanes.length).toBeLessThanOrEqual(3);
+    //
+    // A lane count is NOT that guarantee, which is why the old `<= 3` bound is gone. What bounds a
+    // crossing is how many lanes can fold on ONE pixel, and the lanes are cumulative shells: within
+    // a width gauge, lane k carries every run of load band >= k, so the runs are nested and a
+    // crossing of bands i and m is covered by shells 0..max(i, m) - the fold telescopes to the
+    // heavier arm's own deposit no matter how many bands exist. Only the gauges fold against each
+    // other, so the two assertions below are the real bound: gauges are few, and each gauge's
+    // lanes nest.
     expect(carrier.bristleLanes.length).toBeGreaterThan(0);
-    expect(new Set(carrier.bristleLanes.map(({ loadBand }) => loadBand)).size)
-      .toBe(carrier.bristleLanes.length);
+    const gauges = new Map<number, typeof carrier.bristleLanes[number][]>();
+    for (const lane of carrier.bristleLanes) {
+      gauges.set(lane.lineWidth, [...(gauges.get(lane.lineWidth) ?? []), lane]);
+    }
+    expect(gauges.size).toBeLessThanOrEqual(STUDIO_OIL_BRISTLE_WIDTH_GAUGES);
+    for (const [lineWidth, lanes] of gauges) {
+      // Nesting, and with it the telescoping fold, only holds if the shells repaint IDENTICAL
+      // geometry — hence one lineWidth per gauge, asserted by the grouping key itself.
+      expect(lineWidth, "gauge stroke width").toBeGreaterThan(0);
+      for (let index = 1; index < lanes.length; index += 1) {
+        const outer = new Set(lanes[index - 1]!.runs.map((run) => run.points.join(",")));
+        const inner = lanes[index]!.runs.map((run) => run.points.join(","));
+        expect(inner.length, `shell ${index} must shrink`).toBeLessThan(outer.size);
+        for (const run of inner) expect(outer.has(run), `shell ${index} run escaped`).toBe(true);
+        expect(lanes[index]!.loadBand).toBeGreaterThan(lanes[index - 1]!.loadBand);
+      }
+    }
     for (const lane of carrier.bristleLanes) {
       // A lane must deposit something, but it is NOT required to be fragmented. The old
       // `> 1` bound encoded the white-noise load model, where a hair flipped loaded/dry every

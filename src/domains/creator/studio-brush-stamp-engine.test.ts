@@ -233,9 +233,38 @@ describe("studio stamp brush engine", () => {
       const state = beginStampWalker(0, 0, 0.8);
       walkStampSegment(fast.context, style("ink"), state, 90, 0, 0.8);
     }
-    expect(Math.max(...fast.dabs.map((d) => d.r))).toBeLessThan(
-      Math.max(...slow.dabs.map((d) => d.r))
-    );
+    // Measured on the SETTLED body, not on the maximum. Both strokes start from rest — the pen has
+    // no speed at the instant it touches down — so both now open at full width and the velocity
+    // response eases in over the first few dabs. Comparing maxima therefore compares two identical
+    // heads and says nothing about thinning; it passed before only because the fast stroke's very
+    // first dab was attenuated by a speed it had not travelled yet, which is the head blob this
+    // easing removed (1.470x its own body radius, in one dab).
+    const settled = (dabs: readonly { r: number }[]): number => dabs.at(-1)!.r;
+    expect(settled(fast.dabs)).toBeLessThan(settled(slow.dabs));
+    // And the head is the same width in both, which is the other half of the contract.
+    expect(fast.dabs[0]!.r).toBeCloseTo(slow.dabs[0]!.r, 6);
+  });
+
+  it("opens a fast ink stroke without a step between the head and the body", () => {
+    // A fast stroke pins inkVelocityFactor at its 0.35 floor, so before the easing the stroke went
+    // from a full-width first dab straight to a 0.35 body — a visible blob at the head of every
+    // quick ink line. The contract is that the width falls off continuously instead.
+    const fast = recordingContext();
+    const state = beginStampWalker(0, 0, 0.8);
+    for (let step = 1; step <= 6; step += 1) {
+      walkStampSegment(fast.context, style("ink"), state, step * 90, 0, 0.8);
+    }
+    const radii = fast.dabs.map((dab) => dab.r);
+    expect(radii.length).toBeGreaterThan(8);
+    // Falls to the body width, so the velocity response is still doing its job…
+    expect(Math.min(...radii)).toBeLessThan(radii[0]! * 0.75);
+    // …but never in one step. The largest single-dab drop bounds the visible discontinuity; the
+    // pre-easing plan measured 1.470 here.
+    let steepest = 1;
+    for (let index = 1; index < radii.length; index += 1) {
+      steepest = Math.max(steepest, radii[index - 1]! / Math.max(1e-6, radii[index]!));
+    }
+    expect(steepest).toBeLessThan(1.28);
   });
 
   it("flow builds up: airbrush dab alpha stays below stroke opacity", () => {

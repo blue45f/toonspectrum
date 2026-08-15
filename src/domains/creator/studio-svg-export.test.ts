@@ -1499,12 +1499,18 @@ describe("도형 직렬화", () => {
     // per hair let a self-crossing deposit its ridges twice; one path per band deposits once.
     const bristlePaths = svg.match(/data-paint-bristle-lane="true"/gu) ?? [];
     expect(bristlePaths.length).toBeGreaterThan(0);
-    // Oil/acrylic bristle relief may emit up to three directional lanes on long curves.
-    expect(bristlePaths.length).toBeLessThanOrEqual(3);
-    // Each band still has to be a genuinely broken relief rather than one polyline.
-    for (const lanePath of svg.match(/data-paint-bristle-lane="true" d="([^"]+)"/gu) ?? []) {
-      expect((lanePath.match(/M/gu) ?? []).length).toBeGreaterThan(1);
-    }
+    // No upper bound on the lane count. Lanes are cumulative load shells, so the count is the
+    // stroke's tonal resolution; what a crossing folds is the number of width gauges, which the
+    // carrier's own pixel gate pins. Capping the count here would cap tone for a reason that
+    // stopped applying when the shells landed.
+    //
+    // The relief must still be genuinely broken rather than one polyline, but only the OUTERMOST
+    // shell of a gauge carries the whole population - inner shells hold the heaviest runs alone
+    // and a single-subpath inner shell is the intended shape, not a regression. Assert the union.
+    const laneSubpaths = [...svg.matchAll(/data-paint-bristle-lane="true" d="([^"]+)"/gu)]
+      .map(([, d]) => (d!.match(/M/gu) ?? []).length);
+    expect(laneSubpaths.length).toBe(bristlePaths.length);
+    expect(Math.max(...laneSubpaths)).toBeGreaterThan(1);
     expect(svg).not.toContain("<ellipse");
     expect(exportPageToSvg(page([rectEl({
       id: "acrylic-contiguous-ribbon",

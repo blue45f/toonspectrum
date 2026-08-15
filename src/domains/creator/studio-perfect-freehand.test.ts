@@ -340,3 +340,36 @@ describe("buildStudioPerfectFreehandOutline / PathData (실제 getStroke 주입)
     expect(receivedEndTaper).toBe(12 * gpenProfile.taperEndFactor);
   });
 });
+
+/**
+ * 카탈로그가 "perfect-outline" 엔진이라고 선언한 레인은 실제로 그 엔진으로 그려져야 한다.
+ *
+ * 이 게이트가 없던 동안 pen--perfect-taper 와 calligraphy--perfect-chisel 이 조용히 빠져 있었다.
+ * resolveStudioPerfectFreehandProfile 이 null 을 돌려주면 렌더러는 가변 폭 아웃라인 분기를 아예
+ * 타지 않고 균일 굵기 폴리라인으로 떨어지는데, 선언과 다르다는 신호가 어디에도 없어서 두
+ * 브러시는 테이퍼 없는 뭉툭한 시작·끝으로 출하돼 있었다. 브러시 id 를 여기 하드코딩하는 대신
+ * 카탈로그를 원본으로 삼아, 앞으로 추가되는 레인도 같은 방식으로 빠지지 않게 한다.
+ */
+describe("perfect-outline 레인 계약", () => {
+  it("perfect-outline 로 선언된 모든 레인이 canonical 프로필을 실제로 해석한다", async () => {
+    const { STUDIO_BRUSH_ENGINE_LANE_CATALOG_ROWS } = await import(
+      "./studio-brush-engine-lane-catalog"
+    );
+    const { STUDIO_BRUSH_RUNTIME_CONTRACT } = await import(
+      "./studio-brush-runtime-contract"
+    );
+    const rows = [
+      ...STUDIO_BRUSH_ENGINE_LANE_CATALOG_ROWS,
+      ...STUDIO_BRUSH_RUNTIME_CONTRACT,
+    ].filter((row) => row.engine === "perfect-outline");
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      const resolved = resolveStudioPerfectFreehandProfile(row.id);
+      expect(resolved, `${row.id} 가 perfect-freehand 프로필을 해석하지 못한다`).not.toBeNull();
+      // 프로필은 행이 canonicalId 로 지목한 브러시의 것과 같아야 한다. 어떤 프로필이든
+      // 붙기만 하면 통과하는 게이트는, 잘못된 프로필이 붙는 경우를 잡지 못한다.
+      expect(resolved!.id, `${row.id} 의 프로필이 canonicalId 와 어긋난다`)
+        .toBe(resolveStudioPerfectFreehandProfile(row.canonicalId)?.id);
+    }
+  });
+});

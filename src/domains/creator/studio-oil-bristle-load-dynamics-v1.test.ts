@@ -7,7 +7,10 @@ import {
   STUDIO_OIL_BRISTLE_LOAD_DYNAMICS_PROVENANCE,
   STUDIO_OIL_BRISTLE_LOAD_DYNAMICS_V1_VERSION,
 } from "./studio-oil-bristle-load-dynamics-v1";
-import { planStudioOilRibbonCarrier } from "./studio-oil-ribbon-carrier";
+import {
+  planStudioOilRibbonCarrier,
+  STUDIO_OIL_BRISTLE_WIDTH_GAUGES,
+} from "./studio-oil-ribbon-carrier";
 
 const LANES = 7;
 
@@ -218,17 +221,27 @@ describe("oil ribbon carrier × bristle load dynamics program flag", () => {
     });
     const legacy = planStudioOilRibbonCarrier(dabs);
     const strokeMidX = 1_000;
+    // Runs are counted ONCE each, keyed by geometry, because lanes are cumulative shells: a run in
+    // load band m is repainted by shells 0..m, so walking `lane.runs` naively counts a loaded run
+    // m+1 times in the denominator and once in the numerator, which drives the share toward zero
+    // for exactly the runs the assertion is about. A run's band is the highest `loadBand` among the
+    // shells carrying it — the innermost shell it survives into.
     const topBandShare = (plan: typeof legacy, tail: boolean) => {
+      const bandByRun = new Map<string, number>();
+      for (const lane of plan.bristleLanes) {
+        for (const run of lane.runs) {
+          const key = run.points.join(",");
+          bandByRun.set(key, Math.max(bandByRun.get(key) ?? 0, lane.loadBand));
+        }
+      }
       const topBand = Math.max(...plan.bristleLanes.map(({ loadBand }) => loadBand));
       let loaded = 0;
       let total = 0;
-      for (const lane of plan.bristleLanes) {
-        for (const run of lane.runs) {
-          const startX = run.points[0]!;
-          if (tail ? startX < strokeMidX : startX >= strokeMidX) continue;
-          total += 1;
-          if (lane.loadBand === topBand && topBand > 0) loaded += 1;
-        }
+      for (const [key, band] of bandByRun) {
+        const startX = Number.parseFloat(key.slice(0, key.indexOf(",")));
+        if (tail ? startX < strokeMidX : startX >= strokeMidX) continue;
+        total += 1;
+        if (band === topBand && topBand > 0) loaded += 1;
       }
       return total > 0 ? loaded / total : 0;
     };
@@ -248,7 +261,11 @@ describe("oil ribbon carrier × bristle load dynamics program flag", () => {
     });
     expect(dynamic.repeatedBodyStampCount).toBe(0);
     expect(dynamic.bristleLanes.length).toBeGreaterThan(0);
-    expect(dynamic.bristleLanes.length).toBeLessThanOrEqual(3);
+    // No upper bound on the count: lanes are cumulative load shells inside a width gauge, so the
+    // count tracks the tonal resolution rather than how many passes can fold on one pixel. The
+    // fold depth is the gauge count, pinned in studio-oil-ribbon-carrier.pixel.test.ts.
+    expect(new Set(dynamic.bristleLanes.map(({ lineWidth }) => lineWidth)).size)
+      .toBeLessThanOrEqual(STUDIO_OIL_BRISTLE_WIDTH_GAUGES);
     for (const lane of dynamic.bristleLanes) {
       expect(lane.lineWidth).toBeGreaterThan(0);
       expect(lane.opacity).toBeGreaterThanOrEqual(0);

@@ -44,7 +44,9 @@ export type StudioPerfectFreehandBrushId =
   | "maru-pen"
   | "mapping-pen"
   | "kaburapen"
-  | "liner";
+  | "liner"
+  | "pen--perfect-taper"
+  | "calligraphy--perfect-chisel";
 
 /** 퍼펙트-프리핸드 렌더 경로를 쓰는 브러시의 획 성격 — 카탈로그 계약과 함께 감사된다. */
 export interface StudioPerfectFreehandProfile {
@@ -120,6 +122,12 @@ const STUDIO_PERFECT_FREEHAND_PROFILE_BY_BRUSH: Readonly<
   "mapping-pen": "gpen",
   kaburapen: "gpen",
   liner: "gpen",
+  // 엔진 레인 카탈로그가 engine "perfect-outline" 로 선언한 두 레인. 여기에 없으면
+  // resolveStudioPerfectFreehandProfile 이 null 을 돌려주고, 두 브러시는 선언과 달리 가변 폭
+  // 아웃라인도 테이퍼도 없는 균일 굵기 폴리라인으로 그려진다 — 획의 시작과 끝이 뭉툭해지는
+  // 원인이다. 각 행이 canonicalId 로 지목한 프로필을 그대로 쓴다(gpen 계열과 같은 규약).
+  "pen--perfect-taper": "perfect-ink",
+  "calligraphy--perfect-chisel": "perfect-marker",
 };
 
 /** 브러시 id가 연속 가변 폭 아웃라인 경로를 쓰면 프로필, 아니면 null — 렌더러의 단일 판정 지점. */

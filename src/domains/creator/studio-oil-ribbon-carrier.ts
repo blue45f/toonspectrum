@@ -356,16 +356,61 @@ function directionalTap(station: OilCarrierStation): StudioOilRibbonPath {
   });
 }
 
+/**
+ * Directional cap the body overhangs its first and last station by.
+ *
+ * Shared with the bristle lanes on purpose. The body used to own these numbers privately and the
+ * hairs stopped dead at the outermost station, so both ends of every oil stroke were up to 0.96
+ * half-widths of smooth untextured pigment - a blunt blob stuck on a bed that is otherwise all
+ * ridge and furrow, at exactly the two places a viewer looks first. Extracting the shoulder lets
+ * `bristleCapPoint` place hair tips inside the same outline instead of guessing at it.
+ */
+const OIL_BODY_CAP_AXIS_SCALE = 0.56;
+const OIL_BODY_CAP_RADIUS_SCALE = 0.96;
+/** Where the cap's widest point sits, as a fraction of the cap, and its half-width there. */
+const OIL_BODY_CAP_SHOULDER = 0.5;
+const OIL_BODY_CAP_SHOULDER_WIDTH = 0.84;
+
+function bodyCapLength(station: OilCarrierStation): number {
+  return Math.min(
+    station.radiusX * OIL_BODY_CAP_AXIS_SCALE,
+    station.radiusY * OIL_BODY_CAP_RADIUS_SCALE,
+  );
+}
+
+/**
+ * Where a hair carrying `offset` reaches into the cap, one station past the end of the path.
+ *
+ * The tip stops at the cap's shoulder rather than its point, and its offset is scaled by the
+ * shoulder's own half-width, so the hair lands just inside the body outline. Running it to the
+ * point instead would push the outer hairs past the closing pigment and leave them hanging in
+ * open space; leaving the last stretch to smooth body is also what a loaded brush does, since the
+ * film closes over the hairs where they lift off.
+ */
+function bristleCapPoint(
+  station: OilCarrierStation,
+  offset: number,
+  direction: 1 | -1,
+): readonly [number, number] {
+  const reach = bodyCapLength(station) * OIL_BODY_CAP_SHOULDER * direction;
+  return [
+    station.x + station.tangentX * reach + station.normalX * offset * OIL_BODY_CAP_SHOULDER_WIDTH,
+    station.y + station.tangentY * reach + station.normalY * offset * OIL_BODY_CAP_SHOULDER_WIDTH,
+  ];
+}
+
 function variableWidthBody(stations: readonly OilCarrierStation[]): StudioOilRibbonPath {
   const first = stations[0]!;
   const last = stations.at(-1)!;
-  const firstCap = Math.min(first.radiusX * 0.56, first.radiusY * 0.96);
-  const lastCap = Math.min(last.radiusX * 0.56, last.radiusY * 0.96);
+  const firstCap = bodyCapLength(first);
+  const lastCap = bodyCapLength(last);
   const points: number[] = [
     first.x - first.tangentX * firstCap,
     first.y - first.tangentY * firstCap,
-    first.x - first.tangentX * firstCap * 0.5 + first.normalX * first.radiusY * 0.84,
-    first.y - first.tangentY * firstCap * 0.5 + first.normalY * first.radiusY * 0.84,
+    first.x - first.tangentX * firstCap * OIL_BODY_CAP_SHOULDER
+      + first.normalX * first.radiusY * OIL_BODY_CAP_SHOULDER_WIDTH,
+    first.y - first.tangentY * firstCap * OIL_BODY_CAP_SHOULDER
+      + first.normalY * first.radiusY * OIL_BODY_CAP_SHOULDER_WIDTH,
   ];
 
   for (const station of stations) {
@@ -374,13 +419,15 @@ function variableWidthBody(stations: readonly OilCarrierStation[]): StudioOilRib
       station.y + station.normalY * station.radiusY,
     );
   }
+  const lastShoulder = lastCap * OIL_BODY_CAP_SHOULDER;
+  const lastShoulderWidth = last.radiusY * OIL_BODY_CAP_SHOULDER_WIDTH;
   points.push(
-    last.x + last.tangentX * lastCap * 0.5 + last.normalX * last.radiusY * 0.84,
-    last.y + last.tangentY * lastCap * 0.5 + last.normalY * last.radiusY * 0.84,
+    last.x + last.tangentX * lastShoulder + last.normalX * lastShoulderWidth,
+    last.y + last.tangentY * lastShoulder + last.normalY * lastShoulderWidth,
     last.x + last.tangentX * lastCap,
     last.y + last.tangentY * lastCap,
-    last.x + last.tangentX * lastCap * 0.5 - last.normalX * last.radiusY * 0.84,
-    last.y + last.tangentY * lastCap * 0.5 - last.normalY * last.radiusY * 0.84,
+    last.x + last.tangentX * lastShoulder - last.normalX * lastShoulderWidth,
+    last.y + last.tangentY * lastShoulder - last.normalY * lastShoulderWidth,
   );
   for (let index = stations.length - 1; index >= 0; index -= 1) {
     const station = stations[index]!;
@@ -390,8 +437,10 @@ function variableWidthBody(stations: readonly OilCarrierStation[]): StudioOilRib
     );
   }
   points.push(
-    first.x - first.tangentX * firstCap * 0.5 - first.normalX * first.radiusY * 0.84,
-    first.y - first.tangentY * firstCap * 0.5 - first.normalY * first.radiusY * 0.84,
+    first.x - first.tangentX * firstCap * OIL_BODY_CAP_SHOULDER
+      - first.normalX * first.radiusY * OIL_BODY_CAP_SHOULDER_WIDTH,
+    first.y - first.tangentY * firstCap * OIL_BODY_CAP_SHOULDER
+      - first.normalY * first.radiusY * OIL_BODY_CAP_SHOULDER_WIDTH,
   );
   return Object.freeze({ points: quantizedPoints(points) });
 }
@@ -414,30 +463,21 @@ function mean(values: readonly number[]): number {
 const BRISTLE_RUN_STATIONS = 5;
 
 /**
- * Load bands the runs are quantised into.
+ * Load bands the runs of one width gauge are quantised into - the stroke's tonal resolution.
  *
- * Three bands: dry film, mid ridge, and loaded impasto. Each band is still one paint pass so a
- * self-crossing inside a band costs nothing; the extra mid band restores the multi-tone bristle
- * bed competitive oil reads as without returning to per-run compositing knots.
+ * This used to be pinned at three by self-crossings rather than by tone: each band was its own
+ * multiply pass, so N bands folded N alphas wherever a stroke crossed itself and the figure-eight
+ * knot probe went 0.038 -> 0.084 -> 0.123 -> 0.135 (3/6/12/16 bands) against a limit three passes
+ * only just cleared. Raising it bought interior tone and paid for it in dark knots.
+ *
+ * The shells below untie the two: a band's cost at a crossing is now zero regardless of the count,
+ * so the constant is set by tone alone. Measured on a rendered stroke, the share of ink in the two
+ * most-occupied tone bins falls 0.507 (3) -> 0.321 (6) -> 0.280 (12) -> 0.237 (16) -> 0.250 (24),
+ * with entropy 3.41 -> 4.03 -> 4.37 -> 4.55 -> 4.57 bits. Sixteen is the knee: past it bands start
+ * coming up empty (24 requested, 23 populated) and tone stops improving while the shell count, and
+ * with it the repainted geometry, keeps growing.
  */
-/**
- * Three bands, and this is currently a CEILING set by self-crossings rather than by tone.
- *
- * With the band overlap flattened below, raising this is the single biggest tonal win available:
- * measured, 3/8/16/32 bands give 3/8/16/32 distinct lane tones with zero saturated, and the
- * rendered interior's top-two-tone share falls 0.569 -> 0.385 -> 0.302 -> 0.283 (entropy 3.518 ->
- * 4.482 -> 5.029 -> 5.377 bits), with 16 the knee. That is a large, real answer to the flat
- * "단 2색" look.
- *
- * It is not landed because each band is its own multiply pass, so N bands stack N times where a
- * stroke crosses itself: the figure-eight knot probe in studio-oil-ribbon-carrier.pixel.test.ts
- * measures peak 0.347 at 4 bands, 0.283 at 6 and 0.274 at 8 against a 0.25 limit, while 3 passes.
- * Raising the count therefore trades a flat interior for dark knots at every crossing, which is a
- * different visible defect rather than a fix. The unlock is to stop cross-band stacking at a
- * crossing (rasterise the bands' union once, as the per-band contract already does within a band);
- * do that first, then this constant can go to 16.
- */
-const BRISTLE_LOAD_BANDS = 3;
+const BRISTLE_LOAD_BANDS = 16;
 
 /**
  * Virtual overlaps folded into one deposit. See `planStudioOilRibbonCarrier` for the body budget.
@@ -458,10 +498,59 @@ const BRISTLE_LOAD_BANDS = 3;
  */
 const BRISTLE_VIRTUAL_OVERLAPS = 6;
 
+/**
+ * Ridge-width classes the runs are split into before they are banded by load.
+ *
+ * Two jobs, one split. The first is texture: a run's width comes from its own hair
+ * (`0.15 + radiusYRatio * 1.18`, a 9x range across hairs) but the emitted lane can only carry one
+ * `lineWidth`, and the old code averaged that over a whole load band. Load and width are drawn
+ * from independent hashes, so every band's width mean converged on the same global mean and the
+ * bed rendered as hairs of one thickness - a bristle brush whose hairs are all identical is
+ * exactly the "단 2색" flatness read from the other direction.
+ *
+ * The second is a precondition for the load shells below: a shell repaints its members' geometry,
+ * so every run inside one gauge must stroke at the SAME width or a run would be laid down at two
+ * different widths by two shells and halo. Splitting on width first makes each gauge homogeneous
+ * and the shells exact.
+ *
+ * Three gauges, because gauges are the one axis that still folds at a self-crossing (shells remove
+ * the fold inside a gauge but not between them), and three folds is the depth the knot gate is
+ * already measured against.
+ */
+export const STUDIO_OIL_BRISTLE_WIDTH_GAUGES = 2;
+
+/**
+ * Smallest incremental deposit a shell may carry before it is folded into the next one.
+ *
+ * A shell that darkens what is under it by less than one 8-bit step cannot change the rendered
+ * image, but it still costs a full repaint of every run at and above its band. 1/255 is that step;
+ * the bands it absorbs are the ones whose mean loads landed close enough together that they were
+ * going to render as one tone anyway.
+ */
+const BRISTLE_SHELL_VISIBLE_DEPOSIT = 1 / 255;
+
 interface PlannedBristleRun {
   readonly points: readonly number[];
   readonly load: number;
   readonly width: number;
+}
+
+interface BristleWidthGauge {
+  readonly runs: readonly PlannedBristleRun[];
+  readonly lineWidth: number;
+}
+
+/** Equal-count width quantiles, so each gauge is a real population rather than an empty bucket. */
+function widthGauges(planned: readonly PlannedBristleRun[]): readonly BristleWidthGauge[] {
+  const ordered = [...planned].sort((left, right) => left.width - right.width);
+  const gauges: BristleWidthGauge[] = [];
+  const size = Math.ceil(ordered.length / STUDIO_OIL_BRISTLE_WIDTH_GAUGES);
+  for (let start = 0; start < ordered.length; start += size) {
+    const runs = ordered.slice(start, start + size);
+    if (runs.length === 0) continue;
+    gauges.push({ runs, lineWidth: mean(runs.map(({ width }) => width)) });
+  }
+  return gauges;
 }
 
 function planBristleLanes(
@@ -494,10 +583,16 @@ function planBristleLanes(
           ? station.radiusY
             * physics.laneOffsetRatio[index * physics.laneCount + bristleIndex]!
           : station.radiusY * bristle.offsetRatio;
+        // The body overhangs the outermost stations by a directional cap. A hair that stopped at
+        // the station left that cap as smooth pigment, so every oil stroke began and ended with a
+        // blunt untextured head. Reaching one point into the cap - at the same shoulder the body
+        // outline turns on - carries the ridge and furrow all the way to the tip.
+        if (index === 0) points.push(...bristleCapPoint(station, offset, -1));
         points.push(
           station.x + station.normalX * offset,
           station.y + station.normalY * offset,
         );
+        if (index === stations.length - 1) points.push(...bristleCapPoint(station, offset, 1));
       }
       // One representative station per run rather than the run's mean. Averaging is what erased the
       // tooth: the per-station noise is independent, so a mean over six stations shrinks its
@@ -539,44 +634,69 @@ function planBristleLanes(
   if (planned.length === 0) return [];
 
   const span = maximumLoad - minimumLoad;
-  const bands: PlannedBristleRun[][] = Array.from(
-    { length: BRISTLE_LOAD_BANDS },
-    () => [],
-  );
-  for (const run of planned) {
-    const normalized = span > POINT_EPSILON ? (run.load - minimumLoad) / span : 0;
-    const band = Math.min(
-      BRISTLE_LOAD_BANDS - 1,
-      Math.floor(normalized * BRISTLE_LOAD_BANDS),
-    );
-    bands[band]!.push(run);
-  }
-
   const lanes: StudioOilRibbonBristleLane[] = [];
-  for (const [loadBand, runs] of bands.entries()) {
-    if (runs.length === 0) continue;
-    // Flat, deliberately: the bands are ALREADY ordered by load, so scaling the overlap count by
-    // the band index applied that ordering a second time and pushed the top of the load range onto
-    // `accumulatedOpacity`'s 0.96 clamp. That double-count, not the band count, is what made every
-    // oil stroke read as two flat tones - measured across 288 planned strokes, 126 emitted only
-    // TWO distinct lane opacities and none ever exceeded three. At 32 bands the ramp put 24 of
-    // them on exactly 0.96, so the whole upper half of the load range collapsed onto one tone.
-    //
-    // Flat keeps the alphas monotone in load anyway (the load supplies the ordering the ramp was
-    // added to guarantee) and nothing saturates at any band count.
-    const bandOverlap = BRISTLE_VIRTUAL_OVERLAPS;
-    lanes.push(Object.freeze({
-      runs: Object.freeze(runs.map((run) => Object.freeze({
-        points: quantizedPoints(run.points),
-      }))),
-      lineWidth: quantize(mean(runs.map(({ width }) => width))),
-      // One deposit per band: no bead, self-crossing stays a single paint of the ridge.
-      opacity: quantize(accumulatedOpacity(
-        mean(runs.map(({ load }) => load)),
-        bandOverlap,
-      )),
-      loadBand,
-    }));
+  for (const gauge of widthGauges(planned)) {
+    const bands: PlannedBristleRun[][] = Array.from(
+      { length: BRISTLE_LOAD_BANDS },
+      () => [],
+    );
+    for (const run of gauge.runs) {
+      const normalized = span > POINT_EPSILON ? (run.load - minimumLoad) / span : 0;
+      const band = Math.min(
+        BRISTLE_LOAD_BANDS - 1,
+        Math.floor(normalized * BRISTLE_LOAD_BANDS),
+      );
+      bands[band]!.push(run);
+    }
+
+    // Target deposit per band, monotone in load. Flat overlap count, deliberately: the bands are
+    // ALREADY ordered by load, so scaling the overlap count by the band index applied that
+    // ordering a second time and pushed the top of the load range onto `accumulatedOpacity`'s
+    // 0.96 clamp - measured across 288 planned strokes, 126 emitted only TWO distinct lane
+    // opacities and none ever exceeded three.
+    const occupied: { band: number; target: number; runs: PlannedBristleRun[] }[] = [];
+    let previousTarget = 0;
+    for (const [band, runs] of bands.entries()) {
+      if (runs.length === 0) continue;
+      const target = Math.max(
+        previousTarget,
+        accumulatedOpacity(mean(runs.map(({ load }) => load)), BRISTLE_VIRTUAL_OVERLAPS),
+      );
+      occupied.push({ band, target, runs });
+      previousTarget = target;
+    }
+
+    // Cumulative shells, not one pass per band. Shell k carries every run in band >= k, so a
+    // pixel in band m is painted by shells 0..m and its folded transmittance is the telescoping
+    // product of (1 - delta), which is exactly 1 - target(m). Two arms crossing at bands i and m
+    // are jointly covered by shells 0..max(i, m) and each shell is ONE paint, so the crossing
+    // lands on max(target) instead of folding both - the knot cost of a band goes to zero and the
+    // count stops being capped by self-crossings.
+    let carried = 0;
+    for (let index = 0; index < occupied.length; index += 1) {
+      const entry = occupied[index]!;
+      // Incremental deposit that lands the fold on this band's target given everything already
+      // laid by the shells outside it.
+      const delta = carried >= 1
+        ? 0
+        : clamp(1 - (1 - entry.target) / (1 - carried), 0, 1);
+      // A shell repaints every run at and above its band, so it is the most expensive thing this
+      // planner emits - measured, the shells raise an oil stroke's lane path data about 6x. One
+      // whose deposit cannot survive 8-bit quantisation is pure cost, so it is absorbed rather
+      // than emitted: `carried` is deliberately NOT advanced, which leaves the skipped band's
+      // target to the next shell that IS worth painting, so tone stays exact instead of drifting.
+      if (delta < BRISTLE_SHELL_VISIBLE_DEPOSIT) continue;
+      carried = entry.target;
+      const shell = occupied.slice(index).flatMap(({ runs }) => runs);
+      lanes.push(Object.freeze({
+        runs: Object.freeze(shell.map((run) => Object.freeze({
+          points: quantizedPoints(run.points),
+        }))),
+        lineWidth: quantize(gauge.lineWidth),
+        opacity: quantize(delta),
+        loadBand: entry.band,
+      }));
+    }
   }
   return Object.freeze(lanes);
 }

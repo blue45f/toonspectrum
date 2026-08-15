@@ -123,6 +123,29 @@ function coveredCount(raster: Raster): number {
  * Narrow dimension, in samples, of the uncovered region a lost sample sits in. A retraction that
  * only shaves the outline leaves a sliver whose narrowest run is a sample or two wide.
  */
+/**
+ * Is this sample deep inside the reference shape rather than on its silhouette?
+ *
+ * `narrowestUncoveredRun` only means "how wide is the hole" for a sample the reference says should
+ * be surrounded by ink. On the silhouette it measures something else entirely: the run walks
+ * straight out of the shape into open paper and returns its 64-step cap, so a retraction of ONE
+ * sample at the outer edge - the sub-pixel boundary band this contract explicitly permits - was
+ * scored as a 4-document-pixel gap. Filtering here rather than loosening the bound keeps the bound
+ * meaningful; interior losses are still probed, and the pressure-ramp stroke exercises that path
+ * with 18 of them.
+ */
+function isReferenceInterior(raster: Raster, column: number, row: number): boolean {
+  for (let dy = -1; dy <= 1; dy += 1) {
+    for (let dx = -1; dx <= 1; dx += 1) {
+      const x = column + dx;
+      const y = row + dy;
+      if (x < 0 || y < 0 || x >= raster.width || y >= raster.height) return false;
+      if (raster.covered[y * raster.width + x] !== 1) return false;
+    }
+  }
+  return true;
+}
+
 function narrowestUncoveredRun(raster: Raster, column: number, row: number): number {
   let narrowest = Number.POSITIVE_INFINITY;
   for (const [stepX, stepY] of [[1, 0], [0, 1], [1, 1], [1, -1]] as const) {
@@ -237,7 +260,7 @@ describe("stamp ink ribbon join omission", () => {
             continue;
           }
           lost += 1;
-          if (scale >= 16) {
+          if (scale >= 16 && isReferenceInterior(referenceRaster, column, row)) {
             widestGap = Math.max(widestGap, narrowestUncoveredRun(shippedRaster, column, row));
           }
         }

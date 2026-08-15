@@ -44,16 +44,33 @@ describe("studio oil/acrylic ribbon carrier", () => {
     });
     const plan = planStudioOilRibbonCarrier(dabs);
     expect(plan.bristleLanes.length).toBeGreaterThanOrEqual(2);
-    expect(plan.bristleLanes.length).toBeLessThanOrEqual(3);
-    const opacities = plan.bristleLanes.map(({ opacity }) => opacity);
     const widths = plan.bristleLanes.map(({ lineWidth }) => lineWidth);
+    // What matters is the range of deposits a pixel can end up carrying, and the lanes are
+    // cumulative shells, so a lane's own `opacity` is an INCREMENT rather than a final tone. Fold
+    // each gauge's shells the way the renderer does — successive multiply passes — and check the
+    // resulting tones actually span the load range. The old assertion read the raw increments and
+    // would now report the spread of deltas, which is a different and much smaller number.
+    const foldedByGauge = new Map<number, number[]>();
+    for (const lane of plan.bristleLanes) {
+      const carried = foldedByGauge.get(lane.lineWidth) ?? [];
+      const previous = carried.at(-1) ?? 0;
+      carried.push(1 - (1 - previous) * (1 - lane.opacity));
+      foldedByGauge.set(lane.lineWidth, carried);
+    }
+    const folded = [...foldedByGauge.values()].flat();
     // A single averaged lane made this range exactly zero, which is what a 770 px measured stroke
     // reported as a length-axis coefficient of variation of 0.002.
-    expect(Math.max(...opacities) - Math.min(...opacities)).toBeGreaterThan(0.35);
-    // Every load band must actually be spread over the stroke rather than one band owning everything.
-    for (const lane of plan.bristleLanes) {
-      expect(lane.runs.length).toBeGreaterThan(8);
+    expect(Math.max(...folded) - Math.min(...folded)).toBeGreaterThan(0.35);
+    // The outermost shell of every gauge carries that gauge's whole population, so it must be
+    // spread over the stroke. Inner shells legitimately hold only the heaviest runs — that IS the
+    // tonal resolution — so they carry no minimum of their own beyond being non-empty.
+    for (const lanes of foldedByGauge.values()) expect(lanes.length).toBeGreaterThan(1);
+    for (const [lineWidth, lanes] of foldedByGauge) {
+      const outermost = plan.bristleLanes.find((lane) => lane.lineWidth === lineWidth)!;
+      expect(outermost.runs.length, `gauge ${lineWidth} outer shell`).toBeGreaterThan(8);
+      expect(lanes).toStrictEqual([...lanes].sort((left, right) => left - right));
     }
+    for (const lane of plan.bristleLanes) expect(lane.runs.length).toBeGreaterThan(0);
     // The ridge must be a material fraction of the ribbon rather than a hairline.
     const meanRadiusY = dabs.reduce((sum, dab) => sum + dab.radiusY, 0) / dabs.length;
     expect(Math.max(...widths)).toBeGreaterThan(meanRadiusY * 0.15);
@@ -168,5 +185,45 @@ describe("studio oil/acrylic ribbon carrier", () => {
 
     expect(svgCoordinates).toEqual(canvasCoordinates);
     expect(studioOilRibbonPathData(plan.body!, true)).not.toContain("A");
+  });
+});
+
+describe("oil ribbon head and tail", () => {
+  it("carries bristle texture into the body's directional caps", () => {
+    // A straight horizontal stroke, so "along the stroke" is just x and the caps are the two
+    // extremes of the body outline. The body overhangs its outermost stations by a directional
+    // cap; the hairs used to stop dead at those stations, which left the whole cap as smooth
+    // pigment and gave every oil stroke a blunt untextured head and tail.
+    const dabs = planOilBrushDabs({
+      points: [80, 100, 240, 100, 400, 100, 560, 100],
+      pressures: [0.7, 0.7, 0.7, 0.7],
+      baseWidth: 40,
+      seed: 23,
+    });
+    const plan = planStudioOilRibbonCarrier(dabs);
+    expect(plan.body).not.toBeNull();
+
+    const bodyX = plan.body!.points.filter((_, index) => index % 2 === 0);
+    const laneX = plan.bristleLanes
+      .flatMap((lane) => lane.runs)
+      .flatMap((run) => run.points.filter((_, index) => index % 2 === 0));
+    expect(laneX.length).toBeGreaterThan(0);
+
+    // The stations themselves sit inside the body, so the cap is the stretch between the body's
+    // extreme and the outermost station. Measuring reach as a FRACTION of that stretch keeps the
+    // assertion honest if the cap length is ever retuned.
+    const stationX = dabs.map((dab) => dab.x);
+    const headCap = Math.min(...stationX) - Math.min(...bodyX);
+    const tailCap = Math.max(...bodyX) - Math.max(...stationX);
+    expect(headCap).toBeGreaterThan(0);
+    expect(tailCap).toBeGreaterThan(0);
+
+    const headReach = (Math.min(...stationX) - Math.min(...laneX)) / headCap;
+    const tailReach = (Math.max(...laneX) - Math.max(...stationX)) / tailCap;
+    expect(headReach, "hairs must reach into the head cap").toBeGreaterThan(0.4);
+    expect(tailReach, "hairs must reach into the tail cap").toBeGreaterThan(0.4);
+    // …but not past the closing pigment, or the outer hairs hang in open space beyond the tip.
+    expect(headReach).toBeLessThanOrEqual(1);
+    expect(tailReach).toBeLessThanOrEqual(1);
   });
 });

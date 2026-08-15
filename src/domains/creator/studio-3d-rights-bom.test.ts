@@ -22,8 +22,8 @@ describe("Studio3DRightsBOM", () => {
       assetId: "asset-2",
       assetName: "VRM 캐릭터 하린",
       creator: "Blue45F",
-      license: "proprietary",
-      usageScope: ["personal"],
+      license: "Proprietary-Commercial",
+      usageScope: ["personal", "commercial"],
       attributionRequired: false,
       modificationAllowed: false,
       redistributionAllowed: false,
@@ -39,7 +39,7 @@ describe("Studio3DRightsBOM", () => {
     expect(bom.getRecord("asset-1")?.assetName).toBe("학교 배경 3D 모델");
   });
 
-  it("detects GPL commercial conflict", () => {
+  it("detects GPL commercial copyleft conflict", () => {
     const bom = new Studio3DRightsBOM();
     bom.addRecord({
       assetId: "gpl-mesh",
@@ -55,10 +55,29 @@ describe("Studio3DRightsBOM", () => {
     });
 
     const results = bom.validateForCommercialPublish();
-    expect(results.some((r) => r.code === "GPL_COMMERCIAL_CONFLICT")).toBe(true);
+    expect(results.some((r) => r.code === "GPL_COPYLEFT_CONFLICT")).toBe(true);
   });
 
-  it("detects unknown license warning", () => {
+  it("detects non-commercial NC license conflict", () => {
+    const bom = new Studio3DRightsBOM();
+    bom.addRecord({
+      assetId: "nc-asset",
+      assetName: "비상업 전용 에셋",
+      creator: "Artist",
+      license: "CC-BY-NC-4.0",
+      usageScope: ["commercial"],
+      attributionRequired: true,
+      modificationAllowed: true,
+      redistributionAllowed: false,
+      importDate: "2026-08-01",
+      importSourceFormat: "glTF",
+    });
+
+    const results = bom.validateForCommercialPublish();
+    expect(results.some((r) => r.code === "NC_COMMERCIAL_CONFLICT")).toBe(true);
+  });
+
+  it("detects unknown license and missing attribution warnings", () => {
     const bom = new Studio3DRightsBOM();
     bom.addRecord({
       assetId: "unknown-asset",
@@ -66,7 +85,8 @@ describe("Studio3DRightsBOM", () => {
       creator: "Unknown",
       license: "unknown",
       usageScope: ["commercial"],
-      attributionRequired: false,
+      attributionRequired: true,
+      attributionText: "",
       modificationAllowed: true,
       redistributionAllowed: true,
       importDate: "2026-08-01",
@@ -75,6 +95,7 @@ describe("Studio3DRightsBOM", () => {
 
     const results = bom.validateForCommercialPublish();
     expect(results.some((r) => r.code === "LICENSE_UNKNOWN")).toBe(true);
+    expect(results.some((r) => r.code === "ATTRIBUTION_MISSING")).toBe(true);
   });
 
   it("traces derivation chain", () => {
@@ -100,7 +121,7 @@ describe("Studio3DRightsBOM", () => {
       attributionRequired: false,
       modificationAllowed: true,
       redistributionAllowed: true,
-      importDate: "2026-08-01",
+      importDate: "2026-07-02",
       importSourceFormat: "glTF",
       derivedFrom: "original",
     });
@@ -111,22 +132,22 @@ describe("Studio3DRightsBOM", () => {
     expect(chain[1].assetId).toBe("original");
   });
 
-  it("generates summary report", () => {
+  it("generates comprehensive commercial audit summary and scores", () => {
     const bom = makeBOM();
-    const report = bom.generateSummaryReport();
-    expect(report.totalAssets).toBe(2);
-    expect(report.byLicense["CC-BY-4.0"]).toBe(1);
-    expect(report.byLicense["proprietary"]).toBe(1);
-    expect(report.attributionRequired).toBe(1);
-    expect(report.commercialBlocked).toBe(0);
+    const summary = bom.generateCommercialAuditSummary();
+
+    expect(summary.totalAssets).toBe(2);
+    expect(summary.complianceScore).toBe(100);
+    expect(summary.isApprovedForCommercialPublish).toBe(true);
+    expect(summary.attributionRequiredCount).toBe(1);
   });
 
-  it("serializes and deserializes BOM records", () => {
+  it("generates webtoon end card credits markdown", () => {
     const bom = makeBOM();
-    const json = bom.serializeToJSON();
+    const credits = bom.generateWebtoonEndCardCredits();
 
-    const bom2 = new Studio3DRightsBOM();
-    bom2.loadFromJSON(json);
-    expect(bom2.getAllRecords().length).toBe(2);
+    expect(credits).toContain("## 🎨 3D 에셋");
+    expect(credits).toContain("학교 배경 3D 모델");
+    expect(credits).toContain("© ToonSpectrum Studios");
   });
 });

@@ -552,6 +552,34 @@ function inkVelocityFactor(normalizedSpeed: number): number {
   return Math.min(1, Math.max(0.35, 1.12 - normalizedSpeed * 0.22));
 }
 
+/**
+ * 획 머리에서 속도 감쇠가 붙는 데 걸리는 dab 수.
+ *
+ * 시작 도트(stampDotPlan)에는 속도가 없다 — 펜이 막 닿은 순간이라 정지 상태이고, 정지한 촉이
+ * 제 굵기로 찍히는 건 맞다. 문제는 바로 다음 dab 이 이미 측정된 전체 속도로 감쇠된다는 것이다.
+ * inkVelocityFactor 의 하한이 0.35 이므로 도트가 본문보다 최대 2.857배 굵어지고, 빠르게 그은
+ * 잉크 획은 예외 없이 머리에 혹이 붙는다.
+ *
+ * 도트를 얇게 만드는 대신(그리는 시점에 아직 속도를 알 수 없다) 속도 자체를 0에서 실측값까지
+ * 끌어올린다. 펜이 순간이동하지 않고 가속하는 셈이라 머리가 제 굵기에서 본문 굵기로 자연스럽게
+ * 빠지고, 탭 한 번은 지금과 똑같이 제 굵기로 남는다. dab 간격은 반지름에 비례하므로 dab 수로
+ * 세면 램프 길이가 브러시 크기에 따라 알아서 늘고 준다 — 잉크 간격 0.32 기준으로 4 dab 은
+ * 획 폭의 약 1.3배다.
+ *
+ * state.stampIndex 만 읽으므로 라이브 오버레이·커밋 재생·SVG 내보내기가 같은 값을 본다.
+ */
+const INK_HEAD_VELOCITY_EASE_DABS = 4;
+
+function inkSpeedFactorAt(
+  style: StudioStampBrushStyle,
+  normalizedSpeed: number,
+  stampIndex: number,
+): number {
+  if (style.kind !== "ink") return 1;
+  const t = Math.min(1, Math.max(0, stampIndex / INK_HEAD_VELOCITY_EASE_DABS));
+  return inkVelocityFactor(normalizedSpeed * t * t * (3 - 2 * t));
+}
+
 export interface StudioStampWalkerState {
   lastX: number;
   lastY: number;
@@ -943,9 +971,7 @@ function walkStampSegmentPlan(
   const dy = y - state.lastY;
   const distance = Math.hypot(dx, dy);
   if (!Number.isFinite(distance) || distance <= 0) return;
-  const speedFactor = style.kind === "ink"
-    ? inkVelocityFactor(distance / Math.max(1, style.size))
-    : 1;
+  const normalizedSpeed = style.kind === "ink" ? distance / Math.max(1, style.size) : 0;
   const baseAlpha = stampFlowAlpha(style) * clamp01(style.opacity);
   const paperGrain = style.paperGrain ?? null;
   const cc0Dynamics = style.mypaintCc0Dynamics ?? null;
@@ -967,7 +993,7 @@ function walkStampSegmentPlan(
     let px = state.lastX + dx * t;
     let py = state.lastY + dy * t;
     const p = state.lastPressure + (safePressure - state.lastPressure) * t;
-    let radius = pressureRadius(style, p) * speedFactor;
+    let radius = pressureRadius(style, p) * inkSpeedFactorAt(style, normalizedSpeed, state.stampIndex);
     // CC0 MyPaint 산란/반경 지터(옵트인) — offset/radius_by_random 의 결정적 재현.
     // stampJitter(stampIndex) 시드만 쓰므로 증분·재생·SVG 가 같은 배치를 공유하고,
     // 필드가 없는 브러시는 이 블록을 건너뛰어 계획이 비트 단위로 같다.
