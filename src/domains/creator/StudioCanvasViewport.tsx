@@ -78,6 +78,11 @@ import { STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED } from "./studio-raster-pub
 import { type StudioScrollViewport, type StudioScrollViewportStore } from "./studio-scroll-viewport-store";
 import { unionBounds } from "./studio-selection";
 import { type PixelSelection, type PolyLassoSession, type SelectionDragState, type SelectionFrame, type SelPoint } from "./studio-selection-tools";
+import {
+  beginStudioSingleObjectDragLayer,
+  restoreStudioSingleObjectDragLayer,
+  type StudioSingleObjectDragLayerSession,
+} from "./studio-single-object-drag-layer";
 import { type SmartGuideOverlay } from "./studio-smart-guides";
 import {
   applyStudioStageViewportClip,
@@ -1288,7 +1293,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
     commitSharedGutterDrag,
     endLiveResourceEdit,
     nodeInteractionBegin,
-    patchEl,
+    patchEl: patchElFromPage,
     startEditText,
     snapBoundFunc,
     designateHistoryBrushSource,
@@ -1322,6 +1327,8 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
   const [pixiMountParent, setPixiMountParent] = useState<HTMLDivElement | null>(null);
   const hokusaiLiveCanvasRef = useRef<HTMLCanvasElement>(null);
   const livingInkCanvasRef = useRef<HTMLCanvasElement>(null);
+  const singleObjectDragLayerRef = useRef<Konva.Layer>(null);
+  const singleObjectDragSessionRef = useRef<StudioSingleObjectDragLayerSession | null>(null);
   const hokusaiSurfaceLeft = webGpuViewportSurface?.surface.left;
   const hokusaiSurfaceTop = webGpuViewportSurface?.surface.top;
   const hokusaiSurfaceWidth = webGpuViewportSurface?.surface.width;
@@ -1345,6 +1352,81 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
   const paperGrainOpacity = paperGrainVisible
     ? studioPaperSurfacePreviewOpacity(paperSurfaceForPreview.kind)
     : 0;
+
+  function restoreSingleObjectDragLayer(): void {
+    const session = singleObjectDragSessionRef.current;
+    singleObjectDragSessionRef.current = null;
+    restoreStudioSingleObjectDragLayer(session);
+  }
+
+  function patchElementAfterDragRestore(id: string, patch: Partial<El>): void {
+    if (singleObjectDragSessionRef.current?.elementId === id) {
+      // Child dragend runs before the Stage dragend bubble. Restore the React-owned parent first so
+      // a synchronous external-store/CRDT commit can never reconcile an imperatively lifted node.
+      restoreSingleObjectDragLayer();
+    }
+    patchEl(id, patch);
+  }
+
+  function patchEl(id: string, patch: Partial<El>): void {
+    // Element drag-end handlers commit before their event bubbles to Stage. Restore the lifted
+    // node first so document mutation/reconciliation always starts from the authoritative Layer;
+    // Stage drag-end remains the fallback for cancelled/no-op gestures.
+    if (singleObjectDragSessionRef.current?.elementId === id) {
+      restoreSingleObjectDragLayer();
+    }
+    patchElFromPage(id, patch);
+  }
+
+  function beginSingleObjectDragLayer(
+    event: Konva.KonvaEventObject<DragEvent>,
+  ): void {
+    restoreSingleObjectDragLayer();
+    if (!event.target.isDragging()) return;
+    const selectedElement = selected?.id === selectedId ? selected : null;
+    singleObjectDragSessionRef.current = beginStudioSingleObjectDragLayer({
+      target: event.target,
+      selectedElementId: selectedElement?.id ?? null,
+      selectionSize: marqueeIds.length > 0 ? marqueeIds.length : selectedId ? 1 : 0,
+      mainLayer: mainLayerRef.current,
+      dragLayer: singleObjectDragLayerRef.current,
+      transformer: trRef.current,
+      selectedIsDraw: selectedElement?.type === "draw",
+      hasMaskOrClip: Boolean(
+        selectedElement?.clipBelow
+        || (selectedElement?.type === "image" && shouldApplyLayerMask(selectedElement)),
+      ),
+      layerSensitiveComposite: Boolean(
+        selectedElement?.blendMode
+        && selectedElement.blendMode !== "source-over"
+      ),
+    });
+  }
+
+  function finishSingleObjectDragLayer(): void {
+    restoreSingleObjectDragLayer();
+    onStageDragEnd();
+  }
+
+  function cancelSingleObjectDragLayer(
+    event: Konva.KonvaEventObject<MouseEvent | TouchEvent>,
+  ): void {
+    restoreSingleObjectDragLayer();
+    onStagePointerCancel(event);
+  }
+
+  useLayoutEffect(() => {
+    restoreSingleObjectDragLayer();
+  }, [activePage.id, masterEditMode, marqueeIds.length, selectedId, tool]);
+
+  useLayoutEffect(
+    () => () => {
+      const session = singleObjectDragSessionRef.current;
+      singleObjectDragSessionRef.current = null;
+      restoreStudioSingleObjectDragLayer(session);
+    },
+    [],
+  );
 
   useLayoutEffect(() => {
     const canvas = hokusaiLiveCanvasRef.current;
@@ -2652,7 +2734,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
             onPointerDown={onStageDown}
             onPointerMove={onStageMove}
             onPointerUp={onStageUp}
-            onPointerCancel={onStagePointerCancel}
+            onPointerCancel={cancelSingleObjectDragLayer}
             onClick={narrowCanvasSelectionOnRelease}
             onTap={narrowCanvasSelectionOnRelease}
             onDblClick={enterGroupFromCanvasGesture}
@@ -2667,8 +2749,9 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
               hideLayerMaskCursor();
               hideFilterMaskCursor();
             }}
+            onDragStart={beginSingleObjectDragLayer}
             onDragMove={onStageDragMove}
-            onDragEnd={onStageDragEnd}
+            onDragEnd={finishSingleObjectDragLayer}
             onContextMenu={(e) => {
               e.evt.preventDefault();
               if (canvasInteractionBlocked || commentPinArmed) return;
@@ -3022,7 +3105,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                           // 아직 false일 수 있다. 이 런타임 가드가 이미지 노드의 drag-end
                           // {x,y}/auto-fit 커밋 전체를 소비하고 Stage의 원자 그룹 커밋만 남긴다.
                           if (isCanvasGroupDragActive(el.id)) return;
-                          patchEl(el.id, patch);
+                          patchElementAfterDragRestore(el.id, patch);
                         }}
                         dragBoundFunc={snapBoundFunc}
                         autoFitFrames={autoFitFrames}
@@ -3045,7 +3128,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                       draggable={draggable}
                       innerRef={setRef}
                       onSelect={onSelect}
-                      onChange={(patch) => patchEl(el.id, patch as Partial<El>)}
+                      onChange={(patch) => patchElementAfterDragRestore(el.id, patch as Partial<El>)}
                       dragBoundFunc={snapBoundFunc}
                       onInteractionBegin={() => nodeInteractionBegin(el.id)}
                       onInteractionEnd={endLiveResourceEdit}
@@ -3060,7 +3143,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                       draggable={draggable}
                       innerRef={setRef}
                       onSelect={onSelect}
-                      onChange={(patch) => patchEl(el.id, patch)}
+                      onChange={(patch) => patchElementAfterDragRestore(el.id, patch)}
                       dragBoundFunc={snapBoundFunc}
                       onInteractionBegin={() => nodeInteractionBegin(el.id)}
                       onInteractionEnd={endLiveResourceEdit}
@@ -3074,7 +3157,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                       draggable={draggable}
                       innerRef={setRef}
                       onSelect={onSelect}
-                      onChange={(patch) => patchEl(el.id, patch)}
+                      onChange={(patch) => patchElementAfterDragRestore(el.id, patch)}
                       dragBoundFunc={snapBoundFunc}
                       onInteractionBegin={() => nodeInteractionBegin(el.id)}
                       onInteractionEnd={endLiveResourceEdit}
@@ -3271,7 +3354,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                       innerRef={setRef}
                       onSelect={onSelect}
                       onEdit={startEditText}
-                      onPatch={patchEl}
+                      onPatch={patchElementAfterDragRestore}
                       dragBoundFunc={snapBoundFunc}
                       onInteractionBegin={() => nodeInteractionBegin(el.id)}
                       onInteractionEnd={endLiveResourceEdit}
@@ -3287,7 +3370,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                       innerRef={setRef}
                       onSelect={onSelect}
                       onEdit={startEditText}
-                      onPatch={patchEl}
+                      onPatch={patchElementAfterDragRestore}
                       dragBoundFunc={snapBoundFunc}
                       onInteractionBegin={() => nodeInteractionBegin(el.id)}
                       onInteractionEnd={endLiveResourceEdit}
@@ -3311,7 +3394,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                     dragBoundFunc={snapBoundFunc}
                     onSelect={onSelect}
                     onEdit={() => startEditText(el.id)}
-                    onChange={(patch) => patchEl(el.id, patch)}
+                    onChange={(patch) => patchElementAfterDragRestore(el.id, patch)}
                     onInteractionBegin={() => nodeInteractionBegin(el.id)}
                     onInteractionEnd={endLiveResourceEdit}
                   />
@@ -3705,6 +3788,14 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 );
               })()}
             </Layer>
+            {/* A selected coordinate object is lifted here only while it is being dragged. Konva
+                then repaints this tiny layer per pointer frame instead of rasterizing every
+                committed stroke/image in the document layer. Composite-sensitive and grouped
+                objects deliberately stay on the authoritative main layer. */}
+            <Layer
+              ref={singleObjectDragLayerRef}
+              name="studio-single-object-drag-layer"
+            />
             {/* 라이브 프리핸드 초안은 전용 레이어에서만 다시 그린다: 포인터 프레임마다 메인
                 레이어의 모든 커밋 요소(세그먼트 압력 획·수채 dab 등)를 재래스터하지 않는다.
                 일반 획은 source-over 단일 노드라 별도 캔버스에서 합성해도 시각 결과가 같다.

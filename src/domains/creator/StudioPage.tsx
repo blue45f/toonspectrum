@@ -980,6 +980,7 @@ import {
   type NodeEditHandle,
   type NodeEditTool,
 } from "./studio-node-edit";
+import { snapStudioObjectDragPosition } from "./studio-object-drag-snap";
 import {
   parseStudioObjectInsertDragPayload,
   resolveStudioObjectInsertOpenSeed,
@@ -11280,16 +11281,10 @@ function StudioCuttoonEditor({
     if (gesture.settleTimer) globalThis.clearTimeout(gesture.settleTimer);
   }, []);
   const effScale = scale * zoom;
-  const snapBoundFunc = (pos: { x: number; y: number }) => {
-    if (!snapEnabled) return pos;
-    const stage = stageRef.current;
-    if (!stage) return pos;
-    const transform = stage.getAbsoluteTransform().copy().invert();
-    const localPos = transform.point(pos);
-    const snappedLocalX = Math.round(localPos.x / gridSize) * gridSize;
-    const snappedLocalY = Math.round(localPos.y / gridSize) * gridSize;
-    return stage.getAbsoluteTransform().point({ x: snappedLocalX, y: snappedLocalY });
-  };
+  // Grid/object/guide snapping has one authority in onStageDragMove, where the live visual bounds
+  // are available. A second dragBound snap used to quantize the node origin first and then snap
+  // its edges again in the same frame, which made the pointer feel detached from the object.
+  const snapBoundFunc = (pos: { x: number; y: number }) => pos;
   const canvasEditingGestureIsOwned = () => Boolean(
     drawingRef.current
     || requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession()
@@ -38844,8 +38839,7 @@ const puppetWarpArmed =
   }
 
   function liveCanvasElementRect(
-    element: El,
-    layer: Konva.Layer
+    element: El
   ): { x: number; y: number; width: number; height: number } {
     const fallback = elBounds(element);
     const node = nodeRefsRef.current[element.id];
@@ -38860,7 +38854,14 @@ const puppetWarpArmed =
       };
     }
     if (node) {
-      const rect = node.getClientRect({ relativeTo: layer });
+      // A single coordinate object may be temporarily lifted to the sibling drag Layer. Measuring
+      // every peer relative to the moving node's Layer mixes sibling coordinate systems under a
+      // transformed Stage. Each direct Stage Layer shares document coordinates, so normalize each
+      // node against its own Layer instead.
+      const nodeLayer = node.getLayer();
+      const rect = nodeLayer
+        ? node.getClientRect({ relativeTo: nodeLayer })
+        : node.getClientRect();
       if (
         Number.isFinite(rect.x) &&
         Number.isFinite(rect.y) &&
@@ -38884,15 +38885,17 @@ const puppetWarpArmed =
     const node = e.target;
     const stage = node.getStage();
     if (!node || node === stage) return;
-    if (node.getParent() instanceof KonvaRuntime.Transformer) return; // 트랜스포머 앵커(리사이즈)는 제외
+    if (
+      node instanceof KonvaRuntime.Transformer
+      || node.getParent() instanceof KonvaRuntime.Transformer
+    ) return; // 트랜스포머 proxy/앵커는 작성 객체와 별도 drag 이벤트를 내므로 제외.
+    const draggedId = studioElementIdOf(node);
+    if (!draggedId) return;
     const layer = node.getLayer();
     if (!layer) return;
 
-    const draggedId = studioElementIdOf(node);
     let activeGroupDrag = groupDragRef.current;
-    const candidateGroupIds = draggedId
-      ? canvasInteractionUnitIds(draggedId)
-      : [];
+    const candidateGroupIds = canvasInteractionUnitIds(draggedId);
     const canStartGroupDrag =
       draggedId !== null &&
       candidateGroupIds.length > 1 &&
@@ -38982,7 +38985,7 @@ const puppetWarpArmed =
       const rects = selectedIds
         .map((id) => elementById.get(id))
         .filter((candidate): candidate is El => Boolean(candidate))
-        .map((candidate) => liveCanvasElementRect(candidate, layer));
+        .map((candidate) => liveCanvasElementRect(candidate));
       if (rects.length === 0) return node.getClientRect({ relativeTo: layer });
       const left = Math.min(...rects.map((rect) => rect.x));
       const top = Math.min(...rects.map((rect) => rect.y));
@@ -39009,7 +39012,7 @@ const puppetWarpArmed =
           ) {
             continue;
           }
-          const rect = liveCanvasElementRect(element, layer);
+          const rect = liveCanvasElementRect(element);
           previewOthers.push({
             id: element.id,
             x: rect.x,
@@ -39057,14 +39060,6 @@ const puppetWarpArmed =
       else hLines.push(guide.pos);
     }
 
-    // Grid visibility is presentation-only. Reaching this branch already means snapping is on,
-    // so hidden grid lines remain valid placement targets without altering the display toggle.
-    for (let x = gridSize; x < CANVAS_W; x += gridSize) {
-      if (Math.abs(x - CANVAS_W / 2) > 1) vLines.push(x);
-    }
-    for (let y = gridSize; y < canvasH; y += gridSize) {
-      if (Math.abs(y - canvasH / 2) > 1) hLines.push(y);
-    }
     let panel: FrameEl | null = null;
     const boxCenterX = box.x + box.width / 2;
     const boxCenterY = box.y + box.height / 2;
@@ -39112,6 +39107,28 @@ const puppetWarpArmed =
           gy = line;
         }
       }
+    // Grid visibility is presentation-only: hidden grid lines remain valid placement targets.
+    // Snap one visual anchor (the live bounding box's top-left), not all three edges plus the node
+    // origin. With a 40px grid, three independent 8px attraction bands covered most positions and
+    // made free movement feel like a sequence of tiny jumps.
+    const gridAnchor = snapStudioObjectDragPosition({
+      position: { x: box.x, y: box.y },
+      enabled: snapEnabled,
+      gridSize,
+      viewportScale: effScale,
+    });
+    const gridDx = gridAnchor.x - box.x;
+    const gridDy = gridAnchor.y - box.y;
+    if (gridDx !== 0 && Math.abs(gridDx) < bestX) {
+      dx = gridDx;
+      gx = gridAnchor.x;
+      bestX = Math.abs(gridDx);
+    }
+    if (gridDy !== 0 && Math.abs(gridDy) < bestY) {
+      dy = gridDy;
+      gy = gridAnchor.y;
+      bestY = Math.abs(gridDy);
+    }
     // ── 요소 간 스마트 가이드(PPT급): 엣지/센터 정렬 + 균등 간격 스냅 ──
     // 다른 요소들의 bbox를 O(n)으로 모아(숨김·함께 끌리는 다중선택군 제외) 후보를 구하고,
     // 축별로 캔버스/그리드 라인 스냅과 요소 스냅 중 더 가까운 쪽을 채택한다(동률이면 요소 우선).
@@ -39125,7 +39142,7 @@ const puppetWarpArmed =
         ) {
           continue;
         }
-        const r = liveCanvasElementRect(el, layer);
+        const r = liveCanvasElementRect(el);
         smartOthers.push({
           id: el.id,
           x: r.x,
