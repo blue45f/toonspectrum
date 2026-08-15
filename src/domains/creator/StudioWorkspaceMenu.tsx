@@ -60,6 +60,10 @@ import {
   type StudioQuickActionId,
 } from "./studio-quick-actions";
 import {
+  resolveStudioWorkspaceRecommendation,
+  studioWorkspaceSearchAliases,
+} from "./studio-workspace-recommendation";
+import {
   STUDIO_DEFAULT_WORKSPACES,
   STUDIO_PRO_COMIC_PALETTE_PRIORITY,
   STUDIO_WORKSPACE_DEVICE_KINDS,
@@ -88,6 +92,7 @@ import {
   type StudioWorkspaceSaveResult,
   type StudioWorkspaceState,
 } from "./studio-workspaces";
+import { StudioWorkspaceRecommendation } from "./StudioWorkspaceRecommendation";
 
 import { cn } from "@/lib/utils";
 
@@ -131,6 +136,7 @@ export type StudioWorkspacePersistenceSnapshot = Pick<
 >;
 
 export interface StudioWorkspaceSearchEntry {
+  readonly id?: string;
   readonly name: string;
   readonly description?: string;
 }
@@ -379,7 +385,10 @@ function matchesStudioWorkspaceQuery(
 ): boolean {
   const tokens = normalizedSearchTokens(query);
   if (tokens.length === 0) return true;
-  const haystack = `${workspace.name} ${workspace.description ?? ""}`
+  const aliases = workspace.id
+    ? studioWorkspaceSearchAliases(workspace.id).join(" ")
+    : "";
+  const haystack = `${workspace.name} ${workspace.description ?? ""} ${aliases}`
     .normalize("NFKC")
     .toLocaleLowerCase("ko-KR");
   return tokens.every((token) => haystack.includes(token));
@@ -563,6 +572,12 @@ export function StudioWorkspaceMenu({
     .filter((workspace) => workspace !== null);
   const pendingWorkspace = pendingWorkspaceId
     ? resolveStudioWorkspace(syncedState, pendingWorkspaceId)
+    : null;
+  const workspaceRecommendation = query.trim().length === 0
+    ? resolveStudioWorkspaceRecommendation(
+        STUDIO_DEFAULT_WORKSPACES,
+        syncedState.activeWorkspaceId
+      )
     : null;
   const builtinListExpanded = query.trim().length > 0 || builtinsExpanded;
   const customListExpanded = query.trim().length > 0 || customExpanded;
@@ -1396,6 +1411,18 @@ export function StudioWorkspaceMenu({
                 </div>
               ) : null}
             </section>
+
+            {view === "switch" && workspaceRecommendation ? (
+              <StudioWorkspaceRecommendation
+                recommendation={workspaceRecommendation}
+                onSelect={(event) =>
+                  requestWorkspaceSwitch(
+                    workspaceRecommendation.workspace.id,
+                    event.currentTarget
+                  )
+                }
+              />
+            ) : null}
 
             {showSearch ? (
               <div

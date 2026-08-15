@@ -622,9 +622,9 @@ export const STUDIO_DEFAULT_WORKSPACES: readonly StudioDefaultWorkspace[] = Obje
   }),
   Object.freeze({
     id: "csp-migration",
-    name: "CSP 이주",
+    name: "클립 스튜디오형",
     description:
-      "클립스튜디오에서 넘어온 손에 맞춰 좌우 도크를 넓게 펼치고 서브 도구·도구 속성 동선을 유지합니다.",
+      "CSP·클립 스튜디오에서 넘어온 손에 맞춰 좌우 도크를 넓게 펼치고 서브 도구·도구 속성 동선을 유지합니다.",
     layout: createBuiltinLayout(
       { primary: "layers", image: "fill", document: "navigator" },
       {
