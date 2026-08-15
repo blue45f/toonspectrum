@@ -4904,7 +4904,7 @@ function StudioCuttoonEditor({
     );
   }, [activePage.id, authorizedWorkAssetScopeId, studioCrdtDocument, studioWorkAssetHydrator]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!studioCrdtDocument || sourceHydrationPending) return;
     const applyFrontier = (
       frontier: {
