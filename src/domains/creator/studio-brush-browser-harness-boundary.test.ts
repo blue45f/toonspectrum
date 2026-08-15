@@ -115,9 +115,14 @@ describe("Studio brush browser harness catalogue boundary", () => {
     expect(harness).not.toContain(
       "serializeStudioBrushDynamicsSettingsCanonical(expectedSelection.brushDynamics)",
     );
-    expect(harness).toContain(
-      "Math.ceil(BRUSH_MATRIX_CATALOG_COUNT / 7)",
-    );
+    // The grid no longer HAS a row count to get wrong. A preset's cell and its gesture are a pure
+    // function of a hash of its own id, so no catalogue count — and no delisting — can move another
+    // brush's stroke. That coupling was not hypothetical: the earlier `index % 3` direction and
+    // `floor(index / 7)` row meant quarantining three ids reshuffled the matrix, and it also meant
+    // a focused TOONSPECTRUM_BRUSH_VERIFY_IDS run put every preset at index 0, which is why
+    // presets could "pass in isolation" and fail in the full run.
+    expect(harness).toContain('strokeIdentityUnit(preset.id, "row")');
+    expect(harness).not.toContain("BRUSH_MATRIX_CATALOG_COUNT / 7");
     expect(harness).not.toContain(
       "Math.ceil(BRUSH_PRESETS.length / 7)",
     );

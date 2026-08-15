@@ -79,7 +79,10 @@ import {
   materializeStudioBrushCatalogSelection,
   type StudioBrushCatalogSelection,
 } from "../src/domains/creator/studio-brush-selection";
-import { studioCc0MypaintPresetUsesIntentionalDiscreteCarrier } from "../src/domains/creator/studio-cc0-mypaint-preset-import-v1";
+import {
+  resolveStudioCc0MypaintStampTuning,
+  studioCc0MypaintPresetUsesIntentionalDiscreteCarrier,
+} from "../src/domains/creator/studio-cc0-mypaint-preset-import-v1";
 import { captureStudioDrawPointerPressureContract } from "../src/domains/creator/studio-draw-pointer-pressure-contract";
 import { classifyStudioDryMediaCatalogIdV1 } from "../src/domains/creator/studio-dry-media-anisotropic-grain-v1";
 
@@ -991,15 +994,99 @@ async function enabledHistoryButton(page: Page, ariaLabel: "실행취소" | "다
   throw new Error(`${ariaLabel} button did not become enabled`);
 }
 
+/**
+ * Deterministic 32-bit FNV-1a over an id. The gesture below is derived from THIS and nothing else,
+ * which is the whole point: a brush's verdict must not move when a different brush is added or
+ * delisted. The previous scheme keyed the grid cell AND the direction off the preset's INDEX in
+ * the listed catalogue, so delisting one id shifted every later preset onto a different cell and a
+ * different dy sign — a gate whose result changes when an unrelated brush is delisted is not
+ * measuring the brush. (The length lesson had already been learned here; the direction and the
+ * cell had not.) Hashing the id also makes `TOONSPECTRUM_BRUSH_VERIFY_IDS=<id>` reproduce the full
+ * run's gesture exactly, which the index scheme could not: a focused run put every preset at
+ * index 0.
+ */
+function strokeIdentityHash(seed: string): number {
+  let hash = 0x811c_9dc5;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash ^= seed.charCodeAt(index);
+    hash = Math.imul(hash, 0x0100_0193);
+  }
+  return hash >>> 0;
+}
+
+/** Independent [0,1) streams off one id, salted so cell/direction/shape never correlate. */
+function strokeIdentityUnit(presetId: string, salt: string): number {
+  return strokeIdentityHash(`${salt}:${presetId}`) / 0x1_0000_0000;
+}
+
+/** The historical continuous flick: 9 px of travel with a 2-3 px cross component. */
+const CONTINUOUS_GESTURE_LENGTH_PX = 9;
+/** The historical discrete reach (6 x the flick). No carrier's gesture may fall below it. */
+const DISCRETE_GESTURE_MINIMUM_LENGTH_PX = 54;
+/**
+ * Stations a discrete carrier's gesture must span — the first mark plus two more. Three is the
+ * smallest count that survives the failure this replaces: with one station the verdict is decided
+ * by where that single dab's scatter and radius jitter happened to land, which is exactly how
+ * mypaint-cc0--splatter (spacing 4 diameters = 168 px at its 42 px default width) produced ZERO
+ * changed pixels under both a 54 px and a 90 px flick. Three stations also make the short route no
+ * weaker than the long route, which already proves that carrier paints over 300 px.
+ */
+const DISCRETE_GESTURE_STATIONS = 3;
+
+/**
+ * Distance between two of a discrete carrier's own marks, in CSS px, from the preset's own
+ * authored spacing — never a flat multiplier. The engine walks `2 · pressureRadius · spacingRatio`,
+ * so full-pressure spacing is `diameter · spacingRatio`; taking the full-size (pressure 1) value
+ * is the conservative end, since a smaller radius only packs the marks closer together.
+ */
+function discreteStationSpacingPx(
+  presetId: string,
+  selection: StudioBrushCatalogSelection,
+): number {
+  const cc0 = resolveStudioCc0MypaintStampTuning(presetId);
+  if (cc0) return selection.defaultWidth * cc0.spacingRatio;
+  const dynamics = selection.brushDynamics;
+  // `spacing.base` is already the px projection of the dab spacing (width.base · spacingRatio).
+  if (dynamics && dynamics.spacing.base > 0) return dynamics.spacing.base;
+  if (dynamics?.spacingRatio) return selection.defaultWidth * dynamics.spacingRatio;
+  // No authored spacing to read: fall back to one diameter, which is the very threshold the
+  // discrete classifiers use, so the fallback can never claim a denser carrier than reality.
+  return selection.defaultWidth;
+}
+
+/**
+ * Keeps one axis of the gesture inside the exposed paper WITHOUT shortening it. The measurement is
+ * the gesture; the cell only spreads the matrix over the paper, so when a cell has no room the
+ * cell moves, never the length. Fails loudly if the paper cannot hold the gesture at all — a gate
+ * that silently truncated it would quietly stop proving what it claims.
+ */
+function fitStrokeAxis(
+  start: number,
+  delta: number,
+  low: number,
+  high: number,
+  presetId: string,
+): { start: number; delta: number } {
+  invariant(
+    Math.abs(delta) <= high - low,
+    `${presetId}: gesture needs ${Math.abs(delta).toFixed(0)}px but the exposed paper offers `
+      + `${(high - low).toFixed(0)}px on this axis`,
+  );
+  if (start + delta >= low && start + delta <= high) return { start, delta };
+  if (start - delta >= low && start - delta <= high) return { start, delta: -delta };
+  return { start: delta > 0 ? high - delta : low - delta, delta };
+}
+
 function strokePoint(
   box: { x: number; y: number; width: number; height: number },
   viewport: { width: number; height: number },
-  index: number,
+  preset: StudioBrushCatalogItem,
+  selection: StudioBrushCatalogSelection,
   /**
    * Intentionally discrete carriers (splatter, glint, repeated stamps) place scatter stations
    * along the path instead of a continuous bed, so a 9 px flick can legitimately land between two
-   * stations and deposit nothing. Those presets get a longer — still short and fast — gesture so
-   * the visibility assertion keeps its meaning instead of being skipped.
+   * stations and deposit nothing. Those presets get a longer — still one fast, undwelt move —
+   * gesture so the visibility assertion keeps its meaning instead of being skipped.
    */
   intentionalDiscreteCarrier = false,
 ): { x: number; y: number; dx: number; dy: number } {
@@ -1014,36 +1101,32 @@ function strokePoint(
   } = canvasSafeRect(box, viewport);
   invariant(safeRight - safeLeft >= 260, "visible canvas is too narrow for the brush grid");
   invariant(safeBottom - safeTop >= 220, "visible canvas is too short for the brush grid");
-  const column = index % 7;
-  const row = Math.floor(index / 7);
-  const rows = Math.max(1, Math.ceil(BRUSH_MATRIX_CATALOG_COUNT / 7));
-  const x = safeLeft + ((safeRight - safeLeft) * column) / 6;
-  const y = safeTop + ((safeBottom - safeTop) * (row + 0.5)) / rows;
-  const reach = intentionalDiscreteCarrier ? 6 : 1;
-  // Uniform length, deliberately the longer of the two the parity used to alternate between.
-  // Alternating 9px/7px by index tested nothing about parity, but it made a marginal wet carrier's
-  // verdict depend on its POSITION in the catalogue: quarantining one preset shifted every later
-  // index by one, moved mypaint-cc0--watercolor-fringe from a 9px flick to a 7px one, and it
-  // deposited nothing. A gate whose result changes when an unrelated brush is delisted is not
-  // measuring the brush. Every gesture is now at least as long as before, never shorter.
-  const dx = 9 * reach;
-  const dy = (index % 3 === 0 ? 3 : -2) * reach;
-  // Every ordinary preset keeps its historical gesture byte for byte. A 9px flick from column 6
-  // ends 9px past safeRight, which is still deep inside the 52px inset this rectangle was given,
-  // so "correcting" it would perturb a 324-preset matrix that passes with these exact coordinates
-  // — and on the top row, where the row pitch is a few pixels, flipping dy is a real change.
-  if (!intentionalDiscreteCarrier) return { x, y, dx, dy };
-  // Discrete carriers alone take the 6x reach, and column 6 starts exactly on safeRight, so
-  // theirs is the gesture that can finish on the inspector. The stroke still paints (Konva
-  // captured the pointer at pointerdown), but the evidence clip then spans chrome whose hover
-  // state differs between captures, and the undo comparison measures that instead of ink.
-  const foldIntoSafeArea = (start: number, delta: number, low: number, high: number): number =>
-    start + delta > high || start + delta < low ? -delta : delta;
+  const length = intentionalDiscreteCarrier
+    ? Math.max(
+        DISCRETE_GESTURE_MINIMUM_LENGTH_PX,
+        Math.ceil(
+          (DISCRETE_GESTURE_STATIONS - 1) * discreteStationSpacingPx(preset.id, selection),
+        ),
+      )
+    : CONTINUOUS_GESTURE_LENGTH_PX;
+  // The two shapes the matrix has always drawn (9x3 and 9x-2), now chosen by identity instead of
+  // by `index % 3`, and scaled to the length above so a sparse carrier's gesture is the same
+  // picture, just long enough to contain its own stations.
+  const slope = strokeIdentityUnit(preset.id, "slope") < 0.5 ? 3 / 9 : 2 / 9;
+  const signedLength = strokeIdentityUnit(preset.id, "dx") < 0.5 ? length : -length;
+  const signedCross = Math.max(1, Math.round(length * slope))
+    * (strokeIdentityUnit(preset.id, "dy") < 0.5 ? 1 : -1);
+  const cell = {
+    x: safeLeft + (safeRight - safeLeft) * strokeIdentityUnit(preset.id, "column"),
+    y: safeTop + (safeBottom - safeTop) * strokeIdentityUnit(preset.id, "row"),
+  };
+  const horizontal = fitStrokeAxis(cell.x, signedLength, safeLeft, safeRight, preset.id);
+  const vertical = fitStrokeAxis(cell.y, signedCross, safeTop, safeBottom, preset.id);
   return {
-    x,
-    y,
-    dx: foldIntoSafeArea(x, dx, safeLeft, safeRight),
-    dy: foldIntoSafeArea(y, dy, safeTop, safeBottom),
+    x: Math.round(horizontal.start),
+    y: Math.round(vertical.start),
+    dx: horizontal.delta,
+    dy: vertical.delta,
   };
 }
 
@@ -1523,7 +1606,13 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
         : presetDescriptor
           ? studioBrushPresetUsesIntentionalDiscreteCarrier(presetDescriptor)
           : studioCc0MypaintPresetUsesIntentionalDiscreteCarrier(preset.id);
-      const point = strokePoint(stageBox, viewport, index, usesDiscreteCarrier);
+      const point = strokePoint(
+        stageBox,
+        viewport,
+        preset,
+        expectedSelection,
+        usesDiscreteCarrier,
+      );
       if (DEBUG_BRUSH_VERIFIER) {
         log(`viewport=${JSON.stringify(viewport)} stageBox=${JSON.stringify(stageBox)} presetIndex=${index}`);
       }

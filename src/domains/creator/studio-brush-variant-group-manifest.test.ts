@@ -152,8 +152,21 @@ describe("studio brush variant group manifest", () => {
     // 2026-08-14 long-route quality gate: airbrush--stamp-soft declares preview "soft" (a
     // continuous carrier) but measures edgePeriodicityScore 0.85 at a 7px period — a visible
     // ridge. Its stamp-family and airbrush-family siblings all clear the same bar (지침 6).
+    // 2026-08-16 wave 4 duplicate confirm: pencil--side-shade and gpen--causal-round each declare
+    // an engine/profile variant that no renderer branches on — outside the lane catalogue the only
+    // reference to those ids is the icon map — so they paint their base media. Width-normalised
+    // pixel |difference| p95 (brush-duplicate-confirm.json): 0.00000 vs pencil, 0.00014 vs
+    // gpen--croquis-capsule. marker--chisel-ribbon was a candidate in the same audit and is
+    // deliberately NOT here: since the angled-nib carrier began carrying pressure into the stroke
+    // interior it is visibly distinct from base brush (distinctTones 102 vs 1), so the duplicate
+    // evidence is stale — its remaining gap is that it never opted into the pressure model.
     expect(STUDIO_BRUSH_QUARANTINED_PRESET_IDS)
-      .toEqual(["airbrush--stamp-soft", "glitter--star-field"]);
+      .toEqual([
+        "airbrush--stamp-soft",
+        "glitter--star-field",
+        "pencil--side-shade",
+        "gpen--causal-round",
+      ]);
     expect(Object.isFrozen(STUDIO_BRUSH_QUARANTINED_PRESET_IDS)).toBe(true);
     expect(Object.isFrozen(STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID)).toBe(true);
     for (const quarantinedId of STUDIO_BRUSH_QUARANTINED_PRESET_IDS) {
