@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "measuredAt": "2026-08-14T23:46:15.054Z",
+  "measuredAt": "2026-08-15T00:50:20.251Z",
   "command": "pnpm run verify:studio-brushes",
   "status": "pass",
   "catalog": {
@@ -67,12 +67,12 @@
   },
   "pointerUpDurability": {
     "receiptMarkerReason": "pointerup",
-    "receiptSettledInMs": 6.88,
+    "receiptSettledInMs": 6.87,
     "receiptStrokeCount": 1,
     "survivorMarkerReason": "pointerup",
     "survivorStrokeCount": 2,
     "unloadPromptHeldMs": 150,
-    "navigationIssuedInMs": 0.28,
+    "navigationIssuedInMs": 0.29,
     "unloadGuardShown": true,
     "payloadContainsEveryStroke": true,
     "recoveryBannerShown": true,

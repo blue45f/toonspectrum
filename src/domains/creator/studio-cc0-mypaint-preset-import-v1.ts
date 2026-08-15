@@ -97,6 +97,12 @@ export interface StudioCc0MypaintStampTuning {
   readonly radiusJitter: number;
   readonly opaqueLinearize: number;
   readonly dabsPerPixel: number;
+  /**
+   * Flat-nib geometry, verbatim from `elliptical_dab_ratio` / `elliptical_dab_angle`.
+   * Optional - a round preset omits both and keeps a byte-identical dab plan.
+   */
+  readonly ellipticalRatio?: number;
+  readonly ellipticalAngleDegrees?: number;
 }
 
 /** Style-resident dynamics the stamp planner executes for a cc0 preset (absent = legacy path). */
@@ -107,6 +113,16 @@ export interface StudioCc0MypaintDabDynamicsStyle {
   readonly scatterPressureResponse: number;
   /** Symmetric log-space radius jitter amplitude (libmypaint radius_by_random adaptation). */
   readonly radiusJitter: number;
+  /**
+   * Flat-nib geometry, verbatim from `elliptical_dab_ratio` / `elliptical_dab_angle`.
+   *
+   * Optional: a preset that does not declare a ratio keeps a round dab and a byte-identical plan.
+   * This was the module's largest documented down-scope, and it was the reason CC0 calligraphy and
+   * the fat marker measured 0.186 apart despite obviously different upstream files - the flatness
+   * IS what separates those two media, so dropping it collapsed them onto each other.
+   */
+  readonly ellipticalRatio?: number;
+  readonly ellipticalAngleDegrees?: number;
   /**
    * Pre-linearized per-dab alpha (libmypaint opaque_linearize) — null when the preset pins
    * opaque_linearize to 0, in which case the plain flow value is used unchanged.
@@ -185,6 +201,14 @@ export function resolveStudioCc0MypaintDabDynamicsStyle(
     scatterPressureResponse: tuning.scatterPressureResponse,
     radiusJitter: tuning.radiusJitter,
     linearizedFlow,
+    // Only forwarded when the preset actually declares a flat nib, so a round preset's dab plan
+    // stays byte-identical.
+    ...(tuning.ellipticalRatio && tuning.ellipticalRatio > 1
+      ? {
+          ellipticalRatio: tuning.ellipticalRatio,
+          ellipticalAngleDegrees: tuning.ellipticalAngleDegrees ?? 0,
+        }
+      : {}),
   });
 }
 
@@ -634,6 +658,7 @@ export const STUDIO_CC0_MYPAINT_PRESET_IMPORTS: readonly StudioCc0MypaintPresetI
         spacingRatio: 0.2273, flow: 1, hardness: 0.74, minSizeRatio: 0.6065, sizeScale: 1,
         scatter: 0, scatterPressureResponse: 0, radiusJitter: 0,
         opaqueLinearize: 0, dabsPerPixel: 4.4,
+        ellipticalRatio: 5.46, ellipticalAngleDegrees: 45.92,
       },
       "elliptical_dab_ratio 5.46 / angle 45.92 is the flat nib and is NOT executed by the stamp walker — this import lands the wax/ink density and spacing, not the chisel geometry. direction_filter, speed1 envelopes, smudge_length and both slow_tracking settings are recorded verbatim and unexecuted.",
     ),
@@ -676,6 +701,7 @@ export const STUDIO_CC0_MYPAINT_PRESET_IMPORTS: readonly StudioCc0MypaintPresetI
         spacingRatio: 0.1429, flow: 1, hardness: 1, minSizeRatio: 1, sizeScale: 1,
         scatter: 0, scatterPressureResponse: 0, radiusJitter: 0,
         opaqueLinearize: 0.9, dabsPerPixel: 7,
+        ellipticalRatio: 10, ellipticalAngleDegrees: 113.08,
       },
       "The chisel is tilt-driven upstream (elliptical_dab_ratio 10 collapsing to -9 with declination, angle following ascension); the stamp walker executes neither tilt input nor elliptical dabs, so this import lands the dense saturated marker bed and its 0.9 linearization, not the chisel. minSizeRatio is 1 because the radius envelope is tilt-driven, not pressure-driven.",
     ),

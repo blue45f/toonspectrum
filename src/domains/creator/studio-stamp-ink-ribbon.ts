@@ -65,6 +65,32 @@ interface InkStation {
   readonly y: number;
   readonly radius: number;
   readonly alpha: number;
+  /** Flat-nib minor axis. Absent (the default) means a round nib and the historical geometry. */
+  readonly radiusY?: number;
+  /** Major-axis direction of the nib, radians. Present only with `radiusY`. */
+  readonly angleRadians?: number;
+}
+
+/**
+ * Half-width of the nib measured along `(nx, ny)`.
+ *
+ * A round nib answers `radius` in every direction, which is why the ribbon was previously able to
+ * ignore direction entirely. A flat nib does not: this is the ellipse support function
+ * `sqrt(a²(u·n)² + b²(v·n)²)` for semi-axes `a` along the nib and `b` across it, so a stroke that
+ * travels ACROSS the nib is laid down at full width while one travelling ALONG it thins to `b`.
+ * That direction-dependent swelling is what makes a calligraphy nib legible as calligraphy, and
+ * without it CC0 calligraphy (ratio 5.46) and the fat marker (ratio 10.0) rendered 0.186 apart -
+ * effectively the same brush - despite obviously different upstream files.
+ */
+function nibSupport(station: InkStation, nx: number, ny: number): number {
+  const minor = station.radiusY;
+  if (minor === undefined || !(minor > 0)) return station.radius;
+  const angle = station.angleRadians ?? 0;
+  const ux = Math.cos(angle);
+  const uy = Math.sin(angle);
+  const alongNib = ux * nx + uy * ny;
+  const acrossNib = -uy * nx + ux * ny;
+  return Math.hypot(station.radius * alongNib, minor * acrossNib);
 }
 
 const COORDINATE_LIMIT = 1_000_000_000;
@@ -106,11 +132,22 @@ function sanitizeInkStations(
       || !Number.isFinite(dab.alpha)
       || dab.radius <= 0
     ) continue;
+    const chiselMinor = typeof dab.radiusY === "number"
+        && Number.isFinite(dab.radiusY)
+        && dab.radiusY > 0
+      ? clamp(dab.radiusY, 0.25, RADIUS_LIMIT)
+      : null;
     const station = Object.freeze({
       x: clamp(dab.x, -COORDINATE_LIMIT, COORDINATE_LIMIT),
       y: clamp(dab.y, -COORDINATE_LIMIT, COORDINATE_LIMIT),
       radius: clamp(dab.radius, 0.25, RADIUS_LIMIT),
       alpha: clamp(dab.alpha, 0, 1),
+      ...(chiselMinor !== null
+        ? {
+            radiusY: chiselMinor,
+            angleRadians: Number.isFinite(dab.angleRadians) ? dab.angleRadians! : 0,
+          }
+        : {}),
     });
     const previous = stations.at(-1);
     if (
@@ -142,15 +179,17 @@ function bodyPolygon(
   const normalY = dx / length;
   // Emitted right-side-forward: with a strictly positive length and radius the left-side-forward
   // order is always negatively wound, so this is the re-wound result without measuring it.
+  const fromHalf = nibSupport(from, normalX, normalY);
+  const toHalf = nibSupport(to, normalX, normalY);
   return Object.freeze([
-    quantize(from.x - normalX * from.radius),
-    quantize(from.y - normalY * from.radius),
-    quantize(to.x - normalX * to.radius),
-    quantize(to.y - normalY * to.radius),
-    quantize(to.x + normalX * to.radius),
-    quantize(to.y + normalY * to.radius),
-    quantize(from.x + normalX * from.radius),
-    quantize(from.y + normalY * from.radius),
+    quantize(from.x - normalX * fromHalf),
+    quantize(from.y - normalY * fromHalf),
+    quantize(to.x - normalX * toHalf),
+    quantize(to.y - normalY * toHalf),
+    quantize(to.x + normalX * toHalf),
+    quantize(to.y + normalY * toHalf),
+    quantize(from.x + normalX * fromHalf),
+    quantize(from.y + normalY * fromHalf),
   ]);
 }
 
@@ -158,9 +197,11 @@ function roundPolygon(station: InkStation): readonly number[] {
   const points: number[] = [];
   for (let step = 0; step < ROUND_STEPS; step += 1) {
     const angle = TAU * step / ROUND_STEPS;
+    // Round nib: nibSupport answers `radius` in every direction, so this is the original circle.
+    const support = nibSupport(station, Math.cos(angle), Math.sin(angle));
     points.push(
-      quantize(station.x + Math.cos(angle) * station.radius),
-      quantize(station.y + Math.sin(angle) * station.radius),
+      quantize(station.x + Math.cos(angle) * support),
+      quantize(station.y + Math.sin(angle) * support),
     );
   }
   // Ascending angles are already positively wound, so the generic re-winding copy is skipped.

@@ -573,6 +573,17 @@ export interface StudioStampBrushDab {
   readonly alpha: number;
   /** 결정적 그레인 지터 시드. 시작 탭은 항상 0이다. */
   readonly index: number;
+  /**
+   * 납작 촉(chisel/nib) 기하 — `radius`가 장축, 이 값이 단축이다.
+   *
+   * 두 필드는 **함께 있거나 함께 없다**. 없으면 dab 은 정원이고 계획은 기존과 비트 동일하다
+   * (`elliptical_dab_ratio` 를 선언하지 않은 모든 브러시가 그대로 유지된다). 이 기하가 실행되지
+   * 않던 동안 CC0 캘리그래피(ratio 5.46)와 광폭 마커(ratio 10.0)는 상류 .myb 가 명확히 다른데도
+   * 렌더 거리 0.186 으로 서로 붙어 있었다 — 두 매체를 실제로 가르는 것이 바로 이 납작함이다.
+   */
+  readonly radiusY?: number;
+  /** 장축 방향(라디안). `radiusY` 와 함께만 존재한다. */
+  readonly angleRadians?: number;
 }
 
 export function beginStampWalker(x: number, y: number, pressure: number): StudioStampWalkerState {
@@ -617,10 +628,18 @@ function stampDotPlan(
       radius *= Math.exp((stampJitter(index, 97) - 0.5) * cc0Dynamics.radiusJitter);
     }
   }
+  // 납작 촉: ratio 는 장축/단축 비, angle 은 장축 방향(도). 둘 다 선언된 레인만 타원을 낸다.
+  const chisel = cc0Dynamics?.ellipticalRatio && cc0Dynamics.ellipticalRatio > 1
+    ? {
+        radiusY: radius / cc0Dynamics.ellipticalRatio,
+        angleRadians: (cc0Dynamics.ellipticalAngleDegrees ?? 0) * Math.PI / 180,
+      }
+    : null;
   return {
     x: dabX,
     y: dabY,
     radius,
+    ...(chisel ?? {}),
     // 종이 프로그램을 핀한 레인만 W7 peak-catch 침착을 곱한다(planner 레벨 — Canvas·SVG 공유).
     alpha: style.paperGrain
       ? clamp01(
@@ -728,6 +747,32 @@ function getCachedDabTipCanvas(
 }
 
 function drawDab(
+  context: CanvasRenderingContext2D,
+  style: StudioStampBrushStyle,
+  x: number,
+  y: number,
+  radius: number,
+  alpha: number,
+  index: number
+): void {
+  // 납작 촉은 dab 종류마다 따로 구현하지 않고 한 번의 변환으로 처리한다: 원점으로 옮겨 장축 방향으로
+  // 회전한 뒤 단축을 눌러 그리면 pencil·gradient 등 아래의 모든 분기가 그대로 타원이 된다. ratio 와
+  // angle 은 프리셋 상수(dab 마다 랜덤이 아님)라 계획 경로와 스트리밍 경로가 자동으로 일치한다.
+  const chiselRatio = style.mypaintCc0Dynamics?.ellipticalRatio ?? 0;
+  if (chiselRatio > 1 && typeof context.translate === "function") {
+    const angle = (style.mypaintCc0Dynamics?.ellipticalAngleDegrees ?? 0) * Math.PI / 180;
+    context.save();
+    context.translate(x, y);
+    context.rotate(angle);
+    context.scale(1, 1 / chiselRatio);
+    drawRoundDab(context, style, 0, 0, radius, alpha, index);
+    context.restore();
+    return;
+  }
+  drawRoundDab(context, style, x, y, radius, alpha, index);
+}
+
+function drawRoundDab(
   context: CanvasRenderingContext2D,
   style: StudioStampBrushStyle,
   x: number,
@@ -943,6 +988,14 @@ function walkStampSegmentPlan(
       x: px,
       y: py,
       radius,
+      // 납작 촉은 stampDotPlan 과 같은 규약으로 실린다 — 시작 도트만 타원이고 본문은 원인
+      // 상태가 되지 않도록 두 경로가 같은 필드를 낸다.
+      ...(cc0Dynamics?.ellipticalRatio && cc0Dynamics.ellipticalRatio > 1
+        ? {
+            radiusY: radius / cc0Dynamics.ellipticalRatio,
+            angleRadians: (cc0Dynamics.ellipticalAngleDegrees ?? 0) * Math.PI / 180,
+          }
+        : {}),
       // 종이 스테이션 샘플: 핀된 레인만 dab 위치의 W7 peak-catch 침착을 곱한다. 저필압은
       // 봉우리만 받아 이빨이 드러나고, 고필압은 골까지 잠겨 스케일이 1로 수렴한다.
       alpha: paperGrain
