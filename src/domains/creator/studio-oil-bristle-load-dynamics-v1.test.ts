@@ -221,12 +221,17 @@ describe("oil ribbon carrier × bristle load dynamics program flag", () => {
     });
     const legacy = planStudioOilRibbonCarrier(dabs);
     const strokeMidX = 1_000;
+    // 갈필 has two visible halves — the tail lays FEWER marks and the marks it does lay are
+    // LIGHTER — so both are measured, per half, weighted by stations.
+    //
     // Runs are counted ONCE each, keyed by geometry, because lanes are cumulative shells: a run in
     // load band m is repainted by shells 0..m, so walking `lane.runs` naively counts a loaded run
-    // m+1 times in the denominator and once in the numerator, which drives the share toward zero
-    // for exactly the runs the assertion is about. A run's band is the highest `loadBand` among the
-    // shells carrying it — the innermost shell it survives into.
-    const topBandShare = (plan: typeof legacy, tail: boolean) => {
+    // m+1 times. A run's band is the highest `loadBand` among the shells carrying it — the
+    // innermost shell it survives into. Stations, not runs: consecutive runs of one hair that stay
+    // in the same band are welded into one furrow, so a furrow can begin in the head and deposit
+    // right through the tail, and counting whole runs by their first x credits the tail's paint to
+    // the head.
+    const halfStats = (plan: typeof legacy, tail: boolean) => {
       const bandByRun = new Map<string, number>();
       for (const lane of plan.bristleLanes) {
         for (const run of lane.runs) {
@@ -234,24 +239,33 @@ describe("oil ribbon carrier × bristle load dynamics program flag", () => {
           bandByRun.set(key, Math.max(bandByRun.get(key) ?? 0, lane.loadBand));
         }
       }
-      const topBand = Math.max(...plan.bristleLanes.map(({ loadBand }) => loadBand));
-      let loaded = 0;
-      let total = 0;
+      let stations = 0;
+      let bandSum = 0;
       for (const [key, band] of bandByRun) {
-        const startX = Number.parseFloat(key.slice(0, key.indexOf(",")));
-        if (tail ? startX < strokeMidX : startX >= strokeMidX) continue;
-        total += 1;
-        if (band === topBand && topBand > 0) loaded += 1;
+        const coordinates = key.split(",");
+        for (let index = 0; index < coordinates.length; index += 2) {
+          const x = Number.parseFloat(coordinates[index]!);
+          if (tail ? x < strokeMidX : x >= strokeMidX) continue;
+          stations += 1;
+          bandSum += band;
+        }
       }
-      return total > 0 ? loaded / total : 0;
+      return { stations, meanBand: stations > 0 ? bandSum / stations : 0 };
     };
-    // Depletion must push the tail's runs out of the top load band relative to
-    // the head — the legacy plan shows only band-noise asymmetry (< 0.08).
-    const dynamicDrop = topBandShare(dynamic, false) - topBandShare(dynamic, true);
-    const legacyDrop = topBandShare(legacy, false) - topBandShare(legacy, true);
-    expect(dynamicDrop).toBeGreaterThan(legacyDrop + 0.08);
-    // The tail itself must be nearly dry of top-band ridges.
-    expect(topBandShare(dynamic, true)).toBeLessThan(0.05);
+    const dynamicHead = halfStats(dynamic, false);
+    const dynamicTail = halfStats(dynamic, true);
+    const legacyHead = halfStats(legacy, false);
+    const legacyTail = halfStats(legacy, true);
+    // The tail must run out of paint: far fewer deposited stations than the head, where the legacy
+    // plan — which models no reservoir at all — carries its load to the end. Measured 6504 -> 930
+    // (86% down) against legacy's 7410 -> 6386 (14% down).
+    const dynamicKeep = dynamicTail.stations / dynamicHead.stations;
+    const legacyKeep = legacyTail.stations / legacyHead.stations;
+    expect(dynamicKeep).toBeLessThan(legacyKeep * 0.5);
+    expect(dynamicKeep).toBeLessThan(0.35);
+    // …and what it does lay must be lighter. Legacy's mean band is flat across the stroke.
+    expect(dynamicHead.meanBand - dynamicTail.meanBand)
+      .toBeGreaterThan(legacyHead.meanBand - legacyTail.meanBand + 0.5);
   });
 
   it("stays green on the legacy contract shapes when enabled", () => {

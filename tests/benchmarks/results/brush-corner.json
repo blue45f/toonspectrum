@@ -1,0 +1,377 @@
+{
+  "schema": "toon-brush-corner-sweep-v2",
+  "generatedAtUtc": "2026-08-15T20:10:27.374Z",
+  "strokeWidth": 22,
+  "nearRadius": 30.799999999999997,
+  "farBand": [
+    66,
+    154
+  ],
+  "overshootLimit": 1.3,
+  "holeLimit": 2,
+  "measured": 170,
+  "suspect": 1,
+  "worst": [
+    {
+      "id": "web-neon-tube",
+      "overshootRatio": 1.5,
+      "coreHoleRatio": 0.9901878404906157,
+      "nearOvershootPx": 3.1819805153394642,
+      "farOvershootPx": 2.121320343559643,
+      "nearHole": 0.7423843550206844,
+      "farHole": 0.7497409326424871
+    },
+    {
+      "id": "pastel--cake-soft",
+      "overshootRatio": 1.2857142857142858,
+      "coreHoleRatio": 0.9087748163382946,
+      "nearOvershootPx": 3.1819805153394642,
+      "farOvershootPx": 2.4748737341529163,
+      "nearHole": 0.779992478375329,
+      "farHole": 0.8582901554404145
+    },
+    {
+      "id": "perfect-marker",
+      "overshootRatio": 1.2352941176470589,
+      "coreHoleRatio": 0,
+      "nearOvershootPx": 14.849242404917499,
+      "farOvershootPx": 12.020815280171309,
+      "nearHole": 0,
+      "farHole": 0
+    },
+    {
+      "id": "sketchpad-soft-marker",
+      "overshootRatio": 1.1818181818181819,
+      "coreHoleRatio": 0.9459471314637614,
+      "nearOvershootPx": 4.59619407771256,
+      "farOvershootPx": 3.8890872965260117,
+      "nearHole": 0.320421210981572,
+      "farHole": 0.3387305699481865
+    },
+    {
+      "id": "dry-media",
+      "overshootRatio": 1.1666666666666665,
+      "coreHoleRatio": 0.9923707315937051,
+      "nearOvershootPx": 2.4748737341529163,
+      "farOvershootPx": 2.121320343559643,
+      "nearHole": 0.9714178262504701,
+      "farHole": 0.9788860103626943
+    },
+    {
+      "id": "parallel-pen",
+      "overshootRatio": 1,
+      "coreHoleRatio": 1.7863858593456186,
+      "nearOvershootPx": 11.667261889578034,
+      "farOvershootPx": 11.667261889578034,
+      "nearHole": 0.035727717186912374,
+      "farHole": 0
+    },
+    {
+      "id": "marker--soft-dynamic",
+      "overshootRatio": 1.1538461538461537,
+      "coreHoleRatio": 1.0346593973378775,
+      "nearOvershootPx": 5.303300858899107,
+      "farOvershootPx": 4.59619407771256,
+      "nearHole": 0.23467468973298233,
+      "farHole": 0.22681347150259068
+    },
+    {
+      "id": "mypaint-cc0--ink-blot",
+      "overshootRatio": 1.15,
+      "coreHoleRatio": 1.158899061693124,
+      "nearOvershootPx": 8.131727983645296,
+      "farOvershootPx": 7.0710678118654755,
+      "nearHole": 0.035727717186912374,
+      "farHole": 0.030829015544041452
+    },
+    {
+      "id": "oil-pastel--wgm-mix",
+      "overshootRatio": 1.125,
+      "coreHoleRatio": 0.920671170845981,
+      "nearOvershootPx": 3.1819805153394642,
+      "farOvershootPx": 2.8284271247461903,
+      "nearHole": 0.6051147047762316,
+      "farHole": 0.6572538860103627
+    },
+    {
+      "id": "inkwash-white-ink",
+      "overshootRatio": 1.1224489795918366,
+      "coreHoleRatio": 0,
+      "nearOvershootPx": 19.445436482630058,
+      "farOvershootPx": 17.324116139070416,
+      "nearHole": 0,
+      "farHole": 0
+    },
+    {
+      "id": "oil-pastel--waxy-film",
+      "overshootRatio": 1.111111111111111,
+      "coreHoleRatio": 0.9994696553409607,
+      "nearOvershootPx": 3.5355339059327378,
+      "farOvershootPx": 3.1819805153394642,
+      "nearHole": 0.5693869875893193,
+      "farHole": 0.5696891191709844
+    },
+    {
+      "id": "inkwash-pen",
+      "overshootRatio": 1.090909090909091,
+      "coreHoleRatio": 0,
+      "nearOvershootPx": 12.727922061357857,
+      "farOvershootPx": 11.667261889578034,
+      "nearHole": 0,
+      "farHole": 0
+    },
+    {
+      "id": "airbrush",
+      "overshootRatio": 1.0833333333333333,
+      "coreHoleRatio": 0.9710896186639109,
+      "nearOvershootPx": 4.59619407771256,
+      "farOvershootPx": 4.242640687119286,
+      "nearHole": 0.29447160586686727,
+      "farHole": 0.3032383419689119
+    },
+    {
+      "id": "gpen",
+      "overshootRatio": 1.0714285714285714,
+      "coreHoleRatio": 0,
+      "nearOvershootPx": 15.90990257669732,
+      "farOvershootPx": 14.849242404917499,
+      "nearHole": 0,
+      "farHole": 0
+    },
+    {
+      "id": "oil",
+      "overshootRatio": 1.0666666666666667,
+      "coreHoleRatio": 0,
+      "nearOvershootPx": 11.313708498984761,
+      "farOvershootPx": 10.606601717798213,
+      "nearHole": 0,
+      "farHole": 0
+    },
+    {
+      "id": "ink-particle",
+      "overshootRatio": 1.0625,
+      "coreHoleRatio": 1.0893042155804593,
+      "nearOvershootPx": 6.0104076400856545,
+      "farOvershootPx": 5.656854249492381,
+      "nearHole": 0.09326814591951861,
+      "farHole": 0.08562176165803109
+    },
+    {
+      "id": "airbrush-fine",
+      "overshootRatio": 1.0555555555555554,
+      "coreHoleRatio": 0.620534035351636,
+      "nearOvershootPx": 6.7175144212722016,
+      "farOvershootPx": 6.3639610306789285,
+      "nearHole": 0.01241068070703272,
+      "farHole": 0
+    },
+    {
+      "id": "crosshatch",
+      "overshootRatio": 1.0454545454545454,
+      "coreHoleRatio": 0.9585886293975366,
+      "nearOvershootPx": 16.263455967290593,
+      "farOvershootPx": 15.556349186104047,
+      "nearHole": 0.6404663407295976,
+      "farHole": 0.6681347150259067
+    },
+    {
+      "id": "airbrush--stamp-soft",
+      "overshootRatio": 1.0454545454545454,
+      "coreHoleRatio": 0.056412185031966905,
+      "nearOvershootPx": 8.131727983645296,
+      "farOvershootPx": 7.778174593052023,
+      "nearHole": 0.0011282437006393381,
+      "farHole": 0
+    },
+    {
+      "id": "watercolor--dense-core",
+      "overshootRatio": 1.0377358490566038,
+      "coreHoleRatio": 0,
+      "nearOvershootPx": 19.445436482630058,
+      "farOvershootPx": 18.73832970144351,
+      "nearHole": 0,
+      "farHole": 0
+    },
+    {
+      "id": "web-cross-hatch-pen",
+      "overshootRatio": 1.0285714285714287,
+      "coreHoleRatio": 0.9235206604306385,
+      "nearOvershootPx": 12.727922061357857,
+      "farOvershootPx": 12.374368670764582,
+      "nearHole": 0.5231289958631065,
+      "farHole": 0.5664507772020725
+    },
+    {
+      "id": "glitter",
+      "overshootRatio": 1.027027027027027,
+      "coreHoleRatio": 1.0825709115500786,
+      "nearOvershootPx": 13.435028842544403,
+      "farOvershootPx": 13.08147545195113,
+      "nearHole": 0.6254230913877398,
+      "farHole": 0.5777202072538861
+    },
+    {
+      "id": "screentone",
+      "overshootRatio": 1.027027027027027,
+      "coreHoleRatio": 0.994265413718814,
+      "nearOvershootPx": 13.435028842544403,
+      "farOvershootPx": 13.08147545195113,
+      "nearHole": 0.6494922903347123,
+      "farHole": 0.653238341968912
+    },
+    {
+      "id": "pencil-grain",
+      "overshootRatio": 1.0263157894736843,
+      "coreHoleRatio": 0,
+      "nearOvershootPx": 13.788582233137678,
+      "farOvershootPx": 13.435028842544403,
+      "nearHole": 0,
+      "farHole": 0
+    },
+    {
+      "id": "mypaint-cc0--oil-paint",
+      "overshootRatio": 1.0263157894736843,
+      "coreHoleRatio": 0,
+      "nearOvershootPx": 13.788582233137678,
+      "farOvershootPx": 13.435028842544403,
+      "nearHole": 0,
+      "farHole": 0
+    },
+    {
+      "id": "brush--bristle-depletion",
+      "overshootRatio": 1.0250000000000001,
+      "coreHoleRatio": 0,
+      "nearOvershootPx": 14.495689014324226,
+      "farOvershootPx": 14.142135623730951,
+      "nearHole": 0,
+      "farHole": 0
+    },
+    {
+      "id": "acrylic",
+      "overshootRatio": 1.0238095238095237,
+      "coreHoleRatio": 0,
+      "nearOvershootPx": 15.202795795510772,
+      "farOvershootPx": 14.849242404917499,
+      "nearHole": 0,
+      "farHole": 0
+    },
+    {
+      "id": "mypaint-cc0--pastel",
+      "overshootRatio": 1.0212765957446808,
+      "coreHoleRatio": 0,
+      "nearOvershootPx": 16.970562748477143,
+      "farOvershootPx": 16.61700935788387,
+      "nearHole": 0,
+      "farHole": 0
+    },
+    {
+      "id": "web-contour-double",
+      "overshootRatio": 1.0005943536928903,
+      "coreHoleRatio": 0,
+      "nearOvershootPx": 10.259142264341596,
+      "farOvershootPx": 10.25304832720494,
+      "nearHole": 0,
+      "farHole": 0
+    },
+    {
+      "id": "pen",
+      "overshootRatio": 1,
+      "coreHoleRatio": 0,
+      "nearOvershootPx": 14.495689014324226,
+      "farOvershootPx": 14.495689014324226,
+      "nearHole": 0,
+      "farHole": 0
+    },
+    {
+      "id": "fineliner",
+      "overshootRatio": 1,
+      "coreHoleRatio": 0,
+      "nearOvershootPx": 8.838834764831844,
+      "farOvershootPx": 8.838834764831844,
+      "nearHole": 0,
+      "farHole": 0
+    },
+    {
+      "id": "ballpoint",
+      "overshootRatio": 1,
+      "coreHoleRatio": 0,
+      "nearOvershootPx": 9.899494936611665,
+      "farOvershootPx": 9.899494936611665,
+      "nearHole": 0,
+      "farHole": 0
+    },
+    {
+      "id": "glass-pen",
+      "overshootRatio": 1,
+      "coreHoleRatio": 0,
+      "nearOvershootPx": 10.960155108391488,
+      "farOvershootPx": 10.960155108391488,
+      "nearHole": 0,
+      "farHole": 0
+    },
+    {
+      "id": "maru-pen",
+      "overshootRatio": 1,
+      "coreHoleRatio": 0.5265137269650244,
+      "nearOvershootPx": 8.838834764831844,
+      "farOvershootPx": 8.838834764831844,
+      "nearHole": 0.010530274539300489,
+      "farHole": 0
+    },
+    {
+      "id": "mapping-pen",
+      "overshootRatio": 1,
+      "coreHoleRatio": 0.8273787138021812,
+      "nearOvershootPx": 7.0710678118654755,
+      "farOvershootPx": 7.0710678118654755,
+      "nearHole": 0.016547574276043624,
+      "farHole": 0
+    },
+    {
+      "id": "ink-brush",
+      "overshootRatio": 1,
+      "coreHoleRatio": 0,
+      "nearOvershootPx": 8.485281374238571,
+      "farOvershootPx": 8.485281374238571,
+      "nearHole": 0,
+      "farHole": 0
+    },
+    {
+      "id": "calligraphy",
+      "overshootRatio": 1,
+      "coreHoleRatio": 0.866809895463905,
+      "nearOvershootPx": 11.313708498984761,
+      "farOvershootPx": 11.313708498984761,
+      "nearHole": 0.13990221887927792,
+      "farHole": 0.16139896373056994
+    },
+    {
+      "id": "fountain-pen",
+      "overshootRatio": 1,
+      "coreHoleRatio": 0.9561223457198482,
+      "nearOvershootPx": 8.838834764831844,
+      "farOvershootPx": 8.838834764831844,
+      "nearHole": 0.06167732230161715,
+      "farHole": 0.06450777202072538
+    },
+    {
+      "id": "perfect-ink",
+      "overshootRatio": 1,
+      "coreHoleRatio": 0,
+      "nearOvershootPx": 14.495689014324226,
+      "farOvershootPx": 14.495689014324226,
+      "nearHole": 0,
+      "farHole": 0
+    },
+    {
+      "id": "standard-eraser",
+      "overshootRatio": 1,
+      "coreHoleRatio": 0,
+      "nearOvershootPx": 14.495689014324226,
+      "farOvershootPx": 14.495689014324226,
+      "nearHole": 0,
+      "farHole": 0
+    }
+  ],
+  "failures": []
+}

@@ -25,7 +25,7 @@ import {
 import { applyStudioOilWetIntoWetStroke } from "./studio-oil-wet-into-wet";
 import { parseStudioGpuColor } from "./studio-webgpu-color";
 
-import type { FxOilDab } from "./studio-fx-brush";
+import type { FxOilBristle, FxOilDab } from "./studio-fx-brush";
 
 export { applyStudioOilWetIntoWetStroke };
 
@@ -1041,9 +1041,12 @@ export const STUDIO_OIL_IMPASTO_RELIEF_HIGHLIGHT_COLOR = "#ffffff" as const;
 
 /**
  * Program budget: the stroke-local height grid never exceeds this long side (cells). Held at the
- * cap because the interior signal — corrugation between hairs pitched ~0.3·radiusY apart — needs
- * ≥3 cells per pitch before the Sobel window can see it; central differences are blind to
- * period-2 patterns, so a coarser tile silently flattens the whole bristle bed.
+ * cap because the Sobel window must span a ridge's own cross-section before it can read its
+ * slope — a ridge is the hair's footprint wide (~0.3·radiusY, see `impastoRidgeWidth`), so a
+ * coarser tile than a couple of cells per ridge silently flattens the whole bristle bed. It does
+ * NOT have to resolve the hair PITCH: hairs packed closer than their own footprint merge into one
+ * plateau in the paint as well as in the tile, which is why the tent is sized by the hair rather
+ * than by this grid.
  */
 const IMPASTO_RELIEF_GRID_LONG_SIDE = 256;
 /**
@@ -1059,11 +1062,22 @@ const IMPASTO_RELIEF_FILM_HEIGHT = 0.5;
 /** Extra standing-paint level a fully loaded bristle ridge adds on top of the film. */
 const IMPASTO_RELIEF_RIDGE_HEIGHT = 0.55;
 /**
- * Ridge cross-section radius in cells. Deliberately narrower than the hair pitch (~0.3·radiusY)
- * at typical grids: at 1.15 the neighbouring tents merged into one plateau and the whole bristle
- * bed shaded flat — the corrugation between hairs IS the interior impasto signal.
+ * FLOOR for the ridge cross-section radius, in cells. The radius itself is the hair's own
+ * half-footprint (`impastoRidgeWidth`), not a multiple of the grid cell; this only stops a very
+ * fine hair on a coarse tile from becoming a sub-cell needle the Sobel window cannot see.
+ *
+ * It used to BE the model, at 0.8 cells for every hair, and that is what broke the lamp when the
+ * bed stopped being seven hairs. A tent whose width is set by the grid instead of by the brush is
+ * a ridge train sampled at whatever ratio the two happen to land on: at a 26px head the hairs sit
+ * 1.178px apart on a 1.076px cell, so successive crests fall 1.09 cells apart and which cell
+ * centre catches a crest drifts once every ~11 cells. That fold is not paint — it put a smooth
+ * 0.51 → 0.62 hump across the middle of the height field (an 11-cell moiré period, measured), and
+ * the lamp lit that hump into a bright band straight down the centreline, tying the body's own top
+ * rim. Sizing the tent by the hair instead makes the field band-limited by construction: hairs
+ * whose footprints overlap merge into one honest plateau exactly as the pigment lanes do, and
+ * hairs far enough apart to leave a furrow still leave one.
  */
-const IMPASTO_RELIEF_RIDGE_REACH_CELLS = 0.8;
+const IMPASTO_RELIEF_RIDGE_REACH_MIN_CELLS = 0.8;
 /** Film rim slope width in cells — the body edge is a paint cliff, not a hard alias step. */
 const IMPASTO_RELIEF_EDGE_FEATHER_CELLS = 1.5;
 /**
@@ -1111,6 +1125,8 @@ interface ImpastoReliefField {
   readonly originY: number;
   /** Hairs skipped between ridges — the flank stripes must walk the bed on the same stride. */
   readonly hairStride: number;
+  /** First hair the stride starts from, so the sampled bed stays centred on the ribbon. */
+  readonly hairOffset: number;
   /** Flat-normalized dli shading multipliers (1 = flat paint). */
   readonly shading: Float32Array;
 }
@@ -1139,6 +1155,18 @@ function impastoHairStride(
   const ribbonWidth = 2 * mean(stations.map((station) => station.radiusY));
   const resolvable = Math.max(1, Math.floor(ribbonWidth / cell));
   return Math.max(1, Math.round(bristleCount / Math.min(bristleCount, resolvable)));
+}
+
+/**
+ * Cross-stroke width of the standing ridge one hair leaves, in canvas px.
+ *
+ * Single source for both halves of the overlay: the height field raises its tent this wide and the
+ * flank stripes are drawn and probed against the same number. They were two copies of the same
+ * expression, and the field's copy had drifted onto the grid cell — which is precisely how the
+ * field came to model a 1.7px ridge while the geometry drew a 2.7px one on top of it.
+ */
+function impastoRidgeWidth(station: OilCarrierStation, hair: FxOilBristle): number {
+  return Math.max(0.38, station.radiusY * (0.15 + hair.radiusYRatio * 1.18));
 }
 
 function impastoBristleCount(stations: readonly OilCarrierStation[]): number {
@@ -1237,11 +1265,17 @@ function buildImpastoReliefField(
   const ridge = new Float32Array(cellCount);
   const bristleCount = impastoBristleCount(stations);
   const hairStride = impastoHairStride(stations, cell, bristleCount);
-  const ridgeReach = cell * IMPASTO_RELIEF_RIDGE_REACH_CELLS;
+  // Centred, not started at zero. Walking `0, stride, 2·stride, …` leaves the remainder entirely at
+  // the far edge of the bed, so one side of the ribbon keeps its outermost ridges and the other
+  // loses them — and a lamp asked which flank is lit then answers from an asymmetric bed. Offset
+  // by half the remainder so the sampled hairs straddle the centreline evenly.
+  const hairOffset = Math.floor((((bristleCount - 1) % hairStride) + 1) / 2);
+  const minRidgeReach = cell * IMPASTO_RELIEF_RIDGE_REACH_MIN_CELLS;
   const hairX = new Float64Array(stations.length);
   const hairY = new Float64Array(stations.length);
   const hairLoad = new Float64Array(stations.length);
-  for (let bristleIndex = 0; bristleIndex < bristleCount; bristleIndex += hairStride) {
+  const hairReach = new Float64Array(stations.length);
+  for (let bristleIndex = hairOffset; bristleIndex < bristleCount; bristleIndex += hairStride) {
     for (let index = 0; index < stations.length; index += 1) {
       const station = stations[index]!;
       const hair = station.source.bristles[bristleIndex]!;
@@ -1249,6 +1283,7 @@ function buildImpastoReliefField(
       hairX[index] = station.x + station.normalX * offset;
       hairY[index] = station.y + station.normalY * offset;
       hairLoad[index] = clamp(station.opacity * hair.opacity, 0, 1);
+      hairReach[index] = Math.max(minRidgeReach, impastoRidgeWidth(station, hair) * 0.5);
     }
     for (let index = 0; index + 1 < stations.length; index += 1) {
       const fromX = hairX[index]!;
@@ -1259,33 +1294,56 @@ function buildImpastoReliefField(
       const toLoad = hairLoad[index + 1]!;
       const segmentX = toX - fromX;
       const segmentY = toY - fromY;
-      const steps = Math.max(
-        1,
-        Math.ceil(Math.sqrt(segmentX * segmentX + segmentY * segmentY) / (cell * 0.6)),
-      );
+      // The hair keeps one diameter over a segment (only `contact` varies with travel, and only
+      // slightly), so one reach is the whole ridge for that segment.
+      const ridgeReach = Math.max(hairReach[index]!, hairReach[index + 1]!);
       const ridgeReachSquared = ridgeReach * ridgeReach;
-      // s = 0 duplicates the previous segment's endpoint sample; only the first segment needs it.
-      for (let step = index === 0 ? 0 : 1; step <= steps; step += 1) {
-        const t = step / steps;
-        const pointX = fromX + segmentX * t;
-        const pointY = fromY + segmentY * t;
-        const level = IMPASTO_RELIEF_RIDGE_HEIGHT
-          * (0.25 + 0.75 * (fromLoad + (toLoad - fromLoad) * t));
-        const minCellX = Math.max(0, Math.floor((pointX - ridgeReach - minX) / cell));
-        const maxCellX = Math.min(gridWidth - 1, Math.ceil((pointX + ridgeReach - minX) / cell));
-        const minCellY = Math.max(0, Math.floor((pointY - ridgeReach - minY) / cell));
-        const maxCellY = Math.min(gridHeight - 1, Math.ceil((pointY + ridgeReach - minY) / cell));
-        for (let cellY = minCellY; cellY <= maxCellY; cellY += 1) {
-          const deltaY = minY + (cellY + 0.5) * cell - pointY;
-          const deltaYSquared = deltaY * deltaY;
-          for (let cellX = minCellX; cellX <= maxCellX; cellX += 1) {
-            const deltaX = minX + (cellX + 0.5) * cell - pointX;
-            const distanceSquared = deltaX * deltaX + deltaYSquared;
-            if (distanceSquared >= ridgeReachSquared) continue;
-            const value = level * (1 - Math.sqrt(distanceSquared) / ridgeReach);
-            const at = cellY * gridWidth + cellX;
-            if (value > ridge[at]!) ridge[at] = value;
-          }
+      // ONE capsule per segment, not a chain of overlapping discs.
+      //
+      // The tent is a distance falloff, so the max over a dense chain of point splats IS the
+      // segment's distance field — the chain was only ever quadrature for it, and a badly
+      // over-sampled one: the discs were stepped at 0.6 of a tent radius while each is two radii
+      // wide, so every cell under the ridge was re-read and re-compared three to five times to
+      // arrive at the value the closed form gives once. Rasterising the capsule directly drops
+      // that multiplier, and it is also the more faithful ridge: point quadrature scallops the
+      // crest between taps, the distance field does not.
+      const lengthSquared = segmentX * segmentX + segmentY * segmentY;
+      const inverseLengthSquared = lengthSquared > POINT_EPSILON ? 1 / lengthSquared : 0;
+      const loadSpan = toLoad - fromLoad;
+      const minCellX = Math.max(
+        0,
+        Math.floor((Math.min(fromX, toX) - ridgeReach - minX) / cell),
+      );
+      const maxCellX = Math.min(
+        gridWidth - 1,
+        Math.ceil((Math.max(fromX, toX) + ridgeReach - minX) / cell),
+      );
+      const minCellY = Math.max(
+        0,
+        Math.floor((Math.min(fromY, toY) - ridgeReach - minY) / cell),
+      );
+      const maxCellY = Math.min(
+        gridHeight - 1,
+        Math.ceil((Math.max(fromY, toY) + ridgeReach - minY) / cell),
+      );
+      for (let cellY = minCellY; cellY <= maxCellY; cellY += 1) {
+        const pointY = minY + (cellY + 0.5) * cell - fromY;
+        for (let cellX = minCellX; cellX <= maxCellX; cellX += 1) {
+          const pointX = minX + (cellX + 0.5) * cell - fromX;
+          const t = clamp(
+            (pointX * segmentX + pointY * segmentY) * inverseLengthSquared,
+            0,
+            1,
+          );
+          const deltaX = pointX - segmentX * t;
+          const deltaY = pointY - segmentY * t;
+          const distanceSquared = deltaX * deltaX + deltaY * deltaY;
+          if (distanceSquared >= ridgeReachSquared) continue;
+          const level = IMPASTO_RELIEF_RIDGE_HEIGHT
+            * (0.25 + 0.75 * (fromLoad + loadSpan * t));
+          const value = level * (1 - Math.sqrt(distanceSquared) / ridgeReach);
+          const at = cellY * gridWidth + cellX;
+          if (value > ridge[at]!) ridge[at] = value;
         }
       }
     }
@@ -1299,6 +1357,7 @@ function buildImpastoReliefField(
     originX: minX,
     originY: minY,
     hairStride,
+    hairOffset,
     // dli defaults verbatim (normalScale 7, roughness 0.075, F0 0.05, light (0,−1,1) image-space);
     // only heightScale compensates the single-stroke tile (see the constant above).
     shading: computeStudioImpastoReliefShading(film, {
@@ -1405,6 +1464,7 @@ function planImpastoReliefOverlayLanes(
   // `impastoHairStride`: a stripe on a hair that raised no ridge would sample flat film and claim
   // a glint that is not in the field.
   const stripeStride = field.hairStride;
+  const stripeOffset = field.hairOffset;
 
   const collectRun = (
     runStart: number,
@@ -1458,13 +1518,14 @@ function planImpastoReliefOverlayLanes(
     for (const side of [-1, 1] as const) {
       // Ridge flanks — one lit and one shaded band per hair, clamped inside the body silhouette
       // so a screen-blended glint can never halo outside the paint.
-      for (let bristleIndex = 0; bristleIndex < bristleCount; bristleIndex += stripeStride) {
+      for (
+        let bristleIndex = stripeOffset;
+        bristleIndex < bristleCount;
+        bristleIndex += stripeStride
+      ) {
         collectRun(runStart, runEnd, (station, flankSide) => {
           const hair = station.source.bristles[bristleIndex]!;
-          const ridgeWidth = Math.max(
-            0.38,
-            station.radiusY * (0.15 + hair.radiusYRatio * 1.18),
-          );
+          const ridgeWidth = impastoRidgeWidth(station, hair);
           const width = Math.max(0.4, ridgeWidth * 0.85);
           const offset = station.radiusY * hair.offsetRatio;
           const flankDelta = Math.max(ridgeWidth * 0.5, field.cell * 0.4);

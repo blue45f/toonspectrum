@@ -215,14 +215,12 @@ describe("studio oil ribbon carrier — impasto relief overlay (brush--impasto-r
     // The canonical <30ms budget case is the 2000-station stroke above; this blob-shaped
     // scribble maximises grid area AND splat density, so it only guards pathological blowup.
     //
-    // Raised 45 -> 80 when the bristle bed stopped being seven hairs at every size and started
-    // scaling with head width (this stroke's 26px head now carries twenty). The relief field
-    // raises one ridge per resolvable hair, so its cost is proportional to the bed and the
-    // measurement moved 25 -> 65ms in step with it. Two redundancies found on the way ARE fixed
-    // rather than budgeted for — runs are quantised once instead of once per shell they appear in,
-    // and both the ridges and the flank stripes stride the bed so hairs finer than the field's own
-    // cell are not splatted twice — and the canonical case still holds its original 30ms. What is
-    // left is real work for real texture, and this guard exists to catch blowup, not density.
-    expect(elapsed).toBeLessThan(80);
+    // Held at 45 through a 7 -> 20 hair bed on this stroke. The bed scaling alone took it to 65ms;
+    // every millisecond of that came back out as redundancy rather than as texture, and the ridge
+    // count is unchanged at twenty: runs are quantised once instead of once per shell they appear
+    // in, the ridges and flank stripes stride the bed so hairs finer than the field's own cell are
+    // not splatted twice, and each ridge segment is one capsule distance field instead of a chain
+    // of overlapping discs that was quadrature for exactly that field. Measured 33-38ms.
+    expect(elapsed).toBeLessThan(45);
   });
 });
