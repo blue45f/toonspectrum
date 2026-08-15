@@ -91,6 +91,27 @@ interface LeadershipRecord {
 
 const defaultRegistry: StudioAutosaveDocumentLeadershipRegistry = new Map();
 
+/**
+ * Same-tab overlapping opens (React effect re-run, Strict Mode, key change) must not race the
+ * Web Lock. The registry only helps after the first attempt has written it; this gate covers the
+ * window before that write so one tab cannot demote itself to a follower of its own request.
+ */
+const inflightByRegistry = new WeakMap<
+  StudioAutosaveDocumentLeadershipRegistry,
+  Map<string, Promise<StudioAutosaveDocumentLease>>
+>();
+
+function inflightFor(
+  registry: StudioAutosaveDocumentLeadershipRegistry,
+): Map<string, Promise<StudioAutosaveDocumentLease>> {
+  let inflight = inflightByRegistry.get(registry);
+  if (!inflight) {
+    inflight = new Map();
+    inflightByRegistry.set(registry, inflight);
+  }
+  return inflight;
+}
+
 /** Test seam: an isolated realm registry so specs do not share one tab-wide leadership map. */
 export function createStudioAutosaveDocumentLeadershipRegistry():
 StudioAutosaveDocumentLeadershipRegistry {
@@ -249,6 +270,52 @@ export async function requestStudioAutosaveDocumentLeadership(input: {
   }
   const registry = input.registry ?? defaultRegistry;
   const lockName = studioAutosaveDocumentLockName(input.autosaveKey);
+  const existing = registry.get(lockName);
+  if (existing) return adoptRecord(existing, input.autosaveKey);
+
+  const inflight = inflightFor(registry);
+  const pending = inflight.get(lockName);
+  if (pending) {
+    try {
+      await pending;
+    } catch {
+      // The in-flight open failed; this caller still needs its own attempt.
+    }
+    const after = registry.get(lockName);
+    if (after) return adoptRecord(after, input.autosaveKey);
+  }
+
+  let settleInflight: (lease: StudioAutosaveDocumentLease) => void = () => undefined;
+  let failInflight: (cause: unknown) => void = () => undefined;
+  const gate = new Promise<StudioAutosaveDocumentLease>((resolve, reject) => {
+    settleInflight = resolve;
+    failInflight = reject;
+  });
+  inflight.set(lockName, gate);
+  try {
+    const lease = await acquireStudioAutosaveDocumentLeadership({
+      autosaveKey: input.autosaveKey,
+      locks: input.locks,
+      registry,
+      lockName,
+    });
+    settleInflight(lease);
+    return lease;
+  } catch (cause) {
+    failInflight(cause);
+    throw cause;
+  } finally {
+    if (inflight.get(lockName) === gate) inflight.delete(lockName);
+  }
+}
+
+async function acquireStudioAutosaveDocumentLeadership(input: {
+  readonly autosaveKey: string;
+  readonly locks: StudioAutosaveDocumentLockManagerLike | null | undefined;
+  readonly registry: StudioAutosaveDocumentLeadershipRegistry;
+  readonly lockName: string;
+}): Promise<StudioAutosaveDocumentLease> {
+  const { registry, lockName } = input;
   const existing = registry.get(lockName);
   if (existing) return adoptRecord(existing, input.autosaveKey);
 

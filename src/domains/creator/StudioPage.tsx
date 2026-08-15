@@ -3894,6 +3894,15 @@ function StudioCuttoonEditor({
             role: opened.role,
             basis: opened.lease.basis,
           });
+          if (opened.role === "follower") {
+            void opened.lease.waitForLeadership().then((promoted) => {
+              if (!promoted || disposed) return;
+              setAutosaveDocumentLeadership({
+                role: opened.lease.role,
+                basis: opened.lease.basis,
+              });
+            });
+          }
         }
         return opened;
       })
@@ -4143,10 +4152,11 @@ function StudioCuttoonEditor({
     studioCrdtSceneRuntimeRef.current &&
     studioCrdtReconciledDocument === studioCrdtDocument
   );
+  const studioLiveJam = Boolean(liveRoomQueryParam || !workId);
   const requiresStudioLiveServer = shouldRequireStudioLiveServer({
     expectsSharedDocument,
     draftCollaborationReady: draftCollaboration?.status === "ready",
-    liveJam: Boolean(liveRoomQueryParam || !workId),
+    liveJam: studioLiveJam,
   });
   const isRealtimeTeamSession = requiresStudioLiveServer;
   const collaborationOperationSyncRequired = Boolean(
@@ -46017,7 +46027,7 @@ function clearSelectionForEdit() {
           guides={guides}
           hasAutosave={hasAutosave}
           autosaveDocumentLeadership={autosaveDocumentLeadership}
-          autosaveLiveJam={!requiresStudioLiveServer}
+          autosaveLiveJam={studioLiveJam}
           healCloneArmed={healCloneArmed}
           healCloneCursorRef={healCloneCursorRef}
           healCloneDragPreview={healCloneDragPreview}

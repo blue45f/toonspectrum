@@ -297,6 +297,30 @@ describe("requestStudioAutosaveDocumentLeadership", () => {
     expect(await second.waitForLeadership({ timeoutMs: 0 })).toBe(false);
   });
 
+  it("does not demote a tab that opens the same document twice before the first lock settles", async () => {
+    const locks = new FakeLockManager();
+    const registry = createStudioAutosaveDocumentLeadershipRegistry();
+    const [first, second] = await Promise.all([
+      requestStudioAutosaveDocumentLeadership({
+        autosaveKey: AUTOSAVE_KEY,
+        locks,
+        registry,
+      }),
+      requestStudioAutosaveDocumentLeadership({
+        autosaveKey: AUTOSAVE_KEY,
+        locks,
+        registry,
+      }),
+    ]);
+
+    expect(first.role).toBe("leader");
+    expect(second.role).toBe("leader");
+    await first.release();
+    expect(second.role).toBe("leader");
+    expect(locks.held.has(studioAutosaveDocumentLockName(AUTOSAVE_KEY))).toBe(true);
+    await second.release();
+  });
+
   it("keeps one tab leading itself when the same document is opened twice in that tab", async () => {
     const locks = new FakeLockManager();
     const registry = createStudioAutosaveDocumentLeadershipRegistry();

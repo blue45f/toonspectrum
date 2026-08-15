@@ -367,6 +367,8 @@ describe("Studio Magma/Figma live collaboration session", () => {
     );
     expect(pageSource).toContain("studioAutosaveLeadershipAllowsLocalEdit");
     expect(pageSource).toContain("!persistLeadershipAllowsDraw");
+    expect(pageSource).toContain("autosaveLiveJam={studioLiveJam}");
+    expect(pageSource).not.toContain("autosaveLiveJam={!requiresStudioLiveServer}");
   });
 
   it("lets a persist-follower apply a local stroke on the shipped document path", async () => {
