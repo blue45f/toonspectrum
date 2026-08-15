@@ -32,6 +32,8 @@ import { fileURLToPath } from "node:url";
 
 import { STUDIO_BRUSH_ENGINE_LANE_CATALOG_ROWS } from "../../../src/domains/creator/studio-brush-engine-lane-catalog";
 import { STUDIO_BRUSH_RUNTIME_CONTRACT } from "../../../src/domains/creator/studio-brush-runtime-contract";
+import { materializeStudioBrushCatalogSelection } from "../../../src/domains/creator/studio-brush-selection";
+import { captureStudioDrawPointerPressureContract } from "../../../src/domains/creator/studio-draw-pointer-pressure-contract";
 import { exportPageToSvg } from "../../../src/domains/creator/studio-svg-export";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -100,13 +102,50 @@ const module_ = await import("@resvg/resvg-wasm");
 const require = createRequire(import.meta.url);
 await module_.initWasm(await readFile(require.resolve("@resvg/resvg-wasm/index_bg.wasm")));
 
-function svgFor(
+/**
+ * The pins the app applies at pointer-down, cached per brush.
+ *
+ * Without them this probe compares the WRONG ENGINES. `studio-svg-export` strips an absent
+ * dynamics snapshot through `studioReplaySafeBrushDynamicsSettingsForBrushId`, so dry media falls
+ * to the union carrier and serialises as one flat path instead of ~900 stamps; without
+ * `materialPressureModel` the retained media take their pre-rollout fixed-width route where
+ * pressure reaches neither nib nor pigment; and without `mode` an eraser draws as a pen. A
+ * duplicate verdict measured on a route no artist can take is not a verdict about the brushes.
+ */
+const pinCache = new Map<string, {
+  brushDynamics: unknown;
+  drawMode: string | null;
+  materialPressureModel: unknown;
+  materialMinimumDiameterRatio: number | undefined;
+}>();
+
+async function pinsFor(brush: string, strokeWidth: number) {
+  const cached = pinCache.get(brush);
+  if (cached) return cached;
+  const selection = await materializeStudioBrushCatalogSelection(brush);
+  const drawMode = (selection as { drawMode?: string } | null)?.drawMode ?? null;
+  const contract = captureStudioDrawPointerPressureContract(
+    { drawMode: drawMode ?? "pen", brush, strokeWidth },
+    false,
+  );
+  const pins = {
+    brushDynamics: selection?.brushDynamics ?? null,
+    drawMode,
+    materialPressureModel: contract.materialPressureModel ?? null,
+    materialMinimumDiameterRatio: contract.materialMinimumDiameterRatio,
+  };
+  pinCache.set(brush, pins);
+  return pins;
+}
+
+async function svgFor(
   brush: string,
   canvas: { width: number; height: number },
   points: number[],
   pressures: number[],
   phase: Phase,
-): string {
+): Promise<string> {
+  const pins = await pinsFor(brush, phase.strokeWidth);
   const { svg } = exportPageToSvg({
     width: canvas.width,
     height: canvas.height,
@@ -123,6 +162,14 @@ function svgFor(
         strokeWidth: phase.strokeWidth,
         opacity: phase.opacity,
         seed: phase.seed,
+        ...(pins.brushDynamics ? { brushDynamics: pins.brushDynamics } : {}),
+        ...(pins.drawMode ? { mode: pins.drawMode } : {}),
+        ...(pins.materialPressureModel
+          ? { materialPressureModel: pins.materialPressureModel }
+          : {}),
+        ...(pins.materialMinimumDiameterRatio === undefined
+          ? {}
+          : { materialMinimumDiameterRatio: pins.materialMinimumDiameterRatio }),
       },
     ] as never,
   });
@@ -435,7 +482,7 @@ for (const row of rows) {
     for (const [phaseIndex, phase] of PHASES.entries()) {
       const tex = textureStroke(phase);
       const texture = measureTexture(
-        renderField(svgFor(id, { width: TEX_W, height: TEX_H }, tex.points, tex.pressures, phase), TEX_W * TEXTURE_SCALE),
+        renderField(await svgFor(id, { width: TEX_W, height: TEX_H }, tex.points, tex.pressures, phase), TEX_W * TEXTURE_SCALE),
       );
       if (!texture) {
         if (phaseIndex === 0) {
@@ -449,7 +496,7 @@ for (const row of rows) {
       for (const angle of ANGLES_DEG) {
         const stroke = responseStroke(angle, REFERENCE_PRESSURE, phase);
         byAngle.push(measureResponse(
-          renderField(svgFor(id, canvas, stroke.points, stroke.pressures, phase), RES_SIZE * RESPONSE_SCALE),
+          renderField(await svgFor(id, canvas, stroke.points, stroke.pressures, phase), RES_SIZE * RESPONSE_SCALE),
           lengthPx,
         ));
       }
@@ -461,7 +508,7 @@ for (const row of rows) {
         }
         const stroke = responseStroke(0, pressure, phase);
         byPressure.push(measureResponse(
-          renderField(svgFor(id, canvas, stroke.points, stroke.pressures, phase), RES_SIZE * RESPONSE_SCALE),
+          renderField(await svgFor(id, canvas, stroke.points, stroke.pressures, phase), RES_SIZE * RESPONSE_SCALE),
           lengthPx,
         ));
       }
