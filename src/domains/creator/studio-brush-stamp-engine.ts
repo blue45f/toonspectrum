@@ -553,22 +553,27 @@ function inkVelocityFactor(normalizedSpeed: number): number {
 }
 
 /**
- * 획 머리에서 속도 감쇠가 붙는 데 걸리는 dab 수.
+ * 획 머리에서 속도 감쇠가 완전히 붙는 데 걸리는 dab 수.
  *
  * 시작 도트(stampDotPlan)에는 속도가 없다 — 펜이 막 닿은 순간이라 정지 상태이고, 정지한 촉이
  * 제 굵기로 찍히는 건 맞다. 문제는 바로 다음 dab 이 이미 측정된 전체 속도로 감쇠된다는 것이다.
  * inkVelocityFactor 의 하한이 0.35 이므로 도트가 본문보다 최대 2.857배 굵어지고, 빠르게 그은
- * 잉크 획은 예외 없이 머리에 혹이 붙는다.
+ * 잉크 획은 예외 없이 머리에 혹이 붙는다 — 한 dab 만에 1.470배가 떨어지는 게 실측값이다.
  *
- * 도트를 얇게 만드는 대신(그리는 시점에 아직 속도를 알 수 없다) 속도 자체를 0에서 실측값까지
- * 끌어올린다. 펜이 순간이동하지 않고 가속하는 셈이라 머리가 제 굵기에서 본문 굵기로 자연스럽게
- * 빠지고, 탭 한 번은 지금과 똑같이 제 굵기로 남는다. dab 간격은 반지름에 비례하므로 dab 수로
- * 세면 램프 길이가 브러시 크기에 따라 알아서 늘고 준다 — 잉크 간격 0.32 기준으로 4 dab 은
- * 획 폭의 약 1.3배다.
+ * 도트를 얇게 만드는 대신(그리는 시점에 아직 속도를 알 수 없다) 감쇠를 1에서 실측값까지
+ * 끌어내린다. 펜이 순간이동하지 않고 가속하는 셈이라 머리가 제 굵기에서 본문 굵기로 자연스럽게
+ * 빠지고, 탭 한 번은 지금과 똑같이 제 굵기로 남는다.
  *
- * state.stampIndex 만 읽으므로 라이브 오버레이·커밋 재생·SVG 내보내기가 같은 값을 본다.
+ * 보간은 속도가 아니라 감쇠 계수를, 그것도 기하적으로 한다. 속도를 램프시키면 계수가 속도에
+ * 선형이고 0.35 에서 잘리는 탓에 빠른 획일수록 전 구간이 한두 dab 에 몰려 램프가 무의미해진다
+ * (속도 3.75 에서 dab 당 최대 2.46배). 계수를 f^t 로 걸면 dab 당 비율이 (1/f)^(1/N) 로 항상
+ * 같아서, 어떤 속도에서도 균일하게 열린다 — 최악인 f=0.35, N=5 에서 1.23배다.
+ *
+ * dab 간격은 반지름에 비례하므로 dab 수로 세면 램프 길이가 브러시 크기에 따라 알아서 늘고
+ * 준다. 잉크 간격 0.32 기준 5 dab 은 획 폭의 약 1.6배다. state.stampIndex 만 읽으므로 라이브
+ * 오버레이·커밋 재생·SVG 내보내기가 같은 값을 본다.
  */
-const INK_HEAD_VELOCITY_EASE_DABS = 4;
+const INK_HEAD_VELOCITY_EASE_DABS = 5;
 
 function inkSpeedFactorAt(
   style: StudioStampBrushStyle,
@@ -576,8 +581,9 @@ function inkSpeedFactorAt(
   stampIndex: number,
 ): number {
   if (style.kind !== "ink") return 1;
+  const settled = inkVelocityFactor(normalizedSpeed);
   const t = Math.min(1, Math.max(0, stampIndex / INK_HEAD_VELOCITY_EASE_DABS));
-  return inkVelocityFactor(normalizedSpeed * t * t * (3 - 2 * t));
+  return settled ** t;
 }
 
 export interface StudioStampWalkerState {
