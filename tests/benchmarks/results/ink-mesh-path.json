@@ -1,0 +1,74 @@
+{
+  "schema": "toon-ink-mesh-path-benchmark-v1",
+  "generatedAtUtc": "2026-08-15T15:00:52.144Z",
+  "adr": "ADR 0005 §4 승격 게이트 — mesh→PathIR 변환 비용",
+  "runtime": {
+    "node": "v24.16.0",
+    "platform": "darwin 25.6.0",
+    "cpu": "Apple M2 Max",
+    "execution": "real committed Emscripten WASM in Node; no mock"
+  },
+  "upstream": {
+    "repository": "https://github.com/google/ink",
+    "commit": "1d0daba661f3035f42f3649b8e6a0061b47aa759"
+  },
+  "workload": {
+    "points": 240,
+    "chunkSize": 8,
+    "warmupStrokes": 5,
+    "measuredStrokes": 40,
+    "updatesPerStroke": 30
+  },
+  "latencyMs": {
+    "meshUpdate": {
+      "p50": 0.04787499999997635,
+      "p95": 0.07408399999999915,
+      "p99": 0.15358299999999758,
+      "max": 0.48320799999999053
+    },
+    "pathConversion": {
+      "p50": 0.011124999999992724,
+      "p95": 0.03070900000000165,
+      "p99": 0.1074999999999875,
+      "max": 0.15162499999999568
+    },
+    "meshPlusConversion": {
+      "p50": 0.05945800000000645,
+      "p95": 0.10995900000000347,
+      "p99": 0.20020799999997507,
+      "max": 0.4992080000000101
+    },
+    "firstUpdateOfStroke": {
+      "p50": 0.05312500000002274,
+      "p95": 0.09420800000000895,
+      "p99": 0.1565830000000119,
+      "max": 0.1565830000000119
+    }
+  },
+  "fidelity": {
+    "areaErrorMax": 0,
+    "areaErrorP95": 0,
+    "finalMeshArea": 4021.1280003808643,
+    "finalPathArea": 4021.1280003808643
+  },
+  "finalPath": {
+    "verbCount": 132,
+    "loopCount": 1,
+    "boundaryEdgeCount": 131,
+    "outerLoops": 1,
+    "holeLoops": 0
+  },
+  "determinism": {
+    "verbCountStableAcrossRuns": true
+  },
+  "gate": {
+    "budgetMs": {
+      "p50": 4,
+      "p95": 8
+    },
+    "firstUpdateP50WithinBudget": true,
+    "firstUpdateP95WithinBudget": true,
+    "conversionShareOfUpdateP50": 0.18710686535018867,
+    "note": "이 하니스는 Node 에서 메시 생성 + PathIR 변환만 측정한다. 실제 제품의 입력→첫 preview 는 포인터 이벤트·스태빌라이저·표시까지 포함하므로 이 값은 그 예산의 하한이다."
+  }
+}
