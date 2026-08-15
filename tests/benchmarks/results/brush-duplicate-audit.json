@@ -1,0 +1,2864 @@
+{
+ "generatedAtUtc": "2026-08-15T17:47:28.893Z",
+ "question": "which brushes differ only by the WIDTH and OPACITY scalars, i.e. render the same texture once those two knobs are normalised away",
+ "pipeline": {
+  "1_probe": {
+   "harness": "tests/benchmarks/harness/brush-duplicate-probe.ts",
+   "output": "tests/benchmarks/results/brush-duplicate-probe.json",
+   "what": {
+    "profile": "width- and opacity-normalised cross-section shape (48 bins, mean absolute difference)",
+    "grain": "opacity-normalised ink density histogram (25 bins over r = a/meanInk), compared by earth-mover distance in r units — total variation saturates on smooth brushes whose histogram is a near-delta",
+    "direction": "effective width at 0/45/90/135 deg, divided by its own mean (chisel vs round)",
+    "size": "effective width at pressure 0.2/0.45/0.7/0.95, divided by its own mean",
+    "ink": "mean ink at those pressures, divided by its own mean"
+   },
+   "normalisation": {
+    "width": "cross-section resampled onto u=(y-c)/sigma over [-3,3] in 48 bins; every response vector divided by its own mean",
+    "opacity": "profile rescaled to mean 1.0; grain histogram over ratio a/meanInk in 25 bins; ink response divided by its own mean"
+   }
+  },
+  "2_matrix": {
+   "harness": "tests/benchmarks/harness/brush-duplicate-audit.ts",
+   "output": "tests/benchmarks/results/brush-duplicate-matrix.json",
+   "gate": "per pair, per axis: clamp(1 x max(scalarResidual(a), scalarResidual(b)), pooledResidual.p10, pooledResidual.p95). A pair is a duplicate only when ALL five axes are inside their gate — the conjunction, not any single axis, carries the precision.",
+   "calibration": {
+    "source": "same brush re-rendered with the two knobs the owner named actually turned: strokeWidth 16 -> 24 and opacity 1.0 -> 0.7 (plus a sub-pixel path offset). Whatever distance survives normalisation here is what 'only the numbers differ' measures like, per brush.",
+    "samples": 168,
+    "profile": {
+     "p10": 0.000822,
+     "p50": 0.017147,
+     "p90": 0.073181,
+     "p95": 0.090802,
+     "max": 0.395248
+    },
+    "grain": {
+     "p10": 0.004953,
+     "p50": 0.025553,
+     "p90": 0.086131,
+     "p95": 0.102369,
+     "max": 0.178752
+    },
+    "direction": {
+     "p10": 0.000659,
+     "p50": 0.004625,
+     "p90": 0.020034,
+     "p95": 0.028164,
+     "max": 0.190928
+    },
+    "size": {
+     "p10": 0,
+     "p50": 0.009179,
+     "p90": 0.028877,
+     "p95": 0.038274,
+     "max": 0.070413
+    },
+    "ink": {
+     "p10": 0,
+     "p50": 0.012315,
+     "p90": 0.043514,
+     "p95": 0.054594,
+     "max": 0.099468
+    }
+   }
+  },
+  "3_pixelConfirm": {
+   "harness": "tests/benchmarks/harness/brush-duplicate-confirm.ts",
+   "output": "tests/benchmarks/results/brush-duplicate-confirm.json",
+   "method": "B is re-rendered over a stroke-width grid centred on the width that matches A's measured effective width, each render compared against A at five vertical sub-pixel shifts, both normalised to mean ink 1.0; the best overlay is reported. Judged on p95 of the per-pixel |difference| — nrmse is dominated by a few edge rows, p95 answers whether the body of the stroke is the same picture.",
+   "search": {
+    "width": "solved analytically (two-point linear fit of effective width vs stroke width plus a Newton correction), then refined over [0.99,0.995,1,1.005,1.01]",
+    "shiftsPx": [
+     -2,
+     -1.75,
+     -1.5,
+     -1.25,
+     -1,
+     -0.75,
+     -0.5,
+     -0.25,
+     0,
+     0.25,
+     0.5,
+     0.75,
+     1,
+     1.25,
+     1.5,
+     1.75,
+     2
+    ]
+   },
+   "gate": {
+    "metric": "p95 of per-pixel |difference| after mean-ink normalisation",
+    "threshold": 0.02,
+    "rationale": "the confirmed-candidate distribution has a 7x empty gap between 0.0128 and 0.0902; the threshold sits inside that gap"
+   }
+  }
+ },
+ "tiers": {
+  "A": "same picture on pixels AND all five normalised response axes inside the pair's own scalar residual — safe to collapse",
+  "B": "same picture on pixels, but one response axis sits 1.0-1.4x outside the gate — the brushes do differ somewhere (angle or pressure), just not enough to read as a different texture; collapse only if the shelf wants fewer knobs"
+ },
+ "limitations": [
+  "Measured on the SVG export path (studio-svg-export), which the repo's own catalogue contract test already uses as the durable-parity surface. A difference that lives only in the live Canvas/WebGPU path would not appear here — that is why alias-table pressure curves are called out per cluster rather than assumed inert.",
+  "The texture probe draws one horizontal constant-pressure stroke; angle and pressure behaviour are covered by the separate direction/size/ink response axes, not by the pixel overlay.",
+  "The two erase presets (standard-eraser, kneaded-eraser) are excluded: with nothing underneath, the export draws their carrier and they measure bit-identical to pen."
+ ],
+ "population": {
+  "brushes": 168,
+  "excludedFromJudgement": [
+   "standard-eraser",
+   "kneaded-eraser"
+  ],
+  "pairsCompared": 14028,
+  "distanceQuantiles": {
+   "profile": {
+    "p01": 0.000279,
+    "p05": 0.009348,
+    "p50": 0.176274,
+    "p95": 0.481581
+   },
+   "grain": {
+    "p01": 0.004412,
+    "p05": 0.012703,
+    "p50": 0.243999,
+    "p95": 0.64491
+   },
+   "direction": {
+    "p01": 0.000521,
+    "p05": 0.001791,
+    "p50": 0.011355,
+    "p95": 0.338071
+   },
+   "size": {
+    "p01": 0,
+    "p05": 0.014167,
+    "p50": 0.129542,
+    "p95": 0.350765
+   },
+   "ink": {
+    "p01": 0,
+    "p05": 0.003892,
+    "p50": 0.091663,
+    "p95": 0.306789
+   }
+  }
+ },
+ "clusterCount": 10,
+ "clusters": [
+  {
+   "cluster": 1,
+   "tier": "A",
+   "members": [
+    "pencil",
+    "pencil--side-shade",
+    "pencil-2b"
+   ],
+   "recommendation": {
+    "keep": [
+     "pencil"
+    ],
+    "drop": [
+     "pencil--side-shade",
+     "pencil-2b"
+    ],
+    "confidence": "high",
+    "reason": "pencil--side-shade has zero render wiring — its id appears nowhere outside its own catalogue row, so the engine-variant it declares does not exist at paint time; pencil-2b is wired only into tag/route/alias tables and its alias entry is diameterScale 1.1 on an identity pressure curve. Both render bit-identically to pencil (p95 <= 0.00014)."
+   },
+   "pairs": [
+    {
+     "pair": [
+      "pencil",
+      "pencil--side-shade"
+     ],
+     "pixelP95": 0,
+     "pixelNrmse": 0,
+     "responseWorstRatio": 0.523,
+     "responseWorstAxis": "direction",
+     "normalisedDistance": {
+      "profile": 0.003814,
+      "grain": 0.001886,
+      "direction": 0.00051,
+      "size": 0,
+      "ink": 0
+     },
+     "perPairGate": {
+      "profile": 0.008907,
+      "grain": 0.00519,
+      "direction": 0.000975,
+      "size": 0,
+      "ink": 0
+     },
+     "measuredWidthRatio": 1.1652,
+     "measuredOpacityRatio": 1.0042
+    },
+    {
+     "pair": [
+      "pencil--side-shade",
+      "pencil-2b"
+     ],
+     "pixelP95": 0.00007,
+     "pixelNrmse": 0.03966,
+     "responseWorstRatio": 0.922,
+     "responseWorstAxis": "profile",
+     "normalisedDistance": {
+      "profile": 0.008211,
+      "grain": 0.004284,
+      "direction": 0.000237,
+      "size": 0,
+      "ink": 0
+     },
+     "perPairGate": {
+      "profile": 0.008907,
+      "grain": 0.00519,
+      "direction": 0.001216,
+      "size": 0,
+      "ink": 0
+     },
+     "measuredWidthRatio": 0.7002,
+     "measuredOpacityRatio": 1.1023
+    },
+    {
+     "pair": [
+      "pencil",
+      "pencil-2b"
+     ],
+     "pixelP95": 0.00014,
+     "pixelNrmse": 0.02738,
+     "responseWorstRatio": 0.672,
+     "responseWorstAxis": "profile",
+     "normalisedDistance": {
+      "profile": 0.004397,
+      "grain": 0.002404,
+      "direction": 0.000274,
+      "size": 0,
+      "ink": 0
+     },
+     "perPairGate": {
+      "profile": 0.006543,
+      "grain": 0.004953,
+      "direction": 0.001216,
+      "size": 0,
+      "ink": 0
+     },
+     "measuredWidthRatio": 0.8158,
+     "measuredOpacityRatio": 1.107
+    }
+   ],
+   "rows": [
+    {
+     "id": "pencil",
+     "name": "pencil",
+     "family": "pencil",
+     "engine": "pencil-path",
+     "engineVariant": "jitter",
+     "declaredCanonicalId": "pencil",
+     "declaredDistinctness": "unique",
+     "texture": "procedural-grain",
+     "dynamics": "grain-jitter",
+     "defaultWidth": null,
+     "defaultOpacity": null,
+     "wiring": {
+      "renderWiringFiles": 23,
+      "renderWiringSites": 71,
+      "declaredOnlyInCatalogue": false,
+      "files": [
+       "StudioBrushLibrarySheet.tsx",
+       "StudioDrawNode.tsx",
+       "StudioHokusaiNaturalMediaInspectorSection.tsx",
+       "studio-brush-alias-profile.ts",
+       "studio-brush-engine-lane-catalog.ts",
+       "studio-brush-stamp-engine.ts",
+       "studio-cc0-mypaint-preset-import-v1.ts",
+       "studio-dry-media-kernel-tip.ts",
+       "studio-filter-catalog.ts",
+       "studio-hokusai-live-brush-router.ts",
+       "studio-hokusai-natural-media-contract.ts",
+       "studio-hokusai-natural-media-presets.ts",
+       "studio-hokusai-natural-media-product.ts",
+       "studio-hokusai-natural-media-texture-v2.ts",
+       "studio-hybrid-pressure-profile.ts",
+       "studio-paper-media-profile-v1.ts",
+       "studio-retained-media-pressure.ts",
+       "studio-svg-export.ts",
+       "studio-tool-hint-preview-routing.ts",
+       "studio-vrm-props.ts",
+       "studio-vrm-texture-paint-runtime.ts",
+       "studio-vrm-texture-stroke-walker.ts",
+       "studio-vrm-texture-stroke.ts"
+      ]
+     },
+     "cost": {
+      "marks": 2,
+      "bytes": 2143,
+      "serialiseUs": 2428.7
+     },
+     "coverage": {
+      "sameEngineSignature": [
+       "pencil-2b",
+       "pencil-6b",
+       "soft-pencil",
+       "colored-pencil"
+      ],
+      "sameEngineSignatureCount": 4,
+      "sameTextureClassCount": 8
+     },
+     "measured": {
+      "effectiveWidthPx": 54.3822,
+      "inkAtReference": 0.97517,
+      "directionResponse": [
+       1.0009,
+       1.00683,
+       0.996278,
+       0.995992
+      ],
+      "sizeResponse": [
+       1,
+       1,
+       1,
+       1
+      ],
+      "inkResponse": [
+       1,
+       1,
+       1,
+       1
+      ]
+     }
+    },
+    {
+     "id": "pencil--side-shade",
+     "name": "연필 · 측면 음영",
+     "family": "pencil",
+     "engine": "pencil-path",
+     "engineVariant": "side-shade",
+     "declaredCanonicalId": "pencil",
+     "declaredDistinctness": "engine-variant",
+     "texture": "procedural-grain",
+     "dynamics": "grain-jitter",
+     "defaultWidth": 10,
+     "defaultOpacity": 0.68,
+     "wiring": {
+      "renderWiringFiles": 0,
+      "renderWiringSites": 0,
+      "declaredOnlyInCatalogue": true,
+      "files": []
+     },
+     "cost": {
+      "marks": 2,
+      "bytes": 2157,
+      "serialiseUs": 302.2
+     },
+     "coverage": {
+      "sameEngineSignature": [],
+      "sameEngineSignatureCount": 0,
+      "sameTextureClassCount": 8
+     },
+     "measured": {
+      "effectiveWidthPx": 46.6733,
+      "inkAtReference": 0.97107,
+      "directionResponse": [
+       1.001609,
+       1.007141,
+       0.995935,
+       0.995315
+      ],
+      "sizeResponse": [
+       1,
+       1,
+       1,
+       1
+      ],
+      "inkResponse": [
+       1,
+       1,
+       1,
+       1
+      ]
+     }
+    },
+    {
+     "id": "pencil-2b",
+     "name": "pencil-2b",
+     "family": "pencil",
+     "engine": "pencil-path",
+     "engineVariant": "jitter",
+     "declaredCanonicalId": "pencil",
+     "declaredDistinctness": "profile-variant",
+     "texture": "procedural-grain",
+     "dynamics": "grain-jitter",
+     "defaultWidth": null,
+     "defaultOpacity": null,
+     "wiring": {
+      "renderWiringFiles": 7,
+      "renderWiringSites": 11,
+      "declaredOnlyInCatalogue": false,
+      "files": [
+       "studio-brush-alias-profile.ts",
+       "studio-brush-backend-quality-policy.ts",
+       "studio-creator-pack-catalog.ts",
+       "studio-hokusai-live-brush-router.ts",
+       "studio-hybrid-pressure-profile.ts",
+       "studio-oss-brush-hybrid-registry.ts",
+       "studio-retained-media-pressure.ts"
+      ]
+     },
+     "cost": {
+      "marks": 2,
+      "bytes": 2171,
+      "serialiseUs": 237.2
+     },
+     "coverage": {
+      "sameEngineSignature": [
+       "pencil",
+       "pencil-6b",
+       "soft-pencil",
+       "colored-pencil"
+      ],
+      "sameEngineSignatureCount": 4,
+      "sameTextureClassCount": 8
+     },
+     "measured": {
+      "effectiveWidthPx": 66.66,
+      "inkAtReference": 0.88094,
+      "directionResponse": [
+       1.001135,
+       1.007142,
+       0.995962,
+       0.995761
+      ],
+      "sizeResponse": [
+       1,
+       1,
+       1,
+       1
+      ],
+      "inkResponse": [
+       1,
+       1,
+       1,
+       1
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "cluster": 2,
+   "tier": "A",
+   "members": [
+    "mypaint-cc0--marker-fat",
+    "mypaint-cc0--marker-small"
+   ],
+   "recommendation": {
+    "keep": [
+     "mypaint-cc0--marker-small"
+    ],
+    "drop": [
+     "mypaint-cc0--marker-fat"
+    ],
+    "confidence": "high",
+    "reason": "identical wiring (2 sites each, both profile-variant -> ink-brush) and an effective-width ratio of 1.006 at the same toolbar width — the catalogue defaults 24 vs 10 are the whole difference. marker-small draws the same picture in 27,699 bytes against 46,749."
+   },
+   "pairs": [
+    {
+     "pair": [
+      "mypaint-cc0--marker-fat",
+      "mypaint-cc0--marker-small"
+     ],
+     "pixelP95": 0.00001,
+     "pixelNrmse": 0.02003,
+     "responseWorstRatio": 0.61,
+     "responseWorstAxis": "direction",
+     "normalisedDistance": {
+      "profile": 0,
+      "grain": 0.000183,
+      "direction": 0.017175,
+      "size": 0,
+      "ink": 0
+     },
+     "perPairGate": {
+      "profile": 0.016695,
+      "grain": 0.013676,
+      "direction": 0.028164,
+      "size": 0,
+      "ink": 0
+     },
+     "measuredWidthRatio": 1.0057,
+     "measuredOpacityRatio": 0.9995
+    }
+   ],
+   "rows": [
+    {
+     "id": "mypaint-cc0--marker-fat",
+     "name": "MyPaint 오픈소스 · 광폭 마커",
+     "family": "stamp",
+     "engine": "stamp-dabs",
+     "engineVariant": "ink",
+     "declaredCanonicalId": "ink-brush",
+     "declaredDistinctness": "profile-variant",
+     "texture": "none",
+     "dynamics": "stamp-pressure-flow",
+     "defaultWidth": 24,
+     "defaultOpacity": 1,
+     "wiring": {
+      "renderWiringFiles": 2,
+      "renderWiringSites": 2,
+      "declaredOnlyInCatalogue": false,
+      "files": [
+       "studio-brush-backend-quality-policy.ts",
+       "studio-oss-brush-hybrid-registry.ts"
+      ]
+     },
+     "cost": {
+      "marks": 2,
+      "bytes": 46749,
+      "serialiseUs": 4386
+     },
+     "coverage": {
+      "sameEngineSignature": [
+       "ink-brush",
+       "gouache--flat-stamp",
+       "mypaint-cc0--dry-brush",
+       "mypaint-cc0--kabura",
+       "mypaint-cc0--calligraphy",
+       "mypaint-cc0--marker-small",
+       "mypaint-cc0--slow-ink",
+       "mypaint-cc0--knife"
+      ],
+      "sameEngineSignatureCount": 8,
+      "sameTextureClassCount": 7
+     },
+     "measured": {
+      "effectiveWidthPx": 45.9111,
+      "inkAtReference": 0.98915,
+      "directionResponse": [
+       1.310041,
+       1.360959,
+       0.676389,
+       0.652611
+      ],
+      "sizeResponse": [
+       1,
+       1,
+       1,
+       1
+      ],
+      "inkResponse": [
+       1,
+       1,
+       1,
+       1
+      ]
+     }
+    },
+    {
+     "id": "mypaint-cc0--marker-small",
+     "name": "MyPaint 오픈소스 · 세필 마커",
+     "family": "stamp",
+     "engine": "stamp-dabs",
+     "engineVariant": "ink",
+     "declaredCanonicalId": "ink-brush",
+     "declaredDistinctness": "profile-variant",
+     "texture": "none",
+     "dynamics": "stamp-pressure-flow",
+     "defaultWidth": 10,
+     "defaultOpacity": 1,
+     "wiring": {
+      "renderWiringFiles": 2,
+      "renderWiringSites": 2,
+      "declaredOnlyInCatalogue": false,
+      "files": [
+       "studio-brush-backend-quality-policy.ts",
+       "studio-oss-brush-hybrid-registry.ts"
+      ]
+     },
+     "cost": {
+      "marks": 2,
+      "bytes": 27699,
+      "serialiseUs": 1504.5
+     },
+     "coverage": {
+      "sameEngineSignature": [
+       "ink-brush",
+       "gouache--flat-stamp",
+       "mypaint-cc0--dry-brush",
+       "mypaint-cc0--kabura",
+       "mypaint-cc0--calligraphy",
+       "mypaint-cc0--marker-fat",
+       "mypaint-cc0--slow-ink",
+       "mypaint-cc0--knife"
+      ],
+      "sameEngineSignatureCount": 8,
+      "sameTextureClassCount": 7
+     },
+     "measured": {
+      "effectiveWidthPx": 45.6489,
+      "inkAtReference": 0.98967,
+      "directionResponse": [
+       1.301445,
+       1.354029,
+       0.657565,
+       0.686961
+      ],
+      "sizeResponse": [
+       1,
+       1,
+       1,
+       1
+      ],
+      "inkResponse": [
+       1,
+       1,
+       1,
+       1
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "cluster": 3,
+   "tier": "B",
+   "members": [
+    "brush",
+    "flat-brush",
+    "marker--chisel-ribbon"
+   ],
+   "recommendation": {
+    "keep": [
+     "brush"
+    ],
+    "drop": [
+     "marker--chisel-ribbon",
+     "flat-brush"
+    ],
+    "confidence": "medium",
+    "reason": "all three emit a structurally identical SVG skeleton (same tags, only numbers differ) and overlay bit-identically. marker--chisel-ribbon has zero render wiring while advertising an angled-ribbon chisel nib — the chisel is not in the code. flat-brush is wired but differs only by diameterScale 1.3; medium confidence because its alias pressure curve may still separate it on the Canvas path this SVG-export audit does not exercise."
+   },
+   "pairs": [
+    {
+     "pair": [
+      "brush",
+      "flat-brush"
+     ],
+     "pixelP95": 0,
+     "pixelNrmse": 0,
+     "responseWorstRatio": 0.692,
+     "responseWorstAxis": "direction",
+     "normalisedDistance": {
+      "profile": 0.013522,
+      "grain": 0.01426,
+      "direction": 0.010936,
+      "size": 0,
+      "ink": 0
+     },
+     "perPairGate": {
+      "profile": 0.024308,
+      "grain": 0.022426,
+      "direction": 0.015801,
+      "size": 0,
+      "ink": 0
+     },
+     "measuredWidthRatio": 0.7501,
+     "measuredOpacityRatio": 1.0322
+    },
+    {
+     "pair": [
+      "brush",
+      "marker--chisel-ribbon"
+     ],
+     "pixelP95": 0.00002,
+     "pixelNrmse": 0.00114,
+     "responseWorstRatio": 1.205,
+     "responseWorstAxis": "direction",
+     "normalisedDistance": {
+      "profile": 0.016193,
+      "grain": 0.016662,
+      "direction": 0.01544,
+      "size": 0,
+      "ink": 0
+     },
+     "perPairGate": {
+      "profile": 0.017513,
+      "grain": 0.022426,
+      "direction": 0.01281,
+      "size": 0,
+      "ink": 0
+     },
+     "measuredWidthRatio": 0.8571,
+     "measuredOpacityRatio": 1.0371
+    },
+    {
+     "pair": [
+      "flat-brush",
+      "marker--chisel-ribbon"
+     ],
+     "pixelP95": 0.00003,
+     "pixelNrmse": 0.00095,
+     "responseWorstRatio": 0.957,
+     "responseWorstAxis": "direction",
+     "normalisedDistance": {
+      "profile": 0.002671,
+      "grain": 0.002414,
+      "direction": 0.015129,
+      "size": 0,
+      "ink": 0
+     },
+     "perPairGate": {
+      "profile": 0.024308,
+      "grain": 0.017439,
+      "direction": 0.015801,
+      "size": 0,
+      "ink": 0
+     },
+     "measuredWidthRatio": 1.1427,
+     "measuredOpacityRatio": 1.0048
+    }
+   ],
+   "rows": [
+    {
+     "id": "brush",
+     "name": "brush",
+     "family": "brush",
+     "engine": "angled-ribbon",
+     "engineVariant": "minus-30deg",
+     "declaredCanonicalId": "brush",
+     "declaredDistinctness": "unique",
+     "texture": "none",
+     "dynamics": "ribbon-pressure",
+     "defaultWidth": null,
+     "defaultOpacity": null,
+     "wiring": {
+      "renderWiringFiles": 55,
+      "renderWiringSites": 146,
+      "declaredOnlyInCatalogue": false,
+      "files": [
+       "Binary file StudioSelectionOverlays.tsx matche",
+       "StudioCommunityMarketplacePanel.tsx",
+       "StudioCreatorPackMarketplacePanel.tsx",
+       "StudioDrawNode.tsx",
+       "StudioDrawOptionsBar.tsx",
+       "StudioPage.tsx",
+       "StudioRasterToolRecoveryPanel.tsx",
+       "StudioSelectionToolsPanel.tsx",
+       "StudioShortcutsHelp.tsx",
+       "StudioToolsCompanionPage.tsx",
+       "StudioVrmPoser.tsx",
+       "StudioVrmTexturePaintPanel.tsx",
+       "kernel/Memory64WorkloadCoordinator.ts",
+       "kernel/WasmMemory64Capability.ts",
+       "studio-brush-alias-profile.ts",
+       "studio-brush-engine-lane-catalog.ts",
+       "studio-brush-library.ts",
+       "studio-canonical-brush-draw-adapter.ts",
+       "studio-chrome-ia-map.ts",
+       "studio-color-range-worker-protocol.ts",
+       "studio-community-marketplace.ts",
+       "studio-companion-review-projection.ts",
+       "studio-crdt-document.ts",
+       "studio-creator-pack-catalog.ts",
+       "studio-creator-pack-product-runtime.ts",
+       "studio-creator-pack-runtime.ts",
+       "studio-draw-rendering.ts",
+       "studio-dry-media-union-continuation-worker-client.ts",
+       "studio-feature-tutorials.ts",
+       "studio-hokusai-live-brush-router.ts",
+       "studio-hybrid-brush-filter-edit-runtime.ts",
+       "studio-hybrid-pressure-profile.ts",
+       "studio-inkml-conformance.ts",
+       "studio-inspector-layout.ts",
+       "studio-interchange-capabilities.ts",
+       "studio-living-ink-execution-validation.ts",
+       "studio-living-ink-field.ts",
+       "studio-living-ink-webgpu-pure-runtime.ts",
+       "studio-main-menu-group-spec.ts",
+       "studio-main-menu-surface-contract.ts",
+       "studio-marketplace-packages.ts",
+       "studio-p5-brush-standalone-runtime-adapter.ts",
+       "studio-paper-media-profile-v1.ts",
+       "studio-pixel-selection-history.ts",
+       "studio-pixel-selection-session-history.ts",
+       "studio-pixel-selection-transform.ts",
+       "studio-raster-edit-preparation.ts",
+       "studio-raster-handoff-authority.ts",
+       "studio-retained-media-pressure.ts",
+       "studio-selection-stencil.ts",
+       "studio-selection-tools.ts",
+       "studio-stroke-local-coverage.ts",
+       "studio-svg-export.ts",
+       "studio-tool-hint-preview-routing.ts",
+       "studio-tools-companion.ts"
+      ]
+     },
+     "cost": {
+      "marks": 2,
+      "bytes": 3016,
+      "serialiseUs": 772.7
+     },
+     "coverage": {
+      "sameEngineSignature": [
+       "flat-brush",
+       "marker--chisel-ribbon"
+      ],
+      "sameEngineSignatureCount": 2,
+      "sameTextureClassCount": 2
+     },
+     "measured": {
+      "effectiveWidthPx": 24.1067,
+      "inkAtReference": 0.98976,
+      "directionResponse": [
+       0.757846,
+       1.492638,
+       1.323716,
+       0.425799
+      ],
+      "sizeResponse": [
+       1,
+       1,
+       1,
+       1
+      ],
+      "inkResponse": [
+       1,
+       1,
+       1,
+       1
+      ]
+     }
+    },
+    {
+     "id": "flat-brush",
+     "name": "flat-brush",
+     "family": "brush",
+     "engine": "angled-ribbon",
+     "engineVariant": "minus-30deg",
+     "declaredCanonicalId": "brush",
+     "declaredDistinctness": "profile-variant",
+     "texture": "none",
+     "dynamics": "ribbon-pressure",
+     "defaultWidth": null,
+     "defaultOpacity": null,
+     "wiring": {
+      "renderWiringFiles": 9,
+      "renderWiringSites": 13,
+      "declaredOnlyInCatalogue": false,
+      "files": [
+       "StudioDrawNode.tsx",
+       "studio-brush-alias-profile.ts",
+       "studio-brush-backend-quality-policy.ts",
+       "studio-hokusai-live-brush-router.ts",
+       "studio-hybrid-pressure-profile.ts",
+       "studio-oss-brush-hybrid-registry.ts",
+       "studio-retained-media-pressure.ts",
+       "studio-stroke-local-coverage.ts",
+       "studio-svg-export.ts"
+      ]
+     },
+     "cost": {
+      "marks": 2,
+      "bytes": 3032,
+      "serialiseUs": 341.2
+     },
+     "coverage": {
+      "sameEngineSignature": [
+       "brush",
+       "marker--chisel-ribbon"
+      ],
+      "sameEngineSignatureCount": 2,
+      "sameTextureClassCount": 2
+     },
+     "measured": {
+      "effectiveWidthPx": 32.14,
+      "inkAtReference": 0.95889,
+      "directionResponse": [
+       0.775631,
+       1.487927,
+       1.306555,
+       0.429887
+      ],
+      "sizeResponse": [
+       1,
+       1,
+       1,
+       1
+      ],
+      "inkResponse": [
+       1,
+       1,
+       1,
+       1
+      ]
+     }
+    },
+    {
+     "id": "marker--chisel-ribbon",
+     "name": "마커 · 치즐 리본",
+     "family": "brush",
+     "engine": "angled-ribbon",
+     "engineVariant": "minus-30deg",
+     "declaredCanonicalId": "brush",
+     "declaredDistinctness": "profile-variant",
+     "texture": "none",
+     "dynamics": "ribbon-pressure",
+     "defaultWidth": 18,
+     "defaultOpacity": 0.7,
+     "wiring": {
+      "renderWiringFiles": 0,
+      "renderWiringSites": 0,
+      "declaredOnlyInCatalogue": true,
+      "files": []
+     },
+     "cost": {
+      "marks": 2,
+      "bytes": 3056,
+      "serialiseUs": 393.8
+     },
+     "coverage": {
+      "sameEngineSignature": [
+       "brush",
+       "flat-brush"
+      ],
+      "sameEngineSignatureCount": 2,
+      "sameTextureClassCount": 2
+     },
+     "measured": {
+      "effectiveWidthPx": 28.1267,
+      "inkAtReference": 0.95433,
+      "directionResponse": [
+       0.779192,
+       1.472628,
+       1.333251,
+       0.414929
+      ],
+      "sizeResponse": [
+       1,
+       1,
+       1,
+       1
+      ],
+      "inkResponse": [
+       1,
+       1,
+       1,
+       1
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "cluster": 4,
+   "tier": "B",
+   "members": [
+    "gouache--flat-stamp",
+    "ink-brush",
+    "gpen--causal-round",
+    "gpen--croquis-capsule"
+   ],
+   "recommendation": {
+    "keep": [
+     "ink-brush",
+     "gpen--croquis-capsule"
+    ],
+    "drop": [
+     "gpen--causal-round",
+     "gouache--flat-stamp"
+    ],
+    "confidence": "medium",
+    "reason": "two engines converging on the same solid line. gpen--causal-round has zero render wiring and is a declared profile-variant of pen. gouache--flat-stamp carries the gouache product name but paints the ink-brush stamp it declares as its canonical, at 37,559 bytes against ink-brush's 27,896. gpen--croquis-capsule is kept because its lane pins a real croquis-capsule-v1 program; ink-brush is the unique canonical eight lanes point at."
+   },
+   "pairs": [
+    {
+     "pair": [
+      "gpen--causal-round",
+      "gpen--croquis-capsule"
+     ],
+     "pixelP95": 0.00014,
+     "pixelNrmse": 0.00457,
+     "responseWorstRatio": 1,
+     "responseWorstAxis": "ink",
+     "normalisedDistance": {
+      "profile": 0,
+      "grain": 0.006059,
+      "direction": 0.000073,
+      "size": 0.008122,
+      "ink": 0.006232
+     },
+     "perPairGate": {
+      "profile": 0.000822,
+      "grain": 0.006928,
+      "direction": 0.002326,
+      "size": 0.016083,
+      "ink": 0.006231
+     },
+     "measuredWidthRatio": 1.0016,
+     "measuredOpacityRatio": 1.0066
+    },
+    {
+     "pair": [
+      "gpen--causal-round",
+      "ink-brush"
+     ],
+     "pixelP95": 0.00191,
+     "pixelNrmse": 0.12996,
+     "responseWorstRatio": 1.368,
+     "responseWorstAxis": "ink",
+     "normalisedDistance": {
+      "profile": 0.016286,
+      "grain": 0.025222,
+      "direction": 0.001702,
+      "size": 0.029849,
+      "ink": 0.034766
+     },
+     "perPairGate": {
+      "profile": 0.012773,
+      "grain": 0.024305,
+      "direction": 0.002326,
+      "size": 0.028267,
+      "ink": 0.025406
+     },
+     "measuredWidthRatio": 2.4113,
+     "measuredOpacityRatio": 1.0315
+    },
+    {
+     "pair": [
+      "gouache--flat-stamp",
+      "gpen--croquis-capsule"
+     ],
+     "pixelP95": 0.00209,
+     "pixelNrmse": 0.07422,
+     "responseWorstRatio": 1.004,
+     "responseWorstAxis": "grain",
+     "normalisedDistance": {
+      "profile": 0.020929,
+      "grain": 0.014352,
+      "direction": 0.00538,
+      "size": 0.016056,
+      "ink": 0.021335
+     },
+     "perPairGate": {
+      "profile": 0.020929,
+      "grain": 0.014293,
+      "direction": 0.013246,
+      "size": 0.029479,
+      "ink": 0.02135
+     },
+     "measuredWidthRatio": 0.4442,
+     "measuredOpacityRatio": 0.9118
+    },
+    {
+     "pair": [
+      "gpen--croquis-capsule",
+      "ink-brush"
+     ],
+     "pixelP95": 0.00387,
+     "pixelNrmse": 0.15236,
+     "responseWorstRatio": 1.358,
+     "responseWorstAxis": "ink",
+     "normalisedDistance": {
+      "profile": 0.016286,
+      "grain": 0.019176,
+      "direction": 0.001629,
+      "size": 0.034466,
+      "ink": 0.03449
+     },
+     "perPairGate": {
+      "profile": 0.012773,
+      "grain": 0.024305,
+      "direction": 0.002247,
+      "size": 0.028267,
+      "ink": 0.025406
+     },
+     "measuredWidthRatio": 2.4075,
+     "measuredOpacityRatio": 1.0247
+    },
+    {
+     "pair": [
+      "gouache--flat-stamp",
+      "ink-brush"
+     ],
+     "pixelP95": 0.00995,
+     "pixelNrmse": 0.06194,
+     "responseWorstRatio": 0.858,
+     "responseWorstAxis": "grain",
+     "normalisedDistance": {
+      "profile": 0.010496,
+      "grain": 0.020845,
+      "direction": 0.007009,
+      "size": 0.01841,
+      "ink": 0.013174
+     },
+     "perPairGate": {
+      "profile": 0.020929,
+      "grain": 0.024305,
+      "direction": 0.013246,
+      "size": 0.029479,
+      "ink": 0.025406
+     },
+     "measuredWidthRatio": 1.0694,
+     "measuredOpacityRatio": 0.9343
+    },
+    {
+     "pair": [
+      "gouache--flat-stamp",
+      "gpen--causal-round"
+     ],
+     "pixelP95": 0.01007,
+     "pixelNrmse": 0.16448,
+     "responseWorstRatio": 1.057,
+     "responseWorstAxis": "ink",
+     "normalisedDistance": {
+      "profile": 0.020929,
+      "grain": 0.008479,
+      "direction": 0.005307,
+      "size": 0.014675,
+      "ink": 0.022566
+     },
+     "perPairGate": {
+      "profile": 0.020929,
+      "grain": 0.014293,
+      "direction": 0.013246,
+      "size": 0.029479,
+      "ink": 0.02135
+     },
+     "measuredWidthRatio": 0.4435,
+     "measuredOpacityRatio": 0.9058
+    }
+   ],
+   "rows": [
+    {
+     "id": "gouache--flat-stamp",
+     "name": "과슈 · 평면 스탬프",
+     "family": "stamp",
+     "engine": "stamp-dabs",
+     "engineVariant": "ink",
+     "declaredCanonicalId": "ink-brush",
+     "declaredDistinctness": "profile-variant",
+     "texture": "none",
+     "dynamics": "stamp-pressure-flow",
+     "defaultWidth": 26,
+     "defaultOpacity": 0.9,
+     "wiring": {
+      "renderWiringFiles": 2,
+      "renderWiringSites": 2,
+      "declaredOnlyInCatalogue": false,
+      "files": [
+       "studio-brush-engine-lane-catalog.ts",
+       "studio-brush-stamp-engine.ts"
+      ]
+     },
+     "cost": {
+      "marks": 2,
+      "bytes": 37559,
+      "serialiseUs": 1522.9
+     },
+     "coverage": {
+      "sameEngineSignature": [
+       "ink-brush",
+       "mypaint-cc0--dry-brush",
+       "mypaint-cc0--kabura",
+       "mypaint-cc0--calligraphy",
+       "mypaint-cc0--marker-fat",
+       "mypaint-cc0--marker-small",
+       "mypaint-cc0--slow-ink",
+       "mypaint-cc0--knife"
+      ],
+      "sameEngineSignatureCount": 8,
+      "sameTextureClassCount": 7
+     },
+     "measured": {
+      "effectiveWidthPx": 40.4,
+      "inkAtReference": 0.88969,
+      "directionResponse": [
+       1.00592,
+       0.993526,
+       1.005865,
+       0.994688
+      ],
+      "sizeResponse": [
+       0.484797,
+       0.797848,
+       1.192639,
+       1.524715
+      ],
+      "inkResponse": [
+       0.959272,
+       1.02221,
+       0.996502,
+       1.022016
+      ]
+     }
+    },
+    {
+     "id": "ink-brush",
+     "name": "ink-brush",
+     "family": "stamp",
+     "engine": "stamp-dabs",
+     "engineVariant": "ink",
+     "declaredCanonicalId": "ink-brush",
+     "declaredDistinctness": "unique",
+     "texture": "none",
+     "dynamics": "stamp-pressure-flow",
+     "defaultWidth": null,
+     "defaultOpacity": null,
+     "wiring": {
+      "renderWiringFiles": 5,
+      "renderWiringSites": 11,
+      "declaredOnlyInCatalogue": false,
+      "files": [
+       "studio-brush-backend-quality-policy.ts",
+       "studio-brush-engine-lane-catalog.ts",
+       "studio-brush-stamp-engine.ts",
+       "studio-hybrid-pressure-profile.ts",
+       "studio-oss-brush-hybrid-registry.ts"
+      ]
+     },
+     "cost": {
+      "marks": 2,
+      "bytes": 27896,
+      "serialiseUs": 1280.9
+     },
+     "coverage": {
+      "sameEngineSignature": [
+       "gouache--flat-stamp",
+       "mypaint-cc0--dry-brush",
+       "mypaint-cc0--kabura",
+       "mypaint-cc0--calligraphy",
+       "mypaint-cc0--marker-fat",
+       "mypaint-cc0--marker-small",
+       "mypaint-cc0--slow-ink",
+       "mypaint-cc0--knife"
+      ],
+      "sameEngineSignatureCount": 8,
+      "sameTextureClassCount": 7
+     },
+     "measured": {
+      "effectiveWidthPx": 37.7778,
+      "inkAtReference": 0.95229,
+      "directionResponse": [
+       0.998884,
+       1.001116,
+       0.998884,
+       1.001116
+      ],
+      "sizeResponse": [
+       0.452307,
+       0.793518,
+       1.202944,
+       1.551231
+      ],
+      "inkResponse": [
+       0.932962,
+       1.022173,
+       1.00212,
+       1.042745
+      ]
+     }
+    },
+    {
+     "id": "gpen--causal-round",
+     "name": "G펜 · 연속 원형",
+     "family": "pen",
+     "engine": "causal-ink",
+     "engineVariant": "round",
+     "declaredCanonicalId": "pen",
+     "declaredDistinctness": "profile-variant",
+     "texture": "none",
+     "dynamics": "causal-pressure",
+     "defaultWidth": 7,
+     "defaultOpacity": 1,
+     "wiring": {
+      "renderWiringFiles": 0,
+      "renderWiringSites": 0,
+      "declaredOnlyInCatalogue": true,
+      "files": []
+     },
+     "cost": {
+      "marks": 48,
+      "bytes": 5430,
+      "serialiseUs": 317.3
+     },
+     "coverage": {
+      "sameEngineSignature": [
+       "pen",
+       "fineliner",
+       "ballpoint",
+       "gel-pen",
+       "glass-pen",
+       "ruling-pen",
+       "technical-pen",
+       "kneaded-eraser",
+       "marker",
+       "felt-tip",
+       "marker-bold",
+       "alcohol-marker"
+      ],
+      "sameEngineSignatureCount": 12,
+      "sameTextureClassCount": 19
+     },
+     "measured": {
+      "effectiveWidthPx": 91.0933,
+      "inkAtReference": 0.98225,
+      "directionResponse": [
+       1.000586,
+       0.999414,
+       1.000586,
+       0.999414
+      ],
+      "sizeResponse": [
+       0.489358,
+       0.816164,
+       1.16329,
+       1.531188
+      ],
+      "inkResponse": [
+       1.002494,
+       1.002966,
+       0.998411,
+       0.996128
+      ]
+     }
+    },
+    {
+     "id": "gpen--croquis-capsule",
+     "name": "G펜 · 크로키 캡슐",
+     "family": "gpen",
+     "engine": "capsule-outline",
+     "engineVariant": "croquis-capsule",
+     "declaredCanonicalId": "gpen--croquis-capsule",
+     "declaredDistinctness": "unique",
+     "texture": "none",
+     "dynamics": "outline-pressure",
+     "defaultWidth": 7.5,
+     "defaultOpacity": 1,
+     "wiring": {
+      "renderWiringFiles": 1,
+      "renderWiringSites": 2,
+      "declaredOnlyInCatalogue": false,
+      "files": [
+       "studio-brush-engine-lane-catalog.ts"
+      ]
+     },
+     "cost": {
+      "marks": 48,
+      "bytes": 5432,
+      "serialiseUs": 284
+     },
+     "coverage": {
+      "sameEngineSignature": [],
+      "sameEngineSignatureCount": 0,
+      "sameTextureClassCount": 7
+     },
+     "measured": {
+      "effectiveWidthPx": 90.9511,
+      "inkAtReference": 0.97578,
+      "directionResponse": [
+       1.000513,
+       0.999487,
+       1.000513,
+       0.999487
+      ],
+      "sizeResponse": [
+       0.493077,
+       0.82168,
+       1.170299,
+       1.514944
+      ],
+      "inkResponse": [
+       1.001942,
+       0.996574,
+       0.992892,
+       1.008592
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "cluster": 5,
+   "tier": "A",
+   "members": [
+    "highlighter",
+    "pastel-highlighter"
+   ],
+   "recommendation": {
+    "keep": [
+     "highlighter"
+    ],
+    "drop": [
+     "pastel-highlighter"
+    ],
+    "confidence": "high",
+    "reason": "pastel-highlighter is declared an engine-variant of highlighter but overlays at p95 0.00021 and shares the same studio-highlighter-wash-ribbon path; its alias entry is diameterScale 1.1. highlighter carries more wiring (12 files vs 8) and is the canonical."
+   },
+   "pairs": [
+    {
+     "pair": [
+      "highlighter",
+      "pastel-highlighter"
+     ],
+     "pixelP95": 0.00021,
+     "pixelNrmse": 0.06043,
+     "responseWorstRatio": 0.945,
+     "responseWorstAxis": "grain",
+     "normalisedDistance": {
+      "profile": 0.000275,
+      "grain": 0.080645,
+      "direction": 0.003902,
+      "size": 0,
+      "ink": 0
+     },
+     "perPairGate": {
+      "profile": 0.007577,
+      "grain": 0.085303,
+      "direction": 0.005996,
+      "size": 0,
+      "ink": 0
+     },
+     "measuredWidthRatio": 0.8943,
+     "measuredOpacityRatio": 1.0166
+    }
+   ],
+   "rows": [
+    {
+     "id": "highlighter",
+     "name": "highlighter",
+     "family": "highlighter",
+     "engine": "highlighter-path",
+     "engineVariant": "one-wash-round",
+     "declaredCanonicalId": "highlighter",
+     "declaredDistinctness": "unique",
+     "texture": "none",
+     "dynamics": "ribbon-pressure",
+     "defaultWidth": null,
+     "defaultOpacity": null,
+     "wiring": {
+      "renderWiringFiles": 12,
+      "renderWiringSites": 26,
+      "declaredOnlyInCatalogue": false,
+      "files": [
+       "StudioBrushLibrarySheet.tsx",
+       "StudioDrawNode.tsx",
+       "studio-brush-alias-profile.ts",
+       "studio-draw-rendering.ts",
+       "studio-fx-brush.ts",
+       "studio-highlighter-wash-ribbon.ts",
+       "studio-hokusai-live-brush-router.ts",
+       "studio-hybrid-pressure-profile.ts",
+       "studio-oss-brush-hybrid-registry.ts",
+       "studio-paper-media-profile-v1.ts",
+       "studio-paper-vector-document-adapter.ts",
+       "studio-svg-export.ts"
+      ]
+     },
+     "cost": {
+      "marks": 3,
+      "bytes": 24249,
+      "serialiseUs": 4877.9
+     },
+     "coverage": {
+      "sameEngineSignature": [],
+      "sameEngineSignatureCount": 0,
+      "sameTextureClassCount": 1
+     },
+     "measured": {
+      "effectiveWidthPx": 51.2889,
+      "inkAtReference": 0.99407,
+      "directionResponse": [
+       0.992133,
+       1.007867,
+       0.992133,
+       1.007867
+      ],
+      "sizeResponse": [
+       1,
+       1,
+       1,
+       1
+      ],
+      "inkResponse": [
+       1,
+       1,
+       1,
+       1
+      ]
+     }
+    },
+    {
+     "id": "pastel-highlighter",
+     "name": "pastel-highlighter",
+     "family": "highlighter",
+     "engine": "highlighter-path",
+     "engineVariant": "one-wash-pastel",
+     "declaredCanonicalId": "highlighter",
+     "declaredDistinctness": "engine-variant",
+     "texture": "procedural-grain",
+     "dynamics": "ribbon-pressure",
+     "defaultWidth": null,
+     "defaultOpacity": null,
+     "wiring": {
+      "renderWiringFiles": 8,
+      "renderWiringSites": 15,
+      "declaredOnlyInCatalogue": false,
+      "files": [
+       "StudioBrushLibrarySheet.tsx",
+       "studio-brush-alias-profile.ts",
+       "studio-brush-backend-quality-policy.ts",
+       "studio-fx-brush.ts",
+       "studio-highlighter-wash-ribbon.ts",
+       "studio-hokusai-live-brush-router.ts",
+       "studio-hybrid-pressure-profile.ts",
+       "studio-oss-brush-hybrid-registry.ts"
+      ]
+     },
+     "cost": {
+      "marks": 3,
+      "bytes": 23704,
+      "serialiseUs": 1965.3
+     },
+     "coverage": {
+      "sameEngineSignature": [],
+      "sameEngineSignatureCount": 0,
+      "sameTextureClassCount": 0
+     },
+     "measured": {
+      "effectiveWidthPx": 57.3533,
+      "inkAtReference": 0.97786,
+      "directionResponse": [
+       0.996035,
+       1.003946,
+       0.996035,
+       1.003985
+      ],
+      "sizeResponse": [
+       1,
+       1,
+       1,
+       1
+      ],
+      "inkResponse": [
+       1,
+       1,
+       1,
+       1
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "cluster": 6,
+   "tier": "B",
+   "members": [
+    "calligraphy--perfect-chisel",
+    "felt-tip",
+    "perfect-marker"
+   ],
+   "recommendation": {
+    "keep": [
+     "perfect-marker",
+     "felt-tip"
+    ],
+    "drop": [
+     "calligraphy--perfect-chisel"
+    ],
+    "confidence": "high",
+    "reason": "calligraphy--perfect-chisel is a declared profile-variant of perfect-marker with one wiring site and overlays at p95 0.00002. felt-tip is kept as a different engine (causal-ink, its own marker-nib profile) that merely coincides on this stroke — but note it spends 48 marks / 5,432 bytes where perfect-marker spends 2 / 2,573 for the same line, which is a cost defect worth its own ticket rather than a catalogue trim."
+   },
+   "pairs": [
+    {
+     "pair": [
+      "calligraphy--perfect-chisel",
+      "perfect-marker"
+     ],
+     "pixelP95": 0.00002,
+     "pixelNrmse": 0.00191,
+     "responseWorstRatio": 1.128,
+     "responseWorstAxis": "size",
+     "normalisedDistance": {
+      "profile": 0,
+      "grain": 0.000035,
+      "direction": 0.002532,
+      "size": 0.010181,
+      "ink": 0.008115
+     },
+     "perPairGate": {
+      "profile": 0.000949,
+      "grain": 0.009157,
+      "direction": 0.011506,
+      "size": 0.009029,
+      "ink": 0.008406
+     },
+     "measuredWidthRatio": 0.9157,
+     "measuredOpacityRatio": 0.9889
+    },
+    {
+     "pair": [
+      "calligraphy--perfect-chisel",
+      "felt-tip"
+     ],
+     "pixelP95": 0.00005,
+     "pixelNrmse": 0.00686,
+     "responseWorstRatio": 1.058,
+     "responseWorstAxis": "grain",
+     "normalisedDistance": {
+      "profile": 0.000889,
+      "grain": 0.009684,
+      "direction": 0.004185,
+      "size": 0.006663,
+      "ink": 0.008209
+     },
+     "perPairGate": {
+      "profile": 0.000949,
+      "grain": 0.009157,
+      "direction": 0.011506,
+      "size": 0.009029,
+      "ink": 0.008406
+     },
+     "measuredWidthRatio": 0.704,
+     "measuredOpacityRatio": 0.9746
+    },
+    {
+     "pair": [
+      "felt-tip",
+      "perfect-marker"
+     ],
+     "pixelP95": 0.00141,
+     "pixelNrmse": 0.09962,
+     "responseWorstRatio": 1.31,
+     "responseWorstAxis": "grain",
+     "normalisedDistance": {
+      "profile": 0.000889,
+      "grain": 0.009673,
+      "direction": 0.001653,
+      "size": 0.007476,
+      "ink": 0.005768
+     },
+     "perPairGate": {
+      "profile": 0.000889,
+      "grain": 0.007386,
+      "direction": 0.003224,
+      "size": 0.007791,
+      "ink": 0.007082
+     },
+     "measuredWidthRatio": 1.3007,
+     "measuredOpacityRatio": 1.0147
+    }
+   ],
+   "rows": [
+    {
+     "id": "calligraphy--perfect-chisel",
+     "name": "캘리 · 퍼펙트 치즐",
+     "family": "perfect",
+     "engine": "perfect-outline",
+     "engineVariant": "marker-flat",
+     "declaredCanonicalId": "perfect-marker",
+     "declaredDistinctness": "profile-variant",
+     "texture": "none",
+     "dynamics": "outline-pressure",
+     "defaultWidth": 14,
+     "defaultOpacity": 0.98,
+     "wiring": {
+      "renderWiringFiles": 1,
+      "renderWiringSites": 2,
+      "declaredOnlyInCatalogue": false,
+      "files": [
+       "studio-perfect-freehand.ts"
+      ]
+     },
+     "cost": {
+      "marks": 2,
+      "bytes": 2599,
+      "serialiseUs": 1280.2
+     },
+     "coverage": {
+      "sameEngineSignature": [
+       "perfect-marker"
+      ],
+      "sameEngineSignatureCount": 1,
+      "sameTextureClassCount": 3
+     },
+     "measured": {
+      "effectiveWidthPx": 51.86,
+      "inkAtReference": 0.9626,
+      "directionResponse": [
+       1.005894,
+       0.994084,
+       1.005981,
+       0.994041
+      ],
+      "sizeResponse": [
+       0.871898,
+       0.963739,
+       1.055806,
+       1.108557
+      ],
+      "inkResponse": [
+       1.003564,
+       0.99394,
+       0.986545,
+       1.015951
+      ]
+     }
+    },
+    {
+     "id": "felt-tip",
+     "name": "felt-tip",
+     "family": "marker",
+     "engine": "causal-ink",
+     "engineVariant": "round",
+     "declaredCanonicalId": "pen",
+     "declaredDistinctness": "profile-variant",
+     "texture": "none",
+     "dynamics": "causal-pressure",
+     "defaultWidth": null,
+     "defaultOpacity": null,
+     "wiring": {
+      "renderWiringFiles": 8,
+      "renderWiringSites": 10,
+      "declaredOnlyInCatalogue": false,
+      "files": [
+       "StudioBrushLibrarySheet.tsx",
+       "studio-brush-alias-profile.ts",
+       "studio-brush-backend-quality-policy.ts",
+       "studio-hokusai-live-brush-router.ts",
+       "studio-hybrid-pressure-profile.ts",
+       "studio-marker-nib-profile.ts",
+       "studio-node-edit.ts",
+       "studio-oss-brush-hybrid-registry.ts"
+      ]
+     },
+     "cost": {
+      "marks": 48,
+      "bytes": 5432,
+      "serialiseUs": 442.7
+     },
+     "coverage": {
+      "sameEngineSignature": [
+       "pen",
+       "fineliner",
+       "ballpoint",
+       "gel-pen",
+       "glass-pen",
+       "ruling-pen",
+       "technical-pen",
+       "kneaded-eraser",
+       "marker",
+       "marker-bold",
+       "alcohol-marker",
+       "gpen--causal-round"
+      ],
+      "sameEngineSignatureCount": 12,
+      "sameTextureClassCount": 4
+     },
+     "measured": {
+      "effectiveWidthPx": 73.6622,
+      "inkAtReference": 0.98768,
+      "directionResponse": [
+       1.001753,
+       0.998247,
+       1.001753,
+       0.998247
+      ],
+      "sizeResponse": [
+       0.871693,
+       0.97147,
+       1.042685,
+       1.114152
+      ],
+      "inkResponse": [
+       1.003414,
+       0.987179,
+       1.002963,
+       1.006444
+      ]
+     }
+    },
+    {
+     "id": "perfect-marker",
+     "name": "perfect-marker",
+     "family": "perfect",
+     "engine": "perfect-outline",
+     "engineVariant": "marker-flat",
+     "declaredCanonicalId": "perfect-marker",
+     "declaredDistinctness": "unique",
+     "texture": "none",
+     "dynamics": "outline-pressure",
+     "defaultWidth": null,
+     "defaultOpacity": null,
+     "wiring": {
+      "renderWiringFiles": 6,
+      "renderWiringSites": 11,
+      "declaredOnlyInCatalogue": false,
+      "files": [
+       "studio-brush-backend-quality-policy.ts",
+       "studio-hybrid-pressure-profile.ts",
+       "studio-oss-brush-hybrid-registry.ts",
+       "studio-outline-stroke-contract.ts",
+       "studio-perfect-freehand.ts",
+       "studio-six-engine-filter-service.ts"
+      ]
+     },
+     "cost": {
+      "marks": 2,
+      "bytes": 2573,
+      "serialiseUs": 447.1
+     },
+     "coverage": {
+      "sameEngineSignature": [
+       "calligraphy--perfect-chisel"
+      ],
+      "sameEngineSignatureCount": 1,
+      "sameTextureClassCount": 3
+     },
+     "measured": {
+      "effectiveWidthPx": 56.6333,
+      "inkAtReference": 0.97339,
+      "directionResponse": [
+       1.003406,
+       0.996594,
+       1.003406,
+       0.996594
+      ],
+      "sizeResponse": [
+       0.871879,
+       0.956604,
+       1.042598,
+       1.128918
+      ],
+      "inkResponse": [
+       1.005354,
+       0.996775,
+       0.998149,
+       0.999722
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "cluster": 7,
+   "tier": "B",
+   "members": [
+    "pen--perfect-taper",
+    "perfect-ink"
+   ],
+   "recommendation": {
+    "keep": [
+     "perfect-ink"
+    ],
+    "drop": [
+     "pen--perfect-taper"
+    ],
+    "confidence": "high",
+    "reason": "pen--perfect-taper is a declared profile-variant of perfect-ink with a single wiring site (its perfect-freehand profile), overlays at p95 0.00021, and costs marginally more (1,504 vs 1,487 bytes) for the same picture."
+   },
+   "pairs": [
+    {
+     "pair": [
+      "pen--perfect-taper",
+      "perfect-ink"
+     ],
+     "pixelP95": 0.00021,
+     "pixelNrmse": 0.00911,
+     "responseWorstRatio": 1.128,
+     "responseWorstAxis": "grain",
+     "normalisedDistance": {
+      "profile": 0.000165,
+      "grain": 0.015456,
+      "direction": 0.001519,
+      "size": 0.004225,
+      "ink": 0.005487
+     },
+     "perPairGate": {
+      "profile": 0.000822,
+      "grain": 0.013706,
+      "direction": 0.003924,
+      "size": 0.004165,
+      "ink": 0.005114
+     },
+     "measuredWidthRatio": 1.1234,
+     "measuredOpacityRatio": 0.9994
+    }
+   ],
+   "rows": [
+    {
+     "id": "pen--perfect-taper",
+     "name": "펜 · 퍼펙트 테이퍼",
+     "family": "perfect",
+     "engine": "perfect-outline",
+     "engineVariant": "ink-taper",
+     "declaredCanonicalId": "perfect-ink",
+     "declaredDistinctness": "profile-variant",
+     "texture": "none",
+     "dynamics": "outline-pressure",
+     "defaultWidth": 8,
+     "defaultOpacity": 1,
+     "wiring": {
+      "renderWiringFiles": 1,
+      "renderWiringSites": 2,
+      "declaredOnlyInCatalogue": false,
+      "files": [
+       "studio-perfect-freehand.ts"
+      ]
+     },
+     "cost": {
+      "marks": 2,
+      "bytes": 1504,
+      "serialiseUs": 425.3
+     },
+     "coverage": {
+      "sameEngineSignature": [
+       "perfect-ink"
+      ],
+      "sameEngineSignatureCount": 1,
+      "sameTextureClassCount": 3
+     },
+     "measured": {
+      "effectiveWidthPx": 59.6778,
+      "inkAtReference": 0.9834,
+      "directionResponse": [
+       0.99691,
+       1.003072,
+       0.996947,
+       1.003072
+      ],
+      "sizeResponse": [
+       0.518766,
+       0.839452,
+       1.160181,
+       1.481601
+      ],
+      "inkResponse": [
+       0.988107,
+       1.000777,
+       1.004789,
+       1.006327
+      ]
+     }
+    },
+    {
+     "id": "perfect-ink",
+     "name": "perfect-ink",
+     "family": "perfect",
+     "engine": "perfect-outline",
+     "engineVariant": "ink-taper",
+     "declaredCanonicalId": "perfect-ink",
+     "declaredDistinctness": "unique",
+     "texture": "none",
+     "dynamics": "outline-pressure",
+     "defaultWidth": null,
+     "defaultOpacity": null,
+     "wiring": {
+      "renderWiringFiles": 7,
+      "renderWiringSites": 15,
+      "declaredOnlyInCatalogue": false,
+      "files": [
+       "StudioDrawNode.tsx",
+       "studio-brush-backend-quality-policy.ts",
+       "studio-hybrid-pressure-profile.ts",
+       "studio-oss-brush-hybrid-registry.ts",
+       "studio-outline-stroke-contract.ts",
+       "studio-perfect-freehand.ts",
+       "studio-six-engine-filter-service.ts"
+      ]
+     },
+     "cost": {
+      "marks": 2,
+      "bytes": 1487,
+      "serialiseUs": 296.8
+     },
+     "coverage": {
+      "sameEngineSignature": [
+       "pen--perfect-taper"
+      ],
+      "sameEngineSignatureCount": 1,
+      "sameTextureClassCount": 3
+     },
+     "measured": {
+      "effectiveWidthPx": 53.1244,
+      "inkAtReference": 0.98396,
+      "directionResponse": [
+       0.995389,
+       1.004549,
+       0.99543,
+       1.004632
+      ],
+      "sizeResponse": [
+       0.52081,
+       0.845858,
+       1.15325,
+       1.480082
+      ],
+      "inkResponse": [
+       0.983785,
+       0.994124,
+       1.013437,
+       1.008654
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "cluster": 8,
+   "tier": "B",
+   "members": [
+    "mypaint-cc0--kabura",
+    "pen"
+   ],
+   "recommendation": {
+    "keep": [
+     "pen"
+    ],
+    "drop": [
+     "mypaint-cc0--kabura"
+    ],
+    "confidence": "high",
+    "reason": "the sharpest cost finding in the audit: mypaint-cc0--kabura spends 86,347 bytes where pen spends 5,428 — 15.9x the export weight — for a line that overlays at p95 0.0118. It has two wiring sites, both tag/route tables, and declares ink-brush as its canonical."
+   },
+   "pairs": [
+    {
+     "pair": [
+      "mypaint-cc0--kabura",
+      "pen"
+     ],
+     "pixelP95": 0.01175,
+     "pixelNrmse": 0.07475,
+     "responseWorstRatio": 1.269,
+     "responseWorstAxis": "grain",
+     "normalisedDistance": {
+      "profile": 0.013424,
+      "grain": 0.031205,
+      "direction": 0.012466,
+      "size": 0.036048,
+      "ink": 0.028793
+     },
+     "perPairGate": {
+      "profile": 0.011115,
+      "grain": 0.024599,
+      "direction": 0.0148,
+      "size": 0.032561,
+      "ink": 0.031298
+     },
+     "measuredWidthRatio": 0.5574,
+     "measuredOpacityRatio": 0.604
+    }
+   ],
+   "rows": [
+    {
+     "id": "mypaint-cc0--kabura",
+     "name": "MyPaint 오픈소스 · 카부라 펜",
+     "family": "stamp",
+     "engine": "stamp-dabs",
+     "engineVariant": "ink",
+     "declaredCanonicalId": "ink-brush",
+     "declaredDistinctness": "profile-variant",
+     "texture": "none",
+     "dynamics": "stamp-pressure-flow",
+     "defaultWidth": 6,
+     "defaultOpacity": 1,
+     "wiring": {
+      "renderWiringFiles": 2,
+      "renderWiringSites": 2,
+      "declaredOnlyInCatalogue": false,
+      "files": [
+       "studio-brush-backend-quality-policy.ts",
+       "studio-oss-brush-hybrid-registry.ts"
+      ]
+     },
+     "cost": {
+      "marks": 2,
+      "bytes": 86347,
+      "serialiseUs": 3970.5
+     },
+     "coverage": {
+      "sameEngineSignature": [
+       "ink-brush",
+       "gouache--flat-stamp",
+       "mypaint-cc0--dry-brush",
+       "mypaint-cc0--calligraphy",
+       "mypaint-cc0--marker-fat",
+       "mypaint-cc0--marker-small",
+       "mypaint-cc0--slow-ink",
+       "mypaint-cc0--knife"
+      ],
+      "sameEngineSignatureCount": 8,
+      "sameTextureClassCount": 7
+     },
+     "measured": {
+      "effectiveWidthPx": 38.3467,
+      "inkAtReference": 0.59641,
+      "directionResponse": [
+       0.980956,
+       1.019044,
+       0.980956,
+       1.019044
+      ],
+      "sizeResponse": [
+       0.545591,
+       0.862391,
+       1.129948,
+       1.46207
+      ],
+      "inkResponse": [
+       0.949939,
+       0.981424,
+       1.034637,
+       1.033999
+      ]
+     }
+    },
+    {
+     "id": "pen",
+     "name": "pen",
+     "family": "pen",
+     "engine": "causal-ink",
+     "engineVariant": "round",
+     "declaredCanonicalId": "pen",
+     "declaredDistinctness": "unique",
+     "texture": "none",
+     "dynamics": "causal-pressure",
+     "defaultWidth": null,
+     "defaultOpacity": null,
+     "wiring": {
+      "renderWiringFiles": 96,
+      "renderWiringSites": 323,
+      "declaredOnlyInCatalogue": false,
+      "files": [
+       "StudioCanvasViewport.tsx",
+       "StudioDrawNode.tsx",
+       "StudioDrawOptionsBar.tsx",
+       "StudioInspectorAside.tsx",
+       "StudioInspectorDrawModeControls.tsx",
+       "StudioLeftToolRail.tsx",
+       "StudioMobileEditingDock.tsx",
+       "StudioPage.tsx",
+       "StudioToolBeltContent.tsx",
+       "StudioVrmPoser.tsx",
+       "studio-active-stroke-lifecycle.ts",
+       "studio-app-settings.ts",
+       "studio-brush-alias-profile.ts",
+       "studio-brush-backend-quality-policy.ts",
+       "studio-brush-behavior-ui.ts",
+       "studio-brush-engine-lane-catalog.ts",
+       "studio-brush-library-repository.ts",
+       "studio-brush-library-sqlite-repository.ts",
+       "studio-brush-library.ts",
+       "studio-brush-selection.ts",
+       "studio-brush-velocity-pressure.ts",
+       "studio-brush-worker-client.ts",
+       "studio-canonical-brush-draw-adapter.ts",
+       "studio-canonical-stroke-v2.ts",
+       "studio-chrome-ia-map.ts",
+       "studio-command-catalog.ts",
+       "studio-companion-review-projection.ts",
+       "studio-companion-tool-command-executor.ts",
+       "studio-crdt-document.ts",
+       "studio-crdt-draw-bridge.ts",
+       "studio-crdt-raster-ui-bridge.ts",
+       "studio-draw-hud.ts",
+       "studio-draw-pointer-pressure-contract.ts",
+       "studio-draw-pointer-start-plan.ts",
+       "studio-draw-rendering.ts",
+       "studio-drawing-pointer-transport.ts",
+       "studio-editor-tool-model.ts",
+       "studio-element-model.ts",
+       "studio-eyedropper-loupe.ts",
+       "studio-feature-tutorials.ts",
+       "studio-filter-catalog.ts",
+       "studio-fixed-rate-input-eligibility.ts",
+       "studio-hokusai-natural-media-contract.ts",
+       "studio-hybrid-brush-filter-edit-runtime.ts",
+       "studio-hybrid-pressure-profile.ts",
+       "studio-inkml-interchange.ts",
+       "studio-inspector-layout.ts",
+       "studio-isometric-solid.ts",
+       "studio-layer-navigator.ts",
+       "studio-lazy-brush-stabilizer.ts",
+       "studio-liquify-pointer.ts",
+       "studio-live-ink-stabilizer-plan.ts",
+       "studio-live-wet-ink-overlay.ts",
+       "studio-living-ink-execution-validation.ts",
+       "studio-living-ink-field.ts",
+       "studio-living-ink-gpu-protocol.ts",
+       "studio-living-ink-input-routing.ts",
+       "studio-living-ink-studio-coordinator.ts",
+       "studio-living-ink-webgl2-runtime.ts",
+       "studio-living-ink-webgpu-pure-runtime.ts",
+       "studio-main-menu-contract.ts",
+       "studio-main-menu-items-brush.ts",
+       "studio-marker-nib-profile.ts",
+       "studio-menu-session-model.ts",
+       "studio-node-edit.ts",
+       "studio-p5-brush-standalone-runtime-adapter.ts",
+       "studio-paper-media-profile-v1.ts",
+       "studio-paper-vector-document-adapter.ts",
+       "studio-path-boolean.ts",
+       "studio-persisted-pointer-channels.ts",
+       "studio-pointer-input.ts",
+       "studio-pointer-prediction-capability.ts",
+       "studio-pointer-release-endpoint-plan.ts",
+       "studio-primary-canvas-tool-transition.ts",
+       "studio-procedural-artistic-brush-plan.ts",
+       "studio-quick-access-integration.ts",
+       "studio-quick-access.ts",
+       "studio-quick-actions.ts",
+       "studio-raw-pen-ink-preview.ts",
+       "studio-retouch-raster-gesture.ts",
+       "studio-smart-shape-brush-effect.ts",
+       "studio-stroke-paint-model.ts",
+       "studio-stroke-stabilizer.ts",
+       "studio-svg-export.ts",
+       "studio-tool-hint-preview-routing.ts",
+       "studio-tool-hints.ts",
+       "studio-tools-companion.ts",
+       "studio-velocity-pressure-response.ts",
+       "studio-vrm-surface-paint-tool.ts",
+       "studio-webgpu-committed-plan.ts",
+       "studio-webgpu-live-source-journal.ts",
+       "studio-will-v1-import-bridge.ts",
+       "studio-workspace-device-signals.ts",
+       "studio-workspace-interchange.ts",
+       "studio-workspaces.ts",
+       "useStudioBrushBaselineController.ts"
+      ]
+     },
+     "cost": {
+      "marks": 48,
+      "bytes": 5428,
+      "serialiseUs": 207.2
+     },
+     "coverage": {
+      "sameEngineSignature": [
+       "fineliner",
+       "ballpoint",
+       "gel-pen",
+       "glass-pen",
+       "ruling-pen",
+       "technical-pen",
+       "kneaded-eraser",
+       "marker",
+       "felt-tip",
+       "marker-bold",
+       "alcohol-marker",
+       "gpen--causal-round"
+      ],
+      "sameEngineSignatureCount": 12,
+      "sameTextureClassCount": 19
+     },
+     "measured": {
+      "effectiveWidthPx": 68.8,
+      "inkAtReference": 0.98746,
+      "directionResponse": [
+       0.993422,
+       1.006578,
+       0.993422,
+       1.006578
+      ],
+      "sizeResponse": [
+       0.497465,
+       0.838421,
+       1.162555,
+       1.501558
+      ],
+      "inkResponse": [
+       1.007527,
+       0.980345,
+       1.00387,
+       1.008259
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "cluster": 9,
+   "tier": "B",
+   "members": [
+    "marker-bold",
+    "technical-pen"
+   ],
+   "recommendation": {
+    "keep": [
+     "marker-bold",
+     "technical-pen"
+    ],
+    "drop": [],
+    "confidence": "medium",
+    "reason": "the purest 'only the numbers differ' pair: same engine, identical SVG skeleton, overlay p95 0.00045, alias diameterScale 1.5 vs 0.55 on near-identical pressure curves ({0.92,1,0.55} vs {0.9,1,0.5}). Both keep real wiring (marker nib profile; thin-line ink input admit list), so the fix is to present them as width presets of one shelf entry rather than to delete either."
+   },
+   "pairs": [
+    {
+     "pair": [
+      "marker-bold",
+      "technical-pen"
+     ],
+     "pixelP95": 0.00045,
+     "pixelNrmse": 0.09075,
+     "responseWorstRatio": 1.283,
+     "responseWorstAxis": "grain",
+     "normalisedDistance": {
+      "profile": 0.017141,
+      "grain": 0.012501,
+      "direction": 0.00123,
+      "size": 0.008089,
+      "ink": 0.006211
+     },
+     "perPairGate": {
+      "profile": 0.017037,
+      "grain": 0.009743,
+      "direction": 0.001507,
+      "size": 0.007206,
+      "ink": 0.006023
+     },
+     "measuredWidthRatio": 2.9867,
+     "measuredOpacityRatio": 1.0265
+    }
+   ],
+   "rows": [
+    {
+     "id": "marker-bold",
+     "name": "marker-bold",
+     "family": "marker",
+     "engine": "causal-ink",
+     "engineVariant": "round",
+     "declaredCanonicalId": "pen",
+     "declaredDistinctness": "profile-variant",
+     "texture": "none",
+     "dynamics": "causal-pressure",
+     "defaultWidth": null,
+     "defaultOpacity": null,
+     "wiring": {
+      "renderWiringFiles": 8,
+      "renderWiringSites": 10,
+      "declaredOnlyInCatalogue": false,
+      "files": [
+       "StudioBrushLibrarySheet.tsx",
+       "studio-brush-alias-profile.ts",
+       "studio-brush-backend-quality-policy.ts",
+       "studio-hokusai-live-brush-router.ts",
+       "studio-hybrid-pressure-profile.ts",
+       "studio-marker-nib-profile.ts",
+       "studio-node-edit.ts",
+       "studio-oss-brush-hybrid-registry.ts"
+      ]
+     },
+     "cost": {
+      "marks": 48,
+      "bytes": 5432,
+      "serialiseUs": 215.3
+     },
+     "coverage": {
+      "sameEngineSignature": [
+       "pen",
+       "fineliner",
+       "ballpoint",
+       "gel-pen",
+       "glass-pen",
+       "ruling-pen",
+       "technical-pen",
+       "kneaded-eraser",
+       "marker",
+       "felt-tip",
+       "alcohol-marker",
+       "gpen--causal-round"
+      ],
+      "sameEngineSignatureCount": 12,
+      "sameTextureClassCount": 4
+     },
+     "measured": {
+      "effectiveWidthPx": 147.9467,
+      "inkAtReference": 0.98724,
+      "directionResponse": [
+       0.999062,
+       1.000938,
+       0.999062,
+       1.000938
+      ],
+      "sizeResponse": [
+       0.975684,
+       0.995115,
+       1.013071,
+       1.01613
+      ],
+      "inkResponse": [
+       1.000878,
+       1.000322,
+       0.997156,
+       1.001643
+      ]
+     }
+    },
+    {
+     "id": "technical-pen",
+     "name": "technical-pen",
+     "family": "pen",
+     "engine": "causal-ink",
+     "engineVariant": "round",
+     "declaredCanonicalId": "pen",
+     "declaredDistinctness": "profile-variant",
+     "texture": "none",
+     "dynamics": "causal-pressure",
+     "defaultWidth": null,
+     "defaultOpacity": null,
+     "wiring": {
+      "renderWiringFiles": 5,
+      "renderWiringSites": 7,
+      "declaredOnlyInCatalogue": false,
+      "files": [
+       "studio-brush-alias-profile.ts",
+       "studio-brush-backend-quality-policy.ts",
+       "studio-hybrid-pressure-profile.ts",
+       "studio-oss-brush-hybrid-registry.ts",
+       "studio-thin-line-ink-input-v1.ts"
+      ]
+     },
+     "cost": {
+      "marks": 48,
+      "bytes": 5432,
+      "serialiseUs": 217.3
+     },
+     "coverage": {
+      "sameEngineSignature": [
+       "pen",
+       "fineliner",
+       "ballpoint",
+       "gel-pen",
+       "glass-pen",
+       "ruling-pen",
+       "kneaded-eraser",
+       "marker",
+       "felt-tip",
+       "marker-bold",
+       "alcohol-marker",
+       "gpen--causal-round"
+      ],
+      "sameEngineSignatureCount": 12,
+      "sameTextureClassCount": 19
+     },
+     "measured": {
+      "effectiveWidthPx": 49.5356,
+      "inkAtReference": 0.96177,
+      "directionResponse": [
+       1.000292,
+       0.999708,
+       1.000292,
+       0.999708
+      ],
+      "sizeResponse": [
+       0.976372,
+       0.978937,
+       1.021223,
+       1.023468
+      ],
+      "inkResponse": [
+       0.999581,
+       1.012744,
+       0.987421,
+       1.000253
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "cluster": 10,
+   "tier": "B",
+   "members": [
+    "fineliner",
+    "gel-pen"
+   ],
+   "recommendation": {
+    "keep": [
+     "fineliner"
+    ],
+    "drop": [
+     "gel-pen"
+    ],
+    "confidence": "medium",
+    "reason": "both are profile-variants of pen with five wiring sites each and both sit in the same thin-line-ink admit list; they overlay at p95 0.00059 and differ by diameterScale 0.48 vs 0.74 on nearly the same pressure curve. Keep fineliner as the standard name; gel-pen adds a width, not a texture."
+   },
+   "pairs": [
+    {
+     "pair": [
+      "fineliner",
+      "gel-pen"
+     ],
+     "pixelP95": 0.00059,
+     "pixelNrmse": 0.01114,
+     "responseWorstRatio": 1.339,
+     "responseWorstAxis": "ink",
+     "normalisedDistance": {
+      "profile": 0.004173,
+      "grain": 0.024047,
+      "direction": 0.010268,
+      "size": 0.01657,
+      "ink": 0.014963
+     },
+     "perPairGate": {
+      "profile": 0.006839,
+      "grain": 0.020636,
+      "direction": 0.016593,
+      "size": 0.012901,
+      "ink": 0.011178
+     },
+     "measuredWidthRatio": 0.6115,
+     "measuredOpacityRatio": 0.9981
+    }
+   ],
+   "rows": [
+    {
+     "id": "fineliner",
+     "name": "fineliner",
+     "family": "pen",
+     "engine": "causal-ink",
+     "engineVariant": "round",
+     "declaredCanonicalId": "pen",
+     "declaredDistinctness": "profile-variant",
+     "texture": "none",
+     "dynamics": "causal-pressure",
+     "defaultWidth": null,
+     "defaultOpacity": null,
+     "wiring": {
+      "renderWiringFiles": 5,
+      "renderWiringSites": 6,
+      "declaredOnlyInCatalogue": false,
+      "files": [
+       "studio-brush-alias-profile.ts",
+       "studio-hybrid-pressure-profile.ts",
+       "studio-node-edit.ts",
+       "studio-thin-line-ink-input-v1.ts",
+       "studio-webgpu-committed-plan.ts"
+      ]
+     },
+     "cost": {
+      "marks": 48,
+      "bytes": 5428,
+      "serialiseUs": 253.9
+     },
+     "coverage": {
+      "sameEngineSignature": [
+       "pen",
+       "ballpoint",
+       "gel-pen",
+       "glass-pen",
+       "ruling-pen",
+       "technical-pen",
+       "kneaded-eraser",
+       "marker",
+       "felt-tip",
+       "marker-bold",
+       "alcohol-marker",
+       "gpen--causal-round"
+      ],
+      "sameEngineSignatureCount": 12,
+      "sameTextureClassCount": 19
+     },
+     "measured": {
+      "effectiveWidthPx": 40.5956,
+      "inkAtReference": 0.98618,
+      "directionResponse": [
+       0.98913,
+       1.010843,
+       0.98913,
+       1.010897
+      ],
+      "sizeResponse": [
+       0.943654,
+       0.997683,
+       1.002016,
+       1.056647
+      ],
+      "inkResponse": [
+       0.988781,
+       0.987252,
+       1.01895,
+       1.005017
+      ]
+     }
+    },
+    {
+     "id": "gel-pen",
+     "name": "gel-pen",
+     "family": "pen",
+     "engine": "causal-ink",
+     "engineVariant": "round",
+     "declaredCanonicalId": "pen",
+     "declaredDistinctness": "profile-variant",
+     "texture": "none",
+     "dynamics": "causal-pressure",
+     "defaultWidth": null,
+     "defaultOpacity": null,
+     "wiring": {
+      "renderWiringFiles": 5,
+      "renderWiringSites": 7,
+      "declaredOnlyInCatalogue": false,
+      "files": [
+       "studio-brush-alias-profile.ts",
+       "studio-brush-backend-quality-policy.ts",
+       "studio-hybrid-pressure-profile.ts",
+       "studio-oss-brush-hybrid-registry.ts",
+       "studio-thin-line-ink-input-v1.ts"
+      ]
+     },
+     "cost": {
+      "marks": 48,
+      "bytes": 5434,
+      "serialiseUs": 252.7
+     },
+     "coverage": {
+      "sameEngineSignature": [
+       "pen",
+       "fineliner",
+       "ballpoint",
+       "glass-pen",
+       "ruling-pen",
+       "technical-pen",
+       "kneaded-eraser",
+       "marker",
+       "felt-tip",
+       "marker-bold",
+       "alcohol-marker",
+       "gpen--causal-round"
+      ],
+      "sameEngineSignatureCount": 12,
+      "sameTextureClassCount": 19
+     },
+     "measured": {
+      "effectiveWidthPx": 66.3911,
+      "inkAtReference": 0.98802,
+      "directionResponse": [
+       0.999398,
+       1.000602,
+       0.999398,
+       1.000602
+      ],
+      "sizeResponse": [
+       0.918129,
+       0.990069,
+       1.029346,
+       1.062456
+      ],
+      "inkResponse": [
+       1.008837,
+       0.997123,
+       1.005894,
+       0.988146
+      ]
+     }
+    }
+   ]
+  }
+ ],
+ "rejectedByPixelConfirm": [
+  {
+   "pair": [
+    "sketchpad-mirror",
+    "web-lazy-ink"
+   ],
+   "normalisedDistance": {
+    "profile": 0.004818,
+    "grain": 0.013994,
+    "direction": 0.011112,
+    "size": 0.00954,
+    "ink": 0.015731
+   },
+   "responseWorstRatio": 0.967,
+   "pixelP95": 0.06781,
+   "note": "passed every normalised response gate but the pixels disagree — not a duplicate"
+  },
+  {
+   "pair": [
+    "mypaint-cc0--kabura",
+    "sketchpad-mirror"
+   ],
+   "normalisedDistance": {
+    "profile": 0.011098,
+    "grain": 0.01936,
+    "direction": 0.005486,
+    "size": 0.011208,
+    "ink": 0.017308
+   },
+   "responseWorstRatio": 0.757,
+   "pixelP95": 0.12777,
+   "note": "passed every normalised response gate but the pixels disagree — not a duplicate"
+  },
+  {
+   "pair": [
+    "ink-wash--fiber-feather",
+    "ink-wash--living-bake"
+   ],
+   "normalisedDistance": {
+    "profile": 0.046992,
+    "grain": 0.061765,
+    "direction": 0.002655,
+    "size": 0.009193,
+    "ink": 0.008018
+   },
+   "responseWorstRatio": 0.827,
+   "pixelP95": 0.23469,
+   "note": "passed every normalised response gate but the pixels disagree — not a duplicate"
+  },
+  {
+   "pair": [
+    "airbrush",
+    "marker--soft-dynamic"
+   ],
+   "normalisedDistance": {
+    "profile": 0.006565,
+    "grain": 0.013097,
+    "direction": 0.001371,
+    "size": 0.009066,
+    "ink": 0.008504
+   },
+   "responseWorstRatio": 0.797,
+   "pixelP95": 0.24427,
+   "note": "passed every normalised response gate but the pixels disagree — not a duplicate"
+  },
+  {
+   "pair": [
+    "web-blend-softener",
+    "web-neon-tube"
+   ],
+   "normalisedDistance": {
+    "profile": 0.014917,
+    "grain": 0.024326,
+    "direction": 0.001976,
+    "size": 0.023461,
+    "ink": 0.025424
+   },
+   "responseWorstRatio": 0.952,
+   "pixelP95": 0.35515,
+   "note": "passed every normalised response gate but the pixels disagree — not a duplicate"
+  },
+  {
+   "pair": [
+    "acrylic",
+    "brush--bristle-depletion"
+   ],
+   "normalisedDistance": {
+    "profile": 0.056909,
+    "grain": 0.001861,
+    "direction": 0.000679,
+    "size": 0.008274,
+    "ink": 0.009683
+   },
+   "responseWorstRatio": 0.716,
+   "pixelP95": 0.42159,
+   "note": "passed every normalised response gate but the pixels disagree — not a duplicate"
+  },
+  {
+   "pair": [
+    "gouache--flat-stamp",
+    "maru-pen"
+   ],
+   "normalisedDistance": {
+    "profile": 0.004553,
+    "grain": 0.008086,
+    "direction": 0.000497,
+    "size": 0.028235,
+    "ink": 0.006883
+   },
+   "responseWorstRatio": 0.958,
+   "pixelP95": 0.51012,
+   "note": "passed every normalised response gate but the pixels disagree — not a duplicate"
+  },
+  {
+   "pair": [
+    "brush--bristle-depletion",
+    "brush--impasto-relief"
+   ],
+   "normalisedDistance": {
+    "profile": 0.08678,
+    "grain": 0.080013,
+    "direction": 0.000588,
+    "size": 0.006702,
+    "ink": 0.042695
+   },
+   "responseWorstRatio": 0.956,
+   "pixelP95": 0.51204,
+   "note": "passed every normalised response gate but the pixels disagree — not a duplicate"
+  },
+  {
+   "pair": [
+    "airbrush--hard-envelope",
+    "web-kaleido-ink"
+   ],
+   "normalisedDistance": {
+    "profile": 0.01697,
+    "grain": 0.027804,
+    "direction": 0.00363,
+    "size": 0.003994,
+    "ink": 0.006665
+   },
+   "responseWorstRatio": 0.889,
+   "pixelP95": 0.55972,
+   "note": "passed every normalised response gate but the pixels disagree — not a duplicate"
+  },
+  {
+   "pair": [
+    "pastel-highlighter",
+    "pencil-2b"
+   ],
+   "normalisedDistance": {
+    "profile": 0.002838,
+    "grain": 0.00997,
+    "direction": 0.004148,
+    "size": 0,
+    "ink": 0
+   },
+   "responseWorstRatio": 0.899,
+   "pixelP95": 0.61376,
+   "note": "passed every normalised response gate but the pixels disagree — not a duplicate"
+  },
+  {
+   "pair": [
+    "acrylic--polymer-flat",
+    "web-rough-ink"
+   ],
+   "normalisedDistance": {
+    "profile": 0.023548,
+    "grain": 0.02029,
+    "direction": 0.014282,
+    "size": 0.004895,
+    "ink": 0.00554
+   },
+   "responseWorstRatio": 0.994,
+   "pixelP95": 0.70483,
+   "note": "passed every normalised response gate but the pixels disagree — not a duplicate"
+  },
+  {
+   "pair": [
+    "calligraphy--perfect-chisel",
+    "kaburapen"
+   ],
+   "normalisedDistance": {
+    "profile": 0.000026,
+    "grain": 0.000442,
+    "direction": 0.004292,
+    "size": 0.00569,
+    "ink": 0.008325
+   },
+   "responseWorstRatio": 0.99,
+   "pixelP95": 0.75671,
+   "note": "passed every normalised response gate but the pixels disagree — not a duplicate"
+  },
+  {
+   "pair": [
+    "gpen",
+    "pen"
+   ],
+   "normalisedDistance": {
+    "profile": 0.000042,
+    "grain": 0.000535,
+    "direction": 0.004558,
+    "size": 0.0127,
+    "ink": 0.006319
+   },
+   "responseWorstRatio": 0.862,
+   "pixelP95": 1.00136,
+   "note": "passed every normalised response gate but the pixels disagree — not a duplicate"
+  }
+ ]
+}
