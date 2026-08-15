@@ -232,7 +232,19 @@ export const DEFAULT_STUDIO_BRUSH_SNAPSHOT: StudioBrushSnapshot = {
   preserveCorners: true,
   pressureCurve: 1.0,
   pressureMinSize: 0,
-  useVelocityPressure: false,
+  // On by default. A stylus never sees it — `hardwarePressureOf` returns the pen's own reading and
+  // the resolver runs "hardware-precedence", so this only reaches a mouse, a trackpad, and the
+  // force-incapable touch that Pointer Events reports as exactly 0.5. Those inputs used to draw
+  // every stroke at one dead constant width and opacity from first pixel to last, which is the
+  // largest single stroke-feel gap against every reference app that does not assume a pen.
+  //
+  // Measured on a synthetic drag-then-flick at both 60 and 240 Hz: a slow drag resolves to 0.858
+  // pressure and a fast flick to 0.350, identically at both rates. The temporal low-pass stays at
+  // its calibrated 12 ms — raising it to settle the simulated pressure was considered and measured
+  // instead: sample-to-sample movement during a steady drag is already 0.0026, below one 8-bit
+  // step, so there is nothing to settle, while 90 ms would have cost 380-570 ms of catch-up after
+  // a speed change.
+  useVelocityPressure: true,
   velocitySensitivity: 0.65,
   tiltEnabled: true,
   tipAngle: -30,

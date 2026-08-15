@@ -86,7 +86,9 @@ describe("studio brush applied baseline contract", () => {
       preserveCorners: false,
       pressureCurve: 2.2,
       pressureMinSize: 0.54,
-      useVelocityPressure: true,
+      // Differs from the default, which is now true — this snapshot's job is to make EVERY
+      // brush-feel field dirty at once, so it has to be the opposite of whatever ships.
+      useVelocityPressure: false,
       velocitySensitivity: 0.91,
       tiltEnabled: false,
       tipAngle: 88,

@@ -160,7 +160,10 @@ describe("sanitizeBrushSnapshot", () => {
     // 2026-08-14: 기본 선 보정이 속도 적응 3으로 바뀌었다(느린 장선 손떨림 통과율 100%→48%).
     expect(snapshot.stabilizer).toBe(3);
     expect(snapshot.postCorrection).toBe(0);
-    expect(snapshot.useVelocityPressure).toBe(false);
+    // 2026-08-16: 기본값 true. 스타일러스는 hardware-precedence 로 자기 필압을 그대로 쓰므로
+    // 영향이 없고, 마우스·트랙패드·힘 감지 없는 터치만 속도→필압을 받는다. 그전에는 이 입력들이
+    // 획 전체를 죽은 상수 굵기·농도로 그렸다.
+    expect(snapshot.useVelocityPressure).toBe(true);
     expect(adjustedFields).toContain("brushId");
     expect(adjustedFields).toContain("color");
     expect(adjustedFields).toContain("useVelocityPressure");
@@ -225,9 +228,9 @@ describe("sanitizeBrushSnapshot", () => {
     expect(adjustedFields).toEqual([]);
   });
 
-  it("useVelocityPressure가 boolean이 아니면 포인터 일치 기본값(false)으로 대체한다", () => {
+  it("useVelocityPressure가 boolean이 아니면 포인터 일치 기본값(true)으로 대체한다", () => {
     const { snapshot, adjustedFields } = sanitizeBrushSnapshot({ ...validSnapshot, useVelocityPressure: "yes" });
-    expect(snapshot.useVelocityPressure).toBe(false);
+    expect(snapshot.useVelocityPressure).toBe(true);
     expect(adjustedFields).toEqual(["useVelocityPressure"]);
   });
 
