@@ -15,6 +15,11 @@
 /coverage
 /test-results/
 /tests/benchmarks/artifacts/
+# Regenerable visual-check renders. The JSON receipts beside them ARE tracked; the PNG sheets are
+# 51MB and are rebuilt by their harnesses on demand.
+/tests/benchmarks/results/brush-contact-sheet/
+/tests/benchmarks/results/brush-corner/
+/tests/benchmarks/results/brush-tremor/
 
 # production
 /build

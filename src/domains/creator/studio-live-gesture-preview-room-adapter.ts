@@ -78,7 +78,7 @@ export class StudioLiveGesturePreviewRoomAdapter {
   private readonly listeners = new Set<() => void>();
   private readonly pinsByKey = new Map<string, EligibleGesturePin>();
   private readonly ownerKeyByGestureId = new Map<string, string>();
-  private readonly storeUnsubscribe: () => void;
+  private storeUnsubscribe: (() => void) | null = null;
   private room: StudioLiveGesturePreviewRoomSource | null = null;
   private roomUnsubscribe: (() => void) | null = null;
   private roomGeneration = 0;
@@ -96,7 +96,6 @@ export class StudioLiveGesturePreviewRoomAdapter {
       pageId: this.activePageId,
     });
     this.store.setActivePage(this.activePageId);
-    this.storeUnsubscribe = this.store.subscribe(() => this.reconcileFromStore());
     this.reconcileFromStore();
   }
 
@@ -107,7 +106,13 @@ export class StudioLiveGesturePreviewRoomAdapter {
   readonly subscribe = (listener: () => void): (() => void) => {
     if (this.disposed) return () => undefined;
     this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
+    this.ensureStoreSubscription();
+    return () => {
+      this.listeners.delete(listener);
+      if (this.listeners.size !== 0) return;
+      this.storeUnsubscribe?.();
+      this.storeUnsubscribe = null;
+    };
   };
 
   setRoom(room: StudioLiveRoom | StudioLiveGesturePreviewRoomSource | null): void {
@@ -183,7 +188,8 @@ export class StudioLiveGesturePreviewRoomAdapter {
     this.roomUnsubscribe = null;
     this.room = null;
     this.clearTransientState();
-    this.storeUnsubscribe();
+    this.storeUnsubscribe?.();
+    this.storeUnsubscribe = null;
     this.store.dispose();
     this.listeners.clear();
     this.disposed = true;
@@ -207,6 +213,11 @@ export class StudioLiveGesturePreviewRoomAdapter {
     ) {
       this.clearTransientState();
     }
+  }
+
+  private ensureStoreSubscription(): void {
+    if (this.storeUnsubscribe || this.disposed) return;
+    this.storeUnsubscribe = this.store.subscribe(() => this.reconcileFromStore());
   }
 
   private applyGesturePreview(

@@ -1,0 +1,2384 @@
+{
+ "generatedAtUtc": "2026-08-15T17:43:06.850Z",
+ "method": "B is re-rendered over a stroke-width grid centred on the width that matches A's measured effective width, each render compared against A at five vertical sub-pixel shifts, both normalised to mean ink 1.0; the best overlay is reported. Judged on p95 of the per-pixel |difference| — nrmse is dominated by a few edge rows, p95 answers whether the body of the stroke is the same picture.",
+ "canvas": {
+  "width": 460,
+  "height": 96,
+  "scale": 4,
+  "pressure": 0.7
+ },
+ "search": {
+  "width": "solved analytically (two-point linear fit of effective width vs stroke width plus a Newton correction), then refined over [0.99,0.995,1,1.005,1.01]",
+  "shiftsPx": [
+   -2,
+   -1.75,
+   -1.5,
+   -1.25,
+   -1,
+   -0.75,
+   -0.5,
+   -0.25,
+   0,
+   0.25,
+   0.5,
+   0.75,
+   1,
+   1.25,
+   1.5,
+   1.75,
+   2
+  ]
+ },
+ "candidates": 81,
+ "pairs": [
+  {
+   "a": "pencil",
+   "b": "pencil--side-shade",
+   "distance": {
+    "profile": 0.003814,
+    "grain": 0.001886,
+    "direction": 0.00051,
+    "size": 0,
+    "ink": 0
+   },
+   "gate": {
+    "profile": 0.008907,
+    "grain": 0.00519,
+    "direction": 0.000975,
+    "size": 0,
+    "ink": 0
+   },
+   "worstRatio": 0.523,
+   "worstAxis": "direction",
+   "widthRatio": 1.1652,
+   "opacityRatio": 1.0042,
+   "pixel": {
+    "p95": 0,
+    "nrmse": 0,
+    "pixelsCompared": 114331,
+    "bestStrokeWidth": 18.547,
+    "bestShiftPx": 0
+   }
+  },
+  {
+   "a": "brush",
+   "b": "flat-brush",
+   "distance": {
+    "profile": 0.013522,
+    "grain": 0.01426,
+    "direction": 0.010936,
+    "size": 0,
+    "ink": 0
+   },
+   "gate": {
+    "profile": 0.024308,
+    "grain": 0.022426,
+    "direction": 0.015801,
+    "size": 0,
+    "ink": 0
+   },
+   "worstRatio": 0.692,
+   "worstAxis": "direction",
+   "widthRatio": 0.7501,
+   "opacityRatio": 1.0322,
+   "pixel": {
+    "p95": 0,
+    "nrmse": 0,
+    "pixelsCompared": 54336,
+    "bestStrokeWidth": 12.302,
+    "bestShiftPx": 0
+   }
+  },
+  {
+   "a": "mypaint-cc0--marker-fat",
+   "b": "mypaint-cc0--marker-small",
+   "distance": {
+    "profile": 0,
+    "grain": 0.000183,
+    "direction": 0.017175,
+    "size": 0,
+    "ink": 0
+   },
+   "gate": {
+    "profile": 0.016695,
+    "grain": 0.013676,
+    "direction": 0.028164,
+    "size": 0,
+    "ink": 0
+   },
+   "worstRatio": 0.61,
+   "worstAxis": "direction",
+   "widthRatio": 1.0057,
+   "opacityRatio": 0.9995,
+   "pixel": {
+    "p95": 0.00001,
+    "nrmse": 0.02003,
+    "pixelsCompared": 103303,
+    "bestStrokeWidth": 15.967,
+    "bestShiftPx": 0
+   }
+  },
+  {
+   "a": "colored-pencil",
+   "b": "pencil-2b",
+   "distance": {
+    "profile": 0.002916,
+    "grain": 0.00147,
+    "direction": 0.001516,
+    "size": 0,
+    "ink": 0
+   },
+   "gate": {
+    "profile": 0.005193,
+    "grain": 0.004953,
+    "direction": 0.001216,
+    "size": 0,
+    "ink": 0
+   },
+   "worstRatio": 1.247,
+   "worstAxis": "direction",
+   "widthRatio": 0.8522,
+   "opacityRatio": 0.9089,
+   "pixel": {
+    "p95": 0.00001,
+    "nrmse": 0.09277,
+    "pixelsCompared": 119945,
+    "bestStrokeWidth": 13.688,
+    "bestShiftPx": 0
+   }
+  },
+  {
+   "a": "calligraphy--perfect-chisel",
+   "b": "perfect-marker",
+   "distance": {
+    "profile": 0,
+    "grain": 0.000035,
+    "direction": 0.002532,
+    "size": 0.010181,
+    "ink": 0.008115
+   },
+   "gate": {
+    "profile": 0.000949,
+    "grain": 0.009157,
+    "direction": 0.011506,
+    "size": 0.009029,
+    "ink": 0.008406
+   },
+   "worstRatio": 1.128,
+   "worstAxis": "size",
+   "widthRatio": 0.9157,
+   "opacityRatio": 0.9889,
+   "pixel": {
+    "p95": 0.00002,
+    "nrmse": 0.00191,
+    "pixelsCompared": 108224,
+    "bestStrokeWidth": 14.615,
+    "bestShiftPx": 0
+   }
+  },
+  {
+   "a": "brush",
+   "b": "marker--chisel-ribbon",
+   "distance": {
+    "profile": 0.016193,
+    "grain": 0.016662,
+    "direction": 0.01544,
+    "size": 0,
+    "ink": 0
+   },
+   "gate": {
+    "profile": 0.017513,
+    "grain": 0.022426,
+    "direction": 0.01281,
+    "size": 0,
+    "ink": 0
+   },
+   "worstRatio": 1.205,
+   "worstAxis": "direction",
+   "widthRatio": 0.8571,
+   "opacityRatio": 1.0371,
+   "pixel": {
+    "p95": 0.00002,
+    "nrmse": 0.00114,
+    "pixelsCompared": 54337,
+    "bestStrokeWidth": 14.364,
+    "bestShiftPx": 0
+   }
+  },
+  {
+   "a": "flat-brush",
+   "b": "marker--chisel-ribbon",
+   "distance": {
+    "profile": 0.002671,
+    "grain": 0.002414,
+    "direction": 0.015129,
+    "size": 0,
+    "ink": 0
+   },
+   "gate": {
+    "profile": 0.024308,
+    "grain": 0.017439,
+    "direction": 0.015801,
+    "size": 0,
+    "ink": 0
+   },
+   "worstRatio": 0.957,
+   "worstAxis": "direction",
+   "widthRatio": 1.1427,
+   "opacityRatio": 1.0048,
+   "pixel": {
+    "p95": 0.00003,
+    "nrmse": 0.00095,
+    "pixelsCompared": 71317,
+    "bestStrokeWidth": 18.573,
+    "bestShiftPx": 0
+   }
+  },
+  {
+   "a": "calligraphy--perfect-chisel",
+   "b": "felt-tip",
+   "distance": {
+    "profile": 0.000889,
+    "grain": 0.009684,
+    "direction": 0.004185,
+    "size": 0.006663,
+    "ink": 0.008209
+   },
+   "gate": {
+    "profile": 0.000949,
+    "grain": 0.009157,
+    "direction": 0.011506,
+    "size": 0.009029,
+    "ink": 0.008406
+   },
+   "worstRatio": 1.058,
+   "worstAxis": "grain",
+   "widthRatio": 0.704,
+   "opacityRatio": 0.9746,
+   "pixel": {
+    "p95": 0.00005,
+    "nrmse": 0.00686,
+    "pixelsCompared": 108240,
+    "bestStrokeWidth": 11.351,
+    "bestShiftPx": 0
+   }
+  },
+  {
+   "a": "pencil--side-shade",
+   "b": "pencil-2b",
+   "distance": {
+    "profile": 0.008211,
+    "grain": 0.004284,
+    "direction": 0.000237,
+    "size": 0,
+    "ink": 0
+   },
+   "gate": {
+    "profile": 0.008907,
+    "grain": 0.00519,
+    "direction": 0.001216,
+    "size": 0,
+    "ink": 0
+   },
+   "worstRatio": 0.922,
+   "worstAxis": "profile",
+   "widthRatio": 0.7002,
+   "opacityRatio": 1.1023,
+   "pixel": {
+    "p95": 0.00007,
+    "nrmse": 0.03966,
+    "pixelsCompared": 98421,
+    "bestStrokeWidth": 11.334,
+    "bestShiftPx": 0
+   }
+  },
+  {
+   "a": "pencil",
+   "b": "pencil-2b",
+   "distance": {
+    "profile": 0.004397,
+    "grain": 0.002404,
+    "direction": 0.000274,
+    "size": 0,
+    "ink": 0
+   },
+   "gate": {
+    "profile": 0.006543,
+    "grain": 0.004953,
+    "direction": 0.001216,
+    "size": 0,
+    "ink": 0
+   },
+   "worstRatio": 0.672,
+   "worstAxis": "profile",
+   "widthRatio": 0.8158,
+   "opacityRatio": 1.107,
+   "pixel": {
+    "p95": 0.00014,
+    "nrmse": 0.02738,
+    "pixelsCompared": 114529,
+    "bestStrokeWidth": 13.207,
+    "bestShiftPx": 0
+   }
+  },
+  {
+   "a": "gpen--causal-round",
+   "b": "gpen--croquis-capsule",
+   "distance": {
+    "profile": 0,
+    "grain": 0.006059,
+    "direction": 0.000073,
+    "size": 0.008122,
+    "ink": 0.006232
+   },
+   "gate": {
+    "profile": 0.000822,
+    "grain": 0.006928,
+    "direction": 0.002326,
+    "size": 0.016083,
+    "ink": 0.006231
+   },
+   "worstRatio": 1,
+   "worstAxis": "ink",
+   "widthRatio": 1.0016,
+   "opacityRatio": 1.0066,
+   "pixel": {
+    "p95": 0.00014,
+    "nrmse": 0.00457,
+    "pixelsCompared": 188651,
+    "bestStrokeWidth": 16.098,
+    "bestShiftPx": 0
+   }
+  },
+  {
+   "a": "highlighter",
+   "b": "pastel-highlighter",
+   "distance": {
+    "profile": 0.000275,
+    "grain": 0.080645,
+    "direction": 0.003902,
+    "size": 0,
+    "ink": 0
+   },
+   "gate": {
+    "profile": 0.007577,
+    "grain": 0.085303,
+    "direction": 0.005996,
+    "size": 0,
+    "ink": 0
+   },
+   "worstRatio": 0.945,
+   "worstAxis": "grain",
+   "widthRatio": 0.8943,
+   "opacityRatio": 1.0166,
+   "pixel": {
+    "p95": 0.00021,
+    "nrmse": 0.06043,
+    "pixelsCompared": 111191,
+    "bestStrokeWidth": 14.489,
+    "bestShiftPx": 0
+   }
+  },
+  {
+   "a": "pen--perfect-taper",
+   "b": "perfect-ink",
+   "distance": {
+    "profile": 0.000165,
+    "grain": 0.015456,
+    "direction": 0.001519,
+    "size": 0.004225,
+    "ink": 0.005487
+   },
+   "gate": {
+    "profile": 0.000822,
+    "grain": 0.013706,
+    "direction": 0.003924,
+    "size": 0.004165,
+    "ink": 0.005114
+   },
+   "worstRatio": 1.128,
+   "worstAxis": "grain",
+   "widthRatio": 1.1234,
+   "opacityRatio": 0.9994,
+   "pixel": {
+    "p95": 0.00021,
+    "nrmse": 0.00911,
+    "pixelsCompared": 152309,
+    "bestStrokeWidth": 18.649,
+    "bestShiftPx": 0
+   }
+  },
+  {
+   "a": "marker-bold",
+   "b": "technical-pen",
+   "distance": {
+    "profile": 0.017141,
+    "grain": 0.012501,
+    "direction": 0.00123,
+    "size": 0.008089,
+    "ink": 0.006211
+   },
+   "gate": {
+    "profile": 0.017037,
+    "grain": 0.009743,
+    "direction": 0.001507,
+    "size": 0.007206,
+    "ink": 0.006023
+   },
+   "worstRatio": 1.283,
+   "worstAxis": "grain",
+   "widthRatio": 2.9867,
+   "opacityRatio": 1.0265,
+   "pixel": {
+    "p95": 0.00045,
+    "nrmse": 0.09075,
+    "pixelsCompared": 300150,
+    "bestStrokeWidth": 44.354,
+    "bestShiftPx": 0.5
+   }
+  },
+  {
+   "a": "fineliner",
+   "b": "gel-pen",
+   "distance": {
+    "profile": 0.004173,
+    "grain": 0.024047,
+    "direction": 0.010268,
+    "size": 0.01657,
+    "ink": 0.014963
+   },
+   "gate": {
+    "profile": 0.006839,
+    "grain": 0.020636,
+    "direction": 0.016593,
+    "size": 0.012901,
+    "ink": 0.011178
+   },
+   "worstRatio": 1.339,
+   "worstAxis": "ink",
+   "widthRatio": 0.6115,
+   "opacityRatio": 0.9981,
+   "pixel": {
+    "p95": 0.00059,
+    "nrmse": 0.01114,
+    "pixelsCompared": 90264,
+    "bestStrokeWidth": 10.163,
+    "bestShiftPx": 0
+   }
+  },
+  {
+   "a": "alcohol-marker",
+   "b": "gel-pen",
+   "distance": {
+    "profile": 0.006839,
+    "grain": 0.004108,
+    "direction": 0.00048,
+    "size": 0.009375,
+    "ink": 0.006903
+   },
+   "gate": {
+    "profile": 0.006839,
+    "grain": 0.004953,
+    "direction": 0.002139,
+    "size": 0.006991,
+    "ink": 0.007537
+   },
+   "worstRatio": 1.341,
+   "worstAxis": "size",
+   "widthRatio": 1.6512,
+   "opacityRatio": 1.0024,
+   "pixel": {
+    "p95": 0.00081,
+    "nrmse": 0.01137,
+    "pixelsCompared": 226210,
+    "bestStrokeWidth": 25.206,
+    "bestShiftPx": 0
+   }
+  },
+  {
+   "a": "mypaint-cc0--kabura",
+   "b": "pen--croquis-stabilized",
+   "distance": {
+    "profile": 0.013424,
+    "grain": 0.017686,
+    "direction": 0.015102,
+    "size": 0.043973,
+    "ink": 0.028262
+   },
+   "gate": {
+    "profile": 0.011115,
+    "grain": 0.024599,
+    "direction": 0.0148,
+    "size": 0.032561,
+    "ink": 0.031298
+   },
+   "worstRatio": 1.35,
+   "worstAxis": "size",
+   "widthRatio": 0.409,
+   "opacityRatio": 0.6056,
+   "pixel": {
+    "p95": 0.00094,
+    "nrmse": 0.04336,
+    "pixelsCompared": 86704,
+    "bestStrokeWidth": 7.164,
+    "bestShiftPx": 0
+   }
+  },
+  {
+   "a": "felt-tip",
+   "b": "perfect-marker",
+   "distance": {
+    "profile": 0.000889,
+    "grain": 0.009673,
+    "direction": 0.001653,
+    "size": 0.007476,
+    "ink": 0.005768
+   },
+   "gate": {
+    "profile": 0.000889,
+    "grain": 0.007386,
+    "direction": 0.003224,
+    "size": 0.007791,
+    "ink": 0.007082
+   },
+   "worstRatio": 1.31,
+   "worstAxis": "grain",
+   "widthRatio": 1.3007,
+   "opacityRatio": 1.0147,
+   "pixel": {
+    "p95": 0.00141,
+    "nrmse": 0.09962,
+    "pixelsCompared": 158825,
+    "bestStrokeWidth": 20.882,
+    "bestShiftPx": 0
+   }
+  },
+  {
+   "a": "gpen--causal-round",
+   "b": "ink-brush",
+   "distance": {
+    "profile": 0.016286,
+    "grain": 0.025222,
+    "direction": 0.001702,
+    "size": 0.029849,
+    "ink": 0.034766
+   },
+   "gate": {
+    "profile": 0.012773,
+    "grain": 0.024305,
+    "direction": 0.002326,
+    "size": 0.028267,
+    "ink": 0.025406
+   },
+   "worstRatio": 1.368,
+   "worstAxis": "ink",
+   "widthRatio": 2.4113,
+   "opacityRatio": 1.0315,
+   "pixel": {
+    "p95": 0.00191,
+    "nrmse": 0.12996,
+    "pixelsCompared": 192090,
+    "bestStrokeWidth": 36.951,
+    "bestShiftPx": 0
+   }
+  },
+  {
+   "a": "gouache--flat-stamp",
+   "b": "gpen--croquis-capsule",
+   "distance": {
+    "profile": 0.020929,
+    "grain": 0.014352,
+    "direction": 0.00538,
+    "size": 0.016056,
+    "ink": 0.021335
+   },
+   "gate": {
+    "profile": 0.020929,
+    "grain": 0.014293,
+    "direction": 0.013246,
+    "size": 0.029479,
+    "ink": 0.02135
+   },
+   "worstRatio": 1.004,
+   "worstAxis": "grain",
+   "widthRatio": 0.4442,
+   "opacityRatio": 0.9118,
+   "pixel": {
+    "p95": 0.00209,
+    "nrmse": 0.07422,
+    "pixelsCompared": 86792,
+    "bestStrokeWidth": 7.561,
+    "bestShiftPx": 0
+   }
+  },
+  {
+   "a": "gouache--flat-stamp",
+   "b": "pen--croquis-stabilized",
+   "distance": {
+    "profile": 0.020929,
+    "grain": 0.014975,
+    "direction": 0.009835,
+    "size": 0.018695,
+    "ink": 0.018344
+   },
+   "gate": {
+    "profile": 0.020929,
+    "grain": 0.014293,
+    "direction": 0.013246,
+    "size": 0.029479,
+    "ink": 0.02135
+   },
+   "worstRatio": 1.048,
+   "worstAxis": "grain",
+   "widthRatio": 0.4309,
+   "opacityRatio": 0.9033,
+   "pixel": {
+    "p95": 0.00209,
+    "nrmse": 0.07422,
+    "pixelsCompared": 86792,
+    "bestStrokeWidth": 7.296,
+    "bestShiftPx": 0
+   }
+  },
+  {
+   "a": "gouache--flat-stamp",
+   "b": "pen",
+   "distance": {
+    "profile": 0.020929,
+    "grain": 0.011751,
+    "direction": 0.012471,
+    "size": 0.026621,
+    "ink": 0.027811
+   },
+   "gate": {
+    "profile": 0.020929,
+    "grain": 0.014293,
+    "direction": 0.013246,
+    "size": 0.029479,
+    "ink": 0.02135
+   },
+   "worstRatio": 1.303,
+   "worstAxis": "ink",
+   "widthRatio": 0.5872,
+   "opacityRatio": 0.901,
+   "pixel": {
+    "p95": 0.00236,
+    "nrmse": 0.07481,
+    "pixelsCompared": 86792,
+    "bestStrokeWidth": 9.664,
+    "bestShiftPx": 0
+   }
+  },
+  {
+   "a": "gpen--croquis-capsule",
+   "b": "ink-brush",
+   "distance": {
+    "profile": 0.016286,
+    "grain": 0.019176,
+    "direction": 0.001629,
+    "size": 0.034466,
+    "ink": 0.03449
+   },
+   "gate": {
+    "profile": 0.012773,
+    "grain": 0.024305,
+    "direction": 0.002247,
+    "size": 0.028267,
+    "ink": 0.025406
+   },
+   "worstRatio": 1.358,
+   "worstAxis": "ink",
+   "widthRatio": 2.4075,
+   "opacityRatio": 1.0247,
+   "pixel": {
+    "p95": 0.00387,
+    "nrmse": 0.15236,
+    "pixelsCompared": 192046,
+    "bestStrokeWidth": 36.937,
+    "bestShiftPx": 0
+   }
+  },
+  {
+   "a": "chisel-highlighter",
+   "b": "pastel-highlighter",
+   "distance": {
+    "profile": 0.001194,
+    "grain": 0.004612,
+    "direction": 0.006249,
+    "size": 0,
+    "ink": 0
+   },
+   "gate": {
+    "profile": 0.007263,
+    "grain": 0.085303,
+    "direction": 0.004615,
+    "size": 0,
+    "ink": 0
+   },
+   "worstRatio": 1.354,
+   "worstAxis": "direction",
+   "widthRatio": 1.2369,
+   "opacityRatio": 1.0028,
+   "pixel": {
+    "p95": 0.00619,
+    "nrmse": 0.10548,
+    "pixelsCompared": 153264,
+    "bestStrokeWidth": 19.712,
+    "bestShiftPx": 0
+   }
+  },
+  {
+   "a": "gouache--flat-stamp",
+   "b": "ink-brush",
+   "distance": {
+    "profile": 0.010496,
+    "grain": 0.020845,
+    "direction": 0.007009,
+    "size": 0.01841,
+    "ink": 0.013174
+   },
+   "gate": {
+    "profile": 0.020929,
+    "grain": 0.024305,
+    "direction": 0.013246,
+    "size": 0.029479,
+    "ink": 0.025406
+   },
+   "worstRatio": 0.858,
+   "worstAxis": "grain",
+   "widthRatio": 1.0694,
+   "opacityRatio": 0.9343,
+   "pixel": {
+    "p95": 0.00995,
+    "nrmse": 0.06194,
+    "pixelsCompared": 86436,
+    "bestStrokeWidth": 16.882,
+    "bestShiftPx": 0
+   }
+  },
+  {
+   "a": "gouache--flat-stamp",
+   "b": "gpen--causal-round",
+   "distance": {
+    "profile": 0.020929,
+    "grain": 0.008479,
+    "direction": 0.005307,
+    "size": 0.014675,
+    "ink": 0.022566
+   },
+   "gate": {
+    "profile": 0.020929,
+    "grain": 0.014293,
+    "direction": 0.013246,
+    "size": 0.029479,
+    "ink": 0.02135
+   },
+   "worstRatio": 1.057,
+   "worstAxis": "ink",
+   "widthRatio": 0.4435,
+   "opacityRatio": 0.9058,
+   "pixel": {
+    "p95": 0.01007,
+    "nrmse": 0.16448,
+    "pixelsCompared": 86712,
+    "bestStrokeWidth": 7.295,
+    "bestShiftPx": 0
+   }
+  },
+  {
+   "a": "mypaint-cc0--kabura",
+   "b": "pen",
+   "distance": {
+    "profile": 0.013424,
+    "grain": 0.031205,
+    "direction": 0.012466,
+    "size": 0.036048,
+    "ink": 0.028793
+   },
+   "gate": {
+    "profile": 0.011115,
+    "grain": 0.024599,
+    "direction": 0.0148,
+    "size": 0.032561,
+    "ink": 0.031298
+   },
+   "worstRatio": 1.269,
+   "worstAxis": "grain",
+   "widthRatio": 0.5574,
+   "opacityRatio": 0.604,
+   "pixel": {
+    "p95": 0.01175,
+    "nrmse": 0.07475,
+    "pixelsCompared": 86752,
+    "bestStrokeWidth": 9.539,
+    "bestShiftPx": 0
+   }
+  },
+  {
+   "a": "sketchpad-mirror",
+   "b": "web-lazy-ink",
+   "distance": {
+    "profile": 0.004818,
+    "grain": 0.013994,
+    "direction": 0.011112,
+    "size": 0.00954,
+    "ink": 0.015731
+   },
+   "gate": {
+    "profile": 0.017257,
+    "grain": 0.025575,
+    "direction": 0.011485,
+    "size": 0.013998,
+    "ink": 0.024815
+   },
+   "worstRatio": 0.967,
+   "worstAxis": "direction",
+   "widthRatio": 0.928,
+   "opacityRatio": 1.0136,
+   "pixel": {
+    "p95": 0.06781,
+    "nrmse": 0.05861,
+    "pixelsCompared": 107500,
+    "bestStrokeWidth": 14.914,
+    "bestShiftPx": 0
+   }
+  },
+  {
+   "a": "mypaint-cc0--kabura",
+   "b": "web-calligraphy-ribbon",
+   "distance": {
+    "profile": 0.021497,
+    "grain": 0.022539,
+    "direction": 0.011882,
+    "size": 0.014414,
+    "ink": 0.035392
+   },
+   "gate": {
+    "profile": 0.017683,
+    "grain": 0.024599,
+    "direction": 0.019613,
+    "size": 0.032561,
+    "ink": 0.031298
+   },
+   "worstRatio": 1.216,
+   "worstAxis": "profile",
+   "widthRatio": 2.3051,
+   "opacityRatio": 0.6148,
+   "pixel": {
+    "p95": 0.08101,
+    "nrmse": 0.1867,
+    "pixelsCompared": 88858,
+    "bestStrokeWidth": 37.801,
+    "bestShiftPx": 0
+   }
+  },
+  {
+   "a": "mypaint-cc0--slow-ink",
+   "b": "web-cel-flat",
+   "distance": {
+    "profile": 0.019006,
+    "grain": 0.01421,
+    "direction": 0.014871,
+    "size": 0.009396,
+    "ink": 0.006724
+   },
+   "gate": {
+    "profile": 0.030785,
+    "grain": 0.03275,
+    "direction": 0.011767,
+    "size": 0.008296,
+    "ink": 0.00788
+   },
+   "worstRatio": 1.264,
+   "worstAxis": "direction",
+   "widthRatio": 0.875,
+   "opacityRatio": 1.0129,
+   "pixel": {
+    "p95": 0.11563,
+    "nrmse": 0.08483,
+    "pixelsCompared": 100836,
+    "bestStrokeWidth": 14.069,
+    "bestShiftPx": 0
+   }
+  },
+  {
+   "a": "mypaint-cc0--kabura",
+   "b": "sketchpad-mirror",
+   "distance": {
+    "profile": 0.011098,
+    "grain": 0.01936,
+    "direction": 0.005486,
+    "size": 0.011208,
+    "ink": 0.017308
+   },
+   "gate": {
+    "profile": 0.017257,
+    "grain": 0.025575,
+    "direction": 0.0148,
+    "size": 0.032561,
+    "ink": 0.031298
+   },
+   "worstRatio": 0.757,
+   "worstAxis": "grain",
+   "widthRatio": 0.7999,
+   "opacityRatio": 0.6184,
+   "pixel": {
+    "p95": 0.12777,
+    "nrmse": 0.11797,
+    "pixelsCompared": 86652,
+    "bestStrokeWidth": 12.77,
+    "bestShiftPx": 0
+   }
+  },
+  {
+   "a": "mypaint-cc0--kabura",
+   "b": "web-lazy-ink",
+   "distance": {
+    "profile": 0.009799,
+    "grain": 0.015697,
+    "direction": 0.016598,
+    "size": 0.009398,
+    "ink": 0.029346
+   },
+   "gate": {
+    "profile": 0.011115,
+    "grain": 0.024599,
+    "direction": 0.0148,
+    "size": 0.032561,
+    "ink": 0.031298
+   },
+   "worstRatio": 1.121,
+   "worstAxis": "direction",
+   "widthRatio": 0.7423,
+   "opacityRatio": 0.6268,
+   "pixel": {
+    "p95": 0.13069,
+    "nrmse": 0.13466,
+    "pixelsCompared": 87696,
+    "bestStrokeWidth": 12.083,
+    "bestShiftPx": 0
+   }
+  },
+  {
+   "a": "sketchpad-mirror",
+   "b": "web-calligraphy-ribbon",
+   "distance": {
+    "profile": 0.014687,
+    "grain": 0.034087,
+    "direction": 0.006396,
+    "size": 0.018167,
+    "ink": 0.021778
+   },
+   "gate": {
+    "profile": 0.017683,
+    "grain": 0.025575,
+    "direction": 0.019613,
+    "size": 0.013998,
+    "ink": 0.024815
+   },
+   "worstRatio": 1.333,
+   "worstAxis": "grain",
+   "widthRatio": 2.8816,
+   "opacityRatio": 0.9942,
+   "pixel": {
+    "p95": 0.17749,
+    "nrmse": 0.16957,
+    "pixelsCompared": 109477,
+    "bestStrokeWidth": 47.005,
+    "bestShiftPx": 0
+   }
+  },
+  {
+   "a": "sketchpad-soft-marker",
+   "b": "web-neon-tube",
+   "distance": {
+    "profile": 0.007763,
+    "grain": 0.021989,
+    "direction": 0.015595,
+    "size": 0.024804,
+    "ink": 0.030673
+   },
+   "gate": {
+    "profile": 0.012697,
+    "grain": 0.031466,
+    "direction": 0.014516,
+    "size": 0.038274,
+    "ink": 0.036806
+   },
+   "worstRatio": 1.074,
+   "worstAxis": "direction",
+   "widthRatio": 0.9291,
+   "opacityRatio": 1.72,
+   "pixel": {
+    "p95": 0.21411,
+    "nrmse": 0.10241,
+    "pixelsCompared": 84898,
+    "bestStrokeWidth": 15.568,
+    "bestShiftPx": -0.25
+   }
+  },
+  {
+   "a": "ink-wash--fiber-feather",
+   "b": "ink-wash--living-bake",
+   "distance": {
+    "profile": 0.046992,
+    "grain": 0.061765,
+    "direction": 0.002655,
+    "size": 0.009193,
+    "ink": 0.008018
+   },
+   "gate": {
+    "profile": 0.07609,
+    "grain": 0.074677,
+    "direction": 0.005766,
+    "size": 0.011508,
+    "ink": 0.027277
+   },
+   "worstRatio": 0.827,
+   "worstAxis": "grain",
+   "widthRatio": 1.1275,
+   "opacityRatio": 1.0827,
+   "pixel": {
+    "p95": 0.23469,
+    "nrmse": 0.11941,
+    "pixelsCompared": 342920,
+    "bestStrokeWidth": 18.707,
+    "bestShiftPx": 1.5
+   }
+  },
+  {
+   "a": "airbrush",
+   "b": "marker--soft-dynamic",
+   "distance": {
+    "profile": 0.006565,
+    "grain": 0.013097,
+    "direction": 0.001371,
+    "size": 0.009066,
+    "ink": 0.008504
+   },
+   "gate": {
+    "profile": 0.008239,
+    "grain": 0.024511,
+    "direction": 0.002095,
+    "size": 0.022762,
+    "ink": 0.026844
+   },
+   "worstRatio": 0.797,
+   "worstAxis": "profile",
+   "widthRatio": 1.0328,
+   "opacityRatio": 0.8571,
+   "pixel": {
+    "p95": 0.24427,
+    "nrmse": 0.11952,
+    "pixelsCompared": 97736,
+    "bestStrokeWidth": 16.865,
+    "bestShiftPx": 0
+   }
+  },
+  {
+   "a": "colored-pencil",
+   "b": "web-pressure-flat",
+   "distance": {
+    "profile": 0.005905,
+    "grain": 0.019031,
+    "direction": 0.00742,
+    "size": 0,
+    "ink": 0
+   },
+   "gate": {
+    "profile": 0.005193,
+    "grain": 0.014505,
+    "direction": 0.006041,
+    "size": 0,
+    "ink": 0
+   },
+   "worstRatio": 1.312,
+   "worstAxis": "grain",
+   "widthRatio": 1.0945,
+   "opacityRatio": 0.8337,
+   "pixel": {
+    "p95": 0.24867,
+    "nrmse": 0.18008,
+    "pixelsCompared": 123794,
+    "bestStrokeWidth": 17.531,
+    "bestShiftPx": 0
+   }
+  },
+  {
+   "a": "acrylic--polymer-flat",
+   "b": "oil--tube-extrude",
+   "distance": {
+    "profile": 0.00263,
+    "grain": 0.003657,
+    "direction": 0.001594,
+    "size": 0.004063,
+    "ink": 0.003324
+   },
+   "gate": {
+    "profile": 0.013573,
+    "grain": 0.02553,
+    "direction": 0.001163,
+    "size": 0.010041,
+    "ink": 0.018427
+   },
+   "worstRatio": 1.37,
+   "worstAxis": "direction",
+   "widthRatio": 0.992,
+   "opacityRatio": 0.9941,
+   "pixel": {
+    "p95": 0.27028,
+    "nrmse": 0.12291,
+    "pixelsCompared": 57128,
+    "bestStrokeWidth": 16.031,
+    "bestShiftPx": -0.25
+   }
+  },
+  {
+   "a": "gouache--flat-stamp",
+   "b": "gpen",
+   "distance": {
+    "profile": 0.020887,
+    "grain": 0.011703,
+    "direction": 0.007913,
+    "size": 0.017962,
+    "ink": 0.021492
+   },
+   "gate": {
+    "profile": 0.020929,
+    "grain": 0.014293,
+    "direction": 0.013246,
+    "size": 0.029479,
+    "ink": 0.02135
+   },
+   "worstRatio": 1.007,
+   "worstAxis": "ink",
+   "widthRatio": 0.6814,
+   "opacityRatio": 0.9108,
+   "pixel": {
+    "p95": 0.27704,
+    "nrmse": 0.20838,
+    "pixelsCompared": 89401,
+    "bestStrokeWidth": 9.66,
+    "bestShiftPx": 0
+   }
+  },
+  {
+   "a": "watercolor--granular",
+   "b": "watercolor--granulating",
+   "distance": {
+    "profile": 0.04583,
+    "grain": 0.033636,
+    "direction": 0.010991,
+    "size": 0.004803,
+    "ink": 0.005483
+   },
+   "gate": {
+    "profile": 0.073433,
+    "grain": 0.045486,
+    "direction": 0.015351,
+    "size": 0.004556,
+    "ink": 0.031483
+   },
+   "worstRatio": 1.054,
+   "worstAxis": "size",
+   "widthRatio": 0.7675,
+   "opacityRatio": 1.0114,
+   "pixel": {
+    "p95": 0.29213,
+    "nrmse": 0.17005,
+    "pixelsCompared": 362550,
+    "bestStrokeWidth": 12.917,
+    "bestShiftPx": -0.75
+   }
+  },
+  {
+   "a": "watercolor--edge-bloom",
+   "b": "watercolor--granulating",
+   "distance": {
+    "profile": 0.072368,
+    "grain": 0.052616,
+    "direction": 0.006434,
+    "size": 0.007589,
+    "ink": 0.037527
+   },
+   "gate": {
+    "profile": 0.069367,
+    "grain": 0.062502,
+    "direction": 0.015351,
+    "size": 0.009432,
+    "ink": 0.04671
+   },
+   "worstRatio": 1.043,
+   "worstAxis": "profile",
+   "widthRatio": 1.0278,
+   "opacityRatio": 1.1298,
+   "pixel": {
+    "p95": 0.29426,
+    "nrmse": 0.18301,
+    "pixelsCompared": 457101,
+    "bestStrokeWidth": 16.323,
+    "bestShiftPx": -0.5
+   }
+  },
+  {
+   "a": "watercolor",
+   "b": "watercolor--edge-bloom",
+   "distance": {
+    "profile": 0.083996,
+    "grain": 0.086858,
+    "direction": 0.002954,
+    "size": 0.006282,
+    "ink": 0.055076
+   },
+   "gate": {
+    "profile": 0.073073,
+    "grain": 0.088065,
+    "direction": 0.012864,
+    "size": 0.019303,
+    "ink": 0.04671
+   },
+   "worstRatio": 1.179,
+   "worstAxis": "ink",
+   "widthRatio": 0.7339,
+   "opacityRatio": 1.1553,
+   "pixel": {
+    "p95": 0.32332,
+    "nrmse": 0.21099,
+    "pixelsCompared": 338182,
+    "bestStrokeWidth": 12.112,
+    "bestShiftPx": -2
+   }
+  },
+  {
+   "a": "sketchpad-soft-marker",
+   "b": "web-blend-softener",
+   "distance": {
+    "profile": 0.013881,
+    "grain": 0.023319,
+    "direction": 0.014092,
+    "size": 0.0248,
+    "ink": 0.029553
+   },
+   "gate": {
+    "profile": 0.01567,
+    "grain": 0.019591,
+    "direction": 0.014516,
+    "size": 0.024755,
+    "ink": 0.023706
+   },
+   "worstRatio": 1.247,
+   "worstAxis": "ink",
+   "widthRatio": 1.0383,
+   "opacityRatio": 1.6238,
+   "pixel": {
+    "p95": 0.33117,
+    "nrmse": 0.15613,
+    "pixelsCompared": 85166,
+    "bestStrokeWidth": 16.604,
+    "bestShiftPx": 0
+   }
+  },
+  {
+   "a": "oil-pastel--waxy-film",
+   "b": "oil-pastel--wgm-mix",
+   "distance": {
+    "profile": 0.002776,
+    "grain": 0.019092,
+    "direction": 0.002921,
+    "size": 0.012863,
+    "ink": 0.014205
+   },
+   "gate": {
+    "profile": 0.020321,
+    "grain": 0.033143,
+    "direction": 0.005432,
+    "size": 0.011643,
+    "ink": 0.028593
+   },
+   "worstRatio": 1.105,
+   "worstAxis": "size",
+   "widthRatio": 1.0064,
+   "opacityRatio": 1.2638,
+   "pixel": {
+    "p95": 0.34272,
+    "nrmse": 0.17295,
+    "pixelsCompared": 43727,
+    "bestStrokeWidth": 15.965,
+    "bestShiftPx": -0.25
+   }
+  },
+  {
+   "a": "web-blend-softener",
+   "b": "web-neon-tube",
+   "distance": {
+    "profile": 0.014917,
+    "grain": 0.024326,
+    "direction": 0.001976,
+    "size": 0.023461,
+    "ink": 0.025424
+   },
+   "gate": {
+    "profile": 0.01567,
+    "grain": 0.031466,
+    "direction": 0.003763,
+    "size": 0.038274,
+    "ink": 0.036806
+   },
+   "worstRatio": 0.952,
+   "worstAxis": "profile",
+   "widthRatio": 0.8948,
+   "opacityRatio": 1.0592,
+   "pixel": {
+    "p95": 0.35515,
+    "nrmse": 0.16577,
+    "pixelsCompared": 83471,
+    "bestStrokeWidth": 15.298,
+    "bestShiftPx": 0.25
+   }
+  },
+  {
+   "a": "colored-pencil",
+   "b": "pastel-highlighter",
+   "distance": {
+    "profile": 0.00559,
+    "grain": 0.008501,
+    "direction": 0.003049,
+    "size": 0,
+    "ink": 0
+   },
+   "gate": {
+    "profile": 0.005193,
+    "grain": 0.085303,
+    "direction": 0.004615,
+    "size": 0,
+    "ink": 0
+   },
+   "worstRatio": 1.076,
+   "worstAxis": "profile",
+   "widthRatio": 0.9904,
+   "opacityRatio": 0.8189,
+   "pixel": {
+    "p95": 0.39726,
+    "nrmse": 0.20259,
+    "pixelsCompared": 123583,
+    "bestStrokeWidth": 15.538,
+    "bestShiftPx": 0
+   }
+  },
+  {
+   "a": "watercolor--edge-bloom",
+   "b": "watercolor--granular",
+   "distance": {
+    "profile": 0.095248,
+    "grain": 0.079526,
+    "direction": 0.012249,
+    "size": 0.01098,
+    "ink": 0.042534
+   },
+   "gate": {
+    "profile": 0.073433,
+    "grain": 0.062502,
+    "direction": 0.013933,
+    "size": 0.009432,
+    "ink": 0.04671
+   },
+   "worstRatio": 1.297,
+   "worstAxis": "profile",
+   "widthRatio": 1.3391,
+   "opacityRatio": 1.117,
+   "pixel": {
+    "p95": 0.40551,
+    "nrmse": 0.24829,
+    "pixelsCompared": 458049,
+    "bestStrokeWidth": 20.058,
+    "bestShiftPx": 1
+   }
+  },
+  {
+   "a": "oil--knife-edge",
+   "b": "web-calligraphy-ribbon",
+   "distance": {
+    "profile": 0.006335,
+    "grain": 0.025353,
+    "direction": 0.010936,
+    "size": 0.006258,
+    "ink": 0.010368
+   },
+   "gate": {
+    "profile": 0.017683,
+    "grain": 0.02068,
+    "direction": 0.019613,
+    "size": 0.008374,
+    "ink": 0.012269
+   },
+   "worstRatio": 1.226,
+   "worstAxis": "grain",
+   "widthRatio": 1.4479,
+   "opacityRatio": 0.993,
+   "pixel": {
+    "p95": 0.41446,
+    "nrmse": 0.17924,
+    "pixelsCompared": 55360,
+    "bestStrokeWidth": 23.632,
+    "bestShiftPx": 0.25
+   }
+  },
+  {
+   "a": "acrylic",
+   "b": "brush--bristle-depletion",
+   "distance": {
+    "profile": 0.056909,
+    "grain": 0.001861,
+    "direction": 0.000679,
+    "size": 0.008274,
+    "ink": 0.009683
+   },
+   "gate": {
+    "profile": 0.090802,
+    "grain": 0.102369,
+    "direction": 0.001993,
+    "size": 0.011554,
+    "ink": 0.054594
+   },
+   "worstRatio": 0.716,
+   "worstAxis": "size",
+   "widthRatio": 1.056,
+   "opacityRatio": 1.0186,
+   "pixel": {
+    "p95": 0.42159,
+    "nrmse": 0.24511,
+    "pixelsCompared": 150619,
+    "bestStrokeWidth": 17.847,
+    "bestShiftPx": -1.5
+   }
+  },
+  {
+   "a": "brush--bristle-depletion",
+   "b": "oil",
+   "distance": {
+    "profile": 0.112577,
+    "grain": 0.04178,
+    "direction": 0.001237,
+    "size": 0.011928,
+    "ink": 0.008434
+   },
+   "gate": {
+    "profile": 0.090802,
+    "grain": 0.102369,
+    "direction": 0.001861,
+    "size": 0.011554,
+    "ink": 0.054594
+   },
+   "worstRatio": 1.24,
+   "worstAxis": "profile",
+   "widthRatio": 1.2732,
+   "opacityRatio": 1.0311,
+   "pixel": {
+    "p95": 0.43398,
+    "nrmse": 0.23225,
+    "pixelsCompared": 135259,
+    "bestStrokeWidth": 19.112,
+    "bestShiftPx": 0.5
+   }
+  },
+  {
+   "a": "sketchpad-soft-marker",
+   "b": "web-smudge-trail",
+   "distance": {
+    "profile": 0.00833,
+    "grain": 0.032852,
+    "direction": 0.017547,
+    "size": 0.020797,
+    "ink": 0.033402
+   },
+   "gate": {
+    "profile": 0.00875,
+    "grain": 0.065813,
+    "direction": 0.014516,
+    "size": 0.038274,
+    "ink": 0.050827
+   },
+   "worstRatio": 1.209,
+   "worstAxis": "direction",
+   "widthRatio": 1.0407,
+   "opacityRatio": 2.6037,
+   "pixel": {
+    "p95": 0.44948,
+    "nrmse": 0.21325,
+    "pixelsCompared": 86224,
+    "bestStrokeWidth": 16.352,
+    "bestShiftPx": 0
+   }
+  },
+  {
+   "a": "ink-wash--bleed-halo",
+   "b": "watercolor--fluid-feather",
+   "distance": {
+    "profile": 0.083961,
+    "grain": 0.0854,
+    "direction": 0.007039,
+    "size": 0.003911,
+    "ink": 0.040649
+   },
+   "gate": {
+    "profile": 0.084237,
+    "grain": 0.066209,
+    "direction": 0.009502,
+    "size": 0.008811,
+    "ink": 0.042629
+   },
+   "worstRatio": 1.29,
+   "worstAxis": "grain",
+   "widthRatio": 1.2208,
+   "opacityRatio": 0.7954,
+   "pixel": {
+    "p95": 0.45434,
+    "nrmse": 0.21831,
+    "pixelsCompared": 470720,
+    "bestStrokeWidth": 19.573,
+    "bestShiftPx": 1.5
+   }
+  },
+  {
+   "a": "acrylic",
+   "b": "brush--impasto-relief",
+   "distance": {
+    "profile": 0.111329,
+    "grain": 0.079577,
+    "direction": 0.00009,
+    "size": 0.001931,
+    "ink": 0.034269
+   },
+   "gate": {
+    "profile": 0.090802,
+    "grain": 0.089767,
+    "direction": 0.001993,
+    "size": 0.005588,
+    "ink": 0.054594
+   },
+   "worstRatio": 1.226,
+   "worstAxis": "profile",
+   "widthRatio": 1.5007,
+   "opacityRatio": 1.1053,
+   "pixel": {
+    "p95": 0.4854,
+    "nrmse": 0.27005,
+    "pixelsCompared": 150157,
+    "bestStrokeWidth": 24.371,
+    "bestShiftPx": -0.5
+   }
+  },
+  {
+   "a": "chisel-highlighter",
+   "b": "colored-pencil",
+   "distance": {
+    "profile": 0.005566,
+    "grain": 0.004558,
+    "direction": 0.003478,
+    "size": 0,
+    "ink": 0
+   },
+   "gate": {
+    "profile": 0.007263,
+    "grain": 0.080266,
+    "direction": 0.003466,
+    "size": 0,
+    "ink": 0
+   },
+   "worstRatio": 1.003,
+   "worstAxis": "direction",
+   "widthRatio": 1.2488,
+   "opacityRatio": 1.2246,
+   "pixel": {
+    "p95": 0.50244,
+    "nrmse": 0.21173,
+    "pixelsCompared": 156542,
+    "bestStrokeWidth": 20.162,
+    "bestShiftPx": -0.25
+   }
+  },
+  {
+   "a": "pencil",
+   "b": "web-pressure-flat",
+   "distance": {
+    "profile": 0.004424,
+    "grain": 0.018094,
+    "direction": 0.007637,
+    "size": 0,
+    "ink": 0
+   },
+   "gate": {
+    "profile": 0.006543,
+    "grain": 0.014505,
+    "direction": 0.006041,
+    "size": 0,
+    "ink": 0
+   },
+   "worstRatio": 1.264,
+   "worstAxis": "direction",
+   "widthRatio": 1.0479,
+   "opacityRatio": 1.0153,
+   "pixel": {
+    "p95": 0.50682,
+    "nrmse": 0.20261,
+    "pixelsCompared": 118915,
+    "bestStrokeWidth": 16.785,
+    "bestShiftPx": 0.5
+   }
+  },
+  {
+   "a": "gouache--flat-stamp",
+   "b": "maru-pen",
+   "distance": {
+    "profile": 0.004553,
+    "grain": 0.008086,
+    "direction": 0.000497,
+    "size": 0.028235,
+    "ink": 0.006883
+   },
+   "gate": {
+    "profile": 0.023674,
+    "grain": 0.014293,
+    "direction": 0.013246,
+    "size": 0.029479,
+    "ink": 0.02135
+   },
+   "worstRatio": 0.958,
+   "worstAxis": "size",
+   "widthRatio": 1.128,
+   "opacityRatio": 0.9214,
+   "pixel": {
+    "p95": 0.51012,
+    "nrmse": 0.22222,
+    "pixelsCompared": 89430,
+    "bestStrokeWidth": 16.665,
+    "bestShiftPx": 0
+   }
+  },
+  {
+   "a": "brush--bristle-depletion",
+   "b": "brush--impasto-relief",
+   "distance": {
+    "profile": 0.08678,
+    "grain": 0.080013,
+    "direction": 0.000588,
+    "size": 0.006702,
+    "ink": 0.042695
+   },
+   "gate": {
+    "profile": 0.090802,
+    "grain": 0.102369,
+    "direction": 0.001861,
+    "size": 0.011554,
+    "ink": 0.054594
+   },
+   "worstRatio": 0.956,
+   "worstAxis": "profile",
+   "widthRatio": 1.4211,
+   "opacityRatio": 1.0851,
+   "pixel": {
+    "p95": 0.51204,
+    "nrmse": 0.27357,
+    "pixelsCompared": 134069,
+    "bestStrokeWidth": 21.72,
+    "bestShiftPx": 0.5
+   }
+  },
+  {
+   "a": "pencil--side-shade",
+   "b": "web-pressure-flat",
+   "distance": {
+    "profile": 0.0007,
+    "grain": 0.016243,
+    "direction": 0.007454,
+    "size": 0,
+    "ink": 0
+   },
+   "gate": {
+    "profile": 0.008907,
+    "grain": 0.014505,
+    "direction": 0.006041,
+    "size": 0,
+    "ink": 0
+   },
+   "worstRatio": 1.234,
+   "worstAxis": "direction",
+   "widthRatio": 0.8993,
+   "opacityRatio": 1.011,
+   "pixel": {
+    "p95": 0.53074,
+    "nrmse": 0.22138,
+    "pixelsCompared": 103898,
+    "bestStrokeWidth": 14.446,
+    "bestShiftPx": 0.5
+   }
+  },
+  {
+   "a": "pastel-highlighter",
+   "b": "pencil",
+   "distance": {
+    "profile": 0.007071,
+    "grain": 0.007668,
+    "direction": 0.003996,
+    "size": 0,
+    "ink": 0
+   },
+   "gate": {
+    "profile": 0.006543,
+    "grain": 0.085303,
+    "direction": 0.004615,
+    "size": 0,
+    "ink": 0
+   },
+   "worstRatio": 1.081,
+   "worstAxis": "profile",
+   "widthRatio": 1.0546,
+   "opacityRatio": 1.0028,
+   "pixel": {
+    "p95": 0.54542,
+    "nrmse": 0.21078,
+    "pixelsCompared": 128552,
+    "bestStrokeWidth": 17.264,
+    "bestShiftPx": -0.5
+   }
+  },
+  {
+   "a": "pastel-highlighter",
+   "b": "pencil--side-shade",
+   "distance": {
+    "profile": 0.010884,
+    "grain": 0.006405,
+    "direction": 0.004385,
+    "size": 0,
+    "ink": 0
+   },
+   "gate": {
+    "profile": 0.008907,
+    "grain": 0.085303,
+    "direction": 0.004615,
+    "size": 0,
+    "ink": 0
+   },
+   "worstRatio": 1.222,
+   "worstAxis": "profile",
+   "widthRatio": 1.2288,
+   "opacityRatio": 1.007,
+   "pixel": {
+    "p95": 0.54542,
+    "nrmse": 0.21078,
+    "pixelsCompared": 128552,
+    "bestStrokeWidth": 20.011,
+    "bestShiftPx": -0.5
+   }
+  },
+  {
+   "a": "airbrush--hard-envelope",
+   "b": "web-kaleido-ink",
+   "distance": {
+    "profile": 0.01697,
+    "grain": 0.027804,
+    "direction": 0.00363,
+    "size": 0.003994,
+    "ink": 0.006665
+   },
+   "gate": {
+    "profile": 0.036144,
+    "grain": 0.092813,
+    "direction": 0.004083,
+    "size": 0.010174,
+    "ink": 0.014833
+   },
+   "worstRatio": 0.889,
+   "worstAxis": "direction",
+   "widthRatio": 0.3879,
+   "opacityRatio": 1.0479,
+   "pixel": {
+    "p95": 0.55972,
+    "nrmse": 0.2168,
+    "pixelsCompared": 54420,
+    "bestStrokeWidth": 6.779,
+    "bestShiftPx": 0.25
+   }
+  },
+  {
+   "a": "pastel-highlighter",
+   "b": "pencil-2b",
+   "distance": {
+    "profile": 0.002838,
+    "grain": 0.00997,
+    "direction": 0.004148,
+    "size": 0,
+    "ink": 0
+   },
+   "gate": {
+    "profile": 0.00488,
+    "grain": 0.085303,
+    "direction": 0.004615,
+    "size": 0,
+    "ink": 0
+   },
+   "worstRatio": 0.899,
+   "worstAxis": "direction",
+   "widthRatio": 0.8604,
+   "opacityRatio": 1.11,
+   "pixel": {
+    "p95": 0.61376,
+    "nrmse": 0.21715,
+    "pixelsCompared": 128737,
+    "bestStrokeWidth": 14.248,
+    "bestShiftPx": -0.5
+   }
+  },
+  {
+   "a": "ballpoint",
+   "b": "mypaint-cc0--dry-brush",
+   "distance": {
+    "profile": 0.020364,
+    "grain": 0.012304,
+    "direction": 0.02445,
+    "size": 0.010244,
+    "ink": 0.009087
+   },
+   "gate": {
+    "profile": 0.020421,
+    "grain": 0.013679,
+    "direction": 0.022748,
+    "size": 0.011256,
+    "ink": 0.012362
+   },
+   "worstRatio": 1.075,
+   "worstAxis": "direction",
+   "widthRatio": 0.4559,
+   "opacityRatio": 2.2012,
+   "pixel": {
+    "p95": 0.63655,
+    "nrmse": 0.23922,
+    "pixelsCompared": 101984,
+    "bestStrokeWidth": 8.254,
+    "bestShiftPx": 0.5
+   }
+  },
+  {
+   "a": "chisel-highlighter",
+   "b": "pencil",
+   "distance": {
+    "profile": 0.007046,
+    "grain": 0.004697,
+    "direction": 0.004557,
+    "size": 0,
+    "ink": 0
+   },
+   "gate": {
+    "profile": 0.007263,
+    "grain": 0.080266,
+    "direction": 0.003466,
+    "size": 0,
+    "ink": 0
+   },
+   "worstRatio": 1.315,
+   "worstAxis": "direction",
+   "widthRatio": 1.3045,
+   "opacityRatio": 1.0055,
+   "pixel": {
+    "p95": 0.64191,
+    "nrmse": 0.22585,
+    "pixelsCompared": 156688,
+    "bestStrokeWidth": 20.984,
+    "bestShiftPx": -0.5
+   }
+  },
+  {
+   "a": "chisel-highlighter",
+   "b": "pencil--side-shade",
+   "distance": {
+    "profile": 0.01086,
+    "grain": 0.005148,
+    "direction": 0.004713,
+    "size": 0,
+    "ink": 0
+   },
+   "gate": {
+    "profile": 0.008907,
+    "grain": 0.080266,
+    "direction": 0.003466,
+    "size": 0,
+    "ink": 0
+   },
+   "worstRatio": 1.36,
+   "worstAxis": "direction",
+   "widthRatio": 1.5199,
+   "opacityRatio": 1.0098,
+   "pixel": {
+    "p95": 0.64192,
+    "nrmse": 0.2257,
+    "pixelsCompared": 156716,
+    "bestStrokeWidth": 24.324,
+    "bestShiftPx": -0.5
+   }
+  },
+  {
+   "a": "chisel-highlighter",
+   "b": "pencil-2b",
+   "distance": {
+    "profile": 0.002923,
+    "grain": 0.005518,
+    "direction": 0.004713,
+    "size": 0,
+    "ink": 0
+   },
+   "gate": {
+    "profile": 0.007263,
+    "grain": 0.080266,
+    "direction": 0.003466,
+    "size": 0,
+    "ink": 0
+   },
+   "worstRatio": 1.36,
+   "worstAxis": "direction",
+   "widthRatio": 1.0642,
+   "opacityRatio": 1.1131,
+   "pixel": {
+    "p95": 0.69818,
+    "nrmse": 0.22736,
+    "pixelsCompared": 157613,
+    "bestStrokeWidth": 17.498,
+    "bestShiftPx": -0.5
+   }
+  },
+  {
+   "a": "acrylic--polymer-flat",
+   "b": "web-rough-ink",
+   "distance": {
+    "profile": 0.023548,
+    "grain": 0.02029,
+    "direction": 0.014282,
+    "size": 0.004895,
+    "ink": 0.00554
+   },
+   "gate": {
+    "profile": 0.031487,
+    "grain": 0.096056,
+    "direction": 0.014366,
+    "size": 0.009836,
+    "ink": 0.018427
+   },
+   "worstRatio": 0.994,
+   "worstAxis": "direction",
+   "widthRatio": 0.4462,
+   "opacityRatio": 1.0166,
+   "pixel": {
+    "p95": 0.70483,
+    "nrmse": 0.26066,
+    "pixelsCompared": 58344,
+    "bestStrokeWidth": 7.25,
+    "bestShiftPx": 0.5
+   }
+  },
+  {
+   "a": "oil--tube-extrude",
+   "b": "web-rough-ink",
+   "distance": {
+    "profile": 0.022277,
+    "grain": 0.018311,
+    "direction": 0.015771,
+    "size": 0.008853,
+    "ink": 0.006905
+   },
+   "gate": {
+    "profile": 0.031487,
+    "grain": 0.096056,
+    "direction": 0.014366,
+    "size": 0.010041,
+    "ink": 0.013374
+   },
+   "worstRatio": 1.098,
+   "worstAxis": "direction",
+   "widthRatio": 0.4498,
+   "opacityRatio": 1.0227,
+   "pixel": {
+    "p95": 0.70889,
+    "nrmse": 0.26165,
+    "pixelsCompared": 58834,
+    "bestStrokeWidth": 7.322,
+    "bestShiftPx": 0.5
+   }
+  },
+  {
+   "a": "mypaint-cc0--dry-brush",
+   "b": "web-kaleido-ink",
+   "distance": {
+    "profile": 0.048551,
+    "grain": 0.057457,
+    "direction": 0.01962,
+    "size": 0.012393,
+    "ink": 0.019534
+   },
+   "gate": {
+    "profile": 0.036144,
+    "grain": 0.092813,
+    "direction": 0.022748,
+    "size": 0.010174,
+    "ink": 0.014833
+   },
+   "worstRatio": 1.343,
+   "worstAxis": "profile",
+   "widthRatio": 1.7119,
+   "opacityRatio": 0.4855,
+   "pixel": {
+    "p95": 0.75581,
+    "nrmse": 0.26873,
+    "pixelsCompared": 214635,
+    "bestStrokeWidth": 25.924,
+    "bestShiftPx": -0.5
+   }
+  },
+  {
+   "a": "calligraphy--perfect-chisel",
+   "b": "kaburapen",
+   "distance": {
+    "profile": 0.000026,
+    "grain": 0.000442,
+    "direction": 0.004292,
+    "size": 0.00569,
+    "ink": 0.008325
+   },
+   "gate": {
+    "profile": 0.000949,
+    "grain": 0.009157,
+    "direction": 0.011506,
+    "size": 0.009029,
+    "ink": 0.008406
+   },
+   "worstRatio": 0.99,
+   "worstAxis": "ink",
+   "widthRatio": 0.843,
+   "opacityRatio": 0.9913,
+   "pixel": {
+    "p95": 0.75671,
+    "nrmse": 0.25416,
+    "pixelsCompared": 111362,
+    "bestStrokeWidth": 11.838,
+    "bestShiftPx": 0
+   }
+  },
+  {
+   "a": "mypaint-cc0--kabura",
+   "b": "perfect-ink",
+   "distance": {
+    "profile": 0.01298,
+    "grain": 0.013972,
+    "direction": 0.014454,
+    "size": 0.020657,
+    "ink": 0.023273
+   },
+   "gate": {
+    "profile": 0.011115,
+    "grain": 0.024599,
+    "direction": 0.0148,
+    "size": 0.032561,
+    "ink": 0.031298
+   },
+   "worstRatio": 1.168,
+   "worstAxis": "profile",
+   "widthRatio": 0.7218,
+   "opacityRatio": 0.6061,
+   "pixel": {
+    "p95": 0.75848,
+    "nrmse": 0.30147,
+    "pixelsCompared": 89551,
+    "bestStrokeWidth": 10.012,
+    "bestShiftPx": 0
+   }
+  },
+  {
+   "a": "brush--dry-rake",
+   "b": "pastel--cake-soft",
+   "distance": {
+    "profile": 0.013174,
+    "grain": 0.046488,
+    "direction": 0.014163,
+    "size": 0.007034,
+    "ink": 0.010617
+   },
+   "gate": {
+    "profile": 0.017262,
+    "grain": 0.038247,
+    "direction": 0.012556,
+    "size": 0.029701,
+    "ink": 0.016474
+   },
+   "worstRatio": 1.215,
+   "worstAxis": "grain",
+   "widthRatio": 1.3997,
+   "opacityRatio": 1.0202,
+   "pixel": {
+    "p95": 0.7964,
+    "nrmse": 0.39669,
+    "pixelsCompared": 64309,
+    "bestStrokeWidth": 22.21,
+    "bestShiftPx": -0.5
+   }
+  },
+  {
+   "a": "charcoal--vine-soft",
+   "b": "dry-media",
+   "distance": {
+    "profile": 0.018734,
+    "grain": 0.03791,
+    "direction": 0.012319,
+    "size": 0.019002,
+    "ink": 0.023808
+   },
+   "gate": {
+    "profile": 0.014237,
+    "grain": 0.028836,
+    "direction": 0.013152,
+    "size": 0.01784,
+    "ink": 0.023134
+   },
+   "worstRatio": 1.316,
+   "worstAxis": "profile",
+   "widthRatio": 1.0645,
+   "opacityRatio": 0.9591,
+   "pixel": {
+    "p95": 0.81262,
+    "nrmse": 0.41124,
+    "pixelsCompared": 46897,
+    "bestStrokeWidth": 17.756,
+    "bestShiftPx": -0.25
+   }
+  },
+  {
+   "a": "gpen",
+   "b": "pen",
+   "distance": {
+    "profile": 0.000042,
+    "grain": 0.000535,
+    "direction": 0.004558,
+    "size": 0.0127,
+    "ink": 0.006319
+   },
+   "gate": {
+    "profile": 0.000822,
+    "grain": 0.00868,
+    "direction": 0.006604,
+    "size": 0.015878,
+    "ink": 0.00733
+   },
+   "worstRatio": 0.862,
+   "worstAxis": "ink",
+   "widthRatio": 0.8618,
+   "opacityRatio": 0.9892,
+   "pixel": {
+    "p95": 1.00136,
+    "nrmse": 0.33649,
+    "pixelsCompared": 146753,
+    "bestStrokeWidth": 15.205,
+    "bestShiftPx": -0.5
+   }
+  },
+  {
+   "a": "gpen",
+   "b": "pen--croquis-stabilized",
+   "distance": {
+    "profile": 0.000042,
+    "grain": 0.013056,
+    "direction": 0.001922,
+    "size": 0.016288,
+    "ink": 0.004501
+   },
+   "gate": {
+    "profile": 0.000822,
+    "grain": 0.011234,
+    "direction": 0.00204,
+    "size": 0.014786,
+    "ink": 0.00733
+   },
+   "worstRatio": 1.162,
+   "worstAxis": "grain",
+   "widthRatio": 0.6324,
+   "opacityRatio": 0.9918,
+   "pixel": {
+    "p95": 1.00136,
+    "nrmse": 0.33675,
+    "pixelsCompared": 146769,
+    "bestStrokeWidth": 11.534,
+    "bestShiftPx": -0.5
+   }
+  },
+  {
+   "a": "gpen",
+   "b": "ink-brush",
+   "distance": {
+    "profile": 0.016244,
+    "grain": 0.032115,
+    "direction": 0.000904,
+    "size": 0.032331,
+    "ink": 0.031838
+   },
+   "gate": {
+    "profile": 0.012773,
+    "grain": 0.024305,
+    "direction": 0.000828,
+    "size": 0.028267,
+    "ink": 0.025406
+   },
+   "worstRatio": 1.321,
+   "worstAxis": "grain",
+   "widthRatio": 1.5695,
+   "opacityRatio": 1.0257,
+   "pixel": {
+    "p95": 1.00136,
+    "nrmse": 0.29875,
+    "pixelsCompared": 145790,
+    "bestStrokeWidth": 27.451,
+    "bestShiftPx": -0.5
+   }
+  },
+  {
+   "a": "gouache--flat-stamp",
+   "b": "pen--perfect-taper",
+   "distance": {
+    "profile": 0.020651,
+    "grain": 0.011428,
+    "direction": 0.008964,
+    "size": 0.037786,
+    "ink": 0.018561
+   },
+   "gate": {
+    "profile": 0.020929,
+    "grain": 0.014293,
+    "direction": 0.013246,
+    "size": 0.029479,
+    "ink": 0.02135
+   },
+   "worstRatio": 1.282,
+   "worstAxis": "size",
+   "widthRatio": 0.677,
+   "opacityRatio": 0.9047,
+   "pixel": {
+    "p95": 1.00245,
+    "nrmse": 0.27326,
+    "pixelsCompared": 90886,
+    "bestStrokeWidth": 8.696,
+    "bestShiftPx": -0.5
+   }
+  },
+  {
+   "a": "felt-tip",
+   "b": "kaburapen",
+   "distance": {
+    "profile": 0.000863,
+    "grain": 0.009482,
+    "direction": 0.000107,
+    "size": 0.008833,
+    "ink": 0.008737
+   },
+   "gate": {
+    "profile": 0.000889,
+    "grain": 0.00756,
+    "direction": 0.003224,
+    "size": 0.007791,
+    "ink": 0.007082
+   },
+   "worstRatio": 1.254,
+   "worstAxis": "grain",
+   "widthRatio": 1.1974,
+   "opacityRatio": 1.0172,
+   "pixel": {
+    "p95": 1.01022,
+    "nrmse": 0.30094,
+    "pixelsCompared": 163153,
+    "bestStrokeWidth": 17.068,
+    "bestShiftPx": -0.5
+   }
+  },
+  {
+   "a": "mypaint-cc0--kabura",
+   "b": "pen--perfect-taper",
+   "distance": {
+    "profile": 0.013145,
+    "grain": 0.02941,
+    "direction": 0.015972,
+    "size": 0.024882,
+    "ink": 0.02876
+   },
+   "gate": {
+    "profile": 0.011115,
+    "grain": 0.024599,
+    "direction": 0.0148,
+    "size": 0.032561,
+    "ink": 0.031298
+   },
+   "worstRatio": 1.196,
+   "worstAxis": "grain",
+   "widthRatio": 0.6426,
+   "opacityRatio": 0.6065,
+   "pixel": {
+    "p95": 1.01087,
+    "nrmse": 0.3363,
+    "pixelsCompared": 94147,
+    "bestStrokeWidth": 8.943,
+    "bestShiftPx": -0.5
+   }
+  },
+  {
+   "a": "pen--croquis-stabilized",
+   "b": "pen--perfect-taper",
+   "distance": {
+    "profile": 0.000279,
+    "grain": 0.011734,
+    "direction": 0.00087,
+    "size": 0.019558,
+    "ink": 0.001649
+   },
+   "gate": {
+    "profile": 0.000822,
+    "grain": 0.011234,
+    "direction": 0.00204,
+    "size": 0.014786,
+    "ink": 0.004918
+   },
+   "worstRatio": 1.323,
+   "worstAxis": "size",
+   "widthRatio": 1.5711,
+   "opacityRatio": 1.0015,
+   "pixel": {
+    "p95": 1.01373,
+    "nrmse": 0.42489,
+    "pixelsCompared": 216246,
+    "bestStrokeWidth": 20.574,
+    "bestShiftPx": -0.5
+   }
+  },
+  {
+   "a": "perfect-ink",
+   "b": "sketchpad-mirror",
+   "distance": {
+    "profile": 0.01979,
+    "grain": 0.022752,
+    "direction": 0.008967,
+    "size": 0.017198,
+    "ink": 0.010044
+   },
+   "gate": {
+    "profile": 0.017257,
+    "grain": 0.025575,
+    "direction": 0.011485,
+    "size": 0.013998,
+    "ink": 0.024815
+   },
+   "worstRatio": 1.229,
+   "worstAxis": "size",
+   "widthRatio": 1.1082,
+   "opacityRatio": 1.0203,
+   "pixel": {
+    "p95": 1.01741,
+    "nrmse": 0.33094,
+    "pixelsCompared": 143452,
+    "bestStrokeWidth": 19.968,
+    "bestShiftPx": 0.5
+   }
+  }
+ ]
+}

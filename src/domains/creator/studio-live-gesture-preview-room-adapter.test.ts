@@ -5,6 +5,10 @@ import {
   StudioLiveGesturePreviewRoomAdapter,
   type StudioLiveGesturePreviewRoomSource,
 } from "./studio-live-gesture-preview-room-adapter";
+import {
+  StudioLiveGesturePreviewStore,
+  type StudioLiveGesturePreviewStoreScheduler,
+} from "./studio-live-gesture-preview-store";
 
 import type { StudioLiveParticipant } from "./studio-live-collaboration-protocol";
 import type {
@@ -127,6 +131,39 @@ class FakeRoom implements StudioLiveGesturePreviewRoomSource {
 }
 
 describe("StudioLiveGesturePreviewRoomAdapter", () => {
+  it("keeps construction side-effect free and leases the prune timer to subscribers", () => {
+    const intervals = new Set<object>();
+    const scheduler: StudioLiveGesturePreviewStoreScheduler = {
+      now: () => 1,
+      setInterval: () => {
+        const handle = {};
+        intervals.add(handle);
+        return handle;
+      },
+      clearInterval: (handle) => {
+        intervals.delete(handle as object);
+      },
+    };
+    const store = new StudioLiveGesturePreviewStore({ scheduler });
+    const adapter = new StudioLiveGesturePreviewRoomAdapter({ store });
+
+    // React StrictMode may discard a state initializer result before effects subscribe to it.
+    expect(intervals.size).toBe(0);
+    const firstUnsubscribe = adapter.subscribe(() => undefined);
+    const secondUnsubscribe = adapter.subscribe(() => undefined);
+    expect(intervals.size).toBe(1);
+    firstUnsubscribe();
+    expect(intervals.size).toBe(1);
+    secondUnsubscribe();
+    expect(intervals.size).toBe(0);
+
+    const replayUnsubscribe = adapter.subscribe(() => undefined);
+    expect(intervals.size).toBe(1);
+    replayUnsubscribe();
+    adapter.dispose();
+    expect(intervals.size).toBe(0);
+  });
+
   it("rotates rooms atomically and ignores events from the detached room", () => {
     const firstRoom = new FakeRoom([peer("sender-a")]);
     const secondRoom = new FakeRoom([peer("sender-b")]);

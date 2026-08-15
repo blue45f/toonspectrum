@@ -1,5 +1,6 @@
 import {
   normalizeStudioBrushDynamicsSettings,
+  studioBrushDynamicsSettingsEqual,
   studioBrushDynamicsPresetSettings,
 } from "./studio-brush-dynamics";
 
@@ -143,7 +144,13 @@ export function projectStudioLiveGesturePreviewEntry(
     ...(renderer.sampleSpacing === undefined
       ? {}
       : { sampleSpacing: renderer.sampleSpacing }),
-    ...(renderer.blendMode === undefined ? {} : { blendMode: renderer.blendMode }),
+    ...(renderer.blendMode === undefined
+      ? {}
+      : {
+          blendMode: renderer.blendMode === "normal"
+            ? "source-over"
+            : renderer.blendMode,
+        }),
     ...(renderer.paintModel === undefined ? {} : { paintModel: renderer.paintModel }),
     ...(renderer.pressureModel === undefined
       ? {}
@@ -198,6 +205,21 @@ function shapeEndpointsMatch(authoritative: DrawEl, preview: DrawEl): boolean {
     && authoritative.points[3] === preview.points[3];
 }
 
+function canonicalBlendMode(blendMode: string | undefined): string {
+  return blendMode === undefined || blendMode === "normal"
+    ? "source-over"
+    : blendMode;
+}
+
+function optionalFlatObjectFieldsEqual<T extends object>(
+  left: T | undefined,
+  right: T | undefined,
+  fields: readonly (keyof T)[],
+): boolean {
+  if (!left || !right) return left === right;
+  return fields.every((field) => Object.is(left[field], right[field]));
+}
+
 function rendererIdentityMatches(authoritative: DrawEl, preview: DrawEl): boolean {
   return (authoritative.mode ?? "pen") === (preview.mode ?? "pen")
     && authoritative.stroke === preview.stroke
@@ -205,11 +227,52 @@ function rendererIdentityMatches(authoritative: DrawEl, preview: DrawEl): boolea
     && (authoritative.opacity ?? 1) === (preview.opacity ?? 1)
     && authoritative.fill === preview.fill
     && authoritative.brush === preview.brush
-    && (authoritative.blendMode ?? "source-over") === (preview.blendMode ?? "source-over")
+    && authoritative.brushCatalogId === preview.brushCatalogId
+    && authoritative.brushCatalogName === preview.brushCatalogName
+    && authoritative.sampleSpacing === preview.sampleSpacing
+    && canonicalBlendMode(authoritative.blendMode) === canonicalBlendMode(preview.blendMode)
     && authoritative.paintModel === preview.paintModel
     && authoritative.pressureModel === preview.pressureModel
+    && authoritative.materialPressureModel === preview.materialPressureModel
+    && authoritative.materialMinimumDiameterRatio === preview.materialMinimumDiameterRatio
     && authoritative.watercolorPipeline === preview.watercolorPipeline
-    && authoritative.stampPipeline === preview.stampPipeline;
+    && authoritative.stampPipeline === preview.stampPipeline
+    && optionalFlatObjectFieldsEqual(
+      authoritative.brushTip,
+      preview.brushTip,
+      ["tiltEnabled", "angleDeg", "roundness"],
+    )
+    && optionalFlatObjectFieldsEqual(
+      authoritative.strokeStyle,
+      preview.strokeStyle,
+      ["dash", "lineCap", "arrowStart", "arrowEnd"],
+    )
+    && optionalFlatObjectFieldsEqual(
+      authoritative.shapeParams,
+      preview.shapeParams,
+      ["starPoints", "starInnerRatio", "polygonSides", "cornerRadius"],
+    )
+    && optionalFlatObjectFieldsEqual(
+      authoritative.sketch,
+      preview.sketch,
+      ["enabled", "roughness", "bowing", "fillStyle"],
+    )
+    && optionalFlatObjectFieldsEqual(
+      authoritative.symmetry,
+      preview.symmetry,
+      ["type", "centerX", "centerY", "radialCount"],
+    )
+    && studioBrushDynamicsSettingsEqual(
+      authoritative.brushDynamics,
+      preview.brushDynamics,
+    )
+    // V1 cannot faithfully describe these paint programs. If the retained slot owns one, it wins
+    // immediately instead of being approximated by a simpler speculative renderer.
+    && authoritative.gradient === undefined
+    && authoritative.pattern === undefined
+    && authoritative.outlineStroke === undefined
+    && authoritative.brushEnginePrograms === undefined
+    && authoritative.stamp === undefined;
 }
 
 function authoritativeElementWins(authoritative: El, preview: DrawEl): boolean {
@@ -230,8 +293,165 @@ function authoritativeElementWins(authoritative: El, preview: DrawEl): boolean {
   return shapeEndpointsMatch(authoritative, preview);
 }
 
-function reconcileDrawElement(authoritative: El, preview: DrawEl): El {
-  return authoritativeElementWins(authoritative, preview) ? authoritative : preview;
+function withAuthoritativeLayerStructure(
+  authoritative: El,
+  preview: DrawEl,
+): El {
+  return {
+    ...preview,
+    ...(authoritative.name === undefined ? {} : { name: authoritative.name }),
+    ...(authoritative.hidden === undefined ? {} : { hidden: authoritative.hidden }),
+    ...(authoritative.locked === undefined ? {} : { locked: authoritative.locked }),
+    ...(authoritative.noClip === undefined ? {} : { noClip: authoritative.noClip }),
+    ...(authoritative.lockAspect === undefined
+      ? {}
+      : { lockAspect: authoritative.lockAspect }),
+    ...(authoritative.groupId === undefined
+      ? {}
+      : { groupId: authoritative.groupId }),
+    ...(authoritative.clipBelow === undefined
+      ? {}
+      : { clipBelow: authoritative.clipBelow }),
+    ...(authoritative.alphaLocked === undefined
+      ? {}
+      : { alphaLocked: authoritative.alphaLocked }),
+    ...(authoritative.maskSrc === undefined
+      ? {}
+      : { maskSrc: authoritative.maskSrc }),
+    ...(authoritative.maskEnabled === undefined
+      ? {}
+      : { maskEnabled: authoritative.maskEnabled }),
+    ...(authoritative.layerRole === undefined
+      ? {}
+      : { layerRole: authoritative.layerRole }),
+    ...(authoritative.layerColor === undefined
+      ? {}
+      : { layerColor: authoritative.layerColor }),
+    ...(authoritative.emeresSourceId === undefined
+      ? {}
+      : { emeresSourceId: authoritative.emeresSourceId }),
+  };
+}
+
+export interface StudioLiveGesturePreviewRenderPlan {
+  /** The sole paint list for the retained canvas layer. Never persist this list. */
+  readonly elements: readonly El[];
+  /** Element ids whose current paint slot contains speculative preview geometry. */
+  readonly previewElementIds: ReadonlySet<string>;
+  /** Preview ids whose authoritative slot is ready to own the next visible layer draw. */
+  readonly authoritativeHandoffIds: readonly string[];
+  /** Latest preview sequence for cache invalidation of speculative paint slots. */
+  readonly previewSequenceByElementId: ReadonlyMap<string, number>;
+  /** Changes whenever the exact authoritative gesture+sequence receipt set changes. */
+  readonly authoritativeHandoffToken: string;
+}
+
+interface ProjectedPreview {
+  readonly entry: StudioLiveGesturePreviewSnapshotEntry;
+  readonly element: DrawEl;
+}
+
+const EMPTY_PREVIEW_ELEMENT_IDS: ReadonlySet<string> = new Set();
+const EMPTY_PREVIEW_SEQUENCE_BY_ELEMENT_ID: ReadonlyMap<string, number> = new Map();
+const EMPTY_AUTHORITATIVE_HANDOFF_IDS: readonly string[] = Object.freeze([]);
+
+function emptyStudioLiveGesturePreviewRenderPlan(
+  authoritative: readonly El[],
+): StudioLiveGesturePreviewRenderPlan {
+  return {
+    elements: authoritative,
+    previewElementIds: EMPTY_PREVIEW_ELEMENT_IDS,
+    authoritativeHandoffIds: EMPTY_AUTHORITATIVE_HANDOFF_IDS,
+    previewSequenceByElementId: EMPTY_PREVIEW_SEQUENCE_BY_ELEMENT_ID,
+    authoritativeHandoffToken: "[]",
+  };
+}
+
+/**
+ * Builds the one retained-layer paint plan for speculative remote gestures. Eligibility is pinned
+ * by the room adapter to the exact sender+gesture begin packet. Ambiguous ids are omitted from both
+ * preview paint and authoritative receipts, so an id collision always fails closed.
+ */
+export function planStudioLiveGesturePreviewRenderElements(
+  authoritative: readonly El[],
+  snapshot: StudioLiveGesturePreviewSnapshot,
+  eligiblePreviewKeys: ReadonlySet<string>,
+  reservedAuthoritativeElementIds?: ReadonlySet<string>,
+): StudioLiveGesturePreviewRenderPlan {
+  if (
+    !eligiblePreviewKeys
+    || typeof eligiblePreviewKeys.has !== "function"
+    || snapshot.length === 0
+    || eligiblePreviewKeys.size === 0
+  ) {
+    return emptyStudioLiveGesturePreviewRenderPlan(authoritative);
+  }
+
+  const projected: ProjectedPreview[] = [];
+  const previewIdCounts = new Map<string, number>();
+  for (const entry of snapshot) {
+    if (!eligiblePreviewKeys.has(entry.key)) continue;
+    const element = projectStudioLiveGesturePreviewEntry(entry);
+    if (!element) continue;
+    projected.push({ entry, element });
+    previewIdCounts.set(element.id, (previewIdCounts.get(element.id) ?? 0) + 1);
+  }
+  if (projected.length === 0) {
+    return emptyStudioLiveGesturePreviewRenderPlan(authoritative);
+  }
+
+  const authoritativeIndex = new Map<string, number>();
+  const duplicateAuthoritativeIds = new Set<string>();
+  for (const [index, element] of authoritative.entries()) {
+    if (authoritativeIndex.has(element.id)) duplicateAuthoritativeIds.add(element.id);
+    else authoritativeIndex.set(element.id, index);
+  }
+
+  let merged: El[] | null = null;
+  const previewElementIds = new Set<string>();
+  const previewSequenceByElementId = new Map<string, number>();
+  const authoritativeHandoffIds: string[] = [];
+  const authoritativeHandoffReceipts: Array<readonly [gestureId: string, seq: number]> = [];
+
+  for (const { entry, element: preview } of projected) {
+    if (
+      previewIdCounts.get(preview.id) !== 1
+      || duplicateAuthoritativeIds.has(preview.id)
+    ) continue;
+
+    const index = authoritativeIndex.get(preview.id);
+    if (index === undefined) {
+      // Paint projections may temporarily omit an authored work-asset element while it hydrates.
+      // Its raw document id still reserves the slot, so a remote gesture may not borrow that id.
+      if (reservedAuthoritativeElementIds?.has(preview.id)) continue;
+      merged ??= [...authoritative];
+      authoritativeIndex.set(preview.id, merged.length);
+      merged.push(preview);
+      previewElementIds.add(preview.id);
+      previewSequenceByElementId.set(preview.id, entry.seq);
+      continue;
+    }
+
+    const current = (merged ?? authoritative)[index]!;
+    if (authoritativeElementWins(current, preview)) {
+      authoritativeHandoffIds.push(preview.id);
+      authoritativeHandoffReceipts.push([preview.id, entry.seq]);
+      continue;
+    }
+
+    merged ??= [...authoritative];
+    merged[index] = withAuthoritativeLayerStructure(current, preview);
+    previewElementIds.add(preview.id);
+    previewSequenceByElementId.set(preview.id, entry.seq);
+  }
+
+  return {
+    elements: merged ?? authoritative,
+    previewElementIds,
+    authoritativeHandoffIds,
+    previewSequenceByElementId,
+    authoritativeHandoffToken: JSON.stringify(authoritativeHandoffReceipts),
+  };
 }
 
 /**
@@ -244,50 +464,11 @@ export function mergeStudioLiveGesturePreviewElements(
   snapshot: StudioLiveGesturePreviewSnapshot,
   eligiblePreviewKeys: ReadonlySet<string>,
 ): readonly El[] {
-  // Eligibility is pinned by the adapter only when this exact sender+gesture key began while its
-  // authoritative id was absent. Without that evidence, an id-reuse packet could temporarily
-  // replace another peer's pre-existing CRDT element.
-  if (!eligiblePreviewKeys || typeof eligiblePreviewKeys.has !== "function") {
-    return authoritative;
-  }
-  const projected: DrawEl[] = [];
-  for (const entry of snapshot) {
-    if (!eligiblePreviewKeys.has(entry.key)) continue;
-    const preview = projectStudioLiveGesturePreviewEntry(entry);
-    if (preview) projected.push(preview);
-  }
-  const previewIdCounts = new Map<string, number>();
-  for (const preview of projected) {
-    previewIdCounts.set(preview.id, (previewIdCounts.get(preview.id) ?? 0) + 1);
-  }
-
-  const authoritativeIndex = new Map<string, number>();
-  const duplicateAuthoritativeIds = new Set<string>();
-  for (const [index, element] of authoritative.entries()) {
-    if (authoritativeIndex.has(element.id)) duplicateAuthoritativeIds.add(element.id);
-    else authoritativeIndex.set(element.id, index);
-  }
-
-  let merged: El[] | null = null;
-  for (const preview of projected) {
-    if (
-      previewIdCounts.get(preview.id) !== 1
-      || duplicateAuthoritativeIds.has(preview.id)
-    ) continue;
-    const index = authoritativeIndex.get(preview.id);
-    if (index === undefined) {
-      merged ??= [...authoritative];
-      authoritativeIndex.set(preview.id, merged.length);
-      merged.push(preview);
-      continue;
-    }
-    const current = (merged ?? authoritative)[index]!;
-    const reconciled = reconcileDrawElement(current, preview);
-    if (reconciled === current) continue;
-    merged ??= [...authoritative];
-    merged[index] = reconciled;
-  }
-  return merged ?? authoritative;
+  return planStudioLiveGesturePreviewRenderElements(
+    authoritative,
+    snapshot,
+    eligiblePreviewKeys,
+  ).elements;
 }
 
 /**
@@ -299,32 +480,9 @@ export function studioLiveGesturePreviewAuthoritativeReceiptIds(
   snapshot: StudioLiveGesturePreviewSnapshot,
   eligiblePreviewKeys: ReadonlySet<string>,
 ): readonly string[] {
-  if (!eligiblePreviewKeys || typeof eligiblePreviewKeys.has !== "function") return [];
-
-  const projectedById = new Map<string, DrawEl | null>();
-  for (const entry of snapshot) {
-    if (!eligiblePreviewKeys.has(entry.key)) continue;
-    const preview = projectStudioLiveGesturePreviewEntry(entry);
-    if (!preview) continue;
-    projectedById.set(
-      preview.id,
-      projectedById.has(preview.id) ? null : preview,
-    );
-  }
-
-  const authoritativeById = new Map<string, El | null>();
-  for (const element of authoritative) {
-    authoritativeById.set(
-      element.id,
-      authoritativeById.has(element.id) ? null : element,
-    );
-  }
-
-  const ready: string[] = [];
-  for (const [gestureId, preview] of projectedById) {
-    const retained = authoritativeById.get(gestureId);
-    if (!preview || !retained || !authoritativeElementWins(retained, preview)) continue;
-    ready.push(gestureId);
-  }
-  return ready;
+  return planStudioLiveGesturePreviewRenderElements(
+    authoritative,
+    snapshot,
+    eligiblePreviewKeys,
+  ).authoritativeHandoffIds;
 }
