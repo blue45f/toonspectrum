@@ -876,6 +876,77 @@ describe("studio-tools-companion protocol", () => {
     expect(studioCompanionUrl(primaryA, "https://example.com")).not.toContain("view=");
   });
 
+  it("reuses a router-canonicalized popup without releasing its binding or reloading it", () => {
+    const popup = {
+      closed: false,
+      focus: vi.fn(),
+      location: {
+        href: "http://localhost/studio/companion/review?session=primary-a-1234&id=work-1&view=review",
+      },
+    } as unknown as Window;
+    const open = vi.fn();
+    vi.stubGlobal("window", { open });
+    const binding = new StudioCompanionPrimaryBinding();
+    expect(binding.acceptHello(buildStudioCompanionHello({
+      role: "companion",
+      companionInstanceId: reviewA,
+      targetPrimaryInstanceId: primaryA,
+      surface: "review",
+    }, Date.now()), primaryA)).toBe(true);
+    const release = vi.spyOn(binding, "release");
+    const windowRef = { current: popup as Window | null };
+    const announce = vi.fn();
+
+    openReadyStudioToolsCompanionForMenu({
+      sessionId: primaryA,
+      surface: "review",
+      workId: "work-1",
+      windowRef,
+      binding,
+      announce,
+    });
+
+    expect(isStudioToolsCompanionWindowReusable(
+      primaryA,
+      popup,
+      "review",
+      "work-1",
+    )).toBe(true);
+    expect(release).not.toHaveBeenCalled();
+    expect(open).not.toHaveBeenCalled();
+    expect(popup.focus).toHaveBeenCalledOnce();
+    expect(windowRef.current).toBe(popup);
+    expect(binding.companionInstanceId("review")).toBe(reviewA);
+    expect(announce).toHaveBeenLastCalledWith(expect.stringContaining("앞으로"));
+  });
+
+  it("fails closed for conflicting or invalid canonical companion surfaces", () => {
+    const makePopup = (href: string) => ({
+      closed: false,
+      focus: vi.fn(),
+      location: { href },
+    }) as unknown as Window;
+
+    expect(isStudioToolsCompanionWindowReusable(
+      primaryA,
+      makePopup("http://localhost/studio/companion/review?session=primary-a-1234"),
+      "review",
+    )).toBe(true);
+
+    for (const href of [
+      "http://localhost/studio/companion/navigator?session=primary-a-1234&view=review",
+      "http://localhost/studio/companion/unknown?session=primary-a-1234&view=unknown",
+      "http://localhost/studio/companion/review/extra?session=primary-a-1234&view=review",
+      "http://localhost/studio/companion/review?session=primary-a-1234&view=review&view=review",
+    ]) {
+      expect(isStudioToolsCompanionWindowReusable(
+        primaryA,
+        makePopup(href),
+        "review",
+      )).toBe(false);
+    }
+  });
+
   it("keeps ready-window recovery and reserved-window completion inside the lazy protocol", () => {
     const wrongWindow = {
       closed: false,

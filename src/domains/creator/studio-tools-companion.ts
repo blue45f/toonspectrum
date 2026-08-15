@@ -1827,6 +1827,37 @@ function studioCompanionOriginBase(origin: string): string {
   }
 }
 
+function studioCompanionRouteSurface(url: URL): StudioCompanionSurface | null {
+  const querySurface = parseStudioCompanionSurface(url.search);
+  if (querySurface === null) return null;
+
+  const segments = url.pathname.split("/");
+  if (segments.at(-1) === "") segments.pop();
+  if (
+    segments.length === 3
+    && segments[0] === ""
+    && segments[1] === "studio"
+    && segments[2] === "tools-companion"
+  ) {
+    return querySurface;
+  }
+  if (
+    segments.length !== 4
+    || segments[0] !== ""
+    || segments[1] !== "studio"
+    || segments[2] !== "companion"
+    || !STUDIO_COMPANION_SURFACE_IDS.has(segments[3])
+  ) {
+    return null;
+  }
+
+  const pathSurface = segments[3] as StudioCompanionSurface;
+  const queryViews = url.searchParams.getAll(STUDIO_COMPANION_VIEW_QUERY);
+  return queryViews.length === 0 || querySurface === pathSurface
+    ? pathSurface
+    : null;
+}
+
 function isMatchingStudioToolsCompanionWindow(
   candidate: Window,
   expectedUrl: string,
@@ -1840,10 +1871,9 @@ function isMatchingStudioToolsCompanionWindow(
     const expected = new URL(expectedUrl, currentUrl.origin);
     const currentScope = studioCompanionPrimaryScope(currentUrl.search);
     const expectedScope = studioCompanionPrimaryScope(expected.search);
-    const currentSurface = parseStudioCompanionSurface(currentUrl.search);
-    const expectedSurface = parseStudioCompanionSurface(expected.search);
+    const currentSurface = studioCompanionRouteSurface(currentUrl);
+    const expectedSurface = studioCompanionRouteSurface(expected);
     return currentUrl.origin === expected.origin
-      && currentUrl.pathname === STUDIO_TOOLS_COMPANION_PATH
       && parseStudioCompanionSessionId(currentUrl.search) === sessionId
       && currentScope !== null
       && expectedScope !== null
