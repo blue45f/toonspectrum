@@ -60,6 +60,10 @@ export function createStudioLiveSignalingServerTransport(
       return connectLocal();
     },
     send(envelope) {
+      // This shell's BroadcastChannel reaches only same-origin tabs. Returning true for a
+      // cross-browser preview fallback would silently hide a missing mesh packet, so preview is
+      // accepted only by the outer P2P mesh or a real Socket.IO authoritative primary.
+      if (envelope.kind === "preview:gesture") return false;
       return local?.send(envelope) ?? false;
     },
     subscribe(listener) {

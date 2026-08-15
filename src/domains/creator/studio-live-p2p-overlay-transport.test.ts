@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 
 import { STUDIO_CRDT_PROTOCOL_VERSION } from "./studio-crdt-protocol";
 import {
+  STUDIO_LIVE_GESTURE_PREVIEW_ENVELOPE_MAX_BYTES,
   createStudioLiveEnvelope,
+  studioLiveEnvelopeByteLength,
   type StudioLiveEnvelope,
   type StudioLiveMessageKind,
   type StudioLiveParticipant,
@@ -14,6 +16,7 @@ import {
   isStudioLiveP2pMeshShareId,
   STUDIO_LIVE_P2P_CHANNEL_LABEL,
   STUDIO_LIVE_P2P_MESH_SHARE_ID,
+  STUDIO_LIVE_P2P_PREVIEW_MAX_BUFFERED_BYTES,
   type StudioLiveP2pRtcDataChannel,
   type StudioLiveP2pRtcPeerConnection,
 } from "./studio-live-p2p-overlay-transport";
@@ -59,10 +62,10 @@ function contextFor(participant: StudioLiveParticipant): StudioLiveTransportCont
   };
 }
 
-function gesturePreview(): StudioLiveGesturePreviewPayload {
+function gesturePreview(gestureId = "gesture-p2p-1"): StudioLiveGesturePreviewPayload {
   return {
     version: 1,
-    gestureId: "gesture-p2p-1",
+    gestureId,
     pageId: "page-1",
     seq: 1,
     phase: "begin",
@@ -105,12 +108,16 @@ async function flush(): Promise<void> {
 class MemoryDataChannel implements StudioLiveP2pRtcDataChannel {
   readonly label: string;
   readyState = "connecting";
+  bufferedAmount = 0;
   peer: MemoryDataChannel | null = null;
   onopen: ((event: Event) => void) | null = null;
   onclose: ((event: Event) => void) | null = null;
   onmessage: ((event: MessageEvent<string>) => void) | null = null;
 
-  constructor(label: string) {
+  constructor(
+    label: string,
+    private readonly beforeSend: () => void,
+  ) {
     this.label = label;
   }
 
@@ -118,6 +125,7 @@ class MemoryDataChannel implements StudioLiveP2pRtcDataChannel {
     if (this.readyState !== "open" || this.peer?.readyState !== "open") {
       throw new Error("data channel is not open");
     }
+    this.beforeSend();
     this.peer.onmessage?.({ data } as MessageEvent<string>);
   }
 
@@ -139,6 +147,7 @@ class MemoryDataChannel implements StudioLiveP2pRtcDataChannel {
 
 class MemoryPeerConnection implements StudioLiveP2pRtcPeerConnection {
   connectionState = "new";
+  readonly sctp = { maxMessageSize: 0 };
   onicecandidate: StudioLiveP2pRtcPeerConnection["onicecandidate"] = null;
   ondatachannel: StudioLiveP2pRtcPeerConnection["ondatachannel"] = null;
   onconnectionstatechange: (() => void) | null = null;
@@ -155,7 +164,7 @@ class MemoryPeerConnection implements StudioLiveP2pRtcPeerConnection {
   }
 
   createDataChannel(label: string): StudioLiveP2pRtcDataChannel {
-    const channel = new MemoryDataChannel(label);
+    const channel = this.hub.createChannel(label);
     this.localChannel = channel;
     return channel;
   }
@@ -200,6 +209,40 @@ class MemoryPeerConnection implements StudioLiveP2pRtcPeerConnection {
 class MemoryRtcHub {
   private nextId = 1;
   private readonly connections = new Set<MemoryPeerConnection>();
+  private readonly channels = new Set<MemoryDataChannel>();
+  private sendsBeforeFailure: number | null = null;
+  private simulatedSendFailure = false;
+
+  get didSimulateSendFailure(): boolean {
+    return this.simulatedSendFailure;
+  }
+
+  createChannel(label: string): MemoryDataChannel {
+    const channel = new MemoryDataChannel(label, () => this.beforeDataChannelSend());
+    this.channels.add(channel);
+    return channel;
+  }
+
+  setBufferedAmount(value: number): void {
+    for (const channel of this.channels) channel.bufferedAmount = value;
+  }
+
+  setMaxMessageSize(value: number): void {
+    for (const connection of this.connections) connection.sctp.maxMessageSize = value;
+  }
+
+  failOnNthSend(sendNumber: number): void {
+    this.sendsBeforeFailure = sendNumber;
+  }
+
+  private beforeDataChannelSend(): void {
+    if (this.sendsBeforeFailure === null) return;
+    this.sendsBeforeFailure -= 1;
+    if (this.sendsBeforeFailure > 0) return;
+    this.sendsBeforeFailure = null;
+    this.simulatedSendFailure = true;
+    throw new Error("simulated data-channel send failure");
+  }
 
   create(): StudioLiveP2pRtcPeerConnection {
     const connection = new MemoryPeerConnection(this, String(this.nextId++));
@@ -226,7 +269,7 @@ class MemoryRtcHub {
   private openPair(left: MemoryPeerConnection, right: MemoryPeerConnection): void {
     const offered = left.localChannel ?? right.localChannel;
     if (!offered) return;
-    const answerer = new MemoryDataChannel(STUDIO_LIVE_P2P_CHANNEL_LABEL);
+    const answerer = this.createChannel(STUDIO_LIVE_P2P_CHANNEL_LABEL);
     offered.peer = answerer;
     answerer.peer = offered;
     const answerConnection = left.localChannel ? right : left;
@@ -241,8 +284,11 @@ class MemoryRtcHub {
 class SignalingBus {
   readonly primaries = new Map<string, FakePrimaryTransport>();
 
-  create(participant: StudioLiveParticipant): FakePrimaryTransport {
-    const primary = new FakePrimaryTransport(this, participant.sessionId);
+  create(
+    participant: StudioLiveParticipant,
+    crdtFanout: "authoritative" | "mesh" = "authoritative",
+  ): FakePrimaryTransport {
+    const primary = new FakePrimaryTransport(this, participant.sessionId, crdtFanout);
     this.primaries.set(participant.sessionId, primary);
     return primary;
   }
@@ -261,7 +307,6 @@ class SignalingBus {
 
 class FakePrimaryTransport implements StudioLiveTransport {
   readonly mode = "server" as const;
-  readonly crdtFanout = "authoritative" as const;
   readonly sent: StudioLiveEnvelope[] = [];
   readonly acquireLock = vi.fn(async () => ({
     status: "timeout" as const,
@@ -293,6 +338,7 @@ class FakePrimaryTransport implements StudioLiveTransport {
   constructor(
     private readonly bus: SignalingBus,
     readonly sessionId: string,
+    readonly crdtFanout: "authoritative" | "mesh",
   ) {}
 
   async connect(): Promise<void> {
@@ -333,6 +379,7 @@ class FakePrimaryTransport implements StudioLiveTransport {
 }
 
 async function connectedMesh(): Promise<{
+  hub: MemoryRtcHub;
   localPrimary: FakePrimaryTransport;
   remotePrimary: FakePrimaryTransport;
   local: StudioLiveTransport;
@@ -372,7 +419,55 @@ async function connectedMesh(): Promise<{
     }),
   );
   await flush();
-  return { localPrimary, remotePrimary, local, remote, receivedRemote };
+  return { hub, localPrimary, remotePrimary, local, remote, receivedRemote };
+}
+
+async function connectedThreePeerMesh(): Promise<{
+  hub: MemoryRtcHub;
+  localPrimary: FakePrimaryTransport;
+  local: StudioLiveTransport;
+  receivedRemote: StudioLiveEnvelope[];
+  receivedThird: StudioLiveEnvelope[];
+}> {
+  const hub = new MemoryRtcHub();
+  const bus = new SignalingBus();
+  const localPrimary = bus.create(LOCAL);
+  const remotePrimary = bus.create(REMOTE);
+  const thirdPrimary = bus.create(THIRD);
+  const wrap = (primary: FakePrimaryTransport, participant: StudioLiveParticipant) =>
+    applyStudioLiveP2pOverlay(() => primary, {
+      createPeerConnection: () => hub.create(),
+      now: () => NOW,
+    })(contextFor(participant));
+  const local = wrap(localPrimary, LOCAL);
+  const remote = wrap(remotePrimary, REMOTE);
+  const third = wrap(thirdPrimary, THIRD);
+  const receivedRemote: StudioLiveEnvelope[] = [];
+  const receivedThird: StudioLiveEnvelope[] = [];
+  remote.subscribe((value) => receivedRemote.push(value as StudioLiveEnvelope));
+  third.subscribe((value) => receivedThird.push(value as StudioLiveEnvelope));
+  await local.connect();
+  await remote.connect();
+  await third.connect();
+
+  const presence = (
+    sender: StudioLiveParticipant,
+    sequence: number,
+  ) => envelope({
+    sender,
+    kind: "presence:heartbeat",
+    payload: { visibility: "active", pageId: "page-1", tool: "pen" },
+    sequence,
+  });
+  localPrimary.emit(presence(REMOTE, 1));
+  localPrimary.emit(presence(THIRD, 1));
+  remotePrimary.emit(presence(LOCAL, 2));
+  remotePrimary.emit(presence(THIRD, 2));
+  thirdPrimary.emit(presence(LOCAL, 3));
+  thirdPrimary.emit(presence(REMOTE, 3));
+  await flush();
+  await flush();
+  return { hub, localPrimary, local, receivedRemote, receivedThird };
 }
 
 describe("Studio live P2P overlay", () => {
@@ -456,6 +551,102 @@ describe("Studio live P2P overlay", () => {
     ).toBe(false);
   });
 
+  it("uses the signaling participant instead of spoofable data-channel profile fields", async () => {
+    const { local, remote } = await connectedMesh();
+    const receivedLocal: StudioLiveEnvelope[] = [];
+    local.subscribe((value) => receivedLocal.push(value as StudioLiveEnvelope));
+    const spoofed = envelope({
+      sender: { ...REMOTE, displayName: "위조된 소유자", role: "owner" },
+      kind: "preview:gesture",
+      payload: gesturePreview("gesture-canonical-sender"),
+      sequence: 41,
+    });
+
+    expect(remote.send(spoofed)).toBe(true);
+    expect(receivedLocal.at(-1)).toEqual({
+      ...spoofed,
+      sender: REMOTE,
+    });
+  });
+
+  it("preflights preview byte, buffer, and SCTP limits before mesh fanout", async () => {
+    const { hub, localPrimary, local, receivedRemote } = await connectedMesh();
+    const atBoundary = envelope({
+      sender: LOCAL,
+      kind: "preview:gesture",
+      payload: gesturePreview("gesture-boundary"),
+      sequence: 41,
+    });
+    const boundaryBytes = studioLiveEnvelopeByteLength(atBoundary)!;
+    hub.setMaxMessageSize(boundaryBytes);
+    hub.setBufferedAmount(STUDIO_LIVE_P2P_PREVIEW_MAX_BUFFERED_BYTES - boundaryBytes);
+
+    expect(local.send(atBoundary)).toBe(true);
+    expect(localPrimary.sent).not.toContainEqual(atBoundary);
+
+    const overSctp = envelope({
+      sender: LOCAL,
+      kind: "preview:gesture",
+      payload: gesturePreview("gesture-over-sctp"),
+      sequence: 42,
+    });
+    hub.setBufferedAmount(0);
+    hub.setMaxMessageSize(studioLiveEnvelopeByteLength(overSctp)! - 1);
+    expect(local.send(overSctp)).toBe(true);
+    expect(localPrimary.sent).toContainEqual(overSctp);
+
+    const unlimitedSctp = envelope({
+      sender: LOCAL,
+      kind: "preview:gesture",
+      payload: gesturePreview("gesture-unlimited-sctp"),
+      sequence: 43,
+    });
+    hub.setMaxMessageSize(Number.POSITIVE_INFINITY);
+    expect(local.send(unlimitedSctp)).toBe(true);
+    expect(localPrimary.sent).not.toContainEqual(unlimitedSctp);
+
+    const overBuffer = envelope({
+      sender: LOCAL,
+      kind: "preview:gesture",
+      payload: gesturePreview("gesture-over-buffer"),
+      sequence: 44,
+    });
+    const overBufferBytes = studioLiveEnvelopeByteLength(overBuffer)!;
+    hub.setMaxMessageSize(0);
+    hub.setBufferedAmount(
+      STUDIO_LIVE_P2P_PREVIEW_MAX_BUFFERED_BYTES - overBufferBytes + 1,
+    );
+    expect(local.send(overBuffer)).toBe(true);
+    expect(localPrimary.sent).toContainEqual(overBuffer);
+    expect(
+      receivedRemote.filter((item) => item.kind === "preview:gesture"),
+    ).toEqual(expect.arrayContaining([atBoundary, overSctp, unlimitedSctp, overBuffer]));
+  });
+
+  it("rejects a preview above the protocol envelope cap without attempting primary", async () => {
+    const { localPrimary, local } = await connectedMesh();
+    const valid = envelope({
+      sender: LOCAL,
+      kind: "preview:gesture",
+      payload: gesturePreview("gesture-invalid-oversize"),
+      sequence: 45,
+    });
+    const oversized = {
+      ...valid,
+      payload: {
+        ...valid.payload,
+        extension: "x".repeat(STUDIO_LIVE_GESTURE_PREVIEW_ENVELOPE_MAX_BYTES),
+      },
+    } as unknown as StudioLiveEnvelope;
+    expect(studioLiveEnvelopeByteLength(oversized)).toBeGreaterThan(
+      STUDIO_LIVE_GESTURE_PREVIEW_ENVELOPE_MAX_BYTES,
+    );
+    const primarySendCount = localPrimary.sent.length;
+
+    expect(local.send(oversized)).toBe(false);
+    expect(localPrimary.sent).toHaveLength(primarySendCount);
+  });
+
   it("falls back to the server while the mesh is incomplete", async () => {
     const bus = new SignalingBus();
     const primary = bus.create(LOCAL);
@@ -491,6 +682,32 @@ describe("Studio live P2P overlay", () => {
     expect(primary.sent).toContainEqual(preview);
   });
 
+  it("fails closed when an incomplete mesh has no authoritative preview primary", async () => {
+    const bus = new SignalingBus();
+    const primary = bus.create(LOCAL, "mesh");
+    const transport = applyStudioLiveP2pOverlay(() => primary, {
+      createPeerConnection: () => {
+        throw new Error("rtc disabled");
+      },
+      now: () => NOW,
+    })(contextFor(LOCAL));
+    await transport.connect();
+    primary.emit(envelope({
+      sender: REMOTE,
+      kind: "presence:heartbeat",
+      payload: { visibility: "active", pageId: "page-1", tool: "pen" },
+    }));
+    const preview = envelope({
+      sender: LOCAL,
+      kind: "preview:gesture",
+      payload: gesturePreview("gesture-no-primary"),
+      sequence: 4,
+    });
+
+    expect(transport.send(preview)).toBe(false);
+    expect(primary.sent).not.toContainEqual(preview);
+  });
+
   it("uses only primary when one observed peer is missing from an otherwise open mesh", async () => {
     const { localPrimary, local, receivedRemote } = await connectedMesh();
     localPrimary.emit(envelope({
@@ -512,6 +729,29 @@ describe("Studio live P2P overlay", () => {
     expect(
       receivedRemote.filter((item) => item.kind === "preview:gesture"),
     ).toEqual([preview]);
+  });
+
+  it("falls back authoritatively when a channel closes after multi-peer preflight", async () => {
+    const {
+      hub,
+      localPrimary,
+      local,
+      receivedRemote,
+      receivedThird,
+    } = await connectedThreePeerMesh();
+    hub.failOnNthSend(2);
+    const preview = envelope({
+      sender: LOCAL,
+      kind: "preview:gesture",
+      payload: gesturePreview("gesture-send-race"),
+      sequence: 46,
+    });
+
+    expect(local.send(preview)).toBe(true);
+    expect(hub.didSimulateSendFailure).toBe(true);
+    expect(localPrimary.sent).toContainEqual(preview);
+    expect(receivedRemote.some((item) => item.kind === "preview:gesture")).toBe(true);
+    expect(receivedThird.some((item) => item.kind === "preview:gesture")).toBe(true);
   });
 
   it("carries jam CRDT updates on the mesh when the primary has no Socket.IO authority", async () => {

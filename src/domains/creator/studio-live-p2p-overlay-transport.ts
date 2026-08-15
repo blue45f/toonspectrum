@@ -13,8 +13,10 @@ import {
   type StudioCrdtUpdateRequest,
 } from "./studio-crdt-protocol";
 import {
+  STUDIO_LIVE_GESTURE_PREVIEW_ENVELOPE_MAX_BYTES,
   createStudioLiveEnvelope,
   parseStudioLiveEnvelope,
+  studioLiveUtf8ByteLength,
   type StudioLiveEnvelope,
   type StudioLiveMessageKind,
   type StudioLiveParticipant,
@@ -37,6 +39,8 @@ export const STUDIO_LIVE_P2P_MESH_SHARE_ID = "p2p-mesh-v1";
 export const STUDIO_LIVE_P2P_CHANNEL_LABEL = "studio-live-p2p";
 /** Full-mesh ICE above this size is more expensive than a single server fanout. */
 export const STUDIO_LIVE_P2P_MAX_PEERS = 8;
+/** Keeps at most a few maximum-size preview packets queued per peer before using primary relay. */
+export const STUDIO_LIVE_P2P_PREVIEW_MAX_BUFFERED_BYTES = 256 * 1024;
 
 const STUDIO_LIVE_P2P_EPHEMERAL_KINDS = new Set<StudioLiveMessageKind>([
   "presence:heartbeat",
@@ -65,6 +69,7 @@ export interface StudioLiveP2pRtcIceCandidate {
 export interface StudioLiveP2pRtcDataChannel {
   readonly label: string;
   readonly readyState: string;
+  readonly bufferedAmount: number;
   send(data: string): void;
   close(): void;
   onopen: ((event: Event) => void) | null;
@@ -74,6 +79,7 @@ export interface StudioLiveP2pRtcDataChannel {
 
 export interface StudioLiveP2pRtcPeerConnection {
   readonly connectionState: string;
+  readonly sctp?: { readonly maxMessageSize?: number } | null;
   onicecandidate: ((event: { candidate: StudioLiveP2pRtcIceCandidate | null }) => void) | null;
   ondatachannel: ((event: { channel: StudioLiveP2pRtcDataChannel }) => void) | null;
   onconnectionstatechange: (() => void) | null;
@@ -137,6 +143,8 @@ interface StudioLiveP2pPeerLink {
   closed: boolean;
 }
 
+type StudioLiveP2pEphemeralSendResult = "sent" | "fallback" | "rejected";
+
 /**
  * Opportunistic STUN-only data-channel mesh on top of an authoritative server transport.
  * Cursor, presence heartbeat, chat, and gesture previews hop peer-to-peer once every known peer
@@ -199,8 +207,14 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
 
   send(envelope: StudioLiveEnvelope): boolean {
     if (this.closed) return false;
-    if (isStudioLiveP2pEphemeralKind(envelope.kind) && this.sendEphemeral(envelope)) {
-      return true;
+    if (isStudioLiveP2pEphemeralKind(envelope.kind)) {
+      const result = this.sendEphemeral(envelope);
+      if (result === "sent") return true;
+      if (result === "rejected") return false;
+      if (
+        envelope.kind === "preview:gesture"
+        && this.primary.crdtFanout !== "authoritative"
+      ) return false;
     }
     return this.primary.send(envelope);
   }
@@ -463,11 +477,28 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
     return open;
   }
 
-  private sendEphemeral(envelope: StudioLiveEnvelope): boolean {
+  private sendEphemeral(envelope: StudioLiveEnvelope): StudioLiveP2pEphemeralSendResult {
+    let serialized: string | undefined;
+    try {
+      serialized = JSON.stringify(envelope);
+    } catch {
+      return "rejected";
+    }
+    if (serialized === undefined) return "rejected";
+    const serializedBytes = studioLiveUtf8ByteLength(serialized);
+    const isPreview = envelope.kind === "preview:gesture";
+    if (
+      isPreview
+      && serializedBytes > STUDIO_LIVE_GESTURE_PREVIEW_ENVELOPE_MAX_BYTES
+    ) return "rejected";
+
     const targetSessionId = envelope.targetSessionId;
     if (targetSessionId) {
       const peer = this.peers.get(targetSessionId);
-      return Boolean(peer && this.sendToPeer(peer, envelope));
+      if (!peer || !this.peerCanSendSerialized(peer, serializedBytes, isPreview)) {
+        return "fallback";
+      }
+      return this.sendSerializedToPeer(peer, serialized) ? "sent" : "fallback";
     }
     // A peer that exceeded the mesh cap or whose channel failed is still known through presence.
     // Fall back before a partial fanout so every room member sees the same ephemeral packet.
@@ -477,18 +508,46 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
       || [...this.peers.values()].some(
         (peer) => peer.closed || peer.channel?.readyState !== "open",
       )
-    ) return false;
+    ) return "fallback";
+    if (
+      isPreview
+      && [...this.peers.values()].some(
+        (peer) => !this.peerCanSendSerialized(peer, serializedBytes, true),
+      )
+    ) return "fallback";
+
     let delivered = 0;
-    const serialized = JSON.stringify(envelope);
     for (const peer of this.peers.values()) {
       if (this.sendSerializedToPeer(peer, serialized)) delivered += 1;
-      else return false;
+      // A channel can still close between preflight and send. The authoritative primary may
+      // duplicate an already-delivered packet, which the preview store handles idempotently; it
+      // is preferable to silently omitting the remaining peers.
+      else return "fallback";
     }
-    return delivered > 0;
+    return delivered > 0 ? "sent" : "fallback";
   }
 
-  private sendToPeer(peer: StudioLiveP2pPeerLink, envelope: StudioLiveEnvelope): boolean {
-    return this.sendSerializedToPeer(peer, JSON.stringify(envelope));
+  private peerCanSendSerialized(
+    peer: StudioLiveP2pPeerLink,
+    serializedBytes: number,
+    enforcePreviewLimits: boolean,
+  ): boolean {
+    const channel = peer.channel;
+    if (peer.closed || channel?.readyState !== "open") return false;
+    if (!enforcePreviewLimits) return true;
+    if (
+      !Number.isFinite(channel.bufferedAmount)
+      || channel.bufferedAmount < 0
+      || channel.bufferedAmount + serializedBytes
+        > STUDIO_LIVE_P2P_PREVIEW_MAX_BUFFERED_BYTES
+    ) return false;
+    const maxMessageSize = peer.connection.sctp?.maxMessageSize;
+    return maxMessageSize === undefined
+      || maxMessageSize === 0
+      || maxMessageSize === Number.POSITIVE_INFINITY
+      || (Number.isFinite(maxMessageSize)
+        && maxMessageSize > 0
+        && serializedBytes <= maxMessageSize);
   }
 
   private sendSerializedToPeer(peer: StudioLiveP2pPeerLink, serialized: string): boolean {
@@ -681,7 +740,10 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
       || envelope.sender.sessionId !== link.sessionId
       || !isStudioLiveP2pEphemeralKind(envelope.kind)
     ) return;
-    this.emit(envelope);
+    this.emit({
+      ...envelope,
+      sender: { ...link.participant },
+    });
   }
 
   private sendMeshDescription(
