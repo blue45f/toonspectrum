@@ -462,6 +462,9 @@ function mean(values: readonly number[]): number {
  */
 const BRISTLE_RUN_STATIONS = 5;
 
+/** Stations each successive hair shifts its run boundaries by. Coprime-ish with the run length. */
+const BRISTLE_RUN_PHASE_STRIDE = 2;
+
 /**
  * Load bands the runs of one width gauge are quantised into - the stroke's tonal resolution.
  *
@@ -566,12 +569,21 @@ function planBristleLanes(
   let minimumLoad = Number.POSITIVE_INFINITY;
   let maximumLoad = Number.NEGATIVE_INFINITY;
   for (let bristleIndex = 0; bristleIndex < bristleCount; bristleIndex += 1) {
+    // Each hair cuts its runs on a different phase. A run carries ONE load, so a run boundary is a
+    // hard tonal step; with every hair cutting at stations 0, 5, 10, … those steps lined up across
+    // the whole ribbon and the bed rendered as a stack of rectangular blocks with seams running
+    // clean through it - the "각진" look, arriving through tone rather than through geometry.
+    // Striding the phase by 2 spreads seven hairs over all five phases (0,2,4,1,3,0,2), so the
+    // steps scatter into a mosaic instead of a grid. Nothing about the load itself changes.
+    const phase = (bristleIndex * BRISTLE_RUN_PHASE_STRIDE) % BRISTLE_RUN_STATIONS;
     for (
-      let runStart = 0;
-      runStart < stations.length - 1;
-      runStart += BRISTLE_RUN_STATIONS
+      let runOrigin = -phase;
+      runOrigin < stations.length - 1;
+      runOrigin += BRISTLE_RUN_STATIONS
     ) {
-      const runEnd = Math.min(stations.length - 1, runStart + BRISTLE_RUN_STATIONS);
+      const runStart = Math.max(0, runOrigin);
+      const runEnd = Math.min(stations.length - 1, runOrigin + BRISTLE_RUN_STATIONS);
+      if (runEnd <= runStart) continue;
       const points: number[] = [];
       for (let index = runStart; index <= runEnd; index += 1) {
         const station = stations[index]!;
@@ -597,7 +609,7 @@ function planBristleLanes(
       // One representative station per run rather than the run's mean. Averaging is what erased the
       // tooth: the per-station noise is independent, so a mean over six stations shrinks its
       // amplitude by √6 and a mean over a whole stroke annihilates it.
-      const sampleIndex = Math.min(runEnd, runStart + (BRISTLE_RUN_STATIONS >> 1));
+      const sampleIndex = Math.min(runEnd, runStart + ((runEnd - runStart) >> 1));
       const sample = stations[sampleIndex]!;
       const sampleBristle = sample.source.bristles[bristleIndex]!;
       let load = clamp(sample.opacity * sampleBristle.opacity, 0, 1);

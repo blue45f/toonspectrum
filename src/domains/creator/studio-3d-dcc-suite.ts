@@ -20,6 +20,10 @@ export * from "./studio-3d-procedural-cityscape";
 export * from "./studio-3d-cinematography-rail";
 export * from "./studio-3d-toon-shader-graph";
 export * from "./studio-3d-cloth-hair-dynamics";
+export * from "./studio-3d-spatial-webtoon-ar";
+export * from "./studio-3d-spatial-webtoon-vr";
+export * from "./studio-3d-spatial-audio";
+export * from "./studio-3d-spatial-hand-tracking";
 export * from "./studio-3d-scene-dependency-graph";
 export {
   type GeometryAuthority,

@@ -1408,6 +1408,43 @@ function bristleLoadAlongTravel(
 }
 
 /**
+ * How far a hair drifts across the ribbon as it travels, in ribbon half-widths.
+ *
+ * The bed used to be seven evenly-spaced constants held for the whole stroke, so it rendered as
+ * seven dead-straight parallel lanes at identical pitch - plywood grain, not a brush. Real hairs
+ * neither sit on a lattice nor hold their line: they splay, clump and cross. Two corrections, both
+ * deterministic in (bristleIndex, seed) so replay and export are unchanged:
+ *
+ *   PITCH  breaks the lattice - each hair takes a fixed offset of its own, so the spacing between
+ *          neighbours is irregular and two hairs can sit close together as a clump.
+ *   DRIFT  breaks the straightness - the offset wanders along travel on the same value-noise the
+ *          load uses, so lanes converge and separate instead of running parallel.
+ *
+ * Both are small on purpose. The carrier multiplies offsetRatio by the station's radiusY, so the
+ * total must stay inside 1 or the outer hairs leave the ribbon the body draws; the base offsets
+ * top out at 0.88 and the two corrections are budgeted against the 0.12 that is left.
+ */
+const BRISTLE_PITCH_JITTER = 0.05;
+const BRISTLE_DRIFT_AMPLITUDE = 0.06;
+/** Longer than the load's wavelength: a hair should wander over the stroke, not vibrate. */
+const BRISTLE_DRIFT_WAVELENGTH_STATIONS = 34;
+
+function bristleDriftAlongTravel(
+  stationIndex: number,
+  bristleIndex: number,
+  seed: number,
+): number {
+  const t = stationIndex / BRISTLE_DRIFT_WAVELENGTH_STATIONS;
+  const knot = Math.floor(t);
+  const fraction = t - knot;
+  const key = 907 + bristleIndex * 13;
+  const start = hash2(knot, key, seed);
+  const end = hash2(knot + 1, key, seed);
+  const eased = fraction * fraction * (3 - 2 * fraction);
+  return (start + (end - start) * eased) * 2 - 1;
+}
+
+/**
  * Acrylic lanes carry the fast-setting body; everything else on this carrier is oil. Kept as one
  * shared predicate so the Canvas and SVG renderers cannot drift into disagreeing about which paint
  * a stroke is made of.
@@ -1527,8 +1564,11 @@ export function planOilBrushDabs(input: FxOilPlanInput): FxOilDab[] {
         const contactGate = smoothGate(contact, 0.42, 0.18);
         const toothGate = smoothGate(tooth, 0.38, 0.22);
         const loadGate = contactGate * toothGate;
+        const pitch = (hash2(bristleIndex, 613, seed) - 0.5) * 2 * BRISTLE_PITCH_JITTER;
+        const drift = bristleDriftAlongTravel(si, bristleIndex, seed)
+          * BRISTLE_DRIFT_AMPLITUDE;
         return {
-          offsetRatio: offsetRatio * (0.9 + pressureFeel * 0.14),
+          offsetRatio: (offsetRatio + pitch + drift) * (0.9 + pressureFeel * 0.14),
           radiusXRatio: 0.62 + tooth * 0.28 + pressureFeel * 0.08,
           // Ridges must remain a material fraction of radiusY after the ribbon carrier's
           // 0.17 + ratio*1.1 width map — keep them resolvable without repainting the body.
