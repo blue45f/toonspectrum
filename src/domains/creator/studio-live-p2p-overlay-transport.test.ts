@@ -501,7 +501,7 @@ describe("Studio live P2P overlay", () => {
     )).toBe(true);
   });
 
-  it("keeps lock claims on the server and prefers the mesh for CRDT when every peer is connected", async () => {
+  it("keeps lock claims on the server and still publishes CRDT on the primary when the mesh is up", async () => {
     const { localPrimary, local } = await connectedMesh();
     await local.acquireLock?.({
       resource: "page:1",
@@ -516,10 +516,10 @@ describe("Studio live P2P overlay", () => {
       update: "AAAA",
     });
     expect(localPrimary.acquireLock).toHaveBeenCalledOnce();
-    expect(localPrimary.publishCrdtUpdate).not.toHaveBeenCalled();
+    expect(localPrimary.publishCrdtUpdate).toHaveBeenCalledOnce();
   });
 
-  it("keeps same-origin jam CRDT on BroadcastChannel until a P2P channel opens", async () => {
+  it("keeps same-origin jam CRDT on BroadcastChannel even after a P2P channel opens", async () => {
     const workId = `work-p2p-bc-${crypto.randomUUID()}`;
     const factory = applyStudioLiveP2pOverlay(
       createStudioLiveSignalingServerTransportFactory,
@@ -539,6 +539,54 @@ describe("Studio live P2P overlay", () => {
     await local.connect();
     await remote.connect();
     const updateId = "00000000-0000-4000-8000-000000000036";
+    await local.publishCrdtUpdate?.({
+      protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+      workId,
+      updateId,
+      clientSequence: 1,
+      update: "AAAA",
+    });
+    await vi.waitFor(() => expect(received).toContain(updateId));
+    local.close();
+    remote.close();
+  });
+
+  it("still delivers same-origin CRDT on BroadcastChannel after the mesh claims an open channel", async () => {
+    const workId = `work-p2p-bc-open-${crypto.randomUUID()}`;
+    const hub = new MemoryRtcHub();
+    const factory = applyStudioLiveP2pOverlay(
+      createStudioLiveSignalingServerTransportFactory,
+      {
+        createPeerConnection: () => hub.create(),
+        now: () => NOW,
+      },
+    );
+    const context = (participant: StudioLiveParticipant): StudioLiveTransportContext => ({
+      workId,
+      roomName: workId,
+      participant,
+    });
+    const local = factory(context(LOCAL));
+    const remote = factory(context(REMOTE));
+    const received: string[] = [];
+    remote.subscribeCrdt?.((message) => {
+      if (message.type === "update") received.push(message.update.updateId);
+    });
+    await local.connect();
+    await remote.connect();
+    local.send(envelope({
+      sender: LOCAL,
+      kind: "presence:heartbeat",
+      payload: { visibility: "active", pageId: "page-1", tool: "pen" },
+    }));
+    remote.send(envelope({
+      sender: REMOTE,
+      kind: "presence:heartbeat",
+      payload: { visibility: "active", pageId: "page-1", tool: "pen" },
+      sequence: 2,
+    }));
+    await flush();
+    const updateId = "00000000-0000-4000-8000-000000000037";
     await local.publishCrdtUpdate?.({
       protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
       workId,

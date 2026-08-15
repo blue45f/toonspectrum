@@ -3,6 +3,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SqliteUnavailableError } from "./studio-local-database";
 import {
+  StudioOpfsRecoveryJournalError,
+  type StudioOpfsRecoveryAppendInput,
+  type StudioOpfsRecoveryCheckpointInput,
+  type StudioOpfsRecoveryEntry,
+  type StudioOpfsRecoveryScan,
+  type StudioOpfsRecoveryWriterLease,
+} from "./studio-opfs-recovery-journal";
+import {
   createStudioPagesHistoryCommandJournal,
   type StudioHistoryJournalNavigationTarget,
 } from "./studio-pages-history-command-journal";
@@ -12,14 +20,6 @@ import {
   StudioPagesHistoryDurabilityUnavailableError,
   StudioPagesHistoryDurableRuntime,
 } from "./studio-pages-history-durable-runtime";
-
-import type {
-  StudioOpfsRecoveryAppendInput,
-  StudioOpfsRecoveryCheckpointInput,
-  StudioOpfsRecoveryEntry,
-  StudioOpfsRecoveryScan,
-  StudioOpfsRecoveryWriterLease,
-} from "./studio-opfs-recovery-journal";
 
 const IDENTITY = {
   documentId: "history-test-document",
@@ -307,6 +307,35 @@ describe("Studio pages history durable runtime", () => {
     });
     expect(recovery.commands).toHaveLength(1);
     expect(commandJournal.replayPlan().recordCount).toBeGreaterThan(1);
+  });
+
+  it("does not treat a two-tab journal lease loss as a diagnostic crash", async () => {
+    const onError = vi.fn();
+    const recovery = new FakeRecovery();
+    const commandJournal = createStudioPagesHistoryCommandJournal();
+    const runtime = new StudioPagesHistoryDurableRuntime({
+      commandJournal,
+      recovery,
+      initialScan: EMPTY_SCAN,
+      pageId: "page-history",
+      eventTarget: null,
+      onError,
+      persistenceKind: "native-opfs",
+    });
+    recovery.failNextCommand = new StudioOpfsRecoveryJournalError(
+      "LEASE_LOST",
+      "OPFS 복구 저널 writer lease가 만료되었거나 교체되었습니다.",
+    );
+
+    runtime.recordTransition(transition(0, 1));
+    await runtime.flush();
+
+    expect(onError).not.toHaveBeenCalled();
+    expect(runtime.durabilityStatus()).toMatchObject({
+      state: "memory-only",
+      retryable: true,
+    });
+    await runtime.close();
   });
 });
 

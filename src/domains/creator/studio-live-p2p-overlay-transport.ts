@@ -94,6 +94,17 @@ export interface StudioLiveP2pOverlayOptions {
   readonly maxPeers?: number;
 }
 
+async function firstNonNullCrdtSyncResponse(
+  primary: Promise<StudioCrdtSyncResponse | null>,
+  mesh: Promise<StudioCrdtSyncResponse | null>,
+): Promise<StudioCrdtSyncResponse | null> {
+  const settled = await Promise.allSettled([primary, mesh]);
+  for (const result of settled) {
+    if (result.status === "fulfilled" && result.value) return result.value;
+  }
+  return null;
+}
+
 function defaultCreatePeerConnection(): StudioLiveP2pRtcPeerConnection | null {
   if (typeof RTCPeerConnection !== "function") return null;
   return new RTCPeerConnection({
@@ -232,11 +243,12 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
   }
 
   requestCrdtSync(request: StudioCrdtSyncRequest): Promise<StudioCrdtSyncResponse | null> {
-    if (this.openPeerChannelCount() > 0) return this.requestMeshCrdtSync(request);
-    if (this.primary.requestCrdtSync) {
-      return this.primary.requestCrdtSync(request);
-    }
-    return Promise.resolve(null);
+    const primary = this.primary.requestCrdtSync
+      ? this.primary.requestCrdtSync(request)
+      : null;
+    const mesh = this.openPeerChannelCount() > 0 ? this.requestMeshCrdtSync(request) : null;
+    if (primary && mesh) return firstNonNullCrdtSyncResponse(primary, mesh);
+    return primary ?? mesh ?? Promise.resolve(null);
   }
 
   respondCrdtSync(response: StudioCrdtSyncResponse, targetSessionId: string): boolean {
@@ -271,10 +283,14 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
   }
 
   publishCrdtUpdate(request: StudioCrdtUpdateRequest): Promise<StudioCrdtUpdateAck> {
-    if (this.openPeerChannelCount() > 0) {
-      return this.publishMeshCrdtUpdate(request);
-    }
+    // Same-origin tabs share BroadcastChannel on the signaling primary. A half-open
+    // WebRTC channel used to steal this path and then ACK even when the other tab
+    // never received the Yjs diff. Keep BC as the same-profile plane and still fan
+    // out on the mesh for a second browser that cannot see that channel.
     if (this.primary.publishCrdtUpdate) {
+      if (this.openPeerChannelCount() > 0) {
+        void this.publishMeshCrdtUpdate(request).catch(() => undefined);
+      }
       return this.primary.publishCrdtUpdate(request);
     }
     return this.publishMeshCrdtUpdate(request);

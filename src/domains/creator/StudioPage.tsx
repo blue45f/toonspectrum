@@ -2745,6 +2745,9 @@ const STUDIO_TRANSIENT_PEN_INK_SURFACE_ENABLED =
 function createStudioPageHistoryCommandJournalClient() {
   return createStudioPagesHistoryCommandJournalClient({
     onError: (cause) => {
+      // Another tab owning the OPFS journal is expected on a jam follower. The structured
+      // memory-only status still updates; do not dump that as a crash.
+      if (studioAutosaveDocumentBusy(cause)) return;
       // This callback exists in production too. The client publishes the same failure through its
       // structured status observer, while the console receipt preserves the original cause.
       console.error("Studio command journal durability degraded.", cause);

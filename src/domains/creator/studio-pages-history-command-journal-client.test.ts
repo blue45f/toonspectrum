@@ -418,6 +418,10 @@ describe("Studio pages history command journal lazy client", () => {
 
     expect(studioPage).toContain("observeDurabilityStatus(");
     expect(studioPage).toContain("onError: (cause) =>");
+    expect(studioPage).toContain("if (studioAutosaveDocumentBusy(cause)) return;");
+    expect(studioPage.indexOf("if (studioAutosaveDocumentBusy(cause)) return;")).toBeLessThan(
+      studioPage.indexOf("console.error(\"Studio command journal durability degraded.\""),
+    );
     expect(studioPage).toContain("setPagesHistoryDurabilityStatus");
     expect(studioPage).toContain("retryDurability()");
     expect(studioPage).toContain('data-studio-pages-history-durability="memory-only"');

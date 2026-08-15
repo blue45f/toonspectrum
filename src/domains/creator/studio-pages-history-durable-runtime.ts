@@ -1,3 +1,4 @@
+import { studioAutosaveDocumentBusy } from "./studio-autosave-opfs-session";
 import {
   calculateStudioCrc32,
 } from "./studio-crc32";
@@ -908,6 +909,7 @@ export class StudioPagesHistoryDurableRuntime
     this.#durabilityFailed = true;
     this.#durabilityStatus = historyDurabilityStatus("memory-only", cause);
     this.#publishDurabilityStatus();
+    if (studioAutosaveDocumentBusy(cause)) return;
     try {
       this.#onError?.(cause);
     } catch {
