@@ -95,6 +95,7 @@ function cellSvg(
   brush: string,
   width: number,
   brushDynamics: unknown,
+  drawMode: string | null,
 ): string {
   const elements = strokes(width).map((stroke, index) => ({
     id: `${brush}-${stroke.id}`,
@@ -108,6 +109,10 @@ function cellSvg(
     opacity: 1,
     seed: 4_100 + index,
     ...(brushDynamics ? { brushDynamics } : {}),
+    // The two erasers carry drawMode "eraser", and the exporter checks el.mode BEFORE it ever
+    // resolves a brush family. Omitting it made this sheet draw standard-eraser as a PEN — and
+    // report the two as byte-identical duplicates, which they are not on any route a user takes.
+    ...(drawMode ? { mode: drawMode } : {}),
   }));
   const { svg } = exportPageToSvg({
     width: CELL_W,
@@ -131,7 +136,12 @@ const cells: { id: string; name: string; png: Uint8Array }[] = [];
 for (const { id, name } of all) {
   try {
     const selection = await materializeStudioBrushCatalogSelection(id);
-    const svg = cellSvg(id, 16, selection?.brushDynamics ?? null);
+    const svg = cellSvg(
+      id,
+      16,
+      selection?.brushDynamics ?? null,
+      (selection as { drawMode?: string } | null)?.drawMode ?? null,
+    );
     const renderer = new module_.Resvg(svg, {
       shapeRendering: 2,
       font: { loadSystemFonts: false },
