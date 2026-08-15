@@ -239,15 +239,32 @@ function stampPaperDepositScale(
   // `resolveStudioPaperMediaModulationV1({...}).depositScale` — the two share one
   // deposit-math source — but allocates no per-dab input/result objects. The
   // planner reads only depositScale, thousands of times per long stroke.
-  return resolveStudioPaperDepositScaleV1(
-    paper.medium,
-    paper.preset,
-    pressure,
-    x,
-    y,
-    paper.seed,
-  );
+  //
+  // Floored, because this gate is sampled ONCE at the dab centre and multiplied into the whole
+  // dab's alpha, while the height field it samples is locked to document position and has a
+  // correlation length larger than the smallest dab. When a trough is several tooth-cells wide,
+  // every dab whose centre lands in it is multiplied to exactly zero together — measured on the
+  // printmaking sheet, 38 consecutive dabs died at once, leaving 47.5px of literally uncovered
+  // canvas on a 16px stroke. That is not texture; it is the mark being deleted, and no amount of
+  // extra dabs can fill it because the gate does not move with the dab index.
+  //
+  // Tooth may thin a dab. It must not extinguish it. At this floor the longest dead run goes to
+  // zero and the minimum dab alpha to 0.089, while peak-to-trough contrast stays 8.3:1 so the
+  // drybrush sparkle survives. Only the paper modulation is floored — the stamp's own coverage
+  // kernel is never touched.
+  return STAMP_PAPER_DEPOSIT_FLOOR
+    + (1 - STAMP_PAPER_DEPOSIT_FLOOR) * resolveStudioPaperDepositScaleV1(
+      paper.medium,
+      paper.preset,
+      pressure,
+      x,
+      y,
+      paper.seed,
+    );
 }
+
+/** Smallest share of a dab's alpha the paper gate may leave standing. See above. */
+const STAMP_PAPER_DEPOSIT_FLOOR = 0.12;
 
 export interface StudioStampBrushStyle {
   readonly kind: StudioStampBrushKind;
