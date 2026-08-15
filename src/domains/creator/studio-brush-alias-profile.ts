@@ -374,7 +374,7 @@ export const STUDIO_BRUSH_ALIAS_PROFILES = {
     // core pigment, wider lower-opacity diffuse skirt so soft airbrush and wet
     // wash stop reading as the same envelope (browser texture QA 2026-08-12).
     watercolor: {
-      spacingRatio: 0.22,
+      spacingRatio: 0.154,
       coreRadiusScale: 0.76,
       coreOpacityScale: 1.42,
       diffuseRadiusScale: 1.62,
@@ -390,7 +390,7 @@ export const STUDIO_BRUSH_ALIAS_PROFILES = {
     // opens the wash and feeds the wet edge. Distinct from soft watercolor's flatter diffuse load.
     pressure: { minimum: 0.14, maximum: 1.08, exponent: 0.74 },
     watercolor: {
-      spacingRatio: 0.18,
+      spacingRatio: 0.126,
       coreRadiusScale: 0.72,
       coreOpacityScale: 1.78,
       diffuseRadiusScale: 1.72,
@@ -404,7 +404,7 @@ export const STUDIO_BRUSH_ALIAS_PROFILES = {
     diameterScale: 0.65,
     pressure: { minimum: 0.12, maximum: 1.1, exponent: 1.2 },
     watercolor: {
-      spacingRatio: 0.18,
+      spacingRatio: 0.126,
       coreRadiusScale: 0.85,
       coreOpacityScale: 1.6,
       diffuseRadiusScale: 1.25,
@@ -418,7 +418,7 @@ export const STUDIO_BRUSH_ALIAS_PROFILES = {
     diameterScale: 1.2,
     pressure: { minimum: 0.3, maximum: 1.0, exponent: 0.7 },
     watercolor: {
-      spacingRatio: 0.28,
+      spacingRatio: 0.196,
       coreRadiusScale: 0.5,
       coreOpacityScale: 0.2,
       diffuseRadiusScale: 1.8,
@@ -432,7 +432,7 @@ export const STUDIO_BRUSH_ALIAS_PROFILES = {
     diameterScale: 1.35,
     pressure: { minimum: 0.15, maximum: 1.0, exponent: 0.8 },
     watercolor: {
-      spacingRatio: 0.25,
+      spacingRatio: 0.175,
       coreRadiusScale: 0.7,
       coreOpacityScale: 1.1,
       diffuseRadiusScale: 1.9,
@@ -446,7 +446,7 @@ export const STUDIO_BRUSH_ALIAS_PROFILES = {
     diameterScale: 0.85,
     pressure: { minimum: 0.25, maximum: 1.0, exponent: 0.9 },
     watercolor: {
-      spacingRatio: 0.22,
+      spacingRatio: 0.154,
       coreRadiusScale: 0.92,
       coreOpacityScale: 1.4,
       diffuseRadiusScale: 1.3,
@@ -460,7 +460,7 @@ export const STUDIO_BRUSH_ALIAS_PROFILES = {
     diameterScale: 0.95,
     pressure: IDENTITY_PRESSURE,
     watercolor: {
-      spacingRatio: 0.28,
+      spacingRatio: 0.196,
       coreRadiusScale: 0.9,
       coreOpacityScale: 1.2,
       diffuseRadiusScale: 1.1,

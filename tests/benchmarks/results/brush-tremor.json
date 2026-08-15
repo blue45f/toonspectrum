@@ -1,9 +1,9 @@
 {
   "schema": "toon-brush-tremor-sweep-v1",
-  "generatedAtUtc": "2026-08-15T16:05:09.506Z",
+  "generatedAtUtc": "2026-08-15T17:07:32.191Z",
   "limitPx": 0.5,
   "measured": 170,
-  "overLimit": 72,
+  "overLimit": 73,
   "worst": [
     {
       "id": "sparkle-star",
@@ -104,13 +104,6 @@
       "inkedColumns": 1711
     },
     {
-      "id": "watercolor--granulating",
-      "topRms": 3.032473671224068,
-      "bottomRms": 2.735929415117416,
-      "worstRms": 3.032473671224068,
-      "inkedColumns": 1714
-    },
-    {
       "id": "mypaint-cc0--charcoal-tanda",
       "topRms": 2.591361366889437,
       "bottomRms": 3.0026862118226645,
@@ -139,32 +132,11 @@
       "inkedColumns": 1655
     },
     {
-      "id": "inkwash-bleed-wash",
-      "topRms": 2.4244201370144767,
-      "bottomRms": 1.9569829820137727,
-      "worstRms": 2.4244201370144767,
-      "inkedColumns": 1748
-    },
-    {
       "id": "inkwash-water-brush",
-      "topRms": 1.6054130485348903,
-      "bottomRms": 2.372904102792682,
-      "worstRms": 2.372904102792682,
-      "inkedColumns": 1725
-    },
-    {
-      "id": "watercolor--edge-bloom",
-      "topRms": 2.0358172253188926,
-      "bottomRms": 1.9438314784344575,
-      "worstRms": 2.0358172253188926,
-      "inkedColumns": 1717
-    },
-    {
-      "id": "ink-wash--chroma-halo",
-      "topRms": 1.9522109090657223,
-      "bottomRms": 1.8822552126987446,
-      "worstRms": 1.9522109090657223,
-      "inkedColumns": 1729
+      "topRms": 1.347264980658838,
+      "bottomRms": 1.980167011103464,
+      "worstRms": 1.980167011103464,
+      "inkedColumns": 1732
     },
     {
       "id": "sketchpad-tile",
@@ -172,6 +144,34 @@
       "bottomRms": 1.9143805070254836,
       "worstRms": 1.9143805070254836,
       "inkedColumns": 1588
+    },
+    {
+      "id": "inkwash-bleed-wash",
+      "topRms": 1.8797799753140105,
+      "bottomRms": 1.6400708472107548,
+      "worstRms": 1.8797799753140105,
+      "inkedColumns": 1764
+    },
+    {
+      "id": "watercolor--granulating",
+      "topRms": 1.799352033321079,
+      "bottomRms": 1.4423416214053726,
+      "worstRms": 1.799352033321079,
+      "inkedColumns": 1714
+    },
+    {
+      "id": "web-soft-cloud",
+      "topRms": 1.6125294106347239,
+      "bottomRms": 1.6185530772710826,
+      "worstRms": 1.6185530772710826,
+      "inkedColumns": 995
+    },
+    {
+      "id": "watercolor--edge-bloom",
+      "topRms": 1.358945824007504,
+      "bottomRms": 1.5599005301883544,
+      "worstRms": 1.5599005301883544,
+      "inkedColumns": 1717
     }
   ],
   "failures": []

@@ -871,9 +871,10 @@ describe("StudioDrawNode orchestration", () => {
     );
 
     const [planInput, finalize] = watercolorCapture.causalPlan.mock.calls[0]!;
-    // ink-wash diameterScale 0.92 × strokeWidth 20; spacingRatio 0.18 of scaled width.
+    // ink-wash diameterScale 0.92 × strokeWidth 20; spacingRatio 0.126 of scaled width
+    // (0.18 을 0.7배로 좁힘 — 젖은 dab 구슬 현상, 2026-08-16 시각 대조).
     expect(planInput?.baseWidth).toBeCloseTo(18.4);
-    expect(planInput?.spacing).toBeCloseTo(3.312);
+    expect(planInput?.spacing).toBeCloseTo(2.3184);
     expect(planInput?.pressures).toEqual([
       expect.any(Number),
       expect.any(Number),

@@ -314,55 +314,55 @@ const ENGINE_LANE_WATERCOLOR_MATERIAL: Readonly<
   Record<string, StudioBrushEngineLaneWatercolorMaterial>
 > = Object.freeze({
   "watercolor--granular": Object.freeze({
-    spacingRatio: 0.28, coreRadiusScale: 0.62, coreOpacityScale: 1.15,
+    spacingRatio: 0.196, coreRadiusScale: 0.62, coreOpacityScale: 1.15,
     diffuseRadiusScale: 1.95, diffuseOpacityScale: 0.42,
   }),
   "watercolor--dense-core": Object.freeze({
-    spacingRatio: 0.16, coreRadiusScale: 0.95, coreOpacityScale: 1.85,
+    spacingRatio: 0.112, coreRadiusScale: 0.95, coreOpacityScale: 1.85,
     diffuseRadiusScale: 1.15, diffuseOpacityScale: 0.38,
   }),
   "ink-wash--sumi-core": Object.freeze({
-    spacingRatio: 0.14, coreRadiusScale: 0.88, coreOpacityScale: 2.05,
+    spacingRatio: 0.098, coreRadiusScale: 0.88, coreOpacityScale: 2.05,
     diffuseRadiusScale: 1.25, diffuseOpacityScale: 0.4,
   }),
   "ink-wash--bleed-halo": Object.freeze({
-    spacingRatio: 0.24, coreRadiusScale: 0.55, coreOpacityScale: 1.2,
+    spacingRatio: 0.168, coreRadiusScale: 0.55, coreOpacityScale: 1.2,
     diffuseRadiusScale: 2.15, diffuseOpacityScale: 0.48,
   }),
   "gouache--matte-body": Object.freeze({
-    spacingRatio: 0.2, coreRadiusScale: 1.05, coreOpacityScale: 1.65,
+    spacingRatio: 0.140, coreRadiusScale: 1.05, coreOpacityScale: 1.65,
     diffuseRadiusScale: 0.9, diffuseOpacityScale: 0.22,
   }),
   // 2026-08-13 wet-texture lanes: material + opt-in wet-edge-bloom program (기존 레인 무변경).
   "watercolor--edge-bloom": Object.freeze({
-    spacingRatio: 0.26, coreRadiusScale: 0.7, coreOpacityScale: 1.2,
+    spacingRatio: 0.182, coreRadiusScale: 0.7, coreOpacityScale: 1.2,
     diffuseRadiusScale: 1.75, diffuseOpacityScale: 0.5,
     wetEdgeBloomProgramId: "edge-bloom",
   }),
   "watercolor--granulating": Object.freeze({
-    spacingRatio: 0.3, coreRadiusScale: 0.66, coreOpacityScale: 1.1,
+    spacingRatio: 0.210, coreRadiusScale: 0.66, coreOpacityScale: 1.1,
     diffuseRadiusScale: 1.9, diffuseOpacityScale: 0.44,
     wetEdgeBloomProgramId: "granulating-wash",
   }),
   "ink-wash--fiber-feather": Object.freeze({
-    spacingRatio: 0.18, coreRadiusScale: 0.8, coreOpacityScale: 1.7,
+    spacingRatio: 0.126, coreRadiusScale: 0.8, coreOpacityScale: 1.7,
     diffuseRadiusScale: 1.5, diffuseOpacityScale: 0.42,
     wetEdgeBloomProgramId: "fiber-feather",
   }),
   "ink-wash--chroma-halo": Object.freeze({
-    spacingRatio: 0.24, coreRadiusScale: 0.6, coreOpacityScale: 1.35,
+    spacingRatio: 0.168, coreRadiusScale: 0.6, coreOpacityScale: 1.35,
     diffuseRadiusScale: 1.9, diffuseOpacityScale: 0.46,
     wetEdgeBloomProgramId: "chroma-halo",
   }),
   // 2026-08-13 wave 3 physics-texture lanes: settled-only 리빙잉크 베이크 핀. 정착 시에만
   // 유체장이 번짐/림/페더를 굽는다(라이브 프리픽스는 항등) — UI 카피도 "정착 시 번짐"으로.
   "ink-wash--living-bake": Object.freeze({
-    spacingRatio: 0.2, coreRadiusScale: 0.82, coreOpacityScale: 1.75,
+    spacingRatio: 0.140, coreRadiusScale: 0.82, coreOpacityScale: 1.75,
     diffuseRadiusScale: 1.6, diffuseOpacityScale: 0.44,
     livingInkBakeProgramId: "sumi-flow-bake",
   }),
   "watercolor--fluid-feather": Object.freeze({
-    spacingRatio: 0.26, coreRadiusScale: 0.68, coreOpacityScale: 1.15,
+    spacingRatio: 0.182, coreRadiusScale: 0.68, coreOpacityScale: 1.15,
     diffuseRadiusScale: 1.85, diffuseOpacityScale: 0.46,
     livingInkBakeProgramId: "fluid-feather-lite",
   }),

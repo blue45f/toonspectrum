@@ -142,12 +142,17 @@ describe("studio brush alias profiles", () => {
   it("gives ink wash a denser plan, compact dark core and broad pale diffuse bleed", () => {
     const watercolor = resolveStudioBrushAliasWatercolorPlanSettings("watercolor", 20);
     expect(watercolor?.baseWidth).toBe(20);
-    // denser wash stations (spacingRatio 0.22) keep wet edge continuous vs soft airbrush
-    expect(watercolor?.spacing).toBeCloseTo(4.4);
+    // 의도적 변경(2026-08-16 시각 대조): 젖은 dab 은 부드러운 그라데이션이라 딱딱한 원보다
+    // 성기게 보인다. 4배 확대에서 코어가 원 사슬처럼 구슬져서 간격을 0.7배로 좁혔고,
+    // 실루엣 잔차가 수묵 3.03px -> 1.80px 로 떨어졌다(brush-tremor-sweep).
+    expect(watercolor?.spacing).toBeCloseTo(3.08);
     const inkWash = resolveStudioBrushAliasWatercolorPlanSettings("ink-wash", 20);
     // Sumi is slightly narrower than toolbar size, denser stations, stronger core vs pale wash.
     expect(inkWash?.baseWidth).toBeCloseTo(18.4);
-    expect(inkWash?.spacing).toBeCloseTo(3.312);
+    // 의도적 변경(2026-08-16 시각 대조): 젖은 dab 은 부드러운 그라데이션이라 딱딱한 원보다
+    // 성기게 보인다. 같은 간격에서도 코어가 원 사슬처럼 구슬지는 게 4배 확대에서 뚜렷했고,
+    // 간격을 0.7배로 좁히자 실루엣 잔차가 수묵 3.03px -> 1.80px 로 떨어졌다.
+    expect(inkWash?.spacing).toBeCloseTo(2.3184);
     expect(resolveStudioBrushAliasWatercolorPlanSettings("pen", 20)).toBeNull();
 
     const source = [
