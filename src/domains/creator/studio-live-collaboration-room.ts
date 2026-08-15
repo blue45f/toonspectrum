@@ -38,6 +38,7 @@ import {
   type StudioLiveTransportMode,
   type StudioLiveTransportStatus,
 } from "./studio-live-collaboration-transport";
+import { isStudioLiveP2pMeshShareId } from "./studio-live-p2p-overlay-transport";
 import {
   parseStudioTeamCommentLiveEvent,
   type StudioTeamCommentLiveEvent,
@@ -50,7 +51,6 @@ import type {
   StudioCrdtUpdateAck,
   StudioCrdtUpdateRequest,
 } from "./studio-crdt-protocol";
-
 import {
   parseStudioLiveLockResourceScope,
   studioLiveLockResourcesConflict,
@@ -1410,6 +1410,15 @@ export class StudioLiveRoom {
       case "screen:access":
       case "webrtc:description":
       case "webrtc:ice":
+        if (
+          (envelope.kind === "webrtc:description" || envelope.kind === "webrtc:ice") &&
+          isStudioLiveP2pMeshShareId(
+            (envelope.payload as StudioLiveWebRtcDescriptionPayload | StudioLiveWebRtcIcePayload)
+              .shareId,
+          )
+        ) {
+          return;
+        }
         this.emit({ type: "signal", envelope: envelope as StudioLiveSignalEnvelope });
         return;
       case "screen:stop": {

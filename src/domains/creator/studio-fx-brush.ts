@@ -24,6 +24,14 @@ const TAU = Math.PI * 2;
 export const FX_BRUSH_SEED_RANGE = { min: 0, max: 9999 } as const;
 export const DEFAULT_FX_BRUSH_SEED = 1;
 export const FX_BRUSH_PARTICLE_CAP = 768;
+
+/**
+ * How much of a spark's brightness the throw distance costs it, at the edge of the scatter disc.
+ *
+ * Kept modest: the far sparks must still read, they just must not read as the BRIGHTEST ones. The
+ * previous code had exactly that inversion because distance and opacity shared one hash draw.
+ */
+const FX_PARTICLE_DISTANCE_FALLOFF = 0.3;
 export const FX_BRUSH_DAB_CAP = 512;
 /**
  * Oil/acrylic stations feed a continuous ribbon, so they no longer pay one full body draw per
@@ -1249,6 +1257,14 @@ export function planGlitterBrushParticles(input: FxGlitterPlanInput): FxGlitterP
       const n2 = hash2(si, k * 3 + 2, seed);
       const n3 = hash2(si, k * 3 + 3, seed);
       const n4 = hash2(si + 17, k + 9, seed);
+      // Two more independent draws. Reusing n2 for both distance and opacity, and n3 for both
+      // radius and shape, made those pairs perfectly rank-correlated: every far spark was a bright
+      // spark (physically backwards - a spark thrown further has spent more of itself), and every
+      // diamond was in the largest 38% of particles while every circle was in the smallest 62%, so
+      // shape and size carried no independent information. A scatter field whose attributes are
+      // locked together reads as a repeated motif rather than as scattered matter.
+      const n5 = hash2(si + 53, k * 3 + 5, seed);
+      const n6 = hash2(si + 89, k * 3 + 7, seed);
       // Skip some for organic sparsity
       if (n4 > density * 0.92) continue;
       const ang = n1 * TAU;
@@ -1260,8 +1276,15 @@ export function planGlitterBrushParticles(input: FxGlitterPlanInput): FxGlitterP
         x: st.x + Math.cos(ang) * dist,
         y: st.y + Math.sin(ang) * dist,
         radius: Math.max(0.35, rBase),
-        opacity: clamp(0.35 + n2 * 0.6, 0.2, 1),
-        kind: n3 > 0.62 ? 1 : 0,
+        // Distance now DIMS a spark instead of brightening it, on its own draw for the spread.
+        // The falloff scales only the variable part, never the 0.35 floor: a tap has to leave one
+        // visible particle for every seed, and that guarantee is a contract, not a side effect.
+        opacity: clamp(
+          0.35 + n5 * 0.6 * (1 - Math.sqrt(n2) * FX_PARTICLE_DISTANCE_FALLOFF),
+          0.2,
+          1,
+        ),
+        kind: n6 > 0.62 ? 1 : 0,
       });
     }
     // Organic thinning must not erase a whole bounded station. In particular, when a long stroke

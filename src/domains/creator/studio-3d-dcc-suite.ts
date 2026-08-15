@@ -24,6 +24,9 @@ export * from "./studio-3d-spatial-webtoon-ar";
 export * from "./studio-3d-spatial-webtoon-vr";
 export * from "./studio-3d-spatial-audio";
 export * from "./studio-3d-spatial-hand-tracking";
+export * from "./studio-3d-shaper-toon-maker";
+export * from "./studio-3d-tooning-emotion-fx";
+export * from "./studio-3d-storyboard-cut-strip";
 export * from "./studio-3d-scene-dependency-graph";
 export {
   type GeometryAuthority,

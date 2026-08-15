@@ -65,6 +65,7 @@ import {
   type StudioLiveTransportFactory,
   type StudioLiveTransportStatus,
 } from "./studio-live-collaboration-transport";
+import { applyStudioLiveP2pOverlay } from "./studio-live-p2p-overlay-transport";
 import {
   createStudioCloudflarePurposeRoutedLiveTransportFactory,
 } from "./studio-live-purpose-routed-transport";
@@ -4626,8 +4627,13 @@ export function createStudioServerLiveTransportFactory(
       })()
     : localTransportFactory;
 
-  return applyStudioRealtimePurposeRouting(primaryFactory, {
-    realtimeOrigin: import.meta.env.VITE_STUDIO_REALTIME_ORIGIN,
-    providerId: import.meta.env.VITE_STUDIO_REALTIME_PROVIDER_ID,
-  });
+  return applyStudioLiveP2pOverlay(
+    applyStudioRealtimePurposeRouting(primaryFactory, {
+      realtimeOrigin: import.meta.env.VITE_STUDIO_REALTIME_ORIGIN,
+      providerId: import.meta.env.VITE_STUDIO_REALTIME_PROVIDER_ID,
+    }),
+    {
+      enabled: import.meta.env.VITE_STUDIO_LIVE_P2P_ENABLED !== "false",
+    },
+  );
 }

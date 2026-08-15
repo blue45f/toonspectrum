@@ -28,6 +28,7 @@ import {
   type StudioLiveSignalEnvelope,
   type StudioLiveVoiceEvent,
 } from "./studio-live-collaboration-room";
+import { STUDIO_LIVE_P2P_MESH_SHARE_ID } from "./studio-live-p2p-overlay-transport";
 
 import type {
   StudioLiveTransport,
@@ -981,6 +982,27 @@ describe("StudioLiveRoom", () => {
     roomA.close();
     roomB.close();
     roomC.close();
+  });
+
+  it("does not surface P2P mesh signaling as a screen-share event", async () => {
+    const test = harness();
+    const roomA = test.room(alice);
+    const roomB = test.room(bob);
+    const signalsB: StudioLiveSignalEnvelope[] = [];
+    roomB.subscribe((event) => event.type === "signal" && signalsB.push(event.envelope));
+    await roomA.start();
+    await roomB.start();
+
+    expect(
+      roomA.sendWebRtcDescription(bob.sessionId, {
+        shareId: STUDIO_LIVE_P2P_MESH_SHARE_ID,
+        type: "offer",
+        sdp: "v=0",
+      }),
+    ).toBe(true);
+    expect(signalsB).toEqual([]);
+    roomA.close();
+    roomB.close();
   });
 
   it("retains one copy-safe active screen share per peer until matching stop or leave", async () => {
