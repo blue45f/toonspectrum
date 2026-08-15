@@ -77,7 +77,9 @@ export const STUDIO_CHROME_REGIONS: readonly StudioChromeRegionSpec[] = [
 ] as const;
 
 /**
- * Top menubar group order — V5 §15.3, complete. `ai` is a product group §15.3
+ * Canonical menubar catalogue order — V5 §15.3, complete. The visible desktop order is a
+ * presentation concern in `studio-main-menu-presentation.ts`; this list remains the stable source
+ * membership order used by the command builder and coverage tests. `ai` is a product group §15.3
  * does not define. Transform joined the rendered set in Wave D; Animation and
  * Collaboration joined it in Wave E, once the menu got a door onto the keyframe
  * timeline, the team panel and the review flow — features that had shipped long

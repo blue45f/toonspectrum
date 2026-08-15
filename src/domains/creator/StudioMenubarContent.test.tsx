@@ -3,6 +3,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { STUDIO_MAIN_MENU_FAMILIAR_CORE_ORDER } from "./studio-main-menu-presentation";
 import {
   StudioMenubarContent,
   resolveStudioMenubarLaneOverflow,
@@ -49,6 +50,18 @@ vi.mock("./studio-page-lazy-ui", () => ({
 const MENU_GROUP_IDS = [
   "file", "edit", "view", "canvas", "layer", "select", "transform", "brush", "filter",
   "vector", "text", "comic", "animation", "3d", "collaboration", "window", "ai", "help",
+] as const;
+
+const PRESENTED_MENU_GROUP_IDS = [
+  ...STUDIO_MAIN_MENU_FAMILIAR_CORE_ORDER,
+  "canvas",
+  "transform",
+  "brush",
+  "vector",
+  "text",
+  "3d",
+  "collaboration",
+  "ai",
 ] as const;
 
 function createMenuGroups(): StudioMenubarContentProps["studioMainMenuGroups"] {
@@ -149,6 +162,49 @@ describe("resolveStudioMenubarLaneOverflow", () => {
         [{ id: "file", left: 0, right: 60 }]
       )
     ).toEqual({ scrollable: false, hiddenGroupIds: ["file"] });
+  });
+});
+
+describe("StudioMenubarContent menu presentation", () => {
+  it("puts the familiar comic-production menus before every specialist extension", () => {
+    const { container } = render(
+      <StudioMenubarContent {...createProps({ studioMainMenuGroups: createMenuGroups() })} />
+    );
+
+    expect(
+      [
+        ...container.querySelectorAll<HTMLElement>("[data-studio-main-menu-trigger]"),
+      ].map((trigger) => trigger.dataset.studioMainMenuTrigger)
+    ).toEqual(PRESENTED_MENU_GROUP_IDS);
+  });
+
+  it("keeps the lane observer subscribed when unrelated props rerender with the same menu catalogue", () => {
+    let resizeObserverCount = 0;
+    class StableResizeObserver {
+      constructor(_callback: ResizeObserverCallback) {
+        resizeObserverCount += 1;
+      }
+      observe() {}
+      disconnect() {}
+    }
+    vi.stubGlobal("ResizeObserver", StableResizeObserver);
+
+    try {
+      const studioMainMenuGroups = createMenuGroups();
+      const props = createProps({ studioMainMenuGroups });
+      const { rerender } = render(<StudioMenubarContent {...props} />);
+      expect(resizeObserverCount).toBe(1);
+
+      rerender(
+        <StudioMenubarContent
+          {...props}
+          title="같은 메뉴 카탈로그의 새 문서 제목"
+        />
+      );
+      expect(resizeObserverCount).toBe(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 describe("StudioMenubarContent", () => {
@@ -566,7 +622,7 @@ describe("StudioMenubarContent", () => {
     fireEvent.scroll(container.querySelector('[data-studio-menubar-primary="true"]')!);
 
     // 600px 레인 안에 온전히 들어오는 건 앞 6개뿐 — 나머지 12개가 잘린다.
-    const clipped = MENU_GROUP_IDS.slice(6);
+    const clipped = PRESENTED_MENU_GROUP_IDS.slice(6);
     const overflowTrigger = await screen.findByRole("button", {
       name: `가려진 메뉴 ${clipped.length}개`,
     });
@@ -605,7 +661,9 @@ describe("StudioMenubarContent", () => {
     expect(helpEntry).not.toBeNull();
     fireEvent.click(helpEntry!);
 
-    const helpTrigger = triggers.at(-1)!;
+    const helpTrigger = triggers.find(
+      (trigger) => trigger.getAttribute("data-studio-main-menu-trigger") === "help"
+    )!;
     expect(helpTrigger.getAttribute("data-studio-main-menu-trigger")).toBe("help");
     expect(helpTrigger.scrollIntoView).toHaveBeenCalledWith({
       block: "nearest",

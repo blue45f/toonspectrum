@@ -34,7 +34,6 @@ import {
   useCallback,
   useEffect,
   useId,
-  useMemo,
   useRef,
   useState,
   type ChangeEvent,
@@ -48,6 +47,7 @@ import {
 import { createPortal } from "react-dom";
 
 import { STUDIO_CANVAS_WIDTH as CANVAS_W } from "./studio-canvas-constants";
+import { createStudioMainMenuPresentation } from "./studio-main-menu-presentation";
 import {
   StudioExportMenuPanel,
   StudioMainMenu,
@@ -660,6 +660,9 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
   const commentsLocked =
     collaborationDocumentLocked && !sharedDocument?.capabilities.view;
 
+  const mainMenuPresentation = createStudioMainMenuPresentation(studioMainMenuGroups);
+  const presentedStudioMainMenuGroups = mainMenuPresentation.groups;
+
   const menubarLaneRef = useRef<HTMLDivElement | null>(null);
   const [laneOverflow, setLaneOverflow] = useState<StudioMenubarLaneOverflow>(
     EMPTY_LANE_OVERFLOW
@@ -728,13 +731,15 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
     };
   }, [mobileImmersive, studioMainMenuGroups]);
 
-  const overflowMenuGroups = useMemo(() => {
-    const labels = new Map(studioMainMenuGroups.map((group) => [group.id, group.label]));
+  const overflowMenuGroups = (() => {
+    const labels = new Map(
+      presentedStudioMainMenuGroups.map((group) => [group.id, group.label])
+    );
     return laneOverflow.hiddenGroupIds.flatMap((id) => {
       const label = labels.get(id);
       return label === undefined ? [] : [{ id, label }];
     });
-  }, [laneOverflow.hiddenGroupIds, studioMainMenuGroups]);
+  })();
 
   /**
    * 오버플로 목록에서 고른 그룹을 레인 안으로 끌어온 뒤 원래 트리거를 그대로 누른다.
@@ -891,7 +896,8 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
           {/* Desktop application commands live in the compressible center lane. */}
           <Suspense fallback={null}>
             <StudioMainMenu
-              groups={studioMainMenuGroups}
+              groups={presentedStudioMainMenuGroups}
+              specialistBoundaryGroupId={mainMenuPresentation.specialistBoundaryGroupId}
               className={cn("hidden min-w-max shrink-0 md:flex", mobileImmersive && "!hidden")}
             />
           </Suspense>

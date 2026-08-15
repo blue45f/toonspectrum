@@ -1,7 +1,7 @@
 /**
- * StudioMainMenu — CSP/Photopea-style top application menu.
- * V5 §15.3 groups (File · Edit · View · Canvas · Layer · Select · Brush · Filter ·
- * Vector · Text · Comic · 3D · Window · AI · Help) as compact dropdowns.
+ * StudioMainMenu — familiar comic-production application menu with ToonStudio extensions.
+ * The presentation host puts File · Edit · Comic · Animation · Layer · Select · View · Filter ·
+ * Window · Help first, then marks the complete specialist catalogue with a compact tier boundary.
  * Menus portal to document.body with fixed coords so they never lose to options-strip
  * stacking or menubar overflow clipping.
  * When one menu is open, hovering another group switches (desktop app menubar UX), and
@@ -11,6 +11,7 @@
  */
 import { Check, ChevronDown } from "lucide-react";
 import {
+  Fragment,
   useEffect,
   useId,
   useLayoutEffect,
@@ -625,7 +626,7 @@ function MenuDropdown({
             closeMenu();
           }}
           className={cn(
-            // Keep the full File/Edit/Insert/View/Filter/Draw/AI vocabulary at laptop widths.
+            // Keep the full familiar core + specialist vocabulary reachable at laptop widths.
             // The chevron is decorative (aria-haspopup owns the affordance), so compact it
             // before allowing labels to collide inside the compressible menubar lane.
             "inline-flex h-8 items-center gap-1 rounded-lg px-1.5 text-[0.75rem] font-semibold tracking-tight xl:px-2 2xl:px-2.5 2xl:text-[0.78rem] pointer-coarse:h-11 pointer-coarse:px-2",
@@ -654,7 +655,11 @@ function MenuDropdown({
 }
 
 /** Application menu bar — top-bar menu section. */
-export function StudioMainMenu({ groups, className }: StudioMainMenuProps): ReactElement {
+export function StudioMainMenu({
+  groups,
+  specialistBoundaryGroupId = null,
+  className,
+}: StudioMainMenuProps): ReactElement {
   const t = useT();
   const [openId, setOpenId] = useState<string | null>(null);
   // APG roving tabindex: exactly one trigger stays in the sequential tab order and the
@@ -700,20 +705,34 @@ export function StudioMainMenu({ groups, className }: StudioMainMenuProps): Reac
       className={cn("flex min-w-max shrink-0 flex-nowrap items-center gap-0.5", className)}
     >
       {groups.map((group, groupIndex) => (
-        <MenuDropdown
-          key={group.id}
-          group={group}
-          open={openId === group.id}
-          barActive={barActive}
-          isTabStop={groupIndex === activeTabStopIndex}
-          onFocusTrigger={() => setTabStopIndex(groupIndex)}
-          onOpen={() => setOpenId(group.id)}
-          onClose={() => setOpenId((id) => (id === group.id ? null : id))}
-          onNavigateGroup={(direction, openNextMenu) =>
-            navigateGroup(groupIndex, direction, openNextMenu)
-          }
-          t={t}
-        />
+        <Fragment key={group.id}>
+          {group.id === specialistBoundaryGroupId ? (
+            <span
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="전문 도구 메뉴"
+              title="전문 도구"
+              data-studio-main-menu-specialist-boundary="true"
+              className="mx-1 inline-flex h-6 shrink-0 items-center gap-1 text-[0.6rem] font-bold text-fg-3"
+            >
+              <span aria-hidden className="h-4 w-px bg-line-strong" />
+              <span aria-hidden className="hidden 2xl:inline">전문</span>
+            </span>
+          ) : null}
+          <MenuDropdown
+            group={group}
+            open={openId === group.id}
+            barActive={barActive}
+            isTabStop={groupIndex === activeTabStopIndex}
+            onFocusTrigger={() => setTabStopIndex(groupIndex)}
+            onOpen={() => setOpenId(group.id)}
+            onClose={() => setOpenId((id) => (id === group.id ? null : id))}
+            onNavigateGroup={(direction, openNextMenu) =>
+              navigateGroup(groupIndex, direction, openNextMenu)
+            }
+            t={t}
+          />
+        </Fragment>
       ))}
     </div>
   );

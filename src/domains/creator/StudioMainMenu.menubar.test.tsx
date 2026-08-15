@@ -56,6 +56,23 @@ afterEach(() => {
 });
 
 describe("StudioMainMenu menubar interaction", () => {
+  it("marks the specialist tier without adding a keyboard stop", () => {
+    render(
+      <StudioToolHintPreferencesProvider mode="off" touchHoldDelayMs={640} reduceMotion>
+        <StudioMainMenu groups={GROUPS} specialistBoundaryGroupId="view" />
+      </StudioToolHintPreferencesProvider>
+    );
+
+    const boundary = screen.getByRole("separator", { name: "전문 도구 메뉴" });
+    expect(boundary.getAttribute("data-studio-main-menu-specialist-boundary")).toBe("true");
+    expect(boundary.getAttribute("tabindex")).toBeNull();
+    expect(screen.getAllByRole("menuitem")).toHaveLength(GROUPS.length);
+
+    trigger("편집").focus();
+    fireEvent.keyDown(trigger("편집"), { key: "ArrowRight" });
+    expect(document.activeElement).toBe(trigger("보기"));
+  });
+
   it("switches to a neighbouring menu when its title is clicked while another menu is open", () => {
     renderMenu();
 

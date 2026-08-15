@@ -54,5 +54,7 @@ export interface StudioMainMenuGroup {
 
 export interface StudioMainMenuProps {
   groups: readonly StudioMainMenuGroup[];
+  /** First specialist extension group in the already-presented list. */
+  specialistBoundaryGroupId?: string | null;
   className?: string;
 }
