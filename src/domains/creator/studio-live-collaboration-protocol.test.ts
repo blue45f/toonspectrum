@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   STUDIO_LIVE_CHAT_TEXT_MAX_LENGTH,
+  STUDIO_LIVE_GESTURE_PREVIEW_ENVELOPE_MAX_BYTES,
+  STUDIO_LIVE_GESTURE_PREVIEW_ENVELOPE_METADATA_MAX_BYTES,
   STUDIO_LIVE_ICE_CANDIDATE_MAX_LENGTH,
   STUDIO_LIVE_LOCK_MAX_LEASE_MS,
   STUDIO_LIVE_MESSAGE_MAX_AGE_MS,
@@ -21,6 +23,10 @@ import {
   type StudioLiveParticipant,
   type StudioLivePayloadMap,
 } from "./studio-live-collaboration-protocol";
+import {
+  STUDIO_LIVE_GESTURE_PREVIEW_MAX_BYTES,
+  type StudioLiveGesturePreviewPayload,
+} from "./studio-live-gesture-preview";
 
 const NOW = 2_000_000;
 const WORK_ID = "work/local-1";
@@ -56,6 +62,47 @@ function parse(value: unknown, now = NOW) {
   });
 }
 
+function nearMaximumGesturePreviewPayload(): StudioLiveGesturePreviewPayload {
+  const sampleCount = 280;
+  const channel = (value: number) => Array.from({ length: sampleCount }, () => value);
+  return {
+    version: 1,
+    gestureId: "gesture-near-envelope-limit-x",
+    pageId: "page-1",
+    seq: 1,
+    phase: "begin",
+    operation: "draw",
+    base: { documentGeneration: 1 },
+    renderer: {
+      kind: "freehand",
+      mode: "pen",
+      stroke: "#000000",
+      strokeWidth: 1,
+    },
+    samples: {
+      startIndex: 0,
+      points: Array.from(
+        { length: sampleCount },
+        () => [9_999_999.123456789, -9_999_999.123456789],
+      ).flat(),
+      pressures: channel(0.123456789012345),
+      tiltXs: channel(-89.1234567890123),
+      tiltYs: channel(89.1234567890123),
+      twists: channel(358.123456789012),
+      speeds: channel(999_999.123456789),
+      tangentialPressures: channel(-0.123456789012345),
+      altitudeAngles: channel(1.123456789012345),
+      azimuthAngles: channel(6.123456789012345),
+      contactWidths: channel(8_191.123456789012),
+      contactHeights: channel(8_191.123456789012),
+      sampleTimeOffsets: Array.from(
+        { length: sampleCount },
+        (_, index) => index + 0.123456789012345,
+      ),
+    },
+  };
+}
+
 describe("studio live collaboration protocol", () => {
   it("accepts a strict same-work presence envelope without persistent account identifiers", () => {
     const value = message("presence:hello", { visibility: "active", pageId: "page-1" });
@@ -73,6 +120,32 @@ describe("studio live collaboration protocol", () => {
     ).toThrow(StudioLiveProtocolError);
     expect(Object.keys(value.sender).sort()).toEqual(["displayName", "role", "sessionId"]);
     expect(value.sender).not.toHaveProperty("userId");
+  });
+
+  it("strictly parses bounded gesture previews with envelope-only framing headroom", () => {
+    const payload = nearMaximumGesturePreviewPayload();
+    const payloadBytes = studioLiveUtf8ByteLength(JSON.stringify(payload));
+    expect(payloadBytes).toBeLessThanOrEqual(STUDIO_LIVE_GESTURE_PREVIEW_MAX_BYTES);
+
+    const value = message("preview:gesture", payload);
+    const envelopeBytes = studioLiveEnvelopeByteLength(value);
+    expect(envelopeBytes).toBeGreaterThan(STUDIO_LIVE_MESSAGE_MAX_BYTES);
+    expect(envelopeBytes).toBeLessThanOrEqual(STUDIO_LIVE_GESTURE_PREVIEW_ENVELOPE_MAX_BYTES);
+    expect(STUDIO_LIVE_GESTURE_PREVIEW_ENVELOPE_MAX_BYTES).toBe(
+      STUDIO_LIVE_GESTURE_PREVIEW_MAX_BYTES
+        + STUDIO_LIVE_GESTURE_PREVIEW_ENVELOPE_METADATA_MAX_BYTES,
+    );
+    expect(parse(value)).toEqual(value);
+
+    expect(parse({ ...value, targetSessionId: LOCAL_SESSION })).toBeNull();
+    expect(parse({
+      ...value,
+      payload: { ...payload, extension: { rendererUrl: "blob:preview" } },
+    })).toBeNull();
+    expect(parse({
+      ...value,
+      payload: { ...payload, extension: "x".repeat(5 * 1024) },
+    })).toBeNull();
   });
 
   it("rejects cross-work, self, stale and future messages", () => {

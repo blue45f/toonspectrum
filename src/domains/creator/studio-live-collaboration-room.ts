@@ -38,6 +38,10 @@ import {
   type StudioLiveTransportMode,
   type StudioLiveTransportStatus,
 } from "./studio-live-collaboration-transport";
+import {
+  copyStudioLiveGesturePreviewPayload,
+  type StudioLiveGesturePreviewPayload,
+} from "./studio-live-gesture-preview";
 import { isStudioLiveP2pMeshShareId } from "./studio-live-p2p-overlay-transport";
 import {
   parseStudioTeamCommentLiveEvent,
@@ -159,6 +163,11 @@ export type StudioLiveRoomEvent =
     }
   | { type: "locks"; locks: StudioLiveLock[] }
   | { type: "chat"; message: StudioLiveChatMessage }
+  | {
+      type: "gesture-preview";
+      participant: StudioLiveParticipant;
+      payload: StudioLiveGesturePreviewPayload;
+    }
   | { type: "signal"; envelope: StudioLiveSignalEnvelope }
   | { type: "comment-changed"; change: StudioTeamCommentLiveEvent }
   | { type: "transport-status"; status: StudioLiveTransportStatus }
@@ -565,6 +574,15 @@ export class StudioLiveRoom {
   clearCursor(): boolean {
     if (!this.ready) return false;
     return this.post("cursor:update", { x: 0, y: 0, pageId: null, tool: null });
+  }
+
+  /**
+   * Publishes one disposable gesture packet without sharing cursor throttling or presence TTL.
+   * Gesture-local ordering and expiry belong to the preview store, not to this room envelope.
+   */
+  publishGesturePreview(payload: StudioLiveGesturePreviewPayload): boolean {
+    if (!this.ready) return false;
+    return this.post("preview:gesture", payload);
   }
 
   /**
@@ -1314,6 +1332,21 @@ export class StudioLiveRoom {
       now: receivedAt,
     });
     if (!envelope) return;
+
+    // Preview packets can traverse mesh and primary routes independently, so their envelope
+    // sequence is not authoritative. Deliver them before the shared session gate and let the
+    // preview store decide only by (senderSessionId, gestureId, payload.seq).
+    if (envelope.kind === "preview:gesture") {
+      this.emit({
+        type: "gesture-preview",
+        participant: copyParticipant(envelope.sender),
+        payload: copyStudioLiveGesturePreviewPayload(
+          envelope.payload as StudioLiveGesturePreviewPayload,
+        ),
+      });
+      return;
+    }
+
     const previousSequence = this.lastSequenceBySession.get(envelope.sender.sessionId) ?? 0;
     if (envelope.sequence <= previousSequence) return;
     this.lastSequenceBySession.set(envelope.sender.sessionId, envelope.sequence);

@@ -280,6 +280,11 @@ class StudioPurposeRoutedLiveTransport implements StudioLiveTransport {
   send(envelope: StudioLiveEnvelope): boolean {
     if (!this.ready) return false;
     const typedEnvelope = envelope as StudioLiveAnyEnvelope;
+    // Gesture preview has no provider workload/capability in v1. Keep the bounded envelope on the
+    // existing primary route instead of implicitly widening Cloudflare tickets or worker scope.
+    if (typedEnvelope.kind === "preview:gesture") {
+      return this.sendPrimary(typedEnvelope);
+    }
     if (
       typedEnvelope.kind === "presence:hello" ||
       typedEnvelope.kind === "presence:heartbeat"

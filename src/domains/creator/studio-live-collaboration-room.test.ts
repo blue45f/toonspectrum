@@ -37,6 +37,7 @@ import type {
   StudioLiveTransportFactory,
   StudioLiveTransportMode,
 } from "./studio-live-collaboration-transport";
+import type { StudioLiveGesturePreviewPayload } from "./studio-live-gesture-preview";
 
 class FakeHubTransport implements StudioLiveTransport {
   private readonly listeners = new Set<(value: unknown) => void>();
@@ -224,6 +225,37 @@ function deferred<T>() {
     reject = rejectPromise;
   });
   return { promise, resolve, reject };
+}
+
+function gesturePreviewBegin(gestureId = "gesture-1"): StudioLiveGesturePreviewPayload {
+  return {
+    version: 1,
+    gestureId,
+    pageId: "page-1",
+    seq: 1,
+    phase: "begin",
+    operation: "draw",
+    base: { documentGeneration: 1 },
+    renderer: {
+      kind: "freehand",
+      mode: "pen",
+      stroke: "#112233",
+      strokeWidth: 8,
+    },
+    samples: { startIndex: 0, points: [10, 20] },
+  };
+}
+
+function gesturePreviewAppend(gestureId = "gesture-1"): StudioLiveGesturePreviewPayload {
+  return {
+    version: 1,
+    gestureId,
+    pageId: "page-1",
+    seq: 2,
+    phase: "append",
+    operation: "draw",
+    samples: { startIndex: 1, points: [12, 24] },
+  };
 }
 
 function harness(mode: StudioLiveTransportMode = "local") {
@@ -539,6 +571,93 @@ describe("StudioLiveRoom", () => {
     );
     roomA.close();
     roomB.close();
+  });
+
+  it("publishes gesture previews independently from cursor throttling", async () => {
+    const test = harness();
+    const roomA = test.room(alice);
+    const roomB = test.room(bob);
+    const previews: StudioLiveRoomEvent[] = [];
+    roomB.subscribe((event) => {
+      if (event.type === "gesture-preview") previews.push(event);
+    });
+    await roomA.start();
+    await roomB.start();
+    test.hub.published.length = 0;
+
+    expect(roomA.publishCursor({ x: 0.1, y: 0.2, pageId: "page-1", tool: "pen" })).toBe(true);
+    expect(roomA.publishCursor({ x: 0.2, y: 0.3, pageId: "page-1", tool: "pen" })).toBe(false);
+    expect(roomA.publishGesturePreview(gesturePreviewBegin())).toBe(true);
+    expect(roomA.publishGesturePreview(gesturePreviewAppend())).toBe(true);
+
+    expect(test.hub.published.map(({ kind }) => kind)).toEqual([
+      "cursor:update",
+      "preview:gesture",
+      "preview:gesture",
+    ]);
+    expect(previews).toEqual([
+      expect.objectContaining({
+        type: "gesture-preview",
+        participant: expect.objectContaining({ sessionId: alice.sessionId }),
+        payload: expect.objectContaining({ gestureId: "gesture-1", seq: 1 }),
+      }),
+      expect.objectContaining({
+        type: "gesture-preview",
+        participant: expect.objectContaining({ sessionId: alice.sessionId }),
+        payload: expect.objectContaining({ gestureId: "gesture-1", seq: 2 }),
+      }),
+    ]);
+    roomA.close();
+    roomB.close();
+  });
+
+  it("delivers preview payload order before the unrelated envelope sequence gate", async () => {
+    const test = harness();
+    const room = test.room(alice);
+    const cursorXs: number[] = [];
+    const previewSeqs: number[] = [];
+    room.subscribe((event) => {
+      if (event.type === "cursor") cursorXs.push(event.cursor.x);
+      if (event.type === "gesture-preview") previewSeqs.push(event.payload.seq);
+    });
+    await room.start();
+
+    test.hub.inject(0, createStudioLiveEnvelope({
+      workId: "work-1",
+      sender: bob,
+      sentAt: test.now(),
+      sequence: 10,
+      kind: "cursor:update",
+      payload: { x: 0.1, y: 0.2, pageId: "page-1", tool: "pen" },
+    }));
+    test.hub.inject(0, createStudioLiveEnvelope({
+      workId: "work-1",
+      sender: bob,
+      sentAt: test.now(),
+      sequence: 9,
+      kind: "preview:gesture",
+      payload: gesturePreviewBegin("gesture-envelope-independent"),
+    }));
+    test.hub.inject(0, createStudioLiveEnvelope({
+      workId: "work-1",
+      sender: bob,
+      sentAt: test.now(),
+      sequence: 100,
+      kind: "preview:gesture",
+      payload: gesturePreviewAppend("gesture-envelope-independent"),
+    }));
+    test.hub.inject(0, createStudioLiveEnvelope({
+      workId: "work-1",
+      sender: bob,
+      sentAt: test.now(),
+      sequence: 11,
+      kind: "cursor:update",
+      payload: { x: 0.2, y: 0.3, pageId: "page-1", tool: "pen" },
+    }));
+
+    expect(previewSeqs).toEqual([1, 2]);
+    expect(cursorXs).toEqual([0.1, 0.2]);
+    room.close();
   });
 
   it("converges simultaneous lease claims deterministically and releases only the matching claim", async () => {

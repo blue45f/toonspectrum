@@ -31,6 +31,7 @@ import type {
   StudioLiveTransportContext,
   StudioLiveTransportControlEvent,
 } from "./studio-live-collaboration-transport";
+import type { StudioLiveGesturePreviewPayload } from "./studio-live-gesture-preview";
 
 const NOW = Date.parse("2026-08-15T04:00:00.000Z");
 
@@ -44,12 +45,36 @@ const REMOTE: StudioLiveParticipant = {
   displayName: "어시스턴트",
   role: "editor",
 };
+const THIRD: StudioLiveParticipant = {
+  sessionId: "00000000-0000-4000-8000-000000000003",
+  displayName: "채색 보조",
+  role: "editor",
+};
 
 function contextFor(participant: StudioLiveParticipant): StudioLiveTransportContext {
   return {
     workId: "work-p2p",
     roomName: "room-p2p",
     participant,
+  };
+}
+
+function gesturePreview(): StudioLiveGesturePreviewPayload {
+  return {
+    version: 1,
+    gestureId: "gesture-p2p-1",
+    pageId: "page-1",
+    seq: 1,
+    phase: "begin",
+    operation: "erase",
+    base: { documentGeneration: 1 },
+    renderer: {
+      kind: "freehand",
+      mode: "eraser",
+      stroke: "#000000",
+      strokeWidth: 12,
+    },
+    samples: { startIndex: 0, points: [10, 20] },
   };
 }
 
@@ -381,13 +406,14 @@ describe("Studio live P2P overlay", () => {
     expect(isStudioLiveP2pEphemeralKind("cursor:update")).toBe(true);
     expect(isStudioLiveP2pEphemeralKind("presence:heartbeat")).toBe(true);
     expect(isStudioLiveP2pEphemeralKind("chat:message")).toBe(true);
+    expect(isStudioLiveP2pEphemeralKind("preview:gesture")).toBe(true);
     expect(isStudioLiveP2pEphemeralKind("presence:hello")).toBe(false);
     expect(isStudioLiveP2pEphemeralKind("lock:claim")).toBe(false);
     expect(isStudioLiveP2pMeshShareId(STUDIO_LIVE_P2P_MESH_SHARE_ID)).toBe(true);
     expect(isStudioLiveP2pMeshShareId("share-1")).toBe(false);
   });
 
-  it("moves cursors onto the data channel and keeps mesh signaling off the room surface", async () => {
+  it("moves cursors and gesture previews onto the data channel", async () => {
     const { localPrimary, local, receivedRemote } = await connectedMesh();
     const cursor = envelope({
       sender: LOCAL,
@@ -397,11 +423,26 @@ describe("Studio live P2P overlay", () => {
     });
 
     expect(local.send(cursor)).toBe(true);
+    const preview = envelope({
+      sender: LOCAL,
+      kind: "preview:gesture",
+      payload: gesturePreview(),
+      sequence: 41,
+    });
+    expect(local.send(preview)).toBe(true);
     expect(localPrimary.sent.some((item) => item.kind === "cursor:update")).toBe(false);
+    expect(localPrimary.sent.some((item) => item.kind === "preview:gesture")).toBe(false);
     expect(localPrimary.sent.some((item) => item.kind === "webrtc:description")).toBe(true);
     expect(
       receivedRemote.some(
         (item) => item.kind === "cursor:update" && item.payload && "x" in item.payload,
+      ),
+    ).toBe(true);
+    expect(
+      receivedRemote.some(
+        (item) => item.kind === "preview:gesture"
+          && "gestureId" in item.payload
+          && item.payload.gestureId === "gesture-p2p-1",
       ),
     ).toBe(true);
     expect(
@@ -440,6 +481,37 @@ describe("Studio live P2P overlay", () => {
     });
     expect(transport.send(cursor)).toBe(true);
     expect(primary.sent).toContainEqual(cursor);
+    const preview = envelope({
+      sender: LOCAL,
+      kind: "preview:gesture",
+      payload: gesturePreview(),
+      sequence: 4,
+    });
+    expect(transport.send(preview)).toBe(true);
+    expect(primary.sent).toContainEqual(preview);
+  });
+
+  it("uses only primary when one observed peer is missing from an otherwise open mesh", async () => {
+    const { localPrimary, local, receivedRemote } = await connectedMesh();
+    localPrimary.emit(envelope({
+      sender: THIRD,
+      kind: "presence:heartbeat",
+      payload: { visibility: "active", pageId: "page-1", tool: "pen" },
+      sequence: 3,
+    }));
+    await flush();
+    const preview = envelope({
+      sender: LOCAL,
+      kind: "preview:gesture",
+      payload: gesturePreview(),
+      sequence: 42,
+    });
+
+    expect(local.send(preview)).toBe(true);
+    expect(localPrimary.sent).toContainEqual(preview);
+    expect(
+      receivedRemote.filter((item) => item.kind === "preview:gesture"),
+    ).toEqual([preview]);
   });
 
   it("carries jam CRDT updates on the mesh when the primary has no Socket.IO authority", async () => {

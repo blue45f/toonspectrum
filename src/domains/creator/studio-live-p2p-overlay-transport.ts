@@ -42,6 +42,7 @@ const STUDIO_LIVE_P2P_EPHEMERAL_KINDS = new Set<StudioLiveMessageKind>([
   "presence:heartbeat",
   "cursor:update",
   "chat:message",
+  "preview:gesture",
 ]);
 
 const STUDIO_LIVE_P2P_STUN_URLS = ["stun:stun.l.google.com:19302"] as const;
@@ -138,8 +139,8 @@ interface StudioLiveP2pPeerLink {
 
 /**
  * Opportunistic STUN-only data-channel mesh on top of an authoritative server transport.
- * Cursor, presence heartbeat, and chat hop peer-to-peer once every known peer has an open
- * channel. Join, locks, and ICE signaling stay on the primary transport. CRDT stays
+ * Cursor, presence heartbeat, chat, and gesture previews hop peer-to-peer once every known peer
+ * has an open channel. Join, locks, and ICE signaling stay on the primary transport. CRDT stays
  * on the primary when it can persist updates; otherwise the mesh carries jam Yjs diffs.
  * A missing WebRTC implementation or a failed ICE path falls back without shrinking features.
  */
@@ -153,6 +154,7 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
   private readonly createPeerConnection: StudioLiveP2pPeerConnectionFactory;
   private readonly now: () => number;
   private readonly maxPeers: number;
+  private readonly knownPeerSessionIds = new Set<string>();
   private readonly peers = new Map<string, StudioLiveP2pPeerLink>();
   private readonly listeners = new Set<(value: unknown) => void>();
   private readonly crdtListeners = new Set<(message: StudioCrdtTransportMessage) => void>();
@@ -319,6 +321,7 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
     this.seenCrdtUpdateIds.clear();
     this.crdtListeners.clear();
     for (const sessionId of [...this.peers.keys()]) this.teardownPeer(sessionId);
+    this.knownPeerSessionIds.clear();
     this.listeners.clear();
     this.primary.close();
   }
@@ -466,15 +469,22 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
       const peer = this.peers.get(targetSessionId);
       return Boolean(peer && this.sendToPeer(peer, envelope));
     }
-    if (this.peers.size === 0) return false;
+    // A peer that exceeded the mesh cap or whose channel failed is still known through presence.
+    // Fall back before a partial fanout so every room member sees the same ephemeral packet.
+    if (
+      this.knownPeerSessionIds.size === 0
+      || this.peers.size !== this.knownPeerSessionIds.size
+      || [...this.peers.values()].some(
+        (peer) => peer.closed || peer.channel?.readyState !== "open",
+      )
+    ) return false;
     let delivered = 0;
-    let missing = 0;
     const serialized = JSON.stringify(envelope);
     for (const peer of this.peers.values()) {
       if (this.sendSerializedToPeer(peer, serialized)) delivered += 1;
-      else missing += 1;
+      else return false;
     }
-    return missing === 0 && delivered > 0;
+    return delivered > 0;
   }
 
   private sendToPeer(peer: StudioLiveP2pPeerLink, envelope: StudioLiveEnvelope): boolean {
@@ -510,10 +520,12 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
     const sessionId = envelope.sender.sessionId;
     if (sessionId === this.context.participant.sessionId) return;
     if (envelope.kind === "presence:leave") {
+      this.knownPeerSessionIds.delete(sessionId);
       this.teardownPeer(sessionId);
       return;
     }
     if (envelope.kind === "presence:hello" || envelope.kind === "presence:heartbeat") {
+      this.knownPeerSessionIds.add(sessionId);
       this.ensurePeer(envelope.sender);
     }
   }
@@ -643,14 +655,14 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
     }
     link.channel = channel;
     channel.onmessage = (event) => {
-      this.handleChannelMessage(event.data);
+      this.handleChannelMessage(link, event.data);
     };
     channel.onclose = () => {
       if (link.channel === channel) link.channel = null;
     };
   }
 
-  private handleChannelMessage(data: unknown): void {
+  private handleChannelMessage(link: StudioLiveP2pPeerLink, data: unknown): void {
     if (this.closed || typeof data !== "string") return;
     let parsed: unknown;
     try {
@@ -664,7 +676,11 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
       selfSessionId: this.context.participant.sessionId,
       now: this.now(),
     });
-    if (!envelope || !isStudioLiveP2pEphemeralKind(envelope.kind)) return;
+    if (
+      !envelope
+      || envelope.sender.sessionId !== link.sessionId
+      || !isStudioLiveP2pEphemeralKind(envelope.kind)
+    ) return;
     this.emit(envelope);
   }
 

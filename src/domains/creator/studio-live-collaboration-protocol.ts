@@ -1,3 +1,9 @@
+import {
+  STUDIO_LIVE_GESTURE_PREVIEW_KIND,
+  STUDIO_LIVE_GESTURE_PREVIEW_MAX_BYTES,
+  parseStudioLiveGesturePreviewPayload,
+  type StudioLiveGesturePreviewPayload,
+} from "./studio-live-gesture-preview";
 import { STUDIO_TEAM_ROLES, type StudioTeamRole } from "./studio-team-client";
 
 /**
@@ -13,6 +19,15 @@ export const STUDIO_LIVE_PROTOCOL_VERSION = 1 as const;
 export const STUDIO_LIVE_LOCK_PROTOCOL_VERSION = 2 as const;
 export const STUDIO_LIVE_LOCK_REVISION_VERSION = 1 as const;
 export const STUDIO_LIVE_MESSAGE_MAX_BYTES = 64 * 1024;
+/**
+ * Gesture payloads own a strict 64 KiB cap. The envelope needs a small, separately bounded
+ * allowance for work/session metadata so a valid maximum-size payload is not rejected merely by
+ * transport framing. Every non-preview kind remains on `STUDIO_LIVE_MESSAGE_MAX_BYTES`.
+ */
+export const STUDIO_LIVE_GESTURE_PREVIEW_ENVELOPE_METADATA_MAX_BYTES = 4 * 1024;
+export const STUDIO_LIVE_GESTURE_PREVIEW_ENVELOPE_MAX_BYTES =
+  STUDIO_LIVE_GESTURE_PREVIEW_MAX_BYTES
+  + STUDIO_LIVE_GESTURE_PREVIEW_ENVELOPE_METADATA_MAX_BYTES;
 export const STUDIO_LIVE_MESSAGE_MAX_AGE_MS = 30_000;
 export const STUDIO_LIVE_MESSAGE_FUTURE_SKEW_MS = 5_000;
 export const STUDIO_LIVE_LOCK_MAX_LEASE_MS = 30_000;
@@ -238,6 +253,7 @@ export interface StudioLivePayloadMap {
   "voice:description": StudioLiveVoiceDescriptionPayload;
   "voice:ice": StudioLiveVoiceIcePayload;
   "chat:message": StudioLiveChatMessagePayload;
+  "preview:gesture": StudioLiveGesturePreviewPayload;
 }
 
 export type StudioLiveMessageKind = keyof StudioLivePayloadMap;
@@ -649,6 +665,7 @@ const MESSAGE_KINDS = new Set<StudioLiveMessageKind>([
   "voice:description",
   "voice:ice",
   "chat:message",
+  STUDIO_LIVE_GESTURE_PREVIEW_KIND,
 ]);
 
 function isKind(value: unknown): value is StudioLiveMessageKind {
@@ -696,6 +713,8 @@ function payloadMatchesKind(
       return isVoiceIcePayload(payload);
     case "chat:message":
       return isChatMessagePayload(payload);
+    case "preview:gesture":
+      return parseStudioLiveGesturePreviewPayload(payload) !== null;
   }
 }
 
@@ -729,7 +748,11 @@ export function parseStudioLiveEnvelope(
   options: ParseStudioLiveEnvelopeOptions
 ): StudioLiveEnvelope | null {
   const bytes = studioLiveEnvelopeByteLength(value);
-  if (bytes === null || bytes > STUDIO_LIVE_MESSAGE_MAX_BYTES || !isRecord(value)) return null;
+  if (bytes === null || !isRecord(value)) return null;
+  const maximumBytes = value.kind === STUDIO_LIVE_GESTURE_PREVIEW_KIND
+    ? STUDIO_LIVE_GESTURE_PREVIEW_ENVELOPE_MAX_BYTES
+    : STUDIO_LIVE_MESSAGE_MAX_BYTES;
+  if (bytes > maximumBytes) return null;
   if (
     !hasExactKeys(value, [
       "version",

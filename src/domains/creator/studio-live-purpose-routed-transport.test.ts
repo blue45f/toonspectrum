@@ -30,6 +30,7 @@ import type {
   StudioLiveTransportControlEvent,
   StudioLiveTransportFactory,
 } from "./studio-live-collaboration-transport";
+import type { StudioLiveGesturePreviewPayload } from "./studio-live-gesture-preview";
 import type {
   StudioRealtimeInboundEvent,
   StudioRealtimeOutboundEvent,
@@ -233,6 +234,25 @@ function envelope<Kind extends StudioLiveMessageKind>(input: {
   });
 }
 
+function gesturePreview(): StudioLiveGesturePreviewPayload {
+  return {
+    version: 1,
+    gestureId: "gesture-primary-1",
+    pageId: "page-1",
+    seq: 1,
+    phase: "begin",
+    operation: "draw",
+    base: { documentGeneration: 1 },
+    renderer: {
+      kind: "freehand",
+      mode: "pen",
+      stroke: "#224466",
+      strokeWidth: 6,
+    },
+    samples: { startIndex: 0, points: [4, 8] },
+  };
+}
+
 async function flushPromises(): Promise<void> {
   await Promise.resolve();
   await Promise.resolve();
@@ -316,6 +336,24 @@ describe("Studio purpose-routed live transport", () => {
     });
     expect(primary.requestCrdtSync).toHaveBeenCalledOnce();
     expect(primary.acquireLock).toHaveBeenCalledOnce();
+  });
+
+  it("keeps gesture previews on primary without expanding provider workloads", async () => {
+    const { primary, coordinator, transport } = harness();
+    await transport.connect();
+    coordinator.setReady("presence");
+    coordinator.setReady("comments");
+    coordinator.setReady("screen-signaling");
+    const preview = envelope({
+      kind: "preview:gesture",
+      payload: gesturePreview(),
+    });
+
+    expect(transport.send(preview)).toBe(true);
+    await flushPromises();
+
+    expect(primary.sent).toEqual([preview]);
+    expect(coordinator.published).toEqual([]);
   });
 
   it("falls back to the primary transport when a route is unavailable or publishing fails", async () => {
