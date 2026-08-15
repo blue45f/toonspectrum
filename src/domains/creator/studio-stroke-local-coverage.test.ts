@@ -283,6 +283,68 @@ describe("studio stroke-local polygon coverage", () => {
     expect(pixel[3]).toBeGreaterThan(0.9999);
   });
 
+  it("keeps a mark with no resolvable tonal range on the single legacy coverage fill", () => {
+    const points = [0, 0, 20, 0, 40, 0, 60, 0];
+    const constant = planStudioAngledNibStrokeLocalCoverage(
+      points,
+      NIB_WIDTH,
+      NIB_ANGLE,
+      { profileId: "brush", pressures: [0.7, 0.7, 0.7, 0.7], elementOpacity: 0.6 },
+    );
+    const legacy = planStudioAngledNibStrokeLocalCoverage(points, NIB_WIDTH, NIB_ANGLE);
+
+    // One shell carrying every polygon at the element's own opacity IS the historical emission:
+    // both renderers take their byte-identical single-fill branch on exactly this shape.
+    for (const plan of [constant, legacy]) {
+      expect(plan.shells).toHaveLength(1);
+      expect(plan.shells[0]!.polygons).toBe(plan.polygons);
+    }
+    expect(constant.shells[0]!.opacity).toBe(0.6);
+    expect(legacy.shells[0]!.opacity).toBe(1);
+  });
+
+  it("folds cumulative density shells onto a monotone tone that peaks at the element opacity", () => {
+    const points: number[] = [];
+    const pressures: number[] = [];
+    for (let index = 0; index < 24; index += 1) {
+      points.push(index * 8, 0);
+      pressures.push(0.1 + 0.85 * Math.sin((Math.PI * index) / 23));
+    }
+    const elementOpacity = 0.8;
+    const plan = planStudioAngledNibStrokeLocalCoverage(
+      points,
+      NIB_WIDTH,
+      NIB_ANGLE,
+      { profileId: "brush", pressures, elementOpacity },
+    );
+
+    expect(plan.shells.length).toBeGreaterThan(1);
+    // Shell 0 is the whole mark, so the silhouette is the same set of polygons as before.
+    expect(plan.shells[0]!.polygons).toBe(plan.polygons);
+
+    const folds: number[] = [];
+    let transmittance = 1;
+    for (const [index, shell] of plan.shells.entries()) {
+      // Nested: every shell is a subset of the one outside it, which is what makes a pixel's cover
+      // set a prefix and lets the fold telescope.
+      const outer = new Set(plan.shells[index - 1]?.polygons ?? shell.polygons);
+      expect(shell.polygons.every((polygon) => outer.has(polygon))).toBe(true);
+      expect(shell.opacity).toBeGreaterThanOrEqual(0);
+      expect(shell.opacity).toBeLessThanOrEqual(1);
+      transmittance *= 1 - shell.opacity;
+      folds.push(1 - transmittance);
+    }
+
+    for (const [index, fold] of folds.entries()) {
+      if (index > 0) expect(fold).toBeGreaterThan(folds[index - 1]!);
+      // A pixel is only ever covered by a PREFIX of the shells, so no pixel — including one under
+      // a self-crossing, which merely lands on the deeper band's prefix — can exceed this.
+      expect(fold).toBeLessThanOrEqual(elementOpacity + 1e-9);
+    }
+    // The heaviest touch still lands on exactly the tone the flat union painted.
+    expect(folds.at(-1)).toBeCloseTo(elementOpacity, 10);
+  });
+
   it("copies, freezes, bounds, and rejects malformed or degenerate coverage geometry", () => {
     const input = [0, 0, 20, 0, 0, 0];
     const plan = planStudioAngledNibStrokeLocalCoverage(input, NIB_WIDTH);

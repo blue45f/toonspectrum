@@ -19,6 +19,7 @@ import { fileURLToPath } from "node:url";
 import { STUDIO_BRUSH_ENGINE_LANE_CATALOG_ROWS } from "../../../src/domains/creator/studio-brush-engine-lane-catalog";
 import { STUDIO_BRUSH_RUNTIME_CONTRACT } from "../../../src/domains/creator/studio-brush-runtime-contract";
 import { materializeStudioBrushCatalogSelection } from "../../../src/domains/creator/studio-brush-selection";
+import { captureStudioDrawPointerPressureContract } from "../../../src/domains/creator/studio-draw-pointer-pressure-contract";
 import { exportPageToSvg } from "../../../src/domains/creator/studio-svg-export";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -97,7 +98,23 @@ function cellSvg(
   brushDynamics: unknown,
   drawMode: string | null,
 ): string {
+  // The app's own pointer-down capture policy, for the same reason the dynamics snapshot above is
+  // pinned. Without `materialPressureModel` the retained media (brush/flat-brush/the pencils) and
+  // the FX pressure brushes all fall to their pre-rollout fixed-width, fixed-opacity route, where
+  // the pressure journal reaches neither the nib nor the pigment — so this sheet drew a constant
+  // ribbon for strokes an artist can only ever draw with pressure. Taking the marker from the
+  // product function rather than hard-coding it keeps the sheet on whatever the app captures.
+  const pressureContract = captureStudioDrawPointerPressureContract(
+    { drawMode: drawMode ?? "pen", brush, strokeWidth: width },
+    false,
+  );
   const elements = strokes(width).map((stroke, index) => ({
+    ...(pressureContract.materialPressureModel
+      ? { materialPressureModel: pressureContract.materialPressureModel }
+      : {}),
+    ...(pressureContract.materialMinimumDiameterRatio === undefined
+      ? {}
+      : { materialMinimumDiameterRatio: pressureContract.materialMinimumDiameterRatio }),
     id: `${brush}-${stroke.id}`,
     type: "draw" as const,
     kind: "freehand" as const,
