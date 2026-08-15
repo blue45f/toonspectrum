@@ -13,6 +13,11 @@ const EXPECTED_HANDSHAKE_CLOSE = [
 ].join("");
 
 describe("Studio launch static-preview diagnostics", () => {
+  it("requires the shipped live-collaboration host on the Studio work session", () => {
+    expect(launchHarness).toContain("data-studio-presence-dock='true'");
+    expect(launchHarness).toContain("liveHostMounted");
+  });
+
   it("drives the current unified brush catalogue rather than retired mobile copy", () => {
     expect(launchHarness).toContain('sheet.locator(\'[data-studio-open-brush-library="true"]\')');
     expect(launchHarness).toContain(

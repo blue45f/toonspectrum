@@ -31,12 +31,13 @@ describe("creator-studio-links", () => {
     });
   });
 
-  it("builds a same-session live share href that joins both the work and the live room", () => {
-    expect(buildStudioLiveShareHref("work-jam-1")).toBe(
-      "/studio?id=work-jam-1&room=work-jam-1"
-    );
+  it("builds a Magma jam href with only the live room, and a saved-work href with id+room", () => {
+    expect(buildStudioLiveShareHref("work-jam-1")).toBe("/studio?room=work-jam-1");
     expect(buildStudioLiveShareHref("work-jam-1", "https://toonspectrum.example")).toBe(
-      "https://toonspectrum.example/studio?id=work-jam-1&room=work-jam-1"
+      "https://toonspectrum.example/studio?room=work-jam-1"
+    );
+    expect(buildStudioLiveShareHref("work-jam-1", undefined, "work-saved-9")).toBe(
+      "/studio?id=work-saved-9&room=work-jam-1"
     );
   });
 

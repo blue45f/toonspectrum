@@ -664,6 +664,8 @@ export interface StudioCanvasViewportProps {
   /** 이 탭이 문서 저장을 맡는지 — follower 면 복구 배너 대신 읽기 전용 고지를 띄운다. */
   autosaveDocumentLeadership:
     import("./StudioCanvasStatusRail").StudioCanvasStatusRailProps["autosaveDocumentLeadership"];
+  autosaveLiveJam:
+    import("./StudioCanvasStatusRail").StudioCanvasStatusRailProps["autosaveLiveJam"];
   healCloneArmed: boolean;
   healCloneCursorRef: import("react").RefObject<import("konva/lib/shapes/Circle").Circle | null>;
   healCloneDragPreview: { points: SelPoint[]; } | null;
@@ -971,6 +973,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
   guides,
   hasAutosave,
   autosaveDocumentLeadership,
+  autosaveLiveJam,
   healCloneArmed,
   healCloneCursorRef,
   healCloneDragPreview,
@@ -2117,6 +2120,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
             mobileImmersive={mobileImmersive}
             hasAutosave={hasAutosave}
             autosaveDocumentLeadership={autosaveDocumentLeadership}
+            autosaveLiveJam={autosaveLiveJam}
             autosaveRestoreBlockedReason={autosaveRestoreBlockedReason}
             selectionCount={canvasSelectionEls.length}
             selectionGroupName={completeSelectionGroup?.name ?? null}

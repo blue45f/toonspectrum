@@ -1124,6 +1124,23 @@ describe("StudioLiveCanvasOverlay", () => {
     expect(html).toContain('data-studio-presence-dock="true"');
     expect(html).toContain("팀 작업 공간 열기");
     expect(html).toContain('data-studio-presence-link="retrying"');
+    expect(html).not.toContain("data-studio-presence-companion-tab");
+  });
+
+  it("offers a Magma-style open-another-tab action on the presence dock", () => {
+    const html = renderToStaticMarkup(
+      <StudioLivePresenceDock
+        connected
+        alwaysOn
+        peers={[]}
+        followingSessionId={null}
+        onOpenTeam={noop}
+        onOpenCompanionTab={noop}
+        onToggleFollow={noop}
+      />
+    );
+    expect(html).toContain('data-studio-presence-companion-tab="true"');
+    expect(html).toContain("새 탭에서 같이 그리기");
   });
 
   it("announces durability loss assertively and never labels it as safely synced", () => {

@@ -5,6 +5,7 @@ import {
   presentStudioAutosaveDocumentLeadership,
   requestStudioAutosaveDocumentLeadership,
   studioAutosaveDocumentLockName,
+  studioAutosaveLeadershipAllowsLocalEdit,
   type StudioAutosaveDocumentLockManagerLike,
 } from "./studio-autosave-document-leader";
 import {
@@ -381,9 +382,27 @@ describe("presentStudioAutosaveDocumentLeadership", () => {
       basis: "web-lock",
     });
     expect(notice.canPersist).toBe(false);
+    expect(notice.canDraw).toBe(true);
     expect(notice.tone).toBe("warn");
     expect(notice.title).toContain("다른 탭에서 편집 중");
     expect(notice.actionLabel).toContain("새로고침");
+    expect(studioAutosaveLeadershipAllowsLocalEdit({
+      role: "follower",
+      basis: "web-lock",
+    })).toBe(true);
+  });
+
+  it("tells a Magma jam follower they can keep drawing", () => {
+    const notice = presentStudioAutosaveDocumentLeadership(
+      { role: "follower", basis: "web-lock" },
+      { liveJam: true },
+    );
+    expect(notice.canPersist).toBe(false);
+    expect(notice.canDraw).toBe(true);
+    expect(notice.tone).toBe("good");
+    expect(notice.title).toContain("같이 그리는 중");
+    expect(notice.detail).toContain("이 탭에서도 바로 그릴 수 있습니다");
+    expect(notice.actionLabel).toBeNull();
   });
 
   it("only lets a leading tab claim it is the one saving", () => {

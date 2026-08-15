@@ -536,6 +536,15 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
     expect(room.clearCursorCount).toBe(1);
   });
 
+  it("starts a same-origin jam on the local transport even when a server factory exists", () => {
+    const live = renderProvider({ serverRequired: false });
+
+    expect(rooms.instances).toHaveLength(1);
+    expect(rooms.instances[0]?.options.dependencies?.transportFactory).toBeUndefined();
+    expect(live.usingLocalFallback).toBe(true);
+    expect(live.availability).not.toBe("error");
+  });
+
   it("fails closed when an authenticated work loses its server transport", () => {
     const live = renderProvider({ transportFactory: null, serverRequired: true });
 
@@ -814,7 +823,7 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
       message: "팀 원고가 실시간으로 동기화됩니다.",
     };
     const onCrdtDocumentChange = vi.fn();
-    const options = { onCrdtDocumentChange };
+    const options = { onCrdtDocumentChange, serverRequired: true };
     renderProvider(options);
 
     await vi.waitFor(() => {

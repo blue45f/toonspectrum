@@ -38,13 +38,18 @@ export function buildStudioHref(params: StudioLinkParams = {}): string {
 }
 
 /**
- * Magma/Figma-style same-session invite. `id` opens the work document; `room` is the live
- * presence/cursor/CRDT session key Studio already joins from the query string.
+ * Magma-style same-session invite. `room` is the live presence/cursor/CRDT key.
+ * Pass `savedWorkId` only for an existing work document — a jam room must not set `id`,
+ * or the second tab will treat the instant session as a server work and lock the canvas.
  */
-export function buildStudioLiveShareHref(workId: string, origin?: string): string {
+export function buildStudioLiveShareHref(
+  roomId: string,
+  origin?: string,
+  savedWorkId?: string | null
+): string {
   const search = new URLSearchParams();
-  search.set("id", workId);
-  search.set("room", workId);
+  if (savedWorkId) search.set("id", savedWorkId);
+  search.set("room", roomId);
   const path = `/studio?${search.toString()}`;
   return origin ? new URL(path, origin).toString() : path;
 }

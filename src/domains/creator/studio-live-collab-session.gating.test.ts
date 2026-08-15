@@ -4,6 +4,10 @@ import { describe, expect, it } from "vitest";
 
 import { buildStudioLiveShareHref } from "./creator-studio-links";
 import {
+  presentStudioAutosaveDocumentLeadership,
+  studioAutosaveLeadershipAllowsLocalEdit,
+} from "./studio-autosave-document-leader";
+import {
   StudioCrdtDocument,
   type StudioCrdtDrawStrokePayload,
   type StudioCrdtSceneElementInput,
@@ -353,11 +357,50 @@ describe("Studio Magma/Figma live collaboration session", () => {
     expect(pageSource).toContain("StudioLiveCollaborationProvider");
     expect(pageSource).toContain("workId={effectiveWorkId}");
     expect(pageSource).toContain("participant={studioLiveParticipant}");
+    expect(pageSource).toContain("shouldPublishStudioLiveJamRoom");
+    expect(pageSource).toContain("serverRequired={Boolean(studioLiveParticipant && requiresStudioLiveServer)}");
     expect(pageSource).toMatch(/buildStudioLiveShareHref\(provisionalWorkId/u);
     expect(pageSource).toContain("buildStudioLiveShareHref");
     expect(panelSource).toContain("buildStudioLiveShareHref");
     expect(buildStudioLiveShareHref("work-jam-9", "https://studio.example")).toBe(
-      "https://studio.example/studio?id=work-jam-9&room=work-jam-9"
+      "https://studio.example/studio?room=work-jam-9"
     );
+    expect(pageSource).toContain("studioAutosaveLeadershipAllowsLocalEdit");
+    expect(pageSource).toContain("!persistLeadershipAllowsDraw");
+  });
+
+  it("lets a persist-follower apply a local stroke on the shipped document path", async () => {
+    const follower = presentStudioAutosaveDocumentLeadership(
+      { role: "follower", basis: "web-lock" },
+      { liveJam: true },
+    );
+    expect(follower.canPersist).toBe(false);
+    expect(follower.canDraw).toBe(true);
+    expect(studioAutosaveLeadershipAllowsLocalEdit({
+      role: "follower",
+      basis: "web-lock",
+    })).toBe(true);
+
+    const session = await joinDisconnectedPeers("work-magma-follower-draw");
+    const docs = await bindDocuments(session.alice, session.bob);
+    expect(studioAutosaveLeadershipAllowsLocalEdit({
+      role: "follower",
+      basis: "web-lock",
+    })).toBe(true);
+    docs.documentB.addStroke({
+      id: "stroke-follower",
+      pageId: "page-a",
+      layerId: "page-root",
+      payload: strokePayload(44),
+    });
+    await flushReplica(docs.bindingB);
+    await waitUntil(
+      () => docs.documentA.getStroke("stroke-follower") !== null,
+      "follower local stroke did not appear on the other replica"
+    );
+    expect(docs.documentB.getStroke("stroke-follower")).not.toBeNull();
+    expect(docs.documentA.getStroke("stroke-follower")).not.toBeNull();
+    docs.close();
+    session.close();
   });
 });

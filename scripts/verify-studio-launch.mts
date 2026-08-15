@@ -545,6 +545,15 @@ async function runOne(browser: Browser, run: number, url: string): Promise<RunRe
   log(`run${run}: data-studio-logical-w=${logicalW}`);
 
   const hasKonvaSurface = (await page.locator(".konvajs-content, canvas").count().catch(() => 0)) > 0;
+  const liveHost = page.locator(
+    "[data-studio-presence-dock='true'], [data-studio-live-mode], [aria-labelledby='studio-live-collaboration-title']",
+  );
+  const liveHostMounted = await liveHost
+    .first()
+    .waitFor({ state: "attached", timeout: 8_000 })
+    .then(() => true)
+    .catch(() => false);
+  log(`run${run}: liveHostMounted=${liveHostMounted}`);
 
   const dimOk = logicalW === "720" && hasKonvaSurface;
   const sqliteStorageFailureCount = await page.getByText(
@@ -562,12 +571,13 @@ async function runOne(browser: Browser, run: number, url: string): Promise<RunRe
   // Strict gate: driven action performed (click logged) + konva surface + target logical noted
   const ok = pageDelta >= 2
     && dimOk
+    && liveHostMounted
     && workspaceMenu.ok
     && sqliteStorageFailureCount === 0
     && consoleErrors.length === 0;
   if (!ok) {
     log(
-      `run${run} FAIL (delta=${pageDelta}, dimOk=${dimOk}, ` +
+      `run${run} FAIL (delta=${pageDelta}, dimOk=${dimOk}, liveHostMounted=${liveHostMounted}, ` +
       `workspaceMenu=${workspaceMenu.ok}, sqliteStorageFailures=${sqliteStorageFailureCount}, ` +
       `errs=${consoleErrors.length})`,
     );

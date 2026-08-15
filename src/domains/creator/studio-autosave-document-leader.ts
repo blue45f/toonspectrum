@@ -303,6 +303,11 @@ export interface StudioAutosaveDocumentLeadershipNotice {
   readonly actionLabel: string | null;
   /** True only when this tab may persist. Save-safety chrome must not claim green otherwise. */
   readonly canPersist: boolean;
+  /**
+   * Persist leadership never fences the in-memory / CRDT drawing path. A second tab must still
+   * be able to apply a local stroke while the first tab owns OPFS/SQLite.
+   */
+  readonly canDraw: boolean;
 }
 
 /**
@@ -311,14 +316,29 @@ export interface StudioAutosaveDocumentLeadershipNotice {
  */
 export function presentStudioAutosaveDocumentLeadership(
   lease: Pick<StudioAutosaveDocumentLease, "role" | "basis">,
+  options: { liveJam?: boolean } = {},
 ): StudioAutosaveDocumentLeadershipNotice {
   if (lease.role === "leader") {
     return Object.freeze({
       tone: "good" as const,
       title: "이 탭이 원고를 저장합니다",
-      detail: "같은 원고를 연 다른 탭은 읽기 전용으로 열립니다.",
+      detail: options.liveJam
+        ? "다른 탭에서도 바로 같이 그릴 수 있습니다. 이 탭이 이 기기 저장을 맡습니다."
+        : "같은 원고를 연 다른 탭은 읽기 전용으로 열립니다.",
       actionLabel: null,
       canPersist: true,
+      canDraw: true,
+    });
+  }
+  if (options.liveJam) {
+    return Object.freeze({
+      tone: "good" as const,
+      title: "다른 탭과 같이 그리는 중입니다",
+      detail:
+        "이 탭에서도 바로 그릴 수 있습니다. 커서와 획은 실시간으로 맞춰지고, 이 기기 저장은 먼저 연 탭이 맡습니다.",
+      actionLabel: null,
+      canPersist: false,
+      canDraw: true,
     });
   }
   return Object.freeze({
@@ -329,5 +349,16 @@ export function presentStudioAutosaveDocumentLeadership(
       + " 먼저 연 탭을 닫은 뒤 새로고침하면 이 탭에서 이어서 편집할 수 있습니다.",
     actionLabel: "새로고침으로 다시 확인",
     canPersist: false,
+    canDraw: true,
   });
+}
+
+/**
+ * Persist leadership fences OPFS/SQLite only. Followers still apply local CRDT/document edits.
+ */
+export function studioAutosaveLeadershipAllowsLocalEdit(
+  lease: Pick<StudioAutosaveDocumentLease, "role" | "basis"> | null,
+): boolean {
+  if (!lease) return true;
+  return presentStudioAutosaveDocumentLeadership(lease, { liveJam: true }).canDraw;
 }

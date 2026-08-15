@@ -164,6 +164,7 @@ import {
   type StudioAutosavePayload,
   type StudioPendingStrokeDurabilityReason,
 } from "./studio-autosave";
+import { studioAutosaveLeadershipAllowsLocalEdit } from "./studio-autosave-document-leader";
 import {
   preloadStudioBackground3D,
 } from "./studio-background-3d-loader";
@@ -830,6 +831,15 @@ import {
   resolveStudioLiveInkRollout,
   studioLiveInkRolloutInputFromGlobals,
 } from "./studio-live-ink-rollout";
+import {
+  createStudioLiveInstantWorkId,
+  readStudioLiveRoomQuery,
+  resolveStudioLiveSessionWorkId,
+  shouldExpectStudioSharedDocument,
+  shouldPublishStudioLiveJamRoom,
+  shouldRequireStudioLiveServer,
+  withStudioLiveJamRoom,
+} from "./studio-live-jam-session";
 import {
   planStudioLiveHeldResourceReplace,
   selfHoldsStudioLiveLock,
@@ -3270,7 +3280,7 @@ function StudioCuttoonEditor({
   const navigate = useNavigate();
   const location = useLocation();
   const t = useT();
-  const [params] = useSearchParams();
+  const [params, setSearchParams] = useSearchParams();
   const { data: session, ready: studioAuthReady } = useSession();
   const workId = studioRoute.workId;
   const remixId = params.get("remix");
@@ -3906,7 +3916,7 @@ function StudioCuttoonEditor({
       createEmptyStudioAiImageReferenceDocument,
     );
   const loggedIn = Boolean(studioAuthUserId);
-  const liveRoomQueryParam = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("room") : null;
+  const liveRoomQueryParam = readStudioLiveRoomQuery(params);
   const [draftCollaboration, setDraftCollaboration] =
     useState<StudioDraftCollaborationReadiness | null>(null);
   const draftCollaborationProvisionGateRef =
@@ -3945,7 +3955,7 @@ function StudioCuttoonEditor({
     provisionalWorkId: string
   ): Promise<void> {
     await navigator.clipboard.writeText(
-      buildStudioLiveShareHref(provisionalWorkId, window.location.origin)
+      buildStudioLiveShareHref(provisionalWorkId, window.location.origin, provisionalWorkId)
     );
     announceDrawingShortcut("팀 초대 링크를 복사했습니다 · 팀원 권한을 추가한 뒤 전달하세요");
   }
@@ -4033,7 +4043,11 @@ function StudioCuttoonEditor({
       }
     }
   }
-  const expectsSharedDocument = Boolean((workAuthScopeKey && workId && !remixId) || liveRoomQueryParam);
+  const expectsSharedDocument = shouldExpectStudioSharedDocument({
+    workAuthScopeKey,
+    workId,
+    remixId,
+  });
   const [workHydrated, setWorkHydrated] = useState(!(workId || remixId));
   const [workHydrationFailed, setWorkHydrationFailed] = useState(false);
   const [workHydrationUnsupportedFormat, setWorkHydrationUnsupportedFormat] = useState(false);
@@ -4054,16 +4068,29 @@ function StudioCuttoonEditor({
   sharedDocumentRef.current = sharedDocument;
   const instantWorkIdRef = useRef<string | null>(null);
   if (!instantWorkIdRef.current) {
-    instantWorkIdRef.current = `work-instant-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    instantWorkIdRef.current = createStudioLiveInstantWorkId();
   }
   const draftCollaborationWorkId = draftCollaboration?.status === "ready"
     ? draftCollaboration.room.provisionalWorkId
     : draftCollaboration?.identity.draftDocumentId;
-  const effectiveWorkId =
-    workId ??
-    liveRoomQueryParam ??
-    draftCollaborationWorkId ??
-    instantWorkIdRef.current;
+  const effectiveWorkId = resolveStudioLiveSessionWorkId({
+    workId,
+    roomId: liveRoomQueryParam,
+    draftWorkId: draftCollaborationWorkId,
+    instantWorkId: instantWorkIdRef.current,
+  });
+  useEffect(() => {
+    if (!shouldPublishStudioLiveJamRoom({
+      workId,
+      remixId,
+      roomId: liveRoomQueryParam,
+    })) return;
+    const roomId = effectiveWorkId;
+    setSearchParams((current) => {
+      if (readStudioLiveRoomQuery(current) === roomId) return current;
+      return withStudioLiveJamRoom(current, roomId);
+    }, { replace: true });
+  }, [effectiveWorkId, liveRoomQueryParam, remixId, setSearchParams, workId]);
   const studioLiveParticipant = useMemo(() => {
     if (sharedDocument && sharedDocument.status === "active" && sharedDocument.capabilities.view) {
       return {
@@ -4108,7 +4135,11 @@ function StudioCuttoonEditor({
     studioCrdtSceneRuntimeRef.current &&
     studioCrdtReconciledDocument === studioCrdtDocument
   );
-  const isRealtimeTeamSession = Boolean(liveRoomQueryParam);
+  const requiresStudioLiveServer = shouldRequireStudioLiveServer({
+    expectsSharedDocument,
+    draftCollaborationReady: draftCollaboration?.status === "ready",
+  });
+  const isRealtimeTeamSession = requiresStudioLiveServer;
   const collaborationOperationSyncRequired = Boolean(
     expectsSharedDocument && isRealtimeTeamSession && studioLiveParticipant && !collaborationReadOnly
   );
@@ -4805,7 +4836,13 @@ function StudioCuttoonEditor({
   // 신규 캔버스(작업ID/리믹스 없음)에서는 페이지 리뷰 잠금이 편집 차단에 개입하지 않도록 스코프를 분리한다.
   const reviewBoundPage = workId !== null || remixId !== null;
   const pageEditLocked = reviewBoundPage && isPageReviewLocked(activePage.review);
-  const activePageMutationLocked = pageEditLocked || collaborationDocumentLocked;
+  const persistLeadershipAllowsDraw = studioAutosaveLeadershipAllowsLocalEdit(
+    autosaveDocumentLeadership,
+  );
+  const activePageMutationLocked =
+    pageEditLocked ||
+    collaborationDocumentLocked ||
+    !persistLeadershipAllowsDraw;
   const activeSurfaceReviewLocked =
     collaborationDocumentLocked || (pageEditLocked && !masterEditMode);
 
@@ -44537,14 +44574,7 @@ function clearSelectionForEdit() {
       currentTool={tool}
       outboxScope={studioAuthUserId}
       transportFactory={studioLiveTransportFactory}
-      serverRequired={Boolean(
-        studioLiveParticipant
-        && (
-          expectsSharedDocument
-          || Boolean(liveRoomQueryParam)
-          || draftCollaboration?.status === "ready"
-        )
-      )}
+      serverRequired={Boolean(studioLiveParticipant && requiresStudioLiveServer)}
       onRoomChange={handleStudioLiveRoomChange}
       onCrdtDocumentChange={handleStudioCrdtDocumentChange}
       onEditSafetyChange={handleStudioLiveEditSafetyChange}
@@ -45915,6 +45945,7 @@ function clearSelectionForEdit() {
           guides={guides}
           hasAutosave={hasAutosave}
           autosaveDocumentLeadership={autosaveDocumentLeadership}
+          autosaveLiveJam={!requiresStudioLiveServer}
           healCloneArmed={healCloneArmed}
           healCloneCursorRef={healCloneCursorRef}
           healCloneDragPreview={healCloneDragPreview}

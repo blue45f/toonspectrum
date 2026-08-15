@@ -292,7 +292,7 @@ export function StudioLiveCollaborationPanelView({
       <p className="mt-3 text-xs leading-relaxed text-fg-2">
         {mode === "server"
           ? "로그인 세션과 작품 권한을 확인한 팀 연결입니다. 화면은 보기를 직접 요청한 피어에게만 전달됩니다."
-          : "현재 작품을 이 브라우저의 같은 출처 탭에서 열면 접속 상태와 화면 공유를 시험할 수 있습니다. 인터넷 팀 접속으로 표시하지 않습니다."}
+          : "같은 브라우저에서 이 주소로 탭을 하나 더 열면 커서와 획이 바로 같이 움직입니다. 서버 없이 이 기기 안에서만 동기화합니다."}
       </p>
 
       {syncSnapshot && syncPresentation ? (
@@ -1075,7 +1075,7 @@ export function StudioLiveCollaborationPanel({ workId }: { workId: string }) {
     try {
       const { buildStudioLiveShareHref } = await import("./creator-studio-links");
       await navigator.clipboard.writeText(
-        buildStudioLiveShareHref(workId, window.location.origin)
+        buildStudioLiveShareHref(workId, window.location.origin, workId)
       );
       setInviteLinkNotice("초대 링크를 복사했습니다.");
     } catch {

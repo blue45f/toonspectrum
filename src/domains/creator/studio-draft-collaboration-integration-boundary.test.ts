@@ -13,9 +13,10 @@ describe("unsaved Studio collaboration identity wiring", () => {
     expect(page).toContain("loadOrCreateStudioDraftCollaborationIdentity(");
     expect(page).toContain("documentScopeKey: autosaveKey");
     expect(page).toContain("ownerScopeKey: studioAuthUserId");
-    expect(page).toMatch(
-      /workId\s*\?\?\s*liveRoomQueryParam\s*\?\?\s*draftCollaborationWorkId\s*\?\?\s*instantWorkIdRef\.current/
-    );
+    expect(page).toContain("resolveStudioLiveSessionWorkId({");
+    expect(page).toContain("roomId: liveRoomQueryParam");
+    expect(page).toContain("draftWorkId: draftCollaborationWorkId");
+    expect(page).toContain("instantWorkId: instantWorkIdRef.current");
     expect(page).toContain("draftCollaboration={draftCollaboration}");
     expect(page).toContain("provisionCreatorDraftCollaborationRoom(request");
     expect(page).toContain('intent: "share-link"');

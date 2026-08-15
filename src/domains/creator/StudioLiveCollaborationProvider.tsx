@@ -201,7 +201,7 @@ export function StudioLiveCollaborationProvider({
   const [error, setError] = useState<string | null>(null);
   const [localFallbackAllowed, setLocalFallbackAllowed] = useState(true);
   const [transportPreference, setTransportPreference] = useState<"server" | "local">(
-    serverRequired || transportFactory ? "server" : "local"
+    serverRequired ? "server" : "local"
   );
   const [transportRetryKey, setTransportRetryKey] = useState(0);
   const [syncTelemetry, setSyncTelemetry] = useState<StudioCrdtSyncTelemetry | null>(null);
@@ -234,7 +234,7 @@ export function StudioLiveCollaborationProvider({
       observed.serverRequired === serverRequired
     ) return;
     observedTransportPolicyRef.current = { transportFactory, serverRequired };
-    setTransportPreference(serverRequired || transportFactory ? "server" : "local");
+    setTransportPreference(serverRequired ? "server" : "local");
   }, [serverRequired, transportFactory]);
 
   useEffect(() => {

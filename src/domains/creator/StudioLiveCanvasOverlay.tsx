@@ -1,6 +1,7 @@
 import {
   Check,
   CloudOff,
+  ExternalLink,
   LoaderCircle,
   MessageCircle,
   MousePointer2,
@@ -44,6 +45,7 @@ import {
   type StudioLiveCursorPayload,
   type StudioLiveParticipant,
 } from "./studio-live-collaboration-protocol";
+import { openStudioLiveCompanionTab } from "./studio-live-jam-session";
 import { summarizeStudioLiveActiveOwners } from "./studio-live-layer-ownership";
 import {
   INITIAL_STUDIO_LIVE_SYNC_SNAPSHOT,
@@ -115,6 +117,7 @@ export interface StudioLivePresenceDockProps {
   activeLockLabel?: string | null;
   followingSessionId: string | null;
   onOpenTeam: () => void;
+  onOpenCompanionTab?: () => void;
   onToggleFollow: (sessionId: string) => void;
   syncSnapshot?: StudioLiveSyncSnapshot;
   voiceControls?: ReactNode;
@@ -1207,6 +1210,7 @@ export function StudioLivePresenceDock({
   activeLockLabel = null,
   followingSessionId,
   onOpenTeam,
+  onOpenCompanionTab,
   onToggleFollow,
   syncSnapshot,
   voiceControls,
@@ -1262,6 +1266,18 @@ export function StudioLivePresenceDock({
           {syncAnnouncement}
         </span>
       )}
+      {onOpenCompanionTab ? (
+        <button
+          type="button"
+          aria-label="새 탭에서 같이 그리기"
+          title="새 탭에서 같이 그리기"
+          data-studio-presence-companion-tab="true"
+          className="grid size-11 shrink-0 place-items-center rounded-lg border border-accent/40 bg-accent-soft text-accent transition-colors duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent motion-reduce:transition-none"
+          onClick={onOpenCompanionTab}
+        >
+          <ExternalLink size={16} strokeWidth={1.75} aria-hidden />
+        </button>
+      ) : null}
       <button
         type="button"
         aria-label="팀 작업 공간 열기"
@@ -1425,6 +1441,13 @@ export function StudioLivePresenceDockConnected({
       connected={availability === "ready"}
       operationSyncReady={operationSyncReady}
       alwaysOn
+      onOpenCompanionTab={
+        room
+          ? () => {
+              openStudioLiveCompanionTab(room.workId);
+            }
+          : undefined
+      }
       peers={peers}
       activeLockCount={lockOwners.activeLockCount}
       activeLockLabel={lockOwners.label}

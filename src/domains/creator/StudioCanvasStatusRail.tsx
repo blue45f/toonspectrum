@@ -265,6 +265,7 @@ export interface StudioCanvasStatusRailProps {
    * 이 탭이 문서 저장을 맡는지(leader) 아닌지(follower). 결정 전(`null`)에는 아무 고지도
    * 하지 않는다 — 아직 모르는 것을 단정하는 쪽이 더 나쁜 실패다.
    */
+  autosaveLiveJam?: boolean;
   autosaveDocumentLeadership?: {
     readonly role: StudioAutosaveDocumentRole;
     readonly basis: StudioAutosaveDocumentLeadershipBasis;
@@ -308,6 +309,7 @@ export function StudioCanvasStatusRail({
   onDownloadAutosaveBackup,
   onRestoreAutosave,
   onClearAutosave,
+  autosaveLiveJam = false,
   autosaveDocumentLeadership = null,
   onGroupSelection,
   onUngroupSelection,
@@ -349,7 +351,9 @@ export function StudioCanvasStatusRail({
    */
   const followerNotice =
     autosaveDocumentLeadership && autosaveDocumentLeadership.role === "follower"
-      ? presentStudioAutosaveDocumentLeadership(autosaveDocumentLeadership)
+      ? presentStudioAutosaveDocumentLeadership(autosaveDocumentLeadership, {
+          liveJam: autosaveLiveJam,
+        })
       : null;
   // 복구 배너의 안전한 기본 행동은 "복구하기"(복구가 막혔으면 "JSON 백업")다. 영구 삭제
   // 승인 창을 닫고 나면 포커스를 파괴 버튼이 아니라 이 안전한 쪽에 되돌려 준다.
@@ -376,12 +380,21 @@ export function StudioCanvasStatusRail({
       {followerNotice ? (
         <div
           data-studio-autosave-document-follower
+          data-studio-autosave-live-jam={followerNotice.tone === "good" ? "true" : undefined}
           role="status"
           aria-live="polite"
-          className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-warning/30 bg-warning-soft/20 p-2.5 text-xs text-warning"
+          className={cn(
+            "mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border p-2.5 text-xs",
+            followerNotice.tone === "good"
+              ? "border-accent/30 bg-accent-soft/20 text-fg"
+              : "border-warning/30 bg-warning-soft/20 text-warning",
+          )}
         >
           <span className="min-w-0 flex-1 leading-relaxed">
-            <strong className="block font-bold">⚠️ {followerNotice.title}</strong>
+            <strong className="block font-bold">
+              {followerNotice.tone === "warn" ? "⚠️ " : null}
+              {followerNotice.title}
+            </strong>
             <span className="mt-0.5 block font-medium">{followerNotice.detail}</span>
           </span>
           {followerNotice.actionLabel ? (

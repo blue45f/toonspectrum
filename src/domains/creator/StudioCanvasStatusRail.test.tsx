@@ -108,6 +108,21 @@ describe("StudioCanvasStatusRail", () => {
     expect(screen.getByRole("button", { name: "새로고침으로 다시 확인" })).toBeTruthy();
   });
 
+  it("lets a Magma jam follower keep drawing instead of looking read-only", () => {
+    const props = createProps({
+      hasAutosave: true,
+      autosaveLiveJam: true,
+      autosaveDocumentLeadership: { role: "follower", basis: "web-lock" },
+    });
+
+    render(<StudioCanvasStatusRail {...props} />);
+
+    expect(screen.getByText(/같이 그리는 중/u)).toBeTruthy();
+    expect(screen.getByText(/이 탭에서도 바로 그릴 수 있습니다/u)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "새로고침으로 다시 확인" })).toBeNull();
+    expect(document.querySelector("[data-studio-autosave-live-jam='true']")).toBeTruthy();
+  });
+
   it("keeps the recovery banner for the leading tab", () => {
     const props = createProps({
       hasAutosave: true,

@@ -130,8 +130,8 @@ describe("StudioLiveCollaborationPanelView", () => {
     expect(html).toContain('data-studio-live-mode="local"');
     expect(html).toContain("로컬 탭 미리보기");
     expect(html).toContain("같은 출처 탭 연결");
-    expect(html).toContain("이 브라우저의 같은 출처 탭");
-    expect(html).toContain("인터넷 팀 접속으로 표시하지 않습니다");
+    expect(html).toContain("같은 브라우저에서 이 주소로 탭을 하나 더 열면");
+    expect(html).toContain("서버 없이 이 기기 안에서만 동기화합니다");
   });
 
   it("renders an injected authenticated server transport as a separate mode", () => {
