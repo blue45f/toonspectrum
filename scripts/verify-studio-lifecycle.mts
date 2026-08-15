@@ -41,6 +41,7 @@ import {
 } from "playwright";
 
 import { STUDIO_CANVAS_WIDTH } from "../src/domains/creator/studio-canvas-constants";
+import { DEFAULT_CANVAS_H } from "../src/domains/creator/studio-pages";
 
 import {
   inspectPngIntegrity,
@@ -56,6 +57,7 @@ const SCRATCH =
 const LOG_PATH = join(SCRATCH, "studio-lifecycle-preview.log");
 const REPORT_PATH = join(SCRATCH, "studio-lifecycle-report.json");
 const AUTOSAVE_PREFIX = "toonspectrum-studio-autosave";
+const DURABLE_AUTOSAVE_SETTLE_MS = 2_500;
 const CLEAN_SESSION_KEY = "toonspectrum-lifecycle-verifier-cleaned";
 const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
 const MOBILE_HINT_KEY = "toonspectrum-studio-mobile-hint-dismissed";
@@ -71,18 +73,11 @@ interface BrowserErrorCollector {
 }
 
 interface AutosaveEvidence {
-  key: string;
-  savedAt: string;
-  currentPageId: string;
-  canvasHeight: number;
-  drawCount: number;
-  stroke: {
-    id: string;
-    pointCount: number;
-    brush: string | null;
-    brushCatalogId: string | null;
-    fingerprint: string;
-  };
+  authority: "durable-reload-recovery";
+  recoveryBannerObserved: true;
+  restoreActionCompleted: true;
+  browserCompatibilityKeysBeforeReload: number;
+  browserCompatibilityKeysAtRecovery: number;
 }
 
 interface DecodedPngStats {
@@ -107,7 +102,8 @@ interface LifecycleResult {
   timings: {
     pointerGestureMs: number;
     historyReadyAfterPointerUpMs: number;
-    autosaveReadyAfterRedoMs: number;
+    autosaveSettleBeforeReloadMs: number;
+    recoveryReadyAfterReloadMs: number;
   };
   visual: {
     blankToCommitted: PixelDiffEvidence;
@@ -412,115 +408,15 @@ async function captureStableStage(page: Page, stage: Locator): Promise<Buffer> {
   return current;
 }
 
-async function readLatestAutosave(page: Page): Promise<AutosaveEvidence | null> {
+async function countBrowserCompatibilityAutosaveKeys(page: Page): Promise<number> {
   return page.evaluate((prefix) => {
-    interface Candidate {
-      key: string;
-      savedAt: string;
-      currentPageId?: string;
-      pagesList?: Array<{
-        id?: string;
-        canvasH?: number;
-        elements?: unknown[];
-      }>;
-    }
-    let newest: Candidate | null = null;
+    let count = 0;
     for (let index = 0; index < window.localStorage.length; index += 1) {
       const key = window.localStorage.key(index);
-      if (!key?.startsWith(prefix) || key.endsWith(":lifecycle")) continue;
-      const raw = window.localStorage.getItem(key);
-      if (!raw) continue;
-      try {
-        const parsed = JSON.parse(raw) as Omit<Candidate, "key">;
-        if (!Array.isArray(parsed.pagesList)) continue;
-        const candidate = { ...parsed, key };
-        if (!newest || candidate.savedAt >= newest.savedAt) newest = candidate;
-      } catch {
-        // Ignore unrelated or corrupt records; the caller's polling remains strict.
-      }
+      if (key?.startsWith(prefix)) count += 1;
     }
-    if (!newest?.pagesList) return null;
-    const activePage = newest.pagesList.find((candidate) => candidate.id === newest?.currentPageId)
-      ?? newest.pagesList[0];
-    if (!activePage) return null;
-    const draws = (activePage.elements ?? []).filter((element): element is Record<string, unknown> =>
-      Boolean(element)
-      && typeof element === "object"
-      && !Array.isArray(element)
-      && (element as { type?: unknown }).type === "draw"
-    );
-    const stroke = draws[0];
-    const points = Array.isArray(stroke?.points)
-      ? stroke.points.filter((value): value is number =>
-          typeof value === "number" && Number.isFinite(value)
-        )
-      : [];
-    if (
-      draws.length !== 1
-      || typeof stroke?.id !== "string"
-      || points.length < 4
-      || typeof activePage.canvasH !== "number"
-    ) {
-      return null;
-    }
-    return {
-      key: newest.key,
-      savedAt: newest.savedAt,
-      currentPageId: activePage.id ?? newest.currentPageId ?? "",
-      canvasHeight: activePage.canvasH,
-      drawCount: draws.length,
-      stroke: {
-        id: stroke.id,
-        pointCount: points.length / 2,
-        brush: typeof stroke.brush === "string" ? stroke.brush : null,
-        brushCatalogId: typeof stroke.brushCatalogId === "string" ? stroke.brushCatalogId : null,
-        fingerprint: JSON.stringify({
-          id: stroke.id,
-          type: stroke.type,
-          kind: stroke.kind,
-          brush: stroke.brush,
-          brushCatalogId: stroke.brushCatalogId,
-          points,
-        }),
-      },
-    };
+    return count;
   }, AUTOSAVE_PREFIX);
-}
-
-async function waitForAutosave(page: Page): Promise<AutosaveEvidence> {
-  await page.waitForFunction((prefix) => {
-    for (let index = 0; index < window.localStorage.length; index += 1) {
-      const key = window.localStorage.key(index);
-      if (!key?.startsWith(prefix) || key.endsWith(":lifecycle")) continue;
-      const raw = window.localStorage.getItem(key);
-      if (!raw) continue;
-      try {
-        const payload = JSON.parse(raw) as {
-          pagesList?: Array<{ canvasH?: unknown; elements?: unknown[] }>;
-        };
-        const draws = (payload.pagesList ?? []).flatMap((candidate) =>
-          (candidate.elements ?? []).filter((element) =>
-            Boolean(element)
-            && typeof element === "object"
-            && (element as { type?: unknown }).type === "draw"
-          )
-        );
-        if (
-          draws.length === 1
-          && typeof payload.pagesList?.[0]?.canvasH === "number"
-          && Array.isArray((draws[0] as { points?: unknown }).points)
-        ) {
-          return true;
-        }
-      } catch {
-        // Keep waiting for the normal debounced autosave.
-      }
-    }
-    return false;
-  }, AUTOSAVE_PREFIX, { timeout: 7_000 });
-  const evidence = await readLatestAutosave(page);
-  invariant(evidence, "local autosave did not persist the committed draw element");
-  return evidence;
 }
 
 async function captureDownload(
@@ -688,10 +584,16 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
     const redone = await captureStableStage(page, stage);
     writeFileSync(redonePath, redone);
 
-    const autosave = await waitForAutosave(page);
-    const autosaveReadyAfterRedoMs = performance.now() - redoCompletedAt;
-    const autosaveFingerprint = sha256(autosave.stroke.fingerprint);
-    invariant(autosave.stroke.pointCount >= 8, "autosave contains a degenerate pointer stroke");
+    // V12 writes the authoritative snapshot to OPFS/SQLite and deliberately deletes the old
+    // localStorage JSON compatibility slot. Give the shipped debounce one bounded settle window;
+    // the reload/recovery UI and pixel-identical export below are the persistence receipt.
+    await page.waitForTimeout(DURABLE_AUTOSAVE_SETTLE_MS);
+    const autosaveSettleBeforeReloadMs = performance.now() - redoCompletedAt;
+    const browserCompatibilityKeysBeforeReload = await countBrowserCompatibilityAutosaveKeys(page);
+    invariant(
+      browserCompatibilityKeysBeforeReload === 0,
+      "durable autosave left a browser compatibility record before reload",
+    );
 
     const beforeDownload = await captureDownload(page, beforeExportPath);
     const beforePng = inspectPngIntegrity(beforeDownload.bytes);
@@ -701,12 +603,13 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
       "PNG export contains no visible stroke pixels",
     );
     const expectedWidth = Math.round(STUDIO_CANVAS_WIDTH * beforeDownload.scale);
-    const expectedHeight = Math.round(autosave.canvasHeight * beforeDownload.scale);
+    const expectedHeight = Math.round(DEFAULT_CANVAS_H * beforeDownload.scale);
     invariant(
       beforePng.width === expectedWidth && beforePng.height === expectedHeight,
       `PNG dimensions are ${beforePng.width}x${beforePng.height}, expected ${expectedWidth}x${expectedHeight}`,
     );
 
+    const reloadStartedAt = performance.now();
     await page.reload({ waitUntil: "domcontentloaded", timeout: 20_000 });
     await page.locator('[data-studio-editor="true"]').waitFor({ state: "visible", timeout: 12_000 });
     await dismissQuickStart(page);
@@ -719,6 +622,12 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
       { exact: false },
     );
     await recoveryMessage.waitFor({ state: "visible", timeout: 8_000 });
+    const recoveryReadyAfterReloadMs = performance.now() - reloadStartedAt;
+    const browserCompatibilityKeysAtRecovery = await countBrowserCompatibilityAutosaveKeys(page);
+    invariant(
+      browserCompatibilityKeysAtRecovery === 0,
+      "reload recovery was backed by a browser compatibility record instead of OPFS/SQLite",
+    );
     await page.getByRole("button", { name: "복구하기", exact: true }).click();
     await recoveryMessage.waitFor({ state: "detached", timeout: 8_000 });
 
@@ -733,13 +642,6 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
       redoneToReloaded = await comparePngPixels(page, redone, reloaded, 2, artworkCrop);
     }
     writeFileSync(reloadedPath, reloaded);
-
-    const restoredAutosave = await readLatestAutosave(page);
-    invariant(restoredAutosave, "autosave record disappeared during reload recovery");
-    invariant(
-      sha256(restoredAutosave.stroke.fingerprint) === autosaveFingerprint,
-      "recovered stroke payload differs from the saved stroke payload",
-    );
 
     const afterDownload = await captureDownload(page, afterExportPath);
     const afterPng = inspectPngIntegrity(afterDownload.bytes);
@@ -785,16 +687,17 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
       origin,
       externalPreview: Boolean(process.env.TOONSPECTRUM_VERIFY_ORIGIN?.trim()),
       autosave: {
-        ...autosave,
-        stroke: {
-          ...autosave.stroke,
-          fingerprint: autosaveFingerprint,
-        },
+        authority: "durable-reload-recovery",
+        recoveryBannerObserved: true,
+        restoreActionCompleted: true,
+        browserCompatibilityKeysBeforeReload,
+        browserCompatibilityKeysAtRecovery,
       },
       timings: {
         pointerGestureMs,
         historyReadyAfterPointerUpMs,
-        autosaveReadyAfterRedoMs,
+        autosaveSettleBeforeReloadMs,
+        recoveryReadyAfterReloadMs,
       },
       visual,
       export: {
@@ -826,7 +729,7 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
       },
       browserErrors,
       limitations: [
-        "Persistence coverage is the shipped local autosave/recovery path, not authenticated server/database save.",
+        "Persistence coverage is the shipped OPFS/SQLite autosave and reload/recovery UI path, not authenticated server/database save.",
         "historyReadyAfterPointerUpMs includes Playwright transport and DOM polling overhead; it is diagnostic, not input-latency p95.",
         "The gate covers Chromium production preview and one default opaque pen stroke, not every brush/backend/browser.",
       ],
