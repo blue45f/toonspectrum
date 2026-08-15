@@ -16,7 +16,7 @@ describe("StudioBg3dSpatialFxPanel", () => {
     expect(markup).toContain("쿵");
     expect(markup).toContain("쾅");
     expect(markup).toContain("촤아악");
-    expect(markup).toContain("입체 돌출 두께");
+    expect(markup).toContain("입체 두께");
     expect(markup).toContain("3D 씬에 입체 효과음 추가");
   });
 

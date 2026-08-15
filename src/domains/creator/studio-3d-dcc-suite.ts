@@ -15,6 +15,11 @@ export * from "./studio-3d-rights-bom";
 export * from "./studio-3d-character-scene-mixer";
 export * from "./studio-3d-package";
 export * from "./studio-3d-spatial-fx";
+export * from "./studio-3d-atmosphere-weather";
+export * from "./studio-3d-procedural-cityscape";
+export * from "./studio-3d-cinematography-rail";
+export * from "./studio-3d-toon-shader-graph";
+export * from "./studio-3d-cloth-hair-dynamics";
 export * from "./studio-3d-scene-dependency-graph";
 export {
   type GeometryAuthority,
