@@ -1,4 +1,4 @@
-import { isStudioWorkspaceLocation } from "@/src/domains/creator/studio-workspace-route";
+import { studioRouteOwnsDocumentTitle } from "@/src/domains/creator/studio-router/studio-route-manifest";
 
 export interface AppRouteTitleLocation {
   readonly pathname: string;
@@ -18,6 +18,8 @@ export function shouldAppRouterOwnDocumentTitle({
   if (pathname.startsWith("/u/")) return false;
   if (pathname.startsWith("/community/cafes/")) return false;
   if (pathname.startsWith("/community/post/")) return false;
-  if (pathname === "/studio/tools-companion") return false;
-  return !isStudioWorkspaceLocation({ pathname, search });
+  if (pathname === "/studio" || pathname.startsWith("/studio/")) {
+    return !studioRouteOwnsDocumentTitle({ pathname, search });
+  }
+  return true;
 }

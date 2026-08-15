@@ -9,9 +9,9 @@ import { lazyRetry } from "@/lib/lazy-retry";
 import { cn } from "@/lib/utils";
 import { ErrorBoundary } from "@/src/components/error-boundary";
 import { loadStudioI18nDictionaries } from "@/src/domains/creator/studio-i18n-loader";
+import { resolveStudioRoute } from "@/src/domains/creator/studio-router/studio-route-manifest";
 import {
   isStudioRoutePathname,
-  isStudioWorkspaceLocation,
   studioRouteStageKey,
 } from "@/src/domains/creator/studio-workspace-route";
 
@@ -175,31 +175,21 @@ const CreateChallengesPage = lazyRetry(
   () => import("@/src/domains/creator/CreateChallengesPage").then((m) => ({ default: m.CreateChallengesPage })),
   "CreateChallengesPage"
 );
-const StudioPage = lazyRetry(
+const StudioRouter = lazyRetry(
   async () => {
     const [module] = await Promise.all([
-      import("@/src/domains/creator/StudioPage"),
+      import("@/src/domains/creator/studio-router/StudioRouter"),
       loadStudioI18nDictionaries(),
     ]);
-    return { default: module.StudioPage };
+    return { default: module.StudioRouter };
   },
-  "StudioPage",
+  "StudioRouter",
 );
 const StudioCrossOriginIsolationGate = lazyRetry(
   () => import("@/src/app/StudioCrossOriginIsolationGate").then((m) => ({
     default: m.StudioCrossOriginIsolationGate,
   })),
   "StudioCrossOriginIsolationGate",
-);
-const StudioToolsCompanionPage = lazyRetry(
-  async () => {
-    const [module] = await Promise.all([
-      import("@/src/domains/creator/StudioToolsCompanionPage"),
-      loadStudioI18nDictionaries(),
-    ]);
-    return { default: module.StudioToolsCompanionPage };
-  },
-  "StudioToolsCompanionPage"
 );
 const AccountPage = lazyRetry(() => import("@/src/domains/account/AccountPage").then((m) => ({ default: m.AccountPage })), "AccountPage");
 const AuthCallbackPage = lazyRetry(
@@ -248,8 +238,12 @@ function RouteStage({
 }) {
   const [settled, setSettled] = useState(false);
   const location = { pathname, search };
-  const instantEditorEntry = isStudioWorkspaceLocation(location);
-  const stageKey = studioRouteStageKey(location);
+  const studioResolution = isStudioRoutePathname(pathname)
+    ? resolveStudioRoute(location)
+    : null;
+  const instantEditorEntry = studioResolution?.kind === "editor"
+    || studioResolution?.kind === "publish";
+  const stageKey = studioResolution?.lifecycleKey ?? studioRouteStageKey(location);
   const onAnimationEnd = (e: AnimationEvent<HTMLDivElement>) => {
     if (e.animationName === "route-stage-in") setSettled(true);
   };
@@ -277,7 +271,7 @@ export function AppRouter() {
   );
   const routeTree = (
     <RouteStage pathname={pathname} search={search}>
-      <ErrorBoundary resetKey={pathname}>
+      <ErrorBoundary resetKey={`${pathname}${search}`}>
         <Suspense fallback={<RouteFallback />}>
           <Routes>
           <Route path="/" element={<HomePage />} />
@@ -315,8 +309,7 @@ export function AppRouter() {
           <Route path="/create/challenges" element={<CreateChallengesPage />} />
           <Route path="/create/series/:id" element={<CreateSeriesPage />} />
           <Route path="/create/:id" element={<CreateWorkPage />} />
-          <Route path="/studio/tools-companion" element={<StudioToolsCompanionPage />} />
-          <Route path="/studio/*" element={<StudioPage />} />
+          <Route path="/studio/*" element={<StudioRouter />} />
           <Route path="/me" element={<AccountPage />} />
           <Route path="/title/:slug" element={<TitleDetailPage />} />
           <Route path="/author/:name" element={<AuthorPage />} />

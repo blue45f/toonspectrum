@@ -12,6 +12,8 @@ describe("shouldRenderAppSplash", () => {
 
   it("게시용 upload 모드는 기존 앱 인트로 흐름을 유지한다", () => {
     expect(shouldRenderAppSplash("/studio", "?mode=upload")).toBe(true);
+    expect(shouldRenderAppSplash("/studio/publish")).toBe(true);
+    expect(shouldRenderAppSplash("/studio/work/work-1/publish")).toBe(true);
   });
 
   it.each(["/", "/ranking", "/create", "/create/work-1"])(

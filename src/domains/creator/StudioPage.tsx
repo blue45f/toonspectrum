@@ -509,15 +509,12 @@ import {
   shouldHandleStudioEditEvent,
 } from "./studio-edit-controls";
 import {
-  advanceStudioDraftIdentityScope,
-  createStudioDraftIdentityScope,
   invalidateStudioOwnerDetailAfterSharedSave,
   isStudioCuttoonSourceFormat,
   isStudioEditorAsyncScopeCurrent,
   isStudioEditorCollaborationLocked,
   isStudioEditorMutationContinuationAllowed,
   isStudioSourceHydrationPending,
-  studioEditorInstanceKey,
   type StudioEditorMutationTicket,
 } from "./studio-editor-scope";
 import {
@@ -1009,7 +1006,6 @@ import {
   StudioPointCommentComposer,
   StudioShapePickerGrid,
   StudioUnifiedBrushPicker,
-  StudioUploadPublish,
   loadStudioBrushStudio,
   loadStudioCaptureReadinessRuntime,
   loadStudioComipoAssembly,
@@ -1610,13 +1606,11 @@ import {
 import { readStudioWorkspaceDeviceSignalsFromGlobals } from "./studio-workspace-device-signals";
 import {
   createStudioDccNavigationState,
-  parseStudioWorkspaceRoute,
   studioCanvasHref,
   studioDccHref,
   studioWorkspaceReturnHref,
   type StudioDccWorkbenchMode,
   type StudioWorkspaceRoute,
-  type StudioWorkspaceRouteErrorCode,
 } from "./studio-workspace-route";
 import {
   STUDIO_WORKSPACE_LEFT_PANEL_WIDTH,
@@ -1670,7 +1664,6 @@ import {
   type StudioLazyPanelStackHandlers,
   type StudioLazyPanelStackProps,
 } from "./StudioLazyPanelStack";
-import { StudioRouteLoading } from "./StudioLazySurfaceFallback";
 import {
   StudioLiveCollaborationProvider,
   type StudioCrdtAuthoritativeSaveBarrier,
@@ -2894,125 +2887,25 @@ function withStudioLinked3dCloudSaveRecoveryState(
   };
 }
 
-export function StudioPage() {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const [params] = useSearchParams();
-  const { data: session } = useSession();
-  const studioRoute = parseStudioWorkspaceRoute({
-    pathname: location.pathname,
-    search: location.search,
-  });
-  const workId = studioRoute.valid ? studioRoute.workId : null;
-  const remixId = params.get("remix");
-  const authScopeKey = session?.user?.id ?? null;
-  const uploadMode = studioRoute.valid
-    && studioRoute.surface === "canvas"
-    && params.get("mode") === "upload";
-  const draftRouteKey = uploadMode
-    ? `upload:${workId ?? "new"}`
-    : workId
-      ? `work:${workId}`
-      : remixId
-        ? `remix:${remixId}`
-        : "new";
-  const draftIdentityScopeRef = useRef(
-    createStudioDraftIdentityScope(draftRouteKey, authScopeKey)
-  );
-  draftIdentityScopeRef.current = advanceStudioDraftIdentityScope(
-    draftIdentityScopeRef.current,
-    draftRouteKey,
-    authScopeKey
-  );
-  const canonicalStudioHref = studioRoute.valid && !uploadMode
-    ? studioRoute.surface === "dcc"
-      ? studioDccHref({
-          mode: studioRoute.dccMode ?? "model",
-          search: location.search,
-          workId: studioRoute.workId,
-        })
-      : studioCanvasHref({
-          search: location.search,
-          workId: studioRoute.workId,
-        })
-    : null;
-  useEffect(() => {
-    if (!canonicalStudioHref) return;
-    const currentHref = `${location.pathname}${location.search}`;
-    if (canonicalStudioHref === currentHref) return;
-    navigate(canonicalStudioHref, { replace: true, state: location.state });
-  }, [canonicalStudioHref, location.pathname, location.search, location.state, navigate]);
-  if (!studioRoute.valid) {
-    return (
-      <StudioWorkspaceRouteFailure
-        errorCode={studioRoute.errorCode}
-        onOpenStudio={() => navigate("/studio", { replace: true })}
-      />
-    );
-  }
-  if (uploadMode) {
-    return (
-      <Suspense fallback={<StudioRouteLoading label="게시 작업공간을 안전하게 여는 중..." />}>
-        <StudioUploadPublish
-          key={JSON.stringify(["upload", workId ?? "new", draftIdentityScopeRef.current.epoch])}
-          workId={workId}
-        />
-      </Suspense>
-    );
-  }
-  // 저장된 작품은 계정/작품 경계가 바뀌는 즉시 편집기를 새 인스턴스로 만들어 이전 계정 원고가
-  // 다음 계정의 첫 프레임에 남지 않게 한다. 신규·리믹스는 guest→최초 로그인만 같은 epoch로 보존하고,
-  // 인증 계정 logout/전환은 draft epoch를 올려 즉시 격리한다.
-  const editorScopeKey = studioEditorInstanceKey({
-    authScopeKey,
-    workId,
-    remixId,
-    draftSessionEpoch: draftIdentityScopeRef.current.epoch,
-  });
-  return (
-    <Profiler id="studio:editor" onRender={recordStudioRenderProfile}>
-      <StudioCuttoonEditor key={editorScopeKey} studioRoute={studioRoute} />
-    </Profiler>
-  );
+export interface LegacyStudioEditorAdapterProps {
+  /** Canonical path identity supplied by StudioRouter; never re-read from a query alias. */
+  readonly remixId: string | null;
+  readonly studioRoute: StudioWorkspaceRoute;
 }
 
-function StudioWorkspaceRouteFailure({
-  errorCode,
-  onOpenStudio,
-}: {
-  readonly errorCode: StudioWorkspaceRouteErrorCode;
-  readonly onOpenStudio: () => void;
-}) {
-  const detail = errorCode === "work-id-conflict"
-    ? "주소의 작품 ID가 서로 달라 다른 문서를 여는 대신 작업을 중단했습니다."
-    : errorCode === "invalid-work-id"
-      ? "작품 ID를 안전하게 읽을 수 없습니다. 원래 작품 링크를 다시 확인해 주세요."
-      : "지원하지 않는 Studio 작업 주소입니다.";
+/**
+ * Temporary adapter around the monolithic editor while feature panels are extracted in parallel.
+ * URL parsing, canonical navigation, publish routing, and editor instance ownership live in
+ * `studio-router`; this module now owns editor behavior only.
+ */
+export function LegacyStudioEditorAdapter({
+  remixId,
+  studioRoute,
+}: LegacyStudioEditorAdapterProps) {
   return (
-    <section
-      aria-labelledby="studio-workspace-route-error-title"
-      className="grid min-h-dvh place-items-center bg-bg px-5 py-12 text-fg"
-    >
-      <div className="max-w-xl text-center">
-        <p className="text-sm font-semibold text-warn">3D 작업공간을 열지 않았습니다</p>
-        <h1
-          id="studio-workspace-route-error-title"
-          className="mt-2 text-balance text-2xl font-bold tracking-tight sm:text-3xl"
-        >
-          작업 주소를 확인해 주세요
-        </h1>
-        <p className="mx-auto mt-3 max-w-[62ch] text-sm leading-relaxed text-fg-2">
-          {detail}
-        </p>
-        <button
-          type="button"
-          onClick={onOpenStudio}
-          className="mt-6 min-h-11 rounded-lg bg-accent px-5 text-sm font-semibold text-on-accent hover:bg-accent/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-        >
-          새 Studio 작업 열기
-        </button>
-      </div>
-    </section>
+    <Profiler id="studio:editor" onRender={recordStudioRenderProfile}>
+      <StudioCuttoonEditor remixId={remixId} studioRoute={studioRoute} />
+    </Profiler>
   );
 }
 
@@ -3287,8 +3180,10 @@ function closedStudioLayerLiftUiState(): StudioLayerLiftUiState {
 }
 
 function StudioCuttoonEditor({
+  remixId,
   studioRoute,
 }: {
+  readonly remixId: string | null;
   readonly studioRoute: StudioWorkspaceRoute;
 }) {
   const navigate = useNavigate();
@@ -3297,7 +3192,6 @@ function StudioCuttoonEditor({
   const [params, setSearchParams] = useSearchParams();
   const { data: session, ready: studioAuthReady } = useSession();
   const workId = studioRoute.workId;
-  const remixId = params.get("remix");
   const linked3dCloudSaveRecoveryNotice = studioLinked3dCloudSaveRecoveryNotice(
     location.state,
     workId,
@@ -5966,6 +5860,7 @@ function StudioCuttoonEditor({
       return;
     }
     navigate(studioCanvasHref({
+      remixSourceWorkId: studioRoute.remixSourceWorkId,
       search: location.search,
       workId: studioRoute.workId,
     }), { replace: true });
@@ -6018,6 +5913,7 @@ function StudioCuttoonEditor({
     captureHybridDccReturnFocus();
     navigate(studioDccHref({
       mode,
+      remixSourceWorkId: studioRoute.remixSourceWorkId,
       search: location.search,
       workId: studioRoute.workId,
     }), {
@@ -6043,6 +5939,7 @@ function StudioCuttoonEditor({
     if (!hybridDccRouteRequested || mode === studioRoute.dccMode) return;
     navigate(studioDccHref({
       mode,
+      remixSourceWorkId: studioRoute.remixSourceWorkId,
       search: location.search,
       workId: studioRoute.workId,
     }), {
