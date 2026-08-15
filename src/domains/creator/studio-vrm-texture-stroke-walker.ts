@@ -12,6 +12,7 @@
 import {
   beginStampWalker,
   STUDIO_STAMP_BRUSH_MAX_DABS,
+  studioStampInkSpeedFactor,
   type StudioStampBrushDab,
   type StudioStampBrushKind,
   type StudioStampBrushStyle,
@@ -94,9 +95,10 @@ function pressureRadius(style: StudioStampBrushStyle, pressure: number): number 
   return Math.max(0.35, (style.size / 2) * ratio);
 }
 
-function inkVelocityFactor(normalizedSpeed: number): number {
-  return Math.min(1, Math.max(0.35, 1.12 - normalizedSpeed * 0.22));
-}
+// 잉크 속도 감쇠는 studio-brush-stamp-engine 에서 직접 가져온다. 이 모듈은 walk 루프를 batch
+// planner 와 의도적으로 이중화하지만, 감쇠 산식까지 복사해 두었더니 획 머리 이징이 batch 쪽에만
+// 들어가면서 두 경로의 반지름이 갈렸다(패리티 테스트가 정확히 이걸 잡았다). 루프는 그대로 두고
+// 산식만 한 곳에서 읽는다.
 
 /**
  * 기존 stamp engine의 segment core와 같은 상태 전이. public Canvas API를 우회해 fake context를
@@ -117,8 +119,7 @@ function walkIncrementalStampSegment(
   const dy = y - state.lastY;
   const distance = Math.hypot(dx, dy);
   if (!Number.isFinite(distance) || distance <= 0) return;
-  const speedFactor =
-    style.kind === "ink" ? inkVelocityFactor(distance / Math.max(1, style.size)) : 1;
+  const normalizedSpeed = style.kind === "ink" ? distance / Math.max(1, style.size) : 0;
   const baseAlpha = clamp01(style.flow) * clamp01(style.opacity);
   let travelled = state.residual;
   const spacingOf = (samplePressure: number): number =>
@@ -140,7 +141,8 @@ function walkIncrementalStampSegment(
     emit({
       x: px,
       y: py,
-      radius: pressureRadius(style, interpolatedPressure) * speedFactor,
+      radius: pressureRadius(style, interpolatedPressure)
+        * studioStampInkSpeedFactor(style, normalizedSpeed, state.stampIndex),
       alpha: baseAlpha,
       index: state.stampIndex,
     });

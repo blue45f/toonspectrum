@@ -575,7 +575,7 @@ function inkVelocityFactor(normalizedSpeed: number): number {
  */
 const INK_HEAD_VELOCITY_EASE_DABS = 5;
 
-function inkSpeedFactorAt(
+export function studioStampInkSpeedFactor(
   style: StudioStampBrushStyle,
   normalizedSpeed: number,
   stampIndex: number,
@@ -999,7 +999,7 @@ function walkStampSegmentPlan(
     let px = state.lastX + dx * t;
     let py = state.lastY + dy * t;
     const p = state.lastPressure + (safePressure - state.lastPressure) * t;
-    let radius = pressureRadius(style, p) * inkSpeedFactorAt(style, normalizedSpeed, state.stampIndex);
+    let radius = pressureRadius(style, p) * studioStampInkSpeedFactor(style, normalizedSpeed, state.stampIndex);
     // CC0 MyPaint 산란/반경 지터(옵트인) — offset/radius_by_random 의 결정적 재현.
     // stampJitter(stampIndex) 시드만 쓰므로 증분·재생·SVG 가 같은 배치를 공유하고,
     // 필드가 없는 브러시는 이 블록을 건너뛰어 계획이 비트 단위로 같다.

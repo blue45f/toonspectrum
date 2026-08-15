@@ -83,11 +83,17 @@ const INTENTIONAL_FIXED_PRESSURE_BRUSH_IDS = new Set([
   "crosshatch",
   "milli-pen-uniform",
   "web-pressure-flat",
-  // Engine-lane grids / perfect outlines / side-shade paths that intentionally ignore
-  // hardware pressure at the planner-proxy surface (same contract as their base media).
+  // Engine-lane grids / side-shade paths that intentionally ignore hardware pressure at the
+  // planner-proxy surface (same contract as their base media).
+  //
+  // pen--perfect-taper and calligraphy--perfect-chisel used to sit here, and that was this list
+  // recording a bug as an intention. Both declare engine "perfect-outline" and dynamics
+  // "outline-pressure" in the lane catalogue, but neither was registered in
+  // STUDIO_PERFECT_FREEHAND_PROFILE_BY_BRUSH, so the renderer resolved no profile and fell back to
+  // a constant-width round-capped polyline — which is why pressure moved nothing. With the
+  // registration in place they thin with pressure like the perfect-ink / perfect-marker profiles
+  // they name as their canonicalId, so they belong in the responsive population.
   "screentone--sparse-grid",
-  "pen--perfect-taper",
-  "calligraphy--perfect-chisel",
   "pencil--side-shade",
 ]);
 
