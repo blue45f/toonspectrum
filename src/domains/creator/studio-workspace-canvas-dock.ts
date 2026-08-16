@@ -1,7 +1,8 @@
 import { studioUiDensityAllows, type StudioUiDensityMode } from "./studio-ui-density";
-
-const STUDIO_CANVAS_DOCK_GAP_OPEN = 8;
-const STUDIO_CANVAS_DRAW_TOOL_RAIL_WIDTH = 52;
+import {
+  STUDIO_CANVAS_DOCK_GAP_OPEN,
+  STUDIO_CANVAS_DRAW_TOOL_RAIL_WIDTH,
+} from "./studio-workspace-layout-metrics";
 
 export interface StudioWorkspaceCanvasDockInsets {
   readonly left: number;

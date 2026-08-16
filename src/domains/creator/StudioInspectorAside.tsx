@@ -211,6 +211,7 @@ import { normalizeSkewPatch } from "./studio-skew";
 import { normalizeShapeParams, normalizeStrokeStyle } from "./studio-stroke-shapes";
 import { normalizeTextPath, type TextPathConfig } from "./studio-text-path";
 import { type StudioViewRotation } from "./studio-view-controls";
+import { STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH } from "./studio-workspaces";
 import { StudioBgRemoveButton } from "./StudioBgRemoveButton";
 import { StudioCommandSearchHost } from "./StudioCommandSearchHost";
 import { StudioFigmaDesignPanel } from "./StudioFigmaDesignPanel";
@@ -1580,7 +1581,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                     safeMobileKeyboardInset,
                   ),
                 }
-              : { width: rightResize.width, minWidth: 240 }
+              : { width: rightResize.width, minWidth: STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH.minimum }
           }
         >
           <div className="hidden items-center justify-between gap-1 lg:flex">

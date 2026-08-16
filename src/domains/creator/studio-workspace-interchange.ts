@@ -1,9 +1,12 @@
-import type { StudioQuickAccessState } from "./studio-quick-access";
-import type {
-  StudioDrawingPaletteLayout,
-  StudioWorkspaceDesktopLayout,
-  StudioWorkspaceLayout,
+import {
+  STUDIO_WORKSPACE_LEFT_PANEL_WIDTH,
+  STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH,
+  type StudioDrawingPaletteLayout,
+  type StudioWorkspaceDesktopLayout,
+  type StudioWorkspaceLayout,
 } from "./studio-workspaces";
+
+import type { StudioQuickAccessState } from "./studio-quick-access";
 
 /**
  * Portable Studio workspace boundary.
@@ -499,8 +502,16 @@ function parsePanels(value: unknown): StudioWorkspaceInterchangePanels {
     desktop: Object.freeze({
       leftPanelOpen: desktop.leftPanelOpen,
       rightPanelOpen: desktop.rightPanelOpen,
-      leftPanelWidth: parseFiniteInteger(desktop.leftPanelWidth, 128, 360),
-      rightPanelWidth: parseFiniteInteger(desktop.rightPanelWidth, 240, 720),
+      leftPanelWidth: parseFiniteInteger(
+        desktop.leftPanelWidth,
+        STUDIO_WORKSPACE_LEFT_PANEL_WIDTH.minimum,
+        STUDIO_WORKSPACE_LEFT_PANEL_WIDTH.maximum,
+      ),
+      rightPanelWidth: parseFiniteInteger(
+        desktop.rightPanelWidth,
+        STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH.minimum,
+        STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH.maximum,
+      ),
     }),
   });
 }

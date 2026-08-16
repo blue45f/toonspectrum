@@ -697,9 +697,7 @@ export function StudioVerticalToolRail({
       aria-label={localizeStudioRailShellText(ariaLabel, lang, t)}
       data-studio-tool-rail="true"
       className={cn(
-        // xl: slightly wider like Krita docker / Ibis tool column
         "hidden min-h-0 w-12 shrink-0 flex-col overflow-hidden border-r border-line",
-        "xl:w-[3.25rem]",
         "lg:flex",
         className
       )}

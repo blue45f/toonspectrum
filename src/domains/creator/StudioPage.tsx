@@ -44769,7 +44769,7 @@ function clearSelectionForEdit() {
             <div
               aria-hidden="true"
               data-studio-left-tool-rail-loading="true"
-              className="hidden w-14 shrink-0 border-r border-line bg-panel lg:block"
+              className="hidden w-12 shrink-0 border-r border-line bg-panel lg:block"
             />
           )}
         >

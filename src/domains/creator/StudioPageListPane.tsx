@@ -34,6 +34,7 @@ import {
   pageDisplayName,
 } from "./studio-page-meta";
 import { shotTagBadgeText, shotTagBadgeTitle } from "./studio-panel-shot-tags";
+import { STUDIO_WORKSPACE_LEFT_PANEL_WIDTH } from "./studio-workspaces";
 
 import type { El } from "./studio-element-model";
 import type { DocumentMaster } from "./studio-master-page";
@@ -305,7 +306,7 @@ export const StudioPageListPane = memo(function StudioPageListPane({
                   bottom: safeMobileKeyboardInset,
                   ...studioMobileSheetSizeStyle(mobileSnap, safeMobileKeyboardInset),
                 }
-              : { width: leftResize.width, minWidth: 128 }
+              : { width: leftResize.width, minWidth: STUDIO_WORKSPACE_LEFT_PANEL_WIDTH.minimum }
           }
         >
           <div className="shrink-0 border-b border-line/50 pb-1.5">

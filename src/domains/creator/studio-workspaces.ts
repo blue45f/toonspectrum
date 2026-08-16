@@ -21,6 +21,14 @@ import {
   type StudioQuickActionId,
   type StudioQuickActionsPreferences,
 } from "./studio-quick-actions";
+import {
+  STUDIO_WORKSPACE_LEFT_PANEL_DEFAULT_WIDTH,
+  STUDIO_WORKSPACE_LEFT_PANEL_MAX_WIDTH,
+  STUDIO_WORKSPACE_LEFT_PANEL_MIN_WIDTH,
+  STUDIO_WORKSPACE_RIGHT_PANEL_DEFAULT_WIDTH,
+  STUDIO_WORKSPACE_RIGHT_PANEL_MAX_WIDTH,
+  STUDIO_WORKSPACE_RIGHT_PANEL_MIN_WIDTH,
+} from "./studio-workspace-layout-metrics";
 
 export {
   DEFAULT_STUDIO_DRAWING_PALETTE_LAYOUT,
@@ -61,14 +69,14 @@ export const STUDIO_WORKSPACE_RAW_MAX_BYTES = 64 * 1024;
 /** @deprecated Explicit compatibility seam only; not a product authority. */
 export const STUDIO_WORKSPACE_STORAGE_KEY = "toonspectrum:studio:workspaces-v12";
 export const STUDIO_WORKSPACE_LEFT_PANEL_WIDTH = Object.freeze({
-  minimum: 128,
-  default: 160,
-  maximum: 360,
+  minimum: STUDIO_WORKSPACE_LEFT_PANEL_MIN_WIDTH,
+  default: STUDIO_WORKSPACE_LEFT_PANEL_DEFAULT_WIDTH,
+  maximum: STUDIO_WORKSPACE_LEFT_PANEL_MAX_WIDTH,
 });
 export const STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH = Object.freeze({
-  minimum: 240,
-  default: 280,
-  maximum: 720,
+  minimum: STUDIO_WORKSPACE_RIGHT_PANEL_MIN_WIDTH,
+  default: STUDIO_WORKSPACE_RIGHT_PANEL_DEFAULT_WIDTH,
+  maximum: STUDIO_WORKSPACE_RIGHT_PANEL_MAX_WIDTH,
 });
 
 export const STUDIO_LEGACY_LEFT_PANEL_WIDTH_STORAGE_KEY = "studio:leftW";

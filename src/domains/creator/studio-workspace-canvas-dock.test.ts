@@ -4,6 +4,7 @@ import {
   resolveStudioWorkspaceCanvasDockInsets,
   type StudioWorkspaceCanvasDockInsetsInput,
 } from "./studio-workspace-canvas-dock";
+import { STUDIO_CANVAS_DRAW_TOOL_RAIL_WIDTH } from "./studio-workspace-layout-metrics";
 
 describe("studio workspace canvas dock insets", () => {
   const baseInput: StudioWorkspaceCanvasDockInsetsInput = {
@@ -21,7 +22,7 @@ describe("studio workspace canvas dock insets", () => {
       visibleRightPanelOpen: true,
     });
 
-    expect(insets).toEqual({ left: 220, right: 288 });
+    expect(insets).toEqual({ left: 216, right: 288 });
   });
 
   it("maximizes dock width when left dock is hidden", () => {
@@ -31,7 +32,7 @@ describe("studio workspace canvas dock insets", () => {
         visibleLeftPanelOpen: false,
         visibleRightPanelOpen: false,
       })
-    ).toEqual({ left: 52, right: 0 });
+    ).toEqual({ left: STUDIO_CANVAS_DRAW_TOOL_RAIL_WIDTH, right: 0 });
   });
 
   it("applies right-side dock width only when the right dock is visible", () => {
@@ -41,7 +42,7 @@ describe("studio workspace canvas dock insets", () => {
         visibleLeftPanelOpen: false,
         visibleRightPanelOpen: true,
       })
-    ).toEqual({ left: 52, right: 288 });
+    ).toEqual({ left: STUDIO_CANVAS_DRAW_TOOL_RAIL_WIDTH, right: 288 });
   });
 
   it("keeps current tool-rail reserve when panels are hidden under simple mode", () => {
@@ -52,7 +53,7 @@ describe("studio workspace canvas dock insets", () => {
         visibleLeftPanelOpen: false,
         visibleRightPanelOpen: false,
       })
-    ).toEqual({ left: 52, right: 0 });
+    ).toEqual({ left: STUDIO_CANVAS_DRAW_TOOL_RAIL_WIDTH, right: 0 });
   });
 
   it("keeps tool rail inset in focus mode even when panels are hidden", () => {
@@ -63,6 +64,6 @@ describe("studio workspace canvas dock insets", () => {
         visibleLeftPanelOpen: false,
         visibleRightPanelOpen: false,
       })
-    ).toEqual({ left: 52, right: 0 });
+    ).toEqual({ left: STUDIO_CANVAS_DRAW_TOOL_RAIL_WIDTH, right: 0 });
   });
 });

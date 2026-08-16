@@ -933,7 +933,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
               )}
             >
               <Folder size={STUDIO_ICON_SIZE.toolCompact} strokeWidth={STUDIO_ICON_STROKE} aria-hidden /> 템플릿·에셋
-              <ChevronDown size={STUDIO_ICON_SIZE.subtab} aria-hidden className={cn("transition-transform duration-150", activeToolbarGroup === "assetGroup" && "rotate-180")} />
+              <ChevronDown size={STUDIO_ICON_SIZE.subtab} strokeWidth={STUDIO_ICON_STROKE} aria-hidden className={cn("transition-transform duration-150", activeToolbarGroup === "assetGroup" && "rotate-180")} />
             </button>
           </StudioToolBeltHintTarget>
           <StudioFloatingToolPopover
@@ -1138,7 +1138,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
               )}
             >
               <Mountain size={STUDIO_ICON_SIZE.toolCompact} strokeWidth={STUDIO_ICON_STROKE} aria-hidden /> 배경
-              <ChevronDown size={STUDIO_ICON_SIZE.subtab} aria-hidden className={cn("transition-transform duration-150", activeToolbarGroup === "bgGroup" && "rotate-180")} />
+              <ChevronDown size={STUDIO_ICON_SIZE.subtab} strokeWidth={STUDIO_ICON_STROKE} aria-hidden className={cn("transition-transform duration-150", activeToolbarGroup === "bgGroup" && "rotate-180")} />
             </button>
           </StudioToolBeltHintTarget>
           <StudioFloatingToolPopover
@@ -1185,7 +1185,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
               )}
             >
               <Palette size={STUDIO_ICON_SIZE.toolCompact} strokeWidth={STUDIO_ICON_STROKE} aria-hidden /> 스타일
-              <ChevronDown size={STUDIO_ICON_SIZE.subtab} aria-hidden className={cn("transition-transform duration-150", activeToolbarGroup === "styleGroup" && "rotate-180")} />
+              <ChevronDown size={STUDIO_ICON_SIZE.subtab} strokeWidth={STUDIO_ICON_STROKE} aria-hidden className={cn("transition-transform duration-150", activeToolbarGroup === "styleGroup" && "rotate-180")} />
             </button>
           </StudioToolBeltHintTarget>
           <StudioFloatingToolPopover
@@ -1224,7 +1224,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
               )}
             >
               <WandSparkles size={STUDIO_ICON_SIZE.toolCompact} strokeWidth={STUDIO_ICON_STROKE} aria-hidden /> AI
-              <ChevronDown size={STUDIO_ICON_SIZE.subtab} aria-hidden className={cn("transition-transform duration-150", activeToolbarGroup === "aiGroup" && "rotate-180")} />
+              <ChevronDown size={STUDIO_ICON_SIZE.subtab} strokeWidth={STUDIO_ICON_STROKE} aria-hidden className={cn("transition-transform duration-150", activeToolbarGroup === "aiGroup" && "rotate-180")} />
             </button>
           </StudioToolBeltHintTarget>
           <StudioFloatingToolPopover

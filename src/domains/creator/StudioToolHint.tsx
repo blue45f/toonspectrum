@@ -66,6 +66,7 @@ export const STUDIO_TOOL_HINT_SCROLL_HOVER_SUPPRESSION_MS = 720;
 type StudioToolHintInteractionManager = {
   suppressHover: (now?: number) => void;
   isHoverSuppressed: (now?: number) => boolean;
+  getHoverSuppressionUntil: () => number;
   markReveal: (hintId: string, intent: StudioToolHintRevealIntent) => void;
   getRevealIntent: (hintId: string) => StudioToolHintRevealIntent | null;
   clearReveal: (hintId?: string) => void;
@@ -88,6 +89,9 @@ function createStudioToolHintInteractionManager(): StudioToolHintInteractionMana
     },
     isHoverSuppressed(now = Date.now()) {
       return now < hoverSuppressedUntil;
+    },
+    getHoverSuppressionUntil() {
+      return hoverSuppressedUntil;
     },
     markReveal(hintId, intent) {
       activeReveal = { hintId, intent };
@@ -282,6 +286,7 @@ let suppressedPointerHintAt:
       hintId: string;
       x: number;
       y: number;
+      suppressUntil: number;
     }>
   | null = null;
 let clearPointerSuppressionListener: (() => void) | null = null;
@@ -298,12 +303,22 @@ function clearPointerSuppression() {
 }
 
 function isPointerSuppressionActiveForTip(tipId: string): boolean {
-  return suppressedPointerHintAt?.hintId === tipId;
+  return getPointerSuppressionRemainingForTip(tipId) !== null;
+}
+
+function getPointerSuppressionRemainingForTip(
+  tipId: string,
+  now = Date.now()
+): number | null {
+  if (!suppressedPointerHintAt || suppressedPointerHintAt.hintId !== tipId) return null;
+  if (suppressedPointerHintAt.suppressUntil <= now) return null;
+  return suppressedPointerHintAt.suppressUntil - now;
 }
 
 function armPointerSuppression(hintId: string, x: number, y: number) {
   clearPointerSuppression();
-  suppressedPointerHintAt = { hintId, x, y };
+  const suppressUntil = Date.now() + POINTER_HINT_SUPPRESSION_MS;
+  suppressedPointerHintAt = { hintId, x, y, suppressUntil };
   clearPointerSuppressionTimeout = globalThis.setTimeout(() => {
     clearPointerSuppression();
   }, POINTER_HINT_SUPPRESSION_MS) as ReturnType<typeof setTimeout>;
@@ -530,6 +545,31 @@ export function StudioToolHintTarget({
   const [expanded, setExpanded] = useState(false);
   const [anchor, setAnchor] = useState<DOMRect | null>(null);
 
+  function scheduleHintRevealWithDelay(delayMs: number) {
+    if (showTimer.current) {
+      globalThis.clearTimeout(showTimer.current);
+    }
+    const intentEpoch = coordinator.getDismissEpoch();
+    coordinator.markPending(tipId);
+    showTimer.current = globalThis.setTimeout(() => {
+      showTimer.current = 0;
+      if (!coordinator.clearPending(tipId)) return;
+      if (coordinator.getDismissEpoch() !== intentEpoch) return;
+      if (isPointerSuppressionActiveForTip(tipId)) {
+        const remaining = getPointerSuppressionRemainingForTip(tipId);
+        scheduleHintRevealWithDelay(Math.max(remaining ?? 0, SHOW_DELAY_MS));
+        return;
+      }
+      if (interaction.isHoverSuppressed()) {
+        const now = Date.now();
+        const hoverRemaining = Math.max(interaction.getHoverSuppressionUntil() - now, 0);
+        scheduleHintRevealWithDelay(Math.max(hoverRemaining, SHOW_DELAY_MS));
+        return;
+      }
+      reveal(false, "hover");
+    }, delayMs) as unknown as number;
+  }
+
   function clearTimers() {
     if (showTimer.current) globalThis.clearTimeout(showTimer.current);
     if (expandTimer.current) globalThis.clearTimeout(expandTimer.current);
@@ -622,30 +662,28 @@ export function StudioToolHintTarget({
 
   function scheduleShow() {
     if (!hint || preferences.mode === "off") return;
-    if (isPointerSuppressionActiveForTip(tipId)) return;
-    if (interaction.isHoverSuppressed()) return;
+    if (open) {
+      reveal(false, "hover");
+      return;
+    }
+    const now = Date.now();
+    const pointerSuppressionRemaining = getPointerSuppressionRemainingForTip(tipId, now);
+    if (pointerSuppressionRemaining !== null) {
+      scheduleHintRevealWithDelay(pointerSuppressionRemaining + SHOW_DELAY_MS);
+      return;
+    }
+    if (interaction.isHoverSuppressed(now)) {
+      const hoverRemaining = Math.max(interaction.getHoverSuppressionUntil() - now, 0);
+      scheduleHintRevealWithDelay(hoverRemaining + SHOW_DELAY_MS);
+      return;
+    }
     if (!open && !unavailableReason && !exposure.canReveal(hint.id, "hover")) return;
     preloadStudioToolHintBubbleModule();
     if (hideTimer.current) {
       globalThis.clearTimeout(hideTimer.current);
       hideTimer.current = 0;
     }
-    if (open) {
-      reveal(false, "hover");
-      return;
-    }
-    if (showTimer.current) globalThis.clearTimeout(showTimer.current);
-    const intentEpoch = coordinator.getDismissEpoch();
-    coordinator.markPending(tipId);
-    showTimer.current = globalThis.setTimeout(() => {
-      showTimer.current = 0;
-      // A newer target may have claimed the exclusive hint lane while this
-      // hover delay was running. `claim()` clears older pending intents; only
-      // the still-current intent is allowed to reveal itself.
-      if (!coordinator.clearPending(tipId)) return;
-      if (coordinator.getDismissEpoch() !== intentEpoch) return;
-      reveal(false, "hover");
-    }, SHOW_DELAY_MS) as unknown as number;
+    scheduleHintRevealWithDelay(SHOW_DELAY_MS);
   }
 
   function scheduleHide() {
