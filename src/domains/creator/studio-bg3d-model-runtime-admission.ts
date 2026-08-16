@@ -26,6 +26,7 @@ import {
 } from "./studio-bg3d-model-library-loader";
 import { assertStudioBg3dModelPlacementAdmission } from
   "./studio-bg3d-model-placement-admission";
+import { applyStudioBg3dRuntimeAssetQuality } from "./studio-bg3d-runtime-asset-quality";
 import {
   classifyStudioBg3dThreeSemanticMaterials,
 } from "./studio-bg3d-three-semantic-materials";
@@ -47,7 +48,7 @@ import type {
   StudioGeneric3dManifestHints,
   StudioGeneric3dSourceFormat,
 } from "./studio-generic-3d-model-mode";
-import type { Mesh, WebGLRenderer } from "three";
+import type { WebGLRenderer } from "three";
 
 export type StudioBg3dModelRootCacheEntry = Pick<
   StudioBg3dThreeLoadSuccess,
@@ -236,16 +237,16 @@ export async function admitAndCacheStudioBg3dModel(args: {
           cumulativeUsedBytes: args.cumulativeUsedBytes,
           maximumCumulativeBytes: selectedBudgets.complexity.maxModelBytes,
         });
+        applyStudioBg3dRuntimeAssetQuality(loaded.root, {
+          castShadow: args.quality.shadows,
+          receiveShadow: args.quality.shadows,
+          renderer: args.renderer,
+          qualityBudget: args.quality.textureScale,
+        });
         loaded.root.scale.setScalar(resolveStudioBg3dModelNormalizationScale(
           args.record.id,
           measureBg3dObjectSize(loaded.root),
         ));
-        loaded.root.traverse((object) => {
-          const renderable = object as Mesh;
-          if (!renderable.isMesh) return;
-          renderable.castShadow = true;
-          renderable.receiveShadow = true;
-        });
         if (!lease.isCurrent() || !args.isActive()) {
           loaded.dispose();
           lease.throwIfRevoked();

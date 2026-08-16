@@ -910,6 +910,10 @@ export function resolveSecondaryPropTarget(
   };
 }
 
+const STUDIO_VRM_SECONDARY_HAND_SCALE_MIN = 0.55;
+const STUDIO_VRM_SECONDARY_HAND_SCALE_MAX = 2.2;
+const STUDIO_VRM_SECONDARY_PALM_OFFSET_MAX = 0.95;
+
 /**
  * 보조 손의 손목 목표를 계산한다.
  *
@@ -958,9 +962,21 @@ export function resolveSecondaryHandConstraint(
     .multiplyScalar(propScale)
     .applyQuaternion(groupWorldQuaternion)
     .add(new THREE.Vector3(...groupWorldPosition));
+  const stableHandScale = clamp(
+    Math.cbrt(Math.abs(handWorldScale[0] * handWorldScale[1] * handWorldScale[2])),
+    STUDIO_VRM_SECONDARY_HAND_SCALE_MIN,
+    STUDIO_VRM_SECONDARY_HAND_SCALE_MAX,
+  );
   const palmWorldOffset = new THREE.Vector3(...socketPosition)
-    .multiply(new THREE.Vector3(...handWorldScale))
+    .multiplyScalar(stableHandScale)
     .applyQuaternion(targetHandWorldQuaternion);
+  const maxPalmOffset = Math.min(
+    STUDIO_VRM_SECONDARY_PALM_OFFSET_MAX,
+    Math.max(0.05, propScale * 0.45)
+  );
+  if (palmWorldOffset.lengthSq() > maxPalmOffset * maxPalmOffset) {
+    palmWorldOffset.setLength(maxPalmOffset);
+  }
   const wristWorldPosition = anchorWorldPosition.clone().sub(palmWorldOffset);
 
   if (

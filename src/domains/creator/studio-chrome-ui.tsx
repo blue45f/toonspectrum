@@ -52,6 +52,7 @@ export const STUDIO_ICON_SIZE = {
   rail: 18,
   edge: 15,
   nav: 17,
+  contextMenu: 13,
   context: 16,
   identity: 16,
 } as const;

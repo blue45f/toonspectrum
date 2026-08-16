@@ -21,6 +21,8 @@ import {
   Square,
 } from "lucide-react";
 
+import { resolveStudioWorkspaceWidePanelToggle } from "./studio-workspace-wide-mode";
+
 import type { StudioMainMenuItemContext } from "./studio-main-menu-contract";
 import type { StudioMainMenuItem } from "./studio-main-menu-model";
 
@@ -29,6 +31,22 @@ export function buildStudioWindowMenuItems({
   editor,
   ui,
 }: StudioMainMenuItemContext): StudioMainMenuItem[] {
+  const isPresentationSuppressed = state.presentationPanelsHidden === true;
+  const visibleLeftPanelOpen = isPresentationSuppressed
+    ? false
+    : (state.visibleLeftPanelOpen ?? state.leftPanelOpen);
+  const visibleRightPanelOpen = isPresentationSuppressed
+    ? false
+    : (state.visibleRightPanelOpen ?? state.rightPanelOpen);
+  const workspaceWideMode = resolveStudioWorkspaceWidePanelToggle({
+    leftPanelOpen: state.leftPanelOpen,
+    rightPanelOpen: state.rightPanelOpen,
+    visibleLeftPanelOpen,
+    visibleRightPanelOpen,
+    presentationPanelsHidden: isPresentationSuppressed,
+  });
+  const isWorkspaceWideMode = !visibleLeftPanelOpen && !visibleRightPanelOpen;
+
   return [
     {
       id: "density-focus",
@@ -80,10 +98,20 @@ export function buildStudioWindowMenuItems({
       id: "wide",
       commandId: "window.collapse-side-panels",
       legacyPath: "view/wide",
-      label: "패널 접어 넓게",
+      label: isWorkspaceWideMode ? "패널 펼치기" : "패널 접어 넓게",
+      checked: isWorkspaceWideMode,
       icon: Maximize2,
+      ...(isPresentationSuppressed
+        ? {
+            disabled: true,
+            unavailableReason: "전체화면·브라우저 맞춤에서는 작업 패널을 임시로 숨깁니다.",
+          }
+        : {}),
       onSelect: () => {
-        ui.collapseSidePanels();
+        if (isPresentationSuppressed) return;
+        if (isWorkspaceWideMode) ui.expandSidePanels();
+        else if (!workspaceWideMode.leftPanelOpen) ui.collapseSidePanels();
+        else ui.expandSidePanels();
       },
     },
     {

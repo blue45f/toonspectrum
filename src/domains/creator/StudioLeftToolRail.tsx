@@ -49,9 +49,12 @@ import {
 import { type BubbleVariant } from "./studio-assets";
 import { studioChromeRailGroupLabel } from "./studio-chrome-ia-map";
 import {
+  STUDIO_ICON_SIZE,
+  STUDIO_ICON_STROKE,
   StudioRailDivider,
   StudioRailToolButton,
   StudioVerticalToolRail,
+  studioChromeIconClass,
 } from "./studio-chrome-ui";
 import { type DrawMode, type DrawShapeKind, type StudioMenu, type Tool } from "./studio-editor-tool-model";
 import { type El } from "./studio-element-model";
@@ -1091,7 +1094,15 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
                     : "cursor-pointer hover:border-line hover:bg-raised hover:text-fg"
                 )}
               >
-                <ImagePlus size={16} strokeWidth={1.75} aria-hidden />
+                <ImagePlus
+                  size={STUDIO_ICON_SIZE.rail}
+                  strokeWidth={STUDIO_ICON_STROKE}
+                  aria-hidden
+                  className={studioChromeIconClass({
+                    tone: activeSurfaceReviewLocked ? "muted" : "default",
+                    disabled: activeSurfaceReviewLocked,
+                  })}
+                />
                 <span className="sr-only">이미지 추가</span>
                 <input
                   type="file"

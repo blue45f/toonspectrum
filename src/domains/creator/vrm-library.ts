@@ -122,6 +122,35 @@ export type SampleVrm = {
   limitations?: readonly BundledVrmLimitation[];
 };
 
+export function buildFallbackVrmLibraryThumbnail(name: string, id: string): string {
+  let hash = 0;
+  const seed = `${name}:${id}`;
+  for (let i = 0; i < seed.length; i += 1) {
+    hash = (hash * 31 + seed.charCodeAt(i)) & 0xffffffff;
+  }
+  const hue = Math.abs(hash % 360);
+  const safeText = (name || "VRM").replace(/[<>]/g, "").slice(0, 10);
+  const label = safeText.trim() || "VRM";
+  const initials = label.replace(/\s+/g, "").slice(0, 2).toUpperCase();
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180" viewBox="0 0 320 180">
+  <defs>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="hsl(${hue} 68% 24%)" />
+      <stop offset="100%" stop-color="hsl(${(hue + 35) % 360} 78% 40%)" />
+    </linearGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="white" flood-opacity="0.22" />
+    </filter>
+  </defs>
+  <rect width="320" height="180" rx="20" fill="url(#g)" />
+  <circle cx="160" cy="86" r="54" fill="rgba(255,255,255,0.22)" />
+  <text x="160" y="110" font-size="44" text-anchor="middle" fill="#f9e7ce" font-family="Arial, 'Malgun Gothic', sans-serif" filter="url(#glow)" font-weight="700">${initials}</text>
+  <text x="160" y="156" font-size="20" text-anchor="middle" fill="#f5debe" font-family="Arial, 'Malgun Gothic', sans-serif">${label}</text>
+</svg>`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
 export type BundledVrmRightsBlock = SampleVrm & {
   status: "rights-blocked";
   reasonCode: "redistribution-commercial-restriction";
@@ -1274,7 +1303,7 @@ export async function hydrateVrmLibraryThumbnailWindow(
     const withAuthority = licenseAuthority && licenseAuthority !== entry.licenseAuthority
       ? { ...entry, licenseAuthority }
       : entry;
-    if (entry.thumbnail || entry.source === "memory") {
+    if (entry.thumbnail) {
       hydrated.push(withAuthority);
       continue;
     }
@@ -1324,7 +1353,11 @@ export async function hydrateVrmLibraryThumbnailWindow(
         totalBytes += estimatedBytes;
       }
     }
-    hydrated.push(thumbnail ? { ...withAuthority, thumbnail } : withAuthority);
+    hydrated.push(
+      thumbnail
+        ? { ...withAuthority, thumbnail }
+        : { ...withAuthority, thumbnail: buildFallbackVrmLibraryThumbnail(withAuthority.name, withAuthority.id) },
+    );
   }
   return Object.freeze(hydrated);
 }

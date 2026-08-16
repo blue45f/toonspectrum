@@ -17,6 +17,12 @@ import {
   Type as TypeIcon,
 } from "lucide-react";
 
+import {
+  STUDIO_ICON_SIZE,
+  STUDIO_ICON_STROKE,
+  studioChromeIconClass,
+} from "./studio-chrome-ui";
+
 export type StudioCanvasLayerReorder = "front" | "forward" | "backward" | "back";
 
 export interface StudioCanvasContextMenuProps {
@@ -87,7 +93,12 @@ export function StudioCanvasContextMenu({
                 onClick={() => runAndClose(onEditVrm, onClose)}
                 className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs font-semibold text-accent hover:bg-raised"
               >
-                <Sparkles size={12} />
+                <Sparkles
+                  size={STUDIO_ICON_SIZE.contextMenu}
+                  strokeWidth={STUDIO_ICON_STROKE}
+                  aria-hidden
+                  className={studioChromeIconClass({ tone: "accent" })}
+                />
                 3D 캐릭터 편집
               </button>
               <div className="my-1 h-px bg-line" />
@@ -103,7 +114,12 @@ export function StudioCanvasContextMenu({
                 onFocus={onPreloadBackground3d}
                 className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs font-semibold text-accent hover:bg-raised"
               >
-                <Boxes size={12} />
+                <Boxes
+                  size={STUDIO_ICON_SIZE.contextMenu}
+                  strokeWidth={STUDIO_ICON_STROKE}
+                  aria-hidden
+                  className={studioChromeIconClass({ tone: "accent" })}
+                />
                 3D 배경 편집
               </button>
               <div className="my-1 h-px bg-line" />
@@ -114,7 +130,12 @@ export function StudioCanvasContextMenu({
             onClick={onSaveAsEmeres}
             className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-fg hover:bg-raised"
           >
-            <ImagePlus size={12} />
+            <ImagePlus
+              size={STUDIO_ICON_SIZE.contextMenu}
+              strokeWidth={STUDIO_ICON_STROKE}
+              aria-hidden
+              className={studioChromeIconClass({ tone: "default" })}
+            />
             이메레스로 저장
           </button>
           <div className="my-1 h-px bg-line" />
@@ -123,7 +144,12 @@ export function StudioCanvasContextMenu({
             onClick={() => runAndClose(onDuplicate, onClose)}
             className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-fg hover:bg-raised"
           >
-            <Copy size={12} />
+            <Copy
+              size={STUDIO_ICON_SIZE.contextMenu}
+              strokeWidth={STUDIO_ICON_STROKE}
+              aria-hidden
+              className={studioChromeIconClass({ tone: "default" })}
+            />
             복제하기 (⌘J)
           </button>
           <div className="my-1 h-px bg-line" />
@@ -132,7 +158,12 @@ export function StudioCanvasContextMenu({
             onClick={() => runAndClose(() => onReorder("front"), onClose)}
             className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-fg hover:bg-raised"
           >
-            <ArrowUpToLine size={12} />
+            <ArrowUpToLine
+              size={STUDIO_ICON_SIZE.contextMenu}
+              strokeWidth={STUDIO_ICON_STROKE}
+              aria-hidden
+              className={studioChromeIconClass({ tone: "default" })}
+            />
             맨 앞으로
           </button>
           <button
@@ -140,7 +171,12 @@ export function StudioCanvasContextMenu({
             onClick={() => runAndClose(() => onReorder("forward"), onClose)}
             className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-fg hover:bg-raised"
           >
-            <ChevronUp size={12} />
+            <ChevronUp
+              size={STUDIO_ICON_SIZE.contextMenu}
+              strokeWidth={STUDIO_ICON_STROKE}
+              aria-hidden
+              className={studioChromeIconClass({ tone: "default" })}
+            />
             한 단계 앞으로
           </button>
           <button
@@ -148,7 +184,12 @@ export function StudioCanvasContextMenu({
             onClick={() => runAndClose(() => onReorder("backward"), onClose)}
             className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-fg hover:bg-raised"
           >
-            <ChevronDown size={12} />
+            <ChevronDown
+              size={STUDIO_ICON_SIZE.contextMenu}
+              strokeWidth={STUDIO_ICON_STROKE}
+              aria-hidden
+              className={studioChromeIconClass({ tone: "default" })}
+            />
             한 단계 뒤로
           </button>
           <button
@@ -156,7 +197,12 @@ export function StudioCanvasContextMenu({
             onClick={() => runAndClose(() => onReorder("back"), onClose)}
             className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-fg hover:bg-raised"
           >
-            <ArrowDownToLine size={12} />
+            <ArrowDownToLine
+              size={STUDIO_ICON_SIZE.contextMenu}
+              strokeWidth={STUDIO_ICON_STROKE}
+              aria-hidden
+              className={studioChromeIconClass({ tone: "default" })}
+            />
             맨 뒤로
           </button>
           <div className="my-1 h-px bg-line" />
@@ -165,7 +211,21 @@ export function StudioCanvasContextMenu({
             onClick={() => runAndClose(onToggleLock, onClose)}
             className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-fg hover:bg-raised"
           >
-            {locked ? <LockOpen size={12} /> : <Lock size={12} />}
+            {locked ? (
+              <LockOpen
+                size={STUDIO_ICON_SIZE.contextMenu}
+                strokeWidth={STUDIO_ICON_STROKE}
+                aria-hidden
+                className={studioChromeIconClass({ tone: "default" })}
+              />
+            ) : (
+              <Lock
+                size={STUDIO_ICON_SIZE.contextMenu}
+                strokeWidth={STUDIO_ICON_STROKE}
+                aria-hidden
+                className={studioChromeIconClass({ tone: "default" })}
+              />
+            )}
             {locked ? "잠금 해제" : "위치 잠금"}
           </button>
           <button
@@ -173,7 +233,12 @@ export function StudioCanvasContextMenu({
             onClick={() => runAndClose(onDelete, onClose)}
             className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-bad hover:bg-bad-soft/30"
           >
-            <Trash2 size={12} />
+            <Trash2
+              size={STUDIO_ICON_SIZE.contextMenu}
+              strokeWidth={STUDIO_ICON_STROKE}
+              aria-hidden
+              className={studioChromeIconClass({ tone: "danger" })}
+            />
             삭제하기
           </button>
         </>
@@ -184,7 +249,12 @@ export function StudioCanvasContextMenu({
             onClick={() => runAndClose(onSelectPen, onClose)}
             className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs font-semibold text-fg hover:bg-raised"
           >
-            <Pencil size={12} />
+            <Pencil
+              size={STUDIO_ICON_SIZE.contextMenu}
+              strokeWidth={STUDIO_ICON_STROKE}
+              aria-hidden
+              className={studioChromeIconClass({ tone: "default" })}
+            />
             펜으로 그리기
           </button>
           <button
@@ -192,7 +262,12 @@ export function StudioCanvasContextMenu({
             onClick={() => runAndClose(onAddSpeechBubble, onClose)}
             className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-fg hover:bg-raised"
           >
-            <MessageCircle size={12} />
+            <MessageCircle
+              size={STUDIO_ICON_SIZE.contextMenu}
+              strokeWidth={STUDIO_ICON_STROKE}
+              aria-hidden
+              className={studioChromeIconClass({ tone: "default" })}
+            />
             말풍선 추가
           </button>
           <button
@@ -200,7 +275,12 @@ export function StudioCanvasContextMenu({
             onClick={() => runAndClose(onAddText, onClose)}
             className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-fg hover:bg-raised"
           >
-            <TypeIcon size={12} />
+            <TypeIcon
+              size={STUDIO_ICON_SIZE.contextMenu}
+              strokeWidth={STUDIO_ICON_STROKE}
+              aria-hidden
+              className={studioChromeIconClass({ tone: "default" })}
+            />
             텍스트 추가
           </button>
           <div className="my-1 h-px bg-line" />
@@ -209,7 +289,12 @@ export function StudioCanvasContextMenu({
             onClick={() => runAndClose(onAddPage, onClose)}
             className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-fg hover:bg-raised"
           >
-            <Plus size={12} />
+            <Plus
+              size={STUDIO_ICON_SIZE.contextMenu}
+              strokeWidth={STUDIO_ICON_STROKE}
+              aria-hidden
+              className={studioChromeIconClass({ tone: "default" })}
+            />
             새 페이지 추가
           </button>
           <button
@@ -217,7 +302,12 @@ export function StudioCanvasContextMenu({
             onClick={() => runAndClose(onEnableQuickShape, onClose)}
             className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-accent hover:bg-raised"
           >
-            <Shapes size={12} />
+            <Shapes
+              size={STUDIO_ICON_SIZE.contextMenu}
+              strokeWidth={STUDIO_ICON_STROKE}
+              aria-hidden
+              className={studioChromeIconClass({ tone: "accent" })}
+            />
             스마트 도형 켜기
           </button>
         </>

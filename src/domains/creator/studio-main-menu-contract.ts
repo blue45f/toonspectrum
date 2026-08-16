@@ -65,6 +65,9 @@ export interface StudioMainMenuBuilderState extends StudioMainMenuSurfaceState {
   quickAccessPaletteLoading: boolean;
   leftPanelOpen: boolean;
   rightPanelOpen: boolean;
+  visibleLeftPanelOpen?: boolean;
+  visibleRightPanelOpen?: boolean;
+  presentationPanelsHidden?: boolean;
   lastFilterDraft: StudioFilterDraft | null;
   /** Selected layer already clips into the one below it (`clipBelow`). */
   clippingMaskActive: boolean;

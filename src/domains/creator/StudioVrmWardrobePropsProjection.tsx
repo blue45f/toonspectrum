@@ -84,6 +84,7 @@ function schedulePropDisposal(object: THREE.Object3D) {
 
 const VRM_FRAME_PROP_PRIORITY = -2;
 const VRM_FRAME_COMMIT_PRIORITY = -1;
+const STUDIO_VRM_SECONDARY_HAND_TARGET_DAMPING = 0.35;
 const STUDIO_VRM_PROP_GEOMETRY_QUALITY = Object.freeze({
   roundedBox: (width: number, height: number, depth: number, radius: number) => (
     new RoundedBoxGeometry(width, height, depth, 3, radius)
@@ -132,6 +133,9 @@ export function StudioVrmPropAttachment({
   const anchorWorldOffsetRef = useRef(new THREE.Vector3());
   const secondaryWorldTargetRef = useRef(new THREE.Vector3());
   const secondaryTargetQuaternionRef = useRef(new THREE.Quaternion());
+  const secondaryTargetSmoothedRef = useRef(new THREE.Vector3());
+  const secondaryTargetQuaternionSmoothedRef = useRef(new THREE.Quaternion());
+  const secondaryTargetInitializedRef = useRef(false);
   const groupWorldPositionRef = useRef(new THREE.Vector3());
   const groupWorldQuaternionRef = useRef(new THREE.Quaternion());
   const groupWorldScaleRef = useRef(new THREE.Vector3());
@@ -238,6 +242,7 @@ export function StudioVrmPropAttachment({
   useEffect(() => {
     if (!secondaryActive) {
       releaseVrmTwoBoneGripState(secondaryGripState);
+      secondaryTargetInitializedRef.current = false;
       return;
     }
     return () => {
@@ -323,13 +328,48 @@ export function StudioVrmPropAttachment({
         reportAttachmentStatus("unavailable");
         return;
       }
-      const target = secondaryWorldTargetRef.current.set(...constraint.wristWorldPosition);
-      const targetQuaternion = secondaryTargetQuaternionRef.current.set(...constraint.targetHandWorldQuaternion);
+      const rawTarget = secondaryWorldTargetRef.current.set(...constraint.wristWorldPosition);
+      const rawTargetQuaternion = secondaryTargetQuaternionRef.current.set(...constraint.targetHandWorldQuaternion);
+      if (
+        !Number.isFinite(rawTarget.x)
+        || !Number.isFinite(rawTarget.y)
+        || !Number.isFinite(rawTarget.z)
+        || !Number.isFinite(rawTargetQuaternion.x)
+        || !Number.isFinite(rawTargetQuaternion.y)
+        || !Number.isFinite(rawTargetQuaternion.z)
+        || !Number.isFinite(rawTargetQuaternion.w)
+      ) {
+        secondaryTargetInitializedRef.current = false;
+        reportAttachmentStatus("unavailable");
+        releaseVrmTwoBoneGripState(secondaryGripState);
+        return;
+      }
+
+      if (!secondaryTargetInitializedRef.current) {
+        secondaryTargetSmoothedRef.current.copy(rawTarget);
+        secondaryTargetQuaternionSmoothedRef.current.copy(rawTargetQuaternion);
+        secondaryTargetInitializedRef.current = true;
+      } else {
+        const maxStep = 0.12;
+        const next = secondaryTargetSmoothedRef.current.clone()
+          .lerp(rawTarget, STUDIO_VRM_SECONDARY_HAND_TARGET_DAMPING);
+        const jump = next.distanceTo(secondaryTargetSmoothedRef.current);
+        if (jump > maxStep) {
+          next.sub(secondaryTargetSmoothedRef.current).setLength(maxStep).add(secondaryTargetSmoothedRef.current);
+        }
+        secondaryTargetSmoothedRef.current.copy(next);
+        secondaryTargetQuaternionSmoothedRef.current.slerp(
+          rawTargetQuaternion,
+          STUDIO_VRM_SECONDARY_HAND_TARGET_DAMPING,
+        );
+      }
+      const target = secondaryTargetSmoothedRef.current;
+      const targetQuaternion = secondaryTargetQuaternionSmoothedRef.current;
       const applied = applyVrmTwoBoneGrip(
         vrm,
         secondary.bone === "leftHand" ? "left" : "right",
         target,
-        secondary.influence,
+        Math.max(0, Math.min(1, secondary.influence)),
         secondary.elbowHint,
         { targetQuaternion, state: secondaryGripState }
       );

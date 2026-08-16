@@ -1,6 +1,11 @@
 import { ChevronDown, LayoutPanelTop } from "lucide-react";
 import { Suspense, useState, type ComponentType } from "react";
 
+import {
+  STUDIO_ICON_SIZE,
+  STUDIO_ICON_STROKE,
+  studioChromeIconClass,
+} from "./studio-chrome-ui";
 import { createStudioIntentLazyLoader } from "./studio-intent-lazy-loader";
 import {
   isStudioWorkspaceDirty,
@@ -11,6 +16,7 @@ import {
 import type { StudioWorkspaceMenuProps } from "./StudioWorkspaceMenu";
 
 import { lazyRetry } from "@/lib/lazy-retry";
+import { cn } from "@/lib/utils";
 
 type StudioWorkspaceMenuModule = {
   default: ComponentType<StudioWorkspaceMenuProps>;
@@ -84,7 +90,12 @@ function StudioWorkspaceMenuTrigger({
         aria-label={`작업공간: ${activeWorkspace?.name ?? "알 수 없음"}${dirty ? ", 저장되지 않은 배치 변경 있음" : ""}${sessionOnly ? ", 변경은 이 세션에서만 유지" : ", 이 기기 저장 확인됨"}`}
         className="inline-flex min-h-11 max-w-52 items-center gap-2 rounded-lg border border-line bg-card px-3 text-xs font-semibold text-fg-2 transition-colors hover:border-line-strong hover:bg-raised hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/80 focus-visible:ring-offset-2 focus-visible:ring-offset-panel pointer-coarse:min-h-11 max-[359px]:size-11 max-[359px]:justify-center max-[359px]:gap-0 max-[359px]:px-0 lg:min-h-8"
       >
-        <LayoutPanelTop size={15} aria-hidden className="shrink-0" />
+        <LayoutPanelTop
+          size={STUDIO_ICON_SIZE.contextMenu}
+          strokeWidth={STUDIO_ICON_STROKE}
+          aria-hidden
+          className={studioChromeIconClass({ tone: "default" })}
+        />
         <span className="min-w-0 truncate max-[359px]:sr-only">
           {activeWorkspace?.name ?? "작업공간"}
         </span>
@@ -99,9 +110,13 @@ function StudioWorkspaceMenuTrigger({
           </span>
         ) : null}
         <ChevronDown
-          size={13}
+          size={STUDIO_ICON_SIZE.contextMenu}
           aria-hidden
-          className="ml-auto shrink-0 max-[359px]:hidden"
+          strokeWidth={STUDIO_ICON_STROKE}
+          className={cn(
+            "ml-auto shrink-0 max-[359px]:hidden",
+            studioChromeIconClass({ tone: "default" })
+          )}
         />
       </button>
       {busy ? (

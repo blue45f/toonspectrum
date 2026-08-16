@@ -106,8 +106,8 @@ export const DEFAULT_STUDIO_BG3D_GLB_BUDGET_PROFILES: StudioBg3dGlbBudgetProfile
       }),
       textures: Object.freeze({
         maxTextures: 64,
-        maxTotalBytes: 64 * 1024 * 1024,
-        maxDimension: 4096,
+        maxTotalBytes: 128 * 1024 * 1024,
+        maxDimension: 8192,
       }),
     }),
     desktop: Object.freeze({

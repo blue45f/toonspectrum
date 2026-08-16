@@ -2,7 +2,7 @@
  * Dev-only hand comparison page. Open /hand-compare.html via Vite.
  * Applies the same natural-idle path as StudioVrmPoser and renders 4 views.
  */
-import { VRMLoaderPlugin, VRMUtils, type VRM } from "@pixiv/three-vrm";
+import { VRMLoaderPlugin, VRMUtils, type VRM, type VRMHumanBoneName } from "@pixiv/three-vrm";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
@@ -17,6 +17,87 @@ const statusEl = document.getElementById("status")!;
 
 function setStatus(text: string) {
   statusEl.textContent = text;
+}
+
+type HandSide = "left" | "right";
+const handBoneSet = {
+  left: [
+    "leftHand",
+    "leftMiddleProximal",
+    "leftMiddleIntermediate",
+    "leftMiddleDistal",
+    "leftIndexProximal",
+    "leftIndexIntermediate",
+    "leftIndexDistal",
+    "leftThumbProximal",
+    "leftThumbIntermediate",
+    "leftThumbDistal",
+    "leftRingProximal",
+    "leftRingIntermediate",
+    "leftRingDistal",
+    "leftLittleProximal",
+    "leftLittleIntermediate",
+    "leftLittleDistal",
+  ],
+  right: [
+    "rightHand",
+    "rightMiddleProximal",
+    "rightMiddleIntermediate",
+    "rightMiddleDistal",
+    "rightIndexProximal",
+    "rightIndexIntermediate",
+    "rightIndexDistal",
+    "rightThumbProximal",
+    "rightThumbIntermediate",
+    "rightThumbDistal",
+    "rightRingProximal",
+    "rightRingIntermediate",
+    "rightRingDistal",
+    "rightLittleProximal",
+    "rightLittleIntermediate",
+    "rightLittleDistal",
+  ],
+} as const;
+
+function clamp(value: number, min: number, max: number) {
+  if (value < min) return min;
+  if (value > max) return max;
+  return value;
+}
+
+function collectHandPoints(vrm: VRM, side: HandSide) {
+  const humanoid = vrm.humanoid;
+  if (!humanoid) return [];
+  return handBoneSet[side].map((boneName) => humanoid.getNormalizedBoneNode(boneName as VRMHumanBoneName))
+    .filter((node): node is THREE.Object3D => node != null).map((node) => {
+    const value = node.getWorldPosition(new THREE.Vector3());
+    if (Number.isFinite(value.x) && Number.isFinite(value.y) && Number.isFinite(value.z)) {
+      return value;
+    }
+    return null;
+  }).filter((value): value is THREE.Vector3 => value !== null);
+}
+
+function frameByPoints(
+  camera: THREE.PerspectiveCamera,
+  points: readonly THREE.Vector3[],
+  offset: THREE.Vector3,
+) {
+  if (points.length === 0) return false;
+  const mid = new THREE.Vector3();
+  for (const point of points) {
+    mid.add(point);
+  }
+  mid.divideScalar(points.length);
+  let radius = 0.03;
+  for (const point of points) {
+    radius = Math.max(radius, point.distanceTo(mid));
+  }
+  const distance = clamp(radius / Math.tan((camera.fov * Math.PI) / 360) + 0.12, 0.14, 1.6);
+  const normalizedOffset = offset.clone().normalize();
+  camera.position.copy(mid).addScaledVector(normalizedOffset, distance);
+  camera.lookAt(mid.x, mid.y + radius * 0.05, mid.z);
+  return true;
 }
 
 async function loadVrm(url: string): Promise<VRM> {
@@ -139,13 +220,19 @@ class Panel {
       const l = leftHand.getWorldPosition(new THREE.Vector3());
       const r = rightHand.getWorldPosition(new THREE.Vector3());
       mid.copy(l).lerp(r, 0.5);
-      // High-front three-quarter so both palms/fingers stay in frame.
+      const handPoints = [...collectHandPoints(vrm, "left"), ...collectHandPoints(vrm, "right")];
+      const framed = frameByPoints(this.camera, handPoints.length > 0 ? handPoints : [l, r], new THREE.Vector3(0, 0.22, 1));
+      if (framed) return;
+      // High-front three-quarter fallback when humanoid finger bones are partially missing.
       this.camera.position.set(mid.x, mid.y + 0.28, mid.z + 0.78);
       this.camera.lookAt(mid.x, mid.y - 0.04, mid.z);
       return;
     }
     if (this.kind === "left" && leftHand) {
       const l = leftHand.getWorldPosition(new THREE.Vector3());
+      const points = collectHandPoints(vrm, "left");
+      const framed = frameByPoints(this.camera, points.length > 0 ? points : [l], new THREE.Vector3(1, 0.28, 1));
+      if (framed) return;
       // Pull back + outside + elevated so the whole hand is visible (not a hip crop).
       this.camera.position.set(l.x + 0.42, l.y + 0.22, l.z + 0.42);
       this.camera.lookAt(l.x - 0.02, l.y - 0.02, l.z);
@@ -153,6 +240,9 @@ class Panel {
     }
     if (this.kind === "right" && rightHand) {
       const r = rightHand.getWorldPosition(new THREE.Vector3());
+      const points = collectHandPoints(vrm, "right");
+      const framed = frameByPoints(this.camera, points.length > 0 ? points : [r], new THREE.Vector3(-1, 0.28, 1));
+      if (framed) return;
       this.camera.position.set(r.x - 0.42, r.y + 0.22, r.z + 0.42);
       this.camera.lookAt(r.x + 0.02, r.y - 0.02, r.z);
     }
@@ -184,6 +274,23 @@ const panels = {
 
 let current: { vrm: VRM; id: string; name: string; poseId: string } | null = null;
 let raf = 0;
+let requestSequence = 0;
+let isShotAllRunning = false;
+let shotAllEpoch = 0;
+
+function getVrmButtons() {
+  return Array.from(document.querySelectorAll<HTMLButtonElement>("#bar button[data-id]"));
+}
+
+function getShotAllButton() {
+  return document.getElementById("shot-all") as HTMLButtonElement | null;
+}
+
+function wait(ms: number) {
+  return new Promise<void>((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
 
 function paintNotes(note: string) {
   for (const id of ["full-note", "hands-note", "left-note", "right-note"] as const) {
@@ -208,10 +315,11 @@ function tick() {
 }
 
 async function selectCharacter(id: string, url: string, name: string) {
+  const request = ++requestSequence;
   cancelAnimationFrame(raf);
   setStatus(`${name} 로딩…`);
   paintNotes(`${name} 로딩 중…`);
-  document.querySelectorAll("#bar button[data-id]").forEach((btn) => {
+  getVrmButtons().forEach((btn) => {
     btn.classList.toggle("active", (btn as HTMLButtonElement).dataset.id === id);
   });
   try {
@@ -228,6 +336,18 @@ async function selectCharacter(id: string, url: string, name: string) {
       });
     }
     const vrm = await loadVrm(url);
+    if (request !== requestSequence) {
+      vrm.scene.traverse((obj) => {
+        const mesh = obj as THREE.Mesh;
+        if (mesh.isMesh) {
+          mesh.geometry?.dispose?.();
+          const mat = mesh.material;
+          if (Array.isArray(mat)) mat.forEach((m) => m.dispose?.());
+          else mat?.dispose?.();
+        }
+      });
+      return;
+    }
     const pose = applyNaturalIdle(vrm, id);
     current = { vrm, id, name, poseId: pose.id };
     const note = metricsNote(vrm, name, pose.id);
@@ -245,10 +365,73 @@ async function selectCharacter(id: string, url: string, name: string) {
   }
 }
 
+type VrmShotItem = {
+  id: string;
+  name: string;
+  url: string;
+};
+
+function listVrmShotItems(): VrmShotItem[] {
+  return getVrmButtons().map((button) => ({
+    id: button.dataset.id ?? "",
+    name: button.dataset.name ?? "",
+    url: button.dataset.url ?? "",
+  })).filter((entry) => entry.id && entry.url && entry.name);
+}
+
+function cancelShotAll() {
+  if (!isShotAllRunning) return;
+  isShotAllRunning = false;
+  ++shotAllEpoch;
+  getShotAllButton()?.classList.remove("active");
+  setStatus("연속 감상 정지됨");
+}
+
+async function runShotAll() {
+  if (isShotAllRunning) {
+    cancelShotAll();
+    return;
+  }
+
+  const items = listVrmShotItems();
+  if (items.length === 0) {
+    setStatus("순회할 캐릭터가 없습니다.");
+    return;
+  }
+
+  isShotAllRunning = true;
+  const token = ++shotAllEpoch;
+  const shotButton = getShotAllButton();
+  shotButton?.classList.add("active");
+
+  try {
+    for (let index = 0; index < items.length; index += 1) {
+      if (!isShotAllRunning || token !== shotAllEpoch) break;
+      const item = items[index];
+      setStatus(`연속 감상 ${index + 1}/${items.length}: ${item.name}`);
+      await selectCharacter(item.id, item.url, item.name);
+      await wait(900);
+    }
+  } finally {
+    isShotAllRunning = false;
+    shotButton?.classList.remove("active");
+    if (token === shotAllEpoch) {
+      setStatus("연속 감상 완료");
+    }
+  }
+}
+
 document.querySelectorAll<HTMLButtonElement>("#bar button[data-id]").forEach((btn) => {
   btn.addEventListener("click", () => {
+    if (isShotAllRunning) {
+      cancelShotAll();
+    }
     void selectCharacter(btn.dataset.id!, btn.dataset.url!, btn.dataset.name!);
   });
+});
+
+document.getElementById("shot-all")?.addEventListener("click", () => {
+  void runShotAll();
 });
 
 window.addEventListener("resize", () => {

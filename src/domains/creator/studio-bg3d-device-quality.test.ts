@@ -120,10 +120,10 @@ describe("resolveStudioBg3dDeviceQuality", () => {
       renderWidth: 562,
       renderHeight: 1218,
       renderPixels: 684_516,
-      shadows: false,
-      shadowMapSize: 0,
-      textureScale: 0.5,
-      lodBias: 1,
+      shadows: true,
+      shadowMapSize: 2048,
+      textureScale: 1,
+      lodBias: 0,
       targetFps: 30,
     });
     expect(hasStudioBg3dQualityReason(quality, "profile-dpr-max-limited")).toBe(true);
@@ -162,8 +162,8 @@ describe("resolveStudioBg3dDeviceQuality", () => {
       },
     });
 
-    expect(quality.effectiveDpr).toBe(1);
-    expect(quality.renderPixels).toBe(8_294_400);
+    expect(quality.effectiveDpr).toBe(1.23168);
+    expect(quality.renderPixels).toBe(12_579_140);
     expect(hasStudioBg3dQualityReason(quality, "pixel-budget-limited")).toBe(true);
   });
 
@@ -331,8 +331,8 @@ describe("resolveStudioBg3dDeviceQuality", () => {
       },
     });
 
-    expect(quality.maxRenderPixels).toBe(2_073_600);
-    expect(quality.renderPixels).toBeLessThanOrEqual(2_073_600);
+    expect(quality.maxRenderPixels).toBe(4_194_304);
+    expect(quality.renderPixels).toBeLessThanOrEqual(4_194_304);
   });
 });
 
@@ -365,8 +365,8 @@ describe("GLB validator policy derivation", () => {
     });
     expect(profiles.mobile.textures.maxTextures).toBe(64);
     expect(profiles.desktop.textures.maxTextures).toBe(128);
-    expect(profiles.mobile.textures.maxDimension).toBe(4096);
-    expect(profiles.desktop.textures.maxDimension).toBe(4096);
+    expect(profiles.mobile.textures.maxDimension).toBe(8192);
+    expect(profiles.desktop.textures.maxDimension).toBe(8192);
   });
 
   it("preserves stricter project limits across mobile and desktop validator profiles", () => {

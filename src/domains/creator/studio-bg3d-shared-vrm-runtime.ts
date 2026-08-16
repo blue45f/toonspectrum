@@ -1,5 +1,6 @@
 import * as THREE from "three";
 
+import { applyStudioBg3dRuntimeAssetQuality } from "./studio-bg3d-runtime-asset-quality";
 import {
   STUDIO_VRM_BASE_ROTATION_Y_KEY,
   loadStudioVrmAsset,
@@ -429,11 +430,14 @@ export function applyStudioBg3dLinkedCharacterState(
     source.stageTransform.rotationY;
   vrm.scene.name = `ToonSpectrumSharedCharacter:${source.elementId}`;
   vrm.scene.userData.studioShared3dCharacterElementId = source.elementId;
+  applyStudioBg3dRuntimeAssetQuality(vrm.scene, {
+    castShadow: true,
+    receiveShadow: true,
+    qualityBudget: 1,
+  });
   vrm.scene.traverse((object) => {
     const mesh = object as THREE.Mesh;
     if (!mesh.isMesh) return;
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
     // One bounded root proxy owns character selection. Internal face, hair and garment meshes stay
     // pass-through so transparent or oversized geometry cannot steal picks from the background.
     mesh.raycast = () => undefined;

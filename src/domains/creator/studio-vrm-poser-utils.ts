@@ -899,9 +899,9 @@ export function correctVrmHangingHandPalmTwist(vrm: VRM): number {
 }
 
 /** Max forearm twist per pass (larger snaps read as a spun wrist). */
-export const STUDIO_VRM_HANGING_PALM_TWIST_MAX_RAD = THREE.MathUtils.degToRad(28);
+export const STUDIO_VRM_HANGING_PALM_TWIST_MAX_RAD = THREE.MathUtils.degToRad(34);
 /** Fraction of remaining twist error applied each pass. */
-export const STUDIO_VRM_HANGING_PALM_TWIST_BLEND = 0.5;
+export const STUDIO_VRM_HANGING_PALM_TWIST_BLEND = 0.62;
 /** Max extra pitch used only to kill obvious palm-up residuals. */
 export const STUDIO_VRM_HANGING_PALM_PITCH_MAX_RAD = THREE.MathUtils.degToRad(10);
 /**
@@ -909,7 +909,7 @@ export const STUDIO_VRM_HANGING_PALM_PITCH_MAX_RAD = THREE.MathUtils.degToRad(10
  * Natural idle with side-aware winding is often already ≥0.75 — twisting then
  * looks like the wrist was wrenched the wrong way.
  */
-export const STUDIO_VRM_HANGING_PALM_ALREADY_MEDIAL = 0.42;
+export const STUDIO_VRM_HANGING_PALM_ALREADY_MEDIAL = 0.34;
 
 /**
  * Desired palm normal for a relaxed hand on a standing character facing +Z.

@@ -1697,6 +1697,7 @@ import {
   type StudioDccWorkbenchMode,
   type StudioWorkspaceRoute,
 } from "./studio-workspace-route";
+import { resolveStudioWorkspaceWidePanelToggle } from "./studio-workspace-wide-mode";
 import {
   STUDIO_WORKSPACE_LEFT_PANEL_WIDTH,
   STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH,
@@ -5911,6 +5912,18 @@ function StudioCuttoonEditor({
     visibleLeftPanelOpen,
     visibleRightPanelOpen,
   } = panelLayout;
+
+  const toggleCanvasWideMode = () => {
+    const next = resolveStudioWorkspaceWidePanelToggle({
+      leftPanelOpen,
+      rightPanelOpen,
+      visibleLeftPanelOpen,
+      visibleRightPanelOpen,
+      presentationPanelsHidden,
+    });
+    setLeftPanelOpenWithOverride(next.leftPanelOpen);
+    setRightPanelOpenWithOverride(next.rightPanelOpen);
+  };
   const { left: compactCanvasDockLeft, right: compactCanvasDockRight } =
     resolveStudioWorkspaceCanvasDockInsets({
       leftPanelWidth: leftResize.width,
@@ -40346,6 +40359,9 @@ function clearSelectionForEdit() {
           quickAccessPaletteLoading,
           leftPanelOpen,
           rightPanelOpen,
+          visibleLeftPanelOpen,
+          visibleRightPanelOpen,
+          presentationPanelsHidden,
           lastFilterDraft: lastStudioFilterDraft,
           clippingMaskActive: menuClippingMaskActive,
           clippingMaskDisabled: menuClippingMaskDisabled,
@@ -40462,6 +40478,7 @@ function clearSelectionForEdit() {
       isFullscreen,
       lastStudioFilterDraft,
       leftPanelOpen,
+      presentationPanelsHidden,
       menuActiveToolCommandId,
       menuClippingMaskActive,
       menuClippingMaskDisabled,
@@ -40492,6 +40509,8 @@ function clearSelectionForEdit() {
       quickAccessPaletteOpen,
       referencePanelOpen,
       rightPanelOpen,
+      visibleLeftPanelOpen,
+      visibleRightPanelOpen,
       saving,
       setZoom,
       showRulers,
@@ -44537,7 +44556,7 @@ function clearSelectionForEdit() {
           history={history}
           historyPanelOpen={historyPanelOpen}
           isFullscreen={isFullscreen}
-          leftPanelOpen={leftPanelOpen}
+          toggleWorkspaceWideMode={toggleCanvasWideMode}
           magicResizeStrategy={magicResizeStrategy}
           masterEditMode={masterEditMode}
           maximized={maximized}
@@ -44559,7 +44578,6 @@ function clearSelectionForEdit() {
           referencePanelOpen={referencePanelOpen}
           renamingAssetId={renamingAssetId}
           renamingAssetName={renamingAssetName}
-          rightPanelOpen={rightPanelOpen}
           sceneSimilarAnchor={sceneSimilarAnchor}
           sceneSimilarSiblings={sceneSimilarSiblings}
           sceneTemplates={sceneTemplates}

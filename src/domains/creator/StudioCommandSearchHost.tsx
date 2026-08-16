@@ -13,6 +13,7 @@
 import { Search } from "lucide-react";
 import { Suspense, lazy, useCallback, useEffect, useState } from "react";
 
+import { STUDIO_ICON_SIZE, STUDIO_ICON_STROKE, studioChromeIconClass } from "./studio-chrome-ui";
 import { subscribeStudioCommandSearchRequests } from "./studio-help-center-channel";
 
 import type { StudioCommandSearchDialogProps } from "./StudioCommandSearchDialog";
@@ -78,7 +79,12 @@ export function StudioCommandSearchHost({
           title="명령·속성 통합 검색 (F1)"
           className="flex min-h-11 w-full items-center gap-2 border-b border-line px-3 text-left text-xs text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
-          <Search size={14} aria-hidden className="shrink-0" />
+          <Search
+            size={STUDIO_ICON_SIZE.contextMenu}
+            strokeWidth={STUDIO_ICON_STROKE}
+            aria-hidden
+            className={studioChromeIconClass({ tone: "default" })}
+          />
           <span className="min-w-0 flex-1 truncate">
             기능 검색 · CSP·Photoshop 용어
           </span>

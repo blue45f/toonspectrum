@@ -631,7 +631,6 @@ export interface StudioToolBeltContentProps {
   history: PageState[][];
   historyPanelOpen: boolean;
   isFullscreen: boolean;
-  leftPanelOpen: boolean;
   magicResizeStrategy: MagicResizeStrategy;
   masterEditMode: boolean;
   maximized: boolean;
@@ -652,7 +651,6 @@ export interface StudioToolBeltContentProps {
   referencePanelOpen: boolean;
   renamingAssetId: string | null;
   renamingAssetName: string;
-  rightPanelOpen: boolean;
   sceneSimilarAnchor: SceneTemplate | null;
   sceneSimilarSiblings: SceneTemplate[];
   sceneTemplates: StudioSceneTemplatePacks;
@@ -698,7 +696,7 @@ export interface StudioToolBeltContentProps {
   setFxPickerSection: import("react").Dispatch<import("react").SetStateAction<FxPickerSection>>;
   setFxSearchQuery: import("react").Dispatch<import("react").SetStateAction<string>>;
   setHistoryPanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setLeftPanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setLeftPanelOpen?: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setMagicResizeStrategy: import("react").Dispatch<import("react").SetStateAction<MagicResizeStrategy>>;
   setMenu: import("react").Dispatch<import("react").SetStateAction<StudioMenu | null>>;
   setMannequinPoserOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
@@ -708,12 +706,12 @@ export interface StudioToolBeltContentProps {
   setReferencePanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setRenamingAssetId: import("react").Dispatch<import("react").SetStateAction<string | null>>;
   setRenamingAssetName: import("react").Dispatch<import("react").SetStateAction<string>>;
-  setRightPanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setScale: import("react").Dispatch<import("react").SetStateAction<number>>;
   setScenarioOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setSceneSimilarAnchorId: import("react").Dispatch<import("react").SetStateAction<string | null>>;
   setScrollPreviewOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setStoryboardGridOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setRightPanelOpen?: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setTeamPanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setTimelapseOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setTimelineOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
@@ -749,6 +747,7 @@ export interface StudioToolBeltContentProps {
   uiDensityMode: "focus" | "simple" | "full";
   visibleLeftPanelOpen: boolean;
   visibleRightPanelOpen: boolean;
+  toggleWorkspaceWideMode: () => void;
   wrapRef: import("react").RefObject<HTMLDivElement | null>;
   zoom: number;
   stableHandlers: StudioToolBeltContentHandlers;
@@ -776,7 +775,6 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
     history,
     historyPanelOpen,
     isFullscreen,
-    leftPanelOpen,
     masterEditMode,
     maximized,
     menu,
@@ -789,20 +787,17 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
     presentationPanelsHidden,
     recentColors,
     referencePanelOpen,
-    rightPanelOpen,
     selected,
     setBg3dOpen,
     setColor,
     setCommentsOpen,
     setContinuityOpen,
     setHistoryPanelOpen,
-    setLeftPanelOpen,
     setMannequinPoserOpen,
     setMenu,
     setPageReviewOpen,
     setPoserVrmOpen,
     setReferencePanelOpen,
-    setRightPanelOpen,
     setScrollPreviewOpen,
     setStoryboardGridOpen,
     setTeamPanelOpen,
@@ -816,6 +811,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
     uiDensityMode,
     visibleLeftPanelOpen,
     visibleRightPanelOpen,
+    toggleWorkspaceWideMode,
     zoom,
     stableHandlers,
   } = props;
@@ -1552,11 +1548,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
           >
             <button
               type="button"
-              onClick={() => {
-                const anyOpen = leftPanelOpen || rightPanelOpen;
-                setLeftPanelOpen(!anyOpen);
-                setRightPanelOpen(!anyOpen);
-              }}
+              onClick={toggleWorkspaceWideMode}
               disabled={presentationPanelsHidden}
               aria-pressed={!visibleLeftPanelOpen && !visibleRightPanelOpen}
               className={cn(

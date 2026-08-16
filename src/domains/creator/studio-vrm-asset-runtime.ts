@@ -1,5 +1,6 @@
 import * as THREE from "three";
 
+import { applyStudioBg3dRuntimeAssetQuality } from "./studio-bg3d-runtime-asset-quality";
 import {
   inspectStudioVrmLicenseAuthority,
   type StudioVrmLicenseAuthority,
@@ -108,6 +109,11 @@ function prepareVrmScene(vrm: VRM): void {
   vrm.scene.traverse((object) => {
     object.frustumCulled = false;
     if (isMesh(object)) object.receiveShadow = true;
+  });
+  applyStudioBg3dRuntimeAssetQuality(vrm.scene, {
+    castShadow: true,
+    receiveShadow: true,
+    qualityBudget: 1,
   });
   vrm.scene.position.set(0, 0, 0);
   vrm.scene.userData[STUDIO_VRM_BASE_ROTATION_Y_KEY] = vrm.scene.rotation.y;

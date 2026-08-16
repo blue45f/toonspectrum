@@ -8,14 +8,11 @@ import {
   Sparkles,
   Trash2,
   Upload,
-  UserRound,
-  WandSparkles,
 } from "lucide-react";
 import { useEffect, useRef, useState, type ChangeEventHandler } from "react";
 
 import { presentStudioVrmLicenseAuthority } from "./studio-vrm-license-product-gate";
-
-import type { VrmLibraryEntry } from "./vrm-library";
+import { buildFallbackVrmLibraryThumbnail, type VrmLibraryEntry } from "./vrm-library";
 
 const LIBRARY_BATCH_SIZE = 12;
 /** Prefetch margin so the next batch starts before the user hits the list end. */
@@ -405,13 +402,17 @@ export function StudioVrmCharacterLibraryPanel({
                 onClick={() => onSelect(entry)}
               >
                 <span className="grid h-[4.5rem] place-items-center overflow-hidden rounded-lg border border-line/80 bg-panel">
-                  {entry.thumbnail ? (
-                    <img alt="" className="h-full w-full object-contain" src={entry.thumbnail} />
-                  ) : (
-                    <span className="grid size-9 place-items-center rounded-lg border border-line bg-card text-fg-3">
-                      {entry.source === "sample" ? <WandSparkles size={17} aria-hidden /> : <UserRound size={17} aria-hidden />}
-                    </span>
-                  )}
+                  <img
+                    alt=""
+                    className="h-full w-full object-contain"
+                    src={entry.thumbnail ?? buildFallbackVrmLibraryThumbnail(entry.name, entry.id)}
+                    onError={(event) => {
+                      const fallback = buildFallbackVrmLibraryThumbnail(entry.name, entry.id);
+                      if (event.currentTarget.src !== fallback) {
+                        event.currentTarget.src = fallback;
+                      }
+                    }}
+                  />
                 </span>
                 <span className="min-w-0">
                   <span className="block truncate text-xs font-bold text-fg">{entry.name}</span>

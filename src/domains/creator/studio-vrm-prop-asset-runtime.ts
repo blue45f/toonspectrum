@@ -1,5 +1,7 @@
 import * as THREE from "three";
 
+import { applyStudioBg3dRuntimeAssetQuality } from "./studio-bg3d-runtime-asset-quality";
+
 import type { PropGltfGeometrySource } from "./studio-vrm-props";
 
 export interface StudioVrmPropAssetLease {
@@ -39,11 +41,9 @@ function assertFirstPartyPropUrl(url: string): void {
 
 function preparePropClone(object: THREE.Object3D, propId: string): void {
   object.name = `prop:${propId}`;
-  object.traverse((child) => {
-    const mesh = child as THREE.Mesh;
-    if (mesh.isMesh !== true) return;
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
+  applyStudioBg3dRuntimeAssetQuality(object, {
+    castShadow: true,
+    receiveShadow: true,
   });
 }
 
