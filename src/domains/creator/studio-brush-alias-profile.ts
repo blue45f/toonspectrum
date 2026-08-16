@@ -619,6 +619,103 @@ export function resolveStudioBrushAliasProfile(
     : null;
 }
 
+
+/**
+ * Per-preset rendered-diameter multiplier for the 71 variant ids.
+ *
+ * These numbers are FROZEN OUTPUT, not authored intent, and that is the point of writing them
+ * down. They used to be computed at render time as an FNV-1a checksum of the brush's own id —
+ * every id containing "--" had its diameter multiplied by a hash of its own name, undocumented and
+ * untested, spreading 71 presets over 0.848 to 1.337. A checksum is not a width contract: it makes
+ * a preset's size depend on how its name happens to spell, and it silently masked variants that
+ * render identically to their canonical — the diameter offset was the only thing separating
+ * `marker--chisel-ribbon` and `screentone--sparse-grid` from theirs, which is how they came to be
+ * quarantined.
+ *
+ * Baking the hash's exact output keeps every saved document replaying to the byte while taking the
+ * checksum out of the runtime, and it puts the 71 multipliers somewhere they can be read, reviewed
+ * and eventually AUTHORED. The accompanying test recomputes the historical hash and asserts this
+ * table reproduces it exactly, so the provenance stays checkable and the table cannot drift by
+ * accident — while a deliberate edit to any single row is now a one-line, reviewable change.
+ *
+ * An id that is not listed takes 1. The list covers every "--" id in the runtime contract and the
+ * lane catalogue, which together are the ids a document can hold.
+ */
+export const STUDIO_BRUSH_ALIAS_DIAMETER_MULTIPLIERS: Readonly<Record<string, number>> =
+  Object.freeze({
+  "acrylic--polymer-flat": 0.928816,
+  "acrylic--stiff-ribbon": 1.118876,
+  "airbrush--hard-envelope": 1.007492,
+  "airbrush--klecks-grit": 0.969012,
+  "airbrush--stamp-soft": 1.318452,
+  "brush--bristle-depletion": 1.29058,
+  "brush--bristle-physics": 1.13016,
+  "brush--dry-rake": 0.940464,
+  "brush--impasto-relief": 0.930792,
+  "brush--oil-lanes": 1.028916,
+  "calligraphy--perfect-chisel": 0.9137879999999999,
+  "chalk--klecks-powder": 1.322508,
+  "chalk--klecks-stamp": 1.012276,
+  "charcoal--compressed-edge": 1.278724,
+  "charcoal--mypaint-stamp": 1.154912,
+  "charcoal--vine-soft": 1.19958,
+  "crayon--klecks-stamp": 0.901256,
+  "crayon--wax-scrape": 1.1244399999999999,
+  "glitter--star-field": 1.259172,
+  "gouache--flat-stamp": 0.8478,
+  "gouache--matte-body": 1.11326,
+  "gpen--causal-round": 1.283404,
+  "gpen--croquis-capsule": 1.27654,
+  "ink-particle--scatter-cloud": 1.067136,
+  "ink-wash--bleed-halo": 1.076184,
+  "ink-wash--chroma-halo": 1.1310959999999999,
+  "ink-wash--fiber-feather": 1.030788,
+  "ink-wash--living-bake": 0.864752,
+  "ink-wash--sumi-core": 1.281532,
+  "marker--chisel-ribbon": 1.115912,
+  "marker--soft-dynamic": 1.121476,
+  "mypaint-cc0--2b-pencil": 1.2130480000000001,
+  "mypaint-cc0--calligraphy": 0.928816,
+  "mypaint-cc0--charcoal": 1.1864759999999999,
+  "mypaint-cc0--charcoal-tanda": 1.336808,
+  "mypaint-cc0--dry-brush": 1.332128,
+  "mypaint-cc0--ink-blot": 1.089288,
+  "mypaint-cc0--kabura": 1.038224,
+  "mypaint-cc0--knife": 0.948836,
+  "mypaint-cc0--marker-fat": 1.138272,
+  "mypaint-cc0--marker-small": 1.330464,
+  "mypaint-cc0--oil-paint": 0.8808199999999999,
+  "mypaint-cc0--pastel": 0.967764,
+  "mypaint-cc0--slow-ink": 1.209824,
+  "mypaint-cc0--splatter": 1.088716,
+  "mypaint-cc0--spray": 0.9960519999999999,
+  "mypaint-cc0--watercolor-expressive": 0.9894999999999999,
+  "mypaint-cc0--watercolor-fringe": 0.968024,
+  "oil--filbert-ribbon": 0.8552879999999999,
+  "oil--flat-ribbon": 1.00146,
+  "oil--impasto-ribbon": 1.32334,
+  "oil--knife-edge": 1.32776,
+  "oil--tube-extrude": 0.8925719999999999,
+  "oil-pastel--waxy-film": 1.248668,
+  "oil-pastel--wgm-mix": 0.9353159999999999,
+  "pastel--cake-soft": 1.020596,
+  "pastel--soft-stamp": 0.990592,
+  "pen--croquis-stabilized": 1.322248,
+  "pen--perfect-taper": 1.1623999999999999,
+  "pencil--erodible-wear": 1.2742,
+  "pencil--side-shade": 0.8627239999999999,
+  "pencil--stamp-grain": 1.295468,
+  "screentone--sparse-grid": 1.058504,
+  "splatter--burst-cloud": 1.077016,
+  "spray--equal-area": 1.25652,
+  "watercolor--dense-core": 1.301344,
+  "watercolor--edge-bloom": 1.247576,
+  "watercolor--edge-stamp": 1.099896,
+  "watercolor--fluid-feather": 0.9864839999999999,
+  "watercolor--granular": 0.921796,
+  "watercolor--granulating": 1.179716,
+  });
+
 /** Returns the renderer diameter while keeping malformed inputs bounded and deterministic. */
 export function studioBrushAliasEffectiveDiameter(
   brushId: unknown,
@@ -630,13 +727,8 @@ export function studioBrushAliasEffectiveDiameter(
     MAX_EFFECTIVE_DIAMETER
   );
   let scale = resolveStudioBrushAliasProfile(brushId)?.diameterScale ?? 1;
-  if (typeof brushId === "string" && brushId.includes("--")) {
-    let hash = 2166136261;
-    for (let i = 0; i < brushId.length; i++) {
-      hash ^= brushId.charCodeAt(i);
-      hash = Math.imul(hash, 16777619);
-    }
-    scale *= 0.84 + (((hash >>> 0) % 10_000) / 10_000) * 0.52;
+  if (typeof brushId === "string") {
+    scale *= STUDIO_BRUSH_ALIAS_DIAMETER_MULTIPLIERS[brushId] ?? 1;
   }
   return clamp(
     diameter * scale,
