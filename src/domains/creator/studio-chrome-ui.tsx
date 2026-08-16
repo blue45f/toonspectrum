@@ -50,10 +50,38 @@ export const STUDIO_ICON_SIZE = {
   dock: 18,
   header: 15,
   rail: 14,
+  edge: 15,
+  nav: 17,
+  context: 16,
+  identity: 16,
 } as const;
 
 /** Default stroke for small chrome icons — slightly thicker reads cleaner at 14–16px. */
-export const STUDIO_ICON_STROKE = 1.75;
+export const STUDIO_ICON_STROKE = 1.85;
+
+const STUDIO_ICON_CLASS = "shrink-0 transition-colors duration-150";
+
+type StudioChromeIconTone = "default" | "muted" | "accent" | "danger";
+
+function studioChromeIconClass({
+  tone = "default",
+  active = false,
+  disabled = false,
+}: {
+  tone?: StudioChromeIconTone;
+  active?: boolean;
+  disabled?: boolean;
+}): string {
+  return cn(
+    STUDIO_ICON_CLASS,
+    tone === "default" && "text-fg-2",
+    tone === "muted" && "text-fg-3",
+    tone === "accent" && "text-accent",
+    tone === "danger" && "text-bad",
+    active && "text-accent",
+    disabled && "opacity-60"
+  );
+}
 
 /** Horizontal hairline between tool groups (CSP-style tool belt). */
 export function StudioToolbarDivider({
@@ -284,7 +312,7 @@ export function StudioToolButton({
         size={showLabel ? STUDIO_ICON_SIZE.toolCompact : STUDIO_ICON_SIZE.tool}
         strokeWidth={STUDIO_ICON_STROKE}
         aria-hidden
-        className="shrink-0"
+        className={studioChromeIconClass({ tone: "default", active, disabled })}
       />
       {showLabel ? <span className="truncate">{label}</span> : null}
       {chevron ? (
@@ -321,7 +349,12 @@ export function StudioMenuPopoverHeader({
     >
       {Icon ? (
         <span className="grid size-7 shrink-0 place-items-center rounded-md bg-accent-soft text-accent ring-1 ring-accent/15">
-          <Icon size={STUDIO_ICON_SIZE.header} strokeWidth={STUDIO_ICON_STROKE} aria-hidden />
+          <Icon
+            size={STUDIO_ICON_SIZE.header}
+            strokeWidth={STUDIO_ICON_STROKE}
+            aria-hidden
+            className={studioChromeIconClass({ tone: "accent" })}
+          />
         </span>
       ) : null}
       <div className="min-w-0 flex-1">
@@ -384,7 +417,12 @@ export function StudioMenuSubtabs({
               item.disabled && "cursor-not-allowed opacity-40"
             )}
           >
-            <Icon size={STUDIO_ICON_SIZE.subtab} strokeWidth={STUDIO_ICON_STROKE} aria-hidden className="shrink-0" />
+            <Icon
+              size={STUDIO_ICON_SIZE.subtab}
+              strokeWidth={STUDIO_ICON_STROKE}
+              aria-hidden
+              className={studioChromeIconClass({ tone: "default" })}
+            />
             <span className="truncate">{item.label}</span>
           </button>
         );
@@ -430,7 +468,12 @@ export function StudioEdgeRailButton({
       )}
     >
       {Icon ? (
-        <Icon size={15} strokeWidth={STUDIO_ICON_STROKE} aria-hidden className="opacity-70 transition-opacity group-hover:opacity-100" />
+        <Icon
+          size={STUDIO_ICON_SIZE.edge}
+          strokeWidth={STUDIO_ICON_STROKE}
+          aria-hidden
+          className={studioChromeIconClass({ tone: "muted", disabled: false })}
+        />
       ) : null}
       <span className="text-[0.6rem] font-semibold tracking-[0.14em] text-fg-3 [writing-mode:vertical-rl] group-hover:text-fg-2">
         {label}
@@ -501,7 +544,16 @@ export const StudioDockButton = forwardRef<
     >
       {swatch ??
         (Icon ? (
-          <Icon size={STUDIO_ICON_SIZE.dock} strokeWidth={STUDIO_ICON_STROKE} aria-hidden />
+          <Icon
+            size={STUDIO_ICON_SIZE.dock}
+            strokeWidth={STUDIO_ICON_STROKE}
+            aria-hidden
+            className={studioChromeIconClass({
+              tone: danger ? "danger" : active ? "accent" : "default",
+              active,
+              disabled,
+            })}
+          />
         ) : null)}
       <span>{label}</span>
     </button>
@@ -563,7 +615,12 @@ export function StudioDockNavButton({
       )}
       {...rest}
     >
-      <Icon size={17} strokeWidth={STUDIO_ICON_STROKE} aria-hidden />
+      <Icon
+        size={STUDIO_ICON_SIZE.nav}
+        strokeWidth={STUDIO_ICON_STROKE}
+        aria-hidden
+        className={studioChromeIconClass({ tone: active ? "accent" : "default", active })}
+      />
       <span>{label}</span>
     </button>
   );
@@ -599,7 +656,15 @@ export function StudioContextActionButton({
       )}
       {...rest}
     >
-      <Icon size={16} strokeWidth={STUDIO_ICON_STROKE} aria-hidden />
+      <Icon
+        size={STUDIO_ICON_SIZE.context}
+        strokeWidth={STUDIO_ICON_STROKE}
+        aria-hidden
+        className={studioChromeIconClass({
+          tone: danger ? "danger" : active ? "accent" : "default",
+          active,
+        })}
+      />
       {label}
     </button>
   );
@@ -692,7 +757,12 @@ export function StudioToolIdentity({
     >
       {Icon ? (
         <span className="grid size-8 place-items-center rounded-lg bg-canvas/60 text-accent shadow-[inset_0_0_0_1px_oklch(0.72_0.185_42/0.18)]">
-          <Icon size={16} strokeWidth={STUDIO_ICON_STROKE} aria-hidden />
+          <Icon
+            size={STUDIO_ICON_SIZE.identity}
+            strokeWidth={STUDIO_ICON_STROKE}
+            aria-hidden
+            className={studioChromeIconClass({ tone: "accent" })}
+          />
         </span>
       ) : null}
       {iconFirst ? (

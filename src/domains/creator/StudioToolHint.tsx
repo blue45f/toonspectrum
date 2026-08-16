@@ -54,6 +54,8 @@ const EXPAND_DELAY_MS = 620;
 const HIDE_DELAY_MS = 280;
 const TOUCH_HOLD_MOVE_TOLERANCE_PX = 10;
 const TOUCH_PAN_SUPPRESSION_DISTANCE_PX = 8;
+const POINTER_HINT_SUPPRESSION_DISTANCE_PX = 6;
+const POINTER_HINT_SUPPRESSION_MS = 720;
 const FALLBACK_WIDTH = 240;
 const FALLBACK_HEIGHT = 92;
 const FALLBACK_GAP = 10;
@@ -277,19 +279,33 @@ export function StudioToolHintPreferencesProvider({
 // the pointer physically moves (or keyboard focus deliberately takes over).
 let suppressedPointerHintAt: Readonly<{ x: number; y: number }> | null = null;
 let clearPointerSuppressionListener: (() => void) | null = null;
+let clearPointerSuppressionTimeout: ReturnType<typeof setTimeout> | null = null;
 
 function clearPointerSuppression() {
   clearPointerSuppressionListener?.();
   clearPointerSuppressionListener = null;
+  if (clearPointerSuppressionTimeout !== null) {
+    globalThis.clearTimeout(clearPointerSuppressionTimeout);
+    clearPointerSuppressionTimeout = null;
+  }
   suppressedPointerHintAt = null;
 }
 
 function armPointerSuppression(x: number, y: number) {
   clearPointerSuppression();
   suppressedPointerHintAt = { x, y };
+  clearPointerSuppressionTimeout = globalThis.setTimeout(() => {
+    clearPointerSuppression();
+  }, POINTER_HINT_SUPPRESSION_MS) as ReturnType<typeof setTimeout>;
+
   function onPointerMove(event: PointerEvent) {
     if (!suppressedPointerHintAt) return;
-    if (Math.hypot(event.clientX - suppressedPointerHintAt.x, event.clientY - suppressedPointerHintAt.y) <= 6) {
+    if (
+      Math.hypot(
+        event.clientX - suppressedPointerHintAt.x,
+        event.clientY - suppressedPointerHintAt.y
+      ) <= POINTER_HINT_SUPPRESSION_DISTANCE_PX
+    ) {
       return;
     }
     clearPointerSuppression();
