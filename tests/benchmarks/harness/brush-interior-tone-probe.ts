@@ -288,6 +288,13 @@ for (const brush of BRUSHES) {
   const after = measure(svg);
   const before = measure(collapseShells(svg));
   if (process.env.TONE_PROBE_ZOOM) await writeZoom(brush, svg, 20, 200);
+  // resvg 의 20배 확대는 텍스처 팁 경로에서 wasm unreachable 로 죽는다(측정용 1배 래스터는 멀쩡).
+  // 그래서 육안 확인은 SVG 를 그대로 떨궈 실제 브라우저에서 보게 한다 — 죽은 래스터라이저의
+  // 마지막 성공 출력이 그대로 남아 "안 바뀌었다"로 읽히는 함정을 피하는 게 목적이다.
+  if (process.env.TONE_PROBE_WRITE_SVG) {
+    await mkdir(OUT_DIR, { recursive: true });
+    await writeFile(resolve(OUT_DIR, `cell-${brush}.svg`), svg, "utf8");
+  }
   const format = (label: string, m: ReturnType<typeof measure>) => [
     `${label}: interiorPx=${m.pixels}`,
     `distinctTones=${m.distinct}`,

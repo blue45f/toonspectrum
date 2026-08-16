@@ -206,7 +206,11 @@ export const STUDIO_BRUSH_ENGINE_LANE_CATALOG_ROWS: readonly StudioBrushEngineLa
     r("mypaint-cc0--charcoal", "MyPaint 오픈소스 · 목탄", "mypaint-cc0", "dry-stamp", 14, 0.75, ["CC0 목탄", "mypaint charcoal"], "dry-media", "stamp-dabs", "charcoal", "charcoal--mypaint-stamp", "texture", "stamp-pencil", "procedural-grain", "stamp-pressure-flow", "profile-variant"),
     r("mypaint-cc0--charcoal-tanda", "MyPaint 오픈소스 · 목탄 슬리버", "mypaint-cc0", "dry-stamp", 12, 0.8, ["목탄 슬리버", "charcoal sliver"], "dry-media", "stamp-dabs", "charcoal", "charcoal--mypaint-stamp", "texture", "stamp-pencil", "procedural-grain", "stamp-pressure-flow", "profile-variant"),
     r("mypaint-cc0--2b-pencil", "MyPaint 오픈소스 · 2B 연필", "mypaint-cc0", "dry-stamp", 9, 0.9, ["CC0 2B", "2b pencil"], "pencil", "stamp-dabs", "pencil", "pencil-grain", "texture", "stamp-pencil", "procedural-grain", "stamp-pressure-flow", "profile-variant"),
-    r("mypaint-cc0--dry-brush", "MyPaint 오픈소스 · 드라이 브러시", "mypaint-cc0", "dry-stamp", 18, 0.85, ["CC0 드라이 브러시", "dry brush"], "dry-media", "stamp-dabs", "ink", "ink-brush", "texture", "stamp-ink", "none", "stamp-pressure-flow", "profile-variant"),
+    // engineVariant/tip/texture follow the stamp kind, which moved from "ink" (the solid-disc tip)
+    // to "charcoal" in studio-cc0-mypaint-preset-import-v1 — see the note there. The catalog
+    // contract asserts these three agree with the resolved kind, which is exactly how the old
+    // mismatch would have been caught if the kind had ever been questioned.
+    r("mypaint-cc0--dry-brush", "MyPaint 오픈소스 · 드라이 브러시", "mypaint-cc0", "dry-stamp", 18, 0.85, ["CC0 드라이 브러시", "dry brush"], "dry-media", "stamp-dabs", "charcoal", "charcoal--mypaint-stamp", "texture", "stamp-pencil", "procedural-grain", "stamp-pressure-flow", "profile-variant"),
     r("mypaint-cc0--splatter", "MyPaint 오픈소스 · 스플래터", "mypaint-cc0", "spray-stamp", 42, 0.7, ["CC0 스플래터", "splatter burst"], "stamp", "stamp-dabs", "airbrush", "airbrush-fine", "dots", "stamp-airbrush", "soft-gradient", "stamp-pressure-flow", "profile-variant"),
     // ink-blot 이 "mypaint" 스탬프 킨드 시그니처의 카탈로그 canonical(unique); oil-paint 는 같은
     // 킨드의 exact-id 튜닝 변형(profile-variant)이다.

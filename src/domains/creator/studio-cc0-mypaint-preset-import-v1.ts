@@ -330,7 +330,17 @@ export const STUDIO_CC0_MYPAINT_PRESET_IMPORTS: readonly StudioCc0MypaintPresetI
       "MyPaint 오픈소스 · 드라이 브러시",
       "brushes/classic/dry_brush.myb",
       "classic",
-      "ink",
+      // 2026-08-16: was "ink", which is the engine's SOLID-DISC tip. Measured over all 168 brushes,
+      // this preset laid 4016 dabs and rendered exactly ONE distinct interior tone (sd 0.000) — a
+      // flat grey slab with a scalloped edge, which is not a dry brush by any reading. Every cc0
+      // preset on a textured kind measures 88–213 tones; every one on "ink" measures 1–8.
+      //
+      // The kind is only the tip kernel ("retained pixel authority"), so this swaps the solid disc
+      // for a grainy dry tip and changes nothing else. The note that used to sit below claimed
+      // "ink" was chosen for a velocity factor supplying the preset's speed2→radius thinning; there
+      // is no velocity or speed term anywhere in the stamp engine or the OSS kernels, so that
+      // reason was not real and the preset was paying a flat tip for nothing.
+      "charcoal",
       {
         opaque: { baseValue: 0.8, inputs: { pressure: [[0, 0], [1, 0.2]] } },
         opaque_multiply: { baseValue: 0, inputs: { pressure: [[0, 0], [1, 1]] } },
@@ -343,14 +353,13 @@ export const STUDIO_CC0_MYPAINT_PRESET_IMPORTS: readonly StudioCc0MypaintPresetI
         radius_by_random: { baseValue: 0.1 },
       },
       {
-        // 2·(6+6) = 24 → spacing 1/24; flow (0.8+0.1)·0.5 = 0.45. The "ink" stamp kind supplies
-        // the preset's fast=thin response (radius ← speed2 −0.3) via its velocity factor.
+        // 2·(6+6) = 24 → spacing 1/24; flow (0.8+0.1)·0.5 = 0.45.
         spacingRatio: 0.0417, flow: 0.45, hardness: 0.2, minSizeRatio: 1, sizeScale: 1,
         // Inverse of charcoal: pressing harder splays the dry bristles (+1.4·p radii).
         scatter: 0, scatterPressureResponse: 1.4, radiusJitter: 0.1,
         opaqueLinearize: 0, dabsPerPixel: 24,
       },
-      "speed2→radius thinning approximated by the ink kind's velocity factor (different curve, same fast=thin direction).",
+      "speed2→radius thinning is recorded, not executed — the stamp engine has no velocity term.",
     ),
     preset(
       "splatter",
@@ -765,6 +774,14 @@ export const STUDIO_CC0_MYPAINT_PRESET_IMPORTS: readonly StudioCc0MypaintPresetI
       "MyPaint 오픈소스 · 나이프",
       "brushes/classic/knife.myb",
       "classic",
+      // Stays on "ink" — the flat, hard-edged tip — deliberately. This preset measures only 5
+      // interior tones at sd 0.073 from 1185 dabs, and both of this repo's classifications file it
+      // as `paint-oil`, so it was moved to the softer "mypaint" tip its oil sibling uses and
+      // re-measured: 92 tones, sd 20.8. Rendered, that is a soft graded ribbon, which is further
+      // from a palette knife than the flat slab it replaced — and `elliptical_dab_ratio` 6.52 with
+      // `hardness` 0.8 says upstream means a flat HARD nib. What this preset is actually missing is
+      // paint body (ridge/impasto relief), not a softer dab, so the change was backed out rather
+      // than kept for the metric.
       "ink",
       {
         opaque: { baseValue: 1 },
