@@ -765,7 +765,6 @@ import {
   reorderLayerSelection,
   setItemGroup,
   ungroupItems,
-  type LayerGroup,
   type LayerItemReorderDirection,
 } from "./studio-layers";
 import {
@@ -1011,6 +1010,18 @@ import {
   type ProductBrushLibraryRepository,
   type StudioBrushQuickSlotsSnapshot,
 } from "./studio-page-editor-runtime-loaders";
+import {
+  EMPTY_EFFECT_EMOJIS,
+  EMPTY_FX_LINE_PRESETS,
+  EMPTY_LAYER_GROUPS,
+  EMPTY_NODE_EDIT_HANDLES,
+  EMPTY_STUDIO_OPTIONAL_ASSETS,
+  EMPTY_STUDIO_SCENE_TEMPLATE_PACKS,
+  EMPTY_STUDIO_SFX_PACKS,
+  FX_LINE_PRESETS,
+  type PendingBrushDelete,
+  type PendingStudioWorkspaceSync,
+} from "./studio-page-editor-ui-contracts";
 import {
   isDefaultPageGrade,
   normalizePageGrade,
@@ -2452,25 +2463,6 @@ function requireStudioDrawingPointerTransport(ref: {
  * 조용히 돈다 — 로컬 임시저장(1.5초 디바운스)보다 훨씬 길게 잡아 타이핑·드로잉 중 서버 왕복이
  * 겹치지 않게 한다.
  */
-interface PendingBrushDelete {
-  id: string;
-  deleted: DeletedBrushRecord;
-  expiresAt: number;
-}
-
-interface PendingStudioWorkspaceSync {
-  readonly ownerScope: string;
-  /** Broadcast metadata only; the state itself is always re-read from SQLite authority. */
-  readonly authorityRevision: number;
-  readonly sequence: number;
-  /**
-   * Last owner-verified state known before the first queued external write.
-   * Later external events only replace the coalescing token, preserving one stable 3-way base.
-   */
-  readonly baseState: StudioWorkspaceState;
-}
-
-
 // 캔버스와 도구 패널 사이의 드래그 스플리터(데스크톱). 너비를 끌어서 조절, 더블클릭=기본값, ←/→=미세조절.
 
 function readyStudioWorkAssetImageSources(
@@ -2482,39 +2474,6 @@ function readyStudioWorkAssetImageSources(
   }
   return sources;
 }
-
-const EMPTY_LAYER_GROUPS: LayerGroup[] = [];
-const EMPTY_NODE_EDIT_HANDLES: NodeEditHandle[] = [];
-
-// 시나리오 자동 생성의 패널 종횡비(studio-scenario-layout)를 AI 이미지 생성 사이즈 프리셋으로 매핑
-// — studio-scenario-layout.ts는 AI 클라이언트를 몰라도 되게 이 매핑을 호출부(StudioPage)에 남긴다.
-const EMPTY_STUDIO_OPTIONAL_ASSETS: StudioOptionalAssetPacks = {
-  bgSceneSections: [],
-  bgSceneGenreGroups: [],
-  comicVectorStickers: [],
-  creatureStickers: [],
-  propStickers: [],
-  fxOverlays: [],
-  emeresSections: [],
-  emeresUnderlayOpacity: 0.42,
-};
-const EMPTY_STUDIO_SCENE_TEMPLATE_PACKS: StudioSceneTemplatePacks = {
-  categories: [],
-  templates: [],
-};
-const EMPTY_STUDIO_SFX_PACKS: StudioSfxPacks = {
-  categories: [],
-  presets: [],
-};
-
-
-// 만화 선 효과(집중선·속도선) — 효과 피커 검색이 라벨로 거를 수 있게 데이터로 둔다.
-const FX_LINE_PRESETS: { id: "focus" | "speed"; label: string }[] = [
-  { id: "focus", label: "집중선 생성" },
-  { id: "speed", label: "속도선 생성" },
-];
-const EMPTY_EFFECT_EMOJIS: string[] = [];
-const EMPTY_FX_LINE_PRESETS: typeof FX_LINE_PRESETS = [];
 
 
 // 스튜디오 전용 구글폰트 8종(글꼴 패널·말풍선 프리셋용) — 전 페이지 렌더 차단 경로(index.html)에는
