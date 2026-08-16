@@ -932,7 +932,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
                 !studioUiDensityAllows(uiDensityMode, "toolbar-assets") && "sr-only"
               )}
             >
-              <Folder size={STUDIO_ICON_SIZE.toolCompact} aria-hidden /> 템플릿·에셋
+              <Folder size={STUDIO_ICON_SIZE.toolCompact} strokeWidth={STUDIO_ICON_STROKE} aria-hidden /> 템플릿·에셋
               <ChevronDown size={STUDIO_ICON_SIZE.subtab} aria-hidden className={cn("transition-transform duration-150", activeToolbarGroup === "assetGroup" && "rotate-180")} />
             </button>
           </StudioToolBeltHintTarget>
@@ -955,12 +955,12 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
         <StudioToolbarCluster label="컷 배치">
         <StudioToolBeltHintTarget hint={TOOL_BELT_HINTS.panelAdd}>
           <button type="button" onClick={addFrame} className={toolBtn(false)}>
-            <Plus size={STUDIO_ICON_SIZE.toolCompact} aria-hidden /> 패널
+            <Plus size={STUDIO_ICON_SIZE.toolCompact} strokeWidth={STUDIO_ICON_STROKE} aria-hidden /> 패널
           </button>
         </StudioToolBeltHintTarget>
         <StudioToolBeltHintTarget hint={TOOL_BELT_HINTS.panelSplit}>
           <button type="button" onClick={addDiagonalSplit} className={toolBtn(false)}>
-            <SquareSplitHorizontal size={STUDIO_ICON_SIZE.toolCompact} aria-hidden /> 사선 컷
+            <SquareSplitHorizontal size={STUDIO_ICON_SIZE.toolCompact} strokeWidth={STUDIO_ICON_STROKE} aria-hidden /> 사선 컷
           </button>
         </StudioToolBeltHintTarget>
         {selected?.type === "frame" && (
@@ -972,7 +972,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
               onClick={toggleSelectedFrameDiagonal}
               className={toolBtn(Boolean(selected.points))}
             >
-              <SquareSplitHorizontal size={STUDIO_ICON_SIZE.toolCompact} aria-hidden className="opacity-90" />
+              <SquareSplitHorizontal size={STUDIO_ICON_SIZE.toolCompact} strokeWidth={STUDIO_ICON_STROKE} aria-hidden className="opacity-90" />
               {selected.points ? "직선화" : "사선화"}
             </button>
           </StudioToolBeltHintTarget>
@@ -996,7 +996,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
             className={toolBtn(tool === "select")}
             aria-pressed={tool === "select"}
           >
-            <MousePointer2 size={STUDIO_ICON_SIZE.toolCompact} aria-hidden /> 선택
+            <MousePointer2 size={STUDIO_ICON_SIZE.toolCompact} strokeWidth={STUDIO_ICON_STROKE} aria-hidden /> 선택
           </button>
         </StudioToolBeltHintTarget>
         <StudioToolBeltHintTarget
@@ -1014,7 +1014,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
             className={cn(toolBtn(tool === "draw" && drawMode === "pen"), "disabled:cursor-not-allowed disabled:opacity-40")}
             aria-pressed={tool === "draw" && drawMode === "pen"}
           >
-            <Pencil size={STUDIO_ICON_SIZE.toolCompact} aria-hidden /> 펜
+            <Pencil size={STUDIO_ICON_SIZE.toolCompact} strokeWidth={STUDIO_ICON_STROKE} aria-hidden /> 펜
           </button>
         </StudioToolBeltHintTarget>
         <StudioToolBeltHintTarget
@@ -1032,7 +1032,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
             className={cn(toolBtn(tool === "draw" && drawMode === "eraser"), "disabled:cursor-not-allowed disabled:opacity-40")}
             aria-pressed={tool === "draw" && drawMode === "eraser"}
           >
-            <Eraser size={STUDIO_ICON_SIZE.toolCompact} aria-hidden /> 지우개
+            <Eraser size={STUDIO_ICON_SIZE.toolCompact} strokeWidth={STUDIO_ICON_STROKE} aria-hidden /> 지우개
           </button>
         </StudioToolBeltHintTarget>
         <StudioToolBeltHintTarget
@@ -1047,7 +1047,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
             className={toolBtn(advancedFillActive)}
             aria-pressed={advancedFillActive}
           >
-            <PaintBucket size={STUDIO_ICON_SIZE.toolCompact} aria-hidden /> 채우기
+            <PaintBucket size={STUDIO_ICON_SIZE.toolCompact} strokeWidth={STUDIO_ICON_STROKE} aria-hidden /> 채우기
           </button>
         </StudioToolBeltHintTarget>
         <StudioToolBeltHintTarget
@@ -1061,7 +1061,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
             disabled={selected?.type !== "image"}
             className={cn(toolBtn(frameAnimOpen && frameAnimTargetId === selected?.id), "disabled:opacity-40")}
           >
-            <Film size={STUDIO_ICON_SIZE.toolCompact} aria-hidden /> 프레임
+            <Film size={STUDIO_ICON_SIZE.toolCompact} strokeWidth={STUDIO_ICON_STROKE} aria-hidden /> 프레임
           </button>
         </StudioToolBeltHintTarget>
         </StudioToolbarCluster>
@@ -1078,7 +1078,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
             onClick={() => setPoserVrmOpen(true)}
             className={cn(toolBtn(poserVrmOpen), "border-accent/25 bg-accent-soft/25 text-accent hover:bg-accent-soft/40")}
           >
-            <UsersRound size={STUDIO_ICON_SIZE.toolCompact} aria-hidden /> 3D 캐릭터
+            <UsersRound size={STUDIO_ICON_SIZE.toolCompact} strokeWidth={STUDIO_ICON_STROKE} aria-hidden /> 3D 캐릭터
           </button>
         </StudioToolBeltHintTarget>
         <StudioToolBeltHintTarget hint={TOOL_BELT_HINTS.mannequin3d}>
@@ -1087,7 +1087,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
             onClick={() => setMannequinPoserOpen(true)}
             className={cn(toolBtn(mannequinPoserOpen), "border-accent/25 bg-accent-soft/25 text-accent hover:bg-accent-soft/40")}
           >
-            <PersonStanding size={STUDIO_ICON_SIZE.toolCompact} aria-hidden /> 3D 데생 인형
+            <PersonStanding size={STUDIO_ICON_SIZE.toolCompact} strokeWidth={STUDIO_ICON_STROKE} aria-hidden /> 3D 데생 인형
           </button>
         </StudioToolBeltHintTarget>
         <StudioToolBeltHintTarget hint={TOOL_BELT_HINTS.bg3d}>
@@ -1096,7 +1096,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
             onClick={() => setBg3dOpen(true)}
             className={cn(toolBtn(bg3dOpen), "border-accent/25 bg-accent-soft/25 text-accent hover:bg-accent-soft/40")}
           >
-            <Boxes size={STUDIO_ICON_SIZE.toolCompact} aria-hidden /> 3D 배경
+            <Boxes size={STUDIO_ICON_SIZE.toolCompact} strokeWidth={STUDIO_ICON_STROKE} aria-hidden /> 3D 배경
           </button>
         </StudioToolBeltHintTarget>
         <StudioToolBeltHintTarget hint={TOOL_BELT_HINTS.reference}>
@@ -1108,7 +1108,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
             className={cn(toolBtn(referencePanelOpen), "border-accent/25 bg-accent-soft/25 text-accent hover:bg-accent-soft/40")}
             aria-pressed={referencePanelOpen}
           >
-            <PictureInPicture2 size={STUDIO_ICON_SIZE.toolCompact} aria-hidden /> 참고
+            <PictureInPicture2 size={STUDIO_ICON_SIZE.toolCompact} strokeWidth={STUDIO_ICON_STROKE} aria-hidden /> 참고
           </button>
         </StudioToolBeltHintTarget>
         </StudioToolbarCluster>
@@ -1137,7 +1137,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
                 !studioUiDensityAllows(uiDensityMode, "toolbar-scene") && "sr-only"
               )}
             >
-              <Mountain size={STUDIO_ICON_SIZE.toolCompact} aria-hidden /> 배경
+              <Mountain size={STUDIO_ICON_SIZE.toolCompact} strokeWidth={STUDIO_ICON_STROKE} aria-hidden /> 배경
               <ChevronDown size={STUDIO_ICON_SIZE.subtab} aria-hidden className={cn("transition-transform duration-150", activeToolbarGroup === "bgGroup" && "rotate-180")} />
             </button>
           </StudioToolBeltHintTarget>
@@ -1184,7 +1184,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
                 !studioUiDensityAllows(uiDensityMode, "toolbar-style") && "sr-only"
               )}
             >
-              <Palette size={STUDIO_ICON_SIZE.toolCompact} aria-hidden /> 스타일
+              <Palette size={STUDIO_ICON_SIZE.toolCompact} strokeWidth={STUDIO_ICON_STROKE} aria-hidden /> 스타일
               <ChevronDown size={STUDIO_ICON_SIZE.subtab} aria-hidden className={cn("transition-transform duration-150", activeToolbarGroup === "styleGroup" && "rotate-180")} />
             </button>
           </StudioToolBeltHintTarget>
@@ -1223,7 +1223,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
                 !studioUiDensityAllows(uiDensityMode, "toolbar-ai") && "sr-only"
               )}
             >
-              <WandSparkles size={STUDIO_ICON_SIZE.toolCompact} aria-hidden /> AI
+              <WandSparkles size={STUDIO_ICON_SIZE.toolCompact} strokeWidth={STUDIO_ICON_STROKE} aria-hidden /> AI
               <ChevronDown size={STUDIO_ICON_SIZE.subtab} aria-hidden className={cn("transition-transform duration-150", activeToolbarGroup === "aiGroup" && "rotate-180")} />
             </button>
           </StudioToolBeltHintTarget>
@@ -1261,7 +1261,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
             }}
             className={toolBtn(false)}
           >
-            <TypeIcon size={STUDIO_ICON_SIZE.toolCompact} aria-hidden /> 텍스트
+            <TypeIcon size={STUDIO_ICON_SIZE.toolCompact} strokeWidth={STUDIO_ICON_STROKE} aria-hidden /> 텍스트
           </button>
         </StudioToolBeltHintTarget>
         <div ref={menu === "bubble" ? menuRef : undefined} className="relative">
@@ -1276,7 +1276,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
               aria-expanded={menu === "bubble"}
               className={toolBtn(menu === "bubble")}
             >
-              <MessageCircle size={STUDIO_ICON_SIZE.toolCompact} aria-hidden /> 말풍선
+              <MessageCircle size={STUDIO_ICON_SIZE.toolCompact} strokeWidth={STUDIO_ICON_STROKE} aria-hidden /> 말풍선
             </button>
           </StudioToolBeltHintTarget>
           <StudioFloatingToolPopover
@@ -1296,7 +1296,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
               "cursor-pointer focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent"
             )}
           >
-            <ImagePlus size={STUDIO_ICON_SIZE.toolCompact} aria-hidden /> 이미지
+            <ImagePlus size={STUDIO_ICON_SIZE.toolCompact} strokeWidth={STUDIO_ICON_STROKE} aria-hidden /> 이미지
             <input
               type="file"
               accept={STUDIO_CANVAS_IMAGE_ACCEPT}
@@ -1306,7 +1306,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
           </label>
         </StudioToolBeltHintTarget>
         <span className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-card px-2 text-xs text-fg-2 pointer-coarse:h-11">
-          <Palette size={STUDIO_ICON_SIZE.toolCompact} aria-hidden className="text-fg-3" />
+          <Palette size={STUDIO_ICON_SIZE.toolCompact} strokeWidth={STUDIO_ICON_STROKE} aria-hidden className="text-fg-3" />
           <span className="sr-only sm:not-sr-only sm:inline">색</span>
           <LazyStudioColorPopover
             value={color}
@@ -1335,7 +1335,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
             aria-label="타임랩스 녹화"
             className={cn(toolBtn(false), iconToolBtnTouch, "disabled:opacity-40")}
           >
-            <Video size={STUDIO_ICON_SIZE.toolCompact} aria-hidden />
+            <Video size={STUDIO_ICON_SIZE.toolCompact} strokeWidth={STUDIO_ICON_STROKE} aria-hidden />
           </button>
         </StudioToolBeltHintTarget>
         <StudioToolBeltHintTarget hint={TOOL_BELT_HINTS.storyboard}>
@@ -1345,7 +1345,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
             aria-label="스토리보드 그리드 보기"
             className={cn(toolBtn(false), iconToolBtnTouch)}
           >
-            <LayoutGrid size={STUDIO_ICON_SIZE.toolCompact} aria-hidden />
+            <LayoutGrid size={STUDIO_ICON_SIZE.toolCompact} strokeWidth={STUDIO_ICON_STROKE} aria-hidden />
           </button>
         </StudioToolBeltHintTarget>
         <StudioToolBeltHintTarget
@@ -1362,7 +1362,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
             aria-label={pageEditLocked ? "페이지 검토, 현재 편집 잠금" : "페이지 검토와 편집 잠금"}
             className={cn(toolBtn(pageReviewOpen || pageEditLocked), iconToolBtnTouch)}
           >
-            <ClipboardCheck size={STUDIO_ICON_SIZE.toolCompact} aria-hidden />
+            <ClipboardCheck size={STUDIO_ICON_SIZE.toolCompact} strokeWidth={STUDIO_ICON_STROKE} aria-hidden />
           </button>
         </StudioToolBeltHintTarget>
         <StudioToolHintTarget
@@ -1400,7 +1400,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
             aria-label={`문서 댓글${openStudioCommentCount > 0 ? `, 열림 ${openStudioCommentCount}개` : ""}`}
             className={cn(toolBtn(commentsOpen), iconToolBtnTouch, "relative disabled:cursor-not-allowed disabled:opacity-50")}
           >
-            <MessageCircle size={STUDIO_ICON_SIZE.toolCompact} aria-hidden />
+            <MessageCircle size={STUDIO_ICON_SIZE.toolCompact} strokeWidth={STUDIO_ICON_STROKE} aria-hidden />
             {openStudioCommentCount > 0 ? (
               <span
                 aria-hidden
@@ -1427,7 +1427,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
               "relative gap-1 px-2.5 font-medium text-xs text-accent hover:bg-accent/15 border border-accent/30 rounded-full transition-all shadow-sm"
             )}
           >
-            <UsersRound size={STUDIO_ICON_SIZE.toolCompact} className="shrink-0 text-accent" aria-hidden />
+            <UsersRound size={STUDIO_ICON_SIZE.toolCompact} strokeWidth={STUDIO_ICON_STROKE} className="shrink-0 text-accent" aria-hidden />
             <span className="hidden sm:inline font-semibold text-[0.7rem] text-accent">팀 & 실시간 공유</span>
             <span className="relative flex size-2 shrink-0">
               <span className="absolute inline-flex size-full animate-ping rounded-full bg-accent opacity-75" />
@@ -1443,7 +1443,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
             aria-label="이야기 연속성 검사"
             className={cn(toolBtn(continuityOpen), iconToolBtnTouch)}
           >
-            <CheckCircle2 size={STUDIO_ICON_SIZE.toolCompact} aria-hidden />
+            <CheckCircle2 size={STUDIO_ICON_SIZE.toolCompact} strokeWidth={STUDIO_ICON_STROKE} aria-hidden />
           </button>
         </StudioToolBeltHintTarget>
         <StudioToolBeltHintTarget hint={TOOL_BELT_HINTS.scrollPreview}>
@@ -1453,7 +1453,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
             aria-label="세로 스크롤 미리보기"
             className={cn(toolBtn(false), iconToolBtnTouch)}
           >
-            <Smartphone size={STUDIO_ICON_SIZE.toolCompact} aria-hidden />
+            <Smartphone size={STUDIO_ICON_SIZE.toolCompact} strokeWidth={STUDIO_ICON_STROKE} aria-hidden />
           </button>
         </StudioToolBeltHintTarget>
         <StudioToolBeltHintTarget
@@ -1469,7 +1469,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
             aria-label="다중 레이어 타임라인"
             className={cn(toolBtn(timelineOpen), iconToolBtnTouch, "disabled:opacity-40")}
           >
-            <GanttChartSquare size={STUDIO_ICON_SIZE.toolCompact} aria-hidden />
+            <GanttChartSquare size={STUDIO_ICON_SIZE.toolCompact} strokeWidth={STUDIO_ICON_STROKE} aria-hidden />
           </button>
         </StudioToolBeltHintTarget>
         <span className="mx-0.5 hidden h-5 w-px bg-line lg:block" />
