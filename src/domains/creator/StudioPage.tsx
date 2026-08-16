@@ -7,7 +7,7 @@ import {
   SlidersHorizontal,
   Undo2,
 } from "lucide-react";
-import { Suspense, lazy, useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type ChangeEvent, type ComponentProps, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import { Suspense, lazy, useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type ChangeEvent, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { flushSync } from "react-dom";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
@@ -964,16 +964,14 @@ import {
   type StudioMenuSessionState,
   type StudioWorkspaceLayoutSource,
 } from "./studio-menu-session-model";
+import { StudioInspectorAsideFallback } from "./studio-mobile-dock-presets";
+import { STUDIO_MOBILE_EDITING_DOCK_UI } from "./studio-mobile-dock-presets-config";
 import { StudioMobileEditingDock } from "./studio-mobile-editing-dock-loader";
 import {
   saveStudioMobileImmersivePreference,
   shouldStartStudioMobileImmersive,
   studioMobileImmersiveSessionStorage,
 } from "./studio-mobile-immersive";
-import {
-  studioMobileSheetSizeStyle,
-  type StudioMobileSheetSnap,
-} from "./studio-mobile-sheet-snap";
 import {
   beginNodeDrag,
   decimateStrokeHandles,
@@ -1043,8 +1041,6 @@ import {
   type PageGrade,
 } from "./studio-page-grade";
 import {
-  StudioBrushLibraryPanel,
-  StudioBrushStudio,
   StudioBrushCatalogPortal,
   StudioCreativeCompetitorModesPanel,
   StudioFilterDialog,
@@ -1052,9 +1048,6 @@ import {
   StudioPublishContextBanner,
   StudioCommentThreadPopover,
   StudioPointCommentComposer,
-  StudioShapePickerGrid,
-  StudioUnifiedBrushPicker,
-  loadStudioBrushStudio,
   loadStudioCaptureReadinessRuntime,
   loadStudioComipoAssembly,
   loadStudioComipoShipped,
@@ -1876,6 +1869,7 @@ import type {
   StudioMainMenuSurfaceState,
   StudioPixelSelectionToolId,
 } from "./studio-main-menu-surface-contract";
+import type { StudioMobileSheetSnap } from "./studio-mobile-sheet-snap";
 import type { MotionCutImage } from "./studio-motion-export";
 import type { StudioBg3dRecoveryAccessSnapshot } from "./studio-page-editor-runtime-contracts";
 import type { PageState } from "./studio-page-state";
@@ -1960,7 +1954,6 @@ import type {
   StudioBrushCatalogHandlers,
   StudioMobileEditingDockHandlers,
   StudioMobileSheet,
-  StudioMobileEditingDockUi,
 } from "./StudioMobileEditingDock";
 import type { StudioPageListPaneHandlers } from "./StudioPageListPane";
 import type { PublishContext } from "./StudioPublishContextBanner";
@@ -2167,83 +2160,7 @@ const LazyStudioLeftToolRail = lazy(() =>
   }))
 );
 
-function StudioInspectorAsideFallback({
-  isMobile,
-  keyboardInset,
-  propsSheetRef,
-  snap,
-  visible,
-  width,
-}: {
-  isMobile: boolean;
-  keyboardInset: number;
-  propsSheetRef: import("react").RefObject<HTMLElement | null>;
-  snap: StudioMobileSheetSnap;
-  visible: boolean;
-  width: number;
-}) {
-  const safeKeyboardInset = Number.isFinite(keyboardInset)
-    ? Math.max(0, Math.round(keyboardInset))
-    : 0;
-  return (
-    <aside
-      ref={propsSheetRef}
-      role={isMobile ? "dialog" : undefined}
-      aria-modal={isMobile ? true : undefined}
-      aria-busy="true"
-      aria-label="속성 패널 불러오는 중"
-      data-studio-sheet-id="props"
-      data-studio-mobile-sheet={isMobile ? "true" : undefined}
-      data-studio-sheet-snap={isMobile ? snap : undefined}
-      data-popup-kind={isMobile ? "sheet" : undefined}
-      tabIndex={isMobile ? -1 : undefined}
-      className={cn(
-        "flex min-h-0 flex-col gap-3 overflow-hidden border-line bg-panel/50 p-3",
-        "fixed inset-x-0 bottom-0 z-[60] rounded-t-3xl border shadow-2xl",
-        "lg:static lg:z-auto lg:flex-none lg:self-stretch lg:rounded-none lg:border-y-0 lg:border-r-0 lg:shadow-none",
-        !visible && "lg:hidden"
-      )}
-      style={isMobile
-        ? {
-            bottom: safeKeyboardInset,
-            ...studioMobileSheetSizeStyle(snap, safeKeyboardInset),
-          }
-        : { minWidth: 240, width }}
-    >
-      <div className="h-5 w-24 animate-pulse rounded bg-raised motion-reduce:animate-none" />
-      <div className="h-10 animate-pulse rounded-xl bg-raised/80 motion-reduce:animate-none" />
-      <div className="h-28 animate-pulse rounded-xl bg-raised/60 motion-reduce:animate-none" />
-      <div className="h-20 animate-pulse rounded-xl bg-raised/40 motion-reduce:animate-none" />
-    </aside>
-  );
-}
-
 export { StudioCuttoonEditor };
-
-const LazyStudioMobileSheetHandle = lazy(() =>
-  import("./StudioMobileSheetHandle").then(({ StudioMobileSheetHandle }) => ({
-    default: StudioMobileSheetHandle,
-  }))
-);
-
-function StudioMobileSheetHandleBoundary(
-  props: ComponentProps<typeof import("./StudioMobileSheetHandle").StudioMobileSheetHandle>
-) {
-  return (
-    <Suspense fallback={<div aria-hidden className="min-h-11 lg:hidden" />}>
-      <LazyStudioMobileSheetHandle {...props} />
-    </Suspense>
-  );
-}
-
-const STUDIO_MOBILE_EDITING_DOCK_UI: StudioMobileEditingDockUi = {
-  StudioBrushLibraryPanel,
-  StudioBrushStudio,
-  StudioMobileSheetHandle: StudioMobileSheetHandleBoundary,
-  StudioShapePickerGrid,
-  StudioUnifiedBrushPicker,
-  loadStudioBrushStudio,
-};
 
 type StudioDrawingPointerTransport = ReturnType<
   typeof createStudioDrawingPointerTransportController
@@ -8436,7 +8353,7 @@ function StudioCuttoonEditor({
 
   /** 그리기 ▸ 브러시 스튜디오 — §15.3 Brush ▸ Brush Studio/Brush DNA. */
   function openBrushStudioFromMenu() {
-    void loadStudioBrushStudio();
+    void STUDIO_MOBILE_EDITING_DOCK_UI.loadStudioBrushStudio();
     activatePrimaryCanvasTool("draw", "pen");
     openInspectorRoute({ primary: "properties" }, isMobile ? "draw" : null);
     // The section is collapsed by default; the bus opens and reveals it.
@@ -43180,7 +43097,7 @@ function clearSelectionForEdit() {
       void fitBubbleToText();
     },
     openBrushStudio: () => {
-      void loadStudioBrushStudio();
+      void STUDIO_MOBILE_EDITING_DOCK_UI.loadStudioBrushStudio();
       openInspectorRoute({ primary: "properties" }, isMobile ? "draw" : null);
     },
     recallBrushSlot: (index) => {

@@ -132,6 +132,8 @@ describe("Studio mobile editing dock module boundary", () => {
   it("preserves the lazy registry and excludes canvas runtime dependencies", () => {
     const page = moduleShape("./StudioPage.tsx");
     const dock = moduleShape("./StudioMobileEditingDock.tsx");
+    const dockUi = moduleShape("./studio-mobile-dock-presets-config.ts");
+    const dockPresets = moduleShape("./studio-mobile-dock-presets.tsx");
 
     for (const name of [
       "StudioBrushLibraryPanel",
@@ -140,15 +142,15 @@ describe("Studio mobile editing dock module boundary", () => {
       "StudioUnifiedBrushPicker",
       "loadStudioBrushStudio",
     ]) {
-      expect(page.namedValueImports.get(name)).toBe("./studio-page-lazy-ui");
+      expect(page.namedValueImports.has(name)).toBe(false);
+      expect(dockUi.namedValueImports.get(name)).toBe("./studio-page-lazy-ui");
       expect(dock.namedValueImports.has(name)).toBe(false);
     }
     expect(page.namedValueImports.has("StudioMobileSheetHandle")).toBe(false);
-    expect(page.dynamicImports).toContain("./StudioMobileSheetHandle");
-    expect(page.source).toContain("function StudioMobileSheetHandleBoundary(");
-    expect(page.source).toContain(
-      "StudioMobileSheetHandle: StudioMobileSheetHandleBoundary",
-    );
+    expect(page.dynamicImports).not.toContain("./StudioMobileSheetHandle");
+    expect(dockPresets.dynamicImports).toContain("./StudioMobileSheetHandle");
+    expect(dockPresets.source).toContain("function StudioMobileSheetHandleBoundary(");
+    expect(dockUi.source).toContain("StudioMobileSheetHandle: StudioMobileSheetHandleBoundary");
     for (const directModule of [
       "./studio-page-lazy-ui",
       "./StudioMobileSheetHandle",
