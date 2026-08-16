@@ -846,6 +846,7 @@ export interface StudioCanvasViewportProps {
   studioCrdtDocument: StudioCrdtDocument | null;
   studioCrdtOperationSyncReady: boolean;
   studioLiveGesturePreviewAdapter: StudioLiveGesturePreviewRoomAdapter;
+  studioLiveGesturePreviewAuthoritativeElements: El[];
   studioLiveRoomRef: import("react").RefObject<StudioLiveRoom | null>;
   studioRasterAuthorizedAuthorityKey: string | null;
   studioRasterHandoffBaseKey: string;
@@ -1147,6 +1148,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
   studioCrdtDocument,
   studioCrdtOperationSyncReady,
   studioLiveGesturePreviewAdapter,
+  studioLiveGesturePreviewAuthoritativeElements,
   studioLiveRoomRef,
   studioRasterAuthorizedAuthorityKey,
   studioRasterHandoffBaseKey,
@@ -1369,7 +1371,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
     : [];
   const studioLiveGesturePreviewReservedElementIds =
     studioLiveGesturePreviewRenderSnapshot.length > 0
-      ? new Set(elements.map((element) => element.id))
+      ? new Set(studioLiveGesturePreviewAuthoritativeElements.map((element) => element.id))
       : undefined;
   const studioLiveGesturePreviewRenderPlan = planStudioLiveGesturePreviewRenderElements(
     studioLiveGesturePreviewPaintElements,
@@ -1409,10 +1411,10 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
       studioLiveGesturePreviewPageId,
       studioLiveGesturePreviewPageId === null
         ? []
-        : elements.map((element) => element.id),
+        : studioLiveGesturePreviewAuthoritativeElements.map((element) => element.id),
     );
   }, [
-    elements,
+    studioLiveGesturePreviewAuthoritativeElements,
     studioLiveGesturePreviewAdapter,
     studioLiveGesturePreviewPageId,
   ]);
