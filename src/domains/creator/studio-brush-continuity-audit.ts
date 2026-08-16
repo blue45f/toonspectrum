@@ -108,6 +108,17 @@ const INTENTIONALLY_DISCONTINUOUS_PREVIEWS = new Set([
   "tone",
 ]);
 
+/**
+ * Ids this audit excuses from the continuity bar because sparse deposit IS their product promise.
+ *
+ * Exported because the browser gate has to agree. The gate asks three different classifiers
+ * whether a preset is an intentional discrete carrier — a dry-media classification, a brush-pack
+ * descriptor and the cc0 spacing threshold — and none of them can see this list. So
+ * `splatter--burst-cloud`, which is excused HERE for depositing sparse carriers, was handed the
+ * 9px flick meant for continuous media and reported as depositing no visible pixels. One list, two
+ * consumers: a preset that this file excuses must get a gesture long enough to contain its own
+ * stations.
+ */
 const INTENTIONALLY_DISCONTINUOUS_CATALOG_IDS = new Set([
   "spray",
   "splatter",
@@ -364,6 +375,14 @@ function behaviorFingerprint(
       rounded(profile.meanRoundness, 2),
     ]),
   });
+}
+
+/** Whether this catalogue id is excused from the continuity bar by the list above. */
+export function studioBrushCatalogIdIsIntentionallyDiscontinuous(
+  catalogId: string | null | undefined,
+): boolean {
+  return typeof catalogId === "string"
+    && INTENTIONALLY_DISCONTINUOUS_CATALOG_IDS.has(catalogId);
 }
 
 export function auditStudioBrushContinuity(

@@ -60,6 +60,7 @@ import { studioAutosaveKey } from "../src/domains/creator/studio-autosave";
 import { BRUSH_PRESETS } from "../src/domains/creator/studio-brush";
 import { isStudioBrushEraserAliasId } from "../src/domains/creator/studio-brush-alias-profile";
 import { studioBrushPresetUsesIntentionalDiscreteCarrier } from "../src/domains/creator/studio-brush-carrier-quality";
+import { studioBrushCatalogIdIsIntentionallyDiscontinuous } from "../src/domains/creator/studio-brush-continuity-audit";
 import {
   STUDIO_ALL_BRUSH_CATALOG_ITEMS,
   STUDIO_ERASER_BRUSH_CATALOG_ITEMS,
@@ -1601,11 +1602,19 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
       await page.mouse.move(4, 4);
       const presetDescriptor = studioBrushPackDescriptorById(preset.id);
       const desktopDryMediaClassification = classifyStudioDryMediaCatalogIdV1(preset.id);
-      const usesDiscreteCarrier = desktopDryMediaClassification
-        ? desktopDryMediaClassification.kind === "intentional-discrete"
-        : presetDescriptor
-          ? studioBrushPresetUsesIntentionalDiscreteCarrier(presetDescriptor)
-          : studioCc0MypaintPresetUsesIntentionalDiscreteCarrier(preset.id);
+      // The continuity audit's own excuse list is consulted FIRST, because it is the product's
+      // statement that a preset is allowed to deposit sparsely. The three classifiers below cannot
+      // see it: splatter--burst-cloud is excused there for exactly this reason and matches none of
+      // them, so it was handed the 9px flick meant for continuous media and reported as depositing
+      // no visible pixels. A preset excused from the continuity bar must get a gesture long enough
+      // to contain its own stations.
+      const usesDiscreteCarrier =
+        studioBrushCatalogIdIsIntentionallyDiscontinuous(preset.id)
+        || (desktopDryMediaClassification
+          ? desktopDryMediaClassification.kind === "intentional-discrete"
+          : presetDescriptor
+            ? studioBrushPresetUsesIntentionalDiscreteCarrier(presetDescriptor)
+            : studioCc0MypaintPresetUsesIntentionalDiscreteCarrier(preset.id));
       const point = strokePoint(
         stageBox,
         viewport,

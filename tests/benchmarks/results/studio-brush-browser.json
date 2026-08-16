@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "measuredAt": "2026-08-15T22:19:15.379Z",
+  "measuredAt": "2026-08-15T23:59:01.841Z",
   "command": "pnpm run verify:studio-brushes",
   "status": "pass",
   "catalog": {
@@ -9,12 +9,12 @@
     "pro": 160,
     "paint": 328,
     "erase": 2,
-    "quarantined": 4
+    "quarantined": 3
   },
   "desktop": {
-    "selectedAndRendered": 326,
-    "undoPassed": 326,
-    "redoPassed": 326,
+    "selectedAndRendered": 327,
+    "undoPassed": 327,
+    "redoPassed": 327,
     "uiCatalogMatchSkipped": false,
     "surveyMode": false,
     "errorCount": 0,
@@ -27,24 +27,24 @@
       "kneaded-eraser": {
         "operation": "erase",
         "liveRetainedLayerActive": true,
-        "residualEnergyRatio": 0.6204010084298432
+        "residualEnergyRatio": 0.6204658527764474
       }
     }
   },
   "longRouteCore": {
-    "passed": 166,
-    "total": 166,
+    "passed": 167,
+    "total": 167,
     "totalSegmentsPerTool": 6,
-    "continuousPolicyTools": 153,
+    "continuousPolicyTools": 154,
     "discretePolicyTools": 13,
     "continuousMinimumVisibleSegments": 6,
     "discreteMinimumVisibleSegments": 4,
     "toolsBelowFullCoverage": 1,
     "continuousPolicyFailures": 0,
-    "undoPassed": 166,
+    "undoPassed": 167,
     "representativePersistedPathDistancePx": 392.7396173371252,
     "qualityPolicyCounts": {
-      "strict-continuous": 139,
+      "strict-continuous": 140,
       "soft-wet-continuous": 14,
       "record-only-discrete": 13
     },
@@ -57,9 +57,9 @@
     "errorCount": 0
   },
   "mobile": {
-    "paintSelections": 324,
+    "paintSelections": 325,
     "eraserSelections": 2,
-    "interactiveTargets": 665,
+    "interactiveTargets": 667,
     "minimumTargetWidthPx": 44,
     "minimumTargetHeightPx": 44,
     "undersizedTargets": 0,
@@ -67,12 +67,12 @@
   },
   "pointerUpDurability": {
     "receiptMarkerReason": "pointerup",
-    "receiptSettledInMs": 9.68,
+    "receiptSettledInMs": 7.12,
     "receiptStrokeCount": 1,
     "survivorMarkerReason": "pointerup",
     "survivorStrokeCount": 2,
     "unloadPromptHeldMs": 150,
-    "navigationIssuedInMs": 0.15,
+    "navigationIssuedInMs": 0.16,
     "unloadGuardShown": true,
     "payloadContainsEveryStroke": true,
     "recoveryBannerShown": true,

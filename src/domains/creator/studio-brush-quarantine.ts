@@ -59,10 +59,14 @@ export const STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID: Readonly<Record<string
     // 더 이상 참이 아니고, 남은 문제는 "압력 모델 미채택"이라 옵트인이 해법입니다.)
     // 복귀 경로: 선언한 변형을 렌더러가 실제로 분기해 베이스와 다른 그림을 그리게 만든 뒤
     // (지침 4 byte-identity 핀 포함) 여기서 delist 합니다. 그때까지 저장된 문서는 원래대로 재생됩니다.
-    "pencil--side-shade":
-      "engineVariant \"side-shade\"를 선언하지만 페인트 시점에 분기하는 렌더러가 없어 베이스 "
-      + "pencil을 그대로 칠하는 사실상 중복 — 폭 정규화 픽셀 p95 0.00000 vs pencil. 그룹 내 "
-      + "대안 pencil · pencil-2b · pencil--stamp-grain 이 모두 노출 상태(지침 6).",
+    // 2026-08-16, RETRACTED: pencil--side-shade was quarantined here as a de-facto duplicate of
+    // pencil on a measured p95 of 0.00000, and that measurement was wrong. The duplicate probe
+    // built its elements without the pins the app applies at pointer-down — brushDynamics, the
+    // draw mode and materialPressureModel — so studio-svg-export stripped them and BOTH brushes
+    // were compared on the pre-rollout fixed-width route that no artist can reach. Re-measured
+    // with the pins in place, the pair is not a duplicate candidate at all: its nearest surviving
+    // candidate is web-pressure-flat at p95 0.53074. Delisting a brush for a resemblance it does
+    // not have is worse than leaving a weak variant listed, so it is listed again.
     "gpen--causal-round":
       "causal-ink \"round\" 프로파일 변형을 선언하지만 분기하는 렌더러가 없어 같은 레인의 "
       + "gpen--croquis-capsule 과 같은 그림 — 폭 정규화 픽셀 p95 0.00014. 그룹 내 대안 gpen · "

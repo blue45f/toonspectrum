@@ -164,8 +164,7 @@ describe("studio brush variant group manifest", () => {
       .toEqual([
         "airbrush--stamp-soft",
         "glitter--star-field",
-        "pencil--side-shade",
-        "gpen--causal-round",
+          "gpen--causal-round",
       ]);
     expect(Object.isFrozen(STUDIO_BRUSH_QUARANTINED_PRESET_IDS)).toBe(true);
     expect(Object.isFrozen(STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID)).toBe(true);
