@@ -240,6 +240,18 @@ interface KernelTipShaping {
    * this lift the sparse outer lanes read as a wide half-tone fringe instead of a dry stick edge.
    */
   readonly depositionLinearize: number;
+  /**
+   * How much `depositionLinearize` follows CONTACT instead of being constant. 0 keeps the historic
+   * fixed exponent (byte-identical); 1 scales it all the way down to 1 at a feather touch.
+   *
+   * The exponent stands for how many overlapping deposits land per unit area, and a stick that is
+   * barely touching does not lay as many. Held constant it lifts a light touch exactly as hard as
+   * a full press, which is what pinned pastel and oil-pastel at the top of their range: measured
+   * over a 0.12→0.90 pressure ramp they deposited 210.6 and 214.5 of a possible ~227 at the LIGHT
+   * end, against crayon 151.0 and chalk 140.7. That is why retuning `cut`/`gain` never moved them —
+   * both ends were already saturated, so the shaping had nothing left to shape.
+   */
+  readonly depositionContactBias: number;
 }
 
 // Annotated (not `satisfies`-narrowed) so the optional `band` member is readable on the indexed
@@ -263,6 +275,7 @@ const KERNEL_TIP_SHAPING: Readonly<Record<StudioDryMediaCoreId, KernelTipShaping
     // stick edge. `3` carries the same fibres over the solid threshold: measured halo area falls
     // 1130 -> 702 px and interior mean rises 0.538 -> 0.623 against the three-lane bed.
     depositionLinearize: 3,
+    depositionContactBias: 0,
   }),
   chalk: Object.freeze({
     cut: 0.24,
@@ -270,6 +283,7 @@ const KERNEL_TIP_SHAPING: Readonly<Record<StudioDryMediaCoreId, KernelTipShaping
     gain: 6,
     rimShoulder: 0.08,
     depositionLinearize: 6,
+    depositionContactBias: 0,
   }),
   charcoal: Object.freeze({
     cut: 0.14,
@@ -277,6 +291,7 @@ const KERNEL_TIP_SHAPING: Readonly<Record<StudioDryMediaCoreId, KernelTipShaping
     gain: 5,
     rimShoulder: 0.08,
     depositionLinearize: 5,
+    depositionContactBias: 0,
   }),
   pastel: Object.freeze({
     // 0.14 against a raw kernel denser than its siblings' left this tip near-binary at 51% true
@@ -290,6 +305,7 @@ const KERNEL_TIP_SHAPING: Readonly<Record<StudioDryMediaCoreId, KernelTipShaping
     gain: 5,
     rimShoulder: 0.08,
     depositionLinearize: 6.5,
+    depositionContactBias: 1,
   }),
   "oil-pastel": Object.freeze({
     cut: 0.12,
@@ -298,6 +314,7 @@ const KERNEL_TIP_SHAPING: Readonly<Record<StudioDryMediaCoreId, KernelTipShaping
     rimShoulder: 0.08,
     band: Object.freeze({ zeroAt: 0.72, shoulder: 0.14 }),
     depositionLinearize: 4,
+    depositionContactBias: 1,
   }),
 });
 
@@ -312,9 +329,14 @@ export function linearizeStudioDryMediaKernelDepositionAlpha(
 ): number {
   const bounded = clamp01(alpha);
   if (bounded <= 0) return 0;
-  return clamp01(
-    1 - (1 - bounded) ** KERNEL_TIP_SHAPING[materialId].depositionLinearize,
-  );
+  const shaping = KERNEL_TIP_SHAPING[materialId];
+  const bias = clamp01(shaping.depositionContactBias);
+  // Still pure and still monotonic: raising the dab alpha both shrinks (1 - a) and raises the
+  // exponent, so a harder press deposits more, and a full press lands on the same exponent the
+  // constant form used. Only the light end moves.
+  const exponent = 1
+    + (shaping.depositionLinearize - 1) * (1 - bias + bias * bounded);
+  return clamp01(1 - (1 - bounded) ** exponent);
 }
 
 interface KernelStrokeTooth {
