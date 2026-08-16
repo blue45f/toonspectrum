@@ -42523,6 +42523,16 @@ function clearSelectionForEdit() {
 
   const studioLeftToolRailHandlers = useStudioStableHandlers<StudioLeftToolRailHandlers>({
     activatePrimaryCanvasTool,
+    fitCanvasToWidthWithFocus: () => {
+      fitCanvasToWidth();
+      if (!presentationPanelsHidden) {
+        const isWorkspaceWideMode =
+          !visibleLeftPanelOpen && !visibleRightPanelOpen;
+        if (!isWorkspaceWideMode) {
+          toggleCanvasWideMode();
+        }
+      }
+    },
     fitCanvasToWidth,
     openFrameAnimationForSelected,
     openPixelSelectionTransform,

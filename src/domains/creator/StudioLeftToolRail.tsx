@@ -22,9 +22,6 @@ import {
   PersonStanding,
   PictureInPicture2,
   Pipette,
-  RotateCw,
-  ScanLine,
-  Search,
   Settings2,
   Shapes,
   Square,
@@ -47,7 +44,10 @@ import {
   type StudioRailToolId,
 } from "./studio-app-settings";
 import { type BubbleVariant } from "./studio-assets";
-import { studioChromeRailGroupLabel } from "./studio-chrome-ia-map";
+import {
+  STUDIO_CHROME_DEFAULT_RAIL_TOOL_ORDER,
+  studioChromeRailGroupLabel,
+} from "./studio-chrome-ia-map";
 import {
   STUDIO_ICON_SIZE,
   STUDIO_ICON_STROKE,
@@ -79,6 +79,7 @@ import {
   type SelectionToolKind,
 } from "./studio-selection-tools";
 import { studioUiDensityAllows } from "./studio-ui-density";
+import { StudioLeftToolRailViewToolsCluster } from "./StudioLeftToolRailViewToolsCluster";
 import { StudioToolHintTarget } from "./StudioToolHint";
 
 import { useI18n, useT } from "@/lib/i18n";
@@ -166,6 +167,7 @@ export interface StudioLeftToolRailHandlers {
    */
   activatePrimaryCanvasTool: (tool: "select" | "draw", drawMode?: DrawMode) => void;
   fitCanvasToWidth: () => void;
+  fitCanvasToWidthWithFocus?: () => void;
   openFrameAnimationForSelected: () => void;
   openPixelSelectionTransform: () => void;
   openSelectedLayerCrop: () => void;
@@ -409,6 +411,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
     commitAppSettings,
     disarmAllPixelTools,
     fitCanvasToWidth,
+    fitCanvasToWidthWithFocus,
     onRequestPixelSelection,
     onRequestSelectImage,
     onPickImage,
@@ -424,6 +427,9 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
     openPixelSelectionTransform,
     openSelectedLayerCrop,
   } = stableHandlers;
+
+  const fitCanvasToWidthWithWorkspace =
+    fitCanvasToWidthWithFocus ?? fitCanvasToWidth;
   /** Pick a draw mode from the rail and surface context properties (CSP/PPT IA). */
   const activateDrawTool = (mode: DrawMode, shape?: DrawShapeKind) => {
     // 진행 중인 획 취소 + disarm(스포이드 포함) + tool/drawMode 커밋은 전이 함수가 정본이다.
@@ -564,44 +570,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
           {appSettings.toolbar.visibleIds.length >= DEFAULT_STUDIO_RAIL_TOOL_ORDER.length ? (
             <p className="px-2 py-1.5 text-[0.6875rem] text-fg-3">모두 표시 중</p>
           ) : (
-            (
-              [
-                "select",
-                "hand",
-                "pen",
-                "pixel-pencil",
-                "eraser",
-                "blend",
-                "wet-mix",
-                "dodge-burn",
-                "liquify",
-                "fill",
-                "lasso-fill",
-                "eyedropper",
-                "marquee-rect",
-                "marquee-circle",
-                "lasso",
-                "transform",
-                "crop",
-                "smart-shape",
-                "shape-rect",
-                "shape-ellipse",
-                "text",
-                "bubble",
-                "image",
-                "comment",
-                "perspective",
-                "zoom",
-                "zoom-fit",
-                "rotate-view",
-                "frame-anim",
-                "mannequin3d",
-                "vrm3d",
-                "bg3d",
-                "hybrid-dcc",
-                "reference",
-              ] as StudioRailToolId[]
-            )
+            STUDIO_CHROME_DEFAULT_RAIL_TOOL_ORDER
               .filter((id) => !isRailToolVisible(id))
               .map((id) => (
                 <button
@@ -1258,55 +1227,31 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               data-studio-rail-group-divider="view"
               label={studioChromeRailGroupLabel("view")}
             />
-{isRailToolVisible("zoom") ? (
-            <StudioRailToolButton
-              data-studio-rail-tool-id="zoom"
-              icon={Search}
-              label={zoomViewToolLabel}
-              description={zoomViewToolOpen
+            <StudioLeftToolRailViewToolsCluster
+              isRailToolVisible={isRailToolVisible}
+              zoomViewToolOpen={zoomViewToolOpen}
+              rotateViewToolOpen={rotateViewToolOpen}
+              zoomViewToolLabel={zoomViewToolLabel}
+              rotateViewToolLabel={rotateViewToolLabel}
+              zoomViewToolDescription={zoomViewToolOpen
                 ? "현재 확대·축소 HUD를 닫고 적용한 보기 배율은 그대로 유지합니다."
                 : "확대·축소 HUD를 열어 배율·화면 맞춤·100% 보기를 빠르게 조절합니다."}
-              {...zoomViewToolHintProps}
-              active={zoomViewToolOpen}
-              disabled={viewTransformSuppressed}
-              unavailableReason={viewTransformSuppressed ? "내보내기·저장이 끝난 뒤 보기를 조절하세요." : undefined}
-              aria-expanded={zoomViewToolOpen}
-              aria-controls="studio-view-tools-hud-zoom"
-              data-studio-view-tool-trigger="zoom"
-              onClick={() => setViewTool((current) => current === "zoom" ? null : "zoom")}
-            />
-            ) : null}
-{isRailToolVisible("zoom-fit") ? (
-            <StudioRailToolButton
-              data-studio-rail-tool-id="zoom-fit"
-              icon={ScanLine}
-              label="너비에 맞춤 (Home)"
-              description="캔버스 폭에 맞춰 확대·축소합니다."
-              hintPreview="zoom-view"
-              hintPreviewVariant="fit-width"
-              disabled={viewTransformSuppressed}
-              unavailableReason={viewTransformSuppressed ? "내보내기·저장이 끝난 뒤 보기를 조절하세요." : undefined}
-              onClick={fitCanvasToWidth}
-            />
-            ) : null}
-{isRailToolVisible("rotate-view") ? (
-            <StudioRailToolButton
-              data-studio-rail-tool-id="rotate-view"
-              icon={RotateCw}
-              label={rotateViewToolLabel}
-              description={rotateViewToolOpen
+              rotateViewToolDescription={rotateViewToolOpen
                 ? "현재 회전 HUD를 닫고 적용한 보기 회전·반전 상태는 그대로 유지합니다."
                 : "회전 HUD를 열어 캔버스를 좌·우 90°로 돌리거나 수평 반전합니다. 문서와 내보내기는 바뀌지 않아요."}
-              {...rotateViewToolHintProps}
-              active={rotateViewToolOpen}
-              disabled={viewTransformSuppressed}
-              unavailableReason={viewTransformSuppressed ? "내보내기·저장이 끝난 뒤 보기를 조절하세요." : undefined}
-              aria-expanded={rotateViewToolOpen}
-              aria-controls="studio-view-tools-hud-rotate"
-              data-studio-view-tool-trigger="rotate"
-              onClick={() => setViewTool((current) => current === "rotate" ? null : "rotate")}
+              zoomViewToolHintPreview={zoomViewToolHintProps.hintPreview}
+              zoomViewToolHintVariant={zoomViewToolHintProps.hintPreviewVariant}
+              rotateViewToolHintPreview={rotateViewToolHintProps.hintPreview}
+              rotateViewToolHintVariant={rotateViewToolHintProps.hintPreviewVariant}
+              onFitCanvasToWidth={fitCanvasToWidthWithWorkspace}
+              onToggleZoomView={() => {
+                setViewTool((current) => current === "zoom" ? null : "zoom");
+              }}
+              onToggleRotateView={() => {
+                setViewTool((current) => current === "rotate" ? null : "rotate");
+              }}
+              viewTransformSuppressed={viewTransformSuppressed}
             />
-            ) : null}
           </StudioVerticalToolRail>
         ) : null}
     </>

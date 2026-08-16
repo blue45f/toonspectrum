@@ -50,6 +50,12 @@ interface MockRailButtonProps {
 }
 
 vi.mock("./studio-chrome-ui", () => ({
+  STUDIO_ICON_SIZE: {
+    rail: 14,
+    subtab: 14,
+  },
+  STUDIO_ICON_STROKE: 2,
+  studioChromeIconClass: () => "",
   StudioRailDivider: (props: Record<string, string | undefined>) => (
     <hr
       data-studio-rail-group-divider={props["data-studio-rail-group-divider"]}
@@ -349,6 +355,21 @@ describe("StudioLeftToolRail", () => {
     const zoomAction = vi.mocked(props.setViewTool).mock.calls.at(-1)?.[0];
     expect(typeof zoomAction).toBe("function");
     expect(typeof zoomAction === "function" ? zoomAction(null) : null).toBe("zoom");
+  });
+
+  it("prefers workspace-aware fit-width handler when it is provided", () => {
+    const stableHandlers = createHandlers();
+    stableHandlers.fitCanvasToWidthWithFocus = vi.fn();
+    const props = createProps({
+      stableHandlers,
+      selected: IMAGE,
+    });
+
+    render(<StudioLeftToolRail {...props} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "너비에 맞춤 (Home)" }));
+    expect(stableHandlers.fitCanvasToWidthWithFocus).toHaveBeenCalledOnce();
+    expect(stableHandlers.fitCanvasToWidth).not.toHaveBeenCalled();
   });
 
   it("keeps fill discoverable and clickable while explaining how an unavailable selection recovers", () => {
