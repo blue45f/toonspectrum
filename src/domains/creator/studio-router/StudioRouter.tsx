@@ -22,7 +22,7 @@ import { lazyRetry } from "@/lib/lazy-retry";
 import { useSession } from "@/src/compat/auth-session-store";
 
 const LegacyStudioEditorAdapter = lazyRetry(
-  () => import("../StudioPage").then((module) => ({
+  () => import("../studio-legacy-editor-adapter").then((module) => ({
     default: module.LegacyStudioEditorAdapter,
   })),
   "LegacyStudioEditorAdapter",

@@ -7,7 +7,7 @@ import {
   SlidersHorizontal,
   Undo2,
 } from "lucide-react";
-import { Profiler, Suspense, lazy, useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type ChangeEvent, type ComponentProps, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import { Suspense, lazy, useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type ChangeEvent, type ComponentProps, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { flushSync } from "react-dom";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
@@ -289,7 +289,6 @@ import {
 import { resolveStudioCanvasGestureDisposition } from "./studio-canvas-gesture-arbitration";
 import {
   recordStudioHotPathRender,
-  recordStudioRenderProfile,
   studioElementIdOf,
 } from "./studio-canvas-shared-runtime";
 import { clampStudioCanvasHeight } from "./studio-canvas-size";
@@ -2419,6 +2418,8 @@ function StudioInspectorAsideFallback({
   );
 }
 
+export { StudioCuttoonEditor };
+
 const LazyStudioMobileSheetHandle = lazy(() =>
   import("./StudioMobileSheetHandle").then(({ StudioMobileSheetHandle }) => ({
     default: StudioMobileSheetHandle,
@@ -2490,31 +2491,9 @@ function readyStudioWorkAssetImageSources(
 
 const EMPTY_STUDIO_GPU_STROKES: readonly StudioGpuStroke[] = Object.freeze([]);
 const STUDIO_GPU_LIVE_SOURCE_JOURNAL_STYLE_KEY = "round-ink-source-journal-v1";
+const STUDIO_GPU_LIVE_OPERATION_ORDER_PREFIX = "\uffffstudio-live:";
 // Live operations must sort after the already-settled prefix even when their random UUID happens
 // to compare before it. A fixed-width sequence preserves append-only tile composition.
-const STUDIO_GPU_LIVE_OPERATION_ORDER_PREFIX = "\uffffstudio-live:";
-export interface LegacyStudioEditorAdapterProps {
-  /** Canonical path identity supplied by StudioRouter; never re-read from a query alias. */
-  readonly remixId: string | null;
-  readonly studioRoute: StudioWorkspaceRoute;
-}
-
-/**
- * Temporary adapter around the monolithic editor while feature panels are extracted in parallel.
- * URL parsing, canonical navigation, publish routing, and editor instance ownership live in
- * `studio-router`; this module now owns editor behavior only.
- */
-export function LegacyStudioEditorAdapter({
-  remixId,
-  studioRoute,
-}: LegacyStudioEditorAdapterProps) {
-  return (
-    <Profiler id="studio:editor" onRender={recordStudioRenderProfile}>
-      <StudioCuttoonEditor remixId={remixId} studioRoute={studioRoute} />
-    </Profiler>
-  );
-}
-
 function StudioCuttoonEditor({
   remixId,
   studioRoute,

@@ -15,11 +15,15 @@ const legacyEditorSource = readFileSync(
   resolve(process.cwd(), "src/domains/creator/StudioPage.tsx"),
   "utf8",
 );
+const legacyEditorAdapterSource = readFileSync(
+  resolve(process.cwd(), "src/domains/creator/studio-legacy-editor-adapter.tsx"),
+  "utf8",
+);
 
 describe("Studio router bundle boundaries", () => {
   it("loads the publish screen without a static dependency on the legacy editor", () => {
     expect(routerSource).toContain('import("../StudioUploadPublish")');
-    expect(routerSource).toContain('import("../StudioPage")');
+    expect(routerSource).toContain('import("../studio-legacy-editor-adapter")');
     expect(routerSource).not.toMatch(/from\s+["']\.\.\/StudioPage["']/u);
     expect(legacyEditorSource).not.toContain("StudioUploadPublish,");
   });
@@ -36,14 +40,8 @@ describe("Studio router bundle boundaries", () => {
   });
 
   it("keeps URL and editor-key ownership outside the legacy adapter", () => {
-    const adapterStart = legacyEditorSource.indexOf(
-      "export function LegacyStudioEditorAdapter",
-    );
-    const editorStart = legacyEditorSource.indexOf(
-      "function StudioCuttoonEditor",
-      adapterStart,
-    );
-    const adapterSource = legacyEditorSource.slice(adapterStart, editorStart);
+    const adapterSource = legacyEditorAdapterSource;
+    expect(adapterSource).toContain("export function LegacyStudioEditorAdapter");
     expect(adapterSource).toContain("remixId={remixId}");
     expect(adapterSource).not.toContain("useLocation");
     expect(adapterSource).not.toContain("useSearchParams");
