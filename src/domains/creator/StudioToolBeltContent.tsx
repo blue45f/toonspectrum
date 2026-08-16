@@ -817,6 +817,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
     zoom,
     stableHandlers,
   } = props;
+  const isWorkspaceWideMode = !visibleLeftPanelOpen && !visibleRightPanelOpen;
   const {
     activatePrimaryCanvasTool,
     addDiagonalSplit,
@@ -1537,7 +1538,7 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
           <StudioToolbarDivider />
           <StudioToolBeltHintTarget
             hint={
-              !visibleLeftPanelOpen && !visibleRightPanelOpen
+              isWorkspaceWideMode
                 ? TOOL_BELT_HINTS.workspaceRestore
                 : TOOL_BELT_HINTS.workspaceFocus
             }
@@ -1552,13 +1553,14 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
               type="button"
               onClick={toggleWorkspaceWideMode}
               disabled={presentationPanelsHidden}
-              aria-pressed={!visibleLeftPanelOpen && !visibleRightPanelOpen}
+              aria-pressed={isWorkspaceWideMode}
               className={cn(
-                toolBtn(!visibleLeftPanelOpen && !visibleRightPanelOpen),
+                toolBtn(isWorkspaceWideMode),
                 "h-8 gap-1 px-1.5 text-[0.62rem] font-semibold disabled:cursor-not-allowed disabled:opacity-45"
               )}
             >
-              <Maximize2 size={STUDIO_ICON_SIZE.contextMenu} strokeWidth={STUDIO_ICON_STROKE} aria-hidden /> 넓게
+              <Maximize2 size={STUDIO_ICON_SIZE.contextMenu} strokeWidth={STUDIO_ICON_STROKE} aria-hidden />
+              <span>{isWorkspaceWideMode ? "패널 펼치기" : "패널 접어 넓게"}</span>
             </button>
           </StudioToolBeltHintTarget>
           <StudioToolBeltHintTarget
