@@ -6,7 +6,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { resetStudioBg3dRetainedOwnerForTests } from "./studio-bg3d-retained-owner";
 import { createStudioWebXrSessionController } from "./studio-webxr-session";
-import { StudioBg3dRetainedOwnerHost } from "./StudioBg3dRetainedOwnerHost";
+import {
+  BG3D_RETAINED_OWNER_STALE_RELEASE_MS,
+  StudioBg3dRetainedOwnerHost,
+} from "./StudioBg3dRetainedOwnerHost";
 import { StudioBg3dRetainedOwnerRouteBridge } from "./StudioBg3dRetainedOwnerRouteBridge";
 
 import type {
@@ -220,6 +223,35 @@ describe("Studio BG3D route-independent WebXR owner", () => {
 
     await waitFor(() => {
       expect(view.queryByText("3D 배경 도구를 여는 중")).toBeNull();
+    });
+  });
+
+  it("releases a detached, still-suspended BG3D lease so a returning route can mount", async () => {
+    const suspension = new Promise<void>(() => undefined);
+    const view = render(
+      <>
+        <StudioBg3dRetainedOwnerHost />
+        <SuspendedRouteOwner suspension={suspension} />
+      </>,
+    );
+    expect(view.getByText("3D 배경 도구를 여는 중")).toBeTruthy();
+
+    view.rerender(
+      <>
+        <StudioBg3dRetainedOwnerHost />
+        <PassiveRouteOwner id="fallback-route" />
+      </>,
+    );
+    expect(view.queryByTestId("passive-fallback-route")).toBeNull();
+
+    await act(async () => {
+      await new Promise((resolve) => {
+        setTimeout(resolve, BG3D_RETAINED_OWNER_STALE_RELEASE_MS + 1);
+      });
+    });
+
+    await waitFor(() => {
+      expect(view.getByTestId("passive-fallback-route")).toBeTruthy();
     });
   });
 
