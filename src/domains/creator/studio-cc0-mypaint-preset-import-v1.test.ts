@@ -263,12 +263,32 @@ describe("studio-cc0-mypaint-preset-import-v1", () => {
       expect(first.length).toBeGreaterThanOrEqual(2);
       const dynamics = style.mypaintCc0Dynamics!;
       const expectedFlow = dynamics.linearizedFlow ?? style.flow;
+      const referenceAlpha = expectedFlow * style.opacity;
       for (const dab of first) {
-        expect(dab.alpha).toBeCloseTo(expectedFlow * style.opacity, 12);
         expect(Number.isFinite(dab.x)).toBe(true);
         expect(Number.isFinite(dab.y)).toBe(true);
         expect(dab.radius).toBeGreaterThan(0);
+        expect(dab.alpha).toBeGreaterThan(0);
+        expect(dab.alpha).toBeLessThanOrEqual(style.opacity);
       }
+      // 의도적 변경: 이 루프는 원래 "모든 dab 이 같은 알파"를 고정하고 있었는데, 그게 바로
+      // 결함이었다. 18개 프리셋이 opaque/opaque_multiply 에 필압 곡선을 적고 있는데 dab 알파에는
+      // 필압 항이 아예 없어서, 0.12→0.90 램프를 그려도 잉크 농도가 그대로이거나(2b-pencil 1.010)
+      // 오히려 옅어졌다(dry-brush 0.926). 이제 응답 표를 가진 레인은 dab 마다 달라야 한다.
+      const alphas = [...new Set(first.map((dab) => dab.alpha))];
+      const respondsToPressure =
+        dynamics.flowPressureResponse !== undefined && entry.kind !== "ink";
+      if (!respondsToPressure) {
+        // 표가 없거나(필압 무관 프리셋) ink 레인(리본이 단일 불투명도로 합치는 캐리어)은
+        // 예전 그대로 — 한 획이 한 알파다.
+        for (const dab of first) expect(dab.alpha).toBeCloseTo(referenceAlpha, 12);
+        continue;
+      }
+      expect(alphas.length, `${entry.brushId} varies with pressure`).toBeGreaterThan(1);
+      // 표는 기준 필압 0.5 에서 1 로 정규화돼 있고 이 획은 0.15..0.90 을 지나므로, 손으로 적은
+      // flow 가 실제 침착 범위 안에 들어와야 한다 — 응답이 프리셋 전체를 다시 쓰지 않았다는 뜻.
+      expect(Math.min(...alphas)).toBeLessThan(referenceAlpha);
+      expect(Math.max(...alphas)).toBeGreaterThan(referenceAlpha * 0.999);
     }
   });
 

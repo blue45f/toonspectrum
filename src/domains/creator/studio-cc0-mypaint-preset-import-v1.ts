@@ -103,6 +103,12 @@ export interface StudioCc0MypaintStampTuning {
    */
   readonly ellipticalRatio?: number;
   readonly ellipticalAngleDegrees?: number;
+  /**
+   * Derived, not transcribed: the pressure response of `opaque`/`opaque_multiply`, normalised to
+   * the reference pressure the hand-authored `flow` above is quoted at. Built in `preset()` from
+   * the verbatim table so the two can never drift apart.
+   */
+  readonly flowPressureResponse?: readonly number[];
 }
 
 /** Style-resident dynamics the stamp planner executes for a cc0 preset (absent = legacy path). */
@@ -128,6 +134,22 @@ export interface StudioCc0MypaintDabDynamicsStyle {
    * opaque_linearize to 0, in which case the plain flow value is used unchanged.
    */
   readonly linearizedFlow: number | null;
+  /**
+   * The libmypaint `dabs_per_pixel` exponent that produced `linearizedFlow`, so a consumer that
+   * scales the deposit can re-derive the per-dab alpha at the SCALED target.
+   *
+   * Order matters and is not interchangeable: `opaque` is a stroke-level saturation target and the
+   * per-dab alpha is solved from it, so a pressure response multiplies the TARGET and the solve
+   * happens afterwards. Scaling the already-solved alpha instead is a different (and wrong) curve —
+   * measured on mypaint-cc0--knife it lightened the mark about five-fold.
+   */
+  readonly linearizeDabsPerPixel: number | null;
+  /**
+   * Flow multiplier sampled at pressure 0…1 in 1/16 steps, normalised to 1 at half pressure.
+   * Absent when the preset's deposit does not vary with pressure, which keeps its dab plan
+   * byte-identical.
+   */
+  readonly flowPressureResponse?: readonly number[];
 }
 
 export interface StudioCc0MypaintPresetImport {
@@ -185,22 +207,112 @@ export function studioLibmypaintLinearizedDabAlpha(
   return 1 - Math.pow(1 - target, 1 / dabsPerPixel);
 }
 
+/**
+ * Number of samples in a flow-vs-pressure response table (pressure 0…1 at 1/16 steps).
+ *
+ * A table rather than a formula because the engine must stay a pure consumer: the `.myb` curves
+ * are piecewise-linear control points, and baking them here keeps the interpolation in the module
+ * that owns the upstream semantics.
+ */
+const FLOW_PRESSURE_RESPONSE_SAMPLES = 17;
+
+/**
+ * Reference pressure the mapped `flow` is quoted at. The response table is NORMALISED to it, so a
+ * preset's deposit at half pressure is exactly the number in its table and this field can only add
+ * a response around the existing operating point — never silently restate the whole preset.
+ */
+const FLOW_REFERENCE_PRESSURE = 0.5;
+
+/** Piecewise-linear evaluation of a `.myb` input curve; 0 outside a missing curve. */
+function mybCurveAt(
+  points: readonly (readonly [number, number])[] | undefined,
+  at: number,
+): number {
+  if (!points || points.length === 0) return 0;
+  const first = points[0]!;
+  if (at <= first[0]) return first[1];
+  const last = points[points.length - 1]!;
+  if (at >= last[0]) return last[1];
+  for (let index = 1; index < points.length; index += 1) {
+    const previous = points[index - 1]!;
+    const current = points[index]!;
+    if (at <= current[0]) {
+      const span = current[0] - previous[0];
+      if (span <= 0) return current[1];
+      return previous[1] + ((at - previous[0]) / span) * (current[1] - previous[1]);
+    }
+  }
+  return last[1];
+}
+
+/**
+ * Effective `opaque` at a pressure — the same product the mapped `flow` is quoted from, evaluated
+ * anywhere on the curve instead of only at the reference pressure.
+ *
+ * A preset with no `opaque_multiply` at all multiplies by 1; that is the only reading under which
+ * the mapped numbers in the table below reproduce, and it matches libmypaint, where the setting
+ * defaults to fully opaque rather than to zero.
+ */
+function effectiveOpaqueAtPressure(
+  verbatim: StudioCc0MypaintVerbatimSettings,
+  pressure: number,
+): number {
+  const opaque = verbatim.opaque;
+  const multiply = verbatim.opaque_multiply;
+  const base = clamp01((opaque?.baseValue ?? 0) + mybCurveAt(opaque?.inputs?.pressure, pressure));
+  const scale = multiply
+    ? clamp01(multiply.baseValue + mybCurveAt(multiply.inputs?.pressure, pressure))
+    : 1;
+  return base * scale;
+}
+
+/**
+ * Flow multiplier per pressure, normalised so that half pressure is exactly 1.
+ *
+ * This exists because the import used to collapse `opaque`/`opaque_multiply` to ONE number — the
+ * value at half pressure — and the stamp engine has no pressure term in its dab alpha at all. The
+ * result was measurable and wrong in the obvious direction: rendered over a 0.12→0.90 pressure
+ * ramp, `mypaint-cc0--marker-fat` and `mypaint-cc0--knife` produced an identical mark at both ends
+ * (ink ratio 1.000, thickness ratio 1.000) and `mypaint-cc0--dry-brush` actually got LIGHTER when
+ * pressed (0.926). Eighteen of these presets record a pressure curve on `opaque_multiply`; none of
+ * them could reach a pixel.
+ *
+ * Returns null when the preset's deposit genuinely does not vary with pressure, so those presets
+ * keep a byte-identical dab plan and carry no table.
+ */
+function flowPressureResponseTable(
+  verbatim: StudioCc0MypaintVerbatimSettings,
+): readonly number[] | null {
+  const reference = effectiveOpaqueAtPressure(verbatim, FLOW_REFERENCE_PRESSURE);
+  if (!(reference > 0)) return null;
+  const table: number[] = [];
+  let varies = false;
+  for (let index = 0; index < FLOW_PRESSURE_RESPONSE_SAMPLES; index += 1) {
+    const pressure = index / (FLOW_PRESSURE_RESPONSE_SAMPLES - 1);
+    const ratio = effectiveOpaqueAtPressure(verbatim, pressure) / reference;
+    if (Math.abs(ratio - 1) > 1e-6) varies = true;
+    table.push(Math.max(0, ratio));
+  }
+  return varies ? Object.freeze(table) : null;
+}
+
 /** Resolve the style-resident dynamics for a cc0 tuning at the final (post-override) flow. */
 export function resolveStudioCc0MypaintDabDynamicsStyle(
   tuning: StudioCc0MypaintStampTuning,
   resolvedFlow: number,
 ): StudioCc0MypaintDabDynamicsStyle {
-  const linearizedFlow = tuning.opaqueLinearize > 0
-    ? studioLibmypaintLinearizedDabAlpha(
-        resolvedFlow,
-        1 + clamp01(tuning.opaqueLinearize) * (Math.max(1, tuning.dabsPerPixel) - 1),
-      )
+  const linearizeDabsPerPixel = tuning.opaqueLinearize > 0
+    ? 1 + clamp01(tuning.opaqueLinearize) * (Math.max(1, tuning.dabsPerPixel) - 1)
     : null;
+  const linearizedFlow = linearizeDabsPerPixel === null
+    ? null
+    : studioLibmypaintLinearizedDabAlpha(resolvedFlow, linearizeDabsPerPixel);
   return Object.freeze({
     scatter: tuning.scatter,
     scatterPressureResponse: tuning.scatterPressureResponse,
     radiusJitter: tuning.radiusJitter,
     linearizedFlow,
+    linearizeDabsPerPixel,
     // Only forwarded when the preset actually declares a flat nib, so a round preset's dab plan
     // stays byte-identical.
     ...(tuning.ellipticalRatio && tuning.ellipticalRatio > 1
@@ -208,6 +320,9 @@ export function resolveStudioCc0MypaintDabDynamicsStyle(
           ellipticalRatio: tuning.ellipticalRatio,
           ellipticalAngleDegrees: tuning.ellipticalAngleDegrees ?? 0,
         }
+      : {}),
+    ...(tuning.flowPressureResponse
+      ? { flowPressureResponse: tuning.flowPressureResponse }
       : {}),
   });
 }
@@ -234,7 +349,13 @@ function preset(
     pack,
     kind,
     verbatim: Object.freeze(verbatim),
-    mapped: Object.freeze(mapped),
+    // The flow response is DERIVED from the verbatim curves here rather than transcribed into the
+    // table, so a preset can never declare a pressure response its own upstream settings do not
+    // have — and so the hand-authored `flow` and the response cannot drift apart.
+    mapped: Object.freeze(((): StudioCc0MypaintStampTuning => {
+      const flowPressureResponse = flowPressureResponseTable(verbatim);
+      return flowPressureResponse ? { ...mapped, flowPressureResponse } : mapped;
+    })()),
     mappingNotes,
   });
 }

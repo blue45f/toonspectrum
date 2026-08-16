@@ -18,6 +18,7 @@ import {
   isStudioCc0MypaintPresetBrushId,
   resolveStudioCc0MypaintDabDynamicsStyle,
   resolveStudioCc0MypaintStampBrushKind,
+  studioLibmypaintLinearizedDabAlpha,
   resolveStudioCc0MypaintStampTuning,
 } from "./studio-cc0-mypaint-preset-import-v1";
 import {
@@ -647,9 +648,52 @@ export function beginStampWalker(x: number, y: number, pressure: number): Studio
  * `1 − (1−opaque)^(1/dabs_per_pixel)` 환산 알파, 없으면 기존 표현식(clamp01(style.flow))
  * 그대로다. Canvas·SVG·증분·재생이 이 한 함수를 공유한다.
  */
-function stampFlowAlpha(style: StudioStampBrushStyle): number {
-  const linearized = style.mypaintCc0Dynamics?.linearizedFlow;
-  return typeof linearized === "number" ? clamp01(linearized) : clamp01(style.flow);
+function stampFlowAlpha(style: StudioStampBrushStyle, pressureScale = 1): number {
+  const cc0 = style.mypaintCc0Dynamics;
+  if (pressureScale === 1) {
+    const linearized = cc0?.linearizedFlow;
+    return typeof linearized === "number" ? clamp01(linearized) : clamp01(style.flow);
+  }
+  // Scaled deposit: `opaque` is a STROKE-level saturation target, so the pressure response
+  // multiplies the target and libmypaint's per-dab solve runs afterwards. At scale 1 this returns
+  // the pinned `linearizedFlow` above, bit for bit, so a lane with no response is untouched.
+  const target = clamp01(clamp01(style.flow) * pressureScale);
+  const dabsPerPixel = cc0?.linearizeDabsPerPixel;
+  return typeof dabsPerPixel === "number" && dabsPerPixel > 1
+    ? clamp01(studioLibmypaintLinearizedDabAlpha(target, dabsPerPixel))
+    : target;
+}
+
+/**
+ * Pressure multiplier on the dab's deposit, from the preset's own `opaque`/`opaque_multiply`
+ * curves. 1 for every lane that does not carry a table, which is every non-cc0 brush and every cc0
+ * preset whose upstream deposit is pressure-independent — those keep a byte-identical dab plan.
+ *
+ * Until this existed the dab alpha had NO pressure term at all, while eighteen of the imported
+ * presets recorded one. Measured over a 0.12→0.90 ramp, marker-fat and knife produced an identical
+ * mark at both ends and dry-brush got lighter when pressed.
+ */
+function stampFlowPressureScale(
+  style: StudioStampBrushStyle,
+  pressure: number,
+): number {
+  const table = style.mypaintCc0Dynamics?.flowPressureResponse;
+  if (!table || table.length < 2) return 1;
+  // The ink lane is held back deliberately, not overlooked. Its SVG carrier merges every dab into
+  // ONE ribbon path with a single length-weighted opacity (studio-stamp-ink-ribbon), so a deposit
+  // that varies per dab does not survive serialization: measured on mypaint-cc0--knife the mark
+  // stayed exactly as flat (ink ratio 1.000) and lost most of its density, because the average of
+  // a libmypaint-linearized deposit is not the deposit of the average. Canvas draws the dabs
+  // directly and WOULD show the gradient, so letting this through would buy a canvas improvement
+  // by making the exported file disagree with the artboard. Lift this once the ink ribbon carries
+  // tonal bands the way the angled-nib coverage plan now does.
+  if (style.kind === "ink") return 1;
+  const position = clamp01(pressure) * (table.length - 1);
+  const low = Math.floor(position);
+  const high = Math.min(table.length - 1, low + 1);
+  const blend = position - low;
+  const value = table[low]! + (table[high]! - table[low]!) * blend;
+  return Number.isFinite(value) && value > 0 ? value : 0;
 }
 
 function stampDotPlan(
@@ -659,8 +703,9 @@ function stampDotPlan(
   pressure: number,
   index: number
 ): StudioStampBrushDab {
-  const baseAlpha = stampFlowAlpha(style) * clamp01(style.opacity);
   const safePressure = normalizedPressure(pressure);
+  const baseAlpha = stampFlowAlpha(style, stampFlowPressureScale(style, safePressure))
+    * clamp01(style.opacity);
   let dabX = x;
   let dabY = y;
   let radius = pressureRadius(style, pressure);
@@ -996,7 +1041,13 @@ function walkStampSegmentPlan(
   const distance = Math.hypot(dx, dy);
   if (!Number.isFinite(distance) || distance <= 0) return;
   const normalizedSpeed = style.kind === "ink" ? distance / Math.max(1, style.size) : 0;
-  const baseAlpha = stampFlowAlpha(style) * clamp01(style.opacity);
+  // Per-DAB, not per-segment: the deposit follows the interpolated pressure `p` below, so this can
+  // no longer be hoisted out of the loop. It was hoisted, which is why a cc0 preset's recorded
+  // opaque/opaque_multiply pressure curve could not reach a pixel on this path even after the
+  // dot planner started honouring it.
+  const strokeOpacity = clamp01(style.opacity);
+  const alphaAt = (dabPressure: number): number =>
+    stampFlowAlpha(style, stampFlowPressureScale(style, dabPressure)) * strokeOpacity;
   const paperGrain = style.paperGrain ?? null;
   const cc0Dynamics = style.mypaintCc0Dynamics ?? null;
   let travelled = state.residual;
@@ -1049,8 +1100,8 @@ function walkStampSegmentPlan(
       // 종이 스테이션 샘플: 핀된 레인만 dab 위치의 W7 peak-catch 침착을 곱한다. 저필압은
       // 봉우리만 받아 이빨이 드러나고, 고필압은 골까지 잠겨 스케일이 1로 수렴한다.
       alpha: paperGrain
-        ? clamp01(baseAlpha * stampPaperDepositScale(paperGrain, px, py, p))
-        : baseAlpha,
+        ? clamp01(alphaAt(p) * stampPaperDepositScale(paperGrain, px, py, p))
+        : alphaAt(p),
       index: state.stampIndex,
     });
     state.stampIndex += 1;
