@@ -133,10 +133,7 @@ import {
   studioRoughSeedFromElementId,
   studioSketchStyleOfElement,
 } from "./studio-rough-shape";
-import {
-  planStudioAngledNibStrokeLocalCoverage,
-  type StudioStrokeLocalCoveragePolygon,
-} from "./studio-stroke-local-coverage";
+import { planStudioAngledNibStrokeLocalCoverage } from "./studio-stroke-local-coverage";
 import {
   isStudioBoundedFlowPaintModelCompatible,
 } from "./studio-stroke-paint-model";
@@ -1400,74 +1397,37 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                     profileId: brush === "flat-brush" ? "flat-brush" : "brush",
                     pressures: el.pressures,
                     minimumDiameterRatio: el.materialMinimumDiameterRatio,
-                    elementOpacity: opacity,
                   }
                 : undefined,
             );
-            const traceCoverage = (
-              context: Pick<
-                CanvasRenderingContext2D,
-                "beginPath" | "closePath" | "lineTo" | "moveTo"
-              >,
-              polygons: readonly StudioStrokeLocalCoveragePolygon[],
-            ) => {
-              context.beginPath();
-              for (const polygon of polygons) {
-                context.moveTo(polygon.points[0]!, polygon.points[1]!);
-                for (
-                  let coordinateIndex = 2;
-                  coordinateIndex < polygon.points.length;
-                  coordinateIndex += 2
-                ) {
-                  context.lineTo(
-                    polygon.points[coordinateIndex]!,
-                    polygon.points[coordinateIndex + 1]!,
-                  );
-                }
-                context.closePath();
-              }
-            };
-            // No resolvable tonal range — the historical single coverage fill, unchanged.
-            if (coveragePlan.shells.length <= 1) {
-              return (
-                <Shape
-                  key={index}
-                  sceneFunc={(context, shape) => {
-                    if (coveragePlan.polygons.length === 0) return;
-                    traceCoverage(context, coveragePlan.polygons);
-                    // All subpaths now have one winding, so non-zero fill is a monotonic union.
-                    // Konva applies the Shape opacity once to this complete stroke-local coverage.
-                    context.fillStrokeShape(shape);
-                  }}
-                  fill={stroke}
-                  opacity={opacity}
-                  globalCompositeOperation={composite}
-                  listening={false}
-                />
-              );
-            }
-            // Cumulative density shells — the SVG twin's exact plan. Shell opacity is absolute
-            // (the planner already folded in the element opacity), so this Shape must NOT apply
-            // `opacity` a second time; the inherited alpha still carries any ancestor opacity.
             return (
               <Shape
                 key={index}
-                sceneFunc={(context) => {
-                  context.save();
-                  const inheritedAlpha = context.globalAlpha;
-                  context.fillStyle = stroke;
-                  for (const shell of coveragePlan.shells) {
-                    context.globalAlpha = inheritedAlpha * shell.opacity;
-                    traceCoverage(context, shell.polygons);
-                    context.fill();
+                sceneFunc={(context, shape) => {
+                  if (coveragePlan.polygons.length === 0) return;
+                  context.beginPath();
+                  for (const polygon of coveragePlan.polygons) {
+                    context.moveTo(polygon.points[0]!, polygon.points[1]!);
+                    for (
+                      let coordinateIndex = 2;
+                      coordinateIndex < polygon.points.length;
+                      coordinateIndex += 2
+                    ) {
+                      context.lineTo(
+                        polygon.points[coordinateIndex]!,
+                        polygon.points[coordinateIndex + 1]!,
+                      );
+                    }
+                    context.closePath();
                   }
-                  context.restore();
+                  // All subpaths now have one winding, so non-zero fill is a monotonic union.
+                  // Konva applies the Shape opacity once to this complete stroke-local coverage.
+                  context.fillStrokeShape(shape);
                 }}
                 fill={stroke}
-                opacity={1}
+                opacity={opacity}
                 globalCompositeOperation={composite}
                 listening={false}
-                perfectDrawEnabled={false}
               />
             );
           }

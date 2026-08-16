@@ -237,10 +237,7 @@ import {
 import { buildStudioRoughSvgParityPlan } from "./studio-rough-svg-parity";
 import { skewDegToKonva, type SkewFields } from "./studio-skew";
 import { planStudioStampInkRibbon } from "./studio-stamp-ink-ribbon";
-import {
-  planStudioAngledNibStrokeLocalCoverage,
-  type StudioStrokeLocalCoveragePolygon,
-} from "./studio-stroke-local-coverage";
+import { planStudioAngledNibStrokeLocalCoverage } from "./studio-stroke-local-coverage";
 import {
   isStudioBoundedFlowPaintModelCompatible,
   isStudioStrokePaintModelCompatible,
@@ -2719,14 +2716,11 @@ function serializeFreehand(
             profileId: brush === "flat-brush" ? "flat-brush" : "brush",
             pressures: el.pressures,
             minimumDiameterRatio: el.materialMinimumDiameterRatio,
-            elementOpacity: strokeOpacity,
           }
         : undefined,
     );
     if (coveragePlan.polygons.length === 0) return "";
-    const coverageSubpaths = (
-      polygons: readonly StudioStrokeLocalCoveragePolygon[],
-    ) => polygons.map((polygon) => (
+    const subpaths = coveragePlan.polygons.map((polygon) => (
       `M ${fmt(polygon.points[0])} ${fmt(polygon.points[1])} ${Array.from(
         { length: polygon.points.length / 2 - 1 },
         (_, pointIndex) => {
@@ -2735,18 +2729,7 @@ function serializeFreehand(
         }
       ).join(" ")} Z`
     )).join(" ");
-    // No resolvable tonal range — one compound fill at the element's opacity, byte for byte what
-    // this carrier has always emitted, so saved documents replay unchanged.
-    if (coveragePlan.shells.length <= 1) {
-      return `<path d="${coverageSubpaths(coveragePlan.polygons)}" fill="${escapeXml(stroke)}" fill-rule="nonzero"${opacityAttr} data-brush-engine="angled-nib-local-coverage"/>`;
-    }
-    // Cumulative density shells. Each shell is still ONE compound nonzero fill — the property that
-    // keeps butt joints and self-crossings from double-darkening — and the shell's alpha is
-    // absolute, so the element opacity is applied exactly once, by the planner.
-    const shellPaths = coveragePlan.shells.map((shell) => (
-      `<path d="${coverageSubpaths(shell.polygons)}" fill="${escapeXml(stroke)}" fill-rule="nonzero" opacity="${fmtDabOpacity(shell.opacity)}" data-brush-engine="angled-nib-local-coverage" data-nib-density-band="${shell.band}"/>`
-    )).join("");
-    return `<g data-brush-shells="angled-nib-density">${shellPaths}</g>`;
+    return `<path d="${subpaths}" fill="${escapeXml(stroke)}" fill-rule="nonzero"${opacityAttr} data-brush-engine="angled-nib-local-coverage"/>`;
   }
 
   if (brushFamily === "screentone") {
