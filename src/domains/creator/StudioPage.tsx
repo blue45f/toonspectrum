@@ -5433,6 +5433,7 @@ function StudioCuttoonEditor({
   const [rightPanelOpen, setRightPanelOpen] = useState(
     initialWorkspaceDeviceLayout.desktop.rightPanelOpen
   );
+  const [forceLeftPanelOpen, setForceLeftPanelOpen] = useState(false);
   const [forceRightPanelOpen, setForceRightPanelOpen] = useState(false);
   const [inspectorLayout, setInspectorLayout] = useState<StudioInspectorLayout>(() =>
     workspaceState.liveLayout.inspector
@@ -5675,6 +5676,18 @@ function StudioCuttoonEditor({
     setForceRightPanelOpen(next);
     setRightPanelOpen(next);
   }
+  function setLeftPanelOpenWithOverride(next: SetStateAction<boolean>) {
+    if (typeof next === "function") {
+      setLeftPanelOpen((current) => {
+        const nextValue = next(current);
+        setForceLeftPanelOpen(nextValue);
+        return nextValue;
+      });
+      return;
+    }
+    setForceLeftPanelOpen(next);
+    setLeftPanelOpen(next);
+  }
   function changeInspectorLayout(next: StudioInspectorLayout) {
     setInspectorLayout(next);
     // 탭마다 독립적인 짧은 작업면처럼 느껴지도록 이전 장문 패널의 스크롤 위치를 이어받지 않는다.
@@ -5888,6 +5901,7 @@ function StudioCuttoonEditor({
     activeWorkspaceId: workspaceState.activeWorkspaceId,
     leftPanelOpen,
     rightPanelOpen,
+    forceLeftPanelOpen,
     forceRightPanelOpen,
   });
   const {
@@ -5972,7 +5986,8 @@ function StudioCuttoonEditor({
     const deviceKind = currentStudioWorkspaceDeviceKind();
     const presented = resolveStudioWorkspaceDeviceLayout(layout, deviceKind);
     setInspectorLayout(presented.inspector);
-    setLeftPanelOpen(presented.desktop.leftPanelOpen);
+    setForceLeftPanelOpen(false);
+    setLeftPanelOpenWithOverride(presented.desktop.leftPanelOpen);
     setRightPanelOpenWithOverride(presented.desktop.rightPanelOpen);
     leftResizeSetWidthRef.current(presented.desktop.leftPanelWidth);
     rightResizeSetWidthRef.current(presented.desktop.rightPanelWidth);
@@ -7070,7 +7085,7 @@ function StudioCuttoonEditor({
         setMenu("template");
         break;
       case "layers":
-        setLeftPanelOpen(true);
+        setLeftPanelOpenWithOverride(true);
         if (uiDensityMode === "focus") setStudioUiDensity("simple");
         announceDrawingShortcut(t("studio.tutorialTry.layers"));
         break;
@@ -16901,7 +16916,7 @@ function StudioCuttoonEditor({
           }, 0);
           break;
         case "layers":
-          setLeftPanelOpen(true);
+          setLeftPanelOpenWithOverride(true);
           if (companionUiRef.current.uiDensityMode === "focus") {
             setStudioUiDensityFromCompanion("simple");
           }
@@ -40391,11 +40406,11 @@ function clearSelectionForEdit() {
           togglePageSequence: () => setPageSequenceOpen((current) => !current),
           openProductionInsights: () => setProductionInsightsOpen(true),
           collapseSidePanels: () => {
-            setLeftPanelOpen(false);
+            setLeftPanelOpenWithOverride(false);
             setRightPanelOpenWithOverride(false);
           },
           expandSidePanels: () => {
-            setLeftPanelOpen(true);
+            setLeftPanelOpenWithOverride(true);
             setRightPanelOpenWithOverride(true);
           },
           openToolsCompanion: () => openStudioToolsCompanionForMenu({
@@ -40407,7 +40422,7 @@ function clearSelectionForEdit() {
             t,
           }),
           toggleQuickAccessPalette: studioMainMenuActions.toggleStudioQuickAccessPalette,
-          toggleLeftPanel: () => setLeftPanelOpen((current) => !current),
+          toggleLeftPanel: () => setLeftPanelOpenWithOverride((current) => !current),
           toggleRightPanel: () => setRightPanelOpenWithOverride((current) => !current),
           openShortcuts: () => setShortcutsOpen(true),
           selectDrawMode: (mode) => {
@@ -44558,7 +44573,7 @@ function clearSelectionForEdit() {
           setFxPickerSection={setFxPickerSection}
           setFxSearchQuery={setFxSearchQuery}
           setHistoryPanelOpen={setHistoryPanelOpen}
-          setLeftPanelOpen={setLeftPanelOpen}
+          setLeftPanelOpen={setLeftPanelOpenWithOverride}
           setMagicResizeStrategy={setMagicResizeStrategy}
           setMenu={setMenu}
           setPageReviewOpen={setPageReviewOpen}
@@ -44689,7 +44704,7 @@ function clearSelectionForEdit() {
             pagesSheetRef={pagesSheetRef}
             presentationPanelsHidden={presentationPanelsHidden}
             setCurrentPageId={setCurrentPageId}
-            setLeftPanelOpen={setLeftPanelOpen}
+            setLeftPanelOpen={setLeftPanelOpenWithOverride}
             setMasterPanelOpen={setMasterPanelOpen}
             setMetaEditPageId={setMetaEditPageId}
             setMobileSheet={setMobileSheet}
@@ -45005,7 +45020,7 @@ function clearSelectionForEdit() {
           setFrameAnimOpen={setFrameAnimOpen}
           setFrameAnimTargetId={setFrameAnimTargetId}
           setHistoryPanelOpen={setHistoryPanelOpen}
-          setLeftPanelOpen={setLeftPanelOpen}
+          setLeftPanelOpen={setLeftPanelOpenWithOverride}
           setMarqueeIds={setMarqueeIds}
           setMasterEditMode={setMasterEditMode}
           setMasterPanelOpen={setMasterPanelOpen}

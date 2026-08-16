@@ -10,6 +10,7 @@ export interface StudioWorkspacePresentationLayout {
   readonly rightPanelDensityAllows: boolean;
   readonly densityHidesPageStrip: boolean;
   readonly densityShowsStatusRail: boolean;
+  readonly forceLeftPanelOpen: boolean;
   readonly visibleLeftPanelOpen: boolean;
   readonly visibleRightPanelOpen: boolean;
   readonly presentationPanelsHidden: boolean;
@@ -25,6 +26,7 @@ export function resolveStudioWorkspacePanelLayoutVisibility(input: {
   readonly activeWorkspaceId: StudioWorkspaceId;
   readonly leftPanelOpen: boolean;
   readonly rightPanelOpen: boolean;
+  readonly forceLeftPanelOpen: boolean;
   readonly forceRightPanelOpen: boolean;
 }): StudioWorkspacePresentationLayout {
   const presentationPanelsHidden = input.isFullscreen
@@ -55,8 +57,7 @@ export function resolveStudioWorkspacePanelLayoutVisibility(input: {
   );
   const visibleLeftPanelOpen = input.leftPanelOpen
     && !presentationPanelsHidden
-    && !densityHidesLeftPanel
-    && !densityHidesPageStrip;
+    && (input.forceLeftPanelOpen || (!densityHidesLeftPanel && !densityHidesPageStrip));
   const visibleRightPanelOpen = input.rightPanelOpen
     && !presentationPanelsHidden
     && rightPanelDensityAllows;
@@ -65,6 +66,7 @@ export function resolveStudioWorkspacePanelLayoutVisibility(input: {
     presentationPanelsHidden,
     canvasWideWorkspaceDensityMode,
     densityHidesLeftPanel,
+    forceLeftPanelOpen: input.forceLeftPanelOpen,
     rightPanelDensityAllows,
     densityHidesPageStrip,
     densityShowsStatusRail,

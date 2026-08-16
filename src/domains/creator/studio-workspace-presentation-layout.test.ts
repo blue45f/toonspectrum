@@ -14,6 +14,7 @@ describe("studio workspace panel layout visibility", () => {
       activeWorkspaceId: "lineart",
       leftPanelOpen: true,
       rightPanelOpen: true,
+      forceLeftPanelOpen: false,
       forceRightPanelOpen: false,
     });
     expect(layout.presentationPanelsHidden).toBe(true);
@@ -32,6 +33,7 @@ describe("studio workspace panel layout visibility", () => {
       activeWorkspaceId: "lineart",
       leftPanelOpen: true,
       rightPanelOpen: true,
+      forceLeftPanelOpen: false,
       forceRightPanelOpen: true,
     });
     expect(layout.canvasWideWorkspaceDensityMode).toBe("focus");
@@ -40,22 +42,41 @@ describe("studio workspace panel layout visibility", () => {
     expect(layout.visibleRightPanelOpen).toBe(true);
   });
 
-  it("keeps mobile density and right panel hidden by UI density", () => {
+  it("keeps focus mode right panel hidden by UI density", () => {
     const layout = resolveStudioWorkspacePanelLayoutVisibility({
-      isMobile: true,
+      isMobile: false,
       isFullscreen: false,
       maximized: false,
       mobileImmersive: false,
       canvasOnlyMode: false,
-      uiDensityMode: "simple",
+      uiDensityMode: "focus",
       activeWorkspaceId: "lineart",
       leftPanelOpen: true,
       rightPanelOpen: true,
+      forceLeftPanelOpen: false,
       forceRightPanelOpen: false,
     });
-    expect(layout.canvasWideWorkspaceDensityMode).toBe("simple");
+    expect(layout.canvasWideWorkspaceDensityMode).toBe("focus");
     expect(layout.rightPanelDensityAllows).toBe(false);
     expect(layout.visibleRightPanelOpen).toBe(false);
   });
-});
 
+  it("keeps focus-mode left panel visible when user explicitly opens it", () => {
+    const layout = resolveStudioWorkspacePanelLayoutVisibility({
+      isMobile: false,
+      isFullscreen: false,
+      maximized: false,
+      mobileImmersive: false,
+      canvasOnlyMode: false,
+      uiDensityMode: "full",
+      activeWorkspaceId: "lineart",
+      leftPanelOpen: true,
+      rightPanelOpen: false,
+      forceLeftPanelOpen: true,
+      forceRightPanelOpen: false,
+    });
+
+    expect(layout.densityHidesLeftPanel).toBe(true);
+    expect(layout.visibleLeftPanelOpen).toBe(true);
+  });
+});
