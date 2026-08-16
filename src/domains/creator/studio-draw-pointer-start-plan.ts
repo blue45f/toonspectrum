@@ -18,6 +18,7 @@ import {
 } from "./studio-brush";
 import { isStudioBrushEraserAliasId } from "./studio-brush-alias-profile";
 import { resolveStudioBrushDynamicsSelectionPresetId } from "./studio-brush-dynamics";
+import { resolveStudioStrokeSymmetry } from "./studio-brush-intrinsic-symmetry";
 import {
   resolveStudioStampBrushKind,
   type StudioStampBrushTuning,
@@ -269,14 +270,7 @@ export function planStudioDrawPointerStart(
     stamp: drawMode === "pen" && stampTuning && stampKind && !hasBrushDynamics ? { ...stampTuning } : undefined,
     stampPipeline: drawMode === "pen" && stampKind && !hasBrushDynamics ? "causal-walker-v2" as const : undefined,
     watercolorPipeline: causalWatercolor ? "causal-walker-v2" as const : undefined,
-    symmetry: drawMode === "pixel" || symmetry.type === "none"
-      ? undefined
-      : {
-          type: symmetry.type,
-          centerX: symmetry.centerX,
-          centerY: symmetry.centerY,
-          radialCount: symmetry.radialCount,
-        },
+    symmetry: drawMode === "pixel" ? undefined : resolveStudioStrokeSymmetry(symmetry, brush),
   };
   const element: DrawEl = drawMode === "shape"
     ? {

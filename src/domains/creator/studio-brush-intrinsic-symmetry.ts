@@ -72,3 +72,45 @@ export function resolveStudioBrushIntrinsicSymmetry(
 export const STUDIO_BRUSH_INTRINSIC_SYMMETRY_IDS: readonly string[] = Object.freeze(
   Object.keys(INTRINSIC_SYMMETRY_BY_BRUSH_ID),
 );
+
+/** The symmetry shape a stroke element carries. */
+export interface StudioStrokeSymmetry {
+  readonly type: "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope" | "silk";
+  readonly centerX: number;
+  readonly centerY: number;
+  readonly radialCount?: number;
+}
+
+/**
+ * The symmetry to record on a stroke: the artist's page symmetry when they have switched one on,
+ * otherwise the brush's own, otherwise none.
+ *
+ * An explicit choice is never overridden by a preset — a brush only supplies a fan where the page
+ * has none. The fold is centred on the PAGE rather than the origin: the live route folds these
+ * presets about the origin today, which drops every copy off-canvas, and that is half the reason
+ * the promise looked unimplemented.
+ *
+ * Returns undefined when there is nothing to record, which is the value the planner already wrote
+ * for a stroke with no symmetry — so every brush without one keeps a byte-identical element.
+ */
+export function resolveStudioStrokeSymmetry(
+  page: StudioStrokeSymmetry,
+  brushId: unknown,
+): StudioStrokeSymmetry | undefined {
+  if (page.type !== "none") {
+    return {
+      type: page.type,
+      centerX: page.centerX,
+      centerY: page.centerY,
+      radialCount: page.radialCount,
+    };
+  }
+  const intrinsic = resolveStudioBrushIntrinsicSymmetry(brushId);
+  if (!intrinsic) return undefined;
+  return {
+    type: intrinsic.type,
+    centerX: page.centerX,
+    centerY: page.centerY,
+    radialCount: intrinsic.radialCount ?? page.radialCount,
+  };
+}
