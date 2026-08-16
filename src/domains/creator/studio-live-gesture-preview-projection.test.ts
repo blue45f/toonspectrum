@@ -296,6 +296,35 @@ describe("studio live gesture preview projection", () => {
     expect(unsupportedPlan.previewElementIds.size).toBe(0);
   });
 
+  it("returns the unchanged authoritative identity when all snapshot entries are unsupported", () => {
+    const authoritative: readonly El[] = [draw("kept", [0, 0]), draw("kept-2", [5, 5])];
+    const retouch = freehandEntry({
+      gestureId: "retouch-a",
+      operation: "retouch",
+      renderer: undefined,
+      samples: undefined,
+      retouch: {
+        tool: "smudge",
+        startIndex: 0,
+        points: [0.1, 0.2],
+        radiusNorm: 0.1,
+        strength: 0.5,
+      },
+      sampleCount: 1,
+    });
+
+    const unsupportedPlan = planStudioLiveGesturePreviewRenderElements(
+      authoritative,
+      [retouch],
+      new Set([retouch.key]),
+    );
+
+    expect(unsupportedPlan.elements).toBe(authoritative);
+    expect(unsupportedPlan.previewElementIds.size).toBe(0);
+    expect(unsupportedPlan.authoritativeHandoffIds).toEqual([]);
+    expect(unsupportedPlan.authoritativeHandoffToken).toBe("[]");
+  });
+
   it("keeps raw authored ids reserved when a paint projection temporarily omits them", () => {
     const entry = freehandEntry();
     const plan = planStudioLiveGesturePreviewRenderElements(
