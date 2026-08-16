@@ -288,7 +288,6 @@ import {
   studioElementIdOf,
 } from "./studio-canvas-shared-runtime";
 import { clampStudioCanvasHeight } from "./studio-canvas-size";
-import { resolveStudioCanvasWideDensityMode } from "./studio-canvas-wide-density";
 import { combineStudioShapesWithCanvasKit } from "./studio-canvaskit-path-boolean-document-adapter";
 import {
   selectStudioCausalInkSamples,
@@ -1688,6 +1687,7 @@ import {
   type StudioWorkAssetSceneReference,
 } from "./studio-work-asset-render-projection";
 import { readStudioWorkspaceDeviceSignalsFromGlobals } from "./studio-workspace-device-signals";
+import { resolveStudioWorkspacePanelLayoutVisibility } from "./studio-workspace-presentation-layout";
 import {
   createStudioDccNavigationState,
   studioCanvasHref,
@@ -5878,30 +5878,24 @@ function StudioCuttoonEditor({
   // 전체화면/브라우저 맞춤은 저장된 작업공간을 바꾸지 않는 일시적인 프레젠테이션 상태다.
   // 패널 열림 상태 자체를 덮어쓰면 ESC로 돌아왔을 때 사용자가 만든 레이아웃이 사라지고,
   // 작업공간이 뜻하지 않게 "수정됨"으로 표시되므로 렌더링 가시성만 별도로 계산한다.
-  const presentationPanelsHidden = isFullscreen || maximized || mobileImmersive || canvasOnlyMode;
-  const canvasWideWorkspaceDensityMode = resolveStudioCanvasWideDensityMode({
+  const panelLayout = resolveStudioWorkspacePanelLayoutVisibility({
     isMobile,
+    isFullscreen,
+    maximized,
+    mobileImmersive,
+    canvasOnlyMode,
     uiDensityMode,
     activeWorkspaceId: workspaceState.activeWorkspaceId,
+    leftPanelOpen,
+    rightPanelOpen,
+    forceRightPanelOpen,
   });
-  const densityHidesLeftPanel = !studioUiDensityAllows(
-    canvasWideWorkspaceDensityMode,
-    "left-panel",
-  );
-  // Focus(super-simple) 모드가 우측 패널을 숨겨도, 사용자가 실제로 속성/문서 패널을 요청한 경우
-  // 열린 패널은 우선 렌더링한다.
-  const rightPanelDensityAllows =
-    forceRightPanelOpen || studioUiDensityAllows(canvasWideWorkspaceDensityMode, "right-panel");
-  const densityHidesPageStrip = !studioUiDensityAllows(canvasWideWorkspaceDensityMode, "page-strip");
-  const densityShowsStatusRail = studioUiDensityAllows(canvasWideWorkspaceDensityMode, "status-rail");
-  // Focus density treats the left dock as the page strip (page-strip region).
-  const visibleLeftPanelOpen =
-    leftPanelOpen &&
-    !presentationPanelsHidden &&
-    !densityHidesLeftPanel &&
-    !densityHidesPageStrip;
-  const visibleRightPanelOpen =
-    rightPanelOpen && !presentationPanelsHidden && rightPanelDensityAllows;
+  const {
+    presentationPanelsHidden,
+    densityShowsStatusRail,
+    visibleLeftPanelOpen,
+    visibleRightPanelOpen,
+  } = panelLayout;
   // useMemo: 렌더마다 새 정규화 객체가 메뉴바 memo 자식(작업공간 메뉴)을 재렌더시키지 않게.
   //
   // 화면 기하를 그대로 담지 않고 captureStudioWorkspaceDeviceLayout으로 되돌린다. 화면은 기기
