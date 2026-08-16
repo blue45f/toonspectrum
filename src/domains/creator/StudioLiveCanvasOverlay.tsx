@@ -36,17 +36,19 @@ import {
 } from "./studio-commercial-residuals";
 import {
   planStudioCommentPinPreviewPosition,
+  studioLiveCursorActivityLabel,
+  studioLiveCursorToolLabel,
   studioLiveParticipantColor,
   type StudioCanvasCommentPin,
 } from "./studio-live-canvas-overlay-model";
 import { useStudioLiveCollaboration } from "./studio-live-collaboration-context";
 import {
-  isStudioLiveCursorCleared,
   type StudioLiveCursorPayload,
   type StudioLiveParticipant,
 } from "./studio-live-collaboration-protocol";
 import { openStudioLiveCompanionTab } from "./studio-live-jam-session";
 import { summarizeStudioLiveActiveOwners } from "./studio-live-layer-ownership";
+import { useStudioRemoteCursors } from "./studio-live-remote-cursor-store";
 import {
   INITIAL_STUDIO_LIVE_SYNC_SNAPSHOT,
   formatStudioLiveLastAck,
@@ -995,6 +997,14 @@ export function StudioLiveCanvasOverlay({
         const strokeColor = cursor.strokeColor || color;
         const strokeWidth = cursor.strokeWidth || 4;
         const isDrawing = Boolean(cursor.drawing);
+        const isEraserTrail = cursor.tool === "eraser";
+        const isPixelTrail = cursor.tool === "pixel";
+        const trailColor = isEraserTrail ? color : strokeColor;
+        const toolLabel = studioLiveCursorToolLabel(cursor.tool);
+        const activityLabel = studioLiveCursorActivityLabel(cursor.tool, isDrawing);
+        const eraserOutline = Math.max(2, Math.min(4, strokeWidth * 0.22));
+        const dash = isEraserTrail ? Math.max(8, strokeWidth * 0.7) : 0;
+        const gap = isEraserTrail ? Math.max(6, strokeWidth * 0.45) : 0;
 
         let pointsString = "";
         if (isDrawing && cursor.points && cursor.points.length >= 4) {
@@ -1020,15 +1030,33 @@ export function StudioLiveCanvasOverlay({
         return (
           <Fragment key={participant.sessionId}>
             {pointsString ? (
-              <svg className="pointer-events-none absolute inset-0 size-full z-10">
+              <svg
+                className="pointer-events-none absolute inset-0 z-10 size-full"
+                data-studio-live-cursor-trail={isEraserTrail ? "eraser" : isPixelTrail ? "pixel" : "ink"}
+                preserveAspectRatio="none"
+                viewBox={`0 0 ${canvasWidth} ${canvasHeight}`}
+              >
+                {isEraserTrail ? (
+                  <polyline
+                    points={pointsString}
+                    fill="none"
+                    stroke="white"
+                    strokeWidth={eraserOutline + 2}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeDasharray={`${dash} ${gap}`}
+                    opacity={0.78}
+                  />
+                ) : null}
                 <polyline
                   points={pointsString}
                   fill="none"
-                  stroke={strokeColor}
-                  strokeWidth={strokeWidth}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  opacity={cursor.strokeOpacity ?? 0.9}
+                  stroke={trailColor}
+                  strokeWidth={isEraserTrail ? eraserOutline : strokeWidth}
+                  strokeLinecap={isPixelTrail ? "square" : "round"}
+                  strokeLinejoin={isPixelTrail ? "miter" : "round"}
+                  strokeDasharray={isEraserTrail ? `${dash} ${gap}` : undefined}
+                  opacity={isEraserTrail ? 0.95 : (cursor.strokeOpacity ?? 0.9)}
                   className="motion-safe:transition-all motion-safe:duration-75"
                 />
               </svg>
@@ -1043,11 +1071,14 @@ export function StudioLiveCanvasOverlay({
               <div className="relative">
                 {isDrawing ? (
                   <span
-                    className="absolute -left-3 -top-3 block rounded-full border-2 border-white shadow-md animate-pulse"
+                    className="absolute -left-3 -top-3 block rounded-full border-2 shadow-md animate-pulse"
+                    data-studio-live-cursor-tip={isEraserTrail ? "eraser" : "ink"}
                     style={{
                       width: `${Math.max(12, strokeWidth * 2)}px`,
                       height: `${Math.max(12, strokeWidth * 2)}px`,
-                      backgroundColor: strokeColor,
+                      backgroundColor: isEraserTrail ? "transparent" : strokeColor,
+                      borderColor: isEraserTrail ? color : "#fff",
+                      boxShadow: isEraserTrail ? `0 0 0 1px ${color}` : undefined,
                     }}
                   />
                 ) : null}
@@ -1064,8 +1095,12 @@ export function StudioLiveCanvasOverlay({
                   style={{ backgroundColor: color }}
                 >
                   {participant.displayName}
-                  {cursor.tool ? <span className="ml-1 font-medium opacity-80">· {cursor.tool}</span> : null}
-                  {isDrawing ? <span className="ml-1 text-[0.6rem] font-bold animate-pulse">✏️ 그리는 중</span> : null}
+                  {toolLabel ? <span className="ml-1 font-medium opacity-80">· {toolLabel}</span> : null}
+                  {activityLabel ? (
+                    <span className="ml-1 text-[0.6rem] font-bold animate-pulse">
+                      {activityLabel === "그리는 중" ? `✏️ ${activityLabel}` : activityLabel}
+                    </span>
+                  ) : null}
                 </span>
               </div>
             </div>
@@ -1075,9 +1110,6 @@ export function StudioLiveCanvasOverlay({
     </div>
   );
 }
-
-const REMOTE_CURSOR_TTL_MS = 3_000;
-const REMOTE_CURSOR_LIMIT = 64;
 
 /** Isolated high-frequency subscriber so cursor traffic never rerenders the giant Studio editor. */
 export function StudioRemoteCursorOverlay({
@@ -1097,93 +1129,7 @@ export function StudioRemoteCursorOverlay({
   rotation = 0,
 }: StudioRemoteCursorOverlayProps) {
   const { room } = useStudioLiveCollaboration();
-  const cursorMapRef = useRef(new Map<string, StudioLiveCanvasCursor>());
-  const frameRef = useRef<number | null>(null);
-  const [cursors, setCursors] = useState<StudioLiveCanvasCursor[]>([]);
-
-  useEffect(() => {
-    const cursorMap = cursorMapRef.current;
-    cursorMap.clear();
-    setCursors([]);
-    if (!room) return;
-
-    let pendingRender = false;
-    const flush = () => {
-      frameRef.current = null;
-      const now = Date.now();
-      let expired = false;
-      for (const [sessionId, value] of cursorMap) {
-        if (now - value.updatedAt <= REMOTE_CURSOR_TTL_MS) continue;
-        cursorMap.delete(sessionId);
-        expired = true;
-      }
-      if (pendingRender || expired) setCursors(Array.from(cursorMap.values()));
-      pendingRender = false;
-    };
-    const scheduleFlush = (renderChanged = true) => {
-      if (renderChanged) pendingRender = true;
-      if (frameRef.current !== null) return;
-      frameRef.current = globalThis.requestAnimationFrame(flush);
-    };
-    const clear = () => {
-      const changed = cursorMap.size > 0;
-      cursorMap.clear();
-      scheduleFlush(changed);
-    };
-
-    const unsubscribe = room.subscribe((event) => {
-      if (event.type === "cursor") {
-        const sessionId = event.participant.sessionId;
-        if (isStudioLiveCursorCleared(event.cursor)) {
-          if (cursorMap.delete(sessionId)) scheduleFlush();
-          return;
-        }
-        if (
-          !cursorMap.has(sessionId) &&
-          cursorMap.size >= REMOTE_CURSOR_LIMIT
-        ) {
-          const oldest = Array.from(cursorMap.entries()).sort(
-            (left, right) => left[1].updatedAt - right[1].updatedAt
-          )[0];
-          if (oldest) cursorMap.delete(oldest[0]);
-        }
-        cursorMap.set(sessionId, {
-          participant: event.participant,
-          cursor: event.cursor,
-          updatedAt: Date.now(),
-        });
-        scheduleFlush();
-        return;
-      }
-      if (event.type === "presence") {
-        const activeSessions = new Set(event.peers.map((peer) => peer.sessionId));
-        let changed = false;
-        for (const sessionId of cursorMap.keys()) {
-          if (activeSessions.has(sessionId)) continue;
-          cursorMap.delete(sessionId);
-          changed = true;
-        }
-        scheduleFlush(changed);
-        return;
-      }
-      if (
-        event.type === "transport-status" &&
-        event.status.state !== "ready" &&
-        !(event.status.state === "error" && room.ready)
-      ) {
-        clear();
-      }
-    });
-    const pruneTimer = globalThis.setInterval(() => scheduleFlush(false), 1_000);
-
-    return () => {
-      unsubscribe();
-      globalThis.clearInterval(pruneTimer);
-      if (frameRef.current !== null) globalThis.cancelAnimationFrame(frameRef.current);
-      frameRef.current = null;
-      cursorMap.clear();
-    };
-  }, [room]);
+  const cursors = useStudioRemoteCursors(room);
 
   if (hidden) return null;
   return (
@@ -1307,13 +1253,13 @@ export function StudioLivePresenceDock({
         data-studio-presence-link={resolvedSync.phase}
         data-studio-presence-sync-action="true"
         className={cn(
-          "inline-flex size-11 min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-full border p-0 text-[0.7rem] font-bold transition-colors duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent motion-reduce:transition-none min-[412px]:h-auto min-[412px]:w-auto min-[412px]:min-w-0 min-[412px]:shrink min-[412px]:justify-start min-[412px]:px-3",
+          "inline-flex size-11 min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-full border p-0 text-[0.7rem] font-bold transition-colors duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent motion-reduce:transition-none min-[412px]:h-11 min-[412px]:w-[13.5rem] min-[412px]:justify-start min-[412px]:px-3 sm:w-[16.5rem]",
           syncToneClass(syncPresentation.tone)
         )}
         onClick={onOpenTeam}
       >
         <StudioSyncStatusIcon phase={resolvedSync.phase} />
-        <span className="max-w-40 truncate max-[411px]:hidden sm:max-w-56">
+        <span className="hidden min-w-0 flex-1 truncate text-left tabular-nums max-[411px]:hidden min-[412px]:inline">
           {syncPresentation.shortLabel}
         </span>
       </button>

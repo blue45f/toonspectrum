@@ -811,7 +811,10 @@ import {
   gateStudioCanvasMutation,
   type StudioCanvasMutationIntent,
 } from "./studio-live-canvas-mutation-gate";
-import { projectStudioCanvasCommentPins } from "./studio-live-canvas-overlay-model";
+import {
+  projectStudioCanvasCommentPins,
+  resolveStudioLivePublishedCursorTool,
+} from "./studio-live-canvas-overlay-model";
 import {
   StudioLiveDynamicBrushOverlayRenderer,
   studioLiveDynamicBrushOverlaySupportsElement,
@@ -838,6 +841,8 @@ import {
   shouldExpectStudioSharedDocument,
   shouldPublishStudioLiveJamRoom,
   shouldRequireStudioLiveServer,
+  shouldSeedStudioLiveSharedBootstrapPage,
+  studioLiveSharedBootstrapPageId,
   withStudioLiveJamRoom,
 } from "./studio-live-jam-session";
 import {
@@ -4270,7 +4275,9 @@ function StudioCuttoonEditor({
   const [pagesHistory, setPagesHistoryState] = useState<PageState[][]>([
     [
       {
-        id: uid(),
+        id: shouldSeedStudioLiveSharedBootstrapPage(workId)
+          ? studioLiveSharedBootstrapPageId(effectiveWorkId)
+          : uid(),
         elements: [],
         bg: "#ffffff",
         bgGrad: null,
@@ -35038,6 +35045,12 @@ const puppetWarpArmed =
         if (!pointer) return null;
         const activeDrawing = stageActiveDrawing;
         const isDrawing = Boolean(activeDrawing && (activeDrawing.kind ?? "freehand") === "freehand");
+        const publishedTool = resolveStudioLivePublishedCursorTool({
+          tool,
+          drawMode,
+          drawingMode: activeDrawing?.mode,
+        });
+        const isEraserPreview = publishedTool === "eraser";
         const strokeColor = activeDrawing?.stroke ?? color;
         const strokeWidthVal = activeDrawing?.strokeWidth ?? strokeWidth;
         const strokeOpacity = activeDrawing?.opacity ?? 1;
@@ -35047,9 +35060,9 @@ const puppetWarpArmed =
           x: Math.max(0, Math.min(1, pointer.x / CANVAS_W)),
           y: Math.max(0, Math.min(1, pointer.y / canvasH)),
           pageId: activePage.id,
-          tool,
+          tool: publishedTool,
           drawing: isDrawing,
-          strokeColor,
+          strokeColor: isEraserPreview ? undefined : strokeColor,
           strokeWidth: strokeWidthVal,
           strokeOpacity,
           points: isDrawing && pts && pts.length >= 2 ? pts.slice(-64) : undefined,

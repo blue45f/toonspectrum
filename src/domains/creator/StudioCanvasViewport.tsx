@@ -63,6 +63,7 @@ import { type NodeEditHandle, type NodeEditTool } from "./studio-node-edit";
 import { vignetteCss, type PageGrade } from "./studio-page-grade";
 import { StudioAnimTimelinePanel, StudioAppSettingsPanel, StudioBubbleShapeOverlay, StudioCanonicalVNextDryMediaCanvas, StudioCropOverlay, StudioDialogueBatchPanel, StudioDialogueTranslatePanel, StudioFeatureTutorialHub, StudioFrameAnimationPanel, StudioHealCloneOverlay, StudioHistoryBrushOverlay, StudioHistoryPanel, StudioLayerMaskOverlay, StudioQuickMaskOverlay, StudioLiveDynamicBrushOverlayHost, StudioLiveInkOverlayHost, StudioLiveInkPredictionHost, StudioLivePresenceDockConnected, StudioLivePressureHudPill, StudioLiveStampOverlayHost, StudioLiveWetInkOverlayHost, StudioMasterPagePanel, StudioDrawSelectionOverlay, StudioNodeEditOverlay, StudioOnionSkinImage, StudioPanelSplitOverlay, StudioPuppetWarpOverlay, StudioRasterCrdtSurface, StudioRemoteCursorOverlay, StudioSelectionAntsOverlay, StudioShortcutsHelp, StudioTextEditFallbackModal, StudioTextEditOverlay, QuickStartPanel, StudioWebGpuCanvas, preloadStudioCommentThreadPopover } from "./studio-page-lazy-ui";
 import { pageDisplayName } from "./studio-page-meta";
+import { adoptMissingPage } from "./studio-pages";
 import { isEligibleForPanelAutoFit } from "./studio-panel-autofit";
 import { type PanelSplitPreview } from "./studio-panel-split";
 import {
@@ -2661,7 +2662,11 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
                   )
                 }
                 onFollowPage={(pageId) => {
-                  if (pageId === activePage.id || !pages.some((page) => page.id === pageId)) return;
+                  if (pageId === activePage.id) return;
+                  if (!pages.some((page) => page.id === pageId)) {
+                    const nextPages = adoptMissingPage(pages, pageId, activePage.canvasH || 1080);
+                    if (nextPages === pages || !commitPages(nextPages)) return;
+                  }
                   if (!setCurrentPageId(pageId)) return;
                   setSelectedId(null);
                   setTool("select");

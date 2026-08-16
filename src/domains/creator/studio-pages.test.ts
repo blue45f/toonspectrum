@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createStudioLinked3dRenderPageFixture } from
   "./studio-linked-3d-render-test-fixture";
 import {
+  adoptMissingPage,
   appendPageState,
   applyBackgroundToAllPages,
   applyGradeToAllPages,
@@ -474,6 +475,15 @@ describe("studio-pages (pure, real exports)", () => {
     expect(nextActiveId).toBe("p1");
     // commit simulation: caller would setCurrentPageId(nextActiveId) if was current
     expect(nextPages.find((p: any) => p.id === nextActiveId)).toBeTruthy();
+  });
+
+  it("adoptMissingPage inserts a blank page with the given id once", () => {
+    const before = [samplePage({ id: "p1" })] as PageLike[];
+    const adopted = adoptMissingPage(before, "peer-page", 1200);
+    expect(adopted).toHaveLength(2);
+    expect(adopted[1]).toMatchObject({ id: "peer-page", canvasH: 1200, elements: [] });
+    expect(adoptMissingPage(adopted, "peer-page", 1200)).toBe(adopted);
+    expect(adoptMissingPage(before, "  ", 1200)).toBe(before);
   });
 
   it("appendPageState appends and returns new id (length +1, id present)", () => {

@@ -38,6 +38,25 @@ export function resolveStudioLiveSessionWorkId(input: {
     ?? input.instantWorkId;
 }
 
+const STUDIO_LIVE_SHARED_PAGE_ID_MAX = 160;
+
+/**
+ * Instant jam rooms have no saved page list. A random first-page UUID made
+ * "follow this tab" fail because the follower never had that id.
+ */
+export function studioLiveSharedBootstrapPageId(workId: string): string {
+  const trimmed = workId.trim();
+  if (!trimmed) return "";
+  const id = `jam-page-${trimmed}`;
+  return id.length <= STUDIO_LIVE_SHARED_PAGE_ID_MAX
+    ? id
+    : id.slice(0, STUDIO_LIVE_SHARED_PAGE_ID_MAX);
+}
+
+export function shouldSeedStudioLiveSharedBootstrapPage(savedWorkId: string | null): boolean {
+  return savedWorkId == null;
+}
+
 /** Server ACL document. A Magma-style `?room=` jam is not a shared work document. */
 export function shouldExpectStudioSharedDocument(input: {
   workAuthScopeKey: string | null;

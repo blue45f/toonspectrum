@@ -15,6 +15,63 @@ export const STUDIO_LIVE_PARTICIPANT_COLORS = [
   "#7e22ce",
 ] as const;
 
+/** Presence `tool` is a free string; encode draw-mode here so CF/API schemas stay unchanged. */
+export function resolveStudioLivePublishedCursorTool(input: {
+  readonly tool: string;
+  readonly drawMode?: string | null;
+  readonly drawingMode?: string | null;
+}): string {
+  if (input.drawingMode === "eraser") return "eraser";
+  if (input.tool !== "draw") return input.tool;
+  switch (input.drawMode) {
+    case "eraser":
+      return "eraser";
+    case "pixel":
+      return "pixel";
+    case "lasso-fill":
+      return "lasso-fill";
+    case "shape":
+      return "shape";
+    case "pen":
+      return "pen";
+    default:
+      return input.tool;
+  }
+}
+
+export function studioLiveCursorToolLabel(tool: string | null | undefined): string | null {
+  if (!tool) return null;
+  switch (tool) {
+    case "eraser":
+      return "지우개";
+    case "pen":
+    case "draw":
+      return "펜";
+    case "pixel":
+      return "픽셀";
+    case "shape":
+      return "도형";
+    case "lasso-fill":
+      return "채우기";
+    case "select":
+      return "선택";
+    case "hand":
+      return "이동";
+    default:
+      return tool;
+  }
+}
+
+export function studioLiveCursorActivityLabel(
+  tool: string | null | undefined,
+  drawing: boolean,
+): string | null {
+  if (!drawing) return null;
+  if (tool === "eraser") return "지우는 중";
+  if (tool === "lasso-fill") return "채우는 중";
+  return "그리는 중";
+}
+
 export interface StudioCanvasAnchorBounds {
   x: number;
   y: number;

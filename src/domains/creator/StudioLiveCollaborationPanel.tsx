@@ -243,7 +243,7 @@ export function StudioLiveCollaborationPanelView({
           aria-atomic="true"
           aria-live={syncPresentation?.assertive ? "assertive" : "polite"}
           className={cn(
-            "inline-flex min-h-7 shrink-0 items-center gap-1.5 rounded-full border px-2 text-[0.68rem] font-semibold",
+            "inline-flex min-h-7 w-[11.5rem] shrink-0 items-center justify-center gap-1.5 truncate rounded-full border px-2 text-[0.68rem] font-semibold tabular-nums",
             syncStatusToneClass(syncPresentation?.tone ?? null, ready, availability)
           )}
           role={syncPresentation?.assertive ? "alert" : "status"}

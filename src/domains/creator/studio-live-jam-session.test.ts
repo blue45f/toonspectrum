@@ -9,6 +9,8 @@ import {
   shouldExpectStudioSharedDocument,
   shouldPublishStudioLiveJamRoom,
   shouldRequireStudioLiveServer,
+  shouldSeedStudioLiveSharedBootstrapPage,
+  studioLiveSharedBootstrapPageId,
   withStudioLiveJamRoom,
 } from "./studio-live-jam-session";
 
@@ -71,6 +73,10 @@ describe("studio live jam session", () => {
     });
     expect(first).toBe(instant);
     expect(second).toBe(first);
+    expect(studioLiveSharedBootstrapPageId(first)).toBe(studioLiveSharedBootstrapPageId(second));
+    expect(studioLiveSharedBootstrapPageId(first)).toBe(`jam-page-${first}`);
+    expect(shouldSeedStudioLiveSharedBootstrapPage(null)).toBe(true);
+    expect(shouldSeedStudioLiveSharedBootstrapPage("work-saved-1")).toBe(false);
   });
 
   it("opens a companion tab at the shipped jam href", () => {

@@ -13,6 +13,9 @@ import {
 import {
   planStudioCommentPinPreviewPosition,
   projectStudioCanvasCommentPins,
+  resolveStudioLivePublishedCursorTool,
+  studioLiveCursorActivityLabel,
+  studioLiveCursorToolLabel,
 } from "./studio-live-canvas-overlay-model";
 
 const AUTHOR: StudioCommentActor = { id: "author-1", displayName: "편집자" };
@@ -347,6 +350,50 @@ describe("projectStudioCanvasCommentPins", () => {
     })[0];
     expect(Array.from(longOnly!.previewBody ?? "")).toHaveLength(280);
     expect(longOnly!.previewBody).toMatch(/…$/u);
+  });
+});
+
+describe("resolveStudioLivePublishedCursorTool", () => {
+  it("encodes the active draw mode without adding a new presence field", () => {
+    expect(resolveStudioLivePublishedCursorTool({
+      tool: "draw",
+      drawMode: "eraser",
+    })).toBe("eraser");
+    expect(resolveStudioLivePublishedCursorTool({
+      tool: "draw",
+      drawMode: "pen",
+      drawingMode: "eraser",
+    })).toBe("eraser");
+    expect(resolveStudioLivePublishedCursorTool({
+      tool: "select",
+      drawMode: "eraser",
+    })).toBe("select");
+    expect(resolveStudioLivePublishedCursorTool({
+      tool: "draw",
+      drawMode: "pixel",
+    })).toBe("pixel");
+    expect(resolveStudioLivePublishedCursorTool({
+      tool: "draw",
+      drawMode: "lasso-fill",
+    })).toBe("lasso-fill");
+    expect(resolveStudioLivePublishedCursorTool({
+      tool: "draw",
+      drawMode: "shape",
+    })).toBe("shape");
+    expect(resolveStudioLivePublishedCursorTool({
+      tool: "draw",
+      drawMode: "pen",
+    })).toBe("pen");
+  });
+
+  it("labels remote tools in Korean and distinguishes erase activity", () => {
+    expect(studioLiveCursorToolLabel("eraser")).toBe("지우개");
+    expect(studioLiveCursorToolLabel("pen")).toBe("펜");
+    expect(studioLiveCursorToolLabel("draw")).toBe("펜");
+    expect(studioLiveCursorActivityLabel("eraser", true)).toBe("지우는 중");
+    expect(studioLiveCursorActivityLabel("pen", true)).toBe("그리는 중");
+    expect(studioLiveCursorActivityLabel("lasso-fill", true)).toBe("채우는 중");
+    expect(studioLiveCursorActivityLabel("eraser", false)).toBeNull();
   });
 });
 

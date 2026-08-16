@@ -92,6 +92,9 @@ describe("Studio freehand hot-path boundary", () => {
     expect(earlyReturn).toBeGreaterThan(nativeOwnership);
     expect(unrelatedBranch).toBeGreaterThan(earlyReturn);
     expect(stageMove).toContain("studioLiveRoomRef.current?.publishCursorWhenDue(() => {");
+    expect(stageMove).toContain("resolveStudioLivePublishedCursorTool({");
+    expect(stageMove).toContain("tool: publishedTool,");
+    expect(stageMove).not.toContain("erase:");
     expect(stageMove.indexOf("pts.slice(-64)")).toBeGreaterThan(
       stageMove.indexOf("publishCursorWhenDue(() => {")
     );

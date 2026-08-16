@@ -219,7 +219,7 @@ describe("StudioLiveCanvasOverlay", () => {
     expect(html).toContain("left:25%");
     expect(html).toContain("top:75%");
     expect(html).toContain("서윤 · 이 탭");
-    expect(html).toContain("· pen");
+    expect(html).toContain("· 펜");
     expect(html).toContain(
       "1페이지. 댓글 핀 1/1. 최근 작성자 민지. 최근 댓글 말풍선 간격을 조금 더 넓혀 주세요. 미해결 대화 3개. 읽지 않은 대화 2개. Enter 키로 대화 열기."
     );
@@ -233,6 +233,125 @@ describe("StudioLiveCanvasOverlay", () => {
     expect(html).toContain("clamp(1.375rem, calc(50.0000% + 0px), calc(100% - 1.375rem))");
     expect(html).not.toContain(privateSessionId);
     expect(html).not.toContain("page:page-1");
+  });
+
+  it("maps live drawing tails through the document viewBox so zoom does not shrink the preview", () => {
+    const html = renderToStaticMarkup(
+      <StudioLiveCanvasOverlay
+        canvasWidth={800}
+        canvasHeight={1_200}
+        cursors={[
+          {
+            participant: {
+              sessionId: "peer-draw",
+              displayName: "민호 · 이 탭",
+              role: "editor",
+            },
+            cursor: {
+              x: 0.5,
+              y: 0.25,
+              pageId: "page-1",
+              tool: "pen",
+              drawing: true,
+              strokeColor: "#16100c",
+              strokeWidth: 8,
+              points: [80, 120, 400, 300, 720, 240],
+            },
+            updatedAt: 1,
+          },
+        ]}
+        commentPins={[]}
+        onCommentPinClick={noop}
+      />
+    );
+
+    expect(html).toContain('viewBox="0 0 800 1200"');
+    expect(html).toContain("preserveAspectRatio=\"none\"");
+    expect(html).toContain("80.0,120.0");
+    expect(html).toContain("400.0,300.0");
+    expect(html).toContain("720.0,240.0");
+    expect(html).toContain('data-studio-live-cursor-trail="ink"');
+    expect(html).toContain("✏️ 그리는 중");
+    expect(html).not.toContain("stroke-dasharray");
+  });
+
+  it("renders a remote eraser tail as a dashed hole trail instead of ink", () => {
+    const html = renderToStaticMarkup(
+      <StudioLiveCanvasOverlay
+        canvasWidth={800}
+        canvasHeight={1_200}
+        cursors={[
+          {
+            participant: {
+              sessionId: "peer-erase",
+              displayName: "민호 · 이 탭",
+              role: "editor",
+            },
+            cursor: {
+              x: 0.5,
+              y: 0.25,
+              pageId: "page-1",
+              tool: "eraser",
+              drawing: true,
+              strokeColor: "#ff3b30",
+              strokeWidth: 16,
+              points: [80, 120, 400, 300, 720, 240],
+            },
+            updatedAt: 1,
+          },
+        ]}
+        commentPins={[]}
+        onCommentPinClick={noop}
+      />
+    );
+
+    expect(html).toContain('viewBox="0 0 800 1200"');
+    expect(html).toContain('data-studio-live-cursor-trail="eraser"');
+    expect(html).toContain('data-studio-live-cursor-tip="eraser"');
+    expect(html).toContain("stroke-dasharray");
+    expect(html).toContain("· 지우개");
+    expect(html).toContain("지우는 중");
+    expect(html).not.toContain("그리는 중");
+    expect(html).not.toContain("✏️");
+    expect(html).toContain("background-color:transparent");
+    expect(html).not.toContain("stroke=\"#ff3b30\"");
+    expect(html).not.toContain("background-color:#ff3b30");
+  });
+
+  it("renders a remote pixel tail with square caps instead of a rounded ink stroke", () => {
+    const html = renderToStaticMarkup(
+      <StudioLiveCanvasOverlay
+        canvasWidth={800}
+        canvasHeight={1_200}
+        cursors={[
+          {
+            participant: {
+              sessionId: "peer-pixel",
+              displayName: "서윤 · 이 탭",
+              role: "editor",
+            },
+            cursor: {
+              x: 0.2,
+              y: 0.2,
+              pageId: "page-1",
+              tool: "pixel",
+              drawing: true,
+              strokeColor: "#111111",
+              strokeWidth: 4,
+              points: [40, 40, 80, 40, 80, 80],
+            },
+            updatedAt: 1,
+          },
+        ]}
+        commentPins={[]}
+        onCommentPinClick={noop}
+      />
+    );
+
+    expect(html).toContain('data-studio-live-cursor-trail="pixel"');
+    expect(html).toContain('stroke-linecap="square"');
+    expect(html).toContain("· 픽셀");
+    expect(html).not.toContain("stroke-dasharray");
   });
 
   it("mounts only the active pin preview and removes it after pointer leave", () => {
@@ -1209,8 +1328,10 @@ describe("StudioLiveCanvasOverlay", () => {
     expect(sync.className).toContain("size-11");
     expect(sync.className).toContain("min-h-11");
     expect(sync.className).toContain("min-w-11");
-    expect(sync.className).toContain("min-[412px]:w-auto");
+    expect(sync.className).toContain("min-[412px]:w-[13.5rem]");
+    expect(sync.className).toContain("sm:w-[16.5rem]");
     expect(sync.querySelector("span")?.className).toContain("max-[411px]:hidden");
+    expect(sync.querySelector("span")?.className).toContain("tabular-nums");
 
     expect(screen.getByRole("group", { name: "참여자" }).className)
       .toContain("max-[411px]:hidden");
@@ -1244,6 +1365,8 @@ describe("StudioLiveCanvasOverlay", () => {
     expect(html).toContain("오프라인 · 12개 보관");
     expect(html).toContain("motion-reduce:transition-none");
     expect(html).toContain('data-studio-presence-link="offline-queued"');
+    expect(html).toContain("min-[412px]:w-[13.5rem]");
+    expect(html).toContain("tabular-nums");
   });
 
   it("keeps every participant color readable behind compact cream labels", () => {

@@ -319,6 +319,17 @@ export function appendPageState<P extends PageLike>(
   return { nextPages, newPageId: newPage.id };
 }
 
+/** Insert a blank page with a known id so follow can jump before CRDT topology arrives. */
+export function adoptMissingPage<P extends PageLike>(
+  pages: readonly P[],
+  pageId: string,
+  baseH: number = DEFAULT_CANVAS_H
+): P[] {
+  const id = pageId.trim();
+  if (!id || pages.some((page) => page.id === id)) return pages as P[];
+  return [...pages, createBlankPage(() => id, baseH) as P];
+}
+
 /**
  * Pure delete transition (the shipped delete command).
  * Returns the new list and the id that should become active (if the deleted one was current).
