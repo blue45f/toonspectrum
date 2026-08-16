@@ -87,7 +87,7 @@ export function useStudioAutosaveDocumentRuntime({
         if (!disposed) {
           autosaveDocumentLeaseRef.current = opened.lease;
           setAutosaveDocumentLeadership({
-            role: opened.role,
+            role: opened.lease.role,
             basis: opened.lease.basis,
           });
           if (opened.role === "follower") {

@@ -12,6 +12,7 @@ import {
   StudioAutosaveDocumentBusyError,
   StudioAutosaveDurabilityError,
   StudioAutosaveOpfsSession,
+  reopenStudioAutosaveDocumentSessionForLeadership,
   openStudioAutosaveDocumentSession,
   persistStudioAutosaveWithOpfsPrimary,
   reconcileStudioAutosaveWithOpfsPrimary,
@@ -396,6 +397,64 @@ describe("openStudioAutosaveDocumentSession", () => {
     await tabOne.lease.release();
     expect(await tabTwo.lease.waitForLeadership({ timeoutMs: 1_000 })).toBe(true);
     await tabTwo.lease.release();
+  });
+
+  it("promotes a follower tab to writable OPFS and can write after leadership hand-off", async () => {
+    const locks = new FakeLockManager();
+    const registryOne = createStudioAutosaveDocumentLeadershipRegistry();
+    const registryTwo = createStudioAutosaveDocumentLeadershipRegistry();
+    const scope = { navigator: { locks } } as never;
+    const storage = memoryStorage();
+
+    const leader = await openStudioAutosaveDocumentSession(AUTOSAVE_KEY, scope, {
+      registry: registryOne,
+    });
+    const follower = await openStudioAutosaveDocumentSession(AUTOSAVE_KEY, scope, {
+      registry: registryTwo,
+    });
+    expect(leader.role).toBe("leader");
+    expect(follower.role).toBe("follower");
+    expect(leader.session).not.toBeNull();
+    expect(follower.session).not.toBeNull();
+    await expect(persistStudioAutosaveWithOpfsPrimary({
+      session: follower.session,
+      sqlite: null,
+      storage,
+      key: AUTOSAVE_KEY,
+      payload: payload("2026-08-13T00:01:00.000Z", ["follower-stroke"]),
+    })).rejects.toBeInstanceOf(StudioAutosaveDocumentBusyError);
+
+    await leader.lease.release();
+    expect(await follower.lease.waitForLeadership({ timeoutMs: 1_000 })).toBe(true);
+
+    const promotedSession = await reopenStudioAutosaveDocumentSessionForLeadership({
+      session: follower.session,
+      autosaveKey: AUTOSAVE_KEY,
+    });
+    expect(promotedSession).not.toBeNull();
+    if (promotedSession === null) return;
+
+    const receipt = await persistStudioAutosaveWithOpfsPrimary({
+      session: promotedSession,
+      sqlite: null,
+      storage,
+      key: AUTOSAVE_KEY,
+      payload: payload("2026-08-13T00:02:00.000Z", ["promoted-stroke"]),
+    });
+    expect(receipt.authority).toBe("opfs-journal");
+    const reconciled = await reconcileStudioAutosaveWithOpfsPrimary({
+      session: promotedSession,
+      sqlite: null,
+      storage,
+      key: AUTOSAVE_KEY,
+      allowLegacy: true,
+    });
+    expect(strokeIdsOf(reconciled.candidate?.payload)).toEqual(["promoted-stroke"]);
+
+    await follower.lease.release();
+    await promotedSession.dispose();
+    await leader.session?.dispose();
+    await follower.session?.dispose();
   });
 });
 
