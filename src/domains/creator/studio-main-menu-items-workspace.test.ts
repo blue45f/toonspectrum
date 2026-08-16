@@ -6,10 +6,10 @@ import type {
   StudioMainMenuBuilderState,
   StudioMainMenuEditAvailability,
   StudioMainMenuEditorActions,
-  StudioMainMenuItem,
   StudioMainMenuItemContext,
   StudioMainMenuUiActions,
 } from "./studio-main-menu-contract";
+import type { StudioMainMenuItem } from "./studio-main-menu-model";
 
 const AVAILABLE_EDIT: StudioMainMenuEditAvailability = {
   undoDisabled: false,
