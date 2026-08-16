@@ -30,7 +30,7 @@ describe("StudioPage authoritative mutation-lock integration boundary", () => {
     );
   });
 
-  it("keeps synchronous Konva gestures fail-closed until server leases are authoritative", () => {
+  it("keeps non-server gestures fail-closed while allowing optimistic server lease warmup", () => {
     const begin = sourceBetween(
       "function beginLiveResourceEdit(",
       "function endLiveResourceEdit()",
@@ -39,7 +39,8 @@ describe("StudioPage authoritative mutation-lock integration boundary", () => {
     expect(begin).toContain('if (room.mode !== "server")');
     expect(begin).toContain("selfHoldsStudioLiveLock(locks, resource, room.participant.sessionId)");
     expect(begin).toContain("void beginLiveResourceEditAsync(elementIds");
-    expect(begin.trimEnd().endsWith("return false;\n  }")).toBe(true);
+    expect(begin).toContain("const key = JSON.stringify(resources)");
+    expect(begin).toContain("return true;");
   });
 
   it("routes canvas drag and text edits through the intent-aware soft-lock gate", () => {

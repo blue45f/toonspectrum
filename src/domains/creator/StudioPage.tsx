@@ -2505,9 +2505,12 @@ function StudioCuttoonEditor({
       return true;
     }
 
-    void beginLiveResourceEditAsync(elementIds);
-    setError("팀 서버에서 편집 잠금을 확인하고 있어요. 승인 후 조작을 다시 시작해 주세요.");
-    return false;
+    const key = JSON.stringify(resources);
+    const pending = studioLivePendingMutationRef.current;
+    if (!pending || pending.room !== room || pending.key !== key) {
+      void beginLiveResourceEditAsync(elementIds);
+    }
+    return true;
   }
   function endLiveResourceEdit() {
     const room = studioLiveRoomRef.current;
