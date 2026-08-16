@@ -160,13 +160,31 @@ describe("studio brush variant group manifest", () => {
     // deliberately NOT here: since the angled-nib carrier began carrying pressure into the stroke
     // interior it is visibly distinct from base brush (distinctTones 102 vs 1), so the duplicate
     // evidence is stale — its remaining gap is that it never opted into the pressure model.
+    // 2026-08-16 wave 5 structural-promise audit: five web-*/sketchpad-* ids promise a SECOND MARK
+    // in their name and engineVariant (rays, twin rails, an X, parallel strands, a tile lattice).
+    // The only code that would emit it lives in the studio-web-drawing-* kits, and the single
+    // bridge to them (planStudioWebDrawingDynamicDabs) is unreachable: its one call site sits after
+    // the causal early return in studio-live-dynamic-brush-overlay.ts exactPlan(), and all 28
+    // web-*/sketchpad- presets normalise to depositPipeline "causal-deposit-v3-segmented" (28/28,
+    // measured). Chromium renders of the pinned tone-probe cells confirm the promise is absent —
+    // web-cross-hatch-pen lays 91 dabs in ONE 42.0-48.0deg lobe, so there is no cross at all.
+    // Deliberately NOT here, from the same audit: web-lazy-ink (an INPUT-stage smoother, invisible
+    // to a fixed-geometry render, same carve-out as pen--croquis-stabilized), web-zigzag-edge (its
+    // silhouette does undulate — weak, but present, so "absent" would be an overclaim), and the
+    // intrinsic-symmetry trio web-mirror-ink / web-kaleido-ink / sketchpad-mirror, which do emit a
+    // real second mark through studio-brush-intrinsic-symmetry.ts.
     expect(STUDIO_BRUSH_QUARANTINED_PRESET_IDS)
       .toEqual([
         "airbrush--stamp-soft",
         "glitter--star-field",
-          "marker--chisel-ribbon",
-      "screentone--sparse-grid",
-      "gpen--causal-round",
+        "marker--chisel-ribbon",
+        "screentone--sparse-grid",
+        "gpen--causal-round",
+        "web-cross-hatch-pen",
+        "web-contour-double",
+        "web-radial-burst",
+        "web-fur-strand",
+        "sketchpad-tile",
       ]);
     expect(Object.isFrozen(STUDIO_BRUSH_QUARANTINED_PRESET_IDS)).toBe(true);
     expect(Object.isFrozen(STUDIO_BRUSH_QUARANTINE_REASON_BY_PRESET_ID)).toBe(true);

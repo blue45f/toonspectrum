@@ -1,5 +1,8 @@
+// @vitest-environment jsdom
+
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { StudioToolHintBubble } from "./components/StudioToolHintBubble";
 import bubbleSource from "./components/StudioToolHintBubble.tsx?raw";
@@ -8,6 +11,12 @@ import {
   StudioToolHintTarget,
 } from "./StudioToolHint";
 import source from "./StudioToolHint.tsx?raw";
+
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+  vi.clearAllTimers();
+});
 
 describe("StudioToolHint", () => {
   it("renders an animated motion-coach preview, workflow tip, and exact tooltip id", () => {
@@ -117,6 +126,57 @@ describe("StudioToolHint", () => {
     expect(html).not.toContain("잠시 머물러 미리보기");
     expect(html).not.toContain("동작 미리보기");
     expect(html).not.toContain("data-studio-tool-hint-preview=");
+  });
+
+  it("keeps hover suppression target-local so another control can still reveal", () => {
+    vi.useFakeTimers();
+    render(
+      <StudioToolHintPreferencesProvider mode="compact" touchHoldDelayMs={640} reduceMotion>
+        <div className="flex gap-4">
+          <StudioToolHintTarget
+            hint={{ id: "brush", title: "브러시", description: "붓의 종류를 바꿉니다." }}
+          >
+            <button type="button">브러시</button>
+          </StudioToolHintTarget>
+          <StudioToolHintTarget
+            hint={{
+              id: "eraser",
+              title: "지우개",
+              description: "선을 제거합니다.",
+            }}
+          >
+            <button type="button">지우개</button>
+          </StudioToolHintTarget>
+        </div>
+      </StudioToolHintPreferencesProvider>
+    );
+
+    const brush = screen.getByRole("button", { name: "브러시" });
+    const eraser = screen.getByRole("button", { name: "지우개" });
+
+    fireEvent.pointerDown(brush, {
+      button: 0,
+      pointerType: "mouse",
+      clientX: 12,
+      clientY: 8,
+    });
+    fireEvent.pointerUp(brush, {
+      button: 0,
+      pointerType: "mouse",
+      clientX: 12,
+      clientY: 8,
+    });
+    fireEvent.click(brush, {
+      button: 0,
+      pointerType: "mouse",
+      clientX: 12,
+      clientY: 8,
+    });
+    expect(screen.queryByRole("tooltip")).toBeNull();
+
+    fireEvent.mouseEnter(eraser, { clientX: 100, clientY: 8 });
+    act(() => vi.advanceTimersByTime(280));
+    expect(screen.getByRole("tooltip").textContent).toContain("지우개");
   });
 
   it("keeps the preview implementation behind rich-mode intent", () => {

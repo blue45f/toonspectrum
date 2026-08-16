@@ -49,7 +49,7 @@ export const STUDIO_ICON_SIZE = {
   toolCompact: 15,
   dock: 18,
   header: 15,
-  rail: 14,
+  rail: 18,
   edge: 15,
   nav: 17,
   context: 16,
@@ -913,10 +913,14 @@ export function StudioRailToolButton({
       {...rest}
     >
       <Icon
-        size={18}
+        size={STUDIO_ICON_SIZE.rail}
         strokeWidth={STUDIO_ICON_STROKE}
         aria-hidden
-        className={cn(active && "text-accent")}
+        className={studioChromeIconClass({
+          tone: active ? "accent" : "default",
+          active,
+          disabled,
+        })}
       />
       {grouped ? (
         <span

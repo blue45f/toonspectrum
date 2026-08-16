@@ -277,7 +277,13 @@ export function StudioToolHintPreferencesProvider({
 // Selecting a tool can synchronously replace its control while the pointer is
 // still parked over it. This guard survives that remount and stays armed until
 // the pointer physically moves (or keyboard focus deliberately takes over).
-let suppressedPointerHintAt: Readonly<{ x: number; y: number }> | null = null;
+let suppressedPointerHintAt:
+  | Readonly<{
+      hintId: string;
+      x: number;
+      y: number;
+    }>
+  | null = null;
 let clearPointerSuppressionListener: (() => void) | null = null;
 let clearPointerSuppressionTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -291,15 +297,19 @@ function clearPointerSuppression() {
   suppressedPointerHintAt = null;
 }
 
-function armPointerSuppression(x: number, y: number) {
+function isPointerSuppressionActiveForTip(tipId: string): boolean {
+  return suppressedPointerHintAt?.hintId === tipId;
+}
+
+function armPointerSuppression(hintId: string, x: number, y: number) {
   clearPointerSuppression();
-  suppressedPointerHintAt = { x, y };
+  suppressedPointerHintAt = { hintId, x, y };
   clearPointerSuppressionTimeout = globalThis.setTimeout(() => {
     clearPointerSuppression();
   }, POINTER_HINT_SUPPRESSION_MS) as ReturnType<typeof setTimeout>;
 
   function onPointerMove(event: PointerEvent) {
-    if (!suppressedPointerHintAt) return;
+    if (!suppressedPointerHintAt || suppressedPointerHintAt.hintId !== hintId) return;
     if (
       Math.hypot(
         event.clientX - suppressedPointerHintAt.x,
@@ -612,7 +622,7 @@ export function StudioToolHintTarget({
 
   function scheduleShow() {
     if (!hint || preferences.mode === "off") return;
-    if (suppressedPointerHintAt) return;
+    if (isPointerSuppressionActiveForTip(tipId)) return;
     if (interaction.isHoverSuppressed()) return;
     if (!open && !unavailableReason && !exposure.canReveal(hint.id, "hover")) return;
     preloadStudioToolHintBubbleModule();
@@ -673,7 +683,7 @@ export function StudioToolHintTarget({
     // coach under the user's cursor; leaving the target re-arms hover/focus.
     pointerDismissed.current = true;
     if (hint && !disabled && !unavailableReason) exposure.markActivated(hint.id);
-    armPointerSuppression(event?.clientX ?? 0, event?.clientY ?? 0);
+    armPointerSuppression(tipId, event?.clientX ?? 0, event?.clientY ?? 0);
     touchHoldOpened.current = false;
     clearTimers();
     dismissCoordinatedHintsImmediately();
@@ -695,7 +705,7 @@ export function StudioToolHintTarget({
       y: event.clientY,
     };
     pointerDismissed.current = true;
-    armPointerSuppression(event.clientX, event.clientY);
+    armPointerSuppression(tipId, event.clientX, event.clientY);
     touchHoldOpened.current = false;
     setExpanded(false);
     preloadStudioToolHintBubbleModule();
@@ -956,7 +966,7 @@ export function StudioToolHintTarget({
       tabIndex={disabled ? 0 : undefined}
     >
       {describedChildren}
-      {open && !suppressedPointerHintAt && anchor && typeof document !== "undefined"
+      {open && !isPointerSuppressionActiveForTip(tipId) && anchor && typeof document !== "undefined"
         ? createPortal(
             <Suspense
               fallback={(

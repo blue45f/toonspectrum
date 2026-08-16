@@ -1586,10 +1586,7 @@ import {
   bootStudioTournamentPersistence,
   peekBootedStudioTournamentRuntime,
 } from "./studio-tournament-persistence-bootstrap";
-import {
-  studioUiDensityAllows,
-  type StudioUiDensityMode,
-} from "./studio-ui-density";
+import { type StudioUiDensityMode } from "./studio-ui-density";
 import {
   hasUnsavedStudioWork,
   installStudioUnloadGuard,
@@ -1686,6 +1683,7 @@ import {
   type StudioWorkAssetRenderPlaceholder,
   type StudioWorkAssetSceneReference,
 } from "./studio-work-asset-render-projection";
+import { resolveStudioWorkspaceCanvasDockInsets } from "./studio-workspace-canvas-dock";
 import { readStudioWorkspaceDeviceSignalsFromGlobals } from "./studio-workspace-device-signals";
 import { resolveStudioWorkspacePanelLayoutVisibility } from "./studio-workspace-presentation-layout";
 import {
@@ -5907,14 +5905,18 @@ function StudioCuttoonEditor({
   const {
     presentationPanelsHidden,
     densityShowsStatusRail,
-    densityHidesLeftPanel,
-    rightPanelDensityAllows,
     visibleLeftPanelOpen,
     visibleRightPanelOpen,
   } = panelLayout;
-  const compactCanvasDockInset = !presentationPanelsHidden && !densityHidesLeftPanel;
-  const compactRightDockInset =
-    !presentationPanelsHidden && !rightPanelDensityAllows;
+  const { left: compactCanvasDockLeft, right: compactCanvasDockRight } =
+    resolveStudioWorkspaceCanvasDockInsets({
+      leftPanelWidth: leftResize.width,
+      rightPanelWidth: rightResize.width,
+      presentationPanelsHidden,
+      uiDensityMode,
+      visibleLeftPanelOpen,
+      visibleRightPanelOpen,
+    });
   // useMemo: 렌더마다 새 정규화 객체가 메뉴바 memo 자식(작업공간 메뉴)을 재렌더시키지 않게.
   //
   // 화면 기하를 그대로 담지 않고 captureStudioWorkspaceDeviceLayout으로 되돌린다. 화면은 기기
@@ -43169,22 +43171,8 @@ function clearSelectionForEdit() {
       canvasFlipH,
       color,
       dockInsets: {
-        left:
-          (visibleLeftPanelOpen
-            ? leftResize.width + 8
-            : compactCanvasDockInset
-              ? 0
-              : presentationPanelsHidden
-                ? 0
-                : 32) +
-          (studioUiDensityAllows(uiDensityMode, "tool-rail") ? 52 : 0),
-        right: visibleRightPanelOpen
-          ? rightResize.width + 8
-            : compactRightDockInset
-              ? 0
-              : presentationPanelsHidden
-                ? 0
-                : 32,
+        left: compactCanvasDockLeft,
+        right: compactCanvasDockRight,
       },
       drawMode:
         drawMode === "shape"
@@ -43248,7 +43236,6 @@ function clearSelectionForEdit() {
       drawMode,
       drawShape,
       eraseToIntersection,
-      leftResize.width,
       livingInkBrushSupported,
       livingInkBusy,
       livingInkMaterial,
@@ -43260,14 +43247,12 @@ function clearSelectionForEdit() {
       livingInkState,
       livingInkStateMessage,
       postCorrection,
-      presentationPanelsHidden,
       pressureCurve,
       proDrawPrefs.favoriteBrushIds,
       proDrawPrefs.opacityLocked,
       proDrawPrefs.recentBrushIds,
       proDrawPrefs.sizeLocked,
       quickShapeActive,
-      rightResize.width,
       secondaryColor,
       shapeFill,
       stabilizer,
@@ -43276,11 +43261,8 @@ function clearSelectionForEdit() {
       strokeWidth,
       symmetryType,
       tool,
-      uiDensityMode,
-      compactCanvasDockInset,
-      compactRightDockInset,
-      visibleLeftPanelOpen,
-      visibleRightPanelOpen,
+      compactCanvasDockLeft,
+      compactCanvasDockRight,
     ]
   );
 
