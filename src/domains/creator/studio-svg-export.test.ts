@@ -17,6 +17,7 @@ import {
   type StudioDynamicBrushDab,
   type StudioBrushDynamicsPresetId,
 } from "./studio-brush-dynamics";
+import { resolveStudioStrokeSymmetry } from "./studio-brush-intrinsic-symmetry";
 import {
   planStudioDynamicBrushRenderBudget,
   STUDIO_DYNAMIC_BRUSH_CAUSAL_CONTINUATION_MARK_BUDGET,
@@ -2712,6 +2713,35 @@ describe("도형 직렬화", () => {
     expect(pathData(modern)).not.toBe(pathData(legacy));
     expect(modern).toContain('data-brush-engine="highlighter-wash-ribbon-v2"');
     expect(legacy).toContain('data-brush-engine="highlighter-wash-ribbon-v2"');
+  });
+
+  it("대칭을 선언한 획은 사본을 하나 더 내보낸다", () => {
+    // 브러시 고유 대칭(#18a)이 기대는 계약. 렌더러들은 이미 요소의 symmetry 로 획을 부채질하므로,
+    // 획 시작 시점에 그걸 기록하기만 하면 된다 — 이 단언이 그 "이미"를 고정한다.
+    // 톤 프로브로는 검증할 수 없다: 프로브는 요소를 직접 만들고 pointer-start 플래너를 거치지 않아
+    // 배선을 아예 보지 못한다.
+    const base = rectEl({
+      id: "sym-1",
+      kind: "freehand",
+      brush: "pen",
+      points: [40, 40, 90, 70, 140, 50],
+      pressures: [0.6, 0.8, 0.5],
+      stroke: "#1b1b1f",
+      strokeWidth: 8,
+      fill: undefined,
+    });
+    const marks = (svg: string) => (svg.match(/<(?:path|use|circle|ellipse)/gu) ?? []).length;
+    const plain = marks(exportPageToSvg(page([base])).svg);
+    const mirrored = marks(exportPageToSvg(page([{
+      ...base,
+      symmetry: resolveStudioStrokeSymmetry(
+        { type: "none", centerX: 360, centerY: 500, radialCount: 4 },
+        "web-mirror-ink",
+      ),
+    }])).svg);
+
+    expect(plain).toBeGreaterThan(0);
+    expect(mirrored).toBeGreaterThan(plain);
   });
 
   it("네온 — 미리보기와 같은 2중 컬러 할로 + 밝힌 코어를 내보낸다", () => {
