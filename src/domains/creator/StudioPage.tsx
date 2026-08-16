@@ -288,6 +288,7 @@ import {
   studioElementIdOf,
 } from "./studio-canvas-shared-runtime";
 import { clampStudioCanvasHeight } from "./studio-canvas-size";
+import { resolveStudioCanvasWideDensityMode } from "./studio-canvas-wide-density";
 import { combineStudioShapesWithCanvasKit } from "./studio-canvaskit-path-boolean-document-adapter";
 import {
   selectStudioCausalInkSamples,
@@ -1996,27 +1997,6 @@ import { STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK } from "@/lib/studio-work-asset-c
 import { cn } from "@/lib/utils";
 import { resolveAssetUrl } from "@/src/catalog-static";
 import { useSession } from "@/src/compat/auth-session-store";
-
-const STUDIO_CANVAS_WIDE_WORKSPACES: readonly string[] = [
-  "storyboard",
-  "lineart",
-  "coloring",
-  "lettering",
-  "pro-comic",
-  "quick-sketch",
-  "csp-migration",
-  "pen-display",
-  "mobile-draw",
-  "photo-edit",
-  "vector-design",
-  "animation",
-  "pose-3d",
-] as const satisfies readonly StudioWorkspaceId[];
-
-function isStudioCanvasWideWorkspace(workspaceId: StudioWorkspaceId): boolean {
-  return STUDIO_CANVAS_WIDE_WORKSPACES.includes(workspaceId);
-}
-
 
 /** 이 편집기의 통합 실행취소 저널 — 캔버스 스냅샷 단계와 사이드카 편집을 한 시간 순서로 담는다. */
 type StudioPageHistoryJournal = StudioHistoryJournal<StudioCharacterBible, StudioWriterRoomDocument>;
@@ -5899,11 +5879,11 @@ function StudioCuttoonEditor({
   // 패널 열림 상태 자체를 덮어쓰면 ESC로 돌아왔을 때 사용자가 만든 레이아웃이 사라지고,
   // 작업공간이 뜻하지 않게 "수정됨"으로 표시되므로 렌더링 가시성만 별도로 계산한다.
   const presentationPanelsHidden = isFullscreen || maximized || mobileImmersive || canvasOnlyMode;
-  const canvasWideWorkspaceDensityMode = isMobile
-    ? uiDensityMode
-    : isStudioCanvasWideWorkspace(workspaceState.activeWorkspaceId)
-      ? "focus"
-      : uiDensityMode;
+  const canvasWideWorkspaceDensityMode = resolveStudioCanvasWideDensityMode({
+    isMobile,
+    uiDensityMode,
+    activeWorkspaceId: workspaceState.activeWorkspaceId,
+  });
   const densityHidesLeftPanel = !studioUiDensityAllows(
     canvasWideWorkspaceDensityMode,
     "left-panel",
