@@ -130,6 +130,7 @@ describe("studio main-menu catalogue ownership boundary", () => {
   it("leaves only state projection and browser command composition in StudioPage", () => {
     const page = source("./StudioPage.tsx");
     const companion = source("./studio-tools-companion.ts");
+    const companionRuntime = source("./studio-tools-companion-runtime.ts");
     const start = page.indexOf("const studioMainMenuGroups = useMemo(");
     const end = page.indexOf("// 모바일 하단 보조 막대 버튼", start);
     const composition = page.slice(start, end);
@@ -139,10 +140,16 @@ describe("studio main-menu catalogue ownership boundary", () => {
     // Root import inputs: null-guard then click (optional chaining removed for explicit UX).
     expect(composition).toContain("projectImportInputRef.current.click()");
     expect(composition).toContain("if (!projectImportInputRef.current)");
-    expect(page).toContain('window.open("", "_blank", STUDIO_TOOLS_COMPANION_RESERVATION_FEATURES)');
-    expect(page).toContain("ready.protocol.openReadyStudioToolsCompanionForMenu({");
-    expect(page).toContain("runtime.protocol.completeReservedStudioToolsCompanionWindow({");
-    expect(page).toContain("}, 8_000)");
+    expect(companionRuntime).toContain(
+      'window.open("", "_blank", STUDIO_TOOLS_COMPANION_RESERVATION_FEATURES)',
+    );
+    expect(companionRuntime).toContain(
+      "ready.protocol.openReadyStudioToolsCompanionForMenu({",
+    );
+    expect(companionRuntime).toContain(
+      "runtime.protocol.completeReservedStudioToolsCompanionWindow({",
+    );
+    expect(companionRuntime).toContain("}, 8_000)");
     expect(companion).toContain("openStudioToolsCompanionWindow(");
     expect(companion).toContain("isStudioToolsCompanionWindowReusable(");
     expect(companion).toContain('const surface = input.surface ?? "workspace"');
