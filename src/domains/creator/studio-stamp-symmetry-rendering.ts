@@ -9,6 +9,7 @@ import {
 } from "./studio-brush-symmetry";
 import {
   planStudioStampInkRibbon,
+  studioStampInkRibbonOptions,
   traceStudioStampInkRibbon,
 } from "./studio-stamp-ink-ribbon";
 
@@ -220,7 +221,10 @@ export function drawStudioStampStrokeWithSymmetry(
   if (style.kind === "ink") {
     // Ink keeps the affine-replay ribbon: its dab alpha is position-independent and one shared
     // ribbon guarantees every copy carries the exact same union silhouette.
-    const inkRibbon = planStudioStampInkRibbon(plan.dabs);
+    const inkRibbon = planStudioStampInkRibbon(
+      plan.dabs,
+      studioStampInkRibbonOptions(style),
+    );
     for (const transform of plan.transforms) {
       context.save();
       context.transform(

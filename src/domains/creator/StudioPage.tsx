@@ -4156,7 +4156,7 @@ function StudioCuttoonEditor({
       return maskProjection.elements === projectedPage.elements
         ? projectedPage
         : { ...projectedPage, elements: maskProjection.elements };
-    },
+  },
     [
       master,
       studioFilterMaskHydrationRevision,
@@ -5429,6 +5429,10 @@ function StudioCuttoonEditor({
     resolveStudioWorkspaceDeviceLayout(workspaceState.liveLayout, workspaceDeviceKind)
   );
   // 캔버스 넓게 쓰기 — 좌측 페이지 목록·우측 속성 패널을 접어 캔버스 폭을 키운다(데스크톱).
+  const canvasWidePanelRestoreRef = useRef({
+    left: initialWorkspaceDeviceLayout.desktop.leftPanelOpen,
+    right: initialWorkspaceDeviceLayout.desktop.rightPanelOpen,
+  });
   const [leftPanelOpen, setLeftPanelOpen] = useState(
     initialWorkspaceDeviceLayout.desktop.leftPanelOpen
   );
@@ -5666,30 +5670,60 @@ function StudioCuttoonEditor({
     brushManagerReturnFocusRef.current = launcher;
     setMobileSheet("brushes");
   }
-  function setRightPanelOpenWithOverride(next: SetStateAction<boolean>) {
+  const setRightPanelOpenWithOverride = useCallback((
+    next: SetStateAction<boolean>,
+    options: { preserveWideRestore?: boolean } = {}
+  ) => {
     if (typeof next === "function") {
       setRightPanelOpen((current) => {
         const nextValue = next(current);
+        if (!options.preserveWideRestore) {
+          canvasWidePanelRestoreRef.current = {
+            left: leftPanelOpenRef.current,
+            right: nextValue,
+          };
+        }
         setForceRightPanelOpen(nextValue);
         return nextValue;
       });
       return;
     }
+    if (!options.preserveWideRestore) {
+      canvasWidePanelRestoreRef.current = {
+        left: leftPanelOpenRef.current,
+        right: next,
+      };
+    }
     setForceRightPanelOpen(next);
     setRightPanelOpen(next);
-  }
-  function setLeftPanelOpenWithOverride(next: SetStateAction<boolean>) {
+  }, []);
+  const setLeftPanelOpenWithOverride = useCallback((
+    next: SetStateAction<boolean>,
+    options: { preserveWideRestore?: boolean } = {}
+  ) => {
     if (typeof next === "function") {
       setLeftPanelOpen((current) => {
         const nextValue = next(current);
+        if (!options.preserveWideRestore) {
+          canvasWidePanelRestoreRef.current = {
+            left: nextValue,
+            right: rightPanelOpenRef.current,
+          };
+        }
         setForceLeftPanelOpen(nextValue);
         return nextValue;
       });
       return;
     }
+    if (!options.preserveWideRestore) {
+      canvasWidePanelRestoreRef.current = {
+        left: next,
+        right: rightPanelOpenRef.current,
+      };
+    }
     setForceLeftPanelOpen(next);
     setLeftPanelOpen(next);
-  }
+  }, []);
   function changeInspectorLayout(next: StudioInspectorLayout) {
     setInspectorLayout(next);
     // 탭마다 독립적인 짧은 작업면처럼 느껴지도록 이전 장문 패널의 스크롤 위치를 이어받지 않는다.
@@ -5912,18 +5946,41 @@ function StudioCuttoonEditor({
     visibleLeftPanelOpen,
     visibleRightPanelOpen,
   } = panelLayout;
+  const leftPanelOpenRef = useRef(leftPanelOpen);
+  const rightPanelOpenRef = useRef(rightPanelOpen);
+  const visibleLeftPanelOpenRef = useRef(visibleLeftPanelOpen);
+  const visibleRightPanelOpenRef = useRef(visibleRightPanelOpen);
+  const presentationPanelsHiddenRef = useRef(presentationPanelsHidden);
+  leftPanelOpenRef.current = leftPanelOpen;
+  rightPanelOpenRef.current = rightPanelOpen;
+  visibleLeftPanelOpenRef.current = visibleLeftPanelOpen;
+  visibleRightPanelOpenRef.current = visibleRightPanelOpen;
+  presentationPanelsHiddenRef.current = presentationPanelsHidden;
 
-  const toggleCanvasWideMode = () => {
+  const toggleCanvasWideMode = useCallback(() => {
+    if (presentationPanelsHiddenRef.current) return;
+    const isWorkspaceWideMode =
+      !visibleLeftPanelOpenRef.current && !visibleRightPanelOpenRef.current;
     const next = resolveStudioWorkspaceWidePanelToggle({
-      leftPanelOpen,
-      rightPanelOpen,
-      visibleLeftPanelOpen,
-      visibleRightPanelOpen,
-      presentationPanelsHidden,
+      leftPanelOpen: leftPanelOpenRef.current,
+      rightPanelOpen: rightPanelOpenRef.current,
+      visibleLeftPanelOpen: visibleLeftPanelOpenRef.current,
+      visibleRightPanelOpen: visibleRightPanelOpenRef.current,
+      presentationPanelsHidden: presentationPanelsHiddenRef.current,
     });
-    setLeftPanelOpenWithOverride(next.leftPanelOpen);
-    setRightPanelOpenWithOverride(next.rightPanelOpen);
-  };
+    if (isWorkspaceWideMode) {
+      const { left: restoreLeft, right: restoreRight } = canvasWidePanelRestoreRef.current;
+      setLeftPanelOpenWithOverride(restoreLeft);
+      setRightPanelOpenWithOverride(restoreRight);
+      return;
+    }
+    canvasWidePanelRestoreRef.current = {
+      left: leftPanelOpenRef.current,
+      right: rightPanelOpenRef.current,
+    };
+    setLeftPanelOpenWithOverride(next.leftPanelOpen, { preserveWideRestore: true });
+    setRightPanelOpenWithOverride(next.rightPanelOpen, { preserveWideRestore: true });
+  }, [setLeftPanelOpenWithOverride, setRightPanelOpenWithOverride]);
   const { left: compactCanvasDockLeft, right: compactCanvasDockRight } =
     resolveStudioWorkspaceCanvasDockInsets({
       leftPanelWidth: leftResize.width,
@@ -6009,6 +6066,10 @@ function StudioCuttoonEditor({
     const presented = resolveStudioWorkspaceDeviceLayout(layout, deviceKind);
     setInspectorLayout(presented.inspector);
     setForceLeftPanelOpen(false);
+    canvasWidePanelRestoreRef.current = {
+      left: presented.desktop.leftPanelOpen,
+      right: presented.desktop.rightPanelOpen,
+    };
     setLeftPanelOpenWithOverride(presented.desktop.leftPanelOpen);
     setRightPanelOpenWithOverride(presented.desktop.rightPanelOpen);
     leftResizeSetWidthRef.current(presented.desktop.leftPanelWidth);
@@ -16976,7 +17037,7 @@ function StudioCuttoonEditor({
     return () => {
       companionCommandHandlerRef.current = () => undefined;
     };
-  }, []);
+  }, [setLeftPanelOpenWithOverride]);
 
   const ensureStudioCompanionReferenceCaptureRuntime = useCallback(() => {
     const existingRuntime = companionReferenceCaptureRuntimeRef.current;
@@ -40357,6 +40418,7 @@ function clearSelectionForEdit() {
           hasLocallyHiddenLayers: menuHasLocallyHiddenLayers,
           quickAccessPaletteOpen,
           quickAccessPaletteLoading,
+          canvasWideMode: !visibleLeftPanelOpen && !visibleRightPanelOpen,
           leftPanelOpen,
           rightPanelOpen,
           visibleLeftPanelOpen,
@@ -40438,6 +40500,7 @@ function clearSelectionForEdit() {
             setLeftPanelOpenWithOverride(true);
             setRightPanelOpenWithOverride(true);
           },
+          toggleCanvasWideMode,
           openToolsCompanion: () => openStudioToolsCompanionForMenu({
             ensureRuntime: ensureStudioToolsCompanionRuntime,
             runtimeRef: companionRuntimeRef,
@@ -40518,6 +40581,9 @@ function clearSelectionForEdit() {
       viewTransformSuppressed,
       studioMainMenuSurfaceActions,
       studioMainMenuSurfaceState,
+      setLeftPanelOpenWithOverride,
+      setRightPanelOpenWithOverride,
+      toggleCanvasWideMode,
       t,
       workId,
     ],

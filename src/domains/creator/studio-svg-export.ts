@@ -237,7 +237,10 @@ import {
 } from "./studio-rough-shape";
 import { buildStudioRoughSvgParityPlan } from "./studio-rough-svg-parity";
 import { skewDegToKonva, type SkewFields } from "./studio-skew";
-import { planStudioStampInkRibbon } from "./studio-stamp-ink-ribbon";
+import {
+  planStudioStampInkRibbon,
+  studioStampInkRibbonOptions,
+} from "./studio-stamp-ink-ribbon";
 import {
   planStudioAngledNibStrokeLocalCoverage,
   type StudioStrokeLocalCoveragePolygon,
@@ -2099,7 +2102,7 @@ function serializeStampBrushDabs(
   const color = escapeXml(style.color);
 
   if (style.kind === "ink") {
-    const ribbon = planStudioStampInkRibbon(dabs);
+    const ribbon = planStudioStampInkRibbon(dabs, studioStampInkRibbonOptions(style));
     const path = ribbon.polygons.map((polygon) => (
       pointsToPathD(polygon.points, true)
     )).join(" ");

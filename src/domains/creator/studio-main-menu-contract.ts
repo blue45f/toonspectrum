@@ -67,6 +67,8 @@ export interface StudioMainMenuBuilderState extends StudioMainMenuSurfaceState {
   rightPanelOpen: boolean;
   visibleLeftPanelOpen?: boolean;
   visibleRightPanelOpen?: boolean;
+  /** 현재 패널 접힘 상태를 '넓게 보기' 토글 상태로 해석할지에 대한 보조 플래그. */
+  canvasWideMode?: boolean;
   presentationPanelsHidden?: boolean;
   lastFilterDraft: StudioFilterDraft | null;
   /** Selected layer already clips into the one below it (`clipBelow`). */
@@ -157,6 +159,8 @@ export interface StudioMainMenuUiActions extends StudioMainMenuSurfaceActions {
   toggleQuickAccessPalette: () => unknown;
   toggleLeftPanel: () => unknown;
   toggleRightPanel: () => unknown;
+  /** 왼쪽/오른쪽 도크를 함께 접고 펼쳐 캔버스 활용 폭을 극대화. */
+  toggleCanvasWideMode?: () => unknown;
   openShortcuts: () => unknown;
   selectDrawMode: (mode: Extract<DrawMode, "pen" | "eraser">) => unknown;
   enableSmartShape: () => unknown;

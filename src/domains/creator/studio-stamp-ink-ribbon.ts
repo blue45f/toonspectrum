@@ -13,7 +13,10 @@
  * document pixels — bodies, caps, opacity and determinism are untouched.
  */
 
-import type { StudioStampBrushDab } from "./studio-brush-stamp-engine";
+import type {
+  StudioStampBrushDab,
+  StudioStampBrushStyle,
+} from "./studio-brush-stamp-engine";
 
 export const STUDIO_STAMP_INK_RIBBON_VERSION =
   "stamp-ink-ribbon-v1" as const;
@@ -43,6 +46,8 @@ export interface StudioStampInkRibbonPlan {
   /** Interior stations whose join disc was proven redundant at `joinTolerance`. */
   readonly omittedJoinCount: number;
   readonly opacity: number;
+  /** Exponent applied to recover the union's deposit, or `null` when the plan kept the raw alpha. */
+  readonly depositAccumulation: number | null;
   readonly polygons: readonly StudioStampInkRibbonPolygon[];
 }
 
@@ -52,6 +57,19 @@ export interface StudioStampInkRibbonOptions {
    * one join disc per interior station, which is what the coverage-parity contract compares to.
    */
   readonly joinTolerance?: number;
+  /**
+   * How many dabs the walker laid on one covered pixel — libmypaint's `dabs_per_pixel` after the
+   * preset's `opaque_linearize` interpolation, i.e. the exponent its per-dab alpha was solved
+   * against. Absent (the default) keeps the historical union opacity untouched.
+   *
+   * The ribbon exists to fill the union of those dabs ONCE, which is exactly the accumulation the
+   * linearization assumed would happen and then cancelled: `alpha_dab = 1 − (1 − opaque)^(1/L)`.
+   * Painting the union at `alpha_dab` therefore ships the pre-accumulation alpha as if it were the
+   * finished deposit. Measured on `mypaint-cc0--knife` that is a 7.8x under-deposit — the preset
+   * asks for a saturation of 0.5 and the exported slab came out at 0.064, a ghost rather than
+   * paint. See `accumulatedOpacity`.
+   */
+  readonly depositAccumulation?: number;
 }
 
 export interface StudioStampInkRibbonPathSink {
@@ -320,6 +338,33 @@ function weightedOpacity(stations: readonly InkStation[]): number {
     : weighted / totalLength;
 }
 
+/**
+ * Deposit of `accumulation` coincident dabs of alpha `alpha`, over-compositing: `1 − (1 − a)^L`.
+ *
+ * This is the exact inverse of the linearization the CC0 presets solve their per-dab alpha with
+ * (`studioLibmypaintLinearizedDabAlpha`), so a preset whose stroke saturation target is `opaque`
+ * gets `opaque` back — the union fill lands where the dab chain would have landed instead of one
+ * dab below it.
+ */
+function accumulatedOpacity(alpha: number, accumulation: number): number {
+  if (!(accumulation > 1) || !(alpha > 0)) return alpha;
+  return 1 - (1 - alpha) ** accumulation;
+}
+
+/**
+ * The ribbon options a stamp style implies, so the SVG serializer and the Canvas2D fallback cannot
+ * drift apart on the union's deposit. A style with no `opaque_linearize` pin (every non-cc0 lane)
+ * yields an empty object and the historical plan.
+ */
+export function studioStampInkRibbonOptions(
+  style: Pick<StudioStampBrushStyle, "mypaintCc0Dynamics">,
+): StudioStampInkRibbonOptions {
+  const accumulation = style.mypaintCc0Dynamics?.linearizeDabsPerPixel;
+  return typeof accumulation === "number" && accumulation > 1
+    ? { depositAccumulation: accumulation }
+    : {};
+}
+
 export function planStudioStampInkRibbon(
   dabs: readonly StudioStampBrushDab[],
   options?: StudioStampInkRibbonOptions | null,
@@ -328,6 +373,11 @@ export function planStudioStampInkRibbon(
       && Number.isFinite(options.joinTolerance)
     ? Math.max(0, options.joinTolerance)
     : INK_RIBBON_JOIN_TOLERANCE;
+  const depositAccumulation = typeof options?.depositAccumulation === "number"
+      && Number.isFinite(options.depositAccumulation)
+      && options.depositAccumulation > 1
+    ? options.depositAccumulation
+    : null;
   const stations = sanitizeInkStations(dabs);
   const polygons: StudioStampInkRibbonPolygon[] = [];
   let omittedJoinCount = 0;
@@ -379,7 +429,14 @@ export function planStudioStampInkRibbon(
     acceptedDabCount: stations.length,
     joinTolerance,
     omittedJoinCount,
-    opacity: clamp(weightedOpacity(stations), 0, 1),
+    opacity: clamp(
+      depositAccumulation === null
+        ? weightedOpacity(stations)
+        : accumulatedOpacity(weightedOpacity(stations), depositAccumulation),
+      0,
+      1,
+    ),
+    depositAccumulation,
     polygons: Object.freeze(polygons),
   });
 }

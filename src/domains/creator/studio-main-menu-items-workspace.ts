@@ -36,7 +36,8 @@ export function buildStudioWindowMenuItems({
   const visibleRightPanelOpen = isPresentationSuppressed
     ? false
     : (state.visibleRightPanelOpen ?? state.rightPanelOpen);
-  const isWorkspaceWideMode = !visibleLeftPanelOpen && !visibleRightPanelOpen;
+  const isWorkspaceWideMode =
+    state.canvasWideMode ?? (!visibleLeftPanelOpen && !visibleRightPanelOpen);
 
   return [
     {
@@ -100,6 +101,10 @@ export function buildStudioWindowMenuItems({
         : {}),
       onSelect: () => {
         if (isPresentationSuppressed) return;
+        if (typeof ui.toggleCanvasWideMode === "function") {
+          ui.toggleCanvasWideMode();
+          return;
+        }
         if (isWorkspaceWideMode) ui.expandSidePanels();
         else ui.collapseSidePanels();
       },
