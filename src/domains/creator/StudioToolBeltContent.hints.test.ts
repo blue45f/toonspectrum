@@ -9,6 +9,7 @@ const sourceFiles = [
   "./StudioToolBeltContent.tsx",
   "./StudioToolBeltCanvasControls.tsx",
   "./StudioToolBeltQuickActions.tsx",
+  "./StudioToolBeltCreateModeGroups.tsx",
 ].map((path) => {
   const url = new URL(path, import.meta.url);
   const text = readFileSync(url, "utf8");
@@ -85,7 +86,7 @@ describe("Studio ToolBelt rich hint coverage", () => {
     expect(uploadLabels).toHaveLength(1);
     expect(uploadLabels.filter((label) => nearestHintTarget(label) === null)).toEqual([]);
     expect(uploadLabels.filter((label) => jsxAttribute(label, "title"))).toEqual([]);
-    expect(allSource).toContain('accept={STUDIO_CANVAS_IMAGE_ACCEPT}');
+    expect(allSource).toContain("accept={studioCanvasImageAccept}");
     expect(allSource).toContain("focus-within:outline-accent");
 
   for (const accessibleName of [

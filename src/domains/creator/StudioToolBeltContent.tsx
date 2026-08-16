@@ -1,67 +1,13 @@
-import {
-  Boxes,
-  CheckCircle2,
-  ChevronDown,
-  ClipboardCheck,
-  Eraser,
-  Film,
-  Folder,
-  GanttChartSquare,
-  ImagePlus,
-  LayoutGrid,
-  MessageCircle,
-  Mountain,
-  MousePointer2,
-  PaintBucket,
-  Palette,
-  Plus,
-  Pencil,
-  PictureInPicture2,
-  PersonStanding,
-  Smartphone,
-  SquareSplitHorizontal,
-  Type as TypeIcon,
-  UsersRound,
-  Video,
-  WandSparkles,
-} from "lucide-react";
-import { Suspense, memo, type ComponentProps } from "react";
+import { memo } from "react";
 
-import {
-  StudioFloatingToolPopover,
-  StudioToolbarCluster,
-  StudioToolbarDivider,
-  studioChromeIconClass,
-  STUDIO_ICON_SIZE,
-  STUDIO_ICON_STROKE,
-} from "./studio-chrome-ui";
-import { writeStudioInsertDragPayload } from "./studio-insert-drag-writer";
-import {
-  preloadStudioAssetMenuPanel,
-  preloadStudioPaletteLibraryPanel,
-  preloadStudioReferencePanel,
-} from "./studio-page-lazy-ui";
+import { StudioToolbarDivider } from "./studio-chrome-ui";
 import { studioToolButtonClass } from "./studio-panel-ui";
-import {
-  LazyStudioAiToolPopoverBody,
-  LazyStudioAssetToolPopoverBody,
-  LazyStudioBubbleToolPopoverBody,
-  LazyStudioSceneToolPopoverBody,
-  LazyStudioStyleToolPopoverBody,
-  preloadStudioAiToolPopoverBody,
-  preloadStudioAssetToolPopoverBody,
-  preloadStudioBubbleToolPopoverBody,
-  preloadStudioSceneToolPopoverBody,
-  preloadStudioStyleToolPopoverBody,
-} from "./studio-tool-belt-lazy-ui";
 import { studioToolHintFromLabel, type StudioToolHintSpec } from "./studio-tool-hints";
 import { studioUiDensityAllows } from "./studio-ui-density";
 import { STUDIO_VIEW_ACTION_HINTS } from "./studio-view-action-hints";
-import { LazyStudioColorPopover } from "./StudioLazyColorPopover";
-import { StudioPanelLoading } from "./StudioLazySurfaceFallback";
 import { StudioToolBeltCanvasControls } from "./StudioToolBeltCanvasControls";
+import { StudioToolBeltCreateModeGroups } from "./StudioToolBeltCreateModeGroups";
 import { StudioToolBeltQuickActions } from "./StudioToolBeltQuickActions";
-import { StudioToolHintTarget } from "./StudioToolHint";
 
 import type {
   StudioAiAssistToolId,
@@ -120,8 +66,6 @@ import type {
   SharedAssetCatalogItem,
 } from "@/src/infrastructure/creator-client";
 
-import { cn } from "@/lib/utils";
-
 const STUDIO_CANVAS_IMAGE_ACCEPT =
   "image/*,.bmp,.dib,.tga,.icb,.vda,.vst,.ppm,.pam,.qoi,.tif,.tiff";
 
@@ -130,27 +74,6 @@ const toolBtn = (active: boolean) => studioToolButtonClass(active, { dense: true
 /** Icon-only belt buttons: keep the 44px touch-target contract on coarse pointers
  *  (the dense px-3 padding alone leaves a 14–15px glyph at ~40px width). */
 const iconToolBtnTouch = "pointer-coarse:min-w-11 pointer-coarse:justify-center";
-
-// Group popovers stay viewport-fixed because the desktop ToolBelt is an inert zero-size host.
-const groupPopoverClass = (width: "w-72" | "w-80") =>
-  cn(
-    "fixed inset-x-2 top-[6.5rem] z-[70] max-h-[min(78dvh,36rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-2xl lg:inset-x-auto lg:left-3 lg:w-auto lg:max-w-[min(28rem,calc(100vw-1.5rem))]",
-    width === "w-72" ? "lg:w-72" : "lg:w-80"
-  );
-
-type StudioToolBeltHintTargetProps = Omit<
-  ComponentProps<typeof StudioToolHintTarget>,
-  "preferredSide"
->;
-
-/**
- * The ToolBelt is anchored to the top edge, so all coaches should open below
- * their controls. Keeping the shared target here also gives every action the
- * same single-open, keyboard, touch-hold, and disabled-state behavior.
- */
-function StudioToolBeltHintTarget(props: StudioToolBeltHintTargetProps) {
-  return <StudioToolHintTarget preferredSide="bottom" {...props} />;
-}
 
 const TOOL_BELT_HINTS = {
   undo: studioToolHintFromLabel(
@@ -378,6 +301,8 @@ const TOOL_BELT_HINTS = {
     "canvas-only"
   ),
 } satisfies Record<string, StudioToolHintSpec>;
+
+export type StudioToolBeltHintMap = typeof TOOL_BELT_HINTS;
 
 export type StudioBgScene = {
   id: string;
@@ -750,57 +675,17 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
   props: StudioToolBeltContentProps
 ) {
   const {
-    activeSurfaceReviewLocked,
-    activeToolbarGroup,
-    advancedFillActive,
-    advancedFillUnsupportedReason,
-    bg3dOpen,
     canvasOnlyMode,
     collaborationDocumentLocked,
     collaborationLockMessage,
-    color,
-    commentsOpen,
-    continuityOpen,
-    drawMode,
-    frameAnimOpen,
-    frameAnimTargetId,
     hi,
     history,
     historyPanelOpen,
     isFullscreen,
-    masterEditMode,
     maximized,
-    menu,
-    menuRef,
-    openStudioCommentCount,
-    pageEditLocked,
-    mannequinPoserOpen,
-    pageReviewOpen,
-    poserVrmOpen,
     presentationPanelsHidden,
-    recentColors,
-    referencePanelOpen,
-    selected,
-    setBg3dOpen,
-    setColor,
-    setCommentsOpen,
-    setContinuityOpen,
     setHistoryPanelOpen,
-    setMannequinPoserOpen,
-    setMenu,
-    setPageReviewOpen,
-    setPoserVrmOpen,
-    setReferencePanelOpen,
-    setScrollPreviewOpen,
-    setStoryboardGridOpen,
-    setTeamPanelOpen,
-    setTimelapseOpen,
-    setTimelineOpen,
     setZoom,
-    sharedDocument,
-    teamPanelOpen,
-    timelineOpen,
-    tool,
     uiDensityMode,
     visibleLeftPanelOpen,
     visibleRightPanelOpen,
@@ -811,27 +696,15 @@ export const StudioToolBeltContent = memo(function StudioToolBeltContent(
   const isWorkspaceWideMode = !visibleLeftPanelOpen && !visibleRightPanelOpen;
   const isUndoDisabled = hi === 0 || collaborationDocumentLocked;
   const isRedoDisabled = hi >= history.length - 1 || collaborationDocumentLocked;
-  const studioToolIconClass = (props?: Parameters<typeof studioChromeIconClass>[0]) =>
-    studioChromeIconClass(props ?? {});
   const {
-    activatePrimaryCanvasTool,
-    addDiagonalSplit,
-    addFrame,
-    addText,
-    ensureRecentColorsLoaded,
     enterCanvasOnlyMode,
     fitCanvasToWidth,
-    onPickImage,
     redo,
-    rememberColor,
     resetView,
     setActualPixelView,
-    toggleAdvancedFill,
     toggleFullscreen,
     toggleMaximize,
-    toggleSelectedFrameDiagonal,
     undo,
-    openFrameAnimationForSelected,
   } = stableHandlers;
 
   const fitCanvasToWidthWithFocus = () => {

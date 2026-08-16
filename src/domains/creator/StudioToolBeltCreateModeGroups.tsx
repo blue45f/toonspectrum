@@ -28,24 +28,6 @@ import {
 import { memo, Suspense, type ComponentProps } from "react";
 
 import {
-  LazyStudioAiToolPopoverBody,
-  LazyStudioAssetToolPopoverBody,
-  LazyStudioBubbleToolPopoverBody,
-  LazyStudioSceneToolPopoverBody,
-  LazyStudioStyleToolPopoverBody,
-  preloadStudioAiToolPopoverBody,
-  preloadStudioAssetMenuPanel,
-  preloadStudioAssetToolPopoverBody,
-  preloadStudioBubbleToolPopoverBody,
-  preloadStudioPaletteLibraryPanel,
-  preloadStudioReferencePanel,
-  preloadStudioSceneToolPopoverBody,
-  preloadStudioStyleToolPopoverBody,
-} from "./studio-tool-belt-lazy-ui";
-import { writeStudioInsertDragPayload } from "./studio-insert-drag-writer";
-import { LazyStudioColorPopover } from "./StudioLazyColorPopover";
-import { StudioPanelLoading } from "./StudioLazySurfaceFallback";
-import {
   StudioFloatingToolPopover,
   StudioToolbarCluster,
   StudioToolbarDivider,
@@ -53,9 +35,29 @@ import {
   STUDIO_ICON_SIZE,
   STUDIO_ICON_STROKE,
 } from "./studio-chrome-ui";
-import { StudioToolHintTarget } from "./StudioToolHint";
+import { writeStudioInsertDragPayload } from "./studio-insert-drag-writer";
+import {
+  preloadStudioAssetMenuPanel,
+  preloadStudioPaletteLibraryPanel,
+  preloadStudioReferencePanel,
+} from "./studio-page-lazy-ui";
 import { studioToolButtonClass } from "./studio-panel-ui";
+import {
+  LazyStudioAiToolPopoverBody,
+  LazyStudioAssetToolPopoverBody,
+  LazyStudioBubbleToolPopoverBody,
+  LazyStudioSceneToolPopoverBody,
+  LazyStudioStyleToolPopoverBody,
+  preloadStudioAiToolPopoverBody,
+  preloadStudioAssetToolPopoverBody,
+  preloadStudioBubbleToolPopoverBody,
+  preloadStudioSceneToolPopoverBody,
+  preloadStudioStyleToolPopoverBody,
+} from "./studio-tool-belt-lazy-ui";
 import { studioUiDensityAllows } from "./studio-ui-density";
+import { LazyStudioColorPopover } from "./StudioLazyColorPopover";
+import { StudioPanelLoading } from "./StudioLazySurfaceFallback";
+import { StudioToolHintTarget } from "./StudioToolHint";
 
 import type { StudioToolBeltContentProps, StudioToolBeltHintMap } from "./StudioToolBeltContent";
 
@@ -133,9 +135,6 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
     setTeamPanelOpen,
     setTimelapseOpen,
     setTimelineOpen,
-    onPickImage,
-    rememberColor,
-    ensureRecentColorsLoaded,
   } = toolBelt;
 
   const {
@@ -144,9 +143,9 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
     addFrame,
     addText,
     openFrameAnimationForSelected,
+    onPickImage,
     rememberColor: stableRememberColor,
     ensureRecentColorsLoaded: stableEnsureRecentColorsLoaded,
-    setColor: stableSetColor,
     toggleAdvancedFill,
     toggleSelectedFrameDiagonal,
   } = stableHandlers;
@@ -713,15 +712,12 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
                 value={color}
                 onChange={(nextColor) => {
                   setColor(nextColor);
-                  stableSetColor(nextColor);
                 }}
                 recentColors={recentColors}
                 onUseColor={(nextColor) => {
-                  rememberColor(nextColor);
                   stableRememberColor(nextColor);
                 }}
                 onLoadRecentColors={() => {
-                  ensureRecentColorsLoaded();
                   stableEnsureRecentColorsLoaded();
                 }}
                 label="브러시·도형 색상"
