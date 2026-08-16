@@ -219,9 +219,17 @@ async function rasterizeUnionBaseline(
   return field;
 }
 
+/**
+ * How far from solid pigment a partial pixel stops being tooth and starts being haze, in render
+ * pixels. About one dab radius at the sizes this fixture renders.
+ */
+const HAZE_REACH_PX = 1;
+
 interface BlindMetrics {
   readonly toothVariance: number;
   readonly edgeBlur: number;
+  /** Fringe BEYOND a dab radius of solid pigment — smear past the silhouette, with tooth removed. */
+  readonly hazeBlur: number;
   readonly interiorMean: number;
   readonly componentCount: number;
   readonly maxColumnGapRun: number;
@@ -271,7 +279,42 @@ function blindMetricsOf(field: Float32Array): BlindMetrics {
     if (y > 0) pushExterior(current - WIDTH);
     if (y < HEIGHT - 1) pushExterior(current + WIDTH);
   }
+  // Haze is fringe FAR from the mark; tooth is fringe against it.
+  //
+  // These two live in the same numerator until they are separated, and that made the metric
+  // self-contradicting for a medium that should break up at a feather touch: a sparser, thinner
+  // light-touch stamp adds exterior half-tone AND removes solid boundary, so edgeBlur rises on
+  // both sides at once while `toothVariance` — asserted just above to be HIGHER than the union's —
+  // is measuring the very same pixels approvingly. Measured, every route to the pastel/oil-pastel
+  // contact collapse tripped this while the mark itself was correct (feather peakInk 224.0 -> 204.4
+  // against crayon's working 201.5, pressed end unchanged at 226.0).
+  //
+  // A pore or a broken edge sits within a dab radius of solid pigment. Real haze — the thing this
+  // guard exists for, a tip whose falloff smears past its own silhouette — does not. So only
+  // fringe beyond that reach counts.
+  const nearSolid = new Uint8Array(WIDTH * HEIGHT);
+  for (let index = 0; index < field.length; index += 1) {
+    if (field[index]! >= solidThreshold) nearSolid[index] = 1;
+  }
+  for (let pass = 0; pass < HAZE_REACH_PX; pass += 1) {
+    const grown = new Uint8Array(nearSolid);
+    for (let py = 0; py < HEIGHT; py += 1) {
+      for (let px = 0; px < WIDTH; px += 1) {
+        const index = py * WIDTH + px;
+        if (nearSolid[index] === 1) continue;
+        if (
+          (px > 0 && nearSolid[index - 1] === 1)
+          || (px < WIDTH - 1 && nearSolid[index + 1] === 1)
+          || (py > 0 && nearSolid[index - WIDTH] === 1)
+          || (py < HEIGHT - 1 && nearSolid[index + WIDTH] === 1)
+        ) grown[index] = 1;
+      }
+    }
+    nearSolid.set(grown);
+  }
+
   let fringeCount = 0;
+  let hazeCount = 0;
   let boundaryCount = 0;
   for (let py = 0; py < HEIGHT; py += 1) {
     for (let px = 0; px < WIDTH; px += 1) {
@@ -282,6 +325,12 @@ function blindMetricsOf(field: Float32Array): BlindMetrics {
         && alpha > fringeFloor
         && alpha < solidThreshold
       ) fringeCount += 1;
+      if (
+        exterior[index] === 1
+        && alpha > fringeFloor
+        && alpha < solidThreshold
+        && nearSolid[index] === 0
+      ) hazeCount += 1;
       if (alpha >= solidThreshold) {
         const nearExterior =
           (px > 0 && exterior[index - 1] === 1)
@@ -293,6 +342,7 @@ function blindMetricsOf(field: Float32Array): BlindMetrics {
     }
   }
   const edgeBlur = fringeCount / Math.max(1, boundaryCount);
+  const hazeBlur = hazeCount / Math.max(1, boundaryCount);
 
   const occupied = new Uint8Array(WIDTH * HEIGHT);
   for (let index = 0; index < field.length; index += 1) {
@@ -351,6 +401,7 @@ function blindMetricsOf(field: Float32Array): BlindMetrics {
   return Object.freeze({
     toothVariance,
     edgeBlur,
+    hazeBlur,
     interiorMean,
     componentCount,
     maxColumnGapRun,
