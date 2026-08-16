@@ -200,10 +200,6 @@ import {
   isStudioBrushEraserAliasId,
 } from "./studio-brush-alias-profile";
 import {
-  resolveStudioHokusaiProductLiveAdmission,
-  type StudioHokusaiProductLivePresetId,
-} from "./studio-brush-backend-quality-policy";
-import {
   normalizeStudioBrushDynamicsSettings,
   resolveStudioCapturedBrushDynamicsPresetId,
   studioBrushDynamicsSettingsForBrushId,
@@ -767,6 +763,27 @@ import {
   type LayerItemReorderDirection,
 } from "./studio-layers";
 import {
+  STUDIO_CANVAS_IMAGE_ACCEPT,
+  acquireProductStudioUiPreferencesRepository,
+  createStudioPixelEditCanvas,
+  downscaleStudioCanvasDataUrl,
+  encodeStudioPixelEditResultPng,
+  isStudioOpenRasterDropFile,
+  loadStudioCanvasImageFile,
+  loadStudioWatermarkPreferencesSqliteModule,
+  loadStudioPixelEditImage,
+  readyStudioWorkAssetImageSources,
+  studioHokusaiColor,
+  studioHokusaiProductLivePreset,
+  studioHokusaiSamplesFromDrawElement,
+  studioHokusaiStrokeSeed,
+  studioInkGestureTimeOrigin,
+  studioLivingInkLinearColor,
+  studioLivingInkSamplesFromDrawElement,
+  studioLivingInkSupportsElement,
+  yieldStudioPixelEditMainThread,
+} from "./studio-legacy-editor-runtime-helpers";
+import {
   commitStudioLinked3dPreparedPass,
   prepareStudioLinked3dLinePass,
 } from "./studio-linked-3d-pass-transaction";
@@ -858,7 +875,6 @@ import {
 } from "./studio-live-wet-ink-overlay";
 import {
   STUDIO_LIVING_INK_NEW_PHYSICAL_STROKES_ENABLED,
-  studioLivingInkAdmitsBrush,
   studioLivingInkExplicitBrushKey,
   studioLivingInkSupportsExplicitBrush,
 } from "./studio-living-ink-brush-admission";
@@ -896,7 +912,6 @@ import {
 } from "./studio-living-ink-product-policy";
 import {
   StudioLivingInkStudioCoordinator,
-  type StudioLivingInkAuthoritativeSample,
   type StudioLivingInkFinishedWork,
   type StudioLivingInkStrokeMode,
   type StudioLivingInkStudioState,
@@ -1976,6 +1991,7 @@ import { cn } from "@/lib/utils";
 import { resolveAssetUrl } from "@/src/catalog-static";
 import { useSession } from "@/src/compat/auth-session-store";
 
+
 /** 이 편집기의 통합 실행취소 저널 — 캔버스 스냅샷 단계와 사이드카 편집을 한 시간 순서로 담는다. */
 type StudioPageHistoryJournal = StudioHistoryJournal<StudioCharacterBible, StudioWriterRoomDocument>;
 type StudioPageHistorySidecarEntry = StudioHistoryJournalSidecarEntry<
@@ -2000,48 +2016,6 @@ const STUDIO_HYBRID_DCC_RECOVERY_TIMEOUT_MS = 12_000;
 
 type StudioQuickAccessIntegrationModule =
   typeof import("./studio-quick-access-integration");
-
-type StudioUiPreferencesSqliteModule =
-  typeof import("./studio-ui-preferences-sqlite");
-let studioUiPreferencesSqliteModulePromise: Promise<StudioUiPreferencesSqliteModule> | null = null;
-
-function loadStudioUiPreferencesSqliteModule(): Promise<StudioUiPreferencesSqliteModule> {
-  studioUiPreferencesSqliteModulePromise ??= import("./studio-ui-preferences-sqlite");
-  studioUiPreferencesSqliteModulePromise.catch(() => {
-    studioUiPreferencesSqliteModulePromise = null;
-  });
-  return studioUiPreferencesSqliteModulePromise;
-}
-
-async function acquireProductStudioUiPreferencesRepository() {
-  const module = await loadStudioUiPreferencesSqliteModule();
-  return module.acquireProductStudioUiPreferencesRepository();
-}
-
-type StudioWatermarkPreferencesSqliteModule =
-  typeof import("./studio-watermark-preferences-sqlite");
-let studioWatermarkPreferencesSqliteModulePromise: Promise<StudioWatermarkPreferencesSqliteModule> | null = null;
-
-function loadStudioWatermarkPreferencesSqliteModule(): Promise<StudioWatermarkPreferencesSqliteModule> {
-  studioWatermarkPreferencesSqliteModulePromise ??= import(
-    "./studio-watermark-preferences-sqlite"
-  );
-  studioWatermarkPreferencesSqliteModulePromise.catch(() => {
-    studioWatermarkPreferencesSqliteModulePromise = null;
-  });
-  return studioWatermarkPreferencesSqliteModulePromise;
-}
-
-function studioInkGestureTimeOrigin(
-  contract: unknown,
-  timeStamp: number,
-): number | null {
-  return isStudioInkInputContractV2(contract)
-    && Number.isFinite(timeStamp)
-    && timeStamp >= 0
-    ? timeStamp
-    : null;
-}
 
 type StudioLiveStrokeBackendAuditSession = {
   readonly coordinator: StudioLiveStrokeRenderBackendCoordinator;
@@ -2121,116 +2095,6 @@ type StudioLivingInkCanonicalHandoff = Readonly<{
   strokeId: string | null;
 }>;
 
-function studioLivingInkSupportsElement(
-  element: DrawEl,
-  physicalModeEnabled: boolean,
-): boolean {
-  return element.mode === "pen"
-    && (element.kind ?? "freehand") === "freehand"
-    && !element.fill
-    && (element.symmetry?.type ?? "none") === "none"
-    && studioLivingInkAdmitsBrush({
-      brushId: element.brush,
-      catalogId: element.brushCatalogId,
-      physicalModeEnabled,
-    });
-}
-
-function studioLivingInkLinearColor(value: string): readonly [number, number, number, number] | null {
-  const match = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/iu.exec(value);
-  if (!match) return null;
-  const linear = (channel: string) => {
-    const normalized = Number.parseInt(channel, 16) / 255;
-    return normalized <= 0.04045
-      ? normalized / 12.92
-      : ((normalized + 0.055) / 1.055) ** 2.4;
-  };
-  return Object.freeze([linear(match[1]!), linear(match[2]!), linear(match[3]!), 1]);
-}
-
-function studioHokusaiProductLivePreset(
-  brushId: string,
-  catalogId: string | null | undefined,
-): StudioHokusaiProductLivePresetId | null {
-  // Brush identity is not an opt-in. The committed full-size comparison failed both the visual
-  // parity and 1.2x throughput promotion gates, so the normal shelf never starts Hokusai live.
-  // The selected-stroke inspector remains the explicit, user-visible experimental surface.
-  const admission = resolveStudioHokusaiProductLiveAdmission({ brushId, catalogId });
-  return admission.status === "admitted" ? admission.presetId : null;
-}
-
-function studioHokusaiColor(value: string): `#${string}` | null {
-  return /^#[0-9a-f]{6}$/iu.test(value) ? value.toLowerCase() as `#${string}` : null;
-}
-
-function studioHokusaiStrokeSeed(element: DrawEl): number {
-  const persistedSeed = element.brushDynamics?.seed;
-  if (Number.isSafeInteger(persistedSeed) && (persistedSeed ?? -1) >= 0) {
-    return (persistedSeed as number) >>> 0;
-  }
-  let hash = 0x811c_9dc5;
-  for (let index = 0; index < element.id.length; index += 1) {
-    hash ^= element.id.charCodeAt(index);
-    hash = Math.imul(hash, 0x0100_0193) >>> 0;
-  }
-  return hash;
-}
-
-function studioHokusaiSamplesFromDrawElement(
-  element: DrawEl,
-  startSampleIndex: number,
-): StudioHokusaiLiveSampleLike[] {
-  const sampleCount = Math.floor(element.points.length / 2);
-  const start = Math.max(0, Math.min(sampleCount, Math.floor(startSampleIndex)));
-  const samples: StudioHokusaiLiveSampleLike[] = [];
-  for (let index = start; index < sampleCount; index += 1) {
-    const x = element.points[index * 2];
-    const y = element.points[index * 2 + 1];
-    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
-    const pressure = element.pressures?.[index];
-    const tiltX = element.tiltXs?.[index];
-    const tiltY = element.tiltYs?.[index];
-    const timeMilliseconds = element.sampleTimeOffsets?.[index];
-    samples.push({
-      x: x as number,
-      y: y as number,
-      ...(Number.isFinite(pressure) ? { pressure } : {}),
-      ...(Number.isFinite(tiltX) ? { tiltX } : {}),
-      ...(Number.isFinite(tiltY) ? { tiltY } : {}),
-      ...(Number.isFinite(timeMilliseconds) ? { timeMilliseconds } : {}),
-    });
-  }
-  return samples;
-}
-
-function studioLivingInkSamplesFromDrawElement(
-  element: DrawEl,
-  startSampleIndex: number,
-  fieldScale: number,
-): StudioLivingInkAuthoritativeSample[] {
-  const sampleCount = Math.floor(element.points.length / 2);
-  const start = Math.max(0, Math.min(sampleCount, Math.floor(startSampleIndex)));
-  const samples: StudioLivingInkAuthoritativeSample[] = [];
-  for (let index = start; index < sampleCount; index += 1) {
-    const x = element.points[index * 2];
-    const y = element.points[index * 2 + 1];
-    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
-    const pressure = element.pressures?.[index];
-    const timeMs = element.sampleTimeOffsets?.[index];
-    const tiltX = element.tiltXs?.[index];
-    const tiltY = element.tiltYs?.[index];
-    samples.push(Object.freeze({
-      x: (x as number) * fieldScale,
-      y: (y as number) * fieldScale,
-      pressure: Number.isFinite(pressure) ? Math.max(0, Math.min(1, pressure as number)) : 0.5,
-      timeMs: Number.isFinite(timeMs) ? Math.max(0, timeMs as number) : index * 8,
-      ...(Number.isFinite(tiltX) ? { tiltX } : {}),
-      ...(Number.isFinite(tiltY) ? { tiltY } : {}),
-    }));
-  }
-  return samples;
-}
-
 const LazyStudioMenubarContent = lazy(() =>
   import("./StudioMenubarContent").then(({ StudioMenubarContent }) => ({
     default: StudioMenubarContent,
@@ -2302,70 +2166,6 @@ const LazyStudioLeftToolRail = lazy(() =>
     default: StudioLeftToolRail,
   }))
 );
-
-// Keep the browser image codec off Studio's startup graph. Import/clipboard and pixel-edit
-// operations already cross an async user-action boundary, so the full GIF/raster decoder is
-// fetched only when one of those operations is requested.
-const STUDIO_CANVAS_IMAGE_ACCEPT =
-  "image/*,.bmp,.dib,.tga,.icb,.vda,.vst,.ppm,.pam,.qoi,.tif,.tiff";
-const STUDIO_OPEN_RASTER_FILE_EXTENSION = /\.(?:bmp|dib|tga|icb|vda|vst|ppm|pam|qoi|tif|tiff)$/iu;
-
-function isStudioOpenRasterDropFile(file: Pick<File, "name">): boolean {
-  return STUDIO_OPEN_RASTER_FILE_EXTENSION.test(file.name);
-}
-
-function loadStudioCanvasImageIo() {
-  return import("./studio-canvas-image-io");
-}
-
-async function loadStudioCanvasImageFile(file: File) {
-  const { loadImageFileForCanvas } = await loadStudioCanvasImageIo();
-  return loadImageFileForCanvas(file);
-}
-
-async function downscaleStudioCanvasDataUrl(dataUrl: string, maxWidth: number) {
-  const { downscaleDataUrl } = await loadStudioCanvasImageIo();
-  return downscaleDataUrl(dataUrl, maxWidth);
-}
-
-async function loadStudioPixelEditImage(src: string, abort?: AbortSignal) {
-  const { loadPixelEditImage } = await loadStudioCanvasImageIo();
-  return loadPixelEditImage(src, abort);
-}
-
-function createStudioPixelEditCanvas(
-  width: number,
-  height: number
-): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } | null {
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, Math.round(width));
-  canvas.height = Math.max(1, Math.round(height));
-  const ctx = canvas.getContext("2d");
-  return ctx ? { canvas, ctx } : null;
-}
-
-/**
- * Selection adjust/transform/fill used to call canvas.toDataURL synchronously after full-frame
- * compose — that freezes the page on large layers. Prefer the retouch encoder (toBlob + surface
- * cache) and fall back to the pure async PNG helper when the retouch runtime fails to load.
- */
-async function encodeStudioPixelEditResultPng(
-  canvas: HTMLCanvasElement,
-  signal?: AbortSignal,
-): Promise<string> {
-  // Load failures fall back to the pure async encoder. Encode-time failures must surface.
-  const runtime = await loadStudioPixelEditBrushRuntime().catch(() => null);
-  if (runtime) {
-    return runtime.encodeStudioRetouchCanvasPng(canvas, { signal });
-  }
-  const { encodeStudioPixelEditCanvasPng } = await import("./studio-pixel-edit-async");
-  return encodeStudioPixelEditCanvasPng(canvas, { signal });
-}
-
-async function yieldStudioPixelEditMainThread(): Promise<void> {
-  const { yieldStudioMainThread } = await import("./studio-pixel-edit-async");
-  return yieldStudioMainThread();
-}
 
 function StudioInspectorAsideFallback({
   isMobile,
@@ -2465,16 +2265,6 @@ function requireStudioDrawingPointerTransport(ref: {
  * 겹치지 않게 한다.
  */
 // 캔버스와 도구 패널 사이의 드래그 스플리터(데스크톱). 너비를 끌어서 조절, 더블클릭=기본값, ←/→=미세조절.
-
-function readyStudioWorkAssetImageSources(
-  hydrator: StudioWorkAssetHydrator
-): Map<string, El> {
-  const sources = new Map<string, El>();
-  for (const [assetId, source] of hydrator.readySources()) {
-    if (source.type === "image") sources.set(assetId, source as El);
-  }
-  return sources;
-}
 
 
 // 스튜디오 전용 구글폰트 8종(글꼴 패널·말풍선 프리셋용) — 전 페이지 렌더 차단 경로(index.html)에는
