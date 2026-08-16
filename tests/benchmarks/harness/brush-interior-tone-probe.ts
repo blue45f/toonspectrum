@@ -44,7 +44,22 @@ const SPACING = Number(process.env.TONE_PROBE_SPACING ?? 12);
  * 모든 샘플을 중립 필압으로 고정한다. 굵기 변조가 필압에서 오는지, 촉 각도와 진행 방향의
  * 투영에서만 오는지를 가르는 대조군.
  */
-const FLAT_PRESSURE = process.env.TONE_PROBE_FLAT_PRESSURE === "1";
+/**
+ * 필압 고정. `1` 이면 예전처럼 0.5, 숫자를 주면 그 값으로 전 구간을 고정한다.
+ *
+ * 숫자를 받게 만든 이유가 이 하네스의 존재 이유와 직결된다. 기본 획은 필압 0.12~0.90 램프인데,
+ * pastel 의 폭 매핑이 `pressure 0.62 -> 1.24` 라 깃털 터치에서도 접촉량이 0.70 아래로 내려가지
+ * 않는다. 그래서 구워진 셀의 스탬프 3885개 중 접촉량 0.7 미만은 25개뿐이고, 그 25개를 불투명도
+ * 0 으로 만들어도 peakInk 가 0.0 움직인다 — 가벼운 터치를 겨냥한 변경이 **구조적으로 측정
+ * 불가능**했다. 그것 때문에 세 번의 시도가 "수치가 안 변한다"로 잘못 기각됐다.
+ */
+const FLAT_PRESSURE_RAW = process.env.TONE_PROBE_FLAT_PRESSURE;
+const FLAT_PRESSURE = FLAT_PRESSURE_RAW !== undefined && FLAT_PRESSURE_RAW !== "";
+const FLAT_PRESSURE_VALUE = FLAT_PRESSURE_RAW === "1" || FLAT_PRESSURE_RAW === undefined
+  ? 0.5
+  : Math.min(1, Math.max(0, Number(FLAT_PRESSURE_RAW) || 0.5));
+/** 고정 필압 셀은 파일명에 값을 달아, 가벼운 셀과 눌린 셀이 공존하게 한다. */
+const CELL_SUFFIX = FLAT_PRESSURE ? `@p${FLAT_PRESSURE_VALUE}` : "";
 
 function strokes() {
   const straight = { points: [] as number[], pressures: [] as number[] };
@@ -62,8 +77,8 @@ function strokes() {
     curve.pressures.push(0.55 + 0.35 * Math.cos(t * Math.PI * 3));
   }
   if (FLAT_PRESSURE) {
-    straight.pressures.fill(0.5);
-    curve.pressures.fill(0.5);
+    straight.pressures.fill(FLAT_PRESSURE_VALUE);
+    curve.pressures.fill(FLAT_PRESSURE_VALUE);
   }
   return [
     { id: "straight", ...straight },
@@ -293,7 +308,7 @@ for (const brush of BRUSHES) {
   // 마지막 성공 출력이 그대로 남아 "안 바뀌었다"로 읽히는 함정을 피하는 게 목적이다.
   if (process.env.TONE_PROBE_WRITE_SVG) {
     await mkdir(OUT_DIR, { recursive: true });
-    await writeFile(resolve(OUT_DIR, `cell-${brush}.svg`), svg, "utf8");
+    await writeFile(resolve(OUT_DIR, `cell-${brush}${CELL_SUFFIX}.svg`), svg, "utf8");
   }
   const format = (label: string, m: ReturnType<typeof measure>) => [
     `${label}: interiorPx=${m.pixels}`,
