@@ -279,7 +279,13 @@ const KERNEL_TIP_SHAPING: Readonly<Record<StudioDryMediaCoreId, KernelTipShaping
     depositionLinearize: 5,
   }),
   pastel: Object.freeze({
-    cut: 0.14,
+    // 0.14 against a raw kernel denser than its siblings' left this tip near-binary at 51% true
+    // pores and 49% FULL coverage, where chalk sits at 66/34 and charcoal at 72/28. A tip that
+    // lays full coverage over half its disc saturates the moment lanes overlap, which is why a
+    // light pastel touch measured 66.9% already at full black. `cut` is what turns kernel valleys
+    // into true zero pores, and pastel needs more of it than charcoal precisely because its raw
+    // kernel is denser (mean 0.212 against 0.102) — the same cut does not buy the same tooth.
+    cut: 0.22,
     gamma: 0.45,
     gain: 5,
     rimShoulder: 0.08,
