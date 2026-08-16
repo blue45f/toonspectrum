@@ -70,6 +70,7 @@ const BASE_STATE: StudioMainMenuBuilderState = {
 type StudioMainMenuActionsOverrides = {
   collapseSidePanels?: ReturnType<typeof vi.fn>;
   expandSidePanels?: ReturnType<typeof vi.fn>;
+  toggleCanvasWideMode?: ReturnType<typeof vi.fn>;
 };
 
 const noopActions: StudioMainMenuEditorActions = new Proxy({} as StudioMainMenuEditorActions, {
@@ -82,9 +83,11 @@ function buildWindowItems(
 ): { items: readonly StudioMainMenuItem[]; ui: Record<string, ReturnType<typeof vi.fn>> } {
   const collapseSidePanels = vi.fn();
   const expandSidePanels = vi.fn();
+  const toggleCanvasWideMode = vi.fn();
   const ui = {
     collapseSidePanels,
     expandSidePanels,
+    toggleCanvasWideMode,
     ...uiOverrides,
   } as unknown as StudioMainMenuUiActions;
 
@@ -99,7 +102,11 @@ function buildWindowItems(
 
   return {
     items: buildStudioWindowMenuItems(context),
-    ui: { collapseSidePanels, expandSidePanels },
+    ui: {
+      collapseSidePanels,
+      expandSidePanels,
+      toggleCanvasWideMode,
+    },
   };
 }
 
@@ -124,7 +131,7 @@ describe("window 패널 확장/축소 메뉴", () => {
 
     wide.onSelect();
 
-    expect(ui.expandSidePanels).toHaveBeenCalledTimes(1);
+    expect(ui.toggleCanvasWideMode).toHaveBeenCalledTimes(1);
     expect(ui.collapseSidePanels).toHaveBeenCalledTimes(0);
   });
 
@@ -142,7 +149,7 @@ describe("window 패널 확장/축소 메뉴", () => {
 
     wide.onSelect();
 
-    expect(ui.collapseSidePanels).toHaveBeenCalledTimes(1);
+    expect(ui.toggleCanvasWideMode).toHaveBeenCalledTimes(1);
     expect(ui.expandSidePanels).toHaveBeenCalledTimes(0);
   });
 
@@ -163,5 +170,6 @@ describe("window 패널 확장/축소 메뉴", () => {
 
     expect(ui.collapseSidePanels).toHaveBeenCalledTimes(0);
     expect(ui.expandSidePanels).toHaveBeenCalledTimes(0);
+    expect(ui.toggleCanvasWideMode).toHaveBeenCalledTimes(0);
   });
 });

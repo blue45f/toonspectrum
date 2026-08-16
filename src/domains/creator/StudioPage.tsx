@@ -4156,7 +4156,7 @@ function StudioCuttoonEditor({
       return maskProjection.elements === projectedPage.elements
         ? projectedPage
         : { ...projectedPage, elements: maskProjection.elements };
-  },
+    },
     [
       master,
       studioFilterMaskHydrationRevision,
