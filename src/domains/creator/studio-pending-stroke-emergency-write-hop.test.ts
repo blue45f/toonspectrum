@@ -19,6 +19,10 @@ const STUDIO_PAGE_SOURCE = readFileSync(
   new URL("./StudioPage.tsx", import.meta.url),
   "utf8",
 );
+const AUTOSAVE_RUNTIME_SOURCE = readFileSync(
+  new URL("./useStudioAutosaveDocumentRuntime.ts", import.meta.url),
+  "utf8",
+);
 
 /** 긴급 저장 구현부만 잘라낸다 — 파일의 다른 동적 import 는 이 계약과 무관하다. */
 function emergencyAutosaveImplementation(): string {
@@ -51,7 +55,7 @@ describe("pointerup emergency autosave write hop", () => {
     const implementation = emergencyAutosaveImplementation();
     // 홉을 줄이려고 가드 자체를 버리면 follower 탭이 선행 탭 문서를 덮는 포크가 되살아난다.
     expect(implementation).toContain("autosaveLeadershipGuardRef.current");
-    expect(STUDIO_PAGE_SOURCE).toContain(
+    expect(AUTOSAVE_RUNTIME_SOURCE).toContain(
       "autosaveLeadershipGuardRef.current = withStudioAutosaveDocumentLeadership",
     );
     expect(implementation).toContain("if (studioAutosaveDocumentBusy(cause)) return;");

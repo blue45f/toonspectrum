@@ -7,24 +7,33 @@ const autosaveSession = readFileSync(
   new URL("./studio-autosave-opfs-session.ts", import.meta.url),
   "utf8",
 );
+const autosaveRuntime = readFileSync(
+  new URL("./useStudioAutosaveDocumentRuntime.ts", import.meta.url),
+  "utf8",
+);
 const storageRecoveryRuntime = readFileSync(
   new URL("./studio-storage-recovery-runtime.ts", import.meta.url),
   "utf8",
 );
 
-function sourceBetween(start: string, end: string): string {
-  const startIndex = studioPage.indexOf(start);
-  const endIndex = studioPage.indexOf(end, startIndex + start.length);
+function sourceBetween(
+  source: string,
+  start: string,
+  end: string,
+): string {
+  const startIndex = source.indexOf(start);
+  const endIndex = source.indexOf(end, startIndex + start.length);
   expect(startIndex).toBeGreaterThanOrEqual(0);
   expect(endIndex).toBeGreaterThan(startIndex);
-  return studioPage.slice(startIndex, endIndex);
+  return source.slice(startIndex, endIndex);
 }
 
 describe("Studio OPFS + SQLite autosave product boundary", () => {
   it("loads both heavy authorities lazily and disposes the document-scoped OPFS session", () => {
     const setup = sourceBetween(
+      autosaveRuntime,
       "const autosaveOpfsSessionRef",
-      "const [scenarioImageReferenceDocument",
+      "  return {",
     );
 
     expect(setup).toContain('import("./studio-autosave-opfs-session")');
@@ -47,6 +56,7 @@ describe("Studio OPFS + SQLite autosave product boundary", () => {
 
   it("commits normal autosave through OPFS/SQLite without writing browser KV", () => {
     const autosave = sourceBetween(
+      studioPage,
       "// 오토세이브 임시저장 리스너",
       "// 서버 자동저장",
     );
@@ -67,6 +77,7 @@ describe("Studio OPFS + SQLite autosave product boundary", () => {
 
   it("tombstones a previous recovery snapshot when Undo returns the document to empty", () => {
     const autosave = sourceBetween(
+      studioPage,
       "// 오토세이브 임시저장 리스너",
       "// 서버 자동저장",
     );
@@ -84,6 +95,7 @@ describe("Studio OPFS + SQLite autosave product boundary", () => {
 
   it("reconciles the newest durable checkpoint before exposing the recovery banner", () => {
     const discovery = sourceBetween(
+      studioPage,
       "// 로드 시 임시저장 확인 리스너",
       "function prepareStudioDocumentReplacement",
     );
@@ -109,10 +121,12 @@ describe("Studio OPFS + SQLite autosave product boundary", () => {
 
   it("retains the reconciled durable candidate for restore and backup without rereading its browser mirror", () => {
     const restore = sourceBetween(
+      studioPage,
       "async function restoreAutosave()",
       "function clearAutosaveDurableAuthority()",
     );
     const backup = sourceBetween(
+      studioPage,
       "function downloadAutosaveBackup()",
       "// 화면 드래그 스크롤 핸들러",
     );
@@ -129,6 +143,7 @@ describe("Studio OPFS + SQLite autosave product boundary", () => {
 
   it("makes browser-only compatibility recovery backup-only and explicitly non-durable", () => {
     const discovery = sourceBetween(
+      studioPage,
       "// 로드 시 임시저장 확인 리스너",
       "function prepareStudioDocumentReplacement",
     );
@@ -150,10 +165,12 @@ describe("Studio OPFS + SQLite autosave product boundary", () => {
 
   it("records a durable tombstone for explicit clear and successful server save", () => {
     const clear = sourceBetween(
+      studioPage,
       "function clearAutosaveDurableAuthority()",
       "function downloadAutosaveBackup()",
     );
     const saveHandler = sourceBetween(
+      studioPage,
       "async function handleSave(",
       "const activeToolbarGroup:",
     );
@@ -179,6 +196,7 @@ describe("Studio OPFS + SQLite autosave product boundary", () => {
 
   it("keeps pagehide non-blocking while accepting success only from OPFS/SQLite", () => {
     const lifecycle = sourceBetween(
+      studioPage,
       "persistPendingStrokeEmergencyAutosaveRef.current = (reason) =>",
       "function applyStudioProjectSnapshotWithPreparedDocuments",
     );

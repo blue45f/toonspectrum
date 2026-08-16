@@ -1708,6 +1708,7 @@ import {
   StudioVrmProjectArchiveAttestationHost,
 } from "./StudioVrmProjectArchiveAttestationHost";
 import { useStudioLiveTransportAuth } from "./use-studio-live-transport-auth";
+import { useStudioAutosaveDocumentRuntime } from "./useStudioAutosaveDocumentRuntime";
 import { useStudioBrushBaselineController } from "./useStudioBrushBaselineController";
 import { useStudioModalSheet } from "./useStudioModalSheet";
 import { useStudioProDrawPrefs } from "./useStudioProDrawPrefs";
@@ -1928,22 +1929,6 @@ type StudioPageHistorySidecarEntry = StudioHistoryJournalSidecarEntry<
   StudioCharacterBible,
   StudioWriterRoomDocument
 >;
-
-type StudioAutosaveOpfsSession = NonNullable<
-  Awaited<ReturnType<typeof import("./studio-autosave-opfs-session").createStudioAutosaveOpfsSession>>
->;
-
-type StudioAutosaveSqlitePort =
-  import("./studio-autosave-sqlite-store").StudioAutosaveSqlitePort;
-
-type StudioAutosaveDocumentLease =
-  import("./studio-autosave-document-leader").StudioAutosaveDocumentLease;
-type StudioAutosaveDocumentRole =
-  import("./studio-autosave-document-leader").StudioAutosaveDocumentRole;
-type StudioAutosaveDocumentLeadershipBasis =
-  import("./studio-autosave-document-leader").StudioAutosaveDocumentLeadershipBasis;
-type StudioAutosaveDocumentLeadershipGuard =
-  typeof import("./studio-autosave-opfs-session").withStudioAutosaveDocumentLeadership;
 
 type StudioHybridDccWorkspacePersistence = ReturnType<
   typeof import("./studio-hybrid-dcc-workspace-persistence")
@@ -3760,134 +3745,15 @@ function StudioCuttoonEditor({
   const workAuthScopeKey = workId ? studioAuthUserId : null;
   const autosaveKey = studioAutosaveKey({ userId: studioAuthUserId, workId, remixId });
   const checkpointKey = studioCheckpointKey({ userId: studioAuthUserId, workId, remixId });
-  const autosaveOpfsSessionRef =
-    useRef<Promise<StudioAutosaveOpfsSession | null> | null>(null);
-  /**
-   * 문서 열기 시점에 정해지는 leader 임차권.
-   *
-   * follower 탭이 두 번째 저장 권위(SQLite)에 직접 닿으면 선행 탭의 OPFS 체크포인트보다 늦은
-   * savedAt 행을 써서 다음 reconcile 이 그것을 승격시킨다 — 옆문으로 들어온 문서 포크다.
-   * 그래서 persist 경로를 우회하는 두 곳(pagehide 긴급 저장·빈 문서 tombstone)은 반드시
-   * `withStudioAutosaveDocumentLeadership` 를 지난다.
-   */
-  const autosaveDocumentLeaseRef = useRef<StudioAutosaveDocumentLease | null>(null);
-  /**
-   * pointerup 긴급 저장은 내비게이션이 문서를 헐기 전의 한 홉 안에서 SQLite 쓰기를 발행해야
-   * 한다. 그래서 leadership 가드를 그 자리에서 동적 import 하지 않고 세션 오픈 때 미리 잡아
-   * 둔다 — import 한 번이 늘면 쓰기가 unload task 뒤로 밀려 영구 저장이 사라진다.
-   */
-  const autosaveLeadershipGuardRef =
-    useRef<StudioAutosaveDocumentLeadershipGuard | null>(null);
-  const [autosaveDocumentLeadership, setAutosaveDocumentLeadership] = useState<{
-    readonly role: StudioAutosaveDocumentRole;
-    readonly basis: StudioAutosaveDocumentLeadershipBasis;
-  } | null>(null);
-  const autosaveSqliteStoreRef =
-    useRef<Promise<StudioAutosaveSqlitePort | null> | null>(null);
-  useEffect(() => {
-    const storePromise = import("./studio-autosave-sqlite-store")
-      .then(({ acquireStudioAutosaveSqliteStore }) =>
-        acquireStudioAutosaveSqliteStore()
-      )
-      .catch((cause: unknown) => {
-        if (import.meta.env.DEV) {
-          console.warn("Studio SQLite autosave authority is unavailable.", cause);
-        }
-        return null;
-      });
-    autosaveSqliteStoreRef.current = storePromise;
-    return () => {
-      if (autosaveSqliteStoreRef.current === storePromise) {
-        autosaveSqliteStoreRef.current = null;
-      }
-    };
-  }, []);
-  useEffect(() => {
-    let disposed = false;
-    const openedPromise = import("./studio-autosave-opfs-session")
-      .then((studioAutosaveOpfsSessionModule) => {
-        const {
-          openStudioAutosaveDocumentSession,
-          reopenStudioAutosaveDocumentSessionForLeadership,
-          withStudioAutosaveDocumentLeadership,
-        } = studioAutosaveOpfsSessionModule;
-        if (!disposed) {
-          autosaveLeadershipGuardRef.current = withStudioAutosaveDocumentLeadership;
-        }
-        return Promise.resolve(openStudioAutosaveDocumentSession(autosaveKey)).then((opened) => ({
-          opened,
-          reopenStudioAutosaveDocumentSessionForLeadership,
-        }));
-      })
-      .then(({
-        opened,
-        reopenStudioAutosaveDocumentSessionForLeadership,
-      }) => {
-        if (!disposed) {
-          autosaveDocumentLeaseRef.current = opened.lease;
-          setAutosaveDocumentLeadership({
-            role: opened.role,
-            basis: opened.lease.basis,
-          });
-          if (opened.role === "follower") {
-            void opened.lease.waitForLeadership().then(async (promoted) => {
-              if (!promoted || disposed) return;
-              try {
-                const promotedSessionPromise =
-                  reopenStudioAutosaveDocumentSessionForLeadership({
-                    session: opened.session,
-                    autosaveKey,
-                  });
-                autosaveOpfsSessionRef.current = promotedSessionPromise;
-                const promotedSession = await promotedSessionPromise;
-                if (
-                  disposed
-                  || autosaveOpfsSessionRef.current !== promotedSessionPromise
-                  || autosaveDocumentLeaseRef.current !== opened.lease
-                ) {
-                  await promotedSession?.dispose();
-                  return;
-                }
-                setAutosaveDocumentLeadership({
-                  role: opened.lease.role,
-                  basis: opened.lease.basis,
-                });
-              } catch (cause: unknown) {
-                if (import.meta.env.DEV) {
-                  console.warn("Studio OPFS autosave leadership migration failed.", cause);
-                }
-              }
-            });
-          }
-        }
-        return opened;
-      })
-      .catch((cause: unknown) => {
-        if (import.meta.env.DEV) {
-          console.warn("Studio OPFS autosave session is unavailable.", cause);
-        }
-        return null;
-      });
-    const sessionPromise = openedPromise.then((opened) => opened?.session ?? null);
-    autosaveOpfsSessionRef.current = sessionPromise;
-    return () => {
-      disposed = true;
-      const activeSessionPromise = autosaveOpfsSessionRef.current;
-      if (autosaveOpfsSessionRef.current === sessionPromise) {
-        autosaveOpfsSessionRef.current = null;
-      }
-      autosaveDocumentLeaseRef.current = null;
-      void Promise.all([openedPromise, activeSessionPromise]).then(async ([opened, activeSession]) => {
-        // 세션을 먼저 정리하고 임차권을 나중에 놓는다. 순서가 뒤집히면 대기 중인 follower 가
-        // 아직 살아 있는 writer 위로 승격해 같은 문서에 두 저장 권위가 생긴다.
-        if (opened?.session !== activeSession) {
-          await opened?.session?.dispose();
-        }
-        await activeSession?.dispose();
-        await opened?.lease.release();
-      });
-    };
-  }, [autosaveKey]);
+  const {
+    autosaveDocumentLeadership,
+    autosaveDocumentLeaseRef,
+    autosaveLeadershipGuardRef,
+    autosaveOpfsSessionRef,
+    autosaveSqliteStoreRef,
+  } = useStudioAutosaveDocumentRuntime({
+    autosaveKey,
+  });
   const [scenarioImageReferenceDocument, setScenarioImageReferenceDocument] =
     useState<StudioAiImageReferenceDocument>(
       createEmptyStudioAiImageReferenceDocument,
@@ -11882,9 +11748,12 @@ function StudioCuttoonEditor({
           void reportStudioAutosaveFailure(cause);
           console.error("Auto-save failed:", cause);
         });
-    }, 1500);
-    return () => clearTimeout(timer);
+  }, 1500);
+  return () => clearTimeout(timer);
   }, [
+    autosaveDocumentLeaseRef,
+    autosaveOpfsSessionRef,
+    autosaveSqliteStoreRef,
     buildCurrentStudioProjectFileSnapshot,
     pages,
     master,
@@ -12068,6 +11937,8 @@ function StudioCuttoonEditor({
     };
   }, [
     autosaveKey,
+    autosaveOpfsSessionRef,
+    autosaveSqliteStoreRef,
     collaborationDocumentLocked,
     remixId,
     sharedDocument,
