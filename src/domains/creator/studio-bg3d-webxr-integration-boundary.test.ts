@@ -102,8 +102,10 @@ describe("Studio BG3D WebXR product boundary", () => {
     expect(source.match(/<Canvas\b/gu)).toHaveLength(1);
     expect(panelStack).toContain("<StudioBg3dRetainedOwnerRouteBridge");
     expect(panelStack).toContain("element={bg3dElement}");
-    expect(retainedHost).toContain("cloneElement(lease.element");
-    expect(retainedHost).toContain("open: lease.logicalOpen");
+    expect(retainedHost).toContain("HostedBg3dRetainedElement");
+    expect(retainedHost).toContain("onHostMounted");
+    expect(retainedHost).toContain("onHostUnmounted");
+    expect(retainedHost).toContain("onWebXrCleanupPendingChange");
     expect(retainedHost).toContain("reportStudioBg3dRetainedOwnerCleanup(");
     expect(retainedRoute).toContain("detachStudioBg3dRetainedOwnerRoute(generation)");
     expect(retainedStore).toContain("cleanupPending: snapshot.element !== null");
