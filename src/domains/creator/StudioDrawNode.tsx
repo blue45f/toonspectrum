@@ -134,6 +134,7 @@ import {
   studioRoughSeedFromElementId,
   studioSketchStyleOfElement,
 } from "./studio-rough-shape";
+import { rasterizeStudioCoverageBands } from "./studio-stroke-coverage-raster";
 import { planStudioAngledNibStrokeLocalCoverage } from "./studio-stroke-local-coverage";
 import {
   isStudioBoundedFlowPaintModelCompatible,
@@ -1398,14 +1399,53 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                     profileId: brush === "flat-brush" ? "flat-brush" : "brush",
                     pressures: el.pressures,
                     minimumDiameterRatio: el.materialMinimumDiameterRatio,
+                    // The bands carry ABSOLUTE alpha, so the element opacity is folded in by the
+                    // planner and the Shape below must not apply it a second time.
+                    elementOpacity: opacity,
                   }
                 : undefined,
             );
+            // One band means the mark has no resolvable tonal range. That is the emission this
+            // carrier has always had — one compound fill at the element's own opacity — and it
+            // stays on the original code path, untouched, so saved documents replay to the byte.
+            const tonal = coveragePlan.bands.length > 1;
+            // The raster is normalised to the darkest band, so the mark's own peak alpha is
+            // carried by the Shape and Konva applies it once — which is also what clamps an
+            // overlap to the deepest band instead of letting two bands sum past it.
+            const tonalOpacity = coveragePlan.bands[0]?.opacity ?? opacity;
             return (
               <Shape
                 key={index}
                 sceneFunc={(context, shape) => {
                   if (coveragePlan.polygons.length === 0) return;
+                  if (tonal) {
+                    // Device scale = the layer's own pixel ratio times everything the stage and
+                    // its groups scale this node by. Rasterising at anything less would make the
+                    // mark go soft the moment the artboard is zoomed in.
+                    const nodeScale = shape.getAbsoluteScale();
+                    const raster = rasterizeStudioCoverageBands(
+                      coveragePlan.bands,
+                      stroke,
+                      context.getCanvas().getPixelRatio()
+                        * Math.max(Math.abs(nodeScale.x), Math.abs(nodeScale.y)),
+                    );
+                    if (raster) {
+                      context.drawImage(
+                        raster.source,
+                        0,
+                        0,
+                        raster.sourceWidth,
+                        raster.sourceHeight,
+                        raster.x,
+                        raster.y,
+                        raster.width,
+                        raster.height,
+                      );
+                      return;
+                    }
+                    // Surface refused (no document, or a mark too large to scratch). Falling
+                    // through paints the silhouette flat rather than dropping the stroke.
+                  }
                   context.beginPath();
                   for (const polygon of coveragePlan.polygons) {
                     context.moveTo(polygon.points[0]!, polygon.points[1]!);
@@ -1426,7 +1466,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
                   context.fillStrokeShape(shape);
                 }}
                 fill={stroke}
-                opacity={opacity}
+                opacity={tonal ? tonalOpacity : opacity}
                 globalCompositeOperation={composite}
                 listening={false}
               />
